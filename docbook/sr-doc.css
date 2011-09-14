@@ -1,0 +1,269 @@
+body {
+  padding: 20px;
+  margin: 5px 50px 5px 50px;
+  background: #ffffff;
+  color: #000000;
+  width: 700px;
+  border: solid 2px #888888;
+  font-family: Helvetica,Arial;
+}
+
+p {
+  font-family: Helvetica,Arial;
+  font-size: 12;
+  text-align: justify;
+}
+
+p.c2 {
+  COLOR: #ffffff ;
+  BACKGROUND-color: #a0a0d0;
+  BORDER: solid 1px #606090;
+  PADDING: 1px
+}
+
+a {
+  color: #041fc5;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #990000;
+  text-decoration: underline;
+}
+
+div.abstract {
+  border: solid 2px;
+  padding-left: 10pt;
+  padding-right: 10pt;
+}
+
+pre.screen {
+  font-family:monospace;
+  white-space: pre;
+  background-color: #fefeee;
+  border:solid;
+  color: #000000;
+  border-color: #99CCCC;
+  border-left: solid #99CCCC 1px;
+  border-right: solid #99CCCC 1px;
+  border-top: solid #99CCCC 1px;
+  border-bottom: solid #99CCCC 1px;
+  padding-left: 15pt;
+}
+
+pre.programlisting {
+  font-family:monospace;
+  white-space: pre;
+  background-color: #fefeee;
+  border:solid;
+  color: #000000;
+  border-color: #99CCCC;
+  border-left: solid #99CCCC 1px;
+  border-right: solid #99CCCC 1px;
+  border-top: solid #99CCCC 1px;
+  border-bottom: solid #99CCCC 1px;
+  padding-left: 15pt;
+}
+
+h1 {
+  color: #000000;
+  border: solid 2px #a0a0a0;
+  background-color: #DCDCDC;
+  font-variant: small-caps;
+  font-size: 16;
+  padding-left: 5px;
+}
+
+.title a {
+  color: #000000; 
+  text-decoration: none;
+}
+
+.title a:active {
+  color: #000000; 
+  text-decoration: none;
+}
+
+.title a:visited {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h2 {       
+  COLOR: #000000 ;
+  font-style: italic;
+  border: solid 1px #b0b0b0;
+  background-color: #ECECEC;
+  padding-left: 5px;
+  font-family: Helvetica,Arial;
+  font-weight: bold;
+  font-size: 14;
+}
+
+h2 a {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h2 a:active {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h2 a:visited {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h2 a:hover {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h3.section {       
+  COLOR: #000000 ;
+  font-style: italic;
+  border: solid 1px #c0c0c0;
+  background-color: #F2F2F2;
+  padding-left: 5px;
+  font-family: Helvetica,Arial;
+  font-weight: bold;
+  font-size: 13;
+}
+
+h3 a {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h3 a:active {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h3 a:visited {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h3 a:hover {
+  color: #000000; 
+  text-decoration: none;
+}
+
+h3.author {
+  font-family: Helvetica,Arial;
+  font-weight: bold;
+  font-size: 13;
+}
+
+h3.editor {
+  font-family: Helvetica,Arial;
+  font-weight: bold;
+  font-style: italic;
+  font-size: 11;
+}
+
+h4 {
+  font-family: Helvetica,Arial;
+  font-weight: bold;
+  font-size: 12;
+}
+
+table.important {
+  font-style:italic;
+  border: solid 2px #ff0000;
+  width: 70%;
+  margin-left: 15%;       
+}
+
+table.caution {
+  font-style:italic;
+  border: ridge 2px #ffff00;
+  width: 70%;
+  margin-left: 15%;       
+}
+
+table.note {
+  font-style:italic;
+  border: solid 1px #000000;
+  width: 70%;
+  margin-left: 15%;       
+}
+
+table.tip {
+  font-style:italic;
+  border: solid 1px #000000;
+  width: 70%;
+  margin-left: 15%;       
+}
+
+table.warning {
+  font-style:italic;
+  font-weight: bold;
+  border: ridge 4px #ff0000;
+  width: 70%;
+  margin-left: 15%;       
+}
+
+div.variablelist {
+  font-family: sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  padding-left: 20px;
+}
+
+.varlistentry {
+  font-weight: bold;
+  margin-top: 10px;
+  COLOR: #ffffff ;
+  BACKGROUND-color: #a0a0d0;
+  BORDER: solid 1px #606090;
+  PADDING: 1px
+}
+
+div.navfooter {
+  color: #000000;
+  background-color: #EFEFF8;
+  padding: 5px;
+  margin-top: 10px;
+  width: 100%;
+  border: thin solid #a0a0d0;
+}
+
+div.nukefooter {
+  color: #000000;
+  background-color: #B0E0E6;
+  padding: 5px;
+  margin-top: 10px;
+  width: 100%;
+  border: thin solid #a0a0d0;
+}
+
+div.navheader {
+  color: #000000;
+  background-color: #EFEFF8;
+  padding: 5px;
+  margin-bottom: 10px;
+  width: 100%;
+  border: thin solid #a0a0d0;
+}
+
+div.sect1,div.sect2,div.sect3 {
+  margin-left: 20px;
+}
+
+div.example,div.toc {
+  border: thin dotted #70AAE5;
+  padding-left: 10px;
+  padding-right: 10px;
+  color: #000000;
+  background-color: #EFF8F8;
+}
+
+div.toc {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+

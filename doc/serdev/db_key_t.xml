@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" 
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+
+<section id="db_key_t" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <sectioninfo>
+	<revhistory>
+	    <revision>
+		<revnumber>$Revision$</revnumber>
+		<date>$Date$</date>
+	    </revision>
+	</revhistory>
+    </sectioninfo>
+
+    <title>Type <type>db_key_t</type></title>
+    <para>
+	This type represents a database key. Every time you need to specify a
+	key value, this type should be used. In fact, this type is identical to
+	<type>const char*</type>.
+    </para>
+    <programlisting>
+typedef const char* db_key_t;
+    </programlisting>
+    <para>
+	There are no macros defined (they are not needed).
+    </para>
+</section>

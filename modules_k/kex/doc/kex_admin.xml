@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
+<!-- Module User's Guide -->
+
+<chapter>
+	
+	<title>&adminguide;</title>
+	
+	<section>
+	<title>Overview</title>
+	<para>
+	This module collects extensions from &kamailio; core.
+	</para>
+	<para>
+	&kamailio; Core CookBook is available at:
+	<ulink url="http://kamailio.org/dokuwiki/">
+	http://kamailio.org/dokuwiki/</ulink>
+	</para>
+	</section>
+	
+	<section>
+	<title>Dependencies</title>
+	<section>
+		<title>&kamailio; Modules</title>
+		<para>
+		The following modules must be loaded before this module:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>No dependencies on other &kamailio; modules</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	<section>
+		<title>External Libraries or Applications</title>
+		<para>
+		The following libraries or applications must be installed before running
+		&kamailio; with this module loaded:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>None</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	</section>
+
+	<section>
+	<title>Exported Functions</title>
+		<section>
+		<title><function moreinfo="none">setsflag(flag)</function></title>
+		<para>
+			Set the script flag.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>flag</emphasis> - the index of the script flag to
+				be set. Can be integer or pseudo-variable with integer value.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>setsflag</function> usage</title>
+		<programlisting format="linespecific">
+...
+setsflag("1");
+...
+$var(flag) = 11;
+setsflag("$var(flag)");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">issflagset(flag)</function></title>
+		<para>
+			Return true of the script flag is set.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>flag</emphasis> - the index of the script flag to
+				be tested. Can be integer or pseudo-variable with integer value.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>setsflag</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(issflagset("1"))
+{
+    ...
+}
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">resetsflag(flag)</function></title>
+		<para>
+			Reset the script flag.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>flag</emphasis> - the index of the script flag to
+				be reset. Can be integer or pseudo-variable with integer value.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>resetsflag</function> usage</title>
+		<programlisting format="linespecific">
+...
+resetsflag("1");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">setbflag(flag [, branch])</function></title>
+		<para>
+			Set the branch flag.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>flag</emphasis> - the index of the branch flag to
+				be set. Can be integer or pseudo-variable with integer value.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>branch</emphasis> - the index of the branch whose
+				flag to be set. Can be integer or pseudo-variable with integer
+				value. If omitted, then branch 0 is used (R-URI).
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>setbflag</function> usage</title>
+		<programlisting format="linespecific">
+...
+setbflag("1");
+...
+$var(flag) = 11;
+setbflag("$var(flag)", "1");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">isbflagset(flag [, branch])</function></title>
+		<para>
+			Return true of the branch flag is set.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>flag</emphasis> - the index of the branch flag to
+				be tested. Can be integer or pseudo-variable with integer value.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>branch</emphasis> - the index of the branch whose
+				flag to be set. Can be integer or pseudo-variable with integer
+				value. If omitted, then branch 0 is used (R-URI).
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>setbflag</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(isbflagset("1"))
+{
+    ...
+}
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">resetsflag(flag [, branch])</function></title>
+		<para>
+			Reset the script flag.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>flag</emphasis> - the index of the script flag to
+				be reset. Can be integer or pseudo-variable with integer value.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>branch</emphasis> - the index of the branch whose
+				flag to be set. Can be integer or pseudo-variable with integer
+				value. If omitted, then branch 0 is used (R-URI).
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>resetsflag</function> usage</title>
+		<programlisting format="linespecific">
+...
+resetbflag("1");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">km_append_branch([uri])</function></title>
+		<para>
+			Append a new branch to SIP request.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>uri</emphasis> - SIP URI of the new destination. If
+				omitted then the R-URI is used. It can be static string or
+				a string with pseudo-variables that will be evaluated at
+				runtime.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from REQUEST_ROUTE and FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>km_append_branch</function> usage</title>
+		<programlisting format="linespecific">
+...
+km_append_branch();
+...
+km_append_branch("sip:alice@sip-router.org");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">setdsturi(uri)</function></title>
+		<para>
+			Set the destination address URI (outbound proxy address).
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>uri</emphasis> - Valid SIP URI representing the
+				address where to send the request. It must be a static string,
+				no variables are evaluated at runtime. If you need to set
+				outbound proxy address via a variable, use assginment to $du.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>>setdsturi</function> usage</title>
+		<programlisting format="linespecific">
+...
+setdsturi("sip:10.0.0.10");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">resetdsturi()</function></title>
+		<para>
+			Reset the destination address URI (outbound proxy address).
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>>resetdsturi</function> usage</title>
+		<programlisting format="linespecific">
+...
+resetdsturi();
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">isdsturiset()</function></title>
+		<para>
+			Check if the destination address URI (outbound proxy address)
+			is set.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>>isdsturiset</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(isdsturiset())
+{
+   ...
+}
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">pv_printf(var, str)</function></title>
+		<para>
+			Evalues the str and sets the resulted value to variable var. For
+			backward compatibility reasons, same function can be executed via
+			'avp_printf(var, str)'.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>var</emphasis> - name of a writable variable
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>str</emphasis> - string that may contain variables
+				which will be evaluated at runtime.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>>pv_printf</function> usage</title>
+		<programlisting format="linespecific">
+...
+pv_printf("$ru", "sip:$rU@$fd");
+pv_printf("$avp(x)", "From: $fU - To: $tU");
+...
+</programlisting>
+		</example>
+		</section>
+	</section>
+
+	<section>
+	<title>Exported MI Functions</title>
+	<section>
+		<title>
+		<function moreinfo="none">arg</function>
+		</title>
+		<para>
+		Print command line arguments.
+		</para>
+		<para>
+		Name: <emphasis>arg</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis>.</para>
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:arg:_reply_fifo_file_
+		_empty_line_
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">kill</function>
+		</title>
+		<para>
+		Kill the application.
+		</para>
+		<para>
+		Name: <emphasis>kill</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis>.</para>
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:kill:_reply_fifo_file_
+		_empty_line_
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">pwd</function>
+		</title>
+		<para>
+		Print working directory.
+		</para>
+		<para>
+		Name: <emphasis>pwd</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis>.</para>
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:pwd:_reply_fifo_file_
+		_empty_line_
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">uptime</function>
+		</title>
+		<para>
+		Print uptime.
+		</para>
+		<para>
+		Name: <emphasis>uptime</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis>.</para>
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:uptime:_reply_fifo_file_
+		_empty_line_
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">version</function>
+		</title>
+		<para>
+		Print version information.
+		</para>
+		<para>
+		Name: <emphasis>version</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis>.</para>
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:version:_reply_fifo_file_
+		_empty_line_
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">which</function>
+		</title>
+		<para>
+		Print list of available MI commands.
+		</para>
+		<para>
+		Name: <emphasis>which</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis>.</para>
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:which:_reply_fifo_file_
+		_empty_line_
+		</programlisting>
+    </section>
+    </section>
+
+</chapter>
+

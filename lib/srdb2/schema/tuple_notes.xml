@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE table PUBLIC "-//iptel.org//DTD DBSchema V1.0//EN"
+  "http://iptel.org/dbschema/dtd/1.0/dbschema.dtd" [
+
+<!ENTITY % entities SYSTEM "entities.xml">
+%entities;
+
+]>
+
+<table role="presence">
+
+  <name>tuple_notes</name>
+  <description>Tuple related published notes.</description>
+
+  <!-- related to the version of presence snapshot -->
+  <version>5</version>
+
+  <!-- presentity ID -->
+  <column id="tuple_notes.pres_id">
+	<name>pres_id</name>
+	<type>string</type>
+	<size>64</size>
+	<description>Presentity ID.</description>
+  </column>
+
+  <column id="tuple_notes.tupleid">
+	<name>tupleid</name>
+	<type>string</type>
+	<size>64</size>
+	<description>Tuple identification.</description>
+  </column>
+
+  <column>
+	<name>note</name>
+	<type>string</type>
+	<size>128</size>
+	<description>Note text.</description>
+  </column>
+
+  <column>
+	<name>lang</name>
+	<type>string</type>
+	<size>64</size>
+	<description>Note language (possible note element
+	  attribute).</description>
+  </column>
+  
+</table>

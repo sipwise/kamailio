@@ -1,0 +1,389 @@
+XCAP Server Module
+
+Daniel-Constantin Mierla
+
+   <miconda@gmail.com>
+
+Edited by
+
+Daniel-Constantin Mierla
+
+   <miconda@gmail.com>
+
+   Copyright © 2010 asipto.com
+     __________________________________________________________________
+
+   Table of Contents
+
+   1. Admin Guide
+
+        1. Overview
+        2. Dependencies
+
+              2.1. Kamailio Modules
+              2.2. External Libraries or Applications
+
+        3. Exported Parameters
+
+              3.1. db_url (string)
+              3.2. xcap_table (string)
+              3.3. xcap_root (str)
+              3.4. buf_size (int)
+              3.5. xml_ns (str)
+
+        4. Exported Functions
+
+              4.1. xcaps_put(uri, path, doc)
+              4.2. xcaps_get(uri, path)
+              4.3. xcaps_del(uri, path)
+
+        5. Exported pseudo-variables
+        6. Simple XCAP Server Config
+
+   List of Examples
+
+   1.1. Set the “db_url” parameter
+   1.2. Set the “xcap_table” parameter
+   1.3. Set url_match parameter
+   1.4. Set the “buf_size” parameter
+   1.5. Set url_match parameter
+   1.6. xcaps_put usage
+   1.7. xcaps_get usage
+   1.8. xcaps_del usage
+   1.9. $xcapuri(...) PV
+   1.10. sample xcap server
+
+Chapter 1. Admin Guide
+
+   Table of Contents
+
+   1. Overview
+   2. Dependencies
+
+        2.1. Kamailio Modules
+        2.2. External Libraries or Applications
+
+   3. Exported Parameters
+
+        3.1. db_url (string)
+        3.2. xcap_table (string)
+        3.3. xcap_root (str)
+        3.4. buf_size (int)
+        3.5. xml_ns (str)
+
+   4. Exported Functions
+
+        4.1. xcaps_put(uri, path, doc)
+        4.2. xcaps_get(uri, path)
+        4.3. xcaps_del(uri, path)
+
+   5. Exported pseudo-variables
+   6. Simple XCAP Server Config
+
+1. Overview
+
+   This module provides an XCAP server functionaly inside Kamailio and SER
+   SIP servers.
+
+   Benefits brought by this integrated XCAP server:
+     * reuse of SIP router transport layer - XCAP documents can be sent
+       via SIP (UDP, TCP, TLS and SCTP) and via HTTP (TCP or TLS (HTTPS)).
+       For HTTP/S, you neet to load XHTTP module to handle HTTP/S
+       requests.
+     * the Presence server has access imediatelly to the latest version of
+       XCAP documents. No more need to trigger refresh of XCAP documents
+       via MI command
+     * can be used stand-alone, with a different Presence server. It is
+       not specific for Kamailio or SER. Documents can be fetched via GET
+     * no exotic dependencies, it is written in C. It depends on libxml2,
+       sl module and a database module (required to store the xcap
+       documents).
+     * you can do digest authentication using database, radius, ldap, etc.
+       Can reuse authorization mechanisms provided by SIP server.
+     * flexibility - the XCAP server is controlled from config file of SIP
+       server, therefore you can blend the XCAP logic with features
+       provided by core or other modules.
+
+   Important: be sure you have global parameter: 'tcp_accept_no_cl=yes'.
+
+2. Dependencies
+
+   2.1. Kamailio Modules
+   2.2. External Libraries or Applications
+
+2.1. Kamailio Modules
+
+   The following modules must be loaded before this module:
+     * sl - stateless reply module
+     * db - a database engine module
+     * xhttp - embedded HTTP server if you want to get XCAP documents via
+       HTTP.
+
+2.2. External Libraries or Applications
+
+   The following libraries or applications must be installed before
+   running Kamailio with this module loaded:
+     * libxml2 - libxml2 library for runtime and libxml2-dev for
+       compilation.
+
+3. Exported Parameters
+
+   3.1. db_url (string)
+   3.2. xcap_table (string)
+   3.3. xcap_root (str)
+   3.4. buf_size (int)
+   3.5. xml_ns (str)
+
+3.1. db_url (string)
+
+   Database URL.
+
+   Default value is “mysql://openser:openserrw@localhost/openser”.
+
+   Example 1.1. Set the “db_url” parameter
+...
+modparam("xcap_server", "db_url", "mysql://user:passwd@host.com/dbname")
+...
+
+3.2. xcap_table (string)
+
+   The name of table where to store the xcap documents.
+
+   Default value is “xcap”.
+
+   Example 1.2. Set the “xcap_table” parameter
+...
+modparam("xcap_server", "xcap_table", "xcapdocs")
+...
+
+3.3. xcap_root (str)
+
+   XCAP root URL.
+
+   Default value is '/xcap-root/'.
+
+   Example 1.3. Set url_match parameter
+...
+modparam("xcap_server", "xcap_root", "/xcap-root/")
+...
+
+3.4. buf_size (int)
+
+   Size of local buffer for handling XCAP documents.
+
+   Default value is “1024”.
+
+   Example 1.4. Set the “buf_size” parameter
+...
+modparam("xcap_server", "buf_size", 2048)
+...
+
+3.5. xml_ns (str)
+
+   Register extra XML namespaces to be used with XPath. You can set the
+   parameter many times to add more namespaces. The format is
+   'prefix=href'.
+
+   Default value is 'null'.
+
+   Example 1.5. Set url_match parameter
+...
+modparam("xcap_server", "xml_ns",
+    "rl=urn:ietf:params:xml:ns:resource-lists")
+modparam("xcap_server", "xml_ns",
+    "my=urn:my:prefix")
+...
+
+4. Exported Functions
+
+   4.1. xcaps_put(uri, path, doc)
+   4.2. xcaps_get(uri, path)
+   4.3. xcaps_del(uri, path)
+
+4.1.  xcaps_put(uri, path, doc)
+
+   Handle XCAP PUT command.
+
+   Example 1.6. xcaps_put usage
+...
+event_route[xhttp:request] {
+        if($hu=~"^/xcap-root/")
+        {
+                # xcap ops
+                switch($rm) {
+                        case "PUT":
+                                xcaps_put("sip:101@$Ri", "$hu", "$rb");
+                                exit;
+                                break;
+                }
+        }
+}
+...
+
+4.2.  xcaps_get(uri, path)
+
+   Handle XCAP GET command.
+
+   Example 1.7. xcaps_get usage
+...
+event_route[xhttp:request] {
+        if($hu=~"^/xcap-root/")
+        {
+                # xcap ops
+                switch($rm) {
+                        case "GETT":
+                                xcaps_get("sip:101@$Ri", "$hu");
+                                exit;
+                                break;
+                }
+        }
+}
+...
+
+4.3.  xcaps_del(uri, path)
+
+   Handle XCAP DELETE command.
+
+   Example 1.8. xcaps_del usage
+...
+event_route[xhttp:request] {
+        if($hu=~"^/xcap-root/")
+        {
+                # xcap ops
+                switch($rm) {
+                        case "DELETE":
+                                xcaps_del("sip:101@$Ri", "$hu");
+                                exit;
+                                break;
+                }
+        }
+}
+...
+
+5. Exported pseudo-variables
+
+     * $xcapuri(name=>key) - name can be any to idenitfy the XCAP uri; key
+       can be: data, uri, root, auid, type, tree, xuid, file, node.
+
+   Exported pseudo-variables are documented at
+   http://www.kamailio.org/dokuwiki/.
+
+   Example 1.9. $xcapuri(...) PV
+...
+    $xcapuri(u=>data) = $hu;
+    xdbg("SCRIPT: xcap service $xcapuri(u=>auid) for $xcapuri(u=>xuid)\n");
+...
+
+6. Simple XCAP Server Config
+
+   Example 1.10. sample xcap server
+...
+tcp_accept_no_cl=yes
+...
+loadmodule "xhttp.so"
+loadmodule "xcap_server.so"
+
+...
+
+# ----- xcap_server params -----
+modparam("xcap_server", "db_url",
+        "mysql://openser:openserrw@localhost/openser")
+
+...
+
+event_route[xhttp:request] {
+    if (!www_authorize("xcap", "subscriber"))
+    {
+        www_challenge("xcap", "0");
+        exit;
+    }
+    if($hu=~"^/xcap-root/")
+    {
+        set_reply_close();
+        set_reply_no_connect();
+        # xcap ops - break down http uri to get xcap user id
+        $xcapuri(u=>data) = $hu;
+        if($xcapuri(u=>xuid)=~"^sip:.+@.+")
+            $var(uri) = $xcapuri(u=>xuid);
+        else
+            $var(uri) = "sip:"+ $xcapuri(u=>xuid) + "@" + $Ri;
+
+        # handle XCAP capability request
+        if($rm=="GET" && $xcapuri(u=>auid)=="xcap-caps")
+        {
+            $var(xbody) =
+"<?xml version='1.0' encoding='UTF-8'?>
+<xcap-caps xmlns='urn:ietf:params:xml:ns:xcap-caps'>
+  <auids>
+    <auid>rls-services</auid>
+    <auid>pidf-manipulation</auid>
+    <auid>xcap-caps</auid>
+    <auid>resource-lists</auid>
+    <auid>pres-rules</auid>
+    <auid>org.openmobilealliance.pres-rules</auid>
+  </auids>
+  <extensions>
+  </extensions>
+  <namespaces>
+    <namespace>urn:ietf:params:xml:ns:rls-services</namespace>
+    <namespace>urn:ietf:params:xml:ns:pidf</namespace>
+    <namespace>urn:ietf:params:xml:ns:xcap-caps</namespace>
+    <namespace>urn:ietf:params:xml:ns:resource-lists</namespace>
+    <namespace>urn:ietf:params:xml:ns:pres-rules</namespace>
+  </namespaces>
+</xcap-caps>";
+            xhttp_reply("200", "ok", "application/xcap-caps+xml",
+                    "$var(xbody)");
+            exit;
+        }
+        # be sure auth user access only its documents
+        if ($au!=$(var(uri){uri.user})) {
+            xhttp_reply("403", "Forbidden", "text/html",
+                    "operation not allowed");
+            exit;
+        }
+
+        xdbg("SCRIPT: xcap service $xcapuri(u=>auid) for $xcapuri(u=>xuid)\n");
+        switch($rm) {
+            case "PUT":
+                xcaps_put("$var(uri)", "$hu", "$rb");
+                if($xcapuri(u=>auid)=~"pres-rules")
+                {
+                    pres_update_watchers("$var(uri)", "presence");
+                    pres_refresh_watchers("$var(uri)", "presence", 1);
+                }
+                exit;
+            break;
+            case "GET":
+                xcaps_get("$var(uri)", "$hu");
+                exit;
+            break;
+            case "DELETE":
+                xcaps_del("$var(uri)", "$hu");
+                if($xcapuri(u=>auid)=~"pres-rules")
+                {
+                    pres_update_watchers("$var(uri)", "presence");
+                    pres_refresh_watchers("$var(uri)", "presence", 1);
+                }
+                exit;
+            break;
+        }
+    }
+
+    # other http requests
+    xhttp_reply("200", "OK", "text/html",
+            "<html><body>OK: $si:$sp</body></html>");
+    exit;
+}
+...
+
+   The URL for XCAP has to be:
+
+   http://_your_sip_server_ip_:_your_sip_server_port_/xcap-root/...
+
+   For example, if your SIP server IP is 10.1.1.10 and it is listening on
+   TCP port 5060 and TLS port 5061, following XCAP URLs can be used:
+
+   http://10.1.1.10:5060/xcap-root/...
+
+   https://10.1.1.10:5061/xcap-root/...

@@ -1,0 +1,458 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE section PUBLIC '-//OASIS//DTD DocBook XML V4.2//EN'
+	'http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd'>
+
+<section><title>XCAP</title>
+
+<section><title>Introduction</title>
+
+<para>XCAP is a HTTP based protocol for access remote configuration data. Data
+is stored in XML format and the XCAP protocol allows to query, modify or delete
+parts of such data. This is in detail described in <xref
+linkend="pres_rfc_xcap"/>. The XCAP server is server able to handle XCAP requests.
+</para>
+
+<para>The XCAP server may be used for storing <quote>presence interesting</quote>
+data. From the SIP_ROUTER's point of view these items are interesting:
+<itemizedlist>
+	<listitem><para>authorization data</para></listitem>
+	<listitem><para><quote>buddy lists</quote></para></listitem>
+</itemizedlist>
+</para>
+
+<section><title>XCAP authorization</title>
+<para>Definition of authorization documents and theirs usage is specified in <xref 
+linkend="pres_draft_common_auth"/> and especially for presence purposes in <xref 
+linkend="pres_draft_auth"/>. Both documents are quite common and in SIP_ROUTER's
+presence modules implemented only partialy. For more information about XCAP
+authorization see details in <xref linkend="pa.xcap"/>.</para>
+</section> <!-- XCAP authorization -->
+
+<section><title>Buddy lists</title>
+<para>XCAP server may be used for storing lists of users too. These lists may be
+used for presence subscriptions - subscription to such list means subscription
+to all users on it at once. This reduces number of created subscriptions and may
+reduce data transfers between server and client too; but presence documents for
+lists of users may be very big and thus require TCP connection.</para>
+
+<para>There may be not only lists for individual users with their contacts but 
+there may be other sort of lists representing some <quote>logical
+entities</quote> such <quote>businessmen</quote>, <quote>technical
+support</quote>, ... which are used in cases like if some customer needs someone
+from technical support department and doesn't want to remeber all people
+there. Such customer may simply watch presence state of
+<quote>technical-support@somewhere.net</quote> if he needs help from them.
+</para>
+
+<para>Lists of users - more common resource lists - are defined in <xref
+linkend="pres_draft_rls"/> and their usage with SIP in <xref
+linkend="pres_draft_rls_sip"/>. These lists are partialy implemented in <link
+linkend="pres_rls">RLS module</link>.
+For more information about resource lists see details in <xref
+linkend="rls.xcap"/>.</para>
+</section> <!-- buddy lists -->
+
+<section><title>Manipulation with XCAP documents</title>
+<para>Manipulating with XCAP documents is quite simple because XCAP uses
+standard HTTP methods like GET, PUT or DELETE. Every web browser may be
+used to read XCAP data and it is quite simple to write utility to write data
+to XCAP server. These features allow to use XCAP with SIP_ROUTER although there are is 
+not much client software supporting it.
+</para>
+</section> <!-- manipulating documents -->
+
+</section> <!-- XCAP introduction -->
+
+<section id="xcap.examples"><title>XCAP examples</title>
+<note><para>XCAP documents examples published there doesn't use correct XML
+namespaces due to problems with XCAP server used for tests (problems querying
+partial documents with namespaces).</para></note>
+
+<example><title>Storing XCAP documents</title>
+<para>There is a sample script in Python which stores XCAP documents onto a XCAP
+server. Documents are:
+<itemizedlist>
+	<listitem><para><link linkend="rls.xml">rls-services document</link> stored
+	under name <filename>index</filename>
+	</para></listitem>
+	<listitem><para><link linkend="list.xml">buddy list</link> for user Smith
+	stored under name <filename>smith</filename></para></listitem>
+	<listitem><para><link linkend="pres-rules.xml">presence authorization
+	document</link> for user Smith stored under name
+	<filename>presence-rules.xml</filename></para></listitem>
+</itemizedlist>
+</para>
+<programlisting>
+#!/usr/bin/python
+import httplib, urllib
+
+machine = "localhost"
+
+#
+# store rls-services document
+#
+
+uri = "/xcap-root/rls-services/global/index"
+headers = {"Content-Type": "application/rls-services+xml"}
+bf = file("rls.xml", "r")
+body = bf.read(65536);
+conn = httplib.HTTPConnection(machine)
+conn.request("PUT", uri, body, headers)
+
+response = conn.getresponse()
+print "Storing rls-services document: ", response.status, response.reason
+data = response.read()
+conn.close()
+
+#
+# store resource-list document for user
+#
+
+uri = "/xcap-root/resource-lists/users/smith/resource-list.xml"
+headers = {"Content-Type": "application/resource-lists+xml"}
+bf = file("list.xml", "r")
+body = bf.read(65536);
+conn = httplib.HTTPConnection(machine)
+conn.request("PUT", uri, body, headers)
+
+response = conn.getresponse()
+print "Storing resource-lists document: ", response.status, response.reason
+data = response.read()
+conn.close()
+
+#
+# store presence authorization rules
+#
+
+uri = "/xcap-root/pres-rules/users/smith/presence-rules.xml"
+headers = {"Content-Type": "application/pres-rules+xml"}
+bf = file("presence-rules.xml", "r")
+body = bf.read(65536);
+conn = httplib.HTTPConnection(machine)
+conn.request("PUT", uri, body, headers)
+
+response = conn.getresponse()
+print "Storing pres-rules document: ", response.status, response.reason
+data = response.read()
+conn.close()
+</programlisting>
+</example>
+
+<example id="list.xml"><title>Example resource list document (list.xml)</title>
+<para>Simple buddy lists which shows the possibility of nested lists.
+</para>
+<programlisting>
+&lt;?xml version="1.0" ?&gt;
+&lt;resource-lists&gt;
+	&lt;list name="default"&gt;
+		&lt;list name="work"&gt;
+			&lt;entry uri="sip:someone@someorg.org"&gt;
+				&lt;display-name&gt;Someone&lt;/display-name&gt;
+			&lt;/entry&gt;
+			&lt;entry uri="sip:smith@someorg.org"&gt;
+				&lt;display-name&gt;Jonathan Smith&lt;/display-name&gt;
+			&lt;/entry&gt;
+		&lt;/list&gt;
+		&lt;entry uri="sip:vasek@someorg.org"&gt;
+			&lt;display-name&gt;Vasek&lt;/display-name&gt;
+		&lt;/entry&gt;
+		&lt;entry uri="sip:vaclav.picbumprask@someorg.org"&gt;
+			&lt;display-name&gt;Vaclav Picbumprask&lt;/display-name&gt;
+		&lt;/entry&gt;
+	&lt;/list&gt;
+&lt;/resource-lists&gt;
+</programlisting>
+</example>
+
+<example id="rls.xml"><title>Example rls-services document (rls.xml)</title>
+<para>Example document which is processed by Resource List Server (RLS module).
+This document can contain references to users buddy lists like
+<quote>smith-list@someorg.org</quote> which points to buddy list for user smith
+named <quote>default</quote> and can contain such lists directly.
+<!--<caution><para>EyeBeam stores user's <quote>buddy list</quote> in 
+<filename>&lt;XCAP-root&gt;/users/&lt;username&gt;/resource-list.xml</filename>, 
+not in
+<filename>&lt;XCAP-root&gt;/users/&lt;username&gt;</filename> which was used in 
+these examples.</para></caution>-->
+</para>
+<programlisting>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;rls-services&gt;
+	&lt;service uri="sip:smith-list@someorg.org"&gt;
+		&lt;resource-list&gt;http://localhost/xcap-root/resource-lists/users/smith/resource-list.xml/~~/resource-lists/list[@name=%22default%22]&lt;/resource-list&gt;
+		&lt;packages&gt;
+			&lt;package&gt;presence&lt;/package&gt;
+		&lt;/packages&gt;
+	&lt;/service&gt;
+	&lt;service uri="sip:cz@someorg.org"&gt;
+		&lt;list name="czech part of some org"&gt;
+			&lt;entry uri="sip:abc@someorg.org"&gt;
+				&lt;display-name&gt;A B&lt;/display-name&gt;
+			&lt;/entry&gt;
+			&lt;entry uri="sip:cde@someorg.org"&gt;
+				&lt;display-name&gt;C D&lt;/display-name&gt;
+			&lt;/entry&gt;
+			&lt;entry uri="sip:efg@someorg.org"&gt;
+				&lt;display-name&gt;Ef Ge&lt;/display-name&gt;
+			&lt;/entry&gt;
+		&lt;/list&gt;
+		&lt;packages&gt;
+			&lt;package&gt;presence&lt;/package&gt;
+			&lt;package&gt;email&lt;/package&gt;
+		&lt;/packages&gt;
+	&lt;/service&gt;
+&lt;/rls-services&gt;
+</programlisting>
+</example>
+
+<example id="pres-rules.xml"><title>Example presence authorization document (presence-rules.xml)</title>
+<para>This document contains two rules: 
+<itemizedlist>
+	<listitem><para><quote>white list</quote>, which allows
+	access to presence information from all from domain someorg.org
+	</para></listitem>
+	<listitem><para><quote>black list</quote>, which denies access for user
+	nemo@somewhere.net</para></listitem>	
+</itemizedlist></para>
+<programlisting>
+&lt;?xml version="1.0" ?&gt;
+&lt;ruleset xmlns="urn:ietf:params:xml:ns:common-policy" xmlns:pr="urn:ietf:params:xml:ns:pres-rules"&gt;
+	&lt;rule id="blacklist"&gt;
+		&lt;conditions&gt;
+			&lt;identity&gt;
+				&lt;id&gt;sip:nemo@somewhere.net&lt;/id&gt;
+			&lt;/identity&gt;
+		&lt;/conditions&gt;
+		&lt;actions&gt;
+			&lt;pr:sub-handling&gt;block&lt;/pr:sub-handling&gt;
+		&lt;/actions&gt;
+		&lt;transformations/&gt;
+	&lt;/rule&gt;
+	
+	&lt;rule id="whitelist"&gt;
+		&lt;conditions&gt;
+			&lt;identity&gt;
+				&lt;domain domain="someorg.org"/&gt;
+			&lt;/identity&gt;
+		&lt;/conditions&gt;
+		&lt;actions&gt;
+			&lt;pr:sub-handling&gt;allow&lt;/pr:sub-handling&gt;
+		&lt;/actions&gt;
+		&lt;transformations/&gt;
+	&lt;/rule&gt;
+&lt;/ruleset&gt;
+</programlisting>
+</example>
+
+</section>
+
+<!-- There
+exist extensions for particular types of configuration - for purpose of this
+document only configuration from presence area will be mentioned.
+</para>-->
+
+<section><title>XCAP server simulation</title>
+<para>XCAP server is a HTTP server with some features like document validation
+or ability of working with parts of stored documents. If you have no XCAP
+server, you can simulate it using standard web server. There are not many XCAP
+servers available today, thus the simulation may be interesting for - at least -
+demonstration or testing purposes.
+</para>
+
+<para>There are some disadvantages when the XCAP server is only simulated:
+<itemizedlist>
+	<listitem><para>no XML document validation</para></listitem>
+	<listitem><para>unable to work with XPointer terms (mainly unable to work 
+	with parts of documents)</para></listitem>
+	<listitem><para>possible synchronization problems (!)</para>
+		<para>More clients used by one user working with the same document
+		 (authorization document, buddy list) may rewrite it to each other.
+		 When using regular XCAP server this will be done in one atomic query.
+		 In the case of simulation it is needed to download whole document,
+		 modify it and put it back.</para>
+	 </listitem>
+</itemizedlist>
+</para>
+
+<para>Depending on your needs you can
+<itemizedlist>
+	<listitem><para>create hierarchical directory structure of XML documents according to
+	<xref linkend="pres_rfc_xcap"/></para></listitem>
+	<listitem><para>allow upload (handle HTTP PUT method) which stores documents into the 
+	directory structure</para></listitem>
+	<listitem><para>improve upload to validate documents according to schema
+	(every sort of XCAP document should have their XSD published)</para></listitem>
+	<listitem><para>allow document removing (handle DELETE method)</para></listitem>
+	<listitem><para>process HTTP GET requests with a CGI-script so it processes
+	queries for partial documents</para></listitem>
+</itemizedlist>
+</para>
+
+<section><title>Directory structure</title>
+<para>Presence modules use XCAP documents stored in structure like this:
+<itemizedlist><title>xcap-root</title>
+	<listitem><para><filename>pres-rules</filename></para>
+	<itemizedlist>
+		<listitem><para><filename>users</filename></para>
+		<itemizedlist>
+			<listitem><para><filename>smith</filename></para>
+			<itemizedlist>
+				<listitem><para><filename>presence-rules.xml</filename> (file
+				containg presence authorization rules for user smith)</para></listitem>
+			</itemizedlist>
+			</listitem>
+			<listitem><para><filename>joe</filename></para>
+			<itemizedlist>
+				<listitem><para><filename>presence-rules.xml</filename> (file containing
+				presence authorization rules for user joe)</para></listitem>
+			</itemizedlist>
+			</listitem>
+			<listitem><para>... (directories for other users)</para></listitem>
+		</itemizedlist>
+		</listitem>
+	</itemizedlist></listitem>
+	
+	<listitem><para><filename>resource-lists</filename></para>
+	<itemizedlist>
+		<listitem><para><filename>users</filename></para>
+		<itemizedlist>
+			<listitem><para><filename>smith</filename></para>
+			<itemizedlist>
+				<listitem><para><filename>resource-list.xml</filename> (file
+				containing resources lists for user smith)</para></listitem>
+			</itemizedlist>
+			</listitem>
+			<listitem><para><filename>joe</filename></para>
+			<itemizedlist>
+				<listitem><para><filename>resource-list.xml</filename> (file
+				containing resource lists for user joe)</para></listitem>
+			</itemizedlist>
+			</listitem>
+			<listitem><para>... (directories for other users)</para></listitem>
+		</itemizedlist>
+		</listitem>
+		<!-- rls-services globals used instead this
+		<listitem><para><filename>global</filename></para>
+		<itemizedlist>
+			<listitem><para><filename>index</filename> (file containing global
+			resource lists)</para></listitem>
+		</itemizedlist>
+		</listitem>-->
+	</itemizedlist></listitem>
+	
+	<listitem><para><filename>rls-services</filename></para>
+	<itemizedlist>
+		<listitem><para><filename>global</filename></para>
+		<itemizedlist>
+			<listitem><para><filename>index</filename> (file containing global
+			rls-services documents)</para></listitem>
+		</itemizedlist>
+		</listitem>
+	</itemizedlist></listitem>
+	
+</itemizedlist>
+</para>
+</section> <!-- directory structure -->
+
+<section><title>Usage with SIP_ROUTER</title>
+<para>You don't need a full XCAP server for presence authorization documents -
+these are read as standalone documents from directories of standalone users.
+</para>
+
+<para>For resource lists you have to set <link linkend="rls.parameters">RLS module 
+parameters</link> <varname>mode</varname> and/or
+<varname>reduce_xcap_needs</varname> 
+to work as much as possible with XCAP server simulation.
+</para>
+</section>
+
+<section><title>XCAP simulation examples</title>
+<para>Examples presented here can be used as simple XCAP server simulation. It
+is able to handle PUT method (for whole XML documents).
+</para>
+
+<example><title>Apache2 configuration</title>
+<programlisting><![CDATA[
+...
+Alias /xcap-root /var/simulated-xcap-root
+<Directory /var/simulated-xcap-root>
+	Options Indexes FollowSymLinks MultiViews
+	Script PUT /cgi-bin/upload
+	<Limit PUT DELETE GET>
+		Order Allow,Deny
+		Deny from none
+		Allow from all
+	</Limit>
+</Directory>
+...
+]]></programlisting>
+<para>If apache is running on machine with SIP_ROUTER, you can use as xcap-root
+<literal>http://localhost/xcap-root</literal>.
+</para>
+</example>
+
+<example><title>Simple (and dangerous) cgi-script for upload</title>
+<para>This code is written in C and it is able to create directories if needed, but its usage in
+presented form is realy unsafe! You have to compile it and put into directory
+with other CGI scripts.</para>
+<programlisting><![CDATA[
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+
+void copy_file(const char *filename)
+{
+	char buf[2048];
+	int r;
+	FILE *f;
+	
+	f = fopen(filename, "wb");
+	if (f) {
+		while (!feof(stdin)) {
+			r = fread(buf, 1, sizeof(buf), stdin);
+			fwrite(buf, 1, r, f);
+		}
+		fclose(f);
+	}
+}
+
+int main(int argc, char **argv)
+{
+	char *filename, *x;
+	char tmp[1024];
+	int res = 0;
+	
+	filename = getenv ("PATH_TRANSLATED");
+
+	strcpy(tmp, filename);
+	x = strrchr(tmp, '/');
+	if (x) {
+		*x = 0;
+		res = mkdir(tmp, 0755);		/* ! dangerous ! */
+	}
+	else {
+		printf("Status: 500\n");
+		printf("Content-Type: text/html\n\n");
+		printf("<html><head/>\n<body>Incorrect filename</body></html>\n");	
+		return -1;
+	}
+	
+	copy_file(filename); /* ! dangerous ! */
+		
+	printf("Status: 200\n");
+	printf("Content-Type: text/html\n\n");
+	printf("<html><head><title>Upload</title>\n</head>\n<body>Finished...</body></html>\n");
+	
+	return 0;
+}
+]]></programlisting>
+</example>
+
+</section><!-- XCAP simulation examples -->
+
+</section> <!-- XCAP server simulation -->
+
+</section>
