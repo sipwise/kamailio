@@ -274,6 +274,10 @@ module_group_kpython=app_python
 # K geoip module
 module_group_kgeoip=geoip
 
+# k redis module
+module_group_kredis=ndb_redis
+
+
 # if not set on the cmd. line, env or in the modules.lst (cfg_group_include)
 # exclude the below modules.
 ifneq ($(group_include)$(cfg_group_include),)
