@@ -402,9 +402,9 @@ static cmd_export_t cmds[]={
 	{"t_relay_cancel",     w_t_relay_cancel,        0, 0,
 			REQUEST_ROUTE},
 	{"t_on_failure",       w_t_on_negative,         1, fixup_on_failure,
-			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE },
+			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE | BRANCH_ROUTE },
 	{"t_on_reply",         w_t_on_reply,            1, fixup_on_reply,
-			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE },
+			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE | BRANCH_ROUTE },
 	{"t_on_branch",       w_t_on_branch,         1, fixup_on_branch,
 			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"t_check_status",     t_check_status,          1, fixup_t_check_status,
@@ -1940,12 +1940,17 @@ int w_t_reply_wrp(struct sip_msg *m, unsigned int code, char *txt)
 static int t_check_trans(struct sip_msg* msg, char* foo, char* bar)
 {
 	struct cell* t;
+	int branch;
+	int ret;
 	
-	if (msg->first_line.type==SIP_REPLY)
-		return w_t_check(msg, 0 ,0);
-	else if (msg->REQ_METHOD==METHOD_CANCEL)
+	if (msg->first_line.type==SIP_REPLY) {
+		branch = 0;
+		ret = (t_check_msg( msg , &branch)==1) ? 1 : -1;
+		tm_ctx_set_branch_index(branch);
+		return ret;
+	} else if (msg->REQ_METHOD==METHOD_CANCEL) {
 		return w_t_lookup_cancel(msg, 0, 0);
-	else{
+	} else {
 		switch(t_check_msg(msg, 0)){
 			case -2: /* possible e2e ack */
 				return 1;

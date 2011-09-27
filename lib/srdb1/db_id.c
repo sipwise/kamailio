@@ -162,12 +162,14 @@ static int parse_db_url(struct db_id* id, const str* url)
 			case '@':
 				st = ST_HOST;
 				id->username = prev_token;
+				prev_token = 0;
 				if (dupl_string(&id->password, begin, url->s + i) < 0) goto err;
 				begin = url->s + i + 1;
 				break;
 
 			case '/':
 				id->host = prev_token;
+				prev_token = 0;
 				id->port = str2s(begin, url->s + i - begin, 0);
 				if (dupl_string(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
 				return 0;
@@ -207,11 +209,14 @@ static int parse_db_url(struct db_id* id, const str* url)
 	return 0;
 
  err:
-	if (id->scheme) pkg_free(id->scheme);
-	if (id->username) pkg_free(id->username);
-	if (id->password) pkg_free(id->password);
-	if (id->host) pkg_free(id->host);
-	if (id->database) pkg_free(id->database);
+	if(id){
+		if (id->scheme) pkg_free(id->scheme);
+		if (id->username) pkg_free(id->username);
+		if (id->password) pkg_free(id->password);
+		if (id->host) pkg_free(id->host);
+		if (id->database) pkg_free(id->database);
+		memset(id, 0, sizeof(struct db_id));
+	}
 	if (prev_token) pkg_free(prev_token);
 	return -1;
 }

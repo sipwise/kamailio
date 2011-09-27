@@ -97,13 +97,29 @@ enum kill_reason get_kr() {
 
 void lock_hash(int i) 
 {
-	lock(&_tm_table->entries[i].mutex);
+
+	int mypid;
+
+	mypid = my_pid();
+	if (likely(atomic_get(&_tm_table->entries[i].locker_pid) != mypid)) {
+		lock(&_tm_table->entries[i].mutex);
+		atomic_set(&_tm_table->entries[i].locker_pid, mypid);
+	} else {
+		/* locked within the same process that called us*/
+		_tm_table->entries[i].rec_lock_level++;
+	}
 }
 
 
 void unlock_hash(int i) 
 {
-	unlock(&_tm_table->entries[i].mutex);
+	if (likely(_tm_table->entries[i].rec_lock_level == 0)) {
+		atomic_set(&_tm_table->entries[i].locker_pid, 0);
+		unlock(&_tm_table->entries[i].mutex);
+	} else  {
+		/* recursive locked => decrease rec. lock count */
+		_tm_table->entries[i].rec_lock_level--;
+	}
 }
 
 
@@ -478,4 +494,82 @@ error0:
 }
 
 
+/**
+ * backup xdata from/to msg context to local var and use T lists
+ * - mode = 0 - from msg context to _txdata and use T lists
+ * - mode = 1 - restore to msg context from _txdata
+ */
+void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
+{
+	static tm_xlinks_t _txdata;
+	tm_xlinks_t *x;
 
+	if(xd==NULL)
+		x = &_txdata;
+	else
+		x = xd;
+
+	if(mode==0) {
+		if(t==NULL)
+			return;
+		x->uri_avps_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, &t->uri_avps_from );
+		x->uri_avps_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, &t->uri_avps_to );
+		x->user_avps_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER, &t->user_avps_from );
+		x->user_avps_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, &t->user_avps_to );
+		x->domain_avps_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from );
+		x->domain_avps_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to );
+#ifdef WITH_XAVP
+		x->xavps_list = xavp_set_list(&t->xavps_list);
+#endif
+	} else if(mode==1) {
+		/* restore original avp list */
+		set_avp_list( AVP_TRACK_FROM | AVP_CLASS_URI, x->uri_avps_from );
+		set_avp_list( AVP_TRACK_TO | AVP_CLASS_URI, x->uri_avps_to );
+		set_avp_list( AVP_TRACK_FROM | AVP_CLASS_USER, x->user_avps_from );
+		set_avp_list( AVP_TRACK_TO | AVP_CLASS_USER, x->user_avps_to );
+		set_avp_list( AVP_TRACK_FROM | AVP_CLASS_DOMAIN, x->domain_avps_from );
+		set_avp_list( AVP_TRACK_TO | AVP_CLASS_DOMAIN, x->domain_avps_to );
+#ifdef WITH_XAVP
+		xavp_set_list(x->xavps_list);
+#endif
+	}
+
+}
+
+/**
+ * replace existing lists with newxd and backup in bakxd or restore from bakxd
+ */
+void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
+{
+	if(newxd==NULL && bakxd!=NULL) {
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, bakxd->uri_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, bakxd->uri_avps_to);
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER, bakxd->user_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, bakxd->user_avps_to);
+		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, bakxd->domain_avps_from);
+		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, bakxd->domain_avps_to);
+#ifdef WITH_XAVP
+		xavp_set_list(bakxd->xavps_list);
+#endif
+		return;
+	}
+
+	if(newxd!=NULL && bakxd!=NULL) {
+		bakxd->uri_avps_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI,
+				&newxd->uri_avps_from);
+		bakxd->uri_avps_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI,
+				&newxd->uri_avps_to);
+		bakxd->user_avps_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_USER,
+				&newxd->user_avps_from);
+		bakxd->user_avps_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER,
+				&newxd->user_avps_to);
+		bakxd->domain_avps_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN,
+				&newxd->domain_avps_from);
+		bakxd->domain_avps_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN,
+				&newxd->domain_avps_to);
+#ifdef WITH_XAVP
+		bakxd->xavps_list = xavp_set_list(&newxd->xavps_list);
+#endif
+		return;
+	}
+}
