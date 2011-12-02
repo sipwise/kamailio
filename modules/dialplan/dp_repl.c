@@ -62,11 +62,22 @@ struct subst_expr* repl_exp_parse(str subst)
 	int replace_all;
 	char * p, *end, *repl, *repl_end;
 	int max_pmatch, r;
+	str shms;
 
 	se = 0;
 	replace_all = 0;
-	p = subst.s;
-	end = p + subst.len;
+	shms.s = NULL;
+
+	if (!(shms.s=shm_malloc((subst.len+1) * sizeof(char))) ){
+		LM_ERR("out of shm memory\n");
+		goto error;
+	}
+	memcpy(shms.s, subst.s, subst.len);
+	shms.len = subst.len;
+	shms.s[shms.len] = '\0';
+
+	p = shms.s;
+	end = p + shms.len;
 	rw_no = 0;
 
 	repl = p;
@@ -85,26 +96,27 @@ struct subst_expr* repl_exp_parse(str subst)
 	}
 	memset((void*)se, 0, sizeof(struct subst_expr));
 
+	se->replacement.s = shms.s;
+	shms.s = NULL;
 	se->replacement.len=repl_end-repl;
-	if (!(se->replacement.s=shm_malloc(se->replacement.len * sizeof(char))) ){
-		LM_ERR("out of shm memory \n");
-		goto error;
-	}
 	if(!rw_no){
 		replace_all = 1;
 	}
 	/* start copying */
-	memcpy(se->replacement.s, repl, se->replacement.len);
+	LM_DBG("replacement expression is [%.*s]\n", se->replacement.len,
+			se->replacement.s);
 	se->re=0;
 	se->replace_all=replace_all;
 	se->n_escapes=rw_no;
 	se->max_pmatch=max_pmatch;
 
-    /*replace_with is a simple structure, no shm alloc needed*/
+	/*replace_with is a simple structure, no shm alloc needed*/
 	for (r=0; r<rw_no; r++) se->replace[r]=rw[r];
 	return se;
 
 error:
+	if(shms.s != NULL)
+		shm_free(shms.s);
 	if (se) { repl_expr_free(se);}
 	return NULL;
 }

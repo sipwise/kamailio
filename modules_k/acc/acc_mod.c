@@ -173,6 +173,7 @@ str acc_callid_col     = str_init("callid");
 str acc_sipcode_col    = str_init("sip_code");
 str acc_sipreason_col  = str_init("sip_reason");
 str acc_time_col       = str_init("time");
+str acc_time_hires_col = str_init("time_hires");
 #endif
 
 /*@}*/
@@ -256,6 +257,7 @@ static param_export_t params[] = {
 	{"acc_sip_code_column",  STR_PARAM, &acc_sipcode_col.s    },
 	{"acc_sip_reason_column",STR_PARAM, &acc_sipreason_col.s  },
 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
+	{"acc_time_hires_column",STR_PARAM, &acc_time_hires_col.s },
 #endif
 	{0,0,0}
 };
@@ -371,6 +373,7 @@ static int mod_init( void )
 	acc_sipcode_col.len = strlen(acc_sipcode_col.s);
 	acc_sipreason_col.len = strlen(acc_sipreason_col.s);
 	acc_time_col.len = strlen(acc_time_col.s);
+	acc_time_hires_col.len = strlen(acc_time_hires_col.s);
 #endif
 
 	if (log_facility_str) {
