@@ -1,3 +1,14 @@
+kamailio (3.1.5+sipwise2) unstable; urgency=low
+
+  * enable milliseconds precision for accounting (kamailio part)
+  * fix the usage of avps with string names in dialplan replacement (backport from 3.2.0; bug 453)
+  * db_text(k): init new db text table structure to 0
+  * Do not consider late requests for dialogs in "deleted"
+  * fix ndb_redis connect arguments parsing
+  * Update init file lsb headers
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 02 Dec 2011 14:16:48 +0100
+
 kamailio (3.1.5+sipwise1) unstable; urgency=low
 
   * Merge with kamailio 3.1.5
