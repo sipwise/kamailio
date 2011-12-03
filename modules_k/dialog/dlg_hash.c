@@ -61,6 +61,7 @@
 #include "dlg_hash.h"
 #include "dlg_profile.h"
 #include "dlg_req_within.h"
+#include "dlg_db_handler.h"
 
 #define MAX_LDG_LOCKS  2048
 #define MIN_LDG_LOCKS  2
@@ -68,6 +69,49 @@
 
 /*! global dialog table */
 struct dlg_table *d_table = 0;
+
+
+/*!
+ * \brief Reference a dialog without locking
+ * \param _dlg dialog
+ * \param _cnt increment for the reference counter
+ */
+#define ref_dlg_unsafe(_dlg,_cnt)     \
+	do { \
+		(_dlg)->ref += (_cnt); \
+		LM_DBG("ref dlg %p with %d -> %d\n", \
+			(_dlg),(_cnt),(_dlg)->ref); \
+	}while(0)
+
+
+/*!
+ * \brief Unreference a dialog without locking
+ * \param _dlg dialog
+ * \param _cnt decrement for the reference counter
+ * \param _d_entry dialog entry
+ */
+#define unref_dlg_unsafe(_dlg,_cnt,_d_entry)   \
+	do { \
+		(_dlg)->ref -= (_cnt); \
+		LM_DBG("unref dlg %p with %d -> %d\n",\
+			(_dlg),(_cnt),(_dlg)->ref);\
+		if ((_dlg)->ref<0) {\
+			LM_CRIT("bogus ref %d with cnt %d for dlg %p [%u:%u] "\
+				"with clid '%.*s' and tags '%.*s' '%.*s'\n",\
+				(_dlg)->ref, _cnt, _dlg,\
+				(_dlg)->h_entry, (_dlg)->h_id,\
+				(_dlg)->callid.len, (_dlg)->callid.s,\
+				(_dlg)->tag[DLG_CALLER_LEG].len,\
+				(_dlg)->tag[DLG_CALLER_LEG].s,\
+				(_dlg)->tag[DLG_CALLEE_LEG].len,\
+				(_dlg)->tag[DLG_CALLEE_LEG].s); \
+		}\
+		if ((_dlg)->ref<=0) { \
+			unlink_unsafe_dlg( _d_entry, _dlg);\
+			LM_DBG("ref <=0 for dialog %p\n",_dlg);\
+			destroy_dlg(_dlg);\
+		}\
+	}while(0)
 
 
 /*!
@@ -153,6 +197,10 @@ inline void destroy_dlg(struct dlg_cell *dlg)
 	}
 
 	run_dlg_callbacks( DLGCB_DESTROY , dlg, 0, DLG_DIR_NONE, 0);
+
+	/* delete the dialog from DB*/
+	if (dlg_db_mode)
+		remove_dialog_from_db(dlg);
 
 	if(dlg==get_current_dlg_pointer())
 		reset_current_dlg_pointer();
@@ -370,17 +418,17 @@ error:
 
 /*!
  * \brief Lookup a dialog in the global list
+ *
+ * Note that the caller is responsible for decrementing (or reusing)
+ * the reference counter by one again iff a dialog has been found.
  * \param h_entry number of the hash table entry
  * \param h_id id of the hash table entry
  * \return dialog on success, NULL on failure
  */
-struct dlg_cell* lookup_dlg( unsigned int h_entry, unsigned int h_id, unsigned int *del)
+struct dlg_cell* lookup_dlg( unsigned int h_entry, unsigned int h_id)
 {
 	struct dlg_cell *dlg;
 	struct dlg_entry *d_entry;
-
-	if (del != NULL)
-		*del = 0;
 
 	if (h_entry>=d_table->size)
 		goto not_found;
@@ -391,14 +439,7 @@ struct dlg_cell* lookup_dlg( unsigned int h_entry, unsigned int h_id, unsigned i
 
 	for( dlg=d_entry->first ; dlg ; dlg=dlg->next ) {
 		if (dlg->h_id == h_id) {
-			if (dlg->state==DLG_STATE_DELETED) {
-				if (del != NULL)
-					*del = 1;
-				dlg_unlock( d_table, d_entry);
-				goto not_found;
-			}
-			dlg->ref++;
-			LM_DBG("ref dlg %p with 1 -> %d\n", dlg, dlg->ref);
+			ref_dlg_unsafe(dlg, 1);
 			dlg_unlock( d_table, d_entry);
 			LM_DBG("dialog id=%u found on entry %u\n", h_id, h_entry);
 			return dlg;
@@ -422,14 +463,10 @@ not_found:
  * \return dialog structure on success, NULL on failure
  */
 static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
-						str *callid, str *ftag, str *ttag, unsigned int *dir,
-						unsigned int *del)
+						str *callid, str *ftag, str *ttag, unsigned int *dir)
 {
 	struct dlg_cell *dlg;
 	struct dlg_entry *d_entry;
-
-	if (del != NULL)
-		*del = 0;
 
 	d_entry = &(d_table->entries[h_entry]);
 
@@ -438,14 +475,7 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
 	for( dlg = d_entry->first ; dlg ; dlg = dlg->next ) {
 		/* Check callid / fromtag / totag */
 		if (match_dialog( dlg, callid, ftag, ttag, dir)==1) {
-			if (dlg->state==DLG_STATE_DELETED) {
-				if (del != NULL)
-					*del = 1;
-				dlg_unlock( d_table, d_entry);
-				goto not_found;
-			}
-			dlg->ref++;
-			LM_DBG("ref dlg %p with 1 -> %d\n", dlg, dlg->ref);
+			ref_dlg_unsafe(dlg, 1);
 			dlg_unlock( d_table, d_entry);
 			LM_DBG("dialog callid='%.*s' found\n on entry %u, dir=%d\n",
 				callid->len, callid->s,h_entry,*dir);
@@ -454,8 +484,6 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
 	}
 
 	dlg_unlock( d_table, d_entry);
-
-not_found:
 	LM_DBG("no dialog callid='%.*s' found\n", callid->len, callid->s);
 	return 0;
 }
@@ -470,21 +498,22 @@ not_found:
  * "The combination of the To tag, From tag, and Call-ID completely  
  * defines a peer-to-peer SIP relationship between [two UAs] and is 
  * referred to as a dialog."
+ * Note that the caller is responsible for decrementing (or reusing)
+ * the reference counter by one again iff a dialog has been found.
  * \param callid callid
  * \param ftag from tag
  * \param ttag to tag
  * \param dir direction
  * \return dialog structure on success, NULL on failure
  */
-struct dlg_cell* get_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir,
-		unsigned int *del)
+struct dlg_cell* get_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
 {
 	struct dlg_cell *dlg;
 
 	if ((dlg = internal_get_dlg(core_hash(callid, 0,
-			d_table->size), callid, ftag, ttag, dir, del)) == 0 &&
+			d_table->size), callid, ftag, ttag, dir)) == 0 &&
 			(dlg = internal_get_dlg(core_hash(callid, ttag->len
-			?ttag:0, d_table->size), callid, ftag, ttag, dir, del)) == 0) {
+			?ttag:0, d_table->size), callid, ftag, ttag, dir)) == 0) {
 		LM_DBG("no dialog callid='%.*s' found\n", callid->len, callid->s);
 		return 0;
 	}
@@ -514,55 +543,11 @@ void link_dlg(struct dlg_cell *dlg, int n)
 		d_entry->last = dlg;
 	}
 
-	dlg->ref += 1 + n;
-
-	LM_DBG("ref dlg %p with %d -> %d\n", dlg, n+1, dlg->ref);
+	ref_dlg_unsafe(dlg, 1+n);
 
 	dlg_unlock( d_table, d_entry);
 	return;
 }
-
-
-/*!
- * \brief Reference a dialog without locking
- * \param _dlg dialog
- * \param _cnt increment for the reference counter
- */
-#define ref_dlg_unsafe(_dlg,_cnt)     \
-	do { \
-		(_dlg)->ref += (_cnt); \
-		LM_DBG("ref dlg %p with %d -> %d\n", \
-			(_dlg),(_cnt),(_dlg)->ref); \
-	}while(0)
-
-
-/*!
- * \brief Unreference a dialog without locking
- * \param _dlg dialog
- * \param _cnt decrement for the reference counter
- */
-#define unref_dlg_unsafe(_dlg,_cnt,_d_entry)   \
-	do { \
-		(_dlg)->ref -= (_cnt); \
-		LM_DBG("unref dlg %p with %d -> %d\n",\
-			(_dlg),(_cnt),(_dlg)->ref);\
-		if ((_dlg)->ref<0) {\
-			LM_CRIT("bogus ref %d with cnt %d for dlg %p [%u:%u] "\
-				"with clid '%.*s' and tags '%.*s' '%.*s'\n",\
-				(_dlg)->ref, _cnt, _dlg,\
-				(_dlg)->h_entry, (_dlg)->h_id,\
-				(_dlg)->callid.len, (_dlg)->callid.s,\
-				(_dlg)->tag[DLG_CALLER_LEG].len,\
-				(_dlg)->tag[DLG_CALLER_LEG].s,\
-				(_dlg)->tag[DLG_CALLEE_LEG].len,\
-				(_dlg)->tag[DLG_CALLEE_LEG].s); \
-		}\
-		if ((_dlg)->ref<=0) { \
-			unlink_unsafe_dlg( _d_entry, _dlg);\
-			LM_DBG("ref <=0 for dialog %p\n",_dlg);\
-			destroy_dlg(_dlg);\
-		}\
-	}while(0)
 
 
 /*!
@@ -828,6 +813,11 @@ static inline int internal_mi_print_dlg(struct mi_node *rpl,
 	if (node1==0)
 		goto error;
 
+	p= int2str((unsigned long)dlg->ref, &len);
+	node1 = add_mi_node_child( node, MI_DUP_VALUE, "ref_count", 9, p, len);
+	if (node1==0)
+		goto error;
+
 	p= int2str((unsigned long)dlg->start_ts, &len);
 	node1 = add_mi_node_child(node,MI_DUP_VALUE,"timestart",9, p, len);
 	if (node1==0)
@@ -871,11 +861,25 @@ static inline int internal_mi_print_dlg(struct mi_node *rpl,
 	if(node1 == 0)
 		goto error;
 
-	node1 = add_mi_node_child(node, 0,"caller_bind_addr",16,
-			dlg->bind_addr[DLG_CALLER_LEG]->sock_str.s, 
+	if (dlg->bind_addr[DLG_CALLER_LEG]) {
+		node1 = add_mi_node_child(node, 0,
+			"caller_bind_addr",16,
+			dlg->bind_addr[DLG_CALLER_LEG]->sock_str.s,
 			dlg->bind_addr[DLG_CALLER_LEG]->sock_str.len);
-	if(node1 == 0)
-		goto error;
+	} else {
+		node1 = add_mi_node_child(node, 0,
+			"caller_bind_addr",16,0,0);
+	}
+
+	if (dlg->bind_addr[DLG_CALLEE_LEG]) {
+		node1 = add_mi_node_child(node, 0,
+			"callee_bind_addr",16,
+			dlg->bind_addr[DLG_CALLEE_LEG]->sock_str.s,
+			dlg->bind_addr[DLG_CALLEE_LEG]->sock_str.len);
+	} else {
+		node1 = add_mi_node_child(node, 0,
+			"callee_bind_addr",16,0,0);
+	}
 
 	node1 = add_mi_node_child(node, MI_DUP_VALUE, "to_uri", 6,
 			dlg->to_uri.s, dlg->to_uri.len);
@@ -902,18 +906,6 @@ static inline int internal_mi_print_dlg(struct mi_node *rpl,
 	node1 = add_mi_node_child(node, MI_DUP_VALUE,"callee_route_set",16,
 			dlg->route_set[DLG_CALLEE_LEG].s,
 			dlg->route_set[DLG_CALLEE_LEG].len);
-	if(node1 == 0)
-		goto error;
-
-	if (dlg->bind_addr[DLG_CALLEE_LEG]) {
-		node1 = add_mi_node_child(node, 0,
-			"callee_bind_addr",16,
-			dlg->bind_addr[DLG_CALLEE_LEG]->sock_str.s, 
-			dlg->bind_addr[DLG_CALLEE_LEG]->sock_str.len);
-	} else {
-		node1 = add_mi_node_child(node, 0,
-			"callee_bind_addr",16,0,0);
-	}
 	if(node1 == 0)
 		goto error;
 

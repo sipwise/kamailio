@@ -49,6 +49,7 @@
 #include "../../mod_fix.h"
 #include "../../rpc.h"
 #include "../../rpc_lookup.h"
+#include "../../cfg/cfg_struct.h"
 
 #include "../rr/api.h"
 
@@ -220,8 +221,9 @@ static int mod_init(void)
 		if (from_restore_mode==FROM_AUTO_RESTORE) {
 			/* we need the append_fromtag on in RR */
 			if (!uac_rrb.append_fromtag) {
-				LM_ERR("'append_fromtag' RR param is not enabled!"
-					" - required by AUTO restore mode\n");
+				LM_ERR("'append_fromtag' RR param is not enabled"
+					" - required by AUTO restore mode!"
+					" Or you should set from_restore_mode param to 'none'\n");
 				goto error;
 			}
 			/* get all requests doing loose route */
@@ -257,6 +259,8 @@ static int mod_init(void)
 		}
 		uac_reg_init_db();
 		register_procs(1);
+		/* add child to update local config framework structures */
+		cfg_register_child(1);
 	}
 	init_from_replacer();
 
@@ -284,9 +288,16 @@ static int child_init(int rank)
 	}
 	if (pid==0){
 		/* child */
+		/* initialize the config framework */
+		if (cfg_child_init())
+			return -1;
+
 		uac_reg_load_db();
 		uac_reg_timer(0);
 		for(;;){
+			/* update the local config framework structures */
+			cfg_update();
+
 			sleep(reg_timer_interval);
 			uac_reg_timer(get_ticks());
 		}

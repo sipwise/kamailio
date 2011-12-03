@@ -216,6 +216,8 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	int backup_route_type;
 #endif
 	snd_flags_t snd_flags;
+	tm_xlinks_t backup_xd;
+	tm_xdata_t local_xd;
 
 	ret=-1;
 	hi=0; /* make gcc happy */
@@ -275,7 +277,13 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	}
 #endif /* USE_DNS_FAILOVER */
 
+	/* build cell sets X/AVP lists to new transaction structure
+	 * => bakup in a tmp struct and restore afterwards */
+	memset(&local_xd, 0, sizeof(tm_xdata_t));
+	tm_xdata_replace(&local_xd, &backup_xd);
 	new_cell = build_cell(0); 
+	tm_xdata_replace(0, &backup_xd);
+
 	if (!new_cell) {
 		ret=E_OUT_OF_MEM;
 		LOG(L_ERR, "t_uac: short of cell shmem\n");
@@ -352,9 +360,8 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 			#ifdef USE_COMP
 				lreq.rcv.comp=dst.comp;
 			#endif /* USE_COMP */
-				/* AVPs are reset anyway afterwards, so no need to 
-				   backup/restore them*/
 				sflag_bk = getsflags();
+				tm_xdata_swap(new_cell, &backup_xd, 0);
 
 				/* run the route */
 				backup_route_type = get_route_type();
@@ -373,6 +380,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 				set_route_type( backup_route_type );
 
 				/* restore original environment */
+				tm_xdata_swap(new_cell, &backup_xd, 1);
 				setsflagsval(sflag_bk);
 
 				if (unlikely(lreq.new_uri.s))
@@ -406,13 +414,6 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 			}
 		}
 	}
-#endif
-
-	/* better reset avp list now - anyhow, it's useless from
-	 * this point (bogdan) */
-	reset_avps();
-#ifdef WITH_XAVP
-	xavp_reset_list();
 #endif
 
 	new_cell->method.s = buf;

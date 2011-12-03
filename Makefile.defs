@@ -161,7 +161,7 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 #version number
 VERSION = 3
 PATCHLEVEL = 1
-SUBLEVEL =  3
+SUBLEVEL =  5
 EXTRAVERSION =
 
 # memory debugger switcher
@@ -225,107 +225,6 @@ endif
 # extra CC command line options (e.g  -march=athlon-mp)
 CC_EXTRA_OPTS ?=
 
-LIBDIR ?=
-ifeq ($(LIBDIR),)
-ARCHBSZ= $(shell echo $(HOST_ARCH) | sed -e 's/.*64.*/64b/')
-ifeq ($(ARCHBSZ),64b)
-	LIBDIR = lib64
-else
-	LIBDIR = lib
-endif
-endif
-
-# dirs 
-cfg_dir = etc/$(MAIN_NAME)/
-bin_dir = sbin/
-share_dir = share/$(MAIN_NAME)/
-# lib/$(MAIN_NAME)/modules , lib/$(MAIN_NAME)/modules-s, lib/$(MAIN_NAME)/modules-k
-modules_dir = $(LIBDIR)/$(MAIN_NAME)/
-lib_dir = $(LIBDIR)/$(MAIN_NAME)/
-
-doc_dir = doc/$(MAIN_NAME)/
-man_dir = man/
-data_dir = $(MAIN_NAME)/
-
-ifeq ($(OS), linux)
-	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = share/man/
-	data_dir = share/$(MAIN_NAME)/
-	LOCALBASE ?= /usr/local
-endif
-
-ifeq ($(OS), freebsd)
-	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = man/
-	data_dir = share/$(MAIN_NAME)/
-	LOCALBASE ?= /usr/local
-endif
-
-ifeq ($(OS), openbsd)
-	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = man/
-	data_dir = share/$(MAIN_NAME)/
-	LOCALBASE ?= /usr/local
-endif
-
-ifeq ($(OS), netbsd)
-	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = man/
-	data_dir = share/$(MAIN_NAME)/
-	LOCALBASE ?= /usr/pkg
-endif
-
-ifeq ($(OS), dragonfly)
-	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = man/
-	data_dir = share/$(MAIN_NAME)/
-	LOCALBASE ?= /usr/pkg
-endif
-
-ifeq ($(OS), darwin)
-	doc_dir = share/doc/$(MAIN_NAME)/
-	man_dir = man/
-	data_dir = share/$(MAIN_NAME)/
-	LOCALBASE ?= /usr/local
-endif
-
-LOCALBASE ?= /usr/local
-
-# Doxygen directory
-doxygen_dir=doc/doxygen
-
-# install location
-PREFIX ?= $(LOCALBASE)
-prefix = $(PREFIX)
-# install path is $(basedir) $(prefix) 
-# example:
-#  creating a bin. archive in /tmp, which unpacks in /usr/local
-#  basedir=/tmp
-#  prefix=/usr/local
-
-BASEDIR ?= $(DESTDIR)
-basedir = $(BASEDIR)
-# install prefixes for various stuff
-cfg_prefix = $(basedir)$(prefix)
-bin_prefix = $(basedir)$(prefix)
-modules_prefix = $(basedir)$(prefix)
-lib_prefix = $(basedir)$(prefix)
-doc_prefix = $(basedir)$(prefix)
-man_prefix = $(basedir)$(prefix)
-ut_prefix = $(basedir)$(prefix)
-share_prefix = $(basedir)$(prefix)
-data_prefix = $(basedir)$(prefix)
-
-
-# target dirs for various stuff
-cfg_target = $(prefix)/$(cfg_dir)
-bin_target = $(prefix)/$(bin_dir)
-#modules_target = $(prefix)/$(modules_dir)
-lib_target = $(prefix)/$(lib_dir)
-doc_target = $(prefix)/$(doc_dir)
-data_target = $(prefix)/$(data_dir)
-
-
 
 ifeq ($(OS), solaris)
 #use GNU versions
@@ -385,12 +284,18 @@ ifneq (,$(findstring gcc, $(CC_LONGVER)))
 	#transform gcc version into 2.9x or 3.0
 	CC_SHORTVER:=$(shell echo "$(CC_VER)" | cut -d" " -f 2| \
 				 sed -e 's/[^0-9]*-\(.*\)/\1/'| \
-				 sed -e 's/2\.9.*/2.9x/' -e 's/3\.[0-3]\..*/3.0/' -e \
-				 	's/3\.[0-3]/3.0/' -e 's/3\.[4-9]\..*/3.4/' -e \
-					's/3\.[4-9]/3.4/' -e 's/4\.[0-1]\..*/4.x/' -e \
-					's/4\.[0-1]/4.x/' -e 's/4\.[2-9]\..*/4.2+/' -e \
-					's/4\.[2-9]$$/4.2+/')
-ifeq (,$(strip $(filter-out 3.0 3.4 4.x 4.2+,$(CC_SHORTVER))))
+				 sed -e 's/2\.9.*/2.9x/' \
+					-e 's/3\.[0-3]\..*/3.0/' \
+					-e 's/3\.[0-3]/3.0/' \
+					-e 's/3\.[4-9]\..*/3.4/' \
+					-e 's/3\.[4-9]/3.4/' \
+					-e 's/4\.[0-1]\..*/4.x/' \
+					-e 's/4\.[0-1]/4.x/' \
+					-e 's/4\.[2-46-9]\..*/4.2+/' \
+					-e 's/4\.[2-46-9]$$/4.2+/' \
+					-e 's/4\.5\..*/4.5/' \
+					-e 's/4\.5$$/4.5/')
+ifeq (,$(strip $(filter-out 3.0 3.4 4.x 4.2+ 4.5,$(CC_SHORTVER))))
 	# dependencies can be generated on-the-fly while compiling *.c
 	CC_MKDEP_OPTS=-MMD -MP
 endif # 3.0 <= $(CC_SHORTVER) <= 4.x
@@ -503,6 +408,107 @@ else
 ARCH:=$(HOST_ARCH)
 endif
 $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
+
+LIBDIR ?=
+ifeq ($(LIBDIR),)
+ARCHBSZ= $(shell echo $(ARCH) | sed -e 's/.*64.*/64b/')
+ifeq ($(ARCHBSZ),64b)
+	LIBDIR = lib64
+else
+	LIBDIR = lib
+endif
+endif
+
+# dirs
+cfg_dir = etc/$(MAIN_NAME)/
+bin_dir = sbin/
+share_dir = share/$(MAIN_NAME)/
+# lib/$(MAIN_NAME)/modules , lib/$(MAIN_NAME)/modules-s, lib/$(MAIN_NAME)/modules-k
+modules_dir = $(LIBDIR)/$(MAIN_NAME)/
+lib_dir = $(LIBDIR)/$(MAIN_NAME)/
+
+doc_dir = doc/$(MAIN_NAME)/
+man_dir = man/
+data_dir = $(MAIN_NAME)/
+
+ifeq ($(OS), linux)
+	doc_dir = share/doc/$(MAIN_NAME)/
+	man_dir = share/man/
+	data_dir = share/$(MAIN_NAME)/
+	LOCALBASE ?= /usr/local
+endif
+
+ifeq ($(OS), freebsd)
+	doc_dir = share/doc/$(MAIN_NAME)/
+	man_dir = man/
+	data_dir = share/$(MAIN_NAME)/
+	LOCALBASE ?= /usr/local
+endif
+
+ifeq ($(OS), openbsd)
+	doc_dir = share/doc/$(MAIN_NAME)/
+	man_dir = man/
+	data_dir = share/$(MAIN_NAME)/
+	LOCALBASE ?= /usr/local
+endif
+
+ifeq ($(OS), netbsd)
+	doc_dir = share/doc/$(MAIN_NAME)/
+	man_dir = man/
+	data_dir = share/$(MAIN_NAME)/
+	LOCALBASE ?= /usr/pkg
+endif
+
+ifeq ($(OS), dragonfly)
+	doc_dir = share/doc/$(MAIN_NAME)/
+	man_dir = man/
+	data_dir = share/$(MAIN_NAME)/
+	LOCALBASE ?= /usr/pkg
+endif
+
+ifeq ($(OS), darwin)
+	doc_dir = share/doc/$(MAIN_NAME)/
+	man_dir = man/
+	data_dir = share/$(MAIN_NAME)/
+	LOCALBASE ?= /usr/local
+endif
+
+LOCALBASE ?= /usr/local
+
+# Doxygen directory
+doxygen_dir=doc/doxygen
+
+# install location
+PREFIX ?= $(LOCALBASE)
+prefix = $(PREFIX)
+# install path is $(basedir) $(prefix)
+# example:
+#  creating a bin. archive in /tmp, which unpacks in /usr/local
+#  basedir=/tmp
+#  prefix=/usr/local
+
+BASEDIR ?= $(DESTDIR)
+basedir = $(BASEDIR)
+# install prefixes for various stuff
+cfg_prefix = $(basedir)$(prefix)
+bin_prefix = $(basedir)$(prefix)
+modules_prefix = $(basedir)$(prefix)
+lib_prefix = $(basedir)$(prefix)
+doc_prefix = $(basedir)$(prefix)
+man_prefix = $(basedir)$(prefix)
+ut_prefix = $(basedir)$(prefix)
+share_prefix = $(basedir)$(prefix)
+data_prefix = $(basedir)$(prefix)
+
+
+# target dirs for various stuff
+cfg_target = $(prefix)/$(cfg_dir)
+bin_target = $(prefix)/$(bin_dir)
+#modules_target = $(prefix)/$(modules_dir)
+lib_target = $(prefix)/$(lib_dir)
+doc_target = $(prefix)/$(doc_dir)
+data_target = $(prefix)/$(data_dir)
+
 
 # compile-time options
 #
@@ -857,8 +863,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS=-g -O9 -funroll-loops  -Wcast-align $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 $(call				set_if_empty,CPU,athlon64)
 					CFLAGS+=-m32 -minline-all-stringops \
 							-falign-loops \
@@ -907,7 +913,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 
 else		# CC_NAME, gcc
 ifeq		($(CC_NAME), icc)
@@ -932,6 +938,16 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS=-g -O9 -funroll-loops  -Wcast-align $(PROFILE)
+			#if gcc 4.5
+			# don't add '-mtune=$(CPU)' - gcc failure
+ifeq			($(CC_SHORTVER), 4.5)
+$(call				set_if_empty,CPU,opteron)
+					CFLAGS+=-m64 -minline-all-stringops \
+							-falign-loops \
+							-ftree-vectorize \
+							-fno-strict-overflow
+					LDFLAGS+=-m64
+else
 			#if gcc 4.2+
 ifeq			($(CC_SHORTVER), 4.2+)
 $(call				set_if_empty,CPU,opteron)
@@ -983,6 +999,7 @@ endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
 endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5
 
 else		# CC_NAME, gcc
 ifeq		($(CC_NAME), icc)
@@ -1009,8 +1026,8 @@ ifeq		($(CC_NAME), gcc)
 				CFLAGS=-g -O9 -funroll-loops  $(PROFILE) \
 					#-Wcast-align \
 					#-Wmissing-prototypes 
-				#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+				#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 $(call				set_if_empty,CPU,ultrasparc)
 					#use 32bit for now
 					CFLAGS+=-m64 -mcpu=ultrasparc  \
@@ -1076,7 +1093,7 @@ endif			#CC_SHORTVER, 2.9x
 endif			#CC_SHORTVER, 3.0
 endif			#CC_SHORTVER, 3.4
 endif			#CC_SHORTVER, 4.x
-endif			#CC_SHORTVER, 4.2+
+endif			#CC_SHORTVER, 4.5 or 4.2+
 	
 else		#CC_NAME, gcc
 ifeq		($(CC_NAME), suncc)
@@ -1100,8 +1117,8 @@ ifeq		($(CC_NAME), gcc)
 				CFLAGS=-g -O9 -funroll-loops  $(PROFILE) \
 					#-Wcast-align \
 					#-Wmissing-prototypes 
-				#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+				#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 $(call				set_if_empty,CPU,v8)
 					#use 32bit for now
 					CFLAGS+= -mtune=$(CPU) \
@@ -1142,7 +1159,7 @@ endif			#CC_SHORTVER, 2.9x
 endif			#CC_SHORTVER, 3.0
 endif			#CC_SHORTVER, 3.4
 endif			#CC_SHORTVER, 4.x
-endif			#CC_SHORTVER, 4.2+
+endif			#CC_SHORTVER, 4.5 or 4.2+
 	
 else		#CC_NAME, gcc
 ifeq		($(CC_NAME), suncc)
@@ -1163,8 +1180,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS=-O9 -funroll-loops -fsigned-char $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 					CFLAGS+= -ftree-vectorize -fno-strict-overflow
 					# not supported on arm: -minline-all-stringops 
 else
@@ -1196,7 +1213,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1212,8 +1229,8 @@ ifeq		($(CC_NAME), gcc)
 				#common stuff
 				CFLAGS=-march=armv6 -O9 -funroll-loops -fsigned-char \
 						$(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 					CFLAGS+= -ftree-vectorize -fno-strict-overflow
 else
 			#if gcc 4.x+
@@ -1243,7 +1260,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1258,8 +1275,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS=-O9 -funroll-loops  $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 					CFLAGS+=-march=r3000 -minline-all-stringops \
 							-ftree-vectorize -fno-strict-overflow
 else
@@ -1290,7 +1307,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1305,8 +1322,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS= -mips2 -O9 -funroll-loops $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 					CFLAGS+=-minline-all-stringops -ftree-vectorize \
 							-fno-strict-overflow
 else
@@ -1335,7 +1352,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1350,8 +1367,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS= -mips64 -O9 -funroll-loops $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 					CFLAGS+=-minline-all-stringops -ftree-vectorize \
 							-fno-strict-overflow
 else
@@ -1380,7 +1397,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1395,8 +1412,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS= -O9 -funroll-loops $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 					CFLAGS+= -fno-strict-overflow
 					# not supported: -minline-all-stringops
 else
@@ -1426,7 +1443,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1441,8 +1458,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS= -O9 -funroll-loops -fsigned-char $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 $(call				set_if_empty,CPU,powerpc)
 					CFLAGS+=-ftree-vectorize \
 							-fno-strict-overflow \
@@ -1475,7 +1492,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers
@@ -1490,8 +1507,8 @@ ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS= -O9 -funroll-loops -fsigned-char $(PROFILE)
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
+			#if gcc 4.5 or 4.2+
+ifeq (,$(strip $(filter-out 4.2+ 4.5,$(CC_SHORTVER))))
 $(call				set_if_empty,CPU,powerpc64)
 					CFLAGS+=-ftree-vectorize \
 							-fno-strict-overflow \
@@ -1524,7 +1541,7 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
+endif			# CC_SHORTVER, 4.5 or 4.2+
 	
 else		# CC_NAME, gcc
 				#other compilers

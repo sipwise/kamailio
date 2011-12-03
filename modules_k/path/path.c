@@ -208,9 +208,9 @@ void path_rr_callback(struct sip_msg *_m, str *r_param, void *cb_param)
 {
 	param_hooks_t hooks;
 	param_t *params;
-
+			
 	if (parse_params(r_param, CLASS_CONTACT, &hooks, &params) != 0) {
-		LM_ERR("failed to parse route parameters '%.*s'\n", r_param->len, r_param->s);
+		LM_ERR("failed to parse route parametes\n");
 		return;
 	}
 

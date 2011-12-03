@@ -48,19 +48,6 @@
  * */
 static str su_200_rpl     = str_init("OK");
 
-#define CONT_COPY(buf, dest, source)\
-	dest.s= (char*)buf+ size;\
-	memcpy(dest.s, source.s, source.len);\
-	dest.len= source.len;\
-	size+= source.len;
-
-
-#define CONT_COPY_1 (buf, dest_s, dest_len, source_s, source_len)\
-	dest_s= (char*)buf+ size;\
-	memcpy(dest_s, source_s, source_len);\
-	dest_len= source_len;\
-	size+= source_len;
-
 int parse_subs_state(str auth_state, str** reason, int* expires)
 {
 	str str_exp;
@@ -240,16 +227,6 @@ int rls_handle_notify(struct sip_msg* msg, char* c1, char* c2)
 		LM_ERR("unrecognized event package\n");
 		goto error;
 	}
-	if(pua_get_record_id(&dialog, &res_id)< 0) // verify if within a stored dialog
-	{
-		LM_ERR("occured when trying to get record id\n");
-		goto error;
-	}
-	if(res_id== 0)
-	{
-		LM_ERR("record not found\n");
-		goto error;
-	}
 
 	/* extract the subscription state */
 	hdr = msg->headers;
@@ -276,6 +253,24 @@ int rls_handle_notify(struct sip_msg* msg, char* c1, char* c2)
 		LM_ERR("while parsing 'Subscription-State' header\n");
 		goto error;
 	}
+	if(pua_get_record_id(&dialog, &res_id)< 0) // verify if within a stored dialog
+	{
+		LM_ERR("occured when trying to get record id\n");
+		goto error;
+	}
+	if(res_id==0)
+	{
+		LM_DBG("presence dialog record not found\n");
+		/* if it is a NOTIFY for a terminated SUBSCRIBE dialog in RLS, then
+		 * the module might not have the dialog structure anymore
+		 * - just send 200ok, it is harmless
+		 */
+		if(auth_flag==TERMINATED_STATE)
+			goto done;
+		LM_ERR("no presence dialog record for non-TERMINATED state\n");
+		goto error;
+	}
+
 	if(msg->content_type== NULL || msg->content_type->body.s== NULL)
 	{
 		LM_DBG("cannot find content type header header\n");
@@ -408,9 +403,11 @@ done:
 		goto error;
 	}	
 
-	pkg_free(res_id->s);
-	pkg_free(res_id);
-
+	if(res_id!=NULL)
+	{
+		pkg_free(res_id->s);
+		pkg_free(res_id);
+	}
 	return 1;
 
 error:
@@ -472,8 +469,11 @@ void timer_send_notify(unsigned int ticks,void *param)
 	unsigned int hash_code= 0;
 	int len;
 	int size= BUF_REALLOC_SIZE, buf_len= 0;	
-	char* buf= NULL, *auth_state= NULL, *boundary_string= NULL, *cid= NULL;
-	int contor= 0, auth_state_flag, antet_len;
+	char* buf= NULL, *auth_state= NULL, *boundary_string= NULL;
+	str cid = {0,0};
+	str content_type = {0,0};
+	int contor= 0, auth_state_flag;
+	int chunk_len;
 	str bstr= {0, 0};
 	str rlmi_cont= {0, 0}, multi_cont;
 	subs_t* s, *dialog= NULL;
@@ -547,7 +547,6 @@ void timer_send_notify(unsigned int ticks,void *param)
 		ERR_MEM(PKG_MEM_STR);
 	}
 
-	antet_len= COMPUTE_ANTET_LEN(bstr.s);
 	LM_DBG("found %d records with updated state\n", result->n);
 	for(i= 0; i< result->n; i++)
 	{
@@ -676,7 +675,8 @@ void timer_send_notify(unsigned int ticks,void *param)
 		while(1)
 		{
 			contor++;
-			cid= NULL;
+			cid.s= NULL;
+			cid.len= 0;
 			instance_node= xmlNewChild(resource_node, NULL, 
 					BAD_CAST "instance", NULL);
 			if(instance_node== NULL)
@@ -697,8 +697,8 @@ void timer_send_notify(unsigned int ticks,void *param)
 		
 			if(auth_state_flag & ACTIVE_STATE)
 			{
-				cid= generate_cid(resource_uri, strlen(resource_uri));
-				xmlNewProp(instance_node, BAD_CAST "cid", BAD_CAST cid);
+				cid.s= generate_cid(resource_uri, strlen(resource_uri));
+				xmlNewProp(instance_node, BAD_CAST "cid", BAD_CAST cid.s);
 			}
 			else
 			if(auth_state_flag & TERMINATED_STATE)
@@ -708,18 +708,28 @@ void timer_send_notify(unsigned int ticks,void *param)
 			}
 		
 			/* add in the multipart buffer */
-			if(cid)
+			if(cid.s)
 			{
-				if(buf_len+ antet_len+ pres_state.len+ 4 > size)
+				cid.len = strlen(cid.s);
+				content_type.s = (char*)row_vals[content_type_col].val.string_val;
+				content_type.len = strlen(content_type.s);
+				chunk_len = 4 + bstr.len
+							+ 35
+							+ 16 + cid.len
+							+ 18 + content_type.len
+							+ 4 + pres_state.len + 8;
+				if(buf_len + chunk_len >= size)
 				{
 					REALLOC_BUF
 				}
-				buf_len+= sprintf(buf+ buf_len, "--%s\r\n", bstr.s);
+				buf_len+= sprintf(buf+ buf_len, "--%.*s\r\n", bstr.len,
+						bstr.s);
 				buf_len+= sprintf(buf+ buf_len,
 						"Content-Transfer-Encoding: binary\r\n");
-				buf_len+= sprintf(buf+ buf_len, "Content-ID: <%s>\r\n", cid);
-				buf_len+= sprintf(buf+ buf_len, "Content-Type: %s\r\n\r\n",  
-						row_vals[content_type_col].val.string_val);
+				buf_len+= sprintf(buf+ buf_len, "Content-ID: <%.*s>\r\n",
+						cid.len, cid.s);
+				buf_len+= sprintf(buf+ buf_len, "Content-Type: %.*s\r\n\r\n",
+						content_type.len, content_type.s);
 				buf_len+= sprintf(buf+buf_len,"%.*s\r\n\r\n", pres_state.len,
 						pres_state.s);
 			}

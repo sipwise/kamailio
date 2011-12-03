@@ -559,11 +559,18 @@ static int mod_init(void)
 		return -1;
 	}
 
+	/* sanitize dlg_hash_zie */
+	if (dlg_hash_size < 1){
+		LM_WARN("hash_size is smaller "
+				"then 1  -> rounding from %d to 1\n",
+				dlg_hash_size);
+		dlg_hash_size = 1;
+	}
 	/* initialized the hash table */
 	for( n=0 ; n<(8*sizeof(n)) ; n++) {
 		if (dlg_hash_size==(1<<n))
 			break;
-		if (dlg_hash_size<(1<<n)) {
+		if (n && dlg_hash_size<(1<<n)) {
 			LM_WARN("hash_size is not a power "
 				"of 2 as it should be -> rounding from %d to %d\n",
 				dlg_hash_size, 1<<(n-1));
@@ -1089,9 +1096,10 @@ static int w_dlg_get(struct sip_msg *msg, char *ci, char *ft, char *tt)
 		return -1;
 	}
 
-	dlg = get_dlg(&sc, &sf, &st, &dir, NULL);
+	dlg = get_dlg(&sc, &sf, &st, &dir);
 	if(dlg==NULL)
 		return -1;
+    /* set current dialog pointer - re-use ref increment from dlg_get() above */
 	current_dlg_pointer = dlg;
 	_dlg_ctx.dlg = dlg;
 	_dlg_ctx.dir = dir;
@@ -1154,8 +1162,8 @@ static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, struct dlg_cell *
 {
 	rpc_cb_ctx_t rpc_cb;
 
-	rpc->printf(c, "hash:%u:%u state:%u timestart:%u timeout:%u",
-		dlg->h_entry, dlg->h_id, dlg->state, dlg->start_ts, dlg->tl.timeout);
+	rpc->printf(c, "hash:%u:%u state:%u ref_count:%u timestart:%u timeout:%u",
+		dlg->h_entry, dlg->h_id, dlg->state, dlg->ref, dlg->start_ts, dlg->tl.timeout);
 	rpc->printf(c, "\tcallid:%.*s from_tag:%.*s to_tag:%.*s",
 		dlg->callid.len, dlg->callid.s,
 		dlg->tag[DLG_CALLER_LEG].len, dlg->tag[DLG_CALLER_LEG].s,
@@ -1383,7 +1391,7 @@ static void rpc_end_dlg_entry_id(rpc_t *rpc, void *c) {
 
 	if (rpc->scan(c, "ddS", &h_entry, &h_id, &rpc_extra_hdrs) < 2) return;
 
-	dlg = lookup_dlg(h_entry, h_id, NULL);
+	dlg = lookup_dlg(h_entry, h_id);
 	if(dlg){
 		dlg_bye_all(dlg, (rpc_extra_hdrs.len>0)?&rpc_extra_hdrs:NULL);
 		unref_dlg(dlg, 1);
