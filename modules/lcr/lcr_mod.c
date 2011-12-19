@@ -1496,13 +1496,14 @@ inline int encode_avp_value(char *value, unsigned int gw_index, uri_type scheme,
 }
 
 inline int decode_avp_value(char *value, unsigned int *gw_index, str *scheme,
-			    unsigned int *strip, str *tag, unsigned int *addr,
+			    unsigned int *strip, str *tag, struct ip_addr *addr,
 			    str *hostname, str *port, str *params,
 			    str *transport, unsigned int *flags)
 {
     unsigned int u;
     str s;
     char *sep;
+    struct ip_addr *ip;
 
     /* gw index */
     s.s = value;
@@ -1555,9 +1556,18 @@ inline int decode_avp_value(char *value, unsigned int *gw_index, str *scheme,
     }
     s.len = sep - s.s;
     if (s.len > 0) {
-	str2int(&s, addr);
+	if ((ip = str2ip(&s)) != NULL)
+	    *addr = *ip;
+	else if ((ip = str2ip6(&s)) != NULL)
+	    *addr = *ip;
+	else {
+	    str2int(&s, &u);
+	    addr->af = AF_INET;
+	    addr->len = 4;
+	    addr->u.addr32[0] = u;
+	}
     } else {
-	*addr = 0;
+	addr->af = 0;
     }
     /* hostname */
     hostname->s = sep + 1;
@@ -1831,7 +1841,7 @@ static int load_gws_2(struct sip_msg* _m, char *_lcr_id, char *_from_uri)
 /* Generate Request-URI and Destination URI */
 static int generate_uris(struct sip_msg* _m, char *r_uri, str *r_uri_user,
 			 unsigned int *r_uri_len, char *dst_uri,
-			 unsigned int *dst_uri_len, unsigned int *addr,
+			 unsigned int *dst_uri_len, struct ip_addr *addr,
 			 unsigned int *gw_index, unsigned int *flags)
 {
     int_str gw_uri_val;
@@ -1839,7 +1849,6 @@ static int generate_uris(struct sip_msg* _m, char *r_uri, str *r_uri_user,
     str scheme, tag, hostname, port, params, transport, addr_str;
     char *at;
     unsigned int strip;
-    struct ip_addr a;
     
     gu_avp = search_first_avp(gw_uri_avp_type, gw_uri_avp, &gw_uri_val, 0);
 
@@ -1848,11 +1857,8 @@ static int generate_uris(struct sip_msg* _m, char *r_uri, str *r_uri_user,
     decode_avp_value(gw_uri_val.s.s, gw_index, &scheme, &strip, &tag, addr,
 		     &hostname, &port, &params, &transport, flags);
 
-    if (*addr > 0) {
-	a.af = AF_INET;
-	a.len = 4;
-	a.u.addr32[0] = *addr;
-	addr_str.s = ip_addr2a(&a);
+    if (addr->af != 0) {
+	addr_str.s = ip_addr2a(addr);
 	addr_str.len = strlen(addr_str.s);
     } else {
 	addr_str.len = 0;
@@ -2009,7 +2015,8 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
     struct usr_avp *ru_avp;
     int rval;
     str uri_str;
-    unsigned int flags, r_uri_len, dst_uri_len, addr, gw_index;
+    unsigned int flags, r_uri_len, dst_uri_len, gw_index;
+    struct ip_addr addr;
     char r_uri[MAX_URI_LEN], dst_uri[MAX_URI_LEN];
 
     ru_avp = search_first_avp(ruri_user_avp_type, ruri_user_avp,
@@ -2077,7 +2084,9 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
 	delete_avp(defunct_gw_avp_type, defunct_gw_avp);
 	val.n = gw_index;
 	add_avp(defunct_gw_avp_type, defunct_gw_avp, val);
-	LM_DBG("added defunct_gw_avp <%u>", addr);
+	LM_DBG("added defunct_gw_avp <%x:%x:%x:%x:%x:%x:%x:%x>",
+	    addr.u.addr16[0], addr.u.addr16[1], addr.u.addr16[2], addr.u.addr16[3],
+	    addr.u.addr16[4], addr.u.addr16[5], addr.u.addr16[6], addr.u.addr16[7]);
     }
     
     return 1;
