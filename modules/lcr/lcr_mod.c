@@ -1901,7 +1901,11 @@ static int generate_uris(struct sip_msg* _m, char *r_uri, str *r_uri_user,
 	*r_uri_len = at - r_uri;
 	at = dst_uri;
 	append_str(at, scheme.s, scheme.len);
+	if (addr->af == AF_INET6)
+	    append_chr(at, '[');
 	append_str(at, addr_str.s, addr_str.len);
+	if (addr->af == AF_INET6)
+	    append_chr(at, ']');
 	if (port.len > 0) {
 	    append_chr(at, ':');
 	    append_str(at, port.s, port.len);
@@ -1915,7 +1919,11 @@ static int generate_uris(struct sip_msg* _m, char *r_uri, str *r_uri_user,
 	/* either ip_addr or hostname specified:
 	   place the given one in r-uri and leave dst-uri empty */
 	if (addr_str.len > 0) {
+	    if (addr->af == AF_INET6)
+		append_chr(at, '[');
 	    append_str(at, addr_str.s, addr_str.len);
+	    if (addr->af == AF_INET6)
+		append_chr(at, ']');
 	} else {
 	    append_str(at, hostname.s, hostname.len);
 	}
