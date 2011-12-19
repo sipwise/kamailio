@@ -776,10 +776,11 @@ static int comp_gws(const void *_g1, const void *_g2)
     struct gw_info *g1 = (struct gw_info *)_g1;
     struct gw_info *g2 = (struct gw_info *)_g2;
 
-    if (g1->ip_addr < g2->ip_addr) return -1;
-    if (g1->ip_addr > g2->ip_addr) return 1;
-
-    return 0;
+    if (g1->ip_addr.af < g2->ip_addr.af)   return -1;
+    if (g1->ip_addr.af > g2->ip_addr.af)   return  1;
+    if (g1->ip_addr.len < g2->ip_addr.len) return -1;
+    if (g1->ip_addr.len > g2->ip_addr.len) return  1;
+    return memcmp(g1->ip_addr.u.addr, g2->ip_addr.u.addr, g1->ip_addr.len);
 }
 
 
@@ -787,13 +788,13 @@ static int comp_gws(const void *_g1, const void *_g2)
  * Check if ip_addr/grp_id of gateway is unique.
  */
 static int gw_unique(const struct gw_info *gws, const unsigned int count,
-		     const unsigned int ip_addr, const unsigned int port,
+		     const struct ip_addr *ip_addr, const unsigned int port,
 		     char *hostname, unsigned int hostname_len)
 {
     unsigned int i;
 
     for (i = 1; i <= count; i++) {
-	if ((gws[i].ip_addr == ip_addr) &&
+	if (ip_addr_cmp(&gws[i].ip_addr, ip_addr) &&
 	    (gws[i].port == port) &&
 	    (gws[i].hostname_len == hostname_len) &&
 	    (strncasecmp(gws[i].hostname, hostname, hostname_len) == 0)) {
@@ -805,7 +806,7 @@ static int gw_unique(const struct gw_info *gws, const unsigned int count,
 
 static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
 		     char *gw_name, unsigned int gw_name_len,
-		     unsigned int scheme, unsigned int ip_addr,
+		     unsigned int scheme, struct ip_addr *ip_addr,
 		     unsigned int port, unsigned int transport,
 		     char *params, unsigned int params_len,
 		     char *hostname, unsigned int hostname_len,
@@ -822,7 +823,7 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
     if (gw_name_len) memcpy(&(gws[i].gw_name[0]), gw_name, gw_name_len);
     gws[i].gw_name_len = gw_name_len;
     gws[i].scheme = scheme;
-    gws[i].ip_addr = ip_addr;
+    gws[i].ip_addr = *ip_addr;
     gws[i].port = port;
     gws[i].transport = transport;
     if (params_len) memcpy(&(gws[i].params[0]), params, params_len);
@@ -895,7 +896,7 @@ int reload_tables()
 	tag_len, prefix_len, from_uri_len, stopper, enabled, flags, gw_cnt,
 	hostname_len, params_len, defunct_until, null_gw_ip_addr, priority,
 	weight, tmp;
-    struct in_addr ip_addr;
+    struct ip_addr ip_addr;
     uri_type scheme;
     uri_transport transport;
     char *gw_name, *ip_string, *hostname, *tag, *prefix, *from_uri, *params;
@@ -1162,11 +1163,20 @@ int reload_tables()
 	    }
 	    if (VAL_NULL(ROW_VALUES(row) + 1)) {
 		ip_string = (char *)0;
-		ip_addr.s_addr = 0;
+		ip_addr.af = 0;
+		ip_addr.len = 0;
 		null_gw_ip_addr = 1;
 	    } else {
 		ip_string = (char *)VAL_STRING(ROW_VALUES(row) + 1);
-		if (inet_aton(ip_string, &ip_addr) == 0) {
+		if (inet_pton(AF_INET, ip_string, &ip_addr.u.addr32[0]) == 1) {
+		    ip_addr.af = AF_INET;
+		    ip_addr.len = 4;
+		}
+		else if (inet_pton(AF_INET6, ip_string, ip_addr.u.addr) == 1) {
+		    ip_addr.af = AF_INET6;
+		    ip_addr.len = 16;
+		}
+		else {
 		    LM_ERR("lcr_gw ip_addr <%s> at row <%u> is invalid\n",
 			   ip_string, i);
 		    goto err;
@@ -1298,7 +1308,7 @@ int reload_tables()
 	    flags = (unsigned int)VAL_INT(ROW_VALUES(row) + 9);
 	    gw_cnt++;
 	    if (!insert_gw(gws, gw_cnt, gw_id, gw_name, gw_name_len,
-			   scheme, (unsigned int)ip_addr.s_addr, port,
+			   scheme, &ip_addr, port,
 			   transport, params, params_len, hostname,
 			   hostname_len, ip_string, strip, tag, tag_len, flags,
 			   defunct_until)) {
@@ -1310,7 +1320,7 @@ int reload_tables()
 	res = NULL;
 
 	qsort(&(gws[1]), gw_cnt, sizeof(struct gw_info), comp_gws);
-	gws[0].ip_addr = gw_cnt;
+	gws[0].ip_addr.u.addr32[0] = gw_cnt;
 	gws[0].port = null_gw_ip_addr;
 
 	/* Reload targets */
@@ -1427,7 +1437,7 @@ int reload_tables()
 
 inline int encode_avp_value(char *value, unsigned int gw_index, uri_type scheme,
 			    unsigned int strip, char *tag, unsigned int tag_len,
-			    unsigned int ip_addr, char *hostname,
+			    struct ip_addr *ip_addr, char *hostname,
 			    unsigned int hostname_len, unsigned int port,
 			    char *params, unsigned int params_len,
 			    uri_transport transport, unsigned int flags)
@@ -1453,9 +1463,14 @@ inline int encode_avp_value(char *value, unsigned int gw_index, uri_type scheme,
     append_str(at, tag, tag_len);
     append_chr(at, '|');
     /* ip_addr */
-    if (ip_addr > 0) {
-	string = int2str(ip_addr, &len);
+    if (ip_addr->af == AF_INET && ip_addr->u.addr32[0] > 0) {
+	string = int2str(ip_addr->u.addr32[0], &len);
 	append_str(at, string, len);
+    }
+    else if (ip_addr->af == AF_INET6 && !ip_addr_any(ip_addr)) {
+	append_chr(at, '[');
+	at += ip6tosbuf(ip_addr->u.addr, at, MAX_URI_LEN - (at - value));
+	append_chr(at, ']');
     }
     append_chr(at, '|');
     /* hostname */
@@ -1641,7 +1656,7 @@ void add_gws_into_avps(struct gw_info *gws, struct matched_gw_info *matched_gws,
 	value.len = 
 	    encode_avp_value(encoded_value, index, gws[index].scheme,
 			     strip, gws[index].tag, tag_len,
-			     gws[index].ip_addr,
+			     &gws[index].ip_addr,
 			     gws[index].hostname, hostname_len,
 			     gws[index].port, gws[index].params, params_len,
 			     gws[index].transport, gws[index].flags);
@@ -1962,7 +1977,7 @@ static int defunct_gw(struct sip_msg* _m, char *_defunct_period, char *_s2)
 	return -1;
     }
     gw_index = index_val.n;
-    if ((gw_index < 1) || (gw_index > gws[0].ip_addr)) {
+    if ((gw_index < 1) || (gw_index > gws[0].ip_addr.u.addr32[0])) {
 	LM_ERR("gw index <%u> is out of bounds\n", gw_index);
 	return -1;
     }
@@ -2073,7 +2088,7 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
  * Checks if request comes from ip address of a gateway
  */
 static int do_from_gw(struct sip_msg* _m, unsigned int lcr_id,
-		      unsigned int src_addr)
+		      struct ip_addr *src_addr)
 {
     struct gw_info *res, gw, *gws;
     int_str val;
@@ -2087,8 +2102,8 @@ static int do_from_gw(struct sip_msg* _m, unsigned int lcr_id,
     }
 
     /* Search for gw ip address */
-    gw.ip_addr = src_addr;
-    res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr,
+    gw.ip_addr = *src_addr;
+    res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr.u.addr32[0],
 				    sizeof(struct gw_info), comp_gws);
 
     /* Store flags and return result */
@@ -2112,7 +2127,6 @@ static int do_from_gw(struct sip_msg* _m, unsigned int lcr_id,
 static int from_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
 {
     int lcr_id;
-    unsigned int src_addr;
 
     /* Get and check parameter value */
     if (get_int_fparam(&lcr_id, _m, (fparam_t *)_lcr_id) != 0) {
@@ -2124,11 +2138,8 @@ static int from_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
 	return -1;
     }
 
-    /* Get source address */
-    src_addr = _m->rcv.src_ip.u.addr32[0];
-
     /* Do test */
-    return do_from_gw(_m, lcr_id, src_addr);
+    return do_from_gw(_m, lcr_id, &_m->rcv.src_ip);
 }
 
 
@@ -2138,10 +2149,9 @@ static int from_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
  */
 static int from_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
 {
-    unsigned int src_addr;
     int lcr_id;
     pv_value_t pv_val;
-    struct ip_addr *ip;
+    struct ip_addr src_addr, *ip;
 
     /* Get and check parameter values */
     if (get_int_fparam(&lcr_id, _m, (fparam_t *)_lcr_id) != 0) {
@@ -2155,14 +2165,18 @@ static int from_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
 
     if (_addr && (pv_get_spec_value(_m, (pv_spec_t *)_addr, &pv_val) == 0)) {
 	if (pv_val.flags & PV_VAL_INT) {
-	    src_addr = pv_val.ri;
+	    src_addr.u.addr32[0] = pv_val.ri;
+	    src_addr.af = AF_INET;
+	    src_addr.len = 4;
 	} else if (pv_val.flags & PV_VAL_STR) {
-	    if ((ip = str2ip(&pv_val.rs)) == NULL) {
+	    if ((ip = str2ip(&pv_val.rs)) != NULL)
+		src_addr = *ip;
+	    else if ((ip = str2ip6(&pv_val.rs)) != NULL)
+		src_addr = *ip;
+	    else {
 		LM_DBG("request did not come from gw "
 		       "(addr param value is not an IP address)\n");
 		return -1;
-	    } else {
-		src_addr = ip->u.addr32[0];
 	    }
 	} else {
 	    LM_ERR("addr param has no value\n");
@@ -2174,7 +2188,7 @@ static int from_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
     }
 
     /* Do test */
-    return do_from_gw(_m, lcr_id, src_addr);
+    return do_from_gw(_m, lcr_id, &src_addr);
 }
 
 
@@ -2184,12 +2198,10 @@ static int from_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
  */
 static int from_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
 {
-    unsigned int src_addr, i;
-
-    src_addr = _m->rcv.src_ip.u.addr32[0];
+    unsigned int i;
 
     for (i = 1; i <= lcr_count_param; i++) {
-	if (do_from_gw(_m, i, src_addr) == 1) {
+	if (do_from_gw(_m, i, &_m->rcv.src_ip) == 1) {
 	    return i;
 	}
     }
@@ -2203,21 +2215,25 @@ static int from_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
  */
 static int from_any_gw_1(struct sip_msg* _m, char* _addr, char* _s2)
 {
-    unsigned int i, src_addr;
+    unsigned int i;
     pv_value_t pv_val;
-    struct ip_addr *ip;
+    struct ip_addr src_addr, *ip;
 
     /* Get parameter value */
     if (_addr && (pv_get_spec_value(_m, (pv_spec_t *)_addr, &pv_val) == 0)) {
 	if (pv_val.flags & PV_VAL_INT) {
-	    src_addr = pv_val.ri;
+	    src_addr.u.addr32[0] = pv_val.ri;
+	    src_addr.af = AF_INET;
+	    src_addr.len = 4;
 	} else if (pv_val.flags & PV_VAL_STR) {
-	    if ((ip = str2ip(&pv_val.rs)) == NULL) {
+	    if ((ip = str2ip(&pv_val.rs)) != NULL)
+		src_addr = *ip;
+	    else if ((ip = str2ip6(&pv_val.rs)) != NULL)
+		src_addr = *ip;
+	    else {
 		LM_DBG("request did not come from gw "
 		       "(addr param value is not an IP address)\n");
 		return -1;
-	    } else {
-		src_addr = ip->u.addr32[0];
 	    }
 	} else {
 	    LM_ERR("addr param has no value\n");
@@ -2230,7 +2246,7 @@ static int from_any_gw_1(struct sip_msg* _m, char* _addr, char* _s2)
 
     /* Do test */
     for (i = 1; i <= lcr_count_param; i++) {
-	if (do_from_gw(_m, i, src_addr) == 1) {
+	if (do_from_gw(_m, i, &src_addr) == 1) {
 	    return i;
 	}
     }
@@ -2242,7 +2258,7 @@ static int from_any_gw_1(struct sip_msg* _m, char* _addr, char* _s2)
  * Checks if in-dialog request goes to ip address of a gateway.
  */
 static int do_to_gw(struct sip_msg* _m, unsigned int lcr_id,
-		    unsigned int dst_addr)
+		    struct ip_addr *dst_addr)
 {
     struct gw_info *res, gw, *gws;
 
@@ -2255,8 +2271,8 @@ static int do_to_gw(struct sip_msg* _m, unsigned int lcr_id,
     }
 
     /* Search for gw ip address */
-    gw.ip_addr = dst_addr;
-    res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr,
+    gw.ip_addr = *dst_addr;
+    res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr.u.addr32[0],
 				    sizeof(struct gw_info), comp_gws);
 
     /* Return result */
@@ -2277,8 +2293,7 @@ static int do_to_gw(struct sip_msg* _m, unsigned int lcr_id,
 static int to_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
 {
     int lcr_id;
-    unsigned int dst_addr;
-    struct ip_addr *ip;
+    struct ip_addr dst_addr, *ip;
 
     /* Get and check parameter value */
     if (get_int_fparam(&lcr_id, _m, (fparam_t *)_lcr_id) != 0) {
@@ -2300,16 +2315,18 @@ static int to_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
 	       "(Request-URI host is not an IP address)\n");
 	return -1;
     }
-    if ((ip = str2ip(&(_m->parsed_uri.host))) == NULL) {
+    if ((ip = str2ip(&(_m->parsed_uri.host))) != NULL)
+	dst_addr = *ip;
+    else if ((ip = str2ip6(&(_m->parsed_uri.host))) != NULL)
+	dst_addr = *ip;
+    else {
 	LM_DBG("request is not going to gw "
 	       "(Request-URI host is not an IP address)\n");
 	return -1;
-    } else {
-	dst_addr = ip->u.addr32[0];
     }
 
     /* Do test */
-    return do_to_gw(_m, lcr_id, dst_addr);
+    return do_to_gw(_m, lcr_id, &dst_addr);
 }
 
 
@@ -2320,9 +2337,8 @@ static int to_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
 static int to_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
 {
     int lcr_id;
-    unsigned int dst_addr;
     pv_value_t pv_val;
-    struct ip_addr *ip;
+    struct ip_addr dst_addr, *ip;
 
     /* Get and check parameter values */
     if (get_int_fparam(&lcr_id, _m, (fparam_t *)_lcr_id) != 0) {
@@ -2336,14 +2352,18 @@ static int to_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
 
     if (_addr && (pv_get_spec_value(_m, (pv_spec_t *)_addr, &pv_val) == 0)) {
 	if (pv_val.flags & PV_VAL_INT) {
-	    dst_addr = pv_val.ri;
+	    dst_addr.u.addr32[0] = pv_val.ri;
+	    dst_addr.af = AF_INET;
+	    dst_addr.len = 4;
 	} else if (pv_val.flags & PV_VAL_STR) {
-	    if ((ip = str2ip(&pv_val.rs)) == NULL) {
+	    if ((ip = str2ip(&pv_val.rs)) != NULL)
+		dst_addr = *ip;
+	    else if ((ip = str2ip6(&pv_val.rs)) != NULL)
+		dst_addr = *ip;
+	    else {
 		LM_DBG("request is not going to gw "
 		       "(addr param value is not an IP address)\n");
 		return -1;
-	    } else {
-		dst_addr = ip->u.addr32[0];
 	    }
 	} else {
 	    LM_ERR("addr param has no value\n");
@@ -2355,7 +2375,7 @@ static int to_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
     }
     
     /* Do test */
-    return do_to_gw(_m, lcr_id, dst_addr);
+    return do_to_gw(_m, lcr_id, &dst_addr);
 }
 
 
@@ -2365,8 +2385,8 @@ static int to_gw_2(struct sip_msg* _m, char* _lcr_id, char* _addr)
  */
 static int to_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
 {
-    unsigned int dst_addr, i;
-    struct ip_addr *ip;
+    unsigned int i;
+    struct ip_addr dst_addr, *ip;
 
     /* Get destination address */
     if ((_m->parsed_uri_ok == 0) && (parse_sip_msg_uri(_m) < 0)) {
@@ -2378,17 +2398,19 @@ static int to_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
 	       "(Request-URI host is not an IP address)\n");
 	return -1;
     }
-    if ((ip = str2ip(&(_m->parsed_uri.host))) == NULL) {
+    if ((ip = str2ip(&(_m->parsed_uri.host))) != NULL)
+	dst_addr = *ip;
+    else if ((ip = str2ip6(&(_m->parsed_uri.host))) != NULL)
+	dst_addr = *ip;
+    else {
 	LM_DBG("request is not going to gw "
 	       "(Request-URI host is not an IP address)\n");
 	return -1;
-    } else {
-	dst_addr = ip->u.addr32[0];
     }
 
     /* Do test */
     for (i = 1; i <= lcr_count_param; i++) {
-	if (do_to_gw(_m, i, dst_addr) == 1) {
+	if (do_to_gw(_m, i, &dst_addr) == 1) {
 	    return i;
 	}
     }
@@ -2402,21 +2424,25 @@ static int to_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
  */
 static int to_any_gw_1(struct sip_msg* _m, char* _addr, char* _s2)
 {
-    unsigned int i, dst_addr;
+    unsigned int i;
     pv_value_t pv_val;
-    struct ip_addr *ip;
+    struct ip_addr dst_addr, *ip;
 
     /* Get parameter value */
     if (_addr && (pv_get_spec_value(_m, (pv_spec_t *)_addr, &pv_val) == 0)) {
 	if (pv_val.flags & PV_VAL_INT) {
-	    dst_addr = pv_val.ri;
+	    dst_addr.u.addr32[0] = pv_val.ri;
+	    dst_addr.af = AF_INET;
+	    dst_addr.len = 4;
 	} else if (pv_val.flags & PV_VAL_STR) {
-	    if ((ip = str2ip(&pv_val.rs)) == NULL) {
+	    if ((ip = str2ip(&pv_val.rs)) != NULL)
+		dst_addr = *ip;
+	    else if ((ip = str2ip6(&pv_val.rs)) != NULL)
+		dst_addr = *ip;
+	    else {
 		LM_DBG("request did go to any gw "
 		       "(addr param value is not an IP address)\n");
 		return -1;
-	    } else {
-		dst_addr = ip->u.addr32[0];
 	    }
 	} else {
 	    LM_ERR("addr param has no value\n");
@@ -2429,7 +2455,7 @@ static int to_any_gw_1(struct sip_msg* _m, char* _addr, char* _s2)
 
     /* Do test */
     for (i = 1; i <= lcr_count_param; i++) {
-	if (do_to_gw(_m, i, dst_addr) == 1) {
+	if (do_to_gw(_m, i, &dst_addr) == 1) {
 	    return i;
 	}
     }

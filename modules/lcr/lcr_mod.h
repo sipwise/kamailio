@@ -84,7 +84,7 @@ struct gw_info {
     char gw_name[MAX_NAME_LEN];
     unsigned short gw_name_len;
     uri_type scheme;
-    unsigned int ip_addr;
+    struct ip_addr ip_addr;
     char hostname[MAX_HOST_LEN];
     unsigned short hostname_len;
     unsigned int port;
