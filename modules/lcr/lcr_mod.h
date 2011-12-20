@@ -42,6 +42,7 @@
 #include "../../lib/kmi/mi.h"
 #include "../../locking.h"
 #include "../../parser/parse_uri.h"
+#include "../../ip_addr.h"
 
 #define MAX_PREFIX_LEN 32
 #define MAX_URI_LEN 256
