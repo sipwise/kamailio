@@ -896,10 +896,11 @@ int reload_tables()
 	tag_len, prefix_len, from_uri_len, stopper, enabled, flags, gw_cnt,
 	hostname_len, params_len, defunct_until, null_gw_ip_addr, priority,
 	weight, tmp;
-    struct ip_addr ip_addr;
+    struct in_addr in_addr;
+    struct ip_addr ip_addr, *ip_p;
     uri_type scheme;
     uri_transport transport;
-    char *gw_name, *ip_string, *hostname, *tag, *prefix, *from_uri, *params;
+    char *gw_name, *hostname, *tag, *prefix, *from_uri, *params;
     db1_res_t* res = NULL;
     db_row_t* row;
     db_key_t key_cols[1];
@@ -911,6 +912,7 @@ int reload_tables()
     pcre *from_uri_re;
     struct gw_info *gws, *gw_pt_tmp;
     struct rule_info **rules, **rule_pt_tmp;
+    str ip_string;
 
     key_cols[0] = &lcr_id_col;
     op[0] = OP_EQ;
@@ -1162,23 +1164,32 @@ int reload_tables()
 		goto err;
 	    }
 	    if (VAL_NULL(ROW_VALUES(row) + 1)) {
-		ip_string = (char *)0;
+		ip_string.s = (char *)0;
 		ip_addr.af = 0;
 		ip_addr.len = 0;
 		null_gw_ip_addr = 1;
 	    } else {
-		ip_string = (char *)VAL_STRING(ROW_VALUES(row) + 1);
-		if (inet_pton(AF_INET, ip_string, &ip_addr.u.addr32[0]) == 1) {
+		ip_string.s = (char *)VAL_STRING(ROW_VALUES(row) + 1);
+		ip_string.len = strlen(ip_string.s);
+		if ((ip_p = str2ip(&ip_string))) {
+		    /* 123.123.123.123 */
+		    ip_addr = *ip_p;
+		}
+#ifdef USE_IPV6
+		else if ((ip_p = str2ip6(&ip_string))) {
+		    /* fe80::123:4567:89ab:cdef and [fe80::123:4567:89ab:cdef] */
+		    ip_addr = *ip_p;
+		}
+#endif
+		else if (inet_aton(ip_string.s, &in_addr) == 0) {
+		    /* backwards compatibility for integer or hex notations */
+		    ip_addr.u.addr32[0] = in_addr.s_addr;
 		    ip_addr.af = AF_INET;
 		    ip_addr.len = 4;
 		}
-		else if (inet_pton(AF_INET6, ip_string, ip_addr.u.addr) == 1) {
-		    ip_addr.af = AF_INET6;
-		    ip_addr.len = 16;
-		}
 		else {
 		    LM_ERR("lcr_gw ip_addr <%s> at row <%u> is invalid\n",
-			   ip_string, i);
+			   ip_string.s, i);
 		    goto err;
 		}
 	    }
@@ -1252,7 +1263,7 @@ int reload_tables()
 		goto err;
 	    }
 	    if (VAL_NULL(ROW_VALUES(row) + 6)) {
-		if (ip_string == 0) {
+		if (ip_string.s == 0) {
 		    LM_ERR("lcr_gw gw ip_addr and hostname are both null "
 			   "at row <%u>\n", i);
 		    goto err;
@@ -1310,7 +1321,7 @@ int reload_tables()
 	    if (!insert_gw(gws, gw_cnt, gw_id, gw_name, gw_name_len,
 			   scheme, &ip_addr, port,
 			   transport, params, params_len, hostname,
-			   hostname_len, ip_string, strip, tag, tag_len, flags,
+			   hostname_len, ip_string.s, strip, tag, tag_len, flags,
 			   defunct_until)) {
 		goto err;
 	    }
