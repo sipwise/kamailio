@@ -1672,7 +1672,7 @@ void add_gws_into_avps(struct gw_info *gws, struct matched_gw_info *matched_gws,
 	}
 	tag_len = gws[index].tag_len;
 	if (5 /* gw_index */ + 5 /* scheme */ + 4 /* strip */ + tag_len +
-	    1 /* @ */ + ((hostname_len > 15)?hostname_len:15) + 6 /* port */ +
+	    1 /* @ */ + ((hostname_len > IP6_MAX_STR_SIZE+2)?hostname_len:IP6_MAX_STR_SIZE+2) + 6 /* port */ +
 	    params_len /* params */ + 15 /* transport */ + 10 /* flags */ +
 	    7 /* separators */ > MAX_URI_LEN) {
 	    LM_ERR("too long AVP value\n");
@@ -1880,7 +1880,7 @@ static int generate_uris(struct sip_msg* _m, char *r_uri, str *r_uri_user,
     }
     
     if (scheme.len + r_uri_user->len - strip + tag.len + 1 /* @ */ +
-	((hostname.len > 15)?hostname.len:15) + 1 /* : */ +
+	((hostname.len > IP6_MAX_STR_SIZE+2)?hostname.len:IP6_MAX_STR_SIZE+2) + 1 /* : */ +
 	port.len + params.len + transport.len + 1 /* null */ > MAX_URI_LEN) {
 	LM_ERR("too long Request URI or DST URI\n");
 	return -1;
@@ -2346,7 +2346,7 @@ static int to_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
 	LM_ERR("while parsing Request-URI\n");
 	return -1;
     }
-    if (_m->parsed_uri.host.len > 15) {
+    if (_m->parsed_uri.host.len > IP6_MAX_STR_SIZE+2) {
 	LM_DBG("request is not going to gw "
 	       "(Request-URI host is not an IP address)\n");
 	return -1;
@@ -2433,7 +2433,7 @@ static int to_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
 	LM_ERR("while parsing Request-URI\n");
 	return -1;
     }
-    if (_m->parsed_uri.host.len > 15) {
+    if (_m->parsed_uri.host.len > IP6_MAX_STR_SIZE+2) {
 	LM_DBG("request is not going to gw "
 	       "(Request-URI host is not an IP address)\n");
 	return -1;
