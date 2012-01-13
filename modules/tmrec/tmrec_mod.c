@@ -249,12 +249,12 @@ static int w_time_period_match(struct sip_msg* msg, char* period, char* t)
 	int ti;
 
 	if(msg==NULL)
-		return -1;
+		return -2;
 
 	if(fixup_get_svalue(msg, (gparam_t*)period, &rv)!=0)
 	{
 		LM_ERR("invalid period parameter value\n");
-		return -1;
+		return -3;
 	}
 
 	if(t!=NULL)
@@ -262,7 +262,7 @@ static int w_time_period_match(struct sip_msg* msg, char* period, char* t)
 		if(fixup_get_ivalue(msg, (gparam_t*)t, &ti)!=0)
 		{
 			LM_ERR("invalid time stamp parameter value\n");
-			return -1;
+			return -4;
 		}
 		tv = (time_t)ti;
 	} else {
@@ -271,5 +271,5 @@ static int w_time_period_match(struct sip_msg* msg, char* period, char* t)
 
 	if (in_period(tv, rv.s))
 		return 1;
-	return 0;
+	return -1;
 }
