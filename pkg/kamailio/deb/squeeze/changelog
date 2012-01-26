@@ -1,3 +1,19 @@
+kamailio (3.1.5+sipwise4) unstable; urgency=low
+
+  * lcr: the lcr module shall support ipv6
+  * lcr_mod.c: more required changes for ipv6 support
+  * lcr_mod.c: add [] around ipv6 addresses in sip uris
+  * lcr_mod.h: add a missing required .h include
+  * lcr_mod.c: support ipv6 addresses in [] notation as well
+  * lcr_mod.c: remove some ipv6 stuff if source isnt being built with ipv6 support
+  * lcr_mod.c: adjust sanity checks for longer ip addresses
+  * tmrec: Backport new tmrec module from trunk.
+  * tmrec: Add a port of Time::Period
+  * tmrec: Use different return values for different cases
+  * Makefile: Include tmrec module in builds.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Thu, 26 Jan 2012 14:26:57 +0100
+
 kamailio (3.1.5+sipwise3) unstable; urgency=low
 
   * Bump version for bad tagging fix
