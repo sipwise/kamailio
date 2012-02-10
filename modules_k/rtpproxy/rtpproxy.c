@@ -283,7 +283,8 @@ static int alter_mediaport(struct sip_msg *, str *, str *, str *, int);
 static int alter_rtcp(struct sip_msg *msg, str *body, str *oldport, str *newport);
 static char *gencookie();
 static int rtpp_test(struct rtpp_node*, int, int);
-static int unforce_rtp_proxy_f(struct sip_msg *, char *, char *);
+static int unforce_rtp_proxy0_f(struct sip_msg *, char *, char *);
+static int unforce_rtp_proxy1_f(struct sip_msg *, char *, char *);
 static int force_rtp_proxy0_f(struct sip_msg *, char *, char *);
 static int force_rtp_proxy1_f(struct sip_msg *, char *, char *);
 static int force_rtp_proxy2_f(struct sip_msg *, char *, char *);
@@ -347,7 +348,10 @@ static cmd_export_t cmds[] = {
 	{"set_rtp_proxy_set",  (cmd_function)set_rtp_proxy_set_f,    1,
 		fixup_set_id, 0,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
-	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy_f,    0,
+	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy0_f,    0,
+		0, 0,
+		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy1_f,    1,
 		0, 0,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
 	{"force_rtp_proxy",    (cmd_function)force_rtp_proxy0_f,     0,
@@ -1628,22 +1632,47 @@ found:
 }
 
 static int
-unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
+unforce_rtp_proxy0_f(struct sip_msg* msg, char* str1, char* str2)
 {
+	char arg[1] = {'\0'};
+        return unforce_rtp_proxy1_f(msg, arg, str2);
+}
+
+static int
+unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
+{
+        char *cp;
+        int via;
 	str callid, from_tag, to_tag, viabranch;
 	struct rtpp_node *node;
 	struct iovec v[1 + 4 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
 						/* 1 */   /* 2 */   /* 3 */    /* 4 */   /* 5 */    /* 6 */   /* 1 */
 
+        via = 0;
+
+	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
+		switch (*cp) {
+		case 'v':
+		case 'V':
+			via = 1;
+			break;
+
+		default:
+			LM_ERR("unknown option `%c'\n", *cp);
+			return -1;
+		}
+	}
+
 	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
 		LM_ERR("can't get Call-Id field\n");
 		return -1;
 	}
-        if (get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        if (via && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via1 branch\n");
 		return -1;
+        } else if(via) {
+        	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
         }
-	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
 	to_tag.s = 0;
 	if (get_to_tag(msg, &to_tag) == -1) {
 		LM_ERR("can't get To tag\n");
@@ -1788,7 +1817,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 	str body, body1, oldport, oldip, newport, newip;
 	str callid, from_tag, to_tag, tmp, payload_types;
 	str newrtcp, viabranch;
-	int create, port, len, flookup, argc, proxied, real;
+	int create, port, len, flookup, argc, proxied, real, via;
 	int orgip, commip;
 	int pf, pf1, force, swap;
 	struct options opts, rep_opts, pt_opts;
@@ -1844,7 +1873,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("out of pkg memory\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
-	flookup = force = real = orgip = commip = swap = 0;
+	flookup = force = real = orgip = commip = swap = via = 0;
 	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
 		switch (*cp) {
 		case 'a':
@@ -1911,6 +1940,11 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 			swap_warned = 1;
 			break;
 
+		case 'v':
+		case 'V':
+			via = 1;
+			break;
+
 		case 'w':
 		case 'W':
 			if (append_opts(&opts, 'S') == -1) {
@@ -1965,11 +1999,12 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("can't get From tag\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
-        if(get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        if(via && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via1 branch\n");
 		FORCE_RTP_PROXY_RET (-1);
+        } else if(via) {
+               	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
         }
-	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
 	/*  LOGIC
 	 *  ------
 	 *  1) NO SWAP (create on request, lookup on reply):
