@@ -345,6 +345,28 @@ get_callid(struct sip_msg* _m, str* _cid)
         return 0;
 }
 
+int
+get_via1_branch(struct sip_msg* _m, str* _branch)
+{
+        hdr_field_t *hdr;
+        struct via_body *via;
+        struct via_param *p;
+
+        hdr = _m->h_via1;
+        via = (struct via_body*)hdr->parsed;
+        for(p = via->param_lst; p; p = p->next)
+        {
+                if(p->name.len == strlen("branch")
+                                && strncasecmp(p->name.s, "branch", strlen("branch")) == 0) {
+                        _branch->s = p->value.s;
+                        _branch->len = p->value.len;
+                        return 0;
+                }
+        }
+        return -1;
+}
+
+
 /*
  * Extract tag from To header field of a response
  * assumes the to header is already parsed, so

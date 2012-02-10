@@ -1630,7 +1630,7 @@ found:
 static int
 unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
 {
-	str callid, from_tag, to_tag;
+	str callid, from_tag, to_tag, viabranch;
 	struct rtpp_node *node;
 	struct iovec v[1 + 4 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
 						/* 1 */   /* 2 */   /* 3 */    /* 4 */   /* 5 */    /* 6 */   /* 1 */
@@ -1639,6 +1639,11 @@ unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get Call-Id field\n");
 		return -1;
 	}
+        if (get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+		LM_ERR("can't get via1 branch\n");
+		return -1;
+        }
+	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
 	to_tag.s = 0;
 	if (get_to_tag(msg, &to_tag) == -1) {
 		LM_ERR("can't get To tag\n");
@@ -1782,7 +1787,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 {
 	str body, body1, oldport, oldip, newport, newip;
 	str callid, from_tag, to_tag, tmp, payload_types;
-	str newrtcp;
+	str newrtcp, viabranch;
 	int create, port, len, flookup, argc, proxied, real;
 	int orgip, commip;
 	int pf, pf1, force, swap;
@@ -1799,6 +1804,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		{NULL, 0},	/* per-media/per-node options 2 */
 		{" ", 1},	/* separator */
 		{NULL, 0},	/* callid */
+		//{";", 1},	/* separator */
+		//{NULL, 0},	/* via-branch */
 		{" ", 1},	/* separator */
 		{NULL, 7},	/* newip */
 		{" ", 1},	/* separator */
@@ -1958,6 +1965,11 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("can't get From tag\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
+        if(get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+		LM_ERR("can't get via1 branch\n");
+		FORCE_RTP_PROXY_RET (-1);
+        }
+	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
 	/*  LOGIC
 	 *  ------
 	 *  1) NO SWAP (create on request, lookup on reply):
