@@ -1432,7 +1432,7 @@ char *
 send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt)
 {
 	struct sockaddr_un addr;
-	int fd, len, i;
+	int fd, len, i, j;
 	char *cp;
 	static char buf[256];
 	struct pollfd fds[1];
@@ -1459,6 +1459,10 @@ send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt)
 			goto badproxy;
 		}
 
+                for(j = 0; j < vcnt; ++j) {
+                        str s; s.s = v[j].iov_base; s.len = v[j].iov_len;
+			LM_ERR(">>>>>>> write '%.*s' to rtpp", s.len, s.s);
+                }
 		do {
 			len = writev(fd, v + 1, vcnt - 1);
 		} while (len == -1 && errno == EINTR);
@@ -2011,6 +2015,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		FORCE_RTP_PROXY_RET (-1);
         } else if(via) {
                	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
+	        STR2IOVEC(viabranch, v[5]);
         }
 	/*  LOGIC
 	 *  ------
