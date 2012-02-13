@@ -1645,7 +1645,8 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
         int via;
 	str callid, from_tag, to_tag, viabranch;
 	struct rtpp_node *node;
-	struct iovec v[1 + 4 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
+        int iovec_count;
+	struct iovec v[1 + 6 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {";", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
 						/* 1 */   /* 2 */   /* 3 */    /* 4 */   /* 5 */    /* 6 */   /* 1 */
 
         via = 0;
@@ -1672,6 +1673,7 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		return -1;
         } else if(via) {
         	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
+	        STR2IOVEC(viabranch, v[5]);
         }
 	to_tag.s = 0;
 	if (get_to_tag(msg, &to_tag) == -1) {
@@ -1683,8 +1685,8 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		return -1;
 	}
 	STR2IOVEC(callid, v[3]);
-	STR2IOVEC(from_tag, v[5]);
-	STR2IOVEC(to_tag, v[7]);
+	STR2IOVEC(from_tag, v[7]);
+	STR2IOVEC(to_tag, v[9]);
 	
 	if(msg->id != current_msg_id){
 		selected_rtpp_set = default_rtpp_set;
@@ -1695,7 +1697,12 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("no available proxies\n");
 		return -1;
 	}
-	send_rtpp_command(node, v, (to_tag.len > 0) ? 8 : 6);
+        iovec_count = 6;
+        if(to_tag.len > 0)
+          iovec_count += 2;
+        if(viabranch.len > 0)
+          iovec_count += 2;
+	send_rtpp_command(node, v, iovec_count);
 
 	return 1;
 }
@@ -1833,8 +1840,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		{NULL, 0},	/* per-media/per-node options 2 */
 		{" ", 1},	/* separator */
 		{NULL, 0},	/* callid */
-		//{";", 1},	/* separator */
-		//{NULL, 0},	/* via-branch */
+		{";", 1},	/* separator */
+		{NULL, 0},	/* via-branch */
 		{" ", 1},	/* separator */
 		{NULL, 7},	/* newip */
 		{" ", 1},	/* separator */
@@ -2084,8 +2091,9 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 	v[1].iov_base = opts.s.s;
 	v[1].iov_len = opts.oidx;
 	STR2IOVEC(callid, v[5]);
-	STR2IOVEC(from_tag, v[11]);
-	STR2IOVEC(to_tag, v[15]);
+	STR2IOVEC(viabranch, v[7]);
+	STR2IOVEC(from_tag, v[13]);
+	STR2IOVEC(to_tag, v[17]);
 
 	/* check if this is a single or a multi stream SDP offer/answer */
 	sdp_stream_num = get_sdp_stream_num(msg);
@@ -2139,26 +2147,26 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 					FORCE_RTP_PROXY_RET (-1);
 				}
 			}
-			STR2IOVEC(newip, v[7]);
-			STR2IOVEC(oldport, v[9]);
+			STR2IOVEC(newip, v[9]);
+			STR2IOVEC(oldport, v[11]);
 #ifdef EXTRA_DEBUG
-			LM_DBG("STR2IOVEC(newip[%.*s], v[7])", newip.len, newip.s);
-			LM_DBG("STR2IOVEC(oldport[%.*s], v[9])", oldport.len, oldport.s);
+			LM_DBG("STR2IOVEC(newip[%.*s], v[9])", newip.len, newip.s);
+			LM_DBG("STR2IOVEC(oldport[%.*s], v[11])", oldport.len, oldport.s);
 #endif
 			if (1 || media_multi) /* XXX netch: can't choose now*/
 			{
 				snprintf(itoabuf_buf, sizeof itoabuf_buf, "%d", medianum);
 				itoabuf_str.s = itoabuf_buf;
 				itoabuf_str.len = strlen(itoabuf_buf);
-				STR2IOVEC(itoabuf_str, v[13]);
-				STR2IOVEC(itoabuf_str, v[17]);
+				STR2IOVEC(itoabuf_str, v[15]);
+				STR2IOVEC(itoabuf_str, v[19]);
 #ifdef EXTRA_DEBUG
-				LM_DBG("STR2IOVEC(itoabuf_str, v[13])\n");
-				LM_DBG("STR2IOVEC(itoabuf_str, v[17])\n");
+				LM_DBG("STR2IOVEC(itoabuf_str, v[15])\n");
+				LM_DBG("STR2IOVEC(itoabuf_str, v[19])\n");
 #endif
 			} else {
-				v[12].iov_len = v[13].iov_len = 0;
-				v[16].iov_len = v[17].iov_len = 0;
+				v[14].iov_len = v[15].iov_len = 0;
+				v[18].iov_len = v[19].iov_len = 0;
 			}
 			do {
 				node = select_rtpp_node(callid, 1);
@@ -2216,20 +2224,19 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 				} else {
 					v[3].iov_len = 0;
 				}
-				if (to_tag.len > 0) {
-					iovec_param_count = 18;
-					if (timeout_socket_str.len > 0) {
-						iovec_param_count = 22;
-						snprintf(itoabuf_buf, sizeof itoabuf_buf, "%d", timeout_socket_type);
-						itoabuf_str.s = itoabuf_buf;
-						itoabuf_str.len = strlen(itoabuf_buf);
-						STR2IOVEC(itoabuf_str, v[19]);
-						STR2IOVEC(timeout_socket_str, v[21]);
-					}
-				} else {
-					iovec_param_count = 14;
+				iovec_param_count = 14;
+				if (to_tag.len > 0)
+					iovec_param_count += 4;
+				if (viabranch.len > 0)
+					iovec_param_count += 2;
+				if (timeout_socket_str.len > 0) {
+					iovec_param_count += 4;
+					snprintf(itoabuf_buf, sizeof itoabuf_buf, "%d", timeout_socket_type);
+					itoabuf_str.s = itoabuf_buf;
+					itoabuf_str.len = strlen(itoabuf_buf);
+					STR2IOVEC(itoabuf_str, v[21]);
+					STR2IOVEC(timeout_socket_str, v[23]);
 				}
-
 				cp = send_rtpp_command(node, v, iovec_param_count);
 			} while (cp == NULL);
 			LM_DBG("proxy reply: %s\n", cp);
