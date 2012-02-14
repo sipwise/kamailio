@@ -2029,8 +2029,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		FORCE_RTP_PROXY_RET (-1);
         } else if(via1 || via2) {
                	LM_ERR(">>> extracted via branch '%.*s'\n", viabranch.len, viabranch.s);
-	        STR2IOVEC(viasep, v[4]);
-	        STR2IOVEC(viabranch, v[5]);
+	        STR2IOVEC(viasep, v[6]);
+	        STR2IOVEC(viabranch, v[7]);
         }
 	/*  LOGIC
 	 *  ------
