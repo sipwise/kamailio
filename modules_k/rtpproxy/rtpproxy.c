@@ -1432,7 +1432,7 @@ char *
 send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt)
 {
 	struct sockaddr_un addr;
-	int fd, len, i, j;
+	int fd, len, i;
 	char *cp;
 	static char buf[256];
 	struct pollfd fds[1];
@@ -1459,10 +1459,6 @@ send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt)
 			goto badproxy;
 		}
 
-                for(j = 0; j < vcnt; ++j) {
-                        str s; s.s = v[j].iov_base; s.len = v[j].iov_len;
-			LM_ERR(">>>>>>> write '%.*s' to rtpp", s.len, s.s);
-                }
 		do {
 			len = writev(fd, v + 1, vcnt - 1);
 		} while (len == -1 && errno == EINTR);
@@ -1646,20 +1642,25 @@ static int
 unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 {
         char *cp;
-        int via;
+        int via1, via2;
 	str callid, from_tag, to_tag, viabranch;
 	struct rtpp_node *node;
         int iovec_count;
-	struct iovec v[1 + 6 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {";", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
-						/* 1 */   /* 2 */   /* 3 */    /* 4 */   /* 5 */    /* 6 */   /* 1 */
+	struct iovec v[1 + 6 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {NULL, 0}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
+        char *viasepchar = ";";
+        str viasep;
 
-        via = 0;
+        via1 = via2 = 0;
+        viasep.s = viasepchar; viasep.len = 1;
 
 	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
 		switch (*cp) {
 		case 'v':
+			via1 = 1;
+			break;
+
 		case 'V':
-			via = 1;
+			via2 = 1;
 			break;
 
 		default:
@@ -1672,11 +1673,15 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get Call-Id field\n");
 		return -1;
 	}
-        if (via && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        if (via1 && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via1 branch\n");
 		return -1;
-        } else if(via) {
-        	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
+        } else if (via2 && get_via2_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+		LM_ERR("can't get via2 branch\n");
+		return -1;
+        } else if(via1 || via2) {
+        	LM_ERR(">>> extracted via branch '%.*s'\n", viabranch.len, viabranch.s);
+	        STR2IOVEC(viasep, v[4]);
 	        STR2IOVEC(viabranch, v[5]);
         }
 	to_tag.s = 0;
@@ -1828,7 +1833,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 	str body, body1, oldport, oldip, newport, newip;
 	str callid, from_tag, to_tag, tmp, payload_types;
 	str newrtcp, viabranch;
-	int create, port, len, flookup, argc, proxied, real, via;
+	int create, port, len, flookup, argc, proxied, real, via1, via2;
 	int orgip, commip;
 	int pf, pf1, force, swap;
 	struct options opts, rep_opts, pt_opts;
@@ -1837,6 +1842,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 	char **ap, *argv[10];
 	struct lump* anchor;
 	struct rtpp_node *node;
+        char *viasepchar = ";";
+        str viasep;
 	struct iovec v[] = {
 		{NULL, 0},	/* reserved (cookie) */
 		{NULL, 0},	/* command & common options */
@@ -1844,7 +1851,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		{NULL, 0},	/* per-media/per-node options 2 */
 		{" ", 1},	/* separator */
 		{NULL, 0},	/* callid */
-		{";", 1},	/* separator */
+		{NULL, 0},	/* via-separator ";" */
 		{NULL, 0},	/* via-branch */
 		{" ", 1},	/* separator */
 		{NULL, 7},	/* newip */
@@ -1884,7 +1891,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("out of pkg memory\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
-	flookup = force = real = orgip = commip = swap = via = 0;
+	flookup = force = real = orgip = commip = swap = via1 = via2 = 0;
+        viasep.s = viasepchar; viasep.len = 1;
 	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
 		switch (*cp) {
 		case 'a':
@@ -1952,8 +1960,11 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 			break;
 
 		case 'v':
+			via1 = 1;
+			break;
+
 		case 'V':
-			via = 1;
+			via2 = 1;
 			break;
 
 		case 'w':
@@ -2010,11 +2021,15 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("can't get From tag\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
-        if(via && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        if(via1 && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via1 branch\n");
 		FORCE_RTP_PROXY_RET (-1);
-        } else if(via) {
-               	LM_ERR(">>> extracted via1 branch '%.*s'\n", viabranch.len, viabranch.s);
+        } else if(via2 && get_via2_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+		LM_ERR("can't get via2 branch\n");
+		FORCE_RTP_PROXY_RET (-1);
+        } else if(via1 || via2) {
+               	LM_ERR(">>> extracted via branch '%.*s'\n", viabranch.len, viabranch.s);
+	        STR2IOVEC(viasep, v[4]);
 	        STR2IOVEC(viabranch, v[5]);
         }
 	/*  LOGIC

@@ -345,14 +345,12 @@ get_callid(struct sip_msg* _m, str* _cid)
         return 0;
 }
 
-int
-get_via1_branch(struct sip_msg* _m, str* _branch)
+static int
+get_via_branch(hdr_field_t *hdr, str* _branch)
 {
-        hdr_field_t *hdr;
         struct via_body *via;
         struct via_param *p;
 
-        hdr = _m->h_via1;
         via = (struct via_body*)hdr->parsed;
         for(p = via->param_lst; p; p = p->next)
         {
@@ -364,6 +362,25 @@ get_via1_branch(struct sip_msg* _m, str* _branch)
                 }
         }
         return -1;
+}
+
+
+int
+get_via1_branch(struct sip_msg* _m, str* _branch)
+{
+        hdr_field_t *hdr;
+
+        hdr = _m->h_via1;
+        return get_via_branch(hdr, _branch);
+}
+
+int
+get_via2_branch(struct sip_msg* _m, str* _branch)
+{
+        hdr_field_t *hdr;
+
+        hdr = _m->h_via2;
+        return get_via_branch(hdr, _branch);
 }
 
 
