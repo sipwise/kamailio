@@ -1680,7 +1680,6 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get via2 branch\n");
 		return -1;
         } else if(via1 || via2) {
-        	LM_ERR(">>> extracted via branch '%.*s'\n", viabranch.len, viabranch.s);
 	        STR2IOVEC(viasep, v[4]);
 	        STR2IOVEC(viabranch, v[5]);
         }
@@ -2028,7 +2027,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("can't get via2 branch\n");
 		FORCE_RTP_PROXY_RET (-1);
         } else if(via1 || via2) {
-               	LM_ERR(">>> extracted via branch '%.*s'\n", viabranch.len, viabranch.s);
 	        STR2IOVEC(viasep, v[6]);
 	        STR2IOVEC(viabranch, v[7]);
         }
