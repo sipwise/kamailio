@@ -1673,10 +1673,10 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get Call-Id field\n");
 		return -1;
 	}
-        if (via1 && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        if (via1 && get_via_branch(msg, 1, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via1 branch\n");
 		return -1;
-        } else if (via2 && get_via2_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        } else if (via2 && get_via_branch(msg, 2, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via2 branch\n");
 		return -1;
         } else if(via1 || via2) {
@@ -2020,10 +2020,10 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 		LM_ERR("can't get From tag\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
-        if(via1 && get_via1_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        if(via1 && get_via_branch(msg, 1, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via1 branch\n");
 		FORCE_RTP_PROXY_RET (-1);
-        } else if(via2 && get_via2_branch(msg, &viabranch) == -1 && viabranch.len == 0) {
+        } else if(via2 && get_via_branch(msg, 2, &viabranch) == -1 && viabranch.len == 0) {
 		LM_ERR("can't get via2 branch\n");
 		FORCE_RTP_PROXY_RET (-1);
         } else if(via1 || via2) {
