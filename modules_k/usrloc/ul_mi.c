@@ -493,8 +493,10 @@ struct mi_root* mi_usrloc_add(struct mi_root *cmd, void *param)
 	if (str2q( &ci.q, node->value.s, node->value.len) < 0)
 		goto bad_syntax;
 
-	/* unused value (param 6) FIXME */
+	/* path value (param 6) */
 	node = node->next;
+	if(node->value.len > 0)
+		ci.path = &node->value;
 
 	/* flags value (param 7) */
 	node = node->next;
