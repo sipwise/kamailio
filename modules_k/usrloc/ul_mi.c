@@ -495,7 +495,7 @@ struct mi_root* mi_usrloc_add(struct mi_root *cmd, void *param)
 
 	/* path value (param 6) */
 	node = node->next;
-	if(node->value.len > 0)
+	if(strncmp(node->value.str, "0", 1))
 		ci.path = &node->value;
 
 	/* flags value (param 7) */
