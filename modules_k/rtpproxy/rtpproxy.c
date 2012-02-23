@@ -1655,11 +1655,11 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 
 	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
 		switch (*cp) {
-		case 'v':
+		case '1':
 			via1 = 1;
 			break;
 
-		case 'V':
+		case '2':
 			via2 = 1;
 			break;
 
@@ -1894,6 +1894,14 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
         viasep.s = viasepchar; viasep.len = 1;
 	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
 		switch (*cp) {
+		case '1':
+			via1 = 1;
+			break;
+
+		case '2':
+			via2 = 1;
+			break;
+
 		case 'a':
 		case 'A':
 			if (append_opts(&opts, 'A') == -1) {
@@ -1956,14 +1964,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer)
 			    "rtpproxy_offer() and rtpproxy_answer() "
 			    "instead\n", *cp);
 			swap_warned = 1;
-			break;
-
-		case 'v':
-			via1 = 1;
-			break;
-
-		case 'V':
-			via2 = 1;
 			break;
 
 		case 'w':
