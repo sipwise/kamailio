@@ -1,6 +1,4 @@
 /**
- * $Id$
- *
  * Copyright (C) 2009
  *
  * This file is part of SIP-Router.org, a free SIP server.
@@ -20,20 +18,27 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*!
+ * @defgroup kex KEX :: Kamailio Extensions
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
 #include "../../sr_module.h"
 #include "../../dprint.h"
+#include "../../forward.h"
 #include "../../flags.h"
 #include "../../dset.h"
 #include "../../mod_fix.h"
+#include "../../parser/parse_uri.h"
 
 #include "flags.h"
 #include "km_core.h"
 #include "mi_core.h"
 #include "core_stats.h"
+#include "pkg_stats.h"
 
 
 MODULE_VERSION
@@ -42,7 +47,12 @@ MODULE_VERSION
 /** parameters */
 
 /** module functions */
+int w_is_myself(struct sip_msg *msg, char *uri, str *s2);
+int w_setdebug(struct sip_msg *msg, char *level, str *s2);
+int w_resetdebug(struct sip_msg *msg, char *uri, str *s2);
+
 static int mod_init(void);
+static int child_init(int rank);
 static void destroy(void);
 
 static cmd_export_t cmds[]={
@@ -78,6 +88,12 @@ static cmd_export_t cmds[]={
 			0, ANY_ROUTE },
 	{"avp_printf", (cmd_function)w_pv_printf,   2, pv_printf_fixup,
 			0, ANY_ROUTE },
+	{"is_myself", (cmd_function)w_is_myself,    1, fixup_spve_null,
+			0, ANY_ROUTE },
+	{"setdebug", (cmd_function)w_setdebug,      1, fixup_igp_null,
+			0, ANY_ROUTE },
+	{"resetdebug", (cmd_function)w_resetdebug,  0, 0,
+			0, ANY_ROUTE },
 
 	{0,0,0,0,0,0}
 };
@@ -100,7 +116,7 @@ struct module_exports exports= {
 	mod_init,   /* module initialization function */
 	0,
 	(destroy_function) destroy,
-	0           /* per-child init function */
+	child_init  /* per-child init function */
 };
 
 /**
@@ -116,8 +132,22 @@ static int mod_init(void)
 	if(register_mi_stats()<0)
 		return -1;
 #endif
+	register_pkg_proc_stats();
+	pkg_proc_stats_init_rpc();
 	return 0;
 }
+
+/**
+ *
+ */
+static int child_init(int rank)
+{
+	LM_DBG("rank is (%d)\n", rank);
+	if (rank==PROC_INIT)
+		return pkg_proc_stats_init();
+	return pkg_proc_stats_myinit(rank);
+}
+
 
 /**
  * destroy function
@@ -128,3 +158,52 @@ static void destroy(void)
 }
 
 
+/**
+ *
+ */
+int w_is_myself(struct sip_msg *msg, char *uri, str *s2)
+{
+	int ret;
+	str suri;
+	struct sip_uri puri;
+
+	if(fixup_get_svalue(msg, (gparam_p)uri, &suri)!=0)
+	{
+		LM_ERR("cannot get the URI parameter\n");
+		return -1;
+	}
+	if(suri.len>4 && (strncmp(suri.s, "sip:", 4)==0
+				|| strncmp(suri.s, "sips:", 5)==0))
+	{
+		if(parse_uri(suri.s, suri.len, &puri)!=0)
+		{
+			LM_ERR("failed to parse uri [%.*s]\n", suri.len, suri.s);
+			return -1;
+		}
+		ret = check_self(&puri.host, (puri.port.s)?puri.port_no:0,
+				(puri.transport_val.s)?puri.proto:0);
+	} else {
+		ret = check_self(&suri, 0, 0);
+	}
+	if(ret!=1)
+		return -1;
+	return 1;
+}
+
+int w_setdebug(struct sip_msg *msg, char *level, str *s2)
+{
+	int lval=0;
+	if(fixup_get_ivalue(msg, (gparam_p)level, &lval)!=0)
+	{
+		LM_ERR("no debug level value\n");
+		return -1;
+	}
+	//set_local_debug_level(lval);
+	return 1;
+}
+
+int w_resetdebug(struct sip_msg *msg, char *uri, str *s2)
+{
+	//reset_local_debug_level();
+	return 1;
+}

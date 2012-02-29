@@ -26,7 +26,9 @@
 #define SREV_NET_DATA_IN	1
 #define SREV_NET_DATA_OUT	2
 #define SREV_CORE_STATS		3
-#define SREV_CFG_RUN_ACTION 4
+#define SREV_CFG_RUN_ACTION	4
+#define SREV_PKG_SET_USED	5
+#define SREV_PKG_SET_REAL_USED	6
 
 typedef int (*sr_event_cb_f)(void *data);
 
