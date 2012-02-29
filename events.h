@@ -37,6 +37,8 @@ typedef struct sr_event_cb {
 	sr_event_cb_f net_data_out;
 	sr_event_cb_f core_stats;
 	sr_event_cb_f run_action;
+	sr_event_cb_f pkg_set_used;
+	sr_event_cb_f pkg_set_real_used;
 } sr_event_cb_t;
 
 void sr_event_cb_init(void);
