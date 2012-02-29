@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2006 Voice Sistem SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -26,8 +28,7 @@
 
 /*!
  * \file
- * \brief KEX :: Kamailio statistics
- * \ingroup kex
+ * \brief  Kamailio statistics
  */
 
 

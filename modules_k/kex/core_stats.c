@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2006 Voice Sistem SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -26,8 +28,7 @@
 
 /*!
  * \file
- * \brief KEX :: Kamailio Core statistics
- * \ingroup kex
+ * \brief Kamailio Core statistics
  */
 
 
@@ -55,8 +56,8 @@ stat_var* drp_rpls;				/*!< dropped replies          */
 stat_var* err_reqs;				/*!< error requests           */
 stat_var* err_rpls;				/*!< error replies            */
 stat_var* bad_URIs;				/*!< number of bad URIs       */
-stat_var* unsupported_methods;			/*!< unsupported methods      */
-stat_var* bad_msg_hdr;				/*!< messages with bad header */
+stat_var* unsupported_methods;	/*!< unsupported methods      */
+stat_var* bad_msg_hdr;			/*!< messages with bad header */
 
 
 /*! exported core statistics */
@@ -94,12 +95,10 @@ stat_export_t shm_stats[] = {
 
 static struct mi_root *mi_get_stats(struct mi_root *cmd, void *param);
 static struct mi_root *mi_reset_stats(struct mi_root *cmd, void *param);
-static struct mi_root *mi_clear_stats(struct mi_root *cmd, void *param);
 
 static mi_export_t mi_stat_cmds[] = {
 	{ "get_statistics",    mi_get_stats,    0  ,  0,  0 },
 	{ "reset_statistics",  mi_reset_stats,  0  ,  0,  0 },
-	{ "clear_statistics",  mi_clear_stats,  0  ,  0,  0 },
 	{ 0, 0, 0, 0, 0}
 };
 
@@ -221,9 +220,10 @@ inline static int mi_add_stat(struct mi_node *rpl, stat_var *stat)
 static void mi_add_grp_vars_cbk(void* r, str* g, str* n, counter_handle_t h)
 {
 	struct mi_node *rpl;
+	struct mi_node *node;
 	
 	rpl = r;
-	addf_mi_node_child(rpl, 0, 0, 0, "%.*s:%.*s = %lu",
+	node = addf_mi_node_child(rpl, 0, 0, 0, "%.*s:%.*s = %lu",
 							g->len, g->s, n->len, n->s, counter_get_val(h));
 }
 
@@ -327,125 +327,6 @@ static struct mi_root *mi_reset_stats(struct mi_root *cmd, void *param)
 	}
 
 	return rpl_tree;
-}
-
-
-inline static int mi_reset_and_add_stat(struct mi_node *rpl, stat_var *stat)
-{
-	struct mi_node *node;
-	long old_val, new_val;
-
-	if (stats_support()==0) return -1;
-
-	old_val=get_stat_val(stat);
-	reset_stat(stat);
-	new_val=get_stat_val(stat);
-
-	if (old_val==new_val)
-	{
-		node = addf_mi_node_child(rpl, 0, 0, 0, "%s:%s = %lu",
-				ZSW(get_stat_module(stat)),
-				ZSW(get_stat_name(stat)),
-				new_val);
-	} else {
-		node = addf_mi_node_child(rpl, 0, 0, 0, "%s:%s = %lu (%lu)",
-				ZSW(get_stat_module(stat)),
-				ZSW(get_stat_name(stat)),
-				new_val, old_val );
-	}
-
-	if (node==0)
-		return -1;
-	return 0;
-}
-
-
-/* callback for counter_iterate_grp_vars to reset counters */
-static void mi_add_grp_vars_cbk2(void* r, str* g, str* n, counter_handle_t h)
-{
-	struct mi_node *rpl;
-	counter_val_t old_val, new_val;
-
-	rpl = r;
-	old_val = counter_get_val(h);
-	counter_reset(h);
-	new_val = counter_get_val(h);
-
-	if (old_val==new_val)
-	{
-		addf_mi_node_child(rpl, 0, 0, 0, "%.*s:%.*s = %lu",
-					g->len, g->s, n->len, n->s, new_val);
-	} else {
-		addf_mi_node_child(rpl, 0, 0, 0, "%.*s:%.*s = %lu (%lu)",
-					g->len, g->s, n->len, n->s, new_val, old_val);
-	}
-}
-
-
-/* callback for counter_iterate_grp_names to reset counters */
-static void mi_add_all_grps_cbk2(void* p, str* g)
-{
-	counter_iterate_grp_vars(g->s, mi_add_grp_vars_cbk2, p);
-}
-
-
-static struct mi_root *mi_clear_stats(struct mi_root *cmd, void *param)
-{
-	struct mi_root *rpl_tree;
-	struct mi_node *rpl;
-	struct mi_node *arg;
-	stat_var       *stat;
-	str val;
-
-	if(stats_support()==0)
-		return init_mi_tree( 404, "Statistics Not Found", 20);
-
-	if (cmd->node.kids==NULL)
-	return init_mi_tree( 400, MI_MISSING_PARM_S, MI_MISSING_PARM_LEN);
-
-	rpl_tree = init_mi_tree( 200, MI_OK_S, MI_OK_LEN);
-	if (rpl_tree==0)
-		return 0;
-	rpl = &rpl_tree->node;
-
-	for( arg=cmd->node.kids ; arg ; arg=arg->next)
-	{
-		if (arg->value.len==0)
-			continue;
-
-		val = arg->value;
-
-		if ( val.len==3 && memcmp(val.s,"all",3)==0) {
-			/* add all statistic variables */
-			/* use direct counters access for that */
-			counter_iterate_grp_names(mi_add_all_grps_cbk2, rpl);
-		} else if ( val.len>1 && val.s[val.len-1]==':') {
-			/* add module statistics */
-			val.len--;
-			val.s[val.len]=0; /* zero term. */
-			/* use direct counters access for that */
-			counter_iterate_grp_vars(val.s, mi_add_grp_vars_cbk2, rpl);
-			val.s[val.len]=':' /* restore */;
-		} else {
-			/* reset & return only one statistic */
-			stat = get_stat( &val );
-
-			if (stat==0)
-				continue;
-			if (mi_reset_and_add_stat(rpl,stat)!=0)
-				goto error;
-		}
-	}
-
-	if (rpl->kids==0) {
-		free_mi_tree(rpl_tree);
-		return init_mi_tree( 404, "Statistics Not Found", 20);
-	}
-
-	return rpl_tree;
-error:
-	free_mi_tree(rpl_tree);
-	return 0;
 }
 
 /*** shm stats ***/
