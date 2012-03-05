@@ -1,3 +1,29 @@
+kamailio (3.1.5+sipwise5) unstable; urgency=low
+
+  [ agranig ]
+  * rtpproxy.c,rtpproxy_funcs.c: Also parse via1 branch.
+  * rtpproxy.c,rtpproxy_funcs.h: Add unforce_rtp_proxy("param") function.
+  * rtpproxy.c: Copy viabranch to iovec for sending it out.
+  * rtpproxy.c: More debug for rtpp.
+  * rtpproxy.c,rtpproxy_funcs.c,rtpproxy_funcs.h: Differentiate between 'v' (via1) and 'V' (via2) handling.
+  * rtpproxy.c: Fix position of viabranch.
+  * rtpproxy.c: Remove log message printing via.
+  * rtpproxy_funcs.c: Double-check parsed via header.
+  * rtpproxy.c,rtpproxy_funcs.c,rtpproxy_funcs.h: Cleanup getting via branch.
+  * ul_mi.c: Use Path as 6th param in ul_add.
+  * kamctl,kamctl.8,kamctl.ctlbase: Add path handling to kamctl.
+  * ul_mi.c,kamctl: Make path 0 if not used, otherwise mi parser bails out if empty.
+  * ul_mi.c: Better path detection.
+  * ul_mi.c: Fix syntax error.
+  * rtpproxy_admin.xml,rtpproxy.c: Change v/V flags to 1/2 and add doc.
+
+
+  [ apogrebennyk ]
+  * redis_client.c: while we are at it allow ndb_redis to reconnect
+  * Makefile: enable system malloc instead of pkg_malloc for fifo commands.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Mon, 05 Mar 2012 17:15:57 +0100
+
 kamailio (3.1.5+sipwise4) unstable; urgency=low
 
   * lcr: the lcr module shall support ipv6
