@@ -1,3 +1,9 @@
+kamailio (3.1.5+sipwise6) unstable; urgency=low
+
+  * Fix 'wday' period matching in tmrec module
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Mon, 16 Apr 2012 10:22:28 -0400
+
 kamailio (3.1.5+sipwise5) unstable; urgency=low
 
   [ agranig ]
