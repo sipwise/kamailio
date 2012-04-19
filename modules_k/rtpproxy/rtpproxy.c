@@ -1645,7 +1645,6 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
         int via1, via2;
 	str callid, from_tag, to_tag, viabranch;
 	struct rtpp_node *node;
-        int iovec_count;
 	struct iovec v[1 + 6 + 3] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {NULL, 0}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
         char *viasepchar = ";";
         str viasep;
@@ -1673,10 +1672,10 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get Call-Id field\n");
 		return -1;
 	}
-        if (via1 && get_via_branch(msg, 1, &viabranch) == -1 && viabranch.len == 0) {
+        if (via1 && (get_via_branch(msg, 1, &viabranch) == -1 || viabranch.len == 0)) {
 		LM_ERR("can't get via1 branch\n");
 		return -1;
-        } else if (via2 && get_via_branch(msg, 2, &viabranch) == -1 && viabranch.len == 0) {
+        } else if (via2 && (get_via_branch(msg, 2, &viabranch) == -1 || viabranch.len == 0)) {
 		LM_ERR("can't get via2 branch\n");
 		return -1;
         } else if(via1 || via2) {
@@ -1705,12 +1704,7 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("no available proxies\n");
 		return -1;
 	}
-        iovec_count = 6;
-        if(to_tag.len > 0)
-          iovec_count += 2;
-        if(viabranch.len > 0)
-          iovec_count += 2;
-	send_rtpp_command(node, v, iovec_count);
+	send_rtpp_command(node, v, (to_tag.len > 0) ? 10 : 8);
 
 	return 1;
 }
