@@ -64,6 +64,7 @@ int ht_param(modparam_t type, void* val);
 
 static struct mi_root* ht_mi_reload(struct mi_root* cmd_tree, void* param);
 static struct mi_root* ht_mi_dump(struct mi_root* cmd_tree, void* param);
+static struct mi_root* ht_mi_delete(struct mi_root* cmd_tree, void* param);
 
 static pv_export_t mod_pvs[] = {
 	{ {"sht", sizeof("sht")-1}, PVT_OTHER, pv_get_ht_cell, pv_set_ht_cell,
@@ -81,6 +82,7 @@ static pv_export_t mod_pvs[] = {
 static mi_export_t mi_cmds[] = {
 	{ "sht_reload",     ht_mi_reload,  0,  0,  0},
 	{ "sht_dump",       ht_mi_dump,    0,  0,  0},
+	{ "sht_delete",     ht_mi_delete,  0,  0,  0},
 	{ 0, 0, 0, 0, 0}
 };
 
@@ -393,6 +395,39 @@ static struct mi_root* ht_mi_reload(struct mi_root* cmd_tree, void* param)
 	}
 	ht_db_close_con();
 	return init_mi_tree( 200, MI_OK_S, MI_OK_LEN);
+}
+
+static struct mi_root* ht_mi_delete(struct mi_root* cmd_tree, void* param) {
+	struct mi_node *node;
+	str *htname, *key;
+	ht_t *ht;
+
+	node = cmd_tree->node.kids;
+	if (!node)
+		goto param_err;
+
+	htname = &node->value;
+	if (!htname->len)
+		goto param_err;
+
+	node = node->next;
+	if (!node)
+		goto param_err;
+
+	key = &node->value;
+	if (!key->len)
+		goto param_err;
+
+	ht = ht_get_table(htname);
+	if (!ht)
+		return init_mi_tree(404, MI_BAD_PARM_S, MI_BAD_PARM_LEN);
+
+	ht_del_cell(ht, key);
+
+	return init_mi_tree(200, MI_OK_S, MI_OK_LEN);
+
+param_err:
+	return init_mi_tree(400, MI_MISSING_PARM_S, MI_MISSING_PARM_LEN);
 }
 
 static struct mi_root* ht_mi_dump(struct mi_root* cmd_tree, void* param)
