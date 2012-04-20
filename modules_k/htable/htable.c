@@ -500,7 +500,7 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 			if (rpc->add(c, "{", &th) < 0)
 			{
 				rpc->fault(c, 500, "Internal error creating rpc");
-				return;
+				goto error;
 			}
 			if(rpc->struct_add(th, "dd{",
 							"entry", i,
@@ -508,7 +508,7 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 							"slot",  &ih)<0)
 			{
 				rpc->fault(c, 500, "Internal error creating rpc");
-				return;
+				goto error;
 			}
 			while(it)
 			{
@@ -516,7 +516,7 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 							"item", &vh)<0)
 				{
 					rpc->fault(c, 500, "Internal error creating rpc");
-					return;
+					goto error;
 				}
 				if(it->flags&AVP_VAL_STR) {
 					if(rpc->struct_add(vh, "SS",
@@ -524,7 +524,7 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 							"value", &it->value.s)<0)
 					{
 						rpc->fault(c, 500, "Internal error adding item");
-						return;
+						goto error;
 					}
 				} else {
 					if(rpc->struct_add(vh, "Sd",
@@ -532,7 +532,7 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 							"value", (int)it->value.n))
 					{
 						rpc->fault(c, 500, "Internal error adding item");
-						return;
+						goto error;
 					}
 				}
 				it = it->next;
@@ -540,6 +540,11 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 		}
 		lock_release(&ht->entries[i].lock);
 	}
+
+	return;
+
+error:
+	lock_release(&ht->entries[i].lock);
 }
 
 rpc_export_t htable_rpc[] = {
