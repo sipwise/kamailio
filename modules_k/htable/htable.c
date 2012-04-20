@@ -468,6 +468,27 @@ static const char* htable_dump_doc[2] = {
 	"Dump the contents of hash table.",
 	0
 };
+static const char* htable_delete_doc[2] = {
+	"Delete one key from a hash table.",
+	0
+};
+
+static void htable_rpc_delete(rpc_t* rpc, void* c) {
+	str htname, keyname;
+	ht_t *ht;
+
+	if (rpc->scan(c, "SS", &htname, &keyname) < 2) {
+		rpc->fault(c, 500, "Not enough parameters (htable name & key name");
+		return;
+	}
+	ht = ht_get_table(&htname);
+	if (!ht) {
+		rpc->fault(c, 500, "No such htable");
+		return;
+	}
+
+	ht_del_cell(ht, &keyname);
+}
 
 static void  htable_rpc_dump(rpc_t* rpc, void* c)
 {
@@ -549,6 +570,7 @@ error:
 
 rpc_export_t htable_rpc[] = {
 	{"htable.dump", htable_rpc_dump, htable_dump_doc, 0},
+	{"htable.delete", htable_rpc_delete, htable_delete_doc, 0},
 	{0, 0, 0, 0}
 };
 
