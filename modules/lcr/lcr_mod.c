@@ -1085,7 +1085,7 @@ int reload_tables()
 			goto err;
 		    }
 		    request_uri = (char *)VAL_STRING(ROW_VALUES(row) + 5);
-		    request_uri_len = strlen(from_uri);
+		    request_uri_len = strlen(request_uri);
 		}
 		if (request_uri_len > MAX_URI_LEN) {
 		    LM_ERR("lcr rule <%u> request_uri is too long\n", rule_id);
