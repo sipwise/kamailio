@@ -1,3 +1,10 @@
+kamailio (3.1.5+sipwise7) unstable; urgency=low
+
+  [rfuchs]
+  * Fix logic mistakes in unforce_rtp_proxy1_f.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Wed, 25 Apr 2012 17:53:51 +0200
+
 kamailio (3.1.5+sipwise6) unstable; urgency=low
 
   * Fix 'wday' period matching in tmrec module
