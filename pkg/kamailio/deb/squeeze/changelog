@@ -1,3 +1,12 @@
+kamailio (3.1.5+sipwise8) unstable; urgency=low
+
+  [ agranig ]
+  * path.c: Use single-quotes instead of double-quotes in received-param.
+  * path.c: Strip single quotes from received param in Path.
+  * parse_param.c: Also parse single-quoted params correctly.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Mon, 04 Jun 2012 18:16:56 +0200
+
 kamailio (3.1.5+sipwise7) unstable; urgency=low
 
   [rfuchs]
