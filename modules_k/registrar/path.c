@@ -93,18 +93,7 @@ int build_path_vector(struct sip_msg *_m, str *path, str *received)
 				goto error;
 			}
 			if (hooks.contact.received)
-			{
 				*received = hooks.contact.received->body;
-				if((received->s)[0] == '\'')
-				{
-					received->s++;
-					received->len--;
-				}
-				if((received->s)[received->len-1] == '\'')
-				{
-					received->len--;
-				}
-			}
 			/*for (;params; params = params->next) {
 				if (params->type == P_RECEIVED) {
 					*received = hooks.contact.received->body;
