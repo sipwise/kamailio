@@ -191,8 +191,8 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
 			LM_ERR("overflow\n");
 			goto error;
 		}
-		memcpy(result->s, string.s, ovector[0] - 1);
-		result->len += ovector[0] - 1;
+		memcpy(result->s, string.s, ovector[0]);
+		result->len += ovector[0];
 	}
 
 	if (repl_comp) {
