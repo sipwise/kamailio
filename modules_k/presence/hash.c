@@ -23,7 +23,7 @@
  *
  * History:
  * --------
- *  2007-08-20  initial version (anca)
+ *  2007-08-20  initial version (Anca Vamanu)
  */
 
 /*! \file
@@ -34,7 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../../mem/shm_mem.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../../dprint.h"
 #include "../../str.h"
 #include "../pua/hash.h"
@@ -134,8 +134,9 @@ subs_t* mem_copy_subs(subs_t* s, int mem_type)
 	size= sizeof(subs_t)+ (s->pres_uri.len+ s->to_user.len
 		+ s->to_domain.len+ s->from_user.len+ s->from_domain.len+ s->callid.len
 		+ s->to_tag.len+ s->from_tag.len+s->sockinfo_str.len+s->event_id.len
-		+ s->local_contact.len+ s->contact.len+ s->record_route.len+
-		+ s->reason.len+ 1)*sizeof(char);
+		+ s->local_contact.len+ s->contact.len+ s->record_route.len
+		+ s->reason.len+ s->watcher_user.len+ s->watcher_domain.len
+		+ 1)*sizeof(char);
 
 	if(mem_type & PKG_MEM_TYPE)
 		dest= (subs_t*)pkg_malloc(size);
@@ -154,6 +155,8 @@ subs_t* mem_copy_subs(subs_t* s, int mem_type)
 	CONT_COPY(dest, dest->to_domain, s->to_domain)
 	CONT_COPY(dest, dest->from_user, s->from_user)
 	CONT_COPY(dest, dest->from_domain, s->from_domain)
+	CONT_COPY(dest, dest->watcher_user, s->watcher_user)
+	CONT_COPY(dest, dest->watcher_domain, s->watcher_domain)
 	CONT_COPY(dest, dest->to_tag, s->to_tag)
 	CONT_COPY(dest, dest->from_tag, s->from_tag)
 	CONT_COPY(dest, dest->callid, s->callid)
@@ -198,7 +201,8 @@ subs_t* mem_copy_subs_noc(subs_t* s)
 		+ s->to_domain.len+ s->from_user.len+ s->from_domain.len+ s->callid.len
 		+ s->to_tag.len+ s->from_tag.len+s->sockinfo_str.len+s->event_id.len
 		+ s->local_contact.len + s->record_route.len+
-		+ s->reason.len+ 1)*sizeof(char);
+		+ s->reason.len+ s->watcher_user.len+ s->watcher_domain.len
+		+ 1)*sizeof(char);
 
 	dest= (subs_t*)shm_malloc(size);
 	if(dest== NULL)
@@ -213,6 +217,8 @@ subs_t* mem_copy_subs_noc(subs_t* s)
 	CONT_COPY(dest, dest->to_domain, s->to_domain)
 	CONT_COPY(dest, dest->from_user, s->from_user)
 	CONT_COPY(dest, dest->from_domain, s->from_domain)
+	CONT_COPY(dest, dest->watcher_user, s->watcher_user)
+	CONT_COPY(dest, dest->watcher_domain, s->watcher_domain)
 	CONT_COPY(dest, dest->to_tag, s->to_tag)
 	CONT_COPY(dest, dest->from_tag, s->from_tag)
 	CONT_COPY(dest, dest->callid, s->callid)
@@ -257,31 +263,16 @@ int insert_shtable(shtable_t htable,unsigned int hash_code, subs_t* subs)
 	if(new_rec== NULL)
 	{
 		LM_ERR("copying in share memory a subs_t structure\n");
-		goto error;
+		return -1;
 	}
-
 	new_rec->expires+= (int)time(NULL);
-	if(fallback2db!=0) {
-		if(new_rec->db_flag==0)
-			new_rec->db_flag = INSERTDB_FLAG;
-	} else {
-		new_rec->db_flag = NO_UPDATEDB_FLAG;
-	}
 
 	lock_get(&htable[hash_code].lock);
-	
 	new_rec->next= htable[hash_code].entries->next;
-	
 	htable[hash_code].entries->next= new_rec;
-	
 	lock_release(&htable[hash_code].lock);
-	
-	return 0;
 
-error:
-	if(new_rec)
-		shm_free(new_rec);
-	return -1;
+	return 0;
 }
 
 int delete_shtable(shtable_t htable,unsigned int hash_code,str to_tag)
@@ -295,11 +286,11 @@ int delete_shtable(shtable_t htable,unsigned int hash_code,str to_tag)
 	s= ps->next;
 		
 	while(s)
-	{	
+	{
 		if(s->to_tag.len== to_tag.len &&
 				strncmp(s->to_tag.s, to_tag.s, to_tag.len)== 0)
 		{
-			found= s->local_cseq;
+			found= s->local_cseq +1;
 			ps->next= s->next;
 			if(s->contact.s!=NULL)
 				shm_free(s->contact.s);
@@ -360,9 +351,8 @@ int update_shtable(shtable_t htable,unsigned int hash_code,
 	}
 	else
 	{
-		subs->local_cseq= s->local_cseq;
-		s->local_cseq++;	
-		s->version= subs->version+ 1;
+		subs->local_cseq = ++s->local_cseq;
+		subs->version = ++s->version;
 	}
 	
 	if(strncmp(s->contact.s, subs->contact.s, subs->contact.len))

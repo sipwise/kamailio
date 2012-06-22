@@ -29,7 +29,7 @@
 #include "../../sr_module.h"
 #include "../../pvar.h"
 
-#define XCAP_MAX_URI_SIZE	127
+#define XCAP_MAX_URI_SIZE	255
 /* Node Selector Separator */
 #define XCAP_NSS	"~~"
 
@@ -46,11 +46,14 @@ typedef struct xcap_uri {
 	str rdoc;
 	char *nss;
 	str node;
+	str target;
+	str domain;
 } xcap_uri_t;
 
 int xcap_parse_uri(str *huri, str *xroot, xcap_uri_t *xuri);
 int xcaps_xpath_set(str *inbuf, str *xpaths, str *val, str *outbuf);
 int xcaps_xpath_get(str *inbuf, str *xpaths, str *outbuf);
+int xcaps_check_doc_validity(str *doc);
 
 int pv_get_xcap_uri(struct sip_msg *msg,  pv_param_t *param,
 		pv_value_t *res);

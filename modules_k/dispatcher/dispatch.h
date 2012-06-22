@@ -50,8 +50,16 @@
 #define DS_FAILOVER_ON		2  /*!< store the other dest in avps */
 
 #define DS_INACTIVE_DST		1  /*!< inactive destination */
-#define DS_PROBING_DST		2  /*!< checking destination */
-#define DS_RESET_FAIL_DST	4  /*!< Reset-Failure-Counter */
+#define DS_TRYING_DST		2  /*!< temporary trying destination */
+#define DS_DISABLED_DST		4  /*!< admin disabled destination */
+#define DS_PROBING_DST		8  /*!< checking destination */
+#define DS_STATES_ALL		15  /*!< all bits for the states of destination */
+
+#define ds_skip_dst(flags)	((flags) & (DS_INACTIVE_DST|DS_DISABLED_DST))
+
+#define DS_PROBE_NONE		0
+#define DS_PROBE_ALL		1
+#define DS_PROBE_INACTIVE	2
 
 extern str ds_db_url;
 extern str ds_table_name;
@@ -85,8 +93,9 @@ extern struct tm_binds tmb;
 extern str ds_ping_method;
 extern str ds_ping_from;
 extern int probing_threshhold; /*!< number of failed requests,
-						before a destination is taken into probing */ 
+								 before a destination is taken into probing */ 
 extern int ds_probing_mode;
+extern str ds_outbound_proxy;
 
 int init_data(void);
 int init_ds_db(void);
@@ -97,7 +106,8 @@ int ds_load_db(void);
 int ds_destroy_list(void);
 int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode);
 int ds_next_dst(struct sip_msg *msg, int mode);
-int ds_set_state(int group, str *address, int state, int type);
+int ds_update_state(sip_msg_t *msg, int group, str *address, int state);
+int ds_reinit_state(int group, str *address, int state);
 int ds_mark_dst(struct sip_msg *msg, int mode);
 int ds_print_list(FILE *fout);
 int ds_print_mi_list(struct mi_node* rpl);
@@ -126,5 +136,39 @@ void ds_ht_timer(unsigned int ticks, void *param);
  */
 int ds_ping_check_rplcode(int);
 
+typedef struct _ds_attrs
+{
+	str body;
+	str duid;
+	int maxload;
+	int weight;
+} ds_attrs_t;
+
+typedef struct _ds_dest
+{
+	str uri;
+	int flags;
+	int priority;
+	int dload;
+	ds_attrs_t attrs;
+	struct ip_addr ip_address; 	/*!< IP-Address of the entry */
+	unsigned short int port; 	/*!< Port of the request URI */
+	int failure_count;
+	struct _ds_dest *next;
+} ds_dest_t;
+
+typedef struct _ds_set
+{
+	int id;				/*!< id of dst set */
+	int nr;				/*!< number of items in dst set */
+	int last;			/*!< last used item in dst set (round robin) */
+	int wlast;			/*!< last used item in dst set (by weight) */
+	ds_dest_t *dlist;
+	unsigned int wlist[100];
+	struct _ds_set *next;
+} ds_set_t;
+
+ds_set_t *ds_get_list(void);
+int ds_get_list_nr(void);
 #endif
 

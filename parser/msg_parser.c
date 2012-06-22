@@ -55,6 +55,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "../comp_defs.h"
 #include "msg_parser.h"
@@ -239,7 +240,6 @@ char* get_hdr_field(char* buf, char* end, struct hdr_field* hdr)
 		case HDR_USERAGENT_T:
 		case HDR_SERVER_T:
 		case HDR_CONTENTDISPOSITION_T:
-		case HDR_ACCEPTDISPOSITION_T:
 		case HDR_DIVERSION_T:
 		case HDR_RPID_T:
 		case HDR_SIPIFMATCH_T:
@@ -481,10 +481,6 @@ int parse_headers(struct sip_msg* msg, hdr_flags_t flags, int next)
 				if (msg->content_disposition==0) msg->content_disposition = hf;
 				msg->parsed_flag|=HDR_CONTENTDISPOSITION_F;
 				break;
-			case HDR_ACCEPTDISPOSITION_T:
-				if (msg->accept_disposition==0) msg->accept_disposition = hf;
-				msg->parsed_flag|=HDR_ACCEPTDISPOSITION_F;
-				break;
 			case HDR_DIVERSION_T:
 				if (msg->diversion==0) msg->diversion = hf;
 				msg->parsed_flag|=HDR_DIVERSION_F;
@@ -604,8 +600,6 @@ int parse_msg(char* buf, unsigned int len, struct sip_msg* msg)
 
 	char *tmp;
 	char* rest;
-	char* first_via;
-	char* second_via;
 	struct msg_start *fl;
 	int offset;
 	hdr_flags_t flags;
@@ -654,8 +648,6 @@ int parse_msg(char* buf, unsigned int len, struct sip_msg* msg)
 	}
 	msg->unparsed=tmp;
 	/*find first Via: */
-	first_via=0;
-	second_via=0;
 	if (parse_headers(msg, flags, 0)==-1) goto error;
 
 #ifdef EXTRA_DEBUG
@@ -710,7 +702,7 @@ int parse_msg(char* buf, unsigned int len, struct sip_msg* msg)
 
 error:
 	/* more debugging, msg->orig is/should be null terminated*/
-	LOG(L_ERR, "ERROR: parse_msg: message=<%.*s>\n",
+	LOG(cfg_get(core, core_cfg, corelog), "ERROR: parse_msg: message=<%.*s>\n",
 			(int)msg->len, ZSW(msg->buf));
 	return -1;
 }
@@ -829,9 +821,9 @@ void reset_path_vector(struct sip_msg* msg)
 }
 
 
-struct hdr_field* get_hdr(struct sip_msg *msg, enum _hdr_types_t ht)
+hdr_field_t* get_hdr(sip_msg_t *msg, enum _hdr_types_t ht)
 {
-	struct hdr_field *hdr;
+	hdr_field_t *hdr;
 
 	if (msg->parsed_flag & HDR_T2F(ht))
 		for(hdr = msg->headers; hdr; hdr = hdr->next) {
@@ -841,12 +833,75 @@ struct hdr_field* get_hdr(struct sip_msg *msg, enum _hdr_types_t ht)
 }
 
 
-struct hdr_field* next_sibling_hdr(struct hdr_field *hf)
-{	
-	struct hdr_field *hdr;
-	
+hdr_field_t* next_sibling_hdr(hdr_field_t *hf)
+{
+	hdr_field_t *hdr;
+
 	for(hdr = hf->next; hdr; hdr = hdr->next) {
 		if(hdr->type == hf->type) return hdr;
 	}
 	return NULL;
+}
+
+hdr_field_t* get_hdr_by_name(sip_msg_t *msg, char *name, int name_len)
+{
+	hdr_field_t *hdr;
+
+	for(hdr = msg->headers; hdr; hdr = hdr->next) {
+		if(hdr->name.len == name_len && *hdr->name.s==*name
+				&& strncmp(hdr->name.s, name, name_len)==0)
+			return hdr;
+	}
+	return NULL;
+}
+
+
+hdr_field_t* next_sibling_hdr_by_name(hdr_field_t *hf)
+{
+	hdr_field_t *hdr;
+
+	for(hdr = hf->next; hdr; hdr = hdr->next) {
+		if(hdr->name.len == hf->name.len && *hdr->name.s==*hf->name.s
+				&& strncmp(hdr->name.s, hf->name.s, hf->name.len)==0)
+			return hdr;
+	}
+	return NULL;
+}
+
+/**
+ * set msg context id
+ * - return: -1 on error; 0 - on set
+ */
+int msg_ctx_id_set(sip_msg_t *msg, msg_ctx_id_t *mid)
+{
+	if(msg==NULL || mid==NULL)
+		return -1;
+	mid->msgid = msg->id;
+	mid->pid = msg->pid;
+	return 0;
+}
+
+/**
+ * check msg context id
+ * - return: -1 on error; 0 - on no match; 1 - on match
+ */
+int msg_ctx_id_match(sip_msg_t *msg, msg_ctx_id_t *mid)
+{
+	if(msg==NULL || mid==NULL)
+		return -1;
+	if(msg->id != mid->msgid || msg->pid!=mid->pid)
+		return 0;
+	return 1;
+}
+
+/**
+ * set msg time value
+ */
+int msg_set_time(sip_msg_t *msg)
+{
+	if(unlikely(msg==NULL))
+		return -2;
+	if(msg->tval.tv_sec!=0)
+		return 0;
+	return gettimeofday(&msg->tval, NULL);
 }

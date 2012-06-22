@@ -263,11 +263,10 @@ static int mi_send_dgram(int fd, char* buf, unsigned int len,
  * line is correct and exists*/
 static int identify_command(datagram_stream * dtgram, struct mi_cmd * *f)
 {
-	char *command,*p, *start;
+	char *command,*p;
 
 	/* default offset for the command: 0 */
 	p= dtgram->start;
-	start = p;
 	if (!p){
 		LM_ERR("null pointer  \n");
 		return -1;
@@ -336,6 +335,7 @@ static void datagram_close_async(struct mi_root *mi_rpl,struct mi_handler *hdl, 
 
 	mi_create_dtgram_replysocket(reply_sock, p->domain, err);
 
+        memset(&dtgram, 0, sizeof(dtgram));
 
 	if (mi_rpl!=0) {
 		/*allocate the response datagram*/	

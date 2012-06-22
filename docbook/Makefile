@@ -97,7 +97,7 @@ html_css ?= /css/sr-doc.css
 # the site-wide catalog file present in Debian and possibly other systems
 # too. This file is updated by the package manager whenever docbook schema
 # file or docbook xsl stylesheets are being installed.
-catalog=$(docbook_dir)/catalog.xml
+catalog  ?= $(docbook_dir)/catalog.xml
 
 lynx     ?= lynx
 dia      ?= dia
@@ -113,7 +113,14 @@ ifeq ($(validate), 0)
 	override xsltproc_flags := $(xsltproc_flags) --novalid
 endif
 
-all_deps = Makefile $(docbook_dir)/Makefile $(dep_xsl) $(catalog) $(extra_deps)
+ifeq ($(nocatalog),yes)
+XMLCATALOGX=
+else
+XMLCATALOGX=XML_CATALOG_FILES=$(catalog)
+endif
+
+all_deps = Makefile $(docbook_dir)/Makefile $(docbook_dir)/entities.xml \
+		   $(dep_xsl) $(catalog) $(extra_deps)
 
 all: txt
 
@@ -132,12 +139,12 @@ txt text plaintext: $(txt_files)
 readme README: ../README
 
 ../README: $(readme_docs) $(readme_deps) $(readme_xsl) $(all_deps)
-	XML_CATALOG_FILES=$(catalog) $(xsltproc) $(xsltproc_flags) \
+	$(XMLCATALOGX) $(xsltproc) $(xsltproc_flags) \
 		--xinclude \
         $(readme_xsl) $< | $(lynx) $(lynx_flags) -stdin -dump > $@
 
 $(output_dir)/%.html: %.xml %.d $(single_html_xsl) $(all_deps)
-	XML_CATALOG_FILES=$(catalog) $(xsltproc) $(xsltproc_flags) \
+	$(XMLCATALOGX) $(xsltproc) $(xsltproc_flags) \
         --xinclude \
         --stringparam base.dir "$(output_dir)/" \
         --stringparam root.filename "$(basename $<)" \
@@ -147,7 +154,7 @@ $(output_dir)/%.html: %.xml %.d $(single_html_xsl) $(all_deps)
 
 
 $(output_dir)/%.txt: %.xml %.d $(txt_xsl) $(all_deps)
-	XML_CATALOG_FILES=$(catalog) $(xsltproc) $(xsltproc_flags) \
+	$(XMLCATALOGX) $(xsltproc) $(xsltproc_flags) \
 		--xinclude \
         $(txt_xsl) $< | $(lynx) $(lynx_flags) -stdin -dump > $@
 
@@ -163,7 +170,7 @@ $(output_dir)/%.txt: %.xml %.d $(txt_xsl) $(all_deps)
 
 .PHONY: check
 check: $(docs) $(html_docs) $(txt_docs) $(readme_docs)
-	XML_CATALOG_FILES=$(catalog) $(xmllint) $(xmllint_flags) $<
+	$(XMLCATALOGX) $(xmllint) $(xmllint_flags) $<
 
 .PHONY: clean
 clean:

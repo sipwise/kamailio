@@ -76,6 +76,7 @@ auth_result_t pre_auth(struct sip_msg* msg, str* realm, hdr_types_t hftype,
 	      * in the message, parse them and return pointer to
 	      * parsed structure
 	      */
+	strip_realm(realm);
 	ret = find_credentials(msg, realm, hftype, hdr);
 	if (ret < 0) {
 		LOG(L_ERR, "auth:pre_auth: Error while looking for credentials\n");
@@ -83,7 +84,7 @@ auth_result_t pre_auth(struct sip_msg* msg, str* realm, hdr_types_t hftype,
 	} else if (ret > 0) {
 		DBG("auth:pre_auth: Credentials with realm '%.*s' not found\n",
 				realm->len, ZSW(realm->s));
-		return NOT_AUTHENTICATED;
+		return NO_CREDENTIALS;
 	}
 
 	     /* Pointer to the parsed credentials */
@@ -93,6 +94,11 @@ auth_result_t pre_auth(struct sip_msg* msg, str* realm, hdr_types_t hftype,
 	DBG("auth: digest-algo: %.*s parsed value: %d\n",
 			c->digest.alg.alg_str.len, c->digest.alg.alg_str.s,
 			c->digest.alg.alg_parsed);
+
+	if (mark_authorized_cred(msg, *hdr) < 0) {
+		LOG(L_ERR, "auth:pre_auth: Error while marking parsed credentials\n");
+		return ERROR;
+	}
 
 	    /* check authorization header field's validity */
 	if (check_auth_hdr == NULL) {
@@ -132,7 +138,12 @@ static int auth_check_hdr_md5(struct sip_msg* msg, auth_body_t* auth,
 		if (ret==3 || ret==4){
 			/* failed auth_extra_checks or stale */
 			auth->stale=1; /* we mark the nonce as stale 
-			 				(hack that makes our life much easier) */
+							(hack that makes our life much easier) */
+			*auth_res = STALE_NONCE;
+			return 0;
+		} else if (ret==6) {
+			*auth_res = NONCE_REUSED;
+			return 0;
 		} else {
 			DBG("auth:pre_auth: Invalid nonce value received\n");
 			*auth_res = NOT_AUTHENTICATED;
@@ -166,11 +177,6 @@ auth_result_t post_auth(struct sip_msg* msg, struct hdr_field* hdr)
 			c->stale = 1;
 			res = NOT_AUTHENTICATED;
 		}
-	}
-
-	if (mark_authorized_cred(msg, hdr) < 0) {
-		LOG(L_ERR, "auth:post_auth: Error while marking parsed credentials\n");
-		res = ERROR;
 	}
 
 	return res;
@@ -232,5 +238,8 @@ int bind_auth_s(auth_api_s_t* api)
 	api->calc_HA1 = calc_HA1;
 	api->calc_response = calc_response;
 	api->check_response = auth_check_response;
+	api->auth_challenge = auth_challenge;
+	api->pv_authenticate = pv_authenticate;
+	api->consume_credentials = consume_credentials;
 	return 0;
 }

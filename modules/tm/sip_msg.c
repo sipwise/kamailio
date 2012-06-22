@@ -1,17 +1,4 @@
 /*
- * $Id$
- *
- * cloning a message into shared memory (TM keeps a snapshot
- * of messages in memory); note that many operations, which
- * allocate pkg memory (such as parsing) cannot be used with
- * a cloned message -- it would result in linking pkg structures
- * to shmem msg and eventually in a memory error
- *
- * the cloned message is stored in a single memory fragment to
- * save too many shm_mallocs -- these are expensive as they
- * not only take lookup in fragment table but also a shmem lock
- * operation (the same for shm_free)
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -54,6 +41,28 @@
  *              later than the SIP msg. (Miklos)
  * 2009-07-22  moved most of the functions to core sip_msg_clone.c  (andrei)*/
 
+/**
+ * @file
+ * @brief TM :: Message cloning functionality
+ * 
+ * Cloning a message into shared memory (TM keeps a snapshot
+ * of messages in memory); note that many operations, which
+ * allocate pkg memory (such as parsing) cannot be used with
+ * a cloned message -- it would result in linking pkg structures
+ * to shmem msg and eventually in a memory error.
+ * 
+ * The cloned message is stored in a single memory fragment to
+ * save too many shm_mallocs -- these are expensive as they
+ * not only take lookup in fragment table but also a shmem lock
+ * operation (the same for shm_free)
+ * 
+ * Allow postponing the cloning of SIP msg:
+ * t_newtran() copies the requests to shm mem without the lumps,
+ * and t_forward_nonack() clones the lumps later when it is called
+ * the first time.
+ * @ingroup tm
+ */
+
 #include "defs.h"
 
 
@@ -64,35 +73,40 @@
 #include "../../data_lump_rpl.h"
 #include "../../ut.h"
 #include "../../sip_msg_clone.h"
-
-#ifdef POSTPONE_MSG_CLONING
 #include "../../fix_lumps.h"
-#endif
 
-/* Warning: Cloner does not clone all hdr_field headers (From, To, etc.). Pointers will reference pkg memory. Dereferencing will crash ser!!! */
 
+/**
+ * @brief Clone a SIP message
+ * @warning Cloner does not clone all hdr_field headers (From, To, etc.). Pointers will reference pkg memory. Dereferencing will crash ser!
+ * @param org_msg Original SIP message
+ * @param sip_msg_len Length of the SIP message
+ * @return Cloned SIP message, or NULL on error
+ */
 struct sip_msg*  sip_msg_cloner( struct sip_msg *org_msg, int *sip_msg_len )
 {
-#ifdef POSTPONE_MSG_CLONING
 	/* take care of the lumps only for replies if the msg cloning is 
 	   postponed */
 	if (org_msg->first_line.type==SIP_REPLY)
-#endif /* POSTPONE_MSG_CLONING */
 		/*cloning all the lumps*/
 		return sip_msg_shm_clone(org_msg, sip_msg_len, 1);
-#ifdef POSTPONE_MSG_CLONING
 	/* don't clone the lumps */
 	return sip_msg_shm_clone(org_msg, sip_msg_len, 0);
-#endif /* POSTPONE_MSG_CLONING */
 }
 
-#ifdef POSTPONE_MSG_CLONING
-/* indicates wheter we have already cloned the msg lumps or not */
+/**
+ * @brief Indicates wheter we have already cloned the msg lumps or not
+ */
 unsigned char lumps_are_cloned = 0;
 
 
 
-/* wrapper function for msg_lump_cloner() with some additional sanity checks */
+/**
+ * @brief Wrapper function for msg_lump_cloner() with some additional sanity checks
+ * @param shm_msg SIP message in shared memory
+ * @param pkg_msg SIP message in private memory
+ * @return 0 on success, -1 on error
+ */
 int save_msg_lumps( struct sip_msg *shm_msg, struct sip_msg *pkg_msg)
 {
 	int ret;
@@ -144,4 +158,3 @@ int save_msg_lumps( struct sip_msg *shm_msg, struct sip_msg *pkg_msg)
 	}
 	return ret<0?-1:0;
 }
-#endif /* POSTPONE_MSG_CLONING */

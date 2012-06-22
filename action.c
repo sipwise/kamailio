@@ -93,6 +93,7 @@
 #endif
 #include "switch.h"
 #include "events.h"
+#include "cfg/cfg_struct.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -301,6 +302,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 	unsigned short port;
 	str* dst_host;
 	int i, flags;
+	avp_t* avp;
+	struct search_state st;
 	struct switch_cond_table* sct;
 	struct switch_jmp_table*  sjt;
 	struct rval_expr* rve;
@@ -482,15 +485,45 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			break;
 		case SEND_T:
 		case SEND_TCP_T:
-			if ((a->val[0].type!= PROXY_ST)|(a->val[1].type!=NUMBER_ST)){
-				LOG(L_CRIT, "BUG: do_action: bad send() types %d, %d\n",
-						a->val[0].type, a->val[1].type);
-				ret=E_BUG;
-				goto error;
+			if (a->val[0].type==URIHOST_ST){
+				/*get next hop uri uri*/
+				if (msg->dst_uri.len) {
+					ret = parse_uri(msg->dst_uri.s, msg->dst_uri.len,
+									&next_hop);
+					u = &next_hop;
+				} else {
+					ret = parse_sip_msg_uri(msg);
+					u = &msg->parsed_uri;
+				}
+
+				if (ret<0) {
+					LM_ERR("send() - bad_uri dropping packet\n");
+					ret=E_BUG;
+					goto error;
+				}
+				/* init dst */
+				init_dest_info(&dst);
+				ret = sip_hostport2su(&dst.to, &u->host, u->port_no,
+							&dst.proto);
+				if(ret!=0) {
+					LM_ERR("failed to resolve [%.*s]\n", u->host.len,
+						ZSW(u->host.s));
+					ret=E_BUG;
+					goto error;
+				}
+			} else {
+				if ((a->val[0].type!= PROXY_ST)|(a->val[1].type!=NUMBER_ST)){
+					LOG(L_CRIT, "BUG: do_action: bad send() types %d, %d\n",
+							a->val[0].type, a->val[1].type);
+					ret=E_BUG;
+					goto error;
+				}
+				/* init dst */
+				init_dest_info(&dst);
+				ret=proxy2su(&dst.to,  (struct proxy_l*)a->val[0].u.data);
+				if(ret==0)
+					proxy_mark((struct proxy_l*)a->val[0].u.data, ret);
 			}
-			/* init dst */
-			init_dest_info(&dst);
-			ret=proxy2su(&dst.to,  (struct proxy_l*)a->val[0].u.data);
 			if (ret==0){
 				if (p_onsend){
 					tmp=p_onsend->buf;
@@ -521,7 +554,6 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 				ret=E_BUG;
 				goto error;
 			}
-			proxy_mark((struct proxy_l*)a->val[0].u.data, ret);
 			if (ret>=0) ret=1;
 
 			break;
@@ -554,6 +586,21 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			if ((a->val[0].u.str.s == 0 || a->val[0].u.str.len == 0) &&
 					a->val[1].u.number == Q_UNSPECIFIED)
 				ruri_mark_consumed();
+			break;
+
+		/* remove last branch */
+		case REMOVE_BRANCH_T:
+			if (a->val[0].type!=NUMBER_ST) {
+				ret=drop_sip_branch(0) ? -1 : 1;
+			} else {
+				ret=drop_sip_branch(a->val[0].u.number) ? -1 : 1;
+			}
+			break;
+
+		/* remove all branches */
+		case CLEAR_BRANCHES_T:
+			clear_branches();
+			ret=1;
 			break;
 
 		/* jku begin: is_length_greater_than */
@@ -617,15 +664,16 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			break;
 		/* jku - end : flag processing */
 
-		case AVPFLAG_OPER_T:  {
-			struct search_state st;
-			avp_t* avp;
-			int flag;
+		case AVPFLAG_OPER_T:
 			ret = 0;
-			flag = a->val[1].u.number;
-			if ((a->val[0].u.attr->type & AVP_INDEX_ALL) == AVP_INDEX_ALL || (a->val[0].u.attr->type & AVP_NAME_RE)!=0) {
-				for (avp=search_first_avp(a->val[0].u.attr->type, a->val[0].u.attr->name, NULL, &st); avp; avp = search_next_avp(&st, NULL)) {
-					switch (a->val[2].u.number) {   /* oper: 0..reset, 1..set, -1..no change */
+			if ((a->val[0].u.attr->type & AVP_INDEX_ALL) == AVP_INDEX_ALL ||
+					(a->val[0].u.attr->type & AVP_NAME_RE)!=0) {
+				for (avp=search_first_avp(a->val[0].u.attr->type,
+							a->val[0].u.attr->name, NULL, &st);
+						avp;
+						avp = search_next_avp(&st, NULL)) {
+					switch (a->val[2].u.number) {
+						/* oper: 0..reset, 1..set, -1..no change */
 						case 0:
 							avp->flags &= ~(avp_flags_t)a->val[1].u.number;
 							break;
@@ -634,13 +682,16 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 							break;
 						default:;
 					}
-					ret = ret || ((avp->flags & (avp_flags_t)a->val[1].u.number) != 0);
+					ret = ret ||
+						((avp->flags & (avp_flags_t)a->val[1].u.number) != 0);
 				}
-			}
-			else {
-				avp = search_avp_by_index(a->val[0].u.attr->type, a->val[0].u.attr->name, NULL, a->val[0].u.attr->index);
+			} else {
+				avp = search_avp_by_index(a->val[0].u.attr->type,
+											a->val[0].u.attr->name, NULL,
+											a->val[0].u.attr->index);
 				if (avp) {
-					switch (a->val[2].u.number) {   /* oper: 0..reset, 1..set, -1..no change */
+					switch (a->val[2].u.number) {
+						/* oper: 0..reset, 1..set, -1..no change */
 						case 0:
 							avp->flags &= ~(avp_flags_t)a->val[1].u.number;
 							break;
@@ -655,7 +706,6 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			if (ret==0)
 				ret = -1;
 			break;
-		}
 		case ERROR_T:
 			if ((a->val[0].type!=STRING_ST)|(a->val[1].type!=STRING_ST)){
 				LOG(L_CRIT, "BUG: do_action: bad error() types %d, %d\n",
@@ -1380,7 +1430,9 @@ match_cleanup:
 			ret=1;
 			while(!(flags & (BREAK_R_F|RETURN_R_F|EXIT_R_F)) &&
 					(rval_expr_eval_int(h, msg, &v, rve) == 0) && v){
-				i++;
+				if (cfg_get(core, core_cfg, max_while_loops) > 0)
+					i++;
+
 				if (unlikely(i > cfg_get(core, core_cfg, max_while_loops))){
 					LOG(L_ERR, "ERROR: runaway while (%d, %d): more then"
 								" %d loops\n", 
@@ -1494,6 +1546,40 @@ match_cleanup:
 			msg->rpl_send_flags.f|= SND_F_CON_CLOSE;
 			ret=1; /* continue processing */
 			break;
+		case CFG_SELECT_T:
+			if (a->val[0].type != CFG_GROUP_ST) {
+				BUG("unsupported parameter in CFG_SELECT_T: %d\n",
+						a->val[0].type);
+				ret=-1;
+				goto error;
+			}
+			switch(a->val[1].type) {
+				case NUMBER_ST:
+					v=(int)a->val[1].u.number;
+					break;
+				case RVE_ST:
+					if (rval_expr_eval_int(h, msg, &v, (struct rval_expr*)a->val[1].u.data) < 0) {
+						ret=-1;
+						goto error;
+					}
+					break;
+				default:
+					BUG("unsupported group id type in CFG_SELECT_T: %d\n",
+							a->val[1].type);
+					ret=-1;
+					goto error;
+			}
+			ret=(cfg_select((cfg_group_t*)a->val[0].u.data, v) == 0) ? 1 : -1;
+			break;
+		case CFG_RESET_T:
+			if (a->val[0].type != CFG_GROUP_ST) {
+				BUG("unsupported parameter in CFG_RESET_T: %d\n",
+						a->val[0].type);
+				ret=-1;
+				goto error;
+			}
+			ret=(cfg_reset((cfg_group_t*)a->val[0].u.data) == 0) ? 1 : -1;
+			break;
 /*
 		default:
 			LOG(L_CRIT, "BUG: do_action: unknown type %d\n", a->type);
@@ -1523,6 +1609,7 @@ int run_actions(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 	struct action* t;
 	int ret;
 	struct sr_module *mod;
+	unsigned int ms = 0;
 
 	ret=E_UNSPEC;
 	h->rec_lev++;
@@ -1552,7 +1639,21 @@ int run_actions(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 	}
 
 	for (t=a; t!=0; t=t->next){
+		if(unlikely(cfg_get(core, core_cfg, latency_limit_action)>0))
+			ms = TICKS_TO_MS(get_ticks_raw());
 		ret=do_action(h, t, msg);
+		if(unlikely(cfg_get(core, core_cfg, latency_limit_action)>0)) {
+			ms = TICKS_TO_MS(get_ticks_raw()) - ms;
+			if(ms >= cfg_get(core, core_cfg, latency_limit_action)) {
+				LOG(cfg_get(core, core_cfg, latency_log),
+						"alert - action [%s (%d)]"
+						" cfg [%s:%d] took too long [%u ms]\n",
+						is_mod_func(t) ?
+							((cmd_export_common_t*)(t->val[0].u.data))->name
+							: "corefunc",
+						t->type, (t->cfile)?t->cfile:"", t->cline, ms);
+			}
+		}
 		/* break, return or drop/exit stop execution of the current
 		   block */
 		if (unlikely(h->run_flags & (BREAK_R_F|RETURN_R_F|EXIT_R_F))){

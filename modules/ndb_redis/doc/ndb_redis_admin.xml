@@ -58,15 +58,21 @@
 	</section>
 	</section>
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
-		<title><varname>server</varname> (int)</title>
+		<title><varname>server</varname> (str)</title>
 		<para>
 			Specify the details to connect to REDIS server. It takes a list of
 			attribute=value separated by semicolon, the attributes can be
 			name, addr, port and db. Name is a generic identifier to be used with
 			module functions. addr and port are the IP address and the port to
-			connect to REDIS server. db is the DB number to use (defaults to 0 if not specified).
+			connect to REDIS server. db is the DB number to use (defaults to 0 if
+			not specified).
+		</para>
+		<para>
+			You can set this parameter many times, in case you want to connect to
+			many REDIS servers, just give different attributes and use the specific
+			server name when querying the REDIS instance.
 		</para>
 		<para>
 		<emphasis>
@@ -78,6 +84,7 @@
 		<programlisting format="linespecific">
 ...
 modparam("ndb_redis", "server", "name=srvN;addr=127.0.0.1;port=6379;db=1")
+modparam("ndb_redis", "server", "name=srvX;addr=127.0.0.2;port=6379;db=4")
 ...
 </programlisting>
 		</example>
@@ -85,7 +92,7 @@ modparam("ndb_redis", "server", "name=srvN;addr=127.0.0.1;port=6379;db=1")
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 	    <title>
 		<function moreinfo="none">redis_cmd(srvname, command, replyid)</function>
@@ -101,6 +108,29 @@ modparam("ndb_redis", "server", "name=srvN;addr=127.0.0.1;port=6379;db=1")
 			can be: type - type of the reply (as in hiredis.h); value - the value
 			returned by REDIS server; info - in case of error from REDIS, it will
 			contain an info message.
+		</para>
+		<para>
+			If reply type is an array (as in hiredis.h), there are other keys
+			available:
+			<itemizedlist>
+			<listitem>
+				<para>
+				size - returns number of elements in the array.
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				type[n] - returns the type of the nth element in the array. type
+				- returns array type.
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				value[n] - returns value of the nth element. value - returns null
+				for an array. You need to get each element by index.
+				</para>
+			</listitem>
+			</itemizedlist>
 		</para>
 		<example>
 		<title><function>redis_cmd</function> usage</title>
@@ -118,6 +148,12 @@ redis_cmd("srvN", "SET ruri $ru", "r");
 
 # get a value
 redis_cmd("srvN", "GET foo", "r");
+
+# array example
+if(redis_cmd("srvN", "HMGET foo_key field1 field3", "r")) {
+    xlog("array size: $redis(r=>size)\n");
+    xlog("first values: $redis(r=>value[0]) , $redis(r=>value[1])\n");
+}
 ...
 </programlisting>
 	    </example>

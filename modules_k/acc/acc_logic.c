@@ -43,7 +43,6 @@
 #include "../../parser/parse_content.h"
 #include "../../modules/tm/tm_load.h"
 #include "../rr/api.h"
-#include "../../lib/kcore/km_ut.h"
 #include "../../flags.h"
 #include "acc.h"
 #include "acc_api.h"
@@ -100,6 +99,8 @@ struct acc_enviroment acc_env;
 #define skip_cancel(_rq) \
 	(((_rq)->REQ_METHOD==METHOD_CANCEL) && report_cancels==0)
 
+#define is_acc_prepare_on(_rq) \
+	(is_acc_flag_set(_rq,acc_prepare_flag))
 
 
 
@@ -228,7 +229,8 @@ void acc_onreq( struct cell* t, int type, struct tmcb_params *ps )
 	int is_invite;
 
 	if ( ps->req && !skip_cancel(ps->req) &&
-	(is_acc_on(ps->req) || is_mc_on(ps->req)) ) {
+			( is_acc_on(ps->req) || is_mc_on(ps->req)
+				|| is_acc_prepare_on(ps->req) ) ) {
 		/* do some parsing in advance */
 		if (acc_preparse_req(ps->req)<0)
 			return;
@@ -242,7 +244,8 @@ void acc_onreq( struct cell* t, int type, struct tmcb_params *ps )
 			/* get incoming replies ready for processing */
 			TMCB_RESPONSE_IN |
 			/* report on missed calls */
-			((is_invite && is_mc_on(ps->req))?TMCB_ON_FAILURE:0) ;
+			((is_invite && (is_mc_on(ps->req)
+					|| is_acc_prepare_on(ps->req)))?TMCB_ON_FAILURE:0);
 		if (tmb.register_tmcb( 0, t, tmcb_types, tmcb_func, 0, 0 )<=0) {
 			LM_ERR("cannot register additional callbacks\n");
 			return;
@@ -258,21 +261,33 @@ void acc_onreq( struct cell* t, int type, struct tmcb_params *ps )
 
 
 /* is this reply of interest for accounting ? */
-static inline int should_acc_reply(struct sip_msg *req,struct sip_msg *rpl,
-																	int code)
+static inline int should_acc_reply(struct sip_msg *req, struct sip_msg *rpl,
+				   int code)
 {
+    unsigned int i;
+
 	/* negative transactions reported otherwise only if explicitly 
 	 * demanded */
-	if ( !is_failed_acc_on(req) && code >=300 )
-		return 0;
-	if ( !is_acc_on(req) )
-		return 0;
-	if ( code<200 && !(early_media &&
-	parse_headers(rpl,HDR_CONTENTLENGTH_F, 0)==0 && rpl->content_length &&
-	get_content_length(rpl)>0 ) )
-		return 0;
 
-	return 1; /* seed is through, we will account this reply */
+    if (code >= 300) {
+	if (!is_failed_acc_on(req)) return 0;
+	i = 0;
+	while (failed_filter[i] != 0) {
+	    if (failed_filter[i] == code) return 0;
+	    i++;
+	}
+	return 1;
+    }
+
+    if ( !is_acc_on(req) )
+	return 0;
+	
+    if ( code<200 && !(early_media &&
+		       parse_headers(rpl,HDR_CONTENTLENGTH_F, 0) == 0 &&
+		       rpl->content_length && get_content_length(rpl) > 0))
+	return 0;
+
+    return 1; /* seed is through, we will account this reply */
 }
 
 
@@ -478,6 +493,8 @@ int acc_api_exec(struct sip_msg *rq, acc_engine_t *eng,
 
 static void tmcb_func( struct cell* t, int type, struct tmcb_params *ps )
 {
+	LM_DBG("acc callback called for t(%p) event type %d, reply code %d\n",
+			t, type, ps->code);
 	if (type&TMCB_RESPONSE_OUT) {
 		acc_onreply( t, ps->req, ps->rpl, ps->code);
 	} else if (type&TMCB_E2EACK_IN) {

@@ -37,6 +37,11 @@ static sr_xavp_t *_xavp_list_head = 0;
 /*! Pointer to XAVP current list */
 static sr_xavp_t **_xavp_list_crt = &_xavp_list_head;
 
+/*! Helper functions */
+static sr_xavp_t *xavp_get_internal(str *name, sr_xavp_t **list, int idx, sr_xavp_t **prv);
+static int xavp_rm_internal(str *name, sr_xavp_t **head, int idx);
+
+
 void xavp_shm_free(void *p)
 {
 	shm_free(p);
@@ -74,13 +79,15 @@ void xavp_free_unsafe(sr_xavp_t *xa)
 	shm_free_unsafe(xa);
 }
 
-sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
+static sr_xavp_t *xavp_new_value(str *name, sr_xval_t *val)
 {
-	sr_xavp_t *avp=0;
+	sr_xavp_t *avp;
 	int size;
+	unsigned int id;
 
 	if(name==NULL || name->s==NULL || val==NULL)
 		return NULL;
+	id = get_hash1_raw(name->s, name->len);
 
 	size = sizeof(sr_xavp_t) + name->len + 1;
 	if(val->type == SR_XTYPE_STR)
@@ -89,7 +96,7 @@ sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 	if(avp==NULL)
 		return NULL;
 	memset(avp, 0, size);
-	avp->id = get_hash1_raw(name->s, name->len);
+	avp->id = id;
 	avp->name.s = (char*)avp + sizeof(sr_xavp_t);
 	memcpy(avp->name.s, name->s, name->len);
 	avp->name.s[name->len] = '\0';
@@ -102,6 +109,19 @@ sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 		avp->val.v.s.s[val->v.s.len] = '\0';
 		avp->val.v.s.len = val->v.s.len;
 	}
+
+	return avp;
+}
+
+sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
+{
+	sr_xavp_t *avp=0;
+
+	avp = xavp_new_value(name, val);
+	if (avp==NULL)
+		return NULL;
+
+	/* Prepend new value to the list */
 	if(list) {
 		avp->next = *list;
 		*list = avp;
@@ -115,102 +135,39 @@ sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 
 sr_xavp_t *xavp_set_value(str *name, int idx, sr_xval_t *val, sr_xavp_t **list)
 {
-	sr_xavp_t *avp=0;
+	sr_xavp_t *avp;
+	sr_xavp_t *cur;
 	sr_xavp_t *prv=0;
-	sr_xavp_t *tmp=0;
-	unsigned int id;
-	int size;
-	int n=0;
 
-	if(name==NULL || name->s==NULL || val==NULL)
+	if(val==NULL)
 		return NULL;
 
-	id = get_hash1_raw(name->s, name->len);
-	if(list)
-		avp = *list;
-	else
-		avp=*_xavp_list_crt;
-	while(avp)
-	{
-		if(avp->id==id && avp->name.len==name->len
-				&& strncmp(avp->name.s, name->s, name->len)==0)
-		{
-			if(idx==n)
-				return avp;
-			n++;
-		}
-		prv = avp;
-		avp=avp->next;
-	}
-	if(avp==NULL)
+	/* Find the current value */
+	cur = xavp_get_internal(name, list, idx, &prv);
+	if(cur==NULL)
 		return NULL;
-	tmp = avp;
 
-	size = sizeof(sr_xavp_t) + name->len + 1;
-	if(val->type == SR_XTYPE_STR)
-		size += val->v.s.len + 1;
-	avp = (sr_xavp_t*)shm_malloc(size);
-	if(avp==NULL)
+	avp = xavp_new_value(name, val);
+	if (avp==NULL)
 		return NULL;
-	memset(avp, 0, size);
-	avp->id = get_hash1_raw(name->s, name->len);
-	avp->name.s = (char*)avp + sizeof(sr_xavp_t);
-	memcpy(avp->name.s, name->s, name->len);
-	avp->name.s[name->len] = '\0';
-	avp->name.len = name->len;
-	memcpy(&avp->val, val, sizeof(sr_xval_t));
-	if(val->type == SR_XTYPE_STR)
-	{
-		avp->val.v.s.s = avp->name.s + avp->name.len + 1;
-		memcpy(avp->val.v.s.s, val->v.s.s, val->v.s.len);
-		avp->val.v.s.s[val->v.s.len] = '\0';
-		avp->val.v.s.len = val->v.s.len;
-	}
+
+	/* Replace the current value with the new */
+	avp->next = cur->next;
 	if(prv)
-	{
-			avp->next = prv->next;
-			prv->next = avp;
-	} else {
-		if(list) {
-			avp->next = *list;
-			*list = avp;
-		} else {
-			avp->next = *_xavp_list_crt;
-			*_xavp_list_crt = avp;
-		}
-	}
-	xavp_free(tmp);
+		prv->next = avp;
+	else if(list)
+		*list = avp;
+	else
+		*_xavp_list_crt = avp;
+
+	xavp_free(cur);
 
 	return avp;
 }
 
-sr_xavp_t *xavp_get(str *name, sr_xavp_t *start)
+static sr_xavp_t *xavp_get_internal(str *name, sr_xavp_t **list, int idx, sr_xavp_t **prv)
 {
-	sr_xavp_t *avp=0;
-	unsigned int id;
-
-	if(name==NULL || name->s==NULL)
-		return NULL;
-	id = get_hash1_raw(name->s, name->len);
-	
-	if(start)
-		avp = start;
-	else
-		avp=*_xavp_list_crt;
-	while(avp)
-	{
-		if(avp->id==id && avp->name.len==name->len
-				&& strncmp(avp->name.s, name->s, name->len)==0)
-			return avp;
-		avp=avp->next;
-	}
-
-	return NULL;
-}
-
-sr_xavp_t *xavp_get_by_index(str *name, int idx, sr_xavp_t **start)
-{
-	sr_xavp_t *avp=0;
+	sr_xavp_t *avp;
 	unsigned int id;
 	int n = 0;
 
@@ -218,10 +175,10 @@ sr_xavp_t *xavp_get_by_index(str *name, int idx, sr_xavp_t **start)
 		return NULL;
 	id = get_hash1_raw(name->s, name->len);
 	
-	if(start)
-		avp = *start;
+	if(list && *list)
+		avp = *list;
 	else
-		avp=*_xavp_list_crt;
+		avp = *_xavp_list_crt;
 	while(avp)
 	{
 		if(avp->id==id && avp->name.len==name->len
@@ -231,16 +188,26 @@ sr_xavp_t *xavp_get_by_index(str *name, int idx, sr_xavp_t **start)
 				return avp;
 			n++;
 		}
-		avp=avp->next;
+		if(prv)
+			*prv = avp;
+		avp = avp->next;
 	}
-
 	return NULL;
 }
 
+sr_xavp_t *xavp_get(str *name, sr_xavp_t *start)
+{
+	return xavp_get_internal(name, (start)?&start:NULL, 0, NULL);
+}
+
+sr_xavp_t *xavp_get_by_index(str *name, int idx, sr_xavp_t **start)
+{
+	return xavp_get_internal(name, start, idx, NULL);
+}
 
 sr_xavp_t *xavp_get_next(sr_xavp_t *start)
 {
-	sr_xavp_t *avp=0;
+	sr_xavp_t *avp;
 
 	if(start==NULL)
 		return NULL;
@@ -260,7 +227,7 @@ sr_xavp_t *xavp_get_next(sr_xavp_t *start)
 
 int xavp_rm(sr_xavp_t *xa, sr_xavp_t **head)
 {
-	sr_xavp_t *avp=0;
+	sr_xavp_t *avp;
 	sr_xavp_t *prv=0;
 
 	if(head!=NULL)
@@ -274,11 +241,10 @@ int xavp_rm(sr_xavp_t *xa, sr_xavp_t **head)
 		{
 			if(prv)
 				prv->next=avp->next;
+			else if(head!=NULL)
+				*head = avp->next;
 			else
-				if(head!=NULL)
-					*head = avp->next;
-				else
-					*_xavp_list_crt = avp->next;
+				*_xavp_list_crt = avp->next;
 			xavp_free(avp);
 			return 1;
 		}
@@ -287,14 +253,19 @@ int xavp_rm(sr_xavp_t *xa, sr_xavp_t **head)
 	return 0;
 }
 
-
-int xavp_rm_by_name(str *name, int all, sr_xavp_t **head)
+/* Remove xavps
+ * idx: <0 remove all xavps with the same name
+ *      >=0 remove only the specified index xavp
+ * Returns number of xavps that were deleted
+ */
+static int xavp_rm_internal(str *name, sr_xavp_t **head, int idx)
 {
-	sr_xavp_t *avp=0;
-	sr_xavp_t *foo=0;
+	sr_xavp_t *avp;
+	sr_xavp_t *foo;
 	sr_xavp_t *prv=0;
-	unsigned int id = 0;
+	unsigned int id;
 	int n=0;
+	int count=0;
 
 	if(name==NULL || name->s==NULL)
 		return 0;
@@ -303,7 +274,7 @@ int xavp_rm_by_name(str *name, int all, sr_xavp_t **head)
 	if(head!=NULL)
 		avp = *head;
 	else
-		avp=*_xavp_list_crt;
+		avp = *_xavp_list_crt;
 	while(avp)
 	{
 		foo = avp;
@@ -311,72 +282,43 @@ int xavp_rm_by_name(str *name, int all, sr_xavp_t **head)
 		if(foo->id==id && foo->name.len==name->len
 				&& strncmp(foo->name.s, name->s, name->len)==0)
 		{
-			if(prv!=NULL)
-				prv->next=foo->next;
-			else
-				if(head!=NULL)
+			if(idx<0 || idx==n)
+			{
+				if(prv!=NULL)
+					prv->next=foo->next;
+				else if(head!=NULL)
 					*head = foo->next;
 				else
 					*_xavp_list_crt = foo->next;
-			xavp_free(foo);
+				xavp_free(foo);
+				if(idx>=0)
+					return 1;
+				count++;
+			}
 			n++;
-			if(all==0)
-				return n;
 		} else {
 			prv = foo;
 		}
 	}
-	return n;
+	return count;
+}
+
+int xavp_rm_by_name(str *name, int all, sr_xavp_t **head)
+{
+	return xavp_rm_internal(name, head, -1*all);
 }
 
 int xavp_rm_by_index(str *name, int idx, sr_xavp_t **head)
 {
-	sr_xavp_t *avp=0;
-	sr_xavp_t *foo=0;
-	sr_xavp_t *prv=0;
-	unsigned int id = 0;
-	int n=0;
-
-	if(name==NULL || name->s==NULL)
+	if (idx<0)
 		return 0;
-	if(idx<0)
-		return 0;
-
-	id = get_hash1_raw(name->s, name->len);
-	if(head!=NULL)
-		avp = *head;
-	else
-		avp=*_xavp_list_crt;
-	while(avp)
-	{
-		foo = avp;
-		avp=avp->next;
-		if(foo->id==id && foo->name.len==name->len
-				&& strncmp(foo->name.s, name->s, name->len)==0)
-		{
-			if(idx==n)
-			{
-				if(prv!=NULL)
-					prv->next=foo->next;
-				else
-					if(head!=NULL)
-						*head = foo->next;
-					else
-						*_xavp_list_crt = foo->next;
-				xavp_free(foo);
-				return 1;
-			}
-			n++;
-		}
-		prv = foo;
-	}
-	return 0;
+	return xavp_rm_internal(name, head, idx);
 }
 
 
 int xavp_count(str *name, sr_xavp_t **start)
 {
-	sr_xavp_t *avp=0;
+	sr_xavp_t *avp;
 	unsigned int id;
 	int n = 0;
 
@@ -468,43 +410,44 @@ void xavp_print_list_content(sr_xavp_t **head, int level)
 		start = *head;
 	else
 		start=*_xavp_list_crt;
-	LM_DBG("+++++ start XAVP list: %p (level=%d)\n", start, level);
+	LM_INFO("+++++ start XAVP list: %p (level=%d)\n", start, level);
 	avp = start;
 	while(avp)
 	{
-		LM_DBG("     *** XAVP name: %s\n", avp->name.s);
-		LM_DBG("     XAVP id: %u\n", avp->id);
-		LM_DBG("     XAVP value type: %d\n", avp->val.type);
+		LM_INFO("     *** XAVP name: %s\n", avp->name.s);
+		LM_INFO("     XAVP id: %u\n", avp->id);
+		LM_INFO("     XAVP value type: %d\n", avp->val.type);
 		switch(avp->val.type) {
 			case SR_XTYPE_NULL:
-				LM_DBG("     XAVP value: <null>\n");
+				LM_INFO("     XAVP value: <null>\n");
 			break;
 			case SR_XTYPE_INT:
-				LM_DBG("     XAVP value: %d\n", avp->val.v.i);
+				LM_INFO("     XAVP value: %d\n", avp->val.v.i);
 			break;
 			case SR_XTYPE_STR:
-				LM_DBG("     XAVP value: %s\n", avp->val.v.s.s);
+				LM_INFO("     XAVP value: %s\n", avp->val.v.s.s);
 			break;
 			case SR_XTYPE_TIME:
-				LM_DBG("     XAVP value: %lu\n", avp->val.v.t);
+				LM_INFO("     XAVP value: %lu\n",
+						(long unsigned int)avp->val.v.t);
 			break;
 			case SR_XTYPE_LONG:
-				LM_DBG("     XAVP value: %ld\n", avp->val.v.l);
+				LM_INFO("     XAVP value: %ld\n", avp->val.v.l);
 			break;
 			case SR_XTYPE_LLONG:
-				LM_DBG("     XAVP value: %lld\n", avp->val.v.ll);
+				LM_INFO("     XAVP value: %lld\n", avp->val.v.ll);
 			break;
 			case SR_XTYPE_XAVP:
-				LM_DBG("     XAVP value: <xavp:%p>\n", avp->val.v.xavp);
+				LM_INFO("     XAVP value: <xavp:%p>\n", avp->val.v.xavp);
 				xavp_print_list_content(&avp->val.v.xavp, level+1);
 			break;
 			case SR_XTYPE_DATA:
-				LM_DBG("     XAVP value: <data:%p>\n", avp->val.v.data);
+				LM_INFO("     XAVP value: <data:%p>\n", avp->val.v.data);
 			break;
 		}
 		avp = avp->next;
 	}
-	LM_DBG("----- end XAVP list: %p (level=%d)\n", start, level);
+	LM_INFO("----- end XAVP list: %p (level=%d)\n", start, level);
 }
 
 void xavp_print_list(sr_xavp_t **head)

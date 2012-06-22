@@ -1,8 +1,4 @@
 /*
- * $Id: presence.c 1953 2007-04-04 08:50:33Z anca_vamanu $
- *
- * presence module - presence server implementation
- *
  * Copyright (C) 2006 Voice Sistem S.R.L.
  *
  * This file is part of Kamailio, a free SIP server.
@@ -23,12 +19,12 @@
  *
  * History:
  * --------
- *  2007-04-04  initial version (anca)
+ *  2007-04-04  initial version (Anca Vamanu)
  */
 
-/*! \file
- * \brief Kamailio presence module
- * \ref event_list.h
+/*!
+ * \file
+ * \brief Kamailio presence module :: Events
  * \ingroup presence 
  */
 
@@ -243,6 +239,7 @@ int add_event(pres_ev_t* event)
 	ev->apply_auth_nbody= event->apply_auth_nbody;
 	ev->get_auth_status= event->get_auth_status;
 	ev->get_rules_doc= event->get_rules_doc;
+	ev->get_pidf_doc= event->get_pidf_doc;
 	ev->evs_publ_handl= event->evs_publ_handl;
 	ev->evs_subs_handl= event->evs_subs_handl;
 	ev->etag_not_new= event->etag_not_new;

@@ -94,7 +94,7 @@ enum action_type{
 		SETFLAG_T, RESETFLAG_T, ISFLAGSET_T ,
 		AVPFLAG_OPER_T,
 		LEN_GT_T, PREFIX_T, STRIP_T,STRIP_TAIL_T,
-		APPEND_BRANCH_T,
+		APPEND_BRANCH_T, REMOVE_BRANCH_T, CLEAR_BRANCHES_T,
 		REVERT_URI_T,
 		FORWARD_TCP_T,
 		FORWARD_UDP_T,
@@ -115,8 +115,13 @@ enum action_type{
 		SET_FWD_NO_CONNECT_T,
 		SET_RPL_NO_CONNECT_T,
 		SET_FWD_CLOSE_T,
-		SET_RPL_CLOSE_T
+		SET_RPL_CLOSE_T,
+		CFG_SELECT_T,
+		CFG_RESET_T
 };
+
+#define is_mod_func(a) ((a)->type>=MODULE0_T && (a)->type<=MODULEX_RVE_T)
+
 /* parameter types for actions or types for expression right operands
    (WARNING right operands only, not working for left operands) */
 enum _operand_subtype{
@@ -130,7 +135,8 @@ enum _operand_subtype{
 		SELECT_UNFIXED_ST,
 		STRING_RVE_ST /* RVE converted to a string (fparam hack) */,
 		RVE_FREE_FIXUP_ST /* (str)RVE fixed up by a reversable fixup */,
-		FPARAM_DYN_ST /* temporary only (fparam hack) */
+		FPARAM_DYN_ST /* temporary only (fparam hack) */,
+		CFG_GROUP_ST
 };
 
 typedef enum _expr_l_type expr_l_type;
@@ -203,6 +209,8 @@ struct action{
 	action_u_t val[MAX_ACTIONS];
 };
 
+typedef struct action cfg_action_t;
+
 struct expr* mk_exp(int op, struct expr* left, struct expr* right);
 struct expr* mk_elem(int op, expr_l_type ltype, void* lparam,
 							 expr_r_type rtype, void* rparam);
@@ -220,5 +228,7 @@ void print_expr(struct expr* exp);
 /** joins to cfg file positions into a new one. */
 void cfg_pos_join(struct cfg_pos* res,
 							struct cfg_pos* pos1, struct cfg_pos* pos2);
+
+struct action *get_action_from_param(void **param, int param_no);
 #endif
 

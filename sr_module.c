@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -23,6 +22,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
 /*
  * History:
  * --------
@@ -41,10 +41,13 @@
  *  2008-11-26  added fparam_free_contents() and fix_param_types (andrei)
  */
 
-/** module loading, standard fixups.
- * @file sr_module.c
+/**
+ * @file
+ * @brief SIP-Router core :: modules loading, structures declarations and utilities
  * @ingroup core
+ * Module: \ref core
  */
+
 
 #include "sr_module.h"
 #include "mod_fix.h"
@@ -57,6 +60,7 @@
 #include "route_struct.h"
 #include "flags.h"
 #include "trim.h"
+#include "pvapi.h"
 #include "globals.h"
 #include "rpc_lookup.h"
 #include "sr_compat.h"
@@ -71,6 +75,13 @@
 
 
 struct sr_module* modules=0;
+
+/*We need to define this symbol on Solaris becuase libcurl relies on libnspr which looks for this symbol.
+  If it is not defined, dynamic module loading (dlsym) fails */
+#ifdef __OS_solaris
+	int nspr_use_zone_allocator = 0;
+#endif
+
 
 #ifdef STATIC_EXEC
 	extern struct module_exports exec_exports;
@@ -107,6 +118,42 @@ struct sr_module* modules=0;
 
 int mod_response_cbk_no=0;
 response_function* mod_response_cbks=0;
+
+/**
+ * if bit 1 set, SIP worker processes handle RPC commands as well
+ * if bit 2 set, RPC worker processes handle SIP commands as well
+ */
+static int child_sip_rpc_mode = 0;
+
+#define CHILD_SIP_RPC	1<<0
+#define CHILD_RPC_SIP	1<<1
+
+void set_child_sip_rpc_mode(void)
+{
+	child_sip_rpc_mode |= CHILD_SIP_RPC;
+}
+
+void set_child_rpc_sip_mode(void)
+{
+	child_sip_rpc_mode |= CHILD_RPC_SIP;
+}
+
+int is_rpc_worker(int rank)
+{
+	if(rank==PROC_RPC
+			|| (rank>PROC_MAIN && (child_sip_rpc_mode&CHILD_SIP_RPC)!=0))
+		return 1;
+	return 0;
+}
+
+int is_sip_worker(int rank)
+{
+	if(rank>PROC_MAIN
+			|| ((rank==PROC_RPC || rank==PROC_NOCHLDINIT)
+					&& (child_sip_rpc_mode&CHILD_RPC_SIP)!=0))
+		return 1;
+	return 0;
+}
 
 /* initializes statically built (compiled in) modules*/
 int register_builtin_modules()
@@ -376,16 +423,18 @@ static inline int version_control(void *handle, char *path)
 	return 0;
 }
 
-/** load a sr module.
+/**
+ * \brief load a sr module
+ * 
  * tries to load the module specified by mod_path.
  * If mod_path is 'modname' or 'modname.so' then
- *  <MODS_DIR>/<modname>.so will be tried and if this fails
- *  <MODS_DIR>/<modname>/<modname>.so
+ *  \<MODS_DIR\>/\<modname\>.so will be tried and if this fails
+ *  \<MODS_DIR\>/\<modname\>/\<modname\>.so
  * If mod_path contain a '/' it is assumed to be the 
  * path to the module and tried first. If fails and mod_path is not
  * absolute path (not starting with '/') then will try:
- *   <MODS_DIR>/mod_path
- * @param modname - path or module name
+ * \<MODS_DIR\>/mod_path
+ * @param mod_path path or module name
  * @return 0 on success , <0 on error
  */
 int load_module(char* mod_path)
@@ -573,7 +622,7 @@ reload:
 		if (new_dlflags!=dlflags && new_dlflags!=DEFAULT_DLFLAGS) {
 			/* we have to reload the module */
 			dlclose(handle);
-			WARN("%s: exports dlflags interface is deprecated and it will not"
+			NOTICE("%s: exports dlflags interface is deprecated and it will not"
 					" be supported in newer versions; consider using"
 					" mod_register() instead\n", path);
 			dlflags=new_dlflags;
@@ -699,6 +748,14 @@ struct sr_module* find_module_by_name(char* mod) {
 }
 
 
+/*!
+ * \brief Find a parameter with given type
+ * \param mod module
+ * \param name parameter name
+ * \param type_mask parameter mask
+ * \param param_type parameter type
+ * \return parameter address in memory, if there is no such parameter, NULL is returned
+ */
 void* find_param_export(struct sr_module* mod, char* name,
 						modparam_t type_mask, modparam_t *param_type)
 {
@@ -725,12 +782,19 @@ void destroy_modules()
 {
 	struct sr_module* t, *foo;
 
+	/* call first destroy function from each module */
 	t=modules;
 	while(t) {
 		foo=t->next;
 		if (t->exports.destroy_f){
 			t->exports.destroy_f();
 		}
+		t=foo;
+	}
+	/* free module exports structures */
+	t=modules;
+	while(t) {
+		foo=t->next;
 		pkg_free(t);
 		t=foo;
 	}
@@ -1038,7 +1102,7 @@ int fix_param(int type, void** param)
 {
 	fparam_t* p;
 	str name, s;
-	unsigned int num;
+	int num;
 	int err;
 
 	p = (fparam_t*)pkg_malloc(sizeof(fparam_t));
@@ -1064,7 +1128,7 @@ int fix_param(int type, void** param)
 		case FPARAM_INT:
 			s.s = (char*)*param;
 			s.len = strlen(s.s);
-			err = str2int(&s, &num);
+			err = str2sint(&s, &num);
 			if (err == 0) {
 				p->v.i = (int)num;
 			} else {
@@ -1231,10 +1295,13 @@ void fparam_free_contents(fparam_t* fp)
 }
 
 
-
-/** generic free fixup type function for a fixed fparam.
- * It will free whatever was allocated during the initial fparam fixup
- * and restore the original param value.
+/**
+ * @brief Generic free fixup type function for a fixed fparam
+ * 
+ * Generic free fixup type function for a fixed fparam. It will free whatever
+ * was allocated during the initial fparam fixup and restore the original param
+ * value.
+ * @param param freed parameters
  */
 void fparam_free_restore(void** param)
 {
@@ -1316,6 +1383,43 @@ int fixup_var_str_2(void** param, int param_no)
 {
 	if (param_no == 2) return fixup_var_str_12(param, param_no);
 	else return 0;
+}
+
+/** fixup variable-pve-only-string.
+ * The parameter can be a PVE (pv based format string)
+ * or string.
+ * non-static PVEs  identifiers will be resolved to
+ * their values during runtime.
+ * The parameter value will be converted to fparam structure
+ * @param  param - double pointer to param, as for normal fixup functions.
+ * @param  param_no - parameter number, ignored.
+ * @return -1 on an error, 0 on success.
+ */
+int fixup_var_pve_12(void** param, int param_no)
+{
+	int ret;
+	fparam_t* fp;
+	if (fixup_get_param_type(param) != STRING_RVE_ST) {
+		/* if called with a RVE already converted to string =>
+		   don't try PVE again (to avoid double
+		   deref., e.g.: $foo="$bar"; f($foo) ) */
+		if ((ret = fix_param(FPARAM_PVE, param)) <= 0) {
+			if (ret < 0)
+				return ret;
+			/* check if it resolved to a dynamic or "static" PVE.
+			   If the resulting PVE is static (normal string), discard
+			   it and use the normal string fixup (faster at runtime) */
+			fp = (fparam_t*)*param;
+			if (fp->v.pve->spec.getf == 0)
+				fparam_free_restore(param); /* fallback to STR below */
+			else
+				return ret; /* dynamic PVE => return */
+		}
+		
+	}
+	if ((ret = fix_param(FPARAM_STR, param)) <= 0) return ret;
+	ERR("Error while fixing parameter - PVE or str conversions failed\n");
+	return -1;
 }
 
 
@@ -1501,8 +1605,6 @@ int fixup_str_2(void** param, int param_no)
 
 
 
-#define PV_PRINT_BUF_SIZE  1024
-#define PV_PRINT_BUF_NO    6
 /** Get the function parameter value as string.
  *  @return  0 - Success
  *          -1 - Cannot get value
@@ -1513,8 +1615,6 @@ int get_str_fparam(str* dst, struct sip_msg* msg, fparam_t* param)
 	int ret;
 	avp_t* avp;
 	pv_value_t pv_val;
-	static int buf_itr = 0; /* ugly hack needed for PVE */
-	static char pve_buf[PV_PRINT_BUF_NO][PV_PRINT_BUF_SIZE];
 	
 	switch(param->type) {
 		case FPARAM_REGEX:
@@ -1559,9 +1659,8 @@ int get_str_fparam(str* dst, struct sip_msg* msg, fparam_t* param)
 			}
 			break;
 		case FPARAM_PVE:
-			dst->s=pve_buf[buf_itr];
-			dst->len=PV_PRINT_BUF_SIZE;
-			buf_itr = (buf_itr+1)%PV_PRINT_BUF_NO;
+			dst->s=pv_get_buffer();
+			dst->len=pv_get_buffer_size();
 			if (unlikely(pv_printf(msg, param->v.pve, dst->s, &dst->len)!=0)){
 				ERR("Could not convert the PV-formated string to str\n");
 				dst->len=0;
@@ -1728,12 +1827,14 @@ int is_fparam_rve_fixup(fixup_function f)
 }
 
 
-
-/** returns the corresponding fixup_free* for various known fixup types.
+/**
+ * @brief returns the corresponding fixup_free* for various known fixup types
+ * 
+ * Returns the corresponding fixup_free* for various known fixup types.
  * Used to automatically fill in free_fixup* functions.
- * @param f - fixup function pointer
- * @return - free fixup function pointer on success, 0 on failure (unknown
- *           fixup or no free fixup function).
+ * @param f fixup function pointer
+ * @return free fixup function pointer on success, 0 on failure (unknown
+ * fixup or no free fixup function).
  */
 free_fixup_function get_fixup_free(fixup_function f)
 {

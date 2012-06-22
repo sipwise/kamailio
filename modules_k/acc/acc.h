@@ -41,8 +41,6 @@
 #ifndef _ACC_ACC_H_
 #define _ACC_ACC_H_
 
-#define ACC_CORE_LEN 6
-
 /* leading text for a request accounted from a script */
 #define ACC "ACC: "
 #define ACC_REQUEST ACC"request accounted: "
@@ -69,9 +67,12 @@
 #define A_STATUS_LEN (sizeof(A_STATUS)-1)
 
 #define A_SEPARATOR_CHR ';'
+#define A_SEPARATOR_CHR_2 ' '
 #define A_EQ_CHR '='
 
 #define MAX_SYSLOG_SIZE  65536
+
+#define MAX_FAILED_FILTER_COUNT 15
 
 /* WARNING: This is a flag stored in the sip_msg structure, the flag is
  * temporarily defined here to make the module work with the sip-router core,

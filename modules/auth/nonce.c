@@ -44,7 +44,6 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include "../../compiler_opt.h"
-#include "../../md5global.h"
 #include "../../md5.h"
 #include "../../dprint.h"
 #include "../../ut.h"
@@ -118,15 +117,15 @@ inline static int calc_bin_nonce_md5(union bin_nonce* b_nonce, int cfg,
 
 	MD5Init(&ctx);
 	
-	MD5Update(&ctx, &b_nonce->raw[0], 4 + 4);
+	U_MD5Update(&ctx, &b_nonce->raw[0], 4 + 4);
 	if (cfg && msg){
 		/* auth extra checks => 2 md5s */
 		len = 4 + 4 + 16 + 16;
 #if defined USE_NC  || defined USE_OT_NONCE
 		if (b_nonce->n.nid_pf & (NF_VALID_NC_ID | NF_VALID_OT_ID)){
 			/* if extra auth checks enabled, nid & pf are after the 2nd md5 */
-			MD5Update(&ctx, (unsigned char*)&b_nonce->n.nid_i, 
-							nonce_nid_extra_size);
+			U_MD5Update(&ctx, (unsigned char*)&b_nonce->n.nid_i,
+                                                        nonce_nid_extra_size);
 			len+=nonce_nid_extra_size;
 		}
 #endif /* USE_NC || USE_OT_NONCE */
@@ -148,7 +147,7 @@ inline static int calc_bin_nonce_md5(union bin_nonce* b_nonce, int cfg,
 					  get_from(msg)->tag_value.len);
 		}
 		if (cfg & AUTH_CHECK_SRC_IP) {
-			MD5Update(&ctx, msg->rcv.src_ip.u.addr, msg->rcv.src_ip.len);
+			U_MD5Update(&ctx, msg->rcv.src_ip.u.addr, msg->rcv.src_ip.len);
 		}
 		MD5Update(&ctx, secret2->s, secret2->len);
 		MD5Final(&b_nonce->n.md5_2[0], &ctx);
@@ -159,7 +158,7 @@ inline static int calc_bin_nonce_md5(union bin_nonce* b_nonce, int cfg,
 		if (b_nonce->n_small.nid_pf & (NF_VALID_NC_ID | NF_VALID_OT_ID)){
 			/* if extra auth checks are not enabled, nid & pf are after the
 			 *  1st md5 */
-			MD5Update(&ctx, (unsigned char*)&b_nonce->n_small.nid_i,
+			U_MD5Update(&ctx, (unsigned char*)&b_nonce->n_small.nid_i,
 							nonce_nid_extra_size);
 			len+=nonce_nid_extra_size;
 		}
@@ -276,6 +275,9 @@ int calc_nonce(char* nonce, int *nonce_len, int cfg, int since, int expires,
  */
 #define is_bin_nonce_stale(b_nonce, t) (get_bin_nonce_expire(b_nonce) < (t))
 
+
+
+/** Utility to convert 8 hex digit string to int */
 static inline int l8hex2int(char* _s, unsigned int *_r)
 {
     unsigned int i, res = 0;
@@ -294,6 +296,7 @@ static inline int l8hex2int(char* _s, unsigned int *_r)
     *_r = res;
     return 0;
 }
+
 
 
 /** Check whether the nonce returned by UA is valid.
@@ -319,6 +322,7 @@ static inline int l8hex2int(char* _s, unsigned int *_r)
  *          3 - nonce expires ok, but the auth_extra checks failed
  *          4 - stale
  *          5 - invalid nc value (not an unsigned int)
+ *          6 - nonce reused
  */
 int check_nonce(auth_body_t* auth, str* secret1, str* secret2,
 					struct sip_msg* msg)
@@ -426,7 +430,7 @@ int check_nonce(auth_body_t* auth, str* secret1, str* secret2,
 			    ERR("check_nonce: bad nc value %.*s\n",
 			        auth->digest.nc.len, auth->digest.nc.s);
 			    return 5; /* invalid nc */
-		        }
+			}
 			switch(nc_check_val(n_id, pf & NF_POOL_NO_MASK, nc)){
 				case NC_OK:
 					/* don't perform extra checks or one-time nonce checks
@@ -449,7 +453,7 @@ int check_nonce(auth_body_t* auth, str* secret1, str* secret2,
 				case OTN_ID_OVERFLOW:
 				case OTN_INV_POOL:
 				case OTN_REPLAY:
-					return 4; /* stale */
+					return 6; /* reused */
 			}
 		}
 #endif

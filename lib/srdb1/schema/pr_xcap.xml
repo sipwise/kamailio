@@ -9,7 +9,7 @@
 
 <table id="xcap" xmlns:db="http://docbook.org/ns/docbook">
     <name>xcap</name>
-    <version>3</version>
+    <version>4</version>
     <type db="mysql">&MYSQL_TABLE_TYPE;</type>
     <description>
         <db:para>Table for the presence module. More information can be found at: &KAMAILIO_MOD_DOC;presence.html
@@ -21,9 +21,9 @@
         <type>unsigned int</type>
         <size>&table_id_len;</size>
         <autoincrement/>
-        <primary/>
         <type db="dbtext">int,auto</type>
         <description>Unique ID</description>
+	<primary/>
     </column>
 
     <column id="username">
@@ -44,7 +44,7 @@
 
     <column>
         <name>doc</name>
-        <type>binary</type>
+        <type>largebinary</type>
         <description>doc</description>
     </column>
 
@@ -72,7 +72,7 @@
     <column id="doc_uri">
         <name>doc_uri</name>
         <type>string</type>
-        <size>&uri_len;</size>
+        <size>&xcap_uri_len;</size>
         <description>Document uri</description>
     </column>
 
@@ -84,17 +84,30 @@
     </column>
 
     <index>
-        <name>account_doc_type_idx</name>
-        <colref linkend="username"/>
-        <colref linkend="domain"/>
-        <colref linkend="doc_type"/>
-        <colref linkend="doc_uri"/>
+        <name>doc_uri_idx</name>
+	<colref linkend="doc_uri"/>
         <unique/>
     </index>
 
     <index>
-        <name>source_idx</name>
-        <colref linkend="source"/>
+        <name>account_doc_type_idx</name>
+        <colref linkend="username"/>
+        <colref linkend="domain"/>
+        <colref linkend="doc_type"/>
     </index>
 
+    <index>
+        <name>account_doc_type_uri_idx</name>
+        <colref linkend="username"/>
+        <colref linkend="domain"/>
+        <colref linkend="doc_type"/>
+        <colref linkend="doc_uri"/>
+    </index>
+
+    <index>
+        <name>account_doc_uri_idx</name>
+        <colref linkend="username"/>
+        <colref linkend="domain"/>
+        <colref linkend="doc_uri"/>
+    </index>
 </table>

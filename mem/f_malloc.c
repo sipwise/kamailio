@@ -1,6 +1,4 @@
-/* $Id$
- *
- *
+/*
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of sip-router, a free SIP server.
@@ -17,6 +15,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
  * History:
  * --------
@@ -42,6 +41,12 @@
  *               (only the first bucket was tried) (andrei)
  */
 
+/**
+ * \file
+ * \brief Simple, very fast, malloc library
+ * \ingroup mem
+ */
+
 
 #if !defined(q_malloc)  && (defined F_MALLOC)
 
@@ -55,9 +60,12 @@
 #include "memdbg.h"
 #include "../bit_scan.h"
 #include "../cfg/cfg.h" /* memlog */
+#ifdef MALLOC_STATS
+#include "../events.h"
+#endif
 
 
-/*useful macros*/
+/* useful macros */
 
 #define FRAG_NEXT(f) \
 	((struct fm_frag*)((char*)(f)+sizeof(struct fm_frag)+(f)->size ))
@@ -68,19 +76,14 @@
 
 
 
-/* ROUNDTO= 2^k so the following works */
+/** ROUNDTO= 2^k so the following works */
 #define ROUNDTO_MASK	(~((unsigned long)ROUNDTO-1))
 #define ROUNDUP(s)		(((s)+(ROUNDTO-1))&ROUNDTO_MASK)
 #define ROUNDDOWN(s)	((s)&ROUNDTO_MASK)
 
-/*
- #define ROUNDUP(s)		(((s)%ROUNDTO)?((s)+ROUNDTO)/ROUNDTO*ROUNDTO:(s))
- #define ROUNDDOWN(s)	(((s)%ROUNDTO)?((s)-ROUNDTO)/ROUNDTO*ROUNDTO:(s))
-*/
 
 
-
-	/* finds the hash value for s, s=ROUNDTO multiple*/
+/** finds the hash value for s, s=ROUNDTO multiple */
 #define GET_HASH(s)   ( ((unsigned long)(s)<=F_MALLOC_OPTIMIZE)?\
 							(unsigned long)(s)/ROUNDTO: \
 							F_MALLOC_OPTIMIZE/ROUNDTO+big_hash_idx((s))- \
@@ -91,6 +94,7 @@
 						1UL<<((unsigned long)(h)-F_MALLOC_OPTIMIZE/ROUNDTO+\
 							F_MALLOC_OPTIMIZE_FACTOR-1)\
 					)
+
 
 #ifdef F_MALLOC_HASH_BITMAP
 
@@ -106,10 +110,20 @@
 											~(1UL<<((b)%FM_HASH_BMP_BITS)); \
 	}while(0)
 
-/* returns 0 if not set, !=0 if set */
+/** returns 0 if not set, !=0 if set */
 #define fm_bmp_is_set(qm, b) \
 	((qm)->free_bitmap[(b)/FM_HASH_BMP_BITS] & (1UL<<((b)%FM_HASH_BMP_BITS)))
 
+
+
+/**
+ * \brief Find the first free fragment in a memory block
+ * 
+ * Find the first free fragment in a memory block
+ * \param qm searched memory block
+ * \param start start value
+ * \return index for free fragment
+ */
 inline static int fm_bmp_first_set(struct fm_block* qm, int start)
 {
 	int bmp_idx;
@@ -160,32 +174,27 @@ inline static int fm_bmp_first_set(struct fm_block* qm, int start)
 #define MEM_FRAG_AVOIDANCE
 
 
-/* computes hash number for big buckets*/
-#if 0
-inline static unsigned long big_hash_idx(unsigned long s)
-{
-	unsigned long idx;
-	/* s is rounded => s = k*2^n (ROUNDTO=2^n) 
-	 * index= i such that 2^(i+1) > s >= 2^i
-	 *
-	 * => index = number of the first non null bit in s*/
-	idx=sizeof(long)*8-1;
-	for (; !(s&(1UL<<(sizeof(long)*8-1))) ; s<<=1, idx--);
-	return idx;
-}
-#else
+/** computes hash number for big buckets */
 #define big_hash_idx(s) ((unsigned long)bit_scan_reverse((unsigned long)(s)))
-#endif
 
 
+/**
+ * \name Memory manager boundary check pattern
+ */
+/*@{ */
 #ifdef DBG_F_MALLOC
-#define ST_CHECK_PATTERN   0xf0f0f0f0
-#define END_CHECK_PATTERN1 0xc0c0c0c0
-#define END_CHECK_PATTERN2 0xabcdefed
+#define ST_CHECK_PATTERN   0xf0f0f0f0 /** inserted at the beginning */
+#define END_CHECK_PATTERN1 0xc0c0c0c0 /** inserted at the end       */
+#define END_CHECK_PATTERN2 0xabcdefed /** inserted at the end       */
+/*@} */
 #endif
 
 
-
+/**
+ * \brief Insert a memory fragment in a memory block
+ * \param qm memory block
+ * \param frag memory fragment
+ */
 static inline void fm_insert_free(struct fm_block* qm, struct fm_frag* frag)
 {
 	struct fm_frag** f;
@@ -211,8 +220,14 @@ static inline void fm_insert_free(struct fm_block* qm, struct fm_frag* frag)
 }
 
 
-
- /* size should be already rounded-up */
+/**
+ *\brief Split a memory fragement
+ *
+ * Split a memory fragement, size should be already rounded-up
+ * \param qm memory block
+ * \param frag memory fragment
+ * \param size fragement size
+ */
 static inline
 #ifdef DBG_F_MALLOC 
 void fm_split_frag(struct fm_block* qm, struct fm_frag* frag,
@@ -240,6 +255,9 @@ void fm_split_frag(struct fm_block* qm, struct fm_frag* frag,
 		FRAG_CLEAR_USED(n); /* never used */
 #if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
 		qm->real_used+=FRAG_OVERHEAD;
+#ifdef MALLOC_STATS
+		sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 #endif
 #ifdef DBG_F_MALLOC
 		/* frag created by malloc, mark it*/
@@ -256,8 +274,12 @@ void fm_split_frag(struct fm_block* qm, struct fm_frag* frag,
 }
 
 
-
-/* init malloc and return a fm_block*/
+/**
+ * \brief Initialize memory manager malloc
+ * \param address start address for memory block
+ * \param size Size of allocation
+ * \return return the fm_block
+ */
 struct fm_block* fm_malloc_init(char* address, unsigned long size)
 {
 	char* start;
@@ -316,7 +338,14 @@ struct fm_block* fm_malloc_init(char* address, unsigned long size)
 }
 
 
-
+/**
+ * \brief Main memory manager allocation function
+ * 
+ * Main memory manager allocation function, provide functionality necessary for pkg_malloc
+ * \param qm memory block
+ * \param size memory allocation size
+ * \return address of allocated memory
+ */
 #ifdef DBG_F_MALLOC
 void* fm_malloc(struct fm_block* qm, unsigned long size,
 					const char* file, const char* func, unsigned int line)
@@ -406,13 +435,66 @@ found:
 	qm->used+=frag->size;
 	if (qm->max_real_used<qm->real_used)
 		qm->max_real_used=qm->real_used;
+#ifdef MALLOC_STATS
+	sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+	sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 #endif
 	FRAG_MARK_USED(frag); /* mark it as used */
 	return (char*)frag+sizeof(struct fm_frag);
 }
 
 
+#ifdef MEM_JOIN_FREE
+/**
+ * join fragment f with next one (if it is free)
+ */
+static void fm_join_frag(struct fm_block* qm, struct fm_frag* f)
+{
+	int hash;
+	struct fm_frag **pf;
+	struct fm_frag* n;
 
+	n=FRAG_NEXT(f);
+	/* check if valid and if in free list */
+	if (((char*)n >= (char*)qm->last_frag) || (n->u.nxt_free==NULL))
+		return;
+
+	/* detach n from the free list */
+	hash=GET_HASH(n->size);
+	pf=&(qm->free_hash[hash].first);
+	/* find it */
+	for(;(*pf)&&(*pf!=n); pf=&((*pf)->u.nxt_free)); /*FIXME slow */
+	if (*pf==0){
+		/* not found, bad! */
+		LM_WARN("could not find %p in free list (hash=%ld)\n", n, GET_HASH(n->size));
+		return;
+	}
+	/* detach */
+	*pf=n->u.nxt_free;
+	qm->free_hash[hash].no--;
+#ifdef F_MALLOC_HASH_BITMAP
+	if (qm->free_hash[hash].no==0)
+		fm_bmp_reset(qm, hash);
+#endif /* F_MALLOC_HASH_BITMAP */
+	/* join */
+	f->size+=n->size+FRAG_OVERHEAD;
+#if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
+	qm->real_used-=FRAG_OVERHEAD;
+#ifdef MALLOC_STATS
+	sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif /* MALLOC_STATS */
+#endif /* DBG_F_MALLOC || MALLOC_STATS*/
+}
+#endif /*MEM_JOIN_FREE*/
+
+/**
+ * \brief Main memory manager free function
+ * 
+ * Main memory manager free function, provide functionality necessary for pkg_free
+ * \param qm memory block
+ * \param p freed memory
+ */
 #ifdef DBG_F_MALLOC
 void fm_free(struct fm_block* qm, void* p, const char* file, const char* func, 
 				unsigned int line)
@@ -426,9 +508,11 @@ void fm_free(struct fm_block* qm, void* p)
 #ifdef DBG_F_MALLOC
 	MDBG("fm_free(%p, %p), called from %s: %s(%d)\n", qm, p, file, func, line);
 	if (p>(void*)qm->last_frag || p<(void*)qm->first_frag){
-		LOG(L_CRIT, "BUG: fm_free: bad pointer %p (out of memory block!) - "
-				"aborting\n", p);
-		abort();
+		LOG(L_CRIT, "BUG: fm_free: bad pointer %p (out of memory block!),"
+				" called from %s: %s(%d) - aborting\n", p,
+				file, func, line);
+		if(likely(cfg_get(core, core_cfg, mem_safety)==0))
+			abort();
 	}
 #endif
 	if (p==0) {
@@ -440,20 +524,42 @@ void fm_free(struct fm_block* qm, void* p)
 	MDBG("fm_free: freeing block alloc'ed from %s: %s(%ld)\n",
 			f->file, f->func, f->line);
 #endif
+	if(unlikely(f->u.nxt_free!=NULL)) {
+		LM_INFO("freeing a free fragment (%p/%p) - ignore\n",
+				f, p);
+		return;
+	}
 	size=f->size;
 #if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
 	qm->used-=size;
 	qm->real_used-=size;
+#ifdef MALLOC_STATS
+	sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+	sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 #endif
 #ifdef DBG_F_MALLOC
 	f->file=file;
 	f->func=func;
 	f->line=line;
 #endif
+#ifdef MEM_JOIN_FREE
+	if(unlikely(cfg_get(core, core_cfg, mem_join)!=0))
+		fm_join_frag(qm, f);
+#endif /*MEM_JOIN_FREE*/
 	fm_insert_free(qm, f);
 }
 
 
+/**
+ * \brief Main memory manager realloc function
+ * 
+ * Main memory manager realloc function, provide functionality for pkg_realloc
+ * \param qm memory block
+ * \param p reallocated memory block
+ * \param size
+ * \return reallocated memory block
+ */
 #ifdef DBG_F_MALLOC
 void* fm_realloc(struct fm_block* qm, void* p, unsigned long size,
 					const char* file, const char* func, unsigned int line)
@@ -513,6 +619,10 @@ void* fm_realloc(struct fm_block* qm, void* p, unsigned long size)
 		   free frag, so here we only need orig_size-f->size for real used */
 		qm->real_used-=(orig_size-f->size);
 		qm->used-=(orig_size-f->size);
+#ifdef MALLOC_STATS
+		sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+		sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 #endif
 	}else if (f->size<size){
 		/* grow */
@@ -546,6 +656,9 @@ void* fm_realloc(struct fm_block* qm, void* p, unsigned long size)
 			f->size+=n->size+FRAG_OVERHEAD;
 		#if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
 			qm->real_used-=FRAG_OVERHEAD;
+#ifdef MALLOC_STATS
+			sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 		#endif
 			/* split it if necessary */
 			if (f->size > size){
@@ -559,6 +672,10 @@ void* fm_realloc(struct fm_block* qm, void* p, unsigned long size)
 		#if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
 			qm->real_used+=(f->size-orig_size);
 			qm->used+=(f->size-orig_size);
+#ifdef MALLOC_STATS
+			sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+			sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 		#endif
 		}else{
 			/* could not join => realloc */
@@ -592,7 +709,10 @@ void* fm_realloc(struct fm_block* qm, void* p, unsigned long size)
 }
 
 
-
+/**
+ * \brief Report internal memory manager status
+ * \param qm memory block
+ */
 void fm_status(struct fm_block* qm)
 {
 	struct fm_frag* f;
@@ -601,8 +721,10 @@ void fm_status(struct fm_block* qm)
 	int unused;
 	unsigned long size;
 	int memlog;
+	int mem_summary;
 
 	memlog=cfg_get(core, core_cfg, memlog);
+	mem_summary=cfg_get(core, core_cfg, mem_summary);
 	LOG_(DEFAULT_FACILITY, memlog, "fm_status: ", "fm_status (%p):\n", qm);
 	if (!qm) return;
 
@@ -615,6 +737,9 @@ void fm_status(struct fm_block* qm)
 	LOG_(DEFAULT_FACILITY, memlog, "fm_status: ",
 			" max used (+overhead)= %lu\n", qm->max_real_used);
 #endif
+
+	if (mem_summary & 16) return;
+
 	/*
 	LOG_(DEFAULT_FACILITY, memlog, "fm_status: ", "dumping all fragments:\n");
 	for (f=qm->first_frag, i=0;((char*)f<(char*)qm->last_frag) && (i<10);
@@ -678,9 +803,14 @@ void fm_status(struct fm_block* qm)
 }
 
 
-
-/* fills a malloc info structure with info about the block
- * if a parameter is not supported, it will be filled with 0 */
+/**
+ * \brief Fills a malloc info structure with info about the block
+ *
+ * Fills a malloc info structure with info about the block, if a
+ * parameter is not supported, it will be filled with 0
+ * \param qm memory block
+ * \param info memory information
+ */
 void fm_info(struct fm_block* qm, struct mem_info* info)
 {
 	int r;
@@ -723,9 +853,12 @@ void fm_info(struct fm_block* qm, struct mem_info* info)
 }
 
 
-
-/* returns how much free memory is available
- * on error (not compiled with bookkeeping code) returns (unsigned long)(-1) */
+/**
+ * \brief Helper function for available memory report
+ * \param qm memory block
+ * \return Returns how much free memory is available, on error (not compiled
+ * with bookkeeping code) returns (unsigned long)(-1)
+ */
 unsigned long fm_available(struct fm_block* qm)
 {
 
@@ -773,7 +906,10 @@ make_new:
 }
 
 
-
+/**
+ * \brief Debugging helper, summary and logs all allocated memory blocks
+ * \param qm memory block
+ */
 void fm_sums(struct fm_block* qm)
 {
 	struct fm_frag* f;

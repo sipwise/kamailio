@@ -38,20 +38,9 @@
 #include "../../parser/parse_from.h"
 #include "../../modules/tm/ut.h"
 #include "../../lib/kmi/mi.h"
+#include "../../str_list.h"
 #include "tmx_mod.h"
 
-/*! simple string list */
-struct str_list {
-	str s;
-	struct str_list *next;
-};
-
-/*! Which header fields should be skipped */
-#define skip_hf(_hf) \
-	(((_hf)->type == HDR_FROM_T)  || \
-	((_hf)->type == HDR_TO_T)     || \
-	((_hf)->type == HDR_CALLID_T) || \
-	((_hf)->type == HDR_CSEQ_T))
 
 
 /*!
@@ -160,35 +149,6 @@ static inline struct mi_root* mi_check_msg(struct sip_msg* msg, str* method,
 	return 0;
 }
 
-/*!
- * \brief Allocate a new str on a str list
- *
- * Allocate a new str in pkg_mem and attach it to a str list. Update
- * the total number of list elements.
- * \param s char array
- * \param len length of the char array
- * \param last last list element
- * \param total total number of list elements
- * \return pointer to the new list element
- */
-static inline struct str_list *new_str(char *s, int len, struct str_list **last, int *total)
-{
-	struct str_list *new;
-	new=pkg_malloc(sizeof(struct str_list));
-	if (!new) {
-		LM_ERR("no more pkg mem\n");
-		return 0;
-	}
-	new->s.s=s;
-	new->s.len=len;
-	new->next=0;
-
-	(*last)->next=new;
-	*last=new;
-	*total+=len;
-
-	return new;
-}
 
 /*!
  * \brief Convert a header field block to char array
@@ -216,7 +176,7 @@ static inline char *get_hfblock( str *uri, struct hdr_field *hf, int *l, struct 
 	portname=sock_name=0;
 
 	for (; hf; hf=hf->next) {
-		if (skip_hf(hf)) continue;
+		if (tm_skip_hf(hf)) continue;
 
 		begin=needle=hf->name.s; 
 		hf_avail=hf->len;
@@ -225,7 +185,7 @@ static inline char *get_hfblock( str *uri, struct hdr_field *hf, int *l, struct 
 		while(hf_avail) {
 			d=memchr(needle, SUBST_CHAR, hf_avail);
 			if (!d || d+1>=needle+hf_avail) { /* nothing to substitute */
-				new=new_str(begin, hf_avail, &last, &total_len); 
+				new=append_str_list(begin, hf_avail, &last, &total_len); 
 				if (!new) goto error;
 				break;
 			} else {
@@ -234,7 +194,7 @@ static inline char *get_hfblock( str *uri, struct hdr_field *hf, int *l, struct 
 				switch(*d) {
 					case SUBST_CHAR:	/* double SUBST_CHAR: IP */
 						/* string before substitute */
-						new=new_str(begin, frag_len, &last, &total_len); 
+						new=append_str_list(begin, frag_len, &last, &total_len); 
 						if (!new) goto error;
 						/* substitute */
 						if (!sock_name) {
@@ -248,13 +208,13 @@ static inline char *get_hfblock( str *uri, struct hdr_field *hf, int *l, struct 
 							sock_name=&(*send_sock)->address_str;
 							portname=&(*send_sock)->port_no_str;
 						}
-						new=new_str(sock_name->s, sock_name->len,
+						new=append_str_list(sock_name->s, sock_name->len,
 								&last, &total_len );
 						if (!new) goto error;
 						/* inefficient - FIXME --andrei*/
-						new=new_str(":", 1, &last, &total_len);
+						new=append_str_list(":", 1, &last, &total_len);
 						if (!new) goto error;
-						new=new_str(portname->s, portname->len,
+						new=append_str_list(portname->s, portname->len,
 								&last, &total_len );
 						if (!new) goto error;
 						/* keep going ... */
@@ -268,7 +228,7 @@ static inline char *get_hfblock( str *uri, struct hdr_field *hf, int *l, struct 
 			} /* possible substitute */
 		} /* substitution loop */
 		/* proceed to next header */
-		/* new=new_str(CRLF, CRLF_LEN, &last, &total_len );
+		/* new=append_str_list(CRLF, CRLF_LEN, &last, &total_len );
 		if (!new) goto error; */
 		LM_DBG("one more hf processed\n");
 	} /* header loop */
@@ -516,6 +476,8 @@ struct mi_root*  mi_tm_uac_dlg(struct mi_root* cmd_tree, void* param)
 	for( n=0,node = cmd_tree->node.kids; n<6 && node ; n++,node=node->next );
 	if ( !(n==5 || n==6) || node!=0)
 		return init_mi_tree( 400, MI_MISSING_PARM_S, MI_MISSING_PARM_LEN);
+
+	cseq = -1;
 
 	/* method name (param 1) */
 	node = cmd_tree->node.kids;
@@ -814,6 +776,80 @@ struct mi_root* mi_tm_reply(struct mi_root* cmd_tree, void* param)
 		body = node->value;
 
 	/* it's refcounted now, t_reply_with body unrefs for me -- I can 
+	 * continue but may not use T anymore  */
+	n = _tmx_tmb.t_reply_with_body(trans, rpl_code, &reason, &body,
+			&new_hdrs, &totag);
+
+	if (n<0)
+		return init_mi_tree( 500, "Reply failed", 12);
+
+	return init_mi_tree( 200, MI_OK_S, MI_OK_LEN);
+}
+
+/*
+  Syntax of "t_reply_callid" :
+  code
+  reason
+  callid
+  cseq
+  to_tag
+  new headers
+  [Body]
+*/
+struct mi_root* mi_tm_reply_callid(struct mi_root* cmd_tree, void* param)
+{
+	struct mi_node* node;
+	unsigned int rpl_code;
+	struct cell *trans;
+	str reason = {0, 0};
+	str totag = {0, 0};
+	str new_hdrs = {0, 0};
+	str body = {0, 0};
+	str callid = {0, 0};
+	str cseq = {0, 0};
+	int n;
+
+	for( n=0,node = cmd_tree->node.kids; n<7 && node ; n++,node=node->next );
+	if ( !(n==6 || n==7) || node!=0)
+		return init_mi_tree( 400, MI_MISSING_PARM_S, MI_MISSING_PARM_LEN);
+
+	/* get all info from the command */
+
+	/* reply code (param 1) */
+	node = cmd_tree->node.kids;
+	if (str2int( &node->value, &rpl_code)!=0 || rpl_code>=700)
+		return init_mi_tree( 400, "Invalid reply code", 18);
+
+	/* reason text (param 2) */
+	node = node->next;
+	reason = node->value;
+
+	/* callid (param 3) */
+	node = node->next;
+	callid = node->value;
+
+	/* cseq (param 4) */
+	node = node->next;
+	cseq = node->value;
+
+	if(_tmx_tmb.t_lookup_callid( &trans, callid, cseq) < 0 )
+		return init_mi_tree( 400, "Lookup failed - no transaction", 30);
+
+	/* to_tag (param 5) */
+	node = node->next;
+	totag = node->value;
+
+	/* new headers (param 6) */
+	node = node->next;
+	if (!(node->value.len==1 && node->value.s[0]=='.'))
+		new_hdrs = node->value;
+
+	/* body (param 7 - optional) */
+	node = node->next;
+	if (node)
+		body = node->value;
+
+	/* it's refcounted now, t_reply_with body unrefs for me -- I can
 	 * continue but may not use T anymore  */
 	n = _tmx_tmb.t_reply_with_body(trans, rpl_code, &reason, &body,
 			&new_hdrs, &totag);

@@ -113,115 +113,34 @@ static inline int find_first_route(struct sip_msg* _m)
 
 
 /*!
- * \brief Find out if a URI contains r2 parameter which indicates that we put 2 record routes
- * \param _params URI
- * \return 1 if URI contains a r2 parameter, 0 otherwise
- */
-/*
-static inline int is_2rr(str* _params)
-{
-	str s;
-	int i, state = 0;
-
-	if (_params->len == 0) return 0;
-	s = *_params;
-
-	for(i = 0; i < s.len; i++) {
-		switch(state) {
-		case 0:
-			switch(s.s[i]) {
-			case ' ':
-			case '\r':
-			case '\n':
-			case '\t':           break;
-			case 'r':
-			case 'R': state = 1; break;
-			default:  state = 4; break;
-			}
-			break;
-
-		case 1:
-			switch(s.s[i]) {
-			case '2': state = 2; break;
-			default:  state = 4; break;
-			}
-			break;
-
-		case 2:
-			switch(s.s[i]) {
-			case ';':  return 1;
-			case '=':  return 1;
-			case ' ':
-			case '\r':
-			case '\n':
-			case '\t': state = 3; break;
-			default:   state = 4; break;
-			}
-			break;
-
-		case 3:
-			switch(s.s[i]) {
-			case ';':  return 1;
-			case '=':  return 1;
-			case ' ':
-			case '\r':
-			case '\n':
-			case '\t': break;
-			default:   state = 4; break;
-			}
-			break;
-
-		case 4:
-			switch(s.s[i]) {
-			case '\"': state = 5; break;
-			case ';':  state = 0; break;
-			default:              break;
-			}
-			break;
-			
-		case 5:
-			switch(s.s[i]) {
-			case '\\': state = 6; break;
-			case '\"': state = 4; break;
-			default:              break;
-			}
-			break;
-
-		case 6: state = 5; break;
-		}
-	}
-	
-	if ((state == 2) || (state == 3)) return 1;
-	else return 0;
-}
-*/
-
-/*!
  * \brief Check if URI is myself
  * \param _host host
  * \param _port port
  * \return 0 if the URI is not myself, 1 otherwise
  */
-#ifdef ENABLE_USER_CHECK
-static inline int is_myself(str *_user, str* _host, unsigned short _port)
-#else
-static inline int is_myself(str* _host, unsigned short _port)
-#endif
+static inline int is_myself(sip_uri_t *_puri)
 {
 	int ret;
 	
-	ret = check_self(_host, _port ? _port : SIP_PORT, 0);/* match all protos*/
+	ret = check_self(&_puri->host,
+			_puri->port_no?_puri->port_no:SIP_PORT, 0);/* match all protos*/
 	if (ret < 0) return 0;
 
 #ifdef ENABLE_USER_CHECK
-	if(i_user.len && i_user.len==_user->len
-			&& !strncmp(i_user.s, _user->s, _user->len))
+	if(ret==1 && i_user.len && i_user.len==_puri->user.len
+			&& strncmp(i_user.s, _puri->user.s, _puri->user.len)==0)
 	{
-		LM_DBG("this URI isn't mine\n");
-		return -1;
+		LM_DBG("ignore user matched - URI is not to the server itself\n");
+		return 0;
 	}
 #endif
 	
+	if(ret==1) {
+		/* match on host:port, but if gruu, then fail */
+		if(_puri->gr.s!=NULL)
+			return 0;
+	}
+
 	return ret;
 }
 
@@ -591,20 +510,15 @@ static inline int after_strict(struct sip_msg* _m)
 		return RR_ERROR;
 	}
 
-	if ( enable_double_rr && is_2rr(&puri.params) &&
-#ifdef ENABLE_USER_CHECK
-	is_myself(&puri.user, &puri.host, puri.port_no)
-#else
-	is_myself(&puri.host, puri.port_no)
-#endif
-	) {
+	if ( enable_double_rr && is_2rr(&puri.params) && is_myself(&puri)) {
 		/* double route may occure due different IP and port, so force as
 		 * send interface the one advertise in second Route */
 		si = grep_sock_info( &puri.host, puri.port_no, puri.proto);
 		if (si) {
 			set_force_socket(_m, si);
 		} else {
-			LM_WARN("no socket found for match second RR\n");
+			if (enable_socket_mismatch_warning)
+				LM_WARN("no socket found for match second RR\n");
 		}
 
 		if (!rt->next) {
@@ -760,9 +674,7 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	rr_t* rt;
 	int res;
 	int status;
-#ifdef ENABLE_USER_CHECK
 	int ret;
-#endif
 	str uri;
 	struct socket_info *si;
 
@@ -781,12 +693,8 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	}
 
 	/* IF the URI was added by me, remove it */
-#ifdef ENABLE_USER_CHECK
-	ret=is_myself(&puri.user, &puri.host, puri.port_no);
+	ret=is_myself(&puri);
 	if (ret>0)
-#else
-	if (is_myself(&puri.host, puri.port_no))
-#endif
 	{
 		LM_DBG("Topmost route URI: '%.*s' is me\n",
 			uri.len, ZSW(uri.s));
@@ -826,7 +734,8 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 			if (si) {
 				set_force_socket(_m, si);
 			} else {
-				LM_WARN("no socket found for match second RR\n");
+				if (enable_socket_mismatch_warning)
+					LM_WARN("no socket found for match second RR\n");
 			}
 
 			if (!rt->next) {
@@ -910,11 +819,9 @@ done:
 /*!
  * \brief Do loose routing as per RFC3261
  * \param _m SIP message
- * \param _s1 unused
- * \param _s2 unused
  * \return -1 on failure, 1 on success
  */
-int loose_route(struct sip_msg* _m, char* _s1, char* _s2)
+int loose_route(struct sip_msg* _m)
 {
 	int ret;
 
@@ -934,12 +841,7 @@ int loose_route(struct sip_msg* _m, char* _s1, char* _s2)
 	} else if (ret == 1) {
 		return after_loose(_m, 1);
 	} else {
-#ifdef ENABLE_USER_CHECK
-		if (is_myself(&_m->parsed_uri.user, &_m->parsed_uri.host,
-		_m->parsed_uri.port_no)) {
-#else
-		if (is_myself(&_m->parsed_uri.host, _m->parsed_uri.port_no)) {
-#endif
+		if (is_myself(&_m->parsed_uri)) {
 			return after_strict(_m);
 		} else {
 			return after_loose(_m, 0);

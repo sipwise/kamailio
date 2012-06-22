@@ -27,6 +27,7 @@
  * \brief Functions for parsing a database URL and work with db identifier.
  */
 
+#include "db.h"
 #include "db_id.h"
 #include "../../dprint.h"
 #include "../../mem/mem.h"
@@ -209,15 +210,15 @@ static int parse_db_url(struct db_id* id, const str* url)
 	return 0;
 
  err:
-	if(id){
-		if (id->scheme) pkg_free(id->scheme);
-		if (id->username) pkg_free(id->username);
-		if (id->password) pkg_free(id->password);
-		if (id->host) pkg_free(id->host);
-		if (id->database) pkg_free(id->database);
-		memset(id, 0, sizeof(struct db_id));
-	}
+	if (!id) goto end;
+	if (id->scheme) pkg_free(id->scheme);
+	if (id->username) pkg_free(id->username);
+	if (id->password) pkg_free(id->password);
+	if (id->host) pkg_free(id->host);
+	if (id->database) pkg_free(id->database);
+	memset(id, 0, sizeof(struct db_id));
 	if (prev_token) pkg_free(prev_token);
+ end:
 	return -1;
 }
 
@@ -225,10 +226,12 @@ static int parse_db_url(struct db_id* id, const str* url)
 /**
  * Create a new connection identifier
  * \param url database URL
+ * \param pooling whether or not a pooled connection may be used
  * \return connection identifier, or zero on error
  */
-struct db_id* new_db_id(const str* url)
+struct db_id* new_db_id(const str* url, db_pooling_t pooling)
 {
+	static int poolid=0;
 	struct db_id* ptr;
 
 	if (!url || !url->s) {
@@ -247,6 +250,9 @@ struct db_id* new_db_id(const str* url)
 		LM_ERR("error while parsing database URL: '%.*s' \n", url->len, url->s);
 		goto err;
 	}
+
+	if (pooling == DB_POOLING_NONE) ptr->poolid = ++poolid;
+	else ptr->poolid = 0;
 	ptr->pid = my_pid();
 
 	return ptr;
@@ -284,6 +290,11 @@ unsigned char cmp_db_id(const struct db_id* id1, const struct db_id* id2)
 	if(id1->pid!=id2->pid) {
 		LM_DBG("identical DB URLs, but different DB connection pid [%d/%d]\n",
 				id1->pid, id2->pid);
+		return 0;
+	}
+	if(id1->poolid!=id2->poolid) {
+		LM_DBG("identical DB URLs, but different poolids [%d/%d]\n",
+				id1->poolid, id2->poolid);
 		return 0;
 	}
 	return 1;

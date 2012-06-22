@@ -1,8 +1,4 @@
 /*
- * $Id$
- *
- * presence module - presence server implementation
- *
  * Copyright (C) 2006 Voice Sistem S.R.L.
  *
  * This file is part of Kamailio, a free SIP server.
@@ -23,12 +19,12 @@
  *
  * History:
  * --------
- *  2006-08-15  initial version (anca)
+ *  2006-08-15  initial version (Anca Vamanu)
  */
 
-/*! \file
+/*!
+ * \file
  * \brief Kamailio presence module :: Presentity handling
- * \ref presentity.c
  * \ingroup presence 
  */
 
@@ -75,6 +71,9 @@ char* extract_sphere(str body);
 char* get_sphere(str* pres_uri);
 typedef char* (*pres_get_sphere_t)(str* pres_uri);
 
+int mark_presentity_for_delete(presentity_t *pres);
+int delete_presentity(presentity_t *pres);
+int delete_offline_presentities(str *pres_uri, pres_ev_t *event);
 
 #endif
 

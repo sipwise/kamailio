@@ -51,13 +51,16 @@
 #include <float.h>
 #endif
 
-static int pg_mod_init(void);
-
 MODULE_VERSION
+
+static int pg_mod_init(void);
+static void pg_mod_destroy(void);
 
 int pg_connect_timeout = 0;  /* Default is unlimited */
 int pg_retries = 2;  /* How many times should the module try re-execute failed commands.
 					  * 0 disables reconnecting */
+
+int pg_lockset = 4;
 
 /*
  * Postgres module interface
@@ -88,6 +91,7 @@ static cmd_export_t cmds[] = {
  */
 static param_export_t params[] = {
 	{"retries",         PARAM_INT, &pg_retries },
+	{"lockset",         PARAM_INT, &pg_lockset },
 	{0, 0, 0}
 };
 
@@ -99,7 +103,7 @@ struct module_exports exports = {
 	params,       /* module parameters */
 	pg_mod_init,  /* module initialization function */
 	0,            /* response function*/
-	0,            /* destroy function */
+	pg_mod_destroy,  /* destroy function */
 	0,            /* oncancel function */
 	0             /* per-child init function */
 };
@@ -530,6 +534,13 @@ int pg_test(void)
 }
 #endif /* PG_TEST */
 
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	if(db_api_init()<0)
+		return -1;
+	return 0;
+}
+
 static int pg_mod_init(void)
 {
 #ifdef PG_TEST
@@ -540,7 +551,14 @@ static int pg_mod_init(void)
 	}
 	return -1;
 #endif /* PG_TEST */
+	if(pg_init_lock_set(pg_lockset)<0)
+		return -1;
 	return km_postgres_mod_init();
+}
+
+static void pg_mod_destroy(void)
+{
+	pg_destroy_lock_set();
 }
 
 /** @} */

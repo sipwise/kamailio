@@ -64,6 +64,7 @@
 #include "db_cap.h"
 #include "db_id.h"
 #include "db_pool.h"
+#include "db_query.h"
 #include "db.h"
 
 static unsigned int MAX_URL_LENGTH = 255;	/*!< maximum length of a SQL URL */
@@ -135,6 +136,15 @@ int db_check_api(db_func_t* dbf, char *mname)
 	if (dbf->insert_update) {
 		dbf->cap |= DB_CAP_INSERT_UPDATE;
 	}
+
+	if (dbf->insert_delayed) {
+		dbf->cap |= DB_CAP_INSERT_DELAYED;
+	}
+
+	if (dbf->affected_rows) {
+		dbf->cap |= DB_CAP_AFFECTED_ROWS;
+	}
+
 	return 0;
 error:
 	return -1;
@@ -163,7 +173,7 @@ int db_bind_mod(const str* mod, db_func_t* mydbf)
 	if (mod->len > MAX_URL_LENGTH)
 	{
 		LM_ERR("SQL URL too long\n");
-		return 0;
+		return -1;
 	}
 	// add the prefix
 	name = pkg_malloc(mod->len + 4);
@@ -211,6 +221,7 @@ int db_bind_mod(const str* mod, db_func_t* mydbf)
 		dbf.use_table = (db_use_table_f)find_mod_export(tmp,
 			"db_use_table", 2, 0);
 		dbf.init = (db_init_f)find_mod_export(tmp, "db_init", 1, 0);
+		dbf.init2 = (db_init2_f)find_mod_export(tmp, "db_init2", 1, 0);
 		dbf.close = (db_close_f)find_mod_export(tmp, "db_close", 2, 0);
 		dbf.query = (db_query_f)find_mod_export(tmp, "db_query", 2, 0);
 		dbf.fetch_result = (db_fetch_result_f)find_mod_export(tmp,
@@ -225,8 +236,18 @@ int db_bind_mod(const str* mod, db_func_t* mydbf)
 		dbf.replace = (db_replace_f)find_mod_export(tmp, "db_replace", 2, 0);
 		dbf.last_inserted_id= (db_last_inserted_id_f)find_mod_export(tmp,
 			"db_last_inserted_id", 1, 0);
+		dbf.affected_rows = (db_affected_rows_f)find_mod_export(tmp,
+			"db_affected_rows", 1, 0);
 		dbf.insert_update = (db_insert_update_f)find_mod_export(tmp,
 			"db_insert_update", 2, 0);
+		dbf.insert_delayed = (db_insert_delayed_f)find_mod_export(tmp,
+			"db_insert_delayed", 2, 0);
+		dbf.start_transaction = (db_start_transaction_f)find_mod_export(tmp,
+			"db_start_transaction", 1, 0);
+		dbf.end_transaction = (db_end_transaction_f)find_mod_export(tmp,
+			"db_end_transaction", 1, 0);
+		dbf.abort_transaction = (db_abort_transaction_f)find_mod_export(tmp,
+			"db_abort_transaction", 1, 0);
 	}
 	if(db_check_api(&dbf, tmp)!=0)
 		goto error;
@@ -246,6 +267,16 @@ error:
  * \note No function should be called before this
  */
 db1_con_t* db_do_init(const str* url, void* (*new_connection)())
+{
+	return db_do_init2(url, *new_connection, DB_POOLING_PERMITTED);
+}
+
+
+/*! \brief
+ * Initialize database module
+ * \note No function should be called before this
+ */
+db1_con_t* db_do_init2(const str* url, void* (*new_connection)(), db_pooling_t pooling)
 {
 	struct db_id* id;
 	void* con;
@@ -273,7 +304,7 @@ db1_con_t* db_do_init(const str* url, void* (*new_connection)())
 	}
 	memset(res, 0, con_size);
 
-	id = new_db_id(url);
+	id = new_db_id(url, pooling);
 	if (!id) {
 		LM_ERR("cannot parse URL '%.*s'\n", url->len, url->s);
 		goto err;
@@ -475,5 +506,19 @@ int db_load_bulk_data(db_func_t* binding, db1_con_t* handle, str* name, db_key_t
 		}
 	}
 
+	return 0;
+}
+
+/**
+ * \brief DB API init function.
+ *
+ * This function must be executed by DB connector modules at load time to
+ * initialize the internals of DB API library.
+ * \return returns 0 on successful initialization, -1 on error.
+ */
+int db_api_init(void)
+{
+	if(db_query_init()<0)
+		return -1;
 	return 0;
 }

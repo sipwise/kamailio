@@ -4,6 +4,7 @@
  * dialog module - basic support for dialog tracking
  *
  * Copyright (C) 2006 Voice Sistem SRL
+ * Copyright (C) 2011 Carsten Bock, carsten@ng-voice.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -37,6 +38,19 @@
  *  2010-06-16 added sip-router rpc interface (osas)
  */
 
+/**
+ * @defgroup dialog dialog :: Kamailio dialog module
+ * @brief Kamailio dialog module
+ *
+ * The dialog module provides dialog awareness to the Kamailio proxy. Its
+ * functionality is to keep track of the current dialogs, to offer
+ * information about them (like how many dialogs are active) or to manage
+ * them. The module exports several functions that could be used directly
+ * from scripts.
+ * The module, via an internal API, also provide the foundation to build
+ * on top of it more complex dialog-based functionalities via other
+ * Kamailio modules.                       
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -52,10 +66,11 @@
 #include "../../mod_fix.h"
 #include "../../script_cb.h"
 #include "../../lib/kcore/faked_msg.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../../lib/kcore/kstats_wrapper.h"
 #include "../../mem/mem.h"
 #include "../../lib/kmi/mi.h"
+#include "../../timer_proc.h"
 #include "../../lvalue.h"
 #include "../../parser/parse_to.h"
 #include "../../modules/tm/tm_load.h"
@@ -85,12 +100,16 @@ static char* rr_param = "did";
 static int dlg_flag = -1;
 static str timeout_spec = {NULL, 0};
 static int default_timeout = 60 * 60 * 12;  /* 12 hours */
+static int seq_match_mode = SEQ_MATCH_STRICT_ID;
 static char* profiles_wv_s = NULL;
 static char* profiles_nv_s = NULL;
 str dlg_extra_hdrs = {NULL,0};
 static int db_fetch_rows = 200;
+int initial_cbs_inscript = 1;
+int dlg_wait_ack = 1;
 
-int seq_match_mode = SEQ_MATCH_STRICT_ID;
+int dlg_event_rt[DLG_EVENTRT_MAX];
+
 str dlg_bridge_controller = {"sip:controller@kamailio.org", 27};
 
 str ruri_pvar_param = {"$ru", 3};
@@ -101,6 +120,7 @@ int dlg_enable_stats = 1;
 int active_dlgs_cnt = 0;
 int early_dlgs_cnt = 0;
 int detect_spirals = 1;
+int dlg_send_bye = 0;
 stat_var *active_dlgs = 0;
 stat_var *processed_dlgs = 0;
 stat_var *expired_dlgs = 0;
@@ -113,12 +133,18 @@ pv_spec_t timeout_avp;
 
 int dlg_db_mode_param = DB_MODE_NONE;
 
+str dlg_xavp_cfg = {0};
+int dlg_ka_timer = 0;
+int dlg_ka_interval = 0;
+
 /* db stuff */
 static str db_url = str_init(DEFAULT_DB_URL);
 static unsigned int db_update_period = DB_DEFAULT_UPDATE_PERIOD;
 
 static int pv_get_dlg_count( struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
+
+void dlg_ka_timer_exec(unsigned int ticks, void* param);
 
 /* commands wrappers and fixups */
 static int fixup_profile(void** param, int param_no);
@@ -132,10 +158,12 @@ static int w_get_profile_size3(struct sip_msg*, char*, char*, char*);
 static int w_dlg_isflagset(struct sip_msg *msg, char *flag, str *s2);
 static int w_dlg_resetflag(struct sip_msg *msg, char *flag, str *s2);
 static int w_dlg_setflag(struct sip_msg *msg, char *flag, char *s2);
+static int w_dlg_set_property(struct sip_msg *msg, char *prop, char *s2);
 static int w_dlg_manage(struct sip_msg*, char*, char*);
 static int w_dlg_bye(struct sip_msg*, char*, char*);
 static int w_dlg_refer(struct sip_msg*, char*, char*);
 static int w_dlg_bridge(struct sip_msg*, char*, char*, char*);
+static int w_dlg_set_timeout(struct sip_msg*, char*, char*, char*);
 static int fixup_dlg_bye(void** param, int param_no);
 static int fixup_dlg_refer(void** param, int param_no);
 static int fixup_dlg_bridge(void** param, int param_no);
@@ -146,37 +174,43 @@ static cmd_export_t cmds[]={
 	{"dlg_manage", (cmd_function)w_dlg_manage,            0,0,
 			0, REQUEST_ROUTE },
 	{"set_dlg_profile", (cmd_function)w_set_dlg_profile,  1,fixup_profile,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"set_dlg_profile", (cmd_function)w_set_dlg_profile,  2,fixup_profile,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"unset_dlg_profile", (cmd_function)w_unset_dlg_profile,  1,fixup_profile,
 			0, FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
 	{"unset_dlg_profile", (cmd_function)w_unset_dlg_profile,  2,fixup_profile,
 			0, FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
 	{"is_in_profile", (cmd_function)w_is_in_profile,      1,fixup_profile,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"is_in_profile", (cmd_function)w_is_in_profile,      2,fixup_profile,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"get_profile_size",(cmd_function)w_get_profile_size2, 2,fixup_get_profile2,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"get_profile_size",(cmd_function)w_get_profile_size3, 3,fixup_get_profile3,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_setflag", (cmd_function)w_dlg_setflag,          1,fixup_igp_null,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_resetflag", (cmd_function)w_dlg_resetflag,      1,fixup_igp_null,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_isflagset", (cmd_function)w_dlg_isflagset,      1,fixup_igp_null,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_bye",(cmd_function)w_dlg_bye,                   1,fixup_dlg_bye,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_refer",(cmd_function)w_dlg_refer,               2,fixup_dlg_refer,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_bridge",(cmd_function)w_dlg_bridge,             3,fixup_dlg_bridge,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"dlg_get",(cmd_function)w_dlg_get,                   3,fixup_dlg_bridge,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
 	{"is_known_dlg", (cmd_function)w_is_known_dlg,        0, NULL,
-			0, REQUEST_ROUTE| FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE },
+			0, ANY_ROUTE },
+	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  1,fixup_igp_null,
+			0, ANY_ROUTE },
+	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  3,fixup_igp_all,
+			0, ANY_ROUTE },
+	{"dlg_set_property", (cmd_function)w_dlg_set_property,1,fixup_spve_null,
+			0, ANY_ROUTE },
 	{"load_dlg",  (cmd_function)load_dlg,   0, 0, 0, 0},
 	{0,0,0,0,0,0}
 };
@@ -214,12 +248,25 @@ static param_export_t mod_params[]={
 	{ "from_sock_column",      STR_PARAM, &from_sock_column.s       },
 	{ "sflags_column",         STR_PARAM, &sflags_column.s          },
 	{ "toroute_name_column",   STR_PARAM, &toroute_name_column.s    },
+
+	{ "vars_table_name",       STR_PARAM, &dialog_vars_table_name   },
+	{ "vars_h_id_column",      STR_PARAM, &vars_h_id_column.s       },
+	{ "vars_h_entry_column",   STR_PARAM, &vars_h_entry_column.s    },
+	{ "vars_key_column",       STR_PARAM, &vars_key_column.s        },
+	{ "vars_value_column",     STR_PARAM, &vars_value_column.s      },
+
 	{ "db_update_period",      INT_PARAM, &db_update_period         },
 	{ "db_fetch_rows",         INT_PARAM, &db_fetch_rows            },
 	{ "profiles_with_value",   STR_PARAM, &profiles_wv_s            },
 	{ "profiles_no_value",     STR_PARAM, &profiles_nv_s            },
 	{ "bridge_controller",     STR_PARAM, &dlg_bridge_controller.s  },
 	{ "ruri_pvar",             STR_PARAM, &ruri_pvar_param.s        },
+	{ "initial_cbs_inscript",  INT_PARAM, &initial_cbs_inscript     },
+	{ "send_bye",              INT_PARAM, &dlg_send_bye             },
+	{ "wait_ack",              INT_PARAM, &dlg_wait_ack             },
+	{ "xavp_cfg",              STR_PARAM, &dlg_xavp_cfg.s           },
+	{ "ka_timer",              INT_PARAM, &dlg_ka_timer             },
+	{ "ka_interval",           INT_PARAM, &dlg_ka_interval          },
 	{ 0,0,0 }
 };
 
@@ -259,6 +306,8 @@ static pv_export_t mod_items[] = {
 		pv_set_dlg_ctx, pv_parse_dlg_ctx_name, 0, 0, 0 },
 	{ {"dlg",  sizeof("dlg")-1}, PVT_OTHER, pv_get_dlg,
 		0, pv_parse_dlg_name, 0, 0, 0 },
+	{ {"dlg_var", sizeof("dlg_var")-1}, PVT_OTHER, pv_get_dlg_variable,
+		pv_set_dlg_variable,    pv_parse_dialog_var_name, 0, 0, 0},
 	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -348,6 +397,9 @@ static int fixup_get_profile3(void** param, int param_no)
 int load_dlg( struct dlg_binds *dlgb )
 {
 	dlgb->register_dlgcb = register_dlgcb;
+	dlgb->terminate_dlg = dlg_bye_all;
+	dlgb->set_dlg_var = set_dlg_variable;
+	dlgb->get_dlg_var = get_dlg_variable;
 	return 1;
 }
 
@@ -362,7 +414,7 @@ static int pv_get_dlg_count(struct sip_msg *msg, pv_param_t *param,
 	if(msg==NULL || res==NULL)
 		return -1;
 
-	n = active_dlgs ? (int)get_stat_val(active_dlgs) : 0;
+	n = active_dlgs ? get_stat_val(active_dlgs) : 0;
 	l = 0;
 	ch = int2str( n, &l);
 
@@ -380,6 +432,9 @@ static int mod_init(void)
 {
 	unsigned int n;
 
+	dlg_event_rt[DLG_EVENTRT_START] = route_lookup(&event_rt, "dialog:start");
+	dlg_event_rt[DLG_EVENTRT_END] = route_lookup(&event_rt, "dialog:end");
+	dlg_event_rt[DLG_EVENTRT_FAILED] = route_lookup(&event_rt, "dialog:failed");
 
 #ifdef STATISTICS
 	/* register statistics */
@@ -430,6 +485,15 @@ static int mod_init(void)
 	toroute_name_column.len = strlen(toroute_name_column.s);
 	dialog_table_name.len = strlen(dialog_table_name.s);
 
+	dialog_vars_table_name.len = strlen(dialog_vars_table_name.s);
+	vars_h_id_column.len = strlen(vars_h_id_column.s);
+	vars_h_entry_column.len = strlen(vars_h_entry_column.s);
+	vars_key_column.len = strlen(vars_key_column.s);
+	vars_value_column.len = strlen(vars_value_column.s);
+
+	if(dlg_xavp_cfg.s!=NULL)
+		dlg_xavp_cfg.len = strlen(dlg_xavp_cfg.s);
+
 	/* param checkings */
 	if (dlg_flag==-1) {
 		LM_ERR("no dlg flag set!!\n");
@@ -469,6 +533,12 @@ static int mod_init(void)
 	if(pv_parse_format(&ruri_pvar_param, &ruri_param_model) < 0
 				|| ruri_param_model==NULL) {
 		LM_ERR("malformed r-uri PV string: %s\n", ruri_pvar_param.s);
+		return -1;
+	}
+
+	if (initial_cbs_inscript != 0 && initial_cbs_inscript != 1) {
+		LM_ERR("invalid parameter for running initial callbacks in-script"
+				" (must be either 0 or 1)\n");
 		return -1;
 	}
 
@@ -528,19 +598,24 @@ static int mod_init(void)
 	}
 
 	if (register_script_cb( profile_cleanup, POST_SCRIPT_CB|REQUEST_CB,0)<0) {
-		LM_ERR("cannot regsiter script callback");
+		LM_ERR("cannot register script callback");
 		return -1;
 	}
 	if (register_script_cb(dlg_cfg_cb,
 				PRE_SCRIPT_CB|REQUEST_CB,0)<0)
 	{
-		LM_ERR("cannot regsiter pre-script ctx callback\n");
+		LM_ERR("cannot register pre-script ctx callback\n");
 		return -1;
 	}
 	if (register_script_cb(dlg_cfg_cb,
 				POST_SCRIPT_CB|REQUEST_CB,0)<0)
 	{
-		LM_ERR("cannot regsiter post-script ctx callback\n");
+		LM_ERR("cannot register post-script ctx callback\n");
+		return -1;
+	}
+
+	if (register_script_cb( spiral_detect_reset, POST_SCRIPT_CB|REQUEST_CB,0)<0) {
+		LM_ERR("cannot register req pre-script spiral detection reset callback\n");
 		return -1;
 	}
 
@@ -551,7 +626,7 @@ static int mod_init(void)
 
 	/* init handlers */
 	init_dlg_handlers( rr_param, dlg_flag,
-		timeout_spec.s?&timeout_avp:0, default_timeout);
+		timeout_spec.s?&timeout_avp:0, default_timeout, seq_match_mode);
 
 	/* init timer */
 	if (init_dlg_timer(dlg_ontimeout)!=0) {
@@ -605,6 +680,8 @@ static int mod_init(void)
 	}
 
 	destroy_dlg_callbacks( DLGCB_LOADED );
+	if(dlg_ka_timer>0 && dlg_ka_interval>0)
+		register_sync_timers(1);
 
 	return 0;
 }
@@ -614,15 +691,23 @@ static int child_init(int rank)
 {
 	dlg_db_mode = dlg_db_mode_param;
 
+	if(rank==PROC_MAIN && dlg_ka_timer>0 && dlg_ka_interval>0)
+	{
+		if(fork_sync_timer(PROC_TIMER, "Dialog KA Timer", 1 /*socks flag*/,
+				dlg_ka_timer_exec, NULL, dlg_ka_timer /*sec*/)<0) {
+			LM_ERR("failed to start ka timer routine as process\n");
+			return -1; /* error */
+		}
+	}
+
 	if (rank==1) {
 		if_update_stat(dlg_enable_stats, active_dlgs, active_dlgs_cnt);
 		if_update_stat(dlg_enable_stats, early_dlgs, early_dlgs_cnt);
 	}
 
-	if ( ((dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED)
-				&& (rank>0 || rank==PROC_TIMER || rank==PROC_MAIN))
-			|| (dlg_db_mode==DB_MODE_SHUTDOWN && (rank==PROC_MAIN)) )
-	{
+	if ( ((dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED) &&
+	(rank>0 || rank==PROC_TIMER)) ||
+	(dlg_db_mode==DB_MODE_SHUTDOWN && (rank==PROC_MAIN)) ) {
 		if ( dlg_connect_db(&db_url) ) {
 			LM_ERR("failed to connect to database (rank=%d)\n",rank);
 			return -1;
@@ -798,6 +883,7 @@ static int w_get_profile_size2(struct sip_msg *msg, char *profile, char *result)
 static int w_dlg_setflag(struct sip_msg *msg, char *flag, char *s2)
 {
 	dlg_ctx_t *dctx;
+	dlg_cell_t *d;
 	int val;
 
 	if(fixup_get_ivalue(msg, (gparam_p)flag, &val)!=0)
@@ -811,8 +897,11 @@ static int w_dlg_setflag(struct sip_msg *msg, char *flag, char *s2)
 		return -1;
 
 	dctx->flags |= 1<<val;
-	if(dctx->dlg)
-		dctx->dlg->sflags |= 1<<val;
+	d = dlg_get_by_iuid(&dctx->iuid);
+	if(d!=NULL) {
+		d->sflags |= 1<<val;
+		dlg_release(d);
+	}
 	return 1;
 }
 
@@ -820,6 +909,7 @@ static int w_dlg_setflag(struct sip_msg *msg, char *flag, char *s2)
 static int w_dlg_resetflag(struct sip_msg *msg, char *flag, str *s2)
 {
 	dlg_ctx_t *dctx;
+	dlg_cell_t *d;
 	int val;
 
 	if(fixup_get_ivalue(msg, (gparam_p)flag, &val)!=0)
@@ -834,8 +924,11 @@ static int w_dlg_resetflag(struct sip_msg *msg, char *flag, str *s2)
 		return -1;
 
 	dctx->flags &= ~(1<<val);
-	if(dctx->dlg)
-		dctx->dlg->sflags &= ~(1<<val);
+	d = dlg_get_by_iuid(&dctx->iuid);
+	if(d!=NULL) {
+		d->sflags &= ~(1<<val);
+		dlg_release(d);
+	}
 	return 1;
 }
 
@@ -843,7 +936,9 @@ static int w_dlg_resetflag(struct sip_msg *msg, char *flag, str *s2)
 static int w_dlg_isflagset(struct sip_msg *msg, char *flag, str *s2)
 {
 	dlg_ctx_t *dctx;
+	dlg_cell_t *d;
 	int val;
+	int ret;
 
 	if(fixup_get_ivalue(msg, (gparam_p)flag, &val)!=0)
 	{
@@ -856,38 +951,26 @@ static int w_dlg_isflagset(struct sip_msg *msg, char *flag, str *s2)
 	if ( (dctx=dlg_get_dlg_ctx())==NULL )
 		return -1;
 
-	if(dctx->dlg)
-		return (dctx->dlg->sflags&(1<<val))?1:-1;
+	d = dlg_get_by_iuid(&dctx->iuid);
+	if(d!=NULL) {
+		ret = (d->sflags&(1<<val))?1:-1;
+		dlg_release(d);
+		return ret;
+	}
 	return (dctx->flags&(1<<val))?1:-1;
 }
 
+/**
+ *
+ */
 static int w_dlg_manage(struct sip_msg *msg, char *s1, char *s2)
 {
-	str tag;
-	int backup_mode;
-
-	if( (msg->to==NULL && parse_headers(msg, HDR_TO_F,0)<0) || msg->to==NULL )
-	{
-		LM_ERR("bad TO header\n");
-		return -1;
-	}
-	tag = get_to(msg)->tag_value;
-	if(tag.s!=0 && tag.len!=0)
-	{
-		backup_mode = seq_match_mode;
-		seq_match_mode = SEQ_MATCH_NO_ID;
-		dlg_onroute(msg, NULL, NULL);
-		seq_match_mode = backup_mode;
-	} else {
-		if(dlg_new_dialog(msg, 0)!=0)
-			return -1;
-	}
-	return 1;
+	return dlg_manage(msg);
 }
 
 static int w_dlg_bye(struct sip_msg *msg, char *side, char *s2)
 {
-	struct dlg_cell *dlg;
+	dlg_cell_t *dlg = NULL;
 	int n;
 
 	dlg = dlg_get_ctx_dialog();
@@ -898,22 +981,30 @@ static int w_dlg_bye(struct sip_msg *msg, char *side, char *s2)
 	if(n==1)
 	{
 		if(dlg_bye(dlg, NULL, DLG_CALLER_LEG)!=0)
-			return -1;
-		return 1;
+			goto error;
+		goto done;
 	} else if(n==2) {
 		if(dlg_bye(dlg, NULL, DLG_CALLEE_LEG)!=0)
-			return -1;
-		return 1;
+			goto error;
+		goto done;
 	} else {
 		if(dlg_bye_all(dlg, NULL)!=0)
-			return -1;
-		return 1;
+			goto error;
+		goto done;
 	}
+
+done:
+	dlg_release(dlg);
+	return 1;
+
+error:
+	dlg_release(dlg);
+	return -1;
 }
 
 static int w_dlg_refer(struct sip_msg *msg, char *side, char *to)
 {
-	struct dlg_cell *dlg;
+	dlg_cell_t *dlg;
 	int n;
 	str st = {0,0};
 
@@ -926,22 +1017,28 @@ static int w_dlg_refer(struct sip_msg *msg, char *side, char *to)
 	if(fixup_get_svalue(msg, (gparam_p)to, &st)!=0)
 	{
 		LM_ERR("unable to get To\n");
-		return -1;
+		goto error;
 	}
 	if(st.s==NULL || st.len == 0)
 	{
 		LM_ERR("invalid To parameter\n");
-		return -1;
+		goto error;
 	}
 	if(n==1)
 	{
 		if(dlg_transfer(dlg, &st, DLG_CALLER_LEG)!=0)
-			return -1;
+			goto error;
 	} else {
 		if(dlg_transfer(dlg, &st, DLG_CALLEE_LEG)!=0)
-			return -1;
+			goto error;
 	}
+
+	dlg_release(dlg);
 	return 1;
+
+error:
+	dlg_release(dlg);
+	return -1;
 }
 
 static int w_dlg_bridge(struct sip_msg *msg, char *from, char *to, char *op)
@@ -987,6 +1084,101 @@ static int w_dlg_bridge(struct sip_msg *msg, char *from, char *to, char *op)
 	return 1;
 }
 
+/**
+ *
+ */
+static int w_dlg_set_timeout(struct sip_msg *msg, char *pto, char *phe, char *phi)
+{
+	int to = 0;
+	unsigned int he = 0;
+	unsigned int hi = 0;
+	dlg_cell_t *dlg = NULL;
+
+	if(fixup_get_ivalue(msg, (gparam_p)pto, &to)!=0)
+	{
+		LM_ERR("no timeout value\n");
+		return -1;
+	}
+	if(phe!=NULL)
+	{
+		if(fixup_get_ivalue(msg, (gparam_p)phe, (int*)&he)!=0)
+		{
+			LM_ERR("no hash entry value value\n");
+			return -1;
+		}
+		if(fixup_get_ivalue(msg, (gparam_p)phi, (int*)&hi)!=0)
+		{
+			LM_ERR("no hash id value value\n");
+			return -1;
+		}
+		dlg = dlg_lookup(he, hi);
+	} else {
+		dlg = dlg_get_msg_dialog(msg);
+	}
+
+	if(dlg==NULL)
+	{
+		LM_DBG("no dialog found\n");
+		return -1;
+	}
+
+	if(update_dlg_timer(&dlg->tl, to)<0) {
+		LM_ERR("failed to update dialog lifetime\n");
+		dlg_release(dlg);
+		return -1;
+	}
+	dlg->lifetime = to;
+	dlg->dflags |= DLG_FLAG_CHANGED;
+	dlg_release(dlg);
+	return 1;
+}
+
+static int w_dlg_set_property(struct sip_msg *msg, char *prop, char *s2)
+{
+	dlg_ctx_t *dctx;
+	dlg_cell_t *d;
+	str val;
+
+	if(fixup_get_svalue(msg, (gparam_t*)prop, &val)!=0)
+	{
+		LM_ERR("no property value\n");
+		return -1;
+	}
+	if(val.len<=0)
+	{
+		LM_ERR("empty property value\n");
+		return -1;
+	}
+	if ( (dctx=dlg_get_dlg_ctx())==NULL )
+		return -1;
+
+	if(val.len==6 && strncmp(val.s, "ka-src", 6)==0) {
+		dctx->iflags |= DLG_IFLAG_KA_SRC;
+		d = dlg_get_by_iuid(&dctx->iuid);
+		if(d!=NULL) {
+			d->iflags |= DLG_IFLAG_KA_SRC;
+			dlg_release(d);
+		}
+	} else if(val.len==6 && strncmp(val.s, "ka-dst", 6)==0) {
+		dctx->iflags |= DLG_IFLAG_KA_DST;
+		d = dlg_get_by_iuid(&dctx->iuid);
+		if(d!=NULL) {
+			d->iflags |= DLG_IFLAG_KA_DST;
+			dlg_release(d);
+		}
+	} else {
+		LM_ERR("unknown property value [%.*s]\n", val.len, val.s);
+		return -1;
+	}
+
+	return 1;
+}
+
+
+void dlg_ka_timer_exec(unsigned int ticks, void* param)
+{
+	dlg_ka_run(ticks);
+}
 
 static int fixup_dlg_bye(void** param, int param_no)
 {
@@ -1053,7 +1245,7 @@ static int fixup_dlg_bridge(void** param, int param_no)
 
 static int w_dlg_get(struct sip_msg *msg, char *ci, char *ft, char *tt)
 {
-	struct dlg_cell *dlg = NULL;
+	dlg_cell_t *dlg = NULL;
 	str sc = {0,0};
 	str sf = {0,0};
 	str st = {0,0};
@@ -1099,10 +1291,11 @@ static int w_dlg_get(struct sip_msg *msg, char *ci, char *ft, char *tt)
 	dlg = get_dlg(&sc, &sf, &st, &dir);
 	if(dlg==NULL)
 		return -1;
-    /* set current dialog pointer - re-use ref increment from dlg_get() above */
-	current_dlg_pointer = dlg;
-	_dlg_ctx.dlg = dlg;
+    /* set shorcut to dialog internal unique id */
+	_dlg_ctx.iuid.h_entry = dlg->h_entry;
+	_dlg_ctx.iuid.h_id = dlg->h_id;
 	_dlg_ctx.dir = dir;
+	dlg_release(dlg);
 	return 1;
 }
 
@@ -1158,7 +1351,8 @@ struct mi_root * mi_dlg_bridge(struct mi_root *cmd_tree, void *param)
  * \param with_context if 1 then the dialog context will be also printed
  * \return 0 on success, -1 on failure
  */
-static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, struct dlg_cell *dlg, int with_context)
+static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, dlg_cell_t *dlg,
+		int with_context)
 {
 	rpc_cb_ctx_t rpc_cb;
 
@@ -1191,7 +1385,7 @@ static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, struct dlg_cell *
 	if (with_context) {
 		rpc_cb.rpc = rpc;
 		rpc_cb.c = c;
-		run_dlg_callbacks( DLGCB_RPC_CONTEXT, dlg, NULL, DLG_DIR_NONE, (void *)&rpc_cb);
+		run_dlg_callbacks( DLGCB_RPC_CONTEXT, dlg, NULL, NULL, DLG_DIR_NONE, (void *)&rpc_cb);
 	}
 }
 
@@ -1204,7 +1398,7 @@ static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, struct dlg_cell *
  */
 static void internal_rpc_print_dlgs(rpc_t *rpc, void *c, int with_context)
 {
-	struct dlg_cell *dlg;
+	dlg_cell_t *dlg;
 	unsigned int i;
 
 	for( i=0 ; i<d_table->size ; i++ ) {
@@ -1226,8 +1420,8 @@ static void internal_rpc_print_dlgs(rpc_t *rpc, void *c, int with_context)
  */
 static void internal_rpc_print_single_dlg(rpc_t *rpc, void *c, int with_context) {
 	str callid, from_tag;
-	struct dlg_entry *d_entry;
-	struct dlg_cell *dlg;
+	dlg_entry_t *d_entry;
+	dlg_cell_t *dlg;
 	unsigned int h_entry;
 
 	if (rpc->scan(c, ".S.S", &callid, &from_tag) < 2) return;
@@ -1252,9 +1446,10 @@ static void internal_rpc_print_single_dlg(rpc_t *rpc, void *c, int with_context)
  * \param profile_name the given profile
  * \param value the given profile value
  */
-static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name, str *value) {
+static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name,
+		str *value) {
 	unsigned int size;
-	struct dlg_profile_table *profile;
+	dlg_profile_table_t *profile;
 
 	profile = search_dlg_profile( profile_name );
 	if (!profile) {
@@ -1288,9 +1483,10 @@ static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name
  * \param value the given profile value
  * \param with_context if 1 then the dialog context will be also printed
  */
-static void internal_rpc_profile_print_dlgs(rpc_t *rpc, void *c, str *profile_name, str *value) {
-	struct dlg_profile_table *profile;
-	struct dlg_profile_hash *ph;
+static void internal_rpc_profile_print_dlgs(rpc_t *rpc, void *c, str *profile_name,
+		str *value) {
+	dlg_profile_table_t *profile;
+	dlg_profile_hash_t *ph;
 	unsigned int i;
 
 	profile = search_dlg_profile( profile_name );
@@ -1341,7 +1537,7 @@ static void internal_rpc_profile_print_dlgs(rpc_t *rpc, void *c, str *profile_na
  * Wrapper around is_known_dlg().
  */
 
-static int w_is_known_dlg(struct sip_msg *msg) {
+static int w_is_known_dlg(sip_msg_t *msg) {
 	return	is_known_dlg(msg);
 }
 
@@ -1386,15 +1582,15 @@ static void rpc_print_dlg_ctx(rpc_t *rpc, void *c) {
 }
 static void rpc_end_dlg_entry_id(rpc_t *rpc, void *c) {
 	unsigned int h_entry, h_id;
-	struct dlg_cell * dlg = NULL;
+	dlg_cell_t * dlg = NULL;
 	str rpc_extra_hdrs = {NULL,0};
 
 	if (rpc->scan(c, "ddS", &h_entry, &h_id, &rpc_extra_hdrs) < 2) return;
 
-	dlg = lookup_dlg(h_entry, h_id);
+	dlg = dlg_lookup(h_entry, h_id);
 	if(dlg){
 		dlg_bye_all(dlg, (rpc_extra_hdrs.len>0)?&rpc_extra_hdrs:NULL);
-		unref_dlg(dlg, 1);
+		dlg_release(dlg);
 	}
 }
 static void rpc_profile_get_size(rpc_t *rpc, void *c) {

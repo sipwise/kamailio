@@ -29,6 +29,7 @@
  */
 
 
+#include "../../ut.h"
 #include "../../mem/mem.h"
 #include "../../mem/shm_mem.h"
 #include "../parser_f.h"
@@ -38,6 +39,9 @@
 
 #define USE_PKG_MEM 0
 #define USE_SHM_MEM 1
+
+#define HOLD_IP_STR "0.0.0.0"
+#define HOLD_IP_LEN 7
 
 /**
  * Creates and initialize a new sdp_info structure
@@ -367,6 +371,11 @@ static int parse_sdp_session(str *sdp_body, int session_num, str *cnt_disp, sdp_
 	int parse_payload_attr;
 	str fmtp_string;
 
+	/* hook the start and lenght of sdp body inside structure
+	 * - shorcut useful for multi-part bodies and sdp operations
+	 */
+	_sdp->text = *sdp_body;
+
 	/*
 	 * Parsing of SDP body.
 	 * Each session starts with v-line and each session may contain a few
@@ -524,7 +533,8 @@ static int parse_sdp_session(str *sdp_body, int session_num, str *cnt_disp, sdp_
 
 			if (parse_payload_attr && extract_ptime(&tmpstr1, &stream->ptime) == 0) {
 				a1p = stream->ptime.s + stream->ptime.len;
-			} else if (parse_payload_attr && extract_sendrecv_mode(&tmpstr1, &stream->sendrecv_mode) == 0) {
+			} else if (parse_payload_attr && extract_sendrecv_mode(&tmpstr1,
+					&stream->sendrecv_mode, &stream->is_on_hold) == 0) {
 				a1p = stream->sendrecv_mode.s + stream->sendrecv_mode.len;
 			} else if (parse_payload_attr && extract_rtpmap(&tmpstr1, &rtp_payload, &rtp_enc, &rtp_clock, &rtp_params) == 0) {
 				if (rtp_params.len != 0 && rtp_params.s != NULL) {
@@ -548,11 +558,26 @@ static int parse_sdp_session(str *sdp_body, int session_num, str *cnt_disp, sdp_
 				a1p = stream->max_size.s + stream->max_size.len;
 			} else if (extract_path(&tmpstr1, &stream->path) == 0) {
 				a1p = stream->path.s + stream->path.len;
-			/*} else { */
-			/*	LM_DBG("else: `%.*s'\n", tmpstr1.len, tmpstr1.s); */
+			} else {
+				/* unknown a= line, ignore -- jump over it */
+				LM_DBG("ignoring unknown type in a= line: `%.*s'\n", tmpstr1.len, tmpstr1.s);
+				a1p += 2;
 			}
 
-			a2p = find_next_sdp_line(a1p, m2p, 'a', m2p);
+			a2p = find_first_sdp_line(a1p, m2p, 'a', m2p);
+		}
+		/* Let's detect if the media is on hold by checking
+		 * the good old "0.0.0.0" connection address */
+		if (!stream->is_on_hold) {
+			if (stream->ip_addr.s && stream->ip_addr.len) {
+				if (stream->ip_addr.len == HOLD_IP_LEN &&
+					strncmp(stream->ip_addr.s, HOLD_IP_STR, HOLD_IP_LEN)==0)
+					stream->is_on_hold = 1;
+			} else if (session->ip_addr.s && session->ip_addr.len) {
+				if (session->ip_addr.len == HOLD_IP_LEN &&
+					strncmp(session->ip_addr.s, HOLD_IP_STR, HOLD_IP_LEN)==0)
+					stream->is_on_hold = 1;
+			}
 		}
 		++stream_num;
 	} /* Iterate medias/streams in session */
@@ -566,7 +591,7 @@ static int parse_mixed_content(str *mixed_body, str delimiter, sdp_info_t* _sdp)
 	char *d1p, *d2p;
 	char *ret, *end;
 	unsigned int mime;
-	str sdp_body, cnt_disp;
+	str cnt_disp;
 	int session_num;
 	struct hdr_field hf;
 
@@ -634,10 +659,11 @@ static int parse_mixed_content(str *mixed_body, str delimiter, sdp_info_t* _sdp)
 		} /* end of while */
 		/* and now we need to parse the content */
 		if (start_parsing) {
-			sdp_body.s = rest;
-			sdp_body.len = d2p-rest;
-			/* LM_DBG("we need to check session %d: <%.*s>\n", session_num, sdp_body.len, sdp_body.s); */
-			res = parse_sdp_session(&sdp_body, session_num, &cnt_disp, _sdp);
+			while (('\n' == *rest) || ('\r' == *rest) || ('\t' == *rest)|| (' ' == *rest)) rest++; /* Skip any whitespace */
+			_sdp->raw_sdp.s = rest;
+			_sdp->raw_sdp.len = d2p-rest;
+			/* LM_DBG("we need to check session %d: <%.*s>\n", session_num, _sdp.raw_sdp.len, _sdp.raw_sdp.s); */
+			res = parse_sdp_session(&_sdp->raw_sdp, session_num, &cnt_disp, _sdp);
 			if (res != 0) {
 				LM_DBG("free_sdp\n");
 				free_sdp((sdp_info_t**)(void*)&(_sdp));
@@ -650,10 +676,10 @@ static int parse_mixed_content(str *mixed_body, str delimiter, sdp_info_t* _sdp)
 }
 
 /**
- * Parse SDP.
+ * @brief Parse SIP SDP body and store in _m->body.
  *
- * returns 0 on success.
- * non zero on error.
+ * @param _m the SIP message structure
+ * @return 0 on success, < 0 on error and 1 if there is no message body
  */
 int parse_sdp(struct sip_msg* _m)
 {
@@ -696,6 +722,9 @@ int parse_sdp(struct sip_msg* _m)
 				LM_DBG("free_sdp\n");
 				free_sdp((sdp_info_t**)(void*)&_m->body);
 			}
+			/* The whole body is SDP */
+			((sdp_info_t*)_m->body)->raw_sdp.s = body.s;
+			((sdp_info_t*)_m->body)->raw_sdp.len = body.len;
 			return res;
 			break;
 		default:

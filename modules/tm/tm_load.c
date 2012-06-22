@@ -84,6 +84,7 @@ int load_tm( struct tm_binds *tmb)
 	}*/
 
 	/* non-cfg API */
+	tmb->t_replicate = t_replicate_uri;
 	tmb->register_tmcb =register_tmcb;
 	tmb->t_reply = w_t_reply_wrp;
 	tmb->t_reply_with_body = t_reply_with_body;
@@ -144,4 +145,23 @@ int load_tm( struct tm_binds *tmb)
 	tmb->tm_ctx_get = tm_ctx_get;
 #endif
 	return 1;
+}
+
+int load_xtm(tm_xapi_t *xapi)
+{
+	if(xapi==NULL)
+	{
+		LM_ERR("invalid parameter\n");
+		return -1;
+	}
+
+	memset(xapi, 0, sizeof(tm_xapi_t));
+
+	xapi->t_on_failure    = t_on_negative;
+	xapi->t_on_branch     = t_on_branch;
+	xapi->t_on_reply      = t_on_reply;
+	xapi->t_check_trans   = t_check_trans;
+	xapi->t_is_canceled   = t_is_canceled;
+
+	return 0;
 }

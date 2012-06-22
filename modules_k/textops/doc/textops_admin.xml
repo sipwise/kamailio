@@ -70,7 +70,7 @@ From: medabeda
 
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">search(re)</function>
@@ -122,6 +122,45 @@ if ( search("[Ss][Ii][Pp]") ) { /*....*/ };
 		<programlisting format="linespecific">
 ...
 if ( search_body("[Ss][Ii][Pp]") ) { /*....*/ };
+...
+</programlisting>
+		</example>
+	</section>
+
+		<section>
+		<title>
+		<function moreinfo="none">search_hf(hf, re, flags)</function>
+		</title>
+		<para>
+		Searches for the re in the body of a header field.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>hf</emphasis> - header field name.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>re</emphasis> - regular expression.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>flags</emphasis> - control flags - it
+				has to be one of: a - all headers matching the
+				name; f - only first header matching the name;
+				l - only the last header matching the name.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE, 
+		FAILURE_ROUTE, BRANCH_ROUTE.
+		</para>
+		<example>
+		<title><function>search_body</function> usage</title>
+		<programlisting format="linespecific">
+...
+if ( search_hf("From", ":test@", "a") ) { /*....*/ };
 ...
 </programlisting>
 		</example>
@@ -529,6 +568,46 @@ if (subst_user('/(.*)3642$/$avp(user_prefix)\13642/')){$
 ...
 if ( subst_body('/^o=(.*) /o=$fU /') ) {};
 
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title>
+		<function moreinfo="none">subst_hf(hf, subexp, flags)</function>
+		</title>
+		<para>
+		Perl-like substitutions in the body of a header field.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>hf</emphasis> - header field name.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>subexp</emphasis> - substitution expression
+				in the same format as of the 'subst' function parameter.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>flags</emphasis> - control flags - it
+				has to be one of: a - all headers matching the
+				name; f - only first header matching the name;
+				l - only the last header matching the name.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE, 
+		FAILURE_ROUTE, BRANCH_ROUTE.
+		</para>
+		<example>
+		<title><function>search_body</function> usage</title>
+		<programlisting format="linespecific">
+...
+if ( subst_hf("From", "/:test@/:best@/", "a") ) { /*....*/ };
 ...
 </programlisting>
 		</example>
@@ -968,6 +1047,62 @@ append_time();
 
 	<section>
 		<title>
+		<function moreinfo="none">append_time_to_request()</function>
+		</title>
+		<para>
+		Adds a time header to the request. Header format is: 
+		<quote>Date: %a, %d %b %Y %H:%M:%S GMT</quote>, with the legend:
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>%a</emphasis> abbreviated week of day name (locale)
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>%d</emphasis> day of month as decimal number
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>%b</emphasis> abbreviated month name (locale)
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>%Y</emphasis> year with century
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>%H</emphasis> hour
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>%M</emphasis> minutes
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>%S</emphasis> seconds
+			</para>
+		</listitem>
+		</itemizedlist>
+		</para>
+		<para>
+		Return true if a header was succesfully appended.
+		</para>
+		<para>
+		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
+		FAILURE_ROUTE, BRANCH_ROUTE.
+		</para>
+		<example>
+		<title><function>append_time_to_request</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(!is_present_hf("Date"))
+    append_time_to_request();
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title>
 		<function moreinfo="none">is_method(name)</function>
 		</title>
 		<para>
@@ -1024,7 +1159,9 @@ if(is_method("OPTION|UPDATE"))
 		<function moreinfo="none">remove_hf(hname)</function>
 		</title>
 		<para>
-		Remove from message all headers with name <quote>hname</quote>
+		Remove from message all headers with name <quote>hname</quote>. 
+		Header matching is case-insensitive. Matches and removes also
+		the compact header forms.
 		</para>
 		<para>
 		Returns true if at least one header is found and removed.
@@ -1048,6 +1185,10 @@ if(remove_hf("User-Agent"))
 {
     # User Agent header removed
 }
+# compact form: remove "Contact" or "m" header
+remove_hf("Contact")
+# compact form: remove "Contact" or "m" header
+remove_hf("m")
 ...
 </programlisting>
 		</example>
@@ -1131,6 +1272,31 @@ if(has_body("application/sdp"))
 
 	<section>
 		<title>
+		<function moreinfo="none">is_audio_on_hold()</function>
+		</title>
+		<para>
+		The function returns <emphasis>true</emphasis> if the SIP message
+		has a body attached and at least one audio stream in on hold.
+		</para>
+		<para>
+		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE, 
+		FAILURE_ROUTE and BRANCH_ROUTE.
+		</para>
+		<example>
+		<title><function>is_audio_on_hold</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(is_audio_on_hold())
+{
+    # do interesting stuff here
+}
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title>
 		<function moreinfo="none">is_privacy(privacy_type)</function>
 		</title>
 		<para>
@@ -1155,6 +1321,30 @@ if(is_privacy("id"))
 }
 ...
 </programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title>
+			<function moreinfo="none">in_list(subject, list, separator)</function>
+		</title>
+		<para>
+		Function checks if subject string is found in list string where list items are separated by separator string.  Subject and list strings may contain pseudo variables.  Separator string needs to be one character long.  Returns 1 if subject is found and -1 otherwise.
+    	        </para>
+		<para>
+		Function can be used from all kinds of routes.
+		</para>
+		<example>
+			<title><function>in_list()</function> usage</title>
+			<programlisting format="linespecific">
+...
+$var(subject) = "fi";
+$var(list) = "dk,fi,no,se";
+if (in_list("$var(subject)", "$var(list)", ",") {
+    xlog("L_INFO", "subject is found in list\n");
+}
+...
+			</programlisting>
 		</example>
 	</section>
 

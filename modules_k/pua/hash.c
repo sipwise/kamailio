@@ -30,11 +30,12 @@
 #include "../../mem/mem.h"
 #include "../../mem/shm_mem.h"
 #include "../../dprint.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../../parser/msg_parser.h"
 #include "../../parser/parse_from.h"
 #include "hash.h" 
 #include "pua.h"
+#include "pua_db.h"
 #include "send_publish.h"
 
 void print_ua_pres(ua_pres_t* p)
@@ -62,8 +63,14 @@ htable_t* new_htable(void)
 {
 	htable_t* H= NULL;
 	int i= 0, j;
-
 	H= (htable_t*)shm_malloc(sizeof(htable_t));
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		LM_ERR( "new_htable shouldn't be called in PUA_DB_ONLY mode\n" );
+		return(NULL);
+	}
+
 	if(H== NULL)
 	{
 		LM_ERR("No more memory\n");
@@ -116,8 +123,14 @@ error:
 ua_pres_t* search_htable(ua_pres_t* pres, unsigned int hash_code)
 {
 	ua_pres_t* p= NULL,* L= NULL;
-
 	L= HashT->p_records[hash_code].entity;
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		LM_ERR( "search_htable shouldn't be called in PUA_DB_ONLY mode\n" );
+		return(NULL);
+	}
+
 	LM_DBG("core_hash= %u\n", hash_code);
 
 	for(p= L->next; p; p=p->next)
@@ -140,6 +153,9 @@ ua_pres_t* search_htable(ua_pres_t* pres, unsigned int hash_code)
 						(strncmp(p->watcher_uri->s, pres->watcher_uri->s,
 								  pres->watcher_uri->len )==0))
 					{
+						if (check_remote_contact == 0)
+							break;
+
 						if(pres->remote_contact.s)
 							if(pres->remote_contact.len== p->remote_contact.len &&
 								strncmp(pres->remote_contact.s, p->remote_contact.s,
@@ -176,6 +192,13 @@ ua_pres_t* search_htable(ua_pres_t* pres, unsigned int hash_code)
 void update_htable(ua_pres_t* p, time_t desired_expires, int expires,
 		str* etag, unsigned int hash_code, str* contact)
 {
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		LM_ERR( "update_htable shouldn't be called in PUA_DB_ONLY mode\n" );
+		return;
+	}
+
 	if(etag)
 	{	
 		shm_free(p->etag.s);
@@ -191,7 +214,7 @@ void update_htable(ua_pres_t* p, time_t desired_expires, int expires,
 		p->db_flag= UPDATEDB_FLAG;
 
 	if(p->watcher_uri)
-		p->cseq ++;
+		p->cseq++;
 
 	if(contact)
 	{
@@ -212,57 +235,67 @@ void update_htable(ua_pres_t* p, time_t desired_expires, int expires,
 	}
 }
 /* insert in front; so when searching the most recent result is returned*/
-void insert_htable(ua_pres_t* presentity)
+void _insert_htable(ua_pres_t* presentity, unsigned int hash_code)
 {
 	ua_pres_t* p= NULL;
-	unsigned int hash_code;
 
-	hash_code= core_hash(presentity->pres_uri,presentity->watcher_uri, 
-			HASH_SIZE);
-	
-	lock_get(&HashT->p_records[hash_code].lock);
-
-/*	
- *	useless since always checking before calling insert
-	if(get_dialog(presentity, hash_code)!= NULL )
+	if (dbmode==PUA_DB_ONLY)
 	{
-		LM_DBG("Dialog already found- do not insert\n");
-		return; 
+		LM_ERR( "insert_htable shouldn't be called in PUA_DB_ONLY mode\n" );
+		return;
 	}
-*/	
+
 	p= HashT->p_records[hash_code].entity;
 
 	presentity->db_flag= INSERTDB_FLAG;
 	presentity->next= p->next;
 	
 	p->next= presentity;
-
-	lock_release(&HashT->p_records[hash_code].lock);
-
 }
 
+void insert_htable(ua_pres_t* presentity)
+{
+	unsigned int hash_code;
+
+	hash_code= core_hash(presentity->pres_uri,presentity->watcher_uri, HASH_SIZE);
+	lock_get(&HashT->p_records[hash_code].lock);
+
+	_insert_htable(presentity, hash_code);
+
+	lock_release(&HashT->p_records[hash_code].lock);
+}
+
+/* This function used to perform a search to find the hash table
+   entry that matches the presentity it is passed.  However,
+   everywhere it is used it is passed a pointer to the correct
+   hash table entry already...  so let's just delete that */
 void delete_htable(ua_pres_t* presentity, unsigned int hash_code)
 { 
-	ua_pres_t* p= NULL, *q= NULL;
+	ua_pres_t *q = NULL;
 
-	p= search_htable(presentity, hash_code);
-	if(p== NULL)
+	if (dbmode==PUA_DB_ONLY)
+	{
+		LM_ERR( "delete_htable shouldn't be called in PUA_DB_ONLY mode\n" );
+		return;
+	}
+
+	if (presentity == NULL)
 		return;
 
-	q=HashT->p_records[hash_code].entity;
+	q = HashT->p_records[hash_code].entity;
 
-	while(q->next!=p)
-		q= q->next;
-	q->next=p->next;
+	while (q->next != presentity)
+		q = q->next;
+	q->next = presentity->next;
 	
-	if(p->etag.s)
-		shm_free(p->etag.s);
+	if(presentity->etag.s)
+		shm_free(presentity->etag.s);
 	else
-		if(p->remote_contact.s)
-			shm_free(p->remote_contact.s);
+		if(presentity->remote_contact.s)
+			shm_free(presentity->remote_contact.s);
 
-	shm_free(p);
-	p= NULL;
+	shm_free(presentity);
+	presentity = NULL;
 
 }
 	
@@ -270,6 +303,12 @@ void destroy_htable(void)
 {
 	ua_pres_t* p= NULL,*q= NULL;
 	int i;
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		LM_ERR( "destroy_htable shouldn't be called in PUA_DB_ONLY mode\n" );
+		return;
+	}
 
 	for(i=0; i<HASH_SIZE; i++)
 	{	
@@ -296,10 +335,41 @@ void destroy_htable(void)
   return;
 }
 
+int convert_temporary_dialog(ua_pres_t *dialog)
+{
+	ua_pres_t *temp_dialog;
+	unsigned int hash_code;
+
+	hash_code= core_hash(dialog->pres_uri,dialog->watcher_uri, HASH_SIZE); 
+	lock_get(&HashT->p_records[hash_code].lock);
+
+	temp_dialog = get_temporary_dialog(dialog, hash_code);
+	if (temp_dialog)
+		delete_htable(temp_dialog, hash_code);
+	else
+		return -1;
+
+	_insert_htable(dialog, hash_code);
+
+	lock_release(&HashT->p_records[hash_code].lock);
+
+	return 1;
+}
+
 /* must lock the record line before calling this function*/
 ua_pres_t* get_dialog(ua_pres_t* dialog, unsigned int hash_code)
 {
 	ua_pres_t* p= NULL, *L;
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		LM_ERR( "get_dialog shouldn't be called in PUA_DB_ONLY mode\n" );
+		return(NULL);
+	}
+
+	if (dialog->to_tag.len == 0 || dialog->to_tag.s == NULL)
+		return(NULL);
+
 	LM_DBG("core_hash= %u\n", hash_code);
 
 	L= HashT->p_records[hash_code].entity;
@@ -317,11 +387,8 @@ ua_pres_t* get_dialog(ua_pres_t* dialog, unsigned int hash_code)
 			LM_DBG("searched to_tag= %.*s\tfrom_tag= %.*s\n",
 				 p->to_tag.len, p->to_tag.s, p->from_tag.len, p->from_tag.s);
 	    
-			if((p->pres_uri->len== dialog->pres_uri->len) &&
-				(strncmp(p->pres_uri->s, dialog->pres_uri->s,p->pres_uri->len)==0)&&
-				(p->watcher_uri->len== dialog->watcher_uri->len) &&
- 	    		(strncmp(p->watcher_uri->s,dialog->watcher_uri->s,p->watcher_uri->len )==0)&&
-				(strncmp(p->call_id.s, dialog->call_id.s, p->call_id.len)== 0) &&
+			if( (strncmp(p->call_id.s, dialog->call_id.s, p->call_id.len)== 0) &&
+				p->to_tag.len > 0 &&
 				(strncmp(p->to_tag.s, dialog->to_tag.s, p->to_tag.len)== 0) &&
 				(strncmp(p->from_tag.s, dialog->from_tag.s, p->from_tag.len)== 0) )
 				{	
@@ -335,11 +402,44 @@ ua_pres_t* get_dialog(ua_pres_t* dialog, unsigned int hash_code)
 	return p;
 }
 
+/* must lock the record line before calling this function*/
+ua_pres_t* get_temporary_dialog(ua_pres_t* dialog, unsigned int hash_code)
+{
+	ua_pres_t* p= NULL, *L;
+	LM_DBG("core_hash= %u\n", hash_code);
+
+	L= HashT->p_records[hash_code].entity;
+	for(p= L->next; p; p=p->next)
+	{
+		LM_DBG("pres_uri= %.*s\twatcher_uri=%.*s\n\t"
+				"callid= %.*s\tfrom_tag= %.*s\n",
+			p->pres_uri->len, p->pres_uri->s, p->watcher_uri->len,
+			p->watcher_uri->s,p->call_id.len, p->call_id.s,
+			p->from_tag.len, p->from_tag.s);
+
+		if((p->call_id.len == dialog->call_id.len) &&
+			(strncmp(p->call_id.s, dialog->call_id.s, p->call_id.len)== 0) &&
+			(p->from_tag.len == dialog->from_tag.len) &&
+			(strncmp(p->from_tag.s, dialog->from_tag.s, p->from_tag.len)== 0))
+		{
+			LM_DBG("FOUND temporary dialog\n");
+			break;
+		}
+	}
+
+	return p;
+}
+
 int get_record_id(ua_pres_t* dialog, str** rec_id)
 {
 	unsigned int hash_code;
 	ua_pres_t* rec;
 	str* id;
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		return( get_record_id_puadb( dialog, rec_id ) );
+	}
 
 	*rec_id= NULL;
 
@@ -349,9 +449,14 @@ int get_record_id(ua_pres_t* dialog, str** rec_id)
 	rec= get_dialog(dialog, hash_code);
 	if(rec== NULL)
 	{
-		LM_DBG("Record not found\n");
-		lock_release(&HashT->p_records[hash_code].lock);
-		return 0;
+		LM_DBG("Record not found - looking for temporary\n");
+		rec = get_temporary_dialog(dialog, hash_code);
+		if (rec == NULL)
+		{
+			LM_DBG("Temporary record not found\n");
+			lock_release(&HashT->p_records[hash_code].lock);
+			return 0;
+		}
 	}
 	id= (str*)pkg_malloc(sizeof(str));
 	if(id== NULL)
@@ -380,18 +485,31 @@ int get_record_id(ua_pres_t* dialog, str** rec_id)
 	return 0;
 }
 
+/**
+ * return -1 on not found, 0 on established dialog, 1 on temporary dialog
+ */
 int is_dialog(ua_pres_t* dialog)
 {
 	int ret_code= 0;
 	unsigned int hash_code;
-	
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		return( is_dialog_puadb(dialog) );
+	}	
+
 	hash_code= core_hash(dialog->pres_uri, dialog->watcher_uri, HASH_SIZE);
 	lock_get(&HashT->p_records[hash_code].lock);
 
-	if(get_dialog(dialog, hash_code)== NULL)
-		ret_code= -1;
-	else
+	if(get_dialog(dialog, hash_code)==NULL)
+	{
+		if(get_temporary_dialog(dialog, hash_code)==NULL)
+			ret_code= -1;
+		else
+			ret_code= 1;
+	} else {
 		ret_code= 0;
+	}
 	lock_release(&HashT->p_records[hash_code].lock);
 	
 	return ret_code;
@@ -402,7 +520,7 @@ int update_contact(struct sip_msg* msg, char* str1, char* str2)
 {
 	ua_pres_t* p, hentity;
 	str contact;
-	struct to_body *pto= NULL, TO, *pfrom = NULL;
+	struct to_body *pto = NULL, TO = {0}, *pfrom = NULL;
 	unsigned int hash_code;
 
 	if ( parse_headers(msg,HDR_EOH_F, 0)==-1 )
@@ -453,20 +571,19 @@ int update_contact(struct sip_msg* msg, char* str1, char* str2)
 	}
 	else
 	{
-		memset( &TO , 0, sizeof(TO) );
 		parse_to(msg->to->body.s,msg->to->body.s +
 			msg->to->body.len + 1, &TO);
 		if(TO.uri.len <= 0) 
 		{
 			LM_DBG("'To' header NOT parsed\n");
-			return -1;
+			goto error;
 		}
 		pto = &TO;
 	}			
 	if( pto->tag_value.s ==NULL || pto->tag_value.len == 0)
 	{
 		LM_ERR("no from tag value present\n");
-		return -1;
+		goto error;
 	}
 	hentity.watcher_uri= &pto->uri;
 	hentity.pres_uri= &pfrom->uri; 
@@ -474,16 +591,24 @@ int update_contact(struct sip_msg* msg, char* str1, char* str2)
 	hentity.to_tag= pto->tag_value;
 	hentity.from_tag= pfrom->tag_value;
 	
-	hash_code= core_hash(hentity.pres_uri,hentity.watcher_uri,
-				HASH_SIZE);
 
 	/* extract the contact */
 	if(msg->contact== NULL || msg->contact->body.s== NULL)
 	{
 		LM_ERR("no contact header found in 200 OK reply");
-		return -1;
+		goto error;
 	}
 	contact= msg->contact->body;
+
+	if (dbmode==PUA_DB_ONLY)
+	{
+		update_contact_puadb(&hentity, &contact );
+		free_to_params(&TO);
+		return(1);
+	}
+
+	hash_code= core_hash(hentity.pres_uri,hentity.watcher_uri,
+				HASH_SIZE);
 
 	lock_get(&HashT->p_records[hash_code].lock);
 
@@ -492,7 +617,7 @@ int update_contact(struct sip_msg* msg, char* str1, char* str2)
 	{
 		lock_release(&HashT->p_records[hash_code].lock);
 		LM_ERR("no record for the dialog found in hash table\n");
-		return -1;
+		goto error;
 	}
 
 	shm_free(p->remote_contact.s);
@@ -507,7 +632,7 @@ int update_contact(struct sip_msg* msg, char* str1, char* str2)
 		{
 			LM_ERR("no more shared memory\n");
 			lock_release(&HashT->p_records[hash_code].lock);
-			return -1;
+			goto error;
 		}
 		memcpy(p->remote_contact.s, contact.s, contact.len);
 		p->remote_contact.len= contact.len;
@@ -515,7 +640,59 @@ int update_contact(struct sip_msg* msg, char* str1, char* str2)
 
 	lock_release(&HashT->p_records[hash_code].lock);
 
+	free_to_params(&TO);
 	return 1;
 
+error:
+	free_to_params(&TO);
+	return -1;
 }
 
+list_entry_t *get_subs_list(str *did)
+{
+	int i;
+	str *tmp_str;
+	list_entry_t *list = NULL;
+
+	if (dbmode==PUA_DB_ONLY)
+		return get_subs_list_puadb(did);
+
+	for (i = 0; i < HASH_SIZE; i++)
+	{
+		ua_pres_t *dialog;
+
+		lock_get(&HashT->p_records[i].lock);
+		dialog = HashT->p_records[i].entity;
+		while (dialog != NULL)
+		{
+			if (dialog->id.s != NULL && dialog->id.len > 0 &&
+				strncmp(dialog->id.s, did->s, did->len) == 0 &&
+				dialog->pres_uri != NULL && dialog->pres_uri->s != NULL &&
+				dialog->pres_uri->len > 0)
+			{
+				if ((tmp_str = (str *)pkg_malloc(sizeof(str))) == NULL)
+				{
+					LM_ERR("out of private memory\n");
+					lock_release(&HashT->p_records[i].lock);
+					goto done;
+				}
+				if ((tmp_str->s = (char *)pkg_malloc(sizeof(char) * dialog->pres_uri->len + 1)) == NULL)
+				{
+					pkg_free(tmp_str);
+					LM_ERR("out of private memory\n");
+					lock_release(&HashT->p_records[i].lock);
+					goto done;
+				}
+				memcpy(tmp_str->s, dialog->pres_uri->s, dialog->pres_uri->len);
+				tmp_str->len = dialog->pres_uri->len;
+				tmp_str->s[tmp_str->len] = '\0';
+
+				list = list_insert(tmp_str, list, NULL);
+			}
+			dialog = dialog->next;
+		}
+		lock_release(&HashT->p_records[i].lock);
+	}
+done:
+	return list;
+}

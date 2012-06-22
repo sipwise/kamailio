@@ -119,8 +119,14 @@ struct cfg_group_core default_core_cfg = {
 	-1,  /**< udp4_raw_ttl (auto detect by default) */
 	0,  /*!< force_rport */
 	L_DBG, /*!< memlog */
-	3 /*!< mem_summary -flags: 0 off, 1 pkg_status, 2 shm_status,
-		4 pkg_sums, 8 shm_sums */
+	3, /*!< mem_summary -flags: 0 off, 1 pkg_status, 2 shm_status,
+		4 pkg_sums, 8 shm_sums, 16 short_status */
+	0, /*!< mem_safety - 0 disabled */
+	0, /*!< mem_join - 0 disabled */
+	L_ERR, /*!< corelog */
+	L_ERR, /*!< latency log */
+	0, /*!< latency limit db */
+	0 /*!< latency limit action */
 };
 
 void	*core_cfg = &default_core_cfg;
@@ -300,12 +306,25 @@ cfg_def_t core_cfg_def[] = {
 		"force rport for all the received messages" },
 	{"memlog",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
 		"log level for memory status/summary information"},
-	{"mem_summary",	CFG_VAR_INT|CFG_ATOMIC,	0, 15, 0, 0,
+	{"mem_summary",	CFG_VAR_INT|CFG_ATOMIC,	0, 31, 0, 0,
 		"memory debugging information displayed on exit (flags): "
 		" 0 - off,"
 		" 1 - dump all the pkg used blocks (status),"
 		" 2 - dump all the shm used blocks (status),"
 		" 4 - summary of pkg used blocks,"
-		" 8 - summary of shm used blocks" },
+		" 8 - summary of shm used blocks,"
+		" 16 - short status instead of dump" },
+	{"mem_safety",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
+		"safety level for memory operations"},
+	{"mem_join",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
+		"join free memory fragments"},
+	{"corelog",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
+		"log level for non-critical core error messages"},
+	{"latency_log",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
+		"log level for latency limits alert messages"},
+	{"latency_limit_db",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
+		"limit is ms for alerting on time consuming db commands"},
+	{"latency_limit_action",		CFG_VAR_INT|CFG_ATOMIC,	0, 0, 0, 0,
+		"limit is ms for alerting on time consuming config actions"},
 	{0, 0, 0, 0, 0, 0}
 };

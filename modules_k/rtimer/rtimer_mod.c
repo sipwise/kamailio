@@ -40,6 +40,7 @@
 #include "../../timer_proc.h"
 #include "../../script_cb.h"
 #include "../../parser/parse_param.h"
+#include "../../lib/kcore/faked_msg.h"
 
 
 MODULE_VERSION
@@ -53,10 +54,13 @@ typedef struct _stm_route {
 typedef struct _stm_timer {
 	str name;
 	unsigned int mode;
+	unsigned int flags;
 	unsigned int interval;
 	stm_route_t *rt;
 	struct _stm_timer *next;
 } stm_timer_t;
+
+#define RTIMER_INTERVAL_USEC	(1<<0)
 
 stm_timer_t *_stm_list = NULL;
 
@@ -93,11 +97,6 @@ struct module_exports exports= {
 };
 
 
-#define STM_SIP_MSG "OPTIONS sip:you@kamailio.org SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1\r\nFrom: <you@kamailio.org>;tag=123\r\nTo: <you@kamailio.org>\r\nCall-ID: 123\r\nCSeq: 1 OPTIONS\r\nContent-Length: 0\r\n\r\n"
-#define STM_SIP_MSG_LEN (sizeof(STM_SIP_MSG)-1)
-static char _stm_sip_buf[STM_SIP_MSG_LEN+1];
-static struct sip_msg _stm_msg;
-static unsigned int _stm_msg_no = 1;
 /**
  * init module function
  */
@@ -107,6 +106,14 @@ static int mod_init(void)
 	if(_stm_list==NULL)
 		return 0;
 
+	/* init faked sip msg */
+	if(faked_msg_init()<0)
+	{
+		LM_ERR("failed to init timer local sip msg\n");
+		return -1;
+	}
+
+	/* register timers */
 	it = _stm_list;
 	while(it)
 	{
@@ -118,27 +125,9 @@ static int mod_init(void)
 				return -1;
 			}
 		} else {
-			register_dummy_timers(1);
+			register_basic_timers(1);
 		}
 		it = it->next;
-	}
-
-	/* init faked sip msg */
-	memcpy(_stm_sip_buf, STM_SIP_MSG, STM_SIP_MSG_LEN);
-	_stm_sip_buf[STM_SIP_MSG_LEN] = '\0';
-	
-	memset(&_stm_msg, 0, sizeof(struct sip_msg));
-
-	_stm_msg.buf=_stm_sip_buf;
-	_stm_msg.len=STM_SIP_MSG_LEN;
-
-	_stm_msg.set_global_address=default_global_address;
-	_stm_msg.set_global_port=default_global_port;
-
-	if (parse_msg(_stm_msg.buf, _stm_msg.len, &_stm_msg)!=0)
-	{
-		LM_ERR("parse_msg failed\n");
-		return -1;
 	}
 
 	return 0;
@@ -158,11 +147,21 @@ static int child_init(int rank)
 	{
 		if(it->mode!=0)
 		{
-			if(fork_dummy_timer(PROC_TIMER, "TIMER RT", 1 /*socks flag*/,
+			if(it->flags & RTIMER_INTERVAL_USEC)
+			{
+				if(fork_basic_utimer(PROC_TIMER, "RTIMER USEC EXEC", 1 /*socks flag*/,
+								stm_timer_exec, (void*)it, it->interval
+								/*usec*/)<0) {
+					LM_ERR("failed to start utimer routine as process\n");
+					return -1; /* error */
+				}
+			} else {
+				if(fork_basic_timer(PROC_TIMER, "RTIMER SEC EXEC", 1 /*socks flag*/,
 								stm_timer_exec, (void*)it, it->interval
 								/*sec*/)<0) {
-				LM_ERR("failed to register timer routine as process\n");
-				return -1; /* error */
+					LM_ERR("failed to start timer routine as process\n");
+					return -1; /* error */
+				}
 			}
 		}
 		it = it->next;
@@ -175,7 +174,7 @@ void stm_timer_exec(unsigned int ticks, void *param)
 {
 	stm_timer_t *it;
 	stm_route_t *rt;
-
+	sip_msg_t *fmsg;
 
 	if(param==NULL)
 		return;
@@ -185,14 +184,12 @@ void stm_timer_exec(unsigned int ticks, void *param)
 
 	for(rt=it->rt; rt; rt=rt->next)
 	{
-		/* update local parameters */
-		_stm_msg.id=_stm_msg_no++;
-		clear_branches();
-		if (exec_pre_script_cb(&_stm_msg, REQUEST_CB_TYPE)==0 )
+		fmsg = faked_msg_next();
+		if (exec_pre_script_cb(fmsg, REQUEST_CB_TYPE)==0 )
 			continue; /* drop the request */
 		set_route_type(REQUEST_ROUTE);
-		run_top_route(main_rt.rlist[rt->route], &_stm_msg, 0);
-		exec_post_script_cb(&_stm_msg, REQUEST_CB_TYPE);
+		run_top_route(main_rt.rlist[rt->route], fmsg, 0);
+		exec_post_script_cb(fmsg, REQUEST_CB_TYPE);
 	}
 }
 
@@ -221,9 +218,16 @@ int stm_t_param(modparam_t type, void *val)
 			tmp.name = pit->body;
 		} else if(pit->name.len==4
 				&& strncasecmp(pit->name.s, "mode", 4)==0) {
-			str2int(&pit->body, &tmp.mode);
+			if(tmp.mode==0)
+				str2int(&pit->body, &tmp.mode);
 		}  else if(pit->name.len==8
 				&& strncasecmp(pit->name.s, "interval", 8)==0) {
+			if(pit->body.s[pit->body.len-1]=='u'
+					|| pit->body.s[pit->body.len-1]=='U') {
+				pit->body.len--;
+				tmp.flags |= RTIMER_INTERVAL_USEC;
+				tmp.mode = 1;
+			}
 			str2int(&pit->body, &tmp.interval);
 		}
 	}

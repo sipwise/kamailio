@@ -205,7 +205,7 @@ if(is_present_hf("Authorization"))
 
 	</section>
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>htable</varname> (str)</title>
 		<para>
@@ -253,6 +253,25 @@ if(is_present_hf("Authorization"))
 			startup in hash table. If empty or missing, no data will be loaded.
 		</para>
 		</listitem>
+		<listitem>
+		<para>
+			<emphasis>dbmode</emphasis> - if set to 1, the content of hash
+			table is written to database table when the SIP server is stopped
+			(i.e., ensure persistency over restarts). Default value is 0 (no
+			write back to db table).
+		</para>
+		</listitem>
+		<listitem>
+		<para>
+			<emphasis>initval</emphasis> - the integer value to be returned
+			instead of $null when a requested key is not set.
+		</para>
+		</listitem>
+		<listitem>
+		<para>
+			<emphasis>updateexpire</emphasis> - if set to 1 (default), the time until expiration of an item is reset when that item is updated.  Certain uses of htable may dictate that updates should not reset the expiration timeout, however, in which case this attribute can be set to 0.
+		</para>
+		</listitem>
 		</itemizedlist>
 		<para>
 		<emphasis>
@@ -265,6 +284,7 @@ if(is_present_hf("Authorization"))
 ...
 modparam("htable", "htable", "a=&gt;size=4;autoexpire=7200;dbtable=htable_a;")
 modparam("htable", "htable", "b=&gt;size=5;")
+modparam("htable", "htable", "c=&gt;size=4;autoexpire=7200;initval=1;")
 ...
 </programlisting>
 		</example>
@@ -300,7 +320,7 @@ modparam("htable", "db_url", "mysql://openser:openserrw@localhost/openser")
 		</emphasis>
 		</para>
 		<example>
-		<title>Set <varname>key_name</varname> parameter</title>
+		<title>Set <varname>key_name_column</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
 modparam("htable", "key_name_column", "kname")
@@ -319,7 +339,7 @@ modparam("htable", "key_name_column", "kname")
 		</emphasis>
 		</para>
 		<example>
-		<title>Set <varname>key_name</varname> parameter</title>
+		<title>Set <varname>key_type_column</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
 modparam("htable", "key_type_column", "ktype")
@@ -338,10 +358,10 @@ modparam("htable", "key_type_column", "ktype")
 		</emphasis>
 		</para>
 		<example>
-		<title>Set <varname>value_type</varname> parameter</title>
+		<title>Set <varname>value_type_column</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("htable", "value_type", "vtype")
+modparam("htable", "value_type_column", "vtype")
 ...
 </programlisting>
 		</example>
@@ -357,10 +377,29 @@ modparam("htable", "value_type", "vtype")
 		</emphasis>
 		</para>
 		<example>
-		<title>Set <varname>key_value</varname> parameter</title>
+		<title>Set <varname>key_value_column</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("htable", "key_value", "kvalue")
+modparam("htable", "key_value_column", "kvalue")
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>expires_column</varname> (str)</title>
+		<para>
+			The name of the column containing expires type.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 'expires'.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>expires_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("htable", "expires", "expiry")
 ...
 </programlisting>
 		</example>
@@ -444,9 +483,30 @@ modparam("htable", "timer_mode", 1)
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>db_expires</varname> (integer)</title>
+		<para>
+			If set to 1, will load/save the expires values of the items in
+			hash table fromm/to database. It applies only to hash tables that
+			have auto-expires attribute defined.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>db_expires</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("htable", "db_expires", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">sht_print()</function>
@@ -520,13 +580,25 @@ sht_rm_value_re("ha=>.*");
 			<listitem><para>
 				<emphasis>$shtex(htable=>key)</emphasis>
 			</para></listitem>
+			<listitem><para>
+				<emphasis>$shtcn(htable=>key)</emphasis>
+			</para></listitem>
+			<listitem><para>
+				<emphasis>$shtcv(htable=>key)</emphasis>
+			</para></listitem>
+			<listitem><para>
+				<emphasis>$shtinc(htable=>key)</emphasis>
+			</para></listitem>
+			<listitem><para>
+				<emphasis>$shtval(htable=>key)</emphasis>
+			</para></listitem>
 		</itemizedlist>
 		<para>
 		Exported pseudo-variables are documented at &kamwikilink;.
 		</para>
 	</section>
 	<section>
-	<title>Exported MI Functions</title>
+	<title>MI Commands</title>
 	<section>
 		<title>
 		<function moreinfo="none">sht_reload</function>
@@ -548,7 +620,7 @@ sht_rm_value_re("ha=>.*");
 		_empty_line_
 		</programlisting>
     </section>
-	<section>
+    <section>
 		<title>
 		<function moreinfo="none">sht_dump</function>
 		</title>
@@ -563,10 +635,43 @@ sht_rm_value_re("ha=>.*");
  		<para>
 		MI FIFO Command Format:
 		</para>
-        <programlisting  format="linespecific">
+		<programlisting  format="linespecific">
 		:sht_dump:_reply_fifo_file_
 		_hash_table_name_
 		_empty_line_
+		</programlisting>
+    </section>
+    <section>
+		<title>
+		<function moreinfo="none">sht_delete</function>
+		</title>
+		<para>
+		Delete a key from a hash table via MI.
+		</para>
+		<para>
+		Name: <emphasis>sht_delete</emphasis>
+		</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para><emphasis>_hash_table_name: </emphasis>The table name to delete the key from</para></listitem>
+			<listitem><para><emphasis>_key_name: </emphasis>The key to delete from the htable</para></listitem>
+		</itemizedlist>
+
+ 		<para>
+		MI FIFO Command Format:
+		</para>
+		<programlisting  format="linespecific">
+		:sht_delete:_reply_fifo_file_
+		_hash_table_name_
+		_key_name_
+		_empty_line_
+		</programlisting>
+
+ 		<para>
+		Example (note the quoting when executing it via FIFO):
+		</para>
+		<programlisting  format="linespecific">
+		kamctl fifo sht_delete auth '"user@example.org::last_auth"'
 		</programlisting>
     </section>
     </section>

@@ -16,7 +16,9 @@
 	<section>
 	<title>Overview</title>
 	<para>
-		Offer a possibility to store incoming/outgoing SIP messages in database.
+		Offer a possibility to store incoming/outgoing SIP messages in database
+		and/or duplicate to the capturing server (homer encapsulation protocol 
+		or plain sip mode)
 	</para>
 	<para>
 	There are two ways of storing information.
@@ -86,7 +88,7 @@
 	</section>
 	</section>
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>db_url</varname> (str)</title>
 		<para>
@@ -233,6 +235,31 @@ modparam("siptrace", "duplicate_uri", "sip:10.1.1.1:5888")
 		</example>
 	</section>
 	<section>
+		<title><varname>trace_to_database</varname> (integer)</title>
+		<para>
+		Parameter to enable/disable inserts to the Database from this
+		Kamailio. 
+		</para>
+		<para>
+		In case we only want to send the SIP-Messages to the 
+		duplicate_uri and not store the information to the local 
+		database we can set this to "0".  
+		</para>
+		<para>
+		<emphasis>
+			Default value is "1".
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>trace_to_database</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("siptrace", "trace_to_database", 0)
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
 		<title><varname>trace_local_ip</varname> (str)</title>
 		<para>
 		The address to be used in fromip field for local generated
@@ -280,10 +307,154 @@ modparam("siptrace", "trace_sl_acks", 0)
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>xheaders_write</varname> (integer)</title>
+		<para>
+		Parameter to enable/disable writing of x-headers.
+		</para>
+		<para>
+		Stores fromip, toip, method and direction in X-Siptrace-* headers.
+		This allows to transmit them to a second kamailio server
+		using the duplicate_uri feature.
+		Because the headers are added after the data is written to the database,
+		the headers only show up in the packets sent by duplicate_uri.
+		</para>
+		<para>
+		See <varname>xheaders_read</varname>, it should be used on the receiving
+		side.
+		</para>
+		<para>
+		Note: The headers are first read, then written. This allows to relay
+		the information over more then two kamailio servers by setting both
+		<varname>xheaders_write</varname> and <varname>xheaders_read</varname>
+		to "1" on the servers in the middle.
+		</para>
+		<para>
+		<emphasis>
+			Default value is "0".
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xheaders_write</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("siptrace", "xheaders_write", 0)
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>xheaders_read</varname> (integer)</title>
+		<para>
+		Parameter to enable/disable reading of x-headers.
+		</para>
+		<para>
+		Reads and removes the X-Siptrace-* headers. Packets not containing the
+		headers are neither stored to the database nor relayed (duplicate_uri).
+		See <varname>xheaders_write</varname> for further information.
+		</para>
+		<para>
+		<emphasis>
+			Default value is "0".
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xheaders_read</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("siptrace", "xheaders_read", 0)
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+                <title><varname>hep_mode_on</varname> (integer)</title>
+                <para>
+                Parameter to enable/disable homer encapsulate mode (on(1)/off(0))
+                </para>
+                <para>
+                <emphasis>
+                        Default value is "0".
+                </emphasis>
+                </para>
+                <example>
+                <title>Set <varname>hep_mode_on</varname> parameter</title>
+                <programlisting format="linespecific">
+...
+modparam("siptrace", "hep_mode_on", 1)
+...
+</programlisting>
+                </example>
+        </section>
+        
+        <section>
+                <title><varname>hep_version</varname> (integer)</title>
+                <para>
+                The parameter indicate the version of HEP protocol.
+                Can be 1 or 2. In HEPv2 the timestamp and capture agent ID
+                will
+                be included to HEP header.
+                </para>
+                <para>
+                <emphasis>
+                        Default value is "1".
+                </emphasis>
+                </para>
+                <example>
+                <title>Set <varname>hep_version</varname> parameter</title>
+                <programlisting format="linespecific">
+...
+modparam("siptrace", "hep_version", 2)
+...
+</programlisting>
+                </example>
+        </section>
+        <section>
+                <title><varname>hep_capture_id</varname> (integer)</title>
+                <para>
+                The parameter indicate the capture agent ID for HEPv2
+                protocol.
+                Limitation: 16-bit integer.
+                </para>
+                <para>
+                <emphasis>
+                        Default value is "1".
+                </emphasis>
+                </para>
+                <example>
+                <title>Set <varname>hep_capture_id</varname>
+                parameter</title>
+                <programlisting format="linespecific">
+...
+modparam("siptrace", "hep_capture_id", 234)
+...
+</programlisting>
+                </example>
+        </section>
+        <section>
+                <title><varname>trace_delayed</varname> (integer)</title>
+                <para>
+				Use 'INSERT DELAYED' to store to database when it is available,
+				instead of 'INSERT'.
+                </para>
+                <para>
+                Default value is <emphasis>0 (off)</emphasis>.
+                </para>
+                <example>
+                <title>Set <varname>trace_delayed</varname>
+                parameter</title>
+                <programlisting format="linespecific">
+...
+modparam("siptrace", "trace_delayed", 1)
+...
+</programlisting>
+                </example>
+        </section>
+
 	</section>
 	
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">sip_trace()</function>
@@ -309,7 +480,7 @@ sip_trace();
 	</section>
 
     <section>
-	<title>Exported MI Functions</title>
+	<title>MI Commands</title>
 	<section>
 		<title>
 		<function moreinfo="none">sip_trace</function>

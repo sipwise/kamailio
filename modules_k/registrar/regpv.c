@@ -428,7 +428,7 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 		return -1;
 	}
 
-	if (extract_aor(&u, &aor) < 0) {
+	if (extract_aor(&u, &aor, NULL) < 0) {
 		LM_ERR("failed to extract Address Of Record\n");
 		return -1;
 	}
@@ -442,7 +442,7 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 	}
 	memcpy(rpp->aor.s, aor.s, aor.len);
 	rpp->aor.len = aor.len;
-	rpp->domain = *((udomain_t*)table)->name;
+	rpp->domain = *((udomain_head_t*)table)->name;
 	rpp->flags = 1;
 
 	/* copy contacts */
@@ -466,6 +466,7 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 		if(c0==NULL)
 		{
 			LM_ERR("no more pkg\n");
+			ul.release_urecord(r);
 			ul.unlock_udomain((udomain_t*)table, &aor);
 			goto error;
 		}
@@ -517,6 +518,7 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 		ptr0 = c0;
 		ptr = ptr->next;
 	}
+	ul.release_urecord(r);
 	ul.unlock_udomain((udomain_t*)table, &aor);
 	rpp->nrc = n;
 	LM_DBG("fetched <%d> contacts for <%.*s> in [%.*s]\n",

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005 iptelorg GmbH
  * Written by Jan Janak <jan@iptel.org>
  *
@@ -24,8 +22,10 @@
  * with this program; if not, write to the Free Software Foundation, Inc., 59
  * Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
-
-#define _XOPEN_SOURCE 4           /* strptime */
+/*This define breaks on Solaris OS */
+#ifndef __OS_solaris
+	#define _XOPEN_SOURCE 4           /* strptime */
+#endif
 #define _XOPEN_SOURCE_EXTENDED 1  /* solaris */
 #define _SVID_SOURCE 1            /* timegm */
 
@@ -149,8 +149,12 @@
 
 MODULE_VERSION
 
+#if defined (__OS_darwin) || defined (__OS_freebsd)
+/* redeclaration of functions from stdio.h throws errors */
+#else
 int snprintf(char *str, size_t size, const char *format, ...);
 int vsnprintf(char *str, size_t size, const char *format, va_list ap);
+#endif
 
 static int process_xmlrpc(sip_msg_t* msg);
 static int dispatch_rpc(sip_msg_t* msg, char* s1, char* s2);
@@ -258,7 +262,6 @@ static str member_suffix  = STR_STATIC_INIT("</member>");
 static str name_prefix    = STR_STATIC_INIT("<name>");
 static str name_suffix    = STR_STATIC_INIT("</name>");
 
-
 /** Garbage collection data structure.
  *
  * This is the data structure used by the garbage collector in this module.
@@ -354,6 +357,8 @@ struct rpc_struct {
 	xmlDocPtr doc;                  /**< XML-RPC document */
 	int offset;                     /**< Offset in the reply where the
 									   structure should be printed */
+	struct rpc_struct* nnext;	/**< nested structure support - a recursive list of nested structrures */
+	struct rpc_struct* parent;	/**< access to parent structure - used for flattening structure before reply */
 	struct rpc_struct* next;
 };
 
@@ -553,7 +558,6 @@ static int add_xmlrpc_reply(struct xmlrpc_reply* reply, str* text)
 	return 0;
 }
 
-
 /** Adds arbitrary text to the XML-RPC reply being constructed, the text will
  * be inserted at a specified offset within the XML-RPC reply.
  *
@@ -595,7 +599,7 @@ static int add_xmlrpc_reply_offset(struct xmlrpc_reply* reply, unsigned int offs
 }
 
 
-/** Returns the current lenght of the XML-RPC reply body.
+/** Returns the current length of the XML-RPC reply body.
  *
  * @param reply The XML-RPC reply being constructed
  * @return Number of bytes of the XML-RPC reply body.
@@ -642,6 +646,15 @@ static int init_xmlrpc_reply(struct xmlrpc_reply* reply)
 	return 0;
 }
 
+/** Clear the XML-RPC reply code and sets it back to a success reply.
+ *
+ * @param reply XML-RPC reply structure to be cleared.
+ */
+static void clear_xmlrpc_reply(struct xmlrpc_reply* reply)
+{
+	reply->code = 200;
+	reply->reason = "OK";
+}
 
 
 /* if this a delayed reply context, and it's never been use before, fix it */
@@ -795,6 +808,20 @@ static int send_reply(sip_msg_t* msg, str* body)
 	return 0;
 }
 
+static int flatten_nests(struct rpc_struct* st, struct xmlrpc_reply* reply) {
+	if (!st)
+		return 1;
+
+	if (!st->nnext) {
+		if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
+		if (add_xmlrpc_reply_offset(&st->parent->struct_out, st->offset, &st->struct_out.body) < 0) return -1;
+	} else {
+		flatten_nests(st->nnext, reply);
+		if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
+		if (add_xmlrpc_reply_offset(&st->parent->struct_out, st->offset, &st->struct_out.body) < 0) return -1;
+	}
+	return 1;
+}
 
 static int print_structures(struct xmlrpc_reply* reply, 
 							struct rpc_struct* st)
@@ -802,8 +829,8 @@ static int print_structures(struct xmlrpc_reply* reply,
 	while(st) {
 		     /* Close the structure first */
 		if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
-		if (add_xmlrpc_reply_offset(reply, st->offset, 
-									&st->struct_out.body) < 0) return -1;
+		if (flatten_nests(st->nnext, &st->struct_out) < 0) return -1;
+		if (add_xmlrpc_reply_offset(reply, st->offset, &st->struct_out.body) < 0) return -1;
 		st = st->next;
 	}
 	return 0;
@@ -1018,7 +1045,7 @@ static int print_value(struct xmlrpc_reply* res,
 
 	default:
 		set_fault(err_reply, 500, "Bug In SER (Invalid formatting character)");
-		ERR("Invalid formatting character\n");
+		ERR("Invalid formatting character [%c]\n", fmt);
 		goto err;
 	}
 
@@ -1317,9 +1344,10 @@ static int get_double(double* val, struct xmlrpc_reply* reply,
  * @param doc A pointer to the XML-RPC request document.
  * @param value A pointer to the element containing the parameter to be 
  *              converted within the document.
- * @param flags : GET_X_AUTOCONV - try autoconverting
- *                GET_X_LFLF2CRLF - replace double '\n' with `\r\n'
- *                GET_X_NOREPLY - do not reply
+ * @param flags 
+ *              - GET_X_AUTOCONV - try autoconverting
+ *              - GET_X_LFLF2CRLF - replace double '\\n' with `\\r\\n'
+ *              - GET_X_NOREPLY - do not reply
  * @return <0 on error, 0 on success
  */
 static int get_string(char** val, struct xmlrpc_reply* reply, 
@@ -1439,7 +1467,6 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 {
 	int read;
-	int fmt_len;
 	int* int_ptr;
 	char** char_ptr;
 	str* str_ptr;
@@ -1453,7 +1480,9 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 	va_list ap;
 
 	reply = &ctx->reply;
-	fmt_len = strlen(fmt);
+	/* clear the previously saved error code */
+	clear_xmlrpc_reply(reply);
+
 	va_start(ap, fmt);
 	modifiers=0;
 	read = 0;
@@ -1659,6 +1688,8 @@ static int rpc_struct_add(struct rpc_struct* s, char* fmt, ...)
 	va_list ap;
 	str member_name;
 	struct xmlrpc_reply* reply;
+	void* void_ptr;
+	struct rpc_struct* p, *tmp;
 
 	reply = &s->struct_out;
 
@@ -1672,7 +1703,23 @@ static int rpc_struct_add(struct rpc_struct* s, char* fmt, ...)
 		if (add_xmlrpc_reply_esc(reply, &member_name) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &name_suffix) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &value_prefix) < 0) goto err;
-		if (print_value(reply, reply, *fmt, &ap) < 0) goto err;
+		if (*fmt == '{') {
+			void_ptr = va_arg(ap, void**);
+			p = new_rpcstruct(0, 0, s->reply);
+			if (!p)
+				goto err;
+			*(struct rpc_struct**) void_ptr = p;
+			p->offset = get_reply_len(reply);
+			p->parent = s;
+			if (!s->nnext) {
+				s->nnext = p;
+			} else {
+				for (tmp = s; tmp->nnext; tmp=tmp->nnext);
+				tmp->nnext = p;
+			}
+		} else {
+			if (print_value(reply, reply, *fmt, &ap) < 0) goto err;
+		}
 		if (add_xmlrpc_reply(reply, &value_suffix) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &member_suffix) < 0) goto err;
 		fmt++;
@@ -1776,6 +1823,8 @@ static int rpc_struct_scan(struct rpc_struct* s, char* fmt, ...)
 	while(*fmt) {
 		member_name = va_arg(ap, char*);
 		reply = s->reply;
+		/* clear the previously saved error code */
+		clear_xmlrpc_reply(reply);
 		ret = find_member(&value, s->doc, s->struct_in, reply, member_name);
 		if (ret != 0) goto error;
 
@@ -2448,6 +2497,16 @@ static int mod_init(void)
 		}
 	}
 
+	return 0;
+}
+
+
+/**
+ * advertise that sip workers handle rpc commands
+ */
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	set_child_sip_rpc_mode();
 	return 0;
 }
 

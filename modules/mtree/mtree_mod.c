@@ -82,15 +82,18 @@ static str tvalue_column  = str_init("tvalue");
 str mt_char_list = {"0123456789", 10};
 
 static str value_param = {"$avp(s:tvalue)", 0};
+static str values_param = {"$avp(s:tvalues)", 0};
 static str dstid_param = {"$avp(s:tdstid)", 0};
 static str weight_param = {"$avp(s:tweight)", 0};
 static str count_param = {"$avp(s:tcount)", 0};
 pv_spec_t pv_value;
+pv_spec_t pv_values;
 pv_spec_t pv_dstid;
 pv_spec_t pv_weight;
 pv_spec_t pv_count;
 int _mt_tree_type = MT_TREE_SVAL;
 int _mt_ignore_duplicates = 0;
+int _mt_allow_duplicates = 0;
 
 /* lock, ref counter and flag used for reloading the date */
 static gen_lock_t *mt_lock = 0;
@@ -133,11 +136,13 @@ static param_export_t params[]={
 	{"char_list",      STR_PARAM, &mt_char_list.s},
 	{"fetch_rows",     INT_PARAM, &mt_fetch_rows},
 	{"pv_value",       STR_PARAM, &value_param.s},
+	{"pv_values",      STR_PARAM, &values_param.s},
 	{"pv_dstid",       STR_PARAM, &dstid_param.s},
 	{"pv_weight",      STR_PARAM, &weight_param.s},
 	{"pv_count",       STR_PARAM, &count_param.s},
 	{"mt_tree_type",   INT_PARAM, &_mt_tree_type},
 	{"mt_ignore_duplicates", INT_PARAM, &_mt_ignore_duplicates},
+	{"mt_allow_duplicates", INT_PARAM, &_mt_allow_duplicates},
 	{0, 0, 0}
 };
 
@@ -186,6 +191,7 @@ static int mod_init(void)
 	tvalue_column.len = strlen(tvalue_column.s);
 
 	value_param.len = strlen(value_param.s);
+	values_param.len = strlen(values_param.s);
 	dstid_param.len = strlen(dstid_param.s);
 	weight_param.len = strlen(weight_param.s);
 	count_param.len = strlen(count_param.s);
@@ -195,6 +201,12 @@ static int mod_init(void)
 	{
 		LM_ERR("cannot parse value pv or is read only\n");
 		return -1;
+	}
+
+	if (pv_parse_spec(&values_param, &pv_values) <0
+	    || pv_values.type != PVT_AVP) {
+	    LM_ERR("cannot parse values avp\n");
+	    return -1;
 	}
 
 	if(pv_parse_spec(&dstid_param, &pv_dstid)<0
@@ -227,7 +239,7 @@ static int mod_init(void)
 		LM_ERR("invalid prefix char list\n");
 		return -1;
 	}
-	LM_INFO("mt_char_list=%s \n", mt_char_list.s);
+	LM_DBG("mt_char_list=%s \n", mt_char_list.s);
 	mt_char_table_init();
 
 	/* binding to mysql module */
@@ -483,7 +495,7 @@ static int mt_load_db(str *tname)
 		LM_ERR("no db connection\n");
 		return -1;
 	}
-	LM_ERR("attempting to load [%.*s]\n", tname->len, tname->s);
+
 	old_tree = mt_get_tree(tname);
 	if(old_tree==NULL)
 	{
@@ -795,6 +807,8 @@ int mt_print_mi_node(m_tree_t *tree, mt_node_t *pt, struct mi_node* rpl,
 	int i;
 	struct mi_node* node = NULL;
 	struct mi_attr* attr= NULL;
+	mt_is_t *tvalues;
+	str val;
 
 	if(pt==NULL || len>=MT_MAX_DEPTH)
 		return 0;
@@ -802,7 +816,8 @@ int mt_print_mi_node(m_tree_t *tree, mt_node_t *pt, struct mi_node* rpl,
 	for(i=0; i<MT_NODE_SIZE; i++)
 	{
 		code[len]=mt_char_list.s[i];
-		if(pt[i].tvalue.s!=NULL)
+		tvalues = pt[i].tvalues;
+		if (tvalues != NULL)
 		{
 			node = add_mi_node_child(rpl, 0, "MT", 2, 0, 0);
 			if(node == NULL)
@@ -815,11 +830,21 @@ int mt_print_mi_node(m_tree_t *tree, mt_node_t *pt, struct mi_node* rpl,
 						code, len+1);
 			if(attr == NULL)
 				goto error;
-					
-			attr = add_mi_attr(node, MI_DUP_VALUE, "TVALUE", 6,
-						pt[i].tvalue.s, pt[i].tvalue.len);
-			if(attr == NULL)
+
+			while (tvalues != NULL) {
+			    if (tree->type == MT_TREE_IVAL) {
+				val.s = int2str(tvalues->tvalue.n, &val.len);
+				attr = add_mi_attr(node, MI_DUP_VALUE, "TVALUE", 6,
+						   val.s, val.len);
+			    } else {
+				attr = add_mi_attr(node, MI_DUP_VALUE, "TVALUE", 6,
+						   tvalues->tvalue.s.s,
+						   tvalues->tvalue.s.len);
+			    }
+			    if(attr == NULL)
 				goto error;
+			    tvalues = tvalues->next;
+			}
 		}
 		if(mt_print_mi_node(tree, pt[i].child, rpl, code, len+1)<0)
 			goto error;
@@ -921,6 +946,11 @@ struct mi_root* mt_mi_summary(struct mi_root* cmd_tree, void* param)
 			goto error;
 		attr = add_mi_attr(node, MI_DUP_VALUE, "TNAME", 5,
 				pt->tname.s, pt->tname.len);
+		if(attr == NULL)
+			goto error;
+		val.s = int2str(pt->type, &val.len);
+		attr = add_mi_attr(node, MI_DUP_VALUE, "TTYPE", 5,
+				   val.s, val.len);
 		if(attr == NULL)
 			goto error;
 		val.s = int2str(pt->memsize, &val.len);

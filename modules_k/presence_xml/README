@@ -2,16 +2,13 @@ Presence_XML Module
 
 Anca-Maria Vamanu
 
-   voice-system.ro
+   Voice Sistem SRL
 
 Edited by
 
 Anca-Maria Vamanu
 
-   Copyright © 2007 voice-system.ro
-   Revision History
-   Revision $Revision: 1499 $ $Date: 2007-01-12 14:05:57 +0200 (Fri, 12
-                              Jan 2007) $
+   Copyright © 2007 Voice Sistem SRL
      __________________________________________________________________
 
    Table of Contents
@@ -24,7 +21,7 @@ Anca-Maria Vamanu
               2.1. Kamailio Modules
               2.2. External Libraries or Applications
 
-        3. Exported Parameters
+        3. Parameters
 
               3.1. db_url(str)
               3.2. xcap_table(str)
@@ -32,12 +29,15 @@ Anca-Maria Vamanu
               3.4. disable_winfo(int)
               3.5. disable_bla(int)
               3.6. force_active (int)
-              3.7. pidf_manipulation (int)
-              3.8. integrated_xcap_server (int)
-              3.9. xcap_server (str)
-              3.10. passive_mode(int)
+              3.7. integrated_xcap_server (int)
+              3.8. xcap_server (str)
+              3.9. passive_mode(int)
 
-        4. Exported Functions
+        4. Functions
+
+              4.1. pres_check_basic(presentity_uri, status)
+              4.2. pres_check_activities(presentity_uri, activity)
+
         5. Installation
         6. Exported pseudo-variables
 
@@ -51,10 +51,11 @@ Anca-Maria Vamanu
    1.4. Set disable_winfo parameter
    1.5. Set disable_bla parameter
    1.6. Set force_active parameter
-   1.7. Set pidf_manipulation parameter
-   1.8. Set integrated_xcap_server parameter
-   1.9. Set xcap_server parameter
-   1.10. Set passive_mode parameter
+   1.7. Set integrated_xcap_server parameter
+   1.8. Set xcap_server parameter
+   1.9. Set passive_mode parameter
+   1.10. pres_check_basic usage
+   1.11. pres_check_activities usage
 
 Chapter 1. Admin Guide
 
@@ -66,7 +67,7 @@ Chapter 1. Admin Guide
         2.1. Kamailio Modules
         2.2. External Libraries or Applications
 
-   3. Exported Parameters
+   3. Parameters
 
         3.1. db_url(str)
         3.2. xcap_table(str)
@@ -74,12 +75,15 @@ Chapter 1. Admin Guide
         3.4. disable_winfo(int)
         3.5. disable_bla(int)
         3.6. force_active (int)
-        3.7. pidf_manipulation (int)
-        3.8. integrated_xcap_server (int)
-        3.9. xcap_server (str)
-        3.10. passive_mode(int)
+        3.7. integrated_xcap_server (int)
+        3.8. xcap_server (str)
+        3.9. passive_mode(int)
 
-   4. Exported Functions
+   4. Functions
+
+        4.1. pres_check_basic(presentity_uri, status)
+        4.2. pres_check_activities(presentity_uri, activity)
+
    5. Installation
    6. Exported pseudo-variables
 
@@ -120,7 +124,7 @@ Chapter 1. Admin Guide
    running Kamailio with this module loaded:
      * libxml.
 
-3. Exported Parameters
+3. Parameters
 
    3.1. db_url(str)
    3.2. xcap_table(str)
@@ -128,10 +132,9 @@ Chapter 1. Admin Guide
    3.4. disable_winfo(int)
    3.5. disable_bla(int)
    3.6. force_active (int)
-   3.7. pidf_manipulation (int)
-   3.8. integrated_xcap_server (int)
-   3.9. xcap_server (str)
-   3.10. passive_mode(int)
+   3.7. integrated_xcap_server (int)
+   3.8. xcap_server (str)
+   3.9. passive_mode(int)
 
 3.1. db_url(str)
 
@@ -209,59 +212,42 @@ modparam("presence_xml", "disable_bla", 1)
 modparam("presence_xml", "force_active", 1)
 ...
 
-3.7. pidf_manipulation (int)
+3.7. integrated_xcap_server (int)
 
-   Setting this parameter to 1 enables the features described in RFC 4827.
-   It gives the possibility to have a permanent state notified to the
-   users even in the case in which the phone is not online. The presence
-   document is taken from the XCAP server and aggregated together with the
-   other presence information, if any exist, for each Notify that is sent
-   to the watchers. It is also possible to have information notified even
-   if not issuing any Publish (useful for services such as email, SMS,
-   MMS).
-
-   Default value is “0”.
-
-   Example 1.7. Set pidf_manipulation parameter
-...
-modparam("presence_xml", "pidf_manipulation", 1)
-...
-
-3.8. integrated_xcap_server (int)
-
-   This parameter is a flag for the type of XCAP server or servers used.
-   If the XCAP server is integrated with Kamailio presence_XML module and
-   access the same database tables directly, like the XCAP-lite server
-   from AG Projects, the parameter should be set to a positive value.
-   Apart from updating in xcap table, the integrated server must send an
-   MI command refershWatchers [pres_uri] [event] when a user modifies a
-   rules document, to instruct the presence_xml module to update states
-   from the database and, if needed, send NOTIFY updates.
+   This parameter is a flag for the type of XCAP servers used. If the XCAP
+   server is integrated with Kamailio presence_xml module and access the
+   same database tables directly, like the embedded XCAP server
+   implemented in xcap_server module, the parameter should be set to a
+   positive value. Apart from updating in xcap table, if the integrated
+   server is not running on the same Kamailio instance, it must send an MI
+   command refershWatchers [pres_uri] [event] when a user modifies a rules
+   document, to instruct the presence_xml module to update states from the
+   database and, if needed, send NOTIFY updates.
 
    Otherwise, it uses xcap_client module to fetch documents from the XCAP
    servers with HTTP requests. This mode is currently not supported.
 
    Default value is “0”.
 
-   Example 1.8. Set integrated_xcap_server parameter
+   Example 1.7. Set integrated_xcap_server parameter
 ...
 modparam("presence_xml", "integrated_xcap_server", 1)
 ...
 
-3.9. xcap_server (str)
+3.8. xcap_server (str)
 
    The address of the xcap servers used for storage. This parameter is
    compulsory if the integrated_xcap_server parameter is not set. It can
    be set more that once, to construct an address list of trusted XCAP
    servers.
 
-   Example 1.9. Set xcap_server parameter
+   Example 1.8. Set xcap_server parameter
 ...
 modparam("presence_xml", "xcap_server", "xcap_server.example.org")
 modparam("presence_xml", "xcap_server", "xcap_server.ag.org")
 ...
 
-3.10. passive_mode(int)
+3.9. passive_mode(int)
 
    If set to 1, module acts in passive mode - no bind to presence module,
    no connection to database. Useful when needing only to use $xml(...)
@@ -269,14 +255,63 @@ modparam("presence_xml", "xcap_server", "xcap_server.ag.org")
 
    Default value: “0” (0 - active mode, 1 - passive mode).
 
-   Example 1.10. Set passive_mode parameter
+   Example 1.9. Set passive_mode parameter
 ...
 modparam("presence_xml", "passive_mode", 1)
 ...
 
-4. Exported Functions
+4. Functions
 
-   None to be used in configuration file.
+   4.1. pres_check_basic(presentity_uri, status)
+   4.2. pres_check_activities(presentity_uri, activity)
+
+4.1.  pres_check_basic(presentity_uri, status)
+
+   Checks the /presence/tuple/status/basic nodes in the presentity for
+   presentity_uri against the value in status.
+
+   This function can be used from ANY_ROUTE.
+
+   Return code:
+     * 1 - if a match is found.
+     * -1 - if a match is not found.
+
+   Example 1.10. pres_check_basic usage
+...
+    if (pres_check_basic("$ru", "open")) {
+        ...
+    } else {
+        if (is_method("MESSAGE"))
+            m_store();
+    else
+        send_reply("404", "Not Found");
+    }
+...
+
+4.2.  pres_check_activities(presentity_uri, activity)
+
+   Checks whether a /presence/person/activities/activity node exists in
+   the presentity for presentity_uri.
+
+   This function can be used from ANY_ROUTE.
+
+   Return code:
+     * 1 - if a match is found.
+     * -1 - if a match is not found.
+     * -2 - if /presence/person or /presence/person/activity do not exist.
+
+   Example 1.11. pres_check_activities usage
+...
+    if (pres_check_basic("$ru", "open")) {
+        pres_check_activities("$ru", "unknown");
+        if ($retcode || $retcode == -2 || !is_method("INVITE"))
+            t_relay();
+        else
+            send_reply("486", "Busy Here");
+    } else {
+        ...
+    }
+...
 
 5. Installation
 

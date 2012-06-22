@@ -33,7 +33,7 @@
 #include <sys/wait.h>/*waitpid*/
 
 #include "../../ip_addr.h" /*sockaddr_union, ip_addr*/
-#include "../../lib/kcore/hash_func.h" /*T_TABLE_POWER*/
+#include "../../hashes.h" /*T_TABLE_POWER*/
 #include "../../mem/mem.h" /*pkg_malloc*/
 #include "../../mem/shm_mem.h" /*shm_malloc*/
 #include "../../dprint.h" /*LM_**/
@@ -192,7 +192,7 @@ int dispatcher_main_loop(void)
 	    continue;
 	 }
 	 if(errno==EBADF){
-	    LM_ERR("invalid file descriptor pased to poll (%s)\n",
+	    LM_ERR("invalid file descriptor passed to poll (%s)\n",
 				strerror(errno));
 	    return -1;/*??*/
 	 }

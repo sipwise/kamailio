@@ -94,6 +94,7 @@
 #include "ut.h"
 #include "rvalue.h"
 #include "switch.h"
+#include "cfg/cfg_struct.h"
 
 #define RT_HASH_SIZE	8 /* route names hash */
 
@@ -1149,6 +1150,60 @@ int fix_actions(struct action* a)
 					goto error;
 				}
 				break;
+			case CFG_SELECT_T:
+				if (t->val[1].type == RVE_ST) {
+					rve = t->val[1].u.data;
+					if (rve_is_constant(rve)) {
+						/* if expression is constant => evaluate it
+						   as integer and replace it with the corresp.
+						   int */
+						rv = rval_expr_eval(0, 0, rve);
+						if (rv == 0 ||
+								rval_get_int( 0, 0, &i, rv, 0) < 0 ) {
+							ERR("failed to fix constant rve");
+							if (rv) rval_destroy(rv);
+							ret = E_BUG;
+							goto error;
+						}
+						rval_destroy(rv);
+						rve_destroy(rve);
+						t->val[1].type = NUMBER_ST;
+						t->val[1].u.number = i;
+					} else {
+						/* expression is not constant => fixup &
+						   optimize it */
+						if ((ret=fix_rval_expr(rve))
+								< 0) {
+							ERR("rve fixup failed\n");
+							ret = E_BUG;
+							goto error;
+						}
+					}
+				} else if (t->val[1].type != NUMBER_ST) {
+					BUG("invalid subtype %d for cfg_select()\n",
+								t->val[1].type);
+					ret = E_BUG;
+					goto error;
+				}
+
+			case CFG_RESET_T:
+				if (t->val[0].type != STRING_ST) {
+					BUG("invalid subtype %d for cfg_select() or cfg_reset()\n",
+								t->val[0].type);
+					ret = E_BUG;
+					goto error;
+				}
+				tmp_p = (void *)cfg_lookup_group(t->val[0].u.string, strlen(t->val[0].u.string));
+				if (!tmp_p) {
+					ERR("configuration group \"%s\" not found\n",
+						t->val[0].u.string);
+					ret = E_SCRIPT;
+					goto error;
+				}
+				pkg_free(t->val[0].u.string);
+				t->val[0].u.data = tmp_p;
+				t->val[0].type = CFG_GROUP_ST;
+				break;
 			default:
 				/* no fixup required for the rest */
 				break;
@@ -1699,7 +1754,7 @@ inline static int comp_ip(int op, struct ip_addr* ip, int rtype,
 		default:
 			LOG(L_CRIT, "BUG: comp_ip: invalid type for "
 						" src_ip or dst_ip (%d)\n", rtype);
-			ret=-1;
+			return -1;
 	}
 	/* here "right" is set to the str we compare with */
 	r_expop.str=*right;
@@ -1813,8 +1868,19 @@ inline static int eval_elem(struct run_act_ctx* h, struct expr* e,
 	}
 	switch(e->l_type){
 	case METHOD_O:
-		ret=comp_str(e->op, &msg->first_line.u.request.method,
+		if(msg->first_line.type==SIP_REQUEST)
+		{
+			ret=comp_str(e->op, &msg->first_line.u.request.method,
 			 			e->r_type, &e->r, msg, h);
+		} else {
+			if(parse_headers(msg, HDR_CSEQ_F, 0)!=0 || msg->cseq==NULL)
+			{
+				LM_ERR("cannot parse cseq header\n");
+				goto error;
+			}
+			ret=comp_str(e->op, &get_cseq(msg)->method,
+						e->r_type, &e->r, msg, h);
+		}
 		break;
 	case URI_O:
 		if(msg->new_uri.s) {

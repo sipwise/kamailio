@@ -1,6 +1,4 @@
 /* 
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2006-2007 iptelorg GmbH
  *
@@ -30,7 +28,10 @@
  *  @{
  */
 
-#define _XOPEN_SOURCE 4     /* bsd */
+/* the following macro will break the compile on solaris */
+#if !defined (__SVR4) && !defined (__sun)
+   #define _XOPEN_SOURCE 4     /* bsd */
+#endif
 #define _XOPEN_SOURCE_EXTENDED 1    /* solaris */
 #define _SVID_SOURCE 1 /* timegm */
 
@@ -136,8 +137,9 @@ static void my_cmd_free(db_cmd_t* cmd, struct my_cmd* payload)
 
 /** Builds a DELETE SQL statement.The function builds DELETE statement where
  * cmd->match specify WHERE clause.  
- * @param cmd SQL statement as a result of this function 
+ * @param sql_cmd SQL statement as a result of this function 
  * @param cmd input for statement creation
+ * @return -1 on error, 0 on success
  */
 static int build_delete_cmd(str* sql_cmd, db_cmd_t* cmd)
 {

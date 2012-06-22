@@ -52,8 +52,8 @@
 
 #include "dprint.h"
 
-enum sip_protos { PROTO_NONE, PROTO_UDP, PROTO_TCP, PROTO_TLS, PROTO_SCTP };
-#define PROTO_LAST PROTO_SCTP
+enum sip_protos { PROTO_NONE, PROTO_UDP, PROTO_TCP, PROTO_TLS, PROTO_SCTP, PROTO_OTHER };
+#define PROTO_LAST PROTO_OTHER
 
 #ifdef USE_COMP
 enum comp_methods { COMP_NONE, COMP_SIGCOMP, COMP_SERGZ };
@@ -72,7 +72,7 @@ struct ip_addr{
 	}u;
 };
 
-
+typedef struct ip_addr ip_addr_t;
 
 struct net{
 	struct ip_addr ip;
@@ -102,6 +102,15 @@ struct addr_info{
 	struct addr_info* prev;
 };
 
+struct advertise_info {
+	str name; /* name - eg.: foo.bar or 10.0.0.1 */
+	unsigned short port_no;  /* port number */
+	str port_no_str; /* port number converted to string -- optimization*/
+	str address_str;        /*ip address converted to string -- optimization*/
+	struct ip_addr address; /* ip address */
+	str sock_str; /* Socket proto, ip, and port as string */
+};
+
 struct socket_info{
 	int socket;
 	str name; /* name - eg.: foo.bar or 10.0.0.1 */
@@ -116,6 +125,9 @@ struct socket_info{
 	char proto; /* tcp or udp*/
 	str sock_str; /* Socket proto, ip, and port as string */
 	struct addr_info* addr_info_lst; /* extra addresses (e.g. SCTP mh) */
+	int workers; /* number of worker processes for this socket */
+	int workers_tcpidx; /* index of workers in tcp children array */
+	struct advertise_info useinfo; /* details to be used in SIP msg */
 };
 
 
@@ -250,7 +262,8 @@ void print_ip(char* prefix, struct ip_addr* ip, char* suffix);
 void stdout_print_ip(struct ip_addr* ip);
 void print_net(struct net* net);
 
-char* proto2a(enum sip_protos proto);
+char* get_proto_name(unsigned int proto);
+#define proto2a get_proto_name
 
 
 
@@ -824,5 +837,10 @@ inline static void init_dst_from_rcv(struct dest_info* dst,
 #endif
 }
 
+/**
+ * match ip address with net address and bitmask
+ * - return 0 on match, -1 otherwise
+ */
+int ip_addr_match_net(ip_addr_t *iaddr, ip_addr_t *naddr, int mask);
 
 #endif

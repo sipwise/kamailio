@@ -104,18 +104,33 @@ int db_mysql_update(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _o,
 /*! \brief
  * Just like insert, but replace the row if it exists
  */
-int db_mysql_replace(const db1_con_t* handle, const db_key_t* keys, const db_val_t* vals, const int n);
+int db_mysql_replace(const db1_con_t* handle, const db_key_t* keys,
+		const db_val_t* vals, const int n, const int _un, const int _m);
 
 /*! \brief
  * Returns the last inserted ID
  */
-int db_last_inserted_id(const db1_con_t* _h);
+int db_mysql_last_inserted_id(const db1_con_t* _h);
+
+
+/*! \brief
+ * Returns number of affected rows for last query
+ */
+int db_mysql_affected_rows(const db1_con_t* _h);
+
 
 /*! \brief
  * Insert a row into table, update on duplicate key
  */
-int db_insert_update(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+int db_mysql_insert_update(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
 	const int _n);
+
+
+/*! \brief
+ * Insert a row into table
+ */
+int db_mysql_insert_delayed(const db1_con_t* _h, const db_key_t* _k,
+		const db_val_t* _v, const int _n);
 
 
 /*! \brief

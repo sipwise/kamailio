@@ -1,7 +1,3 @@
-# $Id: Makefile,v 1.2 2005/10/25 16:23:28 bogdan_iancu Exp $
-#
-# PUBLISH
-#
 # 
 # WARNING: do not run this directly, it should be run by the master Makefile
 

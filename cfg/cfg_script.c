@@ -31,6 +31,7 @@
 #include "../ut.h"
 #include "cfg_struct.h"
 #include "cfg.h"
+#include "cfg_ctx.h"
 #include "cfg_script.h"
 
 /* allocates memory for a new config script variable
@@ -56,14 +57,14 @@ cfg_script_var_t *new_cfg_script_var(char *gname, char *vname, unsigned int type
 	/* the group may have been already declared */
 	group = cfg_lookup_group(gname, gname_len);
 	if (group) {
-		if (group->dynamic == 0) {
+		if (group->dynamic == CFG_GROUP_STATIC) {
 			/* the group has been already declared by a module or by the core */
 			LOG(L_ERR, "ERROR: new_cfg_script_var(): "
 				"configuration group has been already declared: %s\n",
 				gname);
 			return NULL;
 		}
-		/* the dynamic group is found */
+		/* the dynamic or empty group is found */
 		/* verify that the variable does not exist */
 		for (	var = (cfg_script_var_t *)group->vars;
 			var;
@@ -76,6 +77,8 @@ cfg_script_var_t *new_cfg_script_var(char *gname, char *vname, unsigned int type
 				return NULL;
 			}
 		}
+		if (group->dynamic == CFG_GROUP_UNKNOWN)
+			group->dynamic = CFG_GROUP_DYNAMIC;
 
 	} else {
 		/* create a new group with NULL values, we will fix it later,
@@ -85,7 +88,7 @@ cfg_script_var_t *new_cfg_script_var(char *gname, char *vname, unsigned int type
 					NULL /* vars */, 0 /* size */, NULL /* handle */);
 					
 		if (!group) goto error;
-		group->dynamic = 1;
+		group->dynamic = CFG_GROUP_DYNAMIC;
 	}
 
 	switch (type) {
@@ -103,7 +106,15 @@ cfg_script_var_t *new_cfg_script_var(char *gname, char *vname, unsigned int type
 		LOG(L_ERR, "ERROR: new_cfg_script_var(): unsupported variable type\n");
 		return NULL;
 	}
+
 	group->num++;
+	if (group->num > CFG_MAX_VAR_NUM) {
+		LOG(L_ERR, "ERROR: new_cfg_script_var(): too many variables (%d) within a single group,"
+			" the limit is %d. Increase CFG_MAX_VAR_NUM, or split the group into multiple"
+			" definitions.\n",
+			group->num, CFG_MAX_VAR_NUM);
+		return NULL;
+	}
 
 	var = (cfg_script_var_t *)pkg_malloc(sizeof(cfg_script_var_t));
 	if (!var) goto error;
@@ -133,6 +144,84 @@ cfg_script_var_t *new_cfg_script_var(char *gname, char *vname, unsigned int type
 error:
 	LOG(L_ERR, "ERROR: new_cfg_script_var(): not enough memory\n");
 	return NULL;
+}
+
+/* Rewrite the value of an already declared script variable before forking.
+ * Return value:
+ * 	 0: success
+ *	-1: error
+ *	 1: variable not found
+ */
+int cfg_set_script_var(cfg_group_t *group, str *var_name,
+			void *val, unsigned int val_type)
+{
+	cfg_script_var_t	*var;
+	void	*v;
+	str	s;
+
+	if (cfg_shmized || (group->dynamic != CFG_GROUP_DYNAMIC)) {
+		LOG(L_ERR, "BUG: cfg_set_script_var(): Not a dynamic group before forking\n");
+		return -1;
+	}
+
+	for (	var = (cfg_script_var_t *)(void *)group->vars;
+		var;
+		var = var->next
+	) {
+		if ((var->name_len == var_name->len)
+			&& (memcmp(var->name, var_name->s, var_name->len) == 0)
+		) {
+			switch (var->type) {
+			case CFG_VAR_INT:
+				if (convert_val(val_type, val, CFG_INPUT_INT, &v))
+					goto error;
+				if ((var->min || var->max)
+					&& ((var->min > (int)(long)v) || (var->max < (int)(long)v))
+				) {
+					LOG(L_ERR, "ERROR: cfg_set_script_var(): integer value is out of range\n");
+					goto error;
+				}
+				var->val.i = (int)(long)v;
+				break;
+
+			case CFG_VAR_STR:
+				if (convert_val(val_type, val, CFG_INPUT_STR, &v))
+					goto error;
+				if (((str *)v)->s) {
+					s.len = ((str *)v)->len;
+					s.s = pkg_malloc(sizeof(char) * (s.len + 1));
+					if (!s.s) {
+						LOG(L_ERR, "ERROR: cfg_set_script_var(): not enough memory\n");
+						goto error;
+					}
+					memcpy(s.s, ((str *)v)->s, s.len);
+					s.s[s.len] = '\0';
+				} else {
+					s.s = NULL;
+					s.len = 0;
+				}
+				if (var->val.s.s)
+					pkg_free(var->val.s.s);
+				var->val.s = s;
+				break;
+
+			default:
+				LOG(L_ERR, "ERROR: cfg_set_script_var(): unsupported variable type\n");
+				goto error;
+			}
+
+			convert_val_cleanup();
+			return 0;
+		}
+	}
+
+	return 1;
+
+error:
+	LOG(L_ERR, "ERROR: cfg_set_script_var(): failed to set the script variable: %.*s.%.*s\n",
+			group->name_len, group->name,
+			var_name->len, var_name->s);
+	return -1;
 }
 
 /* fix-up the dynamically declared group:
@@ -173,6 +262,7 @@ int cfg_script_fixup(cfg_group_t *group, unsigned char *block)
 
 		mapping[i].def = &(def[i]);
 		mapping[i].name_len = script_var->name_len;
+		mapping[i].pos = i;
 
 		switch (script_var->type) {
 		case CFG_VAR_INT:

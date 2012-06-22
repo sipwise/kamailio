@@ -86,15 +86,6 @@
 		</listitem>
 		<listitem>
 			<para>
-			There is no session/dialog accounting (yet) -- &kamailio; maintains
-			no sessions. If one needs to correlate INVITEs with BYEs for 
-			generating proper CDRs for example for purpose of billing, then 
-			it is better done in the entity which processes accounting 
-			information.
-			</para>
-		</listitem>
-		<listitem>
-			<para>
 			If a UA fails in middle of conversation, a proxy will never 
 			find out about it. In general, a better practice is to account from an 
 			end-device (such as PSTN gateway), which best knows about call 
@@ -173,7 +164,7 @@ if (uri=~"sip:+40") /* calls to Romania */ {
 			the request, etc).
 			</para>
 		</section>
-		<section>
+		<section id="acc-def-syn">
 			<title>Definitions and syntax</title>
 			<para>
 			Selection of extra information is done via 
@@ -326,8 +317,133 @@ if (uri=~"sip:+40") /* calls to Romania */ {
 			</itemizedlist>
 		</section>
 	</section>
+	<section>
+		<title>Call Data Record generation</title>
+        <section>
+            <title>Overview</title>
+                <para>
+                In addition to transaction-based logging, it is possible to generate and log Call Data
+                Records (CDRs) directly from &kamailio;. Apart from a basic set of CDR fields which
+                are always included (covering start time, end time, and duration), the approach allows
+                flexible specification of additional fields that should be taken into account using
+                the configuration script. This is very similar to how transaction-based logging may
+                be customized with the exception that CDRs rely on dialogs instead of transactions
+                to store relevant information during a call.
+                </para>
 
+                <para>
+                In order to set up CDR generation, you must enable the CDR switch and load the dialog
+                module. You probably also want to specify a set of pseudo-variables that define more
+                relevant CDR fields. Pseudo-variables may be assigned arbitrarily during script
+                execution, and the module will make sure that the variable content will be transformed
+                into a CDR by the end of the dialog.
+                </para>
 
+                <para>
+                To use CDR logging in a correct manner, you should only use the dialog-based
+                pseudo-variables (dlg_var) from the dialog module. This allows you to save values
+                right from the beginning through all requests and replies until termination of the
+                call. While not recommended, it is still possible to use other pseudo-variables as
+                well. Except for pseudo-variables valid in the call-final transaction, however,
+                information given will not be stored in the CDR as they cannot be accessed by the
+                end of the call when the CDR is logged.
+                </para>
+
+                <para>
+                Note that CDR generation does not involve any kind of database storage (yet). In order
+                to persist the CDRs into a database you will have to set up an exterior process (i.e.,
+                a script living outside of &kamailio;) and implement the storage task yourself.
+                </para>
+        </section>
+		<section id="cdr-extra-id">
+			<title>CDR Extra</title>
+					This section is similar to the <quote>LOG accounting</quote> part of
+					<xref linkend="ACC-extra-id"/>.
+			<section>
+				<title>Definitions and syntax</title>
+					<para>
+					Selection of extra information is done similar to the transaction extra
+					<xref linkend="acc-def-syn"/>.
+					</para>
+					<itemizedlist>
+						<listitem><para><emphasis>
+						cdr_extra = cdr_extra_definition (';'cdr_extra_definition)*
+						</emphasis></para></listitem>
+						<listitem><para><emphasis>
+						cdr_extra_definition = cdr_log_name '=' pseudo_variable
+						</emphasis></para></listitem>
+					</itemizedlist>
+					See also <xref linkend="cdr_extra"/>.
+					<para>
+					The full list of supported pseudo-variables in Sip-Router is
+					available at:
+					<ulink url="http://sip-router.org/wiki/cookbooks/pseudo-variables/devel">
+					http://sip-router.org/wiki/cookbooks/pseudo-variables/devel</ulink>
+					</para>
+			</section>
+		</section>
+		<section id="multi-cdr-call-legs">
+			<title>CDR with Multi Call-Legs</title>
+			<section>
+				<title>Overview</title>
+				<para>
+				As mentioned in <xref linkend="multi-call-legs"/>, a leg represents a parallel
+				or forwarded call. In contrast to the normal accounting the cdr logging uses dialogs
+				instead of transaction to log data. This may reduce the amount of information 
+				but it also make it possible to combine all important data in one cdr at 
+				once. A second mechanism to process multiple data-sets into one cdr is not further
+				necessary.
+				</para>
+			</section>
+			<section>
+				<title>Configuration</title>
+				<para>
+				When you route messages multiple times through your proxy (e.g. to
+				handle <quote>call-forwardings</quote>) you have to use detect_spirals
+				from the dialog modules. Otherwise the proxy can't identify and reuse existing
+				dialogs.
+				</para>
+				<para>
+				To get the correct call-forwarding-chain you have to store each cf* with the
+				corresponding caller and callee in a dialog based pseudo-variable (dlg_var)
+				(e.g. chain=B;cfa;C|C;cfnr;D). Additionally it is necessary to store the
+				caller and callee for each leg. All this helps to identify the involved
+				phone parners and forwarding chain. When you route such calls multiple times
+				to the same Proxy, you could store the caller and callee within an transaction
+				based avp and write it into the dialog based dlg_var pv during a 200 INVITE.
+				</para>
+				<section>
+					<title>Example for a spiraled Proxy</title>
+					<programlisting format="linespecific">
+# A calls B (transaction 1)
+$avp(caller)='A'
+$avp(callee)='B';
+$dlg_var(chain)='';
+
+# B cfa C (transaction 2)
+$avp(caller)='B'
+$avp(callee)='C';
+$dlg_var(chain)='B;cfu;C';
+
+# C cfnr D (transaction 3)
+$avp(caller)='C'
+$avp(callee)='D';
+$dlg_var(chain)=$dlg_var(chain) + "|" + "C;cfnr;D";
+
+# C confirms call (200 reply of transaction 2)
+$dlg_var(caller) = $avp(caller); #caller='B'
+$dlg_var(callee) = $avp(callee); #callee='C'
+					</programlisting>
+				</section>
+			</section>
+			<section>
+				<title>Logged data</title>
+				For each call, all dialog corresponding variables will be logged. After a call
+				is finished, the generated call data record information will be logged as string
+				(VAR1=xxx,VAR2=xxxx,...) to the syslog.
+			</section>
+		</section>
+	</section>
 	<section>
 		<title>Dependencies</title>
 		<section>
@@ -346,6 +462,11 @@ if (uri=~"sip:+40") /* calls to Romania */ {
 				<listitem>
 				<para><emphasis>rr</emphasis> -- Record Route, if 
 				<quote>detect_direction</quote> module parameter is enabled.
+				</para>
+				</listitem>
+				<listitem>
+				<para><emphasis>dialog</emphasis> -- Dialog, if
+				<quote>cdr_enable</quote> module parameter is enabled.
 				</para>
 				</listitem>
 			</itemizedlist>
@@ -370,7 +491,7 @@ if (uri=~"sip:+40") /* calls to Romania */ {
 	</section>
 
 	<section id="ACC-param-id">
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<!-- Generic ACC parameters -->
 	<section>
 		<title><varname>early_media</varname> (integer)</title>
@@ -400,6 +521,24 @@ modparam("acc", "early_media", 1)
 		<title>failed_transaction_flag example</title>
 		<programlisting format="linespecific">
 modparam("acc", "failed_transaction_flag", 4)
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>failed_filter</varname> (string)</title>
+		<para>
+		A string of failure response codes from 300 to 999
+		separated by commas. Failed transaction will not be accounted
+		if its response code is in the list even when
+		failed_transaction_flag is set. 
+		</para>
+		<para>
+		Default value is not-set (failure filtering is off).
+		</para>
+		<example>
+		<title>failed_filter example</title>
+		<programlisting format="linespecific">
+modparam("acc", "failed_filter", "404,407")
 </programlisting>
 		</example>
 	</section>
@@ -457,6 +596,26 @@ modparam("acc", "report_cancels", 1)
 		<title>detect_direction example</title>
 		<programlisting format="linespecific">
 modparam("acc", "detect_direction", 1)
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>acc_prepare_flag</varname> (integer)</title>
+		<para>
+		Per transaction flag which says if the transaction may be accounted
+		later, with flags set in TM module specific routes (e.g., like
+		failure_route). If this flag is not set and acc or missed_call flag
+		are not set either in request route block, there is no way to mark the
+		request for transaction later. If either acc or missed_call flags are
+		set in request route block, it is no need to set this flag.
+		</para>
+		<para>
+		Default value is not-set (no flag).
+		</para>
+		<example>
+		<title>acc_prepare_flag example</title>
+		<programlisting format="linespecific">
+modparam("acc", "acc_prepare_flag", 5)
 </programlisting>
 		</example>
 	</section>
@@ -554,7 +713,6 @@ modparam("acc", "log_facility", "LOG_DAEMON")
 </programlisting>
 		</example>
 	</section>
-
 	<section>
 		<title><varname>log_extra</varname> (string)</title>
 		<para>
@@ -863,6 +1021,23 @@ modparam("acc", "db_extra", "ct=$hdr(Content-type); email=$avp(s:email)")
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>db_insert_mode</varname> (integer)</title>
+		<para>
+		If set to 1, use INSERT DELAYED to add records to accounting tables
+		when the DB driver has support for it. If no INSERT DELAYED support
+		is offered by DB driver, then standard INSERT is used.
+		</para>
+		<para>
+		Default value is 0 (no INSERT DELAYED).
+		</para>
+		<example>
+		<title>db_insert_mode example</title>
+		<programlisting format="linespecific">
+modparam("acc", "db_insert_mode", 1)
+</programlisting>
+		</example>
+	</section>
 	<!-- DIAMETER specific ACC parameters -->
 	<section>
 		<title><varname>diameter_flag</varname> (integer)</title>
@@ -944,10 +1119,121 @@ modparam("acc", "diameter_extra", "7846=$hdr(Content-type);7847=$avp(s:email)")
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>cdr_enable</varname> (integer)</title>
+		<para>
+		Should CDR-based logging be enabled?
+		</para>
+		<para>
+		0 - off (default)
+		1 - on
+		</para>
+		<example>
+		<title>cdr_enable example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_enable", 1)
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>cdr_start_on_confirmed</varname> (integer)</title>
+		<para>
+		Should the start time be taken from the time when the dialog is created,
+        or when the dialog is confirmed?
+		</para>
+		<para>
+		0 - use time of dialog creation (default).
+		1 - use time of dialog confirmation.
+		</para>
+		<example>
+		<title>cdr_start_on_confirmed example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_start_on_confirmed", 1)
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>cdr_facility</varname> (integer)</title>
+		<para>
+		Log facility to which CDR messages are issued to syslog.
+		This allows to easily seperate CDR-specific logging from
+		the other log messages.
+		</para>
+		<para>
+		Default value is LOG_DAEMON.
+		</para>
+		<example>
+		<title>cdr_facility example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_facility", "LOG_DAEMON")
+</programlisting>
+		</example>
+	</section>
+	<section id="cdr_extra">
+		<title><varname>cdr_extra</varname> (string)</title>
+		<para>
+		Set of pseudo-variables defining custom CDR fields. See
+        <xref linkend="cdr-extra-id"/> for more details.
+		</para>
+		<para>
+		Default value is NULL.
+		</para>
+		<example>
+		<title>cdr_extra example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_extra", "c1=$dlg_var(caller);c2=$dlg_var(callee)"
+</programlisting>
+		</example>
+	</section>
+	<section id="cdr_start_id">
+		<title><varname>cdr_start_id</varname> (string)</title>
+		<para>
+		Modifying the start id which is used to store the start time.
+		</para>
+		<para>
+		Default value is 'st'
+		</para>
+		<example>
+		<title>cdr_start_id example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_start_id", "start")
+</programlisting>
+		</example>
+	</section>
+	<section id="cdr_end_id">
+		<title><varname>cdr_end_id</varname> (string)</title>
+		<para>
+		Modifying the end id which is used to store the end time.
+		</para>
+		<para>
+		Default value is 'et'
+		</para>
+		<example>
+		<title>cdr_end_id example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_end_id", "end")
+</programlisting>
+		</example>
+	</section>
+		<section id="cdr_duration_id">
+		<title><varname>cdr_duration_id</varname> (string)</title>
+		<para>
+		Modifying the duration id which is used to store the duration.
+		</para>
+		<para>
+		Default value is 'd'
+		</para>
+		<example>
+		<title>cdr_duration_id example</title>
+		<programlisting format="linespecific">
+modparam("acc", "cdr_duration_id", "start")
+</programlisting>
+		</example>
+	</section>
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 			<function moreinfo="none">acc_log_request(comment)</function>

@@ -277,7 +277,7 @@
 	</section>
 
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>default_allow_file</varname> (string)</title>
 		<para>
@@ -547,7 +547,7 @@ modparam("permissions", "db_mode", 1)
 		<title><varname>trusted_table</varname> (string)</title>
 		<para>
 		Name of database table containing matching rules used by
-		<function moreinfo="none">allow_register</function> function.
+		<function moreinfo="none">allow_trusted</function> function.
 		</para>
 		<para>
 		<emphasis>
@@ -672,10 +672,31 @@ modparam("permissions", "peer_tag_avp", "$avp(i:707)")
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>peer_tag_mode</varname> (integer)</title>
+		<para>
+		Tag mode for allow_trusted(). 0 sets only the tag of the
+		first match. 1 adds the tags of all matches to the avp. In addition
+		the return value of allow_trusted() is the number of matches.
+		</para>
+		<para>
+		<emphasis>
+		Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>peer_tag_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("permissions", "peer_tag_mode", "1")
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">allow_routing()</function>
@@ -1022,7 +1043,7 @@ if ($var(group) != -1) {
 		<para>
 		Source address and transport protocol given in pvar
 		arguments must be in string format.  Valid transport
-		protocol values are (ignoring case) "udp, "tcp", "tls",
+		protocol values are (ignoring case) "any", "udp, "tcp", "tls",
 		and "sctp".
 		</para>
 		<para>
@@ -1046,7 +1067,7 @@ if (allow_trusted("$si", "$proto")) {
 	</section>
 	
 	<section>
-	<title>Exported MI Functions</title>
+	<title>MI Commands</title>
 	<section>
 		<title>
 		<function moreinfo="none">address_reload</function>

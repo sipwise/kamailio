@@ -135,7 +135,7 @@ module_group_standard=acc_syslog auth avp ctl dispatcher diversion enum\
 				eval exec fifo db_flatstore gflags maxfwd mediaproxy \
 				nathelper options pdt permissions pike print ratelimit \
 				registrar rr rtpproxy sanity sl textops timer tm uac \
-				unixsock uri usrloc xlog cfg_rpc tmrec
+				unixsock uri usrloc xlog cfg_rpc sipcapture msrp tmrec
 
 # Modules in this group are considered a standard part of SER (due to 
 # widespread usage) but they have dependencies that must be satisfied for 
@@ -168,18 +168,16 @@ module_group_mysql=$(module_group_mysql_driver) $(module_group_db)
 module_group_postgres_driver=db_postgres
 module_group_postgres=$(module_group_postgres_driver) $(module_group_db)
 
-# For redis
-module_group_redis=ndb_redis
-
 # For radius
 module_group_radius=acc_radius auth_radius misc_radius avp_radius uri_radius \
 					peering
 
 # For presence
 # kamailio modules
-module_group_presence=presence presence_dialoginfo presence_mwi presence_xml \
+module_group_presence=presence presence_dialoginfo presence_mwi presence_xml presence_profile\
 						pua pua_bla pua_dialoginfo pua_mi pua_usrloc pua_xmpp \
-						rls xcap_client xcap_server presence_conference
+						rls xcap_client xcap_server presence_conference \
+						presence_reginfo pua_reginfo
 #ser modules
 module_group_presence+=dialog presence_b2b xcap
 # obsolete/unmaintained ser modules
@@ -196,9 +194,14 @@ module_group_stable=cpl-c dbtext jabber osp sms pdb
 # Modules in this group are either not complete, untested, or without enough
 # reports of usage to allow the module into the stable group. They may or may
 # not have dependencies
-module_group_experimental=tls oracle iptrtpproxy
+module_group_experimental=tls oracle iptrtpproxy ndb_redis async
 
-# Kamailio specific groups
+# For cassandra
+module_group_cassandra_driver=db_cassandra
+module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
+
+
+### Kamailio specific groups ###
 # Standard modules in K Debian distro
 module_group_kstandard=acc alias_db auth auth_db benchmark call_control \
 				cfgutils db_text dialog dispatcher diversion domain drouting \
@@ -210,7 +213,8 @@ module_group_kstandard=acc alias_db auth auth_db benchmark call_control \
 				avpops cfg_db cfg_rpc ctl db_flatstore dialplan enum \
 				iptrtpproxy lcr mediaproxy mi_rpc pdb sanity tm topoh \
 				blst prefix_route counters debugger matrix mqueue mtree \
-				pipelimit rtpproxy textopsx xhttp tmrec
+				pipelimit rtpproxy textopsx xhttp xhttp_rpc ipops p_usrloc \
+				sdpops async sipcapture dmq msrp tmrec db_cluster
 
 # K mysql module
 module_group_kmysql=db_mysql
@@ -261,9 +265,10 @@ module_group_kmemcached=memcached
 module_group_ktls=tls
 
 # K presence modules
-module_group_kpresence=presence presence_dialoginfo presence_mwi presence_xml \
+module_group_kpresence=presence presence_dialoginfo presence_mwi presence_xml presence_profile\
 						pua pua_bla pua_dialoginfo pua_mi pua_usrloc pua_xmpp \
-						rls xcap_client xcap_server presence_conference
+						rls xcap_client xcap_server presence_conference \
+						presence_reginfo pua_reginfo
 
 # K lua module
 module_group_klua=app_lua
@@ -274,9 +279,17 @@ module_group_kpython=app_python
 # K geoip module
 module_group_kgeoip=geoip
 
-# k redis module
+# K sqlite module
+module_group_ksqlite=db_sqlite
+
+# K json modules
+module_group_kjson=json jsonrpc-c
+
+# K redis module
 module_group_kredis=ndb_redis
 
+# K mono module
+module_group_kmono=app_mono
 
 # if not set on the cmd. line, env or in the modules.lst (cfg_group_include)
 # exclude the below modules.
@@ -290,17 +303,18 @@ else
 	exclude_modules?= 		cpl mangler postgres jabber mysql cpl-c \
 							auth_radius misc_radius avp_radius uri_radius \
 							acc_radius pa rls presence_b2b xcap xmlrpc\
-							osp tls oracle \
+							osp tls oracle cassandra \
 							unixsock dbg print_lib auth_identity ldap \
 							db_berkeley db_mysql db_postgres db_oracle \
-							db_unixodbc memcached mi_xmlrpc \
+							db_sqlite db_unixodbc db_cassandra memcached mi_xmlrpc \
 							perl perlvdb purple \
 							snmpstats xmpp \
 							carrierroute peering \
 							dialplan lcr utils presence presence_mwi \
 							presence_dialoginfo presence_xml pua pua_bla \
 							pua_dialoginfo pua_usrloc pua_xmpp \
-							regex xcap_client xcap_server presence_conference
+							regex xcap_client xcap_server presence_conference \
+							presence_reginfo pua_reginfo
 	#excluded because they depend on external *.h files
 	exclude_modules+= h350
 	# excluded because they do not compile (remove them only after they are
@@ -314,6 +328,12 @@ else
 	exclude_modules+= app_python
 	# depends on libxml2
 	exclude_modules+= xmlops
+	# depends on jsoc-c
+	exclude_modules+= json jsonrpc-c
+	# depends on libhiredis
+	exclude_modules+= ndb_redis
+	# depends on mono-devel
+	exclude_modules+= app_mono
 	# depends on tm being compiled with -DWITH_AS_SUPPORT support
 ifeq (,$(findstring -DWITH_AS_SUPPORT, $(C_DEFS)))
 		exclude_modules+= seas
@@ -838,12 +858,9 @@ bin:
 deb:
 	-@if [ -d debian ]; then \
 		dpkg-buildpackage -rfakeroot -tc; \
-	elif [ -d pkg/$(MAIN_NAME)/deb/debian ]; then \
-		ln -s pkg/$(MAIN_NAME)/deb/debian debian; \
-		dpkg-buildpackage -rfakeroot -tc; \
 		rm debian; \
 	else \
-		ln -s pkg/debian debian; \
+		ln -s pkg/$(MAIN_NAME)/deb/debian debian; \
 		dpkg-buildpackage -rfakeroot -tc; \
 		rm debian; \
 	fi
@@ -854,7 +871,7 @@ sunpkg:
 	mkdir -p tmp/$(MAIN_NAME)_sun_pkg
 	$(MAKE) install basedir=$(CURDIR)/tmp/$(MAIN_NAME) \
 			prefix=/usr/local $(mk_params)
-	(cd pkg/solaris; \
+	(cd pkg/$(MAIN_NAME)/solaris; \
 	pkgmk -r ../../tmp/$(MAIN_NAME)/usr/local -o -d ../../tmp/$(MAIN_NAME)_sun_pkg/ -v "$(RELEASE)" ;\
 	cd ../..)
 	cat /dev/null > ../$(NAME)-$(RELEASE)-$(OS)-$(ARCH)-local
@@ -1180,3 +1197,7 @@ dbschema:
 	-@echo "Build database schemas"
 	$(MAKE) -C lib/srdb1/schema
 	-@echo "Done"
+
+.PHONY: printcdefs
+printcdefs:
+	@echo -n $(C_DEFS)

@@ -57,6 +57,7 @@
 #include "../../timer.h" /* ticks_t */
 #include "../../tls_hooks.h"
 #include "../../ut.h"
+#include "../../shm_init.h"
 #include "../../rpc_lookup.h"
 #include "../../cfg/cfg.h"
 #include "tls_init.h"
@@ -272,7 +273,16 @@ static tls_domains_cfg_t* tls_use_modparams(void)
 }
 #endif
 
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	/* shm is used, be sure it is initialized */
+	if(!shm_initialized() && init_shm()<0)
+		return -1;
 
+	if(tls_pre_init()<0)
+		return -1;
+	return 0;
+}
 
 static int mod_init(void)
 {
@@ -433,7 +443,7 @@ static int is_peer_verified(struct sip_msg* msg, char* foo, char* foo2)
 	 */
 	x509_cert = SSL_get_peer_certificate(ssl);
 	if ( x509_cert == NULL ) {
-		LM_WARN("tlsops:is_peer_verified: WARNING: peer did not presented "
+		LM_INFO("tlsops:is_peer_verified: WARNING: peer did not present "
 			"a certificate. Thus it could not be verified... return -1\n");
 		tcpconn_put(c);
 		return -1;
@@ -443,7 +453,7 @@ static int is_peer_verified(struct sip_msg* msg, char* foo, char* foo2)
 
 	tcpconn_put(c);
 
-	LM_DBG("tlsops:is_peer_verified: peer is successfuly verified"
+	LM_DBG("tlsops:is_peer_verified: peer is successfully verified"
 		"...done\n");
 	return 1;
 }

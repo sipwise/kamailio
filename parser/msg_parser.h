@@ -88,19 +88,19 @@ enum request_method {
 	METHOD_UNDEF=0,           /*!< 0 - --- */
 	METHOD_INVITE=1,          /*!< 1 - 2^0 */
 	METHOD_CANCEL=2,          /*!< 2 - 2^1 */
-	METHOD_ACK=4,             /*!< 3 - 2^2 */
-	METHOD_BYE=8,             /*!< 4 - 2^3 */
-	METHOD_INFO=16,           /*!< 5 - 2^4 */
-	METHOD_REGISTER=32,       /*!< 6 - 2^5 */
-	METHOD_SUBSCRIBE=64,      /*!< 7 - 2^6 */
-	METHOD_NOTIFY=128,        /*!< 8 - 2^7 */
-	METHOD_MESSAGE=256,       /*!< 9 - 2^8 */
-	METHOD_OPTIONS=512,       /*!< 10 - 2^9 */
-	METHOD_PRACK=1024,        /*!< 11 - 2^10 */
-	METHOD_UPDATE=2048,       /*!< 12 - 2^11 */
-	METHOD_REFER=4096,        /*!< 13 - 2^12 */
-	METHOD_PUBLISH=8192,      /*!< 14 - 2^13 */
-	METHOD_OTHER=16384        /*!< 15 - 2^14 */
+	METHOD_ACK=4,             /*!< 4 - 2^2 */
+	METHOD_BYE=8,             /*!< 8 - 2^3 */
+	METHOD_INFO=16,           /*!< 16 - 2^4 */
+	METHOD_REGISTER=32,       /*!< 32 - 2^5 */
+	METHOD_SUBSCRIBE=64,      /*!< 64 - 2^6 */
+	METHOD_NOTIFY=128,        /*!< 128 - 2^7 */
+	METHOD_MESSAGE=256,       /*!< 256 - 2^8 */
+	METHOD_OPTIONS=512,       /*!< 512 - 2^9 */
+	METHOD_PRACK=1024,        /*!< 1024 - 2^10 */
+	METHOD_UPDATE=2048,       /*!< 2048 - 2^11 */
+	METHOD_REFER=4096,        /*!< 4096 - 2^12 */
+	METHOD_PUBLISH=8192,      /*!< 8192 - 2^13 */
+	METHOD_OTHER=16384        /*!< 16384 - 2^14 */
 };
 
 #define FL_FORCE_RPORT  (1 << 0)  /*!< force rport */
@@ -118,6 +118,12 @@ enum request_method {
 #define FL_MTU_TLS_FB   (1 << 9)
 #define FL_MTU_SCTP_FB  (1 << 10)
 #define FL_ADD_LOCAL_RPORT  (1 << 11) /*!< add 'rport' to local via hdr */
+#define FL_SDP_BODY     (1 << 12)  /*!< msg has SDP in body */
+#define FL_USE_UAC_FROM      (1<<13)  /* take FROM hdr from UAC instead of UAS*/
+#define FL_USE_UAC_TO        (1<<14)  /* take TO hdr from UAC instead of UAS */
+
+/* WARNING: Value (1 << 28) is temporarily reserved for use in kamailio call_control
+ * module (flag  FL_USE_CALL_CONTROL )! */
 
 /* WARNING: Value (1 << 29) is temporarily reserved for use in kamailio acc
  * module (flag FL_REQ_UPSTREAM)! */
@@ -173,20 +179,7 @@ if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 (((m)->new_uri.s && (m)->new_uri.len) ? (&(m)->new_uri) : (&(m)->first_line.u.request.uri))
 
 
-#if 0
-	/* old version */
-struct sip_uri {
-	str user;     /* Username */
-	str passwd;   /* Password */
-	str host;     /* Host name */
-	str port;     /* Port number */
-	str params;   /* Parameters */
-	str headers;
-	unsigned short port_no;
-};
-#endif
-
-enum _uri_type{ERROR_URI_T=0, SIP_URI_T, SIPS_URI_T, TEL_URI_T, TELS_URI_T};
+enum _uri_type{ERROR_URI_T=0, SIP_URI_T, SIPS_URI_T, TEL_URI_T, TELS_URI_T, URN_URI_T};
 typedef enum _uri_type uri_type;
 enum _uri_flags{
 	URI_USER_NORMALIZE=1,
@@ -219,6 +212,7 @@ struct sip_uri {
 	str method;
 	str lr;
 	str r2; /*!< ser specific rr parameter */
+	str gr;
 	str transport_val; /*!< transport value */
 	str ttl_val;	 /*!< TTL value */
 	str user_param_val; /*!< User= param value */
@@ -226,10 +220,13 @@ struct sip_uri {
 	str method_val; /*!< Method value */
 	str lr_val; /*!< lr value placeholder for lr=on a.s.o*/
 	str r2_val;
+	str gr_val;
 #ifdef USE_COMP
 	unsigned short comp;
 #endif
 };
+
+typedef struct sip_uri sip_uri_t;
 
 struct msg_body;
 
@@ -254,9 +251,14 @@ typedef struct msg_body {
 } msg_body_t;
 
 
+/* pre-declaration, to include sys/time.h in .c */
+struct timeval;
+
 /*! \brief The SIP message */
 typedef struct sip_msg {
 	unsigned int id;               /*!< message id, unique/process*/
+	int pid;                       /*!< process id */
+	struct timeval tval;           /*!< time value associated to message */
 	snd_flags_t fwd_send_flags;    /*!< send flags for forwarding */
 	snd_flags_t rpl_send_flags;    /*!< send flags for replies */
 	struct msg_start first_line;   /*!< Message first line */
@@ -300,7 +302,6 @@ typedef struct sip_msg {
 	struct hdr_field* user_agent;
 	struct hdr_field* server;
 	struct hdr_field* content_disposition;
-	struct hdr_field* accept_disposition;
 	struct hdr_field* diversion;
 	struct hdr_field* rpid;
 	struct hdr_field* refer_to;
@@ -438,8 +439,10 @@ int set_dst_uri(struct sip_msg* msg, str* uri);
 /*! \brief If the dst_uri is set to an URI then reset it */
 void reset_dst_uri(struct sip_msg* msg);
 
-struct hdr_field* get_hdr(struct sip_msg *msg, enum _hdr_types_t ht);
-struct hdr_field* next_sibling_hdr(struct hdr_field *hf);
+hdr_field_t* get_hdr(sip_msg_t *msg, enum _hdr_types_t ht);
+hdr_field_t* next_sibling_hdr(hdr_field_t *hf);
+hdr_field_t* get_hdr_by_name(sip_msg_t *msg, char *name, int name_len);
+hdr_field_t* next_sibling_hdr_by_name(hdr_field_t *hf);
 
 int set_path_vector(struct sip_msg* msg, str* path);
 
@@ -463,5 +466,30 @@ void reset_path_vector(struct sip_msg* msg);
 /** reset a previously forced send socket. */
 #define reset_force_socket(msg) set_force_socket(msg, 0)
 
+/**
+ * struct to identify a msg context
+ * - the pair of pid and message-id
+ */
+typedef struct msg_ctx_id {
+	int pid;
+	int msgid;
+} msg_ctx_id_t;
+
+/**
+ * set msg context id
+ * - return: -1 on error; 0 - on set 
+ */
+int msg_ctx_id_set(sip_msg_t *msg, msg_ctx_id_t *mid);
+
+/**
+ * check msg context id
+ * - return: -1 on error; 0 - on no match; 1 - on match
+ */
+int msg_ctx_id_match(sip_msg_t *msg, msg_ctx_id_t *mid);
+
+/**
+ * set msg time value
+ */
+int msg_set_time(sip_msg_t *msg);
 
 #endif

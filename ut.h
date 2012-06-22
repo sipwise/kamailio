@@ -158,6 +158,9 @@
 	*((_dest)++) = _c;
 
 
+#define is_in_str(p, in) (p < in->s + in->len && *p)
+
+
 /* links a value to a msgid */
 struct msgid_var{
 	union{
@@ -192,14 +195,12 @@ static inline unsigned short str2s(const char* s, unsigned int len,
 	unsigned short ret;
 	int i;
 	unsigned char *limit;
-	unsigned char *init;
 	unsigned char* str;
 
 	/*init*/
 	str=(unsigned char*)s;
 	ret=i=0;
 	limit=str+len;
-	init=str;
 
 	for(;str<limit ;str++){
 		if ( (*str <= '9' ) && (*str >= '0') ){
@@ -215,12 +216,9 @@ static inline unsigned short str2s(const char* s, unsigned int len,
 	return ret;
 
 error_digits:
-	/*DBG("str2s: ERROR: too many letters in [%.*s]\n", (int)len, init); */
 	if (err) *err=1;
 	return 0;
 error_char:
-	/*DBG("str2s: ERROR: unexpected char %c in %.*s\n", *str, (int)len, init);
-	 * */
 	if (err) *err=1;
 	return 0;
 }
@@ -524,7 +522,7 @@ inline static void sleep_us( unsigned int nusecs )
 
 
 /* portable determination of max_path */
-inline static int pathmax()
+inline static int pathmax(void)
 {
 #ifdef PATH_MAX
 	static int pathmax=PATH_MAX;
@@ -697,7 +695,7 @@ static inline int str2sint(str* _s, int* _r)
  */
 static inline int shm_str_dup(str* dst, const str* src)
 {
-	dst->s = shm_malloc(src->len);
+	dst->s = (char*)shm_malloc(src->len);
 	if (!dst->s) {
 		SHM_MEM_ERROR;
 		return -1;
@@ -719,7 +717,7 @@ static inline int shm_str_dup(str* dst, const str* src)
  */
 static inline int pkg_str_dup(str* dst, const str* src)
 {
-	dst->s = pkg_malloc(src->len);
+	dst->s = (char*)pkg_malloc(src->len);
 	if (dst->s==NULL)
 	{
 		PKG_MEM_ERROR;
@@ -772,6 +770,69 @@ static inline int str_strcasecmp(const str *str1, const str *str2)
 		return 1;
 	else
 		return strncasecmp(str1->s, str2->s, str1->len);
+}
+
+#ifndef MIN
+#define	MIN(x, y)	((x) < (y) ? (x) : (y))
+#endif
+#ifndef MAX
+#define	MAX(x, y)	((x) > (y) ? (x) : (y))
+#endif
+
+
+/* INTeger-TO-Buffer-STRing : convers an unsigned long to a string 
+ * IMPORTANT: the provided buffer must be at least INT2STR_MAX_LEN size !! */
+static inline char* int2bstr(unsigned long l, char *s, int* len)
+{
+	int i;
+	i=INT2STR_MAX_LEN-2;
+	s[INT2STR_MAX_LEN-1]=0;
+	/* null terminate */
+	do{
+		s[i]=l%10+'0';
+		i--;
+		l/=10;
+	}while(l && (i>=0));
+	if (l && (i<0)){
+		LM_CRIT("overflow error\n");
+	}
+	if (len) *len=(INT2STR_MAX_LEN-2)-i;
+	return &s[i+1];
+}
+
+
+inline static int hexstr2int(char *c, int len, unsigned int *val)
+{
+	char *pc;
+	int r;
+	char mychar;
+
+	r=0;
+	for (pc=c; pc<c+len; pc++) {
+		r <<= 4 ;
+		mychar=*pc;
+		if ( mychar >='0' && mychar <='9') r+=mychar -'0';
+		else if (mychar >='a' && mychar <='f') r+=mychar -'a'+10;
+		else if (mychar  >='A' && mychar <='F') r+=mychar -'A'+10;
+		else return -1;
+	}
+	*val = r;
+	return 0;
+}
+
+
+
+/*
+ * Convert a str (base 10 or 16) into integer
+ */
+static inline int strno2int( str *val, unsigned int *mask )
+{
+	/* hexa or decimal*/
+	if (val->len>2 && val->s[0]=='0' && val->s[1]=='x') {
+		return hexstr2int( val->s+2, val->len-2, mask);
+	} else {
+		return str2int( val, mask);
+	}
 }
 
 /* converts a username into uid:gid,

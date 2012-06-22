@@ -82,7 +82,6 @@ int t_suspend(struct sip_msg *msg,
 				DBG("SER: ERROR: t_suspend (100)\n");
 	}
 
-#ifdef POSTPONE_MSG_CLONING
 	if ((t->nr_of_outgoings==0) && /* if there had already been
 				an UAC created, then the lumps were
 				saved as well */
@@ -92,7 +91,6 @@ int t_suspend(struct sip_msg *msg,
 			"failed to save the message lumps\n");
 		return -1;
 	}
-#endif
 	/* save the message flags */
 	t->uas.request->flags = msg->flags;
 
@@ -135,6 +133,8 @@ int t_continue(unsigned int hash_index, unsigned int label,
 		/* The transaction has already been canceled,
 		 * needless to continue */
 		UNREF(t); /* t_unref would kill the transaction */
+		/* reset T as we have no working T anymore */
+		set_t(T_UNDEFINED, T_BR_UNDEFINED);
 		return 1;
 	}
 
@@ -212,9 +212,7 @@ int t_continue(unsigned int hash_index, unsigned int label,
 			branch < t->nr_of_outgoings;
 			branch++
 		) {
-			if ((t->uac[branch].request.buffer != NULL)
-				&& (t->uac[branch].last_received < 200)
-			)
+			if (t->uac[branch].last_received < 200)
 				break;
 		}
 

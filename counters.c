@@ -1,6 +1,4 @@
 /* 
- * $Id$
- * 
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -15,10 +13,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/** counters/stats.
- * @file counters.c
+
+/**
+ * @brief counters/stats
+ * @file
  * @ingroup: core
  */
+
 /*
  * History:
  * --------
@@ -202,10 +203,10 @@ int counters_prefork_init(int max_process_no)
 	/* replace the temporary pre-fork pkg array (with only 1 row) with
 	   the final shm version (with max_process_no rows) */
 	old = _cnts_vals;
-	_cnts_vals = shm_malloc(max_process_no * row_size);
+	_cnts_vals = shm_malloc(size);
 	if (_cnts_vals == 0)
 		return -1;
-	memset(_cnts_vals, 0, max_process_no * row_size);
+	memset(_cnts_vals, 0, size);
 	cnts_max_rows = max_process_no;
 	/* copy prefork values into the newly shm array */
 	if (old) {

@@ -1,6 +1,4 @@
 /* 
- * $Id$
- * 
  * Copyright (C) 2006 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -16,14 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/** @file
- *  @brief atomic operations and memory barriers (alpha specific)
+/** 
+ * @file
+ * @brief Atomic operations and memory barriers (alpha specific)
  *
- *  WARNING: atomic ops do not include memory barriers
- *  see atomic_ops.h for more details 
- *
- *  Config defines:  - NOSMP 
- *                   - __CPU_alpha
+ * Atomic operations and memory barriers (alpha specific)
+ * \warning atomic ops do not include memory barriers, see atomic_ops.h
+ * for more details.
+ * 
+ * Config defines:
+ * - NOSMP 
+ * - __CPU_alpha
+ * @ingroup atomic
  */
 /* 
  * History:

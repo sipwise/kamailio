@@ -35,10 +35,10 @@ struct cfg_read_handle {
 };
 
 /* free the list of not yet fixed selects */
-void cfg_free_selects();
+void cfg_free_selects(void);
 
 /* fix-up the select calls */
-int cfg_fixup_selects();
+int cfg_fixup_selects(void);
 
 int select_cfg_var(str *res, select_t *s, struct sip_msg *msg);
 
@@ -60,5 +60,8 @@ unsigned int read_cfg_var(struct cfg_read_handle *read_handle, void **val);
 /* wrapper functions for read_cfg_var() -- convert the value to the requested format */
 int read_cfg_var_int(struct cfg_read_handle *read_handle, int *val);
 int read_cfg_var_str(struct cfg_read_handle *read_handle, str *val);
+
+/* return the selected group instance */
+int cfg_selected_inst(str *res, select_t *s, struct sip_msg *msg);
 
 #endif /* _CFG_SELECT_H */

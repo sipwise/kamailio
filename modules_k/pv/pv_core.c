@@ -24,7 +24,6 @@
 
 
 #include "../../qvalue.h"
-#include "../../lib/kcore/errinfo.h"
 #include "../../ut.h" 
 #include "../../route_struct.h"
 #include "../../dset.h"
@@ -42,7 +41,6 @@
 #include "../../parser/parse_diversion.h"
 #include "../../lib/kcore/parse_ppi.h"
 #include "../../lib/kcore/parse_pai.h"
-#include "../../lib/kcore/parser_helpers.h"
 #include "../../parser/digest/digest.h"
 
 #include "pv_core.h"
@@ -52,6 +50,15 @@
 static str str_udp    = { "UDP", 3 };
 static str str_5060   = { "5060", 4 };
 static str pv_str_1   = { "1", 1 };
+static str pv_uri_scheme[] = {
+		{ "none", 4 },
+		{ "sip",  3 },
+		{ "sips", 4 },
+		{ "tel",  3 },
+		{ "tels", 4 },
+		{ "urn",  3 },
+		{ 0, 0 }
+	};
 
 int _pv_pid = 0;
 
@@ -127,6 +134,45 @@ int pv_get_method(struct sip_msg *msg, pv_param_t *param,
 	return pv_get_strintval(msg, param, res,
 			&get_cseq(msg)->method,
 			get_cseq(msg)->method_id);
+}
+
+int pv_get_methodid(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	if(msg==NULL)
+		return -1;
+
+	if(msg->first_line.type == SIP_REQUEST)
+	{
+		return pv_get_uintval(msg, param, res,
+				(unsigned int)msg->first_line.u.request.method_value);
+	}
+
+	if(msg->cseq==NULL && ((parse_headers(msg, HDR_CSEQ_F, 0)==-1)
+				|| (msg->cseq==NULL)))
+	{
+		LM_ERR("no CSEQ header\n");
+		return pv_get_null(msg, param, res);
+	}
+
+	return pv_get_uintval(msg, param, res,
+			(unsigned int)(get_cseq(msg)->method_id));
+}
+
+int pv_get_msgtype(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	unsigned int type = 0;
+
+	if(msg==NULL)
+		return -1;
+
+	if(msg->first_line.type == SIP_REQUEST)
+		type = 1;
+	else if(msg->first_line.type == SIP_REPLY)
+		type = 2;
+
+	return pv_get_uintval(msg, param, res, type);
 }
 
 int pv_get_version(struct sip_msg *msg, pv_param_t *param,
@@ -232,6 +278,9 @@ int pv_get_xuri_attr(struct sip_msg *msg, struct sip_uri *parsed_uri,
 			return pv_get_udp(msg, param, res);
 		return pv_get_strintval(msg, param, res, &parsed_uri->transport_val,
 				(int)parsed_uri->proto);
+	} else if(param->pvn.u.isname.name.n==5) /* uri scheme */ {
+		return pv_get_strintval(msg, param, res, &pv_uri_scheme[parsed_uri->type],
+				(int)parsed_uri->type);
 	}
 	LM_ERR("unknown specifier\n");
 	return pv_get_null(msg, param, res);
@@ -272,32 +321,10 @@ int pv_get_ouri_attr(struct sip_msg *msg, pv_param_t *param,
 	return pv_get_xuri_attr(msg, &(msg->parsed_orig_ruri), param, res);
 }
 
-extern err_info_t _oser_err_info;
 int pv_get_errinfo_attr(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
 {
-	if(msg==NULL)
-		return -1;
-
-	if(param->pvn.u.isname.name.n==0) /* class */ {
-		return pv_get_sintval(msg, param, res, _oser_err_info.eclass);
-	} else if(param->pvn.u.isname.name.n==1) /* level */ {
-		return pv_get_sintval(msg, param, res, _oser_err_info.level);
-	} else if(param->pvn.u.isname.name.n==2) /* info */ {
-		if(_oser_err_info.info.s==NULL)
-			pv_get_null(msg, param, res);
-		return pv_get_strval(msg, param, res, &_oser_err_info.info);
-	} else if(param->pvn.u.isname.name.n==3) /* rcode */ {
-		return pv_get_sintval(msg, param, res, _oser_err_info.rcode);
-	} else if(param->pvn.u.isname.name.n==4) /* rreason */ {
-		if(_oser_err_info.rreason.s==NULL)
-			pv_get_null(msg, param, res);
-		return pv_get_strval(msg, param, res, &_oser_err_info.rreason);
-	} else {
-		LM_DBG("invalid attribute!\n");
-		return pv_get_null(msg, param, res);
-	}
-	return 0;
+	return pv_get_null(msg, param, res);
 }
 
 int pv_get_contact(struct sip_msg *msg, pv_param_t *param,
@@ -698,6 +725,17 @@ int pv_get_diversion(struct sip_msg *msg, pv_param_t *param,
 
 	if(param->pvn.u.isname.name.n == 3)  { /* privacy param */
 	    name.s = "privacy";
+	    name.len = 7;
+	    val = get_diversion_param(msg, &name);
+	    if (val) {
+			return pv_get_strval(msg, param, res, val);
+	    } else {
+			return pv_get_null(msg, param, res);
+	    }
+	}
+
+	if(param->pvn.u.isname.name.n == 4)  { /* counter param */
+	    name.s = "counter";
 	    name.len = 7;
 	    val = get_diversion_param(msg, &name);
 	    if (val) {
@@ -1542,6 +1580,14 @@ int pv_get_scriptvar(struct sip_msg *msg,  pv_param_t *param,
 	}
 	return 0;
 }
+
+int pv_get_server_id(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	return pv_get_sintval(msg, param, res, server_id);
+}
+
+
 /********* end PV get functions *********/
 
 /********* start PV set functions *********/
@@ -1661,7 +1707,7 @@ int pv_set_dsturi(struct sip_msg* msg, pv_param_t *param,
 	}
 	if(!(val->flags&PV_VAL_STR))
 	{
-		LM_ERR("error - str value requred to set dst uri\n");
+		LM_ERR("error - str value required to set dst uri\n");
 		goto error;
 	}
 	

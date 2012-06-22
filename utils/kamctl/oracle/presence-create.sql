@@ -20,7 +20,10 @@ END presentity_tr;
 /
 BEGIN map2users('presentity'); END;
 /
-INSERT INTO version (table_name, table_version) values ('active_watchers','9');
+CREATE INDEX presentity_presentity_expires  ON presentity (expires);
+CREATE INDEX presentity_account_idx  ON presentity (username, domain, event);
+
+INSERT INTO version (table_name, table_version) values ('active_watchers','11');
 CREATE TABLE active_watchers (
     id NUMBER(10) PRIMARY KEY,
     presentity_uri VARCHAR2(128),
@@ -32,7 +35,7 @@ CREATE TABLE active_watchers (
     event_id VARCHAR2(64),
     to_tag VARCHAR2(64),
     from_tag VARCHAR2(64),
-    callid VARCHAR2(128),
+    callid VARCHAR2(255),
     local_cseq NUMBER(10),
     remote_cseq NUMBER(10),
     contact VARCHAR2(128),
@@ -43,7 +46,11 @@ CREATE TABLE active_watchers (
     version NUMBER(10) DEFAULT 0 NOT NULL,
     socket_info VARCHAR2(64),
     local_contact VARCHAR2(128),
-    CONSTRAINT ORA_active_watchers_idx  UNIQUE (presentity_uri, callid, to_tag, from_tag)
+    from_user VARCHAR2(64),
+    from_domain VARCHAR2(64),
+    updated NUMBER(10),
+    updated_winfo NUMBER(10),
+    CONSTRAINT ORA_active_watchers_idx  UNIQUE (callid, to_tag, from_tag)
 );
 
 CREATE OR REPLACE TRIGGER active_watchers_tr
@@ -54,6 +61,11 @@ END active_watchers_tr;
 /
 BEGIN map2users('active_watchers'); END;
 /
+CREATE INDEX ORA_active_watchers_expires  ON active_watchers (expires);
+CREATE INDEX ORA_active_watchers_pres  ON active_watchers (presentity_uri);
+CREATE INDEX active_watchers_updated_idx  ON active_watchers (updated);
+CREATE INDEX ORA_updated_winfo_idx  ON active_watchers (updated_winfo, presentity_uri);
+
 INSERT INTO version (table_name, table_version) values ('watchers','3');
 CREATE TABLE watchers (
     id NUMBER(10) PRIMARY KEY,
@@ -75,7 +87,7 @@ END watchers_tr;
 /
 BEGIN map2users('watchers'); END;
 /
-INSERT INTO version (table_name, table_version) values ('xcap','3');
+INSERT INTO version (table_name, table_version) values ('xcap','4');
 CREATE TABLE xcap (
     id NUMBER(10) PRIMARY KEY,
     username VARCHAR2(64),
@@ -84,9 +96,9 @@ CREATE TABLE xcap (
     doc_type NUMBER(10),
     etag VARCHAR2(64),
     source NUMBER(10),
-    doc_uri VARCHAR2(128),
+    doc_uri VARCHAR2(255),
     port NUMBER(10),
-    CONSTRAINT xcap_account_doc_type_idx  UNIQUE (username, domain, doc_type, doc_uri)
+    CONSTRAINT xcap_doc_uri_idx  UNIQUE (doc_uri)
 );
 
 CREATE OR REPLACE TRIGGER xcap_tr
@@ -97,13 +109,15 @@ END xcap_tr;
 /
 BEGIN map2users('xcap'); END;
 /
-CREATE INDEX xcap_source_idx  ON xcap (source);
+CREATE INDEX xcap_account_doc_type_idx  ON xcap (username, domain, doc_type);
+CREATE INDEX xcap_account_doc_type_uri_idx  ON xcap (username, domain, doc_type, doc_uri);
+CREATE INDEX xcap_account_doc_uri_idx  ON xcap (username, domain, doc_uri);
 
-INSERT INTO version (table_name, table_version) values ('pua','6');
+INSERT INTO version (table_name, table_version) values ('pua','7');
 CREATE TABLE pua (
     id NUMBER(10) PRIMARY KEY,
     pres_uri VARCHAR2(128),
-    pres_id VARCHAR2(64),
+    pres_id VARCHAR2(255),
     event NUMBER(10),
     expires NUMBER(10),
     desired_expires NUMBER(10),
@@ -111,7 +125,7 @@ CREATE TABLE pua (
     etag VARCHAR2(64),
     tuple_id VARCHAR2(64),
     watcher_uri VARCHAR2(128),
-    call_id VARCHAR2(128),
+    call_id VARCHAR2(255),
     to_tag VARCHAR2(64),
     from_tag VARCHAR2(64),
     cseq NUMBER(10),
@@ -119,7 +133,9 @@ CREATE TABLE pua (
     contact VARCHAR2(128),
     remote_contact VARCHAR2(128),
     version NUMBER(10),
-    extra_headers CLOB
+    extra_headers CLOB,
+    CONSTRAINT pua_pua_idx  UNIQUE (etag, tuple_id, call_id, from_tag),
+    CONSTRAINT pua_expires_idx  UNIQUE (expires)
 );
 
 CREATE OR REPLACE TRIGGER pua_tr
@@ -130,3 +146,10 @@ END pua_tr;
 /
 BEGIN map2users('pua'); END;
 /
+CREATE INDEX pua_dialog1_idx  ON pua (call_id, from_tag, to_tag);
+CREATE INDEX pua_dialog2_idx  ON pua (pres_id, pres_uri);
+CREATE INDEX pua_tmp_dlg1_idx  ON pua (call_id, from_tag);
+CREATE INDEX pua_tmp_dlg2_idx  ON pua (pres_id, pres_uri, call_id, from_tag);
+CREATE INDEX pua_tmp_record1_idx  ON pua (pres_id);
+CREATE INDEX pua_tmp_record2_idx  ON pua (pres_id, etag);
+

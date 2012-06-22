@@ -20,12 +20,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <stddef.h>
 #include <regex.h>
 
 #include "../../mem/shm_mem.h"
 #include "../../mem/mem.h"
 #include "../../dprint.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../../ut.h"
 
 #include "ds_ht.h"
@@ -145,6 +146,32 @@ int ds_ht_destroy(ds_ht_t *dsht)
 	shm_free(dsht->entries);
 	shm_free(dsht);
 	dsht = NULL;
+	return 0;
+}
+
+int ds_ht_clear_slots(ds_ht_t *dsht)
+{
+	int i;
+	ds_cell_t *it, *it0;
+
+	if(dsht==NULL)
+		return -1;
+
+	for(i=0; i<dsht->htsize; i++)
+	{
+		lock_get(&dsht->entries[i].lock);
+		/* free entries */
+		it = dsht->entries[i].first;
+		while(it)
+		{
+			it0 = it;
+			it = it->next;
+			ds_cell_free(it0);
+		}
+		dsht->entries[i].first = NULL;
+		dsht->entries[i].esize = 0;
+		lock_destroy(&dsht->entries[i].lock);
+	}
 	return 0;
 }
 

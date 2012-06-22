@@ -47,6 +47,11 @@
 db1_con_t* db_postgres_init(const str* _url);
 
 /*
+ * Initialize database connection - no pooling
+ */
+db1_con_t* db_postgres_init2(const str* _url, db_pooling_t pooling);
+
+/*
  * Close a database connection
  */
 void db_postgres_close(db1_con_t* _h);
@@ -102,6 +107,25 @@ int db_postgres_update(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _
  */
 int db_postgres_fetch_result(const db1_con_t* _h, db1_res_t** _r, const int nrows);
 
+/*
+ * number of rows affected by the last DB query/statement
+ */
+int db_postgres_affected_rows(const db1_con_t* _h);
+
+/*
+ * SQL BEGIN
+ */
+int db_postgres_start_transaction(db1_con_t* _h);
+
+/*
+ * SQL COMMIT
+ */
+int db_postgres_end_transaction(db1_con_t* _h);
+
+/*
+ * SQL ROLLBACK
+ */
+int db_postgres_abort_transaction(db1_con_t* _h);
 
 /*
  * Store name of table that will be used by
@@ -109,5 +133,10 @@ int db_postgres_fetch_result(const db1_con_t* _h, db1_res_t** _r, const int nrow
  */
 int db_postgres_use_table(db1_con_t* _h, const str* _t);
 
+/*
+ * Replace a row in table (via update/insert)
+ */
+int db_postgres_replace(const db1_con_t* _h, const db_key_t* _k,
+		const db_val_t* _v, const int _n, const int _un, const int _m);
 
 #endif /* KM_DBASE_H */

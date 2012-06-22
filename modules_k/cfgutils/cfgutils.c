@@ -68,14 +68,15 @@
 #include "../../md5.h"
 #include "../../md5utils.h"
 #include "../../globals.h"
-#include "../../lib/kcore/hash_func.h"
-#include "../../lib/kcore/km_ut.h"
+#include "../../hashes.h"
 #include "../../locking.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include "api.h"
 
 MODULE_VERSION
 
@@ -88,6 +89,8 @@ static int m_usleep(struct sip_msg*, char *, char *);
 static int dbg_abort(struct sip_msg*, char*,char*);
 static int dbg_pkg_status(struct sip_msg*, char*,char*);
 static int dbg_shm_status(struct sip_msg*, char*,char*);
+static int dbg_pkg_summary(struct sip_msg*, char*,char*);
+static int dbg_shm_summary(struct sip_msg*, char*,char*);
 
 static int set_gflag(struct sip_msg*, char *, char *);
 static int reset_gflag(struct sip_msg*, char *, char *);
@@ -115,6 +118,10 @@ static int pv_get_random_val(struct sip_msg *msg, pv_param_t *param,
 static int fixup_prob( void** param, int param_no);
 static int fixup_gflags( void** param, int param_no);
 
+static int fixup_core_hash(void **param, int param_no);
+static int w_core_hash(struct sip_msg *msg, char *p1, char *p2, char *p3);
+
+int bind_cfgutils(cfgutils_api_t *api);
 
 static int mod_init(void);
 static void mod_destroy(void);
@@ -137,33 +144,41 @@ static cmd_export_t cmds[]={
 		1,          /* number of parameters */
 		fixup_prob, 0,         /* */
 		/* can be applied to original/failed requests and replies */
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"rand_reset_prob", (cmd_function)reset_prob, 0, 0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"rand_get_prob",   (cmd_function)get_prob,   0, 0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"rand_event",      (cmd_function)rand_event, 0, 0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"sleep",  (cmd_function)m_sleep,  1, fixup_uint_null, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"usleep", (cmd_function)m_usleep, 1, fixup_uint_null, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"abort",      (cmd_function)dbg_abort,        0, 0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"pkg_status", (cmd_function)dbg_pkg_status,   0, 0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"shm_status", (cmd_function)dbg_shm_status,   0, 0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
+	{"pkg_summary", (cmd_function)dbg_pkg_summary,   0, 0, 0,
+		ANY_ROUTE},
+	{"shm_summary", (cmd_function)dbg_shm_summary,   0, 0, 0,
+		ANY_ROUTE},
 	{"set_gflag",    (cmd_function)set_gflag,   1,   fixup_gflags, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"reset_gflag",  (cmd_function)reset_gflag, 1,   fixup_gflags, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"is_gflag",     (cmd_function)is_gflag,    1,   fixup_gflags, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"lock",         (cmd_function)cfg_lock,    1,   fixup_spve_null, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"unlock",       (cmd_function)cfg_unlock,  1,   fixup_spve_null, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
+	{"core_hash",    (cmd_function)w_core_hash, 3,   fixup_core_hash, 0,
+		ANY_ROUTE},
+	{"bind_cfgutils", (cmd_function)bind_cfgutils,  0,
+		0, 0, 0},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -519,11 +534,11 @@ static int MD5File(char *dest, const char *file_name)
 			fclose(input);
 			return -1;
 		}
-		MD5Update(&context, buffer, counter);
+		U_MD5Update(&context, buffer, counter);
 		size -= counter;
 	}
 	fclose(input);
-	MD5Final(hash, &context);
+	U_MD5Final(hash, &context);
 
 	string2hex(hash, 16, dest);
 	LM_DBG("MD5 calculated: %.*s for file %s\n", MD5_LEN, dest, file_name);
@@ -546,6 +561,7 @@ static struct mi_root* mi_check_hash(struct mi_root* cmd, void* param )
 		if (MD5File(tmp, hash_file) != 0) {
 			LM_ERR("could not hash the config file");
 			rpl_tree = init_mi_tree( 500, MI_INTERNAL_ERR_S, MI_INTERNAL_ERR_LEN );
+			return rpl_tree;
 		}
 		
 		if (strncmp(config_hash, tmp, MD5_LEN) == 0) {
@@ -660,16 +676,22 @@ static int dbg_shm_status(struct sip_msg* msg, char* foo, char* bar)
 	return 1;
 }
 
-int cfg_lock_helper(struct sip_msg *msg, gparam_p key, int mode)
+static int dbg_pkg_summary(struct sip_msg* msg, char* foo, char* bar)
 {
-	str s;
+	pkg_sums();
+	return 1;
+}
+
+static int dbg_shm_summary(struct sip_msg* msg, char* foo, char* bar)
+{
+	shm_sums();
+	return 1;
+}
+
+int cfg_lock_helper(str *lkey, int mode)
+{
 	unsigned int pos;
-	if(fixup_get_svalue(msg, key, &s)!=0)
-	{
-		LM_ERR("cannot get first parameter\n");
-		return -1;
-	}
-	pos = core_case_hash(&s, 0, _cfg_lock_size);
+	pos = core_case_hash(lkey, 0, _cfg_lock_size);
 	LM_DBG("cfg_lock mode %d on %u\n", mode, pos);
 	if(mode==0)
 		lock_set_get(_cfg_lock_set, pos);
@@ -678,18 +700,29 @@ int cfg_lock_helper(struct sip_msg *msg, gparam_p key, int mode)
 	return 1;
 }
 
+int cfg_lock_wrapper(struct sip_msg *msg, gparam_p key, int mode)
+{
+	str s;
+	if(fixup_get_svalue(msg, key, &s)!=0)
+	{
+		LM_ERR("cannot get first parameter\n");
+		return -1;
+	}
+	return cfg_lock_helper(&s, mode);
+}
+
 static int cfg_lock(struct sip_msg *msg, char *key, char *s2)
 {
 	if(_cfg_lock_set==NULL || key==NULL)
 		return -1;
-	return cfg_lock_helper(msg, (gparam_p)key, 0);
+	return cfg_lock_wrapper(msg, (gparam_p)key, 0);
 }
 
 static int cfg_unlock(struct sip_msg *msg, char *key, char *s2)
 {
 	if(_cfg_lock_set==NULL || key==NULL)
 		return -1;
-	return cfg_lock_helper(msg, (gparam_p)key, 1);
+	return cfg_lock_wrapper(msg, (gparam_p)key, 1);
 }
 
 
@@ -756,4 +789,75 @@ static void mod_destroy(void)
 		lock_set_destroy(_cfg_lock_set);
 		lock_set_dealloc(_cfg_lock_set);
 	}
+}
+
+/**
+ *
+ */
+int cfgutils_lock(str *lkey)
+{
+	return cfg_lock_helper(lkey, 0);
+}
+
+/**
+ *
+ */
+int cfgutils_unlock(str *lkey)
+{
+	return cfg_lock_helper(lkey, 1);
+}
+
+static int fixup_core_hash(void **param, int param_no)
+{
+	if (param_no == 1)
+		return fixup_spve_null(param, 1);
+	else if (param_no == 2)
+		return fixup_spve_null(param, 1);
+	else if (param_no == 3)
+		return fixup_igp_null(param, 1);
+	else
+		return 0;
+}
+
+static int w_core_hash(struct sip_msg *msg, char *p1, char *p2, char *p3)
+{
+        str s1, s2;
+        int size;
+
+        if (fixup_get_svalue(msg, (gparam_p) p1, &s1) != 0)
+        {
+                LM_ERR("invalid s1 paramerer\n");
+                return -1;
+        }
+        if (fixup_get_svalue(msg, (gparam_p) p2, &s2) != 0)
+        {
+                LM_ERR("invalid s2 paramerer\n");
+                return -1;
+        }
+        if (fixup_get_ivalue(msg, (gparam_p) p3, &size) != 0)
+        {
+                LM_ERR("invalid size paramerer\n");
+                return -1;
+        }
+
+        if (size <= 0) size = 2;
+        else size = 1 << size;
+
+	/* Return value _MUST_ be > 0 */
+        return core_hash(&s1, s2.len ? &s2 : NULL, size) + 1;
+}
+
+/**
+ * @brief bind functions to CFGUTILS API structure
+ */
+int bind_cfgutils(cfgutils_api_t *api)
+{
+	if (!api) {
+		ERR("Invalid parameter value\n");
+		return -1;
+	}
+	api->mlock   = cfgutils_lock;
+	api->munlock = cfgutils_unlock;
+
+	return 0;
 }

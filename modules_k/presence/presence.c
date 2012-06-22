@@ -1,8 +1,4 @@
 /*
- * $Id$
- *
- * presence module - presence server implementation
- *
  * Copyright (C) 2006 Voice Sistem S.R.L.
  *
  * This file is part of Kamailio, a free SIP server.
@@ -23,21 +19,21 @@
  *
  * History:
  * --------
- *  2006-08-15  initial version (anca)
+ *  2006-08-15  initial version (Anca Vamanu)
  */
 
-/*! \defgroup presence Presence :: A generic implementation of the SIP event package (PUBLISH, SUBSCRIBE, NOTIFY)
- *
- *	   The Kamailio presence module is a generic module for SIP event packages, which is much more than presence.
- *	   It is extensible by developing other modules that use the internal developer API.
- *	   Examples:
- *	   - \ref presence_mwi
- *	   - \ref presence_xml
+/*!
+ * \defgroup presence Presence :: A generic implementation of the SIP event package (PUBLISH, SUBSCRIBE, NOTIFY)
+ * The Kamailio presence module is a generic module for SIP event packages, which is much more than presence.
+ * It is extensible by developing other modules that use the internal developer API.
+ * Examples:
+ *- \ref presence_mwi
+ *- \ref presence_xml
  */
 
-/*! \file
- * \brief Kamailio presence module
- * 
+/*!
+ * \file
+ * \brief Kamailio presence module :: Core
  * \ingroup presence 
  */
 
@@ -67,20 +63,22 @@
 #include "../../modules/sl/sl.h"
 #include "../../pt.h"
 #include "../../lib/kmi/mi.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../pua/hash.h"
+#include "presence.h"
 #include "publish.h"
 #include "subscribe.h"
 #include "event_list.h"
 #include "bind_presence.h"
 #include "notify.h"
 #include "../../mod_fix.h"
+#include "../../timer_proc.h"
 
 MODULE_VERSION
 
 #define S_TABLE_VERSION  3
 #define P_TABLE_VERSION  3
-#define ACTWATCH_TABLE_VERSION 9
+#define ACTWATCH_TABLE_VERSION 11
 
 char *log_buf = NULL;
 static int clean_period=100;
@@ -93,6 +91,7 @@ str presentity_table= str_init("presentity");
 str active_watchers_table = str_init("active_watchers");
 str watchers_table= str_init("watchers");
 
+int pres_fetch_rows = 500;
 int library_mode= 0;
 str server_address= {0, 0};
 evlist_t* EvList= NULL;
@@ -119,9 +118,11 @@ static int update_pw_dialogs(subs_t* subs, unsigned int hash_code,
 		subs_t** subs_array);
 int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc);
 static int mi_child_init(void);
-static int pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2);
+static int w_pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2);
 static int w_pres_refresh_watchers(struct sip_msg *msg, char *puri,
 		char *pevent, char *ptype);
+static int w_pres_refresh_watchers5(struct sip_msg *msg, char *puri,
+		char *pevent, char *ptype, char *furi, char *fname);
 static int w_pres_update_watchers(struct sip_msg *msg, char *puri,
 		char *pevent);
 static int fixup_refresh_watchers(void** param, int param_no);
@@ -136,12 +137,19 @@ int expires_offset = 0;
 int max_expires= 3600;
 int shtable_size= 9;
 shtable_t subs_htable= NULL;
-int fallback2db= 0;
+int subs_dbmode = WRITE_BACK;
 int sphere_enable= 0;
 int timeout_rm_subs = 1;
+int send_fast_notify = 1;
+int publ_cache_enabled = 1;
+int pres_waitn_time = 5;
+int pres_notifier_poll_rate = 10;
+int pres_notifier_processes = 1;
+
+int *pres_notifier_id = NULL;
 
 int phtable_size= 9;
-phtable_t* pres_htable;
+phtable_t* pres_htable=NULL;
 
 static cmd_export_t cmds[]=
 {
@@ -149,11 +157,15 @@ static cmd_export_t cmds[]=
 		fixup_presence,0, REQUEST_ROUTE},
 	{"handle_publish",        (cmd_function)handle_publish,          1,
 		fixup_presence, 0, REQUEST_ROUTE},
-	{"handle_subscribe",      (cmd_function)handle_subscribe,        0,
+	{"handle_subscribe",      (cmd_function)handle_subscribe0,       0,
 		fixup_subscribe,0, REQUEST_ROUTE},
-	{"pres_auth_status",      (cmd_function)pres_auth_status,        2,
+	{"handle_subscribe",      (cmd_function)w_handle_subscribe,      1,
+		fixup_subscribe,0, REQUEST_ROUTE},
+	{"pres_auth_status",      (cmd_function)w_pres_auth_status,      2,
 		fixup_pvar_pvar, fixup_free_pvar_pvar, REQUEST_ROUTE},
 	{"pres_refresh_watchers", (cmd_function)w_pres_refresh_watchers, 3,
+		fixup_refresh_watchers, 0, ANY_ROUTE},
+	{"pres_refresh_watchers", (cmd_function)w_pres_refresh_watchers5,5,
 		fixup_refresh_watchers, 0, ANY_ROUTE},
 	{"pres_update_watchers",  (cmd_function)w_pres_update_watchers,  2,
 		fixup_update_watchers, 0, ANY_ROUTE},
@@ -169,15 +181,21 @@ static param_export_t params[]={
 	{ "watchers_table",         STR_PARAM, &watchers_table.s},
 	{ "clean_period",           INT_PARAM, &clean_period },
 	{ "db_update_period",       INT_PARAM, &db_update_period },
+	{ "waitn_time",             INT_PARAM, &pres_waitn_time },
+	{ "notifier_poll_rate",     INT_PARAM, &pres_notifier_poll_rate },
+	{ "notifier_processes",     INT_PARAM, &pres_notifier_processes },
 	{ "to_tag_pref",            STR_PARAM, &to_tag_pref },
 	{ "expires_offset",         INT_PARAM, &expires_offset },
 	{ "max_expires",            INT_PARAM, &max_expires },
 	{ "server_address",         STR_PARAM, &server_address.s},
 	{ "subs_htable_size",       INT_PARAM, &shtable_size},
 	{ "pres_htable_size",       INT_PARAM, &phtable_size},
-	{ "fallback2db",            INT_PARAM, &fallback2db},
+	{ "subs_db_mode",           INT_PARAM, &subs_dbmode},
+	{ "publ_cache",             INT_PARAM, &publ_cache_enabled},
 	{ "enable_sphere_check",    INT_PARAM, &sphere_enable},
 	{ "timeout_rm_subs",        INT_PARAM, &timeout_rm_subs},
+	{ "send_fast_notify",       INT_PARAM, &send_fast_notify},
+	{ "fetch_rows",             INT_PARAM, &pres_fetch_rows},
     {0,0,0}
 };
 
@@ -223,15 +241,15 @@ static int mod_init(void)
 	if(db_url.s== NULL)
 		library_mode= 1;
 
+	EvList= init_evlist();
+	if(!EvList){
+		LM_ERR("unsuccessful initialize event list\n");
+		return -1;
+	}
+
 	if(library_mode== 1)
 	{
 		LM_DBG("Presence module used for API library purpose only\n");
-		EvList= init_evlist();
-		if(!EvList)
-		{
-			LM_ERR("unsuccessful initialize event list\n");
-			return -1;
-		}
 		return 0;
 	}
 
@@ -292,71 +310,90 @@ static int mod_init(void)
 		LM_ERR("Connection to database failed\n");
 		return -1;
 	}
-	
+
 	/*verify table versions */
 	if((db_check_table_version(&pa_dbf, pa_db, &presentity_table, P_TABLE_VERSION) < 0) ||
-		(db_check_table_version(&pa_dbf, pa_db, &active_watchers_table, ACTWATCH_TABLE_VERSION) < 0) ||
 		(db_check_table_version(&pa_dbf, pa_db, &watchers_table, S_TABLE_VERSION) < 0)) {
 			LM_ERR("error during table version check\n");
 			return -1;
 	}
 
-	EvList= init_evlist();
-	if(!EvList)
-	{
-		LM_ERR("initializing event list\n");
+	if(subs_dbmode != NO_DB &&
+		db_check_table_version(&pa_dbf, pa_db, &active_watchers_table, ACTWATCH_TABLE_VERSION) < 0) {
+		LM_ERR("wrong table version for %s\n", active_watchers_table.s);
 		return -1;
 	}
 
-	if(shtable_size< 1)
-		shtable_size= 512;
-	else
-		shtable_size= 1<< shtable_size;
+	if(subs_dbmode != DB_ONLY) {
+		if(shtable_size< 1)
+			shtable_size= 512;
+		else
+			shtable_size= 1<< shtable_size;
 
-	subs_htable= new_shtable(shtable_size);
-	if(subs_htable== NULL)
-	{
-		LM_ERR(" initializing subscribe hash table\n");
-		return -1;
+		subs_htable= new_shtable(shtable_size);
+		if(subs_htable== NULL)
+		{
+			LM_ERR(" initializing subscribe hash table\n");
+			return -1;
+		}
+		if(restore_db_subs()< 0)
+		{
+			LM_ERR("restoring subscribe info from database\n");
+			return -1;
+		}
 	}
 
-	if(restore_db_subs()< 0)
-	{
-		LM_ERR("restoring subscribe info from database\n");
-		return -1;
-	}
+	if(publ_cache_enabled) {
+		if(phtable_size< 1)
+			phtable_size= 256;
+		else
+			phtable_size= 1<< phtable_size;
 
-	if(phtable_size< 1)
-		phtable_size= 256;
-	else
-		phtable_size= 1<< phtable_size;
+		pres_htable= new_phtable();
+		if(pres_htable== NULL)
+		{
+			LM_ERR("initializing presentity hash table\n");
+			return -1;
+		}
 
-	pres_htable= new_phtable();
-	if(pres_htable== NULL)
-	{
-		LM_ERR("initializing presentity hash table\n");
-		return -1;
-	}
-
-	if(pres_htable_restore()< 0)
-	{
-		LM_ERR("filling in presentity hash table from database\n");
-		return -1;
+		if(pres_htable_restore()< 0)
+		{
+			LM_ERR("filling in presentity hash table from database\n");
+			return -1;
+		}
 	}
 
 	startup_time = (int) time(NULL);
-	
 	if(clean_period>0)
 	{
 		register_timer(msg_presentity_clean, 0, clean_period);
 		register_timer(msg_watchers_clean, 0, clean_period);
 	}
-	
+
 	if(db_update_period>0)
 		register_timer(timer_db_update, 0, db_update_period);
 
-	if(pa_db)
-		pa_dbf.close(pa_db);
+	if (pres_waitn_time <= 0)
+		pres_waitn_time = 5;
+
+	if (pres_notifier_poll_rate <= 0)
+		pres_notifier_poll_rate = 10;
+
+	if (pres_notifier_processes < 0 || subs_dbmode != DB_ONLY)
+		pres_notifier_processes = 0;
+
+	if (pres_notifier_processes > 0)
+	{
+		if ((pres_notifier_id = shm_malloc(sizeof(int) * pres_notifier_processes)) == NULL)
+		{
+			LM_ERR("allocating shared memory\n");
+			return -1;
+		}
+
+		register_basic_timers(pres_notifier_processes);
+	}
+
+	pa_dbf.close(pa_db);
 	pa_db = NULL;
 
 	return 0;
@@ -367,8 +404,31 @@ static int mod_init(void)
  */
 static int child_init(int rank)
 {
-	if (rank==PROC_INIT || rank==PROC_MAIN || rank==PROC_TCP_MAIN)
-		return 0; /* do nothing for the main process */
+	if (rank==PROC_INIT || rank==PROC_TCP_MAIN)
+		return 0;
+
+	if (rank == PROC_MAIN)
+	{
+		int i;
+
+		for (i = 0; i < pres_notifier_processes; i++)
+		{
+			char tmp[21];
+			snprintf(tmp, 21, "PRESENCE NOTIFIER %d", i);
+			pres_notifier_id[i] = i;
+
+			if (fork_basic_utimer(PROC_TIMER, tmp, 1,
+						pres_timer_send_notify,
+						&pres_notifier_id[i],
+						1000000/pres_notifier_poll_rate) < 0)
+			{
+				LM_ERR("Failed to start PRESENCE NOTIFIER %d\n", i);
+				return -1;
+			}
+		}
+
+		return 0;
+	}
 
 	pid = my_pid();
 	
@@ -380,16 +440,19 @@ static int child_init(int rank)
 		LM_CRIT("child_init: database not bound\n");
 		return -1;
 	}
-	if (pa_db)
-		return 0;
-	pa_db = pa_dbf.init(&db_url);
+	/* Do not pool the connections where possible when running notifier
+       processes. */
+	if (pres_notifier_processes > 0 && pa_dbf.init2)
+		pa_db = pa_dbf.init2(&db_url, DB_POOLING_NONE);
+	else
+		pa_db = pa_dbf.init(&db_url);
 	if (!pa_db)
 	{
 		LM_ERR("child %d: unsuccessful connecting to database\n", rank);
 		return -1;
 	}
 	
-	if (pa_dbf.use_table(pa_db, &presentity_table) < 0)  
+	if (pa_dbf.use_table(pa_db, &presentity_table) < 0)
 	{
 		LM_ERR( "child %d:unsuccessful use_table presentity_table\n", rank);
 		return -1;
@@ -423,9 +486,12 @@ static int mi_child_init(void)
 		LM_CRIT("database not bound\n");
 		return -1;
 	}
-	if (pa_db)
-		return 0;
-	pa_db = pa_dbf.init(&db_url);
+	/* Do not pool the connections where possible when running notifier
+       processes. */
+	if (pres_notifier_processes > 0 && pa_dbf.init2)
+		pa_db = pa_dbf.init2(&db_url, DB_POOLING_NONE);
+	else
+		pa_db = pa_dbf.init(&db_url);
 	if (!pa_db)
 	{
 		LM_ERR("connecting database\n");
@@ -460,8 +526,14 @@ static int mi_child_init(void)
  */
 static void destroy(void)
 {
-	if(subs_htable && pa_db)
-		timer_db_update(0, 0);
+	if(subs_htable && subs_dbmode == WRITE_BACK) {
+		/* open database connection */
+		pa_db = pa_dbf.init(&db_url);
+		if (!pa_db) {
+			LM_ERR("mod_destroy: unsuccessful connecting to database\n");
+		} else
+			timer_db_update(0, 0);
+	}
 
 	if(subs_htable)
 		destroy_shtable(subs_htable, shtable_size);
@@ -471,7 +543,10 @@ static void destroy(void)
 
 	if(pa_db && pa_dbf.close)
 		pa_dbf.close(pa_db);
-	
+
+	if (pres_notifier_id != NULL)
+		shm_free(pres_notifier_id);
+
 	destroy_evlist();
 }
 
@@ -514,10 +589,13 @@ static int fixup_subscribe(void** param, int param_no)
 				" (db_url not set)\n");
 		return -1;
 	}
+	if (param_no == 1) {
+		return fixup_spve_null(param, 1);
+	}
 	return 0;
 }
 
-int pres_refresh_watchers(str *pres, str *event, int type)
+int pres_refresh_watchers(str *pres, str *event, int type, str *file_uri, str *filename)
 {
 	pres_ev_t *ev;
 	struct sip_uri uri;
@@ -565,6 +643,14 @@ int pres_refresh_watchers(str *pres, str *event, int type)
 		rules_doc = NULL;
 
 	} else {
+		if (type == 2) {
+			if (update_hard_presentity(pres, ev, file_uri, filename) < 0)
+			{
+				LM_ERR("updating hard presentity\n");
+				goto error;
+			}
+		}
+
 		/* if a request to refresh notified info */
 		if(query_db_notify(pres, ev, NULL)< 0)
 		{
@@ -596,7 +682,7 @@ error:
 static struct mi_root* mi_refreshWatchers(struct mi_root* cmd, void* param)
 {
 	struct mi_node* node= NULL;
-	str pres_uri, event;
+	str pres_uri, event, file_uri = {0, 0}, filename = {0, 0};
 	unsigned int refresh_type;
 
 	LM_DBG("start\n");
@@ -638,13 +724,38 @@ static struct mi_root* mi_refreshWatchers(struct mi_root* cmd, void* param)
 		goto error;
 	}
 
+	if (refresh_type == 2)
+	{
+		node = node->next;
+		if(node == NULL)
+			return 0;
+		file_uri = node->value;
+		if(file_uri.s== NULL || file_uri.len== 0)
+		{
+			LM_ERR( "empty file uri parameter\n");
+			return init_mi_tree(400, "Empty file uri parameter", 24);
+		}
+
+		node = node->next;
+		if(node == NULL)
+			return 0;
+		filename = node->value;
+		if(filename.s== NULL || filename.len== 0)
+		{
+			LM_ERR( "empty file name parameter\n");
+			return init_mi_tree(400, "Empty file name parameter", 25);
+		}
+	}
+
 	if(node->next!= NULL)
 	{
 		LM_ERR( "Too many parameters\n");
 		return init_mi_tree(400, "Too many parameters", 19);
 	}
 
-	if(pres_refresh_watchers(&pres_uri, &event, refresh_type)<0)
+	if(pres_refresh_watchers(&pres_uri, &event, refresh_type,
+					file_uri.len ? &file_uri: NULL,
+					filename.len ? &filename : NULL)<0)
 		return 0;
 	
 	return init_mi_tree(200, "OK", 2);
@@ -663,6 +774,7 @@ static struct mi_root* mi_cleanup(struct mi_root* cmd, void* param)
 	
 	(void)msg_watchers_clean(0,0);
 	(void)msg_presentity_clean(0,0);
+	(void)timer_db_update(0,0);
 		
 	return init_mi_tree(200, MI_OK_S, MI_OK_LEN);
 }
@@ -713,8 +825,8 @@ int pres_update_status(subs_t subs, str reason, db_key_t* query_cols,
 											  reason.len)))
 	{
 		/* update in watchers_table */
-		query_vals[q_wuser_col].val.str_val= subs.from_user; 
-		query_vals[q_wdomain_col].val.str_val= subs.from_domain; 
+		query_vals[q_wuser_col].val.str_val= subs.watcher_user; 
+		query_vals[q_wdomain_col].val.str_val= subs.watcher_domain; 
 
 		/* if status is no longer ACTIVE, switch to terminated */
 		if(subs.status!=status && status==ACTIVE_STATUS)
@@ -744,8 +856,8 @@ int pres_update_status(subs_t subs, str reason, db_key_t* query_cols,
 		if(update_pw_dialogs(&subs, subs.db_flag, subs_array)< 0)
 		{
 			LM_ERR( "extracting dialogs from [watcher]=%.*s@%.*s to"
-				" [presentity]=%.*s\n",	subs.from_user.len, subs.from_user.s,
-				subs.from_domain.len, subs.from_domain.s, subs.pres_uri.len,
+				" [presentity]=%.*s\n",	subs.watcher_user.len, subs.watcher_user.s,
+				subs.watcher_domain.len, subs.watcher_domain.s, subs.pres_uri.len,
 				subs.pres_uri.s);
 			return -1;
 		}
@@ -780,13 +892,13 @@ int pres_db_delete_status(subs_t* s)
     query_cols[n_query_cols]= &str_watcher_username_col;
     query_vals[n_query_cols].nul= 0;
     query_vals[n_query_cols].type= DB1_STR;
-    query_vals[n_query_cols].val.str_val= s->from_user;
+    query_vals[n_query_cols].val.str_val= s->watcher_user;
     n_query_cols++;
 
     query_cols[n_query_cols]= &str_watcher_domain_col;
     query_vals[n_query_cols].nul= 0;
     query_vals[n_query_cols].type= DB1_STR;
-    query_vals[n_query_cols].val.str_val= s->from_domain;
+    query_vals[n_query_cols].val.str_val= s->watcher_domain;
     n_query_cols++;
 
     if(pa_dbf.delete(pa_db, query_cols, 0, query_vals, n_query_cols)< 0)
@@ -825,7 +937,7 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 	}ws_t;
 	ws_t* ws_list= NULL;
 
-    LM_DBG("start\n");
+	LM_DBG("start\n");
 
 	if(ev->content_type.s== NULL)
 	{
@@ -837,6 +949,7 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 		}
 	}
 
+	memset(&subs, 0, sizeof(subs_t));
 	subs.pres_uri= pres_uri;
 	subs.event= ev;
 	subs.auth_rules_doc= rules_doc;
@@ -880,14 +993,14 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 		goto done;
 	}
 
-    LM_DBG("found %d record-uri in watchers_table\n", result->n);
+	LM_DBG("found %d record-uri in watchers_table\n", result->n);
 	hash_code= core_hash(&pres_uri, &ev->name, shtable_size);
 	subs.db_flag= hash_code;
 
-    /*must do a copy as sphere_check requires database queries */
+	/*must do a copy as sphere_check requires database queries */
 	if(sphere_enable)
 	{
-        n= result->n;
+        	n= result->n;
 		ws_list= (ws_t*)pkg_malloc(n * sizeof(ws_t));
 		if(ws_list== NULL)
 		{
@@ -953,8 +1066,8 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 
 		for(i=0; i< n; i++)
 		{
-			subs.from_user = ws_list[i].w_user;
-			subs.from_domain = ws_list[i].w_domain;
+			subs.watcher_user = ws_list[i].w_user;
+			subs.watcher_domain = ws_list[i].w_domain;
 			subs.status = ws_list[i].status;
 			memset(&subs.reason, 0, sizeof(str));
 
@@ -996,8 +1109,8 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 		w_domain.s= (char*)row_vals[w_domain_col].val.string_val;
 		w_domain.len= strlen(w_domain.s);
 
-		subs.from_user= w_user;
-		subs.from_domain= w_domain;
+		subs.watcher_user= w_user;
+		subs.watcher_domain= w_domain;
 		subs.status= status;
 		memset(&subs.reason, 0, sizeof(str));
 
@@ -1007,36 +1120,38 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 			LM_ERR("failed to update watcher status\n");
 			goto done;
 		}
-    }
+	}
 
 	pa_dbf.free_result(pa_db, result);
 	result= NULL;
 
 send_notify:
 
-	s= subs_array;
-
-	while(s)
+	if (pres_notifier_processes == 0)
 	{
+		s= subs_array;
 
-		if(notify(s, NULL, NULL, 0)< 0)
+		while(s)
 		{
-			LM_ERR( "sending Notify request\n");
-			goto done;
+			if(notify(s, NULL, NULL, 0)< 0)
+			{
+				LM_ERR( "sending Notify request\n");
+				goto done;
+			}
+
+			/* delete from database also */
+			if(s->status== TERMINATED_STATUS)
+			{
+				if(pres_db_delete_status(s)<0)
+				{
+					LM_ERR("failed to delete terminated "
+						"dialog from database\n");
+					goto done;
+				}
+			}
+
+			s= s->next;
 		}
-
-        /* delete from database also */
-        if(s->status== TERMINATED_STATUS)
-        {
-            if(pres_db_delete_status(s)<0)
-            {
-                err_ret= -1;
-                LM_ERR("failed to delete terminated dialog from database\n");
-                goto done;
-            }
-        }
-
-        s= s->next;
 	}
 
 	free_subs_list(subs_array, PKG_MEM_TYPE, 0);
@@ -1063,26 +1178,285 @@ done:
 	return err_ret;
 }
 
+/********************************************************************************/
+
+static int update_pw_dialogs_dbonlymode(subs_t* subs, subs_t** subs_array)
+{
+	db_key_t query_cols[5], db_cols[3];
+	db_val_t query_vals[5], db_vals[3];
+	db_key_t result_cols[24];
+	int n_query_cols=0, n_result_cols=0, n_update_cols=0;
+	int event_col, pres_uri_col, watcher_user_col, watcher_domain_col;
+	int r_pres_uri_col,r_to_user_col,r_to_domain_col;
+	int r_from_user_col,r_from_domain_col,r_callid_col;
+	int r_to_tag_col,r_from_tag_col,r_sockinfo_col;
+	int r_event_id_col,r_local_contact_col,r_contact_col;
+	int r_record_route_col, r_reason_col;
+	int r_event_col, r_local_cseq_col, r_remote_cseq_col;
+	int r_status_col, r_version_col;
+	int r_expires_col, r_watcher_user_col, r_watcher_domain_col;
+	db1_res_t *result= NULL;
+ 	db_val_t *row_vals;
+	db_row_t *rows;
+	int nr_rows, loop;
+	subs_t s, *cs;
+	str ev_sname;
+
+	if(pa_db == NULL)
+	{
+		LM_ERR("null database connection\n");
+		return(-1);
+	}
+
+	if (pa_dbf.use_table(pa_db, &active_watchers_table) < 0) 
+	{
+		LM_ERR("use table failed\n");
+		return(-1);
+	}
+
+	query_cols[event_col=n_query_cols]= &str_event_col;
+	query_vals[event_col].nul= 0;
+	query_vals[event_col].type= DB1_STR;
+	query_vals[event_col].val.str_val= subs->event->name ;
+	n_query_cols++;
+
+	query_cols[pres_uri_col=n_query_cols]= &str_presentity_uri_col;
+	query_vals[pres_uri_col].nul= 0;
+	query_vals[pres_uri_col].type= DB1_STR;
+	query_vals[pres_uri_col].val.str_val= subs->pres_uri;
+	n_query_cols++;
+
+	query_cols[watcher_user_col=n_query_cols]= &str_watcher_username_col;
+	query_vals[watcher_user_col].nul= 0;
+	query_vals[watcher_user_col].type= DB1_STR;
+	query_vals[watcher_user_col].val.str_val= subs->watcher_user;
+	n_query_cols++;
+
+	query_cols[watcher_domain_col=n_query_cols]= &str_watcher_domain_col;
+	query_vals[watcher_domain_col].nul= 0;
+	query_vals[watcher_domain_col].type= DB1_STR;
+	query_vals[watcher_domain_col].val.str_val= subs->watcher_domain;
+	n_query_cols++;
+
+
+	result_cols[r_to_user_col=n_result_cols++] = &str_to_user_col;
+	result_cols[r_to_domain_col=n_result_cols++] = &str_to_domain_col;
+	result_cols[r_from_user_col=n_result_cols++] = &str_from_user_col;
+	result_cols[r_from_domain_col=n_result_cols++] = &str_from_domain_col;
+	result_cols[r_watcher_user_col=n_result_cols++] = &str_watcher_username_col;
+	result_cols[r_watcher_domain_col=n_result_cols++] = &str_watcher_domain_col;
+	result_cols[r_callid_col=n_result_cols++] = &str_callid_col;
+	result_cols[r_to_tag_col=n_result_cols++] = &str_to_tag_col;
+	result_cols[r_from_tag_col=n_result_cols++] = &str_from_tag_col;
+	result_cols[r_sockinfo_col=n_result_cols++] = &str_socket_info_col;
+	result_cols[r_event_id_col=n_result_cols++] = &str_event_id_col;
+	result_cols[r_local_contact_col=n_result_cols++] = &str_local_contact_col;
+	result_cols[r_record_route_col=n_result_cols++] = &str_record_route_col;
+	result_cols[r_reason_col=n_result_cols++] = &str_reason_col;
+	result_cols[r_local_cseq_col=n_result_cols++] = &str_local_cseq_col;
+	result_cols[r_version_col=n_result_cols++] = &str_version_col;
+	result_cols[r_expires_col=n_result_cols++] = &str_expires_col;
+	result_cols[r_event_col=n_result_cols++] = &str_event_col;
+	result_cols[r_pres_uri_col=n_result_cols++] = &str_presentity_uri_col;
+	result_cols[r_contact_col=n_result_cols++] = &str_contact_col;
+
+	/* these ones are unused for some reason !!! */
+	result_cols[r_remote_cseq_col=n_result_cols++] = &str_remote_cseq_col;
+	result_cols[r_status_col=n_result_cols++] = &str_status_col;
+	/*********************************************/
+
+	if(pa_dbf.query(pa_db, query_cols, 0, query_vals, result_cols, 
+				n_query_cols, n_result_cols, 0, &result )< 0)
+	{
+		LM_ERR("Can't query db\n");
+		if(result) pa_dbf.free_result(pa_db, result);
+		return(-1);
+	}
+
+	if(result == NULL) return(-1);
+
+	nr_rows = RES_ROW_N(result);
+
+	LM_DBG("found %d matching dialogs\n", nr_rows);
+
+	if (nr_rows <= 0)
+	{
+		pa_dbf.free_result(pa_db, result);
+		return 0;
+	}
+
+	/* get the results and fill in return data structure */
+	for (loop=0; loop <nr_rows; loop++)
+	{
+		rows = RES_ROWS(result);
+		row_vals = ROW_VALUES(rows);	
+
+		memset(&s, 0, sizeof(subs_t));
+		s.status= subs->status;
+
+		s.reason.s= subs->reason.s;
+		s.reason.len= s.reason.s?strlen(s.reason.s):0;	//>>>>>>>>>>
+
+		s.pres_uri.s= (char*)row_vals[r_pres_uri_col].val.string_val;
+		s.pres_uri.len= s.pres_uri.s?strlen(s.pres_uri.s):0;
+
+		s.to_user.s= (char*)row_vals[r_to_user_col].val.string_val;
+		s.to_user.len= s.to_user.s?strlen(s.to_user.s):0;
+
+		s.to_domain.s= (char*)row_vals[r_to_domain_col].val.string_val;
+		s.to_domain.len= s.to_domain.s?strlen(s.to_domain.s):0;
+		
+		s.from_user.s= (char*)row_vals[r_from_user_col].val.string_val;
+		s.from_user.len= s.from_user.s?strlen(s.from_user.s):0;
+		
+		s.from_domain.s= (char*)row_vals[r_from_domain_col].val.string_val;
+		s.from_domain.len= s.from_domain.s?strlen(s.from_domain.s):0;
+		
+		s.watcher_user.s= (char*)row_vals[r_watcher_user_col].val.string_val;
+		s.watcher_user.len= s.watcher_user.s?strlen(s.watcher_user.s):0;
+		
+		s.watcher_domain.s= (char*)row_vals[r_watcher_domain_col].val.string_val;
+		s.watcher_domain.len= s.watcher_domain.s?strlen(s.watcher_domain.s):0;
+
+		s.event_id.s=(char*)row_vals[r_event_id_col].val.string_val;
+		s.event_id.len= (s.event_id.s)?strlen(s.event_id.s):0;
+	
+		s.to_tag.s= (char*)row_vals[r_to_tag_col].val.string_val;
+		s.to_tag.len= s.to_tag.s?strlen(s.to_tag.s):0;
+		
+		s.from_tag.s= (char*)row_vals[r_from_tag_col].val.string_val; 
+		s.from_tag.len= s.from_tag.s?strlen(s.from_tag.s):0;
+		
+		s.callid.s= (char*)row_vals[r_callid_col].val.string_val;
+		s.callid.len= s.callid.s?strlen(s.callid.s):0;
+		
+		s.record_route.s=  (char*)row_vals[r_record_route_col].val.string_val;
+		s.record_route.len= (s.record_route.s)?strlen(s.record_route.s):0;
+
+		s.contact.s= (char*)row_vals[r_contact_col].val.string_val;
+		s.contact.len= s.contact.s?strlen(s.contact.s):0;
+		
+		s.sockinfo_str.s = (char*)row_vals[r_sockinfo_col].val.string_val;
+		s.sockinfo_str.len = s.sockinfo_str.s?strlen(s.sockinfo_str.s):0;
+
+		s.local_contact.s = (char*)row_vals[r_local_contact_col].val.string_val;
+		s.local_contact.len = s.local_contact.s?strlen(s.local_contact.s):0;
+
+		ev_sname.s= (char*)row_vals[r_event_col].val.string_val;
+		ev_sname.len= ev_sname.s?strlen(ev_sname.s):0;
+		
+		s.event = contains_event(&ev_sname, NULL);
+
+		if(s.event == NULL)
+		{
+			LM_ERR("event not found and set to NULL\n");
+		}
+		
+		s.local_cseq = row_vals[r_local_cseq_col].val.int_val;
+
+		s.expires = row_vals[r_expires_col].val.int_val;
+
+		if( s.expires < (int)time(NULL) )
+		    s.expires = 0;
+		else
+		    s.expires -= (int)time(NULL);
+
+		s.version = row_vals[r_version_col].val.int_val;
+
+		cs = mem_copy_subs(&s, PKG_MEM_TYPE);
+		if (cs == NULL)
+		{
+			LM_ERR("while copying subs_t structure\n");
+			/* tidy up and return */
+			pa_dbf.free_result(pa_db, result);
+			return(-1);
+		}
+		cs->local_cseq++;
+		cs->next= (*subs_array);
+		(*subs_array)= cs;
+
+		printf_subs(cs);
+	}
+
+	pa_dbf.free_result(pa_db, result);
+
+	if (pres_notifier_processes == 0 && subs->status == TERMINATED_STATUS)
+	{
+		/* delete the records */
+		if(pa_dbf.delete(pa_db, query_cols, 0, query_vals, n_query_cols)< 0)
+		{
+			LM_ERR("sql delete failed\n");
+			return(-1);
+		}
+
+		return(0);
+	}
+
+	/* otherwise we update the records */
+	db_cols[n_update_cols] = &str_status_col; 
+	db_vals[n_update_cols].type = DB1_INT;
+	db_vals[n_update_cols].nul = 0; 
+	db_vals[n_update_cols].val.int_val = subs->status;
+	n_update_cols++;
+ 
+	db_cols[n_update_cols] = &str_reason_col; 
+	db_vals[n_update_cols].type = DB1_STR;
+	db_vals[n_update_cols].nul = 0; 
+	db_vals[n_update_cols].val.str_val= subs->reason;
+	n_update_cols++;
+
+	db_cols[n_update_cols] = &str_updated_col; 
+	db_vals[n_update_cols].type = DB1_INT;
+	db_vals[n_update_cols].nul = 0;
+	if (subs->callid.len == 0 || subs->from_tag.len == 0)
+	{
+		db_vals[n_update_cols].val.int_val = (int) ((rand() / (RAND_MAX + 1.0)) *
+			  (pres_waitn_time * pres_notifier_poll_rate
+					* pres_notifier_processes));
+	} else {
+		db_vals[n_update_cols].val.int_val = 
+			core_hash(&subs->callid, &subs->from_tag,
+				  (pres_waitn_time * pres_notifier_poll_rate
+					* pres_notifier_processes) - 1);
+	}
+	n_update_cols++;
+
+
+	if(pa_dbf.update(pa_db, query_cols, 0, query_vals,
+				db_cols,db_vals,n_query_cols,n_update_cols) < 0)
+	{
+		LM_ERR("DB update failed\n");
+		return(-1);
+	}
+
+	return(0);
+}
+
+/********************************************************************************/
+
 static int update_pw_dialogs(subs_t* subs, unsigned int hash_code, subs_t** subs_array)
 {
 	subs_t* s, *ps, *cs;
 	int i= 0;
 
-    LM_DBG("start\n");
+	LM_DBG("start\n");
+
+	if (subs_dbmode == DB_ONLY) return(update_pw_dialogs_dbonlymode(subs, subs_array));
+
 	lock_get(&subs_htable[hash_code].lock);
 	
-    ps= subs_htable[hash_code].entries;
+	ps= subs_htable[hash_code].entries;
 	
 	while(ps && ps->next)
 	{
 		s= ps->next;
 
 		if(s->event== subs->event && s->pres_uri.len== subs->pres_uri.len &&
-			s->from_user.len== subs->from_user.len && 
-			s->from_domain.len==subs->from_domain.len &&
+			s->watcher_user.len== subs->watcher_user.len && 
+			s->watcher_domain.len==subs->watcher_domain.len &&
 			strncmp(s->pres_uri.s, subs->pres_uri.s, subs->pres_uri.len)== 0 &&
-			strncmp(s->from_user.s, subs->from_user.s, s->from_user.len)== 0 &&
-			strncmp(s->from_domain.s,subs->from_domain.s,s->from_domain.len)==0)
+			strncmp(s->watcher_user.s, subs->watcher_user.s, s->watcher_user.len)== 0 &&
+			strncmp(s->watcher_domain.s,subs->watcher_domain.s,s->watcher_domain.len)==0)
 		{
 			i++;
 			s->status= subs->status;
@@ -1093,9 +1467,10 @@ static int update_pw_dialogs(subs_t* subs, unsigned int hash_code, subs_t** subs
 			if(cs== NULL)
 			{
 				LM_ERR( "copying subs_t stucture\n");
-                lock_release(&subs_htable[hash_code].lock);
-                return -1;
+				lock_release(&subs_htable[hash_code].lock);
+				return -1;
 			}
+			cs->local_cseq++;
 			cs->expires-= (int)time(NULL);
 			cs->next= (*subs_array);
 			(*subs_array)= cs;
@@ -1103,9 +1478,9 @@ static int update_pw_dialogs(subs_t* subs, unsigned int hash_code, subs_t** subs
 			{
 				ps->next= s->next;
 				shm_free(s->contact.s);
-                shm_free(s);
-                LM_DBG(" deleted terminated dialog from hash table\n");
-            }
+				shm_free(s);
+				LM_DBG(" deleted terminated dialog from hash table\n");
+			}
 			else
 				ps= s;
 
@@ -1115,22 +1490,17 @@ static int update_pw_dialogs(subs_t* subs, unsigned int hash_code, subs_t** subs
 			ps= s;
 	}
 	
-    LM_DBG("found %d matching dialogs\n", i);
-    lock_release(&subs_htable[hash_code].lock);
+	LM_DBG("found %d matching dialogs\n", i);
+	lock_release(&subs_htable[hash_code].lock);
 	
-    return 0;
+	return 0;
 }
 
-static int pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2)
+static int w_pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2)
 {
     pv_spec_t *sp;
     pv_value_t pv_val;
-    str watcher_uri, presentity_uri, event;
-    struct sip_uri uri;
-    pres_ev_t* ev;
-    str* rules_doc = NULL;
-    subs_t subs;
-    int res;
+    str watcher_uri, presentity_uri;
 
     sp = (pv_spec_t *)_sp1;
 
@@ -1168,6 +1538,19 @@ static int pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2)
 	return -1;
     }
 
+    return pres_auth_status(_msg, watcher_uri, presentity_uri);
+}
+
+
+int pres_auth_status(struct sip_msg* msg, str watcher_uri, str presentity_uri)
+{
+    str event;
+    struct sip_uri uri;
+    pres_ev_t* ev;
+    str* rules_doc = NULL;
+    subs_t subs;
+    int res;
+
     event.s = "presence";
     event.len = 8;
 
@@ -1195,8 +1578,8 @@ static int pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2)
 	goto err;
     }
 
-    subs.from_user = uri.user;
-    subs.from_domain = uri.host;
+    subs.watcher_user = uri.user;
+    subs.watcher_domain = uri.host;
     subs.pres_uri = presentity_uri;
     subs.auth_rules_doc = rules_doc;
     if (ev->get_auth_status(&subs) < 0) {
@@ -1208,6 +1591,8 @@ static int pres_auth_status(struct sip_msg* _msg, char* _sp1, char* _sp2)
 	   subs.status);
     pkg_free(rules_doc->s);
     pkg_free(rules_doc);
+    if ((subs.reason.len == 12) && (strncmp(subs.reason.s, "polite-block", 12) == 0))
+		return POLITE_BLOCK_STATUS;
     return subs.status;
 
  err:
@@ -1244,7 +1629,61 @@ static int w_pres_refresh_watchers(struct sip_msg *msg, char *puri,
 		return -1;
 	}
 
-	if(pres_refresh_watchers(&pres_uri, &event, refresh_type)<0)
+	if (refresh_type == 2)
+	{
+		LM_ERR("Wrong number of parameters for type 2\n");
+		return -1;
+	}
+
+	if(pres_refresh_watchers(&pres_uri, &event, refresh_type, NULL, NULL)<0)
+		return -1;
+
+	return 1;
+}
+
+static int w_pres_refresh_watchers5(struct sip_msg *msg, char *puri,
+		char *pevent, char *ptype, char *furi, char *fname)
+{
+	str pres_uri, event, file_uri, filename;
+	int refresh_type;
+
+	if(fixup_get_svalue(msg, (gparam_p)puri, &pres_uri)!=0)
+	{
+		LM_ERR("invalid uri parameter");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)pevent, &event)!=0)
+	{
+		LM_ERR("invalid event parameter");
+		return -1;
+	}
+
+	if(fixup_get_ivalue(msg, (gparam_p)ptype, &refresh_type)!=0)
+	{
+		LM_ERR("no type value\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)furi, &file_uri)!=0)
+	{
+		LM_ERR("invalid file uri parameter");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)fname, &filename)!=0)
+	{
+		LM_ERR("invalid filename parameter");
+		return -1;
+	}
+
+	if (refresh_type != 2)
+	{
+		LM_ERR("Wrong number of parameters for type %d\n", refresh_type);
+		return -1;
+	}
+
+	if(pres_refresh_watchers(&pres_uri, &event, refresh_type, &file_uri, &filename)<0)
 		return -1;
 
 	return 1;
@@ -1255,14 +1694,18 @@ static int w_pres_refresh_watchers(struct sip_msg *msg, char *puri,
  */
 static int fixup_refresh_watchers(void** param, int param_no)
 {
-	if(param_no==1)
-	{
+	if(param_no==1) {
 		return fixup_spve_null(param, 1);
 	} else if(param_no==2) {
 		return fixup_spve_null(param, 1);
 	} else if(param_no==3) {
 		return fixup_igp_null(param, 1);
+	} else if(param_no==4) {
+		return fixup_spve_null(param, 1);
+	} else if(param_no==5) {
+		return fixup_spve_null(param, 1);
 	}
+	
 	return 0;
 }
 

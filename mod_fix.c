@@ -1,6 +1,4 @@
 /* 
- * $Id$
- * 
  * Copyright (C) 2008 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -15,10 +13,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/**
- * @file mod_fix.c
- * @brief kamailio compatible fixups
- */
+
 /* 
  * History:
  * --------
@@ -27,7 +22,7 @@
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief SIP-router core :: kamailio compatible fixups
  * \ingroup core
  * Module: \ref core
  */
@@ -67,7 +62,7 @@ int fixup_regexpNL_none(void** param, int param_no); /* textops */
   * @param maxp - maximum parameter number
   * @param no1 -  number of parameters of type1
   * @param type1 - fix_param type for the 1st param
-  * @paran type2 - fix_param type for all the other params
+  * @param type2 - fix_param type for all the other params
   */
 #define FIXUP_F2FP(suffix, minp, maxp, no1, type1, type2) \
 	int fixup_##suffix (void** param, int param_no) \
@@ -395,6 +390,23 @@ int fixup_free_pvar_str_str(void** param, int param_no)
 }
 
 
+int fixup_pvar_uint(void** param, int param_no)
+{
+	if (param_no == 1)
+		return fixup_pvar_all(param, param_no);
+	else if (param_no == 2)
+		return fixup_uint_uint(param, param_no);
+	return E_UNSPEC;
+}
+
+
+int fixup_free_pvar_uint(void** param, int param_no)
+{
+	if (param_no == 1)
+		return fixup_free_pvar_all(param, param_no);
+	return E_UNSPEC;
+}
+
 
 FIXUP_F2FP(igp_null, 1, 1, 1, FPARAM_INT|FPARAM_PVS, 0)
 FIXUP_F2FP(igp_igp, 1, 2, 2,  FPARAM_INT|FPARAM_PVS, 0)
@@ -528,4 +540,20 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
 	if (f == fixup_spve_uint) return 0;
 	if (f == fixup_spve_str) return fixup_free_spve_str;
 	return 0;
+}
+
+/**
+ *
+ */
+int fixup_spve_all(void** param, int param_no)
+{
+	return fixup_spve_null(param, 1);
+}
+
+/**
+ *
+ */
+int fixup_igp_all(void** param, int param_no)
+{
+	return fixup_igp_null(param, 1);
 }

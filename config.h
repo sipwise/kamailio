@@ -141,7 +141,7 @@
 #define SRV_MAX_PREFIX_LEN SRV_TLS_PREFIX_LEN
 
 #ifndef PKG_MEM_SIZE
-#define PKG_MEM_SIZE 16
+#define PKG_MEM_SIZE 4
 #endif
 #define PKG_MEM_POOL_SIZE PKG_MEM_SIZE*1024*1024	/*!< used only if PKG_MALLOC is defined*/
 
@@ -166,7 +166,7 @@
 #define MAX_RECEIVED_SIZE	57	/*!< forwarding  -- Via buffer dimensioning - Received header */
 #define MAX_RPORT_SIZE		13	/*!< forwarding  -- Via buffer dimensioning - Rport */
 
-#define MAX_BRANCHES    	24	/*!< maximum number of branches per transaction */
+#define MAX_BRANCHES    	12	/*!< maximum number of branches per transaction */
 
 #define MAX_PRINT_TEXT 		256	/*!< max length of the text of fifo 'print' command */
 

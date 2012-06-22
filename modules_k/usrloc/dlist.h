@@ -36,9 +36,9 @@
 #define DLIST_H
 
 #include <stdio.h>
-#include "udomain.h"
 #include "../../str.h"
-
+#include "usrloc.h"
+#include "udomain.h"
 
 /*!
  * List of all domains registered with usrloc
@@ -63,7 +63,6 @@ extern dlist_t* root;
  * \param _d new created domain
  * \return 0 on success, -1 on failure
  */
-typedef int (*register_udomain_t)(const char* _n, udomain_t** _d);
 int register_udomain(const char* _n, udomain_t** _d);
 
 
@@ -84,7 +83,7 @@ void print_all_udomains(FILE* _f);
  * \brief Run timer handler of all domains
  * \return 0 if all timer return 0, != 0 otherwise
  */
-int synchronize_all_udomains(void);
+int synchronize_all_udomains(int istart, int istep);
 
 
 /*!
@@ -119,11 +118,18 @@ int synchronize_all_udomains(void);
  * \param part_max maximal part
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
-typedef int  (*get_all_ucontacts_t) (void* buf, int len, unsigned int flags,
-		unsigned int part_idx, unsigned int part_max);
-int get_all_ucontacts(void *, int, unsigned int,
+int get_all_ucontacts(void *buf, int len, unsigned int flags,
 		unsigned int part_idx, unsigned int part_max);
 
+
+/*!
+ * \brief Find and return usrloc domain
+ *
+ * \param _n domain name
+ * \param _d usrloc domain (location table)
+ * \return 0 on success, -1 on failure
+ */
+ int get_udomain(const char* _n, udomain_t** _d);
 
 /*!
  * \brief Loops through all domains summing up the number of users

@@ -1,6 +1,4 @@
-/* $Id$
- *
- *
+/*
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of sip-router, a free SIP server.
@@ -17,6 +15,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
  * History:
  * --------
@@ -36,6 +35,12 @@
  *  2009-09-28  added fm_sums() (patch from Dragos Vingarzan)
  */
 
+/**
+ * \file
+ * \brief Simple & fast malloc library
+ * \ingroup mem
+ */
+
 
 #if !defined(q_malloc) && !(defined F_MALLOC)
 #define q_malloc
@@ -48,6 +53,9 @@
 #include "../globals.h"
 #include "memdbg.h"
 #include "../cfg/cfg.h" /* memlog */
+#ifdef MALLOC_STATS
+#include "../events.h"
+#endif
 
 
 /*useful macros*/
@@ -74,11 +82,6 @@
 #define ROUNDTO_MASK	(~((unsigned long)ROUNDTO-1))
 #define ROUNDUP(s)		(((s)+(ROUNDTO-1))&ROUNDTO_MASK)
 #define ROUNDDOWN(s)	((s)&ROUNDTO_MASK)
-
-/*
-#define ROUNDUP(s)		(((s)%ROUNDTO)?((s)+ROUNDTO)/ROUNDTO*ROUNDTO:(s))
-#define ROUNDDOWN(s)	(((s)%ROUNDTO)?((s)-ROUNDTO)/ROUNDTO*ROUNDTO:(s))
-*/
 
 
 
@@ -394,6 +397,10 @@ void* qm_malloc(struct qm_block* qm, unsigned long size)
 		qm->used+=f->size;
 		if (qm->max_real_used<qm->real_used)
 			qm->max_real_used=qm->real_used;
+#ifdef MALLOC_STATS
+		sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+		sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 #ifdef DBG_QM_MALLOC
 		f->file=file;
 		f->func=func;
@@ -420,31 +427,34 @@ void qm_free(struct qm_block* qm, void* p)
 #endif
 {
 	struct qm_frag* f;
-	struct qm_frag* prev;
-	struct qm_frag* next;
 	unsigned long size;
+#ifdef MEM_JOIN_FREE
+	struct qm_frag* next;
+	struct qm_frag* prev;
+#endif /* MEM_JOIN_FREE*/
 
 #ifdef DBG_QM_MALLOC
 	MDBG("qm_free(%p, %p), called from %s: %s(%d)\n", qm, p, file, func, line);
 	if (p>(void*)qm->last_frag_end || p<(void*)qm->first_frag){
-		LOG(L_CRIT, "BUG: qm_free: bad pointer %p (out of memory block!) - "
-				"aborting\n", p);
-		abort();
+		LOG(L_CRIT, "BUG: qm_free: bad pointer %p (out of memory block!)"
+				" called from %s: %s(%d) - aborting\n", p, file, func, line);
+		if(likely(cfg_get(core, core_cfg, mem_safety)==0))
+			abort();
 	}
 #endif
 	if (p==0) {
 		LOG(L_WARN, "WARNING:qm_free: free(0) called\n");
 		return;
 	}
-	prev=next=0;
 	f=(struct qm_frag*) ((char*)p-sizeof(struct qm_frag));
 #ifdef DBG_QM_MALLOC
 	qm_debug_frag(qm, f);
 	if (f->u.is_free){
-		LOG(L_CRIT, "BUG: qm_free: freeing already freed pointer,"
-				" first free: %s: %s(%ld) - aborting\n",
-				f->file, f->func, f->line);
-		abort();
+		LOG(L_CRIT, "BUG: qm_free: freeing already freed pointer (%p),"
+				" called from %s: %s(%d), first free %s: %s(%ld) - aborting\n",
+				p, file, func, line, f->file, f->func, f->line);
+		if(likely(cfg_get(core, core_cfg, mem_safety)==0))
+			abort();
 	}
 	MDBG("qm_free: freeing frag. %p alloc'ed from %s: %s(%ld)\n",
 			f, f->file, f->func, f->line);
@@ -452,44 +462,51 @@ void qm_free(struct qm_block* qm, void* p)
 	size=f->size;
 	qm->used-=size;
 	qm->real_used-=size;
+#ifdef MALLOC_STATS
+	sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+	sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 
-#ifdef QM_JOIN_FREE
-	/* mark this fragment as used (might fall into the middle of joined frags)
-	  to give us an extra change of detecting a double free call (if the joined
-	  fragment has not yet been reused) */
-	f->u.nxt_free=(void*)0x1L; /* bogus value, just to mark it as free */
-	/* join packets if possible*/
-	next=FRAG_NEXT(f);
-	if (((char*)next < (char*)qm->last_frag_end) &&( next->u.is_free)){
+#ifdef MEM_JOIN_FREE
+	if(unlikely(cfg_get(core, core_cfg, mem_join)!=0)) {
+		next=prev=0;
+		/* mark this fragment as used (might fall into the middle of joined frags)
+		  to give us an extra chance of detecting a double free call (if the joined
+		  fragment has not yet been reused) */
+		f->u.nxt_free=(void*)0x1L; /* bogus value, just to mark it as free */
+		/* join packets if possible*/
+		next=FRAG_NEXT(f);
+		if (((char*)next < (char*)qm->last_frag_end) &&( next->u.is_free)){
 		/* join */
 #ifdef DBG_QM_MALLOC
-		qm_debug_frag(qm, next);
+			qm_debug_frag(qm, next);
 #endif
-		qm_detach_free(qm, next);
-		size+=next->size+FRAG_OVERHEAD;
-		qm->real_used-=FRAG_OVERHEAD;
-		qm->free_hash[GET_HASH(next->size)].no--; /* FIXME slow */
-	}
+			qm_detach_free(qm, next);
+			size+=next->size+FRAG_OVERHEAD;
+			qm->real_used-=FRAG_OVERHEAD;
+			qm->free_hash[GET_HASH(next->size)].no--; /* FIXME slow */
+		}
 	
-	if (f > qm->first_frag){
-		prev=FRAG_PREV(f);
-		/*	(struct qm_frag*)((char*)f - (struct qm_frag_end*)((char*)f-
+		if (f > qm->first_frag){
+			prev=FRAG_PREV(f);
+			/*	(struct qm_frag*)((char*)f - (struct qm_frag_end*)((char*)f-
 								sizeof(struct qm_frag_end))->size);*/
 #ifdef DBG_QM_MALLOC
-		qm_debug_frag(qm, prev);
+			qm_debug_frag(qm, prev);
 #endif
-		if (prev->u.is_free){
-			/*join*/
-			qm_detach_free(qm, prev);
-			size+=prev->size+FRAG_OVERHEAD;
-			qm->real_used-=FRAG_OVERHEAD;
-			qm->free_hash[GET_HASH(prev->size)].no--; /* FIXME slow */
-			f=prev;
+			if (prev->u.is_free){
+				/*join*/
+				qm_detach_free(qm, prev);
+				size+=prev->size+FRAG_OVERHEAD;
+				qm->real_used-=FRAG_OVERHEAD;
+					qm->free_hash[GET_HASH(prev->size)].no--; /* FIXME slow */
+				f=prev;
+			}
 		}
-	}
-	f->size=size;
-	FRAG_END(f)->size=f->size;
-#endif /* QM_JOIN_FREE*/
+		f->size=size;
+		FRAG_END(f)->size=f->size;
+	} /* if cfg_core->mem_join */
+#endif /* MEM_JOIN_FREE*/
 #ifdef DBG_QM_MALLOC
 	f->file=file;
 	f->func=func;
@@ -568,6 +585,10 @@ void* qm_realloc(struct qm_block* qm, void* p, unsigned long size)
 			 */
 			qm->real_used-=(orig_size-f->size);
 			qm->used-=(orig_size-f->size);
+#ifdef MALLOC_STATS
+			sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+			sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 		}
 		
 	}else if (f->size < size){
@@ -598,6 +619,10 @@ void* qm_realloc(struct qm_block* qm, void* p, unsigned long size)
 				}
 				qm->real_used+=(f->size-orig_size);
 				qm->used+=(f->size-orig_size);
+#ifdef MALLOC_STATS
+				sr_event_exec(SREV_PKG_SET_USED, (void*)qm->used);
+				sr_event_exec(SREV_PKG_SET_REAL_USED, (void*)qm->real_used);
+#endif
 			}else{
 				/* could not join => realloc */
 	#ifdef DBG_QM_MALLOC
@@ -693,9 +718,10 @@ void qm_status(struct qm_block* qm)
 	int h;
 	int unused;
 	int memlog;
-
+	int mem_summary;
 
 	memlog=cfg_get(core, core_cfg, memlog);
+	mem_summary=cfg_get(core, core_cfg, mem_summary);
 	LOG_(DEFAULT_FACILITY, memlog, "qm_status: ", "(%p):\n", qm);
 	if (!qm) return;
 
@@ -707,6 +733,8 @@ void qm_status(struct qm_block* qm)
 	LOG_(DEFAULT_FACILITY, memlog, "qm_status: ",
 			"max used (+overhead)= %lu\n", qm->max_real_used);
 	
+	if (mem_summary & 16) return;
+
 	LOG_(DEFAULT_FACILITY, memlog, "qm_status: ",
 			"dumping all alloc'ed. fragments:\n");
 	for (f=qm->first_frag, i=0;(char*)f<(char*)qm->last_frag_end;f=FRAG_NEXT(f)

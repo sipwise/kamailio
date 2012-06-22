@@ -30,15 +30,44 @@
  * \ingroup db1
  */
 
-#include "db_ut.h"
 
-#include "../../mem/mem.h"
-#include "../../dprint.h"
+#if defined (__OS_darwin) || defined (__OS_freebsd)
+#include "../../pvar.h"
+#endif
+
+/**
+ * make strptime available
+ * use 600 for 'Single UNIX Specification, Version 3'
+ * _XOPEN_SOURCE creates conflict in swab definition in Solaris
+ */
+#ifndef __OS_solaris
+	#define _XOPEN_SOURCE 600          /* glibc2 on linux, bsd */
+	#define _BSD_SOURCE 1              /* needed on linux to "fix" the effect
+										 of the above define on 
+										 features.h/unistd.h syscall() */
+#else
+	#define _XOPEN_SOURCE_EXTENDED 1   /* solaris */
+#endif
+
+#include <time.h>
+
+#ifndef __OS_solaris
+	#undef _XOPEN_SOURCE
+	#undef _XOPEN_SOURCE_EXTENDED
+#else
+	#undef _XOPEN_SOURCE_EXTENDED 1   /* solaris */
+#endif
+
 #include <limits.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "../../mem/mem.h"
+#include "../../dprint.h"
+
+#include "db_ut.h"
 
 
 inline int db_str2int(const char* _s, int* _v)
@@ -305,21 +334,35 @@ int db_print_where(const db1_con_t* _c, char* _b, const int _l, const db_key_t* 
 	}
 
 	for(i = 0; i < _n; i++) {
-		if (_o) {
-			ret = snprintf(_b + len, _l - len, "%.*s%s", _k[i]->len, _k[i]->s, _o[i]);
+		if (_o && strncmp(_o[i], OP_BITWISE_AND, 1) == 0) {
+			char tmp_buf[16];
+			int tmp_len = 15;
+			memset(tmp_buf, '0', 16);
+			if ((*val2str)(_c, &(_v[i]), tmp_buf, &tmp_len) < 0) {
+				LM_ERR("Error while converting value to string\n");
+				return -1;
+			}
+			ret = snprintf(_b + len, _l - len, "%.*s&%.*s=%.*s", _k[i]->len, _k[i]->s, tmp_len, tmp_buf, tmp_len, tmp_buf);
 			if (ret < 0 || ret >= (_l - len)) goto error;
 			len += ret;
 		} else {
-			ret = snprintf(_b + len, _l - len, "%.*s=", _k[i]->len, _k[i]->s);
-			if (ret < 0 || ret >= (_l - len)) goto error;
-			len += ret;
+			if (_o) {
+				ret = snprintf(_b + len, _l - len, "%.*s%s", _k[i]->len, _k[i]->s, _o[i]);
+				if (ret < 0 || ret >= (_l - len)) goto error;
+				len += ret;
+			} else {
+				ret = snprintf(_b + len, _l - len, "%.*s=", _k[i]->len, _k[i]->s);
+				if (ret < 0 || ret >= (_l - len)) goto error;
+				len += ret;
+			}
+			l = _l - len;
+			if ( (*val2str)(_c, &(_v[i]), _b + len, &l) < 0) {
+				LM_ERR("Error while converting value to string\n");
+				return -1;
+			}
+			len += l;
 		}
-		l = _l - len;
-		if ( (*val2str)(_c, &(_v[i]), _b + len, &l) < 0) {
-			LM_ERR("Error while converting value to string\n");
-			return -1;
-		}
-		len += l;
+
 		if (i != (_n - 1)) {
 			ret = snprintf(_b + len, _l - len, " AND ");
 			if (ret < 0 || ret >= (_l - len)) goto error;
@@ -370,4 +413,75 @@ int db_print_set(const db1_con_t* _c, char* _b, const int _l, const db_key_t* _k
  error:
 	LM_ERR("Error in snprintf\n");
 	return -1;
+}
+
+/*
+ * Convert db_val to pv_spec
+ */
+int db_val2pv_spec(struct sip_msg* msg, db_val_t *dbval, pv_spec_t *pvs)
+{
+	pv_value_t pv;
+#define LL_LEN 21   /* sign, 19 digits and \0 */
+	static char ll_buf[LL_LEN];
+
+	if(dbval->nul)
+	{
+		pv.flags = PV_VAL_NULL;
+	} else
+	{
+		switch(dbval->type)
+		{
+			case DB1_STRING:
+				pv.flags = PV_VAL_STR;
+				pv.rs.s = (char*)dbval->val.string_val;
+				pv.rs.len = strlen(pv.rs.s);
+			break;
+			case DB1_STR:
+				pv.flags = PV_VAL_STR;
+				pv.rs.s = (char*)dbval->val.str_val.s;
+				pv.rs.len = dbval->val.str_val.len;
+			break;
+			case DB1_BLOB:
+				pv.flags = PV_VAL_STR;
+				pv.rs.s = (char*)dbval->val.blob_val.s;
+				pv.rs.len = dbval->val.blob_val.len;
+			break;
+			case DB1_INT:
+				pv.flags = PV_VAL_INT | PV_TYPE_INT;
+				pv.ri = (int)dbval->val.int_val;
+			break;
+			case DB1_DATETIME:
+				pv.flags = PV_VAL_INT | PV_TYPE_INT;
+				pv.ri = (int)dbval->val.time_val;
+			break;
+			case DB1_BITMAP:
+				pv.flags = PV_VAL_INT | PV_TYPE_INT;
+				pv.ri = (int)dbval->val.bitmap_val;
+			break;
+			case DB1_BIGINT:
+				/* BIGINT is stored as string */
+				pv.flags = PV_VAL_STR;
+				pv.rs.len = LL_LEN;
+				db_longlong2str(dbval->val.ll_val, ll_buf, &pv.rs.len);
+				pv.rs.s = ll_buf;
+			break;
+			default:
+				LM_NOTICE("unknown field type: %d, setting value to null\n",
+				          dbval->type);
+				pv.flags = PV_VAL_NULL;
+		}
+	}
+
+	/* null values are ignored for avp type PV */
+	if (pv.flags == PV_VAL_NULL && pvs->type == PVT_AVP)
+		return 0;
+
+	/* add value to result pv */
+	if (pv_set_spec_value(msg, pvs, 0, &pv) != 0)
+	{
+		LM_ERR("Failed to add value to spec\n");
+		return -1;
+	}
+
+	return 0;
 }

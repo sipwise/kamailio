@@ -27,11 +27,13 @@
 #include "../../sr_module.h"
 #include "../../dprint.h"
 #include "../../mod_fix.h"
+#include "../../route.h"
 #include "../../modules/tm/tm_load.h"
 #include "../../lib/kcore/kstats_wrapper.h"
 
 #include "t_var.h"
 #include "t_mi.h"
+#include "api.h"
 
 MODULE_VERSION
 
@@ -47,13 +49,22 @@ static void destroy(void);
 
 static int t_cancel_branches(struct sip_msg* msg, char *k, char *s2);
 static int fixup_cancel_branches(void** param, int param_no);
-static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *flag);
+static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq,
+				char *flag);
 static int fixup_cancel_callid(void** param, int param_no);
 static int t_reply_callid(struct sip_msg* msg, char *cid, char *cseq,
 				char *rc, char *rs);
 static int fixup_reply_callid(void** param, int param_no);
 
 static int t_flush_flags(struct sip_msg* msg, char*, char* );
+static int t_is_failure_route(struct sip_msg* msg, char*, char* );
+static int t_is_branch_route(struct sip_msg* msg, char*, char* );
+
+static int w_t_suspend(struct sip_msg* msg, char*, char*);
+static int w_t_continue(struct sip_msg* msg, char *idx, char *lbl, char *rtn);
+static int fixup_t_continue(void** param, int param_no);
+
+static int bind_tmx(tmx_api_t* api);
 
 /* statistic variables */
 stat_var *tm_rcv_rpls;
@@ -118,6 +129,8 @@ static pv_export_t mod_pvs[] = {
 		pv_parse_t_var_name, 0, 0, 0 },
 	{ {"T_rpl", sizeof("T_rpl")-1}, PVT_OTHER, pv_get_t_var_rpl, 0,
 		pv_parse_t_var_name, 0, 0, 0 },
+	{ {"T", sizeof("T")-1}, PVT_OTHER, pv_get_t, 0,
+		pv_parse_t_name, 0, 0, 0 },
 	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -126,6 +139,7 @@ static mi_export_t mi_cmds [] = {
 	{MI_TM_CANCEL,  mi_tm_cancel,    0,                  0,  0 },
 	{MI_TM_HASH,    mi_tm_hash,      MI_NO_INPUT_FLAG,   0,  0 },
 	{MI_TM_REPLY,   mi_tm_reply,     0,                  0,  0 },
+	{MI_TM_REPLY_CALLID, mi_tm_reply_callid, 0,          0,  0 },
 	{0,0,0,0,0}
 };
 
@@ -135,10 +149,20 @@ static cmd_export_t cmds[]={
 		fixup_cancel_branches, 0, ONREPLY_ROUTE },
 	{"t_cancel_callid", (cmd_function)t_cancel_callid,  3,
 		fixup_cancel_callid, 0, ANY_ROUTE },
-	{"t_reply_callid", (cmd_function)t_reply_callid,  4,
+	{"t_reply_callid", (cmd_function)t_reply_callid,    4,
 		fixup_reply_callid, 0, ANY_ROUTE },
 	{"t_flush_flags",   (cmd_function)t_flush_flags,    0, 0,
 			0, ANY_ROUTE  },
+	{"t_is_failure_route",   (cmd_function)t_is_failure_route,   0, 0,
+			0, ANY_ROUTE  },
+	{"t_is_branch_route",    (cmd_function)t_is_branch_route,    0, 0,
+			0, ANY_ROUTE  },
+	{"t_suspend",    (cmd_function)w_t_suspend,    0, 0,
+			0, ANY_ROUTE  },
+	{"t_continue", (cmd_function)w_t_continue,     3,
+		fixup_t_continue, 0, ANY_ROUTE },
+	{"bind_tmx", (cmd_function)bind_tmx, 1,
+		0, 0, ANY_ROUTE },
 	{0,0,0,0,0,0}
 };
 
@@ -417,6 +441,136 @@ static int t_flush_flags(struct sip_msg* msg, char *foo, char *bar)
 
 	t->uas.request->flags = msg->flags;
 	return 1;
+}
+
+/**
+ *
+ */
+static int t_is_failure_route(struct sip_msg* msg, char *foo, char *bar)
+{
+	if(route_type==FAILURE_ROUTE)
+		return 1;
+	return -1;
+}
+
+/**
+ *
+ */
+static int t_is_branch_route(struct sip_msg* msg, char *foo, char *bar)
+{
+	if(route_type==BRANCH_ROUTE)
+		return 1;
+	return -1;
+}
+
+/**
+ *
+ */
+static int w_t_suspend(struct sip_msg* msg, char *p1, char *p2)
+{
+	unsigned int tindex;
+	unsigned int tlabel;
+	tm_cell_t *t = 0;
+
+	t=_tmx_tmb.t_gett();
+	if (t==NULL || t==T_UNDEFINED)
+	{
+		if(_tmx_tmb.t_newtran(msg)<0)
+		{
+			LM_ERR("cannot create the transaction\n");
+			return -1;
+		}
+		t = _tmx_tmb.t_gett();
+		if (t==NULL || t==T_UNDEFINED)
+		{
+			LM_ERR("cannot lookup the transaction\n");
+			return -1;
+		}
+	}
+	if(_tmx_tmb.t_suspend(msg, &tindex, &tlabel)<0)
+	{
+		LM_ERR("failed to suppend the processing\n");
+		return -1;
+	}
+
+	LM_DBG("transaction suspended [%u:%u]\n", tindex, tlabel);
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_t_continue(struct sip_msg* msg, char *idx, char *lbl, char *rtn)
+{
+	unsigned int tindex;
+	unsigned int tlabel;
+	str rtname;
+	cfg_action_t *act;
+	int ri;
+
+	if(fixup_get_ivalue(msg, (gparam_p)idx, (int*)&tindex)<0)
+	{
+		LM_ERR("cannot get transaction index\n");
+		return -1;
+	}
+
+	if(fixup_get_ivalue(msg, (gparam_p)lbl, (int*)&tlabel)<0)
+	{
+		LM_ERR("cannot get transaction label\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)rtn, &rtname)<0)
+	{
+		LM_ERR("cannot get route block name\n");
+		return -1;
+	}
+
+	ri = route_get(&main_rt, rtname.s);
+	if(ri<0)
+	{
+		LM_ERR("unable to find route block [%.*s]\n", rtname.len, rtname.s);
+		return -1;
+	}
+	act = main_rt.rlist[ri];
+	if(act==NULL)
+	{
+		LM_ERR("empty action lists in route block [%.*s]\n",
+				rtname.len, rtname.s);
+		return -1;
+	}
+
+	if(_tmx_tmb.t_continue(tindex, tlabel, act)<0)
+	{
+		LM_ERR("resuming the processing of transaction [%u:%u] failed\n",
+				tindex, tlabel);
+		return -1;
+	}
+	return 1;
+}
+
+/**
+ *
+ */
+static int fixup_t_continue(void** param, int param_no)
+{
+	if (param_no==1 || param_no==2) {
+		return fixup_igp_null(param, 1);
+	}
+	if (param_no==3) {
+		return fixup_spve_null(param, 1);
+	}
+
+	return 0;
+}
+
+static int bind_tmx(tmx_api_t* api)
+{
+	if (!api)
+		return -1;
+
+	api->t_suspend = w_t_suspend;
+	return 0;
 }
 
 #ifdef STATISTICS

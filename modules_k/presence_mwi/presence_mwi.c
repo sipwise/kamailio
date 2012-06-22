@@ -1,6 +1,4 @@
 /*
- * presence_mwi module - Presence Handling of message-summary events
- *
  * Copyright (C) 2007 Juha Heinanen
  *
  * This file is part of Kamailio, a free SIP server.
@@ -22,6 +20,11 @@
  * History:
  * --------
  *  2007-05-1  initial version (jih)
+ */
+
+
+/*!
+ * \defgroup presence_mwi Presence_mwi :: Presence Handling of message-summary events
  */
 
 /*!
@@ -102,7 +105,7 @@ static int mod_init(void)
     }
 
     pres_add_event = pres.add_event;
-    if (add_event == NULL) {
+    if (pres_add_event == NULL) {
 	LM_ERR("could not import add_event\n");
 	return -1;
     }

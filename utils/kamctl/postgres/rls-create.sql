@@ -1,9 +1,9 @@
-INSERT INTO version (table_name, table_version) values ('rls_presentity','0');
+INSERT INTO version (table_name, table_version) values ('rls_presentity','1');
 CREATE TABLE rls_presentity (
     id SERIAL PRIMARY KEY NOT NULL,
     rlsubs_did VARCHAR(255) NOT NULL,
     resource_uri VARCHAR(128) NOT NULL,
-    content_type VARCHAR(64) NOT NULL,
+    content_type VARCHAR(255) NOT NULL,
     presence_state BYTEA NOT NULL,
     expires INTEGER NOT NULL,
     updated INTEGER NOT NULL,
@@ -12,9 +12,11 @@ CREATE TABLE rls_presentity (
     CONSTRAINT rls_presentity_rls_presentity_idx UNIQUE (rlsubs_did, resource_uri)
 );
 
+CREATE INDEX rls_presentity_rlsubs_idx ON rls_presentity (rlsubs_did);
 CREATE INDEX rls_presentity_updated_idx ON rls_presentity (updated);
+CREATE INDEX rls_presentity_expires_idx ON rls_presentity (expires);
 
-INSERT INTO version (table_name, table_version) values ('rls_watchers','1');
+INSERT INTO version (table_name, table_version) values ('rls_watchers','3');
 CREATE TABLE rls_watchers (
     id SERIAL PRIMARY KEY NOT NULL,
     presentity_uri VARCHAR(128) NOT NULL,
@@ -26,10 +28,10 @@ CREATE TABLE rls_watchers (
     event_id VARCHAR(64),
     to_tag VARCHAR(64) NOT NULL,
     from_tag VARCHAR(64) NOT NULL,
-    callid VARCHAR(64) NOT NULL,
+    callid VARCHAR(255) NOT NULL,
     local_cseq INTEGER NOT NULL,
     remote_cseq INTEGER NOT NULL,
-    contact VARCHAR(64) NOT NULL,
+    contact VARCHAR(128) NOT NULL,
     record_route TEXT,
     expires INTEGER NOT NULL,
     status INTEGER DEFAULT 2 NOT NULL,
@@ -37,6 +39,14 @@ CREATE TABLE rls_watchers (
     version INTEGER DEFAULT 0 NOT NULL,
     socket_info VARCHAR(64) NOT NULL,
     local_contact VARCHAR(128) NOT NULL,
-    CONSTRAINT rls_watchers_rls_watcher_idx UNIQUE (presentity_uri, callid, to_tag, from_tag)
+    from_user VARCHAR(64) NOT NULL,
+    from_domain VARCHAR(64) NOT NULL,
+    updated INTEGER NOT NULL,
+    CONSTRAINT rls_watchers_rls_watcher_idx UNIQUE (callid, to_tag, from_tag)
 );
+
+CREATE INDEX rls_watchers_rls_watchers_delete ON rls_watchers (callid, to_tag);
+CREATE INDEX rls_watchers_rls_watchers_update ON rls_watchers (watcher_username, watcher_domain, event);
+CREATE INDEX rls_watchers_rls_watchers_expires ON rls_watchers (expires);
+CREATE INDEX rls_watchers_updated_idx ON rls_watchers (updated);
 

@@ -80,7 +80,7 @@ struct s_table* tm_get_table(void) {
 	return _tm_table;
 }
 
-void reset_kr() {
+void reset_kr(void) {
 	kr=0;
 }
 
@@ -369,13 +369,6 @@ struct cell*  build_cell( struct sip_msg* p_msg )
 	}
 
 	if (p_msg) {
-#ifndef POSTPONE_MSG_CLONING
-		/* it makes no sense to clean the lumps when they are not cloned (Miklos) */
-
-		/* clean possible previous added vias/clen header or else they would 
-		 * get propagated in the failure routes */
-		free_via_clen_lump(&p_msg->add_rm);
-#endif
 		new_cell->uas.request = sip_msg_cloner(p_msg,&sip_msg_len);
 		if (!new_cell->uas.request)
 			goto error;
@@ -451,6 +444,7 @@ void free_hash_table(  )
 			}
 		}
 		shm_free(_tm_table);
+		_tm_table = 0;
 	}
 }
 

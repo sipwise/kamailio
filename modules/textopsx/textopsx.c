@@ -27,19 +27,34 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fnmatch.h>
 
 #include "../../sr_module.h"
 #include "../../dprint.h"
 #include "../../data_lump.h"
 #include "../../msg_translator.h"
+#include "../../tcp_options.h"
+#include "../../mod_fix.h"
 
+#include "api.h"
 
 MODULE_VERSION
 
 static int msg_apply_changes_f(sip_msg_t *msg, char *str1, char *str2);
 
-static int change_reply_status_f(struct sip_msg*, char*, char *);
+static int change_reply_status_f(sip_msg_t*, char*, char*);
 static int change_reply_status_fixup(void** param, int param_no);
+
+static int w_keep_hf_f(sip_msg_t*, char*, char*);
+
+static int w_fnmatch2_f(sip_msg_t*, char*, char*);
+static int w_fnmatch3_f(sip_msg_t*, char*, char*, char*);
+static int fixup_fnmatch(void** param, int param_no);
+
+static int w_remove_body_f(struct sip_msg*, char*, char *);
+static int bind_textopsx(textopsx_api_t *tob);
+
+static int mod_init(void);
 
 /* cfg functions */
 static cmd_export_t cmds[] = {
@@ -47,6 +62,17 @@ static cmd_export_t cmds[] = {
 		0, REQUEST_ROUTE },
 	{"change_reply_status",	 change_reply_status_f,	                2,
 		change_reply_status_fixup, ONREPLY_ROUTE },
+	{"remove_body",          (cmd_function)w_remove_body_f,         0,
+		0, ANY_ROUTE },
+	{"keep_hf",              (cmd_function)w_keep_hf_f,             1,
+		fixup_regexp_null, ANY_ROUTE },
+	{"fnmatch",              (cmd_function)w_fnmatch2_f,            2,
+		fixup_fnmatch, ANY_ROUTE },
+	{"fnmatch",              (cmd_function)w_fnmatch3_f,            3,
+		fixup_fnmatch, ANY_ROUTE },
+	{"bind_textopsx",        (cmd_function)bind_textopsx,           1,
+		0, ANY_ROUTE },
+
 
 	{0,0,0,0,0}
 };
@@ -57,13 +83,24 @@ struct module_exports exports= {
 	cmds, /* cfg functions */
 	0, /* RPC methods */
 	0, /* cfg parameters */
-	0, /* initialization function */
+	mod_init, /* initialization function */
 	0, /* response function */
 	0, /* destroy function */
 	0, /* on_cancel function */
 	0  /* per-child init function */
 };
 
+
+/**
+ * init module function
+ */
+static int mod_init(void)
+{
+#ifdef USE_TCP
+	tcp_set_clone_rcvbuf(1);
+#endif
+	return 0;
+}
 
 /**
  *
@@ -123,6 +160,7 @@ static int msg_apply_changes_f(sip_msg_t *msg, char *str1, char *str2)
 	msg->set_global_port    = tmp.set_global_port;
 	msg->flags              = tmp.flags;
 	msg->msg_flags          = tmp.msg_flags;
+	msg->hash_index         = tmp.hash_index;
 	msg->force_send_socket  = tmp.force_send_socket;
 	msg->fwd_send_flags     = tmp.fwd_send_flags;
 	msg->rpl_send_flags     = tmp.rpl_send_flags;
@@ -224,3 +262,169 @@ static int change_reply_status_f(struct sip_msg* msg, char* _code, char* _reason
 }
 
 
+/**
+ *
+ */
+static int w_remove_body_f(struct sip_msg *msg, char *p1, char *p2)
+{
+	str body = {0,0};
+
+	body.len = 0;
+	body.s = get_body(msg);
+	if (body.s==0)
+	{
+		LM_DBG("no body in the message\n");
+		return 1;
+	}
+	body.len = msg->buf + msg->len - body.s;
+	if (body.len<=0)
+	{
+		LM_DBG("empty body in the message\n");
+		return 1;
+	}
+	if(del_lump(msg, body.s - msg->buf, body.len, 0) == 0)
+	{
+		LM_ERR("cannot remove body\n");
+		return -1;
+	}
+	return 1;
+}
+
+
+/**
+ *
+ */
+static int w_keep_hf_f(struct sip_msg* msg, char* key, char* foo)
+{
+	struct hdr_field *hf;
+	regex_t *re;
+	regmatch_t pmatch;
+	char c;
+	struct lump* l;
+
+	re = (regex_t*)key;
+
+	/* we need to be sure we have seen all HFs */
+	parse_headers(msg, HDR_EOH_F, 0);
+	for (hf=msg->headers; hf; hf=hf->next)
+	{
+		switch(hf->type) {
+			case HDR_FROM_T:
+			case HDR_TO_T:
+			case HDR_CALLID_T:
+			case HDR_CSEQ_T:
+			case HDR_VIA_T:
+			case HDR_VIA2_T:
+			case HDR_CONTACT_T:
+			case HDR_CONTENTLENGTH_T:
+			case HDR_CONTENTTYPE_T:
+			case HDR_ROUTE_T:
+			case HDR_RECORDROUTE_T:
+			case HDR_MAXFORWARDS_T:
+				continue;
+			default:
+				;
+		}
+
+		c = hf->name.s[hf->name.len];
+		hf->name.s[hf->name.len] = '\0';
+		if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
+		{
+			/* no match => remove */
+			hf->name.s[hf->name.len] = c;
+			l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
+			if (l==0)
+			{
+				LM_ERR("cannot remove header\n");
+				return -1;
+			}
+		} else {
+			hf->name.s[hf->name.len] = c;
+		}
+	}
+
+	return -1;
+}
+
+/**
+ *
+ */
+static int w_fnmatch(str *val, str *match, str *flags)
+{
+	int i;
+	i = 0;
+#ifdef FNM_CASEFOLD
+	if(flags && (flags->s[0]=='i' || flags->s[0]=='I'))
+		i = FNM_CASEFOLD;
+#endif
+	if(fnmatch(match->s, val->s, i)==0)
+		return 0;
+	return -1;
+}
+
+/**
+ *
+ */
+static int w_fnmatch2_f(sip_msg_t *msg, char *val, char *match)
+{
+	str sval;
+	str smatch;
+	if(get_str_fparam(&sval, msg, (fparam_t*)val)<0
+			|| get_str_fparam(&smatch, msg, (fparam_t*)match)<0)
+	{
+		LM_ERR("invalid parameters");
+		return -1;
+	}
+	if(w_fnmatch(&sval, &smatch, NULL)<0)
+		return -1;
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_fnmatch3_f(sip_msg_t *msg, char *val, char *match, char *flags)
+{
+	str sval;
+	str smatch;
+	str sflags;
+	if(get_str_fparam(&sval, msg, (fparam_t*)val)<0
+			|| get_str_fparam(&smatch, msg, (fparam_t*)match)<0
+			|| get_str_fparam(&sflags, msg, (fparam_t*)flags)<0)
+	{
+		LM_ERR("invalid parameters");
+		return -1;
+	}
+	if(w_fnmatch(&sval, &smatch, &sflags)<0)
+		return -1;
+	return 1;
+}
+
+/**
+ *
+ */
+static int fixup_fnmatch(void** param, int param_no)
+{
+	if (param_no == 1) {
+		return fixup_var_pve_12(param, param_no);
+	} else if (param_no == 2) {
+		return fixup_var_pve_12(param, param_no);
+	} else if (param_no == 3) {
+		return fixup_var_pve_12(param, param_no);
+	} else {
+		return 0;
+	}
+
+}
+
+/*
+ * Function to load the textops api.
+ */
+static int bind_textopsx(textopsx_api_t *tob){
+	if(tob==NULL){
+		LM_WARN("textopsx_binds: Cannot load textopsx API into a NULL pointer\n");
+		return -1;
+	}
+	tob->msg_apply_changes = msg_apply_changes_f;
+	return 0;
+}

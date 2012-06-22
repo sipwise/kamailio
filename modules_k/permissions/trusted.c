@@ -3,7 +3,7 @@
  *
  * allow_trusted related functions
  *
- * Copyright (C) 2003 Juha Heinanen
+ * Copyright (C) 2003-2012 Juha Heinanen
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -288,7 +288,9 @@ void clean_trusted(void)
  */
 static inline int match_proto(const char *proto_string, int proto_int)
 {
-	if (strcasecmp(proto_string, "any") == 0) return 1;
+        if ((proto_int == PROTO_NONE) ||
+	                (strcasecmp(proto_string, "any") == 0))
+	        return 1;
 	
 	if (proto_int == PROTO_UDP) {
 		if (strcasecmp(proto_string, "udp") == 0) {
@@ -328,67 +330,73 @@ static inline int match_proto(const char *proto_string, int proto_int)
 }
 
 /*
- * Matches from uri against patterns returned from database.  Returns 1 when
- * first pattern matches and 0 if none of the patterns match.
+ * Matches from uri against patterns returned from database.  Returns number
+ * of matches or -1 if none of the patterns match.
  */
 static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
 {
-        int i, tag_avp_type;
+	int i, tag_avp_type;
 	str uri;
 	char uri_string[MAX_URI_SIZE+1];
 	db_row_t* row;
 	db_val_t* val;
 	regex_t preg;
 	int_str tag_avp, avp_val;
+	int count = 0;
 
-	if (parse_from_header(msg) < 0) return -1;
-	uri = get_from(msg)->uri;
-	if (uri.len > MAX_URI_SIZE) {
-		LM_ERR("message has From URI too large\n");
-		return -1;
+	if (IS_SIP(msg)) {
+		if (parse_from_header(msg) < 0) return -1;
+		uri = get_from(msg)->uri;
+		if (uri.len > MAX_URI_SIZE) {
+			LM_ERR("message has From URI too large\n");
+			return -1;
+		}
+		memcpy(uri_string, uri.s, uri.len);
+		uri_string[uri.len] = (char)0;
 	}
-	memcpy(uri_string, uri.s, uri.len);
-	uri_string[uri.len] = (char)0;
+	get_tag_avp(&tag_avp, &tag_avp_type);
 
 	row = RES_ROWS(_r);
-		
-	for(i = 0; i < RES_ROW_N(_r); i++) {
-	    val = ROW_VALUES(row + i);
-	    if ((ROW_N(row + i) == 3) &&
-		(VAL_TYPE(val) == DB1_STRING) && !VAL_NULL(val) &&
-		match_proto(VAL_STRING(val), proto) &&
-		(VAL_NULL(val + 1) ||
-		 ((VAL_TYPE(val + 1) == DB1_STRING) && !VAL_NULL(val + 1))) &&
-		(VAL_NULL(val + 2) ||
-		 ((VAL_TYPE(val + 2) == DB1_STRING) && !VAL_NULL(val + 2))))
-	    {
-		if (VAL_NULL(val + 1)) goto found;
-		if (regcomp(&preg, (char *)VAL_STRING(val + 1), REG_NOSUB)) {
-		    LM_ERR("invalid regular expression\n");
-		    continue;
-		}
-		if (regexec(&preg, uri_string, 0, (regmatch_t *)0, 0)) {
-		    regfree(&preg);
-		    continue;
-		} else {
-		    regfree(&preg);
-		    goto found;
-		}
-	    }
-	}
-	return -1;
 
-found:
-	get_tag_avp(&tag_avp, &tag_avp_type);
-	if (tag_avp.n && !VAL_NULL(val + 2)) {
-	    avp_val.s.s = (char *)VAL_STRING(val + 2);
-	    avp_val.s.len = strlen(avp_val.s.s);
-	    if (add_avp(tag_avp_type|AVP_VAL_STR, tag_avp, avp_val) != 0) {
-		LM_ERR("failed to set of tag_avp failed\n");
-		return -1;
-	    }
+	for(i = 0; i < RES_ROW_N(_r); i++) {
+		val = ROW_VALUES(row + i);
+		if ((ROW_N(row + i) == 3) &&
+		    (VAL_TYPE(val) == DB1_STRING) && !VAL_NULL(val) &&
+		    match_proto(VAL_STRING(val), proto) &&
+		    (VAL_NULL(val + 1) ||
+		      ((VAL_TYPE(val + 1) == DB1_STRING) && !VAL_NULL(val + 1))) &&
+		    (VAL_NULL(val + 2) ||
+		      ((VAL_TYPE(val + 2) == DB1_STRING) && !VAL_NULL(val + 2))))
+		{
+			if (!VAL_NULL(val + 1) && IS_SIP(msg)) {
+				if (regcomp(&preg, (char *)VAL_STRING(val + 1), REG_NOSUB)) {
+					LM_ERR("invalid regular expression\n");
+					continue;
+				}
+				if (regexec(&preg, uri_string, 0, (regmatch_t *)0, 0)) {
+					regfree(&preg);
+					continue;
+				}
+			    regfree(&preg);
+			}
+			/* Found a match */
+			if (tag_avp.n && !VAL_NULL(val + 2)) {
+				avp_val.s.s = (char *)VAL_STRING(val + 2);
+				avp_val.s.len = strlen(avp_val.s.s);
+				if (add_avp(tag_avp_type|AVP_VAL_STR, tag_avp, avp_val) != 0) {
+					LM_ERR("failed to set of tag_avp failed\n");
+					return -1;
+				}
+			}
+			if (!peer_tag_mode) 
+				return 1;
+			count++;
+		}
 	}
-	return 1;
+	if (!count)
+		return -1;
+	else 
+		return count;
 }
 
 
@@ -467,43 +475,50 @@ int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp)
     int proto_int;
 
     if (_src_ip_sp==NULL
-			|| (fixup_get_svalue(_msg, (gparam_p)_src_ip_sp, &src_ip) != 0)) {
-		LM_ERR("src_ip param does not exist or has no value\n");
-		return -1;
+	|| (fixup_get_svalue(_msg, (gparam_p)_src_ip_sp, &src_ip) != 0)) {
+	LM_ERR("src_ip param does not exist or has no value\n");
+	return -1;
     }
     
     if (_proto_sp==NULL
-			|| (fixup_get_svalue(_msg, (gparam_p)_proto_sp, &proto) != 0)) {
-		LM_ERR("proto param does not exist or has no value\n");
-		return -1;
+	|| (fixup_get_svalue(_msg, (gparam_p)_proto_sp, &proto) != 0)) {
+	LM_ERR("proto param does not exist or has no value\n");
+	return -1;
     }
-	if(proto.len!=3 && proto.len!=4)
-		goto error;
 
-	switch(proto.s[0]) {
-		case 'u': case 'U':
-			if (proto.len==3 && strncasecmp(proto.s, "udp", 3) == 0) {
-				proto_int = PROTO_UDP;
-			} else goto error;
-		break;
-		case 't': case 'T':
-			if (proto.len==3 && strncasecmp(proto.s, "tcp", 3) == 0) {
-				proto_int = PROTO_TCP;
-			} else if (proto.len==3 && strncasecmp(proto.s, "tls", 3) == 0) {
-				proto_int = PROTO_TLS;
-			} else goto error;
-		break;
-		case 's': case 'S':
-			if (proto.len==4 && strncasecmp(proto.s, "sctp", 4) == 0) {
-				proto_int = PROTO_SCTP;
-			} else goto error;
-		break;
-		default:
-			goto error;
+    if(proto.len!=3 && proto.len!=4)
+	goto error;
+
+    switch(proto.s[0]) {
+    case 'a': case 'A':
+	if (proto.len==3 && strncasecmp(proto.s, "any", 3) == 0) {
+	    proto_int = PROTO_NONE;
+	} else goto error;
+	break;
+    case 'u': case 'U':
+	if (proto.len==3 && strncasecmp(proto.s, "udp", 3) == 0) {
+	    proto_int = PROTO_UDP;
+	} else goto error;
+	break;
+    case 't': case 'T':
+	if (proto.len==3 && strncasecmp(proto.s, "tcp", 3) == 0) {
+	    proto_int = PROTO_TCP;
+	} else if (proto.len==3 && strncasecmp(proto.s, "tls", 3) == 0) {
+	    proto_int = PROTO_TLS;
+	} else goto error;
+	break;
+    case 's': case 'S':
+	if (proto.len==4 && strncasecmp(proto.s, "sctp", 4) == 0) {
+	    proto_int = PROTO_SCTP;
+	} else goto error;
+	break;
+    default:
+	goto error;
     }
 
     return allow_trusted(_msg, src_ip.s, proto_int);
 error:
-	LM_ERR("unknown protocol %.*s\n", proto.len, proto.s);
-	return -1;
+    LM_ERR("unknown protocol %.*s\n", proto.len, proto.s);
+    return -1;
 }
+

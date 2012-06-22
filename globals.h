@@ -86,13 +86,17 @@ extern struct socket_info* sendipv6_sctp; /* same as above for ipv6 */
 #endif
 
 extern unsigned int maxbuffer;
+extern unsigned int sql_buffer_size;
 extern int children_no;
+extern int socket_workers;
 #ifdef USE_TCP
 extern int tcp_main_pid;
+extern int tcp_cfg_children_no;
 extern int tcp_children_no;
 extern int tcp_disable;
 extern enum poll_types tcp_poll_method;
-extern int tcp_max_connections; /* maximum connections, hard limit */
+extern int tcp_max_connections; /* maximum tcp connections, hard limit */
+extern int tls_max_connections; /* maximum tls connections, hard limit */
 #endif
 #ifdef USE_TLS
 extern int tls_disable;
@@ -124,6 +128,7 @@ extern int sock_mode;
 extern char* chroot_dir;
 extern char* working_dir;
 extern int sr_auto_aliases;
+extern int sr_msg_time;
 
 #ifdef USE_MCAST
 extern int mcast_loopback;
@@ -134,6 +139,10 @@ extern int mcast_ttl;
 extern unsigned int stun_refresh_interval;
 extern int stun_allow_stun;
 extern int stun_allow_fp;
+#endif
+
+#ifdef USE_IPV6
+extern int auto_bind_ipv6;
 #endif
 
 extern int tos;
@@ -150,6 +159,7 @@ extern int cfg_warnings;
 extern unsigned int msg_no;
 
 extern unsigned long shm_mem_size;
+extern unsigned long pkg_mem_size;
 
 /* AVP configuration */
 extern char *avp_db_url;  /* db url used by user preferences (AVPs) */
@@ -204,6 +214,7 @@ extern int rt_timer2_prio;  /* "slow" timer */
 extern int rt_timer1_policy; /* "fast" timer, SCHED_OTHER */
 extern int rt_timer2_policy; /* "slow" timer, SCHED_OTHER */
 
+extern int http_reply_hack;
 
 #ifdef USE_DNS_CACHE
 extern int dns_cache_init; /* if 0, the DNS cache is not initialized at startup */

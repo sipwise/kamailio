@@ -2,7 +2,7 @@ Presence Module
 
 Anca-Maria Vamanu
 
-   voice-system.ro
+   Voice Sistem SRL
 
 Juha Heinanen
 
@@ -16,12 +16,9 @@ Edited by
 
 Juha Heinanen
 
-   Copyright © 2006 voice-system.ro
+   Copyright © 2006 Voice Sistem SRL
 
    Copyright © 2009 Juha Heinanen
-   Revision History
-   Revision $Revision: 4594 $ $Date: 2008-08-06 13:08:33 +0300 (Wed, 06
-                              Aug 2008) $
      __________________________________________________________________
 
    Table of Contents
@@ -34,7 +31,7 @@ Juha Heinanen
               2.1. Kamailio Modules
               2.2. External Libraries or Applications
 
-        3. Exported Parameters
+        3. Parameters
 
               3.1. db_url(str)
               3.2. presentity_table(str)
@@ -42,25 +39,33 @@ Juha Heinanen
               3.4. watchers_table(str)
               3.5. clean_period (int)
               3.6. db_update_period (int)
-              3.7. to_tag_pref (str)
-              3.8. expires_offset (int)
-              3.9. max_expires (int)
-              3.10. server_address (str)
-              3.11. fallback2db (int)
-              3.12. subs_htable_size (int)
-              3.13. pres_htable_size (int)
-              3.14. enable_sphere_check (int)
-              3.15. timeout_rm_subs (int)
+              3.7. waitn_time (int)
+              3.8. notifier_poll_rate (int)
+              3.9. notifier_processes (int)
+              3.10. to_tag_pref (str)
+              3.11. expires_offset (int)
+              3.12. max_expires (int)
+              3.13. server_address (str)
+              3.14. subs_db_mode (int)
+              3.15. publ_cache (int)
+              3.16. subs_htable_size (int)
+              3.17. pres_htable_size (int)
+              3.18. send_fast_notify (int)
+              3.19. enable_sphere_check (int)
+              3.20. timeout_rm_subs (int)
+              3.21. fetch_rows (integer)
 
-        4. Exported Functions
+        4. Functions
 
               4.1. handle_publish(char* sender_uri)
-              4.2. handle_subscribe()
+              4.2. handle_subscribe([watcher_uri])
               4.3. pres_auth_status(watcher_uri, presentity_uri)
-              4.4. pres_refresh_watchers(uri, event, type)
+              4.4. pres_refresh_watchers(uri, event, type[, file_uri,
+                      filename])
+
               4.5. pres_update_watchers(uri, event)
 
-        5. Exported MI Functions
+        5. MI Commands
 
               5.1. refreshWatchers
               5.2. cleanup
@@ -84,6 +89,8 @@ Juha Heinanen
         13. get_event_list
         14. update_watchers_status
         15. get_sphere
+        16. get_presentity
+        17. free_presentity
 
    List of Examples
 
@@ -93,20 +100,26 @@ Juha Heinanen
    1.4. Set watchers_table parameter
    1.5. Set clean_period parameter
    1.6. Set db_update_period parameter
-   1.7. Set to_tag_pref parameter
-   1.8. Set expires_offset parameter
-   1.9. Set max_expires parameter
-   1.10. Set server_address parameter
-   1.11. Set fallback2db parameter
-   1.12. Set subs_htable_size parameter
-   1.13. Set pres_htable_size parameter
-   1.14. Set enable_sphere_check parameter
-   1.15. Set timeout_rm_subs parameter
-   1.16. handle_publish usage
-   1.17. handle_subscribe usage
-   1.18. pres_auth_status usage
-   1.19. pres_refresh_watchers usage
-   1.20. pres_update_watchers usage
+   1.7. Set waitn_time parameter
+   1.8. Set notifier_poll_rate parameter
+   1.9. Set notifier_processes parameter
+   1.10. Set to_tag_pref parameter
+   1.11. Set expires_offset parameter
+   1.12. Set max_expires parameter
+   1.13. Set server_address parameter
+   1.14. Set subs_db_mode parameter
+   1.15. Set publ_cache parameter
+   1.16. Set subs_htable_size parameter
+   1.17. Set pres_htable_size parameter
+   1.18. Set send_fast_notify parameter
+   1.19. Set enable_sphere_check parameter
+   1.20. Set timeout_rm_subs parameter
+   1.21. Set fetch_rows parameter
+   1.22. handle_publish usage
+   1.23. handle_subscribe usage
+   1.24. pres_auth_status usage
+   1.25. pres_refresh_watchers usage
+   1.26. pres_update_watchers usage
    2.1. presence_api_t structure
 
 Chapter 1. Admin Guide
@@ -119,7 +132,7 @@ Chapter 1. Admin Guide
         2.1. Kamailio Modules
         2.2. External Libraries or Applications
 
-   3. Exported Parameters
+   3. Parameters
 
         3.1. db_url(str)
         3.2. presentity_table(str)
@@ -127,25 +140,32 @@ Chapter 1. Admin Guide
         3.4. watchers_table(str)
         3.5. clean_period (int)
         3.6. db_update_period (int)
-        3.7. to_tag_pref (str)
-        3.8. expires_offset (int)
-        3.9. max_expires (int)
-        3.10. server_address (str)
-        3.11. fallback2db (int)
-        3.12. subs_htable_size (int)
-        3.13. pres_htable_size (int)
-        3.14. enable_sphere_check (int)
-        3.15. timeout_rm_subs (int)
+        3.7. waitn_time (int)
+        3.8. notifier_poll_rate (int)
+        3.9. notifier_processes (int)
+        3.10. to_tag_pref (str)
+        3.11. expires_offset (int)
+        3.12. max_expires (int)
+        3.13. server_address (str)
+        3.14. subs_db_mode (int)
+        3.15. publ_cache (int)
+        3.16. subs_htable_size (int)
+        3.17. pres_htable_size (int)
+        3.18. send_fast_notify (int)
+        3.19. enable_sphere_check (int)
+        3.20. timeout_rm_subs (int)
+        3.21. fetch_rows (integer)
 
-   4. Exported Functions
+   4. Functions
 
         4.1. handle_publish(char* sender_uri)
-        4.2. handle_subscribe()
+        4.2. handle_subscribe([watcher_uri])
         4.3. pres_auth_status(watcher_uri, presentity_uri)
-        4.4. pres_refresh_watchers(uri, event, type)
+        4.4. pres_refresh_watchers(uri, event, type[, file_uri, filename])
+
         4.5. pres_update_watchers(uri, event)
 
-   5. Exported MI Functions
+   5. MI Commands
 
         5.1. refreshWatchers
         5.2. cleanup
@@ -162,17 +182,13 @@ Chapter 1. Admin Guide
    from the presence_xml module and message-summary from the presence_mwi
    module.
 
-   The module uses database storage and memory caching (to improve
-   performance). The SIP SUBSCRIBE dialog information is stored in memory
-   and is periodically updated in the database, while for PUBLISH only the
-   presence or absence of stored info for a certain resource is maintained
-   in memory to avoid unnecessary, costly database operations. It is
-   possible to disable in-memory caching by configuring a fallback to
-   database mode (by setting the module parameter "fallback2db"). In this
-   mode, in case a searched record is not found in cache, the search is
-   continued in database. This is useful for an architecture in which
-   processing and memory load might be divided on several Kamailio
-   instances, maybe on different servers using the same database.
+   The module can use database and memory storage (to improve
+   performance). For subscriptions it supports the 4 storage modes: Memory
+   Only, Write Back, Write Through and DB Only. For publishes, it stores
+   the state documents in database only(because of the large size) and it
+   can store a publish cache in memory to avoid unnecessairy database
+   queries. Read the subs_db_mode and publ_cache parameter sections to
+   decide which is the best storage configuration for you.
 
    The module implements several API functions, that can be used by other
    modules. In fact, it can be used only as a resource module, or
@@ -198,7 +214,7 @@ Chapter 1. Admin Guide
 
      * libxml.
 
-3. Exported Parameters
+3. Parameters
 
    3.1. db_url(str)
    3.2. presentity_table(str)
@@ -206,15 +222,21 @@ Chapter 1. Admin Guide
    3.4. watchers_table(str)
    3.5. clean_period (int)
    3.6. db_update_period (int)
-   3.7. to_tag_pref (str)
-   3.8. expires_offset (int)
-   3.9. max_expires (int)
-   3.10. server_address (str)
-   3.11. fallback2db (int)
-   3.12. subs_htable_size (int)
-   3.13. pres_htable_size (int)
-   3.14. enable_sphere_check (int)
-   3.15. timeout_rm_subs (int)
+   3.7. waitn_time (int)
+   3.8. notifier_poll_rate (int)
+   3.9. notifier_processes (int)
+   3.10. to_tag_pref (str)
+   3.11. expires_offset (int)
+   3.12. max_expires (int)
+   3.13. server_address (str)
+   3.14. subs_db_mode (int)
+   3.15. publ_cache (int)
+   3.16. subs_htable_size (int)
+   3.17. pres_htable_size (int)
+   3.18. send_fast_notify (int)
+   3.19. enable_sphere_check (int)
+   3.20. timeout_rm_subs (int)
+   3.21. fetch_rows (integer)
 
 3.1. db_url(str)
 
@@ -291,19 +313,73 @@ modparam("presence", "clean_period", 100)
 modparam("presence", "db_update_period", 100)
 ...
 
-3.7. to_tag_pref (str)
+3.7. waitn_time (int)
+
+   The maximum time period that NOTIFY requests will be buffered for. The
+   server will attempt to send NOTIFY requests within many seconds of a
+   change occurring.
+
+   Note: this parameter is only used when notifier_processes is greater
+   than 0. When notifier_processes is less than or equal to 0 NOTIFY
+   requests are sent immediately.
+
+   Default value is “5”.
+
+   Example 1.7. Set waitn_time parameter
+...
+modparam("presence", "waitn_time", 10)
+...
+
+3.8. notifier_poll_rate (int)
+
+   The number of times per second that the notifier processes should check
+   for work. Approximately 1/(waitn_time * notifier_poll_rate *
+   notifier_processes) of the pending updates will be sent each time a
+   notifier process runs.
+
+   Separate notifier processes are only run when subs_db_mode is 3 (DB
+   only mode).
+
+   Default value is “10”.
+
+   Example 1.8. Set notifier_poll_rate parameter
+...
+modparam("presence", "notifier_poll_rate", 20)
+...
+
+3.9. notifier_processes (int)
+
+   The number of notifier processes that should be started.
+
+   Separate notifier processes are only run when subs_db_mode is 3 (DB
+   only mode).
+
+   Note: setting this parameter to 0 when subs_db_mode is 3 keeps the old
+   behaviour (sending NOTIFY requests immediately). This (old) behaviour
+   is disabled by default in DB only mode because under load, when lots of
+   NOTIFY requests can be sent on a dialog at the same time, there are
+   race conditions which result in CSeq re-use.
+
+   Default value is “1”.
+
+   Example 1.9. Set notifier_processes parameter
+...
+modparam("presence", "notifier_processes", 2)
+...
+
+3.10. to_tag_pref (str)
 
    The prefix used when generating to_tag when sending replies for
    SUBSCRIBE requests.
 
    Default value is “10”.
 
-   Example 1.7. Set to_tag_pref parameter
+   Example 1.10. Set to_tag_pref parameter
 ...
 modparam("presence", "to_tag_pref", 'pres')
 ...
 
-3.8. expires_offset (int)
+3.11. expires_offset (int)
 
    The value in seconds that should be subtracted from the expires value
    when sending a 200OK for a publish. It is used for forcing the client
@@ -311,48 +387,95 @@ modparam("presence", "to_tag_pref", 'pres')
 
    Default value is “0”.
 
-   Example 1.8. Set expires_offset parameter
+   Example 1.11. Set expires_offset parameter
 ...
 modparam("presence", "expires_offset", 10)
 ...
 
-3.9. max_expires (int)
+3.12. max_expires (int)
 
    The the maximum admissible expires value for PUBLISH/SUBSCRIBE message
    (in seconds).
 
    Default value is “3600”.
 
-   Example 1.9. Set max_expires parameter
+   Example 1.12. Set max_expires parameter
 ...
 modparam("presence", "max_expires", 3600)
 ...
 
-3.10. server_address (str)
+3.13. server_address (str)
 
    The presence server address which will become the value of Contact
    header filed for 200 OK replies to SUBSCRIBE and PUBLISH and in NOTIFY
    messages.
 
-   Example 1.10. Set server_address parameter
+   Example 1.13. Set server_address parameter
 ...
 modparam("presence", "server_address", "sip:10.10.10.10:5060")
 ...
 
-3.11. fallback2db (int)
+3.14. subs_db_mode (int)
 
-   Setting this parameter enables a fallback to db mode of operation. In
-   this mode, in case a searched record is not found in cache, the search
-   is continued in database. Useful for an architecture in which
-   processing and memory load might be divided on more servers using the
-   same database.
+   The presence module can utilize database for persistent subscription
+   storage. If you use database, your subscriptions will survive machine
+   restarts or SW crashes. The disadvantage is that accessing database can
+   be time consuming. Therefore, presence module implements four database
+   accessing modes:
+     * 0 - This disables database completely. Only memory will be used.
+       Subscriptions will not survive restart. Use this value if you need
+       a really fast presence module and subscription persistence is not
+       necessary or is provided by other means.
+     * 1 - Write-Through scheme. Subscriptions are updated synchronously
+       in database and in memory(used for read operations). Use this
+       scheme if speed is not top priority, but it's important that no
+       subscriptions will be lost during crash or reboot or if you have an
+       external application that reads the state of the subscriptions from
+       database and they need to be updated synchronously.
+     * 2 - Write-Back scheme. This is a combination of previous two
+       schemes. All changes are made to memory and database
+       synchronization is done in the timer. The timer deletes all expired
+       contacts and flushes all modified or new subscriptions to database.
+       Use this scheme if you encounter high-load peaks and want them to
+       process as fast as possible. Latency of this mode is much lower
+       than latency of mode 1, but slightly higher than latency of mode 0.
+       To control the interval at which data is flushed to database, set
+       the db_update_period parameter.
+     * 3 - DB-Only scheme. No memory cache is kept, all operations being
+       directly performed with the database. The timer deletes all expired
+       subscriptions from database. The mode is useful if you configure
+       more servers sharing the same DB without any replication at SIP
+       level. The mode may be slower due the high number of DB operation.
 
-   Example 1.11. Set fallback2db parameter
+   Default value is 2 (Write-Back scheme).
+
+   Example 1.14. Set subs_db_mode parameter
 ...
-modparam("presence", "fallback2db", 1)
+modparam("presence", "subs_db_mode", 1)
 ...
 
-3.12. subs_htable_size (int)
+3.15. publ_cache (int)
+
+   To improve performance, the presence module holds by default a publish
+   cache that says if a certain publication exists in database. This is
+   only a list of URI + event, so it does not use much memory. The cache
+   is used when a Subscription is received to check if there is any
+   published state in database. This way unnecessary queries in presentity
+   table are avoided.
+
+   Setting this parameter to 0 will disable the usage of the publish
+   cache. This is desirable when you have more servers sharing the same
+   database or there are other external entities inserting data into the
+   presentity table.
+
+   Default value is “1”.
+
+   Example 1.15. Set publ_cache parameter
+...
+modparam("presence", "publ_cache", 0)
+...
+
+3.16. subs_htable_size (int)
 
    The size of the in-memory hash table to store subscription dialogs.
    This parameter will be used as the power of 2 when computing table
@@ -360,24 +483,39 @@ modparam("presence", "fallback2db", 1)
 
    Default value is “9 (512)”.
 
-   Example 1.12. Set subs_htable_size parameter
+   Example 1.16. Set subs_htable_size parameter
 ...
 modparam("presence", "subs_htable_size", 11)
 ...
 
-3.13. pres_htable_size (int)
+3.17. pres_htable_size (int)
 
    The size of the in-memory hash table to store publish records. This
    parameter will be used as the power of 2 when computing table size.
 
    Default value is “9 (512)”.
 
-   Example 1.13. Set pres_htable_size parameter
+   Example 1.17. Set pres_htable_size parameter
 ...
 modparam("presence", "pres_htable_size", 11)
 ...
 
-3.14. enable_sphere_check (int)
+3.18. send_fast_notify (int)
+
+   This parameter enables or disables the sending of an initial empty
+   NOTIFY after a SUBSCRIBE/reSUBSCRIBE. This caused problems for MWI
+   application, because some CPEs (like Samsung) fail to understand an
+   empty NOTIFY to an message-summary event. This parameter is enabled by
+   default, thus addering to the standard.
+
+   Default value is “1 ”.
+
+   Example 1.18. Set send_fast_notify parameter
+...
+modparam("presence", "send_fast_notify", 0)
+...
+
+3.19. enable_sphere_check (int)
 
    This parameter is a flag that should be set if permission rules include
    sphere checking. The sphere information is expected to be present in
@@ -387,12 +525,12 @@ modparam("presence", "pres_htable_size", 11)
 
    Default value is “0 ”.
 
-   Example 1.14. Set enable_sphere_check parameter
+   Example 1.19. Set enable_sphere_check parameter
 ...
 modparam("presence", "enable_sphere_check", 1)
 ...
 
-3.15. timeout_rm_subs (int)
+3.20. timeout_rm_subs (int)
 
    This parameter is a flag that should be set if subscriptions should be
    removed from the active_watchers when a NOTIFY times out. RFC3265
@@ -402,17 +540,28 @@ modparam("presence", "enable_sphere_check", 1)
 
    Default value is “1”.
 
-   Example 1.15. Set timeout_rm_subs parameter
+   Example 1.20. Set timeout_rm_subs parameter
 ...
 modparam("presence", "timeout_rm_subs", 0)
 ...
 
-4. Exported Functions
+3.21. fetch_rows (integer)
+
+   Number of rows to be loaded in one step from database.
+
+   Default value is 500.
+
+   Example 1.21. Set fetch_rows parameter
+...
+modparam("presence", "fetch_rows", 1000)
+...
+
+4. Functions
 
    4.1. handle_publish(char* sender_uri)
-   4.2. handle_subscribe()
+   4.2. handle_subscribe([watcher_uri])
    4.3. pres_auth_status(watcher_uri, presentity_uri)
-   4.4. pres_refresh_watchers(uri, event, type)
+   4.4. pres_refresh_watchers(uri, event, type[, file_uri, filename])
    4.5. pres_update_watchers(uri, event)
 
 4.1.  handle_publish(char* sender_uri)
@@ -435,7 +584,7 @@ modparam("presence", "timeout_rm_subs", 0)
 
    The module sends an appropriate stateless reply in all cases.
 
-   Example 1.16. handle_publish usage
+   Example 1.22. handle_publish usage
 ...
         if(is_method("PUBLISH"))
         {
@@ -447,11 +596,16 @@ modparam("presence", "timeout_rm_subs", 0)
         }
 ...
 
-4.2.  handle_subscribe()
+4.2.  handle_subscribe([watcher_uri])
 
    The function which handles SUBSCRIBE requests. It stores or updates
    information in memory and database and calls functions to send NOTIFY
-   messages when a SUBSCRIBE which initiate a dialog is received
+   messages when a SUBSCRIBE which initiate a dialog is received.
+
+   By default this function uses the From: URI from the SUBSCRIBE request
+   as the Watcher URI. The optional watcher_uri parameter can be used to
+   specify a different Watcher URI, possibly taken from a SIP header like
+   P-Asserted-Identity:.
 
    This function can be used from REQUEST_ROUTE.
 
@@ -461,7 +615,7 @@ modparam("presence", "timeout_rm_subs", 0)
 
    The module sends an appropriate stateless reply in all cases.
 
-   Example 1.17. handle_subscribe usage
+   Example 1.23. handle_subscribe usage
 ...
 if(method=="SUBSCRIBE")
     handle_subscribe();
@@ -478,7 +632,7 @@ if(method=="SUBSCRIBE")
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 1.18. pres_auth_status usage
+   Example 1.24. pres_auth_status usage
 ...
 if (method=="MESSAGE") {
     pres_auth_status("$fu", $ru");
@@ -490,7 +644,7 @@ if (method=="MESSAGE") {
 }
 ...
 
-4.4.  pres_refresh_watchers(uri, event, type)
+4.4.  pres_refresh_watchers(uri, event, type[, file_uri, filename])
 
    The function can be used in configuration to triger notifies to
    watchers if a change in watchers authorization or in published state
@@ -500,16 +654,21 @@ if (method=="MESSAGE") {
      * uri - the uri of the user who made the change and whose watchers
        should be informed.
      * event - the event package.
-     * type - it distinguishes between the two different types of events
+     * type - it distinguishes between the three different types of events
        that can trigger the refresh, depending on its value:
           + 0 - a change in watchers authentication.
-          + 1 - a statical update in published state (either through
-            direct update in db table or by modifying the pidf
-            manipulation document, if pidf_manipulation parameter is set).
+          + 1 - a statical update in published state through direct update
+            in db table.
+          + 2 - a statical update in published state by modifying the pidf
+            manipulation document.
+     * file_uri - the uri of the pidf-manipulation file on the XCAP server
+       (only used for type 2).
+     * filename - the name of the pidf-manipulation file on the XCAP
+       server (only used for type 2).
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.19. pres_refresh_watchers usage
+   Example 1.25. pres_refresh_watchers usage
 ...
 pres_refresh_watchers("sip:test@kamailio.org", "presence", 1);
 ...
@@ -527,12 +686,12 @@ pres_refresh_watchers("sip:test@kamailio.org", "presence", 1);
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.20. pres_update_watchers usage
+   Example 1.26. pres_update_watchers usage
 ...
 pres_update_watchers("sip:test@kamailio.org", "presence");
 ...
 
-5. Exported MI Functions
+5. MI Commands
 
    5.1. refreshWatchers
    5.2. cleanup
@@ -545,16 +704,20 @@ pres_update_watchers("sip:test@kamailio.org", "presence");
    Name: refreshWatchers
 
    Parameters:
-     * presentity_uri : the uri of the user who made the change and whose
-       watchers should be informed
-     * event : the event package
-     * refresh type : it distinguishes between the two different types of
-       events that can trigger a refresh:
-          + a change in watchers authentication: refresh type= 0 ;
-          + a statical update in published state (either through direct
-            update in db table or by modifying the pidf manipulation
-            document, if pidf_manipulation parameter is set): refresh
-            type!= 0.
+     * uri - the uri of the user who made the change and whose watchers
+       should be informed
+     * event - the event package.
+     * type - it distinguishes between the three different types of events
+       that can trigger the refresh, depending on its value:
+          + 0 - a change in watchers authentication.
+          + 1 - a statical update in published state through direct update
+            in db table.
+          + 2 - a statical update in published state by modifying the pidf
+            manipulation document.
+     * file_uri - the uri of the pidf-manipulation file on the XCAP server
+       (only used for type 2).
+     * filename - the name of the pidf-manipulation file on the XCAP
+       server (only used for type 2).
 
    MI FIFO Command Format:
                 :refreshWatchers:fifo_reply
@@ -565,12 +728,13 @@ pres_update_watchers("sip:test@kamailio.org", "presence");
 
 5.2.  cleanup
 
-   Manually triggers the cleanup functions for watchers and presentity
-   tables. Useful if you have set clean_period to zero or less.
+   Manually triggers the cleanup functions for the active_watchers,
+   presentity, and watchers tables. Useful if you have set clean_period
+   and/or db_update_period to zero or less.
 
    Name: cleanup
 
-   Parameters:none.emphasis>
+   Parameters: none
 
    MI FIFO Command Format:
                 :cleanup:fifo_reply
@@ -604,6 +768,8 @@ Chapter 2. Developer Guide
    13. get_event_list
    14. update_watchers_status
    15. get_sphere
+   16. get_presentity
+   17. free_presentity
 
    The module provides the following functions that can be used in other
    Kamailio modules.
@@ -634,7 +800,7 @@ typedef struct presence_api {
         /* function to duplicate a subs structure*/
         mem_copy_subs_t  mem_copy_subs;
         /* function used for update in database*/
-        update_db_subs_t update_db_subs;
+        update_db_subs_t update_db_subs_timer;
         /* function to extract dialog information from a
         SUBSCRIBE message */
         extract_sdialog_info_t extract_sdialog_info;
@@ -868,3 +1034,30 @@ typedef char* (*pres_get_sphere_t)(str* pres_uri);
    This function searches for a sphere definition in the published
    information if this has type RPID. If not found returns NULL. (the
    return value is allocated in private memory and should be freed)
+
+16.  get_presentity
+
+   Field type:
+...
+typedef str* (*pres_get_presentity_t)(str pres_uri, pres_ev_t *ev, str *etag, st
+r *contact);
+...
+
+   This function returns a pointer to a str containing an XML document
+   with all of the matching presentities. If no matching presentities are
+   found the function returns NULL.
+
+   The etag and contact parameters are optional and may be set to NULL.
+   Once you are finished with the presentity document you must call
+   free_presentity to free the allocated memory.
+
+17.  free_presentity
+
+   Field type:
+...
+typedef void (*pres_free_presentity_t)(str *presentity, pres_ev_t *ev);
+...
+
+   This function frees memory allocated by a call to get_presentity. The
+   ev parameter MUST point to the same pres_ev_t data-structure that was
+   used in the call to get_presentity.

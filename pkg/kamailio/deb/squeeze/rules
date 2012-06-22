@@ -43,21 +43,22 @@ MODULES_SP=
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils geoip memcached tls \
 			   snmpstats carrierroute xmpp cpl lua python \
-			   redis
+			   sqlite json
+
+# name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
+LIBDIR ?= lib
 
 # directories with possible duplicate libraries (that should be deleted
 # from current module* packages)
-DUP_LIBS_DIRS=$(CURDIR)/debian/kamailio/usr/lib/kamailio \
-			$(CURDIR)/debian/kamailio-db-modules/usr/lib/kamailio \
-			$(CURDIR)/debian/kamailio/usr/lib64/kamailio \
-			$(CURDIR)/debian/kamailio-db-modules/usr/lib64/kamailio
+DUP_LIBS_DIRS=$(CURDIR)/debian/kamailio/usr/$(LIBDIR)/kamailio \
+			$(CURDIR)/debian/kamailio-db-modules/usr/$(LIBDIR)/kamailio
 
 # modules names out of modules sp
 MODULES_SP_NAMES=$(filter-out $(MDIRS),$(subst /, ,$(MODULES_SP)))
 
 # "function" to get package short name out of a dir/module_name
-# it also transforms db_foo or ndb_foo into foo
-mod_name=$(patsubst %db_,,$(lastword $(subst /, ,$(1))))
+# it also transforms db_foo into foo
+mod_name=$(subst db_,,$(lastword $(subst /, ,$(1))))
 
 define PACKAGE_GRP_BUILD_template
 	# package all the modules in PACKAGE_GROUPS in separate packages
@@ -83,10 +84,10 @@ define PACKAGE_GRP_INSTALL_template
 		doc-dir=share/doc/kamailio-$(grp)-modules
 		# eliminate duplicate libs
 		-for d in $(DUP_LIBS_DIRS); do \
-			test "$$d" != "$(CURDIR)/debian/kamailio-$(grp)-modules/usr/lib64/kamailio" &&\
+			test "$$d" != "$(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio" &&\
 			for r in $$d/lib*; do \
 				echo "removing $(grp) lib `basename $$r` present also in $$d";\
-				rm -f $(CURDIR)/debian/kamailio-$(grp)-modules/usr/lib64/kamailio/`basename "$$r"` ; \
+				rm -f $(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
 			done ; \
 		done
 	)
@@ -101,10 +102,10 @@ define PACKAGE_MODULE_INSTALL_template
 				doc-dir=share/doc/kamailio-$(call mod_name,$(mod))-module
 		# eliminate duplicate libs
 		-for d in $(DUP_LIBS_DIRS); do \
-			test "$$d" != "$(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/lib64/kamailio" &&\
+			test "$$d" != "$(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio" &&\
 			for r in $$d/lib*; do \
 				echo "removing $(call mod_name, $(mod)) lib `basename $$r` present also in $$d";\
-				rm -f $(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/lib64/kamailio/`basename "$$r"` ; \
+				rm -f $(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
 			done ; \
 		done
 	)
@@ -119,7 +120,6 @@ endif
 
 configure: configure-stamp
 configure-stamp:
-	export LIBDIR=lib64
 	dh_testdir
 	# Add here commands to configure the package.
 	$(MAKE) FLAVOUR=kamailio cfg prefix=/usr cfg_prefix=$(CURDIR)/debian/kamailio \

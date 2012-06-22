@@ -37,6 +37,7 @@
 #include "../../sr_module.h"
 #include "../../lib/srdb1/db_con.h"
 #include "../../lib/srdb1/db.h"
+#include "../../lib/srdb1/db_query.h"
 #include "km_dbase.h"
 #include "km_db_postgres.h"
 
@@ -84,6 +85,7 @@ int db_postgres_bind_api(db_func_t *dbb)
 
 	dbb->use_table        = db_postgres_use_table;
 	dbb->init             = db_postgres_init;
+	dbb->init2            = db_postgres_init2;
 	dbb->close            = db_postgres_close;
 	dbb->query            = db_postgres_query;
 	dbb->fetch_result     = db_postgres_fetch_result;
@@ -92,6 +94,11 @@ int db_postgres_bind_api(db_func_t *dbb)
 	dbb->insert           = db_postgres_insert;
 	dbb->delete           = db_postgres_delete; 
 	dbb->update           = db_postgres_update;
+	dbb->replace          = db_postgres_replace;
+	dbb->affected_rows    = db_postgres_affected_rows;
+	dbb->start_transaction= db_postgres_start_transaction;
+	dbb->end_transaction  = db_postgres_end_transaction;
+	dbb->abort_transaction= db_postgres_abort_transaction;
 
 	return 0;
 }

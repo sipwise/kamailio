@@ -74,6 +74,9 @@
 #include "tls_ct_wrq.h"
 #include "tls_cfg.h"
 
+/* will be set to 1 when the TLS env is initialized to make destroy safe */
+static int tls_mod_initialized = 0;
+
 #if OPENSSL_VERSION_NUMBER < 0x00907000L
 #    warning ""
 #    warning "==============================================================="
@@ -147,7 +150,6 @@ const SSL_METHOD* ssl_methods[TLS_USE_SSLv23 + 1];
 #define RAND_NULL_MALLOC (1024)
 #define NULL_GRACE_PERIOD 10U
 */
-
 
 inline static char* buf_append(char* buf, char* end, char* str, int str_len)
 {
@@ -331,10 +333,12 @@ int tls_h_init_si(struct socket_info *si)
  */
 static void init_ssl_methods(void)
 {
+#ifndef OPENSSL_NO_SSL2
 	ssl_methods[TLS_USE_SSLv2_cli - 1] = SSLv2_client_method();
 	ssl_methods[TLS_USE_SSLv2_srv - 1] = SSLv2_server_method();
 	ssl_methods[TLS_USE_SSLv2 - 1] = SSLv2_method();
-	
+#endif
+
 	ssl_methods[TLS_USE_SSLv3_cli - 1] = SSLv3_client_method();
 	ssl_methods[TLS_USE_SSLv3_srv - 1] = SSLv3_server_method();
 	ssl_methods[TLS_USE_SSLv3 - 1] = SSLv3_method();
@@ -442,6 +446,32 @@ end:
 }
 
 
+/**
+ * tls pre-init function
+ */
+int tls_pre_init(void)
+{
+	     /*
+	      * this has to be called before any function calling CRYPTO_malloc,
+	      * CRYPTO_malloc will set allow_customize in openssl to 0
+	      */
+#ifdef TLS_MALLOC_DBG
+	if (!CRYPTO_set_mem_ex_functions(ser_malloc, ser_realloc, ser_free)) {
+#else
+	if (!CRYPTO_set_mem_functions(ser_malloc, ser_realloc, ser_free)) {
+#endif
+		ERR("Unable to set the memory allocation functions\n");
+		return -1;
+	}
+
+	if (tls_init_locks()<0)
+		return -1;
+
+	init_tls_compression();
+
+	return 0;
+}
+
 /*
  * First step of TLS initialization
  */
@@ -514,8 +544,8 @@ int init_tls_h(void)
 				" zlib compression: %s"
 				"\n %s\n",
 				SSLeay_version(SSLEAY_VERSION), ssl_version,
-				(lib_kerberos==1)?"on":(lib_kerberos==0)?"off":"unkown",
-				(lib_zlib==1)?"on":(lib_zlib==0)?"off":"unkown",
+				(lib_kerberos==1)?"on":(lib_kerberos==0)?"off":"unknown",
+				(lib_zlib==1)?"on":(lib_zlib==0)?"off":"unknown",
 				SSLeay_version(SSLEAY_CFLAGS));
 	if (lib_kerberos!=kerberos_support){
 		if (lib_kerberos!=-1){
@@ -538,21 +568,7 @@ int init_tls_h(void)
 						" enabled. Possible unstable configuration\n");
 		}
 	}
-	     /*
-	      * this has to be called before any function calling CRYPTO_malloc,
-	      * CRYPTO_malloc will set allow_customize in openssl to 0 
-	      */
-#ifdef TLS_MALLOC_DBG
-	if (!CRYPTO_set_mem_ex_functions(ser_malloc, ser_realloc, ser_free)) {
-#else
-	if (!CRYPTO_set_mem_functions(ser_malloc, ser_realloc, ser_free)) {
-#endif
-		ERR("Unable to set the memory allocation functions\n");
-		return -1;
-	}
-	if (tls_init_locks()<0)
-		return -1;
-	init_tls_compression();
+
 	#ifdef TLS_KSSL_WORKARROUND
 	/* if openssl compiled with kerberos support, and openssl < 0.9.8e-dev
 	 * or openssl between 0.9.9-dev and 0.9.9-beta1 apply workaround for
@@ -605,7 +621,7 @@ int init_tls_h(void)
 		s.s = "low_mem_threshold1";
 		s.len = strlen(s.s);
 		if (low_mem_threshold1 != cfg_get(tls, tls_cfg, low_mem_threshold1) &&
-				cfg_set_now_int(cfg_ctx, &tls_grp, &s, low_mem_threshold1)) {
+				cfg_set_now_int(cfg_ctx, &tls_grp, NULL /* group id */, &s, low_mem_threshold1)) {
 			ERR("failed to set tls.low_mem_threshold1 to %d\n",
 					low_mem_threshold1);
 			return -1;
@@ -613,7 +629,7 @@ int init_tls_h(void)
 		s.s = "low_mem_threshold2";
 		s.len = strlen(s.s);
 		if (low_mem_threshold2 != cfg_get(tls, tls_cfg, low_mem_threshold2) &&
-				cfg_set_now_int(cfg_ctx, &tls_grp, &s, low_mem_threshold2)) {
+				cfg_set_now_int(cfg_ctx, &tls_grp, NULL /* group id */, &s, low_mem_threshold2)) {
 			ERR("failed to set tls.low_mem_threshold1 to %d\n",
 					low_mem_threshold2);
 			return -1;
@@ -623,6 +639,7 @@ int init_tls_h(void)
 	SSL_library_init();
 	SSL_load_error_strings();
 	init_ssl_methods();
+	tls_mod_initialized = 1;
 	return 0;
 }
 
@@ -655,7 +672,8 @@ int tls_check_sockets(tls_domains_cfg_t* cfg)
 void destroy_tls_h(void)
 {
 	DBG("tls module final tls destroy\n");
-	ERR_free_strings();
+	if(tls_mod_initialized > 0)
+		ERR_free_strings();
 	/* TODO: free all the ctx'es */
 	tls_destroy_cfg();
 	tls_destroy_locks();

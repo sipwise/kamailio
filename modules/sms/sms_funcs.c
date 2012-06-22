@@ -65,7 +65,6 @@ struct network networks[MAX_NETWORKS];
 int net_pipes_in[MAX_NETWORKS];
 int nr_of_networks;
 int nr_of_modems;
-int max_sms_parts;
 int *queued_msgs;
 int use_contact;
 struct tm_binds tmb;
@@ -545,7 +544,6 @@ int send_sms_as_sip( struct incame_sms *sms )
 	str  sip_body;
 	str  sip_from;
 	int  is_pattern;
-	int  in_address;
 	int  k;
 	char *p;
 
@@ -559,7 +557,6 @@ int send_sms_as_sip( struct incame_sms *sms )
 	      sip address inside; everything before it is ignored, only the
 	      part following the address being send as sip
 	*/
-	in_address = 0;
 	sip_addr.len = 0;
 	sip_body.len = 0;
 	p = sms->ascii;
@@ -644,7 +641,7 @@ int send_sms_as_sip( struct incame_sms *sms )
 	/* the rest of the sms (if any ;-)) is the body! */
 	sip_body.s = p;
 	sip_body.len = sms->ascii + sms->userdatalength - p;
-	/* let's trim out all \n an \r from begining */
+	/* let's trim out all \n an \r from beginning */
 	while ( sip_body.len && sip_body.s
 	&& (sip_body.s[0]=='\n' || sip_body.s[0]=='\r') ) {
 		sip_body.s++;
@@ -699,7 +696,7 @@ int send_sms_as_sip_scan_no(struct incame_sms *sms, char *to)
 	sip_body.len = sms->ascii + sms->userdatalength - sms->ascii;
 	sip_body.s = sms->ascii;	
 
-	/* let's trim out all \n an \r from begining */
+	/* let's trim out all \n an \r from beginning */
 	while (sip_body.len && sip_body.s && 
 	      (sip_body.s[0] == '\n' || sip_body.s[0] == '\r')) {
 	       sip_body.s++;

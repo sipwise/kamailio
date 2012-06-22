@@ -52,6 +52,11 @@
 #include "db_row.h"
 
 
+typedef enum {
+	DB_POOLING_PERMITTED,
+	DB_POOLING_NONE	
+} db_pooling_t;
+
 /**
  * \brief Specify table name that will be used for subsequent operations.
  * 
@@ -87,6 +92,31 @@ typedef int (*db_use_table_f)(db1_con_t* _h, const str * _t);
  * successful, otherwise 0 is returned
  */
 typedef db1_con_t* (*db_init_f) (const str* _sqlurl);
+
+/**
+ * \brief Initialize database connection and obtain the connection handle.
+ *
+ * This function initialize the database API and open a new database
+ * connection. This function must be called after bind_dbmod but before any
+ * other database API function is called.
+ * 
+ * The function takes one parameter, the parameter must contain the database
+ * connection URL. The URL is of the form 
+ * mysql://username:password\@host:port/database where:
+ * 
+ * username: Username to use when logging into database (optional).
+ * password: password if it was set (optional)
+ * host:     Hosname or IP address of the host where database server lives (mandatory)
+ * port:     Port number of the server if the port differs from default value (optional)
+ * database: If the database server supports multiple databases, you must specify the
+ * name of the database (optional).
+ * \see bind_dbmod
+ * \param _sqlurl database connection URL
+ * \param _pooling whether or not to use a pooled connection
+ * \return returns a pointer to the db1_con_t representing the connection if it was
+ * successful, otherwise 0 is returned
+ */
+typedef db1_con_t* (*db_init2_f) (const str* _sqlurl, db_pooling_t _pooling);
 
 /**
  * \brief Close a database connection and free all memory used.
@@ -245,10 +275,15 @@ typedef int (*db_update_f) (const db1_con_t* _h, const db_key_t* _k, const db_op
  * \param _k key names
  * \param _v values of the keys
  * \param _n number of key=value pairs
+ * \param _un number of keys to build the unique key, starting from first _k
+ * \param _m mode - first update, then insert, or first insert, then update
+ * \note the last two parameters are used only if the DB server does not
+ * have native replace command (like postgres - the module doing an internal
+ * implementation using synchronized update/affected rows/insert mechanism)
  * \return returns 0 if everything is OK, otherwise returns value < 0
 */
 typedef int (*db_replace_f) (const db1_con_t* handle, const db_key_t* keys,
-				const db_val_t* vals, const int n);
+			const db_val_t* vals, const int n, const int _un, const int _m);
 
 
 /**
@@ -282,6 +317,57 @@ typedef int (*db_insert_update_f) (const db1_con_t* _h, const db_key_t* _k,
 
 
 /**
+ * \brief Insert delayed a row into the specified table.
+ *
+ * This function implements INSERT DELAYED SQL directive. It is possible to
+ * insert one or more rows in a table with delay using this function.
+ * \param _h database connection handle
+ * \param _k array of keys (column names)
+ * \param _v array of values for keys specified in _k parameter
+ * \param _n number of keys-value pairs int _k and _v parameters
+ * \return returns 0 if everything is OK, otherwise returns value < 0
+ */
+typedef int (*db_insert_delayed_f) (const db1_con_t* _h, const db_key_t* _k,
+				const db_val_t* _v, const int _n);
+
+
+/**
+ * \brief Retrieve the number of affected rows for the last query.
+ *
+ * The function returns the rows affected by the last query.
+ * If any other type of query was the last, it returns null.
+ * \param _h structure representing database connection
+ * \return returns the number of rows as integer or returns -1 on error
+ */
+typedef int (*db_affected_rows_f) (const db1_con_t* _h);
+
+/**
+ * \brief Start a single transaction that will consist of one or more queries. 
+ *
+ * \param _h structure representing database connection
+ * \return 0 if everything is OK, otherwise returns < 0
+ */
+typedef int (*db_start_transaction_f) (db1_con_t* _h);
+
+/**
+ * \brief End a transaction. 
+ *
+ * \param _h structure representing database connection
+ * \return 0 if everything is OK, otherwise returns < 0
+ */
+typedef int (*db_end_transaction_f) (db1_con_t* _h);
+
+/**
+ * \brief Abort a transaction.
+ *
+ * Use this function if you have an error after having started a transaction
+ * and you want to rollback any uncommitted changes before continuing.
+ * \param _h structure representing database connection
+ * \return 1 if there was something to rollbak, 0 if not, negative on failure
+ */
+typedef int (*db_abort_transaction_f) (db1_con_t* _h);
+
+/**
  * \brief Database module callbacks
  * 
  * This structure holds function pointer to all database functions. Before this
@@ -292,6 +378,7 @@ typedef struct db_func {
 	unsigned int      cap;           /* Capability vector of the database transport */
 	db_use_table_f    use_table;     /* Specify table name */
 	db_init_f         init;          /* Initialize database connection */
+	db_init2_f        init2;         /* Initialize database connection */
 	db_close_f        close;         /* Close database connection */
 	db_query_f        query;         /* query a table */
 	db_fetch_result_f fetch_result;  /* fetch result */
@@ -304,6 +391,11 @@ typedef struct db_func {
 	db_last_inserted_id_f  last_inserted_id;  /* Retrieve the last inserted ID
 	                                            in a table */
 	db_insert_update_f insert_update; /* Insert into table, update on duplicate key */ 
+	db_insert_delayed_f insert_delayed;           /* Insert delayed into table */
+	db_affected_rows_f affected_rows; /* Numer of affected rows for last query */
+	db_start_transaction_f start_transaction; /* Start a single transaction consisting of multiple queries */
+	db_end_transaction_f end_transaction; /* End a transaction */
+	db_abort_transaction_f abort_transaction; /* Abort a transaction */
 } db_func_t;
 
 
@@ -339,6 +431,20 @@ int db_bind_mod(const str* mod, db_func_t* dbf);
    successful, otherwise 0 is returned.
  */
 db1_con_t* db_do_init(const str* url, void* (*new_connection)());
+
+
+/**
+ * \brief Helper for db_init2 function.
+ *
+ * This helper method do the actual work for the database specific db_init
+ * functions.
+ * \param url database connection URL
+ * \param (*new_connection)() Pointer to the db specific connection creation method
+ * \param pooling whether or not to use a pooled connection
+ * \return returns a pointer to the db1_con_t representing the connection if it was
+   successful, otherwise 0 is returned.
+ */
+db1_con_t* db_do_init2(const str* url, void* (*new_connection)(), db_pooling_t pooling);
 
 
 /**
@@ -414,5 +520,30 @@ typedef int (*db_bind_api_f)(db_func_t *dbb);
  */
 int db_load_bulk_data(db_func_t* binding, db1_con_t* handle, str* name, db_key_t* cols,
 		      unsigned int count, unsigned int strict, db1_res_t* res);
+
+/**
+ * \brief DB API init function.
+ *
+ * This function must be executed by DB connector modules at load time to
+ * initialize the internals of DB API library.
+ * \return returns 0 on successful initialization, -1 on error.
+ */
+int db_api_init(void);
+
+/**
+ * \brief wrapper around db query to handle fetch capability
+ * \return -1 error; 0 ok with no fetch capability; 1 ok with fetch capability
+ */
+int db_fetch_query(db_func_t *dbf, int frows,
+		db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+		const db_val_t* _v, const db_key_t* _c, const int _n, const int _nc,
+		const db_key_t _o, db1_res_t** _r);
+
+/**
+ * \brief wrapper around db fetch to handle fetch capability
+ * \return -1 error; 0 ok with no fetch capability; 1 ok with fetch capability
+ */
+int db_fetch_next(db_func_t *dbf, int frows, db1_con_t* _h,
+		db1_res_t** _r);
 
 #endif /* DB1_H */

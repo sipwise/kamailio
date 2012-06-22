@@ -1,6 +1,5 @@
-/* $Id$
- *
- * Shared memory functions
+/*
+
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
@@ -18,6 +17,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
 /*
  * History:
  * --------
@@ -26,6 +26,12 @@
  *  2004-07-27  ANON mmap support, needed on darwin (andrei)
  *  2004-09-19  shm_mem_destroy: destroy first the lock & then unmap (andrei)
  *  2007-06-10   support for sfm_malloc & shm_malloc_destroy() (andrei)
+ */
+
+/**
+ * \file
+ * \brief  Shared memory functions
+ * \ingroup mem
  */
 
 
@@ -112,7 +118,7 @@ void* _shm_resize( void* p , unsigned int s)
 
 
 
-int shm_getmem()
+int shm_getmem(void)
 {
 
 #ifdef SHM_MMAP
@@ -227,7 +233,7 @@ int shm_mem_init(int force_alloc)
 }
 
 
-void shm_mem_destroy()
+void shm_mem_destroy(void)
 {
 #ifndef SHM_MMAP
 	struct shmid_ds shm_info;

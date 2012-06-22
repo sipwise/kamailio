@@ -46,6 +46,7 @@
 #include "../../ip_addr.h"
 #include "../../socket_info.h"
 #include "udomain.h"           /* new_udomain, free_udomain */
+#include "usrloc.h"
 #include "utime.h"
 #include "ul_mod.h"
 
@@ -222,8 +223,11 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 			/* write path */
 			memcpy(cp, &p1_len, sizeof(p1_len));
 			cp = (char*)cp + sizeof(p1_len);
-			memcpy(cp, p1, p1_len);
-			cp = (char*)cp + p1_len;
+			/* copy path only if exist */
+			if(p1_len){
+				memcpy(cp, p1, p1_len);
+				cp = (char*)cp + p1_len;
+			}
 
 			len -= needed;
 		} /* row cycle */
@@ -447,6 +451,29 @@ static inline int new_dlist(str* _n, dlist_t** _d)
 	return 0;
 }
 
+/*!
+ * \brief Registers a new domain with usrloc
+ *
+ * Find and return a usrloc domain (location table)
+ * \param _n domain name
+ * \param _d usrloc domain
+ * \return 0 on success, -1 on failure
+ */
+int get_udomain(const char* _n, udomain_t** _d)
+{
+	dlist_t* d;
+	str s;
+
+	s.s = (char*)_n;
+	s.len = strlen(_n);
+
+	if (find_dlist(&s, &d) == 0) {
+		*_d = d->d;
+		return 0;
+	}
+	*_d = NULL;
+	return -1;
+}
 
 /*!
  * \brief Registers a new domain with usrloc
@@ -578,7 +605,7 @@ unsigned long get_number_of_users(void)
  * \brief Run timer handler of all domains
  * \return 0 if all timer return 0, != 0 otherwise
  */
-int synchronize_all_udomains(void)
+int synchronize_all_udomains(int istart, int istep)
 {
 	int res = 0;
 	dlist_t* ptr;
@@ -590,7 +617,7 @@ int synchronize_all_udomains(void)
 			res |= db_timer_udomain(ptr->d);
 	} else {
 		for( ptr=root ; ptr ; ptr=ptr->next)
-			mem_timer_udomain(ptr->d);
+			mem_timer_udomain(ptr->d, istart, istep);
 	}
 
 	return res;

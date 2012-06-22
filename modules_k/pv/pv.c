@@ -53,6 +53,8 @@ static tr_export_t mod_trans[] = {
 		tr_parse_paramlist },
 	{ {"tobody", sizeof("tobody")-1}, /* param class */
 		tr_parse_tobody },
+	{ {"line", sizeof("line")-1}, /* line class */
+		tr_parse_line },
 
 	{ { 0, 0 }, 0 }
 };
@@ -151,6 +153,9 @@ static pv_export_t mod_pvs[] = {
 	{{"dip", (sizeof("dis")-1)}, /* */
 		PVT_OTHER, pv_get_diversion, 0,
 		0, 0, pv_init_iname, 3},
+	{{"dic", (sizeof("dic")-1)}, /* */
+		PVT_OTHER, pv_get_diversion, 0,
+		0, 0, pv_init_iname, 4},
 	{{"dp", (sizeof("dp")-1)}, /* */
 		PVT_OTHER, pv_get_dsturi_attr, 0,
 		0, 0, pv_init_iname, 2},
@@ -220,6 +225,9 @@ static pv_export_t mod_pvs[] = {
 	{{"ml", (sizeof("ml")-1)}, /* */
 		PVT_OTHER, pv_get_msg_len, 0,
 		0, 0, 0, 0},
+	{{"mt", (sizeof("mt")-1)}, /* */
+		PVT_OTHER, pv_get_msgtype, 0,
+		0, 0, 0, 0},
 	{{"od", (sizeof("od")-1)}, /* */
 		PVT_OTHER, pv_get_ouri_attr, 0,
 		0, 0, pv_init_iname, 2},
@@ -280,6 +288,9 @@ static pv_export_t mod_pvs[] = {
 	{{"rm", (sizeof("rm")-1)}, /* */
 		PVT_OTHER, pv_get_method, 0,
 		0, 0, 0, 0},
+	{{"rmid", (sizeof("rmid")-1)}, /* */
+		PVT_OTHER, pv_get_methodid, 0,
+		0, 0, 0, 0},
 	{{"rp", (sizeof("rp")-1)}, /* */
 		PVT_OTHER, pv_get_ruri_attr, pv_set_ruri_port,
 		0, 0, pv_init_iname, 3},
@@ -310,6 +321,9 @@ static pv_export_t mod_pvs[] = {
 	{{"rv", (sizeof("rv")-1)}, /* */
 		PVT_OTHER, pv_get_version, 0,
 		0, 0, 0, 0},
+	{{"rz", (sizeof("rz")-1)}, /* */
+		PVT_OTHER, pv_get_ruri_attr, 0,
+		0, 0, pv_init_iname, 5},
 	{{"Ri", (sizeof("Ri")-1)}, /* */
 		PVT_OTHER, pv_get_rcvip, 0,
 		0, 0, 0, 0},
@@ -327,6 +341,9 @@ static pv_export_t mod_pvs[] = {
 		0, 0, 0, 0},
 	{{"si", (sizeof("si")-1)}, /* */
 		PVT_OTHER, pv_get_srcip, 0,
+		0, 0, 0, 0},
+	{ {"sid", (sizeof("sid")-1)}, /* server id */
+		PVT_OTHER, pv_get_server_id, 0,
 		0, 0, 0, 0},
 	{{"sp", (sizeof("sp")-1)}, /* */
 		PVT_OTHER, pv_get_srcport, 0,
@@ -358,6 +375,9 @@ static pv_export_t mod_pvs[] = {
 	{{"true", (sizeof("true")-1)}, /* */
 		PVT_OTHER, pv_get_true, 0,
 		0, 0, 0, 0},
+	{{"Tb", (sizeof("Tb")-1)}, /* */
+		PVT_OTHER, pv_get_timeb, 0,
+		0, 0, 0, 0},
 	{{"Tf", (sizeof("Tf")-1)}, /* */
 		PVT_CONTEXT, pv_get_timef, 0,
 		0, 0, 0, 0},
@@ -378,6 +398,8 @@ static pv_export_t mod_pvs[] = {
 		pv_set_shvar, pv_parse_shvar_name, 0, 0, 0},
 	{ {"time", (sizeof("time")-1)}, PVT_CONTEXT, pv_get_time,
 		0, pv_parse_time_name, 0, 0, 0},
+	{ {"timef", (sizeof("timef")-1)}, PVT_CONTEXT, pv_get_strftime,
+		0, pv_parse_strftime_name, 0, 0, 0},
 	{ {"TV", (sizeof("TV")-1)}, PVT_OTHER, pv_get_timeval,
 		0, pv_parse_timeval_name, 0, 0, 0},
 	{ {"nh", (sizeof("nh")-1)}, PVT_OTHER, pv_get_nh,
@@ -405,6 +427,7 @@ static int mod_init(void);
 static void mod_destroy(void);
 static int pv_isset(struct sip_msg* msg, char* pvid, char *foo);
 static int pv_unset(struct sip_msg* msg, char* pvid, char *foo);
+static int is_int(struct sip_msg* msg, char* pvar, char* s2);
 
 static cmd_export_t cmds[]={
 	{"pv_isset",  (cmd_function)pv_isset,  1, fixup_pvar_null, 0, 
@@ -415,6 +438,9 @@ static cmd_export_t cmds[]={
 	{"pv_xavp_print",  (cmd_function)pv_xavp_print,  0, 0, 0, 
 		ANY_ROUTE },
 #endif
+	{"is_int", (cmd_function)is_int, 1, fixup_pvar_null, fixup_free_pvar_null,
+		ANY_ROUTE},
+
 	{0,0,0,0,0,0}
 };
 
@@ -455,6 +481,11 @@ static void mod_destroy(void)
 
 int mod_register(char *path, int *dlflags, void *p1, void *p2)
 {
+	if(tr_init_buffers()<0)
+	{
+		LM_ERR("failed to initialize transformations buffers\n");
+		return -1;
+	}
 	return register_trans_mod(path, mod_trans);
 }
 
@@ -495,3 +526,21 @@ static int add_avp_aliases(modparam_t type, void* val)
 	return 0;
 }
 
+/**
+ * Copyright (C) 2011 Juha Heinanen
+ *
+ * Checks if pvar argument contains int value
+ */
+static int is_int(struct sip_msg* msg, char* pvar, char* s2)
+{
+	pv_spec_t *pvar_sp;
+	pv_value_t pv_val;
+
+	pvar_sp = (pv_spec_t *)pvar;
+
+	if (pvar_sp && (pv_get_spec_value(msg, pvar_sp, &pv_val) == 0)) {
+		return (pv_val.flags & PV_VAL_INT)?1:-1;
+	}
+
+	return -1;
+}

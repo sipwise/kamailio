@@ -23,7 +23,7 @@
  *
  * History:
  * --------
- *  2007-04-17  initial version (anca)
+ *  2007-04-17  initial version (Anca Vamanu)
  */
 
 /*! \file
@@ -40,6 +40,9 @@
 #include "../../sr_module.h"
 #include "presence.h"
 #include "bind_presence.h"
+#include "notify.h"
+#include "publish.h"
+#include "subscribe.h"
 
 int bind_presence(presence_api_t* api)
 {
@@ -60,9 +63,15 @@ int bind_presence(presence_api_t* api)
 	api->delete_shtable= delete_shtable;
 	api->update_shtable= update_shtable;
 	api->mem_copy_subs= mem_copy_subs;
-	api->update_db_subs= update_db_subs;
+	api->update_db_subs_timer= update_db_subs_timer;
 	api->extract_sdialog_info= extract_sdialog_info;
 	api->get_sphere= get_sphere;
+	api->get_presentity= get_p_notify_body;
+	api->free_presentity= free_notify_body;
+	api->pres_auth_status= pres_auth_status;
+	api->handle_publish= handle_publish;
+	api->handle_subscribe0= handle_subscribe0;
+	api->handle_subscribe= handle_subscribe;
 	return 0;
 }
 

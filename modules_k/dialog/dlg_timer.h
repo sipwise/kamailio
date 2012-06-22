@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2006 Voice System SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -39,20 +37,20 @@
 
 
 /*! dialog timeout list */
-struct dlg_tl
+typedef struct dlg_tl
 {
 	struct dlg_tl     *next;
 	struct dlg_tl     *prev;
 	volatile unsigned int  timeout; /*!< timeout in seconds */
-};
+} dlg_tl_t;
 
 
 /*! dialog timer */
-struct dlg_timer
+typedef struct dlg_timer
 {
 	struct dlg_tl   first; /*!< dialog timeout list */
 	gen_lock_t      *lock; /*!< lock for the list */
-};
+} dlg_timer_t;
 
 
 /*! dialog timer handler */
@@ -106,7 +104,7 @@ int update_dlg_timer(struct dlg_tl *tl, int timeout);
 /*!
  * \brief Timer routine for expiration of dialogs
  * Timer handler for expiration of dialogs, runs the global timer handler on them.
- * \param time for expiration checks
+ * \param ticks time for expiration checks
  * \param attr unused
  */
 void dlg_timer_routine(unsigned int ticks , void * attr);

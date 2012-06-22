@@ -73,8 +73,6 @@ extern int received_avp;
 extern int reg_use_domain;
 extern float def_q;
 
-extern unsigned short aor_avp_type;
-extern int_str aor_avp_name;
 extern unsigned short rcv_avp_type;
 extern int_str rcv_avp_name;
 extern unsigned short reg_callid_avp_type;
@@ -85,9 +83,13 @@ extern int method_filtering;
 extern int path_enabled;
 extern int path_mode;
 extern int path_use_params;
+extern int reg_gruu_enabled;
 
 extern str sock_hdr_name;
 extern int sock_flag;
+
+extern str reg_xavp_cfg;
+extern str reg_xavp_rcd;
 
 extern usrloc_api_t ul;/*!< Structure containing pointers to usrloc functions*/
 

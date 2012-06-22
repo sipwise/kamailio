@@ -45,42 +45,62 @@
 #include "../../modules/tm/dlg.h"
 #include "../presence/utils_func.h"
 #include "../presence/hash.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "rls.h"
 #include "notify.h"
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
+
+static str *multipart_body = NULL;
+static int multipart_body_size = 0;
 
 typedef struct res_param
 {
-	xmlNodePtr list_node;
-	db1_res_t* db_result;
-	char** cid_array;
+    struct uri_link **next;
 }res_param_t;
+
+typedef struct uri_link
+{
+    char *uri;
+    struct uri_link *next;
+} uri_link_t;
 
 int resource_uri_col=0, content_type_col, pres_state_col= 0,
 	auth_state_col= 0, reason_col= 0;
 
-str* constr_rlmi_doc(db1_res_t* result, str* rl_uri, int version,
-		xmlNodePtr rl_node, char*** cid_array);
-str* constr_multipart_body(db1_res_t* result,char** cid_array,
-		char* boundary_string);
+xmlDocPtr constr_rlmi_doc(db1_res_t* result, str* rl_uri, int version,
+		xmlNodePtr rl_node, char*** cid_array,
+		str username, str domain);
+void constr_multipart_body(const str *const content_type, const str *const body, str *cid, int boundary_len, char *boundary_string);
 
 dlg_t* rls_notify_dlg(subs_t* subs);
 
 void rls_notify_callback( struct cell *t, int type, struct tmcb_params *ps);
 
+int parse_xcap_uri(char *uri, str *host, unsigned short *port, str *path);
+int rls_get_resource_list(str *rl_uri, str *username, str *domain,
+		xmlNodePtr *rl_node, xmlDocPtr *xmldoc);
+int add_resource_to_list(char* uri, void* param);
+int add_resource(char* uri, xmlNodePtr list_node, char * boundary_string, db1_res_t *result, int *len_est);
 
-int send_full_notify(subs_t* subs, xmlNodePtr rl_node, int version, str* rl_uri,
+char *instance_id = "Scf8UhwQ";
+
+int send_full_notify(subs_t* subs, xmlNodePtr rl_node, str* rl_uri,
 		unsigned int hash_code)
 {
-	str* rlmi_body= NULL;
-	str* multipart_body= NULL;
-	db_key_t query_cols[2], update_cols[2], result_cols[7];
-	db_val_t query_vals[2], update_vals[2];
+	xmlDocPtr rlmi_body= NULL;
+	xmlNodePtr list_node= NULL;
+	db_key_t query_cols[1], update_cols[1], result_cols[5];
+	db_val_t query_vals[1], update_vals[1];
 	db1_res_t *result= NULL;
-	int n_result_cols= 0, i;
+	int n_result_cols= 0;
 	char* boundary_string;
-	char** cid_array= NULL;
 	str rlsubs_did= {0, 0};
+	str* rlmi_cont= NULL;
+	uri_link_t *uri_list_head = NULL;
+	int len_est;
+	res_param_t param;
+	int resource_added = 0; /* Flag to indicate that we have added at least one resource */
 
 	LM_DBG("start\n");
 	/* query in alfabetical order */
@@ -101,94 +121,177 @@ int send_full_notify(subs_t* subs, xmlNodePtr rl_node, int version, str* rl_uri,
 	result_cols[pres_state_col= n_result_cols++]= &str_presence_state_col;
 	result_cols[auth_state_col= n_result_cols++]= &str_auth_state_col;
 	result_cols[reason_col= n_result_cols++]= &str_reason_col;
+
+	update_cols[0]= &str_updated_col;
+	update_vals[0].type = DB1_INT;
+	update_vals[0].nul = 0;
+	update_vals[0].val.int_val= NO_UPDATE_TYPE; 
 	
-	if (rls_dbf.use_table(rls_db, &rlpres_table) < 0) 
+	if (rlpres_dbf.use_table(rlpres_db, &rlpres_table) < 0) 
 	{
 		LM_ERR("in use_table\n");
 		goto error;
 	}
 
-	if(rls_dbf.query(rls_db, query_cols, 0, query_vals, result_cols,
+	if (dbmode == RLS_DB_ONLY && rlpres_dbf.start_transaction)
+	{
+		if (rlpres_dbf.start_transaction(rlpres_db) < 0)
+		{
+			LM_ERR("in start_transaction\n");
+			goto error;
+		}
+	}
+
+	if(rlpres_dbf.query(rlpres_db, query_cols, 0, query_vals, result_cols,
 					1, n_result_cols, &str_resource_uri_col, &result )< 0)
 	{
 		LM_ERR("in sql query\n");
 		goto error;
 	}
-	if(result== NULL)
-		goto error;
-
-	rlmi_body= constr_rlmi_doc(result, rl_uri, version, rl_node, &cid_array);
-	if(rlmi_body== NULL)
+	if(result == NULL)
 	{
-		LM_ERR("while constructing rlmi doc\n");
+		LM_ERR("bad result\n");
 		goto error;
 	}
 
-	boundary_string= generate_string((int)time(NULL), BOUNDARY_STRING_LEN);
-	
-	if(result->n> 0)
+	if (result->n > 0)
 	{
-		multipart_body= constr_multipart_body(result, cid_array, 
-				boundary_string);
-		if(multipart_body== NULL)
+		if(rlpres_dbf.update(rlpres_db, query_cols, 0, query_vals,
+				     update_cols, update_vals, 1, 1) < 0)
 		{
-			LM_ERR("while constructing multipart body\n");
+			LM_ERR("in sql update\n");
 			goto error;
 		}
-		for(i = 0; i<result->n; i++)
+	}
+
+	if (dbmode == RLS_DB_ONLY && rlpres_dbf.end_transaction)
+	{
+		if (rlpres_dbf.end_transaction(rlpres_db) < 0)
 		{
-			if(cid_array[i])
-				pkg_free(cid_array[i]);
+			LM_ERR("in end_transaction\n");
+			goto error;
 		}
 	}
-	pkg_free(cid_array);
-	cid_array= NULL;
-	rls_dbf.free_result(rls_db, result);
-	result= NULL;
 
-	if(agg_body_sendn_update(rl_uri, boundary_string, rlmi_body,
+	/* Allocate an initial buffer for the multipart body.
+	 * This buffer will be reallocated if neccessary */
+	multipart_body= (str*)pkg_malloc(sizeof(str));
+	if(multipart_body== NULL)
+	{
+		ERR_MEM(PKG_MEM_STR);
+	}
+
+	multipart_body_size = BUF_REALLOC_SIZE;
+	multipart_body->s = (char *)pkg_malloc(multipart_body_size);
+
+	if(multipart_body->s== NULL)
+	{
+		ERR_MEM(PKG_MEM_STR);
+	}
+    
+	multipart_body->len= 0;
+
+	/* Create an empty rlmi document */
+	len_est = create_empty_rlmi_doc(&rlmi_body, &list_node, rl_uri, subs->version, 1);
+	xmlDocSetRootElement(rlmi_body, list_node);
+
+	/* Find all the uri's to which we are subscribed */
+	param.next = &uri_list_head;
+	if(process_list_and_exec(rl_node, subs->watcher_user, subs->watcher_domain, add_resource_to_list,(void*)(&param))< 0)
+	{
+		LM_ERR("in process_list_and_exec function\n");
+		goto error;
+	}
+
+	boundary_string= generate_string(BOUNDARY_STRING_LEN);
+	
+	while (uri_list_head)
+	{
+		uri_link_t *last = uri_list_head;
+		if (add_resource(uri_list_head->uri, list_node, boundary_string, result, &len_est) >0)
+		{
+			if (resource_added == 0)
+			{
+				/* We have exceeded our length estimate without adding any resource.
+				   We cannot send this resource, move on. */
+				LM_ERR("Failed to add a single resource %d vs %d\n", len_est, rls_max_notify_body_len);
+				uri_list_head = uri_list_head->next;
+				if (last->uri) pkg_free(last->uri);
+				pkg_free(last); 
+			}
+			else
+			{
+				LM_DBG("send_full_notify estimate exceeded %d vs %d\n", len_est, rls_max_notify_body_len);
+				/* If add_resource returns > 0 the resource did not fit in our size limit */
+				rlmi_cont= (str*)pkg_malloc(sizeof(str));
+				if(rlmi_cont== NULL)
+				{
+					ERR_MEM(PKG_MEM_STR);
+				}
+				/* Where we are worried about length we won't use padding */
+				xmlDocDumpFormatMemory(rlmi_body,(xmlChar**)(void*)&rlmi_cont->s,
+							&rlmi_cont->len, 0);
+				xmlFreeDoc(rlmi_body);
+
+				if(agg_body_sendn_update(rl_uri, boundary_string, rlmi_cont,
+						multipart_body, subs, hash_code)< 0)
+				{
+					LM_ERR("in function agg_body_sendn_update\n");
+					goto error;
+				}
+                
+				/* Create a new rlmi body, but not a full_state one this time */
+				len_est = create_empty_rlmi_doc(&rlmi_body, &list_node, rl_uri, subs->version, 0);
+				xmlDocSetRootElement(rlmi_body, list_node);
+				multipart_body->len = 0;
+				resource_added = 0;
+			}
+		}
+		else
+		{
+			resource_added = 1;
+			uri_list_head = uri_list_head->next;
+			if (last->uri) pkg_free(last->uri);
+			pkg_free(last);
+		}
+	}
+    
+	rlmi_cont= (str*)pkg_malloc(sizeof(str));
+	if(rlmi_cont== NULL)
+	{
+		ERR_MEM(PKG_MEM_STR);
+	}
+	xmlDocDumpFormatMemory(rlmi_body,(xmlChar**)(void*)&rlmi_cont->s,
+			&rlmi_cont->len, (rls_max_notify_body_len == 0));
+	xmlFreeDoc(rlmi_body);
+
+	if(agg_body_sendn_update(rl_uri, boundary_string, rlmi_cont,
 		multipart_body, subs, hash_code)< 0)
 	{
 		LM_ERR("in function agg_body_sendn_update\n");
 		goto error;
 	}
 
-	/* update updated col in rlpres_table*/
-	update_cols[0]= &str_updated_col;
-	update_vals[0].type = DB1_INT;
-	update_vals[0].nul = 0;
-	update_vals[0].val.int_val= NO_UPDATE_TYPE; 
-	
-	if (rls_dbf.use_table(rls_db, &rlpres_table) < 0) 
-	{
-		LM_ERR("in use_table\n");
-		goto error;
-	}
-	if(rls_dbf.update(rls_db, query_cols, 0, query_vals, update_cols,
-					update_vals, 1, 1)< 0)
-	{
-		LM_ERR("in sql update\n");
-		goto error;
-	}
-
-	xmlFree(rlmi_body->s);
-	pkg_free(rlmi_body);
+	xmlFree(rlmi_cont->s);
+	pkg_free(rlmi_cont);
 
 	if(multipart_body)			
 	{
-		pkg_free(multipart_body->s);
+	    if (multipart_body->s)
+			pkg_free(multipart_body->s);
 		pkg_free(multipart_body);
 	}
+	multipart_body_size = 0;
 	pkg_free(rlsubs_did.s);
-
+	rlpres_dbf.free_result(rlpres_db, result);
+	
 	return 0;
 error:
-
-	if(rlmi_body)
+	if(rlmi_cont)
 	{
-		if(rlmi_body->s)
-			xmlFree(rlmi_body->s);
-		pkg_free(rlmi_body);
+		if(rlmi_cont->s)
+			xmlFree(rlmi_cont->s);
+		pkg_free(rlmi_cont);
 	}
 	if(multipart_body)
 	{
@@ -196,18 +299,18 @@ error:
 			pkg_free(multipart_body->s);
 		pkg_free(multipart_body);
 	}
+	multipart_body_size = 0;
 	
-	if(cid_array)
-	{
-		for(i= 0; i< result->n ; i++)
-			if(cid_array[i])
-				pkg_free(cid_array[i]);
-		pkg_free(cid_array);
-	}
 	if(result)
-		rls_dbf.free_result(rls_db, result);
+		rlpres_dbf.free_result(rlpres_db, result);
 	if(rlsubs_did.s)
 		pkg_free(rlsubs_did.s);
+
+	if (dbmode == RLS_DB_ONLY && rlpres_dbf.abort_transaction)
+	{
+		if (rlpres_dbf.abort_transaction(rlpres_db) < 0)
+			LM_ERR("in abort_transaction");
+	}
 	return -1;
 }
 
@@ -267,11 +370,23 @@ int agg_body_sendn_update(str* rl_uri, char* boundary_string, str* rlmi_body,
 	pkg_free(body.s);
 	body.s= NULL;
 
-	if(pres_update_shtable(rls_table, hash_code,subs, LOCAL_TYPE)< 0)
+	if (dbmode==RLS_DB_ONLY)
 	{
-		LM_ERR("updating in hash table\n");
-		goto error;
+		if (update_dialog_notify_rlsdb(subs) < 0)
+		{
+			LM_ERR( "updating DB\n" );
+			goto error;
+		}
 	}
+	else
+	{
+		if(pres_update_shtable(rls_table, hash_code,subs, LOCAL_TYPE)< 0)
+		{
+			LM_ERR("updating in hash table\n");
+			goto error;
+		}
+	}
+
 	return 0;
 
 error:
@@ -283,16 +398,19 @@ error:
 
 
 int add_resource_instance(char* uri, xmlNodePtr resource_node,
-		db1_res_t* result, char** cid_array)
+		db1_res_t* result, char * boundary_string,
+        int *len_est)
 {
 	xmlNodePtr instance_node= NULL;
 	db_row_t *row;	
 	db_val_t *row_vals;
 	int i, cmp_code;
 	char* auth_state= NULL;
-	int contor= 0;
-	str cid;
 	int auth_state_flag;
+	int boundary_len = strlen(boundary_string);
+	str cid;
+	str content_type= {0, 0};
+	str body= {0, 0};
 
 	for(i= 0; i< result->n; i++)
 	{
@@ -306,7 +424,42 @@ int add_resource_instance(char* uri, xmlNodePtr resource_node,
 
 		if(cmp_code== 0)
 		{
-			contor++;
+			auth_state_flag= row_vals[auth_state_col].val.int_val;
+			auth_state= get_auth_string(auth_state_flag );
+			if(auth_state== NULL)
+			{
+				LM_ERR("bad authorization status flag\n");
+				goto error;
+			}
+			*len_est += strlen(auth_state) + 38; /* <instance id="12345678" state="[auth_state]" />r/n */
+
+			if(auth_state_flag & ACTIVE_STATE)
+			{
+				cid.s= generate_cid(uri, strlen(uri));
+				cid.len= strlen(cid.s);
+				body.s= (char*)row_vals[pres_state_col].val.string_val;
+				body.len= strlen(body.s);
+				trim(&body);
+
+				*len_est += cid.len + 8; /* cid="[cid]" */
+				content_type.s = (char*)row_vals[content_type_col].val.string_val;
+				content_type.len = strlen(content_type.s);
+				*len_est += 4 + boundary_len
+ 						 + 35
+						 + 16 + cid.len
+						 + 18 + content_type.len
+						 + 4 + body.len + 8;
+			}
+			else if(auth_state_flag & TERMINATED_STATE)
+			{
+				*len_est += strlen(row_vals[resource_uri_col].val.string_val) + 10; /* reason="[resaon]" */
+			}
+			if (rls_max_notify_body_len > 0 && *len_est > rls_max_notify_body_len)
+			{
+				/* We have a limit on body length set, and we were about to exceed it */
+				return *len_est;
+			}
+            
 			instance_node= xmlNewChild(resource_node, NULL, 
 					BAD_CAST "instance", NULL);
 			if(instance_node== NULL)
@@ -315,30 +468,24 @@ int add_resource_instance(char* uri, xmlNodePtr resource_node,
 				goto error;
 			}
 		
+			/* OK, we are happy this will fit */
+			/* Instance ID should be unique for each instance node
+			   within a resource node.  The same instance ID can be
+			   used in different resource nodes.  Instance ID needs
+			   to remain the same for each resource instance in
+			   future updates.  We can just use a common string
+			   here because you will only get multiple instances
+			   for a resource when the back-end SUBSCRIBE is forked
+			   and pua does not support this.  If/when pua supports
+			   forking of the SUBSCRIBEs it sends this will need to
+			   be fixed properly. */
 			xmlNewProp(instance_node, BAD_CAST "id",
-					BAD_CAST generate_string(contor, 8));
-			auth_state_flag= row_vals[auth_state_col].val.int_val;
-			auth_state= get_auth_string(auth_state_flag );
-			if(auth_state== NULL)
-			{
-				LM_ERR("bad authorization status flag\n");
-				goto error;
-			}
+					BAD_CAST instance_id);
 			xmlNewProp(instance_node, BAD_CAST "state", BAD_CAST auth_state);
 
 			if(auth_state_flag & ACTIVE_STATE)
 			{
-				cid.s= generate_cid(uri, strlen(uri));
-				cid.len= strlen(cid.s);
-
-				cid_array[i]= (char*)pkg_malloc((1+ cid.len)*sizeof(char));
-				if(cid_array[i]== NULL)
-				{
-					ERR_MEM(PKG_MEM_STR);
-				}	
-				memcpy(cid_array[i], cid.s, cid.len);
-				cid_array[i][cid.len]= '\0';
-
+				constr_multipart_body (&content_type, &body, &cid, boundary_len, boundary_string);
 				xmlNewProp(instance_node, BAD_CAST "cid", BAD_CAST cid.s);
 			}
 			else
@@ -356,205 +503,163 @@ error:
 	return -1;
 }
 
-int add_resource(char* uri, void* param)
+int add_resource(char* uri, xmlNodePtr list_node, char * boundary_string, db1_res_t *result, int *len_est)
 {
-	char** cid_array= ((res_param_t*)param)->cid_array;
-	xmlNodePtr list_node= ((res_param_t*)param)->list_node;
 	xmlNodePtr resource_node= NULL;
-	db1_res_t *result= ((res_param_t*)param)->db_result;
+    int res;
 
-	LM_DBG("uri= %s\n", uri);
+    if (rls_max_notify_body_len > 0)
+    {
+        *len_est += strlen (uri) + 35; /* <resource uri="[uri]"></resource>/r/n */
+        if (*len_est > rls_max_notify_body_len)
+        {
+            return *len_est;
+        }
+    }
 	resource_node= xmlNewChild(list_node, NULL, BAD_CAST "resource", NULL);
 	if(resource_node== NULL)
 	{
-		LM_ERR("while adding new rsource_node\n");
 		goto error;
 	}
 	xmlNewProp(resource_node, BAD_CAST "uri", BAD_CAST uri);
 
-	if(add_resource_instance(uri, resource_node, result, cid_array)< 0)
+    res = add_resource_instance(uri, resource_node, result, boundary_string, len_est);
+	if(res < 0)
 	{
 		LM_ERR("while adding resource instance node\n");
 		goto error;
 	}
+
+	return res;
+error:
+	return -1;
+}
+
+int add_resource_to_list(char* uri, void* param)
+{
+    struct uri_link **next = ((res_param_t*)param)->next;
+    *next = pkg_malloc(sizeof(uri_link_t));
+    if (*next == NULL)
+	{
+    	LM_ERR("while creating linked list element\n");
+		goto error;
+	}
+
+    (*next)->next = NULL;
+    (*next)->uri = pkg_malloc(strlen(uri) + 1);
+    if ((*next)->uri == NULL)
+	{
+    	LM_ERR("while creating uri store\n");
+        pkg_free(*next);
+        *next = NULL;
+		goto error;
+	}
+    strcpy((*next)->uri, uri);
+    ((res_param_t*)param)->next = &(*next)->next;
 
 	return 0;
 error:
 	return -1;
 }
 
-str* constr_rlmi_doc(db1_res_t *result, str* rl_uri, int version,
-		xmlNodePtr rl_node, char*** rlmi_cid_array)
+int create_empty_rlmi_doc(xmlDocPtr *rlmi_doc, xmlNodePtr *list_node, str *uri, int version, int full_state)
 {
-	xmlDocPtr doc= NULL;
-	xmlNodePtr list_node= NULL;
-	str* rlmi_cont= NULL;
-	int len; 
-	char* uri;
-	res_param_t param;
-	char** cid_array= NULL;
-	int n= result->n;
-
-	LM_DBG("start\n");
-	cid_array= (char**)pkg_malloc(n* sizeof(char*));
-	if(cid_array== NULL)
-	{
-		ERR_MEM(PKG_MEM_STR);
-	}
-	memset(cid_array, 0, n* sizeof(char*));
-
-	doc= xmlNewDoc(BAD_CAST "1.0");
-	if(doc== NULL)
-	{
-		LM_ERR("while constructing new xml doc\n");
-		goto error;
-	}
-	list_node= xmlNewNode(NULL, BAD_CAST "list");
-	if(list_node== NULL)
+    /* length is an pessimitic estimate of the size of an empty document
+       We calculate it once for performance reasons.
+       We add in the uri length each time as this varies, and it is cheap to add */
+    static int length = 0;
+    char* rl_uri= NULL;
+    int len;
+    
+    /* make new rlmi and multipart documents */
+    *rlmi_doc= xmlNewDoc(BAD_CAST "1.0");
+    if(*rlmi_doc== NULL)
+    {
+        LM_ERR("when creating new xml doc\n");
+        return 0;
+    }
+    *list_node= xmlNewNode(NULL, BAD_CAST "list");
+    if(*list_node== NULL)
 	{
 		LM_ERR("while creating new xml node\n");
-		goto error;
+        return 0;
 	}
-	uri= (char*)pkg_malloc(rl_uri->len+ 1);
-	if(uri== NULL)
+    rl_uri= (char*)pkg_malloc((uri->len+ 1)* sizeof(char));
+    if(rl_uri==  NULL)
 	{
 		ERR_MEM(PKG_MEM_STR);
 	}
-	memcpy(uri, rl_uri->s, rl_uri->len);
-	uri[rl_uri->len]= '\0';
-	xmlNewProp(list_node, BAD_CAST "uri", BAD_CAST uri);
-	pkg_free(uri);
+    memcpy(rl_uri, uri->s, uri->len);
+    rl_uri[uri->len]= '\0';
 
-	xmlNewProp(list_node, BAD_CAST "xmlns",
+    xmlNewProp(*list_node, BAD_CAST "uri", BAD_CAST rl_uri);
+    xmlNewProp(*list_node, BAD_CAST "xmlns",
 			BAD_CAST "urn:ietf:params:xml:ns:rlmi");
-	xmlNewProp(list_node, BAD_CAST "version", BAD_CAST int2str(version, &len));
-	xmlNewProp(list_node, BAD_CAST "fullState", BAD_CAST "true");
-
-	xmlDocSetRootElement(doc, list_node);
+    xmlNewProp(*list_node, BAD_CAST "version",
+            BAD_CAST int2str(version, &len));
+    if (full_state)               
+        xmlNewProp(*list_node, BAD_CAST "fullState", BAD_CAST "true");
+    else
+        xmlNewProp(*list_node, BAD_CAST "fullState", BAD_CAST "false");
 	
-	/* go through the list -- and add the appropriate 'resource' nodes*/
-	
-	param.list_node= list_node;
-	param.db_result= result;
-	param.cid_array= cid_array;
+    xmlDocSetRootElement(*rlmi_doc, *list_node);
+    pkg_free(rl_uri);  /* xmlNewProp takes a copy, so we can free this now */
 
-	if(	process_list_and_exec(rl_node, add_resource,(void*)(&param))< 0)
+    if (length == 0)
 	{
-		LM_ERR("in process_list_and_exec function\n");
-		goto error;
+        /* We haven't found out how big an empty doc is
+           Let's find out now ! */
+        xmlChar* dumped_document;
+        /* Where we are worried about length we won't use padding */
+        xmlDocDumpFormatMemory( *rlmi_doc,&dumped_document, &length, 0);
+        xmlFree(dumped_document);
+        length -= uri->len; /* The uri varies, so we will add it each time */
 	}
-	rlmi_cont= (str*)pkg_malloc(sizeof(str));
-	if(rlmi_cont== NULL)
-	{
-		ERR_MEM(PKG_MEM_STR);
-	}
-	xmlDocDumpFormatMemory(doc,(xmlChar**)(void*)&rlmi_cont->s,
-			&rlmi_cont->len, 1);
-
-	*rlmi_cid_array= cid_array;
-	
-	xmlFreeDoc(doc);
-
-	return rlmi_cont;
-
+    return length + uri->len;
 error:
-	if(doc)
-		xmlFreeDoc(doc);
-	return NULL;	
+    return 0;
 }
 
 
-str* constr_multipart_body(db1_res_t* result, char** cid_array, 
-		char* boundary_string)
+void constr_multipart_body(const str *const content_type, const str *const body, str *cid, int boundary_len, char *boundary_string)
 {
-	char* buf= NULL;
-	int size= BUF_REALLOC_SIZE;
-	int i, length= 0;
-	db_row_t *row;	
-	db_val_t *row_vals;
-	str content_id = {0, 0};
-	str body= {0, 0};
-	str content_type= {0, 0};
+	char* buf= multipart_body->s;
+	int length= multipart_body->len;
 	int chunk_len;
-	str* multi_body= NULL;
-	str bstr = {0, 0};
 	
 	LM_DBG("start\n");
-	buf= pkg_malloc(size* sizeof(char));
-	if(buf== NULL)
-	{
-		ERR_MEM(PKG_MEM_STR);
-	}
 
-	bstr.s = boundary_string;
-	bstr.len = strlen(bstr.s);
-
-	for(i= 0; i< result->n; i++)
-	{
-		row = &result->rows[i];
-		row_vals = ROW_VALUES(row);
-	
-		if(row_vals[auth_state_col].val.int_val!= ACTIVE_STATE)
-			continue;
-	
-		body.s= (char*)row_vals[pres_state_col].val.string_val;
-		body.len= strlen(body.s);
-		trim(&body);
-		content_type.s = (char*)row_vals[content_type_col].val.string_val;
-		content_type.len = strlen(content_type.s);
-		content_id.s= cid_array[i];
-		if(content_id.s== NULL)
+    chunk_len = 4 + boundary_len
+                + 35
+                + 16 + cid->len
+                + 18 + content_type->len
+                + 4 + body->len + 8;
+		while(length + chunk_len >= multipart_body_size)
 		{
-			LM_ERR("No cid found in array for uri= %s\n",
-					row_vals[resource_uri_col].val.string_val);
-			goto error;
+			multipart_body_size += BUF_REALLOC_SIZE;
+			multipart_body->s = (char*)pkg_realloc(multipart_body->s, multipart_body_size);
+			if(multipart_body->s == NULL) 
+			{
+				ERR_MEM("constr_multipart_body");
+			}
 		}
-		content_id.len = strlen(content_id.s);
-
-
-		chunk_len = 4 + bstr.len
-					+ 35
-					+ 16 + content_id.len
-					+ 18 + content_type.len
-					+ 4 + body.len + 8;
-		if(length + chunk_len >= size)
-		{
-			REALLOC_BUF
-		}
+		buf = multipart_body->s;
 
 		length+= sprintf(buf+ length, "--%.*s\r\n",
-				bstr.len, bstr.s);
+            boundary_len, boundary_string);
 		length+= sprintf(buf+ length, "Content-Transfer-Encoding: binary\r\n");
 		length+= sprintf(buf+ length, "Content-ID: <%.*s>\r\n",
-				content_id.len, content_id.s);
+            cid->len, cid->s);
 		length+= sprintf(buf+ length, "Content-Type: %.*s\r\n\r\n",
-				content_type.len, content_type.s);
+            content_type->len, content_type->s);
 		length+= sprintf(buf+length,"%.*s\r\n\r\n",
-				body.len, body.s);
-	}
+            body->len, body->s);
 
-	if(length+ strlen( boundary_string)+ 7> size )
-	{
-		REALLOC_BUF
-	}
-	buf[length]= '\0';
-	
-	multi_body= (str*)pkg_malloc(sizeof(str));
-	if(multi_body== NULL)
-	{
-		ERR_MEM(PKG_MEM_STR);
-	}
-
-	multi_body->s= buf;
-	multi_body->len= length;
-
-	return multi_body;
+	multipart_body->len = length;
 
 error:
 
-	if(buf)
-		pkg_free(buf);
-	return NULL;
+	return;
 }
 
 str* rls_notify_extra_hdr(subs_t* subs, char* start_cid, char* boundary_string)
@@ -642,11 +747,22 @@ error:
 	return NULL;
 
 }
+
 void rls_free_td(dlg_t* td)
 {
-		pkg_free(td->loc_uri.s);
-		pkg_free(td->rem_uri.s);
+	if(td)
+	{
+		if(td->loc_uri.s)
+			pkg_free(td->loc_uri.s);
+	
+		if(td->rem_uri.s)
+			pkg_free(td->rem_uri.s);
+
+		if(td->route_set)
+			pkg_free(td->route_set); 
+
 		pkg_free(td);
+	}	
 }
 
 int rls_send_notify(subs_t* subs, str* body, char* start_cid,
@@ -803,15 +919,7 @@ dlg_t* rls_notify_dlg(subs_t* subs)
 	return td;
 
 error:
-	if(td)
-	{
-		if(td->loc_uri.s)
-			pkg_free(td->loc_uri.s);
-	
-		if(td->rem_uri.s)
-			pkg_free(td->rem_uri.s);
-		pkg_free(td);
-	}	
+	if(td) rls_free_td(td);	
 
 	return NULL;
 
@@ -832,44 +940,54 @@ void rls_notify_callback( struct cell *t, int type, struct tmcb_params *ps)
 
 	if(ps->code >= 300)
 	{
-		/* delete from database table */
 		db_key_t db_keys[2];
 		db_val_t db_vals[2];
 		unsigned int hash_code;
 		subs_t subs;
-		
+
 		memset(&subs, 0, sizeof(subs_t));
 
 		subs.to_tag= ((dialog_id_t*)(*ps->param))->to_tag;
 		subs.from_tag= ((dialog_id_t*)(*ps->param))->from_tag;
 		subs.callid= ((dialog_id_t*)(*ps->param))->callid;
 
-		if (rls_dbf.use_table(rls_db, &rlsubs_table) < 0) 
+		if (dbmode != RLS_DB_ONLY)
 		{
-			LM_ERR("in use_table\n");
-			goto done;
-		}
+			/* delete from cache table */
+			hash_code= core_hash(&subs.callid, &subs.to_tag , hash_size);
+
+			if(pres_delete_shtable(rls_table,hash_code, subs.to_tag)< 0)
+			{
+				LM_ERR("record not found in hash table\n");
+			}
+	
+			/* delete from database table */
+			if (rls_dbf.use_table(rls_db, &rlsubs_table) < 0) 
+			{
+				LM_ERR("in use_table\n");
+				goto done;
+			}
 		
-		db_keys[0] =&str_to_tag_col;
-		db_vals[0].type = DB1_STR;
-		db_vals[0].nul = 0;
-		db_vals[0].val.str_val = subs.to_tag;
+			db_keys[0] =&str_to_tag_col;
+			db_vals[0].type = DB1_STR;
+			db_vals[0].nul = 0;
+			db_vals[0].val.str_val = subs.to_tag;
 
-		db_keys[1] =&str_callid_col;
-		db_vals[1].type = DB1_STR;
-		db_vals[1].nul = 0;
-		db_vals[1].val.str_val = subs.callid;
+			db_keys[1] =&str_callid_col;
+			db_vals[1].type = DB1_STR;
+			db_vals[1].nul = 0;
+			db_vals[1].val.str_val = subs.callid;
 
 
-		if (rls_dbf.delete(rls_db, db_keys, 0, db_vals, 2) < 0) 
-			LM_ERR("cleaning expired messages\n");	
-
-		/* delete from cache table */
-		hash_code= core_hash(&subs.callid, &subs.to_tag , hash_size);
-
-		if(pres_delete_shtable(rls_table,hash_code, subs.to_tag)< 0)
+			if (rls_dbf.delete(rls_db, db_keys, 0, db_vals, 2) < 0) 
+				LM_ERR("cleaning expired messages\n");	
+		}
+		else
 		{
-			LM_ERR("record not found in hash table\n");
+			if (delete_rlsdb(&subs.callid, &subs.to_tag, NULL) < 0 )
+			{
+				LM_ERR( "unable to delete record from DB\n" );
+			}
 		}
 	}	
 
@@ -880,16 +998,67 @@ done:
 
 }
 
-int process_list_and_exec(xmlNodePtr list_node, list_func_t function,
-		void* param)
+int process_list_and_exec(xmlNodePtr list_node, str username, str domain,
+		list_func_t function, void* param)
 {
 	xmlNodePtr node;
-	char* uri;
+	char* uri = NULL;
+	int res = 0;
 
-	LM_DBG("start\n");
 	for(node= list_node->children; node; node= node->next)
 	{
-		if(xmlStrcasecmp(node->name,(unsigned char*)"entry")== 0)
+		if(xmlStrcasecmp(node->name,(unsigned char*)"resource-list")==0)
+		{
+			str hostname, rl_uri;
+			unsigned short port = 0;
+			xmlNodePtr rl_node = NULL;
+			xmlDocPtr rl_doc = NULL;
+
+			uri= XMLNodeGetNodeContentByName(node, "resource-list", NULL);
+
+			if (uri == NULL)
+			{
+				LM_ERR("when extracting URI from node\n");
+				return -1;
+			}
+
+			if(parse_xcap_uri(uri, &hostname, &port, &rl_uri)>0)
+			{
+				if (rls_integrated_xcap_server == 1
+					&& (hostname.len == 0
+						|| check_self(&hostname, 0, PROTO_NONE) == 1))
+				{
+					LM_DBG("fetching local <resource-list/>\n");
+					if (rls_get_resource_list(&rl_uri, &username, &domain, &rl_node, &rl_doc)>0)
+					{
+						LM_DBG("calling myself for rl_node\n");
+						res = process_list_and_exec(rl_node, username, domain, function, param);
+						xmlFree(uri);
+						xmlFreeDoc(rl_doc);
+					}
+					else
+					{
+						LM_ERR("<resource-list/> not found\n");
+						xmlFree(uri);
+						return -1;
+					}
+					
+				}
+				else
+				{
+					LM_ERR("<resource-list/> is not local - unsupported at this time\n");
+					xmlFree(uri);
+					return -1;
+				}
+			}
+			else
+			{
+				LM_ERR("unable to parse URI for <resource-list/>\n");
+				return -1;
+			}
+		}
+		else
+                if(xmlStrcasecmp(node->name,(unsigned char*)"entry")== 0)
 		{
 			uri= XMLNodeGetAttrContentByName(node, "uri");
 			if(uri== NULL)
@@ -900,7 +1069,7 @@ int process_list_and_exec(xmlNodePtr list_node, list_func_t function,
 			LM_DBG("uri= %s\n", uri);
 			if(function(uri, param)< 0)
 			{
-				LM_ERR(" infunction given as a parameter\n");
+				LM_ERR("in function given as a parameter\n");
 				xmlFree(uri);
 				return -1;
 			}
@@ -908,32 +1077,30 @@ int process_list_and_exec(xmlNodePtr list_node, list_func_t function,
 		}
 		else
 		if(xmlStrcasecmp(node->name,(unsigned char*)"list")== 0)
-			process_list_and_exec(node, function, param);
+			res = process_list_and_exec(node, username, domain, function, param);
 	}
-	return 0;
-
+	return res;
 }
 
-char* generate_string(int seed, int length)
+char* generate_string(int length)
 {
 	static char buf[128];
-    int r,i;
+	int r,i;
 
-    if(length>= 128)
+	if(length>= 128)
 	{
 		LM_ERR("requested length exceeds buffer size\n");
 		return NULL;
 	}
-	srand(seed); 
 		
 	for(i=0; i<length; i++) 
 	{
 		r= rand() % ('z'- 'A') + 'A';
-	    if(r>'Z' && r< 'a')
-			r= '0'+ (r- 'Z');
+		if(r>'Z' && r< 'a')
+		r= '0'+ (r- 'Z');
 
-        sprintf(buf+i, "%c", r);
-    }
+		sprintf(buf+i, "%c", r);
+	}
 	buf[length]= '\0';
 
 	return buf;
@@ -961,3 +1128,296 @@ char* get_auth_string(int flag)
 	return NULL;
 }
 
+#define HTTP_PREFIX		"http://"
+#define HTTP_PREFIX_LEN		7
+#define HTTP_PORT_DEFAULT	80
+#define HTTPS_PREFIX		"https://"
+#define HTTPS_PREFIX_LEN	8
+#define HTTPS_PORT_DEFAULT	443
+#define LOCAL_PREFIX		"/"
+#define LOCAL_PREFIX_LEN	1
+#define CHAR_PORT_LEN		5
+
+int parse_xcap_uri(char *uri, str *host, unsigned short *port, str *path)
+{
+	host->s = NULL;
+	host->len = 0;
+	*port = 0;
+	path->s = NULL;
+	path->len = 0;		
+	
+	if(strncmp(uri, HTTP_PREFIX, HTTP_PREFIX_LEN) == 0)
+	{
+		host->s = &uri[HTTP_PREFIX_LEN];
+		*port = HTTP_PORT_DEFAULT;
+		LM_DBG("resource list is on http server\n");
+	}
+	else
+	if(strncmp(uri, HTTPS_PREFIX, HTTPS_PREFIX_LEN) == 0)
+	{
+		host->s = &uri[HTTPS_PREFIX_LEN];
+		*port = HTTPS_PORT_DEFAULT;
+		LM_DBG("resource list is on https server\n");
+	}
+	else
+	if(strncmp(uri, LOCAL_PREFIX, LOCAL_PREFIX_LEN) == 0)
+	{
+		path->s = &uri[0];
+		LM_DBG("resource list is local\n");
+	}
+	else
+	{
+		LM_ERR("resource list is unidentifiable\n");
+		return -1;
+	}
+
+	if (host->s != NULL)
+	{
+		while(host->s[host->len] != '\0' && host->s[host->len] != ':' && host->s[host->len] != '/') host->len++;
+
+		if (host->s[host->len] == ':')
+		{
+			char char_port[CHAR_PORT_LEN + 1];
+			unsigned cur_pos = host->len + 1;
+			memset(char_port, '\0', CHAR_PORT_LEN + 1);
+
+			while(host->s[cur_pos] != '\0' && host->s[cur_pos] != '/') cur_pos++;
+			strncpy(char_port, &host->s[host->len + 1], MIN(cur_pos - host->len - 1, CHAR_PORT_LEN));
+			*port = atoi(char_port);
+
+			path->s = &host->s[cur_pos];
+		}
+		else
+		{
+			path->s = &host->s[host->len];
+		}
+	}
+
+	while(path->s[path->len] != '\0') path->len++;
+
+	return 1;
+}
+
+#define MAX_PATH_LEN	127
+int rls_get_resource_list(str *rl_uri, str *username, str *domain,
+		xmlNodePtr *rl_node, xmlDocPtr *xmldoc)
+{
+	db_key_t query_cols[4];
+	db_val_t query_vals[4];
+	int n_query_cols = 0;
+	db_key_t result_cols[1];
+	int n_result_cols = 0;
+	db1_res_t *result = 0;
+	db_row_t *row;
+	db_val_t *row_vals;
+	int xcap_col;
+	str body;
+	int checked = 0;
+	str root, path = {0, 0};
+	char path_str[MAX_PATH_LEN + 1];
+	xmlXPathContextPtr xpathCtx = NULL;
+	xmlXPathObjectPtr xpathObj = NULL;
+
+
+	if (rl_uri==NULL || username==NULL || domain==NULL)
+	{
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	LM_DBG("rl_uri: %.*s", rl_uri->len, rl_uri->s);
+
+	root.s = rl_uri->s;
+	root.len = rl_uri->len;
+	while (checked < rl_uri->len)
+	{
+		if (checked < rl_uri->len - 3 && strncmp(rl_uri->s + checked, "/~~", 3) == 0)
+		{
+			root.len = checked;
+			checked += 3;
+			break;
+		}
+		checked++;
+	}
+	LM_DBG("doc: %.*s", root.len, root.s);
+
+	memset (path_str, '\0', MAX_PATH_LEN + 1);
+	path.s = path_str;
+	path.len = 0;
+	while (checked < rl_uri->len && path.len <= MAX_PATH_LEN)
+	{
+		if (rl_uri->s[checked] == '/')
+		{
+			strcat(path.s, "/xmlns:");
+			path.len += 7;
+			checked++;
+		}
+		else if (checked <= rl_uri->len - 3 && strncmp(rl_uri->s + checked, "\%5b", 3) == 0)
+		{
+			path.s[path.len++] = '[';
+			checked += 3;
+		}
+		else if (checked <= rl_uri->len - 3 && strncmp(rl_uri->s + checked, "\%5d", 3) == 0)
+		{
+			path.s[path.len++] = ']';
+			checked += 3;
+		}
+		else if (checked <= rl_uri->len - 3 && strncmp(rl_uri->s + checked, "\%22", 3) == 0)
+		{
+			path.s[path.len++] = '\"';
+			checked += 3;
+		}
+		else
+		{
+			path.s[path.len++] = rl_uri->s[checked];
+			checked++;
+		}
+	}
+	LM_DBG("path: %.*s", path.len, path.s);
+
+	query_cols[n_query_cols] = &str_username_col;
+	query_vals[n_query_cols].type = DB1_STR;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.str_val = *username;
+	n_query_cols++;
+
+	query_cols[n_query_cols] = &str_domain_col;
+	query_vals[n_query_cols].type = DB1_STR;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.str_val = *domain;
+	n_query_cols++;
+
+	query_cols[n_query_cols] = &str_doc_type_col;
+	query_vals[n_query_cols].type = DB1_INT;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.int_val = RESOURCE_LIST;
+	n_query_cols++;
+
+	query_cols[n_query_cols] = &str_doc_uri_col;
+	query_vals[n_query_cols].type = DB1_STR;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.str_val = root;
+	n_query_cols++;
+
+	if(rls_xcap_dbf.use_table(rls_xcap_db, &rls_xcap_table) < 0)
+	{
+		LM_ERR("in use_table-[table]=%.*s\n",
+			rls_xcap_table.len, rls_xcap_table.s);
+		return -1;
+	}
+
+	result_cols[xcap_col= n_result_cols++] = &str_doc_col;
+
+	if(rls_xcap_dbf.query(rls_xcap_db, query_cols, 0, query_vals, result_cols,
+				n_query_cols, n_result_cols, 0, &result)<0)
+	{
+		LM_ERR("failed querying table xcap for document: %.*s\n",
+				root.len, root.s);
+		if(result)
+			rls_xcap_dbf.free_result(rls_xcap_db, result);
+		return -1;
+	}
+
+	if(result == NULL)
+	{
+		LM_ERR("bad result\n");
+		return -1;
+	}
+
+	if(result->n<=0)
+	{
+		LM_DBG("No rl document found\n");
+		rls_xcap_dbf.free_result(rls_xcap_db, result);
+		return -1;
+	}
+
+	row = &result->rows[0];
+	row_vals = ROW_VALUES(row);
+
+	body.s = (char*)row_vals[xcap_col].val.string_val;
+	if(body.s==NULL)
+	{
+		LM_ERR("xcap doc is null\n");
+		goto error;
+	}
+	body.len = strlen(body.s);
+	if(body.len==0)
+	{
+		LM_ERR("xcap doc is empty\n");
+		goto error;
+	}
+
+	LM_DBG("rl document:\n%.*s", body.len, body.s);
+	*xmldoc = xmlParseMemory(body.s, body.len);
+	if(*xmldoc==NULL)
+	{
+		LM_ERR("while parsing XML memory. len = %d\n", body.len);
+		goto error;
+	}
+
+	if (path.len == 0)
+	{
+		/* No path specified - use all resource-lists. */
+		*rl_node = XMLDocGetNodeByName(*xmldoc,"resource-lists", NULL);
+		if(rl_node==NULL)
+		{
+			LM_ERR("no resource-lists node in XML document\n");
+			goto error;
+		}
+	}
+	else if (path.s != NULL)
+	{
+		xpathCtx = xmlXPathNewContext(*xmldoc);
+		if (xpathCtx == NULL)
+		{
+			LM_ERR("unable to create new XPath context");
+			goto error;
+		}
+
+		if (xmlXPathRegisterNs(xpathCtx, BAD_CAST "xmlns", BAD_CAST "urn:ietf:params:xml:ns:resource-lists") != 0)
+		{
+			LM_ERR("unable to register xmlns\n");
+			goto error;
+		}
+
+		xpathObj = xmlXPathEvalExpression(BAD_CAST path.s, xpathCtx);
+		if (xpathObj == NULL)
+		{
+			LM_ERR("unable to evaluate path\n");
+			goto error;
+		}
+
+		if (xpathObj->nodesetval == NULL || xpathObj->nodesetval->nodeNr <= 0)
+		{
+			LM_ERR("no nodes found\n");
+			goto error;
+		}
+		if (xpathObj->nodesetval->nodeTab[0] != NULL && xpathObj->nodesetval->nodeTab[0]->type != XML_ELEMENT_NODE)
+		{
+			LM_ERR("no nodes of the correct type found\n");
+			goto error;
+
+		}
+
+		*rl_node = xpathObj->nodesetval->nodeTab[0];
+
+		xmlXPathFreeObject(xpathObj);
+		xmlXPathFreeContext(xpathCtx);
+	}
+	
+	rls_xcap_dbf.free_result(rls_xcap_db, result);
+	return 1;
+
+error:
+	if(result!=NULL)
+		rls_xcap_dbf.free_result(rls_xcap_db, result);
+	if(xpathObj!=NULL)
+		xmlXPathFreeObject(xpathObj);
+	
+	if(xpathCtx!=NULL)
+		xmlXPathFreeContext(xpathCtx);
+	if(xmldoc!=NULL)
+		xmlFreeDoc(*xmldoc);
+
+	return -1;
+}

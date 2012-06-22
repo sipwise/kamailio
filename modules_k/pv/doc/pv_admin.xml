@@ -53,7 +53,7 @@
 	</section>
 	</section>
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>shvset</varname> (string)</title>
 		<para>
@@ -145,7 +145,7 @@ modparam("pv","avp_aliases","email=s:email_addr;tmp=i:100")
 		</section>
 	</section>
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 		<section>
 		<title><function moreinfo="none">pv_isset(pvar)</function></title>
 		<para>
@@ -198,6 +198,28 @@ pv_unset("$avp("s:x")");
 ...
 </programlisting>
 		</example>
+		</section>
+		<section>
+			<title>
+				<function moreinfo="none">is_int(pvar)</function>
+			</title>
+			<para>
+			Function checks if pvar argument contains integer value
+			and returns 1 if it does and -1 otherwise.
+	    	        </para>
+			<para>
+			Function can be used from all kinds of routes.
+			</para>
+			<example>
+				<title><function>is_int()</function> usage</title>
+				<programlisting format="linespecific">
+...
+if (is_int("$var(foo)")) {
+    xlog("L_INFO", "variable foo contains integer value\n");
+}
+...
+				</programlisting>
+			</example>
 		</section>
 	</section>
 

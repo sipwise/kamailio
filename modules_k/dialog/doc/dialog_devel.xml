@@ -51,19 +51,33 @@
 				</para>
 			</listitem>
 			<listitem>
-				<para><emphasis>DLGCB_CONFIRMED</emphasis> - called when the 
+				<para><emphasis>DLGCB_CONFIRMED_NA</emphasis> - called when the
+				dialog is confirmed (2xx replied) but the setup-concluding ACK
+				message from the caller is yet pending - it's a per dialog type.
+				</para>
+			</listitem>
+			<listitem>
+				<para><emphasis>DLGCB_CONFIRMED</emphasis> - called when the
 				dialog is confirmed (2xx replied) and the setup-concluding ACK
 				message from the caller has been seen - it's a per dialog type.
 				</para>
 			</listitem>
 			<listitem>
 				<para><emphasis>DLGCB_REQ_WITHIN</emphasis> - called when the 
-				dialog matches a sequential request - it's a per dialog type.
+				dialog matches a sequential request (excluding setup-concluding
+				ACK messages which are handled in DLGCB_CONFIRMED) - it's a per
+				dialog type.
 				</para>
 			</listitem>
 			<listitem>
 				<para><emphasis>DLGCB_TERMINATED</emphasis> - called when the 
 				dialog is terminated via BYE - it's a per dialog type.
+				</para>
+			</listitem>
+			<listitem>
+				<para><emphasis>DLGCB_TERMINATED_CONFIRMED</emphasis> -
+				called when response to a BYE request is received - it's a
+				per dialog type.
 				</para>
 			</listitem>
 			<listitem>
@@ -126,6 +140,29 @@
 			</para>
 		</listitem>
 
+		</itemizedlist>
+	</section>
+
+
+	<section>
+		<title>
+		<function moreinfo="none">terminate_dlg (dlg, hdrs)</function>
+		</title>
+		<para>
+		Terminate a Dialog
+		</para>
+		<para>Meaning of parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>struct dlg_cell* dlg</emphasis> - dialog to 
+			terminate.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>str* hdrs</emphasis> - string containg extra headers (full format) 
+			to be added to the BYE requests of the dialog.
+			</para>
+		</listitem>
 		</itemizedlist>
 	</section>
 

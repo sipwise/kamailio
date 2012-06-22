@@ -7,7 +7,7 @@ Jiri Kuthan
 
 Bogdan-Andrei Iancu
 
-   voice-system.ro
+   Voice Sistem SRL
    <bogdan@voice-system.ro>
 
 Ramona-Elena Modroiu
@@ -19,12 +19,21 @@ Edited by
 
 Bogdan-Andrei Iancu
 
-   voice-system.ro
+   Voice Sistem SRL
    <bogdan@voice-system.ro>
+
+Edited by
+
+Sven Knoblich
+
+   1&1 Internet AG
+   <sven.knoblich@1und1.de>
 
    Copyright © 2002, 2003 FhG FOKUS
 
-   Copyright © 2004, 2006 voice-system.ro
+   Copyright © 2004, 2006 Voice Sistem SRL
+
+   Copyright © 2011 1&1 Internet AG
    Revision History
    Revision $Revision$ $Date$
      __________________________________________________________________
@@ -49,54 +58,77 @@ Bogdan-Andrei Iancu
               3.2. Configuration
               3.3. Logged data
 
-        4. Dependencies
+        4. Call Data Record generation
 
-              4.1. Kamailio Modules
-              4.2. External Libraries or Applications
+              4.1. Overview
+              4.2. CDR Extra
 
-        5. Exported Parameters
+                    4.2.1. Definitions and syntax
 
-              5.1. early_media (integer)
-              5.2. failed_transaction_flag (integer)
-              5.3. report_ack (integer)
-              5.4. report_cancels (integer)
-              5.5. detect_direction (integer)
-              5.6. multi_leg_info (string)
-              5.7. log_flag (integer)
-              5.8. log_missed_flag (integer)
-              5.9. log_level (integer)
-              5.10. log_facility (string)
-              5.11. log_extra (string)
-              5.12. radius_config (string)
-              5.13. radius_flag (integer)
-              5.14. radius_missed_flag (integer)
-              5.15. service_type (integer)
-              5.16. radius_extra (string)
-              5.17. db_flag (integer)
-              5.18. db_missed_flag (integer)
-              5.19. db_table_acc (string)
-              5.20. db_table_missed_calls (string)
-              5.21. db_url (string)
-              5.22. acc_method_column (string)
-              5.23. acc_from_tag_column (string)
-              5.24. acc_to_tag_column (string)
-              5.25. acc_callid_column (string)
-              5.26. acc_sip_code_column (string)
-              5.27. acc_sip_reason_column (string)
-              5.28. acc_time_column (string)
-              5.29. db_extra (string)
-              5.30. diameter_flag (integer)
-              5.31. diameter_missed_flag (integer)
-              5.32. diameter_client_host (string)
-              5.33. diameter_client_port (int)
-              5.34. diameter_extra (string)
+              4.3. CDR with Multi Call-Legs
 
-        6. Exported Functions
+                    4.3.1. Overview
+                    4.3.2. Configuration
 
-              6.1. acc_log_request(comment)
-              6.2. acc_db_request(comment, table)
-              6.3. acc_rad_request(comment)
-              6.4. acc_diam_request(comment)
+                          4.3.2.1. Example for a spiraled Proxy
+
+                    4.3.3. Logged data
+
+        5. Dependencies
+
+              5.1. Kamailio Modules
+              5.2. External Libraries or Applications
+
+        6. Parameters
+
+              6.1. early_media (integer)
+              6.2. failed_transaction_flag (integer)
+              6.3. failed_filter (string)
+              6.4. report_ack (integer)
+              6.5. report_cancels (integer)
+              6.6. detect_direction (integer)
+              6.7. acc_prepare_flag (integer)
+              6.8. multi_leg_info (string)
+              6.9. log_flag (integer)
+              6.10. log_missed_flag (integer)
+              6.11. log_level (integer)
+              6.12. log_facility (string)
+              6.13. log_extra (string)
+              6.14. radius_config (string)
+              6.15. radius_flag (integer)
+              6.16. radius_missed_flag (integer)
+              6.17. service_type (integer)
+              6.18. radius_extra (string)
+              6.19. db_flag (integer)
+              6.20. db_missed_flag (integer)
+              6.21. db_table_acc (string)
+              6.22. db_table_missed_calls (string)
+              6.23. db_url (string)
+              6.24. acc_method_column (string)
+              6.25. acc_from_tag_column (string)
+              6.26. acc_to_tag_column (string)
+              6.27. acc_callid_column (string)
+              6.28. acc_sip_code_column (string)
+              6.29. acc_sip_reason_column (string)
+              6.30. acc_time_column (string)
+              6.31. db_extra (string)
+              6.32. db_insert_mode (integer)
+              6.33. diameter_flag (integer)
+              6.34. diameter_missed_flag (integer)
+              6.35. diameter_client_host (string)
+              6.36. diameter_client_port (int)
+              6.37. diameter_extra (string)
+              6.38. cdr_enable (integer)
+              6.39. cdr_start_when_confirmed (integer)
+              6.40. cdr_log_facility (integer)
+              6.41. cdr_log_extra (string)
+
+        7. Functions
+
+              7.1. acc_log_request(comment)
+              7.2. acc_db_request(comment, table)
+              7.3. acc_rad_request(comment)
+              7.4. acc_diam_request(comment)
 
    2. Frequently Asked Questions
 
@@ -104,42 +136,49 @@ Bogdan-Andrei Iancu
 
    1.1. early_media example
    1.2. failed_transaction_flag example
-   1.3. report_ack example
-   1.4. report_cancels example
-   1.5. detect_direction example
-   1.6. multi_leg_info example
-   1.7. log_flag example
-   1.8. log_missed_flag example
-   1.9. log_level example
-   1.10. log_facility example
-   1.11. log_extra example
-   1.12. radius_config example
-   1.13. radius_flag example
-   1.14. radius_missed_flag example
-   1.15. service_type example
-   1.16. radius_extra example
-   1.17. db_flag example
-   1.18. db_missed_flag example
-   1.19. db_table_acc example
-   1.20. db_table_missed_calls example
-   1.21. db_url example
-   1.22. acc_method_column example
-   1.23. acc_from_tag_column example
-   1.24. acc_to_tag_column example
-   1.25. acc_callid_column example
-   1.26. acc_sip_code_column example
-   1.27. acc_sip_reason_column example
-   1.28. acc_time_column example
-   1.29. db_extra example
-   1.30. diameter_flag example
-   1.31. diameter_missed_flag example
-   1.32. diameter_client_host example
-   1.33. diameter_client_host example
-   1.34. diameter_extra example
-   1.35. acc_log_request usage
-   1.36. acc_db_request usage
-   1.37. acc_rad_request usage
-   1.38. acc_diam_request usage
+   1.3. failed_filter example
+   1.4. report_ack example
+   1.5. report_cancels example
+   1.6. detect_direction example
+   1.7. acc_prepare_flag example
+   1.8. multi_leg_info example
+   1.9. log_flag example
+   1.10. log_missed_flag example
+   1.11. log_level example
+   1.12. log_facility example
+   1.13. log_extra example
+   1.14. radius_config example
+   1.15. radius_flag example
+   1.16. radius_missed_flag example
+   1.17. service_type example
+   1.18. radius_extra example
+   1.19. db_flag example
+   1.20. db_missed_flag example
+   1.21. db_table_acc example
+   1.22. db_table_missed_calls example
+   1.23. db_url example
+   1.24. acc_method_column example
+   1.25. acc_from_tag_column example
+   1.26. acc_to_tag_column example
+   1.27. acc_callid_column example
+   1.28. acc_sip_code_column example
+   1.29. acc_sip_reason_column example
+   1.30. acc_time_column example
+   1.31. db_extra example
+   1.32. db_insert_mode example
+   1.33. diameter_flag example
+   1.34. diameter_missed_flag example
+   1.35. diameter_client_host example
+   1.36. diameter_client_host example
+   1.37. diameter_extra example
+   1.38. cdr_enable example
+   1.39. cdr_start_when_confirmed example
+   1.40. cdr_log_facility example
+   1.41. cdr_log_extra example
+   1.42. acc_log_request usage
+   1.43. acc_db_request usage
+   1.44. acc_rad_request usage
+   1.45. acc_diam_request usage
 
 Chapter 1. Admin Guide
 
@@ -161,54 +200,77 @@ Chapter 1. Admin Guide
         3.2. Configuration
         3.3. Logged data
 
-   4. Dependencies
+   4. Call Data Record generation
 
-        4.1. Kamailio Modules
-        4.2. External Libraries or Applications
+        4.1. Overview
+        4.2. CDR Extra
 
-   5. Exported Parameters
+              4.2.1. Definitions and syntax
 
-        5.1. early_media (integer)
-        5.2. failed_transaction_flag (integer)
-        5.3. report_ack (integer)
-        5.4. report_cancels (integer)
-        5.5. detect_direction (integer)
-        5.6. multi_leg_info (string)
-        5.7. log_flag (integer)
-        5.8. log_missed_flag (integer)
-        5.9. log_level (integer)
-        5.10. log_facility (string)
-        5.11. log_extra (string)
-        5.12. radius_config (string)
-        5.13. radius_flag (integer)
-        5.14. radius_missed_flag (integer)
-        5.15. service_type (integer)
-        5.16. radius_extra (string)
-        5.17. db_flag (integer)
-        5.18. db_missed_flag (integer)
-        5.19. db_table_acc (string)
-        5.20. db_table_missed_calls (string)
-        5.21. db_url (string)
-        5.22. acc_method_column (string)
-        5.23. acc_from_tag_column (string)
-        5.24. acc_to_tag_column (string)
-        5.25. acc_callid_column (string)
-        5.26. acc_sip_code_column (string)
-        5.27. acc_sip_reason_column (string)
-        5.28. acc_time_column (string)
-        5.29. db_extra (string)
-        5.30. diameter_flag (integer)
-        5.31. diameter_missed_flag (integer)
-        5.32. diameter_client_host (string)
-        5.33. diameter_client_port (int)
-        5.34. diameter_extra (string)
+        4.3. CDR with Multi Call-Legs
 
-   6. Exported Functions
+              4.3.1. Overview
+              4.3.2. Configuration
 
-        6.1. acc_log_request(comment)
-        6.2. acc_db_request(comment, table)
-        6.3. acc_rad_request(comment)
-        6.4. acc_diam_request(comment)
+                    4.3.2.1. Example for a spiraled Proxy
+
+              4.3.3. Logged data
+
+   5. Dependencies
+
+        5.1. Kamailio Modules
+        5.2. External Libraries or Applications
+
+   6. Parameters
+
+        6.1. early_media (integer)
+        6.2. failed_transaction_flag (integer)
+        6.3. failed_filter (string)
+        6.4. report_ack (integer)
+        6.5. report_cancels (integer)
+        6.6. detect_direction (integer)
+        6.7. acc_prepare_flag (integer)
+        6.8. multi_leg_info (string)
+        6.9. log_flag (integer)
+        6.10. log_missed_flag (integer)
+        6.11. log_level (integer)
+        6.12. log_facility (string)
+        6.13. log_extra (string)
+        6.14. radius_config (string)
+        6.15. radius_flag (integer)
+        6.16. radius_missed_flag (integer)
+        6.17. service_type (integer)
+        6.18. radius_extra (string)
+        6.19. db_flag (integer)
+        6.20. db_missed_flag (integer)
+        6.21. db_table_acc (string)
+        6.22. db_table_missed_calls (string)
+        6.23. db_url (string)
+        6.24. acc_method_column (string)
+        6.25. acc_from_tag_column (string)
+        6.26. acc_to_tag_column (string)
+        6.27. acc_callid_column (string)
+        6.28. acc_sip_code_column (string)
+        6.29. acc_sip_reason_column (string)
+        6.30. acc_time_column (string)
+        6.31. db_extra (string)
+        6.32. db_insert_mode (integer)
+        6.33. diameter_flag (integer)
+        6.34. diameter_missed_flag (integer)
+        6.35. diameter_client_host (string)
+        6.36. diameter_client_port (int)
+        6.37. diameter_extra (string)
+        6.38. cdr_enable (integer)
+        6.39. cdr_start_when_confirmed (integer)
+        6.40. cdr_log_facility (integer)
+        6.41. cdr_log_extra (string)
+
+   7. Functions
+
+        7.1. acc_log_request(comment)
+        7.2. acc_db_request(comment, table)
+        7.3. acc_rad_request(comment)
+        7.4. acc_diam_request(comment)
 
 1. Overview
 
@@ -219,14 +281,14 @@ Chapter 1. Admin Guide
 
    To account a transaction and to choose which set of backends to be
    used, the script writer just has to set some flags (see the module
-   parameters section for flag definitions Section 5, “Exported
-   Parameters”). If the accounting flag for a specific backend is set, the
-   acc module will then report on completed transaction. A typical usage
-   of the module takes no acc-specific script command -- the functionality
-   binds invisibly through transaction processing. Script writers just
-   need to mark the transaction for accounting with proper setflag. Even
-   so, the module allows the script writter to force accounting in special
-   cases via some script functions.
+   parameters section for flag definitions Section 6, “Parameters”). If
+   the accounting flag for a specific backend is set, the acc module will
+   then report on completed transaction. A typical usage of the module
+   takes no acc-specific script command -- the functionality binds
+   invisibly through transaction processing. Script writers just need to
+   mark the transaction for accounting with proper setflag. Even so, the
+   module allows the script writter to force accounting in special cases
+   via some script functions.
 
    The accounting module will log by default a fixed set of attributes for
    the transaction - if you customize your accounting by adding more
@@ -251,11 +313,6 @@ Chapter 1. Admin Guide
      * All flags related to accounting need to be set in request
        processing route - only the "missed-call" flag may be toggled from
        other types of routes.
-     * There is no session/dialog accounting (yet) -- Kamailio maintains
-       no sessions. If one needs to correlate INVITEs with BYEs for
-       generating proper CDRs for example for purpose of billing, then it
-       is better done in the entity which processes accounting
-       information.
      * If a UA fails in middle of conversation, a proxy will never find
        out about it. In general, a better practice is to account from an
        end-device (such as PSTN gateway), which best knows about call
@@ -425,12 +482,127 @@ Note
        call-leg AVP set definition.
      * Diameter same as for RADIUS.
 
-4. Dependencies
+4. Call Data Record generation
 
-   4.1. Kamailio Modules
-   4.2. External Libraries or Applications
+   4.1. Overview
+   4.2. CDR Extra
 
-4.1. Kamailio Modules
+        4.2.1. Definitions and syntax
+
+   4.3. CDR with Multi Call-Legs
+
+        4.3.1. Overview
+        4.3.2. Configuration
+
+              4.3.2.1. Example for a spiraled Proxy
+
+        4.3.3. Logged data
+
+4.1. Overview
+
+   It is possible to generate and log Call Data Records (CDRs) directly
+   from Kamailio in addition to transaction-based logging. Apart from a
+   basic set of CDR fields which are always included (covering start time,
+   end time, and duration), the approach allows flexible specification of
+   additional fields that should be taken into account using the
+   configuration script. This is very similar to how transaction-based
+   logging may be customized with the exception that CDRs rely on dialogs
+   instead of transactions to store relevant information during a call.
+
+   In order to set up CDR generation, you must enable the CDR switch and
+   load the dialog module. You probably also want to specify a set of
+   pseudo-variables that define more relevant CDR fields. Pseudo-variables
+   may be assigned arbitrarily during script execution, and the module
+   will make sure that the variable content will be transformed into a CDR
+   by the end of the dialog.
+
+   To use CDR logging in a correct manner, you should only use the
+   dialog-based pseudo-variables (dlg_var) from the dialog module. This
+   allows you to save values right from the beginning through all requests
+   and replies until termination of the call. While not recommended, it is
+   still possible to use other pseudo-variables as well. Except for
+   pseudo-variables valid in the call-final transaction, however,
+   information given will not be stored in the CDR as they cannot be
+   accessed by the end of the call when the CDR is logged.
+
+4.2. CDR Extra
+
+   This section is similar to the “LOG accounting” part of Section 2,
+   “Extra accounting”.
+
+4.2.1. Definitions and syntax
+
+   Selection of extra information is done similar to the transaction extra
+   Section 2.2, “Definitions and syntax”.
+     * cdr_log_extra = cdr_extra_definition (';'cdr_extra_definition)*
+     * cdr_extra_definition = cdr_log_name '=' pseudo_variable
+
+   See also Section 6.41, “cdr_log_extra (string)”.
+
+   The full list of supported pseudo-variables in Sip-Router is available
+   at: http://sip-router.org/wiki/cookbooks/pseudo-variables/devel
+
+4.3. CDR with Multi Call-Legs
+
+4.3.1. Overview
+
+   As mentioned in Section 3, “Multi Call-Legs accounting”, a leg
+   represents a parallel or forwarded call. In contrast to the normal
+   accounting the cdr logging uses dialogs instead of transaction to log
+   data. This may reduce the amount of information but it also make it
+   possible to combine all important data in one cdr at once. A second
+   mechanism to process multiple data-sets into one cdr is not further
+   necessary.
+
+4.3.2. Configuration
+
+   When you route messages multiple times through your proxy (e.g. to
+   handle “call-forwardings”) you have to use detect_spirals from the
+   dialog modules. Otherwise the proxy can't identify and reuse existing
+   dialogs.
+
+   To get the correct call-forwarding-chain you have to store each cf*
+   with the corresponding caller and callee in a dialog based
+   pseudo-variable (dlg_var) (e.g. chain=B;cfa;C|C;cfnr;D). Additionally
+   it is necessary to store the caller and callee for each leg. All this
+   helps to identify the involved phone parners and forwarding chain. When
+   you route such calls multiple times to the same Proxy, you could store
+   the caller and callee within an transaction based avp and write it into
+   the dialog based dlg_var pv during a 200 INVITE.
+
+4.3.2.1. Example for a spiraled Proxy
+
+# A calls B (transaction 1)
+$avp(caller)='A'
+$avp(callee)='B';
+$dlg_var(chain)='';
+
+# B cfa C (transaction 2)
+$avp(caller)='B'
+$avp(callee)='C';
+$dlg_var(chain)='B;cfu;C';
+
+# C cfnr D (transaction 3)
+$avp(caller)='C'
+$avp(callee)='D';
+$dlg_var(chain)=$dlg_var(chain) + "|" + "C;cfnr;D";
+
+# C confirms call (200 reply of transaction 2)
+$dlg_var(caller) = $avp(caller); #caller='B'
+$dlg_var(callee) = $avp(callee); #callee='C'
+
+4.3.3. Logged data
+
+   For each call, all dialog corresponding variables will be logged. After
+   a call is finished, the generated call data record information will be
+   logged as string (VAR1=xxx,VAR2=xxxx,...) to the syslog.
+
+5. Dependencies
+
+   5.1. Kamailio Modules
+   5.2. External Libraries or Applications
+
+5.1. Kamailio Modules
 
    The module depends on the following modules (in the other words the
    listed modules must be loaded before this module):
@@ -438,52 +610,60 @@ Note
      * a database module -- If SQL support is used.
      * rr -- Record Route, if “detect_direction” module parameter is
        enabled.
+     * dialog -- Dialog, if “cdr_enable” module parameter is enabled.
 
-4.2. External Libraries or Applications
+5.2. External Libraries or Applications
 
    The following libraries or applications must be installed before
    running Kamailio with this module loaded:
      * radiusclient-ng 0.5.0 or higher -- if compiled with RADIUS support.
        See http://developer.berlios.de/projects/radiusclient-ng/.
 
-5. Exported Parameters
+6. Parameters
 
-   5.1. early_media (integer)
-   5.2. failed_transaction_flag (integer)
-   5.3. report_ack (integer)
-   5.4. report_cancels (integer)
-   5.5. detect_direction (integer)
-   5.6. multi_leg_info (string)
-   5.7. log_flag (integer)
-   5.8. log_missed_flag (integer)
-   5.9. log_level (integer)
-   5.10. log_facility (string)
-   5.11. log_extra (string)
-   5.12. radius_config (string)
-   5.13. radius_flag (integer)
-   5.14. radius_missed_flag (integer)
-   5.15. service_type (integer)
-   5.16. radius_extra (string)
-   5.17. db_flag (integer)
-   5.18. db_missed_flag (integer)
-   5.19. db_table_acc (string)
-   5.20. db_table_missed_calls (string)
-   5.21. db_url (string)
-   5.22. acc_method_column (string)
-   5.23. acc_from_tag_column (string)
-   5.24. acc_to_tag_column (string)
-   5.25. acc_callid_column (string)
-   5.26. acc_sip_code_column (string)
-   5.27. acc_sip_reason_column (string)
-   5.28. acc_time_column (string)
-   5.29. db_extra (string)
-   5.30. diameter_flag (integer)
-   5.31. diameter_missed_flag (integer)
-   5.32. diameter_client_host (string)
-   5.33. diameter_client_port (int)
-   5.34. diameter_extra (string)
+   6.1. early_media (integer)
+   6.2. failed_transaction_flag (integer)
+   6.3. failed_filter (string)
+   6.4. report_ack (integer)
+   6.5. report_cancels (integer)
+   6.6. detect_direction (integer)
+   6.7. acc_prepare_flag (integer)
+   6.8. multi_leg_info (string)
+   6.9. log_flag (integer)
+   6.10. log_missed_flag (integer)
+   6.11. log_level (integer)
+   6.12. log_facility (string)
+   6.13. log_extra (string)
+   6.14. radius_config (string)
+   6.15. radius_flag (integer)
+   6.16. radius_missed_flag (integer)
+   6.17. service_type (integer)
+   6.18. radius_extra (string)
+   6.19. db_flag (integer)
+   6.20. db_missed_flag (integer)
+   6.21. db_table_acc (string)
+   6.22. db_table_missed_calls (string)
+   6.23. db_url (string)
+   6.24. acc_method_column (string)
+   6.25. acc_from_tag_column (string)
+   6.26. acc_to_tag_column (string)
+   6.27. acc_callid_column (string)
+   6.28. acc_sip_code_column (string)
+   6.29. acc_sip_reason_column (string)
+   6.30. acc_time_column (string)
+   6.31. db_extra (string)
+   6.32. db_insert_mode (integer)
+   6.33. diameter_flag (integer)
+   6.34. diameter_missed_flag (integer)
+   6.35. diameter_client_host (string)
+   6.36. diameter_client_port (int)
+   6.37. diameter_extra (string)
+   6.38. cdr_enable (integer)
+   6.39. cdr_start_when_confirmed (integer)
+   6.40. cdr_log_facility (integer)
+   6.41. cdr_log_extra (string)
 
-5.1. early_media (integer)
+6.1. early_media (integer)
 
    Should be early media (any provisional reply with body) accounted too ?
 
@@ -492,7 +672,7 @@ Note
    Example 1.1. early_media example
 modparam("acc", "early_media", 1)
 
-5.2. failed_transaction_flag (integer)
+6.2. failed_transaction_flag (integer)
 
    Per transaction flag which says if the transaction should be accounted
    also in case of failure (status>=300).
@@ -502,7 +682,18 @@ modparam("acc", "early_media", 1)
    Example 1.2. failed_transaction_flag example
 modparam("acc", "failed_transaction_flag", 4)
 
-5.3. report_ack (integer)
+6.3. failed_filter (string)
+
+   A string of failure response codes from 300 to 999 separated by commas.
+   Failed transaction will not be accounted if its response code is in the
+   list even when failed_transaction_flag is set.
+
+   Default value is not-set (failure filtering is off).
+
+   Example 1.3. failed_filter example
+modparam("acc", "failed_filter", "404,407")
+
+6.4. report_ack (integer)
 
    Shall acc attempt to account e2e ACKs too ? Note that this is really
    only an attempt, as e2e ACKs may take a different path (unless RR
@@ -511,10 +702,10 @@ modparam("acc", "failed_transaction_flag", 4)
 
    Default value is 0 (no).
 
-   Example 1.3. report_ack example
+   Example 1.4. report_ack example
 modparam("acc", "report_ack", 1)
 
-5.4. report_cancels (integer)
+6.5. report_cancels (integer)
 
    By default, CANCEL reporting is disabled -- most accounting
    applications wants to see INVITE's cancellation status. Turn on if you
@@ -522,10 +713,10 @@ modparam("acc", "report_ack", 1)
 
    Default value is 0 (no).
 
-   Example 1.4. report_cancels example
+   Example 1.5. report_cancels example
 modparam("acc", "report_cancels", 1)
 
-5.5. detect_direction (integer)
+6.6. detect_direction (integer)
 
    Controlles the direction detection for sequential requests. If enabled
    (non zero value), for sequential requests with upstream direction (from
@@ -537,10 +728,24 @@ modparam("acc", "report_cancels", 1)
 
    Default value is 0 (disabled).
 
-   Example 1.5. detect_direction example
+   Example 1.6. detect_direction example
 modparam("acc", "detect_direction", 1)
 
-5.6. multi_leg_info (string)
+6.7. acc_prepare_flag (integer)
+
+   Per transaction flag which says if the transaction may be accounted
+   later, with flags set in TM module specific routes (e.g., like
+   failure_route). If this flag is not set and acc or missed_call flag are
+   not set either in request route block, there is no way to mark the
+   request for transaction later. If either acc or missed_call flags are
+   set in request route block, it is no need to set this flag.
+
+   Default value is not-set (no flag).
+
+   Example 1.7. acc_prepare_flag example
+modparam("acc", "acc_prepare_flag", 5)
+
+6.8. multi_leg_info (string)
 
    Defines the AVP set to be used in per-call-leg accounting. See
    Section 3, “Multi Call-Legs accounting” for a detailed description of
@@ -550,7 +755,7 @@ modparam("acc", "detect_direction", 1)
 
    Default value is 0 (disabled).
 
-   Example 1.6. multi_leg_info example
+   Example 1.8. multi_leg_info example
 # for syslog-based accounting, use any text you want to be printed
 modparam("acc", "multi_leg_info",
     "text1=$avp(src);text2=$avp(dst)")
@@ -564,34 +769,34 @@ modparam("acc", "multi_leg_info",
 modparam("acc", "multi_leg_info",
     "2345=$avp(src);2346=$avp(dst)")
 
-5.7. log_flag (integer)
+6.9. log_flag (integer)
 
    Request flag which needs to be set to account a transaction via syslog.
 
    Default value is not-set (no flag).
 
-   Example 1.7. log_flag example
+   Example 1.9. log_flag example
 modparam("acc", "log_flag", 2)
 
-5.8. log_missed_flag (integer)
+6.10. log_missed_flag (integer)
 
    Request flag which needs to be set to account missed calls via syslog.
 
    Default value is not-set (no flag).
 
-   Example 1.8. log_missed_flag example
+   Example 1.10. log_missed_flag example
 modparam("acc", "log_missed_flag", 3)
 
-5.9. log_level (integer)
+6.11. log_level (integer)
 
    Log level at which accounting messages are issued to syslog.
 
    Default value is L_NOTICE.
 
-   Example 1.9. log_level example
+   Example 1.11. log_level example
 modparam("acc", "log_level", 2)   # Set log_level to 2
 
-5.10. log_facility (string)
+6.12. log_facility (string)
 
    Log facility to which accounting messages are issued to syslog. This
    allows to easily seperate the accounting specific logging from the
@@ -599,20 +804,20 @@ modparam("acc", "log_level", 2)   # Set log_level to 2
 
    Default value is LOG_DAEMON.
 
-   Example 1.10. log_facility example
+   Example 1.12. log_facility example
 modparam("acc", "log_facility", "LOG_DAEMON")
 
-5.11. log_extra (string)
+6.13. log_extra (string)
 
    Extra values to be logged. See section Section 2, “Extra accounting”
    for more details.
 
    Default value is NULL.
 
-   Example 1.11. log_extra example
+   Example 1.13. log_extra example
 modparam("acc", "log_extra", "ua=$hdr(User-Agent);uuid=$avp(i:123)")
 
-5.12. radius_config (string)
+6.14. radius_config (string)
 
    This parameter is radius specific. Path to radius client configuration
    file, set the referred config file correctly and specify there address
@@ -625,231 +830,282 @@ modparam("acc", "log_extra", "ua=$hdr(User-Agent);uuid=$avp(i:123)")
 
    Default value is “NULL”.
 
-   Example 1.12. radius_config example
+   Example 1.14. radius_config example
 modparam("acc", "radius_config", "/etc/radiusclient/radiusclient.conf")
 
-5.13. radius_flag (integer)
+6.15. radius_flag (integer)
 
    Request flag which needs to be set to account a transaction -- RADIUS
    specific.
 
    Default value is not-set (no flag).
 
-   Example 1.13. radius_flag example
+   Example 1.15. radius_flag example
 modparam("acc", "radius_flag", 2)
 
-5.14. radius_missed_flag (integer)
+6.16. radius_missed_flag (integer)
 
    Request flag which needs to be set to account missed calls -- RADIUS
    specific.
 
    Default value is not-set (no flag).
 
-   Example 1.14. radius_missed_flag example
+   Example 1.16. radius_missed_flag example
 modparam("acc", "radius_missed_flag", 3)
 
-5.15. service_type (integer)
+6.17. service_type (integer)
 
    Radius service type used for accounting.
 
    Default value is 15 (SIP).
 
-   Example 1.15. service_type example
+   Example 1.17. service_type example
 modparam("acc", "service_type", 16)
 
-5.16. radius_extra (string)
+6.18. radius_extra (string)
 
    Extra values to be logged via RADIUS - RADIUS specific. See section
    Section 2, “Extra accounting” for more details.
 
    Default value is NULL.
 
-   Example 1.16. radius_extra example
+   Example 1.18. radius_extra example
 modparam("acc", "radius_extra", "via=$hdr(Via[*]); email=$avp(s:email)")
 
-5.17. db_flag (integer)
+6.19. db_flag (integer)
 
    Request flag which needs to be set to account a transaction -- database
    specific.
 
    Default value is not-set (no flag).
 
-   Example 1.17. db_flag example
+   Example 1.19. db_flag example
 modparam("acc", "db_flag", 2)
 
-5.18. db_missed_flag (integer)
+6.20. db_missed_flag (integer)
 
    Request flag which needs to be set to account missed calls -- database
    specific.
 
    Default value is not-set (no flag).
 
-   Example 1.18. db_missed_flag example
+   Example 1.20. db_missed_flag example
 modparam("acc", "db_missed_flag", 3)
 
-5.19. db_table_acc (string)
+6.21. db_table_acc (string)
 
    Table name of accounting successfull calls -- database specific.
 
    Default value is “acc”
 
-   Example 1.19. db_table_acc example
+   Example 1.21. db_table_acc example
 modparam("acc", "db_table_acc", "myacc_table")
 
-5.20. db_table_missed_calls (string)
+6.22. db_table_missed_calls (string)
 
    Table name for accounting missed calls -- database specific.
 
    Default value is “missed_calls”
 
-   Example 1.20. db_table_missed_calls example
+   Example 1.22. db_table_missed_calls example
 modparam("acc", "db_table_missed_calls", "myMC_table")
 
-5.21. db_url (string)
+6.23. db_url (string)
 
    SQL address -- database specific. If is set to NULL or emty string, the
    SQL support is disabled.
 
    Default value is “NULL” (SQL disabled).
 
-   Example 1.21. db_url example
+   Example 1.23. db_url example
 modparam("acc", "db_url", "mysql://user:password@localhost/openser")
 
-5.22. acc_method_column (string)
+6.24. acc_method_column (string)
 
    Column name in accounting table to store the request's method name as
    string.
 
    Default value is “method”.
 
-   Example 1.22. acc_method_column example
+   Example 1.24. acc_method_column example
 modparam("acc", "acc_method_column", "method")
 
-5.23. acc_from_tag_column (string)
+6.25. acc_from_tag_column (string)
 
    Column name in accounting table to store the From header TAG parameter.
 
    Default value is “from_tag”.
 
-   Example 1.23. acc_from_tag_column example
+   Example 1.25. acc_from_tag_column example
 modparam("acc", "acc_from_tag_column", "from_tag")
 
-5.24. acc_to_tag_column (string)
+6.26. acc_to_tag_column (string)
 
    Column name in accounting table to store the To header TAG parameter.
 
    Default value is “to_tag”.
 
-   Example 1.24. acc_to_tag_column example
+   Example 1.26. acc_to_tag_column example
 modparam("acc", "acc_to_tag_column", "to_tag")
 
-5.25. acc_callid_column (string)
+6.27. acc_callid_column (string)
 
    Column name in accounting table to store the request's Callid value.
 
    Default value is “callid”.
 
-   Example 1.25. acc_callid_column example
+   Example 1.27. acc_callid_column example
 modparam("acc", "acc_callid_column", "callid")
 
-5.26. acc_sip_code_column (string)
+6.28. acc_sip_code_column (string)
 
    Column name in accounting table to store the final reply's numric code
    value in string format.
 
    Default value is “sip_code”.
 
-   Example 1.26. acc_sip_code_column example
+   Example 1.28. acc_sip_code_column example
 modparam("acc", "acc_sip_code_column", "sip_code")
 
-5.27. acc_sip_reason_column (string)
+6.29. acc_sip_reason_column (string)
 
    Column name in accounting table to store the final reply's reason
    phrase value.
 
    Default value is “sip_reason”.
 
-   Example 1.27. acc_sip_reason_column example
+   Example 1.29. acc_sip_reason_column example
 modparam("acc", "acc_sip_reason_column", "sip_reason")
 
-5.28. acc_time_column (string)
+6.30. acc_time_column (string)
 
    Column name in accounting table to store the time stamp of the
    transaction completion in date-time format.
 
    Default value is “time”.
 
-   Example 1.28. acc_time_column example
+   Example 1.30. acc_time_column example
 modparam("acc", "acc_time_column", "time")
 
-5.29. db_extra (string)
+6.31. db_extra (string)
 
    Extra values to be logged into database - DB specific. See section
    Section 2, “Extra accounting” for more details.
 
    Default value is NULL.
 
-   Example 1.29. db_extra example
+   Example 1.31. db_extra example
 modparam("acc", "db_extra", "ct=$hdr(Content-type); email=$avp(s:email)")
 
-5.30. diameter_flag (integer)
+6.32. db_insert_mode (integer)
+
+   If set to 1, use INSERT DELAYED to add records to accounting tables
+   when the DB driver has support for it. If no INSERT DELAYED support is
+   offered by DB driver, then standard INSERT is used.
+
+   Default value is 0 (no INSERT DELAYED).
+
+   Example 1.32. db_insert_mode example
+modparam("acc", "db_insert_mode", 1)
+
+6.33. diameter_flag (integer)
 
    Request flag which needs to be set to account a transaction -- DIAMETER
    specific.
 
    Default value is not-set (no flag).
 
-   Example 1.30. diameter_flag example
+   Example 1.33. diameter_flag example
 modparam("acc", "diameter_flag", 2)
 
-5.31. diameter_missed_flag (integer)
+6.34. diameter_missed_flag (integer)
 
    Request flag which needs to be set to account missed calls -- DIAMETER
    specific.
 
    Default value is not-set (no flag).
 
-   Example 1.31. diameter_missed_flag example
+   Example 1.34. diameter_missed_flag example
 modparam("acc", "diameter_missed_flag", 3)
 
-5.32. diameter_client_host (string)
+6.35. diameter_client_host (string)
 
    Hostname of the machine where the DIAMETER Client is running --
    DIAMETER specific.
 
    Default value is “localhost”.
 
-   Example 1.32. diameter_client_host example
+   Example 1.35. diameter_client_host example
 modparam("acc", "diameter_client_host", "3a_server.net")
 
-5.33. diameter_client_port (int)
+6.36. diameter_client_port (int)
 
    Port number where the Diameter Client is listening -- DIAMETER
    specific.
 
    Default value is 3000.
 
-   Example 1.33. diameter_client_host example
+   Example 1.36. diameter_client_host example
 modparam("acc", "diameter_client_port", 3000)
 
-5.34. diameter_extra (string)
+6.37. diameter_extra (string)
 
    Extra values to be logged via DIAMETER - DIAMETER specific. See section
    Section 2, “Extra accounting” for more details.
 
    Default value is NULL.
 
-   Example 1.34. diameter_extra example
+   Example 1.37. diameter_extra example
 modparam("acc", "diameter_extra", "7846=$hdr(Content-type);7847=$avp(s:email)")
 
-6. Exported Functions
+6.38. cdr_enable (integer)
 
-   6.1. acc_log_request(comment)
-   6.2. acc_db_request(comment, table)
-   6.3. acc_rad_request(comment)
-   6.4. acc_diam_request(comment)
+   Should CDR-based logging be enabled?
 
-6.1.  acc_log_request(comment)
+   0 - off (default) 1 - on
+
+   Example 1.38. cdr_enable example
+modparam("acc", "cdr_enable", 1)
+
+6.39. cdr_start_when_confirmed (integer)
+
+   Should the start time be taken from the time when the dialog is
+   created, or when the dialog is confirmed?
+
+   0 - use time of dialog creation (default). 1 - use time of dialog
+   confirmation.
+
+   Example 1.39. cdr_start_when_confirmed example
+modparam("acc", "cdr_start_when_confirmed", 1)
+
+6.40. cdr_log_facility (integer)
+
+   Log facility to which CDR messages are issued to syslog. This allows to
+   easily seperate CDR-specific logging from the other log messages.
+
+   Default value is LOG_DAEMON.
+
+   Example 1.40. cdr_log_facility example
+modparam("acc", "cdr_log_facility", "LOG_DAEMON")
+
+6.41. cdr_log_extra (string)
+
+   Set of pseudo-variables defining custom CDR fields. See Section 4.2,
+   “CDR Extra” for more details.
+
+   Default value is NULL.
+
+   Example 1.41. cdr_log_extra example
+modparam("acc", "cdr_log_extra", "c1=$dlg_var(caller);c2=$dlg_var(callee)"
+
+7. Functions
+
+   7.1. acc_log_request(comment)
+   7.2. acc_db_request(comment, table)
+   7.3. acc_rad_request(comment)
+   7.4. acc_diam_request(comment)
+
+7.1.  acc_log_request(comment)
 
    acc_request reports on a request, for example, it can be used to report
    on missed calls to off-line users who are replied 404 - Not Found. To
@@ -861,12 +1117,12 @@ modparam("acc", "diameter_extra", "7846=$hdr(Content-type);7847=$avp(s:email)")
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.35. acc_log_request usage
+   Example 1.42. acc_log_request usage
 ...
 acc_log_request("Some comment");
 ...
 
-6.2.  acc_db_request(comment, table)
+7.2.  acc_db_request(comment, table)
 
    Like acc_log_request, acc_db_request reports on a request. The report
    is sent to database at “db_url”, in the table referred to in the second
@@ -878,12 +1134,12 @@ acc_log_request("Some comment");
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.36. acc_db_request usage
+   Example 1.43. acc_db_request usage
 ...
 acc_log_request("Some comment", "Some table");
 ...
 
-6.3.  acc_rad_request(comment)
+7.3.  acc_rad_request(comment)
 
    Like acc_log_request, acc_rad_request reports on a request. It reports
    to radius server as configured in “radius_config”.
@@ -893,12 +1149,12 @@ acc_log_request("Some comment", "Some table");
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.37. acc_rad_request usage
+   Example 1.44. acc_rad_request usage
 ...
 acc_rad_request("Some comment");
 ...
 
-6.4.  acc_diam_request(comment)
+7.4.  acc_diam_request(comment)
 
    Like acc_log_request, acc_diam_request reports on a request. It reports
    to the configured Diameter server.
@@ -908,7 +1164,7 @@ acc_rad_request("Some comment");
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.38. acc_diam_request usage
+   Example 1.45. acc_diam_request usage
 ...
 acc_diam_request("Some comment");
 ...
@@ -959,20 +1215,20 @@ Chapter 2. Frequently Asked Questions
        First at all check if your question was already answered on one of our
        mailing lists:
          * User Mailing List -
-           http://lists.kamailio.org/cgi-bin/mailman/listinfo/users
+           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-users
          * Developer Mailing List -
-           http://lists.kamailio.org/cgi-bin/mailman/listinfo/devel
+           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-dev
 
        E-mails regarding any stable Kamailio release should be sent to
-       <users@lists.kamailio.org> and e-mails regarding development versions
-       should be sent to <devel@lists.kamailio.org>.
+       <sr-users@lists.sip-router.org> and e-mails regarding development
+       versions should be sent to <sr-dev@lists.sip-router.org>.
 
        If you want to keep the mail private, send it to
-       <team@lists.kamailio.org>.
+       <sr-users@lists.sip-router.org>.
 
    2.6.
 
        How can I report a bug?
 
        Please follow the guidelines provided at:
-       http://sourceforge.net/tracker/?group_id=139143.
+       http://sip-router.org/tracker.

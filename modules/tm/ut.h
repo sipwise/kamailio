@@ -61,6 +61,15 @@
 #include "../../cfg_core.h" /* cfg_get(core, core_cfg, use_dns_failover) */
 #endif
 
+
+/*! Which header fields should be skipped */
+#define tm_skip_hf(_hf) \
+	(((_hf)->type == HDR_FROM_T)  || \
+	((_hf)->type == HDR_TO_T)     || \
+	((_hf)->type == HDR_CALLID_T) || \
+	((_hf)->type == HDR_CSEQ_T))
+
+
 /* a forced_proto takes precedence if != PROTO_NONE */
 inline static enum sip_protos get_proto(enum sip_protos force_proto,
 										enum sip_protos proto)
@@ -376,39 +385,5 @@ inline static struct dest_info *uri2dst(struct dest_info* dst,
 	return uri2dst2(dst, 0, sflags, uri, proto);
 }
 #endif /* USE_DNS_FAILOVER */
-
-
-
-#if 0
-/*
- * Convert a URI into the corresponding sockaddr_union (address to send to) and
- *  send socket_info (socket/address from which to send)
- *  to_su is filled with the destination and the socket_info that will be 
- *  used for sending is returned.
- *  On error return 0.
- *
- *  NOTE: this function is deprecated, you should use uri2dst instead
- */
-static inline struct socket_info *uri2sock(struct sip_msg* msg, str *uri,
-									union sockaddr_union *to_su, int proto)
-{
-	struct dest_info dst;
-
-	if (uri2dst(&dst, msg, uri, proto)==0){
-		LOG(L_ERR, "ERROR: uri2sock: Can't create a dst proxy\n");
-		ser_error=E_BAD_ADDRESS;
-		return 0;
-	}
-	*to_su=dst.to; /* copy su */
-	
-	/* we use dst->send_socket since uri2dst just set it correctly*/
-	if (dst.send_sock==0) {
-		LOG(L_ERR, "ERROR: uri2sock: no corresponding socket for af %d\n", 
-		    to_su->s.sa_family);
-		ser_error = E_NO_SOCKET;
-	}
-	return dst.send_sock;
-}
-#endif
 
 #endif /* _TM_UT_H */

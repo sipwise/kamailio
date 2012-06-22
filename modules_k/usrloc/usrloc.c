@@ -34,6 +34,10 @@
  */
 
 #include "usrloc.h"
+#include "dlist.h"
+#include "urecord.h"
+#include "ucontact.h"
+#include "udomain.h"
 #include "../../sr_module.h"
 #include "ul_mod.h"
 
@@ -61,6 +65,7 @@ int bind_usrloc(usrloc_api_t* api)
 	}
 
 	api->register_udomain   = register_udomain;
+	api->get_udomain        = get_udomain;
 	api->get_all_ucontacts  = get_all_ucontacts;
 	api->insert_urecord     = insert_urecord;
 	api->delete_urecord     = delete_urecord;
@@ -73,6 +78,10 @@ int bind_usrloc(usrloc_api_t* api)
 	api->get_ucontact       = get_ucontact;
 	api->update_ucontact    = update_ucontact;
 	api->register_ulcb      = register_ulcb;
+	api->get_aorhash        = ul_get_aorhash;
+
+	api->get_urecord_by_ruid      = get_urecord_by_ruid;
+	api->get_ucontact_by_instance = get_ucontact_by_instance;
 
 	api->use_domain = use_domain;
 	api->db_mode    = db_mode;

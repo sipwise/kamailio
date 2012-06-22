@@ -37,21 +37,25 @@
 #include "../../ut.h"
 #include "../../str.h"
 #include "../../lib/srdb1/db.h"
+#include "../../lib/srdb1/db_ut.h"
 #include "../../dprint.h"
 #include "../../parser/digest/digest.h"
 #include "../../parser/hf.h"
 #include "../../parser/parser_f.h"
+#include "../../parser/parse_from.h"
+#include "../../parser/parse_to.h"
+#include "../../parser/parse_uri.h"
 #include "../../usr_avp.h"
 #include "../../mod_fix.h"
 #include "../../mem/mem.h"
-#include "aaa_avps.h"
+#include "api.h"
 #include "authdb_mod.h"
 
 
 static inline int get_ha1(struct username* _username, str* _domain,
 			  const str* _table, char* _ha1, db1_res_t** res)
 {
-	struct aaa_avp *cred;
+	pv_elem_t *cred;
 	db_key_t keys[2];
 	db_val_t vals[2];
 	db_key_t *col;
@@ -72,7 +76,7 @@ static inline int get_ha1(struct username* _username, str* _domain,
 		(&pass_column_2) : (&pass_column);
 
 	for (n = 0, cred=credentials; cred ; n++, cred=cred->next) {
-		col[1 + n] = &cred->attr_name;
+		col[1 + n] = &cred->text;
 	}
 
 	VAL_TYPE(vals) = VAL_TYPE(vals + 1) = DB1_STR;
@@ -130,73 +134,18 @@ static inline int get_ha1(struct username* _username, str* _domain,
 /*
  * Generate AVPs from the database result
  */
-static int generate_avps(db1_res_t* result)
+static int generate_avps(struct sip_msg* msg, db1_res_t* db_res)
 {
-	struct aaa_avp *cred;
-	int_str ivalue;
+	pv_elem_t *cred;
 	int i;
 
 	for (cred=credentials, i=1; cred; cred=cred->next, i++) {
-		switch (result->col.types[i]) {
-		case DB1_STR:
-			ivalue.s = VAL_STR(&(result->rows[0].values[i]));
-
-			if (VAL_NULL(&(result->rows[0].values[i])) ||
-			ivalue.s.s == NULL || ivalue.s.len==0)
-				continue;
-
-			if (add_avp(cred->avp_type|AVP_VAL_STR,cred->avp_name,ivalue)!=0){
-				LM_ERR("failed to add AVP\n");
-				return -1;
-			}
-
-			LM_DBG("set string AVP \"%s\"/%d = \"%.*s\"\n",
-				(cred->avp_type&AVP_NAME_STR)?cred->avp_name.s.s:"",
-				(cred->avp_type&AVP_NAME_STR)?0:cred->avp_name.n,
-				ivalue.s.len, ZSW(ivalue.s.s));
-			break;
-		case DB1_STRING:
-			ivalue.s.s = (char*)VAL_STRING(&(result->rows[0].values[i]));
-
-			if (VAL_NULL(&(result->rows[0].values[i])) ||
-			ivalue.s.s == NULL || (ivalue.s.len=strlen(ivalue.s.s))==0 )
-				continue;
-
-			if (add_avp(cred->avp_type|AVP_VAL_STR,cred->avp_name,ivalue)!=0){
-				LM_ERR("failed to add AVP\n");
-				return -1;
-			}
-
-			LM_DBG("set string AVP \"%s\"/%d = \"%.*s\"\n",
-				(cred->avp_type&AVP_NAME_STR)?cred->avp_name.s.s:"",
-				(cred->avp_type&AVP_NAME_STR)?0:cred->avp_name.n,
-				ivalue.s.len, ZSW(ivalue.s.s));
-			break;
-		case DB1_INT:
-			if (VAL_NULL(&(result->rows[0].values[i])))
-				continue;
-
-			ivalue.n = (int)VAL_INT(&(result->rows[0].values[i]));
-
-			if (add_avp(cred->avp_type, cred->avp_name, ivalue)!=0) {
-				LM_ERR("failed to add AVP\n");
-				return -1;
-			}
-
-			LM_DBG("set int AVP \"%s\"/%d = %d\n",
-				(cred->avp_type&AVP_NAME_STR)?cred->avp_name.s.s:"",
-				(cred->avp_type&AVP_NAME_STR)?0:cred->avp_name.n,
-				ivalue.n);
-			break;
-		default:
-			LM_ERR("subscriber table column `%.*s' has unsuported type. "
-				"Only string/str or int columns are supported by"
-				"load_credentials.\n", result->col.names[i]->len,
-				result->col.names[i]->s);
-			break;
+		if (db_val2pv_spec(msg, &RES_ROWS(db_res)[0].values[i], &cred->spec) != 0) {
+			LM_ERR("Failed to convert value for column %.*s\n",
+					RES_NAMES(db_res)[i]->len, RES_NAMES(db_res)[i]->s);
+			return -1;
 		}
 	}
-
 	return 0;
 }
 
@@ -204,42 +153,33 @@ static int generate_avps(db1_res_t* result)
 /*
  * Authorize digest credentials
  */
-static inline int digest_authenticate(struct sip_msg* msg, fparam_t* realm,
-									char* tname, hdr_types_t hftype)
+static int digest_authenticate(struct sip_msg* msg, str *realm,
+				str *table, hdr_types_t hftype)
 {
 	char ha1[256];
 	int res;
 	struct hdr_field* h;
 	auth_body_t* cred;
-	str domain, table;
 	db1_res_t* result = NULL;
 	int ret;
 
 	cred = 0;
 	ret = AUTH_ERROR;
 
-	if(!tname) {
-		LM_ERR("invalid table parameter\n");
-		return AUTH_ERROR;
-	}
-
-	table.s = tname;
-	table.len = strlen(tname);
-
-	if (get_str_fparam(&domain, msg, realm) < 0) {
-		LM_ERR("failed to get realm value\n");
-		goto end;
-	}
-
-	if (domain.len==0)
-	{
-		LM_ERR("invalid realm parameter - empty value\n");
-		goto end;
-	}
-	LM_DBG("realm value [%.*s]\n", domain.len, domain.s);
-
-	ret = auth_api.pre_auth(msg, &domain, hftype, &h, NULL);
+	ret = auth_api.pre_auth(msg, realm, hftype, &h, NULL);
 	switch(ret) {
+		case NONCE_REUSED:
+			LM_DBG("nonce reused");
+			ret = AUTH_NONCE_REUSED;
+			goto end;
+		case STALE_NONCE:
+			LM_DBG("stale nonce\n");
+			ret = AUTH_STALE_NONCE;
+			goto end;
+		case NO_CREDENTIALS:
+			LM_DBG("no credentials\n");
+			ret = AUTH_NO_CREDENTIALS;
+			goto end;
 		case ERROR:
 		case BAD_CREDENTIALS:
 			LM_DBG("error or bad credentials\n");
@@ -266,7 +206,7 @@ static inline int digest_authenticate(struct sip_msg* msg, fparam_t* realm,
 
 	cred = (auth_body_t*)h->parsed;
 
-	res = get_ha1(&cred->digest.username, &domain, &table, ha1, &result);
+	res = get_ha1(&cred->digest.username, realm, table, ha1, &result);
 	if (res < 0) {
 		/* Error while accessing the database */
 		ret = AUTH_ERROR;
@@ -285,7 +225,7 @@ static inline int digest_authenticate(struct sip_msg* msg, fparam_t* realm,
 		ret = AUTH_OK;
 		switch(auth_api.post_auth(msg, h)) {
 			case AUTHENTICATED:
-				generate_avps(result);
+				generate_avps(msg, result);
 				break;
 			default:
 				ret = AUTH_ERROR;
@@ -310,8 +250,30 @@ end:
  */
 int proxy_authenticate(struct sip_msg* _m, char* _realm, char* _table)
 {
-	return digest_authenticate(_m, (fparam_t*)_realm, _table,
-			HDR_PROXYAUTH_T);
+	str srealm;
+	str stable;
+
+	if(_table==NULL) {
+		LM_ERR("invalid table parameter\n");
+		return AUTH_ERROR;
+	}
+
+	stable.s   = _table;
+	stable.len = strlen(stable.s);
+
+	if (get_str_fparam(&srealm, _m, (fparam_t*)_realm) < 0) {
+		LM_ERR("failed to get realm value\n");
+		return AUTH_ERROR;
+	}
+
+	if (srealm.len==0)
+	{
+		LM_ERR("invalid realm parameter - empty value\n");
+		return AUTH_ERROR;
+	}
+	LM_DBG("realm value [%.*s]\n", srealm.len, srealm.s);
+
+	return digest_authenticate(_m, &srealm, &stable, HDR_PROXYAUTH_T);
 }
 
 
@@ -320,6 +282,147 @@ int proxy_authenticate(struct sip_msg* _m, char* _realm, char* _table)
  */
 int www_authenticate(struct sip_msg* _m, char* _realm, char* _table)
 {
-	return digest_authenticate(_m, (fparam_t*)_realm, _table,
-			HDR_AUTHORIZATION_T);
+	str srealm;
+	str stable;
+
+	if(_table==NULL) {
+		LM_ERR("invalid table parameter\n");
+		return AUTH_ERROR;
+	}
+
+	stable.s   = _table;
+	stable.len = strlen(stable.s);
+
+	if (get_str_fparam(&srealm, _m, (fparam_t*)_realm) < 0) {
+		LM_ERR("failed to get realm value\n");
+		return AUTH_ERROR;
+	}
+
+	if (srealm.len==0)
+	{
+		LM_ERR("invalid realm parameter - empty value\n");
+		return AUTH_ERROR;
+	}
+	LM_DBG("realm value [%.*s]\n", srealm.len, srealm.s);
+
+	return digest_authenticate(_m, &srealm, &stable, HDR_AUTHORIZATION_T);
+}
+
+/*
+ * Authenticate using WWW/Proxy-Authorize header field
+ */
+#define AUTH_CHECK_ID_F 1<<0
+
+int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags)
+{
+	str srealm;
+	str stable;
+	int iflags;
+	int ret;
+	hdr_field_t *hdr;
+	sip_uri_t *uri = NULL;
+	sip_uri_t *turi = NULL;
+	sip_uri_t *furi = NULL;
+
+	if ((_m->REQ_METHOD == METHOD_ACK) || (_m->REQ_METHOD == METHOD_CANCEL)) {
+		return AUTH_OK;
+	}
+
+	if(_m==NULL || _realm==NULL || _table==NULL || _flags==NULL) {
+		LM_ERR("invalid parameters\n");
+		return AUTH_ERROR;
+	}
+
+	if (get_str_fparam(&srealm, _m, (fparam_t*)_realm) < 0) {
+		LM_ERR("failed to get realm value\n");
+		return AUTH_ERROR;
+	}
+
+	if (srealm.len==0) {
+		LM_ERR("invalid realm parameter - empty value\n");
+		return AUTH_ERROR;
+	}
+
+	if (get_str_fparam(&stable, _m, (fparam_t*)_table) < 0) {
+		LM_ERR("failed to get realm value\n");
+		return AUTH_ERROR;
+	}
+
+	if (stable.len==0) {
+		LM_ERR("invalid table parameter - empty value\n");
+		return AUTH_ERROR;
+	}
+
+	if(fixup_get_ivalue(_m, (gparam_p)_flags, &iflags)!=0)
+	{
+		LM_ERR("invalid flags parameter\n");
+		return -1;
+	}
+
+	LM_DBG("realm [%.*s] table [%.*s] flags [%d]\n", srealm.len, srealm.s,
+			stable.len,  stable.s, iflags);
+
+	if(_m->REQ_METHOD==METHOD_REGISTER)
+		ret = digest_authenticate(_m, &srealm, &stable, HDR_AUTHORIZATION_T);
+	else
+		ret = digest_authenticate(_m, &srealm, &stable, HDR_PROXYAUTH_T);
+
+	if(ret==AUTH_OK && (iflags&AUTH_CHECK_ID_F)) {
+		hdr = (_m->proxy_auth==0)?_m->authorization:_m->proxy_auth;
+		srealm = ((auth_body_t*)(hdr->parsed))->digest.username.user;
+			
+		if((furi=parse_from_uri(_m))==NULL)
+			return AUTH_ERROR;
+		
+		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
+			if((turi=parse_to_uri(_m))==NULL)
+				return AUTH_ERROR;
+			uri = turi;
+		} else {
+			uri = furi;
+		}
+		if(srealm.len!=uri->user.len
+					|| strncmp(srealm.s, uri->user.s, srealm.len)!=0)
+			return AUTH_USER_MISMATCH;
+
+		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
+			/* check from==to */
+			if(furi->user.len!=turi->user.len
+					|| strncmp(furi->user.s, turi->user.s, furi->user.len)!=0)
+				return AUTH_USER_MISMATCH;
+			if(use_domain!=0 && (furi->host.len!=turi->host.len
+					|| strncmp(furi->host.s, turi->host.s, furi->host.len)!=0))
+				return AUTH_USER_MISMATCH;
+			/* check r-uri==from for publish */
+			if(_m->REQ_METHOD==METHOD_PUBLISH) {
+				if(parse_sip_msg_uri(_m)<0)
+					return AUTH_ERROR;
+				uri = &_m->parsed_uri;
+				if(furi->user.len!=uri->user.len
+						|| strncmp(furi->user.s, uri->user.s, furi->user.len)!=0)
+					return AUTH_USER_MISMATCH;
+				if(use_domain!=0 && (furi->host.len!=uri->host.len
+						|| strncmp(furi->host.s, uri->host.s, furi->host.len)!=0))
+					return AUTH_USER_MISMATCH;
+				}
+		}
+		return AUTH_OK;
+	}
+
+	return ret;
+}
+
+
+/**
+ * @brief bind functions to AUTH_DB API structure
+ */
+int bind_auth_db(auth_db_api_t *api)
+{
+	if (!api) {
+		ERR("Invalid parameter value\n");
+		return -1;
+	}
+	api->digest_authenticate = digest_authenticate;
+
+	return 0;
 }

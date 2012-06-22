@@ -1,7 +1,4 @@
 /*
- * $Id$
- *
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -26,72 +23,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-
-/* 
-  timer.c is where we implement TM timers. It has been designed
-  for high performance using some techniques of which timer users
-  need to be aware.
-
-	One technique is "fixed-timer-length". We maintain separate 
-	timer lists, all of them include elements of the same time
-	to fire. That allows *appending* new events to the list as
-	opposed to inserting them by time, which is costly due to
-	searching time spent in a mutex. The performance benefit is
-	noticeable. The limitation is you need a new timer list for
-	each new timer length.
-
-	Another technique is the timer process slices off expired elements
-	from the list in a mutex, but executes the timer after the mutex
-	is left. That saves time greatly as whichever process wants to
-	add/remove a timer, it does not have to wait until the current
-	list is processed. However, be aware the timers may hit in a delayed
-	manner; you have no guarantee in your process that after resetting a timer, 
-	it will no more hit. It might have been removed by timer process,
-    and is waiting to be executed.  The following example shows it:
-
-			PROCESS1				TIMER PROCESS
-
-	0.								timer hits, it is removed from queue and
-									about to be executed
-	1.	process1 decides to
-		reset the timer 
-	2.								timer is executed now
-	3.	if the process1 naively
-		thinks the timer could not 
-		have been executed after 
-		resetting the timer, it is
-		WRONG -- it was (step 2.)
-
-	So be careful when writing the timer handlers. Currently defined timers 
-	don't hurt if they hit delayed, I hope at least. Retransmission timer 
-	may results in a useless retransmission -- not too bad. FR timer not too
-	bad either as timer processing uses a REPLY mutex making it safe to other
-	processing affecting transaction state. Wait timer not bad either -- processes
-	putting a transaction on wait don't do anything with it anymore.
-
-		Example when it does not hurt:
-
-			P1						TIMER
-	0.								RETR timer removed from list and
-									scheduled for execution
-	1. 200/BYE received->
-	   reset RETR, put_on_wait
-	2.								RETR timer executed -- too late but it does
-									not hurt
-	3.								WAIT handler executed
-
-	The rule of thumb is don't touch data you put under a timer. Create data,
-    put them under a timer, and let them live until they are safely destroyed from
-    wait/delete timer.  The only safe place to manipulate the data is 
-    from timer process in which delayed timers cannot hit (all timers are
-    processed sequentially).
-
-	A "bad example" -- rewriting content of retransmission buffer
-	in an unprotected way is bad because a delayed retransmission timer might 
-	hit. Thats why our reply retransmission procedure is enclosed in 
-	a REPLY_LOCK.
-
-*/
 /*
  * History:
  * --------
@@ -114,8 +45,77 @@
  *             added maximum inv. and non-inv. transaction life time (andrei)
  */
 
-#include "defs.h"
+/**
+ * \file
+ * \brief TM :: timer support
+ * 
+ * TM timer support. It has been designed for high performance using
+ * some techniques of which timer users need to be aware.
+ * - One technique is "fixed-timer-length". We maintain separate 
+ * timer lists, all of them include elements of the same time
+ * to fire. That allows *appending* new events to the list as
+ * opposed to inserting them by time, which is costly due to
+ * searching time spent in a mutex. The performance benefit is
+ * noticeable. The limitation is you need a new timer list for
+ * each new timer length.
+ * - Another technique is the timer process slices off expired elements
+ * from the list in a mutex, but executes the timer after the mutex
+ * is left. That saves time greatly as whichever process wants to
+ * add/remove a timer, it does not have to wait until the current
+ * list is processed. However, be aware the timers may hit in a delayed
+ * manner; you have no guarantee in your process that after resetting a timer, 
+ * it will no more hit. It might have been removed by timer process,
+ * and is waiting to be executed.
+ * 
+ * The following example shows it:
+ * 
+ *		PROCESS1				TIMER PROCESS
+ * 
+ * -	0.						timer hits, it is removed from queue and
+ * 							about to be executed
+ * -	1.	process1 decides to
+ * 		reset the timer 
+ * -	2.						timer is executed now
+ * -	3.	if the process1 naively
+ * 		thinks the timer could not 
+ * 		have been executed after 
+ * 		resetting the timer, it is
+ * 		WRONG -- it was (step 2.)
+ * 
+ * So be careful when writing the timer handlers. Currently defined timers 
+ * don't hurt if they hit delayed, I hope at least. Retransmission timer 
+ * may results in a useless retransmission -- not too bad. FR timer not too
+ * bad either as timer processing uses a REPLY mutex making it safe to other
+ * processing affecting transaction state. Wait timer not bad either -- processes
+ * putting a transaction on wait don't do anything with it anymore.
+ * 
+ * 	Example when it does not hurt:
+ * 
+ * 		PROCESS1				TIMER PROCESS
+ * 
+ * -	0.						RETR timer removed from list and
+ * 							scheduled for execution
+ * -	1. 200/BYE received->
+ * 	   reset RETR, put_on_wait
+ * -	2.						RETR timer executed -- too late but it does
+ * 							not hurt
+ * -	3.						WAIT handler executed
+ *
+ * The rule of thumb is don't touch data you put under a timer. Create data,
+ * put them under a timer, and let them live until they are safely destroyed from
+ * wait/delete timer.  The only safe place to manipulate the data is 
+ * from timer process in which delayed timers cannot hit (all timers are
+ * processed sequentially).
+ * 
+ * A "bad example" -- rewriting content of retransmission buffer
+ * in an unprotected way is bad because a delayed retransmission timer might 
+ * hit. Thats why our reply retransmission procedure is enclosed in 
+ * a REPLY_LOCK.
+ * \ingroup tm
+ */
 
+
+#include "defs.h"
 
 
 #include "config.h"
@@ -150,17 +150,22 @@
 struct msgid_var user_fr_timeout;
 struct msgid_var user_fr_inv_timeout;
 #ifdef TM_DIFF_RT_TIMEOUT
-struct msgid_var user_rt_t1_timeout;
-struct msgid_var user_rt_t2_timeout;
+struct msgid_var user_rt_t1_timeout_ms;
+struct msgid_var user_rt_t2_timeout_ms;
 #endif
 struct msgid_var user_inv_max_lifetime;
 struct msgid_var user_noninv_max_lifetime;
 
 
-/* internal use, val should be unsigned or positive
- *  <= instead of < to get read of gcc warning when 
- *  sizeof(cell_member)==sizeof(val) (Note that this limits
- *  maximum value to max. type -1) */
+/**
+ * \brief Check helper for configuration framework values
+ * 
+ * Check helper for configuration framework values for internal use
+ * The val should be unsigned or positive, use
+ * <= instead of < to get read of gcc warning when 
+ * sizeof(cell_member)==sizeof(val) (Note that this limits
+ * maximum value to max. type -1)
+ */
 #define SIZE_FIT_CHECK(cell_member, val, cfg_name) \
 	if (MAX_UVAR_VALUE(((struct cell*)0)->cell_member) <= (val)){ \
 		ERR("tm_init_timers: " cfg_name " too big: %lu (%lu ticks) " \
@@ -171,15 +176,15 @@ struct msgid_var user_noninv_max_lifetime;
 		goto error; \
 	} 
 
-/* fix timer values to ticks */
-int tm_init_timers()
+/**
+ * \brief fix timer values to ticks
+ */
+int tm_init_timers(void)
 {
 	default_tm_cfg.fr_timeout=MS_TO_TICKS(default_tm_cfg.fr_timeout); 
 	default_tm_cfg.fr_inv_timeout=MS_TO_TICKS(default_tm_cfg.fr_inv_timeout);
 	default_tm_cfg.wait_timeout=MS_TO_TICKS(default_tm_cfg.wait_timeout);
 	default_tm_cfg.delete_timeout=MS_TO_TICKS(default_tm_cfg.delete_timeout);
-	default_tm_cfg.rt_t1_timeout=MS_TO_TICKS(default_tm_cfg.rt_t1_timeout);
-	default_tm_cfg.rt_t2_timeout=MS_TO_TICKS(default_tm_cfg.rt_t2_timeout);
 	default_tm_cfg.tm_max_inv_lifetime=MS_TO_TICKS(default_tm_cfg.tm_max_inv_lifetime);
 	default_tm_cfg.tm_max_noninv_lifetime=MS_TO_TICKS(default_tm_cfg.tm_max_noninv_lifetime);
 	/* fix 0 values to 1 tick (minimum possible wait time ) */
@@ -187,8 +192,8 @@ int tm_init_timers()
 	if (default_tm_cfg.fr_inv_timeout==0) default_tm_cfg.fr_inv_timeout=1;
 	if (default_tm_cfg.wait_timeout==0) default_tm_cfg.wait_timeout=1;
 	if (default_tm_cfg.delete_timeout==0) default_tm_cfg.delete_timeout=1;
-	if (default_tm_cfg.rt_t2_timeout==0) default_tm_cfg.rt_t2_timeout=1;
-	if (default_tm_cfg.rt_t1_timeout==0) default_tm_cfg.rt_t1_timeout=1;
+	if (default_tm_cfg.rt_t2_timeout_ms==0) default_tm_cfg.rt_t2_timeout_ms=1;
+	if (default_tm_cfg.rt_t1_timeout_ms==0) default_tm_cfg.rt_t1_timeout_ms=1;
 	if (default_tm_cfg.tm_max_inv_lifetime==0) default_tm_cfg.tm_max_inv_lifetime=1;
 	if (default_tm_cfg.tm_max_noninv_lifetime==0) default_tm_cfg.tm_max_noninv_lifetime=1;
 	
@@ -196,8 +201,10 @@ int tm_init_timers()
 	SIZE_FIT_CHECK(fr_timeout, default_tm_cfg.fr_timeout, "fr_timer");
 	SIZE_FIT_CHECK(fr_inv_timeout, default_tm_cfg.fr_inv_timeout, "fr_inv_timer");
 #ifdef TM_DIFF_RT_TIMEOUT
-	SIZE_FIT_CHECK(rt_t1_timeout, default_tm_cfg.rt_t1_timeout, "retr_timer1");
-	SIZE_FIT_CHECK(rt_t2_timeout, default_tm_cfg.rt_t2_timeout, "retr_timer2");
+	SIZE_FIT_CHECK(rt_t1_timeout_ms, default_tm_cfg.rt_t1_timeout_ms,
+					"retr_timer1");
+	SIZE_FIT_CHECK(rt_t2_timeout_ms, default_tm_cfg.rt_t2_timeout_ms,
+					"retr_timer2");
 #endif
 	SIZE_FIT_CHECK(end_of_life, default_tm_cfg.tm_max_inv_lifetime, "max_inv_lifetime");
 	SIZE_FIT_CHECK(end_of_life, default_tm_cfg.tm_max_noninv_lifetime, "max_noninv_lifetime");
@@ -205,8 +212,8 @@ int tm_init_timers()
 	memset(&user_fr_timeout, 0, sizeof(user_fr_timeout));
 	memset(&user_fr_inv_timeout, 0, sizeof(user_fr_inv_timeout));
 #ifdef TM_DIFF_RT_TIMEOUT
-	memset(&user_rt_t1_timeout, 0, sizeof(user_rt_t1_timeout));
-	memset(&user_rt_t2_timeout, 0, sizeof(user_rt_t2_timeout));
+	memset(&user_rt_t1_timeout_ms, 0, sizeof(user_rt_t1_timeout_ms));
+	memset(&user_rt_t2_timeout_ms, 0, sizeof(user_rt_t2_timeout_ms));
 #endif
 	memset(&user_inv_max_lifetime, 0, sizeof(user_inv_max_lifetime));
 	memset(&user_noninv_max_lifetime, 0, sizeof(user_noninv_max_lifetime));
@@ -215,15 +222,18 @@ int tm_init_timers()
 			" max_inv_lifetime=%d max_noninv_lifetime=%d\n",
 			default_tm_cfg.fr_timeout, default_tm_cfg.fr_inv_timeout,
 			default_tm_cfg.wait_timeout, default_tm_cfg.delete_timeout,
-			default_tm_cfg.rt_t1_timeout, default_tm_cfg.rt_t2_timeout,
+			default_tm_cfg.rt_t1_timeout_ms, default_tm_cfg.rt_t2_timeout_ms,
 			default_tm_cfg.tm_max_inv_lifetime, default_tm_cfg.tm_max_noninv_lifetime);
 	return 0;
 error:
 	return -1;
 }
 
-/* internal macro for timer_fixup()
- * performs size fit check if the timer name matches
+/**
+ * \brief Internal macro for timer_fixup()
+ * 
+ * Internal macro for timer_fixup(), performs size fit
+ * check if the timer name matches
  */
 #define IF_IS_TIMER_NAME(cell_member, cfg_name) \
 	if ((name->len == sizeof(cfg_name)-1) && \
@@ -231,12 +241,20 @@ error:
 			SIZE_FIT_CHECK(cell_member, t, cfg_name); \
 	}
 
-/* fixup function for the timer values
- * (called by the configuration framework)
+/**
+ * \brief Fixup function for the timer values
+ * 
+ * Fixup function for the timer values, (called by the
+ * configuration framework)
+ * \param handle not used
+ * \param gname not used
+ * \param name not used
+ * \param val fixed timer value
+ * \return 0 on success, -1 on error
  */
 int timer_fixup(void *handle, str *gname, str *name, void **val)
 {
-	ticks_t	t;
+	ticks_t t;
 
 	t = MS_TO_TICKS((unsigned int)(long)(*val));
 	/* fix 0 values to 1 tick (minimum possible wait time ) */
@@ -245,14 +263,34 @@ int timer_fixup(void *handle, str *gname, str *name, void **val)
 	/* size fix checks */
 	IF_IS_TIMER_NAME(fr_timeout, "fr_timer")
 	else IF_IS_TIMER_NAME(fr_inv_timeout, "fr_inv_timer")
-#ifdef TM_DIFF_RT_TIMEOUT
-	else IF_IS_TIMER_NAME(rt_t1_timeout, "retr_timer1")
-	else IF_IS_TIMER_NAME(rt_t2_timeout, "retr_timer2")
-#endif
 	else IF_IS_TIMER_NAME(end_of_life, "max_inv_lifetime")
 	else IF_IS_TIMER_NAME(end_of_life, "max_noninv_lifetime")
 
 	*val = (void *)(long)t;
+	return 0;
+
+error:
+	return -1;
+}
+
+
+
+/** fixup function for timer values that are kept in ms.
+ * (called by the configuration framework)
+ * It checks if the value fits in the tm structures 
+ */
+int timer_fixup_ms(void *handle, str *gname, str *name, void **val)
+{
+	long	t;
+
+	t = (long)(*val);
+
+	/* size fix checks */
+#ifdef TM_DIFF_RT_TIMEOUT
+	IF_IS_TIMER_NAME(rt_t1_timeout_ms, "retr_timer1")
+	else IF_IS_TIMER_NAME(rt_t2_timeout_ms, "retr_timer2")
+#endif
+
 	return 0;
 
 error:
@@ -354,11 +392,9 @@ inline static ticks_t retransmission_handler( struct retr_buf *r_buf )
 				fake_reply(r_buf->my_T, r_buf->branch, 503 );
 				return (ticks_t)-1;
 			}
-#ifdef TMCB_ONSEND
 			if (unlikely(has_tran_tmcbs(r_buf->my_T, TMCB_REQUEST_SENT))) 
-				run_onsend_callbacks(TMCB_REQUEST_SENT, r_buf, 
-										0, 0, TMCB_RETR_F);
-#endif
+				run_trans_callbacks_with_buf(TMCB_REQUEST_SENT, r_buf, 
+				0, 0, TMCB_RETR_F);
 	} else {
 #ifdef EXTRA_DEBUG
 			DBG("DEBUG: retransmission_handler : "
@@ -510,7 +546,8 @@ ticks_t retr_buf_handler(ticks_t ticks, struct timer_ln* tl, void *p)
 	ticks_t fr_remainder;
 	ticks_t retr_remainder;
 	ticks_t retr_interval;
-	ticks_t new_retr_interval;
+	unsigned long new_retr_interval_ms;
+	unsigned long crt_retr_interval_ms;
 	struct cell *t;
 
 	rbuf=(struct  retr_buf*)
@@ -551,28 +588,20 @@ ticks_t retr_buf_handler(ticks_t ticks, struct timer_ln* tl, void *p)
 			if ((s_ticks_t)(rbuf->retr_expire-ticks)<=0){
 				if (rbuf->flags & F_RB_RETR_DISABLED)
 					goto disabled;
-				/* retr_interval= min (2*ri, rt_t2) , *p==2*ri*/
-				/* no branch version: 
-					#idef CC_SIGNED_RIGHT_SHIFT
-						ri=  rt_t2+((2*ri-rt_t2) & 
-						((signed)(2*ri-rt_t2)>>(sizeof(ticks_t)*8-1));
-					#else
-						ri=rt_t2+((2*ri-rt_t2)& -(2*ri<rt_t2));
-					#endif
-				*/
-				
+				crt_retr_interval_ms = (unsigned long)p;
 				/* get the  current interval from timer param. */
-				if ((rbuf->flags & F_RB_T2) || 
-						(((ticks_t)(unsigned long)p)>RT_T2_TIMEOUT(rbuf))){
-					retr_interval=RT_T2_TIMEOUT(rbuf);
-					new_retr_interval=RT_T2_TIMEOUT(rbuf);
+				if (unlikely((rbuf->flags & F_RB_T2) ||
+						(crt_retr_interval_ms > RT_T2_TIMEOUT_MS(rbuf)))){
+					retr_interval = MS_TO_TICKS(RT_T2_TIMEOUT_MS(rbuf));
+					new_retr_interval_ms = RT_T2_TIMEOUT_MS(rbuf);
 				}else{
-					retr_interval=(ticks_t)(unsigned long)p;
-					new_retr_interval=retr_interval<<1;
+					retr_interval = MS_TO_TICKS(crt_retr_interval_ms);
+					new_retr_interval_ms=crt_retr_interval_ms<<1;
 				}
 #ifdef TIMER_DEBUG
-				DBG("tm: timer: retr: new interval %d (max %d)\n", 
-						retr_interval, RT_T2_TIMEOUT(rbuf));
+				DBG("tm: timer: retr: new interval %ld ms / %d ticks"
+						" (max %d ms)\n", new_retr_interval_ms, retr_interval,
+						RT_T2_TIMEOUT_MS(rbuf));
 #endif
 				/* we could race with the reply_received code, but the 
 				 * worst thing that can happen is to delay a reset_to_t2
@@ -580,9 +609,9 @@ ticks_t retr_buf_handler(ticks_t ticks, struct timer_ln* tl, void *p)
 				rbuf->retr_expire=ticks+retr_interval;
 				/* set new interval to -1 on error, or retr_int. on success */
 				retr_remainder=retransmission_handler(rbuf) | retr_interval;
-				/* store the next retr. interval inside the timer struct,
+				/* store the next retr. interval in ms inside the timer struct,
 				 * in the data member */
-				tl->data=(void*)(unsigned long)(new_retr_interval);
+				tl->data=(void*)(new_retr_interval_ms);
 			}else{
 				retr_remainder= rbuf->retr_expire-ticks;
 				DBG("tm: timer: retr: nothing to do, expire in %d\n", 

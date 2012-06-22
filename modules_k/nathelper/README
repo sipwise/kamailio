@@ -26,13 +26,11 @@ Ovidiu Sas
 
    Copyright © 2003-2008 Sippy Software, Inc.
 
-   Copyright © 2005 voice-system.ro
+   Copyright © 2005 Voice Sistem SRL
 
    Copyright © 2009 TuTPro Inc.
 
    Copyright © 2010 VoIPEmbedded Inc.
-   Revision History
-   Revision $Revision$ $Date$
      __________________________________________________________________
 
    Table of Contents
@@ -46,7 +44,7 @@ Ovidiu Sas
               3.1. Kamailio Modules
               3.2. External Libraries or Applications
 
-        4. Exported Parameters
+        4. Parameters
 
               4.1. natping_interval (integer)
               4.2. ping_nated_only (integer)
@@ -58,7 +56,7 @@ Ovidiu Sas
               4.8. sipping_method (string)
               4.9. nortpproxy_str (string)
 
-        5. Exported Functions
+        5. Functions
 
               5.1. fix_nated_contact()
               5.2. fix_nated_sdp(flags [, ip_address])
@@ -66,8 +64,9 @@ Ovidiu Sas
               5.4. add_rcv_param([flag]),
               5.5. fix_nated_register()
               5.6. nat_uac_test(flags)
-              5.7. add_contact_alias()
-              5.8. handle_ruri_alias()
+              5.7. is_rfc1918(ip_address)
+              5.8. add_contact_alias()
+              5.9. handle_ruri_alias()
 
         6. Exported Pseudo Variables
 
@@ -113,7 +112,7 @@ Chapter 1. Admin Guide
         3.1. Kamailio Modules
         3.2. External Libraries or Applications
 
-   4. Exported Parameters
+   4. Parameters
 
         4.1. natping_interval (integer)
         4.2. ping_nated_only (integer)
@@ -125,7 +124,7 @@ Chapter 1. Admin Guide
         4.8. sipping_method (string)
         4.9. nortpproxy_str (string)
 
-   5. Exported Functions
+   5. Functions
 
         5.1. fix_nated_contact()
         5.2. fix_nated_sdp(flags [, ip_address])
@@ -133,8 +132,9 @@ Chapter 1. Admin Guide
         5.4. add_rcv_param([flag]),
         5.5. fix_nated_register()
         5.6. nat_uac_test(flags)
-        5.7. add_contact_alias()
-        5.8. handle_ruri_alias()
+        5.7. is_rfc1918(ip_address)
+        5.8. add_contact_alias()
+        5.9. handle_ruri_alias()
 
    6. Exported Pseudo Variables
 
@@ -205,7 +205,7 @@ Chapter 1. Admin Guide
    running Kamailio with this module loaded:
      * None.
 
-4. Exported Parameters
+4. Parameters
 
    4.1. natping_interval (integer)
    4.2. ping_nated_only (integer)
@@ -349,7 +349,7 @@ Note
 modparam("nathelper", "nortpproxy_str", "a=sdpmangled:yes\r\n")
 ...
 
-5. Exported Functions
+5. Functions
 
    5.1. fix_nated_contact()
    5.2. fix_nated_sdp(flags [, ip_address])
@@ -357,8 +357,9 @@ modparam("nathelper", "nortpproxy_str", "a=sdpmangled:yes\r\n")
    5.4. add_rcv_param([flag]),
    5.5. fix_nated_register()
    5.6. nat_uac_test(flags)
-   5.7. add_contact_alias()
-   5.8. handle_ruri_alias()
+   5.7. is_rfc1918(ip_address)
+   5.8. add_contact_alias()
+   5.9. handle_ruri_alias()
 
 5.1.  fix_nated_contact()
 
@@ -478,7 +479,14 @@ fix_nated_register();
    This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
    FAILURE_ROUTE, BRANCH_ROUTE.
 
-5.7.  add_contact_alias()
+5.7.  is_rfc1918(ip_address)
+
+   Determines if the address in the parameter is an rfc1918 address. The
+   parameter allows pseudo-variables usage.
+
+   This function can be used from ANY_ROUTE.
+
+5.8.  add_contact_alias()
 
    Adds ;alias=ip:port parameter to contact URI containing received
    ip:port if contact uri ip:port does not match received ip:port.
@@ -497,7 +505,7 @@ fix_nated_register();
     };
 ...
 
-5.8.  handle_ruri_alias()
+5.9.  handle_ruri_alias()
 
    Checks if Request URI has alias param and if so, removes it and sets
    $du based on its value. Note that this means that routing of request is
@@ -603,20 +611,20 @@ Chapter 2. Frequently Asked Questions
        First at all check if your question was already answered on one of our
        mailing lists:
          * User Mailing List -
-           http://lists.kamailio.org/cgi-bin/mailman/listinfo/users
+           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-users
          * Developer Mailing List -
-           http://lists.kamailio.org/cgi-bin/mailman/listinfo/devel
+           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-dev
 
        E-mails regarding any stable Kamailio release should be sent to
-       <users@lists.kamailio.org> and e-mails regarding development versions
-       should be sent to <devel@lists.kamailio.org>.
+       <sr-users@lists.sip-router.org> and e-mails regarding development
+       versions should be sent to <sr-dev@lists.sip-router.org>.
 
        If you want to keep the mail private, send it to
-       <team@lists.kamailio.org>.
+       <sr-users@lists.sip-router.org>.
 
    2.4.
 
        How can I report a bug?
 
        Please follow the guidelines provided at:
-       http://sourceforge.net/tracker/?group_id=139143.
+       http://sip-router.org/tracker.

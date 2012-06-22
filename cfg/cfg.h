@@ -30,6 +30,7 @@
 #include "../str.h"
 
 /* variable type */
+#define CFG_VAR_UNSET		0U
 #define CFG_VAR_INT		1U
 #define CFG_VAR_STRING		2U
 #define CFG_VAR_STR		3U
@@ -86,6 +87,25 @@ int cfg_declare_int(char *group_name, char *var_name,
 
 /* declares a single variable with str type */
 int cfg_declare_str(char *group_name, char *var_name, char *val, char *descr);
+
+/* Add a varibale to a group instance with integer type.
+ * The group instance is created if it does not exist.
+ * wrapper function for new_add_var()
+ */
+int cfg_ginst_var_int(char *group_name, unsigned int group_id, char *var_name,
+			int val);
+
+/* Add a varibale to a group instance with string type.
+ * The group instance is created if it does not exist.
+ * wrapper function for new_add_var()
+ */
+int cfg_ginst_var_string(char *group_name, unsigned int group_id, char *var_name,
+			char *val);
+
+/* Create a new group instance.
+ * wrapper function for new_add_var()
+ */
+int cfg_new_ginst(char *group_name, unsigned int group_id);
 
 /* returns the handle of a cfg group */
 void **cfg_get_handle(char *gname);

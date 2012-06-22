@@ -65,8 +65,10 @@ static void dump_gws(rpc_t* rpc, void* c)
     unsigned int i, j;
     enum sip_protos transport;
     str gw_name, hostname, params;
-    str tag;
+    str prefix, tag;
     struct gw_info *gws;
+    char buf[INT2STR_MAX_LEN], *start;
+    int len;
 
     for (j = 1; j <= lcr_count_param; j++) {
 
@@ -122,16 +124,24 @@ static void dump_gws(rpc_t* rpc, void* c)
 	    case PROTO_SCTP:
 		rpc->struct_add(st, "s", "transport", "SCTP");
 		break;
+	    case PROTO_OTHER:
+		rpc->struct_add(st, "s", "transport", "OTHER");
+		break;
 	    case PROTO_NONE:
 		break;
 	    }
+	    prefix.s=gws[i].prefix;
+	    prefix.len=gws[i].prefix_len;
 	    tag.s=gws[i].tag;
 	    tag.len=gws[i].tag_len;
-	    rpc->struct_add(st, "dSdd",
+	    start = int2strbuf(gws[i].defunct_until, &(buf[0]), INT2STR_MAX_LEN,
+			       &len);
+	    rpc->struct_add(st, "dSSds",
 			    "strip",  gws[i].strip,
+			    "prefix", &prefix,
 			    "tag",    &tag,
 			    "flags",  gws[i].flags,
-			    "defunct_until",  &gws[i].defunct_until
+			    "defunct_until",  start
 			    );
 	}
     }
@@ -150,7 +160,7 @@ static void dump_rules(rpc_t* rpc, void* c)
     struct rule_info **rules, *rule;
     struct target *t;
     void* st;
-    str prefix, from_uri;
+    str prefix, from_uri, request_uri;
 
     for (j = 1; j <= lcr_count_param; j++) {
 	    
@@ -164,11 +174,14 @@ static void dump_rules(rpc_t* rpc, void* c)
 		prefix.len=rule->prefix_len;
 		from_uri.s=rule->from_uri;
 		from_uri.len=rule->from_uri_len;
-		rpc->struct_add(st, "ddSSd",
+		request_uri.s=rule->request_uri;
+		request_uri.len=rule->request_uri_len;
+		rpc->struct_add(st, "ddSSSd",
 				"lcr_id", j,
 				"rule_id", rule->rule_id,
 				"prefix", &prefix,
 				"from_uri", &from_uri,
+				"request_uri", &request_uri,
 				"stopper", rule->stopper
 				);
 		t = rule->targets;
@@ -193,9 +206,33 @@ static void dump_rules(rpc_t* rpc, void* c)
 }
 
 
+static const char* defunct_gw_doc[2] = {
+    "Defunct gateway until speficied time (Unix timestamp).",
+    0
+};
+
+
+static void defunct_gw(rpc_t* rpc, void* c)
+{
+    unsigned int lcr_id, gw_id, until;
+
+    if (rpc->scan(c, "ddd", &lcr_id, &gw_id, &until) < 3) {
+	rpc->fault(c, 400, "lcr_id, gw_id, and timestamp parameters required");
+	return;
+    }
+
+    if (rpc_defunct_gw(lcr_id, gw_id, until) == 0) {
+	rpc->fault(c, 400, "parameter value error (see syslog)");
+    }
+    
+    return;
+}
+
+
 rpc_export_t lcr_rpc[] = {
     {"lcr.reload", reload, reload_doc, 0},
     {"lcr.dump_gws", dump_gws, dump_gws_doc, 0},
     {"lcr.dump_rules", dump_rules, dump_rules_doc, 0},
+    {"lcr.defunct_gw", defunct_gw, defunct_gw_doc, 0},
     {0, 0, 0, 0}
 };

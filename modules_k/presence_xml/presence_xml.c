@@ -1,8 +1,4 @@
 /*
- * $Id: presence_xml.c 2006-12-07 18:05:05Z anca_vamanu$
- *
- * presence_xml module - Presence Handling XML bodies module
- *
  * Copyright (C) 2006 Voice Sistem S.R.L.
  *
  * This file is part of Kamailio, a free SIP server.
@@ -26,12 +22,14 @@
  *  2007-04-12  initial version (anca)
  */
 
-/*! \file
+/*!
+ * \file
  * \brief Kamailio Presence_XML :: Core
  * \ingroup presence_xml
  */
 
-/*! \defgroup presence_xml Presence_xml :: This module implements a range of XML-based SIP event packages for presence
+/*!
+ * \defgroup presence_xml Presence_xml :: This module implements a range of XML-based SIP event packages for presence
  */
 
 
@@ -54,12 +52,15 @@
 #include "../xcap_client/xcap_functions.h"
 #include "../../modules/sl/sl.h"
 #include "../../lib/kmi/mi.h"
+#include "../../mod_fix.h"
 #include "pidf.h"
 #include "add_events.h"
 #include "presence_xml.h"
+#include "pres_check.h"
+#include "api.h"
 
 MODULE_VERSION
-#define S_TABLE_VERSION 3
+#define S_TABLE_VERSION 4
 
 /** module functions */
 
@@ -73,6 +74,10 @@ static int xcap_doc_updated(int doc_type, str xid, char* doc);
 static int mi_child_init(void);
 static struct mi_root* dum(struct mi_root* cmd, void* param);
 
+static int fixup_presxml_check(void **param, int param_no);
+static int w_presxml_check_basic(struct sip_msg *msg, char *presentity_uri, char *status);
+static int w_presxml_check_activities(struct sip_msg *msg, char *presentity_uri, char *activities);
+
 /** module variables ***/
 add_event_t pres_add_event;
 update_watchers_t pres_update_watchers;
@@ -83,7 +88,6 @@ pres_get_sphere_t pres_get_sphere;
 str xcap_table= str_init("xcap");
 str db_url = str_init(DEFAULT_DB_URL);
 int force_active= 0;
-int pidf_manipulation= 0;
 int integrated_xcap_server= 0;
 xcap_serv_t* xs_list= NULL;
 int disable_presence = 0;
@@ -102,11 +106,20 @@ db_func_t pxml_dbf;
 
 xcapGetNewDoc_t xcap_GetNewDoc;
 
+static cmd_export_t cmds[]={
+	{ "pres_check_basic",		(cmd_function)w_presxml_check_basic, 2,
+		fixup_presxml_check, 0, ANY_ROUTE},
+	{ "pres_check_activities",	(cmd_function)w_presxml_check_activities, 2,
+		fixup_presxml_check, 0, ANY_ROUTE},
+	{ "bind_presence_xml",		(cmd_function)bind_presence_xml, 1,
+		0, 0, 0},
+	{ 0, 0, 0, 0, 0, 0}
+};
+
 static param_export_t params[]={
 	{ "db_url",		STR_PARAM, &db_url.s},
 	{ "xcap_table",		STR_PARAM, &xcap_table.s},
 	{ "force_active",	INT_PARAM, &force_active },
-	{ "pidf_manipulation",  INT_PARAM, &pidf_manipulation},
 	{ "integrated_xcap_server", INT_PARAM, &integrated_xcap_server},
 	{ "xcap_server",     	STR_PARAM|USE_FUNC_PARAM,(void*)pxml_add_xcap_server},
 	{ "disable_presence",	INT_PARAM, &disable_presence },
@@ -126,7 +139,7 @@ static mi_export_t mi_cmds[] = {
 struct module_exports exports= {
 	"presence_xml",		/* module name */
 	 DEFAULT_DLFLAGS,	/* dlopen flags */
-	 0,  			/* exported functions */
+	 cmds,  		/* exported functions */
 	 params,		/* exported parameters */
 	 0,				/* exported statistics */
 	 mi_cmds,		/* exported MI functions */
@@ -159,30 +172,7 @@ static int mod_init(void)
 	LM_DBG("db_url=%s/%d/%p\n",ZSW(db_url.s),db_url.len, db_url.s);
 	xcap_table.len = xcap_table.s ? strlen(xcap_table.s) : 0;
 	
-	/* binding to mysql module  */
-	if (db_bind_mod(&db_url, &pxml_dbf))
-	{
-		LM_ERR("Database module not found\n");
-		return -1;
-	}
-	
-	if (!DB_CAPABILITY(pxml_dbf, DB_CAP_ALL)) {
-		LM_ERR("Database module does not implement all functions"
-				" needed by the module\n");
-		return -1;
-	}
 
-	pxml_db = pxml_dbf.init(&db_url);
-	if (!pxml_db)
-	{
-		LM_ERR("while connecting to database\n");
-		return -1;
-	}
-
-	if(db_check_table_version(&pxml_dbf, pxml_db, &xcap_table, S_TABLE_VERSION) < 0) {
-		LM_ERR("error during table version check.\n");
-		return -1;
-	}
 	/* bind the SL API */
 	if (sl_load_api(&slb)!=0) {
 		LM_ERR("cannot bind to SL API\n");
@@ -204,6 +194,9 @@ static int mod_init(void)
 	pres_get_sphere= pres.get_sphere;
 	pres_add_event= pres.add_event;
 	pres_update_watchers= pres.update_watchers_status;
+	pres_contains_event= pres.contains_event;
+	pres_get_presentity= pres.get_presentity;
+	pres_free_presentity= pres.free_presentity;
 	if (pres_add_event == NULL || pres_update_watchers== NULL)
 	{
 		LM_ERR("Can't import add_event\n");
@@ -215,35 +208,62 @@ static int mod_init(void)
 		return -1;		
 	}
 	
-	if(force_active== 0 && !integrated_xcap_server )
+	if(force_active== 0)
 	{
-		xcap_api_t xcap_api;
-		bind_xcap_t bind_xcap;
+		/* binding to mysql module  */
+		if (db_bind_mod(&db_url, &pxml_dbf))
+		{
+			LM_ERR("Database module not found\n");
+			return -1;
+		}
+		
+		if (!DB_CAPABILITY(pxml_dbf, DB_CAP_ALL)) {
+			LM_ERR("Database module does not implement all functions"
+					" needed by the module\n");
+			return -1;
+		}
 
-		/* bind xcap */
-		bind_xcap= (bind_xcap_t)find_export("bind_xcap", 1, 0);
-		if (!bind_xcap)
+		pxml_db = pxml_dbf.init(&db_url);
+		if (!pxml_db)
 		{
-			LM_ERR("Can't bind xcap_client\n");
+			LM_ERR("while connecting to database\n");
 			return -1;
 		}
-	
-		if (bind_xcap(&xcap_api) < 0)
-		{
-			LM_ERR("Can't bind xcap_api\n");
+
+		if(db_check_table_version(&pxml_dbf, pxml_db, &xcap_table, S_TABLE_VERSION) < 0) {
+			LM_ERR("error during table version check.\n");
 			return -1;
 		}
-		xcap_GetNewDoc= xcap_api.getNewDoc;
-		if(xcap_GetNewDoc== NULL)
+		if(!integrated_xcap_server )
 		{
-			LM_ERR("can't import get_elem from xcap_client module\n");
-			return -1;
-		}
-	
-		if(xcap_api.register_xcb(PRES_RULES, xcap_doc_updated)< 0)
-		{
-			LM_ERR("registering xcap callback function\n");
-			return -1;
+			xcap_api_t xcap_api;
+			bind_xcap_t bind_xcap;
+
+			/* bind xcap */
+			bind_xcap= (bind_xcap_t)find_export("bind_xcap", 1, 0);
+			if (!bind_xcap)
+			{
+				LM_ERR("Can't bind xcap_client\n");
+				return -1;
+			}
+		
+			if (bind_xcap(&xcap_api) < 0)
+			{
+				LM_ERR("Can't bind xcap_api\n");
+				return -1;
+			}
+			xcap_GetNewDoc= xcap_api.getNewDoc;
+			if(xcap_GetNewDoc== NULL)
+			{
+				LM_ERR("can't import get_elem from xcap_client module\n");
+				return -1;
+			}
+		
+			if(xcap_api.register_xcb(PRES_RULES, xcap_doc_updated)< 0)
+			{
+				LM_ERR("registering xcap callback function\n");
+				return -1;
+			}
 		}
 	}
 
@@ -261,34 +281,31 @@ static int mod_init(void)
 }
 
 static int mi_child_init(void)
-{	
+{
 	if(passive_mode==1)
 		return 0;
-	
-	if (pxml_dbf.init==0)
+
+	if(force_active== 0)
 	{
-		LM_CRIT("database not bound\n");
-		return -1;
+		if(pxml_db)
+			return 0;
+		pxml_db = pxml_dbf.init(&db_url);
+		if (pxml_db== NULL)
+		{
+			LM_ERR("while connecting database\n");
+			return -1;
+		}
+		if (pxml_dbf.use_table(pxml_db, &xcap_table) < 0)
+		{
+			LM_ERR("in use_table SQL operation\n");
+			return -1;
+		}
 	}
-	if(pxml_db)
-		return 0;
-	pxml_db = pxml_dbf.init(&db_url);
-	if (pxml_db== NULL)
-	{
-		LM_ERR("while connecting database\n");
-		return -1;
-	}
-		
-	if (pxml_dbf.use_table(pxml_db, &xcap_table) < 0)
-	{
-		LM_ERR("in use_table SQL operation\n");
-		return -1;
-	}
-	
+
 	LM_DBG("Database connection opened successfully\n");
 
 	return 0;
-}	
+}
 
 static int child_init(int rank)
 {
@@ -296,36 +313,34 @@ static int child_init(int rank)
 	
 	if(passive_mode==1)
 		return 0;
-	
+
 	if (rank==PROC_INIT || rank==PROC_MAIN || rank==PROC_TCP_MAIN)
 		return 0; /* do nothing for the main process */
 
-	if (pxml_dbf.init==0)
+	if(force_active== 0)
 	{
-		LM_CRIT("database not bound\n");
-		return -1;
+		if(pxml_db)
+			return 0;
+		pxml_db = pxml_dbf.init(&db_url);
+		if (pxml_db== NULL)
+		{
+			LM_ERR("while connecting database\n");
+			return -1;
+		}
+		if (pxml_dbf.use_table(pxml_db, &xcap_table) < 0)
+		{
+			LM_ERR("in use_table SQL operation\n");
+			return -1;
+		}
 	}
-	if(pxml_db)
-		return 0;
-	pxml_db = pxml_dbf.init(&db_url);
-	if (pxml_db== NULL)
-	{
-		LM_ERR("child %d: ERROR while connecting database\n",rank);
-		return -1;
-	}
-	if (pxml_dbf.use_table(pxml_db, &xcap_table) < 0)
-	{
-		LM_ERR("child %d: ERROR in use_table\n", rank);
-		return -1;
-	}
-	
+
 	LM_DBG("child %d: Database connection opened successfully\n",rank);
 
 	return 0;
-}	
+}
 
 static void destroy(void)
-{	
+{
 	LM_DBG("start\n");
 	if(pxml_db && pxml_dbf.close)
 		pxml_dbf.close(pxml_db);
@@ -487,4 +502,66 @@ static int xcap_doc_updated(int doc_type, str xid, char* doc)
 static struct mi_root* dum(struct mi_root* cmd, void* param)
 {
 	return 0;
+}
+
+int bind_presence_xml(struct presence_xml_binds *pxb)
+{
+	if (pxb == NULL)
+	{
+		LM_WARN("bind_presence_xml: Cannot load presence_xml API into a NULL pointer\n");
+		return -1;
+	}
+
+	pxb->pres_check_basic = presxml_check_basic;
+	pxb->pres_check_activities = presxml_check_activities;
+	return 0;
+}
+
+static int fixup_presxml_check(void **param, int param_no)
+{
+        if(param_no==1)
+        {
+                return fixup_spve_null(param, 1);
+        } else if(param_no==2) {
+                return fixup_spve_null(param, 1);
+        }
+        return 0;
+}
+
+static int w_presxml_check_basic(struct sip_msg *msg, char *presentity_uri, char *status)
+{
+        str uri, basic;
+
+        if (fixup_get_svalue(msg, (gparam_p)presentity_uri, &uri) != 0)
+        {
+                LM_ERR("invalid presentity uri parameter\n");
+                return -1;
+        }
+
+        if (fixup_get_svalue(msg, (gparam_p)status, &basic) != 0)
+        {
+                LM_ERR("invalid status parameter\n");
+                return -1;
+        }
+
+	return presxml_check_basic(msg, uri, basic);
+}
+
+static int w_presxml_check_activities(struct sip_msg *msg, char *presentity_uri, char *activity)
+{
+        str uri, act;
+
+        if (fixup_get_svalue(msg, (gparam_p)presentity_uri, &uri) != 0)
+        {
+                LM_ERR("invalid presentity uri parameter\n");
+                return -1;
+        }
+
+        if (fixup_get_svalue(msg, (gparam_p)activity, &act) != 0)
+        {
+                LM_ERR("invalid activity parameter\n");
+                return -1;
+        }
+
+	return presxml_check_activities(msg, uri, act);
 }

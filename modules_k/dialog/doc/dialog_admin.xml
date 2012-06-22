@@ -16,22 +16,35 @@
 	<section>
 	<title>Overview</title>
 	<para>
-	The dialog module provides dialog awareness to the &kamailio; proxy. Its
-	functionality is to keep track of the current dialogs, to offer information
-	about them (like how many dialogs are active) or to manage them. The module
-	exports several functions that could be used directly from scripts.
+	Kamailio can behave as a stateful proxy through the TM module.  However, 
+	"stateful" in this context refers to <emphasis>transaction</emphasis> 
+	state, not dialog state.  Certain applications benefit from the proxy's
+	awareness of "calls", not just SIP transactions.
+	</para>
+	<para>For example, a common need is to limit the number of calls that can 
+	be made concurrently by an endpoint, account, user group, etc.  In order 
+	to count the number of calls in progress, it is necessary for the proxy 
+	to be aware of whole dialogs, not just transactions, and to provide some 
+	means of programmatically classifying these dialogs.  This is just one 
+	common application discussed for illustrative purposes; there are many others.  
 	</para>
 	<para>
-	The module, via an internal API, also provide the foundation to build on
-	top of it more complex dialog-based functionalities via other &kamailio;
-	modules.
+	The dialog module provides dialog awareness for the &kamailio; proxy. Its
+	functionality is to keep track of the current dialogs, to offer information
+	about them (e.g. how many dialogs are active), and to manage various 
+	characteristics of dialogs. The module exports several functions that could be 
+	used directly from the configuration route script.
+	</para>
+	<para>
+	This module also provides a foundational API on which to build 
+	more complex dialog-oriented functionality in other &kamailio; modules.
 	</para>
 	</section>
 
 	<section>
 	<title>How it works</title>
 	<para>
-	To create the dialog associated to an initial request, the flag
+	To create the dialog associated with an initial request, the flag
 	<quote>dlg_flag</quote> (<xref linkend="dlg-flag-id"/>) must be set before
 	creating the corresponding transaction.
 	</para>
@@ -41,7 +54,7 @@
 	controlled via the default timeout (see <quote>default_timeout</quote>
 	- <xref linkend="default-timeout-id"/>) and custom timeout (see
 	<quote>timeout_avp</quote> - <xref linkend="timeout-avp-id"/>). The
-	dialog timeout is reset each time a sequential request passes.
+	dialog timeout is reset each time a sequential request is processed.
 	</para>
 	</section>
 
@@ -49,11 +62,12 @@
 	<title>Dialog profiling</title>
 	<para>
 	Dialog profiling is a mechanism that helps in classifying, sorting and
-	keeping trace of certain types of dialogs, using whatever properties of
-	the dialog (like caller, destination, type of calls, etc).
-	Dialogs can be dynamically added in different (and several) profile
-	tables - logically, each profile table can have a special meaning (like
-	dialogs outside the domain, dialogs terminated to PSTN, etc).
+	keeping track of certain types of dialogs.  The classification criteria
+	can be any attributes desired by the user;  they can come from SIP message
+	attributes, other pseudo-variables, custom values, etc.  
+	Dialogs can be dynamically added into one or more profile
+	tables.  Logically, each profile table can have a special meaning (like
+	dialogs outside the domain, dialogs terminated to the PSTN, etc.).
 	</para>
 	<para>
 	There are two types of profiles:
@@ -61,23 +75,27 @@
 		<listitem>
 		<para>
 			<emphasis>with no value</emphasis> - a dialog simply belongs
-			to a profile. (like outbound calls profile). There is no other
-			additional information to describe the dialog's belonging to the
-			profile;
+			to a profile (for instance, an outbound calls profile). There is 
+			no other additional information to describe the dialog beyond 
+			its membership in the profile per se.
 		</para>
 		</listitem>
 		<listitem>
 		<para>
 			<emphasis>with value</emphasis> - a dialog belongs to a profile
-			having a certain value (like in caller profile, where the value
-			is the caller ID). The belonging of the dialog to the profile is
-			strictly related to the value.
+			having a certain value (like in a caller profile, where the value
+			is the caller ID). The membership of the dialog in the profile is
+			strictly related to the value.  For example, if the account ID
+			of the caller is stored in the pseudo-variable $var(account_id),
+			you can use $var(account_id) as a value/key by which to group 
+			dialogs so that you can count the number of open dialogs for
+			each account, enforce concurrent call limits as necessary, etc.
 		</para>
 		</listitem>
 	</itemizedlist>
 	</para>
 	<para>
-	A dialog can be added to multiple profiles in the same time.
+	A dialog can be added to multiple profiles at the same time.
 	</para>
 	<para>
 	Profiles are visible (at the moment) in the request route (for initial
@@ -126,11 +144,11 @@
 
 
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>enable_stats</varname> (integer)</title>
 		<para>
-		If the statistics support should be enabled or not. Via statistic
+		If statistics support should be enabled or not. Via statistics
 		variables, the module provide information about the dialog processing.
 		Set it to zero to disable or to non-zero to enable it.
 		</para>
@@ -154,12 +172,12 @@ modparam("dialog", "enable_stats", 0)
 		<para>
 		The size of the hash table internally used to keep the dialogs. A
 		larger table is much faster but consumes more memory. The hash size
-		must be a power of two number.
+		must be a power of two.
 		</para>
 		<para>
 		IMPORTANT: If dialogs' information should be stored in a database,
 		a constant hash_size should be used, otherwise the restoring process
-		will not take place. If you really want to modify the hash_size you
+		will not take place. If you really want to modify the hash_size, you
 		must delete all table's rows before restarting the server.
 		</para>
 		<para>
@@ -180,8 +198,9 @@ modparam("dialog", "hash_size", 1024)
 	<section>
 		<title><varname>rr_param</varname> (string)</title>
 		<para>
-		Name of the Record-Route parameter to be added with the dialog cookie.
-		It is used for the fast dialog matching of sequential requests.
+		Name of the Record-Route parameter used to store the dialog cookie.
+		It is used for the fast matching of sequential requests to tracked
+		dialogs.
 		</para>
 		<para>
 		<emphasis>
@@ -222,9 +241,9 @@ modparam("dialog", "dlg_flag", 4)
 	<section id="timeout-avp-id">
 		<title><varname>timeout_avp</varname> (string)</title>
 		<para>
-		The specification of an AVP that contain a custom timeout (in seconds)
+		The specification of an AVP that contains a custom timeout value (in seconds)
 		for the dialog. It may be used only in a request (initial or sequential)
-		context
+		context.
 		</para>
 		<para>
 		<emphasis>
@@ -244,7 +263,8 @@ modparam("dialog", "timeout_avp", "$avp(i:10)")
 	<section id="default-timeout-id">
 		<title><varname>default_timeout</varname> (integer)</title>
 		<para>
-		The default dialog timeout (in seconds) if no custom one is set.
+		The default dialog timeout (in seconds), in the absence of a custom
+		value provided in an AVP.
 		</para>
 		<para>
 		<emphasis>
@@ -265,7 +285,7 @@ modparam("dialog", "default_timeout", 21600)
 		<title><varname>dlg_extra_hdrs</varname> (string)</title>
 		<para>
 		A string containing the extra headers (full format, with EOH)
-		to be added in the requests generated by the module (like BYEs).
+		to be added to requests generated locally by the module (like BYEs).
 		</para>
 		<para>
 		<emphasis>
@@ -286,9 +306,9 @@ modparam("dialog", "dlg_extra_hdrs", "Hint: credit expired\r\n")
 		<title><varname>dlg_match_mode</varname> (integer)</title>
 		<para>
 		How the sequential requests should be matched against the known dialogs.
-		The modes are a combination between matching based on a cookie (DID)
-		stored as cookie in Record-Route header and the matching based on SIP
-		elements (as in RFC3261).
+		The modes are a combination of matching based on a cookie (DID)
+		stored as cookie in Record-Route header and matching based on SIP
+		elements (as in RFC 3261).
 		</para>
 		<para>
 		The supported modes are:
@@ -300,7 +320,7 @@ modparam("dialog", "dlg_extra_hdrs", "Hint: credit expired\r\n")
 			</para></listitem>
 			<listitem><para>
 				<emphasis>1 - DID_FALLBACK</emphasis> - the match is first
-				tried based on DID and if not present, it will fallback to
+				tried based on DID and if not present, it will fall back to
 				SIP matching;
 			</para></listitem>
 			<listitem><para>
@@ -328,7 +348,7 @@ modparam("dialog", "dlg_match_mode", 1)
 		<title><varname>detect_spirals</varname> (integer)</title>
 		<para>
 			Whether spirals (i.e., messages routed through the proxy multiple times)
-			should be detected or not.
+			should be detected.
 		</para>
 		<para>
 			If set to 0, spirals will not be detected and result in the generation of a
@@ -351,8 +371,8 @@ modparam("dialog", "detect_spirals", 1)
 	<section>
 		<title><varname>db_url</varname> (string)</title>
 		<para>
-		If you want to store the information about the dialogs in a database
-		a database url must be specified.
+		If you want to store the information about the dialogs in a database,
+		a database URL must be specified.
 		</para>
 		<para>
 		<emphasis>
@@ -372,7 +392,8 @@ modparam("dialog", "db_url", "&exampledb;")
 <section>
 		<title><varname>db_mode</varname> (integer)</title>
 		<para>
-		Describe how to push into the DB the dialogs' information from memory.
+		Mode of synchronisation of dialog information from memory to an
+		underlying database (if desired):
 		</para>
 		<para>
 		The supported modes are:
@@ -414,8 +435,8 @@ modparam("dialog", "db_mode", 1)
 <section>
 		<title><varname>db_update_period</varname> (integer)</title>
 		<para>
-			The interval (seconds) at which to update dialogs' information if you chose to store the dialogs' info at a given interval.
-			A too short interval will generate intensive database operations, a too large one will not notice short dialogs.
+			The interval (seconds) at which to update dialogs' information, if you chose to store the dialogs' info at a given interval.
+			Too short an interval will generate intensive database operations, while an excessively long one will miss dialogs with a short lifetime.
 		</para>
 		<para>
 		<emphasis>
@@ -436,8 +457,8 @@ modparam("dialog", "db_update_period", 120)
 		<title><varname>db_fetch_rows</varname> (integer)</title>
 		<para>
 			The number of the rows to be fetched at once from database when loading the dialog records at startup from the database.
-			This value can be used to tune the load time at startup. For 1MB of private memory (default) it should be below 400.
-			The database driver must support fetch_result() capability. A value of 0 means the functionality is disabled.
+			This value can be used to tune the load time at startup. For 1MB of private memory (default), it should be below 400.
+			The database driver must support the fetch_result() capability. A value of 0 means the functionality is disabled.
 		</para>
 		<para>
 		<emphasis>
@@ -892,6 +913,109 @@ modparam("dialog", "toroute_column", "timeout_route")
 	</section>
 
 	<section>
+		<title><varname>vars_table_name</varname> (string)</title>
+		<para>
+		If you want to store the variables for a dialog in a
+		database a table name must be specified.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>dialog_vars</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>vars_table_name</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "vars_table_name", "my_dialog_vars")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>vars_h_id_column</varname> (string)</title>
+		<para>
+			The column name in the database to store the dialogs'
+			hash id information (as a reference to the dialog table).
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>hash_id</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>vars_h_id_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "vars_h_id_column", "vars_h_id_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>vars_h_entry_column</varname> (string)</title>
+		<para>
+			The column name in the database to store the dialogs'
+			hash entry information (as a reference to the dialog table).
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>hash_entry</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>vars_h_entry_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "vars_h_entry_column", "vars_h_entry_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>vars_key_column</varname> (string)</title>
+		<para>
+			The column name in the database to store the keys of a variable.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>dialog_key</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>vars_key_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "vars_key_column", "vars_key_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>vars_value_column</varname> (string)</title>
+		<para>
+			The column name in the database to store the keys of a variable.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>dialog_value</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>vars_value_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "vars_value_column", "vars_value_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
 		<title><varname>profiles_with_value</varname> (string)</title>
 		<para>
 			List of names for profiles with values.
@@ -951,19 +1075,150 @@ modparam("dialog", "bridge_controller", "sip:ctd@kamailio.org")
 		</example>
 	</section>
 
+	<section>
+		<title><varname>initial_cbs_inscript</varname> (int)</title>
+		<para>
+            If the initial dialog callbacks (i.e., DLGCB_CREATED and
+            DLGCB_SPIRALED) should be executed in-script or post-script.
+            If dlg_manage() is not used, the setting of this parameter does
+            not matter; otherwise, initial callbacks will be executed
+            directly after dlg_manage() is called if this parameter is
+            enabled. If it is disabled, initial callback execution will be
+            postponed until configuration script execution completes.
+		</para>
+		<para>
+		The supported values are:
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>0 - POST-SCRIPT</emphasis> - execute initial
+				callbacks after the script completes;
+			</para></listitem>
+			<listitem><para>
+				<emphasis>1 - IN-SCRIPT</emphasis> - execute initial
+                callbacks during script execution, i.e., right after
+                dlg_manage() is called;
+			</para></listitem>
+		</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is <quote>1</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>initial_cbs_inscript</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "initial_cbs_inscript", 0)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>send_bye</varname> (int)</title>
+		<para>
+			If set to 1, BYE requests will be sent out for each dialog that
+			timed out. It is an alternative to $dlg_ctx(timeout_bye)=1 for
+			all dialogs.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>send_bye</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "send_bye", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>wait_ack</varname> (int)</title>
+		<para>
+			If set to 1, dialog will be keept a bit longer in memory
+			in order to absorb the ACK negative replies of initial
+			INVITE. If not, the dialog is destroyed when negative reply
+			is sent out (less internal complexity).
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>1</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>wait_ack</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "wait_ack", 0)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>ka_timer</varname> (int)</title>
+		<para>
+			Keep-alive timer step - how often to execute the callback to
+			send dialog keep alives (SIP OPTIONS requests within dialog).
+			The value represents the number of seconds.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote> (no keep alive).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>ka_timer</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "ka_timer", 10)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>ka_interval</varname> (int)</title>
+		<para>
+			The interval between keep alives within dialog (SIP OPTIONS
+			requests), sent to caller or callee. The keep alive request
+			will be sent by the first callback fired by KA timer after
+			the ka_interval elapsed from dialog setup or previous keep-alive.
+			The value represents the number of seconds.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote> (no keep alive).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>ka_interval</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "ka_interval", 300)
+...
+</programlisting>
+		</example>
+	</section>
+
 	</section>
 
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">set_dlg_profile(profile,[value])</function>
 		</title>
 		<para>
 		Inserts the current dialog into a profile. Note that if the profile does
-		not supports values, this will be silently discarded. Also, there is
-		no check for inserting the same dialog in the same profile for multiple
+		not support values, they will be silently discarded. Also, there is
+		no check for inserting the same dialog into the same profile multiple
 		times.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
@@ -975,9 +1230,8 @@ modparam("dialog", "bridge_controller", "sip:ctd@kamailio.org")
 		</listitem>
 		<listitem>
 			<para><emphasis>value</emphasis> (optional) - string value to
-			define the belonging of the dialog to the profile - note that the
-			profile must support values.
-			Pseudo-variables are supported.
+			define the membership of the dialog in the profile.  Note that the
+			profile must support values.  Pseudo-variables are supported.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -1041,10 +1295,10 @@ unset_dlg_profile("caller","$fu");
 		<para>
 		Checks if the current dialog belongs to a profile. If the profile
 		supports values, the check can be reinforced to take into account a
-		specific value - if the dialog was inserted into the profile for a
-		specific value. If no value is passed, only the simply belonging of
-		the  dialog to the profile is checked. Note that if the profile does
-		not supports values, this will be silently discarded.
+		specific value, if the dialog was inserted into the profile for a
+		specific value. If no value is passed, only the membership of
+		the dialog in the profile per se is checked. Note that if the profile does
+		not support values, the value parameter will be silently discarded.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -1086,10 +1340,10 @@ if (is_in_profile("caller","XX")) {
 		<para>
 		Returns the number of dialogs belonging to a profile. If the profile
 		supports values, the check can be reinforced to take into account a
-		specific value - how many dialogs were inserted into the profile with
-		a specific value. If no value is passed, only simply belonging of the
-		dialog to the profile is checked. Note that if the profile does not
-		supports values, this will be silently discarded.
+		specific value, i.e. how many dialogs were inserted into the profile with
+		a specific value. If no value is passed, only the membersip of the
+		dialog in the profile per se is checked. Note that if the profile does not
+		support values, the value parameter will be silently discarded.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -1222,13 +1476,13 @@ redlg_setflag("1");
 		<function moreinfo="none">dlg_bye(side)</function>
 		</title>
 		<para>
-		Send BYE to parties in dialog.
+		Send BYE to both parties of a dialog.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
 		<listitem>
 			<para><emphasis>side</emphasis> - where to send the BYE. It can be:
-				caller, callee or both of them.
+				'caller', 'callee', or both.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -1256,8 +1510,8 @@ dlg_bye("all");
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
 		<listitem>
-			<para><emphasis>side</emphasis> - which part to REFER. It can be:
-				caller or callee.
+			<para><emphasis>side</emphasis> - which side of the dialog to REFER. It can be:
+				'caller' or 'callee'.
 			</para>
 		</listitem>
 		<listitem>
@@ -1273,7 +1527,7 @@ dlg_bye("all");
 		<title><function>dlg_refer</function> usage</title>
 		<programlisting format="linespecific">
 ...
-dlg_refer("caller", "sip:annoucement@kamailio.org");
+dlg_refer("caller", "sip:announcement@kamailio.org");
 ...
 </programlisting>
 		</example>
@@ -1284,7 +1538,7 @@ dlg_refer("caller", "sip:annoucement@kamailio.org");
 		<function moreinfo="none">dlg_manage()</function>
 		</title>
 		<para>
-		Process current SIP request with dialog module. It is alternative to
+		Process current SIP request with dialog module. It is an alternative to
 		setting dialog flag for initial INVITE and Route-parameter-callback
 		execution for within-dialog requests.
 		</para>
@@ -1425,11 +1679,94 @@ if(!uri == myself) {
 		</example>
 	</section>
 
+	<section>
+		<title>
+		<function moreinfo="none">dlg_set_timeout(timeout [, h_entry, h_id])</function>
+		</title>
+		<para>
+			Set the dialog timeout. Dialog timeout will be updated if it was
+			already set. If h_entry and h_id parameters are not provided, the
+			dialog will be searched based on (callid, fromtag, totag) of
+			currently processed SIP message.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>timeout</emphasis> - the interval in seconds after
+				which the dialog will time out.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>h_entry</emphasis> - h_entry value of the iternal
+				dialog identifier.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>h_id</emphasis> - h_id valye if the internal dialog
+				identifier.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_set_timeout</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(dlg_set_timeout("180", "123", "456"))
+{
+    ...
+}
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title>
+		<function moreinfo="none">dlg_set_property(attr)</function>
+		</title>
+		<para>
+			Set a dialog property - an attribute that enable/disable
+			various behaviours (e.g., sending keep alive requests).
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>attr</emphasis> - name of property. It can be:
+				'ka-src' - send keep alive OPTION requests to caller;
+				'ka-dst' - send keep alive OPTION requests to callee.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+			If keep alive is enabled for a dialog, the module will send
+			SIP OPTIONS requests with CSeq lower or equal than last request
+			within dialog, with the scope of detecting if the destination is
+			still in the call. If the keep alive request results in a local
+			timeout or '481 Call Leg/Transaction Does Not Exist', then the
+			dialog is ended from the server.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_set_property</function> usage</title>
+		<programlisting format="linespecific">
+...
+dlg_set_property("ka-src");
+dlg_set_property("ka-dst");
+...
+</programlisting>
+		</example>
+	</section>
+
 	</section>
 
 
 	<section>
-	<title>Exported statistics</title>
+	<title>Statistics</title>
 		<section>
 			<title><varname>active_dialogs</varname></title>
 			<para>
@@ -1465,7 +1802,7 @@ if(!uri == myself) {
 
 
 	<section>
-	<title>Exported MI Functions</title>
+	<title>MI Commands</title>
 
 		<section>
 		<title><varname>dlg_list</varname></title>
@@ -1811,7 +2148,7 @@ if(!uri == myself) {
 		specific value - how many dialogs were inserted into the profile with
 		a specific value. If no value is passed, only the simply belonging of
 		the dialog to the profile is checked. Note that if the profile does not
-		supports values, this will be silently discarded.
+		support values, the value parameter will be silently discarded.
 		</para>
 		<para>Name: <emphasis>dlg.profile_get_size</emphasis></para>
 		<para>Parameters:</para>
@@ -1836,7 +2173,7 @@ if(!uri == myself) {
 		<para>
 		Lists all the dialogs belonging to a profile. If the profile
 		supports values, the check can be reinforced to take into account a
-		specific value - list only the dialogs that were inserted into the
+		specific value, i.e. list only the dialogs that were inserted into the
 		profile with that specific value. If no value is passed, all dialogs
 		belonging to the profile will be listed. Note that if the profile does
 		not supports values, this will be silently discarded.
@@ -1862,7 +2199,7 @@ if(!uri == myself) {
 		<section>
 		<title><varname>dlg.bridge_dlg</varname></title>
 		<para>
-			Bridge two SIP addresses in a call using INVITE(hold)-REFER-BYE
+			Bridge two SIP addresses into a call using INVITE(hold)-REFER-BYE
 			mechanism.
 		</para>
 		<para>Name: <emphasis>dlg.bridge_dlg</emphasis></para>
@@ -1947,8 +2284,43 @@ if(!uri == myself) {
 			<para>Access to dialog context attributes.</para>
 		</section>
 
+		<section>
+			<title><varname>$dlg_var(key)</varname></title>
+			<para>
+			This is a read/write variable that can be used to store 
+			custom values assigned with a dialog (e.g. the URI of a
+			billing-server, an assigned emergency-server).
+			This pseudo-variable will be available only for subsequential
+			requests after doing loose_route().
+			</para>
+			<para>
+			Note: You will receive "NULL", if there is no dialog for this
+			request.
+			</para>
+		</section>
+
 	</section>
 
-
+	<section>
+	<title>Event Routes</title>
+		<section>
+			<title><varname>event_route[dialog:start]</varname></title>
+			<para>
+			Executed when 200OK for INVITE is processed.
+			</para>
+		</section>
+		<section>
+			<title><varname>event_route[dialog:end]</varname></title>
+			<para>
+			Executed when BYE is processed or dialog timed out.
+			</para>
+		</section>
+		<section>
+			<title><varname>event_route[dialog:failure]</varname></title>
+			<para>
+			Executed when dialog is not completed (+300 reply to INVITE).
+			</para>
+		</section>
+	</section>
 
 </chapter>

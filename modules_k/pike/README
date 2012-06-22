@@ -2,15 +2,13 @@ pike Module
 
 Bogdan-Andrei Iancu
 
-   voice-system.ro
+   Voice Sistem SRL
 
 Edited by
 
 Bogdan-Andrei Iancu
 
    Copyright © 2003 FhG FOKUS
-   Revision History
-   Revision $Revision$ $Date$
      __________________________________________________________________
 
    Table of Contents
@@ -23,18 +21,18 @@ Bogdan-Andrei Iancu
               2.1. Kamailio Modules
               2.2. External Libraries or Applications
 
-        3. Exported Parameters
+        3. Parameters
 
               3.1. sampling_time_unit (integer)
               3.2. reqs_density_per_unit (integer)
               3.3. remove_latency (integer)
               3.4. pike_log_level (integer)
 
-        4. Exported Functions
+        4. Functions
 
               4.1. pike_check_req()
 
-        5. Exported MI Functions
+        5. MI Commands
 
               5.1. pike_list
 
@@ -59,18 +57,18 @@ Chapter 1. Admin Guide
         2.1. Kamailio Modules
         2.2. External Libraries or Applications
 
-   3. Exported Parameters
+   3. Parameters
 
         3.1. sampling_time_unit (integer)
         3.2. reqs_density_per_unit (integer)
         3.3. remove_latency (integer)
         3.4. pike_log_level (integer)
 
-   4. Exported Functions
+   4. Functions
 
         4.1. pike_check_req()
 
-   5. Exported MI Functions
+   5. MI Commands
 
         5.1. pike_list
 
@@ -100,7 +98,7 @@ Chapter 1. Admin Guide
    running Kamailio with this module loaded:
      * None.
 
-3. Exported Parameters
+3. Parameters
 
    3.1. sampling_time_unit (integer)
    3.2. reqs_density_per_unit (integer)
@@ -109,8 +107,8 @@ Chapter 1. Admin Guide
 
 3.1. sampling_time_unit (integer)
 
-   Time period used for sampling (or the sampling accuracy ;-) ). The
-   smaller the better, but slower. If you want to detect peeks, use a
+   Time period in seconds used for sampling (or the sampling accuracy).
+   The smaller the better, but slower. If you want to detect peeks, use a
    small one. To limit the access (like total number of requests on a long
    period of time) to a proxy resource (a gateway for ex), use a bigger
    value of this parameter.
@@ -142,12 +140,12 @@ modparam("pike", "reqs_density_per_unit", 30)
 3.3. remove_latency (integer)
 
    For how long the IP address will be kept in memory after the last
-   request from that IP address. It's a sort of timeout value. Note that
-   it is not the duration to keep the IP in state 'blocked'. An IP is
-   unblocked next occurence of 'sampling_time_unit' that does not exceed
-   'reqs_density_per_unit'. Keeping an IP in memory results in faster
-   reaching of blocked state -- see the notes about the limits of getting
-   to state 'blocked'.
+   request from that IP address. It's a sort of timeout value, in seconds.
+   Note that it is not the duration to keep the IP in state 'blocked'. An
+   IP is unblocked next occurence of 'sampling_time_unit' that does not
+   exceed 'reqs_density_per_unit'. Keeping an IP in memory results in
+   faster reaching of blocked state -- see the notes about the limits of
+   getting to state 'blocked'.
 
    Default value is 120.
 
@@ -168,7 +166,7 @@ modparam("pike", "remove_latency", 130)
 modparam("pike", "pike_log_level", -1)
 ...
 
-4. Exported Functions
+4. Functions
 
    4.1. pike_check_req()
 
@@ -194,7 +192,7 @@ Warning
 if (!pike_check_req()) { exit; };
 ...
 
-5. Exported MI Functions
+5. MI Commands
 
    5.1. pike_list
 

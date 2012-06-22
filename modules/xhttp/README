@@ -28,14 +28,15 @@ Alex Balashov
         3. Dependencies
 
               3.1. Kamailio Modules
-              3.2. External Libraries or Applications
+              3.2. Kamailio Core Settings
+              3.3. External Libraries or Applications
 
-        4. Exported Parameters
+        4. Parameters
 
               4.1. url_skip (str)
               4.2. url_match (str)
 
-        5. Exported Functions
+        5. Functions
 
               5.1. xhttp_reply(code, reason, ctype, body)
 
@@ -54,14 +55,15 @@ Chapter 1. Admin Guide
    3. Dependencies
 
         3.1. Kamailio Modules
-        3.2. External Libraries or Applications
+        3.2. Kamailio Core Settings
+        3.3. External Libraries or Applications
 
-   4. Exported Parameters
+   4. Parameters
 
         4.1. url_skip (str)
         4.2. url_match (str)
 
-   5. Exported Functions
+   5. Functions
 
         5.1. xhttp_reply(code, reason, ctype, body)
 
@@ -109,20 +111,29 @@ Chapter 1. Admin Guide
 3. Dependencies
 
    3.1. Kamailio Modules
-   3.2. External Libraries or Applications
+   3.2. Kamailio Core Settings
+   3.3. External Libraries or Applications
 
 3.1. Kamailio Modules
 
    The following modules must be loaded before this module:
      * sl - stateless reply.
 
-3.2. External Libraries or Applications
+3.2. Kamailio Core Settings
+
+   SIP requires a Content-Length header for TCP transport. But most HTTP
+   clients do not set the content length for normal GET requests.
+   Therefore, the core must be configured to allow incoming requests
+   without content length header:
+     * tcp_accept_no_cl=yes
+
+3.3. External Libraries or Applications
 
    The following libraries or applications must be installed before
    running Kamailio with this module loaded:
      * None
 
-4. Exported Parameters
+4. Parameters
 
    4.1. url_skip (str)
    4.2. url_match (str)
@@ -153,7 +164,7 @@ modparam("xhttp", "url_skip", "^/RPC2")
 modparam("xhttp", "url_match", "^/sip/")
 ...
 
-5. Exported Functions
+5. Functions
 
    5.1. xhttp_reply(code, reason, ctype, body)
 

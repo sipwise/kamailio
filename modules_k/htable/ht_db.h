@@ -30,13 +30,17 @@ extern str ht_db_name_column;
 extern str ht_db_ktype_column;
 extern str ht_db_vtype_column;
 extern str ht_db_value_column;
+extern str ht_db_expires_column;
 extern str ht_array_size_suffix;
 extern int ht_fetch_rows;
+extern int ht_db_expires_flag;
 
 int ht_db_init_params(void);
 int ht_db_init_con(void);
 int ht_db_open_con(void);
 int ht_db_close_con(void);
 int ht_db_load_table(ht_t *ht, str *dbtable, int mode);
+int ht_db_save_table(ht_t *ht, str *dbtable);
+int ht_db_delete_records(str *dbtable);
 
 #endif

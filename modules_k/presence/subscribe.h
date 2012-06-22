@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * presence module - presence server implementation
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -23,12 +21,11 @@
  *
  * History:
  * --------
- *  2006-08-15  initial version (anca)
+ *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*! \file
  * \brief Kamailio presence module :: SUBSCRIBE support
- * \ref subscribe.c
  * \ingroup presence 
  */
 
@@ -49,6 +46,14 @@ struct pres_ev;
 #define PENDING_STATUS       2
 #define TERMINATED_STATUS    3
 #define WAITING_STATUS       4
+/* Additional value returned from pres_auth_status when the status is ACTIVE
+   and reason is polite-block */
+#define POLITE_BLOCK_STATUS  5
+
+#define PRES_SUBSCRIBE_RECV		1
+
+#define INTERNAL_UPDATE_FALSE	0
+#define INTERNAL_UPDATE_TRUE	1
 
 struct subscription
 {
@@ -57,6 +62,8 @@ struct subscription
 	str to_domain;
 	str from_user;
 	str from_domain;
+	str watcher_user;
+	str watcher_domain;
 	struct pres_ev* event;
 	str event_id;
 	str to_tag;
@@ -75,6 +82,10 @@ struct subscription
 	int send_on_cback;
 	int db_flag;
 	str* auth_rules_doc;
+	int recv_event;
+	int internal_update_flag;
+	int updated;
+	int updated_winfo;
 	struct subscription* next;
 
 };
@@ -84,32 +95,29 @@ void msg_active_watchers_clean(unsigned int ticks,void *param);
 
 void msg_watchers_clean(unsigned int ticks,void *param);
 
-int handle_subscribe(struct sip_msg*, char*, char*);
-
-int delete_db_subs(str pres_uri, str ev_stored_name, str to_tag);
+int handle_subscribe0(struct sip_msg*);
+int w_handle_subscribe(struct sip_msg*, char *watcher_uri);
+int handle_subscribe(struct sip_msg*, str watcher_user, str watcher_domain);
 
 void timer_db_update(unsigned int ticks,void *param);
 
 int update_subs_db(subs_t* subs, int type);
 
-int refresh_watcher(str* pres_uri, str* watcher_uri, str* event, 
-	int status, str* reason);
-
-typedef int (*refresh_watcher_t)(str*, str* , str* ,int , str* );
-
 int restore_db_subs(void);
 
 typedef int (*handle_expired_func_t)(subs_t* );
 
-void update_db_subs(db1_con_t *db,db_func_t dbf, shtable_t hash_table,
+void update_db_subs_timer(db1_con_t *db,db_func_t dbf, shtable_t hash_table,
 	int htable_size, int no_lock, handle_expired_func_t handle_expired_func);
 
 typedef void (*update_db_subs_t)(db1_con_t * ,db_func_t ,shtable_t ,int ,int ,
 		handle_expired_func_t);
 
 int extract_sdialog_info(subs_t* subs,struct sip_msg* msg, int max_expire,
-		int* to_tag_gen, str scontact);
+		int* to_tag_gen, str scontact, str watcher_user, str watcher_domain);
 typedef int (*extract_sdialog_info_t)(subs_t* subs, struct sip_msg* msg,
-		int max_expire, int* to_tag_gen, str scontact);
+		int max_expire, int* to_tag_gen, str scontact, str watcher_user,
+		str watcher_domain);
+void delete_subs(str* pres_uri, str* ev_name, str* to_tag, str* from_tag, str* callid);
 
 #endif

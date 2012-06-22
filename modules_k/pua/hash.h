@@ -33,6 +33,7 @@
 #include "../../lock_ops.h"
 #include "../../dprint.h"
 #include "../../parser/msg_parser.h"
+#include "../rls/list.h"
 
 #define PRESENCE_EVENT      1<<0
 #define PWINFO_EVENT        1<<1
@@ -40,6 +41,7 @@
 #define MSGSUM_EVENT        1<<3
 #define CONFERENCE_EVENT    1<<4
 #define DIALOG_EVENT        1<<5
+#define REGINFO_EVENT       1<<6
 
 #define UL_PUBLISH          1<<0
 #define BLA_PUBLISH         1<<1
@@ -53,10 +55,13 @@
 #define RLS_SUBSCRIBE       1<<9
 #define DIALOG_PUBLISH      1<<10
 #define PURPLE_PUBLISH      1<<11
+#define REGINFO_PUBLISH     1<<12
+#define REGINFO_SUBSCRIBE   1<<13
 
 #define NO_UPDATEDB_FLAG    1<<0
 #define UPDATEDB_FLAG       1<<1
 #define INSERTDB_FLAG       1<<2
+#define WTHROUGHDB_FLAG     1<<3
 
 #define MAX_FORWARD  70
 
@@ -77,8 +82,8 @@ typedef struct ua_pres{
 	/* publish */
 	str etag;
 	str tuple_id;
-	str* body;
-	str content_type;
+	str* body;        /* croc-not stored in db_only mode */
+	str content_type; /* croc-not stored in db_only mode */
 
 	/* subscribe */
 	str* watcher_uri;
@@ -87,8 +92,8 @@ typedef struct ua_pres{
     str from_tag;
 	int cseq;
 	int version;
-    int watcher_count;
-	str* outbound_proxy;
+/*  int watcher_count; croc-nolonger used!! */
+	str* outbound_proxy; /* croc-not sored in db_only mode */
 	str* extra_headers;
 	str record_route;
 	str remote_contact;
@@ -122,9 +127,14 @@ void destroy_htable(void);
 int is_dialog(ua_pres_t* dialog);
 
 ua_pres_t* get_dialog(ua_pres_t* dialog, unsigned int hash_code);
+ua_pres_t* get_temporary_dialog(ua_pres_t* dialog, unsigned int hash_code);
+int convert_temporary_dialog(ua_pres_t *dialog);
 
 int get_record_id(ua_pres_t* dialog, str** rec_id);
 typedef int (*get_record_id_t)(ua_pres_t* dialog, str** rec_id);
+
+list_entry_t *get_subs_list(str *did);
+typedef list_entry_t * (*get_subs_list_t)(str *did);
 
 /* for degug */
 void print_ua_pres(ua_pres_t* p);
@@ -135,6 +145,10 @@ static inline int get_event_flag(str* event)
 {
     switch (event->len) 
     {
+        case 3:
+            if (strncmp(event->s, "reg", 3) == 0)
+                return REGINFO_EVENT;
+            break;
         case 6:
             if (strncmp(event->s, "dialog", 6) == 0)
                 return DIALOG_EVENT;

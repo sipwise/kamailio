@@ -2,6 +2,7 @@
  * $Id$
  *
  * Copyright (C) 2007 Voice System SRL
+ * Copyright (C) 2011 Carsten Bock, carsten@ng-voice.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -49,12 +50,25 @@
 #define FROM_CONTACT_COL		"caller_contact"
 #define FROM_SOCK_COL			"caller_sock"
 #define TO_SOCK_COL				"callee_sock"
+#define IFLAGS_COL				"iflags"
 #define SFLAGS_COL				"sflags"
 #define TOROUTE_NAME_COL		"toroute_name"
 #define REQ_URI_COL				"req_uri"
+#define XDATA_COL				"xdata"
 #define DIALOG_TABLE_NAME		"dialog"
+#define DLG_TABLE_VERSION		7
 
-#define DLG_TABLE_VERSION		5
+#define DIALOG_TABLE_COL_NO 		23
+
+#define VARS_HASH_ID_COL 		"hash_id"
+#define VARS_HASH_ENTRY_COL		"hash_entry"
+#define VARS_KEY_COL			"dialog_key"
+#define VARS_VALUE_COL			"dialog_value"
+#define DIALOG_VARS_TABLE_NAME		"dialog_vars"
+#define DLG_VARS_TABLE_VERSION		1
+
+#define DIALOG_VARS_TABLE_COL_NO 4
+
 
 /*every minute the dialogs' information will be refreshed*/
 #define DB_DEFAULT_UPDATE_PERIOD	60
@@ -63,9 +77,8 @@
 #define DB_MODE_DELAYED				2
 #define DB_MODE_SHUTDOWN			3
 
-#define DIALOG_TABLE_COL_NO 		21
 
-
+/* Dialog table */
 extern str call_id_column; 
 extern str from_uri_column;
 extern str from_tag_column;
@@ -84,10 +97,19 @@ extern str to_contact_column;
 extern str from_contact_column;
 extern str to_sock_column;
 extern str from_sock_column;
+extern str iflags_column;
 extern str sflags_column;
 extern str toroute_name_column;
 extern str dialog_table_name;
 extern int dlg_db_mode;
+
+/* Dialog-Vars Table */
+extern str vars_h_id_column;
+extern str vars_h_entry_column;
+extern str vars_key_column;
+extern str vars_value_column;
+extern str dialog_vars_table_name;
+
 
 int init_dlg_db(const str *db_url, int dlg_hash_size, int db_update_period, int fetch_num_rows);
 int dlg_connect_db(const str *db_url);

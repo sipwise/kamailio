@@ -40,6 +40,10 @@
 #include "../../lib/srdb1/db_con.h"
 #include "../../lib/srdb1/db.h"
 
+#define RLS_DB_DEFAULT 0
+#define RLS_DB_RESERVED 1
+#define RLS_DB_ONLY 2
+
 #define NO_UPDATE_TYPE     -1 
 #define UPDATED_TYPE        1 
 
@@ -79,27 +83,39 @@ typedef struct rls_resource
 	/* the last 2 parameters say if a query in database is needed */
 }rls_res_t;
 
-
+extern int dbmode;
 extern char* xcap_root;
 extern unsigned int xcap_port;
 extern str rls_server_address;
 extern int waitn_time;
+extern int rls_notifier_poll_rate;
+extern int rls_notifier_processes;
 extern str rlsubs_table;
 extern str rlpres_table;
 extern str rls_xcap_table;
 extern str db_url;
 extern int hash_size;
 extern shtable_t rls_table;
-extern int pid;
 extern int rls_max_expires;
 extern int rls_integrated_xcap_server;
 extern int rls_events;
 extern int to_presence_code;
 extern str rls_outbound_proxy;
+extern int rls_max_notify_body_len;
+extern int rls_expires_offset;
+
+extern int rls_disable_remote_presence;
+extern int rls_max_backend_subs;
+
+extern gen_lock_t *rls_update_subs_lock;
 
 /* database connection */
 extern db1_con_t *rls_db;
 extern db_func_t rls_dbf;
+extern db1_con_t *rls_xcap_db;
+extern db_func_t rls_xcap_dbf;
+extern db1_con_t *rlpres_db;
+extern db_func_t rlpres_dbf;
 
 extern struct tm_binds tmb;
 extern sl_api_t slb;
@@ -123,6 +139,7 @@ extern extract_sdialog_info_t pres_extract_sdialog_info;
 /* functions imported from pua module*/
 extern send_subscribe_t pua_send_subscribe;
 extern get_record_id_t pua_get_record_id;
+extern get_subs_list_t pua_get_subs_list;
 
 /* functions imported from presence module */
 extern contains_event_t pres_contains_event;
@@ -135,6 +152,19 @@ extern xcap_nodeSel_init_t xcap_IntNodeSel;
 extern xcap_nodeSel_add_step_t xcap_AddStep;
 extern xcap_nodeSel_add_terminal_t xcap_AddTerminal;
 extern xcap_nodeSel_free_t xcap_FreeNodeSel;
+
+/* rlsdb functions*/
+int delete_expired_subs_rlsdb(void);
+extern int delete_rlsdb(str *callid, str *to_tag, str *from_tag);
+extern int update_dialog_notify_rlsdb(subs_t *s);
+extern int update_dialog_subscribe_rlsdb(subs_t *s);
+extern int insert_rlsdb(subs_t *s);
+extern int get_dialog_subscribe_rlsdb(subs_t *s);
+subs_t *get_dialog_notify_rlsdb(str callid, str to_tag, str from_tag);
+extern int update_all_subs_rlsdb(str *watcher_user, str *watcher_domain, str *evt);
+
+extern int rls_get_service_list(str *service_uri, str *user, str *domain,
+			xmlNodePtr *service_node, xmlDocPtr *rootdoc);
 
 extern str str_rlsubs_did_col;
 extern str str_resource_uri_col;
@@ -149,6 +179,8 @@ extern str str_event_col;
 extern str str_event_id_col;
 extern str str_to_user_col;
 extern str str_to_domain_col;
+extern str str_from_user_col;
+extern str str_from_domain_col;
 extern str str_watcher_username_col;
 extern str str_watcher_domain_col;
 extern str str_callid_col;
@@ -167,6 +199,7 @@ extern str str_domain_col;
 extern str str_doc_type_col;
 extern str str_etag_col;
 extern str str_doc_col;
+extern str str_doc_uri_col;
 
 #define RLS_DID_SEP       ";"
 #define RLS_DID_SEP_LEN   strlen(RLS_DID_SEP)

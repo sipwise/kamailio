@@ -10,7 +10,7 @@
 
 <table id="lcr_gw" xmlns:db="http://docbook.org/ns/docbook">
     <name>lcr_gw</name>
-    <version>1</version>
+    <version>2</version>
     <type db="mysql">&MYSQL_TABLE_TYPE;</type>
     <description>
         <db:para>This table is used by lcr (Least Cost Routing) module
@@ -46,9 +46,9 @@
     <column id="ip_addr">
         <name>ip_addr</name>
         <type>string</type>
-        <size>15</size>
+        <size>47</size>
         <null/>
-        <description>IP Address of the gateway</description>
+        <description>IPv4 or IPv6 Address of the gateway</description>
     </column>
 
     <column id="hostname">
@@ -95,13 +95,22 @@
         <description>The number of digits to strip from Request URI user part before inserting tag</description>
     </column>
 
-    <column id="tag">
-        <name>tag</name>
+    <column id="prefix">
+        <name>prefix</name>
         <type>string</type>
         <size>16</size>
         <null/>
         <default><null/></default>
-        <description>Request URI user part tag</description>
+        <description>Prefix to be added to Request URI user part</description>
+    </column>
+
+    <column id="tag">
+        <name>tag</name>
+        <type>string</type>
+        <size>64</size>
+        <null/>
+        <default><null/></default>
+        <description>Tag of gateway to be stored to tag_avp</description>
     </column>
 
     <column id="flags">
@@ -120,12 +129,8 @@
     </column>
 
     <index>
-        <name>lcr_id_ip_addr_port_hostname_idx</name>
+        <name>lcr_id_idx</name>
         <colref linkend="lcr_id"/>
-        <colref linkend="ip_addr"/>
-        <colref linkend="port"/>
-        <colref linkend="hostname"/>
-        <unique/>
     </index>
 
 </table>

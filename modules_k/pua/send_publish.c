@@ -40,14 +40,14 @@
 #include "../../mem/shm_mem.h"
 #include "../../parser/msg_parser.h"
 #include "../../lib/kcore/cmpapi.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../../modules/tm/tm_load.h"
 #include "pua.h"
 #include "hash.h"
 #include "send_publish.h"
 #include "pua_callback.h"
 #include "event_list.h"
-
+#include "pua_db.h"
 
 str* publ_build_hdr(int expires, pua_event_t* ev, str* content_type, str* etag,
 		str* extra_headers, int is_body)
@@ -145,17 +145,82 @@ str* publ_build_hdr(int expires, pua_event_t* ev, str* content_type, str* etag,
 
 }
 
+static void find_and_delete_record(ua_pres_t *dialog, int hash_code)
+{
+	ua_pres_t *presentity;
+
+	if (dbmode == PUA_DB_ONLY)
+	{
+		delete_record_puadb(dialog);
+	}
+	else
+	{
+		lock_get(&HashT->p_records[hash_code].lock);
+		presentity = search_htable(dialog, hash_code);
+		if (presentity == NULL)
+		{
+			LM_DBG("Record found in table and deleted\n");
+			lock_release(&HashT->p_records[hash_code].lock);
+			return;
+		}
+		delete_htable(presentity, hash_code);
+		lock_release(&HashT->p_records[hash_code].lock);
+	}
+}
+
+static int find_and_update_record(ua_pres_t *dialog, int hash_code, int lexpire, str *etag)
+{
+	ua_pres_t *presentity;
+
+	if(dbmode==PUA_DB_ONLY)
+	{
+		return update_record_puadb(dialog, lexpire, etag);
+	}
+	else
+	{
+		lock_get(&HashT->p_records[hash_code].lock);
+		presentity = search_htable(dialog, hash_code);
+		if (presentity == NULL)
+		{
+			LM_DBG("Record found in table and deleted\n");
+			lock_release(&HashT->p_records[hash_code].lock);
+			return 0;
+		}
+		update_htable(presentity, dialog->desired_expires, lexpire, etag, hash_code, NULL);
+		lock_release(&HashT->p_records[hash_code].lock);
+		return 1;
+	}
+}
+
 void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 {
 	struct hdr_field* hdr= NULL;
 	struct sip_msg* msg= NULL;
 	ua_pres_t* presentity= NULL;
+	ua_pres_t* db_presentity= NULL; 
 	ua_pres_t* hentity= NULL;
 	int found = 0;
 	int size= 0;
 	unsigned int lexpire= 0;
 	str etag;
 	unsigned int hash_code;
+	db1_res_t *res=NULL;
+	ua_pres_t dbpres;
+	str pres_uri={0,0}, watcher_uri={0,0}, extra_headers={0,0};
+
+	memset(&dbpres, 0, sizeof(dbpres));
+	dbpres.pres_uri = &pres_uri;
+	dbpres.watcher_uri = &watcher_uri;
+	dbpres.extra_headers = &extra_headers;
+
+	if (dbmode == PUA_DB_ONLY && pua_dbf.start_transaction)
+	{
+		if (pua_dbf.start_transaction(pua_db) < 0)
+		{
+			LM_ERR("in start_transaction\n");
+			goto error;
+		}
+	}
 
 	if(ps->param== NULL|| *ps->param== NULL)
 	{
@@ -178,21 +243,11 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 		goto done;
 	}
 
+	hash_code= core_hash(hentity->pres_uri, NULL, HASH_SIZE);
+
 	if( ps->code>= 300 )
 	{
-		hash_code= core_hash(hentity->pres_uri, NULL,HASH_SIZE);
-		lock_get(&HashT->p_records[hash_code].lock);
-		presentity= search_htable( hentity, hash_code);
-		if(presentity)
-		{
-			LM_DBG("Record found in table and deleted\n");
-			delete_htable(presentity, hash_code);
-		}
-		else
-		{
-			LM_DBG("Record not found in table\n");
-		}
-		lock_release(&HashT->p_records[hash_code].lock);
+		find_and_delete_record(hentity, hash_code);
 
 		if(ps->code== 412 && hentity->body && hentity->flag!= MI_PUBLISH
 				&& hentity->flag!= MI_ASYN_PUBLISH)
@@ -227,7 +282,7 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 			}
 		}
 		goto done;
-	}
+	} /* code >= 300 */
 	
 	if( parse_headers(msg,HDR_EOH_F, 0)==-1 )
 	{
@@ -268,33 +323,26 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 	LM_DBG("completed with status %d [contact:%.*s]\n",
 			ps->code, hentity->pres_uri->len, hentity->pres_uri->s);
 
-	hash_code= core_hash(hentity->pres_uri, NULL, HASH_SIZE);
-	lock_get(&HashT->p_records[hash_code].lock);
-	
-	presentity= search_htable(hentity, hash_code);
-	if(presentity)
+	if (lexpire == 0)
 	{
-			LM_DBG("update record\n");
-			if(lexpire == 0)
-			{
-				LM_DBG("expires= 0- delete from htable\n"); 
-				delete_htable(presentity, hash_code);
-				lock_release(&HashT->p_records[hash_code].lock);
-				goto done;
-			}
-			
-			update_htable(presentity, hentity->desired_expires,
-					lexpire, &etag, hash_code, NULL);
-			lock_release(&HashT->p_records[hash_code].lock);
-			goto done;
-	}
-	lock_release(&HashT->p_records[hash_code].lock);
-
-	if(lexpire== 0)
-	{
-		LM_DBG("expires= 0: no not insert\n");
+		find_and_delete_record(hentity, hash_code);
 		goto done;
 	}
+
+	if (pua_dbf.affected_rows != NULL || dbmode != PUA_DB_ONLY)
+	{
+		if (find_and_update_record(hentity, hash_code, lexpire, &etag) > 0)
+			goto done;
+	}
+	else
+	{
+		if ((db_presentity = get_record_puadb(hentity->id, &hentity->etag, &dbpres, &res)) != NULL)
+		{
+			update_record_puadb(hentity, lexpire, &etag);
+			goto done;
+		}
+	}
+
 	size= sizeof(ua_pres_t)+ sizeof(str)+ 
 		(hentity->pres_uri->len+ hentity->tuple_id.len + 
 		 hentity->id.len)* sizeof(char);
@@ -308,7 +356,6 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 		goto error;
 	}	
 	memset(presentity, 0, size);
-	memset(&presentity->etag, 0, sizeof(str));
 
 	size= sizeof(ua_pres_t);
 	presentity->pres_uri= (str*)((char*)presentity+ size);
@@ -357,8 +404,15 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 	memcpy(presentity->etag.s, etag.s, etag.len);
 	presentity->etag.len= etag.len;
 
-	insert_htable( presentity);
-	LM_DBG("***Inserted in hash table\n");		
+	if (dbmode==PUA_DB_ONLY)
+	{
+		insert_record_puadb(presentity);
+	}
+	else
+ 	{
+		insert_htable(presentity);
+	}
+	LM_DBG("***Inserted in hash table\n");
 
 done:
 	if(hentity->ua_flag == REQ_OTHER)
@@ -370,6 +424,23 @@ done:
 		shm_free(*ps->param);
 		*ps->param= NULL;
 	}
+	if(dbmode==PUA_DB_ONLY && presentity)
+	{
+		shm_free(presentity->etag.s);
+		shm_free(presentity);
+	}
+
+	if (res) free_results_puadb(res);
+
+	if (dbmode == PUA_DB_ONLY && pua_dbf.end_transaction)
+	{
+		if (pua_dbf.end_transaction(pua_db) < 0)
+		{
+			LM_ERR("in end_transaction\n");
+			goto error;
+		}
+	}
+
 	return;
 
 error:
@@ -378,8 +449,15 @@ error:
 		shm_free(*ps->param);
 		*ps->param= NULL;
 	}
-	if(presentity)
-		shm_free(presentity);
+	if(presentity) shm_free(presentity);
+
+	if (res) free_results_puadb(res);
+
+	if (dbmode == PUA_DB_ONLY && pua_dbf.abort_transaction)
+	{
+		if (pua_dbf.abort_transaction(pua_db) < 0)
+			LM_ERR("in abort_transaction\n");
+	}
 
 	return;
 }	
@@ -391,19 +469,31 @@ int send_publish( publ_info_t* publ )
 	ua_pres_t* presentity= NULL;
 	str* body= NULL;
 	str* tuple_id= NULL;
-	ua_pres_t* cb_param= NULL, pres;
-	unsigned int hash_code;
+	ua_pres_t* cb_param= NULL;
+	unsigned int hash_code=0;
 	str etag= {0, 0};
 	int ver= 0;
 	int result;
 	int ret_code= 0;
 	pua_event_t* ev= NULL;
 	uac_req_t uac_r;
+	db1_res_t *res=NULL;
+	ua_pres_t dbpres; 
+	str pres_uri={0,0}, watcher_uri={0,0}, extra_headers={0,0};
+	int ret = -1;
 
 	LM_DBG("pres_uri=%.*s\n", publ->pres_uri->len, publ->pres_uri->s );
 	
-	/* get event from list */
+	if (dbmode == PUA_DB_ONLY && pua_dbf.start_transaction)
+	{
+		if (pua_dbf.start_transaction(pua_db) < 0)
+		{
+			LM_ERR("in start_transaction\n");
+			goto error;
+		}
+	}
 
+	/* get event from list */
 	ev= get_event(publ->event);
 	if(ev== NULL)
 	{
@@ -411,24 +501,37 @@ int send_publish( publ_info_t* publ )
 		goto error;
 	}	
 
-	memset(&pres, 0, sizeof(ua_pres_t));
-	pres.pres_uri= publ->pres_uri;
-	pres.flag= publ->source_flag;
-	pres.id= publ->id;
-	pres.event= publ->event;
-	if(publ->etag)
-		pres.etag= *publ->etag;
+	if (dbmode==PUA_DB_ONLY)
+	{
+		memset(&dbpres, 0, sizeof(dbpres));
+		dbpres.pres_uri = &pres_uri;
+		dbpres.watcher_uri = &watcher_uri;
+		dbpres.extra_headers = &extra_headers;
+		presentity = get_record_puadb(publ->id, publ->etag, &dbpres, &res);
+	}
+	else
+	{
+		ua_pres_t pres;
 
-	hash_code= core_hash(publ->pres_uri, NULL, HASH_SIZE);
+		memset(&pres, 0, sizeof(ua_pres_t));
+		pres.pres_uri = publ->pres_uri;
+		pres.flag = publ->source_flag;
+		pres.id = publ->id;
+		pres.event = publ->event;
+		if(publ->etag)
+			pres.etag = *publ->etag;
 
-	lock_get(&HashT->p_records[hash_code].lock);
-	
-	presentity= search_htable(&pres, hash_code);
+		hash_code= core_hash(publ->pres_uri, NULL, HASH_SIZE);
+		lock_get(&HashT->p_records[hash_code].lock);
+		presentity= search_htable(&pres, hash_code);
+	}
 
 	if(publ->etag && presentity== NULL)
 	{
-		lock_release(&HashT->p_records[hash_code].lock);
-		return 418;
+		if (dbmode!=PUA_DB_ONLY) 
+			lock_release(&HashT->p_records[hash_code].lock);
+		ret = 418;
+		goto error;
 	}
 
 	if(publ->flag & INSERT_TYPE)
@@ -440,7 +543,8 @@ int send_publish( publ_info_t* publ )
 	if(presentity== NULL)
 	{
 insert:	
-		lock_release(&HashT->p_records[hash_code].lock);
+		if (dbmode!=PUA_DB_ONLY) 
+			lock_release(&HashT->p_records[hash_code].lock);
 		LM_DBG("insert type\n"); 
 		
 		if(publ->flag & UPDATE_TYPE )
@@ -452,12 +556,14 @@ insert:
 		{
 			LM_DBG("request for a publish with expires 0 and"
 					" no record found\n");
-			return 0;
+			goto done;
+			
 		}
 		if(publ->body== NULL)
 		{
 			LM_ERR("New PUBLISH and no body found- invalid request\n");
-			return ERR_PUBLISH_NO_BODY;
+			ret = ERR_PUBLISH_NO_BODY;
+			goto error;
 		}
 	}
 	else
@@ -468,8 +574,9 @@ insert:
 		if(etag.s== NULL)
 		{
 			LM_ERR("while allocating memory\n");
-			lock_release(&HashT->p_records[hash_code].lock);
-			return -1;
+			if (dbmode!=PUA_DB_ONLY) 
+				lock_release(&HashT->p_records[hash_code].lock);
+			goto error;
 		}
 		memcpy(etag.s, presentity->etag.s, presentity->etag.len);
 		etag.len= presentity->etag.len;
@@ -481,14 +588,16 @@ insert:
 			if(tuple_id== NULL)
 			{
 				LM_ERR("No more memory\n");
-				lock_release(&HashT->p_records[hash_code].lock);
+				if (dbmode!=PUA_DB_ONLY) 
+					lock_release(&HashT->p_records[hash_code].lock);
 				goto error;
 			}	
 			tuple_id->s= (char*)pkg_malloc(presentity->tuple_id.len* sizeof(char));
 			if(tuple_id->s== NULL)
 			{
 				LM_ERR("No more memory\n");
-				lock_release(&HashT->p_records[hash_code].lock);
+				if (dbmode!=PUA_DB_ONLY) 
+					lock_release(&HashT->p_records[hash_code].lock);
 				goto error;
 			}	
 			memcpy(tuple_id->s, presentity->tuple_id.s, presentity->tuple_id.len);
@@ -498,16 +607,25 @@ insert:
 		if(publ->expires== 0)
 		{
 			LM_DBG("expires= 0- delete from hash table\n");
-			lock_release(&HashT->p_records[hash_code].lock);
+			if (dbmode!=PUA_DB_ONLY) 
+				lock_release(&HashT->p_records[hash_code].lock);
 			goto send_publish;
 		}
-		presentity->version++;
+
+		presentity->version++; 
 		ver= presentity->version;
-		lock_release(&HashT->p_records[hash_code].lock);
+
+		if (dbmode==PUA_DB_ONLY)
+		{ 
+			update_version_puadb(presentity);
+		}
+		else
+		{
+			lock_release(&HashT->p_records[hash_code].lock);
+		}
 	}
 
-    /* handle body */
-
+	/* handle body */
 	if(publ->body && publ->body->s)
 	{
 		ret_code= ev->process_body(publ, &body, ver, &tuple_id );
@@ -566,36 +684,38 @@ send_publish:
 		goto error;
 	}
 
-	pkg_free(str_hdr);
+done:
+	ret = 0;
 
-	if( body && ret_code)
+	if (dbmode == PUA_DB_ONLY && pua_dbf.end_transaction)
 	{
-		if(body->s)
-			free(body->s);
-		pkg_free(body);
-	}	
-	if(etag.s)
-		pkg_free(etag.s);
-	if(tuple_id)
-	{
-		if(tuple_id->s)
-			pkg_free(tuple_id->s);
-		pkg_free(tuple_id);
+		if (pua_dbf.end_transaction(pua_db) < 0)
+		{
+			LM_ERR("in end_transaction\n");
+			goto error;
+		}
 	}
-
-	return 0;
+	goto finish;
 
 error:
-	if(etag.s)
-		pkg_free(etag.s);
-
+	ret = -1;
 	if(cb_param)
 		shm_free(cb_param);
 
-	if(body&& ret_code)
+	if (dbmode == PUA_DB_ONLY && pua_dbf.abort_transaction)
+	{
+		if (pua_dbf.abort_transaction(pua_db) < 0)
+			LM_ERR("in abort_transaction\n");
+	}
+
+finish:
+	if(etag.s)
+		pkg_free(etag.s);
+
+	if(body && ret_code)
 	{
 		if(body->s)
-			free(body->s);
+			xmlFree(body->s);
 		pkg_free(body);
 	}	
 	if(str_hdr)
@@ -606,7 +726,9 @@ error:
 			pkg_free(tuple_id->s);
 		pkg_free(tuple_id);
 	}
-	return -1;
+	free_results_puadb(res);
+
+	return ret;
 }
 
 ua_pres_t* publish_cbparam(publ_info_t* publ,str* body,str* tuple_id,

@@ -292,12 +292,12 @@ static int t_branch_timeout(struct sip_msg* msg, char*, char*);
 static int t_branch_replied(struct sip_msg* msg, char*, char*);
 static int t_any_timeout(struct sip_msg* msg, char*, char*);
 static int t_any_replied(struct sip_msg* msg, char*, char*);
-static int t_is_canceled(struct sip_msg* msg, char*, char*);
+static int w_t_is_canceled(struct sip_msg* msg, char*, char*);
 static int t_is_expired(struct sip_msg* msg, char*, char*);
 static int t_grep_status(struct sip_msg* msg, char*, char*);
 static int w_t_drop_replies(struct sip_msg* msg, char* foo, char* bar);
 static int w_t_save_lumps(struct sip_msg* msg, char* foo, char* bar);
-static int t_check_trans(struct sip_msg* msg, char* foo, char* bar);
+static int w_t_check_trans(struct sip_msg* msg, char* foo, char* bar);
 
 
 /* by default the fr timers avps are not set, so that the avps won't be
@@ -448,7 +448,7 @@ static cmd_export_t cmds[]={
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"t_any_replied",     t_any_replied,            0, 0, 
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
-	{"t_is_canceled",     t_is_canceled,            0, 0,
+	{"t_is_canceled",     w_t_is_canceled,          0, 0,
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"t_is_expired",      t_is_expired,             0, 0,
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
@@ -460,7 +460,7 @@ static cmd_export_t cmds[]={
 			FAILURE_ROUTE},
 	{"t_save_lumps",      w_t_save_lumps,           0, 0,
 			REQUEST_ROUTE},
-	{"t_check_trans",	  t_check_trans,			0, 0,
+	{"t_check_trans",	  w_t_check_trans,			0, 0,
 			REQUEST_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE },
 
 	{"t_load_contacts", t_load_contacts,            0, 0,
@@ -470,6 +470,7 @@ static cmd_export_t cmds[]={
 
 	/* not applicable from the script */
 	{"load_tm",            (cmd_function)load_tm,           NO_SCRIPT,   0, 0},
+	{"load_xtm",           (cmd_function)load_xtm,          NO_SCRIPT,   0, 0},
 	{0,0,0,0,0}
 };
 
@@ -481,8 +482,8 @@ static param_export_t params[]={
 	{"fr_inv_timer",        PARAM_INT, &default_tm_cfg.fr_inv_timeout        },
 	{"wt_timer",            PARAM_INT, &default_tm_cfg.wait_timeout          },
 	{"delete_timer",        PARAM_INT, &default_tm_cfg.delete_timeout        },
-	{"retr_timer1",         PARAM_INT, &default_tm_cfg.rt_t1_timeout         },
-	{"retr_timer2"  ,       PARAM_INT, &default_tm_cfg.rt_t2_timeout         },
+	{"retr_timer1",         PARAM_INT, &default_tm_cfg.rt_t1_timeout_ms      },
+	{"retr_timer2"  ,       PARAM_INT, &default_tm_cfg.rt_t2_timeout_ms      },
 	{"max_inv_lifetime",    PARAM_INT, &default_tm_cfg.tm_max_inv_lifetime   },
 	{"max_noninv_lifetime", PARAM_INT, &default_tm_cfg.tm_max_noninv_lifetime},
 	{"noisy_ctimer",        PARAM_INT, &default_tm_cfg.noisy_ctimer          },
@@ -516,6 +517,7 @@ static param_export_t params[]={
 	{"disable_6xx_block",   PARAM_INT, &default_tm_cfg.disable_6xx           },
 	{"local_ack_mode",      PARAM_INT, &default_tm_cfg.local_ack_mode        },
 	{"failure_reply_mode",  PARAM_INT, &failure_reply_mode                   },
+	{"faked_reply_prio",    PARAM_INT, &faked_reply_prio                     },
 #ifdef CANCEL_REASON_SUPPORT
 	{"local_cancel_reason", PARAM_INT, &default_tm_cfg.local_cancel_reason   },
 	{"e2e_cancel_reason",   PARAM_INT, &default_tm_cfg.e2e_cancel_reason     },
@@ -721,14 +723,11 @@ static int script_init( struct sip_msg *foo, unsigned int flags, void *bar)
 	t_on_reply(0);
 	t_on_branch(0);
 	/* reset the kr status */
-	reset_kr(0);
+	reset_kr();
 	/* set request mode so that multiple-mode actions know
 	 * how to behave */
 	set_route_type(REQUEST_ROUTE);
-
-#ifdef POSTPONE_MSG_CLONING
 	lumps_are_cloned = 0;
-#endif
 	return 1;
 }
 
@@ -843,6 +842,8 @@ static int mod_init(void)
 	goto_on_local_req=route_lookup(&event_rt, "tm:local-request");
 	if (goto_on_local_req>=0 && event_rt.rlist[goto_on_local_req]==0)
 		goto_on_local_req=-1; /* disable */
+	if (goto_on_local_req>=0)
+		set_child_rpc_sip_mode();
 #endif /* WITH_EVENT_LOCAL_REQUEST */
 	if (goto_on_sl_reply && onreply_rt.rlist[goto_on_sl_reply]==0)
 		WARN("empty/non existing on_sl_reply route\n");
@@ -1285,6 +1286,12 @@ inline static int w_t_release(struct sip_msg* msg, char* str, char* str2)
 	struct cell *t;
 	int ret;
 	
+	if(get_route_type()!=REQUEST_ROUTE)
+	{
+		LM_INFO("invalid usage - not in request route\n");
+		return -1;
+	}
+
 	if (t_check( msg  , 0  )==-1) return -1;
 	t=get_t();
 	if ( t && t!=T_UNDEFINED ) {
@@ -1465,22 +1472,14 @@ inline static int w_t_relay_to_avp( struct sip_msg  *p_msg ,
 	return r;
 }
 
-inline static int w_t_replicate_uri(struct sip_msg  *msg ,
-				char *uri,       /* sip uri as string or variable */
-				char *_foo       /* nothing expected */ )
+int t_replicate_uri(struct sip_msg *msg, str *suri)
 {
 	struct proxy_l *proxy;
 	struct sip_uri turi;
-	str suri;
 	int r = -1;
 
 	memset(&turi, 0, sizeof(struct sip_uri));
-	if(fixup_get_svalue(msg, (gparam_p)uri, &suri)!=0)
-	{
-		LM_ERR("invalid replicate uri parameter");
-		return -1;
-	}
-	if(parse_uri(suri.s, suri.len, &turi)!=0)
+	if(parse_uri(suri->s, suri->len, &turi)!=0)
 	{
 		LM_ERR("bad replicate SIP address!\n");
 		return -1;
@@ -1489,7 +1488,7 @@ inline static int w_t_replicate_uri(struct sip_msg  *msg ,
 	proxy=mk_proxy(&turi.host, turi.port_no, turi.proto);
 	if (proxy==0) {
 		LM_ERR("cannot create proxy from URI <%.*s>\n",
-			suri.len, suri.s );
+			suri->len, suri->s );
 		return -1;
 	}
 
@@ -1497,7 +1496,20 @@ inline static int w_t_replicate_uri(struct sip_msg  *msg ,
 	free_proxy(proxy);
 	pkg_free(proxy);
 	return r;
+}
 
+inline static int w_t_replicate_uri(struct sip_msg  *msg ,
+				char *uri,       /* sip uri as string or variable */
+				char *_foo       /* nothing expected */ )
+{
+	str suri;
+
+	if(fixup_get_svalue(msg, (gparam_p)uri, &suri)!=0)
+	{
+		LM_ERR("invalid replicate uri parameter");
+		return -1;
+	}
+	return t_replicate_uri(msg, &suri);
 }
 
 inline static int w_t_replicate( struct sip_msg  *p_msg ,
@@ -1755,7 +1767,7 @@ int t_branch_replied(struct sip_msg* msg, char* foo, char* bar)
 
 
 /* script function, returns: 1 if the transaction was canceled, -1 if not */
-int t_is_canceled(struct sip_msg* msg, char* foo, char* bar)
+int t_is_canceled(struct sip_msg* msg)
 {
 	struct cell *t;
 	int ret;
@@ -1771,6 +1783,11 @@ int t_is_canceled(struct sip_msg* msg, char* foo, char* bar)
 		ret=(t->flags & T_CANCELED)?1:-1;
 	}
 	return ret;
+}
+
+static int w_t_is_canceled(struct sip_msg* msg, char* foo, char* bar)
+{
+	return t_is_canceled(msg);
 }
 
 /* script function, returns: 1 if the transaction lifetime interval has already elapsed, -1 if not */
@@ -1882,7 +1899,6 @@ static int w_t_drop_replies(struct sip_msg* msg, char* foo, char* bar)
 /* save the message lumps after t_newtran() but before t_relay() */
 static int w_t_save_lumps(struct sip_msg* msg, char* foo, char* bar)
 {
-#ifdef POSTPONE_MSG_CLONING
 	struct cell *t;
 
 	if (is_route_type(REQUEST_ROUTE)) {
@@ -1899,11 +1915,6 @@ static int w_t_save_lumps(struct sip_msg* msg, char* foo, char* bar)
 		}
 	} /* else nothing to do, the lumps have already been saved */
 	return 1;
-#else
-	LOG(L_ERR, "ERROR: w_t_save_lumps: POSTPONE_MSG_CLONING is not defined,"
-			" thus, the functionality is not supported\n");
-	return -1;
-#endif
 }
 
 
@@ -1937,7 +1948,7 @@ int w_t_reply_wrp(struct sip_msg *m, unsigned int code, char *txt)
  *       reliable: if the ACK  is delayed the proxied transaction might
  *       be already deleted when it reaches the proxy (wait_timeout))
  */
-static int t_check_trans(struct sip_msg* msg, char* foo, char* bar)
+int t_check_trans(struct sip_msg* msg)
 {
 	struct cell* t;
 	int branch;
@@ -1979,6 +1990,11 @@ static int t_check_trans(struct sip_msg* msg, char* foo, char* bar)
 		/* not found or error */
 	}
 	return -1;
+}
+
+static int w_t_check_trans(struct sip_msg* msg, char* foo, char* bar)
+{
+	return t_check_trans(msg);
 }
 
 static int hexatoi(str *s, unsigned int* result)

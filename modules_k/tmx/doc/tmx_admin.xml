@@ -57,7 +57,7 @@
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">t_cancel_branches(which)</function>
@@ -192,6 +192,121 @@ t_flush_flags();
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title>
+		<function moreinfo="none">t_is_failure_route()</function>
+		</title>
+		<para>
+		Returns true if the top-executed route block is failure_route.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE .
+		</para>
+		<example>
+		<title><function>t_is_failure_route</function> usage</title>
+		<programlisting format="linespecific">
+...
+failure_route[xyz] {
+    route(abc);
+}
+
+route[abc] {
+    if(t_is_failure_route()) { ... }
+}
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+		<function moreinfo="none">t_is_branch_route()</function>
+		</title>
+		<para>
+		Returns true if the top-executed route block is branch_route.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE .
+		</para>
+		<example>
+		<title><function>t_is_branch_route</function> usage</title>
+		<programlisting format="linespecific">
+...
+branch_route[xyz] {
+    route(abc);
+}
+
+route[abc] {
+    if(t_is_branch_route()) { ... }
+}
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+		<function moreinfo="none">t_suspend()</function>
+		</title>
+		<para>
+		Suspend the execution of SIP request in a transaction. If transaction
+		was not created yet, it is created by this function. Returns true in
+		case of success and internal transaction index and label are available
+		via $T(id_index) and $T(id_label).
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE .
+		</para>
+		<example>
+		<title><function>t_suspend</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(t_suspend())
+{
+    xlog("proceesing suspended in trasaction [$T(id_index):$T(id_label)]\n");
+    exit;
+}
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+			<function moreinfo="none">t_continue(tindex, tlabel, rtname)
+			</function>
+		</title>
+		<para>
+		Continue the execution of the transaction identified by tindex and
+		tlabel with the actions defined in route[rtname].
+		</para>
+		<para>
+		Parameters:.
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>tindex</emphasis> - internal index of transaction.
+				Can be an integer or a pseudo-variable.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>tlabel</emphasis> - internal label of transaction.
+				Can be an integer or a pseudo-variable.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>rtname</emphasis> - the name of the route block to
+				execute. Can be a static string value or a dynamic string with
+				pseudo-variables.
+			</para></listitem>
+		</itemizedlist>
+		<para>
+		This function can be used in ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>t_continue</function> usage</title>
+		<programlisting format="linespecific">
+...
+tcontinue('123', '456', 'MYROUTE');
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 
 	<section>
@@ -217,7 +332,7 @@ t_flush_flags();
 
 
 	<section>
-	<title>Exported MI Functions</title>
+	<title>MI Commands</title>
 
 	<section>
 		<title>
@@ -327,12 +442,49 @@ t_flush_flags();
 			</para></listitem>
 		</itemizedlist>
 	</section>
+	<section>
+		<title>
+		<function moreinfo="none">t_reply_callid</function>
+		</title>
+		<para>
+		Generates and sends a reply for an existing inbound SIP transaction.
+		</para>
+		<para>Parameters: </para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>code</emphasis> - reply code
+			</para></listitem>
+			<listitem><para>
+				<emphasis>reason</emphasis> - reason phrase.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>callid</emphasis> - SIP Call-ID header
+			</para></listitem>
+			<listitem><para>
+				<emphasis>cseq</emphasis> - SIP CSeq header
+			</para></listitem>
+			<listitem><para>
+				<emphasis>to_tag</emphasis> - To tag to be added to TO header
+			</para></listitem>
+			<listitem><para>
+				<emphasis>new_headers</emphasis> - extra headers to be
+				appended to the reply; use a dot (<quote>.</quote>) char 
+				only if there are no headers;
+			</para></listitem>
+			<listitem><para>
+				<emphasis>body</emphasis> - (optional, may not be present)
+				reply body (if present, requires the 
+				<quote>Content-Type</quote> and <quote>Content-length</quote>
+				headers)
+			</para></listitem>
+		</itemizedlist>
+	</section>
 
 	</section>
 
 
 	<section>
-		<title>Exported statistics</title>
+		<title>Statistics</title>
 		<para>
 		Exported statistics are listed in the next sections. All statistics
 		except <quote>inuse_transactions</quote> can be reset.

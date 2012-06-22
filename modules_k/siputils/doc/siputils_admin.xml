@@ -71,7 +71,7 @@
 	</section>
 	
 	<section>
-		<title>Exported Parameters</title>
+		<title>Parameters</title>
 		<section>
 			<title><varname>ring_timeout</varname> (int)</title>
 			<para>
@@ -272,7 +272,7 @@ modparam("auth", "rpid_avp", "$avp(myrpid)")
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 		<section>
 			<title>
 				<function moreinfo="none">ring_insert_callid()</function>
@@ -375,7 +375,7 @@ if (is_user("john")) {
 		Check if To header field uri contains tag parameter.
 		</para>
 		<para>
-		This function can be used from REQUEST_ROUTE.
+		This function can be used from ANY_ROUTE.
 		</para>
 		<example>
 		<title><function>has_totag</function> usage</title>
@@ -477,12 +477,14 @@ add_uri_param("nat=yes");
 	</section>
 	<section>
 		<title>
-		<function moreinfo="none">tel2sip()</function>
+		<function moreinfo="none">tel2sip(uri, hostpart, result)</function>
 		</title>
 		<para>
-		Converts RURI, if it is tel URI, to SIP URI.  Returns true only if
-		conversion succeeded or if no conversion was needed (like RURI
-		was not tel URI).
+		Converts URI in first param (pseudo variable or string) to
+		SIP URI, if it is a tel URI.  If conversion was done,
+		writes resulting SIP URI to third param (pseudo variable).
+		Returns 1 if conversion succeeded or if no conversion
+		was needed.
 		</para>
 		<para>
 		The conversion follows the rules in RFC 3261 section 19.1.6:
@@ -496,22 +498,26 @@ add_uri_param("nat=yes");
                 </itemizedlist>
 		</para>
 		<para>
-		The SIP URI host is formed using the From URI host.
+		The SIP URI hostpart is taken from second param
+		(pseudo variable or string).
 		</para>
 		<para>
-		This function can be used from REQUEST_ROUTE.
+		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
+		BRANCH_ROUTE, or ONREPLY_ROUTE.
 		</para>
 		<example>
 		<title><function>tel2sip</function> usage</title>
 		<programlisting format="linespecific">
 ...
-# RURI:  tel:+(34)-999-888-777
-tel2sip();
-# RURI:  sip:+34999888777@foo.com;user=phone
+# $ru: tel:+(34)-999-888-777
+# $fu: sip:test@foo.com
+tel2sip("$ru", $fd", "$ru");
+# $ru:  sip:+34999888777@foo.com;user=phone
 
-# RURI:  tel:+12-(34)-56-78;Ext=200;ISUB=+123-456
-tel2sip();
-# RURI:  sip:+12345678;ext=200;isub=+123-456@foo.com;user=phone
+# $ru: tel:+12-(34)-56-78;Ext=200;ISUB=+123-456
+# $fu: sip:test@foo.com
+tel2sip("$ru", $fd", "$ru");
+# $ru:  sip:+12345678;ext=200;isub=+123-456@foo.com;user=phone
 ...
 </programlisting>
 		</example>
@@ -554,7 +560,7 @@ if (is_e164("$avp(i:705)") {
 		E164 number.
 		</para>
 		<para>
-		This function can be used from REQUEST_ROUTE and FAILURE_ROUTE.
+		This function can be used from ANY_ROUTE.
 		</para>
 		<example>
 		<title><function>is_uri_user_e164</function> usage</title>
@@ -684,8 +690,7 @@ reply_route[2] {
 		the two parameters matches as SIP URI.
 		</para>
    		<para>
-		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE, 
-		FAILURE_ROUTE and BRANCH_ROUTE.
+		This function can be used from ANY_ROUTE.
 		</para>
 		<example>
 		<title><function>cmp_uri</function> usage</title>
@@ -710,8 +715,7 @@ if(cmp_uri("$ru", "sip:kamailio@kamailio.org"))
 		URIs.
 		</para>
    		<para>
-		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE, 
-		FAILURE_ROUTE and BRANCH_ROUTE.
+		This function can be used from ANY_ROUTE.
 		</para>
 		<example>
 		<title><function>cmp_aor</function> usage</title>
@@ -811,6 +815,146 @@ append_rpid_hf();  # Append Remote-Party-ID header field
 ...
 # Append Remote-Party-ID header field
 append_rpid_hf("", ";party=calling;id-type=subscriber;screen=yes");
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+			<function moreinfo="none">is_rpid_user_e164()</function>
+		</title>
+		<para>
+		The function checks if the SIP URI received from the database or 
+		radius server and will potentially be used in Remote-Party-ID header 
+		field contains an E164 number (+followed by up to 15 decimal digits) 
+		in its user part.  Check fails, if no such SIP URI exists 
+		(i.e. radius server or database didn't provide this information).
+		</para>
+		<para>
+		This function can be used from REQUEST_ROUTE.
+		</para>
+		<example>
+		<title>is_rpid_user_e164 usage</title>
+		<programlisting format="linespecific">
+...
+if (is_rpid_user_e164()) {
+    # do something here
+};
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+			<function moreinfo="none">set_uri_user(uri, user)</function>
+		</title>
+		<para>
+		Sets userpart of SIP URI stored in writable pseudo variable
+		'uri' to value of pseudo variable 'user'.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title>set_uri_user usage</title>
+		<programlisting format="linespecific">
+...
+$var(uri) = "sip:user@host";
+$var(user) = "new_user";
+set_uri_user("$var(uri)", "$var(user)");
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+			<function moreinfo="none">set_uri_host(uri, host)</function>
+		</title>
+		<para>
+		Sets hostpart of SIP URI stored in writable pseudo variable
+		'uri' to value of pseudo variable 'host'.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title>set_uri_host usage</title>
+		<programlisting format="linespecific">
+...
+$var(uri) = "sip:user@host";
+$var(host) = "new_host";
+set_uri_host("$var(uri)", "$var(host)");
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+		<function moreinfo="none">is_request()</function>
+		</title>
+		<para>
+		Return true if the SIP message is a request.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>is_request</function> usage</title>
+		<programlisting format="linespecific">
+...
+if (is_request()) {
+	...
+}
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+		<function moreinfo="none">is_reply()</function>
+		</title>
+		<para>
+		Return true if the SIP message is a reply.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>is_reply</function> usage</title>
+		<programlisting format="linespecific">
+...
+if (is_reply()) {
+	...
+}
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="is-gruu">
+		<title>
+			<function moreinfo="none">is_gruu([uri])</function>
+		</title>
+		<para>
+			The function returns true if the uri is GRUU ('gr' parameter
+			is present): 1 - pub-gruu; 2 - temp-gruu.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>uri</emphasis> - the SIP URI to check for
+				GRUU parameter. It is optional, when missing, the value
+				of R-URI is used.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title>is_gruu() usage</title>
+		<programlisting format="linespecific">
+...
+if(is_gruu()) { ... }
 ...
 </programlisting>
 		</example>

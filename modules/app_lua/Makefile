@@ -1,6 +1,4 @@
-# $Id: Makefile 2 2005-06-13 16:47:24Z bogdan_iancu $
-#
-# print example module makefile
+# $Id$
 #
 # 
 # WARNING: do not run this directly, it should be run by the master Makefile
@@ -16,25 +14,39 @@ ifeq ($(BUILDER),)
 		LUA51 = $(shell ls /usr/lib/liblua* | grep liblua5.1)
 		ifeq ($(LUA51),)
 			DEFS+=-I/usr/include/lua
-			LIBS= -llua
+			LIBS= -llua -lm
 		else
 			DEFS+=-I/usr/include/lua5.1
-			LIBS= -llua5.1
+			LIBS= -llua5.1 -lm
 		endif
 	else
+		LUAVER=XX
 		LUALIBS = $(shell pkg-config --silence-errors --libs lua)
 		ifeq ($(LUALIBS),)
+			LUALIBS = $(shell pkg-config --silence-errors --libs lua5.1)
+			ifneq ($(LUALIBS),)
+				LUAVER=51
+			endif
+		else
+			LUAVER=5X
+		endif
+		ifeq ($(LUAVER),XX)
 			LUA51 = $(shell ls /usr/lib/liblua* | grep liblua5.1)
 			ifeq ($(LUA51),)
 				DEFS+=-I/usr/include/lua
-				LIBS= -llua
+				LIBS= -llua -lm
 			else
 				DEFS+=-I/usr/include/lua5.1
-				LIBS= -llua5.1
+				LIBS= -llua5.1 -lm
 			endif
 		else
-			DEFS+= $(shell pkg-config --cflags lua)
-			LIBS = $(shell pkg-config --libs lua)
+			ifeq ($(LUAVER),51)
+				DEFS+= $(shell pkg-config --cflags lua5.1 | sed -e "s/\\\\/'/" -e "s/\\\\\"/\"'/")
+				LIBS = $(shell pkg-config --libs lua5.1)
+			else
+				DEFS+= $(shell pkg-config --cflags lua)
+				LIBS = $(shell pkg-config --libs lua)
+			endif
 		endif
 	endif
 else

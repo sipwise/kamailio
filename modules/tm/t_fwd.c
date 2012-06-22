@@ -123,9 +123,8 @@
 #ifdef USE_DST_BLACKLIST
 #include "../../dst_blacklist.h"
 #endif
-#ifdef POSTPONE_MSG_CLONING
 #include "../../atomic_ops.h" /* membar_depends() */
-#endif
+
 
 static int goto_on_branch = 0, branch_route = 0;
 
@@ -233,11 +232,9 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 
 	/* dup lumps
 	 * TODO: clone lumps only if needed */
-#ifdef POSTPONE_MSG_CLONING
 	/* lumps can be set outside of the lock, make sure that we read
 	 * the up-to-date values */
 	membar_depends();
-#endif
 	add_rm_backup = i_req->add_rm;
 	body_lumps_backup = i_req->body_lumps;
 	if (unlikely(i_req->add_rm)){
@@ -377,6 +374,10 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 			   ignored) */
 			next_hop=&i_req->dst_uri;
 		}
+		/* no path vector initially, but now is set after branch route and
+		 * callbacks execution */
+		if(i_req->path_vec.s!=0 && free_path==0)
+			free_path=1;
 	}else{
 		/* no branch route and no TMCB_REQUEST_FWDED callback => set
 		   msg uri and path to the new values (if needed) */
@@ -923,11 +924,9 @@ int e2e_cancel_branch( struct sip_msg *cancel_msg, struct cell *t_cancel,
 	/* print */
 	if (cfg_get(tm, tm_cfg, reparse_invite)) {
 		/* buffer is built localy from the INVITE which was sent out */
-#ifdef POSTPONE_MSG_CLONING
 		/* lumps can be set outside of the lock, make sure that we read
 		 * the up-to-date values */
 		membar_depends();
-#endif
 		if (cancel_msg->add_rm || cancel_msg->body_lumps) {
 			LOG(L_WARN, "WARNING: e2e_cancel_branch: CANCEL is built locally, "
 			"thus lumps are not applied to the message!\n");
@@ -1193,14 +1192,12 @@ void e2e_cancel( struct sip_msg *cancel_msg,
 				if (SEND_BUFFER(&t_cancel->uac[i].request) == -1) {
 					LOG(L_ERR, "ERROR: e2e_cancel: send failed\n");
 				}
-#ifdef TMCB_ONSEND
 				else{
 					if (unlikely(has_tran_tmcbs(t_cancel, TMCB_REQUEST_SENT)))
-						run_onsend_callbacks(TMCB_REQUEST_SENT, 
-												&t_cancel->uac[i].request,
-												cancel_msg, 0, TMCB_LOCAL_F);
+						run_trans_callbacks_with_buf(TMCB_REQUEST_SENT,
+						                             &t_cancel->uac[i].request,
+						                             cancel_msg, 0, TMCB_LOCAL_F);
 				}
-#endif
 				if (start_retr( &t_cancel->uac[i].request )!=0)
 					LOG(L_CRIT, "BUG: e2e_cancel: failed to start retr."
 							" for %p\n", &t_cancel->uac[i].request);
@@ -1387,10 +1384,8 @@ int t_send_branch( struct cell *t, int branch, struct sip_msg* p_msg ,
 		if (proxy) { proxy->errors++; proxy->ok=0; }
 		return -2;
 	} else {
-#ifdef TMCB_ONSEND
 		if (unlikely(has_tran_tmcbs(t, TMCB_REQUEST_SENT)))
-			run_onsend_callbacks(TMCB_REQUEST_SENT, &uac->request, p_msg, 0,0);
-#endif
+			run_trans_callbacks_with_buf(TMCB_REQUEST_SENT, &uac->request, p_msg, 0,0);
 		/* start retr. only if the send succeeded */
 		if (start_retr( &uac->request )!=0){
 			LOG(L_CRIT, "BUG: t_send_branch: retr. already started for %p\n",
@@ -1465,7 +1460,6 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 		branch_route = 0;
 	}
 	
-#ifdef POSTPONE_MSG_CLONING
 	/* on first-time forwarding, update the lumps */
 	if (first_branch==0) {
 		/* update the shmem-ized msg with the lumps */
@@ -1476,7 +1470,7 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 				return -1;
 			}
 	}
-#endif
+
 	/* if ruri is not already consumed (by another invocation), use current
 	   uri too. Else add only additional branches (which may be continuously
 	   refilled).
@@ -1552,8 +1546,12 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 			
 			branch_ret=t_send_branch(t, i, p_msg , proxy, lock_replies);
 			if (branch_ret>=0){ /* some kind of success */
-				if (branch_ret==i) /* success */
+				if (branch_ret==i) { /* success */
 					success_branch++;
+					if (unlikely(has_tran_tmcbs(t, TMCB_REQUEST_OUT)))
+						run_trans_callbacks_with_buf( TMCB_REQUEST_OUT, &t->uac[i].request,
+						                              p_msg, 0, -p_msg->REQ_METHOD);
+				}
 				else /* new branch added */
 					added_branches |= 1<<branch_ret;
 			}

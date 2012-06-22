@@ -3,13 +3,19 @@ HTable Module
 Elena-Ramona Modroiu
 
    asipto.com
-   <ramona@asipto.com>
+   <ramona@rosdev.ro>
 
 Edited by
 
 Elena-Ramona Modroiu
 
-   <ramona@asipto.com>
+   <ramona@rosdev.ro>
+
+Edited by
+
+Alex Balashov
+
+   <abalashov@evaristesys.com>
 
    Copyright © 2008-2011 http://www.asipto.com
      __________________________________________________________________
@@ -25,7 +31,7 @@ Elena-Ramona Modroiu
               2.2. External Libraries or Applications
               2.3. Loading from database
 
-        3. Exported Parameters
+        3. Parameters
 
               3.1. htable (str)
               3.2. db_url (str)
@@ -33,19 +39,21 @@ Elena-Ramona Modroiu
               3.4. key_type_column (str)
               3.5. value_type_column (str)
               3.6. key_value_column (str)
-              3.7. array_size_suffix (str)
-              3.8. fetch_rows (integer)
-              3.9. timer_interval (integer)
-              3.10. timer_mode (integer)
+              3.7. expires_column (str)
+              3.8. array_size_suffix (str)
+              3.9. fetch_rows (integer)
+              3.10. timer_interval (integer)
+              3.11. timer_mode (integer)
+              3.12. db_expires (integer)
 
-        4. Exported Functions
+        4. Functions
 
               4.1. sht_print()
               4.2. sht_rm_name_re(htable=>regexp)
               4.3. sht_rm_value_re(htable=>regexp)
 
         5. Exported pseudo-variables
-        6. Exported MI Functions
+        6. MI Commands
 
               6.1. sht_reload
               6.2. sht_dump
@@ -60,17 +68,19 @@ Elena-Ramona Modroiu
    1.2. Dictionary attack limitation
    1.3. Set hash_size parameter
    1.4. Set db_url parameter
-   1.5. Set key_name parameter
-   1.6. Set key_name parameter
-   1.7. Set value_type parameter
-   1.8. Set key_value parameter
-   1.9. Set array_size_suffix parameter
-   1.10. Set fetch_rows parameter
-   1.11. Set timer_interval parameter
-   1.12. Set timer_mode parameter
-   1.13. sht_print usage
-   1.14. sht_rm_name_re usage
-   1.15. sht_rm_value_re usage
+   1.5. Set key_name_column parameter
+   1.6. Set key_type_column parameter
+   1.7. Set value_type_column parameter
+   1.8. Set key_value_column parameter
+   1.9. Set expires_column parameter
+   1.10. Set array_size_suffix parameter
+   1.11. Set fetch_rows parameter
+   1.12. Set timer_interval parameter
+   1.13. Set timer_mode parameter
+   1.14. Set db_expires parameter
+   1.15. sht_print usage
+   1.16. sht_rm_name_re usage
+   1.17. sht_rm_value_re usage
 
 Chapter 1. Admin Guide
 
@@ -83,7 +93,7 @@ Chapter 1. Admin Guide
         2.2. External Libraries or Applications
         2.3. Loading from database
 
-   3. Exported Parameters
+   3. Parameters
 
         3.1. htable (str)
         3.2. db_url (str)
@@ -91,19 +101,21 @@ Chapter 1. Admin Guide
         3.4. key_type_column (str)
         3.5. value_type_column (str)
         3.6. key_value_column (str)
-        3.7. array_size_suffix (str)
-        3.8. fetch_rows (integer)
-        3.9. timer_interval (integer)
-        3.10. timer_mode (integer)
+        3.7. expires_column (str)
+        3.8. array_size_suffix (str)
+        3.9. fetch_rows (integer)
+        3.10. timer_interval (integer)
+        3.11. timer_mode (integer)
+        3.12. db_expires (integer)
 
-   4. Exported Functions
+   4. Functions
 
         4.1. sht_print()
         4.2. sht_rm_name_re(htable=>regexp)
         4.3. sht_rm_value_re(htable=>regexp)
 
    5. Exported pseudo-variables
-   6. Exported MI Functions
+   6. MI Commands
 
         6.1. sht_reload
         6.2. sht_dump
@@ -231,7 +243,7 @@ if(is_present_hf("Authorization"))
           + 1 - value is integer.
      * key value - string containing the value of the key.
 
-3. Exported Parameters
+3. Parameters
 
    3.1. htable (str)
    3.2. db_url (str)
@@ -239,10 +251,12 @@ if(is_present_hf("Authorization"))
    3.4. key_type_column (str)
    3.5. value_type_column (str)
    3.6. key_value_column (str)
-   3.7. array_size_suffix (str)
-   3.8. fetch_rows (integer)
-   3.9. timer_interval (integer)
-   3.10. timer_mode (integer)
+   3.7. expires_column (str)
+   3.8. array_size_suffix (str)
+   3.9. fetch_rows (integer)
+   3.10. timer_interval (integer)
+   3.11. timer_mode (integer)
+   3.12. db_expires (integer)
 
 3.1. htable (str)
 
@@ -264,6 +278,16 @@ if(is_present_hf("Authorization"))
        expire.
      * dbtable - name of database to be loaded at startup in hash table.
        If empty or missing, no data will be loaded.
+     * dbmode - if set to 1, the content of hash table is written to
+       database table when the SIP server is stopped (i.e., ensure
+       persistency over restarts). Default value is 0 (no write back to db
+       table).
+     * initval - the integer value to be returned instead of $null when a
+       requested key is not set.
+     * updateexpire - if set to 1 (default), the time until expiration of
+       an item is reset when that item is updated. Certain uses of htable
+       may dictate that updates should not reset the expiration timeout,
+       however, in which case this attribute can be set to 0.
 
    Default value is NULL.
 
@@ -271,6 +295,7 @@ if(is_present_hf("Authorization"))
 ...
 modparam("htable", "htable", "a=>size=4;autoexpire=7200;dbtable=htable_a;")
 modparam("htable", "htable", "b=>size=5;")
+modparam("htable", "htable", "c=>size=4;autoexpire=7200;initval=1;")
 ...
 
 3.2. db_url (str)
@@ -291,7 +316,7 @@ modparam("htable", "db_url", "mysql://openser:openserrw@localhost/openser")
 
    Default value is 'key_name'.
 
-   Example 1.5. Set key_name parameter
+   Example 1.5. Set key_name_column parameter
 ...
 modparam("htable", "key_name_column", "kname")
 ...
@@ -302,7 +327,7 @@ modparam("htable", "key_name_column", "kname")
 
    Default value is 'key_type'.
 
-   Example 1.6. Set key_name parameter
+   Example 1.6. Set key_type_column parameter
 ...
 modparam("htable", "key_type_column", "ktype")
 ...
@@ -313,9 +338,9 @@ modparam("htable", "key_type_column", "ktype")
 
    Default value is 'value_type'.
 
-   Example 1.7. Set value_type parameter
+   Example 1.7. Set value_type_column parameter
 ...
-modparam("htable", "value_type", "vtype")
+modparam("htable", "value_type_column", "vtype")
 ...
 
 3.6. key_value_column (str)
@@ -324,57 +349,81 @@ modparam("htable", "value_type", "vtype")
 
    Default value is 'key_value'.
 
-   Example 1.8. Set key_value parameter
+   Example 1.8. Set key_value_column parameter
 ...
-modparam("htable", "key_value", "kvalue")
+modparam("htable", "key_value_column", "kvalue")
 ...
 
-3.7. array_size_suffix (str)
+3.7. expires_column (str)
+
+   The name of the column containing expires type.
+
+   Default value is 'expires'.
+
+   Example 1.9. Set expires_column parameter
+...
+modparam("htable", "expires", "expiry")
+...
+
+3.8. array_size_suffix (str)
 
    The suffix to be added to store the number of items in an array.
 
    Default value is '::size'.
 
-   Example 1.9. Set array_size_suffix parameter
+   Example 1.10. Set array_size_suffix parameter
 ...
 modparam("htable", "array_size_suffix", "-count")
 ...
 
-3.8. fetch_rows (integer)
+3.9. fetch_rows (integer)
 
    How many rows to fetch at once from database.
 
    Default value is 100.
 
-   Example 1.10. Set fetch_rows parameter
+   Example 1.11. Set fetch_rows parameter
 ...
 modparam("htable", "fetch_rows", 1000)
 ...
 
-3.9. timer_interval (integer)
+3.10. timer_interval (integer)
 
    Interval in seconds to check for expired htable values.
 
    Default value is 20.
 
-   Example 1.11. Set timer_interval parameter
+   Example 1.12. Set timer_interval parameter
 ...
 modparam("htable", "timer_interval", 10)
 ...
 
-3.10. timer_mode (integer)
+3.11. timer_mode (integer)
 
    If set to 1, will start a new timer process. If set to 0 will use
    default timer process to check for expired htable values.
 
    Default value is 0.
 
-   Example 1.12. Set timer_mode parameter
+   Example 1.13. Set timer_mode parameter
 ...
 modparam("htable", "timer_mode", 1)
 ...
 
-4. Exported Functions
+3.12. db_expires (integer)
+
+   If set to 1, will load/save the expires values of the items in hash
+   table fromm/to database. It applies only to hash tables that have
+   auto-expires attribute defined.
+
+   Default value is 0.
+
+   Example 1.14. Set db_expires parameter
+...
+modparam("htable", "db_expires", 1)
+...
+
+4. Functions
 
    4.1. sht_print()
    4.2. sht_rm_name_re(htable=>regexp)
@@ -388,7 +437,7 @@ modparam("htable", "timer_mode", 1)
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    ONREPLY_ROUTE, BRANCH_ROUTE.
 
-   Example 1.13. sht_print usage
+   Example 1.15. sht_print usage
 ...
 sht_print();
 ...
@@ -401,7 +450,7 @@ sht_print();
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    ONREPLY_ROUTE, BRANCH_ROUTE.
 
-   Example 1.14. sht_rm_name_re usage
+   Example 1.16. sht_rm_name_re usage
 ...
 sht_rm_name_re("ha=>.*");
 ...
@@ -414,7 +463,7 @@ sht_rm_name_re("ha=>.*");
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    ONREPLY_ROUTE, BRANCH_ROUTE.
 
-   Example 1.15. sht_rm_value_re usage
+   Example 1.17. sht_rm_value_re usage
 ...
 sht_rm_value_re("ha=>.*");
 ...
@@ -423,11 +472,15 @@ sht_rm_value_re("ha=>.*");
 
      * $sht(htable=>key)
      * $shtex(htable=>key)
+     * $shtcn(htable=>key)
+     * $shtcv(htable=>key)
+     * $shtinc(htable=>key)
+     * $shtval(htable=>key)
 
    Exported pseudo-variables are documented at
    http://www.kamailio.org/dokuwiki/.
 
-6. Exported MI Functions
+6. MI Commands
 
    6.1. sht_reload
    6.2. sht_dump

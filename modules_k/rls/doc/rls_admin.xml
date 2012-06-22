@@ -99,7 +99,7 @@
 	</section>
 	
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>db_url</varname>(str)</title>
 		<para>
@@ -118,6 +118,76 @@ modparam("rls", "db_url", "&exampledb;")
 </programlisting>
 		</example>
 	</section>
+
+	<section>
+		<title><varname>rlpres_db_url</varname>(str)</title>
+		<para>
+		The rlpres (rls_presentity table) database url.
+		This parameter only needs to be specified if the rls_watchers table and 
+		rls_presentity tables are in different databases.
+		rls_presentity is used to cache the bodies of back-end NOTIFY requests
+		until an RLS NOTIFY can be sent.  On a multi-server system having a single
+		cache for all active servers can cause issues if both servers try to send
+		RLS NOTIFY requests at the same time.  This parameter enables each server
+		to have its own (possibly local) rls_presentity table.
+		</para>
+		<para>
+		<emphasis>	Default value is a mirror of the <quote>db_url</quote> setting.	
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>rlpres_db_url</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "rlpres_db_url", "&exampledb;")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>xcap_db_url</varname>(str)</title>
+		<para>
+		The xcap database url.
+		This parameter only needs to be specified if the rls db and integerated 
+		xcap server db have different urls. 
+		</para>
+		<para>
+		<emphasis>	Default value is a mirror of the <quote>db_url</quote> setting.	
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xcap_db_url</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "xcap_db_url", "&exampledb;")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>db_mode</varname>(int)</title>
+		<para>
+		The module supports 2 modes of operation, high speed memory
+		based storage (mode 0), and database only (mode 2) where all 
+		data is stored in a database, allowing scalability at the
+		expense of speed. Mode 1 is reserved.
+		</para>
+		<para>
+		<emphasis>	Default value is <quote>0</quote> 	
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>db_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "db_mode", 2)
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section>
 		<title><varname>xcap_table</varname>(str)</title>
 		<para>
@@ -183,6 +253,7 @@ modparam("rls", "rlpres_table", "rls_notify")
 		<title><varname>clean_period</varname> (int)</title>
 		<para>
 		The period at which to check for expired information.
+		0 means do not check.
 		</para>
 		<para>
 		<emphasis>Default value is <quote>100</quote>.
@@ -199,14 +270,40 @@ modparam("rls", "clean_period", 100)
 	</section>
 
 	<section>
-		<title><varname>waitn_time</varname> (int)</title>
+		<title><varname>rlpres_clean_period</varname> (int)</title>
 		<para>
-	 The timer period at which the server should attempt to send
-	 Notifies with the updated presence state of the subscribed list
-	 or watcher information.
+		The period at which to check for expired rls_presentity information.
+		-1 means do not use (clean_period) is used instead.
+		0 means do not check.
+		This option can be used when you want to check rls_presentity and
+		rls_watchers on different timeouts.  This is useful when they are
+		in different databases.
 		</para>
 		<para>
-		<emphasis>Default value is <quote>50</quote>.
+		<emphasis>Default value is <quote>-1</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>rlpres_clean_period</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "rlpres_clean_period", 100)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>waitn_time</varname> (int)</title>
+		<para>
+		The maximum time period that RLS NOTIFY requests will
+		be buffered for.  The server will attempt to send
+		NOTIFY requests with the updated presence state of the
+		subscribed list or watcher information within this
+		many seconds of a change occurring.
+		</para>
+		<para>
+		<emphasis>Default value is <quote>5</quote>.
 		</emphasis>
 		</para>
 		<example>
@@ -214,6 +311,55 @@ modparam("rls", "clean_period", 100)
 		<programlisting format="linespecific">
 ...
 modparam("rls", "waitn_time", 10)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>notifier_poll_rate</varname> (int)</title>
+		<para>
+		The number of times per second that the notifier processes
+		should check for work.  Approximately
+		1/(waitn_time * notifier_poll_rate * notifier_processes) of the
+		pending updates will be sent each time a notifier process runs.
+		</para>
+		<para>
+		Separate notifier processes are only run when db_mode is 2
+		(DB only mode).
+		</para>
+		<para>
+		<emphasis>Default value is <quote>10</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>notifier_poll_rate</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "notifier_poll_rate", 20)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>notifier_processes</varname> (int)</title>
+		<para>
+		The number of notifier processes that should be started.
+		</para>
+		<para>
+		Separate notifier processes are only run when db_mode is 2
+		(DB only mode).
+		</para>
+		<para>
+		<emphasis>Default value is <quote>1</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>notifier_processes</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "notifier_processes", 2)
 ...
 </programlisting>
 		</example>
@@ -233,6 +379,32 @@ modparam("rls", "waitn_time", 10)
 		<programlisting format="linespecific">
 ...
 modparam("rls", "max_expires", 10800)
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>expires_offset</varname> (int)</title>
+		<para>
+		This paramater only has an effect when the db_mode is DB_ONLY (mode 2).
+		When expired subscribers are checked for deletion from the database,
+		those that have a value in the expires column which is less than 
+		current_time - expires_offset are matched. Hence when an offset of zero
+		is used, all those that expire prior the current time will be deleted.
+		If an offset of 't' is used, only those that expired more than t seconds
+		ago are deleted from the database. 
+		Negative offsets are treated as though an offset of zero was specifed. 
+		</para>
+		<para>
+		<emphasis>Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>expires_offset</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "expires_offset", 0)
 ...
 		</programlisting>
 		</example>
@@ -378,19 +550,111 @@ modparam("rls", "server_address", "sip:rls@ip.address.ofyour.proxy:5060")
 		</example>
 	</section>
 
+	<section>
+		<title><varname>max_notify_body_length</varname> (int)</title>
+		<para>
+			The maximum size that the body of a NOTIFY message may be. 
+            If set to 0 (the default), no size limit is applied.
+            Note that this refers only to the body, not the complete NOTIFY message.
+		</para>
+		<example>
+		<title>Set <varname>max_notify_body_length</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "max_notify_body_length", 32000)
+...
+		</programlisting>
+		</example>
+	</section>
+	<section>
+	    <title><varname>fetch_rows</varname> (integer)</title>
+	    <para>
+		Number of rows to be loaded in one step from database.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 500.
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>fetch_rows</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "fetch_rows", 1000)
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title><varname>disable_remote_presence</varname> (integer)</title>
+	    <para>
+		When set to a non-zero value RLS will not perform back-end SUBSCRIBEs
+		to non-local presentities.
+		When people have large contact lists RLS will make lots of back-end
+		subscriptions for each local subscriber.  This can be a lot of traffic,
+		and if the contact lists contain non-local (as in not on this Kamailio
+		server or cluster) contacts this can result in a lot of Internet traffic.
+		Setting this option to a non-zero value prevents RLS from performing
+		back-end SUBSCRIBEs for remote presentities.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>disable_remote_presence</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "disable_remote_presence", 1)
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title><varname>max_backend_subs</varname> (integer)</title>
+	    <para>
+		When set to a non-zero value RLS will limit the number of back-end
+		SUBSCRIBEs for each RLS SUBSCRIBE to this value.
+		Leaving this at the default of zero means no limit.
+		When people have large contact lists RLS will make lots of back-end
+		subscriptions.  This can easily overload a system.  This option allows
+		you to limit the number of back-end SUBSCRIBEs to help prevent overload.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>max_backend_subs</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "max_backend_subs", 30)
+...
+</programlisting>
+	    </example>
+	</section>
+
 </section>
 
 <section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
-		<function moreinfo="none">rls_handle_subscribe()</function>
+		<function moreinfo="none">rls_handle_subscribe([watcher_uri])</function>
 		</title>
 		<para>
 		This function detects if a Subscribe message should be
 		handled by RLS. If not it replies with the configured 
 		to_presence_code. If it is, it extracts the dialog info and sends
 		aggregate Notify requests with information for the list.	
+		</para>
+		<para>
+		By default this function uses the From: URI from the SUBSCRIBE
+		request as the Watcher URI.  The optional watcher_uri parameter
+		can be used to specify a different Watcher URI, possibly taken
+		from a SIP header like P-Asserted-Identity:.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE.
@@ -443,6 +707,77 @@ if(method=="NOTIFY")
 ...
 </programlisting>
 		</example>
+	</section>
+
+	<section>
+		<title>
+		<function moreinfo="none">rls_update_subs(uri, event)</function>
+		</title>
+		<para>
+		This function can be used in configuration to trigger updates to
+		resource list subscriptions (for example, after the contents of a
+		resource list has changes).
+		</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem>
+				<para>uri - the uri of the user who made the change
+				and whose resource list subscriptions should be
+				updated</para>
+			</listitem>
+			<listitem>
+				<para>event - the event package (e.g. presence).
+				</para>
+			</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>rls_update_subs</function> usage</title>
+		<programlisting format="linespecific">
+...
+Within event_route[xhttp:request]:
+	case "PUT":
+		xcaps_put("$var(uri)", "$var(doc_uri)", "$rb");
+		if($xcapuri(u=>auid)=~"pres-rules") {
+			pres_update_watchers("$var(uri)", "presence");
+			pres_refresh_watchers("$var(uri)", "presence", 1);
+		} else if ($xcapuri(u=>auid)=~"resource-lists"
+			   || $xcapuri(u=>auid)=~"rls-services") {
+			rls_update_subs("$var(uri)", "presence");
+		}
+		exit;
+		break;
+...
+</programlisting>
+		</example>
+	</section>
+</section>
+
+<section>
+	<title>MI Commands</title>
+	<section>
+	  <title>
+		<function moreinfo="none">rls_cleanup</function>
+	  </title>
+	  <para>
+		Manually triggers the cleanup functions forthe rls_watchers and
+		rls_presentity tables. Useful if you have set
+		<varname>clean_period</varname> to zero or less.
+	  </para>
+	  <para>
+		Name: <emphasis>rls_cleanup</emphasis>
+	  </para>
+	  <para>Parameters: <emphasis>none</emphasis></para>
+
+	  <para>
+		MI FIFO Command Format:
+	  </para>
+	  <programlisting  format="linespecific">
+		:rls_cleanup:fifo_reply
+		_empty_line_
+	  </programlisting>
 	</section>
 </section>
 

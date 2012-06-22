@@ -23,7 +23,7 @@ Daniel-Constantin Mierla
               2.1. Kamailio Modules
               2.2. External Libraries or Applications
 
-        3. Exported Parameters
+        3. Parameters
 
               3.1. mask_key (str)
               3.2. mask_ip (str)
@@ -33,8 +33,9 @@ Daniel-Constantin Mierla
               3.6. vparam_name (str)
               3.7. vparam_prefix (str)
               3.8. callid_prefix (str)
+              3.9. sanity_checks (integer)
 
-        4. Exported Functions
+        4. Functions
 
               4.1.
 
@@ -48,6 +49,7 @@ Daniel-Constantin Mierla
    1.6. Set vparam_name parameter
    1.7. Set vparam_prefix parameter
    1.8. Set callid_prefix parameter
+   1.9. Set sanity_checks parameter
 
 Chapter 1. Admin Guide
 
@@ -59,7 +61,7 @@ Chapter 1. Admin Guide
         2.1. Kamailio Modules
         2.2. External Libraries or Applications
 
-   3. Exported Parameters
+   3. Parameters
 
         3.1. mask_key (str)
         3.2. mask_ip (str)
@@ -69,8 +71,9 @@ Chapter 1. Admin Guide
         3.6. vparam_name (str)
         3.7. vparam_prefix (str)
         3.8. callid_prefix (str)
+        3.9. sanity_checks (integer)
 
-   4. Exported Functions
+   4. Functions
 
         4.1.
 
@@ -107,7 +110,7 @@ Chapter 1. Admin Guide
      * None. In the future the module can be enhanced to use a stronger
        encryption algorithm.
 
-3. Exported Parameters
+3. Parameters
 
    3.1. mask_key (str)
    3.2. mask_ip (str)
@@ -117,6 +120,7 @@ Chapter 1. Admin Guide
    3.6. vparam_name (str)
    3.7. vparam_prefix (str)
    3.8. callid_prefix (str)
+   3.9. sanity_checks (integer)
 
 3.1. mask_key (str)
 
@@ -212,7 +216,21 @@ modparam("topoh", "vparam_prefix", "xyz")
 modparam("topoh", "callid_prefix", "***")
 ...
 
-4. Exported Functions
+3.9. sanity_checks (integer)
+
+   If set to 1, topoh module will bind to sanity module in order to
+   perform sanity checks over received SIP request. Default sanity checks
+   are done. It is useful to check if received request is well formated
+   before proceeding to encoding/decoding.
+
+   Default value is 0 (do not bind to sanity module).
+
+   Example 1.9. Set sanity_checks parameter
+...
+modparam("topoh", "sanity_checks", 1)
+...
+
+4. Functions
 
    4.1.
 

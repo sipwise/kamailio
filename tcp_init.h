@@ -37,7 +37,9 @@
 									   timeout */
 #define DEFAULT_TCP_CONNECT_TIMEOUT 10 /* if a connect doesn't complete in this
 										  time, timeout */
-#define DEFAULT_TCP_MAX_CONNECTIONS 2048 /* maximum connections */
+#define DEFAULT_TCP_MAX_CONNECTIONS 2048 /* maximum tcp connections */
+
+#define DEFAULT_TLS_MAX_CONNECTIONS 2048 /* maximum tls connections */
 
 #define DEFAULT_TCP_BUF_SIZE	4096  /* buffer size used for reads */
 
@@ -48,6 +50,7 @@ struct tcp_child{
 	int proc_no; /* ser proc_no, for debugging */
 	int unix_sock; /* unix "read child" sock fd */
 	int busy;
+	struct socket_info *mysocket; /* listen socket to handle traffic on it */
 	int n_reqs; /* number of requests serviced so far */
 };
 
@@ -55,11 +58,11 @@ struct tcp_child{
 #define TCP_ALIAS_REPLACE   2
 
 
-int init_tcp();
-void destroy_tcp();
+int init_tcp(void);
+void destroy_tcp(void);
 int tcp_init(struct socket_info* sock_info);
-int tcp_init_children();
-void tcp_main_loop();
+int tcp_init_children(void);
+void tcp_main_loop(void);
 void tcp_receive_loop(int unix_sock);
 int tcp_fix_child_sockets(int* fd);
 

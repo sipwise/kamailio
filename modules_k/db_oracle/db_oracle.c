@@ -30,6 +30,7 @@
 #include <oci.h>
 #include "../../sr_module.h"
 #include "../../lib/srdb1/db.h"
+#include "../../lib/srdb1/db_query.h"
 #include "dbase.h"
 #include "asynch.h"
 
@@ -74,6 +75,13 @@ struct module_exports exports = {
 	0                /* per-child init function */
 };
 
+
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	if(db_api_init()<0)
+		return -1;
+	return 0;
+}
 
 static int oracle_mod_init(void)
 {

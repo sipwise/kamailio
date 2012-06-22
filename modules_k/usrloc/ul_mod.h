@@ -43,13 +43,9 @@
  */
 
 
-#define NO_DB         0
-#define WRITE_THROUGH 1
-#define WRITE_BACK    2
-#define DB_ONLY       3
+#define UL_TABLE_VERSION 5
 
-#define UL_TABLE_VERSION 1004
-
+extern str ruid_col;
 extern str user_col;
 extern str domain_col;
 extern str contact_col;
@@ -64,6 +60,8 @@ extern str received_col;
 extern str path_col;
 extern str sock_col;
 extern str methods_col;
+extern str instance_col;
+extern str reg_id_col;
 extern str last_mod_col;
 
 extern str db_url;
@@ -74,6 +72,8 @@ extern int desc_time_order;
 extern int cseq_delay;
 extern int ul_fetch_rows;
 extern int ul_hash_size;
+extern int ul_db_update_as_insert;
+extern int ul_db_check_update;
 
 extern db1_con_t* ul_dbh;   /* Database connection handle */
 extern db_func_t ul_dbf;
@@ -82,9 +82,9 @@ extern db_func_t ul_dbf;
 /*
  * Matching algorithms
  */
-#define CONTACT_ONLY            (0)
-#define CONTACT_CALLID          (1)
-#define CONTACT_PATH		(2)
+#define CONTACT_ONLY        (0)
+#define CONTACT_CALLID      (1)
+#define CONTACT_PATH        (2)
 
 extern int matching_mode;
 

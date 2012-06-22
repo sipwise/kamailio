@@ -186,7 +186,7 @@
 #include "cfg_core.h"
 #include "endianness.h" /* init */
 #include "basex.h" /* init */
-#include "pvapi_init.h" /* init */
+#include "pvapi.h" /* init PV api */
 #include "pv_core.h" /* register core pvars */
 #include "ppcfg.h"
 #include "sock_ut.h"
@@ -245,6 +245,7 @@ Options:\n\
     -b nr        Maximum receive buffer size which will not be exceeded by\n\
                   auto-probing procedure even if  OS allows\n\
     -m nr        Size of shared memory allocated in Megabytes\n\
+    -M nr        Size of private memory allocated, in Megabytes\n\
     -w dir       Change the working directory to \"dir\" (default: \"/\")\n\
     -t dir       Chroot to \"dir\"\n\
     -u uid       Change uid \n\
@@ -262,7 +263,7 @@ Options:\n\
 
 
 /* print compile-time constants */
-void print_ct_constants()
+void print_ct_constants(void)
 {
 #ifdef ADAPTIVE_WAIT
 	printf("ADAPTIVE_WAIT_LOOPS=%d, ", ADAPTIVE_WAIT_LOOPS);
@@ -273,7 +274,7 @@ void print_ct_constants()
 #endif
 */
 	printf("MAX_RECV_BUFFER_SIZE %d, MAX_LISTEN %d,"
-			" MAX_URI_SIZE %d, BUF_SIZE %d, PKG_SIZE %uMB\n",
+			" MAX_URI_SIZE %d, BUF_SIZE %d, DEFAULT PKG_SIZE %uMB\n",
 		MAX_RECV_BUFFER_SIZE, MAX_LISTEN, MAX_URI_SIZE,
 		BUF_SIZE, PKG_MEM_SIZE);
 #ifdef USE_TCP
@@ -281,9 +282,37 @@ void print_ct_constants()
 #endif
 }
 
+/* print compile-time constants */
+void print_internals(void)
+{
+	printf("Print out of %s internals\n", NAME);
+	printf("  Version: %s\n", full_version);
+	printf("  Default config: %s\n", CFG_FILE);
+	printf("  Default paths to modules: %s\n", MODS_DIR);
+	printf("  Compile flags: %s\n", ver_flags );
+	printf("  MAX_RECV_BUFFER_SIZE=%d\n", MAX_RECV_BUFFER_SIZE);
+	printf("  MAX_LISTEN=%d\n", MAX_LISTEN);
+	printf("  MAX_URI_SIZE=%d\n", MAX_URI_SIZE);
+	printf("  BUF_SIZE=%d\n", BUF_SIZE);
+	printf("  DEFAULT PKG_SIZE=%uMB\n", PKG_MEM_SIZE);
+#ifdef SHM_MEM
+	printf("  DEFAULT SHM_SIZE=%uMB\n", SHM_MEM_SIZE);
+#endif
+#ifdef ADAPTIVE_WAIT
+	printf("  ADAPTIVE_WAIT_LOOPS=%d\n", ADAPTIVE_WAIT_LOOPS);
+#endif
+#ifdef USE_TCP
+	printf("  TCP poll methods: %s\n", poll_support);
+#endif
+	printf("  Source code revision ID: %s\n", ver_id);
+	printf("  Compiled with: %s\n", ver_compiler);
+	printf("  Compiled on: %s\n", ver_compiled_time);
+	printf("Thank you for flying %s!\n", NAME);
+}
+
 /* debugging function */
 /*
-void receive_stdin_loop()
+void receive_stdin_loop(void)
 {
 	#define BSIZE 1024
 	char buf[BSIZE+1];
@@ -310,9 +339,14 @@ unsigned int maxbuffer = MAX_RECV_BUFFER_SIZE; /* maximum buffer size we do
 												  not want to exceed during the
 												  auto-probing procedure; may
 												  be re-configured */
-int children_no = 0;			/* number of children processing requests */
+unsigned int sql_buffer_size = 65535; /* Size for the SQL buffer. Defaults to 64k. 
+                                         This may be re-configured */
+int socket_workers = 0;		/* number of workers processing requests for a socket
+							   - it's reset everytime with a new listen socket */
+int children_no = 0;		/* number of children processing requests */
 #ifdef USE_TCP
-int tcp_children_no = 0;
+int tcp_cfg_children_no = 0; /* set via config or command line option */
+int tcp_children_no = 0; /* based on socket_workers and tcp_cfg_children_no */
 int tcp_disable = 0; /* 1 if tcp is disabled */
 #endif
 #ifdef USE_TLS
@@ -384,6 +418,9 @@ int sock_mode= S_IRUSR| S_IWUSR| S_IRGRP| S_IWGRP; /* rw-rw---- */
 
 int server_id = 0; /* Configurable unique ID of the server */
 
+/* set timeval for each received sip message */
+int sr_msg_time = 1;
+
 /* more config stuff */
 int disable_core_dump=0; /* by default enabled */
 int open_files_limit=-1; /* don't touch it by default */
@@ -417,6 +454,10 @@ int mcast_ttl = -1; /* if -1, don't touch it, use the default (usually 1) */
 
 int tos = IPTOS_LOWDELAY;
 int pmtu_discovery = 0;
+
+#ifdef USE_IPV6
+int auto_bind_ipv6 = 0;
+#endif
 
 #if 0
 char* names[MAX_LISTEN];              /* our names */
@@ -488,6 +529,8 @@ int cfg_warnings=0;
 
 /* shared memory (in MB) */
 unsigned long shm_mem_size=0;
+/* private (pkg) memory (in MB) */
+unsigned long pkg_mem_size=0;
 
 /* export command-line to anywhere else */
 int my_argc;
@@ -501,7 +544,7 @@ static int cfg_ok=0;
 
 
 extern FILE* yyin;
-extern int yyparse();
+extern int yyparse(void);
 
 
 int is_main=1; /* flag = is this the  "main" process? */
@@ -552,7 +595,7 @@ void cleanup(show_status)
 	destroy_sctp();
 #endif
 	destroy_timer();
-	destroy_pv_api();
+	pv_destroy_api();
 	destroy_script_cb();
 	destroy_nonsip_hooks();
 	destroy_routes();
@@ -590,6 +633,7 @@ void cleanup(show_status)
 	destroy_lock_ops();
 	if (pid_file) unlink(pid_file);
 	if (pgid_file) unlink(pgid_file);
+	destroy_pkg_mallocs();
 }
 
 
@@ -672,7 +716,7 @@ static void shutdown_children(int sig, int show_status)
 
 
 
-void handle_sigs()
+void handle_sigs(void)
 {
 	pid_t	chld;
 	int	chld_status;
@@ -693,9 +737,9 @@ void handle_sigs()
 				DBG("INT received, program terminates\n");
 			else
 				DBG("SIGTERM received, program terminates\n");
+			LOG(L_NOTICE, "Thank you for flying " NAME "!!!\n");
 			/* shutdown/kill all the children */
 			shutdown_children(SIGTERM, 1);
-			LOG(L_NOTICE, "Thank you for flying " NAME "\n");
 			exit(0);
 			break;
 
@@ -852,7 +896,7 @@ void sig_usr(int signo)
 
 
 /* install the signal handlers, returns 0 on success, -1 on error */
-int install_sigs()
+int install_sigs(void)
 {
 	/* added by jku: add exit handler */
 	if (set_sig_h(SIGINT, sig_usr) == SIG_ERR ) {
@@ -1218,7 +1262,7 @@ int fix_cfg_file(void)
 
 
 /* main loop */
-int main_loop()
+int main_loop(void)
 {
 	int  i;
 	pid_t pid;
@@ -1227,6 +1271,7 @@ int main_loop()
 #ifdef EXTRA_DEBUG
 	int r;
 #endif
+	int nrprocs;
 
 	/* one "main" process and n children handling i/o */
 	if (dont_fork){
@@ -1306,6 +1351,11 @@ int main_loop()
 		   as new processes are forked (while skipping 0 reserved for main
 		*/
 
+		/* Temporary set the local configuration of the main process
+		 * to make the group instances available in PROC_INIT.
+		 */
+		cfg_main_set_local();
+
 		/* init childs with rank==PROC_INIT before forking any process,
 		 * this is a place for delayed (after mod_init) initializations
 		 * (e.g. shared vars that depend on the total number of processes
@@ -1316,8 +1366,10 @@ int main_loop()
 		if (init_child(PROC_INIT) < 0) {
 			LOG(L_ERR, "ERROR: main_dontfork: init_child(PROC_INT) --"
 						" exiting\n");
+			cfg_main_reset_local();
 			goto error;
 		}
+		cfg_main_reset_local();
 		if (counters_prefork_init(get_max_procs()) == -1) goto error;
 
 #ifdef USE_SLOW_TIMER
@@ -1377,7 +1429,7 @@ int main_loop()
 		 * in fact we behave like a child, not like main process
 		 */
 
-		if (init_child(1) < 0) {
+		if (init_child(PROC_SIPINIT) < 0) {
 			LOG(L_ERR, "main_dontfork: init_child failed\n");
 			goto error;
 		}
@@ -1408,7 +1460,7 @@ int main_loop()
 				sendipv6=si;
 	#endif
 			/* children_no per each socket */
-			cfg_register_child(children_no);
+			cfg_register_child((si->workers>0)?si->workers:children_no);
 		}
 #ifdef USE_RAW_SOCKS
 		/* always try to have a raw socket opened if we are using ipv4 */
@@ -1462,7 +1514,7 @@ int main_loop()
 					sendipv6_sctp=si;
 		#endif
 				/* sctp_children_no per each socket */
-				cfg_register_child(sctp_children_no);
+				cfg_register_child((si->workers>0)?si->workers:sctp_children_no);
 			}
 		}
 #endif /* USE_SCTP */
@@ -1519,6 +1571,12 @@ int main_loop()
 			LOG(L_CRIT, "could not initialize shared configuration\n");
 			goto error;
 		}
+
+		/* Temporary set the local configuration of the main process
+		 * to make the group instances available in PROC_INIT.
+		 */
+		cfg_main_set_local();
+
 		/* init childs with rank==PROC_INIT before forking any process,
 		 * this is a place for delayed (after mod_init) initializations
 		 * (e.g. shared vars that depend on the total number of processes
@@ -1529,22 +1587,37 @@ int main_loop()
 		if (init_child(PROC_INIT) < 0) {
 			LOG(L_ERR, "ERROR: main: error in init_child(PROC_INT) --"
 					" exiting\n");
+			cfg_main_reset_local();
 			goto error;
 		}
+		cfg_main_reset_local();
 		if (counters_prefork_init(get_max_procs()) == -1) goto error;
 
 
 		/* udp processes */
 		for(si=udp_listen; si; si=si->next){
-			for(i=0;i<children_no;i++){
+			nrprocs = (si->workers>0)?si->workers:children_no;
+			for(i=0;i<nrprocs;i++){
 				if(si->address.af==AF_INET6) {
-					snprintf(si_desc, MAX_PT_DESC, "udp receiver child=%d "
-						"sock=[%s]:%s",
-						i, si->name.s, si->port_no_str.s);
+					if(si->useinfo.name.s)
+						snprintf(si_desc, MAX_PT_DESC, "udp receiver child=%d "
+							"sock=[%s]:%s (%s:%s)",
+							i, si->name.s, si->port_no_str.s,
+							si->useinfo.name.s, si->useinfo.port_no_str.s);
+					else
+						snprintf(si_desc, MAX_PT_DESC, "udp receiver child=%d "
+							"sock=[%s]:%s",
+							i, si->name.s, si->port_no_str.s);
 				} else {
-					snprintf(si_desc, MAX_PT_DESC, "udp receiver child=%d "
-						"sock=%s:%s",
-						i, si->name.s, si->port_no_str.s);
+					if(si->useinfo.name.s)
+						snprintf(si_desc, MAX_PT_DESC, "udp receiver child=%d "
+							"sock=%s:%s (%s:%s)",
+							i, si->name.s, si->port_no_str.s,
+							si->useinfo.name.s, si->useinfo.port_no_str.s);
+					else
+						snprintf(si_desc, MAX_PT_DESC, "udp receiver child=%d "
+							"sock=%s:%s",
+							i, si->name.s, si->port_no_str.s);
 				}
 				child_rank++;
 				pid = fork_process(child_rank, si_desc, 1);
@@ -1567,7 +1640,8 @@ int main_loop()
 		/* sctp processes */
 		if (!sctp_disable){
 			for(si=sctp_listen; si; si=si->next){
-				for(i=0;i<sctp_children_no;i++){
+				nrprocs = (si->workers>0)?si->workers:sctp_children_no;
+				for(i=0;i<nrprocs;i++){
 					if(si->address.af==AF_INET6) {
 						snprintf(si_desc, MAX_PT_DESC, "sctp receiver child=%d "
 								"sock=[%s]:%s",
@@ -1709,17 +1783,33 @@ static int calc_proc_no(void)
 {
 	int udp_listeners;
 	struct socket_info* si;
+#ifdef USE_TCP
+	int tcp_listeners;
+	int tcp_e_listeners;
+#endif
 #ifdef USE_SCTP
 	int sctp_listeners;
 #endif
 
-	for (si=udp_listen, udp_listeners=0; si; si=si->next, udp_listeners++);
+	for (si=udp_listen, udp_listeners=0; si; si=si->next)
+		udp_listeners += (si->workers>0)?si->workers:children_no;
+#ifdef USE_TCP
+	for (si=tcp_listen, tcp_listeners=0, tcp_e_listeners=0; si; si=si->next) {
+		if(si->workers>0)
+			tcp_listeners += si->workers;
+		else
+			 tcp_e_listeners = tcp_cfg_children_no;
+	}
+	tcp_listeners += tcp_e_listeners;
+	tcp_children_no = tcp_listeners;
+#endif
 #ifdef USE_SCTP
-	for (si=sctp_listen, sctp_listeners=0; si; si=si->next, sctp_listeners++);
+	for (si=sctp_listen, sctp_listeners=0; si; si=si->next)
+		sctp_listeners += (si->workers>0)?si->workers:sctp_children_no;
 #endif
 	return
 		     /* receivers and attendant */
-		(dont_fork ? 1 : children_no * udp_listeners + 1)
+		(dont_fork ? 1 : udp_listeners + 1)
 		     /* timer process */
 		+ 1 /* always, we need it in most cases, and we can't tell here
 		       & now if we don't need it */
@@ -1727,10 +1817,10 @@ static int calc_proc_no(void)
 		+ 1 /* slow timer process */
 #endif
 #ifdef USE_TCP
-		+((!tcp_disable)?( 1/* tcp main */ + tcp_children_no ):0)
+		+((!tcp_disable)?( 1/* tcp main */ + tcp_listeners ):0)
 #endif
 #ifdef USE_SCTP
-		+((!sctp_disable)?sctp_children_no*sctp_listeners:0)
+		+((!sctp_disable)?sctp_listeners:0)
 #endif
 		;
 }
@@ -1762,7 +1852,52 @@ int main(int argc, char** argv)
 	dont_fork_cnt=0;
 
 	daemon_status_init();
-	/*init pkg mallocs (before parsing cfg or cmd line !)*/
+	/* command line options */
+	options=  ":f:cm:M:dVIhEb:l:L:n:vrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:"
+#ifdef STATS
+		"s:"
+#endif
+	;
+	/* Handle special command line arguments, that must be treated before
+	 * intializing the various subsystem or before parsing other arguments:
+	 *  - get the startup debug and log_stderr values
+	 *  - look if pkg mem size is overriden on the command line (-M) and get
+	 *    the new value here (before intializing pkg_mem).
+	 *  - look if there is a -h, e.g. -f -h construction won't be caught
+	 *    later
+	 */
+	opterr = 0;
+	while((c=getopt(argc,argv,options))!=-1) {
+		switch(c) {
+			case 'd':
+					debug_flag = 1;
+					default_core_cfg.debug++;
+					break;
+			case 'E':
+					log_stderr=1;
+					break;
+			case 'M':
+					pkg_mem_size=strtol(optarg, &tmp, 10) * 1024 * 1024;
+					if (tmp &&(*tmp)){
+						fprintf(stderr, "bad private mem size number: -M %s\n",
+											optarg);
+						goto error;
+					};
+					break;
+			default:
+					if (c == 'h' || (optarg && strcmp(optarg, "-h") == 0)) {
+						printf("version: %s\n", full_version);
+						printf("%s",help_msg);
+						exit(0);
+					}
+					break;
+		}
+	}
+	
+	/*init pkg mallocs (before parsing cfg or the rest of the cmd line !)*/
+	if (pkg_mem_size)
+		LOG(L_INFO, " private (per process) memory: %ld bytes\n",
+								pkg_mem_size );
 	if (init_pkg_mallocs()==-1)
 		goto error;
 
@@ -1771,11 +1906,6 @@ int main(int argc, char** argv)
 		"DBG_MSG_QA enabled, ser may exit abruptly\n");
 #endif
 
-	options=  ":f:cm:dVhEb:l:L:n:vrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:"
-#ifdef STATS
-		"s:"
-#endif
-	;
 	/* init counters / stats */
 	if (init_counters() == -1)
 		goto error;
@@ -1785,16 +1915,6 @@ int main(int argc, char** argv)
 #ifdef USE_SCTP
 	init_sctp_options(); /* set defaults before the config */
 #endif
-	/* look if there is a -h, e.g. -f -h construction won't catch it later */
-	opterr = 0;
-	while((c=getopt(argc,argv,options))!=-1) {
-		if (c == 'h' || (optarg && strcmp(optarg, "-h") == 0)) {
-			printf("version: %s\n", full_version);
-			printf("%s",help_msg);
-			exit(0);
-			break;
-		}
-	}
 	/* process command line (cfg. file path etc) */
 	optind = 1;  /* reset getopt */
 	/* switches required before script processing */
@@ -1820,9 +1940,12 @@ int main(int argc, char** argv)
 					LOG(L_INFO, "ser: shared memory: %ld bytes\n",
 									shm_mem_size );
 					break;
+			case 'M':
+					/* ignore it, it was parsed immediately after startup,
+					   the pkg mem. is already initialized at this point */
+					break;
 			case 'd':
-					debug_flag = 1;
-					default_core_cfg.debug++;
+					/* ignore it, was parsed immediately after startup */
 					break;
 			case 'V':
 					printf("version: %s\n", full_version);
@@ -1840,8 +1963,12 @@ int main(int argc, char** argv)
 
 					exit(0);
 					break;
+			case 'I':
+					print_internals();
+					exit(0);
+					break;
 			case 'E':
-					log_stderr=1;
+					/* ignore it, was parsed immediately after startup */
 					break;
 			case 'O':
 					scr_opt_lev=strtol(optarg, &tmp, 10);
@@ -1860,6 +1987,7 @@ int main(int argc, char** argv)
 					if(p) {
 						*p = '\0';
 					}
+					pp_define_set_type(0);
 					if(pp_define(strlen(optarg), optarg)<0) {
 						fprintf(stderr, "error at define param: -A %s\n",
 								optarg);
@@ -1922,7 +2050,7 @@ int main(int argc, char** argv)
 	if (init_routes()<0) goto error;
 	if (init_nonsip_hooks()<0) goto error;
 	if (init_script_cb()<0) goto error;
-	if (init_pv_api()<0) goto error;
+	if (pv_init_api()<0) goto error;
 	if (pv_register_core_vars()!=0) goto error;
 	if (init_rpcs()<0) goto error;
 	if (register_core_rpcs()!=0) goto error;
@@ -1986,14 +2114,17 @@ try_again:
 			case 'f':
 			case 'c':
 			case 'm':
+			case 'M':
 			case 'd':
 			case 'V':
+			case 'I':
 			case 'h':
 			case 'O':
 			case 'A':
 					break;
 			case 'E':
-					log_stderr=1;	// use in both getopt switches
+					log_stderr=1;	/* use in both getopt switches,
+									   takes priority over config */
 					break;
 			case 'b':
 					maxbuffer=strtol(optarg, &tmp, 10);
@@ -2048,7 +2179,7 @@ try_again:
 					break;
 			case 'N':
 				#ifdef USE_TCP
-					tcp_children_no=strtol(optarg, &tmp, 10);
+					tcp_cfg_children_no=strtol(optarg, &tmp, 10);
 					if ((tmp==0) ||(*tmp)){
 						fprintf(stderr, "bad process number: -N %s\n",
 									optarg);
@@ -2129,6 +2260,10 @@ try_again:
 		}
 	}
 
+	/* reinit if pv buffer size has been set in config */
+	if (pv_reinit_buffer()<0)
+		goto error;
+
 	if (dont_fork_cnt)
 		dont_fork = dont_fork_cnt;	/* override by command line */
 
@@ -2176,7 +2311,8 @@ try_again:
 	if (children_no<=0) children_no=CHILD_NO;
 #ifdef USE_TCP
 	if (!tcp_disable){
-		if (tcp_children_no<=0) tcp_children_no=children_no;
+		if (tcp_cfg_children_no<=0) tcp_cfg_children_no=children_no;
+		tcp_children_no = tcp_cfg_children_no;
 	}
 #endif
 #ifdef USE_SCTP
@@ -2334,7 +2470,7 @@ try_again:
 	}
 
 	if (disable_core_dump) set_core_dump(0, 0);
-	else set_core_dump(1, shm_mem_size+PKG_MEM_POOL_SIZE+4*1024*1024);
+	else set_core_dump(1, shm_mem_size+pkg_mem_size+4*1024*1024);
 	if (open_files_limit>0){
 		if(increase_open_fds(open_files_limit)<0){
 			fprintf(stderr, "ERROR: error could not increase file limits\n");

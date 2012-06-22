@@ -73,7 +73,7 @@
 	</section>
 
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>list_file</varname> (string)</title>
 		<para>
@@ -223,12 +223,13 @@ modparam("dispatcher", "priority_col", "dstpriority")
 	<section>
 		<title><varname>force_dst</varname> (int)</title>
 		<para>
-		If set to 1, force overwriting of destination address when that is
-		already set.
+		If set to 1, force overwriting of destination address (outbound proxy)
+		when that is already set. If set to 0, will return error when the
+		destination address is already set.
 		</para>
 		<para>
 		<emphasis>
-			Default value is <quote>0</quote>.
+			Default value is <quote>1</quote>.
 		</emphasis>
 		</para>
 		<example>
@@ -541,13 +542,16 @@ modparam("dispatcher", "force_dst", 1)
  	<section>
  		<title><varname>ds_probing_threshhold</varname> (int)</title>
  		<para>
-		If you want to set a gateway into probing mode, you will need a specific number of requests until it will change from "active" to probing.
-		The number of attempts can be set with this parameter.
+		If you want to set a gateway into inactive mode, there can be
+		a specific number of failed requests until it will change from "active"
+		to "inactive". It is using the state "trying", that allows selection
+		of gateway but indicates there was a failure previously with the
+		gateway. The number of attempts can be set with this parameter.
 		This parameter can be modified via ser config framework.
  		</para>
  		<para>
  		<emphasis>
- 			Default value is <quote>3</quote>.
+		Default value is <quote>1</quote> (set inactive with first failure).
  		</emphasis>
  		</para>
  		<example>
@@ -584,9 +588,10 @@ modparam("dispatcher", "force_dst", 1)
  		<title><varname>ds_probing_mode</varname> (int)</title>
  		<para>
 		Controls what gateways are tested to see if they are reachable. If set
-		to 0, only the gateways with state PROBING are tested, if set to 1, all
-		gateways are tested. If set to 1 and the response is 408 (timeout),
-		an active gateway is set to PROBING state.
+		to 0, only the gateways with state PROBING are tested; if set to 1, all
+		gateways are tested; if set to 2, only gateways in inactive state with
+		probing mode set are tested. If set to 1 and there is a failure of keepalive
+		to an active gateway, then it is set to TRYING state.
  		</para>
  		<para>
  		<emphasis>
@@ -687,11 +692,30 @@ modparam("dispatcher", "force_dst", 1)
  </programlisting>
  		</example>
 	</section>
+ 	<section>
+ 		<title><varname>outbound_proxy</varname> (str)</title>
+ 		<para>
+		SIP URI of outbound proxy to be used when sending pings.
+ 		</para>
+ 		<para>
+ 		<emphasis>
+ 			By default no outbound proxy is defined.
+ 		</emphasis>
+ 		</para>
+ 		<example>
+ 		<title>Set the <quote>outbound_proxy</quote> parameter</title>
+ <programlisting format="linespecific">
+ ...
+ modparam("dispatcher", "outbound_proxy", "sip:outbound.example.com")
+ ...
+ </programlisting>
+ 		</example>
+	</section>
 
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
 		<function moreinfo="none">ds_select_dst(set, alg)</function>
@@ -871,77 +895,91 @@ ds_select_dst("1", "$var(a)");
  	</section>
   	<section>
  		<title>
- 		<function moreinfo="none">ds_mark_dst()</function>
- 		</title>
- 		<para>
- 		Mark the last used address from destination set as inactive, in order
-		to be ingnored in the future. In this way it can be implemented an
-		automatic detection of failed gateways. When an address is marked as
-		inactive, it will be ignored by 'ds_select_dst' and 'ds_select_domain'.
- 		</para>
-		<para>
-		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
-		</para>
- 	</section>
-  	<section>
- 		<title>
- 		<function moreinfo="none">ds_mark_dst("s")</function>
+ 		<function moreinfo="none">ds_mark_dst([state])</function>
  		</title>
  		<para>
 		Mark the last used address from destination set as inactive
-		("i"/"I"/"0"), active ("a"/"A"/"1") or probing ("p"/"P"/"2").
-		With this function, an automatic detection of failed gateways
-		can be implemented. When an address is marked as
-		inactive or probing, it will be ignored by 'ds_select_dst' and
+		("i"/"I"), active ("a"/"A"), disabled ("d"/"D") or trying ("t"/"T").
+		Apart of disabled state, a destination can be set in probing mode by
+		adding ("p"/"P") flag. With this function, an automatic detection
+		of failed gateways can be implemented. When an address is marked as
+		inactive or disabled, it will be ignored by 'ds_select_dst' and
 		'ds_select_domain'.
  		</para>
-		<para>possible parameters:</para>
+ 		<para>
+		The parameter state is optional, when it is missing, then
+		the destination will be marked inactive (i.e., same as 'i').
+ 		</para>
+		<para>Possible values for state parameter:</para>
 		<itemizedlist>
 		<listitem>
-			<para><emphasis>"i", "I" or "0"</emphasis> - the last destination
+			<para><emphasis>"a" or "A"</emphasis> - the last destination
+				should be set to active and the error-counter should set to "0".
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>"i" or "I"</emphasis> - the last destination
 				should be set to inactive and will be ignored in future
 				requests.</para>
 		</listitem>
 		<listitem>
-			<para><emphasis>"a", "A" or "1"</emphasis> - the last destination
-				should be set to active.</para>
+			<para><emphasis>"t" or "T"</emphasis> - the last destination
+				should be set to temporary trying state and failure counter
+				is incremented. When the failure counter reaches the threshold,
+				the destination will be set inactive.
+			</para>
 		</listitem>
 		<listitem>
-			<para><emphasis>"p", "P" or "2"</emphasis> - the last destination
-				will be set to probing. Note: You will need to call this
-				function "threshhold"-times, before it will be actually set
-				to probing.</para>
+			<para><emphasis>"p" and "P"</emphasis> - this has to be used in
+				addition to one of the previous flags - the last destination
+				will be set to probing. This mean the destination will be pinged
+				with SIP OPTIONS requests from time to time to detect if it is
+				up running or down.</para>
 		</listitem>
 		</itemizedlist>
 		<para>
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 		</para>
+		<example>
+		<title><function>ds_mark_dst</function> usage</title>
+		<programlisting format="linespecific">
+...
+failure_route[tryagain] {
+...
+   if(t_check_status("500"))
+      ds_mark_dst("ip"); # set to inactive and probing
+...
+}
+...
+</programlisting>
+		</example>
  	</section>
   	<section>
  		<title>
- 		<function moreinfo="none">ds_is_from_list()</function>
- 		</title>
- 		<para>
-			This function returns true, if the current request comes from a
-			host from the dispatcher-list; otherwise false.
- 		</para>
-		<para>
-			This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
-			BRANCH_ROUTE and ONREPLY_ROUTE.
-		</para>
- 	</section>
-  	<section>
- 		<title>
- 		<function moreinfo="none">ds_is_from_list("group")</function>
+ 		<function moreinfo="none">ds_is_from_list([groupid])</function>
  		</title>
  		<para>
 		This function returns true, if the current request comes from a host
 		in the given group of the dispatcher-list; otherwise false.
  		</para>
 		<para>
-			This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
-			BRANCH_ROUTE and ONREPLY_ROUTE.
+		Parameter groupid is optional, when it is missing, then the matching
+		will be done against all addresses in all groups. Upon a match, the
+		'grp_avp' will be set to groupid of matching address.
+ 		</para>
+		<para>
+			This function can be used from ANY_ROUTE.
 		</para>
+		<example>
+		<title><function>ds_mark_dst</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(ds_is_from_list("10")) {
+    ...
+}
+...
+</programlisting>
+		</example>
  	</section>
   	<section>
  		<title>
@@ -1008,7 +1046,7 @@ onreply_route {
 	</section>
 
 	<section>
-	<title>Exported MI Functions</title>
+	<title>MI Commands</title>
 	<section>
 		<title>
 		<function moreinfo="none">ds_set_state</function>
@@ -1024,10 +1062,14 @@ onreply_route {
 		<itemizedlist>
 			<listitem><para>_state_ : state of the destination address</para>
 			      <itemizedlist>
-	                 <listitem><para> <quote>a</quote>: active </para></listitem> 
-			         <listitem><para> <quote>i</quote>: inactive </para></listitem>	
-				<listitem><para> <quote>p</quote>: probing </para></listitem>
+	                 <listitem><para> <quote>a</quote>: active</para></listitem> 
+			         <listitem><para> <quote>i</quote>: inactive</para></listitem>	
+			         <listitem><para> <quote>t</quote>: trying</para></listitem>	
+			         <listitem><para> <quote>d</quote>: disabled</para></listitem>	
 				  </itemizedlist>
+				  <para>The states <quote>a</quote>, <quote>i</quote> or
+					  <quote>t</quote> can be followed by <quote>p</quote>
+					  to set probing mode (e.g. 'ap', 'ip' or 'tp').</para>
 			</listitem>	  
 
 			<listitem><para>_group_: destination group id</para></listitem>
@@ -1069,10 +1111,11 @@ onreply_route {
 		<function moreinfo="none">ds_reload</function>
 		</title>
 		<para>
-		It reloads the groups and included destinations. The command is
-		disabled for call load based dispatching (algorithm 10) since
-		removal of destinations may leave the list of active
-		calls with broken references.
+		It reloads the groups and included destinations. For algorithm 10
+		(call load distribution), old internal list of active calls is
+		destroyed (because it is bould to the previous list of gateways),
+		meaning that the module is starting to count active calls again
+		from 0.
 		</para>
 		<para>
 		Name: <emphasis>ds_reload</emphasis>
@@ -1087,7 +1130,90 @@ onreply_route {
     </section>
 
     </section>
-	
+
+	<section>
+	<title>Exported RPC Commands</title>
+	<section>
+		<title>
+		<function moreinfo="none">dispatcher.set_state</function>
+		</title>
+		<para>
+		Sets the state for a destination address (can be use to mark the destination
+		as active or inactive).
+		</para>
+		<para>
+		Name: <emphasis>dispatcher.set_state</emphasis>
+		</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_state_ : state of the destination address</para>
+			      <itemizedlist>
+	                 <listitem><para> <quote>a</quote>: active</para></listitem>
+			         <listitem><para> <quote>i</quote>: inactive</para></listitem>
+			         <listitem><para> <quote>t</quote>: trying</para></listitem>
+			         <listitem><para> <quote>d</quote>: disabled</para></listitem>
+				  </itemizedlist>
+				  <para>The states <quote>a</quote>, <quote>i</quote> or
+					  <quote>t</quote> can be followed by <quote>p</quote>
+					  to set probing mode (e.g. 'ap', 'ip' or 'tp').</para>
+			</listitem>
+
+			<listitem><para>_group_: destination group id</para></listitem>
+
+			<listitem><para>_address_: address of the destination in the _group_</para></listitem>
+		</itemizedlist>
+		<para>
+		Example:
+		</para>
+<programlisting  format="linespecific">
+...
+# prototype: sercmd dispatcher.set_state _state_ _group_ _address_
+sercmd dispatcher.set_state ip 2 sip:127.0.0.1:5080
+...
+</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">dispatcher.list</function>
+		</title>
+		<para>
+		It lists the groups and included destinations.
+		</para>
+		<para>
+		Name: <emphasis>dispatcher.list</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis></para>
+		<para>
+		Example:
+		</para>
+        <programlisting  format="linespecific">
+		sercmd dispatcher.list
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">dispatcher.reload</function>
+		</title>
+		<para>
+		It reloads the groups and included destinations. The command is
+		disabled for call load based dispatching (algorithm 10) since
+		removal of destinations may leave the list of active
+		calls with broken references.
+		</para>
+		<para>
+		Name: <emphasis>dispatcher.reload</emphasis>
+		</para>
+		<para>Parameters: <emphasis>none</emphasis></para>
+		<para>
+		Example
+		</para>
+        <programlisting  format="linespecific">
+		sercmd dispatcher.reload
+		</programlisting>
+    </section>
+
+   </section>
+
 	<section>
 	<title>Installation and Running</title>
 	<section>
@@ -1102,8 +1228,12 @@ onreply_route {
 		</para>
 		<itemizedlist>
 			<listitem>
-			<para>flags: 1 - destination inactive, 2 - destination in probing
-			mode -- you can do bitwise OR to set both flags</para>
+			<para>flags (listed by index - can be bitwise mask of values):
+			0 (value 1) - inactive destination; 1 (value 2) - temporary trying
+			destination (in the way to become inactive if it does not reply to
+			keepalives - there is a module parameter to set the threshold of
+			failures); 2 (value 4)  - admin disabled destination; 3 (value 8)
+			- probing destination (sending keep alives);</para>
 			</listitem>
 			<listitem>
 			<para>priority: sets the priority in destination list (based on it
@@ -1162,5 +1292,45 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 		</example>
 	</section>
 	</section>
+
+        <section>
+        <title>Event routes</title>
+        <section>
+                <title>
+                <function moreinfo="none">dispatcher:dst-down</function>
+                </title>
+                <para>
+			When defined, the module calls event_route[dispatcher:ds-down]
+			when a destination goes down (becomes probing). A typical use
+			case is to update NMC equipment as to the status of a destination.
+                </para>
+        <programlisting  format="linespecific">
+...
+event_route[dispatcher:dst-down] {
+    xlog("L_ERR", "Destination down: $rm $ru ($du)\n");
+}
+...
+                </programlisting>
+	</section>
+        <section>
+                <title>
+                <function moreinfo="none">dispatcher:dst-up</function>
+                </title>
+                <para>
+			When defined, the module calls event_route[dispatcher:ds-up]
+			when a destination that was previously down (probing) comes up.
+			A typical use case is to update NMC equipment as to the status
+			of a destination.
+                </para>
+        <programlisting  format="linespecific">
+...
+event_route[dispatcher:dst-up] {
+    xlog("L_ERR", "Destination up: $rm $ru\n");
+}
+...
+                </programlisting>
+    </section>
+    </section>
+
 </chapter>
 

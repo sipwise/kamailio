@@ -76,6 +76,8 @@ typedef void (timer_function)(unsigned int ticks, void* param);
 	timer_ticks.h (.e.g TICKS_TO_S(tick) to convert to s or ms )*/
 #define TIMER_TICK 1 /* 1 s, kept for compatibility */
 
+/*function prototype to execute on mili-second based basic timers */
+typedef void (utimer_function)(unsigned int uticks, void* param);
 
 struct timer_ln; /* forward decl */
 /* new 
@@ -130,20 +132,20 @@ struct timer_ln{ /* timer_link already used in tm */
 
 
 
-void timer_main(); /* timer main loop, never exists */
+void timer_main(void); /* timer main loop, never exists */
 
 
-int init_timer();
-int arm_timer();
-void destroy_timer();
+int init_timer(void);
+int arm_timer(void);
+void destroy_timer(void);
 
 #ifdef USE_SLOW_TIMER
-int arm_slow_timer();
-void slow_timer_main();
+int arm_slow_timer(void);
+void slow_timer_main(void);
 #endif
 
 
-struct timer_ln* timer_alloc();
+struct timer_ln* timer_alloc(void);
 void timer_free(struct timer_ln* t);
 
 #ifdef TIMER_DEBUG
@@ -186,7 +188,7 @@ int timer_del_safe(struct timer_ln *tl);
 #define timer_del timer_del_safe
 #endif
 
-void timer_allow_del();
+void timer_allow_del(void);
 
 /* old timer compatibility functions & structure */
 
@@ -201,7 +203,7 @@ struct sr_timer{
 /*register a periodic timer;
  * ret: <0 on error*/
 int register_timer(timer_function f, void* param, unsigned int interval);
-ticks_t get_ticks();
-ticks_t get_ticks_raw();
+ticks_t get_ticks(void);
+ticks_t get_ticks_raw(void);
 
 #endif

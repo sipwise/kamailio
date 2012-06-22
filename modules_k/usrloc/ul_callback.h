@@ -32,8 +32,10 @@
 #ifndef _UL_CALLBACKS_H
 #define _UL_CALLBACKS_H
 
-#include "ucontact.h"
+#include "../../dprint.h"
 
+/* forward declaration for ucontact_t */
+struct ucontact;
 
 #define UL_CONTACT_INSERT      (1<<0)
 #define UL_CONTACT_UPDATE      (1<<1)
@@ -42,7 +44,7 @@
 #define ULCB_MAX               ((1<<4)-1)
 
 /*! \brief callback function prototype */
-typedef void (ul_cb) (ucontact_t *c, int type, void *param);
+typedef void (ul_cb) (struct ucontact *c, int type, void *param);
 /*! \brief register callback function prototype */
 typedef int (*register_ulcb_t)( int cb_types, ul_cb f, void *param);
 
@@ -65,7 +67,7 @@ extern struct ulcb_head_list*  ulcb_list;
 
 
 #define exists_ulcb_type(_types_) \
-	( (ulcb_list->reg_types)|(_types_) )
+	( (ulcb_list->reg_types)&(_types_) )
 
 
 int init_ulcb_list(void);
@@ -77,7 +79,7 @@ void destroy_ulcb_list(void);
 int register_ulcb( int types, ul_cb f, void *param );
 
 /*! \brief run all transaction callbacks for an event type */
-static inline void run_ul_callbacks( int type , ucontact_t *c)
+static inline void run_ul_callbacks( int type , struct ucontact *c)
 {
 	struct ul_callback *cbp;
 

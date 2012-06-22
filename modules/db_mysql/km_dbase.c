@@ -50,6 +50,8 @@
 #include "km_db_mysql.h"
 #include "km_dbase.h"
 
+static char *mysql_sql_buf;
+
 
 /**
  * \brief Send a SQL query to the server.
@@ -195,7 +197,7 @@ static int db_mysql_store_result(const db1_con_t* _h, db1_res_t** _r)
 		 * to free the mem from the mysql lib side */
 		mysql_free_result(CON_RESULT(_h));
 #if (MYSQL_VERSION_ID >= 40100)
-		while( mysql_next_result( CON_CONNECTION(_h) ) > 0 ) {
+		while( mysql_more_results(CON_CONNECTION(_h)) && mysql_next_result(CON_CONNECTION(_h)) > 0 ) {
 			MYSQL_RES *res = mysql_store_result( CON_CONNECTION(_h) );
 			mysql_free_result(res);
 		}
@@ -206,7 +208,7 @@ static int db_mysql_store_result(const db1_con_t* _h, db1_res_t** _r)
 
 done:
 #if (MYSQL_VERSION_ID >= 40100)
-	while( mysql_next_result( CON_CONNECTION(_h) ) > 0 ) {
+	while( mysql_more_results(CON_CONNECTION(_h)) && mysql_next_result(CON_CONNECTION(_h)) > 0 ) {
 		MYSQL_RES *res = mysql_store_result( CON_CONNECTION(_h) );
 		mysql_free_result(res);
 	}
@@ -455,7 +457,8 @@ int db_mysql_update(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _o,
  * \param _n number of key=value pairs
  * \return zero on success, negative value on failure
  */
-int db_mysql_replace(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v, const int _n)
+int db_mysql_replace(const db1_con_t* _h, const db_key_t* _k,
+		const db_val_t* _v, const int _n, const int _un, const int _m)
 {
 	return db_do_replace(_h, _k, _v, _n, db_mysql_val2str,
 	db_mysql_submit_query);
@@ -468,7 +471,7 @@ int db_mysql_replace(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v
  * \return returns the ID as integer or returns 0 if the previous statement
  * does not use an AUTO_INCREMENT value.
  */
-int db_last_inserted_id(const db1_con_t* _h)
+int db_mysql_last_inserted_id(const db1_con_t* _h)
 {
 	if (!_h) {
 		LM_ERR("invalid parameter value\n");
@@ -478,51 +481,65 @@ int db_last_inserted_id(const db1_con_t* _h)
 }
 
 
- /**
+/**
+ * Returns the affected rows of the last query.
+ * \param _h database handle
+ * \return returns the affected rows as integer or -1 on error.
+ */
+int db_mysql_affected_rows(const db1_con_t* _h)
+{
+	if (!_h) {
+		LM_ERR("invalid parameter value\n");
+		return -1;
+	}
+	return (int)mysql_affected_rows(CON_CONNECTION(_h));
+}
+
+
+/**
   * Insert a row into a specified table, update on duplicate key.
   * \param _h structure representing database connection
   * \param _k key names
   * \param _v values of the keys
   * \param _n number of key=value pairs
  */
- int db_insert_update(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+ int db_mysql_insert_update(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
 	const int _n)
  {
 	int off, ret;
 	static str  sql_str;
-	static char sql_buf[SQL_BUF_LEN];
  
 	if ((!_h) || (!_k) || (!_v) || (!_n)) {
 		LM_ERR("invalid parameter value\n");
 		return -1;
 	}
  
-	ret = snprintf(sql_buf, SQL_BUF_LEN, "insert into %.*s (", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
-	if (ret < 0 || ret >= SQL_BUF_LEN) goto error;
+	ret = snprintf(mysql_sql_buf, sql_buffer_size, "insert into %.*s (", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+	if (ret < 0 || ret >= sql_buffer_size) goto error;
 	off = ret;
 
-	ret = db_print_columns(sql_buf + off, SQL_BUF_LEN - off, _k, _n);
+	ret = db_print_columns(mysql_sql_buf + off, sql_buffer_size - off, _k, _n);
 	if (ret < 0) return -1;
 	off += ret;
 
-	ret = snprintf(sql_buf + off, SQL_BUF_LEN - off, ") values (");
-	if (ret < 0 || ret >= (SQL_BUF_LEN - off)) goto error;
+	ret = snprintf(mysql_sql_buf + off, sql_buffer_size - off, ") values (");
+	if (ret < 0 || ret >= (sql_buffer_size - off)) goto error;
 	off += ret;
-	ret = db_print_values(_h, sql_buf + off, SQL_BUF_LEN - off, _v, _n, db_mysql_val2str);
+	ret = db_print_values(_h, mysql_sql_buf + off, sql_buffer_size - off, _v, _n, db_mysql_val2str);
 	if (ret < 0) return -1;
 	off += ret;
 
-	*(sql_buf + off++) = ')';
+	*(mysql_sql_buf + off++) = ')';
 	
-	ret = snprintf(sql_buf + off, SQL_BUF_LEN - off, " on duplicate key update ");
-	if (ret < 0 || ret >= (SQL_BUF_LEN - off)) goto error;
+	ret = snprintf(mysql_sql_buf + off, sql_buffer_size - off, " on duplicate key update ");
+	if (ret < 0 || ret >= (sql_buffer_size - off)) goto error;
 	off += ret;
 	
-	ret = db_print_set(_h, sql_buf + off, SQL_BUF_LEN - off, _k, _v, _n, db_mysql_val2str);
+	ret = db_print_set(_h, mysql_sql_buf + off, sql_buffer_size - off, _k, _v, _n, db_mysql_val2str);
 	if (ret < 0) return -1;
 	off += ret;
 	
-	sql_str.s = sql_buf;
+	sql_str.s = mysql_sql_buf;
 	sql_str.len = off;
  
 	if (db_mysql_submit_query(_h, &sql_str) < 0) {
@@ -538,6 +555,21 @@ error:
 
 
 /**
+ * Insert delayed a row into a specified table.
+ * \param _h structure representing database connection
+ * \param _k key names
+ * \param _v values of the keys
+ * \param _n number of key=value pairs
+ * \return zero on success, negative value on failure
+ */
+int db_mysql_insert_delayed(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v, const int _n)
+{
+	return db_do_insert_delayed(_h, _k, _v, _n, db_mysql_val2str,
+	db_mysql_submit_query);
+}
+
+
+/**
  * Store the name of table that will be used by subsequent database functions
  * \param _h database handle
  * \param _t table name
@@ -546,4 +578,25 @@ error:
 int db_mysql_use_table(db1_con_t* _h, const str* _t)
 {
 	return db_use_table(_h, _t);
+}
+
+
+/**
+ * Allocate a buffer for database module
+ * No function should be called before this
+ * \return zero on success, negative value on failure
+ */
+int db_mysql_alloc_buffer(void)
+{
+    if (db_api_init())
+    {
+        LM_ERR("Failed to initialise db api\n");
+		return -1;
+    }
+
+    mysql_sql_buf = (char*)malloc(sql_buffer_size);
+    if (mysql_sql_buf == NULL)
+        return -1;
+    else
+        return 0;
 }

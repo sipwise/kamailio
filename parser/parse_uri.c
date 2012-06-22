@@ -52,9 +52,7 @@
 #include "parse_uri.h"
 #include <string.h>
 #include "../dprint.h"
-/* #ifdef PARSE_URI_OLD */ /* ZSW */
 #include "../ut.h"   /* q_memchr */
-/* #endif */
 #include "../error.h"
 #include "../core_stats.h"
 
@@ -62,7 +60,6 @@
  * len= len of uri
  * returns: fills uri & returns <0 on error or 0 if ok 
  */
-#ifndef PARSE_URI_OLD
 int parse_uri(char* buf, int len, struct sip_uri* uri)
 {
 	enum states  {	URI_INIT, URI_USER, URI_PASSWORD, URI_PASSWORD_ALPHA,
@@ -85,6 +82,8 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 					PLR_L, PLR_R_FIN, PLR_eq,
 					/* r2 */
 					PR2_R, PR2_2_FIN, PR2_eq,
+					/* gr */
+					PGR_G, PGR_R_FIN, PGR_eq,
 #ifdef USE_COMP
 					/* comp */
 					PCOMP_C, PCOMP_O, PCOMP_M, PCOMP_P, PCOMP_eq,
@@ -135,6 +134,7 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 #define SIP_SCH		0x3a706973
 #define SIPS_SCH	0x73706973
 #define TEL_SCH		0x3a6c6574
+#define URN_SCH		0x3a6e7275
 	
 #define case_port( ch, var) \
 	case ch: \
@@ -384,7 +384,7 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 	port_no=0;
 	state=URI_INIT;
 	memset(uri, 0, sizeof(struct sip_uri)); /* zero it all, just to be sure*/
-	/*look for sip:, sips: or tel:*/
+	/*look for sip:, sips: ,tel: or urn:*/
 	if (len<5) goto error_too_short;
 	scheme=buf[0]+(buf[1]<<8)+(buf[2]<<16)+(buf[3]<<24);
 	scheme|=0x20202020;
@@ -395,6 +395,8 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 		else goto error_bad_uri;
 	}else if (scheme==TEL_SCH){
 		uri->type=TEL_URI_T;
+	}else if (scheme==URN_SCH){
+		uri->type=URN_URI_T;
 	}else goto error_bad_uri;
 	
 	s=p;
@@ -644,6 +646,11 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 						b=p;
 						state=PR2_R;
 						break;
+					case 'g':
+					case 'G':
+						b=p;
+						state=PGR_G;
+						break;
 #ifdef USE_COMP
 					case 'c':
 					case 'C':
@@ -856,6 +863,42 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 						state=URI_VAL_P;
 				}
 				break;
+			/* gr */
+			param_switch(PGR_G,  'r', 'R', PGR_R_FIN);
+			case PGR_R_FIN:
+				switch(*p){
+					case '@':
+						still_at_user;
+						break;
+					case '=':
+						state=PGR_eq;
+						break;
+					semicolon_case;
+						uri->gr.s=b;
+						uri->gr.len=(p-b);
+						break;
+					question_case;
+						uri->gr.s=b;
+						uri->gr.len=(p-b);
+						break;
+					colon_case;
+						break;
+					default:
+						state=URI_PARAM_P;
+				}
+				break;
+				/* handle gr=something case */
+			case PGR_eq:
+				param=&uri->gr;
+				param_val=&uri->gr_val;
+				switch(*p){
+					param_common_cases;
+					default:
+						v=p;
+						state=URI_VAL_P;
+				}
+				break;
+
 #ifdef USE_COMP
 			param_switch(PCOMP_C,  'o', 'O' , PCOMP_O);
 			param_switch(PCOMP_O,  'm', 'M' , PCOMP_M);
@@ -958,8 +1001,13 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 			uri->user.len=0;
 			break;
 		case URI_PASSWORD_ALPHA:
+			/* it might be an urn, check scheme and set host */
+			if (scheme==URN_SCH){
+				uri->host.s=s;
+				uri->host.len=p-s;
+				DBG("parsed urn scheme...\n");
 			/* this is the port, it can't be the passwd */
-			goto error_bad_port;
+			}else goto error_bad_port;
 		case URI_HOST_P:
 		case URI_HOST6_END:
 			uri->host.s=s;
@@ -1002,7 +1050,8 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 		case PM_D:
 		case PM_eq:
 		case PLR_L: /* lr */
-		case PR2_R:  /* r2 */
+		case PR2_R: /* r2 */
+		case PGR_G: /* gr */
 #ifdef USE_COMP
 		case PCOMP_C:
 		case PCOMP_O:
@@ -1027,6 +1076,13 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 			uri->params.len=p-s;
 			uri->r2.s=b;
 			uri->r2.len=p-b;
+			break;
+		case PGR_R_FIN:
+		case PGR_eq:
+			uri->params.s=s;
+			uri->params.len=p-s;
+			uri->gr.s=b;
+			uri->gr.len=p-b;
 			break;
 		case URI_VAL_P:
 		/* intermediate value states */
@@ -1143,6 +1199,9 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 			uri->host.s="";
 			uri->host.len=0;
 			break;
+		/* urn: do nothing */
+		case URN_URI_T:
+			break;
 		case ERROR_URI_T:
 			LOG(L_ERR, "ERROR: parse_uri unexpected error (BUG?)\n"); 
 			goto error_bad_uri;
@@ -1234,147 +1293,6 @@ error_exit:
 	return E_BAD_URI;
 }
 
-#else /* PARSE_URI_OLD */
-
-int parse_uri(char *buf, int len, struct sip_uri* uri)
-{
-	char* next, *end;
-	char *user, *passwd, *host, *port, *params, *headers, *ipv6;
-	int host_len, port_len, params_len, headers_len;
-	int err;
-	int ret;
-	
-	
-	ret=0;
-	host_len=0;
-	end=buf+len;
-	memset(uri, 0, sizeof(struct sip_uri)); /* zero it all, just to be sure */
-	/* look for "sip:"*/;
-	next=q_memchr(buf, ':',  len);
-	if ((next==0)||(strncasecmp(buf,"sip",next-buf)!=0)){
-		LOG(L_DBG, "ERROR: parse_uri: bad sip uri\n");
-		ser_error=ret=E_BAD_URI;
-		return ret;
-	}
-	buf=next+1; /* next char after ':' */
-	if (buf>end){
-		LOG(L_DBG, "ERROR: parse_uri: uri too short\n");
-		ser_error=ret=E_BAD_URI;
-		return ret;
-	}
-	/*look for '@' */
-	next=q_memchr(buf,'@', end-buf);
-	if (next==0){
-		/* no '@' found, => no userinfo */
-		uri->user.s=0;
-		uri->passwd.s=0;
-		host=buf;
-	}else{
-		/* found it */
-		user=buf;
-		/* try to find passwd */
-		passwd=q_memchr(user,':', next-user);
-		if (passwd==0){
-			/* no ':' found => no password */
-			uri->passwd.s=0;
-			uri->user.s=user;
-			uri->user.len=next-user;
-		}else{
-			uri->user.s=user;
-			uri->user.len=passwd-user;
-			passwd++; /*skip ':' */
-			uri->passwd.s=passwd;
-			uri->passwd.len=next-passwd;
-		}
-		host=next+1; /* skip '@' */
-	}
-	/* try to find the rest */
-	if(host>=end){
-		LOG(L_DBG, "ERROR: parse_uri: missing hostport\n");
-		ser_error=ret=E_UNSPEC;
-		return ret;
-	}
-	next=host;
-	ipv6=q_memchr(host, '[', end-host);
-	if (ipv6){
-		host=ipv6+1; /* skip '[' in "[3ffe::abbcd]" */
-		if (host>=end){
-			LOG(L_DBG, "ERROR: parse_uri: bad ipv6 uri\n");
-			ret=E_UNSPEC;
-			return ret;
-		}
-		ipv6=q_memchr(host, ']', end-host);
-		if ((ipv6==0)||(ipv6==host)){
-			LOG(L_DBG, "ERROR: parse_uri: bad ipv6 uri - null address"
-					" or missing ']'\n");
-			ret=E_UNSPEC;
-			return ret;
-		}
-		host_len=ipv6-host;
-		next=ipv6;
-	}
-
-		
-	headers=q_memchr(next,'?',end-next);
-	params=q_memchr(next,';',end-next);
-	port=q_memchr(next,':',end-next);
-	if (host_len==0){ /* host not ipv6 addr */
-		host_len=(port)?port-host:(params)?params-host:(headers)?headers-host:
-				end-host;
-	}
-	/* get host */
-	uri->host.s=host;
-	uri->host.len=host_len;
-
-	/* get port*/
-	if ((port)&&(port+1<end)){
-		port++;
-		if ( ((params) &&(params<port))||((headers) &&(headers<port)) ){
-			/* error -> invalid uri we found ';' or '?' before ':' */
-			LOG(L_DBG, "ERROR: parse_uri: malformed sip uri\n");
-			ser_error=ret=E_BAD_URI;
-			return ret;
-		}
-		port_len=(params)?params-port:(headers)?headers-port:end-port;
-		uri->port.s=port;
-		uri->port.len=port_len;
-	}else uri->port.s=0;
-	/* get params */
-	if ((params)&&(params+1<end)){
-		params++;
-		if ((headers) && (headers<params)){
-			/* error -> invalid uri we found '?' or '?' before ';' */
-			LOG(L_DBG, "ERROR: parse_uri: malformed sip uri\n");
-			ser_error=ret=E_BAD_URI;
-			return ret;
-		}
-		params_len=(headers)?headers-params:end-params;
-		uri->params.s=params;
-		uri->params.len=params_len;
-	}else uri->params.s=0;
-	/*get headers */
-	if ((headers)&&(headers+1<end)){
-		headers++;
-		headers_len=end-headers;
-		uri->headers.s=headers;
-		uri->headers.len=headers_len;
-	}else uri->headers.s=0;
-
-	err=0;
-	if (uri->port.s) uri->port_no=str2s(uri->port.s, uri->port.len, &err);
-	if (err){
-		LOG(L_DBG, "ERROR: parse_uri: bad port number in sip uri: %.*s\n",
-				uri->port.len, ZSW(uri->port.s));
-		ser_error=ret=E_BAD_URI;
-		return ret;
-	}
-
-	return ret;
-}
-#endif
-
-
-
 
 static inline int _parse_ruri(str *uri,
 	int *status, struct sip_uri *parsed_uri)
@@ -1446,6 +1364,7 @@ str	s_sip  = STR_STATIC_INIT("sip");
 str	s_sips = STR_STATIC_INIT("sips");
 str	s_tel  = STR_STATIC_INIT("tel");
 str	s_tels = STR_STATIC_INIT("tels");
+str	s_urn  = STR_STATIC_INIT("urn");
 static str	s_null = STR_STATIC_INIT("");
 
 inline void uri_type_to_str(uri_type type, str *s) {
@@ -1461,6 +1380,9 @@ inline void uri_type_to_str(uri_type type, str *s) {
 		break;
 	case TELS_URI_T:
 		*s = s_tels;
+		break;
+	case URN_URI_T:
+		*s = s_urn;
 		break;
 	default:
 		*s = s_null;

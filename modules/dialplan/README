@@ -12,12 +12,9 @@ Edited by
 
 Juha Heinanen
 
-   Copyright © 2007-2008 voice-system.ro
+   Copyright © 2007-2008 Voice Sistem SRL
 
    Copyright © 2008-2010 Juha Heinanen
-   Revision History
-   Revision $Revision: 1.1 $ $Date: 2007/08/30 13:16:22 $
-   Revision $Revision: 1.2 $ $Date: 2008/10/9 15:57 $
      __________________________________________________________________
 
    Table of Contents
@@ -32,7 +29,7 @@ Juha Heinanen
               4.1. Kamailio Modules
               4.2. External Libraries or Applications
 
-        5. Exported Parameters
+        5. Parameters
 
               5.1. db_url (string)
               5.2. table_name (string)
@@ -47,16 +44,21 @@ Juha Heinanen
               5.11. attrs_pvar (string)
               5.12. fetch_rows (int)
 
-        6. Exported Functions
+        6. Functions
 
-              6.1. dp_translate(id, src[/dest])
+              6.1. dp_translate(id, [src[/dest]])
 
-        7. Exported MI Functions
+        7. MI Commands
 
               7.1. dp_reload
               7.2. dp_translate
 
-        8. Installation
+        8. Exported RPC Commands
+
+              8.1. dialplan.reload
+              8.2. dialplan.translate
+
+        9. Installation
 
    2. Developer's Guide
 
@@ -76,6 +78,7 @@ Juha Heinanen
    1.12. Set fetch_rows parameter
    1.13. dp_translate usage
    1.14. dp_translate usage
+   1.15. Example of rules
 
 Chapter 1. Admin Guide
 
@@ -89,7 +92,7 @@ Chapter 1. Admin Guide
         4.1. Kamailio Modules
         4.2. External Libraries or Applications
 
-   5. Exported Parameters
+   5. Parameters
 
         5.1. db_url (string)
         5.2. table_name (string)
@@ -104,16 +107,21 @@ Chapter 1. Admin Guide
         5.11. attrs_pvar (string)
         5.12. fetch_rows (int)
 
-   6. Exported Functions
+   6. Functions
 
-        6.1. dp_translate(id, src[/dest])
+        6.1. dp_translate(id, [src[/dest]])
 
-   7. Exported MI Functions
+   7. MI Commands
 
         7.1. dp_reload
         7.2. dp_translate
 
-   8. Installation
+   8. Exported RPC Commands
+
+        8.1. dialplan.reload
+        8.2. dialplan.translate
+
+   9. Installation
 
 1. Overview
 
@@ -130,12 +138,13 @@ Chapter 1. Admin Guide
    the matching transformation.
 
    The module expects an input value which will be matched against a rule
-   by using regular expressions (see 'man pcresyntax' for syntax) or
-   string matching. Overlapping matching expressions can be controlled via
-   priorities. Once a rule is matched, the defined transformation (if any)
-   is applied and the result is returned as output value. Also, if any
-   string attribute is associated to the rule, this will be returned to
-   the script along with the output value.
+   by using regular expressions (see 'man pcresyntax' for syntax), string
+   or fnmatch (see 'man fnmatch') matching. Overlapping matching
+   expressions can be controlled via priorities. Once a rule is matched,
+   the defined transformation (if any) is applied and the result is
+   returned as output value. Also, if any string attribute is associated
+   to the rule, this will be returned to the script along with the output
+   value.
 
    The first matching rule will be processed.
 
@@ -172,7 +181,7 @@ Chapter 1. Admin Guide
    running Kamailio with this module loaded:
      * libpcre - the libraries of PCRE.
 
-5. Exported Parameters
+5. Parameters
 
    5.1. db_url (string)
    5.2. table_name (string)
@@ -324,15 +333,20 @@ modparam("dialplan", "attrs_pvar", "$avp(s:dest)")
 modparam("dialplan", "fetch_rows", 4000)
 ...
 
-6. Exported Functions
+6. Functions
 
-   6.1. dp_translate(id, src[/dest])
+   6.1. dp_translate(id, [src[/dest]])
 
-6.1.  dp_translate(id, src[/dest])
+6.1.  dp_translate(id, [src[/dest]])
 
    Will try to translate src into dest according to the translation rules
-   with dialplan ID equal to id. If dest is missing, only matching and
+   with dialplan ID equal to id. If src/dest is missing the default
+   parameter “ruri.user/ruri.user” will be used, thus translating the
+   request uri user part. If only dest is missing, only matching and
    storing of matching rule's attributes is done.
+
+   Returns 1, if translation succeeded, -1 in case of some error occurred,
+   and -2 if dialplan with ID equal to id does not exist.
 
    Meaning of the parameters is as follows:
      * id -the dialplan id of the possible matching rules. This parameter
@@ -342,9 +356,7 @@ modparam("dialplan", "fetch_rows", 4000)
             variable
           + script var - the dialplan id is the value of an existing
             script variable.
-     * src/dest - input and output of the function. If this parameter is
-       missing the default parameter “ruri.user/ruri.user” will be used,
-       thus translating the request uri user part.
+     * src/dest - input and output of the function.
        Input parameter src can be any pseudo variable. Output parameter
        dest can be:
           + R-URI
@@ -358,7 +370,7 @@ modparam("dialplan", "fetch_rows", 4000)
             existing script variable. At output the function will set an
             script variable with the value of the output string.
 
-   This function can be used from REQUEST_ROUTE, BRANCH_ROUTE.
+   This function can be used from ANY_ROUTE.
 
    Example 1.13. dp_translate usage
 ...
@@ -373,7 +385,7 @@ dp_translate("$var(x)", "$avp(s:src)/$var(y)");
 xlog("translated to var $var(y) \n");
 ...
 
-7. Exported MI Functions
+7. MI Commands
 
    7.1. dp_reload
    7.2. dp_translate
@@ -407,7 +419,38 @@ xlog("translated to var $var(y) \n");
             input
                 _empty_line_
 
-8. Installation
+8. Exported RPC Commands
+
+   8.1. dialplan.reload
+   8.2. dialplan.translate
+
+8.1. dialplan.reload
+
+   Forces an update of the translation rules from the database.
+
+   Name: dialplan.reload
+
+   Parameters: none
+
+   Example:
+                sercmd dialplan.reload
+
+8.2. dialplan.translate
+
+   Will apply a translation rule identified by a dialplan id and an input
+   string.
+
+   Name: dialplan.translate
+
+   Parameters: 2
+     * Dial plan ID
+     * Input String
+
+   Example:
+        # sercmd dp_translate dpid "input"
+        sercmd dp_translate 1 "abcdxyz"
+
+9. Installation
 
    The modules requires one table in Kamailio database: dialplan. The SQL
    syntax to create them can be found in dialplan-create.sql script in the
@@ -415,9 +458,41 @@ xlog("translated to var $var(y) \n");
    the complete database documentation on the project webpage,
    http://www.kamailio.org/docs/db-tables/kamailio-db-devel.html.
 
-Chapter 2. Developer's Guide
+   Some sample records fromd dialplan table are presented in the next
+   figure.
 
-   Revision History
-   Revision $Revision: 1.1 $ $Date: 2007/08/30 13:16:22 $
+   Example 1.15. Example of rules
+...
+dpid: 1
+pr: 1
+match_op: 1
+match_exp: ^0([1-9][0-9]+)$
+match_len: 0
+subst_exp: ^0([1-9][0-9]+)$
+repl_exp: 0049\1
+attrs: xyz
+...
+dpid: 1
+pr: 1
+match_op: 1
+match_exp: ^0([1-9][0-9]+)$
+match_len: 0
+subst_exp: ^0(.+)$
+repl_exp: $var(prefix)\1
+attrs: xyz
+...
+
+   Note that you can use config variables in the replacement expression
+   (repl_exp) field. However, not all of config variables are safe to use
+   there - specifically the variables that have in their name other
+   variables (variables with dinamic name). References to sip message,
+   private variables ($var(...)) and AVPs with static name are among those
+   that are safe to use in replacement expressions.
+
+   The match_op field specify matching operator, valid value being: 0 -
+   string comparison; 1 - regular expression matching (pcre); 2 - fnmatch
+   (shell-like pattern) matching.
+
+Chapter 2. Developer's Guide
 
    The module does not provide any API to use in other Kamailio modules.

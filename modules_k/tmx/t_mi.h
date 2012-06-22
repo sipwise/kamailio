@@ -1,6 +1,4 @@
 /*
- * $Id: mi.h 4518 2008-07-28 15:39:28Z henningw $
- *
  * Header file for TM MI functions
  *
  * Copyright (C) 2006 Voice Sistem SRL
@@ -31,7 +29,6 @@
  *
  * \ingroup tm
  * - Module: \ref tm
- * - \ref mi.c
  */
 
 #ifndef _TM_MI_H_
@@ -43,6 +40,7 @@
 #define MI_TM_CANCEL   "t_uac_cancel"
 #define MI_TM_HASH     "t_hash"
 #define MI_TM_REPLY    "t_reply"
+#define MI_TM_REPLY_CALLID "t_reply_callid"
 
 struct mi_root* mi_tm_uac_dlg(struct mi_root* cmd_tree, void* param);
 
@@ -51,5 +49,7 @@ struct mi_root* mi_tm_cancel(struct mi_root* cmd_tree, void* param);
 struct mi_root* mi_tm_hash(struct mi_root* cmd_tree, void* param);
 
 struct mi_root* mi_tm_reply(struct mi_root* cmd_tree, void* param);
+
+struct mi_root* mi_tm_reply_callid(struct mi_root* cmd_tree, void* param);
 
 #endif

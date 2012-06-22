@@ -37,10 +37,10 @@
 #include "../../modules/tm/dlg.h"
 #include "../../modules/tm/tm_load.h"
 #include "../../lib/kmi/tree.h"
-#include "../../lib/kcore/km_ut.h"
 #include "../../lib/kcore/kstats_wrapper.h"
 #include "dlg_timer.h"
 #include "dlg_hash.h"
+#include "dlg_handlers.h"
 #include "dlg_req_within.h"
 #include "dlg_db_handler.h"
 
@@ -127,11 +127,12 @@ error:
 
 
 
-/*callback function to handle responses to the BYE request */
+/* callback function to handle responses to the BYE request */
 void bye_reply_cb(struct cell* t, int type, struct tmcb_params* ps){
 
 	struct dlg_cell* dlg;
 	int event, old_state, new_state, unref, ret;
+	dlg_iuid_t *iuid = NULL;
 
 	if(ps->param == NULL || *ps->param == NULL){
 		LM_ERR("invalid parameter\n");
@@ -145,10 +146,13 @@ void bye_reply_cb(struct cell* t, int type, struct tmcb_params* ps){
 
 	LM_DBG("receiving a final reply %d\n",ps->code);
 
-	dlg = (struct dlg_cell *)(*(ps->param));
+	iuid = (dlg_iuid_t*)(*ps->param);
+	dlg = dlg_get_by_iuid(iuid);
+	if(dlg==0)
+		return;
+
 	event = DLG_EVENT_REQBYE;
 	next_state_dlg(dlg, event, &old_state, &new_state, &unref);
-
 
 	if(new_state == DLG_STATE_DELETED && old_state != DLG_STATE_DELETED){
 
@@ -175,11 +179,11 @@ void bye_reply_cb(struct cell* t, int type, struct tmcb_params* ps){
 			unref++;
 		}
 		/* dialog terminated (BYE) */
-		run_dlg_callbacks( DLGCB_TERMINATED, dlg, ps->req, DLG_DIR_NONE, 0);
+		run_dlg_callbacks( DLGCB_TERMINATED, dlg, ps->req, ps->rpl, DLG_DIR_NONE, 0);
 
 		LM_DBG("first final reply\n");
 		/* derefering the dialog */
-		unref_dlg(dlg, unref+1);
+		dlg_unref(dlg, unref+1);
 
 		if_update_stat( dlg_enable_stats, active_dlgs, -1);
 	}
@@ -191,11 +195,50 @@ void bye_reply_cb(struct cell* t, int type, struct tmcb_params* ps){
 		if (dlg_db_mode)
 			remove_dialog_from_db(dlg);
 		/* force delete from mem */
-		unref_dlg(dlg, 1);
+		dlg_unref(dlg, 1);
 	}
-
+	dlg_iuid_sfree(iuid);
 }
 
+
+/* callback function to handle responses to the keep-alive request */
+void dlg_ka_cb(struct cell* t, int type, struct tmcb_params* ps){
+
+	dlg_cell_t* dlg;
+	dlg_iuid_t *iuid = NULL;
+
+	if(ps->param == NULL || *ps->param == NULL) {
+		LM_ERR("invalid parameter\n");
+		return;
+	}
+
+	if(ps->code < 200) {
+		LM_DBG("receiving a provisional reply\n");
+		return;
+	}
+
+	LM_DBG("receiving a final reply %d\n",ps->code);
+
+	iuid = (dlg_iuid_t*)(*ps->param);
+	dlg = dlg_get_by_iuid(iuid);
+	if(dlg==0) {
+		dlg_iuid_sfree(iuid);
+		return;
+	}
+
+	if(ps->code==408 || ps->code==481) {
+		if(update_dlg_timer(&dlg->tl, 10)<0) {
+			LM_ERR("failed to update dialog lifetime\n");
+			goto done;
+		}
+		dlg->lifetime = 10;
+		dlg->dflags |= DLG_FLAG_CHANGED;
+	}
+
+done:
+	dlg_unref(dlg, 1);
+	dlg_iuid_sfree(iuid);
+}
 
 
 static inline int build_extra_hdr(struct dlg_cell * cell, str *extra_hdrs,
@@ -241,6 +284,8 @@ static inline int send_bye(struct dlg_cell * cell, int dir, str *hdrs)
 	dlg_t* dialog_info;
 	str met = {"BYE", 3};
 	int result;
+	dlg_iuid_t *iuid = NULL;
+
 	/* do not send BYE request for non-confirmed dialogs (not supported) */
 	if (cell->state != DLG_STATE_CONFIRMED_NA && cell->state != DLG_STATE_CONFIRMED) {
 		LM_ERR("terminating non-confirmed dialogs not supported\n");
@@ -256,16 +301,21 @@ static inline int send_bye(struct dlg_cell * cell, int dir, str *hdrs)
 
 	LM_DBG("sending BYE to %s\n", (dir==DLG_CALLER_LEG)?"caller":"callee");
 
-	ref_dlg(cell, 1);
+	iuid = dlg_get_iuid_shm_clone(cell);
+	if(iuid==NULL)
+	{
+		LM_ERR("failed to create dialog unique id clone\n");
+		goto err;
+	}
 
 	memset(&uac_r,'\0', sizeof(uac_req_t));
 	set_uac_req(&uac_r, &met, hdrs, NULL, dialog_info, TMCB_LOCAL_COMPLETED,
-				bye_reply_cb, (void*)cell);
+				bye_reply_cb, (void*)iuid);
 	result = d_tmb.t_request_within(&uac_r);
 
 	if(result < 0){
 		LM_ERR("failed to send the BYE request\n");
-		goto err1;
+		goto err;
 	}
 
 	free_tm_dlg(dialog_info);
@@ -273,11 +323,73 @@ static inline int send_bye(struct dlg_cell * cell, int dir, str *hdrs)
 	LM_DBG("BYE sent to %s\n", (dir==0)?"caller":"callee");
 	return 0;
 
-err1:
-	unref_dlg(cell, 1);
 err:
 	if(dialog_info)
 		free_tm_dlg(dialog_info);
+	return -1;
+}
+
+
+/* send keep-alive
+ * dlg - pointer to a struct dlg_cell
+ * dir - direction: the request will be sent to:
+ * 		DLG_CALLER_LEG (0): caller
+ * 		DLG_CALLEE_LEG (1): callee
+ */
+int dlg_send_ka(dlg_cell_t *dlg, int dir, str *hdrs)
+{
+	uac_req_t uac_r;
+	dlg_t* di;
+	str met = {"OPTIONS", 7};
+	int result;
+	dlg_iuid_t *iuid = NULL;
+
+	/* do not send KA request for non-confirmed dialogs (not supported) */
+	if (dlg->state != DLG_STATE_CONFIRMED) {
+		LM_DBG("skipping non-confirmed dialogs\n");
+		return 0;
+	}
+
+	/* build tm dlg by direction */
+	if ((di = build_dlg_t(dlg, dir)) == 0){
+		LM_ERR("failed to create dlg_t\n");
+		goto err;
+	}
+
+	/* tm increases cseq value, decrease it no to make it invalid
+	 * - dialog is ended on timeout (408) or C/L does not exist (481) */
+	if(di->loc_seq.value>1)
+		di->loc_seq.value -= 2;
+	else
+		di->loc_seq.value -= 1;
+
+	LM_DBG("sending BYE to %s\n", (dir==DLG_CALLER_LEG)?"caller":"callee");
+
+	iuid = dlg_get_iuid_shm_clone(dlg);
+	if(iuid==NULL)
+	{
+		LM_ERR("failed to create dialog unique id clone\n");
+		goto err;
+	}
+
+	memset(&uac_r,'\0', sizeof(uac_req_t));
+	set_uac_req(&uac_r, &met, hdrs, NULL, di, TMCB_LOCAL_COMPLETED,
+				dlg_ka_cb, (void*)iuid);
+	result = d_tmb.t_request_within(&uac_r);
+
+	if(result < 0){
+		LM_ERR("failed to send the BYE request\n");
+		goto err;
+	}
+
+	free_tm_dlg(di);
+
+	LM_DBG("keep-alive sent to %s\n", (dir==0)?"caller":"callee");
+	return 0;
+
+err:
+	if(di)
+		free_tm_dlg(di);
 	return -1;
 }
 
@@ -318,7 +430,7 @@ struct mi_root * mi_terminate_dlg(struct mi_root *cmd_tree, void *param ){
 
 	LM_DBG("h_entry %u h_id %u\n", h_entry, h_id);
 
-	dlg = lookup_dlg(h_entry, h_id);
+	dlg = dlg_lookup(h_entry, h_id);
 
 	// lookup_dlg has incremented the reference count
 
@@ -333,7 +445,7 @@ struct mi_root * mi_terminate_dlg(struct mi_root *cmd_tree, void *param ){
 			msg_len = MI_OK_LEN;
 		}
 
-		unref_dlg(dlg, 1);
+		dlg_release(dlg);
 
 		return init_mi_tree(status, msg, msg_len);
 	}

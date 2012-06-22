@@ -7,7 +7,7 @@
 #===================================================================
 
 ### version for this script
-VERSION='3.1.0'
+VERSION='3.3.0'
 
 PATH=$PATH:/usr/local/sbin/
 
@@ -120,6 +120,12 @@ case $DBENGINE in
 	DB_BERKELEY|db_berkeley|BERKELEY|berkeley)
 		if [ -f "$MYLIBDIR/kamctl.db_berkeley" ]; then
 			. "$MYLIBDIR/kamctl.db_berkeley"
+			DBENGINELOADED=1
+		fi
+		;;
+	SQLITE|sqlite)
+		if [ -f "$MYLIBDIR/kamctl.sqlite" ]; then
+			. "$MYLIBDIR/kamctl.sqlite"
 			DBENGINELOADED=1
 		fi
 		;;
@@ -1045,9 +1051,9 @@ domain() {
 
 #
 ##### ------------------------------------------------ #####
-### trusted management
+### permissions trusted management
 #
-trusted() {
+permissions_trusted() {
 	case $1 in
 		reload)
 			require_ctlengine
@@ -1116,6 +1122,78 @@ trusted() {
 			exit 1
 	esac
 }
+
+
+#
+##### ------------------------------------------------ #####
+### permissions address management
+#
+permissions_address() {
+	case $1 in
+		reload)
+			require_ctlengine
+			$CTLCMD address_reload
+			;;
+		dump)
+			require_ctlengine
+			$CTLCMD address_dump
+			;;
+		show)
+			require_dbengine
+			QUERY="select * FROM $ADDRESS_TABLE ; "
+			$DBROCMD "$QUERY"
+			;;
+		add)
+			require_dbengine
+			shift
+			if [ $# -lt 2 ] ; then
+				usage_address
+				exit 1
+			fi
+			AMASK=32
+			if [ ! -z "$3" ]; then
+				AMASK="$3"
+			fi
+			APORT=0
+			if [ ! -z "$4" ]; then
+				APORT="$4"
+			fi
+			ATAG=""
+			if [ ! -z "$5" ]; then
+				ATAG="$5"
+			fi
+
+			QUERY="insert into $ADDRESS_TABLE \
+				(grp, ip_addr, mask, port, tag) \
+				VALUES ($1, '$2', $AMASK, $APORT, '$ATAG');"
+			$DBCMD "$QUERY"
+			if [ $? -ne 0 ] ; then
+				merr "permissions address - SQL Error"
+				exit 1
+			fi
+			minfo "execute '$0 address reload' to synchronize cache and database"
+			;;
+		rm)
+			require_dbengine
+			shift
+			if [ $# -ne 2 ] ; then
+				usage_address
+				exit 1
+			fi
+			QUERY="delete from $ADDRESS_TABLE where grp=$1 and ip_addr='$2';"
+			$DBCMD "$QUERY"
+			if [ $? -ne 0 ] ; then
+				merr "permissions address - SQL Error"
+				exit 1
+			fi
+			minfo "execute '$0 address reload' to synchronize cache and database"
+			;;
+		*)
+			usage_address
+			exit 1
+	esac
+}
+
 
 #
 ##### ------------------------------------------------ #####
@@ -2123,17 +2201,10 @@ usrloc() {
 				UL_EXPIRES=0
 				UL_FLAGS=0
 				BR_FLAGS=0
-				UL_PATH=0
 			elif [ $# -eq 4 ] ; then
 				UL_EXPIRES=$4
 				UL_FLAGS=0
 				BR_FLAGS=0
-				UL_PATH=0
-			elif [ $# -eq 5 ] ; then
-				UL_EXPIRES=$4
-				UL_FLAGS=0
-				BR_FLAGS=0
-				UL_PATH="$5"
 			else
 				usage_usrloc
 				exit 1
@@ -2166,7 +2237,7 @@ usrloc() {
 			fi
 
 			$CTLCMD ul_add "$USRLOC_TABLE" "$OSERUSER@$OSERDOMAIN" "$2" \
-"$UL_EXPIRES" "1.00" "$UL_PATH" "$UL_FLAGS" "$BR_FLAGS" "$ALL_METHODS"
+"$UL_EXPIRES" "1.00" "0" "$UL_FLAGS" "$BR_FLAGS" "$ALL_METHODS"
 			exit $?
 			;;
 		rm)
@@ -2403,10 +2474,15 @@ case $1 in
 
 	trusted)
 		shift
-		trusted "$@"
+		permissions_trusted "$@"
 		;;
 
-	fifo|unixsock|ser_mi|sercmd_mi|sercmdmi)
+	address)
+		shift
+		permissions_address "$@"
+		;;
+
+	fifo|mi|unixsock|ser_mi|sercmd_mi|sercmdmi)
 		require_ctlengine
 		shift
 		$CTLCMD "$@"
@@ -2426,11 +2502,6 @@ case $1 in
 	cr)
 		shift
 		cr "$@"
-		;;
-
-	trusted)
-		shift
-		trusted "$@"
 		;;
 
 	dispatcher)
@@ -2468,6 +2539,16 @@ case $1 in
 	ps)
 		require_ctlengine
 		$CTLCMD ps
+		;;
+
+	uptime)
+		require_ctlengine
+		$CTLCMD uptime
+		;;
+
+	stats)
+		require_ctlengine
+		$CTLCMD get_statistics all
 		;;
 
 	restart)

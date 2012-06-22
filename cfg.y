@@ -101,7 +101,7 @@
  * 2010-02-17  added blacklist imask (DST_BLST_*_IMASK) support (andrei)
 */
 
-%expect 5
+%expect 6
 
 %{
 
@@ -111,6 +111,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <string.h>
 #include <errno.h>
@@ -142,6 +143,7 @@
 #include "msg_translator.h"
 
 #include "ppcfg.h"
+#include "pvapi.h"
 #include "config.h"
 #include "cfg_core.h"
 #include "cfg/cfg.h"
@@ -163,6 +165,11 @@
 		if (rt!=ONSEND_ROUTE) yyerror( s " allowed only in onsend_routes");\
 	}while(0)
 
+#ifdef USE_IPV6
+	#define IF_AUTO_BIND_IPV6(x) x
+#else
+	#define IF_AUTO_BIND_IPV6(x) warn("IPV6 support not compiled");
+#endif
 
 #ifdef USE_DNS_CACHE
 	#define IF_DNS_CACHE(x) x
@@ -307,8 +314,10 @@ extern char *finame;
 %token LOG_TOK
 %token ERROR
 %token ROUTE
+%token ROUTE_REQUEST
 %token ROUTE_FAILURE
 %token ROUTE_ONREPLY
+%token ROUTE_REPLY
 %token ROUTE_BRANCH
 %token ROUTE_SEND
 %token ROUTE_EVENT
@@ -321,6 +330,8 @@ extern char *finame;
 %token STRIP_TAIL
 %token SET_USERPHONE
 %token APPEND_BRANCH
+%token REMOVE_BRANCH
+%token CLEAR_BRANCHES
 %token SET_USER
 %token SET_USERPASS
 %token SET_PORT
@@ -347,6 +358,8 @@ extern char *finame;
 %token CASE
 %token DEFAULT
 %token WHILE
+%token CFG_SELECT
+%token CFG_RESET
 %token URIHOST
 %token URIPORT
 %token MAX_LEN
@@ -382,10 +395,12 @@ extern char *finame;
 /* config vars. */
 %token DEBUG_V
 %token FORK
+%token FORK_DELAY
 %token LOGSTDERROR
 %token LOGFACILITY
 %token LOGNAME
 %token LISTEN
+%token ADVERTISE
 %token ALIAS
 %token SR_AUTO_ALIASES
 %token DNS
@@ -412,6 +427,10 @@ extern char *finame;
 %token DNS_CACHE_MEM
 %token DNS_CACHE_GC_INT
 %token DNS_CACHE_DEL_NONEXP
+
+/* ipv6 auto bind */
+%token AUTO_BIND_IPV6
+
 /*blacklist*/
 %token DST_BLST_INIT
 %token USE_DST_BLST
@@ -426,12 +445,16 @@ extern char *finame;
 %token PORT
 %token STAT
 %token CHILDREN
+%token SOCKET_WORKERS
 %token CHECK_VIA
 %token PHONE2TEL
 %token SYN_BRANCH
 %token MEMLOG
 %token MEMDBG
 %token MEMSUM
+%token MEMSAFETY
+%token MEMJOIN
+%token CORELOG
 %token SIP_WARNING
 %token SERVER_SIGNATURE
 %token SERVER_HEADER
@@ -441,6 +464,7 @@ extern char *finame;
 %token LOADPATH
 %token MODPARAM
 %token MAXBUFFER
+%token SQL_BUFFER_SIZE
 %token USER
 %token GROUP
 %token CHROOT
@@ -454,6 +478,7 @@ extern char *finame;
 %token TCP_CON_LIFETIME
 %token TCP_POLL_METHOD
 %token TCP_MAX_CONNECTIONS
+%token TLS_MAX_CONNECTIONS
 %token TCP_NO_CONNECT
 %token TCP_SOURCE_IPV4
 %token TCP_SOURCE_IPV6
@@ -473,6 +498,7 @@ extern char *finame;
 %token TCP_OPT_KEEPCNT
 %token TCP_OPT_CRLF_PING
 %token TCP_OPT_ACCEPT_NO_CL
+%token TCP_CLONE_RCVBUF
 %token DISABLE_TLS
 %token ENABLE_TLS
 %token TLSLOG
@@ -531,8 +557,15 @@ extern char *finame;
 %token PMTU_DISCOVERY
 %token KILL_TIMEOUT
 %token MAX_WLOOPS
+%token PVBUFSIZE
+%token PVBUFSLOTS
+%token HTTP_REPLY_HACK
 %token CFG_DESCRIPTION
 %token SERVER_ID
+%token LATENCY_LOG
+%token LATENCY_LIMIT_DB
+%token LATENCY_LIMIT_ACTION
+%token MSG_TIME
 
 %token FLAGS_DECL
 %token AVPFLAGS_DECL
@@ -557,6 +590,8 @@ extern char *finame;
 
 /*pre-processor*/
 %token SUBST
+%token SUBSTDEF
+%token SUBSTDEFS
 
 /* operators, C like precedence */
 %right EQUAL
@@ -804,6 +839,8 @@ assign_stm:
 	| DEBUG_V EQUAL error  { yyerror("number  expected"); }
 	| FORK  EQUAL NUMBER { dont_fork= ! $3; }
 	| FORK  EQUAL error  { yyerror("boolean value expected"); }
+	| FORK_DELAY  EQUAL NUMBER { set_fork_delay($3); }
+	| FORK_DELAY  EQUAL error  { yyerror("number expected"); }
 	| LOGSTDERROR EQUAL NUMBER { if (!config_check) log_stderr=$3; }
 	| LOGSTDERROR EQUAL error { yyerror("boolean value expected"); }
 	| LOGFACILITY EQUAL ID {
@@ -864,6 +901,8 @@ assign_stm:
 	| DNS_CACHE_GC_INT error { yyerror("boolean value expected"); }
 	| DNS_CACHE_DEL_NONEXP EQUAL NUMBER   { IF_DNS_CACHE(default_core_cfg.dns_cache_del_nonexp=$3); }
 	| DNS_CACHE_DEL_NONEXP error { yyerror("boolean value expected"); }
+	| AUTO_BIND_IPV6 EQUAL NUMBER {IF_AUTO_BIND_IPV6(auto_bind_ipv6 = $3);}
+	| AUTO_BIND_IPV6 error { yyerror("boolean value expected"); }
 	| DST_BLST_INIT EQUAL NUMBER   { IF_DST_BLACKLIST(dst_blacklist_init=$3); }
 	| DST_BLST_INIT error { yyerror("boolean value expected"); }
 	| USE_DST_BLST EQUAL NUMBER {
@@ -904,9 +943,13 @@ assign_stm:
 	}
 	| MAXBUFFER EQUAL NUMBER { maxbuffer=$3; }
 	| MAXBUFFER EQUAL error { yyerror("number expected"); }
+    | SQL_BUFFER_SIZE EQUAL NUMBER { sql_buffer_size=$3; }
+	| SQL_BUFFER_SIZE EQUAL error { yyerror("number expected"); }
 	| PORT EQUAL error    { yyerror("number expected"); }
 	| CHILDREN EQUAL NUMBER { children_no=$3; }
 	| CHILDREN EQUAL error { yyerror("number expected"); }
+	| SOCKET_WORKERS EQUAL NUMBER { socket_workers=$3; }
+	| SOCKET_WORKERS EQUAL error { yyerror("number expected"); }
 	| CHECK_VIA EQUAL NUMBER { check_via=$3; }
 	| CHECK_VIA EQUAL error { yyerror("boolean value expected"); }
 	| PHONE2TEL EQUAL NUMBER { phone2tel=$3; }
@@ -919,6 +962,12 @@ assign_stm:
 	| MEMDBG EQUAL error { yyerror("int value expected"); }
 	| MEMSUM EQUAL intno { default_core_cfg.mem_summary=$3; }
 	| MEMSUM EQUAL error { yyerror("int value expected"); }
+	| MEMSAFETY EQUAL intno { default_core_cfg.mem_safety=$3; }
+	| MEMSAFETY EQUAL error { yyerror("int value expected"); }
+	| MEMJOIN EQUAL intno { default_core_cfg.mem_join=$3; }
+	| MEMJOIN EQUAL error { yyerror("int value expected"); }
+	| CORELOG EQUAL intno { default_core_cfg.corelog=$3; }
+	| CORELOG EQUAL error { yyerror("int value expected"); }
 	| SIP_WARNING EQUAL NUMBER { sip_warning=$3; }
 	| SIP_WARNING EQUAL error { yyerror("boolean value expected"); }
 	| USER EQUAL STRING     {
@@ -965,7 +1014,7 @@ assign_stm:
 	| TCP_ACCEPT_ALIASES EQUAL error { yyerror("boolean value expected"); }
 	| TCP_CHILDREN EQUAL NUMBER {
 		#ifdef USE_TCP
-			tcp_children_no=$3;
+			tcp_cfg_children_no=$3;
 		#else
 			warn("tcp support not compiled in");
 		#endif
@@ -1035,6 +1084,14 @@ assign_stm:
 		#endif
 	}
 	| TCP_MAX_CONNECTIONS EQUAL error { yyerror("number expected"); }
+	| TLS_MAX_CONNECTIONS EQUAL NUMBER {
+		#ifdef USE_TLS
+			tls_max_connections=$3;
+		#else
+			warn("tls support not compiled in");
+		#endif
+	}
+	| TLS_MAX_CONNECTIONS EQUAL error { yyerror("number expected"); }
 	| TCP_NO_CONNECT EQUAL NUMBER {
 		#ifdef USE_TCP
 			tcp_default_cfg.no_connect=$3;
@@ -1195,6 +1252,14 @@ assign_stm:
 		#endif
 	}
 	| TCP_OPT_ACCEPT_NO_CL EQUAL error { yyerror("boolean value expected"); }
+	| TCP_CLONE_RCVBUF EQUAL NUMBER {
+		#ifdef USE_TCP
+			tcp_set_clone_rcvbuf($3);
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_CLONE_RCVBUF EQUAL error { yyerror("number expected"); }
 	| DISABLE_TLS EQUAL NUMBER {
 		#ifdef USE_TLS
 			tls_disable=$3;
@@ -1483,6 +1548,20 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+	| LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_advertise_iface(	lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto,
+									$5, $7,
+									lst_tmp->flags)!=0) {
+				LOG(L_CRIT,  "ERROR: cfg. parser: failed to add listen"
+								" address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
 	| LISTEN EQUAL  error { yyerror("ip address, interface name or"
 									" hostname expected"); }
 	| ALIAS EQUAL  id_lst {
@@ -1570,6 +1649,33 @@ assign_stm:
 	}
 	| MCAST_TTL EQUAL error { yyerror("number expected"); }
 	| TOS EQUAL NUMBER { tos=$3; }
+	| TOS EQUAL ID { if (strcasecmp($3,"IPTOS_LOWDELAY")) {
+			tos=IPTOS_LOWDELAY;
+		} else if (strcasecmp($3,"IPTOS_THROUGHPUT")) {
+			tos=IPTOS_THROUGHPUT;
+		} else if (strcasecmp($3,"IPTOS_RELIABILITY")) {
+			tos=IPTOS_RELIABILITY;
+#if defined(IPTOS_MINCOST)
+		} else if (strcasecmp($3,"IPTOS_MINCOST")) {
+			tos=IPTOS_MINCOST;
+#endif
+#if defined(IPTOS_LOWCOST)
+		} else if (strcasecmp($3,"IPTOS_LOWCOST")) {
+			tos=IPTOS_LOWCOST;
+#endif
+		} else {
+			yyerror("invalid tos value - allowed: "
+				"IPTOS_LOWDELAY,IPTOS_THROUGHPUT,"
+				"IPTOS_RELIABILITY"
+#if defined(IPTOS_LOWCOST)
+				",IPTOS_LOWCOST"
+#endif
+#if !defined(IPTOS_MINCOST)
+				",IPTOS_MINCOST"
+#endif
+				"\n");
+		}
+	}
 	| TOS EQUAL error { yyerror("number expected"); }
 	| PMTU_DISCOVERY EQUAL NUMBER { pmtu_discovery=$3; }
 	| PMTU_DISCOVERY error { yyerror("number expected"); }
@@ -1577,6 +1683,12 @@ assign_stm:
 	| KILL_TIMEOUT EQUAL error { yyerror("number expected"); }
 	| MAX_WLOOPS EQUAL NUMBER { default_core_cfg.max_while_loops=$3; }
 	| MAX_WLOOPS EQUAL error { yyerror("number expected"); }
+	| PVBUFSIZE EQUAL NUMBER { pv_set_buffer_size($3); }
+	| PVBUFSIZE EQUAL error { yyerror("number expected"); }
+	| PVBUFSLOTS EQUAL NUMBER { pv_set_buffer_slots($3); }
+	| PVBUFSLOTS EQUAL error { yyerror("number expected"); }
+	| HTTP_REPLY_HACK EQUAL NUMBER { http_reply_hack=$3; }
+	| HTTP_REPLY_HACK EQUAL error { yyerror("boolean value expected"); }
 	| STUN_REFRESH_INTERVAL EQUAL NUMBER { IF_STUN(stun_refresh_interval=$3); }
 	| STUN_REFRESH_INTERVAL EQUAL error{ yyerror("number expected"); }
 	| STUN_ALLOW_STUN EQUAL NUMBER { IF_STUN(stun_allow_stun=$3); }
@@ -1584,6 +1696,14 @@ assign_stm:
 	| STUN_ALLOW_FP EQUAL NUMBER { IF_STUN(stun_allow_fp=$3) ; }
 	| STUN_ALLOW_FP EQUAL error{ yyerror("number expected"); }
     | SERVER_ID EQUAL NUMBER { server_id=$3; }
+    | LATENCY_LOG EQUAL NUMBER { default_core_cfg.latency_log=$3; }
+	| LATENCY_LOG EQUAL error  { yyerror("number  expected"); }
+    | LATENCY_LIMIT_DB EQUAL NUMBER { default_core_cfg.latency_limit_db=$3; }
+	| LATENCY_LIMIT_DB EQUAL error  { yyerror("number  expected"); }
+    | LATENCY_LIMIT_ACTION EQUAL NUMBER { default_core_cfg.latency_limit_action=$3; }
+	| LATENCY_LIMIT_ACTION EQUAL error  { yyerror("number  expected"); }
+    | MSG_TIME EQUAL NUMBER { sr_msg_time=$3; }
+	| MSG_TIME EQUAL error  { yyerror("number  expected"); }
 	| UDP_MTU EQUAL NUMBER { default_core_cfg.udp_mtu=$3; }
 	| UDP_MTU EQUAL error { yyerror("number expected"); }
 	| FORCE_RPORT EQUAL NUMBER 
@@ -1634,6 +1754,16 @@ cfg_var:
 	}
 	| cfg_var_id DOT cfg_var_id EQUAL error { 
 		yyerror("number or string expected"); 
+	}
+	| cfg_var_id LBRACK NUMBER RBRACK DOT cfg_var_id EQUAL NUMBER {
+		if (cfg_ginst_var_int($1, $3, $6, $8)) {
+			yyerror("variable cannot be added to the group instance");
+		}
+	}
+	| cfg_var_id LBRACK NUMBER RBRACK DOT cfg_var_id EQUAL STRING {
+		if (cfg_ginst_var_string($1, $3, $6, $8)) {
+			yyerror("variable cannot be added to the group instance");
+		}
 	}
 	;
 
@@ -1754,8 +1884,13 @@ route_name:		NUMBER	{
 			|	STRING	{ $$=$1; }
 ;
 
+
+route_main:	ROUTE { ; }
+		  | ROUTE_REQUEST { ; }
+;
+
 route_stm:
-	ROUTE LBRACE actions RBRACE {
+	route_main LBRACE actions RBRACE {
 	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
@@ -1783,6 +1918,7 @@ route_stm:
 		push($6, &main_rt.rlist[i_tmp]);
 	}
 	| ROUTE error { yyerror("invalid  route  statement"); }
+	| ROUTE_REQUEST error { yyerror("invalid  request_route  statement"); }
 	;
 failure_route_stm:
 	ROUTE_FAILURE LBRACE actions RBRACE {
@@ -1815,8 +1951,14 @@ failure_route_stm:
 	| ROUTE_FAILURE error { yyerror("invalid failure_route statement"); }
 	;
 
+
+route_reply_main:	ROUTE_ONREPLY { ; }
+		  | ROUTE_REPLY { ; }
+;
+
+
 onreply_route_stm:
-	ROUTE_ONREPLY LBRACE {rt=CORE_ONREPLY_ROUTE;} actions RBRACE {
+	route_reply_main LBRACE {rt=CORE_ONREPLY_ROUTE;} actions RBRACE {
 	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
@@ -1826,6 +1968,7 @@ onreply_route_stm:
 		push($4, &onreply_rt.rlist[DEFAULT_RT]);
 	}
 	| ROUTE_ONREPLY error { yyerror("invalid onreply_route statement"); }
+	| ROUTE_REPLY error { yyerror("invalid onreply_route statement"); }
 	| ROUTE_ONREPLY LBRACK route_name RBRACK 
 		{rt=(*$3=='0' && $3[1]==0)?CORE_ONREPLY_ROUTE:TM_ONREPLY_ROUTE;}
 		LBRACE actions RBRACE {
@@ -1938,6 +2081,10 @@ event_route_stm: ROUTE_EVENT LBRACK EVENT_RT_NAME RBRACK LBRACE actions RBRACE {
 preprocess_stm:
 	SUBST STRING { if(pp_subst_add($2)<0) YYERROR; }
 	| SUBST error { yyerror("invalid subst preprocess statement"); }
+	| SUBSTDEF STRING { if(pp_substdef_add($2, 0)<0) YYERROR; }
+	| SUBSTDEF error { yyerror("invalid substdef preprocess statement"); }
+	| SUBSTDEFS STRING { if(pp_substdef_add($2, 1)<0) YYERROR; }
+	| SUBSTDEFS error { yyerror("invalid substdefs preprocess statement"); }
 	;
 
 /*exp:	rval_expr
@@ -3010,6 +3157,7 @@ cmd:
 	| FORWARD_SCTP error { $$=0; yyerror("missing '(' or ')' ?"); }
 	| FORWARD_SCTP LPAREN error RPAREN { $$=0; 
 									yyerror("bad forward_tls argument"); }
+	| SEND LPAREN RPAREN { $$=mk_action(SEND_T, 2, URIHOST_ST, 0, URIPORT_ST, 0); set_cfg_pos($$); }
 	| SEND LPAREN host RPAREN	{ $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
 	| SEND LPAREN STRING RPAREN { $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
 	| SEND LPAREN ip RPAREN		{ $$=mk_action(SEND_T, 2, IP_ST, (void*)$3, NUMBER_ST, 0); set_cfg_pos($$); }
@@ -3018,6 +3166,7 @@ cmd:
 	| SEND LPAREN ip COMMA NUMBER RPAREN { $$=mk_action(SEND_T, 2, IP_ST, (void*)$3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
 	| SEND error { $$=0; yyerror("missing '(' or ')' ?"); }
 	| SEND LPAREN error RPAREN { $$=0; yyerror("bad send argument"); }
+	| SEND_TCP LPAREN RPAREN { $$=mk_action(SEND_TCP_T, 2, URIHOST_ST, 0, URIPORT_ST, 0); set_cfg_pos($$); }
 	| SEND_TCP LPAREN host RPAREN	{ $$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
 	| SEND_TCP LPAREN STRING RPAREN { $$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
 	| SEND_TCP LPAREN ip RPAREN	{ $$=mk_action(SEND_TCP_T, 2, IP_ST, (void*)$3, NUMBER_ST, 0); set_cfg_pos($$); }
@@ -3152,6 +3301,17 @@ cmd:
 							NUMBER_ST, (void *)Q_UNSPECIFIED);
 		set_cfg_pos($$);
 	}
+	| REMOVE_BRANCH LPAREN intno RPAREN {
+			$$=mk_action(REMOVE_BRANCH_T, 1, NUMBER_ST, (void*)$3);
+			set_cfg_pos($$);
+	}
+	| REMOVE_BRANCH LPAREN RPAREN {
+			$$=mk_action(REMOVE_BRANCH_T, 0);
+			set_cfg_pos($$);
+	}
+	| REMOVE_BRANCH error { $$=0; yyerror("missing '(' or ')' ?"); }
+	| REMOVE_BRANCH LPAREN error RPAREN { $$=0; yyerror("bad argument, number expected"); }
+	| CLEAR_BRANCHES LPAREN RPAREN { $$=mk_action(CLEAR_BRANCHES_T, 0); set_cfg_pos($$); }
 	| SET_HOSTPORT LPAREN STRING RPAREN { $$=mk_action(SET_HOSTPORT_T, 1, STRING_ST, $3); set_cfg_pos($$); }
 	| SET_HOSTPORT error { $$=0; yyerror("missing '(' or ')' ?"); }
 	| SET_HOSTPORT LPAREN error RPAREN { $$=0; yyerror("bad argument, string expected"); }
@@ -3268,6 +3428,19 @@ cmd:
 	| SET_RPL_CLOSE	{
 		$$=mk_action(SET_RPL_CLOSE_T, 0); set_cfg_pos($$);
 	}
+	| CFG_SELECT LPAREN STRING COMMA NUMBER RPAREN {
+		$$=mk_action(CFG_SELECT_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$);
+	}
+	| CFG_SELECT LPAREN STRING COMMA rval_expr RPAREN {
+		$$=mk_action(CFG_SELECT_T, 2, STRING_ST, $3, RVE_ST, $5); set_cfg_pos($$);
+	}
+	| CFG_SELECT error { $$=0; yyerror("missing '(' or ')' ?"); }
+	| CFG_SELECT LPAREN error RPAREN { $$=0; yyerror("bad arguments, string and number expected"); }
+	| CFG_RESET LPAREN STRING RPAREN {
+		$$=mk_action(CFG_RESET_T, 1, STRING_ST, $3); set_cfg_pos($$);
+	}
+	| CFG_RESET error { $$=0; yyerror("missing '(' or ')' ?"); }
+	| CFG_RESET LPAREN error RPAREN { $$=0; yyerror("bad arguments, string expected"); }
 	| ID {mod_func_action = mk_action(MODULE0_T, 2, MODEXP_ST, NULL, NUMBER_ST,
 			0); } LPAREN func_params RPAREN	{
 		mod_func_action->val[0].u.data =
@@ -3276,8 +3449,10 @@ cmd:
 		if (mod_func_action->val[0].u.data == 0) {
 			if (find_export_record($1, mod_func_action->val[1].u.number, 0,
 									&u_tmp) ) {
+					LOG(L_ERR, "misused command %s\n", $1);
 					yyerror("Command cannot be used in the block\n");
 			} else {
+				LOG(L_ERR, "cfg. parser: failed to find command %s\n", $1);
 				yyerror("unknown command, missing loadmodule?\n");
 			}
 			free_mod_func_action(mod_func_action);

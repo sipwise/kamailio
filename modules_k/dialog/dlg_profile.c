@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008 Voice System SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -35,13 +33,14 @@
 
 
 #include "../../mem/shm_mem.h"
-#include "../../lib/kcore/hash_func.h"
-#include "../../lib/kcore/km_ut.h"
+#include "../../hashes.h"
+#include "../../trim.h"
 #include "../../dprint.h"
 #include "../../ut.h"
 #include "../../route.h"
 #include "../../modules/tm/tm_load.h"
 #include "dlg_hash.h"
+#include "dlg_var.h"
 #include "dlg_handlers.h"
 #include "dlg_profile.h"
 
@@ -53,31 +52,20 @@
 extern struct tm_binds d_tmb;
 
 /*! global dialog message id */
-static unsigned int            current_dlg_msg_id = 0 ;
-
-/*! global dialog */
-struct dlg_cell                *current_dlg_pointer = NULL ;
+static unsigned int       current_dlg_msg_id  = 0 ;
+static unsigned int       current_dlg_msg_pid = 0 ;
 
 /*! pending dialog links */
-static struct dlg_profile_link *current_pending_linkers = NULL;
+static dlg_profile_link_t *current_pending_linkers = NULL;
 
 /*! global dialog profile list */
-static struct dlg_profile_table *profiles = NULL;
+static dlg_profile_table_t *profiles = NULL;
 
 
-static struct dlg_profile_table* new_dlg_profile( str *name,
+static dlg_profile_table_t* new_dlg_profile( str *name,
 		unsigned int size, unsigned int has_value);
 
 
-struct dlg_cell *get_current_dlg_pointer(void)
-{
-	return current_dlg_pointer;
-}
-
-void reset_current_dlg_pointer(void)
-{
-	current_dlg_pointer = NULL;
-}
 
 /*!
  * \brief Add profile definitions to the global list
@@ -307,15 +295,23 @@ void destroy_linkers(struct dlg_profile_link *linker)
  * \brief Cleanup a profile
  * \param msg SIP message
  * \param flags unused
- * \param unused
+ * \param param unused
  * \return 1
  */
 int profile_cleanup( struct sip_msg *msg, unsigned int flags, void *param )
 {
+	dlg_cell_t *dlg;
+
 	current_dlg_msg_id = 0;
-	if (current_dlg_pointer) {
-		unref_dlg( current_dlg_pointer, 1);
-		current_dlg_pointer = NULL;
+	current_dlg_msg_pid = 0;
+	dlg = dlg_get_ctx_dialog();
+	if (dlg!=NULL) {
+		if(dlg->dflags & DLG_FLAG_TM) {
+			dlg_unref(dlg, 1);
+		} else {
+			/* dialog didn't make it to tm */
+			dlg_unref(dlg, 2);
+		}
 	}
 	if (current_pending_linkers) {
 		destroy_linkers(current_pending_linkers);
@@ -328,47 +324,6 @@ int profile_cleanup( struct sip_msg *msg, unsigned int flags, void *param )
 
 
 
-struct dlg_cell* get_dialog_from_tm(struct cell *t)
-{
-    if (t==NULL || t==T_UNDEFINED)
-        return NULL;
-
-    struct tm_callback* x = (struct tm_callback*)(t->tmcb_hl.first);
-
-    while(x){
-        membar_depends();
-        if (x->types==TMCB_MAX && x->callback==dlg_tmcb_dummy){
-            return (struct dlg_cell*)(x->param);
-        }
-        x=x->next;
-    }
-
-    return NULL;
-}
-
-/*!
- * \brief Get the current dialog for a message, if exists
- * \param msg SIP message
- * \return NULL if called in REQUEST_ROUTE, pointer to dialog ctx otherwise
- */ 
-struct dlg_cell *get_current_dialog(struct sip_msg *msg)
-{
-	if (is_route_type(REQUEST_ROUTE|BRANCH_ROUTE)) {
-		/* use the per-process static holder */
-		if (msg->id==current_dlg_msg_id)
-			return current_dlg_pointer;
-		current_dlg_pointer = NULL;
-		current_dlg_msg_id = msg->id;
-		destroy_linkers(current_pending_linkers);
-		current_pending_linkers = NULL;
-		return NULL;
-	} else {
-		/* use current transaction to get dialog */
-	    return get_dialog_from_tm(d_tmb.t_gett());
-	}
-}
-
-
 /*!
  * \brief Calculate the hash profile from a dialog
  * \see core_hash
@@ -377,8 +332,8 @@ struct dlg_cell *get_current_dialog(struct sip_msg *msg)
  * \param profile dialog profile table (for hash size)
  * \return value hash if the value has a value, hash over dialog otherwise
  */
-inline static unsigned int calc_hash_profile(str *value, struct dlg_cell *dlg,
-		struct dlg_profile_table *profile)
+inline static unsigned int calc_hash_profile(str *value, dlg_cell_t *dlg,
+		dlg_profile_table_t *profile)
 {
 	if (profile->has_value) {
 		/* do hash over the value */
@@ -443,17 +398,19 @@ static void link_dlg_profile(struct dlg_profile_link *linker, struct dlg_cell *d
  * \param msg SIP message
  * \param dlg dialog cell
  */
-void set_current_dialog(struct sip_msg *msg, struct dlg_cell *dlg)
+void set_current_dialog(sip_msg_t *msg, dlg_cell_t *dlg)
 {
 	struct dlg_profile_link *linker;
 	struct dlg_profile_link *tlinker;
 
+	LM_DBG("setting current dialog [%u:%u]\n", dlg->h_entry, dlg->h_id);
 	/* if linkers are not from current request, just discard them */
-	if (msg->id!=current_dlg_msg_id) {
+	if (msg->id!=current_dlg_msg_id || msg->pid!=current_dlg_msg_pid) {
 		current_dlg_msg_id = msg->id;
+		current_dlg_msg_pid = msg->pid;
 		destroy_linkers(current_pending_linkers);
 	} else {
-		/* add the linker, one be one, to the dialog */
+		/* add the linker, one by one, to the dialog */
 		linker = current_pending_linkers;
 		while (linker) {
 			tlinker = linker;
@@ -464,10 +421,6 @@ void set_current_dialog(struct sip_msg *msg, struct dlg_cell *dlg)
 		}
 	}
 	current_pending_linkers = NULL;
-	current_dlg_pointer = dlg;
-
-	/* do not increase reference counter here, let caller handle it
-	 * (yes, this is somewhat ugly) */
 }
 
 
@@ -480,11 +433,11 @@ void set_current_dialog(struct sip_msg *msg, struct dlg_cell *dlg)
  */
 int set_dlg_profile(struct sip_msg *msg, str *value, struct dlg_profile_table *profile)
 {
-	struct dlg_cell *dlg;
-	struct dlg_profile_link *linker;
+	dlg_cell_t *dlg = NULL;
+	dlg_profile_link_t *linker;
 
 	/* get current dialog */
-	dlg = get_current_dialog(msg);
+	dlg = dlg_get_msg_dialog(msg);
 
 	if (dlg==NULL && !is_route_type(REQUEST_ROUTE)) {
 		LM_CRIT("BUG - dialog not found in a non REQUEST route (%d)\n",
@@ -497,7 +450,7 @@ int set_dlg_profile(struct sip_msg *msg, str *value, struct dlg_profile_table *p
 		sizeof(struct dlg_profile_link) + (profile->has_value?value->len:0) );
 	if (linker==NULL) {
 		LM_ERR("no more shm memory\n");
-		return -1;
+		goto error;
 	}
 	memset(linker, 0, sizeof(struct dlg_profile_link));
 
@@ -515,14 +468,70 @@ int set_dlg_profile(struct sip_msg *msg, str *value, struct dlg_profile_table *p
 		/* add linker directly to the dialog and profile */
 		link_dlg_profile( linker, dlg);
 	} else {
+		/* if existing linkers are not from current request, just discard them */
+		if (msg->id!=current_dlg_msg_id || msg->pid!=current_dlg_msg_pid) {
+			current_dlg_msg_id = msg->id;
+			current_dlg_msg_pid = msg->pid;
+			destroy_linkers(current_pending_linkers);
+			current_pending_linkers = NULL;
+		}
 		/* no dialog yet -> set linker as pending */
+		if (msg->id!=current_dlg_msg_id || msg->pid!=current_dlg_msg_pid) {
+			current_dlg_msg_id = msg->id;
+			current_dlg_msg_pid = msg->pid;
+			destroy_linkers(current_pending_linkers);
+		}
+
 		linker->next = current_pending_linkers;
 		current_pending_linkers = linker;
 	}
 
+	dlg_release(dlg);
 	return 0;
+error:
+	dlg_release(dlg);
+	return -1;
 }
 
+/*!
+ * \brief Add dialog to a profile
+ * \param dlg dialog
+ * \param value value
+ * \param profile dialog profile table
+ * \return 0 on success, -1 on failure
+ */
+int dlg_add_profile(dlg_cell_t *dlg, str *value, struct dlg_profile_table *profile)
+{
+	dlg_profile_link_t *linker;
+
+	if (dlg==NULL)
+		return -1;
+
+	/* build new linker */
+	linker = (struct dlg_profile_link*)shm_malloc(
+		sizeof(struct dlg_profile_link) + (profile->has_value?value->len:0) );
+	if (linker==NULL) {
+		LM_ERR("no more shm memory\n");
+		goto error;
+	}
+	memset(linker, 0, sizeof(struct dlg_profile_link));
+
+	/* set backpointer to profile */
+	linker->profile = profile;
+
+	/* set the value */
+	if (profile->has_value) {
+		linker->hash_linker.value.s = (char*)(linker+1);
+		memcpy( linker->hash_linker.value.s, value->s, value->len);
+		linker->hash_linker.value.len = value->len;
+	}
+
+	/* add linker directly to the dialog and profile */
+	link_dlg_profile( linker, dlg);
+	return 0;
+error:
+	return -1;
+}
 
 /*!
  * \brief Unset a dialog profile
@@ -531,19 +540,24 @@ int set_dlg_profile(struct sip_msg *msg, str *value, struct dlg_profile_table *p
  * \param profile dialog profile table
  * \return 1 on success, -1 on failure
  */
-int unset_dlg_profile(struct sip_msg *msg, str *value,
-		struct dlg_profile_table *profile)
+int unset_dlg_profile(sip_msg_t *msg, str *value,
+		dlg_profile_table_t *profile)
 {
-	struct dlg_cell *dlg;
-	struct dlg_profile_link *linker;
-	struct dlg_profile_link *linker_prev;
-	struct dlg_entry *d_entry;
+	dlg_cell_t *dlg;
+	dlg_profile_link_t *linker;
+	dlg_profile_link_t *linker_prev;
+	dlg_entry_t *d_entry;
+
+	if (is_route_type(REQUEST_ROUTE)) {
+		LM_ERR("dialog delete profile cannot be used in request route\n");
+		return -1;
+	}
 
 	/* get current dialog */
-	dlg = get_current_dialog(msg);
+	dlg = dlg_get_msg_dialog(msg);
 
-	if (dlg==NULL || is_route_type(REQUEST_ROUTE)) {
-		LM_CRIT("BUG - dialog NULL or del_profile used in request route\n");
+	if (dlg==NULL) {
+		LM_WARN("dialog is NULL for delete profile\n");
 		return -1;
 	}
 
@@ -566,6 +580,7 @@ int unset_dlg_profile(struct sip_msg *msg, str *value,
 		}
 	}
 	dlg_unlock( d_table, d_entry);
+	dlg_release(dlg);
 	return -1;
 
 found:
@@ -580,6 +595,7 @@ found:
 	dlg_unlock( d_table, d_entry);
 	/* remove linker from profile table and free it */
 	destroy_linkers(linker);
+	dlg_release(dlg);
 	return 1;
 }
 
@@ -599,7 +615,7 @@ int is_dlg_in_profile(struct sip_msg *msg, struct dlg_profile_table *profile,
 	struct dlg_entry *d_entry;
 
 	/* get current dialog */
-	dlg = get_current_dialog(msg);
+	dlg = dlg_get_msg_dialog(msg);
 
 	if (dlg==NULL)
 		return -1;
@@ -611,11 +627,11 @@ int is_dlg_in_profile(struct sip_msg *msg, struct dlg_profile_table *profile,
 		if (linker->profile==profile) {
 			if (profile->has_value==0) {
 				dlg_unlock( d_table, d_entry);
-				return 1;
+				goto done;
 			} else if (value && value->len==linker->hash_linker.value.len &&
 			memcmp(value->s,linker->hash_linker.value.s,value->len)==0){
 				dlg_unlock( d_table, d_entry);
-				return 1;
+				goto done;
 			}
 			/* allow further search - maybe the dialog is inserted twice in
 			 * the same profile, but with different values -bogdan
@@ -623,6 +639,9 @@ int is_dlg_in_profile(struct sip_msg *msg, struct dlg_profile_table *profile,
 		}
 	}
 	dlg_unlock( d_table, d_entry);
+
+done:
+	dlg_release(dlg);
 	return -1;
 }
 
@@ -673,8 +692,14 @@ unsigned int get_profile_size(struct dlg_profile_table *profile, str *value)
  * Determine if message is in a dialog currently being tracked
  */
 int	is_known_dlg(struct sip_msg *msg) {
-	if(get_current_dialog(msg) == NULL)
+	dlg_cell_t *dlg;
+
+	dlg = dlg_get_msg_dialog(msg);
+	
+	if(dlg == NULL)
 		return -1;
+
+	dlg_release(dlg);
 
 	return 1;
 }
@@ -847,4 +872,160 @@ struct mi_root * mi_profile_list(struct mi_root *cmd_tree, void *param )
 error:
 	free_mi_tree(rpl_tree);
 	return NULL;
+}
+
+
+/**
+ * json serialization of dialog profiles
+ */
+int dlg_profiles_to_json(dlg_cell_t *dlg, srjson_doc_t *jdoc)
+{
+	dlg_profile_link_t *l;
+	srjson_t *sj = NULL;
+	srjson_t *dj = NULL;
+
+	LM_DBG("serializing profiles for dlg[%u:%u]\n",
+				dlg->h_entry, dlg->h_id);
+	if(dlg==NULL || dlg->profile_links==NULL)
+		return -1;
+	LM_DBG("start of serializing profiles for dlg[%u:%u]\n",
+				dlg->h_entry, dlg->h_id);
+
+	for (l = dlg->profile_links ; l ; l=l->next) {
+		if(l->profile->has_value)
+		{
+			if(dj==NULL)
+			{
+				dj = srjson_CreateObject(jdoc);
+				if(dj==NULL)
+				{
+					LM_ERR("cannot create json dynamic profiles obj\n");
+					goto error;
+				}
+			}
+			srjson_AddStrStrToObject(jdoc, dj,
+					l->profile->name.s, l->profile->name.len,
+					l->hash_linker.value.s, l->hash_linker.value.len);
+		} else {
+			if(sj==NULL)
+			{
+				sj = srjson_CreateArray(jdoc);
+				if(sj==NULL)
+				{
+					LM_ERR("cannot create json static profiles obj\n");
+					goto error;
+				}
+			}
+			srjson_AddItemToArray(jdoc, sj,
+					srjson_CreateStr(jdoc, l->profile->name.s, l->profile->name.len));
+		}
+	}
+
+	if(jdoc->root==NULL)
+	{
+		jdoc->root = srjson_CreateObject(jdoc);
+		if(jdoc->root==NULL)
+		{
+			LM_ERR("cannot create json root\n");
+			goto error;
+		}
+	}
+	if(dj!=NULL)
+		srjson_AddItemToObject(jdoc, jdoc->root, "dprofiles", dj);
+	if(sj!=NULL)
+		srjson_AddItemToObject(jdoc, jdoc->root, "sprofiles", sj);
+	if(jdoc->buf.s != NULL)
+	{
+		jdoc->free_fn(jdoc->buf.s);
+		jdoc->buf.s = NULL;
+		jdoc->buf.len = 0;
+	}
+	jdoc->buf.s = srjson_PrintUnformatted(jdoc, jdoc->root);
+	if(jdoc->buf.s!=NULL)
+	{
+		jdoc->buf.len = strlen(jdoc->buf.s);
+		LM_DBG("serialized profiles for dlg[%u:%u] = [[%.*s]]\n",
+				dlg->h_entry, dlg->h_id, jdoc->buf.len, jdoc->buf.s);
+		return 0;
+	}
+	return -1;
+
+error:
+	srjson_Delete(jdoc, dj);
+	srjson_Delete(jdoc, sj);
+	return -1;
+}
+
+
+/**
+ * json de-serialization of dialog profiles
+ */
+int dlg_json_to_profiles(dlg_cell_t *dlg, srjson_doc_t *jdoc)
+{
+	srjson_t *sj = NULL;
+	srjson_t *dj = NULL;
+	srjson_t *it = NULL;
+	dlg_profile_table_t *profile;
+	str name;
+	str val;
+
+	if(dlg==NULL || jdoc==NULL || jdoc->buf.s==NULL)
+		return -1;
+
+	if(jdoc->root == NULL)
+	{
+		jdoc->root = srjson_Parse(jdoc, jdoc->buf.s);
+		if(jdoc->root == NULL)
+		{
+			LM_ERR("invalid json doc [[%s]]\n", jdoc->buf.s);
+			return -1;
+		}
+	}
+	dj = srjson_GetObjectItem(jdoc, jdoc->root, "dprofiles");
+	sj = srjson_GetObjectItem(jdoc, jdoc->root, "sprofiles");
+	if(dj!=NULL)
+	{
+		for(it=dj->child; it; it = it->next)
+		{
+			name.s = it->string;
+			name.len = strlen(name.s);
+			val.s = it->valuestring;
+			val.len = strlen(val.s);
+			profile = search_dlg_profile(&name);
+			if(profile==NULL)
+			{
+				LM_ERR("profile [%.*s] not found\n", name.len, name.s);
+				continue;
+			}
+			if(profile->has_value)
+			{
+				if(dlg_add_profile(dlg, &val, profile) < 0)
+					LM_ERR("dynamic profile cannot be added, ignore!\n");
+				else
+					LM_DBG("dynamic profile added [%s : %s]\n", name.s, val.s);
+			}
+		}
+	}
+	if(sj!=NULL)
+	{
+		for(it=sj->child; it; it = it->next)
+		{
+			name.s = it->valuestring;
+			name.len = strlen(name.s);
+			profile = search_dlg_profile(&name);
+			if(profile==NULL)
+			{
+				LM_ERR("profile [%.*s] not found\n", name.len, name.s);
+				continue;
+			}
+			if(!profile->has_value)
+			{
+				if(dlg_add_profile(dlg, NULL, profile) < 0)
+					LM_ERR("static profile cannot be added, ignore!\n");
+				else
+					LM_DBG("static profile added [%s]\n", name.s);
+			}
+		}
+	}
+	return 0;
 }

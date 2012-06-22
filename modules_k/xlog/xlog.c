@@ -39,6 +39,7 @@
 
 #include "../../pvar.h"
 
+#define NOFACILITY -1
 
 MODULE_VERSION
 
@@ -49,21 +50,27 @@ char *_xlog_prefix = "<script>: ";
 static int buf_size=4096;
 static int force_color=0;
 static int long_format=0;
+static int xlog_facility = DEFAULT_FACILITY;
+static char *xlog_facility_name = NULL;
 
 /** module functions */
 static int mod_init(void);
 
 static int xlog_1(struct sip_msg*, char*, char*);
 static int xlog_2(struct sip_msg*, char*, char*);
+static int xlog_3(struct sip_msg*, char*, char*, char*);
 static int xdbg(struct sip_msg*, char*, char*);
 
 static int xlogl_1(struct sip_msg*, char*, char*);
 static int xlogl_2(struct sip_msg*, char*, char*);
+static int xlogl_3(struct sip_msg*, char*, char*, char*);
 static int xdbgl(struct sip_msg*, char*, char*);
 
 static int xlog_fixup(void** param, int param_no);
+static int xlog3_fixup(void** param, int param_no);
 static int xdbg_fixup(void** param, int param_no);
 static int xlogl_fixup(void** param, int param_no);
+static int xlogl3_fixup(void** param, int param_no);
 static int xdbgl_fixup(void** param, int param_no);
 
 static void destroy(void);
@@ -97,9 +104,11 @@ static pv_export_t mod_items[] = {
 static cmd_export_t cmds[]={
 	{"xlog",   (cmd_function)xlog_1,   1, xdbg_fixup,  0, ANY_ROUTE},
 	{"xlog",   (cmd_function)xlog_2,   2, xlog_fixup,  0, ANY_ROUTE},
+	{"xlog",   (cmd_function)xlog_3,   3, xlog3_fixup, 0, ANY_ROUTE},
 	{"xdbg",   (cmd_function)xdbg,     1, xdbg_fixup,  0, ANY_ROUTE},
 	{"xlogl",  (cmd_function)xlogl_1,  1, xdbgl_fixup, 0, ANY_ROUTE},
 	{"xlogl",  (cmd_function)xlogl_2,  2, xlogl_fixup, 0, ANY_ROUTE},
+	{"xlogl",  (cmd_function)xlogl_3,  3, xlogl3_fixup,0, ANY_ROUTE},
 	{"xdbgl",  (cmd_function)xdbgl,    1, xdbgl_fixup, 0, ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
@@ -110,6 +119,7 @@ static param_export_t params[]={
 	{"force_color",  INT_PARAM, &force_color},
 	{"long_format",  INT_PARAM, &long_format},
 	{"prefix",       STR_PARAM, &_xlog_prefix},
+	{"log_facility", STR_PARAM, &xlog_facility_name},
 	{0,0,0}
 };
 
@@ -135,6 +145,17 @@ struct module_exports exports= {
  */
 static int mod_init(void)
 {
+	int lf;
+	if (xlog_facility_name!=NULL) {
+		lf = str2facility(xlog_facility_name);
+		if (lf != -1) {
+			xlog_facility = lf;
+		} else {
+			LM_ERR("invalid syslog facility %s\n", xlog_facility_name);
+			return -1;
+		}
+	}
+
 	_xlog_buf = (char*)pkg_malloc((buf_size+1)*sizeof(char));
 	if(_xlog_buf==NULL)
 	{
@@ -145,7 +166,7 @@ static int mod_init(void)
 }
 
 static inline int xlog_helper(struct sip_msg* msg, xl_msg_t *xm,
-		int level, int line)
+		int level, int line, int facility)
 {
 	str txt;
 
@@ -154,17 +175,22 @@ static inline int xlog_helper(struct sip_msg* msg, xl_msg_t *xm,
 	if(xl_print_log(msg, xm->m, _xlog_buf, &txt.len)<0)
 		return -1;
 	txt.s = _xlog_buf;
+	/* if facility is not explicitely defined use the xlog default facility */
+	if (facility==NOFACILITY) {
+		facility = xlog_facility;
+	} 
+
 	if(line>0)
 		if(long_format==1)
-			LOG_(DEFAULT_FACILITY, level, _xlog_prefix,
+			LOG_(facility, level, _xlog_prefix,
 				"%s:%d:%.*s",
 				(xm->a)?(((xm->a->cfile)?xm->a->cfile:"")):"",
 				(xm->a)?xm->a->cline:0, txt.len, txt.s);
 		else
-			LOG_(DEFAULT_FACILITY, level, _xlog_prefix,
+			LOG_(facility, level, _xlog_prefix,
 				"%d:%.*s", (xm->a)?xm->a->cline:0, txt.len, txt.s);
 	else
-		LOG_(DEFAULT_FACILITY, level, _xlog_prefix,
+		LOG_(facility, level, _xlog_prefix,
 			"%.*s", txt.len, txt.s);
 	return 1;
 }
@@ -172,18 +198,27 @@ static inline int xlog_helper(struct sip_msg* msg, xl_msg_t *xm,
 /**
  * print log message to L_ERR level
  */
-static int xlog_1(struct sip_msg* msg, char* frm, char* str2)
+static int xlog_1_helper(struct sip_msg* msg, char* frm, char* str2, int mode, int facility)
 {
 	if(!is_printable(L_ERR))
 		return 1;
 
-	return xlog_helper(msg, (xl_msg_t*)frm, L_ERR, 0);
+	return xlog_helper(msg, (xl_msg_t*)frm, L_ERR, mode, facility);
+}
+static int xlog_1(struct sip_msg* msg, char* frm, char* str2)
+{
+	return xlog_1_helper(msg, frm, str2, 0, NOFACILITY);
 }
 
 /**
- * print log message to level given in parameter
+ * print log message to L_ERR level along with cfg line
  */
-static int xlog_2(struct sip_msg* msg, char* lev, char* frm)
+static int xlogl_1(struct sip_msg* msg, char* frm, char* str2)
+{
+	return xlog_1_helper(msg, frm, str2, 1, NOFACILITY);
+}
+
+static int xlog_2_helper(struct sip_msg* msg, char* lev, char* frm, int mode, int facility)
 {
 	long level;
 	xl_level_p xlp;
@@ -206,28 +241,15 @@ static int xlog_2(struct sip_msg* msg, char* lev, char* frm)
 	if(!is_printable((int)level))
 		return 1;
 
-	return xlog_helper(msg, (xl_msg_t*)frm, (int)level, 0);
+	return xlog_helper(msg, (xl_msg_t*)frm, (int)level, mode, facility);
 }
 
 /**
- * print log message to L_DBG level
+ * print log message to level given in parameter
  */
-static int xdbg(struct sip_msg* msg, char* frm, char* str2)
+static int xlog_2(struct sip_msg* msg, char* lev, char* frm)
 {
-	if(!is_printable(L_DBG))
-		return 1;
-	return xlog_helper(msg, (xl_msg_t*)frm, L_DBG, 0);
-}
-
-/**
- * print log message to L_ERR level along with cfg line
- */
-static int xlogl_1(struct sip_msg* msg, char* frm, char* str2)
-{
-	if(!is_printable(L_ERR))
-		return 1;
-
-	return xlog_helper(msg, (xl_msg_t*)frm, L_ERR, 1);
+	return xlog_2_helper(msg, lev, frm, 0, NOFACILITY);
 }
 
 /**
@@ -235,14 +257,20 @@ static int xlogl_1(struct sip_msg* msg, char* frm, char* str2)
  */
 static int xlogl_2(struct sip_msg* msg, char* lev, char* frm)
 {
+	return xlog_2_helper(msg, lev, frm, 1, NOFACILITY);
+}
+
+static int xlog_3_helper(struct sip_msg* msg, char* fac, char* lev, char* frm, int mode)
+{
 	long level;
+	int facility;
 	xl_level_p xlp;
 	pv_value_t value;
 
 	xlp = (xl_level_p)lev;
 	if(xlp->type==1)
 	{
-		if(pv_get_spec_value(msg, &xlp->v.sp, &value)!=0
+		if(pv_get_spec_value(msg, &xlp->v.sp, &value)!=0 
 			|| value.flags&PV_VAL_NULL || !(value.flags&PV_VAL_INT))
 		{
 			LM_ERR("invalid log level value [%d]\n", value.flags);
@@ -252,11 +280,45 @@ static int xlogl_2(struct sip_msg* msg, char* lev, char* frm)
 	} else {
 		level = xlp->v.level;
 	}
+	facility = *(int*)fac;
 
 	if(!is_printable((int)level))
 		return 1;
 
-	return xlog_helper(msg, (xl_msg_t*)frm, (int)level, 1);
+	return xlog_helper(msg, (xl_msg_t*)frm, (int)level, mode, facility);
+}
+
+/**
+ * print log message to level given in parameter
+ * add dedicated logfacility
+ */
+static int xlog_3(struct sip_msg* msg, char* fac, char* lev, char* frm)
+{
+	return xlog_3_helper(msg, fac, lev, frm, 0);
+}
+
+/**
+ * print log message to level given in parameter along with cfg line
+ * add dedicated logfacility
+ */
+static int xlogl_3(struct sip_msg* msg, char* fac, char* lev, char* frm)
+{
+	return xlog_3_helper(msg, fac, lev, frm, 1);
+}
+
+static int xdbg_helper(struct sip_msg* msg, char* frm, char* str2, int mode, int facility)
+{
+	if(!is_printable(L_DBG))
+		return 1;
+	return xlog_helper(msg, (xl_msg_t*)frm, L_DBG, mode, facility);
+}
+
+/**
+ * print log message to L_DBG level
+ */
+static int xdbg(struct sip_msg* msg, char* frm, char* str2)
+{
+	return xdbg_helper(msg, frm, str2, 0, NOFACILITY);
 }
 
 /**
@@ -264,11 +326,8 @@ static int xlogl_2(struct sip_msg* msg, char* lev, char* frm)
  */
 static int xdbgl(struct sip_msg* msg, char* frm, char* str2)
 {
-	if(!is_printable(L_DBG))
-		return 1;
-	return xlog_helper(msg, (xl_msg_t*)frm, L_DBG, 1);
+	return xdbg_helper(msg, frm, str2, 1, NOFACILITY);
 }
-
 
 /**
  * module destroy function
@@ -277,22 +336,6 @@ static void destroy(void)
 {
 	if(_xlog_buf)
 		pkg_free(_xlog_buf);
-}
-
-/**
- * get the pointer to action structure
- * - take cfg line
- * - cfg file name available, but could be long
- */
-static struct action *xlog_fixup_get_action(void **param, int param_no)
-{
-	struct action *ac, ac2;
-	action_u_t *au, au2;
-	/* param points to au->u.string, get pointer to au */
-	au = (void*) ((char *)param - ((char *)&au2.u.string-(char *)&au2));
-	au = au - 1 - param_no;
-	ac = (void*) ((char *)au - ((char *)&ac2.val-(char *)&ac2));
-	return ac;
 }
 
 static int xdbg_fixup_helper(void** param, int param_no, int mode)
@@ -308,7 +351,7 @@ static int xdbg_fixup_helper(void** param, int param_no, int mode)
 	}
 	memset(xm, 0, sizeof(xl_msg_t));
 	if(mode==1)
-		xm->a = xlog_fixup_get_action(param, param_no);
+		xm->a = get_action_from_param(param, param_no);
 	s.s = (char*)(*param); s.len = strlen(s.s);
 
 	if(pv_parse_format(&s, &xm->m)<0)
@@ -378,6 +421,37 @@ static int xlog_fixup_helper(void** param, int param_no, int mode)
 	return 0;
 }
 
+/*
+ * fixup log facility
+ */
+static int xlog3_fixup_helper(void** param, int param_no)
+{
+	int *facility;
+	str s;
+
+	s.s = (char*)(*param);
+	if(s.s==NULL)
+	{
+		LM_ERR("wrong log facility\n");
+		return E_UNSPEC;
+	}
+	facility = (int*)pkg_malloc(sizeof(int));
+	if(facility == NULL)
+	{
+		LM_ERR("no more memory\n");
+		return E_UNSPEC;
+	}
+	*facility = str2facility(s.s);
+	if (*facility == -1) {
+		LM_ERR("invalid syslog facility %s\n", s.s);
+		return E_UNSPEC;
+	}
+
+	pkg_free(*param);
+	*param = (void*)facility;
+	return 0;
+}
+
 static int xlog_fixup(void** param, int param_no)
 {
 	if(param==NULL || *param==NULL)
@@ -388,6 +462,25 @@ static int xlog_fixup(void** param, int param_no)
 	return xlog_fixup_helper(param, param_no, 0);
 }
 
+static int xlog3_fixup(void** param, int param_no)
+{
+	if(param==NULL || *param==NULL)
+	{
+		LM_ERR("invalid parameter number %d\n", param_no);
+		return E_UNSPEC;
+	}
+	/* fixup loglevel */
+	if (param_no == 2) {
+		return xlog_fixup_helper(param, 1, 0);
+	}
+	/* fixup log message */
+	if (param_no == 3) {
+		return xdbg_fixup_helper(param, 3, 0);
+	}
+	/* fixup facility */
+	return xlog3_fixup_helper(param, param_no);
+}
+
 static int xdbg_fixup(void** param, int param_no)
 {
 	if(param_no!=1 || param==NULL || *param==NULL)
@@ -396,6 +489,25 @@ static int xdbg_fixup(void** param, int param_no)
 		return E_UNSPEC;
 	}
 	return xdbg_fixup_helper(param, param_no, 0);
+}
+
+static int xlogl3_fixup(void** param, int param_no)
+{
+	if(param==NULL || *param==NULL)
+	{
+		LM_ERR("invalid parameter number %d\n", param_no);
+		return E_UNSPEC;
+	}
+	/* fixup loglevel */
+	if (param_no == 2) {
+		return xlog_fixup_helper(param, 1, 1);
+	}
+	/* fixup log message */
+	if (param_no == 3) {
+		return xdbg_fixup_helper(param, 3, 1);
+	}
+	/* fixup facility */
+	return xlog3_fixup_helper(param, param_no);
 }
 
 static int xlogl_fixup(void** param, int param_no)

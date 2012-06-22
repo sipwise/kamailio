@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of SIP-Router, a free SIP server.
@@ -22,7 +20,7 @@
 
 /*!
  * \file
- * \brief SIP-router core ::  PV API specification
+ * \brief SIP-router core :: PV API specification
  * \ingroup core
  * Module: \ref core
  */
@@ -39,13 +37,12 @@
 #include "dprint.h"
 #include "hashes.h"
 #include "route.h"
-#include "pvapi_init.h"
+#include "pvapi.h"
 #include "pvar.h"
 
-#define is_in_str(p, in) (p<in->s+in->len && *p)
-
-#define PV_TABLE_SIZE	16
-#define TR_TABLE_SIZE	4
+#define PV_TABLE_SIZE	32  /*!< pseudo-variables table size */
+#define PV_CACHE_SIZE	32  /*!< pseudo-variables table size */
+#define TR_TABLE_SIZE	16  /*!< transformations table size */
 
 
 void tr_destroy(trans_t *t);
@@ -61,6 +58,16 @@ typedef struct _pv_item
 static pv_item_t* _pv_table[PV_TABLE_SIZE];
 static int _pv_table_set = 0;
 
+typedef struct _pv_cache
+{
+	str pvname;
+	unsigned int pvid;
+	pv_spec_t spec;
+	struct _pv_cache *next;
+} pv_cache_t;
+
+static pv_cache_t* _pv_cache[PV_CACHE_SIZE];
+static int _pv_cache_set = 0;
 
 /**
  *
@@ -74,12 +81,95 @@ void pv_init_table(void)
 /**
  *
  */
+void pv_init_cache(void)
+{
+	memset(_pv_cache, 0, sizeof(pv_cache_t*)*PV_CACHE_SIZE);
+	_pv_cache_set = 1;
+}
+
+
+/**
+ * @brief Check if a char is valid according to the PV syntax
+ * @param c checked char
+ * @return 1 if char is valid, 0 if not valid
+ */
 static int is_pv_valid_char(char c)
 {
 	if((c>='0' && c<='9') || (c>='a' && c<='z') || (c>='A' && c<='Z')
 			|| (c=='_') || (c=='.') || (c=='?') /* ser $? */)
 		return 1;
 	return 0;
+}
+
+/**
+ *
+ */
+int pv_locate_name(str *in)
+{
+	int i;
+	int pcount;
+
+	if(in==NULL || in->s==NULL || in->len<2)
+	{
+		LM_ERR("bad parameters\n");
+		return -1;
+	}
+
+	if(in->s[0]!=PV_MARKER)
+	{
+		LM_ERR("missing pv marker [%.*s]\n", in->len, in->s);
+		return -1;
+	}
+	pcount = 0;
+	if(in->s[1]==PV_LNBRACKET)
+	{
+		/* name with parenthesis: $(...) */
+		pcount = 1;
+		for(i=2; i<in->len; i++)
+		{
+			if(in->s[i]==PV_LNBRACKET)
+				pcount++;
+			else if(in->s[i]==PV_RNBRACKET)
+				pcount--;
+			if(pcount==0)
+				return i+1;
+		}
+		/* non-closing name parenthesis */
+		LM_ERR("non-closing name parenthesis [%.*s]\n",in->len,in->s);
+		return -1;
+	}
+
+	/* name without parenthesis: $xyz(...) */
+	for(i=1; i<in->len; i++)
+	{
+		if(!is_pv_valid_char(in->s[i]))
+		{
+			if(in->s[i]==PV_LNBRACKET)
+			{
+				/* inner-name parenthesis */
+				pcount = 1;
+				break;
+			} else {
+				return i;
+			}
+		}
+	}
+	if(pcount==0)
+		return i;
+
+	i++;
+	for( ; i<in->len; i++)
+	{
+		if(in->s[i]==PV_LNBRACKET)
+			pcount++;
+		else if(in->s[i]==PV_RNBRACKET)
+			pcount--;
+		if(pcount==0)
+			return i+1;
+	}
+	/* non-closing inner-name parenthesis */
+	LM_ERR("non-closing inner-name parenthesis [%.*s]\n",in->len,in->s);
+	return -1;
 }
 
 /**
@@ -159,6 +249,108 @@ int pv_table_add(pv_export_t *e)
 
 done:
 	return 0;
+}
+
+/**
+ *
+ */
+pv_spec_t* pv_cache_add(str *name)
+{
+	pv_cache_t *pvn;
+	unsigned int pvid;
+	char *p;
+
+	if(_pv_cache_set==0)
+	{
+		LM_DBG("PV cache not initialized, doing it now\n");
+		pv_init_cache();
+	}
+	pvid = get_hash1_raw(name->s, name->len);
+	pvn = (pv_cache_t*)pkg_malloc(sizeof(pv_cache_t) + name->len + 1);
+	if(pvn==0)
+	{
+		LM_ERR("no more memory\n");
+		return NULL;
+	}
+	memset(pvn, 0, sizeof(pv_item_t) + name->len + 1);
+	p = pv_parse_spec(name, &pvn->spec);
+
+	if(p==NULL)
+	{
+		pkg_free(pvn);
+		return NULL;
+	}
+	pvn->pvname.len = name->len;
+	pvn->pvname.s = (char*)pvn + sizeof(pv_cache_t);
+	memcpy(pvn->pvname.s, name->s, name->len);
+	pvn->pvid = pvid;
+	pvn->next = _pv_cache[pvid%PV_CACHE_SIZE];
+	_pv_cache[pvid%PV_CACHE_SIZE] = pvn;
+
+	LM_DBG("pvar [%.*s] added in cache\n", name->len, name->s);
+	return &pvn->spec;
+}
+
+/**
+ *
+ */
+pv_spec_t* pv_cache_lookup(str *name)
+{
+	pv_cache_t *pvi;
+	unsigned int pvid;
+	int found;
+
+	if(_pv_cache_set==0)
+		return NULL;
+
+	pvid = get_hash1_raw(name->s, name->len);
+	pvi = _pv_cache[pvid%PV_CACHE_SIZE];
+	while(pvi)
+	{
+		if(pvi->pvid == pvid) {
+			if(pvi->pvname.len==name->len)
+			{
+				found = strncmp(pvi->pvname.s, name->s, name->len);
+
+				if(found==0)
+				{
+					LM_DBG("pvar [%.*s] found in cache\n",
+							name->len, name->s);
+					return &pvi->spec;
+				}
+			}
+		}
+		pvi = pvi->next;
+	}
+	return NULL;
+}
+
+/**
+ *
+ */
+pv_spec_t* pv_cache_get(str *name)
+{
+	pv_spec_t *pvs;
+	str tname;
+
+	if(name->s==NULL || name->len==0)
+	{
+		LM_ERR("invalid parameters\n");
+		return NULL;
+	}
+
+	tname.s = name->s;
+	tname.len = pv_locate_name(name);
+
+	if(tname.len < 0)
+		return NULL;
+
+	pvs = pv_cache_lookup(&tname);
+
+	if(pvs!=NULL)
+		return pvs;
+
+	return pv_cache_add(&tname);
 }
 
 /**
@@ -1012,7 +1204,7 @@ int pv_set_spec_value(struct sip_msg* msg, pv_spec_p sp, int op,
  */
 int pv_printf(struct sip_msg* msg, pv_elem_p list, char *buf, int *len)
 {
-	int n, h;
+	int n;
 	pv_value_t tok;
 	pv_elem_p it;
 	char *cur;
@@ -1026,7 +1218,6 @@ int pv_printf(struct sip_msg* msg, pv_elem_p list, char *buf, int *len)
 	*buf = '\0';
 	cur = buf;
 	
-	h = 0;
 	n = 0;
 	for (it=list; it; it=it->next)
 	{
@@ -1100,20 +1291,25 @@ pvname_list_t* parse_pvname_list(str *in, unsigned int type)
 	p = in->s;
 	while(is_in_str(p, in))
 	{
-		while(is_in_str(p, in) && (*p==' '||*p=='\t'||*p==','||*p==';'))
+		while(is_in_str(p, in) && (*p==' '||*p=='\t'||*p==','||*p==';'||*p=='\n'))
 			p++;
 		if(!is_in_str(p, in))
 		{
 			if(head==NULL)
-				LM_ERR("wrong item name list [%.*s]\n", in->len, in->s);
+				LM_ERR("parse error in name list [%.*s]\n", in->len, in->s);
 			return head;
 		}
-		s.s=p;
-		s.len = in->s+in->len-p;
+		s.s = p;
+		s.len = in->s + in->len - p;
 		p = pv_parse_spec(&s, &spec);
-		if(p==NULL || (type && spec.type!=type))
+		if(p==NULL)
 		{
-			LM_ERR("wrong item name list [%.*s]!\n", in->len, in->s);
+			LM_ERR("parse error in item [%.*s]\n", s.len, s.s);
+			goto error;
+		}
+		if(type && spec.type!=type)
+		{
+			LM_ERR("wrong type for item [%.*s]\n", (int)(p-s.s), s.s);
 			goto error;
 		}
 		al = (pvname_list_t*)pkg_malloc(sizeof(pvname_list_t));
@@ -1196,16 +1392,10 @@ void pv_value_destroy(pv_value_t *val)
 	memset(val, 0, sizeof(pv_value_t));
 }
 
-#define PV_PRINT_BUF_SIZE  1024
-#define PV_PRINT_BUF_NO    3
 int pv_printf_s(struct sip_msg* msg, pv_elem_p list, str *s)
 {
-	static int buf_itr = 0;
-	static char buf[PV_PRINT_BUF_NO][PV_PRINT_BUF_SIZE];
-
-	s->s = buf[buf_itr];
-	s->len = PV_PRINT_BUF_SIZE;
-	buf_itr = (buf_itr+1)%PV_PRINT_BUF_NO;
+	s->s = pv_get_buffer();
+	s->len = pv_get_buffer_size();
 	return pv_printf( msg, list, s->s, &s->len);
 }
 
@@ -1342,11 +1532,10 @@ void tr_destroy(trans_t *t)
 /*!
  * \brief Exec transformation on a pseudo-variable value
  * \param msg SIP message
- * \param tr one or more transformations
- * \param val pseudo-variable value
+ * \param t one or more transformations
+ * \param v pseudo-variable value
  * \return 0 on success, -1 on error
  */
-
 int tr_exec(struct sip_msg *msg, trans_t *t, pv_value_t *v)
 {
 	int r;
@@ -1584,10 +1773,12 @@ static pv_export_t _core_pvs[] = {
 /** init pv api (optional).
  * @return 0 on success, -1 on error
  */
-int init_pv_api(void)
+int pv_init_api(void)
 {
 	pv_init_table();
 	tr_init_table();
+	if(pv_init_buffer()<0)
+		return -1;
 	if(register_pvars_mod("core", _core_pvs)<0)
 		return -1;
 	return 0;
@@ -1595,10 +1786,135 @@ int init_pv_api(void)
 
 
 /** destroy pv api. */
-void destroy_pv_api(void)
+void pv_destroy_api(void)
 {
 	/* free PV and TR hash tables */
 	pv_table_free();
 	tr_table_free();
+	pv_destroy_buffer();
 	return;
+}
+
+/**
+ * - buffer to print PVs
+ */
+static char **_pv_print_buffer = NULL;
+#define PV_DEFAULT_PRINT_BUFFER_SIZE 1024
+static int _pv_print_buffer_size  = PV_DEFAULT_PRINT_BUFFER_SIZE;
+/* 6 mod params + 4 direct usage from mods */
+#define PV_DEFAULT_PRINT_BUFFER_SLOTS 10
+static int _pv_print_buffer_slots = PV_DEFAULT_PRINT_BUFFER_SLOTS;
+static int _pv_print_buffer_index = 0;
+
+/**
+ *
+ */
+int pv_init_buffer(void)
+{
+	int i;
+
+	/* already initialized ?!? */
+	if(_pv_print_buffer!=NULL)
+		return 0;
+
+	_pv_print_buffer =
+		(char**)pkg_malloc(_pv_print_buffer_slots*sizeof(char*));
+	if(_pv_print_buffer==NULL)
+	{
+		LM_ERR("cannot init PV print buffer slots\n");
+		return -1;
+	}
+	memset(_pv_print_buffer, 0, _pv_print_buffer_slots*sizeof(char*));
+	for(i=0; i<_pv_print_buffer_slots; i++)
+	{
+		_pv_print_buffer[i] =
+			(char*)pkg_malloc(_pv_print_buffer_size*sizeof(char));
+		if(_pv_print_buffer[i]==NULL)
+		{
+			LM_ERR("cannot init PV print buffer slot[%d]\n", i);
+			return -1;
+		}
+	}
+	LM_DBG("PV print buffer initialized to [%d][%d]\n",
+			_pv_print_buffer_slots, _pv_print_buffer_size);
+	return 0;
+}
+
+/**
+ *
+ */
+void pv_destroy_buffer(void)
+{
+	int i;
+
+	if(_pv_print_buffer==NULL)
+		return;
+	for(i=0; i<_pv_print_buffer_slots; i++)
+	{
+		if(_pv_print_buffer[i]!=NULL)
+			pkg_free(_pv_print_buffer[i]);
+	}
+	pkg_free(_pv_print_buffer);
+	_pv_print_buffer = NULL;
+}
+
+/**
+ *
+ */
+int pv_reinit_buffer(void)
+{
+	if(_pv_print_buffer_size==PV_DEFAULT_PRINT_BUFFER_SIZE
+			&& _pv_print_buffer_slots==PV_DEFAULT_PRINT_BUFFER_SLOTS)
+		return 0;
+	pv_destroy_buffer();
+	return pv_init_buffer();
+}
+
+/**
+ *
+ */
+char* pv_get_buffer(void)
+{
+	char *p;
+
+	p = _pv_print_buffer[_pv_print_buffer_index];
+	_pv_print_buffer_index = (_pv_print_buffer_index+1)%_pv_print_buffer_slots;
+
+	return p;
+}
+
+/**
+ *
+ */
+int pv_get_buffer_size(void)
+{
+	return _pv_print_buffer_size;
+}
+
+/**
+ *
+ */
+int pv_get_buffer_slots(void)
+{
+	return _pv_print_buffer_slots;
+}
+
+/**
+ *
+ */
+void pv_set_buffer_size(int n)
+{
+	_pv_print_buffer_size = n;
+	if(_pv_print_buffer_size<=0)
+		_pv_print_buffer_size = PV_DEFAULT_PRINT_BUFFER_SIZE;
+}
+
+/**
+ *
+ */
+void pv_set_buffer_slots(int n)
+{
+	_pv_print_buffer_slots = n;
+	if(_pv_print_buffer_slots<=0)
+		_pv_print_buffer_slots = PV_DEFAULT_PRINT_BUFFER_SLOTS;
 }

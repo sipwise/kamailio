@@ -37,6 +37,7 @@
 #include "../../mem/mem.h"
 #include "../../clist.h"
 #include "io_listener.h"
+#include "ctl.h"
 
 #include <stdio.h>  /* vsnprintf */
 #include <stdlib.h> /* strtod */
@@ -97,6 +98,8 @@ struct binrpc_ctx{
 	char* method;
 	struct binrpc_gc_block* gc; /**< garbage collection */
 	int replied;
+	int err_code;
+	str err_phrase;	/**< Leading zero must be included! */
 };
 
 
@@ -143,7 +146,7 @@ inline static int binrpc_gc_track(struct binrpc_ctx* ctx, void* p)
 	b=ctx->gc;
 	if (b==0 || (b->idx>=b->p_no)){
 		n=(b==0)?BINRPC_GC_IBSIZE:b->p_no*2;
-		b=pkg_malloc(sizeof(*b)+n*sizeof(void*)-sizeof(b->p));
+		b=ctl_malloc(sizeof(*b)+n*sizeof(void*)-sizeof(b->p));
 		if (b==0)
 			return -1;
 		b->p_no=n;
@@ -170,8 +173,8 @@ inline static void binrpc_gc_collect(struct binrpc_ctx* ctx)
 	for(b=ctx->gc; b; b=next){
 		next=b->next;
 		for (i=0; i<b->idx; i++)
-			pkg_free(b->p[i]);
-		pkg_free(b);
+			ctl_free(b->p[i]);
+		ctl_free(b);
 	}
 	ctx->gc=0;
 }
@@ -182,7 +185,7 @@ static struct rpc_struct_l* new_rpc_struct()
 	struct rpc_struct_l* rs;
 	
 	/* alloc everything in one chunk */
-	rs=pkg_malloc(sizeof(struct rpc_struct_l)+STRUCT_MAX_BODY);
+	rs=ctl_malloc(sizeof(struct rpc_struct_l)+STRUCT_MAX_BODY);
 	if (rs==0)
 		goto error;
 	memset(rs, 0, sizeof(struct rpc_struct_l));
@@ -190,7 +193,7 @@ static struct rpc_struct_l* new_rpc_struct()
 	if (binrpc_init_pkt(&rs->pkt,
 				(unsigned char*)rs+sizeof(struct rpc_struct_l),
 				STRUCT_MAX_BODY)<0){
-		pkg_free(rs);
+		ctl_free(rs);
 		goto error;
 	}
 	return rs;
@@ -210,7 +213,7 @@ static struct rpc_struct_l* grow_rpc_struct(struct rpc_struct_l *rs)
 	
 	csize=binrpc_pkt_len(&rs->pkt);
 	csize*=2;
-	new_rs=pkg_realloc(rs, sizeof(struct rpc_struct_l)+csize);
+	new_rs=ctl_realloc(rs, sizeof(struct rpc_struct_l)+csize);
 	if (new_rs){
 		binrpc_pkt_update_buf(&rs->pkt, 
 							(unsigned char*)new_rs+sizeof(struct rpc_struct_l),
@@ -233,7 +236,7 @@ inline static int append_pkt_body(struct binrpc_pkt* p, unsigned char* buf,
 		size=2*(int)(p->end-p->body);
 		offset=binrpc_pkt_len(p);
 		for(;(size-offset)<len; size*=2); /* find new size */
-		new_b=pkg_realloc(p->body, size);
+		new_b=ctl_realloc(p->body, size);
 		if (new_b==0)
 			goto error;
 		binrpc_pkt_update_buf(p, new_b, size);
@@ -337,7 +340,7 @@ static void free_structs(struct rpc_struct_head* sl_head)
 	clist_foreach_safe(sl_head, l, tmp, next){
 		free_structs(&l->substructs);
 		memset(l, 0, sizeof(struct rpc_struct_l)); /* debugging */
-		pkg_free(l);
+		ctl_free(l);
 	};
 }
 
@@ -368,7 +371,7 @@ inline static int init_binrpc_ctx(	struct binrpc_ctx* ctx,
 	
 	/* alloc temporary body buffer */
 	send_buf_len=BINRPC_MAX_BODY;
-	send_buf=pkg_malloc(send_buf_len);
+	send_buf=ctl_malloc(send_buf_len);
 	if (send_buf==0){
 		err=E_BINRPC_LAST;
 		goto end;
@@ -385,8 +388,12 @@ inline void destroy_binrpc_ctx(struct binrpc_ctx* ctx)
 {
 	free_structs(&ctx->out.structs);
 	if (ctx->out.pkt.body){
-		pkg_free(ctx->out.pkt.body);
+		ctl_free(ctx->out.pkt.body);
 		ctx->out.pkt.body=0;
+	}
+	if (ctx->err_phrase.s){
+		ctl_free(ctx->err_phrase.s);
+		ctx->err_phrase.s=NULL;
 	}
 	binrpc_gc_collect(ctx);
 }
@@ -395,32 +402,23 @@ inline void destroy_binrpc_ctx(struct binrpc_ctx* ctx)
 
 #define MAX_FAULT_LEN 256
 #define FAULT_START_BUF (3 /* maxint*/+2/*max str header*/)
-static void rpc_fault(struct binrpc_ctx* ctx, int code, char* fmt, ...)
+static void _rpc_fault(struct binrpc_ctx* ctx, int code,
+			char *phrase, int phrase_len)
 {
-	char buf[MAX_FAULT_LEN];
 	static unsigned char fault_start[FAULT_START_BUF];
 	static unsigned char hdr[BINRPC_MAX_HDR_SIZE];
 	struct iovec v[3];
 	struct binrpc_pkt body;
 	int b_len;
-	va_list ap;
-	int len;
 	int hdr_len;
 	int err;
-	
+
 	if (ctx->replied){
 		LOG(L_ERR, "ERROR: binrpc: rpc_send: rpc method %s tried to reply"
 					" more then once\n", ctx->method?ctx->method:"");
 		return;
 	}
 	err=0;
-	va_start(ap, fmt);
-	len=vsnprintf(buf, MAX_FAULT_LEN, fmt, ap); /* ignore trunc. errors */
-	if ((len<0) || (len > MAX_FAULT_LEN))
-		len=MAX_FAULT_LEN-1;
-	va_end(ap);
-	
-	len++; /* vnsprintf doesn't include the terminating 0 */
 	err=binrpc_init_pkt(&body, fault_start, FAULT_START_BUF);
 	if (err<0){
 		LOG(L_ERR, "ERROR: binrpc_init_pkt error\n");
@@ -429,22 +427,22 @@ static void rpc_fault(struct binrpc_ctx* ctx, int code, char* fmt, ...)
 	/* adding a fault "manually" to avoid extra memcpys */
 	err=binrpc_addint(&body, code);
 	if (err<0){
-		LOG(L_ERR, "ERROR: rpc_fault: addint error\n");
+		LOG(L_ERR, "ERROR: _rpc_fault: addint error\n");
 		goto error;
 	}
-	err=binrpc_add_str_mark(&body, BINRPC_T_STR, len);
+	err=binrpc_add_str_mark(&body, BINRPC_T_STR, phrase_len);
 	if (err<0){
-		LOG(L_ERR, "ERROR: rpc_fault: add_str_mark error\n");
+		LOG(L_ERR, "ERROR: _rpc_fault: add_str_mark error\n");
 		goto error;
 	}
 	/*
-	err=binrpc_addfault(&body, code, buf, len); 
+	err=binrpc_addfault(&body, code, phrase, phrase_len);
 	if (err<0){
 		LOG(L_ERR, "ERROR: binrpc_addfault error\n");
 		goto error;
 	}*/
 	b_len=binrpc_pkt_len(&body);
-	err=hdr_len=binrpc_build_hdr(BINRPC_FAULT, b_len+len,
+	err=hdr_len=binrpc_build_hdr(BINRPC_FAULT, b_len+phrase_len,
 								ctx->in.ctx.cookie, hdr, BINRPC_MAX_HDR_SIZE);
 	if (err<0){
 		LOG(L_ERR, "ERROR: binrpc_build_hdr error\n");
@@ -454,25 +452,90 @@ static void rpc_fault(struct binrpc_ctx* ctx, int code, char* fmt, ...)
 	v[0].iov_len=hdr_len;
 	v[1].iov_base=body.body;
 	v[1].iov_len=b_len;
-	v[2].iov_base=buf;
-	v[2].iov_len=len;
+	v[2].iov_base=phrase;
+	v[2].iov_len=phrase_len;
 	if ((err=sock_send_v(ctx->send_h, v, 3))<0){
 		if (err==-2){
-			LOG(L_ERR, "ERROR: binrpc_fault: send failed: "
+			LOG(L_ERR, "ERROR: _rpc_fault: send failed: "
 					"datagram too big\n");
 			return;
 		}
-		LOG(L_ERR, "ERROR: binrpc_fault: send failed\n");
+		LOG(L_ERR, "ERROR: _rpc_fault: send failed\n");
 		return;
 	}
 	ctx->replied=1;
 	return;
 error:
-	LOG(L_ERR, "ERROR: binrpc_fault: binrpc_* failed with: %s (%d)\n",
+	LOG(L_ERR, "ERROR: _rpc_fault: binrpc_* failed with: %s (%d)\n",
 			binrpc_error(err), err);
 }
 
+static void rpc_fault(struct binrpc_ctx* ctx, int code, char* fmt, ...)
+{
+	char buf[MAX_FAULT_LEN];
+	va_list ap;
+	int len;
 
+	if (ctx->replied){
+		LOG(L_ERR, "ERROR: binrpc: rpc_send: rpc method %s tried to reply"
+					" more then once\n", ctx->method?ctx->method:"");
+		return;
+	}
+	va_start(ap, fmt);
+	len=vsnprintf(buf, MAX_FAULT_LEN, fmt, ap); /* ignore trunc. errors */
+	if ((len<0) || (len > MAX_FAULT_LEN))
+		len=MAX_FAULT_LEN-1;
+	va_end(ap);
+
+	len++; /* vnsprintf doesn't include the terminating 0 */
+	return _rpc_fault(ctx, code, buf, len);
+}
+
+/* Prepare the error reply without sending out the message */
+static int rpc_fault_prepare(struct binrpc_ctx* ctx, int code, char* fmt, ...)
+{
+	char buf[MAX_FAULT_LEN];
+	va_list ap;
+	int len;
+
+	if (ctx->replied){
+		LOG(L_ERR, "ERROR: binrpc: rpc_send: rpc method %s tried to reply"
+					" more then once\n", ctx->method?ctx->method:"");
+		return -1;
+	}
+	va_start(ap, fmt);
+	len=vsnprintf(buf, MAX_FAULT_LEN, fmt, ap); /* ignore trunc. errors */
+	if ((len<0) || (len > MAX_FAULT_LEN))
+		len=MAX_FAULT_LEN-1;
+	va_end(ap);
+
+	len++; /* vnsprintf doesn't include the terminating 0 */
+
+	ctx->err_code = code;
+	if (ctx->err_phrase.s)
+		ctl_free(ctx->err_phrase.s);
+	ctx->err_phrase.s = (char*)ctl_malloc(sizeof(char)*len);
+	if (!ctx->err_phrase.s) {
+		ctx->err_code = 0;
+		ctx->err_phrase.len = 0;
+		LOG(L_ERR, "ERROR: rpc_fault_prepare: not enough memory\n");
+		return -1;
+	}
+	memcpy(ctx->err_phrase.s, buf, len);
+	ctx->err_phrase.len = len;
+	return 0;
+}
+
+/* Reset the saved error code */
+static void rpc_fault_reset(struct binrpc_ctx* ctx)
+{
+	ctx->err_code = 0;
+	if (ctx->err_phrase.s) {
+		ctl_free(ctx->err_phrase.s);
+		ctx->err_phrase.s = NULL;
+		ctx->err_phrase.len = 0;
+	}
+}
 
 /* build the reply from the current body */
 static int rpc_send(struct binrpc_ctx* ctx)
@@ -596,14 +659,21 @@ int process_rpc_req(unsigned char* buf, int size, int* bytes_needed,
 	f_ctx.method=val.u.strval.s;
 	rpc_e->function(&binrpc_callbacks, &f_ctx);
 	if (f_ctx.replied==0){
+		if ((binrpc_pkt_len(&f_ctx.out.pkt)==0)
+			&& f_ctx.err_code && f_ctx.err_phrase.s
+		) {
+			_rpc_fault(&f_ctx, f_ctx.err_code,
+				f_ctx.err_phrase.s, f_ctx.err_phrase.len);
 		/* to get an error reply if the rpc handlers hasn't replied
 		 *  uncomment the following code:
-		 * if (binrpc_pkt_len(&f_ctx.out.pkt)==0){
+		 * } else if (binrpc_pkt_len(&f_ctx.out.pkt)==0){
 			rpc_fault(&f_ctx, 500, "internal server error: no reply");
 			LOG(L_ERR, "ERROR: rpc method %s hasn't replied\n",
 					val.u.strval.s);
-		}else  */
+		 */
+		} else {
 			rpc_send(&f_ctx);
+		}
 	}
 end:
 	*bytes_needed=0; /* full read */
@@ -711,7 +781,7 @@ inline static str* binrpc_val_conv_str(struct binrpc_ctx* ctx,
 			return &v->u.strval;
 		case BINRPC_T_INT:
 			s=int2str(v->u.intval, &len);
-			ret=pkg_malloc(sizeof(*ret)+len+1);
+			ret=ctl_malloc(sizeof(*ret)+len+1);
 			if (ret==0 || binrpc_gc_track(ctx, ret)!=0){
 				*err=E_BINRPC_OVERFLOW;
 				return 0;
@@ -749,6 +819,9 @@ static int rpc_scan(struct binrpc_ctx* ctx, char* fmt, ...)
 	double d;
 	str* s;
 	
+	/* clear the previously saved error code */
+	rpc_fault_reset(ctx);
+
 	va_start(ap, fmt);
 	orig_fmt=fmt;
 	nofault = 0;
@@ -823,8 +896,10 @@ static int rpc_scan(struct binrpc_ctx* ctx, char* fmt, ...)
 	va_end(ap);
 	return (int)(fmt-orig_fmt)-modifiers;
 error_read:
+	/* Do not immediately send out the error message, the user might retry the scan with
+	different parameters */
 	if(nofault==0 || ((err!=E_BINRPC_MORE_DATA) && (err!=E_BINRPC_EOP)))
-		rpc_fault(ctx, 400, "error at parameter %d: expected %s type but"
+		rpc_fault_prepare(ctx, 400, "error at parameter %d: expected %s type but"
 						" %s", ctx->in.record_no, rpc_type_name(v.type),
 						 binrpc_error(err));
 	/*
@@ -927,7 +1002,7 @@ static int rpc_printf(struct binrpc_ctx* ctx, char* fmt, ...)
 	int len;
 	int err;
 	
-	buf=pkg_malloc(RPC_PRINTF_BUF_SIZE);
+	buf=ctl_malloc(RPC_PRINTF_BUF_SIZE);
 	if (buf==0) goto error;
 	va_start(ap, fmt);
 	len=vsnprintf(buf, RPC_PRINTF_BUF_SIZE, fmt, ap);
@@ -942,10 +1017,10 @@ static int rpc_printf(struct binrpc_ctx* ctx, char* fmt, ...)
 					" %s (%d)\n", binrpc_error(err), err);
 		goto error;
 	}
-	pkg_free(buf);
+	ctl_free(buf);
 	return 0;
 error:
-	if (buf) pkg_free(buf);
+	if (buf) ctl_free(buf);
 	return -1;
 }
 
@@ -1026,7 +1101,7 @@ static int rpc_struct_printf(struct rpc_struct_l *s, char* name,
 	int err;
 	struct binrpc_val avp;
 	
-	buf=pkg_malloc(RPC_PRINTF_BUF_SIZE);
+	buf=ctl_malloc(RPC_PRINTF_BUF_SIZE);
 	if (buf==0) goto error;
 	va_start(ap, fmt);
 	len=vsnprintf(buf, RPC_PRINTF_BUF_SIZE, fmt, ap);
@@ -1047,10 +1122,10 @@ static int rpc_struct_printf(struct rpc_struct_l *s, char* name,
 					" %s (%d)\n", binrpc_error(err), err);
 		goto error;
 	}
-	pkg_free(buf);
+	ctl_free(buf);
 	return 0;
 error:
-	if (buf) pkg_free(buf);
+	if (buf) ctl_free(buf);
 	return -1;
 }
 

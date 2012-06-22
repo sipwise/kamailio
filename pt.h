@@ -62,10 +62,10 @@ extern int process_no;
 
 extern struct tcp_child* tcp_children;
 
-int init_pt();
-int get_max_procs();
+int init_pt(int proc_no);
+int get_max_procs(void);
 int register_procs(int no);
-int get_max_open_fds();
+int get_max_open_fds(void);
 int register_fds(int no);
 
 
@@ -74,7 +74,7 @@ int close_extra_socks(int proc_id, int proc_no);
 #define get_proc_no() ((process_count)?*process_count:0)
 
 /* return processes pid */
-int my_pid();
+int my_pid(void);
 
 /**
  * Forks a new process.
@@ -102,5 +102,7 @@ void mem_dump_pkg_cb(str *gname, str *name);
 #ifdef SHM_MEM
 int mem_dump_shm_fixup(void *handle, str *gname, str *name, void **val);
 #endif
+
+unsigned int set_fork_delay(unsigned int v);
 
 #endif

@@ -46,6 +46,7 @@
 #include <string.h>
 
 #include "../../dprint.h"
+#include "../../sr_module.h"
 #include "mi_mem.h"
 #include "mi.h"
 
@@ -99,12 +100,20 @@ int register_mi_mod( char *mod_name, mi_export_t *mis)
 
 static int mi_commands_initialized = 0;
 
-int init_mi_child(void)
+
+/**
+ * Init a process to work properly for MI commands
+ * - rank: rank of the process (PROC_XYZ...)
+ * - mode: 0 - don't try to init worker for SIP commands
+ *         1 - try to init worker for SIP commands
+ */
+int init_mi_child(int rank, int mode)
 {
 	int i;
 
 	if(mi_commands_initialized)
 		return 0;
+	mi_commands_initialized = 1;
 	for ( i=0 ; i<mi_cmds_no ; i++ ) {
 		if ( mi_cmds[i].init_f && mi_cmds[i].init_f()!=0 ) {
 			LM_ERR("failed to init <%.*s>\n",
@@ -112,7 +121,15 @@ int init_mi_child(void)
 			return -1;
 		}
 	}
-	mi_commands_initialized = 1;
+	if(mode==1) {
+		if(is_sip_worker(rank)) {
+			LM_DBG("initalizing proc rpc for sip handling\n");
+			if(init_child(PROC_SIPRPC)<0) {
+				LM_ERR("failed to init proc rpc for sip handling\n");
+				return -1;
+			}
+		}
+	}
 	return 0;
 }
 

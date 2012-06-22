@@ -51,7 +51,6 @@
 #include "../../mem/mem.h"
 #include "../../usr_avp.h"
 #include "../../lib/srdb1/db.h"
-#include "../../lib/kcore/km_ut.h"
 #include "../../parser/hf.h"
 #include "../../parser/msg_parser.h"
 #include "../../parser/parse_from.h"
@@ -91,6 +90,7 @@ extern struct acc_extra *dia_extra;
 static db_func_t acc_dbf;
 static db1_con_t* db_handle=0;
 extern struct acc_extra *db_extra;
+extern int acc_db_insert_mode;
 #endif
 
 /* arrays used to collect the values before being
@@ -124,14 +124,6 @@ int core2strar(struct sip_msg *req, str *c_vals, int *i_vals, char *t_vals)
 	struct to_body *ft_body;
 	struct hdr_field *from;
 	struct hdr_field *to;
-
-	struct timeval  tv;
-	struct timezone tz;
-	struct tm      *tm;
-	uint64_t        time_hires;
- 
-	gettimeofday(&tv, &tz);
-	tm = localtime(&tv.tv_sec);
 
 	/* method : request/reply - cseq parsed in acc_preparse_req() */
 	c_vals[0] = get_cseq(req)->method;
@@ -182,10 +174,6 @@ int core2strar(struct sip_msg *req, str *c_vals, int *i_vals, char *t_vals)
 	t_vals[5] = TYPE_STR;
 
 	acc_env.ts = time(NULL);
-
-	time_hires = (tv.tv_sec * 1000) + tv.tv_usec / 1000;
-	acc_env.time_hires = time_hires;
-
 	return ACC_CORE_LEN;
 }
 
@@ -318,8 +306,7 @@ static void acc_db_init_keys(void)
 	db_keys[n++] = &acc_sipcode_col;
 	db_keys[n++] = &acc_sipreason_col;
 	db_keys[n++] = &acc_time_col;
-	db_keys[n++] = &acc_time_hires_col;
-	time_idx = n-2;
+	time_idx = n-1;
 
 	/* init the extra db keys */
 	for(extra=db_extra; extra ; extra=extra->next)
@@ -335,7 +322,6 @@ static void acc_db_init_keys(void)
 		VAL_NULL(db_vals+i)=0;
 	}
 	VAL_TYPE(db_vals+time_idx)=DB1_DATETIME;
-	VAL_TYPE(db_vals+time_idx+1)=DB1_DOUBLE;
 }
 
 
@@ -394,8 +380,7 @@ int acc_db_request( struct sip_msg *rq)
 		VAL_STR(db_vals+i) = val_arr[i];
 	/* time value */
 	VAL_TIME(db_vals+(m++)) = acc_env.ts;
-	VAL_DOUBLE(db_vals+(m++)) = ((double) acc_env.time_hires) / 1000;
-	i = m;
+
 	/* extra columns */
 	m += extra2strar( db_extra, rq, val_arr+m, int_arr+m, type_arr+m);
 
@@ -409,18 +394,32 @@ int acc_db_request( struct sip_msg *rq)
 
 	/* multi-leg columns */
 	if ( !leg_info ) {
-		if (acc_dbf.insert(db_handle, db_keys, db_vals, m) < 0) {
-			LM_ERR("failed to insert into database\n");
-			return -1;
+		if(acc_db_insert_mode==1 && acc_dbf.insert_delayed!=NULL) {
+			if (acc_dbf.insert_delayed(db_handle, db_keys, db_vals, m) < 0) {
+				LM_ERR("failed to insert delayed into database\n");
+				return -1;
+			}
+		} else {
+			if (acc_dbf.insert(db_handle, db_keys, db_vals, m) < 0) {
+				LM_ERR("failed to insert into database\n");
+				return -1;
+			}
 		}
 	} else {
   	        n = legs2strar(leg_info,rq,val_arr+m,int_arr+m,type_arr+m,1);
 		do {
 			for (i=m; i<m+n; i++)
 				VAL_STR(db_vals+i)=val_arr[i];
-			if (acc_dbf.insert(db_handle, db_keys, db_vals, m+n) < 0) {
-				LM_ERR("failed to insert into database\n");
-				return -1;
+			if(acc_db_insert_mode==1 && acc_dbf.insert_delayed!=NULL) {
+				if(acc_dbf.insert_delayed(db_handle,db_keys,db_vals,m+n)<0) {
+					LM_ERR("failed to insert delayed into database\n");
+					return -1;
+				}
+			} else {
+				if (acc_dbf.insert(db_handle, db_keys, db_vals, m+n) < 0) {
+					LM_ERR("failed to insert into database\n");
+					return -1;
+				}
 			}
 		}while ( (n=legs2strar(leg_info,rq,val_arr+m,int_arr+m,
 				       type_arr+m,0))!=0 );

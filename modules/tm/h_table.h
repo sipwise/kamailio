@@ -168,7 +168,7 @@ typedef struct retr_buf
 	volatile unsigned short flags; /* DISABLED, T2 */
 	volatile unsigned char t_active; /* timer active */
 	unsigned short branch; /* no more then 65k branches :-) */
-	short buffer_len;
+	int buffer_len;
 	char *buffer;
 	/*the cell that contains this retrans_buff*/
 	struct cell* my_T;
@@ -295,9 +295,8 @@ struct totag_elem {
 #	define pass_provisional(_t_)	((_t_)->flags&T_PASS_PROVISIONAL_FLAG)
 #endif
 
-/* unsigned short should be enough for a retr. timer: max. 65535 ticks =>
- * max  retr. = 1023 s for tick = 15 ms, which should be more then enough and
- * saves us 2*2 bytes */
+/* unsigned short should be enough for a retr. timer: max. 65535 ms =>
+ * max retr. = 65 s which should be enough and saves us 2*2 bytes */
 typedef unsigned short retr_timeout_t;
 
 /**
@@ -423,8 +422,8 @@ typedef struct cell
 	ticks_t fr_timeout;     /* final response interval for retr_bufs */
 	ticks_t fr_inv_timeout; /* final inv. response interval for retr_bufs */
 #ifdef TM_DIFF_RT_TIMEOUT
-	retr_timeout_t rt_t1_timeout; /* start retr. interval for retr_bufs */
-	retr_timeout_t rt_t2_timeout; /* maximum retr. interval for retr_bufs */
+	retr_timeout_t rt_t1_timeout_ms; /* start retr. interval for retr_bufs */
+	retr_timeout_t rt_t2_timeout_ms; /* maximum retr. interval for retr_bufs */
 #endif
 	ticks_t end_of_life; /* maximum lifetime */
 
@@ -519,17 +518,17 @@ extern struct s_table*  _tm_table; /* private internal stuff, don't touch
 #define no_new_branches(_t_)     ((_t_)->flags&T_6xx)
 
 
-void reset_kr();
+void reset_kr(void);
 void set_kr( enum kill_reason kr );
-enum kill_reason get_kr();
+enum kill_reason get_kr(void);
 
 #define get_tm_table() (_tm_table)
 
 typedef struct s_table* (*tm_get_table_f)(void);
 struct s_table* tm_get_table(void);
 
-struct s_table* init_hash_table();
-void   free_hash_table( );
+struct s_table* init_hash_table(void);
+void   free_hash_table(void);
 void   free_cell( struct cell* dead_cell );
 struct cell*  build_cell( struct sip_msg* p_msg );
 

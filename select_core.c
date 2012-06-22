@@ -332,66 +332,13 @@ int select_contact_params(str* res, select_t* s, struct sip_msg* msg)
 	return 1;
 }
 
-int parse_via_header( struct sip_msg *msg, int n, struct via_body** q)
-{
-	struct hdr_field *p;
-	struct via_body *pp = NULL;
-	int i;
-	
-	switch (n) {
-	case 1:
-	case 2:
-		if (!msg->h_via1 && (parse_headers(msg,HDR_VIA_F,0)==-1 || !msg->h_via1)) {
-                        DBG("bad msg or missing VIA1 header \n");
-                        return -1;
-                }
-		pp = msg->h_via1->parsed;
-		if (n==1) break;
-		pp = pp->next;
-		if (pp) break;
-		
-                if (!msg->h_via2 && (parse_headers(msg,HDR_VIA2_F,0)==-1 || !msg->h_via2)) {
-                        DBG("bad msg or missing VIA2 header \n");
-                        return -1;
-                }
-                pp = msg->h_via2->parsed;
-                break;
-	default:	
-	        if (!msg->eoh && (parse_headers(msg,HDR_EOH_F,0)==-1 || !msg->eoh)) {
-        	        ERR("bad msg while parsing to EOH \n");
-	                return -1;
-		}
-		p = msg->h_via1;
-		i = n;
-		while (i && p) {
-		        if (p->type == HDR_VIA_T) {
-		        	i--;
-		        	pp = p->parsed;
-		        	while (i && (pp->next)) {
-		        		i--;
-		        		pp = pp->next;
-		        	}
-		        }
-			p = p->next;
-		}
-		if (i > 0) {
-			DBG("missing VIA[%d] header\n", n);
-			return -1;
-		}
-	}
-	if (pp) {
-		*q = pp;
-		return 0;
-	} else
-		return -1;
-}
-
 int select_via(str* res, select_t* s, struct sip_msg* msg)
 {
 	struct via_body *p = NULL;
 	
-	if (((s->n == 1) || (s->params[1].type == SEL_PARAM_STR)) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if ((s->n == 1) || (s->params[1].type == SEL_PARAM_STR)) {
+		if (parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	res->s=p->name.s;
 	res->len=p->bsize;
@@ -404,8 +351,9 @@ int select_via_name(str* res, select_t* s, struct sip_msg* msg)
 	struct via_body *p = NULL;
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if(parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	RETURN0_res(p->name);
 }
@@ -415,8 +363,9 @@ int select_via_version(str* res, select_t* s, struct sip_msg* msg)
 	struct via_body *p = NULL;
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if (parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	RETURN0_res(p->version);
 }
@@ -426,8 +375,9 @@ int select_via_transport(str* res, select_t* s, struct sip_msg* msg)
 	struct via_body *p = NULL;
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if(parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	RETURN0_res(p->transport);
 }
@@ -437,8 +387,9 @@ int select_via_host(str* res, select_t* s, struct sip_msg* msg)
 	struct via_body *p = NULL;
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if (parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	RETURN0_res(p->host);
 }
@@ -448,8 +399,9 @@ int select_via_port(str* res, select_t* s, struct sip_msg* msg)
 	struct via_body *p = NULL;
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if (parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	RETURN0_res(p->port_str);
 }
@@ -459,8 +411,9 @@ int select_via_comment(str* res, select_t* s, struct sip_msg* msg)
 	struct via_body *p = NULL;
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if(parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	RETURN0_res(p->comment);
 }
@@ -471,8 +424,9 @@ int select_via_params(str* res, select_t* s, struct sip_msg* msg)
 	struct via_param *q;
 
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type == SEL_PARAM_STR) {
+		if (parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	
 	for (q = p->param_lst;q;q=q->next) {
@@ -494,8 +448,9 @@ int select_via_params_spec(str* res, select_t* s, struct sip_msg* msg)
 	}
 	
 	// it's not neccessary to test if (s->n > 1)
-	if ((s->params[1].type == SEL_PARAM_STR) && (parse_via_header(msg, 1, &p)<0)) return -1;
-	else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
+	if (s->params[1].type != SEL_PARAM_INT) {
+		if(parse_via_header(msg, 1, &p)<0) return -1;
+	} else if (parse_via_header(msg, s->params[1].v.i, &p)<0) return -1;
 	if (!p) return -1;
 	
 	switch (s->params[s->n-1].v.i) {
@@ -921,6 +876,7 @@ int select_uri_hostport(str* res, select_t* s, struct sip_msg* msg)
 			break;
 		case SIP_URI_T:
 		case TEL_URI_T:
+		case URN_URI_T:
 			strncpy(p+select_uri_p->host.len, ":5060", 5);
 			break;
 		case ERROR_URI_T:
@@ -949,6 +905,7 @@ int select_uri_proto(str* res, select_t* s, struct sip_msg* msg)
 				break;
 			case SIP_URI_T:
 			case TEL_URI_T:
+			case URN_URI_T:
 				proto_type_to_str(PROTO_UDP, res);
 				break;
 			case ERROR_URI_T:

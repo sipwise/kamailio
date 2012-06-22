@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of sip-router, a free SIP server.
@@ -24,8 +22,17 @@
  * 
  */
 
+/**
+ * \file
+ * \brief Main definitions for memory manager
+ * 
+ * Main definitions for memory manager, like malloc, free and realloc
+ * \ingroup mem
+ */
+
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "../config.h"
 #include "../dprint.h"
 #include "../globals.h"
@@ -41,35 +48,46 @@
 
 #ifdef PKG_MALLOC
 	#ifndef DL_MALLOC
-	char mem_pool[PKG_MEM_POOL_SIZE];
+	char* mem_pool = 0;
 	#endif
 
 	#ifdef F_MALLOC
-		struct fm_block* mem_block;
+		struct fm_block* mem_block = 0;
 	#elif defined DL_MALLOC
 		/* don't need this */
 	#else
-		struct qm_block* mem_block;
+		struct qm_block* mem_block = 0;
 	#endif
 #endif
 
 
-int init_pkg_mallocs()
+/**
+ * \brief Initialize private memory pool
+ * \return 0 if the memory allocation was successful, -1 otherwise
+ */
+int init_pkg_mallocs(void)
 {
 #ifdef PKG_MALLOC
 	/*init mem*/
+	#ifndef DL_MALLOC
+		if (pkg_mem_size == 0)
+			pkg_mem_size = PKG_MEM_POOL_SIZE;
+		mem_pool = malloc(pkg_mem_size);
+	#endif
 	#ifdef F_MALLOC
-		mem_block=fm_malloc_init(mem_pool, PKG_MEM_POOL_SIZE);
+		if (mem_pool)
+			mem_block=fm_malloc_init(mem_pool, pkg_mem_size);
 	#elif DL_MALLOC
 		/* don't need this */
 	#else
-		mem_block=qm_malloc_init(mem_pool, PKG_MEM_POOL_SIZE);
+		if (mem_pool)
+			mem_block=qm_malloc_init(mem_pool, pkg_mem_size);
 	#endif
 	#ifndef DL_MALLOC
 	if (mem_block==0){
 		LOG(L_CRIT, "could not initialize memory pool\n");
-		fprintf(stderr, "Too much pkg memory demanded: %d\n",
-			PKG_MEM_POOL_SIZE );
+		fprintf(stderr, "Too much pkg memory demanded: %ld bytes\n",
+						pkg_mem_size);
 		return -1;
 	}
 	#endif
@@ -79,6 +97,27 @@ int init_pkg_mallocs()
 
 
 
+/**
+ * \brief Destroy private memory pool
+ */
+void destroy_pkg_mallocs(void)
+{
+#ifdef PKG_MALLOC
+	#ifndef DL_MALLOC
+		if (mem_pool) {
+			free(mem_pool);
+			mem_pool = 0;
+		}
+	#endif
+#endif /* PKG_MALLOC */
+}
+
+
+/**
+ * \brief Initialize shared memory pool
+ * \param force_alloc Force allocation of memory, e.g. initialize complete block with zero
+ * \return 0 if the memory allocation was successful, -1 otherwise
+ */
 int init_shm_mallocs(int force_alloc)
 {
 #ifdef SHM_MEM
@@ -91,5 +130,3 @@ int init_shm_mallocs(int force_alloc)
 #endif
 	return 0;
 }
-
-

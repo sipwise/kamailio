@@ -64,6 +64,7 @@
 #include "../../parser/parse_methods.h"
 #include "../../parser/parse_content.h"
 #include "../../parser/parse_param.h"
+#include "../../parser/sdp/sdp.h"
 #include "../../lib/kcore/parse_privacy.h"
 #include "../../msg_translator.h"
 #include "../../ut.h"
@@ -93,8 +94,12 @@ MODULE_VERSION
 #define TIME_FORMAT "Date: %a, %d %b %Y %H:%M:%S GMT"
 #define MAX_TIME 64
 
+#define AUDIO_STR "audio"
+#define AUDIO_STR_LEN 5
+
 
 static int search_body_f(struct sip_msg*, char*, char*);
+static int search_hf_f(struct sip_msg*, char*, char*, char*);
 static int replace_f(struct sip_msg*, char*, char*);
 static int replace_body_f(struct sip_msg*, char*, char*);
 static int replace_all_f(struct sip_msg*, char*, char*);
@@ -104,6 +109,7 @@ static int subst_f(struct sip_msg*, char*, char*);
 static int subst_uri_f(struct sip_msg*, char*, char*);
 static int subst_user_f(struct sip_msg*, char*, char*);
 static int subst_body_f(struct sip_msg*, char*, char*);
+static int subst_hf_f(struct sip_msg*, char*, char*, char*);
 static int filter_body_f(struct sip_msg*, char*, char*);
 static int is_present_hf_f(struct sip_msg* msg, char* str_hf, char* foo);
 static int search_append_body_f(struct sip_msg*, char*, char*);
@@ -114,25 +120,30 @@ static int insert_hf_1(struct sip_msg* msg, char* str1, char* str2);
 static int insert_hf_2(struct sip_msg* msg, char* str1, char* str2);
 static int append_urihf(struct sip_msg* msg, char* str1, char* str2);
 static int append_time_f(struct sip_msg* msg, char* , char *);
+static int append_time_request_f(struct sip_msg* msg, char* , char *);
 static int set_body_f(struct sip_msg* msg, char*, char *);
 static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
 static int is_method_f(struct sip_msg* msg, char* , char *);
 static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
-static int is_privacy_f(struct sip_msg *msg, char *privacy, char *str2 );
+static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
+ 		     char* _sep);
 static int cmp_str_f(struct sip_msg *msg, char *str1, char *str2 );
 static int cmp_istr_f(struct sip_msg *msg, char *str1, char *str2 );
 static int starts_with_f(struct sip_msg *msg, char *str1, char *str2 );
 static int remove_hf_re_f(struct sip_msg* msg, char* key, char* foo);
 static int is_present_hf_re_f(struct sip_msg* msg, char* key, char* foo);
-
+static int is_audio_on_hold_f(struct sip_msg *msg, char *str1, char *str2 );
 static int fixup_substre(void**, int);
 static int hname_fixup(void** param, int param_no);
 static int free_hname_fixup(void** param, int param_no);
 static int fixup_method(void** param, int param_no);
 static int add_header_fixup(void** param, int param_no);
 static int fixup_body_type(void** param, int param_no);
-static int fixup_privacy(void** param, int param_no);
+static int fixup_in_list(void** param, int param_no);
+static int fixup_free_in_list(void** param, int param_no);
 int fixup_regexpNL_none(void** param, int param_no);
+static int fixup_search_hf(void** param, int param_no);
+static int fixup_subst_hf(void** param, int param_no);
 
 static int mod_init(void);
 
@@ -146,64 +157,67 @@ static tr_export_t mod_trans[] = {
 static cmd_export_t cmds[]={
 	{"search",           (cmd_function)search_f,          1,
 		fixup_regexp_null, fixup_free_regexp_null,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"search_body",      (cmd_function)search_body_f,     1,
 		fixup_regexp_null, fixup_free_regexp_null,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
+	{"search_hf",      (cmd_function)search_hf_f,         3,
+		fixup_search_hf, 0,
+		ANY_ROUTE},
 	{"search_append",    (cmd_function)search_append_f,   2,
 		fixup_regexp_none,fixup_free_regexp_none,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"search_append_body", (cmd_function)search_append_body_f,   2,
 		fixup_regexp_none, fixup_free_regexp_none, 
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"replace",          (cmd_function)replace_f,         2,
 		fixup_regexp_none, fixup_free_regexp_none,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"replace_body",     (cmd_function)replace_body_f,    2,
 		fixup_regexp_none, fixup_free_regexp_none,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"replace_all",      (cmd_function)replace_all_f,     2,
 		fixup_regexp_none, fixup_free_regexp_none,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"replace_body_all", (cmd_function)replace_body_all_f,2,
 		fixup_regexp_none, fixup_free_regexp_none,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"replace_body_atonce", (cmd_function)replace_body_atonce_f,2,
 		fixup_regexpNL_none, fixup_free_regexp_none,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"append_to_reply",  (cmd_function)append_to_reply_f, 1,
 		fixup_spve_null, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ERROR_ROUTE},
+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
 	{"append_hf",        (cmd_function)append_hf_1,       1,
 		add_header_fixup, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"append_hf",        (cmd_function)append_hf_2,       2,
 		add_header_fixup, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"insert_hf",        (cmd_function)insert_hf_1,       1, 
 		add_header_fixup, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"insert_hf",        (cmd_function)insert_hf_2,       2, 
 		add_header_fixup, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"append_urihf",     (cmd_function)append_urihf,      2,
 		fixup_str_str, fixup_free_str_str,
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
 	{"remove_hf",        (cmd_function)remove_hf_f,       1,
 		hname_fixup, free_hname_fixup,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"remove_hf_re",     (cmd_function)remove_hf_re_f,    1,
 		fixup_regexp_null, fixup_free_regexp_null,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"is_present_hf",    (cmd_function)is_present_hf_f,   1,
 		hname_fixup, free_hname_fixup,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"is_present_hf_re", (cmd_function)is_present_hf_re_f,1,
 		fixup_regexp_null, fixup_free_regexp_null,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"subst",            (cmd_function)subst_f,           1,
 		fixup_substre, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"subst_uri",        (cmd_function)subst_uri_f,       1,
 		fixup_substre, 0,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
@@ -212,13 +226,16 @@ static cmd_export_t cmds[]={
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
 	{"subst_body",       (cmd_function)subst_body_f,      1,
 		fixup_substre, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
+	{"subst_hf",         (cmd_function)subst_hf_f,        3,
+		fixup_subst_hf, 0,
+		ANY_ROUTE},
 	{"filter_body",      (cmd_function)filter_body_f,     1,
 		fixup_str_null, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"append_time",      (cmd_function)append_time_f,     0,
 		0, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE },
+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
 	{"set_body",         (cmd_function)set_body_f,        2,
 		fixup_spve_spve, 0,
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
@@ -227,25 +244,34 @@ static cmd_export_t cmds[]={
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"is_method",        (cmd_function)is_method_f,       1,
 		fixup_method, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"has_body",         (cmd_function)has_body_f,        0,
 		0, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"has_body",         (cmd_function)has_body_f,        1, 
 		fixup_body_type, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"is_privacy",       (cmd_function)is_privacy_f,      1,
 		fixup_privacy, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
+ 	{"in_list", (cmd_function)in_list_f, 3, fixup_in_list,
+	        fixup_free_in_list,
+ 	        ANY_ROUTE},
 	{"cmp_str",  (cmd_function)cmp_str_f, 2,
 		fixup_spve_spve, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"cmp_istr",  (cmd_function)cmp_istr_f, 2,
 		fixup_spve_spve, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
 	{"starts_with",  (cmd_function)starts_with_f, 2,
 		fixup_spve_spve, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
+		ANY_ROUTE},
+	{"is_audio_on_hold",  (cmd_function)is_audio_on_hold_f, 0,
+		0, 0,
+		ANY_ROUTE},
+	{"append_time_to_request", (cmd_function)append_time_request_f, 0,
+		0, 0,
+		ANY_ROUTE},
 
 	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
 		0},
@@ -1151,6 +1177,51 @@ static int append_time_f(struct sip_msg* msg, char* p1, char *p2)
 	return 1;
 }
 
+static int append_time_request_f(struct sip_msg* msg, char* p1, char *p2)
+{
+	str time_str = {0, 0};
+	time_t now;
+	struct tm *bd_time;
+	struct hdr_field *hf = msg->headers;
+	struct lump *anchor = anchor_lump(msg, hf->name.s + hf->len - msg->buf, 0, 0);
+
+	now=time(0);
+
+	bd_time=gmtime(&now);
+	if (bd_time==NULL) {
+		LM_ERR("gmtime failed\n");
+		goto error;
+	}
+
+	time_str.s = pkg_malloc(MAX_TIME);
+	time_str.len=strftime(time_str.s, MAX_TIME, TIME_FORMAT, bd_time);
+	if (time_str.len>MAX_TIME-2 || time_str.len==0) {
+		LM_ERR("unexpected time length\n");
+		goto error;
+	}
+
+	time_str.s[time_str.len++]='\r';
+	time_str.s[time_str.len++]='\n';
+
+	if (anchor == NULL)
+	{
+		LM_ERR("Problem with getting anchor");
+		goto error;
+	}
+
+	if (insert_new_lump_after(anchor, time_str.s, time_str.len, 0) == 0)
+	{
+		LM_ERR("unable to add lump\n");
+		goto error;
+	}
+
+	return 1;
+error:
+	if (time_str.s != NULL)
+		pkg_free(time_str.s);
+
+	return -1;
+}
 
 static int set_body_f(struct sip_msg* msg, char* p1, char* p2)
 {
@@ -1198,7 +1269,7 @@ static int set_body_f(struct sip_msg* msg, char* p1, char* p2)
 		return -1;
 	}
 
-	free_lump_list(msg->body_lumps);
+	del_nonshm_lump( &(msg->body_lumps) );
 	msg->body_lumps = NULL;
 
 	if (msg->content_length) 
@@ -1471,13 +1542,16 @@ int add_hf_helper(struct sip_msg* msg, str *str1, str *str2,
 	len=s0.len;
 	if (str2) len+= str2->len + REQ_LINE(msg).uri.len;
 
-	s = (char*)pkg_malloc(len);
+	s  = (char*)pkg_malloc(len);
 	if (!s) {
 		LM_ERR("no pkg memory left\n");
 		return -1;
 	}
 
-	memcpy(s, s0.s, s0.len);
+	if (likely(s0.len>0)){
+		memcpy(s, s0.s, s0.len);
+	}
+
 	if (str2) {
 		memcpy(s+str1->len, REQ_LINE(msg).uri.s, REQ_LINE(msg).uri.len);
 		memcpy(s+str1->len+REQ_LINE(msg).uri.len, str2->s, str2->len );
@@ -1691,7 +1765,7 @@ static int fixup_method(void** param, int param_no)
 /*
  * Convert char* privacy value to corresponding bit value
  */
-static int fixup_privacy(void** param, int param_no)
+int fixup_privacy(void** param, int param_no)
 {
     str p;
     unsigned int val;
@@ -1711,6 +1785,42 @@ static int fixup_privacy(void** param, int param_no)
     
     *param = (void *)(long)val;
     return 0;
+}
+
+/*
+ * Fix in_list params: subject and list (strings that may contain pvars),
+ * separator (string)
+ */
+static int fixup_in_list(void** param, int param_no)
+{
+    if ((param_no == 1) || (param_no == 2)) return fixup_spve_null(param, 1);
+    
+    if (param_no == 3) {
+	if ((strlen((char *)*param) != 1) || (*((char *)(*param)) == 0)) {
+	    LM_ERR("invalid separator parameter\n");
+ 	    return -1;
+ 	}
+ 	return 0;
+    }
+ 
+    LM_ERR("invalid parameter number <%d>\n", param_no);
+    return -1;
+}
+ 
+/*
+ * Free in_list params
+ */
+static int fixup_free_in_list(void** param, int param_no)
+{
+    if ((param_no == 1) || (param_no == 2)) {
+ 	LM_WARN("free function has not been defined for spve\n");
+ 	return 0;
+    }
+ 
+    if (param_no == 3) return 0;
+     
+    LM_ERR("invalid parameter number <%d>\n", param_no);
+    return -1;
 }
 
 static int add_header_fixup(void** param, int param_no)
@@ -1795,13 +1905,89 @@ static int has_body_f(struct sip_msg *msg, char *type, char *str2 )
 }
 
 
-static int is_privacy_f(struct sip_msg *msg, char *_privacy, char *str2 )
+int is_privacy_f(struct sip_msg *msg, char *_privacy, char *str2 )
 {
     if (parse_privacy(msg) == -1)
 	return -1;
 
     return get_privacy_values(msg) & ((unsigned int)(long)_privacy) ? 1 : -1;
 
+}
+
+/* 
+ * Checks if subject is found in list
+ */
+int in_list_f(struct sip_msg* _m, char* _subject, char* _list, char* _sep)
+{
+    str subject, list;
+    int sep;
+    char *at, *past, *next_sep, *s;
+
+    if (fixup_get_svalue(_m, (gparam_p)_subject, &subject) != 0) {
+		LM_ERR("cannot get subject value\n");
+		return -1;
+    } else {
+		if (subject.len == 0) {
+			LM_ERR("subject cannot be empty string\n");
+			return -1;
+		}
+    }
+
+    if (fixup_get_svalue(_m, (gparam_p)_list, &list) != 0) {
+		LM_ERR("cannot get list value\n");
+		return -1;
+    } else {
+		if (list.len == 0) return -1;
+    }
+
+    sep = _sep[0];
+
+    at = list.s;
+    past = list.s + list.len;
+
+	/* Eat leading white space */
+	while ((at < past) && 
+		  ((*at == ' ') || (*at == '\t') || (*at == '\r') || (*at == '\n') )) {
+			at++;
+	}
+
+    while (at < past) {
+		next_sep = index(at, sep);
+		s = next_sep;
+		
+		if (s == NULL) {
+			/* Eat trailing white space */
+			while ((at < past) && 
+				  ((*(past-1) == ' ') || (*(past-1) == '\t') || (*(past-1) == '\r') || (*(past-1) == '\n') )) {
+					past--;
+			}
+			if ((subject.len == (past - at)) &&
+				strncmp(at, subject.s, subject.len) == 0) {
+				return 1;
+			} else {
+				return -1;
+			}
+		} else {
+			/* Eat trailing white space */
+			while ((at < s) && 
+				  ((*(s-1) == ' ') || (*(s-1) == '\t') || (*(s-1) == '\r') || (*(s-1) == '\n') )) {
+					s--;
+			}
+			if ((subject.len == (s - at)) &&
+				strncmp(at, subject.s, subject.len) == 0) {
+				return 1;
+			} else {
+				at = next_sep + 1;
+				/* Eat leading white space */
+				while ((at < past) && 
+					  ((*at == ' ') || (*at == '\t') || (*at == '\r') || (*at == '\n') )) {
+						at++;
+				}
+			}
+		}
+    }
+
+    return -1;
 }
 
 static int cmp_str_f(struct sip_msg *msg, char *str1, char *str2 )
@@ -1877,6 +2063,32 @@ static int starts_with_f(struct sip_msg *msg, char *str1, char *str2 )
 	return -2;
 }
 
+static int is_audio_on_hold_f(struct sip_msg *msg, char *str1, char *str2 )
+{
+	int sdp_session_num = 0, sdp_stream_num;
+	sdp_session_cell_t* sdp_session;
+	sdp_stream_cell_t* sdp_stream;
+
+	if (0 == parse_sdp(msg)) {
+		for(;;) {
+			sdp_session = get_sdp_session(msg, sdp_session_num);
+			if(!sdp_session) break;
+			sdp_stream_num = 0;
+			for(;;) {
+				sdp_stream = get_sdp_stream(msg, sdp_session_num, sdp_stream_num);
+				if(!sdp_stream) break;
+				if(sdp_stream->media.len==AUDIO_STR_LEN &&
+					strncmp(sdp_stream->media.s,AUDIO_STR,AUDIO_STR_LEN)==0 &&
+					sdp_stream->is_on_hold)
+					return 1;
+				sdp_stream_num++;
+			}
+			sdp_session_num++;
+		}
+	}
+	return -1;
+}
+
 int fixup_regexpNL_none(void** param, int param_no)
 {
 	regex_t* re;
@@ -1939,4 +2151,219 @@ int fixup_free_regexp_none(void** param, int param_no)
 	return 0;
 }
 
+
+/**
+ *
+ */
+static int search_hf_f(struct sip_msg* msg, char* str_hf, char* re, char *flags)
+{
+	hdr_field_t *hf;
+	hdr_field_t *hfl = NULL;
+	str body;
+	gparam_t *gp;
+	regmatch_t pmatch;
+	char c;
+	int ret;
+
+	gp = (gparam_t*)str_hf;
+
+	/* we need to be sure we have seen all HFs */
+	parse_headers(msg, HDR_EOH_F, 0);
+	for (hf=msg->headers; hf; hf=hf->next) {
+		if(gp->type==GPARAM_TYPE_INT)
+		{
+			if (gp->v.i!=hf->type)
+				continue;
+		} else {
+			if (hf->name.len!=gp->v.str.len)
+				continue;
+			if (cmp_hdrname_str(&hf->name,&gp->v.str)!=0)
+				continue;
+		}
+
+		if(flags==NULL || *flags!='l')
+		{
+			body = hf->body;
+			c = body.s[body.len];
+			body.s[body.len] = '\0';
+			ret = regexec((regex_t*) re, body.s, 1, &pmatch, 0);
+			body.s[body.len] = c;
+			if(ret==0)
+			{
+				/* match */
+				if(flags==NULL || *flags!='l')
+					return 1;
+			} else {
+				if(flags!=NULL && *flags=='f')
+					return 1;
+			}
+		} else {
+			hfl = hf;
+		}
+	}
+	if(hfl!=NULL)
+	{
+		hf = hfl;
+		body = hf->body;
+		c = body.s[body.len];
+		body.s[body.len] = '\0';
+		ret = regexec((regex_t*) re, body.s, 1, &pmatch, 0);
+		body.s[body.len] = c;
+		if(ret==0)
+			return 1;
+	}
+	return -1;
+}
+
+/*
+ * Convert header name, regexp and flags
+ */
+static int fixup_search_hf(void** param, int param_no)
+{
+	if(param_no==1)
+		return hname_fixup(param, param_no);
+	if(param_no==2)
+		return fixup_regexp_null(param, 1);
+	return 0;
+}
+
+/* sed-perl style re: s/regular expression/replacement/flags */
+static int subst_hf_f(struct sip_msg *msg, char *str_hf, char *subst, char *flags)
+{
+	struct lump* l;
+	struct replace_lst* lst = NULL;
+	struct replace_lst* rpl = NULL;
+	char* begin;
+	struct subst_expr* se;
+	int off;
+	int nmatches;
+	str body;
+	hdr_field_t *hf;
+	hdr_field_t *hfl = NULL;
+	gparam_t *gp;
+	char c;
+	int ret;
+
+	ret = -1;
+	gp = (gparam_t*)str_hf;
+	se=(struct subst_expr*)subst;
+
+	/* we need to be sure we have seen all HFs */
+	parse_headers(msg, HDR_EOH_F, 0);
+	for (hf=msg->headers; hf; hf=hf->next) {
+		if(gp->type==GPARAM_TYPE_INT)
+		{
+			if (gp->v.i!=hf->type)
+				continue;
+		} else {
+			if (hf->name.len!=gp->v.str.len)
+				continue;
+			if (cmp_hdrname_str(&hf->name,&gp->v.str)!=0)
+				continue;
+		}
+
+		if(flags==NULL || *flags!='l')
+		{
+			body = hf->body;
+			c = body.s[body.len];
+			body.s[body.len] = '\0';
+
+			begin=body.s;
+
+			off=begin-msg->buf;
+			lst=subst_run(se, begin, msg, &nmatches);
+			body.s[body.len] = c;
+			if(lst==0 && flags!=NULL && *flags=='f')
+				goto error; /* not found */
+			if(lst!=0)
+				ret=1;
+			for (rpl=lst; rpl; rpl=rpl->next)
+			{
+				LM_DBG("%s replacing at offset %d [%.*s] with [%.*s]\n",
+						exports.name, rpl->offset+off,
+						rpl->size, rpl->offset+off+msg->buf,
+						rpl->rpl.len, rpl->rpl.s);
+				if ((l=del_lump(msg, rpl->offset+off, rpl->size, 0))==0)
+				{
+					ret=-1;
+					goto error;
+				}
+				/* hack to avoid re-copying rpl, possible because both 
+				 * replace_lst & lumps use pkg_malloc */
+				if (insert_new_lump_after(l, rpl->rpl.s, rpl->rpl.len, 0)==0)
+				{
+					LM_ERR("%s could not insert new lump\n",
+						exports.name);
+					ret=-1;
+					goto error;
+				}
+				/* hack continued: set rpl.s to 0 so that replace_lst_free will
+				 * not free it */
+				rpl->rpl.s=0;
+				rpl->rpl.len=0;
+			}
+		} else {
+			hfl = hf;
+		}
+	}
+	if(hfl!=NULL)
+	{
+		hf= hfl;
+		body = hf->body;
+		c = body.s[body.len];
+		body.s[body.len] = '\0';
+
+		begin=body.s;
+
+		off=begin-msg->buf;
+		lst=subst_run(se, begin, msg, &nmatches);
+		body.s[body.len] = c;
+		if(lst==0)
+			goto error; /* not found */
+		ret=1;
+		for (rpl=lst; rpl; rpl=rpl->next)
+		{
+			LM_DBG("%s replacing at offset %d [%.*s] with [%.*s]\n",
+					exports.name, rpl->offset+off,
+					rpl->size, rpl->offset+off+msg->buf,
+					rpl->rpl.len, rpl->rpl.s);
+			if ((l=del_lump(msg, rpl->offset+off, rpl->size, 0))==0)
+			{
+				ret=-1;
+				goto error;
+			}
+			/* hack to avoid re-copying rpl, possible because both 
+			 * replace_lst & lumps use pkg_malloc */
+			if (insert_new_lump_after(l, rpl->rpl.s, rpl->rpl.len, 0)==0)
+			{
+				LM_ERR("%s could not insert new lump\n",
+					exports.name);
+				ret=-1;
+				goto error;
+			}
+			/* hack continued: set rpl.s to 0 so that replace_lst_free will
+			 * not free it */
+			rpl->rpl.s=0;
+			rpl->rpl.len=0;
+		}
+	}
+error:
+	LM_DBG("lst was %p\n", lst);
+	if (lst) replace_lst_free(lst);
+	if (nmatches<0)
+		LM_ERR("%s subst_run failed\n", exports.name);
+	return ret;
+}
+
+/*
+ * Convert header name, substexp and flags
+ */
+static int fixup_subst_hf(void** param, int param_no)
+{
+	if(param_no==1)
+		return hname_fixup(param, param_no);
+	if(param_no==2)
+		return fixup_substre(param, 1);
+	return 0;
+}
 

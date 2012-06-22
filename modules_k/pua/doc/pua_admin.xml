@@ -24,19 +24,21 @@
 	<para>
 		 It can be used with the following modules: pua_mi and pua_usrloc,
 		 pua_bla and pua_xmpp.
-		 The <emphasize>pua_mi</emphasize> offer the possibility to publish any kind of information
+		 The <emphasis>pua_mi</emphasis> offer the possibility to publish any kind of information
 		 or subscribing to a resource through the manager interface.
-		 The <emphasize>pua_usrloc</emphasize> module calls a function exported by pua modules to publish
+		 The <emphasis>pua_usrloc</emphasis> module calls a function exported by pua modules to publish
 		 elementary presence information, such as basic status "open" or "closed",
 		 for clients that do not implement client-to-server presence.
-		 Through <emphasize>pua_bla</emphasize> , BRIDGED LINE APPEARANCE features are added to openser.
-		 The <emphasize>pua_xmpp</emphasize> module represents a gateway between SIP and XMPP, so that 
+		 Through <emphasis>pua_bla</emphasis> , BRIDGED LINE APPEARANCE features are added to openser.
+		 The <emphasis>pua_xmpp</emphasis> module represents a gateway between SIP and XMPP, so that 
 		 jabber and SIP clients can exchange presence information. 
 	</para>
 	<para>
-		The module use a cache to store the presentity list and writes to database
-		on timer to be able to recover upon restart. The presence is kept in-memory
-		during run-time.
+		The module supports 2 modes of operation. In the first a cache is used to store
+		the presentity list and writes to database on timer to be able to recover upon
+		restart. The presence is kept in-memory	during run-time. The second is a database
+		only mode where the presentity list is stored purely in a database, allowing
+		both scalability and resilience.
 	</para>
 	</section>
 		<section>
@@ -75,7 +77,7 @@
 	</section>
 	</section>
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>hash_size</varname> (int)</title>
 		<para>
@@ -173,7 +175,8 @@ modparam("pua", "default_expires", 3600)
 		<para>
 		The interval at which the information in database and hash table
 		should be updated. In the case of the hash table updating means 
-		deleting expired messages.
+		deleting expired messages. 
+		Setting a value less than or equal to zero, disables updates.
 		</para>
 		<para>
 		<emphasis>Default value is <quote>100</quote>.
@@ -233,10 +236,101 @@ modparam("pua", "dlginfo_increase_version", 1)
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>reginfo_increase_version</varname> (int)</title>
+		<para>
+		When sending PUBLISHs for Event: reg, the body contains an
+		XML document according to RFC 4235(?). This XML document contains a 
+		version attribute to easily detect changes in the registration state.
+		By setting this parameter, the pua module parses the XML document and
+		sets the version attribute to the proper value. If the receiver of
+		the PUBLISH does not care about the version parameter (e.g. like
+		&kamailio; presence_reginfo module) it makes no sense to waste 
+		CPU resources for parsing the XML body and the parameter should be 
+		set to 0.
+		</para>
+		<para>
+		<emphasis>Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>reginfo_increase_version</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pua", "reginfo_increase_version", 1)
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>db_mode</varname> (int)</title>
+		<para>
+		The module supports 2 modes of operation, high speed memory
+		based storage (mode 0), and database only (mode 2) where all 
+		data is stored in a database, allowing scalability at the expense of speed.
+		Mode 1 is reserved.
+		</para>
+		<para>
+		<emphasis>Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>db_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pua", "db_mode", 0)
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>check_remote_contact</varname> (int)</title>
+		<para>
+		When sending a SUBSCRIBE check that the remote contact matches the
+		one in the stored dialog or not. If the remote contact is checked
+		and does not match the one in the stored dialog then the dialog is
+		not matched. Checking the remote contact can cause problems when
+		using modules like RLS and should not be required in order to
+		properly match the dialog anyway. Set this parameter to 0 to
+		disable checking of remote contact for SUBSCRIBE dialog matching.
+		</para>
+		<para>
+		<emphasis>Default value is <quote>1</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>check_remote_contact</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pua", "check_remote_contact", 0)
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+	    <title><varname>fetch_rows</varname> (integer)</title>
+	    <para>
+		Number of rows to be loaded in one step from database.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 500.
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>fetch_rows</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pua", "fetch_rows", 1000)
+...
+</programlisting>
+	    </example>
+	</section>
+
 	</section>
 
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 		
 	<section>
 		<title>
@@ -281,6 +375,30 @@ if(method=="NOTIFY")
 	</section>
 </section>
 
+<section>
+	<title>MI Commands</title>
+	<section>
+	  <title>
+		<function moreinfo="none">pua_cleanup</function>
+	  </title>
+	  <para>
+		Manually triggers the cleanup functions for the pua table.
+		Useful if you have set <varname>update_period</varname> to zero or less.
+	  </para>
+	  <para>
+		Name: <emphasis>pua_cleanup</emphasis>
+	  </para>
+	  <para>Parameters: <emphasis>none</emphasis></para>
+
+	  <para>
+		MI FIFO Command Format:
+	  </para>
+	  <programlisting  format="linespecific">
+		:pua_cleanup:fifo_reply
+		_empty_line_
+	  </programlisting>
+	</section>
+</section>
 
 <section>
 	<title>Installation</title>

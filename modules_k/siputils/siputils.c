@@ -106,36 +106,64 @@ sl_api_t opt_slb;
 static int mod_init(void);
 static void mod_destroy(void);
 
+/* Fixup functions to be defined later */
+static int fixup_set_uri(void** param, int param_no);
+static int fixup_free_set_uri(void** param, int param_no);
+static int fixup_tel2sip(void** param, int param_no);
+
 char *contact_flds_separator = DEFAULT_SEPARATOR;
 
 static cmd_export_t cmds[]={
-	{"ring_insert_callid", (cmd_function)ring_insert_callid, 0, ring_fixup, 0, REQUEST_ROUTE|FAILURE_ROUTE},
-	{"options_reply",      (cmd_function)opt_reply, 0, 0, 0, REQUEST_ROUTE},
-	{"is_user",            (cmd_function)is_user,        1, fixup_str_null, 0, REQUEST_ROUTE|LOCAL_ROUTE},
-	{"has_totag", 	       (cmd_function)has_totag,      0, 0, 0, REQUEST_ROUTE|LOCAL_ROUTE},
-	{"uri_param",          (cmd_function)uri_param_1,    1, fixup_str_null, 0, REQUEST_ROUTE|LOCAL_ROUTE},
-	{"uri_param",          (cmd_function)uri_param_2,    2, fixup_str_str, 0, REQUEST_ROUTE|LOCAL_ROUTE},
-	{"add_uri_param",      (cmd_function)add_uri_param,  1, fixup_str_null, 0, REQUEST_ROUTE},
-	{"tel2sip",            (cmd_function)tel2sip,        0, 0,         0, REQUEST_ROUTE},
-	{"is_e164",            (cmd_function)is_e164, 1, fixup_pvar_null, fixup_free_pvar_null, REQUEST_ROUTE|FAILURE_ROUTE|LOCAL_ROUTE},
-	{"is_uri_user_e164",   (cmd_function)is_uri_user_e164, 1, fixup_pvar_null, fixup_free_pvar_null, REQUEST_ROUTE|FAILURE_ROUTE|LOCAL_ROUTE},
-	{"encode_contact",     (cmd_function)encode_contact,2,0, 0, REQUEST_ROUTE|ONREPLY_ROUTE},
-	{"decode_contact",     (cmd_function)decode_contact,0,0, 0, REQUEST_ROUTE},
-	{"decode_contact_header", (cmd_function)decode_contact_header,0,0,0,REQUEST_ROUTE|ONREPLY_ROUTE},
-	{"cmp_uri",  (cmd_function)w_cmp_uri, 2,
-		fixup_spve_spve, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
-	{"cmp_aor",  (cmd_function)w_cmp_aor, 2,
-		fixup_spve_spve, 0,
-		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|LOCAL_ROUTE},
-	{"is_rpid_user_e164",   (cmd_function)is_rpid_user_e164,       0, 0,
+	{"ring_insert_callid", (cmd_function)ring_insert_callid, 0, ring_fixup,
+		0, REQUEST_ROUTE|FAILURE_ROUTE},
+	{"options_reply",      (cmd_function)opt_reply,         0, 0,
+		0, REQUEST_ROUTE},
+	{"is_user",            (cmd_function)is_user,           1, fixup_str_null,
+		0, REQUEST_ROUTE|LOCAL_ROUTE},
+	{"has_totag", 	       (cmd_function)has_totag,         0, 0,
+		0, ANY_ROUTE},
+	{"uri_param",          (cmd_function)uri_param_1,       1, fixup_str_null,
+		0, REQUEST_ROUTE|LOCAL_ROUTE},
+	{"uri_param",          (cmd_function)uri_param_2,       2, fixup_str_str,
+		0, REQUEST_ROUTE|LOCAL_ROUTE},
+	{"add_uri_param",      (cmd_function)add_uri_param,     1, fixup_str_null,
+		0, REQUEST_ROUTE},
+	{"tel2sip", (cmd_function)tel2sip, 3, fixup_tel2sip, 0,
+	 REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE},
+	{"is_e164",            (cmd_function)is_e164,           1, fixup_pvar_null,
+		fixup_free_pvar_null, REQUEST_ROUTE|FAILURE_ROUTE|LOCAL_ROUTE},
+	{"is_uri_user_e164",   (cmd_function)w_is_uri_user_e164,  1, fixup_pvar_null,
+		fixup_free_pvar_null, ANY_ROUTE},
+	{"encode_contact",     (cmd_function)encode_contact,    2, 0,
+		0, REQUEST_ROUTE|ONREPLY_ROUTE},
+	{"decode_contact",     (cmd_function)decode_contact,    0, 0,
+		0, REQUEST_ROUTE},
+	{"decode_contact_header", (cmd_function)decode_contact_header, 0, 0,
+		0,REQUEST_ROUTE|FAILURE_ROUTE|ONREPLY_ROUTE},
+	{"cmp_uri",  (cmd_function)w_cmp_uri,                   2, fixup_spve_spve,
+		0, ANY_ROUTE},
+	{"cmp_aor",  (cmd_function)w_cmp_aor,                   2, fixup_spve_spve,
+		0, ANY_ROUTE},
+	{"is_rpid_user_e164",   (cmd_function)is_rpid_user_e164, 0, 0,
 			0, REQUEST_ROUTE},
-	{"append_rpid_hf",      (cmd_function)append_rpid_hf,          0, 0,
+	{"append_rpid_hf",      (cmd_function)append_rpid_hf,    0, 0,
 			0, REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
-	{"append_rpid_hf",      (cmd_function)append_rpid_hf_p,        2, fixup_str_str,
+	{"append_rpid_hf",      (cmd_function)append_rpid_hf_p,  2, fixup_str_str,
 			0, REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
-	{"bind_siputils",       (cmd_function)bind_siputils,           0, 0,
+	{"set_uri_user", (cmd_function)set_uri_user,             2, fixup_set_uri,
+		    fixup_free_set_uri,	ANY_ROUTE},
+	{"set_uri_host", (cmd_function)set_uri_host,             2, fixup_set_uri,
+		    fixup_free_set_uri,	ANY_ROUTE},
+	{"bind_siputils",       (cmd_function)bind_siputils,           1, 0,
 			0, 0},
+	{"is_request",          (cmd_function)w_is_request,            0, 0,
+			0, ANY_ROUTE},
+	{"is_reply",            (cmd_function)w_is_reply,              0, 0,
+			0, ANY_ROUTE},
+	{"is_gruu",  (cmd_function)w_is_gruu,                    0, 0,
+		0, ANY_ROUTE},
+	{"is_gruu",  (cmd_function)w_is_gruu,                    1, fixup_spve_null,
+		0, ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
 
@@ -239,6 +267,72 @@ int bind_siputils(siputils_api_t* api)
 	}
 
 	get_rpid_avp( &api->rpid_avp, &api->rpid_avp_type );
+	api->has_totag = has_totag;
+	api->is_uri_user_e164 = is_uri_user_e164;
 
 	return 0;
+}
+
+/*
+ * Fix set_uri_* function params: uri (writable pvar) and value (pvar)
+ */
+static int fixup_set_uri(void** param, int param_no)
+{
+    if (param_no == 1) {
+	if (fixup_pvar_null(param, 1) != 0) {
+	    LM_ERR("failed to fixup uri pvar\n");
+	    return -1;
+	}
+	if (((pv_spec_t *)(*param))->setf == NULL) {
+	    LM_ERR("uri pvar is not writeble\n");
+	    return -1;
+	}
+	return 0;
+    }
+
+    if (param_no == 2) {
+	return fixup_pvar_null(param, 1);
+    }
+
+    LM_ERR("invalid parameter number <%d>\n", param_no);
+    return -1;
+}
+
+/*
+ * Free set_uri_* params.
+ */
+static int fixup_free_set_uri(void** param, int param_no)
+{
+    return fixup_free_pvar_null(param, 1);
+}
+
+
+/*
+ * Fix tel2sip function params: uri and hostpart pvars and
+ * result writable pvar.
+ */
+static int fixup_tel2sip(void** param, int param_no)
+{
+    if ((param_no == 1) || (param_no == 2)) {
+	if (fixup_var_str_12(param, 1) < 0) {
+	    LM_ERR("failed to fixup uri or hostpart pvar\n");
+	    return -1;
+	}
+	return 0;
+    }
+
+    if (param_no == 3) {
+	if (fixup_pvar_null(param, 1) != 0) {
+	    LM_ERR("failed to fixup result pvar\n");
+	    return -1;
+	}
+	if (((pv_spec_t *)(*param))->setf == NULL) {
+	    LM_ERR("result pvar is not writeble\n");
+	    return -1;
+	}
+	return 0;
+    }
+
+    LM_ERR("invalid parameter number <%d>\n", param_no);
+    return -1;
 }

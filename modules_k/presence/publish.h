@@ -1,8 +1,4 @@
 /*
- * $Id$
- *
- * presence module - presence server implementation
- *
  * Copyright (C) 2006 Voice Sistem S.R.L.
  *
  * This file is part of Kamailio, a free SIP server.
@@ -23,12 +19,12 @@
  *
  * History:
  * --------
- *  2006-08-15  initial version (anca)
+ *  2006-08-15  initial version (Anca Vamanu)
  */
 
-/*! \file
+/*!
+ * \file
  * \brief Kamailio presence module :: PUBLISH support
- * \ref publish.c
  * \ingroup presence 
  */
 
@@ -52,5 +48,6 @@
 void msg_presentity_clean(unsigned int ticks,void *param);
 
 int handle_publish(struct sip_msg* msg, char* str1 ,char* str2);
+int update_hard_presentity(str *pres_uri, pres_ev_t *event, str *file_uri, str *filename);
 
 #endif

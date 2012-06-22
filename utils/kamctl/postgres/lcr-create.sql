@@ -1,20 +1,22 @@
-INSERT INTO version (table_name, table_version) values ('lcr_gw','1');
+INSERT INTO version (table_name, table_version) values ('lcr_gw','2');
 CREATE TABLE lcr_gw (
     id SERIAL PRIMARY KEY NOT NULL,
     lcr_id SMALLINT NOT NULL,
     gw_name VARCHAR(128),
-    ip_addr VARCHAR(15),
+    ip_addr VARCHAR(47),
     hostname VARCHAR(64),
     port SMALLINT,
     params VARCHAR(64),
     uri_scheme SMALLINT,
     transport SMALLINT,
     strip SMALLINT,
-    tag VARCHAR(16) DEFAULT NULL,
+    prefix VARCHAR(16) DEFAULT NULL,
+    tag VARCHAR(64) DEFAULT NULL,
     flags INTEGER DEFAULT 0 NOT NULL,
-    defunct INTEGER DEFAULT NULL,
-    CONSTRAINT lcr_gw_lcr_id_ip_addr_port_hostname_idx UNIQUE (lcr_id, ip_addr, port, hostname)
+    defunct INTEGER DEFAULT NULL
 );
+
+CREATE INDEX lcr_gw_lcr_id_idx ON lcr_gw (lcr_id);
 
 INSERT INTO version (table_name, table_version) values ('lcr_rule_target','1');
 CREATE TABLE lcr_rule_target (
@@ -29,12 +31,13 @@ CREATE TABLE lcr_rule_target (
 
 CREATE INDEX lcr_rule_target_lcr_id_idx ON lcr_rule_target (lcr_id);
 
-INSERT INTO version (table_name, table_version) values ('lcr_rule','1');
+INSERT INTO version (table_name, table_version) values ('lcr_rule','2');
 CREATE TABLE lcr_rule (
     id SERIAL PRIMARY KEY NOT NULL,
     lcr_id SMALLINT NOT NULL,
     prefix VARCHAR(16) DEFAULT NULL,
     from_uri VARCHAR(64) DEFAULT NULL,
+    request_uri VARCHAR(64) DEFAULT NULL,
     stopper INTEGER DEFAULT 0 NOT NULL,
     enabled INTEGER DEFAULT 1 NOT NULL,
     CONSTRAINT lcr_rule_lcr_id_prefix_from_uri_idx UNIQUE (lcr_id, prefix, from_uri)

@@ -1,9 +1,9 @@
-INSERT INTO version (table_name, table_version) values ('rls_presentity','0');
+INSERT INTO version (table_name, table_version) values ('rls_presentity','1');
 CREATE TABLE rls_presentity (
     id NUMBER(10) PRIMARY KEY,
     rlsubs_did VARCHAR2(255),
     resource_uri VARCHAR2(128),
-    content_type VARCHAR2(64),
+    content_type VARCHAR2(255),
     presence_state BLOB,
     expires NUMBER(10),
     updated NUMBER(10),
@@ -20,9 +20,11 @@ END rls_presentity_tr;
 /
 BEGIN map2users('rls_presentity'); END;
 /
+CREATE INDEX rls_presentity_rlsubs_idx  ON rls_presentity (rlsubs_did);
 CREATE INDEX rls_presentity_updated_idx  ON rls_presentity (updated);
+CREATE INDEX rls_presentity_expires_idx  ON rls_presentity (expires);
 
-INSERT INTO version (table_name, table_version) values ('rls_watchers','1');
+INSERT INTO version (table_name, table_version) values ('rls_watchers','3');
 CREATE TABLE rls_watchers (
     id NUMBER(10) PRIMARY KEY,
     presentity_uri VARCHAR2(128),
@@ -34,10 +36,10 @@ CREATE TABLE rls_watchers (
     event_id VARCHAR2(64),
     to_tag VARCHAR2(64),
     from_tag VARCHAR2(64),
-    callid VARCHAR2(64),
+    callid VARCHAR2(255),
     local_cseq NUMBER(10),
     remote_cseq NUMBER(10),
-    contact VARCHAR2(64),
+    contact VARCHAR2(128),
     record_route CLOB,
     expires NUMBER(10),
     status NUMBER(10) DEFAULT 2 NOT NULL,
@@ -45,7 +47,10 @@ CREATE TABLE rls_watchers (
     version NUMBER(10) DEFAULT 0 NOT NULL,
     socket_info VARCHAR2(64),
     local_contact VARCHAR2(128),
-    CONSTRAINT rls_watchers_rls_watcher_idx  UNIQUE (presentity_uri, callid, to_tag, from_tag)
+    from_user VARCHAR2(64),
+    from_domain VARCHAR2(64),
+    updated NUMBER(10),
+    CONSTRAINT rls_watchers_rls_watcher_idx  UNIQUE (callid, to_tag, from_tag)
 );
 
 CREATE OR REPLACE TRIGGER rls_watchers_tr
@@ -56,3 +61,8 @@ END rls_watchers_tr;
 /
 BEGIN map2users('rls_watchers'); END;
 /
+CREATE INDEX ORA_rls_watchers_delete  ON rls_watchers (callid, to_tag);
+CREATE INDEX ORA_rls_watchers_update  ON rls_watchers (watcher_username, watcher_domain, event);
+CREATE INDEX ORA_rls_watchers_expires  ON rls_watchers (expires);
+CREATE INDEX rls_watchers_updated_idx  ON rls_watchers (updated);
+

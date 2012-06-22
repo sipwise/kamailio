@@ -16,9 +16,17 @@
 		<author>
 		<firstname>Bogdan-Andrei</firstname>
 		<surname>Iancu</surname>
-		<affiliation><orgname>&vsname;</orgname></affiliation>
+		<affiliation><orgname>Voice Sistem SRL</orgname></affiliation>
 		<address>
 			<email>bogdan@voice-system.ro</email>
+		</address>
+		</author>
+		<author>
+		<firstname>Carsten</firstname>
+		<surname>Bock</surname>
+		<affiliation><orgname>ng-voice.com</orgname></affiliation>
+		<address>
+			<email>carsten@ng-voice.com</email>
 		</address>
 		</author>
 		<editor>
@@ -28,17 +36,27 @@
 			<email>bogdan@voice-system.ro</email>
 		</address>
 		</editor>
+		<editor>
+		<firstname>Carsten</firstname>
+		<surname>Bock</surname>
+		<address>
+			<email>carsten@ng-voice.com</email>
+		</address>
+		</editor>
+		<editor>
+			<firstname>Alex</firstname>
+			<surname>Balashov</surname>
+			<email>abalashov@evaristesys.com</email>
+		</editor>
 	</authorgroup>
 	<copyright>
 		<year>2006</year>
-		<holder>&voicesystem;</holder>
+		<holder>Voice Sistem SRL</holder>
 	</copyright>
-	<revhistory>
-		<revision>
-		<revnumber>$Revision$</revnumber>
-		<date>$Date$</date>
-		</revision>
-	</revhistory>
+	<copyright>
+		<year>2011</year>
+		<holder>Carsten Bock, http://www.ng-voice.com</holder>
+	</copyright>
 	</bookinfo>
 	<toc></toc>
 	

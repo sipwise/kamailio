@@ -81,6 +81,10 @@ if (www_authenticate("realm", "subscriber)) {
 					Server Error' reply automatically in failure cases
 					(error code is returned to config)</para>
 			</listitem>
+			<listitem>
+				<para><emphasis>16</emphasis> - build challenge header with
+					stale=true</para>
+			</listitem>
 			</itemizedlist>
 		</listitem>
 		</itemizedlist>
@@ -122,8 +126,35 @@ if (!www_authenticate("$td", "subscriber")) {
 		<title>proxy_challenge usage</title>
 		<programlisting format="linespecific">
 ...
-if (!proxy_authenticate("$fd", "subscriber)) {
+if (!proxy_authenticate("$fd", "subscriber")) {
 	proxy_challenge("$fd", "1");
+};
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="auth_challenge">
+		<title>
+			<function moreinfo="none">auth_challenge(realm, flags)</function>
+		</title>
+		<para>
+		The function challenges a user agent for authentication. It combines
+		the functions www_challenge() and proxy_challenge(), by calling
+		internally the first one for REGISTER requests and the second one for
+		the rest of the request types.
+		</para>
+		<para>Meaning of the parameters the same as for function
+		www_challenge(realm, flags)</para>
+		<para>
+		This function can be used from REQUEST_ROUTE.
+		</para>
+		<example>
+		<title>proxy_challenge usage</title>
+		<programlisting format="linespecific">
+...
+if (!auth_check("$fd", "subscriber", "1")) {
+	auth_challenge("$fd", "1");
 };
 ...
 </programlisting>
@@ -157,6 +188,17 @@ if (!proxy_authenticate("$fd", "subscriber)) {
 			<listitem><para>
 			<emphasis>-3 (invalid user)</emphasis> - authentication user does
 			not exist.
+			</para></listitem>
+			<listitem><para>
+			<emphasis>-4 (nonce expired)</emphasis> - the nonce has expired
+			</para></listitem>
+			<listitem><para>
+			<emphasis>-5 (no credentials)</emphasis> - request does not contain
+			an Authorization header with the correct realm.
+			</para></listitem>
+			<listitem><para>
+			<emphasis>-6 (nonce reused)</emphasis> - the nonce has already been
+			used to authenticate a previous request
 			</para></listitem>
 		</itemizedlist>
 		<para>Meaning of the parameters is as follows:</para>
@@ -203,15 +245,20 @@ if (!proxy_authenticate("$fd", "subscriber)) {
 				<para><emphasis>8</emphasis> - build challenge header with
 					qop=auth-int and add it to avp</para>
 			</listitem>
+			<listitem>
+				<para><emphasis>16</emphasis> - build challenge header with
+					stale=true</para>
+			</listitem>
+
 			</itemizedlist>
 		</listitem>
 		</itemizedlist>
-		<para>
 		<para>
 			When challenge header is built and stored in avp,
 			append_to_reply() and sl reply functions can be used to send
 			appropriate SIP reply to challenge for authentication.
 		</para>
+		<para>
 		This function can be used from REQUEST_ROUTE.
 		</para>
 		<example>
@@ -256,6 +303,30 @@ $avp(password)="xyz";
 if (!pv_proxy_authenticate("$fd", "$avp(password)", "0")) {
 	proxy_challenge("$fd", "1");
 };
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="auth_get_www_authenticate">
+		<title>
+			<function moreinfo="none">auth_get_www_authenticate(realm, flags, pvdst)</function>
+		</title>
+		<para>
+		Build WWW-Authentication header and set the resulting value in 'pvdest' parameter.
+		</para>
+		<para>Meaning of the realm and flags parameters is the same as for
+		pv_www_authenticate(realm, passwd, flags)</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title>auth_get_www_authenticate</title>
+		<programlisting format="linespecific">
+...
+if (auth_get_www_authenticate("$fd", "0", "$var(wauth)")) {
+	xlog("www authenticate header is [$var(wauth)]\n");
+}
 ...
 </programlisting>
 		</example>

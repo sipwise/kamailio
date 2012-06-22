@@ -1,7 +1,6 @@
 /*
- * $Id$
- *
  * Copyright (C) 2006 Voice System SRL
+ * Copyright (C) 2011 Carsten Bock, carsten@ng-voice.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -55,9 +54,10 @@
 
 #include "../../dprint.h"
 #include "../../ut.h"
-#include "../../lib/kcore/hash_func.h"
+#include "../../hashes.h"
 #include "../../lib/kmi/mi.h"
 #include "dlg_timer.h"
+#include "dlg_var.h"
 #include "dlg_hash.h"
 #include "dlg_profile.h"
 #include "dlg_req_within.h"
@@ -66,10 +66,14 @@
 #define MAX_LDG_LOCKS  2048
 #define MIN_LDG_LOCKS  2
 
+extern int dlg_ka_interval;
 
 /*! global dialog table */
 struct dlg_table *d_table = 0;
 
+dlg_ka_t **dlg_ka_list_head = NULL;
+dlg_ka_t **dlg_ka_list_tail = NULL;
+gen_lock_t *dlg_ka_list_lock = NULL;
 
 /*!
  * \brief Reference a dialog without locking
@@ -92,6 +96,11 @@ struct dlg_table *d_table = 0;
  */
 #define unref_dlg_unsafe(_dlg,_cnt,_d_entry)   \
 	do { \
+		if((_dlg)->ref <= 0 ) { \
+			LM_WARN("invalid unref'ing dlg %p with ref %d by %d\n",\
+					(_dlg),(_dlg)->ref,(_cnt));\
+			break; \
+		} \
 		(_dlg)->ref -= (_cnt); \
 		LM_DBG("unref dlg %p with %d -> %d\n",\
 			(_dlg),(_cnt),(_dlg)->ref);\
@@ -113,6 +122,105 @@ struct dlg_table *d_table = 0;
 		}\
 	}while(0)
 
+/**
+ * add item to keep-alive list
+ *
+ */
+int dlg_ka_add(dlg_cell_t *dlg)
+{
+	dlg_ka_t *dka;
+
+	if(dlg_ka_interval<=0)
+		return 0;
+	if(!(dlg->iflags & (DLG_IFLAG_KA_SRC | DLG_IFLAG_KA_SRC)))
+		return 0;
+
+	dka = (dlg_ka_t*)shm_malloc(sizeof(dlg_ka_t));
+	if(dka==NULL) {
+		LM_ERR("no more shm mem\n");
+		return -1;
+	}
+	memset(dka, 0, sizeof(dlg_ka_t));
+	dka->katime = get_ticks() + dlg_ka_interval;
+	dka->iuid.h_entry = dlg->h_entry;
+	dka->iuid.h_id = dlg->h_id;
+	dka->iflags = dlg->iflags;
+
+	lock_get(dlg_ka_list_lock);
+	if(*dlg_ka_list_tail!=NULL)
+		(*dlg_ka_list_tail)->next = dka;
+	if(*dlg_ka_list_head==NULL)
+		*dlg_ka_list_head = dka;
+	*dlg_ka_list_tail = dka;
+	lock_release(dlg_ka_list_lock);
+	LM_DBG("added dlg[%d,%d] to KA list\n", dlg->h_entry, dlg->h_id);
+	return 0;
+}
+
+/**
+ * run keep-alive list
+ *
+ */
+int dlg_ka_run(ticks_t ti)
+{
+	dlg_ka_t *dka;
+	dlg_cell_t *dlg;
+
+	if(dlg_ka_interval<=0)
+		return 0;
+
+	while(1) {
+		/* get head item */
+		lock_get(dlg_ka_list_lock);
+		if(*dlg_ka_list_head==NULL) {
+			lock_release(dlg_ka_list_lock);
+			return 0;
+		}
+		dka = *dlg_ka_list_head;
+#if 0
+		LM_DBG("dlg ka timer at %lu for"
+				" dlg[%u,%u] on %lu\n", (unsigned long)ti,
+				dka->iuid.h_entry, dka->iuid.h_id,
+				(unsigned long)dka->katime);
+#endif
+		if(dka->katime>ti) {
+			lock_release(dlg_ka_list_lock);
+			return 0;
+		}
+		if(*dlg_ka_list_head == *dlg_ka_list_tail) {
+			*dlg_ka_list_head = NULL;
+			*dlg_ka_list_head = NULL;
+		}
+		*dlg_ka_list_head = dka->next;
+		lock_release(dlg_ka_list_lock);
+
+		/* send keep-alive for dka */
+		dlg = dlg_get_by_iuid(&dka->iuid);
+		if(dlg==NULL) {
+			shm_free(dka);
+			dka = NULL;
+		} else {
+			if(dka->iflags & DLG_IFLAG_KA_SRC)
+				dlg_send_ka(dlg, DLG_CALLER_LEG, 0);
+			if(dka->iflags & DLG_IFLAG_KA_DST)
+				dlg_send_ka(dlg, DLG_CALLEE_LEG, 0);
+			dlg_release(dlg);
+		}
+		/* append to tail */
+		if(dka!=NULL)
+		{
+			lock_get(dlg_ka_list_lock);
+			if(*dlg_ka_list_tail!=NULL)
+				(*dlg_ka_list_tail)->next = dka;
+			if(*dlg_ka_list_head==NULL)
+				*dlg_ka_list_tail = dka;
+			*dlg_ka_list_tail = dka;
+			lock_release(dlg_ka_list_lock);
+		}
+	}
+
+	return 0;
+}
 
 /*!
  * \brief Initialize the global dialog table
@@ -123,6 +231,25 @@ int init_dlg_table(unsigned int size)
 {
 	unsigned int n;
 	unsigned int i;
+
+	dlg_ka_list_head = (dlg_ka_t **)shm_malloc(sizeof(dlg_ka_t *));
+	if(dlg_ka_list_head==NULL) {
+		LM_ERR("no more shm mem (h)\n");
+		goto error0;
+	}
+	dlg_ka_list_tail = (dlg_ka_t **)shm_malloc(sizeof(dlg_ka_t *));
+	if(dlg_ka_list_tail==NULL) {
+		LM_ERR("no more shm mem (t)\n");
+		goto error0;
+	}
+	*dlg_ka_list_head = NULL;
+	*dlg_ka_list_tail = NULL;
+	dlg_ka_list_lock = (gen_lock_t*)shm_malloc(sizeof(gen_lock_t));
+	if(dlg_ka_list_lock==NULL) {
+		LM_ERR("no more shm mem (l)\n");
+		goto error0;
+	}
+	lock_init(dlg_ka_list_lock);
 
 	d_table = (struct dlg_table*)shm_malloc
 		( sizeof(struct dlg_table) + size*sizeof(struct dlg_entry));
@@ -157,14 +284,21 @@ int init_dlg_table(unsigned int size)
 
 	for( i=0 ; i<size; i++ ) {
 		memset( &(d_table->entries[i]), 0, sizeof(struct dlg_entry) );
-		d_table->entries[i].next_id = rand();
+		d_table->entries[i].next_id = rand() % (3*size);
 		d_table->entries[i].lock_idx = i % d_table->locks_no;
 	}
 
 	return 0;
 error1:
 	shm_free( d_table );
+	d_table = NULL;
 error0:
+	if(dlg_ka_list_head!=NULL)
+		shm_free(dlg_ka_list_head);
+	if(dlg_ka_list_tail!=NULL)
+		shm_free(dlg_ka_list_tail);
+	dlg_ka_list_head = NULL;
+	dlg_ka_list_tail = NULL;
 	return -1;
 }
 
@@ -176,8 +310,9 @@ error0:
 inline void destroy_dlg(struct dlg_cell *dlg)
 {
 	int ret = 0;
+	struct dlg_var *var;
 
-	LM_DBG("destroying dialog %p\n",dlg);
+	LM_DBG("destroying dialog %p (ref %d)\n", dlg, dlg->ref);
 
 	ret = remove_dialog_timer(&dlg->tl);
 	if (ret < 0) {
@@ -196,14 +331,12 @@ inline void destroy_dlg(struct dlg_cell *dlg)
 			dlg->tag[DLG_CALLEE_LEG].len, dlg->tag[DLG_CALLEE_LEG].s);
 	}
 
-	run_dlg_callbacks( DLGCB_DESTROY , dlg, 0, DLG_DIR_NONE, 0);
+	run_dlg_callbacks( DLGCB_DESTROY , dlg, NULL, NULL, DLG_DIR_NONE, 0);
+
 
 	/* delete the dialog from DB*/
 	if (dlg_db_mode)
 		remove_dialog_from_db(dlg);
-
-	if(dlg==get_current_dlg_pointer())
-		reset_current_dlg_pointer();
 
 	if (dlg->cbs.first)
 		destroy_dlg_callbacks_list(dlg->cbs.first);
@@ -225,6 +358,16 @@ inline void destroy_dlg(struct dlg_cell *dlg)
 
 	if (dlg->toroute_name.s)
 		shm_free(dlg->toroute_name.s);
+
+	
+	while (dlg->vars) {
+		var = dlg->vars;
+		dlg->vars = dlg->vars->next;
+		shm_free(var->key.s);
+		shm_free(var->value.s);
+		shm_free(var);
+	}
+
 
 	shm_free(dlg);
 	dlg = 0;
@@ -423,12 +566,15 @@ error:
  * the reference counter by one again iff a dialog has been found.
  * \param h_entry number of the hash table entry
  * \param h_id id of the hash table entry
- * \return dialog on success, NULL on failure
+ * \return dialog structure on success, NULL on failure
  */
-struct dlg_cell* lookup_dlg( unsigned int h_entry, unsigned int h_id)
+dlg_cell_t *dlg_lookup( unsigned int h_entry, unsigned int h_id)
 {
-	struct dlg_cell *dlg;
-	struct dlg_entry *d_entry;
+	dlg_cell_t *dlg;
+	dlg_entry_t *d_entry;
+
+	if(d_table==NULL)
+		return 0;
 
 	if (h_entry>=d_table->size)
 		goto not_found;
@@ -454,8 +600,27 @@ not_found:
 
 
 /*!
+ * \brief Search a dialog in the global list by iuid
+ *
+ * Note that the caller is responsible for decrementing (or reusing)
+ * the reference counter by one again if a dialog has been found.
+ * \param diuid internal unique id per dialog
+ * \return dialog structure on success, NULL on failure
+ */
+dlg_cell_t* dlg_get_by_iuid(dlg_iuid_t *diuid)
+{
+	if(diuid==NULL)
+		return NULL;
+	if(diuid->h_id==0)
+		return NULL;
+	/* dlg ref counter is increased by next line */
+	return dlg_lookup(diuid->h_entry, diuid->h_id);
+}
+
+/*!
  * \brief Helper function to get a dialog corresponding to a SIP message
  * \see get_dlg
+ * \param h_entry hash index in the directory list
  * \param callid callid
  * \param ftag from tag
  * \param ttag to tag
@@ -509,11 +674,12 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
 struct dlg_cell* get_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
 {
 	struct dlg_cell *dlg;
+	unsigned int he;
 
-	if ((dlg = internal_get_dlg(core_hash(callid, 0,
-			d_table->size), callid, ftag, ttag, dir)) == 0 &&
-			(dlg = internal_get_dlg(core_hash(callid, ttag->len
-			?ttag:0, d_table->size), callid, ftag, ttag, dir)) == 0) {
+	he = core_hash(callid, 0, d_table->size);
+	dlg = internal_get_dlg(he, callid, ftag, ttag, dir);
+
+	if (dlg == 0) {
 		LM_DBG("no dialog callid='%.*s' found\n", callid->len, callid->s);
 		return 0;
 	}
@@ -534,7 +700,10 @@ void link_dlg(struct dlg_cell *dlg, int n)
 
 	dlg_lock( d_table, d_entry);
 
-	dlg->h_id = d_entry->next_id++;
+	/* keep id 0 for special cases */
+	dlg->h_id = 1 + d_entry->next_id++;
+	if(dlg->h_id == 0) dlg->h_id = 1;
+	LM_DBG("linking dialog [%u:%u]\n", dlg->h_entry, dlg->h_id);
 	if (d_entry->first==0) {
 		d_entry->first = d_entry->last = dlg;
 	} else {
@@ -556,9 +725,9 @@ void link_dlg(struct dlg_cell *dlg, int n)
  * \param dlg dialog
  * \param cnt increment for the reference counter
  */
-void ref_dlg(struct dlg_cell *dlg, unsigned int cnt)
+void dlg_ref(dlg_cell_t *dlg, unsigned int cnt)
 {
-	struct dlg_entry *d_entry;
+	dlg_entry_t *d_entry;
 
 	d_entry = &(d_table->entries[dlg->h_entry]);
 
@@ -574,9 +743,9 @@ void ref_dlg(struct dlg_cell *dlg, unsigned int cnt)
  * \param dlg dialog
  * \param cnt decrement for the reference counter
  */
-void unref_dlg(struct dlg_cell *dlg, unsigned int cnt)
+void dlg_unref(dlg_cell_t *dlg, unsigned int cnt)
 {
-	struct dlg_entry *d_entry;
+	dlg_entry_t *d_entry;
 
 	d_entry = &(d_table->entries[dlg->h_entry]);
 
@@ -587,7 +756,20 @@ void unref_dlg(struct dlg_cell *dlg, unsigned int cnt)
 
 
 /*!
- * Small logging helper functions for next_state_dlg.
+ * \brief Release a dialog from ref counter by 1
+ * \see dlg_unref
+ * \param dlg dialog
+ */
+void dlg_release(dlg_cell_t *dlg)
+{
+	if(dlg==NULL)
+		return;
+	dlg_unref(dlg, 1);
+}
+
+
+/*!
+ * \brief Small logging helper functions for next_state_dlg.
  * \param event logged event
  * \param dlg dialog data
  * \see next_state_dlg
@@ -614,10 +796,10 @@ static inline void log_next_state_dlg(const int event, const struct dlg_cell *dl
  * \param new_state new dialog state
  * \param unref set to 1 when the dialog was deleted, 0 otherwise
  */
-void next_state_dlg(struct dlg_cell *dlg, int event,
+void next_state_dlg(dlg_cell_t *dlg, int event,
 		int *old_state, int *new_state, int *unref)
 {
-	struct dlg_entry *d_entry;
+	dlg_entry_t *d_entry;
 
 	d_entry = &(d_table->entries[dlg->h_entry]);
 
@@ -754,7 +936,8 @@ void next_state_dlg(struct dlg_cell *dlg, int event,
 	dlg_unlock( d_table, d_entry);
 
 	LM_DBG("dialog %p changed from state %d to "
-		"state %d, due event %d\n",dlg,*old_state,*new_state,event);
+		"state %d, due event %d (ref %d)\n", dlg, *old_state, *new_state, event,
+		dlg->ref);
 }
 
 /**
@@ -913,8 +1096,12 @@ static inline int internal_mi_print_dlg(struct mi_node *rpl,
 		node1 = add_mi_node_child(node, 0, "context", 7, 0, 0);
 		if(node1 == 0)
 			goto error;
-		run_dlg_callbacks( DLGCB_MI_CONTEXT, dlg, NULL, 
-			DLG_DIR_NONE, (void *)node1);
+		run_dlg_callbacks( DLGCB_MI_CONTEXT,
+		                   dlg,
+		                   NULL,
+		                   NULL,
+		                   DLG_DIR_NONE,
+		                   (void *)node1);
 	}
 	return 0;
 
@@ -1124,4 +1311,5 @@ error:
 	free_mi_tree(rpl_tree);
 	return NULL;
 }
+
 

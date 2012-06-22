@@ -309,7 +309,7 @@ inline static int blacklist_run_hooks(struct blst_callbacks_lst *cb_lst,
 /** init per protocol blacklist event ignore masks.
  * @return 0 on success, < 0 on error.
  */
-int blst_init_ign_masks()
+int blst_init_ign_masks(void)
 {
 	if ((PROTO_UDP > PROTO_LAST) || (PROTO_TCP > PROTO_LAST) ||
 		(PROTO_TLS > PROTO_LAST) || (PROTO_SCTP > PROTO_LAST)){
@@ -936,24 +936,6 @@ void dst_blst_mem_info(rpc_t* rpc, void* ctx)
 }
 
 
-
-static char* get_proto_name(unsigned char proto)
-{
-	switch(proto){
-		case PROTO_NONE:
-			return "*";
-		case PROTO_UDP:
-			return "udp";
-		case PROTO_TCP:
-			return "tcp";
-		case PROTO_TLS:
-			return "tls";
-		case PROTO_SCTP:
-			return "sctp";
-		default:
-			return "unknown";
-	}
-}
 
 
 #ifdef USE_DST_BLACKLIST_STATS

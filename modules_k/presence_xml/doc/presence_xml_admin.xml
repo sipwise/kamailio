@@ -97,7 +97,7 @@
 	</section>
 	
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>db_url</varname>(str)</title>
 		<para>
@@ -220,38 +220,15 @@ modparam("presence_xml", "force_active", 1)
 		</example>
 	</section>
 	<section>
-		<title><varname>pidf_manipulation</varname> (int)</title>
-		<para>
-		Setting this parameter to 1 enables the features described in RFC 4827.
-		It gives the possibility to have a permanent state notified to the users
-		even in the case in which the phone is not online. The presence document
-		is taken from the XCAP server and aggregated together with the other
-		presence information, if any exist, for each Notify that is sent to the
-		watchers. It is also possible to have information notified even if not 
-		issuing any Publish (useful for services such as email, SMS, MMS).
-		</para>
-		<para>
-		<emphasis>Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>pidf_manipulation</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("presence_xml", "pidf_manipulation", 1)
-...
-</programlisting>
-		</example>
-	</section>
-	<section>
 		<title><varname>integrated_xcap_server</varname> (int)</title>
 		<para>
-		This parameter is a flag for the type of XCAP server or servers 
-		used. If the XCAP server is integrated with &kamailio; presence_XML
-		module and access the same database tables directly, like the XCAP-lite 
-		server from AG Projects, the parameter should be
+		This parameter is a flag for the type of XCAP servers
+		used. If the XCAP server is integrated with &kamailio; presence_xml
+		module and access the same database tables directly, like the embedded
+		XCAP server implemented in xcap_server module, the parameter should be
 		set to a positive value. Apart from updating in xcap table,
-		the integrated server must send an MI command refershWatchers 
+		if the integrated server is not running on the same &kamailio; instance,
+		it must send an MI command refershWatchers
 		[pres_uri] [event] when a user modifies a rules document, to 
 		instruct the presence_xml module to update states from the database
 		and, if needed, send NOTIFY updates.
@@ -314,10 +291,99 @@ modparam("presence_xml", "passive_mode", 1)
 </section>
 
 <section>
-	<title>Exported Functions</title>
-	<para>
-	None to be used in configuration file.
-	</para>
+	<title>Functions</title>
+	<section>
+		<title>
+		<function moreinfo="none">pres_check_basic(presentity_uri, status)</function>
+		</title>
+		<para>
+		Checks the /presence/tuple/status/basic nodes in the presentity for
+		<emphasis>presentity_uri</emphasis> against the value in status.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<para>
+		<emphasis>Return code:</emphasis>
+		<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis> 1 - if a match is found</emphasis>.
+			</para>
+			</listitem>
+			<listitem>
+			<para>
+				<emphasis> -1 - if a match is not found</emphasis>.
+			</para>
+			</listitem>
+		</itemizedlist>
+		</para>
+		<example>
+		<title><function>pres_check_basic</function> usage</title>
+		<programlisting format="linespecific">
+...
+    if (pres_check_basic("$ru", "open")) {
+        ...
+    } else {
+        if (is_method("MESSAGE"))
+            m_store();
+    else
+        send_reply("404", "Not Found");
+    }
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title>
+		<function moreinfo="none">pres_check_activities(presentity_uri, activity)</function>
+		</title>
+		<para>
+		Checks whether a /presence/person/activities/<emphasis>activity</emphasis>
+		node exists in the presentity for <emphasis>presentity_uri</emphasis>.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<para>
+		<emphasis>Return code:</emphasis>
+		<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis> 1 - if a match is found</emphasis>.
+			</para>
+			</listitem>
+			<listitem>
+			<para>
+				<emphasis> -1 - if a match is not found</emphasis>.
+			</para>
+			</listitem>
+			<listitem>
+			<para>
+				<emphasis> -2 - if /presence/person or /presence/person/activity do not exist</emphasis>.
+			</para>
+			</listitem>
+	
+		</itemizedlist>
+		</para>
+		<example>
+		<title><function>pres_check_activities</function> usage</title>
+		<programlisting format="linespecific">
+...
+    if (pres_check_basic("$ru", "open")) {
+	pres_check_activities("$ru", "unknown");
+	if ($retcode || $retcode == -2 || !is_method("INVITE"))
+            t_relay();
+	else
+            send_reply("486", "Busy Here");
+    } else {
+        ...
+    }
+...
+</programlisting>
+		</example>
+	</section>
+
 </section>
 
 <section>

@@ -42,11 +42,13 @@
 #include "ht_api.h"
 #include "ht_db.h"
 #include "ht_var.h"
+#include "api.h"
 
 
 MODULE_VERSION
 
 int  ht_timer_interval = 20;
+int  ht_db_expires_flag = 0;
 
 static int htable_init_rpc(void);
 
@@ -76,6 +78,10 @@ static pv_export_t mod_pvs[] = {
 		pv_parse_ht_name, 0, 0, 0 },
 	{ {"shtcv", sizeof("shtcv")-1}, PVT_OTHER, pv_get_ht_cv, 0,
 		pv_parse_ht_name, 0, 0, 0 },
+	{ {"shtinc", sizeof("shtinc")-1}, PVT_OTHER, pv_get_ht_inc, 0,
+		pv_parse_ht_name, 0, 0, 0 },
+	{ {"shtdec", sizeof("shtdec")-1}, PVT_OTHER, pv_get_ht_dec, 0,
+		pv_parse_ht_name, 0, 0, 0 },
 	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -88,15 +94,14 @@ static mi_export_t mi_cmds[] = {
 
 
 static cmd_export_t cmds[]={
-	{"sht_print",  (cmd_function)ht_print,  0, 0, 0, 
-		REQUEST_ROUTE | FAILURE_ROUTE |
-		ONREPLY_ROUTE | BRANCH_ROUTE | ERROR_ROUTE | LOCAL_ROUTE},
-	{"sht_rm_name_re",  (cmd_function)ht_rm_name_re,  1, fixup_ht_rm, 0, 
-		REQUEST_ROUTE | FAILURE_ROUTE |
-		ONREPLY_ROUTE | BRANCH_ROUTE | ERROR_ROUTE | LOCAL_ROUTE},
-	{"sht_rm_value_re",  (cmd_function)ht_rm_value_re,  1, fixup_ht_rm, 0, 
-		REQUEST_ROUTE | FAILURE_ROUTE |
-		ONREPLY_ROUTE | BRANCH_ROUTE | ERROR_ROUTE | LOCAL_ROUTE},
+	{"sht_print",       (cmd_function)ht_print,        0, 0, 0,
+		ANY_ROUTE},
+	{"sht_rm_name_re",  (cmd_function)ht_rm_name_re,   1, fixup_ht_rm, 0,
+		ANY_ROUTE},
+	{"sht_rm_value_re", (cmd_function)ht_rm_value_re,  1, fixup_ht_rm, 0,
+		ANY_ROUTE},
+	{"bind_htable",     (cmd_function)bind_htable,     0, 0, 0,
+		ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
 
@@ -107,9 +112,11 @@ static param_export_t params[]={
 	{"key_type_column",    STR_PARAM, &ht_db_ktype_column.s},
 	{"value_type_column",  STR_PARAM, &ht_db_vtype_column.s},
 	{"key_value_column",   STR_PARAM, &ht_db_value_column.s},
+	{"expires_column",     STR_PARAM, &ht_db_expires_column.s},
 	{"array_size_suffix",  STR_PARAM, &ht_array_size_suffix.s},
 	{"fetch_rows",         INT_PARAM, &ht_fetch_rows},
 	{"timer_interval",     INT_PARAM, &ht_timer_interval},
+	{"db_expires",         INT_PARAM, &ht_db_expires_flag},
 	{0,0,0}
 };
 
@@ -146,7 +153,7 @@ static int mod_init(void)
 		return -1;
 	}
 
-	if(ht_shm_init()!=0)
+	if(ht_init_tables()!=0)
 		return -1;
 	ht_db_init_params();
 
@@ -214,6 +221,18 @@ static int child_init(int rank)
  */
 static void destroy(void)
 {
+	/* sync back to db */
+	if(ht_db_url.len>0)
+	{
+		if(ht_db_init_con()==0)
+		{
+			if(ht_db_open_con()==0)
+			{
+				ht_db_sync_tables();
+				ht_db_close_con();
+			}
+		}
+	}
 	ht_destroy();
 }
 

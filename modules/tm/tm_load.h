@@ -59,6 +59,7 @@ struct tm_binds {
 	cmd_function     t_relay_to_udp; /* WARNING: failure_route unsafe */
 	cmd_function     t_relay_to_tcp; /* WARNING: failure_route unsafe */ 
 	cmd_function     t_relay;        /* WARNING: failure_route unsafe */
+	treplicate_uri_f t_replicate;    /* WARNING: failure_route unsafe */
 	tnewtran_f       t_newtran;
 	treply_f         t_reply;
 	treply_wb_f      t_reply_with_body;
@@ -131,10 +132,12 @@ struct tm_binds {
 #endif
 };
 
+typedef struct tm_binds tm_api_t;
+
 extern int tm_init;
 
 typedef int(*load_tm_f)( struct tm_binds *tmb );
-int load_tm( struct tm_binds *tmb);
+int load_tm(struct tm_binds *tmb);
 
 
 static inline int load_tm_api(struct tm_binds* tmb)
@@ -151,6 +154,52 @@ static inline int load_tm_api(struct tm_binds* tmb)
 	
 	/* let the auto-loading function load all TM stuff */
 	if (load_tm(tmb) == -1) {
+		return -1;
+	}
+	return 0;
+}
+
+static inline int tm_load_api(tm_api_t *tmb)
+{
+	return load_tm_api(tmb);
+}
+
+/**
+ * eXtra API - not common used in other modules
+ */
+
+typedef void (*t_on_route_f)(unsigned int);
+typedef int (*t_no_param_f)(struct sip_msg *);
+
+int t_check_trans(struct sip_msg* msg);
+int t_is_canceled(struct sip_msg* msg);
+
+typedef struct tm_xbinds {
+	t_on_route_f t_on_failure;
+	t_on_route_f t_on_branch;
+	t_on_route_f t_on_reply;
+	t_no_param_f t_check_trans;
+	t_no_param_f t_is_canceled;
+} tm_xapi_t;
+
+typedef int(*load_xtm_f)( tm_xapi_t *xtmb );
+int load_xtm(tm_xapi_t *xtmb);
+
+static inline int tm_load_xapi(tm_xapi_t *xtmb)
+{
+	load_xtm_f load_xtm;
+
+	/* import the TM auto-loading function */
+	load_xtm = (load_xtm_f)find_export("load_xtm", NO_SCRIPT, 0);
+
+	if (load_xtm == NULL) {
+		LOG(L_WARN, "Cannot import load_xtm function from tm module\n");
+		return -1;
+	}
+
+	/* let the auto-loading function load all extra TM stuff */
+	if (load_xtm(xtmb) < 0) {
+		LOG(L_WARN, "Cannot bind xapi from tm module\n");
 		return -1;
 	}
 	return 0;

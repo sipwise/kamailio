@@ -15,7 +15,7 @@ Daniel-Constantin Mierla
    asipto.com
    <miconda@gmail.com>
 
-   Copyright © 2002, 2003 FhG FOKUS
+   Copyright � 2002, 2003 FhG FOKUS
      __________________________________________________________________
 
    1.1. Overview
@@ -37,14 +37,17 @@ Daniel-Constantin Mierla
         1.3.11. nonce_expire (integer)
         1.3.12. nonce_auth_max_drift (integer)
         1.3.13. force_stateless_reply (boolean)
+        1.3.14. realm_prefix (string)
 
    1.4. Functions
 
         1.4.1. consume_credentials()
         1.4.2. www_challenge(realm, flags)
         1.4.3. proxy_challenge(realm, flags)
-        1.4.4. pv_www_authenticate(realm, passwd, flags)
-        1.4.5. pv_proxy_authenticate(realm, passwd, flags)
+        1.4.4. auth_challenge(realm, flags)
+        1.4.5. pv_www_authenticate(realm, passwd, flags)
+        1.4.6. pv_proxy_authenticate(realm, passwd, flags)
+        1.4.7. auth_get_www_authenticate(realm, flags, pvdst)
 
 1.1. Overview
 
@@ -66,7 +69,7 @@ Daniel-Constantin Mierla
 
 1.3. Parameters
 
-1.3.1.  auth_checks_register, auth_checks_no_dlg, and auth_checks_in_dlg
+1.3.1. auth_checks_register, auth_checks_no_dlg, and auth_checks_in_dlg
 (flags)
 
    These three module parameters control which optional integrity checks
@@ -100,15 +103,29 @@ Daniel-Constantin Mierla
    is the same when an UA tries to reuse the nonce, thus protecting or
    severely limiting reply attacks.
 
-   The possible flag values for all three parameters are: 1 for checking
-   if the message uri changed (uses the whole uri), 2 for checking the
-   callid, 4 for the from tag and 8 for the source ip (see nonce.h). For
-   example setting auth_checks_register to 6 would check if the callid or
-   the from tag changed from the REGISTER message for which the original
-   nonce was generated (this would allow nonce reuse only within the same
-   UA and for the expire time). Note that enabling the extra checks will
-   limit nonce caching by UAs, requiring extra challenges and roundtrips,
-   but will provide much better protection.
+   The possible flag values for all three parameters are:
+     * 1 for checking if the message uri changed (uses the whole uri)
+     * 2 for checking the callid
+     * 4 for checking the from tag
+     * 8 for checking the source ip (see nonce.h).
+
+   For example setting auth_checks_register to 3 would check if the callid
+   or the request uri changed from the REGISTER message for which the
+   original nonce was generated (this would allow nonce reuse only within
+   the same UA and for the expire time). Note that enabling the extra
+   checks will limit nonce caching by UAs, requiring extra challenges and
+   roundtrips, but will provide much better protection.
+
+Warning
+
+   Do not enable the from tag check (4) for REGISTERs
+   (auth_checks_register) and out-of-dialog messages (auth_checks_no_dlg)
+   unless you are sure that all your user agents do not change the from
+   tag when challenged. Some user agents will also change the callid when
+   the challenged request is not in-dialog, so avoid enabling the callid
+   check (2) for messages that are not part of a dialog
+   (auth_checks_no_dlg). In some rare case this will also have to be done
+   for REGISTERs.
 
    When the secret parameter is set and the extra checks are enabled, the
    first half of the secret will be used for the expire time MD5 and the
@@ -117,7 +134,25 @@ Daniel-Constantin Mierla
 
    Example 1. Setting the auth_checks_register module parameter
 ...
-modparam("auth", "auth_checks_register", 2) # callid
+# For REGISTER requests we hash the Request-URI, Call-ID, and source IP of the
+# request into the nonce string. This ensures that the generated credentials
+# cannot be used with another registrar, user agent with another source IP
+# address or Call-ID. Note that user agents that change Call-ID with every
+# REGISTER message will not be able to register if you enable this.
+modparam("auth", "auth_checks_register", 11)
+
+# For dialog-establishing requests (such as the original INVITE, OPTIONS, etc)
+# we hash the Request-URI and source IP. Hashing Call-ID and From tags takes
+# some extra precaution, because these checks could render some UA unusable.
+modparam("auth", "auth_checks_no_dlg", 9)
+
+# For mid-dialog requests, such as re-INVITE, we can hash source IP and
+# Request-URI just like in the previous case. In addition to that we can hash
+# Call-ID and From tag because these are fixed within a dialog and are
+# guaranteed not to change. This settings effectively restrict the usage of
+# generated credentials to a single user agent within a single dialog.
+modparam("auth", "auth_checks_in_dlg", 15)
+
 ...
 
 1.3.2. qop (string)
@@ -463,6 +498,20 @@ modparam("auth", "nonce_auth_max_drift", 1)   # set max drift to 1 s
 modparam("auth", "force_stateless_reply", 1)
 ...
 
+1.3.14. realm_prefix (string)
+
+   Prefix to be automatically strip from realm. As an alternative to SRV
+   records (not all SIP clients support SRV lookup), a subdomain of the
+   master domain can be defined for SIP purposes (like sip.mydomain.net
+   pointing to same IP address as the SRV record for mydomain.net). By
+   ignoring the realm_prefix "sip.", at authentication, sip.mydomain.net
+   will be equivalent to mydomain.net .
+
+   Default value is empty string.
+
+   Example 14. realm_prefix parameter example
+modparam("auth", "realm_prefix", "sip.")
+
 1.4. Functions
 
 1.4.1. consume_credentials()
@@ -475,14 +524,14 @@ modparam("auth", "force_stateless_reply", 1)
    little bit shorter. The function must be called after www_authorize,
    proxy_authorize, www_authenticate or proxy_authenticate.
 
-   Example 14. consume_credentials example
+   Example 15. consume_credentials example
 ...
 if (www_authenticate("realm", "subscriber)) {
     consume_credentials();
 };
 ...
 
-1.4.2.  www_challenge(realm, flags)
+1.4.2. www_challenge(realm, flags)
 
    The function challenges a user agent. It will generate a WWW-Authorize
    header field containing a digest challenge, it will put the header
@@ -496,7 +545,7 @@ if (www_authenticate("realm", "subscriber)) {
      * realm - Realm is a opaque string that the user agent should present
        to the user so he can decide what username and password to use.
        Usually this is domain of the host the server is running on.
-       It must not be empty string “”. In case of REGISTER requests To
+       It must not be empty string "". In case of REGISTER requests To
        header field domain (e.g., variable $td) can be used (because this
        header field represents the user being registered), for all other
        messages From header field domain can be used (e.g., variable $fd).
@@ -507,17 +556,18 @@ if (www_authenticate("realm", "subscriber)) {
           + 4 - do not send '500 Internal Server Error' reply
             automatically in failure cases (error code is returned to
             config)
+          + 16 - build challenge header with stale=true
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 15. www_challenge usage
+   Example 16. www_challenge usage
 ...
 if (!www_authenticate("$td", "subscriber")) {
         www_challenge("$td", "1");
 }
 ...
 
-1.4.3.  proxy_challenge(realm, flags)
+1.4.3. proxy_challenge(realm, flags)
 
    The function challenges a user agent. It will generate a
    Proxy-Authorize header field containing a digest challenge, it will put
@@ -532,14 +582,33 @@ if (!www_authenticate("$td", "subscriber")) {
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 16. proxy_challenge usage
+   Example 17. proxy_challenge usage
 ...
-if (!proxy_authenticate("$fd", "subscriber)) {
+if (!proxy_authenticate("$fd", "subscriber")) {
         proxy_challenge("$fd", "1");
 };
 ...
 
-1.4.4.  pv_www_authenticate(realm, passwd, flags)
+1.4.4. auth_challenge(realm, flags)
+
+   The function challenges a user agent for authentication. It combines
+   the functions www_challenge() and proxy_challenge(), by calling
+   internally the first one for REGISTER requests and the second one for
+   the rest of the request types.
+
+   Meaning of the parameters the same as for function www_challenge(realm,
+   flags)
+
+   This function can be used from REQUEST_ROUTE.
+
+   Example 18. proxy_challenge usage
+...
+if (!auth_check("$fd", "subscriber", "1")) {
+        auth_challenge("$fd", "1");
+};
+...
+
+1.4.5. pv_www_authenticate(realm, passwd, flags)
 
    The function verifies credentials according to RFC2617. If the
    credentials are verified successfully then the function will succeed
@@ -553,12 +622,17 @@ if (!proxy_authenticate("$fd", "subscriber)) {
        sent out;
      * -2 (invalid password) - wrong password;
      * -3 (invalid user) - authentication user does not exist.
+     * -4 (nonce expired) - the nonce has expired
+     * -5 (no credentials) - request does not contain an Authorization
+       header with the correct realm.
+     * -6 (nonce reused) - the nonce has already been used to authenticate
+       a previous request
 
    Meaning of the parameters is as follows:
      * realm - Realm is a opaque string that the user agent should present
        to the user so he can decide what username and password to use.
        Usually this is domain of the host the server is running on.
-       It must not be empty string “”. In case of REGISTER requests To
+       It must not be empty string "". In case of REGISTER requests To
        header field domain (e.g., varibale $td) can be used (because this
        header field represents a user being registered), for all other
        messages From header field domain can be used (e.g., varibale $fd).
@@ -570,6 +644,7 @@ if (!proxy_authenticate("$fd", "subscriber)) {
           + 2 - build challenge header with no qop and add it to avp
           + 4 - build challenge header with qop=auth and add it to avp
           + 8 - build challenge header with qop=auth-int and add it to avp
+          + 16 - build challenge header with stale=true
 
    When challenge header is built and stored in avp, append_to_reply() and
    sl reply functions can be used to send appropriate SIP reply to
@@ -577,14 +652,14 @@ if (!proxy_authenticate("$fd", "subscriber)) {
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 17. pv_www_authenticate usage
+   Example 19. pv_www_authenticate usage
 ...
 if (!pv_www_authenticate("$td", "123abc", "0")) {
         www_challenge("$td", "1");
 };
 ...
 
-1.4.5.  pv_proxy_authenticate(realm, passwd, flags)
+1.4.6. pv_proxy_authenticate(realm, passwd, flags)
 
    The function verifies credentials according to RFC2617. If the
    credentials are verified successfully then the function will succeed
@@ -599,10 +674,27 @@ if (!pv_www_authenticate("$td", "123abc", "0")) {
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 18. pv_proxy_authenticate usage
+   Example 20. pv_proxy_authenticate usage
 ...
 $avp(password)="xyz";
 if (!pv_proxy_authenticate("$fd", "$avp(password)", "0")) {
         proxy_challenge("$fd", "1");
 };
+...
+
+1.4.7. auth_get_www_authenticate(realm, flags, pvdst)
+
+   Build WWW-Authentication header and set the resulting value in 'pvdest'
+   parameter.
+
+   Meaning of the realm and flags parameters is the same as for
+   pv_www_authenticate(realm, passwd, flags)
+
+   This function can be used from ANY_ROUTE.
+
+   Example 21. auth_get_www_authenticate
+...
+if (auth_get_www_authenticate("$fd", "0", "$var(wauth)")) {
+        xlog("www authenticate header is [$var(wauth)]\n");
+}
 ...

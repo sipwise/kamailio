@@ -48,7 +48,7 @@ MODULE_VERSION
 
 str suffix = {"", 0};
 
-int add_diversion(struct sip_msg* msg, char* r, char* s);
+int add_diversion(struct sip_msg* msg, char* r, char* u);
 
 /*
  * Module initialization function prototype
@@ -60,8 +60,10 @@ static int mod_init(void);
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-	{"add_diversion",    (cmd_function)add_diversion,    1, fixup_str_null,
-		0, REQUEST_ROUTE|FAILURE_ROUTE|LOCAL_ROUTE},
+	{"add_diversion",    (cmd_function)add_diversion,    1, fixup_spve_null,
+		0, REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
+	{"add_diversion",    (cmd_function)add_diversion,    2, fixup_spve_spve,
+		0, REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -104,15 +106,10 @@ static int mod_init(void)
 static inline int add_diversion_helper(struct sip_msg* msg, str* s)
 {
 	char *ptr;
+	int is_ref;
 
-	static struct lump* anchor = 0;
-	static unsigned int msg_id = 0;
+	struct lump* anchor = 0;
 
-	if (msg_id != msg->id) {
-		msg_id = msg->id;
-		anchor = 0;
-	}
-	
 	if (!msg->diversion && parse_headers(msg, HDR_DIVERSION_F, 0) == -1) {
 		LM_ERR("header parsing failed\n");
 		return -1;
@@ -126,12 +123,10 @@ static inline int add_diversion_helper(struct sip_msg* msg, str* s)
 		ptr = msg->unparsed;
 	}
 
+	anchor = anchor_lump2(msg, ptr - msg->buf, 0, 0, &is_ref);
 	if (!anchor) {
-		anchor = anchor_lump(msg, ptr - msg->buf, 0, 0);
-		if (!anchor) {
-			LM_ERR("can't get anchor\n");
-			return -2;
-		}
+		LM_ERR("can't get anchor\n");
+		return -2;
 	}
 	
 	if (!insert_new_lump_before(anchor, s->s, s->len, 0)) {
@@ -143,18 +138,31 @@ static inline int add_diversion_helper(struct sip_msg* msg, str* s)
 }
 
 
-int add_diversion(struct sip_msg* msg, char* r, char* s)
+int add_diversion(struct sip_msg* msg, char* r, char* u)
 {
 	str div_hf;
 	char *at;
-	str* uri;
-	str* reason;
+	str uri;
+	str reason;
 
-	reason = (str*)r;
+	if(fixup_get_svalue(msg, (gparam_t*)r, &reason)<0)
+	{
+		LM_ERR("cannot get the script\n");
+		return -1;
+	}
 
-	uri = &msg->first_line.u.request.uri;
 
-	div_hf.len = DIVERSION_PREFIX_LEN + uri->len + DIVERSION_SUFFIX_LEN + reason->len + CRLF_LEN;
+	if(u==NULL) {
+		uri = msg->first_line.u.request.uri;
+	} else {
+		if(fixup_get_svalue(msg, (gparam_t*)u, &uri)<0)
+		{
+			LM_ERR("cannot get the uri parameter\n");
+			return -1;
+		}
+	}
+
+	div_hf.len = DIVERSION_PREFIX_LEN + uri.len + DIVERSION_SUFFIX_LEN + reason.len + CRLF_LEN;
 	div_hf.s = pkg_malloc(div_hf.len);
 	if (!div_hf.s) {
 		LM_ERR("no pkg memory left\n");
@@ -165,14 +173,14 @@ int add_diversion(struct sip_msg* msg, char* r, char* s)
 	memcpy(at, DIVERSION_PREFIX, DIVERSION_PREFIX_LEN);
 	at += DIVERSION_PREFIX_LEN;
 
-	memcpy(at, uri->s, uri->len);
-	at += uri->len;
+	memcpy(at, uri.s, uri.len);
+	at += uri.len;
 
 	memcpy(at, DIVERSION_SUFFIX, DIVERSION_SUFFIX_LEN);
 	at += DIVERSION_SUFFIX_LEN;
 
-	memcpy(at, reason->s, reason->len);
-	at += reason->len;
+	memcpy(at, reason.s, reason.len);
+	at += reason.len;
 
 	memcpy(at, CRLF, CRLF_LEN);
 

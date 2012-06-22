@@ -111,9 +111,10 @@ int db_mysql_bind_api(db_func_t *dbb)
 	dbb->delete           = db_mysql_delete;
 	dbb->update           = db_mysql_update;
 	dbb->replace          = db_mysql_replace;
-	dbb->last_inserted_id = db_last_inserted_id;
-	dbb->insert_update    = db_insert_update;
+	dbb->last_inserted_id = db_mysql_last_inserted_id;
+	dbb->insert_update    = db_mysql_insert_update;
+	dbb->insert_delayed   = db_mysql_insert_delayed;
+	dbb->affected_rows    = db_mysql_affected_rows;
 
 	return 0;
 }
-

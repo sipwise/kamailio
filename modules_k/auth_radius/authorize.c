@@ -38,7 +38,6 @@
 #include "../../parser/parse_uri.h"
 #include "../../parser/parse_from.h"
 #include "../../parser/parse_to.h"
-#include "../../lib/kcore/parser_helpers.h"
 #include "../../dprint.h"
 #include "../../ut.h"
 #include "../../pvar.h"
@@ -110,23 +109,32 @@ static inline int authorize(struct sip_msg* _msg, pv_elem_t* _realm,
 #ifdef EXTRA_DEBUG
 	abort();
 #endif
-	ret = -5;
+	ret = -7;
 	goto end;
 
-    case ERROR:
-    case BAD_CREDENTIALS:
-	ret = -2;
+    case NONCE_REUSED:
+	ret = AUTH_NONCE_REUSED;
+	goto end;
+
+    case STALE_NONCE:
+	ret = AUTH_STALE_NONCE;
 	goto end;
 	
+    case ERROR:
+    case BAD_CREDENTIALS:
     case NOT_AUTHENTICATED:
-	ret = -4;
+	ret = AUTH_ERROR;
+	goto end;
+
+    case NO_CREDENTIALS:
+	ret = AUTH_NO_CREDENTIALS;
 	goto end;
 	
     case DO_AUTHENTICATION:
 	break;
 	
     case AUTHENTICATED:
-	ret = 1;
+	ret = AUTH_OK;
 	goto end;
     }
 
@@ -143,24 +151,24 @@ static inline int authorize(struct sip_msg* _msg, pv_elem_t* _realm,
 					       &pv_val.rs);
 	    } else {
 		LM_ERR("uri_user pvar value is not string\n");
-		ret = -5;
+		ret = AUTH_ERROR;
 		goto end;
 	    }
 	} else {
 	    LM_ERR("cannot get uri_user pvar value\n");
-	    ret = -5;
+	    ret = AUTH_ERROR;
 	    goto end;
 	}
     } else {
 	if (get_uri_user(_msg, &uri_user) < 0) {
 	    LM_ERR("To/From URI not found\n");
-	    ret = -2;
+	    ret = AUTH_ERROR;;
 	    goto end;
 	}
 	user.s = (char *)pkg_malloc(uri_user->len);
 	if (user.s == NULL) {
 	    LM_ERR("no pkg memory left for user\n");
-	    ret = -5;
+	    ret = -7;
 	    goto end;
 	}
 	un_escape(uri_user, &user);
@@ -177,20 +185,18 @@ static inline int authorize(struct sip_msg* _msg, pv_elem_t* _realm,
 #ifdef EXTRA_DEBUG
 	    abort();
 #endif
-	    ret = -5;
+	    ret = -7;
 	    break;
 	case ERROR:             
-	    ret = -2;
-	    break;
 	case NOT_AUTHENTICATED:
-	    ret = -3;
+	    ret = AUTH_ERROR;
 	    break;
 	case AUTHENTICATED:
-	    ret = 1;
+	    ret = AUTH_OK;
 	    break;
 	}
     } else {
-	ret = -1;
+	ret = AUTH_INVALID_PASSWORD;
     }
 
  end:
@@ -199,7 +205,7 @@ static inline int authorize(struct sip_msg* _msg, pv_elem_t* _realm,
 	if (auth_api.build_challenge(_msg, (cred ? cred->stale : 0), &domain,
 				     NULL, NULL, _hftype) < 0) {
 	    LM_ERR("while creating challenge\n");
-	    ret = -5;
+	    ret = -7;
 	}
     }
     return ret;
@@ -229,10 +235,20 @@ int radius_proxy_authorize_2(struct sip_msg* _msg, char* _realm,
 
 
 /*
- * Authorize using WWW-Authorize header field
+ * Authorize using WWW-Authorize header field (no URI user parameter given)
  */
-int radius_www_authorize(struct sip_msg* _msg, char* _realm, char* _s2)
+int radius_www_authorize_1(struct sip_msg* _msg, char* _realm, char* _s2)
 {
 	return authorize(_msg, (pv_elem_t*)_realm, (pv_spec_t *)0,
+			 HDR_AUTHORIZATION_T);
+}
+
+
+/*
+ * Authorize using WWW-Authorize header field (URI user parameter given)
+ */
+int radius_www_authorize_2(struct sip_msg* _msg, char* _realm, char* _uri_user)
+{
+	return authorize(_msg, (pv_elem_t*)_realm, (pv_spec_t *)_uri_user,
 			 HDR_AUTHORIZATION_T);
 }

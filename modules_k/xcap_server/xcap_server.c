@@ -44,18 +44,21 @@
 #include "../../parser/parse_uri.h"
 #include "../../modules_k/xcap_client/xcap_callbacks.h"
 #include "../../modules/sl/sl.h"
+#include "../../lib/kcore/cmpapi.h"
 
 #include "xcap_misc.h"
 
 MODULE_VERSION
 
-#define XCAP_TABLE_VERSION   3
+#define XCAP_TABLE_VERSION   4
 
 
 static int xcaps_put_db(str* user, str *domain, xcap_uri_t *xuri, str *etag,
 		str* doc);
-static int xcaps_get_db(str* user, str *domain, xcap_uri_t *xuri,
-		str *etag, str *doc);
+static int xcaps_get_db_doc(str* user, str *domain, xcap_uri_t *xuri,
+		str *doc);
+static int xcaps_get_db_etag(str* user, str *domain, xcap_uri_t *xuri,
+		str *etag);
 static int xcaps_del_db(str* user, str *domain, xcap_uri_t *xuri);
 
 static int w_xcaps_put(sip_msg_t* msg, char* puri, char* ppath,
@@ -63,6 +66,8 @@ static int w_xcaps_put(sip_msg_t* msg, char* puri, char* ppath,
 static int w_xcaps_get(sip_msg_t* msg, char* puri, char* ppath);
 static int w_xcaps_del(sip_msg_t* msg, char* puri, char* ppath);
 static int fixup_xcaps_put(void** param, int param_no);
+static int check_preconditions(sip_msg_t *msg, str etag_hdr);
+static int check_match_header(str body, str *etag);
 
 static int mod_init(void);
 static int child_init(int rank);
@@ -83,6 +88,7 @@ static str xcaps_buf = {0, 8192};
 #define XCAPS_ETAG_SIZE	128
 static char xcaps_etag_buf[XCAPS_ETAG_SIZE];
 
+static str str_id_col = str_init("id");
 static str str_source_col = str_init("source");
 static str str_doc_col = str_init("doc");
 static str str_etag_col = str_init("etag");
@@ -326,12 +332,17 @@ int xcaps_xpath_hack(str *buf, int type)
 static int xcaps_put_db(str* user, str *domain, xcap_uri_t *xuri, str *etag,
 		str* doc)
 {
-	db_key_t qcols[9];
-	db_val_t qvals[9];
-	int ncols = 0;
+	db_key_t qcols[9], rcols[2], ucols[5];
+	db_val_t qvals[9], uvals[5];
+	db1_res_t *res = NULL;
+	int ncols = 0, num_ucols = 0, nrows = 0;
 
+	if(xcaps_check_doc_validity(doc)<0)
+	{
+		LM_ERR("invalid xml doc to insert in database\n");
+		goto error;
+	}
 
-	/* insert in xcap table*/
 	qcols[ncols] = &str_username_col;
 	qvals[ncols].type = DB1_STR;
 	qvals[ncols].nul = 0;
@@ -350,35 +361,13 @@ static int xcaps_put_db(str* user, str *domain, xcap_uri_t *xuri, str *etag,
 	qvals[ncols].val.int_val= xuri->type;
 	ncols++;
 
-	qcols[ncols] = &str_doc_col;
-	qvals[ncols].type = DB1_STR;
-	qvals[ncols].nul = 0;
-	qvals[ncols].val.str_val= *doc;
-	ncols++;
-
-	qcols[ncols] = &str_etag_col;
-	qvals[ncols].type = DB1_STR;
-	qvals[ncols].nul = 0;
-	qvals[ncols].val.str_val= *etag;
-	ncols++;
-
-	qcols[ncols] = &str_source_col;
-	qvals[ncols].type = DB1_INT;
-	qvals[ncols].nul = 0;
-	qvals[ncols].val.int_val = 0;
-	ncols++;
-
 	qcols[ncols] = &str_doc_uri_col;
 	qvals[ncols].type = DB1_STR;
 	qvals[ncols].nul = 0;
 	qvals[ncols].val.str_val= xuri->adoc;
 	ncols++;
 
-	qcols[ncols] = &str_port_col;
-	qvals[ncols].type = DB1_INT;
-	qvals[ncols].nul = 0;
-	qvals[ncols].val.int_val= 0;
-	ncols++;
+	rcols[0] = &str_id_col;
 
 	if (xcaps_dbf.use_table(xcaps_db, &xcaps_db_table) < 0) 
 	{
@@ -386,10 +375,83 @@ static int xcaps_put_db(str* user, str *domain, xcap_uri_t *xuri, str *etag,
 				xcaps_db_table.s);
 		goto error;
 	}
-	
-	if(xcaps_dbf.insert(xcaps_db, qcols, qvals, ncols)< 0)
+
+	if (xcaps_dbf.query(xcaps_db, qcols, 0, qvals, rcols, ncols, 1, 0, &res) < 0)
 	{
-		LM_ERR("in sql insert\n");
+		LM_ERR("in sql query\n");
+		goto error;
+	}
+
+	nrows = RES_ROW_N(res);
+	xcaps_dbf.free_result(xcaps_db, res);
+
+	if (nrows == 0)
+	{
+		qcols[ncols] = &str_doc_col;
+		qvals[ncols].type = DB1_BLOB;
+		qvals[ncols].nul = 0;
+		qvals[ncols].val.str_val= *doc;
+		ncols++;
+
+		qcols[ncols] = &str_etag_col;
+		qvals[ncols].type = DB1_STR;
+		qvals[ncols].nul = 0;
+		qvals[ncols].val.str_val= *etag;
+		ncols++;
+
+		qcols[ncols] = &str_source_col;
+		qvals[ncols].type = DB1_INT;
+		qvals[ncols].nul = 0;
+		qvals[ncols].val.int_val = 0;
+		ncols++;
+
+		qcols[ncols] = &str_port_col;
+		qvals[ncols].type = DB1_INT;
+		qvals[ncols].nul = 0;
+		qvals[ncols].val.int_val = 0;
+		ncols++;
+
+		if(xcaps_dbf.insert(xcaps_db, qcols, qvals, ncols)< 0)
+		{
+			LM_ERR("in sql insert\n");
+			goto error;
+		}
+	}
+	else if (nrows == 1)
+	{
+		ucols[num_ucols] = &str_doc_col;
+		uvals[num_ucols].type = DB1_BLOB;
+		uvals[num_ucols].nul = 0;
+		uvals[num_ucols].val.str_val= *doc;
+		num_ucols++;
+
+		ucols[num_ucols] = &str_etag_col;
+		uvals[num_ucols].type = DB1_STR;
+		uvals[num_ucols].nul = 0;
+		uvals[num_ucols].val.str_val= *etag;
+		num_ucols++;
+
+		ucols[num_ucols] = &str_source_col;
+		uvals[num_ucols].type = DB1_INT;
+		uvals[num_ucols].nul = 0;
+		uvals[num_ucols].val.int_val = 0;
+		num_ucols++;
+
+		ucols[num_ucols] = &str_port_col;
+		uvals[num_ucols].type = DB1_INT;
+		uvals[num_ucols].nul = 0;
+		uvals[num_ucols].val.int_val = 0;
+		num_ucols++;
+
+		if (xcaps_dbf.update(xcaps_db, qcols, 0, qvals, ucols, uvals, ncols, num_ucols) < 0)
+		{
+			LM_ERR("in sql update\n");
+			goto error;
+		}
+	}
+	else
+	{
+		LM_ERR("found %d copies of the same document in XCAP Server\n", nrows);
 		goto error;
 	}
 
@@ -398,18 +460,24 @@ error:
 	return -1;
 }
 
-static str xcaps_str_empty      = {"", 0};
-static str xcaps_str_ok         = {"OK", 2};
-static str xcaps_str_srverr     = {"Server error", 12};
-static str xcaps_str_notfound   = {"Not found", 9};
-static str xcaps_str_appxml     = {"application/xml", 15};
-static str xcaps_str_apprlxml   = {"application/resource-lists+xml", 30};
-static str xcaps_str_apprsxml   = {"application/rls-services+xml", 28};
+static str xcaps_str_empty	= {"", 0};
+static str xcaps_str_ok		= {"OK", 2};
+static str xcaps_str_srverr	= {"Server error", 12};
+static str xcaps_str_notfound	= {"Not found", 9};
+static str xcaps_str_precon	= {"Precondition Failed", 19};
+static str xcaps_str_notmod	= {"Not Modified", 12};
+static str xcaps_str_appxml	= {"application/xml", 15};
+static str xcaps_str_apprlxml	= {"application/resource-lists+xml", 30};
+static str xcaps_str_apprsxml	= {"application/rls-services+xml", 28};
 #if 0
-static str xcaps_str_nocontent  = {"No content", 10};
-static str xcaps_str_appxcxml   = {"application/xcap-caps+xml", 25};
+static str xcaps_str_nocontent	= {"No content", 10};
+static str xcaps_str_appxcxml	= {"application/xcap-caps+xml", 25};
+static str xcaps_str_appsexml	= {"application/vnd.oma.search+xml", 30};
 #endif
-static str xcaps_str_appapxml   = {"application/auth-policy+xml", 27};
+static str xcaps_str_appapxml	= {"application/auth-policy+xml", 27};
+static str xcaps_str_appupxml	= {"application/vnd.oma.user-profile+xml", 36}; 
+static str xcaps_str_apppcxml	= {"application/vnd.oma.pres-content+xml", 36};
+static str xcaps_str_apppdxml	= {"application/pidf+xml", 20};
 
 
 /**
@@ -459,29 +527,25 @@ static int w_xcaps_put(sip_msg_t* msg, char* puri, char* ppath,
 
 	xm = (pv_elem_t*)pbody;
 	body.len = xcaps_buf.len - 1;
-	body.s   = xcaps_buf.s;
-	if(pv_printf(msg, xm, body.s, &body.len)<0)
+	if(pv_printf(msg, xm, xcaps_buf.s, &body.len)<0)
 	{
 		LM_ERR("unable to get body\n");
 		goto error;
 	}
-	if(body.s==NULL || body.len <= 0)
+	if(body.len <= 0)
 	{
 		LM_ERR("invalid body parameter\n");
 		goto error;
 	}
-	nbuf.s = (char*)pkg_malloc(body.len+1);
-	if(nbuf.s==NULL)
+	body.s = (char*)pkg_malloc(body.len+1);
+	if(body.s==NULL)
 	{
 		LM_ERR("no more pkg\n");
-		body.s = NULL;
 		goto error;
 	}
 
-	memcpy(nbuf.s, body.s, body.len);
-	body.s = nbuf.s;
+	memcpy(body.s, xcaps_buf.s, body.len);
 	body.s[body.len] = '\0';
-	nbuf.s = NULL;
 
 	if(parse_uri(uri.s, uri.len, &turi)!=0)
 	{
@@ -496,22 +560,23 @@ static int w_xcaps_put(sip_msg_t* msg, char* puri, char* ppath,
 				path.len, path.s);
 		goto error;
 	}
-	if(xuri.nss==NULL || xuri.node.len<=0)
+
+	xcaps_get_db_etag(&turi.user, &turi.host, &xuri, &etag);
+	if(check_preconditions(msg, etag)!=1)
 	{
-		/* full document upload
-		 *   - fetch and then delete is too expensive if record in db
-		 *   - just try to delete
-		 */
-		if(xcaps_del_db(&turi.user, &turi.host, &xuri)<0)
-		{
-			LM_ERR("could not delete document\n");
-			goto error;
-		}
-	} else {
+		xcaps_send_reply(msg, 412, &xcaps_str_precon, &xcaps_str_empty,
+				&xcaps_str_empty, &xcaps_str_empty);
+
+		pkg_free(body.s);
+		return -2;
+	}
+
+	if(xuri.nss!=NULL && xuri.node.len>0)
+	{
 		/* partial document upload
 		 *   - fetch, update, delete and store
 		 */
-		if(xcaps_get_db(&turi.user, &turi.host, &xuri, &etag, &tbuf)<0)
+		if(xcaps_get_db_doc(&turi.user, &turi.host, &xuri, &tbuf) != 0)
 		{
 			LM_ERR("could not fetch xcap document\n");
 			goto error;
@@ -538,11 +603,6 @@ static int w_xcaps_put(sip_msg_t* msg, char* puri, char* ppath,
 			LM_ERR("could not hack xcap document\n");
 			goto error;
 		}
-		if(xcaps_del_db(&turi.user, &turi.host, &xuri)<0)
-		{
-			LM_ERR("could not delete document\n");
-			goto error;
-		}
 	}
 
 	if(xcaps_generate_etag_hdr(&etag_hdr)<0)
@@ -550,8 +610,8 @@ static int w_xcaps_put(sip_msg_t* msg, char* puri, char* ppath,
 		LM_ERR("could not generate etag\n");
 		goto error;
 	}
-	etag.s = etag_hdr.s + 6; /* 'ETag: ' */
-	etag.len = etag_hdr.len - 8; /* 'ETag: '  '\r\n' */
+	etag.s = etag_hdr.s + 7; /* 'ETag: "' */
+	etag.len = etag_hdr.len - 10; /* 'ETag: "  "\r\n' */
 	if(xcaps_put_db(&turi.user, &turi.host,
 				&xuri, &etag, &body)<0)
 	{
@@ -575,21 +635,128 @@ error:
 /**
  *
  */
-static int xcaps_get_db(str* user, str *domain, xcap_uri_t *xuri,
-		str *etag, str *doc)
+static int xcaps_get_db_doc(str* user, str *domain, xcap_uri_t *xuri, str *doc)
 {
-	db_key_t qcols[4];
-	db_val_t qvals[4];
+	db_key_t qcols[3];
+	db_val_t qvals[3];
 	int ncols = 0;
-	db_key_t rcols[4];
+	db_key_t rcols[3];
+	int nrcols = 0;
+	db1_res_t* db_res = NULL;
+	str s;
+
+	/* returned cols from table xcap*/
+	rcols[nrcols] = &str_doc_col;
+	nrcols++;
+
+	/* query cols in xcap table*/
+	qcols[ncols] = &str_username_col;
+	qvals[ncols].type = DB1_STR;
+	qvals[ncols].nul = 0;
+	qvals[ncols].val.str_val = *user;
+	ncols++;
+
+	qcols[ncols] = &str_domain_col;
+	qvals[ncols].type = DB1_STR;
+	qvals[ncols].nul = 0;
+	qvals[ncols].val.str_val = *domain;
+	ncols++;
+
+	qcols[ncols] = &str_doc_uri_col;
+	qvals[ncols].type = DB1_STR;
+	qvals[ncols].nul = 0;
+	qvals[ncols].val.str_val= xuri->adoc;
+	ncols++;
+
+	if (xcaps_dbf.use_table(xcaps_db, &xcaps_db_table) < 0) 
+	{
+		LM_ERR("in use_table-[table]= %.*s\n", xcaps_db_table.len,
+				xcaps_db_table.s);
+		goto error;
+	}
+
+	if(xcaps_dbf.query(xcaps_db, qcols, NULL, qvals, rcols,
+				ncols, nrcols, NULL, &db_res)< 0)
+	{
+		LM_ERR("in sql query\n");
+		goto error;
+	}
+	if (RES_ROW_N(db_res) <= 0)
+	{
+		LM_DBG("no document\n");
+		goto notfound;
+	}
+
+	/* doc */
+	switch(RES_ROWS(db_res)[0].values[0].type)
+	{
+		case DB1_STRING:
+			s.s=(char*)RES_ROWS(db_res)[0].values[0].val.string_val;
+			s.len=strlen(s.s);
+		break;
+		case DB1_STR:
+			s.len=RES_ROWS(db_res)[0].values[0].val.str_val.len;
+			s.s=(char*)RES_ROWS(db_res)[0].values[0].val.str_val.s;
+		break;
+		case DB1_BLOB:
+			s.len=RES_ROWS(db_res)[0].values[0].val.blob_val.len;
+			s.s=(char*)RES_ROWS(db_res)[0].values[0].val.blob_val.s;
+		break;
+		default:
+			s.len=0;
+			s.s=NULL;
+	}
+	if(s.len==0)
+	{
+		LM_ERR("no xcap doc in db record\n");
+		goto error;
+	}
+	if(s.len>xcaps_buf.len-1)
+	{
+		LM_ERR("xcap doc buffer overflow\n");
+		goto error;
+	}
+	doc->len = s.len;
+	doc->s = xcaps_buf.s;
+	memcpy(doc->s, s.s, s.len);
+	doc->s[doc->len] = '\0';
+
+	if(xcaps_check_doc_validity(doc)<0)
+	{
+		LM_ERR("invalid xml doc retrieved from database\n");
+		goto error;
+	}
+
+	xcaps_dbf.free_result(xcaps_db, db_res);
+	return 0;
+
+notfound:
+	xcaps_dbf.free_result(xcaps_db, db_res);
+	return 1;
+
+error:
+	if(db_res!=NULL)
+		xcaps_dbf.free_result(xcaps_db, db_res);
+	return -1;
+}
+
+/**
+ * get the etag from database record for (user@domain, xuri)
+ * - return: -1 error; 0 - found; 1 - not found
+ *
+ */
+static int xcaps_get_db_etag(str* user, str *domain, xcap_uri_t *xuri, str *etag)
+{
+	db_key_t qcols[3];
+	db_val_t qvals[3];
+	int ncols = 0;
+	db_key_t rcols[3];
 	int nrcols = 0;
 	db1_res_t* db_res = NULL;
 	str s;
 
 	/* returned cols from xcap table*/
 	rcols[nrcols] = &str_etag_col;
-	nrcols++;
-	rcols[nrcols] = &str_doc_col;
 	nrcols++;
 
 	/* query cols in xcap table*/
@@ -654,7 +821,7 @@ static int xcaps_get_db(str* user, str *domain, xcap_uri_t *xuri,
 		goto error;
 	}
 	etag->len = snprintf(xcaps_etag_buf, XCAPS_ETAG_SIZE,
-			"ETag: %.*s\r\n", s.len, s.s);
+			"ETag: \"%.*s\"\r\n", s.len, s.s);
 	if(etag->len < 0)
 	{
 		LM_ERR("error printing etag hdr\n ");
@@ -669,40 +836,6 @@ static int xcaps_get_db(str* user, str *domain, xcap_uri_t *xuri,
 	etag->s = xcaps_etag_buf;
 	etag->s[etag->len] = '\0';
 
-	/* doc */
-	switch(RES_ROWS(db_res)[0].values[1].type)
-	{
-		case DB1_STRING:
-			s.s=(char*)RES_ROWS(db_res)[0].values[1].val.string_val;
-			s.len=strlen(s.s);
-		break;
-		case DB1_STR:
-			s.len=RES_ROWS(db_res)[0].values[1].val.str_val.len;
-			s.s=(char*)RES_ROWS(db_res)[0].values[1].val.str_val.s;
-		break;
-		case DB1_BLOB:
-			s.len=RES_ROWS(db_res)[0].values[1].val.blob_val.len;
-			s.s=(char*)RES_ROWS(db_res)[0].values[1].val.blob_val.s;
-		break;
-		default:
-			s.len=0;
-			s.s=NULL;
-	}
-	if(s.len==0)
-	{
-		LM_ERR("no xcap doc in db record\n");
-		goto error;
-	}
-	if(s.len>xcaps_buf.len-1)
-	{
-		LM_ERR("xcap doc buffer overflow\n");
-		goto error;
-	}
-	doc->len = s.len;
-	doc->s = xcaps_buf.s;
-	memcpy(doc->s, s.s, s.len);
-	doc->s[doc->len] = '\0';
-
 	xcaps_dbf.free_result(xcaps_db, db_res);
 	return 0;
 
@@ -715,7 +848,6 @@ error:
 		xcaps_dbf.free_result(xcaps_db, db_res);
 	return -1;
 }
-
 
 /**
  *
@@ -772,7 +904,31 @@ static int w_xcaps_get(sip_msg_t* msg, char* puri, char* ppath)
 		goto error;
 	}
 
-	if((ret=xcaps_get_db(&turi.user, &turi.host, &xuri, &etag, &body))<0)
+	if((ret=xcaps_get_db_etag(&turi.user, &turi.host, &xuri, &etag))<0)
+	{ 
+		LM_ERR("could not fetch etag for xcap document\n");
+		goto error;
+	}
+	if (ret==1)
+	{
+		/* doc not found */
+		xcaps_send_reply(msg, 404, &xcaps_str_notfound, &xcaps_str_empty,
+				&xcaps_str_empty, &xcaps_str_empty);
+		return 1;
+	}
+	
+	if((ret=check_preconditions(msg, etag))==-1)
+	{
+		xcaps_send_reply(msg, 412, &xcaps_str_precon, &xcaps_str_empty,
+				&xcaps_str_empty, &xcaps_str_empty);
+		return -2;
+	} else if (ret==-2) {
+		xcaps_send_reply(msg, 304, &xcaps_str_notmod, &xcaps_str_empty,
+				&xcaps_str_empty, &xcaps_str_empty);
+		return -2;
+	}
+
+	if((ret=xcaps_get_db_doc(&turi.user, &turi.host, &xuri, &body))<0)
 	{
 		LM_ERR("could not fetch xcap document\n");
 		goto error;
@@ -787,6 +943,12 @@ static int w_xcaps_get(sip_msg_t* msg, char* puri, char* ppath)
 			ctype = &xcaps_str_appapxml;
 		else if(xuri.type==RLS_SERVICE)
 			ctype = &xcaps_str_apprsxml;
+		else if(xuri.type==USER_PROFILE)
+			ctype = &xcaps_str_appupxml;
+		else if(xuri.type==PRES_CONTENT)
+			ctype = &xcaps_str_apppcxml;
+		else if(xuri.type==PIDF_MANIPULATION)
+			ctype = &xcaps_str_apppdxml;
 		xcaps_send_reply(msg, 200, &xcaps_str_ok, &etag,
 				ctype, &body);
 	} else {
@@ -859,9 +1021,9 @@ static int w_xcaps_del(sip_msg_t* msg, char* puri, char* ppath)
 	str uri;
 	str path;
 	xcap_uri_t xuri;
-	str body;
-	str etag_hdr;
-	str etag;
+	str body = {0, 0};
+	str etag_hdr = {0, 0};
+	str etag = {0, 0};
 	str tbuf;
 
 	if(puri==0 || ppath==0)
@@ -905,6 +1067,18 @@ static int w_xcaps_del(sip_msg_t* msg, char* puri, char* ppath)
 		goto error;
 	}
 
+	if(xcaps_get_db_etag(&turi.user, &turi.host, &xuri, &etag)!=0)
+	{ 
+		LM_ERR("could not fetch etag for xcap document\n");
+		goto error;
+	}
+
+	if(check_preconditions(msg, etag)!=1)
+	{
+		xcaps_send_reply(msg, 412, &xcaps_str_precon, &xcaps_str_empty,
+				&xcaps_str_empty, &xcaps_str_empty);
+		return -2;
+	}
 
 	if(xuri.nss==NULL)
 	{
@@ -918,7 +1092,7 @@ static int w_xcaps_del(sip_msg_t* msg, char* puri, char* ppath)
 				&xcaps_str_empty, &xcaps_str_empty);
 	} else {
 		/* delete element */
-		if(xcaps_get_db(&turi.user, &turi.host, &xuri, &etag, &tbuf)<0)
+		if(xcaps_get_db_doc(&turi.user, &turi.host, &xuri, &tbuf) != 0)
 		{
 			LM_ERR("could not fetch xcap document\n");
 			goto error;
@@ -943,18 +1117,13 @@ static int w_xcaps_del(sip_msg_t* msg, char* puri, char* ppath)
 			LM_ERR("could not hack xcap document\n");
 			goto error;
 		}
-		if(xcaps_del_db(&turi.user, &turi.host, &xuri)<0)
-		{
-			LM_ERR("could not delete document\n");
-			goto error;
-		}
 		if(xcaps_generate_etag_hdr(&etag_hdr)<0)
 		{
 			LM_ERR("could not generate etag\n");
 			goto error;
 		}
-		etag.s = etag_hdr.s + 6; /* 'ETag: ' */
-		etag.len = etag_hdr.len - 8; /* 'ETag: '  '\r\n' */
+		etag.s = etag_hdr.s + 7; /* 'ETag: "' */
+		etag.len = etag_hdr.len - 10; /* 'ETag: "  "\r\n' */
 		if(xcaps_put_db(&turi.user, &turi.host,
 				&xuri, &etag, &body)<0)
 		{
@@ -1004,35 +1173,66 @@ int xcaps_path_get_auid_type(str *path)
 	c = s.s[s.len];
 	s.s[s.len] = '\0';
 
-	if(s.len>12
-			&& strstr(s.s, "/pres-rules/")!=NULL)
+	if(s.len>12 && strstr(s.s, "/pres-rules/")!=NULL)
 	{
 		LM_DBG("matched pres-rules\n");
 		ret = PRES_RULES;
 		goto done;
 	}
 
-	if(s.len>14
-			&& strstr(s.s, "/rls-services/")!=NULL)
+	if(s.len>35 && strstr(s.s, "/org.openmobilealliance.pres-rules/")!=NULL)
+	{
+		LM_DBG("matched oma pres-rules\n");
+		ret = PRES_RULES;
+		goto done;
+	}
+
+	if(s.len>14 && strstr(s.s, "/rls-services/")!=NULL)
 	{
 		LM_DBG("matched rls-services\n");
 		ret = RLS_SERVICE;
 		goto done;
 	}
 
-	if(s.len>19
-			&& strstr(s.s, "pidf-manipulation")!=NULL)
+	if(s.len>19 && strstr(s.s, "pidf-manipulation")!=NULL)
 	{
 		LM_DBG("matched pidf-manipulation\n");
 		ret = PIDF_MANIPULATION;
 		goto done;
 	}
 
-	if(s.len>16
-			&& strstr(s.s, "/resource-lists/")!=NULL)
+	if(s.len>16 && strstr(s.s, "/resource-lists/")!=NULL)
 	{
 		LM_DBG("matched resource-lists\n");
 		ret = RESOURCE_LIST;
+		goto done;
+	}
+
+        if(s.len>11 && strstr(s.s, "/xcap-caps/")!=NULL)
+	{
+                LM_DBG("matched xcap-caps\n");
+                ret = XCAP_CAPS;
+		goto done;
+	}
+
+        if(s.len> 37 && strstr(s.s, "/org.openmobilealliance.user-profile/")!=NULL)
+	{
+                LM_DBG("matched oma user-profile\n");
+                ret = USER_PROFILE;
+		goto done;
+	}
+
+        if(s.len> 37 && strstr(s.s, "/org.openmobilealliance.pres-content/")!=NULL)
+	{
+                LM_DBG("matched oma pres-content\n");
+                ret = PRES_CONTENT;
+		goto done;
+	}
+
+	if(s.len>31 && strstr(s.s, "/org.openmobilealliance.search?")!=NULL)
+	{
+                LM_DBG("matched oma search\n");
+                ret = SEARCH;
 		goto done;
 	}
 
@@ -1047,7 +1247,7 @@ done:
 int xcaps_generate_etag_hdr(str *etag)
 {
 	etag->len = snprintf(xcaps_etag_buf, XCAPS_ETAG_SIZE,
-			"ETag: sr-%d-%d-%d\r\n", xcaps_init_time, my_pid(),
+			"ETag: \"sr-%d-%d-%d\"\r\n", xcaps_init_time, my_pid(),
 			xcaps_etag_counter++);
 	if(etag->len <0)
 	{
@@ -1089,4 +1289,77 @@ static int fixup_xcaps_put(void** param, int param_no)
 	return 0;
 }
 
+static int check_preconditions(sip_msg_t *msg, str etag_hdr)
+{
+	struct hdr_field* hdr = msg->headers;
+	int ifmatch_found=0;
+	int matched_matched=0;
+	int matched_nonematched=0;
 
+	if (etag_hdr.len > 0)
+	{
+		str etag;
+
+		/* Keep the surrounding "s in the ETag */
+		etag.s = etag_hdr.s + 6; /* 'ETag: ' */
+		etag.len = etag_hdr.len - 8; /* 'ETag: "  "\r\n' */
+
+		while (hdr!=NULL)
+		{
+			if(cmp_hdrname_strzn(&hdr->name, "If-Match", 8)==0)
+			{
+				ifmatch_found = 1;
+				if (check_match_header(hdr->body, &etag)>0)
+					matched_matched = 1;
+			}
+			else if (cmp_hdrname_strzn(&hdr->name, "If-None-Match", 13)==0)
+			{
+				if (check_match_header(hdr->body, &etag)>0)
+					matched_nonematched = 1;
+			}
+			hdr = hdr->next;
+		}
+	} else {
+		while (hdr!=NULL)
+		{
+			if(cmp_hdrname_strzn(&hdr->name, "If-Match", 8)==0)
+				ifmatch_found = 1;
+
+			hdr = hdr->next;
+		}
+	}
+
+	if (ifmatch_found == 1 && matched_matched == 0)
+		return -1;
+	else if (matched_nonematched == 1)
+		return -2;
+	else
+		return 1;
+}
+
+static int check_match_header(str body, str *etag)
+{
+	do
+	{
+		char *start_pos, *end_pos, *old_body_pos;
+		int cur_etag_len;
+
+		if ((start_pos = strchr(body.s, '"')) == NULL)
+			return -1;
+		if ((end_pos = strchr(start_pos + 1, '"')) == NULL)
+			return -1;
+		cur_etag_len = end_pos - start_pos + 1;
+	
+		if (strncmp(start_pos, etag->s, cur_etag_len)==0)
+			return 1;
+		else if (strncmp(start_pos, "\"*\"", cur_etag_len)==0)
+			return 1;
+
+		old_body_pos = body.s;
+		if ((body.s = strchr(end_pos, ',')) == NULL)
+			return -1;
+		body.len -= body.s - old_body_pos;
+	} while (body.len > 0);
+
+	return -1;
+}

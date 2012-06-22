@@ -23,10 +23,12 @@
 #define _PPCFG_H_
 
 int pp_subst_add(char *data);
+int pp_substdef_add(char *data, int mode);
 int pp_subst_run(char **data);
 
-int  pp_define(int len, const char * text);
-int  pp_define_set(int len, char * text);
+int  pp_define(int len, const char *text);
+int  pp_define_set(int len, char *text);
+int  pp_define_set_type(int type);
 
 #endif /*_PPCFG_H_*/
 

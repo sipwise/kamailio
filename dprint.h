@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -103,10 +101,10 @@
 	(log_level_info[(level) - (L_ALERT)].syslog_level)
 
 
-/** @brief my_pid(), process_no are from pt.h but we cannot #include it here
+/** @brief my_pid(), process_no are from pt.h but we cannot \#include it here
    because of circular dependencies */
 extern int process_no;
-extern int my_pid();
+extern int my_pid(void);
 
 /** @brief non-zero if logging to stderr instead to the syslog */
 extern int log_stderr;
@@ -118,7 +116,12 @@ struct log_level_info {
 	int syslog_level;
 };
 
-#define is_printable(level) (cfg_get(core, core_cfg, debug)>=(level))
+/** @brief per process debug level handling */
+int get_debug_level(void);
+void set_local_debug_level(int level);
+void reset_local_debug_level(void);
+
+#define is_printable(level) (get_debug_level()>=(level))
 extern struct log_level_info log_level_info[];
 extern char *log_name;
 
@@ -167,7 +170,7 @@ int log_facility_fixup(void *handle, str *gname, str *name, void **val);
 #	ifdef __SUNPRO_C
 #		define LOG_(facility, level, prefix, fmt, ...) \
 			do { \
-				if (unlikely(cfg_get(core, core_cfg, debug) >= (level) && \
+				if (unlikely(get_debuglevel() >= (level) && \
 						DPRINT_NON_CRIT)) { \
 					DPRINT_CRIT_ENTER; \
 					if (likely(((level) >= L_ALERT) && ((level) <= L_DBG))){ \
@@ -229,7 +232,7 @@ int log_facility_fixup(void *handle, str *gname, str *name, void **val);
 #	else /* ! __SUNPRO_C */
 #		define LOG_(facility, level, prefix, fmt, args...) \
 			do { \
-				if (cfg_get(core, core_cfg, debug) >= (level) && \
+				if (get_debug_level() >= (level) && \
 						DPRINT_NON_CRIT) { \
 					DPRINT_CRIT_ENTER; \
 					if (likely(((level) >= L_ALERT) && ((level) <= L_DBG))){ \

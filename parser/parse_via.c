@@ -68,6 +68,7 @@
 #include "../ip_addr.h"
 #include "parse_via.h"
 #include "parse_def.h"
+#include "msg_parser.h"
 
 
 
@@ -96,6 +97,7 @@ enum {
 	TCP_TLS1, TCP2, FIN_TCP,
 	          TLS2, FIN_TLS,
 	SCTP1, SCTP2, SCTP3, FIN_SCTP,
+	OTHER_PROTO,
 	L_PROTO, F_PROTO
 };
 
@@ -1125,13 +1127,10 @@ static /*inline*/ char* parse_via_param(char* p, char* end,
 						goto endofvalue;
 #endif
 					case L_VALUE:
-						if (param->type==FIN_RPORT){
-							param->value.len=0;
-							param->value.s=0; /* null value */
-							state=F_PARAM;
-							goto endofvalue;
-						};
-						/* no break */
+						param->value.len=0;
+						param->value.s=0; /* null value */
+						state=F_PARAM;
+						goto endofvalue;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: invalid char <%c>"
 								" in state %d\n", *tmp, state);
@@ -1371,6 +1370,25 @@ parse_again:
 						vb->proto=PROTO_SCTP;
 						state=F_HOST; /* start looking for host*/
 						goto main_via;
+					case OTHER_PROTO:
+						/* finished proto parsing */
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_OTHER;
+						state=F_HOST; /* start looking for host*/
+						goto main_via;
+					case UDP1:
+					case UDP2:
+					case TCP_TLS1:
+					case TCP2:
+					case TLS2:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+						/* finished proto parsing */
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_OTHER;
+						state=F_HOST; /* start looking for host*/
+						goto main_via;
 					case FIN_SIP:
 						vb->name.len=tmp-vb->name.s;
 						state=L_VER;
@@ -1415,6 +1433,34 @@ parse_again:
 					case FIN_TLS:
 						vb->transport.len=tmp-vb->transport.s;
 						vb->proto=PROTO_TLS;
+						state=F_LF;
+						saved_state=F_HOST; /* start looking for host*/
+						goto main_via;
+					case FIN_SCTP:
+						/* finished proto parsing */
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_SCTP;
+						state=F_LF;
+						saved_state=F_HOST; /* start looking for host*/
+						goto main_via;
+					case OTHER_PROTO:
+						/* finished proto parsing */
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_OTHER;
+						state=F_LF;
+						saved_state=F_HOST; /* start looking for host*/
+						goto main_via;
+					case UDP1:
+					case UDP2:
+					case TCP_TLS1:
+					case TCP2:
+					case TLS2:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+						/* finished proto parsing */
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_OTHER;
 						state=F_LF;
 						saved_state=F_HOST; /* start looking for host*/
 						goto main_via;
@@ -1466,6 +1512,32 @@ parse_again:
 					case FIN_TLS:
 						vb->transport.len=tmp-vb->transport.s;
 						vb->proto=PROTO_TLS;
+						state=F_CR;
+						saved_state=F_HOST;
+						goto main_via;
+					case FIN_SCTP:
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_SCTP;
+						state=F_CR;
+						saved_state=F_HOST;
+						goto main_via;
+					case OTHER_PROTO:
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_OTHER;
+						state=F_CR;
+						saved_state=F_HOST;
+						goto main_via;
+					case UDP1:
+					case UDP2:
+					case TCP_TLS1:
+					case TCP2:
+					case TLS2:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+						/* finished proto parsing */
+						vb->transport.len=tmp-vb->transport.s;
+						vb->proto=PROTO_OTHER;
 						state=F_CR;
 						saved_state=F_HOST;
 						goto main_via;
@@ -1528,6 +1600,21 @@ parse_again:
 						state=SCTP1;
 						vb->transport.s=tmp;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
@@ -1539,6 +1626,22 @@ parse_again:
 				switch(state){
 					case SIP1:
 						state=SIP2;
+						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
 						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
@@ -1562,6 +1665,19 @@ parse_again:
 					case SCTP3:
 						state=FIN_SCTP;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
@@ -1575,6 +1691,22 @@ parse_again:
 						state=UDP1;
 						vb->transport.s=tmp;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
@@ -1586,6 +1718,21 @@ parse_again:
 				switch(state){
 					case UDP1:
 						state=UDP2;
+						break;
+					case OTHER_PROTO:
+						break;
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
 						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
@@ -1603,6 +1750,21 @@ parse_again:
 					case SCTP2:
 						state=SCTP3;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
@@ -1618,6 +1780,20 @@ parse_again:
 					case SCTP1:
 						state=SCTP2;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
@@ -1629,6 +1805,21 @@ parse_again:
 				switch(state){
 					case TCP_TLS1:
 						state=TLS2;
+						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
 						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
@@ -1643,6 +1834,22 @@ parse_again:
 						state=VER1;
 						vb->version.s=tmp;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
@@ -1653,6 +1860,22 @@ parse_again:
 				switch(state){
 					case VER1:
 						state=VER2;
+						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
 						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
@@ -1665,17 +1888,55 @@ parse_again:
 					case VER2:
 						state=FIN_VER;
 						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
 					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
 								" state %d\n", *tmp, state);
 						goto error;
 				}
 				break;
-			
 			default:
+				switch(state){
+					case F_PROTO:
+						state=OTHER_PROTO;
+						vb->transport.s=tmp;
+						break;
+					case OTHER_PROTO:
+						break;
+					case UDP1:
+					case UDP2:
+					case FIN_UDP:
+					case TCP_TLS1:
+					case TCP2:
+					case FIN_TCP:
+					case TLS2:
+					case FIN_TLS:
+					case SCTP1:
+					case SCTP2:
+					case SCTP3:
+					case FIN_SCTP:
+						state=OTHER_PROTO;
+						break;
+					default:
 						LOG(L_ERR, "ERROR: parse_via: bad char <%c> on"
-								" state %d\n", *tmp, state);
+						" state %d\n", *tmp, state);
 						goto error;
+				}
 				break;
 		}
 	} /* for tmp*/
@@ -2399,3 +2660,58 @@ void free_via_list(struct via_body* vb)
 		pkg_free(foo);
 	}
 }
+
+int parse_via_header( struct sip_msg *msg, int n, struct via_body** q)
+{
+	struct hdr_field *p;
+	struct via_body *pp = NULL;
+	int i;
+	
+	switch (n) {
+	case 1:
+	case 2:
+		if (!msg->h_via1 && (parse_headers(msg,HDR_VIA_F,0)==-1 || !msg->h_via1)) {
+                        DBG("bad msg or missing VIA1 header \n");
+                        return -1;
+                }
+		pp = msg->h_via1->parsed;
+		if (n==1) break;
+		pp = pp->next;
+		if (pp) break;
+		
+                if (!msg->h_via2 && (parse_headers(msg,HDR_VIA2_F,0)==-1 || !msg->h_via2)) {
+                        DBG("bad msg or missing VIA2 header \n");
+                        return -1;
+                }
+                pp = msg->h_via2->parsed;
+                break;
+	default:	
+	        if (!msg->eoh && (parse_headers(msg,HDR_EOH_F,0)==-1 || !msg->eoh)) {
+        	        ERR("bad msg while parsing to EOH \n");
+	                return -1;
+		}
+		p = msg->h_via1;
+		i = n;
+		while (i && p) {
+		        if (p->type == HDR_VIA_T) {
+		        	i--;
+		        	pp = p->parsed;
+		        	while (i && (pp->next)) {
+		        		i--;
+		        		pp = pp->next;
+		        	}
+		        }
+			p = p->next;
+		}
+		if (i > 0) {
+			DBG("missing VIA[%d] header\n", n);
+			return -1;
+		}
+	}
+	if (pp) {
+		*q = pp;
+		return 0;
+	} else
+		return -1;
+}
+

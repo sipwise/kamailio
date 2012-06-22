@@ -3,7 +3,7 @@
  *
  * Various lcr related constant, types, and external variables
  *
- * Copyright (C) 2005-2010 Juha Heinanen
+ * Copyright (C) 2005-2012 Juha Heinanen
  *
  * This file is part of SIP Router, a free SIP server.
  *
@@ -44,12 +44,12 @@
 #include "../../parser/parse_uri.h"
 #include "../../ip_addr.h"
 
-#define MAX_PREFIX_LEN 32
+#define MAX_PREFIX_LEN 16
 #define MAX_URI_LEN 256
 #define MAX_HOST_LEN 64
 #define MAX_NO_OF_GWS 128
 #define MAX_NAME_LEN 128
-#define MAX_TAG_LEN 16
+#define MAX_TAG_LEN 64
 #define MAX_USER_LEN 64
 #define MAX_PARAMS_LEN 64
 
@@ -57,7 +57,7 @@ typedef enum sip_protos uri_transport;
 
 struct rule_info {
     unsigned int rule_id;
-    char prefix[MAX_PREFIX_LEN + 1];
+    char prefix[MAX_PREFIX_LEN];
     unsigned short prefix_len;
     char from_uri[MAX_URI_LEN + 1];
     unsigned short from_uri_len;
@@ -69,6 +69,12 @@ struct rule_info {
     unsigned int enabled;
     struct target *targets;
     struct rule_info *next;
+};
+
+struct rule_id_info {
+    unsigned int rule_id;
+    struct rule_info *rule_addr;
+    struct rule_id_info *next;
 };
 
 struct target {
@@ -96,7 +102,9 @@ struct gw_info {
     char params[MAX_PARAMS_LEN];
     unsigned short params_len;
     unsigned int strip;
-    char tag[MAX_TAG_LEN + 1];
+    char prefix[MAX_PREFIX_LEN];
+    unsigned short prefix_len;
+    char tag[MAX_TAG_LEN];
     unsigned short tag_len;
     unsigned int flags;
     unsigned int defunct_until;
@@ -110,9 +118,9 @@ extern gen_lock_t *reload_lock;
 
 extern struct gw_info **gw_pt;
 extern struct rule_info ***rule_pt;
+extern struct rule_id_info **rule_id_hash_table;
 
-int  mi_print_gws(struct mi_node* rpl);
-int  mi_print_lcrs(struct mi_node* rpl);
-int  reload_tables();
+extern int reload_tables();
+extern int rpc_defunct_gw(unsigned int, unsigned int, unsigned int);
 
 #endif /* LCR_MOD_H */

@@ -29,6 +29,9 @@
 int pv_parse_time_name(pv_spec_p sp, str *in);
 int pv_get_time(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
+int pv_parse_strftime_name(pv_spec_p sp, str *in);
+int pv_get_strftime(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
 int pv_get_timenows(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 int pv_get_timenowf(struct sip_msg *msg, pv_param_t *param,
@@ -36,6 +39,8 @@ int pv_get_timenowf(struct sip_msg *msg, pv_param_t *param,
 int pv_get_times(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 int pv_get_timef(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+int pv_get_timeb(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_parse_timeval_name(pv_spec_p sp, str *in);

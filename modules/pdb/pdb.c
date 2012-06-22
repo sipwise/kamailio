@@ -1,6 +1,4 @@
 /*
- * $Id: carrierroute.c 4712 2008-08-22 17:05:16Z henningw $
- *
  * Copyright (C) 2009 1&1 Internet AG
  *
  * This file is part of sip-router, a free SIP server.
@@ -46,7 +44,7 @@ MODULE_VERSION
 #define NETBUFSIZE 200
 
 
-static char* modp_server = NULL;  /*!< format: <host>:<port>,... */
+static char* modp_server = NULL;  /*!< format: \<host\>:\<port\>,... */
 static int timeout = 50;  /*!< timeout for queries in milliseconds */
 static int timeoutlogs = -10;  /*!< for aggregating timeout logs */
 static int *active = NULL;
@@ -273,7 +271,6 @@ static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number, struct 
 					buf[NETBUFSIZE] = '\0';
 					if (strncmp(buf, number.s, number.len) == 0) {
 						carrierid=ntohs(*((short int *)&(buf[reqlen]))); /* convert to host byte order */
-						server_list->fds[i].revents = 0; /* clear event for respoding server */
 						goto found;
 					}
 				}

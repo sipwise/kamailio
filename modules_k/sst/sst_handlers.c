@@ -56,7 +56,6 @@
 #include "../../pvar.h"
 #include "../../lib/kcore/parse_sst.h"
 #include "../../lib/kcore/parse_supported.h"
-#include "../../lib/kcore/km_ut.h"
 #include "../../mem/mem.h"
 #include "../../mem/shm_mem.h"
 #include "../../data_lump.h"
@@ -252,7 +251,7 @@ void sst_dialog_created_CB(struct dlg_cell *did, int type,
 {
 	sst_info_t *info = NULL;
 	sst_msg_info_t minfo;
-	struct sip_msg* msg = params->msg;
+	struct sip_msg* msg = params->req;
 
 	memset(&minfo, 0, sizeof(sst_msg_info_t));
 	/*
@@ -365,7 +364,7 @@ void sst_dialog_created_CB(struct dlg_cell *did, int type,
 static void sst_dialog_confirmed_CB(struct dlg_cell *did, int type,
 		struct dlg_cb_params * params)
 {
-	struct sip_msg* msg = params->msg;
+	struct sip_msg* msg = params->rpl;
 
 	LM_DBG("confirmed dialog CB %p\n", did);
 	DLOGMSG(msg);
@@ -431,7 +430,7 @@ static void sst_dialog_request_within_CB(struct dlg_cell* did, int type,
 {
 	sst_info_t *info = (sst_info_t *)*(params->param);
 	sst_msg_info_t minfo = {0,0,0,0};
-	struct sip_msg* msg = params->msg;
+	struct sip_msg* msg = params->req;
 
 	if (msg->first_line.type == SIP_REQUEST) {
 		if ((msg->first_line.u.request.method_value == METHOD_INVITE ||
@@ -497,7 +496,7 @@ static void sst_dialog_request_within_CB(struct dlg_cell* did, int type,
 static void sst_dialog_response_fwded_CB(struct dlg_cell* did, int type,
 		struct dlg_cb_params * params) 
 {
-	struct sip_msg* msg = params->msg;
+	struct sip_msg* msg = params->rpl;
 
 	/*
 	 * This test to see if the message is a response sould ALWAYS be
@@ -944,7 +943,7 @@ static void setup_dialog_callbacks(struct dlg_cell *did, sst_info_t *info)
 #ifdef USE_CONFIRM_CALLBACK
 	LM_DBG("Adding callback DLGCB_CONFIRMED\n");
 	dlg_binds->register_dlgcb(did,
-			DLGCB_CONFIRMED, sst_dialog_confirmed_CB, info, NULL);
+			DLGCB_CONFIRMED_NA, sst_dialog_confirmed_CB, info, NULL);
 #endif /* USE_CONFIRM_CALLBACK */
 
 	LM_DBG("Adding callback "

@@ -46,6 +46,7 @@
 #include "../../sr_module.h"
 #include "../../lib/srdb1/db_res.h"
 #include "../../lib/srdb1/db.h"
+#include "../../lib/srdb1/db_query.h"
 #include "km_db_berkeley.h"
 #include "km_bdb_lib.h"
 #include "km_bdb_res.h"

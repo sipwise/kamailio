@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2006 Voice System SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -60,7 +58,8 @@
  * \param seq_match_mode_p matching mode
  */
 void init_dlg_handlers(char *rr_param, int dlg_flag,
-		pv_spec_t *timeout_avp, int default_timeout);
+		pv_spec_t *timeout_avp, int default_timeout,
+		int seq_match_mode);
 
 
 /*!
@@ -75,13 +74,15 @@ void destroy_dlg_handlers(void);
  * Parse SIP message and populate leg informations. 
  * \param dlg the dialog to add cseq, contact & record_route
  * \param msg sip message
- * \param flag  0-for a request(INVITE), 1- for a reply(200 ok)
+ * \param t transaction
+ * \param leg type of the call leg
+ * \param tag SIP To tag
  * \return 0 on success, -1 on failure
  * \note for a request: get record route in normal order, for a reply get
  * in reverse order, skipping the ones from the request and the proxies' own
  */
-int populate_leg_info( struct dlg_cell *dlg, struct sip_msg *msg,
-	struct cell* t, unsigned int leg, str *tag);
+int populate_leg_info(dlg_cell_t *dlg, sip_msg_t *msg,
+	tm_cell_t *t, unsigned int leg, str *tag);
 
 
 /*!
@@ -90,7 +91,7 @@ int populate_leg_info( struct dlg_cell *dlg, struct sip_msg *msg,
  * \param type type of the entered callback
  * \param param saved dialog structure in the callback
  */
-void dlg_onreq(struct cell* t, int type, struct tmcb_params *param);
+void dlg_onreq(tm_cell_t *t, int type, struct tmcb_params *param);
 
 
 /*!
@@ -104,14 +105,14 @@ void dlg_onreq(struct cell* t, int type, struct tmcb_params *param);
  * \param route_params record-route parameter
  * \param param unused
  */
-void dlg_onroute(struct sip_msg* req, str *rr_param, void *param);
+void dlg_onroute(sip_msg_t *req, str *rr_param, void *param);
 
 
 /*!
  * \brief Timer function that removes expired dialogs, run timeout route
  * \param tl dialog timer list
  */
-void dlg_ontimeout( struct dlg_tl *tl);
+void dlg_ontimeout(dlg_tl_t *tl);
 
 
 /*!
@@ -123,11 +124,12 @@ void dlg_ontimeout( struct dlg_tl *tl);
  * from the dlg_manage function in the configuration script.
  * \see dlg_onreq
  * \see w_dlg_manage
- * \param msg SIP message
+ * \param req SIP message
  * \param t transaction
+ * \param run_initial_cbs if set zero, initial callbacks are not executed
  * \return 0 on success, -1 on failure
  */ 
-int dlg_new_dialog(struct sip_msg *msg, struct cell *t);
+int dlg_new_dialog(sip_msg_t *req, tm_cell_t *t, const int run_initial_cbs);
 
 
 /*!
@@ -137,7 +139,7 @@ int dlg_new_dialog(struct sip_msg *msg, struct cell *t);
  * \param res pseudo-variable result
  * \return 0 on success, -1 on failure
  */
-int pv_get_dlg_lifetime(struct sip_msg *msg, pv_param_t *param,
+int pv_get_dlg_lifetime(sip_msg_t *msg, pv_param_t *param,
 		pv_value_t *res);
 
 
@@ -148,7 +150,7 @@ int pv_get_dlg_lifetime(struct sip_msg *msg, pv_param_t *param,
  * \param res pseudo-variable result
  * \return 0 on success, -1 on failure
  */
-int pv_get_dlg_status(struct sip_msg *msg, pv_param_t *param,
+int pv_get_dlg_status(sip_msg_t *msg, pv_param_t *param,
 		pv_value_t *res);
 
 
@@ -158,6 +160,26 @@ int pv_get_dlg_status(struct sip_msg *msg, pv_param_t *param,
  * \param type unused
  * \param param unused
  */
-void dlg_tmcb_dummy(struct cell* t, int type, struct tmcb_params *param);
+void dlg_tmcb_dummy(tm_cell_t *t, int type, struct tmcb_params *param);
+
+/*!
+ * \brief Get the dialog structure for the SIP message
+ */
+dlg_cell_t *dlg_get_msg_dialog(sip_msg_t *msg);
+
+/*!
+ * \brief Clone dialog internal unique id to shared memory
+ */
+dlg_iuid_t *dlg_get_iuid_shm_clone(dlg_cell_t *dlg);
+
+/*!
+ * \brief Free dialog internal unique id stored in shared memory
+ */
+void dlg_iuid_sfree(void *iuid);
+
+/*!
+ *
+ */
+int dlg_manage(sip_msg_t *msg);
 
 #endif

@@ -63,16 +63,17 @@
 #include <string.h>
 
 #include "../../sr_module.h"
-#include "../../lib/kcore/local_route.h"
 #include "../../dprint.h"
 #include "../../mem/mem.h"
 #include "../../modules/tm/tm_load.h"
+#include "../../str.h"
 #include "../rr/api.h"
 #include "acc.h"
 #include "acc_api.h"
 #include "acc_mod.h"
 #include "acc_extra.h"
 #include "acc_logic.h"
+#include "acc_cdr.h"
 
 #ifdef RAD_ACC
 #include "../../lib/kcore/radius.h"
@@ -102,12 +103,16 @@ int report_cancels = 0;		/*!< would you like us to report CANCELs from upstream 
 int report_ack = 0;		/*!< report e2e ACKs too */
 int detect_direction = 0;	/*!< detect and correct direction in the sequential requests */
 int failed_transaction_flag = -1; /*!< should failed replies (>=3xx) be logged ? default==no */
+static char *failed_filter_str = 0;  /* by default, do not filter logging of
+					failed transactions */
+unsigned short failed_filter[MAX_FAILED_FILTER_COUNT + 1];
 static char* leg_info_str = 0;	/*!< multi call-leg support */
 struct acc_extra *leg_info = 0;
+int acc_prepare_flag = -1; /*!< should the request be prepared for later acc */
 
 
 /* ----- SYSLOG acc variables ----------- */
-/*! \name AccSyslogVariables  Syslog Variables */     
+/*! \name AccSyslogVariables  Syslog Variables */
 /*@{*/
 
 int log_flag = -1;
@@ -119,6 +124,21 @@ static char *log_extra_str = 0; /*!< Syslog: log extra variables */
 struct acc_extra *log_extra = 0; /*!< Log extra attributes */
 
 /*@}*/
+
+/* ----- CDR generation variables ------- */
+/*! \name AccCdrVariables  CDR Variables */
+/*@{*/
+
+int cdr_enable  = 0;
+int cdr_start_on_confirmed = 0;
+static char* cdr_facility_str = 0;
+static char* cdr_log_extra_str = 0;
+
+str cdr_start_str = str_init("st");
+str cdr_end_str = str_init("et");
+str cdr_duration_str = str_init("d");
+
+/*@{*/
 
 /* ----- RADIUS acc variables ----------- */
 /*! \name AccRadiusVariables  Radius Variables */     
@@ -173,7 +193,7 @@ str acc_callid_col     = str_init("callid");
 str acc_sipcode_col    = str_init("sip_code");
 str acc_sipreason_col  = str_init("sip_reason");
 str acc_time_col       = str_init("time");
-str acc_time_hires_col = str_init("time_hires");
+int acc_db_insert_mode = 0;
 #endif
 
 /*@}*/
@@ -217,16 +237,26 @@ static cmd_export_t cmds[] = {
 static param_export_t params[] = {
 	{"early_media",             INT_PARAM, &early_media             },
 	{"failed_transaction_flag", INT_PARAM, &failed_transaction_flag },
+	{"failed_filter",           STR_PARAM, &failed_filter_str       },
 	{"report_ack",              INT_PARAM, &report_ack              },
 	{"report_cancels",          INT_PARAM, &report_cancels          },
 	{"multi_leg_info",          STR_PARAM, &leg_info_str            },
 	{"detect_direction",        INT_PARAM, &detect_direction        },
+	{"acc_prepare_flag",        INT_PARAM, &acc_prepare_flag        },
 	/* syslog specific */
 	{"log_flag",             INT_PARAM, &log_flag             },
 	{"log_missed_flag",      INT_PARAM, &log_missed_flag      },
 	{"log_level",            INT_PARAM, &log_level            },
 	{"log_facility",         STR_PARAM, &log_facility_str     },
 	{"log_extra",            STR_PARAM, &log_extra_str        },
+	/* cdr specific */
+	{"cdr_enable",           INT_PARAM, &cdr_enable                 },
+	{"cdr_start_on_confirmed", INT_PARAM, &cdr_start_on_confirmed   },
+	{"cdr_facility",         STR_PARAM, &cdr_facility_str           },
+	{"cdr_extra",            STR_PARAM, &cdr_log_extra_str          },
+	{"cdr_start_id",	 STR_PARAM, &cdr_start_str.s		},
+	{"cdr_end_id",		 STR_PARAM, &cdr_end_str.s		},
+	{"cdr_duration_id",	 STR_PARAM, &cdr_duration_str.s		},
 #ifdef RAD_ACC
 	{"radius_config",        STR_PARAM, &radius_config        },
 	{"radius_flag",          INT_PARAM, &radius_flag          },
@@ -257,7 +287,7 @@ static param_export_t params[] = {
 	{"acc_sip_code_column",  STR_PARAM, &acc_sipcode_col.s    },
 	{"acc_sip_reason_column",STR_PARAM, &acc_sipreason_col.s  },
 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
-	{"acc_time_hires_column",STR_PARAM, &acc_time_hires_col.s },
+	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
 #endif
 	{0,0,0}
 };
@@ -340,27 +370,48 @@ static int free_acc_fixup(void** param, int param_no)
 
 /************************** INTERFACE functions ****************************/
 
-static int mod_lrt_init( void )
+
+static int parse_failed_filter(char *s, unsigned short *failed_filter)
 {
+    unsigned int n;
+    char *at;
 
-#ifdef SQL_ACC
-	if(db_url.s && acc_db_init_child(&db_url)<0) {
-		LM_ERR("could not open database connection");
-		return -1;
+    n = 0;
+
+    while (1) {
+	if (n >= MAX_FAILED_FILTER_COUNT) {
+	    LM_ERR("too many elements in failed_filter\n");
+	    return 0;
 	}
-#endif
-
-	return 0;
+	at = s;
+	while ((*at >= '0') && (*at <= '9')) at++;
+	if (at - s != 3) {
+	    LM_ERR("respose code in failed_filter must have 3 digits\n");
+	    return 0;
+	}
+	failed_filter[n] = (*s - '0') * 100 + (*(s + 1) - '0') * 10 +
+	    (*(s + 2) - '0');
+	if (failed_filter[n] < 300) {
+	    LM_ERR("invalid respose code %u in failed_filter\n",
+		   failed_filter[n]);
+	    return 0;
+	}
+	LM_DBG("failed_filter %u = %u\n", n, failed_filter[n]);
+	n++;
+	failed_filter[n] = 0;
+	s = at;
+	if (*s == 0)
+	    return 1;
+	if (*s != ',') {
+	    LM_ERR("response code is not followed by comma or end of string\n");
+	    return 0;
+	}
+	s++;
+    }
 }
 
 static int mod_init( void )
 {
-	lrt_info_t li;
-	li.init = mod_lrt_init;
-	li.name = "acc";
-	if(register_lrt_info(&li)!=0)
-		return -1;
-
 #ifdef SQL_ACC
 	if (db_url.s) {
 		db_url.len = strlen(db_url.s);
@@ -378,7 +429,6 @@ static int mod_init( void )
 	acc_sipcode_col.len = strlen(acc_sipcode_col.s);
 	acc_sipreason_col.len = strlen(acc_sipreason_col.s);
 	acc_time_col.len = strlen(acc_time_col.s);
-	acc_time_hires_col.len = strlen(acc_time_hires_col.s);
 #endif
 
 	if (log_facility_str) {
@@ -393,10 +443,19 @@ static int mod_init( void )
 
 	/* ----------- GENERIC INIT SECTION  ----------- */
 
+	/* failed transaction handling */
 	if ((failed_transaction_flag != -1) && 
 		!flag_in_range(failed_transaction_flag)) {
 		LM_ERR("failed_transaction_flag set to invalid value\n");
 		return -1;
+	}
+	if (failed_filter_str) {
+	    if (parse_failed_filter(failed_filter_str, failed_filter) == 0) {
+		LM_ERR("failed to parse failed_filter param\n");
+		return -1;
+	    }
+	} else {
+	    failed_filter[0] = 0;
 	}
 
 	/* load the TM API */
@@ -453,6 +512,52 @@ static int mod_init( void )
 	}
 
 	acc_log_init();
+
+	/* ----------- INIT CDR GENERATION ----------- */
+
+	if( cdr_enable < 0 || cdr_enable > 1)
+	{
+		LM_ERR("cdr_enable is out of range\n");
+		return -1;
+	}
+
+	if( cdr_enable)
+	{
+		if( !cdr_start_str.s || !cdr_end_str.s || !cdr_duration_str.s) 
+		{
+		      LM_ERR( "necessary cdr_parameters are not set\n");
+		      return -1;
+		}			
+		
+		cdr_start_str.len = strlen(cdr_start_str.s);
+		cdr_end_str.len = strlen(cdr_end_str.s);
+		cdr_duration_str.len = strlen(cdr_duration_str.s);
+		
+		if( !cdr_start_str.len || !cdr_end_str.len || !cdr_duration_str.len) 
+		{
+		      LM_ERR( "necessary cdr_parameters are empty\n");
+		      return -1;
+		}
+		
+		
+		if( set_cdr_extra( cdr_log_extra_str) != 0)
+		{
+			LM_ERR( "failed to set cdr extra '%s'\n", cdr_log_extra_str);
+			return -1;
+		}
+
+		if( cdr_facility_str && set_cdr_facility( cdr_facility_str) != 0)
+		{
+			LM_ERR( "failed to set cdr facility '%s'\n", cdr_facility_str);
+			return -1;
+		}
+	
+		if( init_cdr_generation() != 0)
+		{
+			LM_ERR("failed to init cdr generation\n");
+			return -1;
+		}
+	}
 
 	/* ------------ SQL INIT SECTION ----------- */
 

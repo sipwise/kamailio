@@ -83,13 +83,17 @@ int pres_watcher_allowed(subs_t* subs)
 
 	node= get_rule_node(subs, xcap_tree);
 	if(node== NULL)
+	{
+		xmlFreeDoc(xcap_tree);
 		return 0;
+	}
 
 	/* process actions */	
 	actions_node = xmlNodeGetChildByName(node, "actions");
 	if(actions_node == NULL)
 	{	
 		LM_DBG("actions_node NULL\n");
+		xmlFreeDoc(xcap_tree);
 		return 0;
 	}
 	LM_DBG("actions_node->name= %s\n",
@@ -99,6 +103,7 @@ int pres_watcher_allowed(subs_t* subs)
 	if(sub_handling_node== NULL)
 	{	
 		LM_DBG("sub_handling_node NULL\n");
+		xmlFreeDoc(xcap_tree);
 		return 0;
 	}
 	sub_handling = (char*)xmlNodeGetContent(sub_handling_node);
@@ -110,6 +115,7 @@ int pres_watcher_allowed(subs_t* subs)
 	if(sub_handling== NULL)
 	{
 		LM_ERR("Couldn't get sub-handling content\n");
+		xmlFreeDoc(xcap_tree);
 		return -1;
 	}
 	if( strncmp((char*)sub_handling, "block",5 )==0)
@@ -130,9 +136,9 @@ int pres_watcher_allowed(subs_t* subs)
 		subs->reason.s= "polite-block";
 		subs->reason.len = 12;
 	}
-	else	
+	else
 	if( strncmp((char*)sub_handling , "allow",5 )==0)
-	{	
+	{
 		subs->status = ACTIVE_STATUS;
 		subs->reason.s = NULL;
 	}
@@ -140,11 +146,12 @@ int pres_watcher_allowed(subs_t* subs)
 	{
 		LM_ERR("unknown subscription handling action\n");
 		xmlFree(sub_handling);
+		xmlFreeDoc(xcap_tree);
 		return -1;
 	}
 
 	xmlFree(sub_handling);
-
+	xmlFreeDoc(xcap_tree);
 	return 0;
 
 }	
@@ -163,7 +170,7 @@ xmlNodePtr get_rule_node(subs_t* subs, xmlDocPtr xcap_tree )
 	int valid= 0;
 
 
-	uandd_to_uri(subs->from_user, subs->from_domain, &w_uri);
+	uandd_to_uri(subs->watcher_user, subs->watcher_domain, &w_uri);
 	if(w_uri.s == NULL)
 	{
 		LM_ERR("while creating uri\n");
@@ -418,14 +425,19 @@ error:
 int pres_get_rules_doc(str* user, str* domain, str** rules_doc)
 {
 	
-	return get_rules_doc(user, domain, PRES_RULES, rules_doc);
+	return get_rules_doc(user, domain, NULL, PRES_RULES, rules_doc);
 }
 
-int get_rules_doc(str* user, str* domain, int type, str** rules_doc)
+int pres_get_pidf_doc(str *user, str *domain, str *file_uri, str **rules_doc)
 {
-	db_key_t query_cols[5];
-	db_val_t query_vals[5];
-	db_key_t result_cols[3];
+	return get_rules_doc(user, domain, file_uri, PIDF_MANIPULATION, rules_doc);
+}
+
+int get_rules_doc(str* user, str* domain, str *file_uri, int type, str** rules_doc)
+{
+	db_key_t query_cols[3];
+	db_val_t query_vals[3];
+	db_key_t result_cols[1];
 	int n_query_cols = 0;
 	db1_res_t *result = 0;
 	db_row_t *row;
@@ -433,10 +445,11 @@ int get_rules_doc(str* user, str* domain, int type, str** rules_doc)
 	str body;
 	str* doc= NULL;
 	int n_result_cols= 0, xcap_doc_col;
-	static str tmp1 = str_init("username");
-	static str tmp2 = str_init("domain");
-	static str tmp3 = str_init("doc_type");
-	static str tmp4 = str_init("doc");
+	static str tmp1 = str_init("doc_type");
+	static str tmp2 = str_init("doc_uri");
+	static str tmp3 = str_init("username");
+	static str tmp4 = str_init("domain");
+	static str tmp5 = str_init("doc");
 
 	if(force_active)
 	{
@@ -445,26 +458,43 @@ int get_rules_doc(str* user, str* domain, int type, str** rules_doc)
 	}
 	LM_DBG("[user]= %.*s\t[domain]= %.*s", 
 			user->len, user->s,	domain->len, domain->s);
+
 	/* first search in database */
 	query_cols[n_query_cols] = &tmp1;
-	query_vals[n_query_cols].type = DB1_STR;
-	query_vals[n_query_cols].nul = 0;
-	query_vals[n_query_cols].val.str_val = *user;
-	n_query_cols++;
-	
-	query_cols[n_query_cols] = &tmp2;
-	query_vals[n_query_cols].type = DB1_STR;
-	query_vals[n_query_cols].nul = 0;
-	query_vals[n_query_cols].val.str_val = *domain;
-	n_query_cols++;
-	
-	query_cols[n_query_cols] = &tmp3;
 	query_vals[n_query_cols].type = DB1_INT;
 	query_vals[n_query_cols].nul = 0;
 	query_vals[n_query_cols].val.int_val= type;
 	n_query_cols++;
 
-	result_cols[xcap_doc_col= n_result_cols++] = &tmp4;
+	if (file_uri != NULL)
+	{
+		query_cols[n_query_cols] = &tmp2;
+		query_vals[n_query_cols].type = DB1_STR;
+		query_vals[n_query_cols].nul = 0;
+		query_vals[n_query_cols].val.str_val = *file_uri;
+		n_query_cols++;
+	}
+	else if (user != NULL && domain != NULL)
+	{
+		query_cols[n_query_cols] = &tmp3;
+		query_vals[n_query_cols].type = DB1_STR;
+		query_vals[n_query_cols].nul = 0;
+		query_vals[n_query_cols].val.str_val = *user;
+		n_query_cols++;
+	
+		query_cols[n_query_cols] = &tmp4;
+		query_vals[n_query_cols].type = DB1_STR;
+		query_vals[n_query_cols].nul = 0;
+		query_vals[n_query_cols].val.str_val = *domain;
+		n_query_cols++;
+	}
+	else
+	{
+		LM_ERR("Need to specify file uri _OR_ username and domain\n");
+		return -1;
+	}
+	
+	result_cols[xcap_doc_col= n_result_cols++] = &tmp5;
 	
 	if (pxml_dbf.use_table(pxml_db, &xcap_table) < 0) 
 	{
@@ -490,7 +520,12 @@ int get_rules_doc(str* user, str* domain, int type, str** rules_doc)
 			"\t[domain]= %.*s\t[doc_type]= %d\n",user->len, user->s,
 			domain->len, domain->s, type);
 		
-		if(!integrated_xcap_server)
+		if (!integrated_xcap_server && type != PRES_RULES)
+		{
+			LM_WARN("Cannot retrieve non pres-rules documents from"
+				"external XCAP server\n");
+		}
+		else if(!integrated_xcap_server)
 		{
 			if(http_get_rules_doc(*user, *domain, &body)< 0)
 			{
@@ -541,7 +576,7 @@ done:
 	if(result)
 		pxml_dbf.free_result(pxml_db, result);
 
-	return 0;
+	return 1;
 
 error:
 	if(result)

@@ -411,7 +411,7 @@ void check_ser_drift();
  *        - it works ok as long as the adjustment interval < MAX_TICKS_T
  * -- andrei
  */
-inline static void adjust_ticks()
+inline static void adjust_ticks(void)
 {
 	struct timeval crt_time;
 	long long diff_time;
@@ -815,7 +815,7 @@ return ret;
  *            context), all other calls will have no effect and will log a
  *            bug message
  */
-void timer_allow_del()
+void timer_allow_del(void)
 {
 	if (IS_IN_TIMER() ){
 			UNSET_RUNNING();
@@ -892,6 +892,8 @@ inline static void timer_list_expire(ticks_t t, struct timer_head* h
 #endif
 			UNLOCK_TIMER_LIST(); /* acts also as write barrier */ 
 				ret=tl->f(t, tl, tl->data);
+				/* reset the configuration group handles */
+				cfg_reset_all();
 				if (ret==0){
 					UNSET_RUNNING();
 					LOCK_TIMER_LIST();
@@ -922,7 +924,7 @@ inline static void timer_list_expire(ticks_t t, struct timer_head* h
  * WARNING: it should never be called twice for the same *ticks value
  * (it could cause too fast expires for long timers), *ticks must be also
  *  always increasing */
-static void timer_handler()
+static void timer_handler(void)
 {
 	ticks_t saved_ticks;
 #ifdef USE_SLOW_TIMER
@@ -968,7 +970,7 @@ static void timer_handler()
 		if ((slow_idx_t)(*t_idx-*s_idx) < (SLOW_LISTS_NO-1U))
 			(*t_idx)++;
 		else{
-			LOG(L_ERR, "ERROR: slow timer too slow: overflow (%d - %d = %d)\n",
+			LOG(L_WARN, "slow timer too slow: overflow (%d - %d = %d)\n",
 					*t_idx, *s_idx, *t_idx-*s_idx);
 			/* trying to continue */
 		}
@@ -1147,6 +1149,8 @@ void slow_timer_main()
 				SET_RUNNING_SLOW(tl);
 				UNLOCK_SLOW_TIMER_LIST();
 					ret=tl->f(*ticks, tl, tl->data);
+					/* reset the configuration group handles */
+					cfg_reset_all();
 					if (ret==0){
 						/* one shot */
 						UNSET_RUNNING_SLOW();

@@ -41,9 +41,9 @@
 #include "../../dprint.h"
 #include "../../error.h"
 #include "../../mod_fix.h"
+#include "../../trim.h"
 #include "../../mem/mem.h"
 #include "../../modules/auth/api.h"
-#include "aaa_avps.h"
 #include "authorize.h"
 
 MODULE_VERSION
@@ -69,6 +69,8 @@ static int mod_init(void);
 
 
 static int auth_fixup(void** param, int param_no);
+static int auth_check_fixup(void** param, int param_no);
+int parse_aaa_pvs(char *definition, pv_elem_t **pv_def, int *cnt);
 
 #define USER_COL "username"
 #define USER_COL_LEN (sizeof(USER_COL) - 1)
@@ -93,6 +95,7 @@ str domain_column           = {DOMAIN_COL, DOMAIN_COL_LEN};
 str pass_column             = {PASS_COL, PASS_COL_LEN};
 str pass_column_2           = {PASS_COL_2, PASS_COL_2_LEN};
 
+static int version_table_check = 1;
 
 int calc_ha1                = 0;
 int use_domain              = 0; /* Use also domain when looking up in table */
@@ -102,7 +105,7 @@ db_func_t auth_dbf;
 auth_api_s_t auth_api;
 
 char *credentials_list      = DEFAULT_CRED_LIST;
-struct aaa_avp *credentials = 0; /* Parsed list of credentials to load */
+pv_elem_t *credentials      = 0; /* Parsed list of credentials to load */
 int credentials_n           = 0; /* Number of credentials in the list */
 
 /*
@@ -117,6 +120,10 @@ static cmd_export_t cmds[] = {
 		REQUEST_ROUTE},
 	{"proxy_authenticate", (cmd_function)proxy_authenticate, 2, auth_fixup, 0,
 		REQUEST_ROUTE},
+	{"auth_check",         (cmd_function)auth_check,         3, auth_check_fixup, 0,
+		REQUEST_ROUTE},
+	{"bind_auth_db",       (cmd_function)bind_auth_db,       0, 0, 0,
+		0},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -125,14 +132,15 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"db_url",            STR_PARAM, &db_url.s           },
-	{"user_column",       STR_PARAM, &user_column.s      },
-	{"domain_column",     STR_PARAM, &domain_column.s    },
-	{"password_column",   STR_PARAM, &pass_column.s      },
-	{"password_column_2", STR_PARAM, &pass_column_2.s    },
-	{"calculate_ha1",     INT_PARAM, &calc_ha1           },
-	{"use_domain",        INT_PARAM, &use_domain         },
-	{"load_credentials",  STR_PARAM, &credentials_list   },
+	{"db_url",            STR_PARAM, &db_url.s            },
+	{"user_column",       STR_PARAM, &user_column.s       },
+	{"domain_column",     STR_PARAM, &domain_column.s     },
+	{"password_column",   STR_PARAM, &pass_column.s       },
+	{"password_column_2", STR_PARAM, &pass_column_2.s     },
+	{"calculate_ha1",     INT_PARAM, &calc_ha1            },
+	{"use_domain",        INT_PARAM, &use_domain          },
+	{"load_credentials",  STR_PARAM, &credentials_list    },
+	{"version_table",     INT_PARAM, &version_table_check },
 	{0, 0, 0}
 };
 
@@ -201,7 +209,7 @@ static int mod_init(void)
 	}
 
 	/* process additional list of credentials */
-	if (parse_aaa_avps( credentials_list, &credentials, &credentials_n)!=0) {
+	if (parse_aaa_pvs(credentials_list, &credentials, &credentials_n) != 0) {
 		LM_ERR("failed to parse credentials\n");
 		return -5;
 	}
@@ -217,7 +225,7 @@ static void destroy(void)
 		auth_db_handle = 0;
 	}
 	if (credentials) {
-		free_aaa_avp_list(credentials);
+		pv_elem_free_all(credentials);
 		credentials = 0;
 		credentials_n = 0;
 	}
@@ -248,12 +256,132 @@ static int auth_fixup(void** param, int param_no)
 			LM_ERR("unable to open database connection\n");
 			return -1;
 		}
-		if(db_check_table_version(&auth_dbf, dbh, &name, TABLE_VERSION) < 0) {
+		if(version_table_check!=0
+				&& db_check_table_version(&auth_dbf, dbh, &name,
+					TABLE_VERSION) < 0) {
 			LM_ERR("error during table version check.\n");
 			auth_dbf.close(dbh);
 			return -1;
 		}
+		auth_dbf.close(dbh);
 	}
-	auth_dbf.close(dbh);
 	return 0;
+}
+
+/*
+ * Convert cfg parameters to run-time structures
+ */
+static int auth_check_fixup(void** param, int param_no)
+{
+	if(strlen((char*)*param)<=0) {
+		LM_ERR("empty parameter %d not allowed\n", param_no);
+		return -1;
+	}
+	if (param_no == 1) {
+		return fixup_var_str_12(param, 1);
+	}
+	if (param_no == 2) {
+		return fixup_var_str_12(param, 2);
+	}
+	if (param_no == 3) {
+		return fixup_igp_null(param, 1);
+	}
+	return 0;
+}
+
+/*
+ * Parse extra credentials list
+ */
+int parse_aaa_pvs(char *definition, pv_elem_t **pv_def, int *cnt)
+{
+	pv_elem_t *pve;
+	str pv;
+	char *p;
+	char *end;
+	char *sep;
+
+	p = definition;
+	*pv_def = 0;
+	*cnt = 0;
+
+	if (p==0 || *p==0)
+		return 0;
+
+	/* get element by element */
+	while ( (end=strchr(p,';'))!=0 || (end=p+strlen(p))!=p ) {
+		/* new pv_elem_t */
+		if ( (pve=(pv_elem_t*)pkg_malloc(sizeof(pv_elem_t)))==0 ) {
+			LM_ERR("no more pkg mem\n");
+			goto error;
+		}
+		memset( pve, 0, sizeof(pv_elem_t));
+
+		/* definition is between p and e */
+		/* search backwards because PV definition may contain '=' characters */
+		for (sep = end; sep >= p && *sep != '='; sep--); 
+		if (sep > p) {
+			/* pv=column style */
+			/* set column name */
+			pve->text.s = sep + 1;
+			pve->text.len = end - pve->text.s;
+			trim(&pve->text);
+			if (pve->text.len == 0)
+				goto parse_error;
+			/* set pv spec */
+			pv.s = p;
+			pv.len = sep - p;
+			trim(&pv);
+			if (pv.len == 0)
+				goto parse_error;
+		} else {
+			/* no pv, only column name */
+			pve->text.s = p;
+			pve->text.len = end - pve->text.s;
+			trim(&pve->text);
+			if (pve->text.len == 0)
+				goto parse_error;
+			/* create an avp definition for the spec parser */
+			pv.s = (char*)pkg_malloc(pve->text.len + 7);
+			if (pv.s == NULL) {
+				LM_ERR("no more pkg mem\n");
+				goto parse_error;
+			}
+			pv.len = snprintf(pv.s, pve->text.len + 7, "$avp(%.*s)",
+			                  pve->text.len, pve->text.s);
+		}
+
+		/* create a pv spec */
+		LM_DBG("column: %.*s  pv: %.*s\n", pve->text.len, pve->text.s, pv.len, pv.s);
+		if (pv_parse_spec(&pv, &pve->spec) == 0) {
+			LM_ERR("malformed PV definition: %.*s\n", pv.len, pv.s);
+			goto parse_error;;
+		}
+		if(pve->spec.setf == NULL) {
+			LM_ERR("PV is not writeable: %.*s\n", pv.len, pv.s);
+			goto parse_error;
+		}
+
+		/* link the element */
+		pve->next = *pv_def;
+		*pv_def = pve;
+		(*cnt)++;
+		pve = 0;
+		/* go to the end */
+		p = end;
+		if (*p==';')
+			p++;
+		if (*p==0)
+			break;
+	}
+
+	return 0;
+parse_error:
+	LM_ERR("parse failed in \"%s\" at pos %d(%s)\n",
+		definition, (int)(long)(p-definition),p);
+error:
+	pkg_free( pve );
+	pv_elem_free_all( *pv_def );
+	*pv_def = 0;
+	*cnt = 0;
+	return -1;
 }

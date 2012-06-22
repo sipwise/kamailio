@@ -69,6 +69,23 @@
 		<quote>path_mode</quote>.
 		</para>
 	</section>
+	<section>
+		<title>GRUU Support</title>
+		<para>
+			GRUU (RFC5627) is supported with both public and temporary
+			addresses.
+		</para>
+		<para>
+			The public GRUU is build based on '+sip.instance'
+			parameter as recommended by RFC.
+		</para>
+		<para>
+			The temporary GRUU is built based on internal SRUID (unique
+			id generator) and it is kept the same for the duration of
+			contact validity.
+		</para>
+	</section>
+	
 	</section>
 
 
@@ -108,7 +125,7 @@
 	</section>
 	</section>
 	<section>
-	<title>Exported Parameters</title>
+	<title>Parameters</title>
 	<section>
 		<title><varname>default_expires</varname> (integer)</title>
 		<para>
@@ -284,26 +301,9 @@ modparam("registrar", "append_branches", 0)
 	<section>
 		<title><varname>aor_avp</varname> (str)</title>
 		<para>
-		If set, the module will try first to get the AOR from this AVP 
-		instead of fetching it form the processed request.
+		This module parameter has been removed. Use the 'uri' parameter from
+		functions (e.g., save, lookup, registered).
 		</para>
-		<para>
-		The AVP must contain a valid SIP URI. If no AVP is found, it will be
-		tried to get the AOR from the message (standard behaviour).
-		</para>
-		<para>
-		<emphasis>
-			Default value is "NULL" (disabled).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>aor_avp</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("registrar", "aor_avp", "$avp(i:3223)")
-...
-</programlisting>
-		</example>
 	</section>
 
 	<section>
@@ -623,14 +623,110 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 		</programlisting>
 		</example>
 	</section>
+
+	<section>
+		<title><varname>xavp_cfg</varname> (string)</title>
+		<para>
+			Defines the name of XAVP class to store runtime module config
+			values. The values are stored as inner XAVPs, like
+			$xavp(class=&gt;attribute). Valid inner XAVP names:
+		</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>max_contacts</emphasis> - the number of maximum
+				contacts to be stored for current registration AoR. It
+				overwrites the 'max_contacts' module parameter value.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+			For example. if this parameter is set to 'reg', then the number
+			of maximum contacts can be set in $xavp(reg=&gt;max_contacts).
+		</para>
+		<para>
+		<emphasis>
+			Default value is NULL (disabled).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xavp_cfg</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "xavp_cfg", "reg")
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>xavp_rcd</varname> (string)</title>
+		<para>
+			Defines the name of XAVP class to store details from the
+			location records. The values are stored as inner XAVPs, like
+			$xavp(class=&gt;attribute). Valid inner XAVP names:
+		</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>ruid</emphasis> - the record's internal unique
+				id.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+			For example. if this parameter is set to 'ulrcd', then the ruid
+			for contact records are set in $xavp(ulrcd=&gt;ruid).
+		</para>
+		<para>
+		<emphasis>
+			Default value is NULL (disabled).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xavp_rcd</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "xavp_cfg", "ulrcd")
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title><varname>gruu_enabled</varname> (integer)</title>
+		<para>
+		If set to 1 and GRUU <quote>+sip.instance</quote> parameter to
+		Contact header of REGISTER is present, then the value of the
+		parameter is saved to location and pub-gruu and temp-gruu addresses
+		are generated.
+		</para>
+		<para>
+		Set it to 0 if you want to ignore GRUU extensions in REGISTER.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 1 (enabled).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>gruu_enabled</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "gruu_enabled", 0)
+...
+		</programlisting>
+		</example>
+	</section>
+
 	</section>
 
 	
 	<section>
-	<title>Exported Functions</title>
+	<title>Functions</title>
 	<section>
 		<title>
-		<function moreinfo="none">save(domain)</function>
+		<function moreinfo="none">save(domain, [, flags [, uri]])</function>
 		</title>
 		<para>
 		The function processes a REGISTER message. It can add, remove or 
@@ -647,6 +743,38 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 			<emphasis>domain</emphasis> - Logical domain within registrar. 
 			If database is used then this must be name of the table which 
 			stores the contacts.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>flags</emphasis> (optional) - the value may be a bitwise
+			OR of the following flags:
+			</para>
+			<itemizedlist>
+				<listitem>
+					<para><emphasis>0x01</emphasis> - save the contacts only
+					in memory cache without no DB operation;
+					</para>
+				</listitem>
+				<listitem>
+					<para><emphasis>0x02</emphasis> - do not generate a SIP 
+						reply to the current REGISTER request. When used in
+						ONREPLY_ROUTE, this parameter is obsolete.</para>
+				</listitem>
+				<listitem>
+					<para><emphasis>0x04</emphasis> - store and maintain one
+					contact per AoR. If there are other contact addresses for
+					AoR not matching current registration, remove them.
+					This mode ensures one contact per AoR (user).</para>
+				</listitem>
+			</itemizedlist>
+			<para>The flags may be given in decimal or hexa format.</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>uri</emphasis> (optional - flags param has to be set and
+			can be 0 for default behavior) - SIP URI to do be used instead of To
+			header URI. It can be a dynamic string with pseudo-variables.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -678,6 +806,8 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 		<programlisting format="linespecific">
 ...
 save("location");
+save("location", "0x01");
+save("location", "0x00", "sip:test@kamailio.org");
 ...
 </programlisting>
 		</example>
@@ -685,63 +815,7 @@ save("location");
 
 	<section>
 		<title>
-		<function moreinfo="none">save(domain,flags)</function>
-		</title>
-		<para>
-		Same as <function>save()</function> but it accepts a set of flags for
-		controlling its behaviour.
-		</para>
-		<para>Meaning of the parameters is as follows:</para>
-		<itemizedlist>
-		<listitem>
-			<para>
-			<emphasis>domain</emphasis> - Logical domain within registrar. 
-			If database is used then this must be name of the table which 
-			stores the contacts.
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-			<emphasis>flags</emphasis> - the value may be a bitwise OR of 
-			the following flags:
-			</para>
-			<itemizedlist>
-				<listitem>
-					<para><emphasis>0x01</emphasis> - save the contacts only
-					in memory cache without no DB operation;
-					</para>
-				</listitem>
-				<listitem>
-					<para><emphasis>0x02</emphasis> - do not generate a SIP 
-						reply to the current REGISTER request. When used in
-						ONREPLY_ROUTE, this parameter is obsolete.</para>
-				</listitem>
-				<listitem>
-					<para><emphasis>0x04</emphasis> - store and maintain one
-					contact per AoR. If there are other contact addresses for
-					AoR not matching current registration, remove them.
-					This mode ensures one contact per AoR (user).</para>
-				</listitem>
-			</itemizedlist>
-			<para>The flags may be given in decimal or hexa format.</para>
-		</listitem>
-		</itemizedlist>
-		<para>
-		This function can be used from REQUEST_ROUTE and ONREPLY_ROUTE.
-		</para>
-		<example>
-		<title><function>save</function> usage</title>
-		<programlisting format="linespecific">
-...
-save("location","0x01");
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section>
-		<title>
-		<function moreinfo="none">lookup(domain)</function>
+		<function moreinfo="none">lookup(domain [, uri])</function>
 		</title>
 		<para>
 		The functions extracts username from Request-URI and tries to find 
@@ -762,6 +836,12 @@ save("location","0x01");
 			<para>
 			<emphasis>domain</emphasis> - Name of table that should be used 
 			for the lookup.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>uri</emphasis> (optional) - SIP URI to do be used instead
+			of R-URI. It can be a dynamic string with pseudo-variables.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -807,7 +887,7 @@ switch ($retcode) {
 
 	<section>
 		<title>
-		<function moreinfo="none">registered(domain)</function>
+		<function moreinfo="none">registered(domain [, uri])</function>
 		</title>
 		<para>
 		The function returns true if the AOR in the Request-URI is 
@@ -821,6 +901,12 @@ switch ($retcode) {
 			<para>
 			<emphasis>domain</emphasis> - Name of table that should be 
 			used for the lookup.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>uri</emphasis> (optional) - SIP URI to do be used instead
+			of R-URI. It can be a dynamic string with pseudo-variables.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -986,7 +1072,7 @@ reg_free_contacts("callee");
 	</section>
 
 <section>
-	<title>Exported Statistics</title>
+	<title>Statistics</title>
 	<section>
 		<title><varname>max_expires</varname></title>
 		<para>

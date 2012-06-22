@@ -1,6 +1,4 @@
 /* 
- * $Id$
- *
  * Generic Parameter Parser
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -161,6 +159,10 @@ static inline void parse_contact_class(param_hooks_t* _h, param_t* _p)
 		    (!strncasecmp(_p->name.s + 1, "eceived", 7))) {
 			_p->type = P_RECEIVED;
 			_h->contact.received = _p;
+		} else if((_p->name.len == 6) &&
+		    (!strncasecmp(_p->name.s + 1, "eg-id", 5))) {
+			_p->type = P_REG_ID;
+			_h->contact.reg_id = _p;
 		}
 		break;
 	case '+':
@@ -278,7 +280,6 @@ static inline int parse_quoted_param(str* _s, str* _r)
 	      */
 	quote = (_s->s)[0];
 
-
 	     /* Skip opening quote */
 	_s->s++;
 	_s->len--;
@@ -286,7 +287,7 @@ static inline int parse_quoted_param(str* _s, str* _r)
 
 	     /* Find closing quote */
 	end_quote = q_memchr(_s->s, quote, _s->len);
-	
+
 	     /* Not found, return error */
 	if (!end_quote) {
 		return -2;
@@ -510,14 +511,11 @@ error:
 
 /*! \brief
  * Parse parameters
- *  \param _s is string containing parameters, it will be updated to point behind the parameters
- *  \param _c is class of parameters
- *  \param _h is pointer to structure that will be filled with pointer to well known parameters
- *  \param the variable _p is pointing to
- * linked list of parsed parameters will be stored
- *
- * The function returns 0 on success and negative number
- * on an error
+ * \param _s is string containing parameters, it will be updated to point behind the parameters
+ * \param _c is class of parameters
+ * \param _h is pointer to structure that will be filled with pointer to well known parameters
+ * \param _p pointing to linked list where parsed parameters will be stored
+ * \return 0 on success and negative number on an error
  */
 int parse_params(str* _s, pclass_t _c, param_hooks_t* _h, param_t** _p)
 {

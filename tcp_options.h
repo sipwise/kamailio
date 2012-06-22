@@ -114,7 +114,8 @@ struct cfg_group_tcp{
 	int connect_timeout_s; /* in s */
 	int send_timeout; /* in ticks (s fixed to ticks) */
 	int con_lifetime; /* in ticks (s fixed to ticks) */
-	int max_connections;
+	int max_connections; /* max tcp connections (includes tls connections) */
+	int max_tls_connections; /* max tls connections */
 	int no_connect; /* do not open any new tcp connection (but accept them) */
 	int fd_cache; /* on /off */
 	/* tcp async options */
@@ -151,9 +152,13 @@ extern struct cfg_group_tcp tcp_default_cfg;
 extern void* tcp_cfg;
 
 
-void init_tcp_options();
-void tcp_options_check();
-int tcp_register_cfg();
+void init_tcp_options(void);
+void tcp_options_check(void);
+int tcp_register_cfg(void);
 void tcp_options_get(struct cfg_group_tcp* t);
+
+#ifdef USE_TCP
+int tcp_set_clone_rcvbuf(int v);
+#endif /* USE_TCP */
 
 #endif /* tcp_options_h */

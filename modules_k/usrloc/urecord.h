@@ -36,25 +36,11 @@
 #include "../../str.h"
 #include "../../qvalue.h"
 #include "ucontact.h"
-
+#include "usrloc.h"
 
 struct hslot; /*!< Hash table slot */
 
-/*! \brief
- * Basic hash table element
- */
-typedef struct urecord {
-	str* domain;                   /*!< Pointer to domain we belong to 
-                                    * ( null terminated string) */
-	str aor;                       /*!< Address of record */
-	unsigned int aorhash;          /*!< Hash over address of record */
-	ucontact_t* contacts;          /*!< One or more contact fields */
 
-	struct hslot* slot;            /*!< Collision slot in the hash table 
-                                    * array we belong to */
-	struct urecord* prev;          /*!< Next item in the hash entry */
-	struct urecord* next;          /*!< Previous item in the hash entry */
-} urecord_t;
 
 
 /*!
@@ -144,7 +130,6 @@ int db_delete_urecord(urecord_t* _r);
  * its not necessary, as this function already releases the record.
  * \param _r released record
  */
-typedef void (*release_urecord_t)(urecord_t* _r);
 void release_urecord(urecord_t* _r);
 
 
@@ -156,8 +141,6 @@ void release_urecord(urecord_t* _r);
  * \param _c new created contact
  * \return 0 on success, -1 on failure
  */
-typedef int (*insert_ucontact_t)(urecord_t* _r, str* _contact,
-		ucontact_info_t* _ci, ucontact_t** _c);
 int insert_ucontact(urecord_t* _r, str* _contact,
 		ucontact_info_t* _ci, ucontact_t** _c);
 
@@ -168,7 +151,6 @@ int insert_ucontact(urecord_t* _r, str* _contact,
  * \param _c deleted contact
  * \return 0 on success, -1 on failure
  */
-typedef int (*delete_ucontact_t)(urecord_t* _r, struct ucontact* _c);
 int delete_ucontact(urecord_t* _r, struct ucontact* _c);
 
 
@@ -183,11 +165,20 @@ int delete_ucontact(urecord_t* _r, struct ucontact* _c);
  * \return 0 - found, 1 - not found, -1 - invalid found, 
  * -2 - found, but to be skipped (same cseq)
  */
-typedef int (*get_ucontact_t)(urecord_t* _r, str* _c, str* _callid,
-		str* _path, int _cseq,
-		struct ucontact** _co);
 int get_ucontact(urecord_t* _r, str* _c, str* _callid, str* _path,
 		int _cseq,
 		struct ucontact** _co);
+
+/*!
+ * \brief Get pointer to ucontact with given contact
+ * \param _r record where to search the contacts
+ * \param _c contact string
+ * \param _ci contact info (callid, cseq, instance, ...)
+ * \param _co found contact
+ * \return 0 - found, 1 - not found, -1 - invalid found, 
+ * -2 - found, but to be skipped (same cseq)
+ */
+int get_ucontact_by_instance(urecord_t* _r, str* _c, ucontact_info_t* _ci,
+		ucontact_t** _co);
 
 #endif

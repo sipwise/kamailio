@@ -47,13 +47,18 @@ extern int report_cancels;
 extern int report_ack;
 extern int early_media;
 extern int failed_transaction_flag;
+extern unsigned short failed_filter[];
 extern int detect_direction;
+extern int acc_prepare_flag;
 
 extern int log_facility;
 extern int log_level;
 extern int log_flag;
 extern int log_missed_flag;
 
+extern int cdr_enable;
+extern int cdr_start_on_confirmed;
+extern int cdr_log_facility;
 
 #ifdef RAD_ACC
 extern int radius_flag;
@@ -85,7 +90,6 @@ extern str acc_cseqno_col;
 extern str acc_sipcode_col;
 extern str acc_sipreason_col;
 extern str acc_time_col;
-extern str acc_time_hires_col;
 #endif /* SQL_ACC */
 
 
