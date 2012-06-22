@@ -90,6 +90,7 @@ extern str acc_cseqno_col;
 extern str acc_sipcode_col;
 extern str acc_sipreason_col;
 extern str acc_time_col;
+extern str acc_time_hires_col;
 #endif /* SQL_ACC */
 
 

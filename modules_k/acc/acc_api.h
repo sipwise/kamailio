@@ -57,6 +57,7 @@ typedef struct acc_enviroment {
 	struct hdr_field *to;
 	str text;
 	time_t ts;
+	uint64_t time_hires;
 } acc_enviroment_t;
 
 /* acc extra parameter */
