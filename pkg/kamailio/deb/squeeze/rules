@@ -46,7 +46,7 @@ PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   sqlite json
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
-LIBDIR ?= lib
+export LIBDIR=lib64
 
 # directories with possible duplicate libraries (that should be deleted
 # from current module* packages)
