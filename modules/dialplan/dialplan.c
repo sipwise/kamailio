@@ -277,7 +277,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
 	int no_change;
 	pv_value_t val;
 
-	no_change = (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
+	no_change = (dest->type == PVT_NONE) || (!repl->s);
 
 	if (no_change)
 		goto set_attr_pvar;
