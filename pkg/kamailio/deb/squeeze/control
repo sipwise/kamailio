@@ -73,7 +73,7 @@ Description: radius modules for Kamailio
  .
  This package provides a set of Radius modules for Kamailio, for
  authentication, peering, group membership and messages URIs checking
- against a Radius Server.
+ against a Radius Server and for sending PacketCable Event Messages.
 
 Package: kamailio-unixodbc-modules
 Architecture: any 
