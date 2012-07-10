@@ -164,9 +164,9 @@ install: build
 	$(call PACKAGE_GRP_INSTALL_template)
 	# make single module packages
 	$(call PACKAGE_MODULE_INSTALL_template)
-	# install /etc/default/kamailio file
-	mkdir -p $(CURDIR)/debian/kamailio/etc/default
-	cp -f debian/kamailio.default $(CURDIR)/debian/kamailio/etc/default/kamailio
+	# install /etc/default/kamailio file -- not needed in ngcp
+	#mkdir -p $(CURDIR)/debian/kamailio/etc/default
+	#cp -f debian/kamailio.default $(CURDIR)/debian/kamailio/etc/default/kamailio
 	#dh_movefiles
 
 
