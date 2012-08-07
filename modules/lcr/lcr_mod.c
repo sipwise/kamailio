@@ -2309,8 +2309,8 @@ static int do_from_gw(struct sip_msg* _m, unsigned int lcr_id,
 
     /* Store tag and flags and return result */
     if ((res != NULL) &&
-	((transport == PROTO_NONE) || (res->transport == transport))) {
-	LM_DBG("request came from gw\n");
+  	((transport == PROTO_NONE) || (res->transport == transport))) {
+	LM_DBG("request game from gw\n");
 	if (tag_avp_param) {
 	    val.s.s = res->tag;
 	    val.s.len = res->tag_len;
@@ -2498,8 +2498,7 @@ static int do_to_gw(struct sip_msg* _m, unsigned int lcr_id,
 
     /* Return result */
     if ((res != NULL) &&
-	((res->transport == transport) ||
-	 ((transport == PROTO_NONE) && (res->transport == PROTO_UDP)))) {
+  	((transport == PROTO_NONE) || (res->transport == transport))) {
 	LM_DBG("request goes to gw\n");
 	return 1;
     } else {
