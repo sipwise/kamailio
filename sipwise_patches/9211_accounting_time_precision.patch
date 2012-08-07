@@ -1,0 +1,110 @@
+Index: modules_k/acc/acc_api.h
+===================================================================
+--- modules_k/acc/acc_api.h	(revisión: 9210)
++++ modules_k/acc/acc_api.h	(revisión: 9211)
+@@ -57,6 +57,7 @@
+ 	struct hdr_field *to;
+ 	str text;
+ 	time_t ts;
++	uint64_t time_hires;
+ } acc_enviroment_t;
+ 
+ /* acc extra parameter */
+Index: modules_k/acc/acc_mod.c
+===================================================================
+--- modules_k/acc/acc_mod.c	(revisión: 9210)
++++ modules_k/acc/acc_mod.c	(revisión: 9211)
+@@ -193,6 +193,7 @@
+ str acc_sipcode_col    = str_init("sip_code");
+ str acc_sipreason_col  = str_init("sip_reason");
+ str acc_time_col       = str_init("time");
++str acc_time_hires_col = str_init("time_hires");
+ int acc_db_insert_mode = 0;
+ #endif
+ 
+@@ -287,6 +288,7 @@
+ 	{"acc_sip_code_column",  STR_PARAM, &acc_sipcode_col.s    },
+ 	{"acc_sip_reason_column",STR_PARAM, &acc_sipreason_col.s  },
+ 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
++	{"acc_time_hires_column",      STR_PARAM, &acc_time_hires_col.s       },
+ 	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
+ #endif
+ 	{0,0,0}
+@@ -429,6 +431,7 @@
+ 	acc_sipcode_col.len = strlen(acc_sipcode_col.s);
+ 	acc_sipreason_col.len = strlen(acc_sipreason_col.s);
+ 	acc_time_col.len = strlen(acc_time_col.s);
++	acc_time_hires_col.len = strlen(acc_time_hires_col.s);
+ #endif
+ 
+ 	if (log_facility_str) {
+Index: modules_k/acc/acc.c
+===================================================================
+--- modules_k/acc/acc.c	(revisión: 9210)
++++ modules_k/acc/acc.c	(revisión: 9211)
+@@ -125,6 +125,14 @@
+ 	struct hdr_field *from;
+ 	struct hdr_field *to;
+ 
++	struct timeval  tv;
++	struct timezone tz;
++	struct tm      *tm;
++	uint64_t        time_hires;
++ 
++	gettimeofday(&tv, &tz);
++	tm = localtime(&tv.tv_sec);
++
+ 	/* method : request/reply - cseq parsed in acc_preparse_req() */
+ 	c_vals[0] = get_cseq(req)->method;
+ 	t_vals[0] = TYPE_STR;
+@@ -174,6 +182,10 @@
+ 	t_vals[5] = TYPE_STR;
+ 
+ 	acc_env.ts = time(NULL);
++
++	time_hires = (tv.tv_sec * 1000) + tv.tv_usec / 1000;
++	acc_env.time_hires = time_hires;
++
+ 	return ACC_CORE_LEN;
+ }
+ 
+@@ -306,7 +318,8 @@
+ 	db_keys[n++] = &acc_sipcode_col;
+ 	db_keys[n++] = &acc_sipreason_col;
+ 	db_keys[n++] = &acc_time_col;
+-	time_idx = n-1;
++	db_keys[n++] = &acc_time_hires_col;
++	time_idx = n-2;
+ 
+ 	/* init the extra db keys */
+ 	for(extra=db_extra; extra ; extra=extra->next)
+@@ -322,6 +335,7 @@
+ 		VAL_NULL(db_vals+i)=0;
+ 	}
+ 	VAL_TYPE(db_vals+time_idx)=DB1_DATETIME;
++	VAL_TYPE(db_vals+time_idx+1)=DB1_DOUBLE;
+ }
+ 
+ 
+@@ -380,7 +394,8 @@
+ 		VAL_STR(db_vals+i) = val_arr[i];
+ 	/* time value */
+ 	VAL_TIME(db_vals+(m++)) = acc_env.ts;
+-
++	VAL_DOUBLE(db_vals+(m++)) = ((double) acc_env.time_hires) / 1000;
++	i = m;
+ 	/* extra columns */
+ 	m += extra2strar( db_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+ 
+Index: modules_k/acc/acc_mod.h
+===================================================================
+--- modules_k/acc/acc_mod.h	(revisión: 9210)
++++ modules_k/acc/acc_mod.h	(revisión: 9211)
+@@ -90,6 +90,7 @@
+ extern str acc_sipcode_col;
+ extern str acc_sipreason_col;
+ extern str acc_time_col;
++extern str acc_time_hires_col;
+ #endif /* SQL_ACC */
+ 
+ 

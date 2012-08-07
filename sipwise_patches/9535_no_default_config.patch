@@ -1,0 +1,26 @@
+Index: Makefile
+===================================================================
+--- Makefile	(revisión: 9534)
++++ Makefile	(revisión: 9535)
+@@ -884,7 +884,7 @@
+ 
+ .PHONY: install
+ install: mk_params="compile_for_install=yes"
+-install: install-bin install-every-module install-cfg \
++install: install-bin install-every-module  \
+ 	install-doc install-man install-utils install-share
+ 
+ .PHONY: dbinstall
+Index: utils/kamctl/Makefile
+===================================================================
+--- utils/kamctl/Makefile	(revisión: 9534)
++++ utils/kamctl/Makefile	(revisión: 9535)
+@@ -8,7 +8,7 @@
+ 
+ install-if-newer: install
+ 
+-install: install-cfg install-bin install-man install-modules
++install:  install-bin install-man install-modules
+ 
+ install-cfg: $(cfg_prefix)/$(cfg_dir)
+ 		# kamctl config
