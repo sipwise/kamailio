@@ -884,7 +884,7 @@ sunpkg:
 
 .PHONY: install
 install: mk_params="compile_for_install=yes"
-install: install-bin install-every-module install-cfg \
+install: install-bin install-every-module  \
 	install-doc install-man install-utils install-share
 
 .PHONY: dbinstall
