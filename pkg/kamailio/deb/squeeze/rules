@@ -17,7 +17,7 @@
 # export DH_COMPAT=4
 #  -- already set in compat
 #  force no striping (always include debug symbols for now)
-export DEB_BUILD_OPTIONS:="$(DEB_BUILD_OPTIONS) nostrip"
+export DEB_BUILD_OPTIONS:="$(DEB_BUILD_OPTIONS) debug"
 
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES= purple
@@ -193,7 +193,7 @@ binary-common:
 #	dh_undocumented
 	dh_installchangelogs ChangeLog 
 	dh_link
-	dh_strip
+	dh_strip --dbg-package=kamailio-dbg
 	dh_compress 
 	dh_fixperms
 	dh_makeshlibs
