@@ -1,6 +1,31 @@
 kamailio (3.3+ngcp2.6.0) unstable; urgency=low
 
+  [ rfuchs ]
+  * Makefile,pcem_logic.c,pcem_logic.h,pcem_mod.c,pcem_mod.h: fix duplicated content in files screwup
+  * lcr_mod.c,regex_mod.c: PCRE_INFO_SIZE requires a size_t argument
+
+  [ Michael Prokop ]
+  * wrap and sort items in Debian packaging files
+
+  [ mwang ]
+  * subscribe.c: modules_k/rls: Fixed memory leak in rls
+  * resource_notify.c: modules_k/rls: Added DB transaction code around rls_presentity insert/replace
+  * send_subscribe.c: modules_k/pua: Fixed double-free in pua
+  * subscribe.c: modules_k/rls: Fixed memory leak in rls under some error conditions
+  * rls.c: modules_k/rls: Fixed incorrect table version check
+
+  [ jbonilla ]
   * Updated to upstream 3.3.1
+  * Apply 9211_accounting_time_precision.patch
+  * Apply 9231_dialplan_regexp_subst.patch
+  * Apply 9233_unforce_rtp_proxy_one_param.patch
+  * Apply 9239_forward_port_usrloc.patch
+  * Apply 9441_add_pcem_module.patch
+  * Apply 9535_no_default_config.patch
+  * Create folder of patches to track Sipwise changes
+  * notify.c: Merge 25c6efc8d245c339c77748f93c222188769a7be8
+  * loose.c: Upstream  8db3e9c29b2cf1ff5c6f93411d3e9a90f7eb82ef
+  * Add kamailio-dbg package to packaging
 
  -- Jon Bonilla <jbonilla@sipwise.com>  Tue, 07 Aug 2012 20:23:56 +0200
 
