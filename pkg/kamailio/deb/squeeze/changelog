@@ -1,3 +1,20 @@
+kamailio (3.3+ngcp2.6.2) unstable; urgency=low
+
+  * Fix bad tagging
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 23 Aug 2012 21:51:43 +0200
+
+kamailio (3.3+ngcp2.6.1) unstable; urgency=low
+
+  [ Michael Prokop ]
+  * Provide postrm script
+  * Provide postinst script, taking care of services restarts in HA mode
+
+  [ jbonilla ]
+  * re-add init stuff 
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 23 Aug 2012 17:23:00 +0200
+
 kamailio (3.3+ngcp2.6.0) unstable; urgency=low
 
   [ rfuchs ]
