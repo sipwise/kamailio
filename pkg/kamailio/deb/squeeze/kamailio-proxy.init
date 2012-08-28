@@ -1,7 +1,7 @@
 #!/bin/sh
 ### BEGIN INIT INFO
 # Provides:          kamailio-proxy
-# Required-Start:    $syslog $network $local_fs $time $remote_fs
+# Required-Start:    $syslog $network $local_fs $time mysql $remote_fs
 # Required-Stop:     $syslog $network $local_fs $remote_fs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
