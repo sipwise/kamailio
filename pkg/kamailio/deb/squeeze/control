@@ -42,7 +42,9 @@ Homepage: http://www.kamailio.org/
 Package: kamailio
 Architecture: any
 Depends: adduser, ${misc:Depends}, ${shlibs:Depends}
-Conflicts: kamailio-regex-modules
+Conflicts: kamailio-regex-modules,
+           ngcp-system-tools-ce (<< 0.6.0),
+           ngcp-system-tools-pro (<< 0.6.0)
 Suggests: kamailio-berkeley-modules,
           kamailio-carrierroute-modules,
           kamailio-cpl-modules,
