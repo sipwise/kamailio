@@ -1392,13 +1392,8 @@ fix_nated_sdp_f(struct sip_msg* msg, char* str1, char* str2)
 			m_start += 4;
 			rest_len = body.len - (m_start - body.s);
 			m_start = m_end = ser_memmem(m_start, "\r\nm=", rest_len, 4);
-			if (!m_end) {
-				m_end = body.s + body.len - 2;
-				if (memcmp(m_end, "\r\n", 2) != 0) {
-					LM_ERR("SDP body is missing trailing CRLF\n");
-					return -1;
-				}
-			}
+			if (!m_end)
+				m_end = body.s + body.len; /* just before the final \r\n */
 		        anchor = anchor_lump(msg, m_end - msg->buf, 0, 0);
 		        if (anchor == NULL) {
 			    LM_ERR("anchor_lump failed\n");
