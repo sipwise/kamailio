@@ -1,3 +1,14 @@
+kamailio (3.3+ngcp2.6.5) unstable; urgency=low
+
+  [ Michael Prokop ]
+  * kamailio.postinst: postinst: do not exit if update-rc.d does not work
+
+  [ jbonilla ]
+  * kamailio.postinst: Remove debhelper mark fomr postinst script
+  * rules: disable dh_installdebconf
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Wed, 29 Aug 2012 10:30:35 +0200
+
 kamailio (3.3+ngcp2.6.4) unstable; urgency=low
 
   * Conflict with ngcp-system-tools-* packages.
