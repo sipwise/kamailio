@@ -3,6 +3,8 @@
 
 set -e
 
+HOMEDIR=/var/run/kamailio
+
 restart_handler() {
   [ -n "$1" ] || return 1
 
@@ -45,7 +47,7 @@ case "$1" in
     configure)
         adduser --quiet --system --group --disabled-password \
                 --shell /bin/false --gecos "Kamailio" \
-                --home $HOMEDIR kamailio || true
+                --home "$HOMEDIR" kamailio || true
         init_handler kamailio-lb
         init_handler kamailio-proxy
         ;;
