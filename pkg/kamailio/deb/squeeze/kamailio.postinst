@@ -1,12 +1,9 @@
 #! /bin/sh
 #
-# $Id$
-
-PKG=kamailio
-DEFAULTS=/etc/default/kamailio
-HOMEDIR=/var/run/kamailio
 
 set -e
+
+HOMEDIR=/var/run/kamailio
 
 restart_handler() {
   [ -n "$1" ] || return 1
@@ -24,7 +21,9 @@ initscript_handler() {
   [ -n "$1" ] || return 1
 
   if [ -x "/etc/init.d/$1" ]; then
-    update-rc.d "$1" defaults >/dev/null
+    if ! update-rc.d "$1" defaults >/dev/null ; then
+      echo "Warning: update-rc.d could not be executed, might be caused by mysql not available yet."
+    fi
     invoke-rc.d "$1" start || exit $?
   fi
 }
@@ -50,13 +49,12 @@ case "$1" in
     configure)
         adduser --quiet --system --group --disabled-password \
                 --shell /bin/false --gecos "Kamailio" \
-                --home $HOMEDIR kamailio || true
+                --home "$HOMEDIR" kamailio || true
         init_handler kamailio-lb
         init_handler kamailio-proxy
         ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
-
         ;;
 
     *)
@@ -64,6 +62,4 @@ case "$1" in
         exit 1
         ;;
 esac
-
-#DEBHELPER#
 
