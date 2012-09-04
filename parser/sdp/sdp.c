@@ -721,12 +721,12 @@ int parse_sdp(struct sip_msg* _m)
 			if (res != 0) {
 				LM_DBG("free_sdp\n");
 				free_sdp((sdp_info_t**)(void*)&_m->body);
+				return res;
 			}
 			/* The whole body is SDP */
 			((sdp_info_t*)_m->body)->raw_sdp.s = body.s;
 			((sdp_info_t*)_m->body)->raw_sdp.len = body.len;
-			return res;
-			break;
+			return 0;
 		default:
 			LM_DBG("TYPE_APPLICATION: unknown %d\n",mime&0x00ff);
 			return -1;
