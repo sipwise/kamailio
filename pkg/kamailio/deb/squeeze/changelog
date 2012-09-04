@@ -1,3 +1,9 @@
+kamailio (3.3+ngcp2.6.7) unstable; urgency=low
+
+  * Fix segfault caused by invalid SDP bodies
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Tue, 04 Sep 2012 17:14:56 -0400
+
 kamailio (3.3+ngcp2.6.6) unstable; urgency=low
 
   [ Richard Fuchs ]
