@@ -107,13 +107,13 @@ struct iovec_array{
 	struct iovec* v;
 	int idx;
 	int len;
-	int (*output)(struct iovec_array *);
-	void *data;
+	void *ctx;
 };
 
 /* send */
 static void rpc_fault(struct binrpc_ctx* ctx, int code, char* fmt, ...);
 static int rpc_send(struct binrpc_ctx* ctx);
+static int rpc_send_v(struct iovec_array *a);
 static int rpc_add(struct binrpc_ctx* ctx, char* fmt, ...);
 static int rpc_scan(struct binrpc_ctx* ctx, char* fmt, ...);
 static int rpc_printf(struct binrpc_ctx* ctx, char* fmt, ...);
@@ -259,7 +259,7 @@ inline static int append_iovec(struct iovec_array* a, unsigned char* buf,
 	int ret;
 
 	if (a->idx >= a->len) {
-		ret = a->output(a);
+		ret = rpc_send_v(a);
 		if (ret < 0)
 			return ret;
 	}
@@ -549,7 +549,7 @@ static int rpc_send_v(struct iovec_array *a)
 	if (a->idx <= 0)
 		return 0;
 
-	ret = sock_send_v(a->data, a->v, a->idx);	
+	ret = sock_send_v(a->ctx, a->v, a->idx);
 	if (ret < 0)
 		return ret;
 
@@ -571,8 +571,7 @@ static int rpc_send(struct binrpc_ctx* ctx)
 	a.v=v;
 	a.idx=1;
 	a.len=MAX_MSG_CHUNKS;
-	a.output = rpc_send_v;
-	a.data = ctx->send_h;
+	a.ctx = ctx->send_h;
 	
 	if (ctx->replied){
 		LOG(L_ERR, "ERROR: binrpc: rpc_send: rpc method %s tried to reply"
@@ -595,7 +594,7 @@ static int rpc_send(struct binrpc_ctx* ctx)
 		LOG(L_ERR, "ERROR: binrprc: rpc_send: too many message chunks\n");
 		goto error;
 	}
-	if ((err = a.output(&a)) < 0){
+	if ((err = rpc_send_v(&a)) < 0){
 		if (err==-2){
 			LOG(L_ERR, "ERROR: binrpc: rpc_send: send failed: "
 					"datagram too big\n");
