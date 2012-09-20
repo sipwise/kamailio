@@ -1,8 +1,9 @@
-kamailio (3.3+ngcp2.6.8) UNRELEASED; urgency=low
+kamailio (3.3+ngcp2.6.8) unstable; urgency=low
 
   * merge [f5997ba] b/f: In case of IPv6 Option in the RTP-Command, the pointers and the length need to be updated.
+  * attempt to work around the modules/ctl message chunk limitation
 
- -- Richard Fuchs <rfuchs@sipwise.com>  Tue, 04 Sep 2012 17:30:36 -0400
+ -- Richard Fuchs <rfuchs@sipwise.com>  Thu, 20 Sep 2012 11:30:41 -0400
 
 kamailio (3.3+ngcp2.6.7) unstable; urgency=low
 
