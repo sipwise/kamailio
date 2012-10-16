@@ -280,7 +280,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
 	memset(&val, 0, sizeof(pv_value_t));
 	val.flags = PV_VAL_STR;
 
-	no_change = (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
+	no_change = (dest->type == PVT_NONE) || (!repl->s);
 
 	if (no_change)
 		goto set_attr_pvar;
