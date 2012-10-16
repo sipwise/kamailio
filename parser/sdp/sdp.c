@@ -451,6 +451,8 @@ static int parse_sdp_session(str *sdp_body, int session_num, str *cnt_disp, sdp_
 		/* c2p will point to per-media "c=" */
 		c2p = find_sdp_line(m1p, m2p, 'c');
 
+		sdp_ip.s = NULL;
+		sdp_ip.len = 0;
 		if (c2p) {
 			/* Extract stream address */
 			tmpstr1.s = c2p;
@@ -721,12 +723,13 @@ int parse_sdp(struct sip_msg* _m)
 			if (res != 0) {
 				LM_DBG("free_sdp\n");
 				free_sdp((sdp_info_t**)(void*)&_m->body);
-				return res;
+                                return res;
 			}
 			/* The whole body is SDP */
 			((sdp_info_t*)_m->body)->raw_sdp.s = body.s;
 			((sdp_info_t*)_m->body)->raw_sdp.len = body.len;
-			return 0;
+			return res;
+			break;
 		default:
 			LM_DBG("TYPE_APPLICATION: unknown %d\n",mime&0x00ff);
 			return -1;

@@ -78,7 +78,9 @@ extern int db_flag;
 extern int db_missed_flag;
 
 extern str db_table_acc;
+extern void *db_table_acc_data;
 extern str db_table_mc;
+extern void *db_table_mc_data;
 
 extern str acc_method_col;
 extern str acc_fromuri_col;
@@ -90,7 +92,6 @@ extern str acc_cseqno_col;
 extern str acc_sipcode_col;
 extern str acc_sipreason_col;
 extern str acc_time_col;
-extern str acc_time_hires_col;
 #endif /* SQL_ACC */
 
 

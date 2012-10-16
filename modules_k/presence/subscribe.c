@@ -470,9 +470,9 @@ int update_subscription_notifier(struct sip_msg* msg, subs_t* subs,
 	*sent_reply= 0;
 
 	/* Set the notifier/update fields for the subscription */
-	subs->updated = core_hash(&subs->callid, &subs->from_tag,
+	subs->updated = core_hash(&subs->callid, &subs->from_tag, 0) %
 				(pres_waitn_time * pres_notifier_poll_rate
-					* pres_notifier_processes) - 1);
+					* pres_notifier_processes);
 	if (subs->event->type & WINFO_TYPE)
 		subs->updated_winfo = UPDATED_TYPE;
 	else if (subs->event->wipeer)
@@ -1581,9 +1581,9 @@ int handle_expired_subs(subs_t* s)
 
 void update_db_subs_timer_notifier(void)
 {
-	db_key_t query_cols[1], result_cols[3];
-	db_val_t query_vals[1], *values;
-	db_op_t query_ops[1];
+	db_key_t query_cols[2], result_cols[3];
+	db_val_t query_vals[2], *values;
+	db_op_t query_ops[2];
 	db_row_t *rows;
 	db1_res_t *result = NULL;
 	int n_query_cols = 0, n_result_cols = 0;
@@ -1610,6 +1610,13 @@ void update_db_subs_timer_notifier(void)
 	query_ops[n_query_cols]= OP_LT;
 	n_query_cols++;
 
+	query_cols[n_query_cols]= &str_updated_col;
+	query_vals[n_query_cols].type = DB1_INT;
+	query_vals[n_query_cols].nul = 0;
+	query_vals[n_query_cols].val.int_val= NO_UPDATE_TYPE;
+	query_ops[n_query_cols]= OP_EQ;
+	n_query_cols++;
+
 	result_cols[r_callid_col=n_result_cols++] = &str_callid_col;
 	result_cols[r_to_tag_col=n_result_cols++] = &str_to_tag_col;
 	result_cols[r_from_tag_col=n_result_cols++] = &str_from_tag_col;
@@ -1634,6 +1641,7 @@ void update_db_subs_timer_notifier(void)
 		for (i = 0; i <RES_ROW_N(result); i++)
 		{
 			values = ROW_VALUES(&rows[i]);
+			memset(&subs, 0, sizeof(subs_t));
 
 			subs.callid.s = (char *) VAL_STRING(&values[r_callid_col]);
 			subs.callid.len = strlen(subs.callid.s);

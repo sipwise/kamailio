@@ -127,17 +127,22 @@ void get_dialog_from_did(char* did, subs_t **dialog, unsigned int *hash_code)
 
 		/* save dialog info */
 		*dialog= pres_copy_subs(s, PKG_MEM_TYPE);
+		if(*dialog== NULL)
+		{
+			LM_ERR("while copying subs_t structure\n");
+			lock_release(&rls_table[*hash_code].lock);
+			return;
+		}
 	}
 
-	if(*dialog== NULL)
-	{
-		LM_ERR("while copying subs_t structure\n");
-	}
+	if ((*dialog)->expires < (int)time(NULL))
+		(*dialog)->expires = 0;
+	else
+		(*dialog)->expires -= (int)time(NULL);
 
 	if (dbmode != RLS_DB_ONLY)
 		lock_release(&rls_table[*hash_code].lock);
 
-	(*dialog)->expires -= (int)time(NULL); 
 }
 
 int send_notify(xmlDocPtr * rlmi_doc, char * buf, int buf_len, 
@@ -715,9 +720,9 @@ int rls_handle_notify(struct sip_msg* msg, char* c1, char* c2)
 	query_vals[n_query_cols].nul = 0;
 	if (dbmode == RLS_DB_ONLY)
 		query_vals[n_query_cols].val.int_val=
-			core_hash(res_id, NULL,
+			core_hash(res_id, NULL, 0) %
 				(waitn_time * rls_notifier_poll_rate
-					* rls_notifier_processes) - 1);
+					* rls_notifier_processes);
 	else
 		query_vals[n_query_cols].val.int_val = UPDATED_TYPE;
 	n_query_cols++;
@@ -994,15 +999,10 @@ static void timer_send_full_state_notifies(int round)
 		sub.remote_cseq = VAL_INT(&values[rcseq_col]);
 		sub.status = VAL_INT(&values[status_col]);
 		sub.version = VAL_INT(&values[version_col]);
-		if (VAL_INT(&values[expires_col]) > now)
-			sub.expires = VAL_INT(&values[expires_col]) - now;
-		else
-			sub.expires = 0;
-
-		if (sub.expires < rls_expires_offset) sub.expires = 0;
-
-		if (sub.expires != 0)
+		if (VAL_INT(&values[expires_col]) > now + rls_expires_offset)
 		{
+			sub.expires = VAL_INT(&values[expires_col]) - now;
+
 			if (rls_get_service_list(&sub.pres_uri, &sub.watcher_user,
 				&sub.watcher_domain, &service_node, &doc) < 0)
 			{
@@ -1026,6 +1026,7 @@ static void timer_send_full_state_notifies(int round)
 		}
 		else
 		{
+			sub.expires = 0;
 			rls_send_notify(&sub, NULL, NULL, NULL);
 			delete_rlsdb(&sub.callid, &sub.to_tag, &sub.from_tag);
 		}
@@ -1153,7 +1154,7 @@ void rls_presentity_clean(unsigned int ticks,void *param)
 	query_ops[0]= OP_LT;
 	query_vals[0].nul= 0;
 	query_vals[0].type= DB1_INT;
-	query_vals[0].val.int_val= (int)time(NULL) - 10;
+	query_vals[0].val.int_val= (int)time(NULL) - rls_expires_offset;
 
 	if (rlpres_dbf.use_table(rlpres_db, &rlpres_table) < 0) 
 	{

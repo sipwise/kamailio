@@ -184,7 +184,9 @@ static char *db_extra_str = 0;		/*!< db extra variables */
 struct acc_extra *db_extra = 0;
 static str db_url = {NULL, 0};		/*!< Database url */
 str db_table_acc = str_init("acc");	/*!< name of database tables */
+void *db_table_acc_data = NULL;
 str db_table_mc = str_init("missed_calls");
+void *db_table_mc_data = NULL;
 /* names of columns in tables acc/missed calls*/
 str acc_method_col     = str_init("method");
 str acc_fromtag_col    = str_init("from_tag");
@@ -193,7 +195,6 @@ str acc_callid_col     = str_init("callid");
 str acc_sipcode_col    = str_init("sip_code");
 str acc_sipreason_col  = str_init("sip_reason");
 str acc_time_col       = str_init("time");
-str acc_time_hires_col = str_init("time_hires");
 int acc_db_insert_mode = 0;
 #endif
 
@@ -288,7 +289,6 @@ static param_export_t params[] = {
 	{"acc_sip_code_column",  STR_PARAM, &acc_sipcode_col.s    },
 	{"acc_sip_reason_column",STR_PARAM, &acc_sipreason_col.s  },
 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
-	{"acc_time_hires_column",      STR_PARAM, &acc_time_hires_col.s       },
 	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
 #endif
 	{0,0,0}
@@ -352,6 +352,8 @@ static int acc_fixup(void** param, int param_no)
 		if (db_url.s==0) {
 			pkg_free(p);
 			*param = 0;
+		} else {
+			return fixup_var_pve_str_12(param, 2);
 		}
 #endif
 	}
@@ -423,7 +425,27 @@ static int mod_init( void )
 		}
 	}
 	db_table_acc.len = strlen(db_table_acc.s);
+	if(db_table_acc.len!=3 || strncmp(db_table_acc.s, "acc", 3)!=0)
+	{
+		db_table_acc_data = db_table_acc.s;
+		if(fixup_var_pve_str_12(&db_table_acc_data, 1)<0)
+		{
+			LM_ERR("unable to parse acc table name [%.*s]\n",
+					db_table_acc.len, db_table_acc.s);
+			return -1;
+		}
+	}
 	db_table_mc.len = strlen(db_table_mc.s);
+	if(db_table_mc.len!=12 || strncmp(db_table_mc.s, "missed_calls", 12)!=0)
+	{
+		db_table_mc_data = db_table_mc.s;
+		if(fixup_var_pve_str_12(&db_table_mc_data, 1)<0)
+		{
+			LM_ERR("unable to parse mc table name [%.*s]\n",
+					db_table_mc.len, db_table_mc.s);
+			return -1;
+		}
+	}
 	acc_method_col.len = strlen(acc_method_col.s);
 	acc_fromtag_col.len = strlen(acc_fromtag_col.s);
 	acc_totag_col.len = strlen(acc_totag_col.s);
@@ -431,7 +453,6 @@ static int mod_init( void )
 	acc_sipcode_col.len = strlen(acc_sipcode_col.s);
 	acc_sipreason_col.len = strlen(acc_sipreason_col.s);
 	acc_time_col.len = strlen(acc_time_col.s);
-	acc_time_hires_col.len = strlen(acc_time_hires_col.s);
 #endif
 
 	if (log_facility_str) {

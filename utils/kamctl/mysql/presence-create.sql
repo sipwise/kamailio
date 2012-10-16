@@ -102,10 +102,10 @@ CREATE TABLE pua (
     remote_contact VARCHAR(128) NOT NULL,
     version INT(11) NOT NULL,
     extra_headers TEXT NOT NULL,
-    CONSTRAINT pua_idx UNIQUE (etag, tuple_id, call_id, from_tag),
-    CONSTRAINT expires_idx UNIQUE (expires)
+    CONSTRAINT pua_idx UNIQUE (etag, tuple_id, call_id, from_tag)
 ) ENGINE=MyISAM;
 
+CREATE INDEX expires_idx ON pua (expires);
 CREATE INDEX dialog1_idx ON pua (call_id, from_tag, to_tag);
 CREATE INDEX dialog2_idx ON pua (pres_id, pres_uri);
 CREATE INDEX tmp_dlg1_idx ON pua (call_id, from_tag);

@@ -170,7 +170,7 @@ module_group_postgres=$(module_group_postgres_driver) $(module_group_db)
 
 # For radius
 module_group_radius=acc_radius auth_radius misc_radius avp_radius uri_radius \
-					peering pcem
+					peering
 
 # For presence
 # kamailio modules
@@ -226,7 +226,7 @@ module_group_kpostgres=db_postgres
 module_group_kcpl=cpl-c
 
 # K radius modules
-module_group_kradius=acc_radius auth_radius misc_radius peering pcem
+module_group_kradius=acc_radius auth_radius misc_radius peering
 
 # K unixodbc module
 module_group_kunixodbc=db_unixodbc
@@ -309,7 +309,7 @@ else
 							db_sqlite db_unixodbc db_cassandra memcached mi_xmlrpc \
 							perl perlvdb purple \
 							snmpstats xmpp \
-							carrierroute peering pcem \
+							carrierroute peering \
 							dialplan lcr utils presence presence_mwi \
 							presence_dialoginfo presence_xml pua pua_bla \
 							pua_dialoginfo pua_usrloc pua_xmpp \
@@ -884,7 +884,7 @@ sunpkg:
 
 .PHONY: install
 install: mk_params="compile_for_install=yes"
-install: install-bin install-every-module  \
+install: install-bin install-every-module install-cfg \
 	install-doc install-man install-utils install-share
 
 .PHONY: dbinstall
