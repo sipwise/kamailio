@@ -1,3 +1,13 @@
+kamailio (3.3+ngcp2.6.9) unstable; urgency=low
+
+  [ Jon Bonilla ]
+  * Merge with upstream 3.3.2
+
+  [ Richard Fuchs ]
+  * Fix a mem leak in siputils module
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 08 Nov 2012 17:42:19 +0100
+
 kamailio (3.3+ngcp2.6.8) unstable; urgency=low
 
   * merge [f5997ba] b/f: In case of IPv6 Option in the RTP-Command, the pointers and the length need to be updated.
