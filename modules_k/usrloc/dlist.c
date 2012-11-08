@@ -110,6 +110,11 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 	void *cp;
 	int shortage, needed;
 
+	if(ul_dbf.raw_query==NULL) {
+		LM_WARN("DB raw query support is required, but not implemented\n");
+		return -1;
+	}
+
 	cp = buf;
 	shortage = 0;
 	/* Reserve space for terminating 0000 */
@@ -201,12 +206,12 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 			} else {
 				if (parse_phostport( p, &host.s, &host.len,
 				&port, &proto)!=0) {
-					LM_ERR("bad socket <%s>...ignoring\n", p);
+					LM_ERR("bad socket <%s>...set to 0\n", p);
 					sock = 0;
 				} else {
 					sock = grep_sock_info( &host, (unsigned short)port, proto);
 					if (sock==0) {
-						LM_WARN("non-local socket <%s>...ignoring\n", p);
+						LM_DBG("non-local socket <%s>...set to 0\n", p);
 					}
 				}
 			}
