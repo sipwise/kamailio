@@ -2394,8 +2394,6 @@ fcmd:
 		if ($1 && rt==ONSEND_ROUTE) {
 			switch($1->type) {
 				case DROP_T:
-				case SEND_T:
-				case SEND_TCP_T:
 				case LOG_T:
 				case SETFLAG_T:
 				case RESETFLAG_T:
