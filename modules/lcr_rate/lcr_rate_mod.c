@@ -206,7 +206,7 @@ static int peers_cmp(const void *aa, const void *bb) {
 		return 1;
 	if (a->cost > b->cost)
 		return -1;
-	if (a->weight < b->cost)
+	if (a->weight < b->weight)
 		return 1;
 	return -1;
 }
