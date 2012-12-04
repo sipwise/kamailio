@@ -107,8 +107,11 @@ static void mod_destroy() {
 static int check_swrate_init() {
 	if (swrate_done)
 		return 0;
-	if (swrate_init(&swrate_handle, db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0))
+	if (swrate_init(&swrate_handle, db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0)) {
+		LM_ERR("failed to initialized libswrate\n");
 		return -1;
+	}
+	swrate_done = 1;
 	return 0;
 }
 
@@ -124,8 +127,10 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 
 	len = 4;
 	ret = pkg_malloc(len * sizeof(*ret));
-	if (!ret)
+	if (!ret) {
+		LM_ERR("out of pkg memory\n");
 		return NULL;
+	}
 	i = 0;
 	time(&now);
 
@@ -136,28 +141,49 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 
 		if (i == len) {
 			len <<= 1;
-			ret = pkg_realloc(ret, len * sizeof(*ret));
-			if (!ret)
+			j = pkg_realloc(ret, len * sizeof(*ret));
+			if (!j) {
+				pkg_free(ret);
+				LM_ERR("out of pkg memory\n");
 				return NULL;
+			}
+			ret = j;
 		}
 
 		j = &ret[i];
 
 		j->s.len = val.s.len;
 		j->s.s = pkg_malloc(val.s.len);
+		if (!j->s.s) {
+			pkg_free(ret);
+			LM_ERR("out of pkg memory\n");
+			return NULL;
+		}
 		memcpy(j->s.s, val.s.s, val.s.len);
 		c = memrchr(j->s.s, '|', val.s.len);
-		if (!c)
+		if (!c) {
+			pkg_free(ret);
+			LM_ERR("separator not found in string <%.*s>\n", val.s.len, j->s.s);
 			return NULL;
+		}
 
 		c++;
 		s.s = c;
 		s.len = val.s.len - (c - j->s.s);
-		str2int(&s, &j->id);
+		if (str2int(&s, &j->id)) {
+			pkg_free(ret);
+			LM_ERR("could not convert string <%.*s> to int\n", s.len, s.s);
+			return NULL;
+		}
 
 		j->weight = i;
 
-		swrate_get_peer_rate(&rate, &swrate_handle, j->id, user->s, domain->s, now);
+		if (swrate_get_peer_rate(&rate, &swrate_handle, j->id, user->s, domain->s, now)) {
+			pkg_free(ret);
+			LM_ERR("failed to get rate for call, peer id %u, user <%.*s>@<%.*s>\n",
+				j->id, user->len, user->s, domain->len, domain->s);
+			return NULL;
+		}
 		j->cost = rate.init_rate;
 
 		destroy_avp(avp);
@@ -186,7 +212,8 @@ static int save_peers(struct peer *peers, int num) {
 
 	for (i = 0; i < num; i++) {
 		val.s = peers[i].s;
-		add_avp(gw_uri_avp_type|AVP_VAL_STR, gw_uri_avp, val);
+		if (add_avp(gw_uri_avp_type|AVP_VAL_STR, gw_uri_avp, val))
+			LM_ERR("add_avp failed\n");
 		pkg_free(val.s.s);
 	}
 
@@ -202,10 +229,18 @@ static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
 	if (check_swrate_init())
 		return -1;
 
-	fixup_get_svalue(msg, (gparam_t *) su, &user);
-	fixup_get_svalue(msg, (gparam_t *) sq, &domain);
+	if (fixup_get_svalue(msg, (gparam_t *) su, &user)) {
+		LM_ERR("failed to get user parameter\n");
+		return -1;
+	}
+	if (fixup_get_svalue(msg, (gparam_t *) sq, &domain)) {
+		LM_ERR("failed to get domain parameter\n");
+		return -1;
+	}
 
 	peers = load_peers(&num_peers, &user, &domain);
+	if (!peers)
+		return -1;
 	qsort(peers, num_peers, sizeof(*peers), peers_cmp);
 	save_peers(peers, num_peers);
 
