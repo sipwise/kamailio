@@ -251,5 +251,5 @@ static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
 	save_peers(peers, num_peers);
 
 	LM_DBG("lcr_rate() done\n");
-	return 0;
+	return 1;
 }
