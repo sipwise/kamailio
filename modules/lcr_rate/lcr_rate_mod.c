@@ -125,6 +125,9 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 	swr_rate_t rate;
 	time_t now;
 
+	LM_DBG("loading peers for user <%.*s>@<%.*s> from avp\n",
+		user->len, user->s, domain->len, domain->s);
+
 	len = 4;
 	ret = pkg_malloc(len * sizeof(*ret));
 	if (!ret) {
@@ -176,6 +179,7 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 			return NULL;
 		}
 
+		LM_DBG("finding rate for peer %u\n", j->id);
 		j->weight = i;
 
 		if (swrate_get_peer_rate(&rate, &swrate_handle, j->id, user->s, domain->s, now)) {
@@ -185,6 +189,7 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 			return NULL;
 		}
 		j->cost = rate.init_rate;
+		LM_DBG("cost is %f\n", j->cost);
 
 		destroy_avp(avp);
 		i++;
@@ -211,7 +216,9 @@ static int save_peers(struct peer *peers, int num) {
 	int_str val;
 
 	for (i = 0; i < num; i++) {
+		LM_DBG("adding back peer %u\n", peers[i].id);
 		val.s = peers[i].s;
+		val.len = peers[i].len;
 		if (add_avp(gw_uri_avp_type|AVP_VAL_STR, gw_uri_avp, val))
 			LM_ERR("add_avp failed\n");
 		pkg_free(val.s.s);
@@ -244,5 +251,6 @@ static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
 	qsort(peers, num_peers, sizeof(*peers), peers_cmp);
 	save_peers(peers, num_peers);
 
+	LM_DBG("lcr_rate() done\n");
 	return 0;
 }
