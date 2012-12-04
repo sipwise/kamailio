@@ -203,12 +203,12 @@ static int peers_cmp(const void *aa, const void *bb) {
 	const struct peer *a = aa, *b = bb;
 
 	if (a->cost < b->cost)
-		return -1;
-	if (a->cost > b->cost)
 		return 1;
-	if (a->weight < b->cost)
+	if (a->cost > b->cost)
 		return -1;
-	return 1;
+	if (a->weight < b->cost)
+		return 1;
+	return -1;
 }
 
 static int save_peers(struct peer *peers, int num) {
