@@ -218,7 +218,6 @@ static int save_peers(struct peer *peers, int num) {
 	for (i = 0; i < num; i++) {
 		LM_DBG("adding back peer %u\n", peers[i].id);
 		val.s = peers[i].s;
-		val.len = peers[i].len;
 		if (add_avp(gw_uri_avp_type|AVP_VAL_STR, gw_uri_avp, val))
 			LM_ERR("add_avp failed\n");
 		pkg_free(val.s.s);
