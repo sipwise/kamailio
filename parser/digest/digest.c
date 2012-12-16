@@ -290,7 +290,7 @@ int find_credentials(struct sip_msg* msg, str* realm,
 			return (res == -1) ? -2 : -3;
 		} else if (res == 0) {
 			r = &(((auth_body_t*)(ptr->parsed))->digest.realm);
-
+			DBG("auth:find_credentials: compare realm '%.*s', len %d to parsed realm '%.*s', len %d\n", realm->s, realm->len, r->s, r->len);
 			if (r->len == realm->len) {
 				if (!strncasecmp(realm->s, r->s, r->len)) {
 					*hdr = ptr;
