@@ -1,8 +1,8 @@
-kamailio (3.3+ngcp2.6.11) unstable; urgency=low
+kamailio (3.3+ngcp2.6.12) unstable; urgency=low
 
-  * Add experimental debugging for find_credentials.
+  * Don't stop after first Authorization header if all message is already parsed in find_credentials.
 
- -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Sun, 16 Dec 2012 11:38:23 +0100
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Sun, 16 Dec 2012 18:21:47 +0100
 
 kamailio (3.3+ngcp2.6.10) unstable; urgency=low
 
