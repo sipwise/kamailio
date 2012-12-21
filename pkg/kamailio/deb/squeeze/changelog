@@ -1,3 +1,12 @@
+kamailio (3.3+ngcp2.7.0) unstable; urgency=low
+
+  * Implement lcr cost-based routing as new lcr_rate module
+  * move send() and send_tcp() from core to corex module. EXPERIMENTAL!
+  * backporting corex module from kamailio trunk including all changes to append_branch()
+  * Fix hunting for Auth header in rare cases in digest parser.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 21 Dec 2012 10:59:56 +0100
+
 kamailio (3.3+ngcp2.6.12) unstable; urgency=low
 
   * Don't stop after first Authorization header if all message is already parsed in find_credentials.
