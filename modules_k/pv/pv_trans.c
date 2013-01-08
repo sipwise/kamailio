@@ -384,7 +384,7 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 					val->rs.s = p+1;
 					val->rs.len = s-p;
 				} else {
-					val->rs.s = "";
+					val->rs.s = val->rs.s + val->rs.len; /* empty string */
 					val->rs.len = 0;
 				}
 			} else {
@@ -406,7 +406,7 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 					val->rs.s = s;
 					val->rs.len = p-s;
 				} else {
-					val->rs.s = "";
+					val->rs.s = val->rs.s + val->rs.len; /* empty string */
 					val->rs.len = 0;
 				}
 			}
