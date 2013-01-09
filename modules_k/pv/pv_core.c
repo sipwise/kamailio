@@ -59,7 +59,7 @@ static str pv_uri_scheme[] = {
 		{ "urn",  3 },
 		{ 0, 0 }
 	};
-static char *empty_str = "";
+static char _empty_str[] = "";
 
 int _pv_pid = 0;
 
