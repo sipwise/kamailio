@@ -6,14 +6,10 @@
 #include <string.h>
 
 #include "bencode.h"
+#include "../../mem/mem.h"
 
 /* set to 0 for alloc debugging, e.g. through valgrind */
 #define BENCODE_MIN_BUFFER_PIECE_LEN	512
-
-#ifndef BENCODE_MALLOC
-#define BENCODE_MALLOC pkg_malloc
-#define BENCODE_FREE pkg_free
-#endif
 
 struct __bencode_buffer_piece {
 	char *tail;
@@ -538,4 +534,29 @@ bencode_item_t *bencode_decode(bencode_buffer_t *buf, const char *s, int len) {
 		default:
 			abort();
 	}
+}
+
+/* XXX inefficient, use a proper hash instead */
+bencode_item_t *bencode_dictionary_get_len(bencode_item_t *dict, const char *keystr, int keylen) {
+	bencode_item_t *key, *val;
+
+	if (!dict)
+		return NULL;
+	if (dict->type != BENCODE_DICTIONARY)
+		return NULL;
+
+	for (val = dict->child; val; val = key->sibling) {
+		key = val->sibling;
+		assert(key != NULL);
+		assert(key->type == BENCODE_STRING);
+
+		if (keylen != key->iov[1].iov_len)
+			continue;
+		if (memcmp(keystr, key->iov[1].iov_base, keylen))
+			continue;
+
+		return val;
+	}
+
+	return NULL;
 }

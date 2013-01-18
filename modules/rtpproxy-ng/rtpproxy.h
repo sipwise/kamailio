@@ -62,6 +62,6 @@ struct rtpp_set_head{
 
 /* Functions from nathelper */
 struct rtpp_node *select_rtpp_node(str, int);
-char *send_rtpp_command(struct rtpp_node *, struct iovec *, int);
+char *send_rtpp_command(struct rtpp_node *, struct iovec *, int, int *);
 
 #endif
