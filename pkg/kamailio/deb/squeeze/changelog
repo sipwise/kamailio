@@ -1,6 +1,7 @@
-kamailio (3.3+ngcp2.6.13) UNRELEASED; urgency=low
+kamailio (3.3+ngcp2.6.13) unstable; urgency=low
 
   * Fix possible segfault in pv module
+  * Create nathelper option to always use contact address
 
  -- Richard Fuchs <rfuchs@sipwise.com>  Wed, 09 Jan 2013 12:43:49 -0500
 
