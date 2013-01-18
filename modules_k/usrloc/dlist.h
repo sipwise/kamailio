@@ -123,6 +123,21 @@ int get_all_ucontacts(void *buf, int len, unsigned int flags,
 
 
 /*!
+ * \brief Same as get_all_ucontacts() with options
+ * \param buf target buffer
+ * \param len length of buffer
+ * \param flags contact flags
+ * \param part_idx part index
+ * \param part_max maximal part
+ * \param options GAU_OPT_* bit field
+ * \return 0 on success, positive if buffer size was not sufficient, negative on failure
+ */
+int get_all_ucontacts_opt(void *buf, int len, unsigned int flags,
+		unsigned int part_idx, unsigned int part_max,
+		unsigned int options);
+
+
+/*!
  * \brief Find and return usrloc domain
  *
  * \param _n domain name

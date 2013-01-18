@@ -333,6 +333,7 @@ static char *force_socket_str = 0;
 static pid_t mypid;
 static int sipping_flag = -1;
 static int natping_processes = 1;
+static int contact_only = 0;
 
 static str nortpproxy_str = str_init("a=nortpproxy:yes");
 
@@ -402,6 +403,7 @@ static param_export_t params[] = {
 	{"sipping_bflag",         INT_PARAM, &sipping_flag          },
 	{"natping_processes",     INT_PARAM, &natping_processes     },
 	{"natping_socket",        STR_PARAM, &natping_socket        },
+	{"contact_only",          INT_PARAM, &contact_only          },
 	{0, 0, 0}
 };
 
@@ -1684,9 +1686,10 @@ nh_timer(unsigned int ticks, void *timer_idx)
 			goto done;
 		}
 	}
-	rval = ul.get_all_ucontacts(buf, cblen, (ping_nated_only?ul.nat_flag:0),
+	rval = ul.get_all_ucontacts_opt(buf, cblen, (ping_nated_only?ul.nat_flag:0),
 		((unsigned int)(unsigned long)timer_idx)*natping_interval+iteration,
-		natping_processes*natping_interval);
+		natping_processes*natping_interval,
+		contact_only ? GAU_OPT_ONLY_CONTACT : 0);
 	if (rval<0) {
 		LM_ERR("failed to fetch contacts\n");
 		goto done;
@@ -1700,9 +1703,10 @@ nh_timer(unsigned int ticks, void *timer_idx)
 			LM_ERR("out of pkg memory\n");
 			goto done;
 		}
-		rval = ul.get_all_ucontacts(buf,cblen,(ping_nated_only?ul.nat_flag:0),
+		rval = ul.get_all_ucontacts_opt(buf,cblen,(ping_nated_only?ul.nat_flag:0),
 		   ((unsigned int)(unsigned long)timer_idx)*natping_interval+iteration,
-		   natping_processes*natping_interval);
+		   natping_processes*natping_interval,
+		   contact_only ? GAU_OPT_ONLY_CONTACT : 0);
 		if (rval != 0) {
 			pkg_free(buf);
 			goto done;
