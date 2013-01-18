@@ -67,6 +67,7 @@ int bind_usrloc(usrloc_api_t* api)
 	api->register_udomain   = register_udomain;
 	api->get_udomain        = get_udomain;
 	api->get_all_ucontacts  = get_all_ucontacts;
+	api->get_all_ucontacts_opt = get_all_ucontacts_opt;
 	api->insert_urecord     = insert_urecord;
 	api->delete_urecord     = delete_urecord;
 	api->get_urecord        = get_urecord;
