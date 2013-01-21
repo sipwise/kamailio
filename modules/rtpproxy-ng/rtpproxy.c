@@ -1119,7 +1119,7 @@ error:
 		node->rn_recheck_ticks = get_ticks() + rtpproxy_disable_tout;
 
 #endif
-	return 1;
+	return 0;
 }
 
 char *
