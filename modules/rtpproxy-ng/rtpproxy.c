@@ -435,7 +435,7 @@ static mi_export_t mi_cmds[] = {
 
 
 struct module_exports exports = {
-	"rtpproxy",
+	"rtpproxy-ng",
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	cmds,
 	params,
