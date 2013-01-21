@@ -1493,7 +1493,7 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		if (!bencode_dictionary_add_str(dict, "via-branch", &viabranch))
 			goto benc_error;
 	}
-	if (!bencode_dictionary_add_str(dict, "from-tag", &to_tag))
+	if (!bencode_dictionary_add_str(dict, "from-tag", &from_tag))
 		goto benc_error;
 	if (to_tag.s && to_tag.len && !bencode_dictionary_add_str(dict, "to-tag", &to_tag))
 		goto benc_error;
@@ -1761,7 +1761,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		from_tag = to_tag;
 		to_tag = tmp;
 	}
-	if (!bencode_dictionary_add_str(dict, "from-tag", &to_tag))
+	if (!bencode_dictionary_add_str(dict, "from-tag", &from_tag))
 		goto benc_error;
 	if (to_tag.s && to_tag.len && !bencode_dictionary_add_str(dict, "to-tag", &to_tag))
 		goto benc_error;
