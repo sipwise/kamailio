@@ -1059,6 +1059,7 @@ rtpp_checkcap(struct rtpp_node *node, char *cap, int caplen)
 static int
 rtpp_test(struct rtpp_node *node, int isdisabled, int force)
 {
+	return 0;
 #if 0
 	int rtpp_ver, rval;
 	char *cp;
@@ -1119,7 +1120,7 @@ error:
 		node->rn_recheck_ticks = get_ticks() + rtpproxy_disable_tout;
 
 #endif
-	return 0;
+	return 1;
 }
 
 char *

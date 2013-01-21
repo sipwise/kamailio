@@ -532,7 +532,7 @@ bencode_item_t *bencode_decode(bencode_buffer_t *buf, const char *s, int len) {
 		case '9':
 			return bencode_decode_string(buf, s, len);
 		default:
-			abort();
+			return NULL;
 	}
 }
 
