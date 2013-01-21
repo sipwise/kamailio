@@ -278,6 +278,12 @@ MODULE_VERSION
 #define	PTL_CPROTOVER	"20081102"
 
 #define	CPORT		"22222"
+
+struct rtpproxy_flags {
+	bencode_item_t *dictionary, *flags, *direction;
+	int flookup, via;
+};
+
 static char *gencookie();
 static int rtpp_test(struct rtpp_node*, int, int);
 static int unforce_rtp_proxy0_f(struct sip_msg *, char *, char *);
@@ -1327,6 +1333,114 @@ unforce_rtp_proxy0_f(struct sip_msg* msg, char* str1, char* str2)
         return unforce_rtp_proxy1_f(msg, arg, str2);
 }
 
+
+static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *flags, bencode_item_t *dict, int offer)
+{
+	const char *cp;
+
+	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
+		switch (*cp) {
+		case '1':
+			flags->via = 1;
+			break;
+
+		case '2':
+			flags->via = 2;
+			break;
+
+		case 'a':
+		case 'A':
+			if (flags->flags) {
+				if (!bencode_list_add_string(flags->flags, "asymmetric"))
+					goto benc_error;
+			}
+			break;
+
+		case 'i':
+		case 'I':
+			if (flags->flags) {
+				if (!bencode_list_add_string(flags->direction, "internal"))
+					goto benc_error;
+			}
+			break;
+
+		case 'e':
+		case 'E':
+			if (flags->direction) {
+				if (!bencode_list_add_string(flags->direction, "external"))
+					goto benc_error;
+			}
+			break;
+
+		case 'l':
+		case 'L':
+			if (offer == 0)
+				goto error;
+			flags->flookup = 1;
+			break;
+
+		case 'f':
+		case 'F':
+		case 'r':
+		case 'R':
+		case 'o':
+		case 'O':
+		case 'c':
+		case 'C':
+			/* ignored for compatibility */
+			break;
+
+		case 'w':
+		case 'W':
+			if (flags->flags) {
+				if (!bencode_list_add_string(flags->flags, "symmetric"))
+					goto benc_error;
+			}
+			break;
+
+#if 0
+		case 'z':
+		case 'Z':
+			if (append_opts(&rep_opts, 'Z') == -1) {
+				LM_ERR("out of pkg memory\n");
+				goto error;
+			}
+			/* If there are any digits following Z copy them into the command */
+			for (; cp[1] != '\0' && isdigit(cp[1]); cp++) {
+				if (append_opts(&rep_opts, cp[1]) == -1) {
+					LM_ERR("out of pkg memory\n");
+					goto error;
+				}
+			}
+			break;
+#endif
+
+		default:
+			LM_ERR("unknown option `%c'\n", *cp);
+			goto error;
+		}
+	}
+
+	/* only add those if any flags were given at all */
+	if (flags->direction && flags->direction->child) {
+		if (!bencode_dictionary_add(dict, "direction", flags->direction))
+			goto benc_error;
+	}
+	if (flags->flags && flags->flags->child) {
+		if (!bencode_dictionary_add(dict, "flags", flags->flags))
+			goto benc_error;
+	}
+
+	return 0;
+
+benc_error:
+	LM_ERR("out of memory - bencode failed\n");
+error:
+	return -1;
+}
+
+
+
 static int
 unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 {
@@ -1336,8 +1450,8 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 	struct iovec *iov;
 	str callid, from_tag, to_tag, viabranch;
 	char *cp;
-	int via = 0;
 	struct rtpp_node *node;
+	struct rtpproxy_flags flags;
 
 	if (bencode_buffer_init(&bencbuf)) {
 		LM_ERR("could not initialized bencode_buffer_t\n");
@@ -1347,21 +1461,10 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 	if (!dict)
 		goto benc_error;
 
-	for (cp = str1; cp && *cp; cp++) {
-		switch (*cp) {
-			case '1':
-				via = 1;
-				break;
+	memset(&flags, 0, sizeof(flags));
 
-			case '2':
-				via = 2;
-				break;
-
-			default:
-				LM_ERR("unknown option `%c'\n", *cp);
-				goto error;
-		}
-	}
+	if (parse_rtpproxy_flags(str1, &flags, dict, 0))
+		goto error;
 
 	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
 		LM_ERR("can't get Call-Id field\n");
@@ -1378,8 +1481,8 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get From tag\n");
 		goto error;
 	}
-	if (via) {
-		if (via == 1)
+	if (flags.via) {
+		if (flags.via == 1)
 			ret = get_via_branch(msg, 1, &viabranch);
 		else /* (via == 2) */
 			ret = get_via_branch(msg, 2, &viabranch);
@@ -1571,19 +1674,19 @@ rtpproxy_answer2_f(struct sip_msg *msg, char *param1, char *param2)
 	return force_rtp_proxy(msg, param1, param2, 0, 1);
 }
 
-
 static int
 force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forcedIP)
 {
 	bencode_buffer_t bencbuf;
-	bencode_item_t *dict, *direction, *flags;
-	int ret, iov_cnt, via, create, flookup, force;
+	bencode_item_t *dict;
+	int ret, iov_cnt, create;
 	struct iovec *iov;
 	str body, newbody;
 	str callid, from_tag, to_tag, viabranch, tmp;
 	struct lump *anchor;
 	struct rtpp_node *node;
 	char *cp;
+	struct rtpproxy_flags flags;
 
 	newbody.s = NULL;
 	if (bencode_buffer_init(&bencbuf)) {
@@ -1593,93 +1696,18 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 	dict = bencode_dictionary(&bencbuf);
 	if (!dict)
 		goto benc_error;
-	direction = bencode_list(&bencbuf);
-	if (!direction)
+
+	memset(&flags, 0, sizeof(flags));
+
+	flags.flags = bencode_list(&bencbuf);
+	if (!flags.flags)
 		goto benc_error;
-	flags = bencode_list(&bencbuf);
-	if (!flags)
+	flags.direction = bencode_list(&bencbuf);
+	if (!flags.direction)
 		goto benc_error;
 
-	flookup = force = via = 0;
-	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
-		switch (*cp) {
-		case '1':
-			via = 1;
-			break;
-
-		case '2':
-			via = 2;
-			break;
-
-		case 'a':
-		case 'A':
-			if (!bencode_list_add_string(flags, "asymmetric"))
-				goto benc_error;
-			break;
-
-		case 'i':
-		case 'I':
-			if (!bencode_list_add_string(direction, "internal"))
-				goto benc_error;
-			break;
-
-		case 'e':
-		case 'E':
-			if (!bencode_list_add_string(direction, "external"))
-				goto benc_error;
-			break;
-
-		case 'l':
-		case 'L':
-			if (offer == 0) {
-				goto error;
-			}
-			flookup = 1;
-			break;
-
-		case 'f':
-		case 'F':
-			force = 1;
-			break;
-
-		case 'w':
-		case 'W':
-			if (!bencode_list_add_string(flags, "symmetric"))
-				goto benc_error;
-			break;
-
-#if 0
-		case 'z':
-		case 'Z':
-			if (append_opts(&rep_opts, 'Z') == -1) {
-				LM_ERR("out of pkg memory\n");
-				goto error;
-			}
-			/* If there are any digits following Z copy them into the command */
-			for (; cp[1] != '\0' && isdigit(cp[1]); cp++) {
-				if (append_opts(&rep_opts, cp[1]) == -1) {
-					LM_ERR("out of pkg memory\n");
-					goto error;
-				}
-			}
-			break;
-#endif
-
-		default:
-			LM_ERR("unknown option `%c'\n", *cp);
-			goto error;
-		}
-	}
-
-	/* only add those if any flags were given at all */
-	if (direction->child) {
-		if (!bencode_dictionary_add(dict, "direction", direction))
-			goto benc_error;
-	}
-	if (flags->child) {
-		if (!bencode_dictionary_add(dict, "flags", flags))
-			goto benc_error;
-	}
+	if (parse_rtpproxy_flags(str1, &flags, dict, offer))
+		goto error;
 
 	create = offer ? 1 : 0;
 
@@ -1707,8 +1735,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		LM_ERR("can't get From tag\n");
 		goto error;
 	}
-	if (via) {
-		if (via == 1)
+	if (flags.via) {
+		if (flags.via == 1)
 			ret = get_via_branch(msg, 1, &viabranch);
 		else /* (via == 2) */
 			ret = get_via_branch(msg, 2, &viabranch);
@@ -1719,7 +1747,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		if (!bencode_dictionary_add_str(dict, "via-branch", &viabranch))
 			goto benc_error;
 	}
-	if (flookup != 0) {
+	if (flags.flookup != 0) {
 		if (to_tag.len == 0) {
 			goto error;
 		}
