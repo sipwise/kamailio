@@ -1059,23 +1059,55 @@ rtpp_checkcap(struct rtpp_node *node, char *cap, int caplen)
 static int
 rtpp_test(struct rtpp_node *node, int isdisabled, int force)
 {
-	return 0;
-#if 0
-	int rtpp_ver, rval;
+	bencode_buffer_t bencbuf;
+	bencode_item_t *dict;
 	char *cp;
-	struct iovec v[2] = {{NULL, 0}, {"V", 1}};
+	int ret;
 
 	if(node->rn_recheck_ticks == MI_MAX_RECHECK_TICKS){
 	    LM_DBG("rtpp %s disabled for ever\n", node->rn_url.s);
 		return 1;
 	}
-
 	if (force == 0) {
 		if (isdisabled == 0)
 			return 0;
 		if (node->rn_recheck_ticks > get_ticks())
 			return 1;
 	}
+
+	if (bencode_buffer_init(&bencbuf)) {
+		LM_ERR("could not initialized bencode_buffer_t\n");
+		return 1;
+	}
+	dict = bencode_dictionary(&bencbuf);
+	if (!dict)
+		goto benc_error;
+	if (!bencode_dictionary_add_string(dict, "command", "ping"))
+		goto benc_error;
+
+	cp = send_rtpp_command(node, dict, &ret);
+	if (!cp) {
+		LM_ERR("proxy did not respond to ping\n");
+		goto error;
+	}
+
+	LM_INFO("rtp proxy <%s> found, support for it %senabled\n",
+	    node->rn_url.s, force == 0 ? "re-" : "");
+
+	bencode_buffer_free(&bencbuf);
+	return 0;
+
+benc_error:
+        LM_ERR("out of memory - bencode failed\n");
+error:
+	bencode_buffer_free(&bencbuf);
+	return 1;
+
+#if 0
+	int rtpp_ver, rval;
+	char *cp;
+	struct iovec v[2] = {{NULL, 0}, {"V", 1}};
+
 	cp = send_rtpp_command(node, v, 2);
 	if (cp == NULL) {
 		LM_WARN("can't get version of the RTP proxy\n");
@@ -1119,18 +1151,25 @@ error:
 	if (rtpproxy_disable_tout >= 0)
 		node->rn_recheck_ticks = get_ticks() + rtpproxy_disable_tout;
 
-#endif
 	return 1;
+#endif
 }
 
 char *
-send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt, int *outlen)
+send_rtpp_command(struct rtpp_node *node, bencode_item_t *dict, int *outlen)
 {
 	struct sockaddr_un addr;
-	int fd, len, i;
+	int fd, len, i, vcnt;
 	char *cp;
 	static char buf[4096];
 	struct pollfd fds[1];
+	struct iovec *v;
+
+	v = bencode_iovec(dict, &vcnt, 1, 0);
+	if (!v) {
+		LM_ERR("error converting bencode to iovec\n");
+		return NULL;
+	}
 
 	len = 0;
 	cp = buf;
@@ -1155,7 +1194,7 @@ send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt, int *outlen
 		}
 
 		do {
-			len = writev(fd, v + 1, vcnt - 1);
+			len = writev(fd, v + 1, vcnt);
 		} while (len == -1 && errno == EINTR);
 		if (len <= 0) {
 			close(fd);
@@ -1184,7 +1223,7 @@ send_rtpp_command(struct rtpp_node *node, struct iovec *v, int vcnt, int *outlen
 		v[0].iov_len = strlen(v[0].iov_base);
 		for (i = 0; i < rtpproxy_retr; i++) {
 			do {
-				len = writev(rtpp_socks[node->idx], v, vcnt);
+				len = writev(rtpp_socks[node->idx], v, vcnt + 1);
 			} while (len == -1 && (errno == EINTR || errno == ENOBUFS));
 			if (len <= 0) {
 				LM_ERR("can't send command to a RTP proxy\n");
@@ -1447,8 +1486,7 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 {
 	bencode_buffer_t bencbuf;
 	bencode_item_t *dict;
-	int ret, iov_cnt;
-	struct iovec *iov;
+	int ret;
 	str callid, from_tag, to_tag, viabranch;
 	char *cp;
 	struct rtpp_node *node;
@@ -1511,12 +1549,11 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		goto error;
 	}
 
-	iov = bencode_iovec(dict, &iov_cnt, 1, 0);
-	if (!iov)
-		goto benc_error;
-	iov_cnt++; /* cookie */
-
-	cp = send_rtpp_command(node, iov, iov_cnt, &ret);
+	cp = send_rtpp_command(node, dict, &ret);
+	if (!cp) {
+		LM_ERR("no response from proxy\n");
+		goto error;
+	}
 
 	/* XXX do something with the response here */
 
@@ -1680,8 +1717,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 {
 	bencode_buffer_t bencbuf;
 	bencode_item_t *dict;
-	int ret, iov_cnt, create;
-	struct iovec *iov;
+	int ret, create;
 	str body, newbody;
 	str callid, from_tag, to_tag, viabranch, tmp;
 	struct lump *anchor;
@@ -1773,11 +1809,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 	if (!bencode_dictionary_add_string(dict, "command", (create == 0) ? "answer" : "offer"))
 		goto benc_error;
 
-	iov = bencode_iovec(dict, &iov_cnt, 1, 0);
-	if (!iov)
-		goto benc_error;
-	iov_cnt++; /* cookie */
-
 	do {
 		node = select_rtpp_node(callid, 1);
 		if (!node) {
@@ -1785,7 +1816,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			goto error;
 		}
 
-		cp = send_rtpp_command(node, iov, iov_cnt, &ret);
+		cp = send_rtpp_command(node, dict, &ret);
 	} while (cp == NULL);
 	LM_DBG("proxy reply: %.*s\n", ret, cp);
 

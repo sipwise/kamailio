@@ -27,6 +27,7 @@
 #ifndef _RTPPROXY_H
 #define _RTPPROXY_H
 
+#include "bencode.h"
 #include "../../str.h"
 
 struct rtpp_node {
@@ -62,6 +63,6 @@ struct rtpp_set_head{
 
 /* Functions from nathelper */
 struct rtpp_node *select_rtpp_node(str, int);
-char *send_rtpp_command(struct rtpp_node *, struct iovec *, int, int *);
+char *send_rtpp_command(struct rtpp_node *, bencode_item_t *, int *);
 
 #endif
