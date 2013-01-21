@@ -7,7 +7,7 @@
 
 include ../../Makefile.defs
 auto_gen=
-NAME=rtpproxy.so
+NAME=rtpproxy-ng.so
 LIBS=
 
 DEFS+=-DOPENSER_MOD_INTERFACE
