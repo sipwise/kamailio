@@ -3,11 +3,18 @@
 
 #include <sys/uio.h>
 #include <string.h>
-#include "../../mem/mem.h"
 
-#ifndef BENCODE_MALLOC
-#define BENCODE_MALLOC pkg_malloc
-#define BENCODE_FREE pkg_free
+#if defined(PKG_MALLOC) || defined(pkg_malloc)
+# include "../../mem/mem.h"
+# ifndef BENCODE_MALLOC
+# define BENCODE_MALLOC pkg_malloc
+# define BENCODE_FREE pkg_free
+# endif
+#else
+# ifndef BENCODE_MALLOC
+# define BENCODE_MALLOC malloc
+# define BENCODE_FREE free
+# endif
 #endif
 
 struct bencode_buffer;

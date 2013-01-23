@@ -6,7 +6,6 @@
 #include <string.h>
 
 #include "bencode.h"
-#include "../../mem/mem.h"
 
 /* set to 0 for alloc debugging, e.g. through valgrind */
 #define BENCODE_MIN_BUFFER_PIECE_LEN	512
