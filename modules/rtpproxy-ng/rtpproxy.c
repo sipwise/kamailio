@@ -222,7 +222,6 @@
 #include "rtpproxy.h"
 #include "rtpproxy_funcs.h"
 #include "bencode.h"
-#include "bencode_glue.h"
  
 MODULE_VERSION
 
@@ -1826,7 +1825,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		goto error;
 	}
 
-	if (bencode_dictionary_get_str_pkg(&newbody, dict, "sdp")) {
+	if (!bencode_dictionary_get_str_dup(dict, "sdp", &newbody)) {
 		LM_ERR("failed to extract sdp body from proxy reply: %.*s\n", ret, cp);
 		goto error;
 	}
