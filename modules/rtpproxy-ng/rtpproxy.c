@@ -1519,7 +1519,7 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 	bencode_buffer_t bencbuf;
 	bencode_item_t *dict;
 	int ret;
-	str callid, from_tag, to_tag, viabranch;
+	str callid, from_tag, to_tag, viabranch, s;
 	char *cp;
 	struct rtpp_node *node;
 	struct rtpproxy_flags flags;
@@ -1587,7 +1587,18 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		goto error;
 	}
 
-	/* XXX do something with the response here */
+	dict = bencode_decode_expect(&bencbuf, cp, ret, BENCODE_DICTIONARY);
+	if (!dict) {
+		LM_ERR("failed to decode bencoded reply from proxy: %.*s\n", ret, cp);
+		goto error;
+	}
+	if (bencode_dictionary_get_strcmp(dict, "result", "ok")) {
+		if (!bencode_dictionary_get_str(dict, "error-reason", &s))
+			LM_ERR("proxy didn't give an \"ok\" response and didn't give an error reason: %.*s\n", ret, cp);
+		else
+			LM_ERR("proxy replied with error: %.*s\n", s.len, s.s);
+		goto error;
+	}
 
 	bencode_buffer_free(&bencbuf);
 	return 1;
