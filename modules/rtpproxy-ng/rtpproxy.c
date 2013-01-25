@@ -1093,6 +1093,12 @@ rtpp_test(struct rtpp_node *node, int isdisabled, int force)
 		goto error;
 	}
 
+	dict = bencode_decode_expect(&bencbuf, cp, ret, BENCODE_DICTIONARY);
+	if (!dict || bencode_dictionary_get_strcmp(dict, "result", "pong")) {
+		LM_ERR("proxy responded with invalid response\n");
+		goto error;
+	}
+
 	LM_INFO("rtp proxy <%s> found, support for it %senabled\n",
 	    node->rn_url.s, force == 0 ? "re-" : "");
 
@@ -1851,6 +1857,13 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 	dict = bencode_decode_expect(&bencbuf, cp, ret, BENCODE_DICTIONARY);
 	if (!dict) {
 		LM_ERR("failed to decode bencoded reply from proxy: %.*s\n", ret, cp);
+		goto error;
+	}
+	if (bencode_dictionary_get_strcmp(dict, "result", "ok")) {
+		if (!bencode_dictionary_get_str(dict, "error-reason", &newbody))
+			LM_ERR("proxy didn't give an \"ok\" response and didn't give an error reason: %.*s\n", ret, cp);
+		else
+			LM_ERR("proxy replied with error: %.*s\n", newbody.len, newbody.s);
 		goto error;
 	}
 
