@@ -279,7 +279,10 @@ MODULE_VERSION
 #define	CPORT		"22222"
 
 struct rtpproxy_flags {
-	bencode_item_t *dictionary, *flags, *direction;
+	bencode_item_t *dictionary,
+	               *flags,
+		       *direction,
+		       *replace;
 	int flookup, via;
 };
 
@@ -1392,12 +1395,14 @@ static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *
 			if (flags->flags) {
 				if (!bencode_list_add_string(flags->flags, "asymmetric"))
 					goto benc_error;
+				if (!bencode_list_add_string(flags->flags, "trust-address"))
+					goto benc_error;
 			}
 			break;
 
 		case 'i':
 		case 'I':
-			if (flags->flags) {
+			if (flags->direction) {
 				if (!bencode_list_add_string(flags->direction, "internal"))
 					goto benc_error;
 			}
@@ -1418,14 +1423,32 @@ static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *
 			flags->flookup = 1;
 			break;
 
-		case 'f':
-		case 'F':
 		case 'r':
 		case 'R':
+			if (flags->flags) {
+				if (!bencode_list_add_string(flags->flags, "trust-address"))
+					goto benc_error;
+			}
+			break;
+
 		case 'o':
 		case 'O':
+			if (flags->replace) {
+				if (!bencode_list_add_string(flags->replace, "origin"))
+					goto benc_error;
+			}
+			break;
+
 		case 'c':
 		case 'C':
+			if (flags->replace) {
+				if (!bencode_list_add_string(flags->replace, "session-connection"))
+					goto benc_error;
+			}
+			break;
+
+		case 'f':
+		case 'F':
 			/* ignored for compatibility */
 			break;
 
@@ -1467,6 +1490,10 @@ static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *
 	}
 	if (flags->flags && flags->flags->child) {
 		if (!bencode_dictionary_add(dict, "flags", flags->flags))
+			goto benc_error;
+	}
+	if (flags->replace && flags->replace->child) {
+		if (!bencode_dictionary_add(dict, "replace", flags->replace))
 			goto benc_error;
 	}
 
@@ -1735,11 +1762,11 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 
 	memset(&flags, 0, sizeof(flags));
 
-	flags.flags = bencode_list(&bencbuf);
-	if (!flags.flags)
+	if (!(flags.flags = bencode_list(&bencbuf)))
 		goto benc_error;
-	flags.direction = bencode_list(&bencbuf);
-	if (!flags.direction)
+	if (!(flags.direction = bencode_list(&bencbuf)))
+		goto benc_error;
+	if (!(flags.replace = bencode_list(&bencbuf)))
 		goto benc_error;
 
 	if (parse_rtpproxy_flags(str1, &flags, dict, offer))
@@ -1754,6 +1781,8 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		LM_ERR("can't extract body from the message\n");
 		goto error;
 	}
+	if (!bencode_dictionary_add_string(dict, "received-from", ip_addr2a(&msg->rcv.src_ip)))
+		goto benc_error;
 	if (!bencode_dictionary_add_str(dict, "sdp", &body))
 		goto benc_error;
 	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
