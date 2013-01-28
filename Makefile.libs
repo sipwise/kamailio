@@ -96,6 +96,12 @@ LDFLAGS:=$(LIB_LDFLAGS) $(NAME_LD_FLAGS)
 NAME:=$(LIB_NAME)
 
 
+.PHONY: lib_all
+lib_all:
+	@$(MAKE) $(NAME)
+	@$(MAKE) $(LIB_RUNTIME_NAME)
+	@$(MAKE) $(LIB_LINK_NAME)
+
 include $(COREPATH)/Makefile.targets
 include $(COREPATH)/Makefile.rules
 
@@ -108,7 +114,7 @@ endif
 endif
 endif
 
-$(NAME): $(LIB_RUNTIME_NAME) $(LIB_LINK_NAME) $(LIBINAME_F)
+$(NAME): $(LIBINAME_F)
 
 $(LIB_RUNTIME_NAME):
 	-@ln -s $(LIB_NAME) $(LIB_RUNTIME_NAME)
