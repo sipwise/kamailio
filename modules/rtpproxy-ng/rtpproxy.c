@@ -1804,14 +1804,14 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 
 	if (!bencode_dictionary_add(dict, "received-from", item))
 		goto benc_error;
-	if (!bencode_list_add_string(dict, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
+	if (!bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
 #ifdef USE_IPV6
 			(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
 #endif
 			"?"
 			) ))
 		goto benc_error;
-	if (!bencode_list_add_string(dict, ip_addr2a(&msg->rcv.src_ip)))
+	if (!bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip)))
 		goto benc_error;
 
 	if (!bencode_dictionary_add_str(dict, "sdp", &body))
