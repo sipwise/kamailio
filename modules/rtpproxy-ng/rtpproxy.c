@@ -1759,7 +1759,7 @@ static int
 force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forcedIP)
 {
 	bencode_buffer_t bencbuf;
-	bencode_item_t *dict;
+	bencode_item_t *dict, *item;
 	int ret, create;
 	str body, newbody;
 	str callid, from_tag, to_tag, viabranch, tmp;
@@ -1798,8 +1798,22 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		LM_ERR("can't extract body from the message\n");
 		goto error;
 	}
-	if (!bencode_dictionary_add_string(dict, "received-from", ip_addr2a(&msg->rcv.src_ip)))
+
+	if (!(item = bencode_list(&bencbuf)))
 		goto benc_error;
+
+	if (!bencode_dictionary_add(dict, "received-from", item))
+		goto benc_error;
+	if (!bencode_list_add_string(dict, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
+#ifdef USE_IPV6
+			(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
+#endif
+			"?"
+			) ))
+		goto benc_error;
+	if (!bencode_list_add_string(dict, ip_addr2a(&msg->rcv.src_ip)))
+		goto benc_error;
+
 	if (!bencode_dictionary_add_str(dict, "sdp", &body))
 		goto benc_error;
 	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
