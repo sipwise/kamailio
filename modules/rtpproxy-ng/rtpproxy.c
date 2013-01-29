@@ -1082,9 +1082,8 @@ rtpp_test(struct rtpp_node *node, int isdisabled, int force)
 		return 1;
 	}
 	dict = bencode_dictionary(&bencbuf);
-	if (!dict)
-		goto benc_error;
-	if (!bencode_dictionary_add_string(dict, "command", "ping"))
+	bencode_dictionary_add_string(dict, "command", "ping");
+	if (bencbuf.error)
 		goto benc_error;
 
 	cp = send_rtpp_command(node, dict, &ret);
@@ -1398,75 +1397,50 @@ static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *
 
 		case 'a':
 		case 'A':
-			if (flags->flags) {
-				if (!bencode_list_add_string(flags->flags, "asymmetric"))
-					goto benc_error;
-				if (!bencode_list_add_string(flags->flags, "trust-address"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->flags, "asymmetric");
+			bencode_list_add_string(flags->flags, "trust-address");
 			break;
 
 		case 'i':
 		case 'I':
-			if (flags->direction) {
-				if (!bencode_list_add_string(flags->direction, "internal"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->direction, "internal");
 			break;
 
 		case 'e':
 		case 'E':
-			if (flags->direction) {
-				if (!bencode_list_add_string(flags->direction, "external"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->direction, "external");
 			break;
 
 		case 'l':
 		case 'L':
 			if (offer == 0)
-				goto error;
+				return -1;
 			flags->flookup = 1;
 			break;
 
 		case 'r':
 		case 'R':
-			if (flags->flags) {
-				if (!bencode_list_add_string(flags->flags, "trust-address"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->flags, "trust-address");
 			break;
 
 		case 'o':
 		case 'O':
-			if (flags->replace) {
-				if (!bencode_list_add_string(flags->replace, "origin"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->replace, "origin");
 			break;
 
 		case 'c':
 		case 'C':
-			if (flags->replace) {
-				if (!bencode_list_add_string(flags->replace, "session-connection"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->replace, "session-connection");
 			break;
 
 		case 'f':
 		case 'F':
-			if (flags->flags) {
-				if (!bencode_list_add_string(flags->flags, "force"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->flags, "force");
 			break;
 
 		case 'w':
 		case 'W':
-			if (flags->flags) {
-				if (!bencode_list_add_string(flags->flags, "symmetric"))
-					goto benc_error;
-			}
+			bencode_list_add_string(flags->flags, "symmetric");
 			break;
 
 #if 0
@@ -1488,30 +1462,19 @@ static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *
 
 		default:
 			LM_ERR("unknown option `%c'\n", *cp);
-			goto error;
+			return -1;
 		}
 	}
 
 	/* only add those if any flags were given at all */
-	if (flags->direction && flags->direction->child) {
-		if (!bencode_dictionary_add(dict, "direction", flags->direction))
-			goto benc_error;
-	}
-	if (flags->flags && flags->flags->child) {
-		if (!bencode_dictionary_add(dict, "flags", flags->flags))
-			goto benc_error;
-	}
-	if (flags->replace && flags->replace->child) {
-		if (!bencode_dictionary_add(dict, "replace", flags->replace))
-			goto benc_error;
-	}
+	if (flags->direction && flags->direction->child)
+		bencode_dictionary_add(dict, "direction", flags->direction);
+	if (flags->flags && flags->flags->child)
+		bencode_dictionary_add(dict, "flags", flags->flags);
+	if (flags->replace && flags->replace->child)
+		bencode_dictionary_add(dict, "replace", flags->replace);
 
 	return 0;
-
-benc_error:
-	LM_ERR("out of memory - bencode failed\n");
-error:
-	return -1;
 }
 
 
@@ -1532,8 +1495,6 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		goto error_nb;
 	}
 	dict = bencode_dictionary(&bencbuf);
-	if (!dict)
-		goto benc_error;
 
 	memset(&flags, 0, sizeof(flags));
 
@@ -1544,8 +1505,7 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 		LM_ERR("can't get Call-Id field\n");
 		goto error;
 	}
-	if (!bencode_dictionary_add_str(dict, "call-id", &callid))
-		goto benc_error;
+	bencode_dictionary_add_str(dict, "call-id", &callid);
 	to_tag.s = 0;
 	if (get_to_tag(msg, &to_tag) == -1) {
 		LM_ERR("can't get To tag\n");
@@ -1564,18 +1524,18 @@ unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
 			LM_ERR("can't get Via branch\n");
 			goto error;
 		}
-		if (!bencode_dictionary_add_str(dict, "via-branch", &viabranch))
-			goto benc_error;
+		bencode_dictionary_add_str(dict, "via-branch", &viabranch);
 	}
-	if (!bencode_dictionary_add_str(dict, "from-tag", &from_tag))
-		goto benc_error;
-	if (to_tag.s && to_tag.len && !bencode_dictionary_add_str(dict, "to-tag", &to_tag))
-		goto benc_error;
+	bencode_dictionary_add_str(dict, "from-tag", &from_tag);
+	if (to_tag.s && to_tag.len)
+		bencode_dictionary_add_str(dict, "to-tag", &to_tag);
 	
 	if(msg->id != current_msg_id)
 		selected_rtpp_set = default_rtpp_set;
 	
-	if (!bencode_dictionary_add_string(dict, "command", "delete"))
+	bencode_dictionary_add_string(dict, "command", "delete");
+
+	if (bencbuf.error)
 		goto benc_error;
 
 	node = select_rtpp_node(callid, 1);
@@ -1777,17 +1737,12 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		goto error_nb;
 	}
 	dict = bencode_dictionary(&bencbuf);
-	if (!dict)
-		goto benc_error;
 
 	memset(&flags, 0, sizeof(flags));
 
-	if (!(flags.flags = bencode_list(&bencbuf)))
-		goto benc_error;
-	if (!(flags.direction = bencode_list(&bencbuf)))
-		goto benc_error;
-	if (!(flags.replace = bencode_list(&bencbuf)))
-		goto benc_error;
+	flags.flags = bencode_list(&bencbuf);
+	flags.direction = bencode_list(&bencbuf);
+	flags.replace = bencode_list(&bencbuf);
 
 	if (parse_rtpproxy_flags(str1, &flags, dict, offer))
 		goto error;
@@ -1802,29 +1757,23 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		goto error;
 	}
 
-	if (!(item = bencode_list(&bencbuf)))
-		goto benc_error;
+	item = bencode_list(&bencbuf);
 
-	if (!bencode_dictionary_add(dict, "received-from", item))
-		goto benc_error;
-	if (!bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
+	bencode_dictionary_add(dict, "received-from", item);
+	bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
 #ifdef USE_IPV6
-			(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
+		(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
 #endif
-			"?"
-			) ))
-		goto benc_error;
-	if (!bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip)))
-		goto benc_error;
+		"?"
+	) );
+	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
 
-	if (!bencode_dictionary_add_str(dict, "sdp", &body))
-		goto benc_error;
+	bencode_dictionary_add_str(dict, "sdp", &body);
 	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
 		LM_ERR("can't get Call-Id field\n");
 		goto error;
 	}
-	if (!bencode_dictionary_add_str(dict, "call-id", &callid))
-		goto benc_error;
+	bencode_dictionary_add_str(dict, "call-id", &callid);
 	to_tag.s = 0;
 	if (get_to_tag(msg, &to_tag) == -1) {
 		LM_ERR("can't get To tag\n");
@@ -1843,8 +1792,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			LM_ERR("can't get Via branch\n");
 			goto error;
 		}
-		if (!bencode_dictionary_add_str(dict, "via-branch", &viabranch))
-			goto benc_error;
+		bencode_dictionary_add_str(dict, "via-branch", &viabranch);
 	}
 	if (flags.flookup != 0) {
 		if (to_tag.len == 0) {
@@ -1860,15 +1808,16 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		from_tag = to_tag;
 		to_tag = tmp;
 	}
-	if (!bencode_dictionary_add_str(dict, "from-tag", &from_tag))
-		goto benc_error;
-	if (to_tag.s && to_tag.len && !bencode_dictionary_add_str(dict, "to-tag", &to_tag))
-		goto benc_error;
+	bencode_dictionary_add_str(dict, "from-tag", &from_tag);
+	if (to_tag.s && to_tag.len)
+		bencode_dictionary_add_str(dict, "to-tag", &to_tag);
 
 	if(msg->id != current_msg_id)
 		selected_rtpp_set = default_rtpp_set;
 
-	if (!bencode_dictionary_add_string(dict, "command", (create == 0) ? "answer" : "offer"))
+	bencode_dictionary_add_string(dict, "command", (create == 0) ? "answer" : "offer");
+
+	if (bencbuf.error)
 		goto benc_error;
 
 	do {
