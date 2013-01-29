@@ -337,9 +337,6 @@ static unsigned int current_msg_id = (unsigned int)-1;
 struct rtpp_set_head * rtpp_set_list =0;
 struct rtpp_set * selected_rtpp_set =0;
 struct rtpp_set * default_rtpp_set=0;
-static char *ice_candidate_priority_avp_param = NULL;
-static int ice_candidate_priority_avp_type;
-static int_str ice_candidate_priority_avp;
 
 /* array with the sockets used by rtpporxy (per process)*/
 static unsigned int rtpp_no = 0;
@@ -436,8 +433,6 @@ static param_export_t params[] = {
 	{"rtpproxy_retr",         INT_PARAM, &rtpproxy_retr         },
 	{"rtpproxy_tout",         INT_PARAM, &rtpproxy_tout         },
 	{"timeout_socket",    	  STR_PARAM, &timeout_socket_str.s  },
-	{"ice_candidate_priority_avp", STR_PARAM,
-	 &ice_candidate_priority_avp_param},
 	{"extra_id_pv",           STR_PARAM, &extra_id_pv_param.s },
 	{0, 0, 0}
 };
@@ -882,9 +877,6 @@ static int
 mod_init(void)
 {
 	int i;
-	pv_spec_t avp_spec;
-	str s;
-	unsigned short avp_flags;
 
 	if(register_mi_mod(exports.name, mi_cmds)!=0)
 	{
@@ -913,19 +905,6 @@ mod_init(void)
 		timeout_socket_str.s = NULL;
 	} else {
 		timeout_socket_str.len = strlen(timeout_socket_str.s);
-	}
-
-	if (ice_candidate_priority_avp_param) {
-	    s.s = ice_candidate_priority_avp_param; s.len = strlen(s.s);
-	    if (pv_parse_spec(&s, &avp_spec) == 0 || avp_spec.type != PVT_AVP) {
-		LM_ERR("malformed or non AVP definition <%s>\n", ice_candidate_priority_avp_param);
-		return -1;
-	    }
-	    if (pv_get_avp_name(0, &(avp_spec.pvp), &ice_candidate_priority_avp, &avp_flags) != 0) {
-		LM_ERR("invalid AVP definition <%s>\n", ice_candidate_priority_avp_param);
-		return -1;
-	    }
-	    ice_candidate_priority_avp_type = avp_flags;
 	}
 
 	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
