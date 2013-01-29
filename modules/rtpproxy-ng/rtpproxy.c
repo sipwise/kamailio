@@ -1455,7 +1455,10 @@ static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *
 
 		case 'f':
 		case 'F':
-			/* ignored for compatibility */
+			if (flags->flags) {
+				if (!bencode_list_add_string(flags->flags, "force"))
+					goto benc_error;
+			}
 			break;
 
 		case 'w':
