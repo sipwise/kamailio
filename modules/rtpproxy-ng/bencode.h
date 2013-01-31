@@ -30,6 +30,7 @@ struct __bencode_free_list;
 typedef enum bencode_type bencode_type_t;
 typedef struct bencode_buffer bencode_buffer_t;
 typedef struct bencode_item bencode_item_t;
+typedef void (*free_func_t)(void *);
 
 enum bencode_type {
 	BENCODE_INVALID = 0,
@@ -37,6 +38,7 @@ enum bencode_type {
 	BENCODE_INTEGER,	/* long long int */
 	BENCODE_LIST,		/* flat list of other objects */
 	BENCODE_DICTIONARY,	/* dictionary of key/values pairs. keys are always strings */
+	BENCODE_IOVEC,		/* special case of a string, built through bencode_string_iovec() */
 	BENCODE_END_MARKER,	/* used internally only */
 };
 
@@ -45,7 +47,7 @@ struct bencode_item {
 	struct iovec iov[2];	/* when decoding, iov[1] contains the contents of a string object */
 	unsigned int iov_cnt;
 	unsigned int str_len;	/* length of the whole ENCODED object. NOT the length of a byte string */
-	long long int value;	/* when decoding an integer, contains the value */
+	long long int value;	/* when decoding an integer, contains the value; otherwise used internally */
 	bencode_item_t *parent, *child, *sibling;
 	bencode_buffer_t *buffer;
 	char __buf[0];
@@ -54,7 +56,7 @@ struct bencode_item {
 struct bencode_buffer {
 	struct __bencode_buffer_piece *pieces;
 	struct __bencode_free_list *free_list;
-	int error:1;
+	int error:1;		/* set to !0 if allocation failed at any point */
 };
 
 
@@ -84,7 +86,11 @@ bencode_item_t *bencode_list(bencode_buffer_t *buf);
 
 /* Adds a pointer to the bencode_buffer_t object's internal free list. When the bencode_buffer_t
  * object is destroyed, BENCODE_FREE will be called on this pointer. */
-void bencode_buffer_freelist_add(bencode_buffer_t *buf, void *);
+static inline void bencode_buffer_freelist_add(bencode_buffer_t *buf, void *);
+
+/* Similar to bencode_buffer_freelist_add(), but instead of freeing/destroying the object at the
+ * given pointer with BENCODE_FREE, the specified destroy function is called. */
+void bencode_buffer_destroy_add(bencode_buffer_t *buf, free_func_t, void *);
 
 
 
@@ -110,6 +116,11 @@ static inline bencode_item_t *bencode_dictionary_add_string(bencode_item_t *dict
 /* Ditto, but for a "str" object */
 static inline bencode_item_t *bencode_dictionary_add_str(bencode_item_t *dict, const char *key, const str *val);
 
+/* Ditto, but adds a string created through an iovec array to the dictionary. See
+ * bencode_string_iovec(). */
+static inline bencode_item_t *bencode_dictionary_add_iovec(bencode_item_t *dict, const char *key,
+	const struct iovec *iov, int iov_cnt, int str_len);
+
 /* Ditto again, but adds the str object (val) to the bencode_buffer_t's internal free list. When
  * the bencode_item_t object is destroyed, BENCODE_FREE will be called on this pointer. */
 static inline bencode_item_t *bencode_dictionary_add_str_free(bencode_item_t *dict, const char *key, str *val);
@@ -130,6 +141,12 @@ bencode_item_t *bencode_list_add(bencode_item_t *list, bencode_item_t *item);
 /* Convenience function to add a string item to a list */
 static inline bencode_item_t *bencode_list_add_string(bencode_item_t *list, const char *s);
 
+
+
+
+
+/*** STRING BUILDING & HANDLING ***/
+
 /* Creates a new byte-string object. The given string does not have to be null-terminated, instead
  * the length of the string is specified by the "len" parameter. Returns NULL if no memory could
  * be allocated.
@@ -137,23 +154,25 @@ static inline bencode_item_t *bencode_list_add_string(bencode_item_t *list, cons
  * the complete document is finally encoded or sent out. */
 bencode_item_t *bencode_string_len(bencode_buffer_t *buf, const char *s, int len);
 
-
-
-
-
-/*** STRING BUILDING & HANDLING ***/
-
 /* Creates a new byte-string object. The given string must be null-terminated. Otherwise identical
  * to bencode_string_len(). */
 static inline bencode_item_t *bencode_string(bencode_buffer_t *buf, const char *s);
 
-/* Convenience function to compare a string object to a regular C string. Returns 2 if object
- * isn't a string object, otherwise returns according to strcmp(). */
-static inline int bencode_strcmp(bencode_item_t *a, const char *b);
-
 /* Creates a new byte-string object from a "str" object. The string does not have to be null-
  * terminated. */
 static inline bencode_item_t *bencode_str(bencode_buffer_t *buf, const str *s);
+
+/* Creates a new byte-string object from an iovec array. The created object has different internal
+ * semantics (not a BENCODE_STRING, but a BENCODE_IOVEC) and must not be treated like other string
+ * objects. The array pointer and contents must still be valid and accessible when the complete
+ * document is encoded. The full length of the string composed of the iovec array is given in the
+ * "str_len" parameter, which can be negative, in which case the array is iterated to calculate the
+ * length. */
+bencode_item_t *bencode_string_iovec(bencode_buffer_t *buf, const struct iovec *iov, int iov_cnt, int str_len);
+
+/* Convenience function to compare a string object to a regular C string. Returns 2 if object
+ * isn't a string object, otherwise returns according to strcmp(). */
+static inline int bencode_strcmp(bencode_item_t *a, const char *b);
 
 /* Converts the string object "in" into a str object "out". Returns "out" on success, or NULL on
  * error ("in" was NULL or not a string object). */
@@ -244,6 +263,14 @@ char *bencode_collapse_dup(bencode_item_t *root, int *len);
  * key/value pair. The next element (following one ->sibling) will be the KEY of the LAST key/value
  * pair (guaranteed to be a string and guaranteed to be present). Following another ->sibling will
  * point to the VALUE of the last-but-one key/value pair, and so on.
+ *
+ * However, to access children objects of dictionaries, the special functions following the naming
+ * scheme bencode_dictionary_get_* below should be used. They perform key lookup through a simple
+ * hash built into the dictionary object and so perform the lookup much faster. Only dictionaries
+ * created through a decoding process (i.e. not ones created from bencode_dictionary()) have this
+ * property. The hash is efficient only up to a certain number of elements (BENCODE_HASH_BUCKETS
+ * in bencode.c) contained in the dictionary. If the number of children object exceeds this number,
+ * key lookup will be slower than simply linearily traversing the list.
  *
  * The decoding function for dictionary object does not check whether keys are unique within the
  * dictionary. It also does not care about lexicographical order of the keys.
@@ -450,6 +477,16 @@ static inline str *bencode_get_str(bencode_item_t *in, str *out) {
 	out->s = in->iov[1].iov_base;
 	out->len = in->iov[1].iov_len;
 	return out;
+}
+
+static inline void bencode_buffer_freelist_add(bencode_buffer_t *buf, void *p) {
+	bencode_buffer_destroy_add(buf, BENCODE_FREE, p);
+}
+
+static inline bencode_item_t *bencode_dictionary_add_iovec(bencode_item_t *dict, const char *key,
+		const struct iovec *iov, int iov_cnt, int str_len)
+{
+	return bencode_dictionary_add(dict, key, bencode_string_iovec(dict->buffer, iov, iov_cnt, str_len));
 }
 
 #endif
