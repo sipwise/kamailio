@@ -1060,25 +1060,6 @@ static void mod_destroy(void)
 
 
 
-#define	ADD_ADIRECTION	0x01
-#define	FIX_MEDIP	0x02
-#define	ADD_ANORTPPROXY	0x04
-#define	FIX_ORGIP	0x08
-
-#define	ADIRECTION	"a=direction:active"
-#define	ADIRECTION_LEN	(sizeof(ADIRECTION) - 1)
-
-#define	AOLDMEDIP	"a=oldmediaip:"
-#define	AOLDMEDIP_LEN	(sizeof(AOLDMEDIP) - 1)
-
-#define	AOLDMEDIP6	"a=oldmediaip6:"
-#define	AOLDMEDIP6_LEN	(sizeof(AOLDMEDIP6) - 1)
-
-#define	AOLDMEDPRT	"a=oldmediaport:"
-#define	AOLDMEDPRT_LEN	(sizeof(AOLDMEDPRT) - 1)
-
-
-
 static char * gencookie(void)
 {
 	static char cook[34];
@@ -1095,7 +1076,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 {
 	bencode_item_t *dict, *flags, *direction, *replace, *item;
 	str callid, from_tag, to_tag, body, viabranch, error;
-	int via, to, ret;
+	int via, to, ret, packetize;
 	struct rtpp_node *node;
 	char *cp;
 
@@ -1216,22 +1197,18 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 			to = 1;
 			break;
 
-#if 0
 		case 'z':
 		case 'Z':
-			if (append_opts(&rep_opts, 'Z') == -1) {
-				LM_ERR("out of pkg memory\n");
-				goto error;
+			packetize = 0;
+			flags_str++;
+			while (isdigit(*flags_str)) {
+				packetize *= 10;
+				packetize += *flags_str - '0';
+				flags_str++;
 			}
-			/* If there are any digits following Z copy them into the command */
-			for (; cp[1] != '\0' && isdigit(cp[1]); cp++) {
-				if (append_opts(&rep_opts, cp[1]) == -1) {
-					LM_ERR("out of pkg memory\n");
-					goto error;
-				}
-			}
+			if (packetize)
+				bencode_dictionary_add_integer(dict, "repacketize", packetize);
 			break;
-#endif
 
 		default:
 			LM_ERR("unknown option `%c'\n", *flags_str);
@@ -1263,7 +1240,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 		bencode_dictionary_add_str(dict, "via-branch", &viabranch);
 	}
 
-	item = bencode_list(dict->buffer);
+	item = bencode_list(bencbuf);
 	bencode_dictionary_add(dict, "received-from", item);
 	bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
 #ifdef USE_IPV6
