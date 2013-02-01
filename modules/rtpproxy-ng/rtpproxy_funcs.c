@@ -347,14 +347,12 @@ get_callid(struct sip_msg* _m, str* _cid)
 
 /*
  * Extract tag from To header field of a response
- * assumes the to header is already parsed, so
- * make sure it really is before calling this function
  */
 int
 get_to_tag(struct sip_msg* _m, str* _tag)
 {
 
-        if (!_m->to) {
+        if (parse_to_header(_m) < 0) {
                 LM_ERR("To header field missing\n");
                 return -1;
         }

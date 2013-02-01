@@ -61,8 +61,4 @@ struct rtpp_set_head{
 	struct rtpp_set		*rset_last;
 };
 
-/* Functions from nathelper */
-struct rtpp_node *select_rtpp_node(str, int);
-char *send_rtpp_command(struct rtpp_node *, bencode_item_t *, int *);
-
 #endif

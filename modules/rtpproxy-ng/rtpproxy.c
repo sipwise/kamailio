@@ -278,13 +278,18 @@ MODULE_VERSION
 
 #define	CPORT		"22222"
 
-struct rtpproxy_flags {
-	bencode_item_t *dictionary,
-	               *flags,
-		       *direction,
-		       *replace;
-	int flookup, to;
-	str callid;
+enum rtpp_operation {
+	OP_OFFER = 1,
+	OP_ANSWER,
+	OP_DELETE,
+	OP_START_RECORDING,
+};
+
+static const char *command_strings[] = {
+	[1] = "offer",
+	[2] = "answer",
+	[3] = "delete",
+	[4] = "start recording",
 };
 
 static char *gencookie();
@@ -304,6 +309,9 @@ static int add_rtpproxy_socks(struct rtpp_set * rtpp_list, char * rtpproxy);
 static int fixup_set_id(void ** param, int param_no);
 static int set_rtp_proxy_set_f(struct sip_msg * msg, char * str1, char * str2);
 static struct rtpp_set * select_rtpp_set(int id_set);
+static struct rtpp_node *select_rtpp_node(str, int);
+static char *send_rtpp_command(struct rtpp_node *, bencode_item_t *, int *);
+static int get_extra_id(struct sip_msg* msg, str *id_str);
 
 static int rtpproxy_set_store(modparam_t type, void * val);
 static int rtpproxy_add_rtpproxy_set( char * rtp_proxies);
@@ -1080,27 +1088,265 @@ static char * gencookie(void)
 	return cook;
 }
 
-#if 0
-/* XXX */
-static int
-rtpp_checkcap(struct rtpp_node *node, char *cap, int caplen)
+
+
+static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_msg *msg,
+	enum rtpp_operation op, const char *flags_str, str *body_out)
 {
+	bencode_item_t *dict, *flags, *direction, *replace, *item;
+	str callid, from_tag, to_tag, body, viabranch, error;
+	int via, to, ret;
+	struct rtpp_node *node;
 	char *cp;
-	struct iovec vf[4] = {{NULL, 0}, {"VF", 2}, {" ", 1}, {NULL, 0}};
 
-	vf[3].iov_base = cap;
-	vf[3].iov_len = caplen;
+	/*** get & init basic stuff needed ***/
 
-	cp = send_rtpp_command(node, vf, 4);
-	if (cp == NULL)
-		return -1;
-	if (cp[0] == 'E' || atoi(cp) != 1)
-		return 0;
-	return 1;
-}
+	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
+		LM_ERR("can't get Call-Id field\n");
+		return NULL;
+	}
+	if (get_to_tag(msg, &to_tag) == -1) {
+		LM_ERR("can't get To tag\n");
+		return NULL;
+	}
+	if (get_from_tag(msg, &from_tag) == -1 || from_tag.len == 0) {
+		LM_ERR("can't get From tag\n");
+		return NULL;
+	}
+	if (bencode_buffer_init(bencbuf)) {
+		LM_ERR("could not initialized bencode_buffer_t\n");
+		return NULL;
+	}
+	dict = bencode_dictionary(bencbuf);
+
+	flags = direction = replace = NULL;
+	if (op == OP_OFFER || op == OP_ANSWER) {
+		flags = bencode_list(bencbuf);
+		direction = bencode_list(bencbuf);
+		replace = bencode_list(bencbuf);
+
+		if (extract_body(msg, &body) == -1) {
+			LM_ERR("can't extract body from the message\n");
+			goto error;
+		}
+		bencode_dictionary_add_str(dict, "sdp", &body);
+	}
+
+	/*** parse flags & build dictionary ***/
+
+	via = 0;
+	to = (op == OP_DELETE) ? 0 : 1;
+
+	for (; flags_str && *flags_str; flags_str++) {
+		switch (*flags_str) {
+		case '1':
+		case '2':
+			via = *flags_str - '0';
+			break;
+
+		case '3':
+			if(msg && msg->first_line.type == SIP_REPLY)
+				via = 2;
+			else
+				via = 1;
+			break;
+
+		case 'b':
+		case 'B':
+			via = -1;
+			break;
+
+		case 'a':
+		case 'A':
+			bencode_list_add_string(flags, "asymmetric");
+			bencode_list_add_string(flags, "trust-address");
+			break;
+
+		case 'i':
+		case 'I':
+			bencode_list_add_string(direction, "internal");
+			break;
+
+		case 'e':
+		case 'E':
+			bencode_list_add_string(direction, "external");
+			break;
+
+		case 'l':
+		case 'L':
+			if (op != OP_OFFER) {
+				LM_ERR("Cannot force answer in non-offer command\n");
+				goto error;
+			}
+			op = OP_ANSWER;
+			break;
+
+		case 'r':
+		case 'R':
+			bencode_list_add_string(flags, "trust-address");
+			break;
+
+		case 'o':
+		case 'O':
+			bencode_list_add_string(replace, "origin");
+			break;
+
+		case 'c':
+		case 'C':
+			bencode_list_add_string(replace, "session-connection");
+			break;
+
+		case 'f':
+		case 'F':
+			bencode_list_add_string(flags, "force");
+			break;
+
+		case 'w':
+		case 'W':
+			bencode_list_add_string(flags, "symmetric");
+			break;
+
+		case 'x':
+		case 'X':
+			bencode_list_add_string(flags, "auto-bridge");
+			break;
+
+		case 't':
+		case 'T':
+			to = 1;
+			break;
+
+#if 0
+		case 'z':
+		case 'Z':
+			if (append_opts(&rep_opts, 'Z') == -1) {
+				LM_ERR("out of pkg memory\n");
+				goto error;
+			}
+			/* If there are any digits following Z copy them into the command */
+			for (; cp[1] != '\0' && isdigit(cp[1]); cp++) {
+				if (append_opts(&rep_opts, cp[1]) == -1) {
+					LM_ERR("out of pkg memory\n");
+					goto error;
+				}
+			}
+			break;
 #endif
 
-/* XXX */
+		default:
+			LM_ERR("unknown option `%c'\n", *flags_str);
+			goto error;
+		}
+	}
+
+	/* only add those if any flags were given at all */
+	if (direction && direction->child)
+		bencode_dictionary_add(dict, "direction", direction);
+	if (flags && flags->child)
+		bencode_dictionary_add(dict, "flags", flags);
+	if (replace && replace->child)
+		bencode_dictionary_add(dict, "replace", replace);
+
+	bencode_dictionary_add_str(dict, "call-id", &callid);
+
+	if (via) {
+		if (via == 1 || via == 2)
+			ret = get_via_branch(msg, via, &viabranch);
+		else if (via == -1 && extra_id_pv)
+			ret = get_extra_id(msg, &viabranch);
+		else
+			ret = -1;
+		if (ret == -1 || viabranch.len == 0) {
+			LM_ERR("can't get Via branch/extra ID\n");
+			goto error;
+		}
+		bencode_dictionary_add_str(dict, "via-branch", &viabranch);
+	}
+
+	item = bencode_list(dict->buffer);
+	bencode_dictionary_add(dict, "received-from", item);
+	bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
+#ifdef USE_IPV6
+		(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
+#endif
+		"?"
+	) );
+	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
+
+	if (msg->first_line.type == SIP_REQUEST && op != OP_ANSWER) {
+		bencode_dictionary_add_str(dict, "from-tag", &from_tag);
+		if (to && to_tag.s && to_tag.len)
+			bencode_dictionary_add_str(dict, "to-tag", &to_tag);
+	}
+	else {
+		if (!to_tag.s || !to_tag.len) {
+			LM_ERR("No to-tag present\n");
+			goto error;
+		}
+		bencode_dictionary_add_str(dict, "from-tag", &to_tag);
+		bencode_dictionary_add_str(dict, "to-tag", &from_tag);
+	}
+
+	bencode_dictionary_add_string(dict, "command", command_strings[op]);
+
+	/*** send it out ***/
+
+	if (bencbuf->error) {
+		LM_ERR("out of memory - bencode failed\n");
+		goto error;
+	}
+
+	if(msg->id != current_msg_id)
+		selected_rtpp_set = default_rtpp_set;
+
+	do {
+		node = select_rtpp_node(callid, 1);
+		if (!node) {
+			LM_ERR("no available proxies\n");
+			goto error;
+		}
+
+		cp = send_rtpp_command(node, dict, &ret);
+	} while (cp == NULL);
+	LM_DBG("proxy reply: %.*s\n", ret, cp);
+
+	/*** process reply ***/
+
+	dict = bencode_decode_expect(bencbuf, cp, ret, BENCODE_DICTIONARY);
+	if (!dict) {
+		LM_ERR("failed to decode bencoded reply from proxy: %.*s\n", ret, cp);
+		goto error;
+	}
+	if (!bencode_dictionary_get_strcmp(dict, "result", "error")) {
+		if (!bencode_dictionary_get_str(dict, "error-reason", &error))
+			LM_ERR("proxy return error but didn't give an error reason: %.*s\n", ret, cp);
+		else
+			LM_ERR("proxy replied with error: %.*s\n", error.len, error.s);
+		goto error;
+	}
+
+	if (body_out)
+		*body_out = body;
+
+	return dict;
+
+error:
+	bencode_buffer_free(bencbuf);
+	return NULL;
+}
+
+static int rtpp_function_call_simple(struct sip_msg *msg, enum rtpp_operation op, const char *flags_str) {
+	bencode_buffer_t bencbuf;
+
+	if (!rtpp_function_call(&bencbuf, msg, op, flags_str, NULL))
+		return -1;
+
+	bencode_buffer_free(&bencbuf);
+	return 1;
+}
+
+
+
 static int
 rtpp_test(struct rtpp_node *node, int isdisabled, int force)
 {
@@ -1152,60 +1398,9 @@ benc_error:
 error:
 	bencode_buffer_free(&bencbuf);
 	return 1;
-
-#if 0
-	int rtpp_ver, rval;
-	char *cp;
-	struct iovec v[2] = {{NULL, 0}, {"V", 1}};
-
-	cp = send_rtpp_command(node, v, 2);
-	if (cp == NULL) {
-		LM_WARN("can't get version of the RTP proxy\n");
-		goto error;
-	}
-	rtpp_ver = atoi(cp);
-	if (rtpp_ver != SUP_CPROTOVER) {
-		LM_WARN("unsupported version of RTP proxy <%s> found: %d supported,"
-				"%d present\n", node->rn_url.s, SUP_CPROTOVER, rtpp_ver);
-		goto error;
-	}
-	rval = rtpp_checkcap(node, REQ_CPROTOVER, sizeof(REQ_CPROTOVER) - 1);
-	if (rval == -1) {
-		LM_WARN("RTP proxy went down during version query\n");
-		goto error;
-	}
-	if (rval == 0) {
-		LM_WARN("of RTP proxy <%s> doesn't support required protocol version"
-				"%s\n", node->rn_url.s, REQ_CPROTOVER);
-		goto error;
-	}
-	LM_INFO("rtp proxy <%s> found, support for it %senabled\n",
-	    node->rn_url.s, force == 0 ? "re-" : "");
-	/* Check for optional capabilities */
-	rval = rtpp_checkcap(node, REP_CPROTOVER, sizeof(REP_CPROTOVER) - 1);
-	if (rval != -1) {
-		node->rn_rep_supported = rval;
-	} else {
-		node->rn_rep_supported = 0;
-	}
-	rval = rtpp_checkcap(node, PTL_CPROTOVER, sizeof(PTL_CPROTOVER) - 1);
-	if (rval != -1) {
-		node->rn_ptl_supported = rval;
-	} else {
-		node->rn_ptl_supported = 0;
-	}
-	return 0;
-error:
-	LM_WARN("support for RTP proxy <%s> has been disabled%s\n", node->rn_url.s,
-	    rtpproxy_disable_tout < 0 ? "" : " temporarily");
-	if (rtpproxy_disable_tout >= 0)
-		node->rn_recheck_ticks = get_ticks() + rtpproxy_disable_tout;
-
-	return 1;
-#endif
 }
 
-char *
+static char *
 send_rtpp_command(struct rtpp_node *node, bencode_item_t *dict, int *outlen)
 {
 	struct sockaddr_un addr;
@@ -1347,7 +1542,7 @@ static struct rtpp_set * select_rtpp_set(int id_set ){
  * too rare. Otherwise we should implement "mature" HA clustering, which is
  * too expensive here.
  */
-struct rtpp_node *
+static struct rtpp_node *
 select_rtpp_node(str callid, int do_test)
 {
 	unsigned sum, sumcut, weight_sum;
@@ -1433,237 +1628,10 @@ get_extra_id(struct sip_msg* msg, str *id_str) {
 
 
 
-static inline int parse_rtpproxy_flags(const char *str1, struct rtpproxy_flags *flags, bencode_item_t *dict, int offer, struct sip_msg *msg)
-{
-	const char *cp;
-	int via, ret;
-	str viabranch;
-	bencode_item_t *item;
-
-	if (!dict)
-		return -1;
-
-	via = 0;
-
-	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
-		switch (*cp) {
-		case '1':
-		case '2':
-			via = *cp - '0';
-			break;
-
-		case '3':
-			if(msg && msg->first_line.type == SIP_REPLY)
-				via = 2;
-			else
-				via = 1;
-			break;
-
-		case 'b':
-		case 'B':
-			via = -1;
-			break;
-
-		case 'a':
-		case 'A':
-			bencode_list_add_string(flags->flags, "asymmetric");
-			bencode_list_add_string(flags->flags, "trust-address");
-			break;
-
-		case 'i':
-		case 'I':
-			bencode_list_add_string(flags->direction, "internal");
-			break;
-
-		case 'e':
-		case 'E':
-			bencode_list_add_string(flags->direction, "external");
-			break;
-
-		case 'l':
-		case 'L':
-			if (offer == 0)
-				return -1;
-			flags->flookup = 1;
-			break;
-
-		case 'r':
-		case 'R':
-			bencode_list_add_string(flags->flags, "trust-address");
-			break;
-
-		case 'o':
-		case 'O':
-			bencode_list_add_string(flags->replace, "origin");
-			break;
-
-		case 'c':
-		case 'C':
-			bencode_list_add_string(flags->replace, "session-connection");
-			break;
-
-		case 'f':
-		case 'F':
-			bencode_list_add_string(flags->flags, "force");
-			break;
-
-		case 'w':
-		case 'W':
-			bencode_list_add_string(flags->flags, "symmetric");
-			break;
-
-		case 'x':
-		case 'X':
-			bencode_list_add_string(flags->flags, "auto-bridge");
-			break;
-
-#if 0
-		case 'z':
-		case 'Z':
-			if (append_opts(&rep_opts, 'Z') == -1) {
-				LM_ERR("out of pkg memory\n");
-				goto error;
-			}
-			/* If there are any digits following Z copy them into the command */
-			for (; cp[1] != '\0' && isdigit(cp[1]); cp++) {
-				if (append_opts(&rep_opts, cp[1]) == -1) {
-					LM_ERR("out of pkg memory\n");
-					goto error;
-				}
-			}
-			break;
-#endif
-
-		default:
-			LM_ERR("unknown option `%c'\n", *cp);
-			return -1;
-		}
-	}
-
-	/* only add those if any flags were given at all */
-	if (flags->direction && flags->direction->child)
-		bencode_dictionary_add(dict, "direction", flags->direction);
-	if (flags->flags && flags->flags->child)
-		bencode_dictionary_add(dict, "flags", flags->flags);
-	if (flags->replace && flags->replace->child)
-		bencode_dictionary_add(dict, "replace", flags->replace);
-
-	/* add basic message parameters, common to all calls */
-	if (get_callid(msg, &flags->callid) == -1 || flags->callid.len == 0) {
-		LM_ERR("can't get Call-Id field\n");
-		return -1;
-	}
-	bencode_dictionary_add_str(dict, "call-id", &flags->callid);
-
-	if (via) {
-		if (via == 1)
-			ret = get_via_branch(msg, 1, &viabranch);
-		else if (via == 2)
-			ret = get_via_branch(msg, 2, &viabranch);
-		else if (via == -1 && extra_id_pv)
-			ret = get_extra_id(msg, &viabranch);
-		else
-			ret = -1;
-		if (ret == -1 || viabranch.len == 0) {
-			LM_ERR("can't get Via branch/extra ID\n");
-			return -1;
-		}
-		bencode_dictionary_add_str(dict, "via-branch", &viabranch);
-	}
-
-	item = bencode_list(dict->buffer);
-	bencode_dictionary_add(dict, "received-from", item);
-	bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
-#ifdef USE_IPV6
-		(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
-#endif
-		"?"
-	) );
-	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
-
-	return 0;
-}
-
-
-
 static int
 unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
 {
-	bencode_buffer_t bencbuf;
-	bencode_item_t *dict;
-	int ret;
-	str from_tag, to_tag, s;
-	char *cp;
-	struct rtpp_node *node;
-	struct rtpproxy_flags flags;
-
-	if (bencode_buffer_init(&bencbuf)) {
-		LM_ERR("could not initialized bencode_buffer_t\n");
-		goto error_nb;
-	}
-	dict = bencode_dictionary(&bencbuf);
-
-	memset(&flags, 0, sizeof(flags));
-
-	if (parse_rtpproxy_flags(str1, &flags, dict, 0, msg))
-		goto error;
-
-	to_tag.s = 0;
-	to_tag.len = 0;
-	if ((flags.to == 1) && get_to_tag(msg, &to_tag) == -1) {
-		LM_ERR("can't get To tag\n");
-		goto error;
-	}
-	if (get_from_tag(msg, &from_tag) == -1 || from_tag.len == 0) {
-		LM_ERR("can't get From tag\n");
-		goto error;
-	}
-	bencode_dictionary_add_str(dict, "from-tag", &from_tag);
-	if (to_tag.s && to_tag.len)
-		bencode_dictionary_add_str(dict, "to-tag", &to_tag);
-	
-	if(msg->id != current_msg_id)
-		selected_rtpp_set = default_rtpp_set;
-	
-	bencode_dictionary_add_string(dict, "command", "delete");
-
-	if (bencbuf.error)
-		goto benc_error;
-
-	node = select_rtpp_node(flags.callid, 1);
-	if (!node) {
-		LM_ERR("no available proxies\n");
-		goto error;
-	}
-
-	cp = send_rtpp_command(node, dict, &ret);
-	if (!cp) {
-		LM_ERR("no response from proxy\n");
-		goto error;
-	}
-
-	dict = bencode_decode_expect(&bencbuf, cp, ret, BENCODE_DICTIONARY);
-	if (!dict) {
-		LM_ERR("failed to decode bencoded reply from proxy: %.*s\n", ret, cp);
-		goto error;
-	}
-	if (bencode_dictionary_get_strcmp(dict, "result", "ok")) {
-		if (!bencode_dictionary_get_str(dict, "error-reason", &s))
-			LM_ERR("proxy didn't give an \"ok\" response and didn't give an error reason: %.*s\n", ret, cp);
-		else
-			LM_ERR("proxy replied with error: %.*s\n", s.len, s.s);
-		goto error;
-	}
-
-	bencode_buffer_free(&bencbuf);
-	return 1;
-
-benc_error:
-	LM_ERR("out of memory - bencode failed\n");
-error:
-	bencode_buffer_free(&bencbuf);
-error_nb:
-	return -1;
+	return rtpp_function_call_simple(msg, OP_DELETE, str1);
 }
 
 /* This function assumes p points to a line of requested type. */
@@ -1841,190 +1809,54 @@ rtpproxy_answer2_f(struct sip_msg *msg, char *param1, char *param2)
 	return force_rtp_proxy(msg, param1, param2, 0, 1);
 }
 
+/* XXX forcedIP */
 static int
 force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forcedIP)
 {
 	bencode_buffer_t bencbuf;
 	bencode_item_t *dict;
-	int ret, create;
 	str body, newbody;
-	str from_tag, to_tag, tmp;
 	struct lump *anchor;
-	struct rtpp_node *node;
-	char *cp;
-	struct rtpproxy_flags flags;
 
-	newbody.s = NULL;
-	if (bencode_buffer_init(&bencbuf)) {
-		LM_ERR("could not initialized bencode_buffer_t\n");
-		goto error_nb;
-	}
-	dict = bencode_dictionary(&bencbuf);
+	dict = rtpp_function_call(&bencbuf, msg, offer ? OP_OFFER : OP_ANSWER, str1, &body);
+	if (!dict)
+		return -1;
 
-	memset(&flags, 0, sizeof(flags));
-
-	flags.flags = bencode_list(&bencbuf);
-	flags.direction = bencode_list(&bencbuf);
-	flags.replace = bencode_list(&bencbuf);
-
-	if (parse_rtpproxy_flags(str1, &flags, dict, offer, msg))
-		goto error;
-
-	create = offer ? 1 : 0;
-
-	/* extract_body will also parse all the headers in the message as
-	 * a side effect => don't move get_callid/get_to_tag in front of it
-	 * -- andrei */
-	if (extract_body(msg, &body) == -1) {
-		LM_ERR("can't extract body from the message\n");
-		goto error;
-	}
-	bencode_dictionary_add_str(dict, "sdp", &body);
-
-	to_tag.s = 0;
-	if (get_to_tag(msg, &to_tag) == -1) {
-		LM_ERR("can't get To tag\n");
-		goto error;
-	}
-	if (get_from_tag(msg, &from_tag) == -1 || from_tag.len == 0) {
-		LM_ERR("can't get From tag\n");
-		goto error;
-	}
-	if (flags.flookup != 0) {
-		if (to_tag.len == 0) {
-			goto error;
-		}
-		create = 0;
-	} else if ((msg->first_line.type == SIP_REPLY && offer != 0)
-			|| (msg->first_line.type == SIP_REQUEST && offer == 0)) {
-		if (to_tag.len == 0) {
-			goto error;
-		}
-		tmp = from_tag;
-		from_tag = to_tag;
-		to_tag = tmp;
-	}
-	bencode_dictionary_add_str(dict, "from-tag", &from_tag);
-	if (to_tag.s && to_tag.len)
-		bencode_dictionary_add_str(dict, "to-tag", &to_tag);
-
-	if(msg->id != current_msg_id)
-		selected_rtpp_set = default_rtpp_set;
-
-	bencode_dictionary_add_string(dict, "command", (create == 0) ? "answer" : "offer");
-
-	if (bencbuf.error)
-		goto benc_error;
-
-	do {
-		node = select_rtpp_node(flags.callid, 1);
-		if (!node) {
-			LM_ERR("no available proxies\n");
-			goto error;
-		}
-
-		cp = send_rtpp_command(node, dict, &ret);
-	} while (cp == NULL);
-	LM_DBG("proxy reply: %.*s\n", ret, cp);
-
-	dict = bencode_decode_expect(&bencbuf, cp, ret, BENCODE_DICTIONARY);
-	if (!dict) {
-		LM_ERR("failed to decode bencoded reply from proxy: %.*s\n", ret, cp);
-		goto error;
-	}
 	if (bencode_dictionary_get_strcmp(dict, "result", "ok")) {
-		if (!bencode_dictionary_get_str(dict, "error-reason", &newbody))
-			LM_ERR("proxy didn't give an \"ok\" response and didn't give an error reason: %.*s\n", ret, cp);
-		else
-			LM_ERR("proxy replied with error: %.*s\n", newbody.len, newbody.s);
+		LM_ERR("proxy didn't return \"ok\" result\n");
 		goto error;
 	}
 
 	if (!bencode_dictionary_get_str_dup(dict, "sdp", &newbody)) {
-		LM_ERR("failed to extract sdp body from proxy reply: %.*s\n", ret, cp);
+		LM_ERR("failed to extract sdp body from proxy reply\n");
 		goto error;
 	}
 
 	anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
 	if (!anchor) {
 		LM_ERR("del_lump failed\n");
-		goto error;
+		goto error_free;
 	}
 	if (!insert_new_lump_after(anchor, newbody.s, newbody.len, 0)) {
 		LM_ERR("insert_new_lump_after failed\n");
-		goto error;
+		goto error_free;
 	}
-	newbody.s = NULL;
 
 	bencode_buffer_free(&bencbuf);
 	return 1;
 
-benc_error:
-	LM_ERR("out of memory - bencode failed\n");
+error_free:
+	pkg_free(newbody.s);
 error:
 	bencode_buffer_free(&bencbuf);
-error_nb:
-	if (newbody.s)
-		pkg_free(newbody.s);
 	return -1;
 }
 
 
-static int start_recording_f(struct sip_msg* msg, char *foo, char *bar)
+static int
+start_recording_f(struct sip_msg* msg, char *foo, char *bar)
 {
-#if 0
-	int nitems;
-	str callid = {0, 0};
-	str from_tag = {0, 0};
-	str to_tag = {0, 0};
-	struct rtpp_node *node;
-	struct iovec v[1 + 4 + 3] = {{NULL, 0}, {"R", 1}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
-	                             /* 1 */   /* 2 */   /* 3 */    /* 4 */   /* 5 */    /* 6 */   /* 1 */
-
-	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
-		LM_ERR("can't get Call-Id field\n");
-		return -1;
-	}
-
-	if (get_to_tag(msg, &to_tag) == -1) {
-		LM_ERR("can't get To tag\n");
-		return -1;
-	}
-
-	if (get_from_tag(msg, &from_tag) == -1 || from_tag.len == 0) {
-		LM_ERR("can't get From tag\n");
-		return -1;
-	}
-
-	if(msg->id != current_msg_id){
-		selected_rtpp_set = default_rtpp_set;
-	}
-
-	STR2IOVEC(callid, v[3]);
-	STR2IOVEC(from_tag, v[5]);
-	STR2IOVEC(to_tag, v[7]);
-	node = select_rtpp_node(callid, 1);
-	if (!node) {
-		LM_ERR("no available proxies\n");
-		return -1;
-	}
-
-	nitems = 8;
-	if (msg->first_line.type == SIP_REPLY) {
-		if (to_tag.len == 0)
-			return -1;
-		STR2IOVEC(to_tag, v[5]);
-		STR2IOVEC(from_tag, v[7]);
-	} else {
-		STR2IOVEC(from_tag, v[5]);
-		STR2IOVEC(to_tag, v[7]);
-		if (to_tag.len <= 0)
-			nitems = 6;
-	}
-	send_rtpp_command(node, v, nitems);
-
-#endif
-	return 1;
+	return rtpp_function_call_simple(msg, OP_START_RECORDING, NULL);
 }
 
 /*
