@@ -220,11 +220,14 @@ binary-arch: build install
 	$(MAKE) -f debian/rules DH_OPTIONS=-a binary-common
 	mkdir -p $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/
 	cp -v debian/overrides $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/kamailio
-
+	find $(CURDIR)/debian
 
 # Any other binary targets build just one binary package at a time.
 binary-%: build install
 	$(MAKE) -f debian/rules binary-common DH_OPTIONS=-p$*
+	mkdir -p $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/
+	cp -v debian/overrides $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/kamailio
+	find $(CURDIR)/debian
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install configure
