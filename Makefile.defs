@@ -858,8 +858,6 @@ ifeq ($(use_fast_lock), yes)
 	found_lock_method=yes
 endif
 
-CFLAGS=
-LDFLAGS=
 C_INCLUDES=
 # setting CFLAGS
 ifeq ($(mode), release)
