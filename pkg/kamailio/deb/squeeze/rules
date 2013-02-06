@@ -118,6 +118,9 @@ ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
 	INSTALL_PROGRAM += -s
 endif
 
+CFLAGS+=$(shell dpkg-buildflags --get CFLAGS)
+LDFLAGS+=$(shell dpkg-buildflags --get LDFLAGS)
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
@@ -126,7 +129,6 @@ configure-stamp:
 			cfg_target=/etc/kamailio/ \
 			basedir=$(CURDIR)/debian/kamailio \
 			skip_modules="$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)" \
-			$(shell dpkg-buildflags --export=configure) \
 			group_include="kstandard"
 
 	touch configure-stamp
