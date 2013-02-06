@@ -19,6 +19,10 @@
 #  force no striping (always include debug symbols for now)
 export DEB_BUILD_OPTIONS:="$(DEB_BUILD_OPTIONS) debug"
 
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/buildflags.mk
+
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES= purple
 
@@ -126,6 +130,7 @@ configure-stamp:
 			cfg_target=/etc/kamailio/ \
 			basedir=$(CURDIR)/debian/kamailio \
 			skip_modules="$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)" \
+			$(shell dpkg-buildflags --export=configure) \
 			group_include="kstandard"
 
 	touch configure-stamp
