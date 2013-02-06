@@ -1,0 +1,7 @@
+diff --git a/pkg/kamailio/deb/squeeze/kamailio.dirs b/pkg/kamailio/deb/squeeze/kamailio.dirs
+index f16a2e9..e69de29 100644
+--- a/pkg/kamailio/deb/squeeze/kamailio.dirs
++++ b/pkg/kamailio/deb/squeeze/kamailio.dirs
+@@ -1,2 +0,0 @@
+-var/run/kamailio
+-
