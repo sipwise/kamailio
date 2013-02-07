@@ -1,0 +1,38 @@
+diff --git a/modules_k/nathelper/nathelper.c b/modules_k/nathelper/nathelper.c
+index f0f2598..0adec7a 100644
+--- a/modules_k/nathelper/nathelper.c
++++ b/modules_k/nathelper/nathelper.c
+@@ -332,6 +332,7 @@ static const char sbuf[4] = {0, 0, 0, 0};
+ static char *force_socket_str = 0;
+ static pid_t mypid;
+ static int sipping_flag = -1;
++static int sipping_disable_flag = -1;
+ static int natping_processes = 1;
+ static int contact_only = 0;
+ 
+@@ -401,6 +402,7 @@ static param_export_t params[] = {
+ 	{"sipping_from",          STR_PARAM, &sipping_from.s        },
+ 	{"sipping_method",        STR_PARAM, &sipping_method.s      },
+ 	{"sipping_bflag",         INT_PARAM, &sipping_flag          },
++	{"sipping_disable_bflag", INT_PARAM, &sipping_disable_flag  },
+ 	{"natping_processes",     INT_PARAM, &natping_processes     },
+ 	{"natping_socket",        STR_PARAM, &natping_socket        },
+ 	{"contact_only",          INT_PARAM, &contact_only          },
+@@ -636,6 +638,7 @@ mod_init(void)
+ 		}
+ 
+ 		sipping_flag = (sipping_flag==-1)?0:(1<<sipping_flag);
++		sipping_disable_flag = (sipping_disable_flag==-1)?0:(1<<sipping_disable_flag);
+ 
+ 		/* set reply function if SIP natping is enabled */
+ 		if (sipping_flag) {
+@@ -1731,6 +1734,9 @@ nh_timer(unsigned int ticks, void *timer_idx)
+ 		path.s = path.len ? ((char*)cp + sizeof(path.len)) : NULL ;
+ 		cp =  (char*)cp + sizeof(path.len) + path.len;
+ 
++		if ((flags & sipping_disable_flag)) /* always 0 if sipping_disable_flag not set */
++			continue;
++
+ 		/* determin the destination */
+ 		if ( path.len && (flags&sipping_flag)!=0 ) {
+ 			/* send to first URI in path */
