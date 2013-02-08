@@ -1250,7 +1250,9 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 	) );
 	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
 
-	if (msg->first_line.type == SIP_REQUEST && op != OP_ANSWER) {
+	if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
+		|| (msg->first_line.type == SIP_REPLY && op == OP_ANSWER))
+	{
 		bencode_dictionary_add_str(dict, "from-tag", &from_tag);
 		if (to && to_tag.s && to_tag.len)
 			bencode_dictionary_add_str(dict, "to-tag", &to_tag);
