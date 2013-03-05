@@ -1210,6 +1210,14 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 				bencode_dictionary_add_integer(dict, "repacketize", packetize);
 			break;
 
+		case '-':
+			bencode_dictionary_add_string(dict, "ICE", "remove");
+			break;
+
+		case '+':
+			bencode_dictionary_add_string(dict, "ICE", "force");
+			break;
+
 		default:
 			LM_ERR("unknown option `%c'\n", *flags_str);
 			goto error;
