@@ -10,7 +10,7 @@
 
 <book xmlns:xi="http://www.w3.org/2001/XInclude">
 	<bookinfo>
-	<title>rtpproxy Module</title>
+	<title>rtpproxy-ng Module</title>
 	<productname class="trade">&kamailioname;</productname>
 	<authorgroup>
 		<author>
@@ -65,6 +65,14 @@
 			<email>carsten@ng-voice.com</email>
 		</address>
 		</editor>
+		<editor>
+		<firstname>Richard</firstname>
+		<surname>Fuchs</surname>
+		<affiliation><orgname>Sipwise GmbH</orgname></affiliation>
+		<address>
+			<email>rfuchs@sipwise.com</email>
+		</address>
+		</editor>
 	</authorgroup>
 	<copyright>
 		<year>2003-2008</year>
@@ -81,6 +89,10 @@
 	<copyright>
 		<year>2010</year>
 		<holder><ulink url='http://www.voipembedded.com'>VoIPEmbedded Inc.</ulink></holder>
+	</copyright>
+	<copyright>
+		<year>2013</year>
+		<holder>Sipwise GmbH</holder>
 	</copyright>
 	</bookinfo>
 	<toc></toc>

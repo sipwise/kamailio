@@ -18,18 +18,22 @@
 	<title>Overview</title>
 	<para>
 		This is a module that enables media streams to be proxied
-		via an rtpproxy.  Rtpproxies know to work with this module
-		are Sippy RTPproxy <ulink url="http://www.rtpproxy.org"></ulink>
-		and ngcp-rtpproxy-ng 
-		<ulink url="http://deb.sipwise.com/spce/2.6/pool/main/n/ngcp-mediaproxy-ng"></ulink>.
-		Some features of the rtpproxy module apply only to one of the two rtpproxies.
+		via an RTP proxy. The only RTP proxy currently known to work
+		with this module is the Sipwise ngcp-rtpproxy-ng
+		<ulink url="https://github.com/sipwise/mediaproxy-ng"></ulink>.
+		The rtpproxy-ng module is a modified version of the original
+		rtpproxy module using a new control protocol. The module is
+		designed to be a drop-in replacement for the old module from
+		a configuration file point of view, however due to the
+		incompatible control protocol, it only works with RTP proxies
+		which specifically support it.
 	</para>
 	</section>
 
 	<section>
 	<title>Multiple RTPProxy usage</title>
 	<para>
-		The rtpproxy module can support multiple rtpproxies for
+		The rtpproxy-ng module can support multiple RTP proxies for
 		balancing/distribution and control/selection purposes.
 	</para>
 	<para>
@@ -111,14 +115,14 @@
 		<programlisting format="linespecific">
 ...
 # single rtproxy
-modparam("rtpproxy", "rtpproxy_sock", "udp:localhost:12221")
+modparam("rtpproxy-ng", "rtpproxy_sock", "udp:localhost:12221")
 # multiple rtproxies for LB
-modparam("rtpproxy", "rtpproxy_sock",
+modparam("rtpproxy-ng", "rtpproxy_sock",
 	"udp:localhost:12221 udp:localhost:12222")
 # multiple sets of multiple rtproxies
-modparam("rtpproxy", "rtpproxy_sock",
+modparam("rtpproxy-ng", "rtpproxy_sock",
 	"1 == udp:localhost:12221 udp:localhost:12222")
-modparam("rtpproxy", "rtpproxy_sock",
+modparam("rtpproxy-ng", "rtpproxy_sock",
 	"2 == udp:localhost:12225")
 ...
 </programlisting>
@@ -127,8 +131,8 @@ modparam("rtpproxy", "rtpproxy_sock",
 	<section>
 		<title><varname>rtpproxy_disable_tout</varname> (integer)</title>
 		<para>
-		Once RTPProxy was found unreachable and marked as disabled, the rtpproxy
-		module will not attempt to establish communication to RTPProxy for
+		Once an RTP proxy was found unreachable and marked as disabled, the rtpproxy-ng
+		module will not attempt to establish communication to that RTP proxy for
 		rtpproxy_disable_tout seconds.
 		</para>
 		<para>
@@ -140,7 +144,7 @@ modparam("rtpproxy", "rtpproxy_sock",
 		<title>Set <varname>rtpproxy_disable_tout</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("rtpproxy", "rtpproxy_disable_tout", 20)
+modparam("rtpproxy-ng", "rtpproxy_disable_tout", 20)
 ...
 </programlisting>
 		</example>
@@ -148,7 +152,7 @@ modparam("rtpproxy", "rtpproxy_disable_tout", 20)
 	<section>
 		<title><varname>rtpproxy_tout</varname> (integer)</title>
 		<para>
-		Timeout value in waiting for reply from RTPProxy.
+		Timeout value in waiting for reply from RTP proxy.
 		</para>
 		<para>
 		<emphasis>
@@ -159,7 +163,7 @@ modparam("rtpproxy", "rtpproxy_disable_tout", 20)
 		<title>Set <varname>rtpproxy_tout</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("rtpproxy", "rtpproxy_tout", 2)
+modparam("rtpproxy-ng", "rtpproxy_tout", 2)
 ...
 </programlisting>
 		</example>
@@ -179,42 +183,16 @@ modparam("rtpproxy", "rtpproxy_tout", 2)
 		<title>Set <varname>rtpproxy_retr</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("rtpproxy", "rtpproxy_retr", 2)
+modparam("rtpproxy-ng", "rtpproxy_retr", 2)
 ...
 </programlisting>
 		</example>
 	</section>
-	<section>
-		<title><varname>nortpproxy_str</varname> (string)</title>
-		<para>
-		This parameter sets the SDP attribute used by rtpproxy to mark
-		the message's SDP attachemnt with information that it have 
-		already been changed.
-		</para>
-		<para>
-		If empty string, no marker will be added or checked.
-		</para>
-		<note><para>
-		The string must be a complete SDP line, including the EOH (\r\n).
-		</para></note>
-		<para>
-		<emphasis>
-			Default value is <quote>a=nortpproxy:yes\r\n</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>nortpproxy_str</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("rtpproxy", "nortpproxy_str", "a=sdpmangled:yes\r\n")
-...
-</programlisting>
-		</example>
-	</section>
+<!--
 	<section>
 		<title><varname>timeout_socket</varname> (string)</title>
 		<para>
-		The parameter sets the RTP timeout socket, which is transmitted to the RTP-Proxy.
+		The parameter sets the RTP timeout socket, which is transmitted to the RTP Proxy.
 		It will be used by the RTP proxy to signal back that a media stream timed
 		out.
 		</para>
@@ -235,34 +213,7 @@ modparam("nathelper", "timeout_socket", "xmlrpc:http://127.0.0.1:8000/RPC2")
 </programlisting>
 		</example>
 	</section>
-	<section>
-		<title><varname>ice_candidate_priority_avp</varname> (string)</title>
-		<para>
-		If specified and if value of the avp value is not 0,
-		<function>rtpproxy_manage</function> function adds
-		ICE relay candidate attributes
-		to sdp stream(s) containing ICE candidate attributes.
-		</para>
-		<para>
-		If value of the avp is 1, added candidates
-		have high priority.  If value of the avp is 2 (default),
-		added candidates have low priority.
-		</para>
-		<para>
-		<emphasis>
-		There is no default value meaning that no ICE relay
-		candidates are added in any circumstance.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>ice_candidate_priority_avp</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("rtpproxy", "ice_candidate_priority_avp", "$avp(ice_priority)")
-...
-</programlisting>
-		</example>
-	</section>
+-->
 	<section>
 		<title><varname>extra_id_pv</varname> (string)</title>
 		<para>
@@ -276,7 +227,7 @@ modparam("rtpproxy", "ice_candidate_priority_avp", "$avp(ice_priority)")
 		<title>Set <varname>extra_id_pv</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("rtpproxy", "extra_id_pv", "$avp(extra_id)")
+modparam("rtpproxy-ng", "extra_id_pv", "$avp(extra_id)")
 ...
 </programlisting>
 		</example>
@@ -334,9 +285,9 @@ rtpproxy_offer();
 				passing the flag '1' or '2' in the <quote>unforce_rtpproxy</quote>, or stop
 				all sessions for a call when not passing one of those two flags there. This is
 				especially useful if you have serially forked call scenarios where rtpproxy
-				gets an <quote>update</quote> command for a new branch, and then a 
+				gets an <quote>offer</quote> command for a new branch, and then a 
 				<quote>delete</quote> command for the previous branch, which would otherwise
-				delete the full call, breaking the subsequent <quote>lookup</quote> for the
+				delete the full call, breaking the subsequent <quote>answer</quote> for the
 				new branch. <emphasis>This flag is only supported by the ngcp-mediaproxy-ng 
 				rtpproxy at the moment!</emphasis>
 				</para></listitem>
@@ -385,16 +336,21 @@ rtpproxy_offer();
 				So, for example if a SIP requests is processed with 'ie' flags, the corresponding
 				response must be processed with 'ie' flags.
 				</para><para>
+				For ngcp-mediaproxy-ng, these flags are used to select between IPv4
+				and IPv6 addresses, corresponding to 'i' and 'e' respectively. For example,
+				if the request is coming from an IPv4 host and is going to an IPv6 host,
+				the flags should be specified as 'ie'.
+				</para><para>
 				Note: As rtpproxy in bridge mode s per default asymmetric, you have to specify
 				the 'w' flag for clients behind NAT! See also above notes!
 				</para></listitem>
 				<listitem><para>
-				<emphasis>x</emphasis> - this flag a shortcut for using the "ie" or "ei"-flags of RTP-Proxy,
+				<emphasis>x</emphasis> - this flag an alternative to the 'ie' or 'ei'-flags
 				in order to do automatic bridging between IPv4 on the
-				"internal network" and IPv6 on the "external network". The distinction is done by
-				the given IP in the SDP, e.g. a IPv4 Address will always call "ie" to the RTPProxy
-				(IPv4(i) to IPv6(e)) and an IPv6Address will always call "ei" to the RTPProxy (IPv6(e)
-				to IPv4(i)).
+				"internal network" and IPv6 on the "external network". Instead of
+				explicitly instructing the RTP proxy to select a particular address
+				family, the distinction is done by the given IP in the SDP body by
+				the RTP proxy itself. Not supported by ngcp-mediaproxy-ng.
 				</para><para>
 				Note: Please note, that this will only work properly with non-dual-stack user-agents or with
 				dual-stack clients according to RFC6157 (which suggest ICE for Dual-Stack implementations).
@@ -438,6 +394,22 @@ rtpproxy_offer();
 				This feature could be used for significantly reducing bandwith
 				overhead for low bitrate codecs, for example with G.729 going
 				from 10ms to 100ms saves two thirds of the network bandwith.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>+</emphasis> - instructs the RTP proxy to
+				discard any ICE attributes already present in the SDP body
+				and then generate and insert new ICE data, leaving itself
+				as the <emphasis>only</emphasis> ICE candidates. Without
+				this flag, new ICE data will only be generated
+				if no ICE was present in the SDP originally; otherwise
+				the RTP proxy will only insert itself as an
+				<emphasis>additional</emphasis> ICE candidate. Other
+				SDP substitutions (c=, m=, etc) are unaffected by this flag.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>-</emphasis> - instructs the RTP proxy to discard
+				any ICE attributes and not insert any new ones into the SDP.
+				Mutually exclusive with the '+' flag.
 				</para></listitem>
 			</itemizedlist>
 		</listitem>
@@ -639,6 +611,7 @@ rtpproxy_manage();
 		</example>
         </section>
 
+<!--
 	<section id="rtpproxy_stream2uac">
 	<title>
 	    <function>rtpproxy_stream2uac(prompt_name, count)</function>,
@@ -754,6 +727,7 @@ start_recording();
 		See function <function>rtpproxy_stop_stream2uac(prompt_name, count)</function>.
 	</para>
 	</section>
+-->
 
 
 	</section>
