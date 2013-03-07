@@ -168,7 +168,6 @@ other:
 int extract_body(struct sip_msg *msg, str *body )
 {
 	char c;
-	int skip;
 	int ret;
 	str mpdel;
 	char *rest, *p1, *p2;
@@ -268,17 +267,6 @@ error:
 	return -1;
 
 done:
-	for (skip = 0; skip < body->len; skip++) {
-		c = body->s[body->len - skip - 1];
-		if (c != '\r' && c != '\n')
-			break;
-	}
-	if (skip == body->len) {
-		LM_ERR("empty body");
-		goto error;
-	}
-	body->len -= skip;
-
 	/*LM_DBG("DEBUG:extract_body:=|%.*s|\n",body->len,body->s);*/
 	return 1;
 }
