@@ -295,6 +295,7 @@ static const char *command_strings[] = {
 static char *gencookie();
 static int rtpp_test(struct rtpp_node*, int, int);
 static int unforce_rtp_proxy_f(struct sip_msg *, char *, char *);
+static int unforce_rtp_proxy1_f(struct sip_msg *, char *, char *);
 static int force_rtp_proxy(struct sip_msg *, char *, char *, int, int);
 static int start_recording_f(struct sip_msg *, char *, char *);
 static int rtpproxy_answer1_f(struct sip_msg *, char *, char *);
@@ -377,11 +378,11 @@ static cmd_export_t cmds[] = {
 	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy_f,    0,
 		0, 0,
 		ANY_ROUTE},
-	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy_f,    1,
-		0, 0,
+	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy1_f,    1,
+		fixup_spve_null, 0,
 		ANY_ROUTE},
-	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy_f,    1,
-		0, 0,
+	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy1_f,    1,
+		fixup_spve_null, 0,
 		ANY_ROUTE},
 	{"start_recording",    (cmd_function)start_recording_f,      0,
 		0, 0,
@@ -390,19 +391,19 @@ static cmd_export_t cmds[] = {
 		0, 0,
 		ANY_ROUTE},
 	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer1_f,     1,
-		0, 0,
+		fixup_spve_null, 0,
 		ANY_ROUTE},
 	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer2_f,     2,
-		0, 0,
+		fixup_spve_null, fixup_spve_null,
 		ANY_ROUTE},
 	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer1_f,    0,
 		0, 0,
 		ANY_ROUTE},
 	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer1_f,    1,
-		0, 0,
+		fixup_spve_null, 0,
 		ANY_ROUTE},
 	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer2_f,    2,
-		0, 0,
+		fixup_spve_null, fixup_spve_null,
 		ANY_ROUTE},
 #if 0
 	{"rtpproxy_stream2uac",(cmd_function)rtpproxy_stream2uac2_f, 2,
@@ -1627,6 +1628,14 @@ unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
 	return rtpp_function_call_simple(msg, OP_DELETE, str1);
 }
 
+static int
+unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
+{
+	str flags;
+	get_str_fparam(&flags, msg, (fparam_t *) str1);
+	return rtpp_function_call_simple(msg, OP_DELETE, flags.s);
+}
+
 /* This function assumes p points to a line of requested type. */
 
 static int
@@ -1764,16 +1773,26 @@ rtpproxy_offer1_f(struct sip_msg *msg, char *str1, char *str2)
 {
         char *cp;
         char newip[IP_ADDR_MAX_STR_SIZE];
+	str flags;
 
         cp = ip_addr2a(&msg->rcv.dst_ip);
         strcpy(newip, cp);
-	return force_rtp_proxy(msg, str1, newip, 1, 0);
+
+	if (str1)
+		get_str_fparam(&flags, msg, (fparam_t *) str1);
+	else
+		flags.s = NULL;
+	return force_rtp_proxy(msg, flags.s, newip, 1, 0);
 }
 
 static int
 rtpproxy_offer2_f(struct sip_msg *msg, char *param1, char *param2)
 {
-	return force_rtp_proxy(msg, param1, param2, 1, 1);
+	str flags, new_ip;
+
+	get_str_fparam(&flags, msg, (fparam_t *) param1);
+	get_str_fparam(&new_ip, msg, (fparam_t *) param2);
+	return force_rtp_proxy(msg, flags.s, new_ip.s, 1, 1);
 }
 
 static int
@@ -1781,6 +1800,7 @@ rtpproxy_answer1_f(struct sip_msg *msg, char *str1, char *str2)
 {
         char *cp;
         char newip[IP_ADDR_MAX_STR_SIZE];
+	str flags;
 
 	if (msg->first_line.type == SIP_REQUEST)
 		if (msg->first_line.u.request.method_value != METHOD_ACK)
@@ -1788,18 +1808,27 @@ rtpproxy_answer1_f(struct sip_msg *msg, char *str1, char *str2)
 
         cp = ip_addr2a(&msg->rcv.dst_ip);
         strcpy(newip, cp);
-	return force_rtp_proxy(msg, str1, newip, 0, 0);
+
+	if (str1)
+		get_str_fparam(&flags, msg, (fparam_t *) str1);
+	else
+		flags.s = NULL;
+	return force_rtp_proxy(msg, flags.s, newip, 0, 0);
 }
 
 static int
 rtpproxy_answer2_f(struct sip_msg *msg, char *param1, char *param2)
 {
 
+	str flags, new_ip;
+
 	if (msg->first_line.type == SIP_REQUEST)
 		if (msg->first_line.u.request.method_value != METHOD_ACK)
 			return -1;
 
-	return force_rtp_proxy(msg, param1, param2, 0, 1);
+	get_str_fparam(&flags, msg, (fparam_t *) param1);
+	get_str_fparam(&new_ip, msg, (fparam_t *) param2);
+	return force_rtp_proxy(msg, flags.s, new_ip.s, 0, 1);
 }
 
 /* XXX forcedIP */
