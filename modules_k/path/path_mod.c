@@ -80,13 +80,17 @@ struct rr_binds path_rrb;
  */
 static cmd_export_t cmds[] = {
 	{ "add_path",          (cmd_function)add_path,              0,
-			0,              0,  REQUEST_ROUTE },
-	{ "add_path",          (cmd_function)add_path_usr,          1,
-			fixup_str_null, 0, REQUEST_ROUTE },
+			0,               0,  REQUEST_ROUTE },
+	{ "add_path",          (cmd_function)add_path,              1,
+			fixup_spve_null, 0, REQUEST_ROUTE },
+	{ "add_path",          (cmd_function)add_path,              2,
+			fixup_spve_null, fixup_spve_null, REQUEST_ROUTE },
 	{ "add_path_received", (cmd_function)add_path_received,     0,
-			0,              0, REQUEST_ROUTE },
-	{ "add_path_received", (cmd_function)add_path_received_usr, 1,
-			fixup_str_null, 0, REQUEST_ROUTE },
+			0,               0, REQUEST_ROUTE },
+	{ "add_path_received", (cmd_function)add_path_received,     1,
+			fixup_spve_null, 0, REQUEST_ROUTE },
+	{ "add_path_received", (cmd_function)add_path_received,     2,
+			fixup_spve_null, fixup_spve_null, REQUEST_ROUTE },
 	{ 0, 0, 0, 0, 0, 0 }
 };
 

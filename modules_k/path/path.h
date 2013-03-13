@@ -42,23 +42,12 @@
  */
 int add_path(struct sip_msg* _msg, char* _a, char* _b);
 
-/*
- * Prepend own uri to Path header and take care of given
- * user.
- */
-int add_path_usr(struct sip_msg* _msg, char* _a, char* _b);
 
 /*
  * Prepend own uri to Path header and append received address as
  * "received"-param to that uri.
  */
 int add_path_received(struct sip_msg* _msg, char* _a, char* _b);
-
-/*
- * Prepend own uri to Path header and append received address as
- * "received"-param to that uri and take care of given user.
- */
-int add_path_received_usr(struct sip_msg* _msg, char* _a, char* _b);
 
 /*
  * rr callback for setting dst-uri

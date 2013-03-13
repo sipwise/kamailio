@@ -37,6 +37,7 @@
 #include "../../data_lump.h"
 #include "../../parser/parse_param.h"
 #include "../../dset.h"
+#include "../../sr_module.h"
 
 #include "path.h"
 #include "path_mod.h"
@@ -44,64 +45,61 @@
 #define PATH_PREFIX		"Path: <sip:"
 #define PATH_PREFIX_LEN		(sizeof(PATH_PREFIX)-1)
 
-#define PATH_LR_PARAM		";lr"
-#define PATH_LR_PARAM_LEN	(sizeof(PATH_LR_PARAM)-1)
+const static char *proto_strings[] = {
+	[PROTO_TCP] = "transport=tcp",
+	[PROTO_TLS] = "transport=tls",
+	[PROTO_SCTP] = "transport=sctp",
+};
 
-#define PATH_RC_PARAM		";received="
-#define PATH_RC_PARAM_LEN	(sizeof(PATH_RC_PARAM)-1)
-
-#define	PATH_CRLF		">\r\n"
-#define PATH_CRLF_LEN		(sizeof(PATH_CRLF)-1)
-
-static int prepend_path(struct sip_msg* _m, str *user, int recv)
+static int prepend_path(struct sip_msg* _m, str *user, int recv, str *parms)
 {
 	struct lump *l;
-	char *prefix, *suffix, *crlf;
+	char *prefix, *suffix, *cp;
+	const char *proto_str;
 	int prefix_len, suffix_len;
 	struct hdr_field *hf;
-	str rcv_addr = {0, 0};
-	char *src_ip;
 		
-	prefix = suffix = crlf = 0;
-
-	prefix_len = PATH_PREFIX_LEN + (user->len ? (user->len+1) : 0);
-	prefix = pkg_malloc(prefix_len);
-	if (!prefix) {
-		LM_ERR("no pkg memory left for prefix\n");
-		goto out1;
-	}
-	memcpy(prefix, PATH_PREFIX, PATH_PREFIX_LEN);
-	if (user->len) {
-		memcpy(prefix + PATH_PREFIX_LEN, user->s, user->len);
-		memcpy(prefix + prefix_len - 1, "@", 1);
-	}
-
-	suffix_len = PATH_LR_PARAM_LEN + (recv ? PATH_RC_PARAM_LEN : 0);
-	suffix = pkg_malloc(suffix_len);
+	suffix_len = strlen(";lr;received='sip::12345;transport=sctp';>\r\n")
+			+ IP_ADDR_MAX_STR_SIZE + (parms ? parms->len : 0) + 1;
+	cp = suffix = pkg_malloc(suffix_len);
 	if (!suffix) {
 		LM_ERR("no pkg memory left for suffix\n");
 		goto out1;
 	}
-	memcpy(suffix, PATH_LR_PARAM, PATH_LR_PARAM_LEN);
-	if(recv)
-		memcpy(suffix+PATH_LR_PARAM_LEN, PATH_RC_PARAM, PATH_RC_PARAM_LEN);
 
-	crlf = pkg_malloc(PATH_CRLF_LEN);
-	if (!crlf) {
-		LM_ERR("no pkg memory left for crlf\n");
-		goto out1;
+	cp += sprintf(cp, ";lr");
+
+	if (recv) {
+		if (_m->rcv.proto < (sizeof(proto_strings) / sizeof(*proto_strings)))
+			proto_str = proto_strings[(unsigned int) _m->rcv.proto];
+		else
+			proto_str = NULL;
+
+		cp += sprintf(cp, ";received='sip:%s:%hu%s'", ip_addr2a(&_m->rcv.src_ip),
+				_m->rcv.src_port, proto_str ? : "");
 	}
-	memcpy(crlf, PATH_CRLF, PATH_CRLF_LEN);
+
+	if (parms && parms->len)
+		cp += sprintf(cp, ";%.*s", parms->len, parms->s);
+
+	cp += sprintf(cp, ">\r\n");
+
+	prefix_len = PATH_PREFIX_LEN + (user ? user->len : 0) + 2;
+	prefix = pkg_malloc(prefix_len);
+	if (!prefix) {
+		LM_ERR("no pkg memory left for prefix\n");
+		goto out2;
+	}
+	if (user && user->len)
+		prefix_len = sprintf(prefix, PATH_PREFIX "%.*s@", user->len, user->s);
+	else
+		prefix_len = sprintf(prefix, PATH_PREFIX);
 
 	if (parse_headers(_m, HDR_PATH_F, 0) < 0) {
 		LM_ERR("failed to parse message for Path header\n");
-		goto out1;
+		goto out3;
 	}
-	for (hf = _m->headers; hf; hf = hf->next) {
-		if (hf->type == HDR_PATH_T) {
-			break;
-		} 
-	}
+	hf = get_hdr(_m, HDR_PATH_T);
 	if (hf)
 		/* path found, add ours in front of that */
 		l = anchor_lump(_m, hf->name.s - _m->buf, 0, 0);
@@ -110,95 +108,56 @@ static int prepend_path(struct sip_msg* _m, str *user, int recv)
 		l = anchor_lump(_m, _m->unparsed - _m->buf, 0, 0);
 	if (!l) {
 		LM_ERR("failed to get anchor\n");
-		goto out1;
+		goto out3;
 	}
 
 	l = insert_new_lump_before(l, prefix, prefix_len, 0);
-	if (!l) goto out1;
+	if (!l) goto out3;
 	l = insert_subst_lump_before(l, SUBST_SND_ALL, 0);
 	if (!l) goto out2;
-	l = insert_new_lump_before(l, suffix, suffix_len, 0);
+	l = insert_new_lump_before(l, suffix, cp - suffix, 0);
 	if (!l) goto out2;
-	if (recv) {
-		/* TODO: agranig: optimize this one! */
-		src_ip = ip_addr2a(&_m->rcv.src_ip);
-		rcv_addr.s = pkg_malloc(6 + IP_ADDR_MAX_STR_SIZE + 22); /* 'sip:<ip>:<port>;transport=sctp'\0 */
-		if(!rcv_addr.s) {
-			LM_ERR("no pkg memory left for receive-address\n");
-			goto out3;
-		}
-		switch (_m->rcv.proto) {
-			case PROTO_UDP:
-				rcv_addr.len = snprintf(rcv_addr.s, 6 + IP_ADDR_MAX_STR_SIZE + 6, "'sip:%s:%u'", src_ip, _m->rcv.src_port);
-				break;
-			case PROTO_TCP:
-				rcv_addr.len = snprintf(rcv_addr.s, 6 + IP_ADDR_MAX_STR_SIZE + 20, "'sip:%s:%u;transport=tcp'", src_ip, _m->rcv.src_port);
-				break;
-			case PROTO_TLS:
-				rcv_addr.len = snprintf(rcv_addr.s, 6 + IP_ADDR_MAX_STR_SIZE + 20, "'sip:%s:%u;transport=tls'", src_ip, _m->rcv.src_port);
-				break;
-			case PROTO_SCTP:
-				rcv_addr.len = snprintf(rcv_addr.s, 6 + IP_ADDR_MAX_STR_SIZE + 21, "'sip:%s:%u;transport=sctp'", src_ip, _m->rcv.src_port);
-				break;
-	    }
-
-		l = insert_new_lump_before(l, rcv_addr.s, rcv_addr.len, 0);
-		if (!l) goto out3;
-	}
-	l = insert_new_lump_before(l, crlf, CRLF_LEN+1, 0);
-	if (!l) goto out4;
 	
 	return 1;
 	
-out1:
-	if (prefix) pkg_free(prefix);
-out2:
-	if (suffix) pkg_free(suffix);
 out3:
-	if (rcv_addr.s) pkg_free(rcv_addr.s);
-out4:
-	if (crlf) pkg_free(crlf);
-
-	LM_ERR("failed to insert prefix lump\n");
+	pkg_free(prefix);
+out2:
+	pkg_free(suffix);
+out1:
+	LM_ERR("failed to insert Path header\n");
 
 	return -1;
 }
 
-/*! \brief
- * Prepend own uri to Path header
- */
-int add_path(struct sip_msg* _msg, char* _a, char* _b)
-{
+static int add_path_rcv(struct sip_msg* _msg, char* _usr, int recv, char* _parms) {
 	str user = {0,0};
-	return prepend_path(_msg, &user, 0);
+	str parms = {0,0};
+
+	if (_usr)
+		get_str_fparam(&user, _msg, (fparam_t *) _usr);
+	if (_parms)
+		get_str_fparam(&parms, _msg, (fparam_t *) _parms);
+
+	return prepend_path(_msg, &user, recv, &parms);
 }
 
 /*! \brief
  * Prepend own uri to Path header and take care of given
- * user.
+ * params.
  */
-int add_path_usr(struct sip_msg* _msg, char* _usr, char* _b)
+int add_path(struct sip_msg* _msg, char* _usr, char* _parms)
 {
-	return prepend_path(_msg, (str*)_usr, 0);
+	return add_path_rcv(_msg, _usr, 0, _parms);
 }
 
 /*! \brief
  * Prepend own uri to Path header and append received address as
  * "received"-param to that uri.
  */
-int add_path_received(struct sip_msg* _msg, char* _a, char* _b)
+int add_path_received(struct sip_msg* _msg, char* _usr, char* _parms)
 {
-	str user = {0,0};
-	return prepend_path(_msg, &user, 1);
-}
-
-/*! \brief
- * Prepend own uri to Path header and append received address as
- * "received"-param to that uri and take care of given user.
- */
-int add_path_received_usr(struct sip_msg* _msg, char* _usr, char* _b)
-{
-	return prepend_path(_msg, (str*)_usr, 1);
+	return add_path_rcv(_msg, _usr, 1, _parms);
 }
 
 /*! \brief
