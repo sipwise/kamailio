@@ -394,7 +394,7 @@ static cmd_export_t cmds[] = {
 		fixup_spve_null, 0,
 		ANY_ROUTE},
 	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer2_f,     2,
-		fixup_spve_null, fixup_spve_null,
+		fixup_spve_spve, 0,
 		ANY_ROUTE},
 	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer1_f,    0,
 		0, 0,
@@ -403,7 +403,7 @@ static cmd_export_t cmds[] = {
 		fixup_spve_null, 0,
 		ANY_ROUTE},
 	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer2_f,    2,
-		fixup_spve_null, fixup_spve_null,
+		fixup_spve_spve, 0,
 		ANY_ROUTE},
 #if 0
 	{"rtpproxy_stream2uac",(cmd_function)rtpproxy_stream2uac2_f, 2,
