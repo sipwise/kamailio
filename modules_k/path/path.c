@@ -46,9 +46,9 @@
 #define PATH_PREFIX_LEN		(sizeof(PATH_PREFIX)-1)
 
 const static char *proto_strings[] = {
-	[PROTO_TCP] = "transport=tcp",
-	[PROTO_TLS] = "transport=tls",
-	[PROTO_SCTP] = "transport=sctp",
+	[PROTO_TCP] = ";transport=tcp",
+	[PROTO_TLS] = ";transport=tls",
+	[PROTO_SCTP] = ";transport=sctp",
 };
 
 static int prepend_path(struct sip_msg* _m, str *user, int recv, str *parms)
