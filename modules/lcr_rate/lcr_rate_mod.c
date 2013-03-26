@@ -115,7 +115,7 @@ static int check_swrate_init() {
 	return 0;
 }
 
-struct peer *load_peers(int *num, str *user, str *domain) {
+struct peer *load_peers(int *num, char *src_user, char *src_domain, char *dst_user, char *dst_domain) {
 	struct usr_avp *avp;
 	int_str val;
 	struct peer *ret, *j;
@@ -125,8 +125,8 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 	swr_rate_t rate;
 	time_t now;
 
-	LM_DBG("loading peers for user <%.*s>@<%.*s> from avp\n",
-		user->len, user->s, domain->len, domain->s);
+	LM_DBG("loading peers for user <%s>@<%s> -> <%s>@<%s> from avp\n",
+		src_user, src_domain, dst_user, dst_domain);
 
 	len = 4;
 	ret = pkg_malloc(len * sizeof(*ret));
@@ -182,10 +182,11 @@ struct peer *load_peers(int *num, str *user, str *domain) {
 		LM_DBG("finding rate for peer %u\n", j->id);
 		j->weight = i;
 
-		if (swrate_get_peer_rate(&rate, &swrate_handle, j->id, user->s, domain->s, now)) {
+		if (swrate_get_peer_ab_rate(&rate, &swrate_handle, j->id, src_user,
+					src_domain, dst_user, dst_domain, now)) {
 			pkg_free(ret);
-			LM_ERR("failed to get rate for call, peer id %u, user <%.*s>@<%.*s>\n",
-				j->id, user->len, user->s, domain->len, domain->s);
+			LM_ERR("failed to get rate for call, peer id %u, user <%s>@<%s> -> <%s>@<%s>\n",
+				j->id, src_user, src_domain, dst_user, dst_domain);
 			return NULL;
 		}
 		j->cost = rate.init_rate;
@@ -227,24 +228,49 @@ static int save_peers(struct peer *peers, int num) {
 	return 0;
 }
 
+static void extract_ud(str *s, char **user, char **at, char **domain) {
+	*user = *at = *domain = NULL;
+	if (!s || !s->s || !*s->s)
+		return;
+	*user = s->s;
+	*at = strchr(*user, '@');
+	if (!*at)
+		return;
+	**at = '\0';
+	*domain = *at + 1;
+	if (!**domain)
+		*domain = NULL;
+}
+
 static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
 	struct peer *peers;
 	int num_peers;
-	str user, domain;
+	str src, dst;
+	char *src_user, *src_at, *src_domain;
+	char *dst_user, *dst_at, *dst_domain;
 
 	if (check_swrate_init())
 		return -1;
 
-	if (fixup_get_svalue(msg, (gparam_t *) su, &user)) {
+	if (fixup_get_svalue(msg, (gparam_t *) su, &src)) {
 		LM_ERR("failed to get user parameter\n");
 		return -1;
 	}
-	if (fixup_get_svalue(msg, (gparam_t *) sq, &domain)) {
+	if (fixup_get_svalue(msg, (gparam_t *) sq, &dst)) {
 		LM_ERR("failed to get domain parameter\n");
 		return -1;
 	}
 
-	peers = load_peers(&num_peers, &user, &domain);
+	extract_ud(&src, &src_user, &src_at, &src_domain);
+	extract_ud(&dst, &dst_user, &dst_at, &dst_domain);
+
+	peers = load_peers(&num_peers, src_user, src_domain, dst_user, dst_domain);
+
+	if (*src_at)
+		*src_at = '@';
+	if (*dst_at)
+		*dst_at = '@';
+
 	if (!peers)
 		return -1;
 	qsort(peers, num_peers, sizeof(*peers), peers_cmp);
