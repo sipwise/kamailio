@@ -76,6 +76,9 @@ cmd_CC+=$(CC_MKDEP_OPTS)
 cmd_MKDEP=
 endif # CC_MKDEP_OPTS
 
+cmd_CC+=-o $@.tmp || rm -f $@.tmp; mv -f $@.tmp $@ 2> /dev/null
+cmd_LD+=-o $(NAME).tmp || rm -f $(NAME).tmp; mv -f $(NAME).tmp $(NAME) 2> /dev/null
+
 cmd_CC_lock=while true; do ( flock -n 9 || exit 95; \
 	$(cmd_CC); \
 	) 9> $@.lock; exitcode=$$?; test $$exitcode = 95 || break; sleep 1; \
