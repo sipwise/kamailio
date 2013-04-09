@@ -1735,10 +1735,10 @@ char* tr_parse_string(str* in, trans_t *t)
 	} else if(name.len==11 && strncasecmp(name.s, "decode.hexa", 11)==0) {
 		t->subtype = TR_S_DECODEHEXA;
 		goto done;
-	} else if(name.len==11 && strncasecmp(name.s, "encode.base64", 13)==0) {
+	} else if(name.len==13 && strncasecmp(name.s, "encode.base64", 13)==0) {
 		t->subtype = TR_S_ENCODEBASE64;
 		goto done;
-	} else if(name.len==11 && strncasecmp(name.s, "decode.base64", 13)==0) {
+	} else if(name.len==13 && strncasecmp(name.s, "decode.base64", 13)==0) {
 		t->subtype = TR_S_DECODEBASE64;
 		goto done;
 	} else if(name.len==13 && strncasecmp(name.s, "escape.common", 13)==0) {
