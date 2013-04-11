@@ -36,6 +36,7 @@
 #include "../../mem/mem.h"
 #include "../../data_lump.h"
 #include "../../parser/parse_param.h"
+#include "../../lib/kcore/strcommon.h"
 #include "../../dset.h"
 #include "../../sr_module.h"
 
@@ -46,9 +47,9 @@
 #define PATH_PREFIX_LEN		(sizeof(PATH_PREFIX)-1)
 
 const static char *proto_strings[] = {
-	[PROTO_TCP] = ";transport=tcp",
-	[PROTO_TLS] = ";transport=tls",
-	[PROTO_SCTP] = ";transport=sctp",
+	[PROTO_TCP] = "%3Btransport%3Dtcp",
+	[PROTO_TLS] = "%3Btransport%3Dtls",
+	[PROTO_SCTP] = "%3Btransport%3Dsctp",
 };
 
 static int prepend_path(struct sip_msg* _m, str *user, int recv, str *parms)
@@ -59,7 +60,7 @@ static int prepend_path(struct sip_msg* _m, str *user, int recv, str *parms)
 	int prefix_len, suffix_len;
 	struct hdr_field *hf;
 		
-	suffix_len = strlen(";lr;received='sip::12345;transport=sctp';>\r\n")
+	suffix_len = strlen(";lr;received=sip::12345%3Btransport%3Dsctp;>\r\n")
 			+ IP_ADDR_MAX_STR_SIZE + (parms ? parms->len : 0) + 1;
 	cp = suffix = pkg_malloc(suffix_len);
 	if (!suffix) {
@@ -75,7 +76,7 @@ static int prepend_path(struct sip_msg* _m, str *user, int recv, str *parms)
 		else
 			proto_str = NULL;
 
-		cp += sprintf(cp, ";received='sip:%s:%hu%s'", ip_addr2a(&_m->rcv.src_ip),
+		cp += sprintf(cp, ";received=sip:%s:%hu%s", ip_addr2a(&_m->rcv.src_ip),
 				_m->rcv.src_port, proto_str ? : "");
 	}
 
@@ -167,6 +168,8 @@ void path_rr_callback(struct sip_msg *_m, str *r_param, void *cb_param)
 {
 	param_hooks_t hooks;
 	param_t *params;
+	static char dst_uri_buf[MAX_URI_SIZE];
+	static str dst_uri;
 			
 	if (parse_params(r_param, CLASS_CONTACT, &hooks, &params) != 0) {
 		LM_ERR("failed to parse route parameters\n");
@@ -174,7 +177,14 @@ void path_rr_callback(struct sip_msg *_m, str *r_param, void *cb_param)
 	}
 
 	if (hooks.contact.received) {
-		if (set_dst_uri(_m, &hooks.contact.received->body) != 0) {
+	        dst_uri.s = dst_uri_buf;
+		dst_uri.len = MAX_URI_SIZE;
+		if (unescape_user(&(hooks.contact.received->body), &dst_uri) < 0) {
+		        LM_ERR("unescaping received failed\n");
+			free_params(params);
+			return;
+		}	    
+		if (set_dst_uri(_m, &dst_uri) != 0) {
 			LM_ERR("failed to set dst-uri\n");
 			free_params(params);
 			return;
