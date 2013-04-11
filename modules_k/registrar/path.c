@@ -32,8 +32,10 @@
 #include "../../data_lump.h"
 #include "../../parser/parse_rr.h"
 #include "../../parser/parse_uri.h"
+#include "../../lib/kcore/strcommon.h"
 #include "path.h"
 #include "reg_mod.h"
+
 
 /*! \brief
  * Combines all Path HF bodies into one string.
@@ -41,6 +43,8 @@
 int build_path_vector(struct sip_msg *_m, str *path, str *received)
 {
 	static char buf[MAX_PATH_SIZE];
+	static char uri_buf[MAX_URI_SIZE];
+	static str uri_str;
 	char *p;
 	struct hdr_field *hdr;
 	struct sip_uri puri;
@@ -92,8 +96,18 @@ int build_path_vector(struct sip_msg *_m, str *path, str *received)
 				LM_ERR("failed to parse parameters of first hop\n");
 				goto error;
 			}
-			if (hooks.contact.received)
-				*received = hooks.contact.received->body;
+
+			if (hooks.contact.received) {
+			        uri_str.s = uri_buf;
+				uri_str.len = MAX_URI_SIZE;
+			        if (unescape_user(&(hooks.contact.received->body), &uri_str) < 0) {
+				        LM_ERR("unescaping received failed\n");
+				        goto error;
+				}
+				*received = uri_str;
+				LM_DBG("received is <%.*s>\n", received->len, received->s);
+			}
+				
 			/*for (;params; params = params->next) {
 				if (params->type == P_RECEIVED) {
 					*received = hooks.contact.received->body;
@@ -107,6 +121,7 @@ int build_path_vector(struct sip_msg *_m, str *path, str *received)
 
 	path->s = buf;
 	path->len = p-buf;
+	LM_DBG("path is <%.*s>\n", path->len, path->s);
 	return 0;
 error:
 	if(route) free_rr(&route);
