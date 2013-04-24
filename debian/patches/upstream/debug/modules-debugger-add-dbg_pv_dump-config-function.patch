@@ -1,0 +1,254 @@
+From e0fbbf9da7d46f04ec5d6ff5ef28e08192f8ef58 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 3 Jun 2013 11:25:17 +0200
+Subject: [PATCH 2/2] modules/debugger: add dbg_pv_dump config function.
+
+It dumps the content of pv_cache on json format.
+---
+ modules/debugger/Makefile               |    9 ++++++
+ modules/debugger/README                 |   24 ++++++++++++++
+ modules/debugger/debugger_api.c         |   54 +++++++++++++++++++++++++++++++
+ modules/debugger/debugger_api.h         |    2 ++
+ modules/debugger/debugger_mod.c         |   13 ++++++++
+ modules/debugger/doc/debugger_admin.xml |   30 ++++++++++++++++-
+ 6 files changed, 131 insertions(+), 1 deletion(-)
+
+--- a/modules/debugger/Makefile
++++ b/modules/debugger/Makefile
+@@ -7,6 +7,15 @@
+ NAME=debugger.so
+ LIBS=
+ 
++BUILDER = $(shell which pkg-config)
++ifeq ($(BUILDER),)
++	DEFS+=-I/usr/include/json -I$(LOCALBASE)/include/json \
++       -I$(LOCALBASE)/include
++	LIBS+=-L$(SYSBASE)/include/lib -L$(LOCALBASE)/lib -ljson
++else
++	DEFS+= $(shell pkg-config --cflags json)
++	LIBS+= $(shell pkg-config --libs json)
++endif
+ DEFS+=-DKAMAILIO_MOD_INTERFACE
+ 
+ include ../../Makefile.modules
+--- a/modules/debugger/README
++++ b/modules/debugger/README
+@@ -10,7 +10,7 @@
+ 
+    <miconda@gmail.com>
+ 
+-   Copyright © 2010 Daniel-Constantin Mierla (asipto.com)
++   Copyright (c) 2010 Daniel-Constantin Mierla (asipto.com)
+      __________________________________________________________________
+ 
+    Table of Contents
+@@ -36,6 +36,7 @@
+         4. Functions
+ 
+               4.1. dbg_breakpoint(mode)
++              4.2. dbg_pv_dump()
+ 
+         5. Exported RPC Functions
+ 
+@@ -55,6 +56,7 @@
+    1.6. Set step_usleep parameter
+    1.7. Set step_loops parameter
+    1.8. dbg_breakpoint usage
++   1.9. dbg_pv_dump usage
+ 
+ Chapter 1. Admin Guide
+ 
+@@ -79,6 +81,7 @@
+    4. Functions
+ 
+         4.1. dbg_breakpoint(mode)
++        4.2. dbg_pv_dump()
+ 
+    5. Exported RPC Functions
+ 
+@@ -226,6 +229,7 @@
+ 4. Functions
+ 
+    4.1. dbg_breakpoint(mode)
++   4.2. dbg_pv_dump()
+ 
+ 4.1. dbg_breakpoint(mode)
+ 
+@@ -242,6 +246,26 @@
+         dbg_breakpoint("1");
+ ...
+ 
++4.2. dbg_pv_dump()
++
++   Prints the content of pv_cache on json format
++
++   Example 1.9. dbg_pv_dump usage
++...
++$var(temp) = 2;
++$avp(s:more_avp) = 3;
++$xavp(x[0]=>more) = "hi";
++
++dbg_pv_dump();
++...
++
++   Output
++...
++  4(24310) DEBUG: debugger [debugger_api.c:1335]: dbg_dump_json(): { "$var(temp)
++": 2, "$avp(s:more_avp)": 3, "$xavp(x[0]=>more)": "hi" }
++
++ ...
++
+ 5. Exported RPC Functions
+ 
+    5.1. dbg.ls
+--- a/modules/debugger/debugger_api.c
++++ b/modules/debugger/debugger_api.c
+@@ -25,6 +25,7 @@
+ #include <string.h>
+ #include <stdlib.h>
+ #include <unistd.h>
++#include <json.h>
+ 
+ #include "../../dprint.h"
+ #include "../../ut.h"
+@@ -1078,3 +1079,56 @@
+ 		return;
+ 	set_module_debug_level_cb(dbg_get_mod_debug_level);
+ }
++
++int dbg_dump_json(struct sip_msg* msg, pv_elem_p list)
++{
++	pv_value_t value;
++	pv_elem_p el = list;
++	json_object * jobj = NULL;
++	json_object *jstring = NULL;
++	json_object *jint = NULL;
++	char sname[100];
++	char svalue[100];
++
++	jobj = json_object_new_object();
++	if(jobj==NULL){
++		LM_ERR("Can not create a new json object\n");
++		return -1;
++	}
++
++	while(el)
++	{
++		/*LM_DBG("el->spec[%p][%d] el->text[%.*s]\n", el->spec,
++			el->spec->type, el->text.len, el->text.s);*/
++		if(!(el->spec->type==PVT_AVP||
++			el->spec->type==PVT_SCRIPTVAR||
++			el->spec->type==PVT_OTHER))
++		{
++			el = el->next;
++			continue;
++		}
++		if(pv_get_spec_value(msg, el->spec, &value)!=0)
++		{
++			LM_ERR("can't get value\n");
++			el = el->next;
++			continue;
++		}
++
++		snprintf(sname, 100, "%.*s", el->text.len, el->text.s);
++		if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE)){
++			jstring = json_object_new_string("$null");
++			json_object_object_add(jobj, sname, jstring);
++		}else if(value.flags&(PV_VAL_INT)){
++			jint = json_object_new_int(value.ri);
++			json_object_object_add(jobj, sname, jint);
++		}else if(value.flags&(PV_VAL_STR)){
++			snprintf(svalue, 100, "%.*s", value.rs.len, value.rs.s);
++			jstring = json_object_new_string(svalue);
++			json_object_object_add(jobj, sname, jstring);
++		}
++		el = el->next;
++	}
++	LM_DBG("%s\n", json_object_to_json_string(jobj));
++	json_object_put(jobj);
++	return 0;
++}
+--- a/modules/debugger/debugger_api.h
++++ b/modules/debugger/debugger_api.h
+@@ -37,5 +37,6 @@
+ int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel);
+ void dbg_enable_mod_levels(void);
+ 
++int dbg_dump_json(struct sip_msg* msg, pv_elem_p list);
+ #endif
+ 
+--- a/modules/debugger/debugger_mod.c
++++ b/modules/debugger/debugger_mod.c
+@@ -46,6 +46,8 @@
+ static int fixup_dbg_breakpoint(void** param, int param_no);
+ static int dbg_mod_level_param(modparam_t type, void *val);
+ 
++static int w_dbg_dump(struct sip_msg* msg, char* point, char* str2);
++
+ /* parameters */
+ extern int _dbg_cfgtrace;
+ extern int _dbg_breakpoint;
+@@ -63,6 +65,8 @@
+ static cmd_export_t cmds[]={
+ 	{"dbg_breakpoint", (cmd_function)w_dbg_breakpoint, 1,
+ 		fixup_dbg_breakpoint, 0, ANY_ROUTE},
++	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 0,
++		0, 0, ANY_ROUTE},
+ 	{0, 0, 0, 0, 0, 0}
+ };
+ 
+@@ -157,6 +161,15 @@
+ 	return 1;
+ }
+ 
++static int w_dbg_dump(struct sip_msg* msg, char* point, char* str2)
++{
++	pv_elem_t *list = pv_cache_dump(msg);
++	if(list==NULL) return 0;
++	dbg_dump_json(msg, list);
++	pv_elem_free_all(list);
++	return 1;
++}
++
+ /**
+  * get the pointer to action structure
+  */
+--- a/modules/debugger/doc/debugger_admin.xml
++++ b/modules/debugger/doc/debugger_admin.xml
+@@ -250,7 +250,35 @@
+ </programlisting>
+ 	    </example>
+ 	</section>
+-	
++
++	<section>
++	    <title>
++		<function moreinfo="none">dbg_pv_dump()</function>
++	    </title>
++	    <para>
++			Prints the content of pv_cache on json format
++	    </para>
++		<example>
++		<title><function>dbg_pv_dump</function> usage</title>
++		<programlisting format="linespecific">
++...
++$var(temp) = 2;
++$avp(s:more_avp) = 3;
++$xavp(x[0]=>more) = "hi";
++
++dbg_pv_dump();
++...
++</programlisting>
++		<para>Output</para>
++		<programlisting format="linespecific">
++...
++  4(24310) DEBUG: debugger [debugger_api.c:1335]: dbg_dump_json(): { "$var(temp)": 2, "$avp(s:more_avp)": 3, "$xavp(x[0]=>more)": "hi" }
++
++ ...
++</programlisting>
++	    </example>
++	</section>
++
+     </section>
+ 	
+ 	<section>

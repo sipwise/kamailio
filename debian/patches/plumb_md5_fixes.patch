@@ -1,0 +1,77 @@
+Description: fix the code to build with Colin Plumb's md5 code
+Author: Tzafrir Cohen <tzafrir@debian.org>
+
+--- a/md5.c
++++ b/md5.c
+@@ -17,9 +17,6 @@
+  * will fill a supplied 16-byte array with the digest.
+  */
+ 
+-#include <config.h>
+-#include <compat.h>
+-
+ #include <sys/types.h>
+ #include <string.h>
+ 
+@@ -66,7 +63,7 @@ MD5Init(MD5_CTX *ctx)
+  * of bytes.
+  */
+ void
+-MD5Update(MD5_CTX *ctx, const unsigned char *input, size_t len)
++U_MD5Update(MD5_CTX *ctx, const unsigned char *input, size_t len)
+ {
+ 	size_t have, need;
+ 
+@@ -117,15 +114,15 @@ MD5Pad(MD5_CTX *ctx)
+ 	    ((ctx->count >> 3) & (MD5_BLOCK_LENGTH - 1));
+ 	if (padlen < 1 + 8)
+ 		padlen += MD5_BLOCK_LENGTH;
+-	MD5Update(ctx, PADDING, padlen - 8);		/* padlen - 8 <= 64 */
+-	MD5Update(ctx, count, 8);
++	U_MD5Update(ctx, PADDING, padlen - 8);		/* padlen - 8 <= 64 */
++	U_MD5Update(ctx, count, 8);
+ }
+ 
+ /*
+  * Final wrapup--call MD5Pad, fill in digest and zero out ctx.
+  */
+ void
+-MD5Final(unsigned char digest[MD5_DIGEST_LENGTH], MD5_CTX *ctx)
++U_MD5Final(unsigned char digest[MD5_DIGEST_LENGTH], MD5_CTX *ctx)
+ {
+ 	int i;
+ 
+--- a/md5.h
++++ b/md5.h
+@@ -19,16 +19,27 @@
+ #define	MD5_DIGEST_LENGTH		16
+ #define	MD5_DIGEST_STRING_LENGTH	(MD5_DIGEST_LENGTH * 2 + 1)
+ 
++/* Probably not the proper place, but will do for Debian: */
++#include <sys/types.h>
++
+ typedef struct MD5Context {
+ 	u_int32_t state[4];			/* state */
+ 	u_int64_t count;			/* number of bits, mod 2^64 */
+-	u_int8_t buffer[MD5_BLOCK_LENGTH];	/* input buffer */
++	unsigned char buffer[MD5_BLOCK_LENGTH];	/* input buffer */
+ } MD5_CTX;
+ 
+ void	 MD5Init(MD5_CTX *);
+-void	 MD5Update(MD5_CTX *, const u_int8_t *, size_t);
++void	 U_MD5Update(MD5_CTX *, const unsigned char *, size_t);
+ void	 MD5Pad(MD5_CTX *);
+-void	 MD5Final(u_int8_t [MD5_DIGEST_LENGTH], MD5_CTX *);
+-void	 MD5Transform(u_int32_t [4], const u_int8_t [MD5_BLOCK_LENGTH]);
++void	 U_MD5Final(unsigned char [MD5_DIGEST_LENGTH], MD5_CTX *);
++void	 MD5Transform(u_int32_t [4], const unsigned char [MD5_BLOCK_LENGTH]);
++
++static inline void MD5Update(MD5_CTX *ctx, const char *str, size_t len) {
++	U_MD5Update(ctx, (const unsigned char *)str, len);
++}
++
++static inline void MD5Final(char buf[MD5_DIGEST_LENGTH], MD5_CTX *ctx) {
++	U_MD5Final((unsigned char *)buf, ctx);
++}
+ 
+ #endif /* _MD5_H_ */

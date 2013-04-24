@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    install|upgrade)
+        # updating from an OpenSER installation
+        if dpkg --compare-versions "$2" "<" "1.4.0"; then
+            # check for old configuration
+            if [ -r /etc/openser/dictionary.radius ]; then
+                echo "Found old Radius module installation, trying to move the configuration file to new location."
+                mkdir -p /etc/kamailio
+                mv /etc/openser/dictionary.radius /etc/kamailio/dictionary.radius
+                echo "Move \"/etc/openser/dictionary.radius\" to \"/etc/kamailio/\"."
+            fi
+        fi
+        ;;
+
+    abort-upgrade)
+        ;;
+    
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#

@@ -1,0 +1,185 @@
+--- a/modules/sipcapture/sipcapture.c
++++ b/modules/sipcapture/sipcapture.c
+@@ -1341,7 +1341,7 @@
+         }
+ #endif
+         else {
+-                ERR("raw_capture_socket: LSF currently suppoted only on linux\n");
++                ERR("raw_capture_socket: LSF currently supported only on linux\n");
+                 goto error;                        
+         }
+                 
+--- a/modules/sms/libsms_getsms.c
++++ b/modules/sms/libsms_getsms.c
+@@ -519,7 +519,7 @@
+ 	ptr = s;
+ 	for ( n=0 ; n<2 && (ptr=strstr(ptr,"\r\n")) ; n++,ptr+=2 );
+ 	if (n<2) {
+-		LM_ERR("failed to find pdu begining in CDS!\n");
++		LM_ERR("failed to find pdu beginning in CDS!\n");
+ 		goto error;
+ 	}
+ 	data = ptr;
+--- a/modules/sms/sms_funcs.c
++++ b/modules/sms/sms_funcs.c
+@@ -644,7 +644,7 @@
+ 	/* the rest of the sms (if any ;-)) is the body! */
+ 	sip_body.s = p;
+ 	sip_body.len = sms->ascii + sms->userdatalength - p;
+-	/* let's trim out all \n an \r from begining */
++	/* let's trim out all \n an \r from beginning */
+ 	while ( sip_body.len && sip_body.s
+ 	&& (sip_body.s[0]=='\n' || sip_body.s[0]=='\r') ) {
+ 		sip_body.s++;
+@@ -699,7 +699,7 @@
+ 	sip_body.len = sms->ascii + sms->userdatalength - sms->ascii;
+ 	sip_body.s = sms->ascii;	
+ 
+-	/* let's trim out all \n an \r from begining */
++	/* let's trim out all \n an \r from beginning */
+ 	while (sip_body.len && sip_body.s && 
+ 	      (sip_body.s[0] == '\n' || sip_body.s[0] == '\r')) {
+ 	       sip_body.s++;
+--- a/modules_k/p_usrloc/ul_db_tran.c
++++ b/modules_k/p_usrloc/ul_db_tran.c
+@@ -85,7 +85,7 @@
+ 	for(i=0; i<DB_NUM; i++) {
+ 		if((handle->db[i].status == DB_ON) && (working[i])) {
+ 			if(submit_tran_commit(&handle->db[i].dbf, handle->db[i].dbh) < 0) {
+-				LM_ERR("error while commiting "
++				LM_ERR("error while committing "
+ 				    "transaction on id %i, db %i.\n", handle->id, handle->db[i].no);
+ 				if(db_handle_error(handle, handle->db[i].no) < 0) {
+ 					LM_ERR("error during handling error "
+--- a/modules_k/path/path.c
++++ b/modules_k/path/path.c
+@@ -210,7 +210,7 @@
+ 	param_t *params;
+ 			
+ 	if (parse_params(r_param, CLASS_CONTACT, &hooks, &params) != 0) {
+-		LM_ERR("failed to parse route parametes\n");
++		LM_ERR("failed to parse route parameters\n");
+ 		return;
+ 	}
+ 
+--- a/modules_k/pv/pv_core.c
++++ b/modules_k/pv/pv_core.c
+@@ -1711,7 +1711,7 @@
+ 	}
+ 	if(!(val->flags&PV_VAL_STR))
+ 	{
+-		LM_ERR("error - str value requred to set dst uri\n");
++		LM_ERR("error - str value required to set dst uri\n");
+ 		goto error;
+ 	}
+ 	
+--- a/modules_k/regex/regex_mod.c
++++ b/modules_k/regex/regex_mod.c
+@@ -316,7 +316,7 @@
+ 			i++;
+ 			/* Check if there are more patterns than the max value */
+ 			if (i >= max_groups) {
+-				LM_ERR("max patterns exceded\n");
++				LM_ERR("max patterns exceeded\n");
+ 				fclose(f);
+ 				goto err;
+ 			}
+@@ -328,7 +328,7 @@
+ 		
+ 		/* Check if the patter size is too big (aprox) */
+ 		if (strlen(patterns[i]) + strlen(line) >= group_max_size - 2) {
+-			LM_ERR("pattern max file exceded\n");
++			LM_ERR("pattern max file exceeded\n");
+ 			fclose(f);
+ 			goto err;
+ 		}
+--- a/modules_k/seas/event_dispatcher.c
++++ b/modules_k/seas/event_dispatcher.c
+@@ -192,7 +192,7 @@
+ 	    continue;
+ 	 }
+ 	 if(errno==EBADF){
+-	    LM_ERR("invalid file descriptor pased to poll (%s)\n",
++	    LM_ERR("invalid file descriptor passed to poll (%s)\n",
+ 				strerror(errno));
+ 	    return -1;/*??*/
+ 	 }
+--- a/modules_s/domain/domain.c
++++ b/modules_s/domain/domain.c
+@@ -182,7 +182,7 @@
+ 	load_attrs_cmd->match[0].v.lstr = d->did;
+ 
+ 	if (db_exec(&res, load_attrs_cmd) < 0) {
+-		ERR("Error while quering database\n");
++		ERR("Error while querying database\n");
+ 		return -1;
+ 	}
+ 
+--- a/socket_info.c
++++ b/socket_info.c
+@@ -1054,7 +1054,7 @@
+ 			//if(! (ifaces[i].flags & IFF_UP) ) continue;
+ 
+ 			for(tmp = ifaces[i].addresses; tmp; tmp = tmp->next){
+-				LM_DBG("\t in add_iface_via_netlink Name %s Adress %s\n", ifaces[i].name, tmp->addr);
++				LM_DBG("\t in add_iface_via_netlink Name %s Address %s\n", ifaces[i].name, tmp->addr);
+ 		                /* match family */
+                                 if (family == tmp->family){
+ 					/* check if loopback */
+--- a/rvalue.c
++++ b/rvalue.c
+@@ -335,7 +335,7 @@
+ 		case RV_SEL:
+ 			return "select";
+ 	}
+-	return "error_unkown_type";
++	return "error_unknown_type";
+ }
+ 
+ 
+--- a/tcp_main.c
++++ b/tcp_main.c
+@@ -1698,7 +1698,7 @@
+ 						c->id, port);
+ 			break;
+ 		default:
+-			LOG(L_ERR, "ERROR: tcpconn_add_alias: unkown error %d\n", ret);
++			LOG(L_ERR, "ERROR: tcpconn_add_alias: unknown error %d\n", ret);
+ 	}
+ 	return -1;
+ }
+--- a/modules/tls/tls_init.c
++++ b/modules/tls/tls_init.c
+@@ -544,8 +544,8 @@
+ 				" zlib compression: %s"
+ 				"\n %s\n",
+ 				SSLeay_version(SSLEAY_VERSION), ssl_version,
+-				(lib_kerberos==1)?"on":(lib_kerberos==0)?"off":"unkown",
+-				(lib_zlib==1)?"on":(lib_zlib==0)?"off":"unkown",
++				(lib_kerberos==1)?"on":(lib_kerberos==0)?"off":"unknown",
++				(lib_zlib==1)?"on":(lib_zlib==0)?"off":"unknown",
+ 				SSLeay_version(SSLEAY_CFLAGS));
+ 	if (lib_kerberos!=kerberos_support){
+ 		if (lib_kerberos!=-1){
+--- a/modules/db_postgres/pg_cmd.c
++++ b/modules/db_postgres/pg_cmd.c
+@@ -349,7 +349,7 @@
+ 	/* FIXME: The function should take the connection as one of parameters */
+ 	pcon = DB_GET_PAYLOAD(cmd->ctx->con[db_payload_idx]);
+ 
+-	DBG("postgres: Uploading comand '%s': '%s'\n", pcmd->name, 
++	DBG("postgres: Uploading command '%s': '%s'\n", pcmd->name, 
+ 		pcmd->sql_cmd.s);
+ 
+ 	res = PQprepare(pcon->con, pcmd->name, pcmd->sql_cmd.s, 0, NULL);
+--- a/utils/kamctl/kamdbctl.8
++++ b/utils/kamctl/kamdbctl.8
+@@ -54,7 +54,7 @@
+ Restores tables from a file.
+ 
+ .SH NOTES
+-Not all databases scripts suport all commands.
++Not all databases scripts support all commands.
+ 
+ .SH FILES
+ .PD 0

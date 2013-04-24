@@ -1,0 +1,26 @@
+From e081c2880b46174ad836ab1f56e3062bb17b4332 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Fri, 17 May 2013 00:46:42 +0200
+Subject: [PATCH 1/4] core: fixed printing function name in log message
+
+- based on http://gcc.gnu.org/onlinedocs/gcc/Function-Names.html
+---
+ dprint.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/dprint.h b/dprint.h
+index 4a9fdbf..285c9f1 100644
+--- a/dprint.h
++++ b/dprint.h
+@@ -46,7 +46,7 @@
+ 
+ /* C >= 99 has __func__, older gcc versions have __FUNCTION__ */
+ #if __STDC_VERSION__ < 199901L
+-#	if __GNUC__ >= 2 && defined __FUNCTION__
++#	if __GNUC__ >= 2
+ #		define _FUNC_NAME_ __FUNCTION__
+ #	else
+ #		define _FUNC_NAME_ ""
+-- 
+1.7.10.4
+

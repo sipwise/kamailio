@@ -1,0 +1,160 @@
+From 9d908f1d24df8c1644c3fbed3d99f5011106cae6 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 28 Mar 2013 10:18:10 +0100
+Subject: [PATCH 2/4] modules/app_lua: Added reload parameter to deactivate
+ the reload check
+
+---
+ modules/app_lua/app_lua_api.c         |   37 +++++++++++++++++++++++++++------
+ modules/app_lua/app_lua_api.h         |    1 +
+ modules/app_lua/app_lua_mod.c         |    7 +++++++
+ modules/app_lua/doc/app_lua_admin.xml |   21 +++++++++++++++++++
+ 4 files changed, 60 insertions(+), 6 deletions(-)
+
+diff --git a/modules/app_lua/app_lua_api.c b/modules/app_lua/app_lua_api.c
+index f2047a6..7a11b1b 100644
+--- a/modules/app_lua/app_lua_api.c
++++ b/modules/app_lua/app_lua_api.c
+@@ -42,7 +42,11 @@
+ 
+ #define SRVERSION "1.0"
+ 
+-
++/**
++ * reload enabled param
++ * default: 0 (off)
++ */
++static unsigned int sr_reload = 0;
+ /**
+  *
+  */
+@@ -158,6 +162,19 @@ int sr_lua_register_module(char *mname)
+ /**
+  *
+  */
++int sr_lua_reload_module(unsigned int reload)
++{
++	LM_DBG("reload:%d\n", reload);
++	if(reload!=0) {
++		sr_reload = 1;
++		LM_DBG("reload param activated!\n");
++	}
++	return 0;
++}
++
++/**
++ *
++ */
+ void lua_sr_openlibs(lua_State *L)
+ {
+ 	lua_sr_core_openlibs(L);
+@@ -360,6 +377,11 @@ int lua_sr_reload_script(int pos)
+ 			LM_CRIT("shm for version not allocated\n");
+ 			return -1;
+ 		}
++		if (sr_reload==0)
++		{
++			LM_ERR("reload is not activated\n");
++			return -3;
++		}
+ 		if (pos<0)
+ 		{
+ 			// let's mark all the scripts to be reloaded
+@@ -590,13 +612,16 @@ int app_lua_run(struct sip_msg *msg, char *func, char *p1, char *p2,
+ 		LM_ERR("lua loading state not initialized (call: %s)\n", func);
+ 		return -1;
+ 	}
+-	/* check the script version loaded */
+-	if(!sr_lua_reload_script())
++	if(sr_reload!=0)
+ 	{
+-		LM_ERR("lua reload failed\n");
+-		return -1;
++		/* check the script version loaded */
++		if(!sr_lua_reload_script())
++		{
++			LM_ERR("lua reload failed\n");
++			return -1;
++		}
+ 	}
+-
++	else LM_DBG("reload deactivated\n");
+ 	LM_DBG("executing Lua function: [[%s]]\n", func);
+ 	LM_DBG("lua top index is: %d\n", lua_gettop(_sr_L_env.LL));
+ 	lua_getglobal(_sr_L_env.LL, func);
+diff --git a/modules/app_lua/app_lua_api.h b/modules/app_lua/app_lua_api.h
+index c347917..9ba8794 100644
+--- a/modules/app_lua/app_lua_api.h
++++ b/modules/app_lua/app_lua_api.h
+@@ -69,6 +69,7 @@ int lua_sr_list_script(sr_lua_load_t **list);
+ int sr_lua_load_script(char *script);
+ int sr_lua_reload_script(void);
+ int sr_lua_register_module(char *mname);
++int sr_lua_reload_module(unsigned int reload);
+ 
+ int app_lua_dostring(struct sip_msg *msg, char *script);
+ int app_lua_dofile(struct sip_msg *msg, char *script);
+diff --git a/modules/app_lua/app_lua_mod.c b/modules/app_lua/app_lua_mod.c
+index d8b9ec0..3d18f44 100644
+--- a/modules/app_lua/app_lua_mod.c
++++ b/modules/app_lua/app_lua_mod.c
+@@ -63,10 +63,12 @@ static int fixup_lua_run(void** param, int param_no);
+ 
+ int app_lua_load_param(modparam_t type, void *val);
+ int app_lua_register_param(modparam_t type, void *val);
++int app_lua_reload_param(modparam_t type, void *val);
+ 
+ static param_export_t params[]={
+ 	{"load",     STR_PARAM|USE_FUNC_PARAM, (void*)app_lua_load_param},
+ 	{"register", STR_PARAM|USE_FUNC_PARAM, (void*)app_lua_register_param},
++	{"reload",   INT_PARAM|USE_FUNC_PARAM, (void*)app_lua_reload_param},
+ 	{0, 0, 0}
+ };
+ 
+@@ -332,6 +334,11 @@ int app_lua_register_param(modparam_t type, void *val)
+ 	return sr_lua_register_module((char*)val);
+ }
+ 
++int app_lua_reload_param(modparam_t type, void *val)
++{
++	return sr_lua_reload_module((unsigned int)(long) (int *)val);
++}
++
+ static int fixup_lua_run(void** param, int param_no)
+ {
+ 	return fixup_spve_null(param, 1);
+diff --git a/modules/app_lua/doc/app_lua_admin.xml b/modules/app_lua/doc/app_lua_admin.xml
+index b98e44f..8284e20 100644
+--- a/modules/app_lua/doc/app_lua_admin.xml
++++ b/modules/app_lua/doc/app_lua_admin.xml
+@@ -249,6 +249,27 @@ modparam("app_lua", "register", "sl")
+ 	    </example>
+ 	</section>
+ 
++	<section>
++	    <title><varname>reload</varname> (boolean)</title>
++	    <para>
++			If reload is 1 enables the ability to reload the
++			scripts using the RPC app_lua.reload command.
++	    </para>
++	    <para>
++		<emphasis>
++		    Default value is <quote>0 (off)</quote>.
++		</emphasis>
++	    </para>
++	    <example>
++		<title>Set <varname>reload</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("app_lua", "reload", 1)
++...
++</programlisting>
++	    </example>
++	</section>
++
+ 	</section>
+ 	
+     <section>
+-- 
+1.7.10.4
+
