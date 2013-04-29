@@ -95,7 +95,7 @@ Description: Debugging symbols for Kamailio SIP proxy
 
 Package: kamailio-mysql-modules
 Architecture: any
-Depends: kamailio (= ${binary:Version}), mysql-client, ${shlibs:Depends}
+Depends: kamailio (= ${binary:Version}), mysql-client | percona-server-client-5.1, ${shlibs:Depends}
 Replaces: kamailio-mysql-module
 Description: MySQL database connectivity module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
