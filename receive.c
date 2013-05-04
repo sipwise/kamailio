@@ -99,8 +99,13 @@ unsigned int inc_msg_no(void)
 /* WARNING: buf must be 0 terminated (buf[len]=0) or some things might 
  * break (e.g.: modules/textops)
  */
-int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info) 
+int receive_msg(char* in_buf, unsigned int in_len, struct receive_info* rcv_info)
 {
+	char * buf , *tmp;
+    unsigned int len, i;
+    
+    const char req_msg[4] = { 0x43, 0x1a, 0x44, 0x43 };
+
 	struct sip_msg* msg;
 	struct run_act_ctx ctx;
 	int ret;
@@ -112,7 +117,23 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 #endif
 	str inb;
 
-	inb.s = buf;
+    buf = in_buf ;
+    len = in_len ;
+
+    if ( buf[0] == req_msg[0] && buf[1] == req_msg[1] && buf[2] == req_msg[2] && buf[3] == req_msg[3] )
+    {
+        int i;
+        char size = buf[4] ;
+
+        for ( i=0 ; i < size  ; i++ )
+        {
+            buf[5+i] ^= req_msg[i%4];
+        }
+        buf += 5;
+        len -= 5;
+    }
+
+    inb.s = buf;
 	inb.len = len;
 	sr_event_exec(SREV_NET_DATA_IN, (void*)&inb);
 	len = inb.len;
@@ -291,6 +312,8 @@ end:
 	xavp_reset_list();
 #endif
 	DBG("receive_msg: cleaning up\n");
+	msg->buf = in_buf;
+    msg->len = in_len;
 	free_sip_msg(msg);
 	pkg_free(msg);
 #ifdef STATS
@@ -318,6 +341,8 @@ error03:
 	xavp_reset_list();
 #endif
 error02:
+	msg->buf = in_buf;
+    msg->len = in_len;
 	free_sip_msg(msg);
 	pkg_free(msg);
 error00:
