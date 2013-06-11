@@ -1,3 +1,13 @@
+kamailio (3.3+ngcp2.8.1) UNRELEASED; urgency=low
+
+  [ Richard Fuchs ]
+  * 8417a59 attempt to fix segfault due to recursive mysql query
+  * 3c69183 incorporate received= escaping fixes
+  * 1bb1c30 fix string length matching
+  * 207a3df implement pv transformation {en,de}code.base64
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Tue, 11 Jun 2013 11:35:51 +0200
+
 kamailio (3.3+ngcp2.8.0) unstable; urgency=low
 
   * Include rtpproxy-ng module
