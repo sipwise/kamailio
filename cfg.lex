@@ -340,6 +340,7 @@ FORK_DELAY	fork_delay
 LOGSTDERROR	log_stderror
 LOGFACILITY	log_facility
 LOGNAME		log_name
+LOGCOLOR	log_color
 LISTEN		listen
 ADVERTISE	advertise|ADVERTISE
 ALIAS		alias
@@ -495,6 +496,7 @@ MAX_WLOOPS		"max_while_loops"
 PVBUFSIZE		"pv_buffer_size"
 PVBUFSLOTS		"pv_buffer_slots"
 HTTP_REPLY_HACK		"http_reply_hack"
+VERSION_TABLE_CFG		"version_table"
 
 /* stun config variables */
 STUN_REFRESH_INTERVAL "stun_refresh_interval"
@@ -522,6 +524,8 @@ UDP			"udp"|"UDP"
 TCP			"tcp"|"TCP"
 TLS			"tls"|"TLS"
 SCTP		"sctp"|"SCTP"
+WS		"ws"|"WS"
+WSS		"wss"|"WSS"
 INET		"inet"|"INET"
 INET6		"inet6"|"INET6"
 SSLv23			"sslv23"|"SSLv23"|"SSLV23"
@@ -711,6 +715,7 @@ IMPORTFILE      "import_file"
 <INITIAL>{LOGSTDERROR}	{ yylval.strval=yytext; return LOGSTDERROR; }
 <INITIAL>{LOGFACILITY}	{ yylval.strval=yytext; return LOGFACILITY; }
 <INITIAL>{LOGNAME}	{ yylval.strval=yytext; return LOGNAME; }
+<INITIAL>{LOGCOLOR}	{ yylval.strval=yytext; return LOGCOLOR; }
 <INITIAL>{LISTEN}	{ count(); yylval.strval=yytext; return LISTEN; }
 <INITIAL>{ADVERTISE}	{ count(); yylval.strval=yytext; return ADVERTISE; }
 <INITIAL>{ALIAS}	{ count(); yylval.strval=yytext; return ALIAS; }
@@ -969,6 +974,7 @@ IMPORTFILE      "import_file"
 									return PVBUFSLOTS; }
 <INITIAL>{HTTP_REPLY_HACK}		{	count(); yylval.strval=yytext;
 									return HTTP_REPLY_HACK; }
+<INITIAL>{VERSION_TABLE_CFG}  { count(); yylval.strval=yytext; return VERSION_TABLE_CFG;}
 <INITIAL>{SERVER_ID}  { count(); yylval.strval=yytext; return SERVER_ID;}
 <INITIAL>{LATENCY_LOG}  { count(); yylval.strval=yytext; return LATENCY_LOG;}
 <INITIAL>{MSG_TIME}  { count(); yylval.strval=yytext; return MSG_TIME;}
@@ -1094,7 +1100,7 @@ IMPORTFILE      "import_file"
 <PVARID>{ID}|'\.'			{yymore(); }
 <PVARID>{LPAREN}			{	state = PVAR_P_S; BEGIN(PVAR_P);
 								p_nest=1; yymore(); }
-<PVARID>.					{	yyless(yyleng-1);
+<PVARID>{CR}|{EAT_ABLE}|.	{	yyless(yyleng-1);
 								count();
 								addstr(&s_buf, yytext, yyleng);
 								yylval.strval=s_buf.s;
@@ -1156,6 +1162,8 @@ IMPORTFILE      "import_file"
 <INITIAL>{UDP}			{ count(); return UDP; }
 <INITIAL>{TLS}			{ count(); return TLS; }
 <INITIAL>{SCTP}			{ count(); return SCTP; }
+<INITIAL>{WS}			{ count(); return WS; }
+<INITIAL>{WSS}			{ count(); return WSS; }
 <INITIAL>{INET}			{ count(); yylval.intval=AF_INET;
 							yy_number_str=yytext; return NUMBER; }
 <INITIAL>{INET6}		{ count();
@@ -1331,7 +1339,7 @@ IMPORTFILE      "import_file"
 <SELECT>.               { unput(yytext[0]); state = INITIAL_S; BEGIN(INITIAL); } /* Rescan the token in INITIAL state */
 
 <INCLF>[ \t]*      /* eat the whitespace */
-<INCLF>[^ \t\n]+   { /* get the include file name */
+<INCLF>[^ \t\r\n]+   { /* get the include file name */
 				memset(&s_buf, 0, sizeof(s_buf));
 				addstr(&s_buf, yytext, yyleng);
 				r = pp_subst_run(&s_buf.s);
@@ -1345,7 +1353,7 @@ IMPORTFILE      "import_file"
 }
 
 <IMPTF>[ \t]*      /* eat the whitespace */
-<IMPTF>[^ \t\n]+   { /* get the import file name */
+<IMPTF>[^ \t\r\n]+   { /* get the import file name */
 				memset(&s_buf, 0, sizeof(s_buf));
 				addstr(&s_buf, yytext, yyleng);
 				r = pp_subst_run(&s_buf.s);

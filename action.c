@@ -140,7 +140,7 @@ struct onsend_info* p_onsend=0; /* onsend route send info */
 				if ((dst)[i+2].type == RVE_FREE_FIXUP_ST) {\
 					/* call free_fixup (which should restore the original
 					   string) */ \
-					call_fixup((cmd)->free_fixup, &(dst)[i+2].u.data, i+1); \
+					(void)call_fixup((cmd)->free_fixup, &(dst)[i+2].u.data, i+1); \
 				} else if ((dst)[i+2].type == FPARAM_DYN_ST) {\
 					/* completely frees fparam and restore original string */\
 					fparam_free_restore(&(dst)[i+2].u.data); \
@@ -446,8 +446,10 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 									u->proto);
 							ret=E_BAD_PROTO;
 							goto error_fwd_uri;
-						}
-						dst.proto=PROTO_TLS;
+						} else if (u->proto!=PROTO_WSS)
+							dst.proto=PROTO_TLS;
+						else
+							dst.proto=PROTO_WSS;
 					}
 #endif
 				}
@@ -505,8 +507,9 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			}
 			getbflagsval(0, (flag_t*)&flags);
 			ret=append_branch(msg, &a->val[0].u.str, &msg->dst_uri,
-								&msg->path_vec, a->val[1].u.number,
-								(flag_t)flags, msg->force_send_socket);
+					  &msg->path_vec, a->val[1].u.number,
+					  (flag_t)flags, msg->force_send_socket,
+					  0, 0);
 			/* if the uri is the ruri and q was also not changed, mark
 			   ruri as consumed, to avoid having an identical branch */
 			if ((a->val[0].u.str.s == 0 || a->val[0].u.str.len == 0) &&

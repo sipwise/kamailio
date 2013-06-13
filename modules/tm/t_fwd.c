@@ -138,7 +138,7 @@ void t_on_branch( unsigned int go_to )
 	if (!t || t==T_UNDEFINED ) {
 		goto_on_branch=go_to;
 	} else {
-		get_t()->on_branch = go_to;
+		t->on_branch = go_to;
 	}
 }
 
@@ -317,7 +317,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 			/* run branch_route actions if provided */
 			backup_route_type = get_route_type();
 			set_route_type(BRANCH_ROUTE);
-			tm_ctx_set_branch_index(branch+1);
+			tm_ctx_set_branch_index(branch);
 			/* no need to backup/set avp lists: the on_branch route is run
 			   only in the main route context (e.g. t_relay() in the main
 			   route) or in the failure route context (e.g. append_branch &
@@ -351,14 +351,14 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 				/* if DROP was called in cfg, don't forward, jump to end */
 				if (unlikely(ctx.run_flags&DROP_R_F))
 				{
-					tm_ctx_set_branch_index(0);
+					tm_ctx_set_branch_index(T_BR_UNDEFINED);
 					set_route_type(backup_route_type);
 					/* triggered by drop in CFG */
 					ret=E_CFG;
 					goto error03;
 				}
 			}
-			tm_ctx_set_branch_index(0);
+			tm_ctx_set_branch_index(T_BR_UNDEFINED);
 			set_route_type(backup_route_type);
 		}
 
@@ -416,7 +416,11 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	} /* else next_hop==0 =>
 		no dst_uri / empty dst_uri and initial next_hop==0 =>
 		dst is pre-filled with a valid dst => use the pre-filled dst */
-	
+
+	/* Set on_reply and on_negative handlers for this branch to the handlers in the transaction */
+	t->uac[branch].on_reply = t->on_reply;
+	t->uac[branch].on_failure = t->on_failure;
+
 	/* check if send_sock is ok */
 	if (t->uac[branch].request.dst.send_sock==0) {
 		LOG(L_ERR, "ERROR: can't fwd to af %d, proto %d "
@@ -428,7 +432,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	/* ... and build it now */
 	shbuf=build_req_buf_from_sip_req( i_req, &len, dst, BUILD_IN_SHM);
 	if (!shbuf) {
-		LOG(L_ERR, "ERROR: print_uac_request: no shm mem\n"); 
+		LM_ERR("could not build request\n"); 
 		ret=E_OUT_OF_MEM;
 		goto error01;
 	}

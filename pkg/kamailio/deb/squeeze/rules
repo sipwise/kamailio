@@ -16,7 +16,6 @@
 # This is the debhelper compatibility version to use.
 # export DH_COMPAT=4
 #  -- already set in compat
-#  force no striping (always include debug symbols for now)
 export DEB_BUILD_OPTIONS:="$(DEB_BUILD_OPTIONS) debug"
 
 # modules not in the "main" kamailio package
@@ -30,7 +29,7 @@ EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy
 
 # possible module directories that can appear in MODULES_SP
 # (only used for deducing a module name)
-MDIRS=modules modules_s modules_k
+MDIRS=modules
 
 # modules packaged in separate packages (complete with full modules_* path)
 # with the package name: kamailio-$(module_name)-module
@@ -43,10 +42,10 @@ MODULES_SP=
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils geoip memcached tls \
 			   snmpstats carrierroute xmpp cpl lua python \
-			   sqlite json
+			   sqlite json ims outbound websocket
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
-export LIBDIR=lib64
+LIBDIR ?= lib
 
 # directories with possible duplicate libraries (that should be deleted
 # from current module* packages)
@@ -63,7 +62,7 @@ mod_name=$(subst db_,,$(lastword $(subst /, ,$(1))))
 define PACKAGE_GRP_BUILD_template
 	# package all the modules in PACKAGE_GROUPS in separate packages
 	$(foreach grp,$(PACKAGE_GROUPS),\
-		$(MAKE) -j`nproc` every-module group_include="k$(grp)"
+		$(MAKE) every-module group_include="k$(grp)"
 	)
 endef
 
@@ -71,7 +70,7 @@ endef
 define PACKAGE_MODULE_BUILD_template
 	# package all the modules MODULES_SP in separate packages
 	$(foreach mod,$(MODULES_SP),\
-		$(MAKE) -j`nproc` modules modules="$(mod)"
+		$(MAKE) modules modules="$(mod)"
 	)
 endef
 
@@ -86,8 +85,10 @@ define PACKAGE_GRP_INSTALL_template
 		-for d in $(DUP_LIBS_DIRS); do \
 			test "$$d" != "$(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio" &&\
 			for r in $$d/lib*; do \
-				echo "removing $(grp) lib `basename $$r` present also in $$d";\
-				rm -f $(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
+				if [ "$$r" != "$$d/lib*" ]; then \
+					echo "removing $(grp) lib `basename $$r` present also in $$d";\
+					rm -f $(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
+				fi \
 			done ; \
 		done
 	)
@@ -104,8 +105,10 @@ define PACKAGE_MODULE_INSTALL_template
 		-for d in $(DUP_LIBS_DIRS); do \
 			test "$$d" != "$(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio" &&\
 			for r in $$d/lib*; do \
-				echo "removing $(call mod_name, $(mod)) lib `basename $$r` present also in $$d";\
-				rm -f $(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
+				if [ "$$r" != "$$d/lib*" ]; then \
+					echo "removing $(call mod_name, $(mod)) lib `basename $$r` present also in $$d";\
+					rm -f $(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
+				fi \
 			done ; \
 		done
 	)
@@ -117,9 +120,6 @@ endif
 ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
 	INSTALL_PROGRAM += -s
 endif
-
-CFLAGS+=$(shell dpkg-buildflags --get CFLAGS)
-LDFLAGS+=$(shell dpkg-buildflags --get LDFLAGS)
 
 configure: configure-stamp
 configure-stamp:
@@ -139,7 +139,7 @@ build: build-stamp
 build-stamp: configure-stamp 
 	dh_testdir
 	# Add here commands to compile the package.
-	$(MAKE) -j`nproc` all
+	$(MAKE) all
 	# make groups
 	$(call PACKAGE_GRP_BUILD_template)
 	# make single-module packages
@@ -167,9 +167,9 @@ install: build
 	$(call PACKAGE_GRP_INSTALL_template)
 	# make single module packages
 	$(call PACKAGE_MODULE_INSTALL_template)
-	# install /etc/default/kamailio file -- not needed in ngcp
-	#mkdir -p $(CURDIR)/debian/kamailio/etc/default
-	#cp -f debian/kamailio.default $(CURDIR)/debian/kamailio/etc/default/kamailio
+	# install /etc/default/kamailio file
+	mkdir -p $(CURDIR)/debian/kamailio/etc/default
+	cp -f debian/kamailio.default $(CURDIR)/debian/kamailio/etc/default/kamailio
 	#dh_movefiles
 
 
@@ -181,7 +181,7 @@ install: build
 binary-common: 
 	dh_testdir
 	dh_testroot
-#	dh_installdebconf	
+	dh_installdebconf	
 	dh_installdocs
 	dh_installexamples
 	dh_installmenu
@@ -189,8 +189,7 @@ binary-common:
 #	dh_installemacsen
 #	dh_installpam
 #	dh_installmime
-	dh_installinit  --name=kamailio-lb
-	dh_installinit  --name=kamailio-proxy
+	dh_installinit  -- defaults 23
 	dh_installcron
 	dh_installman
 	dh_installinfo
@@ -218,16 +217,10 @@ binary-indep: build install
 # Build architecture-dependent packages using the common target
 binary-arch: build install
 	$(MAKE) -f debian/rules DH_OPTIONS=-a binary-common
-	mkdir -p $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/
-	cp -v debian/overrides $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/kamailio
-	find $(CURDIR)/debian
 
 # Any other binary targets build just one binary package at a time.
 binary-%: build install
 	$(MAKE) -f debian/rules binary-common DH_OPTIONS=-p$*
-	mkdir -p $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/
-	cp -v debian/overrides $(CURDIR)/debian/kamailio/usr/share/lintian/overrides/kamailio
-	find $(CURDIR)/debian
 
 binary: binary-indep binary-arch
 .PHONY: build clean binary-indep binary-arch binary install configure

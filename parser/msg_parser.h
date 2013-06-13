@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -84,7 +82,7 @@
 #define SIP_MSG_START(m)	((m)->first_line.u.request.method.s)
 
 /*! \brief number methods as power of two to allow bitmap matching */
-enum request_method {
+typedef enum request_method {
 	METHOD_UNDEF=0,           /*!< 0 - --- */
 	METHOD_INVITE=1,          /*!< 1 - 2^0 */
 	METHOD_CANCEL=2,          /*!< 2 - 2^1 */
@@ -101,7 +99,7 @@ enum request_method {
 	METHOD_REFER=4096,        /*!< 4096 - 2^12 */
 	METHOD_PUBLISH=8192,      /*!< 8192 - 2^13 */
 	METHOD_OTHER=16384        /*!< 16384 - 2^14 */
-};
+} request_method_t;
 
 #define FL_FORCE_RPORT  (1 << 0)  /*!< force rport */
 #define FL_FORCE_ACTIVE (1 << 1)  /*!< force active SDP */
@@ -365,6 +363,8 @@ typedef struct sip_msg {
 	struct socket_info* force_send_socket; /* force sending on this socket,
 											  if ser */
 	str path_vec;
+        str instance;
+        unsigned int reg_id;
 } sip_msg_t;
 
 /*! \brief pointer to a fakes message which was never received ;
@@ -382,18 +382,18 @@ extern int via_cnt;
 extern unsigned int global_req_flags;
 
 
-int parse_msg(char* buf, unsigned int len, struct sip_msg* msg);
+int parse_msg(char* const buf, const unsigned int len, struct sip_msg* const msg);
 
-int parse_headers(struct sip_msg* msg, hdr_flags_t flags, int next);
+int parse_headers(struct sip_msg* const msg, const hdr_flags_t flags, const int next);
 
-char* get_hdr_field(char* buf, char* end, struct hdr_field* hdr);
+char* get_hdr_field(char* const buf, char* const end, struct hdr_field* const hdr);
 
-void free_sip_msg(struct sip_msg* msg);
+void free_sip_msg(struct sip_msg* const msg);
 
 /*! \brief make sure all HFs needed for transaction identification have been
    parsed; return 0 if those HFs can't be found
 */
-inline static int check_transaction_quadruple( struct sip_msg* msg )
+inline static int check_transaction_quadruple(struct sip_msg* const msg)
 {
 	if ( parse_headers(msg, HDR_FROM_F|HDR_TO_F|HDR_CALLID_F|HDR_CSEQ_F,0)!=-1
 		&& msg->from && msg->to && msg->callid && msg->cseq ) {
@@ -408,7 +408,7 @@ inline static int check_transaction_quadruple( struct sip_msg* msg )
 
 /*! \brief returns a pointer to the begining of the msg's body
  */
-inline static char* get_body(struct sip_msg *msg)
+inline static char* get_body(struct sip_msg* const msg)
 {
 	int offset;
 	unsigned int len;
@@ -434,20 +434,24 @@ inline static char* get_body(struct sip_msg *msg)
 /*! \brief
  * Make a private copy of the string and assign it to dst_uri
  */
-int set_dst_uri(struct sip_msg* msg, str* uri);
+int set_dst_uri(struct sip_msg* const msg, const str* const uri);
 
 /*! \brief If the dst_uri is set to an URI then reset it */
-void reset_dst_uri(struct sip_msg* msg);
+void reset_dst_uri(struct sip_msg* const msg);
 
-hdr_field_t* get_hdr(sip_msg_t *msg, enum _hdr_types_t ht);
-hdr_field_t* next_sibling_hdr(hdr_field_t *hf);
-hdr_field_t* get_hdr_by_name(sip_msg_t *msg, char *name, int name_len);
-hdr_field_t* next_sibling_hdr_by_name(hdr_field_t *hf);
+hdr_field_t* get_hdr(const sip_msg_t* const msg, const enum _hdr_types_t ht);
+hdr_field_t* next_sibling_hdr(const hdr_field_t* const hf);
+/** not used yet */
+hdr_field_t* get_hdr_by_name(const sip_msg_t* const msg, const char* const name, const int name_len);
+hdr_field_t* next_sibling_hdr_by_name(const hdr_field_t* const hf);
 
 int set_path_vector(struct sip_msg* msg, str* path);
 
-void reset_path_vector(struct sip_msg* msg);
+void reset_path_vector(struct sip_msg* const msg);
 
+int set_instance(struct sip_msg* msg, str* instance);
+
+void reset_instance(struct sip_msg* const msg);
 
 /** force a specific send socket for forwarding a request.
  * @param msg - sip msg.
@@ -479,17 +483,17 @@ typedef struct msg_ctx_id {
  * set msg context id
  * - return: -1 on error; 0 - on set 
  */
-int msg_ctx_id_set(sip_msg_t *msg, msg_ctx_id_t *mid);
+int msg_ctx_id_set(const sip_msg_t* const msg, msg_ctx_id_t* const mid);
 
 /**
  * check msg context id
  * - return: -1 on error; 0 - on no match; 1 - on match
  */
-int msg_ctx_id_match(sip_msg_t *msg, msg_ctx_id_t *mid);
+int msg_ctx_id_match(const sip_msg_t* const msg, const msg_ctx_id_t* const mid);
 
 /**
  * set msg time value
  */
-int msg_set_time(sip_msg_t *msg);
+int msg_set_time(sip_msg_t* const msg);
 
 #endif

@@ -389,6 +389,8 @@ extern char *finame;
 %token TCP
 %token TLS
 %token SCTP
+%token WS
+%token WSS
 
 /* config vars. */
 %token DEBUG_V
@@ -397,6 +399,7 @@ extern char *finame;
 %token LOGSTDERROR
 %token LOGFACILITY
 %token LOGNAME
+%token LOGCOLOR
 %token LISTEN
 %token ADVERTISE
 %token ALIAS
@@ -558,6 +561,7 @@ extern char *finame;
 %token PVBUFSIZE
 %token PVBUFSLOTS
 %token HTTP_REPLY_HACK
+%token VERSION_TABLE_CFG
 %token CFG_DESCRIPTION
 %token SERVER_ID
 %token LATENCY_LOG
@@ -654,7 +658,7 @@ extern char *finame;
 %type <sockid>  id_lst
 %type <sockid>  phostport
 %type <sockid>  listen_phostport
-%type <intval> proto port
+%type <intval> proto eqproto port
 %type <intval> equalop strop cmpop rve_cmpop rve_equalop
 %type <intval> uri_type
 %type <attr> attr_id
@@ -769,6 +773,15 @@ proto:
 	| SCTP	{ $$=PROTO_SCTP; }
 	| STAR	{ $$=0; }
 	;
+eqproto:
+	UDP	{ $$=PROTO_UDP; }
+	| TCP	{ $$=PROTO_TCP; }
+	| TLS	{ $$=PROTO_TLS; }
+	| SCTP	{ $$=PROTO_SCTP; }
+	| WS	{ $$=PROTO_WS; }
+	| WSS	{ $$=PROTO_WSS; }
+	| STAR	{ $$=0; }
+	;
 port:
 	NUMBER	{ $$=$1; }
 	| STAR	{ $$=0; }
@@ -839,7 +852,9 @@ assign_stm:
 	| FORK  EQUAL error  { yyerror("boolean value expected"); }
 	| FORK_DELAY  EQUAL NUMBER { set_fork_delay($3); }
 	| FORK_DELAY  EQUAL error  { yyerror("number expected"); }
-	| LOGSTDERROR EQUAL NUMBER { if (!config_check) log_stderr=$3; }
+	| LOGSTDERROR EQUAL NUMBER { if (!config_check)  /* if set from cmd line, don't overwrite from yyparse()*/ 
+					if(log_stderr == 0) log_stderr=$3; 
+				   }
 	| LOGSTDERROR EQUAL error { yyerror("boolean value expected"); }
 	| LOGFACILITY EQUAL ID {
 		if ( (i_tmp=str2facility($3))==-1)
@@ -850,6 +865,8 @@ assign_stm:
 	| LOGFACILITY EQUAL error { yyerror("ID expected"); }
 	| LOGNAME EQUAL STRING { log_name=$3; }
 	| LOGNAME EQUAL error { yyerror("string value expected"); }
+	| LOGCOLOR EQUAL NUMBER { log_color=$3; }
+	| LOGCOLOR EQUAL error { yyerror("boolean value expected"); }
 	| DNS EQUAL NUMBER   { received_dns|= ($3)?DO_DNS:0; }
 	| DNS EQUAL error { yyerror("boolean value expected"); }
 	| REV_DNS EQUAL NUMBER { received_dns|= ($3)?DO_REV_DNS:0; }
@@ -968,6 +985,10 @@ assign_stm:
 	| CORELOG EQUAL error { yyerror("int value expected"); }
 	| SIP_WARNING EQUAL NUMBER { sip_warning=$3; }
 	| SIP_WARNING EQUAL error { yyerror("boolean value expected"); }
+	| VERSION_TABLE_CFG EQUAL STRING { version_table.s=$3;
+			version_table.len=strlen(version_table.s);
+	}
+	| VERSION_TABLE_CFG EQUAL error { yyerror("string value expected"); }
 	| USER EQUAL STRING     {
 		if (shm_initialized())
 			yyerror("user must be before any modparam or the"
@@ -2199,18 +2220,18 @@ exp_elem:
 	| eint_op cmpop error   { $$=0; yyerror("number expected"); }
 	| eint_op equalop error { $$=0; yyerror("number expected"); }
 	| eint_op error { $$=0; yyerror("==, !=, <,>, >= or <=  expected"); }
-	| PROTO equalop proto %prec EQUAL_T
+	| PROTO equalop eqproto %prec EQUAL_T
 		{ $$=mk_elem($2, PROTO_O, 0, NUMBER_ST, (void*)$3 ); }
 	| PROTO equalop rval_expr %prec EQUAL_T
 		{ $$=mk_elem($2, PROTO_O, 0, RVE_ST, $3 ); }
 	| PROTO equalop error
-		{ $$=0; yyerror("protocol expected (udp, tcp, tls or sctp)"); }
-	| SNDPROTO equalop proto %prec EQUAL_T
+		{ $$=0; yyerror("protocol expected (udp, tcp, tls, sctp, ws, or wss)"); }
+	| SNDPROTO equalop eqproto %prec EQUAL_T
 		{ $$=mk_elem($2, SNDPROTO_O, 0, NUMBER_ST, (void*)$3 ); }
 	| SNDPROTO equalop rval_expr %prec EQUAL_T
 		{ $$=mk_elem($2, SNDPROTO_O, 0, RVE_ST, $3 ); }
 	| SNDPROTO equalop error
-		{ $$=0; yyerror("protocol expected (udp, tcp, tls or sctp)"); }
+		{ $$=0; yyerror("protocol expected (udp, tcp, tls, sctp, ws, or wss)"); }
 	| eip_op strop ipnet %prec EQUAL_T { $$=mk_elem($2, $1, 0, NET_ST, $3); }
 	| eip_op strop rval_expr %prec EQUAL_T {
 			s_tmp.s=0;

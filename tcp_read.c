@@ -439,7 +439,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 		if (bytes<=0) return bytes;
 	}
 	p=r->parsed;
-	
+
 	while(p<r->pos && r->error==TCP_REQ_OK){
 		switch((unsigned char)r->state){
 			case H_BODY: /* read the body*/
@@ -805,11 +805,25 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					case '\r':
 					case ' ':
 					case '\t': /* FIXME: check if line contains only WS */
+						if(r->content_len<0) {
+							LOG(L_ERR, "bad Content-Length header value %d in"
+									" state %d\n", r->content_len, r->state);
+							r->content_len=0;
+							r->error=TCP_REQ_BAD_LEN;
+							r->state=H_SKIP; /* skip now */
+						}
 						r->state=H_SKIP;
 						r->flags|=F_TCP_REQ_HAS_CLEN;
 						break;
 					case '\n':
 						/* end of line, parse successful */
+						if(r->content_len<0) {
+							LOG(L_ERR, "bad Content-Length header value %d in"
+									" state %d\n", r->content_len, r->state);
+							r->content_len=0;
+							r->error=TCP_REQ_BAD_LEN;
+							r->state=H_SKIP; /* skip now */
+						}
 						r->state=H_LF;
 						r->flags|=F_TCP_REQ_HAS_CLEN;
 						break;
@@ -934,14 +948,16 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					if(r->pos - r->start < 10) {
 						LM_ERR("weird situation when reading MSRP frame"
 								" - continue reading\n");
+						/* *p=='\n' */
+						r->state=H_MSRP_BODY_LF;
 						p++;
-						r->state=H_MSRP_BODY;
 						break;
 					}
 					if(*(p-1)!='\r') {
 						/* not ending in '\r\n' - not end-line */
+						/* *p=='\n' */
+						r->state=H_MSRP_BODY_LF;
 						p++;
-						r->state=H_MSRP_BODY;
 						break;
 					}
 					/* locate transaction id in first line
@@ -956,16 +972,18 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 							p - 1 /*\r*/ - 1 /* '+'|'#'|'$' */ - mtransid.len,
 							mtransid.len)!=0) {
 						/* no match on session id - not end-line */
+						/* *p=='\n' */
+						r->state=H_MSRP_BODY_LF;
 						p++;
-						r->state=H_MSRP_BODY;
 						break;
 					}
 					if(memcmp(p - 1 /*\r*/ - 1 /* '+'|'#'|'$' */ - mtransid.len
 								- 7 /* 7 x '-' */ - 1 /* '\n' */, "\n-------",
 								8)!=0) {
 						/* no match on "\n-------" - not end-line */
+						/* *p=='\n' */
+						r->state=H_MSRP_BODY_LF;
 						p++;
-						r->state=H_MSRP_BODY;
 						break;
 					}
 					r->state=H_MSRP_FINISH;
@@ -1015,6 +1033,132 @@ int msrp_process_msg(char* tcpbuf, unsigned int len,
 }
 #endif
 
+#ifdef READ_WS
+static int tcp_read_ws(struct tcp_connection *c, int* read_flags)
+{
+	int bytes, size, pos, mask_present;
+	unsigned int len;
+	char *p;
+	struct tcp_req *r;
+
+	r=&c->req;
+#ifdef USE_TLS
+	if (unlikely(c->type == PROTO_WSS))
+		bytes = tls_read(c, read_flags);
+	else
+#endif
+		bytes = tcp_read(c, read_flags);
+
+	if (bytes <= 0)
+	{
+		if (likely(r->parsed >= r->pos))
+			return 0;
+	}
+
+	size = r->pos - r->parsed;
+
+	p = r->parsed;
+	pos = 0;
+
+	/*
+	 0                   1                   2                   3
+	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+	+-+-+-+-+-------+-+-------------+-------------------------------+
+	|F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+	|I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+	|N|V|V|V|       |S|             |   (if payload len==126/127)   |
+	| |1|2|3|       |K|             |                               |
+	+-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+	|     Extended payload length continued, if payload len == 127  |
+	+ - - - - - - - - - - - - - - - +-------------------------------+
+	|                               |Masking-key, if MASK set to 1  |
+	+-------------------------------+-------------------------------+
+	| Masking-key (continued)       |          Payload Data         |
+	+-------------------------------- - - - - - - - - - - - - - - - +
+	:                     Payload Data continued ...                :
+	+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+	|                     Payload Data continued ...                |
+	+---------------------------------------------------------------+
+
+	Do minimal parse required to make sure the full message has been
+	received (websocket module will do full parse and validation).
+	*/
+
+	/* Process first two bytes */
+	if (size < pos + 2)
+		goto skip;
+	pos++;
+	mask_present = p[pos] & 0x80;
+	len = (p[pos++] & 0xff) & ~0x80;
+
+	/* Work out real length */
+	if (len == 126)
+	{
+		if (size < pos + 2)
+			goto skip;
+
+		len =	  ((p[pos + 0] & 0xff) <<  8)
+			| ((p[pos + 1] & 0xff) <<  0);
+		pos += 2;
+	}
+	else if (len == 127)
+	{
+		if (size < pos + 8)
+			goto skip;
+
+		/* Only decoding the last four bytes of the length...
+		   This limits the size of WebSocket messages that can be
+		   handled to 2^32 - which should be plenty for SIP! */
+		len =	  ((p[pos + 4] & 0xff) << 24)
+			| ((p[pos + 5] & 0xff) << 16)
+			| ((p[pos + 6] & 0xff) <<  8)
+			| ((p[pos + 7] & 0xff) <<  0);
+		pos += 8;
+	}
+
+	/* Skip mask */
+	if (mask_present)
+	{
+		if (size < pos + 4)
+			goto skip;
+		pos += 4;
+	}
+
+	/* Now check the whole message has been received */
+	if (size < pos + len)
+		goto skip;
+
+	pos += len;
+	r->flags |= F_TCP_REQ_COMPLETE;
+	r->parsed = &p[pos];
+
+skip:
+	return bytes;
+}
+
+static int ws_process_msg(char* tcpbuf, unsigned int len,
+		struct receive_info* rcv_info, struct tcp_connection* con)
+{
+	int ret;
+	tcp_event_info_t tev;
+
+	ret = 0;
+	LM_DBG("WebSocket Message: [[>>>\n%.*s<<<]]\n", len, tcpbuf);
+	if(likely(sr_event_enabled(SREV_TCP_WS_FRAME_IN))) {
+		memset(&tev, 0, sizeof(tcp_event_info_t));
+		tev.type = SREV_TCP_WS_FRAME_IN;
+		tev.buf = tcpbuf;
+		tev.len = len;
+		tev.rcv = rcv_info;
+		tev.con = con;
+		ret = sr_event_exec(SREV_TCP_WS_FRAME_IN, (void*)(&tev));
+	} else {
+		LM_DBG("no callback registering for handling WebSockets - dropping!\n");
+	}
+	return ret;
+}
+#endif
+
 /**
  * @brief wrapper around receive_msg() to clone the tcpbuf content
  *
@@ -1041,6 +1185,11 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 		if(unlikely(con->req.flags&F_TCP_REQ_MSRP_FRAME))
 			return msrp_process_msg(tcpbuf, len, rcv_info, con);
 #endif
+#ifdef READ_WS
+		if(unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
+			return ws_process_msg(tcpbuf, len, rcv_info, con);
+#endif
+
 		return receive_msg(tcpbuf, len, rcv_info);
 	}
 
@@ -1084,11 +1233,19 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 	if(unlikely(con->req.flags&F_TCP_REQ_MSRP_FRAME))
 		return msrp_process_msg(buf, len, rcv_info, con);
 #endif
+#ifdef READ_WS
+	if(unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
+		return ws_process_msg(buf, len, rcv_info, con);
+#endif
 	return receive_msg(buf, len, rcv_info);
 #else /* TCP_CLONE_RCVBUF */
 #ifdef READ_MSRP
 	if(unlikely(con->req.flags&F_TCP_REQ_MSRP_FRAME))
 		return msrp_process_msg(tcpbuf, len, rcv_info, con);
+#endif
+#ifdef READ_WS
+	if(unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
+		return ws_process_msg(tcpbuf, len, rcv_info, con);
 #endif
 	return receive_msg(tcpbuf, len, rcv_info);
 #endif /* TCP_CLONE_RCVBUF */
@@ -1112,7 +1269,12 @@ int tcp_read_req(struct tcp_connection* con, int* bytes_read, int* read_flags)
 
 again:
 		if (likely(req->error==TCP_REQ_OK)){
-			bytes=tcp_read_headers(con, read_flags);
+#ifdef READ_WS
+			if (unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
+				bytes=tcp_read_ws(con, read_flags);
+			else
+#endif
+				bytes=tcp_read_headers(con, read_flags);
 #ifdef EXTRA_DEBUG
 						/* if timeout state=0; goto end__req; */
 			DBG("read= %d bytes, parsed=%d, state=%d, error=%d\n",
@@ -1140,7 +1302,6 @@ again:
 				resp=CONN_EOF;
 				goto end_req;
 			}
-		
 		}
 		if (unlikely(req->error!=TCP_REQ_OK)){
 			LOG(L_ERR,"ERROR: tcp_read_req: bad request, state=%d, error=%d "
@@ -1226,6 +1387,12 @@ again:
 				ret = receive_tcp_msg(req->start,
 						req->body + req->content_len - req->start,
 						&con->rcv, con);
+			}else
+#endif
+#ifdef READ_WS
+			if (unlikely(con->type == PROTO_WS || con->type == PROTO_WSS)){
+				ret = receive_tcp_msg(req->start, req->parsed-req->start,
+									&con->rcv, con);
 			}else
 #endif
 				ret = receive_tcp_msg(req->start, req->parsed-req->start,

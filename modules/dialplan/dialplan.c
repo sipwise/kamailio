@@ -280,7 +280,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
 	memset(&val, 0, sizeof(pv_value_t));
 	val.flags = PV_VAL_STR;
 
-	no_change = (dest->type == PVT_NONE) || (!repl->s);
+	no_change = (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
 
 	if (no_change)
 		goto set_attr_pvar;
@@ -295,7 +295,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
 
 	if(is_route_type(FAILURE_ROUTE)
 			&& (dest->type==PVT_RURI || dest->type==PVT_RURI_USERNAME)) {
-		if (append_branch(msg, 0, 0, 0, Q_UNSPECIFIED, 0, 0)!=1 ){
+	    if (append_branch(msg, 0, 0, 0, Q_UNSPECIFIED, 0, 0, 0, 0) != 1) {
 			LM_ERR("append_branch action failed\n");
 			return -1;
 		}
@@ -672,7 +672,7 @@ static void dialplan_rpc_translate(rpc_t* rpc, void* ctx)
 rpc_export_t dialplan_rpc_list[] = {
 	{"dialplan.reload", dialplan_rpc_reload,
 		dialplan_rpc_reload_doc, 0},
-	{"dialplan.dump",   dialplan_rpc_translate,
+	{"dialplan.translate",   dialplan_rpc_translate,
 		dialplan_rpc_translate_doc, 0},
 	{0, 0, 0, 0}
 };

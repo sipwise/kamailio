@@ -60,6 +60,8 @@
 #include "../../mem/mem.h"
 #include "../../mem/shm_mem.h"
 #include "../../lib/kmi/mi.h"
+#include "../../rpc.h"
+#include "../../rpc_lookup.h"
 #include "../../lib/srdb1/db.h"
 #include "../../parser/contact/parse_contact.h"
 #include "../../parser/parse_content.h"
@@ -74,6 +76,8 @@
 #include "../../resolve.h"
 #include "../../receive.h"
 #include "sipcapture.h"
+#include "hash_mode.h"
+#include "hep.h"
 
 #ifdef STATISTICS
 #include "../../lib/kcore/statistics.h"
@@ -82,47 +86,6 @@
 
 MODULE_VERSION
 
-struct _sipcapture_object {
-	str method;
-	str reply_reason;
-	str ruri;
-	str ruri_user;
-	str from_user;
-	str from_tag;
-	str to_user;
-	str to_tag;
-	str pid_user;
-	str contact_user;
-	str auth_user;
-	str callid;
-	str callid_aleg;
-	str via_1;
-	str via_1_branch;
-	str cseq;
-	str diversion;
-	str reason;
-	str content_type;
-	str authorization;
-	str user_agent;
-	str source_ip;
-	int source_port;
-	str destination_ip;
-	int destination_port;
-	str contact_ip;
-	int contact_port;
-	str originator_ip;
-	int originator_port;
-	int proto;
-	int family;
-	str rtp_stat;
-	int type;
-        long long tmstamp;
-	str node;	
-	str msg;	
-#ifdef STATISTICS
-	stat_var *stat;
-#endif
-};
 
 #define ETHHDR 14 /* sizeof of ethhdr structure */
 
@@ -130,14 +93,14 @@ struct _sipcapture_object {
 
 #define TABLE_LEN 256
 
-#define NR_KEYS 37
+#define NR_KEYS 36
 
 /* module function prototypes */
 static int mod_init(void);
+static int sipcapture_init_rpc(void);
 static int child_init(int rank);
 static void destroy(void);
 static int sip_capture(struct sip_msg *msg, char *s1, char *s2);
-int hep_msg_received(void *data);
 int init_rawsock_children(void);
 int extract_host_port(void);
 int raw_capture_socket(struct ip_addr* ip, str* iface, int port_start, int port_end, int proto);
@@ -147,9 +110,10 @@ int raw_capture_rcv_loop(int rsock, int port1, int port2, int ipip);
 
 static struct mi_root* sip_capture_mi(struct mi_root* cmd, void* param );
 
-static str db_url		= str_init(DEFAULT_RODB_URL);
+static str db_url		= str_init(DEFAULT_DB_URL);
 static str table_name		= str_init("sip_capture");
-static str id_column		= str_init("id");
+static str hash_source		= str_init("call_id");
+static str mt_mode		= str_init("rand");
 static str date_column		= str_init("date");
 static str micro_ts_column 	= str_init("micro_ts");
 static str method_column 	= str_init("method"); 	
@@ -171,7 +135,7 @@ static str cseq_column		= str_init("cseq");
 static str diversion_column 	= str_init("diversion_user"); 
 static str reason_column 	= str_init("reason");        
 static str content_type_column 	= str_init("content_type");  
-static str authorization_column = str_init("authorization"); 
+static str authorization_column = str_init("auth"); 
 static str user_agent_column 	= str_init("user_agent");
 static str source_ip_column 	= str_init("source_ip");  
 static str source_port_column 	= str_init("source_port");	
@@ -193,7 +157,6 @@ static str star_contact		= str_init("*");
 int raw_sock_desc = -1; /* raw socket used for ip packets */
 unsigned int raw_sock_children = 1;
 int capture_on   = 0;
-int hep_capture_on   = 0;
 int ipip_capture_on   = 0;
 int moni_capture_on   = 0;
 int moni_port_start = 0;
@@ -202,8 +165,8 @@ int *capture_on_flag = NULL;
 int db_insert_mode = 0;
 int promisc_on = 0;
 int bpf_on = 0;
-int hep_offset = 0; //this stores the hep header added offset 
-
+int hep_capture_on   = 0;
+int hep_offset = 0;
 str raw_socket_listen = { 0, 0 };
 str raw_interface = { 0, 0 };
 
@@ -226,6 +189,23 @@ static struct sock_filter BPF_code[] = { { 0x28, 0, 0, 0x0000000c }, { 0x15, 0, 
 db1_con_t *db_con = NULL; 		/*!< database connection */
 db_func_t db_funcs;      		/*!< Database functions */
 
+str* table_names = NULL;
+char* table_name_cpy = NULL;
+unsigned int no_tables = 0;
+
+/*multiple table mode*/
+enum e_mt_mode{
+	mode_random = 1,
+	mode_hash,
+	mode_round_robin,
+	mode_error
+};
+
+enum e_mt_mode mtmode = mode_random ;
+enum hash_source source = hs_error;
+
+unsigned int rr_idx = 0;
+
 struct hep_timehdr* heptime;
 
 
@@ -244,7 +224,8 @@ static cmd_export_t cmds[] = {
 static param_export_t params[] = {
 	{"db_url",			STR_PARAM, &db_url.s            },
 	{"table_name",       		STR_PARAM, &table_name.s	},
-	{"id_column",        		STR_PARAM, &id_column.s         },
+	{"hash_source",				STR_PARAM, &hash_source.s	},
+	{"mt_mode",					STR_PARAM, &mt_mode.s	},
 	{"date_column",        		STR_PARAM, &date_column.s       },	
 	{"micro_ts_column",     	STR_PARAM, &micro_ts_column.s	},
 	{"method_column",      		STR_PARAM, &method_column.s 	},
@@ -273,7 +254,7 @@ static param_export_t params[] = {
 	{"destination_ip_column",	STR_PARAM, &dest_ip_column.s	},
 	{"destination_port_column",	STR_PARAM, &dest_port_column.s	},		
 	{"contact_ip_column",		STR_PARAM, &contact_ip_column.s },
-	{"contact_port_column",		STR_PARAM, &contact_port_column.s	},
+	{"contact_port_column",		STR_PARAM, &contact_port_column.s},
 	{"originator_ip_column",	STR_PARAM, &orig_ip_column.s    },
 	{"originator_port_column",	STR_PARAM, &orig_port_column.s  },
 	{"proto_column",		STR_PARAM, &proto_column.s },
@@ -337,6 +318,79 @@ struct module_exports exports = {
 };
 
 
+static int mt_init(void) {
+
+	char *p = NULL;
+	int i = 0;
+
+	/*parse and save table names*/
+	no_tables = 1;
+
+	table_name_cpy = (char *) pkg_malloc(sizeof(char) * table_name.len + 1 );
+	if (table_name_cpy == NULL){
+		LM_ERR("no more pkg memory left\n");
+		return -1;
+	}
+	memcpy (table_name_cpy, table_name.s, table_name.len);
+	table_name_cpy[table_name.len] = '\0';
+
+	p = table_name_cpy;
+
+	while (*p)
+	{
+		if (*p== '|')
+		{
+			no_tables++;
+		}
+		p++;
+	}
+
+	table_names = (str*)pkg_malloc(sizeof(str) * no_tables);
+	if(table_names == NULL) {
+		LM_ERR("no more pkg memory left\n");
+		return -1;
+	}
+	p = strtok (table_name_cpy,"| \t");
+	while (p != NULL)
+	{
+		LM_INFO ("INFO: table name:%s\n",p);
+		table_names[i].s =  p;
+		table_names[i].len = strlen (p);
+		i++;
+		p = strtok (NULL, "| \t");
+	}
+
+	if (strcmp (mt_mode.s, "rand") ==0)
+	{
+		mtmode = mode_random;
+	}
+	else if (strcmp (mt_mode.s, "round_robin") ==0)
+	{
+		mtmode = mode_round_robin;
+	}
+	else if (strcmp (mt_mode.s, "hash") == 0)
+	{
+		mtmode = mode_hash;
+	}
+	else {
+		LM_ERR("ERROR: sipcapture: mod_init: multiple tables mode unrecognized\n");
+		return -1;
+		
+	}
+
+
+	if ( mtmode == mode_hash && (source = get_hash_source (hash_source.s) ) == hs_error)
+	{
+		LM_ERR("ERROR: sipcapture: mod_init: hash source unrecognized\n");
+		return -1;
+	}
+
+	srand(time(NULL));
+
+	return 0;
+
+}
+
 /*! \brief Initialize sipcapture module */
 static int mod_init(void) {
 
@@ -356,11 +410,17 @@ static int mod_init(void) {
 		LM_ERR("failed to register MI commands\n");
 		return -1;
 	}
+	if(sipcapture_init_rpc()!=0)
+	{
+		LM_ERR("failed to register RPC commands\n");
+		return -1;
+	}
 
 	db_url.len = strlen(db_url.s);
 	table_name.len = strlen(table_name.s);
+	hash_source.len = strlen (hash_source.s);
+	mt_mode.len = strlen(mt_mode.s);
 	date_column.len = strlen(date_column.s);
-	id_column.len = strlen(id_column.s);
 	micro_ts_column.len = strlen(micro_ts_column.s);
 	method_column.len = strlen(method_column.s); 	
 	reply_reason_column.len = strlen(reply_reason_column.s);        
@@ -418,6 +478,11 @@ static int mod_init(void) {
 	/*Check the table name*/
 	if(!table_name.len) {	
 		LM_ERR("ERROR: sipcapture: mod_init: table_name is not defined or empty\n");
+		return -1;
+	}
+
+	if (mt_init () <0)
+	{
 		return -1;
 	}
 
@@ -561,6 +626,10 @@ static int child_init(int rank)
                 return -1;
         }
 
+    if (mtmode ==mode_round_robin && rank > 0)
+    {
+		rr_idx = rank % no_tables;
+    }
 
 	return 0;
 }
@@ -611,180 +680,24 @@ static void destroy(void)
                 }                		
 		close(raw_sock_desc);
 	}
+
+	if (table_name_cpy){
+		pkg_free(table_name_cpy);
+	}
+	if (table_names){
+		pkg_free(table_names);
+	}
 }
-
-
-/**
- * HEP message
- */
-int hep_msg_received(void *data)
-{
-
-	void **srevp;
-	char *buf;
-	unsigned *len;
-	struct receive_info *ri;
-	
-	int hl;
-        struct hep_hdr *heph;
-        struct ip_addr dst_ip, src_ip;
-        char *hep_payload, *end, *hep_ip;
-        struct hep_iphdr *hepiph = NULL;
-
-	struct hep_timehdr* heptime_tmp = NULL;
-        memset(heptime, 0, sizeof(struct hep_timehdr));
-
-#ifdef USE_IPV6
-        struct hep_ip6hdr *hepip6h = NULL;
-#endif /* USE_IPV6 */
-
-	if(!hep_capture_on) {
-		LOG(L_ERR, "ERROR: sipcapture:hep_msg_received HEP is not enabled\n");
-                return -1;	
-	}	
-	
-	hep_offset = 0; 
-	
-	srevp = (void**)data;
-	        
-	buf = (char *)srevp[0];
-	len = (unsigned *)srevp[1];
-	ri = (struct receive_info *)srevp[2];
-
-
-	hl = hep_offset = sizeof(struct hep_hdr);
-        end = buf + *len;
-        if (unlikely(*len<hep_offset)) {
-        	LOG(L_ERR, "ERROR: sipcapture:hep_msg_received len less than offset [%i] vs [%i]\n", *len, hep_offset);
-                return -1;
-        }
-
-	/* hep_hdr */
-        heph = (struct hep_hdr*) buf;
-
-        switch(heph->hp_f){
-        	case AF_INET:
-                	hl += sizeof(struct hep_iphdr);
-                        break;
-#ifdef USE_IPV6
-		case AF_INET6:
-                	hl += sizeof(struct hep_ip6hdr);
-                        break;
-#endif /* USE_IPV6 */
-		default:
-                        LOG(L_ERR, "ERROR: sipcapture:hep_msg_received:  unsupported family [%d]\n", heph->hp_f);
-                        return -1;
-                }
-
-	/* Check version */
-        if((heph->hp_v != 1 && heph->hp_v != 2) || hl != heph->hp_l) {
-        	LOG(L_ERR, "ERROR: sipcapture:hep_msg_received: not supported version or bad length: v:[%d] l:[%d] vs [%d]\n",
-                                                heph->hp_v, heph->hp_l, hl);
-                return -1;
-	}
-
-        /* PROTO */
-        if(heph->hp_p == IPPROTO_UDP) ri->proto=PROTO_UDP;
-        else if(heph->hp_p == IPPROTO_TCP) ri->proto=PROTO_TCP;
-        else if(heph->hp_p == IPPROTO_IDP) ri->proto=PROTO_TLS; /* fake protocol */
-#ifdef USE_SCTP
-        else if(heph->hp_p == IPPROTO_SCTP) ri->proto=PROTO_SCTP;
-#endif
-        else {
-        	LOG(L_ERR, "ERROR: sipcapture:hep_msg_received: unknow protocol [%d]\n",heph->hp_p);
-                ri->proto = PROTO_NONE;
-	}
-
-        hep_ip = buf + sizeof(struct hep_hdr);
-
-        if (unlikely(hep_ip>end)){
-                LOG(L_ERR,"hep_ip is over buf+len\n");
-                return -1;
-        }
-
-	switch(heph->hp_f){
-		case AF_INET:
-                	hep_offset+=sizeof(struct hep_iphdr);
-                        hepiph = (struct hep_iphdr*) hep_ip;
-                        break;
-#ifdef USE_IPV6
-
-		case AF_INET6:
-                	hep_offset+=sizeof(struct hep_ip6hdr);
-                        hepip6h = (struct hep_ip6hdr*) hep_ip;
-                        break;
-#endif /* USE_IPV6 */
-
-	  }
-
-	/* VOIP payload */
-        hep_payload = buf + hep_offset;
-
-        if (unlikely(hep_payload>end)){
-        	LOG(L_ERR,"hep_payload is over buf+len\n");
-                return -1;
-	}
-
-	/* timming */
-        if(heph->hp_v == 2) {
-                hep_offset+=sizeof(struct hep_timehdr);
-                heptime_tmp = (struct hep_timehdr*) hep_payload;
-
-                heptime->tv_sec = heptime_tmp->tv_sec;
-                heptime->tv_usec = heptime_tmp->tv_usec;
-                heptime->captid = heptime_tmp->captid;
-        }
-
-
-
-	/* fill ip from the packet to dst_ip && to */
-        switch(heph->hp_f){
-
-		case AF_INET:
-                	dst_ip.af = src_ip.af = AF_INET;
-                        dst_ip.len = src_ip.len = 4 ;
-                        memcpy(&dst_ip.u.addr, &hepiph->hp_dst, 4);
-                        memcpy(&src_ip.u.addr, &hepiph->hp_src, 4);
-                        break;
-#ifdef USE_IPV6
-
-		case AF_INET6:
-                	dst_ip.af = src_ip.af = AF_INET6;
-                        dst_ip.len = src_ip.len = 16 ;
-                        memcpy(&dst_ip.u.addr, &hepip6h->hp6_dst, 16);
-                        memcpy(&src_ip.u.addr, &hepip6h->hp6_src, 16);
-                        break;
-
-#endif /* USE_IPV6 */
-	}
-
-        ri->src_ip = src_ip;
-        ri->src_port = ntohs(heph->hp_sport);
-
-        ri->dst_ip = dst_ip;
-        ri->dst_port = ntohs(heph->hp_dport);
-
-	/* cut off the offset */
-	/* 
-	 *  *len -= offset;
-         *  p = buf + offset;
-	 *  memmove(buf, p, BUF_SIZE+1); 
-	*/
-	memset(buf, '\n', hep_offset); /* the parser will ignore the starting \n no need to do expensive memmove */
-	
-	return 0;
-}
-
 
 static int sip_capture_prepare(sip_msg_t *msg)
 {
-	/* We need parse all headers */
-	if (parse_headers(msg, HDR_CALLID_F|HDR_EOH_F, 0) != 0) {
-		LM_ERR("cannot parse headers\n");
-		return -1;
-	}
-	
-	return 0;
+        /* We need parse all headers */
+        if (parse_headers(msg, HDR_CALLID_F|HDR_EOH_F, 0) != 0) {
+                LM_ERR("cannot parse headers\n");
+                return -1;
+        }
+
+        return 0;
 }
 
 static int sip_capture_store(struct _sipcapture_object *sco)
@@ -793,6 +706,7 @@ static int sip_capture_store(struct _sipcapture_object *sco)
 	db_val_t db_vals[NR_KEYS];
 
 	str tmp;
+	int ii = 0;
 
 	if(sco==NULL)
 	{
@@ -800,205 +714,223 @@ static int sip_capture_store(struct _sipcapture_object *sco)
 		return -1;
 	}
 	
-	db_keys[0] = &id_column;			
-        db_vals[0].type = DB1_INT;
-        db_vals[0].nul = 0;
-        db_vals[0].val.int_val = 0;
-        
-	db_keys[1] = &date_column;
-	db_vals[1].type = DB1_DATETIME;
-	db_vals[1].nul = 0;
-	db_vals[1].val.time_val = time(NULL);
+	db_keys[0] = &date_column;
+	db_vals[0].type = DB1_DATETIME;
+	db_vals[0].nul = 0;
+	db_vals[0].val.time_val = time(NULL);
 	
-	db_keys[2] = &micro_ts_column;
-        db_vals[2].type = DB1_BIGINT;
-        db_vals[2].nul = 0;
-        db_vals[2].val.ll_val = sco->tmstamp;
+	db_keys[1] = &micro_ts_column;
+        db_vals[1].type = DB1_BIGINT;
+        db_vals[1].nul = 0;
+        db_vals[1].val.ll_val = sco->tmstamp;
 	
-	db_keys[3] = &method_column;
+	db_keys[2] = &method_column;
+	db_vals[2].type = DB1_STR;
+	db_vals[2].nul = 0;
+	db_vals[2].val.str_val = sco->method;
+	
+	db_keys[3] = &reply_reason_column;
 	db_vals[3].type = DB1_STR;
 	db_vals[3].nul = 0;
-	db_vals[3].val.str_val = sco->method;
+	db_vals[3].val.str_val = sco->reply_reason;
 	
-	db_keys[4] = &reply_reason_column;
+	db_keys[4] = &ruri_column;
 	db_vals[4].type = DB1_STR;
 	db_vals[4].nul = 0;
-	db_vals[4].val.str_val = sco->reply_reason;
+	db_vals[4].val.str_val = sco->ruri;
 	
-	db_keys[5] = &ruri_column;
+	db_keys[5] = &ruri_user_column;
 	db_vals[5].type = DB1_STR;
 	db_vals[5].nul = 0;
-	db_vals[5].val.str_val = sco->ruri;
+	db_vals[5].val.str_val = sco->ruri_user;
 	
-	db_keys[6] = &ruri_user_column;
+	db_keys[6] = &from_user_column;
 	db_vals[6].type = DB1_STR;
 	db_vals[6].nul = 0;
-	db_vals[6].val.str_val = sco->ruri_user;
+	db_vals[6].val.str_val = sco->from_user;
 	
-	db_keys[7] = &from_user_column;
+	db_keys[7] = &from_tag_column;
 	db_vals[7].type = DB1_STR;
 	db_vals[7].nul = 0;
-	db_vals[7].val.str_val = sco->from_user;
-	
-	db_keys[8] = &from_tag_column;
+	db_vals[7].val.str_val = sco->from_tag;
+
+	db_keys[8] = &to_user_column;
 	db_vals[8].type = DB1_STR;
 	db_vals[8].nul = 0;
-	db_vals[8].val.str_val = sco->from_tag;
+	db_vals[8].val.str_val = sco->to_user;
 
-	db_keys[9] = &to_user_column;
+	db_keys[9] = &to_tag_column;
 	db_vals[9].type = DB1_STR;
 	db_vals[9].nul = 0;
-	db_vals[9].val.str_val = sco->to_user;
-
-	db_keys[10] = &to_tag_column;
+	db_vals[9].val.str_val = sco->to_tag;
+	
+	db_keys[10] = &pid_user_column;
 	db_vals[10].type = DB1_STR;
 	db_vals[10].nul = 0;
-	db_vals[10].val.str_val = sco->to_tag;
-	
-	db_keys[11] = &pid_user_column;
+	db_vals[10].val.str_val = sco->pid_user;
+
+	db_keys[11] = &contact_user_column;
 	db_vals[11].type = DB1_STR;
 	db_vals[11].nul = 0;
-	db_vals[11].val.str_val = sco->pid_user;
+	db_vals[11].val.str_val = sco->contact_user;	
 
-	db_keys[12] = &contact_user_column;
+	db_keys[12] = &auth_user_column;
 	db_vals[12].type = DB1_STR;
 	db_vals[12].nul = 0;
-	db_vals[12].val.str_val = sco->contact_user;	
-
-	db_keys[13] = &auth_user_column;
+	db_vals[12].val.str_val = sco->auth_user;
+	
+	db_keys[13] = &callid_column;
 	db_vals[13].type = DB1_STR;
 	db_vals[13].nul = 0;
-	db_vals[13].val.str_val = sco->auth_user;
-	
-	db_keys[14] = &callid_column;
+	db_vals[13].val.str_val = sco->callid;
+
+	db_keys[14] = &callid_aleg_column;
 	db_vals[14].type = DB1_STR;
 	db_vals[14].nul = 0;
-	db_vals[14].val.str_val = sco->callid;
-
-	db_keys[15] = &callid_aleg_column;
+	db_vals[14].val.str_val = sco->callid_aleg;
+	
+	db_keys[15] = &via_1_column;
 	db_vals[15].type = DB1_STR;
 	db_vals[15].nul = 0;
-	db_vals[15].val.str_val = sco->callid_aleg;
+	db_vals[15].val.str_val = sco->via_1;
 	
-	db_keys[16] = &via_1_column;
+	db_keys[16] = &via_1_branch_column;
 	db_vals[16].type = DB1_STR;
 	db_vals[16].nul = 0;
-	db_vals[16].val.str_val = sco->via_1;
-	
-	db_keys[17] = &via_1_branch_column;
+	db_vals[16].val.str_val = sco->via_1_branch;
+
+	db_keys[17] = &cseq_column;
 	db_vals[17].type = DB1_STR;
 	db_vals[17].nul = 0;
-	db_vals[17].val.str_val = sco->via_1_branch;
-
-	db_keys[18] = &cseq_column;
+	db_vals[17].val.str_val = sco->cseq;	
+	
+	db_keys[18] = &reason_column;
 	db_vals[18].type = DB1_STR;
 	db_vals[18].nul = 0;
-	db_vals[18].val.str_val = sco->cseq;	
+	db_vals[18].val.str_val = sco->reason;
 	
-	db_keys[19] = &reason_column;
+	db_keys[19] = &content_type_column;
 	db_vals[19].type = DB1_STR;
 	db_vals[19].nul = 0;
-	db_vals[19].val.str_val = sco->reason;
-	
-	db_keys[20] = &content_type_column;
+	db_vals[19].val.str_val = sco->content_type;
+
+	db_keys[20] = &authorization_column;
 	db_vals[20].type = DB1_STR;
 	db_vals[20].nul = 0;
-	db_vals[20].val.str_val = sco->content_type;
+	db_vals[20].val.str_val = sco->authorization;
 
-	db_keys[21] = &authorization_column;
+	db_keys[21] = &user_agent_column;
 	db_vals[21].type = DB1_STR;
 	db_vals[21].nul = 0;
-	db_vals[21].val.str_val = sco->authorization;
-
-	db_keys[22] = &user_agent_column;
+	db_vals[21].val.str_val = sco->user_agent;
+	
+	db_keys[22] = &source_ip_column;
 	db_vals[22].type = DB1_STR;
 	db_vals[22].nul = 0;
-	db_vals[22].val.str_val = sco->user_agent;
+	db_vals[22].val.str_val = sco->source_ip;
 	
-	db_keys[23] = &source_ip_column;
-	db_vals[23].type = DB1_STR;
-	db_vals[23].nul = 0;
-	db_vals[23].val.str_val = sco->source_ip;
-	
-	db_keys[24] = &source_port_column;
-        db_vals[24].type = DB1_INT;
-        db_vals[24].nul = 0;
-        db_vals[24].val.int_val = sco->source_port;
+	db_keys[23] = &source_port_column;
+        db_vals[23].type = DB1_INT;
+        db_vals[23].nul = 0;
+        db_vals[23].val.int_val = sco->source_port;
         
-	db_keys[25] = &dest_ip_column;
-	db_vals[25].type = DB1_STR;
-	db_vals[25].nul = 0;
-	db_vals[25].val.str_val = sco->destination_ip;
+	db_keys[24] = &dest_ip_column;
+	db_vals[24].type = DB1_STR;
+	db_vals[24].nul = 0;
+	db_vals[24].val.str_val = sco->destination_ip;
 	
-	db_keys[26] = &dest_port_column;
-        db_vals[26].type = DB1_INT;
-        db_vals[26].nul = 0;
-        db_vals[26].val.int_val = sco->destination_port;        
+	db_keys[25] = &dest_port_column;
+        db_vals[25].type = DB1_INT;
+        db_vals[25].nul = 0;
+        db_vals[25].val.int_val = sco->destination_port;        
         
-	db_keys[27] = &contact_ip_column;
-	db_vals[27].type = DB1_STR;
-	db_vals[27].nul = 0;
-	db_vals[27].val.str_val = sco->contact_ip;
+	db_keys[26] = &contact_ip_column;
+	db_vals[26].type = DB1_STR;
+	db_vals[26].nul = 0;
+	db_vals[26].val.str_val = sco->contact_ip;
 	
-	db_keys[28] = &contact_port_column;
-        db_vals[28].type = DB1_INT;
-        db_vals[28].nul = 0;
-        db_vals[28].val.int_val = sco->contact_port;
+	db_keys[27] = &contact_port_column;
+        db_vals[27].type = DB1_INT;
+        db_vals[27].nul = 0;
+        db_vals[27].val.int_val = sco->contact_port;
         
-	db_keys[29] = &orig_ip_column;
-	db_vals[29].type = DB1_STR;
-	db_vals[29].nul = 0;
-	db_vals[29].val.str_val = sco->originator_ip;
+	db_keys[28] = &orig_ip_column;
+	db_vals[28].type = DB1_STR;
+	db_vals[28].nul = 0;
+	db_vals[28].val.str_val = sco->originator_ip;
 	
-	db_keys[30] = &orig_port_column;			
+	db_keys[29] = &orig_port_column;			
+        db_vals[29].type = DB1_INT;
+        db_vals[29].nul = 0;
+        db_vals[29].val.int_val = sco->originator_port;        
+        
+        db_keys[30] = &proto_column;			
         db_vals[30].type = DB1_INT;
         db_vals[30].nul = 0;
-        db_vals[30].val.int_val = sco->originator_port;        
-        
-        db_keys[31] = &proto_column;			
+        db_vals[30].val.int_val = sco->proto;        
+
+        db_keys[31] = &family_column;			
         db_vals[31].type = DB1_INT;
         db_vals[31].nul = 0;
-        db_vals[31].val.int_val = sco->proto;        
-
-        db_keys[32] = &family_column;			
-        db_vals[32].type = DB1_INT;
+        db_vals[31].val.int_val = sco->family;        
+        
+        db_keys[32] = &rtp_stat_column;			
+        db_vals[32].type = DB1_STR;
         db_vals[32].nul = 0;
-        db_vals[32].val.int_val = sco->family;        
+        db_vals[32].val.str_val = sco->rtp_stat;                
         
-        db_keys[33] = &rtp_stat_column;			
-        db_vals[33].type = DB1_STR;
+        db_keys[33] = &type_column;			
+        db_vals[33].type = DB1_INT;
         db_vals[33].nul = 0;
-        db_vals[33].val.str_val = sco->rtp_stat;                
-        
-        db_keys[34] = &type_column;			
-        db_vals[34].type = DB1_INT;
-        db_vals[34].nul = 0;
-        db_vals[34].val.int_val = sco->type;                
+        db_vals[33].val.int_val = sco->type;                
 
-	db_keys[35] = &node_column;
-	db_vals[35].type = DB1_STR;
+	db_keys[34] = &node_column;
+	db_vals[34].type = DB1_STR;
+	db_vals[34].nul = 0;
+	db_vals[34].val.str_val = sco->node;
+	
+	db_keys[35] = &msg_column;
+	db_vals[35].type = DB1_BLOB;
 	db_vals[35].nul = 0;
-	db_vals[35].val.str_val = sco->node;
-	
-	db_keys[36] = &msg_column;
-	db_vals[36].type = DB1_BLOB;
-	db_vals[36].nul = 0;
-	
-	if(hep_offset>0){
-		/* if message was captured via hep skip trailing empty spaces(newlines) from the start of the buffer */
+		
+	/* need to be removed in the future */
+        /* if message was captured via hep skip trailing empty spaces(newlines) from the start of the buffer */
+	/* if(hep_offset>0){
 		tmp.s = sco->msg.s + hep_offset;
 		tmp.len = sco->msg.len - hep_offset;
 		hep_offset = 0;
 	} else {
+
 		tmp.s = sco->msg.s;
 		tmp.len = sco->msg.len;
 	}
+	*/
+	
+	/*we don't have empty spaces now */
+	tmp.s = sco->msg.s;
+	tmp.len = sco->msg.len;
 
-	db_vals[36].val.blob_val = tmp;
+	db_vals[35].val.blob_val = tmp;
 
-	LM_DBG("homer table: [%.*s]\n", table_name.len, table_name.s);		
-                
-	db_funcs.use_table(db_con, &table_name);
+	if (no_tables > 0 ){
+		if ( mtmode == mode_hash ){
+			ii = hash_func ( sco, source , no_tables);
+			LM_DBG ("hash idx is:%d\n", ii);
+		}
+		else if (mtmode == mode_random )
+		{
+			ii = rand() % no_tables;
+			LM_DBG("rand idx is:%d\n", ii);
+		}
+		else if (mtmode == mode_round_robin)
+		{
+			ii = rr_idx;
+			rr_idx = (rr_idx +1) % no_tables;
+			LM_DBG("round robin idx is:%d\n", ii);
+		}
+	}
+	LM_DBG("insert into homer table: [%.*s]\n", table_names[ii].len, table_names[ii].s);
+	db_funcs.use_table(db_con, &table_names[ii]);
 
 	LM_DBG("storing info...\n");
 	
@@ -1632,4 +1564,54 @@ int raw_capture_rcv_loop(int rsock, int port1, int port2, int ipip) {
 	return 0;
 }
 
+static void sipcapture_rpc_status (rpc_t* rpc, void* c) {
+	str status = {0, 0};
+
+	if (rpc->scan(c, "S", &status) < 1) {
+		rpc->fault(c, 500, "Not enough parameters (on, off or check)");
+		return;
+	}
+
+	if(capture_on_flag==NULL) {
+		rpc->fault(c, 500, "Internal error");
+		return;
+	}
+
+	if (strncasecmp(status.s, "on", strlen("on")) == 0) {
+		*capture_on_flag = 1;
+		rpc->printf(c, "Enabled");
+		return;
+	}
+	if (strncasecmp(status.s, "off", strlen("off")) == 0) {
+		*capture_on_flag = 0;
+		rpc->printf(c, "Disabled");
+		return;
+	}
+	if (strncasecmp(status.s, "check", strlen("check")) == 0) {
+		rpc->printf(c, *capture_on_flag ? "Enabled" : "Disabled");
+		return;
+	} 
+	rpc->fault(c, 500, "Bad parameter (on, off or check)");
+	return;
+}
+
+static const char* sipcapture_status_doc[2] = {
+        "Get status or turn on/off sipcapture.",
+        0
+};
+
+rpc_export_t sipcapture_rpc[] = {
+	{"sipcapture.status", sipcapture_rpc_status, sipcapture_status_doc, 0},
+	{0, 0, 0, 0}
+};
+
+static int sipcapture_init_rpc(void)
+{
+	if (rpc_register_array(sipcapture_rpc)!=0)
+	{
+		LM_ERR("failed to register RPC commands\n");
+		return -1;
+	}
+	return 0;
+}
 

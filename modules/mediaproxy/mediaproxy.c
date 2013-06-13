@@ -46,8 +46,8 @@
 #include "../../parser/parse_to.h"
 #include "../../parser/parse_param.h"
 #include "../../msg_translator.h"
-#include "../../modules_k/dialog/dlg_load.h"
-#include "../../modules_k/dialog/dlg_hash.h"
+#include "../../modules/dialog/dlg_load.h"
+#include "../../modules/dialog/dlg_hash.h"
 
 
 MODULE_VERSION
@@ -2113,7 +2113,7 @@ static int
 child_init(int rank)
 {
     // initialize the connection to mediaproxy if needed
-    if (!mediaproxy_disabled)
+    if (!mediaproxy_disabled && rank > PROC_MAIN)
         mediaproxy_connect();
 
     return 0;

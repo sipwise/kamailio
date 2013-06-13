@@ -1,4 +1,4 @@
-# $Id$
+
 #
 # makefile defs (CC, LD,a.s.o)
 #
@@ -123,11 +123,11 @@ endif # verbose
 set_if_empty=$(if $($(1)),,$(eval override $(1)=$(2)))
 
 # flavour: sip-router, ser or kamailio
-$(call	set_if_empty,FLAVOUR,sip-router)
+$(call	set_if_empty,FLAVOUR,kamailio)
 
 #prefix for various configs and scripts
 #config name/name-prefix for distributed configs
-CFG_NAME=sip-router
+CFG_NAME?=sip-router
 #config name/name-prefix for distributed scripts
 SCR_NAME=sip-router
 #name in source tree
@@ -148,25 +148,30 @@ CFG_NAME=kamailio
 KMSTATS ?= 1
 # fast malloc statistics on
 FMSTATS ?= 1
+else # unknown:
+# main binary name
+MAIN_NAME=kamailio
+endif
+
 # application server support on
 WITHAS ?= 1
-else # default:
-# main binary name
-MAIN_NAME=sip-router
-endif
 
 # what to install
 INSTALL_FLAVOUR=$(FLAVOUR)
 
 #version number
-VERSION = 3
-PATCHLEVEL = 3
-SUBLEVEL =  2
-EXTRAVERSION =
+VERSION = 4
+PATCHLEVEL = 0
+SUBLEVEL = 1
+EXTRAVERSION = 
 
+# memory manager switcher
+# 0 - f_malloc (fast malloc)
+# 1 - q_malloc (quick malloc)
+MEMMNG ?= 1
 # memory debugger switcher
-# 0 - off (release mode)
-# 1 - on (devel mode)
+# 0 - off (no-debug mode)
+# 1 - on (debug mode)
 MEMDBG ?= 0
 
 SER_VER = $(shell expr $(VERSION) \* 1000000 + $(PATCHLEVEL) \* 1000 + \
@@ -266,7 +271,7 @@ CC_LONGVER:=$(shell if  $(CC) -v 2>/dev/null; then \
 					else \
 						$(CC) -V 2>&1 ; \
 					fi )
-MKTAGS=ctags -R .
+MKTAGS=ctags
 
 #find-out the compiler's name
 
@@ -321,6 +326,14 @@ ifneq (, $(findstring Intel(R) C++ Compiler, $(CC_LONGVER)))
 	MKDEP=$(CC) -MM 
 endif
 
+ifneq (, $(findstring clang, $(CC_LONGVER)))
+	#clang should be gcc compatible
+	CC_NAME=clang
+	CC_FULLVER:=$(shell echo "$(CC_LONGVER)" | head -n 1 |  sed -e 's/.*version \([0-9]\.[0-9]\).*/\1/g' )
+	CC_SHORTVER:=$(shell echo "$(CC_FULLVER)" | cut -d. -f1,2 )
+	CC_VER=$(CC) $(CC_FULLVER)
+	MKDEP=$(CC) -MM 
+endif
 
 ifeq (,$(CC_NAME))
 #not found
@@ -704,13 +717,22 @@ C_DEFS= $(extra_defs) \
 # use make mode=debug all instead. Anyway no by default ser is  compiled w/ 
 # debugging symbols in all cases (-g). --andrei
 
-ifeq ($(MEMDBG), 1)
-	C_DEFS+= -DDBG_QM_MALLOC
+# set memory manager and its debug mode
+ifeq ($(MEMMNG), 1)
+#	use q_malloc
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_QM_MALLOC
+endif
 	C_DEFS+= -DMEM_JOIN_FREE
 else
+#	use f_malloc
 	C_DEFS+= -DF_MALLOC
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_F_MALLOC
+endif
 	C_DEFS+= -DMEM_JOIN_FREE
 endif
+
 ifneq ($(PKG_MEM_SIZE),)
 	C_DEFS+= -DPKG_MEM_SIZE=$(PKG_MEM_SIZE)
 endif
@@ -858,13 +880,15 @@ ifeq ($(use_fast_lock), yes)
 	found_lock_method=yes
 endif
 
+CFLAGS=
+LDFLAGS=
 C_INCLUDES=
 # setting CFLAGS
 ifeq ($(mode), release)
 	#if i386
 ifeq	($(ARCH), i386)
 		# if gcc 
-ifeq		($(CC_NAME), gcc)
+ifeq		($(CC_NAME), gcc) 
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
 				CFLAGS=-g -O9 -funroll-loops  -Wcast-align $(PROFILE)
@@ -921,6 +945,15 @@ endif			# CC_SHORTVER, 4.x
 endif			# CC_SHORTVER, 4.5+ or 4.2+
 
 else		# CC_NAME, gcc
+ifeq		($(CC_NAME), clang)
+$(call                          set_if_empty,CPU,athlon64)
+					C_DEFS+=-DCC_GCC_LIKE_ASM
+                                        CFLAGS+=-m32
+                                                -O9      \
+                                                         \
+                                                -mtune=$(CPU)
+                                        LDFLAGS+=-m32
+else			# CC_NAME, clang
 ifeq		($(CC_NAME), icc)
 			C_DEFS+=-DCC_GCC_LIKE_ASM
 			CFLAGS=-g -O3  -ipo -ipo_obj -unroll  $(PROFILE) \
@@ -933,6 +966,7 @@ else
 				#other compilers
 $(error 			Unsupported compiler ($(CC):$(CC_NAME)), try gcc)
 endif		#CC_NAME, icc
+endif		#CC_NAME, clang
 endif		#CC_NAME, gcc
 endif	#ARCH, i386
 
@@ -1007,6 +1041,13 @@ endif			# CC_SHORTVER, 4.2+
 endif			# CC_SHORTVER, 4.5+
 
 else		# CC_NAME, gcc
+ifeq            ($(CC_NAME), clang)
+$(call                          set_if_empty,CPU,opteron)
+					C_DEFS+=-DCC_GCC_LIKE_ASM
+                                        CFLAGS+=-m64 \
+                                                -O9        
+                                        LDFLAGS+=-m64
+else      	# CC_NAME, clang
 ifeq		($(CC_NAME), icc)
 			C_DEFS+=-DCC_GCC_LIKE_ASM
 			CFLAGS=-g -O3  -ipo -ipo_obj -unroll  $(PROFILE) \
@@ -1019,6 +1060,7 @@ else
 				#other compilers
 $(error 			Unsupported compiler ($(CC):$(CC_NAME)), try gcc)
 endif		#CC_NAME, icc
+endif		#CC_NAME, clang
 endif		#CC_NAME, gcc
 endif	#ARCH, x86_64
 
@@ -1184,7 +1226,7 @@ ifeq	($(ARCH), arm)
 ifeq		($(CC_NAME), gcc)
 				C_DEFS+=-DCC_GCC_LIKE_ASM
 				#common stuff
-				CFLAGS=-O9 -funroll-loops -fsigned-char $(PROFILE)
+				CFLAGS=-marm -march=armv5t -O9 -funroll-loops -fsigned-char $(PROFILE)
 			#if gcc 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+,$(CC_SHORTVER))))
 					CFLAGS+= -ftree-vectorize -fno-strict-overflow
@@ -1595,6 +1637,14 @@ endif
 	# the executable file, because it's always loaded at a fixed address
 	# -andrei
 
+ifeq ($(CC_NAME), clang)
+	LDFLAGS+=-Wl,-O2 -Wl,-E $(PROFILE)
+        MOD_LDFLAGS:=-shared $(LDFLAGS)
+        LIB_LDFLAGS:=-shared $(LDFLAGS)
+        LIB_SONAME=-Wl,-soname,
+        LD_RPATH=-Wl,-rpath,
+endif
+
 LDFLAGS+= $(LD_EXTRA_OPTS)
 MOD_LDFLAGS+= $(LD_EXTRA_OPTS)
 LIB_LDFLAGS+= $(LD_EXTRA_OPTS)
@@ -1672,6 +1722,11 @@ ifeq	($(CC_NAME), suncc)
 MOD_CFLAGS=-xcode=pic32  $(CFLAGS)
 LIB_CFLAGS=-xcode=pic32  $(CFLAGS)
 endif
+ifeq    ($(CC_NAME), clang)
+MOD_CFLAGS=-fPIC -DPIC $(CFLAGS)
+LIB_CFLAGS=-fPIC -DPIC $(CFLAGS)
+endif
+
 UTILS_CFLAGS=$(CFLAGS)
 # LDFLAGS uses for compiling the utils
 UTILS_LDFLAGS=$(LDFLAGS)
@@ -1710,7 +1765,12 @@ ifeq ($(OS), linux)
 			LIBS+=-lpthread
 		endif
 	endif
-	# check for >= 2.5.44
+	ifneq (,$(findstring -DUSE_DNSSEC, $(C_DEFS)))
+		LIBS+=-lval-threads -lcrypto -lsres -lpthread
+$(info "using libval for DNSSEC validation")
+	endif
+        # check for >= 2.5.44
+
 	ifeq ($(shell [ $(OSREL_N) -ge 2005044 ] && echo has_epoll), has_epoll)
 		ifeq ($(NO_EPOLL),)
 			C_DEFS+=-DHAVE_EPOLL

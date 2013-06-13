@@ -67,7 +67,7 @@
  * 2003-03-30  set_kr for requests only (jiri)
  * 2003-04-04  bug_fix: RESPONSE_IN callback not called for local
  *             UAC transactions (jiri)
- * 2003-04-07  new transactions inherit on_negative and on_relpy from script
+ * 2003-04-07  new transactions inherit on_failure and on_relpy from script
  *             variables on instantiation (jiri)
  * 2003-04-30  t_newtran clean up (jiri)
  * 2003-08-21  request lookups fixed to skip UAC transactions, 
@@ -453,9 +453,16 @@ static int matching_3261( struct sip_msg *p_msg, struct cell **trans,
 			continue;
 		}
 		/* now real tid matching occurs  for negative ACKs and any 
-	 	 * other requests */
+		 * other requests */
 		if (!via_matching(t_msg->via1 /* inv via */, via1 /* ack */ ))
 			continue;
+		/* check if call-id is still the same */
+		if (cfg_get(tm, tm_cfg, callid_matching) && !EQ_LEN(callid) && !EQ_STR(callid)) {
+			LOG(L_ERR, "matching transaction found but callids don't match (received: %.*s stored: %.*s)\n",
+			        p_msg->callid->body.len, p_msg->callid->body.s,
+			        t_msg->callid->body.len, t_msg->callid->body.s);
+			continue;
+		}
 		if (t_msg->REQ_METHOD==METHOD_CANCEL){
 			if ((p_msg->REQ_METHOD!=METHOD_CANCEL) && !is_ack){
 			/* found an existing cancel for the searched transaction */
@@ -1005,6 +1012,15 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 				&& p_cell->uac[branch_id].local_cancel.buffer_len ))) 
 			continue;
 
+		if (cfg_get(tm, tm_cfg, callid_matching) && 
+		        (p_msg->callid->body.len != p_cell->uas.request->callid->body.len ||
+		         memcmp(p_msg->callid->body.s, p_cell->uas.request->callid->body.s, p_msg->callid->body.len) != 0)
+		) {
+			LOG(L_ERR, "matching transaction found but callids don't match (received: %.*s stored: %.*s)\n",
+		        p_msg->callid->body.len, p_msg->callid->body.s,
+		        p_cell->uas.request->callid->body.len, p_cell->uas.request->callid->body.s);
+			continue;
+		}
 
 		/* we passed all disqualifying factors .... the transaction has been
 		   matched !
@@ -1114,12 +1130,12 @@ int t_check_msg( struct sip_msg* p_msg , int *param_branch )
 								"completely parsed\n");
 					/* try to continue, via1 & cseq are checked below */
 				}
-			}else if ( parse_headers(p_msg, HDR_VIA1_F|HDR_CSEQ_F, 0 )==-1) {
+			}else if ( parse_headers(p_msg, HDR_VIA1_F|HDR_CSEQ_F|HDR_CALLID_F, 0 )==-1) {
 				LOG(L_ERR, "ERROR: reply cannot be parsed\n");
 				goto error;
 			}
-			if ((p_msg->via1==0) || (p_msg->cseq==0)){
-				LOG(L_ERR, "ERROR: reply doesn't have a via or cseq"
+			if ((p_msg->via1==0) || (p_msg->cseq==0) || (p_msg->callid==0)){
+				LOG(L_ERR, "ERROR: reply doesn't have a via, cseq or call-id"
 							" header\n");
 				goto error;
 			}
@@ -1269,7 +1285,7 @@ static inline void init_new_t(struct cell *new_cell, struct sip_msg *p_msg)
 		if (likely(lifetime==0))
 			lifetime=cfg_get(tm, tm_cfg, tm_max_noninv_lifetime);
 	}
-	new_cell->on_negative=get_on_negative();
+	new_cell->on_failure=get_on_failure();
 	new_cell->on_reply=get_on_reply();
 	new_cell->end_of_life=get_ticks_raw()+lifetime;;
 	new_cell->fr_timeout=(ticks_t)get_msgid_val(user_fr_timeout,
@@ -1954,6 +1970,7 @@ tm_ctx_t* tm_ctx_get(void)
 void tm_ctx_init(void)
 {
 	memset(&_tm_ctx, 0, sizeof(tm_ctx_t));
+	_tm_ctx.branch_index = T_BR_UNDEFINED;
 }
 
 void tm_ctx_set_branch_index(int v)

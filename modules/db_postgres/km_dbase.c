@@ -166,6 +166,7 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
 	char *s=NULL;
 	int i, retries;
 	ExecStatusType pqresult;
+	PGresult *res = NULL;
 
 	if(! _con || !_s || !_s->s)
 	{
@@ -216,9 +217,14 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
 		/* exec the query */
 
 		if (PQsendQuery(CON_CONNECTION(_con), s)) {
+			/* Get the result of the query */
+			while ((res = PQgetResult(CON_CONNECTION(_con))) != NULL) {
+				db_postgres_free_query(_con);
+				CON_RESULT(_con) = res;
+			}
 			pqresult = PQresultStatus(CON_RESULT(_con));
 			if((pqresult!=PGRES_FATAL_ERROR)
-					|| (PQstatus(CON_CONNECTION(_con))==CONNECTION_OK))
+					&& (PQstatus(CON_CONNECTION(_con))==CONNECTION_OK))
 			{
 				LM_DBG("sending query ok: %p (%d) - [%.*s]\n",
 						_con, pqresult, _s->len, _s->s);
@@ -262,7 +268,6 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
 int db_postgres_fetch_result(const db1_con_t* _con, db1_res_t** _res, const int nrows)
 {
 	int rows;
-	PGresult *res = NULL;
 	ExecStatusType pqresult;
 
 	if (!_con || !_res || nrows < 0) {
@@ -283,14 +288,6 @@ int db_postgres_fetch_result(const db1_con_t* _con, db1_res_t** _res, const int 
 		/* Allocate a new result structure */
 		*_res = db_new_result();
 
-		/* Get the result of the previous query */
-		while (1) {
-			if ((res = PQgetResult(CON_CONNECTION(_con)))) {
-				CON_RESULT(_con) = res;
-			} else {
-				break;
-			}
-		}
 		pqresult = PQresultStatus(CON_RESULT(_con));
 		LM_DBG("%p PQresultStatus(%s) PQgetResult(%p)\n", _con,
 			PQresStatus(pqresult), CON_RESULT(_con));
@@ -441,6 +438,33 @@ int db_postgres_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _o
 
 
 /*!
+ * \brief Query table for specified rows and lock them
+ * \param _h structure representing database connection
+ * \param _k key names
+ * \param _op operators
+ * \param _v values of the keys that must match
+ * \param _c column names to return
+ * \param _n nmber of key=values pairs to compare
+ * \param _nc number of columns to return
+ * \param _o order by the specified column
+ * \param _r result set
+ * \return 0 on success, negative on failure
+ */
+int db_postgres_query_lock(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+	     const db_val_t* _v, const db_key_t* _c, const int _n, const int _nc,
+	     const db_key_t _o, db1_res_t** _r)
+{
+	if (CON_TRANSACTION(_h) == 0)
+	{
+		LM_ERR("transaction not in progress\n");
+		return -1;
+	}
+	return db_do_query_lock(_h, _k, _op, _v, _c, _n, _nc, _o, _r, db_postgres_val2str,
+		db_postgres_submit_query, db_postgres_store_result);
+}
+
+
+/*!
  * Execute a raw SQL query
  * \param _h database connection
  * \param _s raw query string
@@ -469,7 +493,6 @@ int db_postgres_raw_query(const db1_con_t* _h, const str* _s, db1_res_t** _r)
  */
 int db_postgres_store_result(const db1_con_t* _con, db1_res_t** _r)
 {
-	PGresult *res = NULL;
 	ExecStatusType pqresult;
 	int rc = 0;
 
@@ -478,14 +501,6 @@ int db_postgres_store_result(const db1_con_t* _con, db1_res_t** _r)
 		LM_ERR("failed to init new result\n");
 		rc = -1;
 		goto done;
-	}
-
-	while (1) {
-		if ((res = PQgetResult(CON_CONNECTION(_con)))) {
-			CON_RESULT(_con) = res;
-		} else {
-			break;
-		}
 	}
 
 	pqresult = PQresultStatus(CON_RESULT(_con));
@@ -658,10 +673,15 @@ int db_postgres_affected_rows(const db1_con_t* _h)
  * \param _h database handle
  * \return 0 on success, negative on failure
  */
-int db_postgres_start_transaction(db1_con_t* _h)
+int db_postgres_start_transaction(db1_con_t* _h, db_locking_t _l)
 {
 	db1_res_t *res = NULL;
-	str query_str = str_init("BEGIN");
+	str begin_str = str_init("BEGIN");
+	str lock_start_str = str_init("LOCK TABLE ");
+	str lock_write_end_str = str_init(" IN EXCLUSIVE MODE");
+	str lock_full_end_str = str_init(" IN ACCESS EXCLUSIVE MODE");
+	str *lock_end_str = &lock_write_end_str;
+	str lock_str = {0, 0};
 	
 	if (!_h) {
 		LM_ERR("invalid parameter value\n");
@@ -673,7 +693,7 @@ int db_postgres_start_transaction(db1_con_t* _h)
 		return -1;
 	}
 
-	if (db_postgres_raw_query(_h, &query_str, &res) < 0)
+	if (db_postgres_raw_query(_h, &begin_str, &res) < 0)
 	{
 		LM_ERR("executing raw_query\n");
 		return -1;
@@ -682,7 +702,49 @@ int db_postgres_start_transaction(db1_con_t* _h)
 	if (res) db_postgres_free_result(_h, res);
 
 	CON_TRANSACTION(_h) = 1;
+
+	switch(_l)
+	{
+	case DB_LOCKING_NONE:
+		break;
+	case DB_LOCKING_FULL:
+		lock_end_str = &lock_full_end_str;
+		/* Fall-thru */
+	case DB_LOCKING_WRITE:
+		if ((lock_str.s = pkg_malloc((lock_start_str.len + CON_TABLE(_h)->len + lock_end_str->len) * sizeof(char))) == NULL)
+		{
+			LM_ERR("allocating pkg memory\n");
+			goto error;
+		}
+
+		memcpy(lock_str.s, lock_start_str.s, lock_start_str.len);
+		lock_str.len += lock_start_str.len;
+		memcpy(lock_str.s + lock_str.len, CON_TABLE(_h)->s, CON_TABLE(_h)->len);
+		lock_str.len += CON_TABLE(_h)->len;
+		memcpy(lock_str.s + lock_str.len, lock_end_str->s, lock_end_str->len);
+		lock_str.len += lock_end_str->len;
+
+		if (db_postgres_raw_query(_h, &lock_str, &res) < 0)
+		{
+			LM_ERR("executing raw_query\n");
+			goto error;
+		}
+
+		if (res) db_postgres_free_result(_h, res);
+		if (lock_str.s) pkg_free(lock_str.s);
+		break;
+
+	default:
+		LM_WARN("unrecognised lock type\n");
+		goto error;
+	}
+
 	return 0;
+
+error:
+	if (lock_str.s) pkg_free(lock_str.s);
+	db_postgres_abort_transaction(_h);
+	return -1;
 }
 
 /**

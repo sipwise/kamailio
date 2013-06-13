@@ -44,6 +44,8 @@
 
 #define MSRP_REQ_RPLSTART	10000
 
+#define MSRP_RPL_CODE(n)	((n) - MSRP_REQ_RPLSTART)
+
 typedef struct msrp_fline {
 	str buf;
 	int msgtypeid;
@@ -58,6 +60,7 @@ typedef struct msrp_fline {
 #define MSRP_SCHEME_MSRPS	2
 
 #define MSRP_PROTO_TCP	1
+#define MSRP_PROTO_WS	2
 
 typedef struct msrp_uri {
 	str buf;
@@ -88,6 +91,7 @@ int msrp_parse_uri(char *start, int len, msrp_uri_t *uri);
 #define MSRP_HDR_AUTH			9
 #define MSRP_HDR_WWWAUTH		10
 #define MSRP_HDR_AUTHINFO		11
+#define MSRP_HDR_EXPIRES		12
 
 #define MSRP_DATA_SET	1
 
@@ -135,4 +139,7 @@ typedef struct str_array {
 	str *list;
 } str_array_t;
 
+int msrp_frame_get_sessionid(msrp_frame_t *mf, str *sres);
+int msrp_frame_get_first_from_path(msrp_frame_t *mf, str *sres);
+int msrp_frame_get_expires(msrp_frame_t *mf, int *expires);
 #endif
