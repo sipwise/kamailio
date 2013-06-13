@@ -78,7 +78,7 @@ static str str_status_upgrade_required = str_init("Upgrade Required");
 static str str_status_internal_server_error = str_init("Internal Server Error");
 static str str_status_service_unavailable = str_init("Service Unavailable");
 
-#define HDR_BUF_LEN		(256)
+#define HDR_BUF_LEN		(512)
 static char headers_buf[HDR_BUF_LEN];
 
 static char key_buf[base64_enc_len(SHA_DIGEST_LENGTH)];
@@ -277,7 +277,8 @@ int ws_handle_handshake(struct sip_msg *msg)
 
 	/* Final check that all required headers/values were found */
 	sub_protocol &= ws_sub_protocols;
-	if (hdr_flags != REQUIRED_HEADERS || sub_protocol == 0)
+	if ((hdr_flags & REQUIRED_HEADERS) != REQUIRED_HEADERS
+			|| sub_protocol == 0)
 	{
 
 		LM_WARN("required headers not present\n");

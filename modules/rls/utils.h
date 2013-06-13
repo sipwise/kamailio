@@ -1,9 +1,7 @@
-/**
- * $Id$
+/*
+ * rls module - resource list server
  *
- * dmq module - distributed message queue
- *
- * Copyright (C) 2011 Bucur Marius - Ovidiu
+ * Copyright (C) 2012 AG Projects
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -20,12 +18,14 @@
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  */
 
+#ifndef RLS_URILS_H
+#define RLS_UTILS_H
 
-#ifndef _MESSAGE_H_
-#define _MESSAGE_H_
+#include "../../ut.h"
 
-int dmq_handle_message(struct sip_msg*, char*, char*);
+extern str* normalize_sip_uri(const str *uri);
 
 #endif
