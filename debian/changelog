@@ -1,11 +1,11 @@
-ngcp-kamailio (4.0.1-1) UNRELEASED; urgency=low
+ngcp-kamailio (4.0.2-1) UNRELEASED; urgency=low
 
   * Upstream new version.
   * Use Debian packaging as base.
     All sipwise changes as quilt patches.
   * Rename to ngcp-kamailio*
 
- -- Victor Seva <vseva@sipwise.com>  Wed, 24 Apr 2013 08:18:16 +0200
+ -- Victor Seva <vseva@sipwise.com>  Thu, 13 Jun 2013 14:44:17 +0200
 
 kamailio (3.3+ngcp2.8.0) unstable; urgency=low
 
