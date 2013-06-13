@@ -1,0 +1,214 @@
+# $Id$
+#
+# History:
+# --------
+#  2009-05-07  created by Andrei Pelinescu-Onciul <andrei@iptel.org>
+
+
+Overview
+========
+
+kamcmd is a unix tool for interfacing with Kamailio using exported RPCs.
+It uses binrpc (a proprietary protocol, designed for minimal packet size and
+fast parsing) over a variety of transports (unix stream sockets, unix datagram
+ sockets, udp or tcp).
+For more details on binrpc see the ctl module documentation
+(modules/ctl/README).
+
+kamcmd can work in command line mode (the RPC or command name is just another
+command line parameter) or in interactive mode. The interactive mode supports
+history and tab-completion (if kamcmd was compiled with libreadline support).
+
+On Kamailio side the ctl module must be loaded.
+
+Usage
+=====
+
+	kamcmd [options][-s address] [ cmd ]
+
+Options:
+    -s address  unix socket name or host name to send the commands on
+    -R name     force reply socket name, for the unix datagram socket mode
+    -D dir      create the reply socket in the directory <dir> if no reply
+                socket is forced (-R) and an unix datagram socket is selected
+                as the transport
+    -f format   print the result using format. Format is a string containing
+                %v at the places where values read from the reply should be
+                substituted. To print '%v', escape it using '%': %%v.
+    -v          Verbose 
+    -V          Version number
+    -h          Help message
+address:
+    [proto:]name[:port]   where proto is one of tcp, udp, unixs, unix or unixd
+                          e.g.:  tcp:localhost:2048 , unixs:/tmp/ser_ctl
+                          If the protocol is not specified, unixs will be
+                          used if name is a filesystem path and udp if not.
+                          "unixs" or "unix" stand for unix stream sockets
+                          and "unixd" for unix datagram sockets.
+cmd:
+    method  [arg1 [arg2...]]
+arg:
+     string or number; to force a number to be interpreted as string 
+     prefix it by "s:", e.g. s:1
+
+If no address is specified (no -s), kamcmd will use  by default
+unixs:/tmp/ser_ctl. This is also the default for the ctl module (if no
+ "binrpc" module parameters are present in the config).
+
+
+Command Types
+=============
+
+There are 3 types of commands: "raw" RPC, kamcmd aliases and kamcmd
+ builtins.
+
+The "raw" RPC commands work directly with ser with no change on the input or
+ the output.
+To list available RPC commands, use "kamcmd help".
+
+The aliases are just easier to remember names for some RPCs, which
+some time include nicer formatting of the RPC result.
+One can see all the defined aliases using: kamcmd help|grep alias: .
+Example:
+ ps is an alias for core.ps with the output formatted in a more readable way.
+ kamcmd ps is equivalent to kamcmd -f"%v\t%v\n" core.ps.
+ Without the formatting, the output of kamcmd core.ps looks like:
+
+11262
+attendant
+11268
+udp receiver child=0 sock=127.0.0.1:5060
+...
+ Using kamcmd ps (or  kamcmd -f"%v\t%v\n" core.ps) the output looks like:
+
+11262	attendant
+11268	udp receiver child=0 sock=127.0.0.1:5060
+...
+
+The built-in commands can combine several different rpcs.
+One can see all the built-in commands using: kamcmd help|grep builtin: .
+
+Getting help on a command
+=========================
+
+To get the help message associated with a command use 
+kamcmd help <command_name>.
+Example:
+$ kamcmd help ps
+ps is an alias for core.ps with reply formatting: "%v\t%v\n"
+$ kamcmd help core.ps
+Returns the description of running Kamailio processes.
+
+
+Listing all the commands
+========================
+
+To see all the available commands (ser RPCs, aliases and bultins) use
+ kamcmd help.
+To see only the "raw" RPCs, user kamcmd ls.
+Note: since each module can define its own RPCs, the available RPCs depend
+ on the loaded modules.
+
+
+Examples
+========
+
+Using the default socket (requires only loadmodule "ctl" in ser.cfg):
+
+$ kamcmd ps
+11262	attendant
+11268	udp receiver child=0 sock=127.0.0.1:5060
+11269	udp receiver child=1 sock=127.0.0.1:5060
+11270	udp receiver child=0 sock=192.168.1.101:5060
+11271	udp receiver child=1 sock=192.168.1.101:5060
+11272	slow timer
+11273	timer
+11274	ctl handler
+11275	tcp receiver child=0
+11276	tcp receiver child=1
+11277	tcp main process
+
+$ kamcmd help  # list all the supported commands
+dst_blacklist.add
+ctl.who
+...
+
+$ kamcmd help core.uptime # help for the core.uptime rpc
+Returns uptime of the Kamailio server.
+
+$ kamcmd cfg.cfg_set_int_now debug 5 # turn debug level to 5 (needs cfg)
+
+$ kamcmd # enters interactive mode
+
+Using a tcp socket
+(assumes modparam("ctl", "binrpc", "tcp:localhost:2048") in kamailio.cfg)
+
+$ kamcmd -s tcp:localhost:2048 core.version
+Server: Kamailio (3.3.2 (i386/linux))
+
+$ kamcmd -s tcp:localhost:2048 SRV _sip._udp.iptel.org
+    name: _sip._udp.iptel.org
+    type: SRV
+    size (bytes): 104
+    reference counter: 2
+    expires in (s): 67693
+    last used (s): 0
+    error flags: 0
+    rr name: sip.iptel.org
+    rr port: 5060
+    rr priority: 0
+    rr weight: 0
+    rr expires in (s): 67693
+    rr error flags: 0
+
+kamcmd -s tcp:127.0.0.1:2048  # enters interactive mode over tcp
+
+For more examples see utils/kamcmd/EXAMPLES
+ [http://git.sip-router.org/cgi-bin/gitweb.cgi?p=sip-router;a=blob;f=utils/kamcmd/EXAMPLES].
+
+
+Interactive Mode
+================
+
+To enter the interactive mode start kamcmd without specifying a command name
+ on the command line.
+If kamcmd was compiled with libreadline support (automatically if
+libreadline dev files are installed), the interactive mode will have tab
+completion and history support.
+
+Example:
+
+$ kamcmd
+kamcmd 0.2
+Copyright 2006 iptelorg GmbH
+This is free software with ABSOLUTELY NO WARRANTY.
+For details type `warranty'.
+kamcmd> core.s<tab>
+core.sctp_info     core.sctp_options  core.shmmem
+kamcmd> help core.shmmem 
+Returns shared memory info.
+kamcmd> core.shmmem
+{
+	total: 33554432
+	free: 33147816
+	used: 190644
+	real_used: 406616
+	max_used: 406616
+	fragments: 2
+}
+kamcmd> quit
+
+
+Related Stuff
+=============
+
+* ctl module: required, implements binrpc on Kamailio side, without it kamcmd doesn't work.
+
+See modules/ctl/README
+ [http://git.sip-router.org/cgi-bin/gitweb.cgi?p=sip-router;a=blob;f=modules_s/ctl/README].
+
+* cfg_rpc module: allows setting or reading configuration parameters on-the-fly.
+	For example one could change the tcp connection lifetime to 180s using:
+	$ kamcmd cfg.set_now_int tcp.connection_lifetime 180
+	See modules/cfg_rpc/README
+ 	[http://git.sip-router.org/cgi-bin/gitweb.cgi?p=sip-router;a=blob;f=modules_s/cfg_rpc/README].

@@ -1,0 +1,56 @@
+#
+# $Id$
+#
+# control tool for maintaining Kamailio
+#
+#===================================================================
+
+##### ----------------------------------------------- #####
+### FIFO specific variables and functions
+#
+
+##### ----------------------------------------------- #####
+### load CTL base
+#
+if [ -f "$MYLIBDIR/kamctl.ctlbase" ]; then
+	. "$MYLIBDIR/kamctl.ctlbase"
+else
+	mwarn "Cannot load CTL core functions '$MYLIBDIR/kamctl.ctlbase' ..."
+	# exit -1
+fi
+
+#
+##### ----------------------------------------------- #####
+### parameters
+#
+
+#
+##### ----------------------------------------------- #####
+### functions
+#
+usage_ser() {
+	echo
+	mecho " -- command 'kamcmd'"
+	echo
+cat <<EOF
+ kamcmd ............................. send command through kamcmd
+EOF
+}
+USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_ser"
+
+
+ser_cmd()
+{
+	mdbg "entering ser_cmd $*"
+	
+	if [ "$#" -lt 1 ]; then
+		merr "kamcmd must take at least command name as parameter"
+		exit 1
+	fi
+
+	
+	$SERCMD "$@"
+}
+
+SERCTLCMD=ser_cmd
+

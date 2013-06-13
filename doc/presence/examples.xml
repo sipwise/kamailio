@@ -1,0 +1,60 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE section PUBLIC '-//OASIS//DTD DocBook XML V4.2//EN'
+	'http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd'>
+
+<section><title>Examples</title>
+
+<para>This section is under construction...
+</para>
+
+<para>I found a bug during testing sample configs - one TM module change caused
+impossibility of sending request to predefined destination. As far as I know
+affected modules are presence_b2b and msilo.
+</para>
+
+<section><title>Full presence server</title>
+<para>This config file has grown from previous versions of presence server
+configurations. It has to be re-tested with Ottendorf and de-uglyfied. (TBD soon)
+</para>
+<para><ulink url="cfg/full_ps.cfg">cfg/full_ps.cfg</ulink>
+</para>
+</section>
+
+<section><title>Presence server with no authorization and without RLS</title>
+<para>Following config file is based on demo config file installed with SIP-router
+It is not finished yet. I recommend to use a variant of the config file above right
+now.</para>
+<para><ulink url="cfg/ps.cfg">cfg/ps.cfg</ulink></para>
+</section>
+
+<section><title>Forwarding to presence server</title>
+<para>It is good idea to have separated presence stuff from the proxy. You can
+use following piece of code for that. Instead of
+<function>t_forward_nonack</function> you can use
+<function>t_forward_nonack_tcp</function>.
+</para>
+<example><title>forwarding to presence server</title>
+<programlisting><![CDATA[
+...
+# forward presence messages to presence server
+if ((method=="SUBSCRIBE") || (method=="PUBLISH") || (method=="MESSAGE")) {
+	log(1, "Forwarding request\n");
+	
+	if (!t_newtran()) {
+		log(1, "newtran error\n");
+		sl_reply_error();
+		break;
+	};
+	
+	if (!t_forward_nonack("presence-server.test-domain.com", "5060")) {
+		log(1, "Forward to presence server failed\n");
+		t_reply("500", "forward to presence server failed");
+	}
+	break;
+};
+]]>
+</programlisting>
+</example>
+</section>
+
+</section>

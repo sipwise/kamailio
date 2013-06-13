@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
+<!-- Module User's Guide -->
+
+<chapter>
+	
+	<title>&adminguide;</title>
+	
+	<section>
+	<title>Overview</title>
+	<para>
+		This module provides functions for checking and managing the 
+		<acronym>SDP</acronym> payloads of SIP messages.
+	</para>
+	<para>
+		Examples of functions this module offers: remove codecs from SDP,
+		check the media stream types and return attributes of SDP document.
+		For the full list of the features provided by this module and
+		the implementation state, please read the list of exported functions.
+	</para>
+	</section>
+
+	<section>
+	<title>Dependencies</title>
+	<section>
+		<title>&kamailio; Modules</title>
+		<para>
+		The following modules must be loaded before this module:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>none</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	<section>
+		<title>External Libraries or Applications</title>
+		<para>
+		The following libraries or applications must be installed before running
+		&kamailio; with this module loaded:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>None</emphasis>
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	</section>
+	<section>
+	<title>Parameters</title>
+		<para>
+		The module does not export any config parameter yet.
+		</para>
+	</section>
+
+	<section>
+	<title>Functions</title>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_remove_codecs_by_id(list)</function>
+	    </title>
+	    <para>
+			Remove the codecs provided in the parameter 'list' from all
+			media streams found in SDP payload. The parameter 'list' must
+			be one item or a comma separated list of numeric codec IDs. The
+			parameter can be a static string or a variable holding the
+			list of numeric codec IDs.
+	    </para>
+	    <para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_remove_codecs_by_id</function> usage</title>
+		<programlisting format="linespecific">
+...
+# remove PCMU
+sdp_remove_codecs_by_id("0");
+# remove PCMU, PCMA and GSM
+sdp_remove_codecs_by_id("0,8,3");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_remove_codecs_by_name(list)</function>
+	    </title>
+	    <para>
+			Remove the codecs provided in the parameter 'list' from all
+			media streams found in SDP payload. The parameter 'list' must
+			be one item or a comma separated list of codec names. The
+			parameter can be a static string or a variable holding the
+			list of codec names.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_remove_codecs_by_name</function> usage</title>
+		<programlisting format="linespecific">
+...
+# remove PCMU
+sdp_remove_codecs_by_name("PCMU");
+# remove PCMU, PCMA and GSM
+sdp_remove_codecs_by_name("PCMU,PCMA,GSM");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	<title>
+		<function moreinfo="none">sdp_remove_line_by_prefix(string)</function>
+	</title>
+	<para>
+			Remove all SDP attribute lines beginning with 'string'
+			in all media streams.
+	</para>
+	<para>
+			This function can be used from ANY_ROUTE.
+	</para>
+	<example>
+	<title><function>sdp_remove_line_by_prefix</function> usage</title>
+	<programlisting format="linespecific">
+...
+if ($si == "2001:DB8::8:800:200C:417A"
+        and ( has_body("application/sdp") or has_body("multipart/mixed")))
+{
+    xlog("L_INFO", "Cleaning ugly SDP from $si\n");
+    sdp_remove_codecs_by_name("X-NSE");
+    sdp_remove_line_by_prefix("a=X-");
+}
+
+...
+</programlisting>
+	</example>
+        </section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_keep_codecs_by_id(list [, mtype])</function>
+	    </title>
+	    <para>
+			Keep only the codecs provided in the parameter 'list' from all
+			media streams found in SDP payload. The parameter 'list' must
+			be one item or a comma separated list of numeric codec IDs. The
+			parameter can be a static string or a variable holding the
+			list of numeric codec IDs.
+	    </para>
+		<para>
+			Optional parameter mtype can be provided to apply the operations
+			only to the streams matching m=mtype.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_keep_codecs_by_id</function> usage</title>
+		<programlisting format="linespecific">
+...
+# keep only PCMU
+sdp_keep_codecs_by_id("0");
+# keep PCMU, PCMA and GSM in audio stream
+sdp_keep_codecs_by_id("0,8,3", "audio");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_keep_codecs_by_name(list [, mtype])</function>
+	    </title>
+	    <para>
+			Keep only the codecs provided in the parameter 'list' from all
+			media streams found in SDP payload. The parameter 'list' must
+			be one or a comma separated list of codec names. The
+			parameter can be a static string or a variable holding the
+			list of codec names.
+	    </para>
+		<para>
+			Optional parameter mtype can be provided to apply the operations
+			only to the streams matching m=mtype.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_keep_codecs_by_name</function> usage</title>
+		<programlisting format="linespecific">
+...
+# keep only PCMU
+sdp_keep_codecs_by_name("PCMU");
+# keep PCMU, PCMA and GSM
+sdp_keep_codecs_by_name("PCMU,PCMA,GSM");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_with_media(type)</function>
+	    </title>
+	    <para>
+		Return true of the SDP has 'media=type ...' line. Useful to check
+		the content of the RTP sessions, such as 'audio' or 'video'. The
+		parameter can be static string or variable holding the media type.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_with_media</function> usage</title>
+		<programlisting format="linespecific">
+...
+# check for video stream
+if(sdp_with_media("video"))
+{
+    # the session has a video stream
+}
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_remove_media(type)</function>
+	    </title>
+	    <para>
+		Remove the streams that match on 'm=type ...' line. The
+		parameter can be static string or variable holding the media type.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_remove_media</function> usage</title>
+		<programlisting format="linespecific">
+...
+# remove video stream
+sdp_remove_media("video");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_with_codecs_by_id(list)</function>
+	    </title>
+	    <para>
+			Returns true if any of the codecs provided in the parameter 'list'
+			from all media streams is found in SDP payload. The parameter
+			'list' must be one or a comma separated list of numeric codec IDs.
+			The parameter can be a static string or a variable holding the
+			list of numeric codec IDs.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_with_codecs_by_id</function> usage</title>
+		<programlisting format="linespecific">
+...
+# test for PCMU
+if(sdp_with_codecs_by_id("0")) { ... }
+# test for PCMU, PCMA or GSM
+if(sdp_with_codecs_by_id("0,8,3")) { ... }
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_with_codecs_by_name(list)</function>
+	    </title>
+	    <para>
+			Returns true if any of the codecs provided in the parameter 'list'
+			from all media streams is found in SDP payload. The parameter
+			'list' must be one item or a comma separated list of codec names.
+			The parameter can be a static string or a variable holding the
+			list of codec names.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_with_codecs_by_name</function> usage</title>
+		<programlisting format="linespecific">
+...
+# test for PCMU
+if(sdp_with_codecs_by_name("PCMU")) { ... }
+# test for PCMU, PCMA or GSM
+if(sdp_with_codecs_by_name("PCMU,PCMA,GSM")) { ... }
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_print(level)</function>
+	    </title>
+	    <para>
+		Print the SDP internal structure to log 'level'. The
+		parameter can be static integer or variable holding the integer
+		value of the log level.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_print</function> usage</title>
+		<programlisting format="linespecific">
+...
+# print the SDP
+sdp_print("1");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_get(avpvar)</function>
+	    </title>
+	    <para>
+		Store the SDP part of message body in an AVP. Return 1 if SDP is found,
+		-1 on error and -2 if there is no SDP part in the message body.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_get</function> usage</title>
+		<programlisting format="linespecific">
+...
+sdp_get("$avp(sdp)");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+	    <title>
+		<function moreinfo="none">sdp_content()</function>
+	    </title>
+	    <para>
+		Return true if the SIP message has SDP body or a SDP part in body.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_content</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(sdp_content()) {
+    ...
+}
+...
+</programlisting>
+	    </example>
+	</section>
+	</section>
+</chapter>
+

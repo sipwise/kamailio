@@ -1,0 +1,1448 @@
+$Id$
+
+Release notes for Kamailio/SIP Router (sr)
+***********************************************
+
+For news about release 4.0, please check
+http://www.kamailio.org/wiki/features/new-in-4.0.x
+===================================================
+
+sip-router 3.1 changes
+
+core:
+  - Dragonfly BSD support
+  - statistics / counters support for tcp and sctp (enable by default)
+  - statistics / counters api
+  - networks addresses support in ip comparisons (src_ip, dst_ip, to_ip)
+    with strings or rvalue expressions.
+    E.g.: $ip=10.0.0.0;  if (src_ip == $ip +"/8") ....
+  - lots of module functions automatically support now expressions or
+      variables in function parameters. This applies to all the module
+      functions declared without a fixup, with a fixup and the corresponding
+      free_fixup function or with a compatible ser or kamailio style standard
+      fixup (declared in sr_module.h or mod_fix.h).
+      E.g.: f($a, "b = " + $b);  t_set_fr($v + 2 + $x).
+            t_set_fr($foo) (equivalent now with t_set_fr("$foo")).
+  - all the module functions can now be called with any constant expression
+      as parameters. E.g.: f("7 *" +" 6 = " + 7 * 6);
+  - major performance increase on Linux multi-cpu machines that send a lot
+     of UDP IPv4 packets (40-50% faster in stateless mode). For it to work
+     udp4_raw must be enabled or set into auto mode in sr.cfg and sr must be
+     started as root or with CAP_NET_RAW. Note that even if udp4_raw is
+     off (default), if sr was started with enough privileges, it can be
+     enabled at runtime.
+     The support for using raw sockets is also available on FreeBSD (compiled
+     by default but not tested for performance yet), NetBSD, OpenBSD and
+     Darwin (not tested and not compiled by default, needs
+     make cfg extra_defs=-DUSE_RAW_SOCKS). To check if the support is
+     compiled, use ser -V |grep --color RAW_SOCKS or for a running
+     ser: sercmd core.udp4_raw_info.
+     See udp4_raw, udp4_raw_mtu and udp4_raw_ttl below.
+  - asynchronous TLS support
+  - onreply_route {...} is now equivalent with onreply_route[0] {...}
+  - global, per protocol blacklist ignore masks (via extended send_flags).
+    See dst_blacklist_udp_imask a.s.o (dst_blacklist_*_imask).
+  - per message blacklist ignore masks
+  - route() now supports rvalue expressions (e.g. route("test"+$i))
+  - support for permanent entries in the DNS cache.
+
+new config variables:
+  - udp4_raw - enables raw socket support for sending UDP IPv4 datagrams 
+      (40-50% performance increase on linux multi-cpu).
+      Possible values: 0 - disabled (default), 1 - enabled, -1 auto.
+      In "auto" mode it will be enabled if possible (sr started as root or
+      with CAP_NET_RAW).
+      udp4_raw can be used on Linux and FreeBSD. For other BSDs and Darwin
+      one must compile with -DUSE_RAW_SOCKS.
+      On Linux one should also set udp4_raw_mtu if the MTU on any network
+      interface that could be used for sending is smaller then 1500.
+      Can be set at runtime as long as sr was started with enough privileges
+      (core.udp4_raw).
+  - udp4_raw_mtu - MTU value used for UDP IPv4 packets when udp4_raw is
+      enabled.  It should be set to the minimum MTU of all the network
+      interfaces that could be used for sending. The default value is 1500.
+      Note that on BSDs it does not need to be set (if set it will be ignored,
+      the proper MTU will be used automatically by the kernel). On Linux it
+      should be set.
+      Can be set at runtime (core.udp4_raw_mtu).
+  - udp4_raw_ttl - TTL value used for UDP IPv4 packets when udp4_raw is
+      enabled. By default it is set to auto mode (-1), meaning that the
+      same TTL will be used as for normal UDP sockets.
+      Can be set at runtime (core.udp4_raw_ttl).
+  - dst_blacklist_udp_imask - global blacklist events ignore mask for udp
+    (a blacklist event/reason set in this variable will be ignored when 
+    deciding whether or not to blacklist an udp destination). Can be set
+    at runtime. Default: 0 (no blacklist reason is ignored).
+    Possible values:  0 -disabled, 2 - send error; 4 - connect error,
+                      8 - icmp (reserverd), 16 - transaction timeout,
+                     32 - 503 received, 64 - administratively prohibited
+                     (manually set).
+   - dst_blacklist_tcp_imask - like dst_blacklist_udp_imask, but for tcp.
+   - dst_blacklist_tls_imask - like dst_blacklist_tls_imask, but for tcp.
+   - dst_blacklist_sctp_imask -like dst_blacklist_sctp_imask, but for tcp.
+   - dns_cache_rec_pref - DNS cache record preference:
+		0 - do not check duplicates (default)
+		1 - prefer old records
+		2 - prefer new records
+		3 - prefer records with longer lifetime
+
+modules:
+   - counters: functions and RPCs for manipulating counters (statistics):
+           modparam("counters", "script_counter", name)
+           cnt_inc(name)
+           cnt_add(name, val)
+           cnt_reset(name)
+   - blst: functions for ignoring blacklist events per message:
+           blst_set_ignore(mask):  set the events in mask in the per
+            per message blacklist ignore mask for a request
+            (see dst_blacklist_udp_imask for possible values).
+            The basic operation is: msg_blst_ignore_mask|=mask.
+           blst_clear_ignore(mask): like blst_set_ignore(mask), but instead
+            of setting some events, it clears them
+            (msg_blst_ignore_mask&=~mask).
+           blst_rpl_set_ignore(mask): like blst_set_ignore(mask), but sets
+            the mask for possible local replies to the current message.
+           blst_rpl_clear_ignore(mask): like blst_rpl_ignore(mask), but
+            clears instead of setting.
+   - tls:
+          certificate revocation list (CRL) support.
+          asynchronous TLS support
+          new TLS RPCs (tls.info, tls.options), tls.list more detailed.
+          removed handshake_timeout and send_timeout module parameters /
+            config variables. The values from tcp are used instead
+            (tcp_connect_timeout and tcp_send_timeout).
+          runtime config support
+          more config options:
+            crl - certificate revocation list file path (PEM format).
+            send_close_notify - enables/disables sending close notify
+              alerts prior to closing the corresponding TCP connection.
+              Sending the close notify prior to tcp shutdown is "nicer"
+              from a TLS point of view, but it has a measurable
+              performance impact. Default: off. Can be set at runtime
+              (tls.send_close_notify).
+            con_ct_wq_max - per connection tls maximum clear text write
+              queue size.  The TLS clear-text write queues are used when a
+              send attempt has to be delayed due to an on-going TLS level
+              renegotiation. Can be set at runtime (tls.con_ct_wq_max).
+              Default: 65536 (64 Kb).
+            ct_wq_max - maximum total for all the tls clear text write
+              queues (summed). Can be set at runtime (tls.ct_wq_max).
+              Default: 10485760 (10 Mb).
+            ct_wq_blk_size - internal TLS pre-write (clear-text) queue
+              minimum block size (advance tunning or debugging).
+              Can be set at runtime (tls.ct_wq_blk_size).
+              Default: 4096 (4 Kb).
+          verbose debug messages can be enable by re-compiling with
+            -DTLS_RD_DEBUG (for the read path) and -DTLS_WR_DEBUG
+            (for the write path).
+          new options for better tuning memory usage for modern openssl
+            versions: ssl_release_buffers (default 1), ssl_freelist_max_len
+            (default 0), ssl_max_send_fragment, ssl_read_ahead (default 0).
+            For more info see modules/doc/tls/README.
+          compression is now disabled by default. To enable it set
+            tls_disable_compression to 0, but note that memory usage will
+            increase dramatically especially for large number of
+            connections (>1000).
+tm:
+   - reason header support (RFC3326) both for CANCELs generated due to a
+      received final reply and for hop by hop CANCELs generated because of a
+      received CANCEL.
+      E.g.: reason header added for a CANCEL generated after a 200 reply was
+            received on one of the branches "Reason: SIP;cause=200".
+      The reason header support can be turned on/off using either tm
+      module parameters or in the end to end CANCEL case also on a per
+      transaction basis, using a script function:
+       local_cancel_reason = 0 | 1 (default 1/on) - turns on adding reason
+         headers for CANCELs generated due to a final reply. Can be changed
+         at runtime.
+       e2e_cancel_reason = 0 | 1 (default 1/on) - turns on copying reason
+         headers from a received end to end CANCEL (the generated hop by hop
+         CANCELs will have the same reason headers as the received CANCEL).
+         Can be changed at runtime.
+       t_set_no_e2e_cancel_reason(0|1) - enable/disable cancel reason 
+         header copying on a per transaction basis (0 - enable, 1 disable).
+   - t_reply() can be used both from the main/core onreply_route{} and tm
+     onreply_route[...]{}s.
+
+
+
+sip-router 3.0 changes
+
+core:
+  - type casts operators: (int), (str).
+  - new operators eq, ne for string compares and ieq, ine for interger 
+    compares. The names are not yet final (use them at your own risk).
+    Future version might use ==/!= only for ints (ieq/ine) and eq/ne for
+    strings (under debate).
+    They are almost equivalent to == or !=, but they force the conversion 
+    of their operands (eq to string and ieq to int), allowing among other
+    things better type checking on startup and more optimizations.
+    Non equiv. examples: 0 == "" (true) is not equivalent to 0 eq ""
+    (false: it evaluates to "0" eq ""). "a" ieq "b" (true: (int)"a" is 0
+     and (int)"b" is 0) is not equivalent to "a" == "b" (false).
+    Note: internally == and != are converted on startup to eq/ne/ieq/ine 
+    whenever possible (both operand types can be safely determined at
+    start time and they are the same).
+  - try to guess what the user wanted when operators that support multiple
+     types are used on different typed operands. In general convert the
+     the right operand to the type of the left operand and then perform the
+     operation. Exception: the left operand is undef.
+     This applies to the following operators: +, == and !=.
+     Special case: undef as left operand:
+     For +: undef + expr -> undef is converted to string => "" + expr.
+     For == and !=:   undef == expr -> undef is converted to type_of expr.
+     If expr is undef, then undef == undef is true (internally is converted
+     to string).
+  - expression evaluation changes: auto-convert to interger or string
+     in function of the operators: 
+       int(undef)==0,  int("")==0, int("123")==123, int("abc")==0
+       str(undef)=="", str(123)=="123".
+  - new script operators: defined, strlen, strempty
+      defined expr - returns true if expr is defined, and false if not.
+                     Note: only a standalone avp or pvar can be
+                     undefined, everything else is defined.
+      strlen(expr) - returns the lenght of expr evaluated as string.
+      strempty(expr) - returns true if expr evaluates to the empty
+                       string (equivalent to expr=="").
+    e.g.: if (defined $v && !strempty($v)) $len=strlen($v);
+  - msg:len max_len comparison obsoleted and removed (it did not make any
+    sense, msg:len > max_len was always false, use something like 
+    4096 or 16384 in its place).
+  - module search path support: loadpath takes now a list of directories
+    separated by ':'. The list is searched in-order. For each directory d
+    $d/${module_name}.so and $d/${module_name}/${module_name}.so are tried.
+  - dns TXT, EBL and PTR support (both cache and non-cached resolver)
+  - support for dual module interfaces: ser and kamailio
+config script changes:
+  - script mode can be switched between ser compatible, kamailio compatible
+    and max compatibility (compatible with both as much as possible), using
+      #!SER
+      #!KAMAILIO
+      #!OPENSER
+      #!ALL
+      #!MAXCOMPAT
+    where #!KAMAILIO is equivalent with #!OPENSER and #!ALL with #!MAXCOMPAT
+  - support for kamailio style pvars
+  - C-like switch()/case (integer only)
+  - while()
+  - include file support: include_file "somefile"
+  - event route support: event_route[module_name:eventid]
+  - user and shm_force_alloc must now appear prior to any modparam() or route
+     block.
+  - per message send_flags support (see set_forward_no_connect(),
+     set_forward_reply_no_connect(), set_forward_close() & set_reply_close())
+
+build system:
+  - multiple modules directories are now supported (defined in Makefile.dirs)
+
+new config variables:
+  - max_while_loops - maximum iterations allowed for a while  (can be changed
+       at runtime). Default 100.
+  - log_name - set the application name used when printing to syslog.
+  - mem_summary - memory debugging info logged on exit or on SIGUSR1.
+       The value is a combination of flags: 0 - off,
+       1 - dump all used memory blocks and some statistics (lots of output),
+       2 - dump a summary of the used memory blocks (works only if
+           compiled with DBG_QM_MALLOC or DBG_F_MALLOC).
+       Default: 1.
+       Can be changed at runtime.
+  - shm = number  or shm_mem = number  - size of shared memory in MB. It's
+       overwritten if a value is specified on the command line (-m val).
+       Default: 32 Mb. Must appear prior to any modparam() or route block.
+
+new script commands:
+  add_local_rport() - adds the rport parameter to the added via header
+       (rfc3581).
+  set_forward_no_connect() - the message will be forwarded only if there is
+       already an existing connection to the destination (it applies only to
+       connection oriented protocols like tcp, tls and in the future sctp).
+  set_reply_no_connect() - like set_forward_no_connect(),  but works for
+       replies to the current message.
+  set_forward_close()  - try to close the connection after forwarding the
+       current message (it applies only when the underlying protocol is
+       connection oriented).
+  set_reply_close() - like set_forward_close(), but it works for replies to
+       the current message.
+
+tm:
+  disable_6xx_block parameter - if set, will treat 6xx replies like normal
+       replies (non rfc conformant). Default: off.
+       See also t_set_disable_6xx().
+  t_set_disable_6xx(0|1) - can be used to turn off/on the special 6xx handling
+       on a per transaction basis.
+  t_set_disable_failover(0|1) - can be used to turn off/on dns failover on a
+       per transaction basis.
+
+
+
+2.1.0 changes
+
+modules:
+ - textops   - functions:
+                        - remove_hf_re("regexp") -- filter message headers out
+                          by matching the header name field against a regular
+                          expression.
+ - avp       - export new selects table to allow dissecting the content of an
+               attribute by interpreting it as a "name-addr" value 
+ - auth      - experimental support for one-time nonces: when enabled a nonce
+               will be accepted only for one response (each new request will
+               be challenged). See one_time_nonce.
+             - experimental support for nc checking when qop=auth
+               (fast, non-locking implementation, see nonce_count, 
+                nc_array_size, nc_array_order and nid_pool_no) 
+             - switched to base64 nonces
+             - record nonce generation time inside the nonce so that a 
+               received nonce can be checked against ser start time
+               (if older => stale). This allows gracefully handling ser
+               restarts with different auth configs.
+             - added extra authentication checks support, to protect
+               against various reply attacks.
+             - params:
+                       - nonce_auth_max_drift - maximum difference in seconds
+                          from the current time, if a nonce appears to be
+                          created in the future (if exceeded the nonce is 
+                          considered stale).
+                       - one_time_nonce - if enabled each nonce is allowed 
+                          only once => each new request (including 
+                          retransmissions!) will be challenged. It should be
+                          used only in stateful mode (so that tm deals with
+                          the retransmissions). The major disadvantage is that
+                          the UA won't be able to used any cached credentials
+                          (=> extra messages, extra round trips, more work for
+                           the proxy)
+                       - otn_in_flight_no - maximum number of in-flight nonces
+                          for one-time-nonces. It must be a number of the form
+                          2^k (if not it will be automatically rounded down).
+                          The memory used will be otn_in_flight_no/8
+                       - otn_in_flight_order - like otn_in_flight_no, but 
+                          instead of specifying the number as 2^k, it directly
+                          sets k (otn_in_flight_no=2^otn_in_flight_order)
+                       - nonce_count - if enabled and qop=auth or 
+                          qop=auth-int, store and check received nc values
+                          (for details see rfc2617 and auth/doc). It should be
+                          used only in stateful mode (so that tm deals with
+                          the retransmissions which would otherwise be 
+                          challenged). The major advantage is greatly 
+                          enhanced security (extremely small probability of
+                          a succesfull replay attack) combine with support
+                          for cached credentials (if the UAs do support qop 
+                          and auth)
+                       - nc_array_size - size of the array used for storing
+                          nc values, default 1Mb. It will be rounded down to
+                          a 2^k value. It represents the maximum number of
+                          in-flight nonces supported
+                       - nc_array_order - equivalent to nc_array_size, but 
+                          instead of specifying the size in bytes, it can 
+                          be used to directly set the power of 2 used
+                          (nc_array_size=2^nc_array_order)
+                       - nid_pool_no - number of nc and one-time-nonce array 
+                          and index partitions, useful for increasing 
+                          performance on multi-cpu systems (default 1,
+                          recommended 4)
+                       - auth_checks_register, auth_checks_no_dlg, 
+                         auth_checks_in_dlg - flags specifying which extra
+                          message part/parts will be checked for change before
+                          allowing nonce reuse. See the auth module docs for
+                          for more information (modules/auth/README).
+ - blst      - new module containing script blacklist manipulations functions
+               (the source of a message can be blacklisted, removed from the
+                blacklist or checked for presence in the blacklist).
+ - tm        - added API function t_get_canceled_ident(): returns the hash 
+               coordinates (bucket/index) of the transaction the currently 
+               processed CANCEL is targeting. Requires AS support enabled.
+             - added API function ack_local_uac(): allow generating the ACKs 
+               for 2xx'ed locally originated INVITEs - new headers and body can
+               now also be appended to it. Requires AS support enabled.
+             - matching of E2E ACKs no longer requires full From HF identity,
+               but rather only tag equality (this behaviour can be changed by
+               defining TM_E2E_ACK_CHECK_FROM_URI)
+             - added t_reset_fr(), t_reset_retr(), t_reset_max_lifetime()
+             - t_relay_to renamed to t_relay_to_avp (undocumented function)
+             - t_relay() can now also take host and port parameters (e.g.
+               t_relay(host, port)), behaving like a statefull 
+               forwad(host, port) version (forward to host:port using the same
+               protocol on which the message was received)
+             - t_relay_to_udp(), t_relay_to_tcp() and t_relay_to_tls() work
+               now even with no parameters: in this case the message is 
+               forwarded using the request uri, but with the specified protocol
+               (equivalent to a t_relay() with a forced protocol)
+             - method for canceling unreplied branches can now be selected
+               using the new cancel_b_method tm parameter.
+             - support for adding a 503 reply source to the blacklist for
+               the time specified in the Retry-After header (see the new tm
+               parameters blst_503, blst_503_def_timeout, blst_503_min_timeout
+               and blst_503_max_timeout).
+             - different error replies for too many branches (500 but with
+               different text), resolve error (478) or send error
+               (477).
+             - tm can be configured not to automatically send 100 replies
+               for invites either globally (see the auto_inv_100 parameter)
+               or on a per transaction basis (see t_set_auto_inv_100(...))
+             - t_relay* error reply are delayed till the end of the script
+               to allow the script writer to overwrite them
+             - branches are always canceled hop by hop
+             - cancels for silently canceled branches (no replies ever 
+               received) are automatically generated if later a provisional
+               reply arrives on such a branch
+             - noisy_ctimer is now 1 (on) by default
+             - added maximum transaction lifetime - a transaction is not
+               allowed to be active longer then this interval. See
+               t_set_max_lifetime(), max_inv_lifetime and max_noninv_lifetime.
+             - support for changing the retransmission intervals on the fly,
+               on a per transaction basis (it is enabled if tm is compiled
+               with -DTM_DIFF_RT_TIMEOUT -- default): t_set_retr(t1, t2).
+             - transaction are deleted the moment they are not referenced 
+               anymore (removed the need for the delete timer) -- this 
+               should improve memory usage on very busy proxies.
+             - lots of callbacks added
+             - new onsend callbacks support (require defining TMCB_ONSEND prior
+               to compiling tm)
+             - behaviour when receiving a CANCEL which doesn't match any 
+               transaction can be selected using the unmatched_cancel param.
+             - params: 
+                        - cancel_b_method - selects one of the three methods
+                          for dealing with unreplied branches when the 
+                          transaction must be canceled. The possible values
+                          are 0 (old behaviour) for stopping request 
+                          retransmission on the branch and act as if 
+                          the branch was immediately replied with a 487,
+                          1 for continuing to retransmit the request until an
+                          answer is received or the timeout kicks in (default)
+                          and
+                          2 for stopping the request retransmission and sending
+                          CANCEL on the branch (not rfc conforming).
+                          For more information see tm docs.
+                        - blst_503 - if set and if the blacklist is used
+                          (use_dst_blacklist=1), add the source of a 503 reply
+                          to the blacklist
+                        - blst_503_def_timeout - if the Retry-After header from
+                          a 503 reply is missing, use this value for the 
+                          blacklist timeout (in s). Depends on blst_503.
+                          The default value is 0 ( do not blacklist if no
+                          Retry-After is present).
+                        - blst_503_min_timeot (in s) - if the 503 reply 
+                          Retry-After header value is less, use this value
+                          for the blacklist timeout. Depends on blst_503.
+                          The default value is 0.
+                        - blst_503_max_timeout (in s) - if the 503 reply 
+                          Retry-After header value is greater, use this value
+                          instead. Depends on blst_503.
+                          The default value is 3600 s.
+                        - auto_inv_100 - if set (default) tm will automatically
+                          send an 100 reply to INVITEs (see also 
+                         t_set_auto_inv_100())
+                        - noisy_ctimer is now 1 by default
+                        - max_inv_lifetime & max_noninv_lifetime - default
+                          maximum lifetimes for an invite or non-invite 
+                          transaction. After this interval has passed from 
+                          the transaction creation the transaction will be 
+                          either switched into the wait state or in the
+                          final response retransmission state => a transaction
+                          will be kept in memory for maximum: 
+                           max_*inv_lifetime + fr_timer /*ack w.*/ +wait_timer.
+                        - unmatched_cancel - selects between forwarding cancels
+                           that do not match any transaction statefully (0, 
+                           default value), statelessly (1) or dropping them
+                           (2). Note that the statefull forwarding has an 
+                           additional hidden advantage: tm will be able to
+                           recognize INVITEs that arrive after their CANCEL.
+                           Note also that this feature could be used to try
+                           a memory exhaustion DOS attack against a proxy that
+                           authenticates all requests, by continuously flooding
+                           the victim with CANCELs to random destinations 
+                           (since the CANCEL cannot be authenticated, each
+                           received bogus CANCEL will create a new transaction 
+                           that will live by default 30s).
+             - functions:
+                        - t_reset_fr() -- resets the current transaction 
+                          fr_inv_timer and fr_timer to the default values
+                          (set via the tm modparams fr_inv_timer and fr_timer).
+                        - t_reset_retr() -- resets the current transaction
+                          retransmission intervals on the fly, to the default
+                          values (set via the tm modparams retr_timer1 and 
+                          retr_timer2).
+                        - t_reset_max_lifetime() -- resets the current 
+                          transaction maximum lifetime to the default value
+                          (set via the tm  modparam max_inv_lifetime or 
+                           max_noninv_lifetime).
+                        - t_grep_status("code") -- returns true if any branch
+                          received code as the final reply (or if no final 
+                          reply was yet received, but a "code" provisional 
+                          reply).
+                        - t_set_auto_inv_100(on/off) - switch automatically
+                          sending 100 replies to INVITEs on/off on a per
+                          transaction basis. It overrides the tm param.
+                          auto_inv_100.
+                        - t_set_max_lifetime(inv, noninv) - changes the 
+                          maximum transaction lifetime on the fly, for the
+                          current or next to be created transaction.
+                        - t_set_retr(t1, t2) - changes the retransmissions
+                           intervals on the fly, on a per transaction basis.
+core:
+             - most tcp config vars migrated to the dynamic config framework
+               (can be changed at runtime, e.g. 
+                 sercmd cfg.set_now_int tcp connection_lifetime 180 )
+             - fallback to tcp or other congestion controlled transport 
+               protocol if a forwarded udp sip request is greater then 
+               udp_mtu (config). Default off. See udp_mtu and 
+               udp_mtu_try_proto.
+             - sctp support (one-to-many, work in progress, for now linux
+               and freebsd only)
+             - partial cygwin (windows) support revived: core+static modules, 
+               no ipv6, no tcp, no dynamic modules
+             - most of the config variables can now be changed on the fly,
+               without ser restart  (migration work in progress)
+             - tcp improvements (better tcp timers, send fd cache, special
+                options support)
+             - dns naptr support (see dns_try_naptr and dns_<proto>_pref)
+             - dns srv based load balancing support (see dns_srv_lb)
+             - support for locking ser's pages in memory, pre-mapping
+               all the shared memory on startup (fill it with 0)
+             - real time options
+             - devel: new PROC_INIT rank, init_child(PROC_INIT) called first
+             - futex support on linux (better behaviour when waiting on 
+               long held locks, almost no performance impact otherwise)
+             - when dns search list was used for resolution, store the "link"
+               between the short name and long name in cache as CNAME record
+
+new config variables:
+  tcp_rd_buf_size = buffer size used for tcp reads.
+                    A high buffer size increases performance on server with few
+                    connections and lot of traffic on them, but also increases
+                     memory consumption (so for lots of connection is better 
+                    to use a low value). Note also that this value limits the
+                    maximum datagram size that can be received over tcp.
+                    Default: 4096, can be changed at runtime.
+  tcp_wq_blk_size = block size used for tcp async writes. It should be big
+                    enough to hold a few datagrams. If it's smaller then a
+                    datagram (in fact a tcp write()) size, it will be rounded
+                    up. It has no influenced on the number of datagrams 
+                    queued (for that see tcp_conn_wq_max or tcp_wq_max).
+                    It has mostly debugging and testing value (can be ignored).
+                    Default: 2100 (~ 2 INVITEs), can be changed at runtime.
+  tcp_no_connect = yes/no - disable connects, ser will only accept new 
+                     connections, it will never try to open new ones.
+                     Default: no, can be changed at runtime.
+  udp_mtu = number - fallback to another protocol (udp_mtu_try_proto must be
+                     set also either globally or per packet) if the constructed
+                     request size is greater then udp_mtu.
+                     Recommended size: 1300. Default: 0 (off).
+  udp_mtu_try_proto = TCP|TLS|SCTP|UDP - if udp_mtu !=0 and udp forwarded
+                     request size (after adding all the "local" headers) >
+                     udp_mtu, use this protocol instead of udp. Only the
+                     Via header will be updated (e.g. The Record-Route
+                     will be the one built for udp).
+                     Default: UDP (off). Recommended: TCP.
+  force_rport =yes/no - like force_rport(), but works globally.
+  disable_sctp = yes/no - disable sctp support (default auto, see enable_sctp)
+  enable_sctp = 0/1/2  - disable (0)/enable (1)/auto (2) sctp support, 
+                         default auto (2)
+  sctp_children = number - sctp children no (similar to udp children)
+  sctp_socket_rcvbuf = number - size for the sctp socket receive buffer
+  sctp_socket_sndbuf = number - size for the sctp socket send buffer
+  sctp_autoclose = seconds - number of seconds before autoclosing an idle
+                   association (default: 180 s).
+                   Can be changed at runtime, but it will affect only new
+                   associations. E.g.:
+                   $ sercmd cfg.set_now_int sctp autoclose 120
+  sctp_send_ttl = milliseconds - number of milliseconds before an unsent
+                  message/chunk is dropped (default: 32000 ms or 32 s).
+                  Can be changed at runtime, e.g.:
+                  $ sercmd cfg.set_now_int sctp send_ttl 180000
+  sctp_send_retries - how many times to attempt re-sending a message on a
+                      re-opened association, if the sctp stack did give up
+                      sending it (it's not related to sctp protocol level
+                      retransmission). Useful to improve reliability with
+                      peers that reboot/restart or fail over to another 
+                      machine. WARNING: use with care and low values (e.g.
+                      1-3) to avoid "multiplying" traffic to unresponding 
+                      hosts (default: 0).
+                      Can be changed at runtime.
+  sctp_assoc_tracking = yes/no - controls whether or not sctp associations
+     are tracked inside ser/sip-router. Turning it off would result in
+     less memory being used and slightly better performance, but it will also
+     disable some other features that depend on it (e.g. sctp_assoc_reuse).
+     Default: yes.
+     Can be changed at runtime (sercmd sctp assoc_tracking 0), but changes
+     will be allowed only if all the other features that depend on it are
+     turned off (for example it can be turned off only if first
+     sctp_assoc_reuse was turned off).
+     Note: turning sctp_assoc_tracking on/off will delete all the tracking
+     information for all the currently tracked associations and might introduce
+     a small temporary delay in the sctp processing if lots of associations
+     were tracked.
+     Config options depending on sctp_assoc_tracking being on:
+      sctp_assoc_reuse.
+  sctp_assoc_reuse = yes/no - controls sctp association reuse. For now only
+     association reuse for replies is affected by it. Default: yes.
+     Depends on sctp_assoc_tracking being on.
+     Note that even if turned off, if the port in via corresponds to the
+     source port of the association the request was sent on or if rport is
+     turned on (force_rport() or via containing a rport option), the
+     association will be automatically reused by the sctp stack.
+     Can be changed at runtime (sctp assoc_reuse), but it can be turned on
+     only if sctp_assoc_tracking is on.
+  sctp_max_assocs = number - maximum number of allowed open sctp associations.
+     -1 means maximum allowed by the OS. Default: -1.
+     Can be changed at runtime (e.g.:
+      sercmd cfg.set_now_int sctp max_assocs 10 ).
+     When the maximum associations number is exceeded and a new associations
+     is opened by a remote host, the association will be immediately closed.
+     However it is possible that some sip packets get through (especially if
+     they are sent early, as part of the 4-way handshake).
+     When ser/sip-router tries to open a new association and the max_assocs
+     is exceeded the exact behaviour depends on whether or not
+     sctp_assoc_tracking is on. If on, the send triggering the active open
+     will gracefully fail, before actually opening the new association and no
+     packet will be sent. However if sctp_assoc_tracking is off, the
+     association will first be opened and then immediately closed. In general
+     this means that the initial sip packet will be sent (as part of the 4-way
+     handshake).
+  sctp_srto_initial = milliseconds - initial value of the retr. timeout, used
+     in RTO calculations (default: OS specific).
+     Can be changed at runtime (sctp srto_initial) but it will affect only new
+     associations.
+  sctp_srto_max = milliseconds - maximum value of the retransmission timeout
+     (RTO) (default: OS specific).
+     WARNING: values lower then the sctp sack_delay will cause lots of
+     retransmissions and connection instability (see sctp_srto_min for more
+     details).
+     Can be changed at runtime (sctp srto_max) but it will affect only new
+     associations.
+  sctp_srto_min = milliseconds - minimum value of the retransmission timeout
+     (RTO) (default: OS specific).
+     WARNING: values lower then the sctp sack_delay of any peer might cause
+     retransmissions and possible interoperability problems. According to the
+     standard the sack_delay should be between 200 and 500 ms, so avoid trying
+     values lower then 500 ms unless you control all the possible sctp peers
+     and you do make sure their sack_delay is higher or their sack_freq is 1.
+     Can be changed at runtime (sctp srto_min) but it will affect only new
+     associations.
+  sctp_asocmaxrxt   = number - maximum retransmissions attempts per association
+     (default: OS specific). It should be set to sctp_pathmaxrxt * no. of
+     expected paths.
+     Can be changed at runtime (sctp asocmaxrxt) but it will affect only new
+     associations.
+  sctp_init_max_attempts = number - maximum INIT retransmission attempts
+     (default: OS specific).
+     Can be changed at runtime (sctp init_max_attempts).
+  sctp_init_max_timeo = milliseconds - maximum INIT retransmission timeout (RTO
+     max for INIT). Default: OS specific.
+     Can be changed at runtime (sctp init_max_timeo).
+  sctp_hbinterval = milliseconds - sctp heartbeat interval. Setting it to -1
+     will disable the heartbeats. Default: OS specific.
+     Can be changed at runtime (sctp hbinterval) but it will affect only new
+     associations.
+  sctp_pathmaxrxt = number - maximum retransmission attempts per path (see also
+     sctp_asocmaxrxt). Default: OS specific.
+     Can be changed at runtime (sctp pathmaxrxt) but it will affect only new
+     associations.
+  sctp_sack_delay = milliseconds - delay until an ACK is generated after
+     receiving a packet. Default: OS specific.
+     WARNING: a value higher then srto_min can cause a lot of retransmissions
+     (and strange problems). A value higher then srto_max will result in very
+     high connections instability. According to the standard the sack_delay
+     value should be between 200 and 500 ms.
+     Can be changed at runtime (sctp sack_delay) but it will affect only new
+     associations.
+  sctp_sack_freq = number - number of packets received before an ACK is sent
+     (without waiting for the sack_delay to expire).  Default: OS specific.
+     Note: on linux with lksctp up to and including 1.0.9 is not possible to
+     set this value (having it in the config will produce a warning on
+     startup).
+     Can be changed at runtime (sctp sack_freq) but it will affect only new
+     associations.
+  sctp_max_burst = number - maximum burst of packets that can be emitted by an
+     association. Default: OS specific.
+     Can be changed at runtime (sctp max_burst) but it will affect only new 
+     associations.
+  server_id = number - A configurable unique server id that can be used to
+                       discriminate server instances within a cluster of
+                       servers when all other information, such as IP addresses
+                       are the same.
+  loadpath = <modules path> - directory where to load the modules from (-L
+     equivalent); modules can be loaded simply by specifying their name
+     (loadmodule "maxfwd")
+  tcp_fd_cache = yes | no (default yes) - if enabled FDs used for sending
+     will be cached inside the process calling tcp_send (performance increase
+     for sending over tcp at the cost of slightly slower connection closing and
+     extra FDs kept open)
+  tcp_async = yes | no (default yes) - if enabled all the tcp  writes that 
+     would block / wait for connect to finish, will be queued and attempted
+     latter (see also tcp_conn_wq_max and tcp_wq_max).
+  tcp_buf_write = obsoleted synonim for tcp_async
+  tcp_conn_wq_max = bytes (default 32 K) - maximum bytes queued for write 
+     allowed per connection. Attempting to queue more bytes would result
+     in an error and in the connection being closed (too slow). If 
+     tcp_write_buf is not enabled, it has no effect.
+  tcp_wq_max = bytes (default 10 Mb) - maximum bytes queued for write allowed
+     globally. It has no effect if tcp_write_buf is not enabled.
+  tcp_defer_accept =  yes | no (default no) on freebsd  / number of seconds
+        before timeout on linux (default disabled) - tcp accepts will be 
+        delayed until some data is received (improves performance on proxies
+        with lots of opened tcp connections). See linux tcp(7) TCP_DEFER_ACCEPT
+        or freebsd ACCF_DATA(0). For now linux and freebsd only.
+        WARNING: the  linux TCP_DEFER_ACCEPT is buggy (<=2.6.23) and doesn't 
+         work exactly as expected (if no data is received it will retransmit 
+         syn acks for ~ 190 s, irrespective of the set timeout and then it will
+         silently drop the connection without sending a RST or FIN). Try to 
+         use it together with tcp_syncnt (this way the number of retrans.
+          SYNACKs can be limited => the timeout can be controlled in some way).
+  tcp_delayed_ack  = yes | no (default yes when supported) - initial ACK for
+        opened connections will be delayed and sent with the first data
+        segment (see linux tcp(7) TCP_QUICKACK). For now linux only.
+  tcp_syncnt = number of syn retr. (default not set) - number of SYN 
+        retransmissions before aborting a connect attempt (see linux tcp(7)
+        TCP_SYNCNT). Linux only.
+  tcp_linger2 = seconds (not set by default) - lifetime of orphaned sockets
+        in FIN_WAIT2 state (overrides tcp_fin_timeout on, see linux tcp(7) 
+        TCP_LINGER2). Linux only.
+  tcp_keepalive = yes | no (default yes) - enables keepalive for tcp.
+  tcp_keepidle  = seconds (not set by default) - time before starting to send
+         keepalives, if the connection is idle. Linux only.
+  tcp_keepintvl = seconds (not set by default) - time interval between 
+         keepalive probes, when the previous probe failed. Linux only.
+  tcp_keepcnt = number (not set by default) - number of keepalives sent before
+         dropping the connection. Linux only.
+  tcp_crlf_ping = yes | no (set by default) - enable CRLF keepalives aka
+         SIP outbound.
+  pmtu_discovery = 0 | 1 (default 0) - set DF bit in outbound IP if enabled
+  dns_srv_lb = yes | no (default no) - enable dns srv weight based load 
+    balancing (see doc/dns.txt)
+  dns_try_naptr = yes | no (default no) - enable naptr support 
+    (see doc/dns.txt for more info)
+  dns_{udp,tcp,tls,sctp}_pref = number - ser preference for each protocol
+    when doing naptr lookups. By default dns_udp_pref=30, dns_tcp_pref=20, 
+    dns_tls_pref=10 and dns_sctp_pref=20. To use the remote site preferences
+    set all dns_*_pref to the same positive value (e.g. dns_udp_pref=1,
+    dns_tcp_pref=1, dns_tls_pref=1, dns_sctp_pref=1). To completely ignore 
+    NAPTR records for a specific protocol, set the corresponding protocol 
+    preference to -1 (or any other negative number).  (see doc/dns.txt for 
+    more info)
+  dns_search_full_match = yes | no (default yes) - when name was resolved 
+    using dns search list, check the domain added in the answer matches with
+    one from the search list (small performance hit, but more safe)
+  mlock_pages = yes |no (default no) - locks all ser pages into memory making 
+    it unswappable (in general one doesn't want his sip proxy swapped out :-))
+  shm_force_alloc = yes | no (default no) - tries to pre-fault all the 
+    shared memory, before starting. When on start time will increase, but
+    combined with mlock_pages will guarantee ser will get all its memory from
+    the beginning (no more kswapd slow downs)
+  real_time = <int> (flags) (default off). - sets real time priority
+     for all the ser processes, or the timers. 
+     Possible values:   0  - off
+                        1  - the "fast" timer
+                        2  - the "slow" timer
+                        4  - all processes, except the timers
+     Example: real_time= 7 => everything switched to real time priority.
+  rt_prio = <int> (default 0) - real time priority used for everything except
+     the timers, if real_time is enabled
+  rt_policy= <0..3> (default 0)- real time scheduling policy, 0 = SCHED_OTHER,
+     1= SCHED_RR and 2=SCHED_FIFO
+  rt_timer1_prio=<int> (default 0) - like rt_prio but for the "fast" timer
+     process (if real_time & 1)
+  rt_timer1_policy=<0..3> (default 0) - like rt_policy but for the "fast" timer
+  rt_timer2_prio=<int> (default 0) - like rt_prio but for the "slow" timer
+  rt_timer2_policy=<0..3> (default 0) - like rt_policy but for the "slow" timer
+  tcp_source_ipv4 = IPv4 address
+  tcp_source_ipv6 = IPv6 address
+    Set the given source IP for all outbound TCP connections.
+    If setting the IP fails the TCP connection will use the default.
+  dns_cache_init = on | off (default on) - if off, the dns cache is not
+    initialized at startup and cannot be enabled runtime, that saves some
+    memory.
+  dst_blacklist_init = on | off (default on) - if off, the blacklist
+    is not initialized at startup and cannot be enabled runtime,
+    that saves some memory.
+
+new script commands:
+  udp_mtu_try_proto(TCP|TLS|SCTP|UDP) - same as udp_mtu_try_proto=... (see
+    above), but works per packet and not globally.
+
+
+build system:
+ - check defines and includes used at compile time and if different 
+   force rebuilding everything in the current dir (creates a new file: 
+   makecfg.lst that stores the compile defines & includes used at compile 
+   time)
+ - make cfg / config support: store the build config in an autogenerated file 
+   (config.mak) and use it for future compiles (e.g.: 
+   make cfg include_modules=mysql skip_modules=print CPU=pentium-m; make all).
+   Main advantages are easier usage and faster builds (e.g. make proper is
+    +16 times faster, make clean ~9 times, make with previously generated
+    config is 2.6 times faster and a make that has nothing to do is ~9 times
+    faster).
+
+
+
+
+2.0.0 changes
+
+
+new archs:
+
+
+modules:
+ - tls        - new module that enables tls support (set enable_tls=yes
+                in the config file and load the tls module)
+ - ctl        - new  fifo/unixsocket/xmlrpc like module, using a space 
+                efficient binary encoding for the requests.
+                It supports multiple clients on tcp, udp, unix stream or
+                unix datagram modes. By default (no modparams) it opens
+                one unix stream control socket in /tmp/ser_ctl.
+                It also includes extended fifo support: multiple fifos,
+                fifo over tcp, udp and unix sockets (see ctl/ctl.cfg).
+                Use utils/sercmd/sercmd to send commands to it.
+ - dispatcher - added hashing after request uri and to uri
+              - added a new flag parameter which can be used (for now) to
+                select only the username or the username, host and port when
+                hashing after an uri (to, from or request uri)
+              - improved uri hashing (password is ignored, port is used only
+                if != 5060 or 5061)
+ - tm        - aggregate challenges (WWW/Proxy-Authenticate) from all the
+               401 & 407 if the final reply is a 401/407. To turn this off
+               and fall back to the old behaviour set tm aggregate_challenges
+               parameter to 0.
+             - if a relayed 503 is the final reply, replace it by a 500
+             - if a 503 reply is received try the dns based failover
+               (forward to another ip if the original destination uri 
+                resolved to several SRV, A or AAAA records)
+             - on 6xx immediately cancel all the branches for which a 
+               provisional response was received and wait for all the 
+               branches to finish (either timeout, the 487 from the CANCEL
+               or a final response still on the wire in the moment the
+               CANCEL was sent)
+             - better final reply selection: 6xx is preferred over other 
+               negative replies; from several 4xx prefer 401, 407, 415, 420,
+               484 (in this order). For all the other cases, return the lowest
+               code (as before)
+             - special functions for checking for timeout, if a reply was
+               received or if the current transaction was canceled
+             - dns failover and dst blacklist support
+             - migrated to the new timers (tm timers completely rewritten)
+             - improved speed and less memory usage
+             - much more precise retransmissions timing
+             - params: - retr_timer1p1, retr_timer1p2, retr_timer1p3 removed
+                         and replaced by retr_timer1 and retr_timer2
+                       - all timer values are now expressed in milliseconds
+                         (they were in seconds before).
+                         Affected params: fr_timer, fr_inv_timer, wt_timer,
+                         delete_timer, retr_timer1, retr_timer2
+                       - retr_timer1 (first retransmission) changed to 500 ms
+                       - delete_timer changed to 200 ms
+                       - unix_tx_timeout expressed now in milliseconds; default
+                         value changed to 500 ms
+             - functions:
+                       - t_branch_timeout() -- returns true if the failure
+                         route is executed for a branch that did timeout
+                         (failure_route only).
+                       - t_branch_replied() -- returns true if the failure 
+                         route is executed for a branch that did receive at
+                         least one reply in the past (the current reply 
+                          is not taken into account). It can be used
+                         together with t_branch_timeout() to distinguish 
+                         between a remote side that doesn't respond (some 
+                         provisional reply received) and one that is completely
+                          dead. (failure_route only)
+                       - t_any_timeout() -- returns true if any of the current
+                         transaction branches did timeout.
+                       - t_any_replied() -- returns true if at least one branch
+                          of the current transaction received one reply in the
+                          past. If called from a failure_route or an
+                          onreply_route, the "current" reply is not taken into
+                          account.
+                       - t_is_canceled() -- returns true if the current 
+                         transaction  has been canceled.
+                       - new t_set_fr(timeout_fr_inv, timeout_fr) -- allows
+                         changing the transaction timer from script, even if
+                         the transaction was already created (see tm docs for
+                         more).
+            - t_relay will not stop script execution anymore in case of
+              send error
+ - textops  - search() can be used in the onsend_route where it will search
+              on the "new" message (after applying all script changes, adding
+              Vias a.s.o) and not on the original message
+ 
+core:
+ - compiled by default with tls hooks support (so that no recompile is
+   needed before loading the tls module and enabling the tls support)
+ -  enable_tls config option added (the reverse of disable_tls)
+ - added STUN keep-alive functionality in accordance with 
+   draft-ietf-behave-rfc3489bis-04.txt
+ - dns cache and dns failover support added (see doc/dns.txt)
+ - destination blacklist added -- destinations to which forwarding fails
+   (send error, tm timeout a.s.o) are temporarily added to a blacklist which 
+    is consulted before each send => faster send error detection
+    in the near future (see doc/dst_blacklist.txt)
+ - default log level switched to 0 (only messages < L_WARN will be printed
+   by default)
+ - separate memdbg log level which controls the memory/malloc related
+   debug messages (to see them ser must be compiled with malloc debuging:
+     -DDBG_QM_MALLOC or -DDBG_FM_MALLOC and memdbg must be <= debug )
+ - added named routes: names can be used instead of numbers in all the
+   route commads or route declarations. route(number) is equivalent to
+   route("number").
+   Example:
+     route("test");
+      route["test"]{
+           ...
+     }
+ - added named flags, declared at the beginning of the config file with:
+     flags  flag1_name[:position],  flag2_name ...
+   Example:
+       flags test, a:1, b:2 ;
+       route{
+              setflag(test);
+              if (isflagset(a)){ # equiv. to isflagset(1)
+                ....
+              }
+              resetflag(b);  # equiv. to resetflag(2) 
+ - added return [val] which returns from a route. if no value is specified, or
+   a route reaches its end without executing a return statement, it returns 1.
+   If return is used in the top level route is equivalent with exit [val].
+ - drop /exit [n] now will end the script execution
+   exit n will exit with code n (usefull in onreply/onsend routes where
+   if script code !=0 a reply is generated/the message is sent or to force
+   script errors)
+ - added $? which can be used to check the return code of the last executed
+   route{} (e.g. route(1); if ($?==1){ /* ... */}else if ($?==2) ... )
+ - onsend_route added: special route executed before a request is sent.
+                       Only a limited number of commands are allowed (drop, if
+                       + all the checks, msg flag manipulations, send(), log(),
+                       textops::search()). In this route the final destination
+                       of the message is available an can be checked (with
+                       snd_ip, snd_port, to_ip, to_port, snd_proto, snd_af).
+                       This route is executed only when forwarding requests.
+                       It's not executed for replies, retransmissions, or
+                       locally generated messages (e.g. via fifo uac).
+      short example:
+            onsend_route{  if(to_ip==1.2.3.4 && !isflagset(12)){
+                              log(1, "message blocked\n");
+                              drop;
+                           }
+                         }
+ - onsend_route specific checks:
+     - snd_ip, snd_port - behave like src_ip/src_port, but contain the
+       ip/port ser will use to send the message
+     - to_ip, to_port - like above, but contain the ip/port the message will
+       be sent to (not to be confused with dst_ip/dst-port, which are the
+       destination of the original message: ser's ip and port on which the
+       message was received)
+     - snd_proto, snd_af - behave like proto/af but contain the 
+       protocol/address family that ser will use to send the message
+     - msg:len - when used in an onsend_route, msg:len will contain the length
+       of the message on the wire (after all the changes in the script are
+       applied, Vias are added a.s.o) and not the lentgh of the original 
+       message
+ - timer: - improved performance/precision, new api, see doc/timers.txt 
+ - tcp: - improved  performance (io event handling), using OS specific
+           optimizations
+        - 1024 connections limit removed (see tcp_max_connections)
+-  resolver: - timeouts, retries a.s.o can now be set from ser.cfg
+             (see below dns_* and man resolv.conf(6)).
+             The maximum time a dns request can take (before failing) is:
+              (dns_retr_time*dns_retr_no)*(search_list_domains)
+             If dns_try_ipv6 is yes, mutliply it again by 2.
+             The fastest possible dns config (max 1s):
+                dns_try_ipv6=no
+                dns_retr_time=1
+                dns_retr_no=1
+                dns_use_search_list=no
+- default on reply route added: onreply_route {.. } will add a default 
+    onreply route that will be executed for any reply (usefull to catch
+    replies without using tm)
+- branch_routes added (tm triggered), only a very limited number of commands
+   are available (see tm docs)
+- avps directly accessible from script with %avp_name (variable style)
+new config variables:
+   enable_tls/disable_tls = enable/disable tls support, default disable.
+       Note: a tls "engine" is still needed (e.g. the tls module must
+              be loaded, enable_tls by itself is not enough).
+   exit_timeout = seconds - how much time ser will wait for all the shutdown
+       procedures to complete. If this time is exceeded, all the remaining
+       processes are immediately killed and ser exits immediately (it might
+       also generate a core dump if the cleanup part takes too long).
+       Default: 60 s. Use 0 to disable.
+   stun_refresh_interval = number in millisecond (default 0); value for 
+      attribute REFRESH INTERVAL
+   stun_allow_stun = 0 | 1 (off | on - default 1); use STUN or not if compiled
+   stun_allow_fp = 0 | 1 (off | on - default 1); use FINGERPRINT attribute
+   use_dns_cache = on | off  (default on)  
+   use_dns_failover = on | off (default off)
+   dns_cache_flags = number (default 0)
+   dns_cache_negative_ttl = number in seconds (default 60)
+   dns_cache_min_ttl = time in seconds (default 0)
+   dns_cache_max_ttl = time in seconds (default MAXINT)
+   dns_cache_mem = maximum memory used for the dns cache in Kb (default 500 K)
+   dns_cache_gc_interval = interval in seconds after which the dns cache is
+      garbage collected (default: 120 s)
+   use_dst_blacklist = on | off (default off)
+   dst_blacklist_expire = time in s (default 60)
+   dst_blacklist_mem = maximum memory used for the blacklist in Kb (default 250
+      K)
+   dst_blacklist_gc_interval = interval in seconds after which the destination 
+      blacklist is garbage collected (default 60)
+   tos = number  - ip type of service (TOS) value
+   dns_try_ipv6 = yes/no - if yes and a dns lookup fails, it will retry it
+      for ipv6 (AAAA record). Default: yes
+   dns_retr_time = time - time in s before retrying a dns request.
+      Default: system specific, depends also on the/etc/resolv.conf content
+      (usually 5s).
+   dns_retr_no = no. - number of dns retransmissions before giving up.
+      Default: see above (usually 4)
+   dns_servers_no = no. - how many dns servers from the ones defined in 
+      /etc/resolv.conf will be used. Default: all of them.
+   dns_use_search_list= yes/no - if no, the search list in /etc/resolv.conf
+      will be ignored (=> fewer lookups => gives up faster). Default: yes.
+      HINT: even if you don't have a search list defined, setting this option
+      to "no" will still be "faster", because an empty search list is in 
+      fact search "" (so even if the search list is empty/missing there will
+      still be 2 dns queries, eg. foo+'.' and foo+""+'.')
+   tcp_connection_lifetime = value (s) - how long the lifetime of a
+      tcp connection will be exteneded after an IO event (accept, connect, 
+      read, write). Default: 120 s.
+   tcp_poll_method = poll|select|sigio_rt|epoll_et|epoll-lt|kqueue|devpoll - 
+      poll method used (by default the best one for the current OS is selected)
+   tcp_max_connections = no. - maximum number of tcp connections (if the number
+      is exceeded no new tcp connections will be accepted). Default: 2048.
+
+tools:
+  utils/sercmd - command line serctl like tool for interrogating ser ctl
+                 module (uses the binrpc encoding). Supports various
+                 connection methods (udp, tcp, unix stream & datagram sockets),
+                 reply formating (see -f, e.g. sercmd -f "pid:%v %v\n" core.ps)
+                 , interactive mode, command line completion (if compiled with 
+                 libreadline) a.s.o.
+
+WARNING: - older 0.10.99-dev version (< 0.10.99-dev46) returned a 480 reply
+ on invite transaction timeout, if a provisional reply was received. Newer
+ versions reverted to returning 408 on all timeouts (one can use 
+  t_branch_timeout() and t_branch_replied() to distinguish between the two
+  timeout types)
+
+
+
+0.9.4 fixes/improvements (0.9.4 is a bug fix release for 0.9.3)
+ 
+general:
+ - gcc 4.0 support
+ - mutlicast options are set for all the sockets
+ - mediaproxy: memory leak, unchecked memory allocations
+ - postgress: some bugs and cleanups (compiles cleanly now)
+ - tm: shm cloned lumps (SER-55) 
+ - tm: t_fifo: 64-bit fix
+ - tm: dst_uri clone fix
+ - tm: t_newtran/t_restransmit* races  (!)
+ - usloc: memory leak
+
+solaris:
+ - serctl, better ISA detection, signals
+*bsd:
+ - multicast options are properly set
+openbsd:
+ - tcp 64 bit fix
+
+
+
+0.9.3 changes
+
+
+new archs:
+ - alpha experimental support
+ - mips2/cobalt experimental support
+ - x86_64 support
+ - OS X (darwin) support
+ - sparc32 single cpu highly experimental support
+ - ppc64 support
+
+modules:
+ - enum - support for more than one NAPTR
+ - msilo - explicit multidomain support -- recipient's user ID is stored in
+   the columns username and domain -- r_uri column kept for compatibility
+   reasons (will be removed in future) but not filled by this version of
+   module
+ - mysql - implements a connection pool, all modules will use same connection
+   to access the database
+ - nathelper received port  test (flag 16 for nat_uac_test): compares the
+   source port of the message with sip port in the first Via and returns
+   true if different.
+ - permsions - support for multiple allow/deny files, allow_register function
+ - TM has a new parameter: restart_fr_on_each_reply. If set (default)
+   fr_inv timer will be restarted for each provisional reply, if not set
+   it will be restarted only for the first reply and for replies >=180
+   (but only if increasing, eg.: 180, 181 ...). Usefull when dealing with bad
+   UAs that re-transmit 180s.
+ - TM saves the avp list into transactions, and make it available into
+   callbacks, failure and reply routes.
+ - TM contains new command - t_write_unix("/tmp/sems.sock", "announcement")
+   sends a message using unix socket interface instead of FIFO interface.
+ - TM contains new config variable - unix_tx_timeout -- it specifies the
+   transmit timeout of t_write_sock
+ - VM functionality was transfered into TM module. Instead of fetching the
+   email value from DB (as VM), TM looks for the "email" attribute to get the
+   value.
+   vm() function was replaced with t_write_req()
+   vm_reply() fifo functions was replcated by TM with t_reply() fifo function
+   NOTE!! because current version of SEMS/AA try to send reply via vm_reply,
+   it will not work with the TM version.
+ - xlog - printing the body of any header by specifying the name; new
+   specifiers for user-agent, message buffer, message length, message's flags,
+   message id.
+
+new modules:
+ - avp / avp_db / avp_radius - load and check avps per caller or callee
+ - avpops - flexible module for operations with avps and database, introducing
+   a pseudo-varible support in SER configuration file
+ - cpl-c - implementation of Call Processing Language
+ - dispatcher - implements a dispatcher for incoming requests using hashes
+   over parts of the request to select the destination
+ - diversion - implements the Diversion extensions as per 
+   draft-levy-sip-diversion-08
+ - flatstore - simple module that implements very fast inserts for accounting
+   purposes
+ - gflags - keeps a bitmap of flags in shared memory and may be used to change
+   behaviour of server based on value of the flags
+ - options - answer server options requests
+ - speeddial - provides on-server speed dial facilities
+ - uri_db - split from uri module, performs various checks related to SIP URI
+   over database fields
+
+removed modules:
+ - vm - the functionality was transfered to tm module (see t_write_req(...)
+   method)
+
+core:
+ - new parts:
+       UNIX domain socket server implemented
+ - changes: 
+    - command line: removed -p port and extended -l:
+       -l [proto:]addr[:port] , where proto=udp|tcp and 
+       addr= host|ip_address|interface_name. The format is the same
+       as for listen in the config file. ipv6 addresses must be enclosed in
+       [].
+    - added from_uri & to_uri: behave exactly like uri but use the
+      "From:"/"To:" uris
+       (e.g.: if (from_uri==myself) ..., if (to_uri=~"^sip:test@")... )
+    - config: better escape support in strings (e.g. \", \<cr>, \x0a, \012)
+    - bad network addresses are now automatically fixed
+      (e.g. 192.168.1.80/27 => 192.168.1.64/27)
+    - avp (Attribute-Value Pair) support added
+    - avp alias support added
+    - multicast support added (see mcast_loopback & mcast_ttl)
+    - saving of procces group id enabled, if the -G option is specified
+      (a safe way to quickly kill all ser processes)
+    - core dump-ing is enabled by default, see also disable_core_dump
+    - protocol and port can be specified in the alias and listen lines, e.g.:
+        alias= tcp:foo.bar:* udp:test.bar:5080 foo.com
+        listen= eth0   tcp:eth0:5065 udp:127.0.0.1 [3ffe::1]
+    - multiple operator support: ==, != for special operations (e.g myself, ip)
+                              ==, !=, ~= for strings
+                              ==, !=, >, <, >=, <= for integers
+    - database api changed to support usage of different drivers
+      simultaneously. The database URL must start now with the name of the
+      driver (module). Example: for mysql the DB URL
+      'sql://user:password@dbhost:port/database' must be specified now as
+      'mysql://user:password@dbhost:port/database'
+ - new config variables:
+   mcast_loopback = <yes/no> - loopback sent multicast datagram, default no.
+   mcast_ttl = number - set multicast ttl, default OS specific (usually 1).
+   sock_mode = <permissions> (e.g. sock_mode=0600:  default value = 0660)
+       ser unix sockets and fifo will be created with this permissions
+       (old name fifo_mode is still supported, but deprecated)
+   sock_user = username|"uid"
+   sock_group = groupname|"gid"
+      change the owner and/or group of the ser unix sockets or fifo
+      Short example config snippet:
+           sock_mode=0600        # ser socket/fifo mode
+           sock_user="www-data"  # ser socket/fifo owner
+           sock_group=nogroup  
+           user=nobody       # ser user (ser will suid to it)
+   disable_core_dump= yes|no 
+       by default core dump limits are set to unlimited or a high enough
+       value, set this config variable o yes to disable core dump-ing
+       (will set core limits to 0)
+   open_files_limit= number
+       if set and bigger than the current open file limit, ser will try
+       to increase its open file limit to this number. Note: ser must be
+       started as root to be able to increase a limit past the hard limit
+       (which, for open files, is 1024 on most systems)
+   tcp_connect_timeout= seconds
+       time before an ongoing connect will be aborted
+   tcp_send_timeout= seconds
+       time after a tcp connection will be closed if it is not available 
+       for writing in this interval (and ser wants to send something on it)
+   tcp_accept_aliases= yes|no
+       if a message received over a tcp connection has "alias" in its via
+       a new tcp alias port will be created for the connection the message
+       came from (the alias port will be set to the via one).
+       Based on draft-ietf-sip-connect-reuse-00.txt, but using only the port
+       (host aliases are too dangerous IMHO, involve extra DNS
+        lookups and the need for them is questionable)
+       See force_tcp_alias for more details.
+   log_facility = LOG_LOCAL0
+       if ser logs to syslog, you can control the facility for logging. Very
+       useful when you want to divert all ser logs to a different log file.
+       See man page syslog(3) for more detailes.
+   unix_sock = "/tmp/ser.sock"
+       The name of the socket the unixsock server should listen on.
+   unix_sock_children = 1
+       The number of children that will listen on the unix domain socket.
+   unix_tx_timeout = 2000
+       Timeout (in ms) used when sending replies through unix sockets.
+ - new script commands:
+   force_send_socket([proto:]address[:port])
+       sends the message from the specified socket (it _must_ be one of the
+       sockets ser listens on). If the protocol doesn't match (e.g. udp
+       message "forced" to a tcp socket) the closest socket of the same
+       protocol is used.
+   force_tcp_alias()
+   force_tcp_alias(port)
+       adds a tcp port alias for the current connection (if tcp).
+       Usefull if you want to send all the trafic to port_alias through
+       the same connection this request came from [it could help 
+       for firewall or nat traversal].
+       With no parameters adds the port from the message via as the alias.
+       When the "aliased" connection is closed (e.g. it's idle for too
+       much time), all the port aliases are removed.
+       Note: by default ser closes idle connection after 3 minutes (stable)
+       or 1 minute (unstable) so to take full advantage of tcp aliases for
+       things like firewall and nat traversal, redefine TCP_CON_*TIMEOUT
+       in tcp_conn.h and recompile. Also right now there can be maximum
+       3 port aliases to a connection (you shouldn't need more than one).
+       To change this redefine TCP_CON_MAX_ALIASES in the same file
+       (set it to you desired value + 1; 1 is needed for the real port).
+
+utilities:
+ - ngrep patch for displaying new lines in captured SIP messages is no longer
+   needed; use ngrep V 1.42 with the option "-W byline"
+
+
+
+***********************************************
+* Changes/fixes introduced in 0.8.12
+***********************************************
++--------------------------------------------------------+
+| WARNING: if you want to use a 0.8.11 config script     |
+| with 0.8.12, replace if ( len_gt(number) ) with:       |
+|                      if ( msg:len > bumber )           |
++--------------------------------------------------------+
+
+New Features
+============
+
+texops:
+ - subst('s/re/repl/flags') support
+core:
+ - added switch to check the config file (-c)
+ - changes: removed len_gt() and replaced with if (msg:len op number|max_len)
+ - multiple operator support: ==, != for special operations (e.g myself, ip)
+                              ==, !=, ~= for strings
+                              ==, !=, >, <, >=, <= for integers
+ - new config variables:
+     advertised_address= ip | string
+       address advertised in via and in the DST_* lumps (e.g RR)
+       This is the default value, if empty (default) the socket
+       address will be used.
+       WARNING: - don't set it unless you know what you are doing
+                 (e.g. nat traversal)
+               - you can set anything here, no check is made
+                (e.g. foo.bar will be accepted even if 
+                 foo.bar doesn't exist)
+    advertised_port= no
+       port advertised in via and in the DST_*lumps (e.g. RR)
+       This is the default value, if empty (default) the socket
+       port will be used.
+       Same warnings as above.
+ - new script commands:
+    set_advertised_address(ip|string)
+       same as advertised_address but it affects only the current message:
+       Message host/lump address= the set_advertised one if
+       present, else advertised_address else socket address.
+    set_advertised_port(no)
+       same as advertised_port but it affects only the current
+       message; see set_advertised_address & s/address/port/g
+
+usrloc:
+ - usernames are case insensitive
+ 
+registrar:
+ - lookup function succeeds when appending of a branch failed
+
+auth_db:
+ - support for rpid stored in database (thanks to Jakob Schlyter)
+
+Bug fixes
+=========
+- memory leak in digest credentials parser fixed
+- authenticathion ha1 didn't include domain if username was of the form
+  user@domain and calculate_ha1 was set to yes (modules/auth_db)
+- tm reply processing race condition (modules/tm), special thanks go to
+ Dong Liu
+- Many bugs in pa module fixed, works with registrar again.
+ 
+Security updates
+================
+ 
+- fifo processing code will write responses only to other
+ fifos and only if they are not hard-linked, also default
+ ser fifo persmissions were changed to 0600.
+                                                                                
+Performance improvements
+========================
+- tuned internal malloc implementation parameters to better reflect the
+actual workload (malloc is a little bit faster now)
+
+
+
+***********************************************
+* Changes introduced in 0.8.11
+***********************************************
+
++--------------------------------------------------------+
+| CAUTION: the 0.8.11 release include changes which      |
+| are incompatible with scripts and databases used       |
+| in previous versions. Care is advised when upgrading   |
+| from previous releases to 0.8.11.                      |
++--------------------------------------------------------+
+
+New features
+=============
+- RFC3261 support
+    - TCP support and cross-transport forwarding [core]
+    - loose routing support [rr module]
+- New modules
+    - vm -- voicemail interface [vm]
+    - ENUM support [enum]
+    - presence agent [pa]
+    - dynamic domain management -- allows to manipulate 
+      hosting of multiple domains in run-time [module]
+    - flat-text-file database support [dbtext]
+    - rich access control lists [permissions]
+- Feature Improvements
+    - click-to-dial, which is based on improved tm/FIFO 
+      that better supports external applications [tm module]
+    - web accounting -- acc module can report to serweb
+        on placed calls [acc module]
+    - improved exec module (header fields passed now
+      as environment variables to scripts) [exec module]
+- Architectural Improvements
+    - powerpc fast locking support
+    - netbsd support
+    - 64 bits arch. support (e.g. netbsd/sparc64).
+- New Experimental Features (not tested at all yet)
+    - nathelper utility for Cisco/ATA NAT traversal [nathelper]
+    - another NAT traversal utility [mangler]
+    - postgress support [postgress]
+    - fcp module [fcp]
+    - pdt module (prefix2domain) [pdt]
+
+Changes to use of ser scripts
+=============================
+
+About Multiple Transport Support
+--------------------------------
+SER now suports multiple transport protocols: UDP and TCP. As there
+may be UAs which support only either protocol and cannot speak to
+each other directly, we recommend to alway record-route SIP requests,
+to keep the transport-translating SER in path. Also, if a destination
+transport is not known, stateful forwarding is recommended -- use of
+stateless forwarding for TCP2UDP would result in loss of reliability.
+
+
+core
+----
+- reply_route has been renamed to failure_route -- the old name caused
+  too much confusion
+- forward_tcp and forward_udp can force SER to forward via specific
+  transport protocol
+
+acc module:
+-----------
+- radius and sql support integrated in this module; you need to
+  recompile to enable it
+- acc_flag is now called log_flag to better reflect it relates
+  to the syslog mode (as opposed to sql/radius); for the same
+  reasons, the accounting action is now called "acc_log_request"
+  and the option for missed calls "log_missed_calls"
+- log_fmt allows now to specify what will be printed to syslog
+
+auth module:
+------------
+- auth module has been split in auth, auth_db, auth_radius, group
+  group_radius, uri and uri_radius 
+- all the parameters that were part of former auth module are now 
+  part of auth_db module
+- auth_db module contains all functions needed for database
+  authentication
+- auth_radius contains functions needed for radius authentication
+- group module contains group membership checking functions
+- group_radius contains radius group membeship checking functions
+- is_in_group has been renamed to is_user_in and places to groups
+  module
+- check_to and check_from have been moved to the uri module
+ 
+
+im module:
+----------
+- im is no longer used and has been obsoleted by TM
+
+exec module:
+------------
+- exec_uri and exec_user have been obsoleted by exec_dset; 
+  exec_dset is identical to exec_uri in capabilities; it 
+  additionaly passes content of request elements (header 
+  fields and URI parts) in environment variables; users of 
+  exec_user can use exec_dset now and use the "URI_USER"  
+  variable to learn user part of URI
+- exec_dset and exec_msg return false, if return value of 
+  script does not euqal zero
+- exec_dset takes an additional parameter, which enables 
+  validation of SIP URIs returned by external application
+
+jabber module:
+--------------
+- presence support for Jabber users is enabled loading the PA
+  module and using handle_subscribe("jabber") for SUBSCRIBE 
+  requests to jabber user 
+
+msilo module:
+-------------
+- m_store has now a parameter to set what should be considered
+  for storing as destination uri. This enables support for saving
+  the messages on negative replies.
+
+radius_acc module:
+------------------
+- radius_acc module has been removed and radius accounting 
+  is now part of acc module
+
+registrar/usrloc modules:
+-------------------------
+- multi domain support, the modules user username@domain as AOR
+  if enabled
+- descent modification time ordering of contacts
+- case sensitive/insensitive comparison of URI can be enabled
+
+rr module:
+----------
+- addRecordRoute has been replaced with record_route
+- rewriteFromRoute has been replaced with loose_route()
+- a new option, "enable_full_lr" can be set to make life
+  with misimplemented UAs easier and put LR in from "lr=on"
+- rr module can insert two Record-Route header fields when
+  necesarry (disconnected networks, UDP->TCP and so on)
+
+tm module:
+----------
+- t_reply_unsafe, used in former versions within reply_routes,
+  is deprecated; now t_reply is used from any places in script
+- t_on_negative is renamed to t_on_failure -- the old name just
+  caused too much confusion
+- FIFO t_uac used by some applications (like serweb) has been
+  replaced with t_uac_dlg (which allows easier use by dialog-
+  oriented applications, like click-to-dial) 
+- if you wish to do forward to another destination from 
+  failure_route (reply_route formerly), you need to call t_relay
+  or t_relay_to explicitely now
+- t_relay_to has been replaced with t_relay_to_udp and t_relay_to_tcp
+

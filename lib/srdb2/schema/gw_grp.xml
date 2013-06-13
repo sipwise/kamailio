@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE table PUBLIC "-//iptel.org//DTD DBSchema V1.0//EN"
+  "http://iptel.org/dbschema/dtd/1.0/dbschema.dtd" [
+
+<!ENTITY % entities SYSTEM "entities.xml">
+%entities;
+
+]>
+
+<table>
+  <name>gw_grp</name>
+  <version>2</version>
+
+  <column id="gw_grp.id">
+	<name>grp_id</name>
+	<type>int</type>
+	<type db="mysql">INT AUTO_INCREMENT</type>
+	<type db="postgres">SERIAL</type>
+	<type db="dbtext">int,auto</type>
+  </column>
+
+  <column>
+	<name>grp_name</name>
+	<type>string</type>
+	<size>64</size>
+  </column>
+
+  <index>
+	<name>gwgrp_idx</name>
+	<unique/>
+	<colref linkend="gw_grp.id"/>
+  </index>
+</table>

@@ -1,0 +1,91 @@
+Standalone libraries:
+---------------------
+
+binrpc - A library that provides common interface for different communication
+         methods (UNIX sockets, TCP, UDP) using binary RPC as a transport form 
+         of data. The interface is documented directly in binrpc_api.h file and 
+         can by generated into HTML form by using Doxygen. There is no 
+         difference between compilation "with" or "without" SER (see compilation
+         section below).
+
+Libraries common to modules:
+---------------------------
+
+cds - Common Data Structures (basic string operations, dynamic string,
+      vector, message queue, ...)
+
+presence - Library holding common structures and functions abaut presence
+           (API for internal subscriptions, common presence structures,
+           common presence data formats)
+           requires internal libraries: cds
+
+xcap - Common XCAP operations and structures (XCAP authorization documents
+       and XCAP resource lists processing)
+       requires external libraries: libxml2, libcurl3 (nonSER version)
+       requires internal libraries: cds
+
+shm_regex - Wrapper functions for regcomp, regexec, regfree and regerror
+	    using shared memory. See 'man regex' for details.
+
+Used by modules: pa, rls, dialog, rpa
+
+trie - Common digit trie implementation for prefix matching, used by
+       carrierroute and userblacklist
+
+Used by IMS modules: icscf, usrloc_scscf, usrloc_pcscf, registrar_scscf, registrar_pcscf
+
+ims - IMS extensions helpers. Generally just getters.
+
+Usage:
+-----
+
+All libraries except shm_regex can be compiled "with ser" or "without ser".
+Compilation without ser may be useful for debugging purposes or for example for 
+searching for memory leaks with some tool like valgrind.
+shm_regex library can be compiled only with ser.
+
+Compilation with ser:
+--------------------
+
+Compilation and installation of these libraries is NOT DONE by running
+main ser makefile now - it MUST be done MANUALLY. To compile and install
+libraries simply run
+
+   make install
+
+in lib directory. You can select destination directory like in the case
+of ser, for example:
+
+   make install prefix="/my/ser/directory"
+   
+AFTER COMPILATION of libraries you can COMPILE MODULES using this 
+libraries like PA, RLS or dialog.
+
+
+Running with ser (Linux):
+----------------
+
+The path to installed libraries must be known to linker on startup. This
+can be done by setting variable LD_LIBRARY_PATH before running ser. For
+example, if libraries were installed to default directory (/usr/local),
+you should set LD_LIBRARY_PATH=/usr/local/lib/ser. In the case of 
+nonstandard installation, you can use something like 
+LD_LIBRARY_PATH=/my/ser/directory/lib/ser.
+
+Compilation without ser:
+--------------------
+Use the alternate makefile, Makefile.noser:
+
+   make -f Makefile.noser install
+
+Documentation
+-------------
+Documentation for all libraries is (or will be) in 
+docbook-XML format and it is stored in doc directory (for example cds/doc 
+contains documentation for Common Data Structures library).
+
+Documentation can be translated into HTML using a XSLT processor
+which is able to work with "include" directives.
+For example
+   xmlto html cds/doc/cds.xml
+will create HTML documentation for CDS library in current directory.

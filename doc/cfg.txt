@@ -1,0 +1,485 @@
+# $Id$
+#
+# History:
+# --------
+# 2007-12-06:	Created by Miklos
+
+SIP-router Configuration Framework
+
+1. Overview
+===============================================================================
+
+The configuration framework can be used by SIP-router core and by modules,
+to get and set internal variables on-the-fly, and eliminate server restarts
+whenever it is possible.
+
+The core and the modules can declare configuration variables, and can
+retrieve the value of the variables at any time without performance
+overhead. The framework makes sure that the variables do not change
+during the SIP message processing, the child processes see a snapshot
+of the variables with constant values. The variable, that is changed by
+a cfg driver module, will be automatically replaced by the framework
+the next time a SIP message is started to be processed.
+  
+The drivers can change the values of all the variables by names with or
+without the need of commit. That means a kind of transaction support,
+the framework can keep track of the changes (per driver) until they
+are committed or rolled-back.
+
+The framework also supports multiple versions of the core or module
+configurations. Every SIP message processing or timer function starts with
+the default version which can be changed runtime in the script. Hence, even if
+the core/module implements a variable with a single value, it may have multiple
+instances with different values in memory, and the configuration instances can be
+swapped runtime. New instances of a configuration group can be added and deleted
+runtime by the drivers, and all the variables in the group instances take
+the default value unless their value has been explicitely set.
+
+2. Using the framework in a module
+===============================================================================
+
+Make sure that the run-time change of the variable cannot cause troubles.
+You can expect the variable change before a SIP message is processed,
+or before a timer fires, but it will never change during the function
+calls.
+
+1. Include the header file:
+
+#include "../../cfg/cfg.h"
+
+-------------------------------------------------------------------------------
+
+2. Define a structure that contains the variables, the structure name
+must begin with "cfg_group_" followed by the group name: (The group name
+is typically the module name, but a single module can register more than
+one groups as well.)
+
+struct cfg_group_foo {
+	int	i;
+	char	*ch;
+	str	s;
+	void	*p;
+};
+
+-------------------------------------------------------------------------------
+
+3. Set the default values:
+
+static struct cfg_group_foo default_cfg = {
+	-1,
+	"mystring",
+	{"interoperability", 16},
+	NULL,
+};
+
+-------------------------------------------------------------------------------
+
+4. Export the variables over the module interface if you wish:
+
+static param_export_t params[] = {
+	{"i",	PARAM_INT,	&default_cfg.i},
+	{"ch",	PARAM_STRING,	&default_cfg.ch},
+	{"s",	PARAM_STR,	&default_cfg.s},
+	{0, 0, 0}
+};
+
+-------------------------------------------------------------------------------
+
+5. Declare a void* handle that will be used to access the config group:
+
+static void	*cfg_handle = &default_cfg;
+
+-------------------------------------------------------------------------------
+
+6. Describe the structure you defined at step 2 for the framework:
+
+static cfg_def_t cfg_def[] = {
+	{"i", CFG_VAR_INT, -10, 10, 0, 0, "integer for testing"},
+	{"ch", CFG_VAR_STRING, 0, 0, 0, 0, "string for testing"},
+	{"s", CFG_VAR_STR, 0, 0, 0, 0, "str for testing"},
+	{"p", CFG_VAR_POINTER | CFG_INPUT_STRING, 0, 0, fixup_p, fixup_child_p, "pointer for testing"},
+	{0, 0, 0, 0, 0, 0, 0},
+};
+
+Each row consists of the following items:
+
+- name that will be used by the drivers to refer to the variable
+- flag indicating the variable and the input type, that is accepted
+  by the fixup function, and additional optional settings
+
+  Valid variable types are:
+	- CFG_VAR_INT		= int
+	- CFG_VAR_STRING	= char*
+	- CFG_VAR_STR		= str
+	- CFG_VAR_POINTER	= void*
+
+  Valid input types are:
+	- CFG_INPUT_INT		= int
+	- CFG_INPUT_STRING	= char*
+	- CFG_INPUT_STR		= str*
+
+  Optional settings:
+	- CFG_ATOMIC		Indicates that atomic change is allowed:
+				the variable can be changed at any time,
+				there is no need to wait for the SIP
+				message processing to finish.
+				It can be used only with CFG_VAR_INT type,
+				and per-child process callback is not allowed
+
+	- CFG_READONLY		The variable is read-only, its value cannot
+				be changed.
+
+	- CFG_CB_ONLY_ONCE	The per-child process callback is called only once
+				after the changes to the global config have been
+				committed. (The first child process that updates
+				its local config calls the callback, and no other child
+				process does so.)
+				The per-child process cb is intended to be used to
+				update the config variables that are stored outside
+				of the cfg framework. By default this callback is
+				called by all the child processes separately,
+				this can be changed with this flag.
+				Multiple values are not supported together with
+				the CFG_CB_ONLY_ONCE flag.
+
+- minimum value for integers (optional)
+- maximum value for integers (optional)
+- fixup function (optional) that is called when the variable is going to be
+  changed by a driver. The module still uses the old value until the change
+  is committed, and the next SIP message is started to be processed, however
+  the new, not-yet-committed values can be accessed by using the temporary
+  handle within the fixup function. String and str values are cloned to
+  shm memory by the framework. The callback type is:
+
+  typedef int (*cfg_on_change)(void *temp_handle, str *group_name, str *var_name, void **value);
+
+- per-child process callback function (optional) that is called by each child
+  process separately (unless the CFG_CB_ONLY_ONCE flag is set, see above)
+  after the new values have been committed, and the
+  child process is updating its local configuration. The old value will no
+  longer be used by the process. (Useful for fix-ups that cannot be done
+  in shm memory, for example regexp compilation.)
+
+  typedef void (*cfg_on_set_child)(str *group_name, str *var_name);
+
+- description of the variable
+
+-------------------------------------------------------------------------------
+
+7. Declare the configuration group in mod_init:
+
+static int mod_init(void)
+{
+	if (cfg_declare("foo", cfg_def, &default_cfg, cfg_sizeof(foo),
+			 &cfg_handle)
+	) {
+		/* error */
+		return -1;
+	}
+	...
+}
+
+-------------------------------------------------------------------------------
+
+8. The variables can be accessed any time by the group name and handle:
+
+cfg_get(foo, cfg_handle, i)
+cfg_get(foo, cfg_handle, ch)
+cfg_get(foo, cfg_handle, s)
+cfg_get(foo, cfg_handle, p)
+
+
+It is also possible to access the variables of other modules or the core in two
+different ways:
+
+1) For the core: include the header file that declares the cfg_group_*
+structure and the handle for it. Than use the handle of the core to access
+the variable:
+
+#include "../../cfg_core.h"
+cfg_get(core, core_cfg, use_dst_blacklist)
+
+2) For the core, module, or script: access the variables by their group
+and variable name:
+
+#include "../../cfg/cfg_select.h"
+
+struct cfg_read_handle var_bar_j;
+
+in the module init function:
+static int mod_init(void)
+{
+	if ((read_cfg_var_fixup("bar", "j", &var_bar_j)) < 0)
+		return -1;
+	/* Note that the variable may or may not exist at this point
+	 * depending on the module loading order. The fixup will still
+	 * be successful but the variable cannot be read if it has not been
+	 * declared yet. If the variable will not be declared at all
+	 * SER will fail to start
+	 */
+}
+
+int	j;
+if ((read_cfg_var_int(&var_bar_j, &j)) < 0) { error... }
+
+or similarly,
+str	s;
+if ((read_cfg_var_str(&var_bar_j, &s)) < 0) { error... }
+
+2) is a bit slower than 1) because the first solution returns the pointer directly
+to the variable, but 2) offers access also to the configuration of other modules
+and to the variables declared in the script that are not known at compile time.
+
+3. Using the framework in the core
+===============================================================================
+
+There is basically no difference between the modules and the core, the core can
+register any number of groups just like a module. A group called "core" has
+been already registered, have a look at the cfg_core.* files.
+
+
+4. Drivers
+===============================================================================
+
+Drivers can change the values of the configuration variables run-time, they can
+implement RPC calls or database backend for example.
+The framework is multi-process safe, more drivers (or a single driver with
+multiple processes) can modify the configuration at the same time.
+
+1. Create a context for the driver
+
+#include "../../cfg/cfg_ctx.h"
+
+static cfg_ctx_t	*ctx = NULL;
+
+static void on_declare(str *group_name, cfg_def_t *definition)
+{
+	...
+}
+
+static int mod_init(void)
+{
+	if (cfg_register_ctx(&ctx, on_declare)) {
+		/* error */
+		return -1;
+	}
+	...
+}
+
+The callback function, on_declare(), is called every time a new configuration
+group is registered, so the driver has a chance to know which groups and
+variables are present, and can immediately modify them.
+
+-------------------------------------------------------------------------------
+
+2. Get the value of a variable by name:
+
+cfg_get_by_name()
+
+-------------------------------------------------------------------------------
+
+3. Set the value of a variable without the need of explicit commit:
+
+cfg_set_now()
+
+wrapper functions:
+
+cfg_set_now_int()
+cfg_set_now_string()
+
+-------------------------------------------------------------------------------
+
+4. Set the value of a variable, but does not commit the change:
+
+cfg_set_delayed()
+
+wrapper functions:
+
+cfg_set_delayed_int()
+cfg_set_delayed_string()
+
+More changes can be done, and committed at once.
+
+-------------------------------------------------------------------------------
+
+5. Commit or roll back the previously prepared changes:
+
+cfg_commit()
+cfg_rollback()
+
+-------------------------------------------------------------------------------
+
+6. Get the description of a variable:
+
+cfg_help()
+
+-------------------------------------------------------------------------------
+
+7. Get the list of group definitions:
+
+void	*h;
+str	gname;
+cfg_def_t	*def;
+
+cfg_get_group_init(&h);
+while(cfg_get_group_next(&h, &gname, &def)) {
+	...
+}
+
+-------------------------------------------------------------------------------
+
+8. Get the list of pending changes that have not been committed yet:
+
+void		*h;
+str		gname, vname;
+void		*old_val, *new_val;
+unsigned int	val_type;
+unsigned int	*group_id;
+
+if (cfg_diff_init(ctx, &h)) return -1;
+while(cfg_diff_next(&h,
+		&gname, &group_id, &vname,
+		&old_val, &new_val,
+		&val_type)
+) {
+	...
+}
+cfg_diff_release(ctx);
+
+-------------------------------------------------------------------------------
+9. Add/delete an instance of an existing group:
+
+cfg_add_group_inst()
+cfg_del_group_inst()
+
+5. Refreshing the configuration
+===============================================================================
+
+There is no need to refresh the configuration in the modules, the core takes
+care of it, unless the module forks a new process that runs in an endless
+loop. In this case, it is the task of the forked child process to periodically
+update its own local configuration the following way:
+
+
+#include "../../cfg/cfg_struct.h"
+
+int mod_init(void)
+{
+	/* register the number of children
+	 * that will keep updating their local
+	 * configuration */
+	cfg_register_child(1);
+}
+
+void loop_forever(void)
+{
+	while(1) {
+		/* update the local config */
+		cfg_update();
+		...
+	}
+}
+
+int child_init(int rank)
+{
+	int	pid;
+
+	pid = fork_process(PROC_NOCHLDINIT, "foo", 1);
+	if (pid == 0) {
+		/* This is the child process */
+
+		/* initialize the config framework */
+		if (cfg_child_init()) return -1;
+
+		loop_forever(); /* never returns */
+	}
+	...
+}
+
+The local configuration must be destroyed only when the child process exits,
+but SER continues running, so the module keeps forking and destroying child
+processes runtime. Calling the configuration destroy function must be the
+very last action of the child process before it exists:
+
+int new_process(void)
+{
+	int	pid;
+
+	pid = fork();
+
+	if (pid == 0) {
+		/* This is the child process */
+
+		/* initialize the config framework
+		 * There is no chance to register the
+		 * number of forked processes from mod_init,
+		 * hence the late version of ...child_init()
+		 * needs to be called.
+		 */
+		if (cfg_late_child_init()) return -1;
+
+		loop_forever(); /* the function may return */
+
+		/* destroy the local config */
+		cfg_child_destroy();
+		exit(0);
+	}
+}
+
+Note, that the configuration should be refreshed even if the module does not
+declare any config variable, because other modules and the core may need the
+up-to-date config.
+
+
+6. Configuration values in the script
+===============================================================================
+
+New configuration values can be declared in the script, the syntax is:
+
+<group_name>.<var_name> = <value> [descr <description>]
+
+The values can be accessed via select calls:
+
+@cfg_get.<group_name>.<var_name>
+
+
+Use the following syntax to set an additional instance of a configuration value:
+
+<group_name>[id].<var_name> = <value>
+
+id is an unsigned integer starting from 0, it does not have to be continuous.
+Note, that not the variables but the entire configuration group can have multiple
+instances, and it is possible to swap the configuration of the entire group at once
+with cfg_select("group_name", id), see the example below:
+
+custom.var1 = 1;
+custom.var2 = "default string";
+
+custom[1].var1 = 15;
+custom[1].var2 = "More specific string";
+
+custom[2].var1 = 3;
+# custom[2].var2 is not set, hence, it will inherit the value of custom.var2.
+# When custom.var2 changes, custom[2].var1 will be also updated.
+
+
+route {
+	# Actual values: var1:1, var2:"default string"
+
+	cfg_select("custom", 1);
+	# Actual values: var1:15, var2:"More specific string"
+
+	cfg_select("custom", 2");
+	# Actual values: var1:3, var2:"default string"
+
+	cfg_reset("custom")
+	# Actual values: var1:1, var2:"default string"
+}
+
+cfg_reset("group_name") can be used to reset the configuration back to the original values.
+The values are automatically reseted before each SIP message is started to be processed, or after
+each timer function execution.
+The above example with custom variables is supported also with module and core configuration
+groups. The only restriction is that variables with CFG_CB_ONLY_ONCE flag cannot have
+multiple values.
+

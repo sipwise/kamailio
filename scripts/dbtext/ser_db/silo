@@ -1,0 +1,1 @@
+mid(int,auto) from_hdr(str) to_hdr(str) ruri(str) uid(str) inc_time(int) exp_time(int) ctype(str) body(str) 

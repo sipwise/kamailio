@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
+<!-- Module User's Guide -->
+
+<chapter>
+	
+	<title>&adminguide;</title>
+	
+	<section>
+	<title>Overview</title>
+	<para>
+		This module provides reimplementation of a few very old functions that
+		used to be in the core and supported only static string or integer parameters.
+		The new versions bring support for dynamic parameters (allowing
+		variables inside the parameters).
+	</para>
+	<para>
+		There are also brand new features, related to core internals, but
+		controlled from configuration file or via control interfaces.
+	</para>
+	<para>
+		Contributions to this module must be done under the BSD license, to
+		follow the requirements of the core contributions.
+	</para>
+	</section>
+
+	<section>
+	<title>Dependencies</title>
+	<section>
+		<title>&kamailio; Modules</title>
+		<para>
+		The following modules must be loaded before this module:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>None</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	<section>
+		<title>External Libraries or Applications</title>
+		<para>
+		The following libraries or applications must be installed before running
+		&kamailio; with this module loaded:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>None</emphasis>
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	</section>
+
+    <section>
+	<title>Parameters</title>
+	<section>
+	    <title><varname>alias_subdomains</varname> (string)</title>
+	    <para>
+		Register a domain and all its sub-domains to match the <quote>myself</quote>
+		condition. It can be set many times. Its full format is:
+		'proto:domain:port', allowing to set restrictions on protocol
+		and port as well. Protocol and port are optional.
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is <quote>NULL</quote>.
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>alias_subdomains</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("corex", "alias_subdomains", "kamailio.org")
+modparam("corex", "alias_subdomains", "udp:sip-router.org:5060")
+...
+</programlisting>
+	    </example>
+	</section>
+	</section>
+
+	<section>
+	<title>Functions</title>
+	<section>
+	    <title>
+		<function moreinfo="none">append_branch([ uri, [ q ] ])</function>
+	    </title>
+	    <para>
+			Append a new branch to the destination set, useful to build the
+			set of destination addresses for parallel forking or redirect replies.
+		</para>
+		<para>
+			Both parameters are optional, If no uri parameter is provided,
+			then the address from request URI (r-uri) is used to build the
+			new branch.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>uri</emphasis> - SIP address of the branch to be
+				used as R-URI in the outgoing request.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>q</emphasis> - the Q value to set the priority
+				of the branch based on Contact address specifications
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from REQUEST_ROUTE or FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>append_branch</function> usage</title>
+		<programlisting format="linespecific">
+...
+    append_branch();
+    append_branch("$avp(uri)", "0.5");
+...
+</programlisting>
+	    </example>
+	</section>
+
+	<section>
+		<title>
+			<function moreinfo="none">send([ host [ :port ] ])</function>
+		</title>
+		<para>
+			Send the original SIP message to a specific destination in stateless
+			mode. No changes are applied to received message, no Via header is
+			added. Host can be an IP address or hostname. Port is optional and
+			defaults to 5060. Used protocol: UDP.
+		</para>
+		<para>
+			The parameter is optional and defaults to the destination URI from
+			the SIP message if left out. Otherwise it's a string parameter
+			(supporting pseudo-variables) in format
+			"<emphasis>hostname</emphasis>" or
+			"<emphasis>hostname</emphasis>:<emphasis>port</emphasis>",
+			where <emphasis>hostname</emphasis>" can also be a numeric IP
+			address.
+		</para>
+		<para>
+			This function can be used from REQUEST_ROUTE or FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>send</function> usage</title>
+		<programlisting format="linespecific">
+...
+	send();
+	send("10.20.15.10");
+	send("sip.example.com:5070");
+	send("$var(res)");
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section>
+		<title>
+			<function moreinfo="none">send_tcp([ host [ :port ] ])</function>
+		</title>
+		<para>
+			This function is identical to <emphasis>send()</emphasis>
+			described above, except that it sends the SIP message using the
+			TCP protocol instead of UDP.
+		</para>
+	</section>
+	</section>
+
+	<section>
+	<title>RPC Commands</title>
+	<section>
+		<title>
+		<function moreinfo="none">corex.list_sockets</function>
+		</title>
+		<para>
+			Print the list of sockets the application is listening on.
+		</para>
+		<para>
+		Example:
+		</para>
+        <programlisting  format="linespecific">
+		&sercmd; corex.list_sockets
+		</programlisting>
+    </section>
+	<section>
+		<title>
+		<function moreinfo="none">corex.list_aliases</function>
+		</title>
+		<para>
+			Print the list of hostname aliases used to match the myself
+			condition.
+		</para>
+		<para>
+		Example:
+		</para>
+        <programlisting  format="linespecific">
+		&sercmd; corex.list_aliases
+		</programlisting>
+    </section>
+    </section>
+</chapter>
+
