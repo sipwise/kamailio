@@ -117,7 +117,7 @@ It dumps the content of pv_cache on json format.
  #include "debugger_act.h"
  #include "debugger_api.h"
  
-@@ -1078,3 +1081,342 @@
+@@ -1078,3 +1081,370 @@
  		return;
  	set_module_debug_level_cb(dbg_get_mod_debug_level);
  }
@@ -288,6 +288,11 @@ It dumps the content of pv_cache on json format.
 +	struct str_list *keys;
 +	struct str_list *k;
 +
++	if(xname==NULL||xname->index.type!=PVT_EXTRA)
++	{
++		return -1;
++	}
++
 +	*jobjr = srjson_CreateArray(jdoc);
 +	if(*jobjr==NULL)
 +	{
@@ -297,12 +302,22 @@ It dumps the content of pv_cache on json format.
 +	item_name->s = xname->name.s;
 +	item_name->len = xname->name.len;
 +	xavp = xavp_get_by_index(&xname->name, 0, NULL);
++	if(xavp==NULL)
++	{
++		LM_ERR("cannot get xavp[%.*s] index 0\n", xname->name.len, xname->name.s);
++		return -1;
++	}
 +	do
 +	{
 +		if(xavp->val.type==SR_XTYPE_XAVP)
 +		{
 +			avp = xavp->val.v.xavp;
 +			jobj = srjson_CreateObject(jdoc);
++			if(jobj==NULL)
++			{
++				LM_ERR("cannot create json object\n");
++				return -1;
++			}
 +			keys = xavp_get_list_key_names(xavp);
 +			if(keys!=NULL)
 +			{
@@ -318,8 +333,11 @@ It dumps the content of pv_cache on json format.
 +				}while(keys!=NULL);
 +			}
 +		}
-+		srjson_AddItemToArray(jdoc, *jobjr, jobj);
-+		jobj = NULL;
++		if(jobj!=NULL)
++		{
++			srjson_AddItemToArray(jdoc, *jobjr, jobj);
++			jobj = NULL;
++		}
 +	}while((xavp = xavp_get_next(xavp))!=0);
 +
 +	return 0;
@@ -379,7 +397,7 @@ It dumps the content of pv_cache on json format.
 +			{
 +				if(_dbg_get_array_avp_vals(msg, &el->spec->pvp, &jdoc, &jobj, &item_name)!=0)
 +				{
-+					LM_ERR("can't get value[%.*s]\n", el->text.len, el->text.s);
++					LM_WARN("can't get value[%.*s]\n", el->text.len, el->text.s);
 +					el = el->next;
 +					continue;
 +				}
@@ -407,8 +425,9 @@ It dumps the content of pv_cache on json format.
 +						continue;
 +						break;
 +					}
++					break;
 +				case -1:
-+					LM_ERR("can't get value[%.*s]\n", el->text.len, el->text.s);
++					LM_WARN("can't get value[%.*s]\n", el->text.len, el->text.s);
 +					el = el->next;
 +					continue;
 +					break;
@@ -418,23 +437,32 @@ It dumps the content of pv_cache on json format.
 +		{
 +			if(pv_get_spec_value(msg, el->spec, &value)!=0)
 +			{
-+				LM_ERR("can't get value[%.*s]\n", el->text.len, el->text.s);
++				LM_WARN("can't get value[%.*s]\n", el->text.len, el->text.s);
 +				el = el->next;
 +				continue;
 +			}
 +			if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE)
 +				&& mask&DBG_DP_NULL){
++				LM_DBG("el->text[%.*s] null\n", el->text.len, el->text.s);
 +				jobj = srjson_CreateNull(&jdoc);
 +			}else if(value.flags&(PV_VAL_INT)){
++				LM_DBG("el->text[%.*s] INT\n", el->text.len, el->text.s);
 +				jobj = srjson_CreateNumber(&jdoc, value.ri);
 +			}else if(value.flags&(PV_VAL_STR)){
++				LM_DBG("el->text[%.*s] INT\n", el->text.len, el->text.s);
 +				jobj = srjson_CreateStr(&jdoc, value.rs.s, value.rs.len);
++			}else {
++				LM_WARN("el->text[%.*s] value[%d] unhandled\n", el->text.len, el->text.s,
++					value.flags);
++				el = el->next;
++				continue;
 +			}
 +			item_name.s = el->text.s;
 +			item_name.len = el->text.len;
 +			if(jobj==NULL)
 +			{
-+				LM_ERR("cannot create json object\n");
++				LM_ERR("el->text[%.*s] empty json object\n", el->text.len,
++					el->text.s);
 +				goto error;
 +			}
 +		}
