@@ -117,7 +117,7 @@ It dumps the content of pv_cache on json format.
  #include "debugger_act.h"
  #include "debugger_api.h"
  
-@@ -1078,3 +1081,370 @@
+@@ -1078,3 +1081,367 @@
  		return;
  	set_module_debug_level_cb(dbg_get_mod_debug_level);
  }
@@ -443,13 +443,10 @@ It dumps the content of pv_cache on json format.
 +			}
 +			if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE)
 +				&& mask&DBG_DP_NULL){
-+				LM_DBG("el->text[%.*s] null\n", el->text.len, el->text.s);
 +				jobj = srjson_CreateNull(&jdoc);
 +			}else if(value.flags&(PV_VAL_INT)){
-+				LM_DBG("el->text[%.*s] INT\n", el->text.len, el->text.s);
 +				jobj = srjson_CreateNumber(&jdoc, value.ri);
 +			}else if(value.flags&(PV_VAL_STR)){
-+				LM_DBG("el->text[%.*s] INT\n", el->text.len, el->text.s);
 +				jobj = srjson_CreateStr(&jdoc, value.rs.s, value.rs.len);
 +			}else {
 +				LM_WARN("el->text[%.*s] value[%d] unhandled\n", el->text.len, el->text.s,
