@@ -117,7 +117,7 @@ It dumps the content of pv_cache on json format.
  #include "debugger_act.h"
  #include "debugger_api.h"
  
-@@ -1078,3 +1081,375 @@
+@@ -1078,3 +1081,377 @@
  		return;
  	set_module_debug_level_cb(dbg_get_mod_debug_level);
  }
@@ -356,6 +356,7 @@ It dumps the content of pv_cache on json format.
 +	srjson_t *jobj = NULL;
 +	char *output = NULL;
 +	str item_name = STR_NULL;
++	static char iname[128];
 +	int result = -1;
 +
 +	memset(_dbg_xavp_dump, 0, sizeof(str*)*DBG_XAVP_DUMP_SIZE);
@@ -371,9 +372,6 @@ It dumps the content of pv_cache on json format.
 +	}
 +	while(el)
 +	{
-+		jobj = NULL;
-+		item_name.len = 0;
-+		item_name.s = 0;
 +		if(!(el->spec->type==PVT_AVP||
 +			el->spec->type==PVT_SCRIPTVAR||
 +			el->spec->type==PVT_OTHER)||
@@ -385,6 +383,10 @@ It dumps the content of pv_cache on json format.
 +			el = el->next;
 +			continue;
 +		}
++		jobj = NULL;
++		item_name.len = 0;
++		item_name.s = 0;
++		iname[0] = '\0';
 +		if(el->spec->type==PVT_AVP)
 +		{
 +			if(el->spec->pvp.pvi.type==PV_IDX_ALL||
@@ -406,6 +408,7 @@ It dumps the content of pv_cache on json format.
 +					el = el->next;
 +					continue;
 +				}
++				snprintf(iname, 128, "$avp(%.*s)", item_name.len, item_name.s);
 +			}
 +		}
 +		else if(el->spec->type==PVT_OTHER&&
@@ -432,6 +435,7 @@ It dumps the content of pv_cache on json format.
 +					continue;
 +					break;
 +			}
++			snprintf(iname, 128, "$xavp(%.*s)", item_name.len, item_name.s);
 +		}
 +		else
 +		{
@@ -462,19 +466,17 @@ It dumps the content of pv_cache on json format.
 +				el = el->next;
 +				continue;
 +			}
-+			item_name.s = el->text.s;
-+			item_name.len = el->text.len;
 +			if(jobj==NULL)
 +			{
 +				LM_ERR("el->text[%.*s] empty json object\n", el->text.len,
 +					el->text.s);
 +				goto error;
 +			}
++			snprintf(iname, 128, "%.*s", el->text.len, el->text.s);
 +		}
 +		if(jobj!=NULL)
 +		{
-+			srjson_AddStrItemToObject(&jdoc, jdoc.root,
-+				item_name.s, item_name.len, jobj);
++			srjson_AddItemToObject(&jdoc, jdoc.root, iname, jobj);
 +		}
 +		el = el->next;
 +	}
