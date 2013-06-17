@@ -1,0 +1,83 @@
+From 69c409e14c568fae45e449122e5b4efbf009bf41 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Sun, 16 Jun 2013 16:39:14 +0200
+Subject: [PATCH] core: added function to get the pv cache table
+
+- pv cache struct moved to header file
+---
+ pvapi.c |   17 ++++++++---------
+ pvar.h  |   16 ++++++++++++++++
+ 2 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/pvapi.c b/pvapi.c
+index 98b3d90..7f5fcc2 100644
+--- a/pvapi.c
++++ b/pvapi.c
+@@ -41,7 +41,6 @@
+ #include "pvar.h"
+ 
+ #define PV_TABLE_SIZE	32  /*!< pseudo-variables table size */
+-#define PV_CACHE_SIZE	32  /*!< pseudo-variables table size */
+ #define TR_TABLE_SIZE	16  /*!< transformations table size */
+ 
+ 
+@@ -58,14 +57,6 @@ typedef struct _pv_item
+ static pv_item_t* _pv_table[PV_TABLE_SIZE];
+ static int _pv_table_set = 0;
+ 
+-typedef struct _pv_cache
+-{
+-	str pvname;
+-	unsigned int pvid;
+-	pv_spec_t spec;
+-	struct _pv_cache *next;
+-} pv_cache_t;
+-
+ static pv_cache_t* _pv_cache[PV_CACHE_SIZE];
+ static int _pv_cache_set = 0;
+ 
+@@ -87,6 +78,14 @@ void pv_init_cache(void)
+ 	_pv_cache_set = 1;
+ }
+ 
++/**
++ *
++ */
++pv_cache_t **pv_cache_get_table(void)
++{
++	if(_pv_cache_set==1) return _pv_cache;
++	return NULL;
++}
+ 
+ /**
+  * @brief Check if a char is valid according to the PV syntax
+diff --git a/pvar.h b/pvar.h
+index c3d7b44..75c4914 100644
+--- a/pvar.h
++++ b/pvar.h
+@@ -226,6 +226,22 @@ int pv_get_intstrval(struct sip_msg *msg, pv_param_t *param,
+ 		pv_value_t *res, int ival, str *sval);
+ 
+ /**
++ * Core PV Cache
++ */
++typedef struct _pv_cache
++{
++	str pvname;
++	unsigned int pvid;
++	pv_spec_t spec;
++	struct _pv_cache *next;
++} pv_cache_t;
++
++#define PV_CACHE_SIZE	32  /*!< pseudo-variables cache table size */
++
++pv_cache_t **pv_cache_get_table(void);
++
++
++/**
+  * Transformations
+  */
+ #define TR_LBRACKET_STR		"{"
+-- 
+1.7.10.4
+

@@ -1,0 +1,26 @@
+From 424691bfae61b00fa6d5f1f75e95fe60bf823526 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Mon, 17 Jun 2013 14:47:56 +0200
+Subject: [PATCH 1/2] core: define PVT_XAVP as type for xavp pseudo-variables
+
+- they may need special handling for debug purposes
+---
+ pvar.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/pvar.h b/pvar.h
+index 75c4914..c35ae94 100644
+--- a/pvar.h
++++ b/pvar.h
+@@ -78,7 +78,7 @@ enum _pv_type {
+ 	PVT_DSTURI,           PVT_COLOR,             PVT_BRANCH,
+ 	PVT_FROM,             PVT_TO,                PVT_OURI,
+ 	PVT_SCRIPTVAR,        PVT_MSG_BODY,          PVT_CONTEXT,
+-	PVT_OTHER,            PVT_EXTRA /* keep it last */
++	PVT_XAVP,             PVT_OTHER,             PVT_EXTRA /* keep it last */
+ };
+ 
+ typedef enum _pv_type pv_type_t;
+-- 
+1.7.10.4
+

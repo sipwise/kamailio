@@ -12,8 +12,10 @@ upstream/debug/0002-core-updated-dprint-api-to-enable-support-for-debug-.patch
 upstream/debug/0003-debugger-option-to-set-debug-level-per-module.patch
 upstream/debug/core-use-pointer-to-pv_spec_t-on-lvalue-union.-Use-p.patch
 upstream/debug/0001-core-don-t-free-pvar-spec-is-reference-to-cache.patch
-upstream/debug/core-Add-pv_cache_dump-function.patch
 upstream/debug/modules-lcr-use-pv_cache_get.patch
+upstream/debug/0001-core-added-function-to-get-the-pv-cache-table.patch
+upstream/debug/0001-core-define-PVT_XAVP-as-type-for-xavp-pseudo-variabl.patch
+upstream/debug/0002-pv-xavp-name-is-marked-as-PVT_XAVP-type.patch
 upstream/debug/modules-debugger-add-dbg_pv_dump-config-function.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch

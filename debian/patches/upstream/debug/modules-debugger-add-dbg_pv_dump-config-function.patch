@@ -37,7 +37,7 @@ It dumps the content of pv_cache on json format.
          4. Functions
  
                4.1. dbg_breakpoint(mode)
-+              4.2. dbg_pv_dump(mask)
++              4.2. dbg_pv_dump([mask] [, level])
  
          5. Exported RPC Functions
  
@@ -53,29 +53,106 @@ It dumps the content of pv_cache on json format.
     4. Functions
  
          4.1. dbg_breakpoint(mode)
-+        4.2. dbg_pv_dump(mask)
++        4.2. dbg_pv_dump([mask] [, level])
  
     5. Exported RPC Functions
  
+@@ -143,7 +146,7 @@
+    startup. You can change the value at runtime without restart, globally
+    or per process.
+ 
+-   Default value is "0" (disabled).
++   Default value is “0” (disabled).
+ 
+    Example 1.1. Set cfgtrace parameter
+ ...
+@@ -155,7 +158,7 @@
+    Control whether every line (global) breakpoint is enabled or disabled
+    at startup.
+ 
+-   Default value is "0" (disabled).
++   Default value is “0” (disabled).
+ 
+    Example 1.2. Set breakpoint parameter
+ ...
+@@ -166,7 +169,7 @@
+ 
+    What log level is to be used to print module-specific messages.
+ 
+-   Default value is "-1" (L_ERR).
++   Default value is “-1” (L_ERR).
+ 
+    Example 1.3. Set log_level parameter
+ ...
+@@ -179,7 +182,7 @@
+    using this setting, you can configure syslog to send debug messages to
+    a separate log channel, like a specific kamailio-debug log file.
+ 
+-   Default value is "NULL" (default from core).
++   Default value is “NULL” (default from core).
+ 
+    Example 1.4. Set log_facility parameter
+ ...
+@@ -190,7 +193,7 @@
+ 
+    String to print before any module-specific messages.
+ 
+-   Default value is "*** cfgtrace:".
++   Default value is “*** cfgtrace:”.
+ 
+    Example 1.5. Set log_prefix parameter
+ ...
+@@ -202,7 +205,7 @@
+    Microseconds to sleep before checking for new commands when waiting at
+    a breakpoint.
+ 
+-   Default value is "100000" (that is 0.1 sec).
++   Default value is “100000” (that is 0.1 sec).
+ 
+    Example 1.6. Set step_usleep parameter
+ ...
+@@ -216,7 +219,7 @@
+    blocking RPC process forever in case the worker process 'forgets' to
+    write back a reply.
+ 
+-   Default value is "200".
++   Default value is “200”.
+ 
+    Example 1.7. Set step_loops parameter
+ ...
 @@ -226,6 +229,7 @@
  4. Functions
  
     4.1. dbg_breakpoint(mode)
-+   4.2. dbg_pv_dump(mask)
++   4.2. dbg_pv_dump([mask] [, level])
  
  4.1. dbg_breakpoint(mode)
  
-@@ -242,6 +246,37 @@
+@@ -242,6 +246,51 @@
          dbg_breakpoint("1");
  ...
  
-+4.2. dbg_pv_dump(mask)
++4.2. dbg_pv_dump([mask] [, level])
 +
-+   Prints the content of pv_cache on json format controled by mask value
-+#define DBG_DP_NULL                     1
-+#define DBG_DP_AVP                      2
-+#define DBG_DP_SCRIPTVAR        4
-+#define DBG_DP_OTHER            8
++   Prints the content of pv_cache on json format. Defaults are mask=31 and
++   level = "L_DBG"
++
++   mask - Controls the content to dump:
++     * 1 - dump null values
++     * 2 - dump avp vars
++     * 4 - dump script vars
++     * 8 - dump xavp vars
++     * 16 - dump DP_OTHER vars
++
++   level - The level that will be used in LOG function. It can be:
++     * L_ALERT - log level -5
++     * L_BUG - log level -4
++     * L_CRIT - log level -3
++     * L_ERR - log level -1
++     * L_WARN - log level 0
++     * L_NOTICE - log level 1
++     * L_INFO - log level 2
++     * L_DBG - log level 3
 +
 +   Example 1.9. dbg_pv_dump usage
 +...
@@ -89,7 +166,7 @@ It dumps the content of pv_cache on json format.
 +$xavp(x=>different) = "foo";
 +$var(empty) = $null;
 +
-+dbg_pv_dump(14);
++dbg_pv_dump(30, "L_DBG");
 +...
 +
 +   Output
@@ -117,7 +194,7 @@ It dumps the content of pv_cache on json format.
  #include "debugger_act.h"
  #include "debugger_api.h"
  
-@@ -1078,3 +1081,377 @@
+@@ -1078,3 +1081,378 @@
  		return;
  	set_module_debug_level_cb(dbg_get_mod_debug_level);
  }
@@ -288,25 +365,21 @@ It dumps the content of pv_cache on json format.
 +	struct str_list *keys;
 +	struct str_list *k;
 +
-+	if(xname==NULL||xname->index.type!=PVT_EXTRA)
-+	{
-+		return -1;
-+	}
-+
 +	*jobjr = srjson_CreateArray(jdoc);
 +	if(*jobjr==NULL)
 +	{
 +		LM_ERR("cannot create json object\n");
 +		return -1;
 +	}
++
 +	item_name->s = xname->name.s;
 +	item_name->len = xname->name.len;
 +	xavp = xavp_get_by_index(&xname->name, 0, NULL);
 +	if(xavp==NULL)
 +	{
-+		LM_ERR("cannot get xavp[%.*s] index 0\n", xname->name.len, xname->name.s);
-+		return -1;
++		return 0; /* empty */
 +	}
++
 +	do
 +	{
 +		if(xavp->val.type==SR_XTYPE_XAVP)
@@ -343,21 +416,24 @@ It dumps the content of pv_cache on json format.
 +	return 0;
 +}
 +
-+#define DBG_DP_NULL			1
-+#define DBG_DP_AVP			2
-+#define DBG_DP_SCRIPTVAR	4
-+#define DBG_DP_OTHER		8
-+
-+int dbg_dump_json(struct sip_msg* msg, pv_elem_p list, unsigned int mask)
++int dbg_dump_json(struct sip_msg* msg, unsigned int mask, int level)
 +{
++	int i;
 +	pv_value_t value;
-+	pv_elem_p el = list;
++	pv_cache_t **_pv_cache = pv_cache_get_table();
++	pv_cache_t *el = NULL;
 +	srjson_doc_t jdoc;
 +	srjson_t *jobj = NULL;
 +	char *output = NULL;
 +	str item_name = STR_NULL;
 +	static char iname[128];
 +	int result = -1;
++
++	if(_pv_cache==NULL)
++	{
++		LM_ERR("cannot access pv_cache\n");
++		return -1;
++	}
 +
 +	memset(_dbg_xavp_dump, 0, sizeof(str*)*DBG_XAVP_DUMP_SIZE);
 +	srjson_InitDoc(&jdoc, NULL);
@@ -370,36 +446,64 @@ It dumps the content of pv_cache on json format.
 +			goto error;
 +		}
 +	}
-+	while(el)
++	for(i=0;i<PV_CACHE_SIZE;i++)
 +	{
-+		if(!(el->spec->type==PVT_AVP||
-+			el->spec->type==PVT_SCRIPTVAR||
-+			el->spec->type==PVT_OTHER)||
-+			!((el->spec->type==PVT_AVP&&mask&DBG_DP_AVP)||
-+			(el->spec->type==PVT_SCRIPTVAR&&mask&DBG_DP_SCRIPTVAR)||
-+			(el->spec->type==PVT_OTHER&&mask&DBG_DP_OTHER))||
-+			(el->spec->trans!=NULL))
++		el = _pv_cache[i];
++		while(el)
 +		{
-+			el = el->next;
-+			continue;
-+		}
-+		jobj = NULL;
-+		item_name.len = 0;
-+		item_name.s = 0;
-+		iname[0] = '\0';
-+		if(el->spec->type==PVT_AVP)
-+		{
-+			if(el->spec->pvp.pvi.type==PV_IDX_ALL||
-+				(el->spec->pvp.pvi.type==PV_IDX_INT&&el->spec->pvp.pvi.u.ival!=0))
++			/*LM_DBG("[%d] el->spec[%d] el->pname[%.*s]\n", i, el->spec.type,
++				el->pvname.len, el->pvname.s);*/
++			if(!(el->spec.type==PVT_AVP||
++				el->spec.type==PVT_SCRIPTVAR||
++				el->spec.type==PVT_XAVP||
++				el->spec.type==PVT_OTHER)||
++				!((el->spec.type==PVT_AVP&&mask&DBG_DP_AVP)||
++				(el->spec.type==PVT_XAVP&&mask&DBG_DP_XAVP)||
++				(el->spec.type==PVT_SCRIPTVAR&&mask&DBG_DP_SCRIPTVAR)||
++				(el->spec.type==PVT_OTHER&&mask&DBG_DP_OTHER))||
++				(el->spec.trans!=NULL))
 +			{
 +				el = el->next;
 +				continue;
 +			}
-+			else
++			jobj = NULL;
++			item_name.len = 0;
++			item_name.s = 0;
++			iname[0] = '\0';
++			if(el->spec.type==PVT_AVP)
 +			{
-+				if(_dbg_get_array_avp_vals(msg, &el->spec->pvp, &jdoc, &jobj, &item_name)!=0)
++				if(el->spec.pvp.pvi.type==PV_IDX_ALL||
++					(el->spec.pvp.pvi.type==PV_IDX_INT&&el->spec.pvp.pvi.u.ival!=0))
 +				{
-+					LM_WARN("can't get value[%.*s]\n", el->text.len, el->text.s);
++					el = el->next;
++					continue;
++				}
++				else
++				{
++					if(_dbg_get_array_avp_vals(msg, &el->spec.pvp, &jdoc, &jobj, &item_name)!=0)
++					{
++						LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
++						el = el->next;
++						continue;
++					}
++					if(srjson_GetArraySize(&jdoc, jobj)==0 && !(mask&DBG_DP_NULL))
++					{
++						el = el->next;
++						continue;
++					}
++					snprintf(iname, 128, "$avp(%.*s)", item_name.len, item_name.s);
++				}
++			}
++			else if(el->spec.type==PVT_XAVP)
++			{
++				if(_dbg_xavp_dump_lookup(&el->spec.pvp)!=0)
++				{
++					el = el->next;
++					continue;
++				}
++				if(_dbg_get_obj_xavp_vals(msg, &el->spec.pvp, &jdoc, &jobj, &item_name)!=0)
++				{
++					LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
 +					el = el->next;
 +					continue;
 +				}
@@ -408,77 +512,51 @@ It dumps the content of pv_cache on json format.
 +					el = el->next;
 +					continue;
 +				}
-+				snprintf(iname, 128, "$avp(%.*s)", item_name.len, item_name.s);
++				snprintf(iname, 128, "$xavp(%.*s)", item_name.len, item_name.s);
 +			}
-+		}
-+		else if(el->spec->type==PVT_OTHER&&
-+			el->spec->pvp.pvn.type==PV_NAME_PVAR)
-+		{
-+			if(_dbg_xavp_dump_lookup(&el->spec->pvp)!=0)
++			else
 +			{
-+				el = el->next;
-+				continue;
-+			}
-+			switch(_dbg_get_obj_xavp_vals(msg, &el->spec->pvp, &jdoc, &jobj, &item_name))
-+			{
-+				case 1: /* empty */
-+					if(!(mask&DBG_DP_NULL))
++				if(pv_get_spec_value(msg, &el->spec, &value)!=0)
++				{
++					LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
++					el = el->next;
++					continue;
++				}
++				if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE))
++				{
++					if(mask&DBG_DP_NULL)
++					{
++						jobj = srjson_CreateNull(&jdoc);
++					}
++					else
 +					{
 +						el = el->next;
 +						continue;
-+						break;
 +					}
-+					break;
-+				case -1:
-+					LM_WARN("can't get value[%.*s]\n", el->text.len, el->text.s);
++				}else if(value.flags&(PV_VAL_INT)){
++					jobj = srjson_CreateNumber(&jdoc, value.ri);
++				}else if(value.flags&(PV_VAL_STR)){
++					jobj = srjson_CreateStr(&jdoc, value.rs.s, value.rs.len);
++				}else {
++					LM_WARN("el->pvname[%.*s] value[%d] unhandled\n", el->pvname.len, el->pvname.s,
++						value.flags);
 +					el = el->next;
 +					continue;
-+					break;
++				}
++				if(jobj==NULL)
++				{
++					LM_ERR("el->pvname[%.*s] empty json object\n", el->pvname.len,
++						el->pvname.s);
++					goto error;
++				}
++				snprintf(iname, 128, "%.*s", el->pvname.len, el->pvname.s);
 +			}
-+			snprintf(iname, 128, "$xavp(%.*s)", item_name.len, item_name.s);
-+		}
-+		else
-+		{
-+			if(pv_get_spec_value(msg, el->spec, &value)!=0)
++			if(jobj!=NULL)
 +			{
-+				LM_WARN("can't get value[%.*s]\n", el->text.len, el->text.s);
-+				el = el->next;
-+				continue;
++				srjson_AddItemToObject(&jdoc, jdoc.root, iname, jobj);
 +			}
-+			if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE))
-+                        {
-+                                if(mask&DBG_DP_NULL)
-+                                {
-+                                        jobj = srjson_CreateNull(&jdoc);
-+                                }
-+                                else
-+                                {
-+                                        el = el->next;
-+                                        continue;
-+                                }
-+			}else if(value.flags&(PV_VAL_INT)){
-+				jobj = srjson_CreateNumber(&jdoc, value.ri);
-+			}else if(value.flags&(PV_VAL_STR)){
-+				jobj = srjson_CreateStr(&jdoc, value.rs.s, value.rs.len);
-+			}else {
-+				LM_WARN("el->text[%.*s] value[%d] unhandled\n", el->text.len, el->text.s,
-+					value.flags);
-+				el = el->next;
-+				continue;
-+			}
-+			if(jobj==NULL)
-+			{
-+				LM_ERR("el->text[%.*s] empty json object\n", el->text.len,
-+					el->text.s);
-+				goto error;
-+			}
-+			snprintf(iname, 128, "%.*s", el->text.len, el->text.s);
++			el = el->next;
 +		}
-+		if(jobj!=NULL)
-+		{
-+			srjson_AddItemToObject(&jdoc, jdoc.root, iname, jobj);
-+		}
-+		el = el->next;
 +	}
 +	output = srjson_PrintUnformatted(&jdoc, jdoc.root);
 +	if(output==NULL)
@@ -486,7 +564,7 @@ It dumps the content of pv_cache on json format.
 +		LM_ERR("cannot print json doc\n");
 +		goto error;
 +	}
-+	LM_DBG("%s\n", output);
++	LOG(level, "%s\n", output);
 +	result = 0;
 +
 +error:
@@ -495,45 +573,106 @@ It dumps the content of pv_cache on json format.
 +
 +	return result;
 +}
+\ No newline at end of file
 --- a/modules/debugger/debugger_api.h
 +++ b/modules/debugger/debugger_api.h
-@@ -37,5 +37,6 @@
+@@ -37,5 +37,12 @@
  int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel);
  void dbg_enable_mod_levels(void);
  
-+int dbg_dump_json(struct sip_msg* msg, pv_elem_p list, unsigned int mask);
++#define DBG_DP_NULL			1
++#define DBG_DP_AVP			2
++#define DBG_DP_SCRIPTVAR	4
++#define DBG_DP_XAVP			8
++#define DBG_DP_OTHER		16
++#define DBG_DP_ALL			31
++int dbg_dump_json(struct sip_msg* msg, unsigned int mask, int level);
  #endif
  
 --- a/modules/debugger/debugger_mod.c
 +++ b/modules/debugger/debugger_mod.c
-@@ -46,6 +46,8 @@
+@@ -46,6 +46,9 @@
  static int fixup_dbg_breakpoint(void** param, int param_no);
  static int dbg_mod_level_param(modparam_t type, void *val);
  
-+static int w_dbg_dump(struct sip_msg* msg, char* point, char* str2);
++static int fixup_dbg_pv_dump(void** param, int param_no);
++static int w_dbg_dump(struct sip_msg* msg, char* mask, char* level);
 +
  /* parameters */
  extern int _dbg_cfgtrace;
  extern int _dbg_breakpoint;
-@@ -63,6 +65,8 @@
+@@ -63,6 +66,12 @@
  static cmd_export_t cmds[]={
  	{"dbg_breakpoint", (cmd_function)w_dbg_breakpoint, 1,
  		fixup_dbg_breakpoint, 0, ANY_ROUTE},
++	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 0,
++		fixup_dbg_pv_dump, 0, ANY_ROUTE},
 +	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 1,
-+		fixup_uint_null, 0, ANY_ROUTE},
++		fixup_dbg_pv_dump, 0, ANY_ROUTE},
++	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 2,
++		fixup_dbg_pv_dump, 0, ANY_ROUTE},
  	{0, 0, 0, 0, 0, 0}
  };
  
-@@ -157,6 +161,15 @@
+@@ -157,6 +166,64 @@
  	return 1;
  }
  
-+static int w_dbg_dump(struct sip_msg* msg, char* mask, char* str2)
++/**
++ * fixup for cfg dbg_pv_dump
++ */
++static int fixup_dbg_pv_dump(void** param, int param_no)
 +{
-+	pv_elem_t *list = pv_cache_dump(msg);
-+	if(list==NULL) return 0;
-+	dbg_dump_json(msg, list, (unsigned int)(unsigned long)mask);
-+	pv_elem_free_all(list);
++	unsigned int mask;
++	int level;
++	str s = STR_NULL;
++
++	switch(param_no)
++	{
++		case 2:
++			switch(((char*)(*param))[2])
++			{
++				case 'A': level = L_ALERT; break;
++				case 'B': level = L_BUG; break;
++				case 'C': level = L_CRIT2; break;
++				case 'E': level = L_ERR; break;
++				case 'W': level = L_WARN; break;
++				case 'N': level = L_NOTICE; break;
++				case 'I': level = L_INFO; break;
++				case 'D': level = L_DBG; break;
++				default:
++					LM_ERR("unknown log level\n");
++					return E_UNSPEC;
++			}
++			*param = (void*)(long)level;
++		break;
++		case 1:
++			s.s = *param;
++			s.len = strlen(s.s);
++			if(str2int(&s, &mask) == 0) {
++				*param = (void*)(long)mask;
++			}
++			else return E_UNSPEC;
++		break;
++	}
++
++    return 0;
++}
++
++/**
++ * dump pv_cache contents as json
++ */
++static int w_dbg_dump(struct sip_msg* msg, char* mask, char* level)
++{
++	unsigned int umask = DBG_DP_ALL;
++	int ilevel = L_DBG;
++	if(level!=NULL){
++		ilevel = (int)(long)level;
++	}
++	if(mask!=NULL){
++		umask = (unsigned int)(unsigned long)mask;
++	}
++	dbg_dump_json(msg, umask, ilevel);
 +	return 1;
 +}
 +
@@ -542,7 +681,7 @@ It dumps the content of pv_cache on json format.
   */
 --- a/modules/debugger/doc/debugger_admin.xml
 +++ b/modules/debugger/doc/debugger_admin.xml
-@@ -250,7 +250,46 @@
+@@ -250,7 +250,92 @@
  </programlisting>
  	    </example>
  	</section>
@@ -550,17 +689,63 @@ It dumps the content of pv_cache on json format.
 +
 +	<section>
 +	    <title>
-+		<function moreinfo="none">dbg_pv_dump(mask)</function>
++		<function moreinfo="none">dbg_pv_dump([mask] [, level])</function>
 +	    </title>
 +	    <para>
-+			Prints the content of pv_cache on json format controled by mask value
++			Prints the content of pv_cache on json format.
++			Defaults are mask=31 and level = "L_DBG"
 +	    </para>
-+	    <programlisting format="linespecific">
-+#define DBG_DP_NULL			1
-+#define DBG_DP_AVP			2
-+#define DBG_DP_SCRIPTVAR	4
-+#define DBG_DP_OTHER		8
-+	    </programlisting>
++		<para>
++		</para>
++		<itemizedlist>
++			<para><emphasis>mask</emphasis> - Controls the content to dump:
++			</para>
++			<itemizedlist>
++			<listitem><para>
++			  1 - dump null values
++			</para></listitem>
++			<listitem><para>
++			  2 - dump avp vars
++			</para></listitem>
++			<listitem><para>
++			  4 - dump script vars
++			</para></listitem>
++			<listitem><para>
++			  8 - dump xavp vars
++			</para></listitem>
++			<listitem><para>
++			  16 - dump DP_OTHER vars
++			</para></listitem>
++			</itemizedlist>
++			<para><emphasis>level</emphasis> - The level that will be used in LOG function. It can be:
++			</para>
++			<itemizedlist>
++			<listitem><para>
++				L_ALERT - log level -5
++			</para></listitem>
++			<listitem><para>
++				L_BUG - log level -4
++			</para></listitem>
++			<listitem><para>
++				L_CRIT - log level -3
++			</para></listitem>
++			<listitem><para>
++				L_ERR - log level -1
++			</para></listitem>
++			<listitem><para>
++				L_WARN - log level 0
++			</para></listitem>
++			<listitem><para>
++				L_NOTICE - log level 1
++			</para></listitem>
++			<listitem><para>
++				L_INFO - log level 2
++			</para></listitem>
++			<listitem><para>
++				L_DBG - log level 3
++				</para></listitem>
++			</itemizedlist>
++		</itemizedlist>
 +		<example>
 +		<title><function>dbg_pv_dump</function> usage</title>
 +		<programlisting format="linespecific">
@@ -575,7 +760,7 @@ It dumps the content of pv_cache on json format.
 +$xavp(x=>different) = "foo";
 +$var(empty) = $null;
 +
-+dbg_pv_dump(14);
++dbg_pv_dump(30, "L_DBG");
 +...
 +</programlisting>
 +		<para>Output</para>
