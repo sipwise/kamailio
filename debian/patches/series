@@ -33,3 +33,4 @@ sipwise/rtproxy-ng.patch
 sipwise/path_second_parameter.patch
 sipwise/modules-usrloc-use-6th-param-to-set-the-contact-path.patch
 sipwise/utils-kamctl-Add-contact-path-parameter.patch
+sipwise/url-safe_base64.patch
