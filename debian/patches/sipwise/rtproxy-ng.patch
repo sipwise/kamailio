@@ -3110,7 +3110,7 @@
 +}
 --- /dev/null
 +++ b/modules/rtpproxy-ng/rtpproxy.c
-@@ -0,0 +1,1946 @@
+@@ -0,0 +1,1971 @@
 +/* $Id$
 + *
 + * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
@@ -4191,12 +4191,19 @@
 +
 +
 +
++static const char *transports[] = {
++	[0x00]	= "RTP/AVP",
++	[0x01]	= "RTP/SAVP",
++	[0x02]	= "RTP/AVPF",
++	[0x03]	= "RTP/SAVPF",
++};
++
 +static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_msg *msg,
 +	enum rtpp_operation op, const char *flags_str, str *body_out)
 +{
 +	bencode_item_t *dict, *flags, *direction, *replace, *item;
 +	str callid, from_tag, to_tag, body, viabranch, error;
-+	int via, to, ret, packetize;
++	int via, to, ret, packetize, transport;
 +	struct rtpp_node *node;
 +	char *cp;
 +
@@ -4237,6 +4244,7 @@
 +
 +	via = 0;
 +	to = (op == OP_DELETE) ? 0 : 1;
++	transport = 0;
 +
 +	for (; flags_str && *flags_str; flags_str++) {
 +		switch (*flags_str) {
@@ -4338,6 +4346,21 @@
 +			bencode_dictionary_add_string(dict, "ICE", "force");
 +			break;
 +
++		case 's':
++			transport |= 0x100;
++			transport &= ~0x001;
++			break;
++		case 'S':
++			transport |= 0x101;
++			break;
++		case 'p':
++			transport |= 0x100;
++			transport &= ~0x002;
++			break;
++		case 'P':
++			transport |= 0x102;
++			break;
++
 +		default:
 +			LM_ERR("unknown option `%c'\n", *flags_str);
 +			goto error;
@@ -4351,6 +4374,8 @@
 +		bencode_dictionary_add(dict, "flags", flags);
 +	if (replace && replace->child)
 +		bencode_dictionary_add(dict, "replace", replace);
++	if ((transport & 0x100))
++		bencode_dictionary_add_string(dict, "transport-protocol", transports[transport & 0x003]);
 +
 +	bencode_dictionary_add_str(dict, "call-id", &callid);
 +
