@@ -162,9 +162,20 @@ unsigned char _bx_b64_fourth[256];
 
 unsigned char _bx_ub64[256];
 
+unsigned char _bx_b64url_first[256];
+unsigned char _bx_b64url_second[4][256];
+unsigned char _bx_b64url_third[4][256];
+unsigned char _bx_b64url_fourth[256];
+
+unsigned char _bx_ub64url[256];
+
+
 #elif defined BASE64_LOOKUP_8K
 unsigned short _bx_b64_12[4096];
 unsigned char _bx_ub64[256];
+
+unsigned short _bx_b64url_12[4096];
+unsigned char _bx_ub64url[256];
 
 #else /*  BASE64_LOOKUP_LARGE */
 /* very small lookup, 65 bytes */
@@ -184,12 +195,30 @@ unsigned char _bx_ub64[0x54+1]={
 		0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
 		0x2f, 0x30, 0x31, 0x32, 0x33, 0xff, 0xff, 0xff, 0xff, 0xff };
 
+
+unsigned char _bx_b64url[64+1]=
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+
+unsigned char _bx_ub64url[0x54+1]={
+		                              0xff, 0xff, 0x3e, 0xff, 0xff,
+		0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02,
+		0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
+		0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+		0x17, 0x18, 0x19, 0xff, 0xff, 0xff, 0xff, 0x3f, 0xff, 0x1a,
+		0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24,
+		0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
+		0x2f, 0x30, 0x31, 0x32, 0x33, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 #endif /*  BASE64_LOOKUP_LARGE */
 
 #endif /* BASE64_LOOKUP_TABLE */
 
 #define b64_enc_char(c) base64_enc_char(c)
 #define b64_dec_char(c) base64_dec_char(c)
+#define b64url_enc_char(c) base64url_enc_char(c)
+#define b64url_dec_char(c) base64url_dec_char(c)
 
 int init_basex()
 {
@@ -201,36 +230,53 @@ int init_basex()
 	int i;
 	
 	/* encode tables */
-	for (r=0; r<256; r++)
+	for (r=0; r<256; r++) {
 		_bx_b64_first[r]=b64_enc_char(((unsigned char)r)>>2);
+		_bx_b64url_first[r]=b64url_enc_char(((unsigned char)r)>>2);
+	}
 	for(i=0; i<4; i++){
-		for (r=0; r<256; r++)
+		for (r=0; r<256; r++) {
 			_bx_b64_second[i][r]=
 					b64_enc_char((unsigned char)((i<<4)|(r>>4)));
+			_bx_b64url_second[i][r]=
+					b64url_enc_char((unsigned char)((i<<4)|(r>>4)));
+		}
 	}
 	for(i=0; i<4; i++){
-		for (r=0; r<256; r++)
+		for (r=0; r<256; r++) {
 			_bx_b64_third[i][r]=
 				b64_enc_char((unsigned char)(((r<<2)&0x3f)|i));
+			_bx_b64url_third[i][r]=
+				b64url_enc_char((unsigned char)(((r<<2)&0x3f)|i));
+		}
 	}
-	for (r=0; r<256; r++)
+	for (r=0; r<256; r++) {
 		_bx_b64_fourth[r]=b64_enc_char(((unsigned char)r&0x3f));
+		_bx_b64url_fourth[r]=b64url_enc_char(((unsigned char)r&0x3f));
+	}
 	
 	/* decode */
-	for (r=0; r<256; r++)
+	for (r=0; r<256; r++) {
 		_bx_ub64[r]=b64_dec_char((unsigned char)r);
+		_bx_ub64url[r]=b64url_dec_char((unsigned char)r);
+	}
 #elif defined BASE64_LOOKUP_8K
-	for (r=0; r< 4096; r++)
+	for (r=0; r< 4096; r++) {
 #if defined __IS_LITTLE_ENDIAN
 		_bx_b64_12[r]=b64_enc_char(r>>6)|(b64_enc_char(r&0x3f)<<8);
+		_bx_b64url_12[r]=b64url_enc_char(r>>6)|(b64url_enc_char(r&0x3f)<<8);
 #elif defined __IS_BIG_ENDIAN /* __IS_LITTLE_ENDIAN */
 		_bx_b64_12[r]=(b64_enc_char(r>>6)<<8)|b64_enc_char(r&0x3f);
+		_bx_b64url_12[r]=(b64url_enc_char(r>>6)<<8)|b64url_enc_char(r&0x3f);
 #else /* __IS_LITTLE_ENDIAN */
 #error Neither __IS_LITTE_ENDIAN nor __IS_BIG_ENDIAN  defined
 #endif
+	}
 	/* decode */
-	for (r=0; r<256; r++)
+	for (r=0; r<256; r++) {
 		_bx_ub64[r]=b64_dec_char((unsigned char)r);
+		_bx_ub64url[r]=b64url_dec_char((unsigned char)r);
+	}
 #endif
 #endif
 	return 0;

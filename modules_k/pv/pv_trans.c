@@ -222,6 +222,32 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			val->rs.s = _tr_buffer;
 			val->rs.len = i;
 			break;
+		case TR_S_ENCODEBASE64URL:
+			if(!(val->flags&PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			i = base64url_enc((unsigned char *) val->rs.s, val->rs.len,
+					(unsigned char *) _tr_buffer, TR_BUFFER_SIZE-1);
+			if (i < 0)
+				return -1;
+			_tr_buffer[i] = '\0';
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.len = i;
+			break;
+		case TR_S_DECODEBASE64URL:
+			if(!(val->flags&PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			i = base64url_dec((unsigned char *) val->rs.s, val->rs.len,
+					(unsigned char *) _tr_buffer, TR_BUFFER_SIZE-1);
+			if (i < 0 || (i == 0 && val->rs.len > 0))
+				return -1;
+			_tr_buffer[i] = '\0';
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.len = i;
+			break;
 		case TR_S_ESCAPECOMMON:
 			if(!(val->flags&PV_VAL_STR))
 				val->rs.s = int2str(val->ri, &val->rs.len);
@@ -1740,6 +1766,12 @@ char* tr_parse_string(str* in, trans_t *t)
 		goto done;
 	} else if(name.len==13 && strncasecmp(name.s, "decode.base64", 13)==0) {
 		t->subtype = TR_S_DECODEBASE64;
+		goto done;
+	} else if(name.len==16 && strncasecmp(name.s, "encode.base64url", 16)==0) {
+		t->subtype = TR_S_ENCODEBASE64URL;
+		goto done;
+	} else if(name.len==16 && strncasecmp(name.s, "decode.base64url", 16)==0) {
+		t->subtype = TR_S_DECODEBASE64URL;
 		goto done;
 	} else if(name.len==13 && strncasecmp(name.s, "escape.common", 13)==0) {
 		t->subtype = TR_S_ESCAPECOMMON;
