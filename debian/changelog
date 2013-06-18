@@ -1,4 +1,4 @@
-kamailio (3.3+ngcp2.8.1) UNRELEASED; urgency=low
+kamailio (3.3+ngcp2.8.1) unstable; urgency=low
 
   [ Richard Fuchs ]
   * ce6ae9f adding patch files
