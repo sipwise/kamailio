@@ -1,6 +1,9 @@
 kamailio (3.3+ngcp2.8.1) UNRELEASED; urgency=low
 
   [ Richard Fuchs ]
+  * ce6ae9f adding patch files
+  * dab16a0 backport c70f884 (IPv6 fix for nathelper) from kamailio
+  * 741e89c backporting url-safe_base64.patch from 4.x master
   * 8417a59 attempt to fix segfault due to recursive mysql query
   * 3c69183 incorporate received= escaping fixes
   * 1bb1c30 fix string length matching
