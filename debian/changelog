@@ -1,4 +1,4 @@
-ngcp-kamailio (4.0.2-1) UNRELEASED; urgency=low
+ngcp-kamailio (4.0.2-1) unstable; urgency=low
 
   * Upstream new version.
   * Use Debian packaging as base.
