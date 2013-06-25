@@ -194,7 +194,7 @@ It dumps the content of pv_cache on json format.
  #include "debugger_act.h"
  #include "debugger_api.h"
  
-@@ -1078,3 +1081,378 @@
+@@ -1094,3 +1097,378 @@
  		return;
  	set_module_debug_level_cb(dbg_get_mod_debug_level);
  }
@@ -576,10 +576,11 @@ It dumps the content of pv_cache on json format.
 \ No newline at end of file
 --- a/modules/debugger/debugger_api.h
 +++ b/modules/debugger/debugger_api.h
-@@ -37,5 +37,12 @@
- int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel);
+@@ -38,5 +38,13 @@
  void dbg_enable_mod_levels(void);
  
+ void dbg_enable_outtrace(void);
++
 +#define DBG_DP_NULL			1
 +#define DBG_DP_AVP			2
 +#define DBG_DP_SCRIPTVAR	4
@@ -601,7 +602,7 @@ It dumps the content of pv_cache on json format.
  /* parameters */
  extern int _dbg_cfgtrace;
  extern int _dbg_breakpoint;
-@@ -63,6 +66,12 @@
+@@ -64,6 +67,12 @@
  static cmd_export_t cmds[]={
  	{"dbg_breakpoint", (cmd_function)w_dbg_breakpoint, 1,
  		fixup_dbg_breakpoint, 0, ANY_ROUTE},
@@ -614,7 +615,7 @@ It dumps the content of pv_cache on json format.
  	{0, 0, 0, 0, 0, 0}
  };
  
-@@ -157,6 +166,64 @@
+@@ -160,6 +169,64 @@
  	return 1;
  }
  
