@@ -15,16 +15,24 @@ Subject: [PATCH] modules/debugger: trace msg out
   */
  int _dbg_step_loops = 200;
  
-+int _dbg_outtrace = 0;
++int _dbg_msgtrace = 0;
 +
  /**
   *
   */
-@@ -415,6 +417,20 @@
+@@ -415,6 +417,31 @@
  	return 0;
  }
  
-+int dbg_cfg_dump(void *data)
++int _dbg_cfg_msgdump_in(void *data)
++{
++	str *buf = (str *) data;
++	if(buf==NULL) return 0;
++	LM_DBG("msg in:{%.*s}\n", buf->len, buf->s);
++	return 0;
++}
++
++int _dbg_cfg_msgdump_out(void *data)
 +{
 +	str *buf = (str *) data;
 +	if(buf==NULL) return 0;
@@ -32,10 +40,13 @@ Subject: [PATCH] modules/debugger: trace msg out
 +	return 0;
 +}
 +
-+void dbg_enable_outtrace(void)
++void dbg_enable_msgtrace(void)
 +{
-+	if(_dbg_outtrace==1)
-+		sr_event_register_cb(SREV_NET_DATA_OUT, dbg_cfg_dump);
++	if(_dbg_msgtrace==1)
++	{
++		sr_event_register_cb(SREV_NET_DATA_OUT, _dbg_cfg_msgdump_out);
++		sr_event_register_cb(SREV_NET_DATA_IN, _dbg_cfg_msgdump_in);
++	}
 +}
 +
  /**
@@ -47,7 +58,7 @@ Subject: [PATCH] modules/debugger: trace msg out
  int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel);
  void dbg_enable_mod_levels(void);
  
-+void dbg_enable_outtrace(void);
++void dbg_enable_msgtrace(void);
  #endif
  
 --- a/modules/debugger/debugger_mod.c
@@ -56,7 +67,7 @@ Subject: [PATCH] modules/debugger: trace msg out
  extern char *_dbg_cfgtrace_prefix;
  extern int _dbg_step_usleep;
  extern int _dbg_step_loops;
-+extern int _dbg_outtrace;
++extern int _dbg_msgtrace;
  
  static char * _dbg_cfgtrace_facility_str = 0;
  
@@ -64,7 +75,7 @@ Subject: [PATCH] modules/debugger: trace msg out
  	{"log_prefix",        STR_PARAM, &_dbg_cfgtrace_prefix},
  	{"step_usleep",       INT_PARAM, &_dbg_step_usleep},
  	{"step_loops",        INT_PARAM, &_dbg_step_loops},
-+	{"trace_out_msg",     INT_PARAM, &_dbg_outtrace},
++	{"trace_msg",         INT_PARAM, &_dbg_msgtrace},
  	{"mod_hash_size",     INT_PARAM, &_dbg_mod_hash_size},
  	{"mod_level_mode",    INT_PARAM, &_dbg_mod_level},
  	{"mod_level",         STR_PARAM|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
@@ -72,7 +83,7 @@ Subject: [PATCH] modules/debugger: trace msg out
  	LM_DBG("rank is (%d)\n", rank);
  	if (rank==PROC_INIT) {
  		dbg_enable_mod_levels();
-+		dbg_enable_outtrace();
++		dbg_enable_msgtrace();
  		return dbg_init_pid_list();
  	}
  	return dbg_init_mypid();
