@@ -194,7 +194,7 @@ It dumps the content of pv_cache on json format.
  #include "debugger_act.h"
  #include "debugger_api.h"
  
-@@ -1094,3 +1097,378 @@
+@@ -1105,3 +1108,378 @@
  		return;
  	set_module_debug_level_cb(dbg_get_mod_debug_level);
  }
@@ -579,7 +579,7 @@ It dumps the content of pv_cache on json format.
 @@ -38,5 +38,13 @@
  void dbg_enable_mod_levels(void);
  
- void dbg_enable_outtrace(void);
+ void dbg_enable_msgtrace(void);
 +
 +#define DBG_DP_NULL			1
 +#define DBG_DP_AVP			2
