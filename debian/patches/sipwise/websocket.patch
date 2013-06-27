@@ -1,0 +1,11 @@
+--- a/action.c
++++ b/action.c
+@@ -421,6 +421,8 @@
+ 							/* no proto, try to get it from the dns */
+ 							break;
+ 						case PROTO_UDP:
++						case PROTO_WS:
++						case PROTO_WSS:
+ #ifdef USE_TCP
+ 						case PROTO_TCP:
+ #endif
