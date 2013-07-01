@@ -1,0 +1,14 @@
+--- a/action.c
++++ b/action.c
+@@ -423,9 +423,11 @@
+ 						case PROTO_UDP:
+ #ifdef USE_TCP
+ 						case PROTO_TCP:
++						case PROTO_WS:
+ #endif
+ #ifdef USE_TLS
+ 						case PROTO_TLS:
++						case PROTO_WSS:
+ #endif
+ #ifdef USE_SCTP
+ 						case PROTO_SCTP:
