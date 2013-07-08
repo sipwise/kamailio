@@ -22,7 +22,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpproxy-ng/README
-@@ -0,0 +1,625 @@
+@@ -0,0 +1,635 @@
 +rtpproxy-ng Module
 +
 +Maxim Sobolev
@@ -430,6 +430,16 @@
 +          + - - instructs the RTP proxy to discard any ICE attributes and
 +            not insert any new ones into the SDP. Mutually exclusive with
 +            the '+' flag.
++          + s, S, p, P - These flags control the RTP transport protocol
++            that should be used towards the recipient of the SDP. If none
++            of them are specified, the protocol given in the SDP is left
++            untouched. Otherwise, the "S" flag indicates that SRTP should
++            be used, while "s" indicates that SRTP should not be used. "P"
++            indicates that the advanced RTCP profile with feedback
++            messages should be used, and "p" indicates that the regular
++            RTCP profile should be used. As such, the combinations "sp",
++            "sP", "Sp" and "SP" select between RTP/AVP, RTP/AVPF, RTP/SAVP
++            and RTP/SAVPF, respectively.
 +     * ip_address - new SDP IP address.
 +
 +   This function can be used from ANY_ROUTE.
@@ -1879,7 +1889,7 @@
 --- /dev/null
 +++ b/modules/rtpproxy-ng/doc/Makefile
 @@ -0,0 +1,4 @@
-+docs = rtpproxy.xml
++docs = rtpproxy-ng.xml
 +
 +docbook_dir = ../../../docbook
 +include $(docbook_dir)/Makefile.module
@@ -1991,7 +2001,7 @@
 +</book>
 --- /dev/null
 +++ b/modules/rtpproxy-ng/doc/rtpproxy_admin.xml
-@@ -0,0 +1,809 @@
+@@ -0,0 +1,821 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 +"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
@@ -2404,6 +2414,18 @@
 +				<emphasis>-</emphasis> - instructs the RTP proxy to discard
 +				any ICE attributes and not insert any new ones into the SDP.
 +				Mutually exclusive with the '+' flag.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>s, S, p, P</emphasis> - These flags control the RTP
++				transport protocol that should be used towards the recipient of
++				the SDP. If none of them are specified, the protocol given in
++				the SDP is left untouched. Otherwise, the "S" flag indicates that
++				SRTP should be used, while "s" indicates that SRTP should not be used.
++				"P" indicates that the advanced RTCP profile with feedback messages
++				should be used, and "p" indicates that the regular RTCP profile
++				should be used. As such, the combinations "sp", "sP", "Sp" and "SP"
++				select between RTP/AVP, RTP/AVPF, RTP/SAVP and RTP/SAVPF,
++				respectively.
 +				</para></listitem>
 +			</itemizedlist>
 +		</listitem>
