@@ -124,6 +124,7 @@ Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Recommends: sqlite3
 Conflicts: kamailio-sqlite-modules
 Replaces: kamailio-sqlite-modules
 Description: SQLite database connectivity module for Kamailio
