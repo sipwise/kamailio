@@ -22,7 +22,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpproxy-ng/README
-@@ -0,0 +1,635 @@
+@@ -0,0 +1,652 @@
 +rtpproxy-ng Module
 +
 +Maxim Sobolev
@@ -99,10 +99,11 @@
 +              5.4. rtpproxy_destroy([flags])
 +              5.5. unforce_rtp_proxy()
 +              5.6. rtpproxy_manage([flags [, ip_address]])
++              5.7. start_recording()
 +
 +        6. Exported Pseudo Variables
 +
-+              6.1. $rtpstart
++              6.1. $rtpstat
 +
 +        7. MI Commands
 +
@@ -123,9 +124,10 @@
 +   1.8. rtpproxy_answer usage
 +   1.9. rtpproxy_destroy usage
 +   1.10. rtpproxy_manage usage
-+   1.11. $rtpstat-Usage
-+   1.12. nh_enable_rtpp usage
-+   1.13. nh_show_rtpp usage
++   1.11. start_recording usage
++   1.12. $rtpstat Usage
++   1.13. nh_enable_rtpp usage
++   1.14. nh_show_rtpp usage
 +
 +Chapter 1. Admin Guide
 +
@@ -154,10 +156,11 @@
 +        5.4. rtpproxy_destroy([flags])
 +        5.5. unforce_rtp_proxy()
 +        5.6. rtpproxy_manage([flags [, ip_address]])
++        5.7. start_recording()
 +
 +   6. Exported Pseudo Variables
 +
-+        6.1. $rtpstart
++        6.1. $rtpstat
 +
 +   7. MI Commands
 +
@@ -303,6 +306,7 @@
 +   5.4. rtpproxy_destroy([flags])
 +   5.5. unforce_rtp_proxy()
 +   5.6. rtpproxy_manage([flags [, ip_address]])
++   5.7. start_recording()
 +
 +5.1.  set_rtp_proxy_set(setid)
 +
@@ -563,18 +567,31 @@
 +rtpproxy_manage();
 +...
 +
++5.7.  start_recording()
++
++   This function will send a signal to the RTP Proxy to record the RTP
++   stream on the RTP Proxy. This function is not supported by
++   ngcp-mediaproxy-ng at the moment!
++
++   This function can be used from REQUEST_ROUTE and ONREPLY_ROUTE.
++
++   Example 1.11. start_recording usage
++...
++start_recording();
++...
++
 +6. Exported Pseudo Variables
 +
-+   6.1. $rtpstart
++   6.1. $rtpstat
 +
-+6.1. $rtpstart
++6.1. $rtpstat
 +
-+   Returns the RTP-Statistics from the RTP-Proxy. The RTP-Statistics from
-+   the RTP-Proxy are provided as a string and it does contain several
-+   packet-counters. The statistics must be retrieved before the session is
++   Returns the RTP Statistics from the RTP Proxy. The RTP Statistics from
++   the RTP Proxy are provided as a string and it does contain several
++   packet counters. The statistics must be retrieved before the session is
 +   deleted (before unforce_rtpproxy()).
 +
-+   Example 1.11. $rtpstat-Usage
++   Example 1.12. $rtpstat Usage
 +...
 +    append_hf("X-RTP-Statistics: $rtpstat\r\n");
 +...
@@ -597,7 +614,7 @@
 +   NOTE: if a rtpproxy is defined multiple times (in the same or diferente
 +   sete), all of its instances will be enables/disabled.
 +
-+   Example 1.12.  nh_enable_rtpp usage
++   Example 1.13.  nh_enable_rtpp usage
 +...
 +$ kamctl fifo nh_enable_rtpp udp:192.168.2.133:8081 0
 +...
@@ -609,7 +626,7 @@
 +
 +   No parameter.
 +
-+   Example 1.13.  nh_show_rtpp usage
++   Example 1.14.  nh_show_rtpp usage
 +...
 +$ kamctl fifo nh_show_rtpp
 +...
@@ -2001,7 +2018,7 @@
 +</book>
 --- /dev/null
 +++ b/modules/rtpproxy-ng/doc/rtpproxy_admin.xml
-@@ -0,0 +1,821 @@
+@@ -0,0 +1,823 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 +"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
@@ -2714,14 +2731,15 @@
 +	    These functions can be used from REQUEST_ROUTE, ONREPLY_ROUTE.
 +	</para>
 +	</section>
++-->
 +	<section>
 +		<title>
 +		<function moreinfo="none">start_recording()</function>
 +		</title>
 +		<para>
-+		This function will send a signal to the RTP-Proxy to record
-+		the RTP stream on the RTP-Proxy.
-+		<emphasis>This function is only supported by Sippy RTPproxy at the moment!</emphasis>
++		This function will send a signal to the RTP Proxy to record
++		the RTP stream on the RTP Proxy.
++		<emphasis>This function is not supported by ngcp-mediaproxy-ng at the moment!</emphasis>
 +		</para>
 +		<para>
 +		This function can be used from REQUEST_ROUTE and ONREPLY_ROUTE.
@@ -2735,6 +2753,7 @@
 +		</programlisting>
 +		</example>
 +	</section>
++<!--
 +	<section id="rtpproxy_stop_stream2uas">
 +	<title>
 +	    <function>rtpproxy_stop_stream2uas(prompt_name, count)</function>
@@ -2751,15 +2770,15 @@
 +	<section>
 +		<title>Exported Pseudo Variables</title>
 +		<section>
-+			<title><function moreinfo="none">$rtpstart</function></title>
++			<title><function moreinfo="none">$rtpstat</function></title>
 +			<para>
-+			Returns the RTP-Statistics from the RTP-Proxy. The RTP-Statistics from the RTP-Proxy
-+			are provided as a string and it does contain several packet-counters. The statistics
++			Returns the RTP Statistics from the RTP Proxy. The RTP Statistics from the RTP Proxy
++			are provided as a string and it does contain several packet counters. The statistics
 +			must be retrieved before the session is deleted	(before <function>unforce_rtpproxy()</function>).
 +			</para>
 +
 +		<example>
-+		<title>$rtpstat-Usage</title>
++		<title>$rtpstat Usage</title>
 +		<programlisting format="linespecific">
 +...
 +    append_hf("X-RTP-Statistics: $rtpstat\r\n");
@@ -2907,7 +2926,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpproxy-ng/rtpproxy.c
-@@ -0,0 +1,1971 @@
+@@ -0,0 +1,2021 @@
 +/* $Id$
 + *
 + * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
@@ -3193,13 +3212,15 @@
 +	OP_ANSWER,
 +	OP_DELETE,
 +	OP_START_RECORDING,
++	OP_QUERY,
 +};
 +
 +static const char *command_strings[] = {
-+	[1] = "offer",
-+	[2] = "answer",
-+	[3] = "delete",
-+	[4] = "start recording",
++	[OP_OFFER]		= "offer",
++	[OP_ANSWER]		= "answer",
++	[OP_DELETE]		= "delete",
++	[OP_START_RECORDING]	= "start recording",
++	[OP_QUERY]		= "query",
 +};
 +
 +static char *gencookie();
@@ -4274,6 +4295,23 @@
 +	return 1;
 +}
 +
++static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
++		enum rtpp_operation op, const char *flags_str, str *body) {
++	bencode_item_t *ret;
++
++	ret = rtpp_function_call(bencbuf, msg, op, flags_str, body);
++	if (!ret)
++		return NULL;
++
++	if (bencode_dictionary_get_strcmp(ret, "result", "ok")) {
++		LM_ERR("proxy didn't return \"ok\" result\n");
++		bencode_buffer_free(bencbuf);
++		return NULL;
++	}
++
++	return ret;
++}
++
 +
 +
 +static int
@@ -4775,14 +4813,9 @@
 +	str body, newbody;
 +	struct lump *anchor;
 +
-+	dict = rtpp_function_call(&bencbuf, msg, offer ? OP_OFFER : OP_ANSWER, str1, &body);
++	dict = rtpp_function_call_ok(&bencbuf, msg, offer ? OP_OFFER : OP_ANSWER, str1, &body);
 +	if (!dict)
 +		return -1;
-+
-+	if (bencode_dictionary_get_strcmp(dict, "result", "ok")) {
-+		LM_ERR("proxy didn't return \"ok\" result\n");
-+		goto error;
-+	}
 +
 +	if (!bencode_dictionary_get_str_dup(dict, "sdp", &newbody)) {
 +		LM_ERR("failed to extract sdp body from proxy reply\n");
@@ -4823,6 +4856,42 @@
 +pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param,
 +		  pv_value_t *res)
 +{
++	bencode_buffer_t bencbuf;
++	bencode_item_t *dict, *tot, *in, *out;
++	static char buf[256];
++	str ret;
++
++	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL);
++	if (!dict)
++		return -1;
++
++	tot = bencode_dictionary_get_expect(dict, "totals", BENCODE_DICTIONARY);
++	in = bencode_dictionary_get_expect(tot, "input", BENCODE_DICTIONARY);
++	in = bencode_dictionary_get_expect(in, "rtp", BENCODE_DICTIONARY);
++	out = bencode_dictionary_get_expect(tot, "output", BENCODE_DICTIONARY);
++	out = bencode_dictionary_get_expect(out, "rtp", BENCODE_DICTIONARY);
++
++	if (!in || !out)
++		goto error;
++
++	ret.s = buf;
++	ret.len = snprintf(buf, sizeof(buf),
++			"Input: %lli bytes, %lli packets, %lli errors; "
++			"Output: %lli bytes, %lli packets, %lli errors",
++			bencode_dictionary_get_integer(in, "bytes", -1),
++			bencode_dictionary_get_integer(in, "packets", -1),
++			bencode_dictionary_get_integer(in, "errors", -1),
++			bencode_dictionary_get_integer(out, "bytes", -1),
++			bencode_dictionary_get_integer(out, "packets", -1),
++			bencode_dictionary_get_integer(out, "errors", -1));
++
++	bencode_buffer_free(&bencbuf);
++	return pv_get_strval(msg, param, res, &ret);
++
++error:
++	bencode_buffer_free(&bencbuf);
++	return -1;
++
 +#if 0
 +    str ret_val = {0, 0};
 +    int nitems;
