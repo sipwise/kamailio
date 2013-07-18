@@ -1,0 +1,44 @@
+From d3a0a8b15af59846fdaee5d9ceae61484f1d7301 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 17 Jul 2013 20:19:28 +0200
+Subject: [PATCH] uac: restrict check of multiple from/to header changes to
+ request route blocks
+
+- it can occur many times in due to branch route usage
+- reported by Andrew Pogrebennyk, FS#323
+---
+ modules/uac/replace.c |   11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/modules/uac/replace.c b/modules/uac/replace.c
+index 791d69b..7f1f92c 100644
+--- a/modules/uac/replace.c
++++ b/modules/uac/replace.c
+@@ -39,6 +39,7 @@
+ #include "../../parser/parse_from.h"
+ #include "../../mem/mem.h"
+ #include "../../data_lump.h"
++#include "../../route.h"
+ #include "../../modules/tm/h_table.h"
+ #include "../../modules/tm/tm_load.h"
+ #include "../rr/api.h"
+@@ -251,10 +252,12 @@ int replace_uri( struct sip_msg *msg, str *display, str *uri,
+ 	str * dlgvar_names;
+ 
+ 	uac_flag = (hdr==msg->from)?FL_USE_UAC_FROM:FL_USE_UAC_TO;
+-	if(msg->msg_flags & uac_flag)
+-	{
+-		LM_ERR("Called uac_replace multiple times on the message\n");
+-		return -1;
++	if(get_route_type()==REQUEST_ROUTE) {
++		if(msg->msg_flags & uac_flag)
++		{
++			LM_ERR("Called uac_replace multiple times on the message\n");
++			return -1;
++		}
+ 	}
+ 
+ 	/* consistency check! in AUTO mode, do NOT allow URI changing
+-- 
+1.7.10.4
+
