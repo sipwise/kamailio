@@ -1,3 +1,32 @@
+ngcp-kamailio (4.0.2-2) unstable; urgency=low
+
+  [ Victor Seva ]
+  * Added output trace patch. Just for testing.
+  * Refresh trace msg patch. Now dumps incoming messages too.
+  * fix last commit. Refresh modules-debugger-add-dbg_pv_dump-config-function.patch
+  * Revert to c3278bfc0d43e0337847edba19f36774fa0a08a6
+  * try websocket PROTO in forward
+  * websocket patch applied upstream. Refresh and renamed.
+  * add sqlite3 Recommends on sqlite-modules
+  * Add upstream fix for natping_process limit. (FS#321)
+  * Added upstream fix for uac_replace_from FS#323
+
+  [ Richard Fuchs ]
+  * update rtpproxy-ng docs
+  * remove obsolete files
+  * implement $rtpstat and document start_recording()
+  * remove obsolete code
+  * implement second parameter to rtpproxy_offer/answer/manage
+  * adding untested url-safe_base64.patch
+  * adding "transport-protocol" selection support to rtpproxy-ng
+  * adding gitignore for .pc
+  * autover.h is auto-generated
+
+  [ Andrew Pogrebennyk ]
+  * update changelog
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Wed, 07 Aug 2013 11:31:01 +0200
+
 ngcp-kamailio (4.0.2-1) unstable; urgency=low
 
   * Upstream new version.
