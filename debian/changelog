@@ -2,9 +2,6 @@ ngcp-kamailio (4.0.2-2) unstable; urgency=low
 
   [ Victor Seva ]
   * Added output trace patch. Just for testing.
-  * Refresh trace msg patch. Now dumps incoming messages too.
-  * fix last commit. Refresh modules-debugger-add-dbg_pv_dump-config-function.patch
-  * Revert to c3278bfc0d43e0337847edba19f36774fa0a08a6
   * try websocket PROTO in forward
   * websocket patch applied upstream. Refresh and renamed.
   * add sqlite3 Recommends on sqlite-modules
