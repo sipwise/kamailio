@@ -1,0 +1,214 @@
+From 95ad961731bd638d4ba1d69ecd1baa879cf9deff Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 12 Aug 2013 16:20:48 +0200
+Subject: [PATCH] modules/debugger: Added module parameter reset_msgid. Added
+ RPC command dbg.reset_msgid.
+
+---
+ modules/debugger/debugger_api.c |  100 +++++++++++++++++++++++++++++++++++++++
+ modules/debugger/debugger_api.h |   10 ++++
+ modules/debugger/debugger_mod.c |   10 ++++
+ 3 files changed, 120 insertions(+)
+
+--- a/modules/debugger/debugger_api.c
++++ b/modules/debugger/debugger_api.c
+@@ -179,6 +179,11 @@
+ int _dbg_outtrace = 0;
+ 
+ /**
++ * disabled by default
++ */
++int _dbg_reset_msgid = 0;
++
++/**
+  *
+  */
+ typedef struct _dbg_cmd
+@@ -198,6 +203,9 @@
+ 	unsigned int state;
+ 	dbg_cmd_t in;
+ 	dbg_cmd_t out;
++	gen_lock_t *lock;
++	unsigned int reset_msgid; /* flag to reset the id */
++	unsigned int msgid_base; /* real id since the reset */
+ } dbg_pid_t;
+ 
+ /**
+@@ -226,6 +234,48 @@
+  */
+ static dbg_bp_t *_dbg_bp_list = NULL;
+ 
++/* defined later */
++int dbg_get_pid_index(unsigned int pid);
++
++/*!
++ * \brief Callback function that checks if reset_msgid is set
++ *  and modifies msg->id if necessary.
++ * \param msg SIP message
++ * \param flags unused
++ * \param bar unused
++ * \return 1 on success, -1 on failure
++ */
++int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar)
++{
++	unsigned int process_no = my_pid();
++	int indx = dbg_get_pid_index(process_no);
++	unsigned int msgid_base = 0;
++	unsigned int msgid_new = 0;
++	if(indx<0) return -1;
++	LM_DBG("process_no:%d indx:%d\n", process_no, indx);
++	lock_get(_dbg_pid_list[indx].lock);
++	if(_dbg_pid_list[indx].reset_msgid==1)
++	{
++		LM_DBG("reset_msgid! msgid_base:%d\n", msg->id);
++		_dbg_pid_list[indx].reset_msgid = 0;
++		_dbg_pid_list[indx].msgid_base = msg->id - 1;
++	}
++	msgid_base = _dbg_pid_list[indx].msgid_base;
++	lock_release(_dbg_pid_list[indx].lock);
++	msgid_new = msg->id - msgid_base;
++	LM_DBG("msg->id:%d msgid_base:%d -> %d\n", msg->id, msgid_base, msgid_new);
++	if(msgid_new>0)
++	{
++		msg->id = msgid_new;
++		return 1;
++	}
++	else
++	{
++		LM_WARN("msgid_new<=0??\n");
++		return -1;
++	}
++}
++
+ /**
+  * callback executed for each cfg action
+  */
+@@ -510,6 +560,22 @@
+ 		_dbg_pid_list[process_no].set |= DBG_ABKPOINT_ON;
+ 	if(_dbg_cfgtrace==1)
+ 		_dbg_pid_list[process_no].set |= DBG_CFGTRACE_ON;
++	if(_dbg_reset_msgid==1)
++	{
++		LM_DBG("[%d] create locks\n", process_no);
++		_dbg_pid_list[process_no].lock = lock_alloc();
++		if(_dbg_pid_list[process_no].lock==NULL)
++		{
++			LM_ERR("cannot allocate the lock\n");
++			return -1;
++		}
++		if(lock_init(_dbg_pid_list[process_no].lock)==NULL)
++		{
++			LM_ERR("cannot init the lock\n");
++			lock_dealloc(_dbg_pid_list[process_no].lock);
++			return -1;
++		}
++	}
+ 	return 0;
+ }
+ 
+@@ -863,6 +929,35 @@
+ 	rpc->add(ctx, "s", "200 ok");
+ }
+ 
++static const char* dbg_rpc_reset_msgid_doc[2] = {
++	"Reset msgid on all process",
++	0
++};
++
++static void dbg_rpc_reset_msgid(rpc_t* rpc, void* ctx){
++	int i;
++	if (_dbg_reset_msgid==0)
++	{
++		rpc->fault(ctx, 500, "reset_msgid is 0. Set it to 1 to enable.");
++		return;
++	}
++	if(_dbg_pid_list==NULL)
++	{
++		rpc->fault(ctx, 500, "_dbg_pid_list is NULL");
++		return;
++	}
++	LM_DBG("set reset_msgid\n");
++	for(i=0; i<_dbg_pid_no; i++)
++	{
++		if (_dbg_pid_list[i].lock!=NULL)
++		{
++			lock_get(_dbg_pid_list[i].lock);
++			_dbg_pid_list[i].reset_msgid = 1;
++			lock_release(_dbg_pid_list[i].lock);
++		}
++	}
++	rpc->add(ctx, "s", "200 ok");
++}
+ 
+ /**
+  *
+@@ -871,6 +966,7 @@
+ 	{"dbg.bp",    dbg_rpc_bp,        dbg_rpc_bp_doc,       0},
+ 	{"dbg.ls",    dbg_rpc_list,      dbg_rpc_list_doc,     0},
+ 	{"dbg.trace", dbg_rpc_trace,     dbg_rpc_trace_doc,    0},
++	{"dbg.reset_msgid", dbg_rpc_reset_msgid, dbg_rpc_reset_msgid_doc, 0},
+ 	{0, 0, 0, 0}
+ };
+ 
+--- a/modules/debugger/debugger_api.h
++++ b/modules/debugger/debugger_api.h
+@@ -39,6 +39,16 @@
+ 
+ void dbg_enable_outtrace(void);
+ 
++/*!
++ * \brief Callback function that checks if reset_msgid is set
++ *  and modifies msg->id if necessary.
++ * \param msg SIP message
++ * \param flags unused
++ * \param bar unused
++ * \return 1 on success, -1 on failure
++ */
++int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar);
++
+ #define DBG_DP_NULL			1
+ #define DBG_DP_AVP			2
+ #define DBG_DP_SCRIPTVAR	4
+--- a/modules/debugger/debugger_mod.c
++++ b/modules/debugger/debugger_mod.c
+@@ -33,6 +33,7 @@
+ #include "../../mod_fix.h"
+ #include "../../parser/parse_param.h"
+ #include "../../shm_init.h"
++#include "../../script_cb.h"
+ 
+ #include "debugger_api.h"
+ 
+@@ -58,6 +59,7 @@
+ extern int _dbg_step_usleep;
+ extern int _dbg_step_loops;
+ extern int _dbg_outtrace;
++extern int _dbg_reset_msgid;
+ 
+ static char * _dbg_cfgtrace_facility_str = 0;
+ 
+@@ -88,6 +90,7 @@
+ 	{"mod_hash_size",     INT_PARAM, &_dbg_mod_hash_size},
+ 	{"mod_level_mode",    INT_PARAM, &_dbg_mod_level},
+ 	{"mod_level",         STR_PARAM|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
++	{"reset_msgid",   INT_PARAM, &_dbg_reset_msgid},
+ 	{0, 0, 0}
+ };
+ 
+@@ -136,7 +139,15 @@
+ 		LM_ERR("failed to init per module log level\n");
+ 		return -1;
+ 	}
+-
++	if(_dbg_reset_msgid==1)
++	{
++		unsigned int ALL = REQUEST_CB+FAILURE_CB+ONREPLY_CB
++		  +BRANCH_CB+ONSEND_CB+ERROR_CB+LOCAL_CB+EVENT_CB;
++		if (register_script_cb(dbg_msgid_filter, PRE_SCRIPT_CB|ALL, 0) != 0) {
++			LM_ERR("could not insert callback");
++			return -1;
++		}
++	}
+ 	return dbg_init_bp_list();
+ }
+ 
