@@ -220,7 +220,7 @@ int populate_leg_info( struct dlg_cell *dlg, struct sip_msg *msg,
 		cseq = (get_cseq(msg))->number;
 	} else {
 		/* use the same as in request */
-		cseq = dlg->cseq[DLG_CALLER_LEG];
+		cseq = dlg->cseq[DLG_CALLEE_LEG];
 	}
 
 	/* extract the contact address */
@@ -721,11 +721,14 @@ void dlg_onreq(struct cell* t, int type, struct tmcb_params *param)
 	if (dlg==NULL) {
 		if((req->flags&dlg_flag)!=dlg_flag)
 			return;
+		LM_DBG("dialog creation on config flag\n");
 		dlg_new_dialog(req, t, 1);
 		dlg = dlg_get_ctx_dialog();
 	}
 	if (dlg!=NULL) {
+		LM_DBG("dialog added to tm callbacks\n");
 		dlg_set_tm_callbacks(t, req, dlg, spiral_detected);
+		_dlg_ctx.t = 1;
 		dlg_release(dlg);
 	}
 }
@@ -1249,21 +1252,28 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 	}
 
 	if ( (event==DLG_EVENT_REQ || event==DLG_EVENT_REQACK)
-	&& new_state==DLG_STATE_CONFIRMED) {
+	&& (new_state==DLG_STATE_CONFIRMED || new_state==DLG_STATE_EARLY)) {
 
 		timeout = get_dlg_timeout(req);
 		if (timeout!=default_timeout) {
 			dlg->lifetime = timeout;
 		}
-		if (update_dlg_timer( &dlg->tl, dlg->lifetime )==-1) {
-			LM_ERR("failed to update dialog lifetime\n");
+		if (new_state!=DLG_STATE_EARLY) {
+			if (update_dlg_timer( &dlg->tl, dlg->lifetime )==-1) {
+				LM_ERR("failed to update dialog lifetime\n");
+			} else {
+				dlg->dflags |= DLG_FLAG_CHANGED;
+			}
 		}
-		if (update_cseqs(dlg, req, dir)!=0) {
-			LM_ERR("cseqs update failed\n");
-		} else {
-			dlg->dflags |= DLG_FLAG_CHANGED;
-			if ( dlg_db_mode==DB_MODE_REALTIME )
-				update_dialog_dbinfo(dlg);
+		if(event != DLG_EVENT_REQACK) {
+			if(update_cseqs(dlg, req, dir)!=0) {
+				LM_ERR("cseqs update failed\n");
+			} else {
+				dlg->dflags |= DLG_FLAG_CHANGED;
+			}
+		}
+		if(dlg_db_mode==DB_MODE_REALTIME && (dlg->dflags&DLG_FLAG_CHANGED)) {
+			update_dialog_dbinfo(dlg);
 		}
 
 		if (old_state==DLG_STATE_CONFIRMED_NA) {
@@ -1508,8 +1518,13 @@ int dlg_manage(sip_msg_t *msg)
 		dlg = dlg_get_ctx_dialog();
 		if(dlg==NULL)
 			return -1;
-		if(t!=NULL)
+		if(t!=NULL) {
 			dlg_set_tm_callbacks(t, msg, dlg, spiral_detected);
+			_dlg_ctx.t = 1;
+			LM_DBG("dialog created on existing transaction\n");
+		} else {
+			LM_DBG("dialog created before transaction\n");
+		}
 		dlg_release(dlg);
 	}
 	return 1;

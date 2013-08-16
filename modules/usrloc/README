@@ -67,7 +67,7 @@ Bogdan-Andrei Iancu
               3.29. db_check_update (string)
               3.30. timer_procs (string)
               3.31. xavp_contact (string)
-              3.32. db_obs_ruid (string)
+              3.32. db_ops_ruid (int)
 
         4. Functions
         5. MI Commands
@@ -148,7 +148,7 @@ Bogdan-Andrei Iancu
    1.29. Set db_check_update parameter
    1.30. Set timer_procs parameter
    1.31. Set xavp_contact parameter
-   1.32. Set db_obs_ruid parameter
+   1.32. Set db_ops_ruid parameter
 
 Chapter 1. Admin Guide
 
@@ -196,7 +196,7 @@ Chapter 1. Admin Guide
         3.29. db_check_update (string)
         3.30. timer_procs (string)
         3.31. xavp_contact (string)
-        3.32. db_obs_ruid (string)
+        3.32. db_ops_ruid (int)
 
    4. Functions
    5. MI Commands
@@ -309,7 +309,7 @@ Chapter 1. Admin Guide
    3.29. db_check_update (string)
    3.30. timer_procs (string)
    3.31. xavp_contact (string)
-   3.32. db_obs_ruid (string)
+   3.32. db_ops_ruid (int)
 
 3.1. nat_bflag (integer)
 
@@ -731,7 +731,7 @@ modparam("usrloc", "timer_procs", 4)
 modparam("usrloc", "xavp_contact", "ulattrs")
 ...
 
-3.32. db_obs_ruid (string)
+3.32. db_ops_ruid (int)
 
    If set to 1, database queries for update or delete are done using ruid
    value. If it is set to 0, the old style using aor, contact and call-id
@@ -739,9 +739,9 @@ modparam("usrloc", "xavp_contact", "ulattrs")
 
    Default value is "0".
 
-   Example 1.32. Set db_obs_ruid parameter
+   Example 1.32. Set db_ops_ruid parameter
 ...
-modparam("usrloc", "db_obs_ruid", 1)
+modparam("usrloc", "db_ops_ruid", 1)
 ...
 
 4. Functions
