@@ -83,6 +83,11 @@ ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
 	INSTALL_PROGRAM += -s
 endif
 
+# CFLAGS + CPPFLAGS -> CC_EXTRA_OPTS
+# LDFLAGS -> LD_EXTRA_OPTS
+CUSTOM_BUILDFLAGS:=$(shell dpkg-buildflags --export=configure| \
+sed -e 's/" CPPFLAGS="/ /' -e 's/CFLAGS/CC_EXTRA_OPTS/g' -e 's/LDFLAGS/LD_EXTRA_OPTS/g')
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
@@ -91,7 +96,7 @@ configure-stamp:
 			cfg_target=/etc/kamailio/ \
 			basedir=$(CURDIR)/debian/$(PKG_NAME) \
 			skip_modules="$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)" \
-			$(shell dpkg-buildflags --export=configure) \
+			$(CUSTOM_BUILDFLAGS) \
 			group_include="kstandard"
 
 	touch configure-stamp
