@@ -32,6 +32,7 @@
 #include "../../str.h"
 #include "../../dprint.h"
 #include "../../mem/mem.h"
+#include "../../lib/srutils/sruid.h"
 #include "../../modules/tm/tm_load.h"
 #include "rd_funcs.h"
 #include "rd_filter.h"
@@ -56,9 +57,12 @@ unsigned int bflags = 0;
 #define ACCEPT_RULE_STR "accept"
 #define DENY_RULE_STR   "deny"
 
+/* sruid to get internal uid */
+sruid_t _redirect_sruid;
 
 
 static int redirect_init(void);
+static int child_init(int rank);
 static int w_set_deny(struct sip_msg* msg, char *dir, char *foo);
 static int w_set_accept(struct sip_msg* msg, char *dir, char *foo);
 static int w_get_redirect1(struct sip_msg* msg, char *dir, char *foo);
@@ -103,7 +107,7 @@ struct module_exports exports = {
 	redirect_init, /* Module initialization function */
 	0,
 	0,
-	(child_init_function) 0 /* per-child init function */
+	child_init /* per-child init function */
 };
 
 
@@ -160,25 +164,24 @@ static int get_redirect_fixup(void** param, int param_no)
 
 		pkg_free(*param);
 		*param=(void*)(long)( (((unsigned short)maxt)<<8) | maxb);
-
 	} else if (param_no==2) {
 		/* acc function loaded? */
-		if (rd_acc_fct!=0)
-			return 0;
-		/* must import the acc stuff */
-		if (acc_fct_s==0 || acc_fct_s[0]==0) {
-			LM_ERR("acc support enabled, but no acc function defined\n");
-			return E_UNSPEC;
+		if (rd_acc_fct==0) {
+			/* must import the acc stuff */
+			if (acc_fct_s==0 || acc_fct_s[0]==0) {
+				LM_ERR("acc support enabled, but no acc function defined\n");
+				return E_UNSPEC;
+			}
+			fct = find_export(acc_fct_s, 2, REQUEST_ROUTE);
+			if ( fct==0 )
+				fct = find_export(acc_fct_s, 1, REQUEST_ROUTE);
+			if ( fct==0 ) {
+				LM_ERR("cannot import %s function; is acc loaded and proper "
+					"compiled?\n", acc_fct_s);
+				return E_UNSPEC;
+			}
+			rd_acc_fct = fct;
 		}
-		fct = find_export(acc_fct_s, 2, REQUEST_ROUTE);
-		if ( fct==0 )
-			fct = find_export(acc_fct_s, 1, REQUEST_ROUTE);
-		if ( fct==0 ) {
-			LM_ERR("cannot import %s function; is acc loaded and proper "
-				"compiled?\n", acc_fct_s);
-			return E_UNSPEC;
-		}
-		rd_acc_fct = fct;
 		/* set the reason str */
 		accp = (struct acc_param*)pkg_malloc(sizeof(struct acc_param));
 		if (accp==0) {
@@ -260,12 +263,21 @@ static int regexp_compile(char *re_s, regex_t **re)
 static int redirect_init(void)
 {
 	regex_t *filter;
+	void *p;
 
 	/* load the TM API */
 	if (load_tm_api(&rd_tmb)!=0) {
 		LM_ERR("failed to load TM API\n");
 		goto error;
 	}
+
+	p = (void*)acc_db_table;
+	/* fixup table name */
+	if(fixup_var_pve_str_12(&p, 1)<0) {
+		LM_ERR("failed to fixup acc db table\n");
+		goto error;
+	}
+	acc_db_table = p;
 
 	/* init filter */
 	init_filters();
@@ -295,11 +307,20 @@ static int redirect_init(void)
 	}
 	add_default_filter( DENY_FILTER, filter);
 
+	if(sruid_init(&_redirect_sruid, '-', "rdir", SRUID_INC)<0)
+		return -1;
+
 	return 0;
 error:
 	return -1;
 }
 
+static int child_init(int rank)
+{
+	if(sruid_init(&_redirect_sruid, '-', "rdir", SRUID_INC)<0)
+		return -1;
+	return 0;
+}
 
 static inline void msg_tracer(struct sip_msg* msg, int reset)
 {

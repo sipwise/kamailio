@@ -197,6 +197,8 @@ int acc_db_set_table_name(struct sip_msg *msg, void *param, str *table)
 			return -1;
 		}
 		strncpy(db_table_name_buf, dbtable.s, dbtable.len);
+                /* FS#327: since the buffer is static terminate the table name */
+                db_table_name_buf[dbtable.len] = '\0';
 		env_set_text(db_table_name_buf, dbtable.len);
 	} else {
 		if(table==NULL) {
@@ -220,7 +222,7 @@ int w_acc_db_request(struct sip_msg *rq, char *comment, char *table)
 	if(acc_db_set_table_name(rq, (void*)table, NULL)<0) {
 		LM_ERR("cannot set table name\n");
 		return -1;
-    }
+	}
 	env_set_to( rq->to );
 	env_set_comment((struct acc_param*)comment);
 	return acc_db_request(rq);
