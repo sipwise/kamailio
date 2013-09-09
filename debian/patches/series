@@ -37,3 +37,4 @@ sipwise/path_second_parameter.patch
 sipwise/modules-usrloc-use-6th-param-to-set-the-contact-path.patch
 sipwise/utils-kamctl-Add-contact-path-parameter.patch
 sipwise/url-safe_base64.patch
+sipwise/uac_redirect-get_redirect-check-reason-value-before-.patch
