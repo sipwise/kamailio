@@ -21,6 +21,7 @@ upstream/debug/0001-modules-debugger-trace-msg-out.patch
 upstream/debug/modules-debugger-add-dbg_pv_dump-config-function.patch
 upstream/debug/reset_msgid.patch
 upstream/websocket.patch
+upstream/uac_redirect-get_redirect-check-reason-value-before-.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
@@ -38,4 +39,3 @@ sipwise/path_second_parameter.patch
 sipwise/modules-usrloc-use-6th-param-to-set-the-contact-path.patch
 sipwise/utils-kamctl-Add-contact-path-parameter.patch
 sipwise/url-safe_base64.patch
-sipwise/uac_redirect-get_redirect-check-reason-value-before-.patch
