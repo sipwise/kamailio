@@ -1,3 +1,14 @@
+ngcp-kamailio (4.0.3-2) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [442c46a] fix get_redirects core dump ( Closes: FS#337 ) (cherry picked from commit f15dbc9b1a97a68a2227d2b58484ff9a65e8c1c3)
+  * [385bfc3] uac_redirect patch merged upstream. Will be included on next 4.0 series (cherry picked from commit 9fabbf154aa7679edb0536a812621baae5087e93)
+
+  [ Richard Fuchs ]
+  * [c8d7ab8] fix possible segfault in rtpproxy-ng (cherry picked from commit 8098f4bfdf573032f79374d3d4b231920517257c)
+
+ -- Victor Seva <vseva@sipwise.com>  Tue, 10 Sep 2013 12:49:51 +0200
+
 ngcp-kamailio (4.0.3-1) unstable; urgency=low
 
   * New upstream version.
