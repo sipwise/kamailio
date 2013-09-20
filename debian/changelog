@@ -1,3 +1,10 @@
+ngcp-kamailio (4.0.3-4) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [c4d0a11] Add patches from upstream to fix #3837
+
+ -- Victor Seva <vseva@sipwise.com>  Fri, 20 Sep 2013 11:26:06 +0200
+
 ngcp-kamailio (4.0.3-3) unstable; urgency=low
 
   [ Victor Seva ]
