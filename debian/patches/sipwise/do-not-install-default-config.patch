@@ -1,0 +1,35 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 24 Apr 2013 10:40:21 +0200
+Subject: do not install default config
+
+---
+ Makefile              |    2 +-
+ utils/kamctl/Makefile |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index b35ce80..8ec62d2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -707,7 +707,7 @@ sunpkg:
+ 
+ .PHONY: install
+ install: mk_params="compile_for_install=yes"
+-install: install-bin install-every-module install-cfg \
++install: install-bin install-every-module  \
+ 	install-doc install-man install-utils install-share
+ 
+ .PHONY: dbinstall
+diff --git a/utils/kamctl/Makefile b/utils/kamctl/Makefile
+index 3056ae0..d0d3fac 100644
+--- a/utils/kamctl/Makefile
++++ b/utils/kamctl/Makefile
+@@ -8,7 +8,7 @@ all:
+ 
+ install-if-newer: install
+ 
+-install: install-cfg install-bin install-man install-modules
++install: install-bin install-man install-modules
+ 
+ install-cfg: $(cfg_prefix)/$(cfg_dir)
+ 		# kamctl config

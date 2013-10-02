@@ -1,0 +1,162 @@
+-diff --git a/modules/acc/acc_api.h b/modules/acc/acc_api.h
+-index bc52eee..61bbb51 100644
+---- a/modules/acc/acc_api.h
+-+++ b/modules/acc/acc_api.h
+-@@ -57,6 +57,7 @@ typedef struct acc_enviroment {
+- 	struct hdr_field *to;
+- 	str text;
+- 	time_t ts;
+-+	uint64_t time_hires;
+- } acc_enviroment_t;
+- 
+- /* acc extra parameter */
+-diff --git a/modules/acc/acc_mod.c b/modules/acc/acc_mod.c
+-index 9f40e14..f8124d5 100644
+---- a/modules/acc/acc_mod.c
+-+++ b/modules/acc/acc_mod.c
+-@@ -195,6 +195,7 @@ str acc_callid_col     = str_init("callid");
+- str acc_sipcode_col    = str_init("sip_code");
+- str acc_sipreason_col  = str_init("sip_reason");
+- str acc_time_col       = str_init("time");
+-+str acc_time_hires_col = str_init("time_hires");
+- int acc_db_insert_mode = 0;
+- #endif
+- 
+-@@ -289,6 +290,7 @@ static param_export_t params[] = {
+- 	{"acc_sip_code_column",  STR_PARAM, &acc_sipcode_col.s    },
+- 	{"acc_sip_reason_column",STR_PARAM, &acc_sipreason_col.s  },
+- 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
+-+	{"acc_time_hires_column",      STR_PARAM, &acc_time_hires_col.s       },
+- 	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
+- #endif
+- 	{0,0,0}
+-@@ -453,6 +455,7 @@ static int mod_init( void )
+- 	acc_sipcode_col.len = strlen(acc_sipcode_col.s);
+- 	acc_sipreason_col.len = strlen(acc_sipreason_col.s);
+- 	acc_time_col.len = strlen(acc_time_col.s);
+-+	acc_time_hires_col.len = strlen(acc_time_hires_col.s);
+- #endif
+- 
+- 	if (log_facility_str) {
+-diff --git a/modules/acc/acc_mod.h b/modules/acc/acc_mod.h
+-index 5e7792a..6494a30 100644
+---- a/modules/acc/acc_mod.h
+-+++ b/modules/acc/acc_mod.h
+-@@ -92,6 +92,7 @@ extern str acc_cseqno_col;
+- extern str acc_sipcode_col;
+- extern str acc_sipreason_col;
+- extern str acc_time_col;
+-+extern str acc_time_hires_col;
+- #endif /* SQL_ACC */
+- 
+- 
+diff --git a/modules/acc/acc.c b/modules/acc/acc.c
+index d4fd89c..e322ba1 100644
+--- a/modules/acc/acc.c
++++ b/modules/acc/acc.c
+@@ -125,6 +125,14 @@ int core2strar(struct sip_msg *req, str *c_vals, int *i_vals, char *t_vals)
+ 	struct hdr_field *from;
+ 	struct hdr_field *to;
+ 
++	struct timeval  tv;
++	struct timezone tz;
++	struct tm      *tm;
++	uint64_t        time_hires;
++ 
++	gettimeofday(&tv, &tz);
++	tm = localtime(&tv.tv_sec);
++
+ 	/* method : request/reply - cseq parsed in acc_preparse_req() */
+ 	c_vals[0] = get_cseq(req)->method;
+ 	t_vals[0] = TYPE_STR;
+@@ -174,6 +182,10 @@ int core2strar(struct sip_msg *req, str *c_vals, int *i_vals, char *t_vals)
+ 	t_vals[5] = TYPE_STR;
+ 
+ 	acc_env.ts = time(NULL);
++
++	time_hires = (tv.tv_sec * 1000) + tv.tv_usec / 1000;
++	acc_env.time_hires = time_hires;
++
+ 	return ACC_CORE_LEN;
+ }
+ 
+@@ -306,7 +318,8 @@ static void acc_db_init_keys(void)
+ 	db_keys[n++] = &acc_sipcode_col;
+ 	db_keys[n++] = &acc_sipreason_col;
+ 	db_keys[n++] = &acc_time_col;
+-	time_idx = n-1;
++	db_keys[n++] = &acc_time_hires_col;
++	time_idx = n-2;
+ 
+ 	/* init the extra db keys */
+ 	for(extra=db_extra; extra ; extra=extra->next)
+@@ -322,6 +335,7 @@ static void acc_db_init_keys(void)
+ 		VAL_NULL(db_vals+i)=0;
+ 	}
+ 	VAL_TYPE(db_vals+time_idx)=DB1_DATETIME;
++	VAL_TYPE(db_vals+time_idx+1)=DB1_DOUBLE;
+ }
+ 
+ 
+@@ -380,7 +394,8 @@ int acc_db_request( struct sip_msg *rq)
+ 		VAL_STR(db_vals+i) = val_arr[i];
+ 	/* time value */
+ 	VAL_TIME(db_vals+(m++)) = acc_env.ts;
+-
++	VAL_DOUBLE(db_vals+(m++)) = ((double) acc_env.time_hires) / 1000;
++	i = m;
+ 	/* extra columns */
+ 	m += extra2strar( db_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+ 
+diff --git a/modules/acc/acc_api.h b/modules/acc/acc_api.h
+index bc52eee..61bbb51 100644
+--- a/modules/acc/acc_api.h
++++ b/modules/acc/acc_api.h
+@@ -57,6 +57,7 @@ typedef struct acc_enviroment {
+ 	struct hdr_field *to;
+ 	str text;
+ 	time_t ts;
++	uint64_t time_hires;
+ } acc_enviroment_t;
+ 
+ /* acc extra parameter */
+diff --git a/modules/acc/acc_mod.c b/modules/acc/acc_mod.c
+index 9f40e14..f8124d5 100644
+--- a/modules/acc/acc_mod.c
++++ b/modules/acc/acc_mod.c
+@@ -195,6 +195,7 @@ str acc_callid_col     = str_init("callid");
+ str acc_sipcode_col    = str_init("sip_code");
+ str acc_sipreason_col  = str_init("sip_reason");
+ str acc_time_col       = str_init("time");
++str acc_time_hires_col = str_init("time_hires");
+ int acc_db_insert_mode = 0;
+ #endif
+ 
+@@ -289,6 +290,7 @@ static param_export_t params[] = {
+ 	{"acc_sip_code_column",  STR_PARAM, &acc_sipcode_col.s    },
+ 	{"acc_sip_reason_column",STR_PARAM, &acc_sipreason_col.s  },
+ 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
++	{"acc_time_hires_column",      STR_PARAM, &acc_time_hires_col.s       },
+ 	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
+ #endif
+ 	{0,0,0}
+@@ -453,6 +455,7 @@ static int mod_init( void )
+ 	acc_sipcode_col.len = strlen(acc_sipcode_col.s);
+ 	acc_sipreason_col.len = strlen(acc_sipreason_col.s);
+ 	acc_time_col.len = strlen(acc_time_col.s);
++	acc_time_hires_col.len = strlen(acc_time_hires_col.s);
+ #endif
+ 
+ 	if (log_facility_str) {
+diff --git a/modules/acc/acc_mod.h b/modules/acc/acc_mod.h
+index 5e7792a..6494a30 100644
+--- a/modules/acc/acc_mod.h
++++ b/modules/acc/acc_mod.h
+@@ -92,6 +92,7 @@ extern str acc_cseqno_col;
+ extern str acc_sipcode_col;
+ extern str acc_sipreason_col;
+ extern str acc_time_col;
++extern str acc_time_hires_col;
+ #endif /* SQL_ACC */
+ 
+ 

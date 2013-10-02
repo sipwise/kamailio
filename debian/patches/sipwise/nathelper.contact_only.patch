@@ -1,0 +1,200 @@
+diff --git a/modules/nathelper/nathelper.c b/modules/nathelper/nathelper.c
+index ab1c66a..069bb04 100644
+--- a/modules/nathelper/nathelper.c
++++ b/modules/nathelper/nathelper.c
+@@ -340,6 +340,7 @@ static char *force_socket_str = 0;
+ static pid_t mypid;
+ static int sipping_flag = -1;
+ static int natping_processes = 1;
++static int contact_only = 0;
+ 
+ static str nortpproxy_str = str_init("a=nortpproxy:yes");
+ 
+@@ -415,6 +416,7 @@ static param_export_t params[] = {
+ 	{"natping_processes",     INT_PARAM, &natping_processes     },
+ 	{"natping_socket",        STR_PARAM, &natping_socket        },
+ 	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
++	{"contact_only",          INT_PARAM, &contact_only          },
+ 
+ 	{0, 0, 0}
+ };
+@@ -1946,9 +1948,10 @@ nh_timer(unsigned int ticks, void *timer_idx)
+ 			goto done;
+ 		}
+ 	}
+-	rval = ul.get_all_ucontacts(buf, cblen, (ping_nated_only?ul.nat_flag:0),
++	rval = ul.get_all_ucontacts_opt(buf, cblen, (ping_nated_only?ul.nat_flag:0),
+ 		((unsigned int)(unsigned long)timer_idx)*natping_interval+iteration,
+-		natping_processes*natping_interval);
++		natping_processes*natping_interval,
++		contact_only ? GAU_OPT_ONLY_CONTACT : 0);
+ 	if (rval<0) {
+ 		LM_ERR("failed to fetch contacts\n");
+ 		goto done;
+@@ -1962,9 +1965,10 @@ nh_timer(unsigned int ticks, void *timer_idx)
+ 			LM_ERR("out of pkg memory\n");
+ 			goto done;
+ 		}
+-		rval = ul.get_all_ucontacts(buf,cblen,(ping_nated_only?ul.nat_flag:0),
++		rval = ul.get_all_ucontacts_opt(buf,cblen,(ping_nated_only?ul.nat_flag:0),
+ 		   ((unsigned int)(unsigned long)timer_idx)*natping_interval+iteration,
+-		   natping_processes*natping_interval);
++		   natping_processes*natping_interval,
++		   contact_only ? GAU_OPT_ONLY_CONTACT : 0);
+ 		if (rval != 0) {
+ 			pkg_free(buf);
+ 			goto done;
+diff --git a/modules/usrloc/dlist.c b/modules/usrloc/dlist.c
+index 2f14f16..999fdc1 100644
+--- a/modules/usrloc/dlist.c
++++ b/modules/usrloc/dlist.c
+@@ -88,10 +88,12 @@ static inline int find_dlist(str* _n, dlist_t** _d)
+  * \param flags contact flags
+  * \param part_idx part index
+  * \param part_max maximal part
++ * \param options GAU_OPT_* bit field
+  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
+  */
+ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+-								unsigned int part_idx, unsigned int part_max)
++								unsigned int part_idx, unsigned int part_max,
++								unsigned int options)
+ {
+ 	static char query_buf[512];
+ 	static str query_str;
+@@ -172,7 +174,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+ 
+ 			/* received */
+ 			addr.s = (char*)VAL_STRING(ROW_VALUES(row));
+-			if ( VAL_NULL(ROW_VALUES(row)) || addr.s==0 || addr.s[0]==0 ) {
++			if ( VAL_NULL(ROW_VALUES(row)) || addr.s==0 || addr.s[0]==0 || (options & GAU_OPT_ONLY_CONTACT) ) {
+ 				/* contact */
+ 				addr.s = (char*)VAL_STRING(ROW_VALUES(row)+1);
+ 				if (VAL_NULL(ROW_VALUES(row)+1) || addr.s==0 || addr.s[0]==0) {
+@@ -293,10 +295,12 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+  * \param flags contact flags
+  * \param part_idx part index
+  * \param part_max maximal part
++ * \param options GAU_OPT_* bit field
+  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
+  */
+ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
+-								unsigned int part_idx, unsigned int part_max)
++								unsigned int part_idx, unsigned int part_max,
++								unsigned int options)
+ {
+ 	dlist_t *p;
+ 	urecord_t *r;
+@@ -355,7 +359,7 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
+ 						}
+ 					}
+ 
+-					if (c->received.s) {
++					if (c->received.s && !(options & GAU_OPT_ONLY_CONTACT)) {
+ 						needed = (int)(sizeof(c->received.len)
+ 								+ c->received.len
+ 								+ sizeof(c->sock) + sizeof(c->cflags)
+@@ -466,15 +470,33 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
+  * \param flags contact flags
+  * \param part_idx part index
+  * \param part_max maximal part
++ * \param options GAU_OPT_* bit field
+  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
+  */
+ int get_all_ucontacts(void *buf, int len, unsigned int flags,
+ 								unsigned int part_idx, unsigned int part_max)
+ {
++	return get_all_ucontacts_opt(buf, len, flags, part_idx, part_max, 0);
++}
++
++
++/*
++ * \param buf target buffer
++ * \param len length of buffer
++ * \param flags contact flags
++ * \param part_idx part index
++ * \param part_max maximal part
++ * \param options GAU_OPT_* bit field
++ * \return 0 on success, positive if buffer size was not sufficient, negative on failure
++ */
++int get_all_ucontacts_opt(void *buf, int len, unsigned int flags,
++								unsigned int part_idx, unsigned int part_max,
++								unsigned int options)
++{
+ 	if (db_mode==DB_ONLY)
+-		return get_all_db_ucontacts( buf, len, flags, part_idx, part_max);
++		return get_all_db_ucontacts( buf, len, flags, part_idx, part_max, options);
+ 	else
+-		return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max);
++		return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max, options);
+ }
+ 
+ 
+diff --git a/modules/usrloc/dlist.h b/modules/usrloc/dlist.h
+index 149b84c..e39f09a 100644
+--- a/modules/usrloc/dlist.h
++++ b/modules/usrloc/dlist.h
+@@ -121,6 +121,20 @@ int synchronize_all_udomains(int istart, int istep);
+ int get_all_ucontacts(void *buf, int len, unsigned int flags,
+ 		unsigned int part_idx, unsigned int part_max);
+ 
++/*!
++ * \brief Same as get_all_ucontacts() with options
++ * \param buf target buffer
++ * \param len length of buffer
++ * \param flags contact flags
++ * \param part_idx part index
++ * \param part_max maximal part
++ * \param options GAU_OPT_* bit field
++ * \return 0 on success, positive if buffer size was not sufficient, negative on failure
++ */
++int get_all_ucontacts_opt(void *buf, int len, unsigned int flags,
++		unsigned int part_idx, unsigned int part_max,
++		unsigned int options);
++
+ 
+ /*!
+  * \brief Find and return usrloc domain
+diff --git a/modules/usrloc/usrloc.c b/modules/usrloc/usrloc.c
+index ba0ec1a..716aca5 100644
+--- a/modules/usrloc/usrloc.c
++++ b/modules/usrloc/usrloc.c
+@@ -62,6 +62,7 @@ int bind_usrloc(usrloc_api_t* api)
+ 	api->register_udomain   = register_udomain;
+ 	api->get_udomain        = get_udomain;
+ 	api->get_all_ucontacts  = get_all_ucontacts;
++	api->get_all_ucontacts_opt = get_all_ucontacts_opt;
+ 	api->insert_urecord     = insert_urecord;
+ 	api->delete_urecord     = delete_urecord;
+ 	api->get_urecord        = get_urecord;
+diff --git a/modules/usrloc/usrloc.h b/modules/usrloc/usrloc.h
+index 8b96d90..8da7b02 100644
+--- a/modules/usrloc/usrloc.h
++++ b/modules/usrloc/usrloc.h
+@@ -41,6 +41,8 @@
+ #define WRITE_BACK    2
+ #define DB_ONLY       3
+ 
++#define GAU_OPT_ONLY_CONTACT   (1<<0)  /* ignore "received" address and always return contact */
++
+ /*forward declaration necessary for udomain*/
+ 
+ struct udomain;
+@@ -175,6 +177,9 @@ typedef int (*register_udomain_t)(const char* _n, struct udomain** _d);
+ typedef int  (*get_all_ucontacts_t) (void* buf, int len, unsigned int flags,
+ 		unsigned int part_idx, unsigned int part_max);
+ 
++typedef int  (*get_all_ucontacts_opt_t) (void* buf, int len, unsigned int flags,
++		unsigned int part_idx, unsigned int part_max, unsigned int options);
++
+ typedef int (*get_udomain_t)(const char* _n, udomain_t** _d);
+ 
+ typedef unsigned int (*ul_get_aorhash_t)(str *_aor);
+@@ -195,6 +200,7 @@ typedef struct usrloc_api {
+ 	register_udomain_t   register_udomain;
+ 	get_udomain_t        get_udomain;
+ 	get_all_ucontacts_t  get_all_ucontacts;
++	get_all_ucontacts_opt_t get_all_ucontacts_opt;
+ 
+ 	insert_urecord_t     insert_urecord;
+ 	delete_urecord_t     delete_urecord;

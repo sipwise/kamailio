@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    install|upgrade)
+        # updating from an OpenSER installation
+        if dpkg --compare-versions "$2" "<" "1.4.0"; then
+            # check for old configuration
+            if [ -r /etc/openser/openser.cfg ]; then
+                echo "Found old OpenSER installation, trying to move configuration files to new location."
+                mkdir -p /etc/kamailio
+                mv /etc/openser/openser.cfg /etc/kamailio/kamailio.cfg
+                echo "Moved \"/etc/openser/openser.cfg\" to \"/etc/kamailio/kamailio.cfg\"."
+                if [ -r /etc/openser/openserctlrc ]; then
+                    mv /etc/openser/openserctlrc /etc/kamailio/kamctlrc
+                    echo "Moved \"/etc/openser/openserctlrc\" to \"/etc/kamailio/kamctlrc\"."
+                fi
+                if [ -r /etc/default/openser ]; then
+                    mv /etc/default/openser /etc/default/kamailio
+                    echo "Moved \"/etc/default/openser\" to \"/etc/default/kamailio\"."
+                fi
+                echo "Please take a look at kamailio.README.debian about how to upgrade your configuration."
+            fi
+        fi
+        ;;
+
+    abort-upgrade)
+        ;;
+    
+    *)
+        echo "preinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#

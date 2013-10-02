@@ -1,0 +1,632 @@
+--- a/basex.c
++++ b/basex.c
+@@ -162,10 +162,21 @@
+ 
+ unsigned char _bx_ub64[256];
+ 
++unsigned char _bx_b64url_first[256];
++unsigned char _bx_b64url_second[4][256];
++unsigned char _bx_b64url_third[4][256];
++unsigned char _bx_b64url_fourth[256];
++
++unsigned char _bx_ub64url[256];
++
++
+ #elif defined BASE64_LOOKUP_8K
+ unsigned short _bx_b64_12[4096];
+ unsigned char _bx_ub64[256];
+ 
++unsigned short _bx_b64url_12[4096];
++unsigned char _bx_ub64url[256];
++
+ #else /*  BASE64_LOOKUP_LARGE */
+ /* very small lookup, 65 bytes */
+ 
+@@ -184,12 +195,30 @@
+ 		0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
+ 		0x2f, 0x30, 0x31, 0x32, 0x33, 0xff, 0xff, 0xff, 0xff, 0xff };
+ 
++
++unsigned char _bx_b64url[64+1]=
++		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
++
++
++unsigned char _bx_ub64url[0x54+1]={
++		                              0xff, 0xff, 0x3e, 0xff, 0xff,
++		0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d,
++		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x01, 0x02,
++		0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c,
++		0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
++		0x17, 0x18, 0x19, 0xff, 0xff, 0xff, 0xff, 0x3f, 0xff, 0x1a,
++		0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24,
++		0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
++		0x2f, 0x30, 0x31, 0x32, 0x33, 0xff, 0xff, 0xff, 0xff, 0xff };
++
+ #endif /*  BASE64_LOOKUP_LARGE */
+ 
+ #endif /* BASE64_LOOKUP_TABLE */
+ 
+ #define b64_enc_char(c) base64_enc_char(c)
+ #define b64_dec_char(c) base64_dec_char(c)
++#define b64url_enc_char(c) base64url_enc_char(c)
++#define b64url_dec_char(c) base64url_dec_char(c)
+ 
+ int init_basex()
+ {
+@@ -201,36 +230,53 @@
+ 	int i;
+ 	
+ 	/* encode tables */
+-	for (r=0; r<256; r++)
++	for (r=0; r<256; r++) {
+ 		_bx_b64_first[r]=b64_enc_char(((unsigned char)r)>>2);
++		_bx_b64url_first[r]=b64url_enc_char(((unsigned char)r)>>2);
++	}
+ 	for(i=0; i<4; i++){
+-		for (r=0; r<256; r++)
++		for (r=0; r<256; r++) {
+ 			_bx_b64_second[i][r]=
+ 					b64_enc_char((unsigned char)((i<<4)|(r>>4)));
++			_bx_b64url_second[i][r]=
++					b64url_enc_char((unsigned char)((i<<4)|(r>>4)));
++		}
+ 	}
+ 	for(i=0; i<4; i++){
+-		for (r=0; r<256; r++)
++		for (r=0; r<256; r++) {
+ 			_bx_b64_third[i][r]=
+ 				b64_enc_char((unsigned char)(((r<<2)&0x3f)|i));
++			_bx_b64url_third[i][r]=
++				b64url_enc_char((unsigned char)(((r<<2)&0x3f)|i));
++		}
+ 	}
+-	for (r=0; r<256; r++)
++	for (r=0; r<256; r++) {
+ 		_bx_b64_fourth[r]=b64_enc_char(((unsigned char)r&0x3f));
++		_bx_b64url_fourth[r]=b64url_enc_char(((unsigned char)r&0x3f));
++	}
+ 	
+ 	/* decode */
+-	for (r=0; r<256; r++)
++	for (r=0; r<256; r++) {
+ 		_bx_ub64[r]=b64_dec_char((unsigned char)r);
++		_bx_ub64url[r]=b64url_dec_char((unsigned char)r);
++	}
+ #elif defined BASE64_LOOKUP_8K
+-	for (r=0; r< 4096; r++)
++	for (r=0; r< 4096; r++) {
+ #if defined __IS_LITTLE_ENDIAN
+ 		_bx_b64_12[r]=b64_enc_char(r>>6)|(b64_enc_char(r&0x3f)<<8);
++		_bx_b64url_12[r]=b64url_enc_char(r>>6)|(b64url_enc_char(r&0x3f)<<8);
+ #elif defined __IS_BIG_ENDIAN /* __IS_LITTLE_ENDIAN */
+ 		_bx_b64_12[r]=(b64_enc_char(r>>6)<<8)|b64_enc_char(r&0x3f);
++		_bx_b64url_12[r]=(b64url_enc_char(r>>6)<<8)|b64url_enc_char(r&0x3f);
+ #else /* __IS_LITTLE_ENDIAN */
+ #error Neither __IS_LITTE_ENDIAN nor __IS_BIG_ENDIAN  defined
+ #endif
++	}
+ 	/* decode */
+-	for (r=0; r<256; r++)
++	for (r=0; r<256; r++) {
+ 		_bx_ub64[r]=b64_dec_char((unsigned char)r);
++		_bx_ub64url[r]=b64url_dec_char((unsigned char)r);
++	}
+ #endif
+ #endif
+ 	return 0;
+--- a/basex.h
++++ b/basex.h
+@@ -190,21 +190,45 @@
+ extern unsigned char _bx_b64_third[4][256];
+ extern unsigned char _bx_b64_fourth[256];
+ 
+-#define BASE64_1(a) _bx_b64_first[(a)]
+-#define BASE64_2(a,b) _bx_b64_second[(a)&0x3][(b)]
+-#define BASE64_3(b,c) _bx_b64_third[(c)>>6][(b)]
+-#define BASE64_4(c) _bx_b64_fourth[(c)]
++extern unsigned char _bx_b64url_first[256];
++extern unsigned char _bx_b64url_second[4][256];
++extern unsigned char _bx_b64url_third[4][256];
++extern unsigned char _bx_b64url_fourth[256];
++
++#define BASE64_1_TBL(t,a) (t)[(a)]
++#define BASE64_2_TBL(t,a,b) (t)[(a)&0x3][(b)]
++#define BASE64_3_TBL(t,b,c) (t)[(c)>>6][(b)]
++#define BASE64_4_TBL(t,c) (t)[(c)]
++
++#define BASE64_1(a) BASE64_1_TBL(_bx_b64_first,a)
++#define BASE64_2(a,b) BASE64_2_TBL(_bx_b64_second,a,b)
++#define BASE64_3(b,c) BASE64_3_TBL(_bx_b64_third,b,c)
++#define BASE64_4(c) BASE64_4_TBL(_bx_b64_fourth,c)
++
++#define BASE64URL_1(a) BASE64_1_TBL(_bx_b64url_first,a)
++#define BASE64URL_2(a,b) BASE64_2_TBL(_bx_b64url_second,a,b)
++#define BASE64URL_3(b,c) BASE64_3_TBL(_bx_b64url_third,b,c)
++#define BASE64URL_4(c) BASE64_4_TBL(_bx_b64url_fourth,c)
+ 
+ extern unsigned char _bx_ub64[256];
+-#define UNBASE64(v) _bx_ub64[(v)]
++extern unsigned char _bx_ub64url[256];
++
++#define UNBASE64_TBL(t,v) (((unsigned char *)(t))[(v)])
++#define UNBASE64_TABLE ((void *) _bx_ub64)
++#define UNBASE64URL_TABLE ((void *) _bx_ub64url)
+ 
+ #elif defined BASE64_LOOKUP_8K
+ /* even larger encode tables: 8k */
+ extern unsigned short _bx_b64_12[4096];
++extern unsigned short _bx_b64url_12[4096];
+ 
+ /* return a word (16 bits) */
+-#define BASE64_12(a,b)	_bx_b64_12[((a)<<4)|((b)>>4)]
+-#define BASE64_34(b,c)	_bx_b64_12[(((b)&0xf)<<8)|(c)]
++#define BASE64_12_TBL(t,a,b)	(t)[((a)<<4)|((b)>>4)]
++#define BASE64_34_TBL(t,b,c)	(t)[(((b)&0xf)<<8)|(c)]
++#define BASE64_12(a,b)		BASE64_12_TBL(_bx_b64_12,a,b)
++#define BASE64_34(b,c)		BASE64_34_TBL(_bx_b64_12,b,c)
++#define BASE64URL_12(a,b)	BASE64_12_TBL(_bx_b64url_12,a,b)
++#define BASE64URL_34(b,c)	BASE64_34_TBL(_bx_b64url_12,b,c)
+ #ifdef __IS_LITTLE_ENDIAN
+ #define FIRST_8B(s)	((unsigned char)(s))
+ #define LAST_8B(s)	((s)>>8)
+@@ -217,37 +241,71 @@
+ 
+ 
+ extern unsigned char _bx_ub64[256];
+-#define UNBASE64(v) _bx_ub64[(v)]
++extern unsigned char _bx_ub64url[256];
++#define UNBASE64_TBL(t,v) (((unsigned char *)(t))[(v)])
++#define UNBASE64_TABLE ((void *) _bx_ub64)
++#define UNBASE64URL_TABLE ((void *) _bx_ub64url)
++
+ 
+ #else /* BASE64_LOOKUP_LARGE */
+ /* small lookup tables */
+ extern unsigned char _bx_b64[64+1];
++extern unsigned char _bx_b64url[64+1];
+ 
+-#define BASE64_DIG(v)	_bx_b64[(v)]
++#define BASE64_DIG_TBL(t,v)	(t)[(v)]
+ 
+-#define BASE64_1(a)		BASE64_DIG((a)>>2)
+-#define BASE64_2(a, b)	BASE64_DIG( (((a)<<4)&0x3f) | ((b)>>4))
+-#define BASE64_3(b, c)	BASE64_DIG( (((b)<<2)&0x3f) | ((c)>>6))
+-#define BASE64_4(c)		BASE64_DIG((c)&0x3f)
++#define BASE64_1_TBL(t,a)	BASE64_DIG_TBL(t,(a)>>2)
++#define BASE64_2_TBL(t,a,b)	BASE64_DIG_TBL(t, (((a)<<4)&0x3f) | ((b)>>4))
++#define BASE64_3_TBL(t,b,c)	BASE64_DIG_TBL(t, (((b)<<2)&0x3f) | ((c)>>6))
++#define BASE64_4_TBL(t,c)	BASE64_DIG_TBL(t,(c)&0x3f)
++
++#define BASE64_1(a)		BASE64_1_TBL(_bx_b64,a)
++#define BASE64_2(a, b)		BASE64_2_TBL(_bx_b64,a,b)
++#define BASE64_3(b, c)		BASE64_3_TBL(_bx_b64,b,c)
++#define BASE64_4(c)		BASE64_4_TBL(_bx_b64,c)
++
++#define BASE64URL_1(a)		BASE64_1_TBL(_bx_b64url,a)
++#define BASE64URL_2(a, b)	BASE64_2_TBL(_bx_b64url,a,b)
++#define BASE64URL_3(b, c)	BASE64_3_TBL(_bx_b64url,b,c)
++#define BASE64URL_4(c)		BASE64_4_TBL(_bx_b64url,c)
+ 
+ extern unsigned char _bx_ub64[0x54+1];
+-#define UNBASE64(v) _bx_ub64[(((v)&0x7f)-0x2b)]
++extern unsigned char _bx_ub64url[0x54+1];
++#define UNBASE64_TBL(t,v) ((v) >= 0x2b ? ((unsigned char *) (t))[(((v)&0x7f)-0x2b)] : 0xff)
++#define UNBASE64_TABLE ((void *) _bx_ub64)
++#define UNBASE64URL_TABLE ((void *) _bx_ub64url)
+ 
+ #endif /* BASE64_LOOKUP_LARGE */
+ 
+ 
+ #else /* BASE64_LOOKUP_TABLE */
+ 
+-#define BASE64_DIG(v) base64_enc_char(v)
+-#define BASE64_1(a)		BASE64_DIG((a)>>2)
+-#define BASE64_2(a, b)	BASE64_DIG( (((a)<<4)&0x3f) | ((b)>>4))
+-#define BASE64_3(b, c)	BASE64_DIG( (((b)<<2)&0x3f) | ((c)>>6))
+-#define BASE64_4(c)		BASE64_DIG((c)&0x3f)
++#define BASE64_DIG_TBL(t,v) ((unsigned char (*)(unsigned char)) (t))(v)
+ 
+-#define UNBASE64(v) base64_dec_char(v)
++#define BASE64_1_TBL(t,a)	BASE64_DIG_TBL(t,(a)>>2)
++#define BASE64_2_TBL(t,a, b)	BASE64_DIG_TBL(t, (((a)<<4)&0x3f) | ((b)>>4))
++#define BASE64_3_TBL(t,b, c)	BASE64_DIG_TBL(t, (((b)<<2)&0x3f) | ((c)>>6))
++#define BASE64_4_TBL(t,c)	BASE64_DIG_TBL(t,(c)&0x3f)
++
++#define BASE64_1(a)		BASE64_1_TBL(base64_enc_char,a)
++#define BASE64_2(a, b)		BASE64_2_TBL(base64_enc_char,a,b)
++#define BASE64_3(b, c)		BASE64_3_TBL(base64_enc_char,b,c)
++#define BASE64_4(c)		BASE64_4_TBL(base64_enc_char,c)
++
++#define BASE64URL_1(a)		BASE64_1_TBL(base64url_enc_char,a)
++#define BASE64URL_2(a, b)	BASE64_2_TBL(base64url_enc_char,a,b)
++#define BASE64URL_3(b, c)	BASE64_3_TBL(base64url_enc_char,b,c)
++#define BASE64URL_4(c)		BASE64_4_TBL(base64url_enc_char,c)
++
++#define UNBASE64_TBL(t,v) ((unsigned char (*)(unsigned char)) (t))(v)
++#define UNBASE64_TABLE ((void *) base64_dec_char)
++#define UNBASE64URL_TABLE ((void *) base64_dec_char)
+ 
+ #endif /* BASE64_LOOKUP_TABLE */
+ 
++#define UNBASE64(v) UNBASE64_TBL(UNBASE64_TABLE,v)
++#define UNBASE64URL(v) UNBASE64_TBL(UNBASE64URL_TABLE,v)
++
+ 
+ 
+ /*! \brief lenght needed for encoding l bytes */
+@@ -553,6 +611,37 @@
+ }
+ 
+ 
++/*! \brief helper internal function: encodes v (6 bits value)
++ * \return char ascii encoding on success and 0xff on error
++ * (value out of range) */
++inline static unsigned char base64url_enc_char(unsigned char v)
++{
++	switch(v){
++		case 0x3f:
++			return '_';
++		case 0x3e:
++			return '-';
++	}
++	return base64_enc_char(v);
++}
++
++/*! \brief helper internal function: decodes a base64url "digit",
++ * \return value on success (0-63) and 0xff on error (invalid)*/
++inline static unsigned base64url_dec_char(unsigned char v)
++{
++	switch(v){
++		case '_':
++			return 0x3f;
++		case '-':
++			return 0x3e;
++		case '/':
++		case '+':
++			return 0xff;
++	}
++	return base64_dec_char(v);
++}
++
++
+ #ifdef BASE64_LOOKUP_8K
+ /*!
+  * \return : size used from the output buffer (dst) on success ((slen+2)/3*4)
+@@ -560,8 +649,10 @@
+  *
+  * \note WARNING: the output string is not 0-term
+  */
+-inline static int base64_enc(unsigned char* src, int slen,
+-							unsigned char* dst,  int dlen)
++inline static int base64_enc_tbl(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen,
++							unsigned short *tbl, int pad)
++
+ {
+ 	unsigned char* end;
+ 	int osize;
+@@ -572,53 +663,82 @@
+ 	end=src+slen/3*3;
+ 	if (unlikely((long)dst%2)){
+ 		for (;src<end; src+=3,dst+=4){
+-			dst[0]=FIRST_8B(BASE64_12(src[0], src[1]));
+-			dst[1]=LAST_8B(BASE64_12(src[0], src[1]));
+-			dst[2]=FIRST_8B(BASE64_34(src[1], src[2]));
+-			dst[3]=LAST_8B(BASE64_34(src[1], src[2]));
++			dst[0]=FIRST_8B(BASE64_12_TBL(tbl, src[0], src[1]));
++			dst[1]=LAST_8B(BASE64_12_TBL(tbl, src[0], src[1]));
++			dst[2]=FIRST_8B(BASE64_34_TBL(tbl, src[1], src[2]));
++			dst[3]=LAST_8B(BASE64_34_TBL(tbl, src[1], src[2]));
+ 		}
+ 		switch(slen%3){
+ 			case 2:
+-				dst[0]=FIRST_8B(BASE64_12(src[0], src[1]));
+-				dst[1]=LAST_8B(BASE64_12(src[0], src[1]));
+-				dst[2]=FIRST_8B(BASE64_34(src[1], 0));
+-				dst[3]='=';
++				dst[0]=FIRST_8B(BASE64_12_TBL(tbl, src[0], src[1]));
++				dst[1]=LAST_8B(BASE64_12_TBL(tbl, src[0], src[1]));
++				dst[2]=FIRST_8B(BASE64_34_TBL(tbl, src[1], 0));
++				if (pad)
++					dst[3]='=';
++				else
++					osize--;
+ 				break;
+ 			case 1:
+-				dst[0]=FIRST_8B(BASE64_12(src[0], 0));
+-				dst[1]=LAST_8B(BASE64_12(src[0], 0));
+-				dst[2]='=';
+-				dst[3]='=';
++				dst[0]=FIRST_8B(BASE64_12_TBL(tbl, src[0], 0));
++				dst[1]=LAST_8B(BASE64_12_TBL(tbl, src[0], 0));
++				if (pad) {
++					dst[2]='=';
++					dst[3]='=';
++				}
++				else
++					osize -= 2;
+ 				break;
+ 		}
+ 	}else{
+ 		for (;src<end; src+=3,dst+=4){
+-			*(unsigned short*)(dst+0)=_bx_b64_12[(src[0]<<4)|(src[1]>>4)];
+-			*(unsigned short*)(dst+2)=_bx_b64_12[((src[1]&0xf)<<8)|src[2]];
++			*(unsigned short*)(dst+0)=tbl[(src[0]<<4)|(src[1]>>4)];
++			*(unsigned short*)(dst+2)=tbl[((src[1]&0xf)<<8)|src[2]];
+ 		}
+ 		switch(slen%3){
+ 			case 2:
+-				*(unsigned short*)(dst+0)=_bx_b64_12[(src[0]<<4)|(src[1]>>4)];
+-				*(unsigned short*)(dst+2)=_bx_b64_12[((src[1]&0xf)<<8)|0];
+-				dst[3]='=';
++				*(unsigned short*)(dst+0)=tbl[(src[0]<<4)|(src[1]>>4)];
++				*(unsigned short*)(dst+2)=tbl[((src[1]&0xf)<<8)|0];
++				if (pad)
++					dst[3]='=';
++				else
++					osize--;
+ 				break;
+ 			case 1:
+-				*(unsigned short*)(dst+0)=_bx_b64_12[(src[0]<<4)|0];
+-				dst[2]='=';
+-				dst[3]='=';
++				*(unsigned short*)(dst+0)=tbl[(src[0]<<4)|0];
++				if (pad) {
++					dst[2]='=';
++					dst[3]='=';
++				}
++				else
++					osize -= 2;
+ 				break;
+ 		}
+ 	}
+ 	return osize;
+ }
++inline static int base64_enc(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen)
++{
++	return base64_enc_tbl(src, slen, dst, dlen, _bx_b64_12, 1);
++}
++inline static int base64url_enc(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen)
++{
++	return base64_enc_tbl(src, slen, dst, dlen, _bx_b64url_12, 0);
++}
+ #else /*BASE64_LOOKUP_8K*/
+ /*! \brief Convert to base64
+  * \return size used from the output buffer (dst) on success ((slen+2)/3*4)
+  *          -size_needed on error
+  * \note WARNING: the output string is not 0-term
+  */
+-inline static int base64_enc(unsigned char* src, int slen,
+-							unsigned char* dst,  int dlen)
++inline static int base64_enc_tbl(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen,
++							unsigned char tbl_first[256],
++							unsigned char tbl_second[4][256],
++							unsigned char tbl_third[4][256],
++							unsigned char tbl_fourth[256],
++							int pad)
+ {
+ 	unsigned char* end;
+ 	int osize;
+@@ -628,27 +748,48 @@
+ 		return -osize;
+ 	end=src+slen/3*3;
+ 	for (;src<end; src+=3,dst+=4){
+-		dst[0]=BASE64_1(src[0]);
+-		dst[1]=BASE64_2(src[0], src[1]);
+-		dst[2]=BASE64_3(src[1], src[2]);
+-		dst[3]=BASE64_4(src[2]);
++		dst[0]=BASE64_1_TBL(tbl_first, src[0]);
++		dst[1]=BASE64_2_TBL(tbl_second, src[0], src[1]);
++		dst[2]=BASE64_3_TBL(tbl_third, src[1], src[2]);
++		dst[3]=BASE64_4_TBL(tbl_fourth, src[2]);
+ 	}
+ 	switch(slen%3){
+ 		case 2:
+-			dst[0]=BASE64_1(src[0]);
+-			dst[1]=BASE64_2(src[0], src[1]);
+-			dst[2]=BASE64_3(src[1], 0);
+-			dst[3]='=';
++			dst[0]=BASE64_1_TBL(tbl_first, src[0]);
++			dst[1]=BASE64_2_TBL(tbl_second, src[0], src[1]);
++			dst[2]=BASE64_3_TBL(tbl_third, src[1], 0);
++			if (pad)
++				dst[3]='=';
++			else
++				osize--;
+ 			break;
+ 		case 1:
+-			dst[0]=BASE64_1(src[0]);
+-			dst[1]=BASE64_2(src[0], 0);
+-			dst[2]='=';
+-			dst[3]='=';
++			dst[0]=BASE64_1_TBL(tbl_first, src[0]);
++			dst[1]=BASE64_2_TBL(tbl_second, src[0], 0);
++			if (pad) {
++				dst[2]='=';
++				dst[3]='=';
++			}
++			else
++				osize -= 2;
+ 			break;
+ 	}
+ 	return osize;
+ }
++inline static int base64_enc(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen)
++{
++	return base64_enc_tbl(src, slen, dst, dlen,
++			_bx_b64_first, _bx_b64_second,
++			_bx_b64_third, _bx_b64_fourth, 1);
++}
++inline static int base64url_enc(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen)
++{
++	return base64_enc_tbl(src, slen, dst, dlen,
++			_bx_b64url_first, _bx_b64url_second,
++			_bx_b64url_third, _bx_b64url_fourth, 0);
++}
+ #endif /*BASE64_LOOKUP_8K*/
+ 
+ 
+@@ -658,63 +799,73 @@
+  *          -size_needed on error or 0 on bad base64 encoded string
+  * \note WARNING: the output string is not 0-term
+  */
+-inline static int base64_dec(unsigned char* src, int slen,
+-							unsigned char* dst,  int dlen)
++inline static int base64_dec_tbl(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen,
++							void *tbl, int osize)
+ {
+ 	
+ 	unsigned char* end;
+-	int osize;
+ 	register unsigned a, b, c, d; /* more registers used, but allows for
+ 									 paralles execution */
+ 	
+-	if (unlikely((slen<4) || (slen%4) || 
+-				(src[slen-2]=='=' && src[slen-1]!='=')))
+-		return 0; /* invalid base64 enc. */
+-	osize=(slen/4*3)-(src[slen-2]=='=')-(src[slen-1]=='=');
+ 	if (unlikely(dlen<osize))
+ 		return -osize;
+ 	end=src+slen-4;
+ 	for (;src<end; src+=4,dst+=3){
+-#if 0
+-		u=	(UNBASE64(src[0])<<18) | (UNBASE64(src[1])<<12) | 
+-			(UNBASE64(src[2])<<6)  |  UNBASE64(src[3]);
+-		dst[0]=u>>16;
+-		dst[1]=u>>8;
+-		dst[3]=u;
+-#endif
+-		a=UNBASE64(src[0]);
+-		b=UNBASE64(src[1]);
+-		c=UNBASE64(src[2]);
+-		d=UNBASE64(src[3]);
++		a=UNBASE64_TBL(tbl,src[0]);
++		b=UNBASE64_TBL(tbl,src[1]);
++		c=UNBASE64_TBL(tbl,src[2]);
++		d=UNBASE64_TBL(tbl,src[3]);
+ 		dst[0]=(a<<2) | (b>>4);
+ 		dst[1]=(b<<4) | (c>>2);
+ 		dst[2]=(c<<6) | d;
+ 	}
+ 	switch(osize%3){
+ 		case 0: /* no '=' => 3 output bytes at the end */
+-			a=UNBASE64(src[0]);
+-			b=UNBASE64(src[1]);
+-			c=UNBASE64(src[2]);
+-			d=UNBASE64(src[3]);
++			a=UNBASE64_TBL(tbl, src[0]);
++			b=UNBASE64_TBL(tbl, src[1]);
++			c=UNBASE64_TBL(tbl, src[2]);
++			d=UNBASE64_TBL(tbl, src[3]);
+ 			dst[0]=(a<<2) | (b>>4);
+ 			dst[1]=(b<<4) | (c>>2);
+ 			dst[2]=(c<<6) | d;
+ 			break;
+ 		case 2: /* 1  '=' => 2 output bytes at the end */
+-			a=UNBASE64(src[0]);
+-			b=UNBASE64(src[1]);
+-			c=UNBASE64(src[2]);
++			a=UNBASE64_TBL(tbl, src[0]);
++			b=UNBASE64_TBL(tbl, src[1]);
++			c=UNBASE64_TBL(tbl, src[2]);
+ 			dst[0]=(a<<2) | (b>>4);
+ 			dst[1]=(b<<4) | (c>>2);
+ 			break;
+ 		case 1: /* 2  '=' => 1 output byte at the end */
+-			a=UNBASE64(src[0]);
+-			b=UNBASE64(src[1]);
++			a=UNBASE64_TBL(tbl, src[0]);
++			b=UNBASE64_TBL(tbl, src[1]);
+ 			dst[0]=(a<<2) | (b>>4);
+ 			break;
+ 	}
+ 	return osize;
+ }
++inline static int base64_dec(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen)
++{
++	int osize;
++
++	if (unlikely((slen<4) || (slen%4) ||
++				(src[slen-2]=='=' && src[slen-1]!='=')))
++		return 0; /* invalid base64 enc. */
++	osize=(slen/4*3)-(src[slen-2]=='=')-(src[slen-1]=='=');
++	return base64_dec_tbl(src, slen, dst, dlen, UNBASE64_TABLE, osize);
++}
++inline static int base64url_dec(unsigned char* src, int slen,
++							unsigned char* dst,  int dlen)
++{
++	int osize;
++
++	if (unlikely((slen % 4 == 1)))
++		return 0; /* invalid base64url enc. */
++	osize=(slen*3/4);
++	return base64_dec_tbl(src, slen, dst, dlen, UNBASE64URL_TABLE, osize);
++}
+ 
+ 
+ 
+--- a/modules/pv/pv_trans.c
++++ b/modules/pv/pv_trans.c
+@@ -231,6 +231,32 @@
+ 			val->rs.s = _tr_buffer;
+ 			val->rs.len = i;
+ 			break;
++		case TR_S_ENCODEBASE64URL:
++			if(!(val->flags&PV_VAL_STR))
++				val->rs.s = int2str(val->ri, &val->rs.len);
++			i = base64url_enc((unsigned char *) val->rs.s, val->rs.len,
++					(unsigned char *) _tr_buffer, TR_BUFFER_SIZE-1);
++			if (i < 0)
++				return -1;
++			_tr_buffer[i] = '\0';
++			memset(val, 0, sizeof(pv_value_t));
++			val->flags = PV_VAL_STR;
++			val->rs.s = _tr_buffer;
++			val->rs.len = i;
++			break;
++		case TR_S_DECODEBASE64URL:
++			if(!(val->flags&PV_VAL_STR))
++				val->rs.s = int2str(val->ri, &val->rs.len);
++			i = base64url_dec((unsigned char *) val->rs.s, val->rs.len,
++					(unsigned char *) _tr_buffer, TR_BUFFER_SIZE-1);
++			if (i < 0 || (i == 0 && val->rs.len > 0))
++				return -1;
++			_tr_buffer[i] = '\0';
++			memset(val, 0, sizeof(pv_value_t));
++			val->flags = PV_VAL_STR;
++			val->rs.s = _tr_buffer;
++			val->rs.len = i;
++			break;
+ 		case TR_S_ESCAPECOMMON:
+ 			if(!(val->flags&PV_VAL_STR))
+ 				val->rs.s = int2str(val->ri, &val->rs.len);
+@@ -1797,6 +1823,12 @@
+ 	} else if(name.len==13 && strncasecmp(name.s, "decode.base64", 13)==0) {
+ 		t->subtype = TR_S_DECODEBASE64;
+ 		goto done;
++	} else if(name.len==16 && strncasecmp(name.s, "encode.base64url", 16)==0) {
++		t->subtype = TR_S_ENCODEBASE64URL;
++		goto done;
++	} else if(name.len==16 && strncasecmp(name.s, "decode.base64url", 16)==0) {
++		t->subtype = TR_S_DECODEBASE64URL;
++		goto done;
+ 	} else if(name.len==13 && strncasecmp(name.s, "escape.common", 13)==0) {
+ 		t->subtype = TR_S_ESCAPECOMMON;
+ 		goto done;
+--- a/modules/pv/pv_trans.h
++++ b/modules/pv/pv_trans.h
+@@ -38,6 +38,7 @@
+ 	TR_S_NONE=0, TR_S_LEN, TR_S_INT, TR_S_MD5, TR_S_SUBSTR,
+ 	TR_S_SELECT, TR_S_ENCODEHEXA, TR_S_DECODEHEXA,
+ 	TR_S_ENCODEBASE64, TR_S_DECODEBASE64,
++	TR_S_ENCODEBASE64URL, TR_S_DECODEBASE64URL,
+ 	TR_S_ESCAPECOMMON, TR_S_UNESCAPECOMMON, TR_S_ESCAPEUSER, TR_S_UNESCAPEUSER,
+ 	TR_S_ESCAPEPARAM, TR_S_UNESCAPEPARAM, TR_S_TOLOWER, TR_S_TOUPPER,
+ 	TR_S_STRIP, TR_S_STRIPTAIL, TR_S_PREFIXES, TR_S_PREFIXES_QUOT, TR_S_REPLACE,

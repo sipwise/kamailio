@@ -1,0 +1,375 @@
+ngcp-kamailio (3.3.5-1) unstable; urgency=low
+
+  * Upstream new version.
+  * Use Debian packaging as base.
+    All sipwise changes as quilt patches.
+  * Rename to ngcp-kamailio*
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 02 Oct 2013 14:55:05 +0200
+
+kamailio (3.3+ngcp2.8.1) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * ce6ae9f adding patch files
+  * dab16a0 backport c70f884 (IPv6 fix for nathelper) from kamailio
+  * 741e89c backporting url-safe_base64.patch from 4.x master
+  * 8417a59 attempt to fix segfault due to recursive mysql query
+  * 3c69183 incorporate received= escaping fixes
+  * 1bb1c30 fix string length matching
+  * 207a3df implement pv transformation {en,de}code.base64
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Tue, 11 Jun 2013 11:35:51 +0200
+
+kamailio (3.3+ngcp2.8.0) unstable; urgency=low
+
+  * Include rtpproxy-ng module
+  * Support parallel building
+  * Debian build fixes
+  * Include natping_disable_bflag
+  * Include presence_dialoginfo_notify.patch
+  * Support pvars in rtpproxy
+  * Add second parameter to add_path*() and support pvars
+  * Update lcr_rate to support a/b rating
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Wed, 27 Mar 2013 08:49:17 -0400
+
+kamailio (3.3+ngcp2.7.2) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * Introduce sipping_disable_bflag option
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Thu, 07 Feb 2013 12:56:41 +0100
+
+kamailio (3.3+ngcp2.7.1) unstable; urgency=low
+
+  * Fix possible segfault in pv module
+  * Create nathelper option to always use contact address
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Wed, 09 Jan 2013 12:40:43 -0500
+
+kamailio (3.3+ngcp2.7.0) unstable; urgency=low
+
+  * Implement lcr cost-based routing as new lcr_rate module
+  * move send() and send_tcp() from core to corex module. EXPERIMENTAL!
+  * backporting corex module from kamailio trunk including all changes to append_branch()
+  * Fix hunting for Auth header in rare cases in digest parser.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 21 Dec 2012 10:59:56 +0100
+
+kamailio (3.3+ngcp2.6.12) unstable; urgency=low
+
+  * Don't stop after first Authorization header if all message is already parsed in find_credentials.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Sun, 16 Dec 2012 18:21:47 +0100
+
+kamailio (3.3+ngcp2.6.10) unstable; urgency=low
+
+  * Fix bag tagging.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Mon, 26 Nov 2012 12:38:23 +0100
+
+kamailio (3.3+ngcp2.6.9) unstable; urgency=low
+
+  [ Jon Bonilla ]
+  * Merge with upstream 3.3.2
+
+  [ Richard Fuchs ]
+  * Fix a mem leak in siputils module
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 08 Nov 2012 17:42:19 +0100
+
+kamailio (3.3+ngcp2.6.8) unstable; urgency=low
+
+  * merge [f5997ba] b/f: In case of IPv6 Option in the RTP-Command, the pointers and the length need to be updated.
+  * attempt to work around the modules/ctl message chunk limitation
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Thu, 20 Sep 2012 11:30:41 -0400
+
+kamailio (3.3+ngcp2.6.7) unstable; urgency=low
+
+  * Fix segfault caused by invalid SDP bodies
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Tue, 04 Sep 2012 17:14:56 -0400
+
+kamailio (3.3+ngcp2.6.6) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * Fix a= lines inserted out of order
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Wed, 29 Aug 2012 22:51:01 +0200
+
+kamailio (3.3+ngcp2.6.5) unstable; urgency=low
+
+  [ Michael Prokop ]
+  * kamailio.postinst: postinst: do not exit if update-rc.d does not work
+
+  [ jbonilla ]
+  * kamailio.postinst: Remove debhelper mark fomr postinst script
+  * rules: disable dh_installdebconf
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Wed, 29 Aug 2012 10:30:35 +0200
+
+kamailio (3.3+ngcp2.6.4) unstable; urgency=low
+
+  * Conflict with ngcp-system-tools-* packages.
+  * Depend on mysql for correct insserv.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Tue, 28 Aug 2012 10:42:53 +0200
+
+kamailio (3.3+ngcp2.6.3) unstable; urgency=low
+
+  * Fix init script and default file handling 
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Mon, 27 Aug 2012 13:15:04 +0200
+
+kamailio (3.3+ngcp2.6.2) unstable; urgency=low
+
+  * Fix bad tagging
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 23 Aug 2012 21:51:43 +0200
+
+kamailio (3.3+ngcp2.6.1) unstable; urgency=low
+
+  [ Michael Prokop ]
+  * Provide postrm script
+  * Provide postinst script, taking care of services restarts in HA mode
+
+  [ jbonilla ]
+  * re-add init stuff 
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Thu, 23 Aug 2012 17:23:00 +0200
+
+kamailio (3.3+ngcp2.6.0) unstable; urgency=low
+
+  [ rfuchs ]
+  * Makefile,pcem_logic.c,pcem_logic.h,pcem_mod.c,pcem_mod.h: fix duplicated content in files screwup
+  * lcr_mod.c,regex_mod.c: PCRE_INFO_SIZE requires a size_t argument
+
+  [ Michael Prokop ]
+  * wrap and sort items in Debian packaging files
+
+  [ mwang ]
+  * subscribe.c: modules_k/rls: Fixed memory leak in rls
+  * resource_notify.c: modules_k/rls: Added DB transaction code around rls_presentity insert/replace
+  * send_subscribe.c: modules_k/pua: Fixed double-free in pua
+  * subscribe.c: modules_k/rls: Fixed memory leak in rls under some error conditions
+  * rls.c: modules_k/rls: Fixed incorrect table version check
+
+  [ jbonilla ]
+  * Updated to upstream 3.3.1
+  * Apply 9211_accounting_time_precision.patch
+  * Apply 9231_dialplan_regexp_subst.patch
+  * Apply 9233_unforce_rtp_proxy_one_param.patch
+  * Apply 9239_forward_port_usrloc.patch
+  * Apply 9441_add_pcem_module.patch
+  * Apply 9535_no_default_config.patch
+  * Create folder of patches to track Sipwise changes
+  * notify.c: Merge 25c6efc8d245c339c77748f93c222188769a7be8
+  * loose.c: Upstream  8db3e9c29b2cf1ff5c6f93411d3e9a90f7eb82ef
+  * Add kamailio-dbg package to packaging
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Tue, 07 Aug 2012 20:23:56 +0200
+
+kamailio (3.3.0+ngcp0) unstable; urgency=low
+
+  * update to 3.3.0 from upstream
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 22 Jun 2012 17:42:30 +0200
+
+kamailio (3.1.5+sipwise8) unstable; urgency=low
+
+  [ agranig ]
+  * path.c: Use single-quotes instead of double-quotes in received-param.
+  * parse_param.c: Also parse single-quoted params correctly.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Mon, 04 Jun 2012 18:16:56 +0200
+
+kamailio (3.1.5+sipwise7) unstable; urgency=low
+
+  [rfuchs]
+  * Fix logic mistakes in unforce_rtp_proxy1_f.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Wed, 25 Apr 2012 17:53:51 +0200
+
+kamailio (3.1.5+sipwise6) unstable; urgency=low
+
+  * Fix 'wday' period matching in tmrec module
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Mon, 16 Apr 2012 10:22:28 -0400
+
+kamailio (3.1.5+sipwise5) unstable; urgency=low
+
+  [ agranig ]
+  * rtpproxy.c,rtpproxy_funcs.c: Also parse via1 branch.
+  * rtpproxy.c,rtpproxy_funcs.h: Add unforce_rtp_proxy("param") function.
+  * rtpproxy.c: Copy viabranch to iovec for sending it out.
+  * rtpproxy.c: More debug for rtpp.
+  * rtpproxy.c,rtpproxy_funcs.c,rtpproxy_funcs.h: Differentiate between 'v' (via1) and 'V' (via2) handling.
+  * rtpproxy.c: Fix position of viabranch.
+  * rtpproxy.c: Remove log message printing via.
+  * rtpproxy_funcs.c: Double-check parsed via header.
+  * rtpproxy.c,rtpproxy_funcs.c,rtpproxy_funcs.h: Cleanup getting via branch.
+  * ul_mi.c: Use Path as 6th param in ul_add.
+  * kamctl,kamctl.8,kamctl.ctlbase: Add path handling to kamctl.
+  * ul_mi.c,kamctl: Make path 0 if not used, otherwise mi parser bails out if empty.
+  * ul_mi.c: Better path detection.
+  * ul_mi.c: Fix syntax error.
+  * rtpproxy_admin.xml,rtpproxy.c: Change v/V flags to 1/2 and add doc.
+
+
+  [ apogrebennyk ]
+  * redis_client.c: while we are at it allow ndb_redis to reconnect
+  * Makefile: enable system malloc instead of pkg_malloc for fifo commands.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Mon, 05 Mar 2012 17:15:57 +0100
+
+kamailio (3.1.5+sipwise4) unstable; urgency=low
+
+  * lcr: the lcr module shall support ipv6
+  * lcr_mod.c: more required changes for ipv6 support
+  * lcr_mod.c: add [] around ipv6 addresses in sip uris
+  * lcr_mod.h: add a missing required .h include
+  * lcr_mod.c: support ipv6 addresses in [] notation as well
+  * lcr_mod.c: remove some ipv6 stuff if source isnt being built with ipv6 support
+  * lcr_mod.c: adjust sanity checks for longer ip addresses
+  * tmrec: Backport new tmrec module from trunk.
+  * tmrec: Add a port of Time::Period
+  * tmrec: Use different return values for different cases
+  * Makefile: Include tmrec module in builds.
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Thu, 26 Jan 2012 14:26:57 +0100
+
+kamailio (3.1.5+sipwise3) unstable; urgency=low
+
+  * Bump version for bad tagging fix
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 02 Dec 2011 14:16:48 +0100
+
+kamailio (3.1.5+sipwise2) unstable; urgency=low
+
+  * enable milliseconds precision for accounting (kamailio part)
+  * fix the usage of avps with string names in dialplan replacement (backport from 3.2.0; bug 453)
+  * db_text(k): init new db text table structure to 0
+  * Do not consider late requests for dialogs in "deleted"
+  * fix ndb_redis connect arguments parsing
+  * Update init file lsb headers
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 02 Dec 2011 14:16:48 +0100
+
+kamailio (3.1.5+sipwise1) unstable; urgency=low
+
+  * Merge with kamailio 3.1.5
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Tue, 27 Sep 2011 15:31:35 +0200
+
+kamailio (3.1.3+sipwise7) unstable; urgency=low
+
+  * Fix redis module package creation
+
+ -- Jon Bonilla <jbonilla@sipwise.com>  Mon, 26 Sep 2011 15:31:35 +0200
+
+kamailio (3.1.3+sipwise6) unstable; urgency=low
+
+  * Increase PKG_MEM_SIZE to 16 and MAX_BRANCHES to 24.
+
+ -- Andreas Granig <agranig@sipwise.com>  Tue, 20 Sep 2011 15:31:35 +0200
+
+kamailio (3.1.3+sipwise5) unstable; urgency=low
+
+  * Cherry-picked 9dbf735878acc87bab1a0740476f1d106f89412f from
+    upstream: core: allow forcing send socket for replies
+
+ -- Andreas Granig <agranig@sipwise.com>  Tue, 20 Sep 2011 13:25:00 +0200
+
+kamailio (3.1.3+sipwise4) unstable; urgency=low
+
+  * Cherry-picked b4fae8b9eee6d893aa2591bcc9039ea53a142161 from
+    upstream: rr(k): execute callbacks only for local route uri
+
+ -- Andreas Granig <agranig@sipwise.com>  Wed, 14 Sep 2011 11:40:57 +0200
+
+kamailio (3.1.3+sipwise3) unstable; urgency=low
+
+  * Backported ndb_redis module from 3.2 tree.
+
+ -- Andreas Granig <agranig@sipwise.com>  Fri, 22 Jul 2011 11:28:32 +0200
+
+kamailio (3.1.3+sipwise2) unstable; urgency=low
+
+  * Cherry-picked 16183d4553aca270da1284255f3f6862132a3aeb from
+    upstream to fix registrar handling with pjsip-based clients.
+
+ -- Andreas Granig <agranig@sipwise.com>  Wed, 08 Jun 2011 17:53:10 +0200
+
+kamailio (3.1.3+sipwise1) unstable; urgency=low
+
+  * Rebuild from upstream.
+  * Change PKG mem pool size to 8M.
+  * Suppress debug message regarding "broken replies" to natping requests.
+
+ -- Andreas Granig <agranig@sipwise.com>  Wed, 20 Apr 2011 16:15:29 +0200
+
+kamailio (3.1.1) unstable; urgency=low
+
+  * update to 3.1.1 from upstream
+
+ -- Jon Bonilla <manwe@aholab.ehu.es>  Fri, 3 Dec 2010 16:30:00 +0100
+
+kamailio (3.1.0) unstable; urgency=low
+
+  * update to 3.1.0 from upstream
+
+ -- Jon Bonilla <manwe@aholab.ehu.es>  Wed, 6 Oct 2010 17:24:00 +0100
+
+kamailio (3.0.2.99) unstable; urgency=low
+
+  * update to 3.0.2.99 for development version builds
+
+ -- Jon Bonilla <manwe@aholab.ehu.es>  Fri, 28 May 2010 22:26:00 +0100
+
+kamailio (3.0.2) unstable; urgency=low
+
+  * update to 3.0.2 from upstream
+
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 27 May 2010 10:27:36 +0100
+
+kamailio (3.0.1) unstable; urgency=low
+
+  * update to 3.0.1 from upstream
+
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Mon, 08 Mar 2010 20:30:48 +0100
+
+kamailio (3.0.0) unstable; urgency=low
+
+  * update to 3.0.0 from upstream
+
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Mon, 11 Jan 2010 18:30:42 +0100
+
+kamailio (3.0.0-rc3) unstable; urgency=low
+
+  * update to 3.0.0-rc3 from upstream
+  * updated debian/rules to work with the SIP Router style module packaging
+
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Fri, 10 Dec 2009 12:10:02 +0100
+
+kamailio (3.0.0-rc2) unstable; urgency=low
+
+  * update to 3.0.0-rc2 from upstream
+  * updated debian/rules to work with the new style module packaging
+
+ -- Jonas Bergler <jonas.bergler@staff.snap.net.nz>  Wed, 18 Nov 2009 12:30:02 +1300
+
+kamailio (1.5.0-svn1) unstable; urgency=low
+
+  * increment debian packaging for trunk
+
+ -- Henning Westerholt <henning.westerholt@1und1.de>  Mon, 02 Mar 2009 17:40:02 +0100
+
+kamailio (1.4.0-svn1) unstable; urgency=low
+
+  [ Klaus Darilion ]
+  * first release of Kamailio (after renaming from Openser)
+
+ -- Julien BLACHE <jblache@debian.org>  Wed, 12 Dec 2007 17:25:31 +0100
+
+

@@ -1,0 +1,81 @@
+From c1174b41f2ac36aae0a636665aece3a265b2f93e Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 3 May 2013 09:21:04 +0200
+Subject: [PATCH 2/2] utils/kamctl: Add contact path parameter
+
+---
+ utils/kamctl/kamctl         |    9 ++++++++-
+ utils/kamctl/kamctl.8       |    3 +++
+ utils/kamctl/kamctl.ctlbase |   11 ++++++-----
+ 3 files changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
+index 9e6b0ba..01c99c9 100755
+--- a/utils/kamctl/kamctl
++++ b/utils/kamctl/kamctl
+@@ -2281,10 +2281,17 @@ usrloc() {
+ 				UL_EXPIRES=0
+ 				UL_FLAGS=0
+ 				BR_FLAGS=0
++				UL_PATH=0
+ 			elif [ $# -eq 4 ] ; then
+ 				UL_EXPIRES=$4
+ 				UL_FLAGS=0
+ 				BR_FLAGS=0
++				UL_PATH=0
++			elif [ $# -eq 5 ] ; then
++				UL_EXPIRES=$4
++				UL_FLAGS=0
++				BR_FLAGS=0
++				UL_PATH="$5"
+ 			else
+ 				usage_usrloc
+ 				exit 1
+@@ -2317,7 +2324,7 @@ usrloc() {
+ 			fi
+ 
+ 			$CTLCMD ul_add "$USRLOC_TABLE" "$OSERUSER@$OSERDOMAIN" "$2" \
+-"$UL_EXPIRES" "1.00" "0" "$UL_FLAGS" "$BR_FLAGS" "$ALL_METHODS"
++"$UL_EXPIRES" "1.00" "$UL_PATH" "$UL_FLAGS" "$BR_FLAGS" "$ALL_METHODS"
+ 			exit $?
+ 			;;
+ 		rm)
+diff --git a/utils/kamctl/kamctl.8 b/utils/kamctl/kamctl.8
+index 61fc55f..83db5d7 100644
+--- a/utils/kamctl/kamctl.8
++++ b/utils/kamctl/kamctl.8
+@@ -169,6 +169,9 @@ Introduce a permanent usrloc entry
+ .TP
+ .B ul add <username> <uri> <expires>
+ Introduce a temporary usrloc entry
++.TP
++.B ul add <username> <uri> <expires> <path>
++Introduce a temporary usrloc entry including a path
+ 
+ .TP 16
+ .I Fifo commands:
+diff --git a/utils/kamctl/kamctl.ctlbase b/utils/kamctl/kamctl.ctlbase
+index a5ddf72..a605b10 100644
+--- a/utils/kamctl/kamctl.ctlbase
++++ b/utils/kamctl/kamctl.ctlbase
+@@ -67,11 +67,12 @@ usage_usrloc() {
+ 	mecho " -- command 'ul|alias' - manage user location or aliases"
+ 	echo
+ cat <<EOF
+- ul show [<username>]................ show in-RAM online users
+- ul show --brief..................... show in-RAM online users in short format
+- ul rm <username> [<contact URI>].... delete user's usrloc entries
+- ul add <username> <uri> ............ introduce a permanent usrloc entry
+- ul add <username> <uri> <expires> .. introduce a temporary usrloc entry
++ ul show [<username>]................... show in-RAM online users
++ ul show --brief........................ show in-RAM online users in short format
++ ul rm <username> [<contact URI>]....... delete user's usrloc entries
++ ul add <username> <uri> ............... introduce a permanent usrloc entry
++ ul add <username> <uri> <expires> ..... introduce a temporary usrloc entry
++ ul add <user> <uri> <expires> <path> .. introduce a temporary usrloc entry
+ EOF
+ }
+ USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_usrloc"
+-- 
+1.7.10.4
+

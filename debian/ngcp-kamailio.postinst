@@ -1,0 +1,66 @@
+#! /bin/sh
+#
+
+set -e
+
+HOMEDIR=/var/run/kamailio
+
+restart_handler() {
+  [ -n "$1" ] || return 1
+
+  if [ -x "/etc/init.d/$1" ]; then
+    if [ -x "$(which invoke-rc.d 2>/dev/null)" ]; then
+      invoke-rc.d "$1" restart || exit $?
+    else
+      /etc/init.d/"$1" restart || exit $?
+    fi
+  fi
+}
+
+initscript_handler() {
+  [ -n "$1" ] || return 1
+
+  if [ -x "/etc/init.d/$1" ]; then
+    if ! update-rc.d "$1" defaults >/dev/null ; then
+      echo "Warning: update-rc.d could not be executed, might be caused by mysql not available yet."
+    fi
+    invoke-rc.d "$1" start || exit $?
+  fi
+}
+
+init_handler() {
+  # just invoke init script wrappers on ce systems since
+  # they do not provide ngcp-check_active and we don't
+  # have to handle inactive nodes
+  if ! [ -x "$(which ngcp-check_active 2>/dev/null)" ]; then
+    restart_handler "$1"
+    initscript_handler "$1"
+  else # do not restart daemon on inactive node in pro systems
+    if ngcp-check_active ; then
+      echo "Active node detected, restarting $1"
+      restart_handler "$1"
+    else
+      echo "Inactive node detected, ignoring request to restart $1"
+    fi
+  fi
+}
+
+case "$1" in
+    configure)
+        adduser --quiet --system --group --disabled-password \
+                --shell /bin/false --gecos "Kamailio" \
+                --home "$HOMEDIR" kamailio || true
+        init_handler kamailio-lb
+        init_handler kamailio-proxy
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#

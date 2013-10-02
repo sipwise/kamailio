@@ -1,0 +1,5437 @@
+--- /dev/null
++++ b/modules/rtpproxy-ng/Makefile
+@@ -0,0 +1,19 @@
++# $Id$
++#
++# print example module makefile
++#
++#
++# WARNING: do not run this directly, it should be run by the master Makefile
++
++include ../../Makefile.defs
++auto_gen=
++NAME=rtpproxy-ng.so
++LIBS=
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE
++
++SERLIBPATH=../../lib
++SER_LIBS+=$(SERLIBPATH)/kmi/kmi
++SER_LIBS+=$(SERLIBPATH)/kcore/kcore
++include ../../Makefile.modules
++
+--- /dev/null
++++ b/modules/rtpproxy-ng/README
+@@ -0,0 +1,652 @@
++rtpproxy-ng Module
++
++Maxim Sobolev
++
++   Sippy Software, Inc.
++
++Juha Heinanen
++
++   TuTPro, Inc.
++
++Edited by
++
++Maxim Sobolev
++
++Edited by
++
++Bogdan-Andrei Iancu
++
++Edited by
++
++Juha Heinanen
++
++Edited by
++
++Sas Ovidiu
++
++Edited by
++
++Carsten Bock
++
++   ng-voice GmbH
++
++Edited by
++
++Richard Fuchs
++
++   Sipwise GmbH
++
++   Copyright © 2003-2008 Sippy Software, Inc.
++
++   Copyright © 2005 Voice Sistem SRL
++
++   Copyright © 2009-2012 TuTPro Inc.
++
++   Copyright © 2010 VoIPEmbedded Inc.
++
++   Copyright © 2013 Sipwise GmbH
++     __________________________________________________________________
++
++   Table of Contents
++
++   1. Admin Guide
++
++        1. Overview
++        2. Multiple RTPProxy usage
++        3. Dependencies
++
++              3.1. Kamailio Modules
++              3.2. External Libraries or Applications
++
++        4. Parameters
++
++              4.1. rtpproxy_sock (string)
++              4.2. rtpproxy_disable_tout (integer)
++              4.3. rtpproxy_tout (integer)
++              4.4. rtpproxy_retr (integer)
++              4.5. extra_id_pv (string)
++
++        5. Functions
++
++              5.1. set_rtp_proxy_set(setid)
++              5.2. rtpproxy_offer([flags [, ip_address]])
++              5.3. rtpproxy_answer([flags [, ip_address]])
++              5.4. rtpproxy_destroy([flags])
++              5.5. unforce_rtp_proxy()
++              5.6. rtpproxy_manage([flags [, ip_address]])
++              5.7. start_recording()
++
++        6. Exported Pseudo Variables
++
++              6.1. $rtpstat
++
++        7. MI Commands
++
++              7.1. nh_enable_rtpp
++              7.2. nh_show_rtpp
++
++   2. Frequently Asked Questions
++
++   List of Examples
++
++   1.1. Set rtpproxy_sock parameter
++   1.2. Set rtpproxy_disable_tout parameter
++   1.3. Set rtpproxy_tout parameter
++   1.4. Set rtpproxy_retr parameter
++   1.5. Set extra_id_pv parameter
++   1.6. set_rtp_proxy_set usage
++   1.7. rtpproxy_offer usage
++   1.8. rtpproxy_answer usage
++   1.9. rtpproxy_destroy usage
++   1.10. rtpproxy_manage usage
++   1.11. start_recording usage
++   1.12. $rtpstat Usage
++   1.13. nh_enable_rtpp usage
++   1.14. nh_show_rtpp usage
++
++Chapter 1. Admin Guide
++
++   Table of Contents
++
++   1. Overview
++   2. Multiple RTPProxy usage
++   3. Dependencies
++
++        3.1. Kamailio Modules
++        3.2. External Libraries or Applications
++
++   4. Parameters
++
++        4.1. rtpproxy_sock (string)
++        4.2. rtpproxy_disable_tout (integer)
++        4.3. rtpproxy_tout (integer)
++        4.4. rtpproxy_retr (integer)
++        4.5. extra_id_pv (string)
++
++   5. Functions
++
++        5.1. set_rtp_proxy_set(setid)
++        5.2. rtpproxy_offer([flags [, ip_address]])
++        5.3. rtpproxy_answer([flags [, ip_address]])
++        5.4. rtpproxy_destroy([flags])
++        5.5. unforce_rtp_proxy()
++        5.6. rtpproxy_manage([flags [, ip_address]])
++        5.7. start_recording()
++
++   6. Exported Pseudo Variables
++
++        6.1. $rtpstat
++
++   7. MI Commands
++
++        7.1. nh_enable_rtpp
++        7.2. nh_show_rtpp
++
++1. Overview
++
++   This is a module that enables media streams to be proxied via an RTP
++   proxy. The only RTP proxy currently known to work with this module is
++   the Sipwise ngcp-rtpproxy-ng https://github.com/sipwise/mediaproxy-ng.
++   The rtpproxy-ng module is a modified version of the original rtpproxy
++   module using a new control protocol. The module is designed to be a
++   drop-in replacement for the old module from a configuration file point
++   of view, however due to the incompatible control protocol, it only
++   works with RTP proxies which specifically support it.
++
++2. Multiple RTPProxy usage
++
++   The rtpproxy-ng module can support multiple RTP proxies for
++   balancing/distribution and control/selection purposes.
++
++   The module allows definition of several sets of rtpproxies.
++   Load-balancing will be performed over a set and the admin has the
++   ability to choose what set should be used. The set is selected via its
++   id - the id being defined with the set. Refer to the “rtpproxy_sock”
++   module parameter definition for syntax description.
++
++   The balancing inside a set is done automatically by the module based on
++   the weight of each rtpproxy from the set.
++
++   The selection of the set is done from script prior using
++   unforce_rtp_proxy(), rtpproxy_offer() or rtpproxy_answer() functions -
++   see the set_rtp_proxy_set() function.
++
++   For backward compatibility reasons, a set with no id take by default
++   the id 0. Also if no set is explicitly set before unforce_rtp_proxy(),
++   rtpproxy_offer() or rtpproxy_answer() the 0 id set will be used.
++
++   IMPORTANT: if you use multiple sets, take care and use the same set for
++   both rtpproxy_offer()/rtpproxy_answer() and unforce_rtpproxy()!!
++
++3. Dependencies
++
++   3.1. Kamailio Modules
++   3.2. External Libraries or Applications
++
++3.1. Kamailio Modules
++
++   The following modules must be loaded before this module:
++     * tm module - (optional) if you want to have rtpproxy_manage() fully
++       functional
++
++3.2. External Libraries or Applications
++
++   The following libraries or applications must be installed before
++   running Kamailio with this module loaded:
++     * None.
++
++4. Parameters
++
++   4.1. rtpproxy_sock (string)
++   4.2. rtpproxy_disable_tout (integer)
++   4.3. rtpproxy_tout (integer)
++   4.4. rtpproxy_retr (integer)
++   4.5. extra_id_pv (string)
++
++4.1. rtpproxy_sock (string)
++
++   Definition of socket(s) used to connect to (a set) RTPProxy. It may
++   specify a UNIX socket or an IPv4/IPv6 UDP socket.
++
++   Default value is “NONE” (disabled).
++
++   Example 1.1. Set rtpproxy_sock parameter
++...
++# single rtproxy
++modparam("rtpproxy-ng", "rtpproxy_sock", "udp:localhost:12221")
++# multiple rtproxies for LB
++modparam("rtpproxy-ng", "rtpproxy_sock",
++        "udp:localhost:12221 udp:localhost:12222")
++# multiple sets of multiple rtproxies
++modparam("rtpproxy-ng", "rtpproxy_sock",
++        "1 == udp:localhost:12221 udp:localhost:12222")
++modparam("rtpproxy-ng", "rtpproxy_sock",
++        "2 == udp:localhost:12225")
++...
++
++4.2. rtpproxy_disable_tout (integer)
++
++   Once an RTP proxy was found unreachable and marked as disabled, the
++   rtpproxy-ng module will not attempt to establish communication to that
++   RTP proxy for rtpproxy_disable_tout seconds.
++
++   Default value is “60”.
++
++   Example 1.2. Set rtpproxy_disable_tout parameter
++...
++modparam("rtpproxy-ng", "rtpproxy_disable_tout", 20)
++...
++
++4.3. rtpproxy_tout (integer)
++
++   Timeout value in waiting for reply from RTP proxy.
++
++   Default value is “1”.
++
++   Example 1.3. Set rtpproxy_tout parameter
++...
++modparam("rtpproxy-ng", "rtpproxy_tout", 2)
++...
++
++4.4. rtpproxy_retr (integer)
++
++   How many times the module should retry to send and receive after
++   timeout was generated.
++
++   Default value is “5”.
++
++   Example 1.4. Set rtpproxy_retr parameter
++...
++modparam("rtpproxy-ng", "rtpproxy_retr", 2)
++...
++
++4.5. extra_id_pv (string)
++
++   The parameter sets the PV defination to use when the “b” parameter is
++   used on unforce_rtp_proxy(), rtpproxy_offer(), rtpproxy_answer() or
++   rtpproxy_manage() command.
++
++   Default is empty, the “b” parameter may not be used then.
++
++   Example 1.5. Set extra_id_pv parameter
++...
++modparam("rtpproxy-ng", "extra_id_pv", "$avp(extra_id)")
++...
++
++5. Functions
++
++   5.1. set_rtp_proxy_set(setid)
++   5.2. rtpproxy_offer([flags [, ip_address]])
++   5.3. rtpproxy_answer([flags [, ip_address]])
++   5.4. rtpproxy_destroy([flags])
++   5.5. unforce_rtp_proxy()
++   5.6. rtpproxy_manage([flags [, ip_address]])
++   5.7. start_recording()
++
++5.1.  set_rtp_proxy_set(setid)
++
++   Sets the Id of the rtpproxy set to be used for the next
++   unforce_rtp_proxy(), rtpproxy_offer(), rtpproxy_answer() or
++   rtpproxy_manage() command. The parameter can be an integer or a config
++   variable holding an integer.
++
++   This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
++   BRANCH_ROUTE.
++
++   Example 1.6. set_rtp_proxy_set usage
++...
++set_rtp_proxy_set("2");
++rtpproxy_offer();
++...
++
++5.2.  rtpproxy_offer([flags [, ip_address]])
++
++   Rewrites SDP body to ensure that media is passed through an RTP proxy.
++   To be invoked on INVITE for the cases the SDPs are in INVITE and 200 OK
++   and on 200 OK when SDPs are in 200 OK and ACK.
++
++   Meaning of the parameters is as follows:
++     * flags - flags to turn on some features.
++          + 1 - append first Via branch to Call-ID when sending command to
++            rtpproxy. This can be used to create one media session per
++            branch on the rtpproxy. When sending a subsequent “delete”
++            command to the rtpproxy, you can then stop just the session
++            for a specific branch when passing the flag '1' or '2' in the
++            “unforce_rtpproxy”, or stop all sessions for a call when not
++            passing one of those two flags there. This is especially
++            useful if you have serially forked call scenarios where
++            rtpproxy gets an “offer” command for a new branch, and then a
++            “delete” command for the previous branch, which would
++            otherwise delete the full call, breaking the subsequent
++            “answer” for the new branch. This flag is only supported by
++            the ngcp-mediaproxy-ng rtpproxy at the moment!
++          + 2 - append second Via branch to Call-ID when sending command
++            to rtpproxy. See flag '1' for its meaning.
++          + 3 - behave like flag 1 is set for a request and like flag 2 is
++            set for a reply.
++          + a - flags that UA from which message is received doesn't
++            support symmetric RTP. (automatically sets the 'r' flag)
++          + b - append branch specific variable to Call-ID when sending
++            command to rtpproxy. This creates one rtpproxy session per
++            unique variable. Works similar to the 1, 2 and 3 parameter,
++            but is usefull when forking to multiple destinations on
++            different address families or network segments, requiring
++            different rtpproxy parameters. The variable value is taken
++            from the “extra_id_pv”. When used, it must be used in every
++            call to rtpproxy_manage(), rtpproxy_offer(), rtpproxy_answer()
++            and rtpproxy_destroy() with the same contents of the PV. The b
++            parameter may not be used in conjunction with the 1, 2 or 3
++            parameter to use the Via branch in the Call-ID.
++          + l - force “lookup”, that is, only rewrite SDP when
++            corresponding session already exists in the RTP proxy. By
++            default is on when the session is to be completed.
++          + i, e - these flags specify the direction of the SIP message.
++            These flags only make sense when rtpproxy is running in bridge
++            mode. 'i' means internal network (LAN), 'e' means external
++            network (WAN). 'i' corresponds to rtpproxy's first interface,
++            'e' corresponds to rtpproxy's second interface. You always
++            have to specify two flags to define the incoming network and
++            the outgoing network. For example, 'ie' should be used for SIP
++            message received from the local interface and sent out on the
++            external interface, and 'ei' vice versa. Other options are
++            'ii' and 'ee'. So, for example if a SIP requests is processed
++            with 'ie' flags, the corresponding response must be processed
++            with 'ie' flags.
++            For ngcp-mediaproxy-ng, these flags are used to select between
++            IPv4 and IPv6 addresses, corresponding to 'i' and 'e'
++            respectively. For example, if the request is coming from an
++            IPv4 host and is going to an IPv6 host, the flags should be
++            specified as 'ie'.
++            Note: As rtpproxy in bridge mode s per default asymmetric, you
++            have to specify the 'w' flag for clients behind NAT! See also
++            above notes!
++          + x - this flag an alternative to the 'ie' or 'ei'-flags in
++            order to do automatic bridging between IPv4 on the "internal
++            network" and IPv6 on the "external network". Instead of
++            explicitly instructing the RTP proxy to select a particular
++            address family, the distinction is done by the given IP in the
++            SDP body by the RTP proxy itself. Not supported by
++            ngcp-mediaproxy-ng.
++            Note: Please note, that this will only work properly with
++            non-dual-stack user-agents or with dual-stack clients
++            according to RFC6157 (which suggest ICE for Dual-Stack
++            implementations). This short-cut will not work properly with
++            RFC4091 (ANAT) compatible clients, which suggests having
++            different m-lines with different IP-protocols grouped
++            together.
++          + f - instructs rtpproxy to ignore marks inserted by another
++            rtpproxy in transit to indicate that the session is already
++            goes through another proxy. Allows creating a chain of
++            proxies.
++          + r - flags that IP address in SDP should be trusted. Without
++            this flag, rtpproxy ignores address in the SDP and uses source
++            address of the SIP message as media address which is passed to
++            the RTP proxy.
++          + o - flags that IP from the origin description (o=) should be
++            also changed.
++          + c - flags to change the session-level SDP connection (c=) IP
++            if media-description also includes connection information.
++          + w - flags that for the UA from which message is received,
++            support symmetric RTP must be forced.
++          + zNN - requests the RTPproxy to perform re-packetization of RTP
++            traffic coming from the UA which has sent the current message
++            to increase or decrease payload size per each RTP packet
++            forwarded if possible. The NN is the target payload size in
++            ms, for the most codecs its value should be in 10ms
++            increments, however for some codecs the increment could differ
++            (e.g. 30ms for GSM or 20ms for G.723). The RTPproxy would
++            select the closest value supported by the codec. This feature
++            could be used for significantly reducing bandwith overhead for
++            low bitrate codecs, for example with G.729 going from 10ms to
++            100ms saves two thirds of the network bandwith.
++          + + - instructs the RTP proxy to discard any ICE attributes
++            already present in the SDP body and then generate and insert
++            new ICE data, leaving itself as the only ICE candidates.
++            Without this flag, new ICE data will only be generated if no
++            ICE was present in the SDP originally; otherwise the RTP proxy
++            will only insert itself as an additional ICE candidate. Other
++            SDP substitutions (c=, m=, etc) are unaffected by this flag.
++          + - - instructs the RTP proxy to discard any ICE attributes and
++            not insert any new ones into the SDP. Mutually exclusive with
++            the '+' flag.
++          + s, S, p, P - These flags control the RTP transport protocol
++            that should be used towards the recipient of the SDP. If none
++            of them are specified, the protocol given in the SDP is left
++            untouched. Otherwise, the "S" flag indicates that SRTP should
++            be used, while "s" indicates that SRTP should not be used. "P"
++            indicates that the advanced RTCP profile with feedback
++            messages should be used, and "p" indicates that the regular
++            RTCP profile should be used. As such, the combinations "sp",
++            "sP", "Sp" and "SP" select between RTP/AVP, RTP/AVPF, RTP/SAVP
++            and RTP/SAVPF, respectively.
++     * ip_address - new SDP IP address.
++
++   This function can be used from ANY_ROUTE.
++
++   Example 1.7. rtpproxy_offer usage
++route {
++...
++    if (is_method("INVITE")) {
++        if (has_sdp()) {
++            if (rtpproxy_offer())
++                t_on_reply("1");
++        } else {
++            t_on_reply("2");
++        }
++    }
++    if (is_method("ACK") && has_sdp())
++        rtpproxy_answer();
++...
++}
++
++onreply_route[1]
++{
++...
++    if (has_sdp())
++        rtpproxy_answer();
++...
++}
++
++onreply_route[2]
++{
++...
++    if (has_sdp())
++        rtpproxy_offer();
++...
++}
++
++5.3.  rtpproxy_answer([flags [, ip_address]])
++
++   Rewrites SDP body to ensure that media is passed through an RTP proxy.
++   To be invoked on 200 OK for the cases the SDPs are in INVITE and 200 OK
++   and on ACK when SDPs are in 200 OK and ACK.
++
++   See rtpproxy_answer() function description above for the meaning of the
++   parameters.
++
++   This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
++   FAILURE_ROUTE, BRANCH_ROUTE.
++
++   Example 1.8. rtpproxy_answer usage
++
++   See rtpproxy_offer() function example above for example.
++
++5.4.  rtpproxy_destroy([flags])
++
++   Tears down the RTPProxy session for the current call.
++
++   This function can be used from ANY_ROUTE.
++
++   Meaning of the parameters is as follows:
++     * flags - flags to turn on some features.
++          + 1 - append first Via branch to Call-ID when sending command to
++            rtpproxy. This can be used to create one media session per
++            branch on the rtpproxy. When sending a subsequent “delete”
++            command to the rtpproxy, you can then stop just the session
++            for a specific branch when passing the flag '1' or '2' in the
++            “unforce_rtpproxy”, or stop all sessions for a call when not
++            passing one of those two flags there. This is especially
++            useful if you have serially forked call scenarios where
++            rtpproxy gets an “update” command for a new branch, and then a
++            “delete” command for the previous branch, which would
++            otherwise delete the full call, breaking the subsequent
++            “lookup” for the new branch. This flag is only supported by
++            the ngcp-mediaproxy-ng rtpproxy at the moment!
++          + 2 - append second Via branch to Call-ID when sending command
++            to rtpproxy. See flag '1' for its meaning.
++          + b - append branch specific variable to Call-ID when sending
++            command to rtpproxy. See rtpproxy_offer() for details.
++            <listitem>
++            </listitem>
++            t - do not include To tag to “delete” command to rtpproxy thus
++            causing full call to be deleted. Useful for deleting unused
++            rtpproxy call when 200 OK is received on a branch, where
++            rtpproxy is not needed.
++
++   Example 1.9. rtpproxy_destroy usage
++...
++rtpproxy_destroy();
++...
++
++5.5.  unforce_rtp_proxy()
++
++   Same as rtpproxy_destroy().
++
++5.6.  rtpproxy_manage([flags [, ip_address]])
++
++   Manage the RTPProxy session - it combines the functionality of
++   rtpproxy_offer(), rtpproxy_answer() and unforce_rtpproxy(), detecting
++   internally based on message type and method which one to execute.
++
++   It can take the same parameters as rtpproxy_offer(). The flags
++   parameter to rtpproxy_manage() can be a configuration variable
++   containing the flags as a string.
++
++   Functionality:
++     * If INVITE with SDP, then do rtpproxy_offer()
++     * If INVITE with SDP, when the tm module is loaded, mark transaction
++       with internal flag FL_SDP_BODY to know that the 1xx and 2xx are for
++       rtpproxy_answer()
++     * If ACK with SDP, then do rtpproxy_answer()
++     * If BYE or CANCEL, or called within a FAILURE_ROUTE[], then do
++       unforce_rtpproxy()
++     * If reply to INVITE with code >= 300 do unforce_rtpproxy()
++     * If reply with SDP to INVITE having code 1xx and 2xx, then do
++       rtpproxy_answer() if the request had SDP or tm is not loaded,
++       otherwise do rtpproxy_offer()
++
++   This function can be used from ANY_ROUTE.
++
++   Example 1.10. rtpproxy_manage usage
++...
++rtpproxy_manage();
++...
++
++5.7.  start_recording()
++
++   This function will send a signal to the RTP Proxy to record the RTP
++   stream on the RTP Proxy. This function is not supported by
++   ngcp-mediaproxy-ng at the moment!
++
++   This function can be used from REQUEST_ROUTE and ONREPLY_ROUTE.
++
++   Example 1.11. start_recording usage
++...
++start_recording();
++...
++
++6. Exported Pseudo Variables
++
++   6.1. $rtpstat
++
++6.1. $rtpstat
++
++   Returns the RTP Statistics from the RTP Proxy. The RTP Statistics from
++   the RTP Proxy are provided as a string and it does contain several
++   packet counters. The statistics must be retrieved before the session is
++   deleted (before unforce_rtpproxy()).
++
++   Example 1.12. $rtpstat Usage
++...
++    append_hf("X-RTP-Statistics: $rtpstat\r\n");
++...
++
++7. MI Commands
++
++   7.1. nh_enable_rtpp
++   7.2. nh_show_rtpp
++
++7.1. nh_enable_rtpp
++
++   Enables a rtp proxy if parameter value is greater than 0. Disables it
++   if a zero value is given.
++
++   The first parameter is the rtp proxy url (exactly as defined in the
++   config file).
++
++   The second parameter value must be a number in decimal.
++
++   NOTE: if a rtpproxy is defined multiple times (in the same or diferente
++   sete), all of its instances will be enables/disabled.
++
++   Example 1.13.  nh_enable_rtpp usage
++...
++$ kamctl fifo nh_enable_rtpp udp:192.168.2.133:8081 0
++...
++
++7.2. nh_show_rtpp
++
++   Displays all the rtp proxies and their information: set and status
++   (disabled or not, weight and recheck_ticks).
++
++   No parameter.
++
++   Example 1.14.  nh_show_rtpp usage
++...
++$ kamctl fifo nh_show_rtpp
++...
++
++Chapter 2. Frequently Asked Questions
++
++   2.1. What happend with “rtpproxy_disable” parameter?
++   2.2. Where can I find more about Kamailio?
++   2.3. Where can I post a question about this module?
++   2.4. How can I report a bug?
++
++   2.1.
++
++       What happend with “rtpproxy_disable” parameter?
++
++       It was removed as it became obsolete - now “rtpproxy_sock” can take
++       empty value to disable the rtpproxy functionality.
++
++   2.2.
++
++       Where can I find more about Kamailio?
++
++       Take a look at http://www.kamailio.org/.
++
++   2.3.
++
++       Where can I post a question about this module?
++
++       First at all check if your question was already answered on one of our
++       mailing lists:
++         * User Mailing List -
++           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-users
++         * Developer Mailing List -
++           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-dev
++
++       E-mails regarding any stable Kamailio release should be sent to
++       <sr-users@lists.sip-router.org> and e-mails regarding development
++       versions should be sent to <sr-dev@lists.sip-router.org>.
++
++       If you want to keep the mail private, send it to
++       <sr-users@lists.sip-router.org>.
++
++   2.4.
++
++       How can I report a bug?
++
++       Please follow the guidelines provided at:
++       http://sip-router.org/tracker.
+--- /dev/null
++++ b/modules/rtpproxy-ng/bencode.c
+@@ -0,0 +1,703 @@
++#include "bencode.h"
++#include <stdio.h>
++#include <sys/uio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <assert.h>
++#include <string.h>
++
++
++/* set to 0 for alloc debugging, e.g. through valgrind */
++#define BENCODE_MIN_BUFFER_PIECE_LEN	512
++
++#define BENCODE_HASH_BUCKETS		31 /* prime numbers work best */
++
++struct __bencode_buffer_piece {
++	char *tail;
++	unsigned int left;
++	struct __bencode_buffer_piece *next;
++	char buf[0];
++};
++struct __bencode_free_list {
++	void *ptr;
++	free_func_t func;
++	struct __bencode_free_list *next;
++};
++struct __bencode_hash {
++	struct bencode_item *buckets[BENCODE_HASH_BUCKETS];
++};
++
++
++
++
++
++static bencode_item_t __bencode_end_marker = {
++	.type = BENCODE_END_MARKER,
++	.iov[0].iov_base = "e",
++	.iov[0].iov_len = 1,
++	.iov_cnt = 1,
++	.str_len = 1,
++};
++
++
++
++
++static bencode_item_t *__bencode_decode(bencode_buffer_t *buf, const char *s, const char *end);
++
++
++
++static void __bencode_item_init(bencode_item_t *item) {
++	item->last_child = item->parent = item->child = item->sibling = NULL;
++}
++
++static void __bencode_container_init(bencode_item_t *cont) {
++	cont->iov[0].iov_len = 1;
++	cont->iov[1].iov_base = "e";
++	cont->iov[1].iov_len = 1;
++	cont->iov_cnt = 2;
++	cont->str_len = 2;
++}
++
++static void __bencode_dictionary_init(bencode_item_t *dict) {
++	dict->type = BENCODE_DICTIONARY;
++	dict->iov[0].iov_base = "d";
++	dict->value = 0;
++	__bencode_container_init(dict);
++}
++
++static void __bencode_list_init(bencode_item_t *list) {
++	list->type = BENCODE_LIST;
++	list->iov[0].iov_base = "l";
++	__bencode_container_init(list);
++}
++
++static struct __bencode_buffer_piece *__bencode_piece_new(unsigned int size) {
++	struct __bencode_buffer_piece *ret;
++
++	if (size < BENCODE_MIN_BUFFER_PIECE_LEN)
++		size = BENCODE_MIN_BUFFER_PIECE_LEN;
++	ret = BENCODE_MALLOC(sizeof(*ret) + size);
++	if (!ret)
++		return NULL;
++
++	ret->tail = ret->buf;
++	ret->left = size;
++	ret->next = NULL;
++
++	return ret;
++}
++
++int bencode_buffer_init(bencode_buffer_t *buf) {
++	buf->pieces = __bencode_piece_new(0);
++	if (!buf->pieces)
++		return -1;
++	buf->free_list = NULL;
++	buf->error = 0;
++	return 0;
++}
++
++static void *__bencode_alloc(bencode_buffer_t *buf, unsigned int size) {
++	struct __bencode_buffer_piece *piece;
++	void *ret;
++
++	if (!buf)
++		return NULL;
++	if (buf->error)
++		return NULL;
++
++	piece = buf->pieces;
++
++	if (size <= piece->left)
++		goto alloc;
++
++	piece = __bencode_piece_new(size);
++	if (!piece) {
++		buf->error = 1;
++		return NULL;
++	}
++	piece->next = buf->pieces;
++	buf->pieces = piece;
++
++	assert(size <= piece->left);
++
++alloc:
++	piece->left -= size;
++	ret = piece->tail;
++	piece->tail += size;
++	return ret;
++}
++
++void bencode_buffer_free(bencode_buffer_t *buf) {
++	struct __bencode_free_list *fl;
++	struct __bencode_buffer_piece *piece, *next;
++
++	for (fl = buf->free_list; fl; fl = fl->next)
++		fl->func(fl->ptr);
++
++	for (piece = buf->pieces; piece; piece = next) {
++		next = piece->next;
++		BENCODE_FREE(piece);
++	}
++}
++
++static bencode_item_t *__bencode_item_alloc(bencode_buffer_t *buf, unsigned int payload) {
++	bencode_item_t *ret;
++
++	ret = __bencode_alloc(buf, sizeof(struct bencode_item) + payload);
++	if (!ret)
++		return NULL;
++	ret->buffer = buf;
++	__bencode_item_init(ret);
++	return ret;
++}
++
++bencode_item_t *bencode_dictionary(bencode_buffer_t *buf) {
++	bencode_item_t *ret;
++
++	ret = __bencode_item_alloc(buf, 0);
++	if (!ret)
++		return NULL;
++	__bencode_dictionary_init(ret);
++	return ret;
++}
++
++bencode_item_t *bencode_list(bencode_buffer_t *buf) {
++	bencode_item_t *ret;
++
++	ret = __bencode_item_alloc(buf, 0);
++	if (!ret)
++		return NULL;
++	__bencode_list_init(ret);
++	return ret;
++}
++
++static void __bencode_container_add(bencode_item_t *parent, bencode_item_t *child) {
++	if (!parent)
++		return;
++	if (!child)
++		return;
++
++	assert(child->parent == NULL);
++	assert(child->sibling == NULL);
++
++	child->parent = parent;
++	if (parent->last_child)
++		parent->last_child->sibling = child;
++	parent->last_child = child;
++	if (!parent->child)
++		parent->child = child;
++
++	while (parent) {
++		parent->iov_cnt += child->iov_cnt;
++		parent->str_len += child->str_len;
++		parent = parent->parent;
++	}
++}
++
++static bencode_item_t *__bencode_string_alloc(bencode_buffer_t *buf, const void *base,
++		int str_len, int iov_len, int iov_cnt, bencode_type_t type)
++{
++	bencode_item_t *ret;
++	int len_len;
++
++	assert((str_len <= 99999) && (str_len >= 0));
++	ret = __bencode_item_alloc(buf, 7);
++	if (!ret)
++		return NULL;
++	len_len = sprintf(ret->__buf, "%d:", str_len);
++
++	ret->type = type;
++	ret->iov[0].iov_base = ret->__buf;
++	ret->iov[0].iov_len = len_len;
++	ret->iov[1].iov_base = (void *) base;
++	ret->iov[1].iov_len = iov_len;
++	ret->iov_cnt = iov_cnt + 1;
++	ret->str_len = len_len + str_len;
++
++	return ret;
++}
++
++bencode_item_t *bencode_string_len_dup(bencode_buffer_t *buf, const char *s, int len) {
++	char *sd = __bencode_alloc(buf, len);
++	if (!sd)
++		return NULL;
++	memcpy(sd, s, len);
++	return bencode_string_len(buf, sd, len);
++}
++
++bencode_item_t *bencode_string_len(bencode_buffer_t *buf, const char *s, int len) {
++	return __bencode_string_alloc(buf, s, len, len, 1, BENCODE_STRING);
++}
++
++bencode_item_t *bencode_string_iovec(bencode_buffer_t *buf, const struct iovec *iov, int iov_cnt, int str_len) {
++	int i;
++
++	if (iov_cnt < 0)
++		return NULL;
++	if (str_len < 0) {
++		str_len = 0;
++		for (i = 0; i < iov_cnt; i++)
++			str_len += iov[i].iov_len;
++	}
++
++	return __bencode_string_alloc(buf, iov, str_len, iov_cnt, iov_cnt, BENCODE_IOVEC);
++}
++
++bencode_item_t *bencode_integer(bencode_buffer_t *buf, long long int i) {
++	bencode_item_t *ret;
++	int alen, rlen;
++
++	alen = 8;
++	while (1) {
++		ret = __bencode_item_alloc(buf, alen + 3);
++		if (!ret)
++			return NULL;
++		rlen = snprintf(ret->__buf, alen, "i%llde", i);
++		if (rlen < alen)
++			break;
++		alen <<= 1;
++	}
++
++	ret->type = BENCODE_INTEGER;
++	ret->iov[0].iov_base = ret->__buf;
++	ret->iov[0].iov_len = rlen;
++	ret->iov[1].iov_base = NULL;
++	ret->iov[1].iov_len = 0;
++	ret->iov_cnt = 1;
++	ret->str_len = rlen;
++
++	return ret;
++}
++
++bencode_item_t *bencode_dictionary_add_len(bencode_item_t *dict, const char *key, int keylen, bencode_item_t *val) {
++	bencode_item_t *str;
++
++	if (!dict || !val)
++		return NULL;
++	assert(dict->type == BENCODE_DICTIONARY);
++
++	str = bencode_string_len(dict->buffer, key, keylen);
++	if (!str)
++		return NULL;
++	__bencode_container_add(dict, str);
++	__bencode_container_add(dict, val);
++	return val;
++}
++
++bencode_item_t *bencode_list_add(bencode_item_t *list, bencode_item_t *item) {
++	if (!list || !item)
++		return NULL;
++	assert(list->type == BENCODE_LIST);
++	__bencode_container_add(list, item);
++	return item;
++}
++
++static int __bencode_iovec_cpy(struct iovec *out, const struct iovec *in, int num) {
++	memcpy(out, in, num * sizeof(*out));
++	return num;
++}
++
++static int __bencode_str_cpy(char *out, const struct iovec *in, int num) {
++	char *orig = out;
++
++	while (--num >= 0) {
++		memcpy(out, in->iov_base, in->iov_len);
++		out += in->iov_len;
++		in++;
++	}
++	return out - orig;
++}
++
++static int __bencode_iovec_dump(struct iovec *out, bencode_item_t *item) {
++	bencode_item_t *child;
++	struct iovec *orig = out;
++
++	assert(item->iov[0].iov_base != NULL);
++	out += __bencode_iovec_cpy(out, &item->iov[0], 1);
++
++	child = item->child;
++	while (child) {
++		out += __bencode_iovec_dump(out, child);
++		child = child->sibling;
++	}
++
++	if (item->type == BENCODE_IOVEC)
++		out += __bencode_iovec_cpy(out, item->iov[1].iov_base, item->iov[1].iov_len);
++	else if (item->iov[1].iov_base)
++		out += __bencode_iovec_cpy(out, &item->iov[1], 1);
++
++	assert((out - orig) == item->iov_cnt);
++	return item->iov_cnt;
++}
++
++static int __bencode_str_dump(char *out, bencode_item_t *item) {
++	char *orig = out;
++	bencode_item_t *child;
++
++	assert(item->iov[0].iov_base != NULL);
++	out += __bencode_str_cpy(out, &item->iov[0], 1);
++
++	child = item->child;
++	while (child) {
++		out += __bencode_str_dump(out, child);
++		child = child->sibling;
++	}
++
++	if (item->type == BENCODE_IOVEC)
++		out += __bencode_str_cpy(out, item->iov[1].iov_base, item->iov[1].iov_len);
++	else if (item->iov[1].iov_base)
++		out += __bencode_str_cpy(out, &item->iov[1], 1);
++
++	assert((out - orig) == item->str_len);
++	*out = '\0';
++	return item->str_len;
++}
++
++struct iovec *bencode_iovec(bencode_item_t *root, int *cnt, unsigned int head, unsigned int tail) {
++	struct iovec *ret;
++
++	if (!root)
++		return NULL;
++	assert(cnt != NULL);
++	assert(root->iov_cnt > 0);
++
++	ret = __bencode_alloc(root->buffer, sizeof(*ret) * (root->iov_cnt + head + tail));
++	if (!ret)
++		return NULL;
++	*cnt = __bencode_iovec_dump(ret + head, root);
++	return ret;
++}
++
++char *bencode_collapse(bencode_item_t *root, int *len) {
++	char *ret;
++	int l;
++
++	if (!root)
++		return NULL;
++	assert(root->str_len > 0);
++
++	ret = __bencode_alloc(root->buffer, root->str_len + 1);
++	if (!ret)
++		return NULL;
++	l = __bencode_str_dump(ret, root);
++	if (len)
++		*len = l;
++	return ret;
++}
++
++char *bencode_collapse_dup(bencode_item_t *root, int *len) {
++	char *ret;
++	int l;
++
++	if (!root)
++		return NULL;
++	assert(root->str_len > 0);
++
++	ret = BENCODE_MALLOC(root->str_len + 1);
++	if (!ret)
++		return NULL;
++
++	l = __bencode_str_dump(ret, root);
++	if (len)
++		*len = l;
++	return ret;
++}
++
++static unsigned int __bencode_hash_str_len(const unsigned char *s, int len) {
++	unsigned long *ul;
++	unsigned int *ui;
++	unsigned short *us;
++
++	if (len >= sizeof(*ul)) {
++		ul = (void *) s;
++		return *ul % BENCODE_HASH_BUCKETS;
++	}
++	if (len >= sizeof(*ui)) {
++		ui = (void *) s;
++		return *ui % BENCODE_HASH_BUCKETS;
++	}
++	if (len >= sizeof(*us)) {
++		us = (void *) s;
++		return *us % BENCODE_HASH_BUCKETS;
++	}
++	if (len >= sizeof(*s))
++		return *s % BENCODE_HASH_BUCKETS;
++
++	return 0;
++}
++
++static unsigned int __bencode_hash_str(bencode_item_t *str) {
++	assert(str->type == BENCODE_STRING);
++	return __bencode_hash_str_len(str->iov[1].iov_base, str->iov[1].iov_len);
++}
++
++static void __bencode_hash_insert(bencode_item_t *key, struct __bencode_hash *hash) {
++	unsigned int bucket, i;
++
++	i = bucket = __bencode_hash_str(key);
++
++	while (1) {
++		if (!hash->buckets[i]) {
++			hash->buckets[i] = key;
++			break;
++		}
++		i++;
++		if (i >= BENCODE_HASH_BUCKETS)
++			i = 0;
++		if (i == bucket)
++			break;
++	}
++}
++
++static bencode_item_t *__bencode_decode_dictionary(bencode_buffer_t *buf, const char *s, const char *end) {
++	bencode_item_t *ret, *key, *value;
++	struct __bencode_hash *hash;
++
++	if (*s != 'd')
++		return NULL;
++	s++;
++
++	ret = __bencode_item_alloc(buf, sizeof(*hash));
++	if (!ret)
++		return NULL;
++	__bencode_dictionary_init(ret);
++	ret->value = 1;
++	hash = (void *) ret->__buf;
++	memset(hash, 0, sizeof(*hash));
++
++	while (s < end) {
++		key = __bencode_decode(buf, s, end);
++		if (!key)
++			return NULL;
++		s += key->str_len;
++		if (key->type == BENCODE_END_MARKER)
++			break;
++		if (key->type != BENCODE_STRING)
++			return NULL;
++		__bencode_container_add(ret, key);
++
++		if (s >= end)
++			return NULL;
++		value = __bencode_decode(buf, s, end);
++		if (!value)
++			return NULL;
++		s += value->str_len;
++		if (value->type == BENCODE_END_MARKER)
++			return NULL;
++		__bencode_container_add(ret, value);
++
++		__bencode_hash_insert(key, hash);
++	}
++
++	return ret;
++}
++
++static bencode_item_t *__bencode_decode_list(bencode_buffer_t *buf, const char *s, const char *end) {
++	bencode_item_t *ret, *item;
++
++	if (*s != 'l')
++		return NULL;
++	s++;
++
++	ret = __bencode_item_alloc(buf, 0);
++	if (!ret)
++		return NULL;
++	__bencode_list_init(ret);
++
++	while (s < end) {
++		item = __bencode_decode(buf, s, end);
++		if (!item)
++			return NULL;
++		s += item->str_len;
++		if (item->type == BENCODE_END_MARKER)
++			break;
++		__bencode_container_add(ret, item);
++	}
++
++	return ret;
++}
++
++static bencode_item_t *__bencode_decode_integer(bencode_buffer_t *buf, const char *s, const char *end) {
++	long long int i;
++	const char *orig = s;
++	char *convend;
++	bencode_item_t *ret;
++
++	if (*s != 'i')
++		return NULL;
++	s++;
++
++	if (s >= end)
++		return NULL;
++
++	if (*s == '0') {
++		i = 0;
++		s++;
++		goto done;
++	}
++
++	i = strtoll(s, &convend, 10);
++	if (convend == s)
++		return NULL;
++	s += (convend - s);
++
++done:
++	if (s >= end)
++		return NULL;
++	if (*s != 'e')
++		return NULL;
++	s++;
++
++	ret = __bencode_item_alloc(buf, 0);
++	if (!ret)
++		return NULL;
++	ret->type = BENCODE_INTEGER;
++	ret->iov[0].iov_base = (void *) orig;
++	ret->iov[0].iov_len = s - orig;
++	ret->iov[1].iov_base = NULL;
++	ret->iov[1].iov_len = 0;
++	ret->iov_cnt = 1;
++	ret->str_len = s - orig;
++	ret->value = i;
++
++	return ret;
++}
++
++static bencode_item_t *__bencode_decode_string(bencode_buffer_t *buf, const char *s, const char *end) {
++	unsigned long int sl;
++	char *convend;
++	const char *orig = s;
++	bencode_item_t *ret;
++
++	if (*s == '0') {
++		sl = 0;
++		s++;
++		goto colon;
++	}
++
++	sl = strtoul(s, &convend, 10);
++	if (convend == s)
++		return NULL;
++	s += (convend - s);
++
++colon:
++	if (s >= end)
++		return NULL;
++	if (*s != ':')
++		return NULL;
++	s++;
++
++	if (s + sl > end)
++		return NULL;
++
++	ret = __bencode_item_alloc(buf, 0);
++	if (!ret)
++		return NULL;
++	ret->type = BENCODE_STRING;
++	ret->iov[0].iov_base = (void *) orig;
++	ret->iov[0].iov_len = s - orig;
++	ret->iov[1].iov_base = (void *) s;
++	ret->iov[1].iov_len = sl;
++	ret->iov_cnt = 2;
++	ret->str_len = s - orig + sl;
++
++	return ret;
++}
++
++static bencode_item_t *__bencode_decode(bencode_buffer_t *buf, const char *s, const char *end) {
++	if (s >= end)
++		return NULL;
++
++	switch (*s) {
++		case 'd':
++			return __bencode_decode_dictionary(buf, s, end);
++		case 'l':
++			return __bencode_decode_list(buf, s, end);
++		case 'i':
++			return __bencode_decode_integer(buf, s, end);
++		case 'e':
++			return &__bencode_end_marker;
++		case '0':
++		case '1':
++		case '2':
++		case '3':
++		case '4':
++		case '5':
++		case '6':
++		case '7':
++		case '8':
++		case '9':
++			return __bencode_decode_string(buf, s, end);
++		default:
++			return NULL;
++	}
++}
++
++bencode_item_t *bencode_decode(bencode_buffer_t *buf, const char *s, int len) {
++	assert(s != NULL);
++	return __bencode_decode(buf, s, s + len);
++}
++
++
++static int __bencode_dictionary_key_match(bencode_item_t *key, const char *keystr, int keylen) {
++	assert(key->type == BENCODE_STRING);
++
++	if (keylen != key->iov[1].iov_len)
++		return 0;
++	if (memcmp(keystr, key->iov[1].iov_base, keylen))
++		return 0;
++
++	return 1;
++}
++
++bencode_item_t *bencode_dictionary_get_len(bencode_item_t *dict, const char *keystr, int keylen) {
++	bencode_item_t *key;
++	unsigned int bucket, i;
++	struct __bencode_hash *hash;
++
++	if (!dict)
++		return NULL;
++	if (dict->type != BENCODE_DICTIONARY)
++		return NULL;
++
++	/* try hash lookup first if possible */
++	if (dict->value == 1) {
++		hash = (void *) dict->__buf;
++		i = bucket = __bencode_hash_str_len((const unsigned char *) keystr, keylen);
++		while (1) {
++			key = hash->buckets[i];
++			if (!key)
++				return NULL; /* would be there, but isn't */
++			assert(key->sibling != NULL);
++			if (__bencode_dictionary_key_match(key, keystr, keylen))
++				return key->sibling;
++			i++;
++			if (i >= BENCODE_HASH_BUCKETS)
++				i = 0;
++			if (i == bucket)
++				break; /* fall back to regular lookup */
++		}
++	}
++
++	for (key = dict->child; key; key = key->sibling->sibling) {
++		assert(key->sibling != NULL);
++		if (__bencode_dictionary_key_match(key, keystr, keylen))
++			return key->sibling;
++	}
++
++	return NULL;
++}
++
++void bencode_buffer_destroy_add(bencode_buffer_t *buf, free_func_t func, void *p) {
++	struct __bencode_free_list *li;
++
++	if (!p)
++		return;
++	li = __bencode_alloc(buf, sizeof(*li));
++	if (!li)
++		return;
++	li->ptr = p;
++	li->func = func;
++	li->next = buf->free_list;
++	buf->free_list = li;
++}
+--- /dev/null
++++ b/modules/rtpproxy-ng/bencode.h
+@@ -0,0 +1,530 @@
++#ifndef _BENCODE_H_
++#define _BENCODE_H_
++
++#include <sys/uio.h>
++#include <string.h>
++
++#if defined(PKG_MALLOC) || defined(pkg_malloc)
++/* kamailio */
++# include "../../mem/mem.h"
++# include "../../str.h"
++# ifndef BENCODE_MALLOC
++# define BENCODE_MALLOC pkg_malloc
++# define BENCODE_FREE pkg_free
++# endif
++#else
++/* mediaproxy-ng */
++# include "str.h"
++# ifndef BENCODE_MALLOC
++# define BENCODE_MALLOC malloc
++# define BENCODE_FREE free
++# endif
++#endif
++
++struct bencode_buffer;
++enum bencode_type;
++struct bencode_item;
++struct __bencode_buffer_piece;
++struct __bencode_free_list;
++
++typedef enum bencode_type bencode_type_t;
++typedef struct bencode_buffer bencode_buffer_t;
++typedef struct bencode_item bencode_item_t;
++typedef void (*free_func_t)(void *);
++
++enum bencode_type {
++	BENCODE_INVALID = 0,
++	BENCODE_STRING,		/* byte string */
++	BENCODE_INTEGER,	/* long long int */
++	BENCODE_LIST,		/* flat list of other objects */
++	BENCODE_DICTIONARY,	/* dictionary of key/values pairs. keys are always strings */
++	BENCODE_IOVEC,		/* special case of a string, built through bencode_string_iovec() */
++	BENCODE_END_MARKER,	/* used internally only */
++};
++
++struct bencode_item {
++	bencode_type_t type;
++	struct iovec iov[2];	/* when decoding, iov[1] contains the contents of a string object */
++	unsigned int iov_cnt;
++	unsigned int str_len;	/* length of the whole ENCODED object. NOT the length of a byte string */
++	long long int value;	/* when decoding an integer, contains the value; otherwise used internally */
++	bencode_item_t *parent, *child, *last_child, *sibling;
++	bencode_buffer_t *buffer;
++	char __buf[0];
++};
++
++struct bencode_buffer {
++	struct __bencode_buffer_piece *pieces;
++	struct __bencode_free_list *free_list;
++	int error:1;		/* set to !0 if allocation failed at any point */
++};
++
++
++
++
++
++/*** INIT & DESTROY ***/
++
++/* Initializes a bencode_buffer_t object. This object is used to group together all memory allocations
++ * made when encoding or decoding. Its memory usage is always growing, until it is freed, at which point
++ * all objects created through it become invalid. The actual object must be allocated separately, for
++ * example by being put on the stack.
++ * Returns 0 on success or -1 on failure (if no memory could be allocated). */
++int bencode_buffer_init(bencode_buffer_t *buf);
++
++/* Destroys a previously initialized bencode_buffer_t object. All memory used by the object is freed
++ * and all objects created through it become invalid. */
++void bencode_buffer_free(bencode_buffer_t *buf);
++
++/* Creates a new empty dictionary object. Memory will be allocated from the bencode_buffer_t object.
++ * Returns NULL if no memory could be allocated. */
++bencode_item_t *bencode_dictionary(bencode_buffer_t *buf);
++
++/* Creates a new empty list object. Memory will be allocated from the bencode_buffer_t object.
++ * Returns NULL if no memory could be allocated. */
++bencode_item_t *bencode_list(bencode_buffer_t *buf);
++
++/* Adds a pointer to the bencode_buffer_t object's internal free list. When the bencode_buffer_t
++ * object is destroyed, the specified function will be called on this pointer. */
++void bencode_buffer_destroy_add(bencode_buffer_t *buf, free_func_t, void *);
++
++/* Returns the buffer associated with an item, or NULL if pointer given is NULL */
++static inline bencode_buffer_t *bencode_item_buffer(bencode_item_t *);
++
++
++
++
++
++/*** DICTIONARY BUILDING ***/
++
++/* Adds a new key/value pair to a dictionary. Memory will be allocated from the same bencode_buffer_t
++ * object as the dictionary was allocated from. Returns NULL if no memory could be allocated, otherwise
++ * returns "val".
++ * The function does not check whether the key being added is already present in the dictionary.
++ * Also, the function does not reorder keys into lexicographical order; keys will be encoded in
++ * the same order as they've been added. The key must a null-terminated string.
++ * The value to be added must not have been previously linked into any other dictionary or list. */
++static inline bencode_item_t *bencode_dictionary_add(bencode_item_t *dict, const char *key, bencode_item_t *val);
++
++/* Identical to bencode_dictionary_add() but doesn't require the key string to be null-terminated */
++bencode_item_t *bencode_dictionary_add_len(bencode_item_t *dict, const char *key, int keylen, bencode_item_t *val);
++
++/* Convenience function to add a string value to a dictionary, possibly duplicated into the
++ * bencode_buffer_t object. */
++static inline bencode_item_t *bencode_dictionary_add_string(bencode_item_t *dict, const char *key, const char *val);
++static inline bencode_item_t *bencode_dictionary_add_string_dup(bencode_item_t *dict, const char *key, const char *val);
++
++/* Ditto, but for a "str" object */
++static inline bencode_item_t *bencode_dictionary_add_str(bencode_item_t *dict, const char *key, const str *val);
++static inline bencode_item_t *bencode_dictionary_add_str_dup(bencode_item_t *dict, const char *key, const str *val);
++
++/* Ditto, but adds a string created through an iovec array to the dictionary. See
++ * bencode_string_iovec(). */
++static inline bencode_item_t *bencode_dictionary_add_iovec(bencode_item_t *dict, const char *key,
++	const struct iovec *iov, int iov_cnt, int str_len);
++
++/* Convenience functions to add the respective (newly created) objects to a dictionary */
++static inline bencode_item_t *bencode_dictionary_add_integer(bencode_item_t *dict, const char *key, long long int val);
++static inline bencode_item_t *bencode_dictionary_add_dictionary(bencode_item_t *dict, const char *key);
++static inline bencode_item_t *bencode_dictionary_add_list(bencode_item_t *dict, const char *key);
++
++
++
++
++
++/*** LIST BUILDING ***/
++
++/* Adds a new item to a list. Returns "item".
++ * The item to be added must not have been previously linked into any other dictionary or list. */
++bencode_item_t *bencode_list_add(bencode_item_t *list, bencode_item_t *item);
++
++/* Convenience function to add the respective (newly created) objects to a list */
++static inline bencode_item_t *bencode_list_add_string(bencode_item_t *list, const char *s);
++static inline bencode_item_t *bencode_list_add_list(bencode_item_t *list);
++static inline bencode_item_t *bencode_list_add_dictionary(bencode_item_t *list);
++
++
++
++
++
++/*** STRING BUILDING & HANDLING ***/
++
++/* Creates a new byte-string object. The given string does not have to be null-terminated, instead
++ * the length of the string is specified by the "len" parameter. Returns NULL if no memory could
++ * be allocated.
++ * Strings are not copied or duplicated, so the string pointed to by "s" must remain valid until
++ * the complete document is finally encoded or sent out. */
++bencode_item_t *bencode_string_len(bencode_buffer_t *buf, const char *s, int len);
++
++/* Creates a new byte-string object. The given string must be null-terminated. Otherwise identical
++ * to bencode_string_len(). */
++static inline bencode_item_t *bencode_string(bencode_buffer_t *buf, const char *s);
++
++/* Creates a new byte-string object from a "str" object. The string does not have to be null-
++ * terminated. */
++static inline bencode_item_t *bencode_str(bencode_buffer_t *buf, const str *s);
++
++/* Identical to the above three functions, but copies the string into the bencode_buffer_t object.
++ * Thus, the given string doesn't have to remain valid and accessible afterwards. */
++bencode_item_t *bencode_string_len_dup(bencode_buffer_t *buf, const char *s, int len);
++static inline bencode_item_t *bencode_string_dup(bencode_buffer_t *buf, const char *s);
++static inline bencode_item_t *bencode_str_dup(bencode_buffer_t *buf, const str *s);
++
++/* Creates a new byte-string object from an iovec array. The created object has different internal
++ * semantics (not a BENCODE_STRING, but a BENCODE_IOVEC) and must not be treated like other string
++ * objects. The array pointer and contents must still be valid and accessible when the complete
++ * document is encoded. The full length of the string composed of the iovec array is given in the
++ * "str_len" parameter, which can be negative, in which case the array is iterated to calculate the
++ * length. */
++bencode_item_t *bencode_string_iovec(bencode_buffer_t *buf, const struct iovec *iov, int iov_cnt, int str_len);
++
++/* Convenience function to compare a string object to a regular C string. Returns 2 if object
++ * isn't a string object, otherwise returns according to strcmp(). */
++static inline int bencode_strcmp(bencode_item_t *a, const char *b);
++
++/* Converts the string object "in" into a str object "out". Returns "out" on success, or NULL on
++ * error ("in" was NULL or not a string object). */
++static inline str *bencode_get_str(bencode_item_t *in, str *out);
++
++
++
++
++
++/*** INTEGER BUILDING ***/
++
++/* Creates a new integer object. Returns NULL if no memory could be allocated. */
++bencode_item_t *bencode_integer(bencode_buffer_t *buf, long long int i);
++
++
++
++
++
++/*** COLLAPSING & ENCODING ***/
++
++/* Collapses and encodes the complete document structure under the "root" element (which normally
++ * is either a dictionary or a list) into an array of "iovec" structures. This array can then be
++ * passed to functions ala writev() or sendmsg() to output the encoded document as a whole. Memory
++ * is allocated from the same bencode_buffer_t object as the "root" object was allocated from.
++ * The "head" and "tail" parameters specify additional "iovec" structures that should be included
++ * in the allocated array before or after (respectively) the iovec structures used by the encoded
++ * document. Both parameters can be zero if no additional elements in the array are required.
++ * Returns a pointer to the allocated array or NULL if no memory could be allocated. The number of
++ * array elements is returned in "cnt" which must be a valid pointer to an int. This number does
++ * not include any additional elements allocated through the "head" or "tail" parameters.
++ *
++ * Therefore, the contents of the returned array are:
++ * [0 .. (head - 1)]                         = unused and uninitialized iovec structures
++ * [(head) .. (head + cnt - 1)]              = the encoded document
++ * [(head + cnt) .. (head + cnt + tail - 1)] = unused and uninitialized iovec structures
++ *
++ * The returned array will be freed when the corresponding bencode_buffer_t object is destroyed. */
++struct iovec *bencode_iovec(bencode_item_t *root, int *cnt, unsigned int head, unsigned int tail);
++
++/* Similar to bencode_iovec(), but instead returns the encoded document as a null-terminated string.
++ * Memory for the string is allocated from the same bencode_buffer_t object as the "root" object
++ * was allocated from. If "len" is a non-NULL pointer, the length of the genrated string is returned
++ * in *len. This is important if the encoded document contains binary data, in which case null
++ * termination cannot be trusted. The returned string is freed when the corresponding
++ * bencode_buffer_t object is destroyed. */
++char *bencode_collapse(bencode_item_t *root, int *len);
++
++/* Identical to bencode_collapse() but fills in a "str" object. Returns "out". */
++static str *bencode_collapse_str(bencode_item_t *root, str *out);
++
++/* Identical to bencode_collapse(), but the memory for the returned string is not allocated from
++ * a bencode_buffer_t object, but instead using the function defined as BENCODE_MALLOC (normally
++ * malloc() or pkg_malloc()), similar to strdup(). Using this function, the bencode_buffer_t
++ * object can be destroyed, but the returned string remains valid and usable. */
++char *bencode_collapse_dup(bencode_item_t *root, int *len);
++
++
++
++
++
++/*** DECODING ***/
++
++/* Decodes an encoded document from a string into a tree of bencode_item_t objects. The string does
++ * not need to be null-terminated, instead the length of the string is given through the "len"
++ * parameter. Memory is allocated from the bencode_buffer_t object. Returns NULL if no memory could
++ * be allocated or if the document could not be successfully decoded.
++ *
++ * The returned element is the "root" of the document tree and normally is either a list object or
++ * a dictionary object, but can also be a single string or integer object with no other objects
++ * underneath or besides it (no childred and no siblings). The type of the object can be determined
++ * by its ->type property.
++ *
++ * The number of bytes that could successfully be decoded into an object tree can be accessed through
++ * the root element's ->str_len property. Normally, this number should be equal to the "len" parameter
++ * passed, in which case the full string could be decoded. If ->str_len is less than "len", then there
++ * was additional stray byte data after the end of the encoded document.
++ *
++ * The document tree can be traversed through the ->child and ->sibling pointers in each object. The
++ * ->child pointer will be NULL for string and integer objects, as they don't contain other objects.
++ * For lists and dictionaries, ->child will be a pointer to the first contained object. This first
++ * contained object's ->sibling pointer will point to the next (second) contained object of the list
++ * or the dictionary, and so on. The last contained element of a list of dictionary will have a
++ * NULL ->sibling pointer.
++ *
++ * Dictionaries are like lists with ordered key/value pairs. When traversing dictionaries like
++ * lists, the following applies: The first element in the list (where ->child points to) will be the
++ * key of the first key/value pair (guaranteed to be a string and guaranteed to be present). The
++ * next element (following one ->sibling) will be the value of the first key/value pair. Following
++ * another ->sibling will point to the key of the next (second) key/value pair, and so on.
++ *
++ * However, to access children objects of dictionaries, the special functions following the naming
++ * scheme bencode_dictionary_get_* below should be used. They perform key lookup through a simple
++ * hash built into the dictionary object and so perform the lookup much faster. Only dictionaries
++ * created through a decoding process (i.e. not ones created from bencode_dictionary()) have this
++ * property. The hash is efficient only up to a certain number of elements (BENCODE_HASH_BUCKETS
++ * in bencode.c) contained in the dictionary. If the number of children object exceeds this number,
++ * key lookup will be slower than simply linearily traversing the list.
++ *
++ * The decoding function for dictionary object does not check whether keys are unique within the
++ * dictionary. It also does not care about lexicographical order of the keys.
++ *
++ * Decoded string objects will contain the raw decoded byte string in ->iov[1] (including the correct
++ * length). Strings are NOT null-terminated. Decoded integer objects will contain the decoded value
++ * in ->value.
++ *
++ * All memory is freed when the bencode_buffer_t object is destroyed.
++ */
++bencode_item_t *bencode_decode(bencode_buffer_t *buf, const char *s, int len);
++
++/* Identical to bencode_decode(), but returns successfully only if the type of the decoded object match
++ * "expect". */
++static inline bencode_item_t *bencode_decode_expect(bencode_buffer_t *buf, const char *s, int len, bencode_type_t expect);
++
++/* Identical to bencode_decode_expect() but takes a "str" argument. */
++static inline bencode_item_t *bencode_decode_expect_str(bencode_buffer_t *buf, const str *s, bencode_type_t expect);
++
++
++
++
++
++/*** DICTIONARY LOOKUP & EXTRACTION ***/
++
++/* Searches the given dictionary object for the given key and returns the respective value. Returns
++ * NULL if the given object isn't a dictionary or if the key doesn't exist. The key must be a
++ * null-terminated string. */
++static inline bencode_item_t *bencode_dictionary_get(bencode_item_t *dict, const char *key);
++
++/* Identical to bencode_dictionary_get() but doesn't require the key to be null-terminated. */
++bencode_item_t *bencode_dictionary_get_len(bencode_item_t *dict, const char *key, int key_len);
++
++/* Identical to bencode_dictionary_get() but returns the value only if its type is a string, and
++ * returns it as a pointer to the string itself. Returns NULL if the value is of some other type. The
++ * returned string is NOT null-terminated. Length of the string is returned in *len, which must be a
++ * valid pointer. The returned string will be valid until dict's bencode_buffer_t object is destroyed. */
++static inline char *bencode_dictionary_get_string(bencode_item_t *dict, const char *key, int *len);
++
++/* Identical to bencode_dictionary_get_string() but fills in a "str" struct. Returns str->s, which
++ * may be NULL. */
++static inline char *bencode_dictionary_get_str(bencode_item_t *dict, const char *key, str *str);
++
++/* Looks up the given key in the dictionary and compares the corresponding value to the given
++ * null-terminated string. Returns 2 if the key isn't found or if the value isn't a string, otherwise
++ * returns according to strcmp(). */
++static inline int bencode_dictionary_get_strcmp(bencode_item_t *dict, const char *key, const char *str);
++
++/* Identical to bencode_dictionary_get() but returns the string in a newly allocated buffer (using the
++ * BENCODE_MALLOC function), which remains valid even after bencode_buffer_t is destroyed. */
++static inline char *bencode_dictionary_get_string_dup(bencode_item_t *dict, const char *key, int *len);
++
++/* Combines bencode_dictionary_get_str() and bencode_dictionary_get_string_dup(). Fills in a "str"
++ * struct, but copies the string into a newly allocated buffer. Returns str->s. */
++static inline char *bencode_dictionary_get_str_dup(bencode_item_t *dict, const char *key, str *str);
++
++/* Identical to bencode_dictionary_get_string() but expects an integer object. The parameter "defval"
++ * specified which value should be returned if the key is not found or if the value is not an integer. */
++static inline long long int bencode_dictionary_get_integer(bencode_item_t *dict, const char *key, long long int defval);
++
++/* Identical to bencode_dictionary_get(), but returns the object only if its type matches "expect". */
++static inline bencode_item_t *bencode_dictionary_get_expect(bencode_item_t *dict, const char *key, bencode_type_t expect);
++
++
++
++
++
++/**************************/
++
++static inline bencode_buffer_t *bencode_item_buffer(bencode_item_t *i) {
++	if (!i)
++		return NULL;
++	return i->buffer;
++}
++
++static inline bencode_item_t *bencode_string(bencode_buffer_t *buf, const char *s) {
++	return bencode_string_len(buf, s, strlen(s));
++}
++
++static inline bencode_item_t *bencode_string_dup(bencode_buffer_t *buf, const char *s) {
++	return bencode_string_len_dup(buf, s, strlen(s));
++}
++
++static inline bencode_item_t *bencode_str(bencode_buffer_t *buf, const str *s) {
++	return bencode_string_len(buf, s->s, s->len);
++}
++
++static inline bencode_item_t *bencode_str_dup(bencode_buffer_t *buf, const str *s) {
++	return bencode_string_len_dup(buf, s->s, s->len);
++}
++
++static inline bencode_item_t *bencode_dictionary_add(bencode_item_t *dict, const char *key, bencode_item_t *val) {
++	if (!key)
++		return NULL;
++	return bencode_dictionary_add_len(dict, key, strlen(key), val);
++}
++
++static inline bencode_item_t *bencode_dictionary_add_string(bencode_item_t *dict, const char *key, const char *val) {
++	if (!val)
++		return NULL;
++	return bencode_dictionary_add(dict, key, bencode_string(bencode_item_buffer(dict), val));
++}
++
++static inline bencode_item_t *bencode_dictionary_add_string_dup(bencode_item_t *dict, const char *key, const char *val) {
++	if (!val)
++		return NULL;
++	return bencode_dictionary_add(dict, key, bencode_string_dup(bencode_item_buffer(dict), val));
++}
++
++static inline bencode_item_t *bencode_dictionary_add_str(bencode_item_t *dict, const char *key, const str *val) {
++	if (!val)
++		return NULL;
++	return bencode_dictionary_add(dict, key, bencode_str(bencode_item_buffer(dict), val));
++}
++
++static inline bencode_item_t *bencode_dictionary_add_str_dup(bencode_item_t *dict, const char *key, const str *val) {
++	if (!val)
++		return NULL;
++	return bencode_dictionary_add(dict, key, bencode_str_dup(bencode_item_buffer(dict), val));
++}
++
++static inline bencode_item_t *bencode_dictionary_add_integer(bencode_item_t *dict, const char *key, long long int val) {
++	return bencode_dictionary_add(dict, key, bencode_integer(bencode_item_buffer(dict), val));
++}
++
++static inline bencode_item_t *bencode_dictionary_add_dictionary(bencode_item_t *dict, const char *key) {
++	return bencode_dictionary_add(dict, key, bencode_dictionary(bencode_item_buffer(dict)));
++}
++
++static inline bencode_item_t *bencode_dictionary_add_list(bencode_item_t *dict, const char *key) {
++	return bencode_dictionary_add(dict, key, bencode_list(bencode_item_buffer(dict)));
++}
++
++static inline bencode_item_t *bencode_list_add_string(bencode_item_t *list, const char *s) {
++	return bencode_list_add(list, bencode_string(bencode_item_buffer(list), s));
++}
++
++static inline bencode_item_t *bencode_list_add_list(bencode_item_t *list) {
++	return bencode_list_add(list, bencode_list(bencode_item_buffer(list)));
++}
++
++static inline bencode_item_t *bencode_list_add_dictionary(bencode_item_t *list) {
++	return bencode_list_add(list, bencode_dictionary(bencode_item_buffer(list)));
++}
++
++static inline bencode_item_t *bencode_dictionary_get(bencode_item_t *dict, const char *key) {
++	if (!key)
++		return NULL;
++	return bencode_dictionary_get_len(dict, key, strlen(key));
++}
++
++static inline char *bencode_dictionary_get_string(bencode_item_t *dict, const char *key, int *len) {
++	bencode_item_t *val;
++	val = bencode_dictionary_get(dict, key);
++	if (!val || val->type != BENCODE_STRING)
++		return NULL;
++	*len = val->iov[1].iov_len;
++	return val->iov[1].iov_base;
++}
++
++static inline char *bencode_dictionary_get_str(bencode_item_t *dict, const char *key, str *str) {
++	str->s = bencode_dictionary_get_string(dict, key, &str->len);
++	if (!str->s)
++		str->len = 0;
++	return str->s;
++}
++
++static inline char *bencode_dictionary_get_string_dup(bencode_item_t *dict, const char *key, int *len) {
++	const char *s;
++	char *ret;
++	s = bencode_dictionary_get_string(dict, key, len);
++	if (!s)
++		return NULL;
++	ret = BENCODE_MALLOC(*len);
++	if (!ret)
++		return NULL;
++	memcpy(ret, s, *len);
++	return ret;
++}
++
++static inline char *bencode_dictionary_get_str_dup(bencode_item_t *dict, const char *key, str *str) {
++	str->s = bencode_dictionary_get_string_dup(dict, key, &str->len);
++	return str->s;
++}
++
++static inline long long int bencode_dictionary_get_integer(bencode_item_t *dict, const char *key, long long int defval) {
++	bencode_item_t *val;
++	val = bencode_dictionary_get(dict, key);
++	if (!val || val->type != BENCODE_INTEGER)
++		return defval;
++	return val->value;
++}
++
++static inline bencode_item_t *bencode_decode_expect(bencode_buffer_t *buf, const char *s, int len, bencode_type_t expect) {
++	bencode_item_t *ret;
++	ret = bencode_decode(buf, s, len);
++	if (!ret || ret->type != expect)
++		return NULL;
++	return ret;
++}
++
++static inline bencode_item_t *bencode_decode_expect_str(bencode_buffer_t *buf, const str *s, bencode_type_t expect) {
++	return bencode_decode_expect(buf, s->s, s->len, expect);
++}
++
++static inline bencode_item_t *bencode_dictionary_get_expect(bencode_item_t *dict, const char *key, bencode_type_t expect) {
++	bencode_item_t *ret;
++	ret = bencode_dictionary_get(dict, key);
++	if (!ret || ret->type != expect)
++		return NULL;
++	return ret;
++}
++static inline str *bencode_collapse_str(bencode_item_t *root, str *out) {
++	out->s = bencode_collapse(root, &out->len);
++	return out;
++}
++static inline int bencode_strcmp(bencode_item_t *a, const char *b) {
++	int len;
++	if (a->type != BENCODE_STRING)
++		return 2;
++	len = strlen(b);
++	if (a->iov[1].iov_len < len)
++		return -1;
++	if (a->iov[1].iov_len > len)
++		return 1;
++	return memcmp(a->iov[1].iov_base, b, len);
++}
++static inline int bencode_dictionary_get_strcmp(bencode_item_t *dict, const char *key, const char *str) {
++	bencode_item_t *i;
++	i = bencode_dictionary_get(dict, key);
++	if (!i)
++		return 2;
++	return bencode_strcmp(i, str);
++}
++
++static inline str *bencode_get_str(bencode_item_t *in, str *out) {
++	if (!in || in->type != BENCODE_STRING)
++		return NULL;
++	out->s = in->iov[1].iov_base;
++	out->len = in->iov[1].iov_len;
++	return out;
++}
++
++static inline bencode_item_t *bencode_dictionary_add_iovec(bencode_item_t *dict, const char *key,
++		const struct iovec *iov, int iov_cnt, int str_len)
++{
++	return bencode_dictionary_add(dict, key, bencode_string_iovec(bencode_item_buffer(dict), iov, iov_cnt, str_len));
++}
++
++#endif
+--- /dev/null
++++ b/modules/rtpproxy-ng/doc/Makefile
+@@ -0,0 +1,4 @@
++docs = rtpproxy-ng.xml
++
++docbook_dir = ../../../docbook
++include $(docbook_dir)/Makefile.module
+--- /dev/null
++++ b/modules/rtpproxy-ng/doc/rtpproxy-ng.xml
+@@ -0,0 +1,103 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++%docentities;
++
++]>
++
++<book xmlns:xi="http://www.w3.org/2001/XInclude">
++	<bookinfo>
++	<title>rtpproxy-ng Module</title>
++	<productname class="trade">&kamailioname;</productname>
++	<authorgroup>
++		<author>
++		<firstname>Maxim</firstname>
++		<surname>Sobolev</surname>
++		<affiliation><orgname>Sippy Software, Inc.</orgname></affiliation>
++		<address>
++			<email>sobomax@sippysoft.com</email>
++		</address>
++		</author>
++		<author>
++		<firstname>Juha</firstname>
++		<surname>Heinanen</surname>
++		<affiliation><orgname>TuTPro, Inc.</orgname></affiliation>
++		<address>
++			<email>jh@tutpro.com</email>
++		</address>
++		</author>
++		<editor>
++		<firstname>Maxim</firstname>
++		<surname>Sobolev</surname>
++		<address>
++			<email>sobomax@sippysoft.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Bogdan-Andrei</firstname>
++		<surname>Iancu</surname>
++		<address>
++			<email>bogdan@voice-system.ro</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Juha</firstname>
++		<surname>Heinanen</surname>
++		<address>
++			<email>jh@tutpro.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Sas</firstname>
++		<surname>Ovidiu</surname>
++		<address>
++			<email>osas@voipembedded.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Carsten</firstname>
++		<surname>Bock</surname>
++		<affiliation><orgname>ng-voice GmbH</orgname></affiliation>
++		<address>
++			<email>carsten@ng-voice.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Richard</firstname>
++		<surname>Fuchs</surname>
++		<affiliation><orgname>Sipwise GmbH</orgname></affiliation>
++		<address>
++			<email>rfuchs@sipwise.com</email>
++		</address>
++		</editor>
++	</authorgroup>
++	<copyright>
++		<year>2003-2008</year>
++		<holder>Sippy Software, Inc.</holder>
++	</copyright>
++	<copyright>
++		<year>2005</year>
++		<holder>Voice Sistem SRL</holder>
++	</copyright>
++	<copyright>
++		<year>2009-2012</year>
++		<holder>TuTPro Inc.</holder>
++	</copyright>
++	<copyright>
++		<year>2010</year>
++		<holder><ulink url='http://www.voipembedded.com'>VoIPEmbedded Inc.</ulink></holder>
++	</copyright>
++	<copyright>
++		<year>2013</year>
++		<holder>Sipwise GmbH</holder>
++	</copyright>
++	</bookinfo>
++	<toc></toc>
++
++	<xi:include href="rtpproxy_admin.xml"/>
++	<xi:include href="rtpproxy_faq.xml"/>
++
++</book>
+--- /dev/null
++++ b/modules/rtpproxy-ng/doc/rtpproxy_admin.xml
+@@ -0,0 +1,823 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++%docentities;
++
++]>
++
++<!-- Module User's Guide -->
++
++<chapter>
++
++	<title>&adminguide;</title>
++
++	<section>
++	<title>Overview</title>
++	<para>
++		This is a module that enables media streams to be proxied
++		via an RTP proxy. The only RTP proxy currently known to work
++		with this module is the Sipwise ngcp-rtpproxy-ng
++		<ulink url="https://github.com/sipwise/mediaproxy-ng"></ulink>.
++		The rtpproxy-ng module is a modified version of the original
++		rtpproxy module using a new control protocol. The module is
++		designed to be a drop-in replacement for the old module from
++		a configuration file point of view, however due to the
++		incompatible control protocol, it only works with RTP proxies
++		which specifically support it.
++	</para>
++	</section>
++
++	<section>
++	<title>Multiple RTPProxy usage</title>
++	<para>
++		The rtpproxy-ng module can support multiple RTP proxies for
++		balancing/distribution and control/selection purposes.
++	</para>
++	<para>
++		The module allows definition of several sets of rtpproxies.
++		Load-balancing will be performed over a set and the admin has the
++		ability to choose what set should be used. The set is selected via
++		its id - the id being defined with the set. Refer to the
++		<quote>rtpproxy_sock</quote> module parameter definition for syntax
++		description.
++	</para>
++	<para>
++		The balancing inside a set is done automatically by the module based on
++		the weight of each rtpproxy from the set.
++	</para>
++	<para>
++		The selection of the set is done from script prior using
++		unforce_rtp_proxy(), rtpproxy_offer() or rtpproxy_answer()
++		functions - see the set_rtp_proxy_set() function.
++	</para>
++	<para>
++		For backward compatibility reasons, a set with no id take by default
++		the id 0. Also if no set is explicitly set before
++		unforce_rtp_proxy(), rtpproxy_offer() or rtpproxy_answer()
++		the 0 id set will be used.
++	</para>
++	<para>
++		IMPORTANT: if you use multiple sets, take care and use the same set for
++		both rtpproxy_offer()/rtpproxy_answer() and unforce_rtpproxy()!!
++	</para>
++	</section>
++
++	<section>
++	<title>Dependencies</title>
++	<section>
++		<title>&kamailio; Modules</title>
++		<para>
++		The following modules must be loaded before this module:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>tm module</emphasis> - (optional) if you want to
++				have rtpproxy_manage() fully functional
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	</section>
++	<section>
++		<title>External Libraries or Applications</title>
++		<para>
++		The following libraries or applications must be installed before
++		running &kamailio; with this module loaded:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>None</emphasis>.
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	</section>
++	</section>
++
++	<section>
++	<title>Parameters</title>
++	<section>
++		<title><varname>rtpproxy_sock</varname> (string)</title>
++		<para>
++		Definition of socket(s) used to connect to (a set) RTPProxy. It may
++		specify a UNIX socket or an IPv4/IPv6 UDP socket.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote>NONE</quote> (disabled).
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>rtpproxy_sock</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++# single rtproxy
++modparam("rtpproxy-ng", "rtpproxy_sock", "udp:localhost:12221")
++# multiple rtproxies for LB
++modparam("rtpproxy-ng", "rtpproxy_sock",
++	"udp:localhost:12221 udp:localhost:12222")
++# multiple sets of multiple rtproxies
++modparam("rtpproxy-ng", "rtpproxy_sock",
++	"1 == udp:localhost:12221 udp:localhost:12222")
++modparam("rtpproxy-ng", "rtpproxy_sock",
++	"2 == udp:localhost:12225")
++...
++</programlisting>
++		</example>
++	</section>
++	<section>
++		<title><varname>rtpproxy_disable_tout</varname> (integer)</title>
++		<para>
++		Once an RTP proxy was found unreachable and marked as disabled, the rtpproxy-ng
++		module will not attempt to establish communication to that RTP proxy for
++		rtpproxy_disable_tout seconds.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote>60</quote>.
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>rtpproxy_disable_tout</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("rtpproxy-ng", "rtpproxy_disable_tout", 20)
++...
++</programlisting>
++		</example>
++	</section>
++	<section>
++		<title><varname>rtpproxy_tout</varname> (integer)</title>
++		<para>
++		Timeout value in waiting for reply from RTP proxy.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote>1</quote>.
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>rtpproxy_tout</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("rtpproxy-ng", "rtpproxy_tout", 2)
++...
++</programlisting>
++		</example>
++	</section>
++	<section>
++		<title><varname>rtpproxy_retr</varname> (integer)</title>
++		<para>
++		How many times the module should retry to send and receive after
++		timeout was generated.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote>5</quote>.
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>rtpproxy_retr</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("rtpproxy-ng", "rtpproxy_retr", 2)
++...
++</programlisting>
++		</example>
++	</section>
++<!--
++	<section>
++		<title><varname>timeout_socket</varname> (string)</title>
++		<para>
++		The parameter sets the RTP timeout socket, which is transmitted to the RTP Proxy.
++		It will be used by the RTP proxy to signal back that a media stream timed
++		out.
++		</para>
++		<para>
++		If it is an empty string, no timeout socket will be transmitted to the RTP-Proxy.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote></quote> (nothing).
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>timeout_socket</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("nathelper", "timeout_socket", "xmlrpc:http://127.0.0.1:8000/RPC2")
++...
++</programlisting>
++		</example>
++	</section>
++-->
++	<section>
++		<title><varname>extra_id_pv</varname> (string)</title>
++		<para>
++			The parameter sets the PV defination to use when the <quote>b</quote>
++			parameter is used on unforce_rtp_proxy(), rtpproxy_offer(),
++			rtpproxy_answer() or rtpproxy_manage() command.
++		</para><para>
++			Default is empty, the <quote>b</quote> parameter may not be used then.
++		</para>
++		<example>
++		<title>Set <varname>extra_id_pv</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("rtpproxy-ng", "extra_id_pv", "$avp(extra_id)")
++...
++</programlisting>
++		</example>
++	</section>
++	</section>
++
++	<section>
++	<title>Functions</title>
++	<section>
++		<title>
++		<function moreinfo="none">set_rtp_proxy_set(setid)</function>
++		</title>
++		<para>
++		Sets the Id of the rtpproxy set to be used for the next
++		unforce_rtp_proxy(), rtpproxy_offer(), rtpproxy_answer()
++		or rtpproxy_manage() command. The parameter can be an integer or
++		a config variable holding an integer.
++		</para>
++		<para>
++		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
++		BRANCH_ROUTE.
++		</para>
++		<example>
++		<title><function>set_rtp_proxy_set</function> usage</title>
++		<programlisting format="linespecific">
++...
++set_rtp_proxy_set("2");
++rtpproxy_offer();
++...
++</programlisting>
++		</example>
++	</section>
++        <section>
++                <title>
++                <function moreinfo="none">rtpproxy_offer([flags [, ip_address]])</function>
++                </title>
++                <para>
++                Rewrites &sdp; body to ensure that media is passed through
++                an &rtp; proxy. To be invoked
++		on INVITE for the cases the SDPs are in INVITE and 200 OK and on 200 OK
++		when SDPs are in 200 OK and ACK.
++                </para>
++		<para>Meaning of the parameters is as follows:</para>
++		<itemizedlist>
++		<listitem>
++			<para>
++			<emphasis>flags</emphasis> - flags to turn on some features.
++			</para>
++			<itemizedlist>
++				<listitem><para>
++				<emphasis>1</emphasis> - append first Via branch to Call-ID when sending
++				command to rtpproxy. This can be used to create one media session per branch
++				on the rtpproxy. When sending a subsequent <quote>delete</quote> command to
++				the rtpproxy, you can then stop just the session for a specific branch when
++				passing the flag '1' or '2' in the <quote>unforce_rtpproxy</quote>, or stop
++				all sessions for a call when not passing one of those two flags there. This is
++				especially useful if you have serially forked call scenarios where rtpproxy
++				gets an <quote>offer</quote> command for a new branch, and then a
++				<quote>delete</quote> command for the previous branch, which would otherwise
++				delete the full call, breaking the subsequent <quote>answer</quote> for the
++				new branch. <emphasis>This flag is only supported by the ngcp-mediaproxy-ng
++				rtpproxy at the moment!</emphasis>
++				</para></listitem>
++				<listitem><para>
++				<emphasis>2</emphasis> - append second Via branch to Call-ID when sending
++				command to rtpproxy. See flag '1' for its meaning.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>3</emphasis> - behave like flag 1 is set for a request and
++				like flag 2 is set for a reply.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>a</emphasis> - flags that UA from which message is
++				received doesn't support symmetric RTP. (automatically sets the 'r' flag)
++				</para></listitem>
++				<listitem><para>
++				<emphasis>b</emphasis> - append branch specific variable to Call-ID when sending
++				command to rtpproxy. This creates one rtpproxy session per unique variable.
++
++				Works similar to the 1, 2 and 3 parameter, but is usefull when forking to multiple
++				destinations on different address families or network segments, requiring different
++				rtpproxy parameters.
++
++				The variable value is taken from the <quote>extra_id_pv</quote>.
++
++				When used, it must be used in every call to rtpproxy_manage(), rtpproxy_offer(),
++				rtpproxy_answer() and rtpproxy_destroy() with the same contents of the PV.
++				The b parameter may not be used in conjunction with the 1, 2 or 3 parameter
++				to use the Via branch in the Call-ID.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>l</emphasis> - force <quote>lookup</quote>, that is,
++				only rewrite SDP when corresponding session already exists
++				in the RTP proxy. By default is on when the session is to be
++				completed.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>i, e</emphasis> - these flags specify the direction of the SIP
++				message. These flags only make sense when rtpproxy is running in bridge mode.
++				'i' means internal network (LAN), 'e' means external network (WAN). 'i'
++				corresponds to rtpproxy's first interface, 'e' corresponds to rtpproxy's
++				second interface. You always have to specify two flags to define
++				the incoming network and the outgoing network. For example, 'ie' should be
++				used for SIP message received from the local interface and sent out on the
++				external interface, and 'ei' vice versa. Other options are 'ii' and 'ee'.
++				So, for example if a SIP requests is processed with 'ie' flags, the corresponding
++				response must be processed with 'ie' flags.
++				</para><para>
++				For ngcp-mediaproxy-ng, these flags are used to select between IPv4
++				and IPv6 addresses, corresponding to 'i' and 'e' respectively. For example,
++				if the request is coming from an IPv4 host and is going to an IPv6 host,
++				the flags should be specified as 'ie'.
++				</para><para>
++				Note: As rtpproxy in bridge mode s per default asymmetric, you have to specify
++				the 'w' flag for clients behind NAT! See also above notes!
++				</para></listitem>
++				<listitem><para>
++				<emphasis>x</emphasis> - this flag an alternative to the 'ie' or 'ei'-flags
++				in order to do automatic bridging between IPv4 on the
++				"internal network" and IPv6 on the "external network". Instead of
++				explicitly instructing the RTP proxy to select a particular address
++				family, the distinction is done by the given IP in the SDP body by
++				the RTP proxy itself. Not supported by ngcp-mediaproxy-ng.
++				</para><para>
++				Note: Please note, that this will only work properly with non-dual-stack user-agents or with
++				dual-stack clients according to RFC6157 (which suggest ICE for Dual-Stack implementations).
++				This short-cut will not work properly with RFC4091 (ANAT) compatible clients, which suggests
++				having different m-lines with different IP-protocols grouped together.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>f</emphasis> - instructs rtpproxy to ignore marks
++				inserted by another rtpproxy in transit to indicate that the
++				session is already goes through another proxy. Allows creating
++				a chain of proxies.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>r</emphasis> - flags that IP address in SDP should
++				be trusted. Without this flag, rtpproxy ignores address in
++				the SDP and uses source address of the SIP message as media
++				address which is passed to the RTP proxy.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>o</emphasis> - flags that IP from the origin
++				description (o=) should be also changed.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>c</emphasis> - flags to change the session-level
++				SDP connection (c=) IP if media-description also includes
++				connection information.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>w</emphasis> - flags that for the UA from which
++				message is received, support symmetric RTP must be forced.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>zNN</emphasis> - requests the RTPproxy to perform
++				re-packetization of RTP traffic coming from the UA which
++				has sent the current message to increase or decrease payload
++				size per each RTP packet forwarded if possible.  The NN is the
++				target payload size in ms, for the most codecs its value should
++				be in 10ms increments, however for some codecs the increment
++				could differ (e.g. 30ms for GSM or 20ms for G.723).  The
++				RTPproxy would select the closest value supported by the codec.
++				This feature could be used for significantly reducing bandwith
++				overhead for low bitrate codecs, for example with G.729 going
++				from 10ms to 100ms saves two thirds of the network bandwith.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>+</emphasis> - instructs the RTP proxy to
++				discard any ICE attributes already present in the SDP body
++				and then generate and insert new ICE data, leaving itself
++				as the <emphasis>only</emphasis> ICE candidates. Without
++				this flag, new ICE data will only be generated
++				if no ICE was present in the SDP originally; otherwise
++				the RTP proxy will only insert itself as an
++				<emphasis>additional</emphasis> ICE candidate. Other
++				SDP substitutions (c=, m=, etc) are unaffected by this flag.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>-</emphasis> - instructs the RTP proxy to discard
++				any ICE attributes and not insert any new ones into the SDP.
++				Mutually exclusive with the '+' flag.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>s, S, p, P</emphasis> - These flags control the RTP
++				transport protocol that should be used towards the recipient of
++				the SDP. If none of them are specified, the protocol given in
++				the SDP is left untouched. Otherwise, the "S" flag indicates that
++				SRTP should be used, while "s" indicates that SRTP should not be used.
++				"P" indicates that the advanced RTCP profile with feedback messages
++				should be used, and "p" indicates that the regular RTCP profile
++				should be used. As such, the combinations "sp", "sP", "Sp" and "SP"
++				select between RTP/AVP, RTP/AVPF, RTP/SAVP and RTP/SAVPF,
++				respectively.
++				</para></listitem>
++			</itemizedlist>
++		</listitem>
++		<listitem><para>
++		<emphasis>ip_address</emphasis> - new SDP IP address.
++		</para></listitem>
++		</itemizedlist>
++		<para>
++		This function can be used from ANY_ROUTE.
++                </para>
++		<example>
++		<title><function>rtpproxy_offer</function> usage</title>
++		<programlisting format="linespecific">
++route {
++...
++    if (is_method("INVITE")) {
++        if (has_sdp()) {
++            if (rtpproxy_offer())
++                t_on_reply("1");
++        } else {
++            t_on_reply("2");
++        }
++    }
++    if (is_method("ACK") &amp;&amp; has_sdp())
++        rtpproxy_answer();
++...
++}
++
++onreply_route[1]
++{
++...
++    if (has_sdp())
++        rtpproxy_answer();
++...
++}
++
++onreply_route[2]
++{
++...
++    if (has_sdp())
++        rtpproxy_offer();
++...
++}
++</programlisting>
++                </example>
++	</section>
++        <section>
++                <title>
++                <function moreinfo="none">rtpproxy_answer([flags [, ip_address]])</function>
++                </title>
++		<para>
++		Rewrites &sdp; body to ensure that media is passed through
++		an &rtp; proxy. To be invoked
++		on 200 OK for the cases the SDPs are in INVITE and 200 OK and on ACK
++		when SDPs are in 200 OK and ACK.
++		</para>
++		<para>
++		See rtpproxy_answer() function description above for the meaning of the
++		parameters.
++		</para>
++		<para>
++		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
++		FAILURE_ROUTE, BRANCH_ROUTE.
++		</para>
++		<example>
++		 <title><function>rtpproxy_answer</function> usage</title>
++		<para>
++		See rtpproxy_offer() function example above for example.
++		</para>
++		</example>
++        </section>
++	<section>
++		<title>
++		<function moreinfo="none">rtpproxy_destroy([flags])</function>
++		</title>
++		<para>
++		Tears down the RTPProxy session for the current call.
++		</para>
++		<para>
++		This function can be used from ANY_ROUTE.
++		</para>
++		<para>Meaning of the parameters is as follows:</para>
++		<itemizedlist>
++		<listitem>
++			<para>
++			<emphasis>flags</emphasis> - flags to turn on some features.
++			</para>
++			<itemizedlist>
++				<listitem><para>
++				<emphasis>1</emphasis> - append first Via branch to Call-ID when sending
++				command to rtpproxy. This can be used to create one media session per branch
++				on the rtpproxy. When sending a subsequent <quote>delete</quote> command to
++				the rtpproxy, you can then stop just the session for a specific branch when
++				passing the flag '1' or '2' in the <quote>unforce_rtpproxy</quote>, or stop
++				all sessions for a call when not passing one of those two flags there. This is
++				especially useful if you have serially forked call scenarios where rtpproxy
++				gets an <quote>update</quote> command for a new branch, and then a
++				<quote>delete</quote> command for the previous branch, which would otherwise
++				delete the full call, breaking the subsequent <quote>lookup</quote> for the
++				new branch. <emphasis>This flag is only supported by the ngcp-mediaproxy-ng
++				rtpproxy at the moment!</emphasis>
++				</para></listitem>
++				<listitem><para>
++				<emphasis>2</emphasis> - append second Via branch to Call-ID when sending
++				command to rtpproxy. See flag '1' for its meaning.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>b</emphasis> - append branch specific variable to Call-ID when sending
++				command to rtpproxy. See rtpproxy_offer() for details.
++				<listitem><para>
++				</para></listitem>
++				<emphasis>t</emphasis> - do not include To tag to <quote>delete</quote> command to rtpproxy thus causing full call to be deleted. Useful for deleting unused rtpproxy call when 200 OK is received on a branch, where rtpproxy is not needed.
++				</para></listitem>
++			</itemizedlist>
++		</listitem>
++		</itemizedlist>
++		<example>
++		<title><function>rtpproxy_destroy</function> usage</title>
++		<programlisting format="linespecific">
++...
++rtpproxy_destroy();
++...
++</programlisting>
++		</example>
++	</section>
++	<section>
++		<title>
++		<function moreinfo="none">unforce_rtp_proxy()</function>
++		</title>
++		<para>
++			Same as rtpproxy_destroy().
++		</para>
++	</section>
++
++    <section>
++        <title>
++        <function moreinfo="none">rtpproxy_manage([flags [, ip_address]])</function>
++        </title>
++		<para>
++		Manage the RTPProxy session - it combines the functionality of
++		rtpproxy_offer(), rtpproxy_answer() and unforce_rtpproxy(), detecting
++		internally based on message type and method which one to execute.
++		</para>
++		<para>
++		It can take the same parameters as <function>rtpproxy_offer().</function>
++		The flags parameter to rtpproxy_manage() can be a configuration variable
++		containing the flags as a string.
++		</para>
++		<para>
++		Functionality:
++		</para>
++		<itemizedlist>
++		<listitem>
++			<para>
++			If INVITE with SDP, then do <function>rtpproxy_offer()</function>
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			If INVITE with SDP, when the tm module is loaded, mark transaction with
++			internal flag FL_SDP_BODY to know that the 1xx and 2xx are for
++			<function>rtpproxy_answer()</function>
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			If ACK with SDP, then do <function>rtpproxy_answer()</function>
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			If BYE or CANCEL, or called within a FAILURE_ROUTE[], then do <function>unforce_rtpproxy()</function>
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			If reply to INVITE with code >= 300 do <function>unforce_rtpproxy()</function>
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			If reply with SDP to INVITE having code 1xx and 2xx, then
++			do <function>rtpproxy_answer()</function> if the request had SDP or tm is not loaded,
++			otherwise do <function>rtpproxy_offer()</function>
++			</para>
++		</listitem>
++	</itemizedlist>
++
++		<para>
++		This function can be used from ANY_ROUTE.
++		</para>
++		<example>
++		 <title><function>rtpproxy_manage</function> usage</title>
++		<programlisting format="linespecific">
++...
++rtpproxy_manage();
++...
++</programlisting>
++		</example>
++        </section>
++
++<!--
++	<section id="rtpproxy_stream2uac">
++	<title>
++	    <function>rtpproxy_stream2uac(prompt_name, count)</function>,
++	</title>
++	<para>
++	    Instruct the RTPproxy to stream prompt/announcement pre-encoded with
++	    the makeann command from the RTPproxy distribution. The uac/uas
++	    suffix selects who will hear the announcement relatively to the current
++	    transaction - UAC or UAS. For example invoking the
++	    <function>rtpproxy_stream2uac</function> in the request processing
++	    block on ACK transaction will play the prompt to the UA that has
++	    generated original INVITE and ACK while
++	    <function>rtpproxy_stop_stream2uas</function> on 183 in reply
++	    processing block will play the prompt to the UA that has generated 183.
++	</para>
++	<para>
++	    Apart from generating announcements, another possible application
++	    of this function is implementing music on hold (MOH) functionality.
++	    When count is -1, the streaming will be in loop indefinitely until
++	    the appropriate <function>rtpproxy_stop_stream2xxx</function> is issued.
++	</para>
++	<para>
++	    In order to work correctly, these functions require that a session in the
++	    RTPproxy already exists. Also those functions don't alter the SDP, so that
++	    they are not a substitute for calling <function>rtpproxy_offer</function>
++	    or <function>rtpproxy_answer</function>.
++	</para>
++	<para>
++	    This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE.
++	</para>
++	<para>Meaning of the parameters is as follows:</para>
++	<itemizedlist>
++	    <listitem>
++		<para>
++		    <emphasis>prompt_name</emphasis> - name of the prompt to
++		    stream. Should be either absolute pathname or pathname
++		    relative to the directory where RTPproxy runs.
++		</para>
++	    </listitem>
++	    <listitem>
++		<para>
++		    <emphasis>count</emphasis> - number of times the prompt
++		    should be repeated. A value of -1 means that it will
++		    be streaming in a loop indefinitely, until the appropriate
++		    <function>rtpproxy_stop_stream2xxx</function> is issued.
++		</para>
++	    </listitem>
++	</itemizedlist>
++	<example>
++	    <title><function>rtpproxy_stream2xxx</function> usage</title>
++	    <programlisting>
++...
++    if (is_method("INVITE")) {
++        rtpproxy_offer();
++        if (detect_hold()) {
++            rtpproxy_stream2uas("/var/rtpproxy/prompts/music_on_hold", "-1");
++        } else {
++            rtpproxy_stop_stream2uas();
++        };
++    };
++...
++	    </programlisting>
++	</example>
++	</section>
++	<section id="rtpproxy_stream2uas">
++	<title>
++	    <function>rtpproxy_stream2uas(prompt_name, count)</function>
++	</title>
++	<para>
++		See function <function>rtpproxy_stream2uac(prompt_name, count)</function>.
++	</para>
++	</section>
++	<section id="rtpproxy_stop_stream2uac">
++	<title>
++	    <function>rtpproxy_stop_stream2uac()</function>,
++	</title>
++	<para>
++	    Stop streaming of announcement/prompt/MOH started previously by the
++	    respective <function>rtpproxy_stream2xxx</function>.  The uac/uas
++	    suffix selects whose announcement relatively to tha current
++	    transaction should be stopped - UAC or UAS.
++	</para>
++	<para>
++	    These functions can be used from REQUEST_ROUTE, ONREPLY_ROUTE.
++	</para>
++	</section>
++-->
++	<section>
++		<title>
++		<function moreinfo="none">start_recording()</function>
++		</title>
++		<para>
++		This function will send a signal to the RTP Proxy to record
++		the RTP stream on the RTP Proxy.
++		<emphasis>This function is not supported by ngcp-mediaproxy-ng at the moment!</emphasis>
++		</para>
++		<para>
++		This function can be used from REQUEST_ROUTE and ONREPLY_ROUTE.
++		</para>
++		<example>
++		<title><function>start_recording</function> usage</title>
++		<programlisting format="linespecific">
++...
++start_recording();
++...
++		</programlisting>
++		</example>
++	</section>
++<!--
++	<section id="rtpproxy_stop_stream2uas">
++	<title>
++	    <function>rtpproxy_stop_stream2uas(prompt_name, count)</function>
++	</title>
++	<para>
++		See function <function>rtpproxy_stop_stream2uac(prompt_name, count)</function>.
++	</para>
++	</section>
++-->
++
++
++	</section>
++
++	<section>
++		<title>Exported Pseudo Variables</title>
++		<section>
++			<title><function moreinfo="none">$rtpstat</function></title>
++			<para>
++			Returns the RTP Statistics from the RTP Proxy. The RTP Statistics from the RTP Proxy
++			are provided as a string and it does contain several packet counters. The statistics
++			must be retrieved before the session is deleted	(before <function>unforce_rtpproxy()</function>).
++			</para>
++
++		<example>
++		<title>$rtpstat Usage</title>
++		<programlisting format="linespecific">
++...
++    append_hf("X-RTP-Statistics: $rtpstat\r\n");
++...
++		</programlisting>
++		</example>
++	        </section>
++
++	</section>
++
++	<section>
++		<title><acronym>MI</acronym> Commands</title>
++		<section>
++			<title><function moreinfo="none">nh_enable_rtpp</function></title>
++			<para>
++			Enables a rtp proxy if parameter value is greater than 0.
++			Disables it if a zero value is given.
++			</para>
++			<para>
++			The first parameter is the rtp proxy url (exactly as defined in
++			the config file).
++			</para>
++			<para>
++			The second parameter value must be a number in decimal.
++			</para>
++			<para>
++			NOTE: if a rtpproxy is defined multiple times (in the same or
++			diferente sete), all of its instances will be enables/disabled.
++			</para>
++			<example>
++			<title>
++			<function moreinfo="none">nh_enable_rtpp</function> usage</title>
++			<programlisting format="linespecific">
++...
++$ &ctltool; fifo nh_enable_rtpp udp:192.168.2.133:8081 0
++...
++			</programlisting>
++			</example>
++		</section>
++
++			<section>
++			<title><function moreinfo="none">nh_show_rtpp</function></title>
++			<para>
++			Displays all the rtp proxies and their information: set and
++			status (disabled or not, weight and recheck_ticks).
++			</para>
++			<para>
++			No parameter.
++			</para>
++			<example>
++			<title>
++				<function moreinfo="none">nh_show_rtpp</function> usage</title>
++			<programlisting format="linespecific">
++...
++$ &ctltool; fifo nh_show_rtpp
++...
++			</programlisting>
++			</example>
++		</section>
++	</section>
++
++</chapter>
++
+--- /dev/null
++++ b/modules/rtpproxy-ng/doc/rtpproxy_faq.xml
+@@ -0,0 +1,79 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++%docentities;
++
++]>
++<!-- Module FAQ -->
++
++<chapter>
++
++    <title>&faqguide;</title>
++    <qandaset defaultlabel="number">
++	<qandaentry>
++	    <question>
++		<para>What happend with <quote>rtpproxy_disable</quote> parameter?</para>
++	    </question>
++	    <answer>
++		<para>
++			It was removed as it became obsolete - now
++			<quote>rtpproxy_sock</quote> can take empty value to disable the
++			rtpproxy functionality.
++		</para>
++	    </answer>
++	</qandaentry>
++	<qandaentry>
++	    <question>
++		<para>Where can I find more about &kamailio;?</para>
++	    </question>
++	    <answer>
++		<para>
++			Take a look at &kamailiohomelink;.
++		</para>
++	    </answer>
++	</qandaentry>
++	<qandaentry>
++	    <question>
++		<para>Where can I post a question about this module?</para>
++	    </question>
++	    <answer>
++		<para>
++			First at all check if your question was already answered on one of
++			our mailing lists:
++		</para>
++		<itemizedlist>
++		    <listitem>
++			<para>User Mailing List - &kamailiouserslink;</para>
++		    </listitem>
++		    <listitem>
++			<para>Developer Mailing List - &kamailiodevlink;</para>
++		    </listitem>
++		</itemizedlist>
++		<para>
++			E-mails regarding any stable &kamailio; release should be sent to
++			&kamailiousersmail; and e-mails regarding development versions
++			should be sent to &kamailiodevmail;.
++		</para>
++		<para>
++			If you want to keep the mail private, send it to
++			&kamailiohelpmail;.
++		</para>
++	    </answer>
++	</qandaentry>
++	<qandaentry>
++	    <question>
++		<para>How can I report a bug?</para>
++	    </question>
++	    <answer>
++		<para>
++			Please follow the guidelines provided at:
++			&kamailiobugslink;.
++		</para>
++	    </answer>
++	</qandaentry>
++    </qandaset>
++</chapter>
++
+--- /dev/null
++++ b/modules/rtpproxy-ng/rtpproxy.c
+@@ -0,0 +1,1943 @@
++/* $Id$
++ *
++ * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * History:
++ * ---------
++ * 2003-10-09	nat_uac_test introduced (jiri)
++ *
++ * 2003-11-06   nat_uac_test permitted from onreply_route (jiri)
++ *
++ * 2003-12-01   unforce_rtp_proxy introduced (sobomax)
++ *
++ * 2004-01-07	RTP proxy support updated to support new version of the
++ *		RTP proxy (20040107).
++ *
++ *		force_rtp_proxy() now inserts a special flag
++ *		into the SDP body to indicate that this session already
++ *		proxied and ignores sessions with such flag.
++ *
++ *		Added run-time check for version of command protocol
++ *		supported by the RTP proxy.
++ *
++ * 2004-01-16   Integrated slightly modified patch from Tristan Colgate,
++ *		force_rtp_proxy function with IP as a parameter (janakj)
++ *
++ * 2004-01-28	nat_uac_test extended to allow testing SDP body (sobomax)
++ *
++ *		nat_uac_test extended to allow testing top Via (sobomax)
++ *
++ * 2004-02-21	force_rtp_proxy now accepts option argument, which
++ *		consists of string of chars, each of them turns "on"
++ *		some feature, currently supported ones are:
++ *
++ *		 `a' - flags that UA from which message is received
++ *		       doesn't support symmetric RTP;
++ *		 `l' - force "lookup", that is, only rewrite SDP when
++ *		       corresponding session is already exists in the
++ *		       RTP proxy. Only makes sense for SIP requests,
++ *		       replies are always processed in "lookup" mode;
++ *		 `i' - flags that message is received from UA in the
++ *		       LAN. Only makes sense when RTP proxy is running
++ *		       in the bridge mode.
++ *
++ *		force_rtp_proxy can now be invoked without any arguments,
++ *		as previously, with one argument - in this case argument
++ *		is treated as option string and with two arguments, in
++ *		which case 1st argument is option string and the 2nd
++ *		one is IP address which have to be inserted into
++ *		SDP (IP address on which RTP proxy listens).
++ *
++ * 2004-03-12	Added support for IPv6 addresses in SDPs. Particularly,
++ *		force_rtp_proxy now can work with IPv6-aware RTP proxy,
++ *		replacing IPv4 address in SDP with IPv6 one and vice versa.
++ *		This allows creating full-fledged IPv4<->IPv6 gateway.
++ *		See 4to6.cfg file for example.
++ *
++ *		Two new options added into force_rtp_proxy:
++ *
++ *		 `f' - instructs nathelper to ignore marks inserted
++ *		       by another nathelper in transit to indicate
++ *		       that the session is already goes through another
++ *		       proxy. Allows creating chain of proxies.
++ *		 `r' - flags that IP address in SDP should be trusted.
++ *		       Without this flag, nathelper ignores address in the
++ *		       SDP and uses source address of the SIP message
++ *		       as media address which is passed to the RTP proxy.
++ *
++ *		Protocol between nathelper and RTP proxy in bridge
++ *		mode has been slightly changed. Now RTP proxy expects SER
++ *		to provide 2 flags when creating or updating session
++ *		to indicate direction of this session. Each of those
++ *		flags can be either `e' or `i'. For example `ei' means
++ *		that we received INVITE from UA on the "external" network
++ *		network and will send it to the UA on "internal" one.
++ *		Also possible `ie' (internal->external), `ii'
++ *		(internal->internal) and `ee' (external->external). See
++ *		example file alg.cfg for details.
++ *
++ * 2004-03-15	If the rtp proxy test failed (wrong version or not started)
++ *		retry test from time to time, when some *rtpproxy* function
++ *		is invoked. Minimum interval between retries can be
++ *		configured via rtpproxy_disable_tout module parameter (default
++ *		is 60 seconds). Setting it to -1 will disable periodic
++ *		rechecks completely, setting it to 0 will force checks
++ *		for each *rtpproxy* function call. (andrei)
++ *
++ * 2004-03-22	Fix assignment of rtpproxy_retr and rtpproxy_tout module
++ *		parameters.
++ *
++ * 2004-03-22	Fix get_body position (should be called before get_callid)
++ * 				(andrei)
++ *
++ * 2004-03-24	Fix newport for null ip address case (e.g onhold re-INVITE)
++ * 				(andrei)
++ *
++ * 2004-09-30	added received port != via port test (andrei)
++ *
++ * 2004-10-10   force_socket option introduced (jiri)
++ *
++ * 2005-02-24	Added support for using more than one rtp proxy, in which
++ *		case traffic will be distributed evenly among them. In addition,
++ *		each such proxy can be assigned a weight, which will specify
++ *		which share of the traffic should be placed to this particular
++ *		proxy.
++ *
++ *		Introduce failover mechanism, so that if SER detects that one
++ *		of many proxies is no longer available it temporarily decreases
++ *		its weight to 0, so that no traffic will be assigned to it.
++ *		Such "disabled" proxies are periodically checked to see if they
++ *		are back to normal in which case respective weight is restored
++ *		resulting in traffic being sent to that proxy again.
++ *
++ *		Those features can be enabled by specifying more than one "URI"
++ *		in the rtpproxy_sock parameter, optionally followed by the weight,
++ *		which if absent is assumed to be 1, for example:
++ *
++ *		rtpproxy_sock="unix:/foo/bar=4 udp:1.2.3.4:3456=3 udp:5.6.7.8:5432=1"
++ *
++ * 2005-02-25	Force for pinging the socket returned by USRLOC (bogdan)
++ *
++ * 2005-03-22	support for multiple media streams added (netch)
++ *
++ * 2005-07-11  SIP ping support added (bogdan)
++ *
++ * 2005-07-14  SDP origin (o=) IP may be also changed (bogdan)
++ *
++ * 2006-03-08  fix_nated_sdp() may take one more param to force a specific IP;
++ *             force_rtp_proxy() accepts a new flag 's' to swap creation/
++ *              confirmation between requests/replies;
++ *             add_rcv_param() may take as parameter a flag telling if the
++ *              parameter should go to the contact URI or contact header;
++ *             (bogdan)
++ * 2006-03-28 Support for changing session-level SDP connection (c=) IP when
++ *            media-description also includes connection information (bayan)
++ * 2007-04-13 Support multiple sets of rtpproxies and set selection added
++ *            (ancuta)
++ * 2007-04-26 Added some MI commands:
++ *             nh_enable_ping used to enable or disable natping
++ *             nh_enable_rtpp used to enable or disable a specific rtp proxy
++ *             nh_show_rtpp   used to display information for all rtp proxies
++ *             (ancuta)
++ * 2007-05-09 New function start_recording() allowing to start recording RTP
++ *             session in the RTP proxy (Carsten Bock - ported from SER)
++ * 2007-09-11 Separate timer process and support for multiple timer processes
++ *             (bogdan)
++ * 2008-12-12 Support for RTCP attribute in the SDP
++ *              (Min Wang/BASIS AudioNet - ported from SER)
++ * 2010-08-05 Core SDP parser integrated into nathelper (osas)
++ * 2010-10-08 Removal of deprecated force_rtp_proxy and swap flag (osas)
++ */
++
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <sys/time.h>
++#include <netinet/in.h>
++#include <netinet/in_systm.h>
++#ifndef __USE_BSD
++#define  __USE_BSD
++#endif
++#include <netinet/ip.h>
++#ifndef __FAVOR_BSD
++#define __FAVOR_BSD
++#endif
++#include <netinet/udp.h>
++#include <arpa/inet.h>
++#include <sys/uio.h>
++#include <sys/un.h>
++#include <ctype.h>
++#include <errno.h>
++#include <netdb.h>
++#include <poll.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "../../flags.h"
++#include "../../sr_module.h"
++#include "../../dprint.h"
++#include "../../data_lump.h"
++#include "../../data_lump_rpl.h"
++#include "../../error.h"
++#include "../../forward.h"
++#include "../../mem/mem.h"
++#include "../../parser/parse_from.h"
++#include "../../parser/parse_to.h"
++#include "../../parser/parse_uri.h"
++#include "../../parser/parser_f.h"
++#include "../../parser/sdp/sdp.h"
++#include "../../resolve.h"
++#include "../../timer.h"
++#include "../../trim.h"
++#include "../../ut.h"
++#include "../../pt.h"
++#include "../../timer_proc.h"
++#include "../../lib/kmi/mi.h"
++#include "../../pvar.h"
++#include "../../lvalue.h"
++#include "../../msg_translator.h"
++#include "../../usr_avp.h"
++#include "../../socket_info.h"
++#include "../../mod_fix.h"
++#include "../../dset.h"
++#include "../../route.h"
++#include "../../modules/tm/tm_load.h"
++#include "rtpproxy.h"
++#include "rtpproxy_funcs.h"
++#include "bencode.h"
++
++MODULE_VERSION
++
++#if !defined(AF_LOCAL)
++#define	AF_LOCAL AF_UNIX
++#endif
++#if !defined(PF_LOCAL)
++#define	PF_LOCAL PF_UNIX
++#endif
++
++/* NAT UAC test constants */
++#define	NAT_UAC_TEST_C_1918	0x01
++#define	NAT_UAC_TEST_RCVD	0x02
++#define	NAT_UAC_TEST_V_1918	0x04
++#define	NAT_UAC_TEST_S_1918	0x08
++#define	NAT_UAC_TEST_RPORT	0x10
++
++
++#define DEFAULT_RTPP_SET_ID		0
++
++#define MI_SET_NATPING_STATE		"nh_enable_ping"
++#define MI_DEFAULT_NATPING_STATE	1
++
++#define MI_ENABLE_RTP_PROXY			"nh_enable_rtpp"
++#define MI_MIN_RECHECK_TICKS		0
++#define MI_MAX_RECHECK_TICKS		(unsigned int)-1
++
++#define MI_SHOW_RTP_PROXIES			"nh_show_rtpp"
++
++#define MI_RTP_PROXY_NOT_FOUND		"RTP proxy not found"
++#define MI_RTP_PROXY_NOT_FOUND_LEN	(sizeof(MI_RTP_PROXY_NOT_FOUND)-1)
++#define MI_PING_DISABLED			"NATping disabled from script"
++#define MI_PING_DISABLED_LEN		(sizeof(MI_PING_DISABLED)-1)
++#define MI_SET						"set"
++#define MI_SET_LEN					(sizeof(MI_SET)-1)
++#define MI_INDEX					"index"
++#define MI_INDEX_LEN				(sizeof(MI_INDEX)-1)
++#define MI_DISABLED					"disabled"
++#define MI_DISABLED_LEN				(sizeof(MI_DISABLED)-1)
++#define MI_WEIGHT					"weight"
++#define MI_WEIGHT_LEN				(sizeof(MI_WEIGHT)-1)
++#define MI_RECHECK_TICKS			"recheck_ticks"
++#define MI_RECHECK_T_LEN			(sizeof(MI_RECHECK_TICKS)-1)
++
++
++
++/* Supported version of the RTP proxy command protocol */
++#define	SUP_CPROTOVER	20040107
++/* Required additional version of the RTP proxy command protocol */
++#define	REQ_CPROTOVER	"20050322"
++/* Additional version necessary for re-packetization support */
++#define	REP_CPROTOVER	"20071116"
++#define	PTL_CPROTOVER	"20081102"
++
++#define	CPORT		"22222"
++
++enum rtpp_operation {
++	OP_OFFER = 1,
++	OP_ANSWER,
++	OP_DELETE,
++	OP_START_RECORDING,
++	OP_QUERY,
++};
++
++static const char *command_strings[] = {
++	[OP_OFFER]		= "offer",
++	[OP_ANSWER]		= "answer",
++	[OP_DELETE]		= "delete",
++	[OP_START_RECORDING]	= "start recording",
++	[OP_QUERY]		= "query",
++};
++
++static char *gencookie();
++static int rtpp_test(struct rtpp_node*, int, int);
++static int unforce_rtp_proxy_f(struct sip_msg *, const char *, char *);
++static int unforce_rtp_proxy1_f(struct sip_msg *, char *, char *);
++static int force_rtp_proxy(struct sip_msg *, const char *, const str *, int);
++static int start_recording_f(struct sip_msg *, char *, char *);
++static int rtpproxy_answer1_f(struct sip_msg *, char *, char *);
++static int rtpproxy_answer2_f(struct sip_msg *, char *, char *);
++static int rtpproxy_offer1_f(struct sip_msg *, char *, char *);
++static int rtpproxy_offer2_f(struct sip_msg *, char *, char *);
++static int rtpproxy_manage0(struct sip_msg *msg, char *flags, char *ip);
++static int rtpproxy_manage1(struct sip_msg *msg, char *flags, char *ip);
++static int rtpproxy_manage2(struct sip_msg *msg, char *flags, char *ip);
++
++static int add_rtpproxy_socks(struct rtpp_set * rtpp_list, char * rtpproxy);
++static int fixup_set_id(void ** param, int param_no);
++static int set_rtp_proxy_set_f(struct sip_msg * msg, char * str1, char * str2);
++static struct rtpp_set * select_rtpp_set(int id_set);
++static struct rtpp_node *select_rtpp_node(str, int);
++static char *send_rtpp_command(struct rtpp_node *, bencode_item_t *, int *);
++static int get_extra_id(struct sip_msg* msg, str *id_str);
++
++static int rtpproxy_set_store(modparam_t type, void * val);
++static int rtpproxy_add_rtpproxy_set( char * rtp_proxies);
++
++static int mod_init(void);
++static int child_init(int);
++static void mod_destroy(void);
++
++/* Pseudo-Variables */
++static int pv_get_rtpstat_f(struct sip_msg *, pv_param_t *, pv_value_t *);
++
++/*mi commands*/
++static struct mi_root* mi_enable_rtp_proxy(struct mi_root* cmd_tree,
++		void* param );
++static struct mi_root* mi_show_rtpproxies(struct mi_root* cmd_tree,
++		void* param);
++
++
++static int rtpproxy_disable_tout = 60;
++static int rtpproxy_retr = 5;
++static int rtpproxy_tout = 1;
++static pid_t mypid;
++static unsigned int myseqn = 0;
++static str extra_id_pv_param = {NULL, 0};
++
++static char ** rtpp_strings=0;
++static int rtpp_sets=0; /*used in rtpproxy_set_store()*/
++static int rtpp_set_count = 0;
++static unsigned int current_msg_id = (unsigned int)-1;
++/* RTP proxy balancing list */
++struct rtpp_set_head * rtpp_set_list =0;
++struct rtpp_set * selected_rtpp_set =0;
++struct rtpp_set * default_rtpp_set=0;
++
++/* array with the sockets used by rtpporxy (per process)*/
++static unsigned int rtpp_no = 0;
++static int *rtpp_socks = 0;
++
++
++typedef struct rtpp_set_link {
++	struct rtpp_set *rset;
++	pv_spec_t *rpv;
++} rtpp_set_link_t;
++
++/* tm */
++static struct tm_binds tmb;
++
++/*0-> disabled, 1 ->enabled*/
++unsigned int *natping_state=0;
++
++#if 0
++static str timeout_socket_str = {0, 0};
++#endif
++static pv_elem_t *extra_id_pv = NULL;
++
++static cmd_export_t cmds[] = {
++	{"set_rtp_proxy_set",  (cmd_function)set_rtp_proxy_set_f,    1,
++		fixup_set_id, 0,
++		ANY_ROUTE},
++	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy_f,    0,
++		0, 0,
++		ANY_ROUTE},
++	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy_f,    0,
++		0, 0,
++		ANY_ROUTE},
++	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy1_f,    1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
++	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy1_f,    1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
++	{"start_recording",    (cmd_function)start_recording_f,      0,
++		0, 0,
++		ANY_ROUTE },
++	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer1_f,     0,
++		0, 0,
++		ANY_ROUTE},
++	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer1_f,     1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
++	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer2_f,     2,
++		fixup_spve_spve, 0,
++		ANY_ROUTE},
++	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer1_f,    0,
++		0, 0,
++		ANY_ROUTE},
++	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer1_f,    1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
++	{"rtpproxy_answer",	(cmd_function)rtpproxy_answer2_f,    2,
++		fixup_spve_spve, 0,
++		ANY_ROUTE},
++#if 0
++	{"rtpproxy_stream2uac",(cmd_function)rtpproxy_stream2uac2_f, 2,
++		fixup_var_str_int, 0,
++		ANY_ROUTE },
++	{"rtpproxy_stream2uas",(cmd_function)rtpproxy_stream2uas2_f, 2,
++		fixup_var_str_int, 0,
++		ANY_ROUTE },
++	{"rtpproxy_stop_stream2uac",(cmd_function)rtpproxy_stop_stream2uac2_f,0,
++		NULL, 0,
++		ANY_ROUTE },
++	{"rtpproxy_stop_stream2uas",(cmd_function)rtpproxy_stop_stream2uas2_f,0,
++		NULL, 0,
++		ANY_ROUTE },
++#endif
++	{"rtpproxy_manage",	(cmd_function)rtpproxy_manage0,     0,
++		0, 0,
++		ANY_ROUTE},
++	{"rtpproxy_manage",	(cmd_function)rtpproxy_manage1,     1,
++		fixup_spve_null, fixup_free_spve_null,
++		ANY_ROUTE},
++	{"rtpproxy_manage",	(cmd_function)rtpproxy_manage2,     2,
++		fixup_spve_str, fixup_free_spve_str,
++		ANY_ROUTE},
++	{0, 0, 0, 0, 0, 0}
++};
++
++static pv_export_t mod_pvs[] = {
++    {{"rtpstat", (sizeof("rtpstat")-1)}, /* RTP-Statistics */
++     PVT_OTHER, pv_get_rtpstat_f, 0, 0, 0, 0, 0},
++    {{0, 0}, 0, 0, 0, 0, 0, 0, 0}
++};
++
++static param_export_t params[] = {
++	{"rtpproxy_sock",         STR_PARAM|USE_FUNC_PARAM,
++	                         (void*)rtpproxy_set_store          },
++	{"rtpproxy_disable_tout", INT_PARAM, &rtpproxy_disable_tout },
++	{"rtpproxy_retr",         INT_PARAM, &rtpproxy_retr         },
++	{"rtpproxy_tout",         INT_PARAM, &rtpproxy_tout         },
++#if 0
++	{"timeout_socket",    	  STR_PARAM, &timeout_socket_str.s  },
++#endif
++	{"extra_id_pv",           STR_PARAM, &extra_id_pv_param.s },
++	{0, 0, 0}
++};
++
++static mi_export_t mi_cmds[] = {
++	{MI_ENABLE_RTP_PROXY,     mi_enable_rtp_proxy,  0,                0, 0},
++	{MI_SHOW_RTP_PROXIES,     mi_show_rtpproxies,   MI_NO_INPUT_FLAG, 0, 0},
++	{ 0, 0, 0, 0, 0}
++};
++
++
++struct module_exports exports = {
++	"rtpproxy-ng",
++	DEFAULT_DLFLAGS, /* dlopen flags */
++	cmds,
++	params,
++	0,           /* exported statistics */
++	mi_cmds,     /* exported MI functions */
++	mod_pvs,     /* exported pseudo-variables */
++	0,           /* extra processes */
++	mod_init,
++	0,           /* reply processing */
++	mod_destroy, /* destroy function */
++	child_init
++};
++
++
++static int rtpproxy_set_store(modparam_t type, void * val){
++
++	char * p;
++	int len;
++
++	p = (char* )val;
++
++	if(p==0 || *p=='\0'){
++		return 0;
++	}
++
++	if(rtpp_sets==0){
++		rtpp_strings = (char**)pkg_malloc(sizeof(char*));
++		if(!rtpp_strings){
++			LM_ERR("no pkg memory left\n");
++			return -1;
++		}
++	} else {/*realloc to make room for the current set*/
++		rtpp_strings = (char**)pkg_realloc(rtpp_strings,
++										  (rtpp_sets+1)* sizeof(char*));
++		if(!rtpp_strings){
++			LM_ERR("no pkg memory left\n");
++			return -1;
++		}
++	}
++
++	/*allocate for the current set of urls*/
++	len = strlen(p);
++	rtpp_strings[rtpp_sets] = (char*)pkg_malloc((len+1)*sizeof(char));
++
++	if(!rtpp_strings[rtpp_sets]){
++		LM_ERR("no pkg memory left\n");
++		return -1;
++	}
++
++	memcpy(rtpp_strings[rtpp_sets], p, len);
++	rtpp_strings[rtpp_sets][len] = '\0';
++	rtpp_sets++;
++
++	return 0;
++}
++
++
++static int add_rtpproxy_socks(struct rtpp_set * rtpp_list,
++										char * rtpproxy){
++	/* Make rtp proxies list. */
++	char *p, *p1, *p2, *plim;
++	struct rtpp_node *pnode;
++	int weight;
++
++	p = rtpproxy;
++	plim = p + strlen(p);
++
++	for(;;) {
++			weight = 1;
++		while (*p && isspace((int)*p))
++			++p;
++		if (p >= plim)
++			break;
++		p1 = p;
++		while (*p && !isspace((int)*p))
++			++p;
++		if (p <= p1)
++			break; /* may happen??? */
++		/* Have weight specified? If yes, scan it */
++		p2 = memchr(p1, '=', p - p1);
++		if (p2 != NULL) {
++			weight = strtoul(p2 + 1, NULL, 10);
++		} else {
++			p2 = p;
++		}
++		pnode = shm_malloc(sizeof(struct rtpp_node));
++		if (pnode == NULL) {
++			LM_ERR("no shm memory left\n");
++			return -1;
++		}
++		memset(pnode, 0, sizeof(*pnode));
++		pnode->idx = rtpp_no++;
++		pnode->rn_recheck_ticks = 0;
++		pnode->rn_weight = weight;
++		pnode->rn_umode = 0;
++		pnode->rn_disabled = 0;
++		pnode->rn_url.s = shm_malloc(p2 - p1 + 1);
++		if (pnode->rn_url.s == NULL) {
++			shm_free(pnode);
++			LM_ERR("no shm memory left\n");
++			return -1;
++		}
++		memmove(pnode->rn_url.s, p1, p2 - p1);
++		pnode->rn_url.s[p2 - p1] 	= 0;
++		pnode->rn_url.len 			= p2-p1;
++
++		LM_DBG("url is %s, len is %i\n", pnode->rn_url.s, pnode->rn_url.len);
++		/* Leave only address in rn_address */
++		pnode->rn_address = pnode->rn_url.s;
++		if (strncasecmp(pnode->rn_address, "udp:", 4) == 0) {
++			pnode->rn_umode = 1;
++			pnode->rn_address += 4;
++		} else if (strncasecmp(pnode->rn_address, "udp6:", 5) == 0) {
++			pnode->rn_umode = 6;
++			pnode->rn_address += 5;
++		} else if (strncasecmp(pnode->rn_address, "unix:", 5) == 0) {
++			pnode->rn_umode = 0;
++			pnode->rn_address += 5;
++		}
++
++		if (rtpp_list->rn_first == NULL) {
++			rtpp_list->rn_first = pnode;
++		} else {
++			rtpp_list->rn_last->rn_next = pnode;
++		}
++
++		rtpp_list->rn_last = pnode;
++		rtpp_list->rtpp_node_count++;
++	}
++	return 0;
++}
++
++
++/*	0-succes
++ *  -1 - erorr
++ * */
++static int rtpproxy_add_rtpproxy_set( char * rtp_proxies)
++{
++	char *p,*p2;
++	struct rtpp_set * rtpp_list;
++	unsigned int my_current_id;
++	str id_set;
++	int new_list;
++
++	/* empty definition? */
++	p= rtp_proxies;
++	if(!p || *p=='\0'){
++		return 0;
++	}
++
++	for(;*p && isspace(*p);p++);
++	if(*p=='\0'){
++		return 0;
++	}
++
++	rtp_proxies = strstr(p, "==");
++	if(rtp_proxies){
++		if(*(rtp_proxies +2)=='\0'){
++			LM_ERR("script error -invalid rtp proxy list!\n");
++			return -1;
++		}
++
++		*rtp_proxies = '\0';
++		p2 = rtp_proxies-1;
++		for(;isspace(*p2); *p2 = '\0',p2--);
++		id_set.s = p;	id_set.len = p2 - p+1;
++
++		if(id_set.len <= 0 ||str2int(&id_set, &my_current_id)<0 ){
++		LM_ERR("script error -invalid set_id value!\n");
++			return -1;
++		}
++
++		rtp_proxies+=2;
++	}else{
++		rtp_proxies = p;
++		my_current_id = DEFAULT_RTPP_SET_ID;
++	}
++
++	for(;*rtp_proxies && isspace(*rtp_proxies);rtp_proxies++);
++
++	if(!(*rtp_proxies)){
++		LM_ERR("script error -empty rtp_proxy list\n");
++		return -1;;
++	}
++
++	/*search for the current_id*/
++	rtpp_list = rtpp_set_list ? rtpp_set_list->rset_first : 0;
++	while( rtpp_list != 0 && rtpp_list->id_set!=my_current_id)
++		rtpp_list = rtpp_list->rset_next;
++
++	if(rtpp_list==NULL){	/*if a new id_set : add a new set of rtpp*/
++		rtpp_list = shm_malloc(sizeof(struct rtpp_set));
++		if(!rtpp_list){
++			LM_ERR("no shm memory left\n");
++			return -1;
++		}
++		memset(rtpp_list, 0, sizeof(struct rtpp_set));
++		rtpp_list->id_set = my_current_id;
++		new_list = 1;
++	} else {
++		new_list = 0;
++	}
++
++	if(add_rtpproxy_socks(rtpp_list, rtp_proxies)!= 0){
++		/*if this list will not be inserted, clean it up*/
++		goto error;
++	}
++
++	if (new_list) {
++		if(!rtpp_set_list){/*initialize the list of set*/
++			rtpp_set_list = shm_malloc(sizeof(struct rtpp_set_head));
++			if(!rtpp_set_list){
++				LM_ERR("no shm memory left\n");
++				return -1;
++			}
++			memset(rtpp_set_list, 0, sizeof(struct rtpp_set_head));
++		}
++
++		/*update the list of set info*/
++		if(!rtpp_set_list->rset_first){
++			rtpp_set_list->rset_first = rtpp_list;
++		}else{
++			rtpp_set_list->rset_last->rset_next = rtpp_list;
++		}
++
++		rtpp_set_list->rset_last = rtpp_list;
++		rtpp_set_count++;
++
++		if(my_current_id == DEFAULT_RTPP_SET_ID){
++			default_rtpp_set = rtpp_list;
++		}
++	}
++
++	return 0;
++error:
++	return -1;
++}
++
++
++static int fixup_set_id(void ** param, int param_no)
++{
++	int int_val, err;
++	struct rtpp_set* rtpp_list;
++	rtpp_set_link_t *rtpl = NULL;
++	str s;
++
++	rtpl = (rtpp_set_link_t*)pkg_malloc(sizeof(rtpp_set_link_t));
++	if(rtpl==NULL) {
++		LM_ERR("no more pkg memory\n");
++		return -1;
++	}
++	memset(rtpl, 0, sizeof(rtpp_set_link_t));
++	s.s = (char*)*param;
++	s.len = strlen(s.s);
++
++	if(s.s[0] == PV_MARKER) {
++		int_val = pv_locate_name(&s);
++		if(int_val<0 || int_val!=s.len) {
++			LM_ERR("invalid parameter %s\n", s.s);
++			return -1;
++		}
++		rtpl->rpv = pv_cache_get(&s);
++		if(rtpl->rpv == NULL) {
++			LM_ERR("invalid pv parameter %s\n", s.s);
++			return -1;
++		}
++	} else {
++		int_val = str2s(*param, strlen(*param), &err);
++		if (err == 0) {
++			pkg_free(*param);
++			if((rtpp_list = select_rtpp_set(int_val)) ==0){
++				LM_ERR("rtpp_proxy set %i not configured\n", int_val);
++				return E_CFG;
++			}
++			rtpl->rset = rtpp_list;
++		} else {
++			LM_ERR("bad number <%s>\n",	(char *)(*param));
++			return E_CFG;
++		}
++	}
++	*param = (void*)rtpl;
++	return 0;
++}
++
++static struct mi_root* mi_enable_rtp_proxy(struct mi_root* cmd_tree,
++												void* param )
++{	struct mi_node* node;
++	str rtpp_url;
++	unsigned int enable;
++	struct rtpp_set * rtpp_list;
++	struct rtpp_node * crt_rtpp;
++	int found;
++
++	found = 0;
++
++	if(rtpp_set_list ==NULL)
++		goto end;
++
++	node = cmd_tree->node.kids;
++	if(node == NULL)
++		return init_mi_tree( 400, MI_MISSING_PARM_S, MI_MISSING_PARM_LEN);
++
++	if(node->value.s == NULL || node->value.len ==0)
++		return init_mi_tree( 400, MI_BAD_PARM_S, MI_BAD_PARM_LEN);
++
++	rtpp_url = node->value;
++
++	node = node->next;
++	if(node == NULL)
++		return init_mi_tree( 400, MI_MISSING_PARM_S, MI_MISSING_PARM_LEN);
++
++	enable = 0;
++	if( strno2int( &node->value, &enable) <0)
++		goto error;
++
++	for(rtpp_list = rtpp_set_list->rset_first; rtpp_list != NULL;
++					rtpp_list = rtpp_list->rset_next){
++
++		for(crt_rtpp = rtpp_list->rn_first; crt_rtpp != NULL;
++						crt_rtpp = crt_rtpp->rn_next){
++			/*found a matching rtpp*/
++
++			if(crt_rtpp->rn_url.len == rtpp_url.len){
++
++				if(strncmp(crt_rtpp->rn_url.s, rtpp_url.s, rtpp_url.len) == 0){
++					/*set the enabled/disabled status*/
++					found = 1;
++					crt_rtpp->rn_recheck_ticks =
++						enable? MI_MIN_RECHECK_TICKS : MI_MAX_RECHECK_TICKS;
++					crt_rtpp->rn_disabled = enable?0:1;
++				}
++			}
++		}
++	}
++
++end:
++	if(found)
++		return init_mi_tree( 200, MI_OK_S, MI_OK_LEN);
++	return init_mi_tree(404,MI_RTP_PROXY_NOT_FOUND,MI_RTP_PROXY_NOT_FOUND_LEN);
++error:
++	return init_mi_tree( 400, MI_BAD_PARM_S, MI_BAD_PARM_LEN);
++}
++
++
++
++#define add_rtpp_node_int_info(_parent, _name, _name_len, _value, _child,\
++								_len, _string, _error)\
++	do {\
++		(_string) = int2str((_value), &(_len));\
++		if((_string) == 0){\
++			LM_ERR("cannot convert int value\n");\
++				goto _error;\
++		}\
++		if(((_child) = add_mi_node_child((_parent), MI_DUP_VALUE, (_name), \
++				(_name_len), (_string), (_len))   ) == 0)\
++			goto _error;\
++	}while(0);
++
++static struct mi_root* mi_show_rtpproxies(struct mi_root* cmd_tree,
++												void* param)
++{
++	struct mi_node* node, *crt_node, *child;
++	struct mi_root* root;
++	struct mi_attr * attr;
++	struct rtpp_set * rtpp_list;
++	struct rtpp_node * crt_rtpp;
++	char * string, *id;
++	int id_len, len;
++
++	string = id = 0;
++
++	root = init_mi_tree(200, MI_OK_S, MI_OK_LEN);
++	if (!root) {
++		LM_ERR("the MI tree cannot be initialized!\n");
++		return 0;
++	}
++
++	if(rtpp_set_list ==NULL)
++		return root;
++
++	node = &root->node;
++
++	for(rtpp_list = rtpp_set_list->rset_first; rtpp_list != NULL;
++					rtpp_list = rtpp_list->rset_next){
++
++		for(crt_rtpp = rtpp_list->rn_first; crt_rtpp != NULL;
++						crt_rtpp = crt_rtpp->rn_next){
++
++			id =  int2str(rtpp_list->id_set, &id_len);
++			if(!id){
++				LM_ERR("cannot convert set id\n");
++				goto error;
++			}
++
++			if(!(crt_node = add_mi_node_child(node, 0, crt_rtpp->rn_url.s,
++					crt_rtpp->rn_url.len, 0,0)) ) {
++				LM_ERR("cannot add the child node to the tree\n");
++				goto error;
++			}
++
++			LM_DBG("adding node name %s \n",crt_rtpp->rn_url.s );
++
++			if((attr = add_mi_attr(crt_node, MI_DUP_VALUE, MI_SET, MI_SET_LEN,
++									id, id_len))== 0){
++				LM_ERR("cannot add attributes to the node\n");
++				goto error;
++			}
++
++			add_rtpp_node_int_info(crt_node, MI_INDEX, MI_INDEX_LEN,
++				crt_rtpp->idx, child, len,string,error);
++			add_rtpp_node_int_info(crt_node, MI_DISABLED, MI_DISABLED_LEN,
++				crt_rtpp->rn_disabled, child, len,string,error);
++			add_rtpp_node_int_info(crt_node, MI_WEIGHT, MI_WEIGHT_LEN,
++				crt_rtpp->rn_weight,  child, len, string,error);
++			add_rtpp_node_int_info(crt_node, MI_RECHECK_TICKS,MI_RECHECK_T_LEN,
++				crt_rtpp->rn_recheck_ticks, child, len, string, error);
++		}
++	}
++
++	return root;
++error:
++	if (root)
++		free_mi_tree(root);
++	return 0;
++}
++
++
++static int
++mod_init(void)
++{
++	int i;
++
++	if(register_mi_mod(exports.name, mi_cmds)!=0)
++	{
++		LM_ERR("failed to register MI commands\n");
++		return -1;
++	}
++
++	/* any rtpproxy configured? */
++	if(rtpp_set_list)
++		default_rtpp_set = select_rtpp_set(DEFAULT_RTPP_SET_ID);
++
++	/* storing the list of rtp proxy sets in shared memory*/
++	for(i=0;i<rtpp_sets;i++){
++		if(rtpproxy_add_rtpproxy_set(rtpp_strings[i]) !=0){
++			for(;i<rtpp_sets;i++)
++				if(rtpp_strings[i])
++					pkg_free(rtpp_strings[i]);
++			pkg_free(rtpp_strings);
++			return -1;
++		}
++		if(rtpp_strings[i])
++			pkg_free(rtpp_strings[i]);
++	}
++#if 0
++	if (timeout_socket_str.s==NULL || timeout_socket_str.s[0]==0) {
++		timeout_socket_str.len = 0;
++		timeout_socket_str.s = NULL;
++	} else {
++		timeout_socket_str.len = strlen(timeout_socket_str.s);
++	}
++#endif
++
++	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
++		extra_id_pv_param.len = strlen(extra_id_pv_param.s);
++		if(pv_parse_format(&extra_id_pv_param, &extra_id_pv) < 0) {
++			LM_ERR("malformed PV string: %s\n", extra_id_pv_param.s);
++			return -1;
++		}
++	} else {
++		extra_id_pv = NULL;
++	}
++
++	if (rtpp_strings)
++		pkg_free(rtpp_strings);
++
++	if (load_tm_api( &tmb ) < 0)
++	{
++		LM_DBG("could not load the TM-functions - answer-offer model"
++				" auto-detection is disabled\n");
++		memset(&tmb, 0, sizeof(struct tm_binds));
++	}
++
++	return 0;
++}
++
++
++static int
++child_init(int rank)
++{
++	int n;
++	char *cp;
++	struct addrinfo hints, *res;
++	struct rtpp_set  *rtpp_list;
++	struct rtpp_node *pnode;
++
++	if(rtpp_set_list==NULL )
++		return 0;
++
++	/* Iterate known RTP proxies - create sockets */
++	mypid = getpid();
++
++	rtpp_socks = (int*)pkg_malloc( sizeof(int)*rtpp_no );
++	if (rtpp_socks==NULL) {
++		LM_ERR("no more pkg memory\n");
++		return -1;
++	}
++
++	for(rtpp_list = rtpp_set_list->rset_first; rtpp_list != 0;
++		rtpp_list = rtpp_list->rset_next){
++
++		for (pnode=rtpp_list->rn_first; pnode!=0; pnode = pnode->rn_next){
++			char *hostname;
++
++			if (pnode->rn_umode == 0) {
++				rtpp_socks[pnode->idx] = -1;
++				goto rptest;
++			}
++
++			/*
++			 * This is UDP or UDP6. Detect host and port; lookup host;
++			 * do connect() in order to specify peer address
++			 */
++			hostname = (char*)pkg_malloc(sizeof(char) * (strlen(pnode->rn_address) + 1));
++			if (hostname==NULL) {
++				LM_ERR("no more pkg memory\n");
++				return -1;
++			}
++			strcpy(hostname, pnode->rn_address);
++
++			cp = strrchr(hostname, ':');
++			if (cp != NULL) {
++				*cp = '\0';
++				cp++;
++			}
++			if (cp == NULL || *cp == '\0')
++				cp = CPORT;
++
++			memset(&hints, 0, sizeof(hints));
++			hints.ai_flags = 0;
++			hints.ai_family = (pnode->rn_umode == 6) ? AF_INET6 : AF_INET;
++			hints.ai_socktype = SOCK_DGRAM;
++			if ((n = getaddrinfo(hostname, cp, &hints, &res)) != 0) {
++				LM_ERR("%s\n", gai_strerror(n));
++				pkg_free(hostname);
++				return -1;
++			}
++			pkg_free(hostname);
++
++			rtpp_socks[pnode->idx] = socket((pnode->rn_umode == 6)
++			    ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
++			if ( rtpp_socks[pnode->idx] == -1) {
++				LM_ERR("can't create socket\n");
++				freeaddrinfo(res);
++				return -1;
++			}
++
++			if (connect( rtpp_socks[pnode->idx], res->ai_addr, res->ai_addrlen) == -1) {
++				LM_ERR("can't connect to a RTP proxy\n");
++				close( rtpp_socks[pnode->idx] );
++				rtpp_socks[pnode->idx] = -1;
++				freeaddrinfo(res);
++				return -1;
++			}
++			freeaddrinfo(res);
++rptest:
++			pnode->rn_disabled = rtpp_test(pnode, 0, 1);
++		}
++	}
++
++	return 0;
++}
++
++
++static void mod_destroy(void)
++{
++	struct rtpp_set * crt_list, * last_list;
++	struct rtpp_node * crt_rtpp, *last_rtpp;
++
++	/*free the shared memory*/
++	if (natping_state)
++		shm_free(natping_state);
++
++	if(rtpp_set_list == NULL)
++		return;
++
++	for(crt_list = rtpp_set_list->rset_first; crt_list != NULL; ){
++
++		for(crt_rtpp = crt_list->rn_first; crt_rtpp != NULL;  ){
++
++			if(crt_rtpp->rn_url.s)
++				shm_free(crt_rtpp->rn_url.s);
++
++			last_rtpp = crt_rtpp;
++			crt_rtpp = last_rtpp->rn_next;
++			shm_free(last_rtpp);
++		}
++
++		last_list = crt_list;
++		crt_list = last_list->rset_next;
++		shm_free(last_list);
++	}
++
++	shm_free(rtpp_set_list);
++}
++
++
++
++static char * gencookie(void)
++{
++	static char cook[34];
++
++	sprintf(cook, "%d_%u ", (int)mypid, myseqn);
++	myseqn++;
++	return cook;
++}
++
++
++
++static const char *transports[] = {
++	[0x00]	= "RTP/AVP",
++	[0x01]	= "RTP/SAVP",
++	[0x02]	= "RTP/AVPF",
++	[0x03]	= "RTP/SAVPF",
++};
++
++static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_msg *msg,
++	enum rtpp_operation op, const char *flags_str, const str *force_addr, str *body_out)
++{
++	bencode_item_t *dict, *flags, *direction, *replace, *item;
++	str callid, from_tag, to_tag, body, viabranch, error;
++	int via, to, ret, packetize, transport;
++	struct rtpp_node *node;
++	char *cp;
++
++	/*** get & init basic stuff needed ***/
++
++	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
++		LM_ERR("can't get Call-Id field\n");
++		return NULL;
++	}
++	if (get_to_tag(msg, &to_tag) == -1) {
++		LM_ERR("can't get To tag\n");
++		return NULL;
++	}
++	if (get_from_tag(msg, &from_tag) == -1 || from_tag.len == 0) {
++		LM_ERR("can't get From tag\n");
++		return NULL;
++	}
++	if (bencode_buffer_init(bencbuf)) {
++		LM_ERR("could not initialized bencode_buffer_t\n");
++		return NULL;
++	}
++	dict = bencode_dictionary(bencbuf);
++
++	flags = direction = replace = NULL;
++	if (op == OP_OFFER || op == OP_ANSWER) {
++		flags = bencode_list(bencbuf);
++		direction = bencode_list(bencbuf);
++		replace = bencode_list(bencbuf);
++
++		if (extract_body(msg, &body) == -1) {
++			LM_ERR("can't extract body from the message\n");
++			goto error;
++		}
++		bencode_dictionary_add_str(dict, "sdp", &body);
++	}
++
++	/*** parse flags & build dictionary ***/
++
++	via = 0;
++	to = (op == OP_DELETE) ? 0 : 1;
++	transport = 0;
++
++	for (; flags_str && *flags_str; flags_str++) {
++		switch (*flags_str) {
++		case '1':
++		case '2':
++			via = *flags_str - '0';
++			break;
++
++		case '3':
++			if(msg && msg->first_line.type == SIP_REPLY)
++				via = 2;
++			else
++				via = 1;
++			break;
++
++		case 'b':
++		case 'B':
++			via = -1;
++			break;
++
++		case 'a':
++		case 'A':
++			bencode_list_add_string(flags, "asymmetric");
++			bencode_list_add_string(flags, "trust-address");
++			break;
++
++		case 'i':
++		case 'I':
++			bencode_list_add_string(direction, "internal");
++			break;
++
++		case 'e':
++		case 'E':
++			bencode_list_add_string(direction, "external");
++			break;
++
++		case 'l':
++		case 'L':
++			if (op != OP_OFFER) {
++				LM_ERR("Cannot force answer in non-offer command\n");
++				goto error;
++			}
++			op = OP_ANSWER;
++			break;
++
++		case 'r':
++		case 'R':
++			bencode_list_add_string(flags, "trust-address");
++			break;
++
++		case 'o':
++		case 'O':
++			bencode_list_add_string(replace, "origin");
++			break;
++
++		case 'c':
++		case 'C':
++			bencode_list_add_string(replace, "session-connection");
++			break;
++
++		case 'f':
++		case 'F':
++			bencode_list_add_string(flags, "force");
++			break;
++
++		case 'w':
++		case 'W':
++			bencode_list_add_string(flags, "symmetric");
++			break;
++
++		case 'x':
++		case 'X':
++			bencode_list_add_string(flags, "auto-bridge");
++			break;
++
++		case 't':
++		case 'T':
++			to = 1;
++			break;
++
++		case 'z':
++		case 'Z':
++			packetize = 0;
++			flags_str++;
++			while (isdigit(*flags_str)) {
++				packetize *= 10;
++				packetize += *flags_str - '0';
++				flags_str++;
++			}
++			if (packetize)
++				bencode_dictionary_add_integer(dict, "repacketize", packetize);
++			break;
++
++		case '-':
++			bencode_dictionary_add_string(dict, "ICE", "remove");
++			break;
++
++		case '+':
++			bencode_dictionary_add_string(dict, "ICE", "force");
++			break;
++
++		case 's':
++			transport |= 0x100;
++			transport &= ~0x001;
++			break;
++		case 'S':
++			transport |= 0x101;
++			break;
++		case 'p':
++			transport |= 0x100;
++			transport &= ~0x002;
++			break;
++		case 'P':
++			transport |= 0x102;
++			break;
++
++		default:
++			LM_ERR("unknown option `%c'\n", *flags_str);
++			goto error;
++		}
++	}
++
++	/* only add those if any flags were given at all */
++	if (direction && direction->child)
++		bencode_dictionary_add(dict, "direction", direction);
++	if (flags && flags->child)
++		bencode_dictionary_add(dict, "flags", flags);
++	if (replace && replace->child)
++		bencode_dictionary_add(dict, "replace", replace);
++	if ((transport & 0x100))
++		bencode_dictionary_add_string(dict, "transport-protocol", transports[transport & 0x003]);
++
++	bencode_dictionary_add_str(dict, "call-id", &callid);
++
++	if (via) {
++		if (via == 1 || via == 2)
++			ret = get_via_branch(msg, via, &viabranch);
++		else if (via == -1 && extra_id_pv)
++			ret = get_extra_id(msg, &viabranch);
++		else
++			ret = -1;
++		if (ret == -1 || viabranch.len == 0) {
++			LM_ERR("can't get Via branch/extra ID\n");
++			goto error;
++		}
++		bencode_dictionary_add_str(dict, "via-branch", &viabranch);
++	}
++
++	item = bencode_list(bencbuf);
++	bencode_dictionary_add(dict, "received-from", item);
++	bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
++#ifdef USE_IPV6
++		(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
++#endif
++		"?"
++	) );
++	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
++
++	if (force_addr && force_addr->len)
++		bencode_dictionary_add_str(dict, "media address", force_addr);
++
++	if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
++		|| (msg->first_line.type == SIP_REPLY && op == OP_ANSWER))
++	{
++		bencode_dictionary_add_str(dict, "from-tag", &from_tag);
++		if (to && to_tag.s && to_tag.len)
++			bencode_dictionary_add_str(dict, "to-tag", &to_tag);
++	}
++	else {
++		if (!to_tag.s || !to_tag.len) {
++			LM_ERR("No to-tag present\n");
++			goto error;
++		}
++		bencode_dictionary_add_str(dict, "from-tag", &to_tag);
++		bencode_dictionary_add_str(dict, "to-tag", &from_tag);
++	}
++
++	bencode_dictionary_add_string(dict, "command", command_strings[op]);
++
++	/*** send it out ***/
++
++	if (bencbuf->error) {
++		LM_ERR("out of memory - bencode failed\n");
++		goto error;
++	}
++
++	if(msg->id != current_msg_id)
++		selected_rtpp_set = default_rtpp_set;
++
++	do {
++		node = select_rtpp_node(callid, 1);
++		if (!node) {
++			LM_ERR("no available proxies\n");
++			goto error;
++		}
++
++		cp = send_rtpp_command(node, dict, &ret);
++	} while (cp == NULL);
++	LM_DBG("proxy reply: %.*s\n", ret, cp);
++
++	/*** process reply ***/
++
++	dict = bencode_decode_expect(bencbuf, cp, ret, BENCODE_DICTIONARY);
++	if (!dict) {
++		LM_ERR("failed to decode bencoded reply from proxy: %.*s\n", ret, cp);
++		goto error;
++	}
++	if (!bencode_dictionary_get_strcmp(dict, "result", "error")) {
++		if (!bencode_dictionary_get_str(dict, "error-reason", &error))
++			LM_ERR("proxy return error but didn't give an error reason: %.*s\n", ret, cp);
++		else
++			LM_ERR("proxy replied with error: %.*s\n", error.len, error.s);
++		goto error;
++	}
++
++	if (body_out)
++		*body_out = body;
++
++	return dict;
++
++error:
++	bencode_buffer_free(bencbuf);
++	return NULL;
++}
++
++static int rtpp_function_call_simple(struct sip_msg *msg, enum rtpp_operation op, const char *flags_str) {
++	bencode_buffer_t bencbuf;
++
++	if (!rtpp_function_call(&bencbuf, msg, op, flags_str, NULL, NULL))
++		return -1;
++
++	bencode_buffer_free(&bencbuf);
++	return 1;
++}
++
++static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
++		enum rtpp_operation op, const char *flags_str, const str *force_addr, str *body) {
++	bencode_item_t *ret;
++
++	ret = rtpp_function_call(bencbuf, msg, op, flags_str, force_addr, body);
++	if (!ret)
++		return NULL;
++
++	if (bencode_dictionary_get_strcmp(ret, "result", "ok")) {
++		LM_ERR("proxy didn't return \"ok\" result\n");
++		bencode_buffer_free(bencbuf);
++		return NULL;
++	}
++
++	return ret;
++}
++
++
++
++static int
++rtpp_test(struct rtpp_node *node, int isdisabled, int force)
++{
++	bencode_buffer_t bencbuf;
++	bencode_item_t *dict;
++	char *cp;
++	int ret;
++
++	if(node->rn_recheck_ticks == MI_MAX_RECHECK_TICKS){
++	    LM_DBG("rtpp %s disabled for ever\n", node->rn_url.s);
++		return 1;
++	}
++	if (force == 0) {
++		if (isdisabled == 0)
++			return 0;
++		if (node->rn_recheck_ticks > get_ticks())
++			return 1;
++	}
++
++	if (bencode_buffer_init(&bencbuf)) {
++		LM_ERR("could not initialized bencode_buffer_t\n");
++		return 1;
++	}
++	dict = bencode_dictionary(&bencbuf);
++	bencode_dictionary_add_string(dict, "command", "ping");
++	if (bencbuf.error)
++		goto benc_error;
++
++	cp = send_rtpp_command(node, dict, &ret);
++	if (!cp) {
++		LM_ERR("proxy did not respond to ping\n");
++		goto error;
++	}
++
++	dict = bencode_decode_expect(&bencbuf, cp, ret, BENCODE_DICTIONARY);
++	if (!dict || bencode_dictionary_get_strcmp(dict, "result", "pong")) {
++		LM_ERR("proxy responded with invalid response\n");
++		goto error;
++	}
++
++	LM_INFO("rtp proxy <%s> found, support for it %senabled\n",
++	    node->rn_url.s, force == 0 ? "re-" : "");
++
++	bencode_buffer_free(&bencbuf);
++	return 0;
++
++benc_error:
++        LM_ERR("out of memory - bencode failed\n");
++error:
++	bencode_buffer_free(&bencbuf);
++	return 1;
++}
++
++static char *
++send_rtpp_command(struct rtpp_node *node, bencode_item_t *dict, int *outlen)
++{
++	struct sockaddr_un addr;
++	int fd, len, i, vcnt;
++	char *cp;
++	static char buf[4096];
++	struct pollfd fds[1];
++	struct iovec *v;
++
++	v = bencode_iovec(dict, &vcnt, 1, 0);
++	if (!v) {
++		LM_ERR("error converting bencode to iovec\n");
++		return NULL;
++	}
++
++	len = 0;
++	cp = buf;
++	if (node->rn_umode == 0) {
++		memset(&addr, 0, sizeof(addr));
++		addr.sun_family = AF_LOCAL;
++		strncpy(addr.sun_path, node->rn_address,
++		    sizeof(addr.sun_path) - 1);
++#ifdef HAVE_SOCKADDR_SA_LEN
++		addr.sun_len = strlen(addr.sun_path);
++#endif
++
++		fd = socket(AF_LOCAL, SOCK_STREAM, 0);
++		if (fd < 0) {
++			LM_ERR("can't create socket\n");
++			goto badproxy;
++		}
++		if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
++			close(fd);
++			LM_ERR("can't connect to RTP proxy\n");
++			goto badproxy;
++		}
++
++		do {
++			len = writev(fd, v + 1, vcnt);
++		} while (len == -1 && errno == EINTR);
++		if (len <= 0) {
++			close(fd);
++			LM_ERR("can't send command to a RTP proxy\n");
++			goto badproxy;
++		}
++		do {
++			len = read(fd, buf, sizeof(buf) - 1);
++		} while (len == -1 && errno == EINTR);
++		close(fd);
++		if (len <= 0) {
++			LM_ERR("can't read reply from a RTP proxy\n");
++			goto badproxy;
++		}
++	} else {
++		fds[0].fd = rtpp_socks[node->idx];
++		fds[0].events = POLLIN;
++		fds[0].revents = 0;
++		/* Drain input buffer */
++		while ((poll(fds, 1, 0) == 1) &&
++		    ((fds[0].revents & POLLIN) != 0)) {
++			recv(rtpp_socks[node->idx], buf, sizeof(buf) - 1, 0);
++			fds[0].revents = 0;
++		}
++		v[0].iov_base = gencookie();
++		v[0].iov_len = strlen(v[0].iov_base);
++		for (i = 0; i < rtpproxy_retr; i++) {
++			do {
++				len = writev(rtpp_socks[node->idx], v, vcnt + 1);
++			} while (len == -1 && (errno == EINTR || errno == ENOBUFS));
++			if (len <= 0) {
++				LM_ERR("can't send command to a RTP proxy\n");
++				goto badproxy;
++			}
++			while ((poll(fds, 1, rtpproxy_tout * 1000) == 1) &&
++			    (fds[0].revents & POLLIN) != 0) {
++				do {
++					len = recv(rtpp_socks[node->idx], buf, sizeof(buf)-1, 0);
++				} while (len == -1 && errno == EINTR);
++				if (len <= 0) {
++					LM_ERR("can't read reply from a RTP proxy\n");
++					goto badproxy;
++				}
++				if (len >= (v[0].iov_len - 1) &&
++				    memcmp(buf, v[0].iov_base, (v[0].iov_len - 1)) == 0) {
++					len -= (v[0].iov_len - 1);
++					cp += (v[0].iov_len - 1);
++					if (len != 0) {
++						len--;
++						cp++;
++					}
++					goto out;
++				}
++				fds[0].revents = 0;
++			}
++		}
++		if (i == rtpproxy_retr) {
++			LM_ERR("timeout waiting reply from a RTP proxy\n");
++			goto badproxy;
++		}
++	}
++
++out:
++	cp[len] = '\0';
++	*outlen = len;
++	return cp;
++badproxy:
++	LM_ERR("proxy <%s> does not respond, disable it\n", node->rn_url.s);
++	node->rn_disabled = 1;
++	node->rn_recheck_ticks = get_ticks() + rtpproxy_disable_tout;
++
++	return NULL;
++}
++
++/*
++ * select the set with the id_set id
++ */
++
++static struct rtpp_set * select_rtpp_set(int id_set ){
++
++	struct rtpp_set * rtpp_list;
++	/*is it a valid set_id?*/
++
++	if(!rtpp_set_list || !rtpp_set_list->rset_first){
++		LM_ERR("no rtp_proxy configured\n");
++		return 0;
++	}
++
++	for(rtpp_list=rtpp_set_list->rset_first; rtpp_list!=0 &&
++		rtpp_list->id_set!=id_set; rtpp_list=rtpp_list->rset_next);
++	if(!rtpp_list){
++		LM_ERR(" script error-invalid id_set to be selected\n");
++	}
++
++	return rtpp_list;
++}
++/*
++ * Main balancing routine. This does not try to keep the same proxy for
++ * the call if some proxies were disabled or enabled; proxy death considered
++ * too rare. Otherwise we should implement "mature" HA clustering, which is
++ * too expensive here.
++ */
++static struct rtpp_node *
++select_rtpp_node(str callid, int do_test)
++{
++	unsigned sum, sumcut, weight_sum;
++	struct rtpp_node* node;
++	int was_forced;
++
++	if(!selected_rtpp_set){
++		LM_ERR("script error -no valid set selected\n");
++		return NULL;
++	}
++	/* Most popular case: 1 proxy, nothing to calculate */
++	if (selected_rtpp_set->rtpp_node_count == 1) {
++		node = selected_rtpp_set->rn_first;
++		if (node->rn_disabled && node->rn_recheck_ticks <= get_ticks())
++			node->rn_disabled = rtpp_test(node, 1, 0);
++		return node->rn_disabled ? NULL : node;
++	}
++
++	/* XXX Use quick-and-dirty hashing algo */
++	for(sum = 0; callid.len > 0; callid.len--)
++		sum += callid.s[callid.len - 1];
++	sum &= 0xff;
++
++	was_forced = 0;
++retry:
++	weight_sum = 0;
++	for (node=selected_rtpp_set->rn_first; node!=NULL; node=node->rn_next) {
++
++		if (node->rn_disabled && node->rn_recheck_ticks <= get_ticks()){
++			/* Try to enable if it's time to try. */
++			node->rn_disabled = rtpp_test(node, 1, 0);
++		}
++		if (!node->rn_disabled)
++			weight_sum += node->rn_weight;
++	}
++	if (weight_sum == 0) {
++		/* No proxies? Force all to be redetected, if not yet */
++		if (was_forced)
++			return NULL;
++		was_forced = 1;
++		for(node=selected_rtpp_set->rn_first; node!=NULL; node=node->rn_next) {
++			node->rn_disabled = rtpp_test(node, 1, 1);
++		}
++		goto retry;
++	}
++	sumcut = sum % weight_sum;
++	/*
++	 * sumcut here lays from 0 to weight_sum-1.
++	 * Scan proxy list and decrease until appropriate proxy is found.
++	 */
++	for (node=selected_rtpp_set->rn_first; node!=NULL; node=node->rn_next) {
++		if (node->rn_disabled)
++			continue;
++		if (sumcut < node->rn_weight)
++			goto found;
++		sumcut -= node->rn_weight;
++	}
++	/* No node list */
++	return NULL;
++found:
++	if (do_test) {
++		node->rn_disabled = rtpp_test(node, node->rn_disabled, 0);
++		if (node->rn_disabled)
++			goto retry;
++	}
++	return node;
++}
++
++static int
++get_extra_id(struct sip_msg* msg, str *id_str) {
++	if(msg==NULL || extra_id_pv==NULL || id_str==NULL) {
++		LM_ERR("bad parameters\n");
++		return -1;
++	}
++	if (pv_printf_s(msg, extra_id_pv, id_str)<0) {
++		LM_ERR("cannot print the additional id\n");
++		return -1;
++	}
++
++	return 1;
++
++}
++
++
++
++static int
++unforce_rtp_proxy_f(struct sip_msg* msg, const char* str1, char* str2)
++{
++	return rtpp_function_call_simple(msg, OP_DELETE, str1);
++}
++
++static int
++unforce_rtp_proxy1_f(struct sip_msg* msg, char* str1, char* str2)
++{
++	str flags;
++	get_str_fparam(&flags, msg, (fparam_t *) str1);
++	return rtpp_function_call_simple(msg, OP_DELETE, flags.s);
++}
++
++/* This function assumes p points to a line of requested type. */
++
++static int
++set_rtp_proxy_set_f(struct sip_msg * msg, char * str1, char * str2)
++{
++	rtpp_set_link_t *rtpl;
++	pv_value_t val;
++
++	rtpl = (rtpp_set_link_t*)str1;
++
++	current_msg_id = 0;
++	selected_rtpp_set = 0;
++
++	if(rtpl->rset != NULL) {
++		current_msg_id = msg->id;
++		selected_rtpp_set = rtpl->rset;
++	} else {
++		if(pv_get_spec_value(msg, rtpl->rpv, &val)<0) {
++			LM_ERR("cannot evaluate pv param\n");
++			return -1;
++		}
++		if(!(val.flags & PV_VAL_INT)) {
++			LM_ERR("pv param must hold an integer value\n");
++			return -1;
++		}
++		selected_rtpp_set = select_rtpp_set(val.ri);
++		if(selected_rtpp_set==NULL) {
++			LM_ERR("could not locate rtpproxy set %d\n", val.ri);
++			return -1;
++		}
++		current_msg_id = msg->id;
++	}
++	return 1;
++}
++
++static int
++rtpproxy_manage(struct sip_msg *msg, const char *flags, const str *force_addr)
++{
++	int method;
++	int nosdp;
++
++	if(msg->cseq==NULL && ((parse_headers(msg, HDR_CSEQ_F, 0)==-1)
++				|| (msg->cseq==NULL)))
++	{
++		LM_ERR("no CSEQ header\n");
++		return -1;
++	}
++
++	method = get_cseq(msg)->method_id;
++
++	if(!(method==METHOD_INVITE || method==METHOD_ACK || method==METHOD_CANCEL
++				|| method==METHOD_BYE || method==METHOD_UPDATE))
++		return -1;
++
++	if(method==METHOD_CANCEL || method==METHOD_BYE)
++		return unforce_rtp_proxy_f(msg, flags, 0);
++
++	if(msg->msg_flags & FL_SDP_BODY)
++		nosdp = 0;
++	else
++		nosdp = parse_sdp(msg);
++
++	if(msg->first_line.type == SIP_REQUEST) {
++		if(method==METHOD_ACK && nosdp==0)
++			return force_rtp_proxy(msg, flags, force_addr, OP_ANSWER);
++		if(method==METHOD_UPDATE && nosdp==0)
++			return force_rtp_proxy(msg, flags, force_addr, OP_OFFER);
++		if(method==METHOD_INVITE && nosdp==0) {
++			msg->msg_flags |= FL_SDP_BODY;
++			if(tmb.t_gett!=NULL && tmb.t_gett()!=NULL
++					&& tmb.t_gett()!=T_UNDEFINED)
++				tmb.t_gett()->uas.request->msg_flags |= FL_SDP_BODY;
++			if(route_type==FAILURE_ROUTE)
++				return unforce_rtp_proxy_f(msg, flags, 0);
++			return force_rtp_proxy(msg, flags, force_addr, OP_OFFER);
++		}
++	} else if(msg->first_line.type == SIP_REPLY) {
++		if(msg->first_line.u.reply.statuscode>=300)
++			return unforce_rtp_proxy_f(msg, flags, 0);
++		if(nosdp==0) {
++			if(method==METHOD_UPDATE)
++				return force_rtp_proxy(msg, flags, force_addr, OP_ANSWER);
++			if(tmb.t_gett==NULL || tmb.t_gett()==NULL
++					|| tmb.t_gett()==T_UNDEFINED)
++				return force_rtp_proxy(msg, flags, force_addr, OP_ANSWER);
++			if(tmb.t_gett()->uas.request->msg_flags & FL_SDP_BODY)
++				return force_rtp_proxy(msg, flags, force_addr, OP_ANSWER);
++			return force_rtp_proxy(msg, flags, force_addr, OP_OFFER);
++		}
++	}
++	return -1;
++}
++
++static int
++rtpproxy_manage0(struct sip_msg *msg, char *flags, char *ip)
++{
++	return rtpproxy_manage(msg, 0, 0);
++}
++
++static int
++rtpproxy_manage1(struct sip_msg *msg, char *flags, char *ip)
++{
++	str flag_str;
++	fixup_get_svalue(msg, (gparam_p)flags, &flag_str);
++	return rtpproxy_manage(msg, flag_str.s, 0);
++}
++
++static int
++rtpproxy_manage2(struct sip_msg *msg, char *flags, char *ip)
++{
++	str flag_str;
++	str ip_str;
++	fixup_get_svalue(msg, (gparam_p)flags, &flag_str);
++	fixup_get_svalue(msg, (gparam_p)ip, &ip_str);
++	return rtpproxy_manage(msg, flag_str.s, &ip_str);
++}
++
++static int
++rtpproxy_offer1_f(struct sip_msg *msg, char *str1, char *str2)
++{
++	str flags;
++
++	if (str1)
++		get_str_fparam(&flags, msg, (fparam_t *) str1);
++	else
++		flags.s = NULL;
++	return force_rtp_proxy(msg, flags.s, NULL, OP_OFFER);
++}
++
++static int
++rtpproxy_offer2_f(struct sip_msg *msg, char *param1, char *param2)
++{
++	str flags, new_ip;
++
++	get_str_fparam(&flags, msg, (fparam_t *) param1);
++	get_str_fparam(&new_ip, msg, (fparam_t *) param2);
++	return force_rtp_proxy(msg, flags.s, &new_ip, OP_OFFER);
++}
++
++static int
++rtpproxy_answer1_f(struct sip_msg *msg, char *str1, char *str2)
++{
++	str flags;
++
++	if (msg->first_line.type == SIP_REQUEST)
++		if (msg->first_line.u.request.method_value != METHOD_ACK)
++			return -1;
++
++	if (str1)
++		get_str_fparam(&flags, msg, (fparam_t *) str1);
++	else
++		flags.s = NULL;
++	return force_rtp_proxy(msg, flags.s, NULL, OP_ANSWER);
++}
++
++static int
++rtpproxy_answer2_f(struct sip_msg *msg, char *param1, char *param2)
++{
++
++	str flags, new_ip;
++
++	if (msg->first_line.type == SIP_REQUEST)
++		if (msg->first_line.u.request.method_value != METHOD_ACK)
++			return -1;
++
++	get_str_fparam(&flags, msg, (fparam_t *) param1);
++	get_str_fparam(&new_ip, msg, (fparam_t *) param2);
++	return force_rtp_proxy(msg, flags.s, &new_ip, OP_ANSWER);
++}
++
++static int
++force_rtp_proxy(struct sip_msg *msg, const char *flags, const str *force_addr, int op)
++{
++	bencode_buffer_t bencbuf;
++	bencode_item_t *dict;
++	str body, newbody;
++	struct lump *anchor;
++
++	dict = rtpp_function_call_ok(&bencbuf, msg, op, flags, force_addr, &body);
++	if (!dict)
++		return -1;
++
++	if (!bencode_dictionary_get_str_dup(dict, "sdp", &newbody)) {
++		LM_ERR("failed to extract sdp body from proxy reply\n");
++		goto error;
++	}
++
++	anchor = del_lump(msg, body.s - msg->buf, body.len, 0);
++	if (!anchor) {
++		LM_ERR("del_lump failed\n");
++		goto error_free;
++	}
++	if (!insert_new_lump_after(anchor, newbody.s, newbody.len, 0)) {
++		LM_ERR("insert_new_lump_after failed\n");
++		goto error_free;
++	}
++
++	bencode_buffer_free(&bencbuf);
++	return 1;
++
++error_free:
++	pkg_free(newbody.s);
++error:
++	bencode_buffer_free(&bencbuf);
++	return -1;
++}
++
++
++static int
++start_recording_f(struct sip_msg* msg, char *foo, char *bar)
++{
++	return rtpp_function_call_simple(msg, OP_START_RECORDING, NULL);
++}
++
++/*
++ * Returns the current RTP-Statistics from the RTP-Proxy
++ */
++static int
++pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param,
++		  pv_value_t *res)
++{
++	bencode_buffer_t bencbuf;
++	bencode_item_t *dict, *tot, *in, *out;
++	static char buf[256];
++	str ret;
++
++	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL, NULL);
++	if (!dict)
++		return -1;
++
++	tot = bencode_dictionary_get_expect(dict, "totals", BENCODE_DICTIONARY);
++	in = bencode_dictionary_get_expect(tot, "input", BENCODE_DICTIONARY);
++	in = bencode_dictionary_get_expect(in, "rtp", BENCODE_DICTIONARY);
++	out = bencode_dictionary_get_expect(tot, "output", BENCODE_DICTIONARY);
++	out = bencode_dictionary_get_expect(out, "rtp", BENCODE_DICTIONARY);
++
++	if (!in || !out)
++		goto error;
++
++	ret.s = buf;
++	ret.len = snprintf(buf, sizeof(buf),
++			"Input: %lli bytes, %lli packets, %lli errors; "
++			"Output: %lli bytes, %lli packets, %lli errors",
++			bencode_dictionary_get_integer(in, "bytes", -1),
++			bencode_dictionary_get_integer(in, "packets", -1),
++			bencode_dictionary_get_integer(in, "errors", -1),
++			bencode_dictionary_get_integer(out, "bytes", -1),
++			bencode_dictionary_get_integer(out, "packets", -1),
++			bencode_dictionary_get_integer(out, "errors", -1));
++
++	bencode_buffer_free(&bencbuf);
++	return pv_get_strval(msg, param, res, &ret);
++
++error:
++	bencode_buffer_free(&bencbuf);
++	return -1;
++}
++
+--- /dev/null
++++ b/modules/rtpproxy-ng/rtpproxy.h
+@@ -0,0 +1,64 @@
++/* $Id: nathelper.c 1808 2007-03-10 17:36:19Z bogdan_iancu $
++ *
++ * Copyright (C) 2003 Porta Software Ltd
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * History:
++ * ---------
++ * 2007-04-13   splitted from nathelper.c (ancuta)
++*/
++
++
++#ifndef _RTPPROXY_H
++#define _RTPPROXY_H
++
++#include "bencode.h"
++#include "../../str.h"
++
++struct rtpp_node {
++	unsigned int		idx;			/* overall index */
++	str					rn_url;			/* unparsed, deletable */
++	int					rn_umode;
++	char				*rn_address;	/* substring of rn_url */
++	int					rn_disabled;	/* found unaccessible? */
++	unsigned			rn_weight;		/* for load balancing */
++	unsigned int		rn_recheck_ticks;
++        int                     rn_rep_supported;
++        int                     rn_ptl_supported;
++	struct rtpp_node	*rn_next;
++};
++
++
++struct rtpp_set{
++	unsigned int 		id_set;
++	unsigned			weight_sum;
++	unsigned int		rtpp_node_count;
++	int 				set_disabled;
++	unsigned int		set_recheck_ticks;
++	struct rtpp_node	*rn_first;
++	struct rtpp_node	*rn_last;
++	struct rtpp_set     *rset_next;
++};
++
++
++struct rtpp_set_head{
++	struct rtpp_set		*rset_first;
++	struct rtpp_set		*rset_last;
++};
++
++#endif
+--- /dev/null
++++ b/modules/rtpproxy-ng/rtpproxy_funcs.c
+@@ -0,0 +1,430 @@
++/*
++ * $Id$
++ *
++ * Copyright (C) 2001-2003 FhG Fokus
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * History:
++ * --------
++ *  2003-11-06  body len is computed using the message len (it's
++ *               not taken any more from the msg. content-length) (andrei)
++ *  2008-08-30  body len is taken from Conent-length header as it is more
++ *               reliable (UDP packages may contain garbage at the end)(bogdan)
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <sys/types.h>
++#include <unistd.h>
++#include "rtpproxy_funcs.h"
++#include "../../dprint.h"
++#include "../../config.h"
++#include "../../ut.h"
++#include "../../forward.h"
++#include "../../resolve.h"
++#include "../../globals.h"
++#include "../../udp_server.h"
++#include "../../pt.h"
++#include "../../parser/msg_parser.h"
++#include "../../trim.h"
++#include "../../parser/parse_from.h"
++#include "../../parser/contact/parse_contact.h"
++#include "../../parser/parse_uri.h"
++#include "../../parser/parse_content.h"
++#include "../../parser/parser_f.h"
++#include "../../parser/sdp/sdp_helpr_funcs.h"
++
++#define READ(val) \
++	(*(val + 0) + (*(val + 1) << 8) + (*(val + 2) << 16) + (*(val + 3) << 24))
++#define advance(_ptr,_n,_str,_error) \
++	do{\
++		if ((_ptr)+(_n)>(_str).s+(_str).len)\
++			goto _error;\
++		(_ptr) = (_ptr) + (_n);\
++	}while(0);
++#define one_of_16( _x , _t ) \
++	(_x==_t[0]||_x==_t[15]||_x==_t[8]||_x==_t[2]||_x==_t[3]||_x==_t[4]\
++	||_x==_t[5]||_x==_t[6]||_x==_t[7]||_x==_t[1]||_x==_t[9]||_x==_t[10]\
++	||_x==_t[11]||_x==_t[12]||_x==_t[13]||_x==_t[14])
++#define one_of_8( _x , _t ) \
++	(_x==_t[0]||_x==_t[7]||_x==_t[1]||_x==_t[2]||_x==_t[3]||_x==_t[4]\
++	||_x==_t[5]||_x==_t[6])
++
++
++
++/**
++ * return:
++ * -1: error
++ *  1: text or sdp
++ *  2: multipart
++ */
++int check_content_type(struct sip_msg *msg)
++{
++	static unsigned int appl[16] = {
++		0x6c707061/*appl*/,0x6c707041/*Appl*/,0x6c705061/*aPpl*/,
++		0x6c705041/*APpl*/,0x6c507061/*apPl*/,0x6c507041/*ApPl*/,
++		0x6c505061/*aPPl*/,0x6c505041/*APPl*/,0x4c707061/*appL*/,
++		0x4c707041/*AppL*/,0x4c705061/*aPpL*/,0x4c705041/*APpL*/,
++		0x4c507061/*apPL*/,0x4c507041/*ApPL*/,0x4c505061/*aPPL*/,
++		0x4c505041/*APPL*/};
++	static unsigned int icat[16] = {
++		0x74616369/*icat*/,0x74616349/*Icat*/,0x74614369/*iCat*/,
++		0x74614349/*ICat*/,0x74416369/*icAt*/,0x74416349/*IcAt*/,
++		0x74414369/*iCAt*/,0x74414349/*ICAt*/,0x54616369/*icaT*/,
++		0x54616349/*IcaT*/,0x54614369/*iCaT*/,0x54614349/*ICaT*/,
++		0x54416369/*icAT*/,0x54416349/*IcAT*/,0x54414369/*iCAT*/,
++		0x54414349/*ICAT*/};
++	static unsigned int ion_[8] = {
++		0x006e6f69/*ion_*/,0x006e6f49/*Ion_*/,0x006e4f69/*iOn_*/,
++		0x006e4f49/*IOn_*/,0x004e6f69/*ioN_*/,0x004e6f49/*IoN_*/,
++		0x004e4f69/*iON_*/,0x004e4f49/*ION_*/};
++	static unsigned int sdp_[8] = {
++		0x00706473/*sdp_*/,0x00706453/*Sdp_*/,0x00704473/*sDp_*/,
++		0x00704453/*SDp_*/,0x00506473/*sdP_*/,0x00506453/*SdP_*/,
++		0x00504473/*sDP_*/,0x00504453/*SDP_*/};
++	str           str_type;
++	unsigned int  x;
++	char          *p;
++
++	if (!msg->content_type)
++	{
++		LM_WARN("the header Content-TYPE is absent!"
++			"let's assume the content is text/plain ;-)\n");
++		return 1;
++	}
++
++	trim_len(str_type.len,str_type.s,msg->content_type->body);
++	if (str_type.len>=15 && (*str_type.s=='m' || *str_type.s=='M')
++			&& strncasecmp(str_type.s, "multipart/mixed", 15) == 0) {
++		return 2;
++    }
++	p = str_type.s;
++	advance(p,4,str_type,error_1);
++	x = READ(p-4);
++	if (!one_of_16(x,appl))
++		goto other;
++	advance(p,4,str_type,error_1);
++	x = READ(p-4);
++	if (!one_of_16(x,icat))
++		goto other;
++	advance(p,3,str_type,error_1);
++	x = READ(p-3) & 0x00ffffff;
++	if (!one_of_8(x,ion_))
++		goto other;
++
++	/* skip spaces and tabs if any */
++	while (*p==' ' || *p=='\t')
++		advance(p,1,str_type,error_1);
++	if (*p!='/')
++	{
++		LM_ERR("no / found after primary type\n");
++		goto error;
++	}
++	advance(p,1,str_type,error_1);
++	while ((*p==' ' || *p=='\t') && p+1<str_type.s+str_type.len)
++		advance(p,1,str_type,error_1);
++
++	advance(p,3,str_type,error_1);
++	x = READ(p-3) & 0x00ffffff;
++	if (!one_of_8(x,sdp_))
++		goto other;
++
++	if (*p==';'||*p==' '||*p=='\t'||*p=='\n'||*p=='\r'||*p==0) {
++		LM_DBG("type <%.*s> found valid\n", (int)(p-str_type.s), str_type.s);
++		return 1;
++	} else {
++		LM_ERR("bad end for type!\n");
++		return -1;
++	}
++
++error_1:
++	LM_ERR("body ended :-(!\n");
++error:
++	return -1;
++other:
++	LM_ERR("invalid type for a message\n");
++	return -1;
++}
++
++
++/*
++ * Get message body and check Content-Type header field
++ */
++int extract_body(struct sip_msg *msg, str *body )
++{
++	char c;
++	int ret;
++	str mpdel;
++	char *rest, *p1, *p2;
++	struct hdr_field hf;
++	unsigned int mime;
++
++	body->s = get_body(msg);
++	if (body->s==0) {
++		LM_ERR("failed to get the message body\n");
++		goto error;
++	}
++
++	/*
++	 * Better use the content-len value - no need of any explicit
++	 * parcing as get_body() parsed all headers and Conten-Length
++	 * body header is automaticaly parsed when found.
++	 */
++	if (msg->content_length==0) {
++		LM_ERR("failed to get the content length in message\n");
++		goto error;
++	}
++
++	body->len = get_content_length(msg);
++	if (body->len==0) {
++		LM_ERR("message body has length zero\n");
++		goto error;
++	}
++
++	if (body->len + body->s > msg->buf + msg->len) {
++		LM_ERR("content-length exceeds packet-length by %d\n",
++				(int)((body->len + body->s) - (msg->buf + msg->len)));
++		goto error;
++	}
++
++	/* no need for parse_headers(msg, EOH), get_body will
++	 * parse everything */
++	/*is the content type correct?*/
++	if((ret = check_content_type(msg))==-1)
++	{
++		LM_ERR("content type mismatching\n");
++		goto error;
++	}
++
++	if(ret!=2)
++		goto done;
++
++	/* multipart body */
++	if(get_mixed_part_delimiter(&msg->content_type->body,&mpdel) < 0) {
++		goto error;
++	}
++	p1 = find_sdp_line_delimiter(body->s, body->s+body->len, mpdel);
++	if (p1 == NULL) {
++		LM_ERR("empty multipart content\n");
++		return -1;
++	}
++	p2=p1;
++	c = 0;
++	for(;;)
++	{
++		p1 = p2;
++		if (p1 == NULL || p1 >= body->s+body->len)
++			break; /* No parts left */
++		p2 = find_next_sdp_line_delimiter(p1, body->s+body->len,
++				mpdel, body->s+body->len);
++		/* p2 is text limit for application parsing */
++		rest = eat_line(p1 + mpdel.len + 2, p2 - p1 - mpdel.len - 2);
++		if ( rest > p2 ) {
++			LM_ERR("Unparsable <%.*s>\n", (int)(p1-p1), p1);
++			return -1;
++		}
++		while( rest<p2 ) {
++			memset(&hf,0, sizeof(struct hdr_field));
++			rest = get_sdp_hdr_field(rest, p2, &hf);
++			if(hf.type==HDR_EOH_T)
++				break;
++			if(hf.type==HDR_ERROR_T)
++				return -1;
++			if(hf.type==HDR_CONTENTTYPE_T) {
++				if(decode_mime_type(hf.body.s, hf.body.s + hf.body.len,
++						&mime)==NULL)
++					return -1;
++				if (((((unsigned int)mime)>>16) == TYPE_APPLICATION)
++						&& ((mime&0x00ff) == SUBTYPE_SDP)) {
++					c = 1;
++				}
++			}
++		} /* end of while */
++		if(c==1)
++		{
++			body->s = rest;
++			body->len = p2-rest;
++			goto done;
++		}
++	}
++
++error:
++	return -1;
++
++done:
++	/*LM_DBG("DEBUG:extract_body:=|%.*s|\n",body->len,body->s);*/
++	return 1;
++}
++
++/*
++ * ser_memmem() returns the location of the first occurrence of data
++ * pattern b2 of size len2 in memory block b1 of size len1 or
++ * NULL if none is found. Obtained from NetBSD.
++ */
++void *
++ser_memmem(const void *b1, const void *b2, size_t len1, size_t len2)
++{
++        /* Initialize search pointer */
++        char *sp = (char *) b1;
++
++        /* Initialize pattern pointer */
++        char *pp = (char *) b2;
++
++        /* Initialize end of search address space pointer */
++        char *eos = sp + len1 - len2;
++
++        /* Sanity check */
++        if(!(b1 && b2 && len1 && len2))
++                return NULL;
++
++        while (sp <= eos) {
++                if (*sp == *pp)
++                        if (memcmp(sp, pp, len2) == 0)
++                                return sp;
++
++                        sp++;
++        }
++
++        return NULL;
++}
++
++/*
++ * Some helper functions taken verbatim from tm module.
++ */
++
++/*
++ * Extract Call-ID value
++ * assumes the callid header is already parsed
++ * (so make sure it is, before calling this function or
++ *  it might fail even if the message _has_ a callid)
++ */
++int
++get_callid(struct sip_msg* _m, str* _cid)
++{
++
++        if ((parse_headers(_m, HDR_CALLID_F, 0) == -1)) {
++                LM_ERR("failed to parse call-id header\n");
++                return -1;
++        }
++
++        if (_m->callid == NULL) {
++                LM_ERR("call-id not found\n");
++                return -1;
++        }
++
++        _cid->s = _m->callid->body.s;
++        _cid->len = _m->callid->body.len;
++        trim(_cid);
++        return 0;
++}
++
++/*
++ * Extract tag from To header field of a response
++ */
++int
++get_to_tag(struct sip_msg* _m, str* _tag)
++{
++
++        if (parse_to_header(_m) < 0) {
++                LM_ERR("To header field missing\n");
++                return -1;
++        }
++
++        if (get_to(_m)->tag_value.len) {
++                _tag->s = get_to(_m)->tag_value.s;
++                _tag->len = get_to(_m)->tag_value.len;
++        } else {
++                _tag->s = NULL; /* fixes gcc 4.0 warnings */
++                _tag->len = 0;
++        }
++
++        return 0;
++}
++
++/*
++ * Extract tag from From header field of a request
++ */
++int
++get_from_tag(struct sip_msg* _m, str* _tag)
++{
++
++        if (parse_from_header(_m)<0) {
++                LM_ERR("failed to parse From header\n");
++                return -1;
++        }
++
++        if (get_from(_m)->tag_value.len) {
++                _tag->s = get_from(_m)->tag_value.s;
++                _tag->len = get_from(_m)->tag_value.len;
++        } else {
++                _tag->s = NULL; /* fixes gcc 4.0 warnings */
++                _tag->len = 0;
++        }
++
++        return 0;
++}
++
++/*
++ * Extract URI from the Contact header field
++ */
++int
++get_contact_uri(struct sip_msg* _m, struct sip_uri *uri, contact_t** _c)
++{
++
++        if ((parse_headers(_m, HDR_CONTACT_F, 0) == -1) || !_m->contact)
++                return -1;
++        if (!_m->contact->parsed && parse_contact(_m->contact) < 0) {
++                LM_ERR("failed to parse Contact body\n");
++                return -1;
++        }
++        *_c = ((contact_body_t*)_m->contact->parsed)->contacts;
++        if (*_c == NULL)
++                /* no contacts found */
++                return -1;
++
++        if (parse_uri((*_c)->uri.s, (*_c)->uri.len, uri) < 0 || uri->host.len <= 0) {
++                LM_ERR("failed to parse Contact URI [%.*s]\n",
++                        (*_c)->uri.len, ((*_c)->uri.s)?(*_c)->uri.s:"");
++                return -1;
++        }
++        return 0;
++}
++
++/*
++ * Extract branch from Via header
++ */
++int
++get_via_branch(struct sip_msg* msg, int vianum, str* _branch)
++{
++	struct via_body *via;
++	struct via_param *p;
++
++	if (parse_via_header(msg, vianum, &via) < 0)
++		return -1;
++
++	for (p = via->param_lst; p; p = p->next)
++	{
++		if (p->name.len == strlen("branch")
++				&& strncasecmp(p->name.s, "branch", strlen("branch")) == 0) {
++			_branch->s = p->value.s;
++			_branch->len = p->value.len;
++			return 0;
++		}
++	}
++	return -1;
++}
+--- /dev/null
++++ b/modules/rtpproxy-ng/rtpproxy_funcs.h
+@@ -0,0 +1,40 @@
++/*
++ * $Id$
++ *
++ * Copyright (C) 2001-2003 FhG Fokus
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++
++#ifndef _RTPPROXY_FUNCS_H
++#define _RTPPROXY_FUNCS_H
++
++#include "../../str.h"
++#include "../../parser/msg_parser.h"
++#include "../../parser/contact/contact.h"
++
++int extract_body(struct sip_msg * , str *);
++int check_content_type(struct sip_msg * );
++void *ser_memmem(const void *, const void *, size_t, size_t);
++int get_callid(struct sip_msg *, str *);
++int get_to_tag(struct sip_msg *, str *);
++int get_from_tag(struct sip_msg *, str *);
++int get_contact_uri(struct sip_msg *, struct sip_uri *, contact_t **);
++int get_via_branch(struct sip_msg *, int, str *);
++
++#endif
+--- a/Makefile.groups
++++ b/Makefile.groups
+@@ -13,7 +13,7 @@
+ 				   mediaproxy mi_datagram mi_fifo mi_rpc mqueue \
+ 				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
+ 				   rtpproxy sanity sdpops siputils sl statistics textops \
+-				   textopsx tm tmx topoh xlog
++				   textopsx tm tmx topoh xlog rtpproxy-ng
+ 
+ # - extra used modules, with no extra dependency
+ mod_list_extra=avp auth_diameter call_control dmq domainpolicy msrp pdb qos \

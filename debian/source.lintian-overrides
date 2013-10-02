@@ -1,0 +1,2 @@
+# can be removed when/if the code is moved to GnuTLS
+ngcp-kamailio-tls-modules source: possible-gpl-code-linked-with-openssl

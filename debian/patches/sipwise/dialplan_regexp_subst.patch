@@ -1,0 +1,304 @@
+diff --git a/modules/dialplan/dialplan.c b/modules/dialplan/dialplan.c
+index ffa8bb4..a515bf4 100644
+--- a/modules/dialplan/dialplan.c
++++ b/modules/dialplan/dialplan.c
+@@ -280,7 +280,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
+ 	memset(&val, 0, sizeof(pv_value_t));
+ 	val.flags = PV_VAL_STR;
+ 
+-	no_change = (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
++	no_change = (dest->type == PVT_NONE) || (!repl->s);
+ 
+ 	if (no_change)
+ 		goto set_attr_pvar;
+diff --git a/modules/dialplan/dp_repl.c b/modules/dialplan/dp_repl.c
+index ec2e5bb..63cf7d5 100644
+--- a/modules/dialplan/dp_repl.c
++++ b/modules/dialplan/dp_repl.c
+@@ -147,41 +147,9 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+ 	subst_comp 	= rule->subst_comp;
+ 	repl_comp 	= rule->repl_comp;
+ 
+-	if(!repl_comp){
+-		LM_DBG("null replacement\n");
+-		return 0;
+-	}
+-
+-	if(subst_comp){
+-		/*just in case something went wrong at load time*/
+-		rc = pcre_fullinfo(subst_comp, NULL, PCRE_INFO_CAPTURECOUNT,
+-				&cap_cnt);
+-		if (rc != 0) {
+-			LM_ERR("pcre_fullinfo on compiled pattern yielded error: %d\n",
+-					rc);
+-			return -1;;
+-		}
+-		if(repl_comp->max_pmatch > cap_cnt){
+-			LM_ERR("illegal access to the %i-th subexpr of the subst expr\n",
+-					repl_comp->max_pmatch);
+-			return -1;
+-		}
+-
+-		/*search for the pattern from the compiled subst_exp*/
+-		if (pcre_exec(rule->subst_comp, NULL, string.s, string.len,
+-					0, 0, ovector, 3 * (MAX_REPLACE_WITH + 1)) <= 0) {
+-			LM_ERR("the string %.*s matched "
+-					"the match_exp %.*s but not the subst_exp %.*s!\n", 
+-					string.len, string.s, 
+-					rule->match_exp.len, rule->match_exp.s,
+-					rule->subst_exp.len, rule->subst_exp.s);
+-			return -1;
+-		}
+-	}
+-
+-	/*simply copy from the replacing string*/
+-	if(!subst_comp || (repl_comp->n_escapes <=0)){
+-		if(!repl_comp->replacement.s || repl_comp->replacement.len == 0){
++	if (!subst_comp) {
++		/*simply copy from the replacing string*/
++		if(!repl_comp || !repl_comp->replacement.s || repl_comp->replacement.len == 0){
+ 			LM_ERR("invalid replacing string\n");
+ 			goto error;
+ 		}
+@@ -194,108 +162,156 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+ 		return 0;
+ 	}
+ 
+-	/* offset- offset in the replacement string */
+-	result->len = repl_nb = offset = 0;
+-	p=repl_comp->replacement.s;
+-
+-	while( repl_nb < repl_comp->n_escapes){
++	/*just in case something went wrong at load time*/
++	rc = pcre_fullinfo(subst_comp, NULL, PCRE_INFO_CAPTURECOUNT,
++			&cap_cnt);
++	if (rc != 0) {
++		LM_ERR("pcre_fullinfo on compiled pattern yielded error: %d\n",
++			rc);
++		return -1;;
++	}
++	if(repl_comp && repl_comp->max_pmatch > cap_cnt){
++		LM_ERR("illegal access to the %i-th subexpr of the subst expr\n",
++			repl_comp->max_pmatch);
++		return -1;
++	}
+ 
+-		token = repl_comp->replace[repl_nb];
++	/*search for the pattern from the compiled subst_exp*/
++	if (pcre_exec(rule->subst_comp, NULL, string.s, string.len,
++			0, 0, ovector, 3 * (MAX_REPLACE_WITH + 1)) <= 0) {
++		LM_ERR("the string %.*s matched "
++			"the match_exp %.*s but not the subst_exp %.*s!\n", 
++			string.len, string.s, 
++			rule->match_exp.len, rule->match_exp.s,
++			rule->subst_exp.len, rule->subst_exp.s);
++		return -1;
++	}
+ 
+-		if(offset< token.offset){
+-			if((repl_comp->replacement.len < offset)||
+-					(result->len + token.offset -offset >= MAX_PHONE_NB_DIGITS)){
+-				LM_ERR("invalid length\n");
+-				goto error;
+-			}
+-			/*copy from the replacing string*/
+-			size = token.offset - offset;
+-			memcpy(result->s + result->len, p + offset, size);
+-			LM_DBG("copying <%.*s> from replacing string\n",
+-					size, p + offset);
+-			result->len += size;
+-			offset = token.offset;
++	/* copy non-matched prefix of string to output */
++	if (ovector[0] > 0) {
++		if (ovector[0] >= MAX_PHONE_NB_DIGITS) {
++			LM_ERR("overflow\n");
++			goto error;
+ 		}
++		memcpy(result->s, string.s, ovector[0]);
++		result->len += ovector[0];
++	}
++
++	if (repl_comp) {
++		/* offset- offset in the replacement string */
++		repl_nb = offset = 0;
++		p=repl_comp->replacement.s;
+ 
+-		switch(token.type) {
+-			case REPLACE_NMATCH:
+-				/*copy from the match subexpression*/	
+-				match_nb = token.u.nmatch * 2;
+-				match.s =  string.s + ovector[match_nb];
+-				match.len = ovector[match_nb + 1] - ovector[match_nb];
+-				if(result->len + match.len >= MAX_PHONE_NB_DIGITS){
+-					LM_ERR("overflow\n");
++		while( repl_nb < repl_comp->n_escapes){
++
++			token = repl_comp->replace[repl_nb];
++			
++			if(offset< token.offset){
++				if((repl_comp->replacement.len < offset)||
++					(result->len + token.offset -offset >= MAX_PHONE_NB_DIGITS)){
++					LM_ERR("invalid length\n");
+ 					goto error;
+ 				}
++				/*copy from the replacing string*/
++				size = token.offset - offset;
++				memcpy(result->s + result->len, p + offset, size);
++				LM_DBG("copying <%.*s> from replacing string\n",
++				       size, p + offset);
++				result->len += size;
++				offset = token.offset;
++			}
+ 
+-				memcpy(result->s + result->len, match.s, match.len);
+-				LM_DBG("copying match <%.*s> token size %d\n",
+-						match.len, match.s, token.size);
+-				result->len += match.len;
+-				offset += token.size;
++			switch(token.type) {
++				case REPLACE_NMATCH:
++					/*copy from the match subexpression*/	
++					match_nb = token.u.nmatch * 2;
++					match.s =  string.s + ovector[match_nb];
++					match.len = ovector[match_nb + 1] - ovector[match_nb];
++					if(result->len + match.len >= MAX_PHONE_NB_DIGITS){
++						LM_ERR("overflow\n");
++						goto error;
++					}
++
++					memcpy(result->s + result->len, match.s, match.len);
++					LM_DBG("copying match <%.*s> token size %d\n",
++					       match.len, match.s, token.size);
++					result->len += match.len;
++					offset += token.size;
+ 				break;
+-			case REPLACE_CHAR:
+-				if(result->len + 1>= MAX_PHONE_NB_DIGITS){
+-					LM_ERR("overflow\n");
+-					goto error;
+-				}
+-				*(result->s + result->len) = token.u.c;
+-				LM_DBG("copying char <%c> token size %d\n",
++				case REPLACE_CHAR:
++					if(result->len + 1>= MAX_PHONE_NB_DIGITS){
++						LM_ERR("overflow\n");
++						goto error;
++					}
++					*(result->s + result->len) = token.u.c;
++					LM_DBG("copying char <%c> token size %d\n",
+ 						token.u.c, token.size);
+-				result->len++;
+-				offset += token.size;
++					result->len++;
++					offset += token.size;
+ 				break;
+-			case REPLACE_URI:	
+-				if ( msg== NULL || msg->first_line.type!=SIP_REQUEST){
+-					LM_CRIT("uri substitution attempt on no request"
++				case REPLACE_URI:	
++					if ( msg== NULL || msg->first_line.type!=SIP_REQUEST){
++						LM_CRIT("uri substitution attempt on no request"
+ 							" message\n");
+-					break; /* ignore, we can continue */
+-				}
+-				uri= (msg->new_uri.s)?(&msg->new_uri):
+-					(&msg->first_line.u.request.uri);
+-				if(result->len+uri->len>=MAX_PHONE_NB_DIGITS){
+-					LM_ERR("overflow\n");
+-					goto error;
+-				}
+-				memcpy(result->s + result->len, uri->s, uri->len);
+-				LM_DBG("copying uri <%.*s> token size %d\n",
++						break; /* ignore, we can continue */
++					}
++					uri= (msg->new_uri.s)?(&msg->new_uri):
++						(&msg->first_line.u.request.uri);
++					if(result->len+uri->len>=MAX_PHONE_NB_DIGITS){
++						LM_ERR("overflow\n");
++						goto error;
++					}
++					memcpy(result->s + result->len, uri->s, uri->len);
++					LM_DBG("copying uri <%.*s> token size %d\n",
+ 						uri->len, uri->s, token.size);
+-				result->len+=uri->len;
+-				offset += token.size;
++					result->len+=uri->len;
++					offset += token.size;
+ 				break;
+-			case REPLACE_SPEC:
+-				if (msg== NULL) {
+-					LM_DBG("replace spec attempted on no message\n");
+-					break;
+-				}
+-				if (pv_get_spec_value(msg, &token.u.spec, &sv) != 0) {
+-					LM_CRIT("item substitution returned error\n");
+-					break; /* ignore, we can continue */
+-				}
+-				if(result->len+sv.rs.len>=MAX_PHONE_NB_DIGITS){
+-					LM_ERR("rule_translate: overflow\n");
+-					goto error;
+-				}
+-				memcpy(result->s + result->len, sv.rs.s,
+-						sv.rs.len);
+-				LM_DBG("copying pvar value <%.*s> token size %d\n",
++				case REPLACE_SPEC:
++					if (msg== NULL) {
++						LM_DBG("replace spec attempted on no message\n");
++						break;
++					}
++					if (pv_get_spec_value(msg, &token.u.spec, &sv) != 0) {
++						LM_CRIT("item substitution returned error\n");
++						break; /* ignore, we can continue */
++					}
++					if(result->len+sv.rs.len>=MAX_PHONE_NB_DIGITS){
++						LM_ERR("rule_translate: overflow\n");
++						goto error;
++					}
++					memcpy(result->s + result->len, sv.rs.s,
++					       sv.rs.len);
++					LM_DBG("copying pvar value <%.*s> token size %d\n",
+ 						sv.rs.len, sv.rs.s, token.size);
+-				result->len+=sv.rs.len;
+-				offset += token.size;
++					result->len+=sv.rs.len;
++					offset += token.size;
+ 				break;
+-			default:
+-				LM_CRIT("unknown type %d\n", repl_comp->replace[repl_nb].type);
+-				/* ignore it */
++				default:
++					LM_CRIT("unknown type %d\n", repl_comp->replace[repl_nb].type);
++					/* ignore it */
++			}
++			repl_nb++;
+ 		}
+-		repl_nb++;
+-	}
+-	/* anything left? */
+-	if( repl_nb && offset < repl_comp->replacement.len){
+-		/*copy from the replacing string*/
+-		size = repl_comp->replacement.len - offset;
+-		memcpy(result->s + result->len, p + offset, size);
+-		LM_DBG("copying leftover <%.*s> from replacing string\n",
++		/* anything left? */
++		if(offset < repl_comp->replacement.len){
++			/*copy from the replacing string*/
++			size = repl_comp->replacement.len - offset;
++			memcpy(result->s + result->len, p + offset, size);
++			LM_DBG("copying leftover <%.*s> from replacing string\n",
+ 				size, p + offset);
++			result->len += size;
++		}
++	}
++
++	/* copy non-matched suffix of string to output */
++	size = string.len - ovector[1];
++	if (size > 0) {
++		if (result->len + size >= MAX_PHONE_NB_DIGITS) {
++			LM_ERR("overflow\n");
++			goto error;
++		}
++		memcpy(result->s + result->len, string.s + ovector[1], size);
+ 		result->len += size;
+ 	}
+ 

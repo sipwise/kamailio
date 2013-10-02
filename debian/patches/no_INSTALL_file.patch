@@ -1,0 +1,14 @@
+Description: Don't copy the INSTALL file to the docs dir
+Author: Victor Seva <linuxmaniac@torreviejawireless.org>
+
+--- a/Makefile
++++ b/Makefile
+@@ -895,8 +895,6 @@
+ 
+ 
+ install-doc: $(doc_prefix)/$(doc_dir) install-every-module-doc
+-	$(INSTALL_TOUCH) $(doc_prefix)/$(doc_dir)/INSTALL 
+-	$(INSTALL_DOC) INSTALL $(doc_prefix)/$(doc_dir)
+ 	$(INSTALL_TOUCH) $(doc_prefix)/$(doc_dir)/README-MODULES 
+ 	$(INSTALL_DOC) README-MODULES $(doc_prefix)/$(doc_dir)
+ 	$(INSTALL_TOUCH) $(doc_prefix)/$(doc_dir)/AUTHORS 
