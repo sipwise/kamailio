@@ -1,5 +1,5 @@
---- a/modules/usrloc/ul_rpc.c
-+++ b/modules/usrloc/ul_rpc.c
+--- a/modules_k/usrloc/ul_rpc.c
++++ b/modules_k/usrloc/ul_rpc.c
 @@ -524,14 +524,15 @@
  /*!
   * \brief Add a new contact for an address of record

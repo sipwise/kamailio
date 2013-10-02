@@ -10,7 +10,7 @@
  static int force_rtp_proxy(struct sip_msg *, char *, char *, int, int);
  static int start_recording_f(struct sip_msg *, char *, char *);
  static int rtpproxy_answer1_f(struct sip_msg *, char *, char *);
-@@ -359,17 +360,17 @@
+@@ -349,10 +350,10 @@
  	{"set_rtp_proxy_set",  (cmd_function)set_rtp_proxy_set_f,    1,
  		fixup_set_id, 0,
  		ANY_ROUTE},
@@ -22,19 +22,8 @@
 +	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy0_f,    0,
  		0, 0,
  		ANY_ROUTE},
--	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy_f,    1,
--		0, 0,
-+	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy1_f,    1,
-+		fixup_spve_null, 0,
- 		ANY_ROUTE},
--	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy_f,    1,
--		0, 0,
-+	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy1_f,    1,
-+		fixup_spve_null, 0,
- 		ANY_ROUTE},
  	{"start_recording",    (cmd_function)start_recording_f,      0,
- 		0, 0,
-@@ -378,19 +379,19 @@
+@@ -362,19 +363,19 @@
  		0, 0,
  		ANY_ROUTE},
  	{"rtpproxy_offer",	(cmd_function)rtpproxy_offer1_f,     1,
@@ -58,67 +47,65 @@
  		ANY_ROUTE},
  	{"rtpproxy_stream2uac",(cmd_function)rtpproxy_stream2uac2_f, 2,
  		fixup_var_str_int, 0,
-@@ -1798,9 +1799,15 @@
- 	return 1;
+@@ -1638,17 +1639,30 @@
  }
  
-+static int
+ static int
+-unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
 +unforce_rtp_proxy0_f(struct sip_msg* msg, char* flags, char* str2)
 +{
-+        char arg[1] = {'\0'};
-+        return unforce_rtp_proxy1_f(msg, arg, str2);
++	char arg[1] = {'\0'};
++	return unforce_rtp_proxy1_f(msg, arg, str2);
 +}
- 
- static int
--unforce_rtp_proxy_f(struct sip_msg* msg, char* flags, char* str2)
++
++static int
 +unforce_rtp_proxy1_f(struct sip_msg* msg, char* param1, char* param2)
  {
  	str callid, from_tag, to_tag, viabranch;
  	char *cp;
-@@ -1810,10 +1817,16 @@
- 	str extra_id;
+ 	int via = 0;
  	int ret;
  	struct rtpp_node *node;
 +	str str1;
  	struct iovec v[1 + 4 + 3 + 2] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {NULL, 0}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
- 	                                            /* 1 */   /* 2 */   /* 3 */    /* 4 */    /* 5 */    /* 6 */   /* 7 */    /* 8 */   /* 9 */
+ 						    /* 1 */   /* 2 */   /* 3 */    /* 4 */    /* 5 */    /* 6 */   /* 7 */    /* 8 */   /* 9 */
  
--	for (cp = flags; cp && *cp; cp++) {
-+        if (param1)
-+            get_str_fparam(&str1, msg, (fparam_t *) param1);
-+        else
-+            str1.s = NULL;
+-	for (cp = str1; cp && *cp; cp++) {
++	if (param1)
++		get_str_fparam(&str1, msg, (fparam_t *) param1);
++	else
++		str1.s = NULL;
 +
 +	for (cp = str1.s; cp && *cp; cp++) {
  		switch (*cp) {
  			case '1':
  				via = 1;
-@@ -1976,7 +1989,7 @@
+@@ -1740,7 +1754,7 @@
  		return -1;
  
  	if(method==METHOD_CANCEL || method==METHOD_BYE)
--		return unforce_rtp_proxy_f(msg, flags, 0);
+-		return unforce_rtp_proxy_f(msg, 0, 0);
 +		return unforce_rtp_proxy0_f(msg, flags, 0);
  
  	if(ip==NULL)
  	{
-@@ -2002,13 +2015,13 @@
+@@ -1766,13 +1780,13 @@
  					&& tmb.t_gett()!=T_UNDEFINED)
  				tmb.t_gett()->uas.request->msg_flags |= FL_SDP_BODY;
  			if(route_type==FAILURE_ROUTE)
--				return unforce_rtp_proxy_f(msg, flags, 0);
+-				return unforce_rtp_proxy_f(msg, 0, 0);
 +				return unforce_rtp_proxy0_f(msg, flags, 0);
  			return force_rtp_proxy(msg, flags, (cp!=NULL)?newip:ip, 1,
  					(ip!=NULL)?1:0);
  		}
  	} else if(msg->first_line.type == SIP_REPLY) {
  		if(msg->first_line.u.reply.statuscode>=300)
--			return unforce_rtp_proxy_f(msg, flags, 0);
+-			return unforce_rtp_proxy_f(msg, 0, 0);
 +			return unforce_rtp_proxy0_f(msg, flags, 0);
  		if(nosdp==0) {
  			if(method==METHOD_UPDATE)
  				return force_rtp_proxy(msg, flags, (cp!=NULL)?newip:ip, 0,
-@@ -2068,16 +2081,26 @@
+@@ -1814,16 +1828,26 @@
  {
          char *cp;
          char newip[IP_ADDR_MAX_STR_SIZE];
@@ -147,7 +134,7 @@
  }
  
  static int
-@@ -2085,6 +2108,7 @@
+@@ -1831,6 +1855,7 @@
  {
          char *cp;
          char newip[IP_ADDR_MAX_STR_SIZE];
@@ -155,7 +142,7 @@
  
  	if (msg->first_line.type == SIP_REQUEST)
  		if (msg->first_line.u.request.method_value != METHOD_ACK)
-@@ -2092,18 +2116,26 @@
+@@ -1838,18 +1863,26 @@
  
          cp = ip_addr2a(&msg->rcv.dst_ip);
          strcpy(newip, cp);
@@ -186,7 +173,7 @@
  
 --- a/modules/rtpproxy/README
 +++ b/modules/rtpproxy/README
-@@ -77,7 +77,7 @@
+@@ -70,7 +70,7 @@
  
          6. Exported Pseudo Variables
  
@@ -195,16 +182,16 @@
  
          7. MI Commands
  
-@@ -103,7 +103,7 @@
-    1.13. rtpproxy_manage usage
-    1.14. rtpproxy_stream2xxx usage
-    1.15. start_recording usage
--   1.16. $rtpstat-Usage
-+   1.16. $rtpstart-Usage
-    1.17. nh_enable_rtpp usage
-    1.18. nh_show_rtpp usage
+@@ -95,7 +95,7 @@
+    1.12. rtpproxy_manage usage
+    1.13. rtpproxy_stream2xxx usage
+    1.14. start_recording usage
+-   1.15. $rtpstat-Usage
++   1.15. $rtpstart-Usage
+    1.16. nh_enable_rtpp usage
+    1.17. nh_show_rtpp usage
  
-@@ -145,7 +145,7 @@
+@@ -136,7 +136,7 @@
  
     6. Exported Pseudo Variables
  
@@ -213,7 +200,7 @@
  
     7. MI Commands
  
-@@ -659,18 +659,18 @@
+@@ -588,18 +588,18 @@
  
  6. Exported Pseudo Variables
  
@@ -226,10 +213,10 @@
     Returns the RTP-Statistics from the RTP-Proxy. The RTP-Statistics from
     the RTP-Proxy are provided as a string and it does contain several
     packet-counters. The statistics must be retrieved before the session is
-    deleted (before unforce_rtpproxy()).
+    deleted (before unforce_rtpproxy).
  
--   Example 1.16. $rtpstat-Usage
-+   Example 1.16. $rtpstart-Usage
+-   Example 1.15. $rtpstat-Usage
++   Example 1.15. $rtpstart-Usage
  ...
 -    append_hf("X-RTP-Statistics: $rtpstat\r\n");
 +    append_hf("X-RTP-Statistics: $rtpstart\r\n");

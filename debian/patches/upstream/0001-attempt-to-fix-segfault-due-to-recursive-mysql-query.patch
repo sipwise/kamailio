@@ -1,0 +1,315 @@
+From 8417a59e98d8801496976ed50541b1365afda218 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Wed, 27 Mar 2013 11:37:07 -0400
+Subject: [PATCH] attempt to fix segfault due to recursive mysql query
+
+---
+ lib/srdb1/db_res.h           |    3 +++
+ modules/db_mysql/km_dbase.c  |   36 +++++++++++++++++++-----------------
+ modules/db_mysql/km_dbase.h  |    2 +-
+ modules/db_mysql/km_my_con.c |    1 -
+ modules/db_mysql/km_my_con.h |    4 ----
+ modules/db_mysql/km_res.c    |   27 +++++++++++++++++++++++----
+ modules/db_mysql/km_res.h    |   19 +++++++++++++++++++
+ modules/db_mysql/km_row.c    |    5 +++--
+ 8 files changed, 68 insertions(+), 29 deletions(-)
+
+--- a/lib/srdb1/db_res.h
++++ b/lib/srdb1/db_res.h
+@@ -61,6 +61,7 @@
+ 	int n;                 /**< Number of rows in current fetch */
+ 	int res_rows;          /**< Number of total rows in query   */
+ 	int last_row;          /**< Last row                        */
++	void* ptr;             /**< For use by DB modules           */
+ } db1_res_t;
+ 
+ 
+@@ -78,6 +79,8 @@
+ #define RES_LAST_ROW(re)  ((re)->last_row)
+ /** Return the number of total result rows */
+ #define RES_NUM_ROWS(re) ((re)->res_rows)
++/** Return the module-specific pointer */
++#define RES_PTR(re) ((re)->ptr)
+ 
+ 
+ /**
+--- a/modules/db_mysql/km_dbase.c
++++ b/modules/db_mysql/km_dbase.c
+@@ -163,14 +163,14 @@
+ 		return -1;
+ 	}
+ 
+-	*_r = db_new_result();
++	*_r = db_mysql_new_result();
+ 	if (*_r == 0) {
+ 		LM_ERR("no memory left\n");
+ 		return -2;
+ 	}
+ 
+-	CON_RESULT(_h) = mysql_store_result(CON_CONNECTION(_h));
+-	if (!CON_RESULT(_h)) {
++	RES_RESULT(*_r) = mysql_store_result(CON_CONNECTION(_h));
++	if (!RES_RESULT(*_r)) {
+ 		if (mysql_field_count(CON_CONNECTION(_h)) == 0) {
+ 			(*_r)->col.n = 0;
+ 			(*_r)->n = 0;
+@@ -181,7 +181,7 @@
+ 			if (code == CR_SERVER_GONE_ERROR || code == CR_SERVER_LOST) {
+ 				counter_inc(mysql_cnts_h.driver_err);
+ 			}
+-			db_free_result(*_r);
++			db_mysql_free_result(_h, *_r);
+ 			*_r = 0;
+ 			return -3;
+ 		}
+@@ -195,14 +195,14 @@
+ 		/* all mem on openser API side is already freed by
+ 		 * db_mysql_convert_result in case of error, but we also need
+ 		 * to free the mem from the mysql lib side */
+-		mysql_free_result(CON_RESULT(_h));
++		mysql_free_result(RES_RESULT(*_r));
+ #if (MYSQL_VERSION_ID >= 40100)
+ 		while( mysql_more_results(CON_CONNECTION(_h)) && mysql_next_result(CON_CONNECTION(_h)) > 0 ) {
+ 			MYSQL_RES *res = mysql_store_result( CON_CONNECTION(_h) );
+ 			mysql_free_result(res);
+ 		}
+ #endif
+-		CON_RESULT(_h) = 0;
++		RES_RESULT(*_r) = 0;
+ 		return -4;
+ 	}
+ 
+@@ -224,19 +224,21 @@
+  * \param _r result set that should be freed
+  * \return zero on success, negative value on failure
+  */
+-int db_mysql_free_result(db1_con_t* _h, db1_res_t* _r)
++int db_mysql_free_result(const db1_con_t* _h, db1_res_t* _r)
+ {
+      if ((!_h) || (!_r)) {
+ 	     LM_ERR("invalid parameter value\n");
+ 	     return -1;
+      }
+ 
++     mysql_free_result(RES_RESULT(_r));
++     RES_RESULT(_r) = 0;
++     pkg_free(RES_PTR(_r));
++
+      if (db_free_result(_r) < 0) {
+ 	     LM_ERR("unable to free result structure\n");
+ 	     return -1;
+      }
+-     mysql_free_result(CON_RESULT(_h));
+-     CON_RESULT(_h) = 0;
+      return 0;
+ }
+ 
+@@ -288,21 +290,21 @@
+ 
+ 	/* exit if the fetch count is zero */
+ 	if (nrows == 0) {
+-		db_free_result(*_r);
++		db_mysql_free_result(_h, *_r);
+ 		*_r = 0;
+ 		return 0;
+ 	}
+ 
+ 	if(*_r==0) {
+ 		/* Allocate a new result structure */
+-		*_r = db_new_result();
++		*_r = db_mysql_new_result();
+ 		if (*_r == 0) {
+ 			LM_ERR("no memory left\n");
+ 			return -2;
+ 		}
+ 
+-		CON_RESULT(_h) = mysql_store_result(CON_CONNECTION(_h));
+-		if (!CON_RESULT(_h)) {
++		RES_RESULT(*_r) = mysql_store_result(CON_CONNECTION(_h));
++		if (!RES_RESULT(*_r)) {
+ 			if (mysql_field_count(CON_CONNECTION(_h)) == 0) {
+ 				(*_r)->col.n = 0;
+ 				(*_r)->n = 0;
+@@ -313,7 +315,7 @@
+ 				if (code == CR_SERVER_GONE_ERROR || code == CR_SERVER_LOST) {
+ 					counter_inc(mysql_cnts_h.driver_err);
+ 				}
+-				db_free_result(*_r);
++				db_mysql_free_result(_h, *_r);
+ 				*_r = 0;
+ 				return -3;
+ 			}
+@@ -323,7 +325,7 @@
+ 			return -4;
+ 		}
+ 
+-		RES_NUM_ROWS(*_r) = mysql_num_rows(CON_RESULT(_h));
++		RES_NUM_ROWS(*_r) = mysql_num_rows(RES_RESULT(*_r));
+ 		if (!RES_NUM_ROWS(*_r)) {
+ 			LM_DBG("no rows returned from the query\n");
+ 			RES_ROWS(*_r) = 0;
+@@ -362,8 +364,8 @@
+ 	}
+ 
+ 	for(i = 0; i < rows; i++) {
+-		CON_ROW(_h) = mysql_fetch_row(CON_RESULT(_h));
+-		if (!CON_ROW(_h)) {
++		RES_ROW(*_r) = mysql_fetch_row(RES_RESULT(*_r));
++		if (!RES_ROW(*_r)) {
+ 			LM_ERR("driver error: %s\n", mysql_error(CON_CONNECTION(_h)));
+ 			RES_ROW_N(*_r) = i;
+ 			db_free_rows(*_r);
+--- a/modules/db_mysql/km_dbase.h
++++ b/modules/db_mysql/km_dbase.h
+@@ -57,7 +57,7 @@
+ /*! \brief
+  * Free all memory allocated by get_result
+  */
+-int db_mysql_free_result(db1_con_t* _h, db1_res_t* _r);
++int db_mysql_free_result(const db1_con_t* _h, db1_res_t* _r);
+ 
+ 
+ /*! \brief
+--- a/modules/db_mysql/km_my_con.c
++++ b/modules/db_mysql/km_my_con.c
+@@ -144,7 +144,6 @@
+ 
+ 	_c = (struct my_con*) con;
+ 
+-	if (_c->res) mysql_free_result(_c->res);
+ 	if (_c->id) free_db_id(_c->id);
+ 	if (_c->con) {
+ 		mysql_close(_c->con);
+--- a/modules/db_mysql/km_my_con.h
++++ b/modules/db_mysql/km_my_con.h
+@@ -44,9 +44,7 @@
+ 	unsigned int ref;        /*!< Reference count */
+ 	struct pool_con* next;   /*!< Next connection in the pool */
+ 
+-	MYSQL_RES* res;          /*!< Actual result */
+ 	MYSQL* con;              /*!< Connection representation */
+-	MYSQL_ROW row;           /*!< Actual row in the result */
+ 	time_t timestamp;        /*!< Timestamp of last query */
+ };
+ 
+@@ -54,9 +52,7 @@
+ /*
+  * Some convenience wrappers
+  */
+-#define CON_RESULT(db_con)     (((struct my_con*)((db_con)->tail))->res)
+ #define CON_CONNECTION(db_con) (((struct my_con*)((db_con)->tail))->con)
+-#define CON_ROW(db_con)        (((struct my_con*)((db_con)->tail))->row)
+ #define CON_TIMESTAMP(db_con)  (((struct my_con*)((db_con)->tail))->timestamp)
+ 
+ 
+--- a/modules/db_mysql/km_res.c
++++ b/modules/db_mysql/km_res.c
+@@ -73,7 +73,7 @@
+ 		return -3;
+ 	}
+ 
+-	fields = mysql_fetch_fields(CON_RESULT(_h));
++	fields = mysql_fetch_fields(RES_RESULT(_r));
+ 	for(col = 0; col < RES_COL_N(_r); col++) {
+ 		RES_NAMES(_r)[col] = (str*)pkg_malloc(sizeof(str));
+ 		if (! RES_NAMES(_r)[col]) {
+@@ -164,7 +164,7 @@
+ 		return -1;
+ 	}
+ 
+-	RES_ROW_N(_r) = mysql_num_rows(CON_RESULT(_h));
++	RES_ROW_N(_r) = mysql_num_rows(RES_RESULT(_r));
+ 	if (!RES_ROW_N(_r)) {
+ 		LM_DBG("no rows returned from the query\n");
+ 		RES_ROWS(_r) = 0;
+@@ -177,8 +177,8 @@
+ 	}
+ 
+ 	for(row = 0; row < RES_ROW_N(_r); row++) {
+-		CON_ROW(_h) = mysql_fetch_row(CON_RESULT(_h));
+-		if (!CON_ROW(_h)) {
++		RES_ROW(_r) = mysql_fetch_row(RES_RESULT(_r));
++		if (!RES_ROW(_r)) {
+ 			LM_ERR("driver error: %s\n", mysql_error(CON_CONNECTION(_h)));
+ 			RES_ROW_N(_r) = row;
+ 			db_free_rows(_r);
+@@ -221,3 +221,22 @@
+ 	return 0;
+ }
+ 
++
++/*!
++ * \brief Allocate new result set with private structure
++ * \return db1_res_t object on success, NULL on failure
++ */
++db1_res_t* db_mysql_new_result(void)
++{
++	db1_res_t* obj;
++
++	obj = db_new_result();
++	if (!obj)
++		return NULL;
++	RES_PTR(obj) = pkg_malloc(sizeof(struct my_res));
++	if (!RES_PTR(obj)) {
++		db_free_result(obj);
++		return NULL;
++	}
++	return obj;
++}
+--- a/modules/db_mysql/km_res.h
++++ b/modules/db_mysql/km_res.h
+@@ -37,6 +37,18 @@
+ #include "../../lib/srdb1/db_con.h"
+ 
+ 
++struct my_res {
++	MYSQL_RES* res;          /*!< Actual result */
++	MYSQL_ROW row;           /*!< Actual row in the result */
++};
++
++/*
++ * Some convenience wrappers
++ */
++#define RES_RESULT(db_res)     (((struct my_res*)((db_res)->ptr))->res)
++#define RES_ROW(db_res)        (((struct my_res*)((db_res)->ptr))->row)
++
++
+ /*!
+  * \brief Fill the result structure with data from database
+  * \param _h database connection
+@@ -54,4 +66,11 @@
+  */
+ int db_mysql_get_columns(const db1_con_t* _h, db1_res_t* _r);
+ 
++
++/*!
++ * \brief Allocate new result set with private structure
++ * \return db1_res_t object on success, NULL on failure
++ */
++db1_res_t* db_mysql_new_result(void);
++
+ #endif
+--- a/modules/db_mysql/km_row.c
++++ b/modules/db_mysql/km_row.c
+@@ -36,6 +36,7 @@
+ #include "km_my_con.h"
+ #include "km_val.h"
+ #include "km_row.h"
++#include "km_res.h"
+ 
+ /*!
+  * \brief Convert a row from result into DB API representation
+@@ -59,11 +60,11 @@
+ 		return -2;
+ 	}
+ 	
+-	lengths = mysql_fetch_lengths(CON_RESULT(_h));
++	lengths = mysql_fetch_lengths(RES_RESULT(_res));
+ 
+ 	for(i = 0; i < RES_COL_N(_res); i++) {
+ 		if (db_str2val(RES_TYPES(_res)[i], &(ROW_VALUES(_r)[i]),
+-			    ((MYSQL_ROW)CON_ROW(_h))[i], lengths[i], 0) < 0) {
++			    ((MYSQL_ROW)RES_ROW(_res))[i], lengths[i], 0) < 0) {
+ 			LM_ERR("failed to convert value\n");
+ 			LM_DBG("free row at %p\n", _r);
+ 			db_free_row(_r);

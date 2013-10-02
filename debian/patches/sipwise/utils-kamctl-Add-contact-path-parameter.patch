@@ -9,11 +9,9 @@ Subject: [PATCH 2/2] utils/kamctl: Add contact path parameter
  utils/kamctl/kamctl.ctlbase |   11 ++++++-----
  3 files changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
-index 9e6b0ba..01c99c9 100755
 --- a/utils/kamctl/kamctl
 +++ b/utils/kamctl/kamctl
-@@ -2281,10 +2281,17 @@ usrloc() {
+@@ -2201,10 +2201,17 @@
  				UL_EXPIRES=0
  				UL_FLAGS=0
  				BR_FLAGS=0
@@ -31,7 +29,7 @@ index 9e6b0ba..01c99c9 100755
  			else
  				usage_usrloc
  				exit 1
-@@ -2317,7 +2324,7 @@ usrloc() {
+@@ -2237,7 +2244,7 @@
  			fi
  
  			$CTLCMD ul_add "$USRLOC_TABLE" "$OSERUSER@$OSERDOMAIN" "$2" \
@@ -40,11 +38,9 @@ index 9e6b0ba..01c99c9 100755
  			exit $?
  			;;
  		rm)
-diff --git a/utils/kamctl/kamctl.8 b/utils/kamctl/kamctl.8
-index 61fc55f..83db5d7 100644
 --- a/utils/kamctl/kamctl.8
 +++ b/utils/kamctl/kamctl.8
-@@ -169,6 +169,9 @@ Introduce a permanent usrloc entry
+@@ -169,6 +169,9 @@
  .TP
  .B ul add <username> <uri> <expires>
  Introduce a temporary usrloc entry
@@ -54,11 +50,9 @@ index 61fc55f..83db5d7 100644
  
  .TP 16
  .I Fifo commands:
-diff --git a/utils/kamctl/kamctl.ctlbase b/utils/kamctl/kamctl.ctlbase
-index a5ddf72..a605b10 100644
 --- a/utils/kamctl/kamctl.ctlbase
 +++ b/utils/kamctl/kamctl.ctlbase
-@@ -67,11 +67,12 @@ usage_usrloc() {
+@@ -67,11 +67,12 @@
  	mecho " -- command 'ul|alias' - manage user location or aliases"
  	echo
  cat <<EOF
@@ -76,6 +70,3 @@ index a5ddf72..a605b10 100644
  EOF
  }
  USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_usrloc"
--- 
-1.7.10.4
-

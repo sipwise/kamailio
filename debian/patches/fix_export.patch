@@ -3,7 +3,7 @@ Author: Tzafrir Cohen <tzafrir@debian.org>
 
 --- a/Makefile
 +++ b/Makefile
-@@ -200,6 +200,8 @@
+@@ -403,6 +403,8 @@
  main_makefile=1
  include Makefile.defs
  

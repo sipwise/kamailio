@@ -1,35 +1,15 @@
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -95,6 +95,9 @@
- # - modules depending on unistring library
- mod_list_websocket=websocket
+--- a/Makefile
++++ b/Makefile
+@@ -214,7 +214,8 @@
+ 				iptrtpproxy lcr mediaproxy mi_rpc pdb sanity tm topoh \
+ 				blst prefix_route counters debugger matrix mqueue mtree \
+ 				pipelimit rtpproxy textopsx xhttp xhttp_rpc ipops p_usrloc \
+-				sdpops async sipcapture dmq msrp tmrec db_cluster corex
++				sdpops async sipcapture dmq msrp tmrec db_cluster corex \
++				lcr_rate
  
-+# - modules depending on swrate library
-+mod_list_lcrrate=lcr_rate
-+
- # - modules related to SIMPLE presence extensions
- mod_list_presence=presence presence_conference presence_dialoginfo \
- 					   presence_mwi presence_profile presence_reginfo \
-@@ -161,7 +164,9 @@
- 			   $(mod_list_mono) $(mod_list_ims) \
- 			   $(mod_list_cassandra) $(mod_list_oracle) \
- 			   $(mod_list_iptrtpproxy) $(mod_list_mi_xmlrpc) \
--			   $(mod_list_outbound) $(mod_list_osp) )
-+			   $(mod_list_outbound) $(mod_list_osp) ) \
-+			   $(mod_list_lcrrate)
-+
- 
- 
- 
-@@ -307,6 +312,8 @@
- # pkg outbound module
- module_group_koutbound=$(mod_list_outbound)
- 
-+# pkg lcrrate module
-+module_group_klcrrate=$(mod_list_lcrrate)
- 
- # list of static modules
- #
+ # K mysql module
+ module_group_kmysql=db_mysql
 --- /dev/null
 +++ b/modules/lcr_rate/Makefile
 @@ -0,0 +1,9 @@

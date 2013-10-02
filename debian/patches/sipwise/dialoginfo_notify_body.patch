@@ -1,8 +1,6 @@
-diff --git a/modules/presence_dialoginfo/notify_body.c b/modules/presence_dialoginfo/notify_body.c
-index 6a63d3e..4f49998 100644
---- a/modules/presence_dialoginfo/notify_body.c
-+++ b/modules/presence_dialoginfo/notify_body.c
-@@ -66,8 +66,10 @@ str* dlginfo_agg_nbody(str* pres_user, str* pres_domain, str** body_array, int n
+--- a/modules_k/presence_dialoginfo/notify_body.c
++++ b/modules_k/presence_dialoginfo/notify_body.c
+@@ -66,8 +66,10 @@
  	LM_DBG("[pres_user]=%.*s [pres_domain]= %.*s, [n]=%d\n",
  			pres_user->len, pres_user->s, pres_domain->len, pres_domain->s, n);
  
@@ -15,7 +13,7 @@ index 6a63d3e..4f49998 100644
  
  	n_body= agregate_xmls(pres_user, pres_domain, body_array, n);
  	LM_DBG("[n_body]=%p\n", n_body);
-@@ -106,13 +108,17 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
+@@ -106,13 +108,17 @@
  	LM_DBG("[pres_user]=%.*s [pres_domain]= %.*s, [n]=%d\n",
  			pres_user->len, pres_user->s, pres_domain->len, pres_domain->s, n);
  
@@ -38,7 +36,7 @@ index 6a63d3e..4f49998 100644
  
  	/* parse all the XML documents */
  	for(i=0; i<n; i++)
-@@ -133,14 +139,14 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
+@@ -133,14 +139,14 @@
  		j++;
  
  	} 

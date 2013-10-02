@@ -1,0 +1,1886 @@
+diff --git Makefile Makefile
+index 66b64be..f610af7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -214,7 +214,7 @@ module_group_kstandard=acc alias_db auth auth_db benchmark call_control \
+ 				iptrtpproxy lcr mediaproxy mi_rpc pdb sanity tm topoh \
+ 				blst prefix_route counters debugger matrix mqueue mtree \
+ 				pipelimit rtpproxy textopsx xhttp xhttp_rpc ipops p_usrloc \
+-				sdpops async sipcapture dmq msrp tmrec db_cluster
++				sdpops async sipcapture dmq msrp tmrec db_cluster corex
+ 
+ # K mysql module
+ module_group_kmysql=db_mysql
+diff --git action.c action.c
+index 5263f02..b21e122 100644
+--- a/action.c
++++ b/action.c
+@@ -483,80 +483,6 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
+ 				goto error;
+ 			}
+ 			break;
+-		case SEND_T:
+-		case SEND_TCP_T:
+-			if (a->val[0].type==URIHOST_ST){
+-				/*get next hop uri uri*/
+-				if (msg->dst_uri.len) {
+-					ret = parse_uri(msg->dst_uri.s, msg->dst_uri.len,
+-									&next_hop);
+-					u = &next_hop;
+-				} else {
+-					ret = parse_sip_msg_uri(msg);
+-					u = &msg->parsed_uri;
+-				}
+-
+-				if (ret<0) {
+-					LM_ERR("send() - bad_uri dropping packet\n");
+-					ret=E_BUG;
+-					goto error;
+-				}
+-				/* init dst */
+-				init_dest_info(&dst);
+-				ret = sip_hostport2su(&dst.to, &u->host, u->port_no,
+-							&dst.proto);
+-				if(ret!=0) {
+-					LM_ERR("failed to resolve [%.*s]\n", u->host.len,
+-						ZSW(u->host.s));
+-					ret=E_BUG;
+-					goto error;
+-				}
+-			} else {
+-				if ((a->val[0].type!= PROXY_ST)|(a->val[1].type!=NUMBER_ST)){
+-					LOG(L_CRIT, "BUG: do_action: bad send() types %d, %d\n",
+-							a->val[0].type, a->val[1].type);
+-					ret=E_BUG;
+-					goto error;
+-				}
+-				/* init dst */
+-				init_dest_info(&dst);
+-				ret=proxy2su(&dst.to,  (struct proxy_l*)a->val[0].u.data);
+-				if(ret==0)
+-					proxy_mark((struct proxy_l*)a->val[0].u.data, ret);
+-			}
+-			if (ret==0){
+-				if (p_onsend){
+-					tmp=p_onsend->buf;
+-					len=p_onsend->len;
+-				}else{
+-					tmp=msg->buf;
+-					len=msg->len;
+-				}
+-				if (a->type==SEND_T){
+-					/*udp*/
+-					dst.proto=PROTO_UDP; /* not really needed for udp_send */
+-					dst.send_sock=get_send_socket(msg, &dst.to, PROTO_UDP);
+-					if (dst.send_sock!=0){
+-						ret=udp_send(&dst, tmp, len);
+-					}else{
+-						ret=-1;
+-					}
+-				}
+-#ifdef USE_TCP
+-					else{
+-						/*tcp*/
+-						dst.proto=PROTO_TCP;
+-						dst.id=0;
+-						ret=tcp_send(&dst, 0, tmp, len);
+-				}
+-#endif
+-			}else{
+-				ret=E_BUG;
+-				goto error;
+-			}
+-			if (ret>=0) ret=1;
+-
+-			break;
+ 		case LOG_T:
+ 			if ((a->val[0].type!=NUMBER_ST)|(a->val[1].type!=STRING_ST)){
+ 				LOG(L_CRIT, "BUG: do_action: bad log() types %d, %d\n",
+diff --git cfg.lex cfg.lex
+index a626c8c..5042ca3 100644
+--- a/cfg.lex
++++ b/cfg.lex
+@@ -195,8 +195,6 @@ DROP	"drop"
+ EXIT	"exit"
+ RETURN	"return"
+ BREAK	"break"
+-SEND	send
+-SEND_TCP	send_tcp
+ LOG		log
+ ERROR	error
+ ROUTE	route
+@@ -236,7 +234,6 @@ PREFIX			"prefix"
+ STRIP			"strip"
+ STRIP_TAIL		"strip_tail"
+ SET_USERPHONE		"userphone"
+-APPEND_BRANCH	"append_branch"
+ REMOVE_BRANCH	"remove_branch"
+ CLEAR_BRANCHES	"clear_branches"
+ IF				"if"
+@@ -604,8 +601,6 @@ IMPORTFILE      "import_file"
+ <INITIAL>{EXIT}	{ count(); yylval.strval=yytext; return EXIT; }
+ <INITIAL>{RETURN}	{ count(); yylval.strval=yytext; return RETURN; }
+ <INITIAL>{BREAK}	{ count(); yylval.strval=yytext; return BREAK; }
+-<INITIAL>{SEND}	{ count(); yylval.strval=yytext; return SEND; }
+-<INITIAL>{SEND_TCP}	{ count(); yylval.strval=yytext; return SEND_TCP; }
+ <INITIAL>{LOG}	{ count(); yylval.strval=yytext; return LOG_TOK; }
+ <INITIAL>{ERROR}	{ count(); yylval.strval=yytext; return ERROR; }
+ <INITIAL>{SETFLAG}	{ count(); yylval.strval=yytext; return SETFLAG; }
+@@ -639,8 +634,6 @@ IMPORTFILE      "import_file"
+ <INITIAL>{PREFIX}	{ count(); yylval.strval=yytext; return PREFIX; }
+ <INITIAL>{STRIP}	{ count(); yylval.strval=yytext; return STRIP; }
+ <INITIAL>{STRIP_TAIL}	{ count(); yylval.strval=yytext; return STRIP_TAIL; }
+-<INITIAL>{APPEND_BRANCH}	{ count(); yylval.strval=yytext;
+-								return APPEND_BRANCH; }
+ <INITIAL>{REMOVE_BRANCH}	{ count(); yylval.strval=yytext;
+ 								return REMOVE_BRANCH; }
+ <INITIAL>{CLEAR_BRANCHES}	{ count(); yylval.strval=yytext;
+diff --git cfg.y cfg.y
+index cdd03fc..703f89c 100644
+--- a/cfg.y
++++ b/cfg.y
+@@ -305,8 +305,6 @@ extern char *finame;
+ %token FORWARD_TLS
+ %token FORWARD_SCTP
+ %token FORWARD_UDP
+-%token SEND
+-%token SEND_TCP
+ %token EXIT
+ %token DROP
+ %token RETURN
+@@ -2396,8 +2394,6 @@ fcmd:
+ 		if ($1 && rt==ONSEND_ROUTE) {
+ 			switch($1->type) {
+ 				case DROP_T:
+-				case SEND_T:
+-				case SEND_TCP_T:
+ 				case LOG_T:
+ 				case SETFLAG_T:
+ 				case RESETFLAG_T:
+@@ -3157,24 +3153,6 @@ cmd:
+ 	| FORWARD_SCTP error { $$=0; yyerror("missing '(' or ')' ?"); }
+ 	| FORWARD_SCTP LPAREN error RPAREN { $$=0; 
+ 									yyerror("bad forward_tls argument"); }
+-	| SEND LPAREN RPAREN { $$=mk_action(SEND_T, 2, URIHOST_ST, 0, URIPORT_ST, 0); set_cfg_pos($$); }
+-	| SEND LPAREN host RPAREN	{ $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
+-	| SEND LPAREN STRING RPAREN { $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
+-	| SEND LPAREN ip RPAREN		{ $$=mk_action(SEND_T, 2, IP_ST, (void*)$3, NUMBER_ST, 0); set_cfg_pos($$); }
+-	| SEND LPAREN host COMMA NUMBER RPAREN	{ $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
+-	| SEND LPAREN STRING COMMA NUMBER RPAREN {$$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
+-	| SEND LPAREN ip COMMA NUMBER RPAREN { $$=mk_action(SEND_T, 2, IP_ST, (void*)$3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
+-	| SEND error { $$=0; yyerror("missing '(' or ')' ?"); }
+-	| SEND LPAREN error RPAREN { $$=0; yyerror("bad send argument"); }
+-	| SEND_TCP LPAREN RPAREN { $$=mk_action(SEND_TCP_T, 2, URIHOST_ST, 0, URIPORT_ST, 0); set_cfg_pos($$); }
+-	| SEND_TCP LPAREN host RPAREN	{ $$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
+-	| SEND_TCP LPAREN STRING RPAREN { $$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
+-	| SEND_TCP LPAREN ip RPAREN	{ $$=mk_action(SEND_TCP_T, 2, IP_ST, (void*)$3, NUMBER_ST, 0); set_cfg_pos($$); }
+-	| SEND_TCP LPAREN host COMMA NUMBER RPAREN	{ $$=mk_action(	SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$);}
+-	| SEND_TCP LPAREN STRING COMMA NUMBER RPAREN {$$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
+-	| SEND_TCP LPAREN ip COMMA NUMBER RPAREN { $$=mk_action(SEND_TCP_T, 2, IP_ST, (void*)$3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
+-	| SEND_TCP error { $$=0; yyerror("missing '(' or ')' ?"); }
+-	| SEND_TCP LPAREN error RPAREN { $$=0; yyerror("bad send_tcp argument"); }
+ 	| LOG_TOK LPAREN STRING RPAREN	{$$=mk_action(LOG_T, 2, NUMBER_ST,
+ 										(void*)(L_DBG+1), STRING_ST, $3);
+ 									set_cfg_pos($$); }
+@@ -3278,29 +3256,6 @@ cmd:
+ 	| STRIP LPAREN error RPAREN { $$=0; yyerror("bad argument, number expected"); }
+ 	| SET_USERPHONE LPAREN RPAREN { $$=mk_action(SET_USERPHONE_T, 0); set_cfg_pos($$); }
+ 	| SET_USERPHONE error { $$=0; yyerror("missing '(' or ')' ?"); }
+-	| APPEND_BRANCH LPAREN STRING COMMA STRING RPAREN {
+-		qvalue_t q;
+-		if (str2q(&q, $5, strlen($5)) < 0) {
+-			yyerror("bad argument, q value expected");
+-		}
+-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, $3, NUMBER_ST, (void *)(long)q);
+-		set_cfg_pos($$);
+-	}
+-	| APPEND_BRANCH LPAREN STRING RPAREN {
+-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, $3,
+-							NUMBER_ST, (void *)Q_UNSPECIFIED);
+-		set_cfg_pos($$);
+-	}
+-	| APPEND_BRANCH LPAREN RPAREN {
+-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, 0,
+-							NUMBER_ST, (void *)Q_UNSPECIFIED);
+-		set_cfg_pos($$);
+-	}
+-	| APPEND_BRANCH {
+-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, 0,
+-							NUMBER_ST, (void *)Q_UNSPECIFIED);
+-		set_cfg_pos($$);
+-	}
+ 	| REMOVE_BRANCH LPAREN intno RPAREN {
+ 			$$=mk_action(REMOVE_BRANCH_T, 1, NUMBER_ST, (void*)$3);
+ 			set_cfg_pos($$);
+diff --git etc/kamailio.cfg etc/kamailio.cfg
+index 619f9ad..6c963e8 100644
+--- a/etc/kamailio.cfg
++++ b/etc/kamailio.cfg
+@@ -211,6 +211,7 @@ loadmodule "db_mysql.so"
+ 
+ loadmodule "mi_fifo.so"
+ loadmodule "kex.so"
++loadmodule "corex.so"
+ loadmodule "tm.so"
+ loadmodule "tmx.so"
+ loadmodule "sl.so"
+diff --git modules/corex/Makefile modules/corex/Makefile
+new file mode 100644
+index 0000000..5c8cb4e
+--- /dev/null
++++ b/modules/corex/Makefile
+@@ -0,0 +1,12 @@
++# $Id$
++#
++# WARNING: do not run this directly, it should be run by the master Makefile
++
++include ../../Makefile.defs
++auto_gen=
++NAME=corex.so
++LIBS=
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE
++
++include ../../Makefile.modules
+diff --git modules/corex/README modules/corex/README
+new file mode 100644
+index 0000000..402089a
+--- /dev/null
++++ b/modules/corex/README
+@@ -0,0 +1,192 @@
++COREX Module
++
++Daniel-Constantin Mierla
++
++   <miconda@gmail.com>
++
++Edited by
++
++Daniel-Constantin Mierla
++
++   <miconda@gmail.com>
++
++   Copyright © 2012 asipto.com
++     __________________________________________________________________
++
++   Table of Contents
++
++   1. Admin Guide
++
++        1. Overview
++        2. Dependencies
++
++              2.1. Kamailio Modules
++              2.2. External Libraries or Applications
++
++        3. Parameters
++
++              3.1. alias_subdomains (string)
++
++        4. Functions
++
++              4.1. append_branch([ uri, [ q ] ])
++              4.2. send([ host [ :port ] ])
++              4.3. send_tcp([ host [ :port ] ])
++
++        5. RPC Commands
++
++              5.1. corex.list_sockets
++              5.2. corex.list_aliases
++
++   List of Examples
++
++   1.1. Set alias_subdomains parameter
++   1.2. append_branch usage
++   1.3. send usage
++
++Chapter 1. Admin Guide
++
++   Table of Contents
++
++   1. Overview
++   2. Dependencies
++
++        2.1. Kamailio Modules
++        2.2. External Libraries or Applications
++
++   3. Parameters
++
++        3.1. alias_subdomains (string)
++
++   4. Functions
++
++        4.1. append_branch([ uri, [ q ] ])
++        4.2. send([ host [ :port ] ])
++        4.3. send_tcp([ host [ :port ] ])
++
++   5. RPC Commands
++
++        5.1. corex.list_sockets
++        5.2. corex.list_aliases
++
++1. Overview
++
++   This module provides reimplementation of very old functions that were
++   in core and supported only static string or integer parameters. The new
++   versions bring support for dynamic parameters (allowing variables
++   inside the parameters).
++
++   There are also brand new features, related to core internals, but
++   controlled from configuration file or via control interfaces.
++
++   Contributions to this module must be done under BSD license, to follow
++   the requirements of the core contributions.
++
++2. Dependencies
++
++   2.1. Kamailio Modules
++   2.2. External Libraries or Applications
++
++2.1. Kamailio Modules
++
++   The following modules must be loaded before this module:
++     * None.
++
++2.2. External Libraries or Applications
++
++   The following libraries or applications must be installed before
++   running Kamailio with this module loaded:
++     * None
++
++3. Parameters
++
++   3.1. alias_subdomains (string)
++
++3.1. alias_subdomains (string)
++
++   Register a domain and all its sub-domains to match the myself
++   condition. It can be set many times. Its full format is:
++   'proto:domain:port', allowing to set restrictions on protocol and port
++   as well. Protocol and port are optional.
++
++   Default value is “NULL”.
++
++   Example 1.1. Set alias_subdomains parameter
++...
++modparam("corex", "alias_subdomains", "kamailio.org")
++modparam("corex", "alias_subdomains", "udp:sip-router.org:5060")
++...
++
++4. Functions
++
++   4.1. append_branch([ uri, [ q ] ])
++   4.2. send([ host [ :port ] ])
++   4.3. send_tcp([ host [ :port ] ])
++
++4.1.  append_branch([ uri, [ q ] ])
++
++   Append a new branch to the destination set, useful to build the
++   addresses for parallel forking or redirect replies.
++
++   Both parameters are optional, If no uri parameter is provided, then the
++   address from request URI (r-uri) is taken to build the new branch.
++
++   Meaning of the parameters is as follows:
++     * uri - SIP address of the branch to be used as R-URI in the outgoing
++       request.
++     * q - the Q value to set the priority of the branch based on Contact
++       address specifications
++
++   This function can be used from REQUEST_ROUTE or FAILURE_ROUTE.
++
++   Example 1.2. append_branch usage
++...
++    append_branch();
++    append_branch("$avp(uri)", "0.5");
++...
++
++4.2.  send([ host [ :port ] ])
++
++   Send the original SIP message to a specific destination in stateless
++   mode. No changes are applied to received message, no Via header is
++   added. Host can be an IP address or hostname. Port is optional and
++   defaults to 5060. Used protocol: UDP.
++
++   The parameter is optional and defaults to the destination URI from the
++   SIP message if left out. Otherwise it's a string parameter (supporting
++   pseudo-variables) in format "hostname" or "hostname:port", where
++   hostname" can also be a numeric IP address.
++
++   This function can be used from REQUEST_ROUTE or FAILURE_ROUTE.
++
++   Example 1.3. send usage
++...
++        send();
++        send("10.20.15.10");
++        send("sip.example.com:5070");
++        send("$var(res)");
++...
++
++4.3.  send_tcp([ host [ :port ] ])
++
++   This function is identical to send() described above, except that it
++   sends the SIP message using the TCP protocol instead of UDP.
++
++5. RPC Commands
++
++   5.1. corex.list_sockets
++   5.2. corex.list_aliases
++
++5.1.  corex.list_sockets
++
++   Print the list of sockets the application is listening on.
++
++   Example:
++                sercmd corex.list_sockets
++
++5.2.  corex.list_aliases
++
++   Print the list of hostname aliases used to match myself condition.
++
++   Example:
++                sercmd corex.list_aliases
+diff --git modules/corex/corex_lib.c modules/corex/corex_lib.c
+new file mode 100644
+index 0000000..cfe49fd
+--- /dev/null
++++ b/modules/corex/corex_lib.c
+@@ -0,0 +1,300 @@
++/**
++ * $Id$
++ *
++ * Copyright (C) 2011 Daniel-Constantin Mierla (asipto.com)
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++
++#include <stdio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../../dprint.h"
++#include "../../dset.h"
++#include "../../forward.h"
++#include "../../parser/parse_uri.h"
++#include "../../resolve.h"
++
++#include "corex_lib.h"
++
++/**
++ * append new branches with generic parameters
++ */
++int corex_append_branch(sip_msg_t *msg, gparam_t *pu, gparam_t *pq)
++{
++	str uri = {0};
++	str qv = {0};
++	int ret = 0;
++
++	qvalue_t q = Q_UNSPECIFIED;
++	flag_t branch_flags = 0;
++
++	if (pu!=NULL)
++	{
++		if(fixup_get_svalue(msg, pu, &uri)!=0)
++		{
++			LM_ERR("cannot get the URI parameter\n");
++			return -1;
++		}
++	}
++
++	if (pq!=NULL)
++	{
++		if(fixup_get_svalue(msg, pq, &qv)!=0)
++		{
++			LM_ERR("cannot get the Q parameter\n");
++			return -1;
++		}
++		if(qv.len>0 && str2q(&q, qv.s, qv.len)<0)
++		{
++			LM_ERR("cannot parse the Q parameter\n");
++			return -1;
++		}
++	}
++
++
++	getbflagsval(0, &branch_flags);
++	ret = append_branch(msg, (uri.len>0)?&uri:0, &msg->dst_uri,
++			&msg->path_vec, q, branch_flags,
++			msg->force_send_socket);
++
++
++	if(uri.len<=0)
++	{
++		/* reset all branch attributes if r-uri was shifted to branch */
++		reset_force_socket(msg);
++		setbflagsval(0, 0);
++		if(msg->dst_uri.s!=0)
++			pkg_free(msg->dst_uri.s);
++		msg->dst_uri.s = 0;
++		msg->dst_uri.len = 0;
++		if(msg->path_vec.s!=0)
++			pkg_free(msg->path_vec.s);
++		msg->path_vec.s = 0;
++		msg->path_vec.len = 0;
++	}
++
++	return ret;
++}
++
++typedef struct corex_alias {
++	str alias;
++	unsigned short port;
++	unsigned short proto;
++	int flags;
++	struct corex_alias* next;
++} corex_alias_t;
++
++static corex_alias_t *_corex_alias_list = NULL;
++
++int corex_add_alias_subdomains(char* aliasval)
++{
++	char *p = NULL;
++	corex_alias_t ta;
++	corex_alias_t *na;
++
++	memset(&ta, 0, sizeof(corex_alias_t));
++
++	p = strchr(aliasval, ':');
++	if(p==NULL) {
++		/* only hostname */
++		ta.alias.s = aliasval;
++		ta.alias.len = strlen(aliasval);
++		goto done;
++	}
++	if((p-aliasval)==3 || (p-aliasval)==4) {
++		/* check if it is protocol */
++		if((p-aliasval)==3 && strncasecmp(aliasval, "udp", 3)==0) {
++			ta.proto = PROTO_UDP;
++		} else if((p-aliasval)==3 && strncasecmp(aliasval, "tcp", 3)==0) {
++			ta.proto = PROTO_TCP;
++		} else if((p-aliasval)==3 && strncasecmp(aliasval, "tls", 3)==0) {
++			ta.proto = PROTO_TLS;
++		} else if((p-aliasval)==4 && strncasecmp(aliasval, "sctp", 4)==0) {
++			ta.proto = PROTO_SCTP;
++		} else {
++			/* use hostname */
++			ta.alias.s = aliasval;
++			ta.alias.len = p - aliasval;
++		}
++	}
++	if(ta.alias.len==0) {
++		p++;
++		if(p>=aliasval+strlen(aliasval))
++			goto error;
++		ta.alias.s = p;
++		p = strchr(ta.alias.s, ':');
++		if(p==NULL) {
++			ta.alias.len = strlen(ta.alias.s);
++			goto done;
++		}
++	}
++	/* port */
++	p++;
++	if(p>=aliasval+strlen(aliasval))
++		goto error;
++	ta.port = str2s(p, strlen(p), NULL);
++
++done:
++	if(ta.alias.len==0)
++		goto error;
++
++	na = (corex_alias_t*)pkg_malloc(sizeof(corex_alias_t));
++	if(na==NULL) {
++		LM_ERR("no memory for adding alias subdomains: %s\n", aliasval);
++		return -1;
++	}
++	memcpy(na, &ta, sizeof(corex_alias_t));
++	na->next = _corex_alias_list;
++	_corex_alias_list = na;
++
++	return 0;
++
++error:
++	LM_ERR("error adding alias subdomains: %s\n", aliasval);
++	return -1;
++}
++
++
++int corex_check_self(str* host, unsigned short port, unsigned short proto)
++{
++	corex_alias_t *ta;
++
++	for(ta=_corex_alias_list; ta; ta=ta->next) {
++		if(host->len<ta->alias.len)
++			continue;
++		if(ta->port!=0 && port!=0 && ta->port!=port)
++			continue;
++		if(ta->proto!=0 && proto!=0 && ta->proto!=proto)
++			continue;
++		if(host->len==ta->alias.len
++				&& strncasecmp(host->s, ta->alias.s, host->len)==0) {
++			/* match domain */
++			LM_DBG("check self domain match: %d:%.*s:%d\n", (int)ta->port,
++					ta->alias.len, ta->alias.s, (int)ta->proto);
++			return 1;
++		}
++		if(strncasecmp(ta->alias.s, host->s + host->len - ta->alias.len,
++					ta->alias.len)==0) {
++			if(host->s[host->len - ta->alias.len - 1]=='.') {
++				/* match sub-domain */
++				LM_DBG("check self sub-domain match: %d:%.*s:%d\n", (int)ta->port,
++					ta->alias.len, ta->alias.s, (int)ta->proto);
++				return 1;
++			}
++		}
++	}
++
++	return 0; /* no match */
++}
++
++int corex_register_check_self(void)
++{
++	if(_corex_alias_list==NULL)
++		return 0;
++	if (register_check_self_func(corex_check_self) <0 ) {
++	    LM_ERR("failed to register check self function\n");
++	    return -1;
++	}
++	return 0;
++}
++
++int corex_send(sip_msg_t *msg, gparam_t *pu, enum sip_protos proto)
++{
++	str dest = {0};
++	int ret = 0;
++	struct sip_uri next_hop, *u;
++	struct dest_info dst;
++	char *p;
++
++	if (pu)
++	{
++		if (fixup_get_svalue(msg, pu, &dest))
++		{
++			LM_ERR("cannot get the destination parameter\n");
++			return -1;
++		}
++	}
++
++	init_dest_info(&dst);
++
++	if (dest.len <= 0)
++	{
++		/*get next hop uri uri*/
++		if (msg->dst_uri.len) {
++			ret = parse_uri(msg->dst_uri.s, msg->dst_uri.len,
++							&next_hop);
++			u = &next_hop;
++		} else {
++			ret = parse_sip_msg_uri(msg);
++			u = &msg->parsed_uri;
++		}
++
++		if (ret<0) {
++			LM_ERR("send() - bad_uri dropping packet\n");
++			ret=E_BUG;
++			goto error;
++		}
++	}
++	else
++	{
++		u = &next_hop;
++		u->port_no = 5060;
++		u->host = dest;
++		p = memchr(dest.s, ':', dest.len);
++		if (p)
++		{
++			u->host.len = p - dest.s;
++			p++;
++			u->port_no = str2s(p, dest.len - (p - dest.s), NULL);
++		}
++	}
++
++	ret = sip_hostport2su(&dst.to, &u->host, u->port_no,
++				&dst.proto);
++	if(ret!=0) {
++		LM_ERR("failed to resolve [%.*s]\n", u->host.len,
++			ZSW(u->host.s));
++		ret=E_BUG;
++		goto error;
++	}
++
++	dst.proto = proto;
++	if (proto == PROTO_UDP)
++	{
++		dst.send_sock=get_send_socket(msg, &dst.to, PROTO_UDP);
++		if (dst.send_sock!=0){
++			ret=udp_send(&dst, msg->buf, msg->len);
++		}else{
++			ret=-1;
++		}
++	}
++#ifdef USE_TCP
++	else{
++		/*tcp*/
++		dst.id=0;
++		ret=tcp_send(&dst, 0, msg->buf, msg->len);
++	}
++#endif
++
++	if (ret>=0) ret=1;
++
++
++error:
++	return ret;
++}
+diff --git modules/corex/corex_lib.h modules/corex/corex_lib.h
+new file mode 100644
+index 0000000..433e28a
+--- /dev/null
++++ b/modules/corex/corex_lib.h
+@@ -0,0 +1,34 @@
++/**
++ * $Id$
++ *
++ * Copyright (C) 2011 Daniel-Constantin Mierla (asipto.com)
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++
++#ifndef _COREX_LIB_H_
++#define _COREX_LIB_H_
++
++#include "../../mod_fix.h"
++
++int corex_append_branch(sip_msg_t *msg, gparam_t *pu, gparam_t *pq);
++int corex_send(sip_msg_t *msg, gparam_t *pu, enum sip_protos proto);
++
++int corex_add_alias_subdomains(char* aliasval);
++
++int corex_register_check_self(void);
++
++#endif
+diff --git modules/corex/corex_mod.c modules/corex/corex_mod.c
+new file mode 100644
+index 0000000..bddba03
+--- /dev/null
++++ b/modules/corex/corex_mod.c
+@@ -0,0 +1,163 @@
++/**
++ * $Id$
++ *
++ * Copyright (C) 2011 Daniel-Constantin Mierla (asipto.com)
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++
++#include <stdio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../../sr_module.h"
++#include "../../dprint.h"
++#include "../../ut.h"
++
++#include "corex_lib.h"
++#include "corex_rpc.h"
++
++MODULE_VERSION
++
++static int w_append_branch(sip_msg_t *msg, char *su, char *sq);
++static int w_send(sip_msg_t *msg, char *su, char *sq);
++static int w_send_tcp(sip_msg_t *msg, char *su, char *sq);
++
++int corex_alias_subdomains_param(modparam_t type, void *val);
++
++static int  mod_init(void);
++static int  child_init(int);
++static void mod_destroy(void);
++
++static cmd_export_t cmds[]={
++	{"append_branch", (cmd_function)w_append_branch, 0, 0,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"append_branch", (cmd_function)w_append_branch, 1, fixup_spve_null,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"append_branch", (cmd_function)w_append_branch, 2, fixup_spve_spve,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"send", (cmd_function)w_send, 0, 0,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"send", (cmd_function)w_send, 1, fixup_spve_spve,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"send_tcp", (cmd_function)w_send_tcp, 0, 0,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"send_tcp", (cmd_function)w_send_tcp, 1, fixup_spve_null,
++			0, REQUEST_ROUTE | FAILURE_ROUTE },
++
++
++	{0, 0, 0, 0, 0, 0}
++};
++
++static param_export_t params[]={
++	{"alias_subdomains",  STR_PARAM|USE_FUNC_PARAM,
++								(void*)corex_alias_subdomains_param},
++	{0, 0, 0}
++};
++
++struct module_exports exports = {
++	"corex",
++	DEFAULT_DLFLAGS, /* dlopen flags */
++	cmds,
++	params,
++	0,
++	0,              /* exported MI functions */
++	0,              /* exported pseudo-variables */
++	0,              /* extra processes */
++	mod_init,       /* module initialization function */
++	0,              /* response function */
++	mod_destroy,    /* destroy function */
++	child_init      /* per child init function */
++};
++
++
++
++/**
++ * init module function
++ */
++static int mod_init(void)
++{
++	if(corex_init_rpc()<0)
++	{
++		LM_ERR("failed to register RPC commands\n");
++		return -1;
++	}
++
++	if(corex_register_check_self()<0)
++	{
++		LM_ERR("failed to register check self callback\n");
++		return -1;
++	}
++
++	return 0;
++}
++
++/**
++ * @brief Initialize async module children
++ */
++static int child_init(int rank)
++{
++	if (rank!=PROC_MAIN)
++		return 0;
++
++	return 0;
++}
++/**
++ * destroy module function
++ */
++static void mod_destroy(void)
++{
++}
++
++/**
++ * config wrapper for append branch
++ */
++static int w_append_branch(sip_msg_t *msg, char *su, char *sq)
++{
++	if(corex_append_branch(msg, (gparam_t*)su, (gparam_t*)sq) < 0)
++		return -1;
++	return 1;
++}
++
++/**
++ * config wrapper for send() and send_tcp()
++ */
++static int w_send(sip_msg_t *msg, char *su, char *sq)
++{
++	if(corex_send(msg, (gparam_t*)su, PROTO_UDP) < 0)
++		return -1;
++	return 1;
++}
++static int w_send_tcp(sip_msg_t *msg, char *su, char *sq)
++{
++	if(corex_send(msg, (gparam_t*)su, PROTO_TCP) < 0)
++		return -1;
++	return 1;
++}
++
++
++int corex_alias_subdomains_param(modparam_t type, void *val)
++{
++	if(val==NULL)
++		goto error;
++
++	return corex_add_alias_subdomains((char*)val);
++error:
++	return -1;
++
++}
++
+diff --git modules/corex/corex_rpc.c modules/corex/corex_rpc.c
+new file mode 100644
+index 0000000..660b80b
+--- /dev/null
++++ b/modules/corex/corex_rpc.c
+@@ -0,0 +1,168 @@
++/**
++ * $Id$
++ *
++ * Copyright (C) 2011 Daniel-Constantin Mierla (asipto.com)
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++
++#include <stdio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../../dprint.h"
++#include "../../ut.h"
++#include "../../socket_info.h"
++#include "../../name_alias.h"
++#include "../../rpc.h"
++#include "../../rpc_lookup.h"
++
++
++static const char* corex_rpc_list_sockets_doc[2] = {
++	"List listening sockets",
++	0
++};
++
++
++/*
++ * RPC command to list the listening sockets
++ */
++static void corex_rpc_list_sockets(rpc_t* rpc, void* ctx)
++{
++	void* th;
++	void* ih;
++
++	struct socket_info *si;
++	struct socket_info** list;
++	struct addr_info* ai;
++	unsigned short proto;
++	
++	proto=PROTO_UDP;
++	do {
++		list=get_sock_info_list(proto);
++		for(si=list?*list:0; si; si=si->next)
++		{
++			/* add structure node */
++			if (rpc->add(ctx, "{", &th) < 0)
++			{
++				rpc->fault(ctx, 500, "Internal error socket structure");
++				return;
++			}
++
++			if(rpc->struct_add(th, "ss{",
++				"PROTO", 	get_valid_proto_name(proto),
++				"NAME", 	si->name.s,
++				"ADDRLIST",  &ih)<0)
++			{
++				rpc->fault(ctx, 500, "Internal error address list structure");
++				return;
++			}
++
++			if(rpc->struct_add(ih, "s", "ADDR", si->address_str.s)<0)
++			{
++				rpc->fault(ctx, 500, "Internal error address structure");
++				return;
++			}
++	
++			if (si->addr_info_lst)
++			{
++
++				for (ai=si->addr_info_lst; ai; ai=ai->next)
++				{
++					if(rpc->struct_add(ih, "s", "ADDR", ai->address_str.s)<0)
++					{
++						rpc->fault(ctx, 500,
++								"Internal error extra address structure");
++						return;
++					}
++
++				}
++			}
++
++			if(rpc->struct_add(th, "ssss",
++					"PORT", si->port_no_str.s,
++					"MCAST", si->flags & SI_IS_MCAST ? "yes" : "no",
++					"MHOMED", si->flags & SI_IS_MHOMED? "yes" : "no",
++					"ADVERTISE", si->useinfo.name.s?si->useinfo.name.s:"-")<0)
++			{
++				rpc->fault(ctx, 500, "Internal error attrs structure");
++				return;
++			}
++		}
++	} while((proto=next_proto(proto)));
++
++	return;
++}
++
++
++static const char* corex_rpc_list_aliases_doc[2] = {
++	"List socket aliases",
++	0
++};
++
++
++/*
++ * RPC command to list the socket aliases
++ */
++static void corex_rpc_list_aliases(rpc_t* rpc, void* ctx)
++{
++	void* th;
++
++	struct host_alias* a;
++
++	for(a=aliases; a; a=a->next) 
++	{
++		/* add structure node */
++		if (rpc->add(ctx, "{", &th) < 0)
++		{
++			rpc->fault(ctx, 500, "Internal error alias structure");
++			return;
++		}
++		if(rpc->struct_add(th, "sSd",
++				"PROTO", get_valid_proto_name(a->proto),
++				"ADDR",  &a->alias,
++				"PORT",  a->port)<0)
++		{
++			rpc->fault(ctx, 500, "Internal error alias attributes");
++			return;
++		}
++	}
++
++	return;
++}
++
++
++rpc_export_t corex_rpc_cmds[] = {
++	{"corex.list_sockets", corex_rpc_list_sockets,
++		corex_rpc_list_sockets_doc, 0},
++	{"corex.list_aliases", corex_rpc_list_aliases,
++		corex_rpc_list_aliases_doc, 0},
++	{0, 0, 0, 0}
++};
++
++/**
++ * register RPC commands
++ */
++int corex_init_rpc(void)
++{
++	if (rpc_register_array(corex_rpc_cmds)!=0)
++	{
++		LM_ERR("failed to register RPC commands\n");
++		return -1;
++	}
++	return 0;
++}
+diff --git modules/corex/corex_rpc.h modules/corex/corex_rpc.h
+new file mode 100644
+index 0000000..c5006d4
+--- /dev/null
++++ b/modules/corex/corex_rpc.h
+@@ -0,0 +1,27 @@
++/**
++ * $Id$
++ *
++ * Copyright (C) 2011 Daniel-Constantin Mierla (asipto.com)
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++
++#ifndef _COREX_RPC_H_
++#define _COREX_RPC_H_
++
++int corex_init_rpc(void);
++
++#endif
+diff --git modules/corex/doc/Makefile modules/corex/doc/Makefile
+new file mode 100644
+index 0000000..ffc7e29
+--- /dev/null
++++ b/modules/corex/doc/Makefile
+@@ -0,0 +1,4 @@
++docs = corex.xml
++
++docbook_dir = ../../../docbook
++include $(docbook_dir)/Makefile.module
+diff --git modules/corex/doc/corex.xml modules/corex/doc/corex.xml
+new file mode 100644
+index 0000000..1b36a59
+--- /dev/null
++++ b/modules/corex/doc/corex.xml
+@@ -0,0 +1,37 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++%docentities;
++
++]>
++
++<book xmlns:xi="http://www.w3.org/2001/XInclude">
++    <bookinfo>
++	<title>COREX Module</title>
++	<productname class="trade">kamailio.org</productname>
++	<authorgroup>
++	    <author>
++		<firstname>Daniel-Constantin</firstname>
++		<surname>Mierla</surname>
++		<email>miconda@gmail.com</email>
++	    </author>
++	    <editor>
++		<firstname>Daniel-Constantin</firstname>
++		<surname>Mierla</surname>
++		<email>miconda@gmail.com</email>
++	    </editor>
++	</authorgroup>
++	<copyright>
++	    <year>2012</year>
++	    <holder>asipto.com</holder>
++	</copyright>
++    </bookinfo>
++    <toc></toc>
++    
++    <xi:include href="corex_admin.xml"/>
++    
++    
++</book>
+diff --git modules/corex/doc/corex_admin.xml modules/corex/doc/corex_admin.xml
+new file mode 100644
+index 0000000..5dd72e7
+--- /dev/null
++++ b/modules/corex/doc/corex_admin.xml
+@@ -0,0 +1,216 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++%docentities;
++
++]>
++<!-- Module User's Guide -->
++
++<chapter>
++	
++	<title>&adminguide;</title>
++	
++	<section>
++	<title>Overview</title>
++	<para>
++		This module provides reimplementation of very old functions that
++		were in core and supported only static string or integer parameters.
++		The new versions bring support for dynamic parameters (allowing
++		variables inside the parameters).
++	</para>
++	<para>
++		There are also brand new features, related to core internals, but
++		controlled from configuration file or via control interfaces.
++	</para>
++	<para>
++		Contributions to this module must be done under BSD license, to
++		follow the requirements of the core contributions.
++	</para>
++	</section>
++
++	<section>
++	<title>Dependencies</title>
++	<section>
++		<title>&kamailio; Modules</title>
++		<para>
++		The following modules must be loaded before this module:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>None</emphasis>.
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	</section>
++	<section>
++		<title>External Libraries or Applications</title>
++		<para>
++		The following libraries or applications must be installed before running
++		&kamailio; with this module loaded:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>None</emphasis>
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	</section>
++	</section>
++
++    <section>
++	<title>Parameters</title>
++	<section>
++	    <title><varname>alias_subdomains</varname> (string)</title>
++	    <para>
++		Register a domain and all its sub-domains to match the myself
++		condition. It can be set many times. Its full format is:
++		'proto:domain:port', allowing to set restrictions on protocol
++		and port as well. Protocol and port are optional.
++	    </para>
++	    <para>
++		<emphasis>
++		    Default value is <quote>NULL</quote>.
++		</emphasis>
++	    </para>
++	    <example>
++		<title>Set <varname>alias_subdomains</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("corex", "alias_subdomains", "kamailio.org")
++modparam("corex", "alias_subdomains", "udp:sip-router.org:5060")
++...
++</programlisting>
++	    </example>
++	</section>
++	</section>
++
++	<section>
++	<title>Functions</title>
++	<section>
++	    <title>
++		<function moreinfo="none">append_branch([ uri, [ q ] ])</function>
++	    </title>
++	    <para>
++			Append a new branch to the destination set, useful to build the
++			addresses for parallel forking or redirect replies.
++		</para>
++		<para>
++			Both parameters are optional, If no uri parameter is provided,
++			then the address from request URI (r-uri) is taken to build the
++			new branch.
++		</para>
++		<para>Meaning of the parameters is as follows:</para>
++		<itemizedlist>
++		<listitem>
++			<para>
++				<emphasis>uri</emphasis> - SIP address of the branch to be
++				used as R-URI in the outgoing request.
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++				<emphasis>q</emphasis> - the Q value to set the priority
++				of the branch based on Contact address specifications
++			</para>
++		</listitem>
++		</itemizedlist>
++		<para>
++		This function can be used from REQUEST_ROUTE or FAILURE_ROUTE.
++		</para>
++		<example>
++		<title><function>append_branch</function> usage</title>
++		<programlisting format="linespecific">
++...
++    append_branch();
++    append_branch("$avp(uri)", "0.5");
++...
++</programlisting>
++	    </example>
++	</section>
++
++	<section>
++		<title>
++			<function moreinfo="none">send([ host [ :port ] ])</function>
++		</title>
++		<para>
++			Send the original SIP message to a specific destination in stateless
++			mode. No changes are applied to received message, no Via header is
++			added. Host can be an IP address or hostname. Port is optional and
++			defaults to 5060. Used protocol: UDP.
++		</para>
++		<para>
++			The parameter is optional and defaults to the destination URI from
++			the SIP message if left out. Otherwise it's a string parameter
++			(supporting pseudo-variables) in format
++			"<emphasis>hostname</emphasis>" or
++			"<emphasis>hostname</emphasis>:<emphasis>port</emphasis>",
++			where <emphasis>hostname</emphasis>" can also be a numeric IP
++			address.
++		</para>
++		<para>
++			This function can be used from REQUEST_ROUTE or FAILURE_ROUTE.
++		</para>
++		<example>
++		<title><function>send</function> usage</title>
++		<programlisting format="linespecific">
++...
++	send();
++	send("10.20.15.10");
++	send("sip.example.com:5070");
++	send("$var(res)");
++...
++</programlisting>
++		</example>
++	</section>
++
++	<section>
++		<title>
++			<function moreinfo="none">send_tcp([ host [ :port ] ])</function>
++		</title>
++		<para>
++			This function is identical to <emphasis>send()</emphasis>
++			described above, except that it sends the SIP message using the
++			TCP protocol instead of UDP.
++		</para>
++	</section>
++	</section>
++
++	<section>
++	<title>RPC Commands</title>
++	<section>
++		<title>
++		<function moreinfo="none">corex.list_sockets</function>
++		</title>
++		<para>
++			Print the list of sockets the application is listening on.
++		</para>
++		<para>
++		Example:
++		</para>
++        <programlisting  format="linespecific">
++		sercmd corex.list_sockets
++		</programlisting>
++    </section>
++	<section>
++		<title>
++		<function moreinfo="none">corex.list_aliases</function>
++		</title>
++		<para>
++			Print the list of hostname aliases used to match myself
++			condition.
++		</para>
++		<para>
++		Example:
++		</para>
++        <programlisting  format="linespecific">
++		sercmd corex.list_aliases
++		</programlisting>
++    </section>
++    </section>
++</chapter>
++
+diff --git modules/debugger/debugger_act.c modules/debugger/debugger_act.c
+index e9372fa..e825054 100644
+--- a/modules/debugger/debugger_act.c
++++ b/modules/debugger/debugger_act.c
+@@ -46,7 +46,6 @@ static str _dbg_action_special[] = {
+ 
+ static dbg_action_t _dbg_action_list[] = {
+ 	{ FORWARD_T, str_init("forward") },
+-	{ SEND_T, str_init("send") },
+ 	{ LOG_T, str_init("log") },
+ 	{ ERROR_T, str_init("error") },
+ 	{ ROUTE_T, str_init("route") },
+@@ -82,7 +81,6 @@ static dbg_action_t _dbg_action_list[] = {
+ 	{ FORWARD_UDP_T, str_init("forward_udp") },
+ 	{ FORWARD_TLS_T, str_init("forward_tls") },
+ 	{ FORWARD_SCTP_T, str_init("forward_sctp") },
+-	{ SEND_TCP_T, str_init("send_tcp") },
+ 	{ FORCE_RPORT_T, str_init("force_rport") },
+ 	{ ADD_LOCAL_RPORT_T, str_init("add_local_rport") },
+ 	{ SET_ADV_ADDR_T, str_init("set_adv_addr") },
+diff --git modules_k/kex/README modules_k/kex/README
+index 04e2675..d7b35ee 100644
+--- a/modules_k/kex/README
++++ b/modules_k/kex/README
+@@ -11,7 +11,7 @@ Daniel-Constantin Mierla
+ 
+    <miconda@gmail.com>
+ 
+-   Copyright © 2009 Daniel-Constantin Mierla
++   Copyright � 2009 Daniel-Constantin Mierla
+      __________________________________________________________________
+ 
+    Table of Contents
+@@ -65,14 +65,13 @@ Daniel-Constantin Mierla
+    1.4. setbflag usage
+    1.5. setbflag usage
+    1.6. resetsflag usage
+-   1.7. km_append_branch usage
+-   1.8. >setdsturi usage
+-   1.9. >resetdsturi usage
+-   1.10. >isdsturiset usage
+-   1.11. >pv_printf usage
+-   1.12. >is_myself usage
+-   1.13. setdebug usage
+-   1.14. >resetdebug usage
++   1.7. setdsturi usage
++   1.8. resetdsturi usage
++   1.9. isdsturiset usage
++   1.10. pv_printf usage
++   1.11. is_myself usage
++   1.12. setdebug usage
++   1.13. resetdebug usage
+ 
+ Chapter 1. Admin Guide
+ 
+@@ -269,21 +268,8 @@ resetbflag("1");
+ 
+ 3.7. km_append_branch([uri])
+ 
+-   Append a new branch to SIP request.
+-
+-   Meaning of the parameters is as follows:
+-     * uri - SIP URI of the new destination. If omitted then the R-URI is
+-       used. It can be static string or a string with pseudo-variables
+-       that will be evaluated at runtime.
+-
+-   This function can be used from REQUEST_ROUTE and FAILURE_ROUTE.
+-
+-   Example 1.7. km_append_branch usage
+-...
+-km_append_branch();
+-...
+-km_append_branch("sip:alice@sip-router.org");
+-...
++   It was replaced by append_branch() from corex module, starting with
++   version 3.4.0.
+ 
+ 3.8. setdsturi(uri)
+ 
+@@ -297,7 +283,7 @@ km_append_branch("sip:alice@sip-router.org");
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.8. >setdsturi usage
++   Example 1.7. setdsturi usage
+ ...
+ setdsturi("sip:10.0.0.10");
+ ...
+@@ -308,7 +294,7 @@ setdsturi("sip:10.0.0.10");
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.9. >resetdsturi usage
++   Example 1.8. resetdsturi usage
+ ...
+ resetdsturi();
+ ...
+@@ -319,7 +305,7 @@ resetdsturi();
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.10. >isdsturiset usage
++   Example 1.9. isdsturiset usage
+ ...
+ if(isdsturiset())
+ {
+@@ -340,7 +326,7 @@ if(isdsturiset())
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.11. >pv_printf usage
++   Example 1.10. pv_printf usage
+ ...
+ pv_printf("$ru", "sip:$rU@$fd");
+ pv_printf("$avp(x)", "From: $fU - To: $tU");
+@@ -358,7 +344,7 @@ pv_printf("$avp(x)", "From: $fU - To: $tU");
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.12. >is_myself usage
++   Example 1.11. is_myself usage
+ ...
+ if(is_myself("$fu")) {
+     ...
+@@ -375,7 +361,7 @@ if(is_myself("$fu")) {
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.13. setdebug usage
++   Example 1.12. setdebug usage
+ ...
+ setdebug("1");
+ ...
+@@ -390,7 +376,7 @@ setdebug("$var(level)");
+ 
+    This function can be used from ANY_ROUTE.
+ 
+-   Example 1.14. >resetdebug usage
++   Example 1.13. resetdebug usage
+ ...
+ resetdebug();
+ ...
+@@ -407,7 +393,7 @@ resetdebug();
+    4.8. reset_statistics
+    4.9. clear_statistics
+ 
+-4.1.  arg
++4.1. arg
+ 
+    Print command line arguments.
+ 
+@@ -419,7 +405,7 @@ resetdebug();
+                 :arg:_reply_fifo_file_
+                 _empty_line_
+ 
+-4.2.  kill
++4.2. kill
+ 
+    Kill the application.
+ 
+@@ -431,7 +417,7 @@ resetdebug();
+                 :kill:_reply_fifo_file_
+                 _empty_line_
+ 
+-4.3.  pwd
++4.3. pwd
+ 
+    Print working directory.
+ 
+@@ -443,7 +429,7 @@ resetdebug();
+                 :pwd:_reply_fifo_file_
+                 _empty_line_
+ 
+-4.4.  uptime
++4.4. uptime
+ 
+    Print uptime.
+ 
+@@ -455,7 +441,7 @@ resetdebug();
+                 :uptime:_reply_fifo_file_
+                 _empty_line_
+ 
+-4.5.  version
++4.5. version
+ 
+    Print version information.
+ 
+@@ -467,7 +453,7 @@ resetdebug();
+                 :version:_reply_fifo_file_
+                 _empty_line_
+ 
+-4.6.  which
++4.6. which
+ 
+    Print list of available MI commands.
+ 
+@@ -525,7 +511,7 @@ resetdebug();
+ 
+    5.1. pkg.stats
+ 
+-5.1.  pkg.stats
++5.1. pkg.stats
+ 
+    Print private memory (pkg) usage statistics per process. It can take
+    optinally a filter to print statistics only for a specific process or
+diff --git modules_k/kex/doc/kex_admin.xml modules_k/kex/doc/kex_admin.xml
+index f28e75a..8db736e 100644
+--- a/modules_k/kex/doc/kex_admin.xml
++++ b/modules_k/kex/doc/kex_admin.xml
+@@ -250,32 +250,9 @@ resetbflag("1");
+ 		<section>
+ 		<title><function moreinfo="none">km_append_branch([uri])</function></title>
+ 		<para>
+-			Append a new branch to SIP request.
++			It was replaced by append_branch() from corex module, starting with
++			version 3.4.0.
+ 		</para>
+-		<para>Meaning of the parameters is as follows:</para>
+-		<itemizedlist>
+-		<listitem>
+-			<para>
+-				<emphasis>uri</emphasis> - SIP URI of the new destination. If
+-				omitted then the R-URI is used. It can be static string or
+-				a string with pseudo-variables that will be evaluated at
+-				runtime.
+-			</para>
+-		</listitem>
+-		</itemizedlist>
+-		<para>
+-		This function can be used from REQUEST_ROUTE and FAILURE_ROUTE.
+-		</para>
+-		<example>
+-		<title><function>km_append_branch</function> usage</title>
+-		<programlisting format="linespecific">
+-...
+-km_append_branch();
+-...
+-km_append_branch("sip:alice@sip-router.org");
+-...
+-</programlisting>
+-		</example>
+ 		</section>
+ 		<section>
+ 		<title><function moreinfo="none">setdsturi(uri)</function></title>
+@@ -297,7 +274,7 @@ km_append_branch("sip:alice@sip-router.org");
+ 		This function can be used from ANY_ROUTE.
+ 		</para>
+ 		<example>
+-		<title><function>>setdsturi</function> usage</title>
++		<title><function>setdsturi</function> usage</title>
+ 		<programlisting format="linespecific">
+ ...
+ setdsturi("sip:10.0.0.10");
+@@ -314,7 +291,7 @@ setdsturi("sip:10.0.0.10");
+ 		This function can be used from ANY_ROUTE.
+ 		</para>
+ 		<example>
+-		<title><function>>resetdsturi</function> usage</title>
++		<title><function>resetdsturi</function> usage</title>
+ 		<programlisting format="linespecific">
+ ...
+ resetdsturi();
+@@ -332,7 +309,7 @@ resetdsturi();
+ 		This function can be used from ANY_ROUTE.
+ 		</para>
+ 		<example>
+-		<title><function>>isdsturiset</function> usage</title>
++		<title><function>isdsturiset</function> usage</title>
+ 		<programlisting format="linespecific">
+ ...
+ if(isdsturiset())
+@@ -368,7 +345,7 @@ if(isdsturiset())
+ 		This function can be used from ANY_ROUTE.
+ 		</para>
+ 		<example>
+-		<title><function>>pv_printf</function> usage</title>
++		<title><function>pv_printf</function> usage</title>
+ 		<programlisting format="linespecific">
+ ...
+ pv_printf("$ru", "sip:$rU@$fd");
+@@ -397,7 +374,7 @@ pv_printf("$avp(x)", "From: $fU - To: $tU");
+ 		This function can be used from ANY_ROUTE.
+ 		</para>
+ 		<example>
+-		<title><function>>is_myself</function> usage</title>
++		<title><function>is_myself</function> usage</title>
+ 		<programlisting format="linespecific">
+ ...
+ if(is_myself("$fu")) {
+@@ -446,7 +423,7 @@ setdebug("$var(level)");
+ 		This function can be used from ANY_ROUTE.
+ 		</para>
+ 		<example>
+-		<title><function>>resetdebug</function> usage</title>
++		<title><function>resetdebug</function> usage</title>
+ 		<programlisting format="linespecific">
+ ...
+ resetdebug();
+diff --git modules_k/kex/kex_mod.c modules_k/kex/kex_mod.c
+index ad3cc1d..8dafb7f 100644
+--- a/modules_k/kex/kex_mod.c
++++ b/modules_k/kex/kex_mod.c
+@@ -87,10 +87,6 @@ static cmd_export_t cmds[]={
+ 			0, ANY_ROUTE },
+ 	{"isbflagset", (cmd_function)w_isbflagset,      2,fixup_igp_igp,
+ 			0, ANY_ROUTE },
+-	{"km_append_branch", (cmd_function)w_km_append_branch, 0, 0,
+-			0, REQUEST_ROUTE | FAILURE_ROUTE },
+-	{"km_append_branch", (cmd_function)w_km_append_branch, 1, fixup_spve_null,
+-			0, REQUEST_ROUTE | FAILURE_ROUTE },
+ 	{"setdsturi", (cmd_function)w_setdsturi,     1, 0,
+ 			0, ANY_ROUTE },
+ 	{"resetdsturi", (cmd_function)w_resetdsturi, 0, 0,
+diff --git modules_k/kex/km_core.c modules_k/kex/km_core.c
+index 5a0bee6..1e6b0da 100644
+--- a/modules_k/kex/km_core.c
++++ b/modules_k/kex/km_core.c
+@@ -32,40 +32,6 @@
+ #include "../../mod_fix.h"
+ #include "km_core.h"
+ 
+-int w_km_append_branch(struct sip_msg *msg, char *uri, str *sq)
+-{
+-	str suri;
+-	int ret;
+-	int q = Q_UNSPECIFIED;
+-	flag_t branch_flags = 0;
+-
+-	getbflagsval(0, &branch_flags);
+-	if (uri==NULL) {
+-		ret = km_append_branch(msg, 0, &msg->dst_uri, &msg->path_vec,
+-			q, branch_flags, msg->force_send_socket);
+-		/* reset all branch info */
+-		reset_force_socket(msg);
+-		setbflagsval(0, 0);
+-		if(msg->dst_uri.s!=0)
+-			pkg_free(msg->dst_uri.s);
+-		msg->dst_uri.s = 0;
+-		msg->dst_uri.len = 0;
+-		if(msg->path_vec.s!=0)
+-			pkg_free(msg->path_vec.s);
+-		msg->path_vec.s = 0;
+-		msg->path_vec.len = 0;
+-	} else {
+-		if(fixup_get_svalue(msg, (gparam_p)uri, &suri)!=0)
+-		{
+-			LM_ERR("cannot get the URI parameter\n");
+-			return -1;
+-		}
+-		ret = km_append_branch(msg, &suri, &msg->dst_uri, 
+-			&msg->path_vec, q, branch_flags,
+-			msg->force_send_socket);
+-	}
+-	return ret;
+-}
+ 
+ int w_setdsturi(struct sip_msg *msg, char *uri, str *s2)
+ {
+diff --git modules_k/kex/km_core.h modules_k/kex/km_core.h
+index 5fa08f8..c8e23f3 100644
+--- a/modules_k/kex/km_core.h
++++ b/modules_k/kex/km_core.h
+@@ -25,7 +25,6 @@
+ 
+ #include "../../sr_module.h"
+ 
+-int w_km_append_branch(struct sip_msg *msg, char *uri, str *s2);
+ int w_setdsturi(struct sip_msg *msg, char *uri, str *s2);
+ int w_resetdsturi(struct sip_msg *msg, char *uri, str *s2);
+ int w_isdsturiset(struct sip_msg *msg, char *uri, str *s2);
+diff --git route.c route.c
+index 7990cfd..17c1b56 100644
+--- a/route.c
++++ b/route.c
+@@ -663,8 +663,6 @@ int fix_actions(struct action* a)
+ 			case FORWARD_TCP_T:
+ 			case FORWARD_SCTP_T:
+ 			case FORWARD_UDP_T:
+-			case SEND_T:
+-			case SEND_TCP_T:
+ 					switch(t->val[0].type){
+ 						case IP_ST:
+ 							tmp=strdup(ip_addr2a(
+diff --git route_struct.c route_struct.c
+index d2dee05..b46b1b7 100644
+--- a/route_struct.c
++++ b/route_struct.c
+@@ -371,12 +371,6 @@ void print_action(struct action* t)
+ 		case FORWARD_UDP_T:
+ 			DBG("forward_udp(");
+ 			break;
+-		case SEND_T:
+-			DBG("send(");
+-			break;
+-		case SEND_TCP_T:
+-			DBG("send_tcp(");
+-			break;
+ 		case DROP_T:
+ 			DBG("drop(");
+ 			break;
+diff --git route_struct.h route_struct.h
+index b176b9c..e56f4c0 100644
+--- a/route_struct.h
++++ b/route_struct.h
+@@ -79,7 +79,7 @@ enum _expr_l_type{
+ 	   SNDAF_O, RETCODE_O, SELECT_O, PVAR_O, RVEXP_O, SELECT_UNFIXED_O};
+ /* action types */
+ enum action_type{
+-		FORWARD_T=1, SEND_T, DROP_T, LOG_T, ERROR_T, ROUTE_T, EXEC_T,
++		FORWARD_T=1, DROP_T, LOG_T, ERROR_T, ROUTE_T, EXEC_T,
+ 		SET_HOST_T, SET_HOSTPORT_T, SET_USER_T, SET_USERPASS_T,
+ 		SET_PORT_T, SET_URI_T, SET_HOSTPORTTRANS_T, SET_HOSTALL_T,
+ 		SET_USERPHONE_T,
+@@ -100,7 +100,6 @@ enum action_type{
+ 		FORWARD_UDP_T,
+ 		FORWARD_TLS_T,
+ 		FORWARD_SCTP_T,
+-		SEND_TCP_T,
+ 		FORCE_RPORT_T,
+ 		ADD_LOCAL_RPORT_T,
+ 		SET_ADV_ADDR_T,
+diff --git socket_info.c socket_info.c
+index 7c32a10..22eed35 100644
+--- a/socket_info.c
++++ b/socket_info.c
+@@ -329,7 +329,7 @@ static void free_sock_info(struct socket_info* si)
+ 
+ 
+ 
+-static char* get_valid_proto_name(unsigned short proto)
++char* get_valid_proto_name(unsigned short proto)
+ {
+ 	switch(proto){
+ 		case PROTO_NONE:
+diff --git socket_info.h socket_info.h
+index 2d46d7d..926b317 100644
+--- a/socket_info.h
++++ b/socket_info.h
+@@ -105,6 +105,8 @@ struct socket_info** get_sock_info_list(unsigned short proto);
+ int parse_phostport(char* s, char** host, int* hlen,
+ 								 int* port, int* proto);
+ 
++char* get_valid_proto_name(unsigned short proto);
++
+ /* helper function:
+  * returns next protocol, if the last one is reached return 0
+  * useful for cycling on the supported protocols

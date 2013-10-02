@@ -1,6 +1,16 @@
---- a/modules/path/path.c
-+++ b/modules/path/path.c
-@@ -48,83 +48,72 @@
+--- a/modules_k/path/path.c
++++ b/modules_k/path/path.c
+@@ -36,7 +36,9 @@
+ #include "../../mem/mem.h"
+ #include "../../data_lump.h"
+ #include "../../parser/parse_param.h"
++#include "../../lib/kcore/strcommon.h"
+ #include "../../dset.h"
++#include "../../sr_module.h"
+ 
+ #include "path.h"
+ #include "path_mod.h"
+@@ -44,64 +46,61 @@
  #define PATH_PREFIX		"Path: <sip:"
  #define PATH_PREFIX_LEN		(sizeof(PATH_PREFIX)-1)
  
@@ -10,28 +20,16 @@
 +	[PROTO_TCP] = "%3Btransport%3Dtcp",
 +	[PROTO_TLS] = "%3Btransport%3Dtls",
 +	[PROTO_SCTP] = "%3Btransport%3Dsctp",
-+	[PROTO_WS] = "%3Btransport%3Dws",
-+	[PROTO_WSS] = "%3Btransport%3Dws",
 +};
  
 -#define PATH_RC_PARAM		";received="
 -#define PATH_RC_PARAM_LEN	(sizeof(PATH_RC_PARAM)-1)
 -
--#define PATH_OB_PARAM		";ob"
--#define PATH_OB_PARAM_LEN	(sizeof(PATH_OB_PARAM)-1)
--
 -#define	PATH_CRLF		">\r\n"
 -#define PATH_CRLF_LEN		(sizeof(PATH_CRLF)-1)
 -
--#define ALLOC_AND_COPY_PATH_HDR() \
--	if ((suffix = pkg_malloc(suffix_len)) == NULL) { \
--		LM_ERR("no pkg memory left for suffix\n"); \
--		goto out1; \
--	} \
--	memcpy(suffix, PATH_LR_PARAM, PATH_LR_PARAM_LEN);
--
--static int prepend_path(struct sip_msg* _m, str *user, path_param_t param)
-+static int prepend_path(struct sip_msg* _m, str *user, path_param_t param, str *add_params)
+-static int prepend_path(struct sip_msg* _m, str *user, int recv)
++static int prepend_path(struct sip_msg* _m, str *user, int recv, str *parms)
  {
  	struct lump *l;
 -	char *prefix, *suffix, *crlf;
@@ -41,40 +39,42 @@
  	struct hdr_field *hf;
 -	str rcv_addr = {0, 0};
 -	char *src_ip;
--		
+ 		
 -	prefix = suffix = crlf = 0;
- 
+-
 -	prefix_len = PATH_PREFIX_LEN + (user->len ? (user->len+1) : 0);
 -	prefix = pkg_malloc(prefix_len);
 -	if (!prefix) {
 -		LM_ERR("no pkg memory left for prefix\n");
-+	/* maximum possible length of suffix */
-+	suffix_len = strlen(";lr;received=sip::12345%3Btransport%3Dsctp;ob;>\r\n")
-+			+ IP_ADDR_MAX_STR_SIZE + (add_params ? add_params->len : 0) + 1;
-+
-+	cp = suffix = pkg_malloc(suffix_len);
-+	if (!suffix) {
-+		LM_ERR("no pkg memory left for suffix\n");
- 		goto out1;
- 	}
+-		goto out1;
+-	}
 -	memcpy(prefix, PATH_PREFIX, PATH_PREFIX_LEN);
 -	if (user->len) {
 -		memcpy(prefix + PATH_PREFIX_LEN, user->s, user->len);
 -		memcpy(prefix + prefix_len - 1, "@", 1);
 -	}
+-
+-	suffix_len = PATH_LR_PARAM_LEN + (recv ? PATH_RC_PARAM_LEN : 0);
+-	suffix = pkg_malloc(suffix_len);
++	suffix_len = strlen(";lr;received=sip::12345%3Btransport%3Dsctp;>\r\n")
++			+ IP_ADDR_MAX_STR_SIZE + (parms ? parms->len : 0) + 1;
++	cp = suffix = pkg_malloc(suffix_len);
+ 	if (!suffix) {
+ 		LM_ERR("no pkg memory left for suffix\n");
+ 		goto out1;
+ 	}
+-	memcpy(suffix, PATH_LR_PARAM, PATH_LR_PARAM_LEN);
+-	if(recv)
+-		memcpy(suffix+PATH_LR_PARAM_LEN, PATH_RC_PARAM, PATH_RC_PARAM_LEN);
+-
+-	crlf = pkg_malloc(PATH_CRLF_LEN);
+-	if (!crlf) {
+-		LM_ERR("no pkg memory left for crlf\n");
+-		goto out1;
 +
 +	cp += sprintf(cp, ";lr");
- 
- 	switch(param) {
- 	default:
--		suffix_len = PATH_LR_PARAM_LEN;
--		ALLOC_AND_COPY_PATH_HDR();
- 		break;
- 	case PATH_PARAM_RECEIVED:
--		suffix_len = PATH_LR_PARAM_LEN + PATH_RC_PARAM_LEN;
--		ALLOC_AND_COPY_PATH_HDR();
--		memcpy(suffix + PATH_LR_PARAM_LEN, PATH_RC_PARAM,	
--			PATH_RC_PARAM_LEN);
++
++	if (recv) {
 +		if (_m->rcv.proto < (sizeof(proto_strings) / sizeof(*proto_strings)))
 +			proto_str = proto_strings[(unsigned int) _m->rcv.proto];
 +		else
@@ -82,22 +82,10 @@
 +
 +		cp += sprintf(cp, ";received=sip:%s:%hu%s", ip_addr2a(&_m->rcv.src_ip),
 +				_m->rcv.src_port, proto_str ? : "");
- 		break;
- 	case PATH_PARAM_OB:
--		suffix_len = PATH_LR_PARAM_LEN + PATH_OB_PARAM_LEN;
--		ALLOC_AND_COPY_PATH_HDR();
--		memcpy(suffix + PATH_LR_PARAM_LEN, PATH_OB_PARAM,
--			PATH_OB_PARAM_LEN);
-+		cp += sprintf(cp, ";ob");
- 		break;
- 	}
- 
--	crlf = pkg_malloc(PATH_CRLF_LEN);
--	if (!crlf) {
--		LM_ERR("no pkg memory left for crlf\n");
--		goto out1;
-+	if (add_params && add_params->len)
-+		cp += sprintf(cp, ";%.*s", add_params->len, add_params->s);
++	}
++
++	if (parms && parms->len)
++		cp += sprintf(cp, ";%.*s", parms->len, parms->s);
 +
 +	cp += sprintf(cp, ">\r\n");
 +
@@ -127,7 +115,7 @@
  	if (hf)
  		/* path found, add ours in front of that */
  		l = anchor_lump(_m, hf->name.s - _m->buf, 0, 0);
-@@ -133,60 +122,24 @@
+@@ -110,95 +109,56 @@
  		l = anchor_lump(_m, _m->unparsed - _m->buf, 0, 0);
  	if (!l) {
  		LM_ERR("failed to get anchor\n");
@@ -143,7 +131,7 @@
 -	l = insert_new_lump_before(l, suffix, suffix_len, 0);
 +	l = insert_new_lump_before(l, suffix, cp - suffix, 0);
  	if (!l) goto out2;
--	if (param == PATH_PARAM_RECEIVED) {
+-	if (recv) {
 -		/* TODO: agranig: optimize this one! */
 -		src_ip = ip_addr2a(&_m->rcv.src_ip);
 -		rcv_addr.s = pkg_malloc(6 + IP_ADDR_MAX_STR_SIZE + 22); /* 'sip:<ip>:<port>;transport=sctp'\0 */
@@ -164,10 +152,6 @@
 -			case PROTO_SCTP:
 -				rcv_addr.len = snprintf(rcv_addr.s, 6 + IP_ADDR_MAX_STR_SIZE + 21, "'sip:%s:%u;transport=sctp'", src_ip, _m->rcv.src_port);
 -				break;
--			case PROTO_WS:
--			case PROTO_WSS:
--				rcv_addr.len = snprintf(rcv_addr.s, 6 + IP_ADDR_MAX_STR_SIZE + 19, "'sip:%s:%u;transport=ws'", src_ip, _m->rcv.src_port);
--				break;
 -	    }
 -
 -		l = insert_new_lump_before(l, rcv_addr.s, rcv_addr.len, 0);
@@ -177,18 +161,17 @@
 -	if (!l) goto out4;
  	
  	return 1;
--	
+ 	
 -out1:
 -	if (prefix) pkg_free(prefix);
 -out2:
 -	if (suffix) pkg_free(suffix);
--out3:
+ out3:
 -	if (rcv_addr.s) pkg_free(rcv_addr.s);
 -out4:
 -	if (crlf) pkg_free(crlf);
- 
+-
 -	LM_ERR("failed to insert prefix lump\n");
-+out3:
 +	pkg_free(prefix);
 +out2:
 +	pkg_free(suffix);
@@ -197,24 +180,15 @@
  
  	return -1;
  }
-@@ -214,7 +167,7 @@
- 			param = PATH_PARAM_OB;
- 	}
  
--	ret = prepend_path(_msg, &user, param);
-+	ret = prepend_path(_msg, &user, param, NULL);
- 
- 	if (user.s != NULL)
- 		pkg_free(user.s);
-@@ -226,9 +179,17 @@
-  * Prepend own uri to Path header and take care of given
-  * user.
-  */
--int add_path_usr(struct sip_msg* _msg, char* _usr, char* _b)
-+int add_path_usr(struct sip_msg* _msg, char* _usr, char* _parms)
- {
--	return prepend_path(_msg, (str*)_usr, PATH_PARAM_NONE);
-+	str user = {0,0};
+-/*! \brief
+- * Prepend own uri to Path header
+- */
+-int add_path(struct sip_msg* _msg, char* _a, char* _b)
+-{
++static int add_path_rcv(struct sip_msg* _msg, char* _usr, int recv, char* _parms) {
+ 	str user = {0,0};
+-	return prepend_path(_msg, &user, 0);
 +	str parms = {0,0};
 +
 +	if (_usr)
@@ -222,56 +196,101 @@
 +	if (_parms)
 +		get_str_fparam(&parms, _msg, (fparam_t *) _parms);
 +
-+	return prepend_path(_msg, &user, PATH_PARAM_NONE, &parms);
++	return prepend_path(_msg, &user, recv, &parms);
  }
  
  /*! \brief
-@@ -237,17 +198,24 @@
+  * Prepend own uri to Path header and take care of given
+- * user.
++ * params.
   */
- int add_path_received(struct sip_msg* _msg, char* _a, char* _b)
+-int add_path_usr(struct sip_msg* _msg, char* _usr, char* _b)
++int add_path(struct sip_msg* _msg, char* _usr, char* _parms)
  {
--	str user = {0,0};
--	return prepend_path(_msg, &user, PATH_PARAM_RECEIVED);
-+	return prepend_path(_msg, NULL, PATH_PARAM_RECEIVED, NULL);
+-	return prepend_path(_msg, (str*)_usr, 0);
++	return add_path_rcv(_msg, _usr, 0, _parms);
  }
  
  /*! \brief
   * Prepend own uri to Path header and append received address as
-  * "received"-param to that uri and take care of given user.
+  * "received"-param to that uri.
   */
+-int add_path_received(struct sip_msg* _msg, char* _a, char* _b)
+-{
+-	str user = {0,0};
+-	return prepend_path(_msg, &user, 1);
+-}
+-
+-/*! \brief
+- * Prepend own uri to Path header and append received address as
+- * "received"-param to that uri and take care of given user.
+- */
 -int add_path_received_usr(struct sip_msg* _msg, char* _usr, char* _b)
-+int add_path_received_usr(struct sip_msg* _msg, char* _usr, char* _parms)
++int add_path_received(struct sip_msg* _msg, char* _usr, char* _parms)
  {
--	return prepend_path(_msg, (str*)_usr, PATH_PARAM_RECEIVED);
-+	str user = {0,0};
-+	str parms = {0,0};
-+
-+	if (_usr)
-+		get_str_fparam(&user, _msg, (fparam_t *) _usr);
-+	if (_parms)
-+		get_str_fparam(&parms, _msg, (fparam_t *) _parms);
-+
-+	return prepend_path(_msg, &user, PATH_PARAM_RECEIVED, &parms);
+-	return prepend_path(_msg, (str*)_usr, 1);
++	return add_path_rcv(_msg, _usr, 1, _parms);
  }
  
  /*! \brief
---- a/modules/path/path_mod.c
-+++ b/modules/path/path_mod.c
-@@ -87,11 +87,15 @@
+@@ -208,6 +168,8 @@
+ {
+ 	param_hooks_t hooks;
+ 	param_t *params;
++	static char dst_uri_buf[MAX_URI_SIZE];
++	static str dst_uri;
+ 			
+ 	if (parse_params(r_param, CLASS_CONTACT, &hooks, &params) != 0) {
+ 		LM_ERR("failed to parse route parameters\n");
+@@ -215,7 +177,14 @@
+ 	}
+ 
+ 	if (hooks.contact.received) {
+-		if (set_dst_uri(_m, &hooks.contact.received->body) != 0) {
++	        dst_uri.s = dst_uri_buf;
++		dst_uri.len = MAX_URI_SIZE;
++		if (unescape_user(&(hooks.contact.received->body), &dst_uri) < 0) {
++		        LM_ERR("unescaping received failed\n");
++			free_params(params);
++			return;
++		}
++		if (set_dst_uri(_m, &dst_uri) != 0) {
+ 			LM_ERR("failed to set dst-uri\n");
+ 			free_params(params);
+ 			return;
+--- a/modules_k/path/path_mod.c
++++ b/modules_k/path/path_mod.c
+@@ -81,12 +81,16 @@
+ static cmd_export_t cmds[] = {
  	{ "add_path",          (cmd_function)add_path,              0,
  			0,              0,  REQUEST_ROUTE },
- 	{ "add_path",          (cmd_function)add_path_usr,          1,
+-	{ "add_path",          (cmd_function)add_path_usr,          1,
 -			fixup_str_null, 0, REQUEST_ROUTE },
++	{ "add_path",          (cmd_function)add_path,              1,
 +			fixup_spve_null, 0, REQUEST_ROUTE },
-+	{ "add_path",          (cmd_function)add_path_usr,          2,
++	{ "add_path",          (cmd_function)add_path,              2,
 +			fixup_spve_spve, 0, REQUEST_ROUTE },
  	{ "add_path_received", (cmd_function)add_path_received,     0,
  			0,              0, REQUEST_ROUTE },
- 	{ "add_path_received", (cmd_function)add_path_received_usr, 1,
+-	{ "add_path_received", (cmd_function)add_path_received_usr, 1,
 -			fixup_str_null, 0, REQUEST_ROUTE },
++	{ "add_path_received", (cmd_function)add_path_received,     1,
 +			fixup_spve_null, 0, REQUEST_ROUTE },
-+	{ "add_path_received", (cmd_function)add_path_received_usr, 2,
++	{ "add_path_received", (cmd_function)add_path_received,     2,
 +			fixup_spve_spve, 0, REQUEST_ROUTE },
  	{ 0, 0, 0, 0, 0, 0 }
  };
  
+--- a/modules_k/path/Makefile
++++ b/modules_k/path/Makefile
+@@ -10,6 +10,9 @@
+ NAME=path.so
+ LIBS=
+ 
+-DEFS+=-DOPENSER_MOD_INTERFACE
++DEFS+=-DKAMAILIO_MOD_INTERFACE
++
++SERLIBPATH=../../lib
++SER_LIBS+=$(SERLIBPATH)/kcore/kcore
+ 
+ include ../../Makefile.modules

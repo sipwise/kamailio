@@ -5424,14 +5424,14 @@
 +int get_via_branch(struct sip_msg *, int, str *);
 +
 +#endif
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -13,7 +13,7 @@
- 				   mediaproxy mi_datagram mi_fifo mi_rpc mqueue \
- 				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
- 				   rtpproxy sanity sdpops siputils sl statistics textops \
--				   textopsx tm tmx topoh xlog
-+				   textopsx tm tmx topoh xlog rtpproxy-ng
+--- a/Makefile
++++ b/Makefile
+@@ -215,7 +215,7 @@
+ 				blst prefix_route counters debugger matrix mqueue mtree \
+ 				pipelimit rtpproxy textopsx xhttp xhttp_rpc ipops p_usrloc \
+ 				sdpops async sipcapture dmq msrp tmrec db_cluster corex \
+-				lcr_rate
++				lcr_rate rtpproxy-ng
  
- # - extra used modules, with no extra dependency
- mod_list_extra=avp auth_diameter call_control dmq domainpolicy msrp pdb qos \
+ # K mysql module
+ module_group_kmysql=db_mysql

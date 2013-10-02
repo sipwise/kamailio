@@ -1,8 +1,6 @@
-diff --git a/Makefile.rules b/Makefile.rules
-index 0243284..a225ee4 100644
 --- a/Makefile.rules
 +++ b/Makefile.rules
-@@ -77,6 +77,18 @@ cmd_CC+=$(CC_MKDEP_OPTS)
+@@ -77,6 +77,18 @@
  cmd_MKDEP=
  endif # CC_MKDEP_OPTS
  
@@ -21,7 +19,7 @@ index 0243284..a225ee4 100644
  # what will be displayed if quiet==silent
  silent_cmd_CC=CC ($(CC)) [$(strip $(crt_type) $(NAME))]		$@
  silent_cmd_LD=LD ($(LD)) [$(strip $(crt_type) $(NAME))]		$@
-@@ -107,7 +119,7 @@ module_make=	if [ -n "$(1)" -a -r "$(1)/Makefile" ]; then \
+@@ -107,7 +119,7 @@
  quote:= "
  escall= $(subst $$,\$$,$(subst $(quote),\$(quote),$1))
  exec_cmd= $(if $($(quiet)_cmd_$(1)),\

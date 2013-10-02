@@ -7,11 +7,9 @@ Subject: do not install default config
  utils/kamctl/Makefile |    2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index b35ce80..8ec62d2 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -707,7 +707,7 @@ sunpkg:
+@@ -886,7 +886,7 @@
  
  .PHONY: install
  install: mk_params="compile_for_install=yes"
@@ -20,11 +18,9 @@ index b35ce80..8ec62d2 100644
  	install-doc install-man install-utils install-share
  
  .PHONY: dbinstall
-diff --git a/utils/kamctl/Makefile b/utils/kamctl/Makefile
-index 3056ae0..d0d3fac 100644
 --- a/utils/kamctl/Makefile
 +++ b/utils/kamctl/Makefile
-@@ -8,7 +8,7 @@ all:
+@@ -8,7 +8,7 @@
  
  install-if-newer: install
  
