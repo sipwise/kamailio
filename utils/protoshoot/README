@@ -1,6 +1,0 @@
-PROTOSHOOT
-==========
-
-Command line tool to send data on network. Data is loaded from a file.
-
-See 'protoshoot -h' for options.

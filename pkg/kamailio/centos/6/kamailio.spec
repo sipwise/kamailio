@@ -1,1 +1,0 @@
-../../fedora/16/kamailio.spec

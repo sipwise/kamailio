@@ -1,4 +1,0 @@
-# do not use upstream script, we have our own
-# /etc/default/kamailio.* configuration, generated
-# via /etc/ngcp-config/templates/etc/default/kamailio.*
-RUN_KAMAILIO=no

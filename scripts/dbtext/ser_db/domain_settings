@@ -1,1 +1,0 @@
-did(str) filename(str) version(int) timestamp(int,null) content(str,null) flags(int) 

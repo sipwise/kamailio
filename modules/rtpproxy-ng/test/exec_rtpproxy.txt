@@ -1,1 +1,0 @@
-./rtpproxy -T 10 -f -F -i -l 127.0.0.1 -s udp:*:22222 -d DBUG -n tcp:127.0.0.1:9999
