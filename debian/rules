@@ -59,7 +59,7 @@ mod_name=$(subst db_,,$(lastword $(subst /, ,$(1))))
 define PACKAGE_GRP_BUILD_template
        # package all the modules in PACKAGE_GROUPS in separate packages
        $(foreach grp,$(PACKAGE_GROUPS),\
-               $(MAKE) -j`nproc` every-module group_include="k$(grp)"
+               $(MAKE) every-module group_include="k$(grp)"
        )
 endef
 
@@ -67,7 +67,7 @@ endef
 define PACKAGE_MODULE_BUILD_template
        # package all the modules MODULES_SP in separate packages
        $(foreach mod,$(MODULES_SP),\
-               $(MAKE) -j`nproc` modules modules="$(mod)"
+               $(MAKE) modules modules="$(mod)"
        )
 endef
 
@@ -117,7 +117,7 @@ build-indep: build-stamp
 build-stamp: configure-stamp 
 	dh_testdir
 	# Add here commands to compile the package.
-	$(MAKE) -j`nproc` all
+	$(MAKE) all
 	# make groups
 	$(call PACKAGE_GRP_BUILD_template)
 	# make single-module packages

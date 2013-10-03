@@ -13,7 +13,7 @@ sipwise/unforce_rtp_proxy_one_param.patch
 sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/nathelper.contact_only.patch
-sipwise/parallel_build.patch
+#sipwise/parallel_build.patch
 sipwise/natping_disable_bflag.patch
 sipwise/rtpproxy-ng.patch
 sipwise/path_second_parameter.patch
