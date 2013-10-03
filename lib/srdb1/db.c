@@ -61,6 +61,7 @@
 #include "../../sr_module.h"
 #include "../../mem/mem.h"
 #include "../../ut.h"
+#include "../../globals.h"
 #include "db_cap.h"
 #include "db_id.h"
 #include "db_pool.h"
@@ -243,11 +244,12 @@ int db_bind_mod(const str* mod, db_func_t* mydbf)
 		dbf.insert_delayed = (db_insert_delayed_f)find_mod_export(tmp,
 			"db_insert_delayed", 2, 0);
 		dbf.start_transaction = (db_start_transaction_f)find_mod_export(tmp,
-			"db_start_transaction", 1, 0);
+			"db_start_transaction", 2, 0);
 		dbf.end_transaction = (db_end_transaction_f)find_mod_export(tmp,
 			"db_end_transaction", 1, 0);
 		dbf.abort_transaction = (db_abort_transaction_f)find_mod_export(tmp,
 			"db_abort_transaction", 1, 0);
+		dbf.query_lock = (db_query_f)find_mod_export(tmp, "db_query_lock", 2, 0);
 	}
 	if(db_check_api(&dbf, tmp)!=0)
 		goto error;
@@ -371,7 +373,7 @@ int db_table_version(const db_func_t* dbf, db1_con_t* connection, const str* tab
 	db_val_t val[1];
 	db1_res_t* res = NULL;
 	db_val_t* ver = 0;
-	str version = str_init(VERSION_TABLE);
+	str *version = &version_table;
 	str tmp1 = str_init(TABLENAME_COLUMN);
 	str tmp2 = str_init(VERSION_COLUMN);
 	int ret;
@@ -381,7 +383,7 @@ int db_table_version(const db_func_t* dbf, db1_con_t* connection, const str* tab
 		return -1;
 	}
 
-	if (dbf->use_table(connection, &version) < 0) {
+	if (dbf->use_table(connection, version) < 0) {
 		LM_ERR("error while changing table\n");
 		return -1;
 	}

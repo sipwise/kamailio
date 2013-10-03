@@ -134,6 +134,8 @@ static void dump_gws(rpc_t* rpc, void* c)
 	    case PROTO_OTHER:
 		rpc->struct_add(st, "s", "transport", "OTHER");
 		break;
+            case PROTO_WS:
+            case PROTO_WSS:
 	    case PROTO_NONE:
 		break;
 	    }
@@ -214,7 +216,7 @@ static void dump_rules(rpc_t* rpc, void* c)
 
 
 static const char* defunct_gw_doc[2] = {
-    "Defunct gateway until speficied time (Unix timestamp).",
+    "Defunct gateway until specified time (Unix timestamp).",
     0
 };
 

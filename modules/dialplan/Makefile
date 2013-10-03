@@ -6,22 +6,26 @@ include ../../Makefile.defs
 auto_gen=
 NAME=dialplan.so
 
-BUILDER = $(shell which pcre-config)
-
-ifeq ($(BUILDER),)
-	PCREDEFS=-I$(LOCALBASE)/include -I/usr/local/include -I/opt/include \
-	-I/usr/sfw/include
-	PCRELIBS=-L$(LOCALBASE)/lib -L/usr/local/lib -L/usr/sfw/lib \
-	-L/opt/lib -lpcre
-else
-	PCREDEFS = $(shell pcre-config --cflags)
-	PCRELIBS = $(shell pcre-config --libs)
+ifeq ($(CROSS_COMPILE),)
+PCRE_BUILDER = $(shell \
+	if pkg-config --exists libcre; then \
+		echo 'pkg-config libpcre'; \
+	else \
+		which pcre-config; \
+	fi)
 endif
 
+ifeq ($(PCRE_BUILDER),)
+	PCREDEFS=-I$(LOCALBASE)/include
+	PCRELIBS=-L$(LOCALBASE)/lib -lpcre
+else
+	PCREDEFS = $(shell $(PCRE_BUILDER) --cflags)
+	PCRELIBS = $(shell $(PCRE_BUILDER) --libs)
+endif
 DEFS+=$(PCREDEFS)
 LIBS=$(PCRELIBS)
 
-DEFS+=-DOPENSER_MOD_INTERFACE
+DEFS+=-DKAMAILIO_MOD_INTERFACE
 
 SERLIBPATH=../../lib
 SER_LIBS+=$(SERLIBPATH)/kmi/kmi
