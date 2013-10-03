@@ -8,8 +8,6 @@ Subject: [PATCH] pv: Move pv_xavp_name_t declaration to core pvar.h
  pvar.h               |   10 ++++++++++
  2 files changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/modules/pv/pv_xavp.h b/modules/pv/pv_xavp.h
-index 2e12870..4851b3f 100644
 --- a/modules/pv/pv_xavp.h
 +++ b/modules/pv/pv_xavp.h
 @@ -23,12 +23,6 @@
@@ -25,11 +23,9 @@ index 2e12870..4851b3f 100644
  int pv_get_xavp(struct sip_msg *msg, pv_param_t *param,
  		pv_value_t *res);
  int pv_set_xavp(struct sip_msg* msg, pv_param_t *param,
-diff --git a/pvar.h b/pvar.h
-index c35ae94..4d69a43 100644
 --- a/pvar.h
 +++ b/pvar.h
-@@ -288,5 +288,15 @@ void tr_param_free(tr_param_t *tp);
+@@ -287,5 +287,15 @@
  
  int register_trans_mod(char *mod_name, tr_export_t *items);
  
@@ -45,6 +41,3 @@ index c35ae94..4d69a43 100644
 +
  #endif
  
--- 
-1.7.10.4
-

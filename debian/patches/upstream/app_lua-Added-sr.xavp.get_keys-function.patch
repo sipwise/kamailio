@@ -7,8 +7,6 @@ Subject: [PATCH 2/3] app_lua: Added sr.xavp.get_keys function.
  modules/app_lua/app_lua_sr.c |   80 ++++++++++++++++++++++++++++++++++++++++--
  1 file changed, 78 insertions(+), 2 deletions(-)
 
-diff --git a/modules/app_lua/app_lua_sr.c b/modules/app_lua/app_lua_sr.c
-index b5a6a6c..6b9dae6 100644
 --- a/modules/app_lua/app_lua_sr.c
 +++ b/modules/app_lua/app_lua_sr.c
 @@ -39,6 +39,7 @@
@@ -19,7 +17,7 @@ index b5a6a6c..6b9dae6 100644
  
  #include "app_lua_api.h"
  #include "app_lua_sr.h"
-@@ -1122,6 +1123,82 @@ static const luaL_reg _sr_pv_Map [] = {
+@@ -1130,6 +1131,82 @@
  	{NULL, NULL}
  };
  
@@ -102,7 +100,7 @@ index b5a6a6c..6b9dae6 100644
  /**
   *
   */
-@@ -1130,6 +1207,5 @@ void lua_sr_core_openlibs(lua_State *L)
+@@ -1138,6 +1215,5 @@
  	luaL_openlib(L, "sr",      _sr_core_Map, 0);
  	luaL_openlib(L, "sr.hdr",  _sr_hdr_Map,  0);
  	luaL_openlib(L, "sr.pv",   _sr_pv_Map,   0);
@@ -110,6 +108,3 @@ index b5a6a6c..6b9dae6 100644
  }
 -
 -
--- 
-1.7.10.4
-

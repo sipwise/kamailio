@@ -8,11 +8,9 @@ Subject: [PATCH 3/3] app_lua: Added sr.xavp.get function in order to get a
  modules/app_lua/app_lua_sr.c |   92 ++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 92 insertions(+)
 
-diff --git a/modules/app_lua/app_lua_sr.c b/modules/app_lua/app_lua_sr.c
-index 6b9dae6..4011e52 100644
 --- a/modules/app_lua/app_lua_sr.c
 +++ b/modules/app_lua/app_lua_sr.c
-@@ -1144,6 +1144,97 @@ static int lua_sr_push_str_list_table(lua_State *L, struct str_list *list) {
+@@ -1152,6 +1152,97 @@
  }
  
  /**
@@ -110,7 +108,7 @@ index 6b9dae6..4011e52 100644
   * puts a table with the list of keys of the xavp
   */
  static int lua_sr_xavp_get_keys (lua_State *L)
-@@ -1195,6 +1286,7 @@ static int lua_sr_xavp_get_keys (lua_State *L)
+@@ -1203,6 +1294,7 @@
   *
   */
  static const luaL_reg _sr_xavp_Map [] = {
@@ -118,6 +116,3 @@ index 6b9dae6..4011e52 100644
  	{"get_keys",  lua_sr_xavp_get_keys},
  	{NULL, NULL}
  };
--- 
-1.7.10.4
-

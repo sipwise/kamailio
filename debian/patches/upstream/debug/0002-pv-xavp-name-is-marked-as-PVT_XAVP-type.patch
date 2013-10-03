@@ -7,11 +7,9 @@ Subject: [PATCH 2/2] pv: $xavp(name) is marked as PVT_XAVP type
  modules/pv/pv.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/modules/pv/pv.c b/modules/pv/pv.c
-index fcfea11..2b13ec8 100644
 --- a/modules/pv/pv.c
 +++ b/modules/pv/pv.c
-@@ -87,7 +87,7 @@ static pv_export_t mod_pvs[] = {
+@@ -82,7 +82,7 @@
  		pv_parse_snd_name, 0, 0, 0 },
  #ifdef WITH_XAVP
  	{ {"xavp", sizeof("xavp")-1}, /* xavp */
@@ -20,6 +18,3 @@ index fcfea11..2b13ec8 100644
  		pv_parse_xavp_name, 0, 0, 0 },
  #endif
  
--- 
-1.7.10.4
-

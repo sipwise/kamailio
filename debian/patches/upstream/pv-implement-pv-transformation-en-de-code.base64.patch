@@ -8,8 +8,6 @@ Subject: [PATCH] pv: implement pv transformation {en,de}code.base64
  modules/pv/pv_trans.h |    1 +
  2 files changed, 34 insertions(+)
 
-diff --git a/modules/pv/pv_trans.c b/modules/pv/pv_trans.c
-index fc9597b..1e553f1 100644
 --- a/modules/pv/pv_trans.c
 +++ b/modules/pv/pv_trans.c
 @@ -39,6 +39,7 @@
@@ -20,7 +18,7 @@ index fc9597b..1e553f1 100644
  
  #include "../../parser/parse_param.h"
  #include "../../parser/parse_uri.h"
-@@ -195,6 +196,32 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
+@@ -204,6 +205,32 @@
  			val->rs.s = _tr_buffer;
  			val->rs.len = i;
  			break;
@@ -53,7 +51,7 @@ index fc9597b..1e553f1 100644
  		case TR_S_ESCAPECOMMON:
  			if(!(val->flags&PV_VAL_STR))
  				val->rs.s = int2str(val->ri, &val->rs.len);
-@@ -1749,6 +1776,12 @@ char* tr_parse_string(str* in, trans_t *t)
+@@ -1764,6 +1791,12 @@
  	} else if(name.len==11 && strncasecmp(name.s, "decode.hexa", 11)==0) {
  		t->subtype = TR_S_DECODEHEXA;
  		goto done;
@@ -66,11 +64,9 @@ index fc9597b..1e553f1 100644
  	} else if(name.len==13 && strncasecmp(name.s, "escape.common", 13)==0) {
  		t->subtype = TR_S_ESCAPECOMMON;
  		goto done;
-diff --git a/modules/pv/pv_trans.h b/modules/pv/pv_trans.h
-index a34eca2..e2aa494 100644
 --- a/modules/pv/pv_trans.h
 +++ b/modules/pv/pv_trans.h
-@@ -37,6 +37,7 @@ enum _tr_type { TR_NONE=0, TR_STRING, TR_URI, TR_PARAMLIST, TR_NAMEADDR,
+@@ -37,6 +37,7 @@
  enum _tr_s_subtype { 
  	TR_S_NONE=0, TR_S_LEN, TR_S_INT, TR_S_MD5, TR_S_SUBSTR,
  	TR_S_SELECT, TR_S_ENCODEHEXA, TR_S_DECODEHEXA,
@@ -78,6 +74,3 @@ index a34eca2..e2aa494 100644
  	TR_S_ESCAPECOMMON, TR_S_UNESCAPECOMMON, TR_S_ESCAPEUSER, TR_S_UNESCAPEUSER,
  	TR_S_ESCAPEPARAM, TR_S_UNESCAPEPARAM, TR_S_TOLOWER, TR_S_TOUPPER,
  	TR_S_STRIP, TR_S_STRIPTAIL, TR_S_PREFIXES, TR_S_PREFIXES_QUOT, TR_S_REPLACE,
--- 
-1.7.10.4
-

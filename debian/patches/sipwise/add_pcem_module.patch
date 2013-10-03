@@ -1,8 +1,6 @@
-diff --git a/Makefile.groups b/Makefile.groups
-index aa41e71..72a29d3 100644
 --- a/Makefile.groups
 +++ b/Makefile.groups
-@@ -25,7 +25,7 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
+@@ -25,7 +25,7 @@
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
@@ -11,9 +9,6 @@ index aa41e71..72a29d3 100644
  
  
  # - common modules depending on database, using UID db schema
-diff --git a/modules/pcem/Makefile b/modules/pcem/Makefile
-new file mode 100644
-index 0000000..3ab8f8f
 --- /dev/null
 +++ b/modules/pcem/Makefile
 @@ -0,0 +1,18 @@
@@ -35,15 +30,12 @@ index 0000000..3ab8f8f
 +SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1 $(SERLIBPATH)/kcore/kcore
 +
 +include ../../Makefile.modules
-diff --git a/modules/pcem/pcem_logic.c b/modules/pcem/pcem_logic.c
-new file mode 100644
-index 0000000..1d7607a
 --- /dev/null
 +++ b/modules/pcem/pcem_logic.c
 @@ -0,0 +1,130 @@
 +/*
 + * $Id$
-+ * 
++ *
 + * PacketCable Event Messages module
 + *
 + * Copyright (C) 2012 Sipwise GmbH
@@ -98,7 +90,7 @@ index 0000000..1d7607a
 +		return -1;
 +	}
 +*/
-+	return 0;	
++	return 0;
 +}
 +
 +void pcem_onreq( struct cell* t, int type, struct tmcb_params *ps )
@@ -116,7 +108,7 @@ index 0000000..1d7607a
 +			return;
 +
 +		is_invite = (ps->req->REQ_METHOD==METHOD_INVITE)?1:0;
-+	
++
 +		tmcb_types =
 +			/* get completed transactions */
 +			TMCB_RESPONSE_OUT |
@@ -171,9 +163,6 @@ index 0000000..1d7607a
 +	}
 +}
 +
-diff --git a/modules/pcem/pcem_logic.h b/modules/pcem/pcem_logic.h
-new file mode 100644
-index 0000000..9f6a97a
 --- /dev/null
 +++ b/modules/pcem/pcem_logic.h
 @@ -0,0 +1,34 @@
@@ -211,15 +200,12 @@ index 0000000..9f6a97a
 +void pcem_onreq( struct cell* t, int type, struct tmcb_params *ps );
 +
 +#endif
-diff --git a/modules/pcem/pcem_mod.c b/modules/pcem/pcem_mod.c
-new file mode 100644
-index 0000000..0d0ea2c
 --- /dev/null
 +++ b/modules/pcem/pcem_mod.c
 @@ -0,0 +1,153 @@
 +/*
 + * $Id$
-+ * 
++ *
 + * PacketCable Event Messages module
 + *
 + * Copyright (C) 2012 Sipwise GmbH
@@ -317,12 +303,12 @@ index 0000000..0d0ea2c
 +
 +static int mod_init( void )
 +{
-+	if ((pcem_qos_flag != -1) && 
++	if ((pcem_qos_flag != -1) &&
 +		!flag_in_range(pcem_qos_flag)) {
 +		LM_ERR("pcem_qos_flag set to invalid value\n");
 +		return -1;
 +	}
-+	if ((pcem_all_flag != -1) && 
++	if ((pcem_all_flag != -1) &&
 +		!flag_in_range(pcem_all_flag)) {
 +		LM_ERR("pcem_all_flag set to invalid value\n");
 +		return -1;
@@ -370,9 +356,6 @@ index 0000000..0d0ea2c
 +{
 +}
 +
-diff --git a/modules/pcem/pcem_mod.h b/modules/pcem/pcem_mod.h
-new file mode 100644
-index 0000000..167fd30
 --- /dev/null
 +++ b/modules/pcem/pcem_mod.h
 @@ -0,0 +1,33 @@

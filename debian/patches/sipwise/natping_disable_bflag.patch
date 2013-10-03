@@ -16,7 +16,7 @@
  	{"natping_processes",     INT_PARAM, &natping_processes     },
  	{"natping_socket",        STR_PARAM, &natping_socket        },
  	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
-@@ -678,6 +680,7 @@
+@@ -677,6 +679,7 @@
  		}
  
  		sipping_flag = (sipping_flag==-1)?0:(1<<sipping_flag);
@@ -24,7 +24,7 @@
  
  		/* set reply function if SIP natping is enabled */
  		if (sipping_flag) {
-@@ -1998,6 +2001,9 @@
+@@ -2000,6 +2003,9 @@
  		memcpy( &aorhash, cp, sizeof(aorhash));
  		cp = (char*)cp + sizeof(aorhash);
  

@@ -10,11 +10,9 @@ Subject: [PATCH] core: use pointer to pv_spec_t on lvalue union. Use
  lvalue.h |    2 +-
  3 files changed, 11 insertions(+), 23 deletions(-)
 
-diff --git a/cfg.y b/cfg.y
-index 968888a..0e5f8b1 100644
 --- a/cfg.y
 +++ b/cfg.y
-@@ -2611,17 +2611,10 @@ attr_id_any_str:
+@@ -2777,17 +2777,10 @@
  	;
  
  pvar:	PVAR {
@@ -35,7 +33,7 @@ index 968888a..0e5f8b1 100644
  				YYABORT;
  			}
  			$$=pv_spec;
-@@ -2636,12 +2629,8 @@ avp_pvar:	AVP_OR_PVAR {
+@@ -2802,12 +2795,8 @@
  				}
  				memset(lval_tmp, 0, sizeof(*lval_tmp));
  				s_tmp.s=$1; s_tmp.len=strlen(s_tmp.s);
@@ -50,7 +48,7 @@ index 968888a..0e5f8b1 100644
  					lval_tmp->lv.avps.type|= AVP_NAME_STR;
  					lval_tmp->lv.avps.name.s.s = s_tmp.s+1;
  					lval_tmp->lv.avps.name.s.len = s_tmp.len-1;
-@@ -2688,15 +2677,14 @@ lval: attr_id_ass {
+@@ -2854,15 +2843,14 @@
  						yyerror("Not enough memory");
  						YYABORT;
  					}
@@ -69,7 +67,7 @@ index 968888a..0e5f8b1 100644
  							yyerror("pvar with transformations in assignment"
  									" left side");
  					}
-@@ -2715,7 +2703,7 @@ rval: intno			{$$=mk_rve_rval(RV_INT, (void*)$1); }
+@@ -2881,7 +2869,7 @@
  									$$=mk_rve_rval(RV_AVP, &$1->lv.avps);
  									break;
  								case LV_PVAR:
@@ -78,11 +76,9 @@ index 968888a..0e5f8b1 100644
  									break;
  								default:
  									yyerror("BUG: invalid lvalue type ");
-diff --git a/lvalue.c b/lvalue.c
-index a89cfce..a235ccc 100644
 --- a/lvalue.c
 +++ b/lvalue.c
-@@ -255,7 +255,7 @@ inline static int lval_pvar_assign(struct run_act_ctx* h, struct sip_msg* msg,
+@@ -255,7 +255,7 @@
  		pv_get_null(msg, 0, &pval)
  	
  	destroy_pval=0;
@@ -91,8 +87,6 @@ index a89cfce..a235ccc 100644
  	if (unlikely(!pv_is_w(pvar))){
  		ERR("read only pvar\n");
  		goto error;
-diff --git a/lvalue.h b/lvalue.h
-index 566f84e..3dbbcb1 100644
 --- a/lvalue.h
 +++ b/lvalue.h
 @@ -35,7 +35,7 @@
@@ -104,6 +98,3 @@ index 566f84e..3dbbcb1 100644
  	avp_spec_t avps;
  };
  
--- 
-1.7.10.4
-

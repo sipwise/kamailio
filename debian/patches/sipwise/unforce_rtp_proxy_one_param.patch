@@ -102,7 +102,7 @@
  
  	if(ip==NULL)
  	{
-@@ -2002,13 +2015,13 @@
+@@ -2005,13 +2018,13 @@
  					&& tmb.t_gett()!=T_UNDEFINED)
  				tmb.t_gett()->uas.request->msg_flags |= FL_SDP_BODY;
  			if(route_type==FAILURE_ROUTE)
@@ -116,9 +116,9 @@
 -			return unforce_rtp_proxy_f(msg, flags, 0);
 +			return unforce_rtp_proxy0_f(msg, flags, 0);
  		if(nosdp==0) {
- 			if(method==METHOD_UPDATE)
+ 			if(method==METHOD_PRACK)
  				return force_rtp_proxy(msg, flags, (cp!=NULL)?newip:ip, 0,
-@@ -2068,16 +2081,26 @@
+@@ -2074,16 +2087,26 @@
  {
          char *cp;
          char newip[IP_ADDR_MAX_STR_SIZE];
@@ -147,7 +147,7 @@
  }
  
  static int
-@@ -2085,6 +2108,7 @@
+@@ -2091,6 +2114,7 @@
  {
          char *cp;
          char newip[IP_ADDR_MAX_STR_SIZE];
@@ -155,7 +155,7 @@
  
  	if (msg->first_line.type == SIP_REQUEST)
  		if (msg->first_line.u.request.method_value != METHOD_ACK)
-@@ -2092,18 +2116,26 @@
+@@ -2098,18 +2122,26 @@
  
          cp = ip_addr2a(&msg->rcv.dst_ip);
          strcpy(newip, cp);

@@ -1,8 +1,6 @@
-diff --git a/modules/dialplan/dialplan.c b/modules/dialplan/dialplan.c
-index ffa8bb4..a515bf4 100644
 --- a/modules/dialplan/dialplan.c
 +++ b/modules/dialplan/dialplan.c
-@@ -280,7 +280,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
+@@ -280,7 +280,7 @@
  	memset(&val, 0, sizeof(pv_value_t));
  	val.flags = PV_VAL_STR;
  
@@ -11,11 +9,9 @@ index ffa8bb4..a515bf4 100644
  
  	if (no_change)
  		goto set_attr_pvar;
-diff --git a/modules/dialplan/dp_repl.c b/modules/dialplan/dp_repl.c
-index ec2e5bb..63cf7d5 100644
 --- a/modules/dialplan/dp_repl.c
 +++ b/modules/dialplan/dp_repl.c
-@@ -147,41 +147,9 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+@@ -147,41 +147,9 @@
  	subst_comp 	= rule->subst_comp;
  	repl_comp 	= rule->repl_comp;
  
@@ -60,7 +56,7 @@ index ec2e5bb..63cf7d5 100644
  			LM_ERR("invalid replacing string\n");
  			goto error;
  		}
-@@ -194,108 +162,156 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+@@ -194,108 +162,156 @@
  		return 0;
  	}
  
@@ -88,8 +84,8 @@ index ec2e5bb..63cf7d5 100644
 +	if (pcre_exec(rule->subst_comp, NULL, string.s, string.len,
 +			0, 0, ovector, 3 * (MAX_REPLACE_WITH + 1)) <= 0) {
 +		LM_ERR("the string %.*s matched "
-+			"the match_exp %.*s but not the subst_exp %.*s!\n", 
-+			string.len, string.s, 
++			"the match_exp %.*s but not the subst_exp %.*s!\n",
++			string.len, string.s,
 +			rule->match_exp.len, rule->match_exp.s,
 +			rule->subst_exp.len, rule->subst_exp.s);
 +		return -1;
@@ -117,11 +113,6 @@ index ec2e5bb..63cf7d5 100644
 +		memcpy(result->s, string.s, ovector[0]);
 +		result->len += ovector[0];
 +	}
-+
-+	if (repl_comp) {
-+		/* offset- offset in the replacement string */
-+		repl_nb = offset = 0;
-+		p=repl_comp->replacement.s;
  
 -		switch(token.type) {
 -			case REPLACE_NMATCH:
@@ -131,10 +122,15 @@ index ec2e5bb..63cf7d5 100644
 -				match.len = ovector[match_nb + 1] - ovector[match_nb];
 -				if(result->len + match.len >= MAX_PHONE_NB_DIGITS){
 -					LM_ERR("overflow\n");
++	if (repl_comp) {
++		/* offset- offset in the replacement string */
++		repl_nb = offset = 0;
++		p=repl_comp->replacement.s;
++
 +		while( repl_nb < repl_comp->n_escapes){
 +
 +			token = repl_comp->replace[repl_nb];
-+			
++
 +			if(offset< token.offset){
 +				if((repl_comp->replacement.len < offset)||
 +					(result->len + token.offset -offset >= MAX_PHONE_NB_DIGITS)){
@@ -157,7 +153,7 @@ index ec2e5bb..63cf7d5 100644
 -				offset += token.size;
 +			switch(token.type) {
 +				case REPLACE_NMATCH:
-+					/*copy from the match subexpression*/	
++					/*copy from the match subexpression*/
 +					match_nb = token.u.nmatch * 2;
 +					match.s =  string.s + ovector[match_nb];
 +					match.len = ovector[match_nb + 1] - ovector[match_nb];
@@ -195,7 +191,7 @@ index ec2e5bb..63cf7d5 100644
 -			case REPLACE_URI:	
 -				if ( msg== NULL || msg->first_line.type!=SIP_REQUEST){
 -					LM_CRIT("uri substitution attempt on no request"
-+				case REPLACE_URI:	
++				case REPLACE_URI:
 +					if ( msg== NULL || msg->first_line.type!=SIP_REQUEST){
 +						LM_CRIT("uri substitution attempt on no request"
  							" message\n");

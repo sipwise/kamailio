@@ -7,8 +7,6 @@ Subject: [PATCH] avpops: allow xavp semantics on second parameter
  modules/avpops/avpops_impl.c |  112 ++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 112 insertions(+)
 
-diff --git a/modules/avpops/avpops_impl.c b/modules/avpops/avpops_impl.c
-index 65a5239..4fa2a53 100644
 --- a/modules/avpops/avpops_impl.c
 +++ b/modules/avpops/avpops_impl.c
 @@ -45,6 +45,7 @@
@@ -19,7 +17,7 @@ index 65a5239..4fa2a53 100644
  #include "avpops_impl.h"
  #include "avpops_db.h"
  
-@@ -1051,6 +1052,86 @@ error:
+@@ -1051,6 +1052,86 @@
  	return -1;
  }
  
@@ -106,7 +104,7 @@ index 65a5239..4fa2a53 100644
  int ops_check_avp( struct sip_msg* msg, struct fis_param* src,
  													struct fis_param* val)
  {
-@@ -1071,6 +1152,8 @@ int ops_check_avp( struct sip_msg* msg, struct fis_param* src,
+@@ -1071,6 +1152,8 @@
  	char           backup;
  	regex_t	       re_temp;
  	regex_t	       *re;
@@ -115,7 +113,7 @@ index 65a5239..4fa2a53 100644
  
  	/* look if the required avp(s) is/are present */
  	if(src->u.sval->type==PVT_AVP)
-@@ -1138,6 +1221,30 @@ cycle1:
+@@ -1138,6 +1221,30 @@
  				goto error;
  			}
  			check_flags = avp2->flags;
@@ -146,7 +144,7 @@ index 65a5239..4fa2a53 100644
  		} else {
  			avp2 = 0;
  			if(pv_get_spec_value(msg, val->u.sval, &xvalue)!=0)
-@@ -1308,6 +1415,11 @@ next:
+@@ -1308,6 +1415,11 @@
  	{
  		check_flags = avp2->flags;
  		goto cycle2;
@@ -158,6 +156,3 @@ index 65a5239..4fa2a53 100644
  	/* cycle for the first value -> next avp */
  	} else {
  		if(avp1 && val->ops&AVPOPS_FLAG_ALL)
--- 
-1.7.10.4
-

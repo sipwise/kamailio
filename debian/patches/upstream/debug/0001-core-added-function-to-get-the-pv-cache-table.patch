@@ -9,8 +9,6 @@ Subject: [PATCH] core: added function to get the pv cache table
  pvar.h  |   16 ++++++++++++++++
  2 files changed, 24 insertions(+), 9 deletions(-)
 
-diff --git a/pvapi.c b/pvapi.c
-index 98b3d90..7f5fcc2 100644
 --- a/pvapi.c
 +++ b/pvapi.c
 @@ -41,7 +41,6 @@
@@ -21,7 +19,7 @@ index 98b3d90..7f5fcc2 100644
  #define TR_TABLE_SIZE	16  /*!< transformations table size */
  
  
-@@ -58,14 +57,6 @@ typedef struct _pv_item
+@@ -58,14 +57,6 @@
  static pv_item_t* _pv_table[PV_TABLE_SIZE];
  static int _pv_table_set = 0;
  
@@ -36,7 +34,7 @@ index 98b3d90..7f5fcc2 100644
  static pv_cache_t* _pv_cache[PV_CACHE_SIZE];
  static int _pv_cache_set = 0;
  
-@@ -87,6 +78,14 @@ void pv_init_cache(void)
+@@ -87,6 +78,14 @@
  	_pv_cache_set = 1;
  }
  
@@ -51,11 +49,9 @@ index 98b3d90..7f5fcc2 100644
  
  /**
   * @brief Check if a char is valid according to the PV syntax
-diff --git a/pvar.h b/pvar.h
-index c3d7b44..75c4914 100644
 --- a/pvar.h
 +++ b/pvar.h
-@@ -226,6 +226,22 @@ int pv_get_intstrval(struct sip_msg *msg, pv_param_t *param,
+@@ -225,6 +225,22 @@
  		pv_value_t *res, int ival, str *sval);
  
  /**
@@ -78,6 +74,3 @@ index c3d7b44..75c4914 100644
   * Transformations
   */
  #define TR_LBRACKET_STR		"{"
--- 
-1.7.10.4
-
