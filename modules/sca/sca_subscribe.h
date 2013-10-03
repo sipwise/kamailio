@@ -74,7 +74,12 @@ extern const str 	SCA_METHOD_SUBSCRIBE;
 	((sub1)->state >= SCA_SUBSCRIPTION_STATE_TERMINATED && \
 		(sub1)->state <= SCA_SUBSCRIPTION_STATE_TERMINATED_TIMEOUT )
 
+#define SCA_SUB_REPLY_ERROR( mod, scode, smsg, sreply ) \
+        sca_subscription_reply((mod), (scode), (smsg), \
+		SCA_EVENT_TYPE_CALL_INFO, -1, (sreply))
+
 int	sca_handle_subscribe( sip_msg_t *, char *, char * );
+int	sca_subscription_reply( sca_mod *, int, char *, int, int, sip_msg_t * );
 
 int	sca_subscription_from_db_result( db1_res_t *, sca_subscription * );
 int	sca_subscriptions_restore_from_db( sca_mod * );
@@ -83,6 +88,7 @@ void	sca_subscription_db_update_timer( unsigned, void * );
 void	sca_subscription_purge_expired( unsigned int, void * );
 void	sca_subscription_state_to_str( int, str * );
 
+int	sca_subscription_aor_has_subscribers( int, str * );
 int	sca_subscription_delete_subscriber_for_event( sca_mod *, str *, str *,
 						      str * );
 int	sca_subscription_terminate( sca_mod *, str *, int, str *, int, int );
