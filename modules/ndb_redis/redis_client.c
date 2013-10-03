@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <stdarg.h>
 
 #include "../../mem/mem.h"
 #include "../../dprint.h"
@@ -45,7 +46,7 @@ static redisc_reply_t *_redisc_rpl_list=NULL;
  */
 int redisc_init(void)
 {
-	char *addr;
+	char *addr, *unix_sock_path = NULL;
 	unsigned int port, db;
 	redisc_server_t *rsrv=NULL;
 	param_t *pit = NULL;
@@ -67,7 +68,10 @@ int redisc_init(void)
 		db = 0;
 		for (pit = rsrv->attrs; pit; pit=pit->next)
 		{
-			if(pit->name.len==4 && strncmp(pit->name.s, "addr", 4)==0) {
+			if(pit->name.len==4 && strncmp(pit->name.s, "unix", 4)==0) {
+				unix_sock_path = pit->body.s;
+				unix_sock_path[pit->body.len] = '\0';
+			} else if(pit->name.len==4 && strncmp(pit->name.s, "addr", 4)==0) {
 				addr = pit->body.s;
 				addr[pit->body.len] = '\0';
 			} else if(pit->name.len==4 && strncmp(pit->name.s, "port", 4)==0) {
@@ -78,7 +82,14 @@ int redisc_init(void)
 					db = 0;
 			}
 		}
-		rsrv->ctxRedis = redisConnectWithTimeout(addr, port, tv);
+
+		if(unix_sock_path != NULL) {
+			LM_DBG("Connecting to unix socket: %s\n", unix_sock_path);
+			rsrv->ctxRedis = redisConnectUnixWithTimeout(unix_sock_path, tv);
+		} else {
+			rsrv->ctxRedis = redisConnectWithTimeout(addr, port, tv);
+		}
+
 		if(!rsrv->ctxRedis)
 			goto err;
 		if (rsrv->ctxRedis->err)
@@ -93,12 +104,22 @@ int redisc_init(void)
 	return 0;
 
 err2:
-	LM_ERR("error communicating with redis server [%.*s] (%s:%d/%d): %s\n",
-		rsrv->sname->len, rsrv->sname->s, addr, port, db, rsrv->ctxRedis->errstr);
+	if (unix_sock_path != NULL) {
+		LM_ERR("error communicating with redis server [%.*s] (unix:%s db:%d): %s\n",
+			   rsrv->sname->len, rsrv->sname->s, unix_sock_path, db, rsrv->ctxRedis->errstr);
+	} else {
+		LM_ERR("error communicating with redis server [%.*s] (%s:%d/%d): %s\n",
+			   rsrv->sname->len, rsrv->sname->s, addr, port, db, rsrv->ctxRedis->errstr);
+	}
 	return -1;
 err:
-	LM_ERR("failed to connect to redis server [%.*s] (%s:%d/%d)\n",
-		rsrv->sname->len, rsrv->sname->s, addr, port, db);
+	if (unix_sock_path != NULL) {
+		LM_ERR("failed to connect to redis server [%.*s] (unix:%s db:%d)\n",
+			   rsrv->sname->len, rsrv->sname->s, unix_sock_path, db);
+	} else {
+		LM_ERR("failed to connect to redis server [%.*s] (%s:%d/%d)\n",
+			   rsrv->sname->len, rsrv->sname->s, addr, port, db);
+	}
 	return -1;
 }
 
@@ -107,8 +128,26 @@ err:
  */
 int redisc_destroy(void)
 {
+	redisc_reply_t *rpl, *next_rpl;
+
 	redisc_server_t *rsrv=NULL;
 	redisc_server_t *rsrv1=NULL;
+
+	rpl = _redisc_rpl_list;
+	while(rpl != NULL)
+	{
+		next_rpl = rpl->next;
+		if(rpl->rplRedis)
+			freeReplyObject(rpl->rplRedis);
+
+		if(rpl->rname.s != NULL)
+			pkg_free(rpl->rname.s);
+
+		pkg_free(rpl);
+		rpl = next_rpl;
+	}
+	_redisc_rpl_list = NULL;
+
 	if(_redisc_srv_list==NULL)
 		return -1;
 	rsrv=_redisc_srv_list;
@@ -121,6 +160,8 @@ int redisc_destroy(void)
 		free_params(rsrv1->attrs);
 		pkg_free(rsrv1);
 	}
+	_redisc_srv_list = NULL;
+
 	return 0;
 }
 
@@ -201,7 +242,7 @@ redisc_server_t *redisc_get_server(str *name)
  */
 int redisc_reconnect_server(redisc_server_t *rsrv)
 {
-	char *addr;
+	char *addr, *unix_sock_path = NULL;
 	unsigned int port, db;
 	param_t *pit = NULL;
 	struct timeval tv;
@@ -213,7 +254,10 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 	db = 0;
 	for (pit = rsrv->attrs; pit; pit=pit->next)
 	{
-		if(pit->name.len==4 && strncmp(pit->name.s, "addr", 4)==0) {
+		if(pit->name.len==4 && strncmp(pit->name.s, "unix", 4)==0) {
+			unix_sock_path = pit->body.s;
+			unix_sock_path[pit->body.len] = '\0';
+		} else if(pit->name.len==4 && strncmp(pit->name.s, "addr", 4)==0) {
 			addr = pit->body.s;
 			addr[pit->body.len] = '\0';
 		} else if(pit->name.len==4 && strncmp(pit->name.s, "port", 4)==0) {
@@ -229,7 +273,11 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 		rsrv->ctxRedis = NULL;
 	}
 
-	rsrv->ctxRedis = redisConnectWithTimeout(addr, port, tv);
+	if(unix_sock_path != NULL) {
+		rsrv->ctxRedis = redisConnectUnixWithTimeout(unix_sock_path, tv);
+	} else {
+		rsrv->ctxRedis = redisConnectWithTimeout(addr, port, tv);
+	}
 	if(!rsrv->ctxRedis)
 		goto err;
 	if (rsrv->ctxRedis->err)
@@ -242,46 +290,62 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 	return 0;
 
 err2:
-	LM_ERR("error communicating with redis server [%.*s] (%s:%d/%d): %s\n",
-		rsrv->sname->len, rsrv->sname->s, addr, port, db, rsrv->ctxRedis->errstr);
-	return -1;
+	if (unix_sock_path != NULL) {
+		LM_ERR("error communicating with redis server [%.*s] (unix:%s db:%d): %s\n",
+			   rsrv->sname->len, rsrv->sname->s, unix_sock_path, db, rsrv->ctxRedis->errstr);
+	} else {
+		LM_ERR("error communicating with redis server [%.*s] (%s:%d/%d): %s\n",
+			   rsrv->sname->len, rsrv->sname->s, addr, port, db, rsrv->ctxRedis->errstr);
+	}
 err:
-	LM_ERR("failed to connect to redis server [%.*s] (%s:%d/%d)\n",
-		rsrv->sname->len, rsrv->sname->s, addr, port, db);
+	if (unix_sock_path != NULL) {
+		LM_ERR("failed to connect to redis server [%.*s] (unix:%s db:%d)\n",
+			   rsrv->sname->len, rsrv->sname->s, unix_sock_path, db);
+	} else {
+		LM_ERR("failed to connect to redis server [%.*s] (%s:%d/%d)\n",
+			   rsrv->sname->len, rsrv->sname->s, addr, port, db);
+	}
 	return -1;
 }
 
 /**
  *
  */
-int redisc_exec(str *srv, str *cmd, str *argv1, str *argv2, str *argv3,
-		str *res)
+int redisc_exec(str *srv, str *res, str *cmd, ...)
 {
 	redisc_server_t *rsrv=NULL;
 	redisc_reply_t *rpl;
 	char c;
+	va_list ap;
+
+	va_start(ap, cmd);
 
 	rsrv = redisc_get_server(srv);
 	if(srv==NULL || cmd==NULL || res==NULL)
 	{
 		LM_ERR("invalid parameters");
-		return -1;
+		goto error_exec;
+	}
+	if(srv->len==0 || res->len==0 || cmd->len==0)
+	{
+		LM_ERR("invalid parameters");
+		goto error_exec;
 	}
 	if(rsrv==NULL)
 	{
 		LM_ERR("no redis server found: %.*s\n", srv->len, srv->s);
-		return -1;
+		goto error_exec;
 	}
 	if(rsrv->ctxRedis==NULL)
 	{
 		LM_ERR("no redis context for server: %.*s\n", srv->len, srv->s);
-		return -1;
+		goto error_exec;
 	}
 	rpl = redisc_get_reply(res);
 	if(rpl==NULL)
 	{
 		LM_ERR("no redis reply id found: %.*s\n", res->len, res->s);
-		return -1;
+		goto error_exec;
 	}
 	if(rpl->rplRedis!=NULL)
 	{
@@ -291,19 +355,87 @@ int redisc_exec(str *srv, str *cmd, str *argv1, str *argv2, str *argv3,
 	}
 	c = cmd->s[cmd->len];
 	cmd->s[cmd->len] = '\0';
-	rpl->rplRedis = redisCommand(rsrv->ctxRedis, cmd->s);
+	rpl->rplRedis = redisvCommand(rsrv->ctxRedis, cmd->s, ap );
 	if(rpl->rplRedis == NULL)
 	{
 		/* null reply, reconnect and try again */
+		if(rsrv->ctxRedis->err)
+		{
+			LM_ERR("Redis error: %s\n", rsrv->ctxRedis->errstr);
+		}
 		if(redisc_reconnect_server(rsrv)==0)
 		{
-			rpl->rplRedis = redisCommand(rsrv->ctxRedis, cmd->s);
+			rpl->rplRedis = redisvCommand(rsrv->ctxRedis, cmd->s, ap);
+		} else {
+			LM_ERR("unable to reconnect to redis server: %.*s\n", srv->len, srv->s);
+			cmd->s[cmd->len] = c;
+			goto error_exec;
 		}
 	}
 	cmd->s[cmd->len] = c;
+	va_end(ap);
 	return 0;
+
+error_exec:
+	va_end(ap);
+	return -1;
+
 }
 
+/**
+ * Executes a redis command.
+ * Command is coded using a vector of strings, and a vector of lenghts.
+ *
+ * @param rsrv Pointer to a redis_server_t structure.
+ * @param argc number of elements in the command vector.
+ * @param argv vector of zero terminated strings forming the command.
+ * @param argvlen vector of command string lenghts or NULL.
+ * @return redisReply structure or NULL if there was an error.
+ */
+void * redisc_exec_argv(redisc_server_t *rsrv, int argc, const char **argv, const size_t *argvlen)
+{
+	redisReply *res=NULL;
+
+	if(rsrv==NULL || rsrv->ctxRedis==NULL)
+	{
+		LM_ERR("no redis context found for server %.*s\n",
+			   rsrv->sname->len, rsrv->sname->s);
+		return NULL;
+	}
+	if(argc<=0)
+	{
+		LM_ERR("invalid parameters\n");
+		return NULL;
+	}
+	if(argv==NULL || *argv==NULL)
+	{
+		LM_ERR("invalid parameters\n");
+		return NULL;
+	}
+	res = redisCommandArgv(rsrv->ctxRedis, argc, argv, argvlen);
+	if(res)
+	{
+		return res;
+	}
+
+	/* null reply, reconnect and try again */
+	if(rsrv->ctxRedis->err)
+	{
+		LM_ERR("Redis error: %s\n", rsrv->ctxRedis->errstr);
+	}
+	if(redisc_reconnect_server(rsrv)==0)
+	{
+		res = redisCommandArgv(rsrv->ctxRedis, argc, argv, argvlen);
+	}
+	else
+	{
+		LM_ERR("Unable to reconnect to server: %.*s\n",
+			   rsrv->sname->len, rsrv->sname->s);
+		return NULL;
+	}
+
+	return res;
+}
 
 /**
  *
@@ -343,4 +475,41 @@ redisc_reply_t *redisc_get_reply(str *name)
 	rpl->next = _redisc_rpl_list;
 	_redisc_rpl_list = rpl;
 	return rpl;
+}
+
+
+/**
+ *
+ */
+int redisc_free_reply(str *name)
+{
+	redisc_reply_t *rpl, *next_rpl;
+	unsigned int hid;
+
+	if(name==NULL || name->len==0) {
+		LM_ERR("invalid parameters");
+		return -1;
+	}
+
+	hid = get_hash1_raw(name->s, name->len);
+
+	rpl = _redisc_rpl_list;
+	while(rpl) {
+
+		if(rpl->hname==hid && rpl->rname.len==name->len
+		   && strncmp(rpl->rname.s, name->s, name->len)==0) {
+			next_rpl = rpl->next;
+			if(rpl->rplRedis) {
+				freeReplyObject(rpl->rplRedis);
+				rpl->rplRedis = NULL;
+			}
+
+			return 0;
+		}
+
+		rpl = rpl->next;
+	}
+
+	/* reply entry not found. */
+	return -1;
 }

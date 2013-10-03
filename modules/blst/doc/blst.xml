@@ -2,8 +2,9 @@
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
    "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
 
-<section id="blst" xmlns:xi="http://www.w3.org/2001/XInclude">
-    <sectioninfo>
+<book id="blst" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <bookinfo>
+        <title>Blst Module - Blacklist Management</title>
 	<authorgroup>
 	    <author>
 		<firstname>Andrei</firstname>
@@ -18,10 +19,10 @@
 	    <year>2007</year>
 	    <holder>iptelorg GmbH</holder>
 	</copyright>
-    </sectioninfo>
+    </bookinfo>
 
-    <title>Blst Module</title>
-
+    <chapter>
+	<title>Admin Guide</title>
     <section id="blst.overview">
 	<title>Overview</title>
 	<para>
@@ -29,7 +30,7 @@
 	</para>
     </section>
 
-    <xi:include href="functions.xml"/>
-
-</section>
+    <xi:include href="blst_functions.xml"/>
+    </chapter>
+</book>
 

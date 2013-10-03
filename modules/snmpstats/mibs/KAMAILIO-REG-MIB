@@ -1,0 +1,208 @@
+-- *******************************************************************
+-- KAMAILIO-REG-MIB: Kamailio Global Registration MIB file
+--
+-- Date of Creation: March 2006
+-- Mike Varley
+--
+-- Copyright (c) The Internet Society (2006)
+-- Ammendments (c) Soma Networks, Inc. (2006)            
+--
+-- Modeled after recommedations in 'Understanding SNMP MIBs'
+-- (Perkins, McGinnis) Prentice Hall 1997, chapter 8.
+--
+-- using SMIv2 syntax.
+--
+-- *******************************************************************
+
+KAMAILIO-REG-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY,
+    enterprises, OBJECT-IDENTITY
+        FROM SNMPv2-SMI;
+
+kamailioRegMibModule MODULE-IDENTITY
+    LAST-UPDATED    "201301080430Z"
+    ORGANIZATION    "Kamailio"
+    CONTACT-INFO
+        "http://www.kamailio.org open source project."
+    DESCRIPTION
+        "Kamailio Global Registration MIB"
+
+    REVISION "201301080430Z"
+    DESCRIPTION
+        "Moved MIB to the new product name Kamailio and renamed MIB as well as entries"
+
+    REVISION "200909280430Z"
+    DESCRIPTION
+        "Moved the Kamailio MIBs from the experimental branch to the IANA
+         assigned enterprise branch 34352"       
+
+    REVISION "200603211200Z"
+    DESCRIPTION
+        "Initial Kamailio Mib Release"
+    ::= { kamailioModules 1 }
+
+-- top level enterprise identification
+kamailio OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "The IANA has assigned enterprise branch 34352 to Kamailio."
+    ::= { enterprises 34352 }
+
+-- namespace management sub-trees    
+kamailioReg OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for identification of Modules and logical components."
+    ::= { kamailio 1 }
+
+kamailioGeneric OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for objects and events common to Kamailio products."
+    ::= { kamailio 2 }
+    
+kamailioProducts OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for objects and events for specific Kamailio products and modules."
+    ::= { kamailio 3 }
+    
+-- Agent implementation profiles: Agents which implement the product MIBs 
+-- can publish under this branch which portions they support or exclude.
+kamailioCaps OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for agent implementation profiles."
+    ::= { kamailio 4 }
+
+kamailioReqs OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for Management Application module requirements."
+    ::= { kamailio 5 }
+    
+-- Experimental branch, for development
+kamailioExpr   OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for experimental definitions and new development."
+    ::= { kamailio 6 }
+
+
+--
+-- The Registration sub-tree
+--
+kamailioModules  OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree to register the values assigned to modules with the 
+     MODULE-IDENTITY construct. Core MIBs are registered under this branch."
+    ::= { kamailioReg 1 }
+
+kamailioPlugins OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION
+    "Sub-tree to register plugin modules. Plugins with their own specific MIBs
+     are registered under this branch."
+    ::= {kamailioReg 2 }
+    
+--
+-- Generic Sub-tree: currently there are no generic object or event definitions
+-- for the Kamailio group.
+--
+
+--
+-- Products Sub-tree: this is the sub-tree where all product specific object
+-- and events are defined.
+--
+
+kamailioCoreMIB  OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for all objects and events related to the core Kamailio MIBs"
+    ::= { kamailioProducts 1 }
+
+kamailioPluginMIB OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "Sub-tree for all objects and events related to plugins for Kamailio."
+    ::= { kamailioProducts 2 }
+ 
+--
+-- Agent Capabilities Sub-tree: currently there are no agent capability MIBs
+-- defined.
+--   
+
+-- 
+-- Requirements Sub-tree: currently there are no Management Application
+-- requirement MIBs defined.
+--
+
+--
+-- Experimental Sub-tree: currently there are no experimental MIBs defined.
+--
+
+
+--
+-- Module Registrations: each MIB needs a registration entry here, referenced
+-- by the MODULE-IDENTITY construct.
+--
+-- The following are just Module Identifier definitions; the actual OID 
+-- registration takes place in the MIBs themselves. This is for reference,
+-- if someone is looking to add a new module.
+--
+
+-- kamailioRegMibModule ::= { kamailioModules 1 } is this files MODULE-IDENTITY
+
+-- The Text Conventions used by the Kamailio product tree.
+kamailioTcModule OBJECT IDENTIFIER ::= { kamailioModules 2 }
+
+-- The Kamailio version of the SIP-COMMON-MIB.
+kamailioSIPCommonModule OBJECT IDENTIFIER ::= { kamailioModules 3 }
+
+-- The Kamailio version of the SIP-SERVER-MIB.
+kamailioSIPServerModule OBJECT IDENTIFIER ::= { kamailioModules 4 }
+
+-- The Kamailio MIB Module, containing internal statistics and state
+-- information.
+kamailioModule OBJECT IDENTIFIER ::= { kamailioModules 5 }
+
+--
+-- Plugin Module Registrations: add any Kamailio plugin MIB Module registrations
+-- here, under kamailioPlugins.
+--
+
+--
+-- Product Core MIBs: this section has the actual MIB objects registered.
+-- The MIB files will define objects that use the following as their parent.
+--
+
+kamailioSIPCommonMIB OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "The Kamailio version of the SIP-COMMON-MIB. All objects and events are
+     defined under this branch."
+    ::= { kamailioCoreMIB 1 }
+
+kamailioSIPServerMIB OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "The Kamailio version of the SIP-SERVER-MIB. All objects and events are
+     defined under this branch."
+    ::= { kamailioCoreMIB 2 }
+    
+kamailioMIB OBJECT-IDENTITY
+    STATUS current
+    DESCRIPTION 
+    "The Kamailio MIB object and event definitons."
+    ::= { kamailioCoreMIB 3 }
+
+--
+-- Product Plugin MIBs: add any specific Kamailio plugin MIBs here, under 
+-- kamailioPluginMIB
+--
+
+
+END

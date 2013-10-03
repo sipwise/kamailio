@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver     3.3.4
+%define ver     4.0.4
 %define rel     0
 %define _sharedir %{_prefix}/share
 
@@ -538,7 +538,7 @@ fi
 %{_sbindir}/kamailio
 %{_sbindir}/kamctl
 %{_sbindir}/kamdbctl
-%{_sbindir}/sercmd
+%{_sbindir}/kamcmd
 %{_libdir}/kamailio/kamctl/dbtextdb/dbtextdb.py
 %{_libdir}/kamailio/kamctl/dbtextdb/dbtextdb.pyc
 %{_libdir}/kamailio/kamctl/dbtextdb/dbtextdb.pyo

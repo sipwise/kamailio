@@ -305,8 +305,6 @@ extern char *finame;
 %token FORWARD_TLS
 %token FORWARD_SCTP
 %token FORWARD_UDP
-%token SEND
-%token SEND_TCP
 %token EXIT
 %token DROP
 %token RETURN
@@ -391,6 +389,8 @@ extern char *finame;
 %token TCP
 %token TLS
 %token SCTP
+%token WS
+%token WSS
 
 /* config vars. */
 %token DEBUG_V
@@ -399,6 +399,7 @@ extern char *finame;
 %token LOGSTDERROR
 %token LOGFACILITY
 %token LOGNAME
+%token LOGCOLOR
 %token LISTEN
 %token ADVERTISE
 %token ALIAS
@@ -560,6 +561,7 @@ extern char *finame;
 %token PVBUFSIZE
 %token PVBUFSLOTS
 %token HTTP_REPLY_HACK
+%token VERSION_TABLE_CFG
 %token CFG_DESCRIPTION
 %token SERVER_ID
 %token LATENCY_LOG
@@ -656,7 +658,7 @@ extern char *finame;
 %type <sockid>  id_lst
 %type <sockid>  phostport
 %type <sockid>  listen_phostport
-%type <intval> proto port
+%type <intval> proto eqproto port
 %type <intval> equalop strop cmpop rve_cmpop rve_equalop
 %type <intval> uri_type
 %type <attr> attr_id
@@ -771,6 +773,15 @@ proto:
 	| SCTP	{ $$=PROTO_SCTP; }
 	| STAR	{ $$=0; }
 	;
+eqproto:
+	UDP	{ $$=PROTO_UDP; }
+	| TCP	{ $$=PROTO_TCP; }
+	| TLS	{ $$=PROTO_TLS; }
+	| SCTP	{ $$=PROTO_SCTP; }
+	| WS	{ $$=PROTO_WS; }
+	| WSS	{ $$=PROTO_WSS; }
+	| STAR	{ $$=0; }
+	;
 port:
 	NUMBER	{ $$=$1; }
 	| STAR	{ $$=0; }
@@ -841,7 +852,9 @@ assign_stm:
 	| FORK  EQUAL error  { yyerror("boolean value expected"); }
 	| FORK_DELAY  EQUAL NUMBER { set_fork_delay($3); }
 	| FORK_DELAY  EQUAL error  { yyerror("number expected"); }
-	| LOGSTDERROR EQUAL NUMBER { if (!config_check) log_stderr=$3; }
+	| LOGSTDERROR EQUAL NUMBER { if (!config_check)  /* if set from cmd line, don't overwrite from yyparse()*/ 
+					if(log_stderr == 0) log_stderr=$3; 
+				   }
 	| LOGSTDERROR EQUAL error { yyerror("boolean value expected"); }
 	| LOGFACILITY EQUAL ID {
 		if ( (i_tmp=str2facility($3))==-1)
@@ -852,6 +865,8 @@ assign_stm:
 	| LOGFACILITY EQUAL error { yyerror("ID expected"); }
 	| LOGNAME EQUAL STRING { log_name=$3; }
 	| LOGNAME EQUAL error { yyerror("string value expected"); }
+	| LOGCOLOR EQUAL NUMBER { log_color=$3; }
+	| LOGCOLOR EQUAL error { yyerror("boolean value expected"); }
 	| DNS EQUAL NUMBER   { received_dns|= ($3)?DO_DNS:0; }
 	| DNS EQUAL error { yyerror("boolean value expected"); }
 	| REV_DNS EQUAL NUMBER { received_dns|= ($3)?DO_REV_DNS:0; }
@@ -970,6 +985,10 @@ assign_stm:
 	| CORELOG EQUAL error { yyerror("int value expected"); }
 	| SIP_WARNING EQUAL NUMBER { sip_warning=$3; }
 	| SIP_WARNING EQUAL error { yyerror("boolean value expected"); }
+	| VERSION_TABLE_CFG EQUAL STRING { version_table.s=$3;
+			version_table.len=strlen(version_table.s);
+	}
+	| VERSION_TABLE_CFG EQUAL error { yyerror("string value expected"); }
 	| USER EQUAL STRING     {
 		if (shm_initialized())
 			yyerror("user must be before any modparam or the"
@@ -2201,18 +2220,18 @@ exp_elem:
 	| eint_op cmpop error   { $$=0; yyerror("number expected"); }
 	| eint_op equalop error { $$=0; yyerror("number expected"); }
 	| eint_op error { $$=0; yyerror("==, !=, <,>, >= or <=  expected"); }
-	| PROTO equalop proto %prec EQUAL_T
+	| PROTO equalop eqproto %prec EQUAL_T
 		{ $$=mk_elem($2, PROTO_O, 0, NUMBER_ST, (void*)$3 ); }
 	| PROTO equalop rval_expr %prec EQUAL_T
 		{ $$=mk_elem($2, PROTO_O, 0, RVE_ST, $3 ); }
 	| PROTO equalop error
-		{ $$=0; yyerror("protocol expected (udp, tcp, tls or sctp)"); }
-	| SNDPROTO equalop proto %prec EQUAL_T
+		{ $$=0; yyerror("protocol expected (udp, tcp, tls, sctp, ws, or wss)"); }
+	| SNDPROTO equalop eqproto %prec EQUAL_T
 		{ $$=mk_elem($2, SNDPROTO_O, 0, NUMBER_ST, (void*)$3 ); }
 	| SNDPROTO equalop rval_expr %prec EQUAL_T
 		{ $$=mk_elem($2, SNDPROTO_O, 0, RVE_ST, $3 ); }
 	| SNDPROTO equalop error
-		{ $$=0; yyerror("protocol expected (udp, tcp, tls or sctp)"); }
+		{ $$=0; yyerror("protocol expected (udp, tcp, tls, sctp, ws, or wss)"); }
 	| eip_op strop ipnet %prec EQUAL_T { $$=mk_elem($2, $1, 0, NET_ST, $3); }
 	| eip_op strop rval_expr %prec EQUAL_T {
 			s_tmp.s=0;
@@ -2396,8 +2415,6 @@ fcmd:
 		if ($1 && rt==ONSEND_ROUTE) {
 			switch($1->type) {
 				case DROP_T:
-				case SEND_T:
-				case SEND_TCP_T:
 				case LOG_T:
 				case SETFLAG_T:
 				case RESETFLAG_T:
@@ -3157,24 +3174,6 @@ cmd:
 	| FORWARD_SCTP error { $$=0; yyerror("missing '(' or ')' ?"); }
 	| FORWARD_SCTP LPAREN error RPAREN { $$=0; 
 									yyerror("bad forward_tls argument"); }
-	| SEND LPAREN RPAREN { $$=mk_action(SEND_T, 2, URIHOST_ST, 0, URIPORT_ST, 0); set_cfg_pos($$); }
-	| SEND LPAREN host RPAREN	{ $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
-	| SEND LPAREN STRING RPAREN { $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
-	| SEND LPAREN ip RPAREN		{ $$=mk_action(SEND_T, 2, IP_ST, (void*)$3, NUMBER_ST, 0); set_cfg_pos($$); }
-	| SEND LPAREN host COMMA NUMBER RPAREN	{ $$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
-	| SEND LPAREN STRING COMMA NUMBER RPAREN {$$=mk_action(SEND_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
-	| SEND LPAREN ip COMMA NUMBER RPAREN { $$=mk_action(SEND_T, 2, IP_ST, (void*)$3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
-	| SEND error { $$=0; yyerror("missing '(' or ')' ?"); }
-	| SEND LPAREN error RPAREN { $$=0; yyerror("bad send argument"); }
-	| SEND_TCP LPAREN RPAREN { $$=mk_action(SEND_TCP_T, 2, URIHOST_ST, 0, URIPORT_ST, 0); set_cfg_pos($$); }
-	| SEND_TCP LPAREN host RPAREN	{ $$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
-	| SEND_TCP LPAREN STRING RPAREN { $$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, 0); set_cfg_pos($$); }
-	| SEND_TCP LPAREN ip RPAREN	{ $$=mk_action(SEND_TCP_T, 2, IP_ST, (void*)$3, NUMBER_ST, 0); set_cfg_pos($$); }
-	| SEND_TCP LPAREN host COMMA NUMBER RPAREN	{ $$=mk_action(	SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$);}
-	| SEND_TCP LPAREN STRING COMMA NUMBER RPAREN {$$=mk_action(SEND_TCP_T, 2, STRING_ST, $3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
-	| SEND_TCP LPAREN ip COMMA NUMBER RPAREN { $$=mk_action(SEND_TCP_T, 2, IP_ST, (void*)$3, NUMBER_ST, (void*)$5); set_cfg_pos($$); }
-	| SEND_TCP error { $$=0; yyerror("missing '(' or ')' ?"); }
-	| SEND_TCP LPAREN error RPAREN { $$=0; yyerror("bad send_tcp argument"); }
 	| LOG_TOK LPAREN STRING RPAREN	{$$=mk_action(LOG_T, 2, NUMBER_ST,
 										(void*)(L_DBG+1), STRING_ST, $3);
 									set_cfg_pos($$); }
@@ -3278,29 +3277,6 @@ cmd:
 	| STRIP LPAREN error RPAREN { $$=0; yyerror("bad argument, number expected"); }
 	| SET_USERPHONE LPAREN RPAREN { $$=mk_action(SET_USERPHONE_T, 0); set_cfg_pos($$); }
 	| SET_USERPHONE error { $$=0; yyerror("missing '(' or ')' ?"); }
-	| APPEND_BRANCH LPAREN STRING COMMA STRING RPAREN {
-		qvalue_t q;
-		if (str2q(&q, $5, strlen($5)) < 0) {
-			yyerror("bad argument, q value expected");
-		}
-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, $3, NUMBER_ST, (void *)(long)q);
-		set_cfg_pos($$);
-	}
-	| APPEND_BRANCH LPAREN STRING RPAREN {
-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, $3,
-							NUMBER_ST, (void *)Q_UNSPECIFIED);
-		set_cfg_pos($$);
-	}
-	| APPEND_BRANCH LPAREN RPAREN {
-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, 0,
-							NUMBER_ST, (void *)Q_UNSPECIFIED);
-		set_cfg_pos($$);
-	}
-	| APPEND_BRANCH {
-		$$=mk_action(APPEND_BRANCH_T, 2, STRING_ST, 0,
-							NUMBER_ST, (void *)Q_UNSPECIFIED);
-		set_cfg_pos($$);
-	}
 	| REMOVE_BRANCH LPAREN intno RPAREN {
 			$$=mk_action(REMOVE_BRANCH_T, 1, NUMBER_ST, (void*)$3);
 			set_cfg_pos($$);

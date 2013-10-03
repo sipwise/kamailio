@@ -140,6 +140,8 @@ inline static void addr_info_list_ins_lst(struct addr_info* lst,
 /* protocol order, filled by init_proto_order() */
 enum sip_protos nxt_proto[PROTO_LAST+1]=
 { PROTO_UDP, PROTO_TCP, PROTO_TLS, PROTO_SCTP, 0 };
+/* Deliberately left PROTO_WS and PROTO_WSS out of this as they are just
+   upgraded TCP and TLS connections */
 
 
 
@@ -329,7 +331,7 @@ static void free_sock_info(struct socket_info* si)
 
 
 
-static char* get_valid_proto_name(unsigned short proto)
+char* get_valid_proto_name(unsigned short proto)
 {
 	switch(proto){
 		case PROTO_NONE:
@@ -476,11 +478,13 @@ struct socket_info** get_sock_info_list(unsigned short proto)
 			return &udp_listen;
 			break;
 		case PROTO_TCP:
+		case PROTO_WS:
 #ifdef USE_TCP
 			return &tcp_listen;
 #endif
 			break;
 		case PROTO_TLS:
+		case PROTO_WSS:
 #ifdef USE_TLS
 			return &tls_listen;
 #endif
@@ -566,7 +570,9 @@ struct socket_info* grep_sock_info(str* host, unsigned short port,
 		hname.len-=2;
 	}
 #endif
+
 	c_proto=(proto!=PROTO_NONE)?proto:PROTO_UDP;
+retry:
 	do{
 		/* get the proper sock_list */
 		list=get_sock_info_list(c_proto);
@@ -612,7 +618,15 @@ struct socket_info* grep_sock_info(str* host, unsigned short port,
 									&ai->address, ai->flags)==0)
 					goto found;
 		}
+
 	}while( (proto==0) && (c_proto=next_proto(c_proto)) );
+
+#ifdef USE_TLS
+	if (unlikely(c_proto == PROTO_WS)) {
+		c_proto = PROTO_WSS;
+		goto retry;
+	}
+#endif
 /* not_found: */
 	return 0;
 found:
@@ -833,6 +847,7 @@ int add_listen_iface(char* name, struct name_lst* addr_l,
 }
 #ifdef __OS_linux
 
+#include "linux/types.h"
 #include "linux/netlink.h"
 #include "linux/rtnetlink.h"
 #include "arpa/inet.h"
@@ -2003,7 +2018,7 @@ void print_all_socket_lists()
 						si->flags & SI_IS_MCAST ? " mcast" : "",
 						si->flags & SI_IS_MHOMED? " mhomed" : "");
 				if (si->useinfo.name.s)
-					printf(" advertise %s", si->useinfo.name.s);
+					printf(" advertise %s:%d", si->useinfo.name.s, si->useinfo.port_no);
 				printf("\n");
 			}
 		}
@@ -2054,6 +2069,9 @@ void init_proto_order()
 			if (nxt_proto[r]==PROTO_SCTP)
 				nxt_proto[r]=nxt_proto[PROTO_SCTP];
 		}
+
+	/* Deliberately skipping PROTO_WS and PROTO_WSS here as these
+	   are just upgraded TCP and TLS connections */
 }
 
 

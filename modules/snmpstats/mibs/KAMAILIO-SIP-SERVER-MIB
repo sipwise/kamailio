@@ -1,0 +1,780 @@
+-- ***********************************************************************
+--
+-- This MIB provides information related to the Kamailio SIP Router.
+-- 
+-- Copyright (c) The Internet Society (2006)
+-- Ammendments (c) Soma Networks, Inc. (2006)
+--
+-- All rights reserved.
+-- *****************************************************************
+
+
+KAMAILIO-SIP-SERVER-MIB DEFINITIONS ::= BEGIN
+
+      IMPORTS
+           MODULE-IDENTITY,
+           OBJECT-TYPE,
+           OBJECT-IDENTITY,
+           Counter32,
+           Unsigned32,
+           Gauge32
+                FROM SNMPv2-SMI
+
+           TruthValue,
+           DateAndTime,
+           RowStatus
+                FROM SNMPv2-TC
+
+           MODULE-COMPLIANCE,
+           OBJECT-GROUP
+                FROM SNMPv2-CONF
+
+           SnmpAdminString
+                FROM SNMP-FRAMEWORK-MIB
+
+           kamailioModules, 
+           kamailioSIPServerMIB
+                FROM KAMAILIO-REG-MIB;
+
+      kamailioSIPServerModule MODULE-IDENTITY
+           LAST-UPDATED   "201301081000Z"
+           ORGANIZATION   "Kamailio"
+           CONTACT-INFO
+                   "http://www.kamailio.org"
+                   
+           DESCRIPTION
+                "
+                Adapted from the draft-ietf-sip-mib-10.txt:
+                
+                    SIP WG email: sip@ietf.org
+
+                    Co-editor  Kevin Lingle
+                               Cisco Systems, Inc.
+                    postal:    7025 Kit Creek Road
+                               P.O. Box 14987
+                               Research Triangle Park, NC 27709
+                               USA
+                    email:     klingle@cisco.com
+                    phone:     +1 919 392 2029
+
+                    Co-editor  Joon Maeng
+                    email:     jmaeng@austin.rr.com
+
+                    Co-editor  Jean-Francois Mule
+                               CableLabs
+                    postal:    858 Coal Creek Circle
+                               Louisville, CO 80027
+                               USA
+                    email:     jf.mule@cablelabs.com
+                    phone:     +1 303 661 3708
+
+                    Co-editor  Dave Walker
+                    email:     drwalker@rogers.com
+
+                 Session Initiation Protocol (SIP) Server MIB module.
+
+                 SIP is an application-layer signaling protocol for
+                 creating, modifying and terminating multimedia
+                 sessions with one or more participants. These sessions
+                 include Internet multimedia conferences and Internet
+                 telephone calls.  SIP is defined in RFC 3261 (June
+                 2002).
+
+                 This MIB is defined for the management of SIP Proxy,
+                 Redirect and Registrar Servers.
+
+                 A Proxy Server acts as both a client and a server.
+                 It accepts requests from other clients, either
+                 responding to them or passing them on to other
+                 servers, possibly after modification.
+
+                 A Redirect Server accepts requests from clients and
+                 returns zero or more addresses to that client.
+                 Unlike a User Agent Server it does not accept calls.
+
+                 A Registrar is a server that accepts REGISTER
+                 requests.  A Registrar is typically co-located with a
+                 Proxy or Redirect Server.
+
+                 Copyright (C) The Internet Society (2006).
+                 This version of this MIB module is part of RFC XXXX;
+                  see the RFC itself for full legal notices."
+              REVISION        "200603281700Z"
+              DESCRIPTION
+                   "Added kamailioSIPRegUserLookupTable."
+
+              REVISION        "200603231200Z"
+              DESCRIPTION
+                   "made Kamailio specific and changed sipRegUserTable."
+                   
+              REVISION        "200603021700Z"
+              DESCRIPTION
+                   "Initial version of the IETF SIP-SERVER-MIB module."
+
+              REVISION        "201301081000Z"
+              DESCRIPTION
+                   "Changed product name to Kamailio and renamed MIB entries and MIB itself"
+           
+        ::= { kamailioModules 4 }
+
+--
+-- Top-Level Components of this MIB.
+--
+
+      kamailioSIPServerObjects  OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for accessible objects in the MIB." 
+        ::= { kamailioSIPServerMIB 1 }
+        
+      kamailioSIPServerConform  OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for conformance specifications." 
+        ::= { kamailioSIPServerMIB 2 }
+
+--
+-- These groups contain objects common to all SIP servers.
+--
+
+      kamailioSIPServerCfg   OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for server configuration objects." 
+        ::= { kamailioSIPServerObjects 1 }
+
+--
+-- Common Server Configuration Objects
+--
+
+--
+-- This group contains MIB objects related to SIP Proxy Servers.
+--
+    
+      kamailioSIPProxyCfg OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for proxy server configuration objects." 
+        ::= { kamailioSIPServerObjects 3 }
+      
+      kamailioSIPProxyStats    OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for proxy server statistics objects."  
+        ::= { kamailioSIPServerObjects 4 }
+
+--
+-- Proxy Server Configuration
+--
+      kamailioSIPProxyStatefulness OBJECT-TYPE
+          SYNTAX     INTEGER {
+                              stateless(1),
+                              transactionStateful(2),
+                              callStateful(3)
+                      }
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects the default mode of operation for
+                the Proxy Server entity.
+
+                A stateless proxy is a logical entity that does not
+                maintain the client or server transaction state machines
+                when it processes requests. A stateless proxy forwards
+                every request it receives downstream and every response
+                it receives upstream. If the value of this object is
+                stateless(1), the proxy defaults to stateless
+                operations.
+
+                A transaction stateful proxy, or simply a 'stateful
+                proxy', is a logical entity that maintains the client
+                and server transaction state machines during the
+                processing of a request. A (transaction) stateful proxy
+                is not the same as a call stateful proxy. If the value
+                if this object is transactionStateful(2), the proxy is
+                stateful on a transaction basis.
+
+                A call stateful proxy is a logical entity if it retains
+                state for a dialog from the initiating INVITE to the
+                terminating BYE request.  A call stateful proxy is
+                always transaction stateful, but the converse is not
+                necessarily true. If the value of this object is
+                callStateful(3), the proxy is call stateful."
+          REFERENCE
+                "RFC 3261, Section 16"
+          ::= { kamailioSIPProxyCfg 1 }
+
+
+      kamailioSIPProxyRecordRoute OBJECT-TYPE
+          SYNTAX     TruthValue
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects whether or not the proxy adds itself
+                to the Record-Route header as a default action.  This
+                header is used to list the proxies that insist on being in
+                the signaling path for subsequent requests related to the
+                call-leg.
+
+                If the value of this object is 'true', the proxy adds itself
+                to the end of the Record-Route header, creating the header
+                if required.  If the value is 'false', the proxy does
+                not add itself to the Record-Route header."
+          REFERENCE
+                "RFC 3261, Section 20.30"
+          ::= { kamailioSIPProxyCfg 3 }
+
+--
+-- Security
+--
+      kamailioSIPProxyAuthMethod OBJECT-TYPE
+          SYNTAX     BITS {
+                             none(0),
+                             tls(1),
+                             digest(2)
+                     }
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects the authentication methods that
+                MAY be used to authenticate request originators.
+
+                bit 0  no authentication is performed
+                bit 1  TLS is used
+                bit 2  HTTP Digest is used."
+          REFERENCE
+              "RFC 3261 Sections 22, 23, 26, 26.2.3"
+          ::= { kamailioSIPProxyCfg 4 }
+
+
+--
+-- Proxy Server Statistics
+--
+      kamailioSIPNumProxyRequireFailures OBJECT-TYPE
+          SYNTAX     Counter32
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains the number of occurrences of
+                unsupported options being specified in received Proxy-
+                Require headers.  Such occurrences result in a 420 Bad
+                Extension status code being
+                returned."
+          ::= { kamailioSIPProxyStats 1 }
+
+--
+-- This group contains MIB objects related to SIP Registrars.
+--
+      kamailioSIPRegCfg OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for SIP Registrar Configuration."
+        ::= { kamailioSIPServerObjects 5 }
+        
+      kamailioSIPRegStats OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for SIP Registrar Statistics." 
+        ::= { kamailioSIPServerObjects 6 }
+
+--
+-- Registrar Configuration
+--
+
+      kamailioSIPRegMaxContactExpiryDuration OBJECT-TYPE
+          SYNTAX     Unsigned32 (0..4294967295)
+          UNITS      "seconds"
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects the maximum expiry that may be
+                requested by a User Agent for a particular Contact.
+
+                User Agents can specify expiry using either an Expiry
+                header in a REGISTER request, or using an Expires parameter
+                in a Contact header in a REGISTER request.  If the value
+                requested by the User Agent is greater than the value
+                of this object, then the contact information is given the
+                duration specified by this object, and that duration
+                is indicated to the User Agent in the response."
+          ::= { kamailioSIPRegCfg 2 }
+
+      kamailioSIPRegMaxUsers OBJECT-TYPE
+          SYNTAX     Unsigned32 (1..4294967295)
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects the maximum number of users that
+                the Registrar supports.  The current number of users is
+                reflected by sipRegCurrentUsers."
+          ::= { kamailioSIPRegCfg 3 }
+
+      kamailioSIPRegCurrentUsers OBJECT-TYPE
+          SYNTAX     Gauge32 (0..4294967295)
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects the number of users currently
+                registered with the Registrar."
+          ::= { kamailioSIPRegCfg 4 }
+
+      kamailioSIPRegDfltRegActiveInterval OBJECT-TYPE
+          SYNTAX     Unsigned32 (1..4294967295)
+          UNITS      "seconds"
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object reflects the default time interval the
+                Registrar considers registrations to be active.  The
+                value is used to compute the Expires header in the
+                REGISTER response.  If a user agent requests a time
+                interval shorter than specified by this object, the
+                Registrar SHOULD honor that request.  If a Contact
+                entry does not have an 'expires' parameter, the value
+                of the Expires header field is used instead. If a
+                Contact entry has no 'expires' parameter and no the
+                Expires header field is present, the value of this
+                object is used as the default value.
+                This object SHOULD be non-volatile and its value SHOULD
+                be kept at reboot."
+          REFERENCE "RFC 3261, Section 10.2"
+          ::= { kamailioSIPRegCfg 5 }
+
+--
+-- Per User Information
+--
+      kamailioSIPRegUserTable OBJECT-TYPE
+          SYNTAX     SEQUENCE OF KamailioSIPRegUserEntry
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "This table contains information on all users registered
+                to each Registrar in this system."
+          ::= { kamailioSIPRegCfg 6 }
+
+      kamailioSIPRegUserEntry OBJECT-TYPE
+          SYNTAX     KamailioSIPRegUserEntry
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "This entry contains information for a single user
+                registered to this Registrar.
+
+                Each row represents those objects for a particular SIP
+                server present in this system."
+          INDEX { kamailioSIPUserIndex }
+          ::= { kamailioSIPRegUserTable 1 }
+
+      KamailioSIPRegUserEntry ::=
+          SEQUENCE {
+                   kamailioSIPUserIndex                     Unsigned32,
+                   kamailioSIPUserUri                       SnmpAdminString,
+                   kamailioSIPUserAuthenticationFailures    Counter32
+          }
+
+        kamailioSIPUserIndex OBJECT-TYPE
+             SYNTAX     Unsigned32 (1..4294967295)
+             MAX-ACCESS not-accessible
+             STATUS     current
+             DESCRIPTION
+                  "This object uniquely identifies a conceptual row in
+                  the table."
+             ::= { kamailioSIPRegUserEntry 1 }
+             
+      kamailioSIPUserUri OBJECT-TYPE
+          SYNTAX     SnmpAdminString
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains the user's address-of-record.  It
+                is the main form by which the Registrar knows the user.
+                The format is typically 'user@domain'.  It is contained
+                in the To header for all REGISTER requests."
+          ::= { kamailioSIPRegUserEntry 2 }
+
+      kamailioSIPUserAuthenticationFailures OBJECT-TYPE
+          SYNTAX     Counter32
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains a count of the number of times the
+                user has failed authentication."
+          ::= { kamailioSIPRegUserEntry 3 }
+
+--
+-- Per Contact Information
+--
+      kamailioSIPContactTable OBJECT-TYPE
+          SYNTAX     SEQUENCE OF KamailioSipContactEntry
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "This table contains information on every location where
+                a registered user (specified by sipUserIndex) wishes to
+                be found (i.e. the user has provided Contact information
+                to each SIP Registrar in this system)."
+          ::= { kamailioSIPRegCfg 7 }
+
+      kamailioSIPContactEntry OBJECT-TYPE
+          SYNTAX     KamailioSipContactEntry
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "This entry contains information for a single Contact.
+                Multiple contacts may exist for a single user."
+          INDEX { kamailioSIPUserIndex, kamailioSIPContactIndex }
+          ::= { kamailioSIPContactTable 1 }
+
+      KamailioSipContactEntry ::=
+          SEQUENCE {
+                   kamailioSIPContactIndex                Unsigned32,
+                   kamailioSIPContactDisplayName          SnmpAdminString,
+                   kamailioSIPContactURI                  SnmpAdminString,
+                   kamailioSIPContactLastUpdated          DateAndTime,
+                   kamailioSIPContactExpiry               DateAndTime,
+                   kamailioSIPContactPreference           SnmpAdminString
+          }
+
+      kamailioSIPContactIndex OBJECT-TYPE
+          SYNTAX     Unsigned32 (1..4294967295)
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "Along with the sipUserIndex, this object uniquely
+                identifies a conceptual row in the table."
+          ::= { kamailioSIPContactEntry 1 }
+
+      kamailioSIPContactDisplayName OBJECT-TYPE
+          SYNTAX     SnmpAdminString
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains the display name for the Contact.
+                For example, 'Santa at Home', or 'Santa on his Sled',
+                corresponding to contact URIs of
+                sip:BigGuy@sip.northpole.ca or
+                sip:sclaus817@sip.mobile.com, respectively."
+          ::= { kamailioSIPContactEntry 2 }
+
+      kamailioSIPContactURI OBJECT-TYPE
+          SYNTAX     SnmpAdminString
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains a SIP URI where
+                the user can be contacted.  This URI is normally returned
+                to a client from a Redirect Server, or is used as the
+                RequestURI in a SIP request line for requests forwarded
+                by a proxy."
+          ::= { kamailioSIPContactEntry 3 }
+
+      kamailioSIPContactLastUpdated OBJECT-TYPE
+          SYNTAX     DateAndTime
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object indicates the time when this contact
+                information was accepted.  If the contact information
+                is updated via a subsequent REGISTER of the same
+                information, this object is also updated."
+          ::= { kamailioSIPContactEntry 4 }
+
+      kamailioSIPContactExpiry OBJECT-TYPE
+          SYNTAX     DateAndTime
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains the date and time when the contact
+                information will no longer be valid.  Such times may be
+                specified by the user at registration (Expires header
+                or expiry parameter in the Contact information), or a
+                system default can be applied."
+          ::= { kamailioSIPContactEntry 5 }
+
+      kamailioSIPContactPreference OBJECT-TYPE
+          SYNTAX     SnmpAdminString
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object indicates a relative preference for the
+                particular Contact header field value compared to other
+                bindings for this address-of-record. A registering user
+                may provide this preference as a 'qvalue'parameter in
+                the Contact header.
+
+                The format of this item is a decimal number between 0
+                and 1 (for example 0.9).  Higher values indicate
+                locations preferred by the user."
+          REFERENCE
+               "RFC 3261, Section 10.2.1.2, 16.6 and 20.10"
+          ::= { kamailioSIPContactEntry 6 }
+
+--
+-- The regUser lookup table. Clients can use this structure to do a search on 
+-- the SIPRegUserTable and hence the SIPContactTable by URI, to avoid having to 
+-- walk the entire table. 
+--
+-- Clients first get an index by doing a 'get' on the LookupCounter: they can 
+-- do a 'set' on the table, providing their index and the URI they wish to find.
+-- They set the row-status to 'createAndGo'. 
+--
+-- The Agent will then search internally through the RegUserTable and populate
+-- the RegUserIndex column with the RegUserIndex associated with the provided 
+-- URI. Until the index is set, the row-status will be 'notReady', when the 
+-- agent has finished, the row-status will be set to 'active.
+--
+-- When the client has completed the transaction, it should set the row to 
+-- status to 'destroy', so the agent can remove the row and keep this table
+-- size small.
+--
+-- It is not the intention of this table to keep mappings very long, or update 
+-- them if the RegUserTable changes. Clients should always verify the URI they 
+-- get from the RegUserTable is consitent with what they expect; this is SNMP
+-- and there are no guarantees between requests.
+--
+      kamailioSIPRegUserLookupCounter OBJECT-TYPE
+            SYNTAX      Counter32
+            MAX-ACCESS  read-only
+            STATUS      current
+            DESCRIPTION
+                 "This is a monotonically increasing value that increases by 1
+                  each time and SNMP-GET is performed on this object. Clients 
+                  should read this object, then use the result as an index into
+                  the kamailioSIPRegUserLookupTable.
+                  
+                  This ensures that every row-set in the 
+                  kamailioSIPRegUserTable is unique, and each client request 
+                  will have a unique index to use."
+            ::= { kamailioSIPRegCfg 8 }
+            
+       kamailioSIPRegUserLookupTable  OBJECT-TYPE
+          SYNTAX     SEQUENCE OF KamailioSIPRegUserLookupEntry
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "This table contains the index mapping between a user's URI and
+                the index into the kamailioSIPRegUserTable.
+                
+                To use this table, a client must first get an index by doing a
+                SNMP GET on kamailioSIPRegUserLookupCounter. Then it must do an
+                SNMP SET on this table and create a new row in the table: it
+                needs to set the index, the URI the client is looking for, and
+                set the row-status to createAndGo.
+                
+                Then the client can do an SNMP GET on this table with the 
+                aquired index. If the row-status is 'active', then the 
+                kamailioSIPRegUserIndex is the index into the 
+                kamailioSIPRegUserTable that has the specified URI (0 zero 
+                indicates no such URI). The client should then set the 
+                row-status to 'destroy' in order to clean up this entry. Note
+                that after some time the entry will be automatically removed
+                regardless."
+          ::= { kamailioSIPRegCfg 9 }
+
+      kamailioSIPRegUserLookupEntry OBJECT-TYPE
+          SYNTAX     KamailioSIPRegUserLookupEntry
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "This entry contains a mapping from a given URI to the index in
+                the kamailioSIPRegUserTable."
+          INDEX { kamailioSIPRegUserLookupIndex }
+          ::= { kamailioSIPRegUserLookupTable 1 }
+
+      kamailioSIPRegUserLookupEntry ::=
+          SEQUENCE {
+                   kamailioSIPRegUserLookupIndex          Unsigned32,
+                   kamailioSIPRegUserLookupURI            SnmpAdminString,
+                   kamailioSIPRegUserIndex                Unsigned32,
+                   kamailioSIPRegUserLookupRowStatus      RowStatus
+          }
+
+      kamailioSIPRegUserLookupIndex OBJECT-TYPE
+          SYNTAX     Unsigned32
+          MAX-ACCESS not-accessible
+          STATUS     current
+          DESCRIPTION
+               "The specific lookup index for a client's request. Rows are 
+                automatically reaped, so this table remains small."
+          ::= { kamailioSIPRegUserLookupEntry 1 }
+
+      kamailioSIPRegUserLookupURI OBJECT-TYPE
+          SYNTAX     SnmpAdminString
+          MAX-ACCESS read-create
+          STATUS     current
+          DESCRIPTION
+               "This object is the URI to locate in the kamailioSIPRegUserTable.
+                The client must provide this data."
+          ::= { kamailioSIPRegUserLookupEntry 2 }
+
+      kamailioSIPRegUserIndex OBJECT-TYPE
+          SYNTAX     Unsigned32
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object is the index of the specified URI in the 
+                kamailioSIPRegUserTable. 0 (zero) indicates the URI is not in
+                the kamailioSIPRegUserTable. This value is provided by the agent
+                when the row-status is set to 'active'."
+          ::= { kamailioSIPRegUserLookupEntry 3 }
+
+      kamailioSIPRegUserLookupRowStatus OBJECT-TYPE
+          SYNTAX     RowStatus
+          MAX-ACCESS read-create
+          STATUS     current
+          DESCRIPTION
+               "This is the row status for the row:
+                  createAndGo: clients set the value to this when they create
+                      the row, to indicate they wish the agent to proceed.
+                  notReady: the agent has not yet finished processing the 
+                      request.
+                  active: the agent has completed its search and populated the 
+                    kamailioSIPRegUserIndex column.
+                  destroy: the client sets this value to indicate it has 
+                    finished with the row. The agent will remove it from the 
+                    table."
+          ::= { kamailioSIPRegUserLookupEntry 4 }
+
+--
+-- Registrar Statistics
+--
+      kamailioSIPRegAcceptedRegistrations OBJECT-TYPE
+          SYNTAX     Counter32
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains a count of the number of REGISTER
+                requests that have been accepted (status code 200) by
+                the Registrar.  This includes additions of new contact
+                information, refreshing contact information, as well as
+                requests for deletion of contact information."
+          ::= { kamailioSIPRegStats 1 }
+
+      kamailioSIPRegRejectedRegistrations OBJECT-TYPE
+          SYNTAX     Counter32
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               "This object contains a count of the number REGISTER
+                requests that have been rejected by the Registrar."
+          ::= { kamailioSIPRegStats 2 }
+
+--
+-- Conformance
+--
+      kamailioSIPServerCompliances OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for server compliences."  
+        ::= { kamailioSIPServerConform 1 }
+
+      kamailioSIPServerGroups OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for server group compliences."
+        ::= { kamailioSIPServerConform 2 }
+
+--
+-- Compliance Statements
+--
+      kamailioSIPProxyServerCompliance MODULE-COMPLIANCE
+          STATUS     current
+          DESCRIPTION
+               "The compliance statement for SIP entities acting
+                as Proxy Servers."
+          MODULE -- this module
+               MANDATORY-GROUPS { kamailioSIPProxyConfigGroup,
+                                  kamailioSIPProxyStatsGroup }
+          ::= { kamailioSIPServerCompliances 1 }
+
+      kamailioSIPRegistrarServerCompliance MODULE-COMPLIANCE
+          STATUS     current
+          DESCRIPTION
+               "The compliance statement for SIP entities acting
+                as Registrars."
+          MODULE -- this module
+               MANDATORY-GROUPS { kamailioSIPRegistrarConfigGroup,
+                                  kamailioSIPRegistrarStatsGroup }
+          GROUP kamailioSIPRegistrarUsersGroup
+          DESCRIPTION
+               "This is an optional group."
+          ::= { kamailioSIPServerCompliances 3 }
+
+--
+-- Units of Conformance
+--
+
+      kamailioSIPProxyConfigGroup OBJECT-GROUP
+          OBJECTS {
+                  kamailioSIPProxyStatefulness,
+                  kamailioSIPProxyRecordRoute,
+                  kamailioSIPProxyAuthMethod
+          }
+          STATUS  current
+          DESCRIPTION
+               "A collection of objects providing configuration for
+                SIP Proxy servers."
+          ::= { kamailioSIPServerGroups 2 }
+
+      kamailioSIPProxyStatsGroup OBJECT-GROUP
+          OBJECTS {
+                  kamailioSIPNumProxyRequireFailures
+          }
+          STATUS  current
+          DESCRIPTION
+               "A collection of objects providing statistics for
+                SIP Proxy servers."
+          ::= { kamailioSIPServerGroups 3 }
+
+      kamailioSIPRegistrarConfigGroup OBJECT-GROUP
+          OBJECTS {
+                  kamailioSIPRegMaxContactExpiryDuration,
+                  kamailioSIPRegMaxUsers,
+                  kamailioSIPRegCurrentUsers,
+                  kamailioSIPRegDfltRegActiveInterval
+          }
+          STATUS  current
+          DESCRIPTION
+               "A collection of objects providing configuration for
+                SIP Registrars."
+          ::= { kamailioSIPServerGroups 4 }
+
+      kamailioSIPRegistrarStatsGroup OBJECT-GROUP
+          OBJECTS {
+                  kamailioSIPRegAcceptedRegistrations,
+                  kamailioSIPRegRejectedRegistrations
+          }
+          STATUS  current
+          DESCRIPTION
+               "A collection of objects providing statistics for
+                SIP Registrars."
+          ::= { kamailioSIPServerGroups 5 }
+
+      kamailioSIPRegistrarUsersGroup OBJECT-GROUP
+          OBJECTS {
+                  kamailioSIPUserUri,
+                  kamailioSIPUserAuthenticationFailures,
+                  kamailioSIPContactDisplayName,
+                  kamailioSIPContactURI,
+                  kamailioSIPContactLastUpdated,
+                  kamailioSIPContactExpiry,
+                  kamailioSIPContactPreference
+          }
+          STATUS  current
+          DESCRIPTION
+               "A collection of objects related to registered users."
+          ::= {kamailioSIPServerGroups 6 }
+          
+      kamailioSIPRegistrarLookupGroup OBJECT-GROUP
+          OBJECTS {
+                  kamailioSIPRegUserLookupCounter,
+                  kamailioSIPRegUserLookupURI,
+                  kamailioSIPRegUserIndex,
+                  kamailioSIPRegUserLookupRowStatus
+          }
+          STATUS  current
+          DESCRIPTION
+               "A collection of objects related to registered user lookups."
+          ::= {kamailioSIPServerGroups 7 }
+
+END

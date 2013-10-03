@@ -342,6 +342,23 @@ int fixup_free_pvar_null(void** param, int param_no)
 	return fixup_free_pvar_all(param, param_no);
 }
 
+int fixup_pvar_none(void** param, int param_no)
+{
+	if (param_no == 1)
+		return fixup_pvar_all(param, param_no);
+	return 0;
+}
+
+
+
+int fixup_free_pvar_none(void** param, int param_no)
+{
+	if (param_no == 1)
+		return fixup_free_pvar_all(param, param_no);
+	return 0;
+}
+
+
 /* must be written "by hand", see above (fixup_pvar_pvar).
 FIXUP_F2T(pvar_str, 1, 2, 1, FPARAM_PVS, FPARAM_STR)
 FIXUP_F2T(pvar_str_str, 1, 3, 1, FPARAM_PVS, FPARAM_STR)
@@ -484,7 +501,8 @@ int fixup_free_igp_pvar_pvar(void** param, int param_no)
 				return E_UNSPEC; \
 			} else{ \
 				fp=(fparam_t*)*param; \
-				if ((ret==0) && (fp->v.pve->spec.getf==0)){ \
+				if ((ret==0) && (fp->v.pve->spec==0 \
+							|| fp->v.pve->spec->getf==0)){ \
 					fparam_free_restore(param); \
 					return fix_param_types(FPARAM_STR, param); \
 				} else if (ret==1) \
@@ -556,4 +574,28 @@ int fixup_spve_all(void** param, int param_no)
 int fixup_igp_all(void** param, int param_no)
 {
 	return fixup_igp_null(param, 1);
+}
+
+/**
+ *
+ */
+int fixup_spve_igp(void** param, int param_no)
+{
+	if(param_no==1)
+		return fixup_spve_null(param, 1);
+	if(param_no==2)
+		return fixup_igp_null(param, 1);
+	return E_UNSPEC;
+}
+
+/**
+ *
+ */
+int fixup_free_spve_igp(void** param, int param_no)
+{
+	if(param_no==1)
+		return fixup_free_spve_null(param, 1);
+	if(param_no==2)
+		return fixup_free_igp_null(param, 1);
+	return E_UNSPEC;
 }

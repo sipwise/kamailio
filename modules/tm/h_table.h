@@ -247,6 +247,10 @@ typedef struct ua_client
 	 */
 	struct retr_buf *local_ack;
 #endif
+	/* the route to take if no final positive reply arrived */
+	unsigned short on_failure;
+	/* the onreply_route to be processed if registered to do so */
+	unsigned short on_reply;
 }ua_client_type;
 
 
@@ -294,6 +298,8 @@ struct totag_elem {
 #	define T_PASS_PROVISIONAL_FLAG (1<<11)
 #	define pass_provisional(_t_)	((_t_)->flags&T_PASS_PROVISIONAL_FLAG)
 #endif
+
+#define T_DISABLE_INTERNAL_REPLY (1<<12) /* don't send internal negative reply */
 
 /* unsigned short should be enough for a retr. timer: max. 65535 ms =>
  * max retr. = 65 s which should be enough and saves us 2*2 bytes */
@@ -432,7 +438,7 @@ typedef struct cell
 	short relayed_reply_branch;
 
 	/* the route to take if no final positive reply arrived */
-	unsigned short on_negative;
+	unsigned short on_failure;
 	/* the onreply_route to be processed if registered to do so */
 	unsigned short on_reply;
 	 /* The route to take for each downstream branch separately */
