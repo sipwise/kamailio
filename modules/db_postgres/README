@@ -1,0 +1,93 @@
+postgres Module
+
+Greg Fausak
+
+   August.net
+
+Edited by
+
+Greg Fausak
+
+   Copyright © 2003 Greg Fausak
+     __________________________________________________________________
+
+   Table of Contents
+
+   1. Admin Guide
+
+        1. Overview
+        2. Dependencies
+
+              2.1. Kamailio Modules
+              2.2. External Libraries or Applications
+
+        3. Parameters
+
+              3.1. retries (integer)
+
+        4. Functions
+
+   List of Examples
+
+   1.1. Set retries parameter
+
+Chapter 1. Admin Guide
+
+   Table of Contents
+
+   1. Overview
+   2. Dependencies
+
+        2.1. Kamailio Modules
+        2.2. External Libraries or Applications
+
+   3. Parameters
+
+        3.1. retries (integer)
+
+   4. Functions
+
+1. Overview
+
+   The module is an implementation of the internal DB API v1 and v2
+   connector for PostgreSQL server. It has support for reconnecting when
+   the connection is broken.
+
+2. Dependencies
+
+   2.1. Kamailio Modules
+   2.2. External Libraries or Applications
+
+2.1. Kamailio Modules
+
+   The following modules must be loaded before this module:
+     * No dependencies on other Kamailio modules.
+
+2.2. External Libraries or Applications
+
+   The following libraries or applications must be installed before
+   running Kamailio with this module loaded:
+     * PostgreSQL library - e.g., libpq5.
+     * PostgreSQL devel library - to compile the module (e.g., libpq-dev).
+
+3. Parameters
+
+   3.1. retries (integer)
+
+3.1. retries (integer)
+
+   How many retries to attept to reconnect if connection to Postgres
+   server becomes broken.
+
+   Default value is 2 (that means three attepts to submit the query, first
+   will triger the connection error and two more (the value of this
+   parameter) after resetting the connection).
+
+   Example 1.1. Set retries parameter
+...
+modparam("db_postgres", "retries", 3)
+...
+
+4. Functions
+
+   NONE

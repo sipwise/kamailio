@@ -1,0 +1,124 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE section PUBLIC '-//OASIS//DTD DocBook XML V4.2//EN'
+	'http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd'[
+	<!ENTITY % local.common.attrib "xml:base  CDATA  #IMPLIED">
+]>
+
+<section><title>Installation and running</title>
+
+<para>Presence modules use some dynamic libraries distributed with SIP-router and the
+compilation procedure and running is a bit more difficult than usual. For detailed
+description of libraries see their separate documentation (stored in
+<filename>lib/doc</filename> subdirectory of main SIP-router directory).</para>
+
+<section><title>Incompatibility</title>
+<para>XCAP module needed for authorization is not working with TLS module. For
+more information see <xref linkend="pres.known_problems"/>.
+</para>
+</section>
+
+<section id="pres.dependencies"><title>Dependencies</title>
+<para>Presence module dependecies may be found in sections <link
+linkend="pa.dependencies">PA module dependencies</link> and <link
+linkend="rls.dependencies">RLS module dependencies</link>. These modules depend
+on common libraries which have their own dependencies as mentioned below.
+</para>
+
+<xi:include xmlns:xi="http://www.w3.org/2001/XInclude"
+	href="../../lib/doc/libraries.xml"
+	xpointer="xpointer(id('lib.dependencies')/child::*[not(self::title)])">
+	<xi:fallback>
+		<para><emphasis>Missing dependencies for common
+		libraries!</emphasis></para>
+	</xi:fallback>
+</xi:include>
+<!--<para>Presence modules and common libraries need these external libraries installed
+(development versions, with header files):</para>
+<itemizedlist>
+	<listitem><para>libxml2</para></listitem>
+	<listitem><para>libcurl3</para></listitem>
+</itemizedlist>-->
+</section>
+
+<section><title>Installation from CVS</title>
+<para>There is an example of steps which need to be done while installing SIP-router
+with shared libraries into directory /base/ser/directory (if no directory specified - 
+no prefix parameter given - default value is used: /usr/local/)
+<orderedlist>
+	<listitem><para>Download current SIP-router sources:</para>
+	<para><userinput>cvs -d :pserver:anonymous@cvs.berlios.de:/cvsroot/ser checkout sip_router</userinput>
+	</para></listitem>
+	
+	<listitem><para>Download very useful <application>ser_ctl</application> utility
+	(not necessary, but it is handy for adding data into database, running
+	XML-RPC functions etc):</para>
+	<para><userinput>cvs -d :pserver:anonymous@cvs.berlios.de:/cvsroot/ser checkout serctl</userinput>
+	</para></listitem>
+
+	<listitem><para>Compile and install SIP-router with presence modules. Common
+	libraries should be compiled automaticaly - it may fail in the case of
+	unsatisfied library dependencies. You need to install all external libraries
+	introduced in <xref linkend="pres.dependencies"/></para>
+	<para><userinput>cd sip_router</userinput></para>
+	<para><userinput>make install group_include="standard,presence,standard-dep" prefix=/base/ser/directory</userinput></para>
+	</listitem>
+</orderedlist>
+</para>
+</section> <!-- Installation from CVS -->
+
+<section><title>Presence snapshots</title>
+<para>In past there were published <quote>presence snapshots</quote> with stable
+and tested code and up to date documentation. This will change - tested and
+documented stable features will be probably imported into stable SIP-router branch
+(Ottendorf) and unstable ones will remain in CVS head.
+</para>
+</section> <!-- snapshots -->
+
+<section><title>Running SIP-router</title>
+<para>Linker used for dynamic linking must know, where to find these libraries.
+This may be done by setting <varname>LD_LIBRARY_PATH</varname> before
+startup.</para>
+<para><userinput>export LD_LIBRARY_PATH=/base/ser/directory/lib/ser</userinput></para>
+<para><userinput>/base/ser/directory/sbin/ser -f /base/ser/directory/etc/ser/ser.cfg</userinput></para> 
+
+<warning>If you want to run SIP-router under sudo like <quote>sudo /base/ser/directory/sbin/ser -f
+/base/ser/directory/etc/ser/ser.cfg</quote> it need not work - it is possible
+that LD_LIBRARY_PATH will not be propagated in this case!</warning>
+</section> <!-- running SIP-router -->
+
+<section><title>Database initialization</title>
+<warning>
+<para>This paragraph can be out-of-dated by changes in DB init scripts or in
+ser_ctl. It has only informative value!</para>
+</warning>
+<para>It is very handy to use SIP-router together with database - at least domains and
+users with attributes can be stored there. First must be database created -
+there are scripts to do this in SIP-router's source tree in directory scripts; for
+example "scripts/mysql/ser_mysql.sh create" will create the database for MySQL.
+<note><para>Later MySQL versions can complain with current script, if so, you
+can try to remove qotes around $PW in script to get it into work.</para></note>
+</para>
+
+<para>After database creation you can add data using
+<application>ser_ctl</application> utility:
+<itemizedlist>
+	<listitem><para>add domain:</para>
+	<para><userinput>ser_domain add test test-domain.com</userinput></para></listitem>
+	<listitem><para>add user <quote>parf</quote> with password <quote>parf</quote>:</para>
+	<para><userinput>ser_user add parf</userinput></para>
+	<para><userinput>ser_uri add parf parf@test-domain.com</userinput></para>
+	<para><userinput>ser_cred add parf parf test test-domain.com parf</userinput></para>
+	</listitem>
+</itemizedlist>
+</para>
+
+<note>
+<para>Running ser_xxx without arguments shows help.</para>
+<para>You can specify database URI used by <application>ser_ctl</application>;
+for example you can use <quote>postgres://...</quote> instead of default
+<quote>mysql://...</quote> etc.</para>
+</note>
+
+</section>
+
+</section>

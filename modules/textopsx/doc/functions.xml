@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+
+<section id="textopsx.functions" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <title>Functions</title>
+
+	<section id="textopsx.msg_apply_changes">
+		<title>
+		<function moreinfo="none">msg_apply_changes()</function>
+		</title>
+		<para>
+		Use this function to apply changes performed on SIP request content. Be
+		careful when using this function;  due to special handling of changes
+		done to SIP message buffer so far, using this function might change
+		the behaviour of your config.  Do test your config properly!
+		</para>
+   		<para>
+		This function can be used from REQUEST_ROUTE.
+		</para>
+		<example>
+		<title><function>msg_apply_changes()</function> usage</title>
+		<programlisting format="linespecific">
+...
+append_hf("My-Header: yes\r\n");
+if(msg_apply_changes())
+{
+    # msg buffer has a new content
+    if(is_present_hf("My-Header"))
+    {
+        # will get here always
+    }
+}
+...
+</programlisting>
+		</example>
+	</section>
+
+    <section id="textopsx.change_reply_status">
+	<title>
+	    <function>change_reply_status(code, reason)</function>
+	</title>
+	<para>
+		Intercept a SIP reply (in an onreply_route) and change its status code 
+		and reason phrase prior to propogating it.
+	</para>
+	<para>Meaning of the parameters is as follows:</para>
+	<itemizedlist>
+	    <listitem>
+		<para><emphasis>code</emphasis> - Status code.
+		</para>
+	    </listitem>
+	    <listitem>
+		<para><emphasis>reason</emphasis> - Reason phrase.
+		</para>
+	    </listitem>
+	</itemizedlist>
+   		<para>
+		This function can be used from ONREPLY_ROUTE.
+		</para>
+	<example>
+	    <title><function>change_reply_status</function> usage</title>
+	    <programlisting>
+...
+onreply_route {
+    if (@status == "603") {
+        change_reply_status(404, "Not Found");
+        exit;
+    }
+}
+...
+	    </programlisting>
+	</example>
+    </section>
+
+	<section id="textopsx.remove_body">
+		<title>
+		<function moreinfo="none">remove_body()</function>
+		</title>
+		<para>
+		Use this function to remove body of SIP requests or replies.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>remove_body()</function> usage</title>
+		<programlisting format="linespecific">
+...
+remove_body();
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="textopsx.keep_hf">
+		<title>
+		<function moreinfo="none">keep_hf(regexp)</function>
+		</title>
+		<para>
+			Remove headers that don't match the regular expression regexp.
+			Several header are ignored always (thus not removed): Via, From,
+			To, Call-ID, CSeq, Content-Lenght, Content-Type, Max-Forwards,
+			Contact, Route, Record-Route -- these can be removed one by one
+			with remove_hf().
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>keep_hf()</function> usage</title>
+		<programlisting format="linespecific">
+...
+keep_hf("User-Agent");
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="textopsx.fnmatch">
+		<title>
+		<function moreinfo="none">fnmatch(value, expr [, flags])</function>
+		</title>
+		<para>
+			Match the value against the expr using the shell-style pattern
+			for file name matching (see man page for C function fnmatch()).
+			It is known to be faster and uses less-memory than regexp.
+		</para>
+		<para>
+			Parameters flags is optional and can be 'i' to do case insensitive
+			matching.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>fnmatch()</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(fnmatch("$rU", "123*"))
+{
+    ...
+}
+...
+</programlisting>
+		</example>
+	</section>
+
+</section>

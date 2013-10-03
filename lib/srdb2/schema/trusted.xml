@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE table PUBLIC "-//iptel.org//DTD DBSchema V1.0//EN"
+  "http://iptel.org/dbschema/dtd/1.0/dbschema.dtd" [
+
+<!ENTITY % entities SYSTEM "entities.xml">
+%entities;
+
+]>
+
+<table>
+  <name>trusted</name>
+  <version>1</version>
+
+  <column id="trusted.src_ip">
+	<name>src_ip</name>
+	<type>string</type>
+	<size>39</size>
+  </column>
+
+  <column id="trusted.proto">
+	<name>proto</name>
+	<type>string</type>
+	<size>4</size>
+  </column>
+
+  <column id="trusted.from_pattern">
+	<name>from_pattern</name>
+	<type>string</type>
+	<size>64</size>
+  </column>
+
+  <index>
+	<name>trusted_idx</name>
+	<unique/>
+	<colref linkend="trusted.src_ip"/>
+	<colref linkend="trusted.proto"/>
+	<colref linkend="trusted.from_pattern"/>
+  </index>
+</table>

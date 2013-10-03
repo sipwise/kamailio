@@ -1,0 +1,42 @@
+name(str) rich_type(str) raw_type(int) type_spec(str,null) description(str,null) default_flags(int) flags(int) priority(int) access(int) ordering(int) grp(str) 
+uid:string:2:::1:0:0:0:0:other
+did:string:2:::1:0:0:0:0:other
+datetime_created:string:2::creation time:33:0:65792:21:0:other
+asserted_id:string:2::asserted identity:33:0:256:1:200:other
+fr_timer:int:0::@ff_fr_timer:33:0:1073807616:0:140:other
+fr_inv_timer:int:0::@ff_fr_inv_timer:33:0:1073807616:0:150:other
+gflags:int:0::global flags:33:0:1073741824:0:0:other
+digest_realm:string:2::digest realm:33:4096:65536:0:0:other
+acl:string:2::access control list of user:33:1024:0:0:0:other
+first_name:string:2::@ff_first_name:32:2048:256:0:10:general
+last_name:string:2::@ff_last_name:32:2048:256:0:20:general
+email:email_adr:2::@ff_email:33:6144:256:0:30:general
+timezone:timezone:2::@ff_timezone:32:2048:1073807616:0:60:general
+sw_allow_find:boolean:0::@ff_allow_lookup_for_me:32:0:256:0:110:privacy
+lang:lang:2::@ff_language:33:0:1073807616:0:50:general
+sw_show_status:boolean:0::@ff_status_visibility:32:0:1073742080:0:100:privacy
+sw_admin:string:2::admin of domain:32:1024:0:0:0:other
+sw_owner:string:2::owner of domain:32:0:0:0:0:other
+sw_domain_default_flags:int:0::@ff_domain_def_f:32:4096:1073741824:0:0:other
+sw_deleted_ts:int:0::deleted timestamp:32:0:0:0:0:other
+phone:string:2::@ff_phone:32:2048:256:0:40:general
+sw_acl_control:string:2::acl control:32:1024:0:0:0:other
+sw_credential_default_flags:int:0::@ff_credential_def_f:32:4096:1073741824:0:0:other
+sw_uri_default_flags:int:0::@ff_uri_def_f:32:4096:1073741824:0:0:other
+sw_is_admin:boolean:0::admin privilege:32:0:0:0:0:other
+sw_is_hostmaster:boolean:0::hostmaster privilege:32:0:0:0:0:other
+sw_confirmation:string:2::registration confirmation:32:0:0:0:0:other
+sw_pending_ts:string:2::registration timestamp:32:0:0:0:0:other
+sw_require_confirm:boolean:0::@ff_reg_confirmation:32:0:1073807360:0:120:other
+sw_uname_assign_mode:list:2:a\:3\:{s\:4\:"fcfs";s\:23\:"first come first served";s\:5\:"email";s\:18\:"email verification";s\:9\:"adminonly";s\:10\:"admin only";}:@ff_uname_assign_mode:32:0:1073807360:0:122:other
+sw_send_missed:boolean:0::@ff_send_daily_missed_calls:32:0:1073807616:0:130:other
+uid_format:list:2:a\:3\:{i\:0;s\:14\:"username@realm";i\:1;s\:21\:"integer (incremental)";i\:2;s\:15\:"UUID by RFC4122";}:@ff_uid_format:32:0:1073741824:0:160:other
+did_format:list:2:a\:3\:{i\:0;s\:11\:"domain name";i\:1;s\:21\:"integer (incremental)";i\:2;s\:15\:"UUID by RFC4122";}:@ff_did_format:32:0:1073741824:0:170:other
+contact_email:email_adr:2::@ff_contact_email:32:4096:1073807360:0:0:general
+fwd_busy_target:sip_adr:2::@attr_fwd_busy_target:33:0:256:0:50:other
+fwd_noanswer_target:sip_adr:2::@attr_fwd_noanswer_target:33:0:256:0:55:other
+fwd_always_target:sip_adr:2::@attr_fwd_always_target:33:0:256:0:60:other
+domain_data_version:int:0::Version of data in domain table:33:0:0:0:0:other
+sw_highest_alias_number:int:0::highest assigned alias number:32:0:0:0:0:other
+gattr_timestamp:int:0::Version of global attrs data:33:0:0:0:0:other
+sw_max_uri_user:int:0:a\:3\:{s\:3\:\"min\";s\:1\:\"0\";s\:3\:\"max\";s\:3\:\"999\";s\:3\:\"err\";N;}:@ff_max_uri_user:32:4096:1073807360:3:0:other
