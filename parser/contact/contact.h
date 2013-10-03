@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Contact data type
  *
  * Copyright (C) 2001-2003 FhG Fokus

@@ -195,6 +195,8 @@ DROP	"drop"
 EXIT	"exit"
 RETURN	"return"
 BREAK	"break"
+SEND	send
+SEND_TCP	send_tcp
 LOG		log
 ERROR	error
 ROUTE	route
@@ -234,6 +236,7 @@ PREFIX			"prefix"
 STRIP			"strip"
 STRIP_TAIL		"strip_tail"
 SET_USERPHONE		"userphone"
+APPEND_BRANCH	"append_branch"
 REMOVE_BRANCH	"remove_branch"
 CLEAR_BRANCHES	"clear_branches"
 IF				"if"
@@ -340,7 +343,6 @@ FORK_DELAY	fork_delay
 LOGSTDERROR	log_stderror
 LOGFACILITY	log_facility
 LOGNAME		log_name
-LOGCOLOR	log_color
 LISTEN		listen
 ADVERTISE	advertise|ADVERTISE
 ALIAS		alias
@@ -496,7 +498,6 @@ MAX_WLOOPS		"max_while_loops"
 PVBUFSIZE		"pv_buffer_size"
 PVBUFSLOTS		"pv_buffer_slots"
 HTTP_REPLY_HACK		"http_reply_hack"
-VERSION_TABLE_CFG		"version_table"
 
 /* stun config variables */
 STUN_REFRESH_INTERVAL "stun_refresh_interval"
@@ -524,8 +525,6 @@ UDP			"udp"|"UDP"
 TCP			"tcp"|"TCP"
 TLS			"tls"|"TLS"
 SCTP		"sctp"|"SCTP"
-WS		"ws"|"WS"
-WSS		"wss"|"WSS"
 INET		"inet"|"INET"
 INET6		"inet6"|"INET6"
 SSLv23			"sslv23"|"SSLv23"|"SSLV23"
@@ -605,6 +604,8 @@ IMPORTFILE      "import_file"
 <INITIAL>{EXIT}	{ count(); yylval.strval=yytext; return EXIT; }
 <INITIAL>{RETURN}	{ count(); yylval.strval=yytext; return RETURN; }
 <INITIAL>{BREAK}	{ count(); yylval.strval=yytext; return BREAK; }
+<INITIAL>{SEND}	{ count(); yylval.strval=yytext; return SEND; }
+<INITIAL>{SEND_TCP}	{ count(); yylval.strval=yytext; return SEND_TCP; }
 <INITIAL>{LOG}	{ count(); yylval.strval=yytext; return LOG_TOK; }
 <INITIAL>{ERROR}	{ count(); yylval.strval=yytext; return ERROR; }
 <INITIAL>{SETFLAG}	{ count(); yylval.strval=yytext; return SETFLAG; }
@@ -638,6 +639,8 @@ IMPORTFILE      "import_file"
 <INITIAL>{PREFIX}	{ count(); yylval.strval=yytext; return PREFIX; }
 <INITIAL>{STRIP}	{ count(); yylval.strval=yytext; return STRIP; }
 <INITIAL>{STRIP_TAIL}	{ count(); yylval.strval=yytext; return STRIP_TAIL; }
+<INITIAL>{APPEND_BRANCH}	{ count(); yylval.strval=yytext;
+								return APPEND_BRANCH; }
 <INITIAL>{REMOVE_BRANCH}	{ count(); yylval.strval=yytext;
 								return REMOVE_BRANCH; }
 <INITIAL>{CLEAR_BRANCHES}	{ count(); yylval.strval=yytext;
@@ -715,7 +718,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{LOGSTDERROR}	{ yylval.strval=yytext; return LOGSTDERROR; }
 <INITIAL>{LOGFACILITY}	{ yylval.strval=yytext; return LOGFACILITY; }
 <INITIAL>{LOGNAME}	{ yylval.strval=yytext; return LOGNAME; }
-<INITIAL>{LOGCOLOR}	{ yylval.strval=yytext; return LOGCOLOR; }
 <INITIAL>{LISTEN}	{ count(); yylval.strval=yytext; return LISTEN; }
 <INITIAL>{ADVERTISE}	{ count(); yylval.strval=yytext; return ADVERTISE; }
 <INITIAL>{ALIAS}	{ count(); yylval.strval=yytext; return ALIAS; }
@@ -974,7 +976,6 @@ IMPORTFILE      "import_file"
 									return PVBUFSLOTS; }
 <INITIAL>{HTTP_REPLY_HACK}		{	count(); yylval.strval=yytext;
 									return HTTP_REPLY_HACK; }
-<INITIAL>{VERSION_TABLE_CFG}  { count(); yylval.strval=yytext; return VERSION_TABLE_CFG;}
 <INITIAL>{SERVER_ID}  { count(); yylval.strval=yytext; return SERVER_ID;}
 <INITIAL>{LATENCY_LOG}  { count(); yylval.strval=yytext; return LATENCY_LOG;}
 <INITIAL>{MSG_TIME}  { count(); yylval.strval=yytext; return MSG_TIME;}
@@ -1162,8 +1163,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{UDP}			{ count(); return UDP; }
 <INITIAL>{TLS}			{ count(); return TLS; }
 <INITIAL>{SCTP}			{ count(); return SCTP; }
-<INITIAL>{WS}			{ count(); return WS; }
-<INITIAL>{WSS}			{ count(); return WSS; }
 <INITIAL>{INET}			{ count(); yylval.intval=AF_INET;
 							yy_number_str=yytext; return NUMBER; }
 <INITIAL>{INET6}		{ count();

@@ -34,7 +34,7 @@ Build-Depends: bison,
                unixodbc-dev,
                xsltproc,
                zlib1g-dev
-Standards-Version: 3.9.3
+Standards-Version: 3.8.0
 Homepage: http://www.kamailio.org/
 
 Package: kamailio
@@ -373,15 +373,3 @@ Depends: binutils,
 Description: Kamailio - package for "nice to have" installation
  This is a meta-package for easy installation various useful tools that may be
  handy on server with Kamailio installed.
-
-Package: kamailio-ims-modules
-Architecture: any
-Depends: ${shlibs:Depends}, kamailio (= ${binary:Version})
-Description: Kamailio - IMS Modules
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package contains various Diameter interfaces and modules for Kamailio
- to run as an IMS core.
-

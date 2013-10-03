@@ -170,15 +170,12 @@ char tm_tags[TOTAG_VALUE_LEN];
 static str  tm_tag = {tm_tags,TOTAG_VALUE_LEN};
 char *tm_tag_suffix;
 
-/* where to go if there is no positive reply (>=300) */
-static int goto_on_failure=0;
+/* where to go if there is no positive reply */
+static int goto_on_negative=0;
 /* where to go on receipt of reply */
 static int goto_on_reply=0;
 /* where to go on receipt of reply without transaction context */
 int goto_on_sl_reply=0;
-
-/* remap 503 response code to 500 */
-extern int tm_remap_503_500;
 
 /* how to deal with winning branch reply selection in failure_route
  * can be overwritten per transaction with t_drop_replies(...)
@@ -248,7 +245,7 @@ int t_get_picked_branch(void)
 */
 
 
-void t_on_failure( unsigned int go_to )
+void t_on_negative( unsigned int go_to )
 {
 	struct cell *t = get_t();
 
@@ -256,9 +253,9 @@ void t_on_failure( unsigned int go_to )
 	 * in REQUEST_ROUTE T will be set only if the transaction was already
 	 * created; if not -> use the static variable */
 	if (!t || t==T_UNDEFINED )
-		goto_on_failure=go_to;
+		goto_on_negative=go_to;
 	else
-		t->on_failure = go_to;
+		get_t()->on_negative = go_to;
 }
 
 
@@ -272,13 +269,13 @@ void t_on_reply( unsigned int go_to )
 	if (!t || t==T_UNDEFINED )
 		goto_on_reply=go_to;
 	else
-		t->on_reply = go_to;
+		get_t()->on_reply = go_to;
 }
 
 
-unsigned int get_on_failure()
+unsigned int get_on_negative()
 {
-	return goto_on_failure;
+	return goto_on_negative;
 }
 unsigned int get_on_reply()
 {
@@ -878,7 +875,7 @@ void faked_env( struct cell *t, struct sip_msg *msg)
 int fake_req(struct sip_msg *faked_req,
 		struct sip_msg *shmem_msg, int extra_flags, struct ua_client *uac)
 {
-	/* on_failure_reply faked msg now copied from shmem msg (as opposed
+	/* on_negative_reply faked msg now copied from shmem msg (as opposed
 	 * to zero-ing) -- more "read-only" actions (exec in particular) will
 	 * work from reply_route as they will see msg->from, etc.; caution,
 	 * rw actions may append some pkg stuff to msg, which will possibly be
@@ -986,20 +983,19 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 	struct sip_msg *shmem_msg = t->uas.request;
 	int on_failure;
 
-	on_failure = t->uac[picked_branch].on_failure;
-
 	/* failure_route for a local UAC? */
 	if (!shmem_msg) {
 		LOG(L_WARN,"Warning: run_failure_handlers: no UAC support (%d, %d) \n",
-			on_failure, t->tmcb_hl.reg_types);
+			t->on_negative, t->tmcb_hl.reg_types);
 		return 0;
 	}
 
 	/* don't start faking anything if we don't have to */
-	if (unlikely(!on_failure && !has_tran_tmcbs( t, TMCB_ON_FAILURE))) {
+	if (unlikely(!t->on_negative && !has_tran_tmcbs( t, TMCB_ON_FAILURE))) {
 		LOG(L_WARN,
-			"Warning: run_failure_handlers: no failure handler (%d, %d)\n",
-			on_failure, t->tmcb_hl.reg_types);
+			"Warning: run_failure_handlers: no negative handler (%d, %d)\n",
+			t->on_negative,
+			t->tmcb_hl.reg_types);
 		return 1;
 	}
 
@@ -1014,11 +1010,12 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 	if (unlikely(has_tran_tmcbs( t, TMCB_ON_FAILURE)) ) {
 		run_trans_callbacks( TMCB_ON_FAILURE, t, &faked_req, rpl, code);
 	}
-	if (on_failure) {
+	if (t->on_negative) {
 		/* avoid recursion -- if failure_route forwards, and does not
 		 * set next failure route, failure_route will not be reentered
 		 * on failure */
-		t->on_failure=0;
+		on_failure = t->on_negative;
+		t->on_negative=0;
 		if (exec_pre_script_cb(&faked_req, FAILURE_CB_TYPE)>0) {
 			/* run a failure_route action if some was marked */
 			if (run_top_route(failure_rt.rlist[on_failure], &faked_req, 0)<0)
@@ -1290,13 +1287,12 @@ static enum rps t_should_relay_response( struct cell *Trans , int new_code,
 		replies_dropped = 0;
 		/* run ON_FAILURE handlers ( route and callbacks) */
 		if (unlikely(has_tran_tmcbs( Trans, TMCB_ON_FAILURE_RO|TMCB_ON_FAILURE)
-						|| Trans->uac[picked_branch].on_failure )) {
+						|| Trans->on_negative )) {
 			extra_flags=
 				((Trans->uac[picked_branch].request.flags & F_RB_TIMEOUT)?
 							FL_TIMEOUT:0) | 
 				((Trans->uac[picked_branch].request.flags & F_RB_REPLIED)?
 						 	FL_REPLIED:0);
-			tm_ctx_set_branch_index(picked_branch);
 			run_failure_handlers( Trans, Trans->uac[picked_branch].reply,
 									picked_code, extra_flags);
 			if (unlikely((drop_replies==3 && branch_cnt<Trans->nr_of_outgoings) ||
@@ -1763,7 +1759,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 			}
 		} else {
 			relayed_code=relayed_msg->REPLY_STATUS;
-			if (relayed_code==503 && tm_remap_503_500){
+			if (relayed_code==503){
 				/* replace a final 503 with a 500:
 				 * generate a "FAKE" reply and a new to_tag (for easier
 				 *  debugging)*/
@@ -2099,7 +2095,7 @@ int reply_received( struct sip_msg  *p_msg )
 			goto done;
 	}
 	
-	onreply_route=uac->on_reply;
+	onreply_route=t->on_reply;
 	if ( msg_status >= 200 ){
 #ifdef TM_ONREPLY_FINAL_DROP_OK
 #warning Experimental tm onreply_route final reply DROP support active
@@ -2404,7 +2400,7 @@ int reply_received( struct sip_msg  *p_msg )
 	} /* provisional replies */
 
 done:
-	tm_ctx_set_branch_index(T_BR_UNDEFINED);
+	tm_ctx_set_branch_index(0);
 	/* we are done with the transaction, so unref it - the reference
 	 * was incremented by t_check() function -bogdan*/
 	t_unref(p_msg);

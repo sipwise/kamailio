@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Fast 32-bit Header Field Name Parser -- keys
  *
  * Copyright (C) 2001-2003 FhG Fokus

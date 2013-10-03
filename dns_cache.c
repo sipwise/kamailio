@@ -2306,7 +2306,6 @@ inline static struct dns_rr* dns_srv_get_nxt_rr(struct dns_hash_entry* e,
 	servers_up = atomic_get(dns_servers_up);
 #endif
 
-	memset(r_sums, 0, sizeof(struct r_sums_entry) * MAX_SRV_GRP_IDX);
 	rand_w=0;
 	for(rr=e->rr_lst, n=0;rr && (n<*no);rr=rr->next, n++);/* skip *no records*/
 
@@ -2903,7 +2902,7 @@ struct hostent* dns_naptr_sip_resolvehost(str* name, unsigned short* port,
 		dns_hash_put(e);
 	}
 naptr_not_found:
-	return no_naptr_srv_sip_resolvehost(name,port,proto);
+	return dns_srv_sip_resolvehost(name, port, proto);
 }
 #endif /* USE_NAPTR */
 

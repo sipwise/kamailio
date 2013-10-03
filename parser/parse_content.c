@@ -1,4 +1,7 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -213,7 +216,7 @@ static type_node_t subtype_tree[] = {
 
 
 
-char* parse_content_length(char* const buffer, const char* const end, int* const length)
+char* parse_content_length( char* buffer, char* end, int* length)
 {
 	int number;
 	char *p;
@@ -256,7 +259,7 @@ error:
 
 
 
-char* decode_mime_type(char* const start, const char* const end, unsigned int* const mime_type)
+char* decode_mime_type(char *start, char *end, unsigned int *mime_type)
 {
 	int node;
 	char *mark;
@@ -382,10 +385,10 @@ error:
  *  	-   > 0 mime found
  *      -   = 0 hdr not found
  *      -   =-1 error */
-int parse_content_type_hdr(struct sip_msg* const msg)
+int parse_content_type_hdr( struct sip_msg *msg )
 {
 	char *end;
-	const char *ret;
+	char *ret;
 	unsigned int  mime;
 
 	/* is the header already found? */
@@ -427,7 +430,7 @@ error:
 	return -1;
 }
 
-int parse_accept_body(struct hdr_field* const hdr)
+int parse_accept_body(struct hdr_field *hdr)
 {
 	static unsigned int mimes[MAX_MIMES_NR];
 	int nr_mimes;
@@ -489,7 +492,7 @@ error:
  * returns: > 0 ok
  *          = 0 hdr not found
  *          = -1 error */
-int parse_accept_hdr(struct sip_msg* const msg)
+int parse_accept_hdr( struct sip_msg *msg )
 {
 	static unsigned int mimes[MAX_MIMES_NR];
 	int nr_mimes;

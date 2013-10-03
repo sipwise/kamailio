@@ -360,40 +360,6 @@ pv_spec_t* pv_cache_get(str *name)
 /**
  *
  */
-pv_spec_t* pv_spec_lookup(str *name, int *len)
-{
-	pv_spec_t *pvs;
-	str tname;
-
-	if(len!=NULL)
-		*len = 0;
-	if(name->s==NULL || name->len==0)
-	{
-		LM_ERR("invalid parameters\n");
-		return NULL;
-	}
-
-	tname.s = name->s;
-	tname.len = pv_locate_name(name);
-
-	if(tname.len < 0)
-		return NULL;
-
-	if(len!=NULL)
-		*len = tname.len;
-
-	pvs = pv_cache_lookup(&tname);
-
-	if(pvs!=NULL)
-		return pvs;
-
-	LM_DBG("PV <%.*s> is not in cache\n", tname.len, tname.s);
-	return pv_cache_add(&tname);
-}
-
-/**
- *
- */
 int register_pvars_mod(char *mod_name, pv_export_t *items)
 {
 	int ret;
@@ -490,21 +456,6 @@ int pv_get_strval(struct sip_msg *msg, pv_param_t *param,
 		return -1;
 
 	res->rs = *sval;
-	res->flags = PV_VAL_STR;
-	return 0;
-}
-
-/**
- * convert strz to pv_value_t
- */
-int pv_get_strzval(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res, char *sval)
-{
-	if(res==NULL)
-		return -1;
-
-	res->rs.s = sval;
-	res->rs.len = strlen(sval);
 	res->flags = PV_VAL_STR;
 	return 0;
 }
@@ -981,7 +932,6 @@ int pv_parse_format(str *in, pv_elem_p *el)
 	int n = 0;
 	pv_elem_p e, e0;
 	str s;
-	int len;
 
 	if(in==NULL || in->s==NULL || el==NULL)
 		return -1;
@@ -1024,10 +974,7 @@ int pv_parse_format(str *in, pv_elem_p *el)
 			break;
 		s.s = p;
 		s.len = in->s+in->len-p;
-		e->spec = pv_spec_lookup(&s, &len);
-		if(e->spec==NULL)
-			goto error;
-		p0 = p + len;
+		p0 = pv_parse_spec(&s, &e->spec);
 		
 		if(p0==NULL)
 			goto error;
@@ -1292,8 +1239,8 @@ int pv_printf(struct sip_msg* msg, pv_elem_p list, char *buf, int *len)
 			}
 		}
 		/* put the value of the specifier */
-		if(it->spec!=NULL && it->spec->type!=PVT_NONE
-				&& pv_get_spec_value(msg, it->spec, &tok)==0)
+		if(it->spec.type!=PVT_NONE
+				&& pv_get_spec_value(msg, &(it->spec), &tok)==0)
 		{
 			if(tok.flags&PV_VAL_NULL)
 				tok.rs = pv_str_null;
@@ -1858,11 +1805,9 @@ void pv_destroy_api(void)
 static char **_pv_print_buffer = NULL;
 #define PV_DEFAULT_PRINT_BUFFER_SIZE 1024
 static int _pv_print_buffer_size  = PV_DEFAULT_PRINT_BUFFER_SIZE;
-static int _pv_print_buffer_size_active  = 0;
 /* 6 mod params + 4 direct usage from mods */
 #define PV_DEFAULT_PRINT_BUFFER_SLOTS 10
 static int _pv_print_buffer_slots = PV_DEFAULT_PRINT_BUFFER_SLOTS;
-static int _pv_print_buffer_slots_active = 0;
 static int _pv_print_buffer_index = 0;
 
 /**
@@ -1896,9 +1841,6 @@ int pv_init_buffer(void)
 	}
 	LM_DBG("PV print buffer initialized to [%d][%d]\n",
 			_pv_print_buffer_slots, _pv_print_buffer_size);
-	_pv_print_buffer_slots_active = _pv_print_buffer_slots;
-	_pv_print_buffer_size_active = _pv_print_buffer_size;
-
 	return 0;
 }
 
@@ -1911,14 +1853,12 @@ void pv_destroy_buffer(void)
 
 	if(_pv_print_buffer==NULL)
 		return;
-	for(i=0; i<_pv_print_buffer_slots_active; i++)
+	for(i=0; i<_pv_print_buffer_slots; i++)
 	{
 		if(_pv_print_buffer[i]!=NULL)
 			pkg_free(_pv_print_buffer[i]);
 	}
 	pkg_free(_pv_print_buffer);
-	_pv_print_buffer_slots_active = 0;
-	_pv_print_buffer_size_active = 0;
 	_pv_print_buffer = NULL;
 }
 
@@ -1927,8 +1867,8 @@ void pv_destroy_buffer(void)
  */
 int pv_reinit_buffer(void)
 {
-	if(_pv_print_buffer_size==_pv_print_buffer_size_active
-			&& _pv_print_buffer_slots==_pv_print_buffer_slots_active)
+	if(_pv_print_buffer_size==PV_DEFAULT_PRINT_BUFFER_SIZE
+			&& _pv_print_buffer_slots==PV_DEFAULT_PRINT_BUFFER_SLOTS)
 		return 0;
 	pv_destroy_buffer();
 	return pv_init_buffer();

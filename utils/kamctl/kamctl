@@ -60,21 +60,21 @@ else
 	exit -1
 fi
 
-# locate kamcmd
+# locate sercmd
 if [ -z "$SERCMD" ] ; then
 	# try same dir as kamctl
-	SERCMD="$MYDIR/kamcmd"
+	SERCMD="$MYDIR/sercmd"
 	if [ ! -f "$SERCMD" -o ! -x "$SERCMD" ] ; then
 		# try standard location installed from sources
-		SERCMD="/usr/local/sbin/kamcmd"
+		SERCMD="/usr/local/sbin/sercmd"
 		if [ ! -f "$SERCMD" -o ! -x "$SERCMD" ] ; then
 			# try source tree location
-			SERCMD="$MYDIR/../sercmd/kamcmd"
+			SERCMD="$MYDIR/../sercmd/sercmd"
 			if [ ! -f "$SERCMD" -o ! -x "$SERCMD" ] ; then
 				# try locate it with which
-				SERCMD=`which kamcmd`
+				SERCMD=`which sercmd`
 				if [ ! -f "$SERCMD" -o ! -x "$SERCMD" ] ; then
-					mdbg "kamcmd tool not found"
+					mdbg "sercmd tool not found"
 				fi
 			fi
 		fi
@@ -143,9 +143,9 @@ fi
 ### CTLENGINE
 #
 
-require_kamcmd() {
+require_sercmd() {
 	if [ -z "$SERCMD" ] ; then
-		merr "kamcmd tool is missing"
+		merr "sercmd tool is missing"
 		exit -1
 	fi
 }
@@ -168,7 +168,7 @@ case $CTLENGINE in
 		fi
 		;;
 	SER_MI|ser_mi|SERCMD_MI|sercmd_mi|SERCMDMI|sercmdmi)
-		require_kamcmd
+		require_sercmd
 		if [ -f "$MYLIBDIR/kamctl.ser_mi" ]; then
 			. "$MYLIBDIR/kamctl.ser_mi"
 			CTLENGINELOADED=1
@@ -177,7 +177,7 @@ case $CTLENGINE in
 esac
 
 #### ------------------------------------------------- #####
-### Load kamcmd interface
+### Load sercmd interface
 #
 if [ -f "$MYLIBDIR/kamctl.ser" ]; then
 	. "$MYLIBDIR/kamctl.ser"
@@ -983,15 +983,6 @@ db_ops() {
 			QUERY="select * FROM $1;"
 			$DBROCMD "$QUERY"
 			;;
-		showg)
-			shift
-			if [ $# -ne 1 ] ; then
-				merr "missing table parameter"
-				exit 1
-			fi
-			QUERY="select * FROM $1\\G;"
-			$DBROCMD "$QUERY"
-			;;
 		*)
 			usage_db_ops
 			exit 1
@@ -1054,77 +1045,6 @@ domain() {
 			;;
 		*)
 			usage_domain
-			exit 1
-	esac
-}
-
-#
-##### ------------------------------------------------ #####
-### uid_domain management
-#
-uid_domain() {
-	case $1 in
-		reload)
-			require_kamcmd
-			$SERCTLCMD domain.reload
-			;;
-		show)
-			require_kamcmd
-			$SERCTLCMD domain.dump
-			;;
-		showdb)
-			require_dbengine
-			QUERY="select * FROM $UID_DOMAIN_TABLE ; "
-			$DBROCMD "$QUERY"
-			;;
-		add)
-			require_dbengine
-			shift
-			if [ $# -lt 1 ] ; then
-				merr "too few parameters"
-				exit 1
-			fi
-			
-			DOMAIN=$1
-			DID=$2
-			FLAGS=$3
-	
-			if [ -z "$2" ] ; then
-				DID=$DOMAIN
-			fi 
-			if [ -z "$3" ] ; then
-				FLAGS=$(( $SRDB_LOAD_SER | $SRDB_CANON | $SRDB_FOR_SERWEB ))
-			fi 
-
-			if is_value_in_db $UID_DOMAIN_TABLE $UID_DO_DOMAIN_COLUMN $DOMAIN; then
-				minfo "$1 already in $UID_DOMAIN_TABLE table"
-				exit 0
-			fi
-			QUERY="insert into $UID_DOMAIN_TABLE ($UID_DO_DID_COLUMN,$UID_DO_DOMAIN_COLUMN,$UID_DO_FLAGS_COLUMN) VALUES ('$DID','$DOMAIN',$FLAGS);"
-			$DBCMD "$QUERY"
-			if [ $? -ne 0 ] ; then
-				merr "uid_domain - SQL Error"
-				exit 1
-			fi
-			minfo "execute '$0 uid_domain reload' to synchronize cache and database"
-			;;
-		rm)
-			require_dbengine
-			shift
-			if [ $# -ne 1 ] ; then
-				merr "missing domain parameter"
-				exit 1
-			fi
-			QUERY="delete from $UID_DOMAIN_TABLE where domain='$1';"
-			$DBCMD "$QUERY"
-			if [ $? -ne 0 ] ; then
-				merr "domain - SQL Error"
-				exit 1
-			fi
-			minfo "execute '$0 uid_domain reload' to synchronize cache and database"
-			;;
-		*)
-			usage_uid_domain
 			exit 1
 	esac
 }
@@ -1743,9 +1663,9 @@ dialplan() {
 
 #
 ##### ------------------------------------------------ #####
-### kamailio_start
+### openser_start
 #
-kamailio_start() {
+openser_start() {
 	echo
 	minfo "Starting Kamailio : "
 	if [ -r $PID_FILE ] ; then
@@ -1777,9 +1697,9 @@ kamailio_start() {
 
 #
 ##### ------------------------------------------------ #####
-### kamailio_stop
+### openser_stop
 #
-kamailio_stop() {
+openser_stop() {
 	echo
 	minfo "Stopping Kamailio : "
 	if [ -r $PID_FILE ] ; then
@@ -1992,7 +1912,7 @@ $SD_TABLE $CLAUSE ; "
 			# { 
 			#	  if(line==0) print "##  SIP-ID    \tNew-URI   \tDescritpion\n";
 			#	  else {
-			#		  ORS_BAK=ORS;usage_kamailio_monitor() {
+			#		  ORS_BAK=ORS;usage_openser_monitor() {
 			#		  ORS="";
 			#		  print line ") " $1 "@" $2 "\t" $3 "\t\"" $4;
 			#		  for (i=5;i<=NF;++i) print FS $i;
@@ -2552,11 +2472,6 @@ case $1 in
 		domain "$@"
 		;;
 
-	uid_domain)
-		shift
-		uid_domain "$@"
-		;;
-
 	trusted)
 		shift
 		permissions_trusted "$@"
@@ -2567,14 +2482,14 @@ case $1 in
 		permissions_address "$@"
 		;;
 
-	fifo|mi|unixsock|ser_mi|sercmd_mi|sercmdmi|kamcmd_mi|kamcmdmi)
+	fifo|mi|unixsock|ser_mi|sercmd_mi|sercmdmi)
 		require_ctlengine
 		shift
 		$CTLCMD "$@"
 		;;
 
-	ser|sercmd|kamcmd)
-		require_kamcmd
+	ser|sercmd)
+		require_sercmd
 		shift
 		$SERCTLCMD "$@"
 		;;
@@ -2601,7 +2516,7 @@ case $1 in
 
 	monitor|console|moni|con)
 		require_ctlengine
-		$KAMAILIO_MONITOR "$@"
+		$OPENSER_MONITOR "$@"
 		;;
 
 	online)
@@ -2633,17 +2548,13 @@ case $1 in
 
 	stats)
 		require_ctlengine
-		if [ "$#" -eq 1 ] ; then
-			$CTLCMD get_statistics all
-		else
-			$CTLCMD get_statistics "${2}:"
-		fi
+		$CTLCMD get_statistics all
 		;;
 
 	restart)
-		kamailio_stop
+		openser_stop
 		sleep 2
-		kamailio_start
+		openser_start
 		;;
 	
 	rpid)
@@ -2660,11 +2571,11 @@ case $1 in
 		;;
 
 	start)
-		kamailio_start
+		openser_start
 		;;
 
 	stop)
-		kamailio_stop
+		openser_stop
 		;;
 
 	version)

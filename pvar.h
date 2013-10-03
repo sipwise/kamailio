@@ -164,7 +164,7 @@ typedef struct _pv_export {
 typedef struct _pv_elem
 {
 	str text;
-	pv_spec_t *spec;
+	pv_spec_t spec;
 	struct _pv_elem *next;
 } pv_elem_t, *pv_elem_p;
 
@@ -188,7 +188,6 @@ int pv_parse_format(str *in, pv_elem_p *el);
 int pv_parse_index(pv_spec_p sp, str *in);
 int pv_init_iname(pv_spec_p sp, int param);
 int pv_printf_s(struct sip_msg* msg, pv_elem_p list, str *s);
-pv_spec_t* pv_spec_lookup(str *name, int *len);
 
 typedef struct _pvname_list {
 	pv_spec_t sname;
@@ -217,8 +216,6 @@ int pv_get_sintval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, int sival);
 int pv_get_strval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, str *sval);
-int pv_get_strzval(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res, char *sval);
 int pv_get_strintval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, str *sval, int ival);
 int pv_get_intstrval(struct sip_msg *msg, pv_param_t *param,

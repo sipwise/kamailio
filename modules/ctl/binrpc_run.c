@@ -388,7 +388,7 @@ end:
 
 
 
-static inline void destroy_binrpc_ctx(struct binrpc_ctx* ctx)
+inline void destroy_binrpc_ctx(struct binrpc_ctx* ctx)
 {
 	free_structs(&ctx->out.structs);
 	if (ctx->out.pkt.body){

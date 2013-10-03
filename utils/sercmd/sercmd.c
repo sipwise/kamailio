@@ -2154,19 +2154,25 @@ int main(int argc, char** argv)
 {
 	int c;
 	char* sock_name;
+	int port_no;
 	int sock_type;
 	int s;
 	struct binrpc_cmd cmd;
+	int rec;
 	struct id_list* sock_id;
 	char* format;
+	int interactive;
 	char* line;
 	char* l;
 
 	quit=0;
 	format=0;
 	line=0;
+	interactive=0;
+	rec=1;
 	s=-1;
 	sock_name=0;
+	port_no=0;
 	sock_type=UNIXS_SOCK;
 	opterr=0;
 	while((c=getopt(argc, argv, "UVhs:D:R:vf:"))!=-1){
@@ -2235,7 +2241,7 @@ int main(int argc, char** argv)
 	}
 	sock_id=parse_listen_id(sock_name, strlen(sock_name), sock_type);
 	if (sock_id==0){
-		fprintf(stderr, "ERROR: error parsing ser address %s\n", sock_name);
+		fprintf(stderr, "ERROR: error parsing ser adress %s\n", sock_name);
 		goto error;
 	}
 	
@@ -2271,6 +2277,7 @@ int main(int argc, char** argv)
 	sock_id=0;
 	
 	if (optind>=argc){
+			interactive=1;
 			/*fprintf(stderr, "ERROR: no command specified\n");
 			goto error; */
 	}else{

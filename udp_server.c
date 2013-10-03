@@ -321,24 +321,11 @@ int udp_init(struct socket_info* sock_info)
 	}
 	/* tos */
 	optval = tos;
-	if (addr->s.sa_family==AF_INET){
-		if (setsockopt(sock_info->socket, IPPROTO_IP, IP_TOS, (void*)&optval, 
-				sizeof(optval)) ==-1){
-			LOG(L_WARN, "WARNING: udp_init: setsockopt tos: %s\n",
-					strerror(errno));
-			/* continue since this is not critical */
-		}
-#ifdef USE_IPV6
-	} else if (addr->s.sa_family==AF_INET6){
-		if (setsockopt(sock_info->socket, IPPROTO_IPV6, IPV6_TCLASS,
-					(void*)&optval, sizeof(optval)) ==-1) {
-			LOG(L_WARN, "WARNING: udp_init: setsockopt v6 tos: %s\n",
-					strerror(errno));
-			/* continue since this is not critical */
-		}
-#endif
+	if (setsockopt(sock_info->socket, IPPROTO_IP, IP_TOS, (void*)&optval, 
+			sizeof(optval)) ==-1){
+		LOG(L_WARN, "WARNING: udp_init: setsockopt tos: %s\n", strerror(errno));
+		/* continue since this is not critical */
 	}
-
 #if defined (__OS_linux) && defined(UDP_ERRORS)
 	optval=1;
 	/* enable error receiving on unconnected sockets */

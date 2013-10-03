@@ -225,12 +225,11 @@ Options:\n\
                   field to a via\n\
     -R           Same as `-r` but use reverse dns;\n\
                   (to use both use `-rR`)\n\
-    -K           Turn on \"via:\" host checking when forwarding replies\n\
+    -v           Turn on \"via:\" host checking when forwarding replies\n\
     -d           Debugging mode (multiple -d increase the level)\n\
     -D no        1..do not fork (almost) anyway, 2..do not daemonize creator\n\
                   3..daemonize (default)\n\
-    -E           Log to stderr\n\
-    -e           Log messages printed in terminal colors (requires -E)\n"
+    -E           Log to stderr\n"
 #ifdef USE_TCP
 "    -T           Disable tcp\n\
     -N           Number of tcp child processes (default: equal to `-n')\n\
@@ -374,7 +373,6 @@ int sig_flag = 0;              /* last signal received */
 int dont_fork = 0;
 int dont_daemonize = 0;
 int log_stderr = 0;
-int log_color = 0;
 /* set custom app name for syslog printing */
 char *log_name = 0;
 pid_t creator_pid = (pid_t) -1;
@@ -397,7 +395,6 @@ int sip_warning = 0;
 int server_signature=1;
 str server_hdr = {SERVER_HDR, SERVER_HDR_LEN};
 str user_agent_hdr = {USER_AGENT, USER_AGENT_LEN};
-str version_table = {VERSION_TABLE, VERSION_TABLE_LEN};
 /* should ser try to locate outbound interface on multihomed
  * host? by default not -- too expensive
  */
@@ -979,8 +976,6 @@ static int parse_proto(unsigned char* s, long len, int* proto)
 	}
 #endif /* USE_SCTP */
 	else
-	/* Deliberately leaving out PROTO_WS and PROTO_WSS as these are just
-	   upgraded TCP/TLS connections. */
 		return -1;
 	return 0;
 }
@@ -1857,11 +1852,8 @@ int main(int argc, char** argv)
 	dont_fork_cnt=0;
 
 	daemon_status_init();
-
-	dprint_init_colors();
-
 	/* command line options */
-	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:"
+	options=  ":f:cm:M:dVIhEb:l:L:n:vrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:"
 #ifdef STATS
 		"s:"
 #endif
@@ -1883,9 +1875,6 @@ int main(int argc, char** argv)
 					break;
 			case 'E':
 					log_stderr=1;
-					break;
-			case 'e':
-					log_color=1;
 					break;
 			case 'M':
 					pkg_mem_size=strtol(optarg, &tmp, 10) * 1024 * 1024;
@@ -1958,7 +1947,6 @@ int main(int argc, char** argv)
 			case 'd':
 					/* ignore it, was parsed immediately after startup */
 					break;
-			case 'v':
 			case 'V':
 					printf("version: %s\n", full_version);
 					printf("flags: %s\n", ver_flags );
@@ -1980,9 +1968,6 @@ int main(int argc, char** argv)
 					exit(0);
 					break;
 			case 'E':
-					/* ignore it, was parsed immediately after startup */
-					break;
-			case 'e':
 					/* ignore it, was parsed immediately after startup */
 					break;
 			case 'O':
@@ -2021,7 +2006,7 @@ int main(int argc, char** argv)
 			case 'b':
 			case 'l':
 			case 'n':
-			case 'K':
+			case 'v':
 			case 'r':
 			case 'R':
 			case 'D':
@@ -2131,7 +2116,6 @@ try_again:
 			case 'm':
 			case 'M':
 			case 'd':
-			case 'v':
 			case 'V':
 			case 'I':
 			case 'h':
@@ -2140,10 +2124,6 @@ try_again:
 					break;
 			case 'E':
 					log_stderr=1;	/* use in both getopt switches,
-									   takes priority over config */
-					break;
-			case 'e':
-					log_color=1;	/* use in both getopt switches,
 									   takes priority over config */
 					break;
 			case 'b':
@@ -2178,7 +2158,7 @@ try_again:
 						goto error;
 					}
 					break;
-			case 'K':
+			case 'v':
 					check_via=1;
 					break;
 			case 'r':

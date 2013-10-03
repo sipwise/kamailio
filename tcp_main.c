@@ -373,7 +373,7 @@ static inline int init_sock_keepalive(int s)
  *  disable nagle, tos lowdelay, reuseaddr, non-blocking
  *
  * return -1 on error */
-static int init_sock_opt(int s, int af)
+static int init_sock_opt(int s)
 {
 	int flags;
 	int optval;
@@ -388,24 +388,11 @@ static int init_sock_opt(int s, int af)
 #endif
 	/* tos*/
 	optval = tos;
-	if(af==AF_INET){
-		if (setsockopt(s, IPPROTO_IP, IP_TOS, (void*)&optval,
-					sizeof(optval)) ==-1){
-			LOG(L_WARN, "WARNING: init_sock_opt: setsockopt tos: %s\n",
-					strerror(errno));
-			/* continue since this is not critical */
-		}
-#ifdef USE_IPV6
-	} else if(af==AF_INET6){
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_TCLASS,
-					(void*)&optval, sizeof(optval)) ==-1) {
-			LOG(L_WARN, "WARNING: init_sock_opt: setsockopt v6 tos: %s\n",
-					strerror(errno));
-			/* continue since this is not critical */
-		}
-#endif
+	if (setsockopt(s, IPPROTO_IP, IP_TOS, (void*)&optval,sizeof(optval)) ==-1){
+		LOG(L_WARN, "WARNING: init_sock_opt: setsockopt tos: %s\n",
+				strerror(errno));
+		/* continue since this is not critical */
 	}
-
 #if  !defined(TCP_DONT_REUSEADDR) 
 	optval=1;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
@@ -722,7 +709,7 @@ inline static int _wbufq_add(struct  tcp_connection* c, const char* data,
 		if (q->first && TICKS_LT(q->wr_timeout, t)){
 			if (unlikely(c->state==S_CONN_CONNECT)){
 #ifdef USE_DST_BLACKLIST
-				(void)dst_blacklist_su( BLST_ERR_CONNECT, c->rcv.proto,
+				dst_blacklist_su( BLST_ERR_CONNECT, c->rcv.proto,
 										&c->rcv.src_su, &c->send_flags, 0);
 #endif /* USE_DST_BLACKLIST */
 				TCP_EV_CONNECT_TIMEOUT(0, TCP_LADDR(c), TCP_LPORT(c),
@@ -730,7 +717,7 @@ inline static int _wbufq_add(struct  tcp_connection* c, const char* data,
 				TCP_STATS_CONNECT_FAILED();
 			}else{
 #ifdef USE_DST_BLACKLIST
-				(void)dst_blacklist_su( BLST_ERR_SEND, c->rcv.proto,
+				dst_blacklist_su( BLST_ERR_SEND, c->rcv.proto,
 									&c->rcv.src_su, &c->send_flags, 0);
 #endif /* USE_DST_BLACKLIST */
 				TCP_EV_SEND_TIMEOUT(0, &c->rcv);
@@ -1153,7 +1140,7 @@ inline static int tcp_do_connect(	union sockaddr_union* server,
 				su2a(server, sizeof(*server)), errno, strerror(errno));
 		goto error;
 	}
-	if (init_sock_opt(s, server->s.sa_family)<0){
+	if (init_sock_opt(s)<0){
 		LOG(L_ERR, "ERROR: tcp_do_connect %s: init_sock_opt failed\n",
 					su2a(server, sizeof(*server)));
 		goto error;
@@ -1443,7 +1430,7 @@ static inline void _tcpconn_free(struct tcp_connection* c)
 #endif
 	lock_destroy(&c->write_lock);
 #ifdef USE_TLS
-	if (unlikely(c->type==PROTO_TLS || c->type==PROTO_WSS)) tls_tcpconn_clean(c);
+	if (unlikely(c->type==PROTO_TLS)) tls_tcpconn_clean(c);
 #endif
 	shm_free(c);
 }
@@ -1472,7 +1459,7 @@ void tcpconn_rm(struct tcp_connection* c)
 	TCPCONN_UNLOCK;
 	lock_destroy(&c->write_lock);
 #ifdef USE_TLS
-	if ((c->type==PROTO_TLS || c->type==PROTO_WSS)&&(c->extra_data)) tls_tcpconn_clean(c);
+	if ((c->type==PROTO_TLS)&&(c->extra_data)) tls_tcpconn_clean(c);
 #endif
 	shm_free(c);
 }
@@ -1556,11 +1543,10 @@ struct tcp_connection* tcpconn_get(int id, struct ip_addr* ip, int port,
 	if (likely(c)){ 
 			atomic_inc(&c->refcnt);
 			/* update the timeout only if the connection is not handled
-			 * by a tcp reader _and_the timeout is non-zero  (the tcp
-			 * reader process uses c->timeout for its own internal
-			 * timeout and c->timeout will be overwritten * anyway on
-			 * return to tcp_main) */
-			if (likely(c->reader_pid==0 && timeout != 0))
+			 * by a tcp reader (the tcp reader process uses c->timeout for 
+			 * its own internal timeout and c->timeout will be overwritten
+			 * anyway on return to tcp_main) */
+			if (likely(c->reader_pid==0))
 				c->timeout=get_ticks_raw()+timeout;
 	}
 	TCPCONN_UNLOCK;
@@ -2286,7 +2272,7 @@ static int tcpconn_send_put(struct tcp_connection* c, const char* buf,
 				{
 					do_close_fd=0;
 #ifdef USE_TLS
-					if (unlikely(c->type==PROTO_TLS || c->type==PROTO_WSS)) {
+					if (unlikely(c->type==PROTO_TLS)) {
 						t_buf = buf;
 						t_len = len;
 						do {
@@ -2388,7 +2374,7 @@ static int tcpconn_send_put(struct tcp_connection* c, const char* buf,
 		}
 	
 #ifdef USE_TLS
-		if (unlikely(c->type==PROTO_TLS || c->type==PROTO_WSS)) {
+		if (unlikely(c->type==PROTO_TLS)) {
 			/* for TLS the TLS processing and the send must happen
 			   atomically w/ respect to other sends on the same connection
 			   (otherwise reordering might occur which would break TLS) =>
@@ -2974,7 +2960,7 @@ inline static void tcpconn_close_main_fd(struct tcp_connection* tcpconn)
 	
 	fd=tcpconn->s;
 #ifdef USE_TLS
-	if (tcpconn->type==PROTO_TLS || tcpconn->type==PROTO_WSS)
+	if (tcpconn->type==PROTO_TLS)
 		tls_close(tcpconn, fd);
 #endif
 #ifdef TCP_FD_CACHE
@@ -3041,7 +3027,7 @@ inline static void tcpconn_destroy(struct tcp_connection* tcpconn)
 			tcpconn_close_main_fd(tcpconn);
 			tcpconn->flags|=F_CONN_FD_CLOSED;
 			(*tcp_connections_no)--;
-			if (unlikely(tcpconn->type==PROTO_TLS || tcpconn->type==PROTO_WSS))
+			if (unlikely(tcpconn->type==PROTO_TLS))
 				(*tls_connections_no)--;
 		}
 		_tcpconn_free(tcpconn); /* destroys also the wbuf_q if still present*/
@@ -3089,7 +3075,7 @@ inline static int tcpconn_put_destroy(struct tcp_connection* tcpconn)
 		tcpconn_close_main_fd(tcpconn);
 		tcpconn->flags|=F_CONN_FD_CLOSED;
 		(*tcp_connections_no)--;
-		if (unlikely(tcpconn->type==PROTO_TLS || tcpconn->type==PROTO_WSS))
+		if (unlikely(tcpconn->type==PROTO_TLS))
 				(*tls_connections_no)--;
 	}
 	/* all the flags / ops on the tcpconn must be done prior to decrementing
@@ -3449,7 +3435,7 @@ inline static int handle_tcp_child(struct tcp_child* tcp_c, int fd_i)
 					/* timeout */
 					if (unlikely(tcpconn->state==S_CONN_CONNECT)){
 #ifdef USE_DST_BLACKLIST
-						(void)dst_blacklist_su( BLST_ERR_CONNECT,
+						dst_blacklist_su( BLST_ERR_CONNECT,
 											tcpconn->rcv.proto,
 											&tcpconn->rcv.src_su,
 											&tcpconn->send_flags, 0);
@@ -3460,7 +3446,7 @@ inline static int handle_tcp_child(struct tcp_child* tcp_c, int fd_i)
 						TCP_STATS_CONNECT_FAILED();
 					}else{
 #ifdef USE_DST_BLACKLIST
-						(void)dst_blacklist_su( BLST_ERR_SEND,
+						dst_blacklist_su( BLST_ERR_SEND,
 											tcpconn->rcv.proto,
 											&tcpconn->rcv.src_su,
 											&tcpconn->send_flags, 0);
@@ -4238,7 +4224,7 @@ inline static int handle_tcpconn_ev(struct tcp_connection* tcpconn, short ev,
 			if (unlikely(ev & POLLERR)){
 				if (unlikely(tcpconn->state==S_CONN_CONNECT)){
 #ifdef USE_DST_BLACKLIST
-					(void)dst_blacklist_su(BLST_ERR_CONNECT, tcpconn->rcv.proto,
+					dst_blacklist_su(BLST_ERR_CONNECT, tcpconn->rcv.proto,
 										&tcpconn->rcv.src_su,
 										&tcpconn->send_flags, 0);
 #endif /* USE_DST_BLACKLIST */
@@ -4248,7 +4234,7 @@ inline static int handle_tcpconn_ev(struct tcp_connection* tcpconn, short ev,
 					TCP_STATS_CONNECT_FAILED();
 				}else{
 #ifdef USE_DST_BLACKLIST
-					(void)dst_blacklist_su(BLST_ERR_SEND, tcpconn->rcv.proto,
+					dst_blacklist_su(BLST_ERR_SEND, tcpconn->rcv.proto,
 										&tcpconn->rcv.src_su,
 										&tcpconn->send_flags, 0);
 #endif /* USE_DST_BLACKLIST */
@@ -4425,7 +4411,7 @@ static ticks_t tcpconn_main_timeout(ticks_t t, struct timer_ln* tl, void* data)
 	if (tcp_async && _wbufq_non_empty(c) && TICKS_GE(t, c->wbuf_q.wr_timeout)){
 		if (unlikely(c->state==S_CONN_CONNECT)){
 #ifdef USE_DST_BLACKLIST
-			(void)dst_blacklist_su(BLST_ERR_CONNECT, c->rcv.proto, &c->rcv.src_su,
+			dst_blacklist_su(BLST_ERR_CONNECT, c->rcv.proto, &c->rcv.src_su,
 								&c->send_flags, 0);
 #endif /* USE_DST_BLACKLIST */
 			TCP_EV_CONNECT_TIMEOUT(0, TCP_LADDR(c), TCP_LPORT(c), TCP_PSU(c),
@@ -4433,7 +4419,7 @@ static ticks_t tcpconn_main_timeout(ticks_t t, struct timer_ln* tl, void* data)
 			TCP_STATS_CONNECT_FAILED();
 		}else{
 #ifdef USE_DST_BLACKLIST
-			(void)dst_blacklist_su(BLST_ERR_SEND, c->rcv.proto, &c->rcv.src_su,
+			dst_blacklist_su(BLST_ERR_SEND, c->rcv.proto, &c->rcv.src_su,
 								&c->send_flags, 0);
 #endif /* USE_DST_BLACKLIST */
 			TCP_EV_SEND_TIMEOUT(0, &c->rcv);
@@ -4525,7 +4511,7 @@ static inline void tcpconn_destroy_all(void)
 					fd=-1;
 				}
 #ifdef USE_TLS
-				if (fd>0 && (c->type==PROTO_TLS || c->type==PROTO_WSS))
+				if (fd>0 && c->type==PROTO_TLS)
 					tls_close(c, fd);
 #endif
 				_tcpconn_rm(c);
@@ -4538,7 +4524,7 @@ static inline void tcpconn_destroy_all(void)
 					tcp_safe_close(fd);
 				}
 				(*tcp_connections_no)--;
-				if (unlikely(c->type==PROTO_TLS || c->type==PROTO_WSS))
+				if (unlikely(c->type==PROTO_TLS))
 					(*tls_connections_no)--;
 			c=next;
 		}

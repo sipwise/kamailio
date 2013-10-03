@@ -7,10 +7,9 @@ auto_gen=
 NAME=mqueue.so
 LIBS=
 
-DEFS+=-DKAMAILIO_MOD_INTERFACE
+DEFS+=-DOPENSER_MOD_INTERFACE
 
 SERLIBPATH=../../lib
-SER_LIBS+=$(SERLIBPATH)/kmi/kmi
 SER_LIBS+=$(SERLIBPATH)/kcore/kcore
 
 include ../../Makefile.modules

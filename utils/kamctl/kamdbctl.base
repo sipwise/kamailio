@@ -3,22 +3,22 @@ PATH=$PATH:/usr/local/sbin
 # config vars
 
 # name of the database to be used by Kamailio
-DBNAME=${DBNAME:-kamailio}
+DBNAME=${DBNAME:-openser}
 
 # address of database server
 DBHOST=${DBHOST:-localhost}
 
 # user with full privileges over DBNAME database
-DBRWUSER=${DBRWUSER:-kamailio}
+DBRWUSER=${DBRWUSER:-openser}
 
 # password user with full privileges over DBNAME database
-DBRWPW=${DBRWPW:-kamailiorw}
+DBRWPW=${DBRWPW:-openserrw}
 
 # read-only user
-DBROUSER=${DBROUSER:-kamailioro}
+DBROUSER=${DBROUSER:-openserro}
 
 # password for read-only user
-DBROPW=${DBROPW:-kamailioro}
+DBROPW=${DBROPW:-openserro}
 
 # user name column
 USERCOL=${USERCOL:-username}
@@ -29,42 +29,31 @@ USERCOL=${USERCOL:-username}
 
 INSTALL_EXTRA_TABLES=${INSTALL_EXTRA_TABLES:-ask}
 INSTALL_PRESENCE_TABLES=${INSTALL_PRESENCE_TABLES:-ask}
-INSTALL_DBUID_TABLES=${INSTALL_DBUID_TABLES:-ask}
 
 # Used by dbtext and db_berkeley to define tables to be created, used by
 # postgres to do the grants
-STANDARD_TABLES=${STANDARD_TABLES:-version acc dbaliases domain domain_attrs
-		grp uri speed_dial lcr_gw lcr_rule lcr_rule_target pdt subscriber
-		location location_attrs re_grp trusted address missed_calls
-		usr_preferences aliases silo dialog dialog_vars dispatcher dialplan}
+STANDARD_TABLES=${STANDARD_TABLES:-version acc dbaliases domain domain_attrs grp
+		uri speed_dial lcr_gw lcr_rule lcr_rule_target pdt subscriber
+		location re_grp trusted address missed_calls usr_preferences
+		aliases silo dialog dialog_vars dispatcher dialplan}
 EXTRA_TABLES=${EXTRA_TABLES:-imc_members imc_rooms cpl sip_trace domainpolicy
 		carrierroute carrier_name domain_name carrierfailureroute userblacklist
-		globalblacklist htable purplemap uacreg pl_pipes mtree mtrees
-		sca_subscriptions}
+		globalblacklist htable purplemap uacreg pl_pipes mtree mtrees}
 PRESENCE_TABLES=${PRESENCE_TABLES:-presentity active_watchers watchers xcap 
 		pua rls_presentity rls_watchers}
-DBUID_TABLES=${UID_TABLES:-uid_credentials uid_domain uid_domain_attrs
-		uid_global_attrs uid_uri uid_uri_attrs uid_user_attrs}
 
 # SQL definitions
 # If you change this definitions here, then you must change them
-# in ../../lib/srdb1/schema/entities.xml too. They are used in this
-# script and needed to be the same as in the database definitions.
+# in db/schema/entities.xml too.
 # FIXME
 
-FOREVER=${FOREVER:-2030-05-28 21:32:15}
+FOREVER=${FOREVER:-2020-05-28 21:32:15}
 DEFAULT_ALIASES_EXPIRES=${DEFAULT_ALIASES_EXPIRES:-${FOREVER}}
 DEFAULT_Q=${DEFAULT_Q:-1.0}
 DEFAULT_CALLID=${DEFAULT_CALLID:-Default-Call-ID}
 DEFAULT_CSEQ=${DEFAULT_CSEQ:-13}
 DEFAULT_LOCATION_EXPIRES=${DEFAULT_LOCATION_EXPIRES:-${FOREVER}}
 
-
-# default location for config files
-DEFAULT_CFG_DIR=/usr/local/etc/kamailio
-
-# default location for data files
-DEFAULT_DATA_DIR=/usr/local/share/kamailio
 
 # Needed programs
 MD5=${MD5:-md5sum}
@@ -73,17 +62,12 @@ GREP=${GREP:-grep}
 SED=${SED:-sed}
 
 # define what modules should be installed
-STANDARD_MODULES=${STANDARD_MODULES:-standard acc lcr domain group
-		permissions registrar usrloc msilo alias_db uri_db speeddial
-		avpops auth_db pdt dialog dispatcher dialplan}
-
-PRESENCE_MODULES=${PRESENCE_MODULES:-presence rls}
-
+STANDARD_MODULES=${STANDARD_MODULES:-standard acc lcr domain group permissions
+				     registrar usrloc msilo alias_db uri_db
+				     speeddial avpops auth_db pdt dialog dispatcher
+				     dialplan}
 EXTRA_MODULES=${EXTRA_MODULES:-imc cpl siptrace domainpolicy carrierroute
-		userblacklist htable purple uac pipelimit mtree sca}
-
-DBUID_MODULES=${UID_MODULES:-uid_auth_db uid_avp_db uid_domain uid_gflags
-		uid_uri_db}
+    userblacklist htable purple uac pipelimit mtree}
 
 ############################################################
 
@@ -94,26 +78,21 @@ COMMAND=`basename $0`
 cat <<EOF
 $0 $VERSION
 
-usage: $COMMAND create <db name or db_path, optional> ...(creates a new database)
-       $COMMAND drop <db name or db_path, optional> .....(!entirely deletes tables!)
-       $COMMAND reinit <db name or db_path, optional> ...(!entirely deletes and than re-creates tables!)
-       $COMMAND backup <file> ...........................(dumps current database to file)
-       $COMMAND restore <file> ..........................(restores tables from a file)
-       $COMMAND copy <new_db> ...........................(creates a new db from an existing one)
-       $COMMAND migrate <old_db> <new_db> ...............(migrates DB from 1.2 to 1.3, not implemented yet!)
-       $COMMAND presence ................................(adds the presence related tables)
-       $COMMAND extra ...................................(adds the extra tables)
-       $COMMAND dbuid ...................................(adds the uid tables)
-       $COMMAND dbonly ..................................(creates empty database)
-       $COMMAND grant ...................................(grant privileges to database)
-       $COMMAND revoke ..................................(revoke privileges to database)
+usage: $COMMAND create <db name or db_path, optional> .....(creates a new database)
+       $COMMAND drop <db name or db_path, optional> .......(!entirely deletes tables!)
+       $COMMAND reinit <db name or db_path, optional> .....(!entirely deletes and than re-creates tables!)
+       $COMMAND backup <file> .................................(dumps current database to file)
+       $COMMAND restore <file> ................................(restores tables from a file)
+       $COMMAND copy <new_db> .................................(creates a new db from an existing one)
+       $COMMAND migrate <old_db> <new_db> .....................(migrates DB from 1.2 to 1.3, not implemented yet!)
+       $COMMAND presence ......................................(adds the presence related tables)
+       $COMMAND extra .........................................(adds the extra tables)
 
        if you want to manipulate database as other database user than
        root, want to change database name from default value "$DBNAME",
        or want to use other values for users and password, edit the
        "config vars" section of the command $COMMAND.
 
-       $COMMAND pframework create .......................(creates a sample provisioning framework file)
 EOF
 } #usage
 

@@ -2,9 +2,8 @@
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
 	"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
 
-<book id="xmlrpc" xmlns:xi="http://www.w3.org/2001/XInclude">
-    <bookinfo>
-	<title>The XMLRPC Module</title>
+<section id="xmlrpc" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <sectioninfo>
 	<authorgroup>
 		<author>
 		<firstname>Jan</firstname>
@@ -19,7 +18,7 @@
 		<year>2005</year>
 		<holder>iptelorg GmbH</holder>
 	</copyright>
-	</bookinfo>
+	</sectioninfo>
 
 
 	<section id="xmlrpc.design">
@@ -214,7 +213,7 @@ Server: UserLand Frontier/7.0.1-WinNT
 	</para>
 	<mediaobject id="fig.rpc_example" xreflabel="Figure RPC Example">
 	    <imageobject>
-		<imagedata align="center" fileref="xmlrpc_example.png" format="PNG"/>
+		<imagedata align="center" fileref="rpc_example.png" format="PNG"/>
 	    </imageobject>
 	    <textobject>
 		<para>Example RPC Scenario</para>
@@ -756,6 +755,7 @@ route[XMLRPC]{
 	</para>
     </section>
 
-	<xi:include href="xmlrpc_admin.xml"/>
+	<xi:include href="params.xml"/>
+	<xi:include href="functions.xml"/>
 
-</book>
+</section>

@@ -1126,7 +1126,6 @@ static time_t xmlrpc2time(const char* str)
 /* xml value types */
 enum xmlrpc_val_type{
 	XML_T_STR,
-	XML_T_TXT,
 	XML_T_INT,
 	XML_T_BOOL,
 	XML_T_DATE,
@@ -1143,8 +1142,6 @@ static enum xmlrpc_val_type xml_get_type(xmlNodePtr value)
 {
 	if (!xmlStrcmp(value->name, BAD_CAST "string")){
 		return XML_T_STR;
-	} else if (!xmlStrcmp(value->name, BAD_CAST "text")) {
-		return XML_T_TXT;
 	} else if ( !xmlStrcmp(value->name, BAD_CAST "i4") ||
 				!xmlStrcmp(value->name, BAD_CAST "int")) {
 		return XML_T_INT;
@@ -1207,7 +1204,6 @@ static int get_int(int* val, struct xmlrpc_reply* reply,
 			break;
 		case XML_T_DOUBLE:
 		case XML_T_STR:
-		case XML_T_TXT:
 			if (flags & GET_X_AUTOCONV)
 				break;
 		case XML_T_ERR:
@@ -1215,10 +1211,8 @@ static int get_int(int* val, struct xmlrpc_reply* reply,
 				set_fault(reply, 400, "Invalid Parameter Type");
 			return -1;
 	}
-	if (type == XML_T_TXT)
-		val_str = (char*)i4->content;
-	else
-		val_str = (char*)xmlNodeListGetString(doc, i4->xmlChildrenNode, 1);
+
+	val_str = (char*)xmlNodeListGetString(doc, i4->xmlChildrenNode, 1);
 	if (!val_str) {
 		if (!(flags & GET_X_NOREPLY))
 			set_fault(reply, 400, "Empty Parameter Value");
@@ -1229,7 +1223,6 @@ static int get_int(int* val, struct xmlrpc_reply* reply,
 		case XML_T_INT:
 		case XML_T_BOOL:
 		case XML_T_STR:
-		case XML_T_TXT:
 			/* Integer/bool conversion */
 			*val = strtol(val_str, &end_ptr, 10);
 			if (val_str==end_ptr)
@@ -1302,7 +1295,6 @@ static int get_double(double* val, struct xmlrpc_reply* reply,
 		case XML_T_BOOL:
 		case XML_T_DATE:
 		case XML_T_STR:
-		case XML_T_TXT:
 			if (flags & GET_X_AUTOCONV)
 				break;
 		case XML_T_ERR:
@@ -1310,10 +1302,8 @@ static int get_double(double* val, struct xmlrpc_reply* reply,
 				set_fault(reply, 400, "Invalid Parameter Type");
 			return -1;
 	}
-	if (type == XML_T_TXT)
-		val_str = (char*)dbl->content;
-	else
-		val_str = (char*)xmlNodeListGetString(doc, dbl->xmlChildrenNode, 1);
+
+	val_str = (char*)xmlNodeListGetString(doc, dbl->xmlChildrenNode, 1);
 	if (!val_str) {
 		if (!(flags & GET_X_NOREPLY))
 			set_fault(reply, 400, "Empty Double Parameter");
@@ -1325,7 +1315,6 @@ static int get_double(double* val, struct xmlrpc_reply* reply,
 		case XML_T_INT:
 		case XML_T_BOOL:
 		case XML_T_STR:
-		case XML_T_TXT:
 			*val = strtod(val_str, &end_ptr);
 			if (val_str==end_ptr)
 				ret=-1;
@@ -1390,7 +1379,6 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 	type=xml_get_type(dbl);
 	switch(type){
 		case XML_T_STR:
-		case XML_T_TXT:
 			break;
 		case XML_T_INT:
 		case XML_T_BOOL:
@@ -1403,13 +1391,9 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 				set_fault(reply, 400, "Invalid Parameter Type");
 			return -1;
 	}
-	if (type == XML_T_TXT)
-		val_str = (char*)dbl->content;
-	else
-		val_str = (char*)xmlNodeListGetString(doc, dbl->xmlChildrenNode, 1);
-
+	val_str = (char*)xmlNodeListGetString(doc, dbl->xmlChildrenNode, 1);
 	if (!val_str) {
-		if (type==XML_T_STR || type==XML_T_TXT){
+		if (type==XML_T_STR){
 			*val = null_str;
 			return 0;
 		}else{
@@ -1421,7 +1405,6 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 	ret=0;
 	switch(type){
 		case XML_T_STR:
-		case XML_T_TXT:
 			if (flags & GET_X_LFLF2CRLF){
 				p=val_str;
 				while(*p){

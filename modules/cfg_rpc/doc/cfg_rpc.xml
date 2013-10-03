@@ -7,9 +7,8 @@
 
 ]>
 
-<book id="gflags" xmlns:xi="http://www.w3.org/2001/XInclude">
-    <bookinfo>
-        <title>cfg_rpc Module</title>
+<section id="gflags" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <sectioninfo>
 	<authorgroup>
 	    <author>
 		<firstname>Miklos</firstname>
@@ -21,11 +20,10 @@
 	    <year>2007</year>
 	    <holder>iptelorg GmbH</holder>
 	</copyright>
-    </bookinfo>
-    <toc></toc>
+    </sectioninfo>
 
-    <chapter>
-	<title>Admin Guide</title>
+    <title>cfg_rpc Module</title>
+
     <section id="cfg_rpc.overview">
 	<title>Overview</title>
 	<para>
@@ -39,10 +37,10 @@
 	    a.s.o. without the need of restart.
 	</para>
 	<para>
-		RPC connector modules, such as <quote>ctl</quote> or <quote>xmlrpc</quote>, although
+		RPC connector modules, such as ctl or xmlrpc, although
 		not a dependecy, should be loaded in order to execute
 		the RPC commands exported by this module. When ctl module
-		is loaded, the tool '&sercmd;' can be used to execute
+		is loaded, the tool 'sercmd' can be used to execute
 		the RPC commands implemented in this module.
 	</para>
     </section>
@@ -79,7 +77,6 @@
 	</section>
 
     <xi:include href="rpc.xml"/>
-    </chapter>
 
-</book>
+</section>
 

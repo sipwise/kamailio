@@ -124,33 +124,236 @@ ifneq ($(group_include),)
 	modules_configured:=0
 endif
 
-# get the groups of modules to compile
-include Makefile.groups
+# Module group definitions, default only include the standard group
+# Make backwards compatible, don't set group_include default...
+#group_include?="standard"
 
-# - automatically build the list of excluded modules
+# Modules in this group are considered a standard part of SER (due to 
+# widespread usage) and have no external compile or link dependencies (note 
+# that some of these interplay with external systems).
+module_group_standard=acc_syslog auth avp ctl dispatcher diversion enum\
+				eval exec fifo db_flatstore gflags maxfwd mediaproxy \
+				nathelper options pdt permissions pike print ratelimit \
+				registrar rr rtpproxy sanity sl textops timer tm uac \
+				unixsock uri usrloc xlog cfg_rpc sipcapture msrp tmrec
+
+# Modules in this group are considered a standard part of SER (due to 
+# widespread usage) but they have dependencies that must be satisfied for 
+# compilation.
+# acc_radius, auth_radius, misc_radius => radiusclient-ng
+# acc_db, auth_db, avp_db, db_ops, domain, lcr, msilo, dialog, speeddial,
+# uri_db => database module (db_mysql, db_postgres, dbtext ...)
+# mysql, postgres => mysql server and client libraries or postgres server and
+#  client libraries or other database back-end (ex. mysql-devel)
+# pa, xmlrpc => libxml2
+# rls => pa
+#
+# NOTE! All presence modules (dialog, pa, presence_b2b, rls, xcap) have been
+# included in this group due to interdependencies
+module_group_standard_dep=acc_db acc_radius auth_db auth_radius avp_db \
+				auth_identity db_ops domain lcr misc_radius \
+				msilo dialog pa \
+				presence_b2b rls speeddial uri_db xcap xmlrpc
+
+# For db use (db modules, excluding drivers)
+module_group_db=acc_db auth_db avp_db db_ops db_text \
+				uri_db domain lcr msilo speeddial
+				#dbtext (s) not migrated yet to the new db interface
+
+# For mysql
+module_group_mysql_driver=db_mysql
+module_group_mysql=$(module_group_mysql_driver) $(module_group_db)
+
+# For postgress
+module_group_postgres_driver=db_postgres
+module_group_postgres=$(module_group_postgres_driver) $(module_group_db)
+
+# For radius
+module_group_radius=acc_radius auth_radius misc_radius avp_radius uri_radius \
+					peering
+
+# For presence
+# kamailio modules
+module_group_presence=presence presence_dialoginfo presence_mwi presence_xml presence_profile\
+						pua pua_bla pua_dialoginfo pua_mi pua_usrloc pua_xmpp \
+						rls xcap_client xcap_server presence_conference \
+						presence_reginfo pua_reginfo
+#ser modules
+module_group_presence+=dialog presence_b2b xcap
+# obsolete/unmaintained ser modules
+#module_group_presence=pa rls
+
+# Modules in this group satisfy specific or niche applications, but are 
+# considered stable for production use. They may or may not have dependencies
+# cpl-c => libxml2
+# jabber => expat (library)
+# osp => OSP Toolkit (sipfoundry)
+# sms => none (external modem)
+module_group_stable=cpl-c dbtext jabber osp sms pdb
+
+# Modules in this group are either not complete, untested, or without enough
+# reports of usage to allow the module into the stable group. They may or may
+# not have dependencies
+module_group_experimental=tls oracle iptrtpproxy ndb_redis async
+
+# For cassandra
+module_group_cassandra_driver=db_cassandra
+module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
+
+
+### Kamailio specific groups ###
+# Standard modules in K Debian distro
+module_group_kstandard=acc alias_db auth auth_db benchmark call_control \
+				cfgutils db_text dialog dispatcher diversion domain drouting \
+				exec group htable imc kex maxfwd mi_datagram mi_fifo msilo \
+				nat_traversal nathelper path pdt permissions pike pv qos \
+				ratelimit regex registrar rr rtimer rtpproxy siptrace siputils \
+				sl sms speeddial sqlops sst statistics textops tmx uac \
+				uac_redirect uri_db userblacklist usrloc xlog seas \
+				avpops cfg_db cfg_rpc ctl db_flatstore dialplan enum \
+				iptrtpproxy lcr mediaproxy mi_rpc pdb sanity tm topoh \
+				blst prefix_route counters debugger matrix mqueue mtree \
+				pipelimit rtpproxy textopsx xhttp xhttp_rpc ipops p_usrloc \
+				sdpops async sipcapture dmq msrp tmrec db_cluster
+
+# K mysql module
+module_group_kmysql=db_mysql
+
+# K postgress module
+module_group_kpostgres=db_postgres
+
+# K cpl module
+module_group_kcpl=cpl-c
+
+# K radius modules
+module_group_kradius=acc_radius auth_radius misc_radius peering
+
+# K unixodbc module
+module_group_kunixodbc=db_unixodbc
+
+# K xmlrpc modules
+module_group_kxml=xmlrpc mi_xmlrpc xmlops
+
+# K perl module
+module_group_kperl=perl perlvdb
+
+# K snmpstats module
+module_group_ksnmpstats=snmpstats
+
+# K xmpp module
+module_group_kxmpp=xmpp
+
+# K carrierroute module
+module_group_kcarrierroute=carrierroute
+
+# K berkeley module
+module_group_kberkeley=db_berkeley
+
+# K ldap modules
+module_group_kldap=ldap h350
+
+# K utils module
+module_group_kutils=utils
+
+# K purple module
+module_group_kpurple=purple
+
+# K memcached module
+module_group_kmemcached=memcached
+
+# K tls module
+module_group_ktls=tls
+
+# K presence modules
+module_group_kpresence=presence presence_dialoginfo presence_mwi presence_xml presence_profile\
+						pua pua_bla pua_dialoginfo pua_mi pua_usrloc pua_xmpp \
+						rls xcap_client xcap_server presence_conference \
+						presence_reginfo pua_reginfo
+
+# K lua module
+module_group_klua=app_lua
+
+# K python module
+module_group_kpython=app_python
+
+# K geoip module
+module_group_kgeoip=geoip
+
+# K sqlite module
+module_group_ksqlite=db_sqlite
+
+# K json modules
+module_group_kjson=json jsonrpc-c
+
+# K redis module
+module_group_kredis=ndb_redis
+
+# K mono module
+module_group_kmono=app_mono
+
 # if not set on the cmd. line, env or in the modules.lst (cfg_group_include)
 # exclude the below modules.
 ifneq ($(group_include)$(cfg_group_include),)
-	# For group_include, default all modules are excluded except those in
+	# For group_include, default all modules are excluded except those in 
 	# include_modules
 	exclude_modules?=
 else
 	# Old defaults for backwards compatibility
 	# excluded because they depend on external libraries
-ifeq ($(origin exclude_modules), undefined)
-	exclude_modules:= $(sort \
-				$(filter-out $(module_group_default), $(mod_list_all)))
+	exclude_modules?= 		cpl mangler postgres jabber mysql cpl-c \
+							auth_radius misc_radius avp_radius uri_radius \
+							acc_radius pa rls presence_b2b xcap xmlrpc\
+							osp tls oracle cassandra \
+							unixsock dbg print_lib auth_identity ldap \
+							db_berkeley db_mysql db_postgres db_oracle \
+							db_sqlite db_unixodbc db_cassandra memcached mi_xmlrpc \
+							perl perlvdb purple \
+							snmpstats xmpp \
+							carrierroute peering \
+							dialplan lcr utils presence presence_mwi \
+							presence_dialoginfo presence_xml pua pua_bla \
+							pua_dialoginfo pua_usrloc pua_xmpp \
+							regex xcap_client xcap_server presence_conference \
+							presence_reginfo pua_reginfo
+	#excluded because they depend on external *.h files
+	exclude_modules+= h350
+	# excluded because they do not compile (remove them only after they are
+	#  fixed) -- andrei
+	exclude_modules+= bdb dbtext iptrtpproxy pa rls
+	# depends on libgeoip
+	exclude_modules+= geoip
+	# depends on liblua5.1-dev
+	exclude_modules+= app_lua
+	# depends on libpython-dev
+	exclude_modules+= app_python
+	# depends on libxml2
+	exclude_modules+= xmlops
+	# depends on jsoc-c
+	exclude_modules+= json jsonrpc-c
+	# depends on libhiredis
+	exclude_modules+= ndb_redis
+	# depends on mono-devel
+	exclude_modules+= app_mono
+	# depends on tm being compiled with -DWITH_AS_SUPPORT support
+ifeq (,$(findstring -DWITH_AS_SUPPORT, $(C_DEFS)))
+		exclude_modules+= seas
 endif
 endif
 
-# always add skip_modules list - it is done now in modules.lst (dcm)
-# override exclude_modules+= $(skip_modules)
+# always exclude the CVS dir
+override exclude_modules+= CVS $(skip_modules)
 
 # Test for the groups and add to include_modules
 ifneq (,$(group_include))
 $(eval override include_modules+= $(foreach grp, $(group_include), \
 										$(module_group_$(grp)) ))
 endif
+
+# first 2 lines are excluded because of the experimental or incomplete
+# status of the modules
+# the rest is excluded because it depends on external libraries
+#
+static_modules:=
 
 ALLDEP=config.mak Makefile Makefile.dirs Makefile.sources Makefile.rules
 
@@ -355,7 +558,7 @@ endif # (,$(basedir))
 
 else ifneq ($(config_mak),skip)
 
-config.mak: Makefile.defs Makefile.groups
+config.mak: Makefile.defs
 	@echo making config...
 	@echo "# this file is autogenerated by make cfg" >$@
 	@$(call mapf2,cfg_save_var,saved_fixed_vars,$(@))
@@ -368,28 +571,15 @@ config.mak: Makefile.defs Makefile.groups
 
 endif # ifeq ($(config_mak),1)
 
-modules.lst: Makefile.groups
+modules.lst:
 	@echo  saving modules list...
 	@echo "# this file is autogenerated by make modules-cfg" >$@
-	@echo >>$@
-	@echo "# the list of sub-directories with modules" >>$@
 	@echo "modules_dirs:=$(modules_dirs)" >>$@
-	@echo >>$@
-	@echo "# the list of module groups to compile" >>$@
 	@echo "cfg_group_include=$(group_include)" >>$@
-	@echo >>$@
-	@echo "# the list of extra modules to compile" >>$@
 	@$(call cfg_save_var2,include_modules,$@)
-	@echo >>$@
-	@echo "# the list of static modules" >>$@
 	@$(call cfg_save_var2,static_modules,$@)
-	@echo >>$@
-	@echo "# the list of modules to skip from compile list" >>$@
 	@$(call cfg_save_var2,skip_modules,$@)
-	@echo >>$@
-	@echo "# the list of modules to exclude from compile list" >>$@
-	@$(call cfg_save_var3,exclude_modules,skip_modules,$@)
-	@echo >>$@
+	@$(call cfg_save_var2,exclude_modules,$@)
 	@$(foreach mods,$(modules_dirs), \
 		$(call cfg_save_var2,$(mods)_all,$@))
 	@$(foreach mods,$(modules_dirs), \
@@ -671,17 +861,6 @@ deb:
 		rm debian; \
 	else \
 		ln -s pkg/$(MAIN_NAME)/deb/debian debian; \
-		dpkg-buildpackage -rfakeroot -tc; \
-		rm debian; \
-	fi
-
-.PHONY: deb-stable
-deb-stable:
-	-@if [ -d debian ]; then \
-		dpkg-buildpackage -rfakeroot -tc; \
-		rm debian; \
-	else \
-		ln -s pkg/$(MAIN_NAME)/deb/wheezy debian; \
 		dpkg-buildpackage -rfakeroot -tc; \
 		rm debian; \
 	fi
@@ -1022,54 +1201,3 @@ dbschema:
 .PHONY: printcdefs
 printcdefs:
 	@echo -n $(C_DEFS)
-
-.PHONY: printvar
-printvar:
-	@echo "Content of <$(v)> is:"
-	@echo -n $($(v))
-	@echo
-
-.PHONY: uninstall
-uninstall:
-	@echo "-Installation details:"
-	@echo " *PREFIX Path is: ${PREFIX}"
-	@echo " *BINDIR Path is: ${bin_prefix}/${bin_dir}"
-	@echo " *CFGDIR Path is: ${cfg_prefix}/${cfg_dir}"
-	@echo " *DOCDIR Path is: ${doc_prefix}/${doc_dir}"
-	@echo " *LIBDIR Path is: ${lib_prefix}/${lib_dir}"
-	@echo " *MANDIR Path is: ${man_prefix}/${man_dir}"
-	@echo " *SHRDIR Path is: ${share_prefix}/${share_dir}"
-	@if [ "${PREFIX}" != "/usr/local" ] ; then \
-		echo "-Custom PREFIX Path" ; \
-		if [ "${PREFIX}" = "/" -o "${PREFIX}" = "/usr" ] ; then \
-			echo "-Custom installation in a system folder" ; \
-			echo "-This is advanced installation" ; \
-			echo "-You seem to be in control of what files were deployed" ; \
-			echo "-Folders listed above should give hints about what to delete" ; \
-		else \
-			echo "-Uninstall should be just removal of the folder: ${PREFIX}" ; \
-			echo "-WARNING: before deleting, be sure ${PREFIX} is not a system directory" ; \
-		fi ; \
-	else \
-		echo "-Run following commands to uninstall:" ; \
-		echo ; \
-		echo "rm ${bin_prefix}/${bin_dir}${MAIN_NAME}" ; \
-		if [ "${FLAVOUR}" = "kamailio" ] ; then \
-			echo "rm ${bin_prefix}/${bin_dir}kamctl" ; \
-			echo "rm ${bin_prefix}/${bin_dir}kamdbctl" ; \
-		fi ; \
-		echo "rm ${bin_prefix}/${bin_dir}kamcmd" ; \
-		echo "rm ${man_prefix}/${man_dir}man5/$(MAIN_NAME).cfg.5" ; \
-		echo "rm ${man_prefix}/${man_dir}man8/$(MAIN_NAME).8" ; \
-		if [ "${FLAVOUR}" = "kamailio" ] ; then \
-			echo "rm ${man_prefix}/${man_dir}kamctl.8" ; \
-			echo "rm ${man_prefix}/${man_dir}kamdbctl.8" ; \
-		fi ; \
-		echo "rm -rf ${cfg_prefix}/${cfg_dir}" ; \
-		echo "rm -rf ${doc_prefix}/${doc_dir}" ; \
-		echo "rm -rf ${lib_prefix}/${lib_dir}" ; \
-		echo "rm -rf ${share_prefix}/${share_dir}" ; \
-		echo ; \
-		echo "-WARNING: before running the commands, be sure they don't delete any system directory or file" ; \
-	fi ;
-	@echo

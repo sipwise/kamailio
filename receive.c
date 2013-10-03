@@ -185,7 +185,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 			}
 		}
 #endif
-
+			
 	/*	skip: */
 		DBG("preparing to run routing scripts...\n");
 #ifdef  STATS

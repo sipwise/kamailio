@@ -29,7 +29,7 @@
 	<para>
 		However, MSRP is still a text-based protocol.  It uses several routing
 		mechanisms similar to what exists in SIP. Furthermore,
-		MSRP requires TCP, and recommends TLS for confidentiality and security.
+		MSRP requres TCP, and recommends TLS for confidentiality and security.
 		In light of the scalability and performance of &kamailio; in handling
 		TCP/TLS, this module reuses &kamailio;'s core framework to
 		offer MSRP routing capabilities. Along with embedded Presence and XCAP
@@ -105,103 +105,6 @@ modparam("msrp", "sipmsg", 1)
 </programlisting>
 		</example>
 	</section>
-	<section>
-		<title><varname>cmap_size</varname> (int)</title>
-		<para>
-		The size of connection map table, to be computed as power of 2 (e.g.,
-		if the value is 4, then the number of slots in map table is 2^4 = 16).
-		</para>
-		<para>
-		<emphasis>
-			Default value is '0' (no internal map table to be used).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>cmap_size</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("msrp", "cmap_size", 8)
-...
-</programlisting>
-		</example>
-	</section>
-	<section>
-		<title><varname>timer_interval</varname> (int)</title>
-		<para>
-		The timer interval in seconds to run the procedure for cleaning
-		expired connections.
-		</para>
-		<para>
-		<emphasis>
-			Default value is '60'.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>timer_interval</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("msrp", "timer_interval", 90)
-...
-</programlisting>
-		</example>
-	</section>
-	<section>
-		<title><varname>auth_min_expires</varname> (int)</title>
-		<para>
-		The minimum value accepted for Expires header in AUTH requests.
-		</para>
-		<para>
-		<emphasis>
-			Default value is '60'.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>auth_min_expires</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("msrp", "auth_min_expiresl", 90)
-...
-</programlisting>
-		</example>
-	</section>
-	<section>
-		<title><varname>auth_max_expires</varname> (int)</title>
-		<para>
-		The maximum value accepted for Expires header in AUTH requests.
-		</para>
-		<para>
-		<emphasis>
-			Default value is '3600'.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>auth_max_expires</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("msrp", "auth_max_expiresl", 1800)
-...
-</programlisting>
-		</example>
-	</section>
-	<section>
-		<title><varname>use_path_addr</varname> (str)</title>
-		<para>
-		The hostname:port to be used when building Use-Path header.
-		</para>
-		<para>
-		<emphasis>
-			Default value is NULL (server IP and port are used).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>use_path_addr</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("msrp", "use_path_addr", "msrp.kamailio.org:5061")
-...
-</programlisting>
-		</example>
-	</section>
 	</section>
 
 	<section>
@@ -221,7 +124,7 @@ modparam("msrp", "use_path_addr", "msrp.kamailio.org:5061")
 		This function can be used in ANY_ROUTE.
 		</para>
 		<example>
-		<title><function>msrp_relay</function> usage</title>
+		<title><function>msrp</function> usage</title>
 		<programlisting format="linespecific">
 ...
 event_route[msrp:frame-in] {
@@ -396,61 +299,6 @@ event_route[msrp:frame-in] {
 	    </example>
 	</section>
 
-	<section>
-	    <title>
-		<function moreinfo="none">msrp_cmap_save()</function>
-	    </title>
-	    <para>
-		Save details of a MSRP connection upon AUTH request inside
-		the internal map table, indexed by session id.
-		</para>
-		<para>
-		This function can be used in ANY_ROUTE.
-		</para>
-		<example>
-		<title><function>msrp_cmap_save</function> usage</title>
-		<programlisting format="linespecific">
-...
-event_route[msrp:frame-in] {
-    ...
-	if(method=="AUTH") { msrp_cmap_save(); exit; }
-    ...
-}
-...
-</programlisting>
-	    </example>
-	</section>
-
-	<section>
-	    <title>
-		<function moreinfo="none">msrp_cmap_lookup()</function>
-	    </title>
-	    <para>
-		Lookup MSRP connection details for current session id.
-		</para>
-		<para>
-		This function can be used in ANY_ROUTE.
-		</para>
-		<example>
-		<title><function>msrp_cmap_lookup</function> usage</title>
-		<programlisting format="linespecific">
-...
-event_route[msrp:frame-in] {
-    ...
-	if(method=="SEND" and $msrp(nexthops)==1) {
-		if(msrp_cmap_lookup()) {
-			msrp_relay();
-		} else {
-			msrp_reply("481", "Session not found");
-		}
-	}
-    ...
-}
-...
-</programlisting>
-	    </example>
-	</section>
-
 	</section>
 
 	<section>
@@ -469,26 +317,6 @@ event_route[msrp:frame-in] {
 			project web site.
 		</para>
 	</section>
-
-	<section>
-	<title>RPC Commands</title>
-	<section>
-		<title>
-		<function moreinfo="none">msrp.cmaplist</function>
-		</title>
-		<para>
-		List active MSRP connections.
-		</para>
-		<para>
-		Example:
-		</para>
-<programlisting  format="linespecific">
-...
-&sercmd; msrp.cmaplist
-...
-</programlisting>
-    </section>
-    </section>
 
 	<section>
 		<title>Event Routes</title>
@@ -578,7 +406,7 @@ Content-Type: text/plain
 			for MSRP frames. In this config, the SIP traffic is rejected.
 		</para>
 		<example>
-		<title>Event Route (using htable for MSRP connection tracking)</title>
+		<title>Event Route</title>
 		<programlisting format="linespecific">
 ...
 <![CDATA[
@@ -611,14 +439,10 @@ loadmodule "cfgutils.so"
 loadmodule "htable.so"
 loadmodule "xlog.so"
 
+# ----- mi_fifo params -----
 modparam("mi_fifo", "fifo_name", "/tmp/kamailio_fifo")
 
-modparam("auth", "nonce_count", 1)
-modparam("auth", "qop", "auth")
-
-#!substdef "!MSRP_MIN_EXPIRES!1800!g"
-#!substdef "!MSRP_MAX_EXPIRES!3600!g"
-modparam("htable", "htable", "msrp=>size=8;autoexpire=MSRP_MAX_EXPIRES;")
+modparam("htable", "htable", "c=>size=8;autoexpire=1800;")
 
 request_route {
 	sl_send_reply("403", "No SIP Here");
@@ -645,69 +469,51 @@ event_route[msrp:frame-in] {
 
 	msrp_reply_flags("1");
 
-	if(msrp_is_reply())
-	{
-		msrp_relay();
-	}
-	else if($msrp(method)=="AUTH")
+    if(msrp_is_reply())
+    {
+        msrp_relay();
+        exit;
+    }
+
+	# handle AUTH MSRP requests
+	if($msrp(method)=="AUTH")
 	{
 		if($msrp(nexthops)>0)
 		{
 			msrp_relay();
 			exit;
 		}
-
 		# frame for local server - send Use-Path
 		# -- passwd can be loaded from DB based on $au
 		$var(passwd) = "xyz123";
-		if(!pv_www_authenticate("myrealm", "$var(passwd)", "0",
-					"$msrp(method)"))
+		if(!pv_www_authenticate("myrealm", "$var(passwd)", "0"))
 		{
-			if(auth_get_www_authenticate("myrealm", "1",
-							"$var(wauth)"))
+			if(auth_get_www_authenticate("myrealm", "0",
+						"$var(wauth)"))
 			{
-				msrp_reply("401", "Unauthorized",
+				msrp_reply("401", "Authorization Required",
 						"$var(wauth)");
 			} else {
 				msrp_reply("500", "Server Error");
 			}
 			exit;
 		}
-
-		if ($hdr(Expires) != $null) {
-			$var(expires) = (int) $hdr(Expires);
-			if ($var(expires) < MSRP_MIN_EXPIRES) {
-				msrp_reply("423", "Interval Out-of-Bounds",
-					"Min-Expires: MSRP_MIN_EXPIRES\r\n");
-				exit;
-			} else {
-				msrp_reply("423", "Interval Out-of-Bounds",
-					"Max-Expires: MSRP_MAX_EXPIRES\r\n");
-				exit;
-			}
-
-		} else
-			$var(expires) = MSRP_MAX_EXPIRES;
-		
 		$var(cnt) = $var(cnt) + 1;
 		pv_printf("$var(sessid)", "s.$(pp).$(var(cnt)).$(RANDOM)");
 		$sht(msrp=>$var(sessid)::srcaddr) = $msrp(srcaddr);
 		$sht(msrp=>$var(sessid)::srcsock) = $msrp(srcsock);
-		$shtex(msrp=>$var(sessid)) = $var(expires) + 5;
 		# - Use-Path: the MSRP address for server + session id
-		$var(headers) = "Use-Path: msrp://127.0.0.1:5060/"
-				+ $var(sessid) + ";tcp\r\n"
-				+ "Expires: " + $var(expires) + "\r\n";
-		msrp_reply("200", "OK", "$var(headers)");
+		$var(UsePath) = "Use-Path: msrp://127.0.0.1:5060/"
+				+ $var(sessid) + ";tcp\r\n";
+		msrp_reply("200", "OK", "$var(UsePath)");
+		exit;
 	}
-	else if($msrp(method)=="SEND" || $msrp(method)=="REPORT")
+
+	if($msrp(method)=="SEND")
 	{
 		if($msrp(nexthops)>1)
 		{
-			if ($msrp(method)!="REPORT")
-			{
-				msrp_reply("200", "OK");
-			}
+			msrp_reply("200", "Received");
 			msrp_relay();
 			exit;
 		}
@@ -715,163 +521,22 @@ event_route[msrp:frame-in] {
 		if($sht(msrp=>$var(sessid)::srcaddr) == $null)
 		{
 			# one more hop, but we don't have address in htable
-			if ($msrp(method)!="REPORT")
-			{
-				msrp_reply("481", "Session-does-not-exist");
-			}
+			msrp_reply("481", "No Such Session");
 			exit;
-		}
-		else if($msrp(method)!="REPORT")
-		{
-			msrp_reply("200", "OK");
 		}
 		msrp_relay_flags("1");
 		msrp_set_dst("$sht(msrp=>$var(sessid)::srcaddr)",
 				"$sht(msrp=>$var(sessid)::srcsock)");
 		msrp_relay();
+		exit;
 	}
-	else
-	{
-		msrp_reply("501", "Request-method-not-understood");
-	}
+
+	msrp_relay();
 }
 ]]>
 ...
 </programlisting>
-		</example>
-		<example>
-		<title>Event Route (using msrp_cmap_ functions for connection tracking)</title>
-		<programlisting format="linespecific">
-...
-<![CDATA[
-#!KAMAILIO
-
-debug=2
-memdbg=5
-memlog=5
-
-children=4
-
-log_stderror=yes
-auto_aliases=no
-
-tcp_accept_no_cl=yes
-tcp_connection_lifetime=1810
-
-listen=127.0.0.1:5060
-
-mpath="modules_k/:modules/"
-
-loadmodule "sl.so"
-loadmodule "kex.so"
-loadmodule "mi_fifo.so"
-loadmodule "ctl.so"
-loadmodule "msrp.so"
-loadmodule "pv.so"
-loadmodule "auth.so"
-loadmodule "cfgutils.so"
-loadmodule "xlog.so"
-
-modparam("mi_fifo", "fifo_name", "/tmp/kamailio_fifo")
-
-modparam("auth", "nonce_count", 1)
-modparam("auth", "qop", "auth")
-
-modparam("msrp", "cmap_size", 8)
-modparam("msrp", "use_path_addr", "msrp://127.0.0.1:5060")
-
-request_route {
-	sl_send_reply("403", "No SIP Here");
-	exit;
-}
-
-reply_route {
-	drop;
-}
-
-event_route[msrp:frame-in] {
-	xdbg("============#[[$msrp(method)]]===========\n");
-	xdbg("============*[[$si:$sp]]\n");
-	xdbg("============ crthop:   [$msrp(crthop)]\n");
-	xdbg("============ prevhop:  [$msrp(prevhop)]\n");
-	xdbg("============ nexthop:  [$msrp(nexthop)]\n");
-	xdbg("============ firsthop: [$msrp(firsthop)]\n");
-	xdbg("============ lasthop:  [$msrp(lasthop)]\n");
-	xdbg("============ prevhops: [$msrp(prevhops)]\n");
-	xdbg("============ nexthops: [$msrp(nexthops)]\n");
-	xdbg("============ srcaddr:  [$msrp(srcaddr)]\n");
-	xdbg("============ srcsock:  [$msrp(srcsock)]\n");
-	xdbg("============ sessid:   [$msrp(sessid)]\n");
-
-	msrp_reply_flags("1");
-
-	if (msrp_is_reply())
-	{
-		msrp_relay();
-	}
-	else if($msrp(method)=="AUTH")
-	{
-		if($msrp(nexthops)>0)
-		{
-			msrp_relay();
-			exit;
-		}
-
-		# frame for local server - send Use-Path
-		# -- passwd can be loaded from DB based on $au
-		$var(passwd) = "xyz123";
-		if(!pv_www_authenticate("myrealm", "$var(passwd)", "0",
-					"$msrp(method)"))
-		{
-			if(auth_get_www_authenticate("myrealm", "1",
-							"$var(wauth)"))
-			{
-				msrp_reply("401", "Unauthorized",
-						"$var(wauth)");
-			} else {
-				msrp_reply("500", "Server Error");
-			}
-			exit;
-		}
-
-		msrp_cmap_save();
-	}
-	else if ($msrp(method)=="SEND" || $msrp(method)=="REPORT")
-	{
-		if ($msrp(nexthops)>1)
-		{
-			if ($msrp(method)!="REPORT")
-			{
-				msrp_reply("200", "OK");
-			}
-			msrp_relay();
-			exit;
-		}
-
-		if (msrp_cmap_lookup())
-		{
-			if ($msrp(method)!="REPORT")
-			{
-				msrp_reply("200", "OK");
-			}
-			msrp_relay_flags("1");
-			msrp_relay();
-		}
-		else
-		{
-			msrp_reply("481", "Session-does-not-exist");
-		}
-	}
-	else
-	{
-		msrp_reply("501", "Request-method-not-understood");
-	}
-}
-]]>
-...
-</programlisting>
-		</example>
-
+	    </example>
 	</section>
 
 </chapter>

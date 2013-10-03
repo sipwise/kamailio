@@ -42,7 +42,7 @@ MODULES_SP=
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils purple memcached tls \
 			   snmpstats carrierroute xmpp cpl lua python geoip \
-			   sqlite ims
+			   sqlite
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
 LIBDIR ?= lib
@@ -85,10 +85,8 @@ define PACKAGE_GRP_INSTALL_template
 		-for d in $(DUP_LIBS_DIRS); do \
 			test "$$d" != "$(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio" &&\
 			for r in $$d/lib*; do \
-				if [ "$$r" != "$$d/lib*" ]; then \
-					echo "removing $(grp) lib `basename $$r` present also in $$d";\
-					rm -f $(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
-				fi \
+				echo "removing $(grp) lib `basename $$r` present also in $$d";\
+				rm -f $(CURDIR)/debian/kamailio-$(grp)-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
 			done ; \
 		done
 	)
@@ -105,10 +103,8 @@ define PACKAGE_MODULE_INSTALL_template
 		-for d in $(DUP_LIBS_DIRS); do \
 			test "$$d" != "$(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio" &&\
 			for r in $$d/lib*; do \
-				if [ "$$r" != "$$d/lib*" ]; then \
-					echo "removing $(call mod_name, $(mod)) lib `basename $$r` present also in $$d";\
-					rm -f $(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
-				fi \
+				echo "removing $(call mod_name, $(mod)) lib `basename $$r` present also in $$d";\
+				rm -f $(CURDIR)/debian/kamailio-$(call mod_name,$(mod))-module/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
 			done ; \
 		done
 	)

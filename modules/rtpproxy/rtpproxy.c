@@ -322,7 +322,6 @@ static int rtpproxy_tout = 1;
 static pid_t mypid;
 static unsigned int myseqn = 0;
 static str nortpproxy_str = str_init("a=nortpproxy:yes");
-static str extra_id_pv_param = {NULL, 0};
 
 static char ** rtpp_strings=0;
 static int rtpp_sets=0; /*used in rtpproxy_set_store()*/
@@ -332,19 +331,11 @@ static unsigned int current_msg_id = (unsigned int)-1;
 struct rtpp_set_head * rtpp_set_list =0;
 struct rtpp_set * selected_rtpp_set =0;
 struct rtpp_set * default_rtpp_set=0;
-static char *ice_candidate_priority_avp_param = NULL;
-static int ice_candidate_priority_avp_type;
-static int_str ice_candidate_priority_avp;
 
 /* array with the sockets used by rtpporxy (per process)*/
 static unsigned int rtpp_no = 0;
 static int *rtpp_socks = 0;
 
-
-typedef struct rtpp_set_link {
-	struct rtpp_set *rset;
-	pv_spec_t *rpv;
-} rtpp_set_link_t;
 
 /* tm */
 static struct tm_binds tmb;
@@ -353,7 +344,6 @@ static struct tm_binds tmb;
 unsigned int *natping_state=0;
 
 static str timeout_socket_str = {0, 0};
-static pv_elem_t *extra_id_pv = NULL;
 
 static cmd_export_t cmds[] = {
 	{"set_rtp_proxy_set",  (cmd_function)set_rtp_proxy_set_f,    1,
@@ -363,12 +353,6 @@ static cmd_export_t cmds[] = {
 		0, 0,
 		ANY_ROUTE},
 	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy_f,    0,
-		0, 0,
-		ANY_ROUTE},
-	{"unforce_rtp_proxy",  (cmd_function)unforce_rtp_proxy_f,    1,
-		0, 0,
-		ANY_ROUTE},
-	{"rtpproxy_destroy",   (cmd_function)unforce_rtp_proxy_f,    1,
 		0, 0,
 		ANY_ROUTE},
 	{"start_recording",    (cmd_function)start_recording_f,      0,
@@ -408,10 +392,10 @@ static cmd_export_t cmds[] = {
 		0, 0,
 		ANY_ROUTE},
 	{"rtpproxy_manage",	(cmd_function)rtpproxy_manage1,     1,
-		fixup_spve_null, fixup_free_spve_null,
+		0, 0,
 		ANY_ROUTE},
 	{"rtpproxy_manage",	(cmd_function)rtpproxy_manage2,     2,
-		fixup_spve_spve, fixup_free_spve_spve,
+		0, 0,
 		ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
@@ -430,9 +414,6 @@ static param_export_t params[] = {
 	{"rtpproxy_retr",         INT_PARAM, &rtpproxy_retr         },
 	{"rtpproxy_tout",         INT_PARAM, &rtpproxy_tout         },
 	{"timeout_socket",    	  STR_PARAM, &timeout_socket_str.s  },
-	{"ice_candidate_priority_avp", STR_PARAM,
-	 &ice_candidate_priority_avp_param},
-	{"extra_id_pv",           STR_PARAM, &extra_id_pv_param.s },
 	{0, 0, 0}
 };
 
@@ -688,45 +669,21 @@ static int fixup_set_id(void ** param, int param_no)
 {
 	int int_val, err;
 	struct rtpp_set* rtpp_list;
-	rtpp_set_link_t *rtpl = NULL;
-	str s;
 
-	rtpl = (rtpp_set_link_t*)pkg_malloc(sizeof(rtpp_set_link_t));
-	if(rtpl==NULL) {
-		LM_ERR("no more pkg memory\n");
-		return -1;
-	}
-	memset(rtpl, 0, sizeof(rtpp_set_link_t));
-	s.s = (char*)*param;
-	s.len = strlen(s.s);
-
-	if(s.s[0] == PV_MARKER) {
-		int_val = pv_locate_name(&s);
-		if(int_val<0 || int_val!=s.len) {
-			LM_ERR("invalid parameter %s\n", s.s);
-			return -1;
-		}
-		rtpl->rpv = pv_cache_get(&s);
-		if(rtpl->rpv == NULL) {
-			LM_ERR("invalid pv parameter %s\n", s.s);
-			return -1;
-		}
-	} else {
-		int_val = str2s(*param, strlen(*param), &err);
-		if (err == 0) {
-			pkg_free(*param);
-			if((rtpp_list = select_rtpp_set(int_val)) ==0){
-				LM_ERR("rtpp_proxy set %i not configured\n", int_val);
-				return E_CFG;
-			}
-			rtpl->rset = rtpp_list;
-		} else {
-			LM_ERR("bad number <%s>\n",	(char *)(*param));
+	int_val = str2s(*param, strlen(*param), &err);
+	if (err == 0) {
+		pkg_free(*param);
+		if((rtpp_list = select_rtpp_set(int_val)) ==0){
+			LM_ERR("rtpp_proxy set %i not configured\n", int_val);
 			return E_CFG;
 		}
+		*param = (void *)rtpp_list;
+	
+		return 0;
+	} else {
+		LM_ERR("bad number <%s>\n",	(char *)(*param));
+		return E_CFG;
 	}
-	*param = (void*)rtpl;
-	return 0;
 }
 
 static struct mi_root* mi_enable_rtp_proxy(struct mi_root* cmd_tree, 
@@ -876,9 +833,6 @@ static int
 mod_init(void)
 {
 	int i;
-	pv_spec_t avp_spec;
-	str s;
-	unsigned short avp_flags;
 
 	if(register_mi_mod(exports.name, mi_cmds)!=0)
 	{
@@ -919,29 +873,6 @@ mod_init(void)
 		timeout_socket_str.s = NULL;
 	} else {
 		timeout_socket_str.len = strlen(timeout_socket_str.s);
-	}
-
-	if (ice_candidate_priority_avp_param) {
-	    s.s = ice_candidate_priority_avp_param; s.len = strlen(s.s);
-	    if (pv_parse_spec(&s, &avp_spec) == 0 || avp_spec.type != PVT_AVP) {
-		LM_ERR("malformed or non AVP definition <%s>\n", ice_candidate_priority_avp_param);
-		return -1;
-	    }
-	    if (pv_get_avp_name(0, &(avp_spec.pvp), &ice_candidate_priority_avp, &avp_flags) != 0) {
-		LM_ERR("invalid AVP definition <%s>\n", ice_candidate_priority_avp_param);
-		return -1;
-	    }
-	    ice_candidate_priority_avp_type = avp_flags;
-	}
-
-	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
-		extra_id_pv_param.len = strlen(extra_id_pv_param.s);
-		if(pv_parse_format(&extra_id_pv_param, &extra_id_pv) < 0) {
-			LM_ERR("malformed PV string: %s\n", extra_id_pv_param.s);
-			return -1;
-		}
-	} else {
-		extra_id_pv = NULL;
 	}
 
 	if (rtpp_strings)
@@ -1413,83 +1344,6 @@ alter_rtcp(struct sip_msg *msg, str *body, str *oldport, str *newport)
 	return 0;
 }
 
-
-static char *
-append_filtered_ip(char *at, str *ip)
-{
-    int i;
-    for (i = 0; i < ip->len; i++) {
-	if (isdigit(ip->s[i])) {
-	    append_chr(at, ip->s[i]);
-	}
-    }
-    return at;
-}
-
-		
-static int
-insert_candidates(struct sip_msg *msg, char *where, str *ip, unsigned int port,
-		  int priority)
-{
-    char *buf, *at;
-    struct lump* anchor;
-    str rtp_port;
-    str rtcp_port;
-
-    rtcp_port.s = int2str(port+1, &rtcp_port.len); /* beware static buffer */
-    buf = pkg_malloc(24 + 78 + 14 + 24 + 2*ip->len + 2 + 2*rtcp_port.len + 24);
-    if (buf == NULL) {
-	LM_ERR("insert_candidates: out of memory\n");
-	return -1;
-    }
-
-    at = buf;
-
-	append_str(at, "a=candidate:", 12);
-	at = append_filtered_ip(at, ip);
-	append_str(at, " 2 UDP ", 7);
-	if (priority == 2) {
-	    append_str(at, "16777214 ", 9);
-	} else {
-	    append_str(at, "2197815294 ", 11);
-	}
-	append_str(at, ip->s, ip->len);
-	append_chr(at, ' ');
-	append_str(at, rtcp_port.s, rtcp_port.len);
-	append_str(at, " typ relay\r\n", 12);
-
-    rtp_port.s = int2str(port, &rtp_port.len); /* beware static buffer */
-    append_str(at, "a=candidate:", 12);
-    at = append_filtered_ip(at, ip);
-    append_str(at, " 1 UDP ", 7);
-    if (priority == 2) {
-	append_str(at, "16777215 ", 9);
-    } else {
-	append_str(at, "2197815295 ", 11);
-    }
-    append_str(at, ip->s, ip->len);
-    append_chr(at, ' ');
-    append_str(at, rtp_port.s, rtp_port.len);
-    append_str(at, " typ relay\r\n", 12);
-
-    LM_DBG("inserting '%.*s'\n", (int)(at - buf), buf);
-
-    anchor = anchor_lump(msg, where - msg->buf, 0, 0);
-    if (anchor == 0) {
-	LOG(L_ERR, "insert_candidates: can't get anchor\n");
-	pkg_free(buf);
-	return -1;
-    }
-    if (insert_new_lump_before(anchor, buf, at - buf, 0) == 0) {
-	LM_ERR("insert_candidates: insert_new_lump_before failed\n");
-	pkg_free(buf);
-	return -1;
-    }
-
-    return 0;
-}
-    
-
 static char * gencookie(void)
 {
 	static char cook[34];
@@ -1783,37 +1637,18 @@ found:
 	return node;
 }
 
-
 static int
-get_extra_id(struct sip_msg* msg, str *id_str) {
-	if(msg==NULL || extra_id_pv==NULL || id_str==NULL) {
-		LM_ERR("bad parameters\n");
-		return 0;
-	}
-	if (pv_printf_s(msg, extra_id_pv, id_str)<0) {
-		LM_ERR("cannot print the additional id\n");
-		return 0;
-	}
-
-	return 1;
-}
-
-
-static int
-unforce_rtp_proxy_f(struct sip_msg* msg, char* flags, char* str2)
+unforce_rtp_proxy_f(struct sip_msg* msg, char* str1, char* str2)
 {
 	str callid, from_tag, to_tag, viabranch;
 	char *cp;
 	int via = 0;
-	int to = 1;
-	int extra = 0;
-	str extra_id;
 	int ret;
 	struct rtpp_node *node;
 	struct iovec v[1 + 4 + 3 + 2] = {{NULL, 0}, {"D", 1}, {" ", 1}, {NULL, 0}, {NULL, 0}, {NULL, 0}, {" ", 1}, {NULL, 0}, {" ", 1}, {NULL, 0}};
-	                                            /* 1 */   /* 2 */   /* 3 */    /* 4 */    /* 5 */    /* 6 */   /* 7 */    /* 8 */   /* 9 */
+						    /* 1 */   /* 2 */   /* 3 */    /* 4 */    /* 5 */    /* 6 */   /* 7 */    /* 8 */   /* 9 */
 
-	for (cp = flags; cp && *cp; cp++) {
+	for (cp = str1; cp && *cp; cp++) {
 		switch (*cp) {
 			case '1':
 				via = 1;
@@ -1821,45 +1656,6 @@ unforce_rtp_proxy_f(struct sip_msg* msg, char* flags, char* str2)
 
 			case '2':
 				via = 2;
-				break;
-
-			case '3':
-				if(msg && msg->first_line.type == SIP_REPLY)
-					via = 2;
-				else
-					via = 1;
-				break;
-
- 		        case 't':
-		        case 'T':
-			    to = 0;
-			    break;
-			case 'b':
-				extra = 1;
-				break;
-			case 'a':
-			case 'A':
-			case 'i':
-			case 'I':
-			case 'e':
-			case 'E':
-			case 'l':
-			case 'L':
-			case 'f':
-			case 'F':
-			case 'r':
-			case 'R':
-			case 'c':
-			case 'C':
-			case 'o':
-			case 'O':
-			case 'x':
-			case 'X':
-			case 'w':
-			case 'W':
-			case 'z':
-			case 'Z':
-				/* ignore them - they can be sent by rtpproxy_manage() */
 				break;
 
 			default:
@@ -1873,8 +1669,7 @@ unforce_rtp_proxy_f(struct sip_msg* msg, char* flags, char* str2)
 		return -1;
 	}
 	to_tag.s = 0;
-	to_tag.len = 0;
-	if ((to == 1) && get_to_tag(msg, &to_tag) == -1) {
+	if (get_to_tag(msg, &to_tag) == -1) {
 		LM_ERR("can't get To tag\n");
 		return -1;
 	}
@@ -1894,12 +1689,6 @@ unforce_rtp_proxy_f(struct sip_msg* msg, char* flags, char* str2)
 		v[4].iov_base = ";";
 		v[4].iov_len = 1;
 		STR2IOVEC(viabranch, v[5]);
-	} else
-	/* Append extra id to call-id */
-	if (extra && extra_id_pv && get_extra_id(msg, &extra_id)) {
-		v[4].iov_base = ";";
-		v[4].iov_len = 1;
-		STR2IOVEC(extra_id, v[5]);
 	}
 	STR2IOVEC(callid, v[3]);
 	STR2IOVEC(from_tag, v[7]);
@@ -1924,33 +1713,8 @@ unforce_rtp_proxy_f(struct sip_msg* msg, char* flags, char* str2)
 static int
 set_rtp_proxy_set_f(struct sip_msg * msg, char * str1, char * str2)
 {
-	rtpp_set_link_t *rtpl;
-	pv_value_t val;
-
-	rtpl = (rtpp_set_link_t*)str1;
-
-	current_msg_id = 0;
-	selected_rtpp_set = 0;
-
-	if(rtpl->rset != NULL) {
-		current_msg_id = msg->id;
-		selected_rtpp_set = rtpl->rset;
-	} else {
-		if(pv_get_spec_value(msg, rtpl->rpv, &val)<0) {
-			LM_ERR("cannot evaluate pv param\n");
-			return -1;
-		}
-		if(!(val.flags & PV_VAL_INT)) {
-			LM_ERR("pv param must hold an integer value\n");
-			return -1;
-		}
-		selected_rtpp_set = select_rtpp_set(val.ri);
-		if(selected_rtpp_set==NULL) {
-			LM_ERR("could not locate rtpproxy set %d\n", val.ri);
-			return -1;
-		}
-		current_msg_id = msg->id;
-	}
+	current_msg_id = msg->id;
+	selected_rtpp_set = (struct rtpp_set *)str1;
 	return 1;
 }
 
@@ -1976,7 +1740,7 @@ rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 		return -1;
 
 	if(method==METHOD_CANCEL || method==METHOD_BYE)
-		return unforce_rtp_proxy_f(msg, flags, 0);
+		return unforce_rtp_proxy_f(msg, 0, 0);
 
 	if(ip==NULL)
 	{
@@ -2002,13 +1766,13 @@ rtpproxy_manage(struct sip_msg *msg, char *flags, char *ip)
 					&& tmb.t_gett()!=T_UNDEFINED)
 				tmb.t_gett()->uas.request->msg_flags |= FL_SDP_BODY;
 			if(route_type==FAILURE_ROUTE)
-				return unforce_rtp_proxy_f(msg, flags, 0);
+				return unforce_rtp_proxy_f(msg, 0, 0);
 			return force_rtp_proxy(msg, flags, (cp!=NULL)?newip:ip, 1,
 					(ip!=NULL)?1:0);
 		}
 	} else if(msg->first_line.type == SIP_REPLY) {
 		if(msg->first_line.u.reply.statuscode>=300)
-			return unforce_rtp_proxy_f(msg, flags, 0);
+			return unforce_rtp_proxy_f(msg, 0, 0);
 		if(nosdp==0) {
 			if(method==METHOD_UPDATE)
 				return force_rtp_proxy(msg, flags, (cp!=NULL)?newip:ip, 0,
@@ -2036,31 +1800,13 @@ rtpproxy_manage0(struct sip_msg *msg, char *flags, char *ip)
 static int
 rtpproxy_manage1(struct sip_msg *msg, char *flags, char *ip)
 {
-	str flag_str;
-	if(fixup_get_svalue(msg, (gparam_p)flags, &flag_str)<0)
-	{
-		LM_ERR("invalid flags parameter\n");
-		return -1;
-	}
-	return rtpproxy_manage(msg, flag_str.s, 0);
+	return rtpproxy_manage(msg, flags, 0);
 }
 
 static int
 rtpproxy_manage2(struct sip_msg *msg, char *flags, char *ip)
 {
-	str flag_str;
-	str ip_str;
-	if(fixup_get_svalue(msg, (gparam_p)flags, &flag_str)<0)
-	{
-		LM_ERR("invalid flags parameter\n");
-		return -1;
-	}
-	if(fixup_get_svalue(msg, (gparam_p)ip, &ip_str)<0)
-	{
-		LM_ERR("invalid IP parameter\n");
-		return -1;
-	}
-	return rtpproxy_manage(msg, flag_str.s, ip_str.s);
+	return rtpproxy_manage(msg, flags, ip);
 }
 
 static int
@@ -2158,8 +1904,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 {
 	str body, body1, oldport, oldip, newport, newip;
 	str callid, from_tag, to_tag, tmp, payload_types;
-	str newrtcp = {0, 0};
-	str viabranch;
+	str newrtcp, viabranch;
 	int create, port, len, flookup, argc, proxied, real, via, ret;
 	int orgip, commip;
 	int pf, pf1, force;
@@ -2194,9 +1939,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		{NULL, 0},	/* Timeout-Socket */
 	};
 	int iovec_param_count;
-	int autobridge_ipv4v6;
-	int extra;
-	str extra_id;
 
 	char *c1p, *c2p, *bodylimit, *o1p;
 	char itoabuf_buf[20];
@@ -2208,8 +1950,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 	sdp_session_cell_t* sdp_session;
 	sdp_stream_cell_t* sdp_stream;
 
-	int_str ice_candidate_priority_val;
-
 	memset(&opts, '\0', sizeof(opts));
 	memset(&rep_opts, '\0', sizeof(rep_opts));
 	memset(&pt_opts, '\0', sizeof(pt_opts));
@@ -2218,7 +1958,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		LM_ERR("out of pkg memory\n");
 		FORCE_RTP_PROXY_RET (-1);
 	}
-	flookup = force = real = orgip = commip = via = autobridge_ipv4v6 = extra = 0;
+	flookup = force = real = orgip = commip = via = 0;
 	for (cp = str1; cp != NULL && *cp != '\0'; cp++) {
 		switch (*cp) {
 		case '1':
@@ -2229,13 +1969,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			via = 2;
 			break;
 
-		case '3':
-			if(msg && msg->first_line.type == SIP_REPLY)
-				via = 2;
-			else
-				via = 1;
-			break;
-
 		case 'a':
 		case 'A':
 			if (append_opts(&opts, 'A') == -1) {
@@ -2243,10 +1976,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				FORCE_RTP_PROXY_RET (-1);
 			}
 			real = 1;
-			break;
-
-		case 'b':
-			extra = 1;
 			break;
 
 		case 'i':
@@ -2293,11 +2022,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			orgip = 1;
 			break;
 
-		case 'x':
-		case 'X':
-			autobridge_ipv4v6 = 1;
-			break;
-
 		case 'w':
 		case 'W':
 			if (append_opts(&opts, 'S') == -1) {
@@ -2320,11 +2044,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				}
 			}
 			break;
-
-		case 't':
-		case 'T':
-		        /* Only used in rtpproxy_destroy */
-		        break;
 
 		default:
 			LM_ERR("unknown option `%c'\n", *cp);
@@ -2369,12 +2088,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		v[6].iov_base = ";";
 		v[6].iov_len = 1;
 		STR2IOVEC(viabranch, v[7]);
-	} else
-	/* Append extra id to call-id */
-	if (extra && extra_id_pv && get_extra_id(msg, &extra_id)) {
-		v[6].iov_base = ";";
-		v[6].iov_len = 1;
-		STR2IOVEC(extra_id, v[7]);
 	}
 	if (flookup != 0) {
 		if (to_tag.len == 0) {
@@ -2439,22 +2152,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 	STR2IOVEC(from_tag, v[13]);
 	STR2IOVEC(to_tag, v[17]);
 
-	if (ice_candidate_priority_avp_param) {
-	    if (search_first_avp(ice_candidate_priority_avp_type,
-				 ice_candidate_priority_avp,
-				 &ice_candidate_priority_val, 0)
-		== NULL) {
-		ice_candidate_priority_val.n = 2;
-	    } else if ((ice_candidate_priority_val.n < 1) ||
-		       (ice_candidate_priority_val.n > 2)) {
-		LM_ERR("invalid ice candidate priority value %d\n",
-		       ice_candidate_priority_val.n);
-		FORCE_RTP_PROXY_RET (-1);
-	    }
-	} else {
-	    ice_candidate_priority_val.n = 0;
-	}
-
 	/* check if this is a single or a multi stream SDP offer/answer */
 	sdp_stream_num = get_sdp_stream_num(msg);
 	switch (sdp_stream_num) {
@@ -2481,8 +2178,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 		o1p = sdp_session->o_ip_addr.s;
 		for(;;) {
 			sdp_stream = get_sdp_stream(msg, sdp_session_num, sdp_stream_num);
-			if (!sdp_stream ||
-			    (ice_candidate_priority_val.n && sdp_stream->remote_candidates.len)) break;
+			if(!sdp_stream) break;
 
 			if (sdp_stream->ip_addr.s && sdp_stream->ip_addr.len>0) {
 				oldip = sdp_stream->ip_addr;
@@ -2503,14 +2199,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			}
 			/* XXX must compare address families in all addresses */
 			if (pf == AF_INET6) {
-				if (autobridge_ipv4v6 != 0) {
-					if ((append_opts(&opts, 'E') == -1) || (append_opts(&opts, 'I') == -1))  {
-						LM_ERR("out of pkg memory\n");
-						FORCE_RTP_PROXY_RET (-1);
-					}
-					/* Only execute once */
-					autobridge_ipv4v6 = 0;
-				}
 				if (append_opts(&opts, '6') == -1) {
 					LM_ERR("out of pkg memory\n");
 					FORCE_RTP_PROXY_RET (-1);
@@ -2518,20 +2206,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				/* We need to update the pointers and the length here, it has changed. */
 				v[1].iov_base = opts.s.s;
 				v[1].iov_len = opts.oidx;
-			} else {
-				if (autobridge_ipv4v6 != 0) {
-					if ((append_opts(&opts, 'I') == -1) || (append_opts(&opts, 'E') == -1))  {
-						LM_ERR("out of pkg memory\n");
-						FORCE_RTP_PROXY_RET (-1);
-					}
-					/* We need to update the pointers and the length here, it has changed. */
-					v[1].iov_base = opts.s.s;
-					v[1].iov_len = opts.oidx;
-					/* Only execute once */
-					autobridge_ipv4v6 = 0;
-				}
 			}
-
 			STR2IOVEC(newip, v[9]);
 			STR2IOVEC(oldport, v[11]);
 #ifdef EXTRA_DEBUG
@@ -2557,7 +2232,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				node = select_rtpp_node(callid, 1);
 				if (!node) {
 					LM_ERR("no available proxies\n");
-					FORCE_RTP_PROXY_RET (-3);
+					FORCE_RTP_PROXY_RET (-1);
 				}
 				if (rep_opts.oidx > 0) {
 					if (node->rn_rep_supported == 0) {
@@ -2697,7 +2372,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			 * See RFC 3605 for definition of RTCP attribute.
 			 * ported from ser
 			 */
-
 			if (sdp_stream->rtcp_port.s && sdp_stream->rtcp_port.len) {
 				newrtcp.s = int2str(port+1, &newrtcp.len); /* beware static buffer */
 				/* Alter port. */
@@ -2707,16 +2381,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				LM_DBG("alter rtcp body1='%.*s'\n", body1.len, body1.s);
 #endif
 				if (alter_rtcp(msg, &body1, &sdp_stream->rtcp_port, &newrtcp) == -1) {
-					FORCE_RTP_PROXY_RET (-1);
-				}
-			}
-
-			/* Add ice relay candidates */
-			if (ice_candidate_priority_val.n && sdp_stream->ice_attrs_num > 0) {
-				body1.s = sdp_stream->ice_attr->foundation.s - 12;
-				body1.len = bodylimit - body1.s;
-				if (insert_candidates(msg, sdp_stream->ice_attr->foundation.s - 12,
-						&newip, port, ice_candidate_priority_val.n) == -1) {
 					FORCE_RTP_PROXY_RET (-1);
 				}
 			}

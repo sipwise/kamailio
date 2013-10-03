@@ -91,7 +91,7 @@ MODULE_VERSION
  */
 #define LCR_RULE_TABLE_VERSION 2
 #define LCR_RULE_TARGET_TABLE_VERSION 1
-#define LCR_GW_TABLE_VERSION 3
+#define LCR_GW_TABLE_VERSION 2
 
 /* database defaults */
 
@@ -943,8 +943,7 @@ static int insert_gws(db1_res_t *res, struct gw_info *gws,
 		   i);
 	    return 0;
 	}
-	if (VAL_NULL(ROW_VALUES(row) + 1) ||
-	    (strlen((char *)VAL_STRING(ROW_VALUES(row) + 1)) == 0)) {
+	if (VAL_NULL(ROW_VALUES(row) + 1)) {
 	    ip_string.s = (char *)0;
 	    ip_addr.af = 0;
 	    ip_addr.len = 0;
@@ -1740,10 +1739,6 @@ inline int decode_avp_value(char *value, unsigned int *gw_index, str *scheme,
 	transport->s = ";transport=sctp";
 	transport->len = 15;
 	break;
-    case PROTO_WS:
-    case PROTO_WSS:
-        LM_ERR("unsupported transport '%d'\n", u);
-	return 0;
     default:
 	LM_ERR("unknown transport '%d'\n", u);
 	return 0;

@@ -23,25 +23,22 @@
 # DBHOST=localhost
 
 ## database name (for ORACLE this is TNS name)
-# DBNAME=kamailio
+# DBNAME=openser
 
 # database path used by dbtext, db_berkeley or sqlite
 # DB_PATH="/usr/local/etc/kamailio/dbtext"
 
 ## database read/write user
-# DBRWUSER="kamailio"
+# DBRWUSER=openser
 
 ## password for database read/write user
-# DBRWPW="kamailiorw"
+# DBRWPW="openserrw"
 
 ## database read only user
-# DBROUSER="kamailioro"
+# DBROUSER=openserro
 
 ## password for database read only user
-# DBROPW="kamailioro"
-
-## database access host (from where is kamctl used)
-# DBACCESSHOST=192.168.0.1
+# DBROPW=openserro
 
 ## database super user (for ORACLE this is 'scheme-creator' user)
 # DBROOTUSER="root"
@@ -55,7 +52,7 @@
 # in db/schema/entities.xml too.
 # FIXME
 
-# FOREVER="2030-05-28 21:32:15"
+# FOREVER="2020-05-28 21:32:15"
 # DEFAULT_ALIASES_EXPIRES=$FOREVER
 # DEFAULT_Q="1.0"
 # DEFAULT_CALLID="Default-Call-ID"
@@ -110,7 +107,7 @@
 #                   dialplan"
 
 # Kamailio extra modules
-# EXTRA_MODULES="imc cpl siptrace domainpolicy carrierroute userblacklist htable purple sca"
+# EXTRA_MODULES="imc cpl siptrace domainpolicy carrierroute userblacklist htable purple"
 
 
 ## type of aliases used: DB - database aliases; UL - usrloc aliases
@@ -138,7 +135,7 @@
 ## in the subscriber table - default '1'
 # STORE_PLAINTEXT_PW=0
 
-## Kamailio START Options
+## OPENSER START Options
 ## PID file path - default is: /var/run/kamailio.pid
 # PID_FILE=/var/run/kamailio.pid
 

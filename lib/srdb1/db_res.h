@@ -61,7 +61,6 @@ typedef struct db1_res {
 	int n;                 /**< Number of rows in current fetch */
 	int res_rows;          /**< Number of total rows in query   */
 	int last_row;          /**< Last row                        */
-	void* ptr;             /**< For use by DB modules           */
 } db1_res_t;
 
 
@@ -79,8 +78,6 @@ typedef struct db1_res {
 #define RES_LAST_ROW(re)  ((re)->last_row)
 /** Return the number of total result rows */
 #define RES_NUM_ROWS(re) ((re)->res_rows)
-/** Return the module-specific pointer */
-#define RES_PTR(re) ((re)->ptr)
 
 
 /**
@@ -88,7 +85,7 @@ typedef struct db1_res {
  * \param _r the result that should be released
  * \return zero on success, negative on errors
  */
-extern inline int db_free_rows(db1_res_t* _r);
+inline int db_free_rows(db1_res_t* _r);
 
 
 /**
@@ -98,20 +95,20 @@ extern inline int db_free_rows(db1_res_t* _r);
  * \param _r the result that should be released
  * \return zero on success, negative on errors
  */
-extern inline int db_free_columns(db1_res_t* _r);
+inline int db_free_columns(db1_res_t* _r);
 
 
 /**
  * Create a new result structure and initialize it.
  * \return a pointer to the new result on success, NULL on errors
  */
-extern inline db1_res_t* db_new_result(void);
+inline db1_res_t* db_new_result(void);
 
 /**
  * Release memory used by a result structure.
  * \return zero on success, negative on errors
  */
-extern inline int db_free_result(db1_res_t* _r);
+inline int db_free_result(db1_res_t* _r);
 
 /**
  * Allocate storage for column names and type in existing result structure.
@@ -121,7 +118,7 @@ extern inline int db_free_result(db1_res_t* _r);
  * \param cols number of columns
  * \return zero on success, negative on errors
  */
-extern inline int db_allocate_columns(db1_res_t* _r, const unsigned int cols);
+inline int db_allocate_columns(db1_res_t* _r, const unsigned int cols);
 
 
 /**
@@ -129,6 +126,6 @@ extern inline int db_allocate_columns(db1_res_t* _r, const unsigned int cols);
  * \param _res result set
  * \return zero on success, negative on errors
  */
-extern inline int db_allocate_rows(db1_res_t* _res);
+inline int db_allocate_rows(db1_res_t* _res);
 
 #endif /* DB1_RES_H */

@@ -33,27 +33,27 @@
 
 #include "../../modules/sl/sl.h"
 #include "../../modules/tm/tm_load.h"
-#include "../../modules/sqlops/sql_api.h"
-#include "../../modules/rr/api.h"
+#include "../../modules_k/sqlops/sql_api.h"
+#include "../../modules_k/rr/api.h"
 #include "../../modules/auth/api.h"
-#include "../../modules/auth_db/api.h"
-#include "../../modules/maxfwd/api.h"
-#include "../../modules/registrar/api.h"
-#include "../../modules/dispatcher/api.h"
+#include "../../modules_k/auth_db/api.h"
+#include "../../modules_k/maxfwd/api.h"
+#include "../../modules_k/registrar/api.h"
+#include "../../modules_k/dispatcher/api.h"
 #include "../../modules/xhttp/api.h"
 #include "../../modules/sdpops/api.h"
-#include "../../modules/presence/bind_presence.h"
-#include "../../modules/presence_xml/api.h"
-#include "../../modules/textops/api.h"
-#include "../../modules/pua_usrloc/api.h"
-#include "../../modules/siputils/siputils.h"
-#include "../../modules/rls/api.h"
-#include "../../modules/alias_db/api.h"
-#include "../../modules/msilo/api.h"
-#include "../../modules/uac/api.h"
+#include "../../modules_k/presence/bind_presence.h"
+#include "../../modules_k/presence_xml/api.h"
+#include "../../modules_k/textops/api.h"
+#include "../../modules_k/pua_usrloc/api.h"
+#include "../../modules_k/siputils/siputils.h"
+#include "../../modules_k/rls/api.h"
+#include "../../modules_k/alias_db/api.h"
+#include "../../modules_k/msilo/api.h"
+#include "../../modules_k/uac/api.h"
 #include "../../modules/sanity/api.h"
-#include "../../modules/cfgutils/api.h"
-#include "../../modules/tmx/api.h"
+#include "../../modules_k/cfgutils/api.h"
+#include "../../modules_k/tmx/api.h"
 #include "../../modules/mqueue/api.h"
 
 #include "app_lua_api.h"
@@ -1080,7 +1080,7 @@ static int lua_sr_auth_pv_authenticate(lua_State *L, int hftype)
 	realm.len = strlen(realm.s);
 	passwd.len = strlen(passwd.s);
 	ret = _lua_authb.pv_authenticate(env_L->msg, &realm, &passwd, flags,
-			hftype, &env_L->msg->first_line.u.request.method);
+			hftype);
 
 	return app_lua_return_int(L, ret);
 }
@@ -1176,7 +1176,7 @@ static int lua_sr_auth_db_authenticate(lua_State *L, hdr_types_t hftype)
 	realm.len = strlen(realm.s);
 	table.len = strlen(table.s);
 	ret = _lua_auth_dbb.digest_authenticate(env_L->msg, &realm, &table,
-			hftype, &env_L->msg->first_line.u.request.method);
+			hftype);
 
 	return app_lua_return_int(L, ret);
 }
@@ -1262,7 +1262,6 @@ static int lua_sr_registrar_save(lua_State *L)
 	int ret;
 	int flags;
 	char *table;
-	str uri ={NULL, 0};
 	sr_lua_env_t *env_L;
 
 	flags = 0;
@@ -1284,11 +1283,6 @@ static int lua_sr_registrar_save(lua_State *L)
 	} else if(lua_gettop(L)==2) {
 		table  = (char*)lua_tostring(L, -2);
 		flags = lua_tointeger(L, -1);
-	} else if(lua_gettop(L)==3) {
-		table  = (char*)lua_tostring(L, -3);
-		flags = lua_tointeger(L, -2);
-		uri.s = (char*)lua_tostring(L, -1);
-		uri.len = strlen(uri.s);
 	} else {
 		LM_WARN("invalid number of parameters from Lua\n");
 		return app_lua_return_error(L);
@@ -1298,11 +1292,7 @@ static int lua_sr_registrar_save(lua_State *L)
 		LM_WARN("invalid parameters from Lua\n");
 		return app_lua_return_error(L);
 	}
-	if (lua_gettop(L)==3) {
-		ret = _lua_registrarb.save_uri(env_L->msg, table, flags, &uri);
-	} else {
-		ret = _lua_registrarb.save(env_L->msg, table, flags);
-	}
+	ret = _lua_registrarb.save(env_L->msg, table, flags);
 
 	return app_lua_return_int(L, ret);
 }
@@ -1313,8 +1303,7 @@ static int lua_sr_registrar_save(lua_State *L)
 static int lua_sr_registrar_lookup(lua_State *L)
 {
 	int ret;
-	char *table = NULL;
-	str uri = {NULL, 0};
+	char *table;
 	sr_lua_env_t *env_L;
 
 	env_L = sr_lua_env_get();
@@ -1329,31 +1318,18 @@ static int lua_sr_registrar_lookup(lua_State *L)
 		LM_WARN("invalid parameters from Lua env\n");
 		return app_lua_return_error(L);
 	}
-	if(lua_gettop(L)==1)
-	{
-		table = (char*)lua_tostring(L, -1);
-	}
-	else if (lua_gettop(L)==2)
-	{
-		table = (char*)lua_tostring(L, -2);
-		uri.s = (char*)lua_tostring(L, -1);
-		uri.len = strlen(uri.s);
-	} else
+	if(lua_gettop(L)!=1)
 	{
 		LM_WARN("invalid number of parameters from Lua\n");
 		return app_lua_return_error(L);
 	}
+	table  = (char*)lua_tostring(L, -1);
 	if(table==NULL || strlen(table)==0)
 	{
 		LM_WARN("invalid parameters from Lua\n");
 		return app_lua_return_error(L);
 	}
-	if(lua_gettop(L)==2)
-	{
-		ret = _lua_registrarb.lookup_uri(env_L->msg, table, &uri);
-	} else {
-		ret = _lua_registrarb.lookup(env_L->msg, table);
-	}
+	ret = _lua_registrarb.lookup(env_L->msg, table);
 
 	return app_lua_return_int(L, ret);
 }

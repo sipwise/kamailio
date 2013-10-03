@@ -31,7 +31,6 @@
 #include "../../mod_fix.h"
 #include "../../pvar.h"
 #include "../../parser/sdp/sdp.h"
-#include "../../parser/sdp/sdp_helpr_funcs.h"
 #include "../../trim.h"
 #include "../../data_lump.h"
 
@@ -40,7 +39,6 @@
 
 MODULE_VERSION
 
-static int w_sdp_remove_line_by_prefix(sip_msg_t* msg, char* prefix, char* bar);
 static int w_sdp_remove_codecs_by_id(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_remove_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_keep_codecs_by_id(sip_msg_t* msg, char* codecs, char *bar);
@@ -50,14 +48,11 @@ static int w_sdp_with_codecs_by_id(sip_msg_t* msg, char* codec, char *bar);
 static int w_sdp_with_codecs_by_name(sip_msg_t* msg, char* codec, char *bar);
 static int w_sdp_remove_media(sip_msg_t* msg, char* media, char *bar);
 static int w_sdp_print(sip_msg_t* msg, char* level, char *bar);
-static int w_sdp_get(sip_msg_t* msg, char *bar);
-static int w_sdp_content(sip_msg_t* msg, char* foo, char *bar);
+static int w_get_sdp(sip_msg_t* msg, char *bar);
 
 static int mod_init(void);
 
 static cmd_export_t cmds[] = {
-	{"sdp_remove_line_by_prefix",  (cmd_function)w_sdp_remove_line_by_prefix,
-		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_remove_codecs_by_id",    (cmd_function)w_sdp_remove_codecs_by_id,
 		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_remove_codecs_by_name",  (cmd_function)w_sdp_remove_codecs_by_name,
@@ -80,10 +75,8 @@ static cmd_export_t cmds[] = {
 		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_print",                  (cmd_function)w_sdp_print,
 		1, fixup_igp_null,  0, ANY_ROUTE},
-	{"sdp_get",                  (cmd_function)w_sdp_get,
+	{"sdp_get",                  (cmd_function)w_get_sdp,
 		1, 0,  0, ANY_ROUTE},
-	{"sdp_content",                (cmd_function)w_sdp_content,
-		0, 0,  0, ANY_ROUTE},
 	{"bind_sdpops",                (cmd_function)bind_sdpops,
 		1, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}
@@ -343,121 +336,6 @@ int sdp_remove_codecs_by_id(sip_msg_t* msg, str* codecs)
 	}
 
 	return 0;
-}
-
-// removes consecutive blocks of SDP lines that begin with script provided prefix
-int sdp_remove_line_by_prefix(sip_msg_t* msg, str* prefix)
-{
-	str body = {NULL, 0};
-	str remove = {NULL, 0};
-	str line = {NULL, 0};
-	char* del_lump_start = NULL;
-	char* del_lump_end = NULL;
-	int del_lump_flag = 0;
-	struct lump *anchor;
-	char* p = NULL;
-
-	if(parse_sdp(msg) < 0) {
-		LM_ERR("Unable to parse sdp\n");
-		return -1;
-	}
-
-	body.s = ((sdp_info_t*)msg->body)->raw_sdp.s;
-	body.len = ((sdp_info_t*)msg->body)->raw_sdp.len;
-
-	if (body.s==NULL) {
-		LM_ERR("failed to get the message body\n");
-		return -1;
-	}
-	body.len = msg->len - (body.s - msg->buf);
-	if (body.len==0) {
-		LM_DBG("message body has zero length\n");
-		return -1;
-	}
-
-	p = find_sdp_line(body.s, body.s+body.len, prefix->s[0]);
-	while (p != NULL)
-	{
-		if (sdp_locate_line(msg, p, &line) != 0)
-		{
-			LM_ERR("sdp_locate_line fail\n");
-			return -1;
-		}
-
-		//LM_DBG("line.s: %.*s\n", line.len, line.s);
-
-		if (extract_field(&line, &remove, *prefix) == 0)
-		{
-			//LM_DBG("line range: %d - %d\n", line.s - body.s, line.s + line.len - body.s);
-
-			if (del_lump_start == NULL)
-			{
-				del_lump_start = line.s;
-				del_lump_end = line.s + line.len;
-				//LM_DBG("first match, prepare new lump  (len=%d)\n", line.len);
-			}
-			else if ( p == del_lump_end )  // current line is same as del_lump_end
-			{
-				del_lump_end = line.s + line.len;
-				//LM_DBG("cont. match, made lump longer  (len+=%d)\n", line.len);
-			}
-
-			if (del_lump_end >= body.s + body.len)
-			{
-				//LM_DBG("end of buffer, delete lump\n");
-				del_lump_flag = 1;
-			}
-			//LM_DBG("lump pos: %d - %d\n", del_lump_start - body.s, del_lump_end - body.s);
-		}
-		else if ( del_lump_end != NULL)
-		{
-			//LM_DBG("line does not start with search pattern, delete current lump\n");
-			del_lump_flag = 1;
-		}
-
-		if (del_lump_flag && del_lump_start && del_lump_end)
-		{
-			LM_DBG("del_lump range: %d - %d  len: %d\n", (int)(del_lump_start - body.s),
-					(int)(del_lump_end - body.s), (int)(del_lump_end - del_lump_start));
-
-			anchor = del_lump(msg, del_lump_start - msg->buf, del_lump_end - del_lump_start, HDR_OTHER_T);
-			if (anchor == NULL)
-			{
-				LM_ERR("failed to remove lump\n");
-				return -1;
-			}
-
-			del_lump_start = NULL;
-			del_lump_end = NULL;
-			del_lump_flag = 0;
-			//LM_DBG("succesful lump deletion\n");
-		}
-
-		p = find_sdp_line(line.s + line.len, body.s + body.len, prefix->s[0]);
-	}
-	return 0;
-}
-
-static int w_sdp_remove_line_by_prefix(sip_msg_t* msg, char* prefix, char* bar)
-{
-	str prfx = {NULL, 0};
-
-	if(prefix==0)
-	{
-		LM_ERR("invalid parameters\n");
-		return -1;
-	}
-
-	if (get_str_fparam(&prfx, msg, (fparam_t*)prefix))
-	{
-		LM_ERR("unable to determine prefix\n");
-		return -1;
-	}
-	LM_DBG("Removing SDP lines with prefix: %.*s\n", prfx.len, prfx.s);
-
-	if(sdp_remove_line_by_prefix(msg, &prfx)<0)
-		return -1;
-	return 1;
 }
 
 /**
@@ -1057,7 +935,7 @@ static int w_sdp_print(sip_msg_t* msg, char* level, char *bar)
 /**
  *
  */
-static int w_sdp_get(sip_msg_t* msg, char *avp)
+static int w_get_sdp(sip_msg_t* msg, char *avp)
 {
 	sdp_info_t *sdp = NULL;
 	int_str avp_val;
@@ -1107,16 +985,6 @@ static int w_sdp_get(sip_msg_t* msg, char *avp)
 	}
 	
 	return 1;
-}
-
-/**
- *
- */
-static int w_sdp_content(sip_msg_t* msg, char* foo, char *bar)
-{
-	if(parse_sdp(msg)==0 && msg->body!=NULL)
-		return 1;
-	return -1;
 }
 
 /**

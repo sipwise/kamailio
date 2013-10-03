@@ -54,7 +54,6 @@
 #include "udp_server.h"
 #ifdef USE_TCP
 #include "tcp_server.h"
-#include "tcp_conn.h"
 #endif
 #ifdef USE_SCTP
 #include "sctp_server.h"
@@ -105,7 +104,6 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 							((msg)->via1->port)?(msg)->via1->port: SIP_PORT )
 
 int forward_reply( struct sip_msg* msg);
-int forward_reply_nocb( struct sip_msg* msg);
 
 int is_check_self_func_list_set(void);
 
@@ -128,58 +126,14 @@ static inline int msg_send(struct dest_info* dst, char* buf, int len)
 	struct dest_info new_dst;
 	str outb;
 #ifdef USE_TCP 
-	int port;
-	struct ip_addr ip;
-	union sockaddr_union* from = NULL;
+	union sockaddr_union* from;
 	union sockaddr_union local_addr;
-	struct tcp_connection *con = NULL;
-	struct ws_event_info wsev;
 #endif
 	
 	outb.s = buf;
 	outb.len = len;
 	sr_event_exec(SREV_NET_DATA_OUT, (void*)&outb);
-
-#ifdef USE_TCP
-	if (unlikely((dst->proto == PROTO_WS
-#ifdef USE_TLS
-		|| dst->proto == PROTO_WSS
-#endif
-	) && sr_event_enabled(SREV_TCP_WS_FRAME_OUT))) {
-		if (unlikely(dst->send_flags.f & SND_F_FORCE_SOCKET
-				&& dst->send_sock)) {
-			local_addr = dst->send_sock->su;
-			su_setport(&local_addr, 0); /* any local port will do */
-			from = &local_addr;
-		}
-
-		port = su_getport(&dst->to);
-		if (likely(port)) {
-			su2ip_addr(&ip, &dst->to);
-			con = tcpconn_get(dst->id, &ip, port, from, 0);
-		}
-		else if (likely(dst->id))
-			con = tcpconn_get(dst->id, 0, 0, 0, 0);
-		else {
-			LM_CRIT("BUG: msg_send called with null_id & to\n");
-			return -1;
-		}
-
-		if (con == NULL)
-		{
-			LM_WARN("TCP/TLS connection for WebSocket could not be found\n");
-			return -1;
-		}
-
-		memset(&wsev, 0, sizeof(ws_event_info_t));
-		wsev.type = SREV_TCP_WS_FRAME_OUT;
-		wsev.buf = outb.s;
-		wsev.len = outb.len;
-		wsev.id = con->id;
-		return sr_event_exec(SREV_TCP_WS_FRAME_OUT, (void *) &wsev);
-	}
-#endif
-
+	
 	if (likely(dst->proto==PROTO_UDP)){
 		if (unlikely((dst->send_sock==0) || 
 					(dst->send_sock->flags & SI_IS_MCAST))){
@@ -205,6 +159,7 @@ static inline int msg_send(struct dest_info* dst, char* buf, int len)
 					" support is disabled\n");
 			goto error;
 		}else{
+			from=0;
 			if (unlikely((dst->send_flags.f & SND_F_FORCE_SOCKET) &&
 						dst->send_sock)) {
 				local_addr=dst->send_sock->su;
@@ -226,6 +181,7 @@ static inline int msg_send(struct dest_info* dst, char* buf, int len)
 					" support is disabled\n");
 			goto error;
 		}else{
+			from=0;
 			if (unlikely((dst->send_flags.f & SND_F_FORCE_SOCKET) &&
 						dst->send_sock)) {
 				local_addr=dst->send_sock->su;

@@ -32,7 +32,6 @@
 #include "../../lib/srdb2/db.h"
 #include "../../rpc.h"
 #include "../../sr_module.h"
-#include "../../mod_fix.h"
 #include "../../mem/mem.h"
 #include "../../data_lump_rpl.h"
 #include "../../parser/parse_uri.h"
@@ -50,7 +49,7 @@ MODULE_VERSION
 /* Modules parameters */
 static char *db_url   = DEFAULT_DB_URL;
 static char *db_table = "prefix_route";
-static int prefix_route_exit = 1;
+
 
 static int add_route(struct tree_item *root, const char *prefix,
 		     const char *route)
@@ -266,19 +265,11 @@ static int prefix_route(struct sip_msg *msg, char *p1, char *p2)
 	(void)p2;
 
 	/* Get request URI */
-	if(p1==NULL) {
-		err = get_username(msg, &user);
-		if (0 != err) {
-			LOG(L_ERR, "prefix_route: could not get username in"
-			    " Request URI (%d)\n", err);
-			return err;
-		}
-	} else {
-		if(fixup_get_svalue(msg, (gparam_t*)p1, &user)<0)
-		{
-			LOG(L_ERR, "could not get username in parameter\n");
-			return -1;
-		}
+	err = get_username(msg, &user);
+	if (0 != err) {
+		LOG(L_ERR, "prefix_route: could not get username in"
+		    " Request URI (%d)\n", err);
+		return err;
 	}
 
 	route = tree_route_get(&user);
@@ -295,7 +286,7 @@ static int prefix_route(struct sip_msg *msg, char *p1, char *p2)
 	}
 
 	/* Success */
-	return (prefix_route_exit)?0:1;
+	return 0;
 }
 
 
@@ -303,10 +294,7 @@ static int prefix_route(struct sip_msg *msg, char *p1, char *p2)
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-	{"prefix_route", prefix_route, 0, 0,
-		REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
-	{"prefix_route", prefix_route, 1, fixup_spve_null,
-		ANY_ROUTE},
+	{"prefix_route", prefix_route, 0, 0, REQUEST_ROUTE},
 	{0,              0,            0, 0, 0            }
 };
 
@@ -316,7 +304,6 @@ static cmd_export_t cmds[] = {
 static param_export_t params[] = {
 	{"db_url",       STR_PARAM, &db_url  },
 	{"db_table",     STR_PARAM, &db_table},
-	{"exit",         INT_PARAM, &prefix_route_exit},
 	{0,              0,         0        }
 };
 

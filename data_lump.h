@@ -95,6 +95,4 @@ void free_duped_lump_list(struct lump* l);
 /*! \brief remove all non-SHMEM lumps from the list */
 void del_nonshm_lump( struct lump** lump_list );
 
-/*! \brief remove the lump from the internal lists */
-int remove_lump(sip_msg_t *msg, struct lump *l);
 #endif

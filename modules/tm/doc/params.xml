@@ -1,13 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" 
-	"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
-	[ <!ENTITY % local.common.attrib
-	 "xmlns:xi CDATA #FIXED 'http://www.w3.org/2001/XInclude'">
-	 <!-- Include general documentation entities -->
-	 <!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
-	 %docentities;
-	]
->
+   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
 
 <section id="tm.parameters" xmlns:xi="http://www.w3.org/2001/XInclude">
     <sectioninfo>
@@ -165,7 +158,7 @@ modparam("tm", "max_inv_lifetime", 150000)
 	    <title>Set <varname>max_noninv_lifetime</varname> parameter</title>
 	    <programlisting>
 ...
-modparam("tm", "max_noninv_lifetime", 30000)
+modparam("tm", "max_inv_lifetime", 30000)
 ...
 	    </programlisting>
 	</example>
@@ -749,7 +742,7 @@ onreply_route["stateless_replies"] {
 	<section>
 		<title><varname>contacts_avp</varname> (string)</title>
 		<para>
-		This is the name of an XAVP
+		  This is the name or Id of an AVP
                 that <function>t_load_contacts()</function> function uses to
                 store contacts of the destination set and that
                 <function>t_next_contacts()</function> function uses to
@@ -766,33 +759,7 @@ onreply_route["stateless_replies"] {
 		<title>Set <varname>contacts_avp</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("tm", "contacts_avp", "tm_contacts")
-...
-</programlisting>
-		</example>
-	</section>
-	
-	<section>
-		<title><varname>contact_flows_avp</varname> (string)</title>
-		<para>
-		This is the name of an XAVP
-                that <function>t_next_contacts()</function> function uses to
-                store contacts (if any) that it skipped, because they
-		contained same +sip.instance value than some other contact,
-                and that <function>t_next_contact_flows()</function>
-		function uses to restore those contacts.
-		</para>
-		<para>
-		<emphasis>
-			Default value is "NULL".  This parameter MUST be
-			set if variable contacts_avp is set.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>contact_flows_avp</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("tm", "contact_flows_avp", "tm_contact_flows")
+modparam("tm", "contacts_avp", "$avp(i:25)")
 ...
 </programlisting>
 		</example>
@@ -942,7 +909,7 @@ modparam("tm", "unmatched_cancel", "2")
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_int tm ruri_matching 0
+	$ sercmd cfg.set_now_int tm ruri_matching 0
 		</programlisting>
 	</para>
 	<example>
@@ -972,7 +939,7 @@ modparam("tm", "ruri_matching", 1)
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_int tm via1_matching 0
+	$ sercmd cfg.set_now_int tm via1_matching 0
 		</programlisting>
 	</para>
 	<example>
@@ -980,38 +947,6 @@ modparam("tm", "ruri_matching", 1)
 		<programlisting>
 ...
 modparam("tm", "via1_matching", 1)
-...
-	    </programlisting>
-	</example>
-	</section>
-
-	<section id="callid_matching">
-	<title><varname>callid_matching</varname> (integer)</title>
-	<para>
-		If set it will also try to match the callid when doing
-		transaction matching.
-	</para>
-	<para>
-		Turn on if you don't want replies/requests from broken clients who
-		send a mangled Call-ID to match the transaction. For example when
-		the other side won't recognise the response anyway because of changed
-		Call-ID, this setting will prevent accounting records to be created
-		or failure_route to be skipped.
-	</para>
-	<para>
-		Default value is 0 (off).
-	</para>
-	<para>
-		Can be set at runtime, e.g.:
-		<programlisting>
-	$ sercmd cfg.set_now_int tm callid_matching 0
-		</programlisting>
-	</para>
-	<example>
-		<title>Set <varname>callid_matching</varname> parameter</title>
-		<programlisting>
-...
-modparam("tm", "callid_matching", 1)
 ...
 	    </programlisting>
 	</example>
@@ -1029,7 +964,7 @@ modparam("tm", "callid_matching", 1)
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_int tm pass_provisional_replies 1
+	$ sercmd cfg.set_now_int tm pass_provisional_replies 1
 		</programlisting>
 	</para>
 	<example>
@@ -1056,7 +991,7 @@ modparam("tm", "pass_provisional_replies", 1)
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_int tm default_code 505
+	$ sercmd cfg.set_now_int tm default_code 505
 		</programlisting>
 	</para>
 	<example>
@@ -1081,7 +1016,7 @@ modparam("tm", "default_code", 501)
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_string tm default_reason "Unknown error"
+	$ sercmd cfg.set_now_string tm default_reason "Unknown error"
 		</programlisting>
 	</para>
 	<example>
@@ -1116,7 +1051,7 @@ modparam("tm", "default_reason", "Unknown reason")
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_int tm disable_6xx_block 0
+	$ sercmd cfg.set_now_int tm disable_6xx_block 0
 		</programlisting>
 	</para>
 	<para>
@@ -1166,7 +1101,7 @@ modparam("tm", "disable_6xx_block", 1)
 	<para>
 		Can be set at runtime, e.g.:
 		<programlisting>
-	$ &sercmd; cfg.set_now_int tm local_ack_mode 0
+	$ sercmd cfg.set_now_int tm local_ack_mode 0
 		</programlisting>
 	</para>
 	<example>
@@ -1287,7 +1222,7 @@ modparam("tm", "faked_reply_prio", 2000)
 		<para>
 			Can be set at runtime, e.g.:
 			<programlisting>
-	$ &sercmd; cfg.set_now_int tm local_cancel_reason 0
+	$ sercmd cfg.set_now_int tm local_cancel_reason 0
 			</programlisting>
 		</para>
 		<para>
@@ -1318,7 +1253,7 @@ modparam("tm", "local_cancel_reason", 0)
 		<para>
 			Can be changed at runtime, e.g.:
 			<programlisting>
-	$ &sercmd; cfg.set_now_int tm e2e_cancel_reason 0
+	$ sercmd cfg.set_now_int tm e2e_cancel_reason 0
 			</programlisting>
 		</para>
 		<para>
@@ -1330,28 +1265,6 @@ modparam("tm", "local_cancel_reason", 0)
 			<programlisting>
 ...
 modparam("tm", "e2e_cancel_reason", 0)
-...
-			</programlisting>
-		</example>
-	</section>
-
-	<section id="remap_503_500">
-		<title><varname>remap_503_500</varname> (boolean)</title>
-		<para>
-			Enables/disables conversion of 503 response code to 500. By default
-			it is enabled, based on the SIP RFC requirement. This is global
-			setting for all received replies handled by TM. To do it per
-			transaction basis, let this option disabled, set a failure route
-			and then do t_reply("500", "...") inside it.
-		</para>
-		<para>
-			Default value is 1 (enabled).
-		</para>
-		<example>
-			<title>Set <varname>remap_503_500</varname> parameter</title>
-			<programlisting>
-...
-modparam("tm", "remap_503_500", 0)
 ...
 			</programlisting>
 		</example>

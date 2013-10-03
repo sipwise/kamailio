@@ -102,7 +102,7 @@ str_map_t algo_names[] = {
 
 /* at jiri@iptel.org's suggestion:
  *
- * set this to 'cpu' to have Kamailio look at /proc/stat every time_interval
+ * set this to 'cpu' to have openser look at /proc/stat every time_interval
  * or set it to 'external' and you can push data in from an external source
  * via the fifo interface
  */
@@ -308,7 +308,7 @@ static int get_cpuload(double * load)
 	}
 	if (fscanf(f, "cpu  %lld%lld%lld%lld%lld%lld%lld%lld",
 			&n_user, &n_nice, &n_sys, &n_idle, &n_iow, &n_irq, &n_sirq, &n_stl) < 0) {
-		  LM_ERR("could not parse load information\n");
+		  LM_ERR("could not parse load informations\n");
 		  return -1;
 	}
 	fclose(f);

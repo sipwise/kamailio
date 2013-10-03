@@ -140,7 +140,7 @@ struct onsend_info* p_onsend=0; /* onsend route send info */
 				if ((dst)[i+2].type == RVE_FREE_FIXUP_ST) {\
 					/* call free_fixup (which should restore the original
 					   string) */ \
-					(void)call_fixup((cmd)->free_fixup, &(dst)[i+2].u.data, i+1); \
+					call_fixup((cmd)->free_fixup, &(dst)[i+2].u.data, i+1); \
 				} else if ((dst)[i+2].type == FPARAM_DYN_ST) {\
 					/* completely frees fparam and restore original string */\
 					fparam_free_restore(&(dst)[i+2].u.data); \
@@ -446,10 +446,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 									u->proto);
 							ret=E_BAD_PROTO;
 							goto error_fwd_uri;
-						} else if (u->proto!=PROTO_WSS)
-							dst.proto=PROTO_TLS;
-						else
-							dst.proto=PROTO_WSS;
+						}
+						dst.proto=PROTO_TLS;
 					}
 #endif
 				}
@@ -485,6 +483,80 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 				goto error;
 			}
 			break;
+		case SEND_T:
+		case SEND_TCP_T:
+			if (a->val[0].type==URIHOST_ST){
+				/*get next hop uri uri*/
+				if (msg->dst_uri.len) {
+					ret = parse_uri(msg->dst_uri.s, msg->dst_uri.len,
+									&next_hop);
+					u = &next_hop;
+				} else {
+					ret = parse_sip_msg_uri(msg);
+					u = &msg->parsed_uri;
+				}
+
+				if (ret<0) {
+					LM_ERR("send() - bad_uri dropping packet\n");
+					ret=E_BUG;
+					goto error;
+				}
+				/* init dst */
+				init_dest_info(&dst);
+				ret = sip_hostport2su(&dst.to, &u->host, u->port_no,
+							&dst.proto);
+				if(ret!=0) {
+					LM_ERR("failed to resolve [%.*s]\n", u->host.len,
+						ZSW(u->host.s));
+					ret=E_BUG;
+					goto error;
+				}
+			} else {
+				if ((a->val[0].type!= PROXY_ST)|(a->val[1].type!=NUMBER_ST)){
+					LOG(L_CRIT, "BUG: do_action: bad send() types %d, %d\n",
+							a->val[0].type, a->val[1].type);
+					ret=E_BUG;
+					goto error;
+				}
+				/* init dst */
+				init_dest_info(&dst);
+				ret=proxy2su(&dst.to,  (struct proxy_l*)a->val[0].u.data);
+				if(ret==0)
+					proxy_mark((struct proxy_l*)a->val[0].u.data, ret);
+			}
+			if (ret==0){
+				if (p_onsend){
+					tmp=p_onsend->buf;
+					len=p_onsend->len;
+				}else{
+					tmp=msg->buf;
+					len=msg->len;
+				}
+				if (a->type==SEND_T){
+					/*udp*/
+					dst.proto=PROTO_UDP; /* not really needed for udp_send */
+					dst.send_sock=get_send_socket(msg, &dst.to, PROTO_UDP);
+					if (dst.send_sock!=0){
+						ret=udp_send(&dst, tmp, len);
+					}else{
+						ret=-1;
+					}
+				}
+#ifdef USE_TCP
+					else{
+						/*tcp*/
+						dst.proto=PROTO_TCP;
+						dst.id=0;
+						ret=tcp_send(&dst, 0, tmp, len);
+				}
+#endif
+			}else{
+				ret=E_BUG;
+				goto error;
+			}
+			if (ret>=0) ret=1;
+
+			break;
 		case LOG_T:
 			if ((a->val[0].type!=NUMBER_ST)|(a->val[1].type!=STRING_ST)){
 				LOG(L_CRIT, "BUG: do_action: bad log() types %d, %d\n",
@@ -507,9 +579,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			}
 			getbflagsval(0, (flag_t*)&flags);
 			ret=append_branch(msg, &a->val[0].u.str, &msg->dst_uri,
-					  &msg->path_vec, a->val[1].u.number,
-					  (flag_t)flags, msg->force_send_socket,
-					  0, 0);
+								&msg->path_vec, a->val[1].u.number,
+								(flag_t)flags, msg->force_send_socket);
 			/* if the uri is the ruri and q was also not changed, mark
 			   ruri as consumed, to avoid having an identical branch */
 			if ((a->val[0].u.str.s == 0 || a->val[0].u.str.len == 0) &&

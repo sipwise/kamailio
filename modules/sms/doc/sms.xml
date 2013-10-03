@@ -2,9 +2,8 @@
 <!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" 
    "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
 
-<book id="sms" xmlns:xi="http://www.w3.org/2001/XInclude">
-    <bookinfo>
-        <title>SMS Module</title>
+<section id="sms" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <sectioninfo>
 	<authorgroup>
 	    <author>
 		<firstname>Bogdan</firstname>
@@ -19,11 +18,10 @@
 	    <year>2003</year>
 	    <holder>FhG FOKUS</holder>
 	</copyright>
-    </bookinfo>
-    <toc></toc>
+    </sectioninfo>
 
-    <chapter>
-	<title>Admin Guide</title>
+    <title>SMS Module</title>
+
     <section id="sms.overview">
 	<title>Overview</title>
 	<para>
@@ -117,5 +115,5 @@
 
     <xi:include href="params.xml"/>
     <xi:include href="functions.xml"/>
-    </chapter>
-</book>
+
+</section>
