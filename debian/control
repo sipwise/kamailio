@@ -514,7 +514,7 @@ Package: ngcp-kamailio-lcrrate-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio-mysql-modules (= ${binary:Version})
 Description: Provides a set utility functions for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
