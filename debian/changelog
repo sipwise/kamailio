@@ -7,6 +7,12 @@ ngcp-kamailio (4.0.4-1) UNRELEASED; urgency=low
 
  -- Victor Seva <vseva@sipwise.com>  Thu, 03 Oct 2013 13:14:01 +0200
 
+ngcp-kamailio (4.0.3-5) unstable; urgency=low
+
+  * [8478f88] MT#4637 add the patch merged upstream by Richard. (cherry picked from commit 6e3fdbef2d5e6b561bddaaf749faf48acd0ac0fe)
+
+ -- Victor Seva <vseva@sipwise.com>  Fri, 25 Oct 2013 11:48:27 +0200
+
 ngcp-kamailio (4.0.3-4) unstable; urgency=low
 
   [ Victor Seva ]
