@@ -1,0 +1,25 @@
+From 49e566ab80a8458ba229c77149a6011ea5d0df28 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Thu, 24 Oct 2013 12:34:05 -0400
+Subject: [PATCH] tm: fix possible segfault in cancel_branch()
+
+---
+ modules/tm/t_cancel.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/tm/t_cancel.c b/modules/tm/t_cancel.c
+index ccd2212..1b39648 100644
+--- a/modules/tm/t_cancel.c
++++ b/modules/tm/t_cancel.c
+@@ -285,7 +285,7 @@ int cancel_branch( struct cell *t, int branch,
+ 			(t->uas.request && t->uas.request->msg_flags&(FL_USE_UAC_FROM|FL_USE_UAC_TO))) {
+ 		/* build the CANCEL from the INVITE which was sent out */
+ 		cancel = build_local_reparse(t, branch, &len, CANCEL, CANCEL_LEN,
+-									 (t->uas.request->msg_flags&FL_USE_UAC_TO)?0:&t->to
++									 (t->uas.request && t->uas.request->msg_flags&FL_USE_UAC_TO)?0:&t->to
+ 	#ifdef CANCEL_REASON_SUPPORT
+ 									 , reason
+ 	#endif /* CANCEL_REASON_SUPPORT */
+-- 
+1.7.10.4
+
