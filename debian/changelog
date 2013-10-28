@@ -1,11 +1,16 @@
-ngcp-kamailio (4.0.4-1) UNRELEASED; urgency=low
+ngcp-kamailio (4.0.4-1) unstable; urgency=low
 
-  * New upstream version
-  * debian/patches:
+  [ Victor Seva ]
+  * [11dfa8b] New upstream version
+  * [fee2de5] debian/patches:
     - remove patches applied upstream
     - refresh patches
+  * [b4cfc43] lcr_rate needs mysql
 
- -- Victor Seva <vseva@sipwise.com>  Thu, 03 Oct 2013 13:14:01 +0200
+  [ Andrew Pogrebennyk ]
+  * [836c134] MT#4483 Adopt upstream patch for milliseconds precision in acc
+
+ -- Victor Seva <vseva@sipwise.com>  Mon, 28 Oct 2013 10:38:55 +0100
 
 ngcp-kamailio (4.0.3-5) unstable; urgency=low
 
