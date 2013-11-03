@@ -28,6 +28,9 @@ upstream/avops-use-pv_cache_get-instead-of-pv_parse_spec.patch
 upstream/pv-Move-pv_xavp_name_t-declaration-to-core-pvar.h.patch
 upstream/avpops-allow-xavp-semantics-on-second-parameter.patch
 upstream/0001-tm-fix-possible-segfault-in-cancel_branch.patch
+upstream/0001-modules-usrloc-reduce-work-if-contact-attributes-are.patch
+upstream/0001-usrloc-db_update-contact-by-instance-reg-id.patch
+upstream/0002-registrar-clean-static-values-at-pack_ci.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
