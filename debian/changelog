@@ -1,3 +1,9 @@
+ngcp-kamailio (4.0.4-2) unstable; urgency=low
+
+  * [fa78bc4] MT#4143 Add upstream patches
+
+ -- Victor Seva <vseva@sipwise.com>  Mon, 04 Nov 2013 11:23:14 +0100
+
 ngcp-kamailio (4.0.4-1) unstable; urgency=low
 
   [ Victor Seva ]
