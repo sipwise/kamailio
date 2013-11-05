@@ -1,3 +1,10 @@
+ngcp-kamailio (4.0.3-6) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [1456f45] MT#4143 Add upstream patches
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Tue, 05 Nov 2013 19:11:50 +0100
+
 ngcp-kamailio (4.0.3-5) unstable; urgency=low
 
   * [8478f88] MT#4637 add the patch merged upstream by Richard. (cherry picked from commit 6e3fdbef2d5e6b561bddaaf749faf48acd0ac0fe)
