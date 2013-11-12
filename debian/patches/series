@@ -29,6 +29,7 @@ upstream/avpops-allow-xavp-semantics-on-second-parameter.patch
 upstream/acc-new-parameter-time_mode.patch
 upstream/0001-tm-fix-possible-segfault-in-cancel_branch.patch
 upstream/0001-modules-usrloc-reduce-work-if-contact-attributes-are.patch
+upstream/0001-modules-usrloc-fixed-unregister-bug-in-db_mode-3.patch
 upstream/0001-usrloc-db_update-contact-by-instance-reg-id.patch
 upstream/0002-registrar-clean-static-values-at-pack_ci.patch
 no_lib64_on_64_bits.patch
