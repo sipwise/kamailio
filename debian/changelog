@@ -1,3 +1,10 @@
+ngcp-kamailio (4.0.3-7) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [bfe331a] MT#4143 Add upstream ursloc fix
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Fri, 15 Nov 2013 14:42:01 +0100
+
 ngcp-kamailio (4.0.3-6) unstable; urgency=low
 
   [ Victor Seva ]
