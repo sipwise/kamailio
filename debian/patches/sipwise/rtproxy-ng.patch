@@ -4950,7 +4950,7 @@
 +#endif
 --- /dev/null
 +++ b/modules/rtpproxy-ng/rtpproxy_funcs.c
-@@ -0,0 +1,430 @@
+@@ -0,0 +1,434 @@
 +/*
 + * $Id$
 + *
@@ -5210,6 +5210,10 @@
 +		} /* end of while */
 +		if(c==1)
 +		{
++			if (rest < p2 && *rest == '\r') rest++;
++			if (rest < p2 && *rest == '\n') rest++;
++			if (rest < p2 && p2[-1] == '\n') p2--;
++			if (rest < p2 && p2[-1] == '\r') p2--;
 +			body->s = rest;
 +			body->len = p2-rest;
 +			goto done;
