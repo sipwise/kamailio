@@ -1,0 +1,26 @@
+From 66185905850cd2ac9ab933776184da0f0882e5ac Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 1 Nov 2013 15:33:08 +0100
+Subject: [PATCH] registrar: clean static values at pack_ci
+
+---
+ modules/registrar/save.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/modules/registrar/save.c b/modules/registrar/save.c
+index 5cc4627..bc816cd 100644
+--- a/modules_k/registrar/save.c
++++ b/modules_k/registrar/save.c
+@@ -328,6 +328,9 @@ static inline ucontact_info_t* pack_ci( struct sip_msg* _m, contact_t* _c, unsig
+ 		received_found = 0; /* not found yet */
+ 		m = _m; /* remember the message */
+ 	}
++	else {
++		memset( &ci.instance, 0, sizeof(str));
++	}
+ 
+ 	if(_c!=0) {
+ 		/* hook uri address - should be more than 'sip:' chars */
+-- 
+1.8.4.3
+
