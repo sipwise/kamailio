@@ -10,17 +10,17 @@
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -175,7 +178,8 @@
- 			   $(mod_list_iptrtpproxy) $(mod_list_mi_xmlrpc) \
+@@ -179,7 +182,8 @@
  			   $(mod_list_outbound) $(mod_list_osp) \
  			   $(mod_list_java) $(mod_list_dnssec) \
--			   $(mod_list_sctp) $(mod_list_autheph))
-+			   $(mod_list_sctp) $(mod_list_autheph)) \
+ 			   $(mod_list_sctp) $(mod_list_autheph) \
+-			   $(mod_list_gzcompress))
++			   $(mod_list_gzcompress)) \
 +			   $(mod_list_lcrrate)
  
  
  
-@@ -229,6 +233,8 @@
+@@ -233,6 +237,8 @@
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  

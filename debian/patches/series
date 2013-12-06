@@ -1,3 +1,10 @@
+upstream/0001-dialog_ng-Fix-segfault-in-dlg_new_dialog.patch
+upstream/0002-Makefile.groups-include-gzcompress-sipt-and-mohqueue.patch
+upstream/0003-sdpops-fix-setting-0-instead-of-r-for-sdp_get_line_s.patch
+upstream/0004-Makefile.defs-compiler-optimization-level-made-varia.patch
+upstream/0005-core-fixed-several-clang-compiler-warnings.patch
+upstream/0006-usrloc-proper-index-for-domain-column-when-laoding-e.patch
+upstream/0007-tm-safety-checks-inside-t_next_contacts.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch

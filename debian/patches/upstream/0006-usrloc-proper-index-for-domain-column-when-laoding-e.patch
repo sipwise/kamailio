@@ -1,0 +1,31 @@
+From 45ea3c6de26def1fa704f3e444bd37800ca09d9f Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Fri, 6 Dec 2013 18:02:36 +0100
+Subject: [PATCH] usrloc: proper index for domain column when laoding extra
+ attributes
+
+- patch by Seudin Kasumovic, FS#377
+
+(cherry picked from commit 551524cfc83b922c23e2d26f8cc5950df2a0af54)
+---
+ modules/usrloc/udomain.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/modules/usrloc/udomain.c b/modules/usrloc/udomain.c
+index 244f8e7..a736051 100644
+--- a/modules/usrloc/udomain.c
++++ b/modules/usrloc/udomain.c
+@@ -1250,8 +1250,8 @@ int uldb_preload_attrs(udomain_t *_d)
+ 			}
+ 
+ 			if (use_domain) {
+-				domain.s = (char*)VAL_STRING(ROW_VALUES(row) + 6);
+-				if (VAL_NULL(ROW_VALUES(row)+6) || domain.s==0 || domain.s[0]==0){
++				domain.s = (char*)VAL_STRING(ROW_VALUES(row) + 5);
++				if (VAL_NULL(ROW_VALUES(row)+5) || domain.s==0 || domain.s[0]==0){
+ 					LM_CRIT("empty domain record for user %.*s...skipping\n",
+ 							user.len, user.s);
+ 					continue;
+-- 
+1.8.4.3
+
