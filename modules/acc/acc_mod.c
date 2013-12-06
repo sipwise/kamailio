@@ -109,7 +109,17 @@ unsigned short failed_filter[MAX_FAILED_FILTER_COUNT + 1];
 static char* leg_info_str = 0;	/*!< multi call-leg support */
 struct acc_extra *leg_info = 0;
 int acc_prepare_flag = -1; /*!< should the request be prepared for later acc */
+char *acc_time_format = "%Y-%m-%d %H:%M:%S";
 
+/* ----- time mode variables ------- */
+/*! \name AccTimeModeVariables  Time Mode Variables */
+/*@{*/
+
+int acc_time_mode  = 0;
+str acc_time_attr  = str_init("time_attr");
+str acc_time_exten  = str_init("time_exten");
+
+/*@}*/
 
 /* ----- SYSLOG acc variables ----------- */
 /*! \name AccSyslogVariables  Syslog Variables */
@@ -130,15 +140,18 @@ struct acc_extra *log_extra = 0; /*!< Log extra attributes */
 /*@{*/
 
 int cdr_enable  = 0;
+int cdr_log_enable  = 1;
 int cdr_start_on_confirmed = 0;
 static char* cdr_facility_str = 0;
 static char* cdr_log_extra_str = 0;
 
-str cdr_start_str = str_init("st");
-str cdr_end_str = str_init("et");
-str cdr_duration_str = str_init("d");
+str cdr_start_str = str_init("start_time");
+str cdr_end_str = str_init("end_time");
+str cdr_duration_str = str_init("duration");
+/* name for db table to store dialog-based cdrs */
+str acc_cdrs_table = str_init("");
 
-/*@{*/
+/*@}*/
 
 /* ----- RADIUS acc variables ----------- */
 /*! \name AccRadiusVariables  Radius Variables */     
@@ -253,6 +266,7 @@ static param_export_t params[] = {
 	{"log_extra",            STR_PARAM, &log_extra_str        },
 	/* cdr specific */
 	{"cdr_enable",           INT_PARAM, &cdr_enable                 },
+	{"cdr_log_enable",         INT_PARAM, &cdr_log_enable           },
 	{"cdr_start_on_confirmed", INT_PARAM, &cdr_start_on_confirmed   },
 	{"cdr_facility",         STR_PARAM, &cdr_facility_str           },
 	{"cdr_extra",            STR_PARAM, &cdr_log_extra_str          },
@@ -291,6 +305,12 @@ static param_export_t params[] = {
 	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
 	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
 #endif
+	/* time-mode-specific */
+	{"time_mode",            INT_PARAM, &acc_time_mode        },
+	{"time_attr",            PARAM_STR, &acc_time_attr        },
+	{"time_exten",           PARAM_STR, &acc_time_exten       },
+	{"cdrs_table",           PARAM_STR, &acc_cdrs_table       },
+	{"time_format",          STR_PARAM, &acc_time_format      },
 	{0,0,0}
 };
 

@@ -66,6 +66,13 @@ struct branch
     /* reg-id contact header param value */
     unsigned int reg_id;
 
+    /* ruid value from usrloc */
+    char ruid[MAX_RUID_SIZE];
+    unsigned int ruid_len;
+
+    char location_ua[MAX_UA_SIZE + 1];
+    unsigned int location_ua_len;
+
     /* Branch flags */
     flag_t flags;
 };
@@ -88,11 +95,12 @@ int drop_sip_branch(int idx);
 int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 		  qvalue_t q, unsigned int flags,
 		  struct socket_info* force_socket,
-		  str* instance, unsigned int reg_id);
+		  str* instance, unsigned int reg_id,
+		  str* ruid, str* location_ua);
 
 /*! \brief kamailio compatible version */
 #define km_append_branch(msg, uri, dst_uri, path, q, flags, force_socket) \
-    append_branch(msg, uri, dst_uri, path, q, flags, force_socket, 0, 0)
+    append_branch(msg, uri, dst_uri, path, q, flags, force_socket, 0, 0, 0, 0)
 
 /*! \brief ser compatible append_branch version.
  *  append_branch version compatible with ser: no path or branch flags support
@@ -109,7 +117,7 @@ static inline int ser_append_branch(struct sip_msg* msg,
     s_uri.len=uri_len;
     s_dst_uri.s=dst_uri;
     s_dst_uri.len=dst_uri_len;
-    return append_branch(msg, &s_uri, &s_dst_uri, 0, q, 0, force_socket, 0, 0);
+    return append_branch(msg, &s_uri, &s_dst_uri, 0, q, 0, force_socket, 0, 0, 0, 0);
 }
 
 
@@ -134,11 +142,13 @@ void set_branch_iterator(int n);
  *  *len) or 0 if there are no more branches.
  */
 char* next_branch(int* len, qvalue_t* q, str* dst_uri, str* path,
-		  unsigned int* flags, struct socket_info** force_socket);
+		  unsigned int* flags, struct socket_info** force_socket,
+		  str *ruid, str *instance, str *location_ua);
 
 char* get_branch( unsigned int i, int* len, qvalue_t* q, str* dst_uri,
 		  str* path, unsigned int *flags,
-		  struct socket_info** force_socket);
+		  struct socket_info** force_socket,
+		  str* ruid, str *instance, str *location_ua);
 
 /*! \brief
  * Empty the array of branches
@@ -158,6 +168,11 @@ char* print_dset(struct sip_msg* msg, int* len);
  */
 void set_ruri_q(qvalue_t q);
 
+
+/*! \brief
+ * Get src ip, port and proto as SIP uri or proxy address
+ */
+int msg_get_src_addr(sip_msg_t *msg, str *uri, int mode);
 
 /*! \brief
  * Get the q value of the Request-URI
@@ -239,5 +254,8 @@ int getbflagsval(unsigned int branch, flag_t* res);
  * @return 1 on success, -1 on failure
  */
 int setbflagsval(unsigned int branch, flag_t val);
+
+int uri_add_rcv_alias(sip_msg_t *msg, str *uri, str *nuri);
+int uri_restore_rcv_alias(str *uri, str *nuri, str *suri);
 
 #endif /* _DSET_H */

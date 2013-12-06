@@ -140,7 +140,6 @@ void dlg_refer_tm_callback(struct cell *t, int type, struct tmcb_params *ps)
 		goto error;
 	}
 
-	memset(&uac_r, '\0', sizeof(uac_req_t));
 	set_uac_req(&uac_r, &met, NULL, NULL, dialog_info, 0, NULL, NULL);
 	result = d_tmb.t_request_within(&uac_r);
 
@@ -198,7 +197,6 @@ static int dlg_refer_callee(dlg_transfer_ctx_t *dtc)
 	memcpy(hdrs.s+23+dlg_bridge_controller.len+CRLF_LEN+dtc->to.len+CRLF_LEN,
 			dlg_bridge_controller.s, dlg_bridge_controller.len);
 
-	memset(&uac_r, '\0', sizeof(uac_req_t));
 	set_uac_req(&uac_r, &met, &hdrs, NULL, dialog_info, TMCB_LOCAL_COMPLETED,
 				dlg_refer_tm_callback, (void*)dtc);
 	result = d_tmb.t_request_within(&uac_r);
@@ -311,7 +309,7 @@ error:
 }
 
 
-int dlg_bridge(str *from, str *to, str *op)
+int dlg_bridge(str *from, str *to, str *op, str *bd)
 {
 	dlg_transfer_ctx_t *dtc;
 	int ret;
@@ -350,8 +348,13 @@ int dlg_bridge(str *from, str *to, str *op)
 
 	LM_DBG("bridge <%.*s> to <%.*s>\n", dtc->from.len, dtc->from.s,
 			dtc->to.len, dtc->to.s);
-	s_body.s   = DLG_HOLD_SDP;
-	s_body.len = DLG_HOLD_SDP_LEN;
+	if(bd!=NULL && bd->s!=NULL && bd->len>0) {
+		s_body.s = bd->s;
+		s_body.len = bd->len;
+	} else {
+		s_body.s   = DLG_HOLD_SDP;
+		s_body.len = DLG_HOLD_SDP_LEN;
+	}
 
 	memset(&uac_r, '\0', sizeof(uac_req_t));
 	uac_r.method = &s_method;

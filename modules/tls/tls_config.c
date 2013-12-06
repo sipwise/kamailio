@@ -1,28 +1,19 @@
 /*
- * $Id$
+ * TLS module
  *
- * TLS module - Configuration file parser
+ * Copyright (C) 2010 iptelorg GmbH
  *
- * Copyright (C) 2001-2003 FhG FOKUS
- * Copyright (C) 2004,2005 Free Software Foundation, Inc.
- * Copyright (C) 2005,2006 iptelorg GmbH
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
  *
- * This file is part of SIP-router, a free SIP server.
- *
- * SIP-router is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version
- *
- * SIP-router is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 /*!
  * \file
@@ -45,11 +36,14 @@
 #include "../../trim.h"
 #include "../../ut.h"
 #include "../../cfg/cfg.h"
+#include "../../stats.h"
+
+#include <dirent.h>
+#include <sys/stat.h>
 
 static tls_domains_cfg_t* cfg = NULL;
 static tls_domain_t* domain = NULL;
 
-#ifdef USE_IPV6
 static int parse_ipv6(struct ip_addr* ip, cfg_token_t* token, 
 					  cfg_parser_t* st)
 {
@@ -77,7 +71,6 @@ static int parse_ipv6(struct ip_addr* ip, cfg_token_t* token,
 	    st->file, token->start.line, token->start.col);
 	return -1;
 }
-#endif /* USE_IPV6 */
 
 
 static int parse_ipv4(struct ip_addr* ip, cfg_token_t* token, 
@@ -117,10 +110,12 @@ static int parse_ipv4(struct ip_addr* ip, cfg_token_t* token,
 
 
 static cfg_option_t methods[] = { 
-	{"SSLv2",  .val = TLS_USE_SSLv2},
-	{"SSLv3",  .val = TLS_USE_SSLv3},
-	{"SSLv23", .val = TLS_USE_SSLv23},
-	{"TLSv1",  .val = TLS_USE_TLSv1},
+	{"SSLv2",   .val = TLS_USE_SSLv2},
+	{"SSLv3",   .val = TLS_USE_SSLv3},
+	{"SSLv23",  .val = TLS_USE_SSLv23},
+	{"TLSv1",   .val = TLS_USE_TLSv1},
+	{"TLSv1.1", .val = TLS_USE_TLSv1_1},
+	{"TLSv1.2", .val = TLS_USE_TLSv1_2},
 	{0}
 };
 
@@ -202,14 +197,7 @@ static int parse_hostport(int* type, struct ip_addr* ip, unsigned int* port,
 	}
 
 	if (t.type == '[') {
-#ifdef USE_IPV6
 		if (parse_ipv6(ip, &t, st) < 0) return -1;
-#else
-		ERR("%s:%d:%d: IPv6 address  not supported (compiled without IPv6"
-				" support)\n", 
-		    st->file, t.start.line, t.start.col);
-		return -1;
-#endif /* USE_IPV6 */
 	} else if (t.type == CFG_TOKEN_ALPHA) {
 		opt = cfg_lookup_token(token_default, &t.val);
 		if (opt) {
@@ -345,29 +333,106 @@ static int parse_domain(void* param, cfg_parser_t* st, unsigned int flags)
  */
 tls_domains_cfg_t* tls_load_config(str* filename)
 {
-	cfg_parser_t* parser;
-	str empty;
+    cfg_parser_t* parser;
+    str empty;
+    struct stat file_status;
+    char tmp_name[13] = "configXXXXXX";
+    str filename_str;
+    DIR *dir;
+    struct dirent *ent;
+    int out_fd, in_fd, filename_is_directory;
+    char *file_path, ch;
 
-	parser = NULL;
-	if ((cfg = tls_new_cfg()) == NULL) goto error;
+    parser = NULL;
+    memset(&file_status, 0, sizeof(struct stat));
+    dir = (DIR *)NULL;
+    in_fd = out_fd = filename_is_directory = 0;
+    file_path = (char *)0;
 
-	empty.s = 0;
-	empty.len = 0;
-	if ((parser = cfg_parser_init(&empty, filename)) == NULL) {
-		ERR("tls: Error while initializing configuration file parser.\n");
-		goto error;
+    if ((cfg = tls_new_cfg()) == NULL) goto error;
+
+    if (stat(filename->s, &file_status) != 0) {
+	LOG(L_ERR, "cannot stat config file %s\n", filename->s);
+	goto error;
+    }
+    if (S_ISDIR(file_status.st_mode)) {
+	filename_is_directory = 1;
+	dir = opendir(filename->s);
+	if (dir == NULL) {
+	    LOG(L_ERR, "cannot open directory file %s\n", filename->s);
+	    goto error;
 	}
+	out_fd = mkstemp(&(tmp_name[0]));
+	if (out_fd == -1) {
+	    LOG(L_ERR, "cannot make tmp file %s\n", &(tmp_name[0]));
+	    goto error;
+	}
+	while ((ent = readdir(dir)) != NULL) {
+	    file_path = pkg_malloc(filename->len + 1 + 256);
+	    memcpy(file_path, filename->s, filename->len);
+	    file_path[filename->len] = '/';
+	    strcpy(file_path + filename->len + 1, ent->d_name);
+	    if (stat(file_path, &file_status) != 0) {
+		LOG(L_ERR, "cannot get status of config file %s\n",
+		    file_path);
+		goto error;
+	    }
+	    if (S_ISREG(file_status.st_mode)) {
+		in_fd = open(file_path, O_RDONLY);
+		if (in_fd == -1) {
+		    LOG(L_ERR, "cannot open config file %s\n",
+			file_path);
+		    goto error;
+		}
+		pkg_free(file_path);
+		while (read(in_fd, &ch, 1)) {
+		    write(out_fd, &ch, 1);
+		}
+		close(in_fd);
+		in_fd = 0;
+		ch = '\n';
+		write(out_fd, &ch, 1);
+	    }
+	}
+	closedir(dir);
+	close(out_fd);
+	dir = (DIR *)NULL;
+	out_fd = 0;
+    }
 
-	cfg_section_parser(parser, parse_domain, NULL);
+    empty.s = 0;
+    empty.len = 0;
+    if (filename_is_directory) {
+	filename_str.s = &(tmp_name[0]);
+	filename_str.len = strlen(&(tmp_name[0]));
+	if ((parser = cfg_parser_init(&empty, &filename_str)) == NULL) {
+	    ERR("tls: Error while initializing configuration file parser.\n");
+	    unlink(&(tmp_name[0]));
+	    goto error;
+	}
+	unlink(&(tmp_name[0]));
+    } else {
+	if ((parser = cfg_parser_init(&empty, filename)) == NULL) {
+	    ERR("tls: Error while initializing configuration file parser.\n");
+	    goto error;
+	}	
+    }
 
-	if (sr_cfg_parse(parser)) goto error;
-	cfg_parser_close(parser);
-	return cfg;
+    cfg_section_parser(parser, parse_domain, NULL);
+    if (sr_cfg_parse(parser)) goto error;
+    cfg_parser_close(parser);
+    return cfg;
 
  error:
-	if (parser) cfg_parser_close(parser);
-	if (cfg) tls_free_cfg(cfg);
-	return 0;
+    if (dir) closedir(dir);
+    if (out_fd > 0) {
+	close(out_fd);
+	unlink(&(tmp_name[0]));
+    }
+    if (file_path) pkg_free(file_path);
+    if (parser) cfg_parser_close(parser);
+    if (cfg) tls_free_cfg(cfg);
+    return 0;
 }
 
 
@@ -385,6 +450,21 @@ int tls_parse_method(str* method)
 
     opt = cfg_lookup_token(methods, method);
     if (!opt) return -1;
+
+#if OPENSSL_VERSION_NUMBER < 0x1000100fL
+	if(opt->val == TLS_USE_TLSv1_1) {
+		LM_ERR("tls v1.1 not supported by this libssl version: %ld\n",
+				(long)OPENSSL_VERSION_NUMBER);
+		return -1;
+	}
+#endif
+#if OPENSSL_VERSION_NUMBER < 0x1000105fL
+	if(opt->val == TLS_USE_TLSv1_2) {
+		LM_ERR("tls v1.2 not supported by this libssl version: %ld\n",
+				(long)OPENSSL_VERSION_NUMBER);
+		return -1;
+	}
+#endif
 
     return opt->val;
 }

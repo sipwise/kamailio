@@ -195,17 +195,13 @@ static int check_via_address(struct ip_addr* ip, str *name,
 	struct hostent* he;
 	int i;
 	char* s;
-	#ifdef USE_IPV6
 	int len;
-	#endif
 
 	/* maybe we are lucky and name it's an ip */
 	s=ip_addr2a(ip);
 	if (s){
 		DBG("check_via_address(%s, %.*s, %d)\n",
 			s, name->len, name->s, resolver);
-
-	#ifdef USE_IPV6
 
 		len=strlen(s);
 
@@ -220,7 +216,6 @@ static int check_via_address(struct ip_addr* ip, str *name,
 		   )
 			return 0;
 		else
-	#endif
 
 			if (strncmp(name->s, s, name->len)==0)
 				return 0;
@@ -1764,9 +1759,7 @@ after_local_via:
 			}
 #if 0
 			/* no longer necessary, now hots.s contains [] */
-		#ifdef USE_IPV6
 			if(send_sock->address.af==AF_INET6) size+=1; /* +1 for ']'*/
-		#endif
 #endif
 	}
 	/* if received needs to be added, add anchor after host and add it, or
@@ -1963,8 +1956,8 @@ error00:
 
 
 
-char * build_res_buf_from_sip_res( struct sip_msg* msg,
-				unsigned int *returned_len)
+char * generate_res_buf_from_sip_res( struct sip_msg* msg,
+				unsigned int *returned_len, unsigned int mode)
 {
 	unsigned int new_len, via_len, body_delta;
 	char* new_buf;
@@ -1975,13 +1968,19 @@ char * build_res_buf_from_sip_res( struct sip_msg* msg,
 	buf=msg->buf;
 	len=msg->len;
 	new_buf=0;
-	/* we must remove the first via */
-	if (msg->via1->next) {
-		via_len=msg->via1->bsize;
-		via_offset=msg->h_via1->body.s-buf;
+
+	if(unlikely(mode&BUILD_NO_VIA1_UPDATE)) {
+		via_len = 0;
+		via_offset = 0;
 	} else {
-		via_len=msg->h_via1->len;
-		via_offset=msg->h_via1->name.s-buf;
+		/* we must remove the first via */
+		if (msg->via1->next) {
+			via_len=msg->via1->bsize;
+			via_offset=msg->h_via1->body.s-buf;
+		} else {
+			via_len=msg->h_via1->len;
+			via_offset=msg->h_via1->name.s-buf;
+		}
 	}
 
 	     /* Calculate message body difference and adjust
@@ -1990,16 +1989,16 @@ char * build_res_buf_from_sip_res( struct sip_msg* msg,
 	body_delta = lumps_len(msg, msg->body_lumps, 0);
 	if (adjust_clen(msg, body_delta, (msg->via2? msg->via2->proto:PROTO_UDP))
 			< 0) {
-		LOG(L_ERR, "ERROR: build_req_buf_from_sip_req: Error while adjusting"
-				" Content-Length\n");
+		LOG(L_ERR, "error while adjusting Content-Length\n");
 		goto error;
 	}
 
-	/* remove the first via*/
-	if (del_lump( msg, via_offset, via_len, HDR_VIA_T)==0){
-		LOG(L_ERR, "build_res_buf_from_sip_res: error trying to remove first"
-					"via\n");
-		goto error;
+	if(likely(!(mode&BUILD_NO_VIA1_UPDATE))) {
+		/* remove the first via*/
+		if (del_lump( msg, via_offset, via_len, HDR_VIA_T)==0){
+			LOG(L_ERR, "error trying to remove first via\n");
+			goto error;
+		}
 	}
 
 	new_len=len+body_delta+lumps_len(msg, msg->add_rm, 0); /*FIXME: we don't
@@ -2009,7 +2008,7 @@ char * build_res_buf_from_sip_res( struct sip_msg* msg,
 	new_buf=(char*)pkg_malloc(new_len+1); /* +1 is for debugging
 											 (\0 to print it )*/
 	if (new_buf==0){
-		LOG(L_ERR, "ERROR: build_res_buf_from_sip_res: out of mem\n");
+		LOG(L_ERR, "out of mem\n");
 		goto error;
 	}
 	new_buf[new_len]=0; /* debug: print the message */
@@ -2022,7 +2021,7 @@ char * build_res_buf_from_sip_res( struct sip_msg* msg,
 		buf+s_offset,
 		len-s_offset);
 	 /* send it! */
-	DBG("build_res_from_sip_res: copied size: orig:%d, new: %d, rest: %d"
+	DBG("copied size: orig:%d, new: %d, rest: %d"
 			" msg=\n%s\n", s_offset, offset, len-s_offset, new_buf);
 
 	*returned_len=new_len;
@@ -2032,6 +2031,11 @@ error:
 	return 0;
 }
 
+char * build_res_buf_from_sip_res( struct sip_msg* msg,
+				unsigned int *returned_len)
+{
+	return generate_res_buf_from_sip_res(msg, returned_len, 0);
+}
 
 char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 		struct sip_msg* msg, unsigned int *returned_len, struct bookmark *bmark)
@@ -2516,7 +2520,6 @@ char* via_builder( unsigned int *len,
 		LOG(L_CRIT, "BUG: via_builder: unknown proto %d\n", send_info->proto);
 		return 0;
 	}
-#	ifdef USE_IPV6
 	/* add [] only if ipv6 and outbound socket address is used;
 	 * if using pre-set no check is made */
 	if ((send_sock->address.af==AF_INET6) &&
@@ -2526,7 +2529,6 @@ char* via_builder( unsigned int *len,
 		extra_len=1;
 		via_len+=2; /* [ ]*/
 	}
-#	endif
 	memcpy(line_buf+via_prefix_len+extra_len, address_str->s,
 				address_str->len);
 	if ((send_sock->port_no!=SIP_PORT) ||

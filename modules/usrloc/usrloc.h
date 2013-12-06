@@ -40,6 +40,7 @@
 #define WRITE_THROUGH 1
 #define WRITE_BACK    2
 #define DB_ONLY       3
+#define DB_READONLY   4
 
 /*forward declaration necessary for udomain*/
 
@@ -90,6 +91,7 @@ typedef struct ucontact {
 	unsigned int methods;   /*!< Supported methods */
 	str instance;           /*!< SIP instance value - gruu */
 	unsigned int reg_id;    /*!< reg-id parameters */
+	int tcpconn_id;          /* unique tcp connection id */
 #ifdef WITH_XAVP
 	sr_xavp_t * xavp;       /*!< per contact xavps */
 #endif
@@ -115,6 +117,7 @@ typedef struct ucontact_info {
 	unsigned int methods;     /*!< supported methods */
 	str instance;             /*!< SIP instance value - gruu */
 	unsigned int reg_id;      /*!< reg-id parameters */
+	int tcpconn_id;
 #ifdef WITH_XAVP
 	sr_xavp_t * xavp;         /*!< per contact xavps */
 #endif
@@ -149,6 +152,8 @@ typedef int (*get_urecord_by_ruid_t)(udomain_t* _d, unsigned int _aorhash,
 		str *_ruid, struct urecord** _r, struct ucontact** _c);
 
 typedef int  (*delete_urecord_t)(struct udomain* _d, str* _aor, struct urecord* _r);
+
+typedef int  (*delete_urecord_by_ruid_t)(struct udomain* _d, str* _ruid);
 
 typedef int (*update_ucontact_t)(struct urecord* _r, struct ucontact* _c,
 		struct ucontact_info* _ci);
@@ -198,6 +203,7 @@ typedef struct usrloc_api {
 
 	insert_urecord_t     insert_urecord;
 	delete_urecord_t     delete_urecord;
+	delete_urecord_by_ruid_t     delete_urecord_by_ruid;
 	get_urecord_t        get_urecord;
 	lock_udomain_t       lock_udomain;
 	unlock_udomain_t     unlock_udomain;

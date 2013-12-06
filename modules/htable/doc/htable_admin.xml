@@ -31,6 +31,10 @@
 		be adjusted per itme via assignment operation at runtime.
 	</para>
 	<para>
+		Replication between multiple servers is performed automatically (if 
+		enabled) via the DMQ module.
+	</para>
+	<para>
 		You can read more about hash tables at:
 		http://en.wikipedia.org/wiki/Hash_table.
 	</para>
@@ -121,7 +125,7 @@ if(is_present_hf("Authorization"))
 			<itemizedlist>
 			<listitem>
 			<para>
-				<emphasis>No dependencies on other &kamailio; modules</emphasis>.
+				<emphasis>If DMQ replication is enabled, the DMQ module must be loaded first.</emphasis>.
 			</para>
 			</listitem>
 			</itemizedlist>
@@ -236,8 +240,8 @@ if(is_present_hf("Authorization"))
 			<emphasis>size</emphasis> - number specifying the size of hash
 			table.  Larger value means less collisions. The number of entries
 			(aka slots or buckets) in the table is 2^size. The possible range
-			for this value is from 2 to 14, smaller or larger values will be
-			increased or decreased respectivly.
+			for this value is from 2 to 31, smaller or larger values will be
+			increased to 3 (8 slots) or decreased to 14 (16384 slots).
 		</para>
 		</listitem>
 		<listitem>
@@ -272,6 +276,11 @@ if(is_present_hf("Authorization"))
 			<emphasis>updateexpire</emphasis> - if set to 1 (default), the time until expiration of an item is reset when that item is updated.  Certain uses of htable may dictate that updates should not reset the expiration timeout, however, in which case this attribute can be set to 0.
 		</para>
 		</listitem>
+		<listitem>
+		<para>
+			<emphasis>dmqreplicate</emphasis> - if set to 1, any actions (set, update, delete etc.) performed upon entries in this table will be replicated to other nodes (htable peers). Please note, module parameter "enable_dmq" must also be set in order for this to apply (see below). Default is 0 (no replication).
+		</para>
+		</listitem>
 		</itemizedlist>
 		<para>
 		<emphasis>
@@ -284,7 +293,7 @@ if(is_present_hf("Authorization"))
 ...
 modparam("htable", "htable", "a=&gt;size=4;autoexpire=7200;dbtable=htable_a;")
 modparam("htable", "htable", "b=&gt;size=5;")
-modparam("htable", "htable", "c=&gt;size=4;autoexpire=7200;initval=1;")
+modparam("htable", "htable", "c=&gt;size=4;autoexpire=7200;initval=1;dmqreplicate=1;")
 ...
 </programlisting>
 		</example>
@@ -504,6 +513,33 @@ modparam("htable", "db_expires", 1)
 </programlisting>
 		</example>
 	</section>
+	<section>
+		<title><varname>enable_dmq</varname> (integer)</title>
+		<para>
+			If set to 1, will enable DMQ replication of actions performed upon 
+			entries in all tables having "dmqreplicate" parameter set. Any update 
+			action performed via psuedo-variables, MI and RPC commands will be 
+			repeated on all other nodes. Therefore, it is important to ensure the
+			table definition (size, autoexpire etc.) is identical across all instances.
+		</para>
+		<para>
+			Currently, values are not replicated on load from DB as it is expected 
+			that in these cases, all servers will load their values from the same DB.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>enable_dmq</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("htable", "enable_dmq", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 	<section>
 	<title>Functions</title>
@@ -566,6 +602,46 @@ sht_rm_name_re("ha=>.*");
 		<programlisting format="linespecific">
 ...
 sht_rm_value_re("ha=>.*");
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="htable.f.sht_lock">
+		<title>
+		<function moreinfo="none">sht_lock(htable=>key)</function>
+		</title>
+		<para>
+			Lock the slot in htable corespoding to the key item.
+		</para>
+		<para>
+			This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>sht_lock</function> usage</title>
+		<programlisting format="linespecific">
+...
+sht_lock("ha=>test");
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="htable.f.sht_unlock">
+		<title>
+		<function moreinfo="none">sht_unlock(htable=>key)</function>
+		</title>
+		<para>
+			Unlock the slot in htable corespoding to the key item.
+		</para>
+		<para>
+			This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>sht_unlock</function> usage</title>
+		<programlisting format="linespecific">
+...
+sht_lock("ha=>test");
+$sht(ha=>test) = $sht(ha=>test) + 10;
+sht_unlock("ha=>test");
 ...
 </programlisting>
 		</example>
@@ -733,6 +809,66 @@ kamcmd htable.get students anna
 ...
 </programlisting>
 	</section>
+       <section>
+                <title>
+                <function moreinfo="none">htable.sets htable key value</function>
+                </title>
+                <para>
+					Set an item in hash table to string value.
+                </para>
+                <para>
+                Name: <emphasis>htable.sets</emphasis>
+                </para>
+                <para>Parameters:</para>
+                <itemizedlist>
+                        <listitem><para>htable : Name of the hash table</para>
+                        </listitem>
+                        <listitem><para>key : Key name in the hash table</para>
+                        </listitem>
+                        <listitem><para>Value : String value for the item</para>
+                        </listitem>
+
+                </itemizedlist>
+                <para>
+                Example:
+                </para>
+<programlisting  format="linespecific">
+...
+# Set $sht(test=>x)
+kamcmd htable.sets test x abc
+...
+</programlisting>
+	</section>
+       <section>
+                <title>
+                <function moreinfo="none">htable.seti htable key value</function>
+                </title>
+                <para>
+					Set an item in hash table to integer value.
+                </para>
+                <para>
+                Name: <emphasis>htable.seti</emphasis>
+                </para>
+                <para>Parameters:</para>
+                <itemizedlist>
+                        <listitem><para>htable : Name of the hash table</para>
+                        </listitem>
+                        <listitem><para>key : Key name in the hash table</para>
+                        </listitem>
+                        <listitem><para>Value : Integer value for the item</para>
+                        </listitem>
+
+                </itemizedlist>
+                <para>
+                Example:
+                </para>
+<programlisting  format="linespecific">
+...
+# Set $sht(test=>x)
+kamcmd htable.sets test x 123
+...
+</programlisting>
+	</section>
         <section>
                 <title>
                 <function moreinfo="none">htable.dump htable</function>
@@ -760,13 +896,38 @@ kamcmd htable.dump ipban
 	</section>
         <section>
                 <title>
+                <function moreinfo="none">htable.reload htable</function>
+                </title>
+                <para>
+		Reload hash table from database.
+                </para>
+                <para>
+                Name: <emphasis>dhtable.reload</emphasis>
+                </para>
+                <para>Parameters:</para>
+                <itemizedlist>
+                        <listitem><para>htable : Name of the hash table to reload</para>
+                        </listitem>
+
+                </itemizedlist>
+                <para>
+                Example:
+                </para>
+<programlisting  format="linespecific">
+...
+kamcmd htable.reload ipban
+...
+</programlisting>
+	</section>
+        <section>
+                <title>
                 <function moreinfo="none">htable.listTables</function>
                 </title>
                 <para>
 		Lists all defined tables
                 </para>
                 <para>
-                Name: <emphasis>dhtable.listTables</emphasis>
+                Name: <emphasis>htable.listTables</emphasis>
                 </para>
                 <para>Parameters:</para>
                 <itemizedlist>
@@ -780,6 +941,33 @@ kamcmd htable.dump ipban
 <programlisting  format="linespecific">
 ...
 kamcmd htable.listTables
+...
+</programlisting>
+	</section>
+    <section>
+          <title>
+                <function moreinfo="none">htable.stats</function>
+          </title>
+          <para>
+			  Get statistics for hash tables - name, number of slots,
+			  number of items, max number of items per slot, min number
+			  of items per slot.
+          </para>
+                <para>
+                Name: <emphasis>htable.stats</emphasis>
+                </para>
+                <para>Parameters:</para>
+                <itemizedlist>
+                        <listitem><para>None</para>
+                        </listitem>
+
+                </itemizedlist>
+                <para>
+                Example:
+                </para>
+<programlisting  format="linespecific">
+...
+kamcmd htable.stats
 ...
 </programlisting>
 	</section>

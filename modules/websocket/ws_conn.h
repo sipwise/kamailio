@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -72,6 +72,10 @@ extern char *wsconn_state_str[];
 
 extern stat_var *ws_current_connections;
 extern stat_var *ws_max_concurrent_connections;
+extern stat_var *ws_sip_current_connections;
+extern stat_var *ws_sip_max_concurrent_connections;
+extern stat_var *ws_msrp_current_connections;
+extern stat_var *ws_msrp_max_concurrent_connections;
 
 int wsconn_init(void);
 void wsconn_destroy(void);

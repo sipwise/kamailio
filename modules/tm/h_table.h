@@ -91,6 +91,7 @@ struct cell;
 struct timer;
 struct retr_buf;
 struct ua_client;
+struct async_state;
 
 #include "../../mem/shm_mem.h"
 #include "lock.h"
@@ -214,6 +215,7 @@ typedef struct ua_client
 {
 	/* if we store a reply (branch picking), this is where it is */
 	struct sip_msg  *reply;
+	char *end_reply;	/* pointer to end of sip_msg so we know the shm blocked used in clone...(used in async replies) */
 	struct retr_buf  request;
 	/* we maintain a separate copy of cancel rather than
 	   reuse the structure for original request; the 
@@ -229,6 +231,9 @@ typedef struct ua_client
 #endif
 	str uri;
 	str path;
+	str instance;
+	str ruid;
+	str location_ua;
 	/* if we don't store, we at least want to know the status */
 	int             last_received;
 
@@ -236,7 +241,11 @@ typedef struct ua_client
 	/* internal flags per tm uac */
 	unsigned int flags;
 #endif
+	/* per branch flags */
 	flag_t branch_flags;
+	/* internal processing code - (mapping over sip warning codes)
+	 * - storing the code giving a clue of what happened internally */
+	int icode;
 #ifdef WITH_AS_SUPPORT
 	/**
 	 * Resent for every rcvd 2xx reply.
@@ -249,8 +258,12 @@ typedef struct ua_client
 #endif
 	/* the route to take if no final positive reply arrived */
 	unsigned short on_failure;
+	/* the route to take for all failure replies */
+	unsigned short on_branch_failure;
 	/* the onreply_route to be processed if registered to do so */
 	unsigned short on_reply;
+	/* unused - keep the structure aligned to 32b */
+	unsigned short on_unused;
 }ua_client_type;
 
 
@@ -260,7 +273,13 @@ struct totag_elem {
 	volatile int acked;
 };
 
-
+/* structure for storing transaction state prior to suspending of async transactions */
+typedef struct async_state {
+	unsigned int backup_route;
+	unsigned int backup_branch;
+	unsigned int blind_uac;
+	unsigned int ruri_new;
+} async_state_type;
 
 /* transaction's flags */
 /* is the transaction's request an INVITE? */
@@ -298,8 +317,9 @@ struct totag_elem {
 #	define T_PASS_PROVISIONAL_FLAG (1<<11)
 #	define pass_provisional(_t_)	((_t_)->flags&T_PASS_PROVISIONAL_FLAG)
 #endif
+#define T_ASYNC_CONTINUE (1<<12) /* Is this transaction in a continuation after being suspended */
 
-#define T_DISABLE_INTERNAL_REPLY (1<<12) /* don't send internal negative reply */
+#define T_DISABLE_INTERNAL_REPLY (1<<13) /* don't send internal negative reply */
 
 /* unsigned short should be enough for a retr. timer: max. 65535 ms =>
  * max retr. = 65 s which should be enough and saves us 2*2 bytes */
@@ -406,6 +426,9 @@ typedef struct cell
 	/* UA Clients */
 	struct ua_client  uac[ MAX_BRANCHES ];
 	
+	/* store transaction state to be used for async transactions */
+	struct async_state async_backup;
+	
 	/* to-tags of 200/INVITEs which were received from downstream and 
 	 * forwarded or passed to UAC; note that there can be arbitrarily 
 	 * many due to downstream forking; */
@@ -424,7 +447,9 @@ typedef struct cell
 
 	/* protection against concurrent reply processing */
 	ser_lock_t   reply_mutex;
-	
+	/* protect against concurrent async continues */
+	ser_lock_t   async_mutex;
+		
 	ticks_t fr_timeout;     /* final response interval for retr_bufs */
 	ticks_t fr_inv_timeout; /* final inv. response interval for retr_bufs */
 #ifdef TM_DIFF_RT_TIMEOUT
@@ -439,13 +464,15 @@ typedef struct cell
 
 	/* the route to take if no final positive reply arrived */
 	unsigned short on_failure;
+	/* the route to take for all failure replies */
+	unsigned short on_branch_failure;
 	/* the onreply_route to be processed if registered to do so */
 	unsigned short on_reply;
 	 /* The route to take for each downstream branch separately */
 	unsigned short on_branch;
 
-	/* place holder for MD5checksum  (meaningful only if syn_branch=0) */
-	char md5[0]; /* if syn_branch==0 then MD5_LEN bytes are extra alloc'ed*/
+	/* place holder for MD5checksum, MD5_LEN bytes are extra alloc'ed */
+	char md5[0];
 
 } tm_cell_t;
 

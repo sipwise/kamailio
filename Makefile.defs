@@ -155,15 +155,17 @@ endif
 
 # application server support on
 WITHAS ?= 1
+# enable core hooks for SCTP
+SCTP ?= 1
 
 # what to install
 INSTALL_FLAVOUR=$(FLAVOUR)
 
-#version number
+# version number
 VERSION = 4
-PATCHLEVEL = 0
-SUBLEVEL = 4
-EXTRAVERSION = 
+PATCHLEVEL = 1
+SUBLEVEL =  0
+EXTRAVERSION =
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
@@ -172,7 +174,7 @@ MEMMNG ?= 1
 # memory debugger switcher
 # 0 - off (no-debug mode)
 # 1 - on (debug mode)
-MEMDBG ?= 0
+MEMDBG ?= 1
 
 SER_VER = $(shell expr $(VERSION) \* 1000000 + $(PATCHLEVEL) \* 1000 + \
 			$(SUBLEVEL) )
@@ -647,8 +649,6 @@ data_target = $(prefix)/$(data_dir)
 # -DPROFILING
 #		if enabled profiling will be enabled for child processes
 #		Don't forget to set PROFILE (see below)
-# -DUSE_STUN
-#		compiles in stun support
 # -DNO_SIG_DEBUG
 #        turns off debugging messages in signal handlers (which might be 
 #         unsafe)
@@ -682,7 +682,6 @@ C_DEFS= $(extra_defs) \
 	 -DPKG_MALLOC \
 	 -DSHM_MEM  -DSHM_MMAP \
 	 -DDNS_IP_HACK \
-	 -DUSE_IPV6 \
 	 -DUSE_MCAST \
 	 -DUSE_TCP \
 	 -DDISABLE_NAGLE \
@@ -750,10 +749,6 @@ ifeq ($(FMSTATS), 1)
 endif
 ifeq ($(WITHAS), 1)
 	C_DEFS+= -DWITH_AS_SUPPORT
-endif
-
-ifneq ($(STUN),)
-	C_DEFS+= -DUSE_STUN
 endif
 
 ifeq ($(mode),)
@@ -843,6 +838,7 @@ endif
 
 ifeq ($(ARCH), arm6)
 	use_fast_lock=yes
+	C_DEFS+=-DNOSMP # very unlikely to have an smp arm
 endif
 
 ifeq ($(ARCH), ppc)
@@ -1765,10 +1761,6 @@ ifeq ($(OS), linux)
 			LIBS+=-lpthread
 		endif
 	endif
-	ifneq (,$(findstring -DUSE_DNSSEC, $(C_DEFS)))
-		LIBS+=-lval-threads -lcrypto -lsres -lpthread
-$(info "using libval for DNSSEC validation")
-	endif
         # check for >= 2.5.44
 
 	ifeq ($(shell [ $(OSREL_N) -ge 2005044 ] && echo has_epoll), has_epoll)
@@ -1794,31 +1786,6 @@ $(info "using libval for DNSSEC validation")
 	ifeq ($(NO_SELECT),)
 		C_DEFS+=-DHAVE_SELECT
 	endif
-	# sctp support
-	ifeq ($(SCTP),1)
-		# test to see if the devfiles and lib are installed
-		sctp_dev_locations := /usr/include/netinet/sctp.h \
-								$(LOCALBASE)/include/netinet/sctp.h
-		sctp_lib_locations := /usr/lib/libsctp.so \
-								/usr/lib64/libsctp.so \
-								$(LOCALBASE)/usr/local/lib/libsctp.so
-		sctp_dev_path := $(wildcard $(sctp_dev_locations))
-		sctp_lib_path := $(wildcard $(sctp_lib_locations))
-		ifeq ($(sctp_dev_path),)
-$(info "sctp development files not installed -- sctp disabled")
-			override SCTP := 
-		endif
-		ifeq ($(sctp_lib_path),)
-$(info "sctp libraries not installed -- sctp disabled")
-			override SCTP := 
-		endif
-		
-		ifeq ($(SCTP),1)
-			# use lksctp
-			C_DEFS+=-DUSE_SCTP
-			LIBS+=-lsctp
-		endif
-	endif # SCTP
 endif
 
 ifeq  ($(OS), solaris)
@@ -1893,26 +1860,6 @@ ifeq ($(OS), freebsd)
 		C_DEFS+=-DHAVE_SELECT
 	endif
 	YACC=yacc
-	# sctp support
-	ifeq ($(SCTP),1)
-		# test to see if the devfiles and lib are installed
-		sctp_dev_locations := /usr/include/netinet/sctp.h \
-								$(LOCALBASE)/include/netinet/sctp.h
-		sctp_dev_path := $(wildcard $(sctp_dev_locations))
-		ifeq ($(sctp_dev_path),)
-$(info "sctp development files not installed -- sctp disabled")
-			override SCTP := 
-		endif
-		ifeq ($(shell [ $(OSREL_N) -lt 7000 ] && echo sctp), sctp)
-$(info "old freebsd version (>= 7.0 needed) -- sctp disabled")
-			override SCTP := 
-		endif
-		
-		ifeq ($(SCTP),1)
-			C_DEFS+=-DUSE_SCTP
-			LIBS+=  # no extra libs needed on freebsd
-		endif
-	endif # SCTP
 endif
 
 ifeq ($(OS), dragonfly)
@@ -1935,29 +1882,6 @@ ifeq ($(OS), dragonfly)
 		C_DEFS+=-DHAVE_SELECT
 	endif
 	YACC=yacc
-	# sctp support
-	ifeq ($(SCTP),1)
-		# test to see if the devfiles and lib are installed
-		sctp_dev_locations := /usr/include/netinet/sctp.h \
-								$(LOCALBASE)/include/netinet/sctp.h
-		sctp_dev_path := $(wildcard $(sctp_dev_locations))
-		ifeq ($(sctp_dev_path),)
-$(info "sctp development files not installed -- sctp disabled")
-			override SCTP :=
-		endif
-		# FIXME: don't know what's the status of SCTP on dragonfly
-		#        (we suppose the 2.6 version is >= the version in
-		#         in freebsd 7.0)
-		ifeq ($(shell [ $(OSREL_N) -lt 2006 ] && echo sctp), sctp)
-$(info "old dragonfly version (>= 2.6 needed) -- sctp disabled")
-			override SCTP :=
-		endif
-		
-		ifeq ($(SCTP),1)
-			C_DEFS+=-DUSE_SCTP
-			LIBS+=  # no extra libs needed on freebsd
-		endif
-	endif # SCTP
 endif
 
 ifeq ($(OS), openbsd)
@@ -2064,9 +1988,9 @@ ifeq ($(OS), darwin)
 endif
 
 ifneq (,$(findstring cygwin, $(OS)))
-	# cygwin doesn't support IPV6 and doesn't support fd passing so no TCP
-	#C_DEFS:=$(filter-out -DUSE_IPV6 -DUSE_TCP, $(C_DEFS))
-	DEFS_RM+=-DUSE_IPV6 -DUSE_TCP
+	# cygwin does support IPV6 starting from version 1.7, but (still?) doesn't support fd passing so no TCP
+	#C_DEFS:=$(filter-out -DUSE_TCP, $(C_DEFS))
+	DEFS_RM+=-DUSE_TCP
 	C_DEFS+=-DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD \
 			-DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H \
 			-DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER
@@ -2098,11 +2022,6 @@ LIBS+= -L$(LOCALBASE)/lib -L$(LOCALBASE)/ssl/lib -lssl -lcrypto \
 # NOTE: depending on the way in which libssl was compiled you might
 #       have to add -lz -lkrb5   (zlib and kerberos5).
 #       E.g.: make CORE_TLS=1 EXTRA_TLS_LIBS="-lz -lkrb5"
-endif
-
-ifneq ($(STUN),)
-C_INCLUDES+= -I$(LOCALBASE)/ssl/include
-LIBS+= -L$(LOCALBASE)/lib -L$(LOCALBASE)/ssl/lib -lcrypto
 endif
 
 ifneq ($(found_lock_method), yes)

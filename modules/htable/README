@@ -17,7 +17,7 @@ Alex Balashov
 
    <abalashov@evaristesys.com>
 
-   Copyright � 2008-2011 http://www.asipto.com
+   Copyright © 2008-2011 http://www.asipto.com
      __________________________________________________________________
 
    Table of Contents
@@ -45,12 +45,15 @@ Alex Balashov
               3.10. timer_interval (integer)
               3.11. timer_mode (integer)
               3.12. db_expires (integer)
+              3.13. enable_dmq (integer)
 
         4. Functions
 
               4.1. sht_print()
               4.2. sht_rm_name_re(htable=>regexp)
               4.3. sht_rm_value_re(htable=>regexp)
+              4.4. sht_lock(htable=>key)
+              4.5. sht_unlock(htable=>key)
 
         5. Exported pseudo-variables
         6. MI Commands
@@ -63,8 +66,12 @@ Alex Balashov
 
               7.1. htable.get htable key
               7.2. htable.delete htable key
-              7.3. htable.dump htable
-              7.4. htable.listTables
+              7.3. htable.sets htable key value
+              7.4. htable.seti htable key value
+              7.5. htable.dump htable
+              7.6. htable.reload htable
+              7.7. htable.listTables
+              7.8. htable.stats
 
         8. Event routes
 
@@ -86,9 +93,12 @@ Alex Balashov
    1.12. Set timer_interval parameter
    1.13. Set timer_mode parameter
    1.14. Set db_expires parameter
-   1.15. sht_print usage
-   1.16. sht_rm_name_re usage
-   1.17. sht_rm_value_re usage
+   1.15. Set enable_dmq parameter
+   1.16. sht_print usage
+   1.17. sht_rm_name_re usage
+   1.18. sht_rm_value_re usage
+   1.19. sht_lock usage
+   1.20. sht_unlock usage
 
 Chapter 1. Admin Guide
 
@@ -115,12 +125,15 @@ Chapter 1. Admin Guide
         3.10. timer_interval (integer)
         3.11. timer_mode (integer)
         3.12. db_expires (integer)
+        3.13. enable_dmq (integer)
 
    4. Functions
 
         4.1. sht_print()
         4.2. sht_rm_name_re(htable=>regexp)
         4.3. sht_rm_value_re(htable=>regexp)
+        4.4. sht_lock(htable=>key)
+        4.5. sht_unlock(htable=>key)
 
    5. Exported pseudo-variables
    6. MI Commands
@@ -133,8 +146,12 @@ Chapter 1. Admin Guide
 
         7.1. htable.get htable key
         7.2. htable.delete htable key
-        7.3. htable.dump htable
-        7.4. htable.listTables
+        7.3. htable.sets htable key value
+        7.4. htable.seti htable key value
+        7.5. htable.dump htable
+        7.6. htable.reload htable
+        7.7. htable.listTables
+        7.8. htable.stats
 
    8. Event routes
 
@@ -155,10 +172,13 @@ Chapter 1. Admin Guide
    expiration time of cached items. The expiration time can be adjusted
    per itme via assignment operation at runtime.
 
+   Replication between multiple servers is performed automatically (if
+   enabled) via the DMQ module.
+
    You can read more about hash tables at:
    http://en.wikipedia.org/wiki/Hash_table.
 
-   The "name" can be a static string or can include pseudo- variables that
+   The “name” can be a static string or can include pseudo- variables that
    will be replaced at runtime.
 
    Example 1.1. Accessing $sht(htname=>key)
@@ -181,7 +201,7 @@ $sht(a=>$ci::srcip) = $si;
    the failed authentications per user and one for storing the time of
    last authentication attempt. To ensure unique name per user, the hash
    table uses a combination of authentication username and text
-   "::auth_count" and "::last_auth".
+   “::auth_count” and “::last_auth”.
 
    Example 1.2. Dictionary attack limitation
 ...
@@ -234,7 +254,8 @@ if(is_present_hf("Authorization"))
 2.1. Kamailio Modules
 
    The following modules must be loaded before this module:
-     * No dependencies on other Kamailio modules.
+     * If DMQ replication is enabled, the DMQ module must be loaded
+       first..
 
 2.2. External Libraries or Applications
 
@@ -273,6 +294,7 @@ if(is_present_hf("Authorization"))
    3.10. timer_interval (integer)
    3.11. timer_mode (integer)
    3.12. db_expires (integer)
+   3.13. enable_dmq (integer)
 
 3.1. htable (str)
 
@@ -287,8 +309,8 @@ if(is_present_hf("Authorization"))
      * size - number specifying the size of hash table. Larger value means
        less collisions. The number of entries (aka slots or buckets) in
        the table is 2^size. The possible range for this value is from 2 to
-       14, smaller or larger values will be increased or decreased
-       respectivly.
+       31, smaller or larger values will be increased to 3 (8 slots) or
+       decreased to 14 (16384 slots).
      * autoexpire -time in seconds to delete an item from hash table if no
        update was done to it. If is missing or set to 0, the items won't
        expire.
@@ -304,6 +326,11 @@ if(is_present_hf("Authorization"))
        an item is reset when that item is updated. Certain uses of htable
        may dictate that updates should not reset the expiration timeout,
        however, in which case this attribute can be set to 0.
+     * dmqreplicate - if set to 1, any actions (set, update, delete etc.)
+       performed upon entries in this table will be replicated to other
+       nodes (htable peers). Please note, module parameter "enable_dmq"
+       must also be set in order for this to apply (see below). Default is
+       0 (no replication).
 
    Default value is NULL.
 
@@ -311,7 +338,8 @@ if(is_present_hf("Authorization"))
 ...
 modparam("htable", "htable", "a=>size=4;autoexpire=7200;dbtable=htable_a;")
 modparam("htable", "htable", "b=>size=5;")
-modparam("htable", "htable", "c=>size=4;autoexpire=7200;initval=1;")
+modparam("htable", "htable", "c=>size=4;autoexpire=7200;initval=1;dmqreplicate=1
+;")
 ...
 
 3.2. db_url (str)
@@ -439,13 +467,35 @@ modparam("htable", "timer_mode", 1)
 modparam("htable", "db_expires", 1)
 ...
 
+3.13. enable_dmq (integer)
+
+   If set to 1, will enable DMQ replication of actions performed upon
+   entries in all tables having "dmqreplicate" parameter set. Any update
+   action performed via psuedo-variables, MI and RPC commands will be
+   repeated on all other nodes. Therefore, it is important to ensure the
+   table definition (size, autoexpire etc.) is identical across all
+   instances.
+
+   Currently, values are not replicated on load from DB as it is expected
+   that in these cases, all servers will load their values from the same
+   DB.
+
+   Default value is 0.
+
+   Example 1.15. Set enable_dmq parameter
+...
+modparam("htable", "enable_dmq", 1)
+...
+
 4. Functions
 
    4.1. sht_print()
    4.2. sht_rm_name_re(htable=>regexp)
    4.3. sht_rm_value_re(htable=>regexp)
+   4.4. sht_lock(htable=>key)
+   4.5. sht_unlock(htable=>key)
 
-4.1. sht_print()
+4.1.  sht_print()
 
    Dump content of hash table to L_ERR log level. Intended for debug
    purposes.
@@ -453,12 +503,12 @@ modparam("htable", "db_expires", 1)
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    ONREPLY_ROUTE, BRANCH_ROUTE.
 
-   Example 1.15. sht_print usage
+   Example 1.16. sht_print usage
 ...
 sht_print();
 ...
 
-4.2. sht_rm_name_re(htable=>regexp)
+4.2.  sht_rm_name_re(htable=>regexp)
 
    Delete all entries in the htable that match the name against regular
    expression.
@@ -466,12 +516,12 @@ sht_print();
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    ONREPLY_ROUTE, BRANCH_ROUTE.
 
-   Example 1.16. sht_rm_name_re usage
+   Example 1.17. sht_rm_name_re usage
 ...
 sht_rm_name_re("ha=>.*");
 ...
 
-4.3. sht_rm_value_re(htable=>regexp)
+4.3.  sht_rm_value_re(htable=>regexp)
 
    Delete all entries in the htable that match the value against regular
    expression.
@@ -479,9 +529,33 @@ sht_rm_name_re("ha=>.*");
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    ONREPLY_ROUTE, BRANCH_ROUTE.
 
-   Example 1.17. sht_rm_value_re usage
+   Example 1.18. sht_rm_value_re usage
 ...
 sht_rm_value_re("ha=>.*");
+...
+
+4.4.  sht_lock(htable=>key)
+
+   Lock the slot in htable corespoding to the key item.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.19. sht_lock usage
+...
+sht_lock("ha=>test");
+...
+
+4.5.  sht_unlock(htable=>key)
+
+   Unlock the slot in htable corespoding to the key item.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.20. sht_unlock usage
+...
+sht_lock("ha=>test");
+$sht(ha=>test) = $sht(ha=>test) + 10;
+sht_unlock("ha=>test");
 ...
 
 5. Exported pseudo-variables
@@ -502,7 +576,7 @@ sht_rm_value_re("ha=>.*");
    6.2. sht_dump
    6.3. sht_delete
 
-6.1. sht_reload
+6.1.  sht_reload
 
    Reload a hash table from database.
 
@@ -515,7 +589,7 @@ sht_rm_value_re("ha=>.*");
                 _hash_table_name_
                 _empty_line_
 
-6.2. sht_dump
+6.2.  sht_dump
 
    Dump content of a hash table via MI.
 
@@ -528,7 +602,7 @@ sht_rm_value_re("ha=>.*");
                 _hash_table_name_
                 _empty_line_
 
-6.3. sht_delete
+6.3.  sht_delete
 
    Delete a key from a hash table via MI.
 
@@ -551,10 +625,14 @@ sht_rm_value_re("ha=>.*");
 
    7.1. htable.get htable key
    7.2. htable.delete htable key
-   7.3. htable.dump htable
-   7.4. htable.listTables
+   7.3. htable.sets htable key value
+   7.4. htable.seti htable key value
+   7.5. htable.dump htable
+   7.6. htable.reload htable
+   7.7. htable.listTables
+   7.8. htable.stats
 
-7.1. htable.get htable key
+7.1.  htable.get htable key
 
    Lists one value in a hash table
 
@@ -570,7 +648,7 @@ sht_rm_value_re("ha=>.*");
 kamcmd htable.get students daniel
 ...
 
-7.2. htable.delete htable key
+7.2.  htable.delete htable key
 
    Delete one value in a hash table
 
@@ -586,7 +664,41 @@ kamcmd htable.get students daniel
 kamcmd htable.get students anna
 ...
 
-7.3. htable.dump htable
+7.3.  htable.sets htable key value
+
+   Set an item in hash table to string value.
+
+   Name: htable.sets
+
+   Parameters:
+     * htable : Name of the hash table
+     * key : Key name in the hash table
+     * Value : String value for the item
+
+   Example:
+...
+# Set $sht(test=>x)
+kamcmd htable.sets test x abc
+...
+
+7.4.  htable.seti htable key value
+
+   Set an item in hash table to integer value.
+
+   Name: htable.seti
+
+   Parameters:
+     * htable : Name of the hash table
+     * key : Key name in the hash table
+     * Value : Integer value for the item
+
+   Example:
+...
+# Set $sht(test=>x)
+kamcmd htable.sets test x 123
+...
+
+7.5.  htable.dump htable
 
    Lists all the values in a hash table
 
@@ -600,11 +712,25 @@ kamcmd htable.get students anna
 kamcmd htable.dump ipban
 ...
 
-7.4. htable.listTables
+7.6.  htable.reload htable
+
+   Reload hash table from database.
+
+   Name: dhtable.reload
+
+   Parameters:
+     * htable : Name of the hash table to reload
+
+   Example:
+...
+kamcmd htable.reload ipban
+...
+
+7.7.  htable.listTables
 
    Lists all defined tables
 
-   Name: dhtable.listTables
+   Name: htable.listTables
 
    Parameters:
      * None
@@ -614,11 +740,26 @@ kamcmd htable.dump ipban
 kamcmd htable.listTables
 ...
 
+7.8.  htable.stats
+
+   Get statistics for hash tables - name, number of slots, number of
+   items, max number of items per slot, min number of items per slot.
+
+   Name: htable.stats
+
+   Parameters:
+     * None
+
+   Example:
+...
+kamcmd htable.stats
+...
+
 8. Event routes
 
    8.1. htable:mod-init
 
-8.1. htable:mod-init
+8.1.  htable:mod-init
 
    When defined, the module calls event_route[htable:mod-init] after all
    modules have been initialized. A typical use case is to initialise

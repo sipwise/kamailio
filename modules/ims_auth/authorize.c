@@ -47,6 +47,7 @@
 #include "../../ut.h"
 #include "../../str.h"
 #include "../../basex.h"
+#include "../../hashes.h"
 #include "../../lib/srdb1/db.h"
 #include "../../lib/srdb1/db_ut.h"
 #include "../../dprint.h"
@@ -85,6 +86,7 @@ extern int add_authinfo_hdr;
 extern int max_nonce_reuse;
 extern str scscf_name_str;
 extern int ignore_failed_auth;
+extern int av_check_only_impu;
 
 auth_hash_slot_t *auth_data; /**< Authentication vector hash table */
 extern int auth_data_hash_size; /**< authentication vector hash table size */
@@ -268,22 +270,38 @@ int proxy_authenticate(struct sip_msg* _m, char* _realm, char* _table) {
     return digest_authenticate(_m, &srealm, &stable, HDR_PROXYAUTH_T);
 }
  */
-int challenge(struct sip_msg* msg, char* str1, char* str2, int is_proxy_auth) {
+int challenge(struct sip_msg* msg, char* str1, char* str2, int is_proxy_auth, char *route) {
 
     str realm = {0, 0};
     unsigned int aud_hash;
     str private_identity, public_identity, auts = {0, 0}, nonce = {0, 0};
     auth_vector *av = 0;
     int algo_type;
+    
+    str route_name;
 
     saved_transaction_t* saved_t;
     tm_cell_t *t = 0;
     cfg_action_t* cfg_action;
 
-    mar_param_t* ap = (mar_param_t*) str1;
-    cfg_action = ap->paction->next;
+    if (fixup_get_svalue(msg, (gparam_t*) route, &route_name) != 0) {
+        LM_ERR("no async route block for assign_server_unreg\n");
+        return -1;
+    }
+    
+    LM_DBG("Looking for route block [%.*s]\n", route_name.len, route_name.s);
+    int ri = route_get(&main_rt, route_name.s);
+    if (ri < 0) {
+        LM_ERR("unable to find route block [%.*s]\n", route_name.len, route_name.s);
+        return -1;
+    }
+    cfg_action = main_rt.rlist[ri];
+    if (cfg_action == NULL) {
+        LM_ERR("empty action lists in route block [%.*s]\n", route_name.len, route_name.s);
+        return -1;
+    }
 
-    if (get_str_fparam(&realm, msg, (fparam_t*) ap->param) < 0) {
+    if (get_str_fparam(&realm, msg, (fparam_t*) str1) < 0) {
         LM_ERR("failed to get realm value\n");
         return CSCF_RETURN_ERROR;
     }
@@ -453,12 +471,12 @@ int challenge(struct sip_msg* msg, char* str1, char* str2, int is_proxy_auth) {
     return CSCF_RETURN_BREAK;
 }
 
-int www_challenge(struct sip_msg* msg, char* str1, char* str2) {
-    return challenge(msg, str1, str2, 0);
+int www_challenge(struct sip_msg* msg, char* _route, char* str1, char* str2) {
+    return challenge(msg, str1, str2, 0, _route);
 }
 
-int proxy_challenge(struct sip_msg* msg, char* str1, char* str2) {
-    return challenge(msg, str1, str2, 1);
+int proxy_challenge(struct sip_msg* msg, char* _route, char* str1, char* str2) {
+    return challenge(msg, str1, str2, 1, _route);
 }
 
 /**
@@ -648,7 +666,7 @@ int authenticate(struct sip_msg* msg, char* _realm, char* str2, int is_proxy_aut
         LM_ERR("no matching auth vector found - maybe timer expired\n");
 
         if (ignore_failed_auth) {
-            LM_WARN("NB: Ignoring all failed auth - check your config if you dont expect this\n");
+            LM_WARN("NB: Ignoring all failed auth - check your config if you don't expect this\n");
             ret = AUTH_OK;
         }
 
@@ -783,7 +801,7 @@ int authenticate(struct sip_msg* msg, char* _realm, char* str2, int is_proxy_aut
     }
 
     if (ignore_failed_auth) {
-        LM_WARN("NB: Ignoring all failed auth - check your config if you dont expect this\n");
+        LM_WARN("NB: Ignoring all failed auth - check your config if you don't expect this\n");
         ret = AUTH_OK;
     }
 
@@ -1162,6 +1180,12 @@ void free_auth_userdata(auth_userdata * aud) {
  * @returns the hash % Auth_data->size
  */
 inline unsigned int get_hash_auth(str private_identity, str public_identity) {
+if (av_check_only_impu)
+	return core_hash(&public_identity, 0, auth_data_hash_size);
+else
+	return core_hash(&public_identity, 0, auth_data_hash_size);
+/*
+
 
 #define h_inc h+=v^(v>>3)
     char* p;
@@ -1192,6 +1216,7 @@ inline unsigned int get_hash_auth(str private_identity, str public_identity) {
     h = ((h)+(h >> 11))+((h >> 13)+(h >> 23));
     return (h) % auth_data_hash_size;
 #undef h_inc
+*/
 }
 
 /**
@@ -1209,13 +1234,29 @@ auth_userdata * get_auth_userdata(str private_identity, str public_identity) {
     hash = get_hash_auth(private_identity, public_identity);
     auth_data_lock(hash);
     aud = auth_data[hash].head;
+    if (av_check_only_impu)
+      LM_DBG("Searching auth_userdata for IMPU %.*s (Hash %d)\n", public_identity.len, public_identity.s, hash);
+    else
+      LM_DBG("Searching auth_userdata for IMPU %.*s / IMPI %.*s (Hash %d)\n", public_identity.len, public_identity.s,
+        private_identity.len, private_identity.s, hash);
+
     while (aud) {
-        if (aud->private_identity.len == private_identity.len &&
-                aud->public_identity.len == public_identity.len &&
-                memcmp(aud->private_identity.s, private_identity.s, private_identity.len) == 0 &&
-                memcmp(aud->public_identity.s, public_identity.s, public_identity.len) == 0) {
-            return aud;
-        }
+	if (av_check_only_impu) {
+		if (aud->public_identity.len == public_identity.len &&
+		        memcmp(aud->public_identity.s, public_identity.s, public_identity.len) == 0) {
+                    LM_DBG("Found auth_userdata\n");
+		    return aud;
+		}
+	} else {
+		if (aud->private_identity.len == private_identity.len &&
+		        aud->public_identity.len == public_identity.len &&
+		        memcmp(aud->private_identity.s, private_identity.s, private_identity.len) == 0 &&
+		        memcmp(aud->public_identity.s, public_identity.s, public_identity.len) == 0) {
+                    LM_DBG("Found auth_userdata\n");
+		    return aud;
+		}
+	}
+
         aud = aud->next;
     }
     /* if we get here, there is no auth_userdata for this user */
@@ -1407,6 +1448,11 @@ int add_auth_vector(str private_identity, str public_identity, auth_vector * av)
     auth_userdata *aud;
     aud = get_auth_userdata(private_identity, public_identity);
     if (!aud) goto error;
+
+     LM_DBG("Adding auth_vector (status %d) for IMPU %.*s / IMPI %.*s (Hash %d)\n", av->status,
+	public_identity.len, public_identity.s,
+        private_identity.len, private_identity.s, aud->hash);
+
 
     av->prev = aud->tail;
     av->next = 0;

@@ -4,7 +4,7 @@ Peter Dunkley
 
    Crocodile RCS Ltd
 
-   Copyright © 2012 Crocodile RCS Ltd
+   Copyright © 2012-2013 Crocodile RCS Ltd
      __________________________________________________________________
 
    Table of Contents
@@ -31,10 +31,12 @@ Peter Dunkley
               4.4. keepalive_interval (integer)
               4.5. ping_application_data (string)
               4.6. sub_protocols (integer)
+              4.7. cors_mode (integer)
 
         5. Functions
 
               5.1. ws_handle_handshake()
+              5.2. ws_close([status, reason[, connection_id]])
 
         6. MI Commands
 
@@ -59,7 +61,10 @@ Peter Dunkley
    1.6. Set keepalive_interval parameter
    1.7. Set ping_application_data parameter
    1.8. Set sub_protocols parameter
-   1.9. ws_handle_handshake usage
+   1.9. Set cors_mode parameter
+   1.10. ws_handle_handshake usage
+   1.11. ws_close usage
+   1.12. event_route[websocket:closed] usage
 
 Chapter 1. Admin Guide
 
@@ -85,10 +90,12 @@ Chapter 1. Admin Guide
         4.4. keepalive_interval (integer)
         4.5. ping_application_data (string)
         4.6. sub_protocols (integer)
+        4.7. cors_mode (integer)
 
    5. Functions
 
         5.1. ws_handle_handshake()
+        5.2. ws_close([status, reason[, connection_id]])
 
    6. MI Commands
 
@@ -294,8 +301,7 @@ onreply_route[WS_REPLY] {
      * sl.
 
    The following modules are required to make proper use of this module:
-     * nathelper.
-     * tm.
+     * nathelper or outbound.
      * xhttp.
 
    The following module is required to use the secure WebSocket (wss)
@@ -320,6 +326,7 @@ onreply_route[WS_REPLY] {
    4.4. keepalive_interval (integer)
    4.5. ping_application_data (string)
    4.6. sub_protocols (integer)
+   4.7. cors_mode (integer)
 
 4.1. keepalive_mechanism (integer)
 
@@ -404,9 +411,30 @@ modparam("websocket", "ping_application_data", "WebSockets rock")
 modparam("websocket", "sub_protocols", 2)
 ...
 
+4.7. cors_mode (integer)
+
+   This parameter lets you set the "Cross-origin resource sharing"
+   behaviour of the WebSocket server.
+     * 0 - Do not add an "Access-Control-Allow-Origin:" header to the
+       response accepting the WebSocket handshake.
+     * 1 - Add a "Access-Control-Allow-Origin: *" header to the response
+       accepting the WebSocket handshake.
+     * 2 - Add a "Access-Control-Allow-Origin:" header containing the same
+       body as the "Origin:" header from the request to the response
+       accepting the WebSocket handshake. If there is no "Origin:" header
+       in the request no header will be added to the response.
+
+   Default value is 0.
+
+   Example 1.9. Set cors_mode parameter
+...
+modparam("websocket", "cors_mode", 2)
+...
+
 5. Functions
 
    5.1. ws_handle_handshake()
+   5.2. ws_close([status, reason[, connection_id]])
 
 5.1.  ws_handle_handshake()
 
@@ -422,9 +450,34 @@ Note
    This function returns 0, stopping all further processing of the
    request, when there is a problem.
 
-   Example 1.9. ws_handle_handshake usage
+   Example 1.10. ws_handle_handshake usage
 ...
 ws_handle_handshake();
+...
+
+5.2.  ws_close([status, reason[, connection_id]])
+
+   This function closes a WebSocket connection.
+
+   The function returns -1 if there is an error and 1 if it succeeds.
+
+   The meaning of the parameters is as follows:
+     * status - an integer indicating the reason for closure.
+     * reason - a string describing the reason for closure.
+     * connection_id - the connection to close. If not specified the
+       connection the current message arrived on will be closed.
+
+Note
+
+   status and reason values SHOULD correspond to the definitions in
+   section 7.4 of RFC 6455. If these parameters are not used the defaults
+   of "1000" and "Normal closure" will be used.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.11. ws_close usage
+...
+ws_close(4000, "Because I say so");
 ...
 
 6. MI Commands
@@ -533,6 +586,8 @@ Note
    When defined, the module calls event_route[websocket:closed] when a
    connection closes. The connection may be identified using the the $si
    and $sp pseudo-variables.
+
+   Example 1.12. event_route[websocket:closed] usage
 ...
 event_route[websocket:closed] {
         xlog("L_INFO", "WebSocket connection from $si:$sp has closed\n");

@@ -223,6 +223,38 @@ int dlg_ka_run(ticks_t ti)
 	return 0;
 }
 
+/**
+ * clean old unconfirmed dialogs
+ *
+ */
+int dlg_clean_run(ticks_t ti)
+{
+	unsigned int i;
+	unsigned int tm;
+	dlg_cell_t *dlg;
+	dlg_cell_t *tdlg;
+
+	tm = (unsigned int)time(NULL);
+	for(i=0; i<d_table->size; i++)
+	{
+		lock_set_get(d_table->locks, d_table->entries[i].lock_idx);
+		dlg = d_table->entries[i].first;
+		while (dlg) {
+			tdlg = dlg;
+			dlg = dlg->next;
+			if(tdlg->state==DLG_STATE_UNCONFIRMED && tdlg->init_ts<tm-300) {
+				/* dialog in early state older than 5min */
+				LM_NOTICE("dialog in early state is too old (%p ref %d)\n",
+						tdlg, tdlg->ref);
+				unlink_unsafe_dlg(&d_table->entries[i], tdlg);
+				destroy_dlg(tdlg);
+			}
+		}
+		lock_set_release(d_table->locks, d_table->entries[i].lock_idx);
+	}
+	return 0;
+}
+
 /*!
  * \brief Initialize the global dialog table
  * \param size size of the table
@@ -434,6 +466,7 @@ struct dlg_cell* build_new_dlg( str *callid, str *from_uri, str *to_uri,
 
 	memset( dlg, 0, len);
 	dlg->state = DLG_STATE_UNCONFIRMED;
+	dlg->init_ts = (unsigned int)time(NULL);
 
 	dlg->h_entry = core_hash( callid, 0, d_table->size);
 	LM_DBG("new dialog on hash %u\n",dlg->h_entry);
@@ -484,18 +517,24 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 					str *cseq, unsigned int leg)
 {
 	char *p;
+	str cs = {"0", 1};
+
+	/* if we don't have cseq, set it to 0 */
+	if(cseq->len>0) {
+		cs = *cseq;
+	}
 
 	if(dlg->tag[leg].s)
 		shm_free(dlg->tag[leg].s);
 	dlg->tag[leg].s = (char*)shm_malloc( tag->len + rr->len + contact->len );
 
 	if(dlg->cseq[leg].s) {
-		if (dlg->cseq[leg].len < cseq->len) {
+		if (dlg->cseq[leg].len < cs.len) {
 			shm_free(dlg->cseq[leg].s);
-			dlg->cseq[leg].s = (char*)shm_malloc(cseq->len);
+			dlg->cseq[leg].s = (char*)shm_malloc(cs.len);
 		}
 	} else {
-		dlg->cseq[leg].s = (char*)shm_malloc( cseq->len );
+		dlg->cseq[leg].s = (char*)shm_malloc( cs.len );
 	}
 
 	if ( dlg->tag[leg].s==NULL || dlg->cseq[leg].s==NULL) {
@@ -531,8 +570,8 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 	}
 
 	/* cseq */
-	dlg->cseq[leg].len = cseq->len;
-	memcpy( dlg->cseq[leg].s, cseq->s, cseq->len);
+	dlg->cseq[leg].len = cs.len;
+	memcpy( dlg->cseq[leg].s, cs.s, cs.len);
 
 	return 0;
 }

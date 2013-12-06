@@ -725,35 +725,27 @@ modparam("registrar", "gruu_enabled", 0)
 	<section>
 		<title><varname>outbound_mode</varname> (integer)</title>
 		<para>
-		If set to 0 then this module will accept REGISTER requests
-		that do not contain a Supported: header with the outbound
-		options-tag. The 200 OK response to REGISTER requests that this
-		module generates will not contain Require: or Supported: headers
-		with the outbound options tag.
+		If set to 0 this module will accept REGISTER requests that do
+		not contain a Supported: header with the outbound options-tag.
+		The 200 OK response to REGISTER requests that this module
+		generates will not contain Require: or Supported: headers with
+		the outbound options-tag. If the client has a Require: header
+		with the outbound options tag the REGISTER will be rejected
+		with a 420 Bad Extension response.
 		</para>
 		<para>
-                If set to 1 this module will accept REGISTER requests that do
-		not contain a Supported: header with the outbound options-tag
-		and REGISTER requests that do contain a Supported: or a
-		Requires: header with the outbound options-tag.  The 200 OK
-		response that this module generates, will contain a Supported:
-		header with the outbound options tag.  The 200 OK response
-		will also contain a Require: header with the outbound options
-		tag if the REGISTER request contained a Supported:
-		header with the outbound options-tag.
+		If set to 1 this module will accept REGISTER requests that
+		do not contain a Supported: header with the outbound
+		options-tag and REGISTER requests that do contain a Supported:
+		or Requires: header with the outbound options-tag. When the
+		client supports outbound the appropriate RFC5626 procedures
+		will be followed.
 		</para>
 		<para>
-		If set to 2 then this module will reject REGISTER requests
-		that do not contain a Supported: header with the outbound
-		options-tag. The 200 OK response to REGISTER requests that this
-		module generates will contain Require: and Supported: headers
-		with the outbound options tag.
-		</para>
-		<para>
-		Set this parameter to 2 if you are using SIP Outbound (RFC
-		5626) and want your Edge Proxy to insert a Flow-Timer: header
-		into the 200 OK response to REGISTERs (as per RFC 5626 section
-		5.4).
+		If set to 2 this module will reject REGISTER requests that
+		do not contain a Supported: header with the outbound
+		options-tag. When the client supports outbound the appropriate
+		RFC5626 procedures will be followed.
 		</para>
 		<para>
 		<emphasis>
@@ -771,6 +763,33 @@ modparam("registrar", "outbound_mode", 2)
 	</section>
 
 	<section>
+		<title><varname>regid_mode</varname> (integer)</title>
+		<para>
+		If set to 0 this module will ignore regid contact param
+		when saving REGISTER request if REGISTER request does not
+		indicate support for outbound.
+		</para>
+		<para>
+		If set to 1 this module will use regid contact param
+		(if present) when saving REGISTER request even if 
+		REGISTER request does not indicate support for outbound.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>regid_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "regid_mode", 1)
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section>
 		<title><varname>flow_timer</varname> (integer)</title>
 		<para>
 		If set to 0 then this module will not add a Flow-Timer: header
@@ -780,7 +799,7 @@ modparam("registrar", "outbound_mode", 2)
 		If set to > 0 then this module will add a Flow-Timer: header
 		containing this value to 200 OK responses to REGISTER requests.
 		This parameter may only be set to a value > 0 when
-		<emphasis>outbound_mode</emphasis> is set to 2.
+		<emphasis>outbound_mode</emphasis> is set to 1 or 2.
 		</para>
 		<para>
 		When set to a value > 0 this parameter should be set to slightly
@@ -788,13 +807,14 @@ modparam("registrar", "outbound_mode", 2)
 		network (this corresponds to the core
 		<emphasis>tcp_connection_lifetime</emphasis> option and
 		<emphasis>websocket</emphasis>
-		<emphasis>keepalive_timeout</emphasis> modparam). This parameter
-		is most useful when you have a single edge proxy/registrar. If
-		you are using a separate SIP Outbound Edge Proxy you should
+		<emphasis>keepalive_timeout</emphasis> modparam). This
+		parameter is most useful when you have a single edge
+		proxy/registrar or if you have an edge proxy that cannot modify
+		responses. If you are using a separate edge proxy you should
 		consider leaving this parameter set to 0 and adding the
-		Flow-Timer: header on the Edge Proxy (as this allows you to
+		Flow-Timer: header on the edge proxy as this allows you to
 		keep all of the timer values for a specific flow in one
-		configuration - that of the Edge Proxy).
+		configuration.
 		</para>
 		<para>
 		<emphasis>
@@ -892,7 +912,7 @@ modparam("registrar", "flow_timer", 25)
 		</listitem>
 		</itemizedlist>
 		<para>
-		This function can be used from REQUEST_ROUTE and REPLY_ROUTE.
+		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE and REPLY_ROUTE.
 		</para>
 		<example>
 		<title><function>save</function> usage</title>
@@ -1085,10 +1105,14 @@ add_sock_hdr("Sock-Info");
 	</section>
 	<section>
 		<title>
-		<function moreinfo="none">unregister(domain, uri)</function>
+		<function moreinfo="none">unregister(domain, uri[, ruid])</function>
 		</title>
 		<para>
-		The function remove all the contact associated to 'uri'.
+		The function removes contacts associated with 'uri'. If 'ruid' is
+		provided a specific contact is removed, if 'ruid' is not provided
+		all contacts are removed.  If 'ruid' is provided and usrloc is
+		using db_mode=3, 'uri' does not need to be given and can be
+		empty string.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -1105,6 +1129,13 @@ add_sock_hdr("Sock-Info");
 			pseudo-variables that are evaluated at runtime.
 			</para>
 		</listitem>
+		<listitem>
+			<para>
+			<emphasis>ruid</emphasis> - The record unique ID for a
+			a specific contact to be removed. It can contain
+			pseudo-variables that are evaluated at runtime.
+			</para>
+		</listitem>
 		</itemizedlist>
 		<para>
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
@@ -1115,6 +1146,8 @@ add_sock_hdr("Sock-Info");
 ...
 unregister("location", "$ru");
 unregister("location", "sip:user@kamailio.org");
+unregister("location", "$ru", "$ulc(caller=>ruid)");
+unregister("location", "", "$ruid");
 ...
 </programlisting>
 		</example>
@@ -1282,11 +1315,7 @@ event_route[usrloc:contact-expired] {
 				<listitem>
 				<para><emphasis>aorhash</emphasis> - hash id for the record
 				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>count</emphasis> - number of contacts
-				</para>
-				</listitem>	  
+				</listitem>
 				<listitem>
 				<para><emphasis>addr</emphasis> - contact address
 				</para>
@@ -1312,6 +1341,10 @@ event_route[usrloc:contact-expired] {
 				</para>
 				</listitem>	  
 				<listitem>
+				<para><emphasis>cseq</emphasis> - the cseq value
+				</para>
+				</listitem>	  
+				<listitem>
 				<para><emphasis>flags</emphasis> - flags value
 				</para>
 				</listitem>	  
@@ -1333,6 +1366,22 @@ event_route[usrloc:contact-expired] {
 				</listitem>	  
 				<listitem>
 				<para><emphasis>methods</emphasis> - methods value
+				</para>
+				</listitem>	  
+				<listitem>
+				<para><emphasis>count</emphasis> - number of contacts
+				</para>
+				</listitem>	  
+				<listitem>
+				<para><emphasis>ruid</emphasis> - record unique ID
+				</para>
+				</listitem>	  
+				<listitem>
+				<para><emphasis>reg-id</emphasis> - reg-id value
+				</para>
+				</listitem>	  
+				<listitem>
+				<para><emphasis>instance</emphasis> - instance value
 				</para>
 				</listitem>	  
 			</itemizedlist>

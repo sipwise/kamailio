@@ -123,6 +123,9 @@ static pv_export_t mod_pvs[] = {
 	{ {"T_branch_idx", sizeof("T_branch_idx")-1}, PVT_OTHER,
 		pv_get_tm_branch_idx, 0,
 		 0, 0, 0, 0 },
+	{ {"T_reply_ruid", sizeof("T_reply_ruid")-1}, PVT_OTHER,
+		pv_get_tm_reply_ruid, 0,
+		 0, 0, 0, 0 },
 	{ {"T_reply_code", sizeof("T_reply_code")-1}, PVT_OTHER,
 		pv_get_tm_reply_code, 0,
 		 0, 0, 0, 0 },
@@ -331,6 +334,8 @@ static int fixup_cancel_callid(void** param, int param_no)
 static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *flag)
 {
 	struct cell *trans;
+	struct cell *bkt;
+	int bkb;
 	struct cancel_info cancel_data;
 	str cseq_s;
 	str callid_s;
@@ -356,6 +361,8 @@ static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *fla
 		return -1;
 	}
 
+	bkt = _tmx_tmb.t_gett();
+	bkb = _tmx_tmb.t_gett_branch();
 	if( _tmx_tmb.t_lookup_callid(&trans, callid_s, cseq_s) < 0 ) {
 		DBG("Lookup failed - no transaction\n");
 		return -1;
@@ -370,6 +377,7 @@ static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *fla
 	_tmx_tmb.cancel_uacs(trans, &cancel_data, 0);
 
 	//_tmx_tmb.unref_cell(trans);
+	_tmx_tmb.t_sett(bkt, bkb);
 
 	return 1;
 }

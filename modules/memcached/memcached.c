@@ -1,7 +1,6 @@
 /*
- * $Id$
- *
- * Copyright (C) 2009 Henning Westerholt
+ * Copyright (C) 2009, 2013 Henning Westerholt
+ * Copyright (C) 2013 Charles Chance, sipcentric.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -37,23 +36,20 @@
 MODULE_VERSION
 
 
-#define DP_ALERT_TEXT    "ALERT:"
-#define DP_ERR_TEXT      "ERROR:"
-#define DP_WARN_TEXT     "WARNING:"
-#define DP_NOTICE_TEXT   "NOTICE:"
-#define DP_INFO_TEXT     "INFO:"
-
-
 /*! server string */
-char* memcached_srv_str = "localhost:11211";
-/*! cache expire time in seconds */
-unsigned int memcached_expire = 10800;
+char* mcd_srv_str = "localhost:11211";
+/*! cache (default) expire time in seconds */
+unsigned int mcd_expire = 0;
 /*! cache storage mode, set or add */
-unsigned int memcached_mode = 0;
+unsigned int mcd_mode = 0;
 /*! server timeout in ms*/
-int memcached_timeout = 5000;
+unsigned int mcd_timeout = 5000;
+/*! Internal or system memory manager, default is system */
+unsigned int mcd_memory = 0;
 /*! memcached handle */
-struct memcache* memcached_h = NULL;
+struct memcached_st *memcached_h;
+/*! memcached server list */
+struct memcached_server_st *servers;
 
 
 static int mod_init(void);
@@ -81,10 +77,11 @@ static pv_export_t mod_pvs[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"servers", STR_PARAM, &memcached_srv_str },
-	{"expire",   INT_PARAM, &memcached_expire },
-	{"timeout", INT_PARAM, &memcached_timeout },
-	{"mode",    INT_PARAM, &memcached_mode },
+	{"servers", STR_PARAM, &mcd_srv_str },
+	{"expire",  INT_PARAM, &mcd_expire },
+	{"timeout", INT_PARAM, &mcd_timeout },
+	{"mode",    INT_PARAM, &mcd_mode },
+	{"memory",  INT_PARAM, &mcd_memory },
 	{0, 0, 0}
 };
 
@@ -109,95 +106,121 @@ struct module_exports exports = {
 
 
 /*!
- * \brief Wrapper functions around our internal memory management
+ * \brief Wrapper functions around our internal memory management for libmemcached (version >= 0.38) callback
  * \param mem freed memory
+ * \note pkg_free does not allow NULL pointer as standard free, therefore we check it here
  * \see pkg_free
  */
-static inline void memcached_free(void *mem) {
-	pkg_free(mem);
+static inline void mcd_free(memcached_st *ptr, void *mem, void *context) {
+        if (mem)
+        	pkg_free(mem);
+}
+
+/*!
+ * \brief Wrapper functions around our internal memory management for libmemcached (version < 0.38) callback
+ * \param mem freed memory
+ * \note pkg_free does not allow NULL pointer as standard free, therefore we check it here
+ * \see pkg_free
+ */
+ static inline void mcd_free_compat(memcached_st *ptr, void *mem) {
+        if (mem)
+                pkg_free(mem);
 }
 
 
 /*!
- * \brief Wrapper functions around our internal memory management
+ * \brief Wrapper functions around our internal memory management for libmemcached (version >= 0.38) callback
  * \param size allocated size
  * \return allocated memory, or NULL on failure
  * \see pkg_malloc
  */
-static inline void* memcached_malloc(const size_t size) {
+static inline void* mcd_malloc(memcached_st *ptr, const size_t size, void *context) {
 	return pkg_malloc(size);
+}
+
+/*!
+ * \brief Wrapper functions around our internal memory management for libmemcached (version < 0.38) callback
+ * \param size allocated size
+ * \return allocated memory, or NULL on failure
+ * \see pkg_malloc
+ */
+ static inline void* mcd_malloc_compat(memcached_st *ptr, const size_t size) {
+        return pkg_malloc(size);
 }
 
 
 /*!
- * \brief Wrapper functions around our internal memory management
+ * \brief Wrapper functions around our internal memory management for libmemcached (version >= 0.38) callback
  * \param mem pointer to allocated memory
  * \param size new size of memory area
  * \return allocated memory, or NULL on failure
  * \see pkg_realloc
  */
-static inline void* memcached_realloc(void *mem, const size_t size) {
+static inline void* mcd_realloc(memcached_st *ptr, void *mem, const size_t size, void *context) {
  	return pkg_realloc(mem, size);
+}
+
+/*!
+ * \brief Wrapper functions around our internal memory management for libmemcached (version < 0.38) callback
+ * \param mem pointer to allocated memory
+ * \param size new size of memory area
+ * \return allocated memory, or NULL on failure
+ * \see pkg_realloc
+ */
+static inline void* mcd_realloc_compat(memcached_st *ptr, void *mem, const size_t size) {
+        return pkg_realloc(mem, size);
 }
 
 
 /*!
- * \brief Small wrapper around our internal logging function
+ * \brief Wrapper functions around our internal memory management for libmemcached (version >= 0.38) callback
+ * \param mem pointer to allocated memory
+ * \param size new size of memory area
+ * \return allocated memory, or NULL on failure
+ * \see pkg_malloc
+ * \todo this is not optimal, 	use internal calloc implemention which is not exported yet
  */
-static int memcache_err_func(MCM_ERR_FUNC_ARGS) {
-
-	const struct memcache_ctxt *ctxt;
-	struct memcache_err_ctxt *ectxt;
-	int error_level;
-	const char * error_str;
-
-	MCM_ERR_INIT_CTXT(ctxt, ectxt);
-
-	switch (ectxt->severity) {
-		case MCM_ERR_LVL_INFO:
-			error_level = L_INFO;
-			error_str = DP_INFO_TEXT;
-			break;
-		case MCM_ERR_LVL_NOTICE:
-			error_level = L_NOTICE;
-			error_str = DP_NOTICE_TEXT;
-			break;
-		case MCM_ERR_LVL_WARN:
-			error_level = L_WARN;
-			error_str = DP_WARN_TEXT;
-			break;
-		case MCM_ERR_LVL_ERR:
-			error_level = L_ERR;
-			error_str  = DP_ERR_TEXT;
-			/* try to continue */
- 			ectxt->cont = 'y';
-			break;
-		case MCM_ERR_LVL_FATAL:
-  		default:
-			error_level = L_ALERT;
-			error_str = DP_ALERT_TEXT;
-			ectxt->cont = 'y';
-			break;
+static inline void * mcd_calloc(memcached_st *ptr, size_t nelem, const size_t elsize, void *context) {
+	void* tmp = NULL;
+	tmp = pkg_malloc(nelem * elsize);
+	if (tmp != NULL) {
+		memset(tmp, 0, nelem * elsize);
 	}
-
-	/*
-	* ectxt->errmsg - per error message passed along via one of the MCM_*_MSG() macros (optional)
-	* ectxt->errstr - memcache error string (optional, though almost always set)
-	*/
-	if (ectxt->errstr != NULL && ectxt->errmsg != NULL)
-		LM_GEN1(error_level, "%s memcached: %s():%u: %s: %.*s\n", error_str, ectxt->funcname, ectxt->lineno, ectxt->errstr,
-			(int)ectxt->errlen, ectxt->errmsg);
-	else if (ectxt->errstr == NULL && ectxt->errmsg != NULL)
-		LM_GEN1(error_level, "%s memcached: %s():%u: %.*s\n", error_str, ectxt->funcname, ectxt->lineno, (int)ectxt->errlen,
-			ectxt->errmsg);
-	else if (ectxt->errstr != NULL && ectxt->errmsg == NULL)
-		LM_GEN1(error_level, "%s memcached: %s():%u: %s\n", error_str, ectxt->funcname, ectxt->lineno, ectxt->errstr);
-	else
-		LM_GEN1(error_level, "%s memcached: %s():%u\n", error_str, ectxt->funcname, ectxt->lineno);
-
-	return 0;
+	return tmp;
 }
 
+/*!
+ * \brief Wrapper functions around our internal memory management for libmemcached (version < 0.38) callback
+ * \param mem pointer to allocated memory
+ * \param size new size of memory area
+ * \return allocated memory, or NULL on failure
+ * \see pkg_malloc
+ * \todo this is not optimal, 	use internal calloc implemention which is not exported yet
+ */
+static inline void * mcd_calloc_compat(memcached_st *ptr, size_t nelem, const size_t elsize) {
+        void* tmp = NULL;
+        tmp = pkg_malloc(nelem * elsize);
+        if (tmp != NULL) {
+                memset(tmp, 0, nelem * elsize);
+        }
+        return tmp;
+}
+
+
+/**
+ * \brief Callback to check if we could connect successfully to a server
+ * \param ptr memcached handler
+ * \param server server instance
+ * \param context context for callback
+ * \return MEMCACHED_SUCCESS on success, MEMCACHED_CONNECTION_FAILURE on failure
+ * \todo FIXME
+static inline memcached_server_fn mcd_check_connection(const memcached_st *ptr, memcached_server_instance_st my_server, void *context) {
+	if (my_server->fd < 0) {
+		return MEMCACHED_CONNECTION_FAILURE;
+	}
+	return MEMCACHED_SUCCESS;
+}
+*/
 
 /*!
  * \brief Module initialization function
@@ -206,58 +229,77 @@ static int memcache_err_func(MCM_ERR_FUNC_ARGS) {
 static int mod_init(void) {
 	char *server, *port;
 	unsigned int len = 0;
+	memcached_return rc;
 
-	/* setup the callbacks to our internal memory manager */
-	if (mcMemSetup(memcached_free, memcached_malloc,
-			memcached_malloc, memcached_realloc) != 0) {
-		LM_ERR("could not setup memory management callbacks\n");
-		return -1;
-	}
-
-	if (mcErrSetup(memcache_err_func) != 0) {
-		LM_ERR("could not setup error handler callback\n");
-		return -1;
-	}
-
-	/*! delete eventual log filters */
-	mc_err_filter_del(MCM_ERR_LVL_INFO);
-	mc_err_filter_del(MCM_ERR_LVL_NOTICE);
-
-	memcached_h = mc_new();
-	if (memcached_h == NULL) {
-		PKG_MEM_ERROR;
-		return -1;
-	}
-	
-	if ((port = strchr(memcached_srv_str, ':')) != NULL) {
+	if ((port = strchr(mcd_srv_str, ':')) != NULL) {
 		port = port + 1;
-		len = strlen(memcached_srv_str) - strlen(port) - 1;
+		len = strlen(mcd_srv_str) - strlen(port) - 1;
 	} else {
 		LM_DBG("no port definition, using default port\n");
 		port = "11211";
-		len = strlen(memcached_srv_str) ;
+		len = strlen(mcd_srv_str) ;
 	}
 	
-
 	server = pkg_malloc(len);
 	if (server == NULL) {
 		PKG_MEM_ERROR;
 		return -1;
 	}
 
-	strncpy(server, memcached_srv_str, len);
+	strncpy(server, mcd_srv_str, len);
 	server[len] = '\0';
 
-	mc_timeout(memcached_h, 0, memcached_timeout);
-
-	if (mc_server_add(memcached_h, server, port) != 0) {
-		LM_ERR("could not add server %s:%s\n", server, port);
+	memcached_h = memcached_create(NULL);
+	if (memcached_h == NULL) {
+		LM_ERR("could not create memcached structure\n");
 		return -1;
 	}
-	LM_INFO("connected to server %s:%s\n", server, port);
+	LM_DBG("allocated new server handle at %p", memcached_h);
+
+        if (mcd_memory == 1) {
+                LM_INFO("Use internal kamailio memory manager for memcached client library\n");
+
+#if LIBMEMCACHED_VERSION_HEX >= 0x00038000
+                rc = memcached_set_memory_allocators(memcached_h, (memcached_malloc_fn)mcd_malloc,
+                                             (memcached_free_fn)mcd_free, (memcached_realloc_fn)mcd_realloc,
+                                             (memcached_calloc_fn)mcd_calloc, NULL);
+#else
+                rc = memcached_set_memory_allocators(memcached_h, (memcached_malloc_function)mcd_malloc_compat,
+                                             (memcached_free_function)mcd_free_compat, (memcached_realloc_function)mcd_realloc_compat,
+                                             (memcached_calloc_function)mcd_calloc_compat);
+#endif
+
+		if (rc == MEMCACHED_SUCCESS) {
+			LM_DBG("memory manager callbacks set\n");
+		} else {
+			LM_ERR("memory manager callbacks not set, returned %s.\n", memcached_strerror(memcached_h, rc));
+			return -1;
+		}
+	} else {
+		LM_INFO("Use system memory manager for memcached client library\n");
+	}
+
+        servers = memcached_server_list_append(servers, server, atoi(port), &rc);
+	
+	if (memcached_behavior_set(memcached_h, MEMCACHED_BEHAVIOR_CONNECT_TIMEOUT, mcd_timeout) != MEMCACHED_SUCCESS) {
+		LM_ERR("could not set server connection timeout\n");
+		return -1;
+	}
+	rc = memcached_server_push(memcached_h, servers);
+	if (rc == MEMCACHED_SUCCESS) {
+		LM_DBG("added server list to structure\n");
+	} else {
+		LM_ERR("attempt to add server list to structure returned %s.\n", memcached_strerror(memcached_h, rc));
+		return -1;
+	}
+
 	pkg_free(server);
 
-	LM_INFO("memcached client version is %s, released on %d\n", mc_version(), mc_reldate());
+	/** \todo FIXME logic to handle connection errors on startup
+	memcached_server_cursor(memcached_h, (const memcached_server_fn*) &mcd_check_connection, NULL, 1);
+	*/
+	
+	LM_INFO("libmemcached version is %s\n", memcached_lib_version());
 	return 0;
 }
 
@@ -266,9 +308,10 @@ static int mod_init(void) {
  * \brief Module shutdown function
  */
 static void mod_destroy(void) {
-	if (memcached_h != NULL)
-		mc_server_disconnect_all(memcached_h);
-
-	if (memcached_h != NULL)
-		mc_free(memcached_h);
+	if (servers != NULL)
+		memcached_server_list_free(servers);
+	
+	/* Crash on shutdown with internal memory manager, even if we disable the mm callbacks */
+	if (mcd_memory != 1 && memcached_h != NULL)
+		        memcached_free(memcached_h);
 }

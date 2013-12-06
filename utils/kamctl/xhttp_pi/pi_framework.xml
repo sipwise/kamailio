@@ -42,6 +42,15 @@
 		<column><field>sip_reason</field><type>DB1_STR</type></column>
 		<column><field>time</field><type>DB1_DATETIME</type></column>
 	</db_table>
+	<!-- Declaration of acc_cdrs table-->
+	<db_table id="acc_cdrs">
+		<table_name>acc_cdrs</table_name>
+		<db_url_id>mysql</db_url_id>
+		<column><field>id</field><type>DB1_INT</type></column>
+		<column><field>start_time</field><type>DB1_STR</type></column>
+		<column><field>end_time</field><type>DB1_STR</type></column>
+		<column><field>duration</field><type>DB1_STR</type></column>
+	</db_table>
 	<!-- Declaration of missed_calls table-->
 	<db_table id="missed_calls">
 		<table_name>missed_calls</table_name>
@@ -212,17 +221,6 @@
 		<column><field>attrs</field><type>DB1_STR</type></column>
 		<column><field>description</field><type>DB1_STR</type></column>
 	</db_table>
-	<!-- Declaration of domainpolicy table-->
-	<db_table id="domainpolicy">
-		<table_name>domainpolicy</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>id</field><type>DB1_INT</type></column>
-		<column><field>rule</field><type>DB1_STR</type></column>
-		<column><field>type</field><type>DB1_STR</type></column>
-		<column><field>att</field><type>DB1_STR</type></column>
-		<column><field>val</field><type>DB1_STR</type></column>
-		<column><field>description</field><type>DB1_STR</type></column>
-	</db_table>
 	<!-- Declaration of domain table-->
 	<db_table id="domain">
 		<table_name>domain</table_name>
@@ -242,6 +240,17 @@
 		<column><field>type</field><type>DB1_INT</type></column>
 		<column><field>value</field><type>DB1_STR</type></column>
 		<column><field>last_modified</field><type>DB1_DATETIME</type></column>
+	</db_table>
+	<!-- Declaration of domainpolicy table-->
+	<db_table id="domainpolicy">
+		<table_name>domainpolicy</table_name>
+		<db_url_id>mysql</db_url_id>
+		<column><field>id</field><type>DB1_INT</type></column>
+		<column><field>rule</field><type>DB1_STR</type></column>
+		<column><field>type</field><type>DB1_STR</type></column>
+		<column><field>att</field><type>DB1_STR</type></column>
+		<column><field>val</field><type>DB1_STR</type></column>
+		<column><field>description</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of dr_gateways table-->
 	<db_table id="dr_gateways">
@@ -383,6 +392,29 @@
 		<column><field>first</field><type>DB1_INT</type></column>
 		<column><field>second</field><type>DB1_INT</type></column>
 		<column><field>res</field><type>DB1_INT</type></column>
+	</db_table>
+	<!-- Declaration of mohqcalls table-->
+	<db_table id="mohqcalls">
+		<table_name>mohqcalls</table_name>
+		<db_url_id>mysql</db_url_id>
+		<column><field>id</field><type>DB1_INT</type></column>
+		<column><field>mohq_id</field><type>DB1_INT</type></column>
+		<column><field>call_id</field><type>DB1_STR</type></column>
+		<column><field>call_status</field><type>DB1_INT</type></column>
+		<column><field>call_from</field><type>DB1_STR</type></column>
+		<column><field>call_contact</field><type>DB1_STR</type></column>
+		<column><field>call_time</field><type>DB1_DATETIME</type></column>
+	</db_table>
+	<!-- Declaration of mohqueues table-->
+	<db_table id="mohqueues">
+		<table_name>mohqueues</table_name>
+		<db_url_id>mysql</db_url_id>
+		<column><field>id</field><type>DB1_INT</type></column>
+		<column><field>name</field><type>DB1_STR</type></column>
+		<column><field>uri</field><type>DB1_STR</type></column>
+		<column><field>mohdir</field><type>DB1_STR</type></column>
+		<column><field>mohfile</field><type>DB1_STR</type></column>
+		<column><field>debug</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of silo table-->
 	<db_table id="silo">
@@ -629,6 +661,17 @@
 		<column><field>from_user</field><type>DB1_STR</type></column>
 		<column><field>from_domain</field><type>DB1_STR</type></column>
 		<column><field>updated</field><type>DB1_INT</type></column>
+	</db_table>
+	<!-- Declaration of rtpproxy table-->
+	<db_table id="rtpproxy">
+		<table_name>rtpproxy</table_name>
+		<db_url_id>mysql</db_url_id>
+		<column><field>id</field><type>DB1_INT</type></column>
+		<column><field>setid</field><type>DB1_STR</type></column>
+		<column><field>url</field><type>DB1_STR</type></column>
+		<column><field>flags</field><type>DB1_INT</type></column>
+		<column><field>weight</field><type>DB1_INT</type></column>
+		<column><field>description</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of sca_subscriptions table-->
 	<db_table id="sca_subscriptions">
@@ -932,6 +975,47 @@
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
 			<db_table_id>acc</db_table_id>
+			<cmd_type>DB1_DELETE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+		</cmd>
+	</mod>
+	<!-- acc_cdrs provisionning -->
+	<mod><mod_name>acc_cdrs</mod_name>
+		<cmd><cmd_name>show</cmd_name>
+			<db_table_id>acc_cdrs</db_table_id>
+			<cmd_type>DB1_QUERY</cmd_type>
+			<query_cols>
+				<col><field>id</field></col>
+				<col><field>start_time</field></col>
+				<col><field>end_time</field></col>
+				<col><field>duration</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>add</cmd_name>
+			<db_table_id>acc_cdrs</db_table_id>
+			<cmd_type>DB1_INSERT</cmd_type>
+			<query_cols>
+				<col><field>start_time</field></col>
+				<col><field>end_time</field></col>
+				<col><field>duration</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>update</cmd_name>
+			<db_table_id>acc_cdrs</db_table_id>
+			<cmd_type>DB1_UPDATE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+			<query_cols>
+				<col><field>start_time</field></col>
+				<col><field>end_time</field></col>
+				<col><field>duration</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>delete</cmd_name>
+			<db_table_id>acc_cdrs</db_table_id>
 			<cmd_type>DB1_DELETE</cmd_type>
 			<clause_cols>
 				<col><field>id</field><operator>=</operator></col>
@@ -2353,6 +2437,103 @@
 			</query_cols>
 		</cmd>
 	</mod>
+	<!-- mohqcalls provisionning -->
+	<mod><mod_name>mohqcalls</mod_name>
+		<cmd><cmd_name>show</cmd_name>
+			<db_table_id>mohqcalls</db_table_id>
+			<cmd_type>DB1_QUERY</cmd_type>
+			<query_cols>
+				<col><field>id</field></col>
+				<col><field>mohq_id</field></col>
+				<col><field>call_id</field></col>
+				<col><field>call_status</field></col>
+				<col><field>call_from</field></col>
+				<col><field>call_contact</field></col>
+				<col><field>call_time</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>add</cmd_name>
+			<db_table_id>mohqcalls</db_table_id>
+			<cmd_type>DB1_INSERT</cmd_type>
+			<query_cols>
+				<col><field>mohq_id</field></col>
+				<col><field>call_id</field></col>
+				<col><field>call_status</field></col>
+				<col><field>call_from</field></col>
+				<col><field>call_contact</field></col>
+				<col><field>call_time</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>update</cmd_name>
+			<db_table_id>mohqcalls</db_table_id>
+			<cmd_type>DB1_UPDATE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+			<query_cols>
+				<col><field>mohq_id</field></col>
+				<col><field>call_id</field></col>
+				<col><field>call_status</field></col>
+				<col><field>call_from</field></col>
+				<col><field>call_contact</field></col>
+				<col><field>call_time</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>delete</cmd_name>
+			<db_table_id>mohqcalls</db_table_id>
+			<cmd_type>DB1_DELETE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+		</cmd>
+	</mod>
+	<!-- mohqueues provisionning -->
+	<mod><mod_name>mohqueues</mod_name>
+		<cmd><cmd_name>show</cmd_name>
+			<db_table_id>mohqueues</db_table_id>
+			<cmd_type>DB1_QUERY</cmd_type>
+			<query_cols>
+				<col><field>id</field></col>
+				<col><field>name</field></col>
+				<col><field>uri</field></col>
+				<col><field>mohdir</field></col>
+				<col><field>mohfile</field></col>
+				<col><field>debug</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>add</cmd_name>
+			<db_table_id>mohqueues</db_table_id>
+			<cmd_type>DB1_INSERT</cmd_type>
+			<query_cols>
+				<col><field>name</field></col>
+				<col><field>uri</field></col>
+				<col><field>mohdir</field></col>
+				<col><field>mohfile</field></col>
+				<col><field>debug</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>update</cmd_name>
+			<db_table_id>mohqueues</db_table_id>
+			<cmd_type>DB1_UPDATE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+			<query_cols>
+				<col><field>name</field></col>
+				<col><field>uri</field></col>
+				<col><field>mohdir</field></col>
+				<col><field>mohfile</field></col>
+				<col><field>debug</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>delete</cmd_name>
+			<db_table_id>mohqueues</db_table_id>
+			<cmd_type>DB1_DELETE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+		</cmd>
+	</mod>
 	<!-- silo provisionning -->
 	<mod><mod_name>silo</mod_name>
 		<cmd><cmd_name>show</cmd_name>
@@ -3309,6 +3490,53 @@
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
 			<db_table_id>rls_watchers</db_table_id>
+			<cmd_type>DB1_DELETE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+		</cmd>
+	</mod>
+	<!-- rtpproxy provisionning -->
+	<mod><mod_name>rtpproxy</mod_name>
+		<cmd><cmd_name>show</cmd_name>
+			<db_table_id>rtpproxy</db_table_id>
+			<cmd_type>DB1_QUERY</cmd_type>
+			<query_cols>
+				<col><field>id</field></col>
+				<col><field>setid</field></col>
+				<col><field>url</field></col>
+				<col><field>flags</field></col>
+				<col><field>weight</field></col>
+				<col><field>description</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>add</cmd_name>
+			<db_table_id>rtpproxy</db_table_id>
+			<cmd_type>DB1_INSERT</cmd_type>
+			<query_cols>
+				<col><field>setid</field></col>
+				<col><field>url</field></col>
+				<col><field>flags</field></col>
+				<col><field>weight</field></col>
+				<col><field>description</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>update</cmd_name>
+			<db_table_id>rtpproxy</db_table_id>
+			<cmd_type>DB1_UPDATE</cmd_type>
+			<clause_cols>
+				<col><field>id</field><operator>=</operator></col>
+			</clause_cols>
+			<query_cols>
+				<col><field>setid</field></col>
+				<col><field>url</field></col>
+				<col><field>flags</field></col>
+				<col><field>weight</field></col>
+				<col><field>description</field></col>
+			</query_cols>
+		</cmd>
+		<cmd><cmd_name>delete</cmd_name>
+			<db_table_id>rtpproxy</db_table_id>
 			<cmd_type>DB1_DELETE</cmd_type>
 			<clause_cols>
 				<col><field>id</field><operator>=</operator></col>
