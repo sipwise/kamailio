@@ -64,6 +64,7 @@
 #include "globals.h"
 #include "rpc_lookup.h"
 #include "sr_compat.h"
+#include "ppcfg.h"
 
 #include <sys/stat.h>
 #include <regex.h>
@@ -118,6 +119,17 @@ struct sr_module* modules=0;
 
 int mod_response_cbk_no=0;
 response_function* mod_response_cbks=0;
+
+/* number of usec to wait before initializing a module */
+static unsigned int modinit_delay = 0;
+
+unsigned int set_modinit_delay(unsigned int v)
+{
+	unsigned int r;
+	r =  modinit_delay;
+	modinit_delay = v;
+	return r;
+}
 
 /**
  * if bit 1 set, SIP worker processes handle RPC commands as well
@@ -271,6 +283,7 @@ static int register_module(unsigned ver, union module_exports_u* e,
 {
 	int ret, i;
 	struct sr_module* mod;
+	char defmod[64];
 
 	ret=-1;
 
@@ -364,6 +377,20 @@ static int register_module(unsigned ver, union module_exports_u* e,
 			goto error;
 		}
 		/* i==0 => success */
+	}
+
+	/* add cfg define for each module: MOD_modulename */
+	if(strlen(mod->exports.name)>=60) {
+		LM_ERR("too long module name: %s\n", mod->exports.name);
+		goto error;
+	}
+	strcpy(defmod, "MOD_");
+	strcat(defmod, mod->exports.name);
+	pp_define_set_type(0);
+	if(pp_define(strlen(defmod), defmod)<0) {
+		LM_ERR("unable to set cfg define for module: %s\n",
+				mod->exports.name);
+		goto error;
 	}
 
 	/* link module in the list */
@@ -816,12 +843,16 @@ int init_modules(void)
 	struct sr_module* t;
 
 	for(t = modules; t; t = t->next) {
-		if (t->exports.init_f)
+		if (t->exports.init_f) {
 			if (t->exports.init_f() != 0) {
 				LOG(L_ERR, "init_modules(): Error while"
 						" initializing module %s\n", t->exports.name);
 				return -1;
 			}
+			/* delay next module init, if configured */
+			if(unlikely(modinit_delay>0))
+				sleep_us(modinit_delay);
+		}
 		if (t->exports.response_f)
 			mod_response_cbk_no++;
 	}

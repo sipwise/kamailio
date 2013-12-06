@@ -39,6 +39,7 @@
 #include "../../trim.h" 
 #include "../../pvapi.h"
 #include "../../dset.h"
+#include "../../basex.h"
 
 #include "../../parser/parse_param.h"
 #include "../../parser/parse_uri.h"
@@ -102,6 +103,82 @@ char *tr_set_crt_buffer(void)
 		strncpy(_tr_buffer, val->rs.s, val->rs.len); \
 		val->rs.s = _tr_buffer; \
 	} while(0);
+
+/* -- helper functions */
+
+/* Converts a hex character to its integer value */
+static char pv_from_hex(char ch)
+{
+	return isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10;
+}
+
+/* Converts an integer value to its hex character */
+static char pv_to_hex(char code)
+{
+	static char hex[] = "0123456789abcdef";
+	return hex[code & 15];
+}
+
+/*! \brief
+ *  URL Encodes a string for use in a HTTP query
+ */
+static int urlencode_param(str *sin, str *sout)
+{
+	char *at, *p;
+
+	at = sout->s;
+	p  = sin->s;
+
+	if (sin==NULL || sout==NULL || sin->s==NULL || sout->s==NULL ||
+			sin->len<0 || sout->len < 3*sin->len+1)
+		return -1;
+
+	while (p < sin->s+sin->len) {
+		if (isalnum(*p) || *p == '-' || *p == '_' || *p == '.' || *p == '~')
+			*at++ = *p;
+		else if (*p == ' ')
+			*at++ = '+';
+		else
+			*at++ = '%', *at++ = pv_to_hex(*p >> 4), *at++ = pv_to_hex(*p & 15);
+		p++;
+	}
+
+	*at = 0;
+	sout->len = at - sout->s;
+	LM_DBG("urlencoded string is <%s>\n", sout->s);
+
+	return 0;
+}
+
+/* URL Decode a string */
+static int urldecode_param(str *sin, str *sout) {
+	char *at, *p;
+
+	at = sout->s;
+	p  = sin->s;
+
+	while (p < sin->s+sin->len) {
+		if (*p == '%') {
+			if (p[1] && p[2]) {
+				*at++ = pv_from_hex(p[1]) << 4 | pv_from_hex(p[2]);
+				p += 2;
+			}
+		} else if (*p == '+') {
+			*at++ = ' ';
+		} else {
+			*at++ = *p;
+		}
+		p++;
+	}
+
+	*at = 0;
+	sout->len = at - sout->s;
+
+	LM_DBG("urldecoded string is <%s>\n", sout->s);
+	return 0;
+}
+
+/* -- transformations functions */
 
 /*!
  * \brief Evaluate string transformations
@@ -198,6 +275,32 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 					_tr_buffer[i] += val->rs.s[2*i+1]-'A'+10;
 				else return -1;
 			}
+			_tr_buffer[i] = '\0';
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.len = i;
+			break;
+		case TR_S_ENCODEBASE64:
+			if(!(val->flags&PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			i = base64_enc((unsigned char *) val->rs.s, val->rs.len,
+					(unsigned char *) _tr_buffer, TR_BUFFER_SIZE-1);
+			if (i < 0)
+				return -1;
+			_tr_buffer[i] = '\0';
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.len = i;
+			break;
+		case TR_S_DECODEBASE64:
+			if(!(val->flags&PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			i = base64_dec((unsigned char *) val->rs.s, val->rs.len,
+					(unsigned char *) _tr_buffer, TR_BUFFER_SIZE-1);
+			if (i < 0 || (i == 0 && val->rs.len > 0))
+				return -1;
 			_tr_buffer[i] = '\0';
 			memset(val, 0, sizeof(pv_value_t));
 			val->flags = PV_VAL_STR;
@@ -800,6 +903,34 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			val->rs.len = j;
 			break;
 
+		case TR_S_URLENCODEPARAM:
+			if(!(val->flags&PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			if(val->rs.len>TR_BUFFER_SIZE-1)
+				return -1;
+			st.s = _tr_buffer;
+			st.len = TR_BUFFER_SIZE;
+			if (urlencode_param(&val->rs, &st) < 0)
+				return -1;
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs = st;
+			break;
+
+		case TR_S_URLDECODEPARAM:
+			if(!(val->flags&PV_VAL_STR))
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			if(val->rs.len>TR_BUFFER_SIZE-1)
+				return -1;
+			st.s = _tr_buffer;
+			st.len = TR_BUFFER_SIZE;
+			if (urldecode_param(&val->rs, &st) < 0)
+				return -1;
+			memset(val, 0, sizeof(pv_value_t));
+			val->flags = PV_VAL_STR;
+			val->rs = st;
+			break;
+
 		default:
 			LM_ERR("unknown subtype %d\n",
 					subtype);
@@ -982,6 +1113,7 @@ done:
 
 static str _tr_params_str = {0, 0};
 static param_t* _tr_params_list = NULL;
+static char _tr_params_separator = ';';
 
 
 /*!
@@ -998,15 +1130,38 @@ int tr_eval_paramlist(struct sip_msg *msg, tr_param_t *tp, int subtype,
 	pv_value_t v;
 	str sv;
 	int n, i;
+	char separator = ';';
 	param_hooks_t phooks;
 	param_t *pit=NULL;
 
 	if(val==NULL || (!(val->flags&PV_VAL_STR)) || val->rs.len<=0)
 		return -1;
 
-	if(_tr_params_str.len==0 || _tr_params_str.len!=val->rs.len ||
-			strncmp(_tr_params_str.s, val->rs.s, val->rs.len)!=0)
+	if (tp != NULL)
 	{
+		if (subtype == TR_PL_COUNT)
+		{
+			if(tp->type != TR_PARAM_STRING || tp->v.s.len != 1)
+				return -1;
+
+				separator = tp->v.s.s[0];
+		}
+		else if (tp->next != NULL)
+		{
+			if(tp->next->type != TR_PARAM_STRING
+					|| tp->next->v.s.len != 1)
+				return -1;
+
+			separator = tp->next->v.s.s[0];
+		}
+	}
+
+	if(_tr_params_str.len==0 || _tr_params_str.len!=val->rs.len ||
+			strncmp(_tr_params_str.s, val->rs.s, val->rs.len)!=0 ||
+			_tr_params_separator != separator)
+	{
+		_tr_params_separator = separator;
+
 		if(val->rs.len>_tr_params_str.len)
 		{
 			if(_tr_params_str.s) pkg_free(_tr_params_str.s);
@@ -1036,7 +1191,8 @@ int tr_eval_paramlist(struct sip_msg *msg, tr_param_t *tp, int subtype,
 		
 		/* parse params */
 		sv = _tr_params_str;
-		if (parse_params(&sv, CLASS_ANY, &phooks, &_tr_params_list)<0)
+		if (parse_params2(&sv, CLASS_ANY, &phooks, &_tr_params_list,
+					_tr_params_separator)<0)
 			return -1;
 	}
 	
@@ -1764,6 +1920,12 @@ char* tr_parse_string(str* in, trans_t *t)
 	} else if(name.len==11 && strncasecmp(name.s, "decode.hexa", 11)==0) {
 		t->subtype = TR_S_DECODEHEXA;
 		goto done;
+	} else if(name.len==13 && strncasecmp(name.s, "encode.base64", 13)==0) {
+		t->subtype = TR_S_ENCODEBASE64;
+		goto done;
+	} else if(name.len==13 && strncasecmp(name.s, "decode.base64", 13)==0) {
+		t->subtype = TR_S_DECODEBASE64;
+		goto done;
 	} else if(name.len==13 && strncasecmp(name.s, "escape.common", 13)==0) {
 		t->subtype = TR_S_ESCAPECOMMON;
 		goto done;
@@ -2028,6 +2190,12 @@ char* tr_parse_string(str* in, trans_t *t)
 			goto error;
 		}
 		goto done;
+	} else if(name.len==15 && strncasecmp(name.s, "urlencode.param", 15)==0) {
+		t->subtype = TR_S_URLENCODEPARAM;
+		goto done;
+	} else if(name.len==15 && strncasecmp(name.s, "urldecode.param", 15)==0) {
+		t->subtype = TR_S_URLDECODEPARAM;
+		goto done;
 	}
 
 	LM_ERR("unknown transformation: %.*s/%.*s/%d!\n", in->len, in->s,
@@ -2164,6 +2332,7 @@ char* tr_parse_paramlist(str* in, trans_t *t)
 	char *p;
 	char *p0;
 	char *ps;
+	char *start_pos;
 	str s;
 	str name;
 	int n;
@@ -2204,6 +2373,22 @@ char* tr_parse_paramlist(str* in, trans_t *t)
 		t->params = tp;
 		tp = 0;
 		while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+
+		if(*p==TR_PARAM_MARKER)
+		{
+			start_pos = ++p;
+			_tr_parse_sparam(p, p0, tp, spec, ps, in, s);
+			t->params->next = tp;
+			tp = 0;
+			if (p - start_pos != 1)
+			{
+				LM_ERR("invalid separator in transformation: "
+					"%.*s\n", in->len, in->s);
+				goto error;
+			}
+			while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+		}
+
 		if(*p!=TR_RBRACKET)
 		{
 			LM_ERR("invalid value transformation: %.*s!\n",
@@ -2224,6 +2409,22 @@ char* tr_parse_paramlist(str* in, trans_t *t)
 		t->params = tp;
 		tp = 0;
 		while(is_in_str(p, in) && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+
+		if(*p==TR_PARAM_MARKER)
+		{
+			start_pos = ++p;
+			_tr_parse_sparam(p, p0, tp, spec, ps, in, s);
+			t->params->next = tp;
+			tp = 0;
+			if (p - start_pos != 1)
+			{
+				LM_ERR("invalid separator in transformation: "
+					"%.*s\n", in->len, in->s);
+				goto error;
+			}
+			while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+		}
+
 		if(*p!=TR_RBRACKET)
 		{
 			LM_ERR("invalid name transformation: %.*s!\n",
@@ -2244,6 +2445,22 @@ char* tr_parse_paramlist(str* in, trans_t *t)
 		t->params = tp;
 		tp = 0;
 		while(is_in_str(p, in) && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+
+		if(*p==TR_PARAM_MARKER)
+		{
+			start_pos = ++p;
+			_tr_parse_sparam(p, p0, tp, spec, ps, in, s);
+			t->params->next = tp;
+			tp = 0;
+			if (p - start_pos != 1)
+			{
+				LM_ERR("invalid separator in transformation: "
+					"%.*s\n", in->len, in->s);
+				goto error;
+			}
+			while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+		}
+
 		if(*p!=TR_RBRACKET)
 		{
 			LM_ERR("invalid name transformation: %.*s!\n",
@@ -2253,6 +2470,28 @@ char* tr_parse_paramlist(str* in, trans_t *t)
 		goto done;
 	} else if(name.len==5 && strncasecmp(name.s, "count", 5)==0) {
 		t->subtype = TR_PL_COUNT;
+		if(*p==TR_PARAM_MARKER)
+		{
+			start_pos = ++p;
+			_tr_parse_sparam(p, p0, tp, spec, ps, in, s);
+			t->params = tp;
+			tp = 0;
+			if (p - start_pos != 1)
+			{
+				LM_ERR("invalid separator in transformation: "
+					"%.*s\n", in->len, in->s);
+				goto error;
+			}
+
+			while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+			if(*p!=TR_RBRACKET)
+			{
+				LM_ERR("invalid name transformation: %.*s!\n",
+					in->len, in->s);
+				goto error;
+			}
+		}
+
 		goto done;
 	}
 

@@ -33,8 +33,10 @@
 #include "../../mod_fix.h"
 #include "../../parser/parse_param.h"
 #include "../../shm_init.h"
+#include "../../script_cb.h"
 
 #include "debugger_api.h"
+#include "debugger_config.h"
 
 MODULE_VERSION
 
@@ -44,21 +46,34 @@ static void mod_destroy(void);
 
 static int w_dbg_breakpoint(struct sip_msg* msg, char* point, char* str2);
 static int fixup_dbg_breakpoint(void** param, int param_no);
+static int dbg_mod_level_param(modparam_t type, void *val);
+
+static int fixup_dbg_pv_dump(void** param, int param_no);
+static int w_dbg_dump(struct sip_msg* msg, char* mask, char* level);
 
 /* parameters */
 extern int _dbg_cfgtrace;
+extern int _dbg_cfgpkgcheck;
 extern int _dbg_breakpoint;
 extern int _dbg_cfgtrace_level;
 extern int _dbg_cfgtrace_facility;
 extern char *_dbg_cfgtrace_prefix;
 extern int _dbg_step_usleep;
 extern int _dbg_step_loops;
+extern int _dbg_reset_msgid;
 
 static char * _dbg_cfgtrace_facility_str = 0;
+static int _dbg_log_assign = 0;
 
 static cmd_export_t cmds[]={
 	{"dbg_breakpoint", (cmd_function)w_dbg_breakpoint, 1,
 		fixup_dbg_breakpoint, 0, ANY_ROUTE},
+	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 0,
+		fixup_dbg_pv_dump, 0, ANY_ROUTE},
+	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 1,
+		fixup_dbg_pv_dump, 0, ANY_ROUTE},
+	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 2,
+		fixup_dbg_pv_dump, 0, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -68,8 +83,14 @@ static param_export_t params[]={
 	{"log_level",         INT_PARAM, &_dbg_cfgtrace_level},
 	{"log_facility",      STR_PARAM, &_dbg_cfgtrace_facility_str},
 	{"log_prefix",        STR_PARAM, &_dbg_cfgtrace_prefix},
+	{"log_assign",        INT_PARAM, &_dbg_log_assign},
 	{"step_usleep",       INT_PARAM, &_dbg_step_usleep},
 	{"step_loops",        INT_PARAM, &_dbg_step_loops},
+	{"mod_hash_size",     INT_PARAM, &default_dbg_cfg.mod_hash_size},
+	{"mod_level_mode",    INT_PARAM, &default_dbg_cfg.mod_level_mode},
+	{"mod_level",         STR_PARAM|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
+	{"reset_msgid",       INT_PARAM, &_dbg_reset_msgid},
+	{"cfgpkgcheck",       INT_PARAM, &_dbg_cfgpkgcheck},
 	{0, 0, 0}
 };
 
@@ -113,6 +134,38 @@ static int mod_init(void)
 		return -1;
 	}
 
+	if(cfg_declare("dbg", dbg_cfg_def, &default_dbg_cfg, cfg_sizeof(dbg), &dbg_cfg))
+	{
+		LM_ERR("Fail to declare the configuration\n");
+		return -1;
+	}
+	LM_DBG("cfg level_mode:%d hash_size:%d\n",
+		cfg_get(dbg, dbg_cfg, mod_level_mode),
+		cfg_get(dbg, dbg_cfg, mod_hash_size));
+
+	if(dbg_init_mod_levels(cfg_get(dbg, dbg_cfg, mod_hash_size))<0)
+	{
+		LM_ERR("failed to init per module log level\n");
+		return -1;
+	}
+
+	if(_dbg_log_assign>0)
+	{
+		if(dbg_init_pvcache()!=0)
+		{
+			LM_ERR("failed to create pvcache\n");
+			return -1;
+		}
+	}
+	if(_dbg_reset_msgid==1)
+	{
+		unsigned int ALL = REQUEST_CB+FAILURE_CB+ONREPLY_CB
+		  +BRANCH_CB+ONSEND_CB+ERROR_CB+LOCAL_CB+EVENT_CB+BRANCH_FAILURE_CB;
+		if (register_script_cb(dbg_msgid_filter, PRE_SCRIPT_CB|ALL, 0) != 0) {
+			LM_ERR("could not insert callback");
+			return -1;
+		}
+	}
 	return dbg_init_bp_list();
 }
 
@@ -122,8 +175,11 @@ static int mod_init(void)
 static int child_init(int rank)
 {
 	LM_DBG("rank is (%d)\n", rank);
-	if (rank==PROC_INIT)
+	if (rank==PROC_INIT) {
+		dbg_enable_mod_levels();
+		dbg_enable_log_assign();
 		return dbg_init_pid_list();
+	}
 	return dbg_init_mypid();
 }
 
@@ -139,6 +195,64 @@ static void mod_destroy(void)
  */
 static int w_dbg_breakpoint(struct sip_msg* msg, char* point, char* str2)
 {
+	return 1;
+}
+
+/**
+ * fixup for cfg dbg_pv_dump
+ */
+static int fixup_dbg_pv_dump(void** param, int param_no)
+{
+	unsigned int mask;
+	int level;
+	str s = STR_NULL;
+
+	switch(param_no)
+	{
+		case 2:
+			switch(((char*)(*param))[2])
+			{
+				case 'A': level = L_ALERT; break;
+				case 'B': level = L_BUG; break;
+				case 'C': level = L_CRIT2; break;
+				case 'E': level = L_ERR; break;
+				case 'W': level = L_WARN; break;
+				case 'N': level = L_NOTICE; break;
+				case 'I': level = L_INFO; break;
+				case 'D': level = L_DBG; break;
+				default:
+					LM_ERR("unknown log level\n");
+					return E_UNSPEC;
+			}
+			*param = (void*)(long)level;
+		break;
+		case 1:
+			s.s = *param;
+			s.len = strlen(s.s);
+			if(str2int(&s, &mask) == 0) {
+				*param = (void*)(long)mask;
+			}
+			else return E_UNSPEC;
+		break;
+	}
+
+    return 0;
+}
+
+/**
+ * dump pv_cache contents as json
+ */
+static int w_dbg_dump(struct sip_msg* msg, char* mask, char* level)
+{
+	unsigned int umask = DBG_DP_ALL;
+	int ilevel = L_DBG;
+	if(level!=NULL){
+		ilevel = (int)(long)level;
+	}
+	if(mask!=NULL){
+		umask = (unsigned int)(unsigned long)mask;
+	}
+	dbg_dump_json(msg, umask, ilevel);
 	return 1;
 }
 
@@ -173,4 +287,42 @@ static int fixup_dbg_breakpoint(void** param, int param_no)
     return dbg_add_breakpoint(a, (*p=='0')?0:1);
 }
 
+static int dbg_mod_level_param(modparam_t type, void *val)
+{
+	char *p;
+	str s;
+	int l;
+	if(val==NULL)
+		return -1;
+
+	p = strchr((char*)val, '=');
+	if(p==NULL) {
+		LM_ERR("invalid parameter value: %s\n", (char*)val);
+		return -1;
+	}
+	s.s = p + 1;
+	s.len = strlen(s.s);
+
+	if(str2sint(&s, &l)<0) {
+		LM_ERR("invalid parameter - level value: %s\n", (char*)val);
+		return -1;
+	}
+	s.s = (char*)val;
+	s.len = p - s.s;
+	LM_DBG("cfg level_mode:%d hash_size:%d\n",
+		cfg_get(dbg, dbg_cfg, mod_level_mode),
+		cfg_get(dbg, dbg_cfg, mod_hash_size));
+	if(dbg_init_mod_levels(cfg_get(dbg, dbg_cfg, mod_hash_size))<0)
+	{
+		LM_ERR("failed to init per module log level\n");
+		return -1;
+	}
+	if(dbg_set_mod_debug_level(s.s, s.len, &l)<0)
+	{
+		LM_ERR("cannot store parameter: %s\n", (char*)val);
+		return -1;
+	}
+	return 0;
+
+}
 

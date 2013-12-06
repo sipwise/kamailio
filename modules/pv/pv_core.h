@@ -214,6 +214,15 @@ int pv_get_server_id(struct sip_msg *msg, pv_param_t *param,
 int pv_get_cnt(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
+int pv_get_ruid(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
+int pv_get_location_ua(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
+int pv_get_tcpconn_id(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
 /********* end PV get functions *********/
 
 /********* start PV set functions *********/
@@ -305,6 +314,11 @@ int pv_get_K(sip_msg_t *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_parse_flag_param(pv_spec_p sp, str *in);
+
+int pv_parse__s_name(pv_spec_p sp, str *in);
+
+int pv_get__s(sip_msg_t *msg, pv_param_t *param,
+		pv_value_t *res);
 
 #endif
 

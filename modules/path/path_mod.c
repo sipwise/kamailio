@@ -87,11 +87,15 @@ static cmd_export_t cmds[] = {
 	{ "add_path",          (cmd_function)add_path,              0,
 			0,              0,  REQUEST_ROUTE },
 	{ "add_path",          (cmd_function)add_path_usr,          1,
-			fixup_str_null, 0, REQUEST_ROUTE },
+			fixup_spve_null, 0, REQUEST_ROUTE },
+	{ "add_path",          (cmd_function)add_path_usr,          2,
+			fixup_spve_spve, 0, REQUEST_ROUTE },
 	{ "add_path_received", (cmd_function)add_path_received,     0,
 			0,              0, REQUEST_ROUTE },
 	{ "add_path_received", (cmd_function)add_path_received_usr, 1,
-			fixup_str_null, 0, REQUEST_ROUTE },
+			fixup_spve_null, 0, REQUEST_ROUTE },
+	{ "add_path_received", (cmd_function)add_path_received_usr, 2,
+			fixup_spve_spve, 0, REQUEST_ROUTE },
 	{ 0, 0, 0, 0, 0, 0 }
 };
 
@@ -138,7 +142,7 @@ static int mod_init(void)
 	}
 
 	if (ob_load_api(&path_obb) == 0)
-		LM_INFO("Bound path module to outbound module\n");
+		LM_DBG("Bound path module to outbound module\n");
 	else {
 		LM_INFO("outbound module not available\n");
 		memset(&path_obb, 0, sizeof(ob_api_t));

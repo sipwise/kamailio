@@ -87,6 +87,8 @@ extern pv_elem_t * hash_param_model;
 
 extern str ds_setid_pvname;
 extern pv_spec_t ds_setid_pv;
+extern str ds_attrs_pvname;
+extern pv_spec_t ds_attrs_pv;
 
 /* Structure containing pointers to TM-functions */
 extern struct tm_binds tmb;
@@ -103,6 +105,7 @@ int ds_load_list(char *lfile);
 int ds_connect_db(void);
 void ds_disconnect_db(void);
 int ds_load_db(void);
+int ds_reload_db(void);
 int ds_destroy_list(void);
 int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode);
 int ds_next_dst(struct sip_msg *msg, int mode);

@@ -69,6 +69,7 @@ int msrp_auth_min_expires = 60;
 int msrp_auth_max_expires = 3600;
 int msrp_timer_interval = 60;
 str msrp_use_path_addr = { 0 };
+int msrp_tls_module_loaded = 0;
 
 static int msrp_frame_received(void *data);
 sip_msg_t *msrp_fake_sipmsg(msrp_frame_t *mf);
@@ -165,7 +166,17 @@ static int mod_init(void)
 			msrp_timer_interval = 60;
 		register_sync_timers(1);
 	}
+
 	sr_event_register_cb(SREV_TCP_MSRP_FRAME, msrp_frame_received);
+
+	if(!module_loaded("tls")) {
+		LM_WARN("\"tls\" module is not loaded. TLS is mandatory for"
+			" MSRP Relays. To comply with RFC 4976 you must use"
+			"  TLS.\n");
+	} else {
+		msrp_tls_module_loaded = 1;
+	}
+
 	return 0;
 }
 

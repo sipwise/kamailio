@@ -59,7 +59,8 @@ Bogdan-Andre Iancu
               3.22. xavp_rcd (string)
               3.23. gruu_enabled (integer)
               3.24. outbound_mode (integer)
-              3.25. flow_timer (integer)
+              3.25. regid_mode (integer)
+              3.26. flow_timer (integer)
 
         4. Functions
 
@@ -68,7 +69,7 @@ Bogdan-Andre Iancu
               4.3. lookup_branches(domain)
               4.4. registered(domain [, uri])
               4.5. add_sock_hdr(hdr_name)
-              4.6. unregister(domain, uri)
+              4.6. unregister(domain, uri[, ruid])
               4.7. reg_fetch_contacts(domain, uri, profile)
               4.8. reg_free_contacts(profile)
 
@@ -115,17 +116,18 @@ Bogdan-Andre Iancu
    1.21. Set xavp_rcd parameter
    1.22. Set gruu_enabled parameter
    1.23. Set outbound_mode parameter
-   1.24. Set flow_timer parameter
-   1.25. save usage
-   1.26. lookup usage
-   1.27. lookup_branches usage
-   1.28. registered usage
-   1.29. add_sock_hdr usage
-   1.30. unregister usage
-   1.31. reg_fetch_contacts usage
-   1.32. reg_free_contacts usage
-   1.33. event_route[usrloc:contact-expired] usage
-   1.34. $ulc(name) usage
+   1.24. Set regid_mode parameter
+   1.25. Set flow_timer parameter
+   1.26. save usage
+   1.27. lookup usage
+   1.28. lookup_branches usage
+   1.29. registered usage
+   1.30. add_sock_hdr usage
+   1.31. unregister usage
+   1.32. reg_fetch_contacts usage
+   1.33. reg_free_contacts usage
+   1.34. event_route[usrloc:contact-expired] usage
+   1.35. $ulc(name) usage
 
 Chapter 1. Admin Guide
 
@@ -167,7 +169,8 @@ Chapter 1. Admin Guide
         3.22. xavp_rcd (string)
         3.23. gruu_enabled (integer)
         3.24. outbound_mode (integer)
-        3.25. flow_timer (integer)
+        3.25. regid_mode (integer)
+        3.26. flow_timer (integer)
 
    4. Functions
 
@@ -176,7 +179,7 @@ Chapter 1. Admin Guide
         4.3. lookup_branches(domain)
         4.4. registered(domain [, uri])
         4.5. add_sock_hdr(hdr_name)
-        4.6. unregister(domain, uri)
+        4.6. unregister(domain, uri[, ruid])
         4.7. reg_fetch_contacts(domain, uri, profile)
         4.8. reg_free_contacts(profile)
 
@@ -286,7 +289,8 @@ Chapter 1. Admin Guide
    3.22. xavp_rcd (string)
    3.23. gruu_enabled (integer)
    3.24. outbound_mode (integer)
-   3.25. flow_timer (integer)
+   3.25. regid_mode (integer)
+   3.26. flow_timer (integer)
 
 3.1. default_expires (integer)
 
@@ -643,28 +647,23 @@ modparam("registrar", "gruu_enabled", 0)
 
 3.24. outbound_mode (integer)
 
-   If set to 0 then this module will accept REGISTER requests that do not
+   If set to 0 this module will accept REGISTER requests that do not
    contain a Supported: header with the outbound options-tag. The 200 OK
    response to REGISTER requests that this module generates will not
-   contain Require: or Supported: headers with the outbound options tag.
+   contain Require: or Supported: headers with the outbound options-tag.
+   If the client has a Require: header with the outbound options tag the
+   REGISTER will be rejected with a 420 Bad Extension response.
 
    If set to 1 this module will accept REGISTER requests that do not
    contain a Supported: header with the outbound options-tag and REGISTER
-   requests that do contain a Supported: or a Requires: header with the
-   outbound options-tag. The 200 OK response that this module generates,
-   will contain a Supported: header with the outbound options tag. The 200
-   OK response will also contain a Require: header with the outbound
-   options tag if the REGISTER request contained a Supported: header with
-   the outbound options-tag.
+   requests that do contain a Supported: or Requires: header with the
+   outbound options-tag. When the client supports outbound the appropriate
+   RFC5626 procedures will be followed.
 
-   If set to 2 then this module will reject REGISTER requests that do not
-   contain a Supported: header with the outbound options-tag. The 200 OK
-   response to REGISTER requests that this module generates will contain
-   Require: and Supported: headers with the outbound options tag.
-
-   Set this parameter to 2 if you are using SIP Outbound (RFC 5626) and
-   want your Edge Proxy to insert a Flow-Timer: header into the 200 OK
-   response to REGISTERs (as per RFC 5626 section 5.4).
+   If set to 2 this module will reject REGISTER requests that do not
+   contain a Supported: header with the outbound options-tag. When the
+   client supports outbound the appropriate RFC5626 procedures will be
+   followed.
 
    Default value is 0.
 
@@ -673,28 +672,45 @@ modparam("registrar", "gruu_enabled", 0)
 modparam("registrar", "outbound_mode", 2)
 ...
 
-3.25. flow_timer (integer)
+3.25. regid_mode (integer)
+
+   If set to 0 this module will ignore regid contact param when saving
+   REGISTER request if REGISTER request does not indicate support for
+   outbound.
+
+   If set to 1 this module will use regid contact param (if present) when
+   saving REGISTER request even if REGISTER request does not indicate
+   support for outbound.
+
+   Default value is 0.
+
+   Example 1.24. Set regid_mode parameter
+...
+modparam("registrar", "regid_mode", 1)
+...
+
+3.26. flow_timer (integer)
 
    If set to 0 then this module will not add a Flow-Timer: header to 200
    OK responses to REGISTER requests.
 
    If set to > 0 then this module will add a Flow-Timer: header containing
    this value to 200 OK responses to REGISTER requests. This parameter may
-   only be set to a value > 0 when outbound_mode is set to 2.
+   only be set to a value > 0 when outbound_mode is set to 1 or 2.
 
    When set to a value > 0 this parameter should be set to slightly less
    than the connection timeout value between the UAC and the network (this
    corresponds to the core tcp_connection_lifetime option and websocket
    keepalive_timeout modparam). This parameter is most useful when you
-   have a single edge proxy/registrar. If you are using a separate SIP
-   Outbound Edge Proxy you should consider leaving this parameter set to 0
-   and adding the Flow-Timer: header on the Edge Proxy (as this allows you
-   to keep all of the timer values for a specific flow in one
-   configuration - that of the Edge Proxy).
+   have a single edge proxy/registrar or if you have an edge proxy that
+   cannot modify responses. If you are using a separate edge proxy you
+   should consider leaving this parameter set to 0 and adding the
+   Flow-Timer: header on the edge proxy as this allows you to keep all of
+   the timer values for a specific flow in one configuration.
 
    Default value is 0.
 
-   Example 1.24. Set flow_timer parameter
+   Example 1.25. Set flow_timer parameter
 ...
 modparam("registrar", "flow_timer", 25)
 ...
@@ -706,7 +722,7 @@ modparam("registrar", "flow_timer", 25)
    4.3. lookup_branches(domain)
    4.4. registered(domain [, uri])
    4.5. add_sock_hdr(hdr_name)
-   4.6. unregister(domain, uri)
+   4.6. unregister(domain, uri[, ruid])
    4.7. reg_fetch_contacts(domain, uri, profile)
    4.8. reg_free_contacts(profile)
 
@@ -745,9 +761,10 @@ modparam("registrar", "flow_timer", 25)
        3 - contacts deleted.
        4 - contacts returned.
 
-   This function can be used from REQUEST_ROUTE and REPLY_ROUTE.
+   This function can be used from REQUEST_ROUTE, FAILURE_ROUTE and
+   REPLY_ROUTE.
 
-   Example 1.25. save usage
+   Example 1.26. save usage
 ...
 save("location");
 save("location", "0x01");
@@ -780,7 +797,7 @@ save("location", "0x00", "sip:test@kamailio.org");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.26. lookup usage
+   Example 1.27. lookup usage
 ...
 lookup("location");
 switch ($retcode) {
@@ -806,7 +823,7 @@ switch ($retcode) {
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.27. lookup_branches usage
+   Example 1.28. lookup_branches usage
 ...
 lookup_branches("location");
 ...
@@ -825,7 +842,7 @@ lookup_branches("location");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.28. registered usage
+   Example 1.29. registered usage
 ...
 if (registered("location")) {
         sl_send_reply("100", "Trying");
@@ -845,14 +862,17 @@ if (registered("location")) {
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 1.29. add_sock_hdr usage
+   Example 1.30. add_sock_hdr usage
 ...
 add_sock_hdr("Sock-Info");
 ...
 
-4.6. unregister(domain, uri)
+4.6. unregister(domain, uri[, ruid])
 
-   The function remove all the contact associated to 'uri'.
+   The function removes contacts associated with 'uri'. If 'ruid' is
+   provided a specific contact is removed, if 'ruid' is not provided all
+   contacts are removed. If 'ruid' is provided and usrloc is using
+   db_mode=3, 'uri' does not need to be given and can be empty string.
 
    Meaning of the parameters is as follows:
      * domain - Name of table that should be used for the lookup or
@@ -860,13 +880,17 @@ add_sock_hdr("Sock-Info");
      * uri - The SIP URI address of the user which to remove the contact
        addresses for. It can contain pseudo-variables that are evaluated
        at runtime.
+     * ruid - The record unique ID for a a specific contact to be removed.
+       It can contain pseudo-variables that are evaluated at runtime.
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.30. unregister usage
+   Example 1.31. unregister usage
 ...
 unregister("location", "$ru");
 unregister("location", "sip:user@kamailio.org");
+unregister("location", "$ru", "$ulc(caller=>ruid)");
+unregister("location", "", "$ruid");
 ...
 
 4.7. reg_fetch_contacts(domain, uri, profile)
@@ -885,7 +909,7 @@ unregister("location", "sip:user@kamailio.org");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.31. reg_fetch_contacts usage
+   Example 1.32. reg_fetch_contacts usage
 ...
 reg_fetch_contacts("location", "$ru", "callee");
 reg_fetch_contacts("location", "sip:user@kamailio.org", "caller");
@@ -904,7 +928,7 @@ reg_fetch_contacts("location", "sip:user@kamailio.org", "caller");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.32. reg_free_contacts usage
+   Example 1.33. reg_free_contacts usage
 ...
 reg_free_contacts("callee");
 ...
@@ -918,7 +942,7 @@ reg_free_contacts("callee");
    Executed when a contact in location table has expired. The variable
    $ulc(exp=>...) is filled with the attributes of the expired contact.
 
-   Example 1.33. event_route[usrloc:contact-expired] usage
+   Example 1.34. event_route[usrloc:contact-expired] usage
 ...
 event_route[usrloc:contact-expired] {
     xlog("expired contact for $ulc(exp->aor)\n");
@@ -969,24 +993,28 @@ event_route[usrloc:contact-expired] {
      * aor - address of record
      * domain - use location domain name
      * aorhash - hash id for the record
-     * count - number of contacts
      * addr - contact address
      * path - path vector
      * received - received address
      * expires - expires value
      * callid - call-id header value
      * q - the q value
+     * cseq - the cseq value
      * flags - flags value
      * cflags - cflags value
      * user_agent - user agent
      * socket - local socket
      * modified - last modified time
      * methods - methods value
+     * count - number of contacts
+     * ruid - record unique ID
+     * reg-id - reg-id value
+     * instance - instance value
 
    The pseudo-variable accepts positive index value to access a specific
    contact record.
 
-   Example 1.34. $ulc(name) usage
+   Example 1.35. $ulc(name) usage
 ...
 if(reg_fetch_contacts("location", "$fu", "caller"))
 {

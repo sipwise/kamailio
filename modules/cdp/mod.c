@@ -52,6 +52,8 @@
 #include "config.h"
 #include "cdp_load.h"
 
+#include "../../cfg/cfg_struct.h"
+
 MODULE_VERSION
 
 char* config_file="DiameterPeer.xml"; 	/**< default DiameterPeer configuration filename */
@@ -143,6 +145,12 @@ static cmd_export_t cdp_cmds[] = {
 	EXP_FUNC(AAADropAuthSession)
 	EXP_FUNC(AAATerminateAuthSession)
 
+	EXP_FUNC(AAACreateCCAccSession)
+	EXP_FUNC(AAAStartChargingCCAccSession)
+	EXP_FUNC(AAAGetCCAccSession)
+	EXP_FUNC(AAADropCCAccSession)
+	EXP_FUNC(AAATerminateCCAccSession)
+
 	{ 0, 0, 0, 0, 0 }
 };
 
@@ -213,6 +221,7 @@ static int cdp_init( void )
 		return 1;
 	}
 	register_procs(2+config->workers + 2 * config->peers_cnt);
+	cfg_register_child(2+config->workers + 2 * config->peers_cnt);
 	return 0;
 }
 

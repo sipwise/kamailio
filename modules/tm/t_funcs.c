@@ -373,6 +373,7 @@ handle_ret:
 			set_kr(REQ_ERR_DELAYED);
 			DBG("%d error reply generation delayed \n", ser_error);
 #else
+
 			reply_ret=kill_transaction( t, ser_error );
 			if (reply_ret>0) {
 				/* we have taken care of all -- do nothing in

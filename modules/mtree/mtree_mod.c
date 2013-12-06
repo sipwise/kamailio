@@ -120,7 +120,7 @@ static struct mi_root* mt_mi_reload(struct mi_root*, void* param);
 static struct mi_root* mt_mi_list(struct mi_root*, void* param);
 static struct mi_root* mt_mi_summary(struct mi_root*, void* param);
 
-static int mt_load_db(str *tname);
+static int mt_load_db(m_tree_t *pt);
 static int mt_load_db_trees();
 
 static cmd_export_t cmds[]={
@@ -291,8 +291,11 @@ static int mod_init(void)
 
 		while(pt!=NULL)
 		{
+		        LM_DBG("loading from tree <%.*s>\n",
+			        pt->tname.len, pt->tname.s);
+
 			/* loading all information from database */
-			if(mt_load_db(&pt->tname)!=0)
+			if(mt_load_db(pt)!=0)
 			{
 				LM_ERR("cannot load info from database\n");
 				goto error1;
@@ -488,9 +491,12 @@ error:
 
 }
 
-static int mt_load_db(str *tname)
+static int mt_load_db(m_tree_t *pt)
 {
 	db_key_t db_cols[3] = {&tprefix_column, &tvalue_column};
+	db_key_t key_cols[1];
+	db_op_t op[1] = {OP_EQ};
+	db_val_t vals[1];
 	str tprefix, tvalue;
 	db1_res_t* db_res = NULL;
 	int i, ret;
@@ -498,16 +504,22 @@ static int mt_load_db(str *tname)
 	m_tree_t *old_tree = NULL; 
 	mt_node_t *bk_head = NULL; 
 
+	key_cols[0] = &tname_column;
+	VAL_TYPE(vals) = DB1_STRING;
+	VAL_NULL(vals) = 0;
+	VAL_STRING(vals) = pt->tname.s;
+
 	if(db_con==NULL)
 	{
 		LM_ERR("no db connection\n");
 		return -1;
 	}
 
-	old_tree = mt_get_tree(tname);
+	old_tree = mt_get_tree(&(pt->tname));
 	if(old_tree==NULL)
 	{
-		LM_ERR("tree definition not found [%.*s]\n", tname->len, tname->s);
+		LM_ERR("tree definition not found [%.*s]\n", pt->tname.len,
+		       pt->tname.s);
 		return -1;
 	}
 	memcpy(&new_tree, old_tree, sizeof(m_tree_t));
@@ -521,7 +533,8 @@ static int mt_load_db(str *tname)
 	}
 
 	if (DB_CAPABILITY(mt_dbf, DB_CAP_FETCH)) {
-		if(mt_dbf.query(db_con, 0, 0, 0, db_cols, 0, 2, 0, 0) < 0)
+		if(mt_dbf.query(db_con, key_cols, op, vals, db_cols, pt->multi,
+				2, 0, 0) < 0)
 		{
 			LM_ERR("Error while querying db\n");
 			return -1;
@@ -539,8 +552,8 @@ static int mt_load_db(str *tname)
 			}
 		}
 	} else {
-		if((ret=mt_dbf.query(db_con, NULL, NULL, NULL, db_cols,
-						0, 2, 0, &db_res))!=0
+		if((ret=mt_dbf.query(db_con, key_cols, op, vals, db_cols,
+						pt->multi, 2, 0, &db_res))!=0
 				|| RES_ROW_N(db_res)<=0 )
 		{
 			mt_dbf.free_result(db_con, db_res);
@@ -697,7 +710,8 @@ static int mt_load_db_trees()
 				LM_ERR("Error - bad values in db\n");
 				continue;
 			}
-			new_tree = mt_add_tree(&new_head, &tname, &db_table, _mt_tree_type);
+			new_tree = mt_add_tree(&new_head, &tname, &db_table,
+					       _mt_tree_type, 0);
 			if(new_tree==NULL)
 			{
 				LM_ERR("New tree cannot be initialized\n");
@@ -797,7 +811,7 @@ static struct mi_root* mt_mi_reload(struct mi_root *cmd_tree, void *param)
 						&& strncmp(pt->tname.s, tname.s, tname.len)==0))
 			{
 				/* re-loading table from database */
-				if(mt_load_db(&pt->tname)!=0)
+				if(mt_load_db(pt)!=0)
 				{
 					LM_ERR("cannot re-load info from database\n");	
 					goto error;
@@ -1046,8 +1060,65 @@ static const char* rpc_mtree_summary_doc[2] = {
 	0
 };
 
+void rpc_mtree_reload(rpc_t* rpc, void* c)
+{
+	str tname = {0, 0};
+	m_tree_t *pt;
+
+	if(db_table.len>0)
+	{
+		/* re-loading all information from database */
+		if(mt_load_db_trees()!=0)
+		{
+			LM_ERR("cannot re-load mtrees from database\n");
+			goto error;
+		}
+	} else {
+		if(!mt_defined_trees())
+		{
+			LM_ERR("empty mtree list\n");
+			goto error;
+		}
+
+		/* read tree name */
+		if (rpc->scan(c, "S", &tname) != 1) {
+			rpc->fault(c, 500, "Failed to get table name parameter");
+			return;
+		}
+
+		pt = mt_get_first_tree();
+
+		while(pt!=NULL)
+		{
+			if(tname.s==NULL
+					|| (tname.s!=NULL && pt->tname.len>=tname.len
+						&& strncmp(pt->tname.s, tname.s, tname.len)==0))
+			{
+				/* re-loading table from database */
+				if(mt_load_db(pt)!=0)
+				{
+					LM_ERR("cannot re-load mtree from database\n");	
+					goto error;
+				}
+			}
+			pt = pt->next;
+		}
+	}
+
+	return;
+
+error:
+	rpc->fault(c, 500, "Mtree Reload Failed");
+}
+
+static const char* rpc_mtree_reload_doc[2] = {
+	"Reload mtrees from database to memory",
+	0
+};
+
 rpc_export_t mtree_rpc[] = {
 	{"mtree.summary", rpc_mtree_summary, rpc_mtree_summary_doc, 0},
+	{"mtree.reload", rpc_mtree_reload, rpc_mtree_reload_doc, 0},
 	{0, 0, 0, 0}
 };
 

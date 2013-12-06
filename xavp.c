@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mem/mem.h"
 #include "mem/shm_mem.h"
 #include "dprint.h"
 #include "hashes.h"
@@ -538,6 +539,85 @@ void xavp_print_list(sr_xavp_t **head)
 }
 
 /**
+ * returns a list of str with key names.
+ * Example:
+ * If we have this structure
+ * $xavp(test=>one) = 1
+ * $xavp(test[0]=>two) = "2"
+ * $xavp(test[0]=>three) = 3
+ * $xavp(test[0]=>four) = $xavp(whatever)
+ * $xavp(test[0]=>two) = "other 2"
+ *
+ * xavp_get_list_keys_names(test[0]) returns
+ * {"one", "two", "three", "four"}
+ *
+ * free the struct str_list afterwards
+ * but do *NO* free the strings inside
+ */
+struct str_list *xavp_get_list_key_names(sr_xavp_t *xavp)
+{
+	sr_xavp_t *avp = NULL;
+	struct str_list *result = NULL;
+	struct str_list *r = NULL;
+	struct str_list *f = NULL;
+	int total = 0;
+
+	if(xavp==NULL){
+		LM_ERR("xavp is NULL\n");
+		return 0;
+	}
+
+	if(xavp->val.type!=SR_XTYPE_XAVP){
+		LM_ERR("%s not xavp?\n", xavp->name.s);
+		return 0;
+	}
+
+	avp = xavp->val.v.xavp;
+
+	if (avp)
+	{
+		result = (struct str_list*)pkg_malloc(sizeof(struct str_list));
+		if (result==NULL) {
+			PKG_MEM_ERROR;
+			return 0;
+		}
+		r = result;
+		r->s.s = avp->name.s;
+		r->s.len = avp->name.len;
+		r->next = NULL;
+		avp = avp->next;
+	}
+
+	while(avp)
+	{
+		f = result;
+		while(f)
+		{
+			if((avp->name.len==f->s.len)&&
+				(strncmp(avp->name.s, f->s.s, f->s.len)==0))
+			{
+				break; /* name already on list */
+			}
+			f = f->next;
+		}
+		if (f==NULL)
+		{
+			r = append_str_list(avp->name.s, avp->name.len, &r, &total);
+			if(r==NULL){
+				while(result){
+					r = result;
+					result = result->next;
+					pkg_free(r);
+				}
+				return 0;
+			}
+		}
+		avp = avp->next;
+	}
+	return result;
+}
+
+/**
  * clone the xavp without values that are custom data
  * - only one list level is cloned, other sublists are ignored
  */
@@ -706,5 +786,54 @@ sr_xavp_t *xavp_extract(str *name, sr_xavp_t **list)
 		}
 	}
 	return NULL;
+}
+
+/**
+ * return child node of an xavp
+ * - $xavp(rname=>cname)
+ */
+sr_xavp_t* xavp_get_child(str *rname, str *cname)
+{
+	sr_xavp_t *ravp=NULL;
+
+	ravp = xavp_get(rname, NULL);
+	if(ravp==NULL || ravp->val.type!=SR_XTYPE_XAVP)
+		return NULL;
+
+	return xavp_get(cname, ravp->val.v.xavp);
+}
+
+
+/**
+ * return child node of an xavp if it has int value
+ * - $xavp(rname=>cname)
+ */
+sr_xavp_t* xavp_get_child_with_ival(str *rname, str *cname)
+{
+	sr_xavp_t *vavp=NULL;
+
+	vavp = xavp_get_child(rname, cname);
+
+	if(vavp==NULL || vavp->val.type!=SR_XTYPE_INT)
+		return NULL;
+
+	return vavp;
+}
+
+
+/**
+ * return child node of an xavp if it has string value
+ * - $xavp(rname=>cname)
+ */
+sr_xavp_t* xavp_get_child_with_sval(str *rname, str *cname)
+{
+	sr_xavp_t *vavp=NULL;
+
+	vavp = xavp_get_child(rname, cname);
+
+	if(vavp==NULL || vavp->val.type!=SR_XTYPE_STR)
+		return NULL;
+
+	return vavp;
 }
 #endif

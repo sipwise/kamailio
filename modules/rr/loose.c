@@ -47,6 +47,7 @@
 
 #define RR_ERROR -1		/*!< An error occured while processing route set */
 #define RR_DRIVEN 1		/*!< The next hop is determined from the route set */
+#define RR_OB_DRIVEN 2		/*!< The next hop is determined from the route set based on flow-token */
 #define NOT_RR_DRIVEN -1	/*!< The next hop is not determined from the route set */
 #define FLOW_TOKEN_BROKEN -2	/*!< Outbound flow-token shows evidence of tampering */
 
@@ -367,7 +368,7 @@ static inline int get_maddr_uri(str *uri, struct sip_uri *puri)
 		return 0;
 
 	/* sip: + maddr + : + port */
-	if( (puri->maddr_val.len) > (127 - 6 - puri->port.len) )
+	if( (puri->maddr_val.len) > (127 - 10) )
 	{
 		LM_ERR( "Too long maddr parameter\n");
 		return RR_ERROR;
@@ -500,58 +501,67 @@ static char uri_buf[MAX_ROUTE_URI_LEN];
  * \param dst_uri string to write the destination URI to (extracted from flow-token)
  * \return -1 on error, 0 when outbound not in use, 1 when outbound in use
  */
-static inline int process_outbound(struct sip_msg *_m, str flow_token,
-		str *dst_uri)
+static inline int process_outbound(struct sip_msg *_m, str flow_token)
 {
 	int ret;
-	struct receive_info rcv;
+	struct receive_info *rcv = NULL;
 	struct socket_info *si;
+	str dst_uri;
 
 	if (!rr_obb.decode_flow_token)
 		return 0;
 
-	ret = rr_obb.decode_flow_token(&rcv, flow_token);
+	ret = rr_obb.decode_flow_token(_m, &rcv, flow_token);
 
 	if (ret == -2) {
 		LM_DBG("no flow token found - outbound not in use\n");
 		return 0;
 	} else if (ret == -1) {
-		LM_ERR("failed to decode flow token\n");
+		LM_INFO("failed to decode flow token\n");
 		return -1;
-	} else if (!ip_addr_cmp(&rcv.src_ip, &_m->rcv.src_ip)
-			|| rcv.src_port != _m->rcv.src_port) {
+	} else if (!ip_addr_cmp(&rcv->src_ip, &_m->rcv.src_ip)
+			|| rcv->src_port != _m->rcv.src_port) {
 		LM_DBG("\"incoming\" request found. Using flow-token for"
 			"routing\n");
 
 		/* First, force the local socket */
-		si = find_si(&rcv.dst_ip, rcv.dst_port, rcv.proto);
+		si = find_si(&rcv->dst_ip, rcv->dst_port, rcv->proto);
 		if (si)
 			set_force_socket(_m, si);
 		else {
-			LM_ERR("cannot find socket from flow-token\n");
+			LM_INFO("cannot find socket from flow-token\n");
 			return -1;
 		}
 
 		/* Second, override the destination URI */
-		dst_uri->s = uri_buf;
-		dst_uri->len = 0;
+		dst_uri.s = uri_buf;
+		dst_uri.len = 0;
 
-		dst_uri->len += snprintf(dst_uri->s + dst_uri->len,
-					MAX_ROUTE_URI_LEN - dst_uri->len,
+		dst_uri.len += snprintf(dst_uri.s + dst_uri.len,
+					MAX_ROUTE_URI_LEN - dst_uri.len,
 					"sip:%s",
-					rcv.src_ip.af == AF_INET6 ? "[" : "");
-		dst_uri->len += ip_addr2sbuf(&rcv.src_ip,
-					dst_uri->s + dst_uri->len,
-					MAX_ROUTE_URI_LEN - dst_uri->len);
-		dst_uri->len += snprintf(dst_uri->s + dst_uri->len,
-					MAX_ROUTE_URI_LEN - dst_uri->len,
+					rcv->src_ip.af == AF_INET6 ? "[" : "");
+		dst_uri.len += ip_addr2sbuf(&rcv->src_ip,
+					dst_uri.s + dst_uri.len,
+					MAX_ROUTE_URI_LEN - dst_uri.len);
+		dst_uri.len += snprintf(dst_uri.s + dst_uri.len,
+					MAX_ROUTE_URI_LEN - dst_uri.len,
 					"%s:%d;transport=%s",
-					rcv.src_ip.af == AF_INET6 ? "]" : "",
-					rcv.src_port,
-					get_proto_name(rcv.proto));
+					rcv->src_ip.af == AF_INET6 ? "]" : "",
+					rcv->src_port,
+					get_proto_name(rcv->proto));
+
+		if (set_dst_uri(_m, &dst_uri) < 0) {
+			LM_ERR("failed to set dst_uri\n");
+			return -1;
+		}
+		ruri_mark_new();
+
+		return 1;
 	}
 
-	return 1;
+	LM_DBG("Not using flow-token for routing\n");
+	return 0;
 }
 
 /*!
@@ -620,7 +630,7 @@ static inline int after_strict(struct sip_msg* _m)
 			LM_ERR("failed to parse URI\n");
 			return RR_ERROR;
 		}
-	} 
+	}
 
 	/* set the hooks for the param
 	 * important note: RURI is already parsed by the above function, so 
@@ -746,10 +756,11 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	struct sip_uri puri;
 	rr_t* rt;
 	int res;
-	int status;
+	int status = RR_DRIVEN;
 	str uri;
 	struct socket_info *si;
-	int uri_is_myself, use_ob, next_is_strict;
+	int uri_is_myself, next_is_strict;
+	int use_ob = 0;
 
 	hdr = _m->route;
 	rt = (rr_t*)hdr->parsed;
@@ -766,10 +777,6 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	next_is_strict = is_strict(&puri.params);
 	routed_params = puri.params;
 	uri_is_myself = is_myself(&puri);
-	if ((use_ob = process_outbound(_m, puri.user, &uri)) < 0) {
-		LM_ERR("processing outbound flow-token\n");
-		return FLOW_TOKEN_BROKEN;
-	}
 
 	/* IF the URI was added by me, remove it */
 	if (uri_is_myself>0)
@@ -779,6 +786,11 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 		/* set the hooks for the params */
 		routed_msg_id = _m->id;
 
+		if ((use_ob = process_outbound(_m, puri.user)) < 0) {
+			LM_INFO("failed to process outbound flow-token\n");
+			return FLOW_TOKEN_BROKEN;
+		}
+
 		if (!rt->next) {
 			/* No next route in the same header, remove the whole header
 			 * field immediately
@@ -787,10 +799,6 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 				LM_ERR("failed to remove Route HF\n");
 				return RR_ERROR;
 			}
-
-			/* When using outbound skip past all this stuff and just set
- 			   the destination */
-			if (use_ob) goto got_uri;
 
 			res = find_next_route(_m, &hdr);
 			if (res < 0) {
@@ -805,14 +813,15 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 			rt = (rr_t*)hdr->parsed;
 		} else rt = rt->next;
 
-		if (!use_ob) {
-			if (enable_double_rr && is_2rr(&puri.params)) {
-				/* double route may occure due different IP and port, so force as
-				 * send interface the one advertise in second Route */
-				if (parse_uri(rt->nameaddr.uri.s,rt->nameaddr.uri.len,&puri)<0) {
-					LM_ERR("failed to parse the double route URI\n");
-					return RR_ERROR;
-				}
+		if (enable_double_rr && is_2rr(&puri.params)) {
+			/* double route may occure due different IP and port, so force as
+			 * send interface the one advertise in second Route */
+			if (parse_uri(rt->nameaddr.uri.s,rt->nameaddr.uri.len,&puri)<0) {
+				LM_ERR("failed to parse the double route URI\n");
+				return RR_ERROR;
+			}
+
+			if (!use_ob) {
 				si = grep_sock_info( &puri.host, puri.port_no, puri.proto);
 				if (si) {
 					set_force_socket(_m, si);
@@ -820,33 +829,33 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 					if (enable_socket_mismatch_warning)
 						LM_WARN("no socket found for match second RR\n");
 				}
-	
-				if (!rt->next) {
-					/* No next route in the same header, remove the whole header
-					 * field immediately */
-					if (!del_lump(_m, hdr->name.s - _m->buf, hdr->len, 0)) {
-						LM_ERR("failed to remove Route HF\n");
-						return RR_ERROR;
-					}
-					res = find_next_route(_m, &hdr);
-					if (res < 0) {
-						LM_ERR("failed to find next route\n");
-						return RR_ERROR;
-						}
-					if (res > 0) { /* No next route found */
-						LM_DBG("no next URI found\n");
-						status = (preloaded ? NOT_RR_DRIVEN : RR_DRIVEN);
-						goto done;
-					}
-					rt = (rr_t*)hdr->parsed;
-				} else rt = rt->next;
 			}
-			
-			uri = rt->nameaddr.uri;
-			if (parse_uri(uri.s, uri.len, &puri) < 0) {
-				LM_ERR("failed to parse the first route URI\n");
-				return RR_ERROR;
-			}
+
+			if (!rt->next) {
+				/* No next route in the same header, remove the whole header
+				 * field immediately */
+				if (!del_lump(_m, hdr->name.s - _m->buf, hdr->len, 0)) {
+					LM_ERR("failed to remove Route HF\n");
+					return RR_ERROR;
+				}
+				res = find_next_route(_m, &hdr);
+				if (res < 0) {
+					LM_ERR("failed to find next route\n");
+					return RR_ERROR;
+					}
+				if (res > 0) { /* No next route found */
+					LM_DBG("no next URI found\n");
+					status = (preloaded ? NOT_RR_DRIVEN : RR_DRIVEN);
+					goto done;
+				}
+				rt = (rr_t*)hdr->parsed;
+			} else rt = rt->next;
+		}
+		
+		uri = rt->nameaddr.uri;
+		if (parse_uri(uri.s, uri.len, &puri) < 0) {
+			LM_ERR("failed to parse the first route URI\n");
+			return RR_ERROR;
 		}
 	} else {
 #ifdef ENABLE_USER_CHECK
@@ -869,21 +878,21 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	} else {
 		/* Next hop is loose router */
 		LM_DBG("Next URI is a loose router\n");
-got_uri:
 
 		if (!use_ob) {
 			if(get_maddr_uri(&uri, &puri)!=0) {
 				LM_ERR("checking maddr failed\n");
 				return RR_ERROR;
 			}
-		}
-		if (set_dst_uri(_m, &uri) < 0) {
-			LM_ERR("failed to set dst_uri\n");
-			return RR_ERROR;
-		}
-		/* dst_uri changed, so it makes sense to re-use the current uri for
+		
+			if (set_dst_uri(_m, &uri) < 0) {
+				LM_ERR("failed to set dst_uri\n");
+				return RR_ERROR;
+			}
+			/* dst_uri changed, so it makes sense to re-use the current uri for
 			forking */
-		ruri_mark_new(); /* re-use uri for serial forking */
+			ruri_mark_new(); /* re-use uri for serial forking */
+		}
 
 		/* There is a previous route uri which was 2nd uri of mine
 		 * and must be removed here */
@@ -895,9 +904,11 @@ got_uri:
 			}
 		}
 	}
-	status = RR_DRIVEN;
 
 done:
+	if (use_ob == 1)
+		status = RR_OB_DRIVEN;
+
 	/* run RR callbacks only if we have Route URI parameters */
 	if(routed_params.len > 0)
 		run_rr_callbacks( _m, &routed_params );

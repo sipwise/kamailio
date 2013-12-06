@@ -145,6 +145,7 @@
 #include "script_cb.h"
 #include "nonsip_hooks.h"
 #include "ut.h"
+#include "events.h"
 #include "signals.h"
 #ifdef USE_RAW_SOCKS
 #include "raw_sock.h"
@@ -162,8 +163,7 @@
 #endif /* CORE_TLS */
 #endif /* USE_TCP */
 #ifdef USE_SCTP
-#include "sctp_options.h"
-#include "sctp_server.h"
+#include "sctp_core.h"
 #endif
 #include "usr_avp.h"
 #include "rpc_lookup.h"
@@ -383,8 +383,6 @@ int config_check = 0;
 int check_via =  0;
 /* translate user=phone URIs to TEL URIs */
 int phone2tel = 1;
-/* shall use stateful synonym branches? faster but not reboot-safe */
-int syn_branch = 1;
 /* debugging level for timer debugging */
 int timerlog = L_WARN;
 /* should replies include extensive warnings? by default no,
@@ -458,9 +456,7 @@ int mcast_ttl = -1; /* if -1, don't touch it, use the default (usually 1) */
 int tos = IPTOS_LOWDELAY;
 int pmtu_discovery = 0;
 
-#ifdef USE_IPV6
 int auto_bind_ipv6 = 0;
-#endif
 
 #if 0
 char* names[MAX_LISTEN];              /* our names */
@@ -502,15 +498,6 @@ struct socket_info* sendipv6_sctp;
 unsigned short port_no=0; /* default port*/
 #ifdef USE_TLS
 unsigned short tls_port_no=0; /* default port */
-#endif
-
-#ifdef USE_STUN
-/* refresh interval in miliseconds */
-unsigned int stun_refresh_interval=0;
-/* stun can be switch off even if it is compiled */
-int stun_allow_stun=1;
-/* use or don't use fingerprint */
-int stun_allow_fp=1;
 #endif
 
 struct host_alias* aliases=0; /* name aliases list */
@@ -595,7 +582,7 @@ void cleanup(show_status)
 #endif /* USE_TLS */
 #endif /* USE_TCP */
 #ifdef USE_SCTP
-	destroy_sctp();
+	sctp_core_destroy();
 #endif
 	destroy_timer();
 	pv_destroy_api();
@@ -938,7 +925,7 @@ error:
 
 /* returns -1 on error, 0 on success
  * sets proto */
-static int parse_proto(unsigned char* s, long len, int* proto)
+int parse_proto(unsigned char* s, long len, int* proto)
 {
 #define PROTO2UINT3(a, b, c) ((	(((unsigned int)(a))<<16)+ \
 								(((unsigned int)(b))<<8)+  \
@@ -1459,11 +1446,9 @@ int main_loop(void)
 			if ((si->address.af==AF_INET)&&
 					((sendipv4==0)||(sendipv4->flags&(SI_IS_LO|SI_IS_MCAST))))
 				sendipv4=si;
-	#ifdef USE_IPV6
 			if ( ((sendipv6==0)||(sendipv6->flags&(SI_IS_LO|SI_IS_MCAST))) &&
 					(si->address.af==AF_INET6))
 				sendipv6=si;
-	#endif
 			/* children_no per each socket */
 			cfg_register_child((si->workers>0)?si->workers:children_no);
 		}
@@ -1506,18 +1491,16 @@ int main_loop(void)
 #ifdef USE_SCTP
 		if (!sctp_disable){
 			for(si=sctp_listen; si; si=si->next){
-				if (sctp_init_sock(si)==-1)  goto error;
+				if (sctp_core_init_sock(si)==-1)  goto error;
 				/* get first ipv4/ipv6 socket*/
 				if ((si->address.af==AF_INET) &&
 						((sendipv4_sctp==0) ||
 							(sendipv4_sctp->flags&(SI_IS_LO|SI_IS_MCAST))))
 					sendipv4_sctp=si;
-		#ifdef USE_IPV6
 				if( ((sendipv6_sctp==0) || 
 							(sendipv6_sctp->flags&(SI_IS_LO|SI_IS_MCAST))) &&
 						(si->address.af==AF_INET6))
 					sendipv6_sctp=si;
-		#endif
 				/* sctp_children_no per each socket */
 				cfg_register_child((si->workers>0)?si->workers:sctp_children_no);
 			}
@@ -1533,12 +1516,10 @@ int main_loop(void)
 						((sendipv4_tcp==0) ||
 							(sendipv4_tcp->flags&(SI_IS_LO|SI_IS_MCAST))))
 					sendipv4_tcp=si;
-		#ifdef USE_IPV6
 				if( ((sendipv6_tcp==0) ||
 							(sendipv6_tcp->flags&(SI_IS_LO|SI_IS_MCAST))) &&
 						(si->address.af==AF_INET6))
 					sendipv6_tcp=si;
-		#endif
 			}
 			/* the number of sockets does not matter */
 			cfg_register_child(tcp_children_no + 1 /* tcp main */);
@@ -1553,12 +1534,10 @@ int main_loop(void)
 						((sendipv4_tls==0) ||
 							(sendipv4_tls->flags&(SI_IS_LO|SI_IS_MCAST))))
 					sendipv4_tls=si;
-		#ifdef USE_IPV6
 				if( ((sendipv6_tls==0) ||
 							(sendipv6_tls->flags&(SI_IS_LO|SI_IS_MCAST))) &&
 						(si->address.af==AF_INET6))
 					sendipv6_tls=si;
-		#endif
 			}
 		}
 #endif /* USE_TLS */
@@ -1667,7 +1646,7 @@ int main_loop(void)
 #ifdef STATS
 						setstats( i+r*children_no );
 #endif
-						return sctp_rcv_loop();
+						return sctp_core_rcv_loop();
 					}
 				}
 			/*parent*/
@@ -1923,9 +1902,6 @@ int main(int argc, char** argv)
 #ifdef USE_TCP
 	init_tcp_options(); /* set the defaults before the config */
 #endif
-#ifdef USE_SCTP
-	init_sctp_options(); /* set defaults before the config */
-#endif
 	/* process command line (cfg. file path etc) */
 	optind = 1;  /* reset getopt */
 	/* switches required before script processing */
@@ -1963,12 +1939,6 @@ int main(int argc, char** argv)
 					printf("version: %s\n", full_version);
 					printf("flags: %s\n", ver_flags );
 					print_ct_constants();
-#ifdef USE_SCTP
-					tmp=malloc(256);
-					if (tmp && (sctp_check_compiled_sockopts(tmp, 256)!=0))
-						printf("sctp unsupported socket options: %s\n", tmp);
-					if (tmp) free(tmp);
-#endif
 					printf("id: %s\n", ver_id);
 					printf("compiled on %s with %s\n",
 							ver_compiled_time, ver_compiler );
@@ -2284,6 +2254,9 @@ try_again:
 	if (pv_reinit_buffer()<0)
 		goto error;
 
+	/* init lookup for core event routes */
+	sr_core_ert_init();
+
 	if (dont_fork_cnt)
 		dont_fork = dont_fork_cnt;	/* override by command line */
 
@@ -2303,7 +2276,7 @@ try_again:
 #ifdef USE_SCTP
 	if (sctp_disable!=1){
 		/* fix it */
-		if (sctp_check_support()==-1){
+		if (sctp_core_check_support()==-1){
 			/* check if sctp support is auto, if not warn about disabling it */
 			if (sctp_disable!=2){
 				fprintf(stderr, "ERROR: " "sctp enabled, but not supported by"
@@ -2424,12 +2397,6 @@ try_again:
 		goto error;
 	}
 #endif /* USE_TCP */
-#ifdef USE_SCTP
-	if (sctp_register_cfg()){
-		LOG(L_CRIT, "could not register the sctp configuration\n");
-		goto error;
-	}
-#endif /* USE_SCTP */
 	/*init timer, before parsing the cfg!*/
 	if (init_timer()<0){
 		LOG(L_CRIT, "could not initialize timer, exiting...\n");
@@ -2475,7 +2442,7 @@ try_again:
 #endif /* USE_TCP */
 #ifdef USE_SCTP
 	if (!sctp_disable){
-		if (init_sctp()<0){
+		if (sctp_core_init()<0){
 			LOG(L_CRIT, "Could not initialize sctp, exiting...\n");
 			goto error;
 		}

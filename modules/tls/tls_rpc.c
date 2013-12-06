@@ -1,9 +1,6 @@
 /*
- * $Id$
- *
  * TLS module - management interface
  *
- * Copyright (C) 2001-2003 FhG FOKUS
  * Copyright (C) 2005 iptelorg GmbH
  *
  * This file is part of sip-router, a free SIP server.
@@ -32,6 +29,7 @@
 #include "../../tcp_info.h"
 #include "../../timer.h"
 #include "../../cfg/cfg.h"
+#include "../../dprint.h"
 #include "tls_init.h"
 #include "tls_mod.h"
 #include "tls_domain.h"

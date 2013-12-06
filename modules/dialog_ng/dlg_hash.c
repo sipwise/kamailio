@@ -1267,14 +1267,16 @@ int dlg_set_toroute(struct dlg_cell *dlg, str * route) {
  * \return void
  */
 void create_concurrent_did(struct dlg_cell *dlg, str * new_did) {
-    int len  = dlg->did.len + 1;
-    new_did = shm_malloc(len);
-    if (new_did == 0) {
+    int len  = dlg->did.len + 1 + 1;
+    new_did->s = shm_malloc(len);
+    if (new_did->s == 0) {
         LM_ERR("no more shm mem (%d)\n", len);
+        return;
     }
+    memset(new_did->s, 0, len);
     memcpy(new_did->s, dlg->did.s, dlg->did.len);
-    new_did->s[dlg->did.len+1]= 'x';
-    new_did->len = len;
+    new_did->s[dlg->did.len] = 'x';
+    new_did->len = dlg->did.len + 1;
 }
 
 /*!

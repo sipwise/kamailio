@@ -7,7 +7,7 @@
 #===================================================================
 
 ### version for this script
-VERSION='3.3.0'
+VERSION='4.1.0'
 
 PATH=$PATH:/usr/local/sbin/
 
@@ -343,7 +343,7 @@ acl() {
 
 				QUERY="insert into $ACL_TABLE ($ACL_USER_COLUMN,\
 $ACL_GROUP_COLUMN,$ACL_MODIFIED_COLUMN,$ACL_DOMAIN_COLUMN ) values \
-('$OSERUSER','$1', now(), '$OSERDOMAIN' );"
+('$OSERUSER','$1', $DBFNOW, '$OSERDOMAIN' );"
 				$DBCMD "$QUERY"
 				if [ $? -ne 0 ] ; then
 					merr "acl - SQL Error"
@@ -795,7 +795,7 @@ FROM $AVP_TABLE $CLAUSE;"
 			QUERY="INSERT INTO $AVP_TABLE \
 ($AVP_UUID_COLUMN,$AVP_USER_COLUMN,$AVP_DOMAIN_COLUMN,$AVP_ATTRIBUTE_COLUMN,\
 $AVP_TYPE_COLUMN,$AVP_VALUE_COLUMN,$AVP_MODIFIED_COLUMN) \
-VALUES ('$AVP_UUID','$OSERUSER','$OSERDOMAIN','$2',$3,'$4',NOW());"
+VALUES ('$AVP_UUID','$OSERUSER','$OSERDOMAIN','$2',$3,'$4',$DBFNOW);"
 			# echo "Query: $QUERY"
 			$DBCMD "$QUERY"
 			if [ $? -ne 0 ] ; then
@@ -992,6 +992,24 @@ db_ops() {
 			QUERY="select * FROM $1\\G;"
 			$DBROCMD "$QUERY"
 			;;
+		smatch)
+			shift
+			if [ $# -ne 3 ] ; then
+				merr "missing parameters"
+				exit 1
+			fi
+			QUERY="SELECT * FROM $1 WHERE $2='$3'\\G;"
+			$DBROCMD "$QUERY"
+			;;
+		nmatch)
+			shift
+			if [ $# -ne 3 ] ; then
+				merr "missing parameters"
+				exit 1
+			fi
+			QUERY="SELECT * FROM $1 WHERE $2=$3\\G;"
+			$DBROCMD "$QUERY"
+			;;
 		*)
 			usage_db_ops
 			exit 1
@@ -1029,7 +1047,7 @@ domain() {
 				exit 0
 			fi
 			QUERY="insert into $DOMAIN_TABLE ($DO_DOMAIN_COLUMN, \
-			$DO_LAST_MODIFIED_COLUMN) VALUES ('$1',now());"
+			$DO_LAST_MODIFIED_COLUMN) VALUES ('$1',$DBFNOW);"
 			$DBCMD "$QUERY"
 			if [ $? -ne 0 ] ; then
 				merr "domain - SQL Error"
@@ -1532,7 +1550,6 @@ cr() {
 	esac
 }
 
-
 #
 ##### ------------------------------------------------ #####
 ### DISPATCHER management
@@ -1546,27 +1563,44 @@ dispatcher() {
 			QUERY="select * FROM $DISPATCHER_TABLE ORDER BY $DISPATCHER_SETID_COLUMN; "
 			$DBROCMD "$QUERY"
 			;;
-		addgw)
+		addgw|add)
 			shift
-			if [ $# -lt 3 ] ; then
+			if [ $# -lt 2 ] ; then
 				merr "too few parameters"
 				usage_dispatcher
 				exit 1
 			fi
 
-			if [ $# -gt 3 ] ; then
-				DISPATCHER_DESCRIPTION=$4
-			else
-				DISPATCHER_DESCRIPTION=""
-			fi 
-
 			DISPATCHER_SETID=$1
 			DISPATCHER_DESTINATION=$2
-			DISPATCHER_FLAGS=$3
+
+			if [ $# -gt 2 ] ; then
+				DISPATCHER_FLAGS=$3
+			else
+				DISPATCHER_FLAGS=0
+			fi
+
+			if [ $# -gt 3 ] ; then
+				DISPATCHER_PRIORITY=$4
+			else
+				DISPATCHER_PRIORITY=0
+			fi
+
+			if [ $# -gt 4 ] ; then
+				DISPATCHER_ATTRS=$5
+			else
+				DISPATCHER_ATTRS=""
+			fi
+
+			if [ $# -gt 5 ] ; then
+				DISPATCHER_DESCRIPTION=$6
+			else
+				DISPATCHER_DESCRIPTION=""
+			fi
 
 			QUERY="insert into $DISPATCHER_TABLE \
-				( $DISPATCHER_SETID_COLUMN, $DISPATCHER_DESTINATION_COLUMN, $DISPATCHER_FLAGS_COLUMN, $DISPATCHER_DESCRIPTION_COLUMN ) \
-				VALUES ($DISPATCHER_SETID,'$DISPATCHER_DESTINATION',$DISPATCHER_FLAGS,'$DISPATCHER_DESCRIPTION');"
+				( $DISPATCHER_SETID_COLUMN, $DISPATCHER_DESTINATION_COLUMN, $DISPATCHER_FLAGS_COLUMN, $DISPATCHER_PRIORITY_COLUMN, $DISPATCHER_ATTRS_COLUMN, $DISPATCHER_DESCRIPTION_COLUMN ) \
+				VALUES ($DISPATCHER_SETID,'$DISPATCHER_DESTINATION',$DISPATCHER_FLAGS,$DISPATCHER_PRIORITY,'$DISPATCHER_ATTRS','$DISPATCHER_DESCRIPTION');"
 			$DBCMD "$QUERY"
 
 			if [ $? -ne 0 ] ; then
@@ -1574,9 +1608,8 @@ dispatcher() {
 				exit 1
 			fi
 
-			$CTLCMD ds_reload
 			;;
-		rmgw)
+		rmgw|rm)
 			shift
 			if [ $# -ne 1 ] ; then
 				merr "missing gateway id to be removed"
@@ -1591,7 +1624,6 @@ dispatcher() {
 				exit 1
 			fi
 
-			$CTLCMD ds_reload
 			;;
 		reload)
 			$CTLCMD ds_reload
@@ -1603,6 +1635,30 @@ dispatcher() {
 
 		*)
 			usage_dispatcher
+			exit 1
+
+	esac
+}
+
+#
+##### ------------------------------------------------ #####
+### DIALOG management
+#
+dialog() {
+	case $1 in
+		show|list)
+			require_ctlengine
+			mecho "dialog memory records"
+			$CTLCMD dlg_list
+			;;
+		showdb)
+			require_dbengine
+			mecho "dialog database records"
+			QUERY="select * FROM $DIALOG_TABLE ORDER BY id; "
+			$DBROCMD "$QUERY"
+			;;
+		*)
+			usage_dialog
 			exit 1
 
 	esac
@@ -2151,6 +2207,28 @@ subscriber() {
 			fi
 			;;
 
+		show)
+			if [ $# -ne 2 ] ; then
+				usage_subscriber
+				exit 1
+			fi
+			shift
+
+			set_user $1
+
+			case $DBENGINE in
+				MYSQL|mysql|MySQL)
+					QUERY="SELECT * FROM $SUB_TABLE \
+WHERE $SUBSCRIBER_COLUMN='$OSERUSER' AND $REALM_COLUMN='$OSERDOMAIN'\G"
+				;;
+				*)
+					QUERY="SELECT * FROM $SUB_TABLE \
+WHERE $SUBSCRIBER_COLUMN='$OSERUSER' AND $REALM_COLUMN='$OSERDOMAIN';"
+				;;
+			esac
+			$DBROCMD "$QUERY"
+			;;
+
 		passwd)
 			if [ $# -ne 3 ] ; then
 				usage_subscriber
@@ -2214,6 +2292,51 @@ and $REALM_COLUMN='$OSERDOMAIN';"
 			# and also all his contacts
 			$0 ul rm $1   > /dev/null 2>&1
 			;;
+		sets)
+			if [ $# -ne 4 ] ; then
+				usage_subscriber
+				exit 1
+			fi
+			shift
+
+			is_user $1
+			if [ $? -ne 0 ] ; then
+				merr "non-existent user '$1'"
+				exit 1
+			fi
+
+			QUERY="update $SUB_TABLE set $2='$3' \
+WHERE $SUBSCRIBER_COLUMN='$OSERUSER' and $REALM_COLUMN='$OSERDOMAIN';"
+			$DBCMD "$QUERY"
+			if [ $? -ne 0 ] ; then
+				merr "attribute change failed"
+			else
+				minfo "attribute change succeeded"
+			fi
+			;;
+		setn)
+			if [ $# -ne 4 ] ; then
+				usage_subscriber
+				exit 1
+			fi
+			shift
+
+			is_user $1
+			if [ $? -ne 0 ] ; then
+				merr "non-existent user '$1'"
+				exit 1
+			fi
+
+			QUERY="update $SUB_TABLE set $2=$3 \
+WHERE $SUBSCRIBER_COLUMN='$OSERUSER' and $REALM_COLUMN='$OSERDOMAIN';"
+			$DBCMD "$QUERY"
+			if [ $? -ne 0 ] ; then
+				merr "attribute change failed"
+			else
+				minfo "attribute change succeeded"
+			fi
+			;;
+
 	esac
 
 }
@@ -2281,10 +2404,17 @@ usrloc() {
 				UL_EXPIRES=0
 				UL_FLAGS=0
 				BR_FLAGS=0
+				UL_PATH=0
 			elif [ $# -eq 4 ] ; then
 				UL_EXPIRES=$4
 				UL_FLAGS=0
 				BR_FLAGS=0
+				UL_PATH=0
+			elif [ $# -eq 5 ] ; then
+				UL_EXPIRES=$4
+				UL_FLAGS=0
+				BR_FLAGS=0
+				UL_PATH="$5"
 			else
 				usage_usrloc
 				exit 1
@@ -2317,7 +2447,7 @@ usrloc() {
 			fi
 
 			$CTLCMD ul_add "$USRLOC_TABLE" "$OSERUSER@$OSERDOMAIN" "$2" \
-"$UL_EXPIRES" "1.00" "0" "$UL_FLAGS" "$BR_FLAGS" "$ALL_METHODS"
+"$UL_EXPIRES" "1.00" "$UL_PATH" "$UL_FLAGS" "$BR_FLAGS" "$ALL_METHODS"
 			exit $?
 			;;
 		rm)
@@ -2495,6 +2625,25 @@ tls_ca() {
 	fi
 }
 
+extcmd() {
+	if [ -f $ETCDIR/kamctl.${1}.ext ]; then
+		. $ETCDIR/kamctl.${1}.ext
+	else
+		if [ -f ~/.kamctl/kamctl.${1}.ext ]; then
+			. ~/.kamctl/kamctl.${1}.ext
+		else
+			return
+		fi
+	fi
+
+	XCMD=cmd_${1}
+
+	shift
+	$XCMD "$@"
+
+	exit 1
+}
+
 #
 ##### ================================================ #####
 ### main command switch
@@ -2509,11 +2658,23 @@ case $1 in
 		subscriber "$@"
 		;;
 
+	show)
+		subscriber "$@"
+		;;
+
 	passwd)
 		subscriber "$@"
 		;;
 
 	rm)
+		subscriber "$@"
+		;;
+
+	sets)
+		subscriber "$@"
+		;;
+
+	setn)
 		subscriber "$@"
 		;;
 
@@ -2594,6 +2755,11 @@ case $1 in
 		dispatcher "$@"
 		;;
 
+	dialog)
+		shift
+		dialog "$@"
+		;;
+
 	dialplan)
 		shift
 		dialplan "$@"
@@ -2672,6 +2838,8 @@ case $1 in
 		;;
 		
 	*)
+		extcmd "$@"
+
 		usage
 		exit 1
 		;;

@@ -34,6 +34,9 @@ extern struct addr_list ***addr_hash_table;
 extern struct subnet **subnet_table; 
 
 
+/* Pointer to current domain name table */
+extern struct domain_name_list ***domain_list_table;
+
 /*
  * Initialize data structures
  */
@@ -52,6 +55,11 @@ int mi_init_addresses(void);
  */
 int reload_address_table(void);
 
+/*
+ * Wrapper to reload addr table from mi or rpc
+ * we need to open the db_handle
+ */
+int reload_address_table_cmd(void);
 
 /*
  * Close connections and release memory

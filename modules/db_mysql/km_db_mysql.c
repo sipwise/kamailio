@@ -50,6 +50,7 @@
 
 unsigned int db_mysql_timeout_interval = 2;   /* Default is 6 seconds */
 unsigned int db_mysql_auto_reconnect = 1;     /* Default is enabled   */
+unsigned int db_mysql_insert_all_delayed = 0; /* Default is off */
 
 /* MODULE_VERSION */
 
@@ -115,6 +116,9 @@ int db_mysql_bind_api(db_func_t *dbb)
 	dbb->insert_update    = db_mysql_insert_update;
 	dbb->insert_delayed   = db_mysql_insert_delayed;
 	dbb->affected_rows    = db_mysql_affected_rows;
+	dbb->start_transaction= db_mysql_start_transaction;
+	dbb->end_transaction  = db_mysql_end_transaction;
+	dbb->abort_transaction= db_mysql_abort_transaction;
 
 	return 0;
 }

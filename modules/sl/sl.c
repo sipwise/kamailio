@@ -78,8 +78,6 @@ MODULE_VERSION
 static int default_code = 500;
 static str default_reason = STR_STATIC_INIT("Internal Server Error");
 
-int _sl_filtered_ack_route = -1; /* default disabled */
-
 static int sl_bind_tm = 1;
 static struct tm_binds tmb;
 
@@ -101,7 +99,7 @@ static cmd_export_t cmds[]={
 	{"sl_reply",       w_sl_send_reply,             2, fixup_sl_reply,
 		REQUEST_ROUTE},
 	{"send_reply",     w_send_reply,                2, fixup_sl_reply,
-		REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
+		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE},
 	{"sl_reply_error", w_sl_reply_error,            0, 0,
 		REQUEST_ROUTE},
 	{"sl_forward_reply",  w_sl_forward_reply0,      0, 0,
@@ -176,9 +174,7 @@ static int mod_init(void)
 		}
 	}
 
-	_sl_filtered_ack_route=route_lookup(&event_rt, "sl:filtered-ack");
-	if (_sl_filtered_ack_route>=0 && event_rt.rlist[_sl_filtered_ack_route]==0)
-		_sl_filtered_ack_route=-1; /* disable */
+	sl_lookup_event_routes();
 
 	return 0;
 }
@@ -285,6 +281,9 @@ int send_reply(struct sip_msg *msg, int code, str *reason)
 			goto done;
 		}
 	}
+
+	if(msg->first_line.type==SIP_REPLY)
+		goto error;
 
 	LM_DBG("reply in stateless mode (sl)\n");
 	ret = sl_send_reply(msg, code, r);

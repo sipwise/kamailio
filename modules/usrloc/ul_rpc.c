@@ -20,6 +20,7 @@
 
 #include "../../ip_addr.h"
 #include "../../dprint.h"
+#include "../../lib/srutils/sruid.h"
 
 #include "ul_rpc.h"
 #include "dlist.h"
@@ -27,6 +28,17 @@
 #include "udomain.h"
 #include "ul_mod.h"
 #include "utime.h"
+
+/*! CSEQ nr used */
+#define RPC_UL_CSEQ 1
+/*! call-id used for ul_add and ul_rm_contact */
+static str rpc_ul_cid = str_init("dfjrewr12386fd6-343@kamailio.mi");
+/*! path used for ul_add and ul_rm_contact */
+static str rpc_ul_path = str_init("dummypath");
+/*! user agent used for ul_add */
+static str rpc_ul_ua  = str_init("SIP Router MI Server");
+
+extern sruid_t _ul_sruid;
 
 static const char* ul_rpc_dump_doc[2] = {
 	"Dump user location tables",
@@ -95,7 +107,7 @@ int rpc_dump_contact(rpc_t* rpc, void* ctx, void *ih, ucontact_t* c)
 		socket_str.s = c->sock->sock_str.s;
 		socket_str.len = c->sock->sock_str.len;
 	}
-	if(rpc->struct_add(vh, "f", "Q", c->q)<0)
+	if(rpc->struct_add(vh, "f", "Q", q2double(c->q))<0)
 	{
 		rpc->fault(ctx, 500, "Internal error adding q");
 		return -1;
@@ -393,9 +405,409 @@ static void ul_rpc_lookup(rpc_t* rpc, void* ctx)
 	return;
 }
 
+static void ul_rpc_rm_aor(rpc_t* rpc, void* ctx)
+{
+	udomain_t* dom;
+	str table = {0, 0};
+	str aor = {0, 0};
+
+	if (rpc->scan(ctx, "SS", &table, &aor) != 2) {
+		rpc->fault(ctx, 500, "Not enough parameters (table and AOR to lookup)");
+		return;
+	}
+
+	/* look for table */
+	dom = rpc_find_domain( &table );
+	if (dom == NULL) {
+		rpc->fault(ctx, 500, "Domain not found");
+		return;
+	}
+
+	/* process the aor */
+	if ( rpc_fix_aor(&aor) != 0 ) {
+		rpc->fault(ctx, 500, "Domain missing in AOR");
+		return;
+	}
+
+	lock_udomain( dom, &aor);
+	if (delete_urecord( dom, &aor, 0) < 0) {
+		unlock_udomain( dom, &aor);
+		rpc->fault(ctx, 500, "Failed to delete AOR");
+		return;
+	}
+
+	unlock_udomain( dom, &aor);
+	return;
+}
+
+static const char* ul_rpc_rm_aor_doc[2] = {
+	"Delete a address of record including its contacts",
+	0
+};
+
+static void ul_rpc_rm_contact(rpc_t* rpc, void* ctx)
+{
+	udomain_t* dom;
+	str table = {0, 0};
+	str aor = {0, 0};
+	str contact = {0, 0};
+	urecord_t *rec;
+	ucontact_t* con;
+	int ret;
+
+	if (rpc->scan(ctx, "SSS", &table, &aor, &contact) != 3) {
+		rpc->fault(ctx, 500, "Not enough parameters (table, AOR and contact)");
+		return;
+	}
+
+	/* look for table */
+	dom = rpc_find_domain( &table );
+	if (dom == NULL) {
+		rpc->fault(ctx, 500, "Domain not found");
+		return;
+	}
+
+	/* process the aor */
+	if ( rpc_fix_aor(&aor) != 0 ) {
+		rpc->fault(ctx, 500, "Domain missing in AOR");
+		return;
+	}
+
+	lock_udomain( dom, &aor);
+
+	ret = get_urecord( dom, &aor, &rec);
+	if (ret == 1) {
+		unlock_udomain( dom, &aor);
+		rpc->fault(ctx, 404, "AOR not found");
+		return;
+	}
+
+	ret = get_ucontact( rec, &contact, &rpc_ul_cid, &rpc_ul_path, RPC_UL_CSEQ+1, &con);
+	if (ret < 0) {
+		unlock_udomain( dom, &aor);
+		rpc->fault(ctx, 500, "Internal error (can't get contact)");
+		return;
+	}
+	if (ret > 0) {
+		unlock_udomain( dom, &aor);
+		rpc->fault(ctx, 404, "Contact not found");
+		return;
+	}
+
+	if (delete_ucontact(rec, con) < 0) {
+		unlock_udomain( dom, &aor);
+		rpc->fault(ctx, 500, "Internal error (can't delete contact)");
+		return;
+	}
+
+	release_urecord(rec);
+	unlock_udomain( dom, &aor);
+	return;
+}
+
+static const char* ul_rpc_rm_contact_doc[2] = {
+	"Delete a contact from an AOR record",
+	0
+};
+
+static void ul_rpc_flush(rpc_t* rpc, void* ctx)
+{
+	synchronize_all_udomains(0, 1);
+	return;
+}
+
+static const char* ul_rpc_flush_doc[2] = {
+	"Flush the usrloc memory cache to DB",
+	0
+};
+
+/*!
+ * \brief Add a new contact for an address of record
+ * \note Expects 9 parameters: table name, AOR, contact, expires, Q,
+ * path, flags, cflags, methods
+ */
+static void ul_rpc_add(rpc_t* rpc, void* ctx)
+{
+	str table = {0, 0};
+	str aor = {0, 0};
+	str contact = {0, 0};
+	str path = {0, 0};
+	str temp = {0, 0};
+	double dtemp;
+	ucontact_info_t ci;
+	urecord_t* r;
+	ucontact_t* c;
+	udomain_t *dom;
+	int ret;
+
+	memset( &ci, 0, sizeof(ucontact_info_t));
+
+	ret = rpc->scan(ctx, "SSSdfSddd", &table, &aor, &contact, &ci.expires,
+		&dtemp, &path, &ci.flags, &ci.cflags, &ci.methods);
+	if(path.len==1 && (strncmp(temp.s, "0", 1)==0))	{
+		LM_DBG("path == 0 -> unset\n");
+	}
+	else {
+		ci.path = &path;
+	}
+	LM_DBG("ret: %d table:%.*s aor:%.*s contact:%.*s expires:%d dtemp:%f path:%.*s flags:%d bflags:%d methods:%d\n",
+		ret, table.len, table.s, aor.len, aor.s, contact.len, contact.s,
+		(int) ci.expires, dtemp, ci.path->len, ci.path->s, ci.flags, ci.cflags, (int) ci.methods);
+	if ( ret != 9) {
+		rpc->fault(ctx, 500, "Not enough parameters or wrong format");
+		return;
+	}
+	ci.q = double2q(dtemp);
+	temp.s = q2str(ci.q, (unsigned int*)&temp.len);
+	LM_DBG("q:%.*s\n", temp.len, temp.s);
+	/* look for table */
+	dom = rpc_find_domain( &table );
+	if (dom == NULL) {
+		rpc->fault(ctx, 500, "Domain not found");
+		return;
+	}
+
+	/* process the aor */
+	if ( rpc_fix_aor(&aor) != 0 ) {
+		rpc->fault(ctx, 500, "Domain missing in AOR");
+		return;
+	}
+
+	if(sruid_next(&_ul_sruid)<0)
+	{
+		rpc->fault(ctx, 500, "Can't obtain next uid");
+		return;
+	}
+	ci.ruid = _ul_sruid.uid;
+
+	lock_udomain( dom, &aor);
+
+	ret = get_urecord( dom, &aor, &r);
+	if(ret==1) {
+		if (insert_urecord( dom, &aor, &r) < 0)
+		{
+			unlock_udomain( dom, &aor);
+			rpc->fault(ctx, 500, "Can't insert record");
+			return;
+		}
+		c = 0;
+	} else {
+		if (get_ucontact( r, &contact, &rpc_ul_cid, &rpc_ul_path, RPC_UL_CSEQ+1, &c) < 0)
+		{
+			unlock_udomain( dom, &aor);
+			rpc->fault(ctx, 500, "Can't get record");
+			return;
+		}
+	}
+
+	get_act_time();
+
+	ci.callid = &rpc_ul_cid;
+	ci.user_agent = &rpc_ul_ua;
+	ci.cseq = RPC_UL_CSEQ;
+	/* 0 expires means permanent contact */
+	if (ci.expires!=0)
+		ci.expires += act_time;
+
+	if (c) {
+		if (update_ucontact( r, c, &ci) < 0)
+		{
+			release_urecord(r);
+			unlock_udomain( dom, &aor);
+			rpc->fault(ctx, 500, "Can't update contact");
+			return;
+		}
+	} else {
+		if ( insert_ucontact( r, &contact, &ci, &c) < 0 )
+		{
+			release_urecord(r);
+			unlock_udomain( dom, &aor);
+			rpc->fault(ctx, 500, "Can't insert contact");
+			return;
+		}
+	}
+
+	release_urecord(r);
+	unlock_udomain( dom, &aor);
+	return;
+}
+
+static const char* ul_rpc_add_doc[2] = {
+	"Add a new contact for an address of record",
+	0
+};
+
+#define QUERY_LEN 256
+
+static void ul_rpc_db_users(rpc_t* rpc, void* ctx)
+{
+    str table = {0, 0};
+    char query[QUERY_LEN];
+    str query_str;
+    db1_res_t* res;
+    int count;
+
+    if (db_mode == NO_DB) {
+	rpc->fault(ctx, 500, "Command is not supported in db_mode=0");
+	return;
+    }
+
+    if (rpc->scan(ctx, "S", &table) != 1) {
+	rpc->fault(ctx, 500, "Not enough parameters (table to lookup)");
+	return;
+    }
+
+    if (user_col.len + domain_col.len + table.len + 32 > QUERY_LEN) {
+	rpc->fault(ctx, 500, "Too long database query");
+	return;
+    }
+
+    if (!DB_CAPABILITY(ul_dbf, DB_CAP_RAW_QUERY)) {
+	rpc->fault(ctx, 500, "Database does not support raw queries");
+	return;
+    }
+    if (ul_dbf.use_table(ul_dbh, &table) < 0) {
+	rpc->fault(ctx, 500, "Failed to use table");
+	return;
+    }
+	
+    memset(query, 0, QUERY_LEN);
+    query_str.len = snprintf(query, QUERY_LEN,
+			     "SELECT COUNT(DISTINCT %.*s, %.*s) FROM %.*s WHERE (UNIX_TIMESTAMP(expires) = 0) OR (expires > NOW())",
+			     user_col.len, user_col.s,
+			     domain_col.len, domain_col.s,
+			     table.len, table.s);
+    query_str.s = query;
+    if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0) {
+	rpc->fault(ctx, 500, "Failed to query AoR count");
+	return;
+    }
+
+    count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+    ul_dbf.free_result(ul_dbh, res);
+
+    rpc->add(ctx, "d", count);
+}
+
+static const char* ul_rpc_db_users_doc[2] = {
+	"Tell number of different unexpired users (AoRs) in database table (db_mode!=0 only)",
+	0
+};
+
+static void ul_rpc_db_contacts(rpc_t* rpc, void* ctx)
+{
+    str table = {0, 0};
+    char query[QUERY_LEN];
+    str query_str;
+    db1_res_t* res;
+    int count;
+
+    if (db_mode == NO_DB) {
+	rpc->fault(ctx, 500, "Command is not supported in db_mode=0");
+	return;
+    }
+
+    if (rpc->scan(ctx, "S", &table) != 1) {
+	rpc->fault(ctx, 500, "Not enough parameters (table to lookup)");
+	return;
+    }
+
+    if (table.len + 22 > QUERY_LEN) {
+	rpc->fault(ctx, 500, "Too long database query");
+	return;
+    }
+
+    if (!DB_CAPABILITY(ul_dbf, DB_CAP_RAW_QUERY)) {
+	rpc->fault(ctx, 500, "Database does not support raw queries");
+	return;
+    }
+    if (ul_dbf.use_table(ul_dbh, &table) < 0) {
+	rpc->fault(ctx, 500, "Failed to use table");
+	return;
+    }
+	
+    memset(query, 0, QUERY_LEN);
+    query_str.len = snprintf(query, QUERY_LEN, "SELECT COUNT(*) FROM %.*s WHERE (UNIX_TIMESTAMP(expires) = 0) OR (expires > NOW())",
+			     table.len, table.s);
+    query_str.s = query;
+    if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0) {
+	rpc->fault(ctx, 500, "Failed to query contact count");
+	return;
+    }
+
+    count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+    ul_dbf.free_result(ul_dbh, res);
+
+    rpc->add(ctx, "d", count);
+}
+
+static const char* ul_rpc_db_contacts_doc[2] = {
+	"Tell number of unexpired contacts in database table (db_mode=3 only)",
+	0
+};
+
+static void ul_rpc_db_expired_contacts(rpc_t* rpc, void* ctx)
+{
+    str table = {0, 0};
+    char query[QUERY_LEN];
+    str query_str;
+    db1_res_t* res;
+    int count;
+
+    if (db_mode == NO_DB) {
+	rpc->fault(ctx, 500, "Command is not supported in db_mode=0");
+	return;
+    }
+
+    if (rpc->scan(ctx, "S", &table) != 1) {
+	rpc->fault(ctx, 500, "Not enough parameters (table to lookup)");
+	return;
+    }
+
+    if (table.len + 22 > QUERY_LEN) {
+	rpc->fault(ctx, 500, "Too long database query");
+	return;
+    }
+
+    if (!DB_CAPABILITY(ul_dbf, DB_CAP_RAW_QUERY)) {
+	rpc->fault(ctx, 500, "Database does not support raw queries");
+	return;
+    }
+    if (ul_dbf.use_table(ul_dbh, &table) < 0) {
+	rpc->fault(ctx, 500, "Failed to use table");
+	return;
+    }
+	
+    memset(query, 0, QUERY_LEN);
+    query_str.len = snprintf(query, QUERY_LEN, "SELECT COUNT(*) FROM %.*s WHERE (UNIX_TIMESTAMP(expires) > 0) AND (expires <= NOW())",
+			     table.len, table.s);
+    query_str.s = query;
+    if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0) {
+	rpc->fault(ctx, 500, "Failed to query contact count");
+	return;
+    }
+
+    count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+    ul_dbf.free_result(ul_dbh, res);
+
+    rpc->add(ctx, "d", count);
+}
+
+static const char* ul_rpc_db_expired_contacts_doc[2] = {
+	"Tell number of expired contacts in database table (db_mode=3 only)",
+	0
+};
+
 rpc_export_t ul_rpc[] = {
 	{"ul.dump",   ul_rpc_dump,   ul_rpc_dump_doc,   0},
 	{"ul.lookup",   ul_rpc_lookup,   ul_rpc_lookup_doc,   0},
+	{"ul.rm", ul_rpc_rm_aor, ul_rpc_rm_aor_doc, 0},
+	{"ul.rm_contact", ul_rpc_rm_contact, ul_rpc_rm_contact_doc, 0},
+	{"ul.flush", ul_rpc_flush, ul_rpc_flush_doc, 0},
+	{"ul.add", ul_rpc_add, ul_rpc_add_doc, 0},
+	{"ul.db_users", ul_rpc_db_users, ul_rpc_db_users_doc, 0},
+	{"ul.db_contacts", ul_rpc_db_contacts, ul_rpc_db_contacts_doc, 0},
+	{"ul.db_expired_contacts", ul_rpc_db_expired_contacts, ul_rpc_db_expired_contacts_doc, 0},
 	{0, 0, 0, 0}
 };
 

@@ -82,12 +82,15 @@ struct tm_binds {
 	free_dlg_f         free_dlg;
 	print_dlg_f        print_dlg;
 	tgett_f            t_gett;
+	tgett_branch_f     t_gett_branch;
+	tsett_f            t_sett;
 	calculate_hooks_f  calculate_hooks;
 	t_uac_t            t_uac;
 	t_uac_with_ids_t   t_uac_with_ids;
 	trelease_f         t_release;
 	tunref_f           t_unref;
 	run_failure_handlers_f run_failure_handlers;
+	run_branch_failure_handlers_f run_branch_failure_handlers;
 	cancel_uacs_f      cancel_uacs;
 	cancel_all_uacs_f  cancel_all_uacs;
 	prepare_request_within_f  prepare_request_within;

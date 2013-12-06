@@ -138,6 +138,7 @@ int dlg_db_mode_param = DB_MODE_NONE;
 str dlg_xavp_cfg = {0};
 int dlg_ka_timer = 0;
 int dlg_ka_interval = 0;
+int dlg_clean_timer = 90;
 
 /* db stuff */
 static str db_url = str_init(DEFAULT_DB_URL);
@@ -147,6 +148,7 @@ static int pv_get_dlg_count( struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 void dlg_ka_timer_exec(unsigned int ticks, void* param);
+void dlg_clean_timer_exec(unsigned int ticks, void* param);
 
 /* commands wrappers and fixups */
 static int fixup_profile(void** param, int param_no);
@@ -453,7 +455,7 @@ static int mod_init(void)
 #ifdef STATISTICS
 	/* register statistics */
 	if (register_module_stats( exports.name, mod_stats)!=0 ) {
-		LM_ERR("failed to register core statistics\n");
+		LM_ERR("failed to register %s statistics\n", exports.name);
 		return -1;
 	}
 #endif
@@ -697,8 +699,13 @@ static int mod_init(void)
 	}
 
 	destroy_dlg_callbacks( DLGCB_LOADED );
+
+	/* timer process to send keep alive requests */
 	if(dlg_ka_timer>0 && dlg_ka_interval>0)
 		register_sync_timers(1);
+
+	/* timer process to clean old unconfirmed dialogs */
+	register_sync_timers(1);
 
 	return 0;
 }
@@ -708,11 +715,18 @@ static int child_init(int rank)
 {
 	dlg_db_mode = dlg_db_mode_param;
 
-	if(rank==PROC_MAIN && dlg_ka_timer>0 && dlg_ka_interval>0)
-	{
-		if(fork_sync_timer(PROC_TIMER, "Dialog KA Timer", 1 /*socks flag*/,
-				dlg_ka_timer_exec, NULL, dlg_ka_timer /*sec*/)<0) {
-			LM_ERR("failed to start ka timer routine as process\n");
+	if(rank==PROC_MAIN) {
+		if(dlg_ka_timer>0 && dlg_ka_interval>0) {
+			if(fork_sync_timer(PROC_TIMER, "Dialog KA Timer", 1 /*socks flag*/,
+					dlg_ka_timer_exec, NULL, dlg_ka_timer /*sec*/)<0) {
+				LM_ERR("failed to start ka timer routine as process\n");
+				return -1; /* error */
+			}
+		}
+
+		if(fork_sync_timer(PROC_TIMER, "Dialog Clean Timer", 1 /*socks flag*/,
+					dlg_clean_timer_exec, NULL, dlg_clean_timer /*sec*/)<0) {
+			LM_ERR("failed to start clean timer routine as process\n");
 			return -1; /* error */
 		}
 	}
@@ -1097,7 +1111,7 @@ static int w_dlg_bridge(struct sip_msg *msg, char *from, char *to, char *op)
 		return -1;
 	}
 
-	if(dlg_bridge(&sf, &st, &so)!=0)
+	if(dlg_bridge(&sf, &st, &so, NULL)!=0)
 		return -1;
 	return 1;
 }
@@ -1219,6 +1233,11 @@ static int w_dlg_set_timeout_by_profile2(struct sip_msg *msg,
 void dlg_ka_timer_exec(unsigned int ticks, void* param)
 {
 	dlg_ka_run(ticks);
+}
+
+void dlg_clean_timer_exec(unsigned int ticks, void* param)
+{
+	dlg_clean_run(ticks);
 }
 
 static int fixup_dlg_bye(void** param, int param_no)
@@ -1345,6 +1364,7 @@ struct mi_root * mi_dlg_bridge(struct mi_root *cmd_tree, void *param)
 	str from = {0,0};
 	str to = {0,0};
 	str op = {0,0};
+	str bd = {0,0};
 	struct mi_node* node;
 
 	node = cmd_tree->node.kids;
@@ -1374,9 +1394,23 @@ struct mi_root * mi_dlg_bridge(struct mi_root *cmd_tree, void *param)
 		{
 			return init_mi_tree(500, "Bad OP value", 12);
 		}
+		if(op.len==1 && *op.s=='.')
+		{
+			op.s = NULL;
+			op.len = 0;
+		}
+		node= node->next;
+		if(node != NULL)
+		{
+			bd = node->value;
+			if(bd.len<=0 || bd.s==NULL)
+			{
+				return init_mi_tree(500, "Bad SDP value", 13);
+			}
+		}
 	}
 
-	if(dlg_bridge(&from, &to, &op)!=0)
+	if(dlg_bridge(&from, &to, &op, &bd)!=0)
 		return init_mi_tree(500, MI_INTERNAL_ERR_S,  MI_INTERNAL_ERR_LEN);
 
 	return init_mi_tree(200, MI_OK_S, MI_OK_LEN);
@@ -1676,6 +1710,7 @@ static void rpc_dlg_bridge(rpc_t *rpc, void *c) {
 	str from = {NULL,0};
 	str to = {NULL,0};
 	str op = {NULL,0};
+	str bd = {NULL,0};
 	int n;
 
 	n = rpc->scan(c, "SS", &from, &to);
@@ -1687,9 +1722,18 @@ static void rpc_dlg_bridge(rpc_t *rpc, void *c) {
 	if(rpc->scan(c, "*S", &op)<1) {
 		op.s = NULL;
 		op.len = 0;
+	} else {
+		if(op.len==1 && *op.s=='.') {
+			op.s = NULL;
+			op.len = 0;
+		}
+		if(rpc->scan(c, "*S", &bd)<1) {
+			bd.s = NULL;
+			bd.len = 0;
+		}
 	}
 
-	dlg_bridge(&from, &to, &op);
+	dlg_bridge(&from, &to, &op, &bd);
 }
 
 static rpc_export_t rpc_methods[] = {

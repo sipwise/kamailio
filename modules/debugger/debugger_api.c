@@ -35,9 +35,16 @@
 #include "../../rpc_lookup.h"
 #include "../../route_struct.h"
 #include "../../mem/shm_mem.h"
-		       
+#include "../../locking.h"
+#include "../../lvalue.h"
+#include "../../hashes.h"
+#include "../../lib/srutils/srjson.h"
+#include "../../xavp.h"
+#include "../pv/pv_xavp.h"
+
 #include "debugger_act.h"
 #include "debugger_api.h"
+#include "debugger_config.h"
 
 #define DBG_CMD_SIZE 256
 
@@ -145,6 +152,11 @@ int _dbg_cfgtrace = 0;
 /**
  *
  */
+int _dbg_cfgpkgcheck = 0;
+
+/**
+ *
+ */
 int _dbg_breakpoint = 0;
 
 /**
@@ -173,6 +185,11 @@ int _dbg_step_usleep = 100000;
 int _dbg_step_loops = 200;
 
 /**
+ * disabled by default
+ */
+int _dbg_reset_msgid = 0;
+
+/**
  *
  */
 typedef struct _dbg_cmd
@@ -192,6 +209,9 @@ typedef struct _dbg_pid
 	unsigned int state;
 	dbg_cmd_t in;
 	dbg_cmd_t out;
+	gen_lock_t *lock;
+	unsigned int reset_msgid; /* flag to reset the id */
+	unsigned int msgid_base; /* real id since the reset */
 } dbg_pid_t;
 
 /**
@@ -220,6 +240,48 @@ typedef struct _dbg_bp
  */
 static dbg_bp_t *_dbg_bp_list = NULL;
 
+/* defined later */
+int dbg_get_pid_index(unsigned int pid);
+
+/*!
+ * \brief Callback function that checks if reset_msgid is set
+ *  and modifies msg->id if necessary.
+ * \param msg SIP message
+ * \param flags unused
+ * \param bar unused
+ * \return 1 on success, -1 on failure
+ */
+int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar)
+{
+	unsigned int process_no = my_pid();
+	int indx = dbg_get_pid_index(process_no);
+	unsigned int msgid_base = 0;
+	unsigned int msgid_new = 0;
+	if(indx<0) return -1;
+	LM_DBG("process_no:%d indx:%d\n", process_no, indx);
+	lock_get(_dbg_pid_list[indx].lock);
+	if(_dbg_pid_list[indx].reset_msgid==1)
+	{
+		LM_DBG("reset_msgid! msgid_base:%d\n", msg->id);
+		_dbg_pid_list[indx].reset_msgid = 0;
+		_dbg_pid_list[indx].msgid_base = msg->id - 1;
+	}
+	msgid_base = _dbg_pid_list[indx].msgid_base;
+	lock_release(_dbg_pid_list[indx].lock);
+	msgid_new = msg->id - msgid_base;
+	LM_DBG("msg->id:%d msgid_base:%d -> %d\n", msg->id, msgid_base, msgid_new);
+	if(msgid_new>0)
+	{
+		msg->id = msgid_new;
+		return 1;
+	}
+	else
+	{
+		LM_WARN("msgid_new<=0??\n");
+		return -1;
+	}
+}
+
 /**
  * callback executed for each cfg action
  */
@@ -244,6 +306,17 @@ int dbg_cfg_trace(void *data)
 		return 0;
 
 	an = dbg_get_action_name(a);
+
+	if(_dbg_cfgpkgcheck!=0)
+	{
+#ifdef q_malloc_h
+		LM_DBG("checking pkg memory before action %.*s (line %d)\n",
+				an->len, an->s, a->cline);
+		qm_check(mem_block);
+#else
+		LM_DBG("cfg pkg check is disbled due to missing qm handler\n");
+#endif
+	}
 
 	if(_dbg_pid_list[process_no].set&DBG_CFGTRACE_ON)
 	{
@@ -490,6 +563,22 @@ int dbg_init_mypid(void)
 		_dbg_pid_list[process_no].set |= DBG_ABKPOINT_ON;
 	if(_dbg_cfgtrace==1)
 		_dbg_pid_list[process_no].set |= DBG_CFGTRACE_ON;
+	if(_dbg_reset_msgid==1)
+	{
+		LM_DBG("[%d] create locks\n", process_no);
+		_dbg_pid_list[process_no].lock = lock_alloc();
+		if(_dbg_pid_list[process_no].lock==NULL)
+		{
+			LM_ERR("cannot allocate the lock\n");
+			return -1;
+		}
+		if(lock_init(_dbg_pid_list[process_no].lock)==NULL)
+		{
+			LM_ERR("cannot init the lock\n");
+			lock_dealloc(_dbg_pid_list[process_no].lock);
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -843,14 +932,74 @@ static void  dbg_rpc_trace(rpc_t* rpc, void* ctx)
 	rpc->add(ctx, "s", "200 ok");
 }
 
+/**
+ *
+ */
+static const char* dbg_rpc_mod_level_doc[2] = {
+	"Specify module log level",
+	0
+};
+
+static void dbg_rpc_mod_level(rpc_t* rpc, void* ctx){
+	int l;
+	str value = {0,0};
+
+	if (rpc->scan(ctx, "Sd", &value, &l) < 1)
+	{
+		rpc->fault(ctx, 500, "invalid parameters");
+		return;
+	}
+
+	if(dbg_set_mod_debug_level(value.s, value.len, &l)<0)
+	{
+		rpc->fault(ctx, 500, "cannot store parameter\n");
+		return;
+	}
+	rpc->add(ctx, "s", "200 ok");
+}
+
+/**
+ *
+ */
+static const char* dbg_rpc_reset_msgid_doc[2] = {
+	"Reset msgid on all process",
+	0
+};
+
+static void dbg_rpc_reset_msgid(rpc_t* rpc, void* ctx){
+	int i;
+	if (_dbg_reset_msgid==0)
+	{
+		rpc->fault(ctx, 500, "reset_msgid is 0. Set it to 1 to enable.");
+		return;
+	}
+	if(_dbg_pid_list==NULL)
+	{
+		rpc->fault(ctx, 500, "_dbg_pid_list is NULL");
+		return;
+	}
+	LM_DBG("set reset_msgid\n");
+	for(i=0; i<_dbg_pid_no; i++)
+	{
+		if (_dbg_pid_list[i].lock!=NULL)
+		{
+			lock_get(_dbg_pid_list[i].lock);
+			_dbg_pid_list[i].reset_msgid = 1;
+			lock_release(_dbg_pid_list[i].lock);
+		}
+	}
+	rpc->add(ctx, "s", "200 ok");
+}
 
 /**
  *
  */
 rpc_export_t dbg_rpc[] = {
-	{"dbg.bp",    dbg_rpc_bp,        dbg_rpc_bp_doc,       0},
-	{"dbg.ls",    dbg_rpc_list,      dbg_rpc_list_doc,     0},
-	{"dbg.trace", dbg_rpc_trace,     dbg_rpc_trace_doc,    0},
+	{"dbg.bp",        dbg_rpc_bp,        dbg_rpc_bp_doc,        0},
+	{"dbg.ls",        dbg_rpc_list,      dbg_rpc_list_doc,      0},
+	{"dbg.trace",     dbg_rpc_trace,     dbg_rpc_trace_doc,     0},
+	{"dbg.mod_level", dbg_rpc_mod_level, dbg_rpc_mod_level_doc, 0},
+	{"dbg.reset_msgid", dbg_rpc_reset_msgid, dbg_rpc_reset_msgid_doc, 0},
 	{0, 0, 0, 0}
 };
 
@@ -867,3 +1016,759 @@ int dbg_init_rpc(void)
 	return 0;
 }
 
+typedef struct _dbg_mod_level {
+	str name;
+	unsigned int hashid;
+	int level;
+	struct _dbg_mod_level *next;
+} dbg_mod_level_t;
+
+typedef struct _dbg_mod_slot
+{
+	dbg_mod_level_t *first;
+	gen_lock_t lock;
+} dbg_mod_slot_t;
+
+static dbg_mod_slot_t *_dbg_mod_table = NULL;
+static unsigned int _dbg_mod_table_size = 0;
+
+/**
+ *
+ */
+int dbg_init_mod_levels(int dbg_mod_hash_size)
+{
+	int i;
+	if(dbg_mod_hash_size<=0)
+		return 0;
+	if(_dbg_mod_table!=NULL)
+		return 0;
+	_dbg_mod_table_size = 1 << dbg_mod_hash_size;
+	_dbg_mod_table = (dbg_mod_slot_t*)shm_malloc(_dbg_mod_table_size*sizeof(dbg_mod_slot_t));
+	if(_dbg_mod_table==NULL)
+	{
+		LM_ERR("no more shm.\n");
+		return -1;
+	}
+	memset(_dbg_mod_table, 0, _dbg_mod_table_size*sizeof(dbg_mod_slot_t));
+
+	for(i=0; i<_dbg_mod_table_size; i++)
+	{
+		if(lock_init(&_dbg_mod_table[i].lock)==0)
+		{
+			LM_ERR("cannot initalize lock[%d]\n", i);
+			i--;
+			while(i>=0)
+			{
+				lock_destroy(&_dbg_mod_table[i].lock);
+				i--;
+			}
+			shm_free(_dbg_mod_table);
+			_dbg_mod_table = NULL;
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * case insensitive hashing - clone here to avoid usage of LOG*()
+ * - s1 - str to hash
+ * - s1len - len of s1
+ * return computed hash id
+ */
+#define dbg_ch_h_inc h+=v^(v>>3)
+#define dbg_ch_icase(_c) (((_c)>='A'&&(_c)<='Z')?((_c)|0x20):(_c))
+static inline unsigned int dbg_compute_hash(char *s1, int s1len)
+{
+	char *p, *end;
+	register unsigned v;
+	register unsigned h;
+
+	h=0;
+
+	end=s1+s1len;
+	for ( p=s1 ; p<=(end-4) ; p+=4 ){
+		v=(dbg_ch_icase(*p)<<24)+(dbg_ch_icase(p[1])<<16)+(dbg_ch_icase(p[2])<<8)
+			+ dbg_ch_icase(p[3]);
+		dbg_ch_h_inc;
+	}
+	v=0;
+	for (; p<end ; p++){ v<<=8; v+=dbg_ch_icase(*p);}
+	dbg_ch_h_inc;
+
+	h=((h)+(h>>11))+((h>>13)+(h>>23));
+	return h;
+}
+
+int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel)
+{
+	unsigned int idx;
+	unsigned int hid;
+	dbg_mod_level_t *it;
+	dbg_mod_level_t *itp;
+	dbg_mod_level_t *itn;
+
+	if(_dbg_mod_table==NULL)
+		return -1;
+
+	hid = dbg_compute_hash(mname, mnlen);
+	idx = hid&(_dbg_mod_table_size-1);
+
+	lock_get(&_dbg_mod_table[idx].lock);
+	it = _dbg_mod_table[idx].first;
+	itp = NULL;
+	while(it!=NULL && it->hashid < hid) {
+		itp = it;
+		it = it->next;
+	}
+	while(it!=NULL && it->hashid==hid)
+	{
+		if(mnlen==it->name.len
+				&& strncmp(mname, it->name.s, mnlen)==0)
+		{
+			/* found */
+			if(mlevel==NULL) {
+				/* remove */
+				if(itp!=NULL) {
+					itp->next = it->next;
+				} else {
+					_dbg_mod_table[idx].first = it->next;
+				}
+				shm_free(it);
+			} else {
+				/* set */
+				it->level = *mlevel;
+			}
+			lock_release(&_dbg_mod_table[idx].lock);
+			return 0;
+		}
+		itp = it;
+		it = it->next;
+	}
+	/* not found - add */
+	if(mlevel==NULL) {
+		lock_release(&_dbg_mod_table[idx].lock);
+		return 0;
+	}
+	itn = (dbg_mod_level_t*)shm_malloc(sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
+	if(itn==NULL) {
+		LM_ERR("no more shm\n");
+		lock_release(&_dbg_mod_table[idx].lock);
+		return -1;
+	}
+	memset(itn, 0, sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
+	itn->level    = *mlevel;
+	itn->hashid   = hid;
+	itn->name.s   = (char*)(itn) + sizeof(dbg_mod_level_t);
+	itn->name.len = mnlen;
+	strncpy(itn->name.s, mname, mnlen);
+	itn->name.s[itn->name.len] = '\0';
+
+	if(itp==NULL) {
+		itn->next = _dbg_mod_table[idx].first;
+		_dbg_mod_table[idx].first = itn;
+	} else {
+		itn->next = itp->next;
+		itp->next = itn;
+	}
+	lock_release(&_dbg_mod_table[idx].lock);
+	return 0;
+
+}
+
+static int _dbg_get_mod_debug_level = 0;
+int dbg_get_mod_debug_level(char *mname, int mnlen, int *mlevel)
+{
+	unsigned int idx;
+	unsigned int hid;
+	dbg_mod_level_t *it;
+	/* no LOG*() usage in this function and those executed insite it
+	 * - use fprintf(stderr, ...) if need for troubleshooting
+	 * - it will loop otherwise */
+	if(_dbg_mod_table==NULL)
+		return -1;
+
+	if(cfg_get(dbg, dbg_cfg, mod_level_mode)==0)
+		return -1;
+
+	if(_dbg_get_mod_debug_level!=0)
+		return -1;
+	_dbg_get_mod_debug_level = 1;
+
+	hid = dbg_compute_hash(mname, mnlen);
+	idx = hid&(_dbg_mod_table_size-1);
+	lock_get(&_dbg_mod_table[idx].lock);
+	it = _dbg_mod_table[idx].first;
+	while(it!=NULL && it->hashid < hid)
+		it = it->next;
+	while(it!=NULL && it->hashid == hid)
+	{
+		if(mnlen==it->name.len
+				&& strncmp(mname, it->name.s, mnlen)==0)
+		{
+			/* found */
+			*mlevel = it->level;
+			lock_release(&_dbg_mod_table[idx].lock);
+			_dbg_get_mod_debug_level = 0;
+			return 0;
+		}
+		it = it->next;
+	}
+	lock_release(&_dbg_mod_table[idx].lock);
+	_dbg_get_mod_debug_level = 0;
+	return -1;
+}
+
+/**
+ *
+ */
+void dbg_enable_mod_levels(void)
+{
+	if(_dbg_mod_table==NULL)
+		return;
+	set_module_debug_level_cb(dbg_get_mod_debug_level);
+}
+
+#define DBG_PVCACHE_SIZE 32
+
+typedef struct _dbg_pvcache {
+	pv_spec_t *spec;
+	str *pvname;
+	struct _dbg_pvcache *next;
+} dbg_pvcache_t;
+
+static dbg_pvcache_t **_dbg_pvcache = NULL;
+
+int dbg_init_pvcache()
+{
+	_dbg_pvcache = (dbg_pvcache_t**)pkg_malloc(sizeof(dbg_pvcache_t*)*DBG_PVCACHE_SIZE);
+	if(_dbg_pvcache==NULL)
+	{
+		LM_ERR("no more memory.\n");
+		return -1;
+	}
+	memset(_dbg_pvcache, 0, sizeof(dbg_pvcache_t*)*DBG_PVCACHE_SIZE);
+	return 0;
+}
+
+int dbg_assign_add(str *name, pv_spec_t *spec)
+{
+	dbg_pvcache_t *pvn, *last, *next;
+	unsigned int pvid;
+
+	if(name==NULL||spec==NULL)
+		return -1;
+
+	if(_dbg_pvcache==NULL)
+		return -1;
+
+	pvid = get_hash1_raw((char *)&spec, sizeof(pv_spec_t*));
+	pvn = (dbg_pvcache_t*)pkg_malloc(sizeof(dbg_pvcache_t));
+	if(pvn==NULL)
+	{
+		LM_ERR("no more memory\n");
+		return -1;
+	}
+	memset(pvn, 0, sizeof(dbg_pvcache_t));
+	pvn->pvname = name;
+	pvn->spec = spec;
+	next = _dbg_pvcache[pvid%DBG_PVCACHE_SIZE];
+	if(next==NULL)
+	{
+		_dbg_pvcache[pvid%DBG_PVCACHE_SIZE] = pvn;
+	}
+	else
+	{
+		while(next)
+		{
+			last = next;
+			next = next->next;
+		}
+		last->next = pvn;
+	}
+	return 0;
+}
+
+str *_dbg_pvcache_lookup(pv_spec_t *spec)
+{
+	dbg_pvcache_t *pvi;
+	unsigned int pvid;
+	str *name = NULL;
+
+	if(spec==NULL)
+		return NULL;
+
+	if(_dbg_pvcache==NULL)
+		return NULL;
+
+	pvid = get_hash1_raw((char *)&spec, sizeof(pv_spec_t*));
+	pvi = _dbg_pvcache[pvid%DBG_PVCACHE_SIZE];
+	while(pvi)
+	{
+		if(pvi->spec==spec) {
+			return pvi->pvname;
+		}
+		pvi = pvi->next;
+	}
+	name = pv_cache_get_name(spec);
+	if(name!=NULL)
+	{
+		/*LM_DBG("Add name[%.*s] to pvcache\n", name->len, name->s);*/
+		dbg_assign_add(name, spec);
+	}
+	return name;
+}
+
+int _dbg_log_assign_action_avp(struct sip_msg* msg, struct lvalue* lv)
+{
+	int_str avp_val;
+	avp_t* avp;
+	avp_spec_t* avp_s = &lv->lv.avps;
+	avp = search_avp_by_index(avp_s->type, avp_s->name,
+				&avp_val, avp_s->index);
+	if (likely(avp)){
+		if (avp->flags&(AVP_VAL_STR)){
+			LM_DBG("%.*s:\"%.*s\"\n", avp_s->name.s.len, avp_s->name.s.s,
+				avp_val.s.len, avp_val.s.s);
+		}else{
+			LM_DBG("%.*s:%d\n", avp_s->name.s.len, avp_s->name.s.s,
+				avp_val.n);
+		}
+	}
+	return 0;
+}
+
+int _dbg_log_assign_action_pvar(struct sip_msg* msg, struct lvalue* lv)
+{
+	pv_value_t value;
+	pv_spec_t* pvar = lv->lv.pvs;
+	str def_name = {"unknown", 7};
+	str *name = _dbg_pvcache_lookup(pvar);
+
+	if(name==NULL)
+		name = &def_name;
+	if(pv_get_spec_value(msg, pvar, &value)!=0)
+	{
+		LM_ERR("can't get value\n");
+		return -1;
+	}
+
+	if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE)){
+		LM_DBG("%.*s: $null\n", name->len, name->s);
+	}else if(value.flags&(PV_VAL_INT)){
+		LM_DBG("%.*s:%d\n", name->len, name->s, value.ri);
+	}else if(value.flags&(PV_VAL_STR)){
+		LM_DBG("%.*s:\"%.*s\"\n", name->len, name->s, value.rs.len, value.rs.s);
+	}
+	return 0;
+}
+
+int dbg_log_assign(struct sip_msg* msg, struct lvalue *lv)
+{
+	if(lv==NULL)
+	{
+		LM_ERR("left value is NULL\n");
+		return -1;
+	}
+	switch(lv->type){
+		case LV_AVP:
+			return _dbg_log_assign_action_avp(msg, lv);
+			break;
+		case LV_PVAR:
+			return _dbg_log_assign_action_pvar(msg, lv);
+			break;
+		case LV_NONE:
+			break;
+	}
+	return 0;
+}
+
+void dbg_enable_log_assign(void)
+{
+	if(_dbg_pvcache==NULL)
+		return;
+	set_log_assign_action_cb(dbg_log_assign);
+}
+
+int dbg_level_mode_fixup(void *temp_handle,
+	str *group_name, str *var_name, void **value){
+	if(_dbg_mod_table==NULL)
+	{
+		LM_ERR("mod_hash_size must be set on start\n");
+		return -1;
+	}
+	return 0;
+}
+
+int _dbg_get_array_avp_vals(struct sip_msg *msg,
+		pv_param_t *param, srjson_doc_t *jdoc, srjson_t **jobj,
+		str *item_name)
+{
+	struct usr_avp *avp;
+	unsigned short name_type;
+	int_str avp_name;
+	int_str avp_value;
+	struct search_state state;
+	srjson_t *jobjt;
+	memset(&state, 0, sizeof(struct search_state));
+
+	if(pv_get_avp_name(msg, param, &avp_name, &name_type)!=0)
+	{
+		LM_ERR("invalid name\n");
+		return -1;
+	}
+	*jobj = srjson_CreateArray(jdoc);
+	if(*jobj==NULL)
+	{
+		LM_ERR("cannot create json object\n");
+		return -1;
+	}
+	if ((avp=search_first_avp(name_type, avp_name, &avp_value, &state))==0)
+	{
+		goto ok;
+	}
+	do
+	{
+		if(avp->flags & AVP_VAL_STR)
+		{
+			jobjt = srjson_CreateStr(jdoc, avp_value.s.s, avp_value.s.len);
+			if(jobjt==NULL)
+			{
+				LM_ERR("cannot create json object\n");
+				return -1;
+			}
+		} else {
+			jobjt = srjson_CreateNumber(jdoc, avp_value.n);
+			if(jobjt==NULL)
+			{
+				LM_ERR("cannot create json object\n");
+				return -1;
+			}
+		}
+		srjson_AddItemToArray(jdoc, *jobj, jobjt);
+	} while ((avp=search_next_avp(&state, &avp_value))!=0);
+ok:
+	item_name->s = avp_name.s.s;
+	item_name->len = avp_name.s.len;
+	return 0;
+}
+#define DBG_XAVP_DUMP_SIZE 32
+static str* _dbg_xavp_dump[DBG_XAVP_DUMP_SIZE];
+int _dbg_xavp_dump_lookup(pv_param_t *param)
+{
+	unsigned int i = 0;
+	pv_xavp_name_t *xname;
+
+	if(param==NULL)
+		return -1;
+
+	xname = (pv_xavp_name_t*)param->pvn.u.dname;
+
+	while(_dbg_xavp_dump[i]!=NULL&&i<DBG_XAVP_DUMP_SIZE)
+	{
+		if(_dbg_xavp_dump[i]->len==xname->name.len)
+		{
+			if(strncmp(_dbg_xavp_dump[i]->s, xname->name.s, xname->name.len)==0)
+				return 1; /* already dump before */
+		}
+		i++;
+	}
+	if(i==DBG_XAVP_DUMP_SIZE)
+	{
+		LM_WARN("full _dbg_xavp_dump cache array\n");
+		return 0; /* end cache names */
+	}
+	_dbg_xavp_dump[i] = &xname->name;
+	return 0;
+}
+
+void _dbg_get_obj_xavp_val(sr_xavp_t *avp, srjson_doc_t *jdoc, srjson_t **jobj)
+{
+	static char _pv_xavp_buf[128];
+	int result = 0;
+
+	switch(avp->val.type) {
+		case SR_XTYPE_NULL:
+			*jobj = srjson_CreateNull(jdoc);
+		break;
+		case SR_XTYPE_INT:
+			*jobj = srjson_CreateNumber(jdoc, avp->val.v.i);
+		break;
+		case SR_XTYPE_STR:
+			*jobj = srjson_CreateStr(jdoc, avp->val.v.s.s, avp->val.v.s.len);
+		break;
+		case SR_XTYPE_TIME:
+			result = snprintf(_pv_xavp_buf, 128, "%lu", (long unsigned)avp->val.v.t);
+		break;
+		case SR_XTYPE_LONG:
+			result = snprintf(_pv_xavp_buf, 128, "%ld", (long unsigned)avp->val.v.l);
+		break;
+		case SR_XTYPE_LLONG:
+			result = snprintf(_pv_xavp_buf, 128, "%lld", avp->val.v.ll);
+		break;
+		case SR_XTYPE_XAVP:
+			result = snprintf(_pv_xavp_buf, 128, "<<xavp:%p>>", avp->val.v.xavp);
+		break;
+		case SR_XTYPE_DATA:
+			result = snprintf(_pv_xavp_buf, 128, "<<data:%p>>", avp->val.v.data);
+		break;
+		default:
+			LM_WARN("unknown data type\n");
+			*jobj = srjson_CreateNull(jdoc);
+	}
+	if(result<0)
+	{
+		LM_ERR("cannot convert to str\n");
+		*jobj = srjson_CreateNull(jdoc);
+	}
+	else if(*jobj==NULL)
+	{
+		*jobj = srjson_CreateStr(jdoc, _pv_xavp_buf, 128);
+	}
+}
+
+int _dbg_get_obj_avp_vals(str name, sr_xavp_t *xavp, srjson_doc_t *jdoc, srjson_t **jobj)
+{
+	sr_xavp_t *avp = NULL;
+	srjson_t *jobjt = NULL;
+
+	*jobj = srjson_CreateArray(jdoc);
+	if(*jobj==NULL)
+	{
+		LM_ERR("cannot create json object\n");
+		return -1;
+	}
+	avp = xavp;
+	while(avp!=NULL&&!STR_EQ(avp->name,name))
+	{
+		avp = avp->next;
+	}
+	while(avp!=NULL)
+	{
+		_dbg_get_obj_xavp_val(avp, jdoc, &jobjt);
+		srjson_AddItemToArray(jdoc, *jobj, jobjt);
+		jobjt = NULL;
+		avp = xavp_get_next(avp);
+	}
+
+	return 0;
+}
+
+int _dbg_get_obj_xavp_vals(struct sip_msg *msg,
+		pv_param_t *param, srjson_doc_t *jdoc, srjson_t **jobjr,
+		str *item_name)
+{
+	pv_xavp_name_t *xname = (pv_xavp_name_t*)param->pvn.u.dname;
+	sr_xavp_t *xavp = NULL;
+	sr_xavp_t *avp = NULL;
+	srjson_t *jobj = NULL;
+	srjson_t *jobjt = NULL;
+	struct str_list *keys;
+	struct str_list *k;
+
+	*jobjr = srjson_CreateArray(jdoc);
+	if(*jobjr==NULL)
+	{
+		LM_ERR("cannot create json object\n");
+		return -1;
+	}
+
+	item_name->s = xname->name.s;
+	item_name->len = xname->name.len;
+	xavp = xavp_get_by_index(&xname->name, 0, NULL);
+	if(xavp==NULL)
+	{
+		return 0; /* empty */
+	}
+
+	do
+	{
+		if(xavp->val.type==SR_XTYPE_XAVP)
+		{
+			avp = xavp->val.v.xavp;
+			jobj = srjson_CreateObject(jdoc);
+			if(jobj==NULL)
+			{
+				LM_ERR("cannot create json object\n");
+				return -1;
+			}
+			keys = xavp_get_list_key_names(xavp);
+			if(keys!=NULL)
+			{
+				do
+				{
+					_dbg_get_obj_avp_vals(keys->s, avp, jdoc, &jobjt);
+					srjson_AddStrItemToObject(jdoc, jobj, keys->s.s,
+						keys->s.len, jobjt);
+					k = keys;
+					keys = keys->next;
+					pkg_free(k);
+					jobjt = NULL;
+				}while(keys!=NULL);
+			}
+		}
+		if(jobj!=NULL)
+		{
+			srjson_AddItemToArray(jdoc, *jobjr, jobj);
+			jobj = NULL;
+		}
+	}while((xavp = xavp_get_next(xavp))!=0);
+
+	return 0;
+}
+
+int dbg_dump_json(struct sip_msg* msg, unsigned int mask, int level)
+{
+	int i;
+	pv_value_t value;
+	pv_cache_t **_pv_cache = pv_cache_get_table();
+	pv_cache_t *el = NULL;
+	srjson_doc_t jdoc;
+	srjson_t *jobj = NULL;
+	char *output = NULL;
+	str item_name = STR_NULL;
+	static char iname[128];
+	int result = -1;
+
+	if(_pv_cache==NULL)
+	{
+		LM_ERR("cannot access pv_cache\n");
+		return -1;
+	}
+
+	memset(_dbg_xavp_dump, 0, sizeof(str*)*DBG_XAVP_DUMP_SIZE);
+	srjson_InitDoc(&jdoc, NULL);
+	if(jdoc.root==NULL)
+	{
+		jdoc.root = srjson_CreateObject(&jdoc);
+		if(jdoc.root==NULL)
+		{
+			LM_ERR("cannot create json root\n");
+			goto error;
+		}
+	}
+	for(i=0;i<PV_CACHE_SIZE;i++)
+	{
+		el = _pv_cache[i];
+		while(el)
+		{
+			if(!(el->spec.type==PVT_AVP||
+				el->spec.type==PVT_SCRIPTVAR||
+				el->spec.type==PVT_XAVP||
+				el->spec.type==PVT_OTHER)||
+				!((el->spec.type==PVT_AVP&&mask&DBG_DP_AVP)||
+				(el->spec.type==PVT_XAVP&&mask&DBG_DP_XAVP)||
+				(el->spec.type==PVT_SCRIPTVAR&&mask&DBG_DP_SCRIPTVAR)||
+				(el->spec.type==PVT_OTHER&&mask&DBG_DP_OTHER))||
+				(el->spec.trans!=NULL))
+			{
+				el = el->next;
+				continue;
+			}
+			jobj = NULL;
+			item_name.len = 0;
+			item_name.s = 0;
+			iname[0] = '\0';
+			if(el->spec.type==PVT_AVP)
+			{
+				if(el->spec.pvp.pvi.type==PV_IDX_ALL||
+					(el->spec.pvp.pvi.type==PV_IDX_INT&&el->spec.pvp.pvi.u.ival!=0))
+				{
+					el = el->next;
+					continue;
+				}
+				else
+				{
+					if(_dbg_get_array_avp_vals(msg, &el->spec.pvp, &jdoc, &jobj, &item_name)!=0)
+					{
+						LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
+						el = el->next;
+						continue;
+					}
+					if(srjson_GetArraySize(&jdoc, jobj)==0 && !(mask&DBG_DP_NULL))
+					{
+						el = el->next;
+						continue;
+					}
+					snprintf(iname, 128, "$avp(%.*s)", item_name.len, item_name.s);
+				}
+			}
+			else if(el->spec.type==PVT_XAVP)
+			{
+				if(_dbg_xavp_dump_lookup(&el->spec.pvp)!=0)
+				{
+					el = el->next;
+					continue;
+				}
+				if(_dbg_get_obj_xavp_vals(msg, &el->spec.pvp, &jdoc, &jobj, &item_name)!=0)
+				{
+					LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
+					el = el->next;
+					continue;
+				}
+				if(srjson_GetArraySize(&jdoc, jobj)==0 && !(mask&DBG_DP_NULL))
+				{
+					el = el->next;
+					continue;
+				}
+				snprintf(iname, 128, "$xavp(%.*s)", item_name.len, item_name.s);
+			}
+			else
+			{
+				if(pv_get_spec_value(msg, &el->spec, &value)!=0)
+				{
+					LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
+					el = el->next;
+					continue;
+				}
+				if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE))
+				{
+					if(mask&DBG_DP_NULL)
+					{
+						jobj = srjson_CreateNull(&jdoc);
+					}
+					else
+					{
+						el = el->next;
+						continue;
+					}
+				}else if(value.flags&(PV_VAL_INT)){
+					jobj = srjson_CreateNumber(&jdoc, value.ri);
+				}else if(value.flags&(PV_VAL_STR)){
+					jobj = srjson_CreateStr(&jdoc, value.rs.s, value.rs.len);
+				}else {
+					LM_WARN("el->pvname[%.*s] value[%d] unhandled\n", el->pvname.len, el->pvname.s,
+						value.flags);
+					el = el->next;
+					continue;
+				}
+				if(jobj==NULL)
+				{
+					LM_ERR("el->pvname[%.*s] empty json object\n", el->pvname.len,
+						el->pvname.s);
+					goto error;
+				}
+				snprintf(iname, 128, "%.*s", el->pvname.len, el->pvname.s);
+			}
+			if(jobj!=NULL)
+			{
+				srjson_AddItemToObject(&jdoc, jdoc.root, iname, jobj);
+			}
+			el = el->next;
+		}
+	}
+	output = srjson_PrintUnformatted(&jdoc, jdoc.root);
+	if(output==NULL)
+	{
+		LM_ERR("cannot print json doc\n");
+		goto error;
+	}
+	LOG(level, "%s\n", output);
+	result = 0;
+
+error:
+	if(output!=NULL) jdoc.free_fn(output);
+	srjson_DestroyDoc(&jdoc);
+
+	return result;
+}
