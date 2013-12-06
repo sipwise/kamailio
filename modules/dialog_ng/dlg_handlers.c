@@ -380,14 +380,14 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param) {
         return;
     }
 
-    if (type == TMCB_RESPONSE_READY) {
-        LM_DBG("TMCB_RESPONSE_READY\n");
+    if (type == TMCB_RESPONSE_OUT) {
+        LM_DBG("TMCB_RESPONSE_OUT\n");
         return;
     }
 
-    if (type == TMCB_RESPONSE_OUT) {
+    if (type == TMCB_RESPONSE_READY) {
         if (rpl == FAKED_REPLY) {
-            LM_ERR("Faked reply\n");
+            LM_DBG("Faked reply\n");
             return;
         }
 
@@ -426,7 +426,7 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param) {
     LM_DBG("Calling next_state_dlg and event is %i\n", event);
     next_state_dlg(dlg, event, &old_state, &new_state, &unref, &to_tag);
 
-    if (type == TMCB_RESPONSE_OUT) {
+    if (type == TMCB_RESPONSE_READY) {
         LM_DBG("Checking if there is an existing dialog_out entry with same to-tag");
 
         dlg_entry_out = &dlg->dlg_entry_out;
@@ -1422,4 +1422,30 @@ void print_all_dlgs() {
     LM_DBG("********************");
 
 }
+
+struct dlg_cell *dlg_get_msg_dialog(sip_msg_t *msg)
+{
+	struct dlg_cell *dlg = NULL;
+	str callid;
+	str ftag;
+	str ttag;
+	unsigned int dir;
+
+	/* Retrieve the current dialog */
+	dlg = dlg_get_ctx_dialog();
+	if (dlg != NULL )
+		return dlg;
+
+	if (pre_match_parse(msg, &callid, &ftag, &ttag, 0) < 0)
+		return NULL ;
+	dir = DLG_DIR_NONE;
+	dlg = get_dlg(&callid, &ftag, &ttag, &dir);
+	if (dlg == NULL ) {
+		LM_DBG("dlg with callid '%.*s' not found\n",
+				msg->callid->body.len, msg->callid->body.s);
+		return NULL ;
+	}
+	return dlg;
+}
+
 

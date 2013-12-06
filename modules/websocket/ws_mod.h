@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -28,8 +28,13 @@
 #include "../../kstats_types.h"
 #include "../sl/sl.h"
 
+enum
+{
+	SUB_PROTOCOL_SIP  = (1 << 0),
+	SUB_PROTOCOL_MSRP = (1 << 1)
+};
+
 extern sl_api_t ws_slb;
-extern int *ws_enabled;
 extern gen_lock_t *ws_stats_lock;
 
 extern int ws_ping_interval;	/* time (in seconds) between sending Pings */

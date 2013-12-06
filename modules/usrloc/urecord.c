@@ -40,6 +40,7 @@
 #include "../../dprint.h"
 #include "../../ut.h"
 #include "../../hashes.h"
+#include "../../tcp_conn.h"
 #include "ul_mod.h"
 #include "usrloc.h"
 #include "utime.h"
@@ -221,6 +222,26 @@ void mem_delete_ucontact(urecord_t* _r, ucontact_t* _c)
 	free_ucontact(_c);
 }
 
+static inline int is_valid_tcpconn(ucontact_t *c)
+{
+	if (c->tcpconn_id == -1)
+		return 0; /* tcpconn_id is not present */
+	else
+		return 1; /* valid tcpconn_id */
+}
+
+static inline int is_tcp_alive(ucontact_t *c)
+{
+	struct tcp_connection *con = NULL;
+	int rc = 0;
+
+	if ((con = tcpconn_get(c->tcpconn_id, 0, 0, 0, 0))) {
+		tcpconn_put(con); /* refcnt-- */
+		rc = 1;
+	}
+
+	return rc;
+}
 
 /*!
  * \brief Expires timer for NO_DB db_mode
@@ -236,6 +257,11 @@ static inline void nodb_timer(urecord_t* _r)
 	ptr = _r->contacts;
 
 	while(ptr) {
+		if (handle_lost_tcp && is_valid_tcpconn(ptr) && !is_tcp_alive(ptr)) {
+			LM_DBG("tcp connection has been lost, expiring contact %.*s\n", ptr->c.len, ptr->c.s);
+			ptr->expires = UL_EXPIRED_TIME;
+		}
+
 		if (!VALID_CONTACT(ptr, act_time)) {
 			/* run callbacks for EXPIRE event */
 			if (exists_ulcb_type(UL_CONTACT_EXPIRE))
@@ -296,7 +322,6 @@ static inline void wt_timer(urecord_t* _r)
 	}
 }
 
-
 /*!
  * \brief Write-back timer, used for WRITE_BACK db_mode
  *
@@ -316,6 +341,11 @@ static inline void wb_timer(urecord_t* _r)
 	ptr = _r->contacts;
 
 	while(ptr) {
+		if (handle_lost_tcp && is_valid_tcpconn(ptr) && !is_tcp_alive(ptr)) {
+			LM_DBG("tcp connection has been lost, expiring contact %.*s\n", ptr->c.len, ptr->c.s);
+			ptr->expires = UL_EXPIRED_TIME;
+		}
+
 		if (!VALID_CONTACT(ptr, act_time)) {
 			/* run callbacks for EXPIRE event */
 			if (exists_ulcb_type(UL_CONTACT_EXPIRE)) {
@@ -335,7 +365,7 @@ static inline void wb_timer(urecord_t* _r)
 				if (db_delete_ucontact(t) < 0) {
 					LM_ERR("failed to delete contact from the database"
 							" (aor: %.*s)\n",
-							ptr->aor->len, ZSW(ptr->aor->s));
+							t->aor->len, ZSW(t->aor->s));
 				}
 			}
 
@@ -387,6 +417,7 @@ static inline void wb_timer(urecord_t* _r)
 void timer_urecord(urecord_t* _r)
 {
 	switch(db_mode) {
+	case DB_READONLY:
 	case NO_DB:         nodb_timer(_r);
 						break;
 	/* use also the write_back timer routine to handle the failed
@@ -435,6 +466,39 @@ int db_delete_urecord(urecord_t* _r)
 	if (ul_dbf.delete(ul_dbh, keys, 0, vals, (use_domain) ? (2) : (1)) < 0) {
 		LM_ERR("failed to delete from database\n");
 		return -1;
+	}
+
+	return 0;
+}
+
+
+/*!
+ * \brief Delete a record from the database based on ruid
+ * \return 0 on success, -1 on failure
+ */
+int db_delete_urecord_by_ruid(str *_table, str *_ruid)
+{
+	db_key_t keys[1];
+	db_val_t vals[1];
+
+	keys[0] = &ruid_col;
+	vals[0].type = DB1_STR;
+	vals[0].nul = 0;
+	vals[0].val.str_val.s = _ruid->s;
+	vals[0].val.str_val.len = _ruid->len;
+
+	if (ul_dbf.use_table(ul_dbh, _table) < 0) {
+		LM_ERR("use_table failed\n");
+		return -1;
+	}
+
+	if (ul_dbf.delete(ul_dbh, keys, 0, vals, 1) < 0) {
+		LM_ERR("failed to delete from database\n");
+		return -1;
+	}
+
+	if (ul_dbf.affected_rows(ul_dbh) == 0) {
+	        return -2;
 	}
 
 	return 0;
@@ -518,6 +582,17 @@ int delete_ucontact(urecord_t* _r, struct ucontact* _c)
 	}
 
 	return ret;
+}
+
+
+int delete_urecord_by_ruid(udomain_t* _d, str *_ruid)
+{
+    if (db_mode != DB_ONLY) {
+	LM_ERR("delete_urecord_by_ruid currently available only in db_mode=3\n");
+	return -1;
+    }
+
+    return db_delete_urecord_by_ruid(_d->name, _ruid);
 }
 
 

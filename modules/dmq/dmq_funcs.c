@@ -31,6 +31,10 @@
 dmq_peer_t* register_dmq_peer(dmq_peer_t* peer)
 {
 	dmq_peer_t* new_peer;
+	if (!peer_list) {
+		LM_ERR("peer list not initialized\n");
+		return NULL;
+	}
 	lock_get(&peer_list->lock);
 	if(search_peer_list(peer_list, peer)) {
 		LM_ERR("peer already exists: %.*s %.*s\n", peer->peer_id.len, peer->peer_id.s,
@@ -118,7 +122,7 @@ int build_uri_str(str* username, struct sip_uri* uri, str* from)
  * resp_cback - a response callback that gets called when the transaction is complete
  */
 int bcast_dmq_message(dmq_peer_t* peer, str* body, dmq_node_t* except,
-		dmq_resp_cback_t* resp_cback, int max_forwards)
+		dmq_resp_cback_t* resp_cback, int max_forwards, str* content_type)
 {
 	dmq_node_t* node;
 	
@@ -136,7 +140,7 @@ int bcast_dmq_message(dmq_peer_t* peer, str* body, dmq_node_t* except,
 			node = node->next;
 			continue;
 		}
-		if(dmq_send_message(peer, body, node, resp_cback, max_forwards) < 0) {
+		if(dmq_send_message(peer, body, node, resp_cback, max_forwards, content_type) < 0) {
 			LM_ERR("error sending dmq message\n");
 			goto error;
 		}
@@ -158,23 +162,27 @@ error:
  * resp_cback - a response callback that gets called when the transaction is complete
  */
 int dmq_send_message(dmq_peer_t* peer, str* body, dmq_node_t* node,
-		dmq_resp_cback_t* resp_cback, int max_forwards)
+		dmq_resp_cback_t* resp_cback, int max_forwards, str* content_type)
 {
 	uac_req_t uac_r;
 	str str_hdr = {0, 0};
-	str from, to, req_uri;
+	str from, to;
 	dmq_cback_param_t* cb_param = NULL;
 	int result = 0;
 	int len = 0;
 	
-	/* Max-Forwards */
-	str_hdr.len = 20 + CRLF_LEN;
+	if (!content_type) {
+		LM_ERR("content-type is null\n");
+		return -1;
+	}
+	/* add Max-Forwards and Content-Type headers */
+	str_hdr.len = 34 + content_type->len + (CRLF_LEN*2);
 	str_hdr.s = pkg_malloc(str_hdr.len);
 	if(str_hdr.s==NULL) {
 		LM_ERR("no more pkg\n");
 		return -1;
 	}
-	len += sprintf(str_hdr.s, "Max-Forwards: %d%s", max_forwards, CRLF);
+	len += sprintf(str_hdr.s, "Max-Forwards: %d" CRLF "Content-Type: %.*s" CRLF, max_forwards, content_type->len, content_type->s);
 	str_hdr.len = len;
 	
 	cb_param = shm_malloc(sizeof(*cb_param));
@@ -191,11 +199,10 @@ int dmq_send_message(dmq_peer_t* peer, str* body, dmq_node_t* node,
 		LM_ERR("error building to string\n");
 		goto error;
 	}
-	req_uri = to;
 	
 	set_uac_req(&uac_r, &dmq_request_method, &str_hdr, body, NULL,
 			TMCB_LOCAL_COMPLETED, dmq_tm_callback, (void*)cb_param);
-	result = tmb.t_request(&uac_r, &req_uri,
+	result = tmb.t_request(&uac_r, &to,
 			       &to, &from,
 			       NULL);
 	if(result < 0) {
@@ -203,20 +210,27 @@ int dmq_send_message(dmq_peer_t* peer, str* body, dmq_node_t* node,
 		goto error;
 	}
 	pkg_free(str_hdr.s);
+	pkg_free(from.s);
+	pkg_free(to.s);
 	return 0;
 error:
 	pkg_free(str_hdr.s);
+	if (from.s!=NULL) 
+		pkg_free(from.s);
+	if (to.s!=NULL) 
+		pkg_free(to.s);
 	return -1;
 }
 
 /**
  * @brief config file function for sending dmq message
  */
-int cfg_dmq_send_message(struct sip_msg* msg, char* peer, char* to, char* body)
+int cfg_dmq_send_message(struct sip_msg* msg, char* peer, char* to, char* body, char* content_type)
 {
 	str peer_str;
 	str to_str;
 	str body_str;
+	str ct_str;
 	
 	if(get_str_fparam(&peer_str, msg, (fparam_t*)peer)<0) {
 		LM_ERR("cannot get peer value\n");
@@ -230,11 +244,17 @@ int cfg_dmq_send_message(struct sip_msg* msg, char* peer, char* to, char* body)
 		LM_ERR("cannot get body value\n");
 		return -1;
 	}
+	if(get_str_fparam(&ct_str, msg, (fparam_t*)content_type)<0) {
+		LM_ERR("cannot get content-type value\n");
+		return -1;
+	}
+
 	
-	LM_INFO("cfg_dmq_send_message: %.*s - %.*s - %.*s\n",
+	LM_INFO("cfg_dmq_send_message: %.*s - %.*s - %.*s - %.*s\n",
 		peer_str.len, peer_str.s,
 		to_str.len, to_str.s,
-		body_str.len, body_str.s);
+		body_str.len, body_str.s,
+		ct_str.len, ct_str.s);
 	
 	dmq_peer_t* destination_peer = find_peer(peer_str);
 	if(!destination_peer) {
@@ -256,7 +276,7 @@ int cfg_dmq_send_message(struct sip_msg* msg, char* peer, char* to, char* body)
 		goto error;
 	}
 	if(dmq_send_message(destination_peer, &body_str, to_dmq_node,
-				&notification_callback, 1) < 0) {
+				&notification_callback, 1, &ct_str) < 0) {
 		LM_ERR("cannot send dmq message\n");
 		goto error;
 	}
@@ -280,7 +300,7 @@ void ping_servers(unsigned int ticks, void *param) {
 	LM_DBG("ping_servers\n");
 	body = build_notification_body();
 	ret = bcast_dmq_message(dmq_notification_peer, body, notification_node,
-			&notification_callback, 1);
+			&notification_callback, 1, &notification_content_type);
 	pkg_free(body->s);
 	pkg_free(body);
 	if(ret < 0) {

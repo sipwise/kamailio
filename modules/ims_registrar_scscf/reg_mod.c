@@ -107,15 +107,13 @@ str scscf_serviceroute_uri_str; /* Service Route URI */
 static int mod_init(void);
 static int child_init(int);
 static void mod_destroy(void);
-static int w_save(struct sip_msg* _m, char* _d, char* mode, char* _cflags);
-static int w_assign_server_unreg(struct sip_msg* _m, char* _d, char* _direction);
+static int w_save(struct sip_msg* _m, char * _route, char* _d, char* mode, char* _cflags);
+static int w_assign_server_unreg(struct sip_msg* _m, char* _route, char* _d, char* _direction);
 static int w_lookup(struct sip_msg* _m, char* _d, char* _p2);
 
 /*! \brief Fixup functions */
 static int domain_fixup(void** param, int param_no);
-static int assign_save_fixup3(void** param, int param_no);
-//static int save_fixup2(void** param, int param_no);
-//static int assign_fixup2(void** param, int param_no);
+static int assign_save_fixup3_async(void** param, int param_no);
 static int unreg_fixup(void** param, int param_no);
 static int fetchc_fixup(void** param, int param_no);
 /*! \brief Functions */
@@ -186,11 +184,11 @@ static pv_export_t mod_pvs[] = {
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-    {"save", (cmd_function) w_save, 1, assign_save_fixup3, 0, REQUEST_ROUTE | ONREPLY_ROUTE},
+    {"save", (cmd_function) w_save, 2, assign_save_fixup3_async, 0, REQUEST_ROUTE | ONREPLY_ROUTE},
     {"lookup", (cmd_function) w_lookup, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"term_impu_registered", (cmd_function) term_impu_registered, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"impu_registered", (cmd_function) impu_registered, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
-    {"assign_server_unreg", (cmd_function) w_assign_server_unreg, 2, assign_save_fixup3, 0, REQUEST_ROUTE},
+    {"assign_server_unreg", (cmd_function) w_assign_server_unreg, 3, assign_save_fixup3_async, 0, REQUEST_ROUTE},
     {"add_sock_hdr", (cmd_function) add_sock_hdr, 1, fixup_str_null, 0, REQUEST_ROUTE},
     {"unregister", (cmd_function) unregister, 2, unreg_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"reg_fetch_contacts", (cmd_function) pv_fetch_contacts, 3, fetchc_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
@@ -510,18 +508,16 @@ static int child_init(int rank) {
 /*! \brief
  * Wrapper to save(location)
  */
-static int w_save(struct sip_msg* _m, char* _d, char* mode, char* _cflags) {
-    //return save(_m, (udomain_t*)_d);
-    return save(_m, _d);
+static int w_save(struct sip_msg* _m, char* _route, char* _d, char* mode, char* _cflags) {
+    return save(_m, _d, _route);
 }
 
-static int w_assign_server_unreg(struct sip_msg* _m, char* _d, char* _direction) {
+static int w_assign_server_unreg(struct sip_msg* _m, char* _route, char* _d, char* _direction) {
     str direction;
 
     direction.s = _direction;
     direction.len = strlen(_direction);
-    //return assign_server_unreg(_m, (udomain_t*)_d, &direction);
-    return assign_server_unreg(_m, _d, &direction);
+    return assign_server_unreg(_m, _d, &direction, _route);
 
 }
 
@@ -565,35 +561,25 @@ static int unreg_fixup(void** param, int param_no) {
 /*
  * Convert the char* parameters
  */
-static int assign_save_fixup3(void** param, int param_no) {
+static int assign_save_fixup3_async(void** param, int param_no) {
 
     if (strlen((char*) *param) <= 0) {
         LM_ERR("empty parameter %d not allowed\n", param_no);
         return -1;
     }
 
-    if (param_no == 1) {
+    if (param_no == 1) {        //route name - static or dynamic string (config vars)
+        if (fixup_spve_null(param, param_no) < 0)
+            return -1;
+        return 0;
+    } else if (param_no == 2) {
         udomain_t* d;
 
         if (ul.register_udomain((char*) *param, &d) < 0) {
-            LM_ERR("Erroring doing fixup on assign save");
+            LM_ERR("Error doing fixup on assign save");
             return -1;
         }
-
         *param = (void*) d;
-
-        sar_param_t *ap;
-        ap = (sar_param_t*) pkg_malloc(sizeof (sar_param_t));
-        if (ap == NULL) {
-            LM_ERR("no more pkg\n");
-            return -1;
-        }
-        memset(ap, 0, sizeof (sar_param_t));
-        ap->paction = get_action_from_param(param, param_no);
-
-        ap->param = (udomain_t*) * param;
-
-        *param = (void*) ap;
     }
 
     return 0;

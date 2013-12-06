@@ -32,27 +32,21 @@
 #include <fcntl.h>
 #include <time.h>
 
-#include "../../sr_module.h"
-#include "../../dprint.h"
-#include "../../error.h"
 #include "../../ut.h"
 #include "../../mem/mem.h"
 #include "../../mem/shm_mem.h"
 #include "../../usr_avp.h"
-#include "../../modules/tm/tm_load.h"
-#include "../../parser/parse_uri.h"
-#include "../../modules/sl/sl.h"
 #include "../../pt.h"
 #include "../../lib/kmi/mi.h"
 #include "../../hashes.h"
+#include "../../mod_fix.h"
+
 #include "dmq.h"
 #include "dmq_funcs.h"
-#include "peer.h"
 #include "bind_dmq.h"
-#include "worker.h"
+#include "message.h"
 #include "notification_peer.h"
 #include "dmqnode.h"
-#include "../../mod_fix.h"
 
 static int mod_init(void);
 static int child_init(int);
@@ -70,7 +64,7 @@ struct sip_uri dmq_server_uri;
 
 str dmq_notification_address = {0, 0};
 struct sip_uri dmq_notification_uri;
-int ping_interval = 4;
+int ping_interval = MIN_PING_INTERVAL;
 
 /* TM bind */
 struct tm_binds tmb;
@@ -97,8 +91,9 @@ static int parse_server_address(str* uri, struct sip_uri* parsed_uri);
 static cmd_export_t cmds[] = {
 	{"dmq_handle_message",  (cmd_function)dmq_handle_message, 0, handle_dmq_fixup, 0, 
 		REQUEST_ROUTE},
-	{"dmq_send_message", (cmd_function)cfg_dmq_send_message, 3, send_dmq_fixup, 0,
+	{"dmq_send_message", (cmd_function)cfg_dmq_send_message, 4, send_dmq_fixup, 0,
 		ANY_ROUTE},
+        {"bind_dmq",        (cmd_function)bind_dmq,       0, 0,              0},
 	{0, 0, 0, 0, 0, 0}
 };
 

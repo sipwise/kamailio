@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -35,8 +35,10 @@
 #include "../../parser/contact/parse_contact.h"
 #include "../../parser/parse_rr.h"
 #include "../../parser/parse_uri.h"
+#include "../../parser/parse_supported.h"
 
 #include "api.h"
+#include "config.h"
 
 MODULE_VERSION
 
@@ -46,6 +48,7 @@ static int mod_init(void);
 static void destroy(void);
 
 static unsigned int ob_force_flag = (unsigned int) -1;
+static unsigned int ob_force_no_flag = (unsigned int) -1;
 static str ob_key = {0, 0};
 
 static cmd_export_t cmds[]= 
@@ -59,6 +62,7 @@ static cmd_export_t cmds[]=
 static param_export_t params[]=
 {
 	{ "force_outbound_flag",	INT_PARAM, &ob_force_flag },
+	{ "force_no_outbound_flag",     INT_PARAM, &ob_force_no_flag },
 	{ 0, 0, 0 }
 };
 
@@ -86,6 +90,12 @@ static int mod_init(void)
 		return -1;
 	}
 
+	if (ob_force_no_flag != -1 && !flag_in_range(ob_force_no_flag))
+	{
+		LM_ERR("bad no_outbound_flag value (%d)\n", ob_force_no_flag);
+		return -1;
+	}
+
 	if ((ob_key.s = shm_malloc(OB_KEY_LEN)) == NULL)
 	{
 		LM_ERR("Failed to allocate memory for flow-token key\n");
@@ -98,14 +108,19 @@ static int mod_init(void)
 		       "random bytes\n", ob_key.len);
 	}
 
-#ifndef USE_STUN
-	LM_WARN("STUN support not built-in. UDP keep-alive not supported.\n");
-#else
-	if (stun_allow_stun != 1)
+	if (cfg_declare("outbound", outbound_cfg_def, &default_outbound_cfg,
+			cfg_sizeof(outbound), &outbound_cfg))
 	{
-		LM_WARN("STUN disabled.  UDP keep-alive not supported.\n");
+		LM_ERR("declaring config framework variable\n");
+		return -1;
 	}
-#endif
+	default_outbound_cfg.outbound_active = 1;
+
+	if (!module_loaded("stun"))
+	{
+		LM_WARN("\"stun\" module is not loaded. STUN is required to use"
+			" outbound with UDP.\n");
+	}
 
 	return 0;
 }
@@ -195,15 +210,12 @@ int encode_flow_token(str *flow_token, struct receive_info rcv)
 	return 0;
 }
 
-int decode_flow_token(struct receive_info *rcv, str flow_token)
+int decode_flow_token(struct sip_msg *msg, struct receive_info **rcv, str flow_token)
 {
 	int pos = FLOW_TOKEN_START_POS, flow_length, i;
 
-	if (rcv == NULL)
-	{
-		LM_ERR("bad receive_info structure provided\n");
-		return -1;
-	}
+	if (msg->ldv.flow.decoded)
+		goto end;
 
 	if (flow_token.s == NULL)
 	{
@@ -213,7 +225,7 @@ int decode_flow_token(struct receive_info *rcv, str flow_token)
 
 	if (flow_token.len == 0)
 	{
-		LM_ERR("no flow-token found\n");
+		LM_DBG("no flow-token found\n");
 		return -2;
 	}
 
@@ -223,7 +235,7 @@ int decode_flow_token(struct receive_info *rcv, str flow_token)
 	if (flow_length != UNENC_FLOW_TOKEN_MIN_LENGTH
 		&& flow_length != UNENC_FLOW_TOKEN_MAX_LENGTH)
 	{
-		LM_INFO("no flow-token found - bad length (%d)\n", flow_length);
+		LM_DBG("no flow-token found - bad length (%d)\n", flow_length);
 		return -2;
 	}
 
@@ -238,41 +250,44 @@ int decode_flow_token(struct receive_info *rcv, str flow_token)
 		flow_length - FLOW_TOKEN_START_POS,
 		hmac_sha1, NULL) == NULL)
 	{
-		LM_ERR("HMAC-SHA1 failed\n");
+		LM_INFO("HMAC-SHA1 failed\n");
 		return -1;
 	}
 	if (memcmp(unenc_flow_token, &hmac_sha1[SHA1_LENGTH - SHA1_80_LENGTH],
 		SHA1_80_LENGTH) != 0)
 	{
-		LM_ERR("flow-token failed validation\n");
+		LM_INFO("flow-token failed validation\n");
 		return -1;
 	}
 
 	/* Decode protocol information */
 	if (unenc_flow_token[pos] & 0x80)
 	{
-		rcv->dst_ip.af = rcv->src_ip.af = AF_INET6;
-		rcv->dst_ip.len = rcv->src_ip.len = 16;
+		msg->ldv.flow.rcv.dst_ip.af = msg->ldv.flow.rcv.src_ip.af = AF_INET6;
+		msg->ldv.flow.rcv.dst_ip.len = msg->ldv.flow.rcv.src_ip.len = 16;
 	}
 	else
 	{
-		rcv->dst_ip.af = rcv->src_ip.af = AF_INET;
-		rcv->dst_ip.len = rcv->src_ip.len = 4;
+		msg->ldv.flow.rcv.dst_ip.af = msg->ldv.flow.rcv.src_ip.af = AF_INET;
+		msg->ldv.flow.rcv.dst_ip.len = msg->ldv.flow.rcv.src_ip.len = 4;
 	}
-	rcv->proto = unenc_flow_token[pos++] & 0x7f;
+	msg->ldv.flow.rcv.proto = unenc_flow_token[pos++] & 0x7f;
 
 	/* Decode destination address */
-	for (i = 0; i < (rcv->dst_ip.af == AF_INET6 ? 16 : 4); i++)
-		rcv->dst_ip.u.addr[i] = unenc_flow_token[pos++];
-	rcv->dst_port = unenc_flow_token[pos++] << 8;
-	rcv->dst_port |= unenc_flow_token[pos++];
+	for (i = 0; i < (msg->ldv.flow.rcv.dst_ip.af == AF_INET6 ? 16 : 4); i++)
+		msg->ldv.flow.rcv.dst_ip.u.addr[i] = unenc_flow_token[pos++];
+	msg->ldv.flow.rcv.dst_port = unenc_flow_token[pos++] << 8;
+	msg->ldv.flow.rcv.dst_port |= unenc_flow_token[pos++];
 
 	/* Decode source address */
-	for (i = 0; i < (rcv->src_ip.af == AF_INET6 ? 16 : 4); i++)
-		rcv->src_ip.u.addr[i] = unenc_flow_token[pos++];
-	rcv->src_port = unenc_flow_token[pos++] << 8;
-	rcv->src_port |= unenc_flow_token[pos++];
+	for (i = 0; i < (msg->ldv.flow.rcv.src_ip.af == AF_INET6 ? 16 : 4); i++)
+		msg->ldv.flow.rcv.src_ip.u.addr[i] = unenc_flow_token[pos++];
+	msg->ldv.flow.rcv.src_port = unenc_flow_token[pos++] << 8;
+	msg->ldv.flow.rcv.src_port |= unenc_flow_token[pos++];
+	msg->ldv.flow.decoded = 1;
 
+end:
+	*rcv = &msg->ldv.flow.rcv;
 	return 0;
 }
 
@@ -325,7 +340,7 @@ static int use_outbound_non_reg(struct sip_msg *msg)
 	param_hooks_t hooks;
 	param_t *params;
 	int ret;
-	struct receive_info rcv;
+	struct receive_info *rcv = NULL;
 
 	/* Check to see if the top Route-URI is me and has a ;ob parameter */
 	if (msg->route
@@ -371,10 +386,10 @@ static int use_outbound_non_reg(struct sip_msg *msg)
 			LM_DBG("found ;ob parameter on Route-URI - outbound"
 				" used\n");
 
-			if (decode_flow_token(&rcv, puri.user) == 0)
+			if (decode_flow_token(msg, &rcv, puri.user) == 0)
 			{
-				if (!ip_addr_cmp(&rcv.src_ip, &msg->rcv.src_ip)
-					|| rcv.src_port != msg->rcv.src_port)
+				if (!ip_addr_cmp(&rcv->src_ip, &msg->rcv.src_ip)
+					|| rcv->src_port != msg->rcv.src_port)
 				{
 					LM_DBG("\"incoming\" request found\n");
 					return 2;
@@ -383,6 +398,14 @@ static int use_outbound_non_reg(struct sip_msg *msg)
 
 			LM_DBG("\"outgoing\" request found\n");
 			return 1;
+		}
+	}
+
+	/* Check if Supported: outbound is included */
+	if (parse_supported(msg) == 0) {
+                if (!(get_supported(msg) & F_OPTION_TAG_OUTBOUND)) {
+		        LM_DBG("outbound is not supported and thus not used\n");
+		        return 0;
 		}
 	}
 
@@ -446,8 +469,16 @@ int use_outbound(struct sip_msg *msg)
 	/* If Outbound is forced return success without any further checks */
 	if (ob_force_flag != -1 && isflagset(msg, ob_force_flag) > 0)
 	{
-		LM_DBG("outbound forced\n");
+		LM_DBG("outbound used by force\n");
 		return 1;
+	}
+
+	/* If Outbound is turned off, return failure without any further
+	   checks */
+	if (ob_force_no_flag != -1 && isflagset(msg, ob_force_no_flag) > 0)
+	{
+		LM_DBG("outbound not used by force\n");
+		return 0;
 	}
 
 	LM_DBG("Analysing %.*s for outbound markers\n",

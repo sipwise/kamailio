@@ -94,6 +94,7 @@ static int w_lookup(struct sip_msg* _m, char* _d, char* _p2);
 static int w_lookup_branches(struct sip_msg* _m, char* _d, char* _p2);
 static int w_registered(struct sip_msg* _m, char* _d, char* _uri);
 static int w_unregister(struct sip_msg* _m, char* _d, char* _uri);
+static int w_unregister2(struct sip_msg* _m, char* _d, char* _uri, char *_ruid);
 
 /*! \brief Fixup functions */
 static int domain_fixup(void** param, int param_no);
@@ -120,6 +121,7 @@ sruid_t _reg_sruid;
 
 int reg_gruu_enabled = 1;
 int reg_outbound_mode = 0;
+int reg_regid_mode = 0;
 int reg_flow_timer = 0;
 
 /* Populate this AVP if testing for specific registration instance. */
@@ -169,11 +171,11 @@ static pv_export_t mod_pvs[] = {
  */
 static cmd_export_t cmds[] = {
 	{"save",         (cmd_function)w_save2,       1,  save_fixup, 0,
-			REQUEST_ROUTE | ONREPLY_ROUTE },
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
 	{"save",         (cmd_function)w_save2,       2,  save_fixup, 0,
-			REQUEST_ROUTE | ONREPLY_ROUTE },
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
 	{"save",         (cmd_function)w_save3,       3,  save_fixup, 0,
-			REQUEST_ROUTE | ONREPLY_ROUTE },
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
 	{"lookup",       (cmd_function)w_lookup,      1,  domain_uri_fixup, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"lookup",       (cmd_function)w_lookup,      2,  domain_uri_fixup, 0,
@@ -185,6 +187,8 @@ static cmd_export_t cmds[] = {
 	{"add_sock_hdr", (cmd_function)add_sock_hdr,  1,  fixup_str_null, 0,
 			REQUEST_ROUTE },
 	{"unregister",   (cmd_function)w_unregister,  2,  unreg_fixup, 0,
+			REQUEST_ROUTE| FAILURE_ROUTE },
+	{"unregister",   (cmd_function)w_unregister2, 3, unreg_fixup, 0,
 			REQUEST_ROUTE| FAILURE_ROUTE },
 	{"reg_fetch_contacts", (cmd_function)pv_fetch_contacts, 3, 
 			fetchc_fixup, 0,
@@ -228,6 +232,7 @@ static param_export_t params[] = {
 	{"xavp_rcd",           STR_PARAM, &reg_xavp_rcd.s     					},
 	{"gruu_enabled",       INT_PARAM, &reg_gruu_enabled    					},
 	{"outbound_mode",      INT_PARAM, &reg_outbound_mode					},
+	{"regid_mode",         INT_PARAM, &reg_regid_mode					},
 	{"flow_timer",         INT_PARAM, &reg_flow_timer					},
 	{0, 0, 0}
 };
@@ -399,8 +404,13 @@ static int mod_init(void)
 		return -1;
 	}
 
+	if (reg_regid_mode < 0 || reg_regid_mode > 1) {
+		LM_ERR("regid_mode modparam must be 0 (use with outbound), 1 (use always)\n");
+		return -1;
+	}
+
 	if (reg_flow_timer < 0 || reg_flow_timer > REG_FLOW_TIMER_MAX
-			|| (reg_flow_timer > 0 && reg_outbound_mode != REG_OUTBOUND_REQUIRE)) {
+			|| (reg_flow_timer > 0 && reg_outbound_mode == REG_OUTBOUND_NONE)) {
 		LM_ERR("bad value for flow_timer\n");
 		return -1;
 	}
@@ -501,7 +511,26 @@ static int w_unregister(struct sip_msg* _m, char* _d, char* _uri)
 		return -1;
 	}
 
-	return unregister(_m, (udomain_t*)_d, &uri);
+	return unregister(_m, (udomain_t*)_d, &uri, NULL);
+}
+
+static int w_unregister2(struct sip_msg* _m, char* _d, char* _uri, char *_ruid)
+{
+        str uri = {0, 0};
+	str ruid = {0};
+	if(fixup_get_svalue(_m, (gparam_p)_uri, &uri)!=0)
+	{
+	        LM_ERR("invalid uri parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(_m, (gparam_p)_ruid, &ruid)!=0 || ruid.len<=0)
+	{
+		LM_ERR("invalid ruid parameter\n");
+		return -1;
+	}
+
+
+	return unregister(_m, (udomain_t*)_d, &uri, &ruid);
 }
 
 /*! \brief
@@ -545,6 +574,8 @@ static int unreg_fixup(void** param, int param_no)
 	if (param_no == 1) {
 		return domain_fixup(param, 1);
 	} else if (param_no == 2) {
+		return fixup_spve_null(param, 1);
+	} else if (param_no == 3) {
 		return fixup_spve_null(param, 1);
 	}
 	return 0;

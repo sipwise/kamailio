@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2001-2003 FhG FOKUS
+ * TLS module
+ *
  * Copyright (C) 2005,2006 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -33,6 +34,7 @@
 #include "../../mem/shm_mem.h"
 #include "../../pt.h"
 #include "../../cfg/cfg.h"
+#include "../../dprint.h"
 #include "tls_server.h"
 #include "tls_util.h"
 #include "tls_mod.h"

@@ -31,6 +31,7 @@
 #include "../../lib/srutils/sruid.h"
 #include "../../rpc.h"
 #include "../../rpc_lookup.h"
+#include "../../sr_module.h"
 
 #include "msrp_netio.h"
 #include "msrp_env.h"
@@ -42,6 +43,7 @@ static sruid_t _msrp_sruid;
 
 extern int msrp_auth_min_expires;
 extern int msrp_auth_max_expires;
+extern int msrp_tls_module_loaded;
 extern str msrp_use_path_addr;
 
 /**
@@ -210,8 +212,8 @@ int msrp_cmap_save(msrp_frame_t *mf)
 	hid = msrp_get_hashid(&_msrp_sruid.uid);	
 	idx = msrp_get_slot(hid, _msrp_cmap_head->mapsize);
 
-	srcaddr.s = sbuf;;
-	if(mf->tcpinfo->rcv->proto==PROTO_TLS)
+	srcaddr.s = sbuf;
+	if (msrp_tls_module_loaded)
 	{
 		memcpy(srcaddr.s, "msrps://", 8);
 		srcaddr.s+=8;
@@ -295,7 +297,7 @@ int msrp_cmap_save(msrp_frame_t *mf)
 	_msrp_cmap_head->cslots[idx].lsize++;
 	lock_release(&_msrp_cmap_head->cslots[idx].lock);
 
-	if(mf->tcpinfo->rcv->proto==PROTO_TLS)
+	if(mf->tcpinfo->rcv->proto==PROTO_TLS || mf->tcpinfo->rcv->proto==PROTO_WSS)
 	{
 		srcaddr.len = snprintf(sbuf, MSRP_SBUF_SIZE,
 				"Use-Path: msrps://%.*s/%.*s;tcp\r\nExpires: %d\r\n",

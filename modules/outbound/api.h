@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -28,7 +28,7 @@
 #include "../../sr_module.h"
 
 typedef int (*encode_flow_token_t)(str *, struct receive_info);
-typedef int (*decode_flow_token_t)(struct receive_info *, str);
+typedef int (*decode_flow_token_t)(struct sip_msg *, struct receive_info **, str);
 typedef int (*use_outbound_t)(struct sip_msg *);
 
 typedef struct ob_binds {

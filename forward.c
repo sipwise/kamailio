@@ -120,9 +120,7 @@
 
 static int mhomed_sock_cache_disabled = 0;
 static int sock_inet = -1;
-#ifdef USE_IPV6
 static int sock_inet6 = -1;
-#endif /* USE_IPV6 */
 
 static void apply_force_send_socket(struct dest_info* dst, struct sip_msg* msg);
 
@@ -155,7 +153,6 @@ retry:
 		temp_sock = &sock_inet;
 		break;
 	}
-#ifdef USE_IPV6
 	case AF_INET6 : {
 		if(unlikely(sock_inet6 < 0)){
 			sock_inet6 = socket(AF_INET6, SOCK_DGRAM, 0);
@@ -167,7 +164,6 @@ retry:
 		temp_sock = &sock_inet6;
 		break;
 	}
-#endif /* USE_IPV6 */
 	default: {
 		LM_ERR("Unknown protocol family \n");
 		return 0;
@@ -189,12 +185,10 @@ retry:
 				close(sock_inet);
 				sock_inet=-1;
 			}
-#ifdef USE_IPV6
 			if (sock_inet6>=0){
 				close(sock_inet6);
 				sock_inet6=-1;
 			}
-#endif /* USE_IPV6 */
 			goto retry;
 		}
 		LOG(L_ERR, "ERROR: get_out_socket: connect failed: %s\n",
@@ -332,10 +326,8 @@ not_forced:
 				/* FIXME */
 				case AF_INET:	send_sock=sendipv4_tcp;
 								break;
-#ifdef USE_IPV6
 				case AF_INET6:	send_sock=sendipv6_tcp;
 								break;
-#endif
 				default:	LOG(L_ERR, "get_send_socket: BUG: don't know how"
 									" to forward to af %d\n", to->s.sa_family);
 			}
@@ -348,10 +340,8 @@ not_forced:
 				/* FIXME */
 				case AF_INET:	send_sock=sendipv4_tls;
 								break;
-#ifdef USE_IPV6
 				case AF_INET6:	send_sock=sendipv6_tls;
 								break;
-#endif
 				default:	LOG(L_ERR, "get_send_socket: BUG: don't know how"
 									" to forward to af %d\n", to->s.sa_family);
 			}
@@ -365,10 +355,8 @@ not_forced:
 				switch(to->s.sa_family){
 					case AF_INET:	send_sock=sendipv4_sctp;
 									break;
-#ifdef USE_IPV6
 					case AF_INET6:	send_sock=sendipv6_sctp;
 									break;
-#endif
 					default:	LOG(L_ERR, "get_send_socket: BUG: don't know"
 										" how to forward to af %d\n",
 										to->s.sa_family);
@@ -383,10 +371,8 @@ not_forced:
 				switch(to->s.sa_family){
 					case AF_INET:	send_sock=sendipv4;
 									break;
-#ifdef USE_IPV6
 					case AF_INET6:	send_sock=sendipv6;
 									break;
-#endif
 					default:	LOG(L_ERR, "get_send_socket: BUG: don't know"
 										" how to forward to af %d\n",
 										to->s.sa_family);
@@ -549,31 +535,23 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 		}
 	}/* dst */
 	send_info->send_flags=msg->fwd_send_flags;
-	/* calculate branch for outbound request;  if syn_branch is turned off,
+	/* calculate branch for outbound request;
 	   calculate is from transaction key, i.e., as an md5 of From/To/CallID/
 	   CSeq exactly the same way as TM does; good for reboot -- than messages
 	   belonging to transaction lost due to reboot will still be forwarded
 	   with the same branch parameter and will be match-able downstream
-	
-	   if it is turned on, we don't care about reboot; we simply put a simple
-	   value in there; better for performance
 	*/
-	if (syn_branch ) {
-	        memcpy(msg->add_to_branch_s, "z9hG4bKcydzigwkX", 16);
-		msg->add_to_branch_len=16;
-	} else {
-		if (!char_msg_val( msg, md5 )) 	{ /* parses transaction key */
-			LOG(L_ERR, "ERROR: forward_request: char_msg_val failed\n");
-			ret=E_UNSPEC;
-			goto error;
-		}
-		msg->hash_index=hash( msg->callid->body, get_cseq(msg)->number);
-		if (!branch_builder( msg->hash_index, 0, md5, 0 /* 0-th branch */,
-					msg->add_to_branch_s, &msg->add_to_branch_len )) {
-			LOG(L_ERR, "ERROR: forward_request: branch_builder failed\n");
-			ret=E_UNSPEC;
-			goto error;
-		}
+	if (!char_msg_val( msg, md5 )) 	{ /* parses transaction key */
+		LOG(L_ERR, "ERROR: forward_request: char_msg_val failed\n");
+		ret=E_UNSPEC;
+		goto error;
+	}
+	msg->hash_index=hash( msg->callid->body, get_cseq(msg)->number);
+	if (!branch_builder( msg->hash_index, 0, md5, 0 /* 0-th branch */,
+				msg->add_to_branch_s, &msg->add_to_branch_len )) {
+		LOG(L_ERR, "ERROR: forward_request: branch_builder failed\n");
+		ret=E_UNSPEC;
+		goto error;
 	}
 	/* try to send the message until success or all the ips are exhausted
 	 *  (if dns lookup is performed && the dns cache used ) */

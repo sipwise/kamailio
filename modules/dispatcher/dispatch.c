@@ -92,7 +92,7 @@ static ds_ht_t *_dsht_load = NULL;
 extern int ds_force_dst;
 
 static db_func_t ds_dbf;
-static db1_con_t* ds_db_handle=0;
+static db1_con_t* ds_db_handle=NULL;
 
 ds_set_t **ds_lists=NULL;
 
@@ -655,8 +655,8 @@ int init_ds_db(void)
 		return -1;
 	}
 
-	if(ds_connect_db()!=0){
-
+	if(ds_connect_db()!=0)
+	{
 		LM_ERR("unable to connect to the database\n");
 		return -1;
 	}
@@ -684,6 +684,26 @@ int init_ds_db(void)
 		ret = 0;
 	}
 
+	ds_disconnect_db();
+
+	return ret;
+}
+
+/*! \brief reload groups of destinations from DB*/
+int ds_reload_db(void)
+{
+	int ret;
+
+	if(ds_connect_db()!=0)
+	{
+		LM_ERR("unable to connect to the database\n");
+		return -1;
+	}
+	ret = ds_load_db();
+	if (ret == -2)
+	{
+		LM_WARN("failure while loading one or more dispatcher entries\n");
+	}
 	ds_disconnect_db();
 
 	return ret;
@@ -2244,6 +2264,18 @@ int ds_is_from_list(struct sip_msg *_m, int group)
 							return -2;
 						}
 					}
+					if(ds_attrs_pvname.s!=0 && list->dlist[j].attrs.body.len>0)
+					{
+						memset(&val, 0, sizeof(pv_value_t));
+						val.flags = PV_VAL_STR;
+						val.rs = list->dlist[j].attrs.body;
+						if(ds_attrs_pv.setf(_m, &ds_attrs_pv.pvp,
+									(int)EQ_T, &val)<0)
+						{
+							LM_ERR("setting attrs pv failed\n");
+							return -3;
+						}
+					}
 					return 1;
 				}
 			}
@@ -2352,10 +2384,10 @@ static void ds_options_callback( struct cell *t, int type,
 	 *  cast it to an int. */
 	group = (int)(long)(*ps->param);
 	/* The SIP-URI is taken from the Transaction.
-	 * Remove the "To: " (s+4) and the trailing new-line (s - 4 (To: )
-	 * - 2 (\r\n)). */
-	uri.s = t->to.s + 4;
-	uri.len = t->to.len - 6;
+	 * Remove the "To: <" (s+5) and the trailing >+new-line (s - 5 (To: <)
+	 * - 3 (>\r\n)). */
+	uri.s = t->to.s + 5;
+	uri.len = t->to.len - 8;
 	LM_DBG("OPTIONS-Request was finished with code %d (to %.*s, group %d)\n",
 			ps->code, uri.len, uri.s, group);
 	/* ps->code contains the result-code of the request.
