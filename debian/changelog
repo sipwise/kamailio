@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.0-1) UNRELEASED; urgency=low
+
+  * [b9ee1b0] MT#5301 Imported Upstream version 4.1.0
+  * [c99d19e] MT#5301 remove upstream applied patches and refresh the rest
+  * [e08ab8c] MT#5301 Add upstream patches
+  * [9c55b20] MT#5301 refresh lcr_rate_module.patch
+
+ -- Victor Seva <vseva@sipwise.com>  Fri, 06 Dec 2013 14:40:17 +0100
+
 ngcp-kamailio (4.0.4-3) unstable; urgency=low
 
   * [14dbee8] MT#4143 Add upstream ursloc fix
