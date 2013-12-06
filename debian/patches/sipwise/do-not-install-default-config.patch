@@ -9,7 +9,7 @@ Subject: do not install default config
 
 --- a/Makefile
 +++ b/Makefile
-@@ -707,7 +707,7 @@
+@@ -708,7 +708,7 @@
  
  .PHONY: install
  install: mk_params="compile_for_install=yes"

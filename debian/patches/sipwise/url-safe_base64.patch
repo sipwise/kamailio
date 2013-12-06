@@ -574,7 +574,7 @@
  
 --- a/modules/pv/pv_trans.c
 +++ b/modules/pv/pv_trans.c
-@@ -231,6 +231,32 @@
+@@ -307,6 +307,32 @@
  			val->rs.s = _tr_buffer;
  			val->rs.len = i;
  			break;
@@ -607,7 +607,7 @@
  		case TR_S_ESCAPECOMMON:
  			if(!(val->flags&PV_VAL_STR))
  				val->rs.s = int2str(val->ri, &val->rs.len);
-@@ -1797,6 +1823,12 @@
+@@ -1926,6 +1952,12 @@
  	} else if(name.len==13 && strncasecmp(name.s, "decode.base64", 13)==0) {
  		t->subtype = TR_S_DECODEBASE64;
  		goto done;

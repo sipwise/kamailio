@@ -1,22 +1,22 @@
 --- a/modules/nathelper/nathelper.c
 +++ b/modules/nathelper/nathelper.c
-@@ -340,6 +340,7 @@
- static pid_t mypid;
+@@ -342,6 +342,7 @@
  static int sipping_flag = -1;
+ static int natping_disable_flag = -1;
  static int natping_processes = 1;
 +static int contact_only = 0;
  
  static str nortpproxy_str = str_init("a=nortpproxy:yes");
  
-@@ -415,6 +416,7 @@
- 	{"natping_processes",     INT_PARAM, &natping_processes     },
+@@ -423,6 +424,7 @@
  	{"natping_socket",        STR_PARAM, &natping_socket        },
  	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
+ 	{"udpping_from_path",     INT_PARAM, &udpping_from_path     },
 +	{"contact_only",          INT_PARAM, &contact_only          },
  
  	{0, 0, 0}
  };
-@@ -1948,9 +1950,10 @@
+@@ -2068,9 +2070,10 @@
  			goto done;
  		}
  	}
@@ -29,7 +29,7 @@
  	if (rval<0) {
  		LM_ERR("failed to fetch contacts\n");
  		goto done;
-@@ -1964,9 +1967,10 @@
+@@ -2084,9 +2087,10 @@
  			LM_ERR("out of pkg memory\n");
  			goto done;
  		}
@@ -158,19 +158,19 @@
 +	api->get_all_ucontacts_opt = get_all_ucontacts_opt;
  	api->insert_urecord     = insert_urecord;
  	api->delete_urecord     = delete_urecord;
- 	api->get_urecord        = get_urecord;
+ 	api->delete_urecord_by_ruid     = delete_urecord_by_ruid;
 --- a/modules/usrloc/usrloc.h
 +++ b/modules/usrloc/usrloc.h
-@@ -41,6 +41,8 @@
- #define WRITE_BACK    2
+@@ -42,6 +42,8 @@
  #define DB_ONLY       3
+ #define DB_READONLY   4
  
 +#define GAU_OPT_ONLY_CONTACT   (1<<0)  /* ignore "received" address and always return contact */
 +
  /*forward declaration necessary for udomain*/
  
  struct udomain;
-@@ -175,6 +177,9 @@
+@@ -180,6 +182,9 @@
  typedef int  (*get_all_ucontacts_t) (void* buf, int len, unsigned int flags,
  		unsigned int part_idx, unsigned int part_max);
  
@@ -180,7 +180,7 @@
  typedef int (*get_udomain_t)(const char* _n, udomain_t** _d);
  
  typedef unsigned int (*ul_get_aorhash_t)(str *_aor);
-@@ -195,6 +200,7 @@
+@@ -200,6 +205,7 @@
  	register_udomain_t   register_udomain;
  	get_udomain_t        get_udomain;
  	get_all_ucontacts_t  get_all_ucontacts;

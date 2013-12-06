@@ -1,8 +1,8 @@
 --- a/Makefile.groups
 +++ b/Makefile.groups
-@@ -95,6 +95,9 @@
- # - modules depending on unistring library
- mod_list_websocket=websocket
+@@ -104,6 +104,9 @@
+ # - modules depending on openssl library
+ mod_list_autheph=auth_ephemeral
  
 +# - modules depending on swrate library
 +mod_list_lcrrate=lcr_rate
@@ -10,26 +10,25 @@
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -161,7 +164,9 @@
- 			   $(mod_list_mono) $(mod_list_ims) \
- 			   $(mod_list_cassandra) $(mod_list_oracle) \
+@@ -175,7 +178,8 @@
  			   $(mod_list_iptrtpproxy) $(mod_list_mi_xmlrpc) \
--			   $(mod_list_outbound) $(mod_list_osp) )
-+			   $(mod_list_outbound) $(mod_list_osp) ) \
+ 			   $(mod_list_outbound) $(mod_list_osp) \
+ 			   $(mod_list_java) $(mod_list_dnssec) \
+-			   $(mod_list_sctp) $(mod_list_autheph))
++			   $(mod_list_sctp) $(mod_list_autheph)) \
 +			   $(mod_list_lcrrate)
-+
  
  
  
-@@ -307,6 +312,8 @@
- # pkg outbound module
- module_group_koutbound=$(mod_list_outbound)
+@@ -229,6 +233,8 @@
+ module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
+ 
  
 +# pkg lcrrate module
 +module_group_klcrrate=$(mod_list_lcrrate)
  
- # list of static modules
- #
+ ### --- Groups defined for pacKaging ###
+ 
 --- /dev/null
 +++ b/modules/lcr_rate/Makefile
 @@ -0,0 +1,9 @@

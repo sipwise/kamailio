@@ -1,11 +1,11 @@
 --- a/modules/dialplan/dialplan.c
 +++ b/modules/dialplan/dialplan.c
-@@ -280,7 +280,7 @@
+@@ -277,7 +277,7 @@
  	memset(&val, 0, sizeof(pv_value_t));
  	val.flags = PV_VAL_STR;
  
--	no_change = (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
-+	no_change = (dest->type == PVT_NONE) || (!repl->s);
+-	no_change = (dest==NULL) || (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
++	no_change = (dest==NULL) || (dest->type == PVT_NONE) || (!repl->s);
  
  	if (no_change)
  		goto set_attr_pvar;
@@ -113,6 +113,13 @@
 +		memcpy(result->s, string.s, ovector[0]);
 +		result->len += ovector[0];
 +	}
++
++	if (repl_comp) {
++		/* offset- offset in the replacement string */
++		repl_nb = offset = 0;
++		p=repl_comp->replacement.s;
++
++		while( repl_nb < repl_comp->n_escapes){
  
 -		switch(token.type) {
 -			case REPLACE_NMATCH:
@@ -122,13 +129,6 @@
 -				match.len = ovector[match_nb + 1] - ovector[match_nb];
 -				if(result->len + match.len >= MAX_PHONE_NB_DIGITS){
 -					LM_ERR("overflow\n");
-+	if (repl_comp) {
-+		/* offset- offset in the replacement string */
-+		repl_nb = offset = 0;
-+		p=repl_comp->replacement.s;
-+
-+		while( repl_nb < repl_comp->n_escapes){
-+
 +			token = repl_comp->replace[repl_nb];
 +
 +			if(offset< token.offset){
