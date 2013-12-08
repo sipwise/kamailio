@@ -5,6 +5,7 @@ upstream/0004-Makefile.defs-compiler-optimization-level-made-varia.patch
 upstream/0005-core-fixed-several-clang-compiler-warnings.patch
 upstream/0006-usrloc-proper-index-for-domain-column-when-laoding-e.patch
 upstream/0007-tm-safety-checks-inside-t_next_contacts.patch
+upstream/debug/0001-modules-debugger-trace-msg-out.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
