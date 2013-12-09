@@ -1,0 +1,40 @@
+From 8df9d2336e7de2648288cf8ff6821e6820d88da9 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Mon, 9 Dec 2013 10:06:15 +0100
+Subject: [PATCH] usrloc: avoid double locking when preloading attributes
+
+- reported by Seudin Kasumovic, FS#378
+
+(cherry picked from commit 888635bfa3719afeeea6f5f0d407aa862ceb34ac)
+---
+ modules/usrloc/udomain.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/modules/usrloc/udomain.c b/modules/usrloc/udomain.c
+index a736051..88fc7e4 100644
+--- a/modules/usrloc/udomain.c
++++ b/modules/usrloc/udomain.c
+@@ -1270,8 +1270,7 @@ int uldb_preload_attrs(udomain_t *_d)
+ 				suri = user;
+ 			}
+ 
+-			lock_udomain(_d, &suri);
+-			if (get_urecord_by_ruid(_d, ul_get_aorhash(&suri), &ruid, &r, &c) > 0) {
++			if (get_urecord_by_ruid(_d, ul_get_aorhash(&suri), &ruid, &r, &c) < 0) {
+ 				/* delete attrs records from db table */
+ 				LM_INFO("no contact record for this ruid\n");
+ 				uldb_delete_attrs(_d->name, &user, &domain, &ruid);
+@@ -1287,8 +1286,9 @@ int uldb_preload_attrs(udomain_t *_d)
+ 							LM_INFO("cannot add values to contact xavp\n");
+ 					}
+ 				}
++				/* get_urecord_by_ruid() locks the slot */
++				unlock_udomain(_d, &suri);
+ 			}
+-			unlock_udomain(_d, &user);
+ 		}
+ 
+ 		if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
+-- 
+1.8.4.3
+
