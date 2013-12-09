@@ -1,0 +1,52 @@
+--- /dev/null
++++ b/modules/tcap/Makefile
+@@ -0,0 +1,9 @@
++include ../../Makefile.defs
++auto_gen=
++NAME=tcap.so
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE -D_GNU_SOURCE
++DEFS+=-I/usr/include/tcap
++LIBS+=-ltcap
++
++include ../../Makefile.modules
+--- /dev/null
++++ b/modules/tcap/tcap_mod.c
+@@ -0,0 +1,37 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
++#include <tcap/libtcap.h>
++#include "../../sr_module.h"
++#include "../../mod_fix.h"
++#include "../../pvar.h"
++
++MODULE_VERSION
++
++static int tcap(sip_msg_t *msg, char *su, char *sq);
++
++static cmd_export_t cmds[] = {
++	{"tcap", (cmd_function)tcap, 2, fixup_spve_spve, 0,
++	REQUEST_ROUTE | FAILURE_ROUTE},
++	{0,}
++};
++
++struct module_exports exports = {
++	"tcap",
++	DEFAULT_DLFLAGS,
++	cmds,
++	0,
++	0,
++	0,
++	0,
++	0,
++	0,
++	0,
++	0,
++	0
++};
++
++static int tcap(sip_msg_t *msg, char *su, char *sq) {
++	return 0;
++}

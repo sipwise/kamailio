@@ -18,3 +18,4 @@ sipwise/nathelper.contact_only.patch
 sipwise/parallel_build.patch
 sipwise/url-safe_base64.patch
 sipwise/dialoginfo_notify_body.patch
+sipwise/tcap.patch
