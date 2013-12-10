@@ -37,7 +37,7 @@
 +
 +
 +static cmd_export_t cmds[] = {
-+	{"tcap_extract", (cmd_function)tcap_extract_f, 2, fixup_spve_null, 0,
++	{"tcap_extract", (cmd_function)tcap_extract_f, 2, fixup_spve_str, 0,
 +	ANY_ROUTE},
 +	{0,}
 +};
@@ -79,7 +79,7 @@
 +
 +
 +static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq) {
-+	str body, spec, s;
++	str body, spec, *s;
 +	static char buf[1024];
 +	struct output_buffer out;
 +	int_str avp_val, avp_name;
@@ -110,21 +110,21 @@
 +
 +
 +
-+	s.s = sq; s.len = strlen(s.s);
-+	if (pv_locate_name(&s) != s.len)
++	s = (str *) sq;
++	if (pv_locate_name(s) != s->len)
 +	{
 +		LM_ERR("invalid parameter\n");
 +		return -1;
 +	}
-+	if (((avp_spec = pv_cache_get(&s)) == NULL)
++	if (((avp_spec = pv_cache_get(s)) == NULL)
 +			|| avp_spec->type!=PVT_AVP) {
-+		LM_ERR("malformed or non AVP %s AVP definition\n", sq);
++		LM_ERR("malformed or non AVP %s AVP definition\n", s->s);
 +		return -1;
 +	}
 +
 +	if(pv_get_avp_name(0, &avp_spec->pvp, &avp_name, &avp_type)!=0)
 +	{
-+		LM_ERR("[%s]- invalid AVP definition\n", sq);
++		LM_ERR("[%s]- invalid AVP definition\n", s->s);
 +		return -1;
 +	}
 +	avp_val.s.s = out.buf;
