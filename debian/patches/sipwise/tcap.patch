@@ -61,3 +61,13 @@
  
  # - extra used modules, with no extra dependency
  mod_list_extra=avp auth_diameter call_control cnxcc dmq domainpolicy msrp pdb \
+--- a/debian/control
++++ b/debian/control
+@@ -37,6 +37,7 @@
+  libxml2-dev,
+  libxmlrpc-core-c3-dev,
+  ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
++ ngcp-libtcap-dev,
+  openssl,
+  python,
+  python-dev,
