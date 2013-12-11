@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,295 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -279,6 +279,7 @@
 +			break;
 +		if (*pi != ' ')
 +			goto error;
++		pi++;
 +	}
 +
 +	odd = raw[0] & 0x80;
