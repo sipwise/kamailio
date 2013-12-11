@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,127 @@
+@@ -0,0 +1,129 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -85,25 +85,33 @@
 +	int_str avp_val, avp_name;
 +	static unsigned short avp_type = 0;
 +	pv_spec_t *avp_spec = NULL;
++	const char *err;
 +
++	err = "Error fixing up first parameter";
 +	if (fixup_get_svalue(msg, (gparam_p) su, &spec))
 +		goto error;
 +
++	err = "No SIP body found";
 +	body.s = get_body(msg);
 +	if (!body.s)
 +		goto error;
++	err = "No Content-Length found or zero length body";
 +	body.len = get_content_length(msg);
 +	if (!body.len)
 +		goto error;
 +
++	err = "No Content-Type found";
 +	if (!msg->content_type)
 +		goto error;
++	err = "Truncated SIP packet";
 +	if (msg->content_type->body.len < content_type.len)
 +		goto error;
++	err = "Content-Type mismatch";
 +	if (strncasecmp(msg->content_type->body.s, content_type.s, content_type.len))
 +		goto error;
 +
 +	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
 +	if (tcap_extract(body.s, body.len, spec.s, &out))
 +		goto error;
 +
@@ -111,33 +119,27 @@
 +
 +
 +	s = (str *) sq;
++	err = "Invalid second parameter";
 +	if (pv_locate_name(s) != s->len)
-+	{
-+		LM_ERR("invalid parameter\n");
-+		return -1;
-+	}
++		goto error;
++	err = "Malformed AVP definition";
 +	if (((avp_spec = pv_cache_get(s)) == NULL)
-+			|| avp_spec->type!=PVT_AVP) {
-+		LM_ERR("malformed or non AVP %s AVP definition\n", s->s);
-+		return -1;
-+	}
++			|| avp_spec->type!=PVT_AVP)
++		goto error;
 +
++	err = "Invalid AVP definition";
 +	if(pv_get_avp_name(0, &avp_spec->pvp, &avp_name, &avp_type)!=0)
-+	{
-+		LM_ERR("[%s]- invalid AVP definition\n", s->s);
-+		return -1;
-+	}
++		goto error;
 +	avp_val.s.s = out.buf;
 +	avp_val.s.len = out.used;
++	err = "Failed to add return AVP";
 +	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
-+	{
-+		LM_ERR("Failed to add SDP avp");
-+		return -1;
-+	}
++		goto error;
 +
 +	return 1;
 +
 +error:
++	LM_ERR("Error processing TCAP: %s\n", err);
 +	return -1;
 +}
 --- a/Makefile.groups
