@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,131 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -22,6 +22,7 @@
 +#include "../../mod_fix.h"
 +#include "../../pvar.h"
 +#include "../../parser/parse_content.h"
++#include "../../lvalue.h"
 +
 +MODULE_VERSION
 +
@@ -82,10 +83,9 @@
 +	str body, spec, *s;
 +	static char buf[1024];
 +	struct output_buffer out;
-+	int_str avp_val, avp_name;
-+	static unsigned short avp_type = 0;
 +	pv_spec_t *avp_spec = NULL;
 +	const char *err;
++	pv_value_t avp_val;
 +
 +	err = "Error fixing up first parameter";
 +	if (fixup_get_svalue(msg, (gparam_p) su, &spec))
@@ -118,21 +118,24 @@
 +
 +
 +	s = (str *) sq;
-+	err = "Invalid second parameter";
-+	if (pv_locate_name(s) != s->len)
-+		goto error;
 +	err = "Malformed AVP definition";
-+	if (((avp_spec = pv_cache_get(s)) == NULL)
-+			|| avp_spec->type!=PVT_AVP)
++	if (!(avp_spec = pv_cache_get(s)))
 +		goto error;
++	switch (avp_spec->type) {
++		case PVT_AVP:
++		case PVT_XAVP:
++		case PVT_SCRIPTVAR:
++			break;
++		default:
++			goto error;
++	}
 +
-+	err = "Invalid AVP definition";
-+	if(pv_get_avp_name(0, &avp_spec->pvp, &avp_name, &avp_type)!=0)
-+		goto error;
-+	avp_val.s.s = out.buf;
-+	avp_val.s.len = out.used;
-+	err = "Failed to add return AVP";
-+	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
++	memset(&avp_val, 0, sizeof(avp_val));
++	avp_val.flags = PV_VAL_STR;
++	avp_val.rs.s = out.buf;
++	avp_val.rs.len = out.used;
++	err = "Failed to set return AVP";
++	if (avp_spec->setf(msg, &avp_spec->pvp, EQ_T, &avp_val) < 0)
 +		goto error;
 +
 +	return 1;
