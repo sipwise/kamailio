@@ -112,7 +112,7 @@
 +
 +	return 0;
 +error:
-+	LM_ERR("prepare_extract() error: %s\n", err);
++	LM_ERR("%s\n", err);
 +	return -1;
 +}
 +
@@ -145,7 +145,7 @@
 +
 +	return 0;
 +error:
-+	LM_ERR("copy_output() error: %s\n", err);
++	LM_ERR("%s\n", err);
 +	return -1;
 +
 +}
@@ -169,7 +169,7 @@
 +
 +	return 1;
 +error:
-+	LM_ERR("tcap_extract_f() error: %s\n", err);
++	LM_ERR("%s\n", err);
 +	return -1;
 +}
 +
@@ -192,7 +192,7 @@
 +
 +	return 1;
 +error:
-+	LM_ERR("inap_extract_f() error: %s\n", err);
++	LM_ERR("%s\n", err);
 +	return -1;
 +}
 +
@@ -305,7 +305,7 @@
 +	return 1;
 +
 +error:
-+	LM_ERR("inap_extract_f() error: %s\n", err);
++	LM_ERR("%s\n", err);
 +	return -1;
 +}
 --- a/Makefile.groups
