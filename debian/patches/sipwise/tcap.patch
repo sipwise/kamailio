@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,179 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -34,12 +34,15 @@
 +
 +static int mod_init(void);
 +static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int inap_extract_f(sip_msg_t *msg, char *su, char *sq);
 +
 +
 +
 +static cmd_export_t cmds[] = {
-+	{"tcap_extract", (cmd_function)tcap_extract_f, 2, fixup_spve_str, 0,
-+	ANY_ROUTE},
++	{"tcap_extract", (cmd_function)tcap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"inap_extract", (cmd_function)inap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
 +	{0,}
 +};
 +
@@ -79,25 +82,20 @@
 +
 +
 +
-+static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq) {
-+	str body, spec, *s;
-+	static char buf[1024];
-+	struct output_buffer out;
-+	pv_spec_t *avp_spec = NULL;
++static int prepare_extract(sip_msg_t *msg, char *su, str *body, str *spec) {
 +	const char *err;
-+	pv_value_t avp_val;
 +
 +	err = "Error fixing up first parameter";
-+	if (fixup_get_svalue(msg, (gparam_p) su, &spec))
++	if (fixup_get_svalue(msg, (gparam_p) su, spec))
 +		goto error;
 +
 +	err = "No SIP body found";
-+	body.s = get_body(msg);
-+	if (!body.s)
++	body->s = get_body(msg);
++	if (!body->s)
 +		goto error;
 +	err = "No Content-Length found or zero length body";
-+	body.len = get_content_length(msg);
-+	if (!body.len)
++	body->len = get_content_length(msg);
++	if (!body->len)
 +		goto error;
 +
 +	err = "No Content-Type found";
@@ -109,13 +107,17 @@
 +	if (strncasecmp(msg->content_type->body.s, content_type.s, content_type.len))
 +		goto error;
 +
-+	OUTPUT_BUFFER_INIT(&out, buf);
-+	err = "Error parsing TCAP body";
-+	if (tcap_extract(body.s, body.len, spec.s, &out))
-+		goto error;
++	return 0;
++error:
++	LM_ERR("prepare_extract() error: %s\n", err);
++	return -1;
++}
 +
-+
-+
++static int copy_output(sip_msg_t *msg, char *su, char *sq, struct output_buffer *out) {
++	const char *err;
++	pv_spec_t *avp_spec = NULL;
++	str *s;
++	pv_value_t avp_val;
 +
 +	s = (str *) sq;
 +	err = "Malformed AVP definition";
@@ -132,16 +134,62 @@
 +
 +	memset(&avp_val, 0, sizeof(avp_val));
 +	avp_val.flags = PV_VAL_STR;
-+	avp_val.rs.s = out.buf;
-+	avp_val.rs.len = out.used;
++	avp_val.rs.s = out->buf;
++	avp_val.rs.len = out->used;
 +	err = "Failed to set return AVP";
 +	if (avp_spec->setf(msg, &avp_spec->pvp, EQ_T, &avp_val) < 0)
 +		goto error;
 +
-+	return 1;
-+
++	return 0;
 +error:
-+	LM_ERR("Error processing TCAP: %s\n", err);
++	LM_ERR("copy_output() error: %s\n", err);
++	return -1;
++
++}
++
++static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	static char buf[1024];
++	struct output_buffer out;
++	str body, spec;
++
++	if (prepare_extract(msg, su, &body, &spec))
++		return -1;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
++	if (tcap_extract(body.s, body.len, spec.s, &out))
++		goto error;
++
++	if (copy_output(msg, su, sq, &out))
++		return -1;
++
++	return 1;
++error:
++	LM_ERR("tcap_extract_f() error: %s\n", err);
++	return -1;
++}
++
++static int inap_extract_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	static char buf[1024];
++	struct output_buffer out;
++	str body, spec;
++
++	if (prepare_extract(msg, su, &body, &spec))
++		return -1;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
++	if (inap_extract(body.s, body.len, spec.s, &out))
++		goto error;
++
++	if (copy_output(msg, su, sq, &out))
++		return -1;
++
++	return 1;
++error:
++	LM_ERR("inap_extract_f() error: %s\n", err);
 +	return -1;
 +}
 --- a/Makefile.groups
