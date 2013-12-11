@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,295 @@
+@@ -0,0 +1,296 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -294,6 +294,7 @@
 +		*(pi++) = phone_digit(*pr & 0xf);
 +		*(pi++) = phone_digit(*pr >> 4);
 +		rawlen--;
++		pr++;
 +	}
 +
 +	if (odd)
