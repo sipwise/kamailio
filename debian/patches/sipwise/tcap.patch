@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,294 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -35,6 +35,7 @@
 +static int mod_init(void);
 +static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq);
 +static int inap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq);
 +
 +
 +
@@ -42,6 +43,8 @@
 +	{"tcap_extract", (cmd_function)tcap_extract_f, 2,
 +		fixup_spve_str, 0, ANY_ROUTE},
 +	{"inap_extract", (cmd_function)inap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"isup_decode_number", (cmd_function)isup_decode_number_f, 2,
 +		fixup_spve_str, 0, ANY_ROUTE},
 +	{0,}
 +};
@@ -113,7 +116,7 @@
 +	return -1;
 +}
 +
-+static int copy_output(sip_msg_t *msg, char *su, char *sq, struct output_buffer *out) {
++static int copy_output(sip_msg_t *msg, char *sq, char *outbuf, int outlen) {
 +	const char *err;
 +	pv_spec_t *avp_spec = NULL;
 +	str *s;
@@ -134,8 +137,8 @@
 +
 +	memset(&avp_val, 0, sizeof(avp_val));
 +	avp_val.flags = PV_VAL_STR;
-+	avp_val.rs.s = out->buf;
-+	avp_val.rs.len = out->used;
++	avp_val.rs.s = outbuf;
++	avp_val.rs.len = outlen;
 +	err = "Failed to set return AVP";
 +	if (avp_spec->setf(msg, &avp_spec->pvp, EQ_T, &avp_val) < 0)
 +		goto error;
@@ -161,7 +164,7 @@
 +	if (tcap_extract(body.s, body.len, spec.s, &out))
 +		goto error;
 +
-+	if (copy_output(msg, su, sq, &out))
++	if (copy_output(msg, sq, out.buf, out.used))
 +		return -1;
 +
 +	return 1;
@@ -184,10 +187,122 @@
 +	if (inap_extract(body.s, body.len, spec.s, &out))
 +		goto error;
 +
-+	if (copy_output(msg, su, sq, &out))
++	if (copy_output(msg, sq, out.buf, out.used))
 +		return -1;
 +
 +	return 1;
++error:
++	LM_ERR("inap_extract_f() error: %s\n", err);
++	return -1;
++}
++
++
++
++static inline char phone_digit(unsigned char d) {
++	switch (d) {
++		case 0:
++		case 1:
++		case 2:
++		case 3:
++		case 4:
++		case 5:
++		case 6:
++		case 7:
++		case 8:
++		case 9:
++			return '0' + d;
++		case 11:
++			return '*';
++		case 12:
++			return '#';
++		case 15:
++			return 'F';
++		default:
++			return '?';
++	}
++}
++
++
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	char *pi;
++	str inp;
++	unsigned char raw[32], *pr;
++	int rawlen, odd;
++	char num[64];
++
++	err = "Error fixing up first parameter";
++	if (fixup_get_svalue(msg, (gparam_p) su, &inp))
++		goto error;
++	err = "Invalid encoded number";
++	if (inp.len < 5) /* min: 2 octets */
++		goto error;
++	err = "Input too long";
++	if (inp.len > 92) /* 31 * 2 + 30 */
++		goto error;
++
++	/* input is a hex encoded octet string, separated by spaces */
++
++	pr = raw;
++	rawlen = 0;
++	pi = inp.s;
++	while (1) {
++		if (!*pi)
++			break;
++
++		err = "Invalid hex encoded string";
++		if (*pi >= '0' && *pi <= '9')
++			*pr = (*pi - '0') << 4;
++		else if (*pi >= 'A' && *pi <= 'F')
++			*pr = (*pi - 'A' + 10) << 4;
++		else if (*pi >= 'a' && *pi <= 'f')
++			*pr = (*pi - 'a' + 10) << 4;
++		else
++			goto error;
++
++		pi++;
++
++		if (*pi >= '0' && *pi <= '9')
++			*pr |= (*pi - '0');
++		else if (*pi >= 'A' && *pi <= 'F')
++			*pr |= (*pi - 'A' + 10);
++		else if (*pi >= 'a' && *pi <= 'f')
++			*pr |= (*pi - 'a' + 10);
++		else
++			goto error;
++
++		rawlen++;
++		pr++;
++
++		pi++;
++		if (!*pi)
++			break;
++		if (*pi != ' ')
++			goto error;
++	}
++
++	odd = raw[0] & 0x80;
++	err = "Invalid encoding";
++	if (odd && rawlen == 2)
++		goto error;
++
++	pi = num;
++	pr = raw + 2;
++	rawlen -= 2;
++	while (rawlen) {
++		*(pi++) = phone_digit(*pr & 0xf);
++		*(pi++) = phone_digit(*pr >> 4);
++		rawlen--;
++	}
++
++	if (odd)
++		pi--;
++
++	if (copy_output(msg, sq, num, pi - num))
++		return -1;
++
++	return 1;
++
 +error:
 +	LM_ERR("inap_extract_f() error: %s\n", err);
 +	return -1;
