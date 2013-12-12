@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,296 @@
+@@ -0,0 +1,231 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -225,82 +225,17 @@
 +
 +static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq) {
 +	const char *err;
-+	char *pi;
 +	str inp;
-+	unsigned char raw[32], *pr;
-+	int rawlen, odd;
 +	char num[64];
 +
 +	err = "Error fixing up first parameter";
 +	if (fixup_get_svalue(msg, (gparam_p) su, &inp))
 +		goto error;
 +	err = "Invalid encoded number";
-+	if (inp.len < 5) /* min: 2 octets */
-+		goto error;
-+	err = "Input too long";
-+	if (inp.len > 92) /* 31 * 2 + 30 */
++	if (isup_convert_number(inp.s, inp.len, num))
 +		goto error;
 +
-+	/* input is a hex encoded octet string, separated by spaces */
-+
-+	pr = raw;
-+	rawlen = 0;
-+	pi = inp.s;
-+	while (1) {
-+		if (!*pi)
-+			break;
-+
-+		err = "Invalid hex encoded string";
-+		if (*pi >= '0' && *pi <= '9')
-+			*pr = (*pi - '0') << 4;
-+		else if (*pi >= 'A' && *pi <= 'F')
-+			*pr = (*pi - 'A' + 10) << 4;
-+		else if (*pi >= 'a' && *pi <= 'f')
-+			*pr = (*pi - 'a' + 10) << 4;
-+		else
-+			goto error;
-+
-+		pi++;
-+
-+		if (*pi >= '0' && *pi <= '9')
-+			*pr |= (*pi - '0');
-+		else if (*pi >= 'A' && *pi <= 'F')
-+			*pr |= (*pi - 'A' + 10);
-+		else if (*pi >= 'a' && *pi <= 'f')
-+			*pr |= (*pi - 'a' + 10);
-+		else
-+			goto error;
-+
-+		rawlen++;
-+		pr++;
-+
-+		pi++;
-+		if (!*pi)
-+			break;
-+		if (*pi != ' ')
-+			goto error;
-+		pi++;
-+	}
-+
-+	odd = raw[0] & 0x80;
-+	err = "Invalid encoding";
-+	if (odd && rawlen == 2)
-+		goto error;
-+
-+	pi = num;
-+	pr = raw + 2;
-+	rawlen -= 2;
-+	while (rawlen) {
-+		*(pi++) = phone_digit(*pr & 0xf);
-+		*(pi++) = phone_digit(*pr >> 4);
-+		rawlen--;
-+		pr++;
-+	}
-+
-+	if (odd)
-+		pi--;
-+
-+	if (copy_output(msg, sq, num, pi - num))
++	if (copy_output(msg, sq, num, strlen(num)))
 +		return -1;
 +
 +	return 1;
