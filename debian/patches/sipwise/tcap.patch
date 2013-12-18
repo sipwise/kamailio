@@ -250,8 +250,8 @@
  				   mediaproxy mi_datagram mi_fifo mi_rpc mqueue \
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
  				   rtpproxy sanity sdpops siputils sl statistics textops \
--				   textopsx tm tmx topoh xlog rtpproxy-ng stun sipt
-+				   textopsx tm tmx topoh xlog rtpproxy-ng stun sipt tcap
+-				   textopsx tm tmx topoh xlog rtpproxy-ng
++				   textopsx tm tmx topoh xlog rtpproxy-ng tcap
  
  # - extra used modules, with no extra dependency
- mod_list_extra=avp auth_diameter call_control cnxcc dmq domainpolicy msrp pdb \
+ mod_list_extra=avp auth_diameter call_control dmq domainpolicy msrp pdb qos \
