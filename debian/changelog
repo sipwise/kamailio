@@ -1,3 +1,23 @@
+ngcp-kamailio (4.0.4-4) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [a10b7fe] fix handling of multipart sip/sdp
+  * [e87dda0] totally stubby tcap module
+  * [3399799] breaking kamailio build by adding tcap to build modules
+  * [8bd0f59] some rudimentary tcap function
+  * [c2c5679] try a different fixup function
+  * [3d5758b] adding error logging
+  * [0763d36] wrong error message
+  * [c48aa6c] try different method of setting return avp
+  * [c6520f5] implement inap_extract
+  * [5ada4cb] adding isup_decode_number function
+  * [bacb9b8] fix  hex decoding
+  * [79c9e70] less redundant error messages
+  * [21acb74] fix  hex decoding
+  * [ea8df18] use new isup_convert_number from libtcap
+
+ -- Andrew Pogrebennyk <apogrebennyk@sipwise.com>  Wed, 18 Dec 2013 12:24:22 +0100
+
 ngcp-kamailio (4.0.4-3) unstable; urgency=low
 
   * [14dbee8] MT#4143 Add upstream ursloc fix
