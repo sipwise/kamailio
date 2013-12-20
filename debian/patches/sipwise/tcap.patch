@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,231 @@
+@@ -0,0 +1,239 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -29,6 +29,7 @@
 +
 +
 +static str content_type;
++static int strip_trailing_crlf;
 +
 +
 +
@@ -53,6 +54,7 @@
 +
 +static param_export_t params[] = {
 +	{ "content_type",		STR_PARAM,	&content_type.s		},
++	{ "strip_trailing_crlf",	INT_PARAM,	&strip_trailing_crlf	},
 +	{ 0, }
 +};
 +
@@ -100,6 +102,12 @@
 +	body->len = get_content_length(msg);
 +	if (!body->len)
 +		goto error;
++
++	if (strip_trailing_crlf
++			&& body->len >= 2
++			&& body->s[body->len - 1] == '\n'
++			&& body->s[body->len - 2] == '\r')
++		body->len -= 2;
 +
 +	err = "No Content-Type found";
 +	if (!msg->content_type)
