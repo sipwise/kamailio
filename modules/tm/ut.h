@@ -83,7 +83,6 @@ inline static enum sip_protos get_proto(enum sip_protos force_proto,
 				case PROTO_UDP:/* transport specified explicitly */
 #ifdef USE_TCP
 				case PROTO_TCP:
-				case PROTO_WS:
 #endif
 #ifdef USE_TLS
 				case PROTO_TLS:
@@ -92,7 +91,6 @@ inline static enum sip_protos get_proto(enum sip_protos force_proto,
 				case PROTO_SCTP:
 #endif
 						return proto;
-				case PROTO_WSS:	/* should never see ;transport=wss */
 				default:
 						LOG(L_ERR, "ERROR: get_proto: unsupported transport:"
 								" %d\n", proto );
@@ -101,11 +99,9 @@ inline static enum sip_protos get_proto(enum sip_protos force_proto,
 		case PROTO_UDP: /* some protocol has been forced -- take it */
 #ifdef USE_TCP
 		case PROTO_TCP:
-		case PROTO_WS:
 #endif
 #ifdef USE_TLS
 		case PROTO_TLS:
-		case PROTO_WSS:
 #endif
 #ifdef USE_SCTP
 		case PROTO_SCTP:
@@ -140,10 +136,8 @@ inline static struct proxy_l *uri2proxy( str *uri, int proto )
 			LOG(L_ERR, "ERROR: uri2proxy: bad transport for sips uri: %d\n",
 					parsed_uri.proto);
 			return 0;
-		}else if (parsed_uri.proto != PROTO_WS)
+		}else
 			uri_proto=PROTO_TLS;
-		else
-			uri_proto=PROTO_WS;
 	}else
 		uri_proto=parsed_uri.proto;
 #ifdef HONOR_MADDR
@@ -200,10 +194,8 @@ inline static int get_uri_send_info(str* uri, str* host, unsigned short* port,
 			LOG(L_ERR, "ERROR: get_uri_send_info: bad transport for"
 						" sips uri: %d\n", parsed_uri.proto);
 			return -1;
-		}else if (parsed_uri.proto != PROTO_WS)
+		}else
 			uri_proto=PROTO_TLS;
-		else
-			uri_proto=PROTO_WS;
 	}else
 		uri_proto=parsed_uri.proto;
 	
@@ -278,10 +270,8 @@ inline static struct dest_info *uri2dst2(struct dest_info* dst,
 			LOG(L_ERR, "ERROR: uri2dst: bad transport for sips uri: %d\n",
 					parsed_uri.proto);
 			return 0;
-		}else if (parsed_uri.proto!=PROTO_WS)
+		}else
 			uri_proto=PROTO_TLS;
-		else
-			uri_proto=PROTO_WS;
 	}else
 		uri_proto=parsed_uri.proto;
 	

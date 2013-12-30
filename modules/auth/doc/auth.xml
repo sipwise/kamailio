@@ -9,9 +9,8 @@
 	]
 >
 
-<book id="auth" xmlns:xi="http://www.w3.org/2001/XInclude">
-    <bookinfo>
-	<title>The Auth Module</title>
+<section id="auth" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <sectioninfo>
 	<authorgroup>
 	    <author>
 		<firstname>Jan</firstname>
@@ -39,12 +38,10 @@
 	    <holder>FhG FOKUS</holder>
 	</copyright>
 
-    </bookinfo>
-    <toc></toc>
+    </sectioninfo>
 
-
-    <chapter>
-	<title>Admin Guide</title>
+    <title>Auth Module</title>
+    
     <section id="auth.overview">
 	<title>Overview</title>
 	<para>
@@ -54,10 +51,10 @@
 	    authentication backends).
 	</para>
 	<para>
-	    We decided to divide the authentication code into several modules
+	    We decided to break the authentication code into several modules
 	    because there are now more than one backends (currently database
 	    authentication and radius are supported). This allows us to create
-	    separate packages so users can install and load only the required
+	    separate packages so uses can install and load only required
 	    functionality. This also allows us to avoid unnecessary
 	    dependencies in the binary packages.
 	</para>
@@ -70,8 +67,7 @@
 	</para>
     </section>
     
-    <xi:include href="auth_params.xml"/>
-    <xi:include href="auth_functions.xml"/>
+    <xi:include href="params.xml"/>
+    <xi:include href="functions.xml"/>
 
-    </chapter>
-</book>
+</section>

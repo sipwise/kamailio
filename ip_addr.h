@@ -52,7 +52,7 @@
 
 #include "dprint.h"
 
-enum sip_protos { PROTO_NONE, PROTO_UDP, PROTO_TCP, PROTO_TLS, PROTO_SCTP, PROTO_WS, PROTO_WSS, PROTO_OTHER };
+enum sip_protos { PROTO_NONE, PROTO_UDP, PROTO_TCP, PROTO_TLS, PROTO_SCTP, PROTO_OTHER };
 #define PROTO_LAST PROTO_OTHER
 
 #ifdef USE_COMP
@@ -82,7 +82,9 @@ struct net{
 union sockaddr_union{
 		struct sockaddr     s;
 		struct sockaddr_in  sin;
+	#ifdef USE_IPV6
 		struct sockaddr_in6 sin6;
+	#endif
 };
 
 
@@ -215,9 +217,13 @@ struct socket_id{
 #ifdef HAVE_SOCKADDR_SA_LEN
 #define sockaddru_len(su)	((su).s.sa_len)
 #else
+#ifdef USE_IPV6
 #define sockaddru_len(su)	\
 			(((su).s.sa_family==AF_INET6)?sizeof(struct sockaddr_in6):\
 					sizeof(struct sockaddr_in))
+#else
+#define sockaddru_len(su)	sizeof(struct sockaddr_in)
+#endif /*USE_IPV6*/
 #endif /* HAVE_SOCKADDR_SA_LEN*/
 	
 /* inits an ip_addr with the addr. info from a hostent structure
@@ -237,7 +243,11 @@ struct socket_id{
 /* gets the protocol family corresponding to a specific address family
  * ( PF_INET - AF_INET, PF_INET6 - AF_INET6, af for others)
  */
+#ifdef USE_IPV6
 #define AF2PF(af)   (((af)==AF_INET)?PF_INET:((af)==AF_INET6)?PF_INET6:(af))
+#else
+#define AF2PF(af)   (((af)==AF_INET)?PF_INET:(af))
+#endif
 
 
 
@@ -284,8 +294,10 @@ inline static int ip_addr_loopback(struct ip_addr* ip)
 {
 	if (ip->af==AF_INET)
 		return ip->u.addr32[0]==htonl(INADDR_LOOPBACK);
+#ifdef USE_IPV6
 	else if (ip->af==AF_INET6)
 		return IN6_IS_ADDR_LOOPBACK((struct in6_addr*)ip->u.addr32);
+#endif /* USE_IPV6 */
 	return 0;
 }
 
@@ -299,6 +311,7 @@ inline static void ip_addr_mk_any(int af, struct ip_addr* ip)
 		ip->len=4;
 		ip->u.addr32[0]=0;
 	}
+#ifdef USE_IPV6
 	else{
 		ip->len=16;
 #if (defined (ULONG_MAX) && ULONG_MAX > 4294967295) || defined LP64
@@ -312,6 +325,7 @@ inline static void ip_addr_mk_any(int af, struct ip_addr* ip)
 		ip->u.addr32[3]=0;
 #endif /* ULONG_MAX */
 	}
+#endif
 }
 
 /* returns 1 if ip & net.mask == net.ip ; 0 otherwise & -1 on error 
@@ -345,11 +359,13 @@ static inline void sockaddr2ip_addr(struct ip_addr* ip, struct sockaddr* sa)
 			ip->len=4;
 			memcpy(ip->u.addr, &((struct sockaddr_in*)sa)->sin_addr, 4);
 			break;
+#ifdef USE_IPV6
 	case AF_INET6:
 			ip->af=AF_INET6;
 			ip->len=16;
 			memcpy(ip->u.addr, &((struct sockaddr_in6*)sa)->sin6_addr, 16);
 			break;
+#endif
 	default:
 			LOG(L_CRIT, "sockaddr2ip_addr: BUG: unknown address family %d\n",
 					sa->sa_family);
@@ -374,9 +390,11 @@ static inline int su_cmp(const union sockaddr_union* s1,
 		case AF_INET:
 			return (s1->sin.sin_port==s2->sin.sin_port)&&
 					(memcmp(&s1->sin.sin_addr, &s2->sin.sin_addr, 4)==0);
+#ifdef USE_IPV6
 		case AF_INET6:
 			return (s1->sin6.sin6_port==s2->sin6.sin6_port)&&
 					(memcmp(&s1->sin6.sin6_addr, &s2->sin6.sin6_addr, 16)==0);
+#endif
 		default:
 			LOG(L_CRIT,"su_cmp: BUG: unknown address family %d\n",
 						s1->s.sa_family);
@@ -392,8 +410,10 @@ static inline unsigned short su_getport(const union sockaddr_union* su)
 	switch(su->s.sa_family){
 		case AF_INET:
 			return ntohs(su->sin.sin_port);
+#ifdef USE_IPV6
 		case AF_INET6:
 			return ntohs(su->sin6.sin6_port);
+#endif
 		default:
 			LOG(L_CRIT,"su_get_port: BUG: unknown address family %d\n",
 						su->s.sa_family);
@@ -410,9 +430,11 @@ static inline void su_setport(union sockaddr_union* su, unsigned short port)
 		case AF_INET:
 			su->sin.sin_port=htons(port);
 			break;
+#ifdef USE_IPV6
 		case AF_INET6:
 			 su->sin6.sin6_port=htons(port);
 			 break;
+#endif
 		default:
 			LOG(L_CRIT,"su_set_port: BUG: unknown address family %d\n",
 						su->s.sa_family);
@@ -430,11 +452,13 @@ static inline void su2ip_addr(struct ip_addr* ip, union sockaddr_union* su)
 					ip->len=4;
 					memcpy(ip->u.addr, &su->sin.sin_addr, 4);
 					break;
+#ifdef USE_IPV6
 	case AF_INET6:
 					ip->af=AF_INET6;
 					ip->len=16;
 					memcpy(ip->u.addr, &su->sin6.sin6_addr, 16);
 					break;
+#endif
 	default:
 					LOG(L_CRIT,"su2ip_addr: BUG: unknown address family %d\n",
 							su->s.sa_family);
@@ -455,6 +479,7 @@ static inline int init_su( union sockaddr_union* su,
 	memset(su, 0, sizeof(union sockaddr_union));/*needed on freebsd*/
 	su->s.sa_family=ip->af;
 	switch(ip->af){
+#ifdef USE_IPV6
 	case	AF_INET6:
 		memcpy(&su->sin6.sin6_addr, ip->u.addr, ip->len); 
 		#ifdef HAVE_SOCKADDR_SA_LEN
@@ -462,6 +487,7 @@ static inline int init_su( union sockaddr_union* su,
 		#endif
 		su->sin6.sin6_port=htons(port);
 		break;
+#endif
 	case AF_INET:
 		memcpy(&su->sin.sin_addr, ip->u.addr, ip->len);
 		#ifdef HAVE_SOCKADDR_SA_LEN
@@ -490,6 +516,7 @@ static inline int hostent2su( union sockaddr_union* su,
 	memset(su, 0, sizeof(union sockaddr_union)); /*needed on freebsd*/
 	su->s.sa_family=he->h_addrtype;
 	switch(he->h_addrtype){
+#ifdef USE_IPV6
 	case	AF_INET6:
 		memcpy(&su->sin6.sin6_addr, he->h_addr_list[idx], he->h_length);
 		#ifdef HAVE_SOCKADDR_SA_LEN
@@ -497,6 +524,7 @@ static inline int hostent2su( union sockaddr_union* su,
 		#endif
 		su->sin6.sin6_port=htons(port);
 		break;
+#endif
 	case AF_INET:
 		memcpy(&su->sin.sin_addr, he->h_addr_list[idx], he->h_length);
 		#ifdef HAVE_SOCKADDR_SA_LEN
@@ -518,6 +546,7 @@ static inline int hostent2su( union sockaddr_union* su,
 #define IP6_MAX_STR_SIZE 39 /*1234:5678:9012:3456:7890:1234:5678:9012*/
 #define IP4_MAX_STR_SIZE 15 /*123.456.789.012*/
 
+#ifdef USE_IPV6
 /* converts a raw ipv6 addr (16 bytes) to ascii */
 static inline int ip6tosbuf(unsigned char* ip6, char* buff, int len)
 {
@@ -590,6 +619,7 @@ static inline int ip6tosbuf(unsigned char* ip6, char* buff, int len)
 	
 	return offset;
 }
+#endif /* USE_IPV6 */
 
 
 
@@ -658,9 +688,11 @@ static inline int ip4tosbuf(unsigned char* ip4, char* buff, int len)
 static inline int ip_addr2sbuf(struct ip_addr* ip, char* buff, int len)
 {
 	switch(ip->af){
+	#ifdef USE_IPV6
 		case AF_INET6:
 			return ip6tosbuf(ip->u.addr, buff, len);
 			break;
+	#endif /* USE_IPV6 */
 		case AF_INET:
 			return ip4tosbuf(ip->u.addr, buff, len);
 			break;
@@ -704,6 +736,7 @@ static inline char* su2a(union sockaddr_union* su, int su_len)
 	static char buf[SU2A_MAX_STR_SIZE];
 	int offs;
 
+#ifdef USE_IPV6
 	if (unlikely(su->s.sa_family==AF_INET6)){
 		if (unlikely(su_len<sizeof(su->sin6)))
 			return "<addr. error>";
@@ -713,6 +746,7 @@ static inline char* su2a(union sockaddr_union* su, int su_len)
 		buf[offs]=']';
 		offs++;
 	}else
+#endif /* USE_IPV6*/
 	if (unlikely(su_len<sizeof(su->sin)))
 		return "<addr. error>";
 	else
@@ -732,6 +766,7 @@ static inline char* suip2a(union sockaddr_union* su, int su_len)
 	static char buf[SUIP2A_MAX_STR_SIZE];
 	int offs;
 
+#ifdef USE_IPV6
 	if (unlikely(su->s.sa_family==AF_INET6)){
 		if (unlikely(su_len<sizeof(su->sin6)))
 			return "<addr. error>";
@@ -741,6 +776,7 @@ static inline char* suip2a(union sockaddr_union* su, int su_len)
 		buf[offs]=']';
 		offs++;
 	}else
+#endif /* USE_IPV6*/
 	if (unlikely(su_len<sizeof(su->sin)))
 		return "<addr. error>";
 	else

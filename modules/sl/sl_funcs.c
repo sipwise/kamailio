@@ -75,24 +75,7 @@ static char           *tag_suffix;
    we do not filter */
 static unsigned int  *sl_timeout;
 
-static int _sl_filtered_ack_route = -1; /* default disabled */
-
-static int _sl_evrt_local_response = -1; /* default disabled */
-
-/*!
- * lookup sl event routes
- */
-void sl_lookup_event_routes(void)
-{
-	_sl_filtered_ack_route=route_lookup(&event_rt, "sl:filtered-ack");
-	if (_sl_filtered_ack_route>=0 && event_rt.rlist[_sl_filtered_ack_route]==0)
-		_sl_filtered_ack_route=-1; /* disable */
-
-	 _sl_evrt_local_response = route_lookup(&event_rt, "sl:local-response");
-	if (_sl_evrt_local_response>=0
-			&& event_rt.rlist[_sl_evrt_local_response]==NULL)
-		_sl_evrt_local_response = -1;
-}
+extern int _sl_filtered_ack_route;
 
 /*!
  * init sl internal structures
@@ -150,7 +133,7 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 	int backup_mhomed, ret;
 	str text;
 
-	int backup_rt;
+	int rt, backup_rt;
 	struct run_act_ctx ctx;
 	struct sip_msg pmsg;
 
@@ -224,7 +207,8 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 	ret = msg_send(&dst, buf.s, buf.len);
 	mhomed=backup_mhomed;
 
-	if (unlikely(_sl_evrt_local_response >= 0))
+	rt = route_lookup(&event_rt, "sl:local-response");
+	if (unlikely(rt >= 0 && event_rt.rlist[rt] != NULL))
 	{
 		if (likely(build_sip_msg_from_buf(&pmsg, buf.s, buf.len,
 				inc_msg_no()) == 0))
@@ -293,7 +277,7 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 			backup_rt = get_route_type();
 			set_route_type(LOCAL_ROUTE);
 			init_run_actions_ctx(&ctx);
-			run_top_route(event_rt.rlist[_sl_evrt_local_response], &pmsg, 0);
+			run_top_route(event_rt.rlist[rt], &pmsg, 0);
 			set_route_type(backup_rt);
 			p_onsend=0;
 

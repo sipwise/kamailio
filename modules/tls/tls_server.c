@@ -1,6 +1,9 @@
 /*
- * TLS module - main server part
+ * $Id$
  *
+ * TLS module - main server part
+ * 
+ * Copyright (C) 2001-2003 FhG FOKUS
  * Copyright (C) 2005-2010 iptelorg GmbH
  *
  * This file is part of SIP-router, a free SIP server.
@@ -561,7 +564,7 @@ void tls_h_tcpconn_clean(struct tcp_connection *c)
 	/*
 	* runs within global tcp lock
 	*/
-	if ((c->type != PROTO_TLS) && (c->type != PROTO_WSS)) {
+	if (c->type != PROTO_TLS) {
 		BUG("Bad connection structure\n");
 		abort();
 	}

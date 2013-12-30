@@ -152,7 +152,7 @@ static inline void parse_contact_class(param_hooks_t* _h, param_t* _p)
 			_h->contact.methods = _p;
 		}
 		break;
-
+		
 	case 'r':
 	case 'R':
 		if ((_p->name.len == 8) &&
@@ -170,14 +170,6 @@ static inline void parse_contact_class(param_hooks_t* _h, param_t* _p)
 			(!strncasecmp(_p->name.s + 1, "sip.instance", 12))) {
 			_p->type = P_INSTANCE;
 			_h->contact.instance = _p;
-		}
-		break;
-	case 'o':
-	case 'O':
-		if ((_p->name.len == 2) &&
-		    (!strncasecmp(_p->name.s + 1, "b", 1))) {
-			_p->type = P_OB;
-			_h->contact.ob = _p;
 		}
 		break;
 	}
@@ -260,14 +252,6 @@ static inline void parse_uri_class(param_hooks_t* _h, param_t* _p)
 			_h->uri.ftag = _p;
 		}
 		break;
-	case 'o':
-	case 'O':
-		if ((_p->name.len == 2) &&
-		    (!strncasecmp(_p->name.s + 1, "b", 1))) {
-			_p->type = P_OB;
-			_h->uri.ob = _p;
-		}
-		break;
 	}
 
 }
@@ -331,7 +315,7 @@ static inline int parse_quoted_param(str* _s, str* _r)
  * let _r point to the token and update _s
  * to point right behind the token
  */
-static inline int parse_token_param(str* _s, str* _r, char separator)
+static inline int parse_token_param(str* _s, str* _r)
 {
 	int i;
 
@@ -361,14 +345,12 @@ static inline int parse_token_param(str* _s, str* _r, char separator)
 		case '\r':
 		case '\n':
 		case ',':
+		case ';':
 			     /* So if you find
 			      * any of them
 			      * stop iterating
 			      */
 			goto out;
-		default:
-			if(_s->s[i] == separator)
-				goto out;
 		}
 	}
  out:
@@ -393,7 +375,7 @@ static inline int parse_token_param(str* _s, str* _r, char separator)
 /*! \brief
  * Parse a parameter name
  */
-static inline void parse_param_name(str* _s, pclass_t _c, param_hooks_t* _h, param_t* _p, char separator)
+static inline void parse_param_name(str* _s, pclass_t _c, param_hooks_t* _h, param_t* _p)
 {
 
 	if (!_s->s) {
@@ -409,12 +391,10 @@ static inline void parse_param_name(str* _s, pclass_t _c, param_hooks_t* _h, par
 		case '\t':
 		case '\r':
 		case '\n':
+		case ';':
 		case ',':
 		case '=':
 			goto out;
-		default:
-			if (_s->s[0] == separator)
-				goto out;
 		}
 		_s->s++;
 		_s->len--;
@@ -439,7 +419,7 @@ static inline void parse_param_name(str* _s, pclass_t _c, param_hooks_t* _h, par
  * Parse body of a parameter. It can be quoted string or
  * a single token.
  */
-static inline int parse_param_body(str* _s, param_t* _c, char separator)
+static inline int parse_param_body(str* _s, param_t* _c)
 {
 	if (_s->s[0] == '\"' || _s->s[0] == '\'') {
 		if (parse_quoted_param(_s, &(_c->body)) < 0) {
@@ -447,7 +427,7 @@ static inline int parse_param_body(str* _s, param_t* _c, char separator)
 			return -2;
 		}
 	} else {
-		if (parse_token_param(_s, &(_c->body), separator) < 0) {
+		if (parse_token_param(_s, &(_c->body)) < 0) {
 			LOG(L_ERR, "parse_param_body(): Error while parsing token\n");
 			return -3;
 		}
@@ -455,8 +435,6 @@ static inline int parse_param_body(str* _s, param_t* _c, char separator)
 
 	return 0;
 }
-
-
 
 
 /*!  \brief
@@ -467,11 +445,11 @@ static inline int parse_param_body(str* _s, param_t* _c, char separator)
  * 	0: success, but expect a next paramter
  * 	1: success and exepect no more parameters
  */
-static inline int parse_param2(str *_s, pclass_t _c, param_hooks_t *_h, param_t *t, char separator)
+inline int parse_param(str *_s, pclass_t _c, param_hooks_t *_h, param_t *t)
 {
 	memset(t, 0, sizeof(param_t));
 
-	parse_param_name(_s, _c, _h, t, separator);
+	parse_param_name(_s, _c, _h, t);
 	trim_leading(_s);
 	
 	if (_s->len == 0) { /* The last parameter without body */
@@ -489,7 +467,7 @@ static inline int parse_param2(str *_s, pclass_t _c, param_hooks_t *_h, param_t 
 		     * we just set the length of parameter body to 0. */
 		    t->body.s = _s->s;
 		    t->body.len = 0;
-		} else if (parse_param_body(_s, t, separator) < 0) {
+		} else if (parse_param_body(_s, t) < 0) {
 			LOG(L_ERR, "parse_params(): Error while parsing param body\n");
 			goto error;
 		}
@@ -507,9 +485,8 @@ static inline int parse_param2(str *_s, pclass_t _c, param_hooks_t *_h, param_t 
 	if (_s->s[0] == ',') goto ok; /* To be able to parse header parameters */
 	if (_s->s[0] == '>') goto ok; /* To be able to parse URI parameters */
 
-	if (_s->s[0] != separator) {
-		LOG(L_ERR, "parse_params(): Invalid character, %c expected\n",
-			separator);
+	if (_s->s[0] != ';') {
+		LOG(L_ERR, "parse_params(): Invalid character, ; expected\n");
 		goto error;
 	}
 
@@ -518,8 +495,7 @@ static inline int parse_param2(str *_s, pclass_t _c, param_hooks_t *_h, param_t 
 	trim_leading(_s);
 	
 	if (_s->len == 0) {
-		LOG(L_ERR, "parse_params(): Param name missing after %c\n",
-				separator);
+		LOG(L_ERR, "parse_params(): Param name missing after ;\n");
 		goto error;
 	}
 
@@ -531,18 +507,7 @@ error:
 	return -1;
 }
 
-/*!  \brief
- * Only parse one parameter
- * Returns:
- * 	t: out parameter
- * 	-1: on error
- * 	0: success, but expect a next paramter
- * 	1: success and exepect no more parameters
- */
-inline int parse_param(str *_s, pclass_t _c, param_hooks_t *_h, param_t *t)
-{
-	return parse_param2(_s, _c, _h, t, ';');
-}
+
 
 /*! \brief
  * Parse parameters
@@ -553,21 +518,6 @@ inline int parse_param(str *_s, pclass_t _c, param_hooks_t *_h, param_t *t)
  * \return 0 on success and negative number on an error
  */
 int parse_params(str* _s, pclass_t _c, param_hooks_t* _h, param_t** _p)
-{
-	return parse_params2(_s, _c, _h, _p, ';');
-}
-
-/*! \brief
- * Parse parameters with configurable separator
- * \param _s is string containing parameters, it will be updated to point behind the parameters
- * \param _c is class of parameters
- * \param _h is pointer to structure that will be filled with pointer to well known parameters
- * \param _p pointing to linked list where parsed parameters will be stored
- * \param separator single character separator
- * \return 0 on success and negative number on an error
- */
-int parse_params2(str* _s, pclass_t _c, param_hooks_t* _h, param_t** _p,
-			char separator)
 {
 	param_t* t;
 
@@ -592,7 +542,7 @@ int parse_params2(str* _s, pclass_t _c, param_hooks_t* _h, param_t** _p,
 			goto error;
 		}
 
-		switch(parse_param2(_s, _c, _h, t, separator)) {
+		switch(parse_param(_s, _c, _h, t)) {
 		case 0: break;
 		case 1: goto ok;
 		default: goto error;

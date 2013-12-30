@@ -11,9 +11,9 @@
 <!-- Module User's Guide -->
 
 <chapter>
-
+    
     <title>&adminguide;</title>
-
+    
     <section>
 	<title>Overview</title>
 	<para>
@@ -80,7 +80,7 @@
     </section>
     <section>
 	<title>Parameters</title>
-	<section id="app_lua.p.load">
+	<section>
 	    <title><varname>load</varname> (string)</title>
 	    <para>
 			Set the path to the Lua script to be loaded at startup. Then you
@@ -102,7 +102,7 @@ modparam("app_lua", "load", "/usr/local/etc/kamailio/lua/myscript.lua")
 	    </example>
 	</section>
 
-	<section id="app_lua.p.register">
+	<section>
 	    <title><varname>register</varname> (string)</title>
 	    <para>
 			Use this function to register optional SIP Router submodules
@@ -249,32 +249,11 @@ modparam("app_lua", "register", "sl")
 	    </example>
 	</section>
 
-	<section id="app_lua.p.reload">
-	    <title><varname>reload</varname> (boolean)</title>
-	    <para>
-			If reload is 1 enables the ability to reload the
-			scripts using the RPC app_lua.reload command.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is <quote>0 (off)</quote>.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>reload</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("app_lua", "reload", 1)
-...
-</programlisting>
-	    </example>
 	</section>
-
-	</section>
-
+	
     <section>
 	<title>Functions</title>
- 	<section id="app_lua.f.lua_dotfile">
+ 	<section>
 	    <title>
 		<function moreinfo="none">lua_dofile(path)</function>
 	    </title>
@@ -291,8 +270,8 @@ lua_dofile("/usr/local/etc/kamailio/lua/myscript.lua");
 </programlisting>
 	    </example>
 	</section>
-
- 	<section id="app_lua.f.lua_dostring">
+	
+ 	<section>
 	    <title>
 		<function moreinfo="none">lua_dostring(script)</function>
 	    </title>
@@ -313,7 +292,7 @@ if(!lua_dostring("sr.log([[err]], [[----------- Hello World from $fU\n]])"))
 	    </example>
 	</section>
 
-	<section id="app_lua.f.lua_run">
+	<section>
 	    <title>
 		<function moreinfo="none">lua_run(function, params)</function>
 	    </title>
@@ -338,7 +317,7 @@ lua_run("lua_funcx", "$rU", "2");
 	    </example>
 	</section>
 
-	<section id="app_lua.f.lua_runstring">
+	<section>
 	    <title>
 		<function moreinfo="none">lua_runstring(script)</function>
 	    </title>
@@ -359,53 +338,9 @@ if(!lua_runstring("sr.log([[err]], [[----------- Hello World from $fU\n]])"))
 </programlisting>
 	    </example>
 	</section>
-
+	
     </section>
-
-    <section>
-        <title>Exported RPC Commands</title>
-        <section id="app_lua.r.list">
-            <title>
-            <function moreinfo="none">app_lua.list</function>
-            </title>
-            <para>
-            Lists the id and path for every script loaded by
-            the load parameter.
-            </para>
-            <para>
-            Name: <emphasis>app_lua.list</emphasis>
-            </para>
-            <para>Parameters: <emphasis>none</emphasis></para>
-            <para>
-            Example:
-            </para>
-            <programlisting  format="linespecific">
-                &sercmd; app_lua.lists
-            </programlisting>
-        </section>
-        <section id="app_lua.r.reload">
-            <title>
-            <function moreinfo="none">app_lua.reload</function>
-            </title>
-            <para>
-            Marks the need to reload the selected script.
-            The actual reload is done by every working process when the next
-            call to lua_run function is executed.
-            If no parameter is added all the scripts are selected to be reloaded.
-            </para>
-            <para>
-            Name: <emphasis>app_lua.reload</emphasis>
-            </para>
-            <para>Parameters: <emphasis>id</emphasis></para>
-            <para>
-            Example:
-            </para>
-            <programlisting  format="linespecific">
-                &sercmd; app_lua.reload 0
-            </programlisting>
-        </section>
-    </section>
-
+	
     <section>
 	<title>Example of usage</title>
     <para>

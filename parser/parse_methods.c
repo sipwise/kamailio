@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (c) 2004 Juha Heinanen
  *
  * This file is part of ser, a free SIP server.
@@ -51,7 +53,7 @@ static int token_char(char _c)
  * _must_ contain _only_ the method (without trailing or heading whitespace).
  * \return 0 on success, -1 on error
  */
-int parse_method_name(const str* const s, enum request_method* const method)
+int parse_method_name(str* s, enum request_method* method)
  {
 	if (unlikely(!s || !method)) {
 		LOG(L_ERR, "Invalid parameter value\n");
@@ -170,7 +172,7 @@ int parse_method_name(const str* const s, enum request_method* const method)
   * Parse a method pointed by _next, assign its enum bit to _method, and update
   * _next past the method. Returns 1 if parse succeeded and 0 otherwise.
   */
-static int parse_method_advance(str* const _next, enum request_method* const _method)
+static int parse_method_advance(str* _next, enum request_method* _method)
  {
 	char* end;
 	
@@ -356,7 +358,7 @@ found:
   * Parse comma separated list of methods pointed by _body and assign their
   * enum bits to _methods.  Returns 0 on success and -1 on failure.
   */
-int parse_methods(const str* const _body, unsigned int* const _methods)
+ int parse_methods(str* _body, unsigned int* _methods)
  {
  	str next;
  	unsigned int method;

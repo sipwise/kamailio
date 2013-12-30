@@ -84,10 +84,6 @@
 #define READ_MSRP
 #endif
 
-#ifndef NO_READ_WS
-#define READ_WS
-#endif
-
 enum tcp_req_errors {	TCP_REQ_INIT, TCP_REQ_OK, TCP_READ_ERROR,
 						TCP_REQ_OVERRUN, TCP_REQ_BAD_LEN };
 enum tcp_req_states {	H_SKIP_EMPTY, H_SKIP_EMPTY_CR_FOUND,
@@ -353,13 +349,6 @@ typedef struct tcp_event_info {
 	struct receive_info *rcv;
 	struct tcp_connection *con;
 } tcp_event_info_t;
-
-typedef struct ws_event_info {
-	int type;
-	char *buf;
-	unsigned int len;
-	int id;
-} ws_event_info_t;
 
 #endif
 

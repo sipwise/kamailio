@@ -10,7 +10,7 @@
 <!ENTITY kamailioname "Kamailio SIP Server Platform">
 <!ENTITY kamailioconfig "kamailio.cfg">
 
-<!ENTITY kamwiki "http://www.kamailio.org/wiki/">
+<!ENTITY kamwiki "http://www.kamailio.org/dokuwiki/">
 <!ENTITY kamwikilink "<ulink url='&kamwiki;'>&kamwiki;</ulink>">
 
 <!ENTITY kamailiohome "http://www.kamailio.org/">
@@ -46,7 +46,7 @@
 
 <!ENTITY ser "SER">
 <!ENTITY sername "SIP Express Router">
-<!ENTITY sercmd "kamcmd">
+<!ENTITY sercmd "sercmd">
 <!ENTITY ctlsocket "ser_ctl">
 
 <!ENTITY serhome "http://iptel.org/ser">
@@ -63,8 +63,8 @@
 <!ENTITY serusersmail "<email>sr-users@lists.sip-router.org</email>">
 <!ENTITY serdevmail "<email>sr-dev@lists.sip-router.org</email>">
 
-<!ENTITY defaultdb "mysql://kamailio:kamailiorw@localhost/kamailio">
-<!ENTITY defaultrodb "mysql://kamailioro:kamailioro@localhost/kamailio">
+<!ENTITY defaultdb "mysql://openser:openserrw@localhost/openser">
+<!ENTITY defaultrodb "mysql://openserro:openserro@localhost/openser">
 <!ENTITY exampledb "dbdriver://username:password@dbhost/dbname">
 <!ENTITY exampleotherdb "postgres://proxy:frog23@db.sip-router.org/sipdb">
 

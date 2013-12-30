@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 iptelorg GmbH
  *
  * This file is part of ser, a free SIP server.
@@ -31,7 +33,7 @@
 
 
 /* Parse Retry-After header field */
-char* parse_retry_after(char* const buf, const char* const end, unsigned* const after, int* const err);
+char* parse_retry_after(char *buf, char* end, unsigned* after, int* err);
 
 
 

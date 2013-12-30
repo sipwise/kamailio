@@ -31,7 +31,6 @@
 #define CARRIERROUTE_H
 
 #include "../../str.h"
-#include "../../usr_avp.h"
 
 #define DICE_MAX 1000
 
@@ -53,7 +52,5 @@ extern const str CR_EMPTY_PREFIX;
 
 extern int mode;
 extern int cr_match_mode;
-
-extern int_str cr_uris_avp;
 
 #endif

@@ -39,7 +39,6 @@
 #include "../../dset.h"
 #include "../../parser/parse_uri.h"
 #include "../../lib/kcore/cmpapi.h"
-#include "../../xavp.h"
 
 #include "app_lua_api.h"
 #include "app_lua_sr.h"
@@ -240,7 +239,7 @@ static int lua_sr_modf (lua_State *L)
 				goto error;
 			}
 		} else {
-			for(i=1; i<argc; i++)
+			for(i=1; i<=argc; i++)
 			{
 				if(expf->fixup(&(act->val[i+1].u.data), i)<0)
 				{
@@ -256,7 +255,7 @@ static int lua_sr_modf (lua_State *L)
 
 	/* free fixups */
 	if (expf->fixup) {
-		for(i=1; i<argc; i++)
+		for(i=1; i<=argc; i++)
 		{
 			if ((act->val[i+1].type == MODFIXUP_ST) && (act->val[i+1].u.data))
 			{
@@ -990,14 +989,6 @@ static int lua_sr_pv_sets (lua_State *L)
 		LM_ERR("to few parameters [%d]\n",lua_gettop(L));
 		return 0;
 	}
-
-	if(!lua_isstring(L, -1))
-	{
-		LM_ERR("Cannot convert to a string when assigning value to variable: %s\n",
-			   lua_tostring(L, -2));
-		return 0;
-	}
-
 	memset(&val, 0, sizeof(pv_value_t));
 	val.rs.s = (char*)lua_tostring(L, -1);
 	val.rs.len = strlen(val.rs.s);
@@ -1131,283 +1122,6 @@ static const luaL_reg _sr_pv_Map [] = {
 	{NULL, NULL}
 };
 
-
-/**
- * creates and push a table to the lua stack with
- * the elements of the list
- */
-static int lua_sr_push_str_list_table(lua_State *L, struct str_list *list) {
-	lua_Number i = 1;
-	struct str_list *k = list;
-
-	lua_newtable(L);
-	while(k!=NULL){
-		lua_pushnumber(L, i);
-		lua_pushlstring(L, k->s.s, k->s.len);
-		lua_settable(L, -3);
-		i++;
-		k = k->next;
-	}
-	return 1;
-}
-
-static int lua_sr_push_xavp_table(lua_State *L, sr_xavp_t *xavp);
-
-/**
- * creates and push a table for the key name in xavp
- */
-static void lua_sr_push_xavp_name_table(lua_State *L, sr_xavp_t *xavp, str name) {
-	lua_Number i = 1;
-	lua_Number elem = 1;
-	sr_xavp_t *avp = xavp;
-
-	while(avp!=NULL&&!STR_EQ(avp->name,name))
-	{
-		avp = avp->next;
-	}
-	lua_newtable(L);
-
-	while(avp!=NULL){
-		lua_pushnumber(L, elem);
-		switch(avp->val.type) {
-			case SR_XTYPE_NULL:
-				lua_pushnil(L);
-			break;
-			case SR_XTYPE_INT:
-				i = avp->val.v.i;
-				lua_pushnumber(L, i);
-			break;
-			case SR_XTYPE_STR:
-				lua_pushlstring(L, avp->val.v.s.s, avp->val.v.s.len);
-			break;
-			case SR_XTYPE_TIME:
-			case SR_XTYPE_LONG:
-			case SR_XTYPE_LLONG:
-			case SR_XTYPE_DATA:
-				lua_pushnil(L);
-				LM_WARN("XAVP type:%d value not supported\n", avp->val.type);
-			break;
-			case SR_XTYPE_XAVP:
-				if(!lua_sr_push_xavp_table(L,avp->val.v.xavp)){
-					LM_ERR("xavp:%.*s subtable error. Nil value added\n", avp->name.len, avp->name.s);
-					lua_pushnil(L);
-				}
-			break;
-			default:
-				LM_ERR("xavp:%.*s unknown type: %d. Nil value added\n",
-					avp->name.len, avp->name.s, avp->val.type);
-				lua_pushnil(L);
-			break;
-		}
-		lua_rawset(L, -3);
-		elem = elem + 1;
-		avp = xavp_get_next(avp);
-	}
-	lua_setfield(L, -2, name.s);
-}
-
-/**
- * creates and push a table to the lua stack with
- * the elements of the xavp
- */
-static int lua_sr_push_xavp_table(lua_State *L, sr_xavp_t *xavp) {
-	sr_xavp_t *avp = NULL;
-	struct str_list *keys;
-	struct str_list *k;
-
-	if(xavp->val.type!=SR_XTYPE_XAVP){
-		LM_ERR("%s not xavp?\n", xavp->name.s);
-		return 0;
-	}
-	avp = xavp->val.v.xavp;
-	keys = xavp_get_list_key_names(xavp);
-
-	lua_newtable(L);
-	if(keys!=NULL)
-	{
-		do
-		{
-			lua_sr_push_xavp_name_table(L, avp, keys->s);
-			k = keys;
-			keys = keys->next;
-			pkg_free(k);
-		}while(keys!=NULL);
-	}
-
-	return 1;
-}
-
- /**
- * creates and push a table to the lua stack with
- * only the firsts elements of the xavp
- */
-static int lua_sr_push_xavp_table_simple(lua_State *L, sr_xavp_t *xavp) {
-	lua_Number i = 1;
-	sr_xavp_t *avp = NULL;
-
-	if(xavp->val.type!=SR_XTYPE_XAVP){
-		LM_ERR("%s not xavp?\n", xavp->name.s);
-		return 0;
-	}
-	avp = xavp->val.v.xavp;
-
-	lua_newtable(L);
-	while(avp!=NULL){
-		switch(avp->val.type) {
-			case SR_XTYPE_NULL:
-				lua_pushnil(L);
-				lua_setfield(L, -2, avp->name.s);
-			break;
-			case SR_XTYPE_INT:
-				i = avp->val.v.i;
-				lua_pushnumber(L, i);
-				lua_setfield(L, -2, avp->name.s);
-			break;
-			case SR_XTYPE_STR:
-				lua_pushlstring(L, avp->val.v.s.s, avp->val.v.s.len);
-				lua_setfield(L, -2, avp->name.s);
-			break;
-			case SR_XTYPE_TIME:
-			case SR_XTYPE_LONG:
-			case SR_XTYPE_LLONG:
-			case SR_XTYPE_DATA:
-				lua_pushnil(L);
-				lua_setfield(L, -2, avp->name.s);
-				LM_WARN("XAVP type:%d value not supported\n", avp->val.type);
-			break;
-			case SR_XTYPE_XAVP:
-				if(!lua_sr_push_xavp_table(L,avp->val.v.xavp)){
-					LM_ERR("xavp:%.*s subtable error. Nil value added\n", avp->name.len, avp->name.s);
-					lua_pushnil(L);
-				}
-				lua_setfield(L, -2, avp->name.s);
-			break;
-		}
-		avp = avp->next;
-	}
-	return 1;
-}
-
-/**
- * puts a table with content of a xavp
- */
-static int lua_sr_xavp_get(lua_State *L)
-{
-	str xavp_name;
-	int indx = 0;
-	sr_lua_env_t *env_L;
-	sr_xavp_t *avp;
-	int num_param = 0;
-	int param = -1;
-	int simple_flag = 0;
-
-	env_L = sr_lua_env_get();
-	num_param = lua_gettop(L);
-	if(num_param<2 && num_param>3)
-	{
-		LM_ERR("wrong number of parameters [%d]\n", num_param);
-		return 0;
-	}
-
-	if(num_param==3)
-	{
-		if(!lua_isnumber(L, param))
-		{
-			LM_ERR("invalid int parameter\n");
-			return 0;
-		}
-		simple_flag = lua_tointeger(L, param);
-		param = param - 1;
-	}
-
-	if(!lua_isnumber(L, param))
-	{
-		LM_ERR("invalid int parameter\n");
-		return 0;
-	}
-	indx = lua_tointeger(L, param);
-	param = param - 1;
-
-	xavp_name.s = (char*)lua_tostring(L, param);
-	if(xavp_name.s==NULL || env_L->msg==NULL)
-		return 0;
-	xavp_name.len = strlen(xavp_name.s);
-
-	avp = xavp_get_by_index(&xavp_name, indx, NULL);
-	if(avp==NULL){
-		LM_ERR("can't get xavp:%.*s index:%d\n", xavp_name.len, xavp_name.s, indx);
-		lua_pushnil(L);
-		return 1;
-	}
-
-	if (simple_flag != 0)
-	{
-		lua_sr_push_xavp_table_simple(L, avp);
-	}
-	else
-	{
-		lua_sr_push_xavp_table(L, avp);
-	}
-	return 1;
-}
-
-/**
- * puts a table with the list of keys of the xavp
- */
-static int lua_sr_xavp_get_keys (lua_State *L)
-{
-	str xavp_name;
-	int indx = 0;
-	sr_lua_env_t *env_L;
-	sr_xavp_t *avp;
-	struct str_list *keys, *k;
-
-	env_L = sr_lua_env_get();
-
-	if(lua_gettop(L)<2)
-	{
-		LM_ERR("to few parameters [%d]\n",lua_gettop(L));
-		return 0;
-	}
-
-	if(!lua_isnumber(L, -1))
-	{
-		LM_ERR("invalid int parameter\n");
-		return 0;
-	}
-	indx = lua_tointeger(L, -1);
-
-	xavp_name.s = (char*)lua_tostring(L, -2);
-	if(xavp_name.s==NULL || env_L->msg==NULL)
-		return 0;
-	xavp_name.len = strlen(xavp_name.s);
-
-	avp = xavp_get_by_index(&xavp_name, indx, NULL);
-	if(avp==NULL){
-		LM_ERR("can't get xavp:%.*s index:%d\n", xavp_name.len, xavp_name.s, indx);
-		lua_pushnil(L);
-		return 1;
-	}
-	keys = xavp_get_list_key_names(avp);
-	lua_sr_push_str_list_table(L, keys);
-	// free list
-	while(keys!=NULL){
-		k = keys;
-		keys = k->next;
-		pkg_free(k);
-	}
-	return 1;
-}
-
-/**
- *
- */
-static const luaL_reg _sr_xavp_Map [] = {
-	{"get", lua_sr_xavp_get},
-	{"get_keys",  lua_sr_xavp_get_keys},
-	{NULL, NULL}
-};
-
 /**
  *
  */
@@ -1416,5 +1130,6 @@ void lua_sr_core_openlibs(lua_State *L)
 	luaL_openlib(L, "sr",      _sr_core_Map, 0);
 	luaL_openlib(L, "sr.hdr",  _sr_hdr_Map,  0);
 	luaL_openlib(L, "sr.pv",   _sr_pv_Map,   0);
-	luaL_openlib(L, "sr.xavp", _sr_xavp_Map, 0);
 }
+
+

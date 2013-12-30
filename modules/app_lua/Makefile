@@ -7,24 +7,17 @@ include ../../Makefile.defs
 auto_gen=
 NAME=app_lua.so
 
-ifeq ($(CROSS_COMPILE),)
 BUILDER = $(shell which lua-config)
-endif
-
 ifeq ($(BUILDER),)
-	ifeq ($(CROSS_COMPILE),)
 	BUILDER = $(shell which pkg-config)
-	endif
 	ifeq ($(BUILDER),)
-		LUA51 = $(shell ls $(LOCALBASE)/lib/liblua* | grep liblua5.1)
-		DEFS+=-I$(LOCALBASE)/include
-		LIBS+=-L$(LOCALBASE)/lib -lm
+		LUA51 = $(shell ls /usr/lib/liblua* | grep liblua5.1)
 		ifeq ($(LUA51),)
-			DEFS+=-I$(LOCALBASE)/include/lua
-			LIBS+=-llua
+			DEFS+=-I/usr/include/lua
+			LIBS= -llua -lm
 		else
-			DEFS+=-I$(LOCALBASE)/include/lua5.1
-			LIBS+=-llua5.1
+			DEFS+=-I/usr/include/lua5.1
+			LIBS= -llua5.1 -lm
 		endif
 	else
 		LUAVER=XX
@@ -61,7 +54,7 @@ else
 	LIBS = $(shell lua-config --libs)
 endif
 
-DEFS+=-DKAMAILIO_MOD_INTERFACE
+DEFS+=-DOPENSER_MOD_INTERFACE
 
 SERLIBPATH=../../lib
 SER_LIBS+=$(SERLIBPATH)/kcore/kcore

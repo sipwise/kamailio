@@ -10,7 +10,7 @@ Daniel-Constantin Mierla
 
    <miconda@gmail.com>
 
-   Copyright � 2006 Voice Sistem SRL
+   Copyright © 2006 Voice Sistem SRL
      __________________________________________________________________
 
    Table of Contents
@@ -28,7 +28,6 @@ Daniel-Constantin Mierla
               3.1. ping_interval (integer)
               3.2. timeout_interval (integer)
               3.3. auto_reconnect (integer)
-              3.4. insert_delayed (integer)
 
         4. Functions
         5. Installation
@@ -39,10 +38,9 @@ Daniel-Constantin Mierla
    1.1. Set ping_interval parameter
    1.2. Set timeout_interval parameter
    1.3. Set auto_reconnect parameter
-   1.4. Set insert_delayed parameter
-   1.5. Set a my.cnf group in db_url parameter
-   1.6. Adding a kamailio group to my.cnf
-   1.7. Using [client] and specific group
+   1.4. Set a my.cnf group in db_url parameter
+   1.5. Adding a kamailio group to my.cnf
+   1.6. Using [client] and specific group
 
 Chapter 1. Admin Guide
 
@@ -59,7 +57,6 @@ Chapter 1. Admin Guide
         3.1. ping_interval (integer)
         3.2. timeout_interval (integer)
         3.3. auto_reconnect (integer)
-        3.4. insert_delayed (integer)
 
    4. Functions
    5. Installation
@@ -92,7 +89,6 @@ Chapter 1. Admin Guide
    3.1. ping_interval (integer)
    3.2. timeout_interval (integer)
    3.3. auto_reconnect (integer)
-   3.4. insert_delayed (integer)
 
 3.1. ping_interval (integer)
 
@@ -113,8 +109,8 @@ modparam("db_mysql", "ping_interval", 600)
    retries are done from the driver before it gives up.
 
    The read timeout parameter is ignored on MySQL driver versions prior to
-   "5.1.12", "5.0.25" and "4.1.22". The write timeout parameter is ignored
-   on versions prior to "5.1.12" and "5.0.25", the "4.1" release don't
+   “5.1.12”, “5.0.25” and “4.1.22”. The write timeout parameter is ignored
+   on versions prior to “5.1.12” and “5.0.25”, the “4.1” release don't
    support it at all.
 
    Default value is 2 (6 sec).
@@ -134,18 +130,6 @@ modparam("db_mysql", "timeout_interval", 2)
    Example 1.3. Set auto_reconnect parameter
 ...
 modparam("db_mysql", "auto_reconnect", 0)
-...
-
-3.4. insert_delayed (integer)
-
-   If set to 1, all INSERT SQL queries will be sent to MySQL server as
-   INSERT DELAYED.
-
-   Default value is 0 (1 - on / 0 - off).
-
-   Example 1.4. Set insert_delayed parameter
-...
-modparam("db_mysql", "insert_delayed", 1)
 ...
 
 4. Functions
@@ -174,12 +158,12 @@ modparam("db_mysql", "insert_delayed", 1)
      * mysql://user:pass@[group]/db
      * mysql://[group]/db
 
-   Example 1.5. Set a my.cnf group in db_url parameter
+   Example 1.4. Set a my.cnf group in db_url parameter
 ...
 modparam("usrloc", "db_url", "mysql://[kamailio]/kamailio)
 ...
 
-   Example 1.6. Adding a kamailio group to my.cnf
+   Example 1.5. Adding a kamailio group to my.cnf
 ...
 [kamailio]
 socket = /path/to/mysql.sock
@@ -193,7 +177,7 @@ default-character-set = utf8
    both your specific group and the client group, then the value is taken
    from the last one.
 
-   Example 1.7. Using [client] and specific group
+   Example 1.6. Using [client] and specific group
 ...
 [client]
 socket = /var/run/mysql/mysqld.sock

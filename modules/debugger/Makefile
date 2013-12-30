@@ -7,8 +7,6 @@ auto_gen=
 NAME=debugger.so
 LIBS=
 
-DEFS+=-DKAMAILIO_MOD_INTERFACE
+DEFS+=-DOPENSER_MOD_INTERFACE
 
-SERLIBPATH=../../lib
-SER_LIBS+=$(SERLIBPATH)/srutils/srutils
 include ../../Makefile.modules

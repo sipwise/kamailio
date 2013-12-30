@@ -42,6 +42,7 @@
 #include "../../parser/digest/digest.h"
 #include "../../usr_avp.h"
 #include "../../ut.h"
+#include "../../ser_time.h"
 #include "auth_mod.h"
 #include "challenge.h"
 #include "nonce.h"
@@ -199,7 +200,7 @@ int get_challenge_hf(struct sip_msg* msg, int stale, str* realm,
     }
     else {
         l=nonce_len;
-		t=time(0);
+		t=ser_time(0);
 #if defined USE_NC || defined USE_OT_NONCE
 		if (nc_enabled || otn_enabled){
 			pool=nid_get_pool();

@@ -1,6 +1,5 @@
 /*
- * TLS module
- *
+ * Copyright (C) 2001-2003 FhG FOKUS
  * Copyright (C) 2005,2006 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -49,12 +48,6 @@ enum tls_method {
 	TLS_USE_SSLv23_cli,
 	TLS_USE_SSLv23_srv,
 	TLS_USE_SSLv23,
-	TLS_USE_TLSv1_1_cli,
-	TLS_USE_TLSv1_1_srv,
-	TLS_USE_TLSv1_1,
-	TLS_USE_TLSv1_2_cli,
-	TLS_USE_TLSv1_2_srv,
-	TLS_USE_TLSv1_2,
 	TLS_METHOD_MAX
 };
 

@@ -158,7 +158,7 @@ static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number, struct 
 {
 	struct timeval tstart, tnow;
 	struct server_item_t *server;
-	short int carrierid, *_id;
+	short int carrierid;
 	char buf[NETBUFSIZE+1+sizeof(carrierid)];
 	size_t reqlen;
 	int_str avp_val;
@@ -270,8 +270,7 @@ static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number, struct 
 				if (recv(server_list->fds[i].fd, buf, NETBUFSIZE, MSG_DONTWAIT) > 0) { /* do not block - just in case select/poll was wrong */
 					buf[NETBUFSIZE] = '\0';
 					if (strncmp(buf, number.s, number.len) == 0) {
-						_id = (short int *)&(buf[reqlen]);
-						carrierid=ntohs(*_id); /* convert to host byte order */
+						carrierid=ntohs(*((short int *)&(buf[reqlen]))); /* convert to host byte order */
 						goto found;
 					}
 				}

@@ -75,11 +75,11 @@ struct lump* insert_cond_lump_after(struct lump* after, enum lump_conditions c,
 struct lump* insert_cond_lump_before(struct lump* after, enum lump_conditions c,
 									enum _hdr_types_t type);
 
+/*! \brief removes an already existing header */
 /* set an anchor if there is no existing one at the given offset,
  * otherwise return the existing anchor */
 struct lump* anchor_lump2(struct sip_msg* msg, int offset, int len, enum _hdr_types_t type,
 								int *is_ref);
-/*! \brief removes an already existing header */
 struct lump* del_lump(struct sip_msg* msg, int offset, int len, enum _hdr_types_t type);
 /*! \brief set an anchor */
 struct lump* anchor_lump(struct sip_msg* msg, int offset, int len, enum _hdr_types_t type);
@@ -95,6 +95,4 @@ void free_duped_lump_list(struct lump* l);
 /*! \brief remove all non-SHMEM lumps from the list */
 void del_nonshm_lump( struct lump** lump_list );
 
-/*! \brief remove the lump from the internal lists */
-int remove_lump(sip_msg_t *msg, struct lump *l);
 #endif

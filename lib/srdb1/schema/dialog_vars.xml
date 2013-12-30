@@ -54,7 +54,7 @@
 	<column>
 		<name>dialog_value</name>
 		<type>string</type>
-		<size>&long_hf_len;</size>
+		<size>512</size>
 		<description>The value of the dialog variable</description>
 	</column>
 

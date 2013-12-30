@@ -256,7 +256,7 @@ static inline int is_e164(str* _user)
 	int i;
 	char c;
 	
-	if ((_user->len > 2) && (_user->len < MAX_NUM_LEN) && ((_user->s)[0] == '+')) {
+	if ((_user->len > 2) && (_user->len < 17) && ((_user->s)[0] == '+')) {
 		for (i = 1; i < _user->len; i++) {
 			c = (_user->s)[i];
 			if ((c < '0') || (c > '9')) return -1;
@@ -309,7 +309,7 @@ int is_from_user_enum_2(struct sip_msg* _msg, char* _suffix, char* _service)
 	struct naptr_rdata* naptr;
 
 	str pattern, replacement, result;
-	char string[MAX_NUM_LEN];
+	char string[17];
 
 	if (parse_from_header(_msg) < 0) {
 	    LM_ERR("Failed to parse From header\n");
@@ -687,7 +687,7 @@ int do_query(struct sip_msg* _msg, char *user, char *name, str *service) {
 		q = q - 10;
 		curr_prio = priority;
 	    }
-	    if (append_branch(_msg, &result, 0, 0, q, 0, 0, 0, 0, 0, 0) == -1) {
+	    if (append_branch(_msg, &result, 0, 0, q, 0, 0) == -1) {
 		goto done;
 	    }
 	}
@@ -754,7 +754,7 @@ int enum_query(struct sip_msg* _msg, str* suffix, str* service)
 	char *user_s;
 	int user_len, i, j;
 	char name[MAX_DOMAIN_SIZE];
-	char string[MAX_NUM_LEN];
+	char string[17];
 
 	LM_DBG("enum_query on suffix <%.*s> service <%.*s>\n",
 	       suffix->len, suffix->s, service->len, service->s);
@@ -818,7 +818,7 @@ int i_enum_query_2(struct sip_msg* _msg, char* _suffix, char* _service)
 	int cc_len;
 	struct rdata* head;
 
-	char string[MAX_NUM_LEN];
+	char string[17];
 
 	str *suffix, *service;
 
@@ -1137,8 +1137,7 @@ int enum_pv_query_3(struct sip_msg* _msg, char* _sp, char* _suffix,
 				q = q - 10;
 				curr_prio = priority;
 			}
-			if (append_branch(_msg, &result, 0, 0, q, 0, 0, 0, 0, 0, 0)
-			    == -1) {
+			if (append_branch(_msg, &result, 0, 0, q, 0, 0) == -1) {
 				goto done;
 			}
 		}

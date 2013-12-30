@@ -72,16 +72,16 @@
 	
 	<section>
 		<title>Parameters</title>
-		<section id="utils.p.http_query_timeout">
+		<section>
 			<title><varname>http_query_timeout</varname> (int)</title>
 			<para>
-			Defines in seconds how long &kamailio; waits for response
+			Defines in seconds how long &kamailio; waits response
 			from HTTP server.
 			</para>
 			<para>
 			<emphasis>
-				Default value is zero, i.e.,
-				that the http_query_timeout function is disabled.
+				Default value is null, i.e.,
+				xcap_auth_status function is disabled.
 			</emphasis>
 			</para>
 			<example>
@@ -93,14 +93,14 @@ modparam("utils", "http_query_timeout", 2)
 				</programlisting>
 			</example>
 		</section>
-		<section id="utils.p.forward_active">
+		<section>
 			<title><varname>forward_active</varname> (int)</title>
 			<para>
 				Defines if the forwarding callback should be installed.
 			</para>
 			<para>
 				<emphasis>
-					Default value is <quote>0</quote> - disabled.
+					Default value is <quote>0</quote>.
 				</emphasis>
 			</para>
 			<example>
@@ -112,11 +112,11 @@ modparam("utils", "http_query_timeout", 2)
 				</programlisting>
 			</example>
 		</section>
-		<section id="utils.p.pres_db_url">
+		<section>
 			<title><varname>pres_db_url</varname> (string)</title>
 			<para>
-			Defines presence server database URL. If not
-			given, the xcap_auth_status function is disabled.
+			Defines presence server database URL.  If not
+			given, xcap_auth_status function is disabled.
 			</para>
 			<para>
 			<emphasis>
@@ -132,11 +132,10 @@ modparam("utils", "pres_db_url", "mysql://foo:secret@localhost/pres")
 				</programlisting>
 			</example>
 		</section>
-		<section id="utils.p.xcap_table">
+		<section>
 			<title><varname>xcap_table</varname> (string)</title>
 			<para>
-			Defines the name of the xcap table in the presence server database.
-			See the xcap_server module documentation for more information.
+			Defines name of xcap table in presence server database.
 			</para>
 			<para>
 			<emphasis>
@@ -156,23 +155,18 @@ modparam("utils", "xcap_table", "pres_xcap")
 
 	<section>
 	<title>Functions</title>
-		<section id="utils.f.http_query">
+		<section>
 			<title>
-				<function moreinfo="none">http_query(url, [post-data], result)</function>
+				<function moreinfo="none">http_query(url, result)</function>
 			</title>
 			<para>
-			Sends HTTP GET or POST request according to URL given in
+			Sends HTTP GET request according to URL given in
 			<quote>url</quote> parameter, which is a string that may
 			contain pseudo variables.
 	    	        </para>
-			<para>
-			If you want to make a POST-Request, you have to define
-			the <quote>post</quote>-data, that should be submitted
-			in that request as the second parameter.
-	    	        </para>
 		        <para>
 			If HTTP server returns a class 2xx or 3xx reply,
-			the first line of the reply's body (if any) is
+			first line of reply's body (if any) is
 			stored in <quote>result</quote> parameter,
 			which must be a	writable pseudo	variable.
 			</para>
@@ -182,24 +176,13 @@ modparam("utils", "xcap_table", "pres_xcap")
 	   	     	</para>
 			<para>
 			This function can be used from REQUEST_ROUTE,
-			ONREPLY_ROUTE, FAILURE_ROUTE, and BRANCH_ROUTE.
+	ONREPLY_ROUTE, FAILURE_ROUTE, and BRANCH_ROUTE.
 			</para>
 			<example>
 				<title><function>http_query()</function> usage</title>
 				<programlisting format="linespecific">
 ...
-# GET-Request
 http_query("http://tutpro.com/index.php?r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
-           "$var(result)")
-switch ($retcode) {
-       ...
-}
-...
-				</programlisting>
-				<programlisting format="linespecific">
-...
-# POST-Request
-http_query("http://tutpro.com/index.php", "r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
            "$var(result)")
 switch ($retcode) {
        ...
@@ -208,20 +191,20 @@ switch ($retcode) {
 				</programlisting>
 			</example>
 		</section>
-		<section id="utils.f.xcap_auth_status">
+		<section>
 			<title>
 				<function moreinfo="none">xcap_auth_status(watcher_uri, presentity_uri)</function>
 			</title>
 			<para>
-			Function checks in the presence server database if
-			a watcher is authorized to subscribe to event
+			Function checks from presence server database if
+			watcher is authorized to subscribe event
 			<quote>presence</quote> of presentity.  Sphere
 			checking is not included.
 			</para>
 			<para>
 			Both watcher_uri and presentity_uri are
-			pseudo variables. The function returns
-			ACTIVE_STATUS, if a subscription is 
+			pseudo variables. Function returns
+			ACTIVE_STATUS, if subscription is 
 			allowed and PENDING_STATUS, TERMINATED_STATUS,
 			or WAITING_STATUS otherwise. See
 			presence/subscribe.h for the corresponding integer
@@ -251,7 +234,7 @@ if (method=="MESSAGE") {
 	<section>
 	    <title><acronym>MI</acronym> Commands</title>
 		
-	<section id="utils.m.forward_list">
+		<section>
 	    <title><function moreinfo="none">forward_list</function></title>
 	    <para>
 		List active forward rules.
@@ -269,8 +252,8 @@ id switch                         filter proxy
 ...
 		</programlisting>
 	    </example>
-	</section>
-	<section id="utils.m.forward_switch">
+		</section>
+		<section>
 	    <title><function moreinfo="none">forward_switch</function></title>
 	    <para>
 		This command can be used to activate or deactivate forwarding rules.
@@ -280,12 +263,13 @@ id switch                         filter proxy
 		<title><function>forward_switch</function> usage</title>
 		<programlisting format="linespecific">
 ...
-&ctltool; fifo forward_switch 0=on
+&ctltool; fifo sp_forward_switch 0=on
 ...
 		</programlisting>
 	    </example>
-	</section>
-	<section id="utils.m.forward_filter">
+		</section>
+		
+		<section>
 	    <title><function moreinfo="none">forward_filter</function></title>
 	    <para>
 		Can be used to specify the filter for a certain id. Messages will only be
@@ -309,12 +293,13 @@ id switch                         filter proxy
 		<title><function>forward_filter</function> usage</title>
 		<programlisting format="linespecific">
 ...
-&ctltool; fifo forward_filter 0=REGISTER:INVITE
+&ctltool; fifo sp_forward_filter 0=REGISTER:INVITE
 ...
 		</programlisting>
 	    </example>
-	</section>
-	<section id="utils.m.forward_proxy">
+		</section>
+
+		<section>
 	    <title><function moreinfo="none">forward_proxy</function></title>
 	    <para>
 		This command can be used to configure forwarding rules. Specifies
@@ -327,7 +312,7 @@ id switch                         filter proxy
 		<title><function>forward_proxy</function> usage</title>
 		<programlisting format="linespecific">
 ...
-&ctltool; fifo forward_proxy 0=host-c.domain-c:5060
+&ctltool; fifo sp_forward_proxy 0=host-c.domain-c:5060
 ...
 		</programlisting>
 	    </example>
