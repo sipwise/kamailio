@@ -10,6 +10,6 @@ auto_gen=
 NAME=topoh.so
 LIBS=
 
-DEFS+=-DKAMAILIO_MOD_INTERFACE
+DEFS+=-DOPENSER_MOD_INTERFACE
 
 include ../../Makefile.modules

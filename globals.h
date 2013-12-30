@@ -111,6 +111,7 @@ extern int dont_daemonize;
 extern int check_via;
 extern int phone2tel;
 extern int received_dns;
+extern int syn_branch;
 /* extern int process_no; */
 extern int child_rank;
 extern int sip_warning;
@@ -128,14 +129,21 @@ extern char* chroot_dir;
 extern char* working_dir;
 extern int sr_auto_aliases;
 extern int sr_msg_time;
-extern str version_table;
 
 #ifdef USE_MCAST
 extern int mcast_loopback;
 extern int mcast_ttl;
 #endif /* USE_MCAST */
 
+#ifdef USE_STUN
+extern unsigned int stun_refresh_interval;
+extern int stun_allow_stun;
+extern int stun_allow_fp;
+#endif
+
+#ifdef USE_IPV6
 extern int auto_bind_ipv6;
+#endif
 
 extern int tos;
 extern int pmtu_discovery;
@@ -206,7 +214,7 @@ extern int rt_timer2_prio;  /* "slow" timer */
 extern int rt_timer1_policy; /* "fast" timer, SCHED_OTHER */
 extern int rt_timer2_policy; /* "slow" timer, SCHED_OTHER */
 
-extern int http_reply_parse;
+extern int http_reply_hack;
 
 #ifdef USE_DNS_CACHE
 extern int dns_cache_init; /* if 0, the DNS cache is not initialized at startup */

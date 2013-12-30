@@ -1,1 +1,0 @@
-id(int,auto) uid(string) name(string) value(string,null) type(int) flags(int) 

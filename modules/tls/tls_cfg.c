@@ -1,6 +1,4 @@
 /* 
- * TLS module
- *
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -35,7 +33,6 @@
 #include "../../ut.h"
 #include "../../pt.h"
 #include "../../mem/shm_mem.h"
-#include "../../dprint.h"
 
 struct cfg_group_tls default_tls_cfg = {
 	0, /* tls_force_run */

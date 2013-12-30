@@ -144,6 +144,7 @@ void db_mysql_free_connection(struct pool_con* con)
 
 	_c = (struct my_con*) con;
 
+	if (_c->res) mysql_free_result(_c->res);
 	if (_c->id) free_db_id(_c->id);
 	if (_c->con) {
 		mysql_close(_c->con);

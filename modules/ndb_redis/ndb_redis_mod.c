@@ -52,8 +52,6 @@ static int w_redis_cmd6(struct sip_msg* msg, char* ssrv, char* scmd,
 		char *sargv1, char *sargv2, char *sargv3, char* sres);
 static int fixup_redis_cmd6(void** param, int param_no);
 
-static int w_redis_free_reply(struct sip_msg* msg, char* res);
-
 static int  mod_init(void);
 static void mod_destroy(void);
 static int  child_init(int rank);
@@ -77,8 +75,6 @@ static cmd_export_t cmds[]={
 	{"redis_cmd", (cmd_function)w_redis_cmd5, 5, fixup_redis_cmd6,
 		0, ANY_ROUTE},
 	{"redis_cmd", (cmd_function)w_redis_cmd6, 6, fixup_redis_cmd6,
-		0, ANY_ROUTE},
-	{"redis_free", (cmd_function)w_redis_free_reply, 1, fixup_spve_null,
 		0, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
@@ -161,7 +157,7 @@ static int w_redis_cmd3(struct sip_msg* msg, char* ssrv, char* scmd, char* sres)
 		return -1;
 	}
 
-	if(redisc_exec(&s[0], &s[2], &s[1])<0)
+	if(redisc_exec(&s[0], &s[1], NULL, NULL, NULL, &s[2])<0)
 		return -1;
 	return 1;
 }
@@ -172,9 +168,7 @@ static int w_redis_cmd3(struct sip_msg* msg, char* ssrv, char* scmd, char* sres)
 static int w_redis_cmd4(struct sip_msg* msg, char* ssrv, char* scmd,
 		char *sargv1, char* sres)
 {
-	str s[3];
-	str arg1;
-	char c1;
+	str s[4];
 
 	if(fixup_get_svalue(msg, (gparam_t*)ssrv, &s[0])!=0)
 	{
@@ -186,24 +180,19 @@ static int w_redis_cmd4(struct sip_msg* msg, char* ssrv, char* scmd,
 		LM_ERR("no redis command\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sargv1, &arg1)!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sargv1, &s[2])!=0)
 	{
 		LM_ERR("no argument 1\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sres, &s[2])!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sres, &s[3])!=0)
 	{
 		LM_ERR("no redis reply name\n");
 		return -1;
 	}
 
-	c1 = arg1.s[arg1.len];
-	arg1.s[arg1.len] = '\0';
-	if(redisc_exec(&s[0], &s[2], &s[1], arg1.s)<0) {
-		arg1.s[arg1.len] = c1;
+	if(redisc_exec(&s[0], &s[1], &s[2], NULL, NULL, &s[3])<0)
 		return -1;
-	}
-	arg1.s[arg1.len] = c1;
 	return 1;
 }
 
@@ -213,9 +202,7 @@ static int w_redis_cmd4(struct sip_msg* msg, char* ssrv, char* scmd,
 static int w_redis_cmd5(struct sip_msg* msg, char* ssrv, char* scmd,
 		char *sargv1, char *sargv2, char* sres)
 {
-	str s[3];
-	str arg1, arg2;
-	char c1, c2;
+	str s[5];
 
 	if(fixup_get_svalue(msg, (gparam_t*)ssrv, &s[0])!=0)
 	{
@@ -227,33 +214,24 @@ static int w_redis_cmd5(struct sip_msg* msg, char* ssrv, char* scmd,
 		LM_ERR("no redis command\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sargv1, &arg1)!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sargv1, &s[2])!=0)
 	{
 		LM_ERR("no argument 1\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sargv2, &arg2)!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sargv2, &s[3])!=0)
 	{
 		LM_ERR("no argument 2\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sres, &s[2])!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sres, &s[4])!=0)
 	{
 		LM_ERR("no redis reply name\n");
 		return -1;
 	}
 
-	c1 = arg1.s[arg1.len];
-	c2 = arg2.s[arg2.len];
-	arg1.s[arg1.len] = '\0';
-	arg2.s[arg2.len] = '\0';
-	if(redisc_exec(&s[0], &s[2], &s[1], arg1.s, arg2.s)<0) {
-		arg1.s[arg1.len] = c1;
-		arg2.s[arg2.len] = c2;
+	if(redisc_exec(&s[0], &s[1], &s[2], &s[3], NULL, &s[4])<0)
 		return -1;
-	}
-	arg1.s[arg1.len] = c1;
-	arg2.s[arg2.len] = c2;
 	return 1;
 }
 
@@ -263,9 +241,7 @@ static int w_redis_cmd5(struct sip_msg* msg, char* ssrv, char* scmd,
 static int w_redis_cmd6(struct sip_msg* msg, char* ssrv, char* scmd,
 		char *sargv1, char *sargv2, char *sargv3, char* sres)
 {
-	str s[3];
-	str arg1, arg2, arg3;
-	char c1, c2, c3;
+	str s[6];
 
 	if(fixup_get_svalue(msg, (gparam_t*)ssrv, &s[0])!=0)
 	{
@@ -277,42 +253,29 @@ static int w_redis_cmd6(struct sip_msg* msg, char* ssrv, char* scmd,
 		LM_ERR("no redis command\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sargv1, &arg1)!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sargv1, &s[2])!=0)
 	{
 		LM_ERR("no argument 1\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sargv2, &arg2)!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sargv2, &s[3])!=0)
 	{
 		LM_ERR("no argument 2\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sargv3, &arg3)!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sargv3, &s[4])!=0)
 	{
 		LM_ERR("no argument 3\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)sres, &s[2])!=0)
+	if(fixup_get_svalue(msg, (gparam_t*)sres, &s[5])!=0)
 	{
 		LM_ERR("no redis reply name\n");
 		return -1;
 	}
 
-	c1 = arg1.s[arg1.len];
-	c2 = arg2.s[arg2.len];
-	c3 = arg3.s[arg3.len];
-	arg1.s[arg1.len] = '\0';
-	arg2.s[arg2.len] = '\0';
-	arg3.s[arg3.len] = '\0';
-	if(redisc_exec(&s[0], &s[2], &s[1], arg1.s, arg2.s, arg3.s)<0) {
-		arg1.s[arg1.len] = c1;
-		arg2.s[arg2.len] = c2;
-		arg3.s[arg3.len] = c3;
+	if(redisc_exec(&s[0], &s[1], &s[2], &s[3], &s[4], &s[5])<0)
 		return -1;
-	}
-	arg1.s[arg1.len] = c1;
-	arg2.s[arg2.len] = c2;
-	arg3.s[arg3.len] = c3;
 	return 1;
 }
 
@@ -328,29 +291,11 @@ static int fixup_redis_cmd6(void** param, int param_no)
 /**
  *
  */
-static int w_redis_free_reply(struct sip_msg* msg, char* res)
-{
-	str name;
-
-	if(fixup_get_svalue(msg, (gparam_t*)res, &name)!=0)
-	{
-		LM_ERR("no redis reply name\n");
-		return -1;
-	}
-
-	if(redisc_free_reply(&name)<0)
-		return -1;
-
-	return 1;
-}
-
-/**
- *
- */
 int redis_srv_param(modparam_t type, void *val)
 {
 	return redisc_add_server((char*)val);
 }
+
 
 /**
  *

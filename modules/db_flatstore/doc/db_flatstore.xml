@@ -8,9 +8,8 @@
 
 ]>
 
-<book id="flatstore" xmlns:xi="http://www.w3.org/2001/XInclude">
-    <bookinfo>
-    	<title>Db_flatstore Module</title>
+<section id="flatstore" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <sectioninfo>
 	<authorgroup>
 	    <author>
 		<firstname>Jan</firstname>
@@ -24,14 +23,14 @@
 	    <year>2005</year>
 	    <holder>FhG FOKUS</holder>
 	</copyright>
-    </bookinfo>
+    </sectioninfo>
 
-    <chapter>
-	<title>Admin Guide</title>
+    <title>Db_flatstore Module</title>
+
     <section id="flatstore.overview">
 	<title>Overview</title>
 	<para>
-	    Db_flatstore is one of the &siprouter; database modules. It does
+	    Db_flatstore is one of so-called &siprouter; database modules. It does
 	    not export any functions executable from the configuration scripts,
 	    but it exports a subset of functions from the database API and thus
 	    other modules can use it as a database driver, instead of, for
@@ -132,6 +131,6 @@ mv acc_4.log acc_3.log.20050605
 	</section>
     </section>
 
-    <xi:include href="db_flatstore_params.xml"/>
-    </chapter>
-</book>
+    <xi:include href="params.xml"/>
+
+</section>

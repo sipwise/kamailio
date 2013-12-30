@@ -73,22 +73,17 @@
 inline int db_str2int(const char* _s, int* _v)
 {
 	long tmp;
-	char* p = NULL;
 
 	if (!_s || !_v) {
 	       LM_ERR("Invalid parameter value\n");
 	       return -1;
 	}
 
-	tmp = strtoul(_s, &p, 10);
+	tmp = strtoul(_s, 0, 10);
 	if ((tmp == ULONG_MAX && errno == ERANGE) || 
 	    (tmp < INT_MIN) || (tmp > UINT_MAX)) {
 		LM_ERR("Value out of range\n");
 		return -1;
-	}
-	if (p && *p != '\0') {
-		LM_ERR("Unexpected characters: [%s]\n", p);
-		return -2;
 	}
 
 	*_v = (int)tmp;
@@ -99,21 +94,16 @@ inline int db_str2int(const char* _s, int* _v)
 inline int db_str2longlong(const char* _s, long long * _v)
 {
 	long long tmp;
-	char* p = NULL;
 
 	if (!_s || !_v) {
 	       LM_ERR("Invalid parameter value\n");
 	       return -1;
 	}
 
-	tmp = strtoll(_s, &p, 10);
+	tmp = strtoll(_s, 0, 10);
 	if (errno == ERANGE) {
 		LM_ERR("Value out of range\n");
 		return -1;
-	}
-	if (p && *p != '\0') {
-		LM_ERR("Unexpected characters: [%s]\n", p);
-		return -2;
 	}
 
 	*_v = tmp;
@@ -474,11 +464,6 @@ int db_val2pv_spec(struct sip_msg* msg, db_val_t *dbval, pv_spec_t *pvs)
 				pv.rs.len = LL_LEN;
 				db_longlong2str(dbval->val.ll_val, ll_buf, &pv.rs.len);
 				pv.rs.s = ll_buf;
-				/* if it fits, also store as 32 bit integer*/
-				if (! ((unsigned long long)dbval->val.ll_val & 0xffffffff00000000ULL)) {
-					pv.flags |= PV_VAL_INT | PV_TYPE_INT;
-					pv.ri = (int)dbval->val.ll_val;
-				}
 			break;
 			default:
 				LM_NOTICE("unknown field type: %d, setting value to null\n",

@@ -49,8 +49,6 @@
 #include "carrierroute.h"
 #include "config.h"
 
-#define MAX_DESTINATIONS 64
-
 enum hash_algorithm {
 	alg_crc32 = 1, /*!< hashing algorithm is CRC32 */
 	alg_crc32_nofallback, /*!< same algorithm as alg_crc32, with only a backup rule, but no fallback tree is chosen
@@ -87,16 +85,16 @@ static inline int cr_gp2id(struct sip_msg *_msg, gparam_t *gp, struct name_map_t
 		break;
 	case GPARAM_TYPE_PVE:
 		/* does this PV hold an AVP? */
-		if (gp->v.pve->spec->type==PVT_AVP) {
-			avp = search_first_avp(gp->v.pve->spec->pvp.pvn.u.isname.type,
-						gp->v.pve->spec->pvp.pvn.u.isname.name, &avp_val, 0);
+		if (gp->v.pve->spec.type==PVT_AVP) {
+			avp = search_first_avp(gp->v.pve->spec.pvp.pvn.u.isname.type,
+						gp->v.pve->spec.pvp.pvn.u.isname.name, &avp_val, 0);
 			if (!avp) {
-				if(gp->v.pve->spec->pvp.pvn.u.isname.type & AVP_NAME_STR)
-					LM_ERR("cannot find AVP '%.*s'\n", gp->v.pve->spec->pvp.pvn.u.isname.name.s.len,
-						gp->v.pve->spec->pvp.pvn.u.isname.name.s.s);
-				else if(gp->v.pve->spec->pvp.pvn.u.isname.type & AVP_NAME_RE)
+				if(gp->v.pve->spec.pvp.pvn.u.isname.type & AVP_NAME_STR)
+					LM_ERR("cannot find AVP '%.*s'\n", gp->v.pve->spec.pvp.pvn.u.isname.name.s.len,
+						gp->v.pve->spec.pvp.pvn.u.isname.name.s.s);
+				else if(gp->v.pve->spec.pvp.pvn.u.isname.type & AVP_NAME_RE)
 					LM_ERR("cannot find AVP regex\n");
-				else 	LM_ERR("cannot find AVP '%d'\n", gp->v.pve->spec->pvp.pvn.u.isname.name.n);
+				else 	LM_ERR("cannot find AVP '%d'\n", gp->v.pve->spec.pvp.pvn.u.isname.name.n);
 				return -1;
 			}
 			if ((avp->flags&AVP_VAL_STR)==0) {
@@ -104,12 +102,12 @@ static inline int cr_gp2id(struct sip_msg *_msg, gparam_t *gp, struct name_map_t
 			} else {
 				id = map_name2id(map, size, &avp_val.s);
 				if (id < 0) {
-					if(gp->v.pve->spec->pvp.pvn.u.isname.type & AVP_NAME_STR)
-						LM_ERR("cannot map carrier with id %.*s from  AVP '%.*s'\n", avp_val.s.len, avp_val.s.s, gp->v.pve->spec->pvp.pvn.u.isname.name.s.len,
-							gp->v.pve->spec->pvp.pvn.u.isname.name.s.s);
-					else if(gp->v.pve->spec->pvp.pvn.u.isname.type & AVP_NAME_RE)
+					if(gp->v.pve->spec.pvp.pvn.u.isname.type & AVP_NAME_STR)
+						LM_ERR("cannot map carrier with id %.*s from  AVP '%.*s'\n", avp_val.s.len, avp_val.s.s, gp->v.pve->spec.pvp.pvn.u.isname.name.s.len,
+							gp->v.pve->spec.pvp.pvn.u.isname.name.s.s);
+					else if(gp->v.pve->spec.pvp.pvn.u.isname.type & AVP_NAME_RE)
 						LM_ERR("cannot map carrier with id %.*s from  AVP regex\n", avp_val.s.len, avp_val.s.s);
-					else 	LM_ERR("cannot map carrier with id %.*s from  AVP '%d'\n", avp_val.s.len, avp_val.s.s, gp->v.pve->spec->pvp.pvn.u.isname.name.n);
+					else 	LM_ERR("cannot map carrier with id %.*s from  AVP '%d'\n", avp_val.s.len, avp_val.s.s, gp->v.pve->spec.pvp.pvn.u.isname.name.n);
 					return -1;
 				}
 				return id;
@@ -189,8 +187,8 @@ static int set_next_domain_on_rule(struct failure_route_rule *frr_head,
 				((rr->host.len == 0) || (str_strcmp(host, &rr->host)==0)) &&
 				(reply_code_matcher(&(rr->reply_code), reply_code)==0)) {
 			avp_val.n = rr->next_domain;
-			if (add_avp(dstavp->v.pve->spec->pvp.pvn.u.isname.type,
-					dstavp->v.pve->spec->pvp.pvn.u.isname.name, avp_val)<0) {
+			if (add_avp(dstavp->v.pve->spec.pvp.pvn.u.isname.type,
+					dstavp->v.pve->spec.pvp.pvn.u.isname.name, avp_val)<0) {
 				LM_ERR("set AVP failed\n");
 				return -1;
 			}
@@ -271,65 +269,6 @@ static struct route_rule * get_rule_by_hash(const struct route_flags * rf,
 	return act_hash;
 }
 
-// debug functions for cr_uri_avp
-/*
-static void print_cr_uri_avp(){
-	struct search_state st;
-	int_str val;
-	int elem = 0;
-
-	if (!search_first_avp( AVP_VAL_STR | AVP_NAME_STR, cr_uris_avp, &val, &st)) {
-		LM_DBG("no AVPs - we are done!\n");
-		return;
-	}
-
-	LM_DBG("	cr_uri_avp[%d]=%.*s\n", elem++, val.s.len, val.s.s);
-
-	while (  search_next_avp(&st, &val) ) {
-		LM_DBG("	cr_uri_avp[%d]=%.*s\n", elem++, val.s.len, val.s.s);
-	}
-}
-*/
-
-static void build_used_uris_list(avp_value_t* used_dests, int* no_dests){
-	struct search_state st;
-	int_str val;
-	*no_dests = 0;
-
-	if (!search_first_avp( AVP_VAL_STR | AVP_NAME_STR, cr_uris_avp, &val, &st)) {
-		//LM_DBG("no AVPs - we are done!\n");
-		return;
-	}
-
-	used_dests[(*no_dests)++] = val;
-	//LM_DBG("	used_dests[%d]=%.*s \n", (*no_dests)-1, used_dests[(*no_dests)-1].s.len, used_dests[(*no_dests)-1].s.s);
-
-	while ( search_next_avp(&st, &val) ) {
-		if ( MAX_DESTINATIONS == *no_dests ) {
-			LM_ERR("Too many  AVPs - we are done!\n");
-			return;
-		}
-		used_dests[(*no_dests)++] = val;
-		//LM_DBG("	used_dests[%d]=%.*s \n", (*no_dests)-1, used_dests[(*no_dests)-1].s.len, used_dests[(*no_dests)-1].s.s);
-	}
-
-	//LM_DBG("sucessfully built used_uris list!\n");
-}
-
-int cr_uri_already_used(str dest , avp_value_t* used_dests, int no_dests){
-	int i;
-	for (i=0; i<no_dests; i++){
-		if ( (dest.len == used_dests[i].s.len) &&
-				(memcmp(dest.s, used_dests[i].s.s, dest.len)==0)){
-			LM_NOTICE("Candidate destination <%.*s> was previously used.\n", dest.len, dest.s);
-			return 1;
-		}
-
-	}
-	//LM_DBG("cr_uri_already_used: Candidate destination <%.*s> was NEVER USED.\n", dest.len, dest.s);
-	return 0;
-}
-
 
 /**
  * does the work for rewrite_on_rule, writes the new URI into dest
@@ -349,6 +288,7 @@ static int actually_rewrite(const struct route_rule *rs, str *dest,
 	char *p;
 	int_str avp_val;
 	int strip = 0;
+
 	str l_user;
 	
 	if( !rs || !dest || !msg || !user) {
@@ -414,8 +354,8 @@ static int actually_rewrite(const struct route_rule *rs, str *dest,
 
 	if (descavp) {
 		avp_val.s = rs->comment;
-		if (add_avp(AVP_VAL_STR | descavp->v.pve->spec->pvp.pvn.u.isname.type,
-					descavp->v.pve->spec->pvp.pvn.u.isname.name, avp_val)<0) {
+		if (add_avp(AVP_VAL_STR | descavp->v.pve->spec.pvp.pvn.u.isname.type,
+					descavp->v.pve->spec.pvp.pvn.u.isname.name, avp_val)<0) {
 			LM_ERR("set AVP failed\n");
 			return -1;
 		}
@@ -466,11 +406,6 @@ static int rewrite_on_rule(struct route_flags *rf_head, flag_t flags, str * dest
 
 	switch (alg) {
 		case alg_crc32:
-		{
-			static avp_value_t used_dests[MAX_DESTINATIONS];
-			static int no_dests = 0;
-			avp_value_t cr_new_uri;
-
 			if(rf->dice_max == 0) {
 				LM_ERR("invalid dice_max value\n");
 				return -1;
@@ -479,48 +414,15 @@ static int rewrite_on_rule(struct route_flags *rf_head, flag_t flags, str * dest
 				LM_ERR("could not hash message with CRC32");
 				return -1;
 			}
-
 			/* This auto-magically takes the last rule if anything is broken.
 			 * Sometimes the hash result is zero. If the first rule is off
 			 * (has a probablility of zero) then it has also a dice_to of
 			 * zero and the message could not be routed at all if we use
 			 * '<' here. Thus the '<=' is necessary.
-			 *
-			 * cr_uri_already_used is a function that checks that the selected
-			 * rule has not been previously used as a failed destinatin
 			 */
-
 			for (rr = rf->rule_list;
-				rr->next!= NULL && rr->dice_to <= prob ; rr = rr->next) {}
-
-			//LM_DBG("CR: candidate hashed destination is: <%.*s>\n", rr->host.len, rr->host.s);
-
-			if (is_route_type(FAILURE_ROUTE) && (mode == CARRIERROUTE_MODE_DB) ){
-				build_used_uris_list(used_dests, &no_dests);
-
-				if (cr_uri_already_used(rr->host, used_dests, no_dests) ) {
-					//LM_DBG("CR: selecting new destination !!! \n");
-					for (rr = rf->rule_list;
-								rr!= NULL && cr_uri_already_used(rr->host, used_dests, no_dests); rr = rr->next) {}
-					/* are there any destinations that were not already used? */
-					if (rr == NULL) {
-						LM_NOTICE("All gateways from this group were already used\n");
-						return -1;
-					}
-
-					/* this is a hack: we do not take probabilities into consideration if first destination
-					 * was previously tried */
-
-					do {
-						int rule_no = rand() % rf->rule_num;
-						//LM_DBG("CR: trying rule_no=%d \n", rule_no);
-						for (rr = rf->rule_list; (rule_no > 0) && (rr->next!=NULL) ; rule_no-- , rr = rr->next) {}
-					} while (cr_uri_already_used(rr->host, used_dests, no_dests));
-					LM_DBG("CR: candidate selected destination is: <%.*s>\n", rr->host.len, rr->host.s);
-				}
-			}
-			/*This should be regarded as an ELSE branch for the if above
-			 * ( status exists for mode == CARRIERROUTE_MODE_FILE */
+			        rr->next != NULL && rr->dice_to <= prob;
+		        rr = rr->next) {}
 			if (!rr->status) {
 				if (!rr->backup) {
 					LM_ERR("all routes are off\n");
@@ -533,24 +435,7 @@ static int rewrite_on_rule(struct route_flags *rf_head, flag_t flags, str * dest
 					rr = rr->backup->rr;
 				}
 			}
-
-			//LM_DBG("CR: destination is: <%.*s>\n", rr->host.len, rr->host.s);
-			cr_new_uri.s = rr->host;
-			/* insert used destination into avp, in case corresponding request fails and
-			 * another destination has to be used; this new destination must not be one
-			 * that failed before
-			 */
-
-			if (mode == CARRIERROUTE_MODE_DB){
-				if ( add_avp( AVP_VAL_STR | AVP_NAME_STR, cr_uris_avp, cr_new_uri) < 0){
-					LM_ERR("set AVP failed\n");
-					return -1;
-				}
-				//print_cr_uri_avp();
-			}
-
 			break;
-		}
 		case alg_crc32_nofallback:
 			if ((prob = (hash_func(msg, hash_source, rf->max_targets))) < 0) {
 				LM_ERR("could not hash message with CRC32");
@@ -754,8 +639,8 @@ int cr_load_user_carrier(struct sip_msg * _msg, gparam_t *_user, gparam_t *_doma
 		return -1;
 	} else {
 		/* set avp */
-		if (add_avp(_dstavp->v.pve->spec->pvp.pvn.u.isname.type,
-					_dstavp->v.pve->spec->pvp.pvn.u.isname.name, avp_val)<0) {
+		if (add_avp(_dstavp->v.pve->spec.pvp.pvn.u.isname.type,
+					_dstavp->v.pve->spec.pvp.pvn.u.isname.name, avp_val)<0) {
 			LM_ERR("add AVP failed\n");
 			return -1;
 		}

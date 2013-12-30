@@ -97,10 +97,16 @@
 #include "tsend.h"
 #include "forward.h"
 #include "events.h"
-#include "stun.h"
+
+#ifdef USE_STUN
+#include "ser_stun.h"
+
+int is_msg_complete(struct tcp_req* r);
+
+#endif /* USE_STUN */
 
 #ifdef READ_HTTP11
-#define HTTP11CONTINUE	"HTTP/1.1 100 Continue\r\nContent-Length: 0\r\n\r\n"
+#define HTTP11CONTINUE	"HTTP/1.1 100 Continue\r\nContent-Lenght: 0\r\n\r\n"
 #define HTTP11CONTINUE_LEN	(sizeof(HTTP11CONTINUE)-1)
 #endif
 
@@ -116,8 +122,6 @@ static int tcpmain_sock=-1;
 
 static struct local_timer tcp_reader_ltimer;
 static ticks_t tcp_reader_prev_ticks;
-
-int is_msg_complete(struct tcp_req* r);
 
 /**
  * control cloning of TCP receive buffer
@@ -369,8 +373,11 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 	int bytes, remaining;
 	char *p;
 	struct tcp_req* r;
+
+#ifdef USE_STUN
 	unsigned int mc;   /* magic cookie */
 	unsigned short body_len;
+#endif
 
 #ifdef READ_MSRP
 	char *mfline;
@@ -432,7 +439,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 		if (bytes<=0) return bytes;
 	}
 	p=r->parsed;
-
+	
 	while(p<r->pos && r->error==TCP_REQ_OK){
 		switch((unsigned char)r->state){
 			case H_BODY: /* read the body*/
@@ -603,16 +610,18 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 						r->start=p;
 						break;
 					default:
+#ifdef USE_STUN
+						/* STUN support can be switched off even if it's compiled */
 						/* stun test */						
-						if (unlikely(sr_event_enabled(SREV_STUN_IN)) && (unsigned char)*p == 0x00) {
+						if (stun_allow_stun && (unsigned char)*p == 0x00) {
 							r->state=H_STUN_MSG;
 						/* body will used as pointer to the last used byte */
 							r->body=p;
 							r->content_len = 0;
 							DBG("stun msg detected\n");
-						} else {
-							r->state=H_SKIP;
-						}
+						}else
+#endif
+						r->state=H_SKIP;
 						r->start=p;
 				};
 				p++;
@@ -647,7 +656,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					r->state = H_SKIP_EMPTY;
 				}
 				break;
-
+#ifdef USE_STUN
 			case H_STUN_MSG:
 				if ((r->pos - r->body) >= sizeof(struct stun_hdr)) {
 					/* copy second short from buffer where should be body 
@@ -679,8 +688,8 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 						}
 						else {
 							/* set content_len to length of fingerprint */
-							body_len = sizeof(struct stun_attr) + 20;
-							/* 20 is SHA_DIGEST_LENGTH from openssl/sha.h */
+							body_len = sizeof(struct stun_attr) + 
+									   SHA_DIGEST_LENGTH;
 						}
 					}
 					r->content_len=body_len;
@@ -702,8 +711,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					}
 					else {
 						/* set content_len to length of fingerprint */
-						body_len = sizeof(struct stun_attr) + 20;
-						/* 20 is SHA_DIGEST_LENGTH from openssl/sha.h */
+						body_len = sizeof(struct stun_attr)+SHA_DIGEST_LENGTH;
 						r->content_len=body_len;
 					}
 				}
@@ -728,7 +736,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					p = r->pos;
 				}
 				break;
-
+#endif /* USE_STUN */
 			change_state_case(H_CONT_LEN1,  'O', 'o', H_CONT_LEN2);
 			change_state_case(H_CONT_LEN2,  'N', 'n', H_CONT_LEN3);
 			change_state_case(H_CONT_LEN3,  'T', 't', H_CONT_LEN4);
@@ -797,25 +805,11 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					case '\r':
 					case ' ':
 					case '\t': /* FIXME: check if line contains only WS */
-						if(r->content_len<0) {
-							LOG(L_ERR, "bad Content-Length header value %d in"
-									" state %d\n", r->content_len, r->state);
-							r->content_len=0;
-							r->error=TCP_REQ_BAD_LEN;
-							r->state=H_SKIP; /* skip now */
-						}
 						r->state=H_SKIP;
 						r->flags|=F_TCP_REQ_HAS_CLEN;
 						break;
 					case '\n':
 						/* end of line, parse successful */
-						if(r->content_len<0) {
-							LOG(L_ERR, "bad Content-Length header value %d in"
-									" state %d\n", r->content_len, r->state);
-							r->content_len=0;
-							r->error=TCP_REQ_BAD_LEN;
-							r->state=H_SKIP; /* skip now */
-						}
 						r->state=H_LF;
 						r->flags|=F_TCP_REQ_HAS_CLEN;
 						break;
@@ -1025,132 +1019,6 @@ int msrp_process_msg(char* tcpbuf, unsigned int len,
 }
 #endif
 
-#ifdef READ_WS
-static int tcp_read_ws(struct tcp_connection *c, int* read_flags)
-{
-	int bytes, size, pos, mask_present;
-	unsigned int len;
-	char *p;
-	struct tcp_req *r;
-
-	r=&c->req;
-#ifdef USE_TLS
-	if (unlikely(c->type == PROTO_WSS))
-		bytes = tls_read(c, read_flags);
-	else
-#endif
-		bytes = tcp_read(c, read_flags);
-
-	if (bytes <= 0)
-	{
-		if (likely(r->parsed >= r->pos))
-			return 0;
-	}
-
-	size = r->pos - r->parsed;
-
-	p = r->parsed;
-	pos = 0;
-
-	/*
-	 0                   1                   2                   3
-	 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-	+-+-+-+-+-------+-+-------------+-------------------------------+
-	|F|R|R|R| opcode|M| Payload len |    Extended payload length    |
-	|I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
-	|N|V|V|V|       |S|             |   (if payload len==126/127)   |
-	| |1|2|3|       |K|             |                               |
-	+-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
-	|     Extended payload length continued, if payload len == 127  |
-	+ - - - - - - - - - - - - - - - +-------------------------------+
-	|                               |Masking-key, if MASK set to 1  |
-	+-------------------------------+-------------------------------+
-	| Masking-key (continued)       |          Payload Data         |
-	+-------------------------------- - - - - - - - - - - - - - - - +
-	:                     Payload Data continued ...                :
-	+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
-	|                     Payload Data continued ...                |
-	+---------------------------------------------------------------+
-
-	Do minimal parse required to make sure the full message has been
-	received (websocket module will do full parse and validation).
-	*/
-
-	/* Process first two bytes */
-	if (size < pos + 2)
-		goto skip;
-	pos++;
-	mask_present = p[pos] & 0x80;
-	len = (p[pos++] & 0xff) & ~0x80;
-
-	/* Work out real length */
-	if (len == 126)
-	{
-		if (size < pos + 2)
-			goto skip;
-
-		len =	  ((p[pos + 0] & 0xff) <<  8)
-			| ((p[pos + 1] & 0xff) <<  0);
-		pos += 2;
-	}
-	else if (len == 127)
-	{
-		if (size < pos + 8)
-			goto skip;
-
-		/* Only decoding the last four bytes of the length...
-		   This limits the size of WebSocket messages that can be
-		   handled to 2^32 - which should be plenty for SIP! */
-		len =	  ((p[pos + 4] & 0xff) << 24)
-			| ((p[pos + 5] & 0xff) << 16)
-			| ((p[pos + 6] & 0xff) <<  8)
-			| ((p[pos + 7] & 0xff) <<  0);
-		pos += 8;
-	}
-
-	/* Skip mask */
-	if (mask_present)
-	{
-		if (size < pos + 4)
-			goto skip;
-		pos += 4;
-	}
-
-	/* Now check the whole message has been received */
-	if (size < pos + len)
-		goto skip;
-
-	pos += len;
-	r->flags |= F_TCP_REQ_COMPLETE;
-	r->parsed = &p[pos];
-
-skip:
-	return bytes;
-}
-
-static int ws_process_msg(char* tcpbuf, unsigned int len,
-		struct receive_info* rcv_info, struct tcp_connection* con)
-{
-	int ret;
-	tcp_event_info_t tev;
-
-	ret = 0;
-	LM_DBG("WebSocket Message: [[>>>\n%.*s<<<]]\n", len, tcpbuf);
-	if(likely(sr_event_enabled(SREV_TCP_WS_FRAME_IN))) {
-		memset(&tev, 0, sizeof(tcp_event_info_t));
-		tev.type = SREV_TCP_WS_FRAME_IN;
-		tev.buf = tcpbuf;
-		tev.len = len;
-		tev.rcv = rcv_info;
-		tev.con = con;
-		ret = sr_event_exec(SREV_TCP_WS_FRAME_IN, (void*)(&tev));
-	} else {
-		LM_DBG("no callback registering for handling WebSockets - dropping!\n");
-	}
-	return ret;
-}
-#endif
-
 /**
  * @brief wrapper around receive_msg() to clone the tcpbuf content
  *
@@ -1177,11 +1045,6 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 		if(unlikely(con->req.flags&F_TCP_REQ_MSRP_FRAME))
 			return msrp_process_msg(tcpbuf, len, rcv_info, con);
 #endif
-#ifdef READ_WS
-		if(unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
-			return ws_process_msg(tcpbuf, len, rcv_info, con);
-#endif
-
 		return receive_msg(tcpbuf, len, rcv_info);
 	}
 
@@ -1225,19 +1088,11 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 	if(unlikely(con->req.flags&F_TCP_REQ_MSRP_FRAME))
 		return msrp_process_msg(buf, len, rcv_info, con);
 #endif
-#ifdef READ_WS
-	if(unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
-		return ws_process_msg(buf, len, rcv_info, con);
-#endif
 	return receive_msg(buf, len, rcv_info);
 #else /* TCP_CLONE_RCVBUF */
 #ifdef READ_MSRP
 	if(unlikely(con->req.flags&F_TCP_REQ_MSRP_FRAME))
 		return msrp_process_msg(tcpbuf, len, rcv_info, con);
-#endif
-#ifdef READ_WS
-	if(unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
-		return ws_process_msg(tcpbuf, len, rcv_info, con);
 #endif
 	return receive_msg(tcpbuf, len, rcv_info);
 #endif /* TCP_CLONE_RCVBUF */
@@ -1261,12 +1116,7 @@ int tcp_read_req(struct tcp_connection* con, int* bytes_read, int* read_flags)
 
 again:
 		if (likely(req->error==TCP_REQ_OK)){
-#ifdef READ_WS
-			if (unlikely(con->type == PROTO_WS || con->type == PROTO_WSS))
-				bytes=tcp_read_ws(con, read_flags);
-			else
-#endif
-				bytes=tcp_read_headers(con, read_flags);
+			bytes=tcp_read_headers(con, read_flags);
 #ifdef EXTRA_DEBUG
 						/* if timeout state=0; goto end__req; */
 			DBG("read= %d bytes, parsed=%d, state=%d, error=%d\n",
@@ -1294,6 +1144,7 @@ again:
 				resp=CONN_EOF;
 				goto end_req;
 			}
+		
 		}
 		if (unlikely(req->error!=TCP_REQ_OK)){
 			LOG(L_ERR,"ERROR: tcp_read_req: bad request, state=%d, error=%d "
@@ -1356,11 +1207,14 @@ again:
 					LOG(L_ERR, "CRLF ping: tcp_send() failed\n");
 				}
 				ret = 0;
-			} else if (unlikely(req->state==H_STUN_END)) {
+			}else
+#ifdef USE_STUN
+			if (unlikely(req->state==H_STUN_END)){
 				/* stun request */
 				ret = stun_process_msg(req->start, req->parsed-req->start,
 									 &con->rcv);
-			} else
+			}else
+#endif
 #ifdef READ_MSRP
 			// if (unlikely(req->flags&F_TCP_REQ_MSRP_FRAME)){
 			if (unlikely(req->state==H_MSRP_FINISH)){
@@ -1376,12 +1230,6 @@ again:
 				ret = receive_tcp_msg(req->start,
 						req->body + req->content_len - req->start,
 						&con->rcv, con);
-			}else
-#endif
-#ifdef READ_WS
-			if (unlikely(con->type == PROTO_WS || con->type == PROTO_WSS)){
-				ret = receive_tcp_msg(req->start, req->parsed-req->start,
-									&con->rcv, con);
 			}else
 #endif
 				ret = receive_tcp_msg(req->start, req->parsed-req->start,
@@ -1765,6 +1613,8 @@ error:
 }
 
 
+
+#ifdef USE_STUN
 int is_msg_complete(struct tcp_req* r)
 {
 	if (TCP_REQ_HAS_CLEN(r)) {
@@ -1779,5 +1629,6 @@ int is_msg_complete(struct tcp_req* r)
 		return 1;
 	}
 }
+#endif
 
 #endif /* USE_TCP */

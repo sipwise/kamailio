@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -115,7 +117,7 @@ struct via_body {
 /*
  * Main Via header field parser
  */
-char* parse_via(char* buffer, const char* const end, struct via_body* const vbody);
+char* parse_via(char* buffer, char* end, struct via_body *vb);
 
 
 /*

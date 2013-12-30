@@ -1,4 +1,7 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -64,7 +67,6 @@ struct mime_type {
 #define SUBTYPE_XML_MSRTC_PIDF     12
 #define SUBTYPE_CPIM_PIDFXML       13
 #define SUBTYPE_MIXED              14
-#define SUBTYPE_ISUP               15
 #define SUBTYPE_ALL          0xfe
 #define SUBTYPE_UNKNOWN      0xff
 
@@ -103,9 +105,9 @@ struct mime_type {
  *            0        : hdr not found
  *           -1        : error (parse error )
  */
-int parse_content_type_hdr(struct sip_msg* const msg);
+int parse_content_type_hdr( struct sip_msg *msg);
 
-int parse_accept_body(struct hdr_field* const hdr);
+int parse_accept_body(struct hdr_field *hdr);
 
 /*! \brief
  * parse the body of the Accept header. It's values are also converted
@@ -114,7 +116,7 @@ int parse_accept_body(struct hdr_field* const hdr);
  *            0 : hdr not found
  *           -1 : error (parse error)
  */
-int parse_accept_hdr(struct sip_msg* const msg);
+int parse_accept_hdr( struct sip_msg *msg );
 
 
 /*! \brief
@@ -122,11 +124,11 @@ int parse_accept_hdr(struct sip_msg* const msg);
  *  type specified by this header (see th above defines).
  *  Returns the first chr after the end of the header.
  */
-char* parse_content_length(char* const buffer, const char* const end, int* const length);
+char* parse_content_length( char* buffer, char* end, int* len);
 
 /*! \brief
  * Sets the mime type from the body of a Content-Type header
  */
-char* decode_mime_type(char* const start, const char* const end, unsigned int* const mime_type);
+char* decode_mime_type(char *start, char *end, unsigned int *mime_type);
 
 #endif

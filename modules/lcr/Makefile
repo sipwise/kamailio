@@ -8,27 +8,22 @@ include ../../Makefile.defs
 auto_gen=
 NAME=lcr.so
 
-ifeq ($(CROSS_COMPILE),)
-PCRE_BUILDER = $(shell \
-	if pkg-config --exists libcre; then \
-		echo 'pkg-config libpcre'; \
-	else \
-		which pcre-config; \
-	fi)
-endif
+BUILDER = $(shell which pcre-config)
 
-ifeq ($(PCRE_BUILDER),)
-	PCREDEFS=-I$(LOCALBASE)/include
-	PCRELIBS=-L$(LOCALBASE)/lib -lpcre
+ifeq ($(BUILDER),)
+	PCREDEFS=-I$(LOCALBASE)/include -I/usr/local/include -I/opt/include \
+	-I/usr/sfw/include
+	PCRELIBS=-L$(LOCALBASE)/lib -L/usr/local/lib -L/usr/sfw/lib \
+	-L/opt/lib -lpcre
 else
-	PCREDEFS = $(shell $(PCRE_BUILDER) --cflags)
-	PCRELIBS = $(shell $(PCRE_BUILDER) --libs)
+	PCREDEFS = $(shell pcre-config --cflags)
+	PCRELIBS = $(shell pcre-config --libs)
 endif
 
 DEFS+=$(PCREDEFS)
-LIBS+=$(PCRELIBS)
+LIBS=$(PCRELIBS)
 
-DEFS+=-DKAMAILIO_MOD_INTERFACE
+DEFS+=-DOPENSER_MOD_INTERFACE
 
 SERLIBPATH=../../lib
 SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1

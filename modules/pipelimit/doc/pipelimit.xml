@@ -28,11 +28,6 @@
 		</address>
 		</author>
 		<editor>
-		<firstname>Ovidiu</firstname>
-		<surname>Sas</surname>
-		<address><email>osas@voipembedded.com</email></address>
-		</editor>
-		<editor>
 		<firstname>Daniel-Constantin</firstname>
 		<surname>Mierla</surname>
 		<address>
@@ -40,10 +35,6 @@
 		</address>
 		</editor>
 	</authorgroup>
-	<copyright>
-		<year>2013</year>
-		<holder><ulink url='http://www.voipembedded.com'>VoIPEmbedded Inc.</ulink></holder>
-	</copyright>
 	<copyright>
 		<year>2010</year>
 		<holder>Asipto.com</holder>

@@ -40,7 +40,6 @@
 #include "../../lib/srdb1/db_key.h"
 #include "../../lib/srdb1/db_op.h"
 #include "../../lib/srdb1/db_val.h"
-#include "../../lib/srdb1/db_locking.h"
 #include "../../str.h"
 
 /*! \brief
@@ -58,7 +57,7 @@ void db_mysql_close(db1_con_t* _h);
 /*! \brief
  * Free all memory allocated by get_result
  */
-int db_mysql_free_result(const db1_con_t* _h, db1_res_t* _r);
+int db_mysql_free_result(db1_con_t* _h, db1_res_t* _r);
 
 
 /*! \brief
@@ -118,21 +117,6 @@ int db_mysql_last_inserted_id(const db1_con_t* _h);
  * Returns number of affected rows for last query
  */
 int db_mysql_affected_rows(const db1_con_t* _h);
-
-/*! \brief
- * Starts transaction
- */
-int db_mysql_start_transaction(db1_con_t* _h, db_locking_t _l);
-
-/*! \brief
- * Commits transaction
- */
-int db_mysql_end_transaction(db1_con_t* _h);
-
-/*! \brief
- * Aborts transaction
- */
-int db_mysql_abort_transaction(db1_con_t* _h);
 
 
 /*! \brief

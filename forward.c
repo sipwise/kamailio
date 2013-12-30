@@ -120,7 +120,9 @@
 
 static int mhomed_sock_cache_disabled = 0;
 static int sock_inet = -1;
+#ifdef USE_IPV6
 static int sock_inet6 = -1;
+#endif /* USE_IPV6 */
 
 static void apply_force_send_socket(struct dest_info* dst, struct sip_msg* msg);
 
@@ -153,6 +155,7 @@ retry:
 		temp_sock = &sock_inet;
 		break;
 	}
+#ifdef USE_IPV6
 	case AF_INET6 : {
 		if(unlikely(sock_inet6 < 0)){
 			sock_inet6 = socket(AF_INET6, SOCK_DGRAM, 0);
@@ -164,6 +167,7 @@ retry:
 		temp_sock = &sock_inet6;
 		break;
 	}
+#endif /* USE_IPV6 */
 	default: {
 		LM_ERR("Unknown protocol family \n");
 		return 0;
@@ -185,10 +189,12 @@ retry:
 				close(sock_inet);
 				sock_inet=-1;
 			}
+#ifdef USE_IPV6
 			if (sock_inet6>=0){
 				close(sock_inet6);
 				sock_inet6=-1;
 			}
+#endif /* USE_IPV6 */
 			goto retry;
 		}
 		LOG(L_ERR, "ERROR: get_out_socket: connect failed: %s\n",
@@ -247,10 +253,8 @@ struct socket_info* get_send_socket2(struct socket_info* force_send_socket,
 	if (likely(mismatch)) *mismatch=0;
 	/* check if send interface is not forced */
 	if (unlikely(force_send_socket)){
-		orig=force_send_socket;
-		/* Special case here as there is no ;transport=wss - so wss connections will
-		   appear as ws ones and be sorted out in the WebSocket module */
-		if (unlikely(orig->proto!=proto && !(orig->proto==PROTO_TLS && proto==PROTO_WS))){
+		if (unlikely(force_send_socket->proto!=proto)){
+			orig=force_send_socket;
 			force_send_socket=find_si(&(force_send_socket->address),
 											force_send_socket->port_no,
 											proto);
@@ -282,9 +286,7 @@ struct socket_info* get_send_socket2(struct socket_info* force_send_socket,
 		   except tcp_main(), see close_extra_socks() */
 		if (likely((force_send_socket->socket!=-1 ||
 						force_send_socket->proto==PROTO_TCP ||
-						force_send_socket->proto==PROTO_TLS ||
-						force_send_socket->proto==PROTO_WS  ||
-						force_send_socket->proto==PROTO_WSS) &&
+						force_send_socket->proto==PROTO_TLS) &&
 					!(force_send_socket->flags & SI_IS_MCAST)))
 				return force_send_socket;
 		else{
@@ -317,7 +319,6 @@ not_forced:
 	 * eg: ipv4 -> ipv6 or ipv6 -> ipv4) */
 	switch(proto){
 #ifdef USE_TCP
-		case PROTO_WS:
 		case PROTO_TCP:
 		/* on tcp just use the "main address", we don't really now the
 		 * sending address (we can find it out, but we'll need also to see
@@ -326,22 +327,25 @@ not_forced:
 				/* FIXME */
 				case AF_INET:	send_sock=sendipv4_tcp;
 								break;
+#ifdef USE_IPV6
 				case AF_INET6:	send_sock=sendipv6_tcp;
 								break;
+#endif
 				default:	LOG(L_ERR, "get_send_socket: BUG: don't know how"
 									" to forward to af %d\n", to->s.sa_family);
 			}
 			break;
 #endif
 #ifdef USE_TLS
-		case PROTO_WSS:
 		case PROTO_TLS:
 			switch(to->s.sa_family){
 				/* FIXME */
 				case AF_INET:	send_sock=sendipv4_tls;
 								break;
+#ifdef USE_IPV6
 				case AF_INET6:	send_sock=sendipv6_tls;
 								break;
+#endif
 				default:	LOG(L_ERR, "get_send_socket: BUG: don't know how"
 									" to forward to af %d\n", to->s.sa_family);
 			}
@@ -355,8 +359,10 @@ not_forced:
 				switch(to->s.sa_family){
 					case AF_INET:	send_sock=sendipv4_sctp;
 									break;
+#ifdef USE_IPV6
 					case AF_INET6:	send_sock=sendipv6_sctp;
 									break;
+#endif
 					default:	LOG(L_ERR, "get_send_socket: BUG: don't know"
 										" how to forward to af %d\n",
 										to->s.sa_family);
@@ -371,8 +377,10 @@ not_forced:
 				switch(to->s.sa_family){
 					case AF_INET:	send_sock=sendipv4;
 									break;
+#ifdef USE_IPV6
 					case AF_INET6:	send_sock=sendipv6;
 									break;
+#endif
 					default:	LOG(L_ERR, "get_send_socket: BUG: don't know"
 										" how to forward to af %d\n",
 										to->s.sa_family);
@@ -535,23 +543,31 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 		}
 	}/* dst */
 	send_info->send_flags=msg->fwd_send_flags;
-	/* calculate branch for outbound request;
+	/* calculate branch for outbound request;  if syn_branch is turned off,
 	   calculate is from transaction key, i.e., as an md5 of From/To/CallID/
 	   CSeq exactly the same way as TM does; good for reboot -- than messages
 	   belonging to transaction lost due to reboot will still be forwarded
 	   with the same branch parameter and will be match-able downstream
+	
+	   if it is turned on, we don't care about reboot; we simply put a simple
+	   value in there; better for performance
 	*/
-	if (!char_msg_val( msg, md5 )) 	{ /* parses transaction key */
-		LOG(L_ERR, "ERROR: forward_request: char_msg_val failed\n");
-		ret=E_UNSPEC;
-		goto error;
-	}
-	msg->hash_index=hash( msg->callid->body, get_cseq(msg)->number);
-	if (!branch_builder( msg->hash_index, 0, md5, 0 /* 0-th branch */,
-				msg->add_to_branch_s, &msg->add_to_branch_len )) {
-		LOG(L_ERR, "ERROR: forward_request: branch_builder failed\n");
-		ret=E_UNSPEC;
-		goto error;
+	if (syn_branch ) {
+	        memcpy(msg->add_to_branch_s, "z9hG4bKcydzigwkX", 16);
+		msg->add_to_branch_len=16;
+	} else {
+		if (!char_msg_val( msg, md5 )) 	{ /* parses transaction key */
+			LOG(L_ERR, "ERROR: forward_request: char_msg_val failed\n");
+			ret=E_UNSPEC;
+			goto error;
+		}
+		msg->hash_index=hash( msg->callid->body, get_cseq(msg)->number);
+		if (!branch_builder( msg->hash_index, 0, md5, 0 /* 0-th branch */,
+					msg->add_to_branch_s, &msg->add_to_branch_len )) {
+			LOG(L_ERR, "ERROR: forward_request: branch_builder failed\n");
+			ret=E_UNSPEC;
+			goto error;
+		}
 	}
 	/* try to send the message until success or all the ips are exhausted
 	 *  (if dns lookup is performed && the dns cache used ) */
@@ -626,7 +642,7 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 		if (msg_send(send_info, buf, len)<0){
 			ret=ser_error=E_SEND;
 #ifdef USE_DST_BLACKLIST
-			(void)dst_blacklist_add(BLST_ERR_SEND, send_info, msg);
+			dst_blacklist_add(BLST_ERR_SEND, send_info, msg);
 #endif
 #ifdef USE_DNS_FAILOVER
 			continue; /* try another ip */
@@ -732,8 +748,7 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 	he=sip_resolvehost(name, &port, &proto);
 	
 	if (he==0){
-		LOG(L_NOTICE,
-				"update_sock_struct_from_via:resolve_host(%.*s) failure\n",
+		LOG(L_NOTICE, "ERROR:forward_reply:resolve_host(%.*s) failure\n",
 				name->len, name->s);
 		return -1;
 	}
@@ -744,9 +759,8 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 
 
 
-/* removes first via & sends msg to the second
- * - mode param controls if modules sip response callbacks are executed */
-static int do_forward_reply(struct sip_msg* msg, int mode)
+/* removes first via & sends msg to the second */
+int forward_reply(struct sip_msg* msg)
 {
 	char* new_buf;
 	struct dest_info dst;
@@ -772,10 +786,8 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 	}
 	
 	/* check modules response_f functions */
-	if(likely(mode==0)) {
-		for (r=0; r<mod_response_cbk_no; r++)
-			if (mod_response_cbks[r](msg)==0) goto skip;
-	}
+	for (r=0; r<mod_response_cbk_no; r++)
+		if (mod_response_cbks[r](msg)==0) goto skip;
 	/* we have to forward the reply stateless, so we need second via -bogdan*/
 	if (parse_headers( msg, HDR_VIA2_F, 0 )==-1 
 		|| (msg->via2==0) || (msg->via2->error!=PARSE_OK))
@@ -802,10 +814,8 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 	if (
 #ifdef USE_TCP
 			dst.proto==PROTO_TCP
-			|| dst.proto==PROTO_WS
 #ifdef USE_TLS
 			|| dst.proto==PROTO_TLS
-			|| dst.proto==PROTO_WSS
 #endif
 #ifdef USE_SCTP
 			||
@@ -852,18 +862,6 @@ skip:
 error:
 	if (new_buf) pkg_free(new_buf);
 	return -1;
-}
-
-/* removes first via & sends msg to the second */
-int forward_reply(struct sip_msg* msg)
-{
-	return do_forward_reply(msg, 0);
-}
-
-/* removes first via & sends msg to the second - no module callbacks */
-int forward_reply_nocb(struct sip_msg* msg)
-{
-	return do_forward_reply(msg, 1);
 }
 
 static void apply_force_send_socket(struct dest_info* dst, struct sip_msg* msg)

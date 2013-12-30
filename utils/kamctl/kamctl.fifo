@@ -23,12 +23,8 @@ fi
 ##### ----------------------------------------------- #####
 ### parameters
 #
-if [ -z "$FIFOPATH" ]; then
-	if [ -z "$OSER_FIFO" ]; then
-		FIFOPATH=/tmp/kamailio_fifo
-	else
-		FIFOPATH=$OSER_FIFO
-	fi
+if [ -z "$OSER_FIFO" ]; then
+	OSER_FIFO=/tmp/kamailio_fifo
 fi
 
 #
@@ -55,14 +51,14 @@ fifo_cmd()
 		merr "fifo_cmd must take at least command name as parameter"
 		exit 1
 	fi
-	name=kamailio_receiver_$$
+	name=openser_receiver_$$
 	path=$CHROOT_DIR/tmp/$name
-	if [ ! -w $FIFOPATH ]; then
-		merr "Error opening Kamailio's FIFO $FIFOPATH"
-		merr "Make sure you have the line 'modparam(\"mi_fifo\", \"fifo_name\", \"$FIFOPATH\")' in your config"
+	if [ ! -w $OSER_FIFO ]; then
+		merr "Error opening Kamailio's FIFO $OSER_FIFO"
+		merr "Make sure you have the line 'modparam(\"mi_fifo\", \"fifo_name\", \"$OSER_FIFO\")' in your config"
 		merr "and also have loaded the mi_fifo module."
 		if [ ! -z $CHROOT_DIR ]; then
-			merr "[chrooted environment] Check that $FIFOPATH is symlinked to ${CHROOT_DIR}${FIFOPATH}"
+			merr "[chrooted environment] Check that $OSER_FIFO is symlinked to ${CHROOT_DIR}${OSER_FIFO}"
 		fi
 		exit 2
 	fi
@@ -91,7 +87,7 @@ fifo_cmd()
 	cat < $path | filter_fl &
 
 	# issue FIFO request (printf taken to deal with \n)
-	printf "$CMD" > $FIFOPATH
+	printf "$CMD" > $OSER_FIFO
 
 	# wait for the reader to complete
 	wait
@@ -103,12 +99,12 @@ fifo_cmd()
 
 CTLCMD=fifo_cmd
 
-fifo_kamailio_monitor() {
-	name=kamailio_receiver_$$
+fifo_openser_monitor() {
+	name=openser_receiver_$$
 	path=$CHROOT_DIR/tmp/$name
-	if [ ! -w $FIFOPATH ]; then
-		merr "Error opening Kamailio's FIFO $FIFOPATH"
-		merr "Make sure you have the line 'modparam(\"mi_fifo\", \"fifo_name\", \"$FIFOPATH\")' in your config"
+	if [ ! -w $OSER_FIFO ]; then
+		merr "Error opening Kamailio's FIFO $OSER_FIFO"
+		merr "Make sure you have the line 'modparam(\"mi_fifo\", \"fifo_name\", \"$OSER_FIFO\")' in your config"
 		merr "and also have loaded the mi_fifo module."
 		exit 1
 	fi
@@ -137,14 +133,14 @@ fifo_kamailio_monitor() {
 		mecho "[cycle #: $attempt; if constant make sure server lives]"
 
 		cat < $path | filter_fl &
-		cat > $FIFOPATH <<EOF
+		cat > $OSER_FIFO <<EOF
 :version:$name
 
 EOF
 		wait
 
 		cat < $path | filter_fl &
-		cat > $FIFOPATH << EOF
+		cat > $OSER_FIFO << EOF
 :uptime:$name
 
 EOF
@@ -153,7 +149,7 @@ EOF
 
 		mecho "Transaction Statistics: "
 		cat < $path | filter_fl &
-		cat > $FIFOPATH <<EOF
+		cat > $OSER_FIFO <<EOF
 :get_statistics:$name
 UAS_transactions
 UAC_transactions
@@ -165,7 +161,7 @@ EOF
 
 		mecho "Stateless Server Statistics: "
 		cat < $path | filter_fl &
-		cat > $FIFOPATH <<EOF
+		cat > $OSER_FIFO <<EOF
 :get_statistics:$name
 sent_replies
 sent_err_replies
@@ -177,7 +173,7 @@ EOF
 
 		mecho "UsrLoc Stats: "
 		cat < $path | filter_fl &
-		cat > $FIFOPATH <<EOF
+		cat > $OSER_FIFO <<EOF
 :get_statistics:$name
 usrloc:
 
@@ -192,5 +188,5 @@ EOF
 	exit 0
 }
 
-KAMAILIO_MONITOR=fifo_kamailio_monitor
+OPENSER_MONITOR=fifo_openser_monitor
 

@@ -190,13 +190,11 @@ MODULE_VERSION
 static int fixup_hostport2proxy(void** param, int param_no);
 static int fixup_proto_hostport2proxy(void** param, int param_no);
 static int fixup_on_failure(void** param, int param_no);
-static int fixup_on_branch_failure(void** param, int param_no);
 static int fixup_on_reply(void** param, int param_no);
 static int fixup_on_branch(void** param, int param_no);
 static int fixup_t_reply(void** param, int param_no);
 static int fixup_on_sl_reply(modparam_t type, void* val);
 static int fixup_t_relay_to(void** param, int param_no);
-static int fixup_t_is_set(void** param, int param_no);
 
 /* init functions */
 static int mod_init(void);
@@ -272,8 +270,7 @@ inline static int w_t_forward_nonack_sctp(struct sip_msg*, char* str,char*);
 #endif
 inline static int w_t_forward_nonack_to(struct sip_msg* msg, char* str,char*);
 inline static int w_t_relay_cancel(struct sip_msg *p_msg, char *_foo, char *_bar);
-inline static int w_t_on_failure(struct sip_msg* msg, char *go_to, char *foo);
-inline static int w_t_on_branch_failure(struct sip_msg* msg, char *go_to, char *foo);
+inline static int w_t_on_negative(struct sip_msg* msg, char *go_to, char *foo);
 inline static int w_t_on_branch(struct sip_msg* msg, char *go_to, char *foo);
 inline static int w_t_on_reply(struct sip_msg* msg, char *go_to, char *foo );
 inline static int t_check_status(struct sip_msg* msg, char *match, char *foo);
@@ -291,7 +288,6 @@ static int t_set_disable_failover(struct sip_msg* msg, char* on_off, char* f);
 static int t_set_no_e2e_cancel_reason(struct sip_msg* msg, char* on_off,
 										char* f);
 #endif /* CANCEL_REASON_SUPPORT */
-static int t_set_disable_internal_reply(struct sip_msg* msg, char* on_off, char* f);
 static int t_branch_timeout(struct sip_msg* msg, char*, char*);
 static int t_branch_replied(struct sip_msg* msg, char*, char*);
 static int t_any_timeout(struct sip_msg* msg, char*, char*);
@@ -302,23 +298,13 @@ static int t_grep_status(struct sip_msg* msg, char*, char*);
 static int w_t_drop_replies(struct sip_msg* msg, char* foo, char* bar);
 static int w_t_save_lumps(struct sip_msg* msg, char* foo, char* bar);
 static int w_t_check_trans(struct sip_msg* msg, char* foo, char* bar);
-static int w_t_is_set(struct sip_msg* msg, char* target, char* bar);
-static int w_t_use_uac_headers(sip_msg_t* msg, char* foo, char* bar);
 
 
 /* by default the fr timers avps are not set, so that the avps won't be
  * searched for nothing each time a new transaction is created */
 static char *fr_timer_param = 0 /*FR_TIMER_AVP*/;
 static char *fr_inv_timer_param = 0 /*FR_INV_TIMER_AVP*/;
-
-str contacts_avp = {0, 0};
-str contact_flows_avp = {0, 0};
-
-int tm_remap_503_500 = 1;
-
-int tm_failure_exec_mode = 0;
-
-int tm_dns_reuse_rcv_socket = 0;
+static char *contacts_avp_param = 0;
 
 static rpc_export_t tm_rpc[];
 
@@ -415,16 +401,14 @@ static cmd_export_t cmds[]={
 			REQUEST_ROUTE},
 	{"t_relay_cancel",     w_t_relay_cancel,        0, 0,
 			REQUEST_ROUTE},
-	{"t_on_failure",       w_t_on_failure,         1, fixup_on_failure,
-			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE | BRANCH_ROUTE },
-	{"t_on_branch_failure",w_t_on_branch_failure,  1, fixup_on_branch_failure,
+	{"t_on_failure",       w_t_on_negative,         1, fixup_on_failure,
 			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE | BRANCH_ROUTE },
 	{"t_on_reply",         w_t_on_reply,            1, fixup_on_reply,
 			REQUEST_ROUTE | FAILURE_ROUTE | TM_ONREPLY_ROUTE | BRANCH_ROUTE },
 	{"t_on_branch",       w_t_on_branch,         1, fixup_on_branch,
 			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"t_check_status",     t_check_status,          1, fixup_t_check_status,
-			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+			REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
 	{"t_write_req",       t_write_req,              2, fixup_t_write,
 			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"t_write_unix",      t_write_unix,             2, fixup_t_write,
@@ -458,12 +442,8 @@ static cmd_export_t cmds[]={
 		fixup_var_int_1,
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 #endif /* CANCEL_REASON_SUPPORT */
-	{"t_set_disable_internal_reply", t_set_disable_internal_reply, 1, fixup_var_int_1,
-			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
-	{"t_branch_timeout",  t_branch_timeout,         0, 0,
-	                FAILURE_ROUTE|EVENT_ROUTE},
-	{"t_branch_replied",  t_branch_replied,         0, 0,
-	                FAILURE_ROUTE|EVENT_ROUTE},
+	{"t_branch_timeout",  t_branch_timeout,         0, 0,  FAILURE_ROUTE},
+	{"t_branch_replied",  t_branch_replied,         0, 0,  FAILURE_ROUTE},
 	{"t_any_timeout",     t_any_timeout,            0, 0, 
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"t_any_replied",     t_any_replied,            0, 0, 
@@ -482,17 +462,11 @@ static cmd_export_t cmds[]={
 			REQUEST_ROUTE},
 	{"t_check_trans",	  w_t_check_trans,			0, 0,
 			REQUEST_ROUTE|ONREPLY_ROUTE|BRANCH_ROUTE },
-	{"t_is_set",	      w_t_is_set,				1, fixup_t_is_set,
-			ANY_ROUTE },
-	{"t_use_uac_headers",  w_t_use_uac_headers,		0, 0,
-			ANY_ROUTE },
 
 	{"t_load_contacts", t_load_contacts,            0, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE},
 	{"t_next_contacts", t_next_contacts,            0, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE},
-	{"t_next_contact_flow", t_next_contact_flow,            0, 0,
-			REQUEST_ROUTE },
 
 	/* not applicable from the script */
 	{"load_tm",            (cmd_function)load_tm,           NO_SCRIPT,   0, 0},
@@ -504,7 +478,6 @@ static cmd_export_t cmds[]={
 static param_export_t params[]={
 	{"ruri_matching",       PARAM_INT, &default_tm_cfg.ruri_matching         },
 	{"via1_matching",       PARAM_INT, &default_tm_cfg.via1_matching         },
-	{"callid_matching",     PARAM_INT, &default_tm_cfg.callid_matching       },
 	{"fr_timer",            PARAM_INT, &default_tm_cfg.fr_timeout            },
 	{"fr_inv_timer",        PARAM_INT, &default_tm_cfg.fr_inv_timeout        },
 	{"wt_timer",            PARAM_INT, &default_tm_cfg.wait_timeout          },
@@ -540,15 +513,11 @@ static param_export_t params[]={
 	{"cancel_b_method",     PARAM_INT, &default_tm_cfg.cancel_b_flags},
 	{"reparse_on_dns_failover", PARAM_INT, &default_tm_cfg.reparse_on_dns_failover},
 	{"on_sl_reply",         PARAM_STRING|PARAM_USE_FUNC, fixup_on_sl_reply   },
-	{"contacts_avp",        PARAM_STR, &contacts_avp                },
-	{"contact_flows_avp",   PARAM_STR, &contact_flows_avp           },
+	{"contacts_avp",        PARAM_STRING, &contacts_avp_param                },
 	{"disable_6xx_block",   PARAM_INT, &default_tm_cfg.disable_6xx           },
 	{"local_ack_mode",      PARAM_INT, &default_tm_cfg.local_ack_mode        },
 	{"failure_reply_mode",  PARAM_INT, &failure_reply_mode                   },
 	{"faked_reply_prio",    PARAM_INT, &faked_reply_prio                     },
-	{"remap_503_500",       PARAM_INT, &tm_remap_503_500                     },
-	{"failure_exec_mode",   PARAM_INT, &tm_failure_exec_mode                 },
-	{"dns_reuse_rcv_socket",PARAM_INT, &tm_dns_reuse_rcv_socket              },
 #ifdef CANCEL_REASON_SUPPORT
 	{"local_cancel_reason", PARAM_INT, &default_tm_cfg.local_cancel_reason   },
 	{"e2e_cancel_reason",   PARAM_INT, &default_tm_cfg.e2e_cancel_reason     },
@@ -618,31 +587,6 @@ static int fixup_on_failure(void** param, int param_no)
 	return 0;
 }
 
-#define BRANCH_FAILURE_ROUTE_PREFIX "tm:branch-failure"
-static int fixup_on_branch_failure(void** param, int param_no)
-{
-	char *full_route_name = NULL;
-	int len;
-	int ret = 0;
-	if (param_no==1){
-		if((len = strlen((char*)*param))<=1
-				&& (*(char*)(*param)==0 || *(char*)(*param)=='0')) {
-			*param = (void*)0;
-			return 0;
-		}
-		len += strlen(BRANCH_FAILURE_ROUTE_PREFIX) + 1;
-		if ((full_route_name = pkg_malloc(len+1)) == NULL)
-		{
-			LM_ERR("No memory left in branch_failure fixup\n");
-			return -1;
-		}
-		sprintf(full_route_name, "%s:%s", BRANCH_FAILURE_ROUTE_PREFIX, (char*)*param);
-		*param=(void*)full_route_name;
-		ret = fixup_routes("t_on_branch_failure", &event_rt, param);
-		pkg_free(full_route_name);
-	}
-	return ret;
-}
 
 
 static int fixup_on_reply(void** param, int param_no)
@@ -773,10 +717,9 @@ static int script_init( struct sip_msg *foo, unsigned int flags, void *bar)
 	 * not be used again */
 
 	/* make sure the new message will not inherit previous
-		message's t_on_failure value
+		message's t_on_negative value
 	*/
-	t_on_failure( 0 );
-	t_on_branch_failure(0);
+	t_on_negative( 0 );
 	t_on_reply(0);
 	t_on_branch(0);
 	/* reset the kr status */
@@ -890,15 +833,11 @@ static int mod_init(void)
 		return -1;
 	}
 
-	if (init_avp_params(fr_timer_param, fr_inv_timer_param) < 0) {
+	if (init_avp_params( fr_timer_param, fr_inv_timer_param,
+						 contacts_avp_param)<0 ){
 		LOG(L_ERR,"ERROR:tm:mod_init: failed to process AVP params\n");
 		return -1;
 	}
-	if ((contacts_avp.len > 0) && (contact_flows_avp.len == 0)) {
-	    LOG(L_ERR,"ERROR:tm:mod_init: contact_flows_avp param has not been defined\n");
-	    return -1;
-	}
-
 #ifdef WITH_EVENT_LOCAL_REQUEST
 	goto_on_local_req=route_lookup(&event_rt, "tm:local-request");
 	if (goto_on_local_req>=0 && event_rt.rlist[goto_on_local_req]==0)
@@ -908,10 +847,6 @@ static int mod_init(void)
 #endif /* WITH_EVENT_LOCAL_REQUEST */
 	if (goto_on_sl_reply && onreply_rt.rlist[goto_on_sl_reply]==0)
 		WARN("empty/non existing on_sl_reply route\n");
-
-#ifdef WITH_TM_CTX
-	tm_ctx_init();
-#endif
 	tm_init = 1;
 	return 0;
 }
@@ -935,6 +870,8 @@ static int child_init(int rank)
 	}
 	return 0;
 }
+
+
 
 
 
@@ -1021,9 +958,7 @@ static int t_check_status(struct sip_msg* msg, char *p1, char *foo)
 		}
 		status = int2str( lowest_status , 0);
 		break;
-	case BRANCH_FAILURE_ROUTE:
-		status = int2str(t->uac[get_t_branch()].last_received, 0);
-		break;
+
 	default:
 		LOG(L_ERR,"ERROR:t_check_status: unsupported route type %d\n",
 				get_route_type());
@@ -1104,12 +1039,7 @@ inline static int str2proto(char *s, int len) {
 		return PROTO_TLS;	
 	else if (len == 4 && !strncasecmp(s, "sctp", 4))
 		return PROTO_SCTP;
-	else if (len == 2 && !strncasecmp(s, "ws", 2))
-		return PROTO_WS;
-	else if (len == 3 && !strncasecmp(s, "wss", 3)) {
-		LM_WARN("\"wss\" used somewhere...\n");
-		return PROTO_WS;
-	} else
+	else
 		return PROTO_NONE;
 }
 
@@ -1406,19 +1336,11 @@ inline static int w_t_newtran( struct sip_msg* p_msg, char* foo, char* bar )
 }
 
 
-inline static int w_t_on_failure( struct sip_msg* msg, char *go_to, char *foo)
+inline static int w_t_on_negative( struct sip_msg* msg, char *go_to, char *foo)
 {
-	t_on_failure( (unsigned int )(long) go_to );
+	t_on_negative( (unsigned int )(long) go_to );
 	return 1;
 }
-
-
-inline static int w_t_on_branch_failure( struct sip_msg* msg, char *go_to, char *foo)
-{
-	t_on_branch_failure( (unsigned int )(long) go_to );
-	return 1;
-}
-
 
 inline static int w_t_on_branch( struct sip_msg* msg, char *go_to, char *foo)
 {
@@ -1434,55 +1356,6 @@ inline static int w_t_on_reply( struct sip_msg* msg, char *go_to, char *foo )
 }
 
 
-static int w_t_is_set(struct sip_msg* msg, char *target, char *foo )
-{
-	int r;
-	tm_cell_t *t = NULL;
-	
-	r = 0;
-	t = get_t();
-	if (t==T_UNDEFINED) t = NULL;
-
-	switch(target[0]) {
-		case 'b':
-			if(t==NULL)
-				r = get_on_branch();
-			else
-				r = t->on_branch;
-			break;
-		case 'f':
-			if(t==NULL)
-				r = get_on_failure();
-			else
-				r = t->on_failure;
-			break;
-		case 'o':
-			if(t==NULL)
-				r = get_on_reply();
-			else
-				r = t->on_reply;
-			break;
-	}
-	if(r) return 1;
-	return -1;
-}
-
-static int fixup_t_is_set(void** param, int param_no)
-{
-	int len;
-	if (param_no==1) {
-		len = strlen((char*)*param);
-		if((len==13 && strncmp((char*)*param, "failure_route", 13)==0)
-				|| (len==13 && strncmp((char*)*param, "onreply_route", 13)==0)
-				|| (len==12 && strncmp((char*)*param, "branch_route", 12)==0)) {
-			return 0;
-		}
-
-		LM_ERR("invalid parameter value: %s\n", (char*)*param);
-		return 1;
-	}
-	return 0;
-}
 
 inline static int _w_t_relay_to(struct sip_msg  *p_msg ,
 									struct proxy_l *proxy, int force_proto)
@@ -1490,7 +1363,7 @@ inline static int _w_t_relay_to(struct sip_msg  *p_msg ,
 	struct cell *t;
 	int res;
 
-	if (is_route_type(FAILURE_ROUTE|BRANCH_FAILURE_ROUTE)) {
+	if (is_route_type(FAILURE_ROUTE)) {
 		t=get_t();
 		if (!t || t==T_UNDEFINED) {
 			LOG(L_CRIT, "BUG: w_t_relay_to: undefined T\n");
@@ -1601,32 +1474,27 @@ inline static int w_t_relay_to_avp( struct sip_msg  *p_msg ,
 
 int t_replicate_uri(struct sip_msg *msg, str *suri)
 {
-	struct proxy_l *proxy = NULL;
+	struct proxy_l *proxy;
 	struct sip_uri turi;
 	int r = -1;
 
-	if (suri != NULL && suri->s != NULL)
+	memset(&turi, 0, sizeof(struct sip_uri));
+	if(parse_uri(suri->s, suri->len, &turi)!=0)
 	{
-		memset(&turi, 0, sizeof(struct sip_uri));
-		if(parse_uri(suri->s, suri->len, &turi)!=0)
-		{
-			LM_ERR("bad replicate SIP address!\n");
-			return -1;
-		}
-
-		proxy=mk_proxy(&turi.host, turi.port_no, turi.proto);
-		if (proxy==0) {
-			LM_ERR("cannot create proxy from URI <%.*s>\n",
-				suri->len, suri->s );
-			return -1;
-		}
-
-		r = t_replicate(msg, proxy, proxy->proto);
-		free_proxy(proxy);
-		pkg_free(proxy);
-	} else {
-		r = t_replicate(msg, NULL, 0);
+		LM_ERR("bad replicate SIP address!\n");
+		return -1;
 	}
+
+	proxy=mk_proxy(&turi.host, turi.port_no, turi.proto);
+	if (proxy==0) {
+		LM_ERR("cannot create proxy from URI <%.*s>\n",
+			suri->len, suri->s );
+		return -1;
+	}
+
+	r = t_replicate(msg, proxy, proxy->proto);
+	free_proxy(proxy);
+	pkg_free(proxy);
 	return r;
 }
 
@@ -1879,41 +1747,21 @@ T_SET_FLAG_GEN_FUNC(t_set_no_e2e_cancel_reason, T_NO_E2E_CANCEL_REASON)
 #endif /* CANCEL_REASON_SUPPORT */
 
 
-/* disable internal negative reply for the current transaction */
-T_SET_FLAG_GEN_FUNC(t_set_disable_internal_reply, T_DISABLE_INTERNAL_REPLY)
-
-
-/* script function, FAILURE_ROUTE and BRANCH_FAILURE_ROUTE only,
- * returns true if the choosed "failure" branch failed because of a timeout, 
+/* script function, FAILURE_ROUTE only, returns true if the 
+ * choosed "failure" branch failed because of a timeout, 
  * -1 otherwise */
 int t_branch_timeout(struct sip_msg* msg, char* foo, char* bar)
 {
-    switch(get_route_type()) {
-    case FAILURE_ROUTE:
-    case BRANCH_FAILURE_ROUTE:
 	return (msg->msg_flags & FL_TIMEOUT)?1:-1;
-    default:
-	LOG(L_ERR, "ERROR:t_check_status: unsupported route type %d\n",
-	    get_route_type());
-    }
-    return -1;
 }
 
 
-/* script function, FAILURE_ROUTE and BRANCH_FAILURE_ROUTE only,
- * returns true if the choosed "failure" branch ever received a reply,
- * -1 otherwise */
+
+/* script function, FAILURE_ROUTE only, returns true if the 
+ * choosed "failure" branch ever received a reply, -1 otherwise */
 int t_branch_replied(struct sip_msg* msg, char* foo, char* bar)
 {
-    switch(get_route_type()) {
-    case FAILURE_ROUTE:
-    case BRANCH_FAILURE_ROUTE:
 	return (msg->msg_flags & FL_REPLIED)?1:-1;
-    default:
-	LOG(L_ERR, "ERROR:t_check_status: unsupported route type %d\n",
-	    get_route_type());
-    }
-    return -1;
 }
 
 
@@ -2292,11 +2140,13 @@ inline static int w_t_relay_to(struct sip_msg *msg, char *proxy, char *flags)
 			param.v.i = 0;
 			t_set_auto_inv_100(msg, (char*)(&param), 0);
 		}
-		/* no auto negative reply */
+		/* no auto negative reply - not implemented */
+		/*
 		if(fl&2) {
 			param.v.i = 1;
-			t_set_disable_internal_reply(msg, (char*)(&param), 0);
+			t_set_disable_internal_reply(msg, (char*)param, 0);
 		}
+		*/
 		/* no dns failover */
 		if(fl&4) {
 			param.v.i = 1;
@@ -2307,18 +2157,6 @@ inline static int w_t_relay_to(struct sip_msg *msg, char *proxy, char *flags)
 }
 
 
-static int w_t_use_uac_headers(sip_msg_t* msg, char* foo, char* bar)
-{
-	tm_cell_t *t;
-
-	t=get_t();
-	if (t!=NULL && t!=T_UNDEFINED) {
-		t->uas.request->msg_flags |= FL_USE_UAC_FROM|FL_USE_UAC_TO;
-	}
-	msg->msg_flags |= FL_USE_UAC_FROM|FL_USE_UAC_TO;
-
-	return 1;
-}
 
 /* rpc docs */
 
