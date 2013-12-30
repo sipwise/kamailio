@@ -1,0 +1,36 @@
+From e96a8b80fd253777e1d001ad778c5a62473ba010 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 11 Dec 2013 23:01:41 +0100
+Subject: [PATCH] avpops: create a local pv structure when parameter is only
+ flags
+
+- flags details are stored inside it
+- fixes crash at startup reported by Kevin Scott Adams, FS#381
+
+(cherry picked from commit 3c88f1de9d647db8a14bae45af1fa3b34f74d4e6)
+---
+ modules/avpops/avpops_parse.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/modules/avpops/avpops_parse.c b/modules/avpops/avpops_parse.c
+index 3a16f18..3a6c5ec 100644
+--- a/modules/avpops/avpops_parse.c
++++ b/modules/avpops/avpops_parse.c
+@@ -129,6 +129,14 @@ int parse_avp_db(char *s, struct db_param *dbp, int allow_scheme)
+ 				goto error;
+ 			}
+ 		}
++		/* no pv to lookup, create one to store flags details */
++		dbp->a.u.sval = (pv_spec_t*)pkg_malloc(sizeof(pv_spec_t));
++		if(dbp->a.u.sval==NULL)
++		{
++			LM_ERR("no more pkg\n");
++			goto error;
++		}
++		memset(dbp->a.u.sval, 0, sizeof(pv_spec_t));
+ 		dbp->a.u.sval->pvp.pvn.u.isname.type |= (flags<<8)&0xff00;
+ 		dbp->a.type = AVPOPS_VAL_NONE;
+ 	} else {
+-- 
+1.8.5.2
+

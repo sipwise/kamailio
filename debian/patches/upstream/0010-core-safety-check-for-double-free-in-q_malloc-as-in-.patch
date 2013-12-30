@@ -1,0 +1,30 @@
+From eaeb74f5b6af5be13f88de93729998f13e9a06b7 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 11 Dec 2013 09:49:52 +0100
+Subject: [PATCH] core: safety check for double free in q_malloc as in f_malloc
+
+(cherry picked from commit 943a5941f5ab479803fb30e19e9fa607f0f0fe14)
+---
+ mem/q_malloc.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/mem/q_malloc.c b/mem/q_malloc.c
+index 50acab9..8c36d03 100644
+--- a/mem/q_malloc.c
++++ b/mem/q_malloc.c
+@@ -473,6 +473,12 @@ void qm_free(struct qm_block* qm, void* p)
+ 	MDBG("qm_free: freeing frag. %p alloc'ed from %s: %s(%ld)\n",
+ 			f, f->file, f->func, f->line);
+ #endif
++	if (unlikely(f->u.is_free)){
++		LM_INFO("freeing a free fragment (%p/%p) - ignore\n",
++				f, p);
++		return;
++	}
++
+ 	size=f->size;
+ 	qm->used-=size;
+ 	qm->real_used-=size;
+-- 
+1.8.5.2
+

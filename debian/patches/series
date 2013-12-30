@@ -5,6 +5,15 @@ upstream/0004-Makefile.defs-compiler-optimization-level-made-varia.patch
 upstream/0005-core-fixed-several-clang-compiler-warnings.patch
 upstream/0006-usrloc-proper-index-for-domain-column-when-laoding-e.patch
 upstream/0007-tm-safety-checks-inside-t_next_contacts.patch
+upstream/0008-registrar-handle-error-case-when-deleting-contact-fa.patch
+upstream/0009-usrloc-avoid-double-locking-when-preloading-attribut.patch
+upstream/0010-core-safety-check-for-double-free-in-q_malloc-as-in-.patch
+upstream/0011-avpops-create-a-local-pv-structure-when-parameter-is.patch
+upstream/0012-tm-reset-temporary-linking-of-reply-to-transaction-a.patch
+upstream/0013-snmpstats-fixe-MIB-file-definitions.patch
+upstream/0014-db_flatstore-update-timestamp-for-kamailio-specific-.patch
+upstream/0015-modules-pv-fixed-params-and-param-transformation.patch
+upstream/0016-modules-pua-added-some-missing-lock-releases.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
