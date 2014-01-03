@@ -14,6 +14,8 @@ upstream/0013-snmpstats-fixe-MIB-file-definitions.patch
 upstream/0014-db_flatstore-update-timestamp-for-kamailio-specific-.patch
 upstream/0015-modules-pv-fixed-params-and-param-transformation.patch
 upstream/0016-modules-pua-added-some-missing-lock-releases.patch
+upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
+upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
