@@ -1,0 +1,27 @@
+From 2ac00f9083846b958da5396cb4f5a51527957324 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Fri, 3 Jan 2014 10:11:26 +0100
+Subject: [PATCH] acc: regenerated README
+
+---
+ modules/acc/README | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/modules/acc/README b/modules/acc/README
+index f6b1c5c..7a6361c 100644
+--- a/modules/acc/README
++++ b/modules/acc/README
+@@ -1109,7 +1109,9 @@ modparam("acc", "db_extra", "ct=$hdr(Content-type); email=$avp(s:email)")
+ 
+    If set to 1, use INSERT DELAYED to add records to accounting tables
+    when the DB driver has support for it. If no INSERT DELAYED support is
+-   offered by DB driver, then standard INSERT is used.
++   offered by DB driver, then standard INSERT is used. Beware that MySQL
++   InnoDB engine doesn't support INSERT DELAYED, thus be sure the acc
++   tables are defined with different type (e.g., MyISAM).
+ 
+    Default value is 0 (no INSERT DELAYED).
+ 
+-- 
+1.8.5.2
+

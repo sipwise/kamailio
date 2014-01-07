@@ -14,6 +14,16 @@ upstream/0013-snmpstats-fixe-MIB-file-definitions.patch
 upstream/0014-db_flatstore-update-timestamp-for-kamailio-specific-.patch
 upstream/0015-modules-pv-fixed-params-and-param-transformation.patch
 upstream/0016-modules-pua-added-some-missing-lock-releases.patch
+upstream/0017-acc-added-note-about-MySQL-InnoDB-not-supporting-INS.patch
+upstream/0018-acc-regenerated-README.patch
+upstream/0019-tmrec-updated-the-examples-with-tmrec-duration.patch
+upstream/0020-modules-auth_ephemeral-added-OpenSSL-licensing-excep.patch
+upstream/0021-modules-outbound-added-OpenSSL-licensing-exception.patch
+upstream/0022-modules-websocket-added-OpenSSL-licensing-exception.patch
+upstream/0023-htable-use-pkg-for-temporary-hash-table-slots-used-f.patch
+upstream/0024-htable-use-system-malloc-for-temporary-allocation-of.patch
+upstream/0025-htable-free-temporary-slots-used-to-reload-hash-tabl.patch
+upstream/0026-websocket-store-sub-protocol-value-for-later-use-in-.patch
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch

@@ -1,0 +1,80 @@
+From bdb3a86c4453790a91de5aa2320de5b5bb26ad5c Mon Sep 17 00:00:00 2001
+From: Peter Dunkley <peter.dunkley@crocodile-rcs.com>
+Date: Sun, 5 Jan 2014 18:15:33 +0000
+Subject: [PATCH] modules/outbound: added OpenSSL licensing exception
+
+(cherry picked from commit 6741c47ad75806355cd7564d419df56acc68987b)
+---
+ modules/outbound/api.h    | 5 +++++
+ modules/outbound/config.c | 5 +++++
+ modules/outbound/config.h | 5 +++++
+ modules/outbound/ob_mod.c | 5 +++++
+ 4 files changed, 20 insertions(+)
+
+diff --git a/modules/outbound/api.h b/modules/outbound/api.h
+index fc0e8b9..facc1db 100644
+--- a/modules/outbound/api.h
++++ b/modules/outbound/api.h
+@@ -19,6 +19,11 @@
+  * along with this program; if not, write to the Free Software 
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  *
++ * Exception: permission to copy, modify, propagate, and distribute a work
++ * formed by combining OpenSSL toolkit software and the code in this file,
++ * such as linking with software components and libraries released under
++ * OpenSSL project license.
++ *
+  */
+ 
+ #ifndef OB_API_H
+diff --git a/modules/outbound/config.c b/modules/outbound/config.c
+index bcb6fbb..5b291f4 100644
+--- a/modules/outbound/config.c
++++ b/modules/outbound/config.c
+@@ -17,6 +17,11 @@
+  * along with this program; if not, write to the Free Software 
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  *
++ * Exception: permission to copy, modify, propagate, and distribute a work
++ * formed by combining OpenSSL toolkit software and the code in this file,
++ * such as linking with software components and libraries released under
++ * OpenSSL project license.
++ *
+  */
+ 
+ /*!
+diff --git a/modules/outbound/config.h b/modules/outbound/config.h
+index 0410ff5..cf6796e 100644
+--- a/modules/outbound/config.h
++++ b/modules/outbound/config.h
+@@ -17,6 +17,11 @@
+  * along with this program; if not, write to the Free Software 
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  *
++ * Exception: permission to copy, modify, propagate, and distribute a work
++ * formed by combining OpenSSL toolkit software and the code in this file,
++ * such as linking with software components and libraries released under
++ * OpenSSL project license.
++ *
+  */
+ 
+ /*!
+diff --git a/modules/outbound/ob_mod.c b/modules/outbound/ob_mod.c
+index 9902e91..038c5fa 100644
+--- a/modules/outbound/ob_mod.c
++++ b/modules/outbound/ob_mod.c
+@@ -19,6 +19,11 @@
+  * along with this program; if not, write to the Free Software 
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  *
++ * Exception: permission to copy, modify, propagate, and distribute a work
++ * formed by combining OpenSSL toolkit software and the code in this file,
++ * such as linking with software components and libraries released under
++ * OpenSSL project license.
++ *
+  */
+ #include <openssl/hmac.h>
+ #include <openssl/rand.h>
+-- 
+1.8.5.2
+
