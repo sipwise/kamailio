@@ -24,6 +24,7 @@ upstream/0023-htable-use-pkg-for-temporary-hash-table-slots-used-f.patch
 upstream/0024-htable-use-system-malloc-for-temporary-allocation-of.patch
 upstream/0025-htable-free-temporary-slots-used-to-reload-hash-tabl.patch
 upstream/0026-websocket-store-sub-protocol-value-for-later-use-in-.patch
+upstream/0027-usrloc-add-user_col-to-the-update-contact-query-with.patch
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
