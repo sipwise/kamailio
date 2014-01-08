@@ -1,3 +1,11 @@
+ngcp-kamailio (3.3.6-1) unstable; urgency=medium
+
+  * [d337f21] Imported Upstream version 3.3.6
+  * [79af891] MT#5525 remove upstream applied patches
+  * [14809ba] MT#5565 Add fixes from upstream. Fix usrloc db sync.
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 08 Jan 2014 09:53:38 +0100
+
 ngcp-kamailio (3.3.5-2) unstable; urgency=low
 
   * [de51020] refresh patches for 3.3.5
