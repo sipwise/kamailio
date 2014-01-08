@@ -5,6 +5,8 @@ upstream/0001-implement-pv-transformation-en-de-code.base64.patch
 upstream/0002-fix-string-length-matching.patch
 upstream/0001-attempt-to-fix-segfault-due-to-recursive-mysql-query.patch
 upstream/0001-backport-c70f884988c3f9298fa4d40ef12c69eea9da26a5-fr.patch
+upstream/0001-modules_k-pua-added-some-missing-lock-releases-backp.patch
+upstream/0002-modules_k-usrloc-add-user_col-to-the-update-contact-.patch
 sipwise/do-not-install-default-config.patch
 sipwise/corex_module.patch
 sipwise/accounting_time_precision.patch
