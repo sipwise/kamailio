@@ -1,3 +1,9 @@
+ngcp-kamailio (4.0.4-4) unstable; urgency=medium
+
+  * [7e59d4a] MT#5565 add upstream fix for usrloc db sync
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 08 Jan 2014 08:56:18 +0100
+
 ngcp-kamailio (4.0.4-3) unstable; urgency=low
 
   * [14dbee8] MT#4143 Add upstream ursloc fix
