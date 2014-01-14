@@ -1,11 +1,41 @@
 ngcp-kamailio (4.1.0-1) UNRELEASED; urgency=low
 
+  [ Victor Seva ]
   * [b9ee1b0] MT#5301 Imported Upstream version 4.1.0
   * [c99d19e] MT#5301 remove upstream applied patches and refresh the rest
   * [e08ab8c] MT#5301 Add upstream patches
   * [9c55b20] MT#5301 refresh lcr_rate_module.patch
+  * [94e2840] MT#5301 Add missing debug patch not applied upstream.
+  * [4ee1c6a] MT#5301 fix error when upgrading from 4.0.X.
+  * [53988d3] MT#5301 add upstream patches
+  * [e69d588] MT#5301 Add upstream bug fixes
+  * [549b84e] MT#5369 allow pvars in acc functions first parameter
+  * [9f52bf0] MT#5301 Add upstream fixes
+  * [506d1d4] MT#5565 add upstream fix for usrloc db sync
+  * [f8874a8] MT#5301 Merge upstream 4.1.1 changes
+  * [58e93da] MT#5301 remove applied upstream patches
 
- -- Victor Seva <vseva@sipwise.com>  Fri, 06 Dec 2013 14:40:17 +0100
+  [ Richard Fuchs ]
+  * [4ec3f9d] totally stubby tcap module
+  * [d64a8ec] breaking kamailio build by adding tcap to build modules
+  * [73b025b] adding libtcap-dev to build depends
+  * [8d7ad93] dont modify control file in quilt patch
+  * [2801b67] add libtcap to control file
+  * [19f4aeb] add libtcap to control file
+  * [91e1d04] some rudimentary tcap function
+  * [cc99c17] try a different fixup function
+  * [56a4e99] adding error logging
+  * [834b41a] wrong error message
+  * [6e74963] try different method of setting return avp
+  * [cc4984a] implement inap_extract
+  * [0e4fdd2] adding isup_decode_number function
+  * [367843f] fix  hex decoding
+  * [136eea0] less redundant error messages
+  * [872e952] fix  hex decoding
+  * [1ae44ee] use new isup_convert_number from libtcap
+  * [d1893f3] add strip_trailing_crlf option to tcap
+
+ -- Victor Seva <vseva@sipwise.com>  Tue, 14 Jan 2014 10:57:14 +0100
 
 ngcp-kamailio (4.0.4-3) unstable; urgency=low
 
