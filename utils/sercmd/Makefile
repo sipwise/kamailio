@@ -4,8 +4,13 @@ include $(COREPATH)/Makefile.defs
 include $(COREPATH)/Makefile.targets
 
 auto_gen=
-NAME=sercmd
 RELEASE=0.2
+UTIL_SRC_NAME=sercmd
+ifeq ($(FLAVOUR),kamailio)
+	NAME=kamcmd
+else
+	NAME=sercmd
+endif
 
 readline_locations= /usr/include/readline/readline.h \
 					$(LOCALBASE)/include/readline/readline.h
@@ -22,7 +27,7 @@ endif #ifneq (,$(MAKECMDGOALS))
 
 # erase common DEFS (not needed)
 C_DEFS:=
-DEFS:= -DNAME='"$(NAME)"' -DSRNAME='"$(MAIN_NAME)"' -DVERSION='"$(RELEASE)"' \
+DEFS:= -DNAME='"$(NAME)"' -DSRNAME='"$(MAIN_NAME)"' -DVERSION='"$(RELEASE)"' -D__OS_$(OS) \
 		$(filter -D%HAVE -DARCH% -DOS% -D__CPU% -D__OS%, $(DEFS))
 
 # use proper libs (we can't rely on LIBS value since we might be called

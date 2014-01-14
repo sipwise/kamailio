@@ -10,7 +10,7 @@ RPC Exports for debugger
 
 <section id="dbg.bp"><title>dbg.bp</title>
 <para>
-        Documentation missing (dbg_rpc_bp_doc).
+        Breakpoint command
 </para>
 <para>
 </para>
@@ -27,6 +27,22 @@ RPC Exports for debugger
 <section id="dbg.trace"><title>dbg.trace</title>
 <para>
         Config trace command
+</para>
+<para>
+</para>
+</section>
+
+<section id="dbg.mod_level"><title>dbg.mod_level</title>
+<para>
+        Specify module log level
+</para>
+<para>
+</para>
+</section>
+
+<section id="dbg.reset_msgid"><title>dbg.reset_msgid</title>
+<para>
+        Reset msgid on all process
 </para>
 <para>
 </para>

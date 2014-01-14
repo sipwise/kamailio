@@ -105,11 +105,14 @@ int load_tm( struct tm_binds *tmb)
 	tmb->free_dlg = free_dlg;
 	tmb->print_dlg = print_dlg;
 	tmb->t_gett = get_t;
+	tmb->t_gett_branch = get_t_branch;
+	tmb->t_sett = set_t;
 	tmb->calculate_hooks = w_calculate_hooks;
 	tmb->t_uac = t_uac;
 	tmb->t_uac_with_ids = t_uac_with_ids;
 	tmb->t_unref = t_unref;
 	tmb->run_failure_handlers = run_failure_handlers;
+	tmb->run_branch_failure_handlers = run_branch_failure_handlers;
 	tmb->cancel_uacs = cancel_uacs;
 	tmb->cancel_all_uacs = cancel_all_uacs;
 	tmb->prepare_request_within = prepare_req_within;
@@ -157,7 +160,7 @@ int load_xtm(tm_xapi_t *xapi)
 
 	memset(xapi, 0, sizeof(tm_xapi_t));
 
-	xapi->t_on_failure    = t_on_negative;
+	xapi->t_on_failure    = t_on_failure;
 	xapi->t_on_branch     = t_on_branch;
 	xapi->t_on_reply      = t_on_reply;
 	xapi->t_check_trans   = t_check_trans;

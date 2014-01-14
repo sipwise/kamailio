@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
+<!-- Module User's Guide -->
+
+<chapter>
+	
+	<title>&adminguide;</title>
+	
+	<section>
+	<title>Overview</title>
+	<para>
+		This module collects the core pseudo-variables that can be used in
+		configuration file. They are listed in Dokuwiki:
+		<ulink url="http://www.kamailio.org/wiki/">http://www.kamailio.org/wiki/</ulink>,
+		in Pseudo-Variables section
+	</para>
+	</section>
+	<section>
+	<title>Dependencies</title>
+	<section>
+		<title>&kamailio; Modules</title>
+		<para>
+		The following modules must be loaded before this module:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>No dependencies on other &kamailio; modules</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	<section>
+		<title>External Libraries or Applications</title>
+		<para>
+		The following libraries or applications must be installed before running
+		&kamailio; with this module loaded:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>None</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+	</section>
+	<section>
+	<title>Parameters</title>
+	<section>
+		<title><varname>shvset</varname> (string)</title>
+		<para>
+		Set the value of a shared variable ($shv(name)). The parameter
+		can be set many times.
+		</para>
+		<para>
+		The value of the parameter has the format:
+		_name_ '=' _type_ ':' _value_
+		</para>
+		<itemizedlist>
+			<listitem><para>_name_: shared variable name</para></listitem>
+			
+			<listitem><para>_type_: type of the value</para>
+			 <itemizedlist>
+	    <listitem><para> <quote>i</quote>: integer value </para></listitem> 
+		<listitem><para> <quote>s</quote>: string value </para></listitem>	
+		      </itemizedlist>
+			</listitem>	  
+
+			<listitem><para>_value_: value to be set</para></listitem>
+		</itemizedlist>
+		<para>
+		Default value is <quote>NULL</quote>.
+		</para>
+		<example>
+		<title><varname>shvset</varname> parameter usage</title>
+		<programlisting format="linespecific">
+...
+modparam("pv", "shvset", "debug=i:1")
+modparam("pv", "shvset", "pstngw=s:sip:10.10.10.10")
+...
+</programlisting>
+	    </example>
+	</section>
+	<section>
+		<title><varname>varset</varname> (string)</title>
+		<para>
+		Set the value of a script variable ($var(name)). The parameter
+		can be set many times.
+		</para>
+		<para>
+		The value of the parameter has the format:
+		_name_ '=' _type_ ':' _value_
+		</para>
+		<itemizedlist>
+			<listitem><para>_name_: shared variable name</para></listitem>
+			
+			<listitem><para>_type_: type of the value</para>
+			 <itemizedlist>
+	     <listitem><para> <quote>i</quote>: integer value </para></listitem> 
+		 <listitem><para> <quote>s</quote>: string value </para></listitem>	
+			 </itemizedlist>
+			</listitem>	  
+
+			<listitem><para>_value_: value to be set</para></listitem>
+		</itemizedlist>
+		<para>
+		Default value is <quote>NULL</quote>.
+		</para>
+		<example>
+		<title><varname>varset</varname> parameter usage</title>
+		<programlisting format="linespecific">
+...
+modparam("pv", "varset", "init=i:1")
+modparam("pv", "varset", "gw=s:sip:11.11.11.11;transport=tcp")
+...
+</programlisting>
+	    </example>
+	</section>
+		<section>
+			<title><varname>avp_aliases</varname> (string)</title>
+			<para>
+			Define aliases for PV AVP names.
+			</para>
+			<para>
+				<emphasis>
+					Default value is NULL.
+				</emphasis>
+			</para>
+			<example>
+				<title><varname>avp_aliases</varname> parameter usage</title>
+				<programlisting format="linespecific">
+...
+modparam("pv","avp_aliases","email=s:email_addr;tmp=i:100")
+...
+				</programlisting>
+			</example>
+		</section>
+	</section>
+	<section>
+	<title>Functions</title>
+		<section>
+		<title><function moreinfo="none">pv_isset(pvar)</function></title>
+		<para>
+			Return true if a PV value is different than 'null'.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>pvar</emphasis> - pvar identifier.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>pv_isset</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(pv_isset("$avp("s:x")"))
+{
+    ...
+}
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+		<title><function moreinfo="none">pv_unset(pvar)</function></title>
+		<para>
+			Unset the value of the PV (e.g., delete AVP, set to null).
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>pvar</emphasis> - pvar identifier.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>pv_unset</function> usage</title>
+		<programlisting format="linespecific">
+...
+pv_unset("$avp("s:x")");
+...
+</programlisting>
+		</example>
+		</section>
+		<section>
+			<title>
+				<function moreinfo="none">is_int(pvar)</function>
+			</title>
+			<para>
+			Function checks if pvar argument contains integer value
+			and returns 1 if it does and -1 otherwise.
+			</para>
+			<para>
+			Function can be used from all kinds of routes.
+			</para>
+			<example>
+				<title><function>is_int()</function> usage</title>
+				<programlisting format="linespecific">
+...
+if (is_int("$var(foo)")) {
+    xlog("L_INFO", "variable foo contains integer value\n");
+}
+...
+				</programlisting>
+			</example>
+		</section>
+		<section>
+			<title>
+				<function moreinfo="none">typeof(pvar, vtype)</function>
+			</title>
+			<para>
+			Returns true if the type of pseudo-variable matches the second
+			parameter. The second parameter can be: 'int' - type is integer;
+			'str' - type is string; 'null' - type is null.
+			</para>
+			<para>
+			Function can be used from ANYROUTE.
+			</para>
+			<example>
+				<title><function>typeof()</function> usage</title>
+				<programlisting format="linespecific">
+...
+if (typeof("$var(foo)", "str")) {
+    xdbg("variable foo is a string\n");
+}
+...
+				</programlisting>
+			</example>
+		</section>
+		<section>
+			<title>
+				<function moreinfo="none">not_empty(pvar)</function>
+			</title>
+			<para>
+			Returns true if the pseudo-variables has the type string and
+			is not empty value.
+			</para>
+			<para>
+			Function can be used from all kinds of routes.
+			</para>
+			<example>
+				<title><function>not_empty()</function> usage</title>
+				<programlisting format="linespecific">
+...
+if (not_empty("$var(foo)")) {
+    append_hf("X-Foo: $var(foo)\r\n");
+}
+...
+				</programlisting>
+			</example>
+		</section>
+	</section>
+
+	<section>
+		<title><acronym>MI</acronym> Commands</title>
+		<section>
+			<title><function moreinfo="none">shv_set</function></title>
+			<para>
+				Set the value of a shared variable ($shv(name)).
+			</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_name_: shared variable name</para></listitem>
+			
+			<listitem><para>_type_: type of the value</para>
+			      <itemizedlist>
+	    <listitem><para> <quote>int</quote>: integer value </para></listitem> 
+		<listitem><para> <quote>str</quote>: string value </para></listitem>	
+				  </itemizedlist>
+			</listitem>	  
+
+			<listitem><para>_value_: value to be set</para></listitem>
+		</itemizedlist>
+		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:shv_set:_reply_fifo_file_
+		_name_
+		_type_
+		_value_
+		_empty_line_
+		</programlisting>
+			<example>
+			<title><function moreinfo="none">shv_set</function> usage</title>
+			<programlisting format="linespecific">
+...
+$ &ctltool; fifo shv_set debug int 0
+...
+</programlisting>
+			</example>
+		</section>
+		<section>
+			<title><function moreinfo="none">shv_get</function></title>
+			<para>
+				Get the value of a shared variable ($shv(name)).
+			</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_name_: shared variable name. If this parameter
+			is missing, all shared variables are returned.</para></listitem>
+		</itemizedlist>
+		<para>
+		MI FIFO Command Format:
+		</para>
+        <programlisting  format="linespecific">
+		:shv_get:_reply_fifo_file_
+		_name_
+		_empty_line_
+		</programlisting>
+			<example>
+			<title><function moreinfo="none">shv_get</function> usage</title>
+			<programlisting format="linespecific">
+...
+$ &ctltool; fifo shv_get debug
+$ &ctltool; fifo shv_get
+...
+</programlisting>
+			</example>
+		</section>
+	</section>
+	<section>
+        <title>RPC Commands</title>
+		<section>
+			<title><function moreinfo="none">pv.shvSet</function></title>
+			<para>
+				Set the value of a shared variable ($shv(name)).
+			</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_name_: shared variable name</para></listitem>
+			
+			<listitem><para>_type_: type of the value</para>
+			      <itemizedlist>
+	    <listitem><para> <quote>int</quote>: integer value </para></listitem> 
+		<listitem><para> <quote>str</quote>: string value </para></listitem>	
+				  </itemizedlist>
+			</listitem>	  
+
+			<listitem><para>_value_: value to be set</para></listitem>
+		</itemizedlist>
+		</section>
+		<section>
+			<title><function moreinfo="none">pv.shvGet</function></title>
+			<para>
+				Get the value of a shared variable ($shv(name)).
+			</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_name_: shared variable name</para></listitem>
+		</itemizedlist>
+		<para>If no name is given, all shared variables are listed</para>
+		</section>
+	</section>
+	
+</chapter>
+

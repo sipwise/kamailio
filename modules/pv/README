@@ -1,0 +1,335 @@
+Pseudo-Variables Module
+
+Daniel-Constantin Mierla
+
+   asipto.com
+   <daniel@asipto.com>
+
+Edited by
+
+Daniel-Constantin Mierla
+
+   <daniel@asipto.com>
+
+   Copyright © 2008-2011 Daniel-Constantin Mierla (asipto.com)
+
+   Copyright © 2011 Juha Heinanen
+
+   Copyright © 2013 Olle E. Johansson, Edvina AB
+     __________________________________________________________________
+
+   Table of Contents
+
+   1. Admin Guide
+
+        1. Overview
+        2. Dependencies
+
+              2.1. Kamailio Modules
+              2.2. External Libraries or Applications
+
+        3. Parameters
+
+              3.1. shvset (string)
+              3.2. varset (string)
+              3.3. avp_aliases (string)
+
+        4. Functions
+
+              4.1. pv_isset(pvar)
+              4.2. pv_unset(pvar)
+              4.3. is_int(pvar)
+              4.4. typeof(pvar, vtype)
+              4.5. not_empty(pvar)
+
+        5. MI Commands
+
+              5.1. shv_set
+              5.2. shv_get
+
+        6. RPC Commands
+
+              6.1. pv.shvSet
+              6.2. pv.shvGet
+
+   List of Examples
+
+   1.1. shvset parameter usage
+   1.2. varset parameter usage
+   1.3. avp_aliases parameter usage
+   1.4. pv_isset usage
+   1.5. pv_unset usage
+   1.6. is_int() usage
+   1.7. typeof() usage
+   1.8. not_empty() usage
+   1.9. shv_set usage
+   1.10. shv_get usage
+
+Chapter 1. Admin Guide
+
+   Table of Contents
+
+   1. Overview
+   2. Dependencies
+
+        2.1. Kamailio Modules
+        2.2. External Libraries or Applications
+
+   3. Parameters
+
+        3.1. shvset (string)
+        3.2. varset (string)
+        3.3. avp_aliases (string)
+
+   4. Functions
+
+        4.1. pv_isset(pvar)
+        4.2. pv_unset(pvar)
+        4.3. is_int(pvar)
+        4.4. typeof(pvar, vtype)
+        4.5. not_empty(pvar)
+
+   5. MI Commands
+
+        5.1. shv_set
+        5.2. shv_get
+
+   6. RPC Commands
+
+        6.1. pv.shvSet
+        6.2. pv.shvGet
+
+1. Overview
+
+   This module collects the core pseudo-variables that can be used in
+   configuration file. They are listed in Dokuwiki:
+   http://www.kamailio.org/wiki/, in Pseudo-Variables section
+
+2. Dependencies
+
+   2.1. Kamailio Modules
+   2.2. External Libraries or Applications
+
+2.1. Kamailio Modules
+
+   The following modules must be loaded before this module:
+     * No dependencies on other Kamailio modules.
+
+2.2. External Libraries or Applications
+
+   The following libraries or applications must be installed before
+   running Kamailio with this module loaded:
+     * None.
+
+3. Parameters
+
+   3.1. shvset (string)
+   3.2. varset (string)
+   3.3. avp_aliases (string)
+
+3.1. shvset (string)
+
+   Set the value of a shared variable ($shv(name)). The parameter can be
+   set many times.
+
+   The value of the parameter has the format: _name_ '=' _type_ ':'
+   _value_
+     * _name_: shared variable name
+     * _type_: type of the value
+          + "i": integer value
+          + "s": string value
+     * _value_: value to be set
+
+   Default value is "NULL".
+
+   Example 1.1. shvset parameter usage
+...
+modparam("pv", "shvset", "debug=i:1")
+modparam("pv", "shvset", "pstngw=s:sip:10.10.10.10")
+...
+
+3.2. varset (string)
+
+   Set the value of a script variable ($var(name)). The parameter can be
+   set many times.
+
+   The value of the parameter has the format: _name_ '=' _type_ ':'
+   _value_
+     * _name_: shared variable name
+     * _type_: type of the value
+          + "i": integer value
+          + "s": string value
+     * _value_: value to be set
+
+   Default value is "NULL".
+
+   Example 1.2. varset parameter usage
+...
+modparam("pv", "varset", "init=i:1")
+modparam("pv", "varset", "gw=s:sip:11.11.11.11;transport=tcp")
+...
+
+3.3. avp_aliases (string)
+
+   Define aliases for PV AVP names.
+
+   Default value is NULL.
+
+   Example 1.3. avp_aliases parameter usage
+...
+modparam("pv","avp_aliases","email=s:email_addr;tmp=i:100")
+...
+
+4. Functions
+
+   4.1. pv_isset(pvar)
+   4.2. pv_unset(pvar)
+   4.3. is_int(pvar)
+   4.4. typeof(pvar, vtype)
+   4.5. not_empty(pvar)
+
+4.1. pv_isset(pvar)
+
+   Return true if a PV value is different than 'null'.
+
+   Meaning of the parameters is as follows:
+     * pvar - pvar identifier.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.4. pv_isset usage
+...
+if(pv_isset("$avp("s:x")"))
+{
+    ...
+}
+...
+
+4.2. pv_unset(pvar)
+
+   Unset the value of the PV (e.g., delete AVP, set to null).
+
+   Meaning of the parameters is as follows:
+     * pvar - pvar identifier.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.5. pv_unset usage
+...
+pv_unset("$avp("s:x")");
+...
+
+4.3. is_int(pvar)
+
+   Function checks if pvar argument contains integer value and returns 1
+   if it does and -1 otherwise.
+
+   Function can be used from all kinds of routes.
+
+   Example 1.6. is_int() usage
+...
+if (is_int("$var(foo)")) {
+    xlog("L_INFO", "variable foo contains integer value\n");
+}
+...
+
+4.4. typeof(pvar, vtype)
+
+   Returns true if the type of pseudo-variable matches the second
+   parameter. The second parameter can be: 'int' - type is integer; 'str'
+   - type is string; 'null' - type is null.
+
+   Function can be used from ANYROUTE.
+
+   Example 1.7. typeof() usage
+...
+if (typeof("$var(foo)", "str")) {
+    xdbg("variable foo is a string\n");
+}
+...
+
+4.5. not_empty(pvar)
+
+   Returns true if the pseudo-variables has the type string and is not
+   empty value.
+
+   Function can be used from all kinds of routes.
+
+   Example 1.8. not_empty() usage
+...
+if (not_empty("$var(foo)")) {
+    append_hf("X-Foo: $var(foo)\r\n");
+}
+...
+
+5. MI Commands
+
+   5.1. shv_set
+   5.2. shv_get
+
+5.1. shv_set
+
+   Set the value of a shared variable ($shv(name)).
+
+   Parameters:
+     * _name_: shared variable name
+     * _type_: type of the value
+          + "int": integer value
+          + "str": string value
+     * _value_: value to be set
+
+   MI FIFO Command Format:
+                :shv_set:_reply_fifo_file_
+                _name_
+                _type_
+                _value_
+                _empty_line_
+
+   Example 1.9. shv_set usage
+...
+$ kamctl fifo shv_set debug int 0
+...
+
+5.2. shv_get
+
+   Get the value of a shared variable ($shv(name)).
+
+   Parameters:
+     * _name_: shared variable name. If this parameter is missing, all
+       shared variables are returned.
+
+   MI FIFO Command Format:
+                :shv_get:_reply_fifo_file_
+                _name_
+                _empty_line_
+
+   Example 1.10. shv_get usage
+...
+$ kamctl fifo shv_get debug
+$ kamctl fifo shv_get
+...
+
+6. RPC Commands
+
+   6.1. pv.shvSet
+   6.2. pv.shvGet
+
+6.1. pv.shvSet
+
+   Set the value of a shared variable ($shv(name)).
+
+   Parameters:
+     * _name_: shared variable name
+     * _type_: type of the value
+          + "int": integer value
+          + "str": string value
+     * _value_: value to be set
+
+6.2. pv.shvGet
+
+   Get the value of a shared variable ($shv(name)).
+
+   Parameters:
+     * _name_: shared variable name
+
+   If no name is given, all shared variables are listed

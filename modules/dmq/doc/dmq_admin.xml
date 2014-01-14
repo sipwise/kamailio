@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
+<!-- Module User's Guide -->
+
+<chapter>
+	<title>&adminguide;</title>
+	
+	<section>
+	<title>Overview</title>
+	<para>
+	The DMQ module implements a distributed message queue on top of Kamailio in order to enable the 
+	passing/replication of data between multiple instances. The DMQ "nodes" within the system are grouped 
+	in a logical entity called the DMQ "bus" and are able to communicate with each other by 
+	sending/receiving messages (either by broadcast or directly to a specific node). The system 
+	transparently deals with node discovery, consistency, retransmissions, etc.
+	</para>
+	<para>
+	Other entities ("peers") are then able to utlize the DMQ bus to pass messages between themselves. 
+	Peers are grouped by name in order to ensure the correct messages are passed to the relevant peers. 
+	This grouping of peers can be compared to a topic in a typical pub/sub system.
+	</para>
+	
+	</section>
+
+	<section>
+	<title>Dependencies</title>
+	<section>
+		<title>&kamailio; Modules</title>
+		<para>
+		The following modules must be loaded before this module:
+			<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>sl</emphasis>.
+			</para>
+			</listitem>
+			<listitem>
+			<para>
+				<emphasis>tm</emphasis>.
+			</para>
+			</listitem>
+			</itemizedlist>
+		</para>
+	</section>
+
+	<section>
+		<title>External Libraries or Applications</title>
+		<itemizedlist>
+			<listitem>
+			<para>
+				<emphasis>
+				The DMQ module itself has no external dependencies. However, each peer will need 
+				to use its own (de)serialization mechanism. Some examples are libtpl, protobuf.
+				</emphasis>.
+			</para>
+			</listitem>
+		</itemizedlist>
+	</section>
+	</section>
+	
+	<section>
+	<title>Parameters</title>
+	<section id="dmq.p.server_address">
+		<title><varname>server_address</varname>(str)</title>
+		<para>
+		The local server address. This is the interface over which the DMQ engine will send/receive messages.
+		</para>
+		<para>
+		<emphasis>Default value is <quote>NULL</quote>.</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>server_address</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dmq", "server_address", "sip:10.0.0.20:5060")
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="dmq.p.notification_address">
+		<title><varname>notification_address</varname>(str)</title>
+		<para>
+		The address of another DMQ node from which the local node should retrieve initial information about all other nodes.
+		</para>
+		<para>
+		<emphasis>Default value is <quote>NULL</quote>.</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>notification_address</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dmq", "notification_address", "sip:10.0.0.21:5060")
+...
+</programlisting>
+		</example>
+	</section>
+        <section id="dmq.p.num_workers">
+                <title><varname>num_workers</varname>(int)</title>
+                <para>
+                The number of worker threads for sending/receiving messages.
+                </para>
+                <para>
+                <emphasis>Default value is <quote>2</quote>.</emphasis>
+                </para>
+                <example>
+                <title>Set <varname>num_workers</varname> parameter</title>
+                <programlisting format="linespecific">
+...
+modparam("dmq", "num_threads", 4)
+...
+</programlisting>
+                </example>
+        </section>
+        <section id="dmq.p.ping_interval">
+                <title><varname>ping_interval</varname>(int)</title>
+                <para>
+                The number of seconds between node pings (for checking status of other nodes).
+                </para>
+                <para>
+                <emphasis>Minimum value is <quote>60</quote> (default).</emphasis>
+                </para>
+                <example>
+                <title>Set <varname>ping_interval</varname> parameter</title>
+                <programlisting format="linespecific">
+...
+modparam("dmq", "ping_interval", 90)
+...
+</programlisting>
+                </example>
+        </section>
+	</section>
+
+	<section>
+        <title>Functions</title>
+        <section id="dmq.f.dmq_handle_message">
+                <title>
+                <function moreinfo="none">dmq_handle_message()</function>
+                </title>
+                <para>
+                Handles a DMQ message by passing it to the appropriate local peer (module). 
+		The peer is identified by the user part of the To header.
+                </para>
+                <para>
+                This function can be used from REQUEST_ROUTE.
+                </para>
+
+                <example>
+                <title><function>dmq_handle_message</function> usage</title>
+                <programlisting format="linespecific">
+...
+        if(is_method("KDMQ"))
+        {
+                dmq_handle_message();
+        }
+...
+</programlisting>
+                </example>
+        </section>
+        <section id="dmq.f.dmq_send_message">
+                <title>
+               	<function moreinfo="none">dmq_send_message(peer, node, body, content_type)</function>
+                </title>
+                <para>
+                Sends a DMQ message directly from config file.
+                </para>
+		<para>Meaning of parameters:</para>
+                <itemizedlist>
+	                <listitem>
+        	                <para>
+               	        	<emphasis>peer</emphasis> - name of peer that should handle the message.
+                        	</para>
+	                </listitem>
+        	        <listitem>
+                	        <para>
+                       		<emphasis>node</emphasis> - the node to which the message should be sent.
+	                        </para>
+        	        </listitem>
+                	<listitem>
+                        	<para>
+	                        <emphasis>body</emphasis> - the message body.
+	                        </para>
+	                </listitem>
+                	<listitem>
+                        	<para>
+	                        <emphasis>content_type</emphasis> - the MIME type of the message body.
+	                        </para>
+	                </listitem>
+		</itemizedlist>
+                <para>
+                This function can be used from any route.
+                </para>
+
+                <example>
+                <title><function>dmq_send_message</function> usage</title>
+                <programlisting format="linespecific">
+...
+	dmq_send_message("peer_name", "sip:10.0.0.21:5060", "Message body...", "text/plain");
+...
+</programlisting>
+                </example>
+        </section>
+	</section>
+
+</chapter>
+

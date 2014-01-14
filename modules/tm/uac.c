@@ -426,6 +426,9 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	}
 #endif
 
+	new_cell->uac[0].on_reply = new_cell->on_reply;
+	new_cell->uac[0].on_failure = new_cell->on_failure;
+
 	new_cell->method.s = buf;
 	new_cell->method.len = uac_r->method->len;
 
@@ -701,6 +704,12 @@ int req_within(uac_req_t *uac_r)
 		goto err;
 	}
 
+	if(uac_r->ssock!=NULL && uac_r->ssock->len>0
+			&& uac_r->dialog->send_sock==NULL) {
+		/* set local send socket */
+		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+	}
+
 	if ((uac_r->method->len == 3) && (!memcmp("ACK", uac_r->method->s, 3))) goto send;
 	if ((uac_r->method->len == 6) && (!memcmp("CANCEL", uac_r->method->s, 6))) goto send;
 	uac_r->dialog->loc_seq.value++; /* Increment CSeq */
@@ -741,6 +750,12 @@ int req_outside(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 	if (next_hop) uac_r->dialog->dst_uri = *next_hop;
 	w_calculate_hooks(uac_r->dialog);
 
+	if(uac_r->ssock!=NULL && uac_r->ssock->len>0
+			&& uac_r->dialog->send_sock==NULL) {
+		/* set local send socket */
+		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+	}
+
 	return t_uac(uac_r);
 
  err:
@@ -762,7 +777,10 @@ int request(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 
 	if (check_params(uac_r, to, from) < 0) goto err;
 
-	generate_callid(&callid);
+	if (uac_r->callid == NULL || uac_r->callid->len <= 0)
+	    generate_callid(&callid);
+	else
+	    callid = *uac_r->callid;
 	generate_fromtag(&fromtag, &callid);
 
 	if (new_dlg_uac(&callid, &fromtag, DEFAULT_CSEQ, from, to, &dialog) < 0) {
@@ -791,6 +809,13 @@ int request(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 	 * before freeing dialog here must be removed
 	 */
 	uac_r->dialog = dialog;
+
+	if(uac_r->ssock!=NULL && uac_r->ssock->len>0
+			&& uac_r->dialog->send_sock==NULL) {
+		/* set local send socket */
+		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+	}
+
 	res = t_uac(uac_r);
 	dialog->rem_target.s = 0;
 	dialog->dst_uri.s = 0;

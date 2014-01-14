@@ -195,8 +195,6 @@ DROP	"drop"
 EXIT	"exit"
 RETURN	"return"
 BREAK	"break"
-SEND	send
-SEND_TCP	send_tcp
 LOG		log
 ERROR	error
 ROUTE	route
@@ -236,7 +234,6 @@ PREFIX			"prefix"
 STRIP			"strip"
 STRIP_TAIL		"strip_tail"
 SET_USERPHONE		"userphone"
-APPEND_BRANCH	"append_branch"
 REMOVE_BRANCH	"remove_branch"
 CLEAR_BRANCHES	"clear_branches"
 IF				"if"
@@ -340,9 +337,11 @@ AVP_PREF	(([ft][rud]?)|g)\.
 DEBUG	debug
 FORK	fork
 FORK_DELAY	fork_delay
+MODINIT_DELAY	modinit_delay
 LOGSTDERROR	log_stderror
 LOGFACILITY	log_facility
 LOGNAME		log_name
+LOGCOLOR	log_color
 LISTEN		listen
 ADVERTISE	advertise|ADVERTISE
 ALIAS		alias
@@ -361,6 +360,7 @@ DNS_RETR_NO		dns_retr_no
 DNS_SERVERS_NO	dns_servers_no
 DNS_USE_SEARCH	dns_use_search_list
 DNS_SEARCH_FMATCH	dns_search_full_match
+DNS_NAPTR_IGNORE_RFC	dns_naptr_ignore_rfc
 /* dns cache */
 DNS_CACHE_INIT	dns_cache_init
 DNS_USE_CACHE	use_dns_cache
@@ -394,7 +394,6 @@ CHILDREN children
 SOCKET_WORKERS socket_workers
 CHECK_VIA	check_via
 PHONE2TEL	phone2tel
-SYN_BRANCH syn_branch
 MEMLOG		"memlog"|"mem_log"
 MEMDBG		"memdbg"|"mem_dbg"
 MEMSUM		"mem_summary"
@@ -455,25 +454,6 @@ TLS_SEND_TIMEOUT	"tls_send_timeout"
 DISABLE_SCTP	"disable_sctp"
 ENABLE_SCTP	"enable_sctp"
 SCTP_CHILDREN	"sctp_children"
-SCTP_SOCKET_RCVBUF	"sctp_socket_rcvbuf"|"sctp_socket_receive_buffer"
-SCTP_SOCKET_SNDBUF	"sctp_socket_sndbuf"|"sctp_socket_send_buffer"
-SCTP_AUTOCLOSE	"sctp_autoclose"
-SCTP_SEND_TTL	"sctp_send_ttl"
-SCTP_SEND_RETRIES	"sctp_send_retries"
-SCTP_ASSOC_TRACKING	"sctp_assoc_tracking"
-SCTP_ASSOC_REUSE	"sctp_assoc_reuse"
-SCTP_MAX_ASSOCS		"sctp_max_assocs"
-SCTP_SRTO_INITIAL	"sctp_srto_initial"
-SCTP_SRTO_MAX		"sctp_srto_max"
-SCTP_SRTO_MIN		"sctp_srto_min"
-SCTP_ASOCMAXRXT		"sctp_asocmaxrxt"
-SCTP_INIT_MAX_ATTEMPTS		"sctp_init_max_attempts"
-SCTP_INIT_MAX_TIMEO			"sctp_init_max_timeo"
-SCTP_HBINTERVAL				"sctp_hbinterval"
-SCTP_PATHMAXRXT				"sctp_pathmaxrxt"
-SCTP_SACK_DELAY				"sctp_sack_delay"
-SCTP_SACK_FREQ				"sctp_sack_freq"
-SCTP_MAX_BURST				"sctp_max_burst"
 
 ADVERTISED_ADDRESS	"advertised_address"
 ADVERTISED_PORT		"advertised_port"
@@ -497,12 +477,8 @@ KILL_TIMEOUT	"exit_timeout"|"ser_kill_timeout"
 MAX_WLOOPS		"max_while_loops"
 PVBUFSIZE		"pv_buffer_size"
 PVBUFSLOTS		"pv_buffer_slots"
-HTTP_REPLY_HACK		"http_reply_hack"
-
-/* stun config variables */
-STUN_REFRESH_INTERVAL "stun_refresh_interval"
-STUN_ALLOW_STUN "stun_allow_stun"
-STUN_ALLOW_FP "stun_allow_fp"
+HTTP_REPLY_PARSE		"http_reply_hack"|"http_reply_parse"
+VERSION_TABLE_CFG		"version_table"
 
 SERVER_ID     "server_id"
 
@@ -525,6 +501,8 @@ UDP			"udp"|"UDP"
 TCP			"tcp"|"TCP"
 TLS			"tls"|"TLS"
 SCTP		"sctp"|"SCTP"
+WS		"ws"|"WS"
+WSS		"wss"|"WSS"
 INET		"inet"|"INET"
 INET6		"inet6"|"INET6"
 SSLv23			"sslv23"|"SSLv23"|"SSLV23"
@@ -560,10 +538,10 @@ COLON		":"
 STAR		\*
 DOT			\.
 CR			\n
-EVENT_RT_NAME [a-zA-Z][0-9a-zA-Z-]*":"[a-zA-Z][0-9a-zA-Z-]*
+EVENT_RT_NAME [a-zA-Z][0-9a-zA-Z-]*(":"[a-zA-Z][0-9a-zA-Z-]*)+
 
 
-COM_LINE	#
+COM_LINE	"#"|"//"
 COM_START	"/\*"
 COM_END		"\*/"
 
@@ -604,8 +582,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{EXIT}	{ count(); yylval.strval=yytext; return EXIT; }
 <INITIAL>{RETURN}	{ count(); yylval.strval=yytext; return RETURN; }
 <INITIAL>{BREAK}	{ count(); yylval.strval=yytext; return BREAK; }
-<INITIAL>{SEND}	{ count(); yylval.strval=yytext; return SEND; }
-<INITIAL>{SEND_TCP}	{ count(); yylval.strval=yytext; return SEND_TCP; }
 <INITIAL>{LOG}	{ count(); yylval.strval=yytext; return LOG_TOK; }
 <INITIAL>{ERROR}	{ count(); yylval.strval=yytext; return ERROR; }
 <INITIAL>{SETFLAG}	{ count(); yylval.strval=yytext; return SETFLAG; }
@@ -639,8 +615,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{PREFIX}	{ count(); yylval.strval=yytext; return PREFIX; }
 <INITIAL>{STRIP}	{ count(); yylval.strval=yytext; return STRIP; }
 <INITIAL>{STRIP_TAIL}	{ count(); yylval.strval=yytext; return STRIP_TAIL; }
-<INITIAL>{APPEND_BRANCH}	{ count(); yylval.strval=yytext;
-								return APPEND_BRANCH; }
 <INITIAL>{REMOVE_BRANCH}	{ count(); yylval.strval=yytext;
 								return REMOVE_BRANCH; }
 <INITIAL>{CLEAR_BRANCHES}	{ count(); yylval.strval=yytext;
@@ -715,9 +689,11 @@ IMPORTFILE      "import_file"
 <INITIAL>{DEBUG}	{ count(); yylval.strval=yytext; return DEBUG_V; }
 <INITIAL>{FORK}		{ count(); yylval.strval=yytext; return FORK; }
 <INITIAL>{FORK_DELAY}	{ count(); yylval.strval=yytext; return FORK_DELAY; }
+<INITIAL>{MODINIT_DELAY}	{ count(); yylval.strval=yytext; return MODINIT_DELAY; }
 <INITIAL>{LOGSTDERROR}	{ yylval.strval=yytext; return LOGSTDERROR; }
 <INITIAL>{LOGFACILITY}	{ yylval.strval=yytext; return LOGFACILITY; }
 <INITIAL>{LOGNAME}	{ yylval.strval=yytext; return LOGNAME; }
+<INITIAL>{LOGCOLOR}	{ yylval.strval=yytext; return LOGCOLOR; }
 <INITIAL>{LISTEN}	{ count(); yylval.strval=yytext; return LISTEN; }
 <INITIAL>{ADVERTISE}	{ count(); yylval.strval=yytext; return ADVERTISE; }
 <INITIAL>{ALIAS}	{ count(); yylval.strval=yytext; return ALIAS; }
@@ -749,6 +725,8 @@ IMPORTFILE      "import_file"
 								return DNS_USE_SEARCH; }
 <INITIAL>{DNS_SEARCH_FMATCH}	{ count(); yylval.strval=yytext;
 								return DNS_SEARCH_FMATCH; }
+<INITIAL>{DNS_NAPTR_IGNORE_RFC}	{ count(); yylval.strval=yytext;
+								return DNS_NAPTR_IGNORE_RFC; }
 <INITIAL>{DNS_CACHE_INIT}	{ count(); yylval.strval=yytext;
 								return DNS_CACHE_INIT; }
 <INITIAL>{DNS_USE_CACHE}	{ count(); yylval.strval=yytext;
@@ -797,7 +775,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{SOCKET_WORKERS}	{ count(); yylval.strval=yytext; return SOCKET_WORKERS; }
 <INITIAL>{CHECK_VIA}	{ count(); yylval.strval=yytext; return CHECK_VIA; }
 <INITIAL>{PHONE2TEL}	{ count(); yylval.strval=yytext; return PHONE2TEL; }
-<INITIAL>{SYN_BRANCH}	{ count(); yylval.strval=yytext; return SYN_BRANCH; }
 <INITIAL>{MEMLOG}	{ count(); yylval.strval=yytext; return MEMLOG; }
 <INITIAL>{MEMDBG}	{ count(); yylval.strval=yytext; return MEMDBG; }
 <INITIAL>{MEMSUM}	{ count(); yylval.strval=yytext; return MEMSUM; }
@@ -888,44 +865,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{ENABLE_SCTP}	{ count(); yylval.strval=yytext; return ENABLE_SCTP;}
 <INITIAL>{SCTP_CHILDREN}	{ count(); yylval.strval=yytext;
 										return SCTP_CHILDREN; }
-<INITIAL>{SCTP_SOCKET_RCVBUF}	{ count(); yylval.strval=yytext;
-										return SCTP_SOCKET_RCVBUF; }
-<INITIAL>{SCTP_SOCKET_SNDBUF}	{ count(); yylval.strval=yytext;
-										return SCTP_SOCKET_SNDBUF; }
-<INITIAL>{SCTP_AUTOCLOSE}	{ count(); yylval.strval=yytext;
-										return SCTP_AUTOCLOSE; }
-<INITIAL>{SCTP_SEND_TTL}	{ count(); yylval.strval=yytext;
-										return SCTP_SEND_TTL; }
-<INITIAL>{SCTP_SEND_RETRIES}	{ count(); yylval.strval=yytext;
-										return SCTP_SEND_RETRIES; }
-<INITIAL>{SCTP_ASSOC_TRACKING}	{ count(); yylval.strval=yytext;
-										return SCTP_ASSOC_TRACKING; }
-<INITIAL>{SCTP_ASSOC_REUSE}		{ count(); yylval.strval=yytext;
-										return SCTP_ASSOC_REUSE; }
-<INITIAL>{SCTP_MAX_ASSOCS}		{ count(); yylval.strval=yytext;
-										return SCTP_MAX_ASSOCS; }
-<INITIAL>{SCTP_SRTO_INITIAL}	{ count(); yylval.strval=yytext;
-										return SCTP_SRTO_INITIAL; }
-<INITIAL>{SCTP_SRTO_MAX}	{ count(); yylval.strval=yytext;
-										return SCTP_SRTO_MAX; }
-<INITIAL>{SCTP_SRTO_MIN}	{ count(); yylval.strval=yytext;
-										return SCTP_SRTO_MIN; }
-<INITIAL>{SCTP_ASOCMAXRXT}	{ count(); yylval.strval=yytext;
-										return SCTP_ASOCMAXRXT; }
-<INITIAL>{SCTP_INIT_MAX_ATTEMPTS}	{ count(); yylval.strval=yytext;
-										return SCTP_INIT_MAX_ATTEMPTS; }
-<INITIAL>{SCTP_INIT_MAX_TIMEO}	{ count(); yylval.strval=yytext;
-										return SCTP_INIT_MAX_TIMEO; }
-<INITIAL>{SCTP_HBINTERVAL}	{ count(); yylval.strval=yytext;
-										return SCTP_HBINTERVAL; }
-<INITIAL>{SCTP_PATHMAXRXT}	{ count(); yylval.strval=yytext;
-										return SCTP_PATHMAXRXT; }
-<INITIAL>{SCTP_SACK_DELAY}	{ count(); yylval.strval=yytext;
-										return SCTP_SACK_DELAY; }
-<INITIAL>{SCTP_SACK_FREQ}	{ count(); yylval.strval=yytext;
-										return SCTP_SACK_FREQ; }
-<INITIAL>{SCTP_MAX_BURST}	{ count(); yylval.strval=yytext;
-										return SCTP_MAX_BURST; }
 <INITIAL>{SERVER_SIGNATURE}	{ count(); yylval.strval=yytext; return SERVER_SIGNATURE; }
 <INITIAL>{SERVER_HEADER}	{ count(); yylval.strval=yytext; return SERVER_HEADER; }
 <INITIAL>{USER_AGENT_HEADER}	{ count(); yylval.strval=yytext; return USER_AGENT_HEADER; }
@@ -974,8 +913,9 @@ IMPORTFILE      "import_file"
 									return PVBUFSIZE; }
 <INITIAL>{PVBUFSLOTS}			{	count(); yylval.strval=yytext;
 									return PVBUFSLOTS; }
-<INITIAL>{HTTP_REPLY_HACK}		{	count(); yylval.strval=yytext;
-									return HTTP_REPLY_HACK; }
+<INITIAL>{HTTP_REPLY_PARSE}		{	count(); yylval.strval=yytext;
+									return HTTP_REPLY_PARSE; }
+<INITIAL>{VERSION_TABLE_CFG}  { count(); yylval.strval=yytext; return VERSION_TABLE_CFG;}
 <INITIAL>{SERVER_ID}  { count(); yylval.strval=yytext; return SERVER_ID;}
 <INITIAL>{LATENCY_LOG}  { count(); yylval.strval=yytext; return LATENCY_LOG;}
 <INITIAL>{MSG_TIME}  { count(); yylval.strval=yytext; return MSG_TIME;}
@@ -985,10 +925,6 @@ IMPORTFILE      "import_file"
 <INITIAL>{LOADMODULE}	{ count(); yylval.strval=yytext; return LOADMODULE; }
 <INITIAL>{LOADPATH}		{ count(); yylval.strval=yytext; return LOADPATH; }
 <INITIAL>{MODPARAM}     { count(); yylval.strval=yytext; return MODPARAM; }
-
-<INITIAL>{STUN_REFRESH_INTERVAL} { count(); yylval.strval=yytext; return STUN_REFRESH_INTERVAL;}
-<INITIAL>{STUN_ALLOW_STUN} { count(); yylval.strval=yytext; return STUN_ALLOW_STUN;}
-<INITIAL>{STUN_ALLOW_FP} { count(); yylval.strval=yytext; return STUN_ALLOW_FP;}
 
 <INITIAL>{EQUAL}	{ count(); return EQUAL; }
 <INITIAL>{ADDEQ}          { count(); return ADDEQ; }
@@ -1163,14 +1099,12 @@ IMPORTFILE      "import_file"
 <INITIAL>{UDP}			{ count(); return UDP; }
 <INITIAL>{TLS}			{ count(); return TLS; }
 <INITIAL>{SCTP}			{ count(); return SCTP; }
+<INITIAL>{WS}			{ count(); return WS; }
+<INITIAL>{WSS}			{ count(); return WSS; }
 <INITIAL>{INET}			{ count(); yylval.intval=AF_INET;
 							yy_number_str=yytext; return NUMBER; }
 <INITIAL>{INET6}		{ count();
-						#ifdef USE_IPV6
-						  yylval.intval=AF_INET6;
-						#else
-						  yylval.intval=-1; /* no match*/
-						#endif
+						yylval.intval=AF_INET6;
 						yy_number_str=yytext;
 						return NUMBER; }
 <INITIAL>{SSLv23}		{ count(); yylval.strval=yytext; return SSLv23; }

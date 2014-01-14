@@ -5,5 +5,5 @@ RPC Exports for pike
 
 
  1. pike.top
-        pike.top doc.
+        pike.top Dump parts of the pike table
 

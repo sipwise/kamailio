@@ -6,7 +6,13 @@ Hendrik Scholz
 
 Edited by
 
+Ovidiu Sas
+
+Edited by
+
 Daniel-Constantin Mierla
+
+   Copyright © 2013 VoIPEmbedded Inc.
 
    Copyright © 2010 Asipto.com
 
@@ -23,7 +29,7 @@ Daniel-Constantin Mierla
               2.1. Kamailio Modules
               2.2. External Libraries or Applications
 
-        3. Exported Parameters
+        3. Parameters
 
               3.1. db_url (string)
               3.2. plp_table_name (string)
@@ -34,12 +40,12 @@ Daniel-Constantin Mierla
               3.7. reply_code (integer)
               3.8. reply_reason (string)
 
-        4. Exported Functions
+        4. Functions
 
               4.1. pl_check(name)
               4.2. pl_drop([ [min ], max ])
 
-        5. Exported MI Functions
+        5. MI Commands
 
               5.1. pl_stats
               5.2. pl_set_pipe
@@ -47,6 +53,15 @@ Daniel-Constantin Mierla
               5.4. pl_set_pid
               5.5. pl_get_pid
               5.6. pl_push_load
+
+        6. RPC Commands
+
+              6.1. pl.stats
+              6.2. pl.set_pipe
+              6.3. pl.get_pipes
+              6.4. pl.set_pid
+              6.5. pl.get_pid
+              6.6. pl.push_load
 
    List of Examples
 
@@ -73,7 +88,7 @@ Chapter 1. Admin Guide
         2.1. Kamailio Modules
         2.2. External Libraries or Applications
 
-   3. Exported Parameters
+   3. Parameters
 
         3.1. db_url (string)
         3.2. plp_table_name (string)
@@ -84,12 +99,12 @@ Chapter 1. Admin Guide
         3.7. reply_code (integer)
         3.8. reply_reason (string)
 
-   4. Exported Functions
+   4. Functions
 
         4.1. pl_check(name)
         4.2. pl_drop([ [min ], max ])
 
-   5. Exported MI Functions
+   5. MI Commands
 
         5.1. pl_stats
         5.2. pl_set_pipe
@@ -97,6 +112,15 @@ Chapter 1. Admin Guide
         5.4. pl_set_pid
         5.5. pl_get_pid
         5.6. pl_push_load
+
+   6. RPC Commands
+
+        6.1. pl.stats
+        6.2. pl.set_pipe
+        6.3. pl.get_pipes
+        6.4. pl.set_pid
+        6.5. pl.get_pid
+        6.6. pl.push_load
 
 1. Overview
 
@@ -130,7 +154,7 @@ Chapter 1. Admin Guide
    running Kamailio with this module loaded:
      * None.
 
-3. Exported Parameters
+3. Parameters
 
    3.1. db_url (string)
    3.2. plp_table_name (string)
@@ -145,7 +169,7 @@ Chapter 1. Admin Guide
 
    URL of the database server to be used.
 
-   Default value is "mysql://openser:openserrw@localhost/openser".
+   Default value is "mysql://kamailio:kamailiorw@localhost/kamailio".
 
    Example 1.1. Set db_url parameter
 ...
@@ -209,7 +233,7 @@ modparam("pipelimit", "plp_algorithm_column", "name")
 
    Example 1.6. Set timer_interval parameter
 ...
-modparam("ratelimit", "timer_interval", 5)
+modparam("pipelimit", "timer_interval", 5)
 ...
 
 3.7. reply_code (integer)
@@ -220,13 +244,13 @@ modparam("ratelimit", "timer_interval", 5)
 
    Example 1.7. Set reply_code parameter
 ...
-modparam("ratelimit", "reply_code", 505)
+modparam("pipelimit", "reply_code", 505)
 ...
 
-   This value can be modified at runtime using sercmd
+   This value can be modified at runtime using kamcmd
 
    Example 1.8.  Set reply_code parameter at runtime
-sercmd cfg.set_now_int ratelimit reply_code 505
+kamcmd cfg.set_now_int pipelimit reply_code 505
 
 3.8. reply_reason (string)
 
@@ -236,15 +260,15 @@ sercmd cfg.set_now_int ratelimit reply_code 505
 
    Example 1.9. Set reply_reason parameter
 ...
-modparam("ratelimit", "reply_reason", "Limiting")
+modparam("pipelimit", "reply_reason", "Limiting")
 ...
 
-   This value can be modified at runtime using sercmd
+   This value can be modified at runtime using kamcmd
 
    Example 1.10.  Set reply_reason parameter at runtime
-sercmd cfg.set_now_string ratelimit reply_reason "Limiting"
+kamcmd cfg.set_now_string pipelimit reply_reason "Limiting"
 
-4. Exported Functions
+4. Functions
 
    4.1. pl_check(name)
    4.2. pl_drop([ [min ], max ])
@@ -254,8 +278,11 @@ sercmd cfg.set_now_string ratelimit reply_reason "Limiting"
    Check the current request against the 'name' pipe. The pipe name can be
    provided via a pseudo variabile.
 
-   The method will return an error code if the limit for the matched
-   algorithm is reached.
+   The method will return:
+     * -2 if no pipe was found
+     * -1 if pipe limit was reached
+     * 1 if pipe limit was NOT reached
+     * 2 if pipe has NOP algorithm
 
    Meaning of the parameters is as follows:
      * name - the pseudovariable holding the pipe name.
@@ -272,7 +299,27 @@ sercmd cfg.set_now_string ratelimit reply_reason "Limiting"
 ...
         # use pipe 'one' for the current method via PV
         $var(p) = "one";
-        if (!pl_check("$var(p)")) {
+        $var(check_result) = pl_check("$var(p)");
+        switch($var(check_result)) {
+        case -2:
+                xlog("L_ALERT","pl_check(\"$var(p)\") drop -pipe NOT found\n");
+                pl_drop();
+                exit;
+                break;
+        case -1:
+                xlog("L_ALERT","pl_check(\"$var(p)\") drop\n");
+                pl_drop();
+                exit;
+                break;
+        case 1:
+                xlog("L_INFO", "pl_check(\"$var(p)\") pass\n");
+                break;
+        case 2:
+                xlog("L_ALERT","pl_check(\"$var(p)\") pass -NOP algorithm\n");
+                break;
+        default:
+                xlog("L_ERR","pl_check(\"$var(p)\") dropping \
+with unexpected retcode=$var(check_result)\n");
                 pl_drop();
                 exit;
         }
@@ -304,7 +351,7 @@ sercmd cfg.set_now_string ratelimit reply_reason "Limiting"
         }
 ...
 
-5. Exported MI Functions
+5. MI Commands
 
    5.1. pl_stats
    5.2. pl_set_pipe
@@ -315,7 +362,7 @@ sercmd cfg.set_now_string ratelimit reply_reason "Limiting"
 
 5.1. pl_stats
 
-   Lists the parameters and variabiles in the pipelimit module.
+   Lists the parameters and variables in the pipelimit module.
 
    Name: pl_stats
 
@@ -400,3 +447,88 @@ sercmd cfg.set_now_string ratelimit reply_reason "Limiting"
                 :pl_push_load:_reply_fifo_file_
                 0.85
                 _empty_line_
+
+6. RPC Commands
+
+   6.1. pl.stats
+   6.2. pl.set_pipe
+   6.3. pl.get_pipes
+   6.4. pl.set_pid
+   6.5. pl.get_pid
+   6.6. pl.push_load
+
+6.1. pl.stats
+
+   Lists the parameters and variabiles in the pipelimit module: pipe id,
+   pipe load and pipe couter.
+
+   Name: pl.stats
+
+   Parameters: none
+
+   RPC Command Format:
+        kamcmd pl.stats
+
+6.2. pl.set_pipe
+
+   Sets the pipe parameters for the given pipe id.
+
+   Name: pl.set_pipe
+
+   Parameters:
+     * pipe_id - pipe id.
+     * pipe_algorithm - the algorithm assigned to the given pipe id.
+     * pipe_limit - the limit assigned to the given pipe id.
+
+   RPC Command Format:
+        kamcmd pl.set_pipe 2 RED 10
+
+6.3. pl.get_pipes
+
+   Gets the list of in use pipes.
+
+   Name: pl.get_pipes
+
+   Parameters: none
+
+   RPC Command Format:
+        kamcmd pl.get_pipes
+
+6.4. pl.set_pid
+
+   Sets the PID Controller parameters for the Feedback Algorithm.
+
+   Name: pl.set_pid
+
+   Parameters:
+     * ki - the integral parameter.
+     * kp - the proportional parameter.
+     * kd - the derivative parameter.
+
+   RPC Command Format:
+        kamcmd pl.set_pid 0.5 0.5 0.5
+
+6.5. pl.get_pid
+
+   Gets the list of in use PID Controller parameters.
+
+   Name: pl.get_pid
+
+   Parameters: none
+
+   RPC Command Format:
+        kamcmd pl.get_pid
+
+6.6. pl.push_load
+
+   Force the value of the load parameter. This command is useful for
+   testing the Feedback algorithm.
+
+   Name: pl.push_load
+
+   Parameters:
+     * load - the forced value of load (it must be greater then 0.0 and
+       smaller then 1.0).
+
+   RPC Command Format:
+        kamcmd pl.push_load 0.85

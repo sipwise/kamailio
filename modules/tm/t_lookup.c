@@ -13,15 +13,8 @@
  * reply and both  of them are constructed by different software.
  * 
  * As for reply matching, we match based on branch value -- that is
- * faster too. There are two versions .. with SYNONYMs #define
- * enabled, the branch includes ordinal number of a transaction
- * in a synonym list in hash table and is somewhat faster but
- * not reboot-resilient. SYNONYMs turned off are little slower
- * but work across reboots as well.
- *
- * The branch parameter is formed as follows:
- * SYNONYMS  on: hash.synonym.branch
- * SYNONYMS off: hash.md5.branch
+ * faster too.
+ * The branch parameter is formed as follows: hash.md5.branch
  *
  * -jiri
  *
@@ -67,7 +60,7 @@
  * 2003-03-30  set_kr for requests only (jiri)
  * 2003-04-04  bug_fix: RESPONSE_IN callback not called for local
  *             UAC transactions (jiri)
- * 2003-04-07  new transactions inherit on_negative and on_relpy from script
+ * 2003-04-07  new transactions inherit on_failure and on_relpy from script
  *             variables on instantiation (jiri)
  * 2003-04-30  t_newtran clean up (jiri)
  * 2003-08-21  request lookups fixed to skip UAC transactions, 
@@ -453,9 +446,16 @@ static int matching_3261( struct sip_msg *p_msg, struct cell **trans,
 			continue;
 		}
 		/* now real tid matching occurs  for negative ACKs and any 
-	 	 * other requests */
+		 * other requests */
 		if (!via_matching(t_msg->via1 /* inv via */, via1 /* ack */ ))
 			continue;
+		/* check if call-id is still the same */
+		if (cfg_get(tm, tm_cfg, callid_matching) && !EQ_LEN(callid) && !EQ_STR(callid)) {
+			LOG(L_ERR, "matching transaction found but callids don't match (received: %.*s stored: %.*s)\n",
+			        p_msg->callid->body.len, p_msg->callid->body.s,
+			        t_msg->callid->body.len, t_msg->callid->body.s);
+			continue;
+		}
 		if (t_msg->REQ_METHOD==METHOD_CANCEL){
 			if ((p_msg->REQ_METHOD!=METHOD_CANCEL) && !is_ack){
 			/* found an existing cancel for the searched transaction */
@@ -885,16 +885,12 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 
 	char *loopi;
 	int loopl;
-	char *syni;
-	int synl;
 	
 	short is_cancel;
 
 	/* make compiler warnings happy */
 	loopi=0;
 	loopl=0;
-	syni=0;
-	synl=0;
 
 	/* split the branch into pieces: loop_detection_check(ignored),
 	 hash_table_id, synonym_id, branch_id */
@@ -921,25 +917,14 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 	hashi=p;
 	p=n+1;scan_space--;
 
-	if (!syn_branch) {
-		/* md5 value */
-		n=eat_token2_end( p, p+scan_space, BRANCH_SEPARATOR );
-		loopl = n-p;
-		scan_space-= loopl;
-		if (n==p || scan_space<2 || *n!=BRANCH_SEPARATOR) 
-			goto nomatch2;
-		loopi=p;
-		p=n+1; scan_space--;
-	} else {
-		/* synonym id */
-		n=eat_token2_end( p, p+scan_space, BRANCH_SEPARATOR);
-		synl=n-p;
-		scan_space-=synl;
-		if (!synl || scan_space<2 || *n!=BRANCH_SEPARATOR) 
-			goto nomatch2;
-		syni=p;
-		p=n+1;scan_space--;
-	}
+	/* md5 value */
+	n=eat_token2_end( p, p+scan_space, BRANCH_SEPARATOR );
+	loopl = n-p;
+	scan_space-= loopl;
+	if (n==p || scan_space<2 || *n!=BRANCH_SEPARATOR)
+		goto nomatch2;
+	loopi=p;
+	p=n+1; scan_space--;
 
 	/* branch id  -  should exceed the scan_space */
 	n=eat_token_end( p, p+scan_space );
@@ -952,8 +937,7 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 		||hash_index>=TABLE_ENTRIES
 		|| reverse_hex2int(branchi, branchl, &branch_id)<0
 		||branch_id>=MAX_BRANCHES
-		|| (syn_branch ? (reverse_hex2int(syni, synl, &entry_label))<0 
-			: loopl!=MD5_LEN ))
+		|| loopl!=MD5_LEN)
 	) {
 		DBG("DEBUG: t_reply_matching: poor reply labels %d label %d "
 			"branch %d\n", hash_index, entry_label, branch_id );
@@ -976,14 +960,8 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 	/* all the transactions from the entry are compared */
 	clist_foreach(hash_bucket, p_cell, next_c){
 		prefetch_loc_r(p_cell->next_c, 1);
-		/* first look if branch matches */
-		if (likely(syn_branch)) {
-			if (p_cell->label != entry_label) 
-				continue;
-		} else {
-			if ( memcmp(p_cell->md5, loopi,MD5_LEN)!=0)
+		if ( memcmp(p_cell->md5, loopi,MD5_LEN)!=0)
 					continue;
-		}
 
 		/* sanity check ... too high branch ? */
 		if (unlikely(branch_id>=p_cell->nr_of_outgoings))
@@ -1005,6 +983,15 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 				&& p_cell->uac[branch_id].local_cancel.buffer_len ))) 
 			continue;
 
+		if (cfg_get(tm, tm_cfg, callid_matching) && 
+		        (p_msg->callid->body.len != p_cell->uas.request->callid->body.len ||
+		         memcmp(p_msg->callid->body.s, p_cell->uas.request->callid->body.s, p_msg->callid->body.len) != 0)
+		) {
+			LOG(L_ERR, "matching transaction found but callids don't match (received: %.*s stored: %.*s)\n",
+		        p_msg->callid->body.len, p_msg->callid->body.s,
+		        p_cell->uas.request->callid->body.len, p_cell->uas.request->callid->body.s);
+			continue;
+		}
 
 		/* we passed all disqualifying factors .... the transaction has been
 		   matched !
@@ -1014,33 +1001,38 @@ int t_reply_matching( struct sip_msg *p_msg , int *p_branch )
 		REF_UNSAFE( T );
 		UNLOCK_HASH(hash_index);
 		DBG("DEBUG: t_reply_matching: reply matched (T=%p)!\n",T);
-		/* if this is a 200 for INVITE, we will wish to store to-tags to be
-		 * able to distinguish retransmissions later and not to call
- 		 * TMCB_RESPONSE_OUT uselessly; we do it only if callbacks are
-		 * enabled -- except callback customers, nobody cares about 
-		 * retransmissions of multiple 200/INV or ACK/200s
-		 */
-		if (unlikely( is_invite(p_cell) && p_msg->REPLY_STATUS>=200 
-			&& p_msg->REPLY_STATUS<300 
-			&& ((!is_local(p_cell) &&
-				has_tran_tmcbs(p_cell, 
-					TMCB_RESPONSE_OUT|TMCB_RESPONSE_READY
-					|TMCB_E2EACK_IN|TMCB_E2EACK_RETR_IN) )
-			|| (is_local(p_cell)&&has_tran_tmcbs(p_cell, TMCB_LOCAL_COMPLETED))
-		)) ) {
-			if (parse_headers(p_msg, HDR_TO_F, 0)==-1) {
-				LOG(L_ERR, "ERROR: t_reply_matching: to parsing failed\n");
+		if(likely(!(p_msg->msg_flags&FL_TM_RPL_MATCHED))) {
+			/* if this is a 200 for INVITE, we will wish to store to-tags to be
+			 * able to distinguish retransmissions later and not to call
+			 * TMCB_RESPONSE_OUT uselessly; we do it only if callbacks are
+			 * enabled -- except callback customers, nobody cares about
+			 * retransmissions of multiple 200/INV or ACK/200s
+			 */
+			if (unlikely( is_invite(p_cell) && p_msg->REPLY_STATUS>=200
+				&& p_msg->REPLY_STATUS<300
+				&& ((!is_local(p_cell) &&
+					has_tran_tmcbs(p_cell,
+						TMCB_RESPONSE_OUT|TMCB_RESPONSE_READY
+						|TMCB_E2EACK_IN|TMCB_E2EACK_RETR_IN) )
+				|| (is_local(p_cell)&&has_tran_tmcbs(p_cell, TMCB_LOCAL_COMPLETED))
+			)) ) {
+				if (parse_headers(p_msg, HDR_TO_F, 0)==-1) {
+					LOG(L_ERR, "ERROR: t_reply_matching: to parsing failed\n");
+				}
 			}
-		}
-		if (unlikely(has_tran_tmcbs(T, TMCB_RESPONSE_IN |
-										TMCB_LOCAL_RESPONSE_IN))){
-			if (!is_local(p_cell)) {
-				run_trans_callbacks( TMCB_RESPONSE_IN, T, T->uas.request,
-										p_msg, p_msg->REPLY_STATUS);
-			}else{
-				run_trans_callbacks( TMCB_LOCAL_RESPONSE_IN, T, T->uas.request,
-										p_msg, p_msg->REPLY_STATUS);
+			if (unlikely(has_tran_tmcbs(T, TMCB_RESPONSE_IN |
+											TMCB_LOCAL_RESPONSE_IN))){
+				if (!is_local(p_cell)) {
+					run_trans_callbacks( TMCB_RESPONSE_IN, T, T->uas.request,
+											p_msg, p_msg->REPLY_STATUS);
+				}else{
+					run_trans_callbacks( TMCB_LOCAL_RESPONSE_IN, T, T->uas.request,
+											p_msg, p_msg->REPLY_STATUS);
+				}
 			}
+			p_msg->msg_flags |= FL_TM_RPL_MATCHED;
+		} else {
+			DBG("reply in callbacks already done (T=%p)!\n", T);
 		}
 		return 1;
 	} /* for cycle */
@@ -1114,12 +1106,12 @@ int t_check_msg( struct sip_msg* p_msg , int *param_branch )
 								"completely parsed\n");
 					/* try to continue, via1 & cseq are checked below */
 				}
-			}else if ( parse_headers(p_msg, HDR_VIA1_F|HDR_CSEQ_F, 0 )==-1) {
+			}else if ( parse_headers(p_msg, HDR_VIA1_F|HDR_CSEQ_F|HDR_CALLID_F, 0 )==-1) {
 				LOG(L_ERR, "ERROR: reply cannot be parsed\n");
 				goto error;
 			}
-			if ((p_msg->via1==0) || (p_msg->cseq==0)){
-				LOG(L_ERR, "ERROR: reply doesn't have a via or cseq"
+			if ((p_msg->via1==0) || (p_msg->cseq==0) || (p_msg->callid==0)){
+				LOG(L_ERR, "ERROR: reply doesn't have a via, cseq or call-id"
 							" header\n");
 				goto error;
 			}
@@ -1269,7 +1261,8 @@ static inline void init_new_t(struct cell *new_cell, struct sip_msg *p_msg)
 		if (likely(lifetime==0))
 			lifetime=cfg_get(tm, tm_cfg, tm_max_noninv_lifetime);
 	}
-	new_cell->on_negative=get_on_negative();
+	new_cell->on_failure=get_on_failure();
+	new_cell->on_branch_failure=get_on_branch_failure();
 	new_cell->on_reply=get_on_reply();
 	new_cell->end_of_life=get_ticks_raw()+lifetime;;
 	new_cell->fr_timeout=(ticks_t)get_msgid_val(user_fr_timeout,
@@ -1954,6 +1947,7 @@ tm_ctx_t* tm_ctx_get(void)
 void tm_ctx_init(void)
 {
 	memset(&_tm_ctx, 0, sizeof(tm_ctx_t));
+	_tm_ctx.branch_index = T_BR_UNDEFINED;
 }
 
 void tm_ctx_set_branch_index(int v)

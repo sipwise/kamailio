@@ -91,7 +91,7 @@ MODULE_VERSION
  */
 #define LCR_RULE_TABLE_VERSION 2
 #define LCR_RULE_TARGET_TABLE_VERSION 1
-#define LCR_GW_TABLE_VERSION 2
+#define LCR_GW_TABLE_VERSION 3
 
 /* database defaults */
 
@@ -402,7 +402,7 @@ static void lcr_db_close(void)
  */
 static int mod_init(void)
 {
-    pv_spec_t avp_spec;
+    pv_spec_t *avp_spec;
     str s;
     unsigned short avp_flags;
     unsigned int i;
@@ -475,13 +475,13 @@ static int mod_init(void)
 
     if (gw_uri_avp_param && *gw_uri_avp_param) {
 	s.s = gw_uri_avp_param; s.len = strlen(s.s);
-	if (pv_parse_spec(&s, &avp_spec)==0
-	    || avp_spec.type!=PVT_AVP) {
+    avp_spec = pv_cache_get(&s);
+	if (avp_spec==NULL|| avp_spec->type!=PVT_AVP) {
 	    LM_ERR("malformed or non AVP definition <%s>\n", gw_uri_avp_param);
 	    return -1;
 	}
-	
-	if (pv_get_avp_name(0, &(avp_spec.pvp), &gw_uri_avp, &avp_flags) != 0) {
+
+	if (pv_get_avp_name(0, &(avp_spec->pvp), &gw_uri_avp, &avp_flags) != 0) {
 	    LM_ERR("invalid AVP definition <%s>\n", gw_uri_avp_param);
 	    return -1;
 	}
@@ -493,14 +493,14 @@ static int mod_init(void)
 
     if (ruri_user_avp_param && *ruri_user_avp_param) {
 	s.s = ruri_user_avp_param; s.len = strlen(s.s);
-	if (pv_parse_spec(&s, &avp_spec)==0
-	    || avp_spec.type!=PVT_AVP) {
+    avp_spec = pv_cache_get(&s);
+	if (avp_spec==NULL || avp_spec->type!=PVT_AVP) {
 	    LM_ERR("malformed or non AVP definition <%s>\n",
 		   ruri_user_avp_param);
 	    return -1;
 	}
-	
-	if (pv_get_avp_name(0, &(avp_spec.pvp), &ruri_user_avp, &avp_flags)
+
+	if (pv_get_avp_name(0, &(avp_spec->pvp), &ruri_user_avp, &avp_flags)
 	    != 0) {
 	    LM_ERR("invalid AVP definition <%s>\n", ruri_user_avp_param);
 	    return -1;
@@ -513,11 +513,12 @@ static int mod_init(void)
 
     if (tag_avp_param) {
 	s.s = tag_avp_param; s.len = strlen(s.s);
-	if ((pv_parse_spec(&s, &avp_spec)==0) || (avp_spec.type!=PVT_AVP)) {
+    avp_spec = pv_cache_get(&s);
+	if (avp_spec==NULL || (avp_spec->type!=PVT_AVP)) {
 	    LM_ERR("malformed or non AVP definition <%s>\n", tag_avp_param);
 	    return -1;
 	}
-	if (pv_get_avp_name(0, &(avp_spec.pvp), &tag_avp, &avp_flags) != 0) {
+	if (pv_get_avp_name(0, &(avp_spec->pvp), &tag_avp, &avp_flags) != 0) {
 	    LM_ERR("invalid AVP definition <%s>\n", tag_avp_param);
 	    return -1;
 	}
@@ -526,11 +527,12 @@ static int mod_init(void)
 
     if (flags_avp_param) {
 	s.s = flags_avp_param; s.len = strlen(s.s);
-	if ((pv_parse_spec(&s, &avp_spec)==0) || (avp_spec.type != PVT_AVP)) {
+    avp_spec = pv_cache_get(&s);
+	if (avp_spec==NULL || (avp_spec->type != PVT_AVP)) {
 	    LM_ERR("malformed or non AVP definition <%s>\n", flags_avp_param);
 	    return -1;
 	}
-	if (pv_get_avp_name(0, &(avp_spec.pvp), &flags_avp, &avp_flags) != 0) {
+	if (pv_get_avp_name(0, &(avp_spec->pvp), &flags_avp, &avp_flags) != 0) {
 	    LM_ERR("invalid AVP definition <%s>\n", flags_avp_param);
 	    return -1;
 	}
@@ -540,13 +542,13 @@ static int mod_init(void)
     if (defunct_capability_param > 0) {
 	if (defunct_gw_avp_param && *defunct_gw_avp_param) {
 	    s.s = defunct_gw_avp_param; s.len = strlen(s.s);
-	    if ((pv_parse_spec(&s, &avp_spec) == 0) ||
-		(avp_spec.type != PVT_AVP)) {
+        avp_spec = pv_cache_get(&s);
+	    if (avp_spec==NULL || (avp_spec->type != PVT_AVP)) {
 		LM_ERR("malformed or non AVP definition <%s>\n",
 		       defunct_gw_avp_param);
 		return -1;
 	    }
-	    if (pv_get_avp_name(0, &(avp_spec.pvp), &defunct_gw_avp,
+	    if (pv_get_avp_name(0, &(avp_spec->pvp), &defunct_gw_avp,
 				&avp_flags) != 0) {
 		LM_ERR("invalid AVP definition <%s>\n", defunct_gw_avp_param);
 		return -1;
@@ -558,13 +560,13 @@ static int mod_init(void)
 	}
 	if (lcr_id_avp_param && *lcr_id_avp_param) {
 	    s.s = lcr_id_avp_param; s.len = strlen(s.s);
-	    if ((pv_parse_spec(&s, &avp_spec) == 0) ||
-		(avp_spec.type != PVT_AVP)) {
+        avp_spec = pv_cache_get(&s);
+	    if (avp_spec==NULL || (avp_spec->type != PVT_AVP)) {
 		LM_ERR("malformed or non AVP definition <%s>\n",
 		       lcr_id_avp_param);
 		return -1;
 	    }
-	    if (pv_get_avp_name(0, &(avp_spec.pvp), &lcr_id_avp,
+	    if (pv_get_avp_name(0, &(avp_spec->pvp), &lcr_id_avp,
 				&avp_flags) != 0) {
 		LM_ERR("invalid AVP definition <%s>\n", lcr_id_avp_param);
 		return -1;
@@ -943,7 +945,8 @@ static int insert_gws(db1_res_t *res, struct gw_info *gws,
 		   i);
 	    return 0;
 	}
-	if (VAL_NULL(ROW_VALUES(row) + 1)) {
+	if (VAL_NULL(ROW_VALUES(row) + 1) ||
+	    (strlen((char *)VAL_STRING(ROW_VALUES(row) + 1)) == 0)) {
 	    ip_string.s = (char *)0;
 	    ip_addr.af = 0;
 	    ip_addr.len = 0;
@@ -955,12 +958,10 @@ static int insert_gws(db1_res_t *res, struct gw_info *gws,
 		/* 123.123.123.123 */
 		ip_addr = *ip_p;
 	    }
-#ifdef USE_IPV6
 	    else if ((ip_p = str2ip6(&ip_string))) {
 		/* fe80::123:4567:89ab:cdef and [fe80::123:4567:89ab:cdef] */
 		ip_addr = *ip_p;
 	    }
-#endif
 	    else if (inet_aton(ip_string.s, &in_addr) == 0) {
 		/* backwards compatibility for integer or hex notations */
 		ip_addr.u.addr32[0] = in_addr.s_addr;
@@ -1234,7 +1235,7 @@ int reload_tables()
 	request_uri_re = from_uri_re = 0;
     
 	do {
-	    LM_DBG("loading, cycle %d with <%d> rows", n++, RES_ROW_N(res));
+	    LM_DBG("loading, cycle %d with <%d> rows\n", n++, RES_ROW_N(res));
 	    for (i = 0; i < RES_ROW_N(res); i++) {
 
 		request_uri_re = from_uri_re = 0;
@@ -1446,7 +1447,7 @@ int reload_tables()
 
 	n = 0;
 	do {
-	    LM_DBG("loading, cycle %d with <%d> rows", n++, RES_ROW_N(res));
+	    LM_DBG("loading, cycle %d with <%d> rows\n", n++, RES_ROW_N(res));
 	    for (i = 0; i < RES_ROW_N(res); i++) {
 		row = RES_ROWS(res) + i;
 		if ((VAL_NULL(ROW_VALUES(row)) == 1) ||
@@ -1571,13 +1572,11 @@ inline int encode_avp_value(char *value, unsigned int gw_index, uri_type scheme,
 	string = int2str(ip_addr->u.addr32[0], &len);
 	append_str(at, string, len);
     }
-#ifdef USE_IPV6
     else if (ip_addr->af == AF_INET6 && !ip_addr_any(ip_addr)) {
 	append_chr(at, '[');
 	at += ip6tosbuf(ip_addr->u.addr, at, MAX_URI_LEN - (at - value));
 	append_chr(at, ']');
     }
-#endif
     append_chr(at, '|');
     /* hostname */
     append_str(at, hostname, hostname_len);
@@ -1672,10 +1671,8 @@ inline int decode_avp_value(char *value, unsigned int *gw_index, str *scheme,
     if (s.len > 0) {
 	if ((ip = str2ip(&s)) != NULL)
 	    *addr = *ip;
-#ifdef USE_IPV6
 	else if ((ip = str2ip6(&s)) != NULL)
 	    *addr = *ip;
-#endif
 	else {
 	    str2int(&s, &u);
 	    addr->af = AF_INET;
@@ -1739,6 +1736,10 @@ inline int decode_avp_value(char *value, unsigned int *gw_index, str *scheme,
 	transport->s = ";transport=sctp";
 	transport->len = 15;
 	break;
+    case PROTO_WS:
+    case PROTO_WSS:
+        LM_ERR("unsupported transport '%d'\n", u);
+	return 0;
     default:
 	LM_ERR("unknown transport '%d'\n", u);
 	return 0;
@@ -1893,7 +1894,7 @@ static int load_gws(struct sip_msg* _m, int argc, action_u_t argv[])
 	    if ((rule->from_uri_len != 0) &&
 		(pcre_exec(rule->from_uri_re, NULL, from_uri.s,
 			   from_uri.len, 0, 0, NULL, 0) < 0)) {
-		LM_DBG("from uri <%.*s> did not match to from regex <%.*s>",
+		LM_DBG("from uri <%.*s> did not match to from regex <%.*s>\n",
 		       from_uri.len, from_uri.s, rule->from_uri_len,
 		       rule->from_uri);
 		goto next;
@@ -1903,7 +1904,7 @@ static int load_gws(struct sip_msg* _m, int argc, action_u_t argv[])
 	    if ((rule->request_uri_len != 0) &&
 		(pcre_exec(rule->request_uri_re, NULL, request_uri->s,
 			   request_uri->len, 0, 0, NULL, 0) < 0)) {
-		LM_DBG("request uri <%.*s> did not match to request regex <%.*s>",
+		LM_DBG("request uri <%.*s> did not match to request regex <%.*s>\n",
 		       request_uri->len, request_uri->s, rule->request_uri_len,
 		       rule->request_uri);
 		goto next;
@@ -2279,7 +2280,7 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
 	delete_avp(defunct_gw_avp_type, defunct_gw_avp);
 	val.n = gw_index;
 	add_avp(defunct_gw_avp_type, defunct_gw_avp, val);
-	LM_DBG("added defunct_gw_avp <%u>", addr.u.addr32[0]);
+	LM_DBG("added defunct_gw_avp <%u>\n", addr.u.addr32[0]);
     }
     
     return 1;
@@ -2388,10 +2389,8 @@ static int from_gw_3(struct sip_msg* _m, char* _lcr_id, char* _addr,
     addr_str.len = strlen(_addr);
     if ((ip = str2ip(&addr_str)) != NULL)
 	src_addr = *ip;
-#ifdef USE_IPV6
     else if ((ip = str2ip6(&addr_str)) != NULL)
 	src_addr = *ip;
-#endif
     else {
 	LM_ERR("addr param value %s is not an IP address\n", _addr);
 	return -1;
@@ -2448,10 +2447,8 @@ static int from_any_gw_2(struct sip_msg* _m, char* _addr, char* _transport)
     addr_str.len = strlen(_addr);
     if ((ip = str2ip(&addr_str)) != NULL)
 	src_addr = *ip;
-#ifdef USE_IPV6
     else if ((ip = str2ip6(&addr_str)) != NULL)
 	src_addr = *ip;
-#endif
     else {
 	LM_ERR("addr param value %s is not an IP address\n", _addr);
 	return -1;
@@ -2544,10 +2541,8 @@ static int to_gw_1(struct sip_msg* _m, char* _lcr_id, char* _s2)
     }
     if ((ip = str2ip(&(_m->parsed_uri.host))) != NULL)
 	dst_addr = *ip;
-#ifdef USE_IPV6
     else if ((ip = str2ip6(&(_m->parsed_uri.host))) != NULL)
 	dst_addr = *ip;
-#endif
     else {
 	LM_DBG("request is not going to gw "
 	       "(Request-URI host is not an IP address)\n");
@@ -2587,10 +2582,8 @@ static int to_gw_3(struct sip_msg* _m, char* _lcr_id, char* _addr,
     addr_str.len = strlen(_addr);
     if ((ip = str2ip(&addr_str)) != NULL)
 	dst_addr = *ip;
-#ifdef USE_IPV6
     else if ((ip = str2ip(&addr_str)) != NULL)
 	dst_addr = *ip;
-#endif
     else {
 	LM_ERR("addr param value %s is not an IP address\n", _addr);
 	return -1;
@@ -2632,10 +2625,8 @@ static int to_any_gw_0(struct sip_msg* _m, char* _s1, char* _s2)
     }
     if ((ip = str2ip(&(_m->parsed_uri.host))) != NULL)
 	dst_addr = *ip;
-#ifdef USE_IPV6
     else if ((ip = str2ip6(&(_m->parsed_uri.host))) != NULL)
 	dst_addr = *ip;
-#endif
     else {
 	LM_DBG("request is not going to gw "
 	       "(Request-URI host is not an IP address)\n");
@@ -2670,10 +2661,8 @@ static int to_any_gw_2(struct sip_msg* _m, char* _addr, char* _transport)
     addr_str.len = strlen(_addr);
     if ((ip = str2ip(&addr_str)) != NULL)
 	dst_addr = *ip;
-#ifdef USE_IPV6
-    if ((ip = str2ip6(&addr_str)) != NULL)
+    else if ((ip = str2ip6(&addr_str)) != NULL)
 	dst_addr = *ip;
-#endif
     else {
 	LM_ERR("addr param value %s is not an IP address\n", _addr);
 	return -1;

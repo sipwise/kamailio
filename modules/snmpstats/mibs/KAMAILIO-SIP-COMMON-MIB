@@ -1,0 +1,858 @@
+-- ***********************************************************************
+--
+-- This MIB provides information related to the Kamailio SIP Router.
+-- 
+-- Copyright (c) The Internet Society (2006)
+-- Ammendments (c) Soma Networks, Inc. (2006)
+--
+-- All rights reserved.
+-- *****************************************************************
+
+
+
+KAMAILIO-SIP-COMMON-MIB DEFINITIONS ::= BEGIN
+
+   IMPORTS
+        MODULE-IDENTITY,
+        OBJECT-TYPE,
+        OBJECT-IDENTITY,
+        Counter32,
+        Gauge32,
+        TimeTicks,
+        Unsigned32
+             FROM SNMPv2-SMI
+
+        RowStatus
+             FROM SNMPv2-TC
+
+        MODULE-COMPLIANCE,
+        OBJECT-GROUP
+             FROM SNMPv2-CONF
+
+        SnmpAdminString
+             FROM SNMP-FRAMEWORK-MIB
+
+        KamailioSIPTransportProtocol,
+        KamailioSIPMethodIdentifier,
+        KamailioSIPEntityRole
+             FROM KAMAILIO-TC
+
+        kamailioModules, kamailioSIPCommonMIB
+             FROM KAMAILIO-REG-MIB
+
+        InetPortNumber, 
+        InetAddressType,
+        InetAddress
+             FROM INET-ADDRESS-MIB;
+
+   kamailioSIPCommonModule MODULE-IDENTITY
+        LAST-UPDATED "200603221200Z"
+        ORGANIZATION "Kamailio"
+        CONTACT-INFO
+                "http://www.kamailio.org"
+        DESCRIPTION
+             "Originally taken from the IETF Session Initiation Protocol 
+              Working Group (sip@ietf.org). The description is pulled from 
+              there:
+              
+              Session Initiation Protocol (SIP) Common MIB module.
+              This module defines objects which MAY be common to all
+              SIP entities.
+
+              SIP is an application-layer signalling protocol for
+              creating, modifying and terminating multimedia
+              sessions with one or more participants. These sessions
+              include Internet multimedia conferences and Internet
+              telephone calls.  SIP is defined in RFC 3261 (June
+
+              2002).
+
+              This MIB is defined for managing objects which are
+              common to SIP User Agents (UAs), Proxy, Redirect
+              and Registrar servers.  Objects specific to each of
+              these entities MAY be managed using entity specific
+              MIBs defined in other modules.
+
+              User Agent (UA): A logical entity that can act as both
+              a user agent client and user agent server.
+              User Agent Client (UAC): A logical entity that creates
+              a new request, and then uses the client
+              transaction state machinery to send it.  The role of UAC
+              lasts only for the duration of that transaction.  In
+              other words, if a piece of software initiates a
+              request, it acts as a UAC for the duration of that
+              transaction.  If it receives a request later, it
+              assumes the role of a user agent server for the
+              processing of that transaction.
+              User Agent Server (UAS): a logical entity that
+              generates a response to a SIP request.  The
+              response accepts, rejects, or redirects the request.
+              This role lasts only for the duration of that
+              transaction.  In other words, if a piece of software
+              responds to a request, it acts as a UAS for the
+              duration of that transaction.  If it generates a
+              request later, it assumes the role of a user
+              agent client for the processing of that
+              transaction.
+
+              Proxy, Proxy Server: An intermediary entity that acts
+              as both a server and a client for the purpose of making
+              requests on behalf of other clients.  A proxy server
+              primarily plays the role of routing, which means its
+              job is to ensure that a request is sent to another
+              entity 'closer' to the targeted user.
+              Proxies are also useful for enforcing policy.  A proxy
+               interprets, and, if necessary, rewrites specific parts
+               of a request message before forwarding it.
+
+              Redirect Server: A redirect server is a user agent
+              server that generates 3xx responses to requests it
+              receives, directing the client to contact an alternate
+              set of URIs.
+
+              Registrar: A registrar is a server that accepts
+              REGISTER requests and places the information it
+              receives in those requests into the location service
+              for the domain it handles.
+
+              Copyright (C) The Internet Society (2005). This version
+              of this MIB module is part of RFC XXXX; see the RFC
+              itself for full legal notices."
+        REVISION        "200501281700Z"
+        DESCRIPTION
+             "Initial version of the IETF SOMA-SIP-COMMON-MIB module.
+              This version published as part of RFC XXXX."
+        ::= { kamailioModules 3 }
+
+--
+-- Top-Level Components of this MIB.
+--
+
+   kamailioSIPCommonObjects  OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for accessible objects in the MIB."  
+        ::= { kamailioSIPCommonMIB 1 }
+        
+   kamailioSIPCommonConform     OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for conformance specifications."  
+        ::= { kamailioSIPCommonMIB 2 }
+
+--
+-- This MIB contains objects that are common to all SIP entities.
+--
+
+--
+-- Common basic configuration
+--
+   kamailioSIPCommonCfgBase OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Sub-tree for common basic configurations." 
+        ::= { kamailioSIPCommonObjects 1 }
+
+   kamailioSIPCommonCfgTimer OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Protocol timer configuration group." 
+        ::= { kamailioSIPCommonObjects 2 }
+
+   kamailioSIPCommonStatsSummary OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "SIP message summary statistics group."
+        ::= { kamailioSIPCommonObjects 3 }
+
+   kamailioSIPCommonStatsMethod OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Per method statistics group."
+        ::= { kamailioSIPCommonObjects 4 }
+
+   kamailioSIPCommonStatusCode OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Per Status code or status code class statistics group."
+        ::= { kamailioSIPCommonObjects 5 }
+
+   kamailioSIPCommonStatsTrans OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Transaction statistics group."
+        ::= { kamailioSIPCommonObjects 6 }
+
+   kamailioSIPCommonStatsRetry   OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Method retry statistics group."
+        ::= { kamailioSIPCommonObjects 7 }
+
+   kamailioSIPCommonStatsOther   OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Other statistics group."
+        ::= { kamailioSIPCommonObjects 8 }
+
+   kamailioSIPCommonNotifObjects  OBJECT-IDENTITY
+        STATUS current
+        DESCRIPTION 
+        "Accessible-for-notify objects group."
+        ::= { kamailioSIPCommonObjects 9 }
+
+--
+-- Common Configuration Objects
+--
+   kamailioSIPProtocolVersion OBJECT-TYPE
+       SYNTAX      SnmpAdminString
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object will reflect the version of SIP supported by
+             this SIP entity.  It will follow the same format as SIP
+             version information contained in the SIP messages
+             generated by this SIP entity.  For example, entities
+             supporting SIP version 2 will return 'SIP/2.0' as
+             dictated by the standard."
+       REFERENCE
+             "RFC 3261, Section 7.1"
+       ::= { kamailioSIPCommonCfgBase 1 }
+
+   kamailioSIPServiceStartTime OBJECT-TYPE
+       SYNTAX     TimeTicks
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "The value of sysUpTime at the time the SIP entity was last
+             started. If started prior to the last re-initialization of
+             the local network management subsystem, then this object
+             contains a zero value."
+       ::= { kamailioSIPCommonCfgBase 2 }
+
+    kamailioSIPEntityType OBJECT-TYPE
+          SYNTAX     KamailioSIPEntityRole
+          MAX-ACCESS read-only
+          STATUS     current
+          DESCRIPTION
+               " This object identifies the list of SIP entities this
+                 row is related to. It is defined as a bit map.  Each
+                 bit represents a type of SIP entity.
+
+                 If a bit has value 1, the SIP entity represented by
+                 this row plays the role of this entity type.
+
+                 If a bit has value 0, the SIP entity represented by
+                 this row does not act as this entity type
+                 
+                 Combinations of bits can be set when the SIP entity
+                 plays multiple SIP roles.  The bits can be:
+		 
+                 other(0), userAgent(1), proxyServer(2), 
+                 redirectServer(3), registrarServer(4)"
+       ::= { kamailioSIPCommonCfgBase 4 }
+
+--
+-- Support for multiple ports
+--
+   kamailioSIPPortTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF KamailioSIPPortEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This table contains the list of ports that each SIP entity
+             in this system is allowed to use.  These ports can be
+             advertised using the Contact header in a REGISTER request
+             or response."
+       ::= { kamailioSIPCommonCfgBase 5 }
+
+   kamailioSIPPortEntry OBJECT-TYPE
+       SYNTAX     KamailioSIPPortEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "Specification of a particular port.
+
+             Each row represents those objects for a particular SIP
+             entity present in this system."
+       INDEX {
+           kamailioSIPIPType,
+           kamailioSIPIPAddress,
+           kamailioSIPPort
+           }
+       ::= { kamailioSIPPortTable 1 }
+
+   KamailioSIPPortEntry ::=
+       SEQUENCE {
+                kamailioSIPIPType               InetAddressType, 
+                kamailioSIPIPAddress            InetAddress,
+		kamailioSIPPort                 InetPortNumber,
+                kamailioSIPTransportRcv         KamailioSIPTransportProtocol
+       }
+
+   
+   kamailioSIPIPType    OBJECT-TYPE
+       SYNTAX     InetAddressType
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION 
+           "This object tells us what the address format is for the next
+	    column"
+       ::= { kamailioSIPPortEntry 1 }
+
+   kamailioSIPIPAddress OBJECT-TYPE 
+       SYNTAX     InetAddress
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This object shows which IP Address the row pertains to"
+       ::= { kamailioSIPPortEntry 2 } 
+
+   kamailioSIPPort OBJECT-TYPE
+       SYNTAX     InetPortNumber
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This object reflects a particular port that can be used by
+             the SIP application."
+       ::= { kamailioSIPPortEntry 3 }
+
+   kamailioSIPTransportRcv OBJECT-TYPE
+       SYNTAX     KamailioSIPTransportProtocol
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "This object will specify the transport protocol the SIP
+             entity will use to receive SIP messages.
+
+             This object is a bit map.  Each bit represents a transport
+             protocol.  If a bit has value 1, then that transport protocol
+             is currently being used.  If a bit has value 0, then that
+             transport protocol is currently not being used. 
+	     
+             The bits are assigned as follows:
+		bit 0: a protocol other than those defined here
+       		bit 1: User Datagram Protocol
+       		bit 2: Transmission Control Protocol
+       		bit 3: Stream Control Transmission Protocol
+       		bit 4: Transport Layer Security Protocol over TCP
+       		bit 5: Transport Layer Security Protocol over SCTP
+       		bit 6: WebSocket transport
+       		bit 7: WebSocket transport over HTTP/TLS (WSS)"
+       ::= { kamailioSIPPortEntry 4 }
+
+   --
+   -- Supported SIP Methods
+   --
+   kamailioSIPMethodSupportedTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF KamailioSIPMethodSupportedEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This table contains a list of methods supported
+             by each SIP entity in this system. This MAY include,
+             but is not limited to, the standard set of SIP methods
+             discussed in Section 7.1 of RFC 3261.  Any additional
+             methods that MAY be incorporated into the SIP protocol
+             can be represented by this table without any requirement
+             to update this MIB.
+
+             The table is informational in nature; conveying to the NMS
+             capabilities of the managed system.
+
+             From a protocol point of view, the list of methods
+             advertised by the SIP entity in the Allow header (Section
+             20.5 of RFC 3261) MUST be consistent with the methods
+             reflected in this table."
+       ::= { kamailioSIPCommonCfgBase 7 }
+
+   kamailioSIPMethodSupportedEntry OBJECT-TYPE
+       SYNTAX     KamailioSIPMethodSupportedEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "A particular method supported by the SIP entity.
+
+             Each row represents those objects for a particular SIP
+             entity present in this system.  
+
+             The objects in this table entry SHOULD be non-volatile
+             and their value SHOULD be kept at reboot."
+       INDEX { kamailioSIPMethodSupportedIndex }
+       ::= { kamailioSIPMethodSupportedTable 1 }
+
+   KamailioSIPMethodSupportedEntry ::=
+       SEQUENCE {
+                kamailioSIPMethodSupportedIndex     KamailioSIPMethodIdentifier,
+                kamailioSIPMethodName               SnmpAdminString
+       }
+
+   kamailioSIPMethodSupportedIndex OBJECT-TYPE
+       SYNTAX     KamailioSIPMethodIdentifier
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This object uniquely identifies a conceptual row
+             in the table and reflects an assigned number used
+             to identifier a specific SIP method.
+
+             This identifier is suitable for referenceing the
+             associated method throughout this and other MIBs
+             supported by this managed system."
+       ::= { kamailioSIPMethodSupportedEntry 1 }
+
+   kamailioSIPMethodName OBJECT-TYPE
+       SYNTAX SnmpAdminString
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+            "This object reflects the supported method's name.
+             The method name MUST be all upper case (eg, 'FOO')."
+       ::= { kamailioSIPMethodSupportedEntry 2 }
+
+
+--
+-- Summary Statistics
+--
+   kamailioSIPSummaryInRequests OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "This object indicates the total number of SIP request
+             messages received by the SIP entity including
+             retransmissions."
+       ::= { kamailioSIPCommonStatsSummary 1 }
+
+   kamailioSIPSummaryOutRequests OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "This object contains the total number of SIP request
+             messages sent out (originated and relayed) by the SIP
+             entity.  Where a particular message is sent more than
+             once, for example as a retransmission, or as a result of
+             forking, each transmission is counted separately."
+       ::= { kamailioSIPCommonStatsSummary 2 }
+
+   kamailioSIPSummaryInResponses OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "This object contains the total number of SIP response
+             messages received by the SIP entity including
+             retransmissions."
+       ::= { kamailioSIPCommonStatsSummary 3 }
+
+   kamailioSIPSummaryOutResponses OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "This object contains the total number of SIP response
+             messages sent (originated and relayed) by the SIP entity
+             including retransmissions."
+       ::= { kamailioSIPCommonStatsSummary 4 }
+
+   kamailioSIPSummaryTotalTransactions OBJECT-TYPE
+       SYNTAX Counter32
+       MAX-ACCESS read-only
+       STATUS current
+       DESCRIPTION
+            "This object contains a count of the number of transactions
+             that are in progress and transactions that have reached the
+             terminated state.  It is not applicable to stateless
+             SIP Proxy Servers.
+
+             A SIP transaction occurs between a client and a server and
+             comprises all messages from the first request sent from
+             the client to the server up to a final (non-1xx) response
+             sent from the server to the client.
+
+             If the request is INVITE and the final response is a non-2xx,
+             the transaction also include an ACK to the response.  The ACK
+             for a 2xx response to an INVITE request is a separate
+             transaction.
+
+             The branch ID parameter in the Via header field values
+             serves as a transaction identifier.
+
+             A transaction is identified by the CSeq sequence number
+             within a single call leg.  The ACK request has the same
+             CSeq number as the corresponding INVITE request, but
+             comprises a transaction of its own.
+
+             In the case of a forked request, each branch counts as a
+             single transaction.
+
+             For a transaction stateless Proxy Server, this counter
+             is always 0."
+       ::= { kamailioSIPCommonStatsSummary 5 }
+
+--
+-- SIP Method Statistics
+-- Total counts for each SIP method.
+--
+   kamailioSIPMethodStatsTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF KamailioSIPMethodStatsEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This table contains the method statistics objects
+             for SIP entities.  Each row represents those objects
+             for a particular SIP entity present in this system."
+       ::= { kamailioSIPCommonStatsMethod 1 }
+
+   kamailioSIPMethodStatsEntry OBJECT-TYPE
+       SYNTAX     KamailioSIPMethodStatsEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "A row of per entity method statistics.
+
+             Each row represents those objects for a particular SIP
+             entity present in this system."
+       INDEX { kamailioSIPStatsMethod }
+       ::= { kamailioSIPMethodStatsTable 1 }
+
+   KamailioSIPMethodStatsEntry ::=
+       SEQUENCE {
+                kamailioSIPStatsMethod       KamailioSIPMethodIdentifier,
+                kamailioSIPStatsOutbounds    Counter32,
+                kamailioSIPStatsInbounds     Counter32
+       }
+
+   kamailioSIPStatsMethod OBJECT-TYPE
+       SYNTAX      KamailioSIPMethodIdentifier
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            "This object uniquely identifies the SIP method
+             related to the objects in a particular row."
+       ::= { kamailioSIPMethodStatsEntry 1 }
+
+   kamailioSIPStatsOutbounds OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of requests
+             sent by the SIP entity, excluding retransmissions.
+             Retransmissions are counted separately and are not
+             reflected in this counter."
+       REFERENCE
+            "RFC 3261, Section 7.1"
+       ::= { kamailioSIPMethodStatsEntry 2 }
+
+   kamailioSIPStatsInbounds OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of requests
+             received by the SIP entity. Retransmissions are
+             counted separately and are not reflected in this
+             counter."
+       REFERENCE
+            "RFC 3261, Section 7.1"
+       ::= { kamailioSIPMethodStatsEntry 3 }
+
+--
+-- Support for specific status codes
+--
+   kamailioSIPStatusCodesTable OBJECT-TYPE
+       SYNTAX      SEQUENCE OF KamailioSIPStatusCodesEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            "This table contains the list of SIP status codes which
+             each SIP entity in this system has been requested to
+             monitor. It is the mechanism by which specific status
+             codes are monitored."
+       ::= { kamailioSIPCommonStatusCode 1 }
+
+   kamailioSIPStatusCodesEntry OBJECT-TYPE
+       SYNTAX      KamailioSIPStatusCodesEntry
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            "This row contains information on a particular SIP status
+
+             code that the SIP entity has been requested to monitor.
+
+             Each row represents those objects for a particular SIP
+             entity present in this system."
+       INDEX { kamailioSIPStatusCodeMethod, kamailioSIPStatusCodeValue }
+       ::= { kamailioSIPStatusCodesTable 1 }
+
+   KamailioSIPStatusCodesEntry ::=
+       SEQUENCE {
+          kamailioSIPStatusCodeMethod     KamailioSIPMethodIdentifier,
+          kamailioSIPStatusCodeValue      Unsigned32,
+          kamailioSIPStatusCodeIns        Counter32,
+          kamailioSIPStatusCodeOuts       Counter32,
+          kamailioSIPStatusCodeRowStatus  RowStatus
+       }
+
+   kamailioSIPStatusCodeMethod OBJECT-TYPE
+       SYNTAX      KamailioSIPMethodIdentifier
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            "This object uniquely identifies a conceptual row
+             in the table and reflects an assigned number used
+             to identifier a specific SIP method."
+       ::= { kamailioSIPStatusCodesEntry 1 }
+
+   kamailioSIPStatusCodeValue OBJECT-TYPE
+       SYNTAX      Unsigned32 (100..999)
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            "This object contains a SIP status code value that the SIP
+             entity has been requested to monitor.  All of the other
+             information in the row is related to this value."
+       ::= { kamailioSIPStatusCodesEntry 2 }
+
+   kamailioSIPStatusCodeIns OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of response messages
+             received by the SIP entity with the status code value
+             contained in the sipStatusCodeValue column."
+       ::= { kamailioSIPStatusCodesEntry 3 }
+
+   kamailioSIPStatusCodeOuts OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of response messages
+             sent by the SIP entity with the status code value
+             contained in the sipStatusCodeValue column."
+       ::= { kamailioSIPStatusCodesEntry 4 }
+
+   kamailioSIPStatusCodeRowStatus OBJECT-TYPE
+       SYNTAX      RowStatus
+       MAX-ACCESS  read-create
+       STATUS      current
+       DESCRIPTION
+            "The row augmentation in sipStatusCodeNotifTable
+             will be governed by the value of this RowStatus.
+
+             This object is REQUIRED to create or delete rows
+             by a manager.
+
+             The values 'createAndGo' and 'destroy' are the
+             only valid values allowed for this object.
+             If a row exists, it will reflect a status of
+             'active' when queried."
+       ::= { kamailioSIPStatusCodesEntry 5 }
+
+--
+-- Transaction Statistics
+--
+   kamailioSIPCurrentTransactions OBJECT-TYPE
+       SYNTAX     Gauge32 (0..4294967295)
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "This object contains the number of transactions awaiting
+             definitive (non-1xx) response.  In the case of a forked
+             request, each branch counts as a single transaction
+             corresponding to the entity identified by applIndex."
+   ::= { kamailioSIPCommonStatsTrans 1 }
+
+--
+-- SIP Retry Statistics
+--
+-- This group contains various statistic objects about
+-- retransmission counts.
+--
+   kamailioSIPCommonStatsRetryTable OBJECT-TYPE
+       SYNTAX     SEQUENCE OF KamailioSIPCommonStatsRetryEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "This table contains retry statistics objects applicable
+             to each SIP entity in this system."
+       ::= { kamailioSIPCommonStatsRetry 1 }
+
+   kamailioSIPCommonStatsRetryEntry OBJECT-TYPE
+       SYNTAX     KamailioSIPCommonStatsRetryEntry
+       MAX-ACCESS not-accessible
+       STATUS     current
+       DESCRIPTION
+            "A row of retry statistics.
+
+             Each row represents those objects for a particular SIP
+             entity present in this system."
+       INDEX { kamailioSIPStatsRetryMethod }
+       ::= { kamailioSIPCommonStatsRetryTable 1 }
+
+   KamailioSIPCommonStatsRetryEntry ::=
+       SEQUENCE {
+                kamailioSIPStatsRetryMethod           KamailioSIPMethodIdentifier,
+                kamailioSIPStatsRetries                Counter32,
+                kamailioSIPStatsRetryFinalResponses    Counter32,
+                kamailioSIPStatsRetryNonFinalResponses Counter32
+       }
+
+   kamailioSIPStatsRetryMethod OBJECT-TYPE
+       SYNTAX      KamailioSIPMethodIdentifier
+       MAX-ACCESS  not-accessible
+       STATUS      current
+       DESCRIPTION
+            "This object uniquely identifies the SIP method
+             related to the objects in a row."
+       ::= { kamailioSIPCommonStatsRetryEntry 1 }
+
+   kamailioSIPStatsRetries OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of request
+             retransmissions that have been sent by the SIP
+             entity. Note that there could be multiple
+             retransmissions per request."
+       ::= { kamailioSIPCommonStatsRetryEntry 2 }
+
+   kamailioSIPStatsRetryFinalResponses OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of Final Response
+             retries that have been sent by the SIP entity.
+             Note that there could be multiple retransmissions
+             per request."
+       ::= { kamailioSIPCommonStatsRetryEntry 3 }
+
+   kamailioSIPStatsRetryNonFinalResponses OBJECT-TYPE
+       SYNTAX      Counter32
+       MAX-ACCESS  read-only
+       STATUS      current
+       DESCRIPTION
+            "This object reflects the total number of non-Final Response
+             retries that have been sent by the SIP entity."
+       ::= { kamailioSIPCommonStatsRetryEntry 4 }
+
+--
+-- Other Common Statistics
+--
+   kamailioSIPNumUnsupportedUris OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "Number of RequestURIs received with unsupported scheme.
+             A server normally responds to such requests with a 400 Bad
+             Request status code."
+       ::= { kamailioSIPCommonStatsOther 1 }
+
+   kamailioSIPNumUnsupportedMethods OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "Number of SIP requests received with unsupported methods.
+             A server normally responds to such requests with a
+             501 (Not Implemented) or 405 (Method Not Allowed)."
+       ::= { kamailioSIPCommonStatsOther 2 }
+
+   kamailioSIPOtherwiseDiscardedMsgs OBJECT-TYPE
+       SYNTAX     Counter32
+       MAX-ACCESS read-only
+       STATUS     current
+       DESCRIPTION
+            "Number of SIP messages received that for any number
+             of reasons was discarded without a response."
+       ::= { kamailioSIPCommonStatsOther 3 }
+
+--
+-- Conformance
+--
+
+--
+-- Compliance Statements
+--
+   kamailioSIPCommonCompliance MODULE-COMPLIANCE
+       STATUS     current
+       DESCRIPTION
+            "The compliance statement for SIP entities."
+
+       MODULE -- this module
+            MANDATORY-GROUPS { kamailioSIPCommonConfigGroup,
+                               kamailioSIPCommonStatsGroup }
+
+
+       GROUP kamailioSIPCommonStatsRetryGroup
+       DESCRIPTION
+            "This group is OPTIONAL.  A SIP entity can elect to
+             not provide any retry statistics."
+       ::= { kamailioSIPCommonConform 1 }
+
+   kamailioSIPCommonGroups
+     OBJECT IDENTIFIER ::= { kamailioSIPCommonConform 2 }
+
+
+--
+-- Units of Conformance
+--
+   kamailioSIPCommonConfigGroup OBJECT-GROUP
+       OBJECTS {
+               kamailioSIPProtocolVersion,
+               kamailioSIPServiceStartTime,
+	       kamailioSIPPort,
+               kamailioSIPTransportRcv,
+	       kamailioSIPIPType,
+	       kamailioSIPIPAddress,
+               kamailioSIPEntityType,
+               kamailioSIPMethodName
+       }
+       STATUS  current
+       DESCRIPTION
+            "A collection of objects providing configuration common
+             to all SIP enities."
+       ::= { kamailioSIPCommonGroups 1 }
+
+   kamailioSIPCommonStatsGroup OBJECT-GROUP
+       OBJECTS {
+               kamailioSIPSummaryInRequests,
+               kamailioSIPSummaryOutRequests,
+               kamailioSIPSummaryInResponses,
+               kamailioSIPSummaryOutResponses,
+               kamailioSIPSummaryTotalTransactions,
+               kamailioSIPStatsOutbounds,
+               kamailioSIPStatsInbounds,
+               kamailioSIPStatusCodeIns,
+               kamailioSIPStatusCodeOuts,
+               kamailioSIPStatusCodeRowStatus,
+               kamailioSIPCurrentTransactions,
+               kamailioSIPNumUnsupportedUris,
+               kamailioSIPNumUnsupportedMethods,
+               kamailioSIPOtherwiseDiscardedMsgs
+       }
+       STATUS  current
+       DESCRIPTION
+            "A collection of objects providing statistics common
+             to all SIP entities."
+       ::= { kamailioSIPCommonGroups 3 }
+
+   kamailioSIPCommonStatsRetryGroup OBJECT-GROUP
+       OBJECTS {
+                kamailioSIPStatsRetries,
+                kamailioSIPStatsRetryFinalResponses,
+                kamailioSIPStatsRetryNonFinalResponses
+       }
+       STATUS  current
+       DESCRIPTION
+            "A collection of objects providing retry statistics."
+       ::= { kamailioSIPCommonGroups 4 }
+
+   END

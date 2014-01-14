@@ -19,27 +19,32 @@
     <title>Overview</title>
          
     <para>
-      This module offers operations for IPv4 and IPv6.
+      The IPops module offers operations for handling IP addresses, both IPv4 and IPv6.
     </para>
-
     <para>
-      IPv6 is defined in <ulink url="http://tools.ietf.org/html/rfc2460">RFC 2460</ulink>. The same IPv6 can be represented by different ASCII strings, so binary comparison is required. For example, the following IPv6 are equivalent:
+      IPv6 is defined in <ulink url="http://tools.ietf.org/html/rfc2460">RFC 2460</ulink>.
+	The same IPv6 address can be represented by different ASCII strings, so binary comparison is required.
+	For example, the following IPv6 addresses are equivalent:
     </para>
 
     <itemizedlist>
       <listitem>
-        <para>1080:0000:0000:0000:0008:0800:200C:417A</para>
+        <para>2001:DB8:0000:0000:0008:0800:200C:417A</para>
       </listitem>
       <listitem>
-        <para>1080:0:0:0:8:800:200C:417A</para>
+        <para>2001:DB8:0:0:8:800:200C:417A</para>
       </listitem>
       <listitem>
-        <para>1080::8:800:200C:417A</para>
+        <para>2001:DB8::200C:417A</para>
       </listitem>
     </itemizedlist>
 
     <para>
-      When using IPv6 in an URI (i.e. a SIP URI) such IP must be written in "IPv6 reference" format (which is the textual representation of the IPv6 enclosed between [ ] symbols). An example is <quote>sip:alice@[1080:0:0:0:8:800:200C:417A]</quote>. This module also allows comparing a IPv6 with its IPv6 reference representation.
+      	When using IPv6 in an URI (i.e. a SIP URI) the IP address must be written in "IPv6 reference" format 
+	(which is the textual representation of the IPv6 enclosed between [ ] symbols).
+	An example is <quote>sip:alice@[2001:DB8:0:0:8:800:200C:417A]</quote>. This allows separation of
+	address and port number with a :, like <quote>[2001:DB8:0:0:8:800:200C:417A]:5060</quote>.
+	This module also allows comparing an IPv6 address with its IPv6 reference representation.
     </para>
            
   </section>
@@ -88,7 +93,7 @@
 
     <title>Functions</title>
              
-    <section>
+    <section id="ipops.f.is_ip">
       <title>
         <function moreinfo="none">is_ip (ip)</function>
       </title>
@@ -102,7 +107,7 @@
       <itemizedlist>
         <listitem>
           <para>
-            <emphasis>ip</emphasis> - String or pseudo-variable containing the IP to evaluate.
+            <emphasis>ip</emphasis> - String or pseudo-variable containing the IP address to evaluate.
           </para>
         </listitem>
       </itemizedlist>
@@ -118,7 +123,7 @@
         <programlisting format="linespecific">
 ...
 if (is_ip($rd)) {
-  xlog("L_INFO", "RURI domain is IP\n");
+  xlog("L_INFO", "RURI domain is an IP address (not a host name/domain)\n");
 }
 ...
         </programlisting>
@@ -126,7 +131,7 @@ if (is_ip($rd)) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.is_pur_ip">
       <title>
         <function moreinfo="none">is_pure_ip (ip)</function>
       </title>
@@ -165,7 +170,7 @@ if (is_pure_ip($var(ip))) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.is_ipv4">
       <title>
         <function moreinfo="none">is_ipv4 (ip)</function>
       </title>
@@ -203,7 +208,7 @@ if (is_ipv4("1.2.3.4")) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.is_ipv6">
       <title>
         <function moreinfo="none">is_ipv6 (ip)</function>
       </title>
@@ -241,7 +246,7 @@ if (is_ipv6("1080:0:0:0:8:800:200C:417A")) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.is_ipv6_reference">
       <title>
         <function moreinfo="none">is_ipv6_reference (ip)</function>
       </title>
@@ -279,7 +284,7 @@ if (is_ipv6_reference("[1080:0:0:0:8:800:200C:417A]")) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.is_ip_type">
       <title>
         <function moreinfo="none">ip_type (ip)</function>
       </title>
@@ -354,13 +359,14 @@ switch($rc) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.compare_ips">
       <title>
         <function moreinfo="none">compare_ips (ip1, ip2)</function>
       </title>
 
       <para>
-        Returns TRUE if both IP's are the same. FALSE otherwise. This function also allows comparing an IPv6 against an IPv6 reference.
+        Returns TRUE if both IP addresses are the same. FALSE otherwise.
+	This function also allows comparing an IPv6 address against an IPv6 reference.
       </para>
 
       <para>Parameters:</para>
@@ -397,13 +403,14 @@ if (compare_ips("1080:0000:0000:0000:0008:0800:200C:417A", "[1080::8:800:200C:41
 
     </section>
 
-    <section>
+    <section id="ipops.f.compare_pure_ips">
       <title>
         <function moreinfo="none">compare_pure_ips (ip1, ip2)</function>
       </title>
 
       <para>
-        Returns TRUE if both IP's are the same. FALSE otherwise. This function does NOT allow comparing an IPv6 against an IPv6 reference.
+        Returns TRUE if both IP's are the same. FALSE otherwise. This function does NOT 
+	allow comparing an IPv6 against an IPv6 reference.
       </para>
 
       <para>Parameters:</para>
@@ -411,12 +418,12 @@ if (compare_ips("1080:0000:0000:0000:0008:0800:200C:417A", "[1080::8:800:200C:41
       <itemizedlist>
         <listitem>
           <para>
-            <emphasis>ip1</emphasis> - String or pseudo-variable containing the first IP to compare.
+            <emphasis>ip1</emphasis> - String or pseudo-variable containing the first IP address to compare.
           </para>
         </listitem>
         <listitem>
           <para>
-            <emphasis>ip2</emphasis> - String or pseudo-variable containing the second IP to compare.
+            <emphasis>ip2</emphasis> - String or pseudo-variable containing the second IP address to compare.
           </para>
         </listitem>
       </itemizedlist>
@@ -440,7 +447,7 @@ if (compare_pure_ips($si, "1080::8:800:200C:417A")) {
 
     </section>
 
-    <section>
+    <section id="ipops.f.is_ip_rfc1918">
       <title>
         <function moreinfo="none">is_ip_rfc1918 (ip)</function>
       </title>
@@ -478,6 +485,200 @@ if (is_ip_rfc1918("10.0.123.123")) {
 
     </section>
  
+    <section id="ipops.f.is_in_subnet">
+      <title>
+        <function moreinfo="none">is_in_subnet (ip, subnet)</function>
+      </title>
+
+      <para>
+        Returns TRUE if the first argument is an IP address within the (CIDR notation)
+        subnet in the second argument. FALSE otherwise.
+      </para>
+
+      <para>Parameters:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para>
+            <emphasis>ip</emphasis> - string or pseudo-variable containing the ip to evaluate.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <emphasis>subnet</emphasis> - string or pseudo-variable containing the (CIDR notation) subnet to evaluate.
+          </para>
+        </listitem>
+      </itemizedlist>
+
+      <para>
+        This function can be used from REQUEST_ROUTE, FAILURE_ROUTE, ONREPLY_ROUTE, BRANCH_ROUTE and LOCAL_ROUTE.
+      </para>
+
+      <example>
+        <title>
+          <function>is_in_subnet</function> usage
+        </title>
+        <programlisting format="linespecific">
+...
+if (is_in_subnet("10.0.123.123", "10.0.123.1/24")) {
+  xlog("L_INFO", "it's in the subnet\n");
+}
+...
+        </programlisting>
+      </example>
+
+    </section>
+
+    <section id="ipops.f.dns_sys_match_ip">
+      <title>
+        <function moreinfo="none">dns_sys_match_ip(hostname, ipaddr)</function>
+      </title>
+
+      <para>
+		  Returns TRUE if ipaddr is associated by DNS to hostname. FALSE otherwise. It
+		  does not use the internal DNS resolver, but directly getaddrinfo(...). All
+		  addresses returned for the hostname are checked. Note that some hosts may
+		  return different lists of IP addresses for each query, if the DNS server
+		  is configured in that way (e.g., for providing load balancing through DNS).
+      </para>
+
+      <para>Parameters:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para>
+			  <emphasis>hostname</emphasis> - string or pseudo-variable containing the hostname.
+			  The resulting IP addresses from DNS query are compared with ipaddr.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <emphasis>ipaddr</emphasis> - string or pseudo-variable containing the ip address.
+          </para>
+        </listitem>
+      </itemizedlist>
+
+      <para>
+        This function can be used from ANY_ROUTE.
+      </para>
+
+      <example>
+        <title>
+          <function>dns_sys_match_ip</function> usage
+        </title>
+        <programlisting format="linespecific">
+...
+if (!dns_sys_match_ip("myhost.com", "1.2.3.4")) {
+    xdbg("ip address not associated with hostname\n");
+}
+...
+        </programlisting>
+      </example>
+
+    </section>
+
+    <section id="ipops.f.dns_int_match_ip">
+      <title>
+        <function moreinfo="none">dns_int_match_ip(hostname, ipaddr)</function>
+      </title>
+
+      <para>
+		  Returns TRUE if ipaddr is associated by DNS to hostname. FALSE otherwise. It
+		  uses internal DNS resolver. At this moment, the function might not check all
+		  the IP addresses as returned by dns_sys_match_ip(), because the internal
+		  resolver targets to discover the first address to be used for relaying
+		  SIP traffic. Thus is better to use dns_sys_match_ip() if the host you want
+		  to check has many IP addresses, in different address famililies (IPv4/6).
+      </para>
+
+      <para>Parameters:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para>
+			  <emphasis>hostname</emphasis> - string or pseudo-variable containing the hostname.
+			  The resulting IP addresses from DNS query are compared with ipaddr.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <emphasis>ipaddr</emphasis> - string or pseudo-variable containing the ip address.
+          </para>
+        </listitem>
+      </itemizedlist>
+
+      <para>
+        This function can be used from ANY_ROUTE.
+      </para>
+
+      <example>
+        <title>
+          <function>dns_int_match_ip</function> usage
+        </title>
+        <programlisting format="linespecific">
+...
+if (!dns_int_match_ip("myhost.com", "1.2.3.4")) {
+    xdbg("ip address not associated with hostname\n");
+}
+...
+        </programlisting>
+      </example>
+
+    </section>
+
+    <section id="ipops.f.dns_query">
+      <title>
+        <function moreinfo="none">dns_query(hostname, pvid)</function>
+      </title>
+
+      <para>
+		  Store the IP addresses and their type that correspond to hostname
+		  in a config variable $dns(pvid=>key).
+      </para>
+
+      <para>Parameters:</para>
+
+      <itemizedlist>
+        <listitem>
+          <para>
+			  <emphasis>hostname</emphasis> - string or pseudo-variable containing the hostname.
+			  The resulting IP addresses from DNS query are compared with ipaddr.
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            <emphasis>pvid</emphasis> - container id for script variable.
+          </para>
+        </listitem>
+      </itemizedlist>
+
+      <para>
+        This function can be used from ANY_ROUTE.
+      </para>
+
+      <example>
+        <title>
+          <function>dns_query</function> usage
+        </title>
+        <programlisting format="linespecific">
+...
+if(dns_query("test.com", "xyz"))
+{
+    xlog(" number of addresses: $dns(xyz=>count)\n");
+    xlog(" ipv4 address found: $dns(xyz=>ipv4)\n");
+    xlog(" ipv6 address found: $dns(xyz=>ipv6)\n");
+    $var(i) = 0;
+    while($var(i)&lt;$dns(xyz=>count)) {
+        xlog(" #[$var(i)] type ($dns(xyz=>type[$var(i)]))"
+             " addr [$dns(xyz=>addr[$var(i)])]\n");
+        $var(i) = $var(i) + 1;
+    }
+}
+...
+        </programlisting>
+      </example>
+
+    </section>
 
   </section>
  

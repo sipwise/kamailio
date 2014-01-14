@@ -9,27 +9,29 @@
 ### common variables and functions for SQL engines
 
 if [ -z "$DBNAME" ] ; then
-	DBNAME=openser
+	DBNAME=kamailio
 fi
 if [ -z "$DBHOST" ] ; then
 	DBHOST=localhost
 fi
 if [ -z "$DBRWUSER" ] ; then
-	DBRWUSER=openser
+	DBRWUSER=kamailio
 fi
 
 # the read-only user for whom password may be stored here
 if [ -z "$DBROUSER" ] ; then
-	DBROUSER=openserro
+	DBROUSER=kamailioro
 fi
 if [ -z "$DBROPW" ] ; then
-	DBROPW=openserro
+	DBROPW=kamailioro
 fi
 
 # full privileges SQL user
 if [ -z "$DBROOTUSER" ]; then
 	DBROOTUSER="root"
 fi
+
+DBFNOW="now()"
 
 #params: none
 # output: DBRWPW
@@ -60,6 +62,11 @@ cat <<EOF
  db rorun <id> ....................... execute read-only SQL query from 
                                        \$id variable
  db show <table> ..................... display table content
+ db showg <table> .................... display formatted table content
+ db smatch <table> <key> <value>...... display record from table that has
+           ........................... column key equal to value as string
+ db nmatch <table> <key> <value>...... display record from table that has
+           ........................... column key equal to value as non-string
 EOF
 }
 USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_db_ops"
@@ -139,3 +146,17 @@ cat <<EOF
 EOF
 }
 USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_domain"
+
+uid_usage_domain() {
+	echo
+	mecho " -- command 'uid_domain' - manage local domains"
+	echo
+cat <<EOF
+ uid_domain reload ....................... reload domains from disk
+ uid_domain show ......................... show current domains in memory
+ uid_domain showdb ....................... show domains in the database
+ uid_domain add <domain> [did] [flags].... add the domain to the database
+ uid_domain rm <domain> .................. delete the domain from the database
+EOF
+}
+USAGE_FUNCTIONS="$USAGE_FUNCTIONS uid_usage_domain"

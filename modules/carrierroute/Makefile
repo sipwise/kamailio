@@ -9,28 +9,24 @@ include ../../Makefile.defs
 auto_gen=
 NAME=carrierroute.so
 
-BUILDER = $(shell which confuse-config)
-
-ifeq ($(BUILDER),)
-	BUILDER = $(shell which pkg-config)
-	ifeq ($(BUILDER),)
-		CONFUSEDEFS=-I$(LOCALBASE)/include -I/usr/local/include -I/opt/include \
-			-I/usr/sfw/include
-		CONFUSELIBS=-L$(LOCALBASE)/lib -L/usr/local/lib -L/usr/sfw/lib \
-			-L/opt/lib -lconfuse
-	else
-		CONFUSEDEFS = $(shell pkg-config --cflags libconfuse)
-		CONFUSELIBS = $(shell pkg-config --libs libconfuse)
-	endif
-else
-		CONFUSEDEFS = $(shell confuse-config --cflags)
-		CONFUSELIBS = $(shell confuse-config --libs)
+ifeq ($(CROSS_COMPILE),)
+CONFUSE_BUILDER = $(shell \
+	if which confuse-config &>/dev/null;then \
+		echo 'confuse-config'; \
+	elif pkg-config --exists libconfuse; then \
+		echo 'pkg-config libconfuse'; \
+	fi)
 endif
 
-DEFS+=$(CONFUSEDEFS)
-LIBS=$(CONFUSELIBS)
+ifeq ($(CONFUSE_BUILDER),)
+	DEFS += -I$(LOCALBASE)/include
+	LIBS += -L$(LOCALBASE)/lib -lconfuse
+else
+	DEFS += $(shell $(CONFUSE_BUILDER) --cflags)
+	LIBS += $(shell $(CONFUSE_BUILDER) --libs)
+endif
 
-DEFS+=-DOPENSER_MOD_INTERFACE
+DEFS+=-DKAMAILIO_MOD_INTERFACE
 
 SERLIBPATH=../../lib
 SER_LIBS+=$(SERLIBPATH)/trie/trie $(SERLIBPATH)/srdb1/srdb1 $(SERLIBPATH)/kmi/kmi $(SERLIBPATH)/kcore/kcore

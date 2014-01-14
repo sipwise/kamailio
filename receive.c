@@ -143,7 +143,10 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 
 	if (parse_msg(buf,len, msg)!=0){
 		LOG(cfg_get(core, core_cfg, corelog),
-				"ERROR: receive_msg: parse_msg failed\n");
+				"core parsing of SIP message failed (%s:%d/%d)\n",
+				ip_addr2a(&msg->rcv.src_ip), (int)msg->rcv.src_port,
+				(int)msg->rcv.proto);
+		sr_core_ert_run(msg, SR_CORE_ERT_RECEIVE_PARSE_ERROR);
 		goto error02;
 	}
 	DBG("After parse_msg...\n");
@@ -185,7 +188,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 			}
 		}
 #endif
-			
+
 	/*	skip: */
 		DBG("preparing to run routing scripts...\n");
 #ifdef  STATS

@@ -128,10 +128,10 @@ fi
 
 
 # dump all rows
-openser_dump()  # pars: <database name>
+kamailio_dump()  # pars: <database name>
 {
 	if [ $# -ne 2 ] ; then
-		merr "openser_dump function takes two param"
+		merr "kamailio_dump function takes two param"
 		exit 1
 	fi
 	if [ "$USED_DBENGINE" == "oracle" ]; then
@@ -149,10 +149,10 @@ openser_dump()  # pars: <database name>
 }
 
 
-openser_restore() #pars: <database name> <filename>
+kamailio_restore() #pars: <database name> <filename>
 {
 	if [ $# -ne 2 ] ; then
-		merr "openser_restore function takes two params"
+		merr "kamailio_restore function takes two params"
 		exit 1
 	fi
 	if [ "$USED_DBENGINE" == "oracle" ]; then
@@ -168,6 +168,106 @@ openser_restore() #pars: <database name> <filename>
 }
 
 
+kamailio_pframework_create() #pars: none
+{
+	if [ -e $DEFAULT_CFG_DIR/pi_framework_sample ] ; then
+		get_answer ask "Sample already exists. Overwrite? (y/n): "
+		if [ "$ANSWER" != "y" ]; then
+			exit 1
+		fi
+	fi
+	touch $DEFAULT_CFG_DIR/pi_framework_sample
+	if [ $? -ne 0 ] ; then
+		merr "Unable to create $DEFAULT_CFG_DIR/pi_framework_sample"
+		exit 1
+	fi
+
+	if [ -d "$DATA_DIR/xhttp_pi" ] ; then
+		PI_MODULES="$STANDARD_MODULES"
+	else
+		merr "Please install first the xhttp_pi module"
+		exit 1
+	fi
+
+
+	get_answer $INSTALL_EXTRA_TABLES "Add provisionning framework for extra tables? (y/n): "
+	if [ "$ANSWER" = "y" ]; then
+		PI_MODULES="$PI_MODULES $EXTRA_MODULES"
+	fi
+
+	get_answer $INSTALL_PRESENCE_TABLES "Add provisionning framework for presence tables? (y/n): "
+	if [ "$ANSWER" = "y" ]; then
+		PI_PRESENCE_MODULES="TRUE"
+	fi
+
+	cat $DATA_DIR/xhttp_pi/pi_framework-00 > $DEFAULT_CFG_DIR/pi_framework_sample
+	for TABLE in $PI_MODULES; do
+		if [ -e $DATA_DIR/xhttp_pi/$TABLE-table ]; then
+			cat $DATA_DIR/xhttp_pi/$TABLE-table >> $DEFAULT_CFG_DIR/pi_framework_sample
+		else
+			merr "Unable to configure: $TABLE - missing table descriptor"
+		fi
+	done
+	if [ "$PI_PRESENCE_MODULES" = "TRUE" ]; then
+		if [ -e $DATA_DIR/xhttp_pi/presence-table ]; then
+			cat $DATA_DIR/xhttp_pi/presence-table >> $DEFAULT_CFG_DIR/pi_framework_sample
+		else
+			merr "Unable to configure: presence - missing table descriptor"
+		fi
+		if [ -e $DATA_DIR/xhttp_pi/rls-table ]; then
+			cat $DATA_DIR/xhttp_pi/rls-table >> $DEFAULT_CFG_DIR/pi_framework_sample
+		else
+			merr "Unable to configure: rls - missing table descriptor"
+		fi
+	fi
+	cat $DATA_DIR/xhttp_pi/pi_framework-01 >> $DEFAULT_CFG_DIR/pi_framework_sample
+	for TABLE in $PI_MODULES; do
+		if [ -e $DATA_DIR/xhttp_pi/$TABLE-mod ]; then
+			cat $DATA_DIR/xhttp_pi/$TABLE-mod >> $DEFAULT_CFG_DIR/pi_framework_sample
+		else
+			merr "Unable to configure: $TABLE - missing mod descriptor"
+		fi
+	done
+	if [ "$PI_PRESENCE_MODULES" = "TRUE" ]; then
+		if [ -e $DATA_DIR/xhttp_pi/presence-mod ]; then
+			cat $DATA_DIR/xhttp_pi/presence-mod >> $DEFAULT_CFG_DIR/pi_framework_sample
+		else
+			merr "Unable to configure: presence - missing mod descriptor"
+		fi
+		if [ -e $DATA_DIR/xhttp_pi/rls-mod ]; then
+			cat $DATA_DIR/xhttp_pi/rls-mod >> $DEFAULT_CFG_DIR/pi_framework_sample
+		else
+			merr "Unable to configure: rls - missing mod descriptor"
+		fi
+	fi
+	cat $DATA_DIR/xhttp_pi/pi_framework-02 >> $DEFAULT_CFG_DIR/pi_framework_sample
+
+	minfo "Sample provisionning framework saved as: $DEFAULT_CFG_DIR/pi_framework_sample"
+}
+
+kamailio_pframework() #pars: <action>
+{
+	if [ $# -ne 1 ] ; then
+		merr "kamailio_pframework function takes one parameter"
+		exit 1
+	fi
+
+	case $1 in
+		create)
+			shift
+			kamailio_pframework_create "$@"
+			exit $?
+			;;
+		*)
+			merr "Unexpected pframework action: $1"
+			usage
+			exit 1
+			;;
+	esac
+}
+
+
+
 case $1 in
 	migrate)
 		if [ "$USED_DBENGINE" != "mysql" ] ; then
@@ -181,7 +281,7 @@ case $1 in
 		# create new database
 		minfo "Creating new Database $3...."
 		NO_USER_INIT="yes"
-		openser_create $3
+		kamailio_create $3
 		if [ "$?" -ne 0 ] ; then
 			echo "migrate: creating new database failed"
 			exit 1
@@ -208,20 +308,20 @@ case $1 in
 			exit $?
 		fi
 		tmp_file=`mktemp /tmp/kamdbctl.XXXXXXXXXX` || exit 1
-		openser_dump $DBNAME $tmp_file
+		kamailio_dump $DBNAME $tmp_file
 		ret=$?
 		if [ "$ret" -ne 0 ]; then
 			rm $tmp_file
 			exit $ret
 		fi
 		NO_USER_INIT="yes"
-		openser_create $1
+		kamailio_create $1
 		ret=$?
 		if [ "$ret" -ne 0 ]; then
 			rm $tmp_file
 			exit $ret
 		fi
-		openser_restore $1 $tmp_file
+		kamailio_restore $1 $tmp_file
 		ret=$?
 		rm -f $tmp_file
 		exit $ret
@@ -237,7 +337,7 @@ case $1 in
 			usage
 			exit 1
 		fi
-		openser_dump $DBNAME $1
+		kamailio_dump $DBNAME $1
 		exit $?
 		;;
 	restore)
@@ -251,7 +351,7 @@ case $1 in
 			usage
 			exit 1
 		fi
-		openser_restore $DBNAME $1
+		kamailio_restore $DBNAME $1
 		exit $?
 		;;
 	create)
@@ -261,7 +361,7 @@ case $1 in
 			DBNAME="$1"
 		fi
 
-		openser_create $DBNAME
+		kamailio_create $DBNAME
 		exit $?
 		;;
 	presence)
@@ -272,15 +372,19 @@ case $1 in
 		extra_create $DBNAME
 		exit $?
 		;;
+	dbuid)
+		dbuid_create $DBNAME
+		exit $?
+		;;
 	drop)
-		# delete openser database
+		# delete kamailio database
 		# create new database structures
 		shift
 		if [ $# -eq 1 ] ; then
 			DBNAME="$1"
 		fi
 
-		openser_drop $DBNAME
+		kamailio_drop $DBNAME
 		exit $?
 		;;
 	reinit)
@@ -290,17 +394,81 @@ case $1 in
 		if [ $# -eq 1 ] ; then
 			DBNAME="$1"
 		fi
-		openser_drop $DBNAME
+		kamailio_drop $DBNAME
 		ret=$?
 		if [ "$ret" -ne 0 ]; then
 			exit $ret
 		fi
-		openser_create $DBNAME
+		kamailio_create $DBNAME
+		exit $?
+		;;
+	dbonly)
+		# create only an empty database
+		if [ "$USED_DBENGINE" != "mysql" ] ; then
+			merr "$USED_DBENGINE db engine doesn't support this operation"
+			exit 1
+		fi
+		shift
+		if [ $# -eq 1 ] ; then
+			DBNAME="$1"
+		fi
+
+		kamailio_db_create $DBNAME
+		exit $?
+		;;
+	grant)
+		# grant privileges to database
+		if [ "$USED_DBENGINE" != "mysql" ] ; then
+			merr "$USED_DBENGINE db engine doesn't support this operation"
+			exit 1
+		fi
+		shift
+		if [ $# -eq 1 ] ; then
+			DBNAME="$1"
+		fi
+
+		kamailio_db_grant $DBNAME
+		exit $?
+		;;
+	revoke)
+		# revoke privileges to database
+		if [ "$USED_DBENGINE" != "mysql" ] ; then
+			merr "$USED_DBENGINE db engine doesn't support this operation"
+			exit 1
+		fi
+		shift
+		if [ $# -eq 1 ] ; then
+			DBNAME="$1"
+		fi
+
+		kamailio_db_revoke $DBNAME
+		exit $?
+		;;
+	add-tables)
+		if [ "$USED_DBENGINE" != "mysql" ] ; then
+			merr "$USED_DBENGINE don't support add-tables operation"
+			exit 1
+		fi
+		if [ $# -ne 2 ] ; then
+			merr "add-tables requires 1 parameter: group id of tables"
+			exit 1
+		fi
+		if [ -z "$DBNAME" ] ; then
+			merr "DBNAME is not set"
+			exit 1
+		fi
+
+		kamailio_add_tables $DBNAME $2
 		exit $?
 		;;
 	bdb|db_berkeley)
 		shift
-		openser_berkeley "$@"
+		kamailio_berkeley "$@"
+		exit $?
+		;;
+	pframework)
+		shift
+		kamailio_pframework "$@"
 		exit $?
 		;;
 	version)

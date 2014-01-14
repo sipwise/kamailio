@@ -1,4 +1,4 @@
-# $Id$
+
 #
 # makefile defs (CC, LD,a.s.o)
 #
@@ -123,11 +123,11 @@ endif # verbose
 set_if_empty=$(if $($(1)),,$(eval override $(1)=$(2)))
 
 # flavour: sip-router, ser or kamailio
-$(call	set_if_empty,FLAVOUR,sip-router)
+$(call	set_if_empty,FLAVOUR,kamailio)
 
 #prefix for various configs and scripts
 #config name/name-prefix for distributed configs
-CFG_NAME=sip-router
+CFG_NAME?=sip-router
 #config name/name-prefix for distributed scripts
 SCR_NAME=sip-router
 #name in source tree
@@ -148,26 +148,33 @@ CFG_NAME=kamailio
 KMSTATS ?= 1
 # fast malloc statistics on
 FMSTATS ?= 1
+else # unknown:
+# main binary name
+MAIN_NAME=kamailio
+endif
+
 # application server support on
 WITHAS ?= 1
-else # default:
-# main binary name
-MAIN_NAME=sip-router
-endif
+# enable core hooks for SCTP
+SCTP ?= 1
 
 # what to install
 INSTALL_FLAVOUR=$(FLAVOUR)
 
-#version number
-VERSION = 3
-PATCHLEVEL = 3
-SUBLEVEL = 6
+# version number
+VERSION = 4
+PATCHLEVEL = 1
+SUBLEVEL =  1
 EXTRAVERSION =
 
+# memory manager switcher
+# 0 - f_malloc (fast malloc)
+# 1 - q_malloc (quick malloc)
+MEMMNG ?= 1
 # memory debugger switcher
-# 0 - off (release mode)
-# 1 - on (devel mode)
-MEMDBG ?= 0
+# 0 - off (no-debug mode)
+# 1 - on (debug mode)
+MEMDBG ?= 1
 
 SER_VER = $(shell expr $(VERSION) \* 1000000 + $(PATCHLEVEL) \* 1000 + \
 			$(SUBLEVEL) )
@@ -644,8 +651,6 @@ data_target = $(prefix)/$(data_dir)
 # -DPROFILING
 #		if enabled profiling will be enabled for child processes
 #		Don't forget to set PROFILE (see below)
-# -DUSE_STUN
-#		compiles in stun support
 # -DNO_SIG_DEBUG
 #        turns off debugging messages in signal handlers (which might be 
 #         unsafe)
@@ -679,7 +684,6 @@ C_DEFS= $(extra_defs) \
 	 -DPKG_MALLOC \
 	 -DSHM_MEM  -DSHM_MMAP \
 	 -DDNS_IP_HACK \
-	 -DUSE_IPV6 \
 	 -DUSE_MCAST \
 	 -DUSE_TCP \
 	 -DDISABLE_NAGLE \
@@ -714,13 +718,22 @@ C_DEFS= $(extra_defs) \
 # use make mode=debug all instead. Anyway no by default ser is  compiled w/ 
 # debugging symbols in all cases (-g). --andrei
 
-ifeq ($(MEMDBG), 1)
-	C_DEFS+= -DDBG_QM_MALLOC
+# set memory manager and its debug mode
+ifeq ($(MEMMNG), 1)
+#	use q_malloc
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_QM_MALLOC
+endif
 	C_DEFS+= -DMEM_JOIN_FREE
 else
+#	use f_malloc
 	C_DEFS+= -DF_MALLOC
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_F_MALLOC
+endif
 	C_DEFS+= -DMEM_JOIN_FREE
 endif
+
 ifneq ($(PKG_MEM_SIZE),)
 	C_DEFS+= -DPKG_MEM_SIZE=$(PKG_MEM_SIZE)
 endif
@@ -738,10 +751,6 @@ ifeq ($(FMSTATS), 1)
 endif
 ifeq ($(WITHAS), 1)
 	C_DEFS+= -DWITH_AS_SUPPORT
-endif
-
-ifneq ($(STUN),)
-	C_DEFS+= -DUSE_STUN
 endif
 
 ifeq ($(mode),)
@@ -831,6 +840,7 @@ endif
 
 ifeq ($(ARCH), arm6)
 	use_fast_lock=yes
+	C_DEFS+=-DNOSMP # very unlikely to have an smp arm
 endif
 
 ifeq ($(ARCH), ppc)
@@ -1753,7 +1763,8 @@ ifeq ($(OS), linux)
 			LIBS+=-lpthread
 		endif
 	endif
-	# check for >= 2.5.44
+        # check for >= 2.5.44
+
 	ifeq ($(shell [ $(OSREL_N) -ge 2005044 ] && echo has_epoll), has_epoll)
 		ifeq ($(NO_EPOLL),)
 			C_DEFS+=-DHAVE_EPOLL
@@ -1777,31 +1788,6 @@ ifeq ($(OS), linux)
 	ifeq ($(NO_SELECT),)
 		C_DEFS+=-DHAVE_SELECT
 	endif
-	# sctp support
-	ifeq ($(SCTP),1)
-		# test to see if the devfiles and lib are installed
-		sctp_dev_locations := /usr/include/netinet/sctp.h \
-								$(LOCALBASE)/include/netinet/sctp.h
-		sctp_lib_locations := /usr/lib/libsctp.so \
-								/usr/lib64/libsctp.so \
-								$(LOCALBASE)/usr/local/lib/libsctp.so
-		sctp_dev_path := $(wildcard $(sctp_dev_locations))
-		sctp_lib_path := $(wildcard $(sctp_lib_locations))
-		ifeq ($(sctp_dev_path),)
-$(info "sctp development files not installed -- sctp disabled")
-			override SCTP := 
-		endif
-		ifeq ($(sctp_lib_path),)
-$(info "sctp libraries not installed -- sctp disabled")
-			override SCTP := 
-		endif
-		
-		ifeq ($(SCTP),1)
-			# use lksctp
-			C_DEFS+=-DUSE_SCTP
-			LIBS+=-lsctp
-		endif
-	endif # SCTP
 endif
 
 ifeq  ($(OS), solaris)
@@ -1876,26 +1862,6 @@ ifeq ($(OS), freebsd)
 		C_DEFS+=-DHAVE_SELECT
 	endif
 	YACC=yacc
-	# sctp support
-	ifeq ($(SCTP),1)
-		# test to see if the devfiles and lib are installed
-		sctp_dev_locations := /usr/include/netinet/sctp.h \
-								$(LOCALBASE)/include/netinet/sctp.h
-		sctp_dev_path := $(wildcard $(sctp_dev_locations))
-		ifeq ($(sctp_dev_path),)
-$(info "sctp development files not installed -- sctp disabled")
-			override SCTP := 
-		endif
-		ifeq ($(shell [ $(OSREL_N) -lt 7000 ] && echo sctp), sctp)
-$(info "old freebsd version (>= 7.0 needed) -- sctp disabled")
-			override SCTP := 
-		endif
-		
-		ifeq ($(SCTP),1)
-			C_DEFS+=-DUSE_SCTP
-			LIBS+=  # no extra libs needed on freebsd
-		endif
-	endif # SCTP
 endif
 
 ifeq ($(OS), dragonfly)
@@ -1918,29 +1884,6 @@ ifeq ($(OS), dragonfly)
 		C_DEFS+=-DHAVE_SELECT
 	endif
 	YACC=yacc
-	# sctp support
-	ifeq ($(SCTP),1)
-		# test to see if the devfiles and lib are installed
-		sctp_dev_locations := /usr/include/netinet/sctp.h \
-								$(LOCALBASE)/include/netinet/sctp.h
-		sctp_dev_path := $(wildcard $(sctp_dev_locations))
-		ifeq ($(sctp_dev_path),)
-$(info "sctp development files not installed -- sctp disabled")
-			override SCTP :=
-		endif
-		# FIXME: don't know what's the status of SCTP on dragonfly
-		#        (we suppose the 2.6 version is >= the version in
-		#         in freebsd 7.0)
-		ifeq ($(shell [ $(OSREL_N) -lt 2006 ] && echo sctp), sctp)
-$(info "old dragonfly version (>= 2.6 needed) -- sctp disabled")
-			override SCTP :=
-		endif
-		
-		ifeq ($(SCTP),1)
-			C_DEFS+=-DUSE_SCTP
-			LIBS+=  # no extra libs needed on freebsd
-		endif
-	endif # SCTP
 endif
 
 ifeq ($(OS), openbsd)
@@ -2047,9 +1990,9 @@ ifeq ($(OS), darwin)
 endif
 
 ifneq (,$(findstring cygwin, $(OS)))
-	# cygwin doesn't support IPV6 and doesn't support fd passing so no TCP
-	#C_DEFS:=$(filter-out -DUSE_IPV6 -DUSE_TCP, $(C_DEFS))
-	DEFS_RM+=-DUSE_IPV6 -DUSE_TCP
+	# cygwin does support IPV6 starting from version 1.7, but (still?) doesn't support fd passing so no TCP
+	#C_DEFS:=$(filter-out -DUSE_TCP, $(C_DEFS))
+	DEFS_RM+=-DUSE_TCP
 	C_DEFS+=-DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD \
 			-DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H \
 			-DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER
@@ -2081,11 +2024,6 @@ LIBS+= -L$(LOCALBASE)/lib -L$(LOCALBASE)/ssl/lib -lssl -lcrypto \
 # NOTE: depending on the way in which libssl was compiled you might
 #       have to add -lz -lkrb5   (zlib and kerberos5).
 #       E.g.: make CORE_TLS=1 EXTRA_TLS_LIBS="-lz -lkrb5"
-endif
-
-ifneq ($(STUN),)
-C_INCLUDES+= -I$(LOCALBASE)/ssl/include
-LIBS+= -L$(LOCALBASE)/lib -L$(LOCALBASE)/ssl/lib -lcrypto
 endif
 
 ifneq ($(found_lock_method), yes)

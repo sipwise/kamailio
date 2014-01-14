@@ -160,15 +160,13 @@ static int mod_init(void)
 	attrs_column.len    = strlen(attrs_column.s);
 
 	if(attr_pvar_s.s) {
-		attr_pvar = (pv_spec_t *)shm_malloc(sizeof(pv_spec_t));
-		if(!attr_pvar){
-			LM_ERR("out of shm memory\n");
-			return -1;
-		}
 
 		attr_pvar_s.len = strlen(attr_pvar_s.s);
-		if( (pv_parse_spec(&attr_pvar_s, attr_pvar)==NULL) ||
-				((attr_pvar->type != PVT_AVP) && (attr_pvar->type!=PVT_SCRIPTVAR))) {
+		attr_pvar = pv_cache_get(&attr_pvar_s);
+		if( (attr_pvar==NULL) ||
+				((attr_pvar->type != PVT_AVP) &&
+				 (attr_pvar->type != PVT_XAVP) &&
+				 (attr_pvar->type!=PVT_SCRIPTVAR))) {
 			LM_ERR("invalid pvar name\n");
 			return -1;
 		}
@@ -182,13 +180,15 @@ static int mod_init(void)
 	memset(default_par2, 0, sizeof(dp_param_t));
 
 	default_param_s.len = strlen(default_param_s.s);
-	if (pv_parse_spec( &default_param_s, &default_par2->v.sp[0])==NULL) {
+	default_par2->v.sp[0] = pv_cache_get(&default_param_s);
+	if (default_par2->v.sp[0]==NULL) {
 		LM_ERR("input pv is invalid\n");
 		return -1;
 	}
 
 	default_param_s.len = strlen(default_param_s.s);
-	if (pv_parse_spec( &default_param_s, &default_par2->v.sp[1])==NULL) {
+	default_par2->v.sp[1] = pv_cache_get(&default_param_s);
+	if (default_par2->v.sp[1]==NULL) {
 		LM_ERR("output pv is invalid\n");
 		return -1;
 	}
@@ -218,10 +218,6 @@ static void mod_destroy(void)
 		shm_free(default_par2);
 		default_par2 = NULL;
 	}
-	if(attr_pvar){
-		shm_free(attr_pvar);
-		attr_pvar = NULL;
-	}
 	destroy_data();
 }
 
@@ -237,32 +233,33 @@ static int dp_get_ivalue(struct sip_msg* msg, dp_param_p dp, int *val)
 	pv_value_t value;
 
 	if(dp->type==DP_VAL_INT) {
-		LM_DBG("integer value\n");
 		*val = dp->v.id;
+		LM_DBG("dpid is %d from constant argument\n", *val);
 		return 0;
 	}
 
-	LM_DBG("searching %d\n",dp->v.sp[0].type);
+	LM_DBG("searching %d\n",dp->v.sp[0]->type);
 
-	if( pv_get_spec_value( msg, &dp->v.sp[0], &value)!=0
+	if( pv_get_spec_value( msg, dp->v.sp[0], &value)!=0
 			|| value.flags&(PV_VAL_NULL|PV_VAL_EMPTY) || !(value.flags&PV_VAL_INT)) {
-		LM_ERR("no AVP or SCRIPTVAR found (error in scripts)\n");
+		LM_ERR("no AVP, XAVP or SCRIPTVAR found (error in scripts)\n");
 		return -1;
 	}
 	*val = value.ri;
+	LM_DBG("dpid is %d from pv argument\n", *val);
 	return 0;
 }
 
 
-static int dp_get_svalue(struct sip_msg * msg, pv_spec_t spec, str* val)
+static int dp_get_svalue(struct sip_msg * msg, pv_spec_t *spec, str* val)
 {
 	pv_value_t value;
 
-	LM_DBG("searching %d \n", spec.type);
+	LM_DBG("searching %d \n", spec->type);
 
-	if ( pv_get_spec_value(msg,&spec,&value)!=0 || value.flags&PV_VAL_NULL
+	if ( pv_get_spec_value(msg,spec,&value)!=0 || value.flags&PV_VAL_NULL
 			|| value.flags&PV_VAL_EMPTY || !(value.flags&PV_VAL_STR)){
-		LM_ERR("no AVP or SCRIPTVAR found (error in scripts)\n");
+		LM_ERR("no AVP, XAVP or SCRIPTVAR found (error in scripts)\n");
 		return -1;
 	}
 
@@ -280,7 +277,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
 	memset(&val, 0, sizeof(pv_value_t));
 	val.flags = PV_VAL_STR;
 
-	no_change = (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
+	no_change = (dest==NULL) || (dest->type == PVT_NONE) || (!repl->s) || (!repl->len);
 
 	if (no_change)
 		goto set_attr_pvar;
@@ -295,7 +292,7 @@ static int dp_update(struct sip_msg * msg, pv_spec_t * src, pv_spec_t * dest,
 
 	if(is_route_type(FAILURE_ROUTE)
 			&& (dest->type==PVT_RURI || dest->type==PVT_RURI_USERNAME)) {
-		if (append_branch(msg, 0, 0, 0, Q_UNSPECIFIED, 0, 0)!=1 ){
+	    if (append_branch(msg, 0, 0, 0, Q_UNSPECIFIED, 0, 0, 0, 0, 0, 0) != 1) {
 			LM_ERR("append_branch action failed\n");
 			return -1;
 		}
@@ -358,7 +355,7 @@ static int dp_translate_f(struct sip_msg* msg, char* str1, char* str2)
 			input.len, input.s, idp->dp_id, output.len, output.s);
 
 	/*set the output*/
-	if (dp_update(msg, &repl_par->v.sp[0], &repl_par->v.sp[1], 
+	if (dp_update(msg, repl_par->v.sp[0], repl_par->v.sp[1],
 				&output, attrs_par) !=0){
 		LM_ERR("cannot set the output\n");
 		return -1;
@@ -371,20 +368,22 @@ static int dp_translate_f(struct sip_msg* msg, char* str1, char* str2)
 #define verify_par_type(_par_no, _spec)\
 	do{\
 		if( ((_par_no == 1) \
-					&& ((_spec).type != PVT_AVP) && ((_spec).type!=PVT_SCRIPTVAR) )\
+					&& (_spec->type != PVT_AVP) && (_spec->type != PVT_XAVP) && \
+					(_spec->type!=PVT_SCRIPTVAR) )\
 				||((_par_no == 2) \
-					&& ((_spec).type != PVT_AVP) && ((_spec).type!=PVT_SCRIPTVAR) \
-					&& ((_spec).type!=PVT_RURI) && (_spec.type!=PVT_RURI_USERNAME))){\
+					&& (_spec->type != PVT_AVP) && (_spec->type != PVT_XAVP) && \
+					(_spec->type!=PVT_SCRIPTVAR) \
+					&& (_spec->type!=PVT_RURI) && (_spec->type!=PVT_RURI_USERNAME))){\
 			\
-			LM_ERR("Unsupported Parameter TYPE\n");\
+			LM_ERR("Unsupported Parameter TYPE[%d]\n", _spec->type);\
 			return E_UNSPEC;\
 		}\
 	}while(0);
 
 
-/* first param: DPID: type: INT, AVP, SVAR
+/* first param: DPID: type: INT, AVP, XAVP, SVAR
  * second param: SRC type: any psedo variable type
- * second param: DST type: RURI, RURI_USERNAME, AVP, SVAR, N/A
+ * second param: DST type: RURI, RURI_USERNAME, AVP, XAVP, SVAR, N/A
  * default value for the second param: $ru.user/$ru.user
  */
 static int dp_trans_fixup(void ** param, int param_no){
@@ -394,7 +393,7 @@ static int dp_trans_fixup(void ** param, int param_no){
 	char *p, *s=NULL;
 	str lstr;
 
-	if(param_no!=1 && param_no!=2) 
+	if(param_no!=1 && param_no!=2)
 		return 0;
 
 	p = (char*)*param;
@@ -426,7 +425,8 @@ static int dp_trans_fixup(void ** param, int param_no){
 			dp_par->v.id = dpid;
 		}else{
 			lstr.s = p; lstr.len = strlen(p);
-			if (pv_parse_spec( &lstr, &dp_par->v.sp[0])==NULL)
+			dp_par->v.sp[0] = pv_cache_get(&lstr);
+			if (dp_par->v.sp[0]==NULL)
 				goto error;
 
 			verify_par_type(param_no, dp_par->v.sp[0]);
@@ -442,16 +442,16 @@ static int dp_trans_fixup(void ** param, int param_no){
 		}
 
 		lstr.s = p; lstr.len = strlen(p);
-		if(pv_parse_spec( &lstr, &dp_par->v.sp[0])==NULL)
+		dp_par->v.sp[0] = pv_cache_get(&lstr);
+		if(dp_par->v.sp[0]==NULL)
 			goto error;
 
 		if (s != 0) {
 			lstr.s = s; lstr.len = strlen(s);
-			if (pv_parse_spec( &lstr, &dp_par->v.sp[1] )==NULL)
+			dp_par->v.sp[1] = pv_cache_get(&lstr);
+			if (dp_par->v.sp[1]==NULL)
 				goto error;
 			verify_par_type(param_no, dp_par->v.sp[1]);
-		} else {
-			dp_par->v.sp[1].type = PVT_NONE;
 		}
 
 		dp_par->type = DP_VAL_SPEC;
@@ -672,7 +672,7 @@ static void dialplan_rpc_translate(rpc_t* rpc, void* ctx)
 rpc_export_t dialplan_rpc_list[] = {
 	{"dialplan.reload", dialplan_rpc_reload,
 		dialplan_rpc_reload_doc, 0},
-	{"dialplan.dump",   dialplan_rpc_translate,
+	{"dialplan.translate",   dialplan_rpc_translate,
 		dialplan_rpc_translate_doc, 0},
 	{0, 0, 0, 0}
 };

@@ -140,6 +140,8 @@ inline static void addr_info_list_ins_lst(struct addr_info* lst,
 /* protocol order, filled by init_proto_order() */
 enum sip_protos nxt_proto[PROTO_LAST+1]=
 { PROTO_UDP, PROTO_TCP, PROTO_TLS, PROTO_SCTP, 0 };
+/* Deliberately left PROTO_WS and PROTO_WSS out of this as they are just
+   upgraded TCP and TLS connections */
 
 
 
@@ -329,7 +331,7 @@ static void free_sock_info(struct socket_info* si)
 
 
 
-static char* get_valid_proto_name(unsigned short proto)
+char* get_valid_proto_name(unsigned short proto)
 {
 	switch(proto){
 		case PROTO_NONE:
@@ -476,11 +478,13 @@ struct socket_info** get_sock_info_list(unsigned short proto)
 			return &udp_listen;
 			break;
 		case PROTO_TCP:
+		case PROTO_WS:
 #ifdef USE_TCP
 			return &tcp_listen;
 #endif
 			break;
 		case PROTO_TLS:
+		case PROTO_WSS:
 #ifdef USE_TLS
 			return &tls_listen;
 #endif
@@ -509,9 +513,7 @@ struct socket_info** get_sock_info_list(unsigned short proto)
 inline static int si_hname_cmp(str* host, str* name, str* addr_str, 
 								struct ip_addr* ip_addr, int flags)
 {
-#ifdef USE_IPV6
 	struct ip_addr* ip6;
-#endif
 	
 	if ( (host->len==name->len) && 
 		(strncasecmp(host->s, name->s, name->len)==0) /*slower*/)
@@ -520,7 +522,6 @@ inline static int si_hname_cmp(str* host, str* name, str* addr_str,
 		 * ipv6 addresses if we are lucky*/
 		goto found;
 	/* check if host == ip address */
-#ifdef USE_IPV6
 	/* ipv6 case is uglier, host can be [3ffe::1] */
 	ip6=str2ip6(host);
 	if (ip6){
@@ -530,7 +531,6 @@ inline static int si_hname_cmp(str* host, str* name, str* addr_str,
 			return -1; /* no match, but this is an ipv6 address
 						 so no point in trying ipv4 */
 	}
-#endif
 	/* ipv4 */
 	if ( (!(flags&SI_IS_IP)) && (host->len==addr_str->len) && 
 			(memcmp(host->s, addr_str->s, addr_str->len)==0) )
@@ -559,14 +559,14 @@ struct socket_info* grep_sock_info(str* host, unsigned short port,
 	unsigned short c_proto;
 	
 	hname=*host;
-#ifdef USE_IPV6
 	if ((hname.len>2)&&((*hname.s)=='[')&&(hname.s[hname.len-1]==']')){
 		/* ipv6 reference, skip [] */
 		hname.s++;
 		hname.len-=2;
 	}
-#endif
+
 	c_proto=(proto!=PROTO_NONE)?proto:PROTO_UDP;
+retry:
 	do{
 		/* get the proper sock_list */
 		list=get_sock_info_list(c_proto);
@@ -612,7 +612,15 @@ struct socket_info* grep_sock_info(str* host, unsigned short port,
 									&ai->address, ai->flags)==0)
 					goto found;
 		}
+
 	}while( (proto==0) && (c_proto=next_proto(c_proto)) );
+
+#ifdef USE_TLS
+	if (unlikely(c_proto == PROTO_WS)) {
+		c_proto = PROTO_WSS;
+		goto retry;
+	}
+#endif
 /* not_found: */
 	return 0;
 found:
@@ -833,6 +841,7 @@ int add_listen_iface(char* name, struct name_lst* addr_l,
 }
 #ifdef __OS_linux
 
+#include "linux/types.h"
 #include "linux/netlink.h"
 #include "linux/rtnetlink.h"
 #include "arpa/inet.h"
@@ -1260,12 +1269,8 @@ int add_interfaces(char* if_name, int family, unsigned short port,
 				#else
 					( (ifr.ifr_addr.sa_family==AF_INET)?
 						sizeof(struct sockaddr_in):
-					#ifdef USE_IPV6
 						((ifr.ifr_addr.sa_family==AF_INET6)?
 						sizeof(struct sockaddr_in6):sizeof(struct sockaddr)) )
-					#else /* USE_IPV6 */
-						sizeof(struct sockaddr) )
-					#endif /* USE_IPV6 */
 				#endif
 				)
 			#endif
@@ -1828,13 +1833,11 @@ int fix_all_socket_lists()
 		){
 		/* get all listening ipv4/ipv6 interfaces */
 		if ( ( (add_interfaces(0, AF_INET, 0,  PROTO_UDP, &ai_lst)==0)
-#ifdef USE_IPV6
 #ifdef __OS_linux
 		&&  (!auto_bind_ipv6 || add_interfaces_via_netlink(0, AF_INET6, 0, PROTO_UDP, &ai_lst) == 0)
 #else
 		&& ( !auto_bind_ipv6 || add_interfaces(0, AF_INET6, 0,  PROTO_UDP, &ai_lst) !=0 ) /* add_interface does not work for IPv6 on Linux */
 #endif /* __OS_linux */
-#endif /* USE_IPV6 */
 			 ) && (addr_info_to_si_lst(ai_lst, 0, PROTO_UDP, 0, &udp_listen)==0)){
 			free_addr_info_lst(&ai_lst);
 			ai_lst=0;
@@ -1842,13 +1845,11 @@ int fix_all_socket_lists()
 #ifdef USE_TCP
 			if (!tcp_disable){
 				if ( ((add_interfaces(0, AF_INET, 0,  PROTO_TCP, &ai_lst)!=0)
-#ifdef USE_IPV6
 #ifdef __OS_linux
     				|| (auto_bind_ipv6 && add_interfaces_via_netlink(0, AF_INET6, 0, PROTO_TCP, &ai_lst) != 0)
 #else
 				|| (auto_bind_ipv6 && add_interfaces(0, AF_INET6, 0,  PROTO_TCP, &ai_lst) !=0 )
 #endif /* __OS_linux */
-#endif /* USE_IPV6 */
 				) || (addr_info_to_si_lst(ai_lst, 0, PROTO_TCP, 0,
 										 				&tcp_listen)!=0))
 					goto error;
@@ -1858,13 +1859,11 @@ int fix_all_socket_lists()
 				if (!tls_disable){
 					if (((add_interfaces(0, AF_INET, 0, PROTO_TLS,
 										&ai_lst)!=0)
-#ifdef USE_IPV6
 #ifdef __OS_linux
     				|| (auto_bind_ipv6 && add_interfaces_via_netlink(0, AF_INET6, 0, PROTO_TLS, &ai_lst) != 0)
 #else
 				|| (auto_bind_ipv6 && add_interfaces(0, AF_INET6, 0,  PROTO_TLS, &ai_lst)!=0)
 #endif /* __OS_linux */
-#endif /* USE_IPV6 */
 					) || (addr_info_to_si_lst(ai_lst, 0, PROTO_TLS, 0,
 										 				&tls_listen)!=0))
 						goto error;
@@ -1877,13 +1876,11 @@ int fix_all_socket_lists()
 #ifdef USE_SCTP
 			if (!sctp_disable){
 				if (((add_interfaces(0, AF_INET, 0,  PROTO_SCTP, &ai_lst)!=0)
-#ifdef USE_IPV6
 #ifdef __OS_linux
     				|| (auto_bind_ipv6 && add_interfaces_via_netlink(0, AF_INET6, 0, PROTO_SCTP, &ai_lst) != 0)
 #else
 				|| (auto_bind_ipv6 && add_interfaces(0, AF_INET6, 0,  PROTO_SCTP, &ai_lst) != 0)
 #endif /* __OS_linux */
-#endif /* USE_IPV6 */
 					) || (addr_info_to_si_lst(ai_lst, 0, PROTO_SCTP, 0,
 							 				&sctp_listen)!=0))
 					goto error;
@@ -2003,7 +2000,7 @@ void print_all_socket_lists()
 						si->flags & SI_IS_MCAST ? " mcast" : "",
 						si->flags & SI_IS_MHOMED? " mhomed" : "");
 				if (si->useinfo.name.s)
-					printf(" advertise %s", si->useinfo.name.s);
+					printf(" advertise %s:%d", si->useinfo.name.s, si->useinfo.port_no);
 				printf("\n");
 			}
 		}
@@ -2054,6 +2051,103 @@ void init_proto_order()
 			if (nxt_proto[r]==PROTO_SCTP)
 				nxt_proto[r]=nxt_proto[PROTO_SCTP];
 		}
+
+	/* Deliberately skipping PROTO_WS and PROTO_WSS here as these
+	   are just upgraded TCP and TLS connections */
 }
 
 
+/**
+ * parse '[port:]host[:port]' string to a broken down structure
+ */
+int parse_protohostport(str* ins, sr_phostp_t *r)
+{
+	char* first; /* first ':' occurrence */
+	char* second; /* second ':' occurrence */
+	char* p;
+	int bracket;
+	char* tmp;
+
+	first=second=0;
+	bracket=0;
+	memset(r, 0, sizeof(sr_phostp_t));
+
+	/* find the first 2 ':', ignoring possible ipv6 addresses
+	 * (substrings between [])
+	 */
+	for(p=ins->s; p<ins->s+ins->len; p++){
+		switch(*p){
+			case '[':
+				bracket++;
+				if (bracket>1) goto error_brackets;
+				break;
+			case ']':
+				bracket--;
+				if (bracket<0) goto error_brackets;
+				break;
+			case ':':
+				if (bracket==0){
+					if (first==0) first=p;
+					else if( second==0) second=p;
+					else goto error_colons;
+				}
+				break;
+		}
+	}
+	if (p==ins->s) return -1;
+	if (*(p-1)==':') goto error_colons;
+
+	if (first==0) { /* no ':' => only host */
+		r->host.s=ins->s;
+		r->host.len=(int)(p-ins->s);
+		goto end;
+	}
+	if (second) { /* 2 ':' found => check if valid */
+		if (parse_proto((unsigned char*)ins->s, first-ins->s, &r->proto)<0)
+			goto error_proto;
+		r->port=strtol(second+1, &tmp, 10);
+		if ((tmp==0)||(*tmp)||(tmp==second+1)) goto error_port;
+		r->host.s=first+1;
+		r->host.len=(int)(second-r->host.s);
+		goto end;
+	}
+	/* only 1 ':' found => it's either proto:host or host:port */
+	r->port=strtol(first+1, &tmp, 10);
+	if ((tmp==0)||(*tmp)||(tmp==first+1)){
+		/* invalid port => it's proto:host */
+		if (parse_proto((unsigned char*)ins->s, first-ins->s, &r->proto)<0)
+			goto error_proto;
+		r->host.s=first+1;
+		r->host.len=(int)(p-r->host.s);
+	}else{
+		/* valid port => its host:port */
+		r->host.s=ins->s;
+		r->host.len=(int)(first-r->host.s);
+	}
+end:
+	return 0;
+error_brackets:
+	LOG(L_ERR, "too many brackets in %.*s\n", ins->len, ins->s);
+	return -1;
+error_colons:
+	LOG(L_ERR, "too many colons in %.*s\n", ins->len, ins->s);
+	return -1;
+error_proto:
+	LOG(L_ERR, "bad protocol in %.*s\n", ins->len, ins->s);
+	return -1;
+error_port:
+	LOG(L_ERR, "bad port number in %.*s\n", ins->len, ins->s);
+	return -1;
+}
+
+/**
+ * lookup a local socket by '[port:]host[:port]' string
+ */
+struct socket_info* lookup_local_socket(str *phostp)
+{
+	sr_phostp_t r;
+	if(parse_protohostport(phostp, &r)<0)
+		return NULL;
+	return grep_sock_info(&r.host, (unsigned short)r.port,
+			(unsigned short)r.proto);
+}

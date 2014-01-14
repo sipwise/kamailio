@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "mem/mem.h"
 #include "mem/shm_mem.h"
 #include "dprint.h"
 #include "hashes.h"
@@ -113,6 +114,56 @@ static sr_xavp_t *xavp_new_value(str *name, sr_xval_t *val)
 	return avp;
 }
 
+int xavp_add(sr_xavp_t *xavp, sr_xavp_t **list)
+{
+	if (xavp==NULL)
+		return -1;
+	/* Prepend new xavp to the list */
+	if(list) {
+		xavp->next = *list;
+		*list = xavp;
+	} else {
+		xavp->next = *_xavp_list_crt;
+		*_xavp_list_crt = xavp;
+	}
+
+	return 0;
+}
+
+int xavp_add_last(sr_xavp_t *xavp, sr_xavp_t **list)
+{
+	sr_xavp_t *prev;
+	sr_xavp_t *crt;
+
+	if (xavp==NULL)
+		return -1;
+
+	crt = xavp_get_internal(&xavp->name, list, 0, 0);
+
+	prev = NULL;
+
+	while(crt) {
+		prev = crt;
+		crt = xavp_get_next(prev);
+	}
+
+	if(prev==NULL) {
+		/* Prepend new xavp to the list */
+		if(list) {
+			xavp->next = *list;
+			*list = xavp;
+		} else {
+			xavp->next = *_xavp_list_crt;
+			*_xavp_list_crt = xavp;
+		}
+	} else {
+		xavp->next = prev->next;
+		prev->next = xavp;
+	}
+
+	return 0;
+}
+
 sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 {
 	sr_xavp_t *avp=0;
@@ -131,6 +182,38 @@ sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 	}
 
 	return avp;
+}
+
+sr_xavp_t *xavp_add_xavp_value(str *rname, str *name, sr_xval_t *val, sr_xavp_t **list)
+{
+	sr_xavp_t *ravp=0;
+	sr_xavp_t *cavp=0;
+	sr_xval_t rval;
+
+	cavp = xavp_new_value(name, val);
+	if (cavp==NULL)
+		return NULL;
+
+	memset(&rval, 0, sizeof(sr_xval_t));
+	rval.type = SR_XTYPE_XAVP;
+	rval.v.xavp = cavp;
+
+	ravp = xavp_new_value(rname, &rval);
+	if (ravp==NULL) {
+		xavp_destroy_list(&cavp);
+		return NULL;
+	}
+
+	/* Prepend new value to the list */
+	if(list) {
+		ravp->next = *list;
+		*list = ravp;
+	} else {
+		ravp->next = *_xavp_list_crt;
+		*_xavp_list_crt = ravp;
+	}
+
+	return ravp;
 }
 
 sr_xavp_t *xavp_set_value(str *name, int idx, sr_xval_t *val, sr_xavp_t **list)
@@ -453,5 +536,304 @@ void xavp_print_list_content(sr_xavp_t **head, int level)
 void xavp_print_list(sr_xavp_t **head)
 {
 	xavp_print_list_content(head, 0);
+}
+
+/**
+ * returns a list of str with key names.
+ * Example:
+ * If we have this structure
+ * $xavp(test=>one) = 1
+ * $xavp(test[0]=>two) = "2"
+ * $xavp(test[0]=>three) = 3
+ * $xavp(test[0]=>four) = $xavp(whatever)
+ * $xavp(test[0]=>two) = "other 2"
+ *
+ * xavp_get_list_keys_names(test[0]) returns
+ * {"one", "two", "three", "four"}
+ *
+ * free the struct str_list afterwards
+ * but do *NO* free the strings inside
+ */
+struct str_list *xavp_get_list_key_names(sr_xavp_t *xavp)
+{
+	sr_xavp_t *avp = NULL;
+	struct str_list *result = NULL;
+	struct str_list *r = NULL;
+	struct str_list *f = NULL;
+	int total = 0;
+
+	if(xavp==NULL){
+		LM_ERR("xavp is NULL\n");
+		return 0;
+	}
+
+	if(xavp->val.type!=SR_XTYPE_XAVP){
+		LM_ERR("%s not xavp?\n", xavp->name.s);
+		return 0;
+	}
+
+	avp = xavp->val.v.xavp;
+
+	if (avp)
+	{
+		result = (struct str_list*)pkg_malloc(sizeof(struct str_list));
+		if (result==NULL) {
+			PKG_MEM_ERROR;
+			return 0;
+		}
+		r = result;
+		r->s.s = avp->name.s;
+		r->s.len = avp->name.len;
+		r->next = NULL;
+		avp = avp->next;
+	}
+
+	while(avp)
+	{
+		f = result;
+		while(f)
+		{
+			if((avp->name.len==f->s.len)&&
+				(strncmp(avp->name.s, f->s.s, f->s.len)==0))
+			{
+				break; /* name already on list */
+			}
+			f = f->next;
+		}
+		if (f==NULL)
+		{
+			r = append_str_list(avp->name.s, avp->name.len, &r, &total);
+			if(r==NULL){
+				while(result){
+					r = result;
+					result = result->next;
+					pkg_free(r);
+				}
+				return 0;
+			}
+		}
+		avp = avp->next;
+	}
+	return result;
+}
+
+/**
+ * clone the xavp without values that are custom data
+ * - only one list level is cloned, other sublists are ignored
+ */
+sr_xavp_t *xavp_clone_level_nodata(sr_xavp_t *xold)
+{
+	sr_xavp_t *xnew = NULL;
+	sr_xavp_t *navp = NULL;
+	sr_xavp_t *oavp = NULL;
+	sr_xavp_t *pavp = NULL;
+
+	if(xold == NULL)
+	{
+		return NULL;
+	}
+	if(xold->val.type==SR_XTYPE_DATA)
+	{
+		LM_INFO("xavp value type is 'data' - ignoring in clone\n");
+		return NULL;
+	}
+	xnew = xavp_new_value(&xold->name, &xold->val);
+	if(xnew==NULL)
+	{
+		LM_ERR("cannot create cloned root xavp\n");
+		return NULL;
+	}
+
+	if(xold->val.type!=SR_XTYPE_XAVP)
+	{
+		return xnew;
+	}
+
+	xnew->val.v.xavp = NULL;
+	oavp = xold->val.v.xavp;
+
+	while(oavp)
+	{
+		if(oavp->val.type!=SR_XTYPE_DATA && oavp->val.type!=SR_XTYPE_XAVP)
+		{
+			navp =  xavp_new_value(&oavp->name, &oavp->val);
+			if(navp==NULL)
+			{
+				LM_ERR("cannot create cloned embedded xavp\n");
+				if(xnew->val.v.xavp == NULL)
+				{
+					shm_free(xnew);
+					return NULL;
+				} else {
+					xavp_destroy_list(&navp);
+					return NULL;
+				}
+			}
+			if(xnew->val.v.xavp == NULL)
+			{
+				/* link to val in head xavp */
+				xnew->val.v.xavp = navp;
+				pavp = navp;
+			} else {
+				/* link to prev xavp in the list */
+				pavp->next = navp;
+			}
+		}
+		oavp = oavp->next;
+	}
+
+	if(xnew->val.v.xavp == NULL)
+	{
+		shm_free(xnew);
+		return NULL;
+	}
+
+	return xnew;
+}
+
+int xavp_insert(sr_xavp_t *xavp, int idx, sr_xavp_t **list)
+{
+	sr_xavp_t *crt = 0;
+	sr_xavp_t *fst = 0;
+	sr_xavp_t *lst = 0;
+	sr_xval_t val;
+	int n = 0;
+	int i = 0;
+
+	if(idx==0)
+		return xavp_add(xavp, list);
+
+	crt = xavp_get_internal(&xavp->name, list, 0, 0);
+	while(crt!=NULL && n<idx) {
+		lst = crt;
+		n++;
+		crt = xavp_get_next(lst);
+	}
+	memset(&val, 0, sizeof(sr_xval_t));
+	val.type = SR_XTYPE_NULL;
+	for(i=0; i<idx-n; i++) {
+		crt = xavp_add_value(&xavp->name, &val, list);
+		if(crt==NULL)
+			return -1;
+		if(fst==NULL)
+			fst = crt;
+		if(lst==NULL) {
+			if(xavp_add(crt, list)<0)
+				return -1;
+		} else {
+			crt->next = lst->next;
+			lst->next = crt;
+		}
+	}
+
+	if(fst==NULL) {
+		return xavp_add(xavp, list);
+	} else {
+		xavp->next = fst->next;
+		fst->next = xavp;
+	}
+
+	return 0;
+}
+
+sr_xavp_t *xavp_extract(str *name, sr_xavp_t **list)
+{
+	sr_xavp_t *avp = 0;
+	sr_xavp_t *foo;
+	sr_xavp_t *prv = 0;
+	unsigned int id;
+
+	if(name==NULL || name->s==NULL) {
+		if(list!=NULL) {
+			avp = *list;
+			if(avp!=NULL) {
+				*list = avp->next;
+				avp->next = NULL;
+			}
+		} else {
+			avp = *_xavp_list_crt;
+			if(avp!=NULL) {
+				*_xavp_list_crt = avp->next;
+				avp->next = NULL;
+			}
+		}
+		
+		return avp;
+	}
+
+	id = get_hash1_raw(name->s, name->len);
+	if(list!=NULL)
+		avp = *list;
+	else
+		avp = *_xavp_list_crt;
+	while(avp)
+	{
+		foo = avp;
+		avp=avp->next;
+		if(foo->id==id && foo->name.len==name->len
+				&& strncmp(foo->name.s, name->s, name->len)==0)
+		{
+			if(prv!=NULL)
+				prv->next=foo->next;
+			else if(list!=NULL)
+				*list = foo->next;
+			else
+				*_xavp_list_crt = foo->next;
+			foo->next = NULL;
+			return foo;
+		} else {
+			prv = foo;
+		}
+	}
+	return NULL;
+}
+
+/**
+ * return child node of an xavp
+ * - $xavp(rname=>cname)
+ */
+sr_xavp_t* xavp_get_child(str *rname, str *cname)
+{
+	sr_xavp_t *ravp=NULL;
+
+	ravp = xavp_get(rname, NULL);
+	if(ravp==NULL || ravp->val.type!=SR_XTYPE_XAVP)
+		return NULL;
+
+	return xavp_get(cname, ravp->val.v.xavp);
+}
+
+
+/**
+ * return child node of an xavp if it has int value
+ * - $xavp(rname=>cname)
+ */
+sr_xavp_t* xavp_get_child_with_ival(str *rname, str *cname)
+{
+	sr_xavp_t *vavp=NULL;
+
+	vavp = xavp_get_child(rname, cname);
+
+	if(vavp==NULL || vavp->val.type!=SR_XTYPE_INT)
+		return NULL;
+
+	return vavp;
+}
+
+
+/**
+ * return child node of an xavp if it has string value
+ * - $xavp(rname=>cname)
+ */
+sr_xavp_t* xavp_get_child_with_sval(str *rname, str *cname)
+{
+	sr_xavp_t *vavp=NULL;
+
+	vavp = xavp_get_child(rname, cname);
+
+	if(vavp==NULL || vavp->val.type!=SR_XTYPE_STR)
+		return NULL;
+
+	return vavp;
 }
 #endif

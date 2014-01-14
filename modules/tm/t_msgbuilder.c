@@ -152,7 +152,7 @@ char *build_local(struct cell *Trans,unsigned int branch,
 	*len+= via_len;
 	/*headers*/
 	*len+=Trans->from.len+Trans->callid.len+to->len+
-		+Trans->cseq_n.len+1+method_len+CRLF_LEN; 
+		+Trans->cseq_n.len+1+method_len+CRLF_LEN+MAXFWD_HEADER_LEN; 
 
 
 	/* copy'n'paste Route headers */
@@ -226,6 +226,7 @@ char *build_local(struct cell *Trans,unsigned int branch,
 	append_str( p, Trans->cseq_n.s, Trans->cseq_n.len );
 	append_str( p, " ", 1 );
 	append_str( p, method, method_len );
+	append_str( p, MAXFWD_HEADER, MAXFWD_HEADER_LEN );
 	append_str( p, CRLF, CRLF_LEN );
 
 	if (!is_local(Trans))  {
@@ -814,9 +815,7 @@ static unsigned long nhop_type(sip_msg_t *orig_inv, rte_t *rtset,
 		return F_RB_NH_STRICT;
 	/* if 1st route contains an IP address, comparing it against .dst */
 	if ((uri_ia = str2ip(&topr_uri.host))
-#ifdef USE_IPV6
 			|| (uri_ia = str2ip6(&topr_uri.host))
-#endif
 			) {
 		/* we have an IP address in route -> comparison can go swiftly */
 		if (init_su(&uri_sau, uri_ia, uri_port) < 0)
@@ -1397,10 +1396,13 @@ static inline char* print_request_uri(char* w, str* method, dlg_t* dialog, struc
 static inline char* print_to(char* w, dlg_t* dialog, struct cell* t)
 {
 	t->to.s = w;
-	t->to.len = TO_LEN + dialog->rem_uri.len + CRLF_LEN;
+	t->to.len = TO_LEN + dialog->rem_uri.len + CRLF_LEN
+		+ ((dialog->rem_uri.s[0]!='<')?2:0);
 
 	memapp(w, TO, TO_LEN);
+	if(dialog->rem_uri.s[0]!='<') memapp(w, "<", 1);
 	memapp(w, dialog->rem_uri.s, dialog->rem_uri.len);
+	if(dialog->rem_uri.s[0]!='<') memapp(w, ">", 1);
 
 	if (dialog->id.rem_tag.len) {
 		t->to.len += TOTAG_LEN + dialog->id.rem_tag.len ;
@@ -1419,10 +1421,13 @@ static inline char* print_to(char* w, dlg_t* dialog, struct cell* t)
 static inline char* print_from(char* w, dlg_t* dialog, struct cell* t)
 {
 	t->from.s = w;
-	t->from.len = FROM_LEN + dialog->loc_uri.len + CRLF_LEN;
+	t->from.len = FROM_LEN + dialog->loc_uri.len + CRLF_LEN
+		+ ((dialog->loc_uri.s[0]!='<')?2:0);
 
 	memapp(w, FROM, FROM_LEN);
+	if(dialog->loc_uri.s[0]!='<') memapp(w, "<", 1);
 	memapp(w, dialog->loc_uri.s, dialog->loc_uri.len);
+	if(dialog->loc_uri.s[0]!='<') memapp(w, ">", 1);
 
 	if (dialog->id.loc_tag.len) {
 		t->from.len += FROMTAG_LEN + dialog->id.loc_tag.len;
@@ -1474,11 +1479,34 @@ static inline char* print_callid(char* w, dlg_t* dialog, struct cell* t)
 	memapp(w, CRLF, CRLF_LEN);
 	t->callid.s = w;
 	t->callid.len = CALLID_LEN + dialog->id.call_id.len + CRLF_LEN;
-
+	
 	w = print_callid_mini(w, dialog->id.call_id);
 	return w;
 }
 
+/*
+* Find the first occurrence of find in s, where the search is limited to the
+* first slen characters of s.
+*/
+static
+char * _strnstr(const char* s, const char* find, size_t slen) {
+	char c, sc;
+	size_t len;
+
+	if ((c = *find++) != '\0') {
+		len = strlen(find);
+		do {
+			do {
+				if (slen-- < 1 || (sc = *s++) == '\0')
+					return (NULL);
+			} while (sc != c);
+			if (len > slen)
+				return (NULL);
+		} while (strncmp(s, find, len) != 0);
+		s--;
+	}
+	return ((char *)s);
+}
 
 /*
  * Create a request
@@ -1488,6 +1516,7 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 {
 	char* buf, *w;
 	str content_length, cseq, via;
+	unsigned int maxfwd_len;
 
 	if (!method || !dialog) {
 		LOG(L_ERR, "build_uac_req(): Invalid parameter value\n");
@@ -1501,6 +1530,14 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 		LOG(L_ERR, "build_uac_req(): Error while printing CSeq number\n");
 		return 0;
 	}
+
+	if(headers==NULL || headers->len<15
+			|| _strnstr(headers->s, "Max-Forwards:", headers->len)==NULL) {
+		maxfwd_len = MAXFWD_HEADER_LEN;
+	} else {
+		maxfwd_len = 0;
+	}
+
 	*len = method->len + 1 + dialog->hooks.request_uri->len + 1 + SIP_VERSION_LEN + CRLF_LEN;
 
 	if (assemble_via(&via, t, dst, branch) < 0) {
@@ -1511,11 +1548,14 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 
 	*len += TO_LEN + dialog->rem_uri.len
 		+ (dialog->id.rem_tag.len ? (TOTAG_LEN + dialog->id.rem_tag.len) : 0) + CRLF_LEN;    /* To */
+	if(dialog->rem_uri.s[0]!='<') *len += 2; /* To-URI < > */
 	*len += FROM_LEN + dialog->loc_uri.len
 		+ (dialog->id.loc_tag.len ? (FROMTAG_LEN + dialog->id.loc_tag.len) : 0) + CRLF_LEN;  /* From */
+	if(dialog->loc_uri.s[0]!='<') *len += 2; /* From-URI < > */
 	*len += CALLID_LEN + dialog->id.call_id.len + CRLF_LEN;                                      /* Call-ID */
 	*len += CSEQ_LEN + cseq.len + 1 + method->len + CRLF_LEN;                                    /* CSeq */
 	*len += calculate_routeset_length(dialog);                                                   /* Route set */
+	*len += maxfwd_len;                                                                          /* Max-forwards */	
 	*len += CONTENT_LENGTH_LEN + content_length.len + CRLF_LEN; /* Content-
 																	 Length */
 	*len += (server_signature ? (user_agent_hdr.len + CRLF_LEN) : 0);	                         /* Signature */
@@ -1538,6 +1578,9 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 	w = print_cseq(w, &cseq, method, t);                  /* CSeq */
 	w = print_callid(w, dialog, t);                       /* Call-ID */
 	w = print_routeset(w, dialog);                        /* Route set */
+
+	if(maxfwd_len>0)
+		memapp(w, MAXFWD_HEADER, MAXFWD_HEADER_LEN);      /* Max-forwards */
 
      /* Content-Length */
 	memapp(w, CONTENT_LENGTH, CONTENT_LENGTH_LEN);
@@ -1569,11 +1612,7 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 int t_calc_branch(struct cell *t, 
 	int b, char *branch, int *branch_len)
 {
-	return syn_branch ?
-		branch_builder( t->hash_index,
-			t->label, 0,
-			b, branch, branch_len )
-		: branch_builder( t->hash_index,
+	return branch_builder( t->hash_index,
 			0, t->md5,
 			b, branch, branch_len );
 }

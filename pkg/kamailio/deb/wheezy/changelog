@@ -1,50 +1,26 @@
-kamailio (3.3.6) unstable; urgency=low
+kamailio (4.1.1) unstable; urgency=low
 
-  * update to 3.3.6 from upstream
+  * update to 4.1.1 from upstream
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 19 Dec 2013 16:35:00 +0100
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 09 Jan 2014 15:45:35 +0100
 
-kamailio (3.3.5) unstable; urgency=low
+kamailio (4.1.0) unstable; urgency=low
 
-  * update to 3.3.5 from upstream
+  * update to 4.1.0
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Mon, 12 Aug 2013 18:05:00 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Wed, 04 Dec 2013 11:42:27 +0100
 
-kamailio (3.3.4) unstable; urgency=low
+kamailio (4.0.0) unstable; urgency=low
 
-  * update to 3.3.4 from upstream
+  * update to 4.0.0 from upstream
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Mon, 25 Feb 2013 17:25:00 +0100
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Mon, 11 Mar 2013 10:40:30 +0100
 
-kamailio (3.3.3) unstable; urgency=low
+kamailio (3.4.0~dev0) unstable; urgency=low
 
-  * update to 3.3.3 from upstream
+  * update version to 3.4.0~dev0
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Tue, 19 Dec 2012 15:45:00 +0100
-
-kamailio (3.3.2) unstable; urgency=low
-
-  * update to 3.3.2 from upstream
-
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Tue, 16 Oct 2012 15:20:00 +0100
-
-kamailio (3.3.1) unstable; urgency=low
-
-  * update to 3.3.1 from upstream
-
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 2 Aug 2012 14:40:00 +0100
-
-kamailio (3.3.0) unstable; urgency=low
-
-  * update to 3.3.0 from upstream
-
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Mon, 18 Jun 2011 10:20:00 +0100
-
-kamailio (3.3.0-rc0) unstable; urgency=low
-
-  * update version to 3.3.0-rc0
-
- -- Jon Bonilla <manwe@aholab.ehu.es>  Tue, 12 Jun 2012 16:30:00 +0100
+ -- Jon Bonilla <manwe@aholab.ehu.es>  Wed, 15 Jun 2012 03:15:00 +0100
 
 kamailio (3.2.0) unstable; urgency=low
 

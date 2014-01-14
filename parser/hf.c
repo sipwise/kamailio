@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -59,11 +57,12 @@
 #include "parse_disposition.h"
 #include "parse_allow.h"
 #include "../ut.h"
+#include "parse_ppi_pai.h"
 
 /** Frees a hdr_field structure.
  * WARNING: it frees only parsed (and not name.s, body.s)
  */
-void clean_hdr_field(struct hdr_field* hf)
+void clean_hdr_field(struct hdr_field* const hf)
 {
 	void** h_parsed;
 
@@ -124,11 +123,11 @@ void clean_hdr_field(struct hdr_field* hf)
 			break;
 
 		case HDR_PAI_T:
-			free_to(hf->parsed);
+			free_pai_ppi_body(hf->parsed);
 			break;
 
 		case HDR_PPI_T:
-			free_to(hf->parsed);
+			free_pai_ppi_body(hf->parsed);
 			break;
 
 		case HDR_PROXYAUTH_T:
@@ -228,7 +227,7 @@ void free_hdr_field_lst(struct hdr_field* hf)
 }
 
 /* print the content of hdr_field */
-void dump_hdr_field( struct hdr_field* hf )
+void dump_hdr_field(struct hdr_field const* const hf )
 {
 	LOG(L_ERR, "DEBUG: dump_hdr_field: type=%d, name=%.*s, "
 		"body=%.*s, parsed=%p, next=%p\n",
