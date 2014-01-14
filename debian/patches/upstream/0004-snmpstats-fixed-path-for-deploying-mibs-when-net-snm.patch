@@ -1,0 +1,27 @@
+From ac1f9f9b601f3a6f3e53d55c5a061f35df6524e2 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Tue, 14 Jan 2014 08:59:17 +0100
+Subject: [PATCH] snmpstats: fixed path for deploying mibs when net-snmp-config
+ is used
+
+(cherry picked from commit 777548d79f17a6eb81d241e18b22329e9654e951)
+---
+ modules/snmpstats/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/snmpstats/Makefile b/modules/snmpstats/Makefile
+index a26c93e..ea986ac 100644
+--- a/modules/snmpstats/Makefile
++++ b/modules/snmpstats/Makefile
+@@ -17,7 +17,7 @@ ifeq ($(BUILDER),)
+ 	INSTALLMIBDIR =  $(share_prefix)/share/snmp/mibs
+ else
+ 	BUILDAGENTLIBS = $(shell net-snmp-config --netsnmp-agent-libs)
+-	INSTALLMIBDIR = $(share_prefix)$(shell net-snmp-config --prefix)/share/snmp/mibs
++	INSTALLMIBDIR = $(basedir)$(shell net-snmp-config --prefix)/share/snmp/mibs
+ endif 
+ 
+ ifeq ($(EMBEDDED_PERL),1)
+-- 
+1.8.5.2
+

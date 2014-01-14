@@ -1,0 +1,33 @@
+From 620d9309a1bfe5e6f3ea0e93f40f267cd3f5f1bf Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 9 Jan 2014 19:19:31 +0100
+Subject: [PATCH] snmpstats: use $(share_prefix) for deploying MIBS
+
+(cherry picked from commit 5dde71f7fb9715a18dabfe0beeb152b0821c6fb0)
+
+Conflicts:
+	modules/snmpstats/Makefile
+---
+ modules/snmpstats/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/modules/snmpstats/Makefile b/modules/snmpstats/Makefile
+index 0778be1..a26c93e 100644
+--- a/modules/snmpstats/Makefile
++++ b/modules/snmpstats/Makefile
+@@ -14,10 +14,10 @@ ifeq ($(BUILDER),)
+ 	DEFS +=-I$(LOCALBASE)/include
+ 	BUILDAGENTLIBS =-L$(LOCALBASE)/lib -lnetsnmpmibs -lnetsnmpagent \
+ 		-lnetsnmphelpers -lnetsnmp
+-	INSTALLMIBDIR = $(cfg-prefix)/share/snmp/mibs
++	INSTALLMIBDIR =  $(share_prefix)/share/snmp/mibs
+ else
+ 	BUILDAGENTLIBS = $(shell net-snmp-config --netsnmp-agent-libs)
+-	INSTALLMIBDIR = $(cfg-prefix)$(shell net-snmp-config --prefix)/share/snmp/mibs
++	INSTALLMIBDIR = $(share_prefix)$(shell net-snmp-config --prefix)/share/snmp/mibs
+ endif 
+ 
+ ifeq ($(EMBEDDED_PERL),1)
+-- 
+1.8.5.2
+
