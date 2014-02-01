@@ -1,4 +1,4 @@
-ngcp-kamailio (4.1.1-1) UNRELEASED; urgency=low
+ngcp-kamailio (4.1.1-1+0~mr3.3) unstable; urgency=low
 
   [ Victor Seva ]
   * [b9ee1b0] MT#5301 Imported Upstream version 4.1.0
@@ -35,7 +35,10 @@ ngcp-kamailio (4.1.1-1) UNRELEASED; urgency=low
   * [1ae44ee] use new isup_convert_number from libtcap
   * [d1893f3] add strip_trailing_crlf option to tcap
 
- -- Victor Seva <vseva@sipwise.com>  Tue, 14 Jan 2014 10:57:14 +0100
+  [ Sipwise Jenkins Builder ]
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sat, 01 Feb 2014 19:44:02 +0100
 
 ngcp-kamailio (4.0.4-3) unstable; urgency=low
 
