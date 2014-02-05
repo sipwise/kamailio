@@ -21,7 +21,7 @@ include /usr/share/dpkg/buildflags.mk
 #export DH_VERBOSE=1
 
 # modules not in the "main" kamailio package
-EXCLUDED_MODULES= 
+EXCLUDED_MODULES=
 
 # extra modules to skip, because they are not compilable now
 # - regardless if they go to the main kamailio package or to some module package,
@@ -106,7 +106,7 @@ configure-stamp:
 build: build-stamp
 build-arch: build-stamp
 build-indep: build-stamp
-build-stamp: configure-stamp 
+build-stamp: configure-stamp
 	dh_testdir
 	# Add here commands to compile the package.
 	$(MAKE) -j`nproc` all
@@ -134,22 +134,22 @@ install: build
 	# make group packages
 	$(call PACKAGE_GRP_INSTALL_template)
 	mv $(CURDIR)/debian/$(PKG_NAME)-berkeley-modules/usr/sbin/kambdb_recover \
-		$(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/sbin/kambdb_recover 
+		$(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/sbin/kambdb_recover
 
 
 # This single target is used to build all the packages, all at once, or
 # one at a time. So keep in mind: any options passed to commands here will
 # affect _all_ packages. Anything you want to only affect one package
 # should be put in another target, such as the install target.
-binary-common: 
+binary-common:
 	dh_testdir
 	dh_testroot
-	dh_installdebconf	
+	dh_installdebconf
 	dh_installdocs
 	dh_installexamples
 	dh_installmenu
-	dh_installinit --name=kamailio-lb -- defaults 23
-	dh_installinit --name=kamailio-proxy -- defaults 23
+	dh_installinit -n --name=kamailio-lb -- defaults 23
+	dh_installinit -n --name=kamailio-proxy -- defaults 23
 	dh_installcron
 	dh_installman
 	dh_installinfo
@@ -157,7 +157,7 @@ binary-common:
 	dh_lintian
 	dh_link
 	dh_strip --dbg-package=$(PKG_NAME)-dbg
-	dh_compress 
+	dh_compress
 	dh_fixperms
 	dh_makeshlibs
 	dh_installdeb

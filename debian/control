@@ -50,7 +50,7 @@ Vcs-Browser: http://svn.debian.org/wsvn/pkg-voip/kamailio/?op=log
 
 Package: ngcp-kamailio
 Architecture: any
-Multi-Arch: same
+Multi-Arch: foreign
 Pre-Depends: ${misc:Pre-Depends}
 Depends: adduser, python, ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio
@@ -425,7 +425,7 @@ Description: Berkeley database module for Kamailio
 
 Package: ngcp-kamailio-berkeley-bin
 Architecture: any
-Multi-Arch: same
+Multi-Arch: foreign
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-berkeley-bin
@@ -530,7 +530,7 @@ Package: ngcp-kamailio-java-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: gjc-jre,
+Depends: gcj-jre,
          ngcp-kamailio (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
