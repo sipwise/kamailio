@@ -1,0 +1,265 @@
+--- /dev/null
++++ b/modules/tcap/Makefile
+@@ -0,0 +1,9 @@
++include ../../Makefile.defs
++auto_gen=
++NAME=tcap.so
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE -D_GNU_SOURCE
++DEFS+=-I/usr/include/tcap
++LIBS+=-ltcap
++
++include ../../Makefile.modules
+--- /dev/null
++++ b/modules/tcap/tcap_mod.c
+@@ -0,0 +1,239 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
++#include <tcap/libtcap.h>
++#include "../../sr_module.h"
++#include "../../mod_fix.h"
++#include "../../pvar.h"
++#include "../../parser/parse_content.h"
++#include "../../lvalue.h"
++
++MODULE_VERSION
++
++
++
++static str content_type;
++static int strip_trailing_crlf;
++
++
++
++static int mod_init(void);
++static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int inap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq);
++
++
++
++static cmd_export_t cmds[] = {
++	{"tcap_extract", (cmd_function)tcap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"inap_extract", (cmd_function)inap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"isup_decode_number", (cmd_function)isup_decode_number_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{0,}
++};
++
++
++
++static param_export_t params[] = {
++	{ "content_type",		STR_PARAM,	&content_type.s		},
++	{ "strip_trailing_crlf",	INT_PARAM,	&strip_trailing_crlf	},
++	{ 0, }
++};
++
++
++
++struct module_exports exports = {
++	"tcap",
++	DEFAULT_DLFLAGS,
++	cmds,
++	params,
++	0,
++	0,
++	0,
++	0,
++	mod_init,
++	0,
++	0,
++	0
++};
++
++
++
++static int mod_init(void) {
++	if (!content_type.s)
++		content_type.s = "application/tcap";
++	content_type.len = strlen(content_type.s);
++
++	return 0;
++}
++
++
++
++static int prepare_extract(sip_msg_t *msg, char *su, str *body, str *spec) {
++	const char *err;
++
++	err = "Error fixing up first parameter";
++	if (fixup_get_svalue(msg, (gparam_p) su, spec))
++		goto error;
++
++	err = "No SIP body found";
++	body->s = get_body(msg);
++	if (!body->s)
++		goto error;
++	err = "No Content-Length found or zero length body";
++	body->len = get_content_length(msg);
++	if (!body->len)
++		goto error;
++
++	if (strip_trailing_crlf
++			&& body->len >= 2
++			&& body->s[body->len - 1] == '\n'
++			&& body->s[body->len - 2] == '\r')
++		body->len -= 2;
++
++	err = "No Content-Type found";
++	if (!msg->content_type)
++		goto error;
++	err = "Content-Type mismatch";
++	if (msg->content_type->body.len < content_type.len)
++		goto error;
++	if (strncasecmp(msg->content_type->body.s, content_type.s, content_type.len))
++		goto error;
++
++	return 0;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++static int copy_output(sip_msg_t *msg, char *sq, char *outbuf, int outlen) {
++	const char *err;
++	pv_spec_t *avp_spec = NULL;
++	str *s;
++	pv_value_t avp_val;
++
++	s = (str *) sq;
++	err = "Malformed AVP definition";
++	if (!(avp_spec = pv_cache_get(s)))
++		goto error;
++	switch (avp_spec->type) {
++		case PVT_AVP:
++		case PVT_XAVP:
++		case PVT_SCRIPTVAR:
++			break;
++		default:
++			goto error;
++	}
++
++	memset(&avp_val, 0, sizeof(avp_val));
++	avp_val.flags = PV_VAL_STR;
++	avp_val.rs.s = outbuf;
++	avp_val.rs.len = outlen;
++	err = "Failed to set return AVP";
++	if (avp_spec->setf(msg, &avp_spec->pvp, EQ_T, &avp_val) < 0)
++		goto error;
++
++	return 0;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++
++}
++
++static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	static char buf[1024];
++	struct output_buffer out;
++	str body, spec;
++
++	if (prepare_extract(msg, su, &body, &spec))
++		return -1;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
++	if (tcap_extract(body.s, body.len, spec.s, &out))
++		goto error;
++
++	if (copy_output(msg, sq, out.buf, out.used))
++		return -1;
++
++	return 1;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++static int inap_extract_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	static char buf[1024];
++	struct output_buffer out;
++	str body, spec;
++
++	if (prepare_extract(msg, su, &body, &spec))
++		return -1;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
++	if (inap_extract(body.s, body.len, spec.s, &out))
++		goto error;
++
++	if (copy_output(msg, sq, out.buf, out.used))
++		return -1;
++
++	return 1;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++
++
++static inline char phone_digit(unsigned char d) {
++	switch (d) {
++		case 0:
++		case 1:
++		case 2:
++		case 3:
++		case 4:
++		case 5:
++		case 6:
++		case 7:
++		case 8:
++		case 9:
++			return '0' + d;
++		case 11:
++			return '*';
++		case 12:
++			return '#';
++		case 15:
++			return 'F';
++		default:
++			return '?';
++	}
++}
++
++
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	str inp;
++	char num[64];
++
++	err = "Error fixing up first parameter";
++	if (fixup_get_svalue(msg, (gparam_p) su, &inp))
++		goto error;
++	err = "Invalid encoded number";
++	if (isup_convert_number(inp.s, inp.len, num))
++		goto error;
++
++	if (copy_output(msg, sq, num, strlen(num)))
++		return -1;
++
++	return 1;
++
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
+--- a/Makefile
++++ b/Makefile
+@@ -153,7 +153,7 @@
+ module_group_standard_dep=acc_db acc_radius auth_db auth_radius avp_db \
+                auth_identity db_ops domain lcr misc_radius \
+                msilo dialog pa \
+-misc_radiuspresence_b2b rls speeddial uri_db xcap xmlrpc
++speeddialpresence_b2b rls speeddial uri_db xcap xmlrpc tcap
+
+ # For db use (db modules, excluding drivers)
+ module_group_db=acc_db auth_db avp_db db_ops db_text \
