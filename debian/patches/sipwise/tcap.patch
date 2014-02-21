@@ -254,12 +254,13 @@
 +}
 --- a/Makefile
 +++ b/Makefile
-@@ -153,7 +153,7 @@
- module_group_standard_dep=acc_db acc_radius auth_db auth_radius avp_db \
-                auth_identity db_ops domain lcr misc_radius \
-                msilo dialog pa \
--misc_radiuspresence_b2b rls speeddial uri_db xcap xmlrpc
-+speeddialpresence_b2b rls speeddial uri_db xcap xmlrpc tcap
-
- # For db use (db modules, excluding drivers)
- module_group_db=acc_db auth_db avp_db db_ops db_text \
+@@ -135,7 +135,8 @@ module_group_standard=acc_syslog auth av
+ 				eval exec fifo db_flatstore gflags maxfwd mediaproxy \
+ 				nathelper options pdt permissions pike print ratelimit \
+ 				registrar rr rtpproxy sanity sl textops timer tm uac \
+-				unixsock uri usrloc xlog cfg_rpc sipcapture msrp tmrec
++				unixsock uri usrloc xlog cfg_rpc sipcapture msrp tmrec \
++                tcap
+ 
+ # Modules in this group are considered a standard part of SER (due to 
+ # widespread usage) but they have dependencies that must be satisfied for 
