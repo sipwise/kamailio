@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,238 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -136,7 +136,6 @@
 +		goto error;
 +	switch (avp_spec->type) {
 +		case PVT_AVP:
-+		case PVT_XAVP:
 +		case PVT_SCRIPTVAR:
 +			break;
 +		default:
