@@ -1,3 +1,9 @@
+ngcp-kamailio (3.3.6-3) unstable; urgency=medium
+
+  * [1a1d255] MT#6101 Add tcap module support
+
+ -- Kirill Solomko <ksolomko@sipwise.com>  Wed, 26 Feb 2014 14:28:22 +0100
+
 ngcp-kamailio (3.3.6-2) unstable; urgency=medium
 
   * [8a0efb6] MT#5565 Add fixes from upstream. Fix usrloc db sync.
