@@ -131,7 +131,7 @@ int t_suspend(struct sip_msg *msg,
 		t->uac[branch].reply->flags = msg->flags;
 	}
 
-        *hash_index = t->hash_index;
+	*hash_index = t->hash_index;
 	*label = t->label;
 
 

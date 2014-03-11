@@ -878,7 +878,7 @@ void faked_env(struct cell *t, struct sip_msg *msg, int is_async_env) {
 		backup_domain_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
 		backup_domain_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
 #ifdef WITH_XAVP
-			backup_xavps = xavp_set_list(&t->xavps_list);
+		backup_xavps = xavp_set_list(&t->xavps_list);
 #endif
 		/* set default send address to the saved value */
 		backup_si = bind_address;
@@ -900,7 +900,7 @@ void faked_env(struct cell *t, struct sip_msg *msg, int is_async_env) {
 		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, backup_uri_from);
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI, backup_uri_to);
 #ifdef WITH_XAVP
-			xavp_set_list(backup_xavps);
+		xavp_set_list(backup_xavps);
 #endif
 		bind_address = backup_si;
 		/* restore lump lists */
