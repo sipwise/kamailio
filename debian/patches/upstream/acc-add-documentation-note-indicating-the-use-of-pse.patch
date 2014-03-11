@@ -8,11 +8,9 @@ Subject: [PATCH] acc: add documentation note indicating the use of
  modules/acc/doc/acc_admin.xml | 21 ++++++++++++++++-----
  1 file changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/modules/acc/doc/acc_admin.xml b/modules/acc/doc/acc_admin.xml
-index 97858be..e233cb4 100644
 --- a/modules/acc/doc/acc_admin.xml
 +++ b/modules/acc/doc/acc_admin.xml
-@@ -1477,7 +1477,7 @@ modparam("acc", "time_format", "%Y/%m/%d %H:%M:%S")
+@@ -1479,7 +1479,7 @@
  
  	<section>
  	<title>Functions</title>
@@ -21,7 +19,7 @@ index 97858be..e233cb4 100644
  		<title>
  			<function moreinfo="none">acc_log_request(comment)</function>
  		</title>
-@@ -1493,6 +1493,7 @@ modparam("acc", "time_format", "%Y/%m/%d %H:%M:%S")
+@@ -1495,6 +1495,7 @@
  		<itemizedlist>
  		<listitem>
  			<para><emphasis>comment</emphasis> - Comment to be appended.
@@ -29,7 +27,7 @@ index 97858be..e233cb4 100644
  			</para>
  		</listitem>
  		</itemizedlist>
-@@ -1504,11 +1505,14 @@ modparam("acc", "time_format", "%Y/%m/%d %H:%M:%S")
+@@ -1506,11 +1507,14 @@
  		<programlisting format="linespecific">
  ...
  acc_log_request("Some comment");
@@ -45,7 +43,7 @@ index 97858be..e233cb4 100644
  		<title>
  			<function moreinfo="none">acc_db_request(comment, table)</function>
  		</title>
-@@ -1523,7 +1527,9 @@ acc_log_request("Some comment");
+@@ -1525,7 +1529,9 @@
  		</para>
  		<itemizedlist>
  		<listitem>
@@ -56,7 +54,7 @@ index 97858be..e233cb4 100644
  		</listitem>
  		<listitem>
  			<para><emphasis>table</emphasis> - Database table to be used. It
-@@ -1539,11 +1545,12 @@ acc_log_request("Some comment");
+@@ -1541,11 +1547,12 @@
  ...
  acc_db_request("Some comment", "SomeTable");
  acc_db_request("Some comment", "acc_$time(year)_$time(mon)");
@@ -70,7 +68,7 @@ index 97858be..e233cb4 100644
  		<title>
  			<function moreinfo="none">acc_rad_request(comment)</function>
  		</title>
-@@ -1558,6 +1565,7 @@ acc_db_request("Some comment", "acc_$time(year)_$time(mon)");
+@@ -1560,6 +1567,7 @@
  		<itemizedlist>
  		<listitem>
  			<para><emphasis>comment</emphasis> - Comment to be appended.
@@ -78,7 +76,7 @@ index 97858be..e233cb4 100644
  			</para>
  		</listitem>
  		</itemizedlist>
-@@ -1569,11 +1577,12 @@ acc_db_request("Some comment", "acc_$time(year)_$time(mon)");
+@@ -1571,11 +1579,12 @@
  		<programlisting format="linespecific">
  ...
  acc_rad_request("Some comment");
@@ -92,7 +90,7 @@ index 97858be..e233cb4 100644
  		<title>
  			<function moreinfo="none">acc_diam_request(comment)</function>
  		</title>
-@@ -1587,6 +1596,7 @@ acc_rad_request("Some comment");
+@@ -1589,6 +1598,7 @@
  		<itemizedlist>
  		<listitem>
  			<para><emphasis>comment</emphasis> - Comment to be appended.
@@ -100,7 +98,7 @@ index 97858be..e233cb4 100644
  			</para>
  		</listitem>
  		</itemizedlist>
-@@ -1598,6 +1608,7 @@ acc_rad_request("Some comment");
+@@ -1600,6 +1610,7 @@
  		<programlisting format="linespecific">
  ...
  acc_diam_request("Some comment");
@@ -108,6 +106,3 @@ index 97858be..e233cb4 100644
  ...
  </programlisting>
  		</example>
--- 
-1.8.5.2
-

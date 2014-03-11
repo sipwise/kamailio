@@ -1,6 +1,6 @@
 --- a/modules/presence_dialoginfo/notify_body.c
 +++ b/modules/presence_dialoginfo/notify_body.c
-@@ -68,8 +68,10 @@
+@@ -74,8 +74,10 @@
  	LM_DBG("[pres_user]=%.*s [pres_domain]= %.*s, [n]=%d\n",
  			pres_user->len, pres_user->s, pres_domain->len, pres_domain->s, n);
  
@@ -13,7 +13,7 @@
  
  	n_body= agregate_xmls(pres_user, pres_domain, body_array, n);
  	LM_DBG("[n_body]=%p\n", n_body);
-@@ -116,13 +118,17 @@
+@@ -125,13 +127,17 @@
  	LM_DBG("[pres_user]=%.*s [pres_domain]= %.*s, [n]=%d\n",
  			pres_user->len, pres_user->s, pres_domain->len, pres_domain->s, n);
  
@@ -36,7 +36,7 @@
  
  	/* parse all the XML documents */
  	for(i=0; i<n; i++)
-@@ -143,14 +149,14 @@
+@@ -152,14 +158,14 @@
  		j++;
  
  	} 
