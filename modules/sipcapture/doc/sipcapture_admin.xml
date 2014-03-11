@@ -16,10 +16,10 @@
 	<section>
 	<title>Overview</title>
 	<para>
-		Offer a possibility to store incoming/outgoing SIP messages in database.
+		The sipcapture module stores incoming/outgoing SIP messages in database.
 	</para>
 	<para>
-		Kamailio can capture SIP messages in three mode
+		Kamailio can capture SIP messages in three modes
 		<itemizedlist>
 		<listitem>
 		<para>
@@ -33,14 +33,14 @@
                 </listitem>
 		<listitem>
 		<para>
-		Homer encapsulation protocl mode (HEP v1). 
+		Homer encapsulation protocol mode (HEP v1, v2, v3). 
 		</para>
 		</listitem>
 		</itemizedlist>
 	</para>
 
 	<para>
-	The capturing can be turned on/off using fifo commad.
+	The capturing can be turned on/off using mi or rpc commands. Example:
 	</para>
 	<para>
 	&ctltool; fifo sip_capture on
@@ -104,7 +104,7 @@ modparam("sipcapture", "db_url", "mysql://user:passwd@host/dbname")
 	<section>
 		<title><varname>table_name</varname> (str)</title>
 		<para>
-		Name of the table's name where to store the SIP messages. 
+		Name of the table's name used to store the SIP messages. Can contain multiple tables, separated by "|".
 		</para>
 		<para>
 		<emphasis>
@@ -117,7 +117,46 @@ modparam("sipcapture", "db_url", "mysql://user:passwd@host/dbname")
 ...
 modparam("sipcapture", "table_name", "homer_capture")
 ...
-
+modparam("sipcapture", "table_name", "homer_capture1|homer_capture2");
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>mt_mode</varname> (str)</title>
+		<para>
+		Name of the mode used for storing data in multiple tables. Modes can be "rand" (random), "round_robin" (use a round_robin algorithm) or "hash" (use hashing to determine the table to store). These modes are only triggered if there is more than one table specified in table_name parameter, separated by "|". 
+		</para>
+		<para>
+		<emphasis>
+			Default value is "rand".
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>mt_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("sipcapture", "mt_mode", "hash")
+...
+</programlisting>
+		</example>
+	</section>
+	<section>
+		<title><varname>hash_source</varname> (str)</title>
+		<para>
+		The field of the SIP message used for hashing, when mt_mode is set to "hash". The value can be "call_id", "to_user" or "from_user".
+		</para>
+		<para>
+		<emphasis>
+			Default value is "call_id".
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>mt_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("sipcapture", "hash_source", "to_user")
+...
 </programlisting>
 		</example>
 	</section>
@@ -273,7 +312,7 @@ modparam("sipcapture", "raw_interface", "eth0")
         <section>
                 <title><varname>raw_sock_children</varname> (integer)</title>
                 <para>
-		Parameter define how much children must be created to listen the raw socket.
+		Parameter define how many children that must be created to listen the raw socket.
                 </para>
                 <para>
                 <emphasis>
@@ -281,7 +320,7 @@ modparam("sipcapture", "raw_interface", "eth0")
                 </emphasis>
                 </para>
                 <example>
-                <title>Set <varname>raw_socket_listen</varname> parameter</title>
+                <title>Set <varname>raw_sock_children</varname> parameter</title>
                 <programlisting format="linespecific">
 ...
 modparam("sipcapture", "raw_sock_children", 6)
@@ -301,7 +340,7 @@ modparam("sipcapture", "raw_sock_children", 6)
                 </emphasis>
                 </para>
                 <example>
-                <title>Set <varname>hep_capture_on</varname> parameter</title>
+                <title>Set <varname>promiscous_on</varname> parameter</title>
                 <programlisting format="linespecific">
 ...
 modparam("sipcapture", "promiscuous_on", 1)
@@ -386,12 +425,40 @@ modparam("sipcapture", "capture_node", "homer03")
 		_empty_line_
 		</programlisting>
 	</section>
+	</section><!-- MI commands -->
+    	<section>
+	<title>RPC Commands</title>
+	<section>
+		<title>
+		<function moreinfo="none">sipcapture.status param</function>
+		</title>
+		<para>
+
+		</para>
+		<para>
+		Name: <emphasis>sipcapture.status</emphasis>
+		</para>
+		<para>Parameters: </para>
+		<itemizedlist>
+			<listitem><para>on or off: turns on/off SIP message capturing.
+			Possible values are:</para>
+			<itemizedlist>
+				<listitem><para>on</para></listitem> 
+				<listitem><para>off</para></listitem>
+			</itemizedlist>
+			</listitem>
+			<listitem><para><quote>check</quote> does not change 
+			sipcapture status, just reports the current status.</para>
+			</listitem>
+		</itemizedlist>
+
 	</section>
+	</section><!-- RPC commands -->
 	
 	<section>
 		<title>Database setup</title>
 		<para>
-		Before running &kamailio; with sipcapture, you have to setup the database 
+		Before running &kamailio; with the sipcapture module, you have to setup the database 
 		tables where the module will store the data. For that, if the table were not 
 		created by the installation script or you choose to install everything by 
 		yourself you can use the sipcapture_create.sql, <acronym>SQL</acronym> script 
@@ -400,16 +467,18 @@ modparam("sipcapture", "capture_node", "homer03")
 		</para>
 	</section>
 	<section>
-        <title>Limitation</title>
-        <para>
-	
+        <title>Limitations</title>
+	<itemizedlist>
+		<listitem>
 		1. Only one capturing mode on RAW socket is supported: IPIP or monitoring/mirroring port. 
 		   Don't activate both at the same time.
+		</listitem><listitem>
 		2. By default MySQL doesn't support INSERT DELAYED for partitioning table. You can patch MySQL 
 		  (http://bugs.mysql.com/bug.php?id=50393)
+		</listitem><listitem>
 		3. Mirroring port capturing works only on Linux.
-	
-        </para>
+		</listitem>
+        </itemizedlist>
         </section>
 </chapter>
 

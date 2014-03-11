@@ -1,4 +1,4 @@
-# $Id$
+
 #
 # makefile defs (CC, LD,a.s.o)
 #
@@ -123,11 +123,11 @@ endif # verbose
 set_if_empty=$(if $($(1)),,$(eval override $(1)=$(2)))
 
 # flavour: sip-router, ser or kamailio
-$(call	set_if_empty,FLAVOUR,sip-router)
+$(call	set_if_empty,FLAVOUR,kamailio)
 
 #prefix for various configs and scripts
 #config name/name-prefix for distributed configs
-CFG_NAME=sip-router
+CFG_NAME?=sip-router
 #config name/name-prefix for distributed scripts
 SCR_NAME=sip-router
 #name in source tree
@@ -148,25 +148,30 @@ CFG_NAME=kamailio
 KMSTATS ?= 1
 # fast malloc statistics on
 FMSTATS ?= 1
+else # unknown:
+# main binary name
+MAIN_NAME=kamailio
+endif
+
 # application server support on
 WITHAS ?= 1
-else # default:
-# main binary name
-MAIN_NAME=sip-router
-endif
 
 # what to install
 INSTALL_FLAVOUR=$(FLAVOUR)
 
 #version number
-VERSION = 3
-PATCHLEVEL = 3
-SUBLEVEL = 7
-EXTRAVERSION =
+VERSION = 4
+PATCHLEVEL = 0
+SUBLEVEL = 6
+EXTRAVERSION = 
 
+# memory manager switcher
+# 0 - f_malloc (fast malloc)
+# 1 - q_malloc (quick malloc)
+MEMMNG ?= 1
 # memory debugger switcher
-# 0 - off (release mode)
-# 1 - on (devel mode)
+# 0 - off (no-debug mode)
+# 1 - on (debug mode)
 MEMDBG ?= 0
 
 SER_VER = $(shell expr $(VERSION) \* 1000000 + $(PATCHLEVEL) \* 1000 + \
@@ -714,13 +719,22 @@ C_DEFS= $(extra_defs) \
 # use make mode=debug all instead. Anyway no by default ser is  compiled w/ 
 # debugging symbols in all cases (-g). --andrei
 
-ifeq ($(MEMDBG), 1)
-	C_DEFS+= -DDBG_QM_MALLOC
+# set memory manager and its debug mode
+ifeq ($(MEMMNG), 1)
+#	use q_malloc
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_QM_MALLOC
+endif
 	C_DEFS+= -DMEM_JOIN_FREE
 else
+#	use f_malloc
 	C_DEFS+= -DF_MALLOC
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_F_MALLOC
+endif
 	C_DEFS+= -DMEM_JOIN_FREE
 endif
+
 ifneq ($(PKG_MEM_SIZE),)
 	C_DEFS+= -DPKG_MEM_SIZE=$(PKG_MEM_SIZE)
 endif
@@ -1753,7 +1767,12 @@ ifeq ($(OS), linux)
 			LIBS+=-lpthread
 		endif
 	endif
-	# check for >= 2.5.44
+	ifneq (,$(findstring -DUSE_DNSSEC, $(C_DEFS)))
+		LIBS+=-lval-threads -lcrypto -lsres -lpthread
+$(info "using libval for DNSSEC validation")
+	endif
+        # check for >= 2.5.44
+
 	ifeq ($(shell [ $(OSREL_N) -ge 2005044 ] && echo has_epoll), has_epoll)
 		ifeq ($(NO_EPOLL),)
 			C_DEFS+=-DHAVE_EPOLL

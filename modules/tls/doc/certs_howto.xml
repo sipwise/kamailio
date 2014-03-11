@@ -1,6 +1,12 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN" 
-   "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+<?xml version="1.0" encoding='ISO-8859-1'?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
 
 <section id="tls.certs_howto" xmlns:xi="http://www.w3.org/2001/XInclude">
     <sectioninfo>
@@ -14,7 +20,8 @@
 			Assumptions: we run our own CA.
 		</para>
 		<para>
-			Warning: in this example no key is encrypted. The client and server private keys must not be encrypted (ser doesn't support encrypted keys), so make sure the corresponding files are readable only by trusted people. You should use a password for your CA private key.
+			Warning: in this example no key is encrypted. The client and server private keys must not be encrypted (&kamailio; doesn't support encrypted keys),
+			so make sure the corresponding files are readable only by trusted people. You should use a password for your CA private key.
 		</para>
 		<para>
 		<programlisting>
@@ -51,16 +58,16 @@ RANDFILE        = $dir/private/.rand    # private random number file
 If this is not the case create a new openssl config file that uses the above
 paths for the default CA and add to all the openssl commands:
  -config filename. E.g.:
-	openssl ca -config my_openssl.cnf -in ser1_cert_req.pem -out ser1_cert.pem
+	openssl ca -config my_openssl.cnf -in kamailio1_cert_req.pem -out kamailio1_cert.pem
 
 
 Creating CA certificate
 -----------------------
-1. create CA dir
+1. create CA directory
 	mkdir ca
 	cd ca
 	
-2. create ca dir structure and files  (see ca(1))
+2. create ca directory structure and files  (see ca(1))
 	mkdir demoCA #default CA name, edit /etc/ss/openssl.cnf
 	mkdir  demoCA/private
 	mkdir demoCA/newcerts
@@ -79,38 +86,38 @@ Creating CA certificate
 Creating a server/client certificate
 ------------------------------------
 1. create a certificate request (and its private key in privkey.pem)
-	openssl req -out ser1_cert_req.pem -new -nodes
-	WARNING: the organization name should be the same as in the ca certificate.
+	openssl req -out kamailio1_cert_req.pem -new -nodes
+	WARNING: the organization name should be the same as in the CA certificate.
 	
 2. sign it with the ca certificate
-	openssl ca -in ser1_cert_req.pem -out ser1_cert.pem
+	openssl ca -in kamailio1_cert_req.pem -out kamailio1_cert.pem
 	
-3. copy ser1_cert.pem to your ser config. dir
+3. copy kamailio1_cert.pem to your &kamailio; config. dir
 
 
-Setting sip-router to use the certificate
+Setting &kamailio; to use the certificate
 -----------------------------------------
-1. create the ca list file:
+1. Create the ca list file:
 	for each of your ca certificates that you intend to use do:
 		cat cacert.pem >>calist.pem
 	
-2. copy your sip-router certificate, private key and ca list file to your 
-	intended machine (preferably in your sip-router configuration directory,
-	 this is the default place sip-router searches for).
+2. Copy your &kamailio; certificate, private key and ca list file to your 
+	intended machine (preferably in your &kamailio; configuration directory,
+	 this is the default place &kamailio; searches for).
 	
-3. set up sip-router.cfg to use the certificate
-	if your ser certificate name is different from cert.pem or it is not
-	placed in sip-router cfg. directory, add to your sip-router.cfg:
+3. set up &kamailio;.cfg to use the certificate
+	if your &kamailio; certificate name is different from cert.pem or it is not
+	placed in &kamailio; cfg. directory, add to your kamailio.cfg:
 		modparam("tls", "certificate", "/path/cert_file_name")
 	
-4. set up sip-router to use the private key
+4. set up &kamailio; to use the private key
 	if your private key is not contained in the same file as the certificate
 	(or the certificate name is not the default cert.pem), add to your
-	 sip-router.cfg:
+	 &kamailio;.cfg:
 		modparam("tls", "private_key", "/path/private_key_file")
 	
-5. set up sip-router to use the ca list (optional)
-	add to your sip-router.cfg:
+5. set up &kamailio; to use the ca list (optional)
+	add to your &kamailio;.cfg:
 		modparam("tls", "ca_list", "/path/ca_list_file")
 	
 6. set up tls authentication options:
@@ -127,9 +134,9 @@ Revoking a certificate and using a CRL
 2. generate/update the certificate revocation list:
 	openssl ca -gencrl -out my_crl.pem
 	
-3. copy my_crl.pem to your ser config. dir
+3. copy my_crl.pem to your &kamailio; config. dir
 	
-4. set up sip-router to use the CRL:
+4. set up &kamailio; to use the CRL:
 		modparam("tls", "crl", "path/my_crl.pem")
 
 

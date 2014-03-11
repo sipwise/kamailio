@@ -16,7 +16,7 @@ sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ purple/' ${DIST}/rules
 
 # No mi_xmlrpc module
 sed -i -e '/libxmlrpc-c3-dev/d' -e '/^Package: kamailio-xmlrpc-modules/,/^$/d' \
-        ${DIST}/control
+	${DIST}/control
 sed -i -e 's/ mi_xmlrpc[ ,$]*/ /' ${DIST}/rules
 sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ mi_xmlrpc/' ${DIST}/rules
 

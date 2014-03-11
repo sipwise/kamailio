@@ -30,6 +30,7 @@ Build-Depends: bison,
                libsqlite3-dev,
                libxml2-dev,
                libxmlrpc-c3-dev,
+               libunistring-dev,
                openssl,
                python,
                python-dev,
@@ -45,14 +46,12 @@ Package: kamailio
 Architecture: linux-any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: adduser, python, ${misc:Depends}, ${shlibs:Depends}
-Conflicts: kamailio-regex-modules
 Suggests: kamailio-berkeley-modules,
           kamailio-carrierroute-modules,
           kamailio-cpl-modules,
           kamailio-dbg,
           kamailio-ldap-modules,
           kamailio-lua-modules,
-          kamailio-mono-modules,
           kamailio-mysql-modules,
           kamailio-perl-modules,
           kamailio-postgres-modules,
@@ -356,6 +355,18 @@ Description: LDAP modules for Kamailio
  queries from the Kamailio config and storage of SIP account data in an LDAP
  directory.
 
+Package: kamailio-ims-modules
+Architecture: linux-any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Description: IMS module for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains various Diameter interfaces and modules for Kamailio
+ to run as an IMS core.
+
 Package: kamailio-utils-modules
 Architecture: linux-any
 Pre-Depends: ${misc:Pre-Depends}
@@ -375,6 +386,28 @@ Depends: kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Description: contains the TLS kamailio transport module
  This has been split out of the main kamailio package, so that kamailio will
  not depend on openssl. This module will enable you to use the TLS transport.
+
+Package: kamailio-outbound-modules
+Architecture: linux-any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Description: Outbound module for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains the module implementing SIP outbound extension.
+
+Package: kamailio-websocket-modules
+Architecture: linux-any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
+Description: Websocket module for kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains the module implementing WebSocket transport layer.
 
 Package: kamailio-nth
 Architecture: any

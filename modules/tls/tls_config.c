@@ -58,13 +58,13 @@ static int parse_ipv6(struct ip_addr* ip, cfg_token_t* token,
 	struct ip_addr* ipv6;
 	str ip6_str;
 
-	ip6_str.s = t.val.s;
 	while(1) {
 		ret = cfg_get_token(&t, st, 0);
 		if (ret != 0) goto err;
 		if (t.type == ']') break;
 		if (t.type != CFG_TOKEN_ALPHA && t.type != ':') goto err;
 	}
+	ip6_str.s = t.val.s;
 	ip6_str.len = (int)(long)(t.val.s - ip6_str.s);
 
 	ipv6 = str2ip6(&ip6_str);
@@ -91,7 +91,7 @@ static int parse_ipv4(struct ip_addr* ip, cfg_token_t* token,
 	ip->len = 4;
 
 	if (str2int(&token->val, &v) < 0) goto err;
-	if (v < 0 || v > 255) goto err;
+	if (v > 255) goto err;
 
 	ip->u.addr[0] = v;
 
@@ -104,7 +104,7 @@ static int parse_ipv4(struct ip_addr* ip, cfg_token_t* token,
 		if (ret < 0) return -1;
 		if (ret > 0 || t.type != CFG_TOKEN_ALPHA) goto err;
 		if (str2int(&t.val, &v) < 0)  goto err;
-		if (v < 0 || v > 255) goto err;
+		if (v > 255) goto err;
 		ip->u.addr[i] = v;
 	}
 

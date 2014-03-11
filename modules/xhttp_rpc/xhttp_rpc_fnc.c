@@ -142,7 +142,7 @@ static const str XHTTP_RPC_Response_Title_Table_1 = str_init(\
         "<tr bgcolor=\"#BBDDFF\">"\
         "<td colspan=2 valign=\"top\" align=\"left\" bgcolor=\"#EFF7FF\" width=\"100%%\">"\
         "<br/><h2 align=\"center\">");
-static const str XHTTP_RPC_Response_Title_Table_2 = str_init(" RPC Interface</h2>"\
+static const str XHTTP_RPC_Response_Title_Table_2 = str_init(": RPC Interface</h2>"\
         "<p align=\"center\">");
 static const str XHTTP_RPC_Response_Title_Table_4 = str_init("</p><br/></td></tr></table>\n<center>\n");
 
@@ -199,7 +199,7 @@ static const str XHTTP_RPC_Response_Foot = str_init(\
         "<span style='margin-left:5px;'></span>"\
         "<a href=\"http://sip-router.org\">SIP Router web site</a> .:. "\
         "<a href=\"http://www.kamailio.org\">Kamailio web site</a><br/>"\
-        "Copyright &copy; 2011 <a href=\"http://www.voipembedded.com/\">VoIP Embedded</a>"\
+        "Copyright &copy; 2011-2013 <a href=\"http://www.voipembedded.com/\">VoIP Embedded</a>"\
                                                                 ". All rights reserved."\
 "</div></body></html>");
 
@@ -310,7 +310,16 @@ void xhttp_rpc_get_next_arg(rpc_ctx_t* ctx, str *arg)
 	int i;
 
 	trim_leading(&ctx->arg2scan);
-	if (ctx->arg2scan.len) {
+
+	if (ctx->arg2scan.len<=0) {
+		*arg = XHTTP_RPC_NULL_ARG;
+		return;
+	}
+	if (ctx->arg2scan.len==1 && ctx->arg2scan.s[0]=='\0') {
+		*arg = XHTTP_RPC_NULL_ARG;
+		return;
+	}
+	else {
 		*arg = ctx->arg2scan;
 		for(i=1; i<arg->len-1; i++) {
 			if(arg->s[i]==' '||arg->s[i]=='\t'||
@@ -322,8 +331,6 @@ void xhttp_rpc_get_next_arg(rpc_ctx_t* ctx, str *arg)
 		i++;
 		ctx->arg2scan.s += i;
 		ctx->arg2scan.len -= i;
-	} else {
-		*arg = XHTTP_RPC_NULL_ARG;
 	}
 	return;
 }

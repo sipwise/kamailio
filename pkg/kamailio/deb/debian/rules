@@ -18,6 +18,9 @@ include /usr/share/dpkg/buildflags.mk
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+# java stuff using libgcj12
+export JAVA_HOME=/usr/lib/jvm/java-gcj-4.6
+
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES=
 
@@ -33,7 +36,8 @@ EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils lua memcached \
 			   snmpstats carrierroute xmpp cpl redis python geoip\
-			   sqlite json mono purple tls
+			   sqlite json mono ims \
+			   purple tls outbound websocket
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
 LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)

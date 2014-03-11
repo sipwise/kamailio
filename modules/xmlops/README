@@ -1,78 +1,116 @@
-1. XMLOPS Module
+
+XMLOPS Module
 
 Daniel-Constantin Mierla
 
    asipto.com
    <miconda@gmail.com>
 
-   Copyright Â© 2009 asipto.com
-     __________________________________________________________________
+   Copyright © 2009 asipto.com
+     _________________________________________________________________
 
-   1.1. Overview
-   1.2. Dependencies
+   Table of Contents
 
-        1.2.1. Kamailio Modules
-        1.2.2. External Libraries or Applications
+   1. Admin Guide
 
-   1.3. Parameters
+        1. Overview
+        2. Dependencies
 
-        1.3.1. buf_size (integer)
-        1.3.2. xml_ns (str)
+              2.1. Kamailio Modules
+              2.2. External Libraries or Applications
 
-   1.4. Pseudo-Variables
+        3. Parameters
 
-        1.4.1. $xml(name=>spec)
+              3.1. buf_size (integer)
+              3.2. xml_ns (str)
 
-1.1. Overview
+        4. Pseudo-Variables
 
-   This is a module implementing functions and pseudo-variables for XML
+              4.1. $xml(name=>spec) 
+
+   List of Examples
+
+   1.1. Set buf_size parameter
+   1.2. Set xml_ns parameter
+   1.3. xml usage
+
+Chapter 1. Admin Guide
+
+   Table of Contents
+
+   1. Overview
+   2. Dependencies
+
+        2.1. Kamailio Modules
+        2.2. External Libraries or Applications
+
+   3. Parameters
+
+        3.1. buf_size (integer)
+        3.2. xml_ns (str)
+
+   4. Pseudo-Variables
+
+        4.1. $xml(name=>spec) 
+
+1. Overview
+
+   This  is  a module implementing functions and pseudo-variables for XML
    operations.
 
-1.2. Dependencies
+2. Dependencies
 
-1.2.1. Kamailio Modules
+   2.1. Kamailio Modules
+   2.2. External Libraries or Applications
+
+2.1. Kamailio Modules
 
    The following modules must be loaded before this module:
      * none.
 
-1.2.2. External Libraries or Applications
+2.2. External Libraries or Applications
 
-   The following libraries or applications must be installed before
+   The  following  libraries  or  applications  must  be installed before
    running kamailio with this module loaded:
      * libxml - for compilation from source, the development headers from
        this library are needed as well.
 
-1.3. Parameters
+3. Parameters
 
-1.3.1. buf_size (integer)
+   3.1. buf_size (integer)
+   3.2. xml_ns (str)
+
+3.1. buf_size (integer)
 
    Maximum size of the XML buffer.
 
    Default value is 4096.
 
-   Example 1. Set buf_size parameter
+   Example 1.1. Set buf_size parameter
 ...
 modparam("xmlops", "buf_size", 8192)
 ...
 
-1.3.2. xml_ns (str)
+3.2. xml_ns (str)
 
-   Register xml namespace prefix. Parameter value must have the format:
+   Register  xml  namespace prefix. Parameter value must have the format:
    'prefix=uri'.
 
-   Example 2. Set xml_ns parameter
+   Example 1.2. Set xml_ns parameter
 ...
 modparam("xmlops", "xml_ns", "rpid=urn:ietf:params:xml:ns:pidf:rpid")
 ...
 
-1.4. Pseudo-Variables
+4. Pseudo-Variables
 
-1.4.1.  $xml(name=>spec)
+   4.1. $xml(name=>spec) 
 
-   Pseudo-variable for XML document operations using xpath syntax. For
+4.1.  $xml(name=>spec)
+
+   Pseudo-variable  for  XML  document operations using xpath syntax. For
    more see the Pseudo-Variables Cookbook.
 
-   Example 3. xml usage
+   Example 1.3. xml usage
 ...
 $xml(x=>doc)
     = '<?xml version="1.0" encoding="UTF-8"?><a><b>test</b></a>';

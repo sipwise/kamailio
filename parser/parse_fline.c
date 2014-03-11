@@ -1,9 +1,6 @@
 /*
- * $Id$
- * 
  * sip first line parsing automaton
  * 
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -236,8 +233,8 @@ error:
 	if (prn) {
 		for (t=0; t<offset; t++)
 			if (*(buffer+t)) *(prn+t)=*(buffer+t);
-			else *(prn+t)='°';
-		LOG(L_INFO, "ERROR: parsed so far: %.*s\n", offset, ZSW(prn) );
+			else *(prn+t)=176; /* '°' */
+		LOG(L_DBG, "parsed so far: %.*s\n", offset, ZSW(prn) );
 		pkg_free( prn );
 	};
 error1:
