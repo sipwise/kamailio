@@ -20,6 +20,9 @@ include /usr/share/dpkg/buildflags.mk
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+# java stuff using libgcj12
+export JAVA_HOME=/usr/lib/jvm/java-gcj-4.6
+
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES=
 
