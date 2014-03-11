@@ -1,9 +1,4 @@
-upstream/0001-snmpstats-use-share_prefix-for-deploying-MIBS.patch
-upstream/0002-ims_auth-Fix-for-SIP-Digest-Segmentation-fault.patch
-upstream/0003-ims_registrar_scscf-Fix-memory-corruption-in-build_c.patch
-upstream/0004-snmpstats-fixed-path-for-deploying-mibs-when-net-snm.patch
-upstream/0005-modules-tm-fixed-bug-where-AVPs-are-not-restored-cor.patch
-upstream/0006-xhttp_rpc-fix-arg-parsing.patch
+# backports from master
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch

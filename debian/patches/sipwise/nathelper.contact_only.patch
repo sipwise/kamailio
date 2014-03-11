@@ -1,6 +1,6 @@
 --- a/modules/nathelper/nathelper.c
 +++ b/modules/nathelper/nathelper.c
-@@ -342,6 +342,7 @@
+@@ -343,6 +343,7 @@
  static int sipping_flag = -1;
  static int natping_disable_flag = -1;
  static int natping_processes = 1;
@@ -8,7 +8,7 @@
  
  static str nortpproxy_str = str_init("a=nortpproxy:yes");
  
-@@ -423,6 +424,7 @@
+@@ -424,6 +425,7 @@
  	{"natping_socket",        STR_PARAM, &natping_socket        },
  	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
  	{"udpping_from_path",     INT_PARAM, &udpping_from_path     },
@@ -16,7 +16,7 @@
  
  	{0, 0, 0}
  };
-@@ -2068,9 +2070,10 @@
+@@ -2069,9 +2071,10 @@
  			goto done;
  		}
  	}
@@ -29,7 +29,7 @@
  	if (rval<0) {
  		LM_ERR("failed to fetch contacts\n");
  		goto done;
-@@ -2084,9 +2087,10 @@
+@@ -2085,9 +2088,10 @@
  			LM_ERR("out of pkg memory\n");
  			goto done;
  		}
@@ -81,7 +81,7 @@
  {
  	dlist_t *p;
  	urecord_t *r;
-@@ -355,7 +359,7 @@
+@@ -354,7 +358,7 @@
  						}
  					}
  
@@ -90,7 +90,7 @@
  						needed = (int)(sizeof(c->received.len)
  								+ c->received.len
  								+ sizeof(c->sock) + sizeof(c->cflags)
-@@ -466,15 +470,33 @@
+@@ -465,15 +469,33 @@
   * \param flags contact flags
   * \param part_idx part index
   * \param part_max maximal part
