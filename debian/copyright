@@ -89,7 +89,7 @@ License: Apache-1.0
  are met:
  .
  1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer. 
+    notice, this list of conditions and the following disclaimer.
  .
  2. Redistributions in binary form must reproduce the above copyright
     notice, this list of conditions and the following disclaimer in
@@ -151,7 +151,7 @@ License: OpenSSL
  are met:
  .
  1. Redistributions of source code must retain the above copyright
-    notice, this list of conditions and the following disclaimer. 
+    notice, this list of conditions and the following disclaimer.
  .
  2. Redistributions in binary form must reproduce the above copyright
     notice, this list of conditions and the following disclaimer in
@@ -267,7 +267,7 @@ License: MIT
  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  THE SOFTWARE.
- 
+
 License: BSD-3-clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions

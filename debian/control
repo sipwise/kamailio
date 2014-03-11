@@ -4,41 +4,41 @@ Priority: optional
 Maintainer: Sipwise Team <development@sipwise.com>
 Uploaders: Jon Bonilla <manwe@aholab.ehu.es>, Victor Seva <vseva@sipwise.com>
 Build-Depends: bison,
- debhelper (>= 8~),
- dpkg-dev (>= 1.13.19), 
- docbook-xml,
- flex,
- libconfuse-dev,
- libcurl4-gnutls-dev,
- libdb-dev (>= 4.6.19),
- libevent-dev,
- libexpat1-dev,
- libgeoip-dev (>= 1.4.5),
- libjson0-dev,
- libldap2-dev,
- liblua5.1-0-dev,
- libmemcache-dev,
- libmysqlclient-dev,
- libncurses5-dev,
- libpcre3-dev,
- libperl-dev,
- libpq-dev,
- libradiusclient-ng-dev,
- libreadline-dev,
- libsasl2-dev,
- libsnmp-dev,
- libsqlite3-dev,
- libssl-dev,
- libxml2-dev,
- libxmlrpc-c3-dev (<< 1.16.07),
- ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
- ngcp-libtcap-dev,
- openssl,
- python,
- python-dev,
- unixodbc-dev,
- xsltproc,
- zlib1g-dev
+               debhelper (>= 8~),
+               docbook-xml,
+               dpkg-dev (>= 1.13.19),
+               flex,
+               libconfuse-dev,
+               libcurl4-gnutls-dev,
+               libdb-dev (>= 4.6.19),
+               libevent-dev,
+               libexpat1-dev,
+               libgeoip-dev (>= 1.4.5),
+               libjson0-dev,
+               libldap2-dev,
+               liblua5.1-0-dev,
+               libmemcache-dev,
+               libmysqlclient-dev,
+               libncurses5-dev,
+               libpcre3-dev,
+               libperl-dev,
+               libpq-dev,
+               libradiusclient-ng-dev,
+               libreadline-dev,
+               libsasl2-dev,
+               libsnmp-dev,
+               libsqlite3-dev,
+               libssl-dev,
+               libxml2-dev,
+               libxmlrpc-c3-dev (<< 1.16.07),
+               ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
+               ngcp-libtcap-dev,
+               openssl,
+               python,
+               python-dev,
+               unixodbc-dev,
+               xsltproc,
+               zlib1g-dev
 Standards-Version: 3.9.3
 Homepage: http://www.kamailio.org/
 Vcs-Svn: svn://svn.debian.org/pkg-voip/kamailio/trunk/
@@ -47,28 +47,28 @@ Vcs-Browser: http://svn.debian.org/wsvn/pkg-voip/kamailio/?op=log
 Package: ngcp-kamailio
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${shlibs:Depends}, ${misc:Depends}, python, adduser
+Depends: adduser, python, ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio,
            kamailio-regex-modules,
            ngcp-system-tools-ce (<< 0.6.0),
            ngcp-system-tools-pro (<< 0.6.0)
 Replaces: kamailio
 Suggests: ngcp-kamailio-berkeley-modules,
- ngcp-kamailio-carrierroute-modules,
- ngcp-kamailio-cpl-modules,
- ngcp-kamailio-ldap-modules,
- ngcp-kamailio-lua-modules,
- ngcp-kamailio-mysql-modules,
- ngcp-kamailio-perl-modules,
- ngcp-kamailio-postgres-modules,
- ngcp-kamailio-presence-modules,
- ngcp-kamailio-python-modules,
- ngcp-kamailio-radius-modules,
- ngcp-kamailio-snmpstats-modules,
- ngcp-kamailio-tls-modules,
- ngcp-kamailio-unixodbc-modules,
- ngcp-kamailio-xml-modules,
- ngcp-kamailio-xmpp-modules
+          ngcp-kamailio-carrierroute-modules,
+          ngcp-kamailio-cpl-modules,
+          ngcp-kamailio-ldap-modules,
+          ngcp-kamailio-lua-modules,
+          ngcp-kamailio-mysql-modules,
+          ngcp-kamailio-perl-modules,
+          ngcp-kamailio-postgres-modules,
+          ngcp-kamailio-presence-modules,
+          ngcp-kamailio-python-modules,
+          ngcp-kamailio-radius-modules,
+          ngcp-kamailio-snmpstats-modules,
+          ngcp-kamailio-tls-modules,
+          ngcp-kamailio-unixodbc-modules,
+          ngcp-kamailio-xml-modules,
+          ngcp-kamailio-xmpp-modules
 Description: very fast and configurable SIP proxy
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -91,7 +91,7 @@ Priority: extra
 Section: debug
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}
 Conflicts: kamailio-dbg
 Replaces: kamailio-dbg
 Description: very fast and configurable SIP proxy [debug symbols]
@@ -105,7 +105,7 @@ Description: very fast and configurable SIP proxy [debug symbols]
 Package: ngcp-kamailio-geoip-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-geoip-modules
 Replaces: kamailio-geoip-modules
 Description: contains the geoip module
@@ -119,7 +119,7 @@ Description: contains the geoip module
 Package: ngcp-kamailio-sqlite-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Recommends: sqlite3
 Conflicts: kamailio-sqlite-modules
 Replaces: kamailio-sqlite-modules
@@ -133,7 +133,7 @@ Description: SQLite database connectivity module for Kamailio
 Package: ngcp-kamailio-json-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-json-modules
 Replaces: kamailio-json-modules
 Description: Json parser and jsonrpc modules for Kamailio
@@ -147,7 +147,7 @@ Description: Json parser and jsonrpc modules for Kamailio
 Package: ngcp-kamailio-memcached-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-memcached-modules
 Replaces: kamailio-memcached-modules
 Description: Provides the memcached module, an interface to the memcached server
@@ -161,7 +161,7 @@ Description: Provides the memcached module, an interface to the memcached server
 Package: ngcp-kamailio-lua-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-lua-modules
 Replaces: kamailio-lua-modules
 Description: contains the app_lua module
@@ -175,7 +175,10 @@ Description: contains the app_lua module
 Package: ngcp-kamailio-python-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, python-dev, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}),
+         python-dev,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: kamailio-python-modules
 Replaces: kamailio-python-modules
 Description: contains the app_python module
@@ -189,7 +192,10 @@ Description: contains the app_python module
 Package: ngcp-kamailio-mysql-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version}), mysql-client
+Depends: mysql-client,
+         ngcp-kamailio (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: kamailio-mysql-modules
 Replaces: kamailio-mysql-module
 Description: MySQL database connectivity module for Kamailio
@@ -202,7 +208,10 @@ Description: MySQL database connectivity module for Kamailio
 Package: ngcp-kamailio-postgres-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version}), postgresql-client
+Depends: ngcp-kamailio (= ${binary:Version}),
+         postgresql-client,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: kamailio-postgres-modules
 Replaces: kamailio-postgres-module
 Description: PostgreSQL database connectivity module for Kamailio
@@ -215,7 +224,7 @@ Description: PostgreSQL database connectivity module for Kamailio
 Package: ngcp-kamailio-cpl-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-cpl-modules
 Replaces: kamailio-cpl-module
 Description: CPL module (CPL interpreter engine) for Kamailio
@@ -229,7 +238,7 @@ Description: CPL module (CPL interpreter engine) for Kamailio
 Package: ngcp-kamailio-radius-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-radius-modules
 Replaces: kamailio-radius-modules
 Description: RADIUS modules for Kamailio
@@ -244,7 +253,7 @@ Description: RADIUS modules for Kamailio
 Package: ngcp-kamailio-unixodbc-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-unixodbc-modules
 Replaces: kamailio-unixodbc-modules
 Description: unixODBC database connectivity module for Kamailio
@@ -257,7 +266,7 @@ Description: unixODBC database connectivity module for Kamailio
 Package: ngcp-kamailio-presence-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-presence-modules
 Replaces: kamailio-presence-modules
 Description: SIMPLE presence modules for Kamailio
@@ -272,7 +281,7 @@ Description: SIMPLE presence modules for Kamailio
 Package: ngcp-kamailio-perl-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Replaces: kamailio-perl-modules
 Conflicts: kamailio-perl-modules
 Description: Perl extensions and database driver for Kamailio
@@ -286,7 +295,10 @@ Description: Perl extensions and database driver for Kamailio
 Package: ngcp-kamailio-snmpstats-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version}), snmpd
+Depends: ngcp-kamailio (= ${binary:Version}),
+         snmpd,
+         ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: kamailio-snmpstats-modules
 Replaces: kamailio-snmpstats-modules
 Description: SNMP AgentX subagent module for Kamailio
@@ -300,7 +312,7 @@ Description: SNMP AgentX subagent module for Kamailio
 Package: ngcp-kamailio-xmpp-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-xmpp-modules
 Replaces: kamailio-xmpp-modules
 Description: XMPP gateway module for Kamailio
@@ -313,7 +325,7 @@ Description: XMPP gateway module for Kamailio
 Package: ngcp-kamailio-xml-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-xml-modules
 Replaces: kamailio-xml-module, kamailio-xmlrpc-module
 Provides: ngcp-kamailio-xmlrpc-modules
@@ -330,7 +342,7 @@ Description: XML based extensions for Kamailio's Management Interface
 Package: ngcp-kamailio-carrierroute-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-carrierroute-modules
 Replaces: kamailio-carrierroute-modules
 Description: carrierroute module for Kamailio
@@ -344,7 +356,10 @@ Description: carrierroute module for Kamailio
 Package: ngcp-kamailio-berkeley-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version}), db4.8-util
+Depends: db4.8-util,
+         ngcp-kamailio (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
 Conflicts: kamailio-berkeley-modules
 Replaces: kamailio-berkeley-modules
 Description: Berkeley database module for Kamailio
@@ -374,7 +389,7 @@ Description: Berkeley database module for Kamailio - helper program
 Package: ngcp-kamailio-ldap-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-ldap-modules
 Replaces: kamailio-ldap-modules
 Description: LDAP modules for Kamailio
@@ -389,7 +404,7 @@ Description: LDAP modules for Kamailio
 Package: ngcp-kamailio-utils-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-utils-modules
 Replaces: kamailio-utils-modules
 Description: Provides a set utility functions for Kamailio
@@ -403,7 +418,7 @@ Description: Provides a set utility functions for Kamailio
 Package: ngcp-kamailio-tls-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio (= ${binary:Version})
+Depends: ngcp-kamailio (= ${binary:Version}), ${misc:Depends}, ${shlibs:Depends}
 Conflicts: kamailio-tls-modules
 Replaces: kamailio-tls-modules
 Description: contains the TLS kamailio transport module
@@ -417,7 +432,9 @@ Description: contains the TLS kamailio transport module
 Package: ngcp-kamailio-lcrrate-modules
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends}, ${shlibs:Depends}, ngcp-kamailio-mysql-modules (= ${binary:Version})
+Depends: ngcp-kamailio-mysql-modules (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
 Description: Provides a set utility functions for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
