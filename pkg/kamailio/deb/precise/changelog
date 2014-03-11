@@ -1,3 +1,15 @@
+kamailio (4.0.6) unstable; urgency=low
+
+  * update to 4.0.6 from upstream
+
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 06 Mar 2014 15:20:25 +0100
+
+kamailio (4.0.5) unstable; urgency=low
+
+  * update to 4.0.5 from upstream
+
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Fri, 20 Dec 2013 17:10:20 +0100
+
 kamailio (4.0.4) unstable; urgency=low
 
   * update to 4.0.4 from upstream
@@ -33,12 +45,6 @@ kamailio (3.4.0~dev0) unstable; urgency=low
   * update version to 3.4.0~dev0
 
  -- Jon Bonilla <manwe@aholab.ehu.es>  Wed, 15 Jun 2012 03:15:00 +0100
-
-kamailio (3.3-dev) unstable; urgency=low
-
-  * Set version to 3.3-dev for dev builds
-
- -- Jon Bonilla <manwe@aholab.ehu.es>  Wed, 19 Oct 2011 17:24:00 +0100
 
 kamailio (3.2.0) unstable; urgency=low
 

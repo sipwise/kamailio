@@ -368,6 +368,8 @@ void* qm_malloc(struct qm_block* qm, unsigned long size)
 	MDBG("qm_malloc(%p, %lu) called from %s: %s(%d)\n", qm, size, file, func,
 			line);
 #endif
+	/*malloc(0) should return a valid pointer according to specs*/
+	if(unlikely(size==0)) size=4;
 	/*size must be a multiple of 8*/
 	size=ROUNDUP(size);
 	if (size>(qm->size-qm->real_used)) return 0;
@@ -471,6 +473,12 @@ void qm_free(struct qm_block* qm, void* p)
 	MDBG("qm_free: freeing frag. %p alloc'ed from %s: %s(%ld)\n",
 			f, f->file, f->func, f->line);
 #endif
+	if (unlikely(f->u.is_free)){
+		LM_INFO("freeing a free fragment (%p/%p) - ignore\n",
+				f, p);
+		return;
+	}
+
 	size=f->size;
 	qm->used-=size;
 	qm->real_used-=size;

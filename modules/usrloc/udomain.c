@@ -1245,8 +1245,8 @@ int uldb_preload_attrs(udomain_t *_d)
 			}
 
 			if (use_domain) {
-				domain.s = (char*)VAL_STRING(ROW_VALUES(row) + 6);
-				if (VAL_NULL(ROW_VALUES(row)+6) || domain.s==0 || domain.s[0]==0){
+				domain.s = (char*)VAL_STRING(ROW_VALUES(row) + 5);
+				if (VAL_NULL(ROW_VALUES(row)+5) || domain.s==0 || domain.s[0]==0){
 					LM_CRIT("empty domain record for user %.*s...skipping\n",
 							user.len, user.s);
 					continue;
@@ -1265,8 +1265,7 @@ int uldb_preload_attrs(udomain_t *_d)
 				suri = user;
 			}
 
-			lock_udomain(_d, &suri);
-			if (get_urecord_by_ruid(_d, ul_get_aorhash(&suri), &ruid, &r, &c) > 0) {
+			if (get_urecord_by_ruid(_d, ul_get_aorhash(&suri), &ruid, &r, &c) < 0) {
 				/* delete attrs records from db table */
 				LM_INFO("no contact record for this ruid\n");
 				uldb_delete_attrs(_d->name, &user, &domain, &ruid);
@@ -1282,8 +1281,9 @@ int uldb_preload_attrs(udomain_t *_d)
 							LM_INFO("cannot add values to contact xavp\n");
 					}
 				}
+				/* get_urecord_by_ruid() locks the slot */
+				unlock_udomain(_d, &suri);
 			}
-			unlock_udomain(_d, &user);
 		}
 
 		if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {

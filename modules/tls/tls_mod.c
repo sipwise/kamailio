@@ -60,6 +60,7 @@
 #include "../../shm_init.h"
 #include "../../rpc_lookup.h"
 #include "../../cfg/cfg.h"
+#include "../../dprint.h"
 #include "tls_init.h"
 #include "tls_server.h"
 #include "tls_domain.h"
@@ -299,7 +300,7 @@ static int mod_init(void)
 	}
 	/* declare configuration */
 	if (cfg_declare("tls", tls_cfg_def, &default_tls_cfg,
-							cfg_sizeof(tls), &tls_cfg)) {
+							cfg_sizeof(tls), (void **)&tls_cfg)) {
 		ERR("failed to register the configuration\n");
 		return -1;
 	}

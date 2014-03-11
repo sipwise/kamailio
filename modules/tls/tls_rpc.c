@@ -32,6 +32,7 @@
 #include "../../tcp_info.h"
 #include "../../timer.h"
 #include "../../cfg/cfg.h"
+#include "../../dprint.h"
 #include "tls_init.h"
 #include "tls_mod.h"
 #include "tls_domain.h"
@@ -80,8 +81,10 @@ static void tls_reload(rpc_t* rpc, void* ctx)
 	}
 
 	DBG("TLS configuration successfuly loaded");
+	lock_get(tls_domains_cfg_lock);
 	cfg->next = (*tls_domains_cfg);
 	*tls_domains_cfg = cfg;
+	lock_release(tls_domains_cfg_lock);
 	return;
 
  error:
