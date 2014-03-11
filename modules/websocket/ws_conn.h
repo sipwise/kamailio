@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -18,6 +18,11 @@
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Exception: permission to copy, modify, propagate, and distribute a work
+ * formed by combining OpenSSL toolkit software and the code in this file,
+ * such as linking with software components and libraries released under
+ * OpenSSL project license.
  *
  */
 
@@ -72,6 +77,10 @@ extern char *wsconn_state_str[];
 
 extern stat_var *ws_current_connections;
 extern stat_var *ws_max_concurrent_connections;
+extern stat_var *ws_sip_current_connections;
+extern stat_var *ws_sip_max_concurrent_connections;
+extern stat_var *ws_msrp_current_connections;
+extern stat_var *ws_msrp_max_concurrent_connections;
 
 int wsconn_init(void);
 void wsconn_destroy(void);

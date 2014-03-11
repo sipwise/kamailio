@@ -47,9 +47,9 @@ extern "C" {
 
 #include "../../config.h"
 
-#define SIP_PORT_TABLE_STR_INDEX_SIZE 10
+#define SIP_PORT_TABLE_STR_INDEX_SIZE 22
 
-/* This strucutre represents a single row in the table. */
+/* This structure represents a single row in the table. */
 typedef struct kamailioSIPPortTable_context_s 
 {
 
@@ -87,11 +87,9 @@ void  initialize_table_kamailioSIPPortTable(void);
 int   kamailioSIPPortTable_get_value(netsnmp_request_info *, netsnmp_index *, 
 		netsnmp_table_request_info *);
 
-const kamailioSIPPortTable_context * kamailioSIPPortTable_get_by_idx(
-		netsnmp_index *);
+const kamailioSIPPortTable_context *kamailioSIPPortTable_get_by_idx(netsnmp_index *);
 
-const kamailioSIPPortTable_context * kamailioSIPPortTable_get_by_idx_rs(
-		netsnmp_index *, int row_status);
+const kamailioSIPPortTable_context * kamailioSIPPortTable_get_by_idx_rs(netsnmp_index *, int row_status);
 
 /*
  * oid declarations

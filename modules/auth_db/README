@@ -320,8 +320,16 @@ modparam("auth_db", "version_table", 0)
    Negative codes may be interpreted as follows:
      * -1 (generic error) - some generic error occurred and no reply was
        sent out;
-     * -2 (invalid password) - valid user, but wrong password;
+     * -2 (invalid password) - wrong password;
      * -3 (invalid user) - authentication user does not exist.
+     * -4 (nonce expired) - the nonce has expired
+     * -5 (no credentials) - request does not contain an Authorization
+       header with the correct realm.
+     * -6 (nonce reused) - the nonce has already been used to authenticate
+       a previous request
+     * -8 (authuser mismatch) - depending on the method, th From/To/RURI
+       user does not match the authentication user (see auth_check()
+       function).
 
    Meaning of the parameters is as follows:
      * realm - Realm is a opaque string that the user agent should present
@@ -401,6 +409,8 @@ if (!proxy_authorize("$fd", "subscriber)) {
    In addition, a matter of flags parameter value, the function checks if
    authentication username matches From/To header username, and
    Request-URI in case of PUBLISH.
+
+   Negative return codes have the same meaning as for www_authenticate().
 
    Meaning of the parameters is as follows:
      * realm - Realm is a opaque string that the user agent should present

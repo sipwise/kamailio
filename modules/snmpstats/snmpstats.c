@@ -4,6 +4,8 @@
  * SNMPStats Module 
  * Copyright (C) 2006 SOMA Networks, INC.
  * Written by: Jeffrey Magder (jmagder@somanetworks.com)
+ * Copyright (C) 2013 Edvina AB, Sollentuna, Sweden
+ * Updated and extended by: Olle E. Johansson (oej@edvina.net)
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -25,6 +27,7 @@
  * History:
  * --------
  * 2006-11-23 initial version (jmagder)
+ * 2013-04-01 updates of the MIB with core memory, tcp stats and much more (oej)
  * 
  * There are some important points to understanding the SNMPStat modules
  * architecture.
@@ -79,7 +82,8 @@
 #include "snmpstats.h"
 #include "snmpstats_globals.h"
 #include "../../timer.h"
-#include "../../cfg/cfg_struct.h"
+#include "../../cfg/cfg_select.h"
+#include "../../cfg/cfg_ctx.h"
 
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
@@ -126,7 +130,6 @@ static int  mod_child_init(int rank);
 /*! This function is called when Kamailio is shutting down.  When this happens, we
  * log a useful message and kill the AgentX Sub-Agent child process */
 static void mod_destroy(void);
-
 
 static proc_export_t mod_procs[] = {
 	{"SNMP AgentX",  0,  0, agentx_child, 1 },
@@ -366,6 +369,8 @@ static int mod_init(void)
 	register_procs(1);
 	/* add child to update local config framework structures */
 	cfg_register_child(1);
+	/* Initialize config framework in utilities.c */
+	config_context_init();
 
 	return 0;
 }

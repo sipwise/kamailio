@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -19,6 +19,11 @@
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * Exception: permission to copy, modify, propagate, and distribute a work
+ * formed by combining OpenSSL toolkit software and the code in this file,
+ * such as linking with software components and libraries released under
+ * OpenSSL project license.
+ *
  */
 
 #ifndef _WS_MOD_H
@@ -28,8 +33,13 @@
 #include "../../kstats_types.h"
 #include "../sl/sl.h"
 
+enum
+{
+	SUB_PROTOCOL_SIP  = (1 << 0),
+	SUB_PROTOCOL_MSRP = (1 << 1)
+};
+
 extern sl_api_t ws_slb;
-extern int *ws_enabled;
 extern gen_lock_t *ws_stats_lock;
 
 extern int ws_ping_interval;	/* time (in seconds) between sending Pings */

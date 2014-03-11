@@ -32,6 +32,8 @@
 #include "../../socket_info.h"
 #include "../../data_lump.h"
 #include "../../lib/kcore/cmpapi.h"
+#include "../../tcp_conn.h"
+#include "../../pvapi.h"
 
 #include "../../parser/parse_from.h"
 #include "../../parser/parse_uri.h"
@@ -40,8 +42,7 @@
 #include "../../parser/parse_refer_to.h"
 #include "../../parser/parse_rpid.h"
 #include "../../parser/parse_diversion.h"
-#include "../../lib/kcore/parse_ppi.h"
-#include "../../lib/kcore/parse_pai.h"
+#include "../../parser/parse_ppi_pai.h"
 #include "../../parser/digest/digest.h"
 
 #include "pv_core.h"
@@ -71,10 +72,6 @@ int _pv_pid = 0;
 
 #define PV_FIELD_DELIM ", "
 #define PV_FIELD_DELIM_LEN (sizeof(PV_FIELD_DELIM) - 1)
-#define PV_LOCAL_BUF_SIZE	511
-
-static char pv_local_buf[PV_LOCAL_BUF_SIZE+1];
-
 
 int pv_get_msgid(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
@@ -865,38 +862,84 @@ int pv_get_rpid(struct sip_msg *msg, pv_param_t *param,
 int pv_get_ppi_attr(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
 {
+    int idxf;
+    int idx;
     struct sip_uri *uri;
-    
-    if(msg==NULL)
-	return -1;
+    p_id_body_t *ppi_body = NULL;
+	to_body_t *ppi_uri = NULL;
+	int i, cur_id;
 
-    if(parse_ppi_header(msg) < 0) {
-	LM_DBG("no P-Preferred-Identity header\n");
-	return pv_get_null(msg, param, res);
-    }
-	
-    if(msg->ppi == NULL || get_ppi(msg) == NULL) {
-	       LM_DBG("no P-Preferred-Identity header\n");
+    if(msg==NULL)
+		return -1;
+    
+	if(parse_ppi_header(msg) < 0)
+    {
+		LM_DBG("no P-Preferred-Identity header\n");
 		return pv_get_null(msg, param, res);
     }
-    
+
+    if (pv_get_spec_index(msg, param, &idx, &idxf) != 0)
+    {
+    	LM_ERR("Invalid index\n");
+		return -1;
+    }
+
+    if (idxf == PV_IDX_ALL)
+	{
+		LM_ERR("Unable to return 'all' PPI values\n");
+		return -1;
+	}
+
+	ppi_body = get_ppi(msg);
+	ppi_uri = &ppi_body->id[0];
+	cur_id = 0;
+	i = 0;
+	while (i < idx)
+	{
+		cur_id++;
+		if (cur_id < ppi_body->num_ids)
+		{
+			ppi_uri = &ppi_body->id[cur_id];
+			i++;
+		}
+		else if (ppi_body->next != NULL)
+		{
+			ppi_body = ppi_body->next;
+			ppi_uri = &ppi_body->id[0];
+			cur_id = 0;
+			i++;
+		}
+		else
+		{
+			/* No more PPIs */
+			return pv_get_null(msg, param, res);
+		}
+
+	}
+	/* Found the ID at index 'idx' */
+
     if(param->pvn.u.isname.name.n == 1) { /* uri */
-		return pv_get_strval(msg, param, res, &(get_ppi(msg)->uri));
+		return pv_get_strval(msg, param, res, &(ppi_uri->uri));
     }
 	
     if(param->pvn.u.isname.name.n==4) { /* display name */
-		if(get_ppi(msg)->display.s == NULL ||
-				get_ppi(msg)->display.len <= 0) {
+		if(ppi_uri->display.s == NULL ||
+				ppi_uri->display.len <= 0) {
 		    LM_DBG("no P-Preferred-Identity display name\n");
 			return pv_get_null(msg, param, res);
 		}
-		return pv_get_strval(msg, param, res, &(get_ppi(msg)->display));
+		return pv_get_strval(msg, param, res, &(ppi_uri->display));
     }
 
-    if((uri=parse_ppi_uri(msg))==NULL) {
-		LM_ERR("cannot parse P-Preferred-Identity URI\n");
-		return pv_get_null(msg, param, res);
-    }
+	uri = &ppi_uri->parsed_uri;
+	if (uri->host.s == NULL && uri->user.s == NULL)
+	{
+		if (parse_uri(ppi_uri->uri.s, ppi_uri->uri.len, uri) < 0)
+		{
+			LM_ERR("cannot parse P-Preferred-Identity URI\n");
+			return pv_get_null(msg, param, res);
+		}
+	}
 
     if(param->pvn.u.isname.name.n==2) { /* username */
 		if(uri->user.s==NULL || uri->user.len<=0) {
@@ -920,21 +963,62 @@ int pv_get_ppi_attr(struct sip_msg *msg, pv_param_t *param,
 int pv_get_pai(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
 {
+    int idxf;
+    int idx;
+    p_id_body_t *pai_body = NULL;
+	to_body_t *pai_uri = NULL;
+	int i, cur_id;
+
     if(msg==NULL)
 		return -1;
     
-    if(parse_pai_header(msg)==-1)
+	if(parse_pai_header(msg) < 0)
     {
 		LM_DBG("no P-Asserted-Identity header\n");
 		return pv_get_null(msg, param, res);
     }
-	
-    if(msg->pai==NULL || get_pai(msg)==NULL) {
-		LM_DBG("no P-Asserted-Identity header\n");
-		return pv_get_null(msg, param, res);
+
+    if (pv_get_spec_index(msg, param, &idx, &idxf) != 0)
+    {
+    	LM_ERR("Invalid index\n");
+		return -1;
     }
-    
-	return pv_get_strval(msg, param, res, &(get_pai(msg)->uri));
+
+    if (idxf == PV_IDX_ALL)
+	{
+		LM_ERR("Unable to return 'all' PAI values\n");
+		return -1;
+	}
+
+	pai_body = get_pai(msg);
+	pai_uri = &pai_body->id[0];
+	cur_id = 0;
+	i = 0;
+	while (i < idx)
+	{
+		cur_id++;
+		if (cur_id < pai_body->num_ids)
+		{
+			pai_uri = &pai_body->id[cur_id];
+			i++;
+		}
+		else if (pai_body->next != NULL)
+		{
+			pai_body = pai_body->next;
+			pai_uri = &pai_body->id[0];
+			cur_id = 0;
+			i++;
+		}
+		else
+		{
+			/* No more PAIs */
+			return pv_get_null(msg, param, res);
+		}
+
+	}
+	/* Found the ID at index 'idx' */
+
+	return pv_get_strval(msg, param, res, &(pai_uri->uri));
 }
 
 /* proto of received message: $pr or $proto*/
@@ -1272,7 +1356,7 @@ int pv_get_branch(struct sip_msg *msg, pv_param_t *param,
 		return pv_get_null(msg, param, res);
 
 
-	branch.s = get_branch(0, &branch.len, &q, 0, 0, 0, 0);
+	branch.s = get_branch(0, &branch.len, &q, 0, 0, 0, 0, 0, 0, 0);
 	if (!branch.s) {
 		return pv_get_null(msg, param, res);
 	}
@@ -1291,7 +1375,7 @@ int pv_get_branches(struct sip_msg *msg, pv_param_t *param,
 	qvalue_t q;
 	int cnt, i;
 	unsigned int qlen;
-	char *p, *qbuf;
+	char *p, *qbuf, *p_ini;
 
 	if(msg==NULL || res==NULL)
 		return -1;
@@ -1301,7 +1385,7 @@ int pv_get_branches(struct sip_msg *msg, pv_param_t *param,
   
 	cnt = s.len = 0;
 
-	while ((uri.s = get_branch(cnt, &uri.len, &q, 0, 0, 0, 0)))
+	while ((uri.s = get_branch(cnt, &uri.len, &q, 0, 0, 0, 0, 0, 0, 0)))
 	{
 		cnt++;
 		s.len += uri.len;
@@ -1315,17 +1399,17 @@ int pv_get_branches(struct sip_msg *msg, pv_param_t *param,
 		return pv_get_null(msg, param, res);   
 
 	s.len += (cnt - 1) * PV_FIELD_DELIM_LEN;
-
-	if (s.len + 1 > PV_LOCAL_BUF_SIZE)
+	if (s.len + 1 > pv_get_buffer_size())
 	{
 		LM_ERR("local buffer length exceeded\n");
 		return pv_get_null(msg, param, res);
 	}
 
 	i = 0;
-	p = pv_local_buf;
+	p_ini = pv_get_buffer();
+	p = p_ini;
 
-	while ((uri.s = get_branch(i, &uri.len, &q, 0, 0, 0, 0)))
+	while ((uri.s = get_branch(i, &uri.len, &q, 0, 0, 0, 0, 0, 0, 0)))
 	{
 		if (i)
 		{
@@ -1352,7 +1436,7 @@ int pv_get_branches(struct sip_msg *msg, pv_param_t *param,
 		i++;
 	}
 
-	s.s = &(pv_local_buf[0]);
+	s.s = &(p_ini[0]);
 	return pv_get_strval(msg, param, res, &s);
 }
 
@@ -1366,7 +1450,8 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 	struct usr_avp *avp0;
 	int idx;
 	int idxf;
-	char *p;
+	char *p, *p_ini;
+	int p_size;
 	int n=0;
 	struct search_state state;
 
@@ -1404,11 +1489,13 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 	}
 	if(idxf==PV_IDX_ALL)
 	{
-		p = pv_local_buf;
+		p_ini = pv_get_buffer();
+		p = p_ini;
+		p_size = pv_get_buffer_size();
 		do {
-			if(p!=pv_local_buf)
+			if(p!=p_ini)
 			{
-				if(p-pv_local_buf+PV_FIELD_DELIM_LEN+1>PV_LOCAL_BUF_SIZE)
+				if(p-p_ini+PV_FIELD_DELIM_LEN+1>p_size)
 				{
 					LM_ERR("local buffer length exceeded\n");
 					return pv_get_null(msg, param, res);
@@ -1423,7 +1510,7 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 				res->rs.s = int2str(avp_value.n, &res->rs.len);
 			}
 			
-			if(p-pv_local_buf+res->rs.len+1>PV_LOCAL_BUF_SIZE)
+			if(p-p_ini+res->rs.len+1>p_size)
 			{
 				LM_ERR("local buffer length exceeded!\n");
 				return pv_get_null(msg, param, res);
@@ -1431,9 +1518,8 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 			memcpy(p, res->rs.s, res->rs.len);
 			p += res->rs.len;
 		} while ((avp=search_next_avp(&state, &avp_value))!=0);
-		*p = 0;
-		res->rs.s = pv_local_buf;
-		res->rs.len = p - pv_local_buf;
+		res->rs.s = p_ini;
+		res->rs.len = p - p_ini;
 		return 0;
 	}
 
@@ -1492,8 +1578,8 @@ int pv_get_hdr(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 	pv_value_t tv;
 	struct hdr_field *hf;
 	struct hdr_field *hf0;
-	char *p;
-	int n;
+	char *p, *p_ini;
+	int n, p_size;
 
 	if(msg==NULL || res==NULL || param==NULL)
 		return -1;
@@ -1552,11 +1638,13 @@ int pv_get_hdr(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 	}
 	if(idxf==PV_IDX_ALL)
 	{
-		p = pv_local_buf;
+		p_ini = pv_get_buffer();
+		p = p_ini;
+		p_size = pv_get_buffer_size();
 		do {
-			if(p!=pv_local_buf)
+			if(p!=p_ini)
 			{
-				if(p-pv_local_buf+PV_FIELD_DELIM_LEN+1>PV_LOCAL_BUF_SIZE)
+				if(p-p_ini+PV_FIELD_DELIM_LEN+1>p_size)
 				{
 					LM_ERR("local buffer length exceeded\n");
 					return pv_get_null(msg, param, res);
@@ -1564,10 +1652,10 @@ int pv_get_hdr(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 				memcpy(p, PV_FIELD_DELIM, PV_FIELD_DELIM_LEN);
 				p += PV_FIELD_DELIM_LEN;
 			}
-			if(p-pv_local_buf+hf->body.len+1>PV_LOCAL_BUF_SIZE)
+			if(p-p_ini+hf->body.len+1>p_size)
 			{
 				LM_ERR("local buffer length exceeded [%d/%d]!\n",
-						(int)(p-pv_local_buf+hf->body.len+1),
+						(int)(p-p_ini+hf->body.len+1),
 						hf->body.len);
 				return pv_get_null(msg, param, res);
 			}
@@ -1586,9 +1674,8 @@ int pv_get_hdr(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
 				}
 			}
 		} while (hf);
-		*p = 0;
-		res->rs.s = pv_local_buf;
-		res->rs.len = p - pv_local_buf;
+		res->rs.s = p_ini;
+		res->rs.len = p - p_ini;
 		return 0;
 	}
 
@@ -1716,6 +1803,56 @@ int pv_get_cnt(struct sip_msg *msg, pv_param_t *param,
 	}
 
 	return pv_get_uintval(msg, param, res, n);
+}
+
+int pv_get_ruid(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	if(msg==NULL)
+		return -1;
+
+	if(msg->first_line.type == SIP_REPLY)
+		return pv_get_null(msg, param, res);
+
+	if(msg->ruid.len==0) 
+	{
+		LM_DBG("no ruid\n");
+		return pv_get_null(msg, param, res);
+	}
+	
+	return pv_get_strval(msg, param, res, &msg->ruid);
+}
+
+int pv_get_location_ua(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	if(msg==NULL)
+		return -1;
+
+	if(msg->first_line.type == SIP_REPLY)
+		return pv_get_null(msg, param, res);
+
+	if(msg->location_ua.len==0) 
+	{
+		LM_DBG("no location_ua\n");
+		return pv_get_null(msg, param, res);
+	}
+	
+	return pv_get_strval(msg, param, res, &msg->location_ua);
+}
+
+int pv_get_tcpconn_id(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	struct tcp_connection *con;
+
+	if (msg == NULL)
+		return -1;
+
+	if ((con = tcpconn_get(msg->rcv.proto_reserved1, 0, 0, 0, 0)) == NULL)
+		return pv_get_null(msg, param, res);
+
+	return pv_get_sintval(msg, param, res, con->id);
 }
 
 
@@ -2603,14 +2740,15 @@ int pv_parse_hdr_name(pv_spec_p sp, str *in)
 		return 0;
 	}
 
-	if(in->len>=PV_LOCAL_BUF_SIZE-1)
+	if(in->len>=pv_get_buffer_size()-1)
 	{
 		LM_ERR("name too long\n");
 		return -1;
 	}
-	memcpy(pv_local_buf, in->s, in->len);
-	pv_local_buf[in->len] = ':';
-	s.s = pv_local_buf;
+	p = pv_get_buffer();
+	memcpy(p, in->s, in->len);
+	p[in->len] = ':';
+	s.s = p;
 	s.len = in->len+1;
 
 	if (parse_hname2(s.s, s.s + ((s.len<4)?4:s.len), &hdr)==0)
@@ -2760,4 +2898,45 @@ int pv_get_K(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		default:
 			return pv_get_uintval(msg, param, res, AF_INET);
 	}
+}
+
+/**
+ *
+ */
+int pv_parse__s_name(pv_spec_p sp, str *in)
+{
+	pv_elem_t *fmt = NULL;
+
+	if(in->s==NULL || in->len<=0)
+		return -1;
+	if(pv_parse_format(in, &fmt)<0 || fmt==NULL)
+	{
+		LM_ERR("wrong format[%.*s]\n", in->len, in->s);
+		return -1;
+	}
+	sp->pvp.pvn.u.dname = (void*)fmt;
+	sp->pvp.pvn.type = PV_NAME_OTHER;
+	return 0;
+}
+
+/**
+ *
+ */
+int pv_get__s(sip_msg_t *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	str sdata = {0};
+	pv_elem_t *fmt = NULL;
+	fmt = (pv_elem_t*)param->pvn.u.dname;
+
+	if(fmt==NULL)
+	{
+		return pv_get_null(msg, param, res);
+	}
+	if(pv_printf_s(msg, fmt, &sdata)!=0)
+	{
+		LM_ERR("cannot evaluate the string\n");
+		return -1;
+	}
+	return pv_get_strval(msg, param, res, &sdata);
 }

@@ -362,7 +362,7 @@ with unexpected retcode=$var(check_result)\n");
 
 5.1. pl_stats
 
-   Lists the parameters and variabiles in the pipelimit module.
+   Lists the parameters and variables in the pipelimit module.
 
    Name: pl_stats
 

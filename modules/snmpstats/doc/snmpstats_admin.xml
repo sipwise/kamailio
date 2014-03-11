@@ -60,6 +60,11 @@
 			kamailioDialogLimitAlarmStatus, kamailioDialogLimitMinorAlarm,
 			kamailioDialogLimitMajorAlarm
 			</para>
+			<para>
+			In Kamailio 4.1 a set of new OIDs was added to reflect the
+			&kamailio; configuration, the version, core status (memory, connections),
+			transports and module data.
+			</para>
 		</section>
 		<section>
 			<title>SNMP Tables</title>
@@ -203,8 +208,8 @@
 		
 		<listitem>
 		<para>
-		<emphasis>dialog</emphasis> - all scalars relating to the number of dialogs are 
-		dependent on the presence of the dialog module.  Furthermore, if the module is 
+		<emphasis>dialog or dialog-ng</emphasis> - all scalars relating to the number of dialogs are 
+		dependent on the presence of a dialog module.  Furthermore, if the module is 
 		not loaded, then the kamailioDialogLimitMinorEvent, and kamailioDialogLimitMajorEvent
 		alarm will be disabled. 
 		</para>
@@ -243,7 +248,7 @@
 	</section>
 	<section>
 	<title>Parameters</title>
-	<section>
+	<section id ="snmpstats.p.sipentitytape">
 		<title><varname>sipEntityType</varname> (String) </title>
 
 		<para>
@@ -254,7 +259,7 @@
 
 		<para>
 		<emphasis>
-		registrarServer, redirectServer, proxyServer, userAgent, other
+		registrarServer, redirectServer, proxyServer, userAgent, edgeproxyServer, sipcaptureServer,other
 		</emphasis>
 		</para>
 
@@ -271,11 +276,13 @@ modparam("snmpstats", "sipEntityType", "proxyServer")
 		<para>
 		Note that as the above example shows, you can define this parameter more
 		than once.  This is of course because a given Kamailio instance can take on
-		more than one role.
+		more than one role. The edgeproxyServer is an edge server using the outbound
+		module and path extensions. The sipcaptureServer is a Homer Sip Capture
+		server that collect SIP messages.
 		</para>
 	</section>
 
-	<section>
+	<section id ="snmpstats.p.MsqQueueMinorTreshold">
 		<title><varname>MsgQueueMinorThreshold</varname> (Integer)</title>
 
 		<para>
@@ -300,7 +307,7 @@ modparam("snmpstats", "MsgQueueMinorThreshold", 2000)
 		</para>
 	</section>
 	
-	<section>
+	<section id ="snmpstats.p.MsqQueueMajorTreshold">
 		<title><varname>MsgQueueMajorThreshold</varname> (Integer)</title>
 
 		<para>
@@ -325,7 +332,7 @@ modparam("snmpstats", "MsgQueueMajorThreshold", 5000)
 		</para>
 	</section>
 
-	<section>
+	<section id ="snmpstats.p.dlg_minor_treshold">
 		<title><varname>dlg_minor_threshold</varname> (Integer)</title>
 
 		<para>
@@ -349,7 +356,7 @@ modparam("snmpstats", "MsgQueueMajorThreshold", 5000)
 		</para>
 	</section>
 
-	<section>
+	<section id ="snmpstats.p.dlg_major_treshold">
 		<title><varname>dlg_major_threshold</varname> (Integer)</title>
 
 		<para>
@@ -373,7 +380,7 @@ modparam("snmpstats", "MsgQueueMajorThreshold", 5000)
 		</para>
 	</section>
 
-	<section>
+	<section id ="snmpstats.p.snmpgetPath">
 		<title><varname>snmpgetPath</varname> (String)</title>
 
 		<para>
@@ -399,7 +406,7 @@ modparam("snmpstats", "snmpgetPath",     "/my/custom/path/")
 		</example>
 	</section>
 	
-	<section>
+	<section id ="snmpstats.p.snmpCommunity">
 		<title><varname>snmpCommunity</varname> (String)</title>
 
 		<para>
@@ -425,7 +432,7 @@ modparam("snmpstats", "snmpCommunity", "customCommunityString")
 		</example>
 	</section>
 
-	<section>
+	<section id ="snmpstats.p.export_registrar">
 		<title><varname>export_registrar</varname> (int)</title>
 
 		<para>

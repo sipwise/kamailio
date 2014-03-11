@@ -38,7 +38,7 @@
 #include "../../ut.h"
 #include "../../parser/msg_parser.h"
 #include "../../parser/contact/contact.h"
-#include "../../lib/kcore/parse_supported.h"
+#include "../../parser/parse_supported.h"
 #include "../../data_lump_rpl.h"
 #include "../ims_usrloc_scscf/usrloc.h"
 #include "rerrno.h"
@@ -412,61 +412,66 @@ int build_contact(ucontact_t* c, contact_for_header_t** contact_header) {
     tmp_contact_header->data_len = calc_buf_len(c);
     tmp_contact_header->buf = (char*)shm_malloc(tmp_contact_header->data_len);
 
-    p = tmp_contact_header->buf;
+    if (tmp_contact_header->data_len) {
+        p = tmp_contact_header->buf;
 
-    memcpy(p, CONTACT_BEGIN, CONTACT_BEGIN_LEN);
-    p += CONTACT_BEGIN_LEN;
+        memcpy(p, CONTACT_BEGIN, CONTACT_BEGIN_LEN);
+        p += CONTACT_BEGIN_LEN;
 
-    fl = 0;
-    while (c) {
-        if (VALID_CONTACT(c, act_time)) {
-            if (fl) {
-                memcpy(p, CONTACT_SEP, CONTACT_SEP_LEN);
-                p += CONTACT_SEP_LEN;
-            } else {
-                fl = 1;
-            }
+        fl = 0;
+        while (c) {
+            if (VALID_CONTACT(c, act_time)) {
+                if (fl) {
+                    memcpy(p, CONTACT_SEP, CONTACT_SEP_LEN);
+                    p += CONTACT_SEP_LEN;
+                } else {
+                    fl = 1;
+                }
 
-            *p++ = '<';
-            memcpy(p, c->c.s, c->c.len);
-            p += c->c.len;
-            *p++ = '>';
+                *p++ = '<';
+                memcpy(p, c->c.s, c->c.len);
+                p += c->c.len;
+                *p++ = '>';
 
-            len = len_q(c->q);
-            if (len) {
-                memcpy(p, Q_PARAM, Q_PARAM_LEN);
-                p += Q_PARAM_LEN;
-                memcpy(p, q2str(c->q, 0), len);
+                len = len_q(c->q);
+                if (len) {
+                    memcpy(p, Q_PARAM, Q_PARAM_LEN);
+                    p += Q_PARAM_LEN;
+                    memcpy(p, q2str(c->q, 0), len);
+                    p += len;
+                }
+
+                memcpy(p, EXPIRES_PARAM, EXPIRES_PARAM_LEN);
+                p += EXPIRES_PARAM_LEN;
+                cp = int2str((int) (c->expires - act_time), &len);
+                memcpy(p, cp, len);
                 p += len;
+    
+                if (c->received.s) {
+                    *p++ = ';';
+                    memcpy(p, rcv_param.s, rcv_param.len);
+                    p += rcv_param.len;
+                    *p++ = '=';
+                    *p++ = '\"';
+                    memcpy(p, c->received.s, c->received.len);
+                    p += c->received.len;
+                    *p++ = '\"';
+                }
             }
 
-            memcpy(p, EXPIRES_PARAM, EXPIRES_PARAM_LEN);
-            p += EXPIRES_PARAM_LEN;
-            cp = int2str((int) (c->expires - act_time), &len);
-            memcpy(p, cp, len);
-            p += len;
-
-            if (c->received.s) {
-                *p++ = ';';
-                memcpy(p, rcv_param.s, rcv_param.len);
-                p += rcv_param.len;
-                *p++ = '=';
-                *p++ = '\"';
-                memcpy(p, c->received.s, c->received.len);
-                p += c->received.len;
-                *p++ = '\"';
-            }
+            c = c->next;
         }
 
-        c = c->next;
-    }
+        memcpy(p, CRLF, CRLF_LEN);
+        p += CRLF_LEN;
 
-    memcpy(p, CRLF, CRLF_LEN);
-    p += CRLF_LEN;
+        tmp_contact_header->data_len = p - tmp_contact_header->buf;
 
-    tmp_contact_header->data_len = p - tmp_contact_header->buf;
+        LM_DBG("created Contact HF: %.*s\n", tmp_contact_header->data_len, tmp_contact_header->buf);
+    } else 
+        LM_DBG("No Contact HF created, no contacts.\n");
 
-    LM_DBG("created Contact HF: %.*s\n", tmp_contact_header->data_len, tmp_contact_header->buf);
+
     *contact_header = tmp_contact_header;
     return 0;
 }
@@ -563,7 +568,7 @@ int build_p_associated_uri(ims_subscription* s) {
  * Send a reply
  */
 int reg_send_reply_transactional(struct sip_msg* _m, contact_for_header_t* contact_header, struct cell* t_cell) {
-    str unsup = str_init(SUPPORTED_PATH_STR);
+    str unsup = str_init(OPTION_TAG_PATH_STR);
     long code;
     str msg = str_init(MSG_200); /* makes gcc shut up */
     char* buf;
@@ -582,7 +587,7 @@ int reg_send_reply_transactional(struct sip_msg* _m, contact_for_header_t* conta
                     return -1;
                 if (add_path(_m, &_m->path_vec) < 0)
                     return -1;
-            } else if (get_supported(_m) & F_SUPPORTED_PATH) {
+            } else if (get_supported(_m) & F_OPTION_TAG_PATH) {
                 if (add_path(_m, &_m->path_vec) < 0)
                     return -1;
             } else if (path_mode == PATH_MODE_STRICT) {
@@ -656,7 +661,7 @@ int reg_send_reply_transactional(struct sip_msg* _m, contact_for_header_t* conta
  * Send a reply
  */
 int reg_send_reply(struct sip_msg* _m, contact_for_header_t* contact_header) {
-    str unsup = str_init(SUPPORTED_PATH_STR);
+    str unsup = str_init(OPTION_TAG_PATH_STR);
     long code;
     str msg = str_init(MSG_200); /* makes gcc shut up */
     char* buf;
@@ -675,7 +680,7 @@ int reg_send_reply(struct sip_msg* _m, contact_for_header_t* contact_header) {
                     return -1;
                 if (add_path(_m, &_m->path_vec) < 0)
                     return -1;
-            } else if (get_supported(_m) & F_SUPPORTED_PATH) {
+            } else if (get_supported(_m) & F_OPTION_TAG_PATH) {
                 if (add_path(_m, &_m->path_vec) < 0)
                     return -1;
             } else if (path_mode == PATH_MODE_STRICT) {

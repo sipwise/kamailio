@@ -723,19 +723,35 @@ void free_reply_lump( struct lump_rpl *lump)
 /*only the content*/
 void free_sip_msg(struct sip_msg* const msg)
 {
-	if (msg->new_uri.s) { pkg_free(msg->new_uri.s); msg->new_uri.len=0; }
-	if (msg->dst_uri.s) { pkg_free(msg->dst_uri.s); msg->dst_uri.len=0; }
-	if (msg->path_vec.s) { pkg_free(msg->path_vec.s); msg->path_vec.len=0; }
+	reset_new_uri(msg);
+	reset_dst_uri(msg);
+	reset_path_vector(msg);
 	reset_instance(msg);
+	reset_ruid(msg);
+	reset_ua(msg);
 	if (msg->headers)     free_hdr_field_lst(msg->headers);
 	if (msg->body && msg->body->free) msg->body->free(&msg->body);
 	if (msg->add_rm)      free_lump_list(msg->add_rm);
 	if (msg->body_lumps)  free_lump_list(msg->body_lumps);
 	if (msg->reply_lump)   free_reply_lump(msg->reply_lump);
+	msg_ldata_reset(msg);
 	/* don't free anymore -- now a pointer to a static buffer */
 #	ifdef DYN_BUF
 	pkg_free(msg->buf);
 #	endif
+}
+
+/**
+ * reset new uri value
+ */
+void reset_new_uri(struct sip_msg* const msg)
+{
+	if(msg->new_uri.s != 0) {
+		pkg_free(msg->new_uri.s);
+	}
+	msg->new_uri.s = 0;
+	msg->new_uri.len = 0;
+	msg->parsed_uri_ok = 0;
 }
 
 
@@ -857,6 +873,94 @@ void reset_instance(struct sip_msg* const msg)
 	}
 	msg->instance.s = 0;
 	msg->instance.len = 0;
+}
+
+
+int set_ruid(struct sip_msg* msg, str* ruid)
+{
+	char* ptr;
+
+	if (unlikely(!msg || !ruid)) {
+		LM_ERR("invalid ruid parameter value\n");
+		return -1;
+	}
+
+	if (unlikely(ruid->len == 0)) {
+		reset_ruid(msg);
+	} else if (msg->ruid.s && (msg->ruid.len >= ruid->len)) {
+		memcpy(msg->ruid.s, ruid->s, ruid->len);
+		msg->ruid.len = ruid->len;
+	} else {
+		ptr = (char*)pkg_malloc(ruid->len);
+		if (!ptr) {
+			LM_ERR("not enough pkg memory for ruid\n");
+			return -1;
+		}
+		memcpy(ptr, ruid->s, ruid->len);
+		if (msg->ruid.s) pkg_free(msg->ruid.s);
+		msg->ruid.s = ptr;
+		msg->ruid.len = ruid->len;
+	}
+	return 0;
+}
+
+
+void reset_ruid(struct sip_msg* const msg)
+{
+	if(msg->ruid.s != 0) {
+		pkg_free(msg->ruid.s);
+	}
+	msg->ruid.s = 0;
+	msg->ruid.len = 0;
+}
+
+
+int set_ua(struct sip_msg* msg, str* location_ua)
+{
+	char* ptr;
+
+	if (unlikely(!msg || !location_ua)) {
+		LM_ERR("invalid location_ua parameter value\n");
+		return -1;
+	}
+
+	if (unlikely(location_ua->len == 0)) {
+		reset_ua(msg);
+	} else if (msg->location_ua.s && (msg->location_ua.len >= location_ua->len)) {
+		memcpy(msg->location_ua.s, location_ua->s, location_ua->len);
+		msg->location_ua.len = location_ua->len;
+	} else {
+		ptr = (char*)pkg_malloc(location_ua->len);
+		if (!ptr) {
+			LM_ERR("not enough pkg memory for location_ua\n");
+			return -1;
+		}
+		memcpy(ptr, location_ua->s, location_ua->len);
+		if (msg->location_ua.s) pkg_free(msg->location_ua.s);
+		msg->location_ua.s = ptr;
+		msg->location_ua.len = location_ua->len;
+	}
+	return 0;
+}
+
+
+void reset_ua(struct sip_msg* const msg)
+{
+	if(msg->location_ua.s != 0) {
+		pkg_free(msg->location_ua.s);
+	}
+	msg->location_ua.s = 0;
+	msg->location_ua.len = 0;
+}
+
+/**
+ * reset content of msg->ldv (msg_ldata_t structure)
+ */
+void msg_ldata_reset(sip_msg_t *msg)
+{
+	if(msg==NULL)
+		return;
+	memset(&msg->ldv, 0, sizeof(msg_ldata_t));
 }
 
 

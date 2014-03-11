@@ -1,5 +1,8 @@
 /* 
+ * TLS module
+ *
  * Copyright (C) 2010 iptelorg GmbH
+ * Copyright (C) 2013 Motorola Solutions, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above

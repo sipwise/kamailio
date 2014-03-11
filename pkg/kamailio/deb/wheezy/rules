@@ -21,13 +21,15 @@ include /usr/share/dpkg/buildflags.mk
 # java stuff using libgcj12
 export JAVA_HOME=/usr/lib/jvm/java-gcj-4.6
 
+# choose freeradius
+
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES=
 
 # extra modules to skip, because they are not compilable now
 # - regardless if they go to the main kamailio package or to some module package,
 # they will be excluded from compile and install of all
-EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy purple mi_xmlrpc
+EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy purple mi_xmlrpc dnssec
 
 # module groups that are packaged in seperate packages
 # (with the name kamailio-$(group_name)-modules)
@@ -36,8 +38,8 @@ EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy purple mi_xmlrpc
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils lua memcached \
 			   snmpstats carrierroute xmpp cpl redis python geoip\
-			   sqlite json mono ims \
-			   tls outbound websocket
+			   sqlite json mono ims sctp java \
+			   tls outbound websocket autheph 
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
 LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)

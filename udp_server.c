@@ -76,14 +76,11 @@
 #include "ip_addr.h"
 #include "cfg/cfg_struct.h"
 #include "events.h"
+#include "stun.h"
 #ifdef USE_RAW_SOCKS
 #include "raw_sock.h"
 #endif /* USE_RAW_SOCKS */
 
-
-#ifdef USE_STUN
-  #include "ser_stun.h"
-#endif
 
 #ifdef DBG_MSG_QA
 /* message quality assurance -- frequently, bugs in ser have
@@ -243,9 +240,7 @@ int probe_max_receive_buffer( int udp_sock )
 static int setup_mcast_rcvr(int sock, union sockaddr_union* addr)
 {
 	struct ip_mreq mreq;
-#ifdef USE_IPV6
 	struct ipv6_mreq mreq6;
-#endif /* USE_IPV6 */
 	
 	if (addr->s.sa_family==AF_INET){
 		memcpy(&mreq.imr_multiaddr, &addr->sin.sin_addr, 
@@ -259,7 +254,6 @@ static int setup_mcast_rcvr(int sock, union sockaddr_union* addr)
 			return -1;
 		}
 		
-#ifdef USE_IPV6
 	} else if (addr->s.sa_family==AF_INET6){
 		memcpy(&mreq6.ipv6mr_multiaddr, &addr->sin6.sin6_addr, 
 		       sizeof(struct in6_addr));
@@ -275,7 +269,6 @@ static int setup_mcast_rcvr(int sock, union sockaddr_union* addr)
 			return -1;
 		}
 		
-#endif /* USE_IPV6 */
 	} else {
 		LOG(L_ERR, "ERROR: setup_mcast_rcvr: Unsupported protocol family\n");
 		return -1;
@@ -328,7 +321,6 @@ int udp_init(struct socket_info* sock_info)
 					strerror(errno));
 			/* continue since this is not critical */
 		}
-#ifdef USE_IPV6
 	} else if (addr->s.sa_family==AF_INET6){
 		if (setsockopt(sock_info->socket, IPPROTO_IPV6, IPV6_TCLASS,
 					(void*)&optval, sizeof(optval)) ==-1) {
@@ -336,7 +328,6 @@ int udp_init(struct socket_info* sock_info)
 					strerror(errno));
 			/* continue since this is not critical */
 		}
-#endif
 	}
 
 #if defined (__OS_linux) && defined(UDP_ERRORS)
@@ -382,7 +373,6 @@ int udp_init(struct socket_info* sock_info)
 						" %s\n", strerror(errno));
 			}
 		}
-#ifdef USE_IPV6
 	} else if (addr->s.sa_family==AF_INET6){
 		if (setsockopt(sock_info->socket, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, 
 						&mcast_loopback, sizeof(mcast_loopback))==-1){
@@ -396,7 +386,6 @@ int udp_init(struct socket_info* sock_info)
 						"(IPV6_MULTICAST_HOPS): %s\n", strerror(errno));
 			}
 		}
-#endif /* USE_IPV6*/
 	} else {
 		LOG(L_ERR, "ERROR: udp_init: Unsupported protocol family %d\n",
 					addr->s.sa_family);
@@ -412,11 +401,9 @@ int udp_init(struct socket_info* sock_info)
 				(unsigned)sockaddru_len(*addr),
 				sock_info->address_str.s,
 				strerror(errno));
-	#ifdef USE_IPV6
 		if (addr->s.sa_family==AF_INET6)
 			LOG(L_ERR, "ERROR: udp_init: might be caused by using a link "
 					" local address, try site local or global\n");
-	#endif
 		goto error;
 	}
 
@@ -501,19 +488,14 @@ int udp_rcv_loop()
 			}
 		}
 #ifndef NO_ZERO_CHECKS
-#ifdef USE_STUN
-		/* STUN support can be switched off even if it's compiled */
-		if (stun_allow_stun == 0 || (unsigned char)*buf != 0x00) {
-#endif
-		  if (len<MIN_UDP_PACKET) {
-			  tmp=ip_addr2a(&ri.src_ip);
-			  DBG("udp_rcv_loop: probing packet received from %s %d\n",
-				  	tmp, htons(ri.src_port));
-			  continue;
-		  }
-#ifdef USE_STUN
+		if (!unlikely(sr_event_enabled(SREV_STUN_IN)) || (unsigned char)*buf != 0x00) {
+			if (len<MIN_UDP_PACKET) {
+				tmp=ip_addr2a(&ri.src_ip);
+				DBG("udp_rcv_loop: probing packet received from %s %d\n",
+					tmp, htons(ri.src_port));
+				continue;
+			}
 		}
-#endif
 /* historically, zero-terminated packets indicated a bug in clients
  * that calculated wrongly packet length and included string-terminating
  * zero; today clients exist with legitimate binary payloads and we
@@ -544,17 +526,15 @@ int udp_rcv_loop()
 		
 		/* update the local config */
 		cfg_update();
-#ifdef USE_STUN
-			/* STUN support can be switched off even if it's compiled */
-			if (stun_allow_stun && (unsigned char)*buf == 0x00) {
-			    /* stun_process_msg releases buf memory if necessary */
-				if ((stun_process_msg(buf, len, &ri)) != 0) {
-					continue; /* some error occurred */
-				}
-			} else
-#endif
-		/* receive_msg must free buf too!*/
-		receive_msg(buf, len, &ri);
+		if (unlikely(sr_event_enabled(SREV_STUN_IN)) && (unsigned char)*buf == 0x00) {
+			/* stun_process_msg releases buf memory if necessary */
+			if ((stun_process_msg(buf, len, &ri)) != 0) {
+				continue; /* some error occurred */
+			}
+		} else {
+			/* receive_msg must free buf too!*/
+			receive_msg(buf, len, &ri);
+		}
 		
 	/* skip: do other stuff */
 		

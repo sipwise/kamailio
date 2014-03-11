@@ -69,6 +69,7 @@ pv_spec_t timeout_avp;
 static int fixup_profile(void** param, int param_no);
 static int fixup_get_profile2(void** param, int param_no);
 static int fixup_get_profile3(void** param, int param_no);
+static int fixup_dlg_bridge(void** param, int param_no);
 static int fixup_dlg_terminate(void** param, int param_no);
 static int w_set_dlg_profile(struct sip_msg*, char*, char*);
 static int w_unset_dlg_profile(struct sip_msg*, char*, char*);
@@ -79,6 +80,7 @@ static int w_dlg_isflagset(struct sip_msg *msg, char *flag, str *s2);
 static int w_dlg_resetflag(struct sip_msg *msg, char *flag, str *s2);
 static int w_dlg_setflag(struct sip_msg *msg, char *flag, char *s2);
 static int w_dlg_terminate(struct sip_msg*, char*, char*);
+static int w_dlg_get(struct sip_msg*, char*, char*, char*);
 static int w_is_known_dlg(struct sip_msg *);
 
 static cmd_export_t cmds[] = {
@@ -108,6 +110,7 @@ static cmd_export_t cmds[] = {
         0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
     {"dlg_terminate", (cmd_function) w_dlg_terminate, 2, fixup_dlg_terminate,
         0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
+   {"dlg_get", (cmd_function)w_dlg_get, 3, fixup_dlg_bridge, 0, ANY_ROUTE },
     {"is_known_dlg", (cmd_function) w_is_known_dlg, 0, NULL,
         0, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE | BRANCH_ROUTE},
     {"load_dlg", (cmd_function) load_dlg, 0, 0, 0, 0},
@@ -244,6 +247,79 @@ static int fixup_dlg_terminate(void** param, int param_no) {
     return 0;
 }
 
+static int fixup_dlg_bridge(void** param, int param_no)
+{
+	if (param_no>=1 && param_no<=3) {
+		return fixup_spve_null(param, 1);
+	} else {
+		LM_ERR("called with parameter idx %d\n", param_no);
+		return E_BUG;
+	}
+	return 0;
+}
+
+static int w_dlg_get(struct sip_msg *msg, char *ci, char *ft, char *tt)
+{
+	struct dlg_cell *dlg = NULL;
+	str sc = {0,0};
+	str sf = {0,0};
+	str st = {0,0};
+	unsigned int dir = 0;
+
+	if(ci==0 || ft==0 || tt==0)
+	{
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)ci, &sc)!=0)
+	{
+		LM_ERR("unable to get Call-ID\n");
+		return -1;
+	}
+	if(sc.s==NULL || sc.len == 0)
+	{
+		LM_ERR("invalid Call-ID parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_p)ft, &sf)!=0)
+	{
+		LM_ERR("unable to get From tag\n");
+		return -1;
+	}
+	if(sf.s==NULL || sf.len == 0)
+	{
+		LM_ERR("invalid From tag parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_p)tt, &st)!=0)
+	{
+		LM_ERR("unable to get To Tag\n");
+		return -1;
+	}
+	if(st.s==NULL || st.len == 0)
+	{
+		LM_ERR("invalid To tag parameter\n");
+		return -1;
+	}
+
+	dlg = get_dlg(&sc, &sf, &st, &dir);
+	if(dlg==NULL)
+		return -1;
+	
+	/* 
+		note: we should unref the dlg here (from get_dlg). BUT, because we are setting the current dialog
+		we can ignore the unref... instead of unreffing and reffing again for the set_current_dialog. NB.
+		this function is generally called from the cfg file. If used via API, remember to unref the dlg
+		afterwards
+	*/	
+
+	set_current_dialog(msg, dlg);
+    _dlg_ctx.dlg = dlg;
+    _dlg_ctx.dir = dir;
+	return 1;
+}
+
 int load_dlg(struct dlg_binds *dlgb) {
 
     dlgb->register_dlgcb = register_dlgcb;
@@ -251,7 +327,9 @@ int load_dlg(struct dlg_binds *dlgb) {
     dlgb->set_dlg_var = api_set_dlg_variable;
     dlgb->get_dlg_var = api_get_dlg_variable;
     dlgb->terminate_dlg = w_api_terminate_dlg;
+    dlgb->lookup_terminate_dlg = w_api_lookup_terminate_dlg;
     dlgb->get_dlg_expires = api_get_dlg_expires;
+    dlgb->get_dlg = dlg_get_msg_dialog;
 
     return 1;
 }

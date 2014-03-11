@@ -1,10 +1,8 @@
 /*
- * $Id$
- *
  * TLS module - main server part
- * 
- * Copyright (C) 2001-2003 FhG FOKUS
+ *
  * Copyright (C) 2005-2010 iptelorg GmbH
+ * Copyright (C) 2013 Motorola Solutions, Inc.
  *
  * This file is part of SIP-router, a free SIP server.
  *
@@ -153,6 +151,7 @@ static int tls_complete_init(struct tcp_connection* c)
 	     /* Get current TLS configuration and increase reference
 	      * count immediately.
 	      */
+
 	lock_get(tls_domains_cfg_lock);
 	cfg = *tls_domains_cfg;
 

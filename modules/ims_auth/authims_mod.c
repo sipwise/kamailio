@@ -67,7 +67,8 @@ static void destroy(void);
 static int mod_init(void);
 
 static int auth_fixup(void** param, int param_no);
-static int challenge_fixup(void** param, int param_no);
+static int auth_fixup_async(void** param, int param_no);
+static int challenge_fixup_async(void** param, int param_no);
 
 struct cdp_binds cdpb;
 
@@ -86,6 +87,7 @@ int av_request_at_once = 1; /**< how many auth vectors to request in a MAR 				*
 int av_request_at_sync = 1; /**< how many auth vectors to request in a sync MAR 		*/
 char *registration_qop = "auth,auth-int"; /**< the qop options to put in the authorization challenges */
 str registration_qop_str = {0, 0}; /**< the qop options to put in the authorization challenges */
+int av_check_only_impu = 0; /**< Should we check IMPU (0) or IMPU and IMPI (1), when searching for authentication vectors? */
 static str s_qop_s = {", qop=\"", 7};
 static str s_qop_e = {"\"", 1};
 
@@ -108,7 +110,7 @@ str cxdx_forced_peer;
 /* fixed parameter storage */
 str scscf_name_str; /**< fixed name of the S-CSCF 							*/
 
-/* used mainly in testing - load balancing with SIPP where we dont want to worry about auth */
+/* used mainly in testing - load balancing with SIPP where we don't want to worry about auth */
 int ignore_failed_auth = 0;
 
 /*
@@ -116,9 +118,9 @@ int ignore_failed_auth = 0;
  */
 static cmd_export_t cmds[] = {
     {"ims_www_authenticate", (cmd_function) www_authenticate, 1, auth_fixup, 0, REQUEST_ROUTE},
-    {"ims_www_challenge", (cmd_function) www_challenge, 1, challenge_fixup, 0, REQUEST_ROUTE},
+    {"ims_www_challenge", (cmd_function) www_challenge, 2, challenge_fixup_async, 0, REQUEST_ROUTE},
     {"ims_proxy_authenticate", (cmd_function) proxy_authenticate, 1, auth_fixup, 0, REQUEST_ROUTE},
-    {"ims_proxy_challenge", (cmd_function) proxy_challenge, 1, auth_fixup, 0, REQUEST_ROUTE},
+    {"ims_proxy_challenge", (cmd_function) proxy_challenge, 2, auth_fixup_async, 0, REQUEST_ROUTE},
     {"bind_ims_auth", (cmd_function) bind_ims_auth, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0}
 };
@@ -139,6 +141,7 @@ static param_export_t params[] = {
     {"registration_default_algorithm", STR_PARAM, &registration_default_algorithm},
     {"registration_qop", STR_PARAM, &registration_qop},
     {"ignore_failed_auth", INT_PARAM, &ignore_failed_auth},
+    {"av_check_only_impu", INT_PARAM, &av_check_only_impu},
     {"cxdx_forced_peer", STR_PARAM, &cxdx_forced_peer_s},
     {"cxdx_dest_realm", STR_PARAM, &cxdx_dest_realm_s},
     {0, 0, 0}
@@ -266,30 +269,22 @@ static void destroy(void) {
 /*
  * Convert the char* parameters
  */
-static int challenge_fixup(void** param, int param_no) {
+static int challenge_fixup_async(void** param, int param_no) {
 
     if (strlen((char*) *param) <= 0) {
         LM_ERR("empty parameter %d not allowed\n", param_no);
         return -1;
     }
 
-    if (param_no == 1) {
+    if (param_no == 1) {        //route name - static or dynamic string (config vars)
+        if (fixup_spve_null(param, param_no) < 0)
+            return -1;
+        return 0;
+    } else if (param_no == 2) {
         if (fixup_var_str_12(param, 1) == -1) {
             LM_ERR("Erroring doing fixup on challenge");
             return -1;
         }
-        mar_param_t *ap;
-        ap = (mar_param_t*) pkg_malloc(sizeof (mar_param_t));
-        if (ap == NULL) {
-            LM_ERR("no more pkg\n");
-            return -1;
-        }
-        memset(ap, 0, sizeof (mar_param_t));
-        ap->paction = get_action_from_param(param, param_no);
-
-        ap->param = (char*) *param;
-
-        *param = (void*) ap;
     }
 
     return 0;
@@ -305,7 +300,29 @@ static int auth_fixup(void** param, int param_no) {
     }
 
     if (param_no == 1) {
-        //return fixup_var_str_12(param, 1);
+        if (fixup_var_str_12(param, 1) == -1) {
+            LM_ERR("Erroring doing fixup on auth");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Convert the char* parameters
+ */
+static int auth_fixup_async(void** param, int param_no) {
+    if (strlen((char*) *param) <= 0) {
+        LM_ERR("empty parameter %d not allowed\n", param_no);
+        return -1;
+    }
+
+    if (param_no == 1) {        //route name - static or dynamic string (config vars)
+        if (fixup_spve_null(param, param_no) < 0)
+            return -1;
+        return 0;
+    } else if (param_no == 2) {
         if (fixup_var_str_12(param, 1) == -1) {
             LM_ERR("Erroring doing fixup on auth");
             return -1;

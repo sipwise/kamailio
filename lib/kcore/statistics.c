@@ -113,11 +113,37 @@ stat_var *get_stat_var_from_num_code(unsigned int numerical_code, int out_codes)
  *       contents, to avoid a nasty memory leak.
  */
 int get_socket_list_from_proto(int **ipList, int protocol) {
+	return get_socket_list_from_proto_and_family(ipList, protocol, AF_INET);
+}
+
+
+/*!
+ * This function will retrieve a list of all ip addresses and ports that Kamailio
+ * is listening on, with respect to the transport protocol specified with
+ * 'protocol'. This function supports both IPv4 and IPv6
+ *
+ * The first parameter, ipList, is a pointer to a pointer. It will be assigned a
+ * new block of memory holding the IP Addresses and ports being listened to with
+ * respect to 'protocol'.  The array maps a 2D array into a 1 dimensional space,
+ * and is layed out as follows:
+ *
+ * The first NUM_IP_OCTETS indices will be the IP address, and the next index
+ * the port.  So if NUM_IP_OCTETS is equal to 4 and there are two IP addresses
+ * found, then:
+ *
+ *  - ipList[0] will be the first octet of the first ip address
+ *  - ipList[3] will be the last octet of the first ip address.
+ *  - iplist[4] will be the port of the first ip address
+ *  - 
+ *  - iplist[5] will be the first octet of the first ip address, 
+ *  - and so on.  
+ */
+int get_socket_list_from_proto_and_family(int **ipList, int protocol, int family) {
 
 	struct socket_info  *si;
 	struct socket_info** list;
 
-	int num_ip_octets   = 4;
+	int num_ip_octets   = family == AF_INET ? NUM_IP_OCTETS : NUM_IPV6_OCTETS;
 	int numberOfSockets = 0;
 	int currentRow      = 0;
 
@@ -136,6 +162,13 @@ int get_socket_list_from_proto(int **ipList, int protocol) {
 		return 0;
 	}
 #endif
+#ifndef USE_SCTP
+	if (protocol == PROTO_SCTP)
+	{
+		return 0;
+	}
+#endif
+	/* We have no "interfaces" for websockets */
 	if (protocol == PROTO_WS || protocol == PROTO_WSS)
 		return 0;
 
@@ -145,8 +178,7 @@ int get_socket_list_from_proto(int **ipList, int protocol) {
 	/* Find out how many sockets are in the list.  We need to know this so
 	 * we can malloc an array to assign to ipList. */
 	for(si=list?*list:0; si; si=si->next){
-		/* We only support IPV4 at this point. */
-		if (si->address.af == AF_INET) {
+		if (si->address.af == family) {
 			numberOfSockets++;
 		}
 	}
@@ -172,21 +204,18 @@ int get_socket_list_from_proto(int **ipList, int protocol) {
 
 	/* Extract out the IP Addresses and ports.  */
 	for(si=list?*list:0; si; si=si->next){
+		int i;
 
 		/* We currently only support IPV4. */
-		if (si->address.af != AF_INET) {
+		if (si->address.af != family) {
 			continue;
 		}
 
-		(*ipList)[currentRow*(num_ip_octets + 1)  ] = 
-			si->address.u.addr[0];
-		(*ipList)[currentRow*(num_ip_octets + 1)+1] = 
-			si->address.u.addr[1];
-		(*ipList)[currentRow*(num_ip_octets + 1)+2] = 
-			si->address.u.addr[2];
-		(*ipList)[currentRow*(num_ip_octets + 1)+3] = 
-			si->address.u.addr[3];
-		(*ipList)[currentRow*(num_ip_octets + 1)+4] = 
+		for (i = 0; i < num_ip_octets; i++) {
+			(*ipList)[currentRow*(num_ip_octets + 1) + i ] = 
+				si->address.u.addr[i];
+		}
+		(*ipList)[currentRow*(num_ip_octets + 1) + i] = 
 			si->port_no;
 		
 		currentRow++;
@@ -401,16 +430,27 @@ int get_total_bytes_waiting(void)
 	int *UDPList  = NULL;
 	int *TCPList  = NULL;
 	int *TLSList  = NULL;
+	int *UDP6List  = NULL;
+	int *TCP6List  = NULL;
+	int *TLS6List  = NULL;
 
 	int numUDPSockets  = 0;
 	int numTCPSockets  = 0; 
 	int numTLSSockets  = 0;
+	int numUDP6Sockets  = 0;
+	int numTCP6Sockets  = 0; 
+	int numTLS6Sockets  = 0;
 
 	/* Extract out the IP address address for UDP, TCP, and TLS, keeping
 	 * track of the number of IP addresses from each transport  */
 	numUDPSockets  = get_socket_list_from_proto(&UDPList,  PROTO_UDP);
 	numTCPSockets  = get_socket_list_from_proto(&TCPList,  PROTO_TCP);
 	numTLSSockets  = get_socket_list_from_proto(&TLSList,  PROTO_TLS);
+
+	numUDP6Sockets  = get_socket_list_from_proto_and_family(&UDP6List,  PROTO_UDP, AF_INET6);
+	numTCP6Sockets  = get_socket_list_from_proto_and_family(&TCP6List,  PROTO_TCP, AF_INET6);
+	numTLS6Sockets  = get_socket_list_from_proto_and_family(&TLS6List,  PROTO_TLS, AF_INET6);
+
 	/* Deliberately not looking at PROTO_WS or PROTO_WSS here as they are
 	   just upgraded TCP/TLS connections */
 
@@ -420,21 +460,37 @@ int get_total_bytes_waiting(void)
 	bytesWaiting  += get_used_waiting_queue(1, TCPList,  numTCPSockets);
 	bytesWaiting  += get_used_waiting_queue(1, TLSList,  numTLSSockets);
 
+	bytesWaiting  += get_used_waiting_queue(0, UDP6List,  numUDP6Sockets);
+	bytesWaiting  += get_used_waiting_queue(1, TCP6List,  numTCP6Sockets);
+	bytesWaiting  += get_used_waiting_queue(1, TLS6List,  numTLS6Sockets);
+
 	/* get_socket_list_from_proto() allocated a chunk of memory, so we need
 	 * to free it. */
 	if (numUDPSockets > 0)
 	{
 		pkg_free(UDPList);
 	}
+	if (numUDP6Sockets > 0)
+	{
+		pkg_free(UDP6List);
+	}
 
 	if (numTCPSockets > 0) 
 	{
 		pkg_free(TCPList);
 	}
+	if (numTCP6Sockets > 0) 
+	{
+		pkg_free(TCP6List);
+	}
 
 	if (numTLSSockets > 0)
 	{
 		pkg_free(TLSList);
+	}
+	if (numTLS6Sockets > 0)
+	{
+		pkg_free(TLS6List);
 	}
 
 	return bytesWaiting;

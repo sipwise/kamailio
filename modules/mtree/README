@@ -20,9 +20,9 @@ Juha Heinanen
 
    <jh@tutpro.com>
 
-   Copyright © 2010 Daniel-Constantin Mierla (asipto.com)
+   Copyright (c) 2010 Daniel-Constantin Mierla (asipto.com)
 
-   Copyright © 2011 Juha Heinanen
+   Copyright (c) 2011 Juha Heinanen
      __________________________________________________________________
 
    Table of Contents
@@ -64,6 +64,7 @@ Juha Heinanen
         6. RPC Commands
 
               6.1. mtree.summary
+              6.2. mtree.reload
 
    List of Examples
 
@@ -121,6 +122,7 @@ Chapter 1. Admin Guide
    6. RPC Commands
 
         6.1. mtree.summary
+        6.2. mtree.reload
 
 1. Overview
 
@@ -184,13 +186,20 @@ modparam("mtree", "db_table", "mymtrees")
 
 3.3. mtree (string)
 
-   Definition of memory tree
+   Definition of memory tree with parameters name, dbtable, type, and
+   multi. Name is name of the tree, dbtable is name of dbtable where tree
+   is stored, type is type of tree elements (0 = string, 2 = integer), and
+   multi tells if dbtable can contain more than one tree (0 = one tree, 1
+   = more than one tree identified by tname column).
+
+   This parameter can be set many times to add more trees in memory.
 
    Default value is "none".
 
    Example 1.3. Set mtree parameter
 ...
-modparam("mtree", "mtree", "name=mytable;dbtable=routes;type=0;")
+modparam("mtree", "mtree", "name=mytree1;dbtable=routes1;type=0")
+modparam("mtree", "mtree", "name=mytree2;dbtable=routes2;type=0;multi=1")
 ...
 
 3.4. tname_column (string)
@@ -310,7 +319,7 @@ modparam("mtree", "mt_allow_duplicates", 1)
 
    4.1. mt_match(mtree, pv, mode)
 
-4.1. mt_match(mtree, pv, mode)
+4.1.  mt_match(mtree, pv, mode)
 
    Match 'pv' value against 'mtree'. If 'mtree' type is 0 or 2 and value
    of 'mode' is NOT 2, sets a value of the longest matching prefix to
@@ -331,7 +340,7 @@ mt_match("mytree", "$rU", "0");
    5.2. mt_reload
    5.3. mt_summary
 
-5.1. mt_list
+5.1.  mt_list
 
    List content of a tree.
 
@@ -345,7 +354,7 @@ mt_match("mytree", "$rU", "0");
                 _mtname_
                 _empty_line_
 
-5.2. mt_reload
+5.2.  mt_reload
 
    Reload mtree from database.
 
@@ -360,7 +369,7 @@ mt_match("mytree", "$rU", "0");
                 _mtname_
                 _empty_line_
 
-5.3. mt_summary
+5.3.  mt_summary
 
    List usage summary for all trees.
 
@@ -375,9 +384,18 @@ mt_match("mytree", "$rU", "0");
 6. RPC Commands
 
    6.1. mtree.summary
+   6.2. mtree.reload
 
-6.1. mtree.summary
+6.1.  mtree.summary
 
    List usage summary for all trees.
 
    Parameters: none.
+
+6.2.  mtree.reload
+
+   Reload mtree from database to memory.
+
+   Parameters:
+     * _mtree_
+       - name of mtree or empty string meaning all mtrees

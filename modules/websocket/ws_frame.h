@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -18,6 +18,11 @@
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Exception: permission to copy, modify, propagate, and distribute a work
+ * formed by combining OpenSSL toolkit software and the code in this file,
+ * such as linking with software components and libraries released under
+ * OpenSSL project license.
  *
  */
 
@@ -36,9 +41,6 @@ typedef enum
 	REMOTE_CLOSE
 } ws_close_type_t;
 
-#define DEFAULT_KEEPALIVE_TIMEOUT		180 /* seconds */
-extern int ws_keepalive_timeout;
-
 enum
 {
 	KEEPALIVE_MECHANISM_NONE = 0,
@@ -47,6 +49,8 @@ enum
 };
 #define DEFAULT_KEEPALIVE_MECHANISM		KEEPALIVE_MECHANISM_PING
 extern int ws_keepalive_mechanism;
+
+#define DEFAULT_KEEPALIVE_TIMEOUT		180 /* seconds */
 
 extern str ws_ping_application_data;
 #define DEFAULT_PING_APPLICATION_DATA		SERVER_HDR
@@ -57,6 +61,16 @@ extern stat_var *ws_local_closed_connections;
 extern stat_var *ws_received_frames;
 extern stat_var *ws_remote_closed_connections;
 extern stat_var *ws_transmitted_frames;
+extern stat_var *ws_sip_failed_connections;
+extern stat_var *ws_sip_local_closed_connections;
+extern stat_var *ws_sip_received_frames;
+extern stat_var *ws_sip_remote_closed_connections;
+extern stat_var *ws_sip_transmitted_frames;
+extern stat_var *ws_msrp_failed_connections;
+extern stat_var *ws_msrp_local_closed_connections;
+extern stat_var *ws_msrp_received_frames;
+extern stat_var *ws_msrp_remote_closed_connections;
+extern stat_var *ws_msrp_transmitted_frames;
 
 int ws_frame_receive(void *data);
 int ws_frame_transmit(void *data);
@@ -64,5 +78,8 @@ struct mi_root *ws_mi_close(struct mi_root *cmd, void *param);
 struct mi_root *ws_mi_ping(struct mi_root *cmd, void *param);
 struct mi_root *ws_mi_pong(struct mi_root *cmd, void *param);
 void ws_keepalive(unsigned int ticks, void *param);
+int ws_close(sip_msg_t *msg);
+int ws_close2(sip_msg_t *msg, char *_status, char *_reason);
+int ws_close3(sip_msg_t *msg, char *_status, char *_reason, char *_con);
 
 #endif /* _WS_FRAME_H */

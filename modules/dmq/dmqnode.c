@@ -203,12 +203,7 @@ dmq_node_t* build_dmq_node(str* uri, int shm) {
 
 error:
 	if(ret!=NULL) {
-		/* tbd: free uri and params */
-		if(shm) {
-			shm_free(ret);
-		} else {
-			pkg_free(ret);
-		}
+		destroy_dmq_node(ret, shm);
 	}
 	return NULL;
 }
@@ -232,10 +227,13 @@ dmq_node_t* find_dmq_node_uri(dmq_node_list_t* list, str* uri)
  */
 void destroy_dmq_node(dmq_node_t* node, int shm)
 {
-	/* tbd: check inner fields */
 	if(shm) {
+		if (node->params!=NULL)
+			shm_free_params(node->params);
 		shm_free_node(node);
 	} else {
+		if (node->params!=NULL)
+			free_params(node->params);
 		pkg_free_node(node);
 	}
 }
@@ -278,9 +276,7 @@ dmq_node_t* shm_dup_node(dmq_node_t* node)
 	}
 	return newnode;
 error:
-	if(newnode->orig_uri.s!=NULL)
-		shm_free(newnode->orig_uri.s);
-	shm_free(newnode);
+	destroy_dmq_node(newnode, 1);
 	return NULL;
 }
 
@@ -289,7 +285,8 @@ error:
  */
 void shm_free_node(dmq_node_t* node)
 {
-	shm_free(node->orig_uri.s);
+	if (node->orig_uri.s!=NULL) 
+		shm_free(node->orig_uri.s);
 	shm_free(node);
 }
 
@@ -298,7 +295,8 @@ void shm_free_node(dmq_node_t* node)
  */
 void pkg_free_node(dmq_node_t* node)
 {
-	pkg_free(node->orig_uri.s);
+	if (node->orig_uri.s!=NULL) 
+		pkg_free(node->orig_uri.s);
 	pkg_free(node);
 }
 
@@ -314,7 +312,7 @@ int del_dmq_node(dmq_node_list_t* list, dmq_node_t* node)
 	while(cur) {
 		if(cmp_dmq_node(cur, node)) {
 			*prev = cur->next;
-			shm_free_node(cur);
+			destroy_dmq_node(cur, 1);
 			lock_release(&list->lock);
 			return 1;
 		}

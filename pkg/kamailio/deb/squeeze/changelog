@@ -1,38 +1,20 @@
-kamailio (4.0.6) unstable; urgency=low
+kamailio (4.1.2) unstable; urgency=low
 
-  * update to 4.0.6 from upstream
+  * update to 4.1.2 from upstream
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 06 Mar 2014 15:20:25 +0100
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 06 Mar 2014 15:25:35 +0100
 
-kamailio (4.0.5) unstable; urgency=low
+kamailio (4.1.1) unstable; urgency=low
 
-  * update to 4.0.5 from upstream
+  * update to 4.1.1 from upstream
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Fri, 20 Dec 2013 17:10:20 +0100
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 09 Jan 2014 15:45:35 +0100
 
-kamailio (4.0.4) unstable; urgency=low
+kamailio (4.1.0) unstable; urgency=low
 
-  * update to 4.0.4 from upstream
+  * update to 4.1.0
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Wed, 02 Oct 2013 16:05:20 +0100
-
-kamailio (4.0.3) unstable; urgency=low
-
-  * update to 4.0.3 from upstream
-
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 15 Aug 2013 10:35:20 +0100
-
-kamailio (4.0.2) unstable; urgency=low
-
-  * update to 4.0.2 from upstream
-
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Wed, 12 Jun 2013 10:55:50 +0100
-
-kamailio (4.0.1) unstable; urgency=low
-
-  * update to 4.0.1 from upstream
-
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 25 Apr 2013 11:50:20 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Wed, 04 Dec 2013 11:42:27 +0100
 
 kamailio (4.0.0) unstable; urgency=low
 

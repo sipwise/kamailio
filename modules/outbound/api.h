@@ -1,7 +1,7 @@
 /*
  * $Id$
  *
- * Copyright (C) 2012 Crocodile RCS Ltd
+ * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -19,6 +19,11 @@
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * Exception: permission to copy, modify, propagate, and distribute a work
+ * formed by combining OpenSSL toolkit software and the code in this file,
+ * such as linking with software components and libraries released under
+ * OpenSSL project license.
+ *
  */
 
 #ifndef OB_API_H
@@ -28,7 +33,7 @@
 #include "../../sr_module.h"
 
 typedef int (*encode_flow_token_t)(str *, struct receive_info);
-typedef int (*decode_flow_token_t)(struct receive_info *, str);
+typedef int (*decode_flow_token_t)(struct sip_msg *, struct receive_info **, str);
 typedef int (*use_outbound_t)(struct sip_msg *);
 
 typedef struct ob_binds {

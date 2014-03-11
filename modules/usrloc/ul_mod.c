@@ -161,6 +161,7 @@ int timer_interval  = 60;				/*!< Timer interval in seconds */
 int db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
 int use_domain      = 0;				/*!< Whether usrloc should use domain part of aor */
 int desc_time_order = 0;				/*!< By default do not enable timestamp ordering */
+int handle_lost_tcp = 0;				/*!< By default do not remove contacts before expiration time */
 
 int ul_fetch_rows = 2000;				/*!< number of rows to fetch from result */
 int ul_hash_size = 9;
@@ -214,6 +215,7 @@ static param_export_t params[] = {
 	{"fetch_rows",          INT_PARAM, &ul_fetch_rows   },
 	{"hash_size",           INT_PARAM, &ul_hash_size    },
 	{"nat_bflag",           INT_PARAM, &nat_bflag       },
+	{"handle_lost_tcp",     INT_PARAM, &handle_lost_tcp },
 	{"preload",             STR_PARAM|USE_FUNC_PARAM, (void*)ul_preload_param},
 	{"db_update_as_insert", INT_PARAM, &ul_db_update_as_insert},
 	{"timer_procs",         INT_PARAM, &ul_timer_procs},
@@ -387,6 +389,10 @@ static int mod_init(void)
 			return -1;
 		}
 	}
+
+	if (handle_lost_tcp && db_mode == DB_ONLY)
+		LM_WARN("handle_lost_tcp option makes nothing in DB_ONLY mode\n");
+
 	init_flag = 1;
 
 	return 0;
@@ -419,15 +425,19 @@ static int child_init(int _rank)
 			return 0;
 		case DB_ONLY:
 		case WRITE_THROUGH:
-			/* we need connection from working SIP and TIMER and MAIN
-			 * processes only */
+			/* connect to db only from SIP workers, TIMER and MAIN processes */
 			if (_rank<=0 && _rank!=PROC_TIMER && _rank!=PROC_MAIN)
 				return 0;
 			break;
 		case WRITE_BACK:
-			/* connect only from TIMER (for flush), from MAIN (for
+			/* connect to db only from TIMER (for flush), from MAIN (for
 			 * final flush() and from child 1 for preload */
-			if (_rank!=PROC_TIMER && _rank!=PROC_MAIN && _rank!=1)
+			if (_rank!=PROC_TIMER && _rank!=PROC_MAIN && _rank!=PROC_SIPINIT)
+				return 0;
+			break;
+		case DB_READONLY:
+			/* connect to db only from child 1 for preload */
+			if(_rank!=PROC_SIPINIT)
 				return 0;
 			break;
 	}
@@ -438,7 +448,7 @@ static int child_init(int _rank)
 		return -1;
 	}
 	/* _rank==PROC_SIPINIT is used even when fork is disabled */
-	if (_rank==PROC_SIPINIT && db_mode!= DB_ONLY) {
+	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY) {
 		/* if cache is used, populate domains from DB */
 		for( ptr=root ; ptr ; ptr=ptr->next) {
 			if (preload_udomain(ul_dbh, ptr->d) < 0) {

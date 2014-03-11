@@ -1891,10 +1891,8 @@ inline static struct dns_hash_entry* dns_cache_do_request(str* name, int type)
 #endif /* USE_DNS_CACHE_STATS */
 
 	if (type==T_A){
-#ifdef USE_IPV6
 		if (str2ip6(name)!=0)
 			goto end;
-#endif /* USE_IPV6 */
 		if ((ip=str2ip(name))!=0){
 				e=dns_cache_mk_ip_entry(name, ip);
 				if (likely(e))
@@ -1902,7 +1900,6 @@ inline static struct dns_hash_entry* dns_cache_do_request(str* name, int type)
 				goto end; /* we do not cache obvious stuff */
 		}
 	}
-#ifdef USE_IPV6
 	else if (type==T_AAAA){
 		if (str2ip(name)!=0)
 			goto end;
@@ -1913,7 +1910,6 @@ inline static struct dns_hash_entry* dns_cache_do_request(str* name, int type)
 				goto end;/* we do not cache obvious stuff */
 		}
 	}
-#endif /* USE_IPV6 */
 #ifdef DNS_WATCHDOG_SUPPORT
 	if (atomic_get(dns_servers_up)==0)
 		goto end; /* the servers are down, needless to perform the query */
@@ -2412,16 +2408,9 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
 			len=4;
 			break;
 		case T_AAAA:
-#ifdef USE_IPV6
 			af=AF_INET6;
 			len=16;
 			break;
-#else /* USE_IPV6 */
-			LOG(L_ERR, "ERROR: dns_entry2he: IPv6 dns cache entry, but "
-						"IPv6 support disabled at compile time"
-						" (recompile with -DUSE_IPV6)\n");
-			return 0;
-#endif /* USE_IPV6 */
 		default:
 			LOG(L_CRIT, "BUG: dns_entry2he: wrong entry type %d for %.*s\n",
 					e->type, e->name_len, e->name);
@@ -2472,10 +2461,8 @@ inline static struct hostent* dns_a_get_he(str* name)
 	struct hostent* he;
 
 	e=0;
-#ifdef	USE_IPV6
 	if (str2ip6(name)!=0)
 		return 0;
-#endif
 	if ((ip=str2ip(name))!=0){
 		return ip_addr2he(name, ip);
 	}
@@ -2488,7 +2475,6 @@ inline static struct hostent* dns_a_get_he(str* name)
 }
 
 
-#ifdef USE_IPV6
 /* gethostbyname compatibility: performs an aaaa_lookup and returns a pointer
  * to a statical internal hostent structure
  * returns 0 on success, <0 on error (see the error codes)
@@ -2512,7 +2498,6 @@ inline static struct hostent* dns_aaaa_get_he(str* name)
 	dns_hash_put(e);
 	return he;
 }
-#endif
 
 
 
@@ -2527,16 +2512,10 @@ inline static int dns_rr2ip(int type, struct dns_rr* rr, struct ip_addr* ip)
 			return 0;
 			break;
 		case T_AAAA:
-#ifdef USE_IPV6
 			ip->af=AF_INET6;
 			ip->len=16;
 			memcpy(ip->u.addr, ((struct aaaa_rdata*)rr->rdata)->ip6, 16);
 			return 0;
-#else /* USE_IPV6 */
-			LOG(L_ERR, "ERROR: dns_rr2ip: IPv6 dns rr, but IPv6 support"
-					   "disabled at compile time (recompile with "
-					   "-DUSE_IPV6)\n" );
-#endif /*USE_IPV6 */
 			break;
 	}
 	return -1;
@@ -2554,7 +2533,6 @@ inline static int dns_rr2ip(int type, struct dns_rr* rr, struct ip_addr* ip)
  */
 struct hostent* dns_get_he(str* name, int flags)
 {
-#ifdef USE_IPV6
 	struct hostent* he;
 
 	if ((flags&(DNS_IPV6_FIRST|DNS_IPV6_ONLY))){
@@ -2570,9 +2548,6 @@ struct hostent* dns_get_he(str* name, int flags)
 		he=dns_aaaa_get_he(name);
 	}
 	return he;
-#else /* USE_IPV6 */
-	return dns_a_get_he(name);
-#endif /* USE_IPV6 */
 }
 
 
@@ -2706,42 +2681,23 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
 		}else{
 			/* check if it's an ip address */
 			if ( ((ip=str2ip(name))!=0)
-#ifdef	USE_IPV6
 				  || ((ip=str2ip6(name))!=0)
-#endif
 				){
 				/* we are lucky, this is an ip address */
 				return ip_addr2he(name,ip);
 			}
 
+			if(srv_proto==PROTO_WS || srv_proto==PROTO_WS) {
+				/* no srv records for web sockets */
+				return 0;
+			}
+
 			switch(srv_proto){
-				case PROTO_NONE: /* no proto specified, use udp */
-					if (proto)
-						*proto=PROTO_UDP;
-					/* no break */
 				case PROTO_UDP:
-					memcpy(tmp, SRV_UDP_PREFIX, SRV_UDP_PREFIX_LEN);
-					memcpy(tmp+SRV_UDP_PREFIX_LEN, name->s, name->len);
-					tmp[SRV_UDP_PREFIX_LEN + name->len] = '\0';
-					len=SRV_UDP_PREFIX_LEN + name->len;
-					break;
 				case PROTO_TCP:
-					memcpy(tmp, SRV_TCP_PREFIX, SRV_TCP_PREFIX_LEN);
-					memcpy(tmp+SRV_TCP_PREFIX_LEN, name->s, name->len);
-					tmp[SRV_TCP_PREFIX_LEN + name->len] = '\0';
-					len=SRV_TCP_PREFIX_LEN + name->len;
-					break;
 				case PROTO_TLS:
-					memcpy(tmp, SRV_TLS_PREFIX, SRV_TLS_PREFIX_LEN);
-					memcpy(tmp+SRV_TLS_PREFIX_LEN, name->s, name->len);
-					tmp[SRV_TLS_PREFIX_LEN + name->len] = '\0';
-					len=SRV_TLS_PREFIX_LEN + name->len;
-					break;
 				case PROTO_SCTP:
-					memcpy(tmp, SRV_SCTP_PREFIX, SRV_SCTP_PREFIX_LEN);
-					memcpy(tmp+SRV_SCTP_PREFIX_LEN, name->s, name->len);
-					tmp[SRV_SCTP_PREFIX_LEN + name->len] = '\0';
-					len=SRV_SCTP_PREFIX_LEN + name->len;
+					create_srv_name(srv_proto, name, tmp);
 					break;
 				default:
 					LOG(L_CRIT, "BUG: sip_resolvehost: unknown proto %d\n",
@@ -2872,17 +2828,13 @@ struct hostent* dns_naptr_sip_resolvehost(str* name, unsigned short* port,
 		*proto=PROTO_UDP; /* just in case we don't find another */
 		/* check if it's an ip address */
 		if ( ((tmp_ip=str2ip(name))!=0)
-#ifdef	USE_IPV6
 			  || ((tmp_ip=str2ip6(name))!=0)
-#endif
 			){
 			/* we are lucky, this is an ip address */
-#ifdef	USE_IPV6
 			if (((dns_flags&DNS_IPV4_ONLY) && (tmp_ip->af==AF_INET6))||
 				((dns_flags&DNS_IPV6_ONLY) && (tmp_ip->af==AF_INET))){
 				return 0;
 			}
-#endif
 			*port=SIP_PORT;
 			return ip_addr2he(name, tmp_ip);
 		}
@@ -2985,10 +2937,8 @@ inline static int dns_a_resolve( struct dns_hash_entry** e,
 	ret=-E_DNS_NO_IP;
 	if (*e==0){ /* do lookup */
 		/* if ip don't set *e */
-#ifdef	USE_IPV6
 		if (str2ip6(name)!=0)
 			goto error;
-#endif
 		if ((tmp=str2ip(name))!=0){
 			*ip=*tmp;
 			*rr_no=0;
@@ -3018,7 +2968,6 @@ error:
 }
 
 
-#ifdef USE_IPV6
 /* lookup, fills the dns_entry pointer and the ip addr.
  *  (with the first good ip). if *e ==0 does the a lookup, and changes it
  *   to the result, if not it uses the current value and tries to use
@@ -3065,7 +3014,6 @@ inline static int dns_aaaa_resolve( struct dns_hash_entry** e,
 error:
 	return ret;
 }
-#endif /* USE_IPV6 */
 
 
 
@@ -3090,7 +3038,6 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 
 	ret=-E_DNS_NO_IP;
 	if (*e==0){ /* first call */
-#ifdef USE_IPV6
 		if ((flags&(DNS_IPV6_FIRST|DNS_IPV6_ONLY))){
 			ret=dns_aaaa_resolve(e, rr_no, name, ip);
 			if (ret>=0) return ret;
@@ -3103,9 +3050,6 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 		}else if (!(flags&(DNS_IPV6_ONLY|DNS_IPV4_ONLY))){
 			ret=dns_aaaa_resolve(e, rr_no, name, ip);
 		}
-#else /* USE_IPV6 */
-		ret=dns_a_resolve(e, rr_no, name, ip);
-#endif /* USE_IPV6 */
 	}else if ((*e)->type==T_A){
 		/* continue A resolving */
 		/* retrieve host name from the hash entry  (ignore name which might
@@ -3113,7 +3057,6 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 		host.s=(*e)->name;
 		host.len=(*e)->name_len;
 		ret=dns_a_resolve(e, rr_no, &host, ip);
-#ifdef USE_IPV6
 		if (ret>=0) return ret;
 		if (!(flags&(DNS_IPV6_ONLY|DNS_IPV6_FIRST|DNS_IPV4_ONLY))){
 			/* not found, try with AAAA */
@@ -3124,13 +3067,11 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 			/* delay original record release until we're finished with host*/
 			dns_hash_put(orig);
 		}
-#endif /* USE_IPV6 */
 	}else if ((*e)->type==T_AAAA){
 		/* retrieve host name from the hash entry  (ignore name which might
 		  be null when continuing a srv lookup) */
 		host.s=(*e)->name;
 		host.len=(*e)->name_len;
-#ifdef USE_IPV6
 		/* continue AAAA resolving */
 		ret=dns_aaaa_resolve(e, rr_no, &host, ip);
 		if (ret>=0) return ret;
@@ -3143,15 +3084,6 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 			/* delay original record release until we're finished with host*/
 			dns_hash_put(orig);
 		}
-#else /* USE_IPV6 */
-		/* ipv6 disabled, try with A */
-		orig=*e;
-		*e=0;
-		*rr_no=0;
-		ret=dns_a_resolve(e, rr_no, &host, ip);
-		/* delay original record release until we're finished with host*/
-		dns_hash_put(orig);
-#endif /* USE_IPV6 */
 	}else{
 		LOG(L_CRIT, "BUG: dns_ip_resolve: invalid record type %d\n",
 					(*e)->type);
@@ -3283,23 +3215,24 @@ error:
  * h must be initialized prior to  calling this function and can be used to
  * get the subsequent ips
  * returns:  <0 on error
- *            0 on success and it fills *ip, *port, dns_sip_resolve_h
- * WARNING: when finished, dns_sip_resolve_put(h) must be called!
+ *            0 on success and it fills *ip, *port, *h
  */
 inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 						struct ip_addr* ip, unsigned short* port, char* proto,
 						int flags)
 {
+	struct dns_srv_proto srv_proto_list[PROTO_LAST];
 	static char tmp[MAX_DNS_NAME]; /* tmp. buff. for SRV lookups */
-	int len;
 	str srv_name;
 	struct ip_addr* tmp_ip;
 	int ret;
 	struct hostent* he;
-	char srv_proto;
+	size_t i,list_len;
+	char origproto;
 
+	origproto = *proto;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
-		LOG(L_WARN, "WARNING: dns_sip_resolve: called before dns cache"
+		LOG(L_WARN, "WARNING: dns_srv_sip_resolve: called before dns cache"
 					" initialization\n");
 		h->srv=h->a=0;
 		he=_sip_resolvehost(name, port, proto);
@@ -3309,92 +3242,63 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 		}
 		return -E_DNS_NO_SRV;
 	}
-	len=0;
 	if ((h->srv==0) && (h->a==0)){ /* first call */
-		if (proto){ /* makes sure we have a protocol set*/
-			if (*proto==0)
-				*proto=srv_proto=PROTO_UDP; /* default */
-			else
-				srv_proto=*proto;
-		}else{
-			srv_proto=PROTO_UDP;
+		if (proto && *proto==0){ /* makes sure we have a protocol set*/
+			*proto=PROTO_UDP; /* default */
 		}
-		h->port=(srv_proto==PROTO_TLS)?SIPS_PORT:SIP_PORT; /* just in case we
+		h->port=(*proto==PROTO_TLS)?SIPS_PORT:SIP_PORT; /* just in case we
 														don't find another */
-		h->proto=srv_proto; /* store initial protocol */
+		h->proto=*proto; /* store initial protocol */
 		if (port){
 			if (*port==0){
 				/* try SRV if initial call & no port specified
 				 * (draft-ietf-sip-srv-06) */
 				if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-					LOG(L_WARN, "WARNING: dns_sip_resolvehost: domain name too"
+					LOG(L_WARN, "WARNING: dns_srv_sip_resolve: domain name too"
 								" long (%d), unable to perform SRV lookup\n",
 								name->len);
 				}else{
 					/* check if it's an ip address */
 					if ( ((tmp_ip=str2ip(name))!=0)
-#ifdef	USE_IPV6
 						  || ((tmp_ip=str2ip6(name))!=0)
-#endif
 						){
 						/* we are lucky, this is an ip address */
-#ifdef	USE_IPV6
 						if (((flags&DNS_IPV4_ONLY) && (tmp_ip->af==AF_INET6))||
 							((flags&DNS_IPV6_ONLY) && (tmp_ip->af==AF_INET))){
 							return -E_DNS_AF_MISMATCH;
 						}
-#endif
 						*ip=*tmp_ip;
 						*port=h->port;
 						/* proto already set */
 						return 0;
 					}
 
-					switch(srv_proto){
-						case PROTO_NONE: /* no proto specified, use udp */
-							if (proto)
-								*proto=PROTO_UDP;
-							/* no break */
-						case PROTO_UDP:
-							memcpy(tmp, SRV_UDP_PREFIX, SRV_UDP_PREFIX_LEN);
-							memcpy(tmp+SRV_UDP_PREFIX_LEN, name->s, name->len);
-							tmp[SRV_UDP_PREFIX_LEN + name->len] = '\0';
-							len=SRV_UDP_PREFIX_LEN + name->len;
-							break;
-						case PROTO_TCP:
-							memcpy(tmp, SRV_TCP_PREFIX, SRV_TCP_PREFIX_LEN);
-							memcpy(tmp+SRV_TCP_PREFIX_LEN, name->s, name->len);
-							tmp[SRV_TCP_PREFIX_LEN + name->len] = '\0';
-							len=SRV_TCP_PREFIX_LEN + name->len;
-							break;
-						case PROTO_TLS:
-							memcpy(tmp, SRV_TLS_PREFIX, SRV_TLS_PREFIX_LEN);
-							memcpy(tmp+SRV_TLS_PREFIX_LEN, name->s, name->len);
-							tmp[SRV_TLS_PREFIX_LEN + name->len] = '\0';
-							len=SRV_TLS_PREFIX_LEN + name->len;
-							break;
-						case PROTO_SCTP:
-							memcpy(tmp, SRV_SCTP_PREFIX, SRV_SCTP_PREFIX_LEN);
-							memcpy(tmp+SRV_SCTP_PREFIX_LEN, name->s, name->len);
-							tmp[SRV_SCTP_PREFIX_LEN + name->len] = '\0';
-							len=SRV_SCTP_PREFIX_LEN + name->len;
-							break;
-						default:
-							LOG(L_CRIT, "BUG: sip_resolvehost: "
-									"unknown proto %d\n", (int)srv_proto);
-							return -E_DNS_CRITICAL;
-					}
-					srv_name.s=tmp;
-					srv_name.len=len;
-					if ((ret=dns_srv_resolve_ip(h, &srv_name, ip,
-															port, flags))>=0)
-					{
+					/* looping on the ordered list until we found a protocol what has srv record */
+					list_len = create_srv_pref_list(&origproto, srv_proto_list);
+					for (i=0; i<list_len;i++) {
+						switch (srv_proto_list[i].proto) {
+							case PROTO_UDP:
+							case PROTO_TCP:
+							case PROTO_TLS:
+							case PROTO_SCTP:
+								create_srv_name(srv_proto_list[i].proto, name, tmp);
+								break;
+							default:
+								LOG(L_CRIT, "BUG: dns_srv_sip_resolve: "
+										"unknown proto %d\n", (int)srv_proto_list[i].proto);
+								return -E_DNS_CRITICAL;
+						}
+						srv_name.s=tmp;
+						srv_name.len=strlen(tmp);
+						if ((ret=dns_srv_resolve_ip(h, &srv_name, ip, port, flags))>=0)
+						{
+							h->proto = *proto = srv_proto_list[i].proto;
 #ifdef DNS_CACHE_DEBUG
-						DBG("dns_sip_resolve(%.*s, %d, %d), srv0, ret=%d\n",
-							name->len, name->s, h->srv_no, h->ip_no, ret);
+							DBG("dns_srv_sip_resolve(%.*s, %d, %d), srv0, ret=%d\n",
+								name->len, name->s, h->srv_no, h->ip_no, ret);
 #endif
-						/* proto already set */
-						return ret;
+							return ret;
+						}
 					}
 				}
 			}else{ /* if (*port==0) */
@@ -3409,13 +3313,12 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 			ret=dns_srv_resolve_ip(h, &srv_name, ip, port, flags);
 			if (proto)
 				*proto=h->proto;
-			DBG("dns_sip_resolve(%.*s, %d, %d), srv, ret=%d\n",
+			DBG("dns_srv_sip_resolve(%.*s, %d, %d), srv, ret=%d\n",
 					name->len, name->s, h->srv_no, h->ip_no, ret);
 			return ret;
 	}
-/*skip_srv:*/
 	if (name->len >= MAX_DNS_NAME) {
-		LOG(L_ERR, "dns_sip_resolve: domain name too long\n");
+		LOG(L_ERR, "dns_srv_sip_resolve: domain name too long\n");
 		return -E_DNS_NAME_TOO_LONG;
 	}
 	ret=dns_ip_resolve(&h->a, &h->ip_no, name, ip, flags);
@@ -3424,7 +3327,7 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 	if (proto)
 		*proto=h->proto;
 #ifdef DNS_CACHE_DEBUG
-	DBG("dns_sip_resolve(%.*s, %d, %d), ip, ret=%d\n",
+	DBG("dns_srv_sip_resolve(%.*s, %d, %d), ip, ret=%d\n",
 			name->len, name->s, h->srv_no, h->ip_no, ret);
 #endif
 	return ret;
@@ -3454,11 +3357,12 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 	struct ip_addr* tmp_ip;
 	naptr_bmp_t tried_bmp;
 	struct dns_hash_entry* e;
-	char n_proto;
+	char n_proto, origproto;
 	str srv_name;
 	int ret;
 
 	ret=-E_DNS_NO_NAPTR;
+	origproto=*proto;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
 		LOG(L_WARN, "WARNING: dns_sip_resolve: called before dns cache"
 					" initialization\n");
@@ -3476,17 +3380,13 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 
 		/* check if it's an ip address */
 		if ( ((tmp_ip=str2ip(name))!=0)
-#ifdef	USE_IPV6
 			  || ((tmp_ip=str2ip6(name))!=0)
-#endif
 			){
 			/* we are lucky, this is an ip address */
-#ifdef	USE_IPV6
 			if (((flags&DNS_IPV4_ONLY) && (tmp_ip->af==AF_INET6))||
 				((flags&DNS_IPV6_ONLY) && (tmp_ip->af==AF_INET))){
 				return -E_DNS_AF_MISMATCH;
 			}
-#endif
 			*ip=*tmp_ip;
 			h->port=SIP_PORT;
 			h->proto=*proto;
@@ -3518,6 +3418,7 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 								from previous dns_srv_sip_resolve calls */
 	}
 naptr_not_found:
+	*proto=origproto;
 	return dns_srv_sip_resolve(h, name, ip, port, proto, flags);
 }
 #endif /* USE_NAPTR */
@@ -3535,7 +3436,6 @@ naptr_not_found:
  * get the subsequent ips
  * returns:  <0 on error
  *            0 on success and it fills *ip, *port, dns_sip_resolve_h
- * WARNING: when finished, dns_sip_resolve_put(h) must be called!
  */
 int dns_sip_resolve(struct dns_srv_handle* h,  str* name,
 						struct ip_addr* ip, unsigned short* port, char* proto,
@@ -3565,7 +3465,6 @@ inline static int dns_a_get_ip(str* name, struct ip_addr* ip)
 }
 
 
-#ifdef USE_IPV6
 inline static int dns_aaaa_get_ip(str* name, struct ip_addr* ip)
 {
 	struct dns_hash_entry* e;
@@ -3578,7 +3477,6 @@ inline static int dns_aaaa_get_ip(str* name, struct ip_addr* ip)
 	if (e) dns_hash_put(e);
 	return ret;
 }
-#endif /* USE_IPV6 */
 
 
 
@@ -4289,7 +4187,6 @@ int dns_cache_add_record(unsigned short type,
 			}
 			break;
 		case T_AAAA:
-#ifdef USE_IPV6
 			ip_addr = str2ip6(value);
 			if (!ip_addr) {
 				LOG(L_ERR, "ERROR: Malformed ip address: %.*s\n",
@@ -4297,10 +4194,6 @@ int dns_cache_add_record(unsigned short type,
 				return -1;
 			}
 			break;
-#else /* USE_IPV6 */
-			LOG(L_ERR, "ERROR: IPv6 support is disabled\n");
-			return -1;
-#endif /* USE_IPV6 */
 		case T_SRV:
 			rr_name = *value;
 			break;
@@ -4597,7 +4490,6 @@ int dns_cache_delete_single_record(unsigned short type,
 			}
 			break;
 		case T_AAAA:
-#ifdef USE_IPV6
 			ip_addr = str2ip6(value);
 			if (!ip_addr) {
 				LOG(L_ERR, "ERROR: Malformed ip address: %.*s\n",
@@ -4605,10 +4497,6 @@ int dns_cache_delete_single_record(unsigned short type,
 				return -1;
 			}
 			break;
-#else /* USE_IPV6 */
-			LOG(L_ERR, "ERROR: IPv6 support is disabled\n");
-			return -1;
-#endif /* USE_IPV6 */
 		case T_SRV:
 			rr_name = *value;
 			break;

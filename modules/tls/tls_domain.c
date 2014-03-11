@@ -1,6 +1,8 @@
 /*
- * Copyright (C) 2001-2003 FhG FOKUS
+ * TLS module
+ *
  * Copyright (C) 2005,2006 iptelorg GmbH
+ * Copyright (C) 2013 Motorola Solutions, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,7 +23,6 @@
  * @ingroup tls
  * Module: @ref tls
  */
-
 
 #include <stdlib.h>
 #include <openssl/ssl.h>

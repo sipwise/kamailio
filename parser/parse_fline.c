@@ -45,7 +45,7 @@
 #include "../mem/mem.h"
 #include "../ut.h"
 
-int http_reply_hack = 0;
+int http_reply_parse = 0;
 
 /* grammar:
 	request  =  method SP uri SP version CRLF
@@ -77,6 +77,7 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start * fl)
 	*/
 	
 
+	offset = 0;
 	end=buffer+len;
 	/* see if it's a reply (status) */
 
@@ -98,7 +99,7 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start * fl)
 			fl->type=SIP_REPLY;
 			fl->u.reply.version.len=SIP_VERSION_LEN;
 			tmp=buffer+SIP_VERSION_LEN;
-	} else if (http_reply_hack != 0 && 
+	} else if (http_reply_parse != 0 &&
 		 	(*tmp=='H' || *tmp=='h') &&
 			/* 'HTTP/1.' */
 			strncasecmp( tmp+1, HTTP_VERSION+1, HTTP_VERSION_LEN-1)==0 &&
@@ -225,10 +226,10 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start * fl)
 	return nl;
 
 error:
-	LOG(L_INFO, "ERROR:parse_first_line: bad %s first line\n",
+	LOG(L_DBG, "parse_first_line: bad %s first line\n",
 		(fl->type==SIP_REPLY)?"reply(status)":"request");
 
-	LOG(L_INFO, "ERROR: at line 0 char %d: \n", offset );
+	LOG(L_DBG, "at line 0 char %d: \n", offset );
 	prn=pkg_malloc( offset );
 	if (prn) {
 		for (t=0; t<offset; t++)
@@ -239,7 +240,7 @@ error:
 	};
 error1:
 	fl->type=SIP_INVALID;
-	LOG(L_INFO, "ERROR:parse_first_line: bad message\n");
+	LOG(L_ERR, "parse_first_line: bad message (offset: %d)\n", offset);
 	/* skip  line */
 	nl=eat_line(buffer,len);
 	return nl;

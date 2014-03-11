@@ -73,6 +73,8 @@
 #include "notify.h"
 #include "../../mod_fix.h"
 #include "../../timer_proc.h"
+#include "../../rpc.h"
+#include "../../rpc_lookup.h"
 
 MODULE_VERSION
 
@@ -127,6 +129,7 @@ static int w_pres_update_watchers(struct sip_msg *msg, char *puri,
 		char *pevent);
 static int fixup_refresh_watchers(void** param, int param_no);
 static int fixup_update_watchers(void** param, int param_no);
+static int presence_init_rpc(void);
 
 int counter =0;
 int pid = 0;
@@ -145,6 +148,9 @@ int publ_cache_enabled = 1;
 int pres_waitn_time = 5;
 int pres_notifier_poll_rate = 10;
 int pres_notifier_processes = 1;
+
+int db_table_lock_type = 1;
+db_locking_t db_table_lock = DB_LOCKING_WRITE;
 
 int *pres_notifier_id = NULL;
 
@@ -196,6 +202,7 @@ static param_export_t params[]={
 	{ "timeout_rm_subs",        INT_PARAM, &timeout_rm_subs},
 	{ "send_fast_notify",       INT_PARAM, &send_fast_notify},
 	{ "fetch_rows",             INT_PARAM, &pres_fetch_rows},
+	{ "db_table_lock_type",     INT_PARAM, &db_table_lock_type},
     {0,0,0}
 };
 
@@ -229,6 +236,11 @@ static int mod_init(void)
 	if(register_mi_mod(exports.name, mi_cmds)!=0)
 	{
 		LM_ERR("failed to register MI commands\n");
+		return -1;
+	}
+	if(presence_init_rpc()!=0)
+	{
+		LM_ERR("failed to register RPC commands\n");
 		return -1;
 	}
 
@@ -393,6 +405,9 @@ static int mod_init(void)
 		register_basic_timers(pres_notifier_processes);
 	}
 
+	if (db_table_lock_type != 1)
+		db_table_lock = DB_LOCKING_NONE;
+
 	pa_dbf.close(pa_db);
 	pa_db = NULL;
 
@@ -405,6 +420,11 @@ static int mod_init(void)
 static int child_init(int rank)
 {
 	if (rank==PROC_INIT || rank==PROC_TCP_MAIN)
+		return 0;
+
+	pid = my_pid();
+	
+	if(library_mode)
 		return 0;
 
 	if (rank == PROC_MAIN)
@@ -429,11 +449,6 @@ static int child_init(int rank)
 
 		return 0;
 	}
-
-	pid = my_pid();
-	
-	if(library_mode)
-		return 0;
 
 	if (pa_dbf.init==0)
 	{
@@ -1778,6 +1793,39 @@ static int fixup_update_watchers(void** param, int param_no)
 		return fixup_spve_null(param, 1);
 	} else if(param_no==2) {
 		return fixup_spve_null(param, 1);
+	}
+	return 0;
+
+}
+
+void rpc_presence_cleanup(rpc_t* rpc, void* c)
+{
+	LM_DBG("rpc_presence_cleanup:start\n");
+
+	(void) msg_watchers_clean(0,0);
+	(void) msg_presentity_clean(0,0);
+	(void) timer_db_update(0,0);
+		
+	rpc->printf(c, "Reload OK");
+	return;
+}
+
+static const char* rpc_presence_cleanup_doc[2] = {
+	"Manually triggers the cleanup functions for the active_watchers, presentity, and watchers tables.",
+	0
+};
+
+rpc_export_t presence_rpc[] = {
+	{"presence.cleanup", rpc_presence_cleanup, rpc_presence_cleanup_doc, 0},
+	{0, 0, 0, 0}
+};
+
+static int presence_init_rpc(void)
+{
+	if (rpc_register_array(presence_rpc)!=0)
+	{
+		LM_ERR("failed to register RPC commands\n");
+		return -1;
 	}
 	return 0;
 }

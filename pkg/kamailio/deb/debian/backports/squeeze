@@ -26,6 +26,24 @@ if [ -e ${DIST}/patches/series ]; then
   sed -i -e '/hardening_flags.patch/d' ${DIST}/patches/series
 fi
 
+# No java module:
+sed -i -e '/libgcj12-dev/d' -e '/^Package: kamailio-java-modules/,/^$/d' \
+	${DIST}/control
+sed -i -e 's/ java[ ,$]*/ /' ${DIST}/rules
+sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ java/' ${DIST}/rules
+
+# No dnssec module:
+sed -i -e '/libval-dev/d' -e '/^Package: kamailio-dnssec-modules/,/^$/d' \
+	${DIST}/control
+sed -i -e 's/ dnssec[ ,$]*/ /' ${DIST}/rules
+sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ dnssec/' ${DIST}/rules
+
+# No sctp module:
+sed -i -e '/libsctp-dev/d' -e '/^Package: kamailio-sctp-modules/,/^$/d' \
+	${DIST}/control
+sed -i -e 's/ sctp[ ,$]*/ /' ${DIST}/rules
+sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ sctp/' ${DIST}/rules
+
 # No purple module:
 sed -i -e '/libpurple-dev/d' -e '/^Package: kamailio-purple-modules/,/^$/d' \
 	${DIST}/control
@@ -40,13 +58,16 @@ sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ redis/' ${DIST}/rules
 
 # No mono module
 sed -i -e '/libmono-2.0-dev/d' -e '/^Package: kamailio-mono-modules/,/^$/d' \
-	-e '/kamailio-mono-modules/d' \
 	${DIST}/control
 sed -i -e 's/ mono[ ,$]*/ /' ${DIST}/rules
 sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ mono/' ${DIST}/rules
 
 # db-util version
 sed -i -e 's/db-util/db4.8-util/' ${DIST}/control
+
+# use old radius-client-ng
+sed -i 's/libfreeradius-client-dev/libradiusclient-ng-dev/' ${DIST}/control
+sed -i -e '/FREERADIUS/d' ${DIST}/rules
 
 # clean backports scripts
 rm -rf ${DIST}/backports

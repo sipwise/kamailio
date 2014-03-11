@@ -254,10 +254,8 @@ int tls_max_connections=DEFAULT_TLS_MAX_CONNECTIONS;
 
 static union sockaddr_union tcp_source_ipv4_addr; /* saved bind/srv v4 addr. */
 static union sockaddr_union* tcp_source_ipv4=0;
-#ifdef USE_IPV6
 static union sockaddr_union tcp_source_ipv6_addr; /* saved bind/src v6 addr. */
 static union sockaddr_union* tcp_source_ipv6=0;
-#endif
 
 static int* tcp_connections_no=0; /* current tcp (+tls) open connections */
 static int* tls_connections_no=0; /* current tls open connections */
@@ -308,12 +306,10 @@ int tcp_set_src_addr(struct ip_addr* ip)
 			ip_addr2su(&tcp_source_ipv4_addr, ip, 0);
 			tcp_source_ipv4=&tcp_source_ipv4_addr;
 			break;
-		#ifdef USE_IPV6
 		case AF_INET6:
 			ip_addr2su(&tcp_source_ipv6_addr, ip, 0);
 			tcp_source_ipv6=&tcp_source_ipv6_addr;
 			break;
-		#endif
 		default:
 			return -1;
 	}
@@ -395,7 +391,6 @@ static int init_sock_opt(int s, int af)
 					strerror(errno));
 			/* continue since this is not critical */
 		}
-#ifdef USE_IPV6
 	} else if(af==AF_INET6){
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_TCLASS,
 					(void*)&optval, sizeof(optval)) ==-1) {
@@ -403,7 +398,6 @@ static int init_sock_opt(int s, int af)
 					strerror(errno));
 			/* continue since this is not critical */
 		}
-#endif
 	}
 
 #if  !defined(TCP_DONT_REUSEADDR) 
@@ -1250,9 +1244,7 @@ find_socket:
 				" listening socket for %s, using default...\n",
 					su2a(server, sizeof(*server)), ip_addr2a(&ip));
 		if (server->s.sa_family==AF_INET) *res_si=sendipv4_tcp;
-#ifdef USE_IPV6
 		else *res_si=sendipv6_tcp;
-#endif
 	}
 	*res_local_addr=*from;
 	return s;
@@ -1862,11 +1854,9 @@ int tcp_send(struct dest_info* dst, union sockaddr_union* from,
 				case AF_INET:
 						from = tcp_source_ipv4;
 					break;
-#ifdef USE_IPV6
 				case AF_INET6:
 						from = tcp_source_ipv6;
 					break;
-#endif
 				default:
 					/* error, bad af, ignore ... */
 					break;
@@ -4414,7 +4404,7 @@ static ticks_t tcpconn_main_timeout(ticks_t t, struct timer_ln* tl, void* data)
 			c->wbuf_q.queued);
 	
 	tcp_async=cfg_get(tcp, tcp_cfg, async);
-	if (likely(TICKS_LT(t, c->timeout) && ( !tcp_async | _wbufq_empty(c) |
+	if (likely(TICKS_LT(t, c->timeout) && ( !tcp_async || _wbufq_empty(c) ||
 					TICKS_LT(t, c->wbuf_q.wr_timeout)) )){
 		if (unlikely(tcp_async && _wbufq_non_empty(c)))
 			return (ticks_t)MIN_unsigned(c->timeout-t, c->wbuf_q.wr_timeout-t);
