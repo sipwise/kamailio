@@ -967,11 +967,6 @@ int th_del_via_cookie(sip_msg_t *msg, struct via_body *via)
 {
 	struct via_param *p;
 	struct lump* l;
-
-	if(via==NULL) {
-		LM_DBG("no via header\n");
-		return 0;
-	}
 	for(p=via->param_lst; p; p=p->next)
 	{
 		if(p->name.len==th_cookie_name.len

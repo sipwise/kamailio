@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -82,7 +84,7 @@
 #define SIP_MSG_START(m)	((m)->first_line.u.request.method.s)
 
 /*! \brief number methods as power of two to allow bitmap matching */
-typedef enum request_method {
+enum request_method {
 	METHOD_UNDEF=0,           /*!< 0 - --- */
 	METHOD_INVITE=1,          /*!< 1 - 2^0 */
 	METHOD_CANCEL=2,          /*!< 2 - 2^1 */
@@ -99,7 +101,7 @@ typedef enum request_method {
 	METHOD_REFER=4096,        /*!< 4096 - 2^12 */
 	METHOD_PUBLISH=8192,      /*!< 8192 - 2^13 */
 	METHOD_OTHER=16384        /*!< 16384 - 2^14 */
-} request_method_t;
+};
 
 #define FL_FORCE_RPORT  (1 << 0)  /*!< force rport */
 #define FL_FORCE_ACTIVE (1 << 1)  /*!< force active SDP */
@@ -119,8 +121,6 @@ typedef enum request_method {
 #define FL_SDP_BODY     (1 << 12)  /*!< msg has SDP in body */
 #define FL_USE_UAC_FROM      (1<<13)  /* take FROM hdr from UAC instead of UAS*/
 #define FL_USE_UAC_TO        (1<<14)  /* take TO hdr from UAC instead of UAS */
-#define FL_TM_RPL_MATCHED    (1<<15)  /* tm matched reply already */
-#define FL_RPL_SUSPENDED     (1<<16)  /* for async reply processing */
 
 /* WARNING: Value (1 << 28) is temporarily reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */
@@ -155,16 +155,6 @@ if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 #define IS_SIP(req)                                                \
     ((req)->first_line.u.request.version.len >= SIP_VERSION_LEN && \
     !strncasecmp((req)->first_line.u.request.version.s,             \
-		SIP_VERSION, SIP_VERSION_LEN))
-
-#define IS_HTTP_REPLY(rpl)                                                \
-    ((rpl)->first_line.u.reply.version.len >= HTTP_VERSION_LEN && \
-    !strncasecmp((rpl)->first_line.u.reply.version.s,             \
-		HTTP_VERSION, HTTP_VERSION_LEN))
-
-#define IS_SIP_REPLY(rpl)                                                \
-    ((rpl)->first_line.u.reply.version.len >= SIP_VERSION_LEN && \
-    !strncasecmp((rpl)->first_line.u.reply.version.s,             \
 		SIP_VERSION, SIP_VERSION_LEN))
 
 /*! \brief
@@ -264,19 +254,6 @@ typedef struct msg_body {
 /* pre-declaration, to include sys/time.h in .c */
 struct timeval;
 
-/* structure for cached decoded flow for outbound */
-typedef struct ocd_flow {
-		int decoded;
-		struct receive_info rcv;
-} ocd_flow_t;
-
-/* structure holding fields that don't have to be cloned in shm
- * - its content is memset'ed to in shm clone
- * - add to msg_ldata_reset() if a field uses dynamic memory */
-typedef struct msg_ldata {
-	ocd_flow_t flow;
-} msg_ldata_t;
-
 /*! \brief The SIP message */
 typedef struct sip_msg {
 	unsigned int id;               /*!< message id, unique/process*/
@@ -371,31 +348,23 @@ typedef struct sip_msg {
 	struct lump_rpl *reply_lump; /*!< only for localy generated replies !!!*/
 
 	/*! \brief str add_to_branch;
-	   whatever whoever want to append to Via branch comes here */
+	   whatever whoever want to append to branch comes here
+	*/
 	char add_to_branch_s[MAX_BRANCH_PARAM_LEN];
 	int add_to_branch_len;
 
 	unsigned int  hash_index; /*!< index to TM hash table; stored in core to avoid unnecessary calculations */
-	unsigned int msg_flags; /*!< internal flags used by core */
-	flag_t flags; /*!< config flags */
+	unsigned int msg_flags; /*!< flags used by core */
+	     /* allows to set various flags on the message; may be used for
+	      *	simple inter-module communication or remembering processing state
+	      * reached
+	      */
+	flag_t flags;
 	str set_global_address;
 	str set_global_port;
-	struct socket_info* force_send_socket; /*!< force sending on this socket */
+	struct socket_info* force_send_socket; /* force sending on this socket,
+											  if ser */
 	str path_vec;
-	str instance;
-	unsigned int reg_id;
-	str ruid;
-	str location_ua;
-
-	/* structure with fields that are needed for local processing
-	 * - not cloned to shm, reset to 0 in the clone */
-	msg_ldata_t ldv;
-
-	/* IMPORTANT: when adding new fields in this structure (sip_msg_t),
-	 * be sure it is freed in free_sip_msg() and it is cloned or reset
-	 * to shm structure for transaction - see sip_msg_clone.c. In tm
-	 * module, take care of these fields for faked environemt used for
-	 * runing failure handlers - see modules/tm/t_reply.c */
 } sip_msg_t;
 
 /*! \brief pointer to a fakes message which was never received ;
@@ -413,18 +382,18 @@ extern int via_cnt;
 extern unsigned int global_req_flags;
 
 
-int parse_msg(char* const buf, const unsigned int len, struct sip_msg* const msg);
+int parse_msg(char* buf, unsigned int len, struct sip_msg* msg);
 
-int parse_headers(struct sip_msg* const msg, const hdr_flags_t flags, const int next);
+int parse_headers(struct sip_msg* msg, hdr_flags_t flags, int next);
 
-char* get_hdr_field(char* const buf, char* const end, struct hdr_field* const hdr);
+char* get_hdr_field(char* buf, char* end, struct hdr_field* hdr);
 
-void free_sip_msg(struct sip_msg* const msg);
+void free_sip_msg(struct sip_msg* msg);
 
 /*! \brief make sure all HFs needed for transaction identification have been
    parsed; return 0 if those HFs can't be found
 */
-inline static int check_transaction_quadruple(struct sip_msg* const msg)
+inline static int check_transaction_quadruple( struct sip_msg* msg )
 {
 	if ( parse_headers(msg, HDR_FROM_F|HDR_TO_F|HDR_CALLID_F|HDR_CSEQ_F,0)!=-1
 		&& msg->from && msg->to && msg->callid && msg->cseq ) {
@@ -439,7 +408,7 @@ inline static int check_transaction_quadruple(struct sip_msg* const msg)
 
 /*! \brief returns a pointer to the begining of the msg's body
  */
-inline static char* get_body(struct sip_msg* const msg)
+inline static char* get_body(struct sip_msg *msg)
 {
 	int offset;
 	unsigned int len;
@@ -461,38 +430,24 @@ inline static char* get_body(struct sip_msg* const msg)
 	return msg->unparsed + offset;
 }
 
-/*! \brief If the new_uri is set, then reset it */
-void reset_new_uri(struct sip_msg* const msg);
 
 /*! \brief
  * Make a private copy of the string and assign it to dst_uri
  */
-int set_dst_uri(struct sip_msg* const msg, const str* const uri);
+int set_dst_uri(struct sip_msg* msg, str* uri);
 
 /*! \brief If the dst_uri is set to an URI then reset it */
-void reset_dst_uri(struct sip_msg* const msg);
+void reset_dst_uri(struct sip_msg* msg);
 
-hdr_field_t* get_hdr(const sip_msg_t* const msg, const enum _hdr_types_t ht);
-hdr_field_t* next_sibling_hdr(const hdr_field_t* const hf);
-/** not used yet */
-hdr_field_t* get_hdr_by_name(const sip_msg_t* const msg, const char* const name, const int name_len);
-hdr_field_t* next_sibling_hdr_by_name(const hdr_field_t* const hf);
+hdr_field_t* get_hdr(sip_msg_t *msg, enum _hdr_types_t ht);
+hdr_field_t* next_sibling_hdr(hdr_field_t *hf);
+hdr_field_t* get_hdr_by_name(sip_msg_t *msg, char *name, int name_len);
+hdr_field_t* next_sibling_hdr_by_name(hdr_field_t *hf);
 
 int set_path_vector(struct sip_msg* msg, str* path);
 
-void reset_path_vector(struct sip_msg* const msg);
+void reset_path_vector(struct sip_msg* msg);
 
-int set_instance(struct sip_msg* msg, str* instance);
-
-void reset_instance(struct sip_msg* const msg);
-
-int set_ruid(struct sip_msg* msg, str* ruid);
-
-void reset_ruid(struct sip_msg* const msg);
-
-int set_ua(struct sip_msg* msg, str *location_ua);
-
-void reset_ua(struct sip_msg* const msg);
 
 /** force a specific send socket for forwarding a request.
  * @param msg - sip msg.
@@ -524,22 +479,17 @@ typedef struct msg_ctx_id {
  * set msg context id
  * - return: -1 on error; 0 - on set 
  */
-int msg_ctx_id_set(const sip_msg_t* const msg, msg_ctx_id_t* const mid);
+int msg_ctx_id_set(sip_msg_t *msg, msg_ctx_id_t *mid);
 
 /**
  * check msg context id
  * - return: -1 on error; 0 - on no match; 1 - on match
  */
-int msg_ctx_id_match(const sip_msg_t* const msg, const msg_ctx_id_t* const mid);
+int msg_ctx_id_match(sip_msg_t *msg, msg_ctx_id_t *mid);
 
 /**
  * set msg time value
  */
-int msg_set_time(sip_msg_t* const msg);
-
-/**
- * reset content of msg->ldv (msg_ldata_t structure)
- */
-void msg_ldata_reset(sip_msg_t*);
+int msg_set_time(sip_msg_t *msg);
 
 #endif

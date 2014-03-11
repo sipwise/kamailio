@@ -126,9 +126,6 @@
 #include "../../atomic_ops.h" /* membar_depends() */
 
 
-extern int tm_failure_exec_mode;
-extern int tm_dns_reuse_rcv_socket;
-
 static int goto_on_branch = 0, branch_route = 0;
 
 void t_on_branch( unsigned int go_to )
@@ -141,7 +138,7 @@ void t_on_branch( unsigned int go_to )
 	if (!t || t==T_UNDEFINED ) {
 		goto_on_branch=go_to;
 	} else {
-		t->on_branch = go_to;
+		get_t()->on_branch = go_to;
 	}
 }
 
@@ -190,9 +187,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 									str* next_hop,
 									struct socket_info* fsocket,
 									snd_flags_t snd_flags,
-									int fproto, int flags,
-									str *instance, str *ruid,
-									str *location_ua)
+									int fproto, int flags)
 {
 	char *shbuf;
 	struct lump* add_rm_backup, *body_lumps_backup;
@@ -205,12 +200,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	int dst_uri_backed_up;
 	str path_bak;
 	int free_path;
-	str instance_bak;
-	int free_instance;
-	str ruid_bak;
-	int free_ruid;
-	str ua_bak;
-	int free_ua;
 	int backup_route_type;
 	snd_flags_t fwd_snd_flags_bak;
 	snd_flags_t rpl_snd_flags_bak;
@@ -230,15 +219,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	path_bak.s=0;
 	path_bak.len=0;
 	free_path=0;
-	instance_bak.s=0;
-	instance_bak.len=0;
-	free_instance=0;
-	ruid_bak.s=0;
-	ruid_bak.len=0;
-	free_ruid=0;
-	ua_bak.s=0;
-	ua_bak.len=0;
-	free_ua=0;
 	dst=&t->uac[branch].request.dst;
 
 	/* ... we calculate branch ... */	
@@ -279,9 +259,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	parsed_uri_bak=i_req->parsed_uri;
 	parsed_uri_ok_bak=i_req->parsed_uri_ok;
 	path_bak=i_req->path_vec;
-	instance_bak=i_req->instance;
-	ruid_bak=i_req->ruid;
-	ua_bak=i_req->location_ua;
 	
 	if (unlikely(branch_route || has_tran_tmcbs(t, TMCB_REQUEST_FWDED))){
 		/* dup uris, path a.s.o. if we have a branch route or callback */
@@ -315,53 +292,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 			}
 			free_path=1;
 		}
-		/* update instance */
-		/* if instance points to msg instance, it needs to be "fixed" so that we 
-		   can change/update msg->instance */
-		if (instance==&i_req->instance)
-			instance=&instance_bak;
-		/* zero it first so that set_instance will work */
-		i_req->instance.s=0;
-		i_req->instance.len=0;
-		if (unlikely(instance)){
-			if (unlikely(set_instance(i_req, instance)<0)){
-				ret=E_OUT_OF_MEM;
-				goto error03;
-			}
-			free_instance=1;
-		}
-
-		/* update ruid */
-		/* if ruid points to msg ruid, it needs to be "fixed" so that we 
-		   can change/update msg->ruid */
-		if (ruid==&i_req->ruid)
-			ruid=&ruid_bak;
-		/* zero it first so that set_ruid will work */
-		i_req->ruid.s=0;
-		i_req->ruid.len=0;
-		if (unlikely(ruid)){
-			if (unlikely(set_ruid(i_req, ruid)<0)){
-				ret=E_OUT_OF_MEM;
-				goto error03;
-			}
-			free_ruid=1;
-		}
-
-		/* update location_ua */
-		/* if location_ua points to msg location_ua, it needs to be "fixed" so that we 
-		   can change/update msg->location_ua */
-		if (location_ua==&i_req->location_ua)
-			location_ua=&ua_bak;
-		/* zero it first so that set_ua will work */
-		i_req->location_ua.s=0;
-		i_req->location_ua.len=0;
-		if (unlikely(location_ua)){
-			if (unlikely(set_ua(i_req, location_ua)<0)){
-				ret=E_OUT_OF_MEM;
-				goto error03;
-			}
-			free_ua=1;
-		}
 	
 		/* backup dst uri  & zero it*/
 		dst_uri_bak=i_req->dst_uri;
@@ -387,7 +317,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 			/* run branch_route actions if provided */
 			backup_route_type = get_route_type();
 			set_route_type(BRANCH_ROUTE);
-			tm_ctx_set_branch_index(branch);
+			tm_ctx_set_branch_index(branch+1);
 			/* no need to backup/set avp lists: the on_branch route is run
 			   only in the main route context (e.g. t_relay() in the main
 			   route) or in the failure route context (e.g. append_branch &
@@ -421,14 +351,14 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 				/* if DROP was called in cfg, don't forward, jump to end */
 				if (unlikely(ctx.run_flags&DROP_R_F))
 				{
-					tm_ctx_set_branch_index(T_BR_UNDEFINED);
+					tm_ctx_set_branch_index(0);
 					set_route_type(backup_route_type);
 					/* triggered by drop in CFG */
 					ret=E_CFG;
 					goto error03;
 				}
 			}
-			tm_ctx_set_branch_index(T_BR_UNDEFINED);
+			tm_ctx_set_branch_index(0);
 			set_route_type(backup_route_type);
 		}
 
@@ -467,27 +397,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 			i_req->path_vec.s=0;
 			i_req->path_vec.len=0;
 		}
-		if (unlikely(instance && (i_req->instance.s!=instance->s ||
-							  i_req->instance.len!=instance->len))){
-			i_req->instance=*instance;
-		}else if (unlikely(instance==0 && i_req->instance.len!=0)){
-			i_req->instance.s=0;
-			i_req->instance.len=0;
-		}
-		if (unlikely(ruid && (i_req->ruid.s!=ruid->s ||
-							  i_req->ruid.len!=ruid->len))){
-			i_req->ruid=*ruid;
-		}else if (unlikely(ruid==0 && i_req->ruid.len!=0)){
-			i_req->ruid.s=0;
-			i_req->ruid.len=0;
-		}
-		if (unlikely(location_ua && (i_req->location_ua.s!=location_ua->s ||
-							  i_req->location_ua.len!=location_ua->len))){
-			i_req->location_ua=*location_ua;
-		}else if (unlikely(location_ua==0 && i_req->location_ua.len!=0)){
-			i_req->location_ua.s=0;
-			i_req->location_ua.len=0;
-		}
 	}
 	
 	if (likely(next_hop!=0 || (flags & UAC_DNS_FAILOVER_F))){
@@ -507,12 +416,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	} /* else next_hop==0 =>
 		no dst_uri / empty dst_uri and initial next_hop==0 =>
 		dst is pre-filled with a valid dst => use the pre-filled dst */
-
-	/* Set on_reply and on_negative handlers for this branch to the handlers in the transaction */
-	t->uac[branch].on_reply = t->on_reply;
-	t->uac[branch].on_failure = t->on_failure;
-	t->uac[branch].on_branch_failure = t->on_branch_failure;
-
+	
 	/* check if send_sock is ok */
 	if (t->uac[branch].request.dst.send_sock==0) {
 		LOG(L_ERR, "ERROR: can't fwd to af %d, proto %d "
@@ -524,7 +428,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	/* ... and build it now */
 	shbuf=build_req_buf_from_sip_req( i_req, &len, dst, BUILD_IN_SHM);
 	if (!shbuf) {
-		LM_ERR("could not build request\n"); 
+		LOG(L_ERR, "ERROR: print_uac_request: no shm mem\n"); 
 		ret=E_OUT_OF_MEM;
 		goto error01;
 	}
@@ -555,51 +459,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 		t->uac[branch].path.s[i_req->path_vec.len]=0;
 		memcpy( t->uac[branch].path.s, i_req->path_vec.s, i_req->path_vec.len);
 	}
-	if (unlikely(i_req->instance.s && i_req->instance.len)){
-		t->uac[branch].instance.s=shm_malloc(i_req->instance.len+1);
-		if (unlikely(t->uac[branch].instance.s==0)) {
-			shm_free(shbuf);
-			t->uac[branch].request.buffer=0;
-			t->uac[branch].request.buffer_len=0;
-			t->uac[branch].uri.s=0;
-			t->uac[branch].uri.len=0;
-			ret=E_OUT_OF_MEM;
-			goto error01;
-		}
-		t->uac[branch].instance.len=i_req->instance.len;
-		t->uac[branch].instance.s[i_req->instance.len]=0;
-		memcpy( t->uac[branch].instance.s, i_req->instance.s, i_req->instance.len);
-	}
-	if (unlikely(i_req->ruid.s && i_req->ruid.len)){
-		t->uac[branch].ruid.s=shm_malloc(i_req->ruid.len+1);
-		if (unlikely(t->uac[branch].ruid.s==0)) {
-			shm_free(shbuf);
-			t->uac[branch].request.buffer=0;
-			t->uac[branch].request.buffer_len=0;
-			t->uac[branch].uri.s=0;
-			t->uac[branch].uri.len=0;
-			ret=E_OUT_OF_MEM;
-			goto error01;
-		}
-		t->uac[branch].ruid.len=i_req->ruid.len;
-		t->uac[branch].ruid.s[i_req->ruid.len]=0;
-		memcpy( t->uac[branch].ruid.s, i_req->ruid.s, i_req->ruid.len);
-	}
-	if (unlikely(i_req->location_ua.s && i_req->location_ua.len)){
-		t->uac[branch].location_ua.s=shm_malloc(i_req->location_ua.len+1);
-		if (unlikely(t->uac[branch].location_ua.s==0)) {
-			shm_free(shbuf);
-			t->uac[branch].request.buffer=0;
-			t->uac[branch].request.buffer_len=0;
-			t->uac[branch].uri.s=0;
-			t->uac[branch].uri.len=0;
-			ret=E_OUT_OF_MEM;
-			goto error01;
-		}
-		t->uac[branch].location_ua.len=i_req->location_ua.len;
-		t->uac[branch].location_ua.s[i_req->location_ua.len]=0;
-		memcpy( t->uac[branch].location_ua.s, i_req->location_ua.s, i_req->location_ua.len);
-	}
 	ret=0;
 
 error01:
@@ -611,15 +470,6 @@ error03:
 	if (unlikely(free_path)){
 		reset_path_vector(i_req);
 	}
-	if (unlikely(free_instance)){
-		reset_instance(i_req);
-	}
-	if (unlikely(free_ruid)){
-		reset_ruid(i_req);
-	}
-	if (unlikely(free_ua)){
-		reset_ua(i_req);
-	}
 	if (dst_uri_backed_up){
 		reset_dst_uri(i_req); /* free dst_uri */
 		i_req->dst_uri=dst_uri_bak;
@@ -629,9 +479,6 @@ error03:
 	i_req->parsed_uri=parsed_uri_bak;
 	i_req->parsed_uri_ok=parsed_uri_ok_bak;
 	i_req->path_vec=path_bak;
-	i_req->instance=instance_bak;
-	i_req->ruid=ruid_bak;
-	i_req->location_ua=ua_bak;
 	
 	/* Delete the duplicated lump lists, this will also delete
 	 * all lumps created here, such as lumps created in per-branch
@@ -756,11 +603,6 @@ int add_blind_uac( /*struct cell *t*/ )
 	membar_write(); /* to allow lockless prepare_to_cancel() we want to be sure
 					   all the writes finished before updating branch number*/
 	t->nr_of_outgoings=(branch+1);
-	t->async_backup.blind_uac = branch; /* whenever we create a blind UAC, lets save the current branch
-					 * this is used in async tm processing specifically to be able to route replies
-					 * that were possibly in response to a request forwarded on this blind UAC......
-					 * we still want replies to be processed as if it were a normal UAC */
-	
 	/* start FR timer -- protocol set by default to PROTO_NONE,
        which means retransmission timer will not be started
     */
@@ -800,8 +642,7 @@ int add_blind_uac( /*struct cell *t*/ )
 static int add_uac( struct cell *t, struct sip_msg *request, str *uri,
 					str* next_hop, str* path, struct proxy_l *proxy,
 					struct socket_info* fsocket, snd_flags_t snd_flags,
-					int proto, int flags, str *instance, str *ruid,
-					str *location_ua)
+					int proto, int flags)
 {
 
 	int ret;
@@ -846,8 +687,7 @@ static int add_uac( struct cell *t, struct sip_msg *request, str *uri,
 	/* now message printing starts ... */
 	if (unlikely( (ret=prepare_new_uac(t, request, branch, uri, path,
 										next_hop, fsocket, snd_flags,
-										proto, flags, instance, ruid,
-										location_ua)) < 0)){
+										proto, flags)) < 0)){
 		ser_error=ret;
 		goto error01;
 	}
@@ -887,9 +727,7 @@ static int add_uac_from_buf( struct cell *t, struct sip_msg *request,
 								struct socket_info* fsocket,
 								snd_flags_t send_flags,
 								int proto,
-								char *buf, short buf_len,
-								str *instance, str *ruid,
-								str *location_ua)
+								char *buf, short buf_len)
 {
 
 	int ret;
@@ -960,59 +798,6 @@ static int add_uac_from_buf( struct cell *t, struct sip_msg *request,
 		t->uac[branch].path.s[path->len]=0;
 		memcpy( t->uac[branch].path.s, path->s, path->len);
 	}
-	/* copy the instance */
-	if (unlikely(instance && instance->s)){
-		t->uac[branch].instance.s=shm_malloc(instance->len+1);
-		if (unlikely(t->uac[branch].instance.s==0)) {
-			shm_free(shbuf);
-			t->uac[branch].request.buffer=0;
-			t->uac[branch].request.buffer_len=0;
-			t->uac[branch].uri.s=0;
-			t->uac[branch].uri.len=0;
-			ret=ser_error=E_OUT_OF_MEM;
-			goto error;
-		}
-		t->uac[branch].instance.len=instance->len;
-		t->uac[branch].instance.s[instance->len]=0;
-		memcpy( t->uac[branch].instance.s, instance->s, instance->len);
-	}
-	/* copy the ruid */
-	if (unlikely(ruid && ruid->s)){
-		t->uac[branch].ruid.s=shm_malloc(ruid->len+1);
-		if (unlikely(t->uac[branch].ruid.s==0)) {
-			shm_free(shbuf);
-			t->uac[branch].request.buffer=0;
-			t->uac[branch].request.buffer_len=0;
-			t->uac[branch].uri.s=0;
-			t->uac[branch].uri.len=0;
-			ret=ser_error=E_OUT_OF_MEM;
-			goto error;
-		}
-		t->uac[branch].ruid.len=ruid->len;
-		t->uac[branch].ruid.s[ruid->len]=0;
-		memcpy( t->uac[branch].ruid.s, ruid->s, ruid->len);
-	}
-	/* copy the location_ua */
-	if (unlikely(location_ua && location_ua->s)){
-		t->uac[branch].location_ua.s=shm_malloc(location_ua->len+1);
-		if (unlikely(t->uac[branch].location_ua.s==0)) {
-			shm_free(shbuf);
-			t->uac[branch].request.buffer=0;
-			t->uac[branch].request.buffer_len=0;
-			t->uac[branch].uri.s=0;
-			t->uac[branch].uri.len=0;
-			ret=ser_error=E_OUT_OF_MEM;
-			goto error;
-		}
-		t->uac[branch].location_ua.len=location_ua->len;
-		t->uac[branch].location_ua.s[location_ua->len]=0;
-		memcpy( t->uac[branch].location_ua.s, location_ua->s, location_ua->len);
-	}
-
-	t->uac[branch].on_reply = t->on_reply;
-	t->uac[branch].on_failure = t->on_failure;
-	t->uac[branch].on_branch_failure = t->on_branch_failure;
-
 	membar_write(); /* to allow lockless ops (e.g. prepare_to_cancel()) we want
 					   to be sure everything above is fully written before
 					   updating branches no. */
@@ -1080,16 +865,12 @@ int add_uac_dns_fallback(struct cell *t, struct sip_msg* msg,
 							&old_uac->path,
 							 (old_uac->request.dst.send_flags.f &
 								SND_F_FORCE_SOCKET)?
-									old_uac->request.dst.send_sock:
-									((tm_dns_reuse_rcv_socket)
-											?msg->rcv.bind_address:0),
+									old_uac->request.dst.send_sock:0,
 							old_uac->request.dst.send_flags,
 							old_uac->request.dst.proto,
 							old_uac->request.buffer,
-							old_uac->request.buffer_len,
-							&old_uac->instance, &old_uac->ruid,
-							&old_uac->location_ua);
-			} else {
+							old_uac->request.buffer_len);
+			}else
 				/* add_uac will use dns_h => next_hop will be ignored.
 				 * Unfortunately we can't reuse the old buffer, the branch id
 				 *  must be changed and the send_socket might be different =>
@@ -1097,14 +878,9 @@ int add_uac_dns_fallback(struct cell *t, struct sip_msg* msg,
 				ret=add_uac(t,  msg, &old_uac->uri, 0, &old_uac->path, 0,
 							 (old_uac->request.dst.send_flags.f &
 								SND_F_FORCE_SOCKET)?
-									old_uac->request.dst.send_sock:
-									((tm_dns_reuse_rcv_socket)
-											?msg->rcv.bind_address:0),
+									old_uac->request.dst.send_sock:0,
 							old_uac->request.dst.send_flags,
-							old_uac->request.dst.proto, UAC_DNS_FAILOVER_F,
-							&old_uac->instance, &old_uac->ruid,
-							&old_uac->location_ua);
-			}
+							old_uac->request.dst.proto, UAC_DNS_FAILOVER_F);
 
 			if (ret<0){
 				/* failed, delete the copied dns_h */
@@ -1179,8 +955,7 @@ int e2e_cancel_branch( struct sip_msg *cancel_msg, struct cell *t_cancel,
 		if (unlikely((ret=prepare_new_uac( t_cancel, cancel_msg, branch,
 									&t_invite->uac[branch].uri,
 									&t_invite->uac[branch].path,
-									0, 0, snd_flags, PROTO_NONE, 0,
-									NULL, NULL, NULL)) <0)){
+									0, 0, snd_flags, PROTO_NONE, 0)) <0)){
 			ser_error=ret;
 			goto error;
 		}
@@ -1604,25 +1379,9 @@ int t_send_branch( struct cell *t, int branch, struct sip_msg* p_msg ,
 			}
 		}
 #endif
-		uac->icode = 908; /* internal code set to delivery failure */
 		LOG(L_ERR, "ERROR: t_send_branch: sending request on branch %d "
 				"failed\n", branch);
 		if (proxy) { proxy->errors++; proxy->ok=0; }
-		if(tm_failure_exec_mode==1) {
-			LM_DBG("putting branch %d on hold \n", branch);
-			/* put on retransmission timer,
-			 * but set proto to NONE, so actually it is not trying to resend */
-			uac->request.dst.proto = PROTO_NONE;
-			/* reset last_received, 408 reply is faked by timer */
-			uac->last_received=0;
-			/* add to retransmission timer */
-			if (start_retr( &uac->request )!=0){
-				LM_CRIT("retransmission already started for %p\n",
-					&uac->request);
-				return -2;
-			}
-			return branch;
-		}
 		return -2;
 	} else {
 		if (unlikely(has_tran_tmcbs(t, TMCB_REQUEST_SENT)))
@@ -1655,7 +1414,7 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 	int success_branch;
 	int try_new;
 	int lock_replies;
-	str dst_uri, path, instance, ruid, location_ua;
+	str dst_uri, path;
 	struct socket_info* si;
 	flag_t backup_bflags = 0;
 	flag_t bflags = 0;
@@ -1721,8 +1480,7 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 		branch_ret=add_uac( t, p_msg, GET_RURI(p_msg), GET_NEXT_HOP(p_msg),
 							&p_msg->path_vec, proxy, p_msg->force_send_socket,
 							p_msg->fwd_send_flags, proto,
-							(p_msg->dst_uri.len)?0:UAC_SKIP_BR_DST_F, &p_msg->instance,
-							&p_msg->ruid, &p_msg->location_ua);
+							(p_msg->dst_uri.len)?0:UAC_SKIP_BR_DST_F);
 		if (branch_ret>=0) 
 			added_branches |= 1<<branch_ret;
 		else
@@ -1731,15 +1489,14 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 
 	init_branch_iterator();
 	while((current_uri.s=next_branch( &current_uri.len, &q, &dst_uri, &path,
-										&bflags, &si, &ruid, &instance, &location_ua))) {
+										&bflags, &si))) {
 		try_new++;
 		setbflagsval(0, bflags);
 
 		branch_ret=add_uac( t, p_msg, &current_uri,
 							(dst_uri.len) ? (&dst_uri) : &current_uri,
 							&path, proxy, si, p_msg->fwd_send_flags,
-							proto, (dst_uri.len)?0:UAC_SKIP_BR_DST_F, &instance,
-							&ruid, &location_ua);
+							proto, (dst_uri.len)?0:UAC_SKIP_BR_DST_F);
 		/* pick some of the errors in case things go wrong;
 		   note that picking lowest error is just as good as
 		   any other algorithm which picks any other negative

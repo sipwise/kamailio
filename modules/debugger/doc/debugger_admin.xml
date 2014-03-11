@@ -18,20 +18,20 @@
 	<title>Overview</title>
 	<para>
 		This module provides an interactive config file debugger. It can print
-		a trace of config script execution for a SIP message to log and set
-		breakpoints on every script action, allowing step-by-step execution of 
-		the routing and response scripts.
+		a trace of config execution for a SIP message to log and set
+		breakpoints on every config action, allowing step-by-step execution of 
+		the config.
 	</para>
 	<para>
 		Debugging can be done from local or remote host via RPC interface (e.g.,
-		XMLRPC, &sercmd;, siremis).
+		XMLRPC, sercmd, siremis).
 	</para>
 	<para>
 		The framework to set breakpoints on specific actions and config lines
-		is not exported to RPC. Each action can be accompanied by an
+		is not exported to RPC yet. Each action can be accompanied by an
 		breakpoint or you can use dbg_breakpoint() function to set a breakpoint
-		at certain line. Global breakpoints can be enabled/disabled at runtime.
-		The script running trace can also be enabled/disabled at runtime.
+		at certain line. Global breakpoint can be enabled/disabled at runtime.
+		Also the config running trace can be enabled/disabled at runtime.
 	</para>
 	<para>
 		When the SIP router process is stopped at a breakpoint, you can
@@ -74,10 +74,10 @@
     </section>
     <section>
 	<title>Parameters</title>
-	<section id="dbg.p.cfgtrace">
+	<section>
 	    <title><varname>cfgtrace</varname> (int)</title>
 	    <para>
-			Control whether the config script trace is enabled or disabled
+			Control whether config running trace is enabled or disabled
 			at startup. You can change the value at runtime without
 			restart, globally or per process.
 	    </para>
@@ -96,7 +96,7 @@ modparam("debugger", "cfgtrace", 1)
 	    </example>
 	</section>
 
-	<section id="dbg.p.breakpoint">
+	<section>
 	    <title><varname>breakpoint</varname> (int)</title>
 	    <para>
 			Control whether every line (global) breakpoint is enabled
@@ -117,7 +117,7 @@ modparam("debugger", "breakpoint", 1)
 	    </example>
 	</section>
 
-	<section id="dbg.p.log_level">
+	<section>
 	    <title><varname>log_level</varname> (int)</title>
 	    <para>
 			What log level is to be used to print module-specific messages.
@@ -137,12 +137,10 @@ modparam("debugger", "log_level", 1)
 	    </example>
 	</section>
 
-	<section id="dbg.p.log_facility">
+	<section>
 	    <title><varname>log_facility</varname> (str)</title>
 	    <para>
-			Which log facility is to be used to print module-specific messages.
-			By using this setting, you can configure syslog to send debug
-			messages to a separate log channel, like a specific kamailio-debug log file.
+			What log facility is to be used to print module-specific messages.
 	    </para>
 	    <para>
 		<emphasis>
@@ -159,7 +157,7 @@ modparam("debugger", "log_facility", "LOG_DAEMON")
 	    </example>
 	</section>
 
-	<section id="dbg.p.log_prefix">
+	<section>
 	    <title><varname>log_prefix</varname> (str)</title>
 	    <para>
 			String to print before any module-specific messages.
@@ -179,11 +177,11 @@ modparam("debugger", "log_prefix", "from-debugger-with-love:")
 	    </example>
 	</section>
 
-	<section id="dbg.p.step_usleep">
+	<section>
 	    <title><varname>step_usleep</varname> (int)</title>
 	    <para>
 			Microseconds to sleep before checking for new commands when
-			waiting at a breakpoint.
+			waiting at breakpoint.
 	    </para>
 	    <para>
 		<emphasis>
@@ -200,11 +198,11 @@ modparam("debugger", "step_usleep", 500000)
 	    </example>
 	</section>
 
-	<section id="dbg.p.step_loops">
+	<section>
 	    <title><varname>step_loops</varname> (int)</title>
 	    <para>
 			How many sleeps of 'step_usleep' the RPC process performs when
-			waiting for a reply from a worker process before responding to RPC.
+			waiting for a reply from worker process before responding to RPC.
 			This avoids blocking RPC process forever in case the worker
 			process 'forgets' to write back a reply.
 	    </para>
@@ -223,134 +221,11 @@ modparam("debugger", "step_loops", 100)
 	    </example>
 	</section>
 
-	<section id="dbg.p.mod_hash_size">
-	    <title><varname>mod_hash_size</varname> (int)</title>
-	    <para>
-		Used to compute power of two as size of internal hash table to store levels
-		per module (e.g., if its set to 4, internal hash table has 16 slots). This
-		parameter is accesible readonly via the Kamailio config framework.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is <quote>0</quote> - feature disabled.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>mod_hash_size</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("debugger", "mod_hash_size", 5)
-...
-</programlisting>
-	    </example>
 	</section>
-
-	<section id="dbg.p.mod_level_mode">
-	    <title><varname>mod_level_mode</varname> (int)</title>
-	    <para>
-			Enable or disable per module log level (0 - disabled, 1 - enabled).
-			This parameter is tunable via the Kamailio config framework.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is <quote>0</quote>.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>mod_level_mode</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("debugger", "mod_level_mode", 1)
-...
-</programlisting>
-	    </example>
-	</section>
-
-	<section id="dbg.p.mod_level">
-	    <title><varname>mod_level</varname> (str)</title>
-	    <para>
-		Specify module log level - the value must be in the format:
-		modulename=level. The parameter can be set many times. For core
-		log level, use module name 'core'.
-	    </para>
-	    <example>
-		<title>Set <varname>mod_level</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("debugger", "mod_level", "core=3")
-modparam("debugger", "mod_level", "tm=3")
-...
-</programlisting>
-	    </example>
-	</section>
-
-	<section id="dbg.p.log_assign">
-	    <title><varname>log_assign</varname> (int)</title>
-	    <para>
-		Enable or disable log assign actions on config (0 - disabled, 1 - enabled).
-	    </para>
-		<para>
-		<emphasis>
-		    Default value is <quote>0</quote>.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>log_assign</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("debugger", "log_assign", 1)
-...
-</programlisting>
-	    </example>
-	</section>
-
-	<section id="dbg.p.cfgpkgcheck">
-	    <title><varname>cfgpkgcheck</varname> (int)</title>
-	    <para>
-			If set, before each config action is done pkg memory check,
-			useful to detect buffer overflows.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is <quote>0</quote> (disabled).
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>cfgpkgcheck</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("debugger", "cfgpkgcheck", 1)
-...
-</programlisting>
-	    </example>
-	</section>
-
-	<section id="dbg.p.reset_msgid">
-	    <title><varname>reset_msgid</varname> (int)</title>
-	    <para>
-		Used to enable or disable the ability to reset the msgid ($mi)
-		through the dbg.reset_msgid RPC command. (0 - disabled, 1 - enabled).
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is <quote>0</quote> - feature disabled.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>reset_msgid</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("debugger", "reset_msgid", 1)
-...
-</programlisting>
-	    </example>
-	</section>
-
-	</section>
-
+	
     <section>
 	<title>Functions</title>
- 	<section id="dbg.f.db_breakpoint">
+ 	<section>
 	    <title>
 		<function moreinfo="none">dbg_breakpoint(mode)</function>
 	    </title>
@@ -360,7 +235,7 @@ modparam("debugger", "reset_msgid", 1)
 			the breakpoint is enabled (1) or disabled (0) at startup.
 	    </para>
 		<para>
-			Note that this version of the module does not export this anchors to RPC for
+			Note that this version does not export this anchors to RPC for
 			interactive debugging (temporarily disabled).
 	    </para>
 		<example>
@@ -373,103 +248,18 @@ if($si=="10.0.0.10")
 </programlisting>
 	    </example>
 	</section>
-
-	<section id="dbg.f.dbg_pv_dump">
-	    <title>
-		<function moreinfo="none">dbg_pv_dump([mask] [, level])</function>
-	    </title>
-	    <para>
-			Prints the content of pv_cache on json format.
-			Defaults are mask=31 and level = "L_DBG"
-	    </para>
-		<para>
-		</para>
-		<itemizedlist>
-			<para><emphasis>mask</emphasis> - Controls the content to dump:
-			</para>
-			<itemizedlist>
-			<listitem><para>
-			  1 - dump null values
-			</para></listitem>
-			<listitem><para>
-			  2 - dump avp vars
-			</para></listitem>
-			<listitem><para>
-			  4 - dump script vars
-			</para></listitem>
-			<listitem><para>
-			  8 - dump xavp vars
-			</para></listitem>
-			<listitem><para>
-			  16 - dump DP_OTHER vars
-			</para></listitem>
-			</itemizedlist>
-			<para><emphasis>level</emphasis> - The level that will be used in LOG function. It can be:
-			</para>
-			<itemizedlist>
-			<listitem><para>
-				L_ALERT - log level -5
-			</para></listitem>
-			<listitem><para>
-				L_BUG - log level -4
-			</para></listitem>
-			<listitem><para>
-				L_CRIT - log level -3
-			</para></listitem>
-			<listitem><para>
-				L_ERR - log level -1
-			</para></listitem>
-			<listitem><para>
-				L_WARN - log level 0
-			</para></listitem>
-			<listitem><para>
-				L_NOTICE - log level 1
-			</para></listitem>
-			<listitem><para>
-				L_INFO - log level 2
-			</para></listitem>
-			<listitem><para>
-				L_DBG - log level 3
-				</para></listitem>
-			</itemizedlist>
-		</itemizedlist>
-		<example>
-		<title><function>dbg_pv_dump</function> usage</title>
-		<programlisting format="linespecific">
-...
-$var(temp) = 1;
-$avp(s:more_avp) = 2;
-$avp(s:more_avp) = 3;
-$xavp(x=>more) = "bye";
-$xavp(x[0]=>more) = "hi";
-$xavp(x[0]=>other) = 1;
-$xavp(x[0]=>other) = 2;
-$xavp(x=>different) = "foo";
-$var(empty) = $null;
-
-dbg_pv_dump(30, "L_DBG");
-...
-</programlisting>
-		<para>Output</para>
-		<programlisting format="linespecific">
-...
- 4(30943) DEBUG: debugger [debugger_api.c:1613]: dbg_dump_json(): {"$sp":37597,"$var(rc)":0,"$var(temp)":1,"$avp(more_avp)":[3,2],"$si":"127.0.0.1","$rc":0,"$xavp(x)":[{"different":["foo"]},{"other":[2,1],"more":["hi","bye"]}],"$T_branch_idx":0,"$var(empty)":0}
- ...
-</programlisting>
-	    </example>
-	</section>
-
+	
     </section>
 	
 	<section>
 		<title>Exported RPC Functions</title>
 
-	<section id="dbg.r.ls">
+	<section>
 		<title>
 		<function moreinfo="none">dbg.ls</function>
 		</title>
 		<para>
-			List &kamailio; processes with info related to interactive
+			List SIP router processes with info related to interactive
 			debugging.
 		</para>
 		<para>
@@ -481,7 +271,7 @@ dbg_pv_dump(30, "L_DBG");
 			omitted then will print for all processes.</para></listitem>	  
 		</itemizedlist>
 		<para>
-		Examples of use with &sercmd;:
+		Examples of use with sercmd:
 		</para>
         <programlisting  format="linespecific">
 		dbg.ls
@@ -489,27 +279,27 @@ dbg_pv_dump(30, "L_DBG");
 		</programlisting>
     </section>
 
-	<section id="dbg.r.trace">
+	<section>
 		<title>
 		<function moreinfo="none">dbg.trace</function>
 		</title>
 		<para>
-			Control config script running trace.
+			Control config running trace.
 		</para>
 		<para>
 		Name: <emphasis>dbg.trace</emphasis>
 		</para>
 		<para>Parameters:</para>
 		<itemizedlist>
-			<listitem><para>_cmd_ : command can be 'on' or 'off' to
+			<listitem><para>_cmd_ : inner command can be 'on' or 'off' to
 				enable or disable tracing for one or all processes.</para>
 		</listitem>
 			<listitem><para>_pid_ : pid for which to list the details. If 'pid' is
-				omitted, then details for all processes will be printed.</para>
+				omitted, then it will print details for all processes.</para>
 		</listitem>
 		</itemizedlist>
 		<para>
-		Examples for using with &sercmd;:
+		Examples for using with sercmd:
 		</para>
         <programlisting  format="linespecific">
 		dbg.trace on
@@ -518,7 +308,7 @@ dbg_pv_dump(30, "L_DBG");
 		</programlisting>
     </section>
 
-	<section id="dbg.r.bp">
+	<section>
 		<title>
 		<function moreinfo="none">dbg.bp</function>
 		</title>
@@ -530,17 +320,18 @@ dbg_pv_dump(30, "L_DBG");
 		</para>
 		<para>Parameters:</para>
 		<itemizedlist>
-			<listitem><para>_cmd_ : command, see next section for
+			<listitem><para>_cmd_ : inner command, see next section for
 			the list of available values.</para>
 		</listitem>
-		<listitem><para>_pid_ : process id for which to apply the command.
+		<listitem><para>_pid_ : pid for which to apply the inner command.
 				If 'pid' is omitted, then the inner command will be applied 
 				to all processes.</para>
 		</listitem>
-		<listitem><para>_params_ : extra params specific for each command.</para>
+		<listitem><para>_params_ : extra params specific for each inner
+				command.</para>
 		</listitem>
 		</itemizedlist>
-		<para>Commands:</para>
+		<para>Inner commands:</para>
 		<itemizedlist>
 		<listitem>
 			<para>on - turn on breakpoints. Pid parameter is optional.
@@ -573,16 +364,16 @@ dbg_pv_dump(30, "L_DBG");
 			Pid parameter is mandatory.</para>
 		</listitem>
 		<listitem>
-			<para>eval - evaluate a pseudo-variable and print the result in RPC
+			<para>eval - eval a pseudo-variable and print the result in RPC
 			Pid parameter is mandatory.</para>
 		</listitem>
 		<listitem>
-			<para>log - evaluate a pseudo-variable and print the result in SIP
+			<para>log - eval a pseudo-variable and print the result in SIP
 			router logs. Pid parameter is mandatory.</para>
 		</listitem>
 		</itemizedlist>
 		<para>
-		Examples for using with &sercmd;:
+		Examples for using with sercmd:
 		</para>
         <programlisting  format="linespecific">
 		dbg.bp off
@@ -591,54 +382,6 @@ dbg_pv_dump(30, "L_DBG");
 		dbg.bp on 1234
 		dbg.bp eval 1234 $fu
 		dbg.bp move 1234
-		</programlisting>
-    </section>
-
-    <section id="dbg.r.mod_level">
-		<title>
-		<function moreinfo="none">dbg.mod_level</function>
-		</title>
-		<para>
-			Specify module log level.
-		</para>
-		<para>
-		Name: <emphasis>dbg.mod_level</emphasis>
-		</para>
-		<para>Parameters:</para>
-		<itemizedlist>
-			<listitem><para>_module_ : For core log
-				level, use module name 'core'</para></listitem>
-			<listitem><para>_level_ : integer</para></listitem>
-		</itemizedlist>
-		<para>
-		Examples of use with &sercmd;:
-		</para>
-        <programlisting  format="linespecific">
-		dbg.mod_level core 3
-		dbg.mod_level tm 3
-		</programlisting>
-    </section>
-
-	<section id="dbg.r.reset_msgid">
-		<title>
-		<function moreinfo="none">dbg.reset_msgid</function>
-		</title>
-		<para>
-			Resets the message sequence ($mi). Internally there is no real change.
-			This can be useful for unit test cases in order to be able to replicate
-			exactly the same kamailio output.
-
-			You need to set the debugger parameter reset_msgid to 1 to activate this
-			functionallity.
-		</para>
-		<para>
-		Name: <emphasis>dbg.reset_msgid</emphasis>
-		</para>
-		<para>
-		Examples of use with &sercmd;:
-		</para>
-        <programlisting  format="linespecific">
-		dbg.reset_msgid
 		</programlisting>
     </section>
 
@@ -652,30 +395,30 @@ dbg_pv_dump(30, "L_DBG");
 		</para>
 		<para>
 		Another typical usage is to do interactive debugging and run
-		each line of the route blocks of the configuration file step-by-step for a
+		each line of the route blocks of the config file step-by-step for a
 		particular SIP message.
 		</para>
 		<para>
-		You need to connect using &sercmd; (or other RPC client) to &kamailio;.
+		You need to connect using sercmd (or other RPC client) to SIP Router.
 		Then you can enable cfg breakpoints and send the SIP message. One
 		process will be in waiting state ('state' field different than 0 when
-		you do dbg.ls). Calling dbg.release will set the other &kamailio;
+		you do dbg.ls). Calling dbg.release will set the other SIP router
 		processes in no-breakpoint mode so they can process other SIP messages
 		without need to interact with them.
 		</para>
 		<para>
-		A process blocked at a breakpoint is waiting for a command. Use
+		The process blocked at breakpoint is waiting for a command. Use
 		'dbg.bp next pid' to execute the current action and stop at the next
-		one. 'dbg.bp eval pid PV' can be used to retrieve the value of PV. Once
+		one. 'dbg.bp eval pid PV' can be used to retrive the value of PV. Once
 		you are done and want to continue the execution of the config wihtout
 		interaction use 'dbg.bp move pid'.
 		</para>
 		<para>
-		Example of a session:
+		Here is an example of session:
 		</para>
 <programlisting  format="linespecific">
 ...
-&sercmd;> dbg.ls
+sercmd> dbg.ls
 {
 	entry: 0
 	pid: 6393
@@ -702,19 +445,19 @@ dbg_pv_dump(30, "L_DBG");
 	in.cmd: 0
 }
 
-&sercmd;> dbg.bp show 6402
+sercmd> dbg.bp show 6402
 at bkp [/etc/kamailio/debugger.cfg:369] a=6 n=route
 
-&sercmd;> dbg.bp next 6402
+sercmd> dbg.bp next 6402
 exec [/etc/kamailio/debugger.cfg:369] a=6 n=route
 
-&sercmd;> dbg.bp next 6402
+sercmd> dbg.bp next 6402
 exec [/etc/kamailio/debugger.cfg:462] a=17 n=if
 
-&sercmd;> dbg.bp eval 6402 $fu
+sercmd> dbg.bp eval 6402 $fu
 $fu : t=str v=sip:test@kamailio.org
 
-&sercmd;> dbg.bp move 6402
+sercmd> dbg.bp move 6402
 200 ok
 ...
 </programlisting>
@@ -760,7 +503,7 @@ $fu : t=str v=sip:test@kamailio.org
 ...
 </programlisting>
 		<para>
-			The above example is for a registration with default config for
+			The above example is for registration with default config for
 			version 3.1.0, without authentication. Listed fields are:
 			'c' - config file; 'l' - line; 'a' - internal action id;
 			'n' - name of executed action. 'ERROR' prefix is printed

@@ -21,9 +21,6 @@ fi
 
 DBNAME=$DB_PATH
 
-DATENOW=`date`
-DBFNOW="'$DATENOW'"
-
 ##### ----------------------------------------------- #####
 ### binaries
 if [ -z "$SQLITE" ] ; then

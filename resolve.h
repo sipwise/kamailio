@@ -48,7 +48,6 @@
 #include <arpa/nameser.h>
 #include <resolv.h>
 #include "counters.h"
-#include "dns_func.h"
 
 #ifdef __OS_darwin
 #include <arpa/nameser_compat.h>
@@ -58,7 +57,6 @@
 #ifdef USE_DNS_CACHE
 #include "dns_wrappers.h"
 #endif
-
 
 /* define RESOLVE_DBG for debugging info (very noisy) */
 #define RESOLVE_DBG
@@ -88,7 +86,6 @@ struct dns_counters_h {
 };
 
 extern struct dns_counters_h dns_cnts_h;
-extern struct dns_func_t dns_func;
 
 /* query union*/
 union dns_query{
@@ -276,6 +273,7 @@ error_dots:
 }
 
 
+#ifdef USE_IPV6
 /* returns an ip_addr struct.; on error returns 0
  * the ip_addr struct is static, so subsequent calls will destroy its content*/
 static inline struct ip_addr* str2ip6(str* st)
@@ -378,6 +376,7 @@ error_char:
 			st->s);*/
 	return 0;
 }
+#endif /* USE_IPV6 */
 
 
 
@@ -390,11 +389,15 @@ static inline struct hostent* _resolvehost(char* name)
 {
 	static struct hostent* he=0;
 #ifdef HAVE_GETIPNODEBYNAME 
+#ifdef USE_IPV6
 	int err;
 	static struct hostent* he2=0;
 #endif
+#endif
 #ifndef DNS_IP_HACK
+#ifdef USE_IPV6
 	int len;
+#endif
 #endif
 #ifdef DNS_IP_HACK
 	struct ip_addr* ip;
@@ -405,13 +408,16 @@ static inline struct hostent* _resolvehost(char* name)
 
 	/* check if it's an ip address */
 	if ( ((ip=str2ip(&s))!=0)
+#ifdef	USE_IPV6
 		  || ((ip=str2ip6(&s))!=0)
+#endif
 		){
 		/* we are lucky, this is an ip address */
 		return ip_addr2he(&s, ip);
 	}
 	
 #else /* DNS_IP_HACK */
+#ifdef USE_IPV6
 	len=0;
 	if (*name=='['){
 		len=strlen(name);
@@ -422,16 +428,17 @@ static inline struct hostent* _resolvehost(char* name)
 		}
 	}
 #endif
+#endif
 	/* ipv4 */
-	he=dns_func.sr_gethostbyname(name);
-
+	he=gethostbyname(name);
+#ifdef USE_IPV6
 	if(he==0 && cfg_get(core, core_cfg, dns_try_ipv6)){
 #ifndef DNS_IP_HACK
 skip_ipv4:
 #endif
 		/*try ipv6*/
 	#ifdef HAVE_GETHOSTBYNAME2
-		he=dns_func.sr_gethostbyname2(name, AF_INET6);
+		he=gethostbyname2(name, AF_INET6);
 	#elif defined HAVE_GETIPNODEBYNAME
 		/* on solaris 8 getipnodebyname has a memory leak,
 		 * after some time calls to it will fail with err=3
@@ -445,6 +452,7 @@ skip_ipv4:
 		if (len) name[len-2]=']'; /* restore */
 #endif
 	}
+#endif
 	return he;
 }
 
@@ -455,14 +463,7 @@ int resolv_init(void);
 void resolv_reinit(str *gname, str *name);
 int dns_reinit_fixup(void *handle, str *gname, str *name, void **val);
 int dns_try_ipv6_fixup(void *handle, str *gname, str *name, void **val);
-void reinit_proto_prefs(str *gname, str *name);
-
-struct dns_srv_proto {
-	char proto;
-	int proto_pref;
-};
-void create_srv_name(char proto, str *name, char *srv);
-size_t create_srv_pref_list(char *proto, struct dns_srv_proto *list);
+void reinit_naptr_proto_prefs(str *gname, str *name);
 
 #ifdef DNS_WATCHDOG_SUPPORT
 /* callback function that is called by the child processes
@@ -521,8 +522,5 @@ int naptr_choose (struct naptr_rdata** crt, char* crt_proto,
 									struct naptr_rdata* n , char n_proto);
 
 #endif/* USE_NAPTR */
-
-struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port,
-		char* proto);
 
 #endif

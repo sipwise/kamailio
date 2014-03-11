@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -40,7 +42,7 @@
 #include "../mem/mem.h"
 
 /*BUGGY*/
-char* parse_cseq(char* const buf, const char* const end, struct cseq_body* const cb)
+char* parse_cseq(char *buf, char* end, struct cseq_body* cb)
 {
 	char *t, *m, *m_end;
 	
@@ -100,7 +102,7 @@ error:
 }
 
 
-void free_cseq(struct cseq_body* const cb)
+void free_cseq(struct cseq_body* cb)
 {
 	pkg_free(cb);
 }

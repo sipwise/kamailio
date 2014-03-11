@@ -78,7 +78,7 @@ enum _pv_type {
 	PVT_DSTURI,           PVT_COLOR,             PVT_BRANCH,
 	PVT_FROM,             PVT_TO,                PVT_OURI,
 	PVT_SCRIPTVAR,        PVT_MSG_BODY,          PVT_CONTEXT,
-	PVT_XAVP,             PVT_OTHER,             PVT_EXTRA /* keep it last */
+	PVT_OTHER,            PVT_EXTRA /* keep it last */
 };
 
 typedef enum _pv_type pv_type_t;
@@ -164,7 +164,7 @@ typedef struct _pv_export {
 typedef struct _pv_elem
 {
 	str text;
-	pv_spec_t *spec;
+	pv_spec_t spec;
 	struct _pv_elem *next;
 } pv_elem_t, *pv_elem_p;
 
@@ -188,7 +188,6 @@ int pv_parse_format(str *in, pv_elem_p *el);
 int pv_parse_index(pv_spec_p sp, str *in);
 int pv_init_iname(pv_spec_p sp, int param);
 int pv_printf_s(struct sip_msg* msg, pv_elem_p list, str *s);
-pv_spec_t* pv_spec_lookup(str *name, int *len);
 
 typedef struct _pvname_list {
 	pv_spec_t sname;
@@ -207,7 +206,6 @@ int pv_free_extra_list(void);
 
 int pv_locate_name(str *in);
 pv_spec_t* pv_cache_get(str *name);
-str* pv_cache_get_name(pv_spec_t *spec);
 
 /*! \brief PV helper functions */
 int pv_get_null(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
@@ -218,28 +216,10 @@ int pv_get_sintval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, int sival);
 int pv_get_strval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, str *sval);
-int pv_get_strzval(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res, char *sval);
 int pv_get_strintval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, str *sval, int ival);
 int pv_get_intstrval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, int ival, str *sval);
-
-/**
- * Core PV Cache
- */
-typedef struct _pv_cache
-{
-	str pvname;
-	unsigned int pvid;
-	pv_spec_t spec;
-	struct _pv_cache *next;
-} pv_cache_t;
-
-#define PV_CACHE_SIZE	32  /*!< pseudo-variables cache table size */
-
-pv_cache_t **pv_cache_get_table(void);
-
 
 /**
  * Transformations
@@ -287,16 +267,6 @@ int tr_exec(struct sip_msg *msg, trans_t *t, pv_value_t *v);
 void tr_param_free(tr_param_t *tp);
 
 int register_trans_mod(char *mod_name, tr_export_t *items);
-
-
-/**
- * XAVP
- */
-typedef struct _pv_xavp_name {
-	str name;
-	pv_spec_t index;
-	struct _pv_xavp_name *next;
-} pv_xavp_name_t;
 
 #endif
 

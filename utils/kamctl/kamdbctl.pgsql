@@ -72,10 +72,10 @@ sql_query()
 }
 
 
-kamailio_drop()  # pars: <database name>
+openser_drop()  # pars: <database name>
 {
 if [ $# -ne 1 ] ; then
-	merr "kamailio_drop function takes two params"
+	merr "openser_drop function takes two params"
 	exit 1
 fi
 
@@ -95,13 +95,13 @@ else
 fi
 
 minfo "Database $1 dropped"
-} #kamailio_drop
+} #openser_drop
 
 
-kamailio_create () # pars: <database name>
+openser_create () # pars: <database name>
 {
 if [ $# -ne 1 ] ; then
-	merr "kamailio_create function takes one param"
+	merr "openser_create function takes one param"
 	exit 1
 fi
 
@@ -172,7 +172,7 @@ get_answer $INSTALL_EXTRA_TABLES "Install tables for $EXTRA_MODULES? (y/n): "
 if [ "$ANSWER" = "y" ]; then
 	extra_create $1
 fi
-} # kamailio_create
+} # openser_create
 
 
 presence_create () # pars: <database name>
@@ -246,24 +246,3 @@ done
 
 minfo "Extra tables succesfully created."
 }  # end extra_create
-
-
-dbuid_create () # pars: <database name>
-{
-	if [ $# -ne 1 ] ; then
-		merr "dbuid_create function takes one param"
-		exit 1
-	fi
-
-	minfo "creating uid tables into $1 ..."
-
-	for TABLE in $DBUID_MODULES; do
-		mdbg "Creating uid table: $TABLE"
-		sql_query $1 < $DB_SCHEMA/$TABLE-create.sql
-		if [ $? -ne 0 ] ; then
-			merr "Creating uid tables failed at $TABLE!"
-			exit 1
-			fi
-		done
-	minfo "UID tables succesfully created."
-}  # end uid_create

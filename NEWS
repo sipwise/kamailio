@@ -1,13 +1,9 @@
-$Id$
-
-Release notes for Kamailio/SIP Router (sr)
+Release notes for SIP Router (sr)
 ***********************************************
 
-For news about release 4.0, please check
-http://www.kamailio.org/wiki/features/new-in-4.0.x
-===================================================
+$Id$
 
-sip-router 3.1 changes
+sip-router 3.1 chages
 
 core:
   - Dragonfly BSD support

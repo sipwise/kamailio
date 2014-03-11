@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Digest credentials parser interface
  *
  * Copyright (C) 2001-2003 FhG Fokus

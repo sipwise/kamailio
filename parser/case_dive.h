@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * Diversion Header Field Parsing Macros
  *
  * Copyright (C) 2001-2003 FhG Fokus

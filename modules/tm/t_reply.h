@@ -161,11 +161,6 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 					int code, int extra_flags);
 typedef int (*run_failure_handlers_f)(struct cell*, struct sip_msg*, int, int);
 
-/* return 1 if a branch_failure_route processes */
-int run_branch_failure_handlers(struct cell *t, struct sip_msg *rpl,
-					int code, int extra_flags);
-typedef int (*run_branch_failure_handlers_f)(struct cell*, struct sip_msg*, int, int);
-
 
 /* Retransmits the last sent inbound reply.
  * Returns  -1 - error
@@ -206,16 +201,14 @@ void set_final_timer( /* struct s_table *h_table,*/ struct cell *t );
 
 void cleanup_uac_timers( struct cell *t );
 
-void on_failure_reply( struct cell* t, struct sip_msg* msg,
+void on_negative_reply( struct cell* t, struct sip_msg* msg,
 	int code, void *param  );
 
 /* set which 'reply' structure to take if only negative
    replies arrive 
 */
-void t_on_failure( unsigned int go_to );
-unsigned int get_on_failure(void);
-void t_on_branch_failure( unsigned int go_to );
-unsigned int get_on_branch_failure(void);
+void t_on_negative( unsigned int go_to );
+unsigned int get_on_negative(void);
 void t_on_reply( unsigned int go_to );
 unsigned int get_on_reply(void);
 
@@ -235,7 +228,7 @@ void t_drop_replies(int v);
 
 void rpc_reply(rpc_t* rpc, void* c);
 
-void faked_env( struct cell *t,struct sip_msg *msg, int is_async_env);
+void faked_env( struct cell *t,struct sip_msg *msg);
 int fake_req(struct sip_msg *faked_req,
 		struct sip_msg *shmem_msg, int extra_flags, struct ua_client *uac);
 
@@ -243,8 +236,5 @@ void free_faked_req(struct sip_msg *faked_req, struct cell *t);
 
 typedef int (*tget_picked_f)(void);
 int t_get_picked_branch(void);
-
-int t_get_this_branch_instance(struct sip_msg *msg, str *instance);
-int t_get_this_branch_ruid(struct sip_msg *msg, str *ruid);
 
 #endif

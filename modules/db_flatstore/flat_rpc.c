@@ -32,7 +32,6 @@
 
 #include "flat_rpc.h"
 #include "flatstore_mod.h"
-#include "km_flatstore_mod.h"
 
 #include <time.h>
 
@@ -44,7 +43,6 @@
  */
 static void rotate(rpc_t* rpc, void* c)
 {
-	*km_flat_rotate = time(0);
 	*flat_rotate = time(0);
 }
 

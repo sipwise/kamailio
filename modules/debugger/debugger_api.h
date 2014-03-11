@@ -33,29 +33,5 @@ int dbg_init_pid_list(void);
 int dbg_init_mypid(void);
 int dbg_init_rpc(void);
 
-int dbg_init_mod_levels(int _dbg_mod_hash_size);
-int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel);
-void dbg_enable_mod_levels(void);
-
-int dbg_init_pvcache(void);
-void dbg_enable_log_assign(void);
-
-/*!
- * \brief Callback function that checks if reset_msgid is set
- *  and modifies msg->id if necessary.
- * \param msg SIP message
- * \param flags unused
- * \param bar unused
- * \return 1 on success, -1 on failure
- */
-int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar);
-
-#define DBG_DP_NULL			1
-#define DBG_DP_AVP			2
-#define DBG_DP_SCRIPTVAR	4
-#define DBG_DP_XAVP			8
-#define DBG_DP_OTHER		16
-#define DBG_DP_ALL			31
-int dbg_dump_json(struct sip_msg* msg, unsigned int mask, int level);
 #endif
 

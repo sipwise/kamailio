@@ -184,8 +184,10 @@ int mk_net_str(struct net* dst, str* s)
 	
 	/* test for ip only */
 	t = str2ip(s);
+#ifdef USE_IPV6
 	if (unlikely(t == 0))
 		t = str2ip6(s);
+#endif /* USE_IPV6 */
 	if (likely(t))
 		return mk_net_bitlen(dst, t, t->len*8);
 	/* not a simple ip, maybe an ip/netmask pair */
@@ -210,6 +212,7 @@ int mk_net_str(struct net* dst, str* s)
 			/* error */
 			return -1;
 		}
+#ifdef USE_IPV6
 		else {
 			t = str2ip6(&addr);
 			if (likely(t)) {
@@ -224,6 +227,7 @@ int mk_net_str(struct net* dst, str* s)
 				return -1;
 			}
 		}
+#endif /* USE_IPV6 */
 	}
 	return -1;
 }
@@ -242,6 +246,7 @@ void print_ip(char* p, struct ip_addr* ip, char *s)
 								(s)?s:""
 								);
 			break;
+#ifdef USE_IPV6
 		case AF_INET6:
 			DBG("%s%x:%x:%x:%x:%x:%x:%x:%x%s", (p)?p:"",
 											htons(ip->u.addr16[0]),
@@ -255,6 +260,7 @@ void print_ip(char* p, struct ip_addr* ip, char *s)
 											(s)?s:""
 				);
 			break;
+#endif /* USE_IPV6 */
 		default:
 			DBG("print_ip: warning unknown address family %d\n", ip->af);
 	}
@@ -271,6 +277,7 @@ void stdout_print_ip(struct ip_addr* ip)
 								ip->u.addr[2],
 								ip->u.addr[3]);
 			break;
+#ifdef USE_IPV6
 		case AF_INET6:
 			printf("%x:%x:%x:%x:%x:%x:%x:%x",	htons(ip->u.addr16[0]),
 											htons(ip->u.addr16[1]),
@@ -282,6 +289,7 @@ void stdout_print_ip(struct ip_addr* ip)
 											htons(ip->u.addr16[7])
 				);
 			break;
+#endif /* USE_IPV6 */
 		default:
 			DBG("print_ip: warning unknown address family %d\n", ip->af);
 	}
@@ -311,8 +319,10 @@ int is_mcast(struct ip_addr* ip)
 
 	if (ip->af==AF_INET){
 		return IN_MULTICAST(htonl(ip->u.addr32[0]));
+#ifdef USE_IPV6
 	} else if (ip->af==AF_INET6){
 		return IN6_IS_ADDR_MULTICAST((struct in6_addr*)ip->u.addr32);
+#endif /* USE_IPV6 */
 	} else {
 		LOG(L_ERR, "ERROR: is_mcast: Unsupported protocol family\n");
 		return -1;
@@ -340,9 +350,6 @@ char* get_proto_name(unsigned int proto)
 			return "tls";
 		case PROTO_SCTP:
 			return "sctp";
-		case PROTO_WS:
-		case PROTO_WSS:
-			return "ws";
 		default:
 			return "unknown";
 	}

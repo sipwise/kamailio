@@ -157,8 +157,6 @@ static inline void timer_redist(ticks_t t, struct timer_head *h)
 
 static inline void timer_run(ticks_t t)
 {
-	struct timer_head *thp;
-
 	/* trust the compiler for optimizing */
 	if ((t & H0_MASK)==0){              /*r1*/
 		if ((t & H1_H0_MASK)==0){        /*r2*/
@@ -170,8 +168,7 @@ static inline void timer_run(ticks_t t)
 	/*
 	DBG("timer_run: ticks %u, expire h0[%u]\n",
 						(unsigned ) t, (unsigned)(t & H0_MASK));*/
-	thp = &timer_lst->h0[t & H0_MASK];
-	_timer_mv_expire(thp);  /*r1*/
+	_timer_mv_expire(&timer_lst->h0[t & H0_MASK]);  /*r1*/
 }
 #else
 

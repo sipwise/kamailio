@@ -22,22 +22,20 @@ files_list= \
 	$(COREPATH)/sctp_options.c:sctp \
 	$(COREPATH)/tcp_options.c:tcp \
 	$(COREPATH)/modules/tm/config.c:tm \
-	$(COREPATH)/modules/registrar/config.c:registrar \
-	$(COREPATH)/modules/siputils/config.c:siputils \
-	$(COREPATH)/modules/maxfwd/maxfwd.c:maxfwd \
+	$(COREPATH)/modules_k/registrar/config.c:registrar \
+	$(COREPATH)/modules_k/siputils/config.c:siputils \
+	$(COREPATH)/modules_s/maxfwd/maxfwd.c:maxfwd \
 	$(COREPATH)/modules/carrierroute/config.c:carrierroute \
 	$(COREPATH)/modules/malloc_test/malloc_test.c:malloc_test \
 	$(COREPATH)/modules/tls/tls_cfg.c:tls \
-	$(COREPATH)/modules/dispatcher/config.c:dispatcher \
-	$(COREPATH)/modules/websocket/config.c:websocket \
-	$(COREPATH)/modules/outbound/config.c:outbound \
-	$(COREPATH)/modules/stun/config.c:stun
+	$(COREPATH)/modules_k/dispatcher/config.c:dispatcher
+
 
 
 # list of excluded groups
 grp_exclude=pa
 # list of file prefixes to exclude (full path needed)
-file_exclude= $(COREPATH)/modules/tls/
+file_exclude= $(COREPATH)/modules_s/tls/
 
 # special per file group overrides
 # format= grp_filename=... ,where filename does not contain the extension
@@ -63,7 +61,7 @@ gcc=gcc
 
 # defines used by gcc
 c_defs=-D__CPU_i386 -D__OS_linux -DSER_VER=2099099 -DPKG_MALLOC -DSHM_MEM  \
-		-DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP \
+		-DSHM_MMAP -DDNS_IP_HACK -DUSE_IPV6 -DUSE_MCAST -DUSE_TCP \
 		-DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR \
 		-DUSE_TLS -DTLS_HOOKS -DFAST_LOCK   -DCC_GCC_LIKE_ASM \
 		-DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD \

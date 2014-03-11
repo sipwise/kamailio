@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * Expires Header Field Name Parsing Macros
  *
  * Copyright (C) 2007 iptelorg GmbH

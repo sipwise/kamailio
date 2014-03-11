@@ -1,5 +1,4 @@
-/*
- * TLS module
+/* $Id$
  * 
  * This file contains modified zlib compression functions
  * originally part of crypto/comp/c_zlib.c from the openssl library 

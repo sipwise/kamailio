@@ -29,11 +29,6 @@
 		testing/checking the value of an AVP.
 		</para>
 		<para>
-		If you just need a way to execute SQL statements in a
-		&kamailio; configuration script, please consider use the
-		<emphasis>sqlops</emphasis> module instead.
-		</para>
-		<para>
 		AVPs are persistent per SIP transaction, being available in "route", 
 		"branch_route" and "failure_route". A tutorial providing more information (detailed
 		explanations and commented examples) can be found on the SIP-router web site.
@@ -137,7 +132,7 @@ $avp(i3:123) - the AVP identified by the integer 123 which has script flags 1
 	</section>
 	<section>
 		<title>Parameters</title>
-		<section id="avpops.p.db_url">
+		<section>
 			<title><varname>db_url</varname> (string)</title>
 			<para>
 			DB URL for database connection.
@@ -156,7 +151,7 @@ modparam("avpops","db_url","mysql://user:passwd@host/database")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.avp_table">
+		<section>
 			<title><varname>avp_table</varname> (string)</title>
 			<para>
 			DB table to be used.
@@ -176,7 +171,7 @@ modparam("avpops","avp_table","avptable")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.use_domain">
+		<section>
 			<title><varname>use_domain</varname> (integer)</title>
 			<para>
 				If the domain part of the URI should be used for 
@@ -196,7 +191,7 @@ modparam("avpops","use_domain",1)
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.uuid_column">
+		<section>
 			<title><varname>uuid_column</varname> (string)</title>
 			<para>
 				Name of column containing the uuid (unique user id).
@@ -214,7 +209,7 @@ modparam("avpops","uuid_column","uuid")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.username_column">
+		<section>
 			<title><varname>username_column</varname> (string)</title>
 			<para>
 				Name of column containing the username.
@@ -232,7 +227,7 @@ modparam("avpops","username_column","username")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.domain_column">
+		<section>
 			<title><varname>domain_column</varname> (string)</title>
 			<para>
 				Name of column containing the domain name.
@@ -250,7 +245,7 @@ modparam("avpops","domain_column","domain")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.attribute_column">
+		<section>
 			<title><varname>attribute_column</varname> (string)</title>
 			<para>
 				Name of column containing the attribute name (AVP name).
@@ -269,7 +264,7 @@ modparam("avpops","attribute_column","attribute")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.value_column">
+		<section>
 			<title><varname>value_column</varname> (string)</title>
 			<para>
 				Name of column containing the AVP value.
@@ -288,7 +283,7 @@ modparam("avpops","value_column","value")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.type_column">
+		<section>
 			<title><varname>type_column</varname> (string)</title>
 			<para>
 				Name of integer column containing the AVP type.
@@ -325,7 +320,7 @@ modparam("avpops","type_column","type")
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.p.db_scheme">
+		<section>
 			<title><varname>db_scheme</varname> (string)</title>
 			<para>
 				Definition of a DB scheme to be used for non-standard
@@ -375,7 +370,7 @@ modparam("avpops","db_scheme",
 
 	<section>
 		<title>Functions</title>
-		<section id="avpops.f.avp_db_load">
+		<section>
 			<title>
 				<function moreinfo="none">avp_db_load(source,name)
 				</function>
@@ -445,7 +440,7 @@ avp_db_load("$ru","$avp(i1:123)/$some_scheme");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_db_store">
+		<section>
 			<title>
 				<function moreinfo="none">avp_db_store(source,name)</function>
 			</title>
@@ -472,7 +467,7 @@ avp_db_store("$ru/username","$avp(email)");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_db_delete">
+		<section>
 			<title>
 				<function moreinfo="none">avp_db_delete(source,name)</function>
 			</title>
@@ -499,14 +494,12 @@ avp_db_delete("$uuid","$avp(s:404fwd)/fwd_table");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_db_query">
+		<section>
 			<title>
 				<function moreinfo="none">avp_db_query(query[,dest])</function>
 			</title>
 			<para>
 			Make a database query and store the result in AVPs.
-			This command is deprecated, please use the more
-			flexible and advanced <emphasis>sqlops</emphasis> module instead.
 			</para>
 			<para>
 			The meaning and usage of the parameters:
@@ -567,7 +560,7 @@ avp_db_query("delete from subscriber");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_delete">
+		<section>
 			<title>
 				<function moreinfo="none">avp_delete(name)
 				</function>
@@ -612,7 +605,7 @@ avp_delete("a3");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_pushto">
+		<section>
 			<title>
 				<function moreinfo="none">avp_pushto(destination,name)
 				</function>
@@ -678,7 +671,7 @@ avp_pushto("$br","$avp(i:680)");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_check">
+		<section>
 			<title>
 				<function moreinfo="none">avp_check(name,op_value)
 				</function>
@@ -767,29 +760,14 @@ avp_pushto("$br","$avp(i:680)");
 ...
 avp_check("$avp(i:678)", "lt/i:345/g");
 avp_check("$fd","eq/$td/I");
-avp_check("$avp(s:foo)","gt/$avp($var(bar))/g");
+avp_check("$avp(s:foo)","gt/$avp($bar)/g");
 avp_check("$avp(s:foo)","re/sip:.*@bar.net/g");
 avp_check("$avp(s:foo)","fm/$avp(fm_avp)/g");
 ...
 				</programlisting>
-				<para>NOTE: you can use a xavp variable ($xavp(key1[indx1]=>key2[indx2]))
-				as first or second parameter.
-				If you want to check all the values of the key2 you should
-				use [*] at indx2. The [*] index is not allowed at indx1.
-				</para>
-				<programlisting format="linespecific">
-...
-avp_check("$xavp(op[0]=>lt[0])", "lt/i:345/g");
-avp_check("$xavp(op=>fd","eq/$td/I");
-avp_check("$xavp(op[1]=>foo[*])","gt/$avp($var(bar))/g");
-avp_check("$avp(s:foo)","re/$xavp(op[0]=>re[*]/g");
-$var(id)=2;
-avp_check("$xavp(op=>foo[*])","fm/$xavp(op=>fm[$var(id)])/g");
-...
-				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_copy">
+		<section>
 			<title>
 				<function moreinfo="none">avp_copy(old_name,new_name)
 				</function>
@@ -839,7 +817,7 @@ avp_copy("$avp(old)","$avp(new)/gd");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_printf">
+		<section>
 			<title>
 				<function moreinfo="none">avp_printf(dest, format)
 				</function>
@@ -888,7 +866,7 @@ avp_printf("$avp(i:20)", "This is a $rm request with call-id $hdr(call-id)");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_subst">
+		<section>
 			<title>
 				<function moreinfo="none">avp_subst(avps, subst)</function>
 			</title>
@@ -969,7 +947,7 @@ avp_subst("$avp(i:678)/$avp(i:679)/g", "/(.*)@(.*)/\1@$rd/");
 			processing will use it.
 			</para>
 		</section>
-		<section id="avpops.f.avp_op">
+		<section>
 			<title>
 				<function moreinfo="none">avp_op(name,op_value)
 				</function>
@@ -1046,7 +1024,7 @@ avp_op("$avp(number)","sub/$avp(number2)/d");
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.is_avp_set">
+		<section>
 			<title>
 				<function moreinfo="none">is_avp_set(name)
 				</function>
@@ -1085,7 +1063,7 @@ if(is_avp_set("$avp(i:678)"))
 				</programlisting>
 			</example>
 		</section>
-		<section id="avpops.f.avp_print">
+		<section>
 			<title>
 				<function moreinfo="none">avp_print()
 				</function>

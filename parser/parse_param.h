@@ -69,8 +69,7 @@ typedef enum ptype {
 	P_TO_TAG,    /*!< Dialog event package: to-tag */
 	P_ISD,       /*!< Dialog event package: include-session-description */
 	P_SLA,       /*!< Dialog event package: sla */
-	P_MA,        /*!< Dialog event package: ma */
-	P_OB         /*!< Contact|URI: ob parameter */
+	P_MA         /*!< Dialog event package: ma */
 } ptype_t;
 
 
@@ -107,7 +106,6 @@ struct contact_hooks {
 	struct param* received; /*!< received parameter */
 	struct param* instance; /*!< sip.instance parameter */
 	struct param* reg_id;   /*!< reg-id parameter */
-	struct param* ob;       /*!< ob parameter */
 };
 
 
@@ -123,7 +121,6 @@ struct uri_hooks {
 	struct param* dstip;     /*!< Destination IP */
 	struct param* dstport;   /*!< Destination port */
 	struct param* ftag;      /*!< From tag in the original request */
-	struct param* ob;        /*!< ob parameter */
 };
 
 
@@ -166,19 +163,6 @@ extern inline int parse_param(str *_s, pclass_t _c, param_hooks_t *_h, param_t *
  * on an error
  */
 int parse_params(str* _s, pclass_t _c, param_hooks_t* _h, param_t** _p);
-
-/*! \brief
- * Parse parameters
- *  \param _s is string containing parameters
- *  \param _c is class of parameters
- *  \param _h is pointer to structure that will be filled with pointer to well known parameters
- * linked list of parsed parameters will be stored in the variable _p is pointing to
- * \param separator single character separator
- * \return The function returns 0 on success and negative number
- * on an error
- */
-int parse_params2(str* _s, pclass_t _c, param_hooks_t* _h, param_t** _p,
-			char separator);
 
 
 /*! \brief

@@ -1,4 +1,7 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -204,20 +207,16 @@ static type_node_t subtype_tree[] = {
 											{'o',SUBTYPE_UNKNOWN,1,-1},
 												{'d',SUBTYPE_UNKNOWN,1,-1},
 													{'y',SUBTYPE_EXTERNAL_BODY,0,-1},
-	{'m',SUBTYPE_UNKNOWN,1,112}, /* 107 */
+	{'m',SUBTYPE_UNKNOWN,1,-1}, /* 107 */
 		{'i',SUBTYPE_UNKNOWN,1,-1},
 			{'x',SUBTYPE_UNKNOWN,1,-1},
 				{'e',SUBTYPE_UNKNOWN,1,-1},
 					{'d',SUBTYPE_MIXED,0,-1},
-	{'i',SUBTYPE_UNKNOWN,1,-1}, /* 112 */
-		{'s',SUBTYPE_UNKNOWN,1,-1},
-			{'u',SUBTYPE_UNKNOWN,1,-1},
-				{'p',SUBTYPE_ISUP,0,-1},
 };
 
 
 
-char* parse_content_length(char* const buffer, const char* const end, int* const length)
+char* parse_content_length( char* buffer, char* end, int* length)
 {
 	int number;
 	char *p;
@@ -260,7 +259,7 @@ error:
 
 
 
-char* decode_mime_type(char* const start, const char* const end, unsigned int* const mime_type)
+char* decode_mime_type(char *start, char *end, unsigned int *mime_type)
 {
 	int node;
 	char *mark;
@@ -386,10 +385,10 @@ error:
  *  	-   > 0 mime found
  *      -   = 0 hdr not found
  *      -   =-1 error */
-int parse_content_type_hdr(struct sip_msg* const msg)
+int parse_content_type_hdr( struct sip_msg *msg )
 {
 	char *end;
-	const char *ret;
+	char *ret;
 	unsigned int  mime;
 
 	/* is the header already found? */
@@ -431,7 +430,7 @@ error:
 	return -1;
 }
 
-int parse_accept_body(struct hdr_field* const hdr)
+int parse_accept_body(struct hdr_field *hdr)
 {
 	static unsigned int mimes[MAX_MIMES_NR];
 	int nr_mimes;
@@ -493,7 +492,7 @@ error:
  * returns: > 0 ok
  *          = 0 hdr not found
  *          = -1 error */
-int parse_accept_hdr(struct sip_msg* const msg)
+int parse_accept_hdr( struct sip_msg *msg )
 {
 	static unsigned int mimes[MAX_MIMES_NR];
 	int nr_mimes;

@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 Fhg Fokus
  *
  * This file is part of ser, a free SIP server.
@@ -29,7 +31,30 @@
 
 #include "../str.h"
 #include "msg_parser.h"
-#include "parse_addr_spec.h"
+
+enum {
+	TAG_PARAM = 400, GENERAL_PARAM
+};
+
+typedef struct to_param{
+	int type;              /*!< Type of parameter */
+	str name;              /*!< Name of parameter */
+	str value;             /*!< Parameter value */
+	struct to_param* next; /*!< Next parameter in the list */
+} to_param_t;
+
+
+typedef struct to_body{
+	int error;                    /*!< Error code */
+	str body;                     /*!< The whole header field body */
+	str uri;                      /*!< URI */
+	str display;				  /*!< Display Name */
+	str tag_value;                /*!< Value of tag */
+	struct sip_uri parsed_uri;
+	struct to_param *param_lst;   /*!< Linked list of parameters */
+	struct to_param *last_param;  /*!< Last parameter in the list */
+} to_body_t;
+
 
 /* casting macro for accessing To body */
 #define get_to(p_msg)      ((struct to_body*)(p_msg)->to->parsed)
@@ -40,10 +65,14 @@
 /*! \brief
  * To header field parser
  */
-char* parse_to(char* const buffer, const char* const end, struct to_body* const to_b);
+char* parse_to(char* buffer, char *end, struct to_body *to_b);
 
-int parse_to_header(struct sip_msg* const msg);
+void free_to_params(struct to_body* tb);
 
-sip_uri_t *parse_to_uri(struct sip_msg* const msg);
+void free_to(struct to_body* tb);
+
+int parse_to_header(struct sip_msg *msg);
+
+sip_uri_t *parse_to_uri(struct sip_msg* msg);
 
 #endif

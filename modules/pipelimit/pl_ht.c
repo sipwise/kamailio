@@ -39,7 +39,6 @@
 #include "../../hashes.h"
 #include "../../mem/shm_mem.h"
 #include "../../lib/kmi/mi.h"
-#include "../../rpc_lookup.h"
 
 #include "pl_ht.h"
 
@@ -544,7 +543,7 @@ struct mi_root* mi_set_pipe(struct mi_root* cmd_tree, void* param)
 	pipeid = node->value;
 	
 	node = node->next;
-	if ( !node || !node->value.s || !node->value.len)
+	if ( !node->value.s || !node->value.len)
 		goto error;
 	if (str_map_str(algo_names, &(node->value), (int*)&algo_id)) {
 		LM_ERR("unknown algorithm: '%.*s'\n", node->value.len, node->value.s);
@@ -552,7 +551,7 @@ struct mi_root* mi_set_pipe(struct mi_root* cmd_tree, void* param)
 	}
 	
 	node = node->next;
-	if ( !node || !node->value.s || !node->value.len || strno2int(&node->value,&limit)<0)
+	if ( !node->value.s || !node->value.len || strno2int(&node->value,&limit)<0)
 		goto error;
 
 	LM_DBG("set_pipe: %.*s:%d:%d\n", pipeid.len, pipeid.s, algo_id, limit);
@@ -566,14 +565,15 @@ struct mi_root* mi_set_pipe(struct mi_root* cmd_tree, void* param)
 	it->algo = algo_id;
 	it->limit = limit;
 
-	pl_pipe_release(&pipeid);
-
 	if (check_feedback_setpoints(0)) {
+		pl_pipe_release(&pipeid);
 		LM_ERR("feedback limits don't match\n");
 		goto error;
 	} else {
 		*_pl_pid_setpoint = 0.01 * (double)_pl_cfg_setpoint;
 	}
+
+	pl_pipe_release(&pipeid);
 
 	return init_mi_tree( 200, MI_OK_S, MI_OK_LEN);
 error:
@@ -590,99 +590,4 @@ void rpl_pipe_release(int slot)
 	lock_release(&_pl_pipes_ht->slots[slot].lock);
 }
 
-
-/* rpc function implementations */
-void rpc_pl_stats(rpc_t *rpc, void *c)
-{
-	int i;
-	pl_pipe_t *it;
-
-	for(i=0; i<_pl_pipes_ht->htsize; i++)
-	{
-		lock_get(&_pl_pipes_ht->slots[i].lock);
-		it = _pl_pipes_ht->slots[i].first;
-		while(it)
-		{
-			if (it->algo != PIPE_ALGO_NOP) {
-				if (rpc->printf(c, "PIPE: id=%.*s load=%d counter=%d",
-					it->name.len, it->name.s,
-					it->load, it->last_counter) < 0)
-				{
-					lock_release(&_pl_pipes_ht->slots[i].lock);
-					return;
-				}
-			}
-			it = it->next;
-		}
-		lock_release(&_pl_pipes_ht->slots[i].lock);
-	}
-}
-
-void rpc_pl_get_pipes(rpc_t *rpc, void *c)
-{
-	int i;
-	str algo;
-	pl_pipe_t *it;
-
-	for(i=0; i<_pl_pipes_ht->htsize; i++)
-	{
-		lock_get(&_pl_pipes_ht->slots[i].lock);
-		it = _pl_pipes_ht->slots[i].first;
-		while(it)
-		{
-			if (it->algo != PIPE_ALGO_NOP) {
-				if (str_map_int(algo_names, it->algo, &algo))
-				{
-					lock_release(&_pl_pipes_ht->slots[i].lock);
-					return;
-				}
-				if (rpc->printf(c, "PIPE: id=%.*s algorithm=%.*s limit=%d counter=%d",
-					it->name.len, it->name.s, algo.len, algo.s,
-					it->limit, it->counter) < 0)
-				{
-					lock_release(&_pl_pipes_ht->slots[i].lock);
-					return;
-				}
-			}
-			it = it->next;
-		}
-		lock_release(&_pl_pipes_ht->slots[i].lock);
-	}
-}
-
-void rpc_pl_set_pipe(rpc_t *rpc, void *c)
-{
-	unsigned int algo_id, limit = 0;
-	pl_pipe_t *it;
-	str pipeid, algo_str;
-
-	if (rpc->scan(c, "SSd", &pipeid, &algo_str, &limit) < 3) return;
-
-	if (str_map_str(algo_names, &algo_str, (int*)&algo_id)) {
-		LM_ERR("unknown algorithm: '%.*s'\n", algo_str.len, algo_str.s);
-		rpc->fault(c, 400, "Unknown algorithm");
-		return;
-	}
-
-	LM_DBG("set_pipe: %.*s:%d:%d\n", pipeid.len, pipeid.s, algo_id, limit);
-
-	it = pl_pipe_get(&pipeid, 1);
-	if (it==NULL) {
-		LM_ERR("no pipe: %.*s\n", pipeid.len, pipeid.s);
-		rpc->fault(c, 400, "Unknown pipe id %.*s", pipeid.len, pipeid.s);
-		return;
-	}
-
-	it->algo = algo_id;
-	it->limit = limit;
-	pl_pipe_release(&pipeid);
-
-	if (check_feedback_setpoints(0)) {
-		LM_ERR("feedback limits don't match\n");
-		rpc->fault(c, 400, "Feedback limits don't match");
-		return;
-	} else {
-		*_pl_pid_setpoint = 0.01 * (double)_pl_cfg_setpoint;
-	}
-}
 

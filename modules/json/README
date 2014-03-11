@@ -71,7 +71,7 @@ Chapter 1. Admin Guide
 
    The following libraries or applications must be installed before
    running Kamailio with this module loaded:
-     * libjson (https://github.com/json-c/json-c/wiki)
+     * libjson (http://metaparadigm.com/json-c/)
 
 3. Parameters
 

@@ -42,7 +42,7 @@ EOF
 }
 USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_online"
 
-usage_kamailio_monitor() {
+usage_openser_monitor() {
 	echo
 	mecho " -- command 'monitor' - show internal status"
 	echo
@@ -50,7 +50,7 @@ cat <<EOF
  monitor ............................ show server's internal status
 EOF
 }
-USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_kamailio_monitor"
+USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_openser_monitor"
 
 usage_ping() {
 	echo
@@ -67,12 +67,11 @@ usage_usrloc() {
 	mecho " -- command 'ul|alias' - manage user location or aliases"
 	echo
 cat <<EOF
- ul show [<username>]................... show in-RAM online users
- ul show --brief........................ show in-RAM online users in short format
- ul rm <username> [<contact URI>]....... delete user's usrloc entries
- ul add <username> <uri> ............... introduce a permanent usrloc entry
- ul add <username> <uri> <expires> ..... introduce a temporary usrloc entry
- ul add <user> <uri> <expires> <path> .. introduce a temporary usrloc entry
+ ul show [<username>]................ show in-RAM online users
+ ul show --brief..................... show in-RAM online users in short format
+ ul rm <username> [<contact URI>].... delete user's usrloc entries
+ ul add <username> <uri> ............ introduce a permanent usrloc entry
+ ul add <username> <uri> <expires> .. introduce a temporary usrloc entry
 EOF
 }
 USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_usrloc"
@@ -94,7 +93,7 @@ EOF
 	mecho " -- command 'stats' - print internal statistics"
 	echo
 cat <<EOF
- stats [group]....................... dump all or a group of internall statistics
+ stats .............................. dump all internall statistics
 EOF
 }
 USAGE_FUNCTIONS="$USAGE_FUNCTIONS usage_ctlcommon"
