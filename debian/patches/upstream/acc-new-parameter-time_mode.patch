@@ -1,8 +1,6 @@
-diff --git a/modules/acc/README b/modules/acc/README
-index 55bde38..f6b1c5c 100644
 --- a/modules/acc/README
 +++ b/modules/acc/README
-@@ -125,6 +125,12 @@ Sven Knoblich
+@@ -125,6 +125,12 @@
                6.42. cdr_start_id (string)
                6.43. cdr_end_id (string)
                6.44. cdr_duration_id (string)
@@ -15,7 +13,7 @@ index 55bde38..f6b1c5c 100644
  
          7. Functions
  
-@@ -181,10 +187,16 @@ Sven Knoblich
+@@ -181,10 +187,16 @@
     1.42. cdr_start_id example
     1.43. cdr_end_id example
     1.44. cdr_duration_id example
@@ -36,7 +34,7 @@ index 55bde38..f6b1c5c 100644
  
  Chapter 1. Admin Guide
  
-@@ -273,6 +285,12 @@ Chapter 1. Admin Guide
+@@ -273,6 +285,12 @@
          6.42. cdr_start_id (string)
          6.43. cdr_end_id (string)
          6.44. cdr_duration_id (string)
@@ -49,7 +47,7 @@ index 55bde38..f6b1c5c 100644
  
     7. Functions
  
-@@ -586,6 +604,7 @@ Note
+@@ -586,6 +604,7 @@
  
  4.3.2.1. Example for a spiraled Proxy
  
@@ -57,7 +55,7 @@ index 55bde38..f6b1c5c 100644
  # A calls B (transaction 1)
  $avp(caller)='A'
  $avp(callee)='B';
-@@ -604,6 +623,7 @@ $dlg_var(chain)=$dlg_var(chain) + "|" + "C;cfnr;D";
+@@ -604,6 +623,7 @@
  # C confirms call (200 reply of transaction 2)
  $dlg_var(caller) = $avp(caller); #caller='B'
  $dlg_var(callee) = $avp(callee); #callee='C'
@@ -65,7 +63,7 @@ index 55bde38..f6b1c5c 100644
  
  4.3.3. Logged data
  
-@@ -679,6 +699,12 @@ $dlg_var(callee) = $avp(callee); #callee='C'
+@@ -679,6 +699,12 @@
     6.42. cdr_start_id (string)
     6.43. cdr_end_id (string)
     6.44. cdr_duration_id (string)
@@ -78,7 +76,7 @@ index 55bde38..f6b1c5c 100644
  
  6.1. early_media (integer)
  
-@@ -687,7 +713,9 @@ $dlg_var(callee) = $avp(callee); #callee='C'
+@@ -687,7 +713,9 @@
     Default value is 0 (no).
  
     Example 1.1. early_media example
@@ -88,7 +86,7 @@ index 55bde38..f6b1c5c 100644
  
  6.2. failed_transaction_flag (integer)
  
-@@ -697,7 +725,9 @@ modparam("acc", "early_media", 1)
+@@ -697,7 +725,9 @@
     Default value is not-set (no flag).
  
     Example 1.2. failed_transaction_flag example
@@ -98,7 +96,7 @@ index 55bde38..f6b1c5c 100644
  
  6.3. failed_filter (string)
  
-@@ -708,7 +738,9 @@ modparam("acc", "failed_transaction_flag", 4)
+@@ -708,7 +738,9 @@
     Default value is not-set (failure filtering is off).
  
     Example 1.3. failed_filter example
@@ -108,7 +106,7 @@ index 55bde38..f6b1c5c 100644
  
  6.4. report_ack (integer)
  
-@@ -720,7 +752,9 @@ modparam("acc", "failed_filter", "404,407")
+@@ -720,7 +752,9 @@
     Default value is 0 (no).
  
     Example 1.4. report_ack example
@@ -118,7 +116,7 @@ index 55bde38..f6b1c5c 100644
  
  6.5. report_cancels (integer)
  
-@@ -731,7 +765,9 @@ modparam("acc", "report_ack", 1)
+@@ -731,7 +765,9 @@
     Default value is 0 (no).
  
     Example 1.5. report_cancels example
@@ -128,7 +126,7 @@ index 55bde38..f6b1c5c 100644
  
  6.6. detect_direction (integer)
  
-@@ -746,7 +782,9 @@ modparam("acc", "report_cancels", 1)
+@@ -746,7 +782,9 @@
     Default value is 0 (disabled).
  
     Example 1.6. detect_direction example
@@ -138,7 +136,7 @@ index 55bde38..f6b1c5c 100644
  
  6.7. acc_prepare_flag (integer)
  
-@@ -755,12 +793,14 @@ modparam("acc", "detect_direction", 1)
+@@ -755,12 +793,14 @@
     failure_route). If this flag is not set and acc or missed_call flag are
     not set either in request route block, there is no way to mark the
     request for transaction later. If either acc or missed_call flags are
@@ -154,7 +152,7 @@ index 55bde38..f6b1c5c 100644
  
  6.8. multi_leg_info (string)
  
-@@ -773,6 +813,7 @@ modparam("acc", "acc_prepare_flag", 5)
+@@ -773,6 +813,7 @@
     Default value is 0 (disabled).
  
     Example 1.8. multi_leg_info example
@@ -162,7 +160,7 @@ index 55bde38..f6b1c5c 100644
  # for syslog-based accounting, use any text you want to be printed
  modparam("acc", "multi_leg_info",
      "text1=$avp(src);text2=$avp(dst)")
-@@ -785,6 +826,7 @@ modparam("acc", "multi_leg_info",
+@@ -785,6 +826,7 @@
  # for DIAMETER-based accounting, use the DIAMETER AVP ID (as integer)
  modparam("acc", "multi_leg_info",
      "2345=$avp(src);2346=$avp(dst)")
@@ -170,7 +168,7 @@ index 55bde38..f6b1c5c 100644
  
  6.9. log_flag (integer)
  
-@@ -793,7 +835,9 @@ modparam("acc", "multi_leg_info",
+@@ -793,7 +835,9 @@
     Default value is not-set (no flag).
  
     Example 1.9. log_flag example
@@ -180,7 +178,7 @@ index 55bde38..f6b1c5c 100644
  
  6.10. log_missed_flag (integer)
  
-@@ -802,7 +846,9 @@ modparam("acc", "log_flag", 2)
+@@ -802,7 +846,9 @@
     Default value is not-set (no flag).
  
     Example 1.10. log_missed_flag example
@@ -190,7 +188,7 @@ index 55bde38..f6b1c5c 100644
  
  6.11. log_level (integer)
  
-@@ -811,7 +857,9 @@ modparam("acc", "log_missed_flag", 3)
+@@ -811,7 +857,9 @@
     Default value is L_NOTICE.
  
     Example 1.11. log_level example
@@ -200,7 +198,7 @@ index 55bde38..f6b1c5c 100644
  
  6.12. log_facility (string)
  
-@@ -822,7 +870,9 @@ modparam("acc", "log_level", 2)   # Set log_level to 2
+@@ -822,7 +870,9 @@
     Default value is LOG_DAEMON.
  
     Example 1.12. log_facility example
@@ -210,7 +208,7 @@ index 55bde38..f6b1c5c 100644
  
  6.13. log_extra (string)
  
-@@ -832,7 +882,9 @@ modparam("acc", "log_facility", "LOG_DAEMON")
+@@ -832,7 +882,9 @@
     Default value is NULL.
  
     Example 1.13. log_extra example
@@ -220,7 +218,7 @@ index 55bde38..f6b1c5c 100644
  
  6.14. radius_config (string)
  
-@@ -848,7 +900,9 @@ modparam("acc", "log_extra", "ua=$hdr(User-Agent);uuid=$avp(i:123)")
+@@ -848,7 +900,9 @@
     Default value is "NULL".
  
     Example 1.14. radius_config example
@@ -230,7 +228,7 @@ index 55bde38..f6b1c5c 100644
  
  6.15. radius_flag (integer)
  
-@@ -858,7 +912,9 @@ modparam("acc", "radius_config", "/etc/radiusclient/radiusclient.conf")
+@@ -858,7 +912,9 @@
     Default value is not-set (no flag).
  
     Example 1.15. radius_flag example
@@ -240,7 +238,7 @@ index 55bde38..f6b1c5c 100644
  
  6.16. radius_missed_flag (integer)
  
-@@ -868,7 +924,9 @@ modparam("acc", "radius_flag", 2)
+@@ -868,7 +924,9 @@
     Default value is not-set (no flag).
  
     Example 1.16. radius_missed_flag example
@@ -250,7 +248,7 @@ index 55bde38..f6b1c5c 100644
  
  6.17. service_type (integer)
  
-@@ -877,7 +935,9 @@ modparam("acc", "radius_missed_flag", 3)
+@@ -877,7 +935,9 @@
     Default value is 15 (SIP).
  
     Example 1.17. service_type example
@@ -260,7 +258,7 @@ index 55bde38..f6b1c5c 100644
  
  6.18. radius_extra (string)
  
-@@ -887,7 +947,9 @@ modparam("acc", "service_type", 16)
+@@ -887,7 +947,9 @@
     Default value is NULL.
  
     Example 1.18. radius_extra example
@@ -270,7 +268,7 @@ index 55bde38..f6b1c5c 100644
  
  6.19. db_flag (integer)
  
-@@ -897,7 +959,9 @@ modparam("acc", "radius_extra", "via=$hdr(Via[*]); email=$avp(s:email)")
+@@ -897,7 +959,9 @@
     Default value is not-set (no flag).
  
     Example 1.19. db_flag example
@@ -280,7 +278,7 @@ index 55bde38..f6b1c5c 100644
  
  6.20. db_missed_flag (integer)
  
-@@ -907,7 +971,9 @@ modparam("acc", "db_flag", 2)
+@@ -907,7 +971,9 @@
     Default value is not-set (no flag).
  
     Example 1.20. db_missed_flag example
@@ -290,7 +288,7 @@ index 55bde38..f6b1c5c 100644
  
  6.21. db_table_acc (string)
  
-@@ -917,8 +983,10 @@ modparam("acc", "db_missed_flag", 3)
+@@ -917,8 +983,10 @@
     Default value is "acc"
  
     Example 1.21. db_table_acc example
@@ -301,7 +299,7 @@ index 55bde38..f6b1c5c 100644
  
  6.22. db_table_missed_calls (string)
  
-@@ -928,7 +996,9 @@ modparam("acc", "db_table_acc", "acc_$time(year)_$time(mon)")
+@@ -928,7 +996,9 @@
     Default value is "missed_calls"
  
     Example 1.22. db_table_missed_calls example
@@ -311,7 +309,7 @@ index 55bde38..f6b1c5c 100644
  
  6.23. db_url (string)
  
-@@ -938,7 +1008,9 @@ modparam("acc", "db_table_missed_calls", "myMC_table")
+@@ -938,7 +1008,9 @@
     Default value is "NULL" (SQL disabled).
  
     Example 1.23. db_url example
@@ -322,7 +320,7 @@ index 55bde38..f6b1c5c 100644
  
  6.24. acc_method_column (string)
  
-@@ -948,7 +1020,9 @@ modparam("acc", "db_url", "mysql://user:password@localhost/openser")
+@@ -948,7 +1020,9 @@
     Default value is "method".
  
     Example 1.24. acc_method_column example
@@ -332,7 +330,7 @@ index 55bde38..f6b1c5c 100644
  
  6.25. acc_from_tag_column (string)
  
-@@ -957,7 +1031,9 @@ modparam("acc", "acc_method_column", "method")
+@@ -957,7 +1031,9 @@
     Default value is "from_tag".
  
     Example 1.25. acc_from_tag_column example
@@ -342,7 +340,7 @@ index 55bde38..f6b1c5c 100644
  
  6.26. acc_to_tag_column (string)
  
-@@ -966,7 +1042,9 @@ modparam("acc", "acc_from_tag_column", "from_tag")
+@@ -966,7 +1042,9 @@
     Default value is "to_tag".
  
     Example 1.26. acc_to_tag_column example
@@ -352,7 +350,7 @@ index 55bde38..f6b1c5c 100644
  
  6.27. acc_callid_column (string)
  
-@@ -975,7 +1053,9 @@ modparam("acc", "acc_to_tag_column", "to_tag")
+@@ -975,7 +1053,9 @@
     Default value is "callid".
  
     Example 1.27. acc_callid_column example
@@ -362,7 +360,7 @@ index 55bde38..f6b1c5c 100644
  
  6.28. acc_sip_code_column (string)
  
-@@ -985,7 +1065,9 @@ modparam("acc", "acc_callid_column", "callid")
+@@ -985,7 +1065,9 @@
     Default value is "sip_code".
  
     Example 1.28. acc_sip_code_column example
@@ -372,7 +370,7 @@ index 55bde38..f6b1c5c 100644
  
  6.29. acc_sip_reason_column (string)
  
-@@ -995,7 +1077,9 @@ modparam("acc", "acc_sip_code_column", "sip_code")
+@@ -995,7 +1077,9 @@
     Default value is "sip_reason".
  
     Example 1.29. acc_sip_reason_column example
@@ -382,7 +380,7 @@ index 55bde38..f6b1c5c 100644
  
  6.30. acc_time_column (string)
  
-@@ -1005,7 +1089,9 @@ modparam("acc", "acc_sip_reason_column", "sip_reason")
+@@ -1005,7 +1089,9 @@
     Default value is "time".
  
     Example 1.30. acc_time_column example
@@ -392,7 +390,7 @@ index 55bde38..f6b1c5c 100644
  
  6.31. db_extra (string)
  
-@@ -1015,7 +1101,9 @@ modparam("acc", "acc_time_column", "time")
+@@ -1015,7 +1101,9 @@
     Default value is NULL.
  
     Example 1.31. db_extra example
@@ -402,7 +400,7 @@ index 55bde38..f6b1c5c 100644
  
  6.32. db_insert_mode (integer)
  
-@@ -1026,7 +1114,9 @@ modparam("acc", "db_extra", "ct=$hdr(Content-type); email=$avp(s:email)")
+@@ -1028,7 +1116,9 @@
     Default value is 0 (no INSERT DELAYED).
  
     Example 1.32. db_insert_mode example
@@ -412,7 +410,7 @@ index 55bde38..f6b1c5c 100644
  
  6.33. diameter_flag (integer)
  
-@@ -1036,7 +1126,9 @@ modparam("acc", "db_insert_mode", 1)
+@@ -1038,7 +1128,9 @@
     Default value is not-set (no flag).
  
     Example 1.33. diameter_flag example
@@ -422,7 +420,7 @@ index 55bde38..f6b1c5c 100644
  
  6.34. diameter_missed_flag (integer)
  
-@@ -1046,7 +1138,9 @@ modparam("acc", "diameter_flag", 2)
+@@ -1048,7 +1140,9 @@
     Default value is not-set (no flag).
  
     Example 1.34. diameter_missed_flag example
@@ -432,7 +430,7 @@ index 55bde38..f6b1c5c 100644
  
  6.35. diameter_client_host (string)
  
-@@ -1056,7 +1150,9 @@ modparam("acc", "diameter_missed_flag", 3)
+@@ -1058,7 +1152,9 @@
     Default value is "localhost".
  
     Example 1.35. diameter_client_host example
@@ -442,7 +440,7 @@ index 55bde38..f6b1c5c 100644
  
  6.36. diameter_client_port (int)
  
-@@ -1066,7 +1162,9 @@ modparam("acc", "diameter_client_host", "3a_server.net")
+@@ -1068,7 +1164,9 @@
     Default value is 3000.
  
     Example 1.36. diameter_client_host example
@@ -452,7 +450,7 @@ index 55bde38..f6b1c5c 100644
  
  6.37. diameter_extra (string)
  
-@@ -1076,16 +1174,20 @@ modparam("acc", "diameter_client_port", 3000)
+@@ -1078,16 +1176,20 @@
     Default value is NULL.
  
     Example 1.37. diameter_extra example
@@ -474,7 +472,7 @@ index 55bde38..f6b1c5c 100644
  
  6.39. cdr_start_on_confirmed (integer)
  
-@@ -1096,7 +1198,9 @@ modparam("acc", "cdr_enable", 1)
+@@ -1098,7 +1200,9 @@
     confirmation.
  
     Example 1.39. cdr_start_on_confirmed example
@@ -484,7 +482,7 @@ index 55bde38..f6b1c5c 100644
  
  6.40. cdr_facility (integer)
  
-@@ -1106,7 +1210,9 @@ modparam("acc", "cdr_start_on_confirmed", 1)
+@@ -1108,7 +1212,9 @@
     Default value is LOG_DAEMON.
  
     Example 1.40. cdr_facility example
@@ -494,7 +492,7 @@ index 55bde38..f6b1c5c 100644
  
  6.41. cdr_extra (string)
  
-@@ -1116,34 +1222,127 @@ modparam("acc", "cdr_facility", "LOG_DAEMON")
+@@ -1118,34 +1224,127 @@
     Default value is NULL.
  
     Example 1.41. cdr_extra example
@@ -629,7 +627,7 @@ index 55bde38..f6b1c5c 100644
  
  7. Functions
  
-@@ -1164,7 +1363,7 @@ modparam("acc", "cdr_duration_id", "start")
+@@ -1166,7 +1365,7 @@
  
     This function can be used from ANY_ROUTE.
  
@@ -638,7 +636,7 @@ index 55bde38..f6b1c5c 100644
  ...
  acc_log_request("Some comment");
  ...
-@@ -1182,7 +1381,7 @@ acc_log_request("Some comment");
+@@ -1184,7 +1383,7 @@
  
     This function can be used from ANY_ROUTE.
  
@@ -647,7 +645,7 @@ index 55bde38..f6b1c5c 100644
  ...
  acc_db_request("Some comment", "SomeTable");
  acc_db_request("Some comment", "acc_$time(year)_$time(mon)");
-@@ -1198,7 +1397,7 @@ acc_db_request("Some comment", "acc_$time(year)_$time(mon)");
+@@ -1200,7 +1399,7 @@
  
     This function can be used from ANY_ROUTE.
  
@@ -656,7 +654,7 @@ index 55bde38..f6b1c5c 100644
  ...
  acc_rad_request("Some comment");
  ...
-@@ -1213,7 +1412,7 @@ acc_rad_request("Some comment");
+@@ -1215,7 +1414,7 @@
  
     This function can be used from ANY_ROUTE.
  
@@ -665,8 +663,6 @@ index 55bde38..f6b1c5c 100644
  ...
  acc_diam_request("Some comment");
  ...
-diff --git a/modules/acc/acc.c b/modules/acc/acc.c
-index 0a563d6..efaebc0 100644
 --- a/modules/acc/acc.c
 +++ b/modules/acc/acc.c
 @@ -75,6 +75,7 @@
@@ -677,7 +673,7 @@ index 0a563d6..efaebc0 100644
  
  #ifdef RAD_ACC
  extern struct acc_extra *rad_extra;
-@@ -90,14 +91,17 @@ extern struct acc_extra *dia_extra;
+@@ -90,14 +91,17 @@
  static db_func_t acc_dbf;
  static db1_con_t* db_handle=0;
  extern struct acc_extra *db_extra;
@@ -700,7 +696,7 @@ index 0a563d6..efaebc0 100644
  
  /********************************************
   *        acc CORE function
-@@ -173,7 +177,9 @@ int core2strar(struct sip_msg *req, str *c_vals, int *i_vals, char *t_vals)
+@@ -173,7 +177,9 @@
  	c_vals[5] = acc_env.reason;
  	t_vals[5] = TYPE_STR;
  
@@ -711,7 +707,7 @@ index 0a563d6..efaebc0 100644
  	return ACC_CORE_LEN;
  }
  
-@@ -224,6 +230,7 @@ int acc_log_request( struct sip_msg *rq)
+@@ -224,6 +230,7 @@
  	int n;
  	int m;
  	int i;
@@ -719,7 +715,7 @@ index 0a563d6..efaebc0 100644
  
  	/* get default values */
  	m = core2strar( rq, val_arr, int_arr, type_arr);
-@@ -275,8 +282,38 @@ int acc_log_request( struct sip_msg *rq)
+@@ -275,8 +282,38 @@
  	*(p++) = '\n';
  	*(p++) = 0;
  
@@ -760,7 +756,7 @@ index 0a563d6..efaebc0 100644
  
  	return 1;
  }
-@@ -288,11 +325,20 @@ int acc_log_request( struct sip_msg *rq)
+@@ -288,11 +325,20 @@
  
  #ifdef SQL_ACC
  
@@ -784,7 +780,7 @@ index 0a563d6..efaebc0 100644
  static void acc_db_init_keys(void)
  {
  	struct acc_extra *extra;
-@@ -311,6 +357,13 @@ static void acc_db_init_keys(void)
+@@ -311,6 +357,13 @@
  	db_keys[n++] = &acc_sipreason_col;
  	db_keys[n++] = &acc_time_col;
  	time_idx = n-1;
@@ -798,7 +794,7 @@ index 0a563d6..efaebc0 100644
  
  	/* init the extra db keys */
  	for(extra=db_extra; extra ; extra=extra->next)
-@@ -326,6 +379,14 @@ static void acc_db_init_keys(void)
+@@ -326,6 +379,14 @@
  		VAL_NULL(db_vals+i)=0;
  	}
  	VAL_TYPE(db_vals+time_idx)=DB1_DATETIME;
@@ -813,7 +809,7 @@ index 0a563d6..efaebc0 100644
  }
  
  
-@@ -376,6 +437,7 @@ int acc_db_request( struct sip_msg *rq)
+@@ -376,6 +437,7 @@
  	int m;
  	int n;
  	int i;
@@ -821,7 +817,7 @@ index 0a563d6..efaebc0 100644
  
  	/* formated database columns */
  	m = core2strar( rq, val_arr, int_arr, type_arr );
-@@ -384,6 +446,29 @@ int acc_db_request( struct sip_msg *rq)
+@@ -384,6 +446,29 @@
  		VAL_STR(db_vals+i) = val_arr[i];
  	/* time value */
  	VAL_TIME(db_vals+(m++)) = acc_env.ts;
@@ -851,11 +847,9 @@ index 0a563d6..efaebc0 100644
  
  	/* extra columns */
  	m += extra2strar( db_extra, rq, val_arr+m, int_arr+m, type_arr+m);
-diff --git a/modules/acc/acc.h b/modules/acc/acc.h
-index ef9a922..12acf98 100644
 --- a/modules/acc/acc.h
 +++ b/modules/acc/acc.h
-@@ -92,6 +92,7 @@ int  acc_db_init(const str* db_url);
+@@ -92,6 +92,7 @@
  int  acc_db_init_child(const str* db_url);
  void acc_db_close(void);
  int  acc_db_request( struct sip_msg *req);
@@ -863,8 +857,6 @@ index ef9a922..12acf98 100644
  #endif
  
  #ifdef RAD_ACC
-diff --git a/modules/acc/acc_api.h b/modules/acc/acc_api.h
-index bc52eee..aa51380 100644
 --- a/modules/acc/acc_api.h
 +++ b/modules/acc/acc_api.h
 @@ -36,6 +36,7 @@
@@ -875,7 +867,7 @@ index bc52eee..aa51380 100644
  
  #include "../../str.h"
  #include "../../dprint.h"
-@@ -57,6 +58,7 @@ typedef struct acc_enviroment {
+@@ -57,6 +58,7 @@
  	struct hdr_field *to;
  	str text;
  	time_t ts;
@@ -883,7 +875,7 @@ index bc52eee..aa51380 100644
  } acc_enviroment_t;
  
  /* acc extra parameter */
-@@ -104,7 +106,7 @@ typedef struct acc_engine {
+@@ -104,7 +106,7 @@
  
  #define MAX_ACC_EXTRA 64
  #define MAX_ACC_LEG   16
@@ -892,8 +884,6 @@ index bc52eee..aa51380 100644
  
  
  enum {TYPE_NULL = 0, TYPE_INT, TYPE_STR};
-diff --git a/modules/acc/acc_cdr.c b/modules/acc/acc_cdr.c
-index 996ebf4..68792e9 100644
 --- a/modules/acc/acc_cdr.c
 +++ b/modules/acc/acc_cdr.c
 @@ -45,6 +45,10 @@
@@ -907,7 +897,7 @@ index 996ebf4..68792e9 100644
  #include <sys/time.h>
  
  /* Solaris does not provide timersub macro in <sys/time.h> */
-@@ -75,13 +79,15 @@ static const str empty_string = { "", 0};
+@@ -75,13 +79,15 @@
  // buffers which are used to collect the crd data for writing
  static str cdr_attrs[ MAX_CDR_CORE + MAX_CDR_EXTRA];
  static str cdr_value_array[ MAX_CDR_CORE + MAX_CDR_EXTRA];
@@ -924,7 +914,7 @@ index 996ebf4..68792e9 100644
  
  /* write all basic information to buffers(e.g. start-time ...) */
  static int cdr_core2strar( struct dlg_cell* dlg,
-@@ -115,8 +121,81 @@ static int cdr_core2strar( struct dlg_cell* dlg,
+@@ -115,8 +121,81 @@
      return MAX_CDR_CORE;
  }
  
@@ -1007,7 +997,7 @@ index 996ebf4..68792e9 100644
                        struct sip_msg* message)
  {
      static char cdr_message[ MAX_SYSLOG_SIZE];
-@@ -127,23 +206,20 @@ static int write_cdr( struct dlg_cell* dialog,
+@@ -127,23 +206,20 @@
      int message_index = 0;
      int counter = 0;
  
@@ -1035,7 +1025,7 @@ index 996ebf4..68792e9 100644
                                    cdr_type_array + message_index);
  
      for( counter = 0, message_position = cdr_message;
-@@ -194,6 +270,23 @@ static int write_cdr( struct dlg_cell* dialog,
+@@ -194,6 +270,23 @@
      return 0;
  }
  
@@ -1059,7 +1049,7 @@ index 996ebf4..68792e9 100644
  /* convert a string into a timeval struct */
  static int string2time( str* time_str, struct timeval* time_value)
  {    
-@@ -495,7 +588,7 @@ static void cdr_on_end( struct dlg_cell* dialog,
+@@ -495,7 +588,7 @@
      }
  }
  
@@ -1068,11 +1058,9 @@ index 996ebf4..68792e9 100644
  static void cdr_on_expired( struct dlg_cell* dialog,
                              int type,
                              struct dlg_cb_params* params)
-diff --git a/modules/acc/acc_logic.c b/modules/acc/acc_logic.c
-index c9bdd20..50278fb 100644
 --- a/modules/acc/acc_logic.c
 +++ b/modules/acc/acc_logic.c
-@@ -197,8 +197,7 @@ int acc_db_set_table_name(struct sip_msg *msg, void *param, str *table)
+@@ -197,8 +197,7 @@
  			return -1;
  		}
  		strncpy(db_table_name_buf, dbtable.s, dbtable.len);
@@ -1082,11 +1070,9 @@ index c9bdd20..50278fb 100644
  		env_set_text(db_table_name_buf, dbtable.len);
  	} else {
  		if(table==NULL) {
-diff --git a/modules/acc/acc_mod.c b/modules/acc/acc_mod.c
-index 9f40e14..2fb9258 100644
 --- a/modules/acc/acc_mod.c
 +++ b/modules/acc/acc_mod.c
-@@ -109,7 +109,17 @@ unsigned short failed_filter[MAX_FAILED_FILTER_COUNT + 1];
+@@ -109,7 +109,17 @@
  static char* leg_info_str = 0;	/*!< multi call-leg support */
  struct acc_extra *leg_info = 0;
  int acc_prepare_flag = -1; /*!< should the request be prepared for later acc */
@@ -1104,7 +1090,7 @@ index 9f40e14..2fb9258 100644
  
  /* ----- SYSLOG acc variables ----------- */
  /*! \name AccSyslogVariables  Syslog Variables */
-@@ -130,15 +140,18 @@ struct acc_extra *log_extra = 0; /*!< Log extra attributes */
+@@ -130,15 +140,18 @@
  /*@{*/
  
  int cdr_enable  = 0;
@@ -1127,7 +1113,7 @@ index 9f40e14..2fb9258 100644
  
  /* ----- RADIUS acc variables ----------- */
  /*! \name AccRadiusVariables  Radius Variables */     
-@@ -253,6 +266,7 @@ static param_export_t params[] = {
+@@ -253,6 +266,7 @@
  	{"log_extra",            STR_PARAM, &log_extra_str        },
  	/* cdr specific */
  	{"cdr_enable",           INT_PARAM, &cdr_enable                 },
@@ -1135,7 +1121,7 @@ index 9f40e14..2fb9258 100644
  	{"cdr_start_on_confirmed", INT_PARAM, &cdr_start_on_confirmed   },
  	{"cdr_facility",         STR_PARAM, &cdr_facility_str           },
  	{"cdr_extra",            STR_PARAM, &cdr_log_extra_str          },
-@@ -291,6 +305,12 @@ static param_export_t params[] = {
+@@ -291,6 +305,12 @@
  	{"acc_time_column",      STR_PARAM, &acc_time_col.s       },
  	{"db_insert_mode",       INT_PARAM, &acc_db_insert_mode   },
  #endif
@@ -1148,11 +1134,9 @@ index 9f40e14..2fb9258 100644
  	{0,0,0}
  };
  
-diff --git a/modules/acc/acc_mod.h b/modules/acc/acc_mod.h
-index 5e7792a..98cef33 100644
 --- a/modules/acc/acc_mod.h
 +++ b/modules/acc/acc_mod.h
-@@ -92,7 +92,14 @@ extern str acc_cseqno_col;
+@@ -92,7 +92,14 @@
  extern str acc_sipcode_col;
  extern str acc_sipreason_col;
  extern str acc_time_col;
@@ -1167,11 +1151,9 @@ index 5e7792a..98cef33 100644
 +
  
  #endif
-diff --git a/modules/acc/doc/acc_admin.xml b/modules/acc/doc/acc_admin.xml
-index a60ba34..97858be 100644
 --- a/modules/acc/doc/acc_admin.xml
 +++ b/modules/acc/doc/acc_admin.xml
-@@ -373,7 +373,7 @@ if (uri=~"sip:+40") /* calls to Romania */ {
+@@ -373,7 +373,7 @@
  						cdr_extra_definition = cdr_log_name '=' pseudo_variable
  						</emphasis></para></listitem>
  					</itemizedlist>
@@ -1180,7 +1162,7 @@ index a60ba34..97858be 100644
  					<para>
  					The full list of supported pseudo-variables in Sip-Router is
  					available at:
-@@ -415,6 +415,7 @@ if (uri=~"sip:+40") /* calls to Romania */ {
+@@ -415,6 +415,7 @@
  				<section>
  					<title>Example for a spiraled Proxy</title>
  					<programlisting format="linespecific">
@@ -1188,7 +1170,7 @@ index a60ba34..97858be 100644
  # A calls B (transaction 1)
  $avp(caller)='A'
  $avp(callee)='B';
-@@ -433,6 +434,7 @@ $dlg_var(chain)=$dlg_var(chain) + "|" + "C;cfnr;D";
+@@ -433,6 +434,7 @@
  # C confirms call (200 reply of transaction 2)
  $dlg_var(caller) = $avp(caller); #caller='B'
  $dlg_var(callee) = $avp(callee); #callee='C'
@@ -1196,7 +1178,7 @@ index a60ba34..97858be 100644
  					</programlisting>
  				</section>
  			</section>
-@@ -493,7 +495,7 @@ $dlg_var(callee) = $avp(callee); #callee='C'
+@@ -493,7 +495,7 @@
  	<section id="ACC-param-id">
  	<title>Parameters</title>
  	<!-- Generic ACC parameters -->
@@ -1205,7 +1187,7 @@ index a60ba34..97858be 100644
  		<title><varname>early_media</varname> (integer)</title>
  		<para>
  		Should be early media (any provisional reply with body) accounted too ?
-@@ -504,11 +506,13 @@ $dlg_var(callee) = $avp(callee); #callee='C'
+@@ -504,11 +506,13 @@
  		<example>
  		<title>early_media example</title>
  		<programlisting format="linespecific">
@@ -1220,7 +1202,7 @@ index a60ba34..97858be 100644
  		<title><varname>failed_transaction_flag</varname> (integer)</title>
  		<para>
  		Per transaction flag which says if the transaction should be 
-@@ -520,11 +524,13 @@ modparam("acc", "early_media", 1)
+@@ -520,11 +524,13 @@
  		<example>
  		<title>failed_transaction_flag example</title>
  		<programlisting format="linespecific">
@@ -1235,7 +1217,7 @@ index a60ba34..97858be 100644
  		<title><varname>failed_filter</varname> (string)</title>
  		<para>
  		A string of failure response codes from 300 to 999
-@@ -538,11 +544,13 @@ modparam("acc", "failed_transaction_flag", 4)
+@@ -538,11 +544,13 @@
  		<example>
  		<title>failed_filter example</title>
  		<programlisting format="linespecific">
@@ -1250,7 +1232,7 @@ index a60ba34..97858be 100644
  		<title><varname>report_ack</varname> (integer)</title>
  		<para>
  		Shall acc attempt to account e2e ACKs too ? Note that this is really 
-@@ -556,11 +564,13 @@ modparam("acc", "failed_filter", "404,407")
+@@ -556,11 +564,13 @@
  		<example>
  		<title>report_ack example</title>
  		<programlisting format="linespecific">
@@ -1265,7 +1247,7 @@ index a60ba34..97858be 100644
  		<title><varname>report_cancels</varname> (integer)</title>
  		<para>
  		By default, CANCEL reporting is disabled -- most accounting
-@@ -573,11 +583,13 @@ modparam("acc", "report_ack", 1)
+@@ -573,11 +583,13 @@
  		<example>
  		<title>report_cancels example</title>
  		<programlisting format="linespecific">
@@ -1280,7 +1262,7 @@ index a60ba34..97858be 100644
  		<title><varname>detect_direction</varname> (integer)</title>
  		<para>
  		Controlles the direction detection for sequential requests. If 
-@@ -595,11 +607,13 @@ modparam("acc", "report_cancels", 1)
+@@ -595,11 +607,13 @@
  		<example>
  		<title>detect_direction example</title>
  		<programlisting format="linespecific">
@@ -1295,7 +1277,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_prepare_flag</varname> (integer)</title>
  		<para>
  		Per transaction flag which says if the transaction may be accounted
-@@ -607,7 +621,7 @@ modparam("acc", "detect_direction", 1)
+@@ -607,7 +621,7 @@
  		failure_route). If this flag is not set and acc or missed_call flag
  		are not set either in request route block, there is no way to mark the
  		request for transaction later. If either acc or missed_call flags are
@@ -1304,7 +1286,7 @@ index a60ba34..97858be 100644
  		</para>
  		<para>
  		Default value is not-set (no flag).
-@@ -615,11 +629,13 @@ modparam("acc", "detect_direction", 1)
+@@ -615,11 +629,13 @@
  		<example>
  		<title>acc_prepare_flag example</title>
  		<programlisting format="linespecific">
@@ -1319,7 +1301,7 @@ index a60ba34..97858be 100644
  		<title><varname>multi_leg_info</varname> (string)</title>
  		<para>
  		Defines the AVP set to be used in per-call-leg accounting.
-@@ -635,6 +651,7 @@ modparam("acc", "acc_prepare_flag", 5)
+@@ -635,6 +651,7 @@
  		<example>
  		<title>multi_leg_info example</title>
  		<programlisting format="linespecific">
@@ -1327,7 +1309,7 @@ index a60ba34..97858be 100644
  # for syslog-based accounting, use any text you want to be printed
  modparam("acc", "multi_leg_info",
      "text1=$avp(src);text2=$avp(dst)")
-@@ -647,11 +664,12 @@ modparam("acc", "multi_leg_info",
+@@ -647,11 +664,12 @@
  # for DIAMETER-based accounting, use the DIAMETER AVP ID (as integer)
  modparam("acc", "multi_leg_info",
      "2345=$avp(src);2346=$avp(dst)")
@@ -1341,7 +1323,7 @@ index a60ba34..97858be 100644
  		<title><varname>log_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account a transaction via syslog.
-@@ -662,11 +680,13 @@ modparam("acc", "multi_leg_info",
+@@ -662,11 +680,13 @@
  		<example>
  		<title>log_flag example</title>
  		<programlisting format="linespecific">
@@ -1356,7 +1338,7 @@ index a60ba34..97858be 100644
  		<title><varname>log_missed_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account missed calls via syslog.
-@@ -677,11 +697,13 @@ modparam("acc", "log_flag", 2)
+@@ -677,11 +697,13 @@
  		<example>
  		<title>log_missed_flag example</title>
  		<programlisting format="linespecific">
@@ -1371,7 +1353,7 @@ index a60ba34..97858be 100644
  		<title><varname>log_level</varname> (integer)</title>
  		<para>
  		Log level at which accounting messages are issued to syslog.
-@@ -692,11 +714,13 @@ modparam("acc", "log_missed_flag", 3)
+@@ -692,11 +714,13 @@
  		<example>
  		<title>log_level example</title>
  		<programlisting format="linespecific">
@@ -1386,7 +1368,7 @@ index a60ba34..97858be 100644
  		<title><varname>log_facility</varname> (string)</title>
  		<para>
  		Log facility to which accounting messages are issued to syslog.
-@@ -709,11 +733,13 @@ modparam("acc", "log_level", 2)   # Set log_level to 2
+@@ -709,11 +733,13 @@
  		<example>
  		<title>log_facility example</title>
  		<programlisting format="linespecific">
@@ -1401,7 +1383,7 @@ index a60ba34..97858be 100644
  		<title><varname>log_extra</varname> (string)</title>
  		<para>
  		Extra values to be logged.
-@@ -725,12 +751,14 @@ modparam("acc", "log_facility", "LOG_DAEMON")
+@@ -725,12 +751,14 @@
  		<example>
  		<title>log_extra example</title>
  		<programlisting format="linespecific">
@@ -1417,7 +1399,7 @@ index a60ba34..97858be 100644
  		<title><varname>radius_config</varname> (string)</title>
  		<para>
  		<emphasis>This parameter is radius specific.</emphasis> Path to 
-@@ -750,11 +778,13 @@ modparam("acc", "log_extra", "ua=$hdr(User-Agent);uuid=$avp(i:123)")
+@@ -750,11 +778,13 @@
  		<example>
  		<title>radius_config example</title>
  		<programlisting format="linespecific">
@@ -1432,7 +1414,7 @@ index a60ba34..97858be 100644
  		<title><varname>radius_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account a 
-@@ -766,11 +796,13 @@ modparam("acc", "radius_config", "/etc/radiusclient/radiusclient.conf")
+@@ -766,11 +796,13 @@
  		<example>
  		<title>radius_flag example</title>
  		<programlisting format="linespecific">
@@ -1447,7 +1429,7 @@ index a60ba34..97858be 100644
  		<title><varname>radius_missed_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account missed 
-@@ -782,11 +814,13 @@ modparam("acc", "radius_flag", 2)
+@@ -782,11 +814,13 @@
  		<example>
  		<title>radius_missed_flag example</title>
  		<programlisting format="linespecific">
@@ -1462,7 +1444,7 @@ index a60ba34..97858be 100644
  		<title><varname>service_type</varname> (integer)</title>
  		<para>
  		Radius service type used for accounting.
-@@ -797,11 +831,13 @@ modparam("acc", "radius_missed_flag", 3)
+@@ -797,11 +831,13 @@
  		<example>
  		<title>service_type example</title>
  		<programlisting format="linespecific">
@@ -1477,7 +1459,7 @@ index a60ba34..97858be 100644
  		<title><varname>radius_extra</varname> (string)</title>
  		<para>
  		Extra values to be logged via RADIUS - RADIUS specific.
-@@ -813,12 +849,14 @@ modparam("acc", "service_type", 16)
+@@ -813,12 +849,14 @@
  		<example>
  		<title>radius_extra example</title>
  		<programlisting format="linespecific">
@@ -1493,7 +1475,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account a 
-@@ -830,11 +868,13 @@ modparam("acc", "radius_extra", "via=$hdr(Via[*]); email=$avp(s:email)")
+@@ -830,11 +868,13 @@
  		<example>
  		<title>db_flag example</title>
  		<programlisting format="linespecific">
@@ -1508,7 +1490,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_missed_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account missed 
-@@ -846,11 +886,13 @@ modparam("acc", "db_flag", 2)
+@@ -846,11 +886,13 @@
  		<example>
  		<title>db_missed_flag example</title>
  		<programlisting format="linespecific">
@@ -1523,7 +1505,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_table_acc</varname> (string)</title>
  		<para>
  		Table name of accounting successfull calls -- database specific. It
-@@ -862,12 +904,14 @@ modparam("acc", "db_missed_flag", 3)
+@@ -862,12 +904,14 @@
  		<example>
  		<title>db_table_acc example</title>
  		<programlisting format="linespecific">
@@ -1539,7 +1521,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_table_missed_calls</varname> (string)</title>
  		<para>
  		Table name for accounting missed calls -- database specific. It
-@@ -879,11 +923,13 @@ modparam("acc", "db_table_acc", "acc_$time(year)_$time(mon)")
+@@ -879,11 +923,13 @@
  		<example>
  		<title>db_table_missed_calls example</title>
  		<programlisting format="linespecific">
@@ -1554,7 +1536,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_url</varname> (string)</title>
  		<para>
  		SQL address -- database specific. If is set to NULL or emty string,
-@@ -895,11 +941,13 @@ modparam("acc", "db_table_missed_calls", "myMC_table")
+@@ -895,11 +941,13 @@
  		<example>
  		<title>db_url example</title>
  		<programlisting format="linespecific">
@@ -1570,7 +1552,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_method_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the request's method name as
-@@ -911,11 +959,13 @@ modparam("acc", "db_url", "mysql://user:password@localhost/openser")
+@@ -911,11 +959,13 @@
  		<example>
  		<title>acc_method_column example</title>
  		<programlisting format="linespecific">
@@ -1585,7 +1567,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_from_tag_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the From header TAG parameter.
-@@ -926,11 +976,13 @@ modparam("acc", "acc_method_column", "method")
+@@ -926,11 +976,13 @@
  		<example>
  		<title>acc_from_tag_column example</title>
  		<programlisting format="linespecific">
@@ -1600,7 +1582,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_to_tag_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the To header TAG parameter.
-@@ -941,11 +993,13 @@ modparam("acc", "acc_from_tag_column", "from_tag")
+@@ -941,11 +993,13 @@
  		<example>
  		<title>acc_to_tag_column example</title>
  		<programlisting format="linespecific">
@@ -1615,7 +1597,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_callid_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the request's Callid value.
-@@ -956,11 +1010,13 @@ modparam("acc", "acc_to_tag_column", "to_tag")
+@@ -956,11 +1010,13 @@
  		<example>
  		<title>acc_callid_column example</title>
  		<programlisting format="linespecific">
@@ -1630,7 +1612,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_sip_code_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the final reply's numric code
-@@ -972,11 +1028,13 @@ modparam("acc", "acc_callid_column", "callid")
+@@ -972,11 +1028,13 @@
  		<example>
  		<title>acc_sip_code_column example</title>
  		<programlisting format="linespecific">
@@ -1645,7 +1627,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_sip_reason_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the final reply's reason
-@@ -988,11 +1046,13 @@ modparam("acc", "acc_sip_code_column", "sip_code")
+@@ -988,11 +1046,13 @@
  		<example>
  		<title>acc_sip_reason_column example</title>
  		<programlisting format="linespecific">
@@ -1660,7 +1642,7 @@ index a60ba34..97858be 100644
  		<title><varname>acc_time_column</varname> (string)</title>
  		<para>
  		Column name in accounting table to store the time stamp of the 
-@@ -1004,11 +1064,13 @@ modparam("acc", "acc_sip_reason_column", "sip_reason")
+@@ -1004,11 +1064,13 @@
  		<example>
  		<title>acc_time_column example</title>
  		<programlisting format="linespecific">
@@ -1675,7 +1657,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_extra</varname> (string)</title>
  		<para>
  		Extra values to be logged into database - DB specific.
-@@ -1020,11 +1082,13 @@ modparam("acc", "acc_time_column", "time")
+@@ -1020,11 +1082,13 @@
  		<example>
  		<title>db_extra example</title>
  		<programlisting format="linespecific">
@@ -1690,7 +1672,7 @@ index a60ba34..97858be 100644
  		<title><varname>db_insert_mode</varname> (integer)</title>
  		<para>
  		If set to 1, use INSERT DELAYED to add records to accounting tables
-@@ -1037,12 +1101,14 @@ modparam("acc", "db_extra", "ct=$hdr(Content-type); email=$avp(s:email)")
+@@ -1039,12 +1103,14 @@
  		<example>
  		<title>db_insert_mode example</title>
  		<programlisting format="linespecific">
@@ -1706,7 +1688,7 @@ index a60ba34..97858be 100644
  		<title><varname>diameter_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account a 
-@@ -1054,11 +1120,13 @@ modparam("acc", "db_insert_mode", 1)
+@@ -1056,11 +1122,13 @@
  		<example>
  		<title>diameter_flag example</title>
  		<programlisting format="linespecific">
@@ -1721,7 +1703,7 @@ index a60ba34..97858be 100644
  		<title><varname>diameter_missed_flag</varname> (integer)</title>
  		<para>
  		Request flag which needs to be set to account missed 
-@@ -1070,11 +1138,13 @@ modparam("acc", "diameter_flag", 2)
+@@ -1072,11 +1140,13 @@
  		<example>
  		<title>diameter_missed_flag example</title>
  		<programlisting format="linespecific">
@@ -1736,7 +1718,7 @@ index a60ba34..97858be 100644
  		<title><varname>diameter_client_host</varname> (string)</title>
  		<para>
  		Hostname of the machine where the DIAMETER Client is 
-@@ -1086,11 +1156,13 @@ modparam("acc", "diameter_missed_flag", 3)
+@@ -1088,11 +1158,13 @@
  		<example>
  		<title>diameter_client_host example</title>
  		<programlisting format="linespecific">
@@ -1751,7 +1733,7 @@ index a60ba34..97858be 100644
  		<title><varname>diameter_client_port</varname> (int)</title>
  		<para>
  		Port number where the Diameter Client is 
-@@ -1102,11 +1174,13 @@ modparam("acc", "diameter_client_host", "3a_server.net")
+@@ -1104,11 +1176,13 @@
  		<example>
  		<title>diameter_client_host example</title>
  		<programlisting format="linespecific">
@@ -1766,7 +1748,7 @@ index a60ba34..97858be 100644
  		<title><varname>diameter_extra</varname> (string)</title>
  		<para>
  		Extra values to be logged via DIAMETER - DIAMETER specific.
-@@ -1118,31 +1192,35 @@ modparam("acc", "diameter_client_port", 3000)
+@@ -1120,31 +1194,35 @@
  		<example>
  		<title>diameter_extra example</title>
  		<programlisting format="linespecific">
@@ -1807,7 +1789,7 @@ index a60ba34..97858be 100644
  		</para>
  		<para>
  		0 - use time of dialog creation (default).
-@@ -1151,11 +1229,13 @@ modparam("acc", "cdr_enable", 1)
+@@ -1153,11 +1231,13 @@
  		<example>
  		<title>cdr_start_on_confirmed example</title>
  		<programlisting format="linespecific">
@@ -1822,7 +1804,7 @@ index a60ba34..97858be 100644
  		<title><varname>cdr_facility</varname> (integer)</title>
  		<para>
  		Log facility to which CDR messages are issued to syslog.
-@@ -1168,11 +1248,13 @@ modparam("acc", "cdr_start_on_confirmed", 1)
+@@ -1170,11 +1250,13 @@
  		<example>
  		<title>cdr_facility example</title>
  		<programlisting format="linespecific">
@@ -1837,7 +1819,7 @@ index a60ba34..97858be 100644
  		<title><varname>cdr_extra</varname> (string)</title>
  		<para>
  		Set of pseudo-variables defining custom CDR fields. See
-@@ -1184,52 +1266,210 @@ modparam("acc", "cdr_facility", "LOG_DAEMON")
+@@ -1186,52 +1268,210 @@
  		<example>
  		<title>cdr_extra example</title>
  		<programlisting format="linespecific">
