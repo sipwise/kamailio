@@ -1,3 +1,10 @@
+ngcp-kamailio (4.0.6-1) unstable; urgency=medium
+
+  * [e709834] Imported Upstream version 4.0.6
+  * [7b6d8b2] MT#6217 remove upstream applied patches. Refresh patches.
+
+ -- Victor Seva <vseva@sipwise.com>  Tue, 11 Mar 2014 11:06:15 +0100
+
 ngcp-kamailio (4.0.4-4) unstable; urgency=medium
 
   * [7e59d4a] MT#5565 add upstream fix for usrloc db sync
