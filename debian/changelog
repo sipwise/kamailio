@@ -1,3 +1,15 @@
+ngcp-kamailio (4.1.2-1+0~mr3.2.1) unstable; urgency=medium
+
+  * [7431204] MT#5301 add upstream fixes
+  * [f25bc8e] MT#5891 wrap-and-sort
+  * [977e032] MT#5891 fix lintian warnings
+  * [2cd9651] Merge tag 'upstream/4.1.2' into master
+  * [b996b46] fix merge
+  * [3efe846] MT#6219 remove upstream applied patches. Refresh patches.
+  * [fc92922] MT#6219 fix java build process
+
+ -- Victor Seva <vseva@sipwise.com>  Tue, 11 Mar 2014 13:56:30 +0100
+
 ngcp-kamailio (4.1.1-1+0~mr3.2.1) unstable; urgency=low
 
   [ Victor Seva ]
