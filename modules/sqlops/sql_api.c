@@ -228,13 +228,16 @@ void sql_reset_result(sql_result_t *res)
 	{
 		for(i=0; i<res->nrows; i++)
 		{
-			for(j=0; j<res->ncols; j++)
+			if(res->vals[i])
 			{
-				if(res->vals[i][j].flags&PV_VAL_STR
-						&& res->vals[i][j].value.s.len>0)
-					pkg_free(res->vals[i][j].value.s.s);
+				for(j=0; j<res->ncols; j++)
+				{
+					if(res->vals[i][j].flags&PV_VAL_STR
+							&& res->vals[i][j].value.s.len>0)
+						pkg_free(res->vals[i][j].value.s.s);
+				}
+				pkg_free(res->vals[i]);
 			}
-			pkg_free(res->vals[i]);
 		}
 		pkg_free(res->vals);
 		res->vals = NULL;
@@ -248,6 +251,8 @@ int sql_do_query(sql_con_t *con, str *query, sql_result_t *res)
 	db1_res_t* db_res = NULL;
 	int i, j;
 	str sv;
+
+	if(res) sql_reset_result(res);
 
 	if(query==NULL)
 	{
@@ -273,7 +278,6 @@ int sql_do_query(sql_con_t *con, str *query, sql_result_t *res)
 		return 3;
 	}
 
-	sql_reset_result(res);
 	res->ncols = RES_COL_N(db_res);
 	res->nrows = RES_ROW_N(db_res);
 	LM_DBG("rows [%d] cols [%d]\n", res->nrows, res->ncols);
