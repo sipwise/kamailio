@@ -1,3 +1,11 @@
+ngcp-kamailio (3.3.7-1) unstable; urgency=medium
+
+  * [080a9b5] Imported Upstream version 3.3.7
+  * [52fac4f] MT#6213 remove upstream applied patches. Refresh patches.
+  * [5c0bdae] MT#6213 wrap-and-sort
+
+ -- Victor Seva <vseva@sipwise.com>  Tue, 11 Mar 2014 17:03:49 +0100
+
 ngcp-kamailio (3.3.6-3) unstable; urgency=medium
 
   * [1a1d255] MT#6101 Add tcap module support
