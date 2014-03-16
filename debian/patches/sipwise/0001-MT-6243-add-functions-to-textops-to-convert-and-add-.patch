@@ -1,4 +1,4 @@
-From b53ff04ab062e66d6d7f32777c6e8c80971bbf84 Mon Sep 17 00:00:00 2001
+From 9c66702e285addd5c1d9207d63790728986d3c3d Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Thu, 13 Mar 2014 19:28:33 +0100
 Subject: [PATCH] MT#6243 add functions to textops to convert and add multipart
@@ -17,11 +17,11 @@ route[TESTING_TEXTOPS]
 	forward(127.2.0.1);
 }
 ---
- modules/textops/textops.c | 386 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 386 insertions(+)
+ modules/textops/textops.c | 415 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 415 insertions(+)
 
 diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..ebb63af 100644
+index 1085019..e806054 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
 @@ -123,6 +123,9 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
@@ -53,7 +53,7 @@ index 1085019..ebb63af 100644
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,378 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
+@@ -1444,7 +1459,407 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
  	return 1;
  }
  
@@ -114,6 +114,25 @@ index 1085019..ebb63af 100644
 +	return 1;
 +}
 +
++/**
++ * return:
++ *  1: multipart
++ */
++static int check_multipart(struct sip_msg *msg)
++{
++	int mime;
+ 
++	/* the function search for and parses the Content-Type hdr */
++	mime = parse_content_type_hdr (msg);
++	if (mime<0) {
++		LM_ERR("failed to extract content type hdr\n");
++		return -1;
++	}
++	LM_DBG("mime:%d [%d]\n", mime, MIMETYPE(MULTIPART,MIXED));
++	if(mime!=MIMETYPE(MULTIPART,MIXED)) return 0;
++    return 1;
++}
++
 +static int set_multibody_f(struct sip_msg* msg, char* p1, char* p2)
 +{
 +	struct lump *anchor;
@@ -136,6 +155,10 @@ index 1085019..ebb63af 100644
 +
 +	if(p1==0 || p2==0)
 +	{
++		if(check_multipart(msg)==1) {
++			LM_WARN("body is alredy multipart. Do nothing\n");
++			return -1;
++		}
 +		convert = 1;
 +	}
 +	else
@@ -160,6 +183,9 @@ index 1085019..ebb63af 100644
 +			LM_ERR("invalid content-type parameter\n");
 +			return -1;
 +		}
++		if(check_multipart(msg)==1) {
++			convert = -1;
++		}
 +	}
 +
 +	body.s = get_body(msg);
@@ -171,7 +197,7 @@ index 1085019..ebb63af 100644
 +
 +	del_nonshm_lump( &(msg->body_lumps) );
 +	msg->body_lumps = NULL;
- 
++
 +	if (msg->content_length)
 +	{
 +		body.len = get_content_length( msg );
@@ -182,7 +208,7 @@ index 1085019..ebb63af 100644
 +				LM_ERR("invalid content length: %d\n", body.len);
 +				return -1;
 +			}
-+			if(convert)
++			if(convert==1)
 +			{
 +				/* need to copy body */
 +				nb.s=pkg_malloc(sizeof(char)*(body.len));
@@ -253,37 +279,45 @@ index 1085019..ebb63af 100644
 +		buf = NULL;
 +	}
 +
-+	/* add content-type */
-+	if(msg->content_type==NULL || msg->content_type->body.len!=nc.len
-+			|| strncmp(msg->content_type->body.s, nc.s, nc.len)!=0)
++	if (convert!=-1)
 +	{
-+		if(msg->content_type!=NULL)
-+			if(del_lump(msg, msg->content_type->name.s-msg->buf,
-+						msg->content_type->len, 0) == 0)
++		/* add content-type */
++		if(msg->content_type==NULL || msg->content_type->body.len!=nc.len
++				|| strncmp(msg->content_type->body.s, nc.s, nc.len)!=0)
++		{
++			if(msg->content_type!=NULL)
++				if(del_lump(msg, msg->content_type->name.s-msg->buf,
++							msg->content_type->len, 0) == 0)
++				{
++					LM_ERR("failed to delete content type\n");
++					goto error;
++				}
++			value_len = nc.len;
++			len=sizeof("Content-Type: ") - 1 + value_len + CRLF_LEN;
++			buf=pkg_malloc(sizeof(char)*(len));
++
++			if (buf==0)
 +			{
-+				LM_ERR("failed to delete content type\n");
++				LM_ERR("out of pkg memory\n");
 +				goto error;
 +			}
-+		value_len = nc.len;
-+		len=sizeof("Content-Type: ") - 1 + value_len + CRLF_LEN;
-+		buf=pkg_malloc(sizeof(char)*(len));
-+
-+		if (buf==0)
++			memcpy(buf, "Content-Type: ", sizeof("Content-Type: ") - 1);
++			memcpy(buf+sizeof("Content-Type: ") - 1, nc.s, value_len);
++			memcpy(buf+sizeof("Content-Type: ") - 1 + value_len, CRLF, CRLF_LEN);
++			if (insert_new_lump_after(anchor, buf, len, 0) == 0)
++			{
++				LM_ERR("failed to insert content-type lump\n");
++				goto error;
++			}
++			buf = NULL;
++		}
++		/* add Mime-Version header */
++		if(add_hf_helper(msg, 0, 0, &header, 0, 0)<0)
 +		{
-+			LM_ERR("out of pkg memory\n");
++			LM_ERR("failed to add Mime-Version header\n");
 +			goto error;
 +		}
-+		memcpy(buf, "Content-Type: ", sizeof("Content-Type: ") - 1);
-+		memcpy(buf+sizeof("Content-Type: ") - 1, nc.s, value_len);
-+		memcpy(buf+sizeof("Content-Type: ") - 1 + value_len, CRLF, CRLF_LEN);
-+		if (insert_new_lump_after(anchor, buf, len, 0) == 0)
-+		{
-+			LM_ERR("failed to insert content-type lump\n");
-+			goto error;
-+		}
-+		buf = NULL;
 +	}
-+
 +	anchor = anchor_lump(msg, body.s - msg->buf, 0, 0);
 +	if (anchor == 0)
 +	{
@@ -305,11 +339,6 @@ index 1085019..ebb63af 100644
 +	}
 +	buf = NULL;
 +
-+	if(add_hf_helper(msg, 0, 0, &header, 0, 0)<0)
-+	{
-+		LM_ERR("failed to add Mime-Version header\n");
-+		goto error;
-+	}
 +	return 1;
 +
 +error:
