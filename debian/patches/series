@@ -15,5 +15,4 @@ sipwise/parallel_build.patch
 sipwise/url-safe_base64.patch
 sipwise/dialoginfo_notify_body.patch
 sipwise/tcap.patch
-sipwise/0001-MT-6243-add-functions-to-textops-to-convert-and-add-.patch
-sipwise/fix_rtpproxy-ng_body.patch
+sipwise/0001-textops-functions-to-convert-and-add-multipart-bodie.patch

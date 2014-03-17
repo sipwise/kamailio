@@ -1,27 +1,23 @@
-From 9c66702e285addd5c1d9207d63790728986d3c3d Mon Sep 17 00:00:00 2001
+From 12cd74b699c969a9c882e878240755a1cea68289 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Thu, 13 Mar 2014 19:28:33 +0100
-Subject: [PATCH] MT#6243 add functions to textops to convert and add multipart
- bodies
+Subject: [PATCH 1/2] textops: functions to convert and add multipart bodies
 
-set_multibody() and append_multibody() functions.
+set_body_multipart() and append_body_part() functions.
 
 route[TESTING_TEXTOPS]
 {
-	$var(body)="7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c";
-	set_multibody();
-	append_multibody("$var(body)\n","application/vnd.cirpack.isdn-ext", "signal;handling=required");
-	append_multibody("$var(body)\n","application/vnd.cirpack.isdn-ext");
-
-	append_hf("X-Test: test\r\n");
-	forward(127.2.0.1);
+	$var(b)="7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c";
+	set_body_multipart();
+	append_body_part("$var(b)\n","application/vnd.cirpack.isdn-ext", "signal;handling=required");
+	append_body_part("$var(b)\n","application/vnd.cirpack.isdn-ext");
 }
 ---
- modules/textops/textops.c | 415 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 415 insertions(+)
+ modules/textops/textops.c | 414 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 414 insertions(+)
 
 diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..e806054 100644
+index 1085019..854245c 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
 @@ -123,6 +123,9 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
@@ -38,22 +34,22 @@ index 1085019..e806054 100644
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
-+	{"set_multibody",         (cmd_function)set_multibody_f,        0,
++	{"set_body_multipart",         (cmd_function)set_multibody_f,        0,
 +		0, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
-+	{"set_multibody",         (cmd_function)set_multibody_f,        2,
++	{"set_body_multipart",         (cmd_function)set_multibody_f,        2,
 +		fixup_spve_spve, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
-+	{"append_multibody",     (cmd_function)append_multibody_f,    2,
++	{"append_body_part",     (cmd_function)append_multibody_f,    2,
 +		fixup_append_multibody_f, 0,
-+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
-+	{"append_multibody",     (cmd_function)append_multibody_f,    3,
++		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
++	{"append_body_part",     (cmd_function)append_multibody_f,    3,
 +		fixup_append_multibody_f, 0,
-+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
++		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,407 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
+@@ -1444,7 +1459,406 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
  	return 1;
  }
  
@@ -128,7 +124,6 @@ index 1085019..e806054 100644
 +		LM_ERR("failed to extract content type hdr\n");
 +		return -1;
 +	}
-+	LM_DBG("mime:%d [%d]\n", mime, MIMETYPE(MULTIPART,MIXED));
 +	if(mime!=MIMETYPE(MULTIPART,MIXED)) return 0;
 +    return 1;
 +}
