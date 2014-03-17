@@ -16,11 +16,9 @@ route[TESTING_TEXTOPS]
  modules/textops/textops.c | 414 ++++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 414 insertions(+)
 
-diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..854245c 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,9 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
+@@ -123,6 +123,9 @@
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
@@ -30,7 +28,7 @@ index 1085019..854245c 100644
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +278,18 @@ static cmd_export_t cmds[]={
+@@ -275,6 +278,18 @@
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -49,7 +47,7 @@ index 1085019..854245c 100644
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,406 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
+@@ -1444,7 +1459,403 @@
  	return 1;
  }
  
@@ -66,7 +64,7 @@ index 1085019..854245c 100644
 +		return -1;
 +	}
 +
-+	n.len=2*(delimiter.len + 2 + CRLF_LEN);
++	n.len=delimiter.len + 2 + CRLF_LEN;
 +	n.len=n.len + ct_len + content_type.len + 3*CRLF_LEN;
 +	if(content_disposition.s!=NULL)
 +	{
@@ -80,9 +78,6 @@ index 1085019..854245c 100644
 +		LM_ERR("out of pkg memory\n");
 +		return -1;
 +	}
-+	memcpy(n.s, "--", 2); i=2;
-+	memcpy(n.s+i, delimiter.s, delimiter.len); i=i+delimiter.len;
-+	memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
 +
 +	memcpy(n.s+i, "Content-Type: ", ct_len); i=i+ct_len;
 +	memcpy(n.s+i, content_type.s, content_type.len); i=i+content_type.len;
@@ -117,7 +112,7 @@ index 1085019..854245c 100644
 +static int check_multipart(struct sip_msg *msg)
 +{
 +	int mime;
- 
++
 +	/* the function search for and parses the Content-Type hdr */
 +	mime = parse_content_type_hdr (msg);
 +	if (mime<0) {
@@ -240,7 +235,7 @@ index 1085019..854245c 100644
 +		LM_ERR("failed to get anchor\n");
 +		goto error;
 +	}
-+
+ 
 +	/* get initial boundary */
 +	if(generate_boundary(&nb, oc, cd, delimiter)<0)
 +	{
@@ -456,6 +451,3 @@ index 1085019..854245c 100644
  
  static int append_to_reply_f(struct sip_msg* msg, char* key, char* str0)
  {
--- 
-1.9.0
-
