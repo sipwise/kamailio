@@ -16,11 +16,9 @@ route[TESTING_TEXTOPS]
  modules/textops/textops.c | 416 ++++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 416 insertions(+)
 
-diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..58bfea5 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,9 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
+@@ -123,6 +123,9 @@
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
@@ -30,7 +28,7 @@ index 1085019..58bfea5 100644
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +278,18 @@ static cmd_export_t cmds[]={
+@@ -275,6 +278,18 @@
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -49,7 +47,7 @@ index 1085019..58bfea5 100644
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,408 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
+@@ -1444,7 +1459,408 @@
  	return 1;
  }
  
@@ -328,8 +326,8 @@ index 1085019..58bfea5 100644
 +		LM_ERR("out of pkg memory\n");
 +		goto error;
 +	}
-+	memcpy(buf, nb.s, nb.len-CRLF_LEN);
-+	if(insert_new_lump_after(anchor, buf, nb.len-CRLF_LEN, 0)==0)
++	memcpy(buf, nb.s, nb.len);
++	if(insert_new_lump_after(anchor, buf, nb.len, 0)==0)
 +	{
 +		LM_ERR("failed to insert body lump\n");
 +		goto error;
@@ -355,7 +353,7 @@ index 1085019..58bfea5 100644
 +	str cd = {0,0};
 +	str txt = {0,0};
 +	str delimiter = {"unique-boundary-1", 17};
- 
++
 +	if(p1==0 || p2==0)
 +	{
 +		LM_ERR("invalid parameters\n");
@@ -382,7 +380,7 @@ index 1085019..58bfea5 100644
 +		LM_ERR("invalid content-type parameter\n");
 +		return -1;
 +	}
-+	if(p3!=NULL)
++	if(p3!=NULL && p3.len>0)
 +	{
 +		if(fixup_get_svalue(msg, (gparam_p)p3, &cd)!=0)
 +		{
@@ -434,7 +432,7 @@ index 1085019..58bfea5 100644
 +{
 +	int ret;
 +	fparam_t* fp;
-+
+ 
 +	if(param_no<=3){
 +		if((ret=fix_param_types(FPARAM_PVE, param))<0){
 +			ERR("Cannot convert function parameter %d to spve \n",
@@ -458,6 +456,3 @@ index 1085019..58bfea5 100644
  
  static int append_to_reply_f(struct sip_msg* msg, char* key, char* str0)
  {
--- 
-1.9.0
-
