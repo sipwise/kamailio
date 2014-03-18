@@ -38,7 +38,7 @@ route[TESTING_TEXTOPS]
 +	{"set_body_multipart",         (cmd_function)set_multibody_f,        2,
 +		fixup_spve_spve, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
-+	{"append_body_part",     (cmd_function)append_multibody_f,    2,
++	{"append_body_part",     (cmd_function)append_multibody2_f,    2,
 +		fixup_append_multibody_f, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
 +	{"append_body_part",     (cmd_function)append_multibody_f,    3,
@@ -47,7 +47,7 @@ route[TESTING_TEXTOPS]
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,408 @@
+@@ -1444,7 +1459,414 @@
  	return 1;
  }
  
@@ -343,6 +343,11 @@ route[TESTING_TEXTOPS]
 +	return -1;
 +}
 +
++static int append_multibody2_f(struct sip_msg* msg, char* p1, char* p2)
++{
++	return append_multibody_f(msg, p1, p2, NULL);
++}
++
 +static int append_multibody_f(struct sip_msg* msg, char* p1, char* p2, char* p3)
 +{
 +	struct lump *l;
@@ -380,7 +385,7 @@ route[TESTING_TEXTOPS]
 +		LM_ERR("invalid content-type parameter\n");
 +		return -1;
 +	}
-+	if(p3!=NULL && p3.len>0)
++	if(p3!=NULL)
 +	{
 +		if(fixup_get_svalue(msg, (gparam_p)p3, &cd)!=0)
 +		{
@@ -427,6 +432,7 @@ route[TESTING_TEXTOPS]
 +	}
 +	return 1;
 +}
++
 +
 +static int fixup_append_multibody_f(void** param, int param_no)
 +{
