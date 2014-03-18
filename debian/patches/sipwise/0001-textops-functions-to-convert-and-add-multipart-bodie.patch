@@ -1,4 +1,4 @@
-From 12cd74b699c969a9c882e878240755a1cea68289 Mon Sep 17 00:00:00 2001
+From b3b90b82177fd9e9344d5bc46b4a6ae0f013ce41 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Thu, 13 Mar 2014 19:28:33 +0100
 Subject: [PATCH 1/2] textops: functions to convert and add multipart bodies
@@ -13,12 +13,14 @@ route[TESTING_TEXTOPS]
 	append_body_part("$var(b)\n","application/vnd.cirpack.isdn-ext");
 }
 ---
- modules/textops/textops.c | 414 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 414 insertions(+)
+ modules/textops/textops.c | 416 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 416 insertions(+)
 
+diff --git a/modules/textops/textops.c b/modules/textops/textops.c
+index 1085019..58bfea5 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,9 @@
+@@ -123,6 +123,9 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
@@ -28,7 +30,7 @@ route[TESTING_TEXTOPS]
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +278,18 @@
+@@ -275,6 +278,18 @@ static cmd_export_t cmds[]={
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -47,25 +49,26 @@ route[TESTING_TEXTOPS]
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,403 @@
+@@ -1444,7 +1459,408 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
  	return 1;
  }
  
 +static int generate_boundary(str *txt, str content_type,
-+	str content_disposition, str delimiter)
++	str content_disposition, str delimiter, unsigned int initial)
 +{
 +	unsigned int i = 0;
 +	unsigned int ct_len = sizeof("Content-Type: ") -1;
 +	unsigned int cd_len = sizeof("Content-Disposition: ") -1;
 +	str n = {0,0};
-+	if (txt==NULL||txt->len==0||content_type.len==0||delimiter.len==0)
++	if(txt==NULL||txt->len==0||content_type.len==0||delimiter.len==0)
 +	{
 +		LM_ERR("invalid parameters\n");
 +		return -1;
 +	}
 +
 +	n.len=delimiter.len + 2 + CRLF_LEN;
-+	n.len=n.len + ct_len + content_type.len + 3*CRLF_LEN;
++	if(initial) n.len = 2*n.len;
++	n.len=n.len + ct_len + content_type.len + 2*CRLF_LEN;
 +	if(content_disposition.s!=NULL)
 +	{
 +		n.len=n.len + cd_len + content_disposition.len + CRLF_LEN;
@@ -73,12 +76,17 @@ route[TESTING_TEXTOPS]
 +	n.len=n.len + txt->len;
 +
 +	n.s=pkg_malloc(sizeof(char)*(n.len));
-+	if (n.s==0)
++	if(n.s==0)
 +	{
 +		LM_ERR("out of pkg memory\n");
 +		return -1;
 +	}
-+
++	if(initial)
++	{
++		memcpy(n.s, "--", 2); i=2;
++		memcpy(n.s+i, delimiter.s, delimiter.len); i=i+delimiter.len;
++		memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
++	}
 +	memcpy(n.s+i, "Content-Type: ", ct_len); i=i+ct_len;
 +	memcpy(n.s+i, content_type.s, content_type.len); i=i+content_type.len;
 +	memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
@@ -95,7 +103,6 @@ route[TESTING_TEXTOPS]
 +
 +	memcpy(n.s+i, "--", 2); i=i+2;
 +	memcpy(n.s+i, delimiter.s, delimiter.len); i=i+delimiter.len;
-+	memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
 +	memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
 +
 +	pkg_free(txt->s);
@@ -115,7 +122,7 @@ route[TESTING_TEXTOPS]
 +
 +	/* the function search for and parses the Content-Type hdr */
 +	mime = parse_content_type_hdr (msg);
-+	if (mime<0) {
++	if(mime<0) {
 +		LM_ERR("failed to extract content type hdr\n");
 +		return -1;
 +	}
@@ -134,7 +141,7 @@ route[TESTING_TEXTOPS]
 +	str nb = {0,0};
 +	str oc = {0,0};
 +	str cd = {0,0};
-+	str nc = {"multipart/mixed;boundary=\"unique-boundary-1\"",44};
++	str nc = {"multipart/mixed;boundary=\"unique-boundary-1\"", 44};
 +	str delimiter = {"unique-boundary-1", 17};
 +	unsigned int convert = 0;
 +	fparam_t header;
@@ -168,7 +175,7 @@ route[TESTING_TEXTOPS]
 +			LM_ERR("unable to get p2\n");
 +			return -1;
 +		}
-+		if(oc.s==NULL || oc.len == 0)
++		if(oc.s==NULL || oc.len==0)
 +		{
 +			LM_ERR("invalid content-type parameter\n");
 +			return -1;
@@ -179,7 +186,7 @@ route[TESTING_TEXTOPS]
 +	}
 +
 +	body.s = get_body(msg);
-+	if (body.s==0)
++	if(body.s==0)
 +	{
 +		LM_ERR("malformed sip message\n");
 +		return -1;
@@ -188,9 +195,9 @@ route[TESTING_TEXTOPS]
 +	del_nonshm_lump( &(msg->body_lumps) );
 +	msg->body_lumps = NULL;
 +
-+	if (msg->content_length)
++	if(msg->content_length)
 +	{
-+		body.len = get_content_length( msg );
++		body.len = get_content_length(msg);
 +		if(body.len > 0)
 +		{
 +			if(body.s+body.len>msg->buf+msg->len)
@@ -201,7 +208,7 @@ route[TESTING_TEXTOPS]
 +			if(convert==1)
 +			{
 +				/* need to copy body */
-+				nb.s=pkg_malloc(sizeof(char)*(body.len));
++				nb.s=pkg_malloc(sizeof(char)*body.len);
 +				if (nb.s==0)
 +				{
 +					LM_ERR("out of pkg memory\n");
@@ -221,7 +228,7 @@ route[TESTING_TEXTOPS]
 +					oc.len = msg->content_type->body.len;
 +				}
 +			}
-+			if(del_lump(msg, body.s - msg->buf, body.len, 0) == 0)
++			if(del_lump(msg, body.s-msg->buf, body.len, 0) == 0)
 +			{
 +				LM_ERR("cannot delete existing body");
 +				goto error;
@@ -229,21 +236,21 @@ route[TESTING_TEXTOPS]
 +		}
 +	}
 +
-+	anchor = anchor_lump(msg, msg->unparsed - msg->buf, 0, 0);
-+	if (anchor == 0)
++	anchor = anchor_lump(msg, msg->unparsed-msg->buf, 0, 0);
++	if(anchor==0)
 +	{
 +		LM_ERR("failed to get anchor\n");
 +		goto error;
 +	}
- 
++
 +	/* get initial boundary */
-+	if(generate_boundary(&nb, oc, cd, delimiter)<0)
++	if(generate_boundary(&nb, oc, cd, delimiter, 1)<0)
 +	{
 +		LM_ERR("couldn't create initial boundary\n");
 +		goto error;
 +	}
 +
-+	if (msg->content_length==0)
++	if(msg->content_length==0)
 +	{
 +		/* need to add Content-Length */
 +		len = nb.len;
@@ -269,7 +276,7 @@ route[TESTING_TEXTOPS]
 +		buf = NULL;
 +	}
 +
-+	if (convert!=-1)
++	if(convert!=-1)
 +	{
 +		/* add content-type */
 +		if(msg->content_type==NULL || msg->content_type->body.len!=nc.len
@@ -286,7 +293,7 @@ route[TESTING_TEXTOPS]
 +			len=sizeof("Content-Type: ") - 1 + value_len + CRLF_LEN;
 +			buf=pkg_malloc(sizeof(char)*(len));
 +
-+			if (buf==0)
++			if(buf==0)
 +			{
 +				LM_ERR("out of pkg memory\n");
 +				goto error;
@@ -309,20 +316,20 @@ route[TESTING_TEXTOPS]
 +		}
 +	}
 +	anchor = anchor_lump(msg, body.s - msg->buf, 0, 0);
-+	if (anchor == 0)
++	if(anchor==0)
 +	{
 +		LM_ERR("failed to get body anchor\n");
 +		goto error;
 +	}
 +
-+	buf=pkg_malloc(sizeof(char)*(nb.len));
-+	if (buf==0)
++	buf=pkg_malloc(sizeof(char)*nb.len);
++	if(buf==0)
 +	{
 +		LM_ERR("out of pkg memory\n");
 +		goto error;
 +	}
-+	memcpy(buf, nb.s, nb.len);
-+	if (insert_new_lump_after(anchor, buf, nb.len, 0) == 0)
++	memcpy(buf, nb.s, nb.len-CRLF_LEN);
++	if(insert_new_lump_after(anchor, buf, nb.len-CRLF_LEN, 0)==0)
 +	{
 +		LM_ERR("failed to insert body lump\n");
 +		goto error;
@@ -332,9 +339,9 @@ route[TESTING_TEXTOPS]
 +	return 1;
 +
 +error:
-+	if (buf!=NULL) pkg_free(buf);
-+	if (convert && nb.s!=NULL) pkg_free(nb.s);
-+	if (convert && oc.s!=NULL) pkg_free(oc.s);
++	if(buf!=NULL) pkg_free(buf);
++	if(convert && nb.s!=NULL) pkg_free(nb.s);
++	if(convert && oc.s!=NULL) pkg_free(oc.s);
 +	return -1;
 +}
 +
@@ -348,7 +355,7 @@ route[TESTING_TEXTOPS]
 +	str cd = {0,0};
 +	str txt = {0,0};
 +	str delimiter = {"unique-boundary-1", 17};
-+
+ 
 +	if(p1==0 || p2==0)
 +	{
 +		LM_ERR("invalid parameters\n");
@@ -360,7 +367,7 @@ route[TESTING_TEXTOPS]
 +		LM_ERR("unable to get p1\n");
 +		return -1;
 +	}
-+	if(txt.s==NULL || txt.len == 0)
++	if(txt.s==NULL || txt.len==0)
 +	{
 +		LM_ERR("invalid body parameter\n");
 +		return -1;
@@ -370,7 +377,7 @@ route[TESTING_TEXTOPS]
 +		LM_ERR("unable to get p2\n");
 +		return -1;
 +	}
-+	if(nc.s==NULL || nc.len == 0)
++	if(nc.s==NULL || nc.len==0)
 +	{
 +		LM_ERR("invalid content-type parameter\n");
 +		return -1;
@@ -385,37 +392,37 @@ route[TESTING_TEXTOPS]
 +	}
 +
 +	body.s = get_body(msg);
-+	if (body.s==0) {
++	if(body.s==0) {
 +		LM_ERR("failed to get the message body\n");
 +		return -1;
 +	}
 +	body.len = msg->len -(int)(body.s-msg->buf);
-+	if (body.len==0) {
++	if(body.len==0) {
 +		LM_DBG("message body has zero length\n");
 +		return -1;
 +	}
 +
 +	off=body.s-msg->buf;
-+	if ((l=anchor_lump(msg, off+body.len, 0, 0))==0)
++	if((l=anchor_lump(msg, off+body.len, 0, 0))==0)
 +	{
 +		LM_ERR("WTF\n");
 +		return -1;
 +	}
 +	/* get boundary */
-+	if(generate_boundary(&txt, nc, cd, delimiter)<0)
++	if(generate_boundary(&txt, nc, cd, delimiter, 0)<0)
 +	{
 +		LM_ERR("couldn't create initial boundary\n");
 +		return -1;
 +	}
 +	nb.len = txt.len;
 +	nb.s = pkg_malloc(sizeof(char)*txt.len);
-+	if (nb.s==0)
++	if(nb.s==0)
 +	{
 +		LM_ERR("out of pkg memory\n");
 +		return -1;
 +	}
 +	memcpy(nb.s, txt.s, txt.len);
-+	if (insert_new_lump_after(l, nb.s, nb.len, 0)==0){
++	if(insert_new_lump_after(l, nb.s, nb.len, 0)==0){
 +		LM_ERR("could not insert new lump\n");
 +		pkg_free(nb.s);
 +		return -1;
@@ -428,18 +435,18 @@ route[TESTING_TEXTOPS]
 +	int ret;
 +	fparam_t* fp;
 +
-+	if (param_no<=3){
-+		if ((ret=fix_param_types(FPARAM_PVE, param))<0){
++	if(param_no<=3){
++		if((ret=fix_param_types(FPARAM_PVE, param))<0){
 +			ERR("Cannot convert function parameter %d to spve \n",
 +					param_no);
 +			return E_UNSPEC;
 +		} else {
 +			fp=(fparam_t*)*param;
-+			if ((ret==0) && (fp->v.pve->spec==0
++			if((ret==0) && (fp->v.pve->spec==0
 +						|| fp->v.pve->spec->getf==0)){
 +				fparam_free_restore(param);
 +				return fix_param_types(FPARAM_STR, param);
-+			} else if (ret==1)
++			} else if(ret==1)
 +				return fix_param_types(FPARAM_STR, param);
 +			return ret;
 +		}
@@ -451,3 +458,6 @@ route[TESTING_TEXTOPS]
  
  static int append_to_reply_f(struct sip_msg* msg, char* key, char* str0)
  {
+-- 
+1.9.0
+
