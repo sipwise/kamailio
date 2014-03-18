@@ -1,35 +1,28 @@
-From b3b90b82177fd9e9344d5bc46b4a6ae0f013ce41 Mon Sep 17 00:00:00 2001
+From a2d8ca281c3a98fada2bba740609f0b013183b54 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Thu, 13 Mar 2014 19:28:33 +0100
-Subject: [PATCH 1/2] textops: functions to convert and add multipart bodies
+Subject: [PATCH 1/4] textops: functions to convert and add multipart bodies
 
-set_body_multipart() and append_body_part() functions.
-
-route[TESTING_TEXTOPS]
-{
-	$var(b)="7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c";
-	set_body_multipart();
-	append_body_part("$var(b)\n","application/vnd.cirpack.isdn-ext", "signal;handling=required");
-	append_body_part("$var(b)\n","application/vnd.cirpack.isdn-ext");
-}
 ---
- modules/textops/textops.c | 416 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 416 insertions(+)
+ modules/textops/textops.c | 424 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 424 insertions(+)
 
+diff --git a/modules/textops/textops.c b/modules/textops/textops.c
+index 1085019..14a2da5 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,10 @@
+@@ -123,6 +123,10 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
 +static int set_multibody_f(struct sip_msg* msg, char*, char *);
-+static int append_multibody2_f(struct sip_msg* msg, char*, char *);
 +static int append_multibody_f(struct sip_msg* msg, char*, char *, char *);
++static int append_multibody_2(struct sip_msg* msg, char*, char *);
 +static int fixup_append_multibody_f(void** param, int param_no);
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +279,18 @@
+@@ -275,6 +279,18 @@ static cmd_export_t cmds[]={
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -39,7 +32,7 @@ route[TESTING_TEXTOPS]
 +	{"set_body_multipart",         (cmd_function)set_multibody_f,        2,
 +		fixup_spve_spve, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
-+	{"append_body_part",     (cmd_function)append_multibody2_f,    2,
++	{"append_body_part",     (cmd_function)append_multibody_2,    2,
 +		fixup_append_multibody_f, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
 +	{"append_body_part",     (cmd_function)append_multibody_f,    3,
@@ -48,7 +41,7 @@ route[TESTING_TEXTOPS]
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1460,414 @@
+@@ -1444,7 +1460,415 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
  	return 1;
  }
  
@@ -56,8 +49,8 @@ route[TESTING_TEXTOPS]
 +	str content_disposition, str delimiter, unsigned int initial)
 +{
 +	unsigned int i = 0;
-+	unsigned int ct_len = sizeof("Content-Type: ") -1;
-+	unsigned int cd_len = sizeof("Content-Disposition: ") -1;
++	str cth = {"Content-Type: ", 14};
++	str cdh = {"Content-Disposition: ", 21};
 +	str n = {0,0};
 +	if(txt==NULL||txt->len==0||content_type.len==0||delimiter.len==0)
 +	{
@@ -67,10 +60,10 @@ route[TESTING_TEXTOPS]
 +
 +	n.len=delimiter.len + 2 + CRLF_LEN;
 +	if(initial) n.len = 2*n.len;
-+	n.len=n.len + ct_len + content_type.len + 2*CRLF_LEN;
-+	if(content_disposition.s!=NULL)
++	n.len=n.len + cth.len + content_type.len + 2*CRLF_LEN;
++	if(content_disposition.len>0)
 +	{
-+		n.len=n.len + cd_len + content_disposition.len + CRLF_LEN;
++		n.len=n.len + cdh.len + content_disposition.len + CRLF_LEN;
 +	}
 +	n.len=n.len + txt->len;
 +
@@ -86,12 +79,14 @@ route[TESTING_TEXTOPS]
 +		memcpy(n.s+i, delimiter.s, delimiter.len); i=i+delimiter.len;
 +		memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
 +	}
-+	memcpy(n.s+i, "Content-Type: ", ct_len); i=i+ct_len;
++
++	memcpy(n.s+i, cth.s, cth.len); i=i+cth.len;
 +	memcpy(n.s+i, content_type.s, content_type.len); i=i+content_type.len;
 +	memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
-+	if(content_disposition.s!=NULL)
++
++	if(content_disposition.len>0)
 +	{
-+		memcpy(n.s+i, "Content-Disposition: ", cd_len); i=i+cd_len;
++		memcpy(n.s+i, cdh.s, cdh.len); i=i+cdh.len;
 +		memcpy(n.s+i, content_disposition.s, content_disposition.len);
 +		i=i+content_disposition.len;
 +		memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
@@ -190,13 +185,13 @@ route[TESTING_TEXTOPS]
 +		LM_ERR("malformed sip message\n");
 +		return -1;
 +	}
++	body.len = msg->len -(int)(body.s-msg->buf);
 +
 +	del_nonshm_lump( &(msg->body_lumps) );
 +	msg->body_lumps = NULL;
 +
 +	if(msg->content_length)
 +	{
-+		body.len = get_content_length(msg);
 +		if(body.len > 0)
 +		{
 +			if(body.s+body.len>msg->buf+msg->len)
@@ -344,11 +339,11 @@ route[TESTING_TEXTOPS]
 +	return -1;
 +}
 +
-+static int append_multibody2_f(struct sip_msg* msg, char* p1, char* p2)
++static int append_multibody_2(struct sip_msg* msg, char* p1, char* p2)
 +{
 +	return append_multibody_f(msg, p1, p2, NULL);
 +}
-+
+ 
 +static int append_multibody_f(struct sip_msg* msg, char* p1, char* p2, char* p3)
 +{
 +	struct lump *l;
@@ -434,12 +429,11 @@ route[TESTING_TEXTOPS]
 +	return 1;
 +}
 +
-+
 +static int fixup_append_multibody_f(void** param, int param_no)
 +{
 +	int ret;
 +	fparam_t* fp;
- 
++
 +	if(param_no<=3){
 +		if((ret=fix_param_types(FPARAM_PVE, param))<0){
 +			ERR("Cannot convert function parameter %d to spve \n",
@@ -463,3 +457,6 @@ route[TESTING_TEXTOPS]
  
  static int append_to_reply_f(struct sip_msg* msg, char* key, char* str0)
  {
+-- 
+1.9.0
+
