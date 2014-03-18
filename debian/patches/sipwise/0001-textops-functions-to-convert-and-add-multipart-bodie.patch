@@ -18,17 +18,18 @@ route[TESTING_TEXTOPS]
 
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,9 @@
+@@ -123,6 +123,10 @@
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
 +static int set_multibody_f(struct sip_msg* msg, char*, char *);
++static int append_multibody2_f(struct sip_msg* msg, char*, char *);
 +static int append_multibody_f(struct sip_msg* msg, char*, char *, char *);
 +static int fixup_append_multibody_f(void** param, int param_no);
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +278,18 @@
+@@ -275,6 +279,18 @@
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -47,7 +48,7 @@ route[TESTING_TEXTOPS]
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,414 @@
+@@ -1444,7 +1460,414 @@
  	return 1;
  }
  
