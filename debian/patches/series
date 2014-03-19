@@ -7,7 +7,6 @@ no_INSTALL_file.patch
 fix_export.patch
 sipwise/do-not-install-default-config.patch
 sipwise/dialplan_regexp_subst.patch
-#sipwise/unforce_rtp_proxy_one_param.patch
 sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/nathelper.contact_only.patch
