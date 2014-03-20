@@ -253,12 +253,13 @@
 +}
 --- a/Makefile
 +++ b/Makefile
-@@ -215,7 +215,7 @@ module_group_kstandard=acc alias_db auth
- 				blst prefix_route counters debugger matrix mqueue mtree \
- 				pipelimit rtpproxy textopsx xhttp xhttp_rpc ipops p_usrloc \
- 				sdpops async sipcapture dmq msrp tmrec db_cluster corex \
--				rtpproxy-ng
-+				rtpproxy-ng tcap
+@@ -295,6 +295,9 @@
+ # K lcrrate
+ module_group_klcrrate=lcr_rate
  
- # K mysql module
- module_group_kmysql=db_mysql
++# pkg tap module
++module_group_ktcap=tcap
++
+ # if not set on the cmd. line, env or in the modules.lst (cfg_group_include)
+ # exclude the below modules.
+ ifneq ($(group_include)$(cfg_group_include),)

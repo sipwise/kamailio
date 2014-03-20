@@ -441,3 +441,15 @@ Description: Provides a set utility functions for Kamailio
  per second even on low-budget hardware.
  .
  This package contains the call rating for least cost routing Module.
+
+Package: ngcp-kamailio-tcap-modules
+Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
+Description: contains the tcap module
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains the tcap Module.
