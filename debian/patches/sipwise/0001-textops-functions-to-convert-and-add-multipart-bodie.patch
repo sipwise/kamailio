@@ -434,7 +434,7 @@ route[TESTING_TEXTOPS]
 +	return append_multibody_helper(msg, p1, p2, NULL);
 +}
 +
-+static int append_multibody_f(struct sip_msg* msg, char* p1, char* p2, char* p3)
++static int append_multibody_3(struct sip_msg* msg, char* p1, char* p2, char* p3)
 +{
 +	return append_multibody_helper(msg, p1, p2, p3);
 +}
