@@ -18,17 +18,18 @@ route[TESTING_TEXTOPS]
 
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,9 @@
+@@ -123,6 +123,10 @@
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
 +static int set_multibody_f(struct sip_msg* msg, char*, char *);
-+static int append_multibody_f(struct sip_msg* msg, char*, char *, char *);
++static int append_multibody_2(struct sip_msg* msg, char*, char *);
++static int append_multibody_3(struct sip_msg* msg, char*, char *, char *);
 +static int fixup_append_multibody_f(void** param, int param_no);
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +278,18 @@
+@@ -275,6 +279,18 @@
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -38,16 +39,16 @@ route[TESTING_TEXTOPS]
 +	{"set_body_multipart",         (cmd_function)set_multibody_f,        2,
 +		fixup_spve_spve, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
-+	{"append_body_part",     (cmd_function)append_multibody_f,    2,
++	{"append_body_part",     (cmd_function)append_multibody_2,    2,
 +		fixup_append_multibody_f, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
-+	{"append_body_part",     (cmd_function)append_multibody_f,    3,
++	{"append_body_part",     (cmd_function)append_multibody_3,    3,
 +		fixup_append_multibody_f, 0,
 +		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1459,408 @@
+@@ -1444,7 +1460,418 @@
  	return 1;
  }
  
@@ -341,7 +342,7 @@ route[TESTING_TEXTOPS]
 +	return -1;
 +}
 +
-+static int append_multibody_f(struct sip_msg* msg, char* p1, char* p2, char* p3)
++int append_multibody_helper(struct sip_msg* msg, char* p1, char* p2, char* p3)
 +{
 +	struct lump *l;
 +	int off;
@@ -357,7 +358,7 @@ route[TESTING_TEXTOPS]
 +		LM_ERR("invalid parameters\n");
 +		return -1;
 +	}
- 
++
 +	if(fixup_get_svalue(msg, (gparam_p)p1, &txt)!=0)
 +	{
 +		LM_ERR("unable to get p1\n");
@@ -428,11 +429,21 @@ route[TESTING_TEXTOPS]
 +	return 1;
 +}
 +
++static int append_multibody_2(struct sip_msg* msg, char* p1, char* p2)
++{
++	return append_multibody_helper(msg, p1, p2, NULL);
++}
++
++static int append_multibody_f(struct sip_msg* msg, char* p1, char* p2, char* p3)
++{
++	return append_multibody_helper(msg, p1, p2, p3);
++}
++
 +static int fixup_append_multibody_f(void** param, int param_no)
 +{
 +	int ret;
 +	fparam_t* fp;
-+
+ 
 +	if (param_no<=3){
 +		if ((ret=fix_param_types(FPARAM_PVE, param))<0){
 +			ERR("Cannot convert function parameter %d to spve \n",
