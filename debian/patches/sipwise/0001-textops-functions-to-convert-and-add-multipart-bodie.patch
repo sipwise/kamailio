@@ -417,9 +417,9 @@ route[TESTING_TEXTOPS]
 +		LM_ERR("out of pkg memory\n");
 +		return -1;
 +	}
-+	memcpy(nb.s, txt.s-2, txt.len-2);
-+	memcpy(nb.s+txt.len-2,"--",2);
-+	memcpy(nb.s+txt.len,"\r\n",2);
++	memcpy(nb.s, txt.s, txt.len-4);
++	memcpy(nb.s+txt.len-4,"--",2);
++	memcpy(nb.s+txt.len-2,"\r\n\r\n",4);
 +	if (insert_new_lump_after(l, nb.s, nb.len, 0)==0){
 +		LM_ERR("could not insert new lump\n");
 +		pkg_free(nb.s);
