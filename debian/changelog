@@ -1,3 +1,15 @@
+ngcp-kamailio (4.1.2-1+0~mr3.2.1.1) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [5395220] MT#6345 create tcap module package
+
+  [ Richard Fuchs ]
+  * [79709a6] remove obsolete patch files
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 21 Mar 2014 17:27:20 +0100
+
 ngcp-kamailio (4.1.2-1+0~mr3.2.1) unstable; urgency=medium
 
   * [7431204] MT#5301 add upstream fixes
