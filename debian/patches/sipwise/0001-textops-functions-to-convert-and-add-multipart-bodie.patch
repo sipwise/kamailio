@@ -1,15 +1,15 @@
-From 43ae28c0017ea9b1ac339bdb6fb23df1b659253e Mon Sep 17 00:00:00 2001
+From 50fdb6a863f36c9f5977ca6f52bfaf974cb674b1 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Thu, 20 Mar 2014 15:24:42 +0100
 Subject: [PATCH] simple
 
 (cherry picked from commit 5fbee6b6c0a2b666a7db63a04f357d2f8e57b6b6)
 ---
- modules/textops/textops.c | 441 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 441 insertions(+)
+ modules/textops/textops.c | 442 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 442 insertions(+)
 
 diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..c1a38ba 100644
+index 1085019..acb97b5 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
 @@ -123,6 +123,10 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
@@ -42,7 +42,7 @@ index 1085019..c1a38ba 100644
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1460,432 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
+@@ -1444,7 +1460,433 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
  	return 1;
  }
  
@@ -51,8 +51,8 @@ index 1085019..c1a38ba 100644
 +	str content_disposition, str delimiter, unsigned int flag)
 +{
 +	unsigned int i = 0;
-+	unsigned int ct_len = sizeof("Content-Type: ") -1;
-+	unsigned int cd_len = sizeof("Content-Disposition: ") -1;
++	str cth = {"Content-Type: ", 14};
++	str cdh = {"Content-Disposition: ", 21};
 +	str n = {0,0};
 +	unsigned int flag_sdp = 0;
 +
@@ -72,10 +72,10 @@ index 1085019..c1a38ba 100644
 +		flag_sdp = 1;
 +		LM_DBG("sdp with no CRLF+CRLF\n");
 +	}
-+	n.len=n.len + ct_len + content_type.len + 2*CRLF_LEN;
++	n.len=n.len + cth.len + content_type.len + 2*CRLF_LEN;
 +	if(content_disposition.s!=NULL)
 +	{
-+		n.len=n.len + cd_len + content_disposition.len + CRLF_LEN;
++		n.len=n.len + cdh.len + content_disposition.len + CRLF_LEN;
 +	}
 +	n.len=n.len + txt->len;
 +
@@ -92,12 +92,12 @@ index 1085019..c1a38ba 100644
 +		memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
 +	}
 +
-+	memcpy(n.s+i, "Content-Type: ", ct_len); i=i+ct_len;
++	memcpy(n.s+i, cth.s, cth.len); i=i+cth.len;
 +	memcpy(n.s+i, content_type.s, content_type.len); i=i+content_type.len;
 +	memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
 +	if(content_disposition.s!=NULL)
 +	{
-+		memcpy(n.s+i, "Content-Disposition: ", cd_len); i=i+cd_len;
++		memcpy(n.s+i, cdh.s, cdh.len); i=i+cdh.len;
 +		memcpy(n.s+i, content_disposition.s, content_disposition.len);
 +		i=i+content_disposition.len;
 +		memcpy(n.s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
@@ -148,6 +148,7 @@ index 1085019..c1a38ba 100644
 +	str cd = {0,0};
 +	str nc = {"multipart/mixed;boundary=\"unique-boundary-1\"",44};
 +	str delimiter = {"unique-boundary-1", 17};
++	str cth = {"Content-Type: ", 14};
 +	unsigned int convert = 0;
 +	fparam_t header;
 +	header.orig = NULL;
@@ -190,6 +191,7 @@ index 1085019..c1a38ba 100644
 +		}
 +	}
 +
++	body.len = 0;
 +	body.s = get_body(msg);
 +	if (body.s==0)
 +	{
@@ -213,7 +215,7 @@ index 1085019..c1a38ba 100644
 +			if(convert==1)
 +			{
 +				/* need to copy body */
-+				nb.s=pkg_malloc(sizeof(char)*(body.len));
++				nb.s=pkg_malloc(sizeof(char)*body.len);
 +				if (nb.s==0)
 +				{
 +					LM_ERR("out of pkg memory\n");
@@ -223,14 +225,14 @@ index 1085019..c1a38ba 100644
 +				nb.len = body.len;
 +				if(msg->content_type!=NULL && msg->content_type->body.s!=NULL)
 +				{
-+					oc.s=pkg_malloc(sizeof(char)*(msg->content_type->body.len));
++					oc.len = msg->content_type->body.len;
++					oc.s=pkg_malloc(sizeof(char)*oc.len);
 +					if (oc.s==0)
 +					{
 +						LM_ERR("out of pkg memory\n");
 +						goto error;
 +					}
-+					memcpy(oc.s, msg->content_type->body.s, msg->content_type->body.len);
-+					oc.len = msg->content_type->body.len;
++					memcpy(oc.s, msg->content_type->body.s, oc.len);
 +				}
 +			}
 +			if(del_lump(msg, body.s - msg->buf, body.len, 0) == 0)
@@ -262,7 +264,7 @@ index 1085019..c1a38ba 100644
 +		value_s=int2str(len, &value_len);
 +
 +		len=CONTENT_LENGTH_LEN+value_len+CRLF_LEN;
-+		buf=pkg_malloc(sizeof(char)*(len));
++		buf=pkg_malloc(sizeof(char)*len);
 +
 +		if (buf==0)
 +		{
@@ -294,18 +296,17 @@ index 1085019..c1a38ba 100644
 +					LM_ERR("failed to delete content type\n");
 +					goto error;
 +				}
-+			value_len = nc.len;
-+			len=sizeof("Content-Type: ") - 1 + value_len + CRLF_LEN;
-+			buf=pkg_malloc(sizeof(char)*(len));
++			len=cth.len + nc.len + CRLF_LEN;
++			buf=pkg_malloc(sizeof(char)*len);
 +
 +			if (buf==0)
 +			{
 +				LM_ERR("out of pkg memory\n");
 +				goto error;
 +			}
-+			memcpy(buf, "Content-Type: ", sizeof("Content-Type: ") - 1);
-+			memcpy(buf+sizeof("Content-Type: ") - 1, nc.s, value_len);
-+			memcpy(buf+sizeof("Content-Type: ") - 1 + value_len, CRLF, CRLF_LEN);
++			memcpy(buf, cth.s, cth.len);
++			memcpy(buf + cth.len, nc.s, nc.len);
++			memcpy(buf + cth.len + nc.len, CRLF, CRLF_LEN);
 +			if (insert_new_lump_after(anchor, buf, len, 0) == 0)
 +			{
 +				LM_ERR("failed to insert content-type lump\n");
@@ -419,7 +420,7 @@ index 1085019..c1a38ba 100644
 +		LM_ERR("couldn't create initial boundary\n");
 +		return -1;
 +	}
-+	nb.len = txt.len+2;
++	nb.len = txt.len + 4;
 +	nb.s = pkg_malloc(sizeof(char)*nb.len);
 +	if (nb.s==0)
 +	{
@@ -427,8 +428,8 @@ index 1085019..c1a38ba 100644
 +		return -1;
 +	}
 +	memcpy(nb.s, txt.s, txt.len-2);
-+	memcpy(nb.s+txt.len-2,"--",2);
-+	memcpy(nb.s+txt.len,"\r\n\r\n",4);
++	memcpy(nb.s+txt.len-2, "--", 2);
++	memcpy(nb.s+txt.len, "\r\n\r\n", 4);
 +	if (insert_new_lump_after(l, nb.s, nb.len, 0)==0){
 +		LM_ERR("could not insert new lump\n");
 +		pkg_free(nb.s);
