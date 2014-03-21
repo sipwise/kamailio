@@ -1,4 +1,4 @@
-From 3339ab12a48b25d118dea79e9af1c1ad8114532d Mon Sep 17 00:00:00 2001
+From 75ebf5ad98496014b6245d3ff71f4ba43916ac6b Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Thu, 13 Mar 2014 19:28:33 +0100
 Subject: [PATCH 1/4] textops: functions to convert and add multipart bodies
@@ -10,7 +10,7 @@ Subject: [PATCH 1/4] textops: functions to convert and add multipart bodies
  3 files changed, 684 insertions(+), 3 deletions(-)
 
 diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..832cc62 100644
+index 1085019..90f2da4 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
 @@ -123,6 +123,10 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
@@ -75,7 +75,7 @@ index 1085019..832cc62 100644
 +		flag = 1;
 +		LM_DBG("adding final CRLF+CRLF\n");
 +	}
-+	n->len=n->len + cth.len + content_type.len + 3*CRLF_LEN;
++	n->len=n->len + cth.len + content_type.len + 2*CRLF_LEN;
 +	if(content_disposition.len>0)
 +	{
 +		n->len = n->len + cdh.len + content_disposition.len + CRLF_LEN;
