@@ -4026,7 +4026,7 @@
 +			flags_str++;
 +
 +		key.s = (void *) flags_str;
-+		key.len = -1;
++		val.len = key.len = -1;
 +		val.s = NULL;
 +
 +		e = strpbrk(key.s, " =");
