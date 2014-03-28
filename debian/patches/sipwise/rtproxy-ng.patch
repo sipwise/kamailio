@@ -1,5 +1,7 @@
---- /dev/null
-+++ b/modules/rtpproxy-ng/Makefile
+Index: kamailio/modules/rtpproxy-ng/Makefile
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/Makefile	2014-03-28 21:38:23.188332324 +0100
 @@ -0,0 +1,19 @@
 +# $Id$
 +#
@@ -20,8 +22,10 @@
 +SER_LIBS+=$(SERLIBPATH)/kcore/kcore
 +include ../../Makefile.modules
 +
---- /dev/null
-+++ b/modules/rtpproxy-ng/README
+Index: kamailio/modules/rtpproxy-ng/README
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/README	2014-03-28 21:38:23.192334339 +0100
 @@ -0,0 +1,652 @@
 +rtpproxy-ng Module
 +
@@ -675,8 +679,10 @@
 +
 +       Please follow the guidelines provided at:
 +       http://sip-router.org/tracker.
---- /dev/null
-+++ b/modules/rtpproxy-ng/bencode.c
+Index: kamailio/modules/rtpproxy-ng/bencode.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/bencode.c	2014-03-28 21:38:23.192334339 +0100
 @@ -0,0 +1,703 @@
 +#include "bencode.h"
 +#include <stdio.h>
@@ -1381,8 +1387,10 @@
 +	li->next = buf->free_list;
 +	buf->free_list = li;
 +}
---- /dev/null
-+++ b/modules/rtpproxy-ng/bencode.h
+Index: kamailio/modules/rtpproxy-ng/bencode.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/bencode.h	2014-03-28 21:38:23.192334339 +0100
 @@ -0,0 +1,530 @@
 +#ifndef _BENCODE_H_
 +#define _BENCODE_H_
@@ -1914,15 +1922,19 @@
 +}
 +
 +#endif
---- /dev/null
-+++ b/modules/rtpproxy-ng/doc/Makefile
+Index: kamailio/modules/rtpproxy-ng/doc/Makefile
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/doc/Makefile	2014-03-28 21:38:23.196336364 +0100
 @@ -0,0 +1,4 @@
 +docs = rtpproxy-ng.xml
 +
 +docbook_dir = ../../../docbook
 +include $(docbook_dir)/Makefile.module
---- /dev/null
-+++ b/modules/rtpproxy-ng/doc/rtpproxy-ng.xml
+Index: kamailio/modules/rtpproxy-ng/doc/rtpproxy-ng.xml
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/doc/rtpproxy-ng.xml	2014-03-28 21:38:23.196336364 +0100
 @@ -0,0 +1,103 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
@@ -2027,8 +2039,10 @@
 +	<xi:include href="rtpproxy_faq.xml"/>
 +
 +</book>
---- /dev/null
-+++ b/modules/rtpproxy-ng/doc/rtpproxy_admin.xml
+Index: kamailio/modules/rtpproxy-ng/doc/rtpproxy_admin.xml
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/doc/rtpproxy_admin.xml	2014-03-28 21:38:23.204340404 +0100
 @@ -0,0 +1,823 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
@@ -2853,8 +2867,10 @@
 +
 +</chapter>
 +
---- /dev/null
-+++ b/modules/rtpproxy-ng/doc/rtpproxy_faq.xml
+Index: kamailio/modules/rtpproxy-ng/doc/rtpproxy_faq.xml
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/doc/rtpproxy_faq.xml	2014-03-28 21:38:23.204340404 +0100
 @@ -0,0 +1,79 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
@@ -2935,8 +2951,10 @@
 +    </qandaset>
 +</chapter>
 +
---- /dev/null
-+++ b/modules/rtpproxy-ng/rtpproxy.c
+Index: kamailio/modules/rtpproxy-ng/rtpproxy.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/rtpproxy.c	2014-03-28 21:38:23.208342420 +0100
 @@ -0,0 +1,1943 @@
 +/* $Id$
 + *
@@ -4881,8 +4899,10 @@
 +	return -1;
 +}
 +
---- /dev/null
-+++ b/modules/rtpproxy-ng/rtpproxy.h
+Index: kamailio/modules/rtpproxy-ng/rtpproxy.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/rtpproxy.h	2014-03-28 21:38:23.212344439 +0100
 @@ -0,0 +1,64 @@
 +/* $Id: nathelper.c 1808 2007-03-10 17:36:19Z bogdan_iancu $
 + *
@@ -4948,9 +4968,11 @@
 +};
 +
 +#endif
---- /dev/null
-+++ b/modules/rtpproxy-ng/rtpproxy_funcs.c
-@@ -0,0 +1,430 @@
+Index: kamailio/modules/rtpproxy-ng/rtpproxy_funcs.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/rtpproxy_funcs.c	2014-03-28 21:38:58.009906917 +0100
+@@ -0,0 +1,434 @@
 +/*
 + * $Id$
 + *
@@ -5210,6 +5232,10 @@
 +		} /* end of while */
 +		if(c==1)
 +		{
++			if (rest < p2 && *rest == '\r') rest++;
++			if (rest < p2 && *rest == '\n') rest++;
++			if (rest < p2 && p2[-1] == '\n') p2--;
++			if (rest < p2 && p2[-1] == '\r') p2--;
 +			body->s = rest;
 +			body->len = p2-rest;
 +			goto done;
@@ -5381,8 +5407,10 @@
 +	}
 +	return -1;
 +}
---- /dev/null
-+++ b/modules/rtpproxy-ng/rtpproxy_funcs.h
+Index: kamailio/modules/rtpproxy-ng/rtpproxy_funcs.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kamailio/modules/rtpproxy-ng/rtpproxy_funcs.h	2014-03-28 21:38:23.228352523 +0100
 @@ -0,0 +1,40 @@
 +/*
 + * $Id$
@@ -5424,8 +5452,10 @@
 +int get_via_branch(struct sip_msg *, int, str *);
 +
 +#endif
---- a/Makefile.groups
-+++ b/Makefile.groups
+Index: kamailio/Makefile.groups
+===================================================================
+--- kamailio.orig/Makefile.groups	2014-03-28 21:38:23.056265672 +0100
++++ kamailio/Makefile.groups	2014-03-28 21:38:23.228352523 +0100
 @@ -13,7 +13,7 @@
  				   mediaproxy mi_datagram mi_fifo mi_rpc mqueue \
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
