@@ -8,11 +8,9 @@ Subject: [PATCH] simple
  modules/textops/textops.c | 449 ++++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 449 insertions(+)
 
-diff --git a/modules/textops/textops.c b/modules/textops/textops.c
-index 1085019..4b975f1 100644
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -123,6 +123,10 @@ static int append_time_f(struct sip_msg* msg, char* , char *);
+@@ -123,6 +123,10 @@
  static int append_time_request_f(struct sip_msg* msg, char* , char *);
  static int set_body_f(struct sip_msg* msg, char*, char *);
  static int set_rpl_body_f(struct sip_msg* msg, char*, char *);
@@ -23,7 +21,7 @@ index 1085019..4b975f1 100644
  static int is_method_f(struct sip_msg* msg, char* , char *);
  static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
  static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
-@@ -275,6 +279,18 @@ static cmd_export_t cmds[]={
+@@ -275,6 +279,18 @@
  
  	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
  		0},
@@ -42,7 +40,7 @@ index 1085019..4b975f1 100644
  
  	{0,0,0,0,0,0}
  };
-@@ -1444,7 +1460,440 @@ static int set_rpl_body_f(struct sip_msg* msg, char* p1, char* p2)
+@@ -1444,7 +1460,440 @@
  	return 1;
  }
  
@@ -131,7 +129,7 @@ index 1085019..4b975f1 100644
 +static int check_multipart(struct sip_msg *msg)
 +{
 +	int mime;
- 
++
 +	/* the function search for and parses the Content-Type hdr */
 +	mime = parse_content_type_hdr (msg);
 +	if (mime<0) {
@@ -280,7 +278,7 @@ index 1085019..4b975f1 100644
 +			LM_ERR("out of pkg memory\n");
 +			goto error;
 +		}
-+
+ 
 +		memcpy(buf, CONTENT_LENGTH, CONTENT_LENGTH_LEN);
 +		memcpy(buf+CONTENT_LENGTH_LEN, value_s, value_len);
 +		memcpy(buf+CONTENT_LENGTH_LEN+value_len, CRLF, CRLF_LEN);
@@ -423,7 +421,7 @@ index 1085019..4b975f1 100644
 +		LM_ERR("couldn't create initial boundary\n");
 +		return -1;
 +	}
-+	nb.len = nbb->len + 4;
++	nb.len = nbb->len + 2;
 +	nb.s = pkg_malloc(sizeof(char)*nb.len);
 +	if (nb.s==0)
 +	{
@@ -432,7 +430,7 @@ index 1085019..4b975f1 100644
 +	}
 +	memcpy(nb.s, nbb->s, nbb->len-2);
 +	memcpy(nb.s+nbb->len-2, "--", 2);
-+	memcpy(nb.s+nbb->len, "\r\n\r\n", 4);
++	memcpy(nb.s+nbb->len, "\r\n", 2);
 +	if (insert_new_lump_after(l, nb.s, nb.len, 0)==0){
 +		LM_ERR("could not insert new lump\n");
 +		goto error;
@@ -483,6 +481,3 @@ index 1085019..4b975f1 100644
  
  static int append_to_reply_f(struct sip_msg* msg, char* key, char* str0)
  {
--- 
-1.9.0
-
