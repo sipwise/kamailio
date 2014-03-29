@@ -3597,7 +3597,7 @@
 +
 +	if (rtpp_list != NULL)
 +	{
-+		if (add_rtpproxy_socks(rtpp_list, rtp_proxies) != 0)
++		if (add_rtpengine_socks(rtpp_list, rtp_proxies) != 0)
 +			goto error;
 +		else
 +			return 0;
@@ -5084,7 +5084,7 @@
 +
 +
 +struct rtpp_set *get_rtpp_set(int set_id);
-+int add_rtpproxy_socks(struct rtpp_set * rtpp_list, char * rtpproxy);
++int add_rtpengine_socks(struct rtpp_set * rtpp_list, char * rtpproxy);
 +
 +int init_rtpproxy_db(void);
 +
@@ -5703,7 +5703,7 @@
 +			continue;
 +		}
 +
-+		if (add_rtpproxy_socks(rtpp_list, url.s) !=  0)
++		if (add_rtpengine_socks(rtpp_list, url.s) !=  0)
 +		{
 +			LM_ERR("error inserting '%.*s' into set %d\n", url.len, url.s, set_id);
 +		}
