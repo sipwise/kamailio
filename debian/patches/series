@@ -45,3 +45,4 @@ sipwise/utils-kamctl-Add-contact-path-parameter.patch
 sipwise/url-safe_base64.patch
 sipwise/dialoginfo_notify_body.patch
 sipwise/0001-textops-functions-to-convert-and-add-multipart-bodie.patch
+sipwise/fix_dump_usrloc.patch
