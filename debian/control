@@ -1,9 +1,7 @@
 Source: ngcp-kamailio
 Section: net
 Priority: optional
-Maintainer: Sipwise Team <development@sipwise.com>
-Uploaders: Jon Bonilla <manwe@aholab.ehu.es>,
-           Victor Seva <vseva@sipwise.com>
+Maintainer: Sipwise Development Team <support@sipwise.com>
 Build-Depends: bison,
                debhelper (>= 9~),
                docbook-xml,
