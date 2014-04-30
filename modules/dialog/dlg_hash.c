@@ -132,7 +132,7 @@ int dlg_ka_add(dlg_cell_t *dlg)
 
 	if(dlg_ka_interval<=0)
 		return 0;
-	if(!(dlg->iflags & (DLG_IFLAG_KA_SRC | DLG_IFLAG_KA_SRC)))
+	if(!(dlg->iflags & (DLG_IFLAG_KA_SRC | DLG_IFLAG_KA_DST)))
 		return 0;
 
 	dka = (dlg_ka_t*)shm_malloc(sizeof(dlg_ka_t));
@@ -585,7 +585,12 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
  * \return 0 on success, -1 on failure
  */
 int dlg_update_cseq(struct dlg_cell * dlg, unsigned int leg, str *cseq)
-{
+{	dlg_entry_t *d_entry;
+
+	d_entry = &(d_table->entries[dlg->h_entry]);
+
+	dlg_lock(d_table, d_entry);
+
 	if ( dlg->cseq[leg].s ) {
 		if (dlg->cseq[leg].len < cseq->len) {
 			shm_free(dlg->cseq[leg].s);
@@ -602,9 +607,12 @@ int dlg_update_cseq(struct dlg_cell * dlg, unsigned int leg, str *cseq)
 	memcpy( dlg->cseq[leg].s, cseq->s, cseq->len );
 	dlg->cseq[leg].len = cseq->len;
 
-	LM_DBG("cseq is %.*s\n", dlg->cseq[leg].len, dlg->cseq[leg].s);
+	LM_DBG("cseq of leg[%d] is %.*s\n", leg,
+			dlg->cseq[leg].len, dlg->cseq[leg].s);
+	dlg_unlock(d_table, d_entry);
 	return 0;
 error:
+	dlg_unlock(d_table, d_entry);
 	LM_ERR("not more shm mem\n");
 	return -1;
 }

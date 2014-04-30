@@ -47,6 +47,7 @@
 #include <netinet/in.h> /* udp sock */
 #include <sys/uio.h> /* writev */
 #include <netdb.h> /* gethostbyname */
+#include <fcntl.h>
 #include <time.h> /* time */
 
 #ifdef USE_READLINE
@@ -718,8 +719,24 @@ static int get_reply(int s, unsigned char* reply_buf, int max_reply_size,
 				goto error;
 			}
 			msg_end=hdr_end+in_pkt->tlen;
-			if ((int)(msg_end-reply_buf)>max_reply_size)
+			if ((int)(msg_end-reply_buf)>max_reply_size) {
+				/* reading the rest from the socket */
+				struct timeval timeout_save;
+				unsigned sizeoft = sizeof(timeout_save);
+				if (getsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
+							&timeout_save, &sizeoft)==0) {
+					struct timeval timeout;
+					timeout.tv_sec = 1;
+					timeout.tv_usec = 0;
+					if (setsockopt (s, SOL_SOCKET, SO_RCVTIMEO,
+								(char*)&timeout,sizeof(timeout))==0) {
+						while(read(s, reply_buf, max_reply_size)>0);
+						setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,
+								(char*)&timeout_save,sizeof(timeout_save));
+					}
+				}
 				goto error_toolong;
+			}
 		}
 	}while(crt<msg_end);
 	

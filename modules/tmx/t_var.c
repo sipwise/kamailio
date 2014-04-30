@@ -384,7 +384,8 @@ int pv_get_tm_branch_idx(struct sip_msg *msg, pv_param_t *param,
 			idx = tcx->branch_index;
 	} else switch(route_type) {
 		case BRANCH_ROUTE:
-			/* branches have their index set */
+		case BRANCH_FAILURE_ROUTE:
+			/* branch and branch_failure routes have their index set */
 			tcx = _tmx_tmb.tm_ctx_get();
 			if(tcx != NULL)
 				idx = tcx->branch_index;
@@ -396,7 +397,7 @@ int pv_get_tm_branch_idx(struct sip_msg *msg, pv_param_t *param,
 		case FAILURE_ROUTE:
 			/* first get the transaction */
 			t = _tmx_tmb.t_gett();
-			if ( t == NULL && t == T_UNDEFINED ) {
+			if ( t == NULL || t == T_UNDEFINED ) {
 				return -1;
 			}
 			/* add the currently added branches to the number of

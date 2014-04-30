@@ -299,6 +299,8 @@ int ops_dbload_avps (struct sip_msg* msg, struct fis_param *sp,
 		goto error;
 	}
 
+	memset(&xvalue, 0, sizeof(pv_value_t));
+
 	/* get uuid from avp */
 	if (sp->opd&AVPOPS_VAL_PVAR)
 	{

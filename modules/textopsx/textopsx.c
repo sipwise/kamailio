@@ -166,7 +166,7 @@ static int msg_apply_changes_f(sip_msg_t *msg, char *str1, char *str2)
 	} else {
 		obuf.s = build_req_buf_from_sip_req(msg,
 				(unsigned int*)&obuf.len, &dst,
-				BUILD_NO_LOCAL_VIA|BUILD_NO_VIA1_UPDATE);
+				BUILD_NO_PATH|BUILD_NO_LOCAL_VIA|BUILD_NO_VIA1_UPDATE);
 	}
 	if(obuf.s == NULL)
 	{
@@ -1040,8 +1040,9 @@ static void get_uri_and_skip_until_params(str *param_area, str *name, str *uri) 
 
 	name->len = 0;
 	uri->len = 0;
+	uri->s = 0;
 	uri_done = 0;
-        name->s = param_area->s;
+    name->s = param_area->s;
 	for (i=0; i<param_area->len && param_area->s[i]!=';'; ) {	/* [ *(token LSW)/quoted-string ] "<" addr-spec ">" | addr-spec */
 		/* skip name */
 		for (quoted=0, uri_pos=i; i<param_area->len; i++) {
@@ -1078,7 +1079,7 @@ static void get_uri_and_skip_until_params(str *param_area, str *name, str *uri) 
 			}
 		}
 	}
-        param_area->s+= i;
+    param_area->s+= i;
 	param_area->len-= i;
 	if (uri->s == name->s)
 		name->len = 0;
@@ -1200,7 +1201,8 @@ static int assign_hf_process2_params(struct sip_msg* msg, struct hdr_field* hf, 
 static int insupddel_hf_value_f(struct sip_msg* msg, char* _hname, char* _val) {
 	struct hname_data* hname = (void*) _hname;
 	struct hdr_field* hf;
-	str val, hval1, hval2;
+	str val = {0};
+	str hval1, hval2;
 	int res;
 
 	if (_val) {
