@@ -1,3 +1,24 @@
+ngcp-kamailio (4.1.3-1+0~mr3.3) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [91684d2] remove obsolete patch files
+  * [58fdf93] adding rtpengine module
+  * [c825170] include rtpengine patch in series
+  * [4720727] silence compiler warning
+  * [80a2bf4] update rtpengine to kamailio master version
+  * [fb9bf4e] update rtpengine to kamailio master
+  * [38ba489] rtpengine: fix inconsistent function naming
+
+  [ Victor Seva ]
+  * [57ce175] MT#6345 create tcap module package
+  * [6da9f1e] MT#6517 unify Debian Packaging
+  * [579e6dd] Imported Upstream version 4.1.3
+
+  [ Michael Prokop ]
+  * [e719525] MT#6511 Bump Standards-Version to 3.9.5
+
+ -- Victor Seva <vseva@sipwise.com>  Thu, 01 May 2014 00:00:06 +0200
+
 ngcp-kamailio (4.1.2-1+0~mr3.3) unstable; urgency=medium
 
   * [201877e] MT#5301 add upstream fixes
