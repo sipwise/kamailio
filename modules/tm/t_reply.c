@@ -2336,6 +2336,11 @@ int reply_received( struct sip_msg  *p_msg )
 	/* processing of on_reply block */
 	if (onreply_route) {
 		set_route_type(TM_ONREPLY_ROUTE);
+
+		/* lock onreply_route, for safe avp usage */
+		LOCK_REPLIES( t );
+		replies_locked=1;
+
 		/* transfer transaction flag to message context */
 		if (t->uas.request) p_msg->flags=t->uas.request->flags;
 		/* set the as avp_list the one from transaction */
@@ -2353,9 +2358,6 @@ int reply_received( struct sip_msg  *p_msg )
 		/* Pre- and post-script callbacks have already
 		 * been executed by the core. (Miklos)
 		 */
-		/* lock onreply_route, for safe avp usage */
-		LOCK_REPLIES( t );
-		replies_locked=1;
 		run_top_route(onreply_rt.rlist[onreply_route], p_msg, &ctx);
 		/* transfer current message context back to t */
 		if (t->uas.request) t->uas.request->flags=p_msg->flags;
@@ -2478,6 +2480,7 @@ int reply_received( struct sip_msg  *p_msg )
 	}
 	if ( is_local(t) ) {
 		reply_status=local_reply( t, p_msg, branch, msg_status, &cancel_data );
+		replies_locked=0;
 		if (reply_status == RPS_COMPLETED) {
 			     /* no more UAC FR/RETR (if I received a 2xx, there may
 			      * be still pending branches ...
@@ -2495,6 +2498,7 @@ int reply_received( struct sip_msg  *p_msg )
 	} else {
 		reply_status=relay_reply( t, p_msg, branch, msg_status,
 									&cancel_data, 1 );
+		replies_locked=0;
 		if (reply_status == RPS_COMPLETED) {
 			     /* no more UAC FR/RETR (if I received a 2xx, there may
 				be still pending branches ...
@@ -2532,7 +2536,8 @@ int reply_received( struct sip_msg  *p_msg )
 skip_send_reply:
 
 	if (likely(replies_locked)){
-		UNLOCK_REPLIES(t); /* unlock replies  - this would be unlocked by send function*/
+		/* unlock replies if still locked coming via goto skip_send_reply */
+		UNLOCK_REPLIES(t);
 		replies_locked=0;
 	}
 
