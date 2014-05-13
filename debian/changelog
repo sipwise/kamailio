@@ -1,3 +1,9 @@
+ngcp-kamailio (4.1.2-1+0~mr3.2.2.1) unstable; urgency=low
+
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 13 May 2014 11:56:31 +0200
+
 ngcp-kamailio (4.1.2-1+0~mr3.2.2.0) unstable; urgency=low
 
   [ Victor Seva ]
