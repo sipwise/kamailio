@@ -1,0 +1,29 @@
+From f44415eee52d5c17a9b6c5e16175bd84455e9867 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 15 May 2014 13:59:03 +0200
+Subject: [PATCH] siputils: allocate enough space to hold ending zero for tel
+ uri in tel2sip()
+
+- reported by Juha Heinanen
+
+(cherry picked from commit 7992a2b8d42bb7e8bcf1738cf042013ed126a47a)
+---
+ modules/siputils/checks.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/siputils/checks.c b/modules/siputils/checks.c
+index a1a9344..7f50cfc 100644
+--- a/modules/siputils/checks.c
++++ b/modules/siputils/checks.c
+@@ -354,7 +354,7 @@ int tel2sip(struct sip_msg* _msg, char* _uri, char* _hostpart, char* _res)
+     if (strncasecmp(uri.s, "tel:", 4) != 0) return 1;
+     
+     /* reserve memory for clean tel uri */
+-    tel_uri.s = pkg_malloc(uri.len);
++    tel_uri.s = pkg_malloc(uri.len+1);
+     if (tel_uri.s == 0) {
+ 	LM_ERR("no more pkg memory\n");
+ 	return -1;
+-- 
+2.0.0.rc0
+

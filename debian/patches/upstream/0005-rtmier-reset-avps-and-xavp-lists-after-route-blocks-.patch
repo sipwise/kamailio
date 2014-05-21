@@ -1,0 +1,42 @@
+From c5781b28cd92360cf163a84312fa72c08c4737b5 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Tue, 29 Apr 2014 20:02:19 +0200
+Subject: [PATCH] rtmier: reset avps and xavp lists after route blocks
+ execution
+
+- avoid leaks if someone is using avp/xavp with rtimer - there is a fake
+  message used there, thus not the normal sip message routing that
+  resets avps/xavps
+
+(cherry picked from commit 159978cf2a98748f3225155d8946bcbd768b51e3)
+---
+ modules/rtimer/rtimer_mod.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/modules/rtimer/rtimer_mod.c b/modules/rtimer/rtimer_mod.c
+index 03a002d..271b888 100644
+--- a/modules/rtimer/rtimer_mod.c
++++ b/modules/rtimer/rtimer_mod.c
+@@ -37,6 +37,8 @@
+ #include "../../socket_info.h"
+ #include "../../dset.h"
+ #include "../../pt.h"
++#include "../../usr_avp.h"
++#include "../../xavp.h"
+ #include "../../timer_proc.h"
+ #include "../../script_cb.h"
+ #include "../../parser/parse_param.h"
+@@ -190,6 +192,10 @@ void stm_timer_exec(unsigned int ticks, void *param)
+ 		set_route_type(REQUEST_ROUTE);
+ 		run_top_route(main_rt.rlist[rt->route], fmsg, 0);
+ 		exec_post_script_cb(fmsg, REQUEST_CB_TYPE);
++		reset_avps();
++#ifdef WITH_XAVP
++		xavp_reset_list();
++#endif
+ 	}
+ }
+ 
+-- 
+2.0.0.rc0
+

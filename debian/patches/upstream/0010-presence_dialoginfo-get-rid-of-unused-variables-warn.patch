@@ -1,0 +1,30 @@
+From 9c15e8444e99f33ca2f0c920d3cbb846d407f596 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 14 May 2014 09:58:50 +0200
+Subject: [PATCH] presence_dialoginfo: get rid of unused variables warning
+
+- priority and winning_priority are used in an alternative winning node
+  selection which is disabled now
+- reported by Jua Heinanen
+
+(cherry picked from commit 4f4641ea2a4018a72558c40d4878e9af7053be2d)
+---
+ modules/presence_dialoginfo/notify_body.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/presence_dialoginfo/notify_body.c b/modules/presence_dialoginfo/notify_body.c
+index db8834b..92ece0a 100644
+--- a/modules/presence_dialoginfo/notify_body.c
++++ b/modules/presence_dialoginfo/notify_body.c
+@@ -101,7 +101,7 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
+ 	xmlDocPtr  doc = NULL;
+ 	xmlNodePtr root_node = NULL;
+ 	xmlNsPtr   namespace = NULL;
+-	int winner_priority = -1, priority;
++	/*int winner_priority = -1, priority;*/
+ 
+ 	xmlNodePtr p_root= NULL;
+ 	xmlDocPtr* xml_array ;
+-- 
+2.0.0.rc0
+

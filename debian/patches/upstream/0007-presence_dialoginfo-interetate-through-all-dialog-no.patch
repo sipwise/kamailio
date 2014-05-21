@@ -1,0 +1,39 @@
+From cc4a7c67f24d105a119ea492ce53f017369af296 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 8 May 2014 08:40:28 +0200
+Subject: [PATCH] presence_dialoginfo: interetate through all 'dialog' nodes of
+ xml document
+
+- PUBLISH request can carry info for many dialogs
+- reported and patch by Klaus Feichtinger
+
+(cherry picked from commit 7a827a612f93b9dd938f9b78c0de3ac2d98a0c77)
+---
+ modules/presence_dialoginfo/notify_body.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/modules/presence_dialoginfo/notify_body.c b/modules/presence_dialoginfo/notify_body.c
+index 7f74b1f..db8834b 100644
+--- a/modules/presence_dialoginfo/notify_body.c
++++ b/modules/presence_dialoginfo/notify_body.c
+@@ -111,6 +111,7 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
+ 	xmlNodePtr confirmed_node = NULL;
+ 	xmlNodePtr proceed_node = NULL;
+ 	xmlNodePtr trying_node = NULL;
++	xmlNodePtr next_node = NULL;
+ 
+ 
+ 	char *state = NULL;
+@@ -214,7 +215,8 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
+ 			goto error;
+ 		}
+ 		if (p_root->children) {
+-			for (node = p_root->children; node; node = node->next) {
++			for (node = p_root->children; node; node = next_node) {
++				next_node = node->next;
+ 				if (node->type == XML_ELEMENT_NODE) {
+ 					LM_DBG("node type: Element, name: %s\n", node->name);
+ 					/* we do not copy the node, but unlink it and then add it ot the new node
+-- 
+2.0.0.rc0
+

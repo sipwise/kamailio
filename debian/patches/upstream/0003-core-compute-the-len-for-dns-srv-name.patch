@@ -1,0 +1,44 @@
+From 70f1b7479f80ca4f5e3a45fcf772785c110d0b57 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 30 Apr 2014 21:46:55 +0200
+Subject: [PATCH] core: compute the len for dns srv name
+
+- fixes dns srv for cache, reported by Rob Eijgenraam, FS#426
+
+(cherry picked from commit b834cde74f8a4b41ec24ceb8332adff8bb3922bb)
+---
+ dns_cache.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/dns_cache.c b/dns_cache.c
+index 7465c83..029b445 100644
+--- a/dns_cache.c
++++ b/dns_cache.c
+@@ -2656,7 +2656,6 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
+ 	struct hostent* he;
+ 	struct ip_addr* ip;
+ 	static char tmp[MAX_DNS_NAME]; /* tmp. buff. for SRV lookups */
+-	int len;
+ 	str srv_name;
+ 	char srv_proto;
+ 
+@@ -2664,7 +2663,6 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
+ 		/* not init or off => use normal, non-cached version */
+ 		return _sip_resolvehost(name, port, proto);
+ 	}
+-	len=0;
+ 	if (proto){ /* makes sure we have a protocol set*/
+ 		if (*proto==0)
+ 			*proto=srv_proto=PROTO_UDP; /* default */
+@@ -2708,7 +2706,7 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
+ 			}
+ 
+ 			srv_name.s=tmp;
+-			srv_name.len=len;
++			srv_name.len=strlen(tmp);
+ 			if ((he=dns_srv_get_he(&srv_name, port, dns_flags))!=0)
+ 				return he;
+ 		}
+-- 
+2.0.0.rc0
+

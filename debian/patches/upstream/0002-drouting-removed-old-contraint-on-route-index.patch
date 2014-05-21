@@ -1,0 +1,26 @@
+From a9a3cebc7688dcaea7539c067c4b1bf3463040ce Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 24 Apr 2014 18:02:34 +0200
+Subject: [PATCH] drouting: removed old contraint on route index
+
+(cherry picked from commit c3386295d7607a58d37a65b6822bf5f98b3fefa0)
+---
+ modules/drouting/drouting.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/drouting/drouting.c b/modules/drouting/drouting.c
+index 60006b1..4322a7e 100644
+--- a/modules/drouting/drouting.c
++++ b/modules/drouting/drouting.c
+@@ -754,7 +754,7 @@ again:
+ 		}
+ 	}
+ 
+-	if (rt_info->route_idx>0 && rt_info->route_idx<RT_NO) {
++	if (rt_info->route_idx>0 && main_rt.rlist[rt_info->route_idx]!=NULL) {
+ 		ret = run_top_route(main_rt.rlist[rt_info->route_idx], msg, 0);
+ 		if (ret<1) {
+ 			/* drop the action */
+-- 
+2.0.0.rc0
+
