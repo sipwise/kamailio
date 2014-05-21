@@ -2,6 +2,13 @@
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
+## multipart bodies
+upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
+upstream/0001-core-add-str_append-helper-function.patch
+upstream/0002-core-add-check_boundaries-to-build_req_buf_from_sip_.patch
+upstream/0003-textops-functions-to-convert-append-and-remove-multi.patch
+upstream/0004-textops-add-new-multipart-functions-documentation.patch
+upstream/0005-textops-Refresh-README.patch
 # fixes from 4.1 branch
 upstream/0001-pipelimit-run-timer-at-1000ms.patch
 upstream/0002-drouting-removed-old-contraint-on-route-index.patch
