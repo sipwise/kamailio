@@ -1,0 +1,129 @@
+From 29eda0d9f9b131ccfb1a653d51f9df1c972bb12c Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Sat, 7 Jun 2014 09:19:03 +0200
+Subject: [PATCH 3/5] core: add route name to action struct
+
+---
+ cfg.lex        | 29 +++++++++++++++++++++--------
+ cfg.y          |  9 +++++++--
+ route_struct.h |  2 ++
+ 3 files changed, 30 insertions(+), 10 deletions(-)
+
+--- a/cfg.lex
++++ b/cfg.lex
+@@ -135,6 +135,9 @@
+ 	int startcolumn=1;
+ 	int startline=1;
+ 	char *finame = 0;
++	char *routename = 0;
++	char *default_routename = 0;
++
+ 	static int ign_lines=0;
+ 	static int ign_columns=0;
+ 	char* yy_number_str=0; /* str correspondent for the current NUMBER token */
+@@ -155,6 +158,7 @@
+ 		int startcolumn;
+ 		int startline;
+ 		char *finame;
++		char *routename;
+ 	} include_stack[MAX_INCLUDE_DEPTH];
+ 	static int include_stack_ptr = 0;
+ 
+@@ -593,16 +597,24 @@
+ <INITIAL>{ISAVPFLAGSET}	{ count(); yylval.strval=yytext; return ISAVPFLAGSET; }
+ <INITIAL>{AVPFLAGS_DECL}	{ count(); yylval.strval=yytext; return AVPFLAGS_DECL; }
+ <INITIAL>{MSGLEN}	{ count(); yylval.strval=yytext; return MSGLEN; }
+-<INITIAL>{ROUTE}	{ count(); yylval.strval=yytext; return ROUTE; }
+-<INITIAL>{ROUTE_REQUEST}	{ count(); yylval.strval=yytext; return ROUTE_REQUEST; }
+-<INITIAL>{ROUTE_ONREPLY}	{ count(); yylval.strval=yytext;
++<INITIAL>{ROUTE}	{ count(); default_routename="DEFAULT_ROUTE\0";
++						yylval.strval=yytext; return ROUTE; }
++<INITIAL>{ROUTE_REQUEST}	{ count(); default_routename="DEFAULT_ROUTE\0";
++								yylval.strval=yytext; return ROUTE_REQUEST; }
++<INITIAL>{ROUTE_ONREPLY}	{ count(); default_routename="DEFAULT_ONREPLY\0";
++								yylval.strval=yytext;
+ 								return ROUTE_ONREPLY; }
+-<INITIAL>{ROUTE_REPLY}	{ count(); yylval.strval=yytext; return ROUTE_REPLY; }
+-<INITIAL>{ROUTE_FAILURE}	{ count(); yylval.strval=yytext;
++<INITIAL>{ROUTE_REPLY}	{ count(); default_routename="DEFAULT_ONREPLY\0";
++							yylval.strval=yytext; return ROUTE_REPLY; }
++<INITIAL>{ROUTE_FAILURE}	{ count(); default_routename="DEFAULT_FAILURE\0";
++								yylval.strval=yytext;
+ 								return ROUTE_FAILURE; }
+-<INITIAL>{ROUTE_BRANCH} { count(); yylval.strval=yytext; return ROUTE_BRANCH; }
+-<INITIAL>{ROUTE_SEND} { count(); yylval.strval=yytext; return ROUTE_SEND; }
+-<INITIAL>{ROUTE_EVENT} { count(); yylval.strval=yytext; return ROUTE_EVENT; }
++<INITIAL>{ROUTE_BRANCH} { count(); default_routename="DEFAULT_BRANCH\0";
++							yylval.strval=yytext; return ROUTE_BRANCH; }
++<INITIAL>{ROUTE_SEND} { count(); default_routename="DEFAULT_SEND\0";
++							yylval.strval=yytext; return ROUTE_SEND; }
++<INITIAL>{ROUTE_EVENT} { count(); default_routename="DEFAULT_EVENT\0";
++							yylval.strval=yytext; return ROUTE_EVENT; }
+ <INITIAL>{EXEC}	{ count(); yylval.strval=yytext; return EXEC; }
+ <INITIAL>{SET_HOST}	{ count(); yylval.strval=yytext; return SET_HOST; }
+ <INITIAL>{SET_HOSTPORT}	{ count(); yylval.strval=yytext; return SET_HOSTPORT; }
+@@ -1588,6 +1600,7 @@
+ 	include_stack[include_stack_ptr].startline = startline;
+ 	include_stack[include_stack_ptr].startcolumn = startcolumn;
+ 	include_stack[include_stack_ptr].finame = finame;
++	include_stack[include_stack_ptr].routename = routename;
+ 	include_stack_ptr++;
+ 
+ 	line=1;
+--- a/cfg.y
++++ b/cfg.y
+@@ -255,12 +255,15 @@
+ extern int startcolumn;
+ extern int startline;
+ extern char *finame;
++extern char *routename;
++extern char *default_routename;
+ 
+ #define set_cfg_pos(x) \
+ 	do{\
+ 		if(x) {\
+ 		(x)->cline = line;\
+ 		(x)->cfile = (finame!=0)?finame:((cfg_file!=0)?cfg_file:"default");\
++		(x)->rname = (routename!=0)?routename:((default_routename!=0)?default_routename:"DEFAULT\0");\
+ 		}\
+ 	}while(0)
+ 
+@@ -1737,9 +1740,10 @@
+ 						memcpy($$, tmp, i_tmp);
+ 						$$[i_tmp]=0;
+ 					}
++					routename = tmp;
+ 						}
+-			|	ID		{ $$=$1; }
+-			|	STRING	{ $$=$1; }
++			|	ID		{ routename = $1; $$=$1; }
++			|	STRING	{ routename = $1; $$=$1; }
+ ;
+ 
+ 
+@@ -3366,6 +3370,7 @@
+ 	if(finame==0)
+ 		finame = (cfg_file!=0)?cfg_file:"default";
+ 	pos->fname=finame;
++	pos->rname=(routename!=0)?routename:default_routename;
+ }
+ 
+ 
+--- a/route_struct.h
++++ b/route_struct.h
+@@ -156,6 +156,7 @@
+ 	unsigned short s_col;
+ 	unsigned short e_col;
+ 	char *fname;
++	char *rname;
+ };
+ 
+ 
+@@ -202,6 +203,7 @@
+ struct action{
+ 	int cline;
+ 	char *cfile;
++	char *rname;
+ 	enum action_type type;  /* forward, drop, log, send ...*/
+ 	int count;
+ 	struct action* next;

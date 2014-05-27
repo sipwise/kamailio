@@ -3,7 +3,6 @@ upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/presence_dialoginfo-optionally-send-dummy-dialog.patch
 upstream/presence_dialoginfo-rfc4235-in-dummy-dialog.patch
-upstream/debug/0001-modules-debugger-trace-msg-out.patch
 ## multipart bodies
 upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
 upstream/0001-core-add-str_append-helper-function.patch
@@ -29,6 +28,11 @@ upstream/0010-core-xavp-Fix-xavp_insert-to-prevent-corrupted-linke.patch
 # fixes from master that are not in 4.2
 upstream/0011-tm-safety-catch-inside-t_check_trans-when-already-in.patch
 upstream/0012-tm-handle-BRANCH_FAILURE_ROUTE-in-t_check_trans-test.patch
+## debugger cfgtest
+sipwise/debug/0003-core-add-route-name-to-action-struct.patch
+sipwise/debug/0001-debugger-show-routename-in-cfgtrace-output.patch
+sipwise/debug/0001-debugger-create-_dbg_get_json-function.patch
+sipwise/debug/0001-debugger-cfgtest-detect-change-of-route.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch

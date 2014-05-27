@@ -7,11 +7,9 @@ Subject: [PATCH] tm: handle BRANCH_FAILURE_ROUTE in t_check_trans() test
  modules/tm/tm.c | 7 ++++---
  1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/modules/tm/tm.c b/modules/tm/tm.c
-index d437119..de1b7d0 100644
 --- a/modules/tm/tm.c
 +++ b/modules/tm/tm.c
-@@ -2141,9 +2141,10 @@ int t_check_trans(struct sip_msg* msg)
+@@ -2110,9 +2110,10 @@
  	int ret;
  	
  	/* already processing a T */
@@ -25,6 +23,3 @@ index d437119..de1b7d0 100644
  		return 1;
  	}
  
--- 
-1.9.3 (Apple Git-50)
-

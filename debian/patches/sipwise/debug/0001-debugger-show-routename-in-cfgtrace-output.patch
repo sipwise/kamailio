@@ -1,0 +1,57 @@
+From bed067f3fb8423f0d138903f8d58941d19b81360 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Sat, 7 Jun 2014 09:19:38 +0200
+Subject: [PATCH] debugger: show routename in cfgtrace output
+
+---
+ modules/debugger/debugger_api.c | 32 ++++++++++++++++++++++++++++++--
+ 1 file changed, 30 insertions(+), 2 deletions(-)
+
+--- a/modules/debugger/debugger_api.c
++++ b/modules/debugger/debugger_api.c
+@@ -282,6 +282,32 @@
+ 	return 1;
+ }
+ 
++char* get_current_route_type_name()
++{
++	switch(route_type){
++		case REQUEST_ROUTE:
++			return "request_route";
++		case FAILURE_ROUTE:
++			return "failure_route";
++		case TM_ONREPLY_ROUTE:
++		case CORE_ONREPLY_ROUTE:
++		case ONREPLY_ROUTE:
++			return "onreply_route";
++		case BRANCH_ROUTE:
++			return "branch_route";
++		case ONSEND_ROUTE:
++			return "onsend_route";
++		case ERROR_ROUTE:
++			return "error_route";
++		case LOCAL_ROUTE:
++			return "local_route";
++		case BRANCH_FAILURE_ROUTE:
++			return "branch_failure_route";
++		default:
++			return "unknown_route";
++	}
++}
++
+ /**
+  * callback executed for each cfg action
+  */
+@@ -324,8 +350,10 @@
+ 		{
+ 			LOG_(_dbg_cfgtrace_facility, _dbg_cfgtrace_level,
+ 					_dbg_cfgtrace_prefix,
+-					" c=[%s] l=%d a=%d n=%.*s\n",
+-					ZSW(a->cfile), a->cline, a->type, an->len, ZSW(an->s)
++					"%s=[%s] c=[%s] l=%d a=%d n=%.*s\n",
++					get_current_route_type_name(), ZSW(a->rname),
++					ZSW(a->cfile), a->cline,
++					a->type, an->len, ZSW(an->s)
+ 				);
+ 		}
+ 	}
