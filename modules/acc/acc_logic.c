@@ -426,6 +426,7 @@ static inline void acc_onreply( struct cell* t, struct sip_msg *req,
 {
 	str new_uri_bk;
 	int br = -1;
+	hdr_field_t *hdr;
 
 	/* acc_onreply is bound to TMCB_REPLY which may be called
 	   from _reply, like when FR hits; we should not miss this
@@ -466,9 +467,9 @@ static inline void acc_onreply( struct cell* t, struct sip_msg *req,
 	if (is_db_acc_on(req)) {
 		if(acc_db_set_table_name(req, db_table_acc_data, &db_table_acc)<0) {
 			LM_ERR("cannot set acc db table name\n");
-			return;
+		} else {
+			acc_db_request(req);
 		}
-		acc_db_request(req);
 	}
 #endif
 #ifdef RAD_ACC
@@ -487,6 +488,19 @@ static inline void acc_onreply( struct cell* t, struct sip_msg *req,
 	if (new_uri_bk.len>=0) {
 		req->new_uri = new_uri_bk;
 		req->parsed_uri_ok = 0;
+	}
+
+	/* free header's parsed structures that were added by resolving acc attributes */
+	for( hdr=req->headers ; hdr ; hdr=hdr->next ) {
+		if ( hdr->parsed && hdr_allocs_parse(hdr) &&
+		(hdr->parsed<(void*)t->uas.request ||
+		hdr->parsed>=(void*)t->uas.end_request)) {
+			/* header parsed filed doesn't point inside uas.request memory
+			 * chunck -> it was added by resolving acc attributes -> free it as pkg */
+			DBG("removing hdr->parsed %d\n", hdr->type);
+			clean_hdr_field(hdr);
+			hdr->parsed = 0;
+		}
 	}
 }
 
