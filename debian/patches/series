@@ -10,18 +10,7 @@ upstream/0003-textops-functions-to-convert-append-and-remove-multi.patch
 upstream/0004-textops-add-new-multipart-functions-documentation.patch
 upstream/0005-textops-Refresh-README.patch
 # fixes from 4.1 branch
-upstream/0001-pipelimit-run-timer-at-1000ms.patch
-upstream/0002-drouting-removed-old-contraint-on-route-index.patch
-upstream/0003-core-compute-the-len-for-dns-srv-name.patch
-upstream/0004-acc-no-request-is-needed-for-setting-end-time-on-dia.patch
-upstream/0005-rtmier-reset-avps-and-xavp-lists-after-route-blocks-.patch
-upstream/0006-dialog-copy-dlg-var-value-locally-on-get-operation.patch
-upstream/0007-presence_dialoginfo-interetate-through-all-dialog-no.patch
-upstream/0008-websocket-Fix-crash-in-websocket-module.patch
-upstream/0009-db_mysql-properly-free-db-result-structure-if-db_mys.patch
-upstream/0010-presence_dialoginfo-get-rid-of-unused-variables-warn.patch
-upstream/0011-siputils-allocate-enough-space-to-hold-ending-zero-f.patch
-upstream/0012-mtree-replace-tree-structure-even-there-are-no-recor.patch
+upstream/0001-core-fix-crash-related-to-core-sockets_list-command.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
