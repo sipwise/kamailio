@@ -543,6 +543,8 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param)
 		LM_DBG("dialog %p failed (negative reply)\n", dlg);
 		/* dialog setup not completed (3456XX) */
 		run_dlg_callbacks( DLGCB_FAILED, dlg, req, rpl, DLG_DIR_UPSTREAM, 0);
+		if(dlg_wait_ack==1)
+			dlg_set_tm_waitack(t, dlg);
 		/* do unref */
 		if (unref)
 			dlg_unref(dlg, unref);
@@ -551,8 +553,6 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param)
 
 		if_update_stat(dlg_enable_stats, failed_dlgs, 1);
 
-		if(dlg_wait_ack==1)
-			dlg_set_tm_waitack(t, dlg);
 		goto done;
 	}
 
@@ -1353,7 +1353,8 @@ void dlg_ontimeout(struct dlg_tl *tl)
 
 		if(dlg->iflags&DLG_IFLAG_TIMEOUTBYE)
 		{
-			dlg_bye_all(dlg, NULL);
+			if(dlg_bye_all(dlg, NULL)<0)
+				dlg_unref(dlg, 1);
 			/* run event route for end of dlg */
 			dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
 			dlg_unref(dlg, 1);
@@ -1477,15 +1478,15 @@ void dlg_run_event_route(dlg_cell_t *dlg, sip_msg_t *msg, int ostate, int nstate
 	else
 		fmsg = msg;
 
-	if (exec_pre_script_cb(fmsg, REQUEST_CB_TYPE)>0)
+	if (exec_pre_script_cb(fmsg, LOCAL_CB_TYPE)>0)
 	{
 		dlg_ref(dlg, 1);
 		dlg_set_ctx_iuid(dlg);
 		LM_DBG("executing event_route %d on state %d\n", rt, nstate);
-		set_route_type(REQUEST_ROUTE);
+		set_route_type(LOCAL_ROUTE);
 		run_top_route(event_rt.rlist[rt], fmsg, 0);
 		dlg_reset_ctx_iuid();
-		exec_post_script_cb(fmsg, REQUEST_CB_TYPE);
+		exec_post_script_cb(fmsg, LOCAL_CB_TYPE);
 		dlg_unref(dlg, 1);
 	}
 }
