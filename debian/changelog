@@ -1,3 +1,10 @@
+ngcp-kamailio (4.1.4-1+0~mr3.4.0.0) unstable; urgency=medium
+
+  * [b16fed8] MT#7503 Imported Upstream version 4.1.4
+  * [01b6608] MT#7503 update upstream patches
+
+ -- Victor Seva <vseva@sipwise.com>  Sat, 14 Jun 2014 17:06:13 +0200
+
 ngcp-kamailio (4.1.3-1+0~mr3.4.0.0) unstable; urgency=low
 
   [ Victor Seva ]
