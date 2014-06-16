@@ -11,6 +11,8 @@ upstream/0004-textops-add-new-multipart-functions-documentation.patch
 upstream/0005-textops-Refresh-README.patch
 # fixes from 4.1 branch
 upstream/0001-core-fix-crash-related-to-core-sockets_list-command.patch
+upstream/0002-app_java-Use-generic-libgcj.patch
+upstream/0005-registrar-Add-check-for-contact-header-before-checki.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch

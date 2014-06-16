@@ -1,0 +1,27 @@
+From 77019552cf3e1d88b98620eedad2ce7fb4bbb469 Mon Sep 17 00:00:00 2001
+From: Hugh Waite <hugh.waite@acision.com>
+Date: Mon, 16 Jun 2014 11:53:11 +0100
+Subject: [PATCH] registrar: Add check for contact header before checking
+ outbound support
+
+- Fixes crash when processing REGISTER without a contact
+(cherry picked from commit c9301c99d3c9acb663023cf02393d0e7ed74c133)
+---
+ modules/registrar/save.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/modules/registrar/save.c b/modules/registrar/save.c
+index 18e6758..70b868b 100644
+--- a/modules/registrar/save.c
++++ b/modules/registrar/save.c
+@@ -910,6 +910,7 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags, str *_uri)
+ 	}
+ 
+ 	if (reg_outbound_mode != REG_OUTBOUND_NONE
++			&& _m->contact && _m->contact->parsed
+ 			&& !(parse_headers(_m, HDR_VIA2_F, 0) == -1 || _m->via2 == 0
+ 				|| _m->via2->error != PARSE_OK)) {
+ 		/* Outbound supported on server, and more than one Via: - not the first hop */
+-- 
+2.0.0
+
