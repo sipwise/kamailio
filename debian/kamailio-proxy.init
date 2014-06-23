@@ -114,16 +114,20 @@ PKG_MEMORY=$((`echo $PKG_MEMORY | sed -e 's/[^0-9]//g'`))
 [ -z "$GROUP" ] && GROUP=kamailio
 
 
-if test "$DUMP_CORE" = "yes" ; then
-    # set proper ulimit
-    ulimit -c unlimited
-fi
+if /usr/sbin/ngcp-virt-identify --type container; then
+  echo "container environment detected. Skip ulimit commands"
+else
+  if test "$DUMP_CORE" = "yes" ; then
+      # set proper ulimit
+      ulimit -c unlimited
+  fi
 
-# raise memlock limit, otherwise mysql client fails to initialize
-ulimit -l unlimited
-# raise file descriptors limit, otherwise we get "Can't send
-# command to RTP proxy" on massive number of calls with RTP
-ulimit -n 16384
+  # raise memlock limit, otherwise mysql client fails to initialize
+  ulimit -l unlimited
+  # raise file descriptors limit, otherwise we get "Can't send
+  # command to RTP proxy" on massive number of calls with RTP
+  ulimit -n 16384
+fi
 
 if [ "$SSD_SUID" != "yes" ]; then
   OPTIONS="-f $CFGFILE -P $PIDFILE -m $SHM_MEMORY -M $PKG_MEMORY -u $USER -g $GROUP"
