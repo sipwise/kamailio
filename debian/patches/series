@@ -21,6 +21,7 @@ fix_export.patch
 sipwise/do-not-install-default-config.patch
 sipwise/0001-core-new-pv_check_format-function.patch
 sipwise/dialplan_pv_rules.patch
+sipwise/dialplan-use-AVP-values-at-match-expresion-one-by-on.patch
 sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/nathelper.contact_only.patch

@@ -1,0 +1,748 @@
+From 84e2dfaae48bb7820a14deec3d5f591ee197caf6 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Sat, 28 Jun 2014 12:37:10 +0200
+Subject: [PATCH] dialplan: use AVP[*] values at match expresion one by one.
+
+---
+ modules/dialplan/dialplan.h |  24 ++-
+ modules/dialplan/dp_db.c    | 174 ++++++++++++++++------
+ modules/dialplan/dp_repl.c  | 345 +++++++++++++++++++++++++++++++++++++-------
+ 3 files changed, 441 insertions(+), 102 deletions(-)
+
+diff --git a/modules/dialplan/dialplan.h b/modules/dialplan/dialplan.h
+index b506853..dcebdcf 100644
+--- a/modules/dialplan/dialplan.h
++++ b/modules/dialplan/dialplan.h
+@@ -46,10 +46,12 @@
+ 
+ #define DP_PV_MATCH		(1 << 0)
+ #define DP_PV_MATCH_M	(1 << 1) /* PV_MARKER at the end */
+-#define DP_PV_SUBST		(1 << 2)
+-#define DP_PV_SUBST_M	(1 << 3) /* PV_MARKER at the end */
++#define DP_PV_MATCH_AVP (1 << 2) /* AVP WITH AVP_INDEX_ALL */
++#define DP_PV_SUBST		(1 << 3)
++#define DP_PV_SUBST_M	(1 << 4) /* PV_MARKER at the end */
++#define DP_PV_SUBST_AVP (1 << 5) /* AVP WITH AVP_INDEX_ALL */
+ 
+-#define DP_PV_MASK (DP_PV_MATCH|DP_PV_SUBST)
++#define DP_PV_MASK (DP_PV_MATCH|DP_PV_SUBST|DP_PV_MATCH_AVP|DP_PV_SUBST_AVP)
+ #define DP_PV_MATCH_MASK (DP_PV_MATCH|DP_PV_MATCH_M)
+ #define DP_PV_SUBST_MASK (DP_PV_SUBST|DP_PV_SUBST_M)
+ 
+@@ -85,10 +87,18 @@ typedef struct dpl_id{
+ 	struct dpl_id * next;
+ }dpl_id_t,*dpl_id_p;
+ 
++typedef struct dpl_pv_regex_node
++{
++	pcre *comp;
++	str expr;
++	int cap_cnt;
++	struct dpl_pv_regex_node *next;
++}dpl_pv_regex_node_t, *dpl_pv_regex_node_p;
++
+ typedef struct dpl_pv_node{
+ 	pv_elem_p match_elem, subst_elem;
+-	str match_exp, subst_exp; /* exp without end dollar char */
+-	pcre *match_comp, *subst_comp; /* compiled patterns */
++	dpl_pv_regex_node_p match; /* list of match regex compiled */
++	dpl_pv_regex_node_p subst; /* list of subst regex compiled */
+ 
+ 	struct dpl_pv_node * next; /* next rule */
+ 	struct dpl_node * orig; /* shared rule */
+@@ -131,5 +141,7 @@ dpl_pv_id_p select_pv_dpid(int id);
+ struct subst_expr* repl_exp_parse(str subst);
+ void repl_expr_free(struct subst_expr *se);
+ int translate(struct sip_msg *msg, str user_name, str* repl_user, dpl_id_p idp, str *);
+-int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule, dpl_pv_node_t * rule_pv, str *);
++int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule,
++	dpl_pv_node_t * rule_pv, dpl_pv_regex_node_p subst_node,
++	str *match_expr, str *);
+ #endif
+diff --git a/modules/dialplan/dp_db.c b/modules/dialplan/dp_db.c
+index 515f36b..bf918b6 100644
+--- a/modules/dialplan/dp_db.c
++++ b/modules/dialplan/dp_db.c
+@@ -396,41 +396,101 @@ int check_pv_marker(str orig, str *dest)
+ 	}
+ }
+ 
+-dpl_pv_node_t * build_pv_rule(dpl_node_t *rule)
++int set_pv_regex_avp_flag(const pv_elem_p elem, unsigned int *pv_flags,
++	const int match)
+ {
+-	pv_elem_p match_elem = NULL, subst_elem = NULL;
+-	str match_exp = {NULL,0}, subst_exp = {NULL,0};
+-	dpl_pv_node_t * new_rule = NULL;
++	int num, num_elem;
++	pv_elem_p e;
++	pv_spec_p spec, spec_check = NULL;
++	if(elem==NULL||pv_flags==NULL) return -1;
++
++	e = elem;
++	if (e==NULL) return -1;
++	spec = e->spec;
++	if (spec==NULL) return -1;
++
++	for(e=elem, num=num_elem=0; e!=NULL; e=e->next, num++)
++	{
++		spec = e->spec;
++		LM_DBG("elem[%d][%p][%.*s][%p]\n", num, e, e->text.len, e->text.s, spec);
++		if(spec!=NULL) num_elem++;
++		if(spec_check==NULL) spec_check = spec;
++	}
++
++	if(num_elem==1 && spec_check->type==PVT_AVP &&
++		spec_check->pvp.pvi.type==PV_IDX_ALL)
++	{
++		if(match==0)
++		{
++			*pv_flags |= DP_PV_MATCH_AVP;
++			*pv_flags &= ~DP_PV_MATCH;
++		}
++		else
++		{
++			*pv_flags |= DP_PV_SUBST_AVP;
++			*pv_flags &= ~DP_PV_SUBST;
++		}
++		return 0;
++	}
++	return 1;
++}
++
++int build_pv_rule_helper(const str orig, str *dest, const int flag[2],
++	pv_elem_p *elem, unsigned int *pv_flags, const int match)
++{
++
++	dest->s = orig.s;
++	if(flag[1]){
++		dest->len = orig.len - 1;
++	}
++	else dest->len = orig.len;
++	if(pv_parse_format(dest, elem)<0){
++		LM_ERR("parsing expr[%.*s]\n", dest->len, dest->s);
++		return -1;
++	}
++	LM_DBG("expr:[%.*s]\n", dest->len, dest->s);
++	if(flag[0]) { LM_DBG("AVP already detected\n"); return 0; }
++	switch(set_pv_regex_avp_flag(*elem, pv_flags, match))
++	{
++		case 0:
++			LM_DBG("AVP detected\n");
++			break;
++		case 1:
++			break;
++		default:
++			LM_ERR("detecting AVP\n");
++			pv_elem_free_all(*elem);
++			return -1;
++		break;
++	}
++	return 0;
++}
+ 
++dpl_pv_node_t * build_pv_rule(const dpl_node_p rule)
++{
++	pv_elem_p match_elem = NULL, subst_elem = NULL;
++	str match_exp = STR_NULL, subst_exp = STR_NULL;
++	dpl_pv_node_p new_rule = NULL;
++	int flags[2];
+ 	if(!rule)
+ 		return NULL;
+ 
+-	if(rule->pv_flags&DP_PV_MATCH)
++	if(rule->pv_flags&DP_PV_MATCH||rule->pv_flags&DP_PV_MATCH_AVP)
+ 	{
+-		match_exp.s = rule->match_exp.s;
+-		if(rule->pv_flags&DP_PV_MATCH_M){
+-			match_exp.len = rule->match_exp.len - 1;
+-		}
+-		else match_exp.len = rule->match_exp.len;
+-		if(pv_parse_format(&match_exp, &match_elem)<0){
+-			LM_ERR("parsing match_exp:%.*s\n",
+-				match_exp.len, match_exp.s);
++		flags[0] = rule->pv_flags&DP_PV_MATCH_AVP;
++		flags[1] = rule->pv_flags&DP_PV_MATCH_M;
++		if(build_pv_rule_helper(rule->match_exp, &match_exp,
++			flags, &match_elem, &(rule->pv_flags), 0)<0)
+ 			goto err;
+-		}
+ 	}
+ 
+-	if(rule->pv_flags&DP_PV_SUBST)
++	if(rule->pv_flags&DP_PV_SUBST||rule->pv_flags&DP_PV_SUBST_AVP)
+ 	{
+-		subst_exp.s = rule->subst_exp.s;
+-		if(rule->pv_flags&DP_PV_SUBST_M){
+-			subst_exp.len = rule->subst_exp.len - 1;
+-		}
+-		else subst_exp.len = rule->subst_exp.len;
+-		if(pv_parse_format(&subst_exp, &subst_elem)<0){
+-			LM_ERR("parsing subst_exp:%.*s\n",
+-				subst_exp.len, subst_exp.s);
++		flags[0] = rule->pv_flags&DP_PV_SUBST_AVP;
++		flags[1] = rule->pv_flags&DP_PV_SUBST_M;
++		if(build_pv_rule_helper(rule->subst_exp, &subst_exp,
++			flags, &subst_elem, &(rule->pv_flags), 1)<0)
+ 			goto err;
+-		}
+ 	}
+ 
+ 	if(rule->pv_flags&DP_PV_MASK){
+@@ -440,12 +500,8 @@ dpl_pv_node_t * build_pv_rule(dpl_node_t *rule)
+ 			goto err;
+ 		}
+ 		memset(new_rule, 0, sizeof(dpl_pv_node_t));
+-		if(rule->pv_flags&DP_PV_MATCH) {
+-			new_rule->match_elem = match_elem;
+-		}
+-		if(rule->pv_flags&DP_PV_SUBST) {
+-			new_rule->subst_elem = subst_elem;
+-		}
++		new_rule->match_elem = match_elem;
++		new_rule->subst_elem = subst_elem;
+ 		new_rule->orig = rule;
+ 	}
+ 	return new_rule;
+@@ -679,7 +735,7 @@ err:
+ 	return -1;
+ }
+ 
+-int add_rule2hash_pv(dpl_pv_node_t * rule)
++int add_rule2hash_pv(dpl_pv_node_p rule)
+ {
+ 	dpl_pv_id_p crt_idp, last_idp;
+ 	dpl_pv_index_p indexp, last_indexp, new_indexp;
+@@ -884,17 +940,29 @@ void destroy_pv_hash(void)
+ }
+ 
+ void destroy_pv_rule(dpl_pv_node_t * rule){
++	dpl_pv_regex_node_p n, h;
++
+ 	if(!rule)
+ 		return;
+ 
+ 	LM_DBG("destroying pv_rule %i\n", rule->orig->dpid);
+-	if(rule->match_comp){
+-		pcre_free(rule->match_comp);
+-		rule->match_comp = NULL;
++	h = rule->match;
++	while(h)
++	{
++		n = h;
++		if(n->comp) pcre_free(n->comp);
++		if(n->expr.s) pkg_free(n->expr.s);
++		h = n->next;
++		pkg_free(n);
+ 	}
+-	if(rule->subst_comp){
+-		pcre_free(rule->subst_comp);
+-		rule->subst_comp = NULL;
++	h = rule->subst;
++	while(h)
++	{
++		n = h;
++		if(n->comp) pcre_free(n->comp);
++		if(n->expr.s) pkg_free(n->expr.s);
++		h = n->next;
++		pkg_free(n);
+ 	}
+ 	if(rule->match_elem){
+ 		pv_elem_free_all(rule->match_elem);
+@@ -1029,20 +1097,40 @@ void list_pv_hash(void)
+ 
+ void list_pv_rule(dpl_pv_node_t * rule)
+ {
+-	LM_DBG("PV_RULE %p: next %p match_exp %.*s, "
+-			"subst_exp %.*s \n", rule, rule->next,
+-			rule->match_exp.len, rule->match_exp.s,
+-			rule->subst_exp.len, rule->subst_exp.s);
++	pv_elem_p e;
++	int num;
++	dpl_pv_regex_node_p n;
++	LM_DBG("PV_RULE[%p]: next[%p]\n", rule, rule->next);
++	for(e=rule->match_elem, num=0; e!=NULL; e=e->next, num++)
++	{
++		LM_DBG("match_elem[%d][%p][%.*s][%p]\n", num, e, e->text.len,
++			e->text.s, e->spec);
++	}
++	for(n=rule->match, num=0;n!=NULL;n=n->next, num++)
++	{
++		LM_DBG("match[%d] expr:%.*s\n", num, n->expr.len, n->expr.s);
++		num++;
++	}
++	for(e=rule->subst_elem, num=0; e!=NULL; e=e->next, num++)
++	{
++		LM_DBG("subst_elem[%d][%p][%.*s][%p]\n", num, e, e->text.len,
++			e->text.s, e->spec);
++	}
++	for(n=rule->subst, num=0;n!=NULL;n=n->next, num++)
++	{
++		LM_DBG("subst[%d] expr:%.*s\n", num, n->expr.len, n->expr.s);
++		num++;
++	}
+ }
+ 
+ void show_pv_flags(unsigned int flag)
+ {
+ 	if(flag&DP_PV_MATCH) LM_DBG("DP_PV_MATCH\n");
+ 	if(flag&DP_PV_MATCH_M) LM_DBG("DP_PV_MATCH_M\n");
+-	if(flag&DP_PV_MATCH_MASK) LM_DBG("DP_PV_MATCH_MASK\n");
+ 	if(flag&DP_PV_SUBST) LM_DBG("DP_PV_SUBST\n");
+ 	if(flag&DP_PV_SUBST_M) LM_DBG("DP_PV_SUBST_M\n");
+-	if(flag&DP_PV_SUBST_MASK) LM_DBG("DP_PV_SUBST_MASK\n");
++	if(flag&DP_PV_MATCH_AVP) LM_DBG("DP_PV_MATCH_AVP\n");
++	if(flag&DP_PV_SUBST_AVP) LM_DBG("DP_PV_SUBST_AVP\n");
+ 	if(flag&DP_PV_MASK) LM_DBG("DP_PV_MASK\n");
+ 	LM_DBG("--pv_flags:%d\n", flag);
+ }
+diff --git a/modules/dialplan/dp_repl.c b/modules/dialplan/dp_repl.c
+index 2a53be4..749a465 100644
+--- a/modules/dialplan/dp_repl.c
++++ b/modules/dialplan/dp_repl.c
+@@ -127,7 +127,8 @@ error:
+ #define MAX_PHONE_NB_DIGITS		127
+ static char dp_output_buf[MAX_PHONE_NB_DIGITS+1];
+ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+-		dpl_pv_node_t * rule_pv, str * result)
++		dpl_pv_node_p rule_pv, dpl_pv_regex_node_p subst_node,
++		str *match_expr, str * result)
+ {
+ 	int repl_nb, offset, match_nb, rc, cap_cnt;
+ 	struct replace_with token;
+@@ -150,21 +151,41 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+ 		return -1;
+ 	}
+ 
+-	if(rule_pv&&(rule_pv->orig->pv_flags&DP_PV_SUBST)){
+-		subst_comp 	= rule_pv->subst_comp;
+-		subst_exp = rule_pv->subst_exp;
++	if(rule_pv&&(rule->pv_flags&DP_PV_SUBST ||
++		rule->pv_flags&DP_PV_SUBST_AVP))
++	{
++		if(subst_node)
++		{
++			subst_comp 	= subst_node->comp;
++			subst_exp.len = subst_node->expr.len;
++			subst_exp.s = subst_node->expr.s;
++		}
++		else
++		{
++			LM_ERR("subst_node is null\n");
++			return -1;
++		}
+ 	}
+ 	else{
+ 		subst_comp 	= rule->subst_comp;
+-		subst_exp = rule->subst_exp;
++		subst_exp.len = rule->subst_exp.len;
++		subst_exp.s = rule->subst_exp.s;
+ 	}
+-	if(rule_pv&&(rule_pv->orig->pv_flags&DP_PV_MATCH)){
+-		match_exp = rule_pv->match_exp;
++	if(rule_pv&&(rule->pv_flags&DP_PV_MATCH ||
++		rule->pv_flags&DP_PV_MATCH_AVP))
++	{
++		if(!match_expr)
++		{
++			LM_ERR("match_expr is null but rule_pv is DP_PV_MATCH[_AVP]\n");
++			return -1;
++		}
++		match_exp.len = match_expr->len;
++		match_exp.s = match_expr->s;
+ 	}
+ 	else{
+ 		match_exp = rule->match_exp;
+ 	}
+-	repl_comp 	= rule->repl_comp;
++	repl_comp = rule->repl_comp;
+ 
+ 	if(!repl_comp){
+ 		LM_DBG("null replacement\n");
+@@ -397,59 +418,235 @@ static pcre *reg_ex_comp_pv(const char *pattern, int *cap_cnt)
+ 	return re;
+ }
+ 
+-int build_pv_comp(struct sip_msg *msg, dpl_pv_node_t *rule)
++void free_pv_regex_node(dpl_pv_regex_node_p *head)
+ {
+-	int cap_cnt = 0;
+-	struct subst_expr *repl_comp = NULL;
++	dpl_pv_regex_node_p n = *head;
++	while(n)
++	{
++		if(n->comp) pcre_free(n->comp);
++		if(n->expr.s) pkg_free(n->expr.s);
++		*head = n->next;
++		pkg_free(n);
++		n = *head;
++	}
++}
+ 
+-	if(!rule)
++int add_pv_regex_node(dpl_pv_regex_node_p *head, pcre *comp,
++	str expr, int cap_cnt)
++{
++	dpl_pv_regex_node_p n;
++
++	if(head==NULL||comp==NULL) return -1;
++	n = pkg_malloc(sizeof(dpl_pv_regex_node_t));
++	if(n==NULL)
++	{
++		LM_ERR("out of pkg memory\n");
+ 		return -1;
++	}
++	memset(n, 0, sizeof(dpl_pv_regex_node_t));
++	n->comp = comp;
++	n->expr.len = expr.len;
++	if(pkg_str_dup(&n->expr, &expr)<0) { pkg_free(n); return -1; }
++	n->cap_cnt = cap_cnt;
++	n->next = *head;
++	*head = n;
++	return 0;
++}
+ 
+-	if(rule->orig->pv_flags&DP_PV_MATCH){
+-		if(pv_printf_s(msg, rule->match_elem, &(rule->match_exp))<0){
+- 			LM_ERR("Can't get match expression value\n");
+- 			return -1;
+- 		}
+- 		if(rule->match_comp) pcre_free(rule->match_comp);
+-		rule->match_comp = reg_ex_comp_pv(rule->match_exp.s, &cap_cnt);
+-		if(!rule->match_comp){
+-			LM_ERR("failed to compile match expression %.*s\n",
+-					rule->match_exp.len, rule->match_exp.s);
+-			return -1;
++int get_pv_avp_param(pv_elem_p regex_elem, pv_param_p *avp_param)
++{
++	int num, num_elem;
++	pv_elem_p e;
++
++	if(regex_elem==NULL) return -1;
++	for(e = regex_elem, num=num_elem=0; e != NULL; e = e->next, num++)
++	{
++		if(e->spec!=NULL)
++		{
++			if(num_elem!=0)
++			{
++				LM_ERR("More than one spec\n");
++				return -1;
++			}
++			num_elem++;
++			if( e->spec->type!=PVT_AVP ||
++				e->spec->pvp.pvi.type!=PV_IDX_ALL)
++			{
++				LM_ERR("spec not AVP or PV_IDX_ALL\n");
++				return -1;
++			}
++			*avp_param = &(e->spec->pvp);
+ 		}
+ 	}
++	return 0;
++}
++
++void dlp_print_elem(pv_elem_p elem)
++{
++	pv_elem_p e;
++	int num;
++	for(e=elem, num=0; e!=NULL; e=e->next, num++)
++	{
++		LM_DBG("elem[%d][%p][%.*s][%p]\n", num, e, e->text.len,
++			e->text.s, e->spec);
++	}
++}
++
++int build_pv_regex_comp_helper(struct sip_msg *msg,
++	dpl_pv_regex_node_p *regex_comp, pv_elem_p elem)
++{
++	pcre *comp = NULL;
++	str expr = STR_NULL;
++	int cap_cnt = 0;
++
++	if(pv_printf_s(msg, elem, &expr)<0){
++		LM_ERR("Can't get regex expression value\n");
++		return -1;
++	}
++	/*LM_DBG("final expr:[%.*s]\n", expr.len, expr.s);*/
++	comp = reg_ex_comp_pv(expr.s, &cap_cnt);
++	if(!comp){
++		LM_ERR("failed to compile regex expression %.*s\n",
++				expr.len, expr.s);
++		return -1;
++	}
++	if(add_pv_regex_node(regex_comp, comp, expr, cap_cnt)<0)
++	{
++		LM_ERR("Can't add regex node\n");
++		return -1;
++	}
++	LM_DBG("expr:[%.*s][%d] added\n", expr.len, expr.s, cap_cnt);
++	return 0;
++}
+ 
+-	if(rule->orig->pv_flags&DP_PV_SUBST){
+-		if(pv_printf_s(msg, rule->subst_elem, &(rule->subst_exp))<0){
+- 			LM_ERR("Can't get subst expression value\n");
+- 			return -1;
+- 		}
+- 		if(rule->subst_comp) pcre_free(rule->subst_comp);
+-		rule->subst_comp = reg_ex_comp_pv(rule->subst_exp.s, &cap_cnt);
+-		if(!rule->subst_comp){
+-			LM_ERR("failed to compile subst expression %.*s\n",
+-					rule->subst_exp.len, rule->subst_exp.s);
++int build_pv_regex_comp(struct sip_msg *msg, dpl_pv_regex_node_p *node,
++	str expr, pv_elem_p elem, int flag[3])
++{
++	struct usr_avp *avp;
++	unsigned short name_type;
++	int_str avp_name;
++	int_str avp_value;
++	struct search_state state;
++	pv_param_p avp_param = NULL;
++	pv_elem_p regex_elem;
++	str regex_exp_orig;
++	str num_index = STR_NULL;
++	char orig_base_buf[256];
++	str regex_exp = STR_NULL;
++	int num = 0;
++	int t[3];
++	char *index;
++
++	if(flag[0]) /* DP_PV_[MATCH|SUBST] */
++	{
++		LM_DBG("simple regex\n");
++		if(build_pv_regex_comp_helper(msg, node, elem)<0)
++			return -1;
++	}
++	else if(flag[2]) /* DP_PV_[MATCH|SUBST]_AVP */
++	{
++		LM_DBG("avp regex\n");
++		if(get_pv_avp_param(elem, &avp_param)<0)
++		{
++			LM_DBG("cannot get avp_param from elem[%p]\n", elem);
++			dlp_print_elem(elem);
++			return -1;
++		}
++		if(pv_get_avp_name(msg, avp_param, &avp_name, &name_type)!=0)
++		{
++			LM_ERR("invalid avp name\n");
+ 			return -1;
+ 		}
+-		if (cap_cnt > MAX_REPLACE_WITH) {
+-			LM_ERR("subst expression %.*s has too many sub-expressions\n",
+-					rule->subst_exp.len, rule->subst_exp.s);
++		regex_exp_orig.len = expr.len;
++		if(flag[1]) regex_exp_orig.len--; /* DP_PV_[MATCH|SUBST]_MATCH */
++		regex_exp_orig.s = expr.s;
++		LM_DBG("regex_exp[%.*s]\n", regex_exp_orig.len, regex_exp_orig.s);
++		index = strstr( regex_exp_orig.s,  "[*]");
++		if(!index)
++		{
++			LM_ERR("Cannot find [*] at regex_exp\n");
+ 			return -1;
+ 		}
++		t[0] = index+1-regex_exp_orig.s;
++		t[2] = regex_exp_orig.s + regex_exp_orig.len - (index+2);
++		strncpy(orig_base_buf, regex_exp_orig.s, t[0]);
++		regex_exp.s = orig_base_buf;
++		regex_exp.len = t[0];
++		avp = search_first_avp(name_type, avp_name, &avp_value, &state);
++		while(avp)
++		{
++			num_index.s = int2str(num, &(num_index.len));
++			strncpy(orig_base_buf+t[0], num_index.s, num_index.len);
++			t[1] = t[0] + num_index.len;
++			regex_exp.len = t[1];
++			strncpy(orig_base_buf+regex_exp.len, index+2, t[2]);
++			regex_exp.len = t[0] + num_index.len + t[2];
++			/*LM_DBG("final regex_exp[%.*s]\n", regex_exp.len, regex_exp.s);*/
++			if(pv_parse_format(&regex_exp, &regex_elem)<0){
++				LM_ERR("parsing regex_exp:%.*s\n",
++					regex_exp.len, regex_exp.s);
++				return -1;
++			}
++			if(build_pv_regex_comp_helper(msg, node, regex_elem)<0) return -1;
++			pv_elem_free_all(regex_elem);
++			avp = search_next_avp(&state, &avp_value);
++			num++;
++		}
+ 	}
++	return 0;
++}
++
++int build_pv_comp(struct sip_msg *msg, dpl_pv_node_p rule)
++{
++	struct subst_expr *repl_comp;
++	dpl_pv_regex_node_p n;
++	int flags[2][3] = {
++		{
++			rule->orig->pv_flags&DP_PV_MATCH,
++			rule->orig->pv_flags&DP_PV_MATCH_M,
++			rule->orig->pv_flags&DP_PV_MATCH_AVP
++		},
++		{
++			rule->orig->pv_flags&DP_PV_SUBST,
++			rule->orig->pv_flags&DP_PV_SUBST_M,
++			rule->orig->pv_flags&DP_PV_SUBST_AVP
++		}
++	};
++	if(!rule)
++		return -1;
+ 
+-	if(rule->orig->pv_flags&DP_PV_MASK) {
++	if(rule->orig->pv_flags&DP_PV_MATCH||rule->orig->pv_flags&DP_PV_MATCH_AVP)
++	{
++		if(rule->match) free_pv_regex_node(&rule->match);
++		if(build_pv_regex_comp(msg, &rule->match, rule->orig->match_exp,
++			rule->match_elem, flags[0])<0) return -1;
++	}
++
++	if(rule->orig->pv_flags&DP_PV_SUBST||rule->orig->pv_flags&DP_PV_SUBST_AVP)
++	{
++		if(rule->subst) free_pv_regex_node(&rule->subst);
++		if(build_pv_regex_comp(msg, &rule->subst, rule->orig->subst_exp,
++			rule->subst_elem, flags[1])<0) return -1;
+ 		repl_comp = rule->orig->repl_comp;
+-		if (repl_comp && (cap_cnt < repl_comp->max_pmatch) &&
+-				(repl_comp->max_pmatch != 0)) {
+-			LM_ERR("repl_exp %.*s refers to %d sub-expressions, but "
+-					"subst_exp %.*s has only %d\n",
+-					rule->orig->repl_exp.len, rule->orig->repl_exp.s,
+-					repl_comp->max_pmatch, rule->subst_exp.len,
+-					rule->subst_exp.s, cap_cnt);
+-			return -1;
++		for(n=rule->subst;n!=NULL;n=n->next)
++		{
++			if (n->cap_cnt > MAX_REPLACE_WITH) {
++				LM_ERR("subst expression %.*s has too many sub-expressions\n",
++						n->expr.len, n->expr.s);
++				return -1;
++			}
++			if (repl_comp && (n->cap_cnt < repl_comp->max_pmatch) &&
++					(repl_comp->max_pmatch != 0)) {
++				LM_ERR("repl_exp %.*s refers to %d sub-expressions, but "
++						"subst_exp %.*s has only %d\n",
++						rule->orig->repl_exp.len, rule->orig->repl_exp.s,
++						repl_comp->max_pmatch, n->expr.len,
++						n->expr.s, n->cap_cnt);
++				return -1;
++			}
+ 		}
+ 	}
++
+ 	return 0;
+ }
+ 
+@@ -461,7 +658,8 @@ int translate(struct sip_msg *msg, str input, str *output, dpl_id_p idp,
+ 	dpl_node_p rulep;
+ 	dpl_pv_node_p rule_pv;
+ 	dpl_index_p indexp;
+-	pcre *match_comp = NULL;
++	dpl_pv_regex_node_p n;
++	str *match_expr;
+ 	int user_len, rez;
+ 	char b;
+ 
+@@ -482,11 +680,13 @@ int translate(struct sip_msg *msg, str input, str *output, dpl_id_p idp,
+ 
+ search_rule:
+ 	for(rulep=indexp->first_rule; rulep!=NULL; rulep= rulep->next) {
++		match_expr = NULL;
+ 		switch(rulep->matchop) {
+ 
+ 			case DP_REGEX_OP:
+ 				LM_DBG("regex operator testing\n");
+-				if(rulep->pv_flags&DP_PV_MATCH) {
++				if(rulep->pv_flags&DP_PV_MATCH||rulep->pv_flags&DP_PV_MATCH_AVP)
++				{
+ 					if(!msg) {
+ 						LM_ERR("Cannot translate using a regex match with pv "
+ 							"without message\n");
+@@ -494,20 +694,43 @@ search_rule:
+ 					}
+ 					rule_pv = get_pv_rule(rulep, idp->dp_id, user_len);
+ 					if(rule_pv) {
++						if(rulep->pv_flags&(DP_PV_MATCH_AVP|DP_PV_SUBST_AVP) &&
++							(!rule_pv->match_elem || !rule_pv->subst_elem))
++						{
++							LM_ERR("AVP match_elem[%p] or subst_elem[%p] are null."
++								" Skip this\n", rule_pv->match_elem,
++								rule_pv->subst_elem);
++							continue;
++						}
+ 						if(build_pv_comp(msg, rule_pv)<0){
+ 							LM_ERR("error rule regex comp. Skip this\n");
+ 							continue;
+ 						}
+-						match_comp = rule_pv->match_comp;
++						n = rule_pv->match;
++						while(n)
++						{
++							LM_DBG("match check: [%.*s][%p]\n", n->expr.len,
++								n->expr.s, n->comp);
++							rez = pcre_exec(n->comp, NULL, input.s,
++									input.len, 0, 0, NULL, 0);
++							if(rez >= 0)
++							{
++								match_expr = &(n->expr);
++								n = NULL;
++							}
++							else n = n->next;
++						}
+ 					}
+ 					else {
+ 						LM_ERR("pv rule not found.Skip this\n");
+ 						continue;
+ 					}
+ 				}
+-				else match_comp = rulep->match_comp;
+-				rez = pcre_exec(match_comp, NULL, input.s, input.len,
++				else
++				{
++					rez = pcre_exec(rulep->match_comp, NULL, input.s, input.len,
+ 						0, 0, NULL, 0);
++				}
+ 				break;
+ 
+ 			case DP_EQUAL_OP:
+@@ -549,8 +772,9 @@ search_rule:
+ 	return -1;
+ 
+ repl:
++	if(!match_expr) match_expr = &(rulep->match_exp);
+ 	LM_DBG("found a matching rule %p: pr %i, match_exp %.*s pv_flags:%d\n",
+-			rulep, rulep->pr, rulep->match_exp.len, rulep->match_exp.s,
++			rulep, rulep->pr, match_expr->len, match_expr->s,
+ 			rulep->pv_flags);
+ 
+ 	if(attrs) {
+@@ -576,10 +800,25 @@ repl:
+ 	if(!(rulep->pv_flags&DP_PV_MASK))
+ 		rule_pv = NULL;
+ 
+-	if(rule_translate(msg, input, rulep, rule_pv, output)!=0){
++	if(rulep->pv_flags&DP_PV_SUBST||rulep->pv_flags&DP_PV_SUBST_AVP)
++	{
++		for(n=rule_pv->subst;n!=NULL;n=n->next)
++		{
++			LM_DBG("subst check: [%.*s]\n", n->expr.len, n->expr.s);
++			if(rule_translate(msg, input, rulep, rule_pv, n, match_expr,
++				output)==0) return 0;
++		}
+ 		LM_ERR("could not build the output\n");
+ 		return -1;
+ 	}
+-
++	else
++	{
++		if(rule_translate(msg, input, rulep, rule_pv, 0, match_expr,
++			output)!=0)
++		{
++			LM_ERR("could not build the output\n");
++			return -1;
++		}
++	}
+ 	return 0;
+ }
+-- 
+2.0.0
+
