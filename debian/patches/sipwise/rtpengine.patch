@@ -2933,7 +2933,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine.c
-@@ -0,0 +1,2070 @@
+@@ -0,0 +1,2072 @@
 +/* $Id$
 + *
 + * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
@@ -4124,6 +4124,8 @@
 +					ng_flags->transport |= 0x100;
 +					ng_flags->transport &= ~0x002;
 +				}
++				else if (str_eq(&key, "TOS") && val.s)
++					bencode_dictionary_add_integer(ng_flags->dict, "TOS", atoi(val.s));
 +				else
 +					goto generic;
 +				goto next;
