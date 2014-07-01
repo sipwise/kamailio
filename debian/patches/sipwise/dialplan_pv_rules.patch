@@ -1,15 +1,15 @@
-From f387dd0681f687830cf74bfd9c99b6e2849e80b3 Mon Sep 17 00:00:00 2001
+From f771ee9d5b0bdcefa78683c09b10b631da145f68 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Mon, 12 May 2014 15:42:48 +0200
-Subject: [PATCH 2/2] dialplan: pv in match and subst
+Subject: [PATCH] dialplan: pv in match and subst
 
 ---
  modules/dialplan/dialplan.c |   5 +
  modules/dialplan/dialplan.h |  37 +++-
- modules/dialplan/dp_db.c    | 425 +++++++++++++++++++++++++++++++++++++++++---
+ modules/dialplan/dp_db.c    | 426 +++++++++++++++++++++++++++++++++++++++++---
  modules/dialplan/dp_db.h    |   1 +
  modules/dialplan/dp_repl.c  | 189 +++++++++++++++++++-
- 5 files changed, 621 insertions(+), 36 deletions(-)
+ 5 files changed, 622 insertions(+), 36 deletions(-)
 
 diff --git a/modules/dialplan/dialplan.c b/modules/dialplan/dialplan.c
 index 07c3271..0ee0e24 100644
@@ -99,7 +99,7 @@ index fd3319e..b506853 100644
 +int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule, dpl_pv_node_t * rule_pv, str *);
  #endif
 diff --git a/modules/dialplan/dp_db.c b/modules/dialplan/dp_db.c
-index bd3bb49..95ec45e 100644
+index bd3bb49..515f36b 100644
 --- a/modules/dialplan/dp_db.c
 +++ b/modules/dialplan/dp_db.c
 @@ -70,6 +70,9 @@ static db_func_t dp_dbf;
@@ -149,7 +149,7 @@ index bd3bb49..95ec45e 100644
  
  	LM_DBG("trying to initialize data from db\n");
  	if(init_db_data() != 0)
-@@ -193,6 +201,22 @@ void destroy_data(void)
+@@ -193,6 +201,23 @@ void destroy_data(void)
  		shm_free(crt_idx);
  }
  
@@ -158,6 +158,7 @@ index bd3bb49..95ec45e 100644
 +	if(rules_pv_hash) {
 +		destroy_pv_hash();
 +		rules_pv_hash = NULL;
++		pv_revision = 0;
 +	}
 +}
 +
@@ -172,7 +173,7 @@ index bd3bb49..95ec45e 100644
  
  /*load rules from DB*/
  int dp_load_db(void)
-@@ -283,6 +307,8 @@ end:
+@@ -283,6 +308,8 @@ end:
  	*crt_idx = *next_idx;
  	list_hash(*crt_idx);
  	dp_dbf.free_result(dp_db_handle, res);
@@ -181,7 +182,7 @@ index bd3bb49..95ec45e 100644
  	return 0;
  
  err2:
-@@ -352,6 +378,84 @@ static pcre *reg_ex_comp(const char *pattern, int *cap_cnt)
+@@ -352,6 +379,84 @@ static pcre *reg_ex_comp(const char *pattern, int *cap_cnt)
  	return result;
  }
  
@@ -266,7 +267,7 @@ index bd3bb49..95ec45e 100644
  
  /*compile the expressions, and if ok, build the rule */
  dpl_node_t * build_rule(db_val_t * values)
-@@ -359,9 +463,10 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -359,9 +464,10 @@ dpl_node_t * build_rule(db_val_t * values)
  	pcre *match_comp, *subst_comp;
  	struct subst_expr *repl_comp;
  	dpl_node_t * new_rule;
@@ -278,7 +279,7 @@ index bd3bb49..95ec45e 100644
  
  	matchop = VAL_INT(values+2);
  
-@@ -377,11 +482,21 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -377,11 +483,21 @@ dpl_node_t * build_rule(db_val_t * values)
  
  	GET_STR_VALUE(match_exp, values, 3);
  	if(matchop == DP_REGEX_OP){
@@ -305,7 +306,7 @@ index bd3bb49..95ec45e 100644
  		}
  	}
  
-@@ -398,26 +513,38 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -398,26 +514,38 @@ dpl_node_t * build_rule(db_val_t * values)
  
  	GET_STR_VALUE(subst_exp, values, 5);
  	if(subst_exp.s && subst_exp.len){
@@ -360,7 +361,7 @@ index bd3bb49..95ec45e 100644
  	}
  
  	new_rule = (dpl_node_t *)shm_malloc(sizeof(dpl_node_t));
-@@ -450,6 +577,7 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -450,6 +578,7 @@ dpl_node_t * build_rule(db_val_t * values)
  	new_rule->match_comp = match_comp;
  	new_rule->subst_comp = subst_comp;
  	new_rule->repl_comp  = repl_comp;
@@ -368,7 +369,7 @@ index bd3bb49..95ec45e 100644
  
  	return new_rule;
  
-@@ -550,6 +678,85 @@ err:
+@@ -550,6 +679,85 @@ err:
  	return -1;
  }
  
@@ -454,7 +455,7 @@ index bd3bb49..95ec45e 100644
  
  void destroy_hash(int index)
  {
-@@ -589,6 +796,114 @@ void destroy_hash(int index)
+@@ -589,6 +797,114 @@ void destroy_hash(int index)
  	rules_hash[index] = 0;
  }
  
@@ -569,7 +570,7 @@ index bd3bb49..95ec45e 100644
  
  void destroy_rule(dpl_node_t * rule){
  
-@@ -619,6 +934,8 @@ void destroy_rule(dpl_node_t * rule){
+@@ -619,6 +935,8 @@ void destroy_rule(dpl_node_t * rule){
  
  	if(rule->attrs.s)
  		shm_free(rule->attrs.s);
@@ -578,7 +579,7 @@ index bd3bb49..95ec45e 100644
  }
  
  
-@@ -636,6 +953,25 @@ dpl_id_p select_dpid(int id)
+@@ -636,6 +954,25 @@ dpl_id_p select_dpid(int id)
  	return NULL;
  }
  
@@ -604,7 +605,7 @@ index bd3bb49..95ec45e 100644
  
  /*FOR DEBUG PURPOSE*/
  void list_hash(int h_index)
-@@ -672,3 +1008,40 @@ void list_rule(dpl_node_t * rule)
+@@ -672,3 +1009,40 @@ void list_rule(dpl_node_t * rule)
  			rule->attrs.len,	rule->attrs.s);
  
  }
@@ -917,5 +918,5 @@ index ec2e5bb..2a53be4 100644
  		return -1;
  	}
 -- 
-2.0.0.rc0
+2.0.0
 
