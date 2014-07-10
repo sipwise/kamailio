@@ -1,3 +1,24 @@
+ngcp-kamailio (4.1.4-1+0~mr3.4.1.0) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [d041b0f] MT#7503 remove old upstream patches. Add new upstream patches. Use gcj-jdk.
+  * [fdf507d] MT#6485 sync init.d scripts from templates.
+  * [d3001c9] MT#6485 add container check at init script
+  * [084fe88] MT#7771 dialplan: match and subst with $(avp(s:xxxx)[*]) at rules
+  * [98500b3] MT#6981 dialplan: fix initial load of pv rules.
+
+  [ Richard Fuchs ]
+  * [368eee5] update rtpengine to kamailio master
+  * [13e6ae6] add TOS= parameter
+  * [f6cf938] update rtpengine bencode.h from kamailio master
+
+  [ Andrew Pogrebennyk ]
+  * [2ff07db] MT#7059 allow t_is_failure_route() call from branch route.
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 10 Jul 2014 15:24:53 +0200
+
 ngcp-kamailio (4.1.4-1+0~mr3.4.0.0) unstable; urgency=medium
 
   * [b16fed8] MT#7503 Imported Upstream version 4.1.4
