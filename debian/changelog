@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.4-1+0~mr3.4.1.1) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [9c5cb04] MT#7995 lcr_rate: ignore peers without valid fees
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 24 Jul 2014 17:59:40 +0200
+
 ngcp-kamailio (4.1.4-1+0~mr3.4.1.0) unstable; urgency=low
 
   [ Victor Seva ]
