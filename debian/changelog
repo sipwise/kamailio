@@ -1,3 +1,14 @@
+ngcp-kamailio (4.1.5-1+0~mr3.5.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [0790281] Imported Upstream version 4.1.4
+  * [acc54fb] Imported Upstream version 4.1.5
+
+  [ Richard Fuchs ]
+  * [2c6f8ca] MT#7995 lcr_rate: ignore peers without valid fees
+
+ -- Victor Seva <vseva@sipwise.com>  Thu, 07 Aug 2014 13:19:56 +0200
+
 ngcp-kamailio (4.1.4-1+0~mr3.5.0.0) unstable; urgency=low
 
   [ Victor Seva ]

@@ -2,7 +2,6 @@
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
-upstream/0006-tmx-handle-branch-route.patch
 ## multipart bodies
 upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
 upstream/0001-core-add-str_append-helper-function.patch
@@ -10,10 +9,6 @@ upstream/0002-core-add-check_boundaries-to-build_req_buf_from_sip_.patch
 upstream/0003-textops-functions-to-convert-append-and-remove-multi.patch
 upstream/0004-textops-add-new-multipart-functions-documentation.patch
 upstream/0005-textops-Refresh-README.patch
-# fixes from 4.1 branch
-upstream/0001-core-fix-crash-related-to-core-sockets_list-command.patch
-upstream/0002-app_java-Use-generic-libgcj.patch
-upstream/0005-registrar-Add-check-for-contact-header-before-checki.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
