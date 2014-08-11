@@ -104,7 +104,7 @@ Now we can force lookup to read from DB
  		if(res<0) {
  			LM_DBG("temp gruu '%.*s' not found in usrloc\n", aor.len, ZSW(aor.s));
  			return -1;
-@@ -353,6 +359,28 @@
+@@ -353,6 +359,29 @@
  	return ret;
  }
  
@@ -128,6 +128,7 @@ Now we can force lookup to read from DB
 + */
 +int lookup_db(struct sip_msg* _m, udomain_t* _d, str* _uri)
 +{
++	LM_DBG("set _dbflag\n");
 +	return _lookup(_m, _d, _uri, 1);
 +}
  
@@ -168,7 +169,7 @@ Now we can force lookup to read from DB
  	{"registered",   (cmd_function)w_registered,  1,  domain_uri_fixup, 0,
  			REQUEST_ROUTE | FAILURE_ROUTE },
  	{"registered",   (cmd_function)w_registered,  2,  domain_uri_fixup, 0,
-@@ -470,16 +472,23 @@
+@@ -470,16 +472,24 @@
  /*! \brief
   * Wrapper to lookup(location)
   */
@@ -189,6 +190,7 @@ Now we can force lookup to read from DB
 +	{
 +		dbflag = (unsigned long)_dbflag;
 +	}
++	LM_DBG("dbflag:%d\n", dbflag);
 +	if(dbflag)
 +		return lookup_db(_m, (udomain_t*)_d, (uri.len>0)?&uri:NULL);
 +	else
@@ -196,7 +198,7 @@ Now we can force lookup to read from DB
  }
  
  /*! \brief
-@@ -556,10 +565,23 @@
+@@ -556,10 +566,23 @@
   */
  static int domain_uri_fixup(void** param, int param_no)
  {
