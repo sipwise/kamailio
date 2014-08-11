@@ -286,7 +286,7 @@ Now we can force lookup to read from DB
  		/* search in DB */
  		r = db_load_urecord_by_ruid(ul_dbh, _d, _ruid);
  		if (r) {
-@@ -1089,6 +1099,71 @@
+@@ -1089,6 +1099,73 @@
  }
  
  /*!
@@ -330,6 +330,7 @@ Now we can force lookup to read from DB
 +		LM_ERR("db_mode is NO_DB\n");
 +		return -1;
 +	}
++	LM_DBG("setting dbflag\n");
 +	return _get_urecord(_d, _aor, _r, 1);
 +}
 +
@@ -351,6 +352,7 @@ Now we can force lookup to read from DB
 +		LM_ERR("db_mode is NO_DB\n");
 +		return -1;
 +	}
++	LM_DBG("setting dbflag\n");
 +	return _get_urecord_by_ruid(_d, _aorhash, _ruid, _r, _c, 1);
 +}
 +
@@ -396,7 +398,7 @@ Now we can force lookup to read from DB
  	api->db_mode    = db_mode;
  	api->nat_flag   = nat_bflag;
  
-+	api->get_urecord_by_ruid = get_urecord_by_ruid_db;
++	api->get_urecord_by_ruid_db = get_urecord_by_ruid_db;
 +	api->get_urecord_db      = get_urecord_db;
 +
  	return 0;
