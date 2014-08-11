@@ -222,7 +222,7 @@ Now we can force lookup to read from DB
  }
 --- a/modules/usrloc/udomain.c
 +++ b/modules/usrloc/udomain.c
-@@ -993,14 +993,16 @@
+@@ -993,14 +993,18 @@
   * \param _d domain to search the record
   * \param _aor address of record
   * \param _r new created record
@@ -237,11 +237,21 @@ Now we can force lookup to read from DB
  	urecord_t* r;
  
 -	if (db_mode!=DB_ONLY) {
++	if(_dbflag) LM_DBG("dbflag set\n");
++
 +	if (db_mode!=DB_ONLY && !_dbflag) {
  		/* search in cache */
  		aorhash = ul_get_aorhash(_aor);
  		sl = aorhash&(_d->size-1);
-@@ -1034,10 +1036,12 @@
+@@ -1016,6 +1020,7 @@
+ 			r = r->next;
+ 		}
+ 	} else {
++		LM_DBG("do db\n");
+ 		/* search in DB */
+ 		r = db_load_urecord( ul_dbh, _d, _aor);
+ 		if (r) {
+@@ -1034,19 +1039,23 @@
   * \param _ruid record internal unique id
   * \param _r store pointer to location record
   * \param _c store pointer to contact structure
@@ -256,7 +266,10 @@ Now we can force lookup to read from DB
  {
  	unsigned int sl, i;
  	urecord_t* r;
-@@ -1046,7 +1050,7 @@
+ 	ucontact_t* c;
+ 
++	if(_dbflag) LM_DBG("dbflag set\n");
++
  	sl = _aorhash&(_d->size-1);
  	lock_ulslot(_d, sl);
  
@@ -265,7 +278,15 @@ Now we can force lookup to read from DB
  		/* search in cache */
  		r = _d->table[sl].first;
  
-@@ -1089,6 +1093,71 @@
+@@ -1066,6 +1075,7 @@
+ 			r = r->next;
+ 		}
+ 	} else {
++		LM_DBG("do db\n");
+ 		/* search in DB */
+ 		r = db_load_urecord_by_ruid(ul_dbh, _d, _ruid);
+ 		if (r) {
+@@ -1089,6 +1099,71 @@
  }
  
  /*!
