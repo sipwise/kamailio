@@ -2,6 +2,7 @@
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
+upstream/debug/0001-debugger-fix-reset_msgid.patch
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
