@@ -16,11 +16,9 @@ Now we can force lookup to read from DB
  modules/usrloc/usrloc.h     |  7 ++++
  9 files changed, 202 insertions(+), 9 deletions(-)
 
-diff --git a/modules/registrar/api.c b/modules/registrar/api.c
-index a8c5b50..90adf91 100644
 --- a/modules/registrar/api.c
 +++ b/modules/registrar/api.c
-@@ -96,6 +96,21 @@ int regapi_lookup_uri(struct sip_msg *msg, char *table, str * uri)
+@@ -96,6 +96,21 @@
  /**
   *
   */
@@ -42,11 +40,9 @@ index a8c5b50..90adf91 100644
  int regapi_registered(struct sip_msg *msg, char *table)
  {
  	udomain_t* d;
-diff --git a/modules/registrar/api.h b/modules/registrar/api.h
-index b3109de..148fd33 100644
 --- a/modules/registrar/api.h
 +++ b/modules/registrar/api.h
-@@ -43,6 +43,9 @@ int regapi_lookup(struct sip_msg *msg, char *table);
+@@ -43,6 +43,9 @@
  typedef int (*regapi_lookup_uri_f)(struct sip_msg *msg, char *table, str *uri);
  int regapi_lookup_uri(struct sip_msg *msg, char *table, str *uri);
  
@@ -56,7 +52,7 @@ index b3109de..148fd33 100644
  typedef int (*regapi_set_q_override_f)(struct sip_msg *msg, str *new_q);
  int regapi_set_q_override(struct sip_msg *msg, str *new_q);
  
-@@ -54,6 +57,7 @@ typedef struct registrar_api {
+@@ -54,6 +57,7 @@
  	regapi_save_uri_f   save_uri;
  	regapi_lookup_f     lookup;
  	regapi_lookup_uri_f lookup_uri;
@@ -64,11 +60,9 @@ index b3109de..148fd33 100644
  	regapi_lookup_f     registered;
  	regapi_set_q_override_f set_q_override;
  } registrar_api_t;
-diff --git a/modules/registrar/lookup.c b/modules/registrar/lookup.c
-index 2b3ad96..176bbbd 100644
 --- a/modules/registrar/lookup.c
 +++ b/modules/registrar/lookup.c
-@@ -87,7 +87,7 @@ int reg_cmp_instances(str *i1, str *i2)
+@@ -87,7 +87,7 @@
   *          -2 : found but method not allowed
   *          -3 : error
   */
@@ -77,7 +71,7 @@ index 2b3ad96..176bbbd 100644
  {
  	urecord_t* r;
  	str aor, uri;
-@@ -109,7 +109,7 @@ int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri)
+@@ -109,7 +109,7 @@
  
  	if (_m->new_uri.s) uri = _m->new_uri;
  	else uri = _m->first_line.u.request.uri;
@@ -86,7 +80,7 @@ index 2b3ad96..176bbbd 100644
  	if (extract_aor((_uri)?_uri:&uri, &aor, &puri) < 0) {
  		LM_ERR("failed to extract address of record\n");
  		return -3;
-@@ -153,7 +153,10 @@ int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri)
+@@ -153,7 +153,10 @@
  	{
  		/* aor or pub-gruu lookup */
  		ul.lock_udomain(_d, &aor);
@@ -98,7 +92,7 @@ index 2b3ad96..176bbbd 100644
  		if (res > 0) {
  			LM_DBG("'%.*s' Not found in usrloc\n", aor.len, ZSW(aor.s));
  			ul.unlock_udomain(_d, &aor);
-@@ -196,7 +199,10 @@ int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri)
+@@ -196,7 +199,10 @@
  		}
  	} else {
  		/* temp-gruu lookup */
@@ -110,7 +104,7 @@ index 2b3ad96..176bbbd 100644
  		if(res<0) {
  			LM_DBG("temp gruu '%.*s' not found in usrloc\n", aor.len, ZSW(aor.s));
  			return -1;
-@@ -353,6 +359,28 @@ done:
+@@ -353,6 +359,28 @@
  	return ret;
  }
  
@@ -139,8 +133,6 @@ index 2b3ad96..176bbbd 100644
  
  int reset_ruri_branch(sip_msg_t *msg)
  {
-diff --git a/modules/registrar/lookup.h b/modules/registrar/lookup.h
-index e2703ad..3da81f4 100644
 --- a/modules/registrar/lookup.h
 +++ b/modules/registrar/lookup.h
 @@ -42,6 +42,12 @@
@@ -156,11 +148,9 @@ index e2703ad..3da81f4 100644
   * Lookup r-uri and additional branches in usrloc
   */
  int lookup_branches(sip_msg_t *msg, udomain_t *d);
-diff --git a/modules/registrar/reg_mod.c b/modules/registrar/reg_mod.c
-index ce0d823..53f3c7f 100644
 --- a/modules/registrar/reg_mod.c
 +++ b/modules/registrar/reg_mod.c
-@@ -91,6 +91,7 @@ static void mod_destroy(void);
+@@ -91,6 +91,7 @@
  static int w_save2(struct sip_msg* _m, char* _d, char* _cflags);
  static int w_save3(struct sip_msg* _m, char* _d, char* _cflags, char* _uri);
  static int w_lookup(struct sip_msg* _m, char* _d, char* _p2);
@@ -168,7 +158,7 @@ index ce0d823..53f3c7f 100644
  static int w_lookup_branches(struct sip_msg* _m, char* _d, char* _p2);
  static int w_registered(struct sip_msg* _m, char* _d, char* _uri);
  static int w_unregister(struct sip_msg* _m, char* _d, char* _uri);
-@@ -181,6 +182,8 @@ static cmd_export_t cmds[] = {
+@@ -180,6 +181,8 @@
  			REQUEST_ROUTE | FAILURE_ROUTE },
  	{"lookup",       (cmd_function)w_lookup,      2,  domain_uri_fixup, 0,
  			REQUEST_ROUTE | FAILURE_ROUTE },
@@ -177,7 +167,7 @@ index ce0d823..53f3c7f 100644
  	{"registered",   (cmd_function)w_registered,  1,  domain_uri_fixup, 0,
  			REQUEST_ROUTE | FAILURE_ROUTE },
  	{"registered",   (cmd_function)w_registered,  2,  domain_uri_fixup, 0,
-@@ -475,6 +478,28 @@ static int w_lookup(struct sip_msg* _m, char* _d, char* _uri)
+@@ -483,6 +486,28 @@
  }
  
  /*! \brief
@@ -206,7 +196,7 @@ index ce0d823..53f3c7f 100644
   * Wrapper to lookup_branches(location)
   */
  static int w_lookup_branches(sip_msg_t* _m, char* _d, char* _p2)
-@@ -548,10 +573,23 @@ static int domain_fixup(void** param, int param_no)
+@@ -556,10 +581,23 @@
   */
  static int domain_uri_fixup(void** param, int param_no)
  {
@@ -230,11 +220,9 @@ index ce0d823..53f3c7f 100644
  	}
  	return 0;
  }
-diff --git a/modules/usrloc/udomain.c b/modules/usrloc/udomain.c
-index 4178906..41f7847 100644
 --- a/modules/usrloc/udomain.c
 +++ b/modules/usrloc/udomain.c
-@@ -993,14 +993,16 @@ int insert_urecord(udomain_t* _d, str* _aor, struct urecord** _r)
+@@ -993,14 +993,16 @@
   * \param _d domain to search the record
   * \param _aor address of record
   * \param _r new created record
@@ -253,7 +241,7 @@ index 4178906..41f7847 100644
  		/* search in cache */
  		aorhash = ul_get_aorhash(_aor);
  		sl = aorhash&(_d->size-1);
-@@ -1034,10 +1036,12 @@ int get_urecord(udomain_t* _d, str* _aor, struct urecord** _r)
+@@ -1034,10 +1036,12 @@
   * \param _ruid record internal unique id
   * \param _r store pointer to location record
   * \param _c store pointer to contact structure
@@ -268,7 +256,7 @@ index 4178906..41f7847 100644
  {
  	unsigned int sl, i;
  	urecord_t* r;
-@@ -1046,7 +1050,7 @@ int get_urecord_by_ruid(udomain_t* _d, unsigned int _aorhash,
+@@ -1046,7 +1050,7 @@
  	sl = _aorhash&(_d->size-1);
  	lock_ulslot(_d, sl);
  
@@ -277,7 +265,7 @@ index 4178906..41f7847 100644
  		/* search in cache */
  		r = _d->table[sl].first;
  
-@@ -1089,6 +1093,71 @@ int get_urecord_by_ruid(udomain_t* _d, unsigned int _aorhash,
+@@ -1089,6 +1093,71 @@
  }
  
  /*!
@@ -349,11 +337,9 @@ index 4178906..41f7847 100644
   * \brief Delete a urecord from domain
   * \param _d domain where the record should be deleted
   * \param _aor address of record
-diff --git a/modules/usrloc/udomain.h b/modules/usrloc/udomain.h
-index 6f2d295..215c773 100644
 --- a/modules/usrloc/udomain.h
 +++ b/modules/usrloc/udomain.h
-@@ -204,6 +204,29 @@ int get_urecord_by_ruid(udomain_t* _d, unsigned int _aorhash,
+@@ -204,6 +204,29 @@
  		str *_ruid, struct urecord** _r, struct ucontact** _c);
  
  /*!
@@ -383,11 +369,9 @@ index 6f2d295..215c773 100644
   * \brief Delete a urecord from domain
   * \param _d domain where the record should be deleted
   * \param _aor address of record
-diff --git a/modules/usrloc/usrloc.c b/modules/usrloc/usrloc.c
-index 1399bd5..89acfb9 100644
 --- a/modules/usrloc/usrloc.c
 +++ b/modules/usrloc/usrloc.c
-@@ -86,6 +86,9 @@ int bind_usrloc(usrloc_api_t* api)
+@@ -87,6 +87,9 @@
  	api->db_mode    = db_mode;
  	api->nat_flag   = nat_bflag;
  
@@ -397,11 +381,9 @@ index 1399bd5..89acfb9 100644
  	return 0;
  }
  
-diff --git a/modules/usrloc/usrloc.h b/modules/usrloc/usrloc.h
-index 82490ae..8e93f66 100644
 --- a/modules/usrloc/usrloc.h
 +++ b/modules/usrloc/usrloc.h
-@@ -151,6 +151,11 @@ typedef int (*get_urecord_t)(struct udomain* _d, str* _aor, struct urecord** _r)
+@@ -153,6 +153,11 @@
  typedef int (*get_urecord_by_ruid_t)(udomain_t* _d, unsigned int _aorhash,
  		str *_ruid, struct urecord** _r, struct ucontact** _c);
  
@@ -413,7 +395,7 @@ index 82490ae..8e93f66 100644
  typedef int  (*delete_urecord_t)(struct udomain* _d, str* _aor, struct urecord* _r);
  
  typedef int  (*delete_urecord_by_ruid_t)(struct udomain* _d, str* _ruid);
-@@ -205,6 +210,7 @@ typedef struct usrloc_api {
+@@ -211,6 +216,7 @@
  	delete_urecord_t     delete_urecord;
  	delete_urecord_by_ruid_t     delete_urecord_by_ruid;
  	get_urecord_t        get_urecord;
@@ -421,7 +403,7 @@ index 82490ae..8e93f66 100644
  	lock_udomain_t       lock_udomain;
  	unlock_udomain_t     unlock_udomain;
  
-@@ -214,6 +220,7 @@ typedef struct usrloc_api {
+@@ -220,6 +226,7 @@
  	get_ucontact_t       get_ucontact;
  
  	get_urecord_by_ruid_t       get_urecord_by_ruid;
@@ -429,6 +411,3 @@ index 82490ae..8e93f66 100644
  	get_ucontact_by_instance_t  get_ucontact_by_instance;
  
  	update_ucontact_t    update_ucontact;
--- 
-2.1.0.rc1
-

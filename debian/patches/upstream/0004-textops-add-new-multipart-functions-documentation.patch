@@ -7,11 +7,9 @@ Subject: [PATCH] textops: add new multipart functions documentation
  modules/textops/doc/textops_admin.xml | 140 ++++++++++++++++++++++++++++++++++
  1 file changed, 140 insertions(+)
 
-diff --git a/modules/textops/doc/textops_admin.xml b/modules/textops/doc/textops_admin.xml
-index e76e921..af9057a 100644
 --- a/modules/textops/doc/textops_admin.xml
 +++ b/modules/textops/doc/textops_admin.xml
-@@ -1358,6 +1358,146 @@ if (starts_with("$rU", "+358"))
+@@ -1423,6 +1423,146 @@
  		</example>
  	</section>
  
@@ -158,6 +156,3 @@ index e76e921..af9057a 100644
  	</section>
  	<section>
  		<title>Known Limitations</title>
--- 
-2.0.0.rc0
-

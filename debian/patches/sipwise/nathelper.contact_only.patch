@@ -16,7 +16,7 @@
  
  	{0, 0, 0}
  };
-@@ -2069,9 +2071,10 @@
+@@ -2071,9 +2073,10 @@
  			goto done;
  		}
  	}
@@ -29,7 +29,7 @@
  	if (rval<0) {
  		LM_ERR("failed to fetch contacts\n");
  		goto done;
-@@ -2085,9 +2088,10 @@
+@@ -2087,9 +2090,10 @@
  			LM_ERR("out of pkg memory\n");
  			goto done;
  		}
