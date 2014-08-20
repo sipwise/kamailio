@@ -1,0 +1,94 @@
+--- a/modules/db_postgres/km_dbase.c
++++ b/modules/db_postgres/km_dbase.c
+@@ -167,6 +167,10 @@
+ 	int i, retries;
+ 	ExecStatusType pqresult;
+ 	PGresult *res = NULL;
++	int sock, ret;
++	fd_set fds;
++	time_t max_time;
++	struct timeval wait_time;
+ 
+ 	if(! _con || !_s || !_s->s)
+ 	{
+@@ -217,6 +221,44 @@
+ 		/* exec the query */
+ 
+ 		if (PQsendQuery(CON_CONNECTION(_con), s)) {
++			if (pg_timeout <= 0)
++				goto do_read;
++
++			max_time = time(NULL) + pg_timeout;
++
++			while (1) {
++				sock = PQsocket(CON_CONNECTION(_con));
++				FD_ZERO(&fds);
++				FD_SET(sock, &fds);
++
++				wait_time.tv_usec = 0;
++				wait_time.tv_sec = max_time - time(NULL);
++				if (wait_time.tv_sec <= 0 || wait_time.tv_sec > 0xffffff)
++					goto timeout;
++
++				ret = select(sock + 1, &fds, NULL, NULL, &wait_time);
++				if (ret < 0) {
++					if (errno == EINTR)
++						continue;
++					LM_WARN("select() error\n");
++					goto reset;
++				}
++				if (!ret) {
++timeout:
++					LM_WARN("timeout waiting for postgres reply\n");
++					goto reset;
++				}
++
++				if (!PQconsumeInput(CON_CONNECTION(_con))) {
++					LM_WARN("error reading data from postgres server: %s\n",
++							PQerrorMessage(CON_CONNECTION(_con)));
++					goto reset;
++				}
++				if (!PQisBusy(CON_CONNECTION(_con)))
++					break;
++			}
++
++do_read:
+ 			/* Get the result of the query */
+ 			while ((res = PQgetResult(CON_CONNECTION(_con))) != NULL) {
+ 				db_postgres_free_query(_con);
+@@ -239,6 +281,7 @@
+ 				PQerrorMessage(CON_CONNECTION(_con)));
+ 		if(PQstatus(CON_CONNECTION(_con))!=CONNECTION_OK)
+ 		{
++reset:
+ 			LM_DBG("reseting the connection to postgress server\n");
+ 			PQreset(CON_CONNECTION(_con));
+ 		}
+--- a/modules/db_postgres/pg_mod.c
++++ b/modules/db_postgres/pg_mod.c
+@@ -61,6 +61,7 @@
+ 					  * 0 disables reconnecting */
+ 
+ int pg_lockset = 4;
++int pg_timeout = 0; /* default = no timeout */
+ 
+ /*
+  * Postgres module interface
+@@ -92,6 +93,7 @@
+ static param_export_t params[] = {
+ 	{"retries",         PARAM_INT, &pg_retries },
+ 	{"lockset",         PARAM_INT, &pg_lockset },
++	{"timeout",         PARAM_INT, &pg_timeout },
+ 	{0, 0, 0}
+ };
+ 
+--- a/modules/db_postgres/pg_mod.h
++++ b/modules/db_postgres/pg_mod.h
+@@ -41,6 +41,7 @@
+  */
+ 
+ extern int pg_retries;
++extern int pg_timeout;
+ 
+ /** @} */
+ 
