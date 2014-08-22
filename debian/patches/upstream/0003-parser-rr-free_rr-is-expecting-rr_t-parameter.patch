@@ -1,0 +1,29 @@
+From 1d44d71e1786182df3f81f7abf206e13faae9d26 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 14 Aug 2014 18:24:31 +0200
+Subject: [PATCH] parser/rr: free_rr() is expecting rr_t** parameter
+
+- give the parameter as &r, following the commit
+  b40d92962b680ac29dd38ffe3c8f1aa1e39d3a97
+
+(cherry picked from commit 34ba948cdabf7139c8563e531f18c4a486b31a00)
+---
+ parser/parse_rr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/parser/parse_rr.c b/parser/parse_rr.c
+index e3df4f3..0f293eb 100644
+--- a/parser/parse_rr.c
++++ b/parser/parse_rr.c
+@@ -138,7 +138,7 @@ static inline int do_parse_rr_body(char *buf, int len, rr_t **head)
+ 	}
+ 
+  error:
+-	if (r) free_rr(r);
++	if (r) free_rr(&r);
+ 	free_rr(head); /* Free any contacts created so far */
+ 	return -1;
+ 
+-- 
+2.1.0.rc1
+
