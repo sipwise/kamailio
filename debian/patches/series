@@ -14,6 +14,9 @@ upstream/0003-textops-functions-to-convert-append-and-remove-multi.patch
 upstream/0004-textops-add-new-multipart-functions-documentation.patch
 upstream/0005-textops-Refresh-README.patch
 #
+upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
+upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
+#
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
