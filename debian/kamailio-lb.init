@@ -168,8 +168,8 @@ case "$1" in
       /usr/sbin/ngcp-check_active -q
       status=$?
       case "${status}" in
-        0|3)
-          echo "Active node or transition."
+        0)
+          echo "Active node"
           ;;
         *)
           echo "Ignored start action in inactive node ($status)"
