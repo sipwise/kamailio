@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.4-1+0~mr3.4.2.2) unstable; urgency=low
+
+  [ Andrew Pogrebennyk ]
+  * [9d98a60] MT#8699 fix debugger.reset_msgid (avoid fuzz)
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 02 Sep 2014 13:53:44 +0200
+
 ngcp-kamailio (4.1.4-1+0~mr3.4.2.1) unstable; urgency=low
 
   [ Victor Seva ]
