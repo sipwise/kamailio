@@ -140,7 +140,6 @@ fi
 
 start_kamailio_daemon ()
 {
-  set -e
   start-stop-daemon --start --quiet --pidfile $PIDFILE $SSDOPTS \
     --exec $DAEMON -- $OPTIONS
   res=$?
