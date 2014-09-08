@@ -1,0 +1,238 @@
+--- a/modules/db_postgres/km_dbase.c
++++ b/modules/db_postgres/km_dbase.c
+@@ -167,6 +167,10 @@
+ 	int i, retries;
+ 	ExecStatusType pqresult;
+ 	PGresult *res = NULL;
++	int sock, ret;
++	fd_set fds;
++	time_t max_time;
++	struct timeval wait_time;
+ 
+ 	if(! _con || !_s || !_s->s)
+ 	{
+@@ -217,6 +221,44 @@
+ 		/* exec the query */
+ 
+ 		if (PQsendQuery(CON_CONNECTION(_con), s)) {
++			if (pg_timeout <= 0)
++				goto do_read;
++
++			max_time = time(NULL) + pg_timeout;
++
++			while (1) {
++				sock = PQsocket(CON_CONNECTION(_con));
++				FD_ZERO(&fds);
++				FD_SET(sock, &fds);
++
++				wait_time.tv_usec = 0;
++				wait_time.tv_sec = max_time - time(NULL);
++				if (wait_time.tv_sec <= 0 || wait_time.tv_sec > 0xffffff)
++					goto timeout;
++
++				ret = select(sock + 1, &fds, NULL, NULL, &wait_time);
++				if (ret < 0) {
++					if (errno == EINTR)
++						continue;
++					LM_WARN("select() error\n");
++					goto reset;
++				}
++				if (!ret) {
++timeout:
++					LM_WARN("timeout waiting for postgres reply\n");
++					goto reset;
++				}
++
++				if (!PQconsumeInput(CON_CONNECTION(_con))) {
++					LM_WARN("error reading data from postgres server: %s\n",
++							PQerrorMessage(CON_CONNECTION(_con)));
++					goto reset;
++				}
++				if (!PQisBusy(CON_CONNECTION(_con)))
++					break;
++			}
++
++do_read:
+ 			/* Get the result of the query */
+ 			while ((res = PQgetResult(CON_CONNECTION(_con))) != NULL) {
+ 				db_postgres_free_query(_con);
+@@ -239,6 +281,7 @@
+ 				PQerrorMessage(CON_CONNECTION(_con)));
+ 		if(PQstatus(CON_CONNECTION(_con))!=CONNECTION_OK)
+ 		{
++reset:
+ 			LM_DBG("reseting the connection to postgress server\n");
+ 			PQreset(CON_CONNECTION(_con));
+ 		}
+--- a/modules/db_postgres/pg_mod.c
++++ b/modules/db_postgres/pg_mod.c
+@@ -61,6 +61,8 @@
+ 					  * 0 disables reconnecting */
+ 
+ int pg_lockset = 4;
++int pg_timeout = 0; /* default = no timeout */
++int pg_keepalive = 0;
+ 
+ /*
+  * Postgres module interface
+@@ -92,6 +94,8 @@
+ static param_export_t params[] = {
+ 	{"retries",         PARAM_INT, &pg_retries },
+ 	{"lockset",         PARAM_INT, &pg_lockset },
++	{"timeout",         PARAM_INT, &pg_timeout },
++	{"tcp_keepalive",   PARAM_INT, &pg_keepalive },
+ 	{0, 0, 0}
+ };
+ 
+--- a/modules/db_postgres/pg_mod.h
++++ b/modules/db_postgres/pg_mod.h
+@@ -41,6 +41,8 @@
+  */
+ 
+ extern int pg_retries;
++extern int pg_timeout;
++extern int pg_keepalive;
+ 
+ /** @} */
+ 
+--- a/modules/db_postgres/pg_con.c
++++ b/modules/db_postgres/pg_con.c
+@@ -39,6 +39,7 @@
+ #include "pg_con.h"
+ #include "pg_uri.h"
+ #include "pg_sql.h"
++#include "pg_mod.h"
+ 
+ #include "../../mem/mem.h"
+ #include "../../dprint.h"
+@@ -237,7 +238,9 @@
+ 	struct pg_con* pcon;
+ 	struct pg_uri* puri;
+ 	char* port_str;
+-	int ret;
++	int ret, i = 0;
++	const char *keywords[10], *values[10];
++	char to[16];
+ 	
+ 	pcon = DB_GET_PAYLOAD(con);
+ 	puri = DB_GET_PAYLOAD(con->uri);
+@@ -251,6 +254,8 @@
+ 
+ 	if (puri->port > 0) {
+ 		port_str = int2str(puri->port, 0);
++		keywords[i] = "port";
++		values[i++] = port_str;
+ 	} else {
+ 		port_str = NULL;
+ 	}
+@@ -260,12 +265,26 @@
+ 		pcon->con = NULL;
+ 	}
+ 
+-	pcon->con = PQsetdbLogin(puri->host, port_str,
+-							 NULL, NULL, puri->database,
+-							 puri->username, puri->password);
++	keywords[i] = "host";
++	values[i++] = puri->host;
++	keywords[i] = "dbname";
++	values[i++] = puri->database;
++	keywords[i] = "user";
++	values[i++] = puri->username;
++	keywords[i] = "password";
++	values[i++] = puri->password;
++	if (pg_timeout > 0) {
++		snprintf(to, sizeof(to)-1, "%d", pg_timeout + 3);
++		keywords[i] = "connect_timeout";
++		values[i++] = to;
++	}
++
++	keywords[i] = values[i] = NULL;
++
++	pcon->con = PQconnectdbParams(keywords, values, 1);
+ 	
+ 	if (pcon->con == NULL) {
+-		ERR("postgres: PQsetdbLogin ran out of memory\n");
++		ERR("postgres: PQconnectdbParams ran out of memory\n");
+ 		goto error;
+ 	}
+ 	
+@@ -285,6 +304,11 @@
+ 	    PQprotocolVersion(pcon->con), 0 );
+ #endif
+ 
++#ifdef TCP_KEEPIDLE
++	if (pg_keepalive)
++		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++#endif
++
+ 	ret = timestamp_format(pcon->con);
+ 	if (ret == 1 || ret == -1) {
+ 		/* Assume INT8 representation if detection fails */
+--- a/modules/db_postgres/km_pg_con.c
++++ b/modules/db_postgres/km_pg_con.c
+@@ -26,6 +26,7 @@
+  */
+ 
+ #include "km_pg_con.h"
++#include "pg_mod.h"
+ #include "../../mem/mem.h"
+ #include "../../dprint.h"
+ #include "../../ut.h"
+@@ -45,6 +46,9 @@
+ {
+ 	struct pg_con* ptr;
+ 	char *ports;
++	int i = 0;
++	const char *keywords[10], *values[10];
++	char to[16];
+ 
+ 	LM_DBG("db_id = %p\n", id);
+  
+@@ -66,6 +70,8 @@
+ 
+ 	if (id->port) {
+ 		ports = int2str(id->port, 0);
++		keywords[i] = "port";
++		values[i++] = ports;
+ 		LM_DBG("opening connection: postgres://xxxx:xxxx@%s:%d/%s\n", ZSW(id->host),
+ 			id->port, ZSW(id->database));
+ 	} else {
+@@ -74,8 +80,24 @@
+ 			ZSW(id->database));
+ 	}
+ 
+- 	ptr->con = PQsetdbLogin(id->host, ports, NULL, NULL, id->database, id->username, id->password);
+-	LM_DBG("PQsetdbLogin(%p)\n", ptr->con);
++	keywords[i] = "host";
++	values[i++] = id->host;
++	keywords[i] = "dbname";
++	values[i++] = id->database;
++	keywords[i] = "user";
++	values[i++] = id->username;
++	keywords[i] = "password";
++	values[i++] = id->password;
++	if (pg_timeout > 0) {
++		snprintf(to, sizeof(to)-1, "%d", pg_timeout + 3);
++		keywords[i] = "connect_timeout";
++		values[i++] = to;
++	}
++
++	keywords[i] = values[i] = NULL;
++
++	ptr->con = PQconnectdbParams(keywords, values, 1);
++	LM_DBG("PQconnectdbParams(%p)\n", ptr->con);
+ 
+ 	if( (ptr->con == 0) || (PQstatus(ptr->con) != CONNECTION_OK) )
+ 	{
+@@ -88,6 +110,11 @@
+ 	ptr->timestamp = time(0);
+ 	ptr->id = id;
+ 
++#ifdef TCP_KEEPIDLE
++	if (pg_keepalive)
++		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++#endif
++
+ 	return ptr;
+ 
+  err:

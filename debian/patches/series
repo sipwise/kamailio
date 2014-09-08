@@ -34,3 +34,4 @@ sipwise/tcap.patch
 sipwise/rtpengine.patch
 # lookup force dbflag
 sipwise/0001-MT-8517-add-lookup-force-dbflag.patch
+sipwise/db_postgres-timeout
