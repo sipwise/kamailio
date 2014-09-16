@@ -2933,7 +2933,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine.c
-@@ -0,0 +1,2158 @@
+@@ -0,0 +1,2159 @@
 +/* $Id$
 + *
 + * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
@@ -4175,12 +4175,13 @@
 +				break;
 +
 +			case 9:
-+				if (str_eq(&key, "RTP/SAVPF")) {
++				if (str_eq(&key, "RTP/SAVPF"))
 +					ng_flags->transport = 0x103;
-+					goto next;
-+				}
 +				else if (str_eq(&key, "direction"))
 +					bencode_list_add_str(ng_flags->direction, &val);
++				else
++					goto generic;
++				goto next;
 +				break;
 +
 +			case 10:
