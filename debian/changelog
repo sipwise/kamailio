@@ -1,3 +1,33 @@
+ngcp-kamailio (4.1.6-1+0~mr3.5.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [5e0cd04] first attempt at double-offer/answer feature
+  * [582fcee] implement db_postgres query timeout
+  * [07de801] implement db_postgres connection timeout
+  * [98b39e0] compile fix
+  * [9e2b7ef] configurable tcp keepalive interval
+  * [4b7b518] add freeform direction= flag to rtpengine module
+  * [25eb694] typo fix
+  * [1b3ab9a] fix rtpengine "direction" flag
+
+  [ Victor Seva ]
+  * [b94e0be] MT#8517 add lookup force dbflag
+  * [fe7f161] MT#8699 fix debugger.reset_msgid
+  * [cb09151] MT#8699 fix fe7f161d1
+  * [000b0cc] MT#8517 add lookup force dbflag. fix b94e0be011e
+  * [d49b83b] refresh patches
+  * [6fd2698] MT#8741 remove init links tricks
+  * [ae2fb05] Add upstream bugfixes from 4.1 branch
+  * [3ac0dec] MT#8741 follow 6fd2698ff9. Remove dh_installinit -n option
+  * [1a6523a] MT#8797 backport upstream patches to deal with double record route
+  * [eb59d01] Imported Upstream version 4.1.6
+  * [b5805c2] MT#9189 remove already applied upstream fixes
+
+  [ Alexander Lutay ]
+  * [b9d539b] MT#6485 Remove 'set -e' which fails inactive->active switch
+
+ -- Victor Seva <vseva@sipwise.com>  Tue, 23 Sep 2014 15:10:41 +0200
+
 ngcp-kamailio (4.1.5-1+0~mr3.5.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
