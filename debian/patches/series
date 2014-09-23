@@ -1,10 +1,6 @@
 # backports from master
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
-upstream/0001-outbound-Fix-memory-leak.patch
-upstream/0002-core-parser-Free-rr-correctly-in-error-cases.patch
-upstream/0003-parser-rr-free_rr-is-expecting-rr_t-parameter.patch
-upstream/0004-debugger-fix-reset_msgid.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
 ## multipart bodies
 upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
