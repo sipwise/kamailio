@@ -24,7 +24,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/lcr_rate/lcr_rate_mod.c
-@@ -0,0 +1,306 @@
+@@ -0,0 +1,324 @@
 +/*
 + * $Id$
 + *
@@ -65,6 +65,7 @@
 +MODULE_VERSION
 +
 +struct peer {
++	int valid;
 +	unsigned int id;
 +	double cost;
 +	unsigned int weight;
@@ -167,7 +168,7 @@
 +	return 0;
 +}
 +
-+struct peer *load_peers(int *num, char *src_user, char *src_domain, char *dst_user, char *dst_domain) {
++static struct peer *load_peers(int *num, char *src_user, char *src_domain, char *dst_user, char *dst_domain) {
 +	struct usr_avp *avp;
 +	int_str val;
 +	struct peer *ret, *j;
@@ -206,6 +207,7 @@
 +		}
 +
 +		j = &ret[i];
++		j->valid = 0;
 +
 +		j->s.len = val.s.len;
 +		j->s.s = pkg_malloc(val.s.len);
@@ -217,18 +219,16 @@
 +		memcpy(j->s.s, val.s.s, val.s.len);
 +		c = memrchr(j->s.s, '|', val.s.len);
 +		if (!c) {
-+			pkg_free(ret);
 +			LM_ERR("separator not found in string <%.*s>\n", val.s.len, j->s.s);
-+			return NULL;
++			goto next;
 +		}
 +
 +		c++;
 +		s.s = c;
 +		s.len = val.s.len - (c - j->s.s);
 +		if (str2int(&s, &j->id)) {
-+			pkg_free(ret);
 +			LM_ERR("could not convert string <%.*s> to int\n", s.len, s.s);
-+			return NULL;
++			goto next;
 +		}
 +
 +		LM_DBG("finding rate for peer %u\n", j->id);
@@ -236,14 +236,15 @@
 +
 +		if (swrate_get_peer_ab_rate(&rate, &swrate_handle, j->id, src_user,
 +					src_domain, dst_user, dst_domain, now)) {
-+			pkg_free(ret);
 +			LM_ERR("failed to get rate for call, peer id %u, user <%s>@<%s> -> <%s>@<%s>\n",
 +				j->id, src_user, src_domain, dst_user, dst_domain);
-+			return NULL;
++			goto next;
 +		}
 +		j->cost = rate.init_rate;
++		j->valid = 1;
 +		LM_DBG("cost is %f\n", j->cost);
 +
++next:
 +		destroy_avp(avp);
 +		i++;
 +	}
@@ -255,13 +256,24 @@
 +static int peers_cmp(const void *aa, const void *bb) {
 +	const struct peer *a = aa, *b = bb;
 +
++	if (a->valid && !b->valid)
++		return 1;
++	if (!a->valid && b->valid)
++		return -1;
++	if (!a->valid && !b->valid)
++		return 0;
++
 +	if (a->cost < b->cost)
 +		return 1;
 +	if (a->cost > b->cost)
 +		return -1;
++
 +	if (a->weight < b->weight)
 +		return 1;
-+	return -1;
++	if (a->weight > b->weight)
++		return -1;
++
++	return 0;
 +}
 +
 +static int save_peers(struct peer *peers, int num) {
@@ -296,7 +308,7 @@
 +
 +static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
 +	struct peer *peers;
-+	int num_peers;
++	int num_peers, ret;
 +	str src, dst;
 +	char *src_user, *src_at, *src_domain;
 +	char *dst_user, *dst_at, *dst_domain;
@@ -326,8 +338,14 @@
 +	if (!peers)
 +		return -1;
 +	qsort(peers, num_peers, sizeof(*peers), peers_cmp);
++
++	ret = 1;
++	if (!num_peers || (!peers[0].valid && !peers[num_peers - 1].valid)) {
++		LM_ERR("no peers with valid ratings found\n");
++		ret = -1;
++	}
 +	save_peers(peers, num_peers);
 +
 +	LM_DBG("lcr_rate() done\n");
-+	return 1;
++	return ret;
 +}
