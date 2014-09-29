@@ -2933,7 +2933,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine.c
-@@ -0,0 +1,2159 @@
+@@ -0,0 +1,2175 @@
 +/* $Id$
 + *
 + * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
@@ -5049,17 +5049,18 @@
 +	return rtpengine_rtpp_set_wrap(msg, rtpengine_start_recording_wrap, NULL, 1);
 +}
 +
-+/*
-+ * Returns the current RTP-Statistics from the RTP-Proxy
-+ */
-+static int
-+pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param,
-+		  pv_value_t *res)
-+{
++static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
++	void **parms;
++	pv_param_t *param;
++	pv_value_t *res;
 +	bencode_buffer_t bencbuf;
 +	bencode_item_t *dict, *tot, *in, *out;
 +	static char buf[256];
 +	str ret;
++
++	parms = d;
++	param = parms[0];
++	res = parms[1];
 +
 +	dict = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, NULL, NULL);
 +	if (!dict)
@@ -5091,6 +5092,21 @@
 +error:
 +	bencode_buffer_free(&bencbuf);
 +	return -1;
++}
++
++/*
++ * Returns the current RTP-Statistics from the RTP-Proxy
++ */
++static int
++pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param,
++		  pv_value_t *res)
++{
++	void *parms[2];
++
++	parms[0] = param;
++	parms[1] = res;
++
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_rtpstat_wrap, parms, 1);
 +}
 +
 --- /dev/null
