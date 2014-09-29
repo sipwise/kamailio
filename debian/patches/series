@@ -29,3 +29,4 @@ sipwise/dialoginfo_notify_body.patch
 sipwise/tcap.patch
 sipwise/rtpengine.patch
 sipwise/db_postgres-timeout
+sipwise/nathelper_socket_filter.patch
