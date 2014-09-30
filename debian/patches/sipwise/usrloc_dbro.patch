@@ -1,0 +1,152 @@
+--- a/modules/usrloc/ul_mod.c
++++ b/modules/usrloc/ul_mod.c
+@@ -157,6 +157,7 @@
+ str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
+ 
+ str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
++str db_url_ro       = STR_NULL;			/*!< Read-Only Database URL */
+ int timer_interval  = 60;				/*!< Timer interval in seconds */
+ int db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
+ int use_domain      = 0;				/*!< Whether usrloc should use domain part of aor */
+@@ -173,6 +174,8 @@
+ db1_con_t* ul_dbh = 0; /* Database connection handle */
+ db_func_t ul_dbf;
+ 
++db1_con_t* ul_dbh_ro = 0; /* Read-Only Database connection handle */
++db_func_t ul_dbf_ro;
+ 
+ 
+ /*! \brief
+@@ -199,6 +202,7 @@
+ 	{"flags_column",        STR_PARAM, &flags_col.s     },
+ 	{"cflags_column",       STR_PARAM, &cflags_col.s    },
+ 	{"db_url",              STR_PARAM, &db_url.s        },
++	{"db_url_ro",           STR_PARAM, &db_url_ro.s     },
+ 	{"timer_interval",      INT_PARAM, &timer_interval  },
+ 	{"db_mode",             INT_PARAM, &db_mode         },
+ 	{"use_domain",          INT_PARAM, &use_domain      },
+@@ -264,6 +268,38 @@
+ 	child_init  /*!< Child initialization function */
+ };
+ 
++/*!
++ * \brief check ro db
++ *
++ * \return 0 on success, -1 on failure
++ */
++int check_dbro(void)
++{
++	db1_con_t* con;
++	str s = str_init("location"); /* TODO other table name?? */
++
++	/* Test tables from database if we are gonna
++	 * to use database
++	 */
++
++	con = ul_dbf_ro.init(&db_url_ro);
++	if (!con) {
++		LM_ERR("failed to open read-only database connection\n");
++		goto err;
++	}
++
++	if(db_check_table_version(&ul_dbf_ro, con, &s, UL_TABLE_VERSION) < 0) {
++		LM_ERR("error during read-only table version check.\n");
++		goto err;
++	}
++	ul_dbf_ro.close(con);
++
++	return 0;
++
++err:
++	if (con) ul_dbf_ro.close(con);
++	return -1;
++}
+ 
+ /*! \brief
+  * Module initialization function
+@@ -316,6 +352,7 @@
+ 	reg_id_col.len = strlen(reg_id_col.s);
+ 	last_mod_col.len = strlen(last_mod_col.s);
+ 	db_url.len = strlen(db_url.s);
++	if(db_url_ro.s) db_url_ro.len = strlen(db_url_ro.s);
+ 
+ 	if(ul_xavp_contact_name.s!=NULL)
+ 		ul_xavp_contact_name.len = strlen(ul_xavp_contact_name.s);
+@@ -374,6 +411,21 @@
+ 		}
+ 	}
+ 
++	/* Shall we use read-only db ? */
++	if (db_mode == DB_ONLY && db_url_ro.len > 0) {
++		if (db_bind_mod(&db_url_ro, &ul_dbf_ro) < 0) { /* Find database module */
++			LM_ERR("failed to bind database module\n");
++			return -1;
++		}
++		if (!DB_CAPABILITY(ul_dbf_ro, DB_CAP_ALL)) {
++			LM_ERR("database module does not implement all functions"
++					" needed by the module\n");
++			return -1;
++		}
++		if(check_dbro()<0) return -1;
++		LM_DBG("db_url_ro detected and checked\n");
++	}
++
+ 	if (nat_bflag==(unsigned int)-1) {
+ 		nat_bflag = 0;
+ 	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
+@@ -398,7 +450,6 @@
+ 	return 0;
+ }
+ 
+-
+ static int child_init(int _rank)
+ {
+ 	dlist_t* ptr;
+@@ -447,6 +498,16 @@
+ 		LM_ERR("child(%d): failed to connect to database\n", _rank);
+ 		return -1;
+ 	}
++
++	if (db_mode == DB_ONLY && db_url_ro.len > 0) {
++		/* Get a database connection per child */
++		ul_dbh_ro = ul_dbf_ro.init(&db_url_ro);
++		if (!ul_dbh_ro) {
++			LM_ERR("child(%d): failed to connect to read-only database\n", _rank);
++			return -1;
++		}
++		LM_DBG("read-only connection init\n");
++	}
+ 	/* _rank==PROC_SIPINIT is used even when fork is disabled */
+ 	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY) {
+ 		/* if cache is used, populate domains from DB */
+@@ -480,6 +541,8 @@
+ 		}
+ 	}
+ 
++	if (db_mode == DB_ONLY)
++
+ 	if(sruid_init(&_ul_sruid, '-', "ulcx", SRUID_INC)<0)
+ 		return -1;
+ 	done = 1;
+@@ -502,6 +565,10 @@
+ 		ul_dbf.close(ul_dbh);
+ 	}
+ 
++	if (ul_dbh_ro) {
++		ul_dbf_ro.close(ul_dbh_ro);
++	}
++
+ 	free_all_udomains();
+ 	ul_destroy_locks();
+ 
+--- a/modules/usrloc/ul_mod.h
++++ b/modules/usrloc/ul_mod.h
+@@ -96,6 +96,8 @@
+ extern db1_con_t* ul_dbh;   /* Database connection handle */
+ extern db_func_t ul_dbf;
+ 
++extern db1_con_t* ul_dbh_ro;   /* Read-Only Database connection handle */
++extern db_func_t ul_dbf_ro;
+ 
+ /*
+  * Matching algorithms

@@ -52,7 +52,7 @@
  			goto done;
 --- a/modules/usrloc/dlist.c
 +++ b/modules/usrloc/dlist.c
-@@ -79,6 +79,57 @@
+@@ -79,6 +79,53 @@
  	return 1;
  }
  
@@ -61,56 +61,52 @@
 +	struct socket_info *si;
 +	struct socket_info** list;
 +	struct addr_info* ai;
-+	unsigned short proto;
++	unsigned short proto=PROTO_UDP;
 +	unsigned int pos = 0;
 +	size_t size = 0;
 +	str s_proto = STR_NULL;
 +	char *s = *buf;
 +
-+	proto=PROTO_UDP;
-+	do{
-+		list=get_sock_info_list(proto);
-+		s_proto.s = get_valid_proto_name(proto);
-+		s_proto.len = strlen(s_proto.s);
-+		LM_DBG("s_proto[%d]:%.s\n", s_proto.len, s_proto.len, s_proto.s);
-+		for(si=list?*list:0; si; si=si->next){
-+			if (si->addr_info_lst)
-+			{
-+				for (ai=si->addr_info_lst; ai; ai=ai->next)
-+				{
-+					size = 5 + s_proto.len + ai->address_str.len + si->port_no_str.len;
-+					if (pos + size + 1>len) goto error;
-+					snprintf(s + pos, size, ",'%s:%s:%s'",
-+						s_proto.s, ai->address_str.s, si->port_no_str.s);
-+					pos = pos + size;
-+					LM_DBG("ip[%d]:%.s\n", ai->address_str.len, ai->address_str.len, ai->address_str.s);
-+					LM_DBG("port[%d]:%.s\n", si->port_no_str.len, si->port_no_str.len, si->port_no_str.s);
-+					LM_DBG("pos:%d size:%d [%.s]\n", pos, size, pos, s);
-+				}
-+			}else{
-+				size = 5 + s_proto.len + si->name.len + si->port_no_str.len;
-+				if (pos + size + 1>len) goto error;
-+				snprintf(s + pos, size, ",'%s:%s:%s'",
-+						s_proto.s, si->name.s, si->port_no_str.s);
-+				pos = pos + size;
-+				LM_DBG("ip[%d]:%.s\n", si->name.len, si->name.len, si->name.s);
-+				LM_DBG("port[%d]:%.s\n", si->port_no_str.len, si->port_no_str.len, si->port_no_str.s);
-+				LM_DBG("pos:%d size:%d [%.s]\n", pos, size, pos, s);
-+			}
-+		}
-+	}while((proto=next_proto(proto)));
-+	s[0] = '('; s[pos] = ')';
-+	LM_DBG("pos:%d [%.s]\n", pos+1, len, s);
-+	return pos + 1;
 +
-+error:
-+	s[0] = '('; s[pos] = ')';
-+	return -1;
++	list=get_sock_info_list(proto);
++	s_proto.s = get_valid_proto_name(proto);
++	s_proto.len = strlen(s_proto.s);
++	LM_DBG("s_proto[%d]:%.*s\n", s_proto.len, s_proto.len, s_proto.s);
++	for(si=list?*list:0; si; si=si->next){
++		if (si->addr_info_lst)
++		{
++			for (ai=si->addr_info_lst; ai; ai=ai->next)
++			{
++				size = 5 + s_proto.len + ai->address_str.len + si->port_no_str.len;
++				LM_DBG("pos:%d size:%d\n", pos, size);
++				if (pos + size + 1>len) return -1;
++				snprintf(s + pos, len-pos, ",'%s:%s:%s'",
++					s_proto.s, ai->address_str.s, si->port_no_str.s);
++				pos = pos + size;
++				LM_DBG("ip[%d]:%.*s\n", ai->address_str.len, ai->address_str.len, ai->address_str.s);
++				LM_DBG("port[%d]:%.*s\n", si->port_no_str.len, si->port_no_str.len, si->port_no_str.s);
++				LM_DBG("s:[%.*s]\n", pos, s);
++			}
++		}else{
++			size = 5 + s_proto.len + si->name.len + si->port_no_str.len;
++			LM_DBG("pos:%d size:%d\n", pos, size);
++			if (pos + size + 1>len) return -1;
++			snprintf(s + pos, len-pos, ",'%s:%s:%s'",
++					s_proto.s, si->name.s, si->port_no_str.s);
++			pos = pos + size;
++			LM_DBG("ip[%d]:%.*s\n", si->name.len, si->name.len, si->name.s);
++			LM_DBG("port[%d]:%.*s\n", si->port_no_str.len, si->port_no_str.len, si->port_no_str.s);
++		}
++	}
++
++	s[0] = '('; s[pos] = ')'; pos = pos + 1;
++	LM_DBG("pos:%d [%.*s]\n", pos, pos, s);
++	return pos;
 +}
  
  /*!
   * \brief Get all contacts from the database, in partitions if wanted
-@@ -96,6 +147,8 @@
+@@ -96,6 +143,8 @@
  								unsigned int options)
  {
  	static char query_buf[512];
@@ -119,17 +115,14 @@
  	static str query_str;
  
  	struct socket_info *sock;
-@@ -115,12 +168,41 @@
+@@ -115,8 +164,52 @@
  	int i;
  	void *cp;
  	int shortage, needed;
 +	char *query_format = NULL;
- 
- 	if(ul_dbf.raw_query==NULL) {
- 		LM_WARN("DB raw query support is required, but not implemented\n");
- 		return -1;
- 	}
- 
++	db1_con_t* dbh = NULL;
++    db_func_t* dbf = NULL;
++
 +	if (options & GAU_OPT_FILTER_SOCKET)
 +	{
 +		socket_str.s = socket_list;
@@ -138,7 +131,7 @@
 +			LM_ERR("error generating socket_list parameter\n");
 +			return -1;
 +		}
-+		LM_DBG("socket_str[%d]:[%.s]\n", socket_str.len, socket_str.len, socket_str.s);
++		LM_DBG("socket_str[%d]:[%.*s]\n", socket_str.len, socket_str.len, socket_str.s);
 +		query_format = "select %.*s, %.*s, %.*s,"
 +			" %.*s, %.*s, %.*s from %s where %.*s > %.*s and"
 +#ifdef ORACLE_USRLOC
@@ -146,6 +139,17 @@
 +#else
 +			" %.*s & %d = %d and id %% %u = %u and %.*s in %.*s";
 +#endif
++		if(!ul_dbh_ro) {
++			LM_ERR("read-only connection not available. Using db_url\n");
++			dbh = ul_dbh;
++			dbf = &ul_dbf;
++		}
++		else
++		{
++			dbh = ul_dbh_ro;
++			dbf = &ul_dbf_ro;
++			LM_DBG("use read-only db\n");
++		}
 +	}
 +	else
 +	{
@@ -156,12 +160,16 @@
 +#else
 +			" %.*s & %d = %d and id %% %u = %u";
 +#endif
++		dbh = ul_dbh;
++		dbf = &ul_dbf;
 +	}
-+
- 	cp = buf;
- 	shortage = 0;
- 	/* Reserve space for terminating 0000 */
-@@ -136,13 +218,8 @@
+ 
+-	if(ul_dbf.raw_query==NULL) {
++	if(dbf->raw_query==NULL) {
+ 		LM_WARN("DB raw query support is required, but not implemented\n");
+ 		return -1;
+ 	}
+@@ -136,13 +229,8 @@
  
  	for (dom = root; dom!=NULL ; dom=dom->next) {
  		/* build query */
@@ -177,7 +185,7 @@
  			received_col.len, received_col.s,
  			contact_col.len, contact_col.s,
  			sock_col.len, sock_col.s,
-@@ -153,7 +230,9 @@
+@@ -153,19 +241,21 @@
  			expires_col.len, expires_col.s,
  			now_len, now_s,
  			cflags_col.len, cflags_col.s,
@@ -188,6 +196,29 @@
  		if ( i>=sizeof(query_buf) ) {
  			LM_ERR("DB query too long\n");
  			return -1;
+ 		}
+ 		query_str.s = query_buf;
+ 		query_str.len = i;
+-		if ( ul_dbf.raw_query( ul_dbh, &query_str, &res)<0 ) {
++		if ( dbf->raw_query( dbh, &query_str, &res)<0 ) {
+ 			LM_ERR("raw_query failed\n");
+ 			return -1;
+ 		}
+ 		if( RES_ROW_N(res)==0 ) {
+-			ul_dbf.free_result(ul_dbh, res);
++			dbf->free_result(dbh, res);
+ 			continue;
+ 		}
+ 
+@@ -269,7 +359,7 @@
+ 			len -= needed;
+ 		} /* row cycle */
+ 
+-		ul_dbf.free_result(ul_dbh, res);
++		dbf->free_result(dbh, res);
+ 	} /* domain cycle */
+ 
+ 	/* len < 0 is possible, if size of the buffer < sizeof(c->c.len) */
 --- a/modules/usrloc/usrloc.h
 +++ b/modules/usrloc/usrloc.h
 @@ -43,6 +43,7 @@
