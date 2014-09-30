@@ -1,8 +1,16 @@
+ngcp-kamailio (3.3.7-5) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * Fake release to have Debian package built by tag (nit by branch)
+
+ -- Alexander Lutay <alutay@sipwise.com>  Tue, 30 Sep 2014 16:24:19 +0200
+
 ngcp-kamailio (3.3.7-3) unstable; urgency=medium
 
+  [ Richard Fuchs ]
   * MT#8019 lcr_rate: ignore peers without valid fees
 
- -- Richard Fuchs <rfuchs@sipwise.com>  Tue, 30 Sep 2014 09:16:44 -0400
+ -- Alexander Lutay <alutay@sipwise.com>  Tue, 30 Sep 2014 16:24:19 +0200
 
 ngcp-kamailio (3.3.7-2) unstable; urgency=medium
 
