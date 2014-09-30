@@ -1,3 +1,9 @@
+ngcp-kamailio (3.3.7-3) unstable; urgency=medium
+
+  * MT#8019 lcr_rate: ignore peers without valid fees
+
+ -- Richard Fuchs <rfuchs@sipwise.com>  Tue, 30 Sep 2014 09:16:44 -0400
+
 ngcp-kamailio (3.3.7-2) unstable; urgency=medium
 
   * [f1e07b7] MT#6345 create tcap module package
