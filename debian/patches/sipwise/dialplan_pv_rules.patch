@@ -11,11 +11,9 @@ Subject: [PATCH] dialplan: pv in match and subst
  modules/dialplan/dp_repl.c  | 189 +++++++++++++++++++-
  5 files changed, 622 insertions(+), 36 deletions(-)
 
-diff --git a/modules/dialplan/dialplan.c b/modules/dialplan/dialplan.c
-index 07c3271..0ee0e24 100644
 --- a/modules/dialplan/dialplan.c
 +++ b/modules/dialplan/dialplan.c
-@@ -207,6 +207,11 @@ static int mod_init(void)
+@@ -207,6 +207,11 @@
  
  static int child_init(int rank)
  {
@@ -27,8 +25,6 @@ index 07c3271..0ee0e24 100644
  	return 0;
  }
  
-diff --git a/modules/dialplan/dialplan.h b/modules/dialplan/dialplan.h
-index fd3319e..b506853 100644
 --- a/modules/dialplan/dialplan.h
 +++ b/modules/dialplan/dialplan.h
 @@ -44,6 +44,15 @@
@@ -47,7 +43,7 @@ index fd3319e..b506853 100644
  #define MAX_REPLACE_WITH	10
  
  typedef struct dpl_node{
-@@ -55,6 +64,7 @@ typedef struct dpl_node{
+@@ -55,6 +64,7 @@
  	pcre *match_comp, *subst_comp; /*compiled patterns*/
  	struct subst_expr * repl_comp; 
  	str attrs;
@@ -55,7 +51,7 @@ index fd3319e..b506853 100644
  
  	struct dpl_node * next; /*next rule*/
  }dpl_node_t, *dpl_node_p;
-@@ -75,6 +85,30 @@ typedef struct dpl_id{
+@@ -75,6 +85,30 @@
  	struct dpl_id * next;
  }dpl_id_t,*dpl_id_p;
  
@@ -86,7 +82,7 @@ index fd3319e..b506853 100644
  
  #define DP_VAL_INT		0
  #define DP_VAL_SPEC		1
-@@ -92,9 +126,10 @@ void destroy_data();
+@@ -92,9 +126,10 @@
  int dp_load_db();
  
  dpl_id_p select_dpid(int id);
@@ -98,11 +94,9 @@ index fd3319e..b506853 100644
 -int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule,  str *);
 +int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule, dpl_pv_node_t * rule_pv, str *);
  #endif
-diff --git a/modules/dialplan/dp_db.c b/modules/dialplan/dp_db.c
-index bd3bb49..515f36b 100644
 --- a/modules/dialplan/dp_db.c
 +++ b/modules/dialplan/dp_db.c
-@@ -70,6 +70,9 @@ static db_func_t dp_dbf;
+@@ -70,6 +70,9 @@
  		(_res).len = strlen(VAL_STR((_values)+ (_index)).s);\
  	}while(0);
  
@@ -112,7 +106,7 @@ index bd3bb49..515f36b 100644
  void destroy_rule(dpl_node_t * rule);
  void destroy_hash(int);
  
-@@ -78,12 +81,16 @@ int add_rule2hash(dpl_node_t *, int);
+@@ -78,12 +81,16 @@
  
  void list_rule(dpl_node_t * );
  void list_hash(int h_index);
@@ -131,7 +125,7 @@ index bd3bb49..515f36b 100644
  
  int init_db_data(void)
  {
-@@ -163,14 +170,15 @@ int init_data(void)
+@@ -163,14 +170,15 @@
  	}
  	rules_hash[0] = rules_hash[1] = 0;
  
@@ -149,7 +143,7 @@ index bd3bb49..515f36b 100644
  
  	LM_DBG("trying to initialize data from db\n");
  	if(init_db_data() != 0)
-@@ -193,6 +201,23 @@ void destroy_data(void)
+@@ -193,6 +201,23 @@
  		shm_free(crt_idx);
  }
  
@@ -173,7 +167,7 @@ index bd3bb49..515f36b 100644
  
  /*load rules from DB*/
  int dp_load_db(void)
-@@ -283,6 +308,8 @@ end:
+@@ -283,6 +308,8 @@
  	*crt_idx = *next_idx;
  	list_hash(*crt_idx);
  	dp_dbf.free_result(dp_db_handle, res);
@@ -182,7 +176,7 @@ index bd3bb49..515f36b 100644
  	return 0;
  
  err2:
-@@ -352,6 +379,84 @@ static pcre *reg_ex_comp(const char *pattern, int *cap_cnt)
+@@ -352,6 +379,84 @@
  	return result;
  }
  
@@ -267,7 +261,7 @@ index bd3bb49..515f36b 100644
  
  /*compile the expressions, and if ok, build the rule */
  dpl_node_t * build_rule(db_val_t * values)
-@@ -359,9 +464,10 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -359,9 +464,10 @@
  	pcre *match_comp, *subst_comp;
  	struct subst_expr *repl_comp;
  	dpl_node_t * new_rule;
@@ -279,7 +273,7 @@ index bd3bb49..515f36b 100644
  
  	matchop = VAL_INT(values+2);
  
-@@ -377,11 +483,21 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -377,11 +483,21 @@
  
  	GET_STR_VALUE(match_exp, values, 3);
  	if(matchop == DP_REGEX_OP){
@@ -306,7 +300,7 @@ index bd3bb49..515f36b 100644
  		}
  	}
  
-@@ -398,26 +514,38 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -398,26 +514,38 @@
  
  	GET_STR_VALUE(subst_exp, values, 5);
  	if(subst_exp.s && subst_exp.len){
@@ -361,7 +355,7 @@ index bd3bb49..515f36b 100644
  	}
  
  	new_rule = (dpl_node_t *)shm_malloc(sizeof(dpl_node_t));
-@@ -450,6 +578,7 @@ dpl_node_t * build_rule(db_val_t * values)
+@@ -450,6 +578,7 @@
  	new_rule->match_comp = match_comp;
  	new_rule->subst_comp = subst_comp;
  	new_rule->repl_comp  = repl_comp;
@@ -369,7 +363,7 @@ index bd3bb49..515f36b 100644
  
  	return new_rule;
  
-@@ -550,6 +679,85 @@ err:
+@@ -550,6 +679,85 @@
  	return -1;
  }
  
@@ -455,7 +449,7 @@ index bd3bb49..515f36b 100644
  
  void destroy_hash(int index)
  {
-@@ -589,6 +797,114 @@ void destroy_hash(int index)
+@@ -589,6 +797,114 @@
  	rules_hash[index] = 0;
  }
  
@@ -468,7 +462,7 @@ index bd3bb49..515f36b 100644
 +	int h_index = *crt_idx;
 +
 +	if(!rules_hash[h_index])
-+		return -1;
++		return 1;
 +
 +	if(*sh_revision==pv_revision){
 +		LM_DBG("already loaded\n");
@@ -570,7 +564,7 @@ index bd3bb49..515f36b 100644
  
  void destroy_rule(dpl_node_t * rule){
  
-@@ -619,6 +935,8 @@ void destroy_rule(dpl_node_t * rule){
+@@ -619,6 +935,8 @@
  
  	if(rule->attrs.s)
  		shm_free(rule->attrs.s);
@@ -579,7 +573,7 @@ index bd3bb49..515f36b 100644
  }
  
  
-@@ -636,6 +954,25 @@ dpl_id_p select_dpid(int id)
+@@ -636,6 +954,25 @@
  	return NULL;
  }
  
@@ -605,7 +599,7 @@ index bd3bb49..515f36b 100644
  
  /*FOR DEBUG PURPOSE*/
  void list_hash(int h_index)
-@@ -672,3 +1009,40 @@ void list_rule(dpl_node_t * rule)
+@@ -672,3 +1009,40 @@
  			rule->attrs.len,	rule->attrs.s);
  
  }
@@ -646,11 +640,9 @@ index bd3bb49..515f36b 100644
 +	if(flag&DP_PV_MASK) LM_DBG("DP_PV_MASK\n");
 +	LM_DBG("--pv_flags:%d\n", flag);
 +}
-diff --git a/modules/dialplan/dp_db.h b/modules/dialplan/dp_db.h
-index 94f6200..a451244 100644
 --- a/modules/dialplan/dp_db.h
 +++ b/modules/dialplan/dp_db.h
-@@ -63,6 +63,7 @@ extern str repl_exp_column;
+@@ -63,6 +63,7 @@
  extern str attrs_column; 
  
  int init_db_data();
@@ -658,11 +650,9 @@ index 94f6200..a451244 100644
  int dp_connect_db();
  void dp_disconnect_db();
  
-diff --git a/modules/dialplan/dp_repl.c b/modules/dialplan/dp_repl.c
-index ec2e5bb..2a53be4 100644
 --- a/modules/dialplan/dp_repl.c
 +++ b/modules/dialplan/dp_repl.c
-@@ -127,13 +127,14 @@ error:
+@@ -127,13 +127,14 @@
  #define MAX_PHONE_NB_DIGITS		127
  static char dp_output_buf[MAX_PHONE_NB_DIGITS+1];
  int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
@@ -678,7 +668,7 @@ index ec2e5bb..2a53be4 100644
  	pv_value_t sv;
  	str* uri;
  	int ovector[3 * (MAX_REPLACE_WITH + 1)];
-@@ -144,7 +145,25 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+@@ -144,7 +145,25 @@
  	result->s = dp_output_buf;
  	result->len = 0;
  
@@ -705,7 +695,7 @@ index ec2e5bb..2a53be4 100644
  	repl_comp 	= rule->repl_comp;
  
  	if(!repl_comp){
-@@ -168,13 +187,13 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
+@@ -168,13 +187,13 @@
  		}
  
  		/*search for the pattern from the compiled subst_exp*/
@@ -722,7 +712,7 @@ index ec2e5bb..2a53be4 100644
  			return -1;
  		}
  	}
-@@ -308,13 +327,141 @@ error:
+@@ -308,13 +327,141 @@
  	return -1;
  }
  
@@ -864,7 +854,7 @@ index ec2e5bb..2a53be4 100644
  	int user_len, rez;
  	char b;
  
-@@ -339,7 +486,27 @@ search_rule:
+@@ -339,7 +486,27 @@
  
  			case DP_REGEX_OP:
  				LM_DBG("regex operator testing\n");
@@ -893,7 +883,7 @@ index ec2e5bb..2a53be4 100644
  						0, 0, NULL, 0);
  				break;
  
-@@ -382,8 +549,9 @@ search_rule:
+@@ -382,8 +549,9 @@
  	return -1;
  
  repl:
@@ -905,7 +895,7 @@ index ec2e5bb..2a53be4 100644
  
  	if(attrs) {
  		attrs->len = 0;
-@@ -405,7 +573,10 @@ repl:
+@@ -405,7 +573,10 @@
  		}
  	}
  
@@ -917,6 +907,3 @@ index ec2e5bb..2a53be4 100644
  		LM_ERR("could not build the output\n");
  		return -1;
  	}
--- 
-2.0.0
-
