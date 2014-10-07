@@ -10,6 +10,8 @@
 # Description:       Start the Kamailio SIP proxy server
 ### END INIT INFO
 
+umask 0022
+
 TYPE=lb
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/sbin/kamailio
@@ -47,7 +49,7 @@ check_homedir ()
 {
     # Create HOMEDIR directory in case it doesn't exist
     if [ ! -d $HOMEDIR ]; then
-        mkdir $HOMEDIR
+        mkdir -m 0755 $HOMEDIR
     fi
 
     # Set the appropiate owner and group
