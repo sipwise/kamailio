@@ -1,3 +1,22 @@
+ngcp-kamailio (4.1.6-1+0~mr3.5.1.0) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [183e61f] add rtpengine set wrapper for $rtpstat
+  * [2ae58ef] adapt $rtpstat to new dictionary layout
+
+  [ Victor Seva ]
+  * [81596a1] MT#8517 MT#9205 remove force-dbflag patch for lookup
+  * [16f9b2c] MT#9205 nathelper: add filter_socket option
+  * [ee1aa68] MT#9205 usrloc: use db ro if socket_filter option
+  * [a6dd6f2] MT#6981 dialplan: remove error when no rules are loaded
+  * [6a42bc7] MT#7505 Add .gitreview file
+  * [193d427] MT#7505 ignore .gitreview file
+  * [331e683] MT#9425 init: set umask and perms
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 09 Oct 2014 16:30:37 +0200
+
 ngcp-kamailio (4.1.6-1+0~mr3.5.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
