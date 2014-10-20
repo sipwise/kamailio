@@ -12,6 +12,17 @@ upstream/0005-textops-Refresh-README.patch
 #
 upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
 upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
+# 4.1 upstream fixes
+upstream/0001-exec-safety-check-against-bash-vulnerability-CVE-201.patch
+upstream/0002-exec-add-parameter-to-control-the-option-for-bash-ex.patch
+upstream/0003-dialog-check-if-the-transaction-is-created-for-BYE-c.patch
+upstream/0004-dialog-set-again-the-dialog-ids-in-context-for-BYE-p.patch
+upstream/0005-dialog-fixed-typo-copy-paste-oversight-to-dlg-pointe.patch
+upstream/0006-core-helper-functions-to-get-addr-and-port-to-be-use.patch
+upstream/0007-tm-use-advertised-addr-port-if-set-for-socket-in-rm-.patch
+upstream/0008-mohqueue-fixed-db_qtable-parameter-name.patch
+upstream/0009-rr-Fix-memory-leak-when-using-outbound.patch
+upstream/0010-core-xavp-Fix-xavp_insert-to-prevent-corrupted-linke.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
