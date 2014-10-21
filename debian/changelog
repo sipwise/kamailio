@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.6-1+0~mr3.5.1.2) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [3f77aab] MT#9561 upstream fixes from 4.1 branch
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 21 Oct 2014 17:45:53 +0200
+
 ngcp-kamailio (4.1.6-1+0~mr3.5.1.1) unstable; urgency=low
 
   * New release.
