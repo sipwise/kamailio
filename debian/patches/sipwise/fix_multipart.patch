@@ -82,3 +82,13 @@
  		if(!replace_body(msg, body))
  		{
  			LM_ERR("Can't replace body\n");
+--- a/modules/textops/textops.c
++++ b/modules/textops/textops.c
+@@ -1875,6 +1875,7 @@
+ 		pkg_free(nbb->s); pkg_free(nbb);
+ 		return -1;
+ 	}
++	LM_DBG("nbb<%d>[%.*s]\n", nbb->len, nbb->s);
+ 	pkg_free(nbb);
+ 	if(!(msg->msg_flags&FL_BODY_MULTIPART))
+ 	{
