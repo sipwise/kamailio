@@ -1,0 +1,73 @@
+--- a/msg_translator.c
++++ b/msg_translator.c
+@@ -148,6 +148,7 @@
+ #include "cfg/cfg.h"
+ #include "parser/parse_to.h"
+ #include "parser/parse_param.h"
++#include "parser/sdp/sdp_helpr_funcs.h"
+ #include "forward.h"
+ #include "str_list.h"
+ 
+@@ -1725,46 +1726,27 @@
+  */
+ int get_boundary(struct sip_msg* msg, str* boundary)
+ {
+-	str params;
+-	param_t *p, *list;
+-	param_hooks_t hooks;
+-
+-	params.s = memchr(msg->content_type->body.s, ';',
+-		msg->content_type->body.len);
+-	if (params.s == NULL)
+-	{
+-		LM_ERR("Content-Type hdr has no params\n");
+-		return -1;
+-	}
+-	params.len = msg->content_type->body.len -
+-		(params.s - msg->content_type->body.s);
+-	if (parse_params(&params, CLASS_ANY, &hooks, &list) < 0)
+-	{
+-		LM_ERR("while parsing Content-Type params\n");
++	str mpdel = {0,0};
++
++	/* multipart body */
++	if(get_mixed_part_delimiter(&msg->content_type->body,&mpdel) < 0) {
++		LM_ERR("no boundary found\n");
+ 		return -1;
+ 	}
++	LM_DBG("delimiter is <%.*s>\n", mpdel->len, mpdel->s);
+ 	boundary->s = NULL;
+ 	boundary->len = 0;
+-	for (p = list; p; p = p->next) {
+-		if ((p->name.len == 8)
+-			&& (strncasecmp(p->name.s, "boundary", 8) == 0))
+-		{
+-			boundary->s = pkg_malloc(p->body.len + 2);
+-			if (boundary->s == NULL)
+-			{
+-				free_params(list);
+-				LM_ERR("no memory for boundary string\n");
+-				return -1;
+-			}
+-			*(boundary->s) = '-';
+-			*(boundary->s + 1) = '-';
+-			memcpy(boundary->s + 2, p->body.s, p->body.len);
+-			boundary->len = 2 + p->body.len;
+-			LM_DBG("boundary is <%.*s>\n", boundary->len, boundary->s);
+-			break;
+-		}
++	boundary->s = pkg_malloc(mpdel.len + 2);
++	if (boundary->s == NULL)
++	{
++		LM_ERR("no memory for boundary string\n");
++		return -1;
+ 	}
+-	free_params(list);
++	*(boundary->s) = '-';
++	*(boundary->s + 1) = '-';
++	memcpy(boundary->s + 2, mpdel.s, mpdel.len);
++	boundary->len = 2 + mpdel.len;
++	LM_DBG("boundary is <%.*s>\n", boundary->len, boundary->s);
+ 	return 0;
+ }
+ 
