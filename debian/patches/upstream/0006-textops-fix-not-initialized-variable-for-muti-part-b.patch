@@ -1,0 +1,25 @@
+From f1178c4d0e12f7d7e05bd6551ec3a841f1f23055 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 16 Oct 2014 01:06:09 +0200
+Subject: [PATCH] textops: fix not initialized variable for muti-part body
+
+---
+ modules/textops/textops.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/textops/textops.c b/modules/textops/textops.c
+index 836f8ac..581fe12 100644
+--- a/modules/textops/textops.c
++++ b/modules/textops/textops.c
+@@ -1546,7 +1546,7 @@ int set_multibody_helper(struct sip_msg* msg, char* p1, char* p2, char* p3)
+ 	str default_delimiter = {"unique-boundary-1", 17};
+ 	str nc = {0,0};
+ 	str cth = {"Content-Type: ", 14};
+-	str* nbb;
++	str* nbb = NULL;
+ 	unsigned int convert = 0;
+ 	fparam_t header;
+ 	header.orig = NULL;
+-- 
+2.1.1
+
