@@ -84,20 +84,60 @@
  			LM_ERR("Can't replace body\n");
 --- a/modules/textops/textops.c
 +++ b/modules/textops/textops.c
-@@ -1489,7 +1489,11 @@
+@@ -1455,8 +1455,8 @@
+ 	return 1;
+ }
+ 
+-static str* generate_boundary(str txt, str content_type,
+-	str content_disposition, str delimiter, unsigned int initial)
++static str* generate_boundary(str *txt, str *content_type,
++	str *content_disposition, str *delimiter, unsigned int initial)
+ {
+ 	unsigned int i = 0;
+ 	str cth = {"Content-Type: ", 14};
+@@ -1464,7 +1464,9 @@
+ 	str* n;
+ 	unsigned int flag = 0;
+ 
+-	if(txt.len==0||content_type.len==0||delimiter.len==0)
++	if(txt==NULL||txt->len==0||
++		content_type==NULL|content_type->len==0
++		delimiter==NULL||delimiter->len==0)
+ 	{
+ 		LM_ERR("invalid parameters\n");
+ 		return NULL;
+@@ -1475,21 +1477,25 @@
+ 		LM_ERR("out of pkg memory\n");
+ 		return NULL;
+ 	}
+-	n->len = delimiter.len + 2 + CRLF_LEN;
++	n->len = delimiter->len + 2 + CRLF_LEN;
+ 	if(initial) n->len = 2*n->len;
+-	if(strncmp("\r\n\r\n", txt.s+txt.len-4,4)!=0)
++	if(strncmp("\r\n\r\n", txt->s+txt->len-4,4)!=0)
+ 	{
+ 		n->len = n->len + CRLF_LEN;
+ 		flag = 1;
+ 		LM_DBG("adding final CRLF+CRLF\n");
+ 	}
+-	n->len=n->len + cth.len + content_type.len + 2*CRLF_LEN;
++	n->len=n->len + cth.len + content_type->len + 2*CRLF_LEN;
+ 	if(content_disposition.len>0)
+ 	{
  		n->len = n->len + cdh.len + content_disposition.len + CRLF_LEN;
  	}
- 	n->len = n->len + txt.len;
+-	n->len = n->len + txt.len;
 -
++	n->len = n->len + txt->len;
 +	LM_DBG("n<%d> txt<%d>[%.*s] content_type<%d>[%.*s] content_disposition<%d>[%.*s]\n",
 +		n->len,
-+		txt.len, txt.len, txt.s,
-+		content_type.len, content_type.len, content_type.s,
-+		content_disposition.len, content_disposition.len, content_disposition.s);
++		txt->len, txt->len, txt->s,
++		content_type->len, content_type->len, content_type->s,
++		content_disposition->len, content_disposition->len, content_disposition->s);
  	n->s = pkg_malloc(sizeof(char)*(n->len));
  	if(n->s==0)
  	{
-@@ -1497,6 +1501,7 @@
+@@ -1497,31 +1503,32 @@
  		pkg_free(n);
  		return NULL;
  	}
@@ -105,7 +145,57 @@
  	if(initial)
  	{
  		memcpy(n->s, "--", 2); i=2;
-@@ -1870,6 +1875,7 @@
+-		memcpy(n->s+i, delimiter.s, delimiter.len); i=i+delimiter.len;
++		memcpy(n->s+i, delimiter->s, delimiter->len); i=i+delimiter->len;
+ 		memcpy(n->s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
+ 	}
+ 
+ 	memcpy(n->s+i, cth.s, cth.len); i=i+cth.len;
+-	memcpy(n->s+i, content_type.s, content_type.len); i=i+content_type.len;
++	memcpy(n->s+i, content_type->s, content_type->len); i=i+content_type->len;
+ 	memcpy(n->s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
+ 
+-	if(content_disposition.len>0)
++	if(content_disposition->len>0)
+ 	{
+ 		memcpy(n->s+i, cdh.s, cdh.len); i=i+cdh.len;
+-		memcpy(n->s+i, content_disposition.s, content_disposition.len);
+-		i=i+content_disposition.len;
++		memcpy(n->s+i, content_disposition->s, content_disposition->len);
++		i=i+content_disposition->len;
+ 		memcpy(n->s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
+ 	}
+ 	memcpy(n->s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
+ 
+-	memcpy(n->s+i, txt.s, txt.len); i=i+txt.len;
++	memcpy(n->s+i, txt->s, txt->len); i=i+txt->len;
+ 	if(flag) { memcpy(n->s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN; }
+ 
+ 	memcpy(n->s+i, "--", 2); i=i+2;
+-	memcpy(n->s+i, delimiter.s, delimiter.len); i=i+delimiter.len;
++	memcpy(n->s+i, delimiter->s, delimiter->len); i=i+delimiter->len;
+ 	memcpy(n->s+i, CRLF, CRLF_LEN); i=i+CRLF_LEN;
+ 
+ 	if(i!=n->len)
+@@ -1668,7 +1675,7 @@
+ 	}
+ 
+ 	/* get initial boundary */
+-	nbb = generate_boundary(nb, oc, cd, delimiter, 1);
++	nbb = generate_boundary(&nb, &oc, &cd, &delimiter, 1);
+ 	if(nbb==NULL)
+ 	{
+ 		LM_ERR("couldn't create initial boundary\n");
+@@ -1862,7 +1869,7 @@
+ 		LM_ERR("Cannot get boundary. Is body multipart?\n");
+ 		return -1;
+ 	}
+-	nbb = generate_boundary(txt, nc, cd, delimiter, 0);
++	nbb = generate_boundary(&txt, &nc, &cd, &delimiter, 0);
+ 	if(nbb==NULL)
+ 	{
+ 		LM_ERR("couldn't create initial boundary\n");
+@@ -1870,6 +1877,7 @@
  		return -1;
  	}
  	pkg_free(delimiter.s);
@@ -113,7 +203,7 @@
  	if(insert_new_lump_after(l, nbb->s, nbb->len, 0)==0){
  		LM_ERR("could not insert new lump\n");
  		pkg_free(nbb->s); pkg_free(nbb);
-@@ -1881,6 +1887,7 @@
+@@ -1881,6 +1889,7 @@
  		LM_DBG("set flag FL_BODY_MULTIPART\n");
  		msg->msg_flags |= FL_BODY_MULTIPART;
  	}
