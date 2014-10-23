@@ -35,7 +35,7 @@
 +		LM_ERR("no boundary found\n");
  		return -1;
  	}
-+	LM_DBG("delimiter is <%.*s>\n", mpdel->len, mpdel->s);
++	LM_DBG("delimiter is <%.*s>\n", mpdel.len, mpdel.s);
  	boundary->s = NULL;
  	boundary->len = 0;
 -	for (p = list; p; p = p->next) {
