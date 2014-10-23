@@ -71,3 +71,14 @@
  	return 0;
  }
  
+@@ -1888,8 +1870,8 @@
+ 			body.len = body.len + lb->s.len;
+ 			/*LM_DBG("copy[%d][%.*s]\n", lb->s.len, lb->s.len, pb - lb->s.len);*/
+ 		}
+-		/*LM_DBG("body[%d][%.*s] expected[%ld]\n",
+-			body.len, body.len, body.s, pb-body.s); */
++		LM_DBG("body[%d][%.*s] expected[%ld]\n",
++			body.len, body.len, body.s, pb-body.s);
+ 		if(!replace_body(msg, body))
+ 		{
+ 			LM_ERR("Can't replace body\n");
