@@ -79,9 +79,40 @@
  		tmp.s = buf.s;
  		t = tmp.len = buf.len;
  		if(get_boundary(msg, &ob)!=0) return -1;
-@@ -1888,8 +1871,8 @@
+@@ -1809,8 +1792,8 @@
+ 			if(find_line_start(b.s, ret, &tmp.s,
+ 				(unsigned int *)&tmp.len))
+ 			{
+-				/*LM_DBG("found t[%d] tmp.len[%d]:[%.*s]\n",
+-					t, tmp.len, tmp.len, tmp.s);*/
++				LM_DBG("found t[%d] tmp.len[%d]:[%.*s]\n",
++					t, tmp.len, tmp.len, tmp.s);
+ 				if(!lb)
+ 				{
+ 					lb = pkg_malloc(sizeof(struct str_list));
+@@ -1864,7 +1847,7 @@
+ 			else {
+ 				t = lb_t->next->s.s - lb_t->s.s;
+ 				memcpy(pb, lb_t->s.s, t);
+-				/*LM_DBG("copy[%d][%.*s]\n", t, t, pb);*/
++				LM_DBG("copy[%d][%.*s]\n", t, t, pb);
+ 				pb = pb + t;
+ 			}
+ 			body.len = body.len + t;
+@@ -1879,17 +1862,17 @@
+ 		{
+ 			LM_DBG("last bondary without -- at the end\n");
+ 			memcpy(pb, fb.s, fb.len);
+-			/*LM_DBG("new chunk[%d][%.*s]\n", fb.len, fb.len, pb);*/
++			LM_DBG("new chunk[%d][%.*s]\n", fb.len, fb.len, pb);
+ 			pb = pb + fb.len;
+ 			body.len = body.len + fb.len;
+ 		}
+ 		else {
+ 			memcpy(pb, lb->s.s, lb->s.len); pb = pb + lb->s.len;
  			body.len = body.len + lb->s.len;
- 			/*LM_DBG("copy[%d][%.*s]\n", lb->s.len, lb->s.len, pb - lb->s.len);*/
+-			/*LM_DBG("copy[%d][%.*s]\n", lb->s.len, lb->s.len, pb - lb->s.len);*/
++			LM_DBG("copy[%d][%.*s]\n", lb->s.len, lb->s.len, pb - lb->s.len);
  		}
 -		/*LM_DBG("body[%d][%.*s] expected[%ld]\n",
 -			body.len, body.len, body.s, pb-body.s); */
@@ -196,15 +227,7 @@
  	if(nbb==NULL)
  	{
  		LM_ERR("couldn't create initial boundary\n");
-@@ -1761,6 +1768,7 @@
- 	}
- 	pkg_free(nbb);
- 	if(nc.s!=NULL) pkg_free(nc.s);
-+	parse_headers(msg, HDR_EOH_F, 0);
- 	LM_DBG("set flag FL_BODY_MULTIPART\n");
- 	msg->msg_flags |= FL_BODY_MULTIPART;
- 	return 1;
-@@ -1857,12 +1865,14 @@
+@@ -1857,12 +1864,14 @@
  		LM_ERR("WTF\n");
  		return -1;
  	}
@@ -220,7 +243,7 @@
  	if(nbb==NULL)
  	{
  		LM_ERR("couldn't create initial boundary\n");
-@@ -1870,17 +1880,20 @@
+@@ -1870,6 +1879,7 @@
  		return -1;
  	}
  	pkg_free(delimiter.s);
@@ -228,12 +251,7 @@
  	if(insert_new_lump_after(l, nbb->s, nbb->len, 0)==0){
  		LM_ERR("could not insert new lump\n");
  		pkg_free(nbb->s); pkg_free(nbb);
- 		return -1;
- 	}
- 	pkg_free(nbb);
-+	parse_headers(msg, HDR_EOH_F, 0);
- 	if(!(msg->msg_flags&FL_BODY_MULTIPART))
- 	{
+@@ -1881,6 +1891,7 @@
  		LM_DBG("set flag FL_BODY_MULTIPART\n");
  		msg->msg_flags |= FL_BODY_MULTIPART;
  	}
