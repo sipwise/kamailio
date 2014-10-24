@@ -9,6 +9,7 @@ upstream/0002-core-add-check_boundaries-to-build_req_buf_from_sip_.patch
 upstream/0003-textops-functions-to-convert-append-and-remove-multi.patch
 upstream/0004-textops-add-new-multipart-functions-documentation.patch
 upstream/0005-textops-Refresh-README.patch
+upstream/0006-textops-fix-append_body_part.patch
 #
 upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
 upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
