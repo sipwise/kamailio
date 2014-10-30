@@ -1,3 +1,13 @@
+ngcp-kamailio (4.1.6-1+0~mr3.7.0.0) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [3421de3] MT#9561 upstream fixes from 4.1 branch
+  * [59ae20b] MT#6243 fix multipart append_body_part function
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 30 Oct 2014 17:19:16 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.6.0.0) unstable; urgency=low
 
   [ Richard Fuchs ]
