@@ -156,13 +156,16 @@
  		goto error;
  	}
  	
-@@ -285,6 +304,11 @@
+@@ -285,6 +304,14 @@
  	    PQprotocolVersion(pcon->con), 0 );
  #endif
  
-+#ifdef TCP_KEEPIDLE
-+	if (pg_keepalive)
++#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
++	if (pg_keepalive) {
++		i = 1;
++		setsockopt(PQsocket(pcon->con), SOL_SOCKET, SO_KEEPALIVE, &i);
 +		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++	}
 +#endif
 +
  	ret = timestamp_format(pcon->con);
@@ -224,13 +227,16 @@
  
  	if( (ptr->con == 0) || (PQstatus(ptr->con) != CONNECTION_OK) )
  	{
-@@ -88,6 +110,11 @@
+@@ -88,6 +110,14 @@
  	ptr->timestamp = time(0);
  	ptr->id = id;
  
-+#ifdef TCP_KEEPIDLE
-+	if (pg_keepalive)
++#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
++	if (pg_keepalive) {
++		i = 1;
++		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i);
 +		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++	}
 +#endif
 +
  	return ptr;
