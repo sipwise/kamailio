@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.6-1+0~mr3.5.1.4) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [8f1138e] MT#9949 TCP_KEEPIDLE requires SO_KEEPALIVE to function
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 10 Nov 2014 15:59:38 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.5.1.3) unstable; urgency=low
 
   [ Victor Seva ]
