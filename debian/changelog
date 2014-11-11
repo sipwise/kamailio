@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.6-1+0~mr3.6.1.2) unstable; urgency=low
+
+  [ Andrew Pogrebennyk ]
+  * [ef3b5f9] MT#9643 upstream fix tm: safety catch inside t_check_trans()
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 11 Nov 2014 13:16:24 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.6.1.1) unstable; urgency=low
 
   [ Richard Fuchs ]
