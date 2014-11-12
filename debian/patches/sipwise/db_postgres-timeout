@@ -105,7 +105,15 @@
  
  #include "../../mem/mem.h"
  #include "../../dprint.h"
-@@ -237,7 +238,9 @@
+@@ -47,6 +48,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <netinet/in.h>
++#include <netinet/tcp.h>
+ #include <time.h>
+ 
+ 
+@@ -237,7 +239,9 @@
  	struct pg_con* pcon;
  	struct pg_uri* puri;
  	char* port_str;
@@ -116,7 +124,7 @@
  	
  	pcon = DB_GET_PAYLOAD(con);
  	puri = DB_GET_PAYLOAD(con->uri);
-@@ -251,6 +254,8 @@
+@@ -251,6 +255,8 @@
  
  	if (puri->port > 0) {
  		port_str = int2str(puri->port, 0);
@@ -125,7 +133,7 @@
  	} else {
  		port_str = NULL;
  	}
-@@ -260,12 +265,26 @@
+@@ -260,12 +266,26 @@
  		pcon->con = NULL;
  	}
  
@@ -156,15 +164,15 @@
  		goto error;
  	}
  	
-@@ -285,6 +304,14 @@
+@@ -285,6 +305,14 @@
  	    PQprotocolVersion(pcon->con), 0 );
  #endif
  
 +#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
 +	if (pg_keepalive) {
 +		i = 1;
-+		setsockopt(PQsocket(pcon->con), SOL_SOCKET, SO_KEEPALIVE, &i);
-+		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++		setsockopt(PQsocket(pcon->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
++		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
 +	}
 +#endif
 +
@@ -173,7 +181,7 @@
  		/* Assume INT8 representation if detection fails */
 --- a/modules/db_postgres/km_pg_con.c
 +++ b/modules/db_postgres/km_pg_con.c
-@@ -26,6 +26,7 @@
+@@ -26,11 +26,14 @@
   */
  
  #include "km_pg_con.h"
@@ -181,7 +189,14 @@
  #include "../../mem/mem.h"
  #include "../../dprint.h"
  #include "../../ut.h"
-@@ -45,6 +46,9 @@
+ #include <string.h>
+ #include <time.h>
++#include <netinet/in.h>
++#include <netinet/tcp.h>
+ 
+ 
+ /*!
+@@ -45,6 +48,9 @@
  {
  	struct pg_con* ptr;
  	char *ports;
@@ -191,7 +206,7 @@
  
  	LM_DBG("db_id = %p\n", id);
   
-@@ -66,6 +70,8 @@
+@@ -66,6 +72,8 @@
  
  	if (id->port) {
  		ports = int2str(id->port, 0);
@@ -200,7 +215,7 @@
  		LM_DBG("opening connection: postgres://xxxx:xxxx@%s:%d/%s\n", ZSW(id->host),
  			id->port, ZSW(id->database));
  	} else {
-@@ -74,8 +80,24 @@
+@@ -74,8 +82,24 @@
  			ZSW(id->database));
  	}
  
@@ -227,15 +242,15 @@
  
  	if( (ptr->con == 0) || (PQstatus(ptr->con) != CONNECTION_OK) )
  	{
-@@ -88,6 +110,14 @@
+@@ -88,6 +112,14 @@
  	ptr->timestamp = time(0);
  	ptr->id = id;
  
 +#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
 +	if (pg_keepalive) {
 +		i = 1;
-+		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i);
-+		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
++		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
 +	}
 +#endif
 +
