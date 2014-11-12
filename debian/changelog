@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.6-1+0~mr3.5.1.6) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [be5b3a0] MT#9949 compile fix for the tcp idle timer
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 12 Nov 2014 16:29:50 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.5.1.5) unstable; urgency=low
 
   [ Andrew Pogrebennyk ]
