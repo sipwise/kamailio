@@ -171,8 +171,8 @@
 +#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
 +	if (pg_keepalive) {
 +		i = 1;
-+		setsockopt(PQsocket(pcon->con), SOL_SOCKET, SO_KEEPALIVE, &i);
-+		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++		setsockopt(PQsocket(pcon->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
++		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
 +	}
 +#else
 +#error "no keepalive"
@@ -251,8 +251,8 @@
 +#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
 +	if (pg_keepalive) {
 +		i = 1;
-+		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i);
-+		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
++		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
++		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
 +	}
 +#else
 +#error "no keepalive"
