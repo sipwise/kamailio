@@ -227,7 +227,7 @@
  
  	if( (ptr->con == 0) || (PQstatus(ptr->con) != CONNECTION_OK) )
  	{
-@@ -88,6 +110,14 @@
+@@ -88,6 +110,16 @@
  	ptr->timestamp = time(0);
  	ptr->id = id;
  
@@ -237,6 +237,8 @@
 +		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i);
 +		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive);
 +	}
++#else
++#error "no keepalive"
 +#endif
 +
  	return ptr;
