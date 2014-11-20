@@ -153,8 +153,8 @@ binary-common:
 	dh_installdocs
 	dh_installexamples
 	dh_installmenu
-	dh_installinit --name=kamailio-lb -- defaults 23
-	dh_installinit --name=kamailio-proxy -- defaults 23
+	dh_installinit -p$(PKG_NAME) --name=kamailio-lb -- defaults 23
+	dh_installinit -p$(PKG_NAME) --name=kamailio-proxy -- defaults 23
 	dh_installcron
 	dh_installman
 	dh_installinfo
