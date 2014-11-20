@@ -52,6 +52,7 @@ Package: ngcp-kamailio
 Architecture: any
 Multi-Arch: foreign
 Pre-Depends: ngcp-system-tools,
+             ngcp-templates-kamailio,
              ${misc:Pre-Depends}
 Depends: adduser,
          python,
