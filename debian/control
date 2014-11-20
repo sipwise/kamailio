@@ -48,10 +48,33 @@ Homepage: http://www.kamailio.org/
 Vcs-Svn: svn://svn.debian.org/pkg-voip/kamailio/trunk/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-voip/kamailio/?op=log
 
+Package: ngcp-kamailio-modules
+Architecture: any
+Multi-Arch: foreign
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
+Description: virtual package to deal with modules dependences
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ C Shell-like scripting language provides full control over the server's
+ behaviour. Its modular architecture allows only required functionality to be
+ loaded.
+ .
+ Among others, the following modules are available: digest authentication, CPL
+ scripts, instant messaging, MySQL support, presence agent, RADIUS
+ authentication, record routing, SMS gateway, Jabber/XMPP gateway, transaction
+ module, registrar and user location, XML-RPC interface.
+ .
+ This package is WIP
+
 Package: ngcp-kamailio
 Architecture: any
 Multi-Arch: foreign
-Pre-Depends: ngcp-system-tools,
+Pre-Depends: ngcp-kamailio-modules (= ${binary:Version}),
+             ngcp-system-tools,
+             ngcp-templates-kamailio,
              ${misc:Pre-Depends}
 Depends: adduser,
          python,
@@ -116,7 +139,7 @@ Package: ngcp-kamailio-geoip-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-geoip-modules
@@ -133,7 +156,7 @@ Package: ngcp-kamailio-sqlite-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Recommends: sqlite3
@@ -150,7 +173,7 @@ Package: ngcp-kamailio-json-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-json-modules
@@ -167,7 +190,7 @@ Package: ngcp-kamailio-memcached-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-memcached-modules
@@ -184,7 +207,7 @@ Package: ngcp-kamailio-lua-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-lua-modules
@@ -201,7 +224,7 @@ Package: ngcp-kamailio-mono-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-mono-modules
@@ -218,7 +241,7 @@ Package: ngcp-kamailio-python-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          python-dev,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -236,7 +259,7 @@ Package: ngcp-kamailio-redis-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-redis-modules
@@ -253,7 +276,7 @@ Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: mysql-client,
-         ngcp-kamailio (= ${binary:Version}),
+         ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-mysql-modules
@@ -269,7 +292,7 @@ Package: ngcp-kamailio-postgres-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          postgresql-client,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -286,7 +309,7 @@ Package: ngcp-kamailio-cpl-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-cpl-modules
@@ -303,7 +326,7 @@ Package: ngcp-kamailio-radius-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-radius-modules
@@ -321,7 +344,7 @@ Package: ngcp-kamailio-unixodbc-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-unixodbc-modules
@@ -337,7 +360,7 @@ Package: ngcp-kamailio-presence-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-presence-modules
@@ -355,7 +378,7 @@ Package: ngcp-kamailio-perl-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Replaces: kamailio-perl-modules
@@ -372,7 +395,7 @@ Package: ngcp-kamailio-snmpstats-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          snmpd,
          ${misc:Depends},
          ${shlibs:Depends}
@@ -390,7 +413,7 @@ Package: ngcp-kamailio-xmpp-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-xmpp-modules
@@ -406,7 +429,7 @@ Package: ngcp-kamailio-xml-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-xml-modules
@@ -427,7 +450,7 @@ Package: ngcp-kamailio-carrierroute-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-carrierroute-modules
@@ -445,7 +468,7 @@ Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: db4.8-util,
-         ngcp-kamailio (= ${binary:Version}),
+         ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-berkeley-modules
@@ -480,7 +503,7 @@ Package: ngcp-kamailio-ldap-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-ldap-modules
@@ -498,7 +521,7 @@ Package: ngcp-kamailio-outbound-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-outbound-modules
@@ -514,7 +537,7 @@ Package: ngcp-kamailio-ims-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-ims-modules
@@ -531,7 +554,7 @@ Package: ngcp-kamailio-websocket-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-websocket-modules
@@ -547,7 +570,7 @@ Package: ngcp-kamailio-autheph-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-autheph-modules
@@ -563,7 +586,7 @@ Package: ngcp-kamailio-sctp-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-sctp-modules
@@ -580,7 +603,7 @@ Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: gcj-jre,
-         ngcp-kamailio (= ${binary:Version}),
+         ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-java-modules
@@ -597,7 +620,7 @@ Package: ngcp-kamailio-utils-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-utils-modules
@@ -614,7 +637,7 @@ Package: ngcp-kamailio-tls-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
+Depends: ngcp-kamailio-modules (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
 Conflicts: kamailio-tls-modules
