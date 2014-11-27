@@ -178,7 +178,6 @@ case "$1" in
           ;;
       esac
     fi
-    check_kamailio_config
     check_homedir
     create_radius_seqfile
 
@@ -190,7 +189,7 @@ case "$1" in
     start_kamailio_daemon
     ;;
 
-    safe-stop)
+  safe-stop)
     check_kamailio_config
     echo "Stopping $DESC:"
     start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE \
@@ -264,9 +263,16 @@ case "$1" in
     fi
     ;;
 
+  check-config)
+    echo -n "Checking config for $DESC: "
+    check_kamailio_config
+    echo "config is OK"
+    exit 0
+    ;;
+
   *)
     N=/etc/init.d/$NAME
-    echo "Usage: $N {start|stop|safe-stop|restart|force-reload|debug|status}" >&2
+    echo "Usage: $N {start|stop|safe-stop|restart|force-reload|debug|check-config|status}" >&2
     exit 1
     ;;
 esac
