@@ -1,3 +1,15 @@
+ngcp-kamailio (4.1.6-1+0~mr3.6.2.1) unstable; urgency=low
+
+  [ Andrew Pogrebennyk ]
+  * [8226bac] MT#9643 upstream fix tm: safety catch inside t_check_trans()
+
+  [ Richard Fuchs ]
+  * [65a042d] MT#9949 compile fix for the tcp idle timer
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 28 Nov 2014 16:18:08 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.6.2.0) unstable; urgency=low
 
   [ Richard Fuchs ]
