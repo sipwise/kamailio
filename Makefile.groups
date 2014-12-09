@@ -13,12 +13,12 @@ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
 				   mediaproxy mi_datagram mi_fifo mi_rpc mqueue \
 				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
 				   rtpproxy sanity sdpops siputils sl statistics textops \
-				   textopsx tm tmx topoh xlog rtpproxy-ng stun sipt
+				   textopsx tm tmx topoh xlog rtpengine stun sipt
 
 # - extra used modules, with no extra dependency
 mod_list_extra=avp auth_diameter call_control cnxcc dmq domainpolicy msrp pdb \
 			     qos sca seas sms sst timer tmrec uac_redirect xhttp \
-				 xhttp_rpc xprint
+				 xhttp_rpc xprint jsonrpc-s nosip
 
 # - common modules depending on database
 mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
@@ -54,7 +54,7 @@ mod_list_postgres=db_postgres
 mod_list_unixodbc=db_unixodbc
 
 # - modules depending on mysql cassandra library
-mod_list_cassandra=db_cassandra
+mod_list_cassandra=db_cassandra ndb_cassandra
 
 # - modules depending on xml2 library
 mod_list_cpl=cpl-c
@@ -157,6 +157,18 @@ mod_list_iptrtpproxy=iptrtpproxy
 # - modules depending on gzip library
 mod_list_gzcompress=gzcompress
 
+# - modules depending on uuid library
+mod_list_uuid=uuid
+
+# - modules depending on ev library
+mod_list_ev=evapi
+
+# - modules depending on kazoo/rabitmq
+mod_list_kazoo=kazoo
+
+# - modules depending on mongodb
+mod_list_mongodb=db_mongodb ndb_mongodb
+
 # - all modules
 mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_db) $(mod_list_dbuid) \
@@ -179,7 +191,9 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_outbound) $(mod_list_osp) \
 			   $(mod_list_java) $(mod_list_dnssec) \
 			   $(mod_list_sctp) $(mod_list_autheph) \
-			   $(mod_list_gzcompress))
+			   $(mod_list_gzcompress) $(mod_list_uuid) \
+			   $(mod_list_ev) $(mod_list_kazoo) \
+			   $(mod_list_mongodb))
 
 
 
@@ -339,6 +353,18 @@ module_group_kautheph=$(mod_list_autheph)
 
 # pkg gzcompress module
 module_group_kgzcompress=$(mod_list_gzcompress)
+
+# pkg uuid module
+module_group_kuuid=$(mod_list_uuid)
+
+# pkg libev modules
+module_group_kev=$(mod_list_ev)
+
+# pkg kazoo module
+module_group_kkazoo=$(mod_list_kazoo)
+
+# pkg mongodb modules
+module_group_kmongodb=$(mod_list_mongodb)
 
 # list of static modules
 #

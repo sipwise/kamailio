@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * ---------
@@ -82,12 +82,29 @@ int reg_cmp_instances(str *i1, str *i2)
 }
 
 /*! \brief
+ * Lookup a contact in usrloc and rewrite R-URI if found
+ */
+int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri) {
+     return lookup_helper(_m, _d, _uri, 0);
+}
+
+/*! \brief
+ * Lookup a contact in usrloc and add the records to the dset structure
+ */
+int lookup_to_dset(struct sip_msg* _m, udomain_t* _d, str* _uri) {
+     return lookup_helper(_m, _d, _uri, 1);
+}
+
+/*! \brief
  * Lookup contact in the database and rewrite Request-URI
+ * or not according to _mode value:
+ *  0: rewrite
+ *  1: don't rewrite
  * \return: -1 : not found
  *          -2 : found but method not allowed
  *          -3 : error
  */
-int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri)
+int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 {
 	urecord_t* r;
 	str aor, uri;
@@ -211,7 +228,8 @@ int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri)
 	}
 
 	ret = 1;
-	if (ptr) {
+	/* don't rewrite r-uri if called by lookup_to_dset */
+	if (_mode == 0 && ptr) {
 		if (rewrite_uri(_m, &ptr->c) < 0) {
 			LM_ERR("unable to rewrite Request-URI\n");
 			ret = -3;

@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -139,16 +139,24 @@ int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post)
 	pkg_free(post);
     }
 
-    if (res != CURLE_OK) {
-	LM_ERR("failed to perform curl\n");
-	curl_easy_cleanup(curl);
-	if(stream)
-	    pkg_free(stream);
-	return -1;
+	if (res != CURLE_OK) {
+		/* http://curl.haxx.se/libcurl/c/libcurl-errors.html */
+		if (res == CURLE_COULDNT_CONNECT) {
+			LM_WARN("failed to connect() to host\n");
+		} else if ( res == CURLE_COULDNT_RESOLVE_HOST ) {
+			LM_WARN("couldn't resolve host\n");
+		} else {
+			LM_ERR("failed to perform curl (%d)\n", res);
+		}
+	
+		curl_easy_cleanup(curl);
+		if(stream)
+			pkg_free(stream);
+		return -1;
     }
 
     curl_easy_getinfo(curl, CURLINFO_HTTP_CODE, &stat);
-    if ((stat >= 200) && (stat < 400)) {
+    if ((stat >= 200) && (stat < 500)) {
 	curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD, &download_size);
 	LM_DBG("http_query download size: %u\n", (unsigned int)download_size);
 	/* search for line feed */

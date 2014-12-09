@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -248,10 +248,10 @@ static cmd_export_t commands[] = {
 
 static param_export_t parameters[] = {
     {"keepalive_interval",       INT_PARAM, &keepalive_interval},
-    {"keepalive_method",         STR_PARAM, &keepalive_params.method},
-    {"keepalive_from",           STR_PARAM, &keepalive_params.from},
-    {"keepalive_extra_headers",  STR_PARAM, &keepalive_params.extra_headers},
-    {"keepalive_state_file",     STR_PARAM, &keepalive_state_file},
+    {"keepalive_method",         PARAM_STRING, &keepalive_params.method},
+    {"keepalive_from",           PARAM_STRING, &keepalive_params.from},
+    {"keepalive_extra_headers",  PARAM_STRING, &keepalive_params.extra_headers},
+    {"keepalive_state_file",     PARAM_STRING, &keepalive_state_file},
     {0, 0, 0}
 };
 

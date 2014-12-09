@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *
  */
@@ -1285,11 +1285,9 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
 		"parse_uri <%.*s> failed", STR_FMT( contact_uri ));
 	goto done;
     }
-    if ( sca_aor_create_from_info( &app_uri_aor, c_uri.type, &c_uri.user,
-		&GET_TO_PURI( msg )->host, &GET_TO_PURI( msg )->port ) < 0 ) {
+    if ( sca_create_canonical_aor( msg, &app_uri_aor ) < 0 ) {
 	LM_ERR( "sca_call_info_invite_200_reply_handler: "
-		"sca_aor_create_from_info %.*s and %.*s failed",
-		STR_FMT( contact_uri ), STR_FMT( &to->uri ));
+		"sca_create_canonical_aor failed" );
 	goto done;
     }
 
@@ -1882,6 +1880,7 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
     int			i;
     int			method;
     int			rc = -1;
+    int			update_mask = SCA_CALL_INFO_SHARED_BOTH;
 
     method = sca_get_msg_method( msg );
 
@@ -1900,6 +1899,29 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
     if ( parse_headers( msg, HDR_EOH_F, 0 ) < 0 ) {
 	LM_ERR( "header parsing failed: bad request" );
 	return( -1 );
+    }
+
+    if ( p1 != NULL ) {
+	if ( get_int_fparam( &update_mask, msg, (fparam_t *)p1 ) < 0 ) {
+	    LM_ERR( "sca_call_info_update: argument 1: bad value "
+		    "(integer expected)" );
+	    return( -1 );
+	}
+
+	switch ( update_mask ) {
+	case SCA_CALL_INFO_SHARED_NONE:
+	    update_mask = SCA_CALL_INFO_SHARED_BOTH;
+	    break;
+
+	case SCA_CALL_INFO_SHARED_CALLER:
+	case SCA_CALL_INFO_SHARED_CALLEE:
+	    break;
+
+	default:
+	    LM_ERR( "sca_call_info_update: argument 1: invalid value "
+		    "(0, 1 or 2 expected)" );
+	    return( -1 );
+	}
     }
 
     memset( &call_info, 0, sizeof( sca_call_info ));
@@ -1964,10 +1986,14 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
 
     /* early check to see if we're dealing with any SCA endpoints */
     if ( sca_uri_is_shared_appearance( sca, &from_aor )) {
-	call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;
+	if (( update_mask & SCA_CALL_INFO_SHARED_CALLER )) {
+	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;
+	}
     }
     if ( sca_uri_is_shared_appearance( sca, &to_aor )) {
-	call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLEE;
+	if (( update_mask & SCA_CALL_INFO_SHARED_CALLEE )) {
+	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLEE;
+	}
     }
 
     if ( call_info_hdr == NULL ) {

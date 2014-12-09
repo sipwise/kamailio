@@ -1381,9 +1381,11 @@ if (t_check_status("(487)|(408)")) {
 				</note>
 			</listitem>
 			<listitem>
-				<para>For other requests (non ACKs and non CANCELs), it will
-				terminate the script for retransmissions and return false for
-				new requests (for which no transaction exists yet).</para>
+				<para>For other requests (non ACKs and non CANCELs), in case of
+				a retransmission matching a transaction, it resends the last
+				reply for that transaction and terminates the config execution.
+				Otherwise, it returns false (in case of new requests for which
+				no transaction exists yet).</para>
 			</listitem>
 		</itemizedlist>
 	</para>
@@ -1490,7 +1492,7 @@ if(!t_relay()) {
 
 	<section id="tm.f.t_replicate">
 	<title>
-	    <function>t_replicate(params)</function>
+	    <function>t_replicate([params])</function>
 	</title>
 	<para>
 		Replicate the SIP request to a specific address.
@@ -1499,7 +1501,7 @@ if(!t_relay()) {
 		There are several function prototypes:
 		<itemizedlist>
 		<listitem><para>
-	    <function>t_replicate(uri)</function>,
+	    <function>t_replicate([uri])</function>,
 		</para></listitem>
 		<listitem><para>
 	    <function>t_replicate(host, port)</function>,
@@ -1525,7 +1527,8 @@ if(!t_relay()) {
 	<itemizedlist>
 	    <listitem>
 		<para><emphasis>uri</emphasis> - SIP URI where the message should be sent.
-		It can be given via a script variable.
+			It can be given via a script variable. It is optional - when missing, the
+			dst-uri or r-uri are used as next hop address.
 		</para>
 	    </listitem>
 	    <listitem>

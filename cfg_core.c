@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History
  * -------
@@ -64,7 +64,7 @@
 struct cfg_group_core default_core_cfg = {
 	L_WARN, 	/*!<  print only msg. < L_WARN */
 	LOG_DAEMON,	/*!< log_facility -- see syslog(3) */
-	L_DBG,  /*!< memdbg */
+	L_DBG+1,    /*!< memdbg */
 #ifdef USE_DST_BLACKLIST
 	/* blacklist */
 	0, /*!< dst blacklist is disabled by default */
@@ -115,7 +115,7 @@ struct cfg_group_core default_core_cfg = {
 	1500, /**< udp4_raw_mtu (1500 by default) */
 	-1,  /**< udp4_raw_ttl (auto detect by default) */
 	0,  /*!< force_rport */
-	L_DBG, /*!< memlog */
+	L_DBG+1, /*!< memlog */
 	3, /*!< mem_summary -flags: 0 off, 1 pkg_status, 2 shm_status,
 		4 pkg_sums, 8 shm_sums, 16 short_status */
 	0, /*!< mem_safety - 0 disabled */

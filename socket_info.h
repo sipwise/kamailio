@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to" the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*
  * This file contains code that initializes and handles ser listen addresses
@@ -116,7 +116,7 @@ char* get_valid_proto_name(unsigned short proto);
 static inline int next_proto(unsigned short proto)
 {
 	if (proto>PROTO_LAST)
-			LOG(L_ERR, "ERROR: next_proto: unknown proto %d\n", proto);
+		LM_ERR("unknown proto %d\n", proto);
 	else
 		return nxt_proto[proto];
 	return 0;

@@ -335,7 +335,7 @@ static inline int clone_authorized_hooks(struct sip_msg* new,
 	while(ptr) {
 		if (ptr == hook1) {
 			if (!new->authorization || !new->authorization->parsed) {
-				LOG(L_CRIT, "BUG: Error in message cloner (authorization)\n");
+				LM_CRIT("Error in message cloner (authorization)\n");
 				return -1;
 			}
 			((struct auth_body*)new->authorization->parsed)->authorized =
@@ -345,7 +345,7 @@ static inline int clone_authorized_hooks(struct sip_msg* new,
 
 		if (ptr == hook2) {
 			if (!new->proxy_auth || !new->proxy_auth->parsed) {
-				LOG(L_CRIT, "BUG: Error in message cloner (proxy_auth)\n");
+				LM_CRIT("Error in message cloner (proxy_auth)\n");
 				return -1;
 			}
 			((struct auth_body*)new->proxy_auth->parsed)->authorized =
@@ -395,6 +395,8 @@ struct sip_msg*  sip_msg_shm_clone( struct sip_msg *org_msg, int *sip_msg_len,
 	/*the dst uri (if any)*/
 	if (org_msg->dst_uri.s && org_msg->dst_uri.len)
 		len+= ROUND4(org_msg->dst_uri.len);
+	if (org_msg->path_vec.s && org_msg->path_vec.len)
+			len+= ROUND4(org_msg->path_vec.len);
 	/*all the headers*/
 	for( hdr=org_msg->headers ; hdr ; hdr=hdr->next )
 	{
@@ -502,7 +504,7 @@ struct sip_msg*  sip_msg_shm_clone( struct sip_msg *org_msg, int *sip_msg_len,
 	p=(char *)shm_malloc(len);
 	if (!p)
 	{
-		LOG(L_ERR , "ERROR: sip_msg_cloner: cannot allocate memory\n" );
+		LM_ERR("cannot allocate memory\n" );
 		return 0;
 	}
 	if (sip_msg_len)
@@ -522,6 +524,7 @@ struct sip_msg*  sip_msg_shm_clone( struct sip_msg *org_msg, int *sip_msg_len,
 	/* zero *uri.s, in case len is 0 but org_msg->*uris!=0 (just to be safe)*/
 	new_msg->new_uri.s = 0;
 	new_msg->dst_uri.s = 0;
+	new_msg->path_vec.s = 0;
 	/* new_uri */
 	if (org_msg->new_uri.s && org_msg->new_uri.len)
 	{
@@ -536,9 +539,13 @@ struct sip_msg*  sip_msg_shm_clone( struct sip_msg *org_msg, int *sip_msg_len,
 		memcpy( p , org_msg->dst_uri.s , org_msg->dst_uri.len);
 		p += ROUND4(org_msg->dst_uri.len);
 	}
-	/* path_vec is not cloned (it's reset instead) */
-	new_msg->path_vec.s=0;
-	new_msg->path_vec.len=0;
+	/* path vector */
+	if (org_msg->path_vec.s && org_msg->path_vec.len) {
+		new_msg->path_vec.s = p;
+		memcpy(p, org_msg->path_vec.s, org_msg->path_vec.len);
+		p += ROUND4(org_msg->path_vec.len);
+	}
+
 	/* instance is not cloned (it's reset instead) */
 	new_msg->instance.s=0;
 	new_msg->instance.len=0;
@@ -736,6 +743,7 @@ struct sip_msg*  sip_msg_shm_clone( struct sip_msg *org_msg, int *sip_msg_len,
 		case HDR_MAXFORWARDS_T:
 			if (!HOOK_SET(maxforwards)) {
 				new_msg->maxforwards = new_hdr;
+				new_msg->maxforwards->parsed = hdr->parsed;
 			}
 			break;
 		case HDR_ROUTE_T:
@@ -980,7 +988,7 @@ int msg_lump_cloner(struct sip_msg *pkg_msg,
 	p=(char *)shm_malloc(len);
 	if (!p)
 	{
-		LOG(L_ERR, "ERROR: msg_lump_cloner: cannot allocate memory\n" );
+		LM_ERR("cannot allocate memory\n" );
 		return -1;
 	}
 

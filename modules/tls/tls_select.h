@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * Exception: permission to copy, modify, propagate, and distribute a work
  * formed by combining OpenSSL toolkit software and the code in this file,
@@ -43,9 +43,12 @@
 
 #include "../../select.h"
 #include "../../pvar.h"
+#include "../../tcp_conn.h"
 
 extern select_row_t tls_sel[];
 
 extern pv_export_t tls_pv[];
+
+void tls_set_pv_con(struct tcp_connection *c);
 
 #endif /* _TLS_SELECT_H */

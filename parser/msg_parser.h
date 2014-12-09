@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History
  * -------
@@ -121,6 +121,9 @@ typedef enum request_method {
 #define FL_USE_UAC_TO        (1<<14)  /* take TO hdr from UAC instead of UAS */
 #define FL_TM_RPL_MATCHED    (1<<15)  /* tm matched reply already */
 #define FL_RPL_SUSPENDED     (1<<16)  /* for async reply processing */
+#define FL_BODY_MULTIPART    (1<<17)  /* body modified is multipart */
+#define FL_RR_ADDED          (1<<18)  /* Record-Route header was added */
+#define FL_UAC_AUTH          (1<<19)  /* Proxy UAC-like authentication */
 
 /* WARNING: Value (1 << 28) is temporarily reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */

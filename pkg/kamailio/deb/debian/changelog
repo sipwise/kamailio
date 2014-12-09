@@ -1,44 +1,101 @@
-kamailio (4.1.6) unstable; urgency=low
+kamailio (4.2.1) unstable; urgency=medium
 
-  * update to 4.1.6 from upstream
+  * update versionto 4.2.1
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 18 Sep 2014 14:10:20 +0100
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Tue, 11 Nov 2014 11:55:40 +0100
 
-kamailio (4.1.5) unstable; urgency=low
+kamailio (4.2.0) unstable; urgency=medium
 
-  * update to 4.1.5 from upstream
+  * update versionto 4.2.0
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Wed, 06 Aug 2014 16:50:20 +0100
+ -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 16 Oct 2014 14:25:30 +0100
 
-kamailio (4.1.4) unstable; urgency=low
+kamailio (4.2.0~rc1) unstable; urgency=medium
 
-  * update to 4.1.4 from upstream
+  * update version to 4.2.0~rc1
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 12 Jun 2014 15:55:55 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Mon, 13 Oct 2014 23:39:26 +0200
 
-kamailio (4.1.3) unstable; urgency=low
+kamailio (4.2.0~rc0) unstable; urgency=medium
 
-  * update to 4.1.3 from upstream
+  * update version to 4.2.0~rc0
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 24 Apr 2014 10:45:20 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Thu, 09 Oct 2014 09:55:52 +0200
 
-kamailio (4.1.2) unstable; urgency=low
+kamailio (4.2.0~pre1) UNRELEASED; urgency=medium
 
-  * update to 4.1.2 from upstream
+  * update version to 4.2.0~pre1
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 06 Mar 2014 15:25:35 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Mon, 29 Sep 2014 10:17:56 +0200
 
-kamailio (4.1.1) unstable; urgency=low
+kamailio (4.2.0~pre0) UNRELEASED; urgency=medium
 
-  * update to 4.1.1 from upstream
+  * update version to 4.2.0~pre0
 
- -- Daniel-Constantin Mierla <miconda@gmail.com>  Thu, 09 Jan 2014 15:45:35 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Fri, 12 Sep 2014 02:38:24 +0200
 
-kamailio (4.1.0) unstable; urgency=low
+kamailio (4.2.0~dev9) unstable; urgency=medium
 
-  * update to 4.1.0
+  * update version to 4.2.0~dev9
 
- -- Victor Seva <linuxmaniac@torreviejawireless.org>  Wed, 04 Dec 2013 11:42:27 +0100
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Tue, 02 Sep 2014 11:18:12 +0200
+
+kamailio (4.2.0~dev8) unstable; urgency=medium
+
+  * update version to 4.2.0~dev8
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Sat, 26 Jul 2014 10:03:22 +0200
+
+kamailio (4.2.0~dev7) unstable; urgency=medium
+
+  * update version to 4.2.0~dev7
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Thu, 12 Jun 2014 12:55:05 +0200
+
+kamailio (4.2.0~dev6) unstable; urgency=medium
+
+  * update version to 4.2.0~dev6
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Sat, 03 May 2014 21:49:21 +0200
+
+kamailio (4.2.0~dev5) unstable; urgency=medium
+
+  * update version to 4.2.0~dev5
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Mon, 21 Apr 2014 22:52:17 +0200
+
+kamailio (4.2.0~dev4) unstable; urgency=medium
+
+  * update version to 4.2.0~dev4
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Tue, 08 Apr 2014 11:56:12 +0200
+
+kamailio (4.2.0~dev3) unstable; urgency=medium
+
+  * update version to 4.2.0~dev3
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Fri, 21 Feb 2014 22:52:43 +0100
+
+kamailio (4.2.0~dev2) unstable; urgency=medium
+
+  * update version to 4.2.0~dev2
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Mon, 03 Feb 2014 11:12:36 +0100
+
+kamailio (4.2.0~dev1) unstable; urgency=medium
+
+  * update version to 4.2.0~dev1
+
+ -- Victor Seva <linuxmaniac@torreviejawireless.org>  Wed, 08 Jan 2014 19:13:30 +0100
+
+kamailio (4.2.0~dev0) unstable; urgency=low
+
+  * Added packages:
+    - kamailio-autheph-modules
+    - kamailio-sctp-modules
+    - kamailio-java-modules
+
+ --  Victor Seva <linuxmaniac@torreviejawireless.org>  Tue, 03 Dec 2013 14:26:58 +0100
 
 kamailio (4.0.0) unstable; urgency=low
 

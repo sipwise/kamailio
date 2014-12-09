@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  *
  * History:
@@ -223,7 +223,7 @@ static int shmcontact2dset(struct sip_msg *req, struct sip_msg *sh_rpl,
 		/* contact header is not parsed */
 		if ( sh_rpl->msg_flags&FL_SHM_CLONE ) {
 			/* duplicate the reply into private memory to be able 
-			 * to parse it and after words to free the parsed mems */
+			 * to parse it and afterwards to free the parsed mems */
 			memcpy( &dup_rpl, sh_rpl, sizeof(struct sip_msg) );
 			dup = 2;
 			/* ok -> force the parsing of contact header */

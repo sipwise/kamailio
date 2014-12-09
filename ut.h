@@ -316,7 +316,7 @@ static inline char* int2strbuf(unsigned long l, char *r, int r_size, int* len)
 		l/=10;
 	}while(l && (i>=0));
 	if (l && (i<0)){
-		LOG(L_CRIT, "BUG: int2str: overflow\n");
+		LM_CRIT("overflow\n");
 	}
 	if (len) *len=(INT2STR_MAX_LEN-2)-i;
 	return &r[i+1];
@@ -558,7 +558,7 @@ inline static int hex2int(char hex_digit)
 	if (hex_digit>='A' && hex_digit<='F')
 		return hex_digit-'A'+10;
 	/* no valid hex digit ... */
-	LOG(L_ERR, "ERROR: hex2int: '%c' is no hex char\n", hex_digit );
+	LM_ERR("'%c' is no hex char\n", hex_digit );
 	return -1;
 }
 
@@ -581,7 +581,7 @@ inline static int un_escape(str *user, str *new_user )
 	int hi, lo;
 
 	if( new_user==0 || new_user->s==0) {
-		LOG(L_CRIT, "BUG: un_escape: called with invalid param\n");
+		LM_CRIT("invalid param\n");
 		return -1;
 	}
 
@@ -591,28 +591,27 @@ inline static int un_escape(str *user, str *new_user )
 	for (i = 0; i < user->len; i++) {
 		if (user->s[i] == '%') {
 			if (i + 2 >= user->len) {
-				LOG(L_ERR, "ERROR: un_escape: escape sequence too short in"
-					" '%.*s' @ %d\n",
+				LM_ERR("escape sequence too short in '%.*s' @ %d\n",
 					user->len, user->s, i );
 				goto error;
 			}
 			hi=hex2int(user->s[i + 1]);
 			if (hi<0) {
-				LOG(L_ERR, "ERROR: un_escape: non-hex high digit in an escape sequence in"
+				LM_ERR("non-hex high digit in an escape sequence in"
 					" '%.*s' @ %d\n",
 					user->len, user->s, i+1 );
 				goto error;
 			}
 			lo=hex2int(user->s[i + 2]);
 			if (lo<0) {
-				LOG(L_ERR, "ERROR: non-hex low digit in an escape sequence in "
+				LM_ERR("non-hex low digit in an escape sequence in "
 					"'%.*s' @ %d\n",
 					user->len, user->s, i+2 );
 				goto error;
 			}
 			value=(hi<<4)+lo;
 			if (value < 32 || value > 126) {
-				LOG(L_ERR, "ERROR: non-ASCII escaped character in '%.*s' @ %d\n",
+				LM_ERR("non-ASCII escaped character in '%.*s' @ %d\n",
 					user->len, user->s, i );
 				goto error;
 			}
@@ -902,4 +901,19 @@ char* get_abs_pathname(str* base, str* file);
  * search for needle in text
  */
 char *str_search(str *text, str *needle);
+
+/*
+ * ser_memmem() returns the location of the first occurrence of data
+ * pattern b2 of size len2 in memory block b1 of size len1 or
+ * NULL if none is found. Obtained from NetBSD.
+ */
+void * ser_memmem(const void *b1, const void *b2, size_t len1, size_t len2);
+
+/*
+ * ser_memrmem() returns the location of the last occurrence of data
+ * pattern b2 of size len2 in memory block b1 of size len1 or
+ * NULL if none is found.
+ */
+void * ser_memrmem(const void *b1, const void *b2, size_t len1, size_t len2);
+
 #endif

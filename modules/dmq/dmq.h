@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 
@@ -44,6 +44,7 @@ extern dmq_peer_t* dmq_notification_peer;
 extern str dmq_server_address;
 extern dmq_peer_list_t* peer_list;
 extern str dmq_request_method;
+extern str dmq_server_socket;
 extern struct sip_uri dmq_server_uri;
 extern str dmq_notification_address;
 extern struct sip_uri dmq_notification_uri;

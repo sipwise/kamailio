@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History
  * -------
@@ -227,7 +227,7 @@ int ds_set_attrs(ds_dest_t *dest, str *attrs)
 				&& strncasecmp(pit->name.s, "duid", 4)==0) {
 			dest->attrs.duid = pit->body;
 		} else if(pit->name.len==6
-				&& strncasecmp(pit->name.s, "weight", 4)==0) {
+				&& strncasecmp(pit->name.s, "weight", 6)==0) {
 			str2sint(&pit->body, &dest->attrs.weight);
 		} else if(pit->name.len==7
 				&& strncasecmp(pit->name.s, "maxload", 7)==0) {
@@ -260,6 +260,13 @@ int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 	{
 		LM_ERR("bad uri [%.*s]\n", uri.len, uri.s);
 		goto err;
+	}
+
+	/* skip IPv6 references if IPv6 lookups are disabled */
+	if (default_core_cfg.dns_try_ipv6 == 0 &&
+	        puri.host.s[0] == '[' && puri.host.s[puri.host.len-1] == ']') {
+		LM_DBG("skipping IPv6 record %.*s\n", puri.host.len, puri.host.s);
+		return 0;
 	}
 
 	/* get dest set */
@@ -332,8 +339,10 @@ int add_dest2list(int id, str uri, int flags, int priority, str *attrs,
 	/* Free the hostname */
 	hostent2ip_addr(&dp->ip_address, he, 0);
 
-	/* Copy the Port out of the URI: */
+	/* Copy the port out of the URI */
 	dp->port = puri.port_no;		
+	/* Copy the proto out of the URI */
+	dp->proto = puri.proto;
 
 	if(sp->dlist==NULL)
 	{
@@ -1586,6 +1595,11 @@ static inline int ds_update_dst(struct sip_msg *msg, str *uri, int mode)
  */
 int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode)
 {
+	return ds_select_dst_limit(msg, set, alg, 0, mode);
+}
+
+int ds_select_dst_limit(struct sip_msg *msg, int set, int alg, unsigned int limit, int mode)
+{
 	int i, cnt;
 	unsigned int hash;
 	int_str avp_val;
@@ -1602,6 +1616,13 @@ int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode)
 		LM_ERR("no destination sets\n");
 		return -1;
 	}
+
+	if (limit==0)
+	{
+		LM_DBG("Limit set to 0 - forcing to unlimited\n");
+		limit = 0xffffffff;
+	}
+	--limit; /* reserving 1 slot for selected dst */
 
 	if((mode==0) && (ds_force_dst==0)
 			&& (msg->dst_uri.s!=NULL || msg->dst_uri.len>0))
@@ -1770,7 +1791,7 @@ int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode)
 	if(dst_avp_name.n!=0)
 	{
 		/* add default dst to last position in AVP list */
-		if(ds_use_default!=0 && hash!=idx->nr-1)
+		if(ds_use_default!=0 && hash!=idx->nr-1 && cnt<limit)
 		{
 			avp_val.s = idx->dlist[idx->nr-1].uri;
 			if(add_avp(AVP_VAL_STR|dst_avp_type, dst_avp_name, avp_val)!=0)
@@ -1802,7 +1823,7 @@ int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode)
 
 		/* add to avp */
 
-		for(i=hash-1; i>=0; i--)
+		for(i=hash-1; i>=0 && cnt<limit; i--)
 		{	
 			if(ds_skip_dst(idx->dlist[i].flags)
 					|| (ds_use_default!=0 && i==(idx->nr-1)))
@@ -1836,7 +1857,7 @@ int ds_select_dst(struct sip_msg *msg, int set, int alg, int mode)
 			cnt++;
 		}
 
-		for(i=idx->nr-1; i>hash; i--)
+		for(i=idx->nr-1; i>hash && cnt<limit; i--)
 		{	
 			if(ds_skip_dst(idx->dlist[i].flags)
 					|| (ds_use_default!=0 && i==(idx->nr-1)))
@@ -2236,14 +2257,44 @@ int ds_print_list(FILE *fout)
 /* Checks, if the request (sip_msg *_m) comes from a host in a group
  * (group-id or -1 for all groups)
  */
-int ds_is_from_list(struct sip_msg *_m, int group)
+int ds_is_addr_from_list(sip_msg_t *_m, int group, str *uri, int mode)
 {
 	pv_value_t val;
 	ds_set_t *list;
 	int j;
+	struct ip_addr* pipaddr;
+	struct ip_addr  aipaddr;
+	unsigned short tport;
+	unsigned short tproto;
+	sip_uri_t puri;
+	static char hn[256];
+	struct hostent* he;
 
 	memset(&val, 0, sizeof(pv_value_t));
 	val.flags = PV_VAL_INT|PV_TYPE_INT;
+
+	if(uri==NULL || uri->len<=0) {
+		pipaddr = &_m->rcv.src_ip;
+		tport = _m->rcv.src_port;
+		tproto = _m->rcv.proto;
+	} else {
+		if(parse_uri(uri->s, uri->len, &puri)!=0 || puri.host.len>255) {
+			LM_ERR("bad uri [%.*s]\n", uri->len, uri->s);
+			return -1;
+		}
+		strncpy(hn, puri.host.s, puri.host.len);
+		hn[puri.host.len]='\0';
+
+		he=resolvehost(hn);
+		if (he==0) {
+			LM_ERR("could not resolve %.*s\n", puri.host.len, puri.host.s);
+			return -1;
+		}
+		hostent2ip_addr(&aipaddr, he, 0);
+		pipaddr = &aipaddr;
+		tport = puri.port_no;
+		tproto = puri.proto;
+	}
 
 	for(list = _ds_list; list!= NULL; list= list->next)
 	{
@@ -2253,9 +2304,11 @@ int ds_is_from_list(struct sip_msg *_m, int group)
 			for(j=0; j<list->nr; j++)
 			{
 				// LM_ERR("port no: %d (%d)\n", list->dlist[j].port, j);
-				if (ip_addr_cmp(&_m->rcv.src_ip, &list->dlist[j].ip_address)
-						&& (list->dlist[j].port==0
-							|| _m->rcv.src_port == list->dlist[j].port))
+				if (ip_addr_cmp(pipaddr, &list->dlist[j].ip_address)
+						&& ((mode&DS_MATCH_NOPORT) || list->dlist[j].port==0
+							|| tport == list->dlist[j].port)
+						&& ((mode&DS_MATCH_NOPROTO)
+							|| tproto == list->dlist[j].proto))
 				{
 					if(group==-1 && ds_setid_pvname.s!=0)
 					{
@@ -2287,6 +2340,10 @@ int ds_is_from_list(struct sip_msg *_m, int group)
 	return -1;
 }
 
+int ds_is_from_list(struct sip_msg *_m, int group)
+{
+	return ds_is_addr_from_list(_m, group, NULL, DS_MATCH_NOPROTO);
+}
 
 int ds_print_mi_list(struct mi_node* rpl)
 {

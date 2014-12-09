@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -472,6 +472,8 @@ typedef struct cell
 	unsigned short on_reply;
 	 /* The route to take for each downstream branch separately */
 	unsigned short on_branch;
+	 /* branch route backup for late branch add (t_append_branch) */
+	unsigned short on_branch_delayed;
 
 	/* place holder for MD5checksum, MD5_LEN bytes are extra alloc'ed */
 	char md5[0];

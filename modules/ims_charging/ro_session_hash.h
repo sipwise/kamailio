@@ -10,6 +10,7 @@
 
 #include "ro_timer.h"
 #include "../../mem/shm_mem.h"
+#include "../ims_usrloc_scscf/usrloc.h"
 #include <stdlib.h>
 
 enum ro_session_event_type {
@@ -23,6 +24,14 @@ struct diameter_avp_value {
 	str mac;
 };
 
+//used to pass data into dialog callbacks
+struct impu_data {
+    str identity;
+    str contact;
+    udomain_t* d;
+} impu_data_t;
+
+
 struct ro_session {
 	str cdp_session_id;
     volatile int ref;
@@ -31,8 +40,8 @@ struct ro_session {
     struct ro_session* prev;
     str ro_session_id;
     str callid;
-    str from_uri;
-    str to_uri;
+    str asserted_identity;
+    str called_asserted_identity;
     unsigned int hop_by_hop;
     struct ro_tl ro_tl;
     unsigned int reserved_secs;
@@ -170,7 +179,7 @@ void link_ro_session(struct ro_session *ro_session, int n);
 
 void remove_aaa_session(str *session_id);
 
-struct ro_session* build_new_ro_session(int direction, int auth_appid, int auth_session_type, str *session_id, str *callid, str *from_uri, str* to_uri, str* mac, unsigned int dlg_h_entry, unsigned int dlg_h_id, unsigned int requested_secs, unsigned int validity_timeout);
+struct ro_session* build_new_ro_session(int direction, int auth_appid, int auth_session_type, str *session_id, str *callid, str *asserted_identity, str* called_asserted_identity, str* mac, unsigned int dlg_h_entry, unsigned int dlg_h_id, unsigned int requested_secs, unsigned int validity_timeout);
 
 /*!
  * \brief Refefence a ro_session with locking
@@ -189,6 +198,8 @@ void ref_ro_session(struct ro_session *ro_session, unsigned int cnt);
 void unref_ro_session(struct ro_session *ro_session, unsigned int cnt);
 
 struct ro_session* lookup_ro_session(unsigned int h_entry, str *callid, int direction, unsigned int *del);
+
+void free_impu_data(struct impu_data *impu_data);
 
 
 #endif	/* RO_SESSION_HASH_H */

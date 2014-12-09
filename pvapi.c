@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -1887,7 +1887,7 @@ void pv_destroy_api(void)
  * - buffer to print PVs
  */
 static char **_pv_print_buffer = NULL;
-#define PV_DEFAULT_PRINT_BUFFER_SIZE 1024
+#define PV_DEFAULT_PRINT_BUFFER_SIZE 8192 /* 8kB */
 static int _pv_print_buffer_size  = PV_DEFAULT_PRINT_BUFFER_SIZE;
 static int _pv_print_buffer_size_active  = 0;
 /* 6 mod params + 4 direct usage from mods */

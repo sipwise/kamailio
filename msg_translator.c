@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *
  * History:
@@ -147,8 +147,9 @@
 #include "pt.h"
 #include "cfg/cfg.h"
 #include "parser/parse_to.h"
+#include "parser/parse_param.h"
 #include "forward.h"
-
+#include "str_list.h"
 
 #define append_str_trans(_dest,_src,_len,_msg) \
 	append_str( (_dest), (_src), (_len) );
@@ -220,7 +221,7 @@ static int check_via_address(struct ip_addr* ip, str *name,
 			if (strncmp(name->s, s, name->len)==0)
 				return 0;
 	}else{
-		LOG(L_CRIT, "check_via_address: BUG: could not convert ip address\n");
+		LM_CRIT("could not convert ip address\n");
 		return -1;
 	}
 
@@ -256,7 +257,7 @@ int received_test( struct sip_msg *msg )
 {
 	int rcvd;
 
-	rcvd=msg->via1->received
+	rcvd=msg->via1->received || msg->via1->rport
 			|| check_via_address(&msg->rcv.src_ip, &msg->via1->host,
 							msg->via1->port, received_dns);
 	return rcvd;
@@ -337,7 +338,7 @@ static char * warning_builder( struct sip_msg *msg, unsigned int *returned_len)
 	*returned_len=clen;
 	return buf;
 error_overflow:
-	LOG(L_NOTICE, "NOTICE: warning_builder: buffer size exceeded (probably too long URI)\n");
+	LM_NOTICE("buffer size exceeded (probably too long URI)\n");
 	*returned_len=0;
 	return 0;
 }
@@ -358,7 +359,7 @@ char* received_builder(struct sip_msg *msg, unsigned int *received_len)
 	buf=pkg_malloc(sizeof(char)*MAX_RECEIVED_SIZE);
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LOG(L_ERR, "ERROR: received_builder: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memcpy(buf, RECEIVED, RECEIVED_LEN);
@@ -391,7 +392,7 @@ char* rport_builder(struct sip_msg *msg, unsigned int *rport_len)
 	buf=pkg_malloc(sizeof(char)*(len+1));/* space for null term */
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LOG(L_ERR, "ERROR: rport_builder: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memcpy(buf, RPORT, RPORT_LEN);
@@ -415,7 +416,7 @@ char* id_builder(struct sip_msg* msg, unsigned int *id_len)
 	size=sizeof(int)*2;
 	p=&revhex[0];
 	if (int2reverse_hex(&p, &size, msg->rcv.proto_reserved1)==-1){
-		LOG(L_CRIT, "BUG: id_builder: not enough space for id\n");
+		LM_CRIT("not enough space for id\n");
 		return 0;
 	}
 	value_len=p-&revhex[0];
@@ -423,7 +424,7 @@ char* id_builder(struct sip_msg* msg, unsigned int *id_len)
 	buf=pkg_malloc(sizeof(char)*(len+1));/* place for ending \0 */
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LOG(L_ERR, "ERROR: id_builder: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memcpy(buf, ID_PARAM, ID_PARAM_LEN);
@@ -449,8 +450,7 @@ char* clen_builder(	struct sip_msg* msg, int *clen_len, int diff,
 	body=get_body(msg);
 	if (body==0){
 		ser_error=E_BAD_REQ;
-		LOG(L_ERR, "ERROR: clen_builder: no message body found"
-					" (missing crlf?)");
+		LM_ERR("no message body found (missing crlf?)");
 		return 0;
 	}
 	value=msg->len-(int)(body-msg->buf)+diff;
@@ -466,7 +466,7 @@ char* clen_builder(	struct sip_msg* msg, int *clen_len, int diff,
 	buf=pkg_malloc(sizeof(char)*(len+1));
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LOG(L_ERR, "ERROR: clen_builder: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	if (body_only) {
@@ -497,7 +497,7 @@ static inline int lump_check_opt(	struct lump *l,
 
 #define get_ip_port_proto \
 			if ((snd_i==0) || (snd_i->send_sock==0)){ \
-				LOG(L_CRIT, "ERROR: lump_check_opt: null send socket\n"); \
+				LM_CRIT("null send socket\n"); \
 				return 1; /* we presume they are different :-) */ \
 			} \
 			if (msg->rcv.bind_address){ \
@@ -561,8 +561,7 @@ static inline int lump_check_opt(	struct lump *l,
 				return 1;
 			} else return 0;
 		default:
-			LOG(L_CRIT, "BUG: lump:w_check_opt: unknown lump condition %d\n",
-					l->u.cond);
+			LM_CRIT("unknown lump condition %d\n", l->u.cond);
 	}
 	return 0; /* false */
 }
@@ -599,8 +598,7 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 								new_len+=COMP_PARAM_LEN+SERGZ_NAME_LEN ; \
 								break; \
 						default: \
-						LOG(L_CRIT, "BUG: lumps_len: unknown comp %d\n", \
-								msg->rcv.comp); \
+						LM_CRIT("unknown comp %d\n", msg->rcv.comp); \
 					}
 
 	#define SENDCOMP_LUMP_LEN \
@@ -615,8 +613,7 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 								new_len+=COMP_PARAM_LEN+SERGZ_NAME_LEN ; \
 								break; \
 						default: \
-						LOG(L_CRIT, "BUG: lumps_len: unknown comp %d\n", \
-								send_info->comp); \
+						LM_CRIT("unknown comp %d\n", send_info->comp); \
 					}
 #else
 	#define RCVCOMP_LUMP_LEN
@@ -632,7 +629,7 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 						new_len+=2; \
 				}else{ \
 					/* FIXME */ \
-					LOG(L_CRIT, "FIXME: null bind_address\n"); \
+					LM_CRIT("FIXME: null bind_address\n"); \
 				}; \
 				break; \
 			case SUBST_RCV_PORT: \
@@ -640,7 +637,7 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 					new_len+=recv_port_str->len; \
 				}else{ \
 					/* FIXME */ \
-					LOG(L_CRIT, "FIXME: null bind_address\n"); \
+					LM_CRIT("FIXME: null bind_address\n"); \
 				}; \
 				break; \
 			case SUBST_RCV_PROTO: \
@@ -666,12 +663,11 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 							new_len+=4; \
 							break; \
 						default: \
-						LOG(L_CRIT, "BUG: lumps_len: unknown proto %d\n", \
-								msg->rcv.bind_address->proto); \
+						LM_CRIT("unknown proto %d\n", msg->rcv.bind_address->proto); \
 					}\
 				}else{ \
 					/* FIXME */ \
-					LOG(L_CRIT, "FIXME: null bind_address\n"); \
+					LM_CRIT("FIXME: null bind_address\n"); \
 				}; \
 				break; \
 			case SUBST_RCV_ALL: \
@@ -704,13 +700,13 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 							new_len+=TRANSPORT_PARAM_LEN+4; \
 							break; \
 						default: \
-						LOG(L_CRIT, "BUG: lumps_len: unknown proto %d\n", \
+						LM_CRIT("unknown proto %d\n", \
 								msg->rcv.bind_address->proto); \
 					}\
 					RCVCOMP_LUMP_LEN \
 				}else{ \
 					/* FIXME */ \
-					LOG(L_CRIT, "FIXME: null bind_address\n"); \
+					LM_CRIT("FIXME: null bind_address\n"); \
 				}; \
 				break; \
 			case SUBST_SND_IP: \
@@ -720,16 +716,14 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 							send_address_str==&(send_sock->address_str)) \
 						new_len+=2; \
 				}else{ \
-					LOG(L_CRIT, "FIXME: lumps_len called with" \
-							" null send_sock\n"); \
+					LM_CRIT("FIXME: null send_sock\n"); \
 				}; \
 				break; \
 			case SUBST_SND_PORT: \
 				if (send_sock){ \
 					new_len+=send_port_str->len; \
 				}else{ \
-					LOG(L_CRIT, "FIXME: lumps_len called with" \
-							" null send_sock\n"); \
+					LM_CRIT("FIXME: null send_sock\n"); \
 				}; \
 				break; \
 			case SUBST_SND_PROTO: \
@@ -755,12 +749,10 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 							new_len+=4; \
 							break; \
 						default: \
-						LOG(L_CRIT, "BUG: lumps_len: unknown proto %d\n", \
-								send_sock->proto); \
+						LM_CRIT("unknown proto %d\n", send_sock->proto); \
 					}\
 				}else{ \
-					LOG(L_CRIT, "FIXME: lumps_len called with" \
-							" null send_sock\n"); \
+					LM_CRIT("FIXME: null send_sock\n"); \
 				}; \
 				break; \
 			case SUBST_SND_ALL: \
@@ -795,21 +787,18 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 							new_len+=TRANSPORT_PARAM_LEN+4; \
 							break; \
 						default: \
-						LOG(L_CRIT, "BUG: lumps_len: unknown proto %d\n", \
-								send_sock->proto); \
+						LM_CRIT("unknown proto %d\n", send_sock->proto); \
 					}\
 					SENDCOMP_LUMP_LEN \
 				}else{ \
 					/* FIXME */ \
-					LOG(L_CRIT, "FIXME: lumps_len called with" \
-							" null send_sock\n"); \
+					LM_CRIT("FIXME: null send_sock\n"); \
 				}; \
 				break; \
 			case SUBST_NOP: /* do nothing */ \
 				break; \
 			default: \
-				LOG(L_CRIT, "BUG: unknown subst type %d\n", \
-						(subst_l)->u.subst); \
+				LM_CRIT("unknown subst type %d\n", (subst_l)->u.subst); \
 		}
 	
 	if (send_info){
@@ -867,8 +856,7 @@ static inline int lumps_len(struct sip_msg* msg, struct lump* lumps,
 					break;
 				default:
 					/* only ADD allowed for before/after */
-						LOG(L_CRIT, "BUG: lumps_len: invalid op "
-							"for data lump (%x)\n", r->op);
+						LM_CRIT("invalid op for data lump (%x)\n", r->op);
 			}
 		}
 skip_before:
@@ -904,8 +892,7 @@ skip_before:
 				/* do nothing */
 				break;
 			default:
-				LOG(L_CRIT,"BUG:lumps_len: invalid"
-							" op for data lump (%x)\n", r->op);
+				LM_CRIT("invalid op for data lump (%x)\n", r->op);
 		}
 		for (r=t->after;r;r=r->after){
 			switch(r->op){
@@ -923,8 +910,7 @@ skip_before:
 					break;
 				default:
 					/* only ADD allowed for before/after */
-					LOG(L_CRIT, "BUG:lumps_len: invalid"
-								" op for data lump (%x)\n", r->op);
+					LM_CRIT("invalid op for data lump (%x)\n", r->op);
 			}
 		}
 skip_after:
@@ -980,8 +966,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 						offset+=SERGZ_NAME_LEN; \
 						break;\
 					default:\
-						LOG(L_CRIT, "BUG: process_lumps: unknown comp %d\n", \
-								msg->rcv.comp); \
+						LM_CRIT("unknown comp %d\n", msg->rcv.comp); \
 				}
 	
 	#define SENDCOMP_PARAM_ADD \
@@ -1003,8 +988,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 						offset+=SERGZ_NAME_LEN; \
 						break;\
 					default:\
-						LOG(L_CRIT, "BUG: process_lumps: unknown comp %d\n", \
-								msg->rcv.comp); \
+						LM_CRIT("unknown comp %d\n", msg->rcv.comp); \
 				} 
 #else
 	#define RCVCOMP_PARAM_ADD
@@ -1026,7 +1010,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 				}\
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: null bind_address\n"); \
+				LM_CRIT("FIXME: null bind_address\n"); \
 			}; \
 			break; \
 		case SUBST_RCV_PORT: \
@@ -1036,7 +1020,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 				offset+=recv_port_str->len; \
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: null bind_address\n"); \
+				LM_CRIT("FIXME: null bind_address\n"); \
 			}; \
 			break; \
 		case SUBST_RCV_ALL: \
@@ -1095,13 +1079,12 @@ static inline void process_lumps(	struct sip_msg* msg,
 						offset+=4; \
 						break; \
 					default: \
-						LOG(L_CRIT, "BUG: process_lumps: unknown proto %d\n", \
-								msg->rcv.bind_address->proto); \
+						LM_CRIT("unknown proto %d\n", msg->rcv.bind_address->proto); \
 				} \
 				RCVCOMP_PARAM_ADD \
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: null bind_address\n"); \
+				LM_CRIT("FIXME: null bind_address\n"); \
 			}; \
 			break; \
 		case SUBST_SND_IP: \
@@ -1119,8 +1102,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 				}\
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: called with" \
-							" null send_sock\n"); \
+				LM_CRIT("FIXME: null send_sock\n"); \
 			}; \
 			break; \
 		case SUBST_SND_PORT: \
@@ -1130,8 +1112,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 				offset+=send_port_str->len; \
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: called with" \
-						" null send_sock\n"); \
+				LM_CRIT("FIXME: null send_sock\n"); \
 			}; \
 			break; \
 		case SUBST_SND_ALL: \
@@ -1192,13 +1173,12 @@ static inline void process_lumps(	struct sip_msg* msg,
 						offset+=4; \
 						break; \
 					default: \
-						LOG(L_CRIT, "BUG: process_lumps: unknown proto %d\n", \
-								send_sock->proto); \
+						LM_CRIT("unknown proto %d\n", send_sock->proto); \
 				} \
 				SENDCOMP_PARAM_ADD \
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: null bind_address\n"); \
+				LM_CRIT("FIXME: null bind_address\n"); \
 			}; \
 			break; \
 		case SUBST_RCV_PROTO: \
@@ -1232,13 +1212,11 @@ static inline void process_lumps(	struct sip_msg* msg,
 						offset+=4; \
 						break; \
 					default: \
-						LOG(L_CRIT, "BUG: process_lumps: unknown proto %d\n", \
-								msg->rcv.bind_address->proto); \
+						LM_CRIT("unknown proto %d\n", msg->rcv.bind_address->proto); \
 				} \
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: called with null" \
-							" send_sock \n"); \
+				LM_CRIT("FIXME: null send_sock \n"); \
 			}; \
 			break; \
 		case  SUBST_SND_PROTO: \
@@ -1272,18 +1250,15 @@ static inline void process_lumps(	struct sip_msg* msg,
 						offset+=4; \
 						break; \
 					default: \
-						LOG(L_CRIT, "BUG: process_lumps: unknown proto %d\n", \
-								send_sock->proto); \
+						LM_CRIT("unknown proto %d\n", send_sock->proto); \
 				} \
 			}else{  \
 				/*FIXME*/ \
-				LOG(L_CRIT, "FIXME: process_lumps: called with null" \
-							" send_sock \n"); \
+				LM_CRIT("FIXME: null send_sock \n"); \
 			}; \
 			break; \
 		default: \
-				LOG(L_CRIT, "BUG: process_lumps: unknown subst type %d\n", \
-							(subst_l)->u.subst); \
+				LM_CRIT("unknown subst type %d\n", (subst_l)->u.subst); \
 	}
 
 	if (send_info){
@@ -1362,8 +1337,7 @@ static inline void process_lumps(	struct sip_msg* msg,
 							break;
 						default:
 							/* only ADD allowed for before/after */
-							LOG(L_CRIT, "BUG:process_lumps: "
-									"invalid op for data lump (%x)\n", r->op);
+							LM_CRIT("invalid op for data lump (%x)\n", r->op);
 					}
 				}
 skip_before:
@@ -1381,8 +1355,7 @@ skip_before:
 						break;
 					default:
 						/* should not ever get here */
-						LOG(L_CRIT, "BUG: process_lumps: unhandled data lump "
-								" op %d\n", t->op);
+						LM_CRIT("unhandled data lump op %d\n", t->op);
 				}
 				/* process after */
 				for(r=t->after;r;r=r->after){
@@ -1403,8 +1376,7 @@ skip_before:
 							break;
 						default:
 							/* only ADD allowed for before/after */
-							LOG(L_CRIT, "BUG:process_lumps: "
-									"invalid op for data lump (%x)\n", r->op);
+							LM_CRIT("invalid op for data lump (%x)\n", r->op);
 					}
 				}
 skip_after:
@@ -1444,8 +1416,7 @@ skip_after:
 							break;
 						default:
 							/* only ADD allowed for before/after */
-							LOG(L_CRIT, "BUG:process_lumps: "
-									"invalid op for data lump (%x)\n",r->op);
+							LM_CRIT("invalid op for data lump (%x)\n",r->op);
 					}
 				}
 skip_nop_before:
@@ -1473,15 +1444,13 @@ skip_nop_before:
 							break;
 						default:
 							/* only ADD allowed for before/after */
-							LOG(L_CRIT, "BUG:process_lumps: "
-									"invalid op for data lump (%x)\n", r->op);
+							LM_CRIT("invalid op for data lump (%x)\n", r->op);
 					}
 				}
 skip_nop_after:
 				break;
 			default:
-					LOG(L_CRIT, "BUG: process_lumps: "
-							"unknown op (%x)\n", t->op);
+					LM_CRIT("unknown op (%x)\n", t->op);
 		}
 	}
 	*new_buf_offs=offset;
@@ -1521,7 +1490,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 #endif
 	    ) {
 		if (parse_headers(msg, HDR_CONTENTLENGTH_F, 0)==-1){
-			LOG(L_ERR, "adjust_clen: error parsing content-length\n");
+			LM_ERR("error parsing content-length\n");
 			goto error;
 		}
 		if (unlikely(msg->content_length==0)){
@@ -1532,7 +1501,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 			anchor=anchor_lump(msg, msg->unparsed-msg->buf, 0,
 												HDR_CONTENTLENGTH_T);
 			if (anchor==0){
-				LOG(L_ERR, "adjust_clen: cannot set clen anchor\n");
+				LM_ERR("cannot set clen anchor\n");
 				goto error;
 			}
 			body_only=0;
@@ -1542,8 +1511,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 			body=get_body(msg);
 			if (unlikely(body==0)){
 				ser_error=E_BAD_REQ;
-				LOG(L_ERR, "adjust_clen: no message body found"
-						" (missing crlf?)");
+				LM_ERR("no message body found (missing crlf?)");
 				goto error;
 			}
 			comp_clen=msg->len-(int)(body-msg->buf)+body_delta;
@@ -1557,8 +1525,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 									msg->content_length->body.len,
 									HDR_CONTENTLENGTH_T);
 				if (anchor==0) {
-					LOG(L_ERR, "adjust_clen: Can't remove original"
-								" Content-Length\n");
+					LM_ERR("Can't remove original Content-Length\n");
 					goto error;
 				}
 				body_only=1;
@@ -1568,7 +1535,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 #endif /* USE_TCP */
 	if (body_delta){
 		if (parse_headers(msg, HDR_CONTENTLENGTH_F, 0) == -1) {
-			LOG(L_ERR, "adjust_clen: Error parsing Content-Length\n");
+			LM_ERR("Error parsing Content-Length\n");
 			goto error;
 		}
 
@@ -1586,7 +1553,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 				anchor=anchor_lump(msg, msg->unparsed-msg->buf, 0,
 													HDR_CONTENTLENGTH_T);
 				if (anchor==0){
-					LOG(L_ERR, "adjust_clen: cannot set clen anchor\n");
+					LM_ERR("cannot set clen anchor\n");
 					goto error;
 				}
 				body_only=0;
@@ -1599,8 +1566,7 @@ static inline int adjust_clen(struct sip_msg* msg, int body_delta, int proto)
 								msg->content_length->body.len,
 								HDR_CONTENTLENGTH_T);
 			if (anchor==0) {
-				LOG(L_ERR, "adjust_clen: Can't remove original"
-							" Content-Length\n");
+				LM_ERR("Can't remove original Content-Length\n");
 				goto error;
 			}
 		}
@@ -1620,7 +1586,301 @@ error:
 	return -1;
 }
 
+static inline int find_line_start(char *text, unsigned int text_len,
+				  char **buf, unsigned int *buf_len)
+{
+	char *ch, *start;
+	unsigned int len;
 
+	start = *buf;
+	len = *buf_len;
+
+	while (text_len <= len) {
+		if (strncmp(text, start, text_len) == 0) {
+			*buf = start;
+			*buf_len = len;
+			return 1;
+		}
+		if ((ch = memchr(start, 13, len - 1))) {
+			if (*(ch + 1) != 10) {
+				LM_ERR("No LF after CR\n");
+				return 0;
+			}
+			len = len - (ch - start + 2);
+			start = ch + 2;
+		} else {
+			LM_ERR("No CRLF found\n");
+			return 0;
+		}
+	}
+	return 0;
+}
+
+static inline int get_line(str s)
+{
+	char *ch;
+
+	if ((ch = memchr(s.s, 13, s.len))) {
+		if (*(ch + 1) != 10) {
+			LM_ERR("No LF after CR\n");
+			return 0;
+		}
+		return ch - s.s + 2;
+	} else {
+		LM_ERR("No CRLF found\n");
+		return s.len;
+	}
+	return 0;
+}
+
+int replace_body(struct sip_msg *msg, str txt)
+{
+	struct lump *anchor;
+	char *buf;
+	str body = {0,0};
+
+	body.s = get_body(msg);
+	if(body.s==0)
+	{
+		LM_ERR("malformed sip message\n");
+		return 0;
+	}
+	body.len = msg->len -(int)(body.s-msg->buf);
+	LM_DBG("old size body[%d] actual[%d]\n", body.len, txt.len);
+	if(body.s+body.len>msg->buf+msg->len)
+	{
+		LM_ERR("invalid content length: %d\n", body.len);
+		return 0;
+	}
+	del_nonshm_lump( &(msg->body_lumps) );
+	msg->body_lumps = NULL;
+
+	if(del_lump(msg, body.s-msg->buf, body.len, 0) == 0)
+	{
+		LM_ERR("cannot delete existing body");
+		return 0;
+	}
+
+	anchor = anchor_lump(msg, body.s - msg->buf, 0, 0);
+	if(anchor==0)
+	{
+		LM_ERR("failed to get anchor\n");
+		return 0;
+	}
+
+	buf=pkg_malloc(sizeof(char)*txt.len);
+	if(buf==0)
+	{
+		PKG_MEM_ERROR;
+		return 0;
+	}
+	memcpy(buf, txt.s, txt.len);
+	if(insert_new_lump_after(anchor, buf, txt.len, 0)==0)
+	{
+		LM_ERR("failed to insert body lump\n");
+		pkg_free(buf);
+		return 0;
+	}
+	return 1;
+}
+
+/**
+ * returns the boundary defined by the Content-Type
+ * header
+ */
+int get_boundary(struct sip_msg* msg, str* boundary)
+{
+	str params;
+	param_t *p, *list;
+	param_hooks_t hooks;
+
+	params.s = memchr(msg->content_type->body.s, ';',
+		msg->content_type->body.len);
+	if (params.s == NULL)
+	{
+		LM_ERR("Content-Type hdr has no params\n");
+		return -1;
+	}
+	params.len = msg->content_type->body.len -
+		(params.s - msg->content_type->body.s);
+	if (parse_params(&params, CLASS_ANY, &hooks, &list) < 0)
+	{
+		LM_ERR("while parsing Content-Type params\n");
+		return -1;
+	}
+	boundary->s = NULL;
+	boundary->len = 0;
+	for (p = list; p; p = p->next) {
+		if ((p->name.len == 8)
+			&& (strncasecmp(p->name.s, "boundary", 8) == 0))
+		{
+			boundary->s = pkg_malloc(p->body.len + 2);
+			if (boundary->s == NULL)
+			{
+				free_params(list);
+				LM_ERR("no memory for boundary string\n");
+				return -1;
+			}
+			*(boundary->s) = '-';
+			*(boundary->s + 1) = '-';
+			memcpy(boundary->s + 2, p->body.s, p->body.len);
+			boundary->len = 2 + p->body.len;
+			LM_DBG("boundary is <%.*s>\n", boundary->len, boundary->s);
+			break;
+		}
+	}
+	free_params(list);
+	return 0;
+}
+
+int check_boundaries(struct sip_msg *msg, struct dest_info *send_info)
+{
+	str b = {0,0};
+	str fb = {0,0};
+	str ob = {0,0};
+	str bsuffix = {"\r\n", 2};
+	str fsuffix = {"--\r\n", 4};
+	str body = {0,0};
+	str buf = {0,0};
+	str tmp = {0,0};
+	struct str_list* lb = NULL;
+	struct str_list* lb_t = NULL;
+	int lb_found = 0;
+	int t, ret, lb_size;
+	char *pb;
+
+	if(!(msg->msg_flags&FL_BODY_MULTIPART)) return 0;
+	else
+	{
+		buf.s = build_body(msg, (unsigned int *)&buf.len, &ret, send_info);
+		if(ret) {
+			LM_ERR("Can't get body\n");
+			return -1;
+		}
+		tmp.s = buf.s;
+		t = tmp.len = buf.len;
+		if(get_boundary(msg, &ob)!=0) return -1;
+		if(str_append(&ob, &bsuffix, &b)!=0) {
+			LM_ERR("Can't append suffix to boundary\n");
+			goto error;
+		}
+		if(str_append(&ob, &fsuffix,&fb)!=0) {
+			LM_ERR("Can't append suffix to final boundary\n");
+			goto error;
+		}
+		ret = b.len-2;
+		while(t>0)
+		{
+			if(find_line_start(b.s, ret, &tmp.s,
+				(unsigned int *)&tmp.len))
+			{
+				/*LM_DBG("found t[%d] tmp.len[%d]:[%.*s]\n",
+					t, tmp.len, tmp.len, tmp.s);*/
+				if(!lb)
+				{
+					lb = pkg_malloc(sizeof(struct str_list));
+					if (!lb) {
+						PKG_MEM_ERROR;
+						goto error;
+					}
+					lb->s.s = tmp.s;
+					lb->s.len = tmp.len;
+					lb->next = 0;
+					lb_t = lb;
+				}
+				else
+				{
+					lb_t = append_str_list(tmp.s, tmp.len, &lb_t, &lb_size);
+				}
+				lb_found = lb_found + 1;
+				tmp.s = tmp.s + ret;
+				t =  t - ret;
+				tmp.len = tmp.len - ret;
+			}
+			else { t=0; }
+		}
+		if(lb_found<2)
+		{
+			LM_ERR("found[%d] wrong number of boundaries\n", lb_found);
+			goto error;
+		}
+		/* adding 2 chars in advance */
+		body.len = buf.len + 2;
+		body.s = pkg_malloc(sizeof(char)*body.len);
+		if (!body.s) {
+			PKG_MEM_ERROR;
+			goto error;
+		}
+		pb = body.s; body.len = 0;
+		lb_t = lb;
+		while(lb_t)
+		{
+			tmp.s = lb_t->s.s; tmp.len = lb_t->s.len;
+			tmp.len = get_line(lb_t->s);
+			if(tmp.len!=b.len || strncmp(b.s, tmp.s, b.len)!=0)
+			{
+				LM_DBG("malformed bondary in the middle\n");
+				memcpy(pb, b.s, b.len); body.len = body.len + b.len;
+				pb = pb + b.len;
+				t = lb_t->s.s - (lb_t->s.s + tmp.len);
+				memcpy(pb, lb_t->s.s+tmp.len, t); pb = pb + t;
+				/*LM_DBG("new chunk[%d][%.*s]\n", t, t, pb-t);*/
+			}
+			else {
+				t = lb_t->next->s.s - lb_t->s.s;
+				memcpy(pb, lb_t->s.s, t);
+				/*LM_DBG("copy[%d][%.*s]\n", t, t, pb);*/
+				pb = pb + t;
+			}
+			body.len = body.len + t;
+			/*LM_DBG("body[%d][%.*s]\n", body.len, body.len, body.s);*/
+			lb_t = lb_t->next;
+			if(!lb_t->next) lb_t = NULL;
+		}
+		/* last boundary */
+		tmp.s = lb->s.s; tmp.len = lb->s.len;
+		tmp.len = get_line(lb->s);
+		if(tmp.len!=fb.len || strncmp(fb.s, tmp.s, fb.len)!=0)
+		{
+			LM_DBG("last bondary without -- at the end\n");
+			memcpy(pb, fb.s, fb.len);
+			/*LM_DBG("new chunk[%d][%.*s]\n", fb.len, fb.len, pb);*/
+			pb = pb + fb.len;
+			body.len = body.len + fb.len;
+		}
+		else {
+			memcpy(pb, lb->s.s, lb->s.len); pb = pb + lb->s.len;
+			body.len = body.len + lb->s.len;
+			/*LM_DBG("copy[%d][%.*s]\n", lb->s.len, lb->s.len, pb - lb->s.len);*/
+		}
+		/*LM_DBG("body[%d][%.*s] expected[%ld]\n",
+			body.len, body.len, body.s, pb-body.s); */
+		if(!replace_body(msg, body))
+		{
+			LM_ERR("Can't replace body\n");
+			goto error;
+		}
+		msg->msg_flags &= ~FL_BODY_MULTIPART;
+		ret = 1;
+		goto clean;
+	}
+
+error:
+	ret = -1;
+clean:
+	if(ob.s) pkg_free(ob.s);
+	if(b.s) pkg_free(b.s);
+	if(fb.s) pkg_free(fb.s);
+	if(body.s) pkg_free(body.s);
+	if(buf.s) pkg_free(buf.s);
+	while(lb)
+	{
+		lb_t = lb->next;
+		pkg_free(lb);
+		lb = lb_t;
+	}
+	return ret;
+}
 
 /** builds a request in memory from another sip request.
   *
@@ -1700,11 +1960,13 @@ char * build_req_buf_from_sip_req( struct sip_msg* msg,
 	path_buf.len=0;
 
 	flags=msg->msg_flags|global_req_flags;
+	if(check_boundaries(msg, send_info)<0){
+		LM_WARN("check_boundaries error\n");
+	}
 	/* Calculate message body difference and adjust Content-Length */
 	body_delta = lumps_len(msg, msg->body_lumps, send_info);
 	if (adjust_clen(msg, body_delta, send_info->proto) < 0) {
-		LOG(L_ERR, "ERROR: build_req_buf_from_sip_req: Error while adjusting"
-				" Content-Length\n");
+		LM_ERR("Error while adjusting Content-Length\n");
 		goto error00;
 	}
 
@@ -1728,8 +1990,7 @@ after_local_via:
 	/* check if received needs to be added */
 	if ( received_test(msg) ) {
 		if ((received_buf=received_builder(msg,&received_len))==0){
-			LOG(L_ERR, "ERROR: build_req_buf_from_sip_req:"
-							" received_builder failed\n");
+			LM_ERR("received_builder failed\n");
 			goto error01;  /* free also line_buf */
 		}
 	}
@@ -1742,8 +2003,7 @@ after_local_via:
 	if ((flags&FL_FORCE_RPORT)||
 			(msg->via1->rport /*&& msg->via1->rport->value.s==0*/)){
 		if ((rport_buf=rport_builder(msg, &rport_len))==0){
-			LOG(L_ERR, "ERROR: build_req_buf_from_sip_req:"
-							" rport_builder failed\n");
+			LM_ERR("rport_builder failed\n");
 			goto error01; /* free everything */
 		}
 	}
@@ -1804,7 +2064,7 @@ after_update_via1:
 		path_buf.len=ROUTE_PREFIX_LEN+msg->path_vec.len+CRLF_LEN;
 		path_buf.s=pkg_malloc(path_buf.len+1);
 		if (unlikely(path_buf.s==0)){
-			LOG(L_ERR, "out of memory\n");
+			LM_ERR("out of memory\n");
 			ser_error=E_OUT_OF_MEM;
 			goto error00;
 		}
@@ -1840,7 +2100,7 @@ after_update_via1:
 	/* compute new msg len and fix overlapping zones*/
 	new_len=len+body_delta+lumps_len(msg, msg->add_rm, send_info)+via_len;
 #ifdef XL_DEBUG
-	LOG(L_ERR, "DEBUG: new_len(%d)=len(%d)+lumps_len\n", new_len, len);
+	LM_ERR("new_len(%d)=len(%d)+lumps_len\n", new_len, len);
 #endif
 	udp_mtu=cfg_get(core, core_cfg, udp_mtu);
 	di.proto=PROTO_NONE;
@@ -1877,8 +2137,7 @@ after_update_via1:
 			if(likely(line_buf)) pkg_free(line_buf);
 			line_buf = create_via_hf( &via_len, msg, &di, &branch);
 			if (!line_buf){
-				LOG(L_ERR,"ERROR: build_req_buf_from_sip_req: "
-							"memory allocation failure!\n");
+				LM_ERR("memory allocation failure!\n");
 				goto error00;
 			}
 			new_len+=via_len;
@@ -1902,7 +2161,7 @@ after_update_via1:
 		new_buf=(char*)pkg_malloc(new_len+1);
 	if (new_buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LOG(L_ERR, "ERROR: build_req_buf_from_sip_req: out of memory\n");
+		LM_ERR("out of memory\n");
 		goto error00;
 	}
 
@@ -1934,7 +2193,7 @@ after_update_via1:
 
 #ifdef DBG_MSG_QA
 	if (new_buf[new_len-1]==0) {
-		LOG(L_ERR, "ERROR: build_req_buf_from_sip_req: 0 in the end\n");
+		LM_ERR("0 in the end\n");
 		abort();
 	}
 #endif
@@ -1955,8 +2214,6 @@ error00:
 	*returned_len=0;
 	return 0;
 }
-
-
 
 char * generate_res_buf_from_sip_res( struct sip_msg* msg,
 				unsigned int *returned_len, unsigned int mode)
@@ -1991,14 +2248,14 @@ char * generate_res_buf_from_sip_res( struct sip_msg* msg,
 	body_delta = lumps_len(msg, msg->body_lumps, 0);
 	if (adjust_clen(msg, body_delta, (msg->via2? msg->via2->proto:PROTO_UDP))
 			< 0) {
-		LOG(L_ERR, "error while adjusting Content-Length\n");
+		LM_ERR("error while adjusting Content-Length\n");
 		goto error;
 	}
 
 	if(likely(!(mode&BUILD_NO_VIA1_UPDATE))) {
 		/* remove the first via*/
 		if (del_lump( msg, via_offset, via_len, HDR_VIA_T)==0){
-			LOG(L_ERR, "error trying to remove first via\n");
+			LM_ERR("error trying to remove first via\n");
 			goto error;
 		}
 	}
@@ -2010,7 +2267,7 @@ char * generate_res_buf_from_sip_res( struct sip_msg* msg,
 	new_buf=(char*)pkg_malloc(new_len+1); /* +1 is for debugging
 											 (\0 to print it )*/
 	if (new_buf==0){
-		LOG(L_ERR, "out of mem\n");
+		LM_ERR("out of mem\n");
 		goto error;
 	}
 	new_buf[new_len]=0; /* debug: print the message */
@@ -2073,8 +2330,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 	end of header (non-block Vias are a really poor property
 	of SIP :( ) */
 	if (parse_headers( msg, HDR_EOH_F, 0 )==-1) {
-		LOG(L_ERR, "ERROR: build_res_buf_from_sip_req: "
-			"alas, parse_headers failed\n");
+		LM_ERR("alas, parse_headers failed\n");
 		goto error00;
 	}
 
@@ -2084,8 +2340,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 	/* check if received needs to be added */
 	if (received_test(msg)) {
 		if ((received_buf=received_builder(msg,&received_len))==0) {
-			LOG(L_ERR, "ERROR: build_res_buf_from_sip_req: "
-				"alas, received_builder failed\n");
+			LM_ERR("alas, received_builder failed\n");
 			goto error00;
 		}
 	}
@@ -2093,8 +2348,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 	if ( ((msg->msg_flags|global_req_flags)&FL_FORCE_RPORT)||
 		(msg->via1->rport /*&& msg->via1->rport->value.s==0*/)){
 		if ((rport_buf=rport_builder(msg, &rport_len))==0){
-			LOG(L_ERR, "ERROR: build_res_buf_from_sip_req:"
-							" rport_builder failed\n");
+			LM_ERR("rport_builder failed\n");
 			goto error01; /* free everything */
 		}
 		if (msg->via1->rport)
@@ -2144,13 +2398,13 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 			body = lump;
 	}
 	/* server header */
-	if (server_signature)
+	if (server_signature && server_hdr.len)
 		len += server_hdr.len + CRLF_LEN;
 	/* warning hdr */
 	if (sip_warning) {
 		warning_buf = warning_builder(msg,&warning_len);
 		if (warning_buf) len += warning_len + CRLF_LEN;
-		else LOG(L_WARN, "WARNING: warning skipped -- too big\n");
+		else LM_WARN("warning skipped -- too big\n");
 	}
 	/* content length hdr */
 	if (body) {
@@ -2166,8 +2420,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 	buf = (char*) pkg_malloc( len+1 );
 	if (!buf)
 	{
-		LOG(L_ERR, "ERROR: build_res_buf_from_sip_req: out of memory "
-			" ; needs %d\n",len);
+		LM_ERR("out of memory; needs %d\n",len);
 		goto error01;
 	}
 
@@ -2283,7 +2536,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 			p += lump->text.len;
 		}
 	/* server header */
-	if (server_signature) {
+	if (server_signature && server_hdr.len>0) {
 		memcpy( p, server_hdr.s, server_hdr.len );
 		p+=server_hdr.len;
 		memcpy( p, CRLF, CRLF_LEN );
@@ -2314,8 +2567,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 	}
 
 	if (len!=p-buf)
-		LOG(L_CRIT,"BUG:build_res_from_sip_req: diff len=%d p-buf=%d\n",
-					len, (int)(p-buf));
+		LM_CRIT("diff len=%d p-buf=%d\n", len, (int)(p-buf));
 
 	*(p) = 0;
 	*returned_len = len;
@@ -2446,8 +2698,7 @@ char* via_builder( unsigned int *len,
 			comp_name=SERGZ_NAME;
 			break;
 		default:
-			LOG(L_CRIT, "BUG: via_builder: unknown comp %d\n",
-					send_info->comp);
+			LM_CRIT("unknown comp %d\n", send_info->comp);
 			/* continue, we'll just ignore comp */
 	}
 #endif /* USE_COMP */
@@ -2463,7 +2714,7 @@ char* via_builder( unsigned int *len,
 	line_buf=pkg_malloc( max_len );
 	if (line_buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LOG(L_ERR, "ERROR: via_builder: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 
@@ -2496,8 +2747,7 @@ char* via_builder( unsigned int *len,
                 else if (likely(send_info->id))
                         con = tcpconn_get(send_info->id, 0, 0, 0, 0);
                 else {
-                        LM_CRIT("BUG: via_builder called with null_id & to\n");
-						pkg_free(line_buf);
+                        LM_CRIT("null_id & to\n"); pkg_free(line_buf);
                         return 0;
                 }
 
@@ -2514,7 +2764,7 @@ char* via_builder( unsigned int *len,
 			memcpy(line_buf+MY_VIA_LEN-4, "WSS ", 4);
 		} else {
 			tcpconn_put(con);
-			LOG(L_CRIT, "BUG: via_builder: unknown proto %d\n", con->rcv.proto);
+			LM_CRIT("unknown proto %d\n", con->rcv.proto);
 			pkg_free(line_buf);
 			return 0;
 		}
@@ -2522,7 +2772,7 @@ char* via_builder( unsigned int *len,
 	}else if (send_info->proto==PROTO_WSS){
 		memcpy(line_buf+MY_VIA_LEN-4, "WSS ", 4);
 	}else{
-		LOG(L_CRIT, "BUG: via_builder: unknown proto %d\n", send_info->proto);
+		LM_CRIT("unknown proto %d\n", send_info->proto);
 		pkg_free(line_buf);
 		return 0;
 	}
@@ -2613,8 +2863,7 @@ char* create_via_hf( unsigned int *len,
 #endif /* USE_SCTP */
 			)){
 		if  ((id_buf=id_builder(msg, &id_len))==0){
-			LOG(L_ERR, "ERROR: create_via_hf:"
-							" id_builder failed\n");
+			LM_ERR("id_builder failed\n");
 			return 0; /* we don't need to free anything,
 			                 nothing alloc'ed yet*/
 		}
@@ -2686,7 +2935,7 @@ char * build_only_headers( struct sip_msg* msg, int skip_first_line,
 
 	new_buf = (char *)pkg_malloc(new_len+1);
 	if (!new_buf) {
-		LOG(L_ERR, "ERROR: build_only_headers: Not enough memory\n");
+		LM_ERR("Not enough memory\n");
 		*error = -1;
 		return 0;
 	}
@@ -2736,7 +2985,7 @@ char * build_body( struct sip_msg* msg,
 
 	new_buf = (char *)pkg_malloc(new_len+1);
 	if (!new_buf) {
-		LOG(L_ERR, "ERROR: build_body: Not enough memory\n");
+		LM_ERR("Not enough memory\n");
 		*error = -1;
 		return 0;
 	}
@@ -2775,8 +3024,7 @@ char * build_all( struct sip_msg* msg, int touch_clen,
 	if (touch_clen) {
 		/* adjust Content-Length */
 		if (adjust_clen(msg, body_delta, send_info->proto) < 0) {
-			LOG(L_ERR, "ERROR: build_all: Error while adjusting"
-					" Content-Length\n");
+			LM_ERR("Error while adjusting Content-Length\n");
 			*error = -1;
 			return 0;
 		}
@@ -2797,7 +3045,7 @@ char * build_all( struct sip_msg* msg, int touch_clen,
 
 	new_buf = (char *)pkg_malloc(new_len+1);
 	if (!new_buf) {
-		LOG(L_ERR, "ERROR: build_all: Not enough memory\n");
+		LM_ERR("Not enough memory\n");
 		*error = -1;
 		return 0;
 	}

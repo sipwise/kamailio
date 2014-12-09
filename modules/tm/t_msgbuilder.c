@@ -24,7 +24,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *
  * History:
@@ -1393,16 +1393,16 @@ static inline char* print_request_uri(char* w, str* method, dlg_t* dialog, struc
 /*
  * Print To header field
  */
-static inline char* print_to(char* w, dlg_t* dialog, struct cell* t)
+static inline char* print_to(char* w, dlg_t* dialog, struct cell* t, int bracket)
 {
 	t->to.s = w;
 	t->to.len = TO_LEN + dialog->rem_uri.len + CRLF_LEN
-		+ ((dialog->rem_uri.s[0]!='<')?2:0);
+		+ (((dialog->rem_uri.s[dialog->rem_uri.len - 1]!='>'))?2:0);
 
 	memapp(w, TO, TO_LEN);
-	if(dialog->rem_uri.s[0]!='<') memapp(w, "<", 1);
+	if(bracket) memapp(w, "<", 1);
 	memapp(w, dialog->rem_uri.s, dialog->rem_uri.len);
-	if(dialog->rem_uri.s[0]!='<') memapp(w, ">", 1);
+	if(bracket) memapp(w, ">", 1);
 
 	if (dialog->id.rem_tag.len) {
 		t->to.len += TOTAG_LEN + dialog->id.rem_tag.len ;
@@ -1418,16 +1418,16 @@ static inline char* print_to(char* w, dlg_t* dialog, struct cell* t)
 /*
  * Print From header field
  */
-static inline char* print_from(char* w, dlg_t* dialog, struct cell* t)
+static inline char* print_from(char* w, dlg_t* dialog, struct cell* t, int bracket)
 {
 	t->from.s = w;
 	t->from.len = FROM_LEN + dialog->loc_uri.len + CRLF_LEN
-		+ ((dialog->loc_uri.s[0]!='<')?2:0);
+		+ ((dialog->loc_uri.s[dialog->loc_uri.len - 1]!='>')?2:0);
 
 	memapp(w, FROM, FROM_LEN);
-	if(dialog->loc_uri.s[0]!='<') memapp(w, "<", 1);
+	if(bracket) memapp(w, "<", 1);
 	memapp(w, dialog->loc_uri.s, dialog->loc_uri.len);
-	if(dialog->loc_uri.s[0]!='<') memapp(w, ">", 1);
+	if(bracket) memapp(w, ">", 1);
 
 	if (dialog->id.loc_tag.len) {
 		t->from.len += FROMTAG_LEN + dialog->id.loc_tag.len;
@@ -1514,9 +1514,10 @@ char * _strnstr(const char* s, const char* find, size_t slen) {
 char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int branch, 
 			struct cell *t, int* len, struct dest_info* dst)
 {
-	char* buf, *w;
+	char* buf, *w, *p;
 	str content_length, cseq, via;
 	unsigned int maxfwd_len;
+	int tbracket, fbracket;
 
 	if (!method || !dialog) {
 		LOG(L_ERR, "build_uac_req(): Invalid parameter value\n");
@@ -1546,19 +1547,40 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 	}
 	*len += via.len;
 
+	if((p=q_memrchr(dialog->rem_uri.s, '>', dialog->rem_uri.len))!=NULL) {
+		if((p==dialog->rem_uri.s + dialog->rem_uri.len - 1)
+				|| *(p+1)==';') {
+			tbracket = 0;
+		} else {
+			tbracket = 1;
+		}
+	} else {
+		tbracket = 1;
+	}
+	if((p=q_memrchr(dialog->loc_uri.s, '>', dialog->loc_uri.len))!=NULL) {
+		if((p==dialog->loc_uri.s + dialog->loc_uri.len - 1)
+				|| *(p+1)==';') {
+			fbracket = 0;
+		} else {
+			fbracket = 1;
+		}
+	} else {
+		fbracket = 1;
+	}
+
 	*len += TO_LEN + dialog->rem_uri.len
 		+ (dialog->id.rem_tag.len ? (TOTAG_LEN + dialog->id.rem_tag.len) : 0) + CRLF_LEN;    /* To */
-	if(dialog->rem_uri.s[0]!='<') *len += 2; /* To-URI < > */
+	if(tbracket) *len += 2; /* To-URI < > */
 	*len += FROM_LEN + dialog->loc_uri.len
 		+ (dialog->id.loc_tag.len ? (FROMTAG_LEN + dialog->id.loc_tag.len) : 0) + CRLF_LEN;  /* From */
-	if(dialog->loc_uri.s[0]!='<') *len += 2; /* From-URI < > */
+	if(fbracket) *len += 2; /* From-URI < > */
 	*len += CALLID_LEN + dialog->id.call_id.len + CRLF_LEN;                                      /* Call-ID */
 	*len += CSEQ_LEN + cseq.len + 1 + method->len + CRLF_LEN;                                    /* CSeq */
 	*len += calculate_routeset_length(dialog);                                                   /* Route set */
 	*len += maxfwd_len;                                                                          /* Max-forwards */	
-	*len += CONTENT_LENGTH_LEN + content_length.len + CRLF_LEN; /* Content-
-																	 Length */
-	*len += (server_signature ? (user_agent_hdr.len + CRLF_LEN) : 0);	                         /* Signature */
+	*len += CONTENT_LENGTH_LEN + content_length.len + CRLF_LEN; /* Content-Length */
+	*len += ((server_signature && user_agent_hdr.len>0)
+							? (user_agent_hdr.len + CRLF_LEN) : 0);	                         /* Signature */
 	*len += (headers ? headers->len : 0);                                                        /* Additional headers */
 	*len += (body ? body->len : 0);                                                              /* Message body */
 	*len += CRLF_LEN;                                                                            /* End of Header */
@@ -1573,8 +1595,8 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 
 	w = print_request_uri(w, method, dialog, t, branch);  /* Request-URI */
 	memapp(w, via.s, via.len);                            /* Top-most Via */
-	w = print_to(w, dialog, t);                           /* To */
-	w = print_from(w, dialog, t);                         /* From */
+	w = print_to(w, dialog, t, tbracket);                 /* To */
+	w = print_from(w, dialog, t, fbracket);               /* From */
 	w = print_cseq(w, &cseq, method, t);                  /* CSeq */
 	w = print_callid(w, dialog, t);                       /* Call-ID */
 	w = print_routeset(w, dialog);                        /* Route set */
@@ -1588,13 +1610,13 @@ char* build_uac_req(str* method, str* headers, str* body, dlg_t* dialog, int bra
 	memapp(w, CRLF, CRLF_LEN);
 	
 	     /* Server signature */
-	if (server_signature) {
+	if (server_signature && user_agent_hdr.len>0) {
 		memapp(w, user_agent_hdr.s, user_agent_hdr.len);
 		memapp(w, CRLF, CRLF_LEN);
 	}
 	if (headers) memapp(w, headers->s, headers->len);
 	memapp(w, CRLF, CRLF_LEN);
-     	if (body) memapp(w, body->s, body->len);
+	if (body) memapp(w, body->s, body->len);
 
 #ifdef EXTRA_DEBUG
 	assert(w-buf == *len);

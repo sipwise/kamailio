@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -66,6 +66,13 @@ static void reset_opts(option_description * opts, int size){
 			opts[i].value.string_data.len = 0;
 		}
 	}
+
+	opts[TO_ID_STRIP     ].value.int_data=0;
+	opts[TO_ID_PROB      ].value.float_data=0;
+	opts[TO_ID_HASH_INDEX].value.int_data=0;
+	opts[TO_ID_STATUS    ].value.int_data=0;
+	opts[TO_ID_BACKUP    ].value.int_data=-1;
+
 	return;
 }
 
@@ -108,6 +115,7 @@ static int init_prefix_opts(option_description * opts){
 	memset(opts, '\0', sizeof(option_description) * PO_MAX_IDS);
 	strcpy((char*)(opts[PO_MAX_TARGETS].name), "max_targets");
 	opts[PO_MAX_TARGETS].type=CFG_INT;
+	opts[PO_MAX_TARGETS].value.int_data=-1;
 	return 0;
 }
 
@@ -402,7 +410,7 @@ int load_config(struct route_data_t * rd) {
 				}
 				backup = target_options[TO_ID_BACKUP].value.int_data;
 
-				LM_ERR("\n Adding route to tree <'%.*s'>: prefix_name:%s\n,"
+				LM_DBG("\n Adding route to tree <'%.*s'>: prefix_name:%s\n,"
 						" max_targets =%d\n, prob=%f\n, rewr_host=%s\n,"
 						" strip=%i\n, rwr_prefix=%s\n, rwr_suff=%s\n,"
 						" status=%i\n, hash_index=%i\n, comment=%s \n",
@@ -452,7 +460,7 @@ int load_config(struct route_data_t * rd) {
 		goto errclose;
 	}
 
-	LM_ERR("File parsed successfully \n");
+	LM_INFO("File parsed successfully \n");
 	fclose(file);
 	return 0;
 errclose:

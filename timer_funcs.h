@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /* History:
@@ -116,7 +116,7 @@ static inline int _timer_dist_tl(struct timer_ln* tl, ticks_t delta)
 {
 	if (delta<H0_ENTRIES){
 		if (delta==0){
-			LOG(L_WARN, "WARNING: timer: add_timeout: 0 expire timer added\n");
+			LM_WARN("0 expire timer added\n");
 			_timer_add_list(&timer_lst->expired, tl);
 		}else{
 			_timer_add_list( &timer_lst->h0[tl->expire & H0_MASK], tl);

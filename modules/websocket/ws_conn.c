@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * Exception: permission to copy, modify, propagate, and distribute a work
  * formed by combining OpenSSL toolkit software and the code in this file,
@@ -486,6 +486,7 @@ ws_connection_t **wsconn_get_list(void)
 	{
 		if (!wsc) {
 			LM_ERR("Wrong list length\n");
+			break;
 		}
 
 		list[i] = wsc;
@@ -494,7 +495,7 @@ ws_connection_t **wsconn_get_list(void)
 
 		wsc = wsc->used_next;
 	}
-	list[list_len] = NULL; /* explicit NULL termination */
+	list[i] = NULL; /* explicit NULL termination */
 
 end:
 	WSCONN_UNLOCK;

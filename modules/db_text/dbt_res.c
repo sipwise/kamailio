@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -501,8 +501,10 @@ int dbt_cmp_val(dbt_val_p _vp, db_val_t* _v)
 		case DB1_BITMAP:
 			return (_vp->val.int_val<_v->val.bitmap_val)?-1:
 				(_vp->val.int_val>_v->val.bitmap_val)?1:0;
+		default:
+			LM_ERR("invalid datatype %d\n", VAL_TYPE(_v));
+			return -2;
 	}
-	LM_ERR("invalid datatype %d\n", VAL_TYPE(_v));
 	return -2;
 }
 

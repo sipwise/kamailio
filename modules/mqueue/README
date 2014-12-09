@@ -41,6 +41,8 @@ Alex Balashov
               4.3. mq_pv_free(queue)
               4.4. mq_size(queue)
 
+        5. Exported Pseudo-variables
+
    List of Examples
 
    1.1. Set mqueue parameter
@@ -69,6 +71,8 @@ Chapter 1. Admin Guide
         4.2. mq_fetch(queue)
         4.3. mq_pv_free(queue)
         4.4. mq_size(queue)
+
+   5. Exported Pseudo-variables
 
 1. Overview
 
@@ -128,7 +132,7 @@ modparam("mqueue", "mqueue", "name=qaz")
    4.3. mq_pv_free(queue)
    4.4. mq_size(queue)
 
-4.1.  mq_add(queue, key, value)
+4.1. mq_add(queue, key, value)
 
    Add a new item (key, value) in the queue. If max size of queue is
    exceeded, the oldest one is removed.
@@ -138,7 +142,7 @@ modparam("mqueue", "mqueue", "name=qaz")
 mq_add("myq", "$rU", "call from $fU");
 ...
 
-4.2.  mq_fetch(queue)
+4.2. mq_fetch(queue)
 
    Take oldest item from queue and fill $mqk(queue) and $mqv(queue) pseudo
    variables.
@@ -154,7 +158,7 @@ while(mq_fetch("myq"))
 }
 ...
 
-4.3.  mq_pv_free(queue)
+4.3. mq_pv_free(queue)
 
    Free the item fetched in pseudo-variables. It is optional, a new fetch
    frees the previous values.
@@ -164,12 +168,26 @@ while(mq_fetch("myq"))
 mq_pv_free("myq");
 ...
 
-4.4.  mq_size(queue)
+4.4. mq_size(queue)
 
    Returns the current number of elements in the mqueue.
+
+   If the mqueue is empty, the function returns -1. If the mqueue is not
+   found, the function returns -2.
 
    Example 1.5. mq_size usage
 ...
 $var(q_size) = mq_size("queue");
 xlog("L_INFO", "Size of queue is: $var(q_size)\n");
 ...
+
+5. Exported Pseudo-variables
+
+     * $mqv(mqueue) - the most recent item key fetched from the specified
+       mqueue
+     * $mqv(mqueue) - the most recent item value fetched from the
+       specified mqueue
+     * $mq_size(mqueue) - the size of the specified mqueue
+
+   Exported pseudo-variables are documented at
+   http://www.kamailio.org/wiki/.

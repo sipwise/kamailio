@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  *
  * History:
@@ -548,7 +548,7 @@ AAA_AVP *rx_create_media_subcomponent_avp(int number, char* proto,
     int intportB = atoi(portB->s);
 
     len = (permit_out.len + from_s.len + to_s.len + ipB->len + ipA->len + 4 +
-            proto_len + portA->len + portB->len) * sizeof (char);
+            proto_len + portA->len + portB->len + 1/*nul terminator*/) * sizeof (char);
 
     if (!flowdata_buf.s || flowdata_buflen < len) {
         if (flowdata_buf.s)
@@ -573,8 +573,8 @@ AAA_AVP *rx_create_media_subcomponent_avp(int number, char* proto,
     /*IMS Flow descriptions*/
     /*first flow is the receive flow*/
     flowdata_buf.len = snprintf(flowdata_buf.s, len, permit_out_with_ports, proto_int,
-            ipB->len, ipB->s, intportB,
-            ipA->len, ipA->s, intportA);
+            ipA->len, ipA->s, intportA,
+            ipB->len, ipB->s, intportB);
 
     flowdata_buf.len = strlen(flowdata_buf.s);
     flow_description1 = cdpb.AAACreateAVP(AVP_IMS_Flow_Description,
@@ -598,8 +598,8 @@ AAA_AVP *rx_create_media_subcomponent_avp(int number, char* proto,
         }
 
     flowdata_buf.len = snprintf(flowdata_buf.s, len2, permit_in_with_ports, proto_int,
-            ipA->len, ipA->s, intportA,
-            ipB->len, ipB->s, intportB);
+            ipB->len, ipB->s, intportB,
+            ipA->len, ipA->s, intportA);
 
     flowdata_buf.len = strlen(flowdata_buf.s);
     flow_description2 = cdpb.AAACreateAVP(AVP_IMS_Flow_Description,

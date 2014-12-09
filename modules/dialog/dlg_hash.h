@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -85,6 +85,8 @@
 #define DLG_IFLAG_TIMEOUTBYE        (1<<0) /*!< send bye on time-out */
 #define DLG_IFLAG_KA_SRC            (1<<1) /*!< send keep alive to src */
 #define DLG_IFLAG_KA_DST            (1<<2) /*!< send keep alive to dst */
+#define DLG_IFLAG_TIMER_NORESET     (1<<3) /*!< don't reset dialog timers on in-dialog messages reception */
+#define DLG_IFLAG_CSEQ_DIFF         (1<<4) /*!< CSeq changed in dialog */
 
 #define DLG_CALLER_LEG         0 /*!< attribute that belongs to a caller leg */
 #define DLG_CALLEE_LEG         1 /*!< attribute that belongs to a callee leg */
@@ -213,7 +215,7 @@ static inline void unlink_unsafe_dlg(dlg_entry_t *d_entry, dlg_cell_t *dlg)
  * \brief Destroy a dialog, run callbacks and free memory
  * \param dlg destroyed dialog
  */
-inline void destroy_dlg(dlg_cell_t *dlg);
+void destroy_dlg(dlg_cell_t *dlg);
 
 
 /*!

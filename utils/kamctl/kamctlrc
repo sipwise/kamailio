@@ -65,6 +65,9 @@
 # awk tool
 # AWK="awk"
 
+# gdb tool
+# GDB="gdb"
+
 # If you use a system with a grep and egrep that is not 100% gnu grep compatible,
 # e.g. solaris, install the gnu grep (ggrep) and specify this below.
 #
@@ -94,6 +97,9 @@
 
 # If to install presence related tables.
 # INSTALL_PRESENCE_TABLES=ask
+
+# If to install uid modules related tables.
+# INSTALL_DBUID_TABLES=ask
 
 # Define what module tables should be installed.
 # If you use the postgres database and want to change the installed tables, then you

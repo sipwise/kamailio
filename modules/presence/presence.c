@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -85,6 +85,7 @@ MODULE_VERSION
 char *log_buf = NULL;
 static int clean_period=100;
 static int db_update_period=100;
+int pres_local_log_level = L_INFO;
 
 /* database connection */
 db1_con_t *pa_db = NULL;
@@ -181,19 +182,19 @@ static cmd_export_t cmds[]=
 };
 
 static param_export_t params[]={
-	{ "db_url",                 STR_PARAM, &db_url.s},
-	{ "presentity_table",       STR_PARAM, &presentity_table.s},
-	{ "active_watchers_table",  STR_PARAM, &active_watchers_table.s},
-	{ "watchers_table",         STR_PARAM, &watchers_table.s},
+	{ "db_url",                 PARAM_STR, &db_url},
+	{ "presentity_table",       PARAM_STR, &presentity_table},
+	{ "active_watchers_table",  PARAM_STR, &active_watchers_table},
+	{ "watchers_table",         PARAM_STR, &watchers_table},
 	{ "clean_period",           INT_PARAM, &clean_period },
 	{ "db_update_period",       INT_PARAM, &db_update_period },
 	{ "waitn_time",             INT_PARAM, &pres_waitn_time },
 	{ "notifier_poll_rate",     INT_PARAM, &pres_notifier_poll_rate },
 	{ "notifier_processes",     INT_PARAM, &pres_notifier_processes },
-	{ "to_tag_pref",            STR_PARAM, &to_tag_pref },
+	{ "to_tag_pref",            PARAM_STRING, &to_tag_pref },
 	{ "expires_offset",         INT_PARAM, &expires_offset },
 	{ "max_expires",            INT_PARAM, &max_expires },
-	{ "server_address",         STR_PARAM, &server_address.s},
+	{ "server_address",         PARAM_STR, &server_address},
 	{ "subs_htable_size",       INT_PARAM, &shtable_size},
 	{ "pres_htable_size",       INT_PARAM, &phtable_size},
 	{ "subs_db_mode",           INT_PARAM, &subs_dbmode},
@@ -203,6 +204,7 @@ static param_export_t params[]={
 	{ "send_fast_notify",       INT_PARAM, &send_fast_notify},
 	{ "fetch_rows",             INT_PARAM, &pres_fetch_rows},
 	{ "db_table_lock_type",     INT_PARAM, &db_table_lock_type},
+	{ "local_log_level",        PARAM_INT, &pres_local_log_level},
     {0,0,0}
 };
 
@@ -244,11 +246,7 @@ static int mod_init(void)
 		return -1;
 	}
 
-	db_url.len = db_url.s ? strlen(db_url.s) : 0;
 	LM_DBG("db_url=%s/%d/%p\n", ZSW(db_url.s), db_url.len,db_url.s);
-	presentity_table.len = strlen(presentity_table.s);
-	active_watchers_table.len = strlen(active_watchers_table.s);
-	watchers_table.len = strlen(watchers_table.s);
 
 	if(db_url.s== NULL)
 		library_mode= 1;
@@ -276,11 +274,6 @@ static int mod_init(void)
 
 	if(server_address.s== NULL)
 		LM_DBG("server_address parameter not set in configuration file\n");
-	
-	if(server_address.s)
-		server_address.len= strlen(server_address.s);
-	else
-		server_address.len= 0;
 
 	/* bind the SL API */
 	if (sl_load_api(&slb)!=0) {
@@ -1806,7 +1799,7 @@ void rpc_presence_cleanup(rpc_t* rpc, void* c)
 	(void) msg_presentity_clean(0,0);
 	(void) timer_db_update(0,0);
 		
-	rpc->printf(c, "Reload OK");
+	rpc->rpl_printf(c, "Reload OK");
 	return;
 }
 

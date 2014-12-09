@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
@@ -71,7 +71,7 @@ inline static gen_lock_set_t* lock_set_alloc(int n)
 	gen_lock_set_t* ls;
 	ls=(gen_lock_set_t*)shm_malloc(sizeof(gen_lock_set_t)+n*sizeof(gen_lock_t));
 	if (ls==0){
-		LOG(L_CRIT, "ERROR: lock_set_alloc (FL): could not allocate lock_set\n");
+		LM_CRIT("could not allocate lock_set\n");
 	}else{
 		ls->locks=(gen_lock_t*)((char*)ls+sizeof(gen_lock_set_t));
 		ls->size=n;

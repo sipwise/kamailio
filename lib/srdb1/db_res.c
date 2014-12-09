@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -184,5 +184,38 @@ int db_allocate_rows(db1_res_t* _res)
 	LM_DBG("allocate %d bytes for rows at %p\n", len, RES_ROWS(_res));
 	memset(RES_ROWS(_res), 0, len);
 	
+	return 0;
+}
+
+/**
+ * Reallocate memory for rows.
+ * \param _res result set
+ * \param _nsize new number of rows in result set
+ * \return zero on success, negative on errors
+ */
+int db_reallocate_rows(db1_res_t* _res, int _nsize)
+{
+	int len;
+	int osize;
+	db_row_t *orows;
+
+	orows = RES_ROWS(_res);
+	osize = RES_ROW_N(_res);
+
+	RES_ROW_N(_res) = _nsize;
+	len = sizeof(db_row_t) * RES_ROW_N(_res);
+	RES_ROWS(_res) = (struct db_row*)pkg_malloc(len);
+	if (!RES_ROWS(_res)) {
+		LM_ERR("no private memory left\n");
+		return -1;
+	}
+	LM_DBG("allocate %d bytes for rows at %p\n", len, RES_ROWS(_res));
+	memset(RES_ROWS(_res), 0, len);
+
+	if(orows==NULL)
+		return 0;
+	memcpy(RES_ROWS(_res), orows,
+			((osize<_nsize)?osize:_nsize)*sizeof(db_row_t));
+	pkg_free(orows);
 	return 0;
 }

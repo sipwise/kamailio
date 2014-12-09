@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -115,7 +115,7 @@ char* get_static_buffer(int req_size) {
 
 #ifdef EXTRA_DEBUG
 	if ((active_buffer < 0) || (active_buffer > MAX_BUFFERS-1)) {
-		LOG(L_CRIT, "BUG: buffers have not been initialized yet. "
+		LM_CRIT("buffers have not been initialized yet. "
 			"Call reset_static_buffer() before executing "
 			"a route block.\n");
 		abort();

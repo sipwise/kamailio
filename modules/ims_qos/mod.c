@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -69,6 +69,7 @@
 #include "rx_str.h"
 #include "rx_aar.h"
 #include "mod.h"
+#include "../../parser/sdp/sdp.h"
 
 #include "../../lib/ims/useful_defs.h"
 
@@ -77,12 +78,14 @@ MODULE_VERSION
 
         extern gen_lock_t* process_lock; /* lock on the process table */
 
-str orig_session_key = {"originating", 11};
-str term_session_key = {"terminating", 11};
+str orig_session_key = str_init("originating");
+str term_session_key = str_init("terminating");
 
 int rx_auth_expiry = 7200;
 
 int must_send_str = 1;
+
+int authorize_video_flow = 1;  //by default we authorize resources for video flow descriptions
 
 struct tm_binds tmb;
 struct cdp_binds cdpb;
@@ -106,11 +109,9 @@ static int fixup_aar(void** param, int param_no);
 int * callback_singleton; /*< Callback singleton */
 
 /* parameters storage */
-char* rx_dest_realm_s = "ims.smilecoms.com";
-str rx_dest_realm;
+str rx_dest_realm = str_init("ims.smilecoms.com");
 /* Only used if we want to force the Rx peer usually this is configured at a stack level and the first request uses realm routing */
-char* rx_forced_peer_s = "";
-str rx_forced_peer;
+str rx_forced_peer = str_init("");
 
 /* commands wrappers and fixups */
 static int w_rx_aar(struct sip_msg *msg, char *route, char* direction, char *bar);
@@ -123,12 +124,13 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-    { "rx_dest_realm", STR_PARAM, &rx_dest_realm_s},
-    { "rx_forced_peer", STR_PARAM, &rx_forced_peer_s},
+    { "rx_dest_realm", PARAM_STR, &rx_dest_realm},
+    { "rx_forced_peer", PARAM_STR, &rx_forced_peer},
     { "rx_auth_expiry", INT_PARAM, &rx_auth_expiry},
     { "cdp_event_latency", INT_PARAM, &cdp_event_latency}, /*flag: report slow processing of CDP callback events or not */
     { "cdp_event_threshold", INT_PARAM, &cdp_event_threshold}, /*time in ms above which we should report slow processing of CDP callback event*/
     { "cdp_event_latency_log", INT_PARAM, &cdp_event_latency_loglevel}, /*log-level to use to report slow processing of CDP callback event*/
+    { "authorize_video_flow", INT_PARAM, &authorize_video_flow}, /*whether or not we authorize resources for video flows*/
     { 0, 0, 0}
 };
 
@@ -148,25 +150,10 @@ struct module_exports exports = {"ims_qos", DEFAULT_DLFLAGS, /* dlopen flags */
     mod_init, /* module initialization function */
     0, mod_destroy, mod_child_init /* per-child init function */};
 
-int fix_parameters() {
-    rx_dest_realm.s = rx_dest_realm_s;
-    rx_dest_realm.len = strlen(rx_dest_realm_s);
-
-    rx_forced_peer.s = rx_forced_peer_s;
-    rx_forced_peer.len = strlen(rx_forced_peer_s);
-
-    return CSCF_RETURN_TRUE;
-}
-
 /**
  * init module function
  */
 static int mod_init(void) {
-
-    /* fix the parameters */
-    if (!fix_parameters())
-        goto error;
-
 #ifdef STATISTICS
     /* register statistics */
     if (register_module_stats(exports.name, mod_stats) != 0) {
@@ -245,7 +232,7 @@ static int mod_child_init(int rank) {
     LM_DBG("Initialization of module in child [%d] \n", rank);
 
     if (rank == PROC_MAIN) {
-        int pid = fork_process(PROC_NOCHLDINIT, "Rx Event Processor", 1);
+        int pid = fork_process(PROC_SIPINIT, "Rx Event Processor", 1);
         if (pid < 0)
             return -1; //error
         if (pid == 0) {
@@ -348,25 +335,169 @@ AAAMessage* callback_cdp_request(AAAMessage *request, void *param) {
     return 0;
 }
 
-void callback_dialog_terminated(struct dlg_cell* dlg, int type, struct dlg_cb_params * params) {
-    LM_DBG("Dialog has ended - we need to terminate Rx bearer session\n");
+const str match_cseq_method = {"INVITE", 6};
 
+void callback_dialog(struct dlg_cell* dlg, int type, struct dlg_cb_params * params) {
+    
+    struct sip_msg* msg = params->rpl;
+    struct cseq_body *parsed_cseq;
     str *rx_session_id;
     rx_session_id = (str*) * params->param;
+    AAASession *auth = 0;
+    rx_authsessiondata_t* p_session_data = 0;
+    flow_description_t *current_fd = 0;
+    flow_description_t *new_fd = 0;
+    int current_has_video = 0;
+    int new_has_video = 0;
+    int must_unlock_aaa = 1;
+    
+    //getting session data
+    
+    LM_DBG("Dialog callback of type %d received\n", type);
+    
+    if(type == DLGCB_TERMINATED || type == DLGCB_DESTROY || type == DLGCB_EXPIRED){
+	   LM_DBG("Dialog has ended - we need to terminate Rx bearer session\n");
 
-    if (!rx_session_id) {
-        LM_ERR("Invalid Rx session id");
-        return;
+	LM_DBG("Received notification of termination of dialog with Rx session ID: [%.*s]\n",
+		rx_session_id->len, rx_session_id->s);
+
+	LM_DBG("Sending STR\n");
+	rx_send_str(rx_session_id);
+    } else if (type == DLGCB_CONFIRMED){
+	
+	LM_DBG("Callback for confirmed dialog - copy new flow description into current flow description\n");
+	if (!rx_session_id || !rx_session_id->s || !rx_session_id->len) {
+	    LM_ERR("Dialog has no Rx session associated\n");
+	    goto error;
+	}
+
+	//getting auth session
+	auth = cdpb.AAAGetAuthSession(*rx_session_id);
+	if (!auth) {
+	    LM_DBG("Could not get Auth Session for session id: [%.*s] - this is fine as this might have been started by already sending an STR\n", rx_session_id->len, rx_session_id->s);
+	    goto error;
+	}
+
+	//getting session data
+	p_session_data = (rx_authsessiondata_t*) auth->u.auth.generic_data;
+	if (!p_session_data) {
+	    LM_DBG("Could not get session data on Auth Session for session id: [%.*s]\n", rx_session_id->len, rx_session_id->s);
+	    goto error;
+	}
+
+	//check if there is a new flow description - if there is then free the current flow description and replace it with the new flow description
+	if(p_session_data->first_new_flow_description) {
+	    //free the current
+	    LM_DBG("Free-ing the current fd\n");
+	    free_flow_description(p_session_data, 1);
+	    //point the current to the new
+	    LM_DBG("Point the first current fd to the first new fd\n");
+	    p_session_data->first_current_flow_description = p_session_data->first_new_flow_description;
+	    //point the new to 0
+	    LM_DBG("Point the first new fd to 0\n");
+	    p_session_data->first_new_flow_description = 0;
+	} else {
+	    LM_ERR("There is no new flow description - this shouldn't happen\n");
+	}
+	
+	show_callsessiondata(p_session_data);
+	if (auth) cdpb.AAASessionsUnlock(auth->hash);
+    
+    } else if (type == DLGCB_RESPONSE_WITHIN){
+	
+	LM_DBG("Dialog has received a response to a request within dialog\n");
+	if (!rx_session_id || !rx_session_id->s || !rx_session_id->len) {
+	    LM_ERR("Dialog has no Rx session associated\n");
+	    goto error;
+	}
+
+	//getting auth session
+	auth = cdpb.AAAGetAuthSession(*rx_session_id);
+	if (!auth) {
+	    LM_DBG("Could not get Auth Session for session id: [%.*s] - this is fine as this might have been started by already sending an STR\n", rx_session_id->len, rx_session_id->s);
+	    goto error;
+	}
+
+	//getting session data
+	p_session_data = (rx_authsessiondata_t*) auth->u.auth.generic_data;
+
+	if (!p_session_data) {
+	    LM_DBG("Could not get session data on Auth Session for session id: [%.*s]\n", rx_session_id->len, rx_session_id->s);
+	    goto error;
+	}
+	
+	show_callsessiondata(p_session_data);
+
+	if (msg->first_line.type == SIP_REPLY) {
+	    LM_DBG("This is a SIP REPLY\n");
+	    if (msg->cseq && (parsed_cseq = get_cseq(msg)) && memcmp(parsed_cseq->method.s, match_cseq_method.s, match_cseq_method.len)==0) {
+		LM_DBG("This response has a cseq method [%.*s]\n", match_cseq_method.len, match_cseq_method.s);
+		
+		if (msg->first_line.u.reply.statuscode == 200) {
+		    LM_DBG("Response is 200 - this is success\n");
+		    //check if there is a new flow description - if there is then free the current flow description and replace it with the new flow description
+		    if(p_session_data->first_new_flow_description) {
+			//free the current
+			free_flow_description(p_session_data, 1);
+			//point the current to the new
+			p_session_data->first_current_flow_description = p_session_data->first_new_flow_description;
+			//point the new to 0
+			p_session_data->first_new_flow_description = 0;
+		    } else {
+			LM_DBG("There is no new flow description - duplicate dialog callback - we ignore.\n");
+		    }
+		} else if (msg->first_line.u.reply.statuscode > 299) {
+		    LM_DBG("Response is more than 299 so this is an error code\n");
+		    
+		    new_fd = p_session_data->first_new_flow_description;
+		    //check if there is video in the new flow description
+		    while(new_fd) {
+			if (strncmp(new_fd->media.s, "video", 5) == 0) {
+			    LM_DBG("The new flow has a video fd in it\n");
+			    new_has_video = 1;
+			    
+			}
+			new_fd = new_fd->next;
+		    }
+		    //check if there is video in the current flow description
+		    current_fd = p_session_data->first_current_flow_description;
+		    while(current_fd) {
+			if (strncmp(current_fd->media.s, "video", 5) == 0) {
+			    LM_DBG("The current flow has a video fd in it\n");
+			    current_has_video = 1;
+			    
+			}
+			current_fd = current_fd->next;
+		    }
+		    if(new_has_video && !current_has_video) {
+			LM_DBG("New flow description has video in it, and current does not - this means we added video and it failed further upstream - "
+				"so we must remove the video\n");
+			//We need to send AAR asynchronously with current fd
+			rx_send_aar_update_no_video(auth);
+			must_unlock_aaa = 0;
+			
+		    } 
+		    //free the new flow description
+		    free_flow_description(p_session_data, 0);
+		}
+	    }
+	}
+	
+	show_callsessiondata(p_session_data);
+		
+	if(must_unlock_aaa)
+	{
+	    LM_DBG("Unlocking AAA session");
+	    cdpb.AAASessionsUnlock(auth->hash);
+	}
+    } else {
+	LM_DBG("Callback type not supported - just returning");
     }
-
-    LM_DBG("Received notification of termination of dialog with Rx session ID: [%.*s]\n",
-            rx_session_id->len, rx_session_id->s);
-
-    LM_DBG("Retrieving Rx auth data for this session id");
-
-    LM_DBG("Sending STR\n");
-    rx_send_str(rx_session_id);
-
+    
+    return;
+    
+    error:
+	if (auth) cdpb.AAASessionsUnlock(auth->hash);
     return;
 }
 
@@ -394,6 +525,7 @@ void callback_pcscf_contact_cb(struct pcontact *c, int type, void *param) {
 static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
 
     int ret = CSCF_RETURN_ERROR;
+    int result = CSCF_RETURN_ERROR;
     struct cell *t;
 
     AAASession* auth_session;
@@ -404,25 +536,29 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     str ttag = {0, 0};
     
     str route_name;
+    str identifier, ip;
+    int ip_version = 0;
+    int must_free_asserted_identity = 0;
+    sdp_session_cell_t* sdp_session;
 
     cfg_action_t* cfg_action = 0;
     saved_transaction_t* saved_t_data = 0; //data specific to each contact's AAR async call
     char* direction = str1;
     if (fixup_get_svalue(msg, (gparam_t*) route, &route_name) != 0) {
         LM_ERR("no async route block for assign_server_unreg\n");
-        return -1;
+        return result;
     }
     
     LM_DBG("Looking for route block [%.*s]\n", route_name.len, route_name.s);
     int ri = route_get(&main_rt, route_name.s);
     if (ri < 0) {
         LM_ERR("unable to find route block [%.*s]\n", route_name.len, route_name.s);
-        return -1;
+        return result;
     }
     cfg_action = main_rt.rlist[ri];
     if (cfg_action == NULL) {
         LM_ERR("empty action lists in route block [%.*s]\n", route_name.len, route_name.s);
-        return -1;
+        return result;
     }
 
     LM_DBG("Rx AAR called\n");
@@ -432,7 +568,7 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     //We don't ever do AAR on request for calling scenario...
     if (msg->first_line.type != SIP_REPLY) {
         LM_DBG("Can't do AAR for call session in request\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
 
     //is it appropriate to send AAR at this stage?
@@ -440,7 +576,7 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     if (t == NULL || t == T_UNDEFINED) {
         LM_WARN("Cannot get transaction for AAR based on SIP Request\n");
         //goto aarna;
-        return CSCF_RETURN_ERROR;
+        return result;
     }
 
     //we dont apply QoS if its not a reply to an INVITE! or UPDATE or PRACK!
@@ -451,39 +587,39 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
                 || cscf_get_content_length(t->uas.request) == 0) {
             LM_DBG("No SDP offer answer -> therefore we can not do Rx AAR");
             //goto aarna; //AAR na if we dont have offer/answer pair
-            return CSCF_RETURN_ERROR;
+            return result;
         }
     } else {
         LM_DBG("Message is not response to INVITE, PRACK or UPDATE -> therefore we do not Rx AAR");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
 
     /* get callid, from and to tags to be able to identify dialog */
     callid = cscf_get_call_id(msg, 0);
     if (callid.len <= 0 || !callid.s) {
         LM_ERR("unable to get callid\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     if (!cscf_get_from_tag(msg, &ftag)) {
         LM_ERR("Unable to get ftag\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     if (!cscf_get_to_tag(msg, &ttag)) {
         LM_ERR("Unable to get ttag\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
 
     //check to see that this is not a result of a retransmission in reply route only
     if (msg->cseq == NULL
             && ((parse_headers(msg, HDR_CSEQ_F, 0) == -1) || (msg->cseq == NULL))) {
         LM_ERR("No Cseq header found - aborting\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
 
     saved_t_data = (saved_transaction_t*) shm_malloc(sizeof (saved_transaction_t));
     if (!saved_t_data) {
         LM_ERR("Unable to allocate memory for transaction data, trying to send AAR\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     memset(saved_t_data, 0, sizeof (saved_transaction_t));
     saved_t_data->act = cfg_action;
@@ -493,7 +629,7 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     if (!saved_t_data->callid.s) {
         LM_ERR("no more memory trying to save transaction state : callid\n");
         shm_free(saved_t_data);
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     memset(saved_t_data->callid.s, 0, callid.len + 1);
     memcpy(saved_t_data->callid.s, callid.s, callid.len);
@@ -504,7 +640,7 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     if (!saved_t_data->ttag.s) {
         LM_ERR("no more memory trying to save transaction state : ttag\n");
         shm_free(saved_t_data);
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     memset(saved_t_data->ttag.s, 0, ttag.len + 1);
     memcpy(saved_t_data->ttag.s, ttag.s, ttag.len);
@@ -515,17 +651,19 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     if (!saved_t_data->ftag.s) {
         LM_ERR("no more memory trying to save transaction state : ftag\n");
         shm_free(saved_t_data);
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     memset(saved_t_data->ftag.s, 0, ftag.len + 1);
     memcpy(saved_t_data->ftag.s, ftag.s, ftag.len);
     saved_t_data->ftag.len = ftag.len;
+    
+    saved_t_data->aar_update = 0;//by default we say this is not an aar update - if it is we set it below
 
     //store branch
     int branch;
     if (tmb.t_check( msg  , &branch )==-1){
         LOG(L_ERR, "ERROR: t_suspend: failed find UAC branch\n");
-        return CSCF_RETURN_ERROR;
+        return result;
     }
     
     //Check that we dont already have an auth session for this specific dialog
@@ -541,19 +679,87 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
 
     if (!rx_session_id || rx_session_id->len <= 0 || !rx_session_id->s) {
         LM_DBG("New AAR session for this dialog in mode %s\n", direction);
-        //create new diameter auth session
-        int ret = create_new_callsessiondata(&callid, &ftag, &ttag, &rx_authdata_p);
+        
+	
+	//get ip and subscription_id and store them in the call session data
+	
+	//SUBSCRIPTION-ID
+	//if its mo we use p_asserted_identity in request - if that not there we use from_uri
+	//if its mt we use p_asserted_identity in reply - if that not there we use to_uri
+	//IP 
+	//if its mo we use request SDP
+	//if its mt we use reply SDP
+	if (dlg_direction == DLG_MOBILE_ORIGINATING) {
+	    LM_DBG("originating direction\n");
+	    if ((identifier = cscf_get_asserted_identity(t->uas.request, 1)).len == 0) {
+		LM_DBG("No P-Asserted-Identity hdr found in request. Using From hdr in req");
+
+		if (!cscf_get_from_uri(t->uas.request, &identifier)) {
+			LM_ERR("Error assigning P-Asserted-Identity using From hdr in req");
+			goto error;
+		}
+	    } else {
+		must_free_asserted_identity = 1;
+	    }
+	    
+	    //get ip from request sdp (we use first SDP session)
+	    if (parse_sdp(t->uas.request) < 0) {
+		LM_ERR("Unable to parse req SDP\n");
+		goto error;
+	    }
+	    
+	    sdp_session = get_sdp_session(t->uas.request, 0);
+	    if (!sdp_session) {
+		    LM_ERR("Missing SDP session information from req\n");
+		    goto error;
+	    }
+	    ip = sdp_session->ip_addr;
+	    ip_version = sdp_session->pf;
+	    free_sdp((sdp_info_t**) (void*) &t->uas.request->body);
+	    
+	} else {
+	    LM_DBG("terminating direction\n");
+	    if ((identifier = cscf_get_asserted_identity(msg, 0)).len == 0) {
+		LM_DBG("No P-Asserted-Identity hdr found in response. Using To hdr in resp");
+		identifier = cscf_get_public_identity(msg); //get public identity from to header
+	    }
+	    
+	    //get ip from reply sdp (we use first SDP session)
+	    if (parse_sdp(msg) < 0) {
+		LM_ERR("Unable to parse req SDP\n");
+		goto error;
+	    }
+	    
+	    sdp_session = get_sdp_session(msg, 0);
+	    if (!sdp_session) {
+		    LM_ERR("Missing SDP session information from reply\n");
+		    goto error;
+	    }
+	    ip = sdp_session->ip_addr;
+	    ip_version = sdp_session->pf;
+	    free_sdp((sdp_info_t**) (void*) &msg->body);
+	    
+	}
+
+        int ret = create_new_callsessiondata(&callid, &ftag, &ttag, &identifier, &ip, ip_version, &rx_authdata_p);
         if (!ret) {
             LM_DBG("Unable to create new media session data parcel\n");
             goto error;
         }
+	
+	//free this cscf_get_asserted_identity allocates it
+	if (must_free_asserted_identity) {
+		pkg_free(identifier.s);
+		must_free_asserted_identity = 1;
+	}
+	
+	//create new diameter auth session
         auth_session = cdpb.AAACreateClientAuthSession(1, callback_for_cdp_session, rx_authdata_p); //returns with a lock
         if (!auth_session) {
             LM_ERR("Rx: unable to create new Rx Media Session\n");
             if (auth_session) cdpb.AAASessionsUnlock(auth_session->hash);
             if (rx_authdata_p) {
-                shm_free(rx_authdata_p);
-                rx_authdata_p = 0;
+		free_callsessiondata(rx_authdata_p);
             }
             goto error;
         }
@@ -569,17 +775,29 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
         LM_DBG("Attached CDP auth session [%.*s] for Rx to dialog in %s mode\n", auth_session->id.len, auth_session->id.s, direction);
     } else {
         LM_DBG("Update AAR session for this dialog in mode %s\n", direction);
-        if (saved_t_data)
-                free_saved_transaction_global_data(saved_t_data); //only free global data if no AARs were sent. if one was sent we have to rely on the callback (CDP) to free
-        create_return_code(CSCF_RETURN_TRUE);
-        return CSCF_RETURN_TRUE;
+	auth_session = cdpb.AAAGetAuthSession(*rx_session_id);
+	
+	    if (!auth_session) {
+	    LM_ERR("Could not get Auth Session for session id: [%.*s] on AAR update\n", rx_session_id->len, rx_session_id->s);
+	    result = CSCF_RETURN_FALSE; //here we return FALSE this just drops the message in the config file
+	    goto error;
+	}
+	
+	if(auth_session->u.auth.state != AUTH_ST_OPEN)
+	{
+	    LM_DBG("This session is not state open, packet will be dropped");
+	    if (auth_session) cdpb.AAASessionsUnlock(auth_session->hash);
+	    result = CSCF_RETURN_FALSE; //here we return FALSE this just drops the message in the config file
+	    goto error;
+	}
+	saved_t_data->aar_update = 1;//this is an update aar - we set this so on async_aar we know this is an update and act accordingly
     }
 
     LM_DBG("Suspending SIP TM transaction\n");
     if (tmb.t_suspend(msg, &saved_t_data->tindex, &saved_t_data->tlabel) < 0) {
         LM_ERR("failed to suspend the TM processing\n");
-        free_saved_transaction_global_data(saved_t_data);
-        return CSCF_RETURN_ERROR;
+	if (auth_session) cdpb.AAASessionsUnlock(auth_session->hash);
+	goto error;
     }
 
     LM_DBG("Sending Rx AAR");
@@ -588,12 +806,13 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* str1, char* bar) {
     if (!ret) {
         LM_ERR("Failed to send AAR\n");
         tmb.t_cancel_suspend(saved_t_data->tindex, saved_t_data->tlabel);
-        goto error;
+	goto error;
 
 
     } else {
         LM_DBG("Successful async send of AAR\n");
-        return CSCF_RETURN_BREAK; //on success we break - because rest of cfg file will be executed by async process
+        result = CSCF_RETURN_BREAK;
+	return result; //on success we break - because rest of cfg file will be executed by async process
     }
 
 error:
@@ -602,7 +821,13 @@ error:
         free_saved_transaction_global_data(saved_t_data); //only free global data if no AARs were sent. if one was sent we have to rely on the callback (CDP) to free
     //otherwise the callback will segfault
 
-     return CSCF_RETURN_ERROR;
+    //free this cscf_get_asserted_identity allocates it
+    if (must_free_asserted_identity) {
+	    pkg_free(identifier.s);
+	    must_free_asserted_identity = 1;
+    }
+
+    return result;
 }
 
 /* Wrapper to send AAR from config file - only used for registration */

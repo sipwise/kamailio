@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -313,10 +313,10 @@ int resolve_select(select_t* s)
 		}
 		switch (s->params[param_idx].type) {
 			case SEL_PARAM_STR:
-				LOG(L_ERR, "Unable to resolve select '%.*s' at level %d\n", s->params[param_idx].v.s.len, s->params[param_idx].v.s.s, param_idx);
+				LM_ERR("Unable to resolve select '%.*s' at level %d\n", s->params[param_idx].v.s.len, s->params[param_idx].v.s.s, param_idx);
 				break;
 			case SEL_PARAM_INT:
-				LOG(L_ERR, "Unable to resolve select [%d] at level %d\n", s->params[param_idx].v.i, param_idx);
+				LM_ERR("Unable to resolve select [%d] at level %d\n", s->params[param_idx].v.i, param_idx);
 				break;
 			default:
 				BUG ("Unable to resolve select at level %d\n", param_idx);

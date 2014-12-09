@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #ifndef tcp_init_h
@@ -41,7 +41,7 @@
 
 #define DEFAULT_TLS_MAX_CONNECTIONS 2048 /* maximum tls connections */
 
-#define DEFAULT_TCP_BUF_SIZE	4096  /* buffer size used for reads */
+#define DEFAULT_TCP_BUF_SIZE	16384  /* 16k - buffer size used for reads */
 
 #define DEFAULT_TCP_WBUF_SIZE	2100 /*  after debugging switch to 4-16k */
 

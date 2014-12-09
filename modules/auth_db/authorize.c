@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * history:
  * ---------
@@ -506,9 +506,14 @@ int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags)
 		} else {
 			uri = furi;
 		}
-		if(srealm.len!=uri->user.len
-					|| strncmp(srealm.s, uri->user.s, srealm.len)!=0)
-			return AUTH_USER_MISMATCH;
+		if(!((iflags&AUTH_CHECK_SKIPFWD_F)
+				&& (_m->REQ_METHOD==METHOD_INVITE || _m->REQ_METHOD==METHOD_BYE
+					|| _m->REQ_METHOD==METHOD_PRACK || _m->REQ_METHOD==METHOD_UPDATE
+					|| _m->REQ_METHOD==METHOD_MESSAGE))) {
+			if(srealm.len!=uri->user.len
+						|| strncmp(srealm.s, uri->user.s, srealm.len)!=0)
+				return AUTH_USER_MISMATCH;
+		}
 
 		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
 			/* check from==to */

@@ -1,13 +1,11 @@
 #!/bin/bash
 #
-# $Id$
-#
 # control tool for maintaining Kamailio
 #
 #===================================================================
 
 ### version for this script
-VERSION='4.1.0'
+VERSION='4.2.0'
 
 PATH=$PATH:/usr/local/sbin/
 
@@ -16,6 +14,27 @@ PATH=$PATH:/usr/local/sbin/
 TEST="false"
 
 ### include config files
+
+# check for rc file at same location with kamctl
+which greadlink > /dev/null
+ret=$?
+if [ $ret -eq 0 ] ; then
+	KAMCTLFULLPATH=$(greadlink -f "$0")
+else
+	which readlink > /dev/null
+	ret=$?
+	if [ $ret -eq 0 ] ; then
+		KAMCTLFULLPATH=$(readlink -f "$0")
+	fi
+fi
+if [ -n "$KAMCTLFULLPATH" ] ; then
+	KAMCTLDIRPATH=$(dirname "$KAMCTLFULLPATH")
+	if [ -f $KAMCTLDIRPATH/kamctlrc ]; then
+		. $KAMCTLDIRPATH/kamctlrc
+	fi
+fi
+
+# check for rc file at standard locations
 if [ -f /etc/kamailio/kamctlrc ]; then
 	. /etc/kamailio/kamctlrc
 fi
@@ -1010,6 +1029,14 @@ db_ops() {
 			QUERY="SELECT * FROM $1 WHERE $2=$3\\G;"
 			$DBROCMD "$QUERY"
 			;;
+		connect)
+			shift
+			if [ -z "$DBCMDCONNECT" ] ; then
+				merr "extension not implemented"
+				exit 1
+			fi
+			$DBCMDCONNECT
+			;;
 		*)
 			usage_db_ops
 			exit 1
@@ -1235,6 +1262,7 @@ permissions_address() {
 		dump)
 			require_ctlengine
 			$CTLCMD address_dump
+			$CTLCMD subnet_dump
 			;;
 		show)
 			require_dbengine
@@ -1686,7 +1714,7 @@ dialplan() {
 
 		addrule)
 			shift
-			if [ $# -lt 8 ] ; then
+			if [ $# -lt 4 ] ; then
 				merr "too few parameters"
 				usage_dialplan
 				exit 1
@@ -1702,15 +1730,27 @@ dialplan() {
 				regexp)
 					DIALPLAN_MATCH_OP=1
 					;;
+				fnmatch)
+					DIALPLAN_MATCH_OP=2
+					;;
 				*)
 					merr "dialplan - unexpected $DIALPLAN_MATCH_OP for operating matching. Use 'equal' or 'regexp'!"
 					exit 1
 			esac
 			DIALPLAN_MATCH_EXP=$4
-			DIALPLAN_MATCH_LEN=$5
-			DIALPLAN_SUBST_EXP=$6
-			DIALPLAN_REPL_EXP=$7
-			DIALPLAN_ATTRS=$8
+			DIALPLAN_MATCH_LEN=0
+			if [ $# -gt 4 ] ; then
+				DIALPLAN_MATCH_LEN=$5
+			fi
+			if [ $# -gt 5 ] ; then
+				DIALPLAN_SUBST_EXP=$6
+			fi
+			if [ $# -gt 6 ] ; then
+				DIALPLAN_REPL_EXP=$7
+			fi
+			if [ $# -gt 7 ] ; then
+				DIALPLAN_ATTRS=$8
+			fi
 
 			QUERY="insert into $DIALPLAN_TABLE \
 				( $DIALPLAN_DPID_COLUMN, $DIALPLAN_PR_COLUMN, $DIALPLAN_MATCH_OP_COLUMN, \
@@ -1720,7 +1760,7 @@ dialplan() {
 				VALUES ( $DIALPLAN_DPID, $DIALPLAN_PR, $DIALPLAN_MATCH_OP, \
 					'$DIALPLAN_MATCH_EXP', $DIALPLAN_MATCH_LEN, '$DIALPLAN_SUBST_EXP', \
 					'$DIALPLAN_REPL_EXP', '$DIALPLAN_ATTRS')";
-			mecho "$QUERY"
+			mdbg "$QUERY"
 			$DBCMD "$QUERY"
 
 			if [ $? -ne 0 ] ; then
@@ -1728,7 +1768,8 @@ dialplan() {
 				exit 1
 			fi
 
-			$CTLCMD dp_reload
+			minfo "do not forget to do dialplan reload"
+			# $CTLCMD dp_reload
 			;;
 
 		rm)
@@ -1740,7 +1781,8 @@ dialplan() {
 				exit 1
 			fi
 
-			$CTLCMD dp_reload
+			minfo "do not forget to do dialplan reload"
+			# $CTLCMD dp_reload
 			;;
 
 		rmdpid)
@@ -1761,7 +1803,8 @@ dialplan() {
 				exit 1
 			fi
 
-			$CTLCMD dp_reload
+			minfo "do not forget to do dialplan reload"
+			# $CTLCMD dp_reload
 			;;
 
 		rmrule)
@@ -1783,7 +1826,8 @@ dialplan() {
 				exit 1
 			fi
 
-			$CTLCMD dp_reload
+			minfo "do not forget to do dialplan reload"
+			# $CTLCMD dp_reload
 			;;
 
 		reload)
@@ -2648,6 +2692,33 @@ extcmd() {
 	exit 1
 }
 
+##### ================================================ #####
+### trap with gdb kamailio processes
+#
+
+kamailio_trap() {
+	if [ -z "$GDB" ] ; then
+		merr "'gdb' tool not found: set GDB variable to correct tool path"
+		exit
+	fi
+	DATE=`/bin/date +%Y%m%d_%H%M%S`
+	LOG_FILE=/tmp/gdb_kamailio_$DATE
+	minfo "Trap file: $LOG_FILE"
+	$SERCTLCMD ps > $LOG_FILE
+	echo -n "Trapping Kamailio with gdb: "
+	PID_TIMESTAMP_VECTOR=`sed -e 's/\([0-9]*\).*/\1/' $LOG_FILE`
+	for pid in $PID_TIMESTAMP_VECTOR
+	do
+		echo -n "."
+		PID=`echo $pid | cut -d '-' -f 1`
+		echo "" >> $LOG_FILE
+		echo "---start $PID -----------------------------------------------------" >> $LOG_FILE
+		$GDB kamailio $PID -batch --eval-command="bt full" & >> $LOG_FILE
+		echo "---end $PID -------------------------------------------------------" >> $LOG_FILE
+	done
+	echo "."
+}
+
 #
 ##### ================================================ #####
 ### main command switch
@@ -2827,6 +2898,11 @@ case $1 in
 	tls)
 		shift
 		tls_ca "$@"
+		;;
+
+	trap)
+		require_ctlengine
+		kamailio_trap
 		;;
 
 	start)

@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * -------
@@ -117,8 +117,8 @@ static cmd_export_t cmds[] = {
 
 /* Exported parameters */
 static param_export_t params[] = {
-    {"pres_db_url", STR_PARAM, &pres_db_url.s},
-    {"xcap_table", STR_PARAM, &xcap_table.s},
+    {"pres_db_url", PARAM_STR, &pres_db_url},
+    {"xcap_table", PARAM_STR, &xcap_table},
     {"http_query_timeout", INT_PARAM, &http_query_timeout},
     {"forward_active", INT_PARAM, &forward_active},
     {0, 0, 0}
@@ -289,10 +289,8 @@ static int mod_init(void)
 	}
 
 	/* presence database */
-	pres_db_url.len = pres_db_url.s ? strlen(pres_db_url.s) : 0;
 	LM_DBG("pres_db_url=%s/%d/%p\n", ZSW(pres_db_url.s), pres_db_url.len,
 	       pres_db_url.s);
-	xcap_table.len = xcap_table.s ? strlen(xcap_table.s) : 0;
 
 	if(pres_db_init() < 0) {
 	    return -1;
