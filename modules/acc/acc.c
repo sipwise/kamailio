@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -229,6 +229,7 @@ int acc_log_request( struct sip_msg *rq)
 	char *p;
 	int n;
 	int m;
+	int o = 0;
 	int i;
 	struct tm *t;
 
@@ -236,7 +237,9 @@ int acc_log_request( struct sip_msg *rq)
 	m = core2strar( rq, val_arr, int_arr, type_arr);
 
 	/* get extra values */
-	m += extra2strar( log_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+	o += extra2strar( log_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+
+	m += o;
 
 	for ( i=0,p=log_msg ; i<m ; i++ ) {
 		if (p+1+log_attrs[i].len+1+val_arr[i].len >= log_msg_end) {
@@ -314,6 +317,8 @@ int acc_log_request( struct sip_msg *rq)
 			acc_env.text.len, acc_env.text.s,(unsigned long)acc_env.ts,
 			log_msg);
 	}
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 
 	return 1;
 }
@@ -488,6 +493,11 @@ int acc_db_request( struct sip_msg *rq)
 				LM_ERR("failed to insert delayed into database\n");
 				return -1;
 			}
+		} else if(acc_db_insert_mode==2 && acc_dbf.insert_async!=NULL) {
+			if (acc_dbf.insert_async(db_handle, db_keys, db_vals, m) < 0) {
+				LM_ERR("failed to insert async into database\n");
+				return -1;
+			}
 		} else {
 			if (acc_dbf.insert(db_handle, db_keys, db_vals, m) < 0) {
 				LM_ERR("failed to insert into database\n");
@@ -502,6 +512,11 @@ int acc_db_request( struct sip_msg *rq)
 			if(acc_db_insert_mode==1 && acc_dbf.insert_delayed!=NULL) {
 				if(acc_dbf.insert_delayed(db_handle,db_keys,db_vals,m+n)<0) {
 					LM_ERR("failed to insert delayed into database\n");
+					return -1;
+				}
+			} else if(acc_db_insert_mode==2 && acc_dbf.insert_async!=NULL) {
+				if(acc_dbf.insert_async(db_handle,db_keys,db_vals,m+n)<0) {
+					LM_ERR("failed to insert async into database\n");
 					return -1;
 				}
 			} else {

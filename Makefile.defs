@@ -163,14 +163,13 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 
 # version number
 VERSION = 4
-PATCHLEVEL = 1
-SUBLEVEL = 6
-EXTRAVERSION =
+PATCHLEVEL = 2
+SUBLEVEL = 1
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
 # 1 - q_malloc (quick malloc)
-MEMMNG ?= 1
+MEMMNG ?= 0
 # memory debugger switcher
 # 0 - off (no-debug mode)
 # 1 - on (debug mode)
@@ -946,7 +945,7 @@ else		# CC_NAME, gcc
 ifeq		($(CC_NAME), clang)
 $(call                          set_if_empty,CPU,athlon64)
 					C_DEFS+=-DCC_GCC_LIKE_ASM
-                                        CFLAGS+=-m32
+                                        CFLAGS+=-g -m32
                                                 $(CC_OPT) \
                                                           \
                                                 -mtune=$(CPU)
@@ -1042,7 +1041,7 @@ else		# CC_NAME, gcc
 ifeq            ($(CC_NAME), clang)
 $(call                          set_if_empty,CPU,opteron)
 					C_DEFS+=-DCC_GCC_LIKE_ASM
-                                        CFLAGS+=-m64 \
+                                        CFLAGS+=-g -m64 \
                                                 $(CC_OPT)        
                                         LDFLAGS+=-m64
 else      	# CC_NAME, clang

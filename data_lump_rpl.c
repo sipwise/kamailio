@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * 2002-02-14 : created by bogdan
@@ -60,11 +60,11 @@ struct lump_rpl** add_lump_rpl2(struct sip_msg *msg, char *s,
 	/* some checking */
 	if ( (flags&(LUMP_RPL_HDR|LUMP_RPL_BODY))==(LUMP_RPL_HDR|LUMP_RPL_BODY)
 	|| (flags&(LUMP_RPL_HDR|LUMP_RPL_BODY))==0 || (flags&LUMP_RPL_SHMEM) ) {
-		LOG(L_ERR,"ERROR:add_lump_rpl: bad flags combination (%d)!\n",flags);
+		LM_ERR("bad flags combination (%d)!\n",flags);
 		goto error;
 	}
 	if (len<=0 || s==0) {
-		LOG(L_ERR,"ERROR:add_lump_rpl: I won't add an empty lump!\n");
+		LM_ERR("I won't add an empty lump!\n");
 		goto error;
 	}
 
@@ -72,7 +72,7 @@ struct lump_rpl** add_lump_rpl2(struct sip_msg *msg, char *s,
 	lump = (struct lump_rpl*) pkg_malloc
 		( sizeof(struct lump_rpl) + ((flags&LUMP_RPL_NODUP)?0:len) );
 	if (!lump) {
-		LOG(L_ERR,"ERROR:add_lump_rpl : no free pkg memory !\n");
+		LM_ERR("no free pkg memory !\n");
 		goto error;
 	}
 
@@ -96,8 +96,7 @@ struct lump_rpl** add_lump_rpl2(struct sip_msg *msg, char *s,
 		else
 			for(foo=msg->reply_lump; ;foo=foo->next) {
 				if (foo->flags&LUMP_RPL_BODY) {
-					LOG(L_ERR,"ERROR:add_lump_rpl: LUMP_RPL_BODY "
-						"already added!\n");
+					LM_ERR("LUMP_RPL_BODY already added!\n");
 					pkg_free(lump);
 					goto error;
 				}

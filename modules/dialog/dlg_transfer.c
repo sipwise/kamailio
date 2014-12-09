@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include <stdio.h>
@@ -140,6 +140,9 @@ void dlg_refer_tm_callback(struct cell *t, int type, struct tmcb_params *ps)
 		goto error;
 	}
 
+	/* after REFER, the CSeq must be increased */
+	dialog_info->loc_seq.value++;
+
 	set_uac_req(&uac_r, &met, NULL, NULL, dialog_info, 0, NULL, NULL);
 	result = d_tmb.t_request_within(&uac_r);
 
@@ -195,7 +198,7 @@ static int dlg_refer_callee(dlg_transfer_ctx_t *dtc)
 	memcpy(hdrs.s+23+dlg_bridge_controller.len+CRLF_LEN+dtc->to.len,
 			CRLF, CRLF_LEN);
 	memcpy(hdrs.s+23+dlg_bridge_controller.len+CRLF_LEN+dtc->to.len+CRLF_LEN,
-			dlg_bridge_controller.s, dlg_bridge_controller.len);
+			dlg_bridge_ref_hdrs.s, dlg_bridge_ref_hdrs.len);
 
 	set_uac_req(&uac_r, &met, &hdrs, NULL, dialog_info, TMCB_LOCAL_COMPLETED,
 				dlg_refer_tm_callback, (void*)dtc);

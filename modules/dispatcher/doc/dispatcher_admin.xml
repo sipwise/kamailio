@@ -737,7 +737,7 @@ modparam("dispatcher", "force_dst", 1)
 	<title>Functions</title>
 	<section id="dispatcher.f.ds_select_dst">
 		<title>
-		<function moreinfo="none">ds_select_dst(set, alg)</function>
+		<function moreinfo="none">ds_select_dst(set, alg[, limit])</function>
 		</title>
 		<para>
 		The method selects a destination from addresses set. It returns true if
@@ -747,9 +747,9 @@ modparam("dispatcher", "force_dst", 1)
 		</para>
 		<para>
 		If the bit 2 in 'flags' parameter is set, the rest of the addresses from
-		the destination set is stored in AVP list. You can use 'ds_next_dst()'
-		to use next address in order to achieve serial forking to all possible
-		destinations.
+		the destination set is stored in AVP list (limited with an optional 'limit'
+		parameter). You can use 'ds_next_dst()' to use next address in order to
+		achieve serial forking to all possible destinations.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -856,6 +856,14 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			</itemizedlist>
 		</listitem>
+		<listitem>
+			<para>
+			<emphasis>limit</emphasis> - the maximum number of items to be
+			stored in AVP list for further failovers (the first selected
+			destination and default destination are the first to be put in
+			the list)
+                        </para>
+                </listitem>
 		</itemizedlist>
 		<para>
 		If the bit 2 in 'flags' is set, the rest of the addresses from the
@@ -875,12 +883,14 @@ ds_select_dst("1", "0");
 $var(a) = 4;
 ds_select_dst("1", "$var(a)");
 ...
+ds_select_dst("1", "4", "3");
+...
 </programlisting>
 		</example>
 	</section>
   	<section id="dispatcher.f.ds_select_domain">
  		<title>
- 		<function moreinfo="none">ds_select_domain(set, alg)</function>
+ 		<function moreinfo="none">ds_select_domain(set, alg[, limit])</function>
  		</title>
  		<para>
  		The method selects a destination from addresses set and rewrites the
@@ -889,9 +899,9 @@ ds_select_dst("1", "$var(a)");
  		</para>
 		<para>
 		If the bit 2 in 'flags' is set, the rest of the addresses from the
-		destination set is stored in AVP list. You can use 'ds_next_domain()'
-		to use next address to achieve serial forking to all possible
-		destinations.
+		destination set is stored in AVP list (limited with an optional 'limit'
+                parameter). You can use 'ds_next_domain()' to use next address to
+		achieve serial forking to all possible destinations.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
@@ -984,19 +994,53 @@ failure_route[tryagain] {
  	</section>
   	<section  id="dispatcher.f.ds_is_from_list">
  		<title>
- 		<function moreinfo="none">ds_is_from_list([groupid])</function>
+		<function moreinfo="none">ds_is_from_list([groupid [, mode [, uri] ] ])</function>
  		</title>
  		<para>
-		This function returns true, if the current request comes from a host
-		in the given group of the dispatcher-list; otherwise false.
+		This function returns true, if there is a match of source address or uri
+		with an address in the given group of the dispatcher-list; otherwise false.
+		</para>
+		<para>Description of parameters:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>groupid</emphasis> (optional) - if not given or its
+				value is -1, the matching will be done over all addresses in
+				all dispacher groups. Otherwise the matching will be done only
+				against the addresses in the specific group id. The parameter
+				can be an integer or a variable holding an integer value.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>mode</emphasis> - (optional) - a bitmask to specify
+				how the matching should be done. If is 0, all ip, port and
+				proto are matched. If bit one is set, then port is ignored.
+				If bit two is set, then protocol is ignored. The parameter
+				can be an integer or a variable holding an integer value.
+				It must be provided if the uri parameter is provided.
+			</para>
+		</listitem>
+        <listitem>
+            <para><emphasis>uri</emphasis> (optional) - if is empty or missing,
+                the matching is done against source IP, port and protocol.
+                Otherwise the value has to be a valid SIP URI, used to match
+                against addresses in the dispatcher list. Only IP, port and
+                protocol are matches, any additional parameters are ignored.
+                The parameter can be a static or dynamic (with variables)
+                string. The domain part of the URI can be an IP address or
+                a hostname.
+            </para>
+        </listitem>
+		</itemizedlist>
+
+		<para>
+		Upon a match, the variable specified by 'setid_pvname' parameter will
+		be set to groupid of matching address and the attributes will be set in
+		variable specified by 'attrs_pvname'.
  		</para>
 		<para>
-		Parameter groupid is optional, when it is missing, then the matching
-		will be done against all addresses in all groups. Upon a match, the
-		variable specified by 'setid_pvname' parameter will be set to groupid
-		of matching address and the attributes will be set in variable
-		specified by 'attrs_pvname'. The parameter can be an integer or a
-		variable holding an integer value.
+		Note that for backward compatibility mode, when no parameter is given
+		or only groupid is given, the matching is done only for IP address
+		and port (protocol is ignored).
  		</para>
 		<para>
 			This function can be used from ANY_ROUTE.
@@ -1005,7 +1049,13 @@ failure_route[tryagain] {
 		<title><function>ds_mark_dst</function> usage</title>
 		<programlisting format="linespecific">
 ...
+if(ds_is_from_list()) {
+    ...
+}
 if(ds_is_from_list("10")) {
+    ...
+}
+if(ds_is_from_list("10", "sip:127.0.0.1:5080", "3")) {
     ...
 }
 ...
@@ -1163,7 +1213,7 @@ onreply_route {
     </section>
 
 	<section>
-	<title>Exported RPC Commands</title>
+	<title>RPC Commands</title>
 	<section id="dispatcher.rpc.set_state">
 		<title>
 		<function moreinfo="none">dispatcher.set_state</function>
@@ -1245,7 +1295,7 @@ onreply_route {
 
    </section>
 
-	<section>
+	<section id="dispatcher.ex.install">
 	<title>Installation and Running</title>
 	<section>
 		<title>Destination List File</title>
@@ -1308,7 +1358,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 		</example>
 		</section>
 	
-		<section>
+		<section id="dispatcher.ex.config">
 		<title>&kamailio; config file</title>
 		<para>
 		Next picture shows a sample usage of the dispatcher module.
@@ -1324,7 +1374,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 	</section>
 	</section>
 
-        <section>
+        <section id="dispatcher.ex.event_routes">
         <title>Event routes</title>
         <section>
                 <title>

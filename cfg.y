@@ -24,7 +24,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
  /*
  * History:
@@ -141,6 +141,7 @@
 #include "rvalue.h"
 #include "sr_compat.h"
 #include "msg_translator.h"
+#include "async_task.h"
 
 #include "ppcfg.h"
 #include "pvapi.h"
@@ -255,12 +256,15 @@ extern int column;
 extern int startcolumn;
 extern int startline;
 extern char *finame;
+extern char *routename;
+extern char *default_routename;
 
 #define set_cfg_pos(x) \
 	do{\
 		if(x) {\
 		(x)->cline = line;\
 		(x)->cfile = (finame!=0)?finame:((cfg_file!=0)?cfg_file:"default");\
+		(x)->rname = (routename!=0)?routename:((default_routename!=0)?default_routename:"DEFAULT");\
 		}\
 	}while(0)
 
@@ -391,6 +395,7 @@ extern char *finame;
 %token LOGFACILITY
 %token LOGNAME
 %token LOGCOLOR
+%token LOGPREFIX
 %token LISTEN
 %token ADVERTISE
 %token ALIAS
@@ -439,6 +444,7 @@ extern char *finame;
 %token STAT
 %token CHILDREN
 %token SOCKET_WORKERS
+%token ASYNC_WORKERS
 %token CHECK_VIA
 %token PHONE2TEL
 %token MEMLOG
@@ -536,10 +542,12 @@ extern char *finame;
 %token VERSION_TABLE_CFG
 %token CFG_DESCRIPTION
 %token SERVER_ID
+%token MAX_RECURSIVE_LEVEL
 %token LATENCY_LOG
 %token LATENCY_LIMIT_DB
 %token LATENCY_LIMIT_ACTION
 %token MSG_TIME
+%token ONSEND_RT_REPLY
 
 %token FLAGS_DECL
 %token AVPFLAGS_DECL
@@ -837,6 +845,8 @@ assign_stm:
 	| LOGNAME EQUAL error { yyerror("string value expected"); }
 	| LOGCOLOR EQUAL NUMBER { log_color=$3; }
 	| LOGCOLOR EQUAL error { yyerror("boolean value expected"); }
+	| LOGPREFIX EQUAL STRING { log_prefix_fmt=$3; }
+	| LOGPREFIX EQUAL error { yyerror("string value expected"); }
 	| DNS EQUAL NUMBER   { received_dns|= ($3)?DO_DNS:0; }
 	| DNS EQUAL error { yyerror("boolean value expected"); }
 	| REV_DNS EQUAL NUMBER { received_dns|= ($3)?DO_REV_DNS:0; }
@@ -937,6 +947,8 @@ assign_stm:
 	| CHILDREN EQUAL error { yyerror("number expected"); }
 	| SOCKET_WORKERS EQUAL NUMBER { socket_workers=$3; }
 	| SOCKET_WORKERS EQUAL error { yyerror("number expected"); }
+	| ASYNC_WORKERS EQUAL NUMBER { async_task_set_workers($3); }
+	| ASYNC_WORKERS EQUAL error { yyerror("number expected"); }
 	| CHECK_VIA EQUAL NUMBER { check_via=$3; }
 	| CHECK_VIA EQUAL error { yyerror("boolean value expected"); }
 	| PHONE2TEL EQUAL NUMBER { phone2tel=$3; }
@@ -1559,6 +1571,7 @@ assign_stm:
 	| HTTP_REPLY_PARSE EQUAL NUMBER { http_reply_parse=$3; }
 	| HTTP_REPLY_PARSE EQUAL error { yyerror("boolean value expected"); }
     | SERVER_ID EQUAL NUMBER { server_id=$3; }
+    | MAX_RECURSIVE_LEVEL EQUAL NUMBER { set_max_recursive_level($3); }
     | LATENCY_LOG EQUAL NUMBER { default_core_cfg.latency_log=$3; }
 	| LATENCY_LOG EQUAL error  { yyerror("number  expected"); }
     | LATENCY_LIMIT_DB EQUAL NUMBER { default_core_cfg.latency_limit_db=$3; }
@@ -1567,6 +1580,8 @@ assign_stm:
 	| LATENCY_LIMIT_ACTION EQUAL error  { yyerror("number  expected"); }
     | MSG_TIME EQUAL NUMBER { sr_msg_time=$3; }
 	| MSG_TIME EQUAL error  { yyerror("number  expected"); }
+	| ONSEND_RT_REPLY EQUAL NUMBER { onsend_route_reply=$3; }
+	| ONSEND_RT_REPLY EQUAL error { yyerror("int value expected"); }
 	| UDP_MTU EQUAL NUMBER { default_core_cfg.udp_mtu=$3; }
 	| UDP_MTU EQUAL error { yyerror("number expected"); }
 	| FORCE_RPORT EQUAL NUMBER 
@@ -1639,15 +1654,25 @@ module_stm:
 	}
 	| LOADMODULE error	{ yyerror("string expected"); }
 	| LOADPATH STRING {
-		DBG("loading modules under %s\n", $2);
-		printf("loading modules under %s\n", $2);
-		mods_dir = $2;
+		if(mods_dir_cmd==0) {
+			DBG("loading modules under %s\n", $2);
+			printf("loading modules under config path: %s\n", $2);
+			mods_dir = $2;
+		} else {
+			DBG("ignoring mod path given in config: %s\n", $2);
+			printf("loading modules under command line path: %s\n", mods_dir);
+		}
 	}
 	| LOADPATH error	{ yyerror("string expected"); }
 	| LOADPATH EQUAL STRING {
-		DBG("loading modules under %s\n", $3);
-		printf("loading modules under %s\n", $3);
-		mods_dir = $3;
+		if(mods_dir_cmd==0) {
+			DBG("loading modules under %s\n", $3);
+			printf("loading modules under config path: %s\n", $3);
+			mods_dir = $3;
+		} else {
+			DBG("ignoring mod path given in config: %s\n", $3);
+			printf("loading modules under command line path: %s\n", mods_dir);
+		}
 	}
 	| LOADPATH EQUAL error	{ yyerror("string expected"); }
 	| MODPARAM LPAREN STRING COMMA STRING COMMA STRING RPAREN {
@@ -1737,9 +1762,10 @@ route_name:		NUMBER	{
 						memcpy($$, tmp, i_tmp);
 						$$[i_tmp]=0;
 					}
+					routename = tmp;
 						}
-			|	ID		{ $$=$1; }
-			|	STRING	{ $$=$1; }
+			|	ID		{ routename = $1; $$=$1; }
+			|	STRING	{ routename = $1; $$=$1; }
 ;
 
 
@@ -3366,6 +3392,7 @@ static void get_cpos(struct cfg_pos* pos)
 	if(finame==0)
 		finame = (cfg_file!=0)?cfg_file:"default";
 	pos->fname=finame;
+	pos->rname=(routename!=0)?routename:default_routename;
 }
 
 

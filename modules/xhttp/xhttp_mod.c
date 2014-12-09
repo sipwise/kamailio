@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -86,8 +86,8 @@ static pv_export_t mod_pvs[] = {
 };
 
 static param_export_t params[] = {
-	{"url_match",       STR_PARAM, &xhttp_url_match},
-	{"url_skip",        STR_PARAM, &xhttp_url_skip},
+	{"url_match",       PARAM_STRING, &xhttp_url_match},
+	{"url_skip",        PARAM_STRING, &xhttp_url_skip},
 	{0, 0, 0}
 };
 

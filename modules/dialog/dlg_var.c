@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 		       
 #include "../../route.h"
@@ -83,13 +83,14 @@ static inline struct dlg_var *new_dlg_var(str *key, str *val)
 	var->vflags = DLG_FLAG_NEW;
 	/* set key */
 	var->key.len = key->len;
-	var->key.s = (char*)shm_malloc(var->key.len);
+	var->key.s = (char*)shm_malloc(var->key.len+1);
 	if (var->key.s==NULL) {
 		shm_free(var);			
 		LM_ERR("no more shm mem\n");
 		return NULL;
 	}
 	memcpy(var->key.s, key->s, key->len);
+	var->key.s[var->key.len] = '\0';
 	/* set value */
 	var->value.len = val->len;
 	var->value.s = (char*)shm_malloc(var->value.len);

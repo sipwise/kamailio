@@ -60,13 +60,13 @@
 	<section>
 	<title>Parameters</title>
 		<para>
-		The module does not export any config parameter yet.
+		The module does not export any config parameters yet.
 		</para>
 	</section>
 
 	<section>
 	<title>Functions</title>
-	<section>
+	<section id="sdpops.f.remove_codecs_by_id">
 	    <title>
 		<function moreinfo="none">sdp_remove_codecs_by_id(list)</function>
 	    </title>
@@ -92,7 +92,7 @@ sdp_remove_codecs_by_id("0,8,3");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.remove_codecs_by_name">
 	    <title>
 		<function moreinfo="none">sdp_remove_codecs_by_name(list)</function>
 	    </title>
@@ -118,7 +118,7 @@ sdp_remove_codecs_by_name("PCMU,PCMA,GSM");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.remove_line_by_prefix">
 	<title>
 		<function moreinfo="none">sdp_remove_line_by_prefix(string)</function>
 	</title>
@@ -145,7 +145,7 @@ if ($si == "2001:DB8::8:800:200C:417A"
 </programlisting>
 	</example>
         </section>
-	<section>
+	<section id="sdpops.f.keep_codecs_by_id">
 	    <title>
 		<function moreinfo="none">sdp_keep_codecs_by_id(list [, mtype])</function>
 	    </title>
@@ -175,7 +175,7 @@ sdp_keep_codecs_by_id("0,8,3", "audio");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.keep_codecs_by_name">
 	    <title>
 		<function moreinfo="none">sdp_keep_codecs_by_name(list [, mtype])</function>
 	    </title>
@@ -185,6 +185,10 @@ sdp_keep_codecs_by_id("0,8,3", "audio");
 			be one or a comma separated list of codec names. The
 			parameter can be a static string or a variable holding the
 			list of codec names.
+	    </para>
+		<para>
+			Note that you have to explicitely keep 'telephone-event' in the list
+			of names if you want to keep DTMF attributes.
 	    </para>
 		<para>
 			Optional parameter mtype can be provided to apply the operations
@@ -205,7 +209,7 @@ sdp_keep_codecs_by_name("PCMU,PCMA,GSM");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_with_media">
 	    <title>
 		<function moreinfo="none">sdp_with_media(type)</function>
 	    </title>
@@ -230,7 +234,7 @@ if(sdp_with_media("video"))
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_remove_media">
 	    <title>
 		<function moreinfo="none">sdp_remove_media(type)</function>
 	    </title>
@@ -251,7 +255,7 @@ sdp_remove_media("video");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_with_transport">
 	    <title>
 		<function moreinfo="none">sdp_with_transport(type)</function>
 	    </title>
@@ -276,7 +280,54 @@ if(sdp_with_transport("RTP/SAVP"))
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_with_transport_like">
+	    <title>
+		<function moreinfo="none">sdp_with_transport_like(string)</function>
+	    </title>
+	    <para>
+		Returns true if the SDP has 'media=media port type ...' line,
+		where type contains string. The
+		parameter can be static string or variable holding a string.
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_with_transport_like</function> usage</title>
+		<programlisting format="linespecific">
+...
+# check for SAVPF stream
+if(sdp_with_transport_like("SAVPF"))
+{
+    # the session has a SAVPF stream, e.g., RTP/SAVPF or UDP/TLS/RTP/SAVPF
+}
+...
+</programlisting>
+	    </example>
+	</section>
+	<section id="sdpops.f.sdp_transport">
+	    <title>
+		<function moreinfo="none">sdp_transport(pv)</function>
+	    </title>
+	    <para>
+		Assigns common media transport (if any) of 'm' lines to pv
+		argument.  Returns 1 if common media transport was found, -2
+		if there was no common media transport, and -1 in case of
+		error.
+	    </para>
+	    <para>
+		  This function can be used from ANY_ROUTE.
+	    </para>
+	    <example>
+	      <title><function>sdp_transport</function> usage</title>
+	      <programlisting format="linespecific">
+...
+sdp_transport("$avp(caller_rtp_transport)");
+...
+</programlisting>
+	    </example>
+	</section>
+	<section id="sdpops.f.sdp_remove_transport">
 	    <title>
 		<function moreinfo="none">sdp_remove_transport(type)</function>
 	    </title>
@@ -297,7 +348,7 @@ sdp_remove_transport("RTP/AVP");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_with_codecs_by_id">
 	    <title>
 		<function moreinfo="none">sdp_with_codecs_by_id(list)</function>
 	    </title>
@@ -323,7 +374,7 @@ if(sdp_with_codecs_by_id("0,8,3")) { ... }
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdspops.f.sdp.with_codecs_by_name">
 	    <title>
 		<function moreinfo="none">sdp_with_codecs_by_name(list)</function>
 	    </title>
@@ -349,7 +400,7 @@ if(sdp_with_codecs_by_name("PCMU,PCMA,GSM")) { ... }
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_print">
 	    <title>
 		<function moreinfo="none">sdp_print(level)</function>
 	    </title>
@@ -371,7 +422,7 @@ sdp_print("1");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_get">
 	    <title>
 		<function moreinfo="none">sdp_get(avpvar)</function>
 	    </title>
@@ -391,7 +442,7 @@ sdp_get("$avp(sdp)");
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_content">
 	    <title>
 		<function moreinfo="none">sdp_content()</function>
 	    </title>
@@ -412,7 +463,28 @@ if(sdp_content()) {
 </programlisting>
 	    </example>
 	</section>
-	<section>
+	<section id="sdpops.f.sdp_with_ice">
+	    <title>
+		<function moreinfo="none">sdp_with_ice()</function>
+	    </title>
+	    <para>
+		Return true if the SIP message has SDP body that contains ICE candidate attribute(s).
+	    </para>
+		<para>
+			This function can be used from ANY_ROUTE.
+	    </para>
+		<example>
+		<title><function>sdp_with_ice</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(sdp_with_ice()) {
+    ...
+}
+...
+</programlisting>
+	    </example>
+	</section>
+	<section id="sdpops.f.sdp_get_line_startswith">
 		<title>
 			<function moreinfo="none">sdp_get_line_startswith(avpvar, string)</function>
 		</title>

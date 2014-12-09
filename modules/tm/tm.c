@@ -44,7 +44,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*
  * History:
@@ -361,6 +361,8 @@ static cmd_export_t cmds[]={
 	{"t_relay_to_sctp",       w_t_relay_to_sctp_uri,    0, 0,
 			REQUEST_ROUTE|FAILURE_ROUTE},
 #endif
+	{"t_replicate",        w_t_replicate_uri,       0, 0,
+			REQUEST_ROUTE},
 	{"t_replicate",        w_t_replicate_uri,       1, fixup_var_str_1,
 			REQUEST_ROUTE},
 	{"t_replicate",        w_t_replicate,           2, fixup_hostport2proxy,
@@ -1608,7 +1610,7 @@ int t_replicate_uri(struct sip_msg *msg, str *suri)
 	struct sip_uri turi;
 	int r = -1;
 
-	if (suri != NULL && suri->s != NULL)
+	if (suri != NULL && suri->s != NULL && suri->len > 0)
 	{
 		memset(&turi, 0, sizeof(struct sip_uri));
 		if(parse_uri(suri->s, suri->len, &turi)!=0)
@@ -1638,6 +1640,9 @@ inline static int w_t_replicate_uri(struct sip_msg  *msg ,
 				char *_foo       /* nothing expected */ )
 {
 	str suri;
+
+	if(uri==NULL)
+		return t_replicate_uri(msg, NULL);
 
 	if(fixup_get_svalue(msg, (gparam_p)uri, &suri)!=0)
 	{
@@ -2109,6 +2114,14 @@ int t_check_trans(struct sip_msg* msg)
 	int branch;
 	int ret;
 	
+	/* already processing a T */
+	if(is_route_type(FAILURE_ROUTE)
+			|| is_route_type(BRANCH_ROUTE)
+			|| is_route_type(BRANCH_FAILURE_ROUTE)
+			|| is_route_type(TM_ONREPLY_ROUTE)) {
+		return 1;
+	}
+
 	if (msg->first_line.type==SIP_REPLY) {
 		branch = 0;
 		ret = (t_check_msg( msg , &branch)==1) ? 1 : -1;
@@ -2140,7 +2153,7 @@ int t_check_trans(struct sip_msg* msg)
 				}
 				/* no need for UNREF(t); set_t(0) - the end-of-script
 				   t_unref callback will take care of them */
-				return 0; /* return from the script */
+				return 0; /* exit from the script */
 		}
 		/* not found or error */
 	}

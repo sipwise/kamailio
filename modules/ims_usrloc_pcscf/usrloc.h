@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -53,6 +53,11 @@
 #include "../../str.h"
 #include "../../modules/tm/dlg.h"
 #include "../cdp/diameter_ims_code_avp.h"
+
+#define NO_DB         0
+#define WRITE_THROUGH 1
+#define WRITE_BACK    2		//not implemented yet
+#define DB_ONLY	      3		//not implemented yet
 
 #define VALID_CONTACT(c, t)   ((c->expires>t) || (c->expires==0))
 
@@ -76,6 +81,12 @@ typedef struct {
 	str wildcarded_psi; /** if exists is the wildcarded psi					*/
 } ims_public_identity;
 
+/** TLS SA Information */
+typedef struct tls {
+	unsigned short port_tls; 	/**< Port UE TLS						*/
+	unsigned long session_hash;
+} tls_t;
+
 /** IPSec SA Information */
 typedef struct ipsec {
 	unsigned int spi_uc; 		/**< SPI Client to use					*/
@@ -98,6 +109,7 @@ typedef struct ipsec {
 typedef enum sec_type {
 	SECURITY_NONE = 0,
 	SECURITY_IPSEC = 1,
+	SECURITY_TLS = 2,
 } security_type;
 
 typedef struct security {
@@ -106,6 +118,7 @@ typedef struct security {
 
 	union {
 		ipsec_t *ipsec; 	/**< IPSec SA information, if any		*/
+		tls_t *tls;			/**< TLS SA information, if any		*/
 	} data;
 	float q;
 } security_t;
@@ -142,7 +155,7 @@ static inline char* reg_state_to_string(enum pcontact_reg_states reg_state) {
 			return "registration pending";
 		case PCONTACT_DEREGISTERED:
 			return "unregistered";
-                case PCONTACT_DEREG_PENDING_PUBLISH:
+		case PCONTACT_DEREG_PENDING_PUBLISH:
 			return "deregistration pending, publish sent";
 		case PCONTACT_REG_PENDING_AAR:
 			return "registration pending, aar sent";
@@ -173,16 +186,21 @@ typedef struct pcontact {
 	struct hslot* slot; 					/*!< Collision slot in the hash table array we belong to */
 	str* domain; 							/*!< Pointer to domain we belong to (null terminated string) */
 	str aor;			 					/*!< Address of record */
-	// str received;           				/*!< IP+port+protocol we received the REGISTER from */
-	str received_host;
-	unsigned short received_port;
-	unsigned short received_proto; /*!< from transport */ ;
+	str contact_host;						/*!< host part of contact */
+	str contact_user;						/*!< user part of contact */
+	unsigned short contact_port;			/*!< port part of contact */
+	str callid;								/*!< Call-ID */
+	str received_host;						/*!< host part of src address where register came from */
+	unsigned short received_port;			/*!< port register was received from */
+	unsigned short received_proto; 			/*!< from transport */ ;
 	str path;               				/*!< Path header */
 	str rx_session_id;						/*!< Rx Session ID for registration Rx AF session - not used if not using diameter_rx */
 	enum pcontact_reg_states reg_state;		/*!< Reg state of contact */
 	time_t expires;							/*!< expires time for contact */
 	str* service_routes;					/*!< Array of service routes */
 	unsigned short num_service_routes;		/*!< Number of service routes */
+	security_t *security;	  				/**< Security-Client Information		*/
+	security_t *security_temp;	    		/**< Security-Client Information (temp)	*/
 	ppublic_t* head;						/*!< list of associated public identities */
 	ppublic_t* tail;
 	struct socket_info *sock; 				/*!< received socket */
@@ -208,6 +226,11 @@ typedef int (*register_udomain_t)(const char* _n, struct udomain** _d);
 typedef int (*get_udomain_t)(const char* _n, udomain_t** _d);
 typedef int (*get_all_ucontacts_t)(void* buf, int len, unsigned int flags, unsigned int part_idx, unsigned int part_max);
 
+/*security related API signatures */
+typedef int (*update_security_t)(struct udomain* _d, security_type _t, security_t* _s, struct pcontact* _c);
+typedef int (*update_temp_security_t)(struct udomain* _d, security_type _t, security_t* _s, struct pcontact* _c);
+
+
 /*! usrloc API export structure */
 typedef struct usrloc_api {
 	int use_domain; /*! use_domain module parameter */
@@ -227,6 +250,9 @@ typedef struct usrloc_api {
 	update_pcontact_t update_pcontact;
 	update_rx_regsession_t update_rx_regsession;
 	get_all_ucontacts_t get_all_ucontacts;
+
+	update_security_t update_security;
+	update_temp_security_t update_temp_security;
 
 	register_ulcb_t register_ulcb;
 } usrloc_api_t;

@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include "dmq_funcs.h"
@@ -76,7 +76,6 @@ int build_uri_str(str* username, struct sip_uri* uri, str* from)
 	/* sip:user@host:port */
 	int from_len;
 	
-	from_len = username->len + uri->host.len + uri->port.len + 10;
 	if(!uri->host.s || !uri->host.len) {
 		LM_ERR("no host in uri\n");
 		return -1;
@@ -85,6 +84,8 @@ int build_uri_str(str* username, struct sip_uri* uri, str* from)
 		LM_ERR("no username given\n");
 		return -1;
 	}
+
+	from_len = username->len + uri->host.len + uri->port.len + 10;
 	from->s = pkg_malloc(from_len);
 	if(from->s==NULL) {
 		LM_ERR("no more pkg\n");
@@ -111,6 +112,30 @@ int build_uri_str(str* username, struct sip_uri* uri, str* from)
 		from->len += uri->port.len;
 	}
 	return 0;
+}
+
+/* Checks if the request (sip_msg_t* msg) comes from another DMQ node based on source IP. */
+int is_from_remote_node(sip_msg_t* msg)
+{
+	ip_addr_t* ip;
+        dmq_node_t* node;
+        int result = -1;
+
+	ip = &msg->rcv.src_ip;
+
+	lock_get(&node_list->lock);
+	node = node_list->nodes;
+
+	while(node) {
+		if (!node->local && ip_addr_cmp(ip, &node->ip_address)) {
+			result = 1;
+			goto done;
+		}
+		node = node->next;
+        }
+done:
+        lock_release(&node_list->lock);
+	return result;
 }
 
 /**
@@ -166,7 +191,7 @@ int dmq_send_message(dmq_peer_t* peer, str* body, dmq_node_t* node,
 {
 	uac_req_t uac_r;
 	str str_hdr = {0, 0};
-	str from, to;
+	str from = {0, 0}, to = {0, 0};
 	dmq_cback_param_t* cb_param = NULL;
 	int result = 0;
 	int len = 0;
@@ -186,9 +211,17 @@ int dmq_send_message(dmq_peer_t* peer, str* body, dmq_node_t* node,
 	str_hdr.len = len;
 	
 	cb_param = shm_malloc(sizeof(*cb_param));
+	if (cb_param == NULL) {
+		LM_ERR("no more shm for building callback parameter\n");
+		goto error;
+	}
 	memset(cb_param, 0, sizeof(*cb_param));
 	cb_param->resp_cback = *resp_cback;
 	cb_param->node = shm_dup_node(node);
+	if (cb_param->node == NULL) {
+		LM_ERR("error building callback parameter\n");
+		goto error;
+	}
 	
 	if(build_uri_str(&peer->peer_id, &dmq_server_uri, &from) < 0) {
 		LM_ERR("error building from string [username %.*s]\n",
@@ -202,6 +235,8 @@ int dmq_send_message(dmq_peer_t* peer, str* body, dmq_node_t* node,
 	
 	set_uac_req(&uac_r, &dmq_request_method, &str_hdr, body, NULL,
 			TMCB_LOCAL_COMPLETED, dmq_tm_callback, (void*)cb_param);
+	uac_r.ssock = &dmq_server_socket;
+
 	result = tmb.t_request(&uac_r, &to,
 			       &to, &from,
 			       NULL);
@@ -219,6 +254,11 @@ error:
 		pkg_free(from.s);
 	if (to.s!=NULL) 
 		pkg_free(to.s);
+	if (cb_param) {
+		if (cb_param->node)
+			destroy_dmq_node(cb_param->node, 1);
+		shm_free(cb_param);
+	}
 	return -1;
 }
 
@@ -250,7 +290,7 @@ int cfg_dmq_send_message(struct sip_msg* msg, char* peer, char* to, char* body, 
 	}
 
 	
-	LM_INFO("cfg_dmq_send_message: %.*s - %.*s - %.*s - %.*s\n",
+	LM_DBG("cfg_dmq_send_message: %.*s - %.*s - %.*s - %.*s\n",
 		peer_str.len, peer_str.s,
 		to_str.len, to_str.s,
 		body_str.len, body_str.s,
@@ -285,6 +325,108 @@ error:
 	return -1;
 }
 
+
+/**
+ * @brief config file function for broadcasting dmq message
+ */
+int cfg_dmq_bcast_message(struct sip_msg* msg, char* peer, char* body, char* content_type)
+{
+	str peer_str;
+	str body_str;
+	str ct_str;
+
+	if(get_str_fparam(&peer_str, msg, (fparam_t*)peer)<0) {
+		LM_ERR("cannot get peer value\n");
+		return -1;
+	}
+	if(get_str_fparam(&body_str, msg, (fparam_t*)body)<0) {
+		LM_ERR("cannot get body value\n");
+		return -1;
+	}
+	if(get_str_fparam(&ct_str, msg, (fparam_t*)content_type)<0) {
+		LM_ERR("cannot get content-type value\n");
+		return -1;
+	}
+
+	LM_DBG("cfg_dmq_bcast_message: %.*s - %.*s - %.*s\n",
+		peer_str.len, peer_str.s,
+		body_str.len, body_str.s,
+		ct_str.len, ct_str.s);
+
+	dmq_peer_t* destination_peer = find_peer(peer_str);
+	if(!destination_peer) {
+		LM_INFO("cannot find peer %.*s - adding it.\n", peer_str.len, peer_str.s);
+		dmq_peer_t new_peer;
+		new_peer.callback = empty_peer_callback;
+		new_peer.description.s = "";
+		new_peer.description.len = 0;
+		new_peer.peer_id = peer_str;
+		destination_peer = register_dmq_peer(&new_peer);
+		if(!destination_peer) {
+			LM_ERR("error in register_dmq_peer\n");
+			goto error;
+		}
+	}
+	if(bcast_dmq_message(destination_peer, &body_str, 0,
+			&notification_callback, 1, &ct_str) < 0) {
+		LM_ERR("cannot send dmq message\n");
+		goto error;
+	}
+	return 1;
+error:
+	return -1;
+}
+
+/**
+ * @brief config file function for replicating SIP message to all nodes (wraps t_replicate)
+ */
+int cfg_dmq_t_replicate(struct sip_msg* msg, char* s)
+{
+	dmq_node_t* node;
+	int i = 0;
+
+	/* avoid loops - do not replicate if message has come from another node
+	 * (override if optional parameter is set)
+	 */
+	if ((!s || (get_int_fparam(&i, msg, (fparam_t*)s)==0 && !i))
+			&& (is_from_remote_node(msg) > 0)) {
+		LM_DBG("message is from another node - skipping replication\n");
+		return -1;
+	}
+
+	lock_get(&node_list->lock);
+	node = node_list->nodes;
+	while(node) {
+		/* we do not send the message to the following:
+		 *   - ourself
+		 *   - any inactive nodes
+		 */
+                if(node->local || node->status != DMQ_NODE_ACTIVE) {
+                        LM_DBG("skipping node %.*s\n", STR_FMT(&node->orig_uri));
+                        node = node->next;
+			continue;
+		}
+		if(tmb.t_replicate(msg, &node->orig_uri) < 0) {
+			LM_ERR("error calling t_replicate\n");
+			goto error;
+		}
+		node = node->next;
+	}
+	lock_release(&node_list->lock);
+	return 0;
+error:
+	lock_release(&node_list->lock);
+	return -1;
+}
+
+/*
+ * @brief config file function to check if received message is from another DMQ node based on source IP
+ */
+int cfg_dmq_is_from_node(struct sip_msg* msg)
+{
+	return is_from_remote_node(msg);
+}
+
 /**
  * @brief pings the servers in the nodelist
  *
@@ -299,6 +441,10 @@ void ping_servers(unsigned int ticks, void *param) {
 	int ret;
 	LM_DBG("ping_servers\n");
 	body = build_notification_body();
+	if (!body) {
+		LM_ERR("could not build notification body\n");
+		return;
+	}
 	ret = bcast_dmq_message(dmq_notification_peer, body, notification_node,
 			&notification_callback, 1, &notification_content_type);
 	pkg_free(body->s);

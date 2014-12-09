@@ -20,7 +20,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #
 
 =head1 Kamailio::Constants
@@ -165,7 +165,11 @@ BEGIN {
 #####################
 # non-enum constants from dprint.h:
 # Logging levels
-	const( L_ALERT	=> -3);
+	const( L_NPRL	=> -6);
+	const( L_MIN	=> -5);
+	const( L_ALERT	=> -5);
+	const( L_BUG	=> -4);
+	const( L_CRIT2  => -3);
 	const( L_CRIT	=> -2);
 	const( L_ERR	=> -1);
 	const( L_WARN	=> 0);

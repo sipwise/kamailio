@@ -25,7 +25,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 
@@ -44,6 +44,7 @@
 
 
 extern char* mods_dir;   /* directory with dyn. loadable modules */
+extern int mods_dir_cmd; /* marker if mods dir was set in command line */
 extern char* cfg_file;
 extern int config_check;
 extern char* stat_file;
@@ -196,6 +197,9 @@ extern int open_files_limit;
 /* memory lock/pre-fault */
 extern int shm_force_alloc;
 extern int mlock_pages;
+
+/* execute onsend_route for replies */
+extern int onsend_route_reply;
 
 /* real time stuff */
 extern int real_time;

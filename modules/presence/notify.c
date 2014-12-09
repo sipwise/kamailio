@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -54,6 +54,8 @@
 
 #define ALLOC_SIZE 3000
 #define MAX_FORWARD 70
+
+extern int pres_local_log_level;
 
 c_back_param* shm_dup_cbparam(subs_t*);
 void free_cbparam(c_back_param* cb_param);
@@ -1594,7 +1596,8 @@ jump_over_body:
 		goto error;
 	}
 
-	LM_INFO("NOTIFY %.*s via %.*s on behalf of %.*s for event %.*s\n",
+	LM_GEN1(pres_local_log_level,
+		"NOTIFY %.*s via %.*s on behalf of %.*s for event %.*s\n",
 		td->rem_uri.len, td->rem_uri.s, td->hooks.next_hop->len,
 		td->hooks.next_hop->s,
 		td->loc_uri.len, td->loc_uri.s, subs->event->name.len,

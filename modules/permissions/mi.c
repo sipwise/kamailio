@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -63,7 +63,7 @@ void rpc_trusted_reload(rpc_t* rpc, void* c) {
 		return;
 	}
 
-	rpc->printf(c, "Reload OK");
+	rpc->rpl_printf(c, "Reload OK");
 	return;
 }
 
@@ -130,7 +130,7 @@ void rpc_address_reload(rpc_t* rpc, void* c) {
 		return;
 	}
 
-	rpc->printf(c, "Reload OK");
+	rpc->rpl_printf(c, "Reload OK");
 	return;
 }
 
@@ -325,9 +325,9 @@ void rpc_test_uri(rpc_t* rpc, void* c)
     	uri[urip.len] = 0;
 
 	if (allow_test(basename, uri, contact) == 1) {
-		rpc->printf(c, "Allowed");
+		rpc->rpl_printf(c, "Allowed");
 		return;
 	}
-	rpc->printf(c, "Denied");
+	rpc->rpl_printf(c, "Denied");
 	return;
 }

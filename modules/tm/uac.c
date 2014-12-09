@@ -28,7 +28,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -67,8 +67,10 @@
 #include "../../md5.h"
 #include "../../crc.h"
 #include "../../ip_addr.h"
+#include "../../dset.h"
 #include "../../socket_info.h"
 #include "../../compiler_opt.h"
+#include "../../parser/parse_cseq.h"
 #include "config.h"
 #include "ut.h"
 #include "h_table.h"
@@ -184,6 +186,43 @@ static inline unsigned int dlg2hash( dlg_t* dlg )
 	return hashid;
 }
 
+/**
+ * refresh hdr shortcuts inside new buffer
+ */
+int uac_refresh_hdr_shortcuts(tm_cell_t *tcell, char *buf, int buf_len)
+{
+	sip_msg_t lreq;
+	struct cseq_body *cs;
+
+	if(likely(build_sip_msg_from_buf(&lreq, buf, buf_len, inc_msg_no())<0)) {
+		LM_ERR("failed to parse msg buffer\n");
+		return -1;
+	}
+	if(parse_headers(&lreq,HDR_CSEQ_F|HDR_CALLID_F|HDR_FROM_F|HDR_TO_F,0)<0) {
+		LM_ERR("failed to parse headers in new message\n");
+		goto error;
+	}
+	tcell->from.s = lreq.from->name.s;
+	tcell->from.len = lreq.from->len;
+	tcell->to.s = lreq.to->name.s;
+	tcell->to.len = lreq.to->len;
+	tcell->callid.s = lreq.callid->name.s;
+	tcell->callid.len = lreq.callid->len;
+
+	cs = get_cseq(&lreq);
+	tcell->cseq_n.s = lreq.cseq->name.s;
+	tcell->cseq_n.len = (int)(cs->number.s + cs->number.len - lreq.cseq->name.s);
+
+	LM_DBG("=========== cseq: [%.*s]\n", tcell->cseq_n.len, tcell->cseq_n.s);
+	lreq.buf=0; /* covers the obsolete DYN_BUF */
+	free_sip_msg(&lreq);
+	return 0;
+
+error:
+	lreq.buf=0; /* covers the obsolete DYN_BUF */
+	free_sip_msg(&lreq);
+	return -1;
+}
 
 /* WARNING: - dst_cell contains the created cell, but it is un-referenced
  *            (before using it make sure you REF() it first)
@@ -220,6 +259,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	snd_flags_t snd_flags;
 	tm_xlinks_t backup_xd;
 	tm_xdata_t local_xd;
+	int refresh_shortcuts = 0;
 
 	ret=-1;
 	hi=0; /* make gcc happy */
@@ -394,19 +434,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 				tm_xdata_swap(new_cell, &backup_xd, 1);
 				setsflagsval(sflag_bk);
 
-				if (unlikely(lreq.new_uri.s))
-				{
-					pkg_free(lreq.new_uri.s);
-					lreq.new_uri.s=0;
-					lreq.new_uri.len=0;
-				}
-				if (unlikely(lreq.dst_uri.s))
-				{
-					pkg_free(lreq.dst_uri.s);
-					lreq.dst_uri.s=0;
-					lreq.dst_uri.len=0;
-				}
-
+				/* rebuild the new message content */
 				if(lreq.force_send_socket != uac_r->dialog->send_sock) {
 					LM_DBG("Send socket updated to: %.*s",
 							lreq.force_send_socket->address_str.len,
@@ -439,6 +467,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 						buf = buf1;
 						buf_len = buf_len1;
 						/* a possible change of the method is not handled! */
+						refresh_shortcuts = 1;
 					}
 
 				} else {
@@ -455,8 +484,23 @@ normal_update:
 							buf = buf1;
 							buf_len = buf_len1;
 							/* a possible change of the method is not handled! */
+							refresh_shortcuts = 1;
 						}
 					}
+				}
+
+				/* clean local msg structure */
+				if (unlikely(lreq.new_uri.s))
+				{
+					pkg_free(lreq.new_uri.s);
+					lreq.new_uri.s=0;
+					lreq.new_uri.len=0;
+				}
+				if (unlikely(lreq.dst_uri.s))
+				{
+					pkg_free(lreq.dst_uri.s);
+					lreq.dst_uri.s=0;
+					lreq.dst_uri.len=0;
 				}
 				lreq.buf=0; /* covers the obsolete DYN_BUF */
 				free_sip_msg(&lreq);
@@ -473,6 +517,12 @@ normal_update:
 
 	request->buffer = buf;
 	request->buffer_len = buf_len;
+	if(unlikely(refresh_shortcuts==1)) {
+		if(uac_refresh_hdr_shortcuts(new_cell, buf, buf_len)<0) {
+			LM_ERR("failed to refresh header shortcuts\n");
+			goto error1;
+		}
+	}
 	new_cell->nr_of_outgoings++;
 
 	/* Register the callbacks after everything is successful and nothing can fail.
@@ -738,6 +788,14 @@ fin:
  */
 int req_within(uac_req_t *uac_r)
 {
+	int ret;
+	char nbuf[MAX_URI_SIZE];
+#define REQ_DST_URI_SIZE	80
+	char dbuf[REQ_DST_URI_SIZE];
+	str ouri = {0, 0};
+	str nuri = {0, 0};
+	str duri = {0, 0};
+
 	if (!uac_r || !uac_r->method || !uac_r->dialog) {
 		LOG(L_ERR, "req_within: Invalid parameter value\n");
 		goto err;
@@ -749,15 +807,49 @@ int req_within(uac_req_t *uac_r)
 		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
 	}
 
+	/* handle alias parameter in uri
+	 * - only if no dst uri and no route set - */
+	if(uac_r->dialog && uac_r->dialog->rem_target.len>0
+			&& uac_r->dialog->dst_uri.len==0
+			&& uac_r->dialog->route_set==NULL) {
+		ouri = uac_r->dialog->rem_target;
+		/*restore alias parameter*/
+		nuri.s = nbuf;
+		nuri.len = MAX_URI_SIZE;
+		duri.s = dbuf;
+		duri.len = REQ_DST_URI_SIZE;
+		if(uri_restore_rcv_alias(&ouri, &nuri, &duri)<0) {
+			nuri.len = 0;
+			duri.len = 0;
+		}
+		if(nuri.len>0 && duri.len>0) {
+			uac_r->dialog->rem_target = nuri;
+			uac_r->dialog->dst_uri    = duri;
+		} else {
+			ouri.len = 0;
+		}
+	}
+
 	if ((uac_r->method->len == 3) && (!memcmp("ACK", uac_r->method->s, 3))) goto send;
 	if ((uac_r->method->len == 6) && (!memcmp("CANCEL", uac_r->method->s, 6))) goto send;
 	uac_r->dialog->loc_seq.value++; /* Increment CSeq */
  send:
-	return t_uac(uac_r);
+	ret = t_uac(uac_r);
+	if(ouri.len>0) {
+		uac_r->dialog->rem_target = ouri;
+		uac_r->dialog->dst_uri.s = 0;
+		uac_r->dialog->dst_uri.len = 0;
+	}
+	return ret;
 
  err:
 	/* callback parameter must be freed outside of tm module
 	if (cbp) shm_free(cbp); */
+	if(ouri.len>0) {
+		uac_r->dialog->rem_target = ouri;
+		uac_r->dialog->dst_uri.s = 0;
+		uac_r->dialog->dst_uri.len = 0;
+	}
 	return -1;
 }
 

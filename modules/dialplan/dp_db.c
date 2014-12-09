@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -43,7 +43,7 @@
 #include "dp_db.h"
 #include "dialplan.h"
 
-str dp_db_url       =   {DEFAULT_RODB_URL, DEFAULT_RODB_URL_LEN};
+str dp_db_url       =   str_init(DEFAULT_RODB_URL);
 str dp_table_name   =   str_init(DP_TABLE_NAME);
 str dpid_column     =   str_init(DPID_COL);
 str pr_column       =   str_init(PR_COL);
@@ -87,7 +87,7 @@ int * crt_idx, *next_idx;
 
 int init_db_data(void)
 {
-	if(dp_table_name.s == 0){
+	if(!dp_table_name.s || dp_table_name.len<=0){
 		LM_ERR("invalid database table name\n");
 		return -1;
 	}
@@ -385,7 +385,6 @@ dpl_node_t * build_rule(db_val_t * values)
 		}
 	}
 
-	LM_DBG("build_rule\n");
 	GET_STR_VALUE(repl_exp, values, 6);
 	if(repl_exp.len && repl_exp.s){
 		repl_comp = repl_exp_parse(repl_exp);
@@ -411,6 +410,9 @@ dpl_node_t * build_rule(db_val_t * values)
 		}
 	}
 
+	LM_DBG("building rule for [%d:%.*s/%.*s/%.*s]\n", matchop,
+			match_exp.len, ZSW(match_exp.s), subst_exp.len, ZSW(subst_exp.s),
+			repl_exp.len, ZSW(repl_exp.s));
 	if (repl_comp && (cap_cnt < repl_comp->max_pmatch) && 
 			(repl_comp->max_pmatch != 0)) {
 		LM_ERR("repl_exp %.*s refers to %d sub-expressions, but "

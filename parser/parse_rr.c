@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
@@ -441,9 +441,9 @@ int print_rr_body(struct hdr_field *iroute, str *oroute, int order,
 	oroute->len=cp - start;
 
 	LM_DBG("out rr [%.*s]\n", oroute->len, oroute->s);
-	LM_DBG("we have %i records\n", n);
+	LM_DBG("we have %i records\n", (nb_recs == NULL) ? n : n-*nb_recs);
 	if(nb_recs != NULL)
-		*nb_recs = (unsigned int)n; 
+		*nb_recs = (unsigned int)n-*nb_recs;
 
 	return 0;
 

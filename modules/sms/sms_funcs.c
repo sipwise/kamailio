@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*
@@ -370,7 +370,7 @@ error:
 
 
 
-inline int send_error(struct sms_msg *sms_messg, char *msg1_s, int msg1_len,
+static inline int send_error(struct sms_msg *sms_messg, char *msg1_s, int msg1_len,
 													char *msg2_s, int msg2_len)
 {
 	str  body;
@@ -398,7 +398,7 @@ error:
 
 
 
-inline unsigned int split_text(str *text, unsigned char *lens,int nice)
+static inline unsigned int split_text(str *text, unsigned char *lens,int nice)
 {
 	int  nr_chunks;
 	int  k,k1,len;

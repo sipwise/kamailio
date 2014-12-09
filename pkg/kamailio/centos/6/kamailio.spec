@@ -1,5 +1,5 @@
 %define name	kamailio
-%define ver	4.1.6
+%define ver	4.2.1
 %define rel	0%{dist}
 
 
@@ -420,12 +420,12 @@ make cfg prefix=/usr cfg_prefix=$RPM_BUILD_ROOT basedir=$RPM_BUILD_ROOT \
 	cfg_target=/%{_sysconfdir}/kamailio/ modules_dirs="modules"
 make
 make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
-	jabber osp" \
+	jabber ndb_cassandra osp" \
 	group_include="kstandard kautheph kberkeley kcarrierroute kcpl \
-	kdnssec kgeoip kims kjava kjson kldap klua kmemcached kmi_xmlrpc \
-	kmysql koutbound kperl kpostgres kpresence kpurple kpython kradius \
-	kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils kwebsocket \
-	kxml kxmpp" 
+	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
+	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
+	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
+	kwebsocket kxml kxmpp"
 cd modules/app_java/kamailio_java_folder/java
 ant
 cd ../../../..
@@ -440,10 +440,10 @@ make install
 make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 	iptrtpproxy jabber osp" \
 	group_include="kstandard kautheph kberkeley kcarrierroute kcpl \
-	kdnssec kgeoip kims kjava kjson kldap klua kmemcached kmi_xmlrpc \
-	kmysql koutbound kperl kpostgres kpresence kpurple kpython kradius \
-	kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils kwebsocket \
-	kxml kxmpp" 
+	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
+	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
+	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
+	kwebsocket kxml kxmpp"
 
 mkdir -p $RPM_BUILD_ROOT/%{_libdir}/kamailio/java
 install -m644 modules/app_java/kamailio_java_folder/java/Kamailio.class \
@@ -1047,6 +1047,11 @@ fi
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.snmpstats
 %{_libdir}/kamailio/modules/snmpstats.so
+%{_datadir}/snmp/mibs/KAMAILIO-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-REG-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-SIP-COMMON-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-SIP-SERVER-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-TC
 
 
 %files		sqlite
@@ -1115,6 +1120,8 @@ fi
 
 
 %changelog
+* Tue Dec 3 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
+  - Updated version to 4.2.0
 * Mon Oct 7 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
   - Consolidating changelog for 4.1.0 into a single entry...
   - Added new modules to main package:

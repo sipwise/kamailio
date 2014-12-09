@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include "usrloc_cb.h"
@@ -49,6 +49,12 @@ Call-ID: 9ad9f89f-164d-bb86-1072-52e7e9eb5025.
 .</registration>
 </reginfo> */
 
+static int _pua_reginfo_self_op = 0;
+
+void pua_reginfo_update_self_op(int v)
+{
+	_pua_reginfo_self_op = v;
+}
 
 str* build_reginfo_full(urecord_t * record, str uri, ucontact_t* c, int type) {
 	xmlDocPtr  doc = NULL; 
@@ -220,6 +226,12 @@ void reginfo_usrloc_cb(ucontact_t* c, int type, void* param) {
 	char* at = NULL;
 	char id_buf[512];
 	int id_buf_len;
+
+	if(_pua_reginfo_self_op == 1) {
+		LM_DBG("operation triggered by own action for aor: %.*s (%d)\n",
+				c->aor->len, c->aor->s, type);
+		return;
+	}
 
 	content_type.s = "application/reginfo+xml";
 	content_type.len = 23;

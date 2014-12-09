@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /* local, per process timer routines
  * WARNING: this should be used only within the same process, the timers
@@ -93,8 +93,7 @@ static inline int _local_timer_dist_tl(struct local_timer* h,
 {
 	if (likely(delta<H0_ENTRIES)){
 		if (unlikely(delta==0)){
-			LOG(L_WARN, "WARNING: local_timer: add_timeout: 0 expire timer"
-						" added\n");
+			LM_WARN("0 expire timer added\n");
 			_timer_add_list(&h->timer_lst.expired, tl);
 		}else{
 			_timer_add_list( &h->timer_lst.h0[tl->expire & H0_MASK], tl);
@@ -162,8 +161,7 @@ int local_timer_add(struct local_timer* h, struct timer_ln* tl, ticks_t delta,
 	}
 	tl->initial_timeout=delta;
 	if (unlikely((tl->next!=0) || (tl->prev!=0))){
-		LOG(L_CRIT, "BUG: tcp_timer_add: called with linked timer:"
-				" %p (%p, %p)\n", tl, tl->next, tl->prev);
+		LM_CRIT("called with linked timer: %p (%p, %p)\n", tl, tl->next, tl->prev);
 		ret=-1;
 		goto error;
 	}
@@ -256,7 +254,7 @@ void local_timer_run(struct local_timer* lt, ticks_t saved_ticks)
 	
 		/* protect against time running backwards */
 		if (unlikely(lt->prev_ticks>=saved_ticks)){
-			LOG(L_CRIT, "BUG: local_timer: backwards or still time\n");
+			LM_CRIT("backwards or still time\n");
 			/* try to continue */
 			lt->prev_ticks=saved_ticks-1;
 			return;

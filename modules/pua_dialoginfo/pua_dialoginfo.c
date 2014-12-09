@@ -21,7 +21,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -114,8 +114,8 @@ static param_export_t params[]={
 	{"include_req_uri",     INT_PARAM, &include_req_uri },
 	{"send_publish_flag",   INT_PARAM, &send_publish_flag },
 	{"use_pubruri_avps",    INT_PARAM, &use_pubruri_avps },
-	{"pubruri_caller_avp",  STR_PARAM, &pubruri_caller_avp },
-	{"pubruri_callee_avp",  STR_PARAM, &pubruri_callee_avp },
+	{"pubruri_caller_avp",  PARAM_STRING, &pubruri_caller_avp },
+	{"pubruri_callee_avp",  PARAM_STRING, &pubruri_callee_avp },
 	{0, 0, 0 }
 };
 

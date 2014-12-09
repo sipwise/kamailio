@@ -24,7 +24,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /* History:
  * --------
@@ -297,13 +297,13 @@ void fix_dns_flags(str *gname, str *name)
 #ifdef DNS_SRV_LB
 		dns_flags|=DNS_SRV_RR_LB;
 #else
-		LOG(L_WARN, "WARNING: fix_dns_flags: SRV loadbalaning is set, but"
+		LM_WARN("SRV loadbalaning is set, but"
 					" support for it is not compiled -- ignoring\n");
 #endif
 	}
 	if (cfg_get(core, core_cfg, dns_try_naptr)) {
 #ifndef USE_NAPTR
-	LOG(L_WARN, "WARNING: fix_dns_flags: NAPTR support is enabled, but"
+	LM_WARN("NAPTR support is enabled, but"
 				" support for it is not compiled -- ignoring\n");
 #endif
 		dns_flags|=DNS_TRY_NAPTR;
@@ -316,8 +316,7 @@ void fix_dns_flags(str *gname, str *name)
 int use_dns_failover_fixup(void *handle, str *gname, str *name, void **val)
 {
 	if ((int)(long)(*val) && !cfg_get(core, handle, use_dns_cache)) {
-		LOG(L_ERR, "ERROR: use_dns_failover_fixup(): "
-			"DNS cache is turned off, failover cannot be enabled. "
+		LM_ERR("DNS cache is turned off, failover cannot be enabled. "
 			"(set use_dns_cache to 1)\n");
 		return -1;
 	}
@@ -330,14 +329,12 @@ int use_dns_failover_fixup(void *handle, str *gname, str *name, void **val)
 int use_dns_cache_fixup(void *handle, str *gname, str *name, void **val)
 {
 	if ((int)(long)(*val) && !dns_cache_init) {
-		LOG(L_ERR, "ERROR: use_dns_cache_fixup(): "
-			"DNS cache is turned off by dns_cache_init=0, "
+		LM_ERR("DNS cache is turned off by dns_cache_init=0, "
 			"it cannot be enabled runtime.\n");
 		return -1;
 	}
 	if (((int)(long)(*val)==0) && cfg_get(core, handle, use_dns_failover)) {
-		LOG(L_ERR, "ERROR: use_dns_failover_fixup(): "
-			"DNS failover depends on use_dns_cache, set use_dns_failover "
+		LM_ERR("DNS failover depends on use_dns_cache, set use_dns_failover "
 			"to 0 before disabling the DNS cache\n");
 		return -1;
 	}
@@ -369,7 +366,7 @@ int init_dns_cache()
 	ret=0;
 	/* sanity check */
 	if (E_DNS_CRITICAL>=sizeof(dns_str_errors)/sizeof(char*)){
-		LOG(L_CRIT, "BUG: dns_cache_init: bad dns error table\n");
+		LM_CRIT("bad dns error table\n");
 		ret=E_BUG;
 		goto error;
 	}
@@ -430,7 +427,7 @@ int init_dns_cache()
 	if (dns_timer_interval){
 		timer_init(dns_timer_h, dns_timer, 0, 0); /* "slow" timer */
 		if (timer_add(dns_timer_h, S_TO_TICKS(dns_timer_interval))<0){
-			LOG(L_CRIT, "BUG: dns_cache_init: failed to add the timer\n");
+			LM_CRIT("failed to add the timer\n");
 			timer_free(dns_timer_h);
 			dns_timer_h=0;
 			goto error;
@@ -481,7 +478,7 @@ int init_dns_cache_stats(int iproc_num)
 							((l)!=dns_last_used_lst))
 
 #define dbg_lu_lst(txt, l) \
-		LOG(L_CRIT, "BUG: %s: crt(%p, %p, %p)," \
+		LM_CRIT("%s: crt(%p, %p, %p)," \
 					" prev(%p, %p, %p), next(%p, %p, %p)\n", txt, \
 					(l), (l)->next, (l)->prev, \
 					(l)->prev, (l)->prev->next, (l)->prev->prev, \
@@ -617,8 +614,8 @@ again:
 					  return the last cname */
 			/* this is a cname => retry using its value */
 			if (cname_chain> MAX_CNAME_CHAIN){
-				LOG(L_ERR, "ERROR: _dns_hash_find: cname chain too long "
-						"or recursive (\"%.*s\")\n", name->len, name->s);
+				LM_ERR("cname chain too long or recursive (\"%.*s\")\n",
+						name->len, name->s);
 				ret=0; /* error*/
 				*err=-1;
 				break;
@@ -814,12 +811,12 @@ inline static int dns_cache_add(struct dns_hash_entry* e)
 #ifdef USE_DNS_CACHE_STATS
 		dns_cache_stats[process_no].dc_lru_cnt++;
 #endif
-		LOG(L_WARN, "WARNING: dns_cache_add: cache full, trying to free...\n");
+		LM_WARN("cache full, trying to free...\n");
 		/* free ~ 12% of the cache */
 		dns_cache_free_mem(*dns_cache_mem_used/16*14,
 					!cfg_get(core, core_cfg, dns_cache_del_nonexp));
 		if ((*dns_cache_mem_used+e->total_size)>=cfg_get(core, core_cfg, dns_cache_max_mem)){
-			LOG(L_ERR, "ERROR: dns_cache_add: max. cache mem size exceeded\n");
+			LM_ERR("max. cache mem size exceeded\n");
 			return -1;
 		}
 	}
@@ -854,14 +851,14 @@ inline static int dns_cache_add_unsafe(struct dns_hash_entry* e)
 #ifdef USE_DNS_CACHE_STATS
 		dns_cache_stats[process_no].dc_lru_cnt++;
 #endif
-		LOG(L_WARN, "WARNING: dns_cache_add: cache full, trying to free...\n");
+		LM_WARN("cache full, trying to free...\n");
 		/* free ~ 12% of the cache */
 		UNLOCK_DNS_HASH();
 		dns_cache_free_mem(*dns_cache_mem_used/16*14,
 					!cfg_get(core, core_cfg, dns_cache_del_nonexp));
 		LOCK_DNS_HASH();
 		if ((*dns_cache_mem_used+e->total_size)>=cfg_get(core, core_cfg, dns_cache_max_mem)){
-			LOG(L_ERR, "ERROR: dns_cache_add: max. cache mem size exceeded\n");
+			LM_ERR("max. cache mem size exceeded\n");
 			return -1;
 		}
 	}
@@ -899,7 +896,7 @@ inline static struct dns_hash_entry* dns_cache_mk_bad_entry(str* name,
 	size=sizeof(struct dns_hash_entry)+name->len-1+1;
 	e=shm_malloc(size);
 	if (e==0){
-		LOG(L_ERR, "ERROR: dns_cache_mk_bad_entry: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0*/
@@ -940,7 +937,7 @@ inline static struct dns_hash_entry* dns_cache_mk_ip_entry(str* name,
 			sizeof(struct dns_rr)+ ip->len;
 	e=shm_malloc(size);
 	if (e==0){
-		LOG(L_ERR, "ERROR: dns_cache_mk_ip_entry: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0*/
@@ -993,7 +990,7 @@ static struct dns_hash_entry* dns_cache_mk_srv_entry(str* name,
 
 	e=shm_malloc(size);
 	if (e==0){
-		LOG(L_ERR, "ERROR: dns_cache_srv_ip_entry: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0*/
@@ -1232,8 +1229,7 @@ inline static struct dns_hash_entry* dns_cache_mk_rd_entry(str* name, int type,
 			}
 			break;
 		default:
-			LOG(L_CRIT, "BUG: dns_cache_mk_rd_entry: type %d not "
-							"supported\n", type);
+			LM_CRIT("type %d not supported\n", type);
 			/* we don't know what to do with it, so don't
 			 * add it to the tmp_lst */
 			return 0; /* error */
@@ -1250,7 +1246,7 @@ inline static struct dns_hash_entry* dns_cache_mk_rd_entry(str* name, int type,
 	size+=ROUND_POINTER(sizeof(struct dns_hash_entry)+name->len-1+1);
 	e=shm_malloc(size);
 	if (e==0){
-		LOG(L_ERR, "ERROR: dns_cache_mk_rd_entry: out of memory\n");
+		LM_ERR("out of memory\n");
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0 */
@@ -1421,8 +1417,7 @@ inline static struct dns_hash_entry* dns_cache_mk_rd_entry(str* name, int type,
 			break;
 		default:
 			/* do nothing */
-			LOG(L_CRIT, "BUG: dns_cache_mk_rd_entry: create: type %d not "
-							"supported\n", type);
+			LM_CRIT("type %d not supported\n", type);
 				;
 	}
 	*tail_rr=0; /* terminate the list */
@@ -1498,8 +1493,7 @@ inline static struct dns_hash_entry* dns_cache_mk_rd_entry2(struct rdata* rd)
 							rec[r].rd->name_len-1+1);
 			no_records++;
 		}else{
-			LOG(L_ERR, "ERROR: dns_cache_mk_rd_entry2: too many records: %d\n",
-						no_records);
+			LM_ERR("too many records: %d\n", no_records);
 			/* skip */
 			continue;
 		}
@@ -1550,8 +1544,7 @@ found:
 							PTR_RDATA_SIZE(*(struct ptr_rdata*)l->rdata));
 				break;
 			default:
-				LOG(L_CRIT, "BUG: dns_cache_mk_rd_entry: type %d not "
-							"supported\n", l->type);
+				LM_CRIT("type %d not supported\n", l->type);
 		}
 	}
 
@@ -1560,7 +1553,7 @@ found:
 	for (r=0; r<no_records; r++){
 		rec[r].e=shm_malloc(rec[r].size);
 		if (rec[r].e==0){
-			LOG(L_ERR, "ERROR: dns_cache_mk_rd_entry: out of memory\n");
+			LM_ERR("out of memory\n");
 			goto error;
 		}
 		memset(rec[r].e, 0, rec[r].size); /* init with 0*/
@@ -1915,8 +1908,7 @@ inline static struct dns_hash_entry* dns_cache_do_request(str* name, int type)
 		goto end; /* the servers are down, needless to perform the query */
 #endif
 	if (name->len>=MAX_DNS_NAME){
-		LOG(L_ERR, "ERROR: dns_cache_do_request: name too long (%d chars)\n",
-					name->len);
+		LM_ERR("name too long (%d chars)\n", name->len);
 		goto end;
 	}
 	/* null terminate the string, needed by get_record */
@@ -2133,8 +2125,8 @@ inline static struct dns_hash_entry* dns_get_entry(str* name, int type)
 
 	e=0;
 	if (rec_cnt>MAX_CNAME_CHAIN){
-		LOG(L_WARN, "WARNING: dns_get_entry: CNAME chain too long or"
-				" recursive CNAMEs (\"%.*s\")\n", name->len, name->s);
+		LM_WARN("CNAME chain too long or recursive CNAMEs (\"%.*s\")\n",
+				name->len, name->s);
 		goto error;
 	}
 	rec_cnt++;
@@ -2414,7 +2406,7 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
 			len=16;
 			break;
 		default:
-			LOG(L_CRIT, "BUG: dns_entry2he: wrong entry type %d for %.*s\n",
+			LM_CRIT("wrong entry type %d for %.*s\n",
 					e->type, e->name_len, e->name);
 			return 0;
 	}
@@ -2676,8 +2668,8 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
 		*port=(srv_proto==PROTO_TLS)?SIPS_PORT:SIP_PORT; /* just in case we
 														 don't find another */
 		if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-			LOG(L_WARN, "WARNING: dns_sip_resolvehost: domain name too long"
-						" (%d), unable to perform SRV lookup\n", name->len);
+			LM_WARN("domain name too long (%d), unable to perform SRV lookup\n",
+						name->len);
 		}else{
 			/* check if it's an ip address */
 			if ( ((ip=str2ip(name))!=0)
@@ -2700,8 +2692,7 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
 					create_srv_name(srv_proto, name, tmp);
 					break;
 				default:
-					LOG(L_CRIT, "BUG: sip_resolvehost: unknown proto %d\n",
-							(int)srv_proto);
+					LM_CRIT("unknown proto %d\n", (int)srv_proto);
 					return 0;
 			}
 
@@ -2713,7 +2704,7 @@ struct hostent* dns_srv_sip_resolvehost(str* name, unsigned short* port,
 	}
 /*skip_srv:*/
 	if (name->len >= MAX_DNS_NAME) {
-		LOG(L_ERR, "dns_sip_resolvehost: domain name too long\n");
+		LM_ERR("domain name too long\n");
 		return 0;
 	}
 	he=dns_get_he(name, dns_flags);
@@ -2758,7 +2749,7 @@ struct naptr_rdata* dns_naptr_sip_iterate(struct dns_rr* naptr_head,
 	for(l=naptr_head; l && (i<MAX_NAPTR_RRS); l=l->next){
 		naptr=(struct naptr_rdata*) l->rdata;
 		if (naptr==0){
-				LOG(L_CRIT, "naptr_iterate: BUG: null rdata\n");
+			LM_CRIT("null rdata\n");
 			goto end;
 		}
 		/* check if valid and get proto */
@@ -2820,8 +2811,7 @@ struct hostent* dns_naptr_sip_resolvehost(str* name, unsigned short* port,
 	origproto=*proto;
 	he=0;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
-		LOG(L_WARN, "WARNING: dns_sip_resolvehost: called before dns cache"
-					" initialization\n");
+		LM_WARN("called before dns cache initialization\n");
 		return _sip_resolvehost(name, port, proto);
 	}
 	if (proto && port && (*proto==0) && (*port==0)){
@@ -3032,7 +3022,7 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 									struct ip_addr* ip,
 									int flags)
 {
-	int ret;
+	int ret, orig_ret;
 	str host;
 	struct dns_hash_entry* orig;
 
@@ -3060,10 +3050,13 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 		if (ret>=0) return ret;
 		if (!(flags&(DNS_IPV6_ONLY|DNS_IPV6_FIRST|DNS_IPV4_ONLY))){
 			/* not found, try with AAAA */
+			orig_ret=ret;
 			orig=*e;
 			*e=0;
 			*rr_no=0;
 			ret=dns_aaaa_resolve(e, rr_no, &host, ip);
+			if (ret==-E_DNS_NO_IP && orig_ret==-E_DNS_EOR)
+				ret=orig_ret;
 			/* delay original record release until we're finished with host*/
 			dns_hash_put(orig);
 		}
@@ -3077,16 +3070,18 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 		if (ret>=0) return ret;
 		if ((flags&DNS_IPV6_FIRST) && !(flags&DNS_IPV6_ONLY)){
 			/* not found, try with A */
+			orig_ret=ret;
 			orig=*e;
 			*e=0;
 			*rr_no=0;
 			ret=dns_a_resolve(e, rr_no, &host, ip);
+			if (ret==-E_DNS_NO_IP && orig_ret==-E_DNS_EOR)
+				ret=orig_ret;
 			/* delay original record release until we're finished with host*/
 			dns_hash_put(orig);
 		}
 	}else{
-		LOG(L_CRIT, "BUG: dns_ip_resolve: invalid record type %d\n",
-					(*e)->type);
+		LM_CRIT("invalid record type %d\n", (*e)->type);
 	}
 	return ret;
 }
@@ -3232,8 +3227,7 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 
 	origproto = *proto;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
-		LOG(L_WARN, "WARNING: dns_srv_sip_resolve: called before dns cache"
-					" initialization\n");
+		LM_WARN("called before dns cache initialization\n");
 		h->srv=h->a=0;
 		he=_sip_resolvehost(name, port, proto);
 		if (he){
@@ -3254,8 +3248,7 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 				/* try SRV if initial call & no port specified
 				 * (draft-ietf-sip-srv-06) */
 				if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-					LOG(L_WARN, "WARNING: dns_srv_sip_resolve: domain name too"
-								" long (%d), unable to perform SRV lookup\n",
+					LM_WARN("domain name too long (%d), unable to perform SRV lookup\n",
 								name->len);
 				}else{
 					/* check if it's an ip address */
@@ -3284,8 +3277,7 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 								create_srv_name(srv_proto_list[i].proto, name, tmp);
 								break;
 							default:
-								LOG(L_CRIT, "BUG: dns_srv_sip_resolve: "
-										"unknown proto %d\n", (int)srv_proto_list[i].proto);
+								LM_CRIT("unknown proto %d\n", (int)srv_proto_list[i].proto);
 								return -E_DNS_CRITICAL;
 						}
 						srv_name.s=tmp;
@@ -3318,7 +3310,7 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 			return ret;
 	}
 	if (name->len >= MAX_DNS_NAME) {
-		LOG(L_ERR, "dns_srv_sip_resolve: domain name too long\n");
+		LM_ERR("domain name too long\n");
 		return -E_DNS_NAME_TOO_LONG;
 	}
 	ret=dns_ip_resolve(&h->a, &h->ip_no, name, ip, flags);
@@ -3364,8 +3356,7 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 	ret=-E_DNS_NO_NAPTR;
 	origproto=*proto;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
-		LOG(L_WARN, "WARNING: dns_sip_resolve: called before dns cache"
-					" initialization\n");
+		LM_WARN("called before dns cache initialization\n");
 		h->srv=h->a=0;
 		he=_sip_resolvehost(name, port, proto);
 		if (he){
@@ -3814,21 +3805,21 @@ void dns_cache_print_entry(rpc_t* rpc, void* ctx, struct dns_hash_entry* e)
 	now=get_ticks_raw();
 	expires = (s_ticks_t)(e->expire-now)<0?-1: TICKS_TO_S(e->expire-now);
 	
-	rpc->printf(ctx, "%sname: %s", SPACE_FORMAT, e->name);
-	rpc->printf(ctx, "%stype: %s", SPACE_FORMAT, print_type(e->type));
-	rpc->printf(ctx, "%ssize (bytes): %d", SPACE_FORMAT,
+	rpc->rpl_printf(ctx, "%sname: %s", SPACE_FORMAT, e->name);
+	rpc->rpl_printf(ctx, "%stype: %s", SPACE_FORMAT, print_type(e->type));
+	rpc->rpl_printf(ctx, "%ssize (bytes): %d", SPACE_FORMAT,
 						e->total_size);
-	rpc->printf(ctx, "%sreference counter: %d", SPACE_FORMAT,
+	rpc->rpl_printf(ctx, "%sreference counter: %d", SPACE_FORMAT,
 						e->refcnt.val);
 	if (e->ent_flags & DNS_FLAG_PERMANENT) {
-		rpc->printf(ctx, "%spermanent: yes", SPACE_FORMAT);
+		rpc->rpl_printf(ctx, "%spermanent: yes", SPACE_FORMAT);
 	} else {
-		rpc->printf(ctx, "%spermanent: no", SPACE_FORMAT);
-		rpc->printf(ctx, "%sexpires in (s): %d", SPACE_FORMAT, expires);
+		rpc->rpl_printf(ctx, "%spermanent: no", SPACE_FORMAT);
+		rpc->rpl_printf(ctx, "%sexpires in (s): %d", SPACE_FORMAT, expires);
 	}
-	rpc->printf(ctx, "%slast used (s): %d", SPACE_FORMAT,
+	rpc->rpl_printf(ctx, "%slast used (s): %d", SPACE_FORMAT,
 						TICKS_TO_S(now-e->last_used));
-	rpc->printf(ctx, "%snegative entry: %s", SPACE_FORMAT,
+	rpc->rpl_printf(ctx, "%snegative entry: %s", SPACE_FORMAT,
 						(e->ent_flags & DNS_FLAG_BAD_NAME) ? "yes" : "no");
 	
 	for (rr=e->rr_lst; rr; rr=rr->next) {
@@ -3836,74 +3827,74 @@ void dns_cache_print_entry(rpc_t* rpc, void* ctx, struct dns_hash_entry* e)
 			case T_A:
 			case T_AAAA:
 				if (dns_rr2ip(e->type, rr, &ip)==0){
-				  rpc->printf(ctx, "%srr ip: %s", SPACE_FORMAT,
+				  rpc->rpl_printf(ctx, "%srr ip: %s", SPACE_FORMAT,
 									ip_addr2a(&ip) );
 				}else{
-				  rpc->printf(ctx, "%srr ip: <error: bad rr>", 
+				  rpc->rpl_printf(ctx, "%srr ip: <error: bad rr>", 
 									SPACE_FORMAT);
 				}
 				break;
 			case T_SRV:
-				rpc->printf(ctx, "%srr name: %s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr name: %s", SPACE_FORMAT,
 							((struct srv_rdata*)(rr->rdata))->name);
-				rpc->printf(ctx, "%srr port: %d", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr port: %d", SPACE_FORMAT,
 							((struct srv_rdata*)(rr->rdata))->port);
-				rpc->printf(ctx, "%srr priority: %d", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr priority: %d", SPACE_FORMAT,
 						((struct srv_rdata*)(rr->rdata))->priority);
-				rpc->printf(ctx, "%srr weight: %d", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr weight: %d", SPACE_FORMAT,
 							((struct srv_rdata*)(rr->rdata))->weight);
 				break;
 			case T_NAPTR:
-				rpc->printf(ctx, "%srr order: %d", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr order: %d", SPACE_FORMAT,
 							((struct naptr_rdata*)(rr->rdata))->order);
-				rpc->printf(ctx, "%srr preference: %d", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr preference: %d", SPACE_FORMAT,
 							((struct naptr_rdata*)(rr->rdata))->pref);
 				s.s = ((struct naptr_rdata*)(rr->rdata))->flags;
 				s.len = ((struct naptr_rdata*)(rr->rdata))->flags_len;
-				rpc->printf(ctx, "%srr flags: %.*s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr flags: %.*s", SPACE_FORMAT,
 									s.len, s.s);
 				s.s=((struct naptr_rdata*)(rr->rdata))->services;
 				s.len=((struct naptr_rdata*)(rr->rdata))->services_len;
-				rpc->printf(ctx, "%srr service: %.*s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr service: %.*s", SPACE_FORMAT,
 									s.len, s.s);
 				s.s = ((struct naptr_rdata*)(rr->rdata))->regexp;
 				s.len = ((struct naptr_rdata*)(rr->rdata))->regexp_len;
-				rpc->printf(ctx, "%srr regexp: %.*s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr regexp: %.*s", SPACE_FORMAT,
 									s.len, s.s);
 				s.s = ((struct naptr_rdata*)(rr->rdata))->repl;
 				s.len = ((struct naptr_rdata*)(rr->rdata))->repl_len;
-				rpc->printf(ctx, "%srr replacement: %.*s", 
+				rpc->rpl_printf(ctx, "%srr replacement: %.*s", 
 									SPACE_FORMAT, s.len, s.s);
 				break;
 			case T_CNAME:
-				rpc->printf(ctx, "%srr name: %s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr name: %s", SPACE_FORMAT,
 							((struct cname_rdata*)(rr->rdata))->name);
 				break;
 			case T_TXT:
 				for (i=0; i<((struct txt_rdata*)(rr->rdata))->cstr_no;
 						i++){
-					rpc->printf(ctx, "%stxt[%d]: %s", SPACE_FORMAT, i,
+					rpc->rpl_printf(ctx, "%stxt[%d]: %s", SPACE_FORMAT, i,
 						((struct txt_rdata*)(rr->rdata))->txt[i].cstr);
 				}
 				break;
 			case T_EBL:
-				rpc->printf(ctx, "%srr position: %d", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr position: %d", SPACE_FORMAT,
 							((struct ebl_rdata*)(rr->rdata))->position);
-				rpc->printf(ctx, "%srr separator: %s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr separator: %s", SPACE_FORMAT,
 							((struct ebl_rdata*)(rr->rdata))->separator);
-				rpc->printf(ctx, "%srr apex: %s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr apex: %s", SPACE_FORMAT,
 							((struct ebl_rdata*)(rr->rdata))->apex);
 				break;
 			case T_PTR:
-				rpc->printf(ctx, "%srr name: %s", SPACE_FORMAT,
+				rpc->rpl_printf(ctx, "%srr name: %s", SPACE_FORMAT,
 							((struct ptr_rdata*)(rr->rdata))->ptrdname);
 				break;
 			default:
-				rpc->printf(ctx, "%sresource record: unknown",
+				rpc->rpl_printf(ctx, "%sresource record: unknown",
 									SPACE_FORMAT);
 		}
 		if ((e->ent_flags & DNS_FLAG_PERMANENT) == 0)
-			rpc->printf(ctx, "%srr expires in (s): %d", SPACE_FORMAT,
+			rpc->rpl_printf(ctx, "%srr expires in (s): %d", SPACE_FORMAT,
 						(s_ticks_t)(rr->expire-now)<0?-1 : 
 						TICKS_TO_S(rr->expire-now));
 	}
@@ -3931,9 +3922,9 @@ void dns_cache_view(rpc_t* rpc, void* ctx)
 			) {
 				continue;
 			}
-			rpc->printf(ctx, "{\n");
+			rpc->rpl_printf(ctx, "{\n");
 			dns_cache_print_entry(rpc, ctx, e);
-			rpc->printf(ctx, "}");
+			rpc->rpl_printf(ctx, "}");
 		}
 	}
 	UNLOCK_DNS_HASH();
@@ -3969,7 +3960,7 @@ void dns_cache_delete_all(rpc_t* rpc, void* ctx)
 		return;
 	}
 	dns_cache_flush(0);
-	rpc->printf(ctx, "OK");
+	rpc->rpl_printf(ctx, "OK");
 }
 
 /* deletes all the entries from the cache,
@@ -3981,7 +3972,7 @@ void dns_cache_delete_all_force(rpc_t* rpc, void* ctx)
 		return;
 	}
 	dns_cache_flush(1);
-	rpc->printf(ctx, "OK");
+	rpc->rpl_printf(ctx, "OK");
 }
 
 /* clones an entry and extends its memory area to hold a new rr.
@@ -4027,8 +4018,7 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 				rr_size = sizeof(struct dns_rr);
 				break;
 			default:
-				LOG(L_ERR, "ERROR: dns_cache_clone_entry: type %d not "
-							"supported\n", e->type);
+				LM_ERR("type %d not supported\n", e->type);
 				return NULL;
 		}
 	} else {
@@ -4039,7 +4029,7 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 
 	new=shm_malloc(rounded_size+rr_size+rdata_size);
 	if (!new) {
-		LOG(L_ERR, "ERROR: dns_cache_clone_entry: out of memory\n");
+		LM_ERR("out of memory\n");
 		return NULL;
 	}
 	memset(new, 0, rounded_size+rr_size+rdata_size);
@@ -4167,13 +4157,12 @@ int dns_cache_add_record(unsigned short type,
 	rr_name.len = 0;
 
 	if (!cfg_get(core, core_cfg, use_dns_cache)){
-		LOG(L_ERR, "ERROR: dns cache support disabled (see use_dns_cache)\n");
+		LM_ERR("dns cache support disabled (see use_dns_cache)\n");
 		return -1;
 	}
 	
 	if ((type != T_A) && (type != T_AAAA) && (type != T_SRV)) {
-		LOG(L_ERR, "ERROR: rr type %d is not implemented\n",
-			type);
+		LM_ERR("rr type %d is not implemented\n", type);
 		return -1;
 	}
 
@@ -4183,7 +4172,7 @@ int dns_cache_add_record(unsigned short type,
 		case T_A:
 			ip_addr = str2ip(value);
 			if (!ip_addr) {
-				LOG(L_ERR, "ERROR: Malformed ip address: %.*s\n",
+				LM_ERR("Malformed ip address: %.*s\n",
 					value->len, value->s);
 				return -1;
 			}
@@ -4191,7 +4180,7 @@ int dns_cache_add_record(unsigned short type,
 		case T_AAAA:
 			ip_addr = str2ip6(value);
 			if (!ip_addr) {
-				LOG(L_ERR, "ERROR: Malformed ip address: %.*s\n",
+				LM_ERR("Malformed ip address: %.*s\n",
 					value->len, value->s);
 				return -1;
 			}
@@ -4215,7 +4204,7 @@ int dns_cache_add_record(unsigned short type,
 		&& (old->ent_flags & DNS_FLAG_PERMANENT)
 		&& ((flags & DNS_FLAG_PERMANENT) == 0)
 	) {
-		LOG(L_ERR, "ERROR: A non-permanent record cannot overwrite "
+		LM_ERR("A non-permanent record cannot overwrite "
 				"a permanent entry\n");
 		goto error;
 	}
@@ -4224,7 +4213,7 @@ int dns_cache_add_record(unsigned short type,
 		/* negative entry */
 		new = dns_cache_mk_bad_entry(name, type, ttl, flags);
 		if (!new) {
-			LOG(L_ERR, "ERROR: Failed to create a negative "
+			LM_ERR("Failed to create a negative "
 					"DNS cache entry\n");
 			goto error;
 		}
@@ -4244,7 +4233,7 @@ int dns_cache_add_record(unsigned short type,
 			case T_AAAA:
 				new = dns_cache_mk_ip_entry(name, ip_addr);
 				if (!new) {
-					LOG(L_ERR, "ERROR: Failed to create an A/AAAA record\n");
+					LM_ERR("Failed to create an A/AAAA record\n");
 					goto error;
 				}
 				/* fix the expiration time, dns_cache_mk_ip_entry() sets it 
@@ -4257,7 +4246,7 @@ int dns_cache_add_record(unsigned short type,
 				new = dns_cache_mk_srv_entry(name, priority, weight, port,
 												&rr_name, ttl);
 				if (!new) {
-					LOG(L_ERR, "ERROR: Failed to create an SRV record\n");
+					LM_ERR("Failed to create an SRV record\n");
 					goto error;
 				}
 			}
@@ -4284,7 +4273,7 @@ int dns_cache_add_record(unsigned short type,
 				/* the rr was found in the list */
 				new = dns_cache_clone_entry(old, 0, 0, 0);
 				if (!new) {
-					LOG(L_ERR, "ERROR: Failed to clone an existing "
+					LM_ERR("Failed to clone an existing "
 							"DNS cache entry\n");
 					goto error;
 				}
@@ -4322,7 +4311,7 @@ int dns_cache_add_record(unsigned short type,
 				}
 				new = dns_cache_clone_entry(old, size, ttl, &rr);
 				if (!new) {
-					LOG(L_ERR, "ERROR: Failed to clone an existing "
+					LM_ERR("Failed to clone an existing "
 							"DNS cache entry\n");
 					goto error;
 				}
@@ -4372,7 +4361,7 @@ int dns_cache_add_record(unsigned short type,
 						rr_p = &((*rr_p)->next)
 					);
 				if (!rr_p) {
-					LOG(L_ERR, "ERROR: Failed to correct the orderd list of SRV resource records\n");
+					LM_ERR("Failed to correct the orderd list of SRV resource records\n");
 					goto error;
 				}
 
@@ -4389,7 +4378,7 @@ int dns_cache_add_record(unsigned short type,
 
 	LOCK_DNS_HASH();
 	if (dns_cache_add_unsafe(new)) {
-		LOG(L_ERR, "ERROR: Failed to add the entry to the cache\n");
+		LM_ERR("Failed to add the entry to the cache\n");
 		UNLOCK_DNS_HASH();
 		goto error;
 	} else {
@@ -4470,13 +4459,12 @@ int dns_cache_delete_single_record(unsigned short type,
 	ip_addr = 0;
 
 	if (!cfg_get(core, core_cfg, use_dns_cache)){
-		LOG(L_ERR, "ERROR: dns cache support disabled (see use_dns_cache)\n");
+		LM_ERR("dns cache support disabled (see use_dns_cache)\n");
 		return -1;
 	}
 	
 	if ((type != T_A) && (type != T_AAAA) && (type != T_SRV)) {
-		LOG(L_ERR, "ERROR: rr type %d is not implemented\n",
-			type);
+		LM_ERR("rr type %d is not implemented\n", type);
 		return -1;
 	}
 
@@ -4486,7 +4474,7 @@ int dns_cache_delete_single_record(unsigned short type,
 		case T_A:
 			ip_addr = str2ip(value);
 			if (!ip_addr) {
-				LOG(L_ERR, "ERROR: Malformed ip address: %.*s\n",
+				LM_ERR("Malformed ip address: %.*s\n",
 					value->len, value->s);
 				return -1;
 			}
@@ -4494,7 +4482,7 @@ int dns_cache_delete_single_record(unsigned short type,
 		case T_AAAA:
 			ip_addr = str2ip6(value);
 			if (!ip_addr) {
-				LOG(L_ERR, "ERROR: Malformed ip address: %.*s\n",
+				LM_ERR("Malformed ip address: %.*s\n",
 					value->len, value->s);
 				return -1;
 			}
@@ -4546,8 +4534,7 @@ int dns_cache_delete_single_record(unsigned short type,
 		* automatically destroyed when its refcnt will be 0*/
 		new = dns_cache_clone_entry(old, 0, 0, 0);
 		if (!new) {
-			LOG(L_ERR, "ERROR: Failed to clone an existing "
-				"DNS cache entry\n");
+			LM_ERR("Failed to clone an existing DNS cache entry\n");
 			dns_hash_put(old);
 			return -1;
 		}
@@ -4568,7 +4555,7 @@ delete:
 	if (new) {
 		/* delete the old entry only if the new one can be added */
 		if (dns_cache_add_unsafe(new)) {
-			LOG(L_ERR, "ERROR: Failed to add the entry to the cache\n");
+			LM_ERR("Failed to add the entry to the cache\n");
 			UNLOCK_DNS_HASH();
 			if (old)
 				dns_hash_put(old);
@@ -4588,7 +4575,7 @@ delete:
 	return 0;
 
 not_found:
-	LOG(L_ERR, "ERROR: No matching record found\n");
+	LM_ERR("No matching record found\n");
 	if (old)
 		dns_hash_put(old);
 	return -1;

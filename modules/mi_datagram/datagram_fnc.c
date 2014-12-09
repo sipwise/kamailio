@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  *
  * History:
@@ -533,7 +533,10 @@ void mi_datagram_server(int rx_sock, int tx_sock)
 
 		if (mi_rpl!=MI_ROOT_ASYNC_RPL) {
 			if(mi_datagram_write_tree(&dtgram , mi_rpl) != 0){
-				LM_ERR("failed to build the response \n");	
+				mi_send_dgram(tx_sock, MI_INTERNAL_ERROR, MI_INTERNAL_ERROR_LEN,
+						(struct sockaddr* )&reply_addr, reply_addr_len,
+						mi_socket_timeout);
+				LM_ERR("failed to build the response \n");
 				goto failure;
 			}
 

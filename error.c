@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -216,7 +216,7 @@ void get_reply_status( str *status, struct sip_msg *reply, int code )
 	status->s=0;
 
 	if (reply==0) {
-		LOG(L_CRIT, "BUG: get_reply_status called with 0 msg\n");
+		LM_CRIT("0 msg\n");
 		return;
 	}
 
@@ -229,7 +229,7 @@ void get_reply_status( str *status, struct sip_msg *reply, int code )
 	status->len=phrase.len+3/*code*/+1/*space*/; 
 	status->s=pkg_malloc(status->len+1/*ZT */);
 	if (!status->s) {
-		LOG(L_ERR, "ERROR: get_reply_status: no mem\n");
+		LM_ERR("no mem\n");
 		return;
 	}
 	status->s[3]=' ';

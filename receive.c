@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * ---------
@@ -119,7 +119,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 
 	msg=pkg_malloc(sizeof(struct sip_msg));
 	if (msg==0) {
-		LOG(L_ERR, "ERROR: receive_msg: no mem for sip_msg\n");
+		LM_ERR("no mem for sip_msg\n");
 		goto error00;
 	}
 	msg_no++;
@@ -142,15 +142,19 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 	if(likely(sr_msg_time==1)) msg_set_time(msg);
 
 	if (parse_msg(buf,len, msg)!=0){
-		LOG(cfg_get(core, core_cfg, corelog),
+		if(sr_event_exec(SREV_RCV_NOSIP, (void*)msg)!=0) {
+			LOG(cfg_get(core, core_cfg, corelog),
 				"core parsing of SIP message failed (%s:%d/%d)\n",
 				ip_addr2a(&msg->rcv.src_ip), (int)msg->rcv.src_port,
 				(int)msg->rcv.proto);
-		sr_core_ert_run(msg, SR_CORE_ERT_RECEIVE_PARSE_ERROR);
+			sr_core_ert_run(msg, SR_CORE_ERT_RECEIVE_PARSE_ERROR);
+		}
 		goto error02;
 	}
 	DBG("After parse_msg...\n");
 
+	/* set log prefix */
+	log_prefix_set(msg);
 
 	/* ... clear branches from previous message */
 	clear_branches();
@@ -167,7 +171,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		/* sanity checks */
 		if ((msg->via1==0) || (msg->via1->error!=PARSE_OK)){
 			/* no via, send back error ? */
-			LOG(L_ERR, "ERROR: receive_msg: no via found in request\n");
+			LM_ERR("no via found in request\n");
 			STATS_BAD_MSG();
 			goto error02;
 		}
@@ -183,7 +187,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 			){
 			if (tcpconn_add_alias(rcv_info->proto_reserved1, msg->via1->port,
 									rcv_info->proto)!=0){
-				LOG(L_ERR, " ERROR: receive_msg: tcp alias failed\n");
+				LM_ERR("tcp alias failed\n");
 				/* continue */
 			}
 		}
@@ -210,8 +214,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		set_route_type(REQUEST_ROUTE);
 		/* exec the routing script */
 		if (run_top_route(main_rt.rlist[DEFAULT_RT], msg, 0)<0){
-			LOG(L_WARN, "WARNING: receive_msg: "
-					"error while trying script\n");
+			LM_WARN("error while trying script\n");
 			goto error_req;
 		}
 
@@ -230,7 +233,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		/* sanity checks */
 		if ((msg->via1==0) || (msg->via1->error!=PARSE_OK)){
 			/* no via, send back error ? */
-			LOG(L_ERR, "ERROR: receive_msg: no via found in reply\n");
+			LM_ERR("no via found in reply\n");
 			STATS_BAD_RPL();
 			goto error02;
 		}
@@ -259,8 +262,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 			ret=run_top_route(onreply_rt.rlist[DEFAULT_RT], msg, &ctx);
 #ifndef NO_ONREPLY_ROUTE_ERROR
 			if (unlikely(ret<0)){
-				LOG(L_WARN, "WARNING: receive_msg: "
-						"error while trying onreply script\n");
+				LM_WARN("error while trying onreply script\n");
 				goto error_rpl;
 			}else
 #endif /* NO_ONREPLY_ROUTE_ERROR */
@@ -299,7 +301,10 @@ end:
 #ifdef STATS
 	if (skipped) STATS_RX_DROPS;
 #endif
+	/* reset log prefix */
+	log_prefix_set(NULL);
 	return 0;
+
 #ifndef NO_ONREPLY_ROUTE_ERROR
 error_rpl:
 	/* execute post reply-script callbacks */
@@ -325,6 +330,8 @@ error02:
 	pkg_free(msg);
 error00:
 	STATS_RX_DROPS;
+	/* reset log prefix */
+	log_prefix_set(NULL);
 	return -1;
 }
 

@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -76,27 +76,18 @@ static int auth_check_fixup(void** param, int param_no);
 int parse_aaa_pvs(char *definition, pv_elem_t **pv_def, int *cnt);
 
 #define USER_COL "username"
-#define USER_COL_LEN (sizeof(USER_COL) - 1)
-
 #define DOMAIN_COL "domain"
-#define DOMAIN_COL_LEN (sizeof(DOMAIN_COL) - 1)
-
 #define PASS_COL "ha1"
-#define PASS_COL_LEN (sizeof(PASS_COL) - 1)
-
 #define PASS_COL_2 "ha1b"
-#define PASS_COL_2_LEN (sizeof(PASS_COL_2) - 1)
-
-#define DEFAULT_CRED_LIST "rpid"
 
 /*
  * Module parameter variables
  */
-static str db_url           = {DEFAULT_RODB_URL, DEFAULT_RODB_URL_LEN};
-str user_column             = {USER_COL, USER_COL_LEN};
-str domain_column           = {DOMAIN_COL, DOMAIN_COL_LEN};
-str pass_column             = {PASS_COL, PASS_COL_LEN};
-str pass_column_2           = {PASS_COL_2, PASS_COL_2_LEN};
+static str db_url           = str_init(DEFAULT_RODB_URL);
+str user_column             = str_init(USER_COL);
+str domain_column           = str_init(DOMAIN_COL);
+str pass_column             = str_init(PASS_COL);
+str pass_column_2           = str_init(PASS_COL_2);
 
 static int version_table_check = 1;
 
@@ -107,7 +98,7 @@ db1_con_t* auth_db_handle    = 0; /* database connection handle */
 db_func_t auth_dbf;
 auth_api_s_t auth_api;
 
-char *credentials_list      = DEFAULT_CRED_LIST;
+char *credentials_list      = 0;
 pv_elem_t *credentials      = 0; /* Parsed list of credentials to load */
 int credentials_n           = 0; /* Number of credentials in the list */
 
@@ -139,14 +130,14 @@ REQUEST_ROUTE},
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"db_url",            STR_PARAM, &db_url.s            },
-	{"user_column",       STR_PARAM, &user_column.s       },
-	{"domain_column",     STR_PARAM, &domain_column.s     },
-	{"password_column",   STR_PARAM, &pass_column.s       },
-	{"password_column_2", STR_PARAM, &pass_column_2.s     },
+	{"db_url",            PARAM_STR, &db_url            },
+	{"user_column",       PARAM_STR, &user_column       },
+	{"domain_column",     PARAM_STR, &domain_column     },
+	{"password_column",   PARAM_STR, &pass_column       },
+	{"password_column_2", PARAM_STR, &pass_column_2     },
 	{"calculate_ha1",     INT_PARAM, &calc_ha1            },
 	{"use_domain",        INT_PARAM, &use_domain          },
-	{"load_credentials",  STR_PARAM, &credentials_list    },
+	{"load_credentials",  PARAM_STRING, &credentials_list    },
 	{"version_table",     INT_PARAM, &version_table_check },
 	{0, 0, 0}
 };
@@ -189,12 +180,6 @@ static int child_init(int rank)
 static int mod_init(void)
 {
 	bind_auth_s_t bind_auth;
-
-	db_url.len = strlen(db_url.s);
-	user_column.len = strlen(user_column.s);
-	domain_column.len = strlen(domain_column.s);
-	pass_column.len = strlen(pass_column.s);
-	pass_column_2.len = strlen(pass_column_2.s);
 
 	/* Find a database module */
 	if (db_bind_mod(&db_url, &auth_dbf) < 0){
@@ -366,11 +351,11 @@ int parse_aaa_pvs(char *definition, pv_elem_t **pv_def, int *cnt)
 	char *sep;
 
 	p = definition;
-	*pv_def = 0;
-	*cnt = 0;
-
 	if (p==0 || *p==0)
 		return 0;
+
+	*pv_def = 0;
+	*cnt = 0;
 
 	/* get element by element */
 	while ( (end=strchr(p,';'))!=0 || (end=p+strlen(p))!=p ) {

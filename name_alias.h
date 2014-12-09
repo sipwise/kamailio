@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*
  * History:
@@ -107,7 +107,7 @@ static inline int add_alias(char* name, int len, unsigned short port,
 	aliases=a;
 	return 1;
 error:
-	LOG(L_ERR, "ERROR: add_alias: memory allocation error\n");
+	LM_ERR("memory allocation error\n");
 	if (a) pkg_free(a);
 	return -1;
 }

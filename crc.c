@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*!
  * \file
@@ -243,7 +243,7 @@ void crcitt_string_array( char *dst, str src[], int size )
 	ccitt = ~ccitt;
 	if (int2reverse_hex( &dst, &str_len, ccitt )==-1) {
 		/* bug ... printed ccitt value longer than CRC32_LEN */
-		LOG(L_CRIT, "ERROR: crcitt_string_array: string conversion incomplete\n");
+		LM_CRIT("string conversion incomplete\n");
 	}
 	/* padding */
 	while( str_len ) {

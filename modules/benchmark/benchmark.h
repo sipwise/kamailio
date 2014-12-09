@@ -21,7 +21,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -69,7 +69,7 @@ typedef struct benchmark_timer
 	struct benchmark_timer *next;
 } benchmark_timer_t;
 
-inline int bm_get_time(bm_timeval_t *t)
+static inline int bm_get_time(bm_timeval_t *t)
 {
 #ifdef BM_CLOCK_REALTIME
 	if(clock_gettime(CLOCK_REALTIME, t)!=0)
@@ -84,7 +84,7 @@ inline int bm_get_time(bm_timeval_t *t)
 	return 0;
 }
 
-inline unsigned long long bm_diff_time(bm_timeval_t *t1, bm_timeval_t *t2)
+static inline unsigned long long bm_diff_time(bm_timeval_t *t1, bm_timeval_t *t2)
 {
 	unsigned long long tdiff;
 

@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -958,7 +958,7 @@ void rls_notify_callback( struct cell *t, int type, struct tmcb_params *ps)
 			/* delete from cache table */
 			hash_code= core_hash(&subs.callid, &subs.to_tag , hash_size);
 
-			if(pres_delete_shtable(rls_table,hash_code, subs.to_tag)< 0)
+			if(pres_delete_shtable(rls_table,hash_code, &subs)< 0)
 			{
 				LM_ERR("record not found in hash table\n");
 			}

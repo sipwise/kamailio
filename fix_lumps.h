@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*
  * History:
@@ -65,7 +65,7 @@ inline static void free_via_clen_lump( struct lump **list )
 		next=lump->next;
 		if (lump->type==HDR_VIA_T||lump->type==HDR_CONTENTLENGTH_T) {
 			if (lump->flags & (LUMPFLAG_DUPED|LUMPFLAG_SHMEM)){
-				LOG(L_CRIT, "BUG: free_via_clen_lmp: lump %p, flags %x\n",
+				LM_CRIT("free_via_clen_lmp: lump %p, flags %x\n",
 						lump, lump->flags);
 				/* ty to continue */
 			}

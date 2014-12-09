@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*
  * non-sip callbacks, called whenever a message with protocol != SIP/2.0
@@ -61,7 +61,7 @@ int init_nonsip_hooks()
 	memset(nonsip_hooks, 0, nonsip_max_hooks*sizeof(struct nonsip_hook));
 	return 0;
 error:
-	LOG(L_ERR, "nonsip_hooks: memory allocation failure\n");
+	LM_ERR("memory allocation failure\n");
 	return -1;
 }
 
