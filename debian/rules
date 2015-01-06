@@ -23,7 +23,7 @@ include /usr/share/dpkg/buildflags.mk
 export JAVA_HOME=/usr/lib/jvm/java-gcj
 
 # choose radius lib
-export FREERADIUS=$(dpkg --list libfreeradius-client-dev >/dev/null 2>&1 && echo 1 || echo 0)
+export FREERADIUS=$(shell dpkg --list libfreeradius-client-dev >/dev/null 2>&1 && echo 1 || echo 0)
 
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES=
