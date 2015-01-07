@@ -24,7 +24,9 @@ export JAVA_HOME=/usr/lib/jvm/java-gcj
 
 # choose radius lib
 export FREERADIUS=$(shell dpkg --list libfreeradius-client-dev >/dev/null 2>&1 && echo 1 || echo 0)
-$(info $$FREERADIUS is ${FREERADIUS}) 
+$(info $$FREERADIUS is ${FREERADIUS})
+export FREERADIUS=$(shell test -f /usr/include/freeradius-client.h && echo 1 || echo 0)
+$(info $$FREERADIUS is ${FREERADIUS})
 
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES=
