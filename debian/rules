@@ -101,7 +101,9 @@ configure: configure-stamp
 configure-stamp:
 	dh_testdir
 	# Add here commands to configure the package.
-	dpkg --list libfreeradius-client-dev && echo works && echo fails
+	dpkg --list libfreeradius-client-dev && echo 1:works || echo 1:fails
+	dpkg --list libfreeradius-client-dev >/dev/null 2>&1 && echo 2:works || echo 2:fails
+	dpkg --list libfreeradius-client-dev >/dev/null 2>/dev/null && echo 3:works || echo 3:fails
 	$(MAKE) FLAVOUR=kamailio cfg prefix=/usr cfg_prefix=$(CURDIR)/debian/$(PKG_NAME) \
 			cfg_target=/etc/kamailio/ \
 			basedir=$(CURDIR)/debian/$(PKG_NAME) \
