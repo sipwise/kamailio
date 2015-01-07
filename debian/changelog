@@ -1,3 +1,24 @@
+ngcp-kamailio (4.1.6-1+0~mr3.7.1.0) unstable; urgency=low
+
+  [ Richard Fuchs ]
+  * [c508e3a] MT#9949 TCP_KEEPIDLE requires SO_KEEPALIVE to function
+  * [a29871b] MT#9949 compile fix for the tcp idle timer
+
+  [ Andrew Pogrebennyk ]
+  * [1d9e639] MT#9643 upstream fix tm: safety catch inside t_check_trans()
+
+  [ Victor Seva ]
+  * [94c2ced] MT#10303 usrloc: fix db_update_addr and db_delete_ucontact_addr
+  * [cce8bdd] MT#9257 add new radius lib as an alternative for jessie build
+  * [3078f99] MT#9257 Use proper radius lib depending on the lib installed
+
+  [ Alexander Lutay ]
+  * [3a7f83b] MT#10383 Kamailio.init new action check-config and stop checking config on start
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 07 Jan 2015 21:25:36 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.7.0.0) unstable; urgency=low
 
   [ Victor Seva ]
