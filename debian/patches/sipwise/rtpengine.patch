@@ -729,7 +729,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpengine/README
-@@ -0,0 +1,690 @@
+@@ -0,0 +1,718 @@
 +rtpengine Module
 +
 +Maxim Sobolev
@@ -801,7 +801,7 @@
 +
 +        5. Functions
 +
-+              5.1. set_rtpengine_set(setid)
++              5.1. set_rtpengine_set(setid[, setid])
 +              5.2. rtpengine_offer([flags])
 +              5.3. rtpengine_answer([flags])
 +              5.4. rtpengine_delete([flags])
@@ -859,7 +859,7 @@
 +
 +   5. Functions
 +
-+        5.1. set_rtpengine_set(setid)
++        5.1. set_rtpengine_set(setid[, setid])
 +        5.2. rtpengine_offer([flags])
 +        5.3. rtpengine_answer([flags])
 +        5.4. rtpengine_delete([flags])
@@ -1030,19 +1030,31 @@
 +
 +5. Functions
 +
-+   5.1. set_rtpengine_set(setid)
++   5.1. set_rtpengine_set(setid[, setid])
 +   5.2. rtpengine_offer([flags])
 +   5.3. rtpengine_answer([flags])
 +   5.4. rtpengine_delete([flags])
 +   5.5. rtpengine_manage([flags])
 +   5.6. start_recording()
 +
-+5.1.  set_rtpengine_set(setid)
++5.1.  set_rtpengine_set(setid[, setid])
 +
 +   Sets the ID of the RTP proxy set to be used for the next
 +   rtpengine_delete(), rtpengine_offer(), rtpengine_answer() or
 +   rtpengine_manage() command. The parameter can be an integer or a config
 +   variable holding an integer.
++
++   A second set ID can be specified to daisy-chain two RTP proxies. The
++   two set IDs must be distinct from each other and there must not be any
++   overlap in the proxies present in both sets. In this use case, the
++   request (offer, answer, etc) is first sent to an RTP proxy from the
++   first set, which rewrites the SDP body and sends it back to the module.
++   The rewritten SDP body is then used to make another request to an RTP
++   proxy from the second set, which rewrites the SDP body another time and
++   sends it back to the module to be placed back into the SIP message.
++   This is useful if you have a set of RTP proxies that the caller must
++   use, and another distinct set of RTP proxies that the callee must use.
++   This is supported by all rtpengine commands except rtpengine_manage().
 +
 +   This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
 +   BRANCH_ROUTE.
@@ -1056,8 +1068,8 @@
 +5.2.  rtpengine_offer([flags])
 +
 +   Rewrites SDP body to ensure that media is passed through an RTP proxy.
-+   To be invoked on INVITE for the cases the SDPs are in INVITE and 200 OK
-+   and on 200 OK when SDPs are in 200 OK and ACK.
++   To be invoked on INVITE for the cases the SDP bodies are in INVITE and
++   200 OK and on 200 OK when SDP bodies are in 200 OK and ACK.
 +
 +   Meaning of the parameters is as follows:
 +     * flags - flags to turn on some features.
@@ -1083,24 +1095,29 @@
 +            “answer” for the new branch. This flag is only supported by
 +            the Sipwise rtpengine RTP proxy at the moment!
 +          + asymmetric - flags that UA from which message is received
-+            doesn't support symmetric RTP. (automatically sets the 'r'
-+            flag)
++            doesn't support symmetric RTP. Disables learning of endpoint
++            addresses in the Sipwise rtpengine proxy.
 +          + force-answer - force “answer”, that is, only rewrite SDP when
 +            corresponding session already exists in the RTP proxy. By
 +            default is on when the session is to be completed.
-+          + internal, external - these flags specify the direction of the
-+            SIP message. These flags only make sense when the RTP proxy is
-+            running in bridge mode. “internal” corresponds to the proxy's
-+            first interface, “external” corresponds to the RTP proxy's
-+            second interface. You always have to specify two flags to
-+            define the incoming network and the outgoing network. For
-+            example, “internal external” should be used for SIP message
-+            received from the local interface and sent out on the external
-+            interface, and “external internal” vice versa. Other options
-+            are “internal internal” and “external external”. So, for
-+            example if a SIP requests is processed with “internal
-+            external” flags, the corresponding response must be processed
-+            with “internal external” flags.
++          + direction=... - this option specifies a logical network
++            interface and should be given exactly twice. It enables RTP
++            bridging between different addresses or networks of the same
++            family (e.g. IPv4 to IPv4). The first instance of the option
++            specifies the interface that the originator of this message
++            should be using, while the second instance specifies the
++            interface that the target should be using. For example, if the
++            SIP message was sent by an endpoint on a private network and
++            will be sent to an endpoint on the public internet, you would
++            use “direction=priv direction=pub” if those two logical
++            network interfaces were called “priv” and “pub” in your RTP
++            proxy's configuration respectively. The direction must only be
++            specified in for initial SDP offer; answers or subsequent
++            offers can omit this option.
++          + internal, external - shorthand for “direction=internal” and
++            “direction=external” respectively. Useful for brevity or as
++            legacy option if the RTP proxy only supports two network
++            interfaces instead of multiple, arbitrarily named ones.
 +          + auto-bridge - this flag an alternative to the “internal” and
 +            “external” flags in order to do automatic bridging between
 +            IPv4 on the "internal network" and IPv6 on the "external
@@ -1139,7 +1156,8 @@
 +            SDP connection (c=) IP if media description also includes
 +            connection information.
 +          + symmetric - flags that for the UA from which message is
-+            received, support symmetric RTP must be forced.
++            received, support symmetric RTP must be forced. Does nothing
++            with the Sipwise rtpengine proxy as it is the default.
 +          + repacketize=NN - requests the RTP proxy to perform
 +            re-packetization of RTP traffic coming from the UA which has
 +            sent the current message to increase or decrease payload size
@@ -1156,13 +1174,16 @@
 +            attributes within the SDP body. Possible values are: “force” -
 +            discard any ICE attributes already present in the SDP body and
 +            then generate and insert new ICE data, leaving itself as the
-+            only ICE candidates; “remove” instructs the RTP proxy to
-+            discard any ICE attributes and not insert any new ones into
-+            the SDP. The default (if no “ICE=...” is given at all), new
-+            ICE data will only be generated if no ICE was present in the
-+            SDP originally; otherwise the RTP proxy will only insert
-+            itself as an additional ICE candidate. Other SDP substitutions
-+            (c=, m=, etc) are unaffected by this flag.
++            only ICE candidates; “force-relay” - discard any “relay” type
++            ICE attributes already present in the SDP body and then
++            generate and insert itself as the only ICE “relay” candidates;
++            “remove” instructs the RTP proxy to discard any ICE attributes
++            and not insert any new ones into the SDP. The default (if no
++            “ICE=...” is given at all), new ICE data will only be
++            generated if no ICE was present in the SDP originally;
++            otherwise the RTP proxy will only insert itself as additional
++            ICE candidate. Other SDP substitutions (c=, m=, etc) are
++            unaffected by this flag.
 +          + RTP, SRTP, AVP, AVPF - These flags control the RTP transport
 +            protocol that should be used towards the recipient of the SDP.
 +            If none of them are specified, the protocol given in the SDP
@@ -1198,6 +1219,13 @@
 +          + media-address=... - force a particular media address to be
 +            used in the SDP body. Address family is detected
 +            automatically.
++          + TOS=... - change the IP TOS value for all outgoing RTP packets
++            within the entire call in both directions. Only honoured in an
++            “offer”, ignored for an “answer”. Valid values are 0 through
++            255, given in decimal. If this option is not specified, the
++            TOS value will revert to the default TOS (normally 184). A
++            value of -1 may be used to leave the currently used TOS
++            unchanged.
 +
 +   This function can be used from ANY_ROUTE.
 +
@@ -1236,8 +1264,8 @@
 +5.3.  rtpengine_answer([flags])
 +
 +   Rewrites SDP body to ensure that media is passed through an RTP proxy.
-+   To be invoked on 200 OK for the cases the SDPs are in INVITE and 200 OK
-+   and on ACK when SDPs are in 200 OK and ACK.
++   To be invoked on 200 OK for the cases the SDP bodies are in INVITE and
++   200 OK and on ACK when SDP bodies are in 200 OK and ACK.
 +
 +   See rtpengine_offer() function description above for the meaning of the
 +   parameters.
@@ -1992,114 +2020,8 @@
 +docbook_dir = ../../../docbook
 +include $(docbook_dir)/Makefile.module
 --- /dev/null
-+++ b/modules/rtpengine/doc/rtpengine-ng.xml
-@@ -0,0 +1,103 @@
-+<?xml version="1.0" encoding='ISO-8859-1'?>
-+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
-+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
-+
-+<!-- Include general documentation entities -->
-+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
-+%docentities;
-+
-+]>
-+
-+<book xmlns:xi="http://www.w3.org/2001/XInclude">
-+	<bookinfo>
-+	<title>rtpproxy-ng Module</title>
-+	<productname class="trade">&kamailioname;</productname>
-+	<authorgroup>
-+		<author>
-+		<firstname>Maxim</firstname>
-+		<surname>Sobolev</surname>
-+		<affiliation><orgname>Sippy Software, Inc.</orgname></affiliation>
-+		<address>
-+			<email>sobomax@sippysoft.com</email>
-+		</address>
-+		</author>
-+		<author>
-+		<firstname>Juha</firstname>
-+		<surname>Heinanen</surname>
-+		<affiliation><orgname>TuTPro, Inc.</orgname></affiliation>
-+		<address>
-+			<email>jh@tutpro.com</email>
-+		</address>
-+		</author>
-+		<editor>
-+		<firstname>Maxim</firstname>
-+		<surname>Sobolev</surname>
-+		<address>
-+			<email>sobomax@sippysoft.com</email>
-+		</address>
-+		</editor>
-+		<editor>
-+		<firstname>Bogdan-Andrei</firstname>
-+		<surname>Iancu</surname>
-+		<address>
-+			<email>bogdan@voice-system.ro</email>
-+		</address>
-+		</editor>
-+		<editor>
-+		<firstname>Juha</firstname>
-+		<surname>Heinanen</surname>
-+		<address>
-+			<email>jh@tutpro.com</email>
-+		</address>
-+		</editor>
-+		<editor>
-+		<firstname>Sas</firstname>
-+		<surname>Ovidiu</surname>
-+		<address>
-+			<email>osas@voipembedded.com</email>
-+		</address>
-+		</editor>
-+		<editor>
-+		<firstname>Carsten</firstname>
-+		<surname>Bock</surname>
-+		<affiliation><orgname>ng-voice GmbH</orgname></affiliation>
-+		<address>
-+			<email>carsten@ng-voice.com</email>
-+		</address>
-+		</editor>
-+		<editor>
-+		<firstname>Richard</firstname>
-+		<surname>Fuchs</surname>
-+		<affiliation><orgname>Sipwise GmbH</orgname></affiliation>
-+		<address>
-+			<email>rfuchs@sipwise.com</email>
-+		</address>
-+		</editor>
-+	</authorgroup>
-+	<copyright>
-+		<year>2003-2008</year>
-+		<holder>Sippy Software, Inc.</holder>
-+	</copyright>
-+	<copyright>
-+		<year>2005</year>
-+		<holder>Voice Sistem SRL</holder>
-+	</copyright>
-+	<copyright>
-+		<year>2009-2012</year>
-+		<holder>TuTPro Inc.</holder>
-+	</copyright>
-+	<copyright>
-+		<year>2010</year>
-+		<holder><ulink url='http://www.voipembedded.com'>VoIPEmbedded Inc.</ulink></holder>
-+	</copyright>
-+	<copyright>
-+		<year>2013</year>
-+		<holder>Sipwise GmbH</holder>
-+	</copyright>
-+	</bookinfo>
-+	<toc></toc>
-+
-+	<xi:include href="rtpproxy_admin.xml"/>
-+	<xi:include href="rtpproxy_faq.xml"/>
-+
-+</book>
---- /dev/null
 +++ b/modules/rtpengine/doc/rtpengine_admin.xml
-@@ -0,0 +1,725 @@
+@@ -0,0 +1,757 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 +"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
@@ -2347,13 +2269,27 @@
 +	<title>Functions</title>
 +	<section id="rtpengine.f.set_rtpengine_set">
 +		<title>
-+		<function moreinfo="none">set_rtpengine_set(setid)</function>
++		<function moreinfo="none">set_rtpengine_set(setid[, setid])</function>
 +		</title>
 +		<para>
 +		Sets the ID of the &rtp; proxy set to be used for the next
 +		rtpengine_delete(), rtpengine_offer(), rtpengine_answer()
 +		or rtpengine_manage() command. The parameter can be an integer or
 +		a config variable holding an integer.
++		</para>
++		<para>
++		A second set ID can be specified to daisy-chain two &rtp; proxies.
++		The two set IDs must be distinct from each other and there must not
++		be any overlap in the proxies present in both sets. In this use case,
++		the request (offer, answer, etc) is first sent to an &rtp; proxy from
++		the first set, which rewrites the &sdp; body and sends it back to the
++		module. The rewritten &sdp; body is then used to make another request
++		to an &rtp; proxy from the second set, which rewrites the &sdp; body
++		another time and sends it back to the module to be placed back into the
++		&sip; message. This is useful if you have a set of &rtp; proxies that
++		the caller must use, and another distinct set of &rtp; proxies that the
++		callee must use. This is supported by all rtpengine commands except
++		rtpengine_manage().
 +		</para>
 +		<para>
 +		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
@@ -2376,8 +2312,8 @@
 +                <para>
 +                Rewrites &sdp; body to ensure that media is passed through
 +                an &rtp; proxy. To be invoked
-+		on INVITE for the cases the SDPs are in INVITE and 200 OK and on 200 OK
-+		when SDPs are in 200 OK and ACK.
++		on INVITE for the cases the &sdp; bodies are in INVITE and 200 OK and on 200 OK
++		when &sdp; bodies are in 200 OK and ACK.
 +                </para>
 +		<para>Meaning of the parameters is as follows:</para>
 +		<itemizedlist>
@@ -2413,7 +2349,8 @@
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>asymmetric</emphasis> - flags that UA from which message is
-+				received doesn't support symmetric RTP. (automatically sets the 'r' flag)
++				received doesn't support symmetric &rtp;. Disables learning of endpoint addresses
++				in the Sipwise rtpengine proxy.
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>force-answer</emphasis> - force <quote>answer</quote>, that is,
@@ -2422,20 +2359,24 @@
 +				completed.
 +				</para></listitem>
 +				<listitem><para>
-+				<emphasis>internal, external</emphasis> - these flags specify the direction of
-+				the SIP message. These flags only make sense when the &rtp; proxy is running
-+				in bridge mode. <quote>internal</quote> corresponds to the proxy's first
-+				interface, <quote>external</quote> corresponds to the &rtp; proxy's
-+				second interface. You always have to specify two flags to define
-+				the incoming network and the outgoing network. For example, <quote>internal
-+				external</quote> should be
-+				used for SIP message received from the local interface and sent out on the
-+				external interface, and <quote>external internal</quote> vice versa. Other
-+				options are <quote>internal internal</quote> and <quote>external
-+				external</quote>.
-+				So, for example if a SIP requests is processed with <quote>internal
-+				external</quote> flags, the corresponding
-+				response must be processed with <quote>internal external</quote> flags.
++				<emphasis>direction=...</emphasis> - this option specifies a logical network
++				interface and should be given exactly twice. It enables &rtp; bridging between
++				different addresses or networks of the same family (e.g. IPv4 to IPv4). The
++				first instance of the option
++				specifies the interface that the originator of this message should be using,
++				while the second instance specifies the interface that the target should be
++				using. For example, if the &sip; message was sent by an endpoint on a private
++				network and will be sent to an endpoint on the public internet, you would use
++				<quote>direction=priv direction=pub</quote> if those two logical network
++				interfaces were called <quote>priv</quote> and <quote>pub</quote> in your
++				&rtp; proxy's configuration respectively. The direction must only be specified
++				in for initial &sdp; offer; answers or subsequent offers can omit this option.
++				</para></listitem>
++				<listitem><para>
++				<emphasis>internal, external</emphasis> - shorthand for
++				<quote>direction=internal</quote> and <quote>direction=external</quote>
++				respectively. Useful for brevity or as legacy option if the &rtp; proxy only
++				supports two network interfaces instead of multiple, arbitrarily named ones.
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>auto-bridge</emphasis> - this flag an alternative to the
@@ -2443,8 +2384,8 @@
 +				in order to do automatic bridging between IPv4 on the
 +				"internal network" and IPv6 on the "external network". Instead of
 +				explicitly instructing the &rtp; proxy to select a particular address
-+				family, the distinction is done by the given IP in the SDP body by
-+				the RTP proxy itself. Not supported by Sipwise rtpengine.
++				family, the distinction is done by the given IP in the &sdp; body by
++				the &rtp; proxy itself. Not supported by Sipwise rtpengine.
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>address-family=...</emphasis> - instructs the &rtp; proxy that the
@@ -2471,10 +2412,10 @@
 +				a chain of proxies. Not supported and ignored by Sipwise rtpengine.
 +				</para></listitem>
 +				<listitem><para>
-+				<emphasis>trust-address</emphasis> - flags that IP address in SDP should
++				<emphasis>trust-address</emphasis> - flags that IP address in &sdp; should
 +				be trusted. Without this flag, the &rtp; proxy ignores address in
-+				the SDP and uses source address of the SIP message as media
-+				address which is passed to the RTP proxy.
++				the &sdp; and uses source address of the &sip; message as media
++				address which is passed to the &rtp; proxy.
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>replace-origin</emphasis> - flags that IP from the origin
@@ -2482,18 +2423,19 @@
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>replace-session-connection</emphasis> - flags to change the session-level
-+				SDP connection (c=) IP if media description also includes
++				&sdp; connection (c=) IP if media description also includes
 +				connection information.
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>symmetric</emphasis> - flags that for the UA from which
-+				message is received, support symmetric RTP must be forced.
++				message is received, support symmetric &rtp; must be forced. Does nothing with
++				the Sipwise rtpengine proxy as it is the default.
 +				</para></listitem>
 +				<listitem><para>
 +				<emphasis>repacketize=NN</emphasis> - requests the &rtp; proxy to perform
-+				re-packetization of RTP traffic coming from the UA which
++				re-packetization of &rtp; traffic coming from the UA which
 +				has sent the current message to increase or decrease payload
-+				size per each RTP packet forwarded if possible.  The NN is the
++				size per each &rtp; packet forwarded if possible.  The NN is the
 +				target payload size in ms, for the most codecs its value should
 +				be in 10ms increments, however for some codecs the increment
 +				could differ (e.g. 30ms for GSM or 20ms for G.723).  The
@@ -2510,12 +2452,16 @@
 +				discard any ICE attributes already present in the &sdp; body
 +				and then generate and insert new ICE data, leaving itself
 +				as the <emphasis>only</emphasis> ICE candidates;
++				<quote>force-relay</quote> -
++				discard any <quote>relay</quote> type ICE attributes already present
++				in the &sdp; body and then generate and insert itself
++				as the <emphasis>only</emphasis> ICE <quote>relay</quote> candidates;
 +				<quote>remove</quote> instructs the &rtp; proxy to discard
 +				any ICE attributes and not insert any new ones into the &sdp;.
 +				The default (if no <quote>ICE=...</quote> is given at all),
 +				new ICE data will only be generated
 +				if no ICE was present in the &sdp; originally; otherwise
-+				the &rtp; proxy will only insert itself as an
++				the &rtp; proxy will only insert itself as
 +				<emphasis>additional</emphasis> ICE candidate. Other
 +				&sdp; substitutions (c=, m=, etc) are unaffected by this flag.
 +				</para></listitem>
@@ -2567,6 +2513,14 @@
 +				<emphasis>media-address=...</emphasis> - force a particular media address to
 +				be used in the &sdp; body. Address family is detected automatically.
 +				</para></listitem>
++				<listitem><para>
++				<emphasis>TOS=...</emphasis> - change the IP TOS value for all outgoing &rtp;
++				packets within the entire call in both directions. Only honoured in an
++				<quote>offer</quote>, ignored for an <quote>answer</quote>. Valid values are
++				0 through 255, given in decimal. If this option is not specified, the TOS
++				value will revert to the default TOS (normally 184). A value of -1 may be used
++				to leave the currently used TOS unchanged.
++				</para></listitem>
 +			</itemizedlist>
 +		</listitem>
 +		</itemizedlist>
@@ -2616,8 +2570,8 @@
 +		<para>
 +		Rewrites &sdp; body to ensure that media is passed through
 +		an &rtp; proxy. To be invoked
-+		on 200 OK for the cases the SDPs are in INVITE and 200 OK and on ACK
-+		when SDPs are in 200 OK and ACK.
++		on 200 OK for the cases the &sdp; bodies are in INVITE and 200 OK and on ACK
++		when &sdp; bodies are in 200 OK and ACK.
 +		</para>
 +		<para>
 +		See rtpengine_offer() function description above for the meaning of the
@@ -2678,19 +2632,19 @@
 +		<itemizedlist>
 +		<listitem>
 +			<para>
-+			If INVITE with SDP, then do <function>rtpengine_offer()</function>
++			If INVITE with &sdp;, then do <function>rtpengine_offer()</function>
 +			</para>
 +		</listitem>
 +		<listitem>
 +			<para>
-+			If INVITE with SDP, when the tm module is loaded, mark transaction with
++			If INVITE with &sdp;, when the tm module is loaded, mark transaction with
 +			internal flag FL_SDP_BODY to know that the 1xx and 2xx are for
 +			<function>rtpengine_answer()</function>
 +			</para>
 +		</listitem>
 +		<listitem>
 +			<para>
-+			If ACK with SDP, then do <function>rtpengine_answer()</function>
++			If ACK with &sdp;, then do <function>rtpengine_answer()</function>
 +			</para>
 +		</listitem>
 +		<listitem>
@@ -2705,8 +2659,8 @@
 +		</listitem>
 +		<listitem>
 +			<para>
-+			If reply with SDP to INVITE having code 1xx and 2xx, then
-+			do <function>rtpengine_answer()</function> if the request had SDP or tm is not loaded,
++			If reply with &sdp; to INVITE having code 1xx and 2xx, then
++			do <function>rtpengine_answer()</function> if the request had &sdp; or tm is not loaded,
 +			otherwise do <function>rtpengine_offer()</function>
 +			</para>
 +		</listitem>
@@ -2731,7 +2685,7 @@
 +		</title>
 +		<para>
 +		This function will send a signal to the &rtp; proxy to record
-+		the RTP stream on the &rtp; proxy.
++		the &rtp; stream on the &rtp; proxy.
 +		<emphasis>This function is not supported by Sipwise rtpengine at the moment!</emphasis>
 +		</para>
 +		<para>
@@ -2933,7 +2887,7 @@
 +
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine.c
-@@ -0,0 +1,2173 @@
+@@ -0,0 +1,2170 @@
 +/* $Id$
 + *
 + * Copyright (C) 2003-2008 Sippy Software, Inc., http://www.sippysoft.com
@@ -2952,7 +2906,7 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 + *
 + * History:
 + * ---------
@@ -3347,16 +3301,16 @@
 +};
 +
 +static param_export_t params[] = {
-+	{"rtpengine_sock",        STR_PARAM|USE_FUNC_PARAM,
++	{"rtpengine_sock",        PARAM_STRING|USE_FUNC_PARAM,
 +	                         (void*)rtpengine_set_store          },
 +	{"rtpengine_disable_tout",INT_PARAM, &rtpengine_disable_tout },
 +	{"rtpengine_retr",        INT_PARAM, &rtpengine_retr         },
 +	{"rtpengine_tout",        INT_PARAM, &rtpengine_tout         },
-+	{"db_url",                STR_PARAM, &rtpp_db_url.s },
-+	{"table_name",            STR_PARAM, &rtpp_table_name.s },
-+	{"url_col",               STR_PARAM, &rtpp_url_col.s },
-+	{"extra_id_pv",           STR_PARAM, &extra_id_pv_param.s },
-+	{"setid_avp",             STR_PARAM, &setid_avp_param },
++	{"db_url",                PARAM_STR, &rtpp_db_url },
++	{"table_name",            PARAM_STR, &rtpp_table_name },
++	{"url_col",               PARAM_STR, &rtpp_url_col },
++	{"extra_id_pv",           PARAM_STR, &extra_id_pv_param },
++	{"setid_avp",             PARAM_STRING, &setid_avp_param },
 +	{0, 0, 0}
 +};
 +
@@ -3860,9 +3814,6 @@
 +		LM_ERR("failed to register MI commands\n");
 +		return -1;
 +	}
-+
-+	rtpp_table_name.len = strlen(rtpp_table_name.s);
-+	rtpp_url_col.len = strlen(rtpp_url_col.s);
 +
 +	/* any rtpproxy configured? */
 +	if(rtpp_set_list)
@@ -5128,7 +5079,7 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 + *
 + * History:
 + * ---------
@@ -5187,7 +5138,7 @@
 +#endif
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine_funcs.c
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,402 @@
 +/*
 + * $Id$
 + *
@@ -5207,7 +5158,7 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 + *
 + * History:
 + * --------
@@ -5466,38 +5417,6 @@
 +}
 +
 +/*
-+ * ser_memmem() returns the location of the first occurrence of data
-+ * pattern b2 of size len2 in memory block b1 of size len1 or
-+ * NULL if none is found. Obtained from NetBSD.
-+ */
-+void *
-+ser_memmem(const void *b1, const void *b2, size_t len1, size_t len2)
-+{
-+        /* Initialize search pointer */
-+        char *sp = (char *) b1;
-+
-+        /* Initialize pattern pointer */
-+        char *pp = (char *) b2;
-+
-+        /* Initialize end of search address space pointer */
-+        char *eos = sp + len1 - len2;
-+
-+        /* Sanity check */
-+        if(!(b1 && b2 && len1 && len2))
-+                return NULL;
-+
-+        while (sp <= eos) {
-+                if (*sp == *pp)
-+                        if (memcmp(sp, pp, len2) == 0)
-+                                return sp;
-+
-+                        sp++;
-+        }
-+
-+        return NULL;
-+}
-+
-+/*
 + * Some helper functions taken verbatim from tm module.
 + */
 +
@@ -5624,7 +5543,7 @@
 +}
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine_funcs.h
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,39 @@
 +/*
 + * $Id$
 + *
@@ -5644,7 +5563,7 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 + */
 +
 +
@@ -5657,7 +5576,6 @@
 +
 +int extract_body(struct sip_msg * , str *);
 +int check_content_type(struct sip_msg * );
-+void *ser_memmem(const void *, const void *, size_t, size_t);
 +int get_callid(struct sip_msg *, str *);
 +int get_to_tag(struct sip_msg *, str *);
 +int get_from_tag(struct sip_msg *, str *);
@@ -5679,7 +5597,7 @@
  mod_list_extra=avp auth_diameter call_control cnxcc dmq domainpolicy msrp pdb \
 --- /dev/null
 +++ b/modules/rtpengine/rtpengine_db.c
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,166 @@
 +/*
 + * rtpproxy module
 + *
@@ -5699,7 +5617,7 @@
 + *
 + * You should have received a copy of the GNU General Public License
 + * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 + *
 + */
 +
@@ -5812,9 +5730,6 @@
 +		/* Database not configured */
 +		return 0;
 +
-+	rtpp_db_url.len = strlen(rtpp_db_url.s);
-+	rtpp_table_name.len = strlen(rtpp_table_name.s);
-+
 +	if (db_bind_mod(&rtpp_db_url, &rtpp_dbf) < 0)
 +	{
 +		LM_ERR("Unable to bind to db driver - %.*s\n", rtpp_db_url.len, rtpp_db_url.s);
@@ -5849,3 +5764,109 @@
 +
 +	return ret;
 +}
+--- /dev/null
++++ b/modules/rtpengine/doc/rtpengine.xml
+@@ -0,0 +1,103 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++%docentities;
++
++]>
++
++<book xmlns:xi="http://www.w3.org/2001/XInclude">
++	<bookinfo>
++	<title>rtpengine Module</title>
++	<productname class="trade">&kamailioname;</productname>
++	<authorgroup>
++		<author>
++		<firstname>Maxim</firstname>
++		<surname>Sobolev</surname>
++		<affiliation><orgname>Sippy Software, Inc.</orgname></affiliation>
++		<address>
++			<email>sobomax@sippysoft.com</email>
++		</address>
++		</author>
++		<author>
++		<firstname>Juha</firstname>
++		<surname>Heinanen</surname>
++		<affiliation><orgname>TuTPro, Inc.</orgname></affiliation>
++		<address>
++			<email>jh@tutpro.com</email>
++		</address>
++		</author>
++		<editor>
++		<firstname>Maxim</firstname>
++		<surname>Sobolev</surname>
++		<address>
++			<email>sobomax@sippysoft.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Bogdan-Andrei</firstname>
++		<surname>Iancu</surname>
++		<address>
++			<email>bogdan@voice-system.ro</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Juha</firstname>
++		<surname>Heinanen</surname>
++		<address>
++			<email>jh@tutpro.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Sas</firstname>
++		<surname>Ovidiu</surname>
++		<address>
++			<email>osas@voipembedded.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Carsten</firstname>
++		<surname>Bock</surname>
++		<affiliation><orgname>ng-voice GmbH</orgname></affiliation>
++		<address>
++			<email>carsten@ng-voice.com</email>
++		</address>
++		</editor>
++		<editor>
++		<firstname>Richard</firstname>
++		<surname>Fuchs</surname>
++		<affiliation><orgname>Sipwise GmbH</orgname></affiliation>
++		<address>
++			<email>rfuchs@sipwise.com</email>
++		</address>
++		</editor>
++	</authorgroup>
++	<copyright>
++		<year>2003-2008</year>
++		<holder>Sippy Software, Inc.</holder>
++	</copyright>
++	<copyright>
++		<year>2005</year>
++		<holder>Voice Sistem SRL</holder>
++	</copyright>
++	<copyright>
++		<year>2009-2014</year>
++		<holder>TuTPro Inc.</holder>
++	</copyright>
++	<copyright>
++		<year>2010</year>
++		<holder><ulink url='http://www.voipembedded.com'>VoIPEmbedded Inc.</ulink></holder>
++	</copyright>
++	<copyright>
++		<year>2013-2014</year>
++		<holder>Sipwise GmbH</holder>
++	</copyright>
++	</bookinfo>
++	<toc></toc>
++
++	<xi:include href="rtpengine_admin.xml"/>
++	<xi:include href="rtpengine_faq.xml"/>
++
++</book>

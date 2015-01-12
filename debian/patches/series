@@ -43,6 +43,7 @@ sipwise/url-safe_base64.patch
 sipwise/dialoginfo_notify_body.patch
 sipwise/tcap.patch
 sipwise/rtpengine.patch
+sipwise/rtpengine-compatibility.patch
 sipwise/db_postgres-timeout
 sipwise/usrloc_dbro.patch
 sipwise/nathelper_socket_filter.patch
