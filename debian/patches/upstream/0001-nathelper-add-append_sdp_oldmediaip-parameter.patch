@@ -1,0 +1,65 @@
+From 1fd5fb1d51a9507b12d02d3ba32384d543940c7d Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 12 Jan 2015 14:05:03 +0100
+Subject: [PATCH] nathelper: add append_sdp_oldmediaip parameter
+
+---
+ modules/nathelper/doc/nathelper_admin.xml | 19 +++++++++++++++++++
+ modules/nathelper/nathelper.c             |  4 +++-
+ 2 files changed, 22 insertions(+), 1 deletion(-)
+
+--- a/modules/nathelper/doc/nathelper_admin.xml
++++ b/modules/nathelper/doc/nathelper_admin.xml
+@@ -424,6 +424,25 @@
+ </programlisting>
+ 		</example>
+ 	</section>
++	<section id="nathelper.p.append_sdp_oldmediaip">
++		<title><varname>append_sdp_oldmediaip</varname> (int)</title>
++		<para>
++		The parameter controls if oldmediaip field should be appended to the SDP.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote>1</quote> (feature enabled).
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>append_sdp_oldmediaip</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("nathelper", "append_sdp_oldmediaip", 1)
++...
++</programlisting>
++		</example>
++	</section>
+ 	</section>
+ 
+ 
+--- a/modules/nathelper/nathelper.c
++++ b/modules/nathelper/nathelper.c
+@@ -354,6 +354,7 @@
+ 
+ static char *natping_socket = 0;
+ static int udpping_from_path = 0;
++static int sdp_oldmediaip = 1;
+ static int raw_sock = -1;
+ static unsigned int raw_ip = 0;
+ static unsigned short raw_port = 0;
+@@ -426,6 +427,7 @@
+ 	{"natping_socket",        STR_PARAM, &natping_socket        },
+ 	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
+ 	{"udpping_from_path",     INT_PARAM, &udpping_from_path     },
++	{"append_sdp_oldmediaip", INT_PARAM, &sdp_oldmediaip        },
+ 	{"contact_only",          INT_PARAM, &contact_only          },
+ 	{"filter_socket",         INT_PARAM, &filter_socket         },
+ 
+@@ -1683,7 +1685,7 @@
+ 		}
+ 		body2.s = oldip.s + oldip.len;
+ 		body2.len = bodylimit - body2.s;
+-		ret = alter_mediaip(msg, &body1, &oldip, pf, &newip, pf,1);
++		ret = alter_mediaip(msg, &body1, &oldip, pf, &newip, pf, sdp_oldmediaip);
+ 		if (ret == -1) {
+ 			LM_ERR("can't alter '%s' IP\n",line);
+ 			return -1;
