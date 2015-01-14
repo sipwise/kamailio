@@ -49,3 +49,4 @@ sipwise/usrloc_dbro.patch
 sipwise/nathelper_socket_filter.patch
 # testing
 sipwise/0001-usrloc-db_update_addr-WHERE-columns-at-UPDATE-query-.patch
+upstream/0001-nathelper-add-append_sdp_oldmediaip-parameter.patch
