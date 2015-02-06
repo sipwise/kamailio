@@ -51,7 +51,7 @@ Vcs-Browser: http://svn.debian.org/wsvn/pkg-voip/kamailio/?op=log
 Package: ngcp-kamailio
 Architecture: any
 Multi-Arch: foreign
-Pre-Depends: ngcp-system-tools,
+Pre-Depends: ngcp-system-tools | ngcp-system-tools-ce,
              ${misc:Pre-Depends}
 Depends: adduser,
          python,
