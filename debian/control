@@ -43,7 +43,7 @@ Build-Depends: bison,
                python-dev,
                unixodbc-dev,
                xsltproc
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Homepage: http://www.kamailio.org/
 Vcs-Svn: svn://svn.debian.org/pkg-voip/kamailio/trunk/
 Vcs-Browser: http://svn.debian.org/wsvn/pkg-voip/kamailio/?op=log
