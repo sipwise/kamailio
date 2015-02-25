@@ -1,6 +1,8 @@
 # backports from master
 upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
+upstream/presence_dialoginfo-optionally-send-dummy-dialog.patch
+upstream/presence_dialoginfo-rfc4235-in-dummy-dialog.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
 ## multipart bodies
 upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
@@ -40,7 +42,6 @@ sipwise/lcr_rate_module.patch
 sipwise/nathelper.contact_only.patch
 sipwise/parallel_build.patch
 sipwise/url-safe_base64.patch
-sipwise/dialoginfo_notify_body.patch
 sipwise/tcap.patch
 sipwise/rtpengine.patch
 sipwise/rtpengine-compatibility.patch
