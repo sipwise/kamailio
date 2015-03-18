@@ -1,3 +1,21 @@
+ngcp-kamailio (4.1.6-1+0~mr4.0.0.0) unstable; urgency=low
+
+  [ Michael Prokop ]
+  * [20c76d2] MT#10837 Adjust FREERADIUS behaviour
+  * [852eace] MT#11387 Switch from Pre-Dependency on ngcp-system-tools* to Depends
+  * [1936824] MT#9127 Bump Standards-Version to 3.9.6
+
+  [ Richard Fuchs ]
+  * [1e73790] sync rtpengine.patch with upsteam
+
+  [ Victor Seva ]
+  * [d24106a] MT#10931 nathelper: append_sdp_oldmediaip parameter
+  * [4a9f398] MT#11753 backport patches for dialoginfo and remove ours
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 18 Mar 2015 14:00:59 +0100
+
 ngcp-kamailio (4.1.6-1+0~mr3.8.0.0) unstable; urgency=low
 
   [ Richard Fuchs ]
