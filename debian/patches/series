@@ -16,17 +16,8 @@ upstream/0006-textops-fix-append_body_part.patch
 upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
 upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
 # 4.1 upstream fixes
-upstream/0001-exec-safety-check-against-bash-vulnerability-CVE-201.patch
-upstream/0002-exec-add-parameter-to-control-the-option-for-bash-ex.patch
-upstream/0004-dialog-set-again-the-dialog-ids-in-context-for-BYE-p.patch
-upstream/0005-dialog-fixed-typo-copy-paste-oversight-to-dlg-pointe.patch
-upstream/0006-core-helper-functions-to-get-addr-and-port-to-be-use.patch
-upstream/0007-tm-use-advertised-addr-port-if-set-for-socket-in-rm-.patch
-upstream/0008-mohqueue-fixed-db_qtable-parameter-name.patch
-upstream/0009-rr-Fix-memory-leak-when-using-outbound.patch
-upstream/0010-core-xavp-Fix-xavp_insert-to-prevent-corrupted-linke.patch
+#
 # fixes from master that are not in 4.2
-upstream/0011-tm-safety-catch-inside-t_check_trans-when-already-in.patch
 upstream/0012-tm-handle-BRANCH_FAILURE_ROUTE-in-t_check_trans-test.patch
 #
 no_lib64_on_64_bits.patch
@@ -47,6 +38,5 @@ sipwise/rtpengine-compatibility.patch
 sipwise/db_postgres-timeout
 sipwise/usrloc_dbro.patch
 sipwise/nathelper_socket_filter.patch
-# testing
-sipwise/0001-usrloc-db_update_addr-WHERE-columns-at-UPDATE-query-.patch
+# backport from master
 upstream/0001-nathelper-add-append_sdp_oldmediaip-parameter.patch
