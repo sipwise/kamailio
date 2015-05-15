@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -61,10 +61,6 @@ char *filename = NULL;
 /* Path to an arbitrary directory where the Kamailio Perl modules are
  * installed */
 char *modpath = NULL;
-
-/* Function to be called before perl interpreter instance is destroyed
- * when attempting reinit */
-static char *perl_destroy_func = NULL;
 
 /* Allow unsafe module functions - functions with fixups. This will create
  * memory leaks, the variable thus is not documented! */
@@ -128,11 +124,10 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"filename", PARAM_STRING, &filename},
-	{"modpath", PARAM_STRING, &modpath},
+	{"filename", STR_PARAM, &filename},
+	{"modpath", STR_PARAM, &modpath},
 	{"unsafemodfnc", INT_PARAM, &unsafemodfnc},
 	{"reset_cycles", INT_PARAM, &_ap_reset_cycles_init},
-	{"perl_destroy_func",  PARAM_STRING, &perl_destroy_func},
 	{ 0, 0, 0 }
 };
 
@@ -435,7 +430,6 @@ int app_perl_reset_interpreter(void)
 {
 	struct timeval t1;
 	struct timeval t2;
-	char *args[] = { NULL };
 
 	if(*_ap_reset_cycles==0)
 		return 0;
@@ -446,9 +440,6 @@ int app_perl_reset_interpreter(void)
 
 	if(_ap_exec_cycles<=*_ap_reset_cycles)
 		return 0;
-
-	if(perl_destroy_func)
-		call_argv(perl_destroy_func, G_DISCARD | G_NOARGS, args);
 
 	gettimeofday(&t1, NULL);
 	if (perl_reload()<0) {

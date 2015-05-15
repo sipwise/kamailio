@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -49,7 +49,8 @@
           	case METHOD_BYE: stats->dir##_requests_bye++; break;		\
 		case METHOD_INFO: stats->dir##_requests_info++; break;		\
           	case METHOD_OTHER: stats->dir##_requests_other++; break;	\
-		default: LM_ERR("unknown method in rq stats (%s)\n", #dir);	\
+          	default: LOG(L_ERR, "ERROR: unknown method in rq stats (%s)\n", \
+							#dir);	\
 		}	\
 	}while(0)
 
@@ -79,7 +80,8 @@
                         _statusline(4, dir)                   \
                         _statusline(5, dir)                   \
                         _statusline(6, dir)                   \
-                        default: LM_INFO("unusual status code received in stats (%s)\n", #dir); \
+                        default: LOG(L_INFO, "ERROR: unusual status code"\
+										 " received in stats (%s)\n", #dir); \
                 }       \
         }while(0)
 

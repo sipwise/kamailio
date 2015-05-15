@@ -118,8 +118,8 @@ static int init_sigio(io_wait_h* h, int rsig)
 		n=SIGRTMAX-SIGRTMIN;
 	}else{
 		if ((rsig < SIGRTMIN) || (rsig >SIGRTMAX)){
-			LM_CRIT("real time signal %d out of range  [%d, %d]\n",
-					rsig, SIGRTMIN, SIGRTMAX);
+			LOG(L_CRIT, "ERROR: init_sigio: real time signal %d out of"
+					          " range  [%d, %d]\n", rsig, SIGRTMIN, SIGRTMAX);
 			goto error;
 		}
 		start_sig=rsig;
@@ -132,7 +132,8 @@ retry1:
 	/* get current block mask */
 	if (sigprocmask(SIG_BLOCK, &h->sset, &oldset )==-1){
 		if (errno==EINTR) goto retry1;
-		LM_ERR("1st sigprocmask failed: %s [%d]\n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: init_sigio: 1st sigprocmask failed: %s [%d]\n",
+				strerror(errno), errno);
 		/* try to continue */
 	}
 	
@@ -148,7 +149,8 @@ retry1:
 	}
 	
 	if (h->signo==0){
-			LM_CRIT("%s\n", rsig?"could not assign requested real-time signal":
+			LOG(L_CRIT, "ERROR: init_sigio: %s\n",
+					rsig?"could not assign requested real-time signal":
 						 "out of real-time signals");
 			goto error;
 	}
@@ -156,19 +158,19 @@ retry1:
 	DBG("init_sigio: trying signal %d... \n", h->signo);
 	
 	if (sigaddset(&h->sset, h->signo)==-1){
-		LM_ERR("sigaddset failed for %d: %s [%d]\n",
+		LOG(L_ERR, "ERROR: init_sigio: sigaddset failed for %d: %s [%d]\n",
 				h->signo, strerror(errno), errno);
 		goto error;
 	}
 	if (sigaddset(&h->sset, SIGIO)==-1){
-		LM_ERR("sigaddset failed for %d: %s [%d]\n",
+		LOG(L_ERR, "ERROR: init_sigio: sigaddset failed for %d: %s [%d]\n",
 				SIGIO, strerror(errno), errno);
 		goto error;
 	}
 retry:
 	if (sigprocmask(SIG_BLOCK, &h->sset, 0)==-1){
 		if (errno==EINTR) goto retry;
-		LM_ERR("sigprocmask failed: %s [%d]\n",
+		LOG(L_ERR, "ERROR: init_sigio: sigprocmask failed: %s [%d]\n",
 				strerror(errno), errno);
 		goto error;
 	}
@@ -204,7 +206,8 @@ again:
 	h->epfd=epoll_create(h->max_fd_no);
 	if (h->epfd==-1){
 		if (errno==EINTR) goto again;
-		LM_ERR("epoll_create: %s [%d]\n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: init_epoll: epoll_create: %s [%d]\n",
+				strerror(errno), errno);
 		return -1;
 	}
 	return 0;
@@ -232,7 +235,8 @@ again:
 	h->kq_fd=kqueue();
 	if (h->kq_fd==-1){
 		if (errno==EINTR) goto again;
-		LM_ERR("kqueue: %s [%d]\n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: init_kqueue: kqueue: %s [%d]\n",
+				strerror(errno), errno);
 		return -1;
 	}
 	return 0;
@@ -260,7 +264,8 @@ again:
 	h->dpoll_fd=open("/dev/poll", O_RDWR);
 	if (h->dpoll_fd==-1){
 		if (errno==EINTR) goto again;
-		LM_ERR("open: %s [%d]\n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: init_/dev/poll: open: %s [%d]\n",
+				strerror(errno), errno);
 		return -1;
 	}
 	return 0;
@@ -473,11 +478,11 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 	if (poll_err || (poll_method==0)){
 		poll_method=choose_poll_method();
 		if (poll_err){
-			LM_ERR("%s, using %s instead\n",
+			LOG(L_ERR, "ERROR: init_io_wait: %s, using %s instead\n",
 					poll_err, poll_method_str[poll_method]);
 		}else{
-			LM_INFO("using %s as the io watch method (auto detected)\n",
-					poll_method_str[poll_method]);
+			LOG(L_INFO, "init_io_wait: using %s as the io watch method"
+					" (auto detected)\n", poll_method_str[poll_method]);
 		}
 	}
 	
@@ -486,7 +491,8 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 	/* common stuff, everybody has fd_hash */
 	h->fd_hash=local_malloc(sizeof(*(h->fd_hash))*h->max_fd_no);
 	if (h->fd_hash==0){
-		LM_CRIT("could not alloc fd hashtable (%ld bytes)\n",
+		LOG(L_CRIT, "ERROR: init_io_wait: could not alloc"
+					" fd hashtable (%ld bytes)\n",
 					(long)sizeof(*(h->fd_hash))*h->max_fd_no );
 		goto error;
 	}
@@ -505,26 +511,27 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 #endif
 			h->fd_array=local_malloc(sizeof(*(h->fd_array))*h->max_fd_no);
 			if (h->fd_array==0){
-				LM_CRIT("could not alloc fd array (%ld bytes)\n",
-						(long)sizeof(*(h->fd_hash))*h->max_fd_no);
+				LOG(L_CRIT, "ERROR: init_io_wait: could not"
+							" alloc fd array (%ld bytes)\n",
+							(long)sizeof(*(h->fd_hash))*h->max_fd_no);
 				goto error;
 			}
 			memset((void*)h->fd_array, 0, sizeof(*(h->fd_array))*h->max_fd_no);
 #ifdef HAVE_SIGIO_RT
 			if ((poll_method==POLL_SIGIO_RT) && (init_sigio(h, 0)<0)){
-				LM_CRIT("sigio init failed\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: sigio init failed\n");
 				goto error;
 			}
 #endif
 #ifdef HAVE_DEVPOLL
 			if ((poll_method==POLL_DEVPOLL) && (init_devpoll(h)<0)){
-				LM_CRIT("/dev/poll init failed\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: /dev/poll init failed\n");
 				goto error;
 			}
 #endif
 #ifdef HAVE_SELECT
 			if ((poll_method==POLL_SELECT) && (init_select(h)<0)){
-				LM_CRIT("select init failed\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: select init failed\n");
 				goto error;
 			}
 #endif
@@ -535,12 +542,13 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 		case POLL_EPOLL_ET:
 			h->ep_array=local_malloc(sizeof(*(h->ep_array))*h->max_fd_no);
 			if (h->ep_array==0){
-				LM_CRIT("could not alloc epoll array\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: could not alloc"
+							" epoll array\n");
 				goto error;
 			}
 			memset((void*)h->ep_array, 0, sizeof(*(h->ep_array))*h->max_fd_no);
 			if (init_epoll(h)<0){
-				LM_CRIT("epoll init failed\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: epoll init failed\n");
 				goto error;
 			}
 			break;
@@ -558,13 +566,15 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 			h->kq_array_size=2 * h->max_fd_no + h->kq_changes_size;
 			h->kq_array=local_malloc(sizeof(*(h->kq_array))*h->kq_array_size);
 			if (h->kq_array==0){
-				LM_CRIT("could not alloc kqueue event array\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: could not alloc"
+							" kqueue event array\n");
 				goto error;
 			}
 			h->kq_changes=local_malloc(sizeof(*(h->kq_changes))*
 										h->kq_changes_size);
 			if (h->kq_changes==0){
-				LM_CRIT("could not alloc kqueue changes array\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: could not alloc"
+							" kqueue changes array\n");
 				goto error;
 			}
 			h->kq_nchanges=0;
@@ -573,13 +583,14 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 			memset((void*)h->kq_changes, 0,
 						sizeof(*(h->kq_changes))* h->kq_changes_size);
 			if (init_kqueue(h)<0){
-				LM_CRIT("kqueue init failed\n");
+				LOG(L_CRIT, "ERROR: init_io_wait: kqueue init failed\n");
 				goto error;
 			}
 			break;
 #endif
 		default:
-			LM_CRIT("unknown/unsupported poll method %s (%d)\n",
+			LOG(L_CRIT, "BUG: init_io_wait: unknown/unsupported poll"
+						" method %s (%d)\n",
 						poll_method_str[poll_method], poll_method);
 			goto error;
 	}

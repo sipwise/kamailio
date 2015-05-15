@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -129,8 +129,12 @@ int branch_builder( unsigned int hash_index,
 
 char* id_builder(struct sip_msg* msg, unsigned int *id_len);
 
-/* check if IP address in Via != source IP address of signaling */
+/* check if IP address in Via != source IP address of signaling,
+ * or the sender is asking to set the values for rport or received */
 int received_test( struct sip_msg *msg );
+
+/* check if IP address in Via != source IP address of signaling */
+int received_via_test( struct sip_msg *msg );
 
 /* builds a char* buffer from message headers without body
  * first line is excluded in case of skip_first_line=1
@@ -162,7 +166,4 @@ void fix_global_req_flags(str* gname, str* name);
 
 int build_sip_msg_from_buf(struct sip_msg *msg, char *buf, int len,
 		unsigned int id);
-
-/* returns a copy in private memory of the boundary in a multipart body */
-int get_boundary(struct sip_msg* msg, str* boundary);
 #endif

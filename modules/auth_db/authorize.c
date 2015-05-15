@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * history:
  * ---------
@@ -50,9 +50,10 @@
 #include "../../mem/mem.h"
 #include "api.h"
 #include "authdb_mod.h"
+#include "authorize.h"
 
 
-int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table)
+int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table, int flags)
 {
 	pv_elem_t *cred;
 	db_key_t keys[2];
@@ -62,11 +63,17 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table)
 
 	int n, nc;
 
-	col = pkg_malloc(sizeof(*col) * (credentials_n + 1));
+	if(flags&AUTH_DB_SUBS_SKIP_CREDENTIALS) {
+		nc = 1;
+	} else {
+		nc = credentials_n;
+	}
+	col = pkg_malloc(sizeof(*col) * (nc+1));
 	if (col == NULL) {
 		LM_ERR("no more pkg memory\n");
 		return -1;
 	}
+	col[0] = &user_column;
 
 	keys[0] = &user_column;
 	keys[1] = &domain_column;
@@ -86,7 +93,6 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table)
 		n = 2;
 	}
 
-	nc = credentials_n;
 	if (auth_dbf.use_table(auth_db_handle, table) < 0) {
 		LM_ERR("failed to use_table\n");
 		pkg_free(col);
@@ -110,6 +116,10 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table)
 				table->len, table->s);
 		return -2;
 	}
+	if(flags&AUTH_DB_SUBS_SKIP_CREDENTIALS) {
+		/* there is a result and flag to skip loading credentials is set */
+		goto done;
+	}
 	for (cred=credentials, n=0; cred; cred=cred->next, n++) {
 		if (db_val2pv_spec(msg, &RES_ROWS(res)[0].values[n], cred->spec) != 0) {
 			if(res)
@@ -119,6 +129,8 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table)
 			return -3;
 		}
 	}
+
+done:
 	if(res)
 		auth_dbf.free_result(auth_db_handle, res);
 	return 0;
@@ -506,14 +518,9 @@ int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags)
 		} else {
 			uri = furi;
 		}
-		if(!((iflags&AUTH_CHECK_SKIPFWD_F)
-				&& (_m->REQ_METHOD==METHOD_INVITE || _m->REQ_METHOD==METHOD_BYE
-					|| _m->REQ_METHOD==METHOD_PRACK || _m->REQ_METHOD==METHOD_UPDATE
-					|| _m->REQ_METHOD==METHOD_MESSAGE))) {
-			if(srealm.len!=uri->user.len
-						|| strncmp(srealm.s, uri->user.s, srealm.len)!=0)
-				return AUTH_USER_MISMATCH;
-		}
+		if(srealm.len!=uri->user.len
+					|| strncmp(srealm.s, uri->user.s, srealm.len)!=0)
+			return AUTH_USER_MISMATCH;
 
 		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
 			/* check from==to */

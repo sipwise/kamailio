@@ -13,7 +13,6 @@ RPC Exports for kex
         Private memory (pkg) statistics per process
 </para>
 <para>
-        Returns an array.
 </para>
 </section>
 

@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
  * History:
@@ -151,7 +151,8 @@ static on_resolv_reinit	on_resolv_reinit_cb = NULL;
 int register_resolv_reinit_cb(on_resolv_reinit cb)
 {
 	if (on_resolv_reinit_cb) {
-		LM_ERR("callback function has been already registered\n");
+		LOG(L_ERR, "ERROR: register_resolv_reinit_cb(): "
+			"callback function has been already registered\n");
 		return -1;
 	}
 	on_resolv_reinit_cb = cb;
@@ -200,7 +201,8 @@ static int _resolv_init(void)
 		_res.options&=~(RES_DEFNAMES|RES_DNSRCH);
 #else
 #warning "no resolv timeout support"
-	LM_WARN("no resolv options support - resolv options will be ignored\n");
+	LOG(L_WARN, "WARNING: _resolv_init: no resolv options support - resolv"
+			" options will be ignored\n");
 #endif
 	return 0;
 }
@@ -230,7 +232,8 @@ void resolv_reinit(str *gname, str *name)
 #ifdef DNS_WATCHDOG_SUPPORT
 	if (on_resolv_reinit_cb) on_resolv_reinit_cb(name);
 #endif
-	LM_DBG("DNS resolver has been reinitialized\n");
+	LOG(L_DBG, "DEBUG: resolv_reinit(): "
+		"DNS resolver has been reinitialized\n");
 }
 
 /* fixup function for dns_reinit variable
@@ -257,7 +260,8 @@ void reinit_proto_prefs(str *gname, str *name)
 int dns_try_ipv6_fixup(void *handle, str *gname, str *name, void **val)
 {
 	if ((int)(long)(*val) && !(socket_types & SOCKET_T_IPV6)) {
-		LM_ERR("SER does not listen on any ipv6 interface, "
+		LOG(L_ERR, "ERROR: dns_try_ipv6_fixup(): "
+			"SER does not listen on any ipv6 interface, "
 			"there is no point in resolving ipv6 addresses\n");
 		return -1;
 	}
@@ -337,7 +341,7 @@ struct srv_rdata* dns_srv_parser( unsigned char* msg, unsigned char* end,
 	/* alloc enought space for the struct + null terminated name */
 	srv=local_malloc(sizeof(struct srv_rdata)-1+len+1);
 	if (srv==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_srv_parser: out of memory\n");
 		goto error;
 	}
 	srv->priority=ntohs(priority);
@@ -423,7 +427,7 @@ struct naptr_rdata* dns_naptr_parser( unsigned char* msg, unsigned char* end,
 	naptr=local_malloc(sizeof(struct naptr_rdata)+flags_len+services_len+
 						regexp_len+len+1-1);
 	if (naptr == 0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_naptr_parser: out of memory\n");
 		goto error;
 	}
 	naptr->order=ntohs(order);
@@ -468,7 +472,7 @@ struct cname_rdata* dns_cname_parser( unsigned char* msg, unsigned char* end,
 	/* alloc sizeof struct + space for the null terminated name */
 	cname=local_malloc(sizeof(struct cname_rdata)-1+len+1);
 	if(cname==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_cname_parser: out of memory\n");
 		goto error;
 	}
 	cname->name_len=len;
@@ -492,7 +496,7 @@ struct a_rdata* dns_a_parser(unsigned char* rdata, unsigned char* eor)
 	if (rdata+4>eor) goto error;
 	a=(struct a_rdata*)local_malloc(sizeof(struct a_rdata));
 	if (a==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_a_parser: out of memory\n");
 		goto error;
 	}
 	memcpy(a->ip, rdata, 4);
@@ -512,7 +516,7 @@ struct aaaa_rdata* dns_aaaa_parser(unsigned char* rdata, unsigned char* eor)
 	if (rdata+16>eor) goto error;
 	aaaa=(struct aaaa_rdata*)local_malloc(sizeof(struct aaaa_rdata));
 	if (aaaa==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_aaaa_parser: out of memory\n");
 		goto error;
 	}
 	memcpy(aaaa->ip6, rdata, 16);
@@ -563,7 +567,7 @@ static struct txt_rdata* dns_txt_parser(unsigned char* msg, unsigned char* end,
 	txt=local_malloc(sizeof(struct txt_rdata) +(n-1)*sizeof(struct dns_cstr)+
 						str_size);
 	if(unlikely(txt==0)){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_txt_parser: out of memory\n");
 		goto error;
 	}
 	/* string table */
@@ -633,7 +637,7 @@ static struct ebl_rdata* dns_ebl_parser(unsigned char* msg, unsigned char* end,
 	/* alloc sizeof struct + space for the 2 null-terminated strings */
 	ebl=local_malloc(sizeof(struct ebl_rdata)-1+sep_len+1+apex_len+1);
 	if (ebl==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_ebl_parser: out of memory\n");
 		goto error;
 	}
 	ebl->position=rdata[0];
@@ -671,7 +675,7 @@ struct ptr_rdata* dns_ptr_parser( unsigned char* msg, unsigned char* end,
 	/* alloc sizeof struct + space for the null terminated name */
 	pname=local_malloc(sizeof(struct ptr_rdata)-1+len+1);
 	if(pname==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_ptr_parser: out of memory\n");
 		goto error;
 	}
 	pname->ptrdname_len=len;
@@ -782,7 +786,7 @@ struct rdata* get_record(char* name, int type, int flags)
 	for (r=0; r<qno; r++){
 		/* skip the name of the question */
 		if (unlikely((p=dns_skipname(p, end))==0)) {
-			LM_ERR("skipname==0\n");
+			LOG(L_ERR, "ERROR: get_record: skipname==0\n");
 			goto error;
 		}
 		p+=2+2; /* skip QCODE & QCLASS */
@@ -791,7 +795,7 @@ struct rdata* get_record(char* name, int type, int flags)
 		p+=1+2+2; /* skip the ending  '\0, QCODE and QCLASS */
 	#endif
 		if (unlikely(p>end)) {
-			LM_ERR("p>=end\n");
+			LOG(L_ERR, "ERROR: get_record: p>=end\n");
 			goto error;
 		}
 	};
@@ -801,21 +805,21 @@ again:
 #if 0
 		/*  ignore it the default domain name */
 		if ((p=dns_skipname(p, end))==0) {
-			LM_ERR("get_record: skip_name=0 (#2)\n");
+			LOG(L_ERR, "ERROR: get_record: skip_name=0 (#2)\n");
 			goto error;
 		}
 #else
 		if (unlikely((skip=dn_expand(buff.buff, end, p, rec_name,
 							MAX_DNS_NAME-1))==-1)){
-			LM_ERR("dn_expand(rec_name) failed\n");
+			LOG(L_ERR, "ERROR: get_record: dn_expand(rec_name) failed\n");
 			goto error;
 		}
 #endif
 		p+=skip;
 		rec_name_len=strlen(rec_name);
 		if (unlikely(rec_name_len>255)){
-			LM_ERR("dn_expand(rec_name): name too long (%d)\n",
-					rec_name_len);
+			LOG(L_ERR, "ERROR: get_record: dn_expand(rec_name): name too"
+					" long  (%d)\n", rec_name_len);
 			goto error;
 		}
 		/* check if enough space is left for type, class, ttl & size */
@@ -848,7 +852,7 @@ again:
 		rd=(struct rdata*) local_malloc(sizeof(struct rdata)+rec_name_len+
 										1-1);
 		if (rd==0){
-			LM_ERR("out of memory\n");
+			LOG(L_ERR, "ERROR: get_record: out of memory\n");
 			goto error;
 		}
 		rd->type=rtype;
@@ -950,7 +954,7 @@ again:
 				last=&(rd->next);
 				break;
 			default:
-				LM_ERR("unknown type %d\n", rtype);
+				LOG(L_ERR, "WARNING: get_record: unknown type %d\n", rtype);
 				rd->rdata=0;
 				*last=rd;
 				last=&(rd->next);
@@ -969,7 +973,7 @@ again:
 		for (r=0; (r<answers_no) && (p<end); r++){
 			/* skip over the ns records */
 			if ((p=dns_skipname(p, end))==0) {
-				LM_ERR("skip_name=0 (#3)\n");
+				LOG(L_ERR, "ERROR: get_record: skip_name=0 (#3)\n");
 				goto error;
 			}
 			/* check if enough space is left for type, class, ttl & size */
@@ -992,7 +996,7 @@ again:
 	if ((search_list_used==1)&&(fullname_rd!=0)) {
 		rd=(struct rdata*) local_malloc(sizeof(struct rdata)+name_len+1-1);
 		if (unlikely(rd==0)){
-			LM_ERR("out of memory\n");
+			LOG(L_ERR, "ERROR: get_record: out of memory\n");
 			goto error;
 		}
 		rd->type=T_CNAME;
@@ -1006,7 +1010,7 @@ again:
 		rd->rdata=(void*)local_malloc(sizeof(struct cname_rdata)-1+
 										head->name_len+1);
 		if(unlikely(rd->rdata==0)){
-			LM_ERR("out of memory\n");
+			LOG(L_ERR, "ERROR: get_record: out of memory\n");
 			goto error_rd;
 		}
 		((struct cname_rdata*)(rd->rdata))->name_len=fullname_rd->name_len;
@@ -1018,19 +1022,19 @@ again:
 
 	return head;
 error_boundary:
-		LM_ERR("end of query buff reached\n");
+		LOG(L_ERR, "ERROR: get_record: end of query buff reached\n");
 		if (head) free_rdata_list(head);
 		return 0;
 error_parse:
-		LM_ERR("rdata parse error (%s, %d), %p-%p"
-				" rtype=%d, class=%d, ttl=%d, rdlength=%d\n",
+		LOG(L_ERR, "ERROR: get_record: rdata parse error (%s, %d), %p-%p"
+						" rtype=%d, class=%d, ttl=%d, rdlength=%d \n",
 				name, type,
 				p, end, rtype, class, ttl, rdlength);
 error_rd:
 		if (rd) local_free(rd); /* rd->rdata=0 & rd is not linked yet into
 								   the list */
 error:
-		LM_ERR("get_record\n");
+		LOG(L_ERR, "ERROR: get_record \n");
 		if (head) free_rdata_list(head);
 not_found:
 	/* increment error counter */
@@ -1230,7 +1234,7 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 	srv_head=0;
 	srv_target=0;
 	if (name->len >= MAX_DNS_NAME) {
-		LM_ERR("domain name too long\n");
+		LOG(L_ERR, "srv_sip_resolvehost: domain name too long\n");
 		he=0;
 		goto end;
 	}
@@ -1273,8 +1277,8 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 			goto end;
 		}
 		if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-			LM_WARN("domain name too long (%d), unable to perform SRV lookup\n",
-						name->len);
+			LOG(L_WARN, "WARNING: srv_sip_resolvehost: domain name too long (%d),"
+						" unable to perform SRV lookup\n", name->len);
 		}else{
 			
 			switch(srv_proto){
@@ -1285,7 +1289,8 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 					create_srv_name(srv_proto, name, tmp);
 					break;
 				default:
-					LM_CRIT("unknown proto %d\n", srv_proto);
+					LOG(L_CRIT, "BUG: srv_sip_resolvehost: unknown proto %d\n",
+							srv_proto);
 					he=0;
 					goto end;
 			}
@@ -1296,7 +1301,7 @@ do_srv:
 				if (l->type!=T_SRV) continue; 
 				srv=(struct srv_rdata*) l->rdata;
 				if (srv==0){
-					LM_CRIT("null rdata\n");
+					LOG(L_CRIT, "srv_sip_resolvehost: BUG: null rdata\n");
 					/* cleanup on exit only */
 					break;
 				}
@@ -1317,7 +1322,7 @@ do_srv:
 				if (l->type!=T_SRV) continue; /*should never happen*/
 				srv=(struct srv_rdata*) l->rdata;
 				if (srv==0){
-					LM_CRIT("null rdata\n");
+					LOG(L_CRIT, "srv_sip_resolvehost: BUG: null rdata\n");
 					/* cleanup on exit only */
 					break;
 				}
@@ -1407,7 +1412,7 @@ struct rdata* naptr_sip_iterate(struct rdata* naptr_head,
 		if (l->type!=T_NAPTR) continue; 
 		naptr=(struct naptr_rdata*) l->rdata;
 		if (naptr==0){
-			LM_CRIT("null rdata\n");
+				LOG(L_CRIT, "naptr_iterate: BUG: null rdata\n");
 			goto end;
 		}
 		/* check if valid and get proto */
@@ -1470,7 +1475,7 @@ void create_srv_name(char proto, str *name, char *srv) {
 			srv[SRV_SCTP_PREFIX_LEN + name->len] = '\0';
 			break;
 		default:
-			LM_CRIT("%s: unknown proto %d\n", __func__, proto);
+			LOG(L_CRIT, "BUG: %s: unknown proto %d\n", __func__, proto);
 	}
 }
 
@@ -1563,7 +1568,8 @@ struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port, ch
 	}
 
 	if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-		LM_WARN("domain name too long (%d), unable to perform SRV lookup\n", name->len);
+		LOG(L_WARN, "WARNING: no_naptr_srv_sip_resolvehost: domain name too long"
+						" (%d), unable to perform SRV lookup\n", name->len);
 	} else {
 		/* looping on the ordered list until we found a protocol what has srv record */
 		list_len = create_srv_pref_list(proto, srv_proto_list);
@@ -1576,7 +1582,8 @@ struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port, ch
 					create_srv_name(srv_proto_list[i].proto, name, tmp_srv);
 					break;
 				default:
-					LM_CRIT("unknown proto %d\n", (int)srv_proto_list[i].proto);
+					LOG(L_CRIT, "BUG: no_naptr_srv_sip_resolvehost: unknown proto %d\n",
+							(int)srv_proto_list[i].proto);
 					return 0;
 			}
 			/* set default port */
@@ -1633,7 +1640,7 @@ struct hostent* naptr_sip_resolvehost(str* name,  unsigned short* port,
 	naptr_head=0;
 	he=0;
 	if (name->len >= MAX_DNS_NAME) {
-		LM_ERR("domain name too long\n");
+		LOG(L_ERR, "naptr_sip_resolvehost: domain name too long\n");
 		goto end;
 	}
 	/* try NAPTR if no port or protocol is specified and NAPTR lookup is
@@ -1722,8 +1729,8 @@ int sip_hostport2su(union sockaddr_union* su, str* name, unsigned short port,
 	he=sip_resolvehost(name, &port, proto);
 	if (he==0){
 		ser_error=E_BAD_ADDRESS;
-		LM_ERR("could not resolve hostname: \"%.*s\"\n",
-					name->len, name->s);
+		LOG(L_ERR, "ERROR: sip_hostport2su: could not resolve hostname:"
+					" \"%.*s\"\n", name->len, name->s);
 		goto error;
 	}
 	/* port filled by sip_resolvehost if empty*/

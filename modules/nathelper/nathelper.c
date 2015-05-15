@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * ---------
@@ -338,7 +338,7 @@ static struct {
  */
 static int ping_nated_only = 0;
 static const char sbuf[4] = {0, 0, 0, 0};
-static str force_socket_str = STR_NULL;
+static char *force_socket_str = 0;
 static pid_t mypid;
 static int sipping_flag = -1;
 static int natping_disable_flag = -1;
@@ -413,15 +413,15 @@ static pv_export_t mod_pvs[] = {
 static param_export_t params[] = {
 	{"natping_interval",      INT_PARAM, &natping_interval      },
 	{"ping_nated_only",       INT_PARAM, &ping_nated_only       },
-	{"nortpproxy_str",        PARAM_STR, &nortpproxy_str      },
-	{"received_avp",          PARAM_STRING, &rcv_avp_param         },
-	{"force_socket",          PARAM_STR, &force_socket_str      },
-	{"sipping_from",          PARAM_STR, &sipping_from        },
-	{"sipping_method",        PARAM_STR, &sipping_method      },
+	{"nortpproxy_str",        STR_PARAM, &nortpproxy_str.s      },
+	{"received_avp",          STR_PARAM, &rcv_avp_param         },
+	{"force_socket",          STR_PARAM, &force_socket_str      },
+	{"sipping_from",          STR_PARAM, &sipping_from.s        },
+	{"sipping_method",        STR_PARAM, &sipping_method.s      },
 	{"sipping_bflag",         INT_PARAM, &sipping_flag          },
 	{"natping_disable_bflag", INT_PARAM, &natping_disable_flag  },
 	{"natping_processes",     INT_PARAM, &natping_processes     },
-	{"natping_socket",        PARAM_STRING, &natping_socket        },
+	{"natping_socket",        STR_PARAM, &natping_socket        },
 	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
 	{"udpping_from_path",     INT_PARAM, &udpping_from_path     },
 
@@ -601,6 +601,7 @@ mod_init(void)
 	int i;
 	bind_usrloc_t bind_usrloc;
 	struct in_addr addr;
+	str socket_str;
 	pv_spec_t avp_spec;
 	str s;
 
@@ -628,8 +629,10 @@ mod_init(void)
 		rcv_avp_type = 0;
 	}
 
-	if (force_socket_str.s && force_socket_str.len>0) {
-		force_socket=grep_sock_info(&force_socket_str,0,0);
+	if (force_socket_str) {
+		socket_str.s=force_socket_str;
+		socket_str.len=strlen(socket_str.s);
+		force_socket=grep_sock_info(&socket_str,0,0);
 	}
 
 	/* create raw socket? */
@@ -640,10 +643,16 @@ mod_init(void)
 			return -1;
 	}
 
-	if (nortpproxy_str.s && nortpproxy_str.len>0) {
+	if (nortpproxy_str.s==NULL || nortpproxy_str.s[0]==0) {
+		nortpproxy_str.len = 0;
+		nortpproxy_str.s = NULL;
+	} else {
+		nortpproxy_str.len = strlen(nortpproxy_str.s);
 		while (nortpproxy_str.len > 0 && (nortpproxy_str.s[nortpproxy_str.len - 1] == '\r' ||
 			nortpproxy_str.s[nortpproxy_str.len - 1] == '\n'))
 				nortpproxy_str.len--;
+		if (nortpproxy_str.len == 0)
+			nortpproxy_str.s = NULL;
 	}
 
 	if (natping_interval > 0) {
@@ -679,11 +688,11 @@ mod_init(void)
 
 		/* set reply function if SIP natping is enabled */
 		if (sipping_flag) {
-			if (sipping_from.s==0 || sipping_from.len<=0) {
+			if (sipping_from.s==0 || sipping_from.s[0]==0) {
 				LM_ERR("SIP ping enabled, but SIP ping FROM is empty!\n");
 				return -1;
 			}
-			if (sipping_method.s==0 || sipping_method.len<=0) {
+			if (sipping_method.s==0 || sipping_method.s[0]==0) {
 				LM_ERR("SIP ping enabled, but SIP ping method is empty!\n");
 				return -1;
 			}
@@ -691,11 +700,13 @@ mod_init(void)
 				ul.set_keepalive_timeout(nh_keepalive_timeout);
 			}
 
+			sipping_method.len = strlen(sipping_method.s);
 			if(parse_method_name(&sipping_method, &sipping_method_id) < 0) {
 				LM_ERR("invalid SIP ping method [%.*s]!\n", sipping_method.len,
 						sipping_method.s);
 				return -1;
 			}
+			sipping_from.len = strlen(sipping_from.s);
 			exports.response_f = sipping_rpl_filter;
 			init_sip_ping();
 		}
@@ -801,6 +812,8 @@ fix_nated_contact_f(struct sip_msg* msg, char* str1, char* str2)
 
 	cp = ip_addr2a(&msg->rcv.src_ip);
 	len = c->uri.len + strlen(cp) + 6 /* :port */ - hostport.len + 1;
+	if(msg->rcv.src_ip.af==AF_INET6)
+		len += 2;
 	buf = pkg_malloc(len);
 	if (buf == NULL) {
 		LM_ERR("out of pkg memory\n");
@@ -810,8 +823,13 @@ fix_nated_contact_f(struct sip_msg* msg, char* str1, char* str2)
 	temp[1] = c->uri.s[c->uri.len];
 	c->uri.s[c->uri.len] = hostport.s[0] = '\0';
 	if(uri.maddr.len<=0) {
-		len1 = snprintf(buf, len, "%s%s:%d%s", c->uri.s, cp, msg->rcv.src_port,
-		    hostport.s + hostport.len);
+		if(msg->rcv.src_ip.af==AF_INET6) {
+			len1 = snprintf(buf, len, "%s[%s]:%d%s", c->uri.s, cp,
+					msg->rcv.src_port, hostport.s + hostport.len);
+		} else {
+			len1 = snprintf(buf, len, "%s%s:%d%s", c->uri.s, cp,
+					msg->rcv.src_port, hostport.s + hostport.len);
+		}
 	} else {
 		/* skip maddr parameter - makes no sense anymore */
 		LM_DBG("removing maddr parameter from contact uri: [%.*s]\n",
@@ -825,8 +843,15 @@ fix_nated_contact_f(struct sip_msg* msg, char* str1, char* str2)
 			params1.len--;
 		params2.s = uri.maddr.s + uri.maddr.len;
 		params2.len = c->uri.s + c->uri.len - params2.s;
-		len1 = snprintf(buf, len, "%s%s:%d%.*s%.*s", c->uri.s, cp, msg->rcv.src_port,
-		    params1.len, params1.s, params2.len, params2.s);
+		if(msg->rcv.src_ip.af==AF_INET6) {
+			len1 = snprintf(buf, len, "%s[%s]:%d%.*s%.*s", c->uri.s, cp,
+					msg->rcv.src_port, params1.len, params1.s,
+					params2.len, params2.s);
+		} else {
+			len1 = snprintf(buf, len, "%s%s:%d%.*s%.*s", c->uri.s, cp,
+					msg->rcv.src_port, params1.len, params1.s,
+					params2.len, params2.s);
+		}
 	}
 	if (len1 < len)
 		len = len1;
@@ -1556,7 +1581,7 @@ nat_uac_test_f(struct sip_msg* msg, char* str1, char* str2)
 	 * test if source address of signaling is different from
 	 * address advertised in Via
 	 */
-	if ((tests & NAT_UAC_TEST_RCVD) && received_test(msg))
+	if ((tests & NAT_UAC_TEST_RCVD) && received_via_test(msg))
 		return 1;
 	/*
 	 * test for occurrences of RFC1918 addresses in Contact

@@ -225,7 +225,8 @@ tryagain:
 			DBG("lock_get: signal received while waiting for on a mutex\n");
 			goto tryagain;
 		}else{
-			LM_CRIT("sysv: %s (%d)\n", strerror(errno), errno);
+			LOG(L_CRIT, "ERROR: lock_get sysv: %s (%d)\n", strerror(errno),
+						errno);
 			return -1;
 		}
 	}
@@ -245,7 +246,8 @@ tryagain:
 			DBG("lock_get: signal received while waiting for on a mutex\n");
 			goto tryagain;
 		}else{
-			LM_CRIT("sysv: %s (%d)\n", strerror(errno), errno);
+			LOG(L_CRIT, "ERROR: lock_get sysv: %s (%d)\n", strerror(errno),
+						errno);
 		}
 	}
 }
@@ -264,7 +266,8 @@ tryagain:
 			DBG("lock_release: signal received while releasing a mutex\n");
 			goto tryagain;
 		}else{
-			LM_CRIT("sysv: %s (%d)\n", strerror(errno), errno);
+			LOG(L_CRIT, "ERROR: lock_release sysv: %s (%d)\n",
+					strerror(errno), errno);
 		}
 	}
 }
@@ -333,14 +336,16 @@ inline static gen_lock_set_t* lock_set_init(gen_lock_set_t* s)
 	if (uid && uid!=euid)
 		seteuid(euid); /* restore euid */
 	if (s->semid==-1){
-		LM_CRIT("(SYSV): semget (..., %d, 0700) failed: %s\n",
+		LOG(L_CRIT, "ERROR: lock_set_init (SYSV): semget (..., %d, 0700)"
+				" failed: %s\n",
 				s->size, strerror(errno));
 		return 0;
 	}
 	su.val=1;
 	for (r=0; r<s->size; r++){
 		if (semctl(s->semid, r, SETVAL, su)==-1){
-			LM_CRIT("(SYSV): semctl failed on sem %d: %s\n", r, strerror(errno));
+			LOG(L_CRIT, "ERROR: lock_set_init (SYSV): semctl failed on sem %d"
+					": %s\n", r, strerror(errno));
 			semctl(s->semid, 0, IPC_RMID, (union semun)(int)0);
 			return 0;
 		}
@@ -370,7 +375,8 @@ tryagain:
 			DBG("lock_get: signal received while waiting for on a mutex\n");
 			goto tryagain;
 		}else{
-			LM_CRIT("sysv: %s (%d)\n", strerror(errno), errno);
+			LOG(L_CRIT, "ERROR: lock_get sysv: %s (%d)\n", strerror(errno),
+						errno);
 			return -1;
 		}
 	}
@@ -390,7 +396,8 @@ tryagain:
 			DBG("lock_set_get: signal received while waiting on a mutex\n");
 			goto tryagain;
 		}else{
-			LM_CRIT("sysv: %s (%d)\n", strerror(errno), errno);
+			LOG(L_CRIT, "ERROR: lock_set_get sysv: %s (%d)\n",
+					strerror(errno), errno);
 		}
 	}
 }
@@ -408,7 +415,8 @@ tryagain:
 			DBG("lock_set_release: signal received while releasing mutex\n");
 			goto tryagain;
 		}else{
-			LM_CRIT("sysv: %s (%d)\n", strerror(errno), errno);
+			LOG(L_CRIT, "ERROR: lock_set_release sysv: %s (%d)\n",
+					strerror(errno), errno);
 		}
 	}
 }

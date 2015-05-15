@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -65,6 +65,9 @@
 #define ONSEND_RT_NO 1  		/*!< onsend_route routing tables number */
 #define EVENT_RT_NO RT_NO 		/*!< event_route routing tables number */
 #define DEFAULT_RT 0 			/*!< default routing table */
+
+#define MAX_REC_LEV 100 		/*!< maximum number of recursive calls */
+#define ROUTE_MAX_REC_LEV 100 		/*!< maximum number of recursive calls for route()*/
 
 #define MAX_URI_SIZE 1024		/*!< Max URI size used when rewriting URIs */
 
@@ -144,11 +147,11 @@
 #define SRV_MAX_PREFIX_LEN SRV_TLS_PREFIX_LEN
 
 #ifndef PKG_MEM_SIZE
-#define PKG_MEM_SIZE 8
+#define PKG_MEM_SIZE 4
 #endif
 #define PKG_MEM_POOL_SIZE PKG_MEM_SIZE*1024*1024	/*!< used only if PKG_MALLOC is defined*/
 
-#define SHM_MEM_SIZE 64				/*!< used if SH_MEM is defined*/
+#define SHM_MEM_SIZE 32				/*!< used if SH_MEM is defined*/
 
 
 /* dimensioning buckets in q_malloc */

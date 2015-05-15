@@ -25,7 +25,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * -------
@@ -92,19 +92,20 @@ static int sipStatusCodes_handler(struct sip_snmp_obj *o, enum handler_op op);
 
 int init_stats(int nr_of_processes)
 {
-	LM_DBG("initializing stats for %d processes\n", 
+	LOG(L_DBG,"init_stats(): initializing stats for %d processes\n", 
 		nr_of_processes);
 
 
 	global_stats = shm_malloc(nr_of_processes*sizeof(struct stats_s));
 	if(!global_stats) {
-		LM_ERR("Out of memory\n");
+		LOG(L_ERR, "Out of memory\n");
 		return -1;
 	}
 	stats_segments = nr_of_processes;
 
 	if(stats_register() == -1)
-		LM_WARN("Couldn't register stats with snmp module\n");
+		LOG(L_WARN, "init_stats(): Couldn't register stats"
+					" with snmp module\n");
 
 
 	return 0;
@@ -114,13 +115,13 @@ int init_stats(int nr_of_processes)
 void setstats(int child_index)
 {
 	if(stats_segments == -1 || !global_stats) {
-		LM_ERR("Stats not initialized. Cannot set them\n");
+		LOG(L_ERR, "Stats not initialized. Cannot set them\n");
 		stats = NULL;
 		return;
 	}
 	if(child_index < 0 || child_index >= stats_segments) {
 		stats = NULL;
-		LM_ERR("Invalid index %d while setting statistics. Only have "
+		LOG(L_ERR, "Invalid index %d while setting statistics. Only have "
 			"space for %d processes\n", child_index, stats_segments);
 		return;
 	}
@@ -138,7 +139,7 @@ int dump_statistic(FILE *fp, struct stats_s *istats, int printheader)
 	struct tm res;
 	char t[256];
 	if(stats_segments == -1 || !global_stats) {
-		LM_ERR("Stats \"engine\" not initialized\n");
+		LOG(L_ERR, "Stats \"engine\" not initialized\n");
 		return -1;
 	}
 
@@ -204,18 +205,18 @@ int dump_all_statistic()
 	FILE *stat_fp = NULL;
 
 	if(stats_segments == -1 || !global_stats) {
-		LM_ERR("%s: Can't dump statistics, not initialized!\n", __func__);
+		LOG(L_ERR, "%s: Can't dump statistics, not initialized!\n", __func__);
 		return -1;
 	}
 
 	if(!stat_file) {
-		LM_ERR("%s: Can't dump statistics, invalid stats file\n", __func__);
+		LOG(L_ERR, "%s: Can't dump statistics, invalid stats file\n", __func__);
 		return -1;
 	}
 
 	stat_fp = fopen(stat_file, "a");
 	if(!stat_fp) {
-		LM_ERR("%s: Couldn't open stats file %s: %s\n", __func__, stat_file,
+		LOG(L_ERR, "%s: Couldn't open stats file %s: %s\n", __func__, stat_file,
 				strerror(errno));
 		return -1;
 	}
@@ -229,7 +230,7 @@ int dump_all_statistic()
 	c = global_stats;
 	for(i=0; i<stats_segments; i++) {
 		if(dump_statistic(stat_fp, c, 1) == -1) {
-			LM_ERR("Error dumping statistics for process %d\n", i);
+			LOG(L_ERR, "Error dumping statistics for process %d\n", i);
 			goto end;
 		}
 		c++;
@@ -239,16 +240,16 @@ int dump_all_statistic()
 	if(!g)
 		g = calloc(1, sizeof(struct stats_s));
 	if(!g) {
-		LM_ERR("Couldn't dump global stats: %s\n", strerror(errno));
+		LOG(L_ERR, "Couldn't dump global stats: %s\n", strerror(errno));
 		goto end;
 	}
 	
 	if(collect_stats(g) == -1) {
-		LM_ERR("%s: Couldn't dump global stats\n", __func__);
+		LOG(L_ERR, "%s: Couldn't dump global stats\n", __func__);
 		goto end;
 	}
 	if(dump_statistic(stat_fp, g, 0) == -1) {
-		LM_ERR("Couldn't dump global stats\n");
+		LOG(L_ERR, "Couldn't dump global stats\n");
 		goto end;
 	}
 end:
@@ -263,11 +264,11 @@ static int collect_stats(struct stats_s *s)
 	register int i;
 	register struct stats_s *c;
 	if(!s) {
-		LM_ERR("Invalid stats pointer passed\n");
+		LOG(L_ERR, "collect_stats(): Invalid stats pointer passed\n");
 		return -1;
 	}
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("Can't collect statistics, not initialized!!\n");
+		LOG(L_ERR, "Can't collect statistics, not initialized!!\n");
 		return -1;
 	}
 
@@ -326,7 +327,7 @@ static int collect_stats(struct stats_s *s)
 
 #define reg(t) \
 	if(t##_register(&f) == -1) {	\
-		LM_ERR("%s: Failed registering SNMP handlers\n", func);	\
+		LOG(L_ERR, "%s: Failed registering SNMP handlers\n", func);	\
 		return -1;	\
 	}
 
@@ -339,8 +340,8 @@ int stats_register()
 	f.new_func = (void*) find_export("snmp_new_handler", 1, 0);
 	f.free_func = (void*) find_export("snmp_free_handler", 1, 0);
 	if(!f.reg_func || !f.new_func || !f.free_func) {
-		LM_INFO("%s: Couldn't find SNMP module\n", func);
-		LM_INFO("%s: Not reporting stats through SNMP\n", func);
+		LOG(L_INFO, "%s: Couldn't find SNMP module\n", func);
+		LOG(L_INFO, "%s: Not reporting stats through SNMP\n", func);
 		return 0;
 	}
 
@@ -367,7 +368,7 @@ static int sipSummaryStatsTable_register(const struct stats_funcs *f)
 
 	h = f->new_func(sizeof(unsigned long));
 	if(!h) {
-		LM_ERR("%s: Error creating handler\n", func);
+		LOG(L_ERR, "%s: Error creating handler\n", func);
 		return -1;
 	}
 	o = h->sip_obj;
@@ -382,7 +383,7 @@ static int sipSummaryStatsTable_register(const struct stats_funcs *f)
 	h->on_get = collect_InReqs;
 	h->on_set = h->on_end = NULL;
 	if(f->reg_func("sipSummaryInRequests", h) == -1) {
-		LM_ERR("%s: Error registering sipSummaryInRequests\n", func);
+		LOG(L_ERR, "%s: Error registering sipSummaryInRequests\n", func);
 		f->free_func(h);
 		return -1;
 	}
@@ -390,7 +391,7 @@ static int sipSummaryStatsTable_register(const struct stats_funcs *f)
 	/* sipSummaryOutRequests */
 	h->on_get = collect_OutReqs;
 	if(f->reg_func("sipSummaryOutRequests", h) == -1) {
-		LM_ERR("%s: Error registering sipSummaryOutRequests\n", func);
+		LOG(L_ERR, "%s: Error registering sipSummaryOutRequests\n", func);
 		f->free_func(h);
 		return -1;
 	}
@@ -398,7 +399,7 @@ static int sipSummaryStatsTable_register(const struct stats_funcs *f)
 	/* sipSummaryInResponses */
 	h->on_get = collect_InResp;
 	if(f->reg_func("sipSummaryInResponses", h) == -1) {
-		LM_ERR("%s: Error registering sipSummaryInResponses\n", func);
+		LOG(L_ERR, "%s: Error registering sipSummaryInResponses\n", func);
 		f->free_func(h);
 		return -1;
 	}
@@ -406,7 +407,7 @@ static int sipSummaryStatsTable_register(const struct stats_funcs *f)
 	/* sipSummaryOutResponses */
 	h->on_get = collect_OutResp;
 	if(f->reg_func("sipSummaryOutResponses", h) == -1) {
-		LM_ERR("%s: Error registering sipSummaryOutResponses\n", func);
+		LOG(L_ERR, "%s: Error registering sipSummaryOutResponses\n", func);
 		f->free_func(h);
 		return -1;
 	}
@@ -443,7 +444,7 @@ static int sipMethodStatsTable_register(const struct stats_funcs *f)
 
 	h = f->new_func(sizeof(unsigned long));
 	if(!h) {
-		LM_ERR("%s: Error creating handler\n", func);
+		LOG(L_ERR, "%s: Error creating handler\n", func);
 		return -1;
 	}
 	o = h->sip_obj;
@@ -456,7 +457,7 @@ static int sipMethodStatsTable_register(const struct stats_funcs *f)
 
 	for(i=0; i<num; i++) {
 		if(f->reg_func(objs[i], h) == -1) {
-			LM_ERR("%s: Error registering %s\n", func, objs[i]);
+			LOG(L_ERR, "%s: Error registering %s\n", func, objs[i]);
 			f->free_func(h);
 			return -1;
 		}
@@ -492,7 +493,7 @@ static int sipStatusCodesTable_register(const struct stats_funcs *f)
 
 	h = f->new_func(sizeof(unsigned long));
 	if(!h) {
-		LM_ERR("%s: Error creating handler\n", func);
+		LOG(L_ERR, "%s: Error creating handler\n", func);
 		return -1;
 	}
 	o = h->sip_obj;
@@ -505,7 +506,7 @@ static int sipStatusCodesTable_register(const struct stats_funcs *f)
 
 	for(i=0; i<num; i++) {
 		if(f->reg_func(objs[i], h) == -1) {
-			LM_ERR("%s: Error registering %s\n", func, objs[i]);
+			LOG(L_ERR, "%s: Error registering %s\n", func, objs[i]);
 			f->free_func(h);
 			return -1;
 		}
@@ -526,20 +527,20 @@ static int collect_InReqs(struct sip_snmp_obj *o, enum handler_op op)
 	const char *func = __FUNCTION__;
 
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("%s: Can't collect stats, they have not been initialized."
+		LOG(L_ERR, "%s: Can't collect stats, they have not been initialized."
 			"Did you call init_stats()?\n", func);
 		return -1;
 	}
 
 	if(op != SER_GET) {
-		LM_ERR("%s: Invalid handler operation passed\n", func);
+		LOG(L_ERR, "%s: Invalid handler operation passed\n", func);
 		return -1;
 	}
 
 	if(!o->value.integer) {
 		o->value.integer = calloc(1, sizeof(unsigned long));
 		if(!o->value.integer) {
-			LM_ERR("%s: %s\n", func, strerror(errno));
+			LOG(L_ERR, "%s: %s\n", func, strerror(errno));
 			return -1;
 		}
 	}
@@ -569,20 +570,20 @@ static int collect_OutReqs(struct sip_snmp_obj *o, enum handler_op op)
 	const char *func = __FUNCTION__;
 
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("%s: Can't collect stats, they have not been initialized."
+		LOG(L_ERR, "%s: Can't collect stats, they have not been initialized."
 			"Did you call init_stats()?\n", func);
 		return -1;
 	}
 
 	if(op != SER_GET) {
-		LM_ERR("%s: Invalid handler operation passed\n", func);
+		LOG(L_ERR, "%s: Invalid handler operation passed\n", func);
 		return -1;
 	}
 
 	if(!o->value.integer) {
 		o->value.integer = calloc(1, sizeof(unsigned long));
 		if(!o->value.integer) {
-			LM_ERR("%s: %s\n", func, strerror(errno));
+			LOG(L_ERR, "%s: %s\n", func, strerror(errno));
 			return -1;
 		}
 	}
@@ -612,20 +613,20 @@ static int collect_InResp(struct sip_snmp_obj *o, enum handler_op op)
 	const char *func = __FUNCTION__;
 
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("%s: Can't collect stats, they have not been initialized."
+		LOG(L_ERR, "%s: Can't collect stats, they have not been initialized."
 			"Did you call init_stats()?\n", func);
 		return -1;
 	}
 
 	if(op != SER_GET) {
-		LM_ERR("%s: Invalid handler operation passed\n", func);
+		LOG(L_ERR, "%s: Invalid handler operation passed\n", func);
 		return -1;
 	}
 
 	if(!o->value.integer) {
 		o->value.integer = calloc(1, sizeof(unsigned long));
 		if(!o->value.integer) {
-			LM_ERR("%s: %s\n", func, strerror(errno));
+			LOG(L_ERR, "%s: %s\n", func, strerror(errno));
 			return -1;
 		}
 	}
@@ -657,20 +658,20 @@ static int collect_OutResp(struct sip_snmp_obj *o, enum handler_op op)
 	const char *func = __FUNCTION__;
 
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("%s: Can't collect stats, they have not been initialized\n",
+		LOG(L_ERR, "%s: Can't collect stats, they have not been initialized\n",
 			func);
 		return -1;
 	}
 
 	if(op != SER_GET) {
-		LM_ERR("%s: Invalid handler operation passed\n", func);
+		LOG(L_ERR, "%s: Invalid handler operation passed\n", func);
 		return -1;
 	}
 
 	if(!o->value.integer) {
 		o->value.integer = calloc(1, sizeof(unsigned long));
 		if(!o->value.integer) {
-			LM_ERR("%s: %s\n", func, strerror(errno));
+			LOG(L_ERR, "%s: %s\n", func, strerror(errno));
 			return -1;
 		}
 	}
@@ -711,25 +712,25 @@ static int sipStatsMethod_handler(struct sip_snmp_obj *o, enum handler_op op)
 	const char *func = __FUNCTION__;
 
 	if(!o) {
-		LM_ERR("%s: Invalid sip SNMP object passed\n", func);
+		LOG(L_ERR, "%s: Invalid sip SNMP object passed\n", func);
 		return -1;
 	}
 
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("%s: Can't collect stats, they have not been initialized\n",
+		LOG(L_ERR, "%s: Can't collect stats, they have not been initialized\n",
 			func);
 		return -1;
 	}
 
 	if(op != SER_GET) {
-		LM_ERR("%s: Invalid handler operation passed\n", func);
+		LOG(L_ERR, "%s: Invalid handler operation passed\n", func);
 		return -1;
 	}
 
 	if(!o->value.integer) {
 		o->value.integer = calloc(1, sizeof(unsigned long));
 		if(!o->value.integer) {
-			LM_ERR("%s: %s\n", func, strerror(errno));
+			LOG(L_ERR, "%s: %s\n", func, strerror(errno));
 			return -1;
 		}
 	}
@@ -790,25 +791,25 @@ static int sipStatusCodes_handler(struct sip_snmp_obj *o, enum handler_op op)
 	const char *func = __FUNCTION__;
 
 	if(!o) {
-		LM_ERR("%s: Invalid sip SNMP object passed\n", func);
+		LOG(L_ERR, "%s: Invalid sip SNMP object passed\n", func);
 		return -1;
 	}
 
 	if(!global_stats || stats_segments == -1) {
-		LM_ERR("%s: Can't collect stats, they have not been initialized\n",
+		LOG(L_ERR, "%s: Can't collect stats, they have not been initialized\n",
 			func);
 		return -1;
 	}
 
 	if(op != SER_GET) {
-		LM_ERR("%s: Invalid handler operation passed\n", func);
+		LOG(L_ERR, "%s: Invalid handler operation passed\n", func);
 		return -1;
 	}
 
 	if(!o->value.integer) {
 		o->value.integer = calloc(1, sizeof(unsigned long));
 		if(!o->value.integer) {
-			LM_ERR("%s: %s\n", func, strerror(errno));
+			LOG(L_ERR, "%s: %s\n", func, strerror(errno));
 			return -1;
 		}
 	}

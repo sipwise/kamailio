@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  *
  * History:
@@ -49,7 +49,6 @@
 #include "callid.h"
 #include "t_cancel.h"
 #include "t_suspend.h"
-#include "t_append_branches.h"
 #include "t_stats.h"
 
 /* export not usable from scripts */
@@ -134,7 +133,6 @@ struct tm_binds {
 #else
 	void* reserved5;
 #endif
-	t_append_branches_f	t_append_branches;
 };
 
 typedef struct tm_binds tm_api_t;

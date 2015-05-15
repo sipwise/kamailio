@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -83,7 +83,7 @@ struct pres_ev
 	event_t* evp;
 	str content_type;
 	int default_expires;
-	int type;
+	int type; /* category type: WINFO_TIPE, PUBL_TYPE, ...*/
 	int etag_not_new;
 	/*
 	 *  0 - the standard mechanism (allocating new etag for each Publish)

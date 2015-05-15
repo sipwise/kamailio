@@ -35,8 +35,6 @@
 #ifndef meminfo_h
 #define meminfo_h
 
-#define MEM_TYPE_SHM	0
-#define MEM_TYPE_PKG	1
 
 /** Memory information structure */
 struct mem_info{

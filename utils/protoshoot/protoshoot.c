@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
  * History:
@@ -51,9 +51,9 @@
 
 
 static char *id="$Id$";
-static char *version="protoflood 0.3";
+static char *version="protoshoot 0.4";
 static char* help_msg="\
-Usage: udp_flood -f file -d address -p port -c count [-v]\n\
+Usage: protoshoot -f file -d address -p port -c count [-v]\n\
 Options:\n\
     -f file       file with the content of the udp packet (max 65k)\n\
     -d address    destination address\n\
@@ -200,12 +200,12 @@ int main (int argc, char** argv)
 				break;
 			case '?':
 				if (isprint(optopt))
-					fprintf(stderr, "Unknown option `-%c´\n", optopt);
+					fprintf(stderr, "Unknown option '-%c'\n", optopt);
 				else
-					fprintf(stderr, "Unknown character `\\x%x´\n", optopt);
+					fprintf(stderr, "Unknown character '\\x%x'\n", optopt);
 				goto error;
 			case ':':
-				fprintf(stderr, "Option `-%c´ requires an argument.\n",
+				fprintf(stderr, "Option '-%c' requires an argument.\n",
 						optopt);
 				goto error;
 				break;

@@ -23,7 +23,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -191,7 +191,7 @@ extern int tm_remap_503_500;
  * - 3 - all branches are discarded if a new leg of serial forking
  *       is started (default kamailio 1.5.x behaviour)
  */
-int failure_reply_mode = 3;
+int failure_reply_mode = 0;
 
 /* responses priority (used by t_pick_branch)
  *  0xx is used only for the initial value (=> should have no chance to be
@@ -1988,10 +1988,8 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		if (likely(uas_rb->dst.send_sock &&
 					SEND_PR_BUFFER( uas_rb, buf, res_len ) >= 0)){
 			if (unlikely(!totag_retr && has_tran_tmcbs(t, TMCB_RESPONSE_OUT))){
-				LOCK_REPLIES( t );
 				run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb, t->uas.request,
 				                              relayed_msg, relayed_code);
-				UNLOCK_REPLIES( t );
 			}
 			if (unlikely(has_tran_tmcbs(t, TMCB_RESPONSE_SENT))){
 				INIT_TMCB_ONSEND_PARAMS(onsend_params, t->uas.request,
@@ -1999,9 +1997,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 									res_len,
 									(relayed_msg==FAKED_REPLY)?TMCB_LOCAL_F:0,
 									uas_rb->branch, relayed_code);
-				LOCK_REPLIES( t );
 				run_trans_callbacks_off_params(TMCB_RESPONSE_SENT, t, &onsend_params);
-				UNLOCK_REPLIES( t );
 			}
 		} else if (unlikely(uas_rb->dst.send_sock == 0))
 			ERR("no resolved dst to send reply to\n");

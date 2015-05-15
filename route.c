@@ -25,7 +25,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -158,7 +158,7 @@ static int route_add(struct route_list* rt, char* name, int i)
 	
 	e=pkg_malloc(sizeof(struct str_hash_entry));
 	if (e==0){
-		LM_CRIT("out of memory\n");
+		LOG(L_CRIT, "ERROR: route_add: out of memory\n");
 		goto error;
 	}
 	LM_DBG("mapping routing block (%p)[%s] to %d\n", rt, name, i);
@@ -180,7 +180,7 @@ inline  static int init_rlist(char* r_name, struct route_list* rt,
 {
 		rt->rlist=pkg_malloc(sizeof(struct action*)*n_entries);
 		if (rt->rlist==0){ 
-			LM_CRIT("failed to allocate \"%s\" route tables: " 
+			LOG(L_CRIT, "ERROR: failed to allocate \"%s\" route tables: " 
 					"out of memory\n", r_name); 
 			goto error; 
 		}
@@ -188,7 +188,7 @@ inline  static int init_rlist(char* r_name, struct route_list* rt,
 		rt->idx=1; /* idx=0 == default == reserved */
 		rt->entries=n_entries;
 		if (str_hash_alloc(&rt->names, hash_size)<0){
-			LM_CRIT("\"%s\" route table: failed to alloc hash\n",
+			LOG(L_CRIT, "ERROR: \"%s\" route table: failed to alloc hash\n",
 					r_name);
 			goto error;
 		}
@@ -234,7 +234,7 @@ static inline int route_new_list(struct route_list* rt)
 	if (rt->idx >= rt->entries){
 		tmp=pkg_realloc(rt->rlist, 2*rt->entries*sizeof(struct action*));
 		if (tmp==0){
-			LM_CRIT("out of memory\n");
+			LOG(L_CRIT, "ERROR: route_new_list: out of memory\n");
 			goto end;
 		}
 		/* init the newly allocated memory chunk */
@@ -520,7 +520,7 @@ int fix_expr(struct expr* exp)
 
 	ret=E_BUG;
 	if (exp==0){
-		LM_CRIT("null pointer\n");
+		LOG(L_CRIT, "BUG: fix_expr: null pointer\n");
 		return E_BUG;
 	}
 	if (exp->type==EXP_T){
@@ -535,7 +535,8 @@ int fix_expr(struct expr* exp)
 						ret=fix_expr(exp->l.expr);
 						break;
 			default:
-						LM_CRIT("unknown op %d\n", exp->op);
+						LOG(L_CRIT, "BUG: fix_expr: unknown op %d\n",
+								exp->op);
 		}
 	}else if (exp->type==ELEM_T){
 			/* first calculate lengths of strings  (only right side, since 
@@ -551,7 +552,7 @@ int fix_expr(struct expr* exp)
 			   before MATCH_OP and other fixups) */
 			if (exp->l_type==RVEXP_O){
 				if ((ret=fix_rval_expr(exp->l.param))<0){
-					LM_ERR("Unable to fix left rval expression\n");
+					ERR("Unable to fix left rval expression\n");
 					return ret;
 				}
 				if (scr_opt_lev>=2)
@@ -559,7 +560,7 @@ int fix_expr(struct expr* exp)
 			}
 			if (exp->r_type==RVE_ST){
 				if ((ret=fix_rval_expr(exp->r.param))<0){
-					LM_ERR("Unable to fix right rval expression\n");
+					ERR("Unable to fix right rval expression\n");
 					return ret;
 				}
 				if (scr_opt_lev>=2)
@@ -575,12 +576,14 @@ int fix_expr(struct expr* exp)
 				if (exp->r_type==STRING_ST){
 					re=(regex_t*)pkg_malloc(sizeof(regex_t));
 					if (re==0){
-						LM_CRIT("memory allocation failure\n");
+						LOG(L_CRIT, "ERROR: fix_expr: memory allocation"
+								" failure\n");
 						return E_OUT_OF_MEM;
 					}
 					if (regcomp(re, (char*) exp->r.param,
 								REG_EXTENDED|REG_NOSUB|REG_ICASE) ){
-						LM_CRIT("bad re \"%s\"\n", (char*) exp->r.param);
+						LOG(L_CRIT, "ERROR: fix_expr : bad re \"%s\"\n",
+									(char*) exp->r.param);
 						pkg_free(re);
 						return E_BAD_RE;
 					}
@@ -593,20 +596,20 @@ int fix_expr(struct expr* exp)
 						exp->r_type != SELECT_UNFIXED_ST &&
 						exp->r_type!= RVE_ST
 						&& exp->r_type != PVAR_ST){
-					LM_CRIT("invalid type for match\n");
+					LOG(L_CRIT, "BUG: fix_expr : invalid type for match\n");
 					return E_BUG;
 				}
 			}
 			if (exp->l_type==ACTION_O){
 				ret=fix_actions((struct action*)exp->r.param);
 				if (ret!=0){
-					LM_CRIT("fix_actions error\n");
+					LOG(L_CRIT, "ERROR: fix_expr : fix_actions error\n");
 					return ret;
 				}
 			}
 			if (exp->l_type==SELECT_UNFIXED_O) {
 				if ((ret=resolve_select(exp->l.select)) < 0) {
-					LM_ERR("Unable to resolve select\n");
+					ERR("Unable to resolve select\n");
 					print_select(exp->l.select);
 					return ret;
 				}
@@ -614,7 +617,7 @@ int fix_expr(struct expr* exp)
 			}
 			if (exp->r_type==SELECT_UNFIXED_ST) {
 				if ((ret=resolve_select(exp->r.select)) < 0) {
-					LM_ERR("Unable to resolve select\n");
+					ERR("Unable to resolve select\n");
 					print_select(exp->r.select);
 					return ret;
 				}
@@ -651,7 +654,7 @@ int fix_actions(struct action* a)
 	int rve_param_no;
 
 	if (a==0){
-		LM_CRIT("null pointer\n");
+		LOG(L_CRIT,"BUG: fix_actions: null pointer\n");
 		return E_BUG;
 	}
 	for(t=a; t!=0; t=t->next){
@@ -666,7 +669,8 @@ int fix_actions(struct action* a)
 							tmp=strdup(ip_addr2a(
 										(struct ip_addr*)t->val[0].u.data));
 							if (tmp==0){
-								LM_CRIT("memory allocation failure\n");
+								LOG(L_CRIT, "ERROR: fix_actions:"
+										"memory allocation failure\n");
 								ret = E_OUT_OF_MEM;
 								goto error;
 							}
@@ -684,7 +688,8 @@ int fix_actions(struct action* a)
 						case URIHOST_ST:
 							break;
 						default:
-							LM_CRIT("invalid type %d (should be string or number)\n",
+							LOG(L_CRIT, "BUG: fix_actions: invalid type"
+									"%d (should be string or number)\n",
 										t->type);
 							ret = E_BUG;
 							goto error;
@@ -692,19 +697,22 @@ int fix_actions(struct action* a)
 					break;
 			case IF_T:
 				if (t->val[0].type!=RVE_ST){
-					LM_CRIT("invalid subtype %d for if (should be rval expr)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for if (should be rval expr)\n",
 								t->val[0].type);
 					ret = E_BUG;
 					goto error;
 				}else if( (t->val[1].type!=ACTIONS_ST) &&
 							(t->val[1].type!=NOSUBTYPE) ){
-					LM_CRIT("invalid subtype %d for if() {...} (should be action)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for if() {...} (should be action)\n",
 								t->val[1].type);
 					ret = E_BUG;
 					goto error;
 				}else if( (t->val[2].type!=ACTIONS_ST) &&
 							(t->val[2].type!=NOSUBTYPE) ){
-					LM_CRIT("invalid subtype %d for if() {} else{...}(should be action)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for if() {} else{...}(should be action)\n",
 								t->val[2].type);
 					ret = E_BUG;
 					goto error;
@@ -715,7 +723,7 @@ int fix_actions(struct action* a)
 					if (!rve_check_type(&rve_type, rve, &err_rve,
 											&err_type, &expected_type)){
 						if (err_rve)
-							LM_ERR("invalid expression "
+							LOG(L_ERR, "fix_actions: invalid expression "
 									"(%d,%d): subexpression (%d,%d) has type"
 									" %s,  but %s is expected\n",
 									rve->fpos.s_line, rve->fpos.s_col,
@@ -723,7 +731,8 @@ int fix_actions(struct action* a)
 									rval_type_name(err_type),
 									rval_type_name(expected_type) );
 						else
-							LM_ERR("invalid expression  (%d,%d): type mismatch?",
+							LOG(L_ERR, "fix_actions: invalid expression "
+									"(%d,%d): type mismatch?",
 									rve->fpos.s_line, rve->fpos.s_col);
 						ret = E_SCRIPT;
 						goto error;
@@ -732,7 +741,7 @@ int fix_actions(struct action* a)
 					   only a script warning (to allow backward compat. stuff
 					   like if (@ruri) 
 					if (rve_type!=RV_INT && rve_type!=RV_NONE){
-						LM_ERR("fix_actions: invalid expression (%d,%d):"
+						LOG(L_ERR, "fix_actions: invalid expression (%d,%d):"
 								" bad type, integer expected\n",
 								rve->fpos.s_line, rve->fpos.s_col);
 						return E_UNSPEC;
@@ -753,12 +762,14 @@ int fix_actions(struct action* a)
 				break;
 			case SWITCH_T:
 				if (t->val[0].type!=RVE_ST){
-					LM_CRIT("invalid subtype %d for switch() (should be expr)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for switch() (should be expr)\n",
 								t->val[0].type);
 					ret = E_BUG;
 					goto error;
 				}else if (t->val[1].type!=CASE_ST){
-					LM_CRIT("invalid subtype %d for switch(...){...}(should be case)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for switch(...){...}(should be case)\n",
 								t->val[1].type);
 					ret = E_BUG;
 					goto error;
@@ -767,7 +778,8 @@ int fix_actions(struct action* a)
 					if ((ret=fix_rval_expr(t->val[0].u.data))<0)
 						goto error;
 				}else{
-					LM_CRIT("null switch() expression\n");
+					LOG(L_CRIT, "BUG: fix_actions: null switch()"
+							" expression\n");
 					ret = E_BUG;
 					goto error;
 				}
@@ -776,12 +788,14 @@ int fix_actions(struct action* a)
 				break;
 			case WHILE_T:
 				if (t->val[0].type!=RVE_ST){
-					LM_CRIT("invalid subtype %d for while() (should be expr)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for while() (should be expr)\n",
 								t->val[0].type);
 					ret = E_BUG;
 					goto error;
 				}else if (t->val[1].type!=ACTIONS_ST){
-					LM_CRIT("invalid subtype %d for while(...){...}(should be action)\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for while(...){...}(should be action)\n",
 								t->val[1].type);
 					ret = E_BUG;
 					goto error;
@@ -792,7 +806,7 @@ int fix_actions(struct action* a)
 					if (!rve_check_type(&rve_type, rve, &err_rve,
 											&err_type, &expected_type)){
 						if (err_rve)
-							LM_ERR("invalid expression "
+							LOG(L_ERR, "fix_actions: invalid expression "
 									"(%d,%d): subexpression (%d,%d) has type"
 									" %s,  but %s is expected\n",
 									rve->fpos.s_line, rve->fpos.s_col,
@@ -800,13 +814,15 @@ int fix_actions(struct action* a)
 									rval_type_name(err_type),
 									rval_type_name(expected_type) );
 						else
-							LM_ERR("invalid expression (%d,%d): type mismatch?",
+							LOG(L_ERR, "fix_actions: invalid expression "
+									"(%d,%d): type mismatch?",
 									rve->fpos.s_line, rve->fpos.s_col);
 						ret = E_SCRIPT;
 						goto error;
 					}
 					if (rve_type!=RV_INT && rve_type!=RV_NONE){
-						LM_ERR("invalid expression (%d,%d): bad type, integer expected\n",
+						LOG(L_ERR, "fix_actions: invalid expression (%d,%d):"
+								" bad type, integer expected\n",
 								rve->fpos.s_line, rve->fpos.s_col);
 						ret = E_SCRIPT;
 						goto error;
@@ -814,7 +830,8 @@ int fix_actions(struct action* a)
 					if ((ret=fix_rval_expr(t->val[0].u.data))<0)
 						goto error;
 				}else{
-					LM_CRIT("null while() expression\n");
+					LOG(L_CRIT, "BUG: fix_actions: null while()"
+							" expression\n");
 					ret = E_BUG;
 					goto error;
 				}
@@ -833,7 +850,7 @@ int fix_actions(struct action* a)
 					if (!rve_check_type(&rve_type, rve, &err_rve,
 											&err_type, &expected_type)){
 						if (err_rve)
-							LM_ERR("invalid expression "
+							LOG(L_ERR, "fix_actions: invalid expression "
 									"(%d,%d): subexpression (%d,%d) has type"
 									" %s,  but %s is expected\n",
 									rve->fpos.s_line, rve->fpos.s_col,
@@ -841,13 +858,15 @@ int fix_actions(struct action* a)
 									rval_type_name(err_type),
 									rval_type_name(expected_type) );
 						else
-							LM_ERR("invalid expression (%d,%d): type mismatch?",
+							LOG(L_ERR, "fix_actions: invalid expression "
+									"(%d,%d): type mismatch?",
 									rve->fpos.s_line, rve->fpos.s_col);
 						ret = E_SCRIPT;
 						goto error;
 					}
 					if (rve_type!=RV_INT && rve_type!=RV_NONE){
-						LM_ERR("invalid expression (%d,%d): bad type, integer expected\n",
+						LOG(L_ERR, "fix_actions: invalid expression (%d,%d):"
+								" bad type, integer expected\n",
 								rve->fpos.s_line, rve->fpos.s_col);
 						ret = E_SCRIPT;
 						goto error;
@@ -855,7 +874,8 @@ int fix_actions(struct action* a)
 					if ((ret=fix_rval_expr(t->val[0].u.data))<0)
 						goto error;
 				}else{
-					LM_CRIT("null drop/return expression\n");
+					LOG(L_CRIT, "BUG: fix_actions: null drop/return"
+							" expression\n");
 					ret = E_BUG;
 					goto error;
 				}
@@ -863,26 +883,27 @@ int fix_actions(struct action* a)
 			case ASSIGN_T:
 			case ADD_T:
 				if (t->val[0].type !=LVAL_ST) {
-					LM_CRIT("Invalid left side of assignment\n");
+					LOG(L_CRIT, "BUG: fix_actions: Invalid left side of"
+								" assignment\n");
 					ret = E_BUG;
 					goto error;
 				}
 				if (t->val[1].type !=RVE_ST) {
-					LM_CRIT("Invalid right side of assignment (%d)\n",
-								t->val[1].type);
+					LOG(L_CRIT, "BUG: fix_actions: Invalid right side of"
+								" assignment (%d)\n", t->val[1].type);
 					ret = E_BUG;
 					goto error;
 				}
 				lval=t->val[0].u.data;
 				if (lval->type==LV_AVP){
 					if (lval->lv.avps.type & AVP_CLASS_DOMAIN) {
-						LM_ERR("You cannot change domain"
+						LOG(L_ERR, "ERROR: You cannot change domain"
 									" attributes from the script, they are"
 									" read-only\n");
 						ret = E_BUG;
 						goto error;
 					} else if (lval->lv.avps.type & AVP_CLASS_GLOBAL) {
-						LM_ERR("You cannot change global"
+						LOG(L_ERR, "ERROR: You cannot change global"
 								   " attributes from the script, they are"
 								   "read-only\n");
 						ret = E_BUG;
@@ -1010,7 +1031,8 @@ int fix_actions(struct action* a)
 				break;
 			case FORCE_SEND_SOCKET_T:
 				if (t->val[0].type!=SOCKID_ST){
-					LM_CRIT("invalid subtype %d for force_send_socket\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for force_send_socket\n",
 								t->val[0].type);
 					ret = E_BUG;
 					goto error;
@@ -1019,7 +1041,8 @@ int fix_actions(struct action* a)
 						((struct socket_id*)t->val[0].u.data)->addr_lst->name
 						);
 				if (he==0){
-					LM_ERR("force_send_socket: could not resolve %s\n",
+					LOG(L_ERR, "ERROR: fix_actions: force_send_socket:"
+								" could not resolve %s\n",
 						((struct socket_id*)t->val[0].u.data)->addr_lst->name);
 					ret = E_BAD_ADDRESS;
 					goto error;
@@ -1028,7 +1051,8 @@ int fix_actions(struct action* a)
 				si=find_si(&ip, ((struct socket_id*)t->val[0].u.data)->port,
 								((struct socket_id*)t->val[0].u.data)->proto);
 				if (si==0){
-					LM_ERR("bad force_send_socket argument: %s:%d (ser doesn't listen on it)\n",
+					LOG(L_ERR, "ERROR: fix_actions: bad force_send_socket"
+							" argument: %s:%d (ser doesn't listen on it)\n",
 						((struct socket_id*)t->val[0].u.data)->addr_lst->name,
 							((struct socket_id*)t->val[0].u.data)->port);
 					ret = E_BAD_ADDRESS;
@@ -1039,7 +1063,8 @@ int fix_actions(struct action* a)
 				break;
 			case UDP_MTU_TRY_PROTO_T:
 				if (t->val[0].type!=NUMBER_ST){
-					LM_CRIT("invalid subtype %d for udp_mtu_try_proto\n",
+					LOG(L_CRIT, "BUG: fix_actions: invalid subtype"
+								"%d for udp_mtu_try_proto\n",
 								t->val[0].type);
 					ret = E_BUG;
 					goto error;
@@ -1058,7 +1083,8 @@ int fix_actions(struct action* a)
 						t->val[0].u.number=FL_MTU_SCTP_FB;
 						break;
 					default:
-						LM_CRIT("invalid argument for udp_mtu_try_proto (%d)\n", 
+						LOG(L_CRIT, "BUG: fix actions: invalid argument for"
+									" udp_mtu_try_proto (%d)\n", 
 									(unsigned int)t->val[0].u.number);
 				}
 				break;
@@ -1079,7 +1105,7 @@ int fix_actions(struct action* a)
 					rve=(struct rval_expr*)t->val[0].u.data;
 					if (!rve_is_constant(rve)) {
 						if ((ret=fix_rval_expr(t->val[0].u.data)) < 0){
-							LM_ERR("route() failed to fix rve at %s:%d\n",
+							ERR("route() failed to fix rve at %s:%d\n",
 								(t->cfile)?t->cfile:"line", t->cline);
 							ret = E_BUG;
 							goto error;
@@ -1090,7 +1116,7 @@ int fix_actions(struct action* a)
 								rval_get_str(0, 0, &s, rv, 0) < 0) {
 							/* out of mem. or bug ? */
 							rval_destroy(rv);
-							LM_ERR("route() failed to fix ct. rve at %s:%d\n",
+							ERR("route() failed to fix ct. rve at %s:%d\n",
 								(t->cfile)?t->cfile:"line", t->cline);
 							ret = E_BUG;
 							goto error;
@@ -1106,7 +1132,7 @@ int fix_actions(struct action* a)
 				if (t->val[0].type == STRING_ST) {
 					i=route_lookup(&main_rt, t->val[0].u.string);
 					if (i < 0) {
-						LM_ERR("route \"%s\" not found at %s:%d\n",
+						ERR("route \"%s\" not found at %s:%d\n",
 								t->val[0].u.string,
 								(t->cfile)?t->cfile:"line", t->cline);
 						ret = E_SCRIPT;
@@ -1133,7 +1159,7 @@ int fix_actions(struct action* a)
 						rv = rval_expr_eval(0, 0, rve);
 						if (rv == 0 ||
 								rval_get_int( 0, 0, &i, rv, 0) < 0 ) {
-							LM_ERR("failed to fix constant rve");
+							ERR("failed to fix constant rve");
 							if (rv) rval_destroy(rv);
 							ret = E_BUG;
 							goto error;
@@ -1147,7 +1173,7 @@ int fix_actions(struct action* a)
 						   optimize it */
 						if ((ret=fix_rval_expr(rve))
 								< 0) {
-							LM_ERR("rve fixup failed\n");
+							ERR("rve fixup failed\n");
 							ret = E_BUG;
 							goto error;
 						}
@@ -1168,7 +1194,7 @@ int fix_actions(struct action* a)
 				}
 				tmp_p = (void *)cfg_lookup_group(t->val[0].u.string, strlen(t->val[0].u.string));
 				if (!tmp_p) {
-					LM_ERR("configuration group \"%s\" not found\n",
+					ERR("configuration group \"%s\" not found\n",
 						t->val[0].u.string);
 					ret = E_SCRIPT;
 					goto error;
@@ -1234,7 +1260,7 @@ inline static int comp_num(int op, long left, int rtype, union exp_op* r,
 			}
 			break;
 		default:
-			LM_CRIT("Invalid right operand (%d)\n", rtype);
+			LOG(L_CRIT, "BUG: comp_num: Invalid right operand (%d)\n", rtype);
 			return E_BUG;
 	}
 
@@ -1246,7 +1272,7 @@ inline static int comp_num(int op, long left, int rtype, union exp_op* r,
 		case GTE_OP:   return (long)left >= (long)right;
 		case LTE_OP:   return (long)left <= (long)right;
 		default:
-			LM_CRIT("unknown operator: %d\n", op);
+			LOG(L_CRIT, "BUG: comp_num: unknown operator: %d\n", op);
 			return E_BUG;
 	}
 	return E_BUG;
@@ -1314,7 +1340,8 @@ inline static int comp_str(int op, str* left, int rtype,
 			break;
 		case RE_ST:
 			if (unlikely(op != MATCH_OP)){
-				LM_CRIT("Bad operator %d, ~= expected\n", op);
+				LOG(L_CRIT, "BUG: comp_str: Bad operator %d,"
+							" ~= expected\n", op);
 				goto error;
 			}
 			break;
@@ -1332,7 +1359,8 @@ inline static int comp_str(int op, str* left, int rtype,
 				goto error;
 			return comp_num(op, l, rtype, r, msg, h);
 		default:
-			LM_CRIT("Bad type %d, string or RE expected\n", rtype);
+			LOG(L_CRIT, "BUG: comp_str: Bad type %d, "
+						"string or RE expected\n", rtype);
 			goto error;
 	}
 
@@ -1376,7 +1404,8 @@ inline static int comp_str(int op, str* left, int rtype,
 					/* we need to compile the RE on the fly */
 					re=(regex_t*)pkg_malloc(sizeof(regex_t));
 					if (re==0){
-						LM_CRIT("memory allocation failure\n");
+						LOG(L_CRIT, "ERROR: comp_strstr: memory allocation"
+									 " failure\n");
 						left->s[left->len] = backup;
 						goto error;
 					}
@@ -1394,13 +1423,14 @@ inline static int comp_str(int op, str* left, int rtype,
 					ret=(regexec(r->re, left->s, 0, 0, 0)==0);
 					break;
 				default:
-					LM_CRIT("Bad operator type %d, for ~= \n", rtype);
+					LOG(L_CRIT, "BUG: comp_str: Bad operator type %d, "
+								"for ~= \n", rtype);
 					goto error;
 			}
 			left->s[left->len] = backup;
 			break;
 		default:
-			LM_CRIT("unknown op %d\n", op);
+			LOG(L_CRIT, "BUG: comp_str: unknown op %d\n", op);
 			goto error;
 	}
 	if (rv){
@@ -1473,7 +1503,8 @@ inline static int comp_avp(int op, avp_spec_t* spec, int rtype,
 				tmp.s=r->string;
 				tmp.len=strlen(r->string);
 				if (str2int(&tmp, &uval)<0){
-					LM_WARN("cannot convert string value to int (%s)\n",
+					LOG(L_WARN, "WARNING: comp_avp: cannot convert"
+								" string value to int (%s)\n",
 								ZSW(r->string));
 					goto error;
 				}
@@ -1481,15 +1512,15 @@ inline static int comp_avp(int op, avp_spec_t* spec, int rtype,
 				return comp_num(op, val.n, NUMBER_ST, &num_val, msg, h);
 			case STR_ST:
 				if (str2int(&r->str, &uval)<0){
-					LM_WARN("cannot convert str value to int (%.*s)\n",
-								r->str.len, ZSW(r->str.s));
+					LOG(L_WARN, "WARNING: comp_avp: cannot convert str value"
+								" to int (%.*s)\n", r->str.len, ZSW(r->str.s));
 					goto error;
 				}
 				num_val.numval=uval;
 				return comp_num(op, val.n, NUMBER_ST, &num_val, msg, h);
 			default:
-				LM_CRIT("invalid type for numeric avp comparison (%d)\n",
-								rtype);
+				LOG(L_CRIT, "BUG: comp_avp: invalid type for numeric avp "
+							"comparison (%d)\n", rtype);
 				goto error;
 		}
 	}
@@ -1533,7 +1564,7 @@ inline static int comp_rve(int op, struct rval_expr* rve, int rtype,
 	
 	rval_cache_init(&c1);
 	if (unlikely(rval_expr_eval_rvint(h,  msg, &rv, &i, rve, &c1)<0)){
-		LM_ERR("failure evaluating expression: bad type\n");
+		ERR("failure evaluating expression: bad type\n");
 		i=0; /* false */
 		goto int_expr;
 	}
@@ -1604,7 +1635,7 @@ inline static int check_self_op(int op, str* s, unsigned short p)
 			ret=(ret > 0) ? 0 : 1;
 			break;
 		default:
-			LM_CRIT("invalid operator %d\n", op);
+			LOG(L_CRIT, "BUG: check_self_op: invalid operator %d\n", op);
 			ret=-1;
 	}
 	return ret;
@@ -1720,7 +1751,8 @@ inline static int comp_ip(int op, struct ip_addr* ip, int rtype,
 			}
 			return ret;
 		default:
-			LM_CRIT("invalid type for src_ip or dst_ip (%d)\n", rtype);
+			LOG(L_CRIT, "BUG: comp_ip: invalid type for "
+						" src_ip or dst_ip (%d)\n", rtype);
 			return -1;
 	}
 	/* here "right" is set to the str we compare with */
@@ -1806,7 +1838,7 @@ inline static int comp_ip(int op, struct ip_addr* ip, int rtype,
 		pv_value_destroy(&pval);
 	return ret;
 error_op:
-	LM_CRIT("invalid operator %d for type %d\n", op, rtype);
+	LOG(L_CRIT, "BUG: comp_ip: invalid operator %d for type %d\n", op, rtype);
 error:
 	if (unlikely(rv)){
 		rval_cache_clean(&rv_cache);
@@ -1830,7 +1862,7 @@ inline static int eval_elem(struct run_act_ctx* h, struct expr* e,
 	ret=E_BUG;
 
 	if (e->type!=ELEM_T){
-		LM_CRIT("invalid type\n");
+		LOG(L_CRIT," BUG: eval_elem: invalid type\n");
 		goto error;
 	}
 	switch(e->l_type){
@@ -1873,13 +1905,14 @@ inline static int eval_elem(struct run_act_ctx* h, struct expr* e,
 
 	case FROM_URI_O:
 		if (parse_from_header(msg)!=0){
-			LM_ERR("bad or missing From: header\n");
+			LOG(L_ERR, "ERROR: eval_elem: bad or missing"
+			    " From: header\n");
 			goto error;
 		}
 		if (e->r_type==MYSELF_ST){
 			if (parse_uri(get_from(msg)->uri.s, get_from(msg)->uri.len,
 				      &uri) < 0){
-				LM_ERR("bad uri in From:\n");
+				LOG(L_ERR, "ERROR: eval_elem: bad uri in From:\n");
 				goto error;
 			}
 			ret=check_self_op(e->op, &uri.host, GET_URI_PORT(&uri));
@@ -1892,14 +1925,15 @@ inline static int eval_elem(struct run_act_ctx* h, struct expr* e,
 	case TO_URI_O:
 		if ((msg->to==0) && ((parse_headers(msg, HDR_TO_F, 0)==-1) ||
 				     (msg->to==0))){
-			LM_ERR("bad or missing To: header\n");
+			LOG(L_ERR, "ERROR: eval_elem: bad or missing"
+			    " To: header\n");
 			goto error;
 		}
 		     /* to content is parsed automatically */
 		if (e->r_type==MYSELF_ST){
 			if (parse_uri(get_to(msg)->uri.s, get_to(msg)->uri.len,
 				      &uri) < 0){
-				LM_ERR("bad uri in To:\n");
+				LOG(L_ERR, "ERROR: eval_elem: bad uri in To:\n");
 				goto error;
 			}
 			ret=check_self_op(e->op, &uri.host, GET_URI_PORT(&uri));
@@ -2036,7 +2070,8 @@ inline static int eval_elem(struct run_act_ctx* h, struct expr* e,
 		break;
 /*
 	default:
-		LM_CRIT("invalid operand %d\n", e->l_type);
+		LOG(L_CRIT, "BUG: eval_elem: invalid operand %d\n",
+		    e->l_type);
 */
 	}
 	return ret;
@@ -2072,11 +2107,11 @@ int eval_expr(struct run_act_ctx* h, struct expr* e, struct sip_msg* msg)
 				ret=(ret > 0) ? 0 : 1;
 				break;
 			default:
-				LM_CRIT("unknown op %d\n", e->op);
+				LOG(L_CRIT, "BUG: eval_expr: unknown op %d\n", e->op);
 				ret=-1;
 		}
 	}else{
-		LM_CRIT("unknown type %d\n", e->type);
+		LOG(L_CRIT, "BUG: eval_expr: unknown type %d\n", e->type);
 		ret=-1;
 	}
 	return ret;
@@ -2102,7 +2137,7 @@ int add_actions(struct action* a, struct action** head)
 {
 	int ret;
 
-	LM_DBG("fixing actions...\n");
+	LOG(L_DBG, "add_actions: fixing actions...\n");
 	if ((ret=fix_actions(a))!=0) goto error;
 	push(a,head);
 	return 0;

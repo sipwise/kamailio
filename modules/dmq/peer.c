@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -48,10 +48,13 @@ dmq_peer_list_t* init_peer_list()
 dmq_peer_t* search_peer_list(dmq_peer_list_t* peer_list, dmq_peer_t* peer)
 {
 	dmq_peer_t* crt;
-
+	int len;
 	crt = peer_list->peers;
 	while(crt) {
-		if (STR_EQ(crt->peer_id, peer->peer_id)) {
+		/* len - the minimum length of the two strings */
+		len = (crt->peer_id.len < peer->peer_id.len)
+			? crt->peer_id.len:peer->peer_id.len;
+		if(strncasecmp(crt->peer_id.s, peer->peer_id.s, len) == 0) {
 			return crt;
 		}
 		crt = crt->next;
@@ -65,8 +68,8 @@ dmq_peer_t* search_peer_list(dmq_peer_list_t* peer_list, dmq_peer_t* peer)
 dmq_peer_t* add_peer(dmq_peer_list_t* peer_list, dmq_peer_t* peer)
 {
 	dmq_peer_t* new_peer = NULL;
-
-	new_peer = shm_malloc(sizeof(dmq_peer_t) + peer->peer_id.len + peer->description.len);
+	
+	new_peer = shm_malloc(sizeof(dmq_peer_t));
 	if(new_peer==NULL) {
 		LM_ERR("no more shm\n");
 		return NULL;
@@ -74,11 +77,25 @@ dmq_peer_t* add_peer(dmq_peer_list_t* peer_list, dmq_peer_t* peer)
 	*new_peer = *peer;
 	
 	/* copy the str's */
-	new_peer->peer_id.s = (char*)new_peer + sizeof(dmq_peer_t);
+	new_peer->peer_id.s = shm_malloc(peer->peer_id.len);
+	if(new_peer->peer_id.s==NULL) {
+		LM_ERR("no more shm\n");
+		shm_free(new_peer);
+		return NULL;
+	}
 	memcpy(new_peer->peer_id.s, peer->peer_id.s, peer->peer_id.len);
+	new_peer->peer_id.len = peer->peer_id.len;
 
-	new_peer->description.s = new_peer->peer_id.s + new_peer->peer_id.len;
-	memcpy(new_peer->description.s, peer->description.s, peer->description.len);
+	new_peer->description.s = shm_malloc(peer->description.len);
+	if(new_peer->description.s==NULL) {
+		LM_ERR("no more shm\n");
+		shm_free(new_peer->peer_id.s);
+		shm_free(new_peer);
+		return NULL;
+	}
+	memcpy(new_peer->peer_id.s, peer->peer_id.s, peer->peer_id.len);
+	new_peer->peer_id.len = peer->peer_id.len;
+	
 	new_peer->next = peer_list->peers;
 	peer_list->peers = new_peer;
 	return new_peer;
