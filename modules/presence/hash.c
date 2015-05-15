@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -275,7 +275,7 @@ int insert_shtable(shtable_t htable,unsigned int hash_code, subs_t* subs)
 	return 0;
 }
 
-int delete_shtable(shtable_t htable,unsigned int hash_code,subs_t* subs)
+int delete_shtable(shtable_t htable,unsigned int hash_code,str to_tag)
 {
 	subs_t* s= NULL, *ps= NULL;
 	int found= -1;
@@ -287,12 +287,8 @@ int delete_shtable(shtable_t htable,unsigned int hash_code,subs_t* subs)
 		
 	while(s)
 	{
-		if(s->callid.len==subs->callid.len &&
-				strncmp(s->callid.s, subs->callid.s, subs->callid.len)==0 &&
-			s->to_tag.len== subs->to_tag.len &&
-				strncmp(s->to_tag.s, subs->to_tag.s, subs->to_tag.len)==0 &&
-			s->from_tag.len== subs->from_tag.len &&
-				strncmp(s->from_tag.s, subs->from_tag.s, subs->from_tag.len)== 0)
+		if(s->to_tag.len== to_tag.len &&
+				strncmp(s->to_tag.s, to_tag.s, to_tag.len)== 0)
 		{
 			found= s->local_cseq +1;
 			ps->next= s->next;
@@ -512,14 +508,16 @@ int insert_phtable(str* pres_uri, int event, char* sphere)
 		if(p->sphere== NULL)
 		{
 			lock_release(&pres_htable[hash_code].lock);
+			shm_free(p);
 			ERR_MEM(SHARE_MEM);
 		}
 		strcpy(p->sphere, sphere);
 	}
 
 	p->event= event;
-	
+	p->publ_count=1;
 
+	/* link the item in the hash table */
 	p->next= pres_htable[hash_code].entries->next;
 	pres_htable[hash_code].entries->next= p;
 

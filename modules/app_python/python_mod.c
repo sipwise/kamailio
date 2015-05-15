@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
 */
 
@@ -40,9 +40,9 @@
 MODULE_VERSION
 
 
-static str script_name = str_init("/usr/local/etc/sip-router/handler.py");
-static str mod_init_fname = str_init("mod_init");
-static str child_init_mname = str_init("child_init");
+static str script_name = {.s = "/usr/local/etc/sip-router/handler.py", .len = 0};
+static str mod_init_fname = { .s = "mod_init", .len = 0};
+static str child_init_mname = { .s = "child_init", .len = 0};
 
 static int mod_init(void);
 static int child_init(int rank);
@@ -56,9 +56,9 @@ PyThreadState *myThreadState;
 
 /** module parameters */
 static param_export_t params[]={
-    {"script_name",        PARAM_STR, &script_name },
-    {"mod_init_function",  PARAM_STR, &mod_init_fname },
-    {"child_init_method",  PARAM_STR, &child_init_mname },
+    {"script_name",        STR_PARAM, &script_name },
+    {"mod_init_function",  STR_PARAM, &mod_init_fname },
+    {"child_init_method",  STR_PARAM, &child_init_mname },
     {0,0,0}
 };
 
@@ -94,6 +94,16 @@ static int mod_init(void)
     int i;
     PyObject *sys_path, *pDir, *pModule, *pFunc, *pArgs;
     PyThreadState *mainThreadState;
+
+    if (script_name.len == 0) {
+        script_name.len = strlen(script_name.s);
+    }
+    if (mod_init_fname.len == 0) {
+        mod_init_fname.len = strlen(mod_init_fname.s);
+    }
+    if (child_init_mname.len == 0) {
+        child_init_mname.len = strlen(child_init_mname.s);
+    }
 
     dname_src = as_asciiz(&script_name);
     bname_src = as_asciiz(&script_name);
@@ -156,7 +166,7 @@ static int mod_init(void)
     PyList_Insert(sys_path, 0, pDir);
     Py_DECREF(pDir);
 
-    if (init_modules() != 0) {
+    if (ap_init_modules() != 0) {
 	if (!PyErr_Occurred())
 	    PyErr_SetString(PyExc_AttributeError, "init_modules() has failed");
 	python_handle_exception("mod_init");

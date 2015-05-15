@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * ---------
@@ -47,8 +47,6 @@
 #include "urecord.h"
 #include "ucontact.h"
 #include "usrloc.h"
-
-extern int ul_db_insert_null;
 
 static int ul_xavp_contact_clone = 1;
 
@@ -482,153 +480,131 @@ int db_insert_ucontact(ucontact_t* _c)
 		return -1;
 	}
 
-
 	keys[0] = &user_col;
+	keys[1] = &contact_col;
+	keys[2] = &expires_col;
+	keys[3] = &q_col;
+	keys[4] = &callid_col;
+	keys[5] = &cseq_col;
+	keys[6] = &flags_col;
+	keys[7] = &cflags_col;
+	keys[8] = &user_agent_col;
+	keys[9] = &received_col;
+	keys[10] = &path_col;
+	keys[11] = &sock_col;
+	keys[12] = &methods_col;
+	keys[13] = &last_mod_col;
+	keys[14] = &ruid_col;
+	keys[15] = &instance_col;
+	keys[16] = &reg_id_col;
+	keys[17] = &domain_col;
+
 	vals[0].type = DB1_STR;
 	vals[0].nul = 0;
 	vals[0].val.str_val.s = _c->aor->s;
 	vals[0].val.str_val.len = _c->aor->len;
 
-	keys[1] = &contact_col;
 	vals[1].type = DB1_STR;
 	vals[1].nul = 0;
 	vals[1].val.str_val.s = _c->c.s; 
 	vals[1].val.str_val.len = _c->c.len;
 
-	keys[2] = &expires_col;
+	vals[2].type = DB1_DATETIME;
 	vals[2].nul = 0;
-	UL_DB_EXPIRES_SET(&vals[2], _c->expires);
+	vals[2].val.time_val = _c->expires;
 
-	keys[3] = &q_col;
 	vals[3].type = DB1_DOUBLE;
 	vals[3].nul = 0;
 	vals[3].val.double_val = q2double(_c->q);
 
-	keys[4] = &callid_col;
 	vals[4].type = DB1_STR;
 	vals[4].nul = 0;
 	vals[4].val.str_val.s = _c->callid.s;
 	vals[4].val.str_val.len = _c->callid.len;
 
-	keys[5] = &cseq_col;
 	vals[5].type = DB1_INT;
 	vals[5].nul = 0;
 	vals[5].val.int_val = _c->cseq;
 
-	keys[6] = &flags_col;
 	vals[6].type = DB1_INT;
 	vals[6].nul = 0;
 	vals[6].val.bitmap_val = _c->flags;
 
-	keys[7] = &cflags_col;
 	vals[7].type = DB1_INT;
 	vals[7].nul = 0;
 	vals[7].val.bitmap_val = _c->cflags;
 
-	keys[8] = &user_agent_col;
 	vals[8].type = DB1_STR;
 	vals[8].nul = 0;
 	vals[8].val.str_val.s = _c->user_agent.s;
 	vals[8].val.str_val.len = _c->user_agent.len;
 
-	nr_cols = 9;
-
-	if (_c->received.s) {
-		keys[nr_cols] = &received_col;
-		vals[nr_cols].type = DB1_STR;
-		vals[nr_cols].nul = 0;
-		vals[nr_cols].val.str_val.s = _c->received.s;
-		vals[nr_cols].val.str_val.len = _c->received.len;
-		nr_cols++;
-	} else if(ul_db_insert_null!=0) {
-		keys[nr_cols] = &received_col;
-		vals[nr_cols].type = DB1_STR;
-		vals[nr_cols].nul = 1;
-		nr_cols++;
+	vals[9].type = DB1_STR;
+	if (_c->received.s == 0) {
+		vals[9].nul = 1;
+	} else {
+		vals[9].nul = 0;
+		vals[9].val.str_val.s = _c->received.s;
+		vals[9].val.str_val.len = _c->received.len;
 	}
 	
-	if (_c->path.s) {
-		keys[nr_cols] = &path_col;
-		vals[nr_cols].type = DB1_STR;
-		vals[nr_cols].nul = 0;
-		vals[nr_cols].val.str_val.s = _c->path.s;
-		vals[nr_cols].val.str_val.len = _c->path.len;
-		nr_cols++;
-	} else if(ul_db_insert_null!=0) {
-		keys[nr_cols] = &path_col;
-		vals[nr_cols].type = DB1_STR;
-		vals[nr_cols].nul = 1;
-		nr_cols++;
+	vals[10].type = DB1_STR;
+	if (_c->path.s == 0) {
+		vals[10].nul = 1;
+	} else {
+		vals[10].nul = 0;
+		vals[10].val.str_val.s = _c->path.s;
+		vals[10].val.str_val.len = _c->path.len;
 	}
 
+	vals[11].type = DB1_STR;
 	if (_c->sock) {
-		keys[nr_cols] = &sock_col;
-		vals[nr_cols].type = DB1_STR;
-		vals[nr_cols].val.str_val = _c->sock->sock_str;
-		vals[nr_cols].nul = 0;
-		nr_cols++;
-	} else if(ul_db_insert_null!=0) {
-		keys[nr_cols] = &sock_col;
-		vals[nr_cols].type = DB1_STR;
-		vals[nr_cols].nul = 1;
-		nr_cols++;
+		vals[11].val.str_val = _c->sock->sock_str;
+		vals[11].nul = 0;
+	} else {
+		vals[11].nul = 1;
 	}
 
-	if (_c->methods != 0xFFFFFFFF) {
-		keys[nr_cols] = &methods_col;
-		vals[nr_cols].type = DB1_BITMAP;
-		vals[nr_cols].val.bitmap_val = _c->methods;
-		vals[nr_cols].nul = 0;
-		nr_cols++;
-	} else if(ul_db_insert_null!=0) {
-		keys[nr_cols] = &methods_col;
-		vals[nr_cols].type = DB1_BITMAP;
-		vals[nr_cols].nul = 1;
-		nr_cols++;
+	vals[12].type = DB1_BITMAP;
+	if (_c->methods == 0xFFFFFFFF) {
+		vals[12].nul = 1;
+	} else {
+		vals[12].val.bitmap_val = _c->methods;
+		vals[12].nul = 0;
 	}
 
-	keys[nr_cols] = &last_mod_col;
-	vals[nr_cols].nul = 0;
-	UL_DB_EXPIRES_SET(&vals[nr_cols], _c->last_modified);
-	nr_cols++;
+	vals[13].type = DB1_DATETIME;
+	vals[13].nul = 0;
+	vals[13].val.time_val = _c->last_modified;
 
+	nr_cols = 14;
 
 	if(_c->ruid.len>0)
 	{
-		keys[nr_cols] = &ruid_col;
 		vals[nr_cols].type = DB1_STR;
 		vals[nr_cols].nul = 0;
 		vals[nr_cols].val.str_val = _c->ruid;
-		nr_cols++;
-	} else if(ul_db_insert_null!=0) {
-		keys[nr_cols] = &ruid_col;
-		vals[nr_cols].type = DB1_STR;
+	} else {
 		vals[nr_cols].nul = 1;
-		nr_cols++;
 	}
+	nr_cols++;
 
 	if(_c->instance.len>0)
 	{
-		keys[nr_cols] = &instance_col;
 		vals[nr_cols].type = DB1_STR;
 		vals[nr_cols].nul = 0;
 		vals[nr_cols].val.str_val = _c->instance;
-		nr_cols++;
-	} else if(ul_db_insert_null!=0) {
-		keys[nr_cols] = &instance_col;
-		vals[nr_cols].type = DB1_STR;
+	} else {
 		vals[nr_cols].nul = 1;
-		nr_cols++;
 	}
+	nr_cols++;
 
-	keys[nr_cols] = &reg_id_col;
 	vals[nr_cols].type = DB1_INT;
 	vals[nr_cols].nul = 0;
 	vals[nr_cols].val.int_val = (int)_c->reg_id;
 	nr_cols++;
 
 	if (use_domain) {
-		keys[nr_cols] = &domain_col;
 		vals[nr_cols].type = DB1_STR;
 		vals[nr_cols].nul = 0;
 
@@ -674,33 +650,17 @@ int db_update_ucontact_addr(ucontact_t* _c)
 	char* dom;
 	db_key_t keys1[4];
 	db_val_t vals1[4];
-	int n1;
+	int n1 = 0;
 
-	db_key_t keys2[15];
-	db_val_t vals2[15];
-	int nr_cols2;
+	db_key_t keys2[16];
+	db_val_t vals2[16];
+	int nr_cols2 = 0;
 
 
 	if (_c->flags & FL_MEM) {
 		return 0;
 	}
 
-	keys2[0] = &expires_col;
-	keys2[1] = &q_col;
-	keys2[2] = &cseq_col;
-	keys2[3] = &flags_col;
-	keys2[4] = &cflags_col;
-	keys2[5] = &user_agent_col;
-	keys2[6] = &received_col;
-	keys2[7] = &path_col;
-	keys2[8] = &sock_col;
-	keys2[9] = &methods_col;
-	keys2[10] = &last_mod_col;
-	keys2[11] = &ruid_col;
-	keys2[12] = &instance_col;
-	keys2[13] = &reg_id_col;
-
-	n1 = 0;
 	keys1[n1] = &user_col;
 	vals1[n1].type = DB1_STR;
 	vals1[n1].nul = 0;
@@ -715,72 +675,140 @@ int db_update_ucontact_addr(ucontact_t* _c)
 	LM_DBG("contact:%.*s\n", vals1[n1].val.str_val.len, vals1[n1].val.str_val.s);
 	n1++;
 
-	keys1[n1] = &callid_col;
-	vals1[n1].type = DB1_STR;
-	vals1[n1].nul = 0;
-	vals1[n1].val.str_val = _c->callid;
-	LM_DBG("callid:%.*s\n", vals1[n1].val.str_val.len, vals1[n1].val.str_val.s);
-	n1++;
+	switch (matching_mode) {
+		case CONTACT_ONLY:
+			/* update call-id */
+			keys2[nr_cols2] = &callid_col;
+			vals2[nr_cols2].type = DB1_STR;
+			vals2[nr_cols2].nul = 0;
+			vals2[nr_cols2].val.str_val = _c->callid;
+			nr_cols2++;
+			/* update path */
+			keys2[nr_cols2] = &path_col;
+			vals2[nr_cols2].type = DB1_STR;
+			if (_c->path.s == 0) {
+				vals2[nr_cols2].nul = 1;
+			} else {
+				vals2[nr_cols2].nul = 0;
+				vals2[nr_cols2].val.str_val = _c->path;
+			}
+			nr_cols2++;
+			break;
+		case CONTACT_CALLID:
+			keys1[n1] = &callid_col;
+			vals1[n1].type = DB1_STR;
+			vals1[n1].nul = 0;
+			vals1[n1].val.str_val = _c->callid;
+			LM_DBG("callid:%.*s\n", vals1[n1].val.str_val.len, vals1[n1].val.str_val.s);
+			n1++;
+			/* update path */
+			keys2[nr_cols2] = &path_col;
+			vals2[nr_cols2].type = DB1_STR;
+			if (_c->path.s == 0) {
+				vals2[nr_cols2].nul = 1;
+			} else {
+				vals2[nr_cols2].nul = 0;
+				vals2[nr_cols2].val.str_val = _c->path;
+			}
+			nr_cols2++;
+			break;
+		case CONTACT_PATH:
+			keys1[n1] = &path_col;
+			vals1[n1].type = DB1_STR;
+			if (_c->path.s == 0) {
+				vals1[n1].nul = 1;
+				LM_DBG("path: NULL\n");
+			} else {
+				vals1[n1].nul = 0;
+				vals1[n1].val.str_val = _c->path;
+				LM_DBG("path:%.*s\n", vals1[n1].val.str_val.len, vals1[n1].val.str_val.s);
+			}
+			n1++;
+			/* update call-id */
+			keys2[nr_cols2] = &callid_col;
+			vals2[nr_cols2].type = DB1_STR;
+			vals2[nr_cols2].nul = 0;
+			vals2[nr_cols2].val.str_val = _c->callid;
+			nr_cols2++;
+			break;
+		default:
+			LM_CRIT("unknown matching_mode %d\n", matching_mode);
+			return -1;
+	}
 
-	vals2[0].nul = 0;
-	UL_DB_EXPIRES_SET(&vals2[0], _c->expires);
+	keys2[nr_cols2] = &expires_col;
+	vals2[nr_cols2].type = DB1_DATETIME;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.time_val = _c->expires;
+	nr_cols2++;
 
-	vals2[1].type = DB1_DOUBLE;
-	vals2[1].nul = 0;
-	vals2[1].val.double_val = q2double(_c->q);
+	keys2[nr_cols2] = &q_col;
+	vals2[nr_cols2].type = DB1_DOUBLE;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.double_val = q2double(_c->q);
+	nr_cols2++;
 
-	vals2[2].type = DB1_INT;
-	vals2[2].nul = 0;
-	vals2[2].val.int_val = _c->cseq;
+	keys2[nr_cols2] = &cseq_col;
+	vals2[nr_cols2].type = DB1_INT;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.int_val = _c->cseq;
+	nr_cols2++;
 
-	vals2[3].type = DB1_INT;
-	vals2[3].nul = 0;
-	vals2[3].val.bitmap_val = _c->flags;
+	keys2[nr_cols2] = &flags_col;
+	vals2[nr_cols2].type = DB1_INT;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.bitmap_val = _c->flags;
+	nr_cols2++;
 
-	vals2[4].type = DB1_INT;
-	vals2[4].nul = 0;
-	vals2[4].val.bitmap_val = _c->cflags;
+	keys2[nr_cols2] = &cflags_col;
+	vals2[nr_cols2].type = DB1_INT;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.bitmap_val = _c->cflags;
+	nr_cols2++;
 
-	vals2[5].type = DB1_STR;
-	vals2[5].nul = 0;
-	vals2[5].val.str_val = _c->user_agent;
+	keys2[nr_cols2] = &user_agent_col;
+	vals2[nr_cols2].type = DB1_STR;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.str_val = _c->user_agent;
+	nr_cols2++;
 
-	vals2[6].type = DB1_STR;
+	keys2[nr_cols2] = &received_col;
+	vals2[nr_cols2].type = DB1_STR;
 	if (_c->received.s == 0) {
-		vals2[6].nul = 1;
+		vals2[nr_cols2].nul = 1;
 	} else {
-		vals2[6].nul = 0;
-		vals2[6].val.str_val = _c->received;
+		vals2[nr_cols2].nul = 0;
+		vals2[nr_cols2].val.str_val = _c->received;
 	}
-	
-	vals2[7].type = DB1_STR;
-	if (_c->path.s == 0) {
-		vals2[7].nul = 1;
-	} else {
-		vals2[7].nul = 0;
-		vals2[7].val.str_val = _c->path;
-	}
+	nr_cols2++;
 
-	vals2[8].type = DB1_STR;
+	keys2[nr_cols2] = &sock_col;
+	vals2[nr_cols2].type = DB1_STR;
 	if (_c->sock) {
-		vals2[8].val.str_val = _c->sock->sock_str;
-		vals2[8].nul = 0;
+		vals2[nr_cols2].val.str_val = _c->sock->sock_str;
+		vals2[nr_cols2].nul = 0;
 	} else {
-		vals2[8].nul = 1;
+		vals2[nr_cols2].nul = 1;
 	}
+	nr_cols2++;
 
-	vals2[9].type = DB1_BITMAP;
+	keys2[nr_cols2] = &methods_col;
+	vals2[nr_cols2].type = DB1_BITMAP;
 	if (_c->methods == 0xFFFFFFFF) {
-		vals2[9].nul = 1;
+		vals2[nr_cols2].nul = 1;
 	} else {
-		vals2[9].val.bitmap_val = _c->methods;
-		vals2[9].nul = 0;
+		vals2[nr_cols2].val.bitmap_val = _c->methods;
+		vals2[nr_cols2].nul = 0;
 	}
+	nr_cols2++;
 
-	vals2[10].nul = 0;
-	UL_DB_EXPIRES_SET(&vals2[10], _c->last_modified);
+	keys2[nr_cols2] = &last_mod_col;
+	vals2[nr_cols2].type = DB1_DATETIME;
+	vals2[nr_cols2].nul = 0;
+	vals2[nr_cols2].val.time_val = _c->last_modified;
+	nr_cols2++;
 
-	nr_cols2 = 11;
+	keys2[nr_cols2] = &ruid_col;
 	if(_c->ruid.len>0)
 	{
 		vals2[nr_cols2].type = DB1_STR;
@@ -791,6 +819,7 @@ int db_update_ucontact_addr(ucontact_t* _c)
 	}
 	nr_cols2++;
 
+	keys2[nr_cols2] = &instance_col;
 	if(_c->instance.len>0)
 	{
 		vals2[nr_cols2].type = DB1_STR;
@@ -801,6 +830,7 @@ int db_update_ucontact_addr(ucontact_t* _c)
 	}
 	nr_cols2++;
 
+	keys2[nr_cols2] = &reg_id_col;
 	vals2[nr_cols2].type = DB1_INT;
 	vals2[nr_cols2].nul = 0;
 	vals2[nr_cols2].val.int_val = (int)_c->reg_id;
@@ -905,8 +935,9 @@ int db_update_ucontact_ruid(ucontact_t* _c)
 
 	n2 = 0;
 	keys2[n2] = &expires_col;
+	vals2[n2].type = DB1_DATETIME;
 	vals2[n2].nul = 0;
-	UL_DB_EXPIRES_SET(&vals2[n2], _c->expires);
+	vals2[n2].val.time_val = _c->expires;
 	n2++;
 
 	keys2[n2] = &q_col;
@@ -980,8 +1011,9 @@ int db_update_ucontact_ruid(ucontact_t* _c)
 	n2++;
 
 	keys2[n2] = &last_mod_col;
+	vals2[n2].type = DB1_DATETIME;
 	vals2[n2].nul = 0;
-	UL_DB_EXPIRES_SET(&vals2[n2], _c->last_modified);
+	vals2[n2].val.time_val = _c->last_modified;
 	n2++;
 
 	keys2[n2] = &callid_col;
@@ -1115,8 +1147,9 @@ int db_update_ucontact_instance(ucontact_t* _c)
 
 	n2 = 0;
 	keys2[n2] = &expires_col;
+	vals2[n2].type = DB1_DATETIME;
 	vals2[n2].nul = 0;
-	UL_DB_EXPIRES_SET(&vals2[n2], _c->expires);
+	vals2[n2].val.time_val = _c->expires;
 	n2++;
 
 	keys2[n2] = &q_col;
@@ -1190,8 +1223,9 @@ int db_update_ucontact_instance(ucontact_t* _c)
 	n2++;
 
 	keys2[n2] = &last_mod_col;
+	vals2[n2].type = DB1_DATETIME;
 	vals2[n2].nul = 0;
-	UL_DB_EXPIRES_SET(&vals2[n2], _c->last_modified);
+	vals2[n2].val.time_val = _c->last_modified;
 	n2++;
 
 	keys2[n2] = &callid_col;
@@ -1318,11 +1352,31 @@ int db_delete_ucontact_addr(ucontact_t* _c)
 	vals[n].val.str_val = _c->c;
 	n++;
 
-	keys[n] = &callid_col;
-	vals[n].type = DB1_STR;
-	vals[n].nul = 0;
-	vals[n].val.str_val = _c->callid;
-	n++;
+	switch (matching_mode) {
+		case CONTACT_ONLY:
+			break;
+		case CONTACT_CALLID:
+			keys[n] = &callid_col;
+			vals[n].type = DB1_STR;
+			vals[n].nul = 0;
+			vals[n].val.str_val = _c->callid;
+			n++;
+			break;
+		case CONTACT_PATH:
+			keys[n] = &path_col;
+			vals[n].type = DB1_STR;
+			if (_c->path.s == 0) {
+				vals[n].nul = 1;
+			} else {
+				vals[n].nul = 0;
+				vals[n].val.str_val = _c->path;
+			}
+			n++;
+			break;
+		default:
+			LM_CRIT("unknown matching_mode %d\n", matching_mode);
+			return -1;
+	}
 
 	if (use_domain) {
 	    keys[n] = &domain_col;
@@ -1660,8 +1714,9 @@ int uldb_insert_attrs(str *_dname, str *_user, str *_domain,
 	vals[1].nul = 0;
 	vals[1].val.str_val = *_ruid;
 
+	vals[2].type = DB1_DATETIME;
 	vals[2].nul = 0;
-	UL_DB_EXPIRES_SET(&vals[2], time(NULL));
+	vals[2].val.time_val = time(NULL);
 
 	if (use_domain && _domain!=NULL && _domain->s!=NULL) {
 		nr_cols = 7;

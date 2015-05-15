@@ -24,7 +24,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /** destination set / branches support.
@@ -334,13 +334,18 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	 * of branches, don't try new ones 
 	 */
 	if (unlikely(nr_branches == MAX_BRANCHES - 1)) {
-		LM_ERR("max nr of branches exceeded\n");
+		LOG(L_ERR, "max nr of branches exceeded\n");
 		ser_error = E_TOO_MANY_BRANCHES;
 		return -1;
 	}
 
 	/* if not parameterized, take current uri */
 	if (uri==0 || uri->len==0 || uri->s==0) {
+		if(msg==NULL) {
+			LM_ERR("no new uri and no msg to take r-uri\n");
+			ser_error = E_INVALID_PARAMS;
+			return -1;
+		}
 		if (msg->new_uri.s)
 			luri = msg->new_uri;
 		else
@@ -350,14 +355,14 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	}
 
 	if (unlikely(luri.len > MAX_URI_SIZE - 1)) {
-		LM_ERR("too long uri: %.*s\n", luri.len, luri.s);
+		LOG(L_ERR, "too long uri: %.*s\n", luri.len, luri.s);
 		return -1;
 	}
 
 	/* copy the dst_uri */
 	if (dst_uri && dst_uri->len && dst_uri->s) {
 		if (unlikely(dst_uri->len > MAX_URI_SIZE - 1)) {
-			LM_ERR("too long dst_uri: %.*s\n", dst_uri->len, dst_uri->s);
+			LOG(L_ERR, "too long dst_uri: %.*s\n", dst_uri->len, dst_uri->s);
 			return -1;
 		}
 		memcpy(branches[nr_branches].dst_uri, dst_uri->s, dst_uri->len);
@@ -371,7 +376,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* copy the path string */
 	if (unlikely(path && path->len && path->s)) {
 		if (unlikely(path->len > MAX_PATH_SIZE - 1)) {
-			LM_ERR("too long path: %.*s\n", path->len, path->s);
+			LOG(L_ERR, "too long path: %.*s\n", path->len, path->s);
 			return -1;
 		}
 		memcpy(branches[nr_branches].path, path->s, path->len);
@@ -394,7 +399,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* copy instance string */
 	if (unlikely(instance && instance->len && instance->s)) {
 		if (unlikely(instance->len > MAX_INSTANCE_SIZE - 1)) {
-			LM_ERR("too long instance: %.*s\n",
+			LOG(L_ERR, "too long instance: %.*s\n",
 			    instance->len, instance->s);
 			return -1;
 		}
@@ -413,7 +418,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* copy ruid string */
 	if (unlikely(ruid && ruid->len && ruid->s)) {
 		if (unlikely(ruid->len > MAX_RUID_SIZE - 1)) {
-			LM_ERR("too long ruid: %.*s\n",
+			LOG(L_ERR, "too long ruid: %.*s\n",
 			    ruid->len, ruid->s);
 			return -1;
 		}
@@ -428,7 +433,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 
 	if (unlikely(location_ua && location_ua->len && location_ua->s)) {
 		if (unlikely(location_ua->len > MAX_UA_SIZE)) {
-			LM_ERR("too long location_ua: %.*s\n",
+			LOG(L_ERR, "too long location_ua: %.*s\n",
 			    location_ua->len, location_ua->s);
 			return -1;
 		}
@@ -492,7 +497,7 @@ char* print_dset(struct sip_msg* msg, int* len)
 	*len += CONTACT_LEN + CRLF_LEN + (cnt - 1) * CONTACT_DELIM_LEN;
 
 	if (*len + 1 > MAX_REDIRECTION_LEN) {
-		LM_ERR("redirection buffer length exceed\n");
+		LOG(L_ERR, "ERROR: redirection buffer length exceed\n");
 		goto error;
 	}
 

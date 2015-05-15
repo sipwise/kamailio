@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -50,6 +50,11 @@ str suffix = {"", 0};
 
 int add_diversion(struct sip_msg* msg, char* r, char* u);
 
+/*
+ * Module initialization function prototype
+ */
+static int mod_init(void);
+
 
 /*
  * Exported functions
@@ -67,7 +72,7 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"suffix", PARAM_STR, &suffix},
+	{"suffix", STR_PARAM, &suffix.s},
 	{0, 0, 0}
 };
 
@@ -84,11 +89,18 @@ struct module_exports exports = {
 	0,          /* exported MI functions */
 	0,          /* exported pseudo-variables */
 	0,          /* extra processes */
-	0,   /* module initialization function */
+	mod_init,   /* module initialization function */
 	0,          /* response function */
 	0,          /* destroy function */
 	0           /* child initialization function */
 };
+
+
+static int mod_init(void)
+{
+	suffix.len = strlen(suffix.s);
+	return 0;
+}
 
 
 static inline int add_diversion_helper(struct sip_msg* msg, str* s)

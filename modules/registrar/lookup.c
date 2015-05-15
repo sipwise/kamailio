@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * ---------
@@ -82,29 +82,12 @@ int reg_cmp_instances(str *i1, str *i2)
 }
 
 /*! \brief
- * Lookup a contact in usrloc and rewrite R-URI if found
- */
-int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri) {
-     return lookup_helper(_m, _d, _uri, 0);
-}
-
-/*! \brief
- * Lookup a contact in usrloc and add the records to the dset structure
- */
-int lookup_to_dset(struct sip_msg* _m, udomain_t* _d, str* _uri) {
-     return lookup_helper(_m, _d, _uri, 1);
-}
-
-/*! \brief
  * Lookup contact in the database and rewrite Request-URI
- * or not according to _mode value:
- *  0: rewrite
- *  1: don't rewrite
  * \return: -1 : not found
  *          -2 : found but method not allowed
  *          -3 : error
  */
-int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
+int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri)
 {
 	urecord_t* r;
 	str aor, uri;
@@ -228,8 +211,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 	}
 
 	ret = 1;
-	/* don't rewrite r-uri if called by lookup_to_dset */
-	if (_mode == 0 && ptr) {
+	if (ptr) {
 		if (rewrite_uri(_m, &ptr->c) < 0) {
 			LM_ERR("unable to rewrite Request-URI\n");
 			ret = -3;
@@ -372,21 +354,48 @@ done:
 }
 
 
-int reset_ruri_branch(sip_msg_t *msg)
+/**
+ * only reset the pointers after local backup in lookup_branches
+ */
+int clear_ruri_branch(sip_msg_t *msg)
 {
 	if(msg==NULL)
 		return -1;
 
-	reset_dst_uri(msg);
-	reset_path_vector(msg);
+	msg->dst_uri.s = 0;
+	msg->dst_uri.len = 0;
+	msg->path_vec.s = 0;
+	msg->path_vec.len = 0;
 	set_ruri_q(Q_UNSPECIFIED);
 	reset_force_socket(msg);
 	setbflagsval(0, 0);
-	reset_instance(msg);
+	msg->instance.len = 0;
 	msg->reg_id = 0;
-	reset_ruid(msg);
-	reset_ua(msg);
+	msg->ruid.s = 0;
+	msg->ruid.len = 0;
+	msg->location_ua.s = 0;
+	msg->location_ua.len = 0;
 	return 0;
+}
+
+/**
+ * reset and free the pointers after cloning to a branch in lookup_branches
+ */
+int reset_ruri_branch(sip_msg_t *msg)
+{
+    if(msg==NULL)
+        return -1;
+
+    reset_dst_uri(msg);
+    reset_path_vector(msg);
+    set_ruri_q(Q_UNSPECIFIED);
+    reset_force_socket(msg);
+    setbflagsval(0, 0);
+    reset_instance(msg);
+    msg->reg_id = 0;
+    reset_ruid(msg);
+    reset_ua(msg);
+    return 0;
 }
 
 /*! \brief
@@ -438,7 +447,7 @@ int lookup_branches(sip_msg_t *msg, udomain_t *d)
 	ruri_b_reg_id = msg->reg_id;
 	ruri_b_ruid = msg->ruid;
 	ruri_b_ua = msg->location_ua;
-	reset_ruri_branch(msg);
+	clear_ruri_branch(msg);
 	/* set new uri buf to null, otherwise is freed or overwritten by
 	 * rewrite_uri() during branch lookup */
 	msg->new_uri.len=0;

@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -59,6 +59,6 @@ char * create_ping_event(int *evt_len,int flags,unsigned int *seqno);
 int prepare_ha(void);
 int spawn_pinger(void);
 int print_pingtable(struct ha *ta,int idx,int lock);
-inline int init_pingtable(struct ha *table,int timeout,int maxpings);
-inline void destroy_pingtable(struct ha *table);
+int init_pingtable(struct ha *table,int timeout,int maxpings);
+void destroy_pingtable(struct ha *table);
 #endif

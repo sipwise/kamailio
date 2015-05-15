@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * ----------
@@ -923,17 +923,21 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags, str *_uri)
 			}
 			if (parse_uri(route->nameaddr.uri.s, route->nameaddr.uri.len, &puri) < 0) {
 				LM_ERR("Failed to parse Path: URI\n");
+				free_rr(&route);
 				goto error;
 			}
 			if (parse_params(&puri.params, CLASS_URI, &hooks, &params) != 0) {
 				LM_ERR("Failed to parse Path: URI parameters\n");
+				free_rr(&route);
 				goto error;
 			}
+			/* Not interested in param body - just the hooks */
+			free_params(params);
 			if (!hooks.uri.ob) {
 				/* No ;ob parameter to top Path: URI - no outbound */
 				use_ob = 0;
 			}
-
+			free_rr(&route);
 		} else {
 			/* No Path: header - no outbound */
 			use_ob = 0;

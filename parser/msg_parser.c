@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * ---------
@@ -829,13 +829,11 @@ int set_path_vector(struct sip_msg* msg, str* path)
 
 void reset_path_vector(struct sip_msg* const msg)
 {
-	/* only free path vector from pkg IFF it is still in pkg... - ie. if msg is shm we don't free... */
-	if (!(msg->msg_flags&FL_SHM_CLONE)) {
-		if (msg->path_vec.s)
-			pkg_free(msg->path_vec.s);
-		msg->path_vec.s = 0;
-		msg->path_vec.len = 0;
+	if(msg->path_vec.s != 0) {
+		pkg_free(msg->path_vec.s);
 	}
+	msg->path_vec.s = 0;
+	msg->path_vec.len = 0;
 }
 
 

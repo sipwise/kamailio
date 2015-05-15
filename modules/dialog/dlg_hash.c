@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -710,7 +710,7 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
 		if (match_dialog( dlg, callid, ftag, ttag, dir)==1) {
 			ref_dlg_unsafe(dlg, 1);
 			dlg_unlock( d_table, d_entry);
-			LM_DBG("dialog callid='%.*s' found\n on entry %u, dir=%d\n",
+			LM_DBG("dialog callid='%.*s' found on entry %u, dir=%d\n",
 				callid->len, callid->s,h_entry,*dir);
 			return dlg;
 		}
@@ -1097,12 +1097,14 @@ int dlg_set_toroute(struct dlg_cell *dlg, str *route)
 
 int	update_dlg_timeout(dlg_cell_t *dlg, int timeout)
 {
-	if(update_dlg_timer(&dlg->tl, timeout) < 0) {
-		LM_ERR("failed to update dialog lifetime\n");
-		dlg_release(dlg);
-		return -1;
-	} 
-
+	if(dlg->state!=DLG_STATE_UNCONFIRMED
+			&& dlg->state!=DLG_STATE_EARLY) {
+		if(update_dlg_timer(&dlg->tl, timeout) < 0) {
+			LM_ERR("failed to update dialog lifetime\n");
+			dlg_release(dlg);
+			return -1;
+		}
+	}
 	dlg->lifetime = timeout;
 	dlg->dflags |= DLG_FLAG_CHANGED;
 

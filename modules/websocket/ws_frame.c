@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Exception: permission to copy, modify, propagate, and distribute a work
  * formed by combining OpenSSL toolkit software and the code in this file,
@@ -27,13 +27,7 @@
  */
 
 #include <limits.h>
-
-#ifdef EMBEDDED_UTF8_DECODE
-#include "utf8_decode.h"
-#else
 #include <unistr.h>
-#endif
-
 #include "../../events.h"
 #include "../../receive.h"
 #include "../../stats.h"
@@ -106,7 +100,7 @@ typedef enum
 /* 0xb - 0xf are reserved for further control frames */
 
 int ws_keepalive_mechanism = DEFAULT_KEEPALIVE_MECHANISM;
-str ws_ping_application_data = STR_NULL;
+str ws_ping_application_data = {0, 0};
 
 stat_var *ws_failed_connections;
 stat_var *ws_local_closed_connections;
@@ -733,16 +727,16 @@ int ws_frame_transmit(void *data)
 	frame.fin = 1;
 	/* Can't be sure whether this message is UTF-8 or not so check to see
 	   if it "might" be UTF-8 and send as binary if it definitely isn't */
-#ifdef EMBEDDED_UTF8_DECODE
-	frame.opcode = IsUTF8((uint8_t *) wsev->buf, wsev->len) ?
-				OPCODE_TEXT_FRAME : OPCODE_BINARY_FRAME;
-#else
 	frame.opcode = (u8_check((uint8_t *) wsev->buf, wsev->len) == NULL) ?
 				OPCODE_TEXT_FRAME : OPCODE_BINARY_FRAME;
-#endif
 	frame.payload_len = wsev->len;
 	frame.payload_data = wsev->buf;
 	frame.wsc = wsconn_get(wsev->id);
+	if (frame.wsc == NULL)
+	{
+		LM_ERR("WebSocket outbound connection not found\n");
+		return -1;
+	}
 
 	LM_DBG("Tx message:\n%.*s\n", frame.payload_len,
 			frame.payload_data);

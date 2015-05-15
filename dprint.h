@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /**
@@ -86,7 +86,6 @@
 /*
  * Log levels
  */
-#define L_NPRL		-6 /* (L_MIN-1) to skip printing level prefix */
 #define L_MIN		-5
 #define L_ALERT		-5
 #define L_BUG		-4
@@ -118,8 +117,6 @@ extern int my_pid(void);
 extern int log_stderr;
 
 extern int log_color;
-extern char *log_prefix_fmt;
-extern str *log_prefix_val;
 
 /** @brief maps log levels to their string name and corresponding syslog level */
 
@@ -153,8 +150,6 @@ void dprint_color_update(int level, char f, char b);
 void dprint_init_colors(void);
 void dprint_term_color(char f, char b, str *obuf);
 
-void log_prefix_init(void);
-
 /** @brief
  * General logging macros
  *
@@ -167,17 +162,13 @@ void log_prefix_init(void);
 #ifdef NO_LOG
 
 #	ifdef __SUNPRO_C
-#		define LOG__(facility, level, lname, prefix, fmt, ...)
 #		define LOG_(facility, level, prefix, fmt, ...)
 #		define LOG(level, fmt, ...)
 #		define LOG_FC(facility, level, fmt, ...)
-#		define LOG_LN(level, lname, fmt, ...)
 #	else
-#		define LOG__(facility, level, lname, prefix, fmt, args...)
 #		define LOG_(facility, level, prefix, fmt, args...)
 #		define LOG(level, fmt, args...)
 #		define LOG_FC(facility, level, fmt, args...)
-#		define LOG_LN(level, lname, fmt, args...)
 #	endif
 
 #else
@@ -193,7 +184,7 @@ void log_prefix_init(void);
 #	endif
 
 #	ifdef __SUNPRO_C
-#		define LOG__(facility, level, lname, prefix, fmt, ...) \
+#		define LOG_(facility, level, prefix, fmt, ...) \
 			do { \
 				if (unlikely(get_debug_level(LOG_MNAME, LOG_MNAME_LEN) >= (level) && \
 						DPRINT_NON_CRIT)) { \
@@ -203,7 +194,7 @@ void log_prefix_init(void);
 							if (unlikely(log_color)) dprint_color(level); \
 							fprintf(stderr, "%2d(%d) %s: %s" fmt, \
 									process_no, my_pid(), \
-									(lname)?(lname):LOG_LEVEL2NAME(level), (prefix), \
+									LOG_LEVEL2NAME(level), (prefix), \
 									__VA_ARGS__); \
 							if (unlikely(log_color)) dprint_color_reset(); \
 						} else { \
@@ -211,8 +202,7 @@ void log_prefix_init(void);
 								   (((facility) != DEFAULT_FACILITY) ? \
 									(facility) : \
 									cfg_get(core, core_cfg, log_facility)), \
-									"%s: %s" fmt, \
-									(lname)?(lname):LOG_LEVEL2NAME(level),\
+									"%s: %s" fmt, LOG_LEVEL2NAME(level),\
 									(prefix), __VA_ARGS__); \
 						} \
 					} else { \
@@ -240,10 +230,7 @@ void log_prefix_init(void);
 					DPRINT_CRIT_EXIT; \
 				} \
 			} while(0)
-
-#		define LOG_(facility, level, lname, prefix, fmt, ...) \
-	LOG__(facility, level, NULL, prefix, fmt, __VA_ARGS__)
-
+			
 #		ifdef LOG_FUNC_NAME
 #			define LOG(level, fmt, ...) \
 	LOG_(DEFAULT_FACILITY, (level), LOC_INFO, "%s(): " fmt,\
@@ -252,11 +239,6 @@ void log_prefix_init(void);
 #			define LOG_FC(facility, level, fmt, ...) \
 	LOG_((facility), (level), LOC_INFO, "%s(): " fmt,\
 				_FUNC_NAME_, __VA_ARGS__)
-
-#			define LOG_LN(level, lname, fmt, ...) \
-	LOG__(DEFAULT_FACILITY, (level), (lname), LOC_INFO, "%s(): " fmt,\
-				_FUNC_NAME_, __VA_ARGS__)
-
 #		else /* LOG_FUNC_NAME */
 
 #			define LOG(level, fmt, ...) \
@@ -265,61 +247,56 @@ void log_prefix_init(void);
 #			define LOG_FC(facility, level, fmt, ...) \
 	LOG_((facility), (level), LOC_INFO, fmt, __VA_ARGS__)
 
-#			define LOG_LN(level, lname, fmt, ...) \
-	LOG_(DEFAULT_FACILITY, (level), (lname), LOC_INFO, fmt, __VA_ARGS__)
-
 #		endif /* LOG_FUNC_NAME */
 
 #	else /* ! __SUNPRO_C */
-#		define LOG__(facility, level, lname, prefix, fmt, args...) \
+#		define LOG_(facility, level, prefix, fmt, args...) \
 			do { \
 				if (get_debug_level(LOG_MNAME, LOG_MNAME_LEN) >= (level) && \
 						DPRINT_NON_CRIT) { \
-					int __llevel; \
-					__llevel = ((level)<L_ALERT)?L_ALERT:(((level)>L_DBG)?L_DBG:level); \
 					DPRINT_CRIT_ENTER; \
-					if (unlikely(log_stderr)) { \
-						if (unlikely(log_color)) dprint_color(__llevel); \
-						if(unlikely(log_prefix_val)) { \
-							fprintf(stderr, "%.*s%2d(%d) %s: %s" fmt, \
-								log_prefix_val->len, log_prefix_val->s, \
-								process_no, my_pid(), \
-								(lname)?(lname):LOG_LEVEL2NAME(__llevel), \
-								(prefix) , ## args);\
-						} else { \
+					if (likely(((level) >= L_ALERT) && ((level) <= L_DBG))){ \
+						if (unlikely(log_stderr)) { \
+							if (unlikely(log_color)) dprint_color(level); \
 							fprintf(stderr, "%2d(%d) %s: %s" fmt, \
-								process_no, my_pid(), \
-								(lname)?(lname):LOG_LEVEL2NAME(__llevel), \
-								(prefix) , ## args);\
-						} \
-						if (unlikely(log_color)) dprint_color_reset(); \
-					} else { \
-						if(unlikely(log_prefix_val)) { \
-							syslog(LOG2SYSLOG_LEVEL(__llevel) |\
-							   (((facility) != DEFAULT_FACILITY) ? \
-								(facility) : \
-								cfg_get(core, core_cfg, log_facility)), \
-								"%.*s%s: %s" fmt,\
-								log_prefix_val->len, log_prefix_val->s, \
-								(lname)?(lname):LOG_LEVEL2NAME(__llevel),\
-								(prefix) , ## args); \
+									process_no, my_pid(), \
+									LOG_LEVEL2NAME(level), \
+									(prefix) , ## args);\
+							if (unlikely(log_color)) dprint_color_reset(); \
 						} else { \
-							syslog(LOG2SYSLOG_LEVEL(__llevel) |\
-							   (((facility) != DEFAULT_FACILITY) ? \
-								(facility) : \
-								cfg_get(core, core_cfg, log_facility)), \
-								"%s: %s" fmt,\
-								(lname)?(lname):LOG_LEVEL2NAME(__llevel),\
-								(prefix) , ## args); \
+							syslog(LOG2SYSLOG_LEVEL(level) |\
+								   (((facility) != DEFAULT_FACILITY) ? \
+									(facility) : \
+									cfg_get(core, core_cfg, log_facility)), \
+									"%s: %s" fmt, LOG_LEVEL2NAME(level),\
+									(prefix) , ## args); \
+						} \
+					} else { \
+						if (log_stderr) { \
+							if (unlikely(log_color)) dprint_color(level); \
+							fprintf(stderr, "%2d(%d) %s" fmt, \
+										process_no, my_pid(), \
+										(prefix) , ## args); \
+							if (unlikely(log_color)) dprint_color_reset(); \
+						} else { \
+							if ((level)<L_ALERT) \
+								syslog(LOG2SYSLOG_LEVEL(L_ALERT) | \
+									   (((facility) != DEFAULT_FACILITY) ? \
+										(facility) : \
+										cfg_get(core, core_cfg, log_facility)),\
+										"%s" fmt, (prefix) , ## args); \
+							else \
+								syslog(LOG2SYSLOG_LEVEL(L_DBG) | \
+									   (((facility) != DEFAULT_FACILITY) ? \
+										(facility) : \
+										cfg_get(core, core_cfg, log_facility)),\
+										"%s" fmt, (prefix) , ## args); \
 						} \
 					} \
 					DPRINT_CRIT_EXIT; \
 				} \
 			} while(0)
-
-#		define LOG_(facility, level, prefix, fmt, args...) \
-	LOG__(facility, level, NULL, prefix, fmt, ## args)
-
+			
 #		ifdef LOG_FUNC_NAME
 #			define LOG(level, fmt, args...) \
 	LOG_(DEFAULT_FACILITY, (level), LOC_INFO, "%s(): " fmt ,\
@@ -328,17 +305,11 @@ void log_prefix_init(void);
 #			define LOG_FC(facility, level, fmt, args...) \
 	LOG_((facility), (level), LOC_INFO, "%s(): " fmt , _FUNC_NAME_, ## args)
 
-#			define LOG_LN(level, lname, fmt, args...) \
-	LOG__(DEFAULT_FACILITY, (level), (lname), LOC_INFO, "%s(): " fmt ,\
-			_FUNC_NAME_, ## args)
-
 #		else /* LOG_FUNC_NAME */
 #			define LOG(level, fmt, args...) \
 	LOG_(DEFAULT_FACILITY, (level), LOC_INFO, fmt , ## args)
 #			define LOG_FC(facility, level, fmt, args...) \
 	LOG_((facility), (level), LOC_INFO, fmt , ## args)
-#			define LOG_LN(level, lname, fmt, args...) \
-	LOG__(DEFAULT_FACILITY, (level), (lname), LOC_INFO, fmt , ## args)
 
 #		endif /* LOG_FUNC_NAME */
 #	endif /* __SUNPRO_C */
@@ -350,7 +321,6 @@ void log_prefix_init(void);
  */
 /*@ { */
 #ifdef __SUNPRO_C
-#	define NPRL(...)   LOG(L_NPRL,  __VA_ARGS__)
 #	define ALERT(...)  LOG(L_ALERT,  __VA_ARGS__)
 #	define BUG(...)    LOG(L_BUG,   __VA_ARGS__)
 #	define ERR(...)    LOG(L_ERR,    __VA_ARGS__)
@@ -370,7 +340,6 @@ void log_prefix_init(void);
 #	define DEBUG(...) DBG(__VA_ARGS__)
 
 #else /* ! __SUNPRO_C */
-#	define NPRL(fmt, args...)   LOG(L_NPRL,  fmt , ## args)
 #	define ALERT(fmt, args...)  LOG(L_ALERT,  fmt , ## args)
 #	define BUG(fmt, args...)    LOG(L_BUG,   fmt , ## args)
 #	define ERR(fmt, args...)    LOG(L_ERR,    fmt , ## args)
@@ -395,7 +364,6 @@ void log_prefix_init(void);
 
 #define LM_GEN1 LOG
 #define LM_GEN2 LOG_FC
-#define LM_NPRL NPRL
 #define LM_ALERT ALERT
 #define LM_CRIT  CRIT
 #define LM_ERR ERR

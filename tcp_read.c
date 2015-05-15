@@ -22,7 +22,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*
  * History:
@@ -191,7 +191,7 @@ int tcp_http11_continue(struct tcp_connection *c)
 	{
 		init_dst_from_rcv(&dst, &c->rcv);
 		if (tcp_send(&dst, 0, HTTP11CONTINUE, HTTP11CONTINUE_LEN) < 0) {
-			LM_ERR("HTTP/1.1 continue failed\n");
+			LOG(L_ERR, "HTTP/1.1 continue failed\n");
 		}
 	}
 	/* check for Transfer-Encoding header */
@@ -337,7 +337,7 @@ int tcp_read(struct tcp_connection *c, int* flags)
 	bytes_free=r->b_size- (int)(r->pos - r->buf);
 	
 	if (unlikely(bytes_free==0)){
-		LM_ERR("buffer overrun, dropping\n");
+		LOG(L_ERR, "ERROR: tcp_read: buffer overrun, dropping\n");
 		r->error=TCP_REQ_OVERRUN;
 		return -1;
 	}
@@ -798,7 +798,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					case ' ':
 					case '\t': /* FIXME: check if line contains only WS */
 						if(r->content_len<0) {
-							LM_ERR("bad Content-Length header value %d in"
+							LOG(L_ERR, "bad Content-Length header value %d in"
 									" state %d\n", r->content_len, r->state);
 							r->content_len=0;
 							r->error=TCP_REQ_BAD_LEN;
@@ -810,7 +810,7 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 					case '\n':
 						/* end of line, parse successful */
 						if(r->content_len<0) {
-							LM_ERR("bad Content-Length header value %d in"
+							LOG(L_ERR, "bad Content-Length header value %d in"
 									" state %d\n", r->content_len, r->state);
 							r->content_len=0;
 							r->error=TCP_REQ_BAD_LEN;
@@ -820,7 +820,8 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 						r->flags|=F_TCP_REQ_HAS_CLEN;
 						break;
 					default:
-						LM_ERR("bad Content-Length header value, unexpected "
+						LOG(L_ERR, "ERROR: tcp_read_headers: bad "
+								"Content-Length header value, unexpected "
 								"char %c in state %d\n", *p, r->state);
 						r->state=H_SKIP; /* try to find another?*/
 				}
@@ -989,7 +990,8 @@ int tcp_read_headers(struct tcp_connection *c, int* read_flags)
 #endif
 
 			default:
-				LM_CRIT("unexpected state %d\n", r->state);
+				LOG(L_CRIT, "BUG: tcp_read_headers: unexpected state %d\n",
+						r->state);
 				abort();
 		}
 	}
@@ -1294,10 +1296,10 @@ again:
 			}
 		}
 		if (unlikely(req->error!=TCP_REQ_OK)){
-			LM_ERR("bad request, state=%d, error=%d buf:\n%.*s\nparsed:\n%.*s\n",
-					req->state, req->error,
-					(int)(req->pos-req->buf), req->buf,
-					(int)(req->parsed-req->start), req->start);
+			LOG(L_ERR,"ERROR: tcp_read_req: bad request, state=%d, error=%d "
+					  "buf:\n%.*s\nparsed:\n%.*s\n", req->state, req->error,
+					  (int)(req->pos-req->buf), req->buf,
+					  (int)(req->parsed-req->start), req->start);
 			DBG("- received from: port %d\n", con->rcv.src_port);
 			print_ip("- received from: ip ",&con->rcv.src_ip, "\n");
 			resp=CONN_ERROR;
@@ -1319,7 +1321,8 @@ again:
 			}else{
 				if (cfg_get(tcp, tcp_cfg, accept_no_cl)==0) {
 					req->error=TCP_REQ_BAD_LEN;
-					LM_ERR("content length not present or unparsable\n");
+					LOG(L_ERR, "ERROR: tcp_read_req: content length not present or"
+						" unparsable\n");
 					resp=CONN_ERROR;
 					goto end_req;
 				}
@@ -1350,7 +1353,7 @@ again:
 				init_dst_from_rcv(&dst, &con->rcv);
 
 				if (tcp_send(&dst, 0, CRLF, CRLF_LEN) < 0) {
-					LM_ERR("CRLF ping: tcp_send() failed\n");
+					LOG(L_ERR, "CRLF ping: tcp_send() failed\n");
 				}
 				ret = 0;
 			} else if (unlikely(req->state==H_STUN_END)) {
@@ -1444,7 +1447,7 @@ void release_tcpconn(struct tcp_connection* c, long state, int unix_sock)
 		response[1]=state;
 		
 		if (tsend_stream(unix_sock, (char*)response, sizeof(response), -1)<=0)
-			LM_ERR("tsend_stream failed\n");
+			LOG(L_ERR, "ERROR: release_tcpconn: tsend_stream failed\n");
 }
 
 
@@ -1462,7 +1465,7 @@ static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
 	}
 	/* if conn->state is ERROR or BAD => force timeout too */
 	if (unlikely(io_watch_del(&io_w, c->fd, -1, IO_FD_CLOSING)<0)){
-		LM_ERR("io_watch_del failed for %p"
+		LOG(L_ERR, "ERROR: tcpconn_read_timeout: io_watch_del failed for %p"
 					" id %d fd %d, state %d, flags %x, main fd %d\n",
 					c, c->id, c->fd, c->state, c->flags, c->s);
 	}
@@ -1511,33 +1514,37 @@ again:
 					break;
 				}else if (errno == EINTR) goto again;
 				else{
-					LM_CRIT("read_fd: %s \n", strerror(errno));
+					LOG(L_CRIT,"BUG: tcp_receive: handle_io: read_fd: %s \n",
+							strerror(errno));
 						abort(); /* big error*/
 				}
 			}
 			if (unlikely(n==0)){
-				LM_ERR("0 bytes read\n");
+				LOG(L_ERR, "WARNING: tcp_receive: handle_io: 0 bytes read\n");
 				goto error;
 			}
 			if (unlikely(con==0)){
-					LM_CRIT("null pointer\n");
+					LOG(L_CRIT, "BUG: tcp_receive: handle_io null pointer\n");
 					goto error;
 			}
 			con->fd=s;
 			if (unlikely(s==-1)) {
-				LM_ERR("read_fd: no fd read\n");
+				LOG(L_ERR, "ERROR: tcp_receive: handle_io: read_fd:"
+									"no fd read\n");
 				goto con_error;
 			}
 			con->reader_pid=my_pid();
 			if (unlikely(con==tcp_conn_lst)){
-				LM_CRIT("duplicate connection received: %p, id %d, fd %d, refcnt %d"
+				LOG(L_CRIT, "BUG: tcp_receive: handle_io: duplicate"
+							" connection received: %p, id %d, fd %d, refcnt %d"
 							" state %d (n=%d)\n", con, con->id, con->fd,
 							atomic_get(&con->refcnt), con->state, n);
 				goto con_error;
 				break; /* try to recover */
 			}
 			if (unlikely(con->state==S_CONN_BAD)){
-				LM_WARN("received an already bad connection: %p id %d refcnt %d\n",
+				LOG(L_WARN, "WARNING: tcp_receive: handle_io: received an"
+							" already bad connection: %p id %d refcnt %d\n",
 							con, con->id, atomic_get(&con->refcnt));
 				goto con_error;
 			}
@@ -1577,7 +1584,8 @@ repeat_1st_read:
 			local_timer_add(&tcp_reader_ltimer, &con->timer,
 								S_TO_TICKS(TCP_CHILD_TIMEOUT), t);
 			if (unlikely(io_watch_add(&io_w, s, POLLIN, F_TCPCONN, con)<0)){
-				LM_CRIT("io_watch_add failed for %p id %d fd %d, state %d, flags %x,"
+				LOG(L_CRIT, "ERROR: tcpconn_receive: handle_io: io_watch_add "
+							"failed for %p id %d fd %d, state %d, flags %x,"
 							" main fd %d, refcnt %d\n",
 							con, con->id, con->fd, con->state, con->flags,
 							con->s, atomic_get(&con->refcnt));
@@ -1591,7 +1599,8 @@ repeat_1st_read:
 			if (unlikely(con->state==S_CONN_BAD)){
 				resp=CONN_ERROR;
 				if (!(con->send_flags.f & SND_F_CON_CLOSE))
-					LM_WARN("F_TCPCONN connection marked as bad: %p id %d refcnt %d\n",
+					LOG(L_WARN, "WARNING: tcp_receive: handle_io: F_TCPCONN"
+							" connection marked as bad: %p id %d refcnt %d\n",
 							con, con->id, atomic_get(&con->refcnt));
 				goto read_error;
 			}
@@ -1611,7 +1620,8 @@ read_error:
 				ret=-1; /* some error occured */
 				if (unlikely(io_watch_del(&io_w, con->fd, idx,
 											IO_FD_CLOSING) < 0)){
-					LM_CRIT("io_watch_del failed for %p id %d fd %d,"
+					LOG(L_CRIT, "ERROR: tcpconn_receive: handle_io: "
+							"io_watch_del failed for %p id %d fd %d,"
 							" state %d, flags %x, main fd %d, refcnt %d\n",
 							con, con->id, con->fd, con->state,
 							con->flags, con->s, atomic_get(&con->refcnt));
@@ -1635,12 +1645,12 @@ read_error:
 			}
 			break;
 		case F_NONE:
-			LM_CRIT("empty fd map %p (%d): {%d, %d, %p}\n",
-						fm, (int)(fm-io_w.fd_hash),
+			LOG(L_CRIT, "BUG: handle_io: empty fd map %p (%d): "
+						"{%d, %d, %p}\n", fm, (int)(fm-io_w.fd_hash),
 						fm->fd, fm->type, fm->data);
 			goto error;
 		default:
-			LM_CRIT("uknown fd type %d\n", fm->type); 
+			LOG(L_CRIT, "BUG: handle_io: uknown fd type %d\n", fm->type); 
 			goto error;
 	}
 	
@@ -1680,7 +1690,8 @@ void tcp_receive_loop(int unix_sock)
 		goto error;
 	/* add the unix socket */
 	if (io_watch_add(&io_w, tcpmain_sock, POLLIN,  F_TCPMAIN, 0)<0){
-		LM_CRIT("failed to add socket to the fd list\n");
+		LOG(L_CRIT, "ERROR: tcp_receive_loop: init: failed to add socket "
+							" to the fd list\n");
 		goto error;
 	}
 
@@ -1742,13 +1753,14 @@ void tcp_receive_loop(int unix_sock)
 			break;
 #endif
 		default:
-			LM_CRIT("no support for poll method %s (%d)\n", 
+			LOG(L_CRIT, "BUG: tcp_receive_loop: no support for poll method "
+					" %s (%d)\n", 
 					poll_method_name(io_w.poll_method), io_w.poll_method);
 			goto error;
 	}
 error:
 	destroy_io_wait(&io_w);
-	LM_CRIT("exiting...");
+	LOG(L_CRIT, "ERROR: tcp_receive_loop: exiting...");
 	exit(-1);
 }
 

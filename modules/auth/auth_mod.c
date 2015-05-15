@@ -24,7 +24,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -772,7 +772,7 @@ static int pv_auth_check(sip_msg_t *msg, char *realm,
 		ret = pv_authenticate(msg, &srealm, &spasswd, vflags, HDR_PROXYAUTH_T,
 					&msg->first_line.u.request.method);
 
-	if(ret==AUTH_OK && (vflags&AUTH_CHECK_ID_F)) {
+	if(ret==AUTH_OK && (vchecks&AUTH_CHECK_ID_F)) {
 		hdr = (msg->proxy_auth==0)?msg->authorization:msg->proxy_auth;
 		srealm = ((auth_body_t*)(hdr->parsed))->digest.username.user;
 

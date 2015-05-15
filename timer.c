@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /* History:
  * --------
@@ -235,23 +235,24 @@ int init_timer()
 	timer_lst=shm_malloc(sizeof(struct timer_lists));
 #else
 	/* in this case get_ticks won't work! */
-	LM_WARN("no shared memory support compiled in get_ticks won't work\n");
+	LOG(L_INFO, "WARNING: no shared memory support compiled in"
+				" get_ticks won't work\n");
 	ticks=pkg_malloc(sizeof(ticks_t));
 	timer_lst=pkg_malloc(sizeof(struct timer_lists));
 #endif
 	if (ticks==0){
-		LM_CRIT("out of shared memory (ticks)\n");
+		LOG(L_CRIT, "ERROR: init_timer: out of shared memory (ticks)\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
 	if (timer_lst==0){
-		LM_CRIT("out of shared memory (timer_lst)\n");
+		LOG(L_CRIT, "ERROR: init_timer: out of shared memory (timer_lst)\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
 	running_timer=shm_malloc(sizeof(struct timer_ln*));
 	if (running_timer==0){
-		LM_CRIT("out of memory (running_timer)\n");
+		LOG(L_CRIT, "ERROR: init_timer: out of memory (running_timer)\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -262,7 +263,8 @@ int init_timer()
 	prev_ticks=last_ticks=last_adj_check=*ticks;
 	*running_timer=0;
 	if (gettimeofday(&start_time, 0)<0){
-		LM_ERR("gettimeofday failed: %s [%d]\n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: init_timer: gettimeofday failed: %s [%d]\n",
+				strerror(errno), errno);
 		ret=-1;
 		goto error;
 	}
@@ -297,7 +299,7 @@ int init_timer()
 	slow_timer_lists=shm_malloc(sizeof(struct timer_head)*SLOW_LISTS_NO);
 	running_timer2=shm_malloc(sizeof(struct timer_ln*));
 	if ((t_idx==0)||(s_idx==0) || (slow_timer_lists==0) ||(running_timer2==0)){
-		LM_ERR("out of shared memory (slow)\n");
+		LOG(L_ERR, "ERROR: init_timer: out of shared memory (slow)\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -331,7 +333,8 @@ int arm_slow_timer()
 again:
 	if (sigprocmask(SIG_BLOCK, &slow_timer_sset, 0)==-1){
 		if (errno==EINTR) goto again;
-		LM_ERR("sigprocmask failed: %s [%d]}n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: arm_slow_timer: sigprocmask failed: %s [%d]}n",
+				strerror(errno), errno);
 		goto error;
 	}
 #ifdef __OS_darwin
@@ -371,16 +374,18 @@ int arm_timer()
 	it.it_value=it.it_interval;
 	/* install the signal handler */
 	if (set_sig_h(SIGALRM, sig_timer) == SIG_ERR ){
-		LM_CRIT("SIGALRM signal handler cannot be installed: %s [%d]\n",
-					strerror(errno), errno);
+		LOG(L_CRIT, "ERROR: init_timer: the SIGALRM signal handler cannot"
+					" be installed: %s [%d]\n", strerror(errno), errno);
 		return -1;
 	}
 	if (setitimer(ITIMER_REAL, &it, 0) == -1){
-		LM_CRIT("setitimer failed: %s [%d]\n", strerror(errno), errno);
+		LOG(L_CRIT, "ERROR: init_timer: setitimer failed: %s [%d]\n",
+					strerror(errno), errno);
 		return -1;
 	}
 	if (gettimeofday(&last_time, 0)<0){
-		LM_ERR("gettimeofday failed: %s [%d]\n", strerror(errno), errno);
+		LOG(L_ERR, "ERROR: arm_timer: gettimeofday failed: %s [%d]\n",
+				strerror(errno), errno);
 		return -1;
 	}
 	/* initialize the config framework */
@@ -421,13 +426,14 @@ inline static void adjust_ticks(void)
 #endif /* DBG_ser_time */
 		last_adj_check=*ticks;
 		if (gettimeofday(&crt_time, 0)<0){
-			LM_ERR("gettimeofday failed: %s [%d]\n", strerror(errno), errno);
+			LOG(L_ERR, "ERROR: adjust_ticks: gettimeofday failed: %s [%d]\n",
+				strerror(errno), errno);
 			return; /* ignore */
 		}
 		diff_time=(long long)crt_time.tv_sec*1000000+crt_time.tv_usec-
 					((long long) last_time.tv_sec*1000000+last_time.tv_usec);
 		if (diff_time<0){
-			LM_WARN("time changed backwards %ld ms ignoring...\n",
+			LOG(L_WARN, "WARNING: time changed backwards %ld ms ignoring...\n",
 						(long)(diff_time/1000));
 			last_time=crt_time;
 			last_ticks=*ticks;
@@ -436,7 +442,7 @@ inline static void adjust_ticks(void)
 			diff_time_ticks=(ticks_t)((diff_time*TIMER_TICKS_HZ)/1000000LL);
 			delta=(s_ticks_t)(diff_time_ticks-diff_ticks_raw);
 			if (delta<-1){
-				LM_WARN("our timer runs faster then real-time"
+				LOG(L_WARN, "WARNING: our timer runs faster then real-time"
 						" (%lu ms / %u ticks our time .->"
 						 " %lu ms / %u ticks real time)\n", 
 						(unsigned long)(diff_ticks_raw*1000L/TIMER_TICKS_HZ),
@@ -593,7 +599,7 @@ int timer_add_safe(struct timer_ln* tl, ticks_t delta)
 	}
 	tl->initial_timeout=delta;
 	if ((tl->next!=0) || (tl->prev!=0)){
-		LM_CRIT("timer_add: called with linked timer: %p (%p, %p)\n",
+		LOG(L_CRIT, "BUG: timer_add: called with linked timer: %p (%p, %p)\n",
 				tl, tl->next, tl->prev);
 		ret=-1;
 		goto error;
@@ -662,7 +668,7 @@ again:
 				if (IS_IN_TIMER_SLOW()){
 					/* if somebody tries to shoot himself in the foot,
 					 * warn him and ignore the delete */
-					LM_CRIT("timer handle %p (s) tried to delete"
+					LOG(L_CRIT, "BUG: timer handle %p (s) tried to delete"
 							" itself\n", tl);
 #ifdef TIMER_DEBUG
 					LOG(timerlog, "WARN: -timer_del-: called from %s(%s):%d\n",
@@ -732,7 +738,7 @@ again:
 				if (IS_IN_TIMER()){
 					/* if somebody tries to shoot himself in the foot,
 					 * warn him and ignore the delete */
-					LM_CRIT("timer handle %p tried to delete"
+					LOG(L_CRIT, "BUG: timer handle %p tried to delete"
 							" itself\n", tl);
 #ifdef TIMER_DEBUG
 					LOG(timerlog, "WARN: -timer_del-: called from %s(%s):%d\n",
@@ -819,7 +825,7 @@ void timer_allow_del(void)
 			UNSET_RUNNING_SLOW();
 	}else 
 #endif
-		LM_CRIT("timer_allow_del called outside a timer handle\n");
+		LOG(L_CRIT, "BUG: timer_allow_del called outside a timer handle\n");
 }
 
 
@@ -850,19 +856,19 @@ inline static void timer_list_expire(ticks_t t, struct timer_head* h
 		tl=h->next;
 #ifdef TIMER_DEBUG /* FIXME: replace w/ EXTRA_DEBUG */
 		if (tl==0){
-			LM_CRIT("timer_list_expire: tl=%p, h=%p {%p, %p}\n",
+			LOG(L_CRIT, "BUG: timer_list_expire: tl=%p, h=%p {%p, %p}\n",
 					tl, h, h->next, h->prev);
 			abort();
 		}else if((tl->next==0) || (tl->prev==0)){
-			LM_CRIT("timer_list_expire: @%d tl=%p "
+			LOG(L_CRIT, "BUG: timer_list_expire: @%d tl=%p "
 					"{ %p, %p, %d, %d, %p, %p, %04x, -},"
 					" h=%p {%p, %p}\n", t, 
 					tl,  tl->next, tl->prev, tl->expire, tl->initial_timeout,
 					tl->data, tl->f, tl->flags, 
 					h, h->next, h->prev);
-			LM_CRIT("-timer_list_expire-: cycle %d, first %p,"
+			LOG(L_CRIT, "BUG: -timer_list_expire-: cycle %d, first %p,"
 						"running %p\n", i, first, *running_timer);
-			LM_CRIT("-timer_list_expire-: added %d times"
+			LOG(L_CRIT, "BUG: -timer_list_expire-: added %d times"
 						", last from: %s(%s):%d, deleted %d times"
 						", last from: %s(%s):%d, init %d times, expired %d \n",
 						tl->add_calls,
@@ -938,7 +944,7 @@ static void timer_handler(void)
 	do{
 		saved_ticks=*ticks; /* protect against time running backwards */
 		if (prev_ticks>=saved_ticks){
-			LM_CRIT("backwards or still time\n");
+			LOG(L_CRIT, "BUG: timer_handler: backwards or still time\n");
 			/* try to continue */
 			prev_ticks=saved_ticks-1;
 			break;
@@ -964,7 +970,7 @@ static void timer_handler(void)
 		if ((slow_idx_t)(*t_idx-*s_idx) < (SLOW_LISTS_NO-1U))
 			(*t_idx)++;
 		else{
-			LM_WARN("slow timer too slow: overflow (%d - %d = %d)\n",
+			LOG(L_WARN, "slow timer too slow: overflow (%d - %d = %d)\n",
 					*t_idx, *s_idx, *t_idx-*s_idx);
 			/* trying to continue */
 		}
@@ -1025,7 +1031,7 @@ int register_timer(timer_function f, void* param, unsigned int interval)
 
 	t=shm_malloc(sizeof(struct sr_timer));
 	if (t==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: register_timer: out of memory\n");
 		goto error;
 	}
 	t->id=timer_id++;
@@ -1034,7 +1040,7 @@ int register_timer(timer_function f, void* param, unsigned int interval)
 	
 	timer_init(&t->tl, compat_old_handler, t, 0); /* is slow */
 	if (timer_add(&t->tl, S_TO_TICKS(interval))!=0){
-		LM_ERR("timer_add failed\n");
+		LOG(L_ERR, "ERROR: register_timer: timer_add failed\n");
 		return -1;
 	}
 	
@@ -1049,7 +1055,7 @@ error:
 ticks_t get_ticks_raw()
 {
 #ifndef SHM_MEM
-	LM_CRIT("no shared memory support compiled in"
+	LOG(L_CRIT, "WARNING: get_ticks: no shared memory support compiled in"
 			", returning 0 (probably wrong)");
 	return 0;
 #endif
@@ -1062,7 +1068,7 @@ ticks_t get_ticks_raw()
 ticks_t get_ticks()
 {
 #ifndef SHM_MEM
-	LM_CRIT("no shared memory support compiled in"
+	LOG(L_CRIT, "WARNING: get_ticks: no shared memory support compiled in"
 			", returning 0 (probably wrong)");
 	return 0;
 #endif
@@ -1077,8 +1083,7 @@ ticks_t get_ticks()
  * This function is intended to be executed in a special separated process
  * (the "slow" timer) which will run the timer handlers of all the registered
  * timers not marked as "fast". The ideea is to execute the fast timers in the
- * "main" timer process, as accurate as possible and defer the execution of the
- * timers marked as "slow" to the "slow" timer.
+ * "main" timer process, as accurate as possible and defer the execution of the  * timers marked as "slow" to the "slow" timer.
  * Implementation details:
  *  - it waits for a signal and then wakes up and processes
  *    all the lists in slow_timer_lists from [s_idx, t_idx). It will
@@ -1108,7 +1113,8 @@ void slow_timer_main()
 #endif
 		if (n==-1){
 			if (errno==EINTR) continue; /* some other signal, ignore it */
-			LM_ERR("sigwaitinfo failed: %s [%d]\n", strerror(errno), errno);
+			LOG(L_ERR, "ERROR: slow_timer_main: sigwaitinfo failed: %s [%d]\n",
+					strerror(errno), errno);
 			sleep(1);
 			/* try to continue */
 		}

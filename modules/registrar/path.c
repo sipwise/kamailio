@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 /*!
@@ -96,6 +96,8 @@ int build_path_vector(struct sip_msg *_m, str *path, str *received)
 				LM_ERR("failed to parse parameters of first hop\n");
 				goto error;
 			}
+			/* Not interested in param body - just the hooks */
+			free_params(params);
 
 			if (hooks.contact.received) {
 			        uri_str.s = uri_buf;
@@ -107,14 +109,6 @@ int build_path_vector(struct sip_msg *_m, str *path, str *received)
 				*received = uri_str;
 				LM_DBG("received is <%.*s>\n", received->len, received->s);
 			}
-				
-			/*for (;params; params = params->next) {
-				if (params->type == P_RECEIVED) {
-					*received = hooks.contact.received->body;
-					break;
-				}
-			}*/
-			free_params(params);
 		}
 		free_rr(&route);
 	}

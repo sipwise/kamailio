@@ -112,12 +112,10 @@ struct qm_frag_lnk{
  */
 
 struct qm_block{
-	int type; /* type of memory */
 	unsigned long size; /* total size */
 	unsigned long used; /* alloc'ed size*/
 	unsigned long real_used; /* used+malloc overhead*/
 	unsigned long max_real_used;
-	unsigned long ffrags;
 	
 	struct qm_frag* first_frag;
 	struct qm_frag_end* last_frag_end;
@@ -128,7 +126,7 @@ struct qm_block{
 
 
 
-struct qm_block* qm_malloc_init(char* address, unsigned long size, int type);
+struct qm_block* qm_malloc_init(char* address, unsigned long size);
 
 #ifdef DBG_QM_MALLOC
 void* qm_malloc(struct qm_block*, unsigned long size, const char* file,

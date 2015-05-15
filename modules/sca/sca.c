@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  *
  */
@@ -40,7 +40,7 @@
 MODULE_VERSION
 
 /* MODULE OBJECT */
-sca_mod			*sca;
+sca_mod			*sca = NULL;
 
 
 /* EXTERNAL API */
@@ -58,8 +58,6 @@ static int		sca_set_config( sca_mod * );
 static cmd_export_t	cmds[] = {
     { "sca_handle_subscribe", sca_handle_subscribe, 0, NULL, REQUEST_ROUTE },
     { "sca_call_info_update", sca_call_info_update, 0, NULL,
-	REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
-    { "sca_call_info_update", sca_call_info_update, 1, fixup_var_int_1,
 	REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
     { NULL, NULL, -1, 0, 0 },
 };
@@ -103,10 +101,10 @@ int			line_seize_max_expires = 15;
 int			purge_expired_interval = 120;
 
 static param_export_t	params[] = {
-    { "outbound_proxy",		PARAM_STR,	&outbound_proxy },
-    { "db_url",			PARAM_STR,	&db_url },
-    { "subs_table",		PARAM_STR,	&db_subs_table },
-    { "state_table",		PARAM_STR,	&db_state_table },
+    { "outbound_proxy",		STR_PARAM,	&outbound_proxy.s },
+    { "db_url",			STR_PARAM,	&db_url.s },
+    { "subs_table",		STR_PARAM,	&db_subs_table.s },
+    { "state_table",		STR_PARAM,	&db_state_table.s },
     { "db_update_interval",	INT_PARAM,	&db_update_interval },
     { "hash_table_size",	INT_PARAM,	&hash_table_size },
     { "call_info_max_expires",	INT_PARAM,	&call_info_max_expires },
@@ -210,27 +208,32 @@ sca_set_config( sca_mod *scam )
 	LM_ERR( "Failed to shm_malloc module configuration" );
 	return( -1 );
     }
+    memset(scam->cfg, 0, sizeof( sca_config ));
 
     if ( outbound_proxy.s ) {
+	outbound_proxy.len = strlen( outbound_proxy.s );
 	scam->cfg->outbound_proxy = &outbound_proxy;
     }
 
-    if ( !db_url.s || db_url.len<=0 ) {
+    if ( db_url.s == NULL ) {
 	LM_ERR( "sca_set_config: db_url must be set!" );
 	return( -1 );
     }
+    db_url.len = strlen( db_url.s );
     scam->cfg->db_url = &db_url;
 
-    if ( !db_subs_table.s || db_subs_table.len<=0 ) {
+    if ( db_subs_table.s == NULL ) {
 	LM_ERR( "sca_set_config: subs_table must be set!" );
 	return( -1 );
     }
+    db_subs_table.len = strlen( db_subs_table.s );
     scam->cfg->subs_table = &db_subs_table;
 
-    if ( !db_state_table.s || db_state_table.len<=0 ) {
+    if ( db_state_table.s == NULL ) {
 	LM_ERR( "sca_set_config: state_table must be set!" );
 	return( -1 );
     }
+    db_state_table.len = strlen( db_state_table.s );
     scam->cfg->state_table = &db_state_table;
 
     if ( hash_table_size > 0 ) {
@@ -293,23 +296,23 @@ sca_mod_init( void )
 
     if ( rpc_register_array( sca_rpc ) != 0 ) {
 	LM_ERR( "Failed to register RPC commands" );
-	return( -1 );
+	goto error;
     }
 
     if ( sca_bind_srdb1( sca, &dbf ) != 0 ) {
 	LM_ERR( "Failed to initialize required DB API" );
-	return( -1 );
+	goto error;
     }
 
     if ( load_tm_api( &tmb ) != 0 ) {
 	LM_ERR( "Failed to initialize required tm API" );
-	return( -1 );
+	goto error;
     }
     sca->tm_api = &tmb;
 
     if ( sca_bind_sl( sca, &slb ) != 0 ) {
 	LM_ERR( "Failed to initialize required sl API" );
-	return( -1 );
+	goto error;
     }
     
     if ( sca_hash_table_create( &sca->subscriptions,
@@ -363,10 +366,15 @@ error:
     void
 sca_mod_destroy( void )
 {
+	if(sca==0)
+		return;
+
     /* write back to the DB to retain most current subscription info */
     if ( sca_subscription_db_update() != 0 ) {
-	LM_ERR( "sca_mod_destroy: failed to save current subscriptions "
-		"in DB %.*s", STR_FMT( sca->cfg->db_url ));
+		if(sca && sca->cfg && sca->cfg->db_url) {
+			LM_ERR( "sca_mod_destroy: failed to save current subscriptions "
+				"in DB %.*s", STR_FMT( sca->cfg->db_url ));
+		}
     }
 
     sca_db_disconnect();

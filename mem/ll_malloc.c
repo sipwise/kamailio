@@ -356,7 +356,7 @@ void sfm_split_frag(struct sfm_block* qm, struct sfm_frag* frag,
 
 
 /* init malloc and return a sfm_block*/
-struct sfm_block* sfm_malloc_init(char* address, unsigned long size, int type)
+struct sfm_block* sfm_malloc_init(char* address, unsigned long size)
 {
 	char* start;
 	char* end;
@@ -392,7 +392,6 @@ struct sfm_block* sfm_malloc_init(char* address, unsigned long size, int type)
 	qm=(struct sfm_block*)start;
 	memset(qm, 0, sizeof(struct sfm_block));
 	qm->size=size;
-	qm->type = type;
 	size-=init_overhead;
 	
 	qm->first_frag=(struct sfm_frag*)(start+ROUNDUP(sizeof(struct sfm_block)));

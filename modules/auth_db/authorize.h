@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -51,10 +51,13 @@ int www_authenticate2(struct sip_msg* _msg, char* _realm, char* _table, char *_m
  */
 int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags);
 
+
+#define AUTH_DB_SUBS_USE_DOMAIN	1<<0
+#define AUTH_DB_SUBS_SKIP_CREDENTIALS	1<<1
 /*
  * Fetch credentials for a specific user
  */
-int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table);
+int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table, int flags);
 
 /*
  * Bind to AUTH_DB API

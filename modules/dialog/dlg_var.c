@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 		       
 #include "../../route.h"
@@ -69,6 +69,21 @@ int dlg_cfg_cb(sip_msg_t *msg, unsigned int flags, void *cbp)
 	return 1;
 }
 
+int cb_dlg_cfg_reset(sip_msg_t *msg, unsigned int flags, void *cbp)
+{
+	memset(&_dlg_ctx, 0, sizeof(dlg_ctx_t));
+
+	return 1;
+}
+
+int cb_dlg_locals_reset(sip_msg_t *msg, unsigned int flags, void *cbp)
+{
+	LM_DBG("resetting the local dialog shortcuts on script callback: %u\n", flags);
+	cb_dlg_cfg_reset(msg, flags, cbp);
+	cb_profile_reset(msg, flags, cbp);
+
+	return 1;
+}
 
 static inline struct dlg_var *new_dlg_var(str *key, str *val)
 {
@@ -83,14 +98,13 @@ static inline struct dlg_var *new_dlg_var(str *key, str *val)
 	var->vflags = DLG_FLAG_NEW;
 	/* set key */
 	var->key.len = key->len;
-	var->key.s = (char*)shm_malloc(var->key.len+1);
+	var->key.s = (char*)shm_malloc(var->key.len);
 	if (var->key.s==NULL) {
 		shm_free(var);			
 		LM_ERR("no more shm mem\n");
 		return NULL;
 	}
 	memcpy(var->key.s, key->s, key->len);
-	var->key.s[var->key.len] = '\0';
 	/* set value */
 	var->value.len = val->len;
 	var->value.s = (char*)shm_malloc(var->value.len);
