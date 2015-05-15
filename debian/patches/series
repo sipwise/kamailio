@@ -18,7 +18,6 @@ upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
 # 4.1 upstream fixes
 upstream/0001-exec-safety-check-against-bash-vulnerability-CVE-201.patch
 upstream/0002-exec-add-parameter-to-control-the-option-for-bash-ex.patch
-upstream/0003-dialog-check-if-the-transaction-is-created-for-BYE-c.patch
 upstream/0004-dialog-set-again-the-dialog-ids-in-context-for-BYE-p.patch
 upstream/0005-dialog-fixed-typo-copy-paste-oversight-to-dlg-pointe.patch
 upstream/0006-core-helper-functions-to-get-addr-and-port-to-be-use.patch
