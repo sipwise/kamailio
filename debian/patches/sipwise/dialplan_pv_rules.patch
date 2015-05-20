@@ -1,8 +1,9 @@
-From f771ee9d5b0bdcefa78683c09b10b631da145f68 Mon Sep 17 00:00:00 2001
+From 65bb8e9ee21b81d8b09f58f5a768f94fcc0ee92d Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Mon, 12 May 2014 15:42:48 +0200
 Subject: [PATCH] dialplan: pv in match and subst
 
+Gbp-Pq-Topic: sipwise
 ---
  modules/dialplan/dialplan.c |   5 +
  modules/dialplan/dialplan.h |  37 +++-
@@ -11,9 +12,11 @@ Subject: [PATCH] dialplan: pv in match and subst
  modules/dialplan/dp_repl.c  | 189 +++++++++++++++++++-
  5 files changed, 622 insertions(+), 36 deletions(-)
 
+diff --git a/modules/dialplan/dialplan.c b/modules/dialplan/dialplan.c
+index 07c3271..0ee0e24 100644
 --- a/modules/dialplan/dialplan.c
 +++ b/modules/dialplan/dialplan.c
-@@ -207,6 +207,11 @@
+@@ -207,6 +207,11 @@ static int mod_init(void)
  
  static int child_init(int rank)
  {
@@ -25,6 +28,8 @@ Subject: [PATCH] dialplan: pv in match and subst
  	return 0;
  }
  
+diff --git a/modules/dialplan/dialplan.h b/modules/dialplan/dialplan.h
+index fd3319e..b506853 100644
 --- a/modules/dialplan/dialplan.h
 +++ b/modules/dialplan/dialplan.h
 @@ -44,6 +44,15 @@
@@ -43,7 +48,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  #define MAX_REPLACE_WITH	10
  
  typedef struct dpl_node{
-@@ -55,6 +64,7 @@
+@@ -55,6 +64,7 @@ typedef struct dpl_node{
  	pcre *match_comp, *subst_comp; /*compiled patterns*/
  	struct subst_expr * repl_comp; 
  	str attrs;
@@ -51,7 +56,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  	struct dpl_node * next; /*next rule*/
  }dpl_node_t, *dpl_node_p;
-@@ -75,6 +85,30 @@
+@@ -75,6 +85,30 @@ typedef struct dpl_id{
  	struct dpl_id * next;
  }dpl_id_t,*dpl_id_p;
  
@@ -82,7 +87,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  #define DP_VAL_INT		0
  #define DP_VAL_SPEC		1
-@@ -92,9 +126,10 @@
+@@ -92,9 +126,10 @@ void destroy_data();
  int dp_load_db();
  
  dpl_id_p select_dpid(int id);
@@ -94,9 +99,11 @@ Subject: [PATCH] dialplan: pv in match and subst
 -int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule,  str *);
 +int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule, dpl_pv_node_t * rule_pv, str *);
  #endif
+diff --git a/modules/dialplan/dp_db.c b/modules/dialplan/dp_db.c
+index 70d37a3..d129748 100644
 --- a/modules/dialplan/dp_db.c
 +++ b/modules/dialplan/dp_db.c
-@@ -70,6 +70,9 @@
+@@ -70,6 +70,9 @@ static db_func_t dp_dbf;
  		(_res).len = strlen(VAL_STR((_values)+ (_index)).s);\
  	}while(0);
  
@@ -106,7 +113,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  void destroy_rule(dpl_node_t * rule);
  void destroy_hash(int);
  
-@@ -78,12 +81,16 @@
+@@ -78,12 +81,16 @@ int add_rule2hash(dpl_node_t *, int);
  
  void list_rule(dpl_node_t * );
  void list_hash(int h_index);
@@ -125,7 +132,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  int init_db_data(void)
  {
-@@ -163,14 +170,15 @@
+@@ -163,14 +170,15 @@ int init_data(void)
  	}
  	rules_hash[0] = rules_hash[1] = 0;
  
@@ -143,7 +150,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  	LM_DBG("trying to initialize data from db\n");
  	if(init_db_data() != 0)
-@@ -193,6 +201,23 @@
+@@ -193,6 +201,23 @@ void destroy_data(void)
  		shm_free(crt_idx);
  }
  
@@ -167,7 +174,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  /*load rules from DB*/
  int dp_load_db(void)
-@@ -283,6 +308,8 @@
+@@ -283,6 +308,8 @@ end:
  	*crt_idx = *next_idx;
  	list_hash(*crt_idx);
  	dp_dbf.free_result(dp_db_handle, res);
@@ -176,7 +183,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  	return 0;
  
  err2:
-@@ -352,6 +379,84 @@
+@@ -352,6 +379,84 @@ static pcre *reg_ex_comp(const char *pattern, int *cap_cnt)
  	return result;
  }
  
@@ -261,7 +268,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  /*compile the expressions, and if ok, build the rule */
  dpl_node_t * build_rule(db_val_t * values)
-@@ -359,9 +464,10 @@
+@@ -359,9 +464,10 @@ dpl_node_t * build_rule(db_val_t * values)
  	pcre *match_comp, *subst_comp;
  	struct subst_expr *repl_comp;
  	dpl_node_t * new_rule;
@@ -273,7 +280,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  	matchop = VAL_INT(values+2);
  
-@@ -377,11 +483,21 @@
+@@ -377,11 +483,21 @@ dpl_node_t * build_rule(db_val_t * values)
  
  	GET_STR_VALUE(match_exp, values, 3);
  	if(matchop == DP_REGEX_OP){
@@ -300,7 +307,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  		}
  	}
  
-@@ -398,26 +514,38 @@
+@@ -397,29 +513,41 @@ dpl_node_t * build_rule(db_val_t * values)
  
  	GET_STR_VALUE(subst_exp, values, 5);
  	if(subst_exp.s && subst_exp.len){
@@ -336,6 +343,9 @@ Subject: [PATCH] dialplan: pv in match and subst
  		}
  	}
  
+ 	LM_DBG("building rule for [%d:%.*s/%.*s/%.*s]\n", matchop,
+ 			match_exp.len, ZSW(match_exp.s), subst_exp.len, ZSW(subst_exp.s),
+ 			repl_exp.len, ZSW(repl_exp.s));
 -	if (repl_comp && (cap_cnt < repl_comp->max_pmatch) && 
 -			(repl_comp->max_pmatch != 0)) {
 -		LM_ERR("repl_exp %.*s refers to %d sub-expressions, but "
@@ -355,7 +365,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  	}
  
  	new_rule = (dpl_node_t *)shm_malloc(sizeof(dpl_node_t));
-@@ -450,6 +578,7 @@
+@@ -452,6 +580,7 @@ dpl_node_t * build_rule(db_val_t * values)
  	new_rule->match_comp = match_comp;
  	new_rule->subst_comp = subst_comp;
  	new_rule->repl_comp  = repl_comp;
@@ -363,7 +373,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  	return new_rule;
  
-@@ -550,6 +679,85 @@
+@@ -552,6 +681,85 @@ err:
  	return -1;
  }
  
@@ -449,7 +459,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  void destroy_hash(int index)
  {
-@@ -589,6 +797,114 @@
+@@ -591,6 +799,114 @@ void destroy_hash(int index)
  	rules_hash[index] = 0;
  }
  
@@ -564,7 +574,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  void destroy_rule(dpl_node_t * rule){
  
-@@ -619,6 +935,8 @@
+@@ -621,6 +937,8 @@ void destroy_rule(dpl_node_t * rule){
  
  	if(rule->attrs.s)
  		shm_free(rule->attrs.s);
@@ -573,7 +583,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  }
  
  
-@@ -636,6 +954,25 @@
+@@ -638,6 +956,25 @@ dpl_id_p select_dpid(int id)
  	return NULL;
  }
  
@@ -599,7 +609,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  /*FOR DEBUG PURPOSE*/
  void list_hash(int h_index)
-@@ -672,3 +1009,40 @@
+@@ -674,3 +1011,40 @@ void list_rule(dpl_node_t * rule)
  			rule->attrs.len,	rule->attrs.s);
  
  }
@@ -640,9 +650,11 @@ Subject: [PATCH] dialplan: pv in match and subst
 +	if(flag&DP_PV_MASK) LM_DBG("DP_PV_MASK\n");
 +	LM_DBG("--pv_flags:%d\n", flag);
 +}
+diff --git a/modules/dialplan/dp_db.h b/modules/dialplan/dp_db.h
+index 0078354..9130718 100644
 --- a/modules/dialplan/dp_db.h
 +++ b/modules/dialplan/dp_db.h
-@@ -63,6 +63,7 @@
+@@ -63,6 +63,7 @@ extern str repl_exp_column;
  extern str attrs_column; 
  
  int init_db_data();
@@ -650,9 +662,11 @@ Subject: [PATCH] dialplan: pv in match and subst
  int dp_connect_db();
  void dp_disconnect_db();
  
+diff --git a/modules/dialplan/dp_repl.c b/modules/dialplan/dp_repl.c
+index ec2e5bb..2a53be4 100644
 --- a/modules/dialplan/dp_repl.c
 +++ b/modules/dialplan/dp_repl.c
-@@ -127,13 +127,14 @@
+@@ -127,13 +127,14 @@ error:
  #define MAX_PHONE_NB_DIGITS		127
  static char dp_output_buf[MAX_PHONE_NB_DIGITS+1];
  int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
@@ -668,7 +682,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  	pv_value_t sv;
  	str* uri;
  	int ovector[3 * (MAX_REPLACE_WITH + 1)];
-@@ -144,7 +145,25 @@
+@@ -144,7 +145,25 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
  	result->s = dp_output_buf;
  	result->len = 0;
  
@@ -695,7 +709,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  	repl_comp 	= rule->repl_comp;
  
  	if(!repl_comp){
-@@ -168,13 +187,13 @@
+@@ -168,13 +187,13 @@ int rule_translate(struct sip_msg *msg, str string, dpl_node_t * rule,
  		}
  
  		/*search for the pattern from the compiled subst_exp*/
@@ -712,7 +726,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  			return -1;
  		}
  	}
-@@ -308,13 +327,141 @@
+@@ -308,13 +327,141 @@ error:
  	return -1;
  }
  
@@ -854,7 +868,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  	int user_len, rez;
  	char b;
  
-@@ -339,7 +486,27 @@
+@@ -339,7 +486,27 @@ search_rule:
  
  			case DP_REGEX_OP:
  				LM_DBG("regex operator testing\n");
@@ -883,7 +897,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  						0, 0, NULL, 0);
  				break;
  
-@@ -382,8 +549,9 @@
+@@ -382,8 +549,9 @@ search_rule:
  	return -1;
  
  repl:
@@ -895,7 +909,7 @@ Subject: [PATCH] dialplan: pv in match and subst
  
  	if(attrs) {
  		attrs->len = 0;
-@@ -405,7 +573,10 @@
+@@ -405,7 +573,10 @@ repl:
  		}
  	}
  
@@ -907,3 +921,6 @@ Subject: [PATCH] dialplan: pv in match and subst
  		LM_ERR("could not build the output\n");
  		return -1;
  	}
+-- 
+2.1.4
+
