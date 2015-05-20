@@ -16,7 +16,9 @@ upstream/0006-textops-fix-append_body_part.patch
 upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
 upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
 # 4.1 upstream fixes
-#
+upstream/0001-sqlops-fix-column-index-for-sqlops_is_null.patch
+upstream/0002-sqlops-fix-use-after-free-by-deep-copying-result-nam.patch
+upstream/0003-modules-nathelper-don-t-include-enclosing-bracket-in.patch
 # fixes from master that are not in 4.2
 upstream/0012-tm-handle-BRANCH_FAILURE_ROUTE-in-t_check_trans-test.patch
 #

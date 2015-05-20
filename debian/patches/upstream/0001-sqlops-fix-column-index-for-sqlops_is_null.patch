@@ -1,0 +1,29 @@
+From 0c8419e3ef8137b443978195f0dfd975578afcff Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 18 Mar 2015 18:36:37 +0100
+Subject: [PATCH] sqlops: fix column index for sqlops_is_null()
+
+- report and patch by Mihaly Zachar
+
+(cherry picked from commit 768dc8b566e2af04411570ef7b4d55a210a1927d)
+(cherry picked from commit 6614c8e78ac9cb5add92aff0db2d3a24dbc65423)
+---
+ modules/sqlops/sql_api.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/sqlops/sql_api.c b/modules/sqlops/sql_api.c
+index bbf86c8..2781069 100644
+--- a/modules/sqlops/sql_api.c
++++ b/modules/sqlops/sql_api.c
+@@ -743,7 +743,7 @@ int sqlops_is_null(str *sres, int i, int j)
+ 		LM_ERR("row index out of bounds [%d/%d]\n", i, res->nrows);
+ 		goto error;
+ 	}
+-	if(i>=res->ncols)
++	if(j>=res->ncols)
+ 	{
+ 		LM_ERR("column index out of bounds [%d/%d]\n", j, res->ncols);
+ 		goto error;
+-- 
+2.1.4
+
