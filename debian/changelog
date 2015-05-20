@@ -1,3 +1,14 @@
+ngcp-kamailio (4.1.8-1+0~mr4.0.0.0) unstable; urgency=medium
+
+  * [ccda56f] MT#12761 dialplan: skip rules with empty avp[*] value
+  * [740c17e] MT#12987 remove empty patch
+  * [5094558] Imported Upstream version 4.1.8
+  * [8f5a085] MT#12987 debian: remove 4.1 patches from upstream already merged
+  * [9deb226] MT#12987 debian: refresh conflicted patches
+  * [4c2fcff] MT#12987 debian: add 4.1 upstream patches after 4.1.8 release
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 20 May 2015 16:03:06 +0200
+
 ngcp-kamailio (4.1.6-1+0~mr4.0.0.0) unstable; urgency=low
 
   [ Michael Prokop ]
