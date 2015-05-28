@@ -336,6 +336,7 @@ int own_pgid = 0; /* whether or not we have our own pgid (and it's ok
 					 to use kill(0, sig) */
 
 char* mods_dir = MODS_DIR;  /* search path for dyn. loadable modules */
+int   mods_dir_cmd = 0; /* mods dir path set in command lin e*/
 
 char* cfg_file = 0;
 unsigned int maxbuffer = MAX_RECV_BUFFER_SIZE; /* maximum buffer size we do
@@ -1930,6 +1931,7 @@ int main(int argc, char** argv)
 					break;
 			case 'L':
 					mods_dir = optarg;
+					mods_dir_cmd = 1;
 					break;
 			case 'm':
 					shm_mem_size=strtol(optarg, &tmp, 10) * 1024 * 1024;
@@ -2484,6 +2486,23 @@ try_again:
 	if (real_time&4)
 			set_rt_prio(rt_prio, rt_policy);
 
+#ifdef USE_TCP
+#ifdef USE_TLS
+	if (!tls_disable){
+		if (!tls_loaded()){
+			LM_WARN("tls support enabled, but no tls engine "
+						" available (forgot to load the tls module?)\n");
+			LM_WARN("disabling tls...\n");
+			tls_disable=1;
+		} else {
+			if (pre_init_tls()<0){
+				LM_CRIT("could not pre-initialize tls, exiting...\n");
+				goto error;
+			}
+		}
+	}
+#endif /* USE_TLS */
+#endif /* USE_TCP */
 	
 	if (init_modules() != 0) {
 		fprintf(stderr, "ERROR: error while initializing modules\n");

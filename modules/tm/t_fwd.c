@@ -600,6 +600,15 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 		t->uac[branch].location_ua.s[i_req->location_ua.len]=0;
 		memcpy( t->uac[branch].location_ua.s, i_req->location_ua.s, i_req->location_ua.len);
 	}
+
+#ifdef TM_UAC_FLAGS
+	len = count_applied_lumps(i_req->add_rm, HDR_RECORDROUTE_T);
+	if(len==1)
+		t->uac[branch].flags = TM_UAC_FLAG_RR;
+	else if(len==2)
+		t->uac[branch].flags = TM_UAC_FLAG_RR|TM_UAC_FLAG_R2;
+#endif
+
 	ret=0;
 
 error01:
@@ -806,9 +815,6 @@ static int add_uac( struct cell *t, struct sip_msg *request, str *uri,
 
 	int ret;
 	unsigned short branch;
-#ifdef TM_UAC_FLAGS
-	unsigned int len;
-#endif /* TM_UAC_FLAGS */
 
 	branch=t->nr_of_outgoings;
 	if (branch==MAX_BRANCHES) {
@@ -851,13 +857,6 @@ static int add_uac( struct cell *t, struct sip_msg *request, str *uri,
 		ser_error=ret;
 		goto error01;
 	}
-#ifdef TM_UAC_FLAGS
-	len = count_applied_lumps(request->add_rm, HDR_RECORDROUTE_T);
-	if(len==1)
-		t->uac[branch].flags = TM_UAC_FLAG_RR;
-	else if(len==2)
-		t->uac[branch].flags = TM_UAC_FLAG_RR|TM_UAC_FLAG_R2;
-#endif
 	getbflagsval(0, &t->uac[branch].branch_flags);
 	membar_write(); /* to allow lockless ops (e.g. prepare_to_cancel()) we want
 					   to be sure everything above is fully written before
@@ -1605,7 +1604,7 @@ int t_send_branch( struct cell *t, int branch, struct sip_msg* p_msg ,
 		}
 #endif
 		uac->icode = 908; /* internal code set to delivery failure */
-		LOG(L_ERR, "ERROR: t_send_branch: sending request on branch %d "
+		LOG(L_WARN, "ERROR: t_send_branch: sending request on branch %d "
 				"failed\n", branch);
 		if (proxy) { proxy->errors++; proxy->ok=0; }
 		if(tm_failure_exec_mode==1) {
@@ -1664,11 +1663,10 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 	/* make -Wall happy */
 	current_uri.s=0;
 
-	if (t->flags & T_CANCELED){
-		DBG("t_forward_non_ack: no forwarding on a canceled transaction\n");
-		ser_error=E_CANCELED;
-		return -1;
-	}
+	getbflagsval(0, &backup_bflags);
+
+	if (t->flags & T_CANCELED) goto canceled;
+
 	if (p_msg->REQ_METHOD==METHOD_CANCEL) { 
 		t_invite=t_lookupOriginalT(  p_msg );
 		if (t_invite!=T_NULL_CELL) {
@@ -1680,8 +1678,6 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 			return 1;
 		}
 	}
-
-	getbflagsval(0, &backup_bflags);
 
 	/* if no more specific error code is known, use this */
 	lowest_ret=E_UNSPEC;
@@ -1723,6 +1719,8 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 							p_msg->fwd_send_flags, proto,
 							(p_msg->dst_uri.len)?0:UAC_SKIP_BR_DST_F, &p_msg->instance,
 							&p_msg->ruid, &p_msg->location_ua);
+		/* test if cancel was received meanwhile */
+		if (t->flags & T_CANCELED) goto canceled;
 		if (branch_ret>=0) 
 			added_branches |= 1<<branch_ret;
 		else
@@ -1740,6 +1738,8 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 							&path, proxy, si, p_msg->fwd_send_flags,
 							proto, (dst_uri.len)?0:UAC_SKIP_BR_DST_F, &instance,
 							&ruid, &location_ua);
+		/* test if cancel was received meanwhile */
+		if (t->flags & T_CANCELED) goto canceled;
 		/* pick some of the errors in case things go wrong;
 		   note that picking lowest error is just as good as
 		   any other algorithm which picks any other negative
@@ -1813,6 +1813,17 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 	ser_error=0; /* clear branch send errors, we have overall success */
 	set_kr(REQ_FWDED);
 	return 1;
+
+canceled:
+	DBG("t_forward_non_ack: no forwarding on a canceled transaction\n");
+	/* reset processed branches */
+	clear_branches();
+	/* restore backup flags from initial env */
+	setbflagsval(0, backup_bflags);
+	/* update message flags, if changed in branch route */
+	t->uas.request->flags = p_msg->flags;
+	ser_error=E_CANCELED;
+	return -1;
 }
 
 

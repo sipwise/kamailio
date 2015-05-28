@@ -692,7 +692,27 @@ static inline char* ip_addr2a(struct ip_addr* ip)
 	return buff;
 }
 
+/* full address in text representation, including [] for ipv6 */
+static inline char* ip_addr2strz(struct ip_addr* ip)
+{
 
+	static char buff[IP_ADDR_MAX_STR_SIZE+2];
+	char *p;
+	int len;
+
+	p = buff;
+	if(ip->af==AF_INET6) {
+		*p++ = '[';
+	}
+	len=ip_addr2sbuf(ip, p, sizeof(buff)-3);
+	p += len;
+	if(ip->af==AF_INET6) {
+		*p++ = ']';
+	}
+	*p=0;
+
+	return buff;
+}
 
 #define SU2A_MAX_STR_SIZE  (IP6_MAX_STR_SIZE + 2 /* [] */+\
 								1 /* : */ + USHORT2SBUF_MAX_LEN + 1 /* \0 */)
@@ -806,5 +826,7 @@ inline static void init_dst_from_rcv(struct dest_info* dst,
  * - return 0 on match, -1 otherwise
  */
 int ip_addr_match_net(ip_addr_t *iaddr, ip_addr_t *naddr, int mask);
+
+int si_get_signaling_data(struct socket_info *si, str **addr, str **port);
 
 #endif

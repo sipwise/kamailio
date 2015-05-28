@@ -599,7 +599,7 @@ static int _reply_light( struct cell *trans, char* buf, unsigned int len,
 	init_cancel_info(&cancel_data);
 	if (!buf)
 	{
-		DBG("DEBUG: _reply_light: response building failed\n");
+		LOG(L_ERR, "ERROR: _reply_light: response building failed\n");
 		/* determine if there are some branches to be canceled */
 		if ( is_invite(trans) ) {
 			prepare_to_cancel(trans, &cancel_data.cancel_bitmap, 0);
@@ -764,10 +764,8 @@ static int _reply( struct cell *trans, struct sip_msg* p_msg,
 	char * buf, *dset;
 	struct bookmark bm;
 	int dset_len;
-	struct lump_rpl* rpl_l;
 	str reason;
 
-	rpl_l=0;
 	if (code>=200) set_kr(REQ_RPLD);
 	/* compute the buffer in private memory prior to entering lock;
 	 * create to-tag if needed */
@@ -788,19 +786,11 @@ static int _reply( struct cell *trans, struct sip_msg* p_msg,
 		calc_crc_suffix( p_msg, tm_tag_suffix );
 		buf = build_res_buf_from_sip_req(code, &reason, &tm_tag, p_msg,
 				&len, &bm);
-		if (unlikely(rpl_l)){
-			unlink_lump_rpl(p_msg, rpl_l);
-			free_lump_rpl(rpl_l);
-		}
 		return _reply_light( trans, buf, len, code,
 			tm_tag.s, TOTAG_VALUE_LEN, lock, &bm);
 	} else {
 		buf = build_res_buf_from_sip_req(code, &reason, 0 /*no to-tag*/,
 			p_msg, &len, &bm);
-		if (unlikely(rpl_l)){
-			unlink_lump_rpl(p_msg, rpl_l);
-			free_lump_rpl(rpl_l);
-		}
 		return _reply_light(trans,buf,len,code,
 			0, 0, /* no to-tag */lock, &bm);
 	}

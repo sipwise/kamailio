@@ -2817,7 +2817,11 @@ struct hostent* dns_naptr_sip_resolvehost(str* name, unsigned short* port,
 	char origproto;
 	str srv_name;
 
-	origproto=*proto;
+	if(proto) {
+		origproto=*proto;
+	} else {
+		origproto=PROTO_NONE;
+	}
 	he=0;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
 		LOG(L_WARN, "WARNING: dns_sip_resolvehost: called before dns cache"
@@ -2858,7 +2862,7 @@ struct hostent* dns_naptr_sip_resolvehost(str* name, unsigned short* port,
 		dns_hash_put(e);
 	}
 naptr_not_found:
-	*proto = origproto;
+	if(proto) *proto = origproto;
 	he = no_naptr_srv_sip_resolvehost(name,port,proto);
 	/* fallback all the way down to A/AAAA */
 	if (he==0) {
@@ -3032,7 +3036,7 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 									struct ip_addr* ip,
 									int flags)
 {
-	int ret;
+	int ret, orig_ret;
 	str host;
 	struct dns_hash_entry* orig;
 
@@ -3060,10 +3064,13 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 		if (ret>=0) return ret;
 		if (!(flags&(DNS_IPV6_ONLY|DNS_IPV6_FIRST|DNS_IPV4_ONLY))){
 			/* not found, try with AAAA */
+			orig_ret=ret;
 			orig=*e;
 			*e=0;
 			*rr_no=0;
 			ret=dns_aaaa_resolve(e, rr_no, &host, ip);
+			if (ret==-E_DNS_NO_IP && orig_ret==-E_DNS_EOR)
+				ret=orig_ret;
 			/* delay original record release until we're finished with host*/
 			dns_hash_put(orig);
 		}
@@ -3077,10 +3084,13 @@ inline static int dns_ip_resolve(	struct dns_hash_entry** e,
 		if (ret>=0) return ret;
 		if ((flags&DNS_IPV6_FIRST) && !(flags&DNS_IPV6_ONLY)){
 			/* not found, try with A */
+			orig_ret=ret;
 			orig=*e;
 			*e=0;
 			*rr_no=0;
 			ret=dns_a_resolve(e, rr_no, &host, ip);
+			if (ret==-E_DNS_NO_IP && orig_ret==-E_DNS_EOR)
+				ret=orig_ret;
 			/* delay original record release until we're finished with host*/
 			dns_hash_put(orig);
 		}

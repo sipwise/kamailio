@@ -196,6 +196,7 @@ static int check_via_address(struct ip_addr* ip, str *name,
 	int i;
 	char* s;
 	int len;
+	char lproto;
 
 	/* maybe we are lucky and name it's an ip */
 	s=ip_addr2a(ip);
@@ -228,7 +229,8 @@ static int check_via_address(struct ip_addr* ip, str *name,
 	if (resolver&DO_DNS){
 		DBG("check_via_address: doing dns lookup\n");
 		/* try all names ips */
-		he=sip_resolvehost(name, &port, 0); /* don't use naptr */
+		lproto = PROTO_NONE;
+		he=sip_resolvehost(name, &port, &lproto); /* don't use naptr */
 		if (he && ip->af==he->h_addrtype){
 			for(i=0;he && he->h_addr_list[i];i++){
 				if ( memcmp(&he->h_addr_list[i], ip->u.addr, ip->len)==0)
@@ -251,17 +253,27 @@ static int check_via_address(struct ip_addr* ip, str *name,
 }
 
 
-/* check if IP address in Via != source IP address of signaling */
+/* check if IP address in Via != source IP address of signaling,
+ * or the sender requires adding rport or received values */
 int received_test( struct sip_msg *msg )
 {
 	int rcvd;
 
-	rcvd=msg->via1->received
+	rcvd=msg->via1->received || msg->via1->rport
 			|| check_via_address(&msg->rcv.src_ip, &msg->via1->host,
 							msg->via1->port, received_dns);
 	return rcvd;
 }
 
+/* check if IP address in Via != source IP address of signaling */
+int received_via_test( struct sip_msg *msg )
+{
+	int rcvd;
+
+	rcvd = (check_via_address(&msg->rcv.src_ip, &msg->via1->host,
+							msg->via1->port, received_dns)!=0);
+	return rcvd;
+}
 
 static char * warning_builder( struct sip_msg *msg, unsigned int *returned_len)
 {
@@ -2144,7 +2156,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 			body = lump;
 	}
 	/* server header */
-	if (server_signature)
+	if (server_signature && server_hdr.len)
 		len += server_hdr.len + CRLF_LEN;
 	/* warning hdr */
 	if (sip_warning) {
@@ -2283,7 +2295,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 			p += lump->text.len;
 		}
 	/* server header */
-	if (server_signature) {
+	if (server_signature && server_hdr.len>0) {
 		memcpy( p, server_hdr.s, server_hdr.len );
 		p+=server_hdr.len;
 		memcpy( p, CRLF, CRLF_LEN );

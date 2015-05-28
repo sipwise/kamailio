@@ -820,7 +820,7 @@ test_source_address(struct sip_msg *msg)
     Bool different_ip, different_port;
     int via1_port;
 
-    different_ip = received_test(msg);
+    different_ip = received_via_test(msg);
     via1_port = (msg->via1->port ? msg->via1->port : SIP_PORT);
     different_port = (msg->rcv.src_port != via1_port);
 
@@ -1510,6 +1510,8 @@ send_keepalive(NAT_Contact *contact)
 	struct dest_info dst;
     int nat_port, len;
     str nat_ip;
+	unsigned short lport;
+	char lproto;
 
     if (keepalive_params.from == NULL) {
         if (contact->socket != last_socket) {
@@ -1554,7 +1556,9 @@ send_keepalive(NAT_Contact *contact)
     ptr = strchr(nat_ip.s, ':');
     nat_ip.len = ptr - nat_ip.s;
     nat_port = strtol(ptr+1, NULL, 10);
-    hostent = sip_resolvehost(&nat_ip, NULL, NULL);
+    lport = 0;
+    lproto = PROTO_NONE;
+    hostent = sip_resolvehost(&nat_ip, &lport, &lproto);
     hostent2su(&dst.to, hostent, 0, nat_port);
 	dst.proto=PROTO_UDP;
 	dst.send_sock=contact->socket;

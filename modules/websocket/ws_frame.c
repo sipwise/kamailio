@@ -530,7 +530,8 @@ static int decode_and_validate_ws_frame(ws_frame_t *frame,
 	frame->masking_key[3] = (buf[mask_start + 3] & 0xff);
 
 	/* Decode and unmask payload */
-	if (len != frame->payload_len + mask_start + 4)
+	if ((unsigned long long)len != (unsigned long long)frame->payload_len
+										+ mask_start + 4)
 	{
 		LM_WARN("message not complete frame size %u but received %u\n",
 			frame->payload_len + mask_start + 4, len);
@@ -731,6 +732,11 @@ int ws_frame_transmit(void *data)
 	frame.payload_len = wsev->len;
 	frame.payload_data = wsev->buf;
 	frame.wsc = wsconn_get(wsev->id);
+	if (frame.wsc == NULL)
+	{
+		LM_ERR("WebSocket outbound connection not found\n");
+		return -1;
+	}
 
 	LM_DBG("Tx message:\n%.*s\n", frame.payload_len,
 			frame.payload_data);
