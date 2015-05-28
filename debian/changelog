@@ -1,3 +1,13 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.2.0) unstable; urgency=medium
+
+  * [97b8098] Imported Upstream version 4.1.8
+  * [9b5fa12] MT#12987 remove empty patch
+  * [2a86cff] MT#12987 debian: remove 4.1 patches from upstream already merged
+  * [607d616] MT#12987 debian: refresh conflicted patches
+  * [8c2543c] MT#12987 debian: add 4.1 upstream patches after 4.1.8 release
+
+ -- Victor Seva <vseva@sipwise.com>  Thu, 28 May 2015 12:50:59 +0200
+
 ngcp-kamailio (4.1.6-1+0~mr3.8.2.0) unstable; urgency=low
 
   * New release.
