@@ -1,3 +1,15 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.2.1) unstable; urgency=low
+
+  [ Victor Seva ]
+  * [5b70894] MT#12691 pua_reginfo fix
+  * [9b867dc] sipwise/nathelper_socket_filter.patch: too much debug information
+  * [4075b01] MT#12691 add upstream fix for usrloc callbacks
+  * [16b1adb] MT#12761 dialplan: skip rules with empty avp[*] value
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 03 Jun 2015 16:28:07 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.2.0) unstable; urgency=medium
 
   * [97b8098] Imported Upstream version 4.1.8
