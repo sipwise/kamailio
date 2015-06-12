@@ -1,3 +1,17 @@
+ngcp-kamailio (4.3.0-1+0~mr4.0.0.0) unstable; urgency=medium
+
+  * [b6e6d38] Imported Upstream version 4.2.1
+  * [97b8098] Imported Upstream version 4.1.8
+  * [c40f566] MT#12691 pua_reginfo fix
+  * [1603f51] sipwise/nathelper_socket_filter.patch: too much debug information
+  * [9376ec2] MT#12691 add upstream fix for usrloc callbacks
+  * [8a1c6f8] MT#13249 fix double precision value on queries
+  * [7e6131e] Imported Upstream version 4.3.0
+  * [e0458e9] remove old patches and disable the ones that need extra work
+  * [f60260e] refresh patches for 4.3.0
+
+ -- Victor Seva <vseva@sipwise.com>  Fri, 12 Jun 2015 15:04:48 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr4.0.0.0) unstable; urgency=medium
 
   * [ccda56f] MT#12761 dialplan: skip rules with empty avp[*] value
