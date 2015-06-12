@@ -20,7 +20,7 @@ Subject: [PATCH] modules/debugger: trace msg out
  /**
   *
   */
-@@ -487,6 +489,20 @@
+@@ -520,6 +522,20 @@
  	return 0;
  }
  
@@ -52,23 +52,23 @@ Subject: [PATCH] modules/debugger: trace msg out
  
 --- a/modules/debugger/debugger_mod.c
 +++ b/modules/debugger/debugger_mod.c
-@@ -60,6 +60,7 @@
- extern char *_dbg_cfgtrace_prefix;
+@@ -61,6 +61,7 @@
+ extern char *_dbg_cfgtrace_lname;
  extern int _dbg_step_usleep;
  extern int _dbg_step_loops;
 +extern int _dbg_outtrace;
  extern int _dbg_reset_msgid;
  
  static char * _dbg_cfgtrace_facility_str = 0;
-@@ -86,6 +87,7 @@
+@@ -88,6 +89,7 @@
  	{"log_assign",        INT_PARAM, &_dbg_log_assign},
  	{"step_usleep",       INT_PARAM, &_dbg_step_usleep},
  	{"step_loops",        INT_PARAM, &_dbg_step_loops},
 +	{"trace_out_msg",     INT_PARAM, &_dbg_outtrace},
  	{"mod_hash_size",     INT_PARAM, &default_dbg_cfg.mod_hash_size},
  	{"mod_level_mode",    INT_PARAM, &default_dbg_cfg.mod_level_mode},
- 	{"mod_level",         STR_PARAM|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
-@@ -178,6 +180,7 @@
+ 	{"mod_level",         PARAM_STRING|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
+@@ -180,6 +182,7 @@
  	if (rank==PROC_INIT) {
  		dbg_enable_mod_levels();
  		dbg_enable_log_assign();

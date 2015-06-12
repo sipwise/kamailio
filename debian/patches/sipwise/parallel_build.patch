@@ -1,6 +1,6 @@
 --- a/Makefile.rules
 +++ b/Makefile.rules
-@@ -77,6 +77,18 @@
+@@ -60,6 +60,18 @@
  cmd_MKDEP=
  endif # CC_MKDEP_OPTS
  
@@ -19,7 +19,7 @@
  # what will be displayed if quiet==silent
  silent_cmd_CC=CC ($(CC)) [$(strip $(crt_type) $(NAME))]		$@
  silent_cmd_LD=LD ($(LD)) [$(strip $(crt_type) $(NAME))]		$@
-@@ -107,7 +119,7 @@
+@@ -90,7 +102,7 @@
  quote:= "
  escall= $(subst $$,\$$,$(subst $(quote),\$(quote),$1))
  exec_cmd= $(if $($(quiet)_cmd_$(1)),\
