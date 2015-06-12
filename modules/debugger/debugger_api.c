@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -177,6 +177,11 @@ char *_dbg_cfgtrace_prefix = "*** cfgtrace:";
 /**
  *
  */
+char *_dbg_cfgtrace_lname = NULL;
+
+/**
+ *
+ */
 int _dbg_step_usleep = 100000;
 
 /**
@@ -282,6 +287,32 @@ int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar)
 	return 1;
 }
 
+char* get_current_route_type_name()
+{
+	switch(route_type){
+		case REQUEST_ROUTE:
+			return "request_route";
+		case FAILURE_ROUTE:
+			return "failure_route";
+		case TM_ONREPLY_ROUTE:
+		case CORE_ONREPLY_ROUTE:
+		case ONREPLY_ROUTE:
+			return "onreply_route";
+		case BRANCH_ROUTE:
+			return "branch_route";
+		case ONSEND_ROUTE:
+			return "onsend_route";
+		case ERROR_ROUTE:
+			return "error_route";
+		case LOCAL_ROUTE:
+			return "local_route";
+		case BRANCH_FAILURE_ROUTE:
+			return "branch_failure_route";
+		default:
+			return "unknown_route";
+	}
+}
+
 /**
  * callback executed for each cfg action
  */
@@ -322,10 +353,12 @@ int dbg_cfg_trace(void *data)
 	{
 		if(is_printable(_dbg_cfgtrace_level))
 		{
-			LOG_(_dbg_cfgtrace_facility, _dbg_cfgtrace_level,
-					_dbg_cfgtrace_prefix,
-					" c=[%s] l=%d a=%d n=%.*s\n",
-					ZSW(a->cfile), a->cline, a->type, an->len, ZSW(an->s)
+			LOG__(_dbg_cfgtrace_facility, _dbg_cfgtrace_level,
+					_dbg_cfgtrace_lname, _dbg_cfgtrace_prefix,
+					"%s=[%s] c=[%s] l=%d a=%d n=%.*s\n",
+					get_current_route_type_name(), ZSW(a->rname),
+					ZSW(a->cfile), a->cline,
+					a->type, an->len, ZSW(an->s)
 				);
 		}
 	}

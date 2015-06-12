@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -123,7 +123,9 @@ void free_session(cdp_session_t *x)
 
 		if(x->dest_host.s) shm_free(x->dest_host.s);
 		if(x->dest_realm.s) shm_free(x->dest_realm.s);
-
+                if (x->sticky_peer_fqdn_buflen && x->sticky_peer_fqdn.s) {
+                    shm_free(x->sticky_peer_fqdn.s);
+                }
 		shm_free(x);
 	}
 }

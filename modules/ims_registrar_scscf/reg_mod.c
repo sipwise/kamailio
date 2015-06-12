@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -57,6 +57,7 @@
 #include "../../lib/kcore/statistics.h"
 #include "../../modules/sl/sl.h"
 #include "../../mod_fix.h"
+#include "../../cfg/cfg_struct.h"
 
 #include "save.h"
 #include "api.h"
@@ -69,10 +70,13 @@
 #include "usrloc_cb.h"
 #include "userdata_parser.h"
 #include "cxdx_sar.h"
+#include "cxdx_callbacks.h"
 #include "registrar_notify.h"
 #include "../cdp_avp/mod_export.h"
 
 MODULE_VERSION
+
+extern gen_lock_t* process_lock; /* lock on the process table */
 
 int * callback_singleton; /**< Cx callback singleton 								*/
 
@@ -88,20 +92,24 @@ usrloc_api_t ul; /*!< Structure containing pointers to usrloc functions*/
 char *scscf_user_data_dtd = 0; /* Path to "CxDataType.dtd" */
 char *scscf_user_data_xsd = 0; /* Path to "CxDataType_Rel6.xsd" or "CxDataType_Rel7.xsd" */
 int scscf_support_wildcardPSI = 0;
-char *scscf_name = "sip:scscf2.ims.smilecoms.com:6060"; /* default scscf_name - actual should be set via parameter*/
 int store_data_on_dereg = 0; /**< should we store SAR data on de-registration  */
 
+int ue_unsubscribe_on_dereg = 0;  /*many UEs do not unsubscribe on de reg - therefore we should remove their subscription and not send a notify
+				   Some UEs do unsubscribe then everything is fine*/
+
+int user_data_always = 0; /* Always Reports that user data is missing to HSS */
+
 /* parameters storage */
-char* cxdx_dest_realm_s = "ims.smilecoms.com";
-str cxdx_dest_realm;
+str cxdx_dest_realm = str_init("ims.smilecoms.com");
 
 //Only used if we want to force the Rx peer
 //Usually this is configured at a stack level and the first request uses realm routing
-char* cxdx_forced_peer_s = "";
-str cxdx_forced_peer;
+str cxdx_forced_peer = {0,0};
 
-str scscf_name_str;
+str scscf_name_str = str_init("sip:scscf2.ims.smilecoms.com:6060"); /* default scscf_name - actual should be set via parameter*/
 str scscf_serviceroute_uri_str; /* Service Route URI */
+
+char *domain = "location";  ///TODO should be configurable mod param
 
 /*! \brief Module init & destroy function */
 static int mod_init(void);
@@ -110,6 +118,7 @@ static void mod_destroy(void);
 static int w_save(struct sip_msg* _m, char * _route, char* _d, char* mode, char* _cflags);
 static int w_assign_server_unreg(struct sip_msg* _m, char* _route, char* _d, char* _direction);
 static int w_lookup(struct sip_msg* _m, char* _d, char* _p2);
+static int w_lookup_path_to_contact(struct sip_msg* _m, char* contact_uri);
 
 /*! \brief Fixup functions */
 static int domain_fixup(void** param, int param_no);
@@ -118,6 +127,8 @@ static int unreg_fixup(void** param, int param_no);
 static int fetchc_fixup(void** param, int param_no);
 /*! \brief Functions */
 static int add_sock_hdr(struct sip_msg* msg, char *str, char *foo);
+
+AAAMessage* callback_cdp_request(AAAMessage *request, void *param);
 
 int tcp_persistent_flag = -1; /*!< if the TCP connection should be kept open */
 int method_filtering = 0; /*!< if the looked up contacts should be filtered based on supported methods */
@@ -150,6 +161,9 @@ str sock_hdr_name = {0, 0};
 int subscription_default_expires = 3600; /**< the default value for expires if none found*/
 int subscription_min_expires = 10; /**< minimum subscription expiration time 		*/
 int subscription_max_expires = 1000000; /**< maximum subscription expiration time 		*/
+int subscription_expires_range = 0;
+
+int notification_list_size_threshold = 0; /**Threshold for size of notification list after which a warning is logged */
 
 
 extern reg_notification_list *notification_list; /**< list of notifications for reg to be sent			*/
@@ -186,7 +200,9 @@ static pv_export_t mod_pvs[] = {
 static cmd_export_t cmds[] = {
     {"save", (cmd_function) w_save, 2, assign_save_fixup3_async, 0, REQUEST_ROUTE | ONREPLY_ROUTE},
     {"lookup", (cmd_function) w_lookup, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
+    {"lookup_path_to_contact", (cmd_function) w_lookup_path_to_contact, 1, fixup_var_str_12, 0, REQUEST_ROUTE},
     {"term_impu_registered", (cmd_function) term_impu_registered, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
+    {"term_impu_has_contact", (cmd_function) term_impu_has_contact, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"impu_registered", (cmd_function) impu_registered, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"assign_server_unreg", (cmd_function) w_assign_server_unreg, 3, assign_save_fixup3_async, 0, REQUEST_ROUTE},
     {"add_sock_hdr", (cmd_function) add_sock_hdr, 1, fixup_str_null, 0, REQUEST_ROUTE},
@@ -195,6 +211,8 @@ static cmd_export_t cmds[] = {
     {"reg_free_contacts", (cmd_function) pv_free_contacts, 1, fixup_str_null, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"can_subscribe_to_reg", (cmd_function) can_subscribe_to_reg, 1, domain_fixup, 0, REQUEST_ROUTE},
     {"subscribe_to_reg", (cmd_function) subscribe_to_reg, 1, domain_fixup, 0, REQUEST_ROUTE},
+    {"can_publish_reg", (cmd_function) can_publish_reg, 1, domain_fixup, 0, REQUEST_ROUTE},
+    {"publish_reg", (cmd_function) publish_reg, 1, domain_fixup, 0, REQUEST_ROUTE},
     //{"bind_registrar", (cmd_function) bind_registrar, 0, 0, 0, 0},  TODO put this back in !
     {0, 0, 0, 0, 0, 0}
 };
@@ -215,31 +233,35 @@ static param_export_t params[] = {
     {"default_q", INT_PARAM, &default_registrar_cfg.default_q},
     {"append_branches", INT_PARAM, &default_registrar_cfg.append_branches},
     {"case_sensitive", INT_PARAM, &default_registrar_cfg.case_sensitive},
-    {"realm_prefix", STR_PARAM, &default_registrar_cfg.realm_pref},
+    {"realm_prefix", PARAM_STRING, &default_registrar_cfg.realm_pref},
 
-    {"received_param", STR_PARAM, &rcv_param},
-    {"received_avp", STR_PARAM, &rcv_avp_param},
-    {"aor_avp", STR_PARAM, &aor_avp_param},
-    {"reg_callid_avp", STR_PARAM, &reg_callid_avp_param},
+    {"received_param", PARAM_STR, &rcv_param},
+    {"received_avp", PARAM_STRING, &rcv_avp_param},
+    {"aor_avp", PARAM_STRING, &aor_avp_param},
+    {"reg_callid_avp", PARAM_STRING, &reg_callid_avp_param},
     {"max_contacts", INT_PARAM, &default_registrar_cfg.max_contacts},
     {"retry_after", INT_PARAM, &default_registrar_cfg.retry_after},
     {"sock_flag", INT_PARAM, &sock_flag},
-    {"sock_hdr_name", STR_PARAM, &sock_hdr_name.s},
+    {"sock_hdr_name", PARAM_STR, &sock_hdr_name},
     {"method_filtering", INT_PARAM, &method_filtering},
     {"use_path", INT_PARAM, &path_enabled},
     {"path_mode", INT_PARAM, &path_mode},
     {"path_use_received", INT_PARAM, &path_use_params},
-    {"user_data_dtd", STR_PARAM, &scscf_user_data_dtd},
-    {"user_data_xsd", STR_PARAM, &scscf_user_data_xsd},
+    {"user_data_dtd", PARAM_STRING, &scscf_user_data_dtd},
+    {"user_data_xsd", PARAM_STRING, &scscf_user_data_xsd},
     {"support_wildcardPSI", INT_PARAM, &scscf_support_wildcardPSI},
-    {"scscf_name", STR_PARAM, &scscf_name}, //TODO: need to set this to default
+    {"scscf_name", PARAM_STR, &scscf_name_str}, //TODO: need to set this to default
     {"store_profile_dereg", INT_PARAM, &store_data_on_dereg},
-    {"cxdx_forced_peer", STR_PARAM, &cxdx_forced_peer_s},
-    {"cxdx_dest_realm", STR_PARAM, &cxdx_dest_realm_s},
+    {"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
+    {"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
 
     {"subscription_default_expires", INT_PARAM, &subscription_default_expires},
     {"subscription_min_expires", INT_PARAM, &subscription_min_expires},
     {"subscription_max_expires", INT_PARAM, &subscription_max_expires},
+    {"ue_unsubscribe_on_dereg", INT_PARAM, &ue_unsubscribe_on_dereg},
+    {"subscription_expires_range", INT_PARAM, &subscription_expires_range},
+    {"user_data_always", INT_PARAM, &user_data_always},
+    {"notification_list_size_threshold", INT_PARAM, &notification_list_size_threshold},
 
     {0, 0, 0}
 };
@@ -286,11 +308,11 @@ static int mod_init(void) {
     str s;
     bind_usrloc_t bind_usrloc;
     qvalue_t dq;
+    
+    callback_singleton = shm_malloc(sizeof (int));
+    *callback_singleton = 0;
 
     /*build the required strings */
-    scscf_name_str.s = scscf_name;
-    scscf_name_str.len = strlen(scscf_name);
-
     scscf_serviceroute_uri_str.s =
             (char*) pkg_malloc(orig_prefix.len + scscf_name_str.len);
 
@@ -312,12 +334,6 @@ static int mod_init(void) {
         scscf_serviceroute_uri_str.len += scscf_name_str.len;
     }
 
-    cxdx_forced_peer.s = cxdx_forced_peer_s;
-    cxdx_forced_peer.len = strlen(cxdx_forced_peer_s);
-
-    cxdx_dest_realm.s = cxdx_dest_realm_s;
-    cxdx_dest_realm.len = strlen(cxdx_dest_realm_s);
-
     /* </build required strings> */
 
 #ifdef STATISTICS
@@ -331,6 +347,9 @@ static int mod_init(void) {
         return -1;
     }
 #endif
+
+    /*register space for notification processor*/
+    register_procs(1);
 
     /* bind the SL API */
     if (sl_load_api(&slb) != 0) {
@@ -355,8 +374,6 @@ static int mod_init(void) {
         LM_ERR("can't load CDP_AVP API\n");
         return -1;
     }
-
-    rcv_param.len = strlen(rcv_param.s);
 
     if (cfg_declare("registrar", registrar_cfg_def, &default_registrar_cfg,
             cfg_sizeof(registrar), &registrar_cfg)) {
@@ -453,12 +470,8 @@ static int mod_init(void) {
     }
 
     if (sock_hdr_name.s) {
-        sock_hdr_name.len = strlen(sock_hdr_name.s);
         if (sock_hdr_name.len == 0 || sock_flag == -1) {
             LM_WARN("empty sock_hdr_name or sock_flag no set -> reseting\n");
-            pkg_free(
-                    sock_hdr_name.s);
-            sock_hdr_name.s = 0;
             sock_hdr_name.len = 0;
             sock_flag = -1;
         }
@@ -483,6 +496,21 @@ static int mod_init(void) {
 }
 
 static int child_init(int rank) {
+    LM_DBG("Initialization of module in child [%d] \n", rank);
+    int pid;
+    
+    if (rank == PROC_MAIN) {
+        pid = fork_process(PROC_MIN, "sip_notification_event_process", 1);
+        if (pid < 0)
+            return -1; //error
+        if (pid == 0) {
+            if (cfg_child_init())
+                return -1; //error
+            notification_event_process();
+        }
+    }
+    
+    
     if (rank == PROC_MAIN || rank == PROC_TCP_MAIN)
         return 0;
     if (rank == 1) {
@@ -501,9 +529,51 @@ static int child_init(int rank) {
     /* Init the user data parser */
     if (!parser_init(scscf_user_data_dtd, scscf_user_data_xsd))
         return -1;
+    
+    
+    lock_get(process_lock);
+    if ((*callback_singleton) == 0) {
+        *callback_singleton = 1;
+        cdpb.AAAAddRequestHandler(callback_cdp_request, NULL);
+    }
+    lock_release(process_lock);
 
     return 0;
 }
+
+
+/**
+ * Handler for incoming Diameter requests.
+ * @param request - the received request
+ * @param param - generic pointer
+ * @returns the answer to this request
+ */
+AAAMessage* callback_cdp_request(AAAMessage *request, void *param) {
+    if (is_req(request)) {
+
+        switch (request->applicationId) {
+            case IMS_Cx:
+            //case IMS_Dx:  IMS_Cx is same as IMS_Dx 16777216
+                switch (request->commandCode) {
+                    case IMS_RTR:
+                        LM_INFO("Cx/Dx request handler():- Received an IMS_RTR \n");
+                        return cxdx_process_rtr(request);
+                        break;
+                    default:
+                        LM_ERR("Cx/Dx request handler(): - Received unknown request for Cx/Dx command %d, flags %#1x endtoend %u hopbyhop %u\n", request->commandCode, request->flags, request->endtoendId, request->hopbyhopId);
+                        return 0;
+                        break;
+                }
+                break;
+            default:
+                LM_ERR("Cx/Dx request handler(): - Received unknown request for app %d command %d\n", request->applicationId, request->commandCode);
+                return 0;
+                break;
+        }
+    }
+    return 0;
+}
+
 
 /*! \brief
  * Wrapper to save(location)
@@ -519,6 +589,10 @@ static int w_assign_server_unreg(struct sip_msg* _m, char* _route, char* _d, cha
     direction.len = strlen(_direction);
     return assign_server_unreg(_m, _d, &direction, _route);
 
+}
+
+static int w_lookup_path_to_contact(struct sip_msg* _m, char* contact_uri) {
+    return lookup_path_to_contact(_m, contact_uri);
 }
 
 /*! \brief

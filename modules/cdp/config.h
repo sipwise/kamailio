@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -54,6 +54,7 @@ typedef struct{
 	str fqdn;	/**< FQDN of the peer */
 	str realm;	/**< Realm of the peer */
 	int port;	/**< TCP port of the peer; the Diameter uri is then aaa://fqdn:port. */
+    str src_addr; /**< IP address used to connect to the peer */
 } peer_config;
 
 
@@ -124,7 +125,7 @@ typedef struct {
 	acceptor_config *acceptors;	/**< list of acceptors */
 	int acceptors_cnt;			/**< size of the list of acceptors */
 	
-	app_config *applications;	/**< list of supporter applications */
+	app_config *applications;	/**< list of supported applications */
 	int applications_cnt;		/**< size of list of supported applications*/
 
 	int *supported_vendors;		/**< list of supported vendor ids */

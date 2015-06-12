@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DBText module core functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,11 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * 
- * History:
- * --------
- * 2003-02-04 created by Daniel
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -47,6 +41,7 @@ typedef struct _dbt_result
 typedef struct _dbt_con
 {
 	dbt_cache_p con;
+	int affected;
 } dbt_con_t, *dbt_con_p;
 
 #define DBT_CON_CONNECTION(db_con) (((dbt_con_p)((db_con)->tail))->con)

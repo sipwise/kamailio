@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DBText module core functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,12 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2003-01-30 created by Daniel
- * 
  */
 
 
@@ -66,7 +60,7 @@ int dbt_query(db1_con_t* _h, db_key_t* _k, db_op_t* _op, db_val_t* _v,
 /*
  * Raw SQL query
  */
-int dbt_raw_query(db1_con_t* _h, char* _s, db1_res_t** _r);
+int dbt_raw_query(db1_con_t* _h,  str* _s, db1_res_t** _r);
 
 
 /*
@@ -86,6 +80,11 @@ int dbt_delete(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v, int _n);
  */
 int dbt_update(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v,
 	      db_key_t* _uk, db_val_t* _uv, int _n, int _un);
+
+/*
+ * Affected rows
+ */
+int dbt_affected_rows(db1_con_t* _h);
 
 #endif
 

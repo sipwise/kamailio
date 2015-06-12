@@ -1,35 +1,28 @@
 /*
- *  $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * History:
- * --------
- * 2003-04-05  DEFAULT_*_URL introduced (jiri)
- * 2003-07-04  fixed SRV lookup prefix for TLS/sips (andrei)
- * 2005-04-25  MAX_BRANCH_PARAM_LEN too small, fixed (andrei)
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
 /*!
  * \file
- * \brief SIP-router core :: Configuration options
+ * \brief Kamailio core :: Configuration options
+ * \author jiri, andrei
  *
  * These settings are settable by the user before compilation
  *
@@ -65,9 +58,6 @@
 #define ONSEND_RT_NO 1  		/*!< onsend_route routing tables number */
 #define EVENT_RT_NO RT_NO 		/*!< event_route routing tables number */
 #define DEFAULT_RT 0 			/*!< default routing table */
-
-#define MAX_REC_LEV 100 		/*!< maximum number of recursive calls */
-#define ROUTE_MAX_REC_LEV 100 		/*!< maximum number of recursive calls for route()*/
 
 #define MAX_URI_SIZE 1024		/*!< Max URI size used when rewriting URIs */
 
@@ -147,11 +137,11 @@
 #define SRV_MAX_PREFIX_LEN SRV_TLS_PREFIX_LEN
 
 #ifndef PKG_MEM_SIZE
-#define PKG_MEM_SIZE 4
+#define PKG_MEM_SIZE 8
 #endif
 #define PKG_MEM_POOL_SIZE PKG_MEM_SIZE*1024*1024	/*!< used only if PKG_MALLOC is defined*/
 
-#define SHM_MEM_SIZE 32				/*!< used if SH_MEM is defined*/
+#define SHM_MEM_SIZE 64				/*!< used if SH_MEM is defined*/
 
 
 /* dimensioning buckets in q_malloc */
@@ -172,7 +162,8 @@
 #define MAX_RECEIVED_SIZE	59	/*!< forwarding  -- Via buffer dimensioning - Received header */
 #define MAX_RPORT_SIZE		13	/*!< forwarding  -- Via buffer dimensioning - Rport */
 
-#define MAX_BRANCHES    	12	/*!< maximum number of branches per transaction */
+#define MAX_BRANCHES_DEFAULT	12	/*!< default maximum number of branches per transaction */
+#define MAX_BRANCHES_LIMIT		32	/*!< limit of maximum number of branches per transaction */
 
 #define MAX_PRINT_TEXT 		256	/*!< max length of the text of fifo 'print' command */
 

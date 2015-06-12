@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -178,8 +178,9 @@ int parse_rv_option(str src, option_description* opt){
 						LM_ERR("Not a string \n");
 						return ERROR_IN_PARSING;
 					}
-				strcpy( opt->value.string_data.s, src.s);
-				opt->value.string_data.len = src.len;
+				strncpy( opt->value.string_data.s, src.s+1, src.len-2);
+				opt->value.string_data.s[src.len-2] = '\0';
+				opt->value.string_data.len = src.len-2;
 				LM_DBG("String Key=<%s>, value=<%s> \n", opt->name, opt->value.string_data.s);
 				ret = SUCCESSFUL_PARSING;
 			}
@@ -377,7 +378,7 @@ int parse_struct_header(FILE* file, char* expected_struct_type, str* struct_name
 			ret = SUCCESSFUL_PARSING;
 		break;
 	default:
-		LM_ERR("Wrong number of tokens in line: %s\n", data.s);
+		LM_DBG("Wrong number of tokens in line: %s\n", data.s);
 	}
 
 	if ( SUCCESSFUL_PARSING == ret ){

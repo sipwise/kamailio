@@ -1,34 +1,22 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005 Voice Sistem SRL
  *
  * This file is part of Kamailio, a free SIP server.
  *
- * UAC Kamailio-module is free software; you can redistribute it and/or
+ * Kamailio is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
  *
- * UAC Kamailio-module is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- *
- * History:
- * ---------
- *  2005-01-31  first version (ramona)
- *  2005-08-12  some TM callbacks replaced with RR callback - more efficient;
- *              (bogdan)
- *  2006-03-02  UAC authentication looks first in AVPs for credential (bogdan)
- *  2006-03-03  the RR parameter is encrypted via XOR with a password
- *              (bogdan)
-
  */
 
 
@@ -80,8 +68,8 @@ static int uac_restore_dlg = 0;
 str rr_from_param = str_init("vsf");
 str rr_to_param = str_init("vst");
 str uac_passwd = str_init("");
-str restore_from_avp = {0 ,0 };
-str restore_to_avp = {0 ,0 };
+str restore_from_avp = STR_NULL;
+str restore_to_avp = STR_NULL;
 int restore_mode = UAC_AUTO_RESTORE;
 struct tm_binds uac_tmb;
 struct rr_binds uac_rrb;
@@ -127,9 +115,8 @@ static cmd_export_t cmds[]={
 			REQUEST_ROUTE },
 	{"uac_auth",          (cmd_function)w_uac_auth,       0,                  0, 0,
 			FAILURE_ROUTE },
-	{"uac_req_send",  (cmd_function)uac_req_send,         0,                  0, 0, 
-		REQUEST_ROUTE | FAILURE_ROUTE |
-		ONREPLY_ROUTE | BRANCH_ROUTE | ERROR_ROUTE | LOCAL_ROUTE},
+	{"uac_req_send",  (cmd_function)w_uac_req_send,       0,                  0, 0,
+			ANY_ROUTE},
 	{"uac_reg_lookup",  (cmd_function)w_uac_reg_lookup,  2, fixup_pvar_pvar,
 		fixup_free_pvar_pvar, ANY_ROUTE },
 	{"uac_reg_request_to",  (cmd_function)w_uac_reg_request_to,  2, fixup_pvar_uint, fixup_free_pvar_uint,
@@ -143,20 +130,20 @@ static cmd_export_t cmds[]={
 
 /* Exported parameters */
 static param_export_t params[] = {
-	{"rr_from_store_param", STR_PARAM,				&rr_from_param.s       },
-	{"rr_to_store_param",   STR_PARAM,				&rr_to_param.s       },
-	{"restore_mode",        STR_PARAM,				&restore_mode_str      },
+	{"rr_from_store_param", PARAM_STR,				&rr_from_param       },
+	{"rr_to_store_param",   PARAM_STR,				&rr_to_param       },
+	{"restore_mode",        PARAM_STRING,				&restore_mode_str      },
 	{"restore_dlg",         INT_PARAM,				&uac_restore_dlg       },
-	{"restore_passwd",      STR_PARAM,				&uac_passwd.s          },
-	{"restore_from_avp",	STR_PARAM,				&restore_from_avp.s },
-	{"restore_to_avp",		STR_PARAM,				&restore_to_avp.s },
-	{"credential",        STR_PARAM|USE_FUNC_PARAM, (void*)&add_credential },
-	{"auth_username_avp", STR_PARAM,                &auth_username_avp     },
-	{"auth_realm_avp",    STR_PARAM,                &auth_realm_avp        },
-	{"auth_password_avp", STR_PARAM,                &auth_password_avp     },
-	{"reg_db_url",        STR_PARAM,                &reg_db_url.s          },
-	{"reg_db_table",      STR_PARAM,                &reg_db_table.s        },
-	{"reg_contact_addr",  STR_PARAM,                &reg_contact_addr.s    },
+	{"restore_passwd",      PARAM_STR,				&uac_passwd          },
+	{"restore_from_avp",	PARAM_STR,				&restore_from_avp },
+	{"restore_to_avp",		PARAM_STR,				&restore_to_avp },
+	{"credential",        PARAM_STRING|USE_FUNC_PARAM, (void*)&add_credential },
+	{"auth_username_avp", PARAM_STRING,                &auth_username_avp     },
+	{"auth_realm_avp",    PARAM_STRING,                &auth_realm_avp        },
+	{"auth_password_avp", PARAM_STRING,                &auth_password_avp     },
+	{"reg_db_url",        PARAM_STR,                &reg_db_url          },
+	{"reg_db_table",      PARAM_STR,                &reg_db_table        },
+	{"reg_contact_addr",  PARAM_STR,                &reg_contact_addr    },
 	{"reg_timer_interval", INT_PARAM,		&reg_timer_interval	},
 	{"reg_retry_interval",INT_PARAM,                &reg_retry_interval    },
 	{0, 0, 0}
@@ -209,15 +196,11 @@ static int mod_init(void)
 		}
 	}
 
-	rr_from_param.len = strlen(rr_from_param.s);
-	rr_to_param.len = strlen(rr_to_param.s);
 	if ( (rr_from_param.len==0 || rr_to_param.len==0) && restore_mode!=UAC_NO_RESTORE)
 	{
 		LM_ERR("rr_store_param cannot be empty if FROM is restoreable\n");
 		goto error;
 	}
-
-	uac_passwd.len = strlen(uac_passwd.s);
 
 	/* parse the auth AVP spesc, if any */
 	if ( auth_username_avp || auth_password_avp || auth_realm_avp) {
@@ -254,8 +237,6 @@ static int mod_init(void)
 
 		if(restore_from_avp.s) {
 
-			restore_from_avp.len = strlen(restore_from_avp.s);
-
 			if (pv_parse_spec(&restore_from_avp, &avp_spec)==0	|| avp_spec.type!=PVT_AVP) {
 				LM_ERR("malformed or non AVP %.*s AVP definition\n", restore_from_avp.len, restore_from_avp.s);
 				return -1;
@@ -271,8 +252,6 @@ static int mod_init(void)
 		}
 
 		if(restore_to_avp.s) {
-
-			restore_to_avp.len = strlen(restore_to_avp.s);
 
 			if (pv_parse_spec(&restore_to_avp, &avp_spec)==0	|| avp_spec.type!=PVT_AVP) {
 				LM_ERR("malformed or non AVP %.*s AVP definition\n", restore_to_avp.len, restore_to_avp.s);
@@ -311,9 +290,9 @@ static int mod_init(void)
 		}
 	}
 
-	if(reg_db_url.s!=NULL)
+	if(reg_db_url.s && reg_db_url.len>=0)
 	{
-		if(reg_contact_addr.s==NULL)
+		if(!reg_contact_addr.s || reg_contact_addr.len<=0)
 		{
 			LM_ERR("contact address parameter not set\n");
 			goto error;
@@ -334,7 +313,7 @@ static int mod_init(void)
 			LM_ERR("failed to init reg htable\n");
 			goto error;
 		}
-		uac_reg_init_db();
+
 		register_procs(1);
 		/* add child to update local config framework structures */
 		cfg_register_child(1);
@@ -354,7 +333,7 @@ static int child_init(int rank)
 	if (rank!=PROC_MAIN)
 		return 0;
 
-	if(reg_db_url.s==NULL)
+	if(!reg_db_url.s || reg_db_url.len<=0)
 		return 0;
 
 	pid=fork_process(PROC_TIMER, "TIMER UAC REG", 1);
@@ -533,6 +512,24 @@ static int w_replace_to(struct sip_msg* msg, char* p1, char* p2)
 
 }
 
+int replace_to_api(sip_msg_t *msg, str* pd, str* pu)
+{
+	str *uri;
+	str *dsp;
+	if ( msg->to==0 && (parse_headers(msg,HDR_TO_F,0)!=0 || msg->to==0) ) {
+		LM_ERR("failed to find/parse TO hdr\n");
+		return -1;
+	}
+
+	uri = (pu!=NULL && pu->len>0)?pu:NULL;
+	dsp = (pd!=NULL && pd->len>0)?pd:NULL;
+
+	LM_DBG("dsp=%p (len=%d) , uri=%p (len=%d)\n", dsp, dsp?dsp->len:0,
+			uri, uri?uri->len:0);
+
+	return replace_uri(msg, dsp, uri, msg->to, &rr_to_param, &restore_to_avp, 0);
+}
+
 
 static int w_uac_auth(struct sip_msg* msg, char* str, char* str2)
 {
@@ -594,14 +591,16 @@ static int w_uac_reg_request_to(struct sip_msg* msg, char* src, char* mode_s)
 }
 
 
-int bind_uac(struct uac_binds *uacb)
+int bind_uac(uac_api_t *uacb)
 {
-	if (uacb == NULL)
-        {
-                LM_WARN("bind_uac: Cannot load uac API into a NULL pointer\n");
-                return -1;
-        }
+	if (uacb == NULL) {
+		LM_WARN("bind_uac: Cannot load uac API into a NULL pointer\n");
+		return -1;
+	}
 
-        uacb->replace_from = replace_from_api;
-        return 0;
+	memset(uacb, 0, sizeof(uac_api_t));
+	uacb->replace_from = replace_from_api;
+	uacb->replace_to = replace_to_api;
+	uacb->req_send = uac_req_send;
+	return 0;
 }

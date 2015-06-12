@@ -1,0 +1,114 @@
+#!/bin/sh
+#
+# $Id$
+#
+#
+# 3w-xxxx:      Starts the sip_router process
+#
+# Version:      @(#) /etc/rc.d/init.d/3w-xxxx
+#
+# chkconfig: 2345 20 80
+# description: controls execution of SIP router
+# processname: sr
+# config: /etc/sip-router/iptel.cfg
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# we use a sip-router symlink -- that allows us to have a different name
+# in process table so that killalls does not start other sip-routers
+# run from somewhere else
+
+BINNAME=sr
+HM=/home/srouter
+SERDIR=$HM/sip_router
+ETC=/etc/sip-router/iptel.cfg
+PIDFILE=/var/run/sr.pid
+NOTIFY=sr@iptel.org
+USR=510
+GRP=510
+
+MONIT=/usr/local/bin/monit
+MONITRC=/usr/local/etc/monitrc
+
+RETVAL=0
+
+BIN=$HM/bin/$BINNAME
+MYDIR=$HM/core
+CORE=$MYDIR/core
+TMP=/tmp/srcore.$$
+
+sip_router_start() {
+	if [ -r $BIN -a -r $CORE ] ; then
+		echo "before startup sip-router core found on `date` at `hostname`" > $TMP
+		echo "----------------------------------" >> $TMP
+		DATE=`date "+%Y-%m-%d--%H-%M"`
+		NEWCORE=$MYDIR/core.$DATE
+		mv $CORE $NEWCORE
+		echo core stored in $NEWCORE >> $TMP
+		gdb $BIN $NEWCORE -x test/bt.gdb -batch >> $TMP
+		chmod a+r $NEWCORE
+		cd $SERDIR; tar czf $MYDIR/sip-router.$DATE.tgz .
+		mail -s "sip-router core found" $NOTIFY < $TMP
+		rm -f $TMP
+	fi
+	cd $MYDIR
+	#ulimit -c 1000000
+	echo "Starting SIP router: "
+	$BIN -f $ETC -w $MYDIR -P $PIDFILE
+	RETVAL=$?
+	echo
+}
+
+sip_router_stop() {
+	echo "Stopping SIP router: "
+	killproc $BINNAME
+	RETVAL=$?
+	echo
+}
+
+monit_start() {
+   echo "Command Monit to start Ser..."
+   ${MONIT} -c ${MONITRC} start sip-router
+   RETVAL=$?
+   echo
+}
+
+monit_stop() {
+   echo "Command Monit to stop Ser..."
+   ${MONIT} -c ${MONITRC} stop sip-router
+   RETVAL=$?
+   echo
+}
+
+# See how we were called.
+case "$1" in
+  serstart)
+	sip_router_start
+	;;
+  sip-routerstop)
+    sip_router_stop
+	;;
+  sip-routerrestart)
+	sip_router_stop
+	echo
+	sip_router_start
+	;;
+  start)
+    monit_start
+	;;
+  stop)
+    monit_stop
+	;;
+  restart)
+	monit_stop
+	sleep 1
+	monit_start
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $RETVAL
+

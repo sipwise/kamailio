@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of sip-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,23 +16,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * History:
- * --------
- *  2003-05-21  on sparc64 roundto 8 even in debugging mode (so malloc'ed
- *               long longs will be 64 bit aligned) (andrei)
- *  2004-07-19  support for 64 bit (2^64 mem. block) and more info
- *               for the future de-fragmentation support (andrei)
- *  2004-11-10  support for > 4Gb mem. (switched to long) (andrei)
- */
-
 /**
  * \file
  * \brief Simple & fast malloc library
  * \ingroup mem
  */
 
-#if !defined(q_malloc_h) && !defined(F_MALLOC)
+#if !defined(q_malloc_h) && !defined(F_MALLOC) && !defined(TLSF_MALLOC)
 #define q_malloc_h
 
 #include "meminfo.h"
@@ -112,10 +102,12 @@ struct qm_frag_lnk{
  */
 
 struct qm_block{
+	int type; /* type of memory */
 	unsigned long size; /* total size */
 	unsigned long used; /* alloc'ed size*/
 	unsigned long real_used; /* used+malloc overhead*/
 	unsigned long max_real_used;
+	unsigned long ffrags;
 	
 	struct qm_frag* first_frag;
 	struct qm_frag_end* last_frag_end;
@@ -126,7 +118,7 @@ struct qm_block{
 
 
 
-struct qm_block* qm_malloc_init(char* address, unsigned long size);
+struct qm_block* qm_malloc_init(char* address, unsigned long size, int type);
 
 #ifdef DBG_QM_MALLOC
 void* qm_malloc(struct qm_block*, unsigned long size, const char* file,

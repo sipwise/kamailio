@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2007-2008 1&1 Internet AG
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -80,7 +78,8 @@ static int db_do_query_internal(const db1_con_t* _h, const db_key_t* _k, const d
 	}
 
 	if (!_c) {
-		ret = snprintf(sql_buf, sql_buffer_size, "select * from %.*s ", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+		ret = snprintf(sql_buf, sql_buffer_size, "select * from %s%.*s%s ",
+				CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 		if (ret < 0 || ret >= sql_buffer_size) goto error;
 		off = ret;
 	} else {
@@ -88,11 +87,12 @@ static int db_do_query_internal(const db1_con_t* _h, const db_key_t* _k, const d
 		if (ret < 0 || ret >= sql_buffer_size) goto error;
 		off = ret;
 
-		ret = db_print_columns(sql_buf + off, sql_buffer_size - off, _c, _nc);
+		ret = db_print_columns(sql_buf + off, sql_buffer_size - off, _c, _nc, CON_TQUOTESZ(_h));
 		if (ret < 0) return -1;
 		off += ret;
 
-		ret = snprintf(sql_buf + off, sql_buffer_size - off, "from %.*s ", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+		ret = snprintf(sql_buf + off, sql_buffer_size - off, "from %s%.*s%s ",
+				CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 		if (ret < 0 || ret >= (sql_buffer_size - off)) goto error;
 		off += ret;
 	}
@@ -205,15 +205,15 @@ int db_do_insert_cmd(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v
 	}
 
 	if(mode==1)
-		ret = snprintf(sql_buf, sql_buffer_size, "insert delayed into %.*s (",
-				CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+		ret = snprintf(sql_buf, sql_buffer_size, "insert delayed into %s%.*s%s (",
+				CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 	else
-		ret = snprintf(sql_buf, sql_buffer_size, "insert into %.*s (",
-				CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+		ret = snprintf(sql_buf, sql_buffer_size, "insert into %s%.*s%s (",
+				CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 	if (ret < 0 || ret >= sql_buffer_size) goto error;
 	off = ret;
 
-	ret = db_print_columns(sql_buf + off, sql_buffer_size - off, _k, _n);
+	ret = db_print_columns(sql_buf + off, sql_buffer_size - off, _k, _n, CON_TQUOTESZ(_h));
 	if (ret < 0) return -1;
 	off += ret;
 
@@ -268,7 +268,8 @@ int db_do_delete(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _o,
 		return -1;
 	}
 
-	ret = snprintf(sql_buf, sql_buffer_size, "delete from %.*s", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+	ret = snprintf(sql_buf, sql_buffer_size, "delete from %s%.*s%s",
+			CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 	if (ret < 0 || ret >= sql_buffer_size) goto error;
 	off = ret;
 
@@ -311,7 +312,8 @@ int db_do_update(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _o,
 		return -1;
 	}
 
-	ret = snprintf(sql_buf, sql_buffer_size, "update %.*s set ", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+	ret = snprintf(sql_buf, sql_buffer_size, "update %s%.*s%s set ",
+			CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 	if (ret < 0 || ret >= sql_buffer_size) goto error;
 	off = ret;
 
@@ -356,11 +358,12 @@ int db_do_replace(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
 		return -1;
 	}
 
-	ret = snprintf(sql_buf, sql_buffer_size, "replace %.*s (", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+	ret = snprintf(sql_buf, sql_buffer_size, "replace %s%.*s%s (",
+			CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 	if (ret < 0 || ret >= sql_buffer_size) goto error;
 	off = ret;
 
-	ret = db_print_columns(sql_buf + off, sql_buffer_size - off, _k, _n);
+	ret = db_print_columns(sql_buf + off, sql_buffer_size - off, _k, _n, CON_TQUOTESZ(_h));
 	if (ret < 0) return -1;
 	off += ret;
 

@@ -1,28 +1,26 @@
 /*
- * $Id: items.h 2111 2007-05-01 11:18:08Z juhe $
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of SIP-Router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-Router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-Router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
  * \file
- * \brief Definitions for Pseudo-variable support
+ * \brief Kamailio core :: Definitions for Pseudo-variable support
  */
 
 
@@ -62,6 +60,7 @@
 #define PV_IDX_INT	0
 #define PV_IDX_PVAR	1
 #define PV_IDX_ALL	2
+#define PV_IDX_ITR	3
 
 /*! if PV name is dynamic, integer, or str */
 #define pv_has_dname(pv) ((pv)->pvp.pvn.type==PV_NAME_PVAR)
@@ -220,6 +219,8 @@ int pv_get_strval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, str *sval);
 int pv_get_strzval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, char *sval);
+int pv_get_strlval(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res, char *sval, int slen);
 int pv_get_strintval(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res, str *sval, int ival);
 int pv_get_intstrval(struct sip_msg *msg, pv_param_t *param,

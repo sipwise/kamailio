@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2007 Voice System SRL
  * Copyright (C) 2011 Carsten Bock, carsten@ng-voice.com
  *
@@ -18,13 +16,15 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2007-05-10  initial version (ancuta)
- * 2007-07-06 additional information saved in the database: cseq, contact, 
- *  		   route set and socket_info for both caller and callee (ancuta)
+ */
+
+/*!
+ * \file
+ * \brief Database interface
+ * \ingroup dialog
+ * Module: \ref dialog
  */
 
 #include <stdlib.h>
@@ -366,7 +366,7 @@ static int load_dialog_info_from_db(int dlg_hash_size, int fetch_num_rows)
 			next_id = d_table->entries[dlg->h_entry].next_id;
 
 			d_table->entries[dlg->h_entry].next_id =
-				(next_id < dlg->h_id) ? (dlg->h_id+1) : next_id;
+				(next_id <= dlg->h_id) ? (dlg->h_id+1) : next_id;
 
 			GET_STR_VALUE(to_tag, values, 6, 1, 1);
 

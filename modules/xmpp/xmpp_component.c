@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * XMPP Module
  * This file is part of Kamailio, a free SIP server.
  *
@@ -18,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * Author: Andreea Spirea
  *
@@ -26,9 +24,7 @@
 /*! \file
  * \brief Kamailio XMPP :: XMPP Component interface support
  *  \ingroup xmpp
- */
-
-/*
+ *
  * An inbound SIP message:
  *   from sip:user1@domain1 to sip:user2*domain2@gateway_domain
  * is translated to an XMPP message:

@@ -1,48 +1,27 @@
 /* 
- *$Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ---------
- * 2003-02-28 scratchpad compatibility abandoned (jiri)
- * 2003-01-29 transport-independent message zero-termination in
- *            receive_msg (jiri)
- * 2003-02-07 undoed jiri's zero term. changes (they break tcp) (andrei)
- * 2003-02-10 moved zero-term in the calling functions (udp_receive &
- *            tcp_read_req)
- * 2003-08-13 fixed exec_pre_cb returning 0 (backported from stable) (andrei)
- * 2004-02-06 added user preferences support - destroy_avps() (bogdan)
- * 2004-04-30 exec_pre_cb is called after basic sanity checks (at least one
- *            via present & parsed ok)  (andrei)
- * 2004-08-23 avp core changed - destroy_avp-> reset_avps (bogdan)
- * 2006-11-29 nonsip_msg hooks called for non-sip msg (e.g HTTP) (andrei)
  */
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -96,7 +75,8 @@ unsigned int inc_msg_no(void)
 }
 
 
-/* WARNING: buf must be 0 terminated (buf[len]=0) or some things might 
+/** Receive message
+ *  WARNING: buf must be 0 terminated (buf[len]=0) or some things might 
  * break (e.g.: modules/textops)
  */
 int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info) 
@@ -119,7 +99,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 
 	msg=pkg_malloc(sizeof(struct sip_msg));
 	if (msg==0) {
-		LOG(L_ERR, "ERROR: receive_msg: no mem for sip_msg\n");
+		LM_ERR("no mem for sip_msg\n");
 		goto error00;
 	}
 	msg_no++;
@@ -142,15 +122,19 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 	if(likely(sr_msg_time==1)) msg_set_time(msg);
 
 	if (parse_msg(buf,len, msg)!=0){
-		LOG(cfg_get(core, core_cfg, corelog),
+		if(sr_event_exec(SREV_RCV_NOSIP, (void*)msg)!=0) {
+			LOG(cfg_get(core, core_cfg, corelog),
 				"core parsing of SIP message failed (%s:%d/%d)\n",
 				ip_addr2a(&msg->rcv.src_ip), (int)msg->rcv.src_port,
 				(int)msg->rcv.proto);
-		sr_core_ert_run(msg, SR_CORE_ERT_RECEIVE_PARSE_ERROR);
+			sr_core_ert_run(msg, SR_CORE_ERT_RECEIVE_PARSE_ERROR);
+		}
 		goto error02;
 	}
-	DBG("After parse_msg...\n");
+	LM_DBG("After parse_msg...\n");
 
+	/* set log prefix */
+	log_prefix_set(msg);
 
 	/* ... clear branches from previous message */
 	clear_branches();
@@ -167,7 +151,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		/* sanity checks */
 		if ((msg->via1==0) || (msg->via1->error!=PARSE_OK)){
 			/* no via, send back error ? */
-			LOG(L_ERR, "ERROR: receive_msg: no via found in request\n");
+			LM_ERR("no via found in request\n");
 			STATS_BAD_MSG();
 			goto error02;
 		}
@@ -183,14 +167,14 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 			){
 			if (tcpconn_add_alias(rcv_info->proto_reserved1, msg->via1->port,
 									rcv_info->proto)!=0){
-				LOG(L_ERR, " ERROR: receive_msg: tcp alias failed\n");
+				LM_ERR("tcp alias failed\n");
 				/* continue */
 			}
 		}
 #endif
 
 	/*	skip: */
-		DBG("preparing to run routing scripts...\n");
+		LM_DBG("preparing to run routing scripts...\n");
 #ifdef  STATS
 		gettimeofday( & tvb, &tz );
 #endif
@@ -210,8 +194,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		set_route_type(REQUEST_ROUTE);
 		/* exec the routing script */
 		if (run_top_route(main_rt.rlist[DEFAULT_RT], msg, 0)<0){
-			LOG(L_WARN, "WARNING: receive_msg: "
-					"error while trying script\n");
+			LM_WARN("error while trying script\n");
 			goto error_req;
 		}
 
@@ -220,7 +203,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		diff = (tve.tv_sec-tvb.tv_sec)*1000000+(tve.tv_usec-tvb.tv_usec);
 		stats->processed_requests++;
 		stats->acc_req_time += diff;
-		DBG("successfully ran routing scripts...(%d usec)\n", diff);
+		LM_DBG("successfully ran routing scripts...(%d usec)\n", diff);
 		STATS_RX_REQUEST( msg->first_line.u.request.method_value );
 #endif
 
@@ -230,7 +213,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		/* sanity checks */
 		if ((msg->via1==0) || (msg->via1->error!=PARSE_OK)){
 			/* no via, send back error ? */
-			LOG(L_ERR, "ERROR: receive_msg: no via found in reply\n");
+			LM_ERR("no via found in reply\n");
 			STATS_BAD_RPL();
 			goto error02;
 		}
@@ -259,8 +242,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 			ret=run_top_route(onreply_rt.rlist[DEFAULT_RT], msg, &ctx);
 #ifndef NO_ONREPLY_ROUTE_ERROR
 			if (unlikely(ret<0)){
-				LOG(L_WARN, "WARNING: receive_msg: "
-						"error while trying onreply script\n");
+				LM_WARN("error while trying onreply script\n");
 				goto error_rpl;
 			}else
 #endif /* NO_ONREPLY_ROUTE_ERROR */
@@ -277,7 +259,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		diff = (tve.tv_sec-tvb.tv_sec)*1000000+(tve.tv_usec-tvb.tv_usec);
 		stats->processed_responses++;
 		stats->acc_res_time+=diff;
-		DBG("successfully ran reply processing...(%d usec)\n", diff);
+		LM_DBG("successfully ran reply processing...(%d usec)\n", diff);
 #endif
 
 		/* execute post reply-script callbacks */
@@ -293,13 +275,16 @@ end:
 #ifdef WITH_XAVP
 	xavp_reset_list();
 #endif
-	DBG("receive_msg: cleaning up\n");
+	LM_DBG("cleaning up\n");
 	free_sip_msg(msg);
 	pkg_free(msg);
 #ifdef STATS
 	if (skipped) STATS_RX_DROPS;
 #endif
+	/* reset log prefix */
+	log_prefix_set(NULL);
 	return 0;
+
 #ifndef NO_ONREPLY_ROUTE_ERROR
 error_rpl:
 	/* execute post reply-script callbacks */
@@ -311,7 +296,7 @@ error_rpl:
 	goto error02;
 #endif /* NO_ONREPLY_ROUTE_ERROR */
 error_req:
-	DBG("receive_msg: error:...\n");
+	LM_DBG("error:...\n");
 	/* execute post request-script callbacks */
 	exec_post_script_cb(msg, REQUEST_CB_TYPE);
 error03:
@@ -325,6 +310,8 @@ error02:
 	pkg_free(msg);
 error00:
 	STATS_RX_DROPS;
+	/* reset log prefix */
+	log_prefix_set(NULL);
 	return -1;
 }
 

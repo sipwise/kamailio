@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -51,8 +51,11 @@
 #include "diameter_peer.h"
 #include "config.h"
 #include "cdp_load.h"
-
+#include "cdp_rpc.h"
+#include "../../rpc.h"
+#include "../../rpc_lookup.h"
 #include "../../cfg/cfg_struct.h"
+#include "cdp_stats.h"
 
 MODULE_VERSION
 
@@ -60,6 +63,7 @@ char* config_file="DiameterPeer.xml"; 	/**< default DiameterPeer configuration f
 unsigned int latency_threshold = 500;			/**< default threshold for Diameter calls (ms) */
 unsigned int *latency_threshold_p = &latency_threshold;
 unsigned int workerq_latency_threshold = 100;	/**< default threshold for putting a task into worker queue (ms) */
+unsigned int workerq_length_threshold_percentage = 0;	/**< default threshold for worker queue length, percentage of max queue length - by default disabled */
 
 extern dp_config *config; 				/**< DiameterPeer configuration structure */
 
@@ -163,13 +167,8 @@ static param_export_t cdp_params[] = {
 	{ "config_file",				PARAM_STRING,	&config_file}, 				/**< configuration filename */
 	{ "latency_threshold", 			PARAM_INT, 		&latency_threshold},		/**<threshold above which we will log*/
 	{ "workerq_latency_threshold", 	PARAM_INT, 		&workerq_latency_threshold},/**<time threshold putting job into queue*/
+	{ "workerq_length_threshold_percentage", 	PARAM_INT, 		&workerq_length_threshold_percentage},/**<queue length threshold - percentage of max queue length*/
 	{ 0, 0, 0 }
-};
-
-stat_export_t mod_stats[] = {
-	{"avg_response_time" ,  STAT_IS_FUNC, 	(stat_var**)get_avg_cdp_response_time	},
-	{"timeouts" ,  			0, 				(stat_var**)&stat_cdp_timeouts  		},
-	{0,0,0}
 };
 
 /**
@@ -180,7 +179,7 @@ struct module_exports exports = {
 	DEFAULT_DLFLAGS,
 	cdp_cmds,                       		/**< Exported functions */
 	cdp_params,                     		/**< Exported parameters */
-	mod_stats,
+	0,
 	0,										/**< MI cmds */
 	0,										/**< pseudovariables */
 	0,										/**< extra processes */
@@ -198,23 +197,15 @@ struct module_exports exports = {
  */
 static int cdp_init( void )
 {
-#ifdef STATISTICS
-	/* register statistics */
-	if ( register_stat("cdp", "replies_response_time", &replies_response_time,0 )!=0 ) {
-		LM_ERR("failed to register stat\n");
+	if (rpc_register_array(cdp_rpc) != 0) {
+		LM_ERR("failed to register RPC commands for CDP module\n");
 		return -1;
 	}
-
-	if ( register_stat("cdp", "replies_received", &replies_received, 0)!=0 ) {
-		LM_ERR("failed to register stat\n");
-		return -1;
+	
+	if (cdp_init_counters() != 0) {
+	    LM_ERR("Failed to register counters for CDP modules\n");
+	    return -1;
 	}
-
-	if (register_module_stats( exports.name, mod_stats)!=0 ) {
-		LM_ERR("failed to register core statistics\n");
-		return -1;
-	}
-#endif
 
 	if (!diameter_peer_init(config_file)){
 		LM_ERR("error initializing the diameter peer\n");

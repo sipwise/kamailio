@@ -12,9 +12,15 @@ Edited by
 
 Juha Heinanen
 
+Edited by
+
+Olle E. Johansson
+
    Copyright © 2007-2008 Voice Sistem SRL
 
    Copyright © 2008-2010 Juha Heinanen
+
+   Copyright © 2014 Olle E. Johansson, Edvina AB
      __________________________________________________________________
 
    Table of Contents
@@ -43,6 +49,7 @@ Juha Heinanen
               5.10. attrs_col (string)
               5.11. attrs_pvar (string)
               5.12. fetch_rows (int)
+              5.13. match_dynamic (int)
 
         6. Functions
 
@@ -55,8 +62,9 @@ Juha Heinanen
 
         8. Exported RPC Commands
 
-              8.1. dialplan.reload
-              8.2. dialplan.translate
+              8.1. dialplan.dump
+              8.2. dialplan.reload
+              8.3. dialplan.translate
 
         9. Installation
 
@@ -76,9 +84,10 @@ Juha Heinanen
    1.10. Set attrs_col parameter
    1.11. Set attrs_pvar parameter
    1.12. Set fetch_rows parameter
-   1.13. dp_translate usage
+   1.13. Set match_dynamic parameter
    1.14. dp_translate usage
-   1.15. Example of rules
+   1.15. dp_translate usage
+   1.16. Example of rules
 
 Chapter 1. Admin Guide
 
@@ -106,6 +115,7 @@ Chapter 1. Admin Guide
         5.10. attrs_col (string)
         5.11. attrs_pvar (string)
         5.12. fetch_rows (int)
+        5.13. match_dynamic (int)
 
    6. Functions
 
@@ -118,8 +128,9 @@ Chapter 1. Admin Guide
 
    8. Exported RPC Commands
 
-        8.1. dialplan.reload
-        8.2. dialplan.translate
+        8.1. dialplan.dump
+        8.2. dialplan.reload
+        8.3. dialplan.translate
 
    9. Installation
 
@@ -127,30 +138,39 @@ Chapter 1. Admin Guide
 
    This module implements generic string translations based on matching
    and replacement rules. It can be used to manipulate the request URI or
-   a PV and to translate to a new format/value.
+   a PV and to translate it to a new format/value. Dialplan can also be
+   used to match a given URI and retrieve a set of attributes based on the
+   match. It is a very flexible module that can be used to handle call
+   routing, prefix rewrites and much more.
 
 2. How it works
 
-   At startup, the module will load a set of transformation rules from a
-   database. Rules are grouped into dialplans. Every database row will be
-   stored in memory as a translation rule. Each rule will describe how the
-   matching will be made, how the input value will be modified and which
-   attributes that will be set for the matching transformation.
+   At startup the module will load a set of matching and transformation
+   rules from a database. Rules are grouped into dialplans. Every database
+   row will be stored in memory as a dialplan rule. Each rule will
+   describe how the matching will be made, how the input value will be
+   modified and which attributes that will be set for the matching
+   transformation.
 
    The module expects an input value which will be matched against a rule
    by using regular expressions (see 'man pcresyntax' for syntax), string
    or fnmatch (see 'man fnmatch') matching. Overlapping matching
-   expressions can be controlled via priorities. Once a rule is matched,
-   the defined transformation (if any) is applied and the result is
-   returned as output value. Also, if any string attribute is associated
-   to the rule, this will be returned to the script along with the output
-   value. This can be used to identify the used rule.
+   expressions can be controlled via priorities. One priority can have
+   multiple dialplan entries. Priorities need not be numbered with
+   consecutive numbers. The next higher priority will be used after trying
+   to match all entries in one priority.
+
+   Once a rule is matched, the defined transformation (if any) is applied
+   and the result is returned as output value. Also, if any string
+   attribute is associated to the rule, this will be returned to the
+   script along with the output value. This can be used to identify the
+   used rule.
 
    The first matching rule will be processed.
 
 3. Dialplan use cases
 
-   The module can be used to implement multiple dialplans - do to
+   The module can be used to implement multiple dialplans - to do
    auto-completion of dialed numbers (like national to international), to
    convert generic numbers to specific numbers (like for emergency
    numbers).
@@ -196,6 +216,7 @@ Chapter 1. Admin Guide
    5.10. attrs_col (string)
    5.11. attrs_pvar (string)
    5.12. fetch_rows (int)
+   5.13. match_dynamic (int)
 
 5.1. db_url (string)
 
@@ -210,7 +231,7 @@ modparam("dialplan", "db_url", "mysql://user:passwb@localhost/db")
 
 5.2. table_name (string)
 
-   The table's name from which to load the translation rules.
+   The name of the database table used to load the translation rules.
 
    Default value is "dialplan".
 
@@ -300,8 +321,8 @@ modparam("dialplan", "repl_exp_col", "column_name")
 
 5.10. attrs_col (string)
 
-   The column name to store the rule's attributes to be set to the
-   message.
+   The column name to store the rule's attributes to be set after match
+   (see attrs_pvar )
 
    Default value is "attrs".
 
@@ -312,9 +333,9 @@ modparam("dialplan", "attrs_col", "column_name")
 
 5.11. attrs_pvar (string)
 
-   The pvar to store the rule's attributes, after translation
-   (dp_translate() succeeds). This parameter can be an AVP or a SCRIPT
-   VAR.
+   The pseudovariable used to store the rule's attributes, after
+   translation (when dp_translate() succeeds). This parameter can be an
+   "AVP" or a script variable ("$var()")..
 
    Default value is "NULL".
 
@@ -334,17 +355,35 @@ modparam("dialplan", "attrs_pvar", "$avp(s:dest)")
 modparam("dialplan", "fetch_rows", 4000)
 ...
 
+5.13. match_dynamic (int)
+
+   If set to 1, the match and substitution expressions can include script
+   variables and their values are evaluated at runtime.
+
+   During the loading process, the values that contain variables are no
+   longer pre-compiled to PCRE structure in memory, because the values
+   change at runtime, thus expect slightly slower performances. Values
+   without script variables are pre-compiled even if this parameter is
+   enabled.
+
+   Default value is "0" (disabled).
+
+   Example 1.13. Set match_dynamic parameter
+...
+modparam("dialplan", "match_dynamic", 1)
+...
+
 6. Functions
 
    6.1. dp_translate(id, [src[/dest]])
 
-6.1.  dp_translate(id, [src[/dest]])
+6.1. dp_translate(id, [src[/dest]])
 
-   Will try to translate src into dest according to the translation rules
-   with dialplan ID equal to id. If src/dest is missing the default
-   parameter "ruri.user/ruri.user" will be used, thus translating the
-   request uri user part. If only dest is missing, only matching and
-   storing of matching rule's attributes is done.
+   Will try to translate "src" into "dest" according to the translation
+   rules in the dialplan identified by "id" . If src/dest is missing the
+   default parameter "ruri.user/ruri.user" will be used, thus translating
+   the request URI user part. If only "dest" is missing, only matching and
+   storing of the matching rule's attributes is done.
 
    Returns 1, if translation succeeded, -1 in case of some error occurred,
    and -2 if dialplan with ID equal to id does not exist.
@@ -373,13 +412,13 @@ modparam("dialplan", "fetch_rows", 4000)
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.13. dp_translate usage
+   Example 1.14. dp_translate usage
 ...
 dp_translate("240", "$ruri.user/$avp(s:dest)");
 xlog("translated to var $avp(s:dest) \n");
 ...
 
-   Example 1.14. dp_translate usage
+   Example 1.15. dp_translate usage
 ...
 $avp(s:src) = $ruri.user;
 dp_translate("$var(x)", "$avp(s:src)/$var(y)");
@@ -422,10 +461,22 @@ xlog("translated to var $var(y) \n");
 
 8. Exported RPC Commands
 
-   8.1. dialplan.reload
-   8.2. dialplan.translate
+   8.1. dialplan.dump
+   8.2. dialplan.reload
+   8.3. dialplan.translate
 
-8.1. dialplan.reload
+8.1. dialplan.dump
+
+   Dumps the content of one dialplan ID
+
+   Name: dialplan.dump
+
+   Parameters: Dialplan ID
+
+   Example:
+                kamcmd dialplan.dump 100
+
+8.2. dialplan.reload
 
    Forces an update of the translation rules from the database.
 
@@ -436,7 +487,7 @@ xlog("translated to var $var(y) \n");
    Example:
                 kamcmd dialplan.reload
 
-8.2. dialplan.translate
+8.3. dialplan.translate
 
    Will apply a translation rule identified by a dialplan id and an input
    string.
@@ -462,12 +513,12 @@ xlog("translated to var $var(y) \n");
    Some sample records from a dialplan table are presented in the next
    figure.
 
-   Example 1.15. Example of rules
+   Example 1.16. Example of rules
 ...
 dpid: 1
 pr: 1
 match_op: 1
-match_exp: ^0([1-9][0-9]+)$
+match_exp: ^0[1-9][0-9]+$
 match_len: 0
 subst_exp: ^0([1-9][0-9]+)$
 repl_exp: 0049\1
@@ -476,7 +527,7 @@ attrs: de
 dpid: 1
 pr: 2
 match_op: 1
-match_exp: ^0([1-9][0-9]+)$
+match_exp: ^0[1-9][0-9]+$
 match_len: 0
 subst_exp: ^0(.+)$
 repl_exp: $var(prefix)\1
@@ -490,9 +541,10 @@ attrs: xyz
    private variables ($var(...)) and AVPs with static name are among those
    that are safe to use in replacement expressions.
 
-   The match_op field specify matching operator, valid values: 0 - string
-   comparison; 1 - regular expression matching (pcre); 2 - fnmatch
-   (shell-like pattern) matching.
+   The match_op field specify matching operator, valid values:
+     * 0 - string comparison;
+     * 1 - regular expression matching (pcre);
+     * 2 - fnmatch (shell-like pattern) matching.
 
 Chapter 2. Developer's Guide
 

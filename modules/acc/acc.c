@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -229,6 +229,7 @@ int acc_log_request( struct sip_msg *rq)
 	char *p;
 	int n;
 	int m;
+	int o;
 	int i;
 	struct tm *t;
 
@@ -236,7 +237,8 @@ int acc_log_request( struct sip_msg *rq)
 	m = core2strar( rq, val_arr, int_arr, type_arr);
 
 	/* get extra values */
-	m += extra2strar( log_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+	o = extra2strar( log_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+	m += o;
 
 	for ( i=0,p=log_msg ; i<m ; i++ ) {
 		if (p+1+log_attrs[i].len+1+val_arr[i].len >= log_msg_end) {
@@ -314,6 +316,8 @@ int acc_log_request( struct sip_msg *rq)
 			acc_env.text.len, acc_env.text.s,(unsigned long)acc_env.ts,
 			log_msg);
 	}
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 
 	return 1;
 }
@@ -437,6 +441,7 @@ int acc_db_request( struct sip_msg *rq)
 	int m;
 	int n;
 	int i;
+	int o;
 	struct tm *t;
 
 	/* formated database columns */
@@ -471,14 +476,15 @@ int acc_db_request( struct sip_msg *rq)
 	}
 
 	/* extra columns */
-	m += extra2strar( db_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+	o = extra2strar( db_extra, rq, val_arr+m, int_arr+m, type_arr+m);
+	m += o;
 
 	for( i++ ; i<m; i++)
 		VAL_STR(db_vals+i) = val_arr[i];
 
 	if (acc_dbf.use_table(db_handle, &acc_env.text/*table*/) < 0) {
 		LM_ERR("error in use_table\n");
-		return -1;
+		goto error;
 	}
 
 	/* multi-leg columns */
@@ -486,35 +492,51 @@ int acc_db_request( struct sip_msg *rq)
 		if(acc_db_insert_mode==1 && acc_dbf.insert_delayed!=NULL) {
 			if (acc_dbf.insert_delayed(db_handle, db_keys, db_vals, m) < 0) {
 				LM_ERR("failed to insert delayed into database\n");
-				return -1;
+				goto error;
+			}
+		} else if(acc_db_insert_mode==2 && acc_dbf.insert_async!=NULL) {
+			if (acc_dbf.insert_async(db_handle, db_keys, db_vals, m) < 0) {
+				LM_ERR("failed to insert async into database\n");
+				goto error;
 			}
 		} else {
 			if (acc_dbf.insert(db_handle, db_keys, db_vals, m) < 0) {
 				LM_ERR("failed to insert into database\n");
-				return -1;
+				goto error;
 			}
 		}
 	} else {
-  	        n = legs2strar(leg_info,rq,val_arr+m,int_arr+m,type_arr+m,1);
+		n = legs2strar(leg_info,rq,val_arr+m,int_arr+m,type_arr+m,1);
 		do {
 			for (i=m; i<m+n; i++)
 				VAL_STR(db_vals+i)=val_arr[i];
 			if(acc_db_insert_mode==1 && acc_dbf.insert_delayed!=NULL) {
 				if(acc_dbf.insert_delayed(db_handle,db_keys,db_vals,m+n)<0) {
 					LM_ERR("failed to insert delayed into database\n");
-					return -1;
+					goto error;
+				}
+			} else if(acc_db_insert_mode==2 && acc_dbf.insert_async!=NULL) {
+				if(acc_dbf.insert_async(db_handle,db_keys,db_vals,m+n)<0) {
+					LM_ERR("failed to insert async into database\n");
+					goto error;
 				}
 			} else {
 				if (acc_dbf.insert(db_handle, db_keys, db_vals, m+n) < 0) {
 					LM_ERR("failed to insert into database\n");
-					return -1;
+					goto error;
 				}
 			}
 		}while ( (n=legs2strar(leg_info,rq,val_arr+m,int_arr+m,
 				       type_arr+m,0))!=0 );
 	}
 
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 	return 1;
+error:
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
+	return -1;
 }
 
 #endif
@@ -636,6 +658,8 @@ int acc_rad_request( struct sip_msg *req )
 	UINT4 av_type;
 	int offset;
 	int i;
+	int m;
+	int o;
 
 	send=NULL;
 
@@ -660,8 +684,10 @@ int acc_rad_request( struct sip_msg *req )
 	ADD_RAD_AVPAIR( RA_TIME_STAMP, &av_type, -1);
 
 	/* add extra also */
-	attr_cnt += extra2strar(rad_extra, req, val_arr+attr_cnt,
+	o = extra2strar(rad_extra, req, val_arr+attr_cnt,
 				int_arr+attr_cnt, type_arr+attr_cnt);
+	attr_cnt += o;
+	m = attr_cnt;
 
 	/* add the values for the vector - start from 1 instead of
 	 * 0 to skip the first value which is the METHOD as string */
@@ -695,10 +721,14 @@ int acc_rad_request( struct sip_msg *req )
 		goto error;
 	}
 	rc_avpair_free(send);
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 	return 1;
 
 error:
 	rc_avpair_free(send);
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 	return -1;
 }
 
@@ -778,6 +808,8 @@ int acc_diam_request( struct sip_msg *req )
 	int status;
 	char tmp[2];
 	unsigned int mid;
+	int m;
+	int o;
 
 	attr_cnt = core2strar( req, val_arr, int_arr, type_arr );
 	/* last value is not used */
@@ -788,6 +820,8 @@ int acc_diam_request( struct sip_msg *req )
 		return -1;
 	}
 
+	m = 0;
+	o = 0;
 	/* AVP_ACCOUNTIG_RECORD_TYPE */
 	if( (status = diam_status(req, acc_env.code))<0) {
 		LM_ERR("status unknown\n");
@@ -831,7 +865,9 @@ int acc_diam_request( struct sip_msg *req )
 	}
 
 	/* also the extra attributes */
-	attr_cnt += extra2strar( dia_extra, req, val_arr, int_arr, type_arr);
+	o = extra2strar( dia_extra, req, val_arr, int_arr, type_arr);
+	attr_cnt += o;
+	m = attr_cnt;
 
 	/* add attributes */
 	for(i=0; i<attr_cnt; i++) {
@@ -922,10 +958,14 @@ int acc_diam_request( struct sip_msg *req )
 	}
 
 	AAAFreeMessage(&send);
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 	return 1;
 
 error:
 	AAAFreeMessage(&send);
+	/* free memory allocated by extra2strar */
+	free_strar_mem( &(type_arr[m-o]), &(val_arr[m-o]), o, m);
 	return -1;
 }
 

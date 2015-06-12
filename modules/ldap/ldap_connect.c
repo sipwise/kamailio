@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Kamailio LDAP Module
  *
  * Copyright (C) 2007 University of North Carolina
@@ -22,11 +20,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2007-02-18: Initial version
  */
 
 
@@ -41,7 +36,7 @@
 #include "../../mem/mem.h"
 #include "../../ut.h"
 
-int ldap_connect(char* _ld_name)
+int ldap_connect_ex(char* _ld_name, int llevel)
 {
 	int rc;
 	int ldap_bind_result_code;
@@ -226,11 +221,16 @@ int ldap_connect(char* _ld_name)
 	/* ldap_msgfree(result); */
 
 
-	LM_DBG(	"[%s]: LDAP bind successful (ldap_host [%s])\n",
+	LOG(llevel, "[%s]: LDAP bind successful (ldap_host [%s])\n",
 		_ld_name, 
 		lds->host_name);
 
 	return 0;
+}
+
+int ldap_connect(char* _ld_name)
+{
+	return ldap_connect_ex(_ld_name, L_DBG);
 }
 
 int ldap_disconnect(char* _ld_name)
@@ -267,14 +267,14 @@ int ldap_reconnect(char* _ld_name)
 		return -1;
 	}
 
-	if ((rc = ldap_connect(_ld_name)) != 0)
+	if ((rc = ldap_connect_ex(_ld_name, L_INFO)) != 0)
 	{
 		LM_ERR("[%s]: reconnect failed\n",
 				_ld_name);
 	}
 	else
 	{
-		LM_ERR("[%s]: LDAP reconnect successful\n",
+		LM_NOTICE("[%s]: LDAP reconnect successful\n",
 				_ld_name);
 	}
 	return rc;

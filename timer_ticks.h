@@ -1,36 +1,27 @@
 /*
- * $Id$
- *
- *
  * timer frequency and ticks conversions
  *
  * Copyright (C) 2005 iptelorg GmbH
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-/* History:
- * --------
- *  2005-07-27  complete re-design/re-implemnetation (andrei)
- *  2007-07-02  added ticks comparison macros (andrei)
- */
-
 /**
  * @file
- * @brief SIP-router core :: timer frequency and ticks conversions
+ * @brief Kamailio core :: timer frequency and ticks conversions
  * @ingroup core
  * Module: @ref core
  */

@@ -1,6 +1,4 @@
 /*
- * $Id$ 
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,13 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ---------
- * 2003-03-12 added replication mark and zombie state support (nils)
- * 2004-03-17 generic callbacks added (bogdan)
- * 2004-06-07 updated to the new DB api (andrei)
  */
 
 /*! \file
@@ -41,6 +34,7 @@
 #include "../../ut.h"
 #include "../../hashes.h"
 #include "../../tcp_conn.h"
+#include "../../pass_fd.h"
 #include "ul_mod.h"
 #include "usrloc.h"
 #include "utime.h"
@@ -244,6 +238,31 @@ static inline int is_tcp_alive(ucontact_t *c)
 }
 
 /*!
+ * \brief Close a TCP connection
+ *
+ * Requests the TCP main process to close the specified TCP connection
+ * \param conid the internal connection ID
+ */
+static inline int close_connection(int conid) {
+	struct tcp_connection *con;
+	long msg[2];
+	int n;
+	if ((con = tcpconn_get(conid, 0, 0, 0, 0))) {
+		msg[0] = (long)con;
+		msg[1] = CONN_EOF;
+
+		n = send_all(unix_tcp_sock, msg, sizeof(msg));
+		tcpconn_put(con);
+		if (unlikely(n <= 0)){
+			LM_ERR("failed to send close request: %s (%d)\n", strerror(errno), errno);
+			return 0;
+		}
+		return 1;
+	}
+	return 0;
+}
+
+/*!
  * \brief Expires timer for NO_DB db_mode
  *
  * Expires timer for NO_DB db_mode, process all contacts from
@@ -253,6 +272,7 @@ static inline int is_tcp_alive(ucontact_t *c)
 static inline void nodb_timer(urecord_t* _r)
 {
 	ucontact_t* ptr, *t;
+
 
 	ptr = _r->contacts;
 
@@ -270,6 +290,10 @@ static inline void nodb_timer(urecord_t* _r)
 			LM_DBG("Binding '%.*s','%.*s' has expired\n",
 				ptr->aor->len, ZSW(ptr->aor->s),
 				ptr->c.len, ZSW(ptr->c.s));
+
+			if (close_expired_tcp && is_valid_tcpconn(ptr)) {
+				close_connection(ptr->tcpconn_id);
+			}
 
 			t = ptr;
 			ptr = ptr->next;
@@ -307,6 +331,10 @@ static inline void wt_timer(urecord_t* _r)
 			LM_DBG("Binding '%.*s','%.*s' has expired\n",
 				ptr->aor->len, ZSW(ptr->aor->s),
 				ptr->c.len, ZSW(ptr->c.s));
+
+			if (close_expired_tcp && is_valid_tcpconn(ptr)) {
+				close_connection(ptr->tcpconn_id);
+			}
 
 			t = ptr;
 			ptr = ptr->next;
@@ -356,6 +384,10 @@ static inline void wb_timer(urecord_t* _r)
 				ptr->aor->len, ZSW(ptr->aor->s),
 				ptr->c.len, ZSW(ptr->c.s));
 			update_stat( _r->slot->d->expires, 1);
+
+			if (close_expired_tcp && is_valid_tcpconn(ptr)) {
+				close_connection(ptr->tcpconn_id);
+			}
 
 			t = ptr;
 			ptr = ptr->next;
@@ -539,11 +571,20 @@ int insert_ucontact(urecord_t* _r, str* _contact, ucontact_info_t* _ci,
 		return -1;
 	}
 
+	if (db_mode==DB_ONLY) {
+		if (db_insert_ucontact(*_c) < 0) {
+			LM_ERR("failed to insert in database\n");
+			return -1;
+		} else {
+			(*_c)->state = CS_SYNC;
+		}
+	}
+
 	if (exists_ulcb_type(UL_CONTACT_INSERT)) {
 		run_ul_callbacks( UL_CONTACT_INSERT, *_c);
 	}
 
-	if (db_mode == WRITE_THROUGH || db_mode==DB_ONLY) {
+	if (db_mode == WRITE_THROUGH) {
 		if (db_insert_ucontact(*_c) < 0) {
 			LM_ERR("failed to insert in database\n");
 			return -1;

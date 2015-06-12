@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2007 voice-system.ro
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,19 +15,19 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 /*!
  * \file
  * \brief Common string handling functions
+ * \ingroup libkcore
  */
 
 #ifndef _STRCOMMON_H_
 #define _STRCOMMON_H_
 
 #include "../../str.h"
-#include "../../md5.h"
 
 /*
  * add backslashes to special characters
@@ -39,8 +37,6 @@ int escape_common(char *dst, char *src, int src_len);
  * remove backslashes to special characters
  */
 int unescape_common(char *dst, char *src, int src_len);
-
-void compute_md5(char *dst, char *src, int src_len);
 
 int escape_user(str *sin, str *sout);
 

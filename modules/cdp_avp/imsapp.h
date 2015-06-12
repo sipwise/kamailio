@@ -34,7 +34,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -272,6 +272,8 @@ cdp_avp			(Multiple_Registration_Indication,IMS_vendor_id_3GPP,0,							Enumerat
 
 cdp_avp_add_ptr	(Restoration_Info,				IMS_vendor_id_3GPP,0,							Grouped,		AAA_AVP_LIST*)	
 cdp_avp_get		(Restoration_Info,				IMS_vendor_id_3GPP,0,							Grouped,		AAA_AVP_LIST)	
+
+cdp_avp_ptr		(Access_Network_Information,            IMS_vendor_id_3GPP,	0,		UTF8String,		str)        
 
 
 /*

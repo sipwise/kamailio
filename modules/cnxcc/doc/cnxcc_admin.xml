@@ -35,7 +35,7 @@
 	</para>
 	<para>
 		If your accounting program does not maintain the state of the call in real time, this module can provide you
-		that ability.
+		with that ability.
 	</para>
 	<para>
 		Cnxcc can also provide more common means of monitoring, i.e., by time limit or by maximum simultaneous calls.
@@ -59,22 +59,41 @@
 		</itemizedlist>
 	    </para>
 	</section>
+	<section>
+	    <title>Libraries</title>
+	    <para>
+		The following module must be loaded before this module: 
+		<itemizedlist>
+		    <listitem>
+		    <para>
+			<emphasis> hiredis-devel >= 0.11.0 </emphasis>
+		    </para>
+		    </listitem>
+		    <listitem>
+		    <para>
+			<emphasis> libevent-devel >= 2.0.18-2 </emphasis>
+		    </para>
+		    </listitem>
+
+		</itemizedlist>
+	    </para>
+	</section>
+
     </section>
 
     <section>
 	<title>Parameters</title>
 	<section>
-		<title><varname> dlg_flag </varname> (integer)</title>
+		<title><varname> redis </varname> (integer)</title>
 	    <para>
-		Flag to indicate if the dialog must be monitored or not. Messages are flagged with this value if we call one of
-		the monitoring functions.
+		Redis datasource connection information
 	    </para>
 	    <example>
 
 		<title>dlg_flag</title>
 		<programlisting format="linespecific">
 ...
-modparam("cnxcc", "dlg_flag", 29)
+modparam("cnxcc", "redis", "addr=127.0.0.1;port=6379;db=1")
 ...		
 		</programlisting>
 	    </example>

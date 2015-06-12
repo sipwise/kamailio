@@ -1,6 +1,4 @@
 /*
- * $Id: xcap_client.h 2230 2007-06-06 07:13:20Z anca_vamanu $
- *
  * xcap_client module - XCAP client for Kamailio
  *
  * Copyright (C) 2007 Voice Sistem S.R.L.
@@ -19,11 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2007-08-20  initial version (anca)
  */
 
 #ifndef XCAP_CL_H

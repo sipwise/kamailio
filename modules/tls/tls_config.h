@@ -17,7 +17,7 @@
  */
 /*!
  * \file
- * \brief SIP-router TLS support :: Configuration file parser
+ * \brief Kamailio TLS support :: Configuration file parser
  * \ingroup tls
  * Module: \ref tls
  */
@@ -28,6 +28,14 @@
 
 #include "../../str.h"
 #include "tls_domain.h"
+
+#include <openssl/ssl.h>
+
+#ifndef OPENSSL_NO_TLSEXT
+#ifndef SSL_CTRL_SET_TLSEXT_HOSTNAME
+#define OPENSSL_NO_TLSEXT
+#endif
+#endif
 
 tls_domains_cfg_t* tls_load_config(str* filename);
 

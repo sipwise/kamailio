@@ -1,29 +1,27 @@
 /*
- * $Id$
- *
  *  Crc - 32 + 16 BIT ANSI X3.66 + CCITT CRC checksum files
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*!
  * \file
- * \brief SIP-router core ::  Crc - 32 + 16 BIT ANSI X3.66 + CCITT CRC checksum files
+ * \brief Kamailio core ::  Crc - 32 + 16 BIT ANSI X3.66 + CCITT CRC checksum files
  * \ingroup core
  *
  * Module: \ref core
@@ -243,7 +241,7 @@ void crcitt_string_array( char *dst, str src[], int size )
 	ccitt = ~ccitt;
 	if (int2reverse_hex( &dst, &str_len, ccitt )==-1) {
 		/* bug ... printed ccitt value longer than CRC32_LEN */
-		LOG(L_CRIT, "ERROR: crcitt_string_array: string conversion incomplete\n");
+		LM_CRIT("string conversion incomplete\n");
 	}
 	/* padding */
 	while( str_len ) {

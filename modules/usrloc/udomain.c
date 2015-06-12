@@ -1,6 +1,4 @@
 /*
- * $Id$ 
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,15 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ---------
- * 2003-03-11 changed to the new locking scheme: locking.h (andrei)
- * 2003-03-12 added replication mark and zombie state (nils)
- * 2004-06-07 updated to the new DB api (andrei)
- * 2004-08-23  hash function changed to process characters as unsigned
- *             -> no negative results occur (jku)
  */
 
 /*! \file
@@ -223,9 +214,10 @@ void print_udomain(FILE* _f, udomain_t* _d)
  * ua, received, path, socket, methods, last_modified)
  * \param vals database values
  * \param contact contact
+ * \param rcon restore connection id
  * \return pointer to the ucontact_info on success, 0 on failure
  */
-static inline ucontact_info_t* dbrow2info( db_val_t *vals, str *contact)
+static inline ucontact_info_t* dbrow2info(db_val_t *vals, str *contact, int rcon)
 {
 	static ucontact_info_t ci;
 	static str callid, ua, received, host, path;
@@ -245,7 +237,7 @@ static inline ucontact_info_t* dbrow2info( db_val_t *vals, str *contact)
 		LM_CRIT("empty expire\n");
 		return 0;
 	}
-	ci.expires = VAL_TIME(vals+1);
+	ci.expires = UL_DB_EXPIRES_GET(vals+1);
 
 	if (VAL_NULL(vals+2)) {
 		LM_CRIT("empty q\n");
@@ -318,7 +310,7 @@ static inline ucontact_info_t* dbrow2info( db_val_t *vals, str *contact)
 		}
 		ci.sock = grep_sock_info( &host, (unsigned short)port, proto);
 		if (ci.sock==0) {
-			LM_INFO("non-local socket <%s>...ignoring\n", p);
+			LM_DBG("non-local socket <%s>...ignoring\n", p);
 		}
 	}
 
@@ -331,7 +323,7 @@ static inline ucontact_info_t* dbrow2info( db_val_t *vals, str *contact)
 
 	/* last modified time */
 	if (!VAL_NULL(vals+12)) {
-		ci.last_modified = VAL_TIME(vals+12);
+		ci.last_modified = UL_DB_EXPIRES_GET(vals+12);
 	}
 
 	/* record internal uid */
@@ -351,8 +343,21 @@ static inline ucontact_info_t* dbrow2info( db_val_t *vals, str *contact)
 		ci.reg_id = VAL_UINT(vals+15);
 	}
 
-	/* tcp connection id */
+	/* server_id */
+	if (!VAL_NULL(vals+16)) {
+		ci.server_id = VAL_UINT(vals+16);
+	}
+
+	/* tcp connection id (not restored always) */
 	ci.tcpconn_id = -1;
+	if(rcon==1 && !VAL_NULL(vals+17)) {
+		ci.tcpconn_id = VAL_UINT(vals+17);
+	}
+
+	/* keepalive */
+	if (!VAL_NULL(vals+18)) {
+		ci.keepalive = VAL_UINT(vals+18);
+	}
 
 	return &ci;
 }
@@ -372,7 +377,7 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d)
 	char uri[MAX_URI_SIZE];
 	ucontact_info_t *ci;
 	db_row_t *row;
-	db_key_t columns[18];
+	db_key_t columns[21];
 	db1_res_t* res = NULL;
 	str user, contact;
 	char* domain;
@@ -399,7 +404,10 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d)
 	columns[14] = &ruid_col;
 	columns[15] = &instance_col;
 	columns[16] = &reg_id_col;
-	columns[17] = &domain_col;
+	columns[17] = &srv_id_col;
+	columns[18] = &con_id_col;
+	columns[19] = &keepalive_col;
+	columns[20] = &domain_col;
 
 	if (ul_dbf.use_table(_c, _d->name) < 0) {
 		LM_ERR("sql use_table failed\n");
@@ -411,7 +419,7 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d)
 #endif
 
 	if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
-		if (ul_dbf.query(_c, 0, 0, 0, columns, 0, (use_domain)?(18):(17), 0,
+		if (ul_dbf.query(_c, 0, 0, 0, columns, 0, (use_domain)?(21):(20), 0,
 		0) < 0) {
 			LM_ERR("db_query (1) failed\n");
 			return -1;
@@ -421,7 +429,7 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d)
 			return -1;
 		}
 	} else {
-		if (ul_dbf.query(_c, 0, 0, 0, columns, 0, (use_domain)?(18):(17), 0,
+		if (ul_dbf.query(_c, 0, 0, 0, columns, 0, (use_domain)?(21):(20), 0,
 		&res) < 0) {
 			LM_ERR("db_query failed\n");
 			return -1;
@@ -449,7 +457,7 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d)
 			}
 			user.len = strlen(user.s);
 
-			ci = dbrow2info( ROW_VALUES(row)+1, &contact);
+			ci = dbrow2info(ROW_VALUES(row)+1, &contact, 0);
 			if (ci==0) {
 				LM_ERR("sipping record for %.*s in table %s\n",
 						user.len, user.s, _d->name->s);
@@ -457,7 +465,7 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d)
 			}
 
 			if (use_domain) {
-				domain = (char*)VAL_STRING(ROW_VALUES(row) + 17);
+				domain = (char*)VAL_STRING(ROW_VALUES(row) + 20);
 				if (VAL_NULL(ROW_VALUES(row)+17) || domain==0 || domain[0]==0){
 					LM_CRIT("empty domain record for user %.*s...skipping\n",
 							user.len, user.s);
@@ -531,12 +539,18 @@ error:
  */
 urecord_t* db_load_urecord(db1_con_t* _c, udomain_t* _d, str *_aor)
 {
+	char tname_buf[64];
+	str tname;
 	ucontact_info_t *ci;
-	db_key_t columns[16];
+	db_key_t columns[19];
 	db_key_t keys[2];
 	db_key_t order;
 	db_val_t vals[2];
 	db1_res_t* res = NULL;
+	db_row_t *row;
+	str aname;
+	str avalue;
+	sr_xval_t aval;
 	str contact;
 	char *domain;
 	int i;
@@ -581,6 +595,9 @@ urecord_t* db_load_urecord(db1_con_t* _c, udomain_t* _d, str *_aor)
 	columns[13] = &ruid_col;
 	columns[14] = &instance_col;
 	columns[15] = &reg_id_col;
+	columns[16] = &srv_id_col;
+	columns[17] = &con_id_col;
+	columns[18] = &keepalive_col;
 
 	if (desc_time_order)
 		order = &last_mod_col;
@@ -607,7 +624,7 @@ urecord_t* db_load_urecord(db1_con_t* _c, udomain_t* _d, str *_aor)
 	r = 0;
 
 	for(i = 0; i < RES_ROW_N(res); i++) {
-		ci = dbrow2info(  ROW_VALUES(RES_ROWS(res) + i), &contact);
+		ci = dbrow2info(ROW_VALUES(RES_ROWS(res) + i), &contact, 1);
 		if (ci==0) {
 			LM_ERR("skipping record for %.*s in table %s\n",
 					_aor->len, _aor->s, _d->name->s);
@@ -630,6 +647,88 @@ urecord_t* db_load_urecord(db1_con_t* _c, udomain_t* _d, str *_aor)
 	}
 
 	ul_dbf.free_result(_c, res);
+
+	/* Retrieve ul attributes */
+	if(ul_xavp_contact_name.s==NULL) {
+		/* feature disabled by mod param */
+		goto done;
+	}
+
+	if(_d->name->len + 6>=64) {
+		LM_ERR("attributes table name is too big\n");
+		goto done;
+	}
+	strncpy(tname_buf, _d->name->s, _d->name->len);
+	tname_buf[_d->name->len] = '\0';
+	strcat(tname_buf, "_attrs");
+	tname.s = tname_buf;
+	tname.len = _d->name->len + 6;
+
+	keys[0] = &ulattrs_ruid_col;
+	vals[0].type = DB1_STR;
+	vals[0].nul = 0;
+	columns[0] = &ulattrs_aname_col;
+	columns[1] = &ulattrs_atype_col;
+	columns[2] = &ulattrs_avalue_col;
+
+	if (ul_dbf.use_table(ul_dbh, &tname) < 0) {
+		LM_ERR("sql use_table failed for %.*s\n", tname.len, tname.s);
+		goto done;
+	}
+
+	for (c = r->contacts; c != NULL; c = c->next) {
+		vals[0].val.str_val.s = c->ruid.s;
+		vals[0].val.str_val.len = c->ruid.len;
+
+		if (ul_dbf.query(ul_dbh, keys, 0, vals, columns, 1, 3, 0, &res) < 0) {
+			LM_ERR("db_query failed\n");
+			continue;
+		}
+
+		if (RES_ROW_N(res) == 0) {
+			LM_DBG("location attrs table is empty\n");
+			ul_dbf.free_result(ul_dbh, res);
+			continue;
+		}
+
+		for(i = 0; i < RES_ROW_N(res); i++) {
+			row = RES_ROWS(res) + i;
+
+			aname.s = (char*)VAL_STRING(ROW_VALUES(row));
+			aname.len = strlen(aname.s);
+			avalue.s = (char*)VAL_STRING(ROW_VALUES(row) + 2);
+			avalue.len = strlen(avalue.s);
+			memset(&aval, 0, sizeof(sr_xval_t));
+			if(VAL_INT(ROW_VALUES(row)+1)==0) {
+				/* string value */
+				aval.v.s = avalue;
+				aval.type = SR_XTYPE_STR;
+			} else if(VAL_INT(ROW_VALUES(row)+1)==1) {
+				/* int value */
+				str2sint(&avalue, &aval.v.i);
+				aval.type = SR_XTYPE_INT;
+			} else {
+				/* unknown type - ignore */
+				continue;
+			}
+
+			/* add xavp to contact */
+			if(c->xavp==NULL) {
+				if(xavp_add_xavp_value(&ul_xavp_contact_name, &aname,
+							&aval, &c->xavp)==NULL)
+					LM_INFO("cannot add first xavp to contact - ignoring\n");
+			} else {
+				if(c->xavp->val.type==SR_XTYPE_XAVP) {
+					if(xavp_add_value(&aname, &aval, &c->xavp->val.v.xavp)==NULL)
+						LM_INFO("cannot add values to contact xavp\n");
+				}
+			}
+		}
+		ul_dbf.free_result(ul_dbh, res);
+	}
+
+
+done:
 	return r;
 }
 
@@ -643,7 +742,7 @@ urecord_t* db_load_urecord(db1_con_t* _c, udomain_t* _d, str *_aor)
 urecord_t* db_load_urecord_by_ruid(db1_con_t* _c, udomain_t* _d, str *_ruid)
 {
 	ucontact_info_t *ci;
-	db_key_t columns[18];
+	db_key_t columns[21];
 	db_key_t keys[1];
 	db_key_t order;
 	db_val_t vals[1];
@@ -678,8 +777,11 @@ urecord_t* db_load_urecord_by_ruid(db1_con_t* _c, udomain_t* _d, str *_ruid)
 	columns[13] = &ruid_col;
 	columns[14] = &instance_col;
 	columns[15] = &reg_id_col;
-	columns[16] = &user_col;
-	columns[17] = &domain_col;
+	columns[16] = &srv_id_col;
+	columns[17] = &con_id_col;
+	columns[18] = &keepalive_col;
+	columns[19] = &user_col;
+	columns[20] = &domain_col;
 
 	if (desc_time_order)
 		order = &last_mod_col;
@@ -709,19 +811,19 @@ urecord_t* db_load_urecord_by_ruid(db1_con_t* _c, udomain_t* _d, str *_ruid)
 	/* use first row - shouldn't be more */
 	row = RES_ROWS(res);
 
-	ci = dbrow2info(ROW_VALUES(RES_ROWS(res)), &contact);
+	ci = dbrow2info(ROW_VALUES(RES_ROWS(res)), &contact, 1);
 	if (ci==0) {
 		LM_ERR("skipping record for %.*s in table %s\n",
 				_ruid->len, _ruid->s, _d->name->s);
 		goto done;
 	}
 
-	aor.s = (char*)VAL_STRING(ROW_VALUES(row) + 16);
+	aor.s = (char*)VAL_STRING(ROW_VALUES(row) + 19);
 	aor.len = strlen(aor.s);
 
 	if (use_domain) {
-		domain.s = (char*)VAL_STRING(ROW_VALUES(row) + 17);
-		if (VAL_NULL(ROW_VALUES(row)+17) || domain.s==0 || domain.s[0]==0){
+		domain.s = (char*)VAL_STRING(ROW_VALUES(row) + 20);
+		if (VAL_NULL(ROW_VALUES(row)+20) || domain.s==0 || domain.s[0]==0){
 			LM_CRIT("empty domain record for user %.*s...skipping\n",
 					aor.len, aor.s);
 			goto done;
@@ -770,15 +872,13 @@ int db_timer_udomain(udomain_t* _d)
 
 	keys[0] = &expires_col;
 	ops[0] = "<";
-	vals[0].type = DB1_DATETIME;
 	vals[0].nul = 0;
-	vals[0].val.time_val = act_time + 1;
+	UL_DB_EXPIRES_SET(&vals[0], act_time + 1);
 
 	keys[1] = &expires_col;
-	ops[1] = "!=";
-	vals[1].type = DB1_DATETIME;
+	ops[1] = OP_NEQ;
 	vals[1].nul = 0;
-	vals[1].val.time_val = 0;
+	UL_DB_EXPIRES_SET(&vals[1], 0);
 
 	if (ul_dbf.use_table(ul_dbh, _d->name) < 0) {
 		LM_ERR("use_table failed\n");
@@ -801,23 +901,30 @@ int db_timer_udomain(udomain_t* _d)
  */
 int testdb_udomain(db1_con_t* con, udomain_t* d)
 {
-	db_key_t key[1], col[1];
-	db_val_t val[1];
+	db_key_t key[2], col[1];
+	db_val_t val[2];
 	db1_res_t* res = NULL;
 
-	if (ul_dbf.use_table(con, d->name) < 0) {
+	if(ul_dbf.use_table(con, d->name) < 0) {
 		LM_ERR("failed to change table\n");
 		return -1;
 	}
 
 	key[0] = &user_col;
+	key[1] = &domain_col;
 
 	col[0] = &user_col;
+
 	VAL_TYPE(val) = DB1_STRING;
 	VAL_NULL(val) = 0;
 	VAL_STRING(val) = "dummy_user";
 	
-	if (ul_dbf.query( con, key, 0, val, col, 1, 1, 0, &res) < 0) {
+	VAL_TYPE(val+1) = DB1_STRING;
+	VAL_NULL(val+1) = 0;
+	VAL_STRING(val+1) = "dummy_domain";
+
+	if(ul_dbf.query(con, key, 0, val, col, (use_domain)?2:1, 1, 0, &res)<0) {
+		if(res) ul_dbf.free_result( con, res);
 		LM_ERR("failure in db_query\n");
 		return -1;
 	}

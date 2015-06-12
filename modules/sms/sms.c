@@ -1,41 +1,22 @@
 /*
- * $Id$
- *
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-/*
- * History:
- * --------
- *  2003-03-11  updated to the new module exports interface (andrei)
- *  2003-03-16  flags export parameter added (janakj)
- *  2003-03-19  all mallocs/frees replaced w/ pkg_malloc/pkg_free (andrei)
- *  2003-04-02  port_no_str does not contain a leading ':' anymore (andrei)
- *  2003-04-06  Only child 1 will execute child init (janakj)
- *  2003-10-24  updated to the new socket_info lists (andrei)
- */
-
 
 #include <stdio.h>
 #include <string.h>
@@ -75,12 +56,11 @@ char *networks_config = 0;
 char *modems_config   = 0;
 char *links_config    = 0;
 char *default_net_str = 0;
-char *domain_str      = 0;
 
 /*global variables*/
 int    default_net    = 0;
 int    max_sms_parts  = MAX_SMS_PARTS;
-str    domain;
+str    domain = {0,0};
 int    *queued_msgs    = 0;
 int    use_contact     = 0;
 int    sms_report_type = NO_REPORT;
@@ -96,12 +76,12 @@ static cmd_export_t cmds[]={
 
 
 static param_export_t params[]={
-	{"networks",        STR_PARAM, &networks_config },
-	{"modems",          STR_PARAM, &modems_config   },
-	{"links",           STR_PARAM, &links_config    },
-	{"default_net",     STR_PARAM, &default_net_str },
+	{"networks",        PARAM_STRING, &networks_config },
+	{"modems",          PARAM_STRING, &modems_config   },
+	{"links",           PARAM_STRING, &links_config    },
+	{"default_net",     PARAM_STRING, &default_net_str },
 	{"max_sms_parts",   INT_PARAM, &max_sms_parts   },
-	{"domain",          STR_PARAM, &domain_str      },
+	{"domain",          PARAM_STR, &domain      },
 	{"use_contact",     INT_PARAM, &use_contact     },
 	{"sms_report_type", INT_PARAM, &sms_report_type },
 	{0,0,0}
@@ -548,11 +528,8 @@ int global_init(void)
 	if (load_tm( &tmb )==-1)
 		goto error;
 
-	/*fix domain length*/
-	if (domain_str) {
-		domain.s = domain_str;
-		domain.len = strlen(domain_str);
-	} else {
+	/*fix domain*/
+	if (!domain.s){
 		si=get_first_socket();
 		if (si==0){
 			LM_CRIT("null listen socket list\n");

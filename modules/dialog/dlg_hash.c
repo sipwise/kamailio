@@ -16,29 +16,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2006-04-14  initial version (bogdan)
- * 2007-03-06  syncronized state machine added for dialog state. New tranzition
- *             design based on events; removed num_1xx and num_2xx (bogdan)
- * 2007-04-30  added dialog matching without DID (dialog ID), but based only
- *             on RFC3261 elements - based on an original patch submitted 
- *             by Michel Bensoussan <michel@extricom.com> (bogdan)
- * 2007-07-06  additional information stored in order to save it in the db:
- *             cseq, route_set, contact and sock_info for both caller and 
- *             callee (ancuta)
- * 2007-07-10  Optimized dlg_match_mode 2 (DID_NONE), it now employs a proper
- *             hash table lookup and isn't dependant on the is_direction 
- *             function (which requires an RR param like dlg_match_mode 0 
- *             anyways.. ;) ; based on a patch from 
- *             Tavis Paquette <tavis@galaxytelecom.net> 
- *             and Peter Baer <pbaer@galaxytelecom.net>  (bogdan)
- * 2008-04-17  added new type of callback to be triggered right before the
- *              dialog is destroyed (deleted from memory) (bogdan)
- * 2008-04-17  added new dialog flag to avoid state tranzitions from DELETED to
- *             CONFIRMED_NA due delayed "200 OK" (bogdan)
  */
 
 
@@ -190,8 +169,9 @@ int dlg_ka_run(ticks_t ti)
 		if(*dlg_ka_list_head == *dlg_ka_list_tail) {
 			*dlg_ka_list_head = NULL;
 			*dlg_ka_list_tail = NULL;
+		} else {
+			*dlg_ka_list_head = dka->next;
 		}
-		*dlg_ka_list_head = dka->next;
 		lock_release(dlg_ka_list_lock);
 
 		/* send keep-alive for dka */
@@ -200,10 +180,16 @@ int dlg_ka_run(ticks_t ti)
 			shm_free(dka);
 			dka = NULL;
 		} else {
-			if(dka->iflags & DLG_IFLAG_KA_SRC)
-				dlg_send_ka(dlg, DLG_CALLER_LEG, 0);
-			if(dka->iflags & DLG_IFLAG_KA_DST)
-				dlg_send_ka(dlg, DLG_CALLEE_LEG, 0);
+			if((dka->iflags & DLG_IFLAG_KA_SRC)
+					&& (dlg->state==DLG_STATE_CONFIRMED))
+				dlg_send_ka(dlg, DLG_CALLER_LEG);
+			if((dka->iflags & DLG_IFLAG_KA_DST)
+					&& (dlg->state==DLG_STATE_CONFIRMED))
+				dlg_send_ka(dlg, DLG_CALLEE_LEG);
+			if(dlg->state==DLG_STATE_DELETED) {
+				shm_free(dka);
+				dka = NULL;
+			}
 			dlg_release(dlg);
 		}
 		/* append to tail */

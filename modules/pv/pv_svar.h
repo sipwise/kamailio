@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2006 voice-system.ro
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -31,7 +29,12 @@
 
 #include "../../usr_avp.h"
 
-#define VAR_VAL_STR	(1<<0)
+#define VAR_VAL_INT		(0)		/* value is INT (other flags not set) */
+#define VAR_VAL_STR		(1<<0)  /* value is STR */
+#define VAR_VAL_NULL	(1<<1)	/* value is NULL */
+
+#define VAR_TYPE_ZERO	(0)		/* default value is 0 (type NULL not set) */
+#define VAR_TYPE_NULL	(1<<15) /* default value is NULL */
 
 typedef struct script_val {
 	int flags;
@@ -44,9 +47,10 @@ typedef struct script_var {
 	struct script_var *next;
 } script_var_t, *script_var_p;
 
-script_var_t* add_var(str *name);
+script_var_t* add_var(str *name, int vtype);
 script_var_t* set_var_value(script_var_t *var, int_str *value, int flags);
 script_var_t* get_var_by_name(str *name);
+script_var_t* get_varnull_by_name(str *name);
 
 void reset_vars(void);
 void destroy_vars(void);

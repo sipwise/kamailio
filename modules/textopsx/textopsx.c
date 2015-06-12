@@ -21,7 +21,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include <stdio.h>
@@ -164,6 +164,11 @@ static int msg_apply_changes_f(sip_msg_t *msg, char *str1, char *str2)
 		obuf.s = generate_res_buf_from_sip_res(msg,
 				(unsigned int*)&obuf.len, BUILD_NO_VIA1_UPDATE);
 	} else {
+		if(msg->msg_flags & FL_RR_ADDED) {
+			LM_ERR("cannot apply msg changes after adding record-route"
+					" header - it breaks conditional 2nd header\n");
+			return -1;
+		}
 		obuf.s = build_req_buf_from_sip_req(msg,
 				(unsigned int*)&obuf.len, &dst,
 				BUILD_NO_PATH|BUILD_NO_LOCAL_VIA|BUILD_NO_VIA1_UPDATE);
@@ -858,7 +863,7 @@ static int find_hf_value2_param(struct hname_data* hname, str* param_area, str* 
 			while (i<param_area->len && is_space(param_area->s[i])) i++;
 		}
 		else {
-			while (i<param_area->len && !is_space(param_area->s[i]) && !param_area->s[i]!=',') i++;
+			while (i<param_area->len && !is_space(param_area->s[i]) && !(param_area->s[i]!=',')) i++;
 		}
 	}
 	lump_del->s = param_area->s + i;

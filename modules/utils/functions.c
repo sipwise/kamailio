@@ -18,13 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
 /*!
  * \file
- * \brief SIP-router utils :: 
+ * \brief Kamailio utils :: 
  * \ingroup utils
  * Module: \ref utils
  */
@@ -46,24 +46,30 @@
 /* 
  * curl write function that saves received data as zero terminated
  * to stream. Returns the amount of data taken care of.
+ *
+ * This function may be called multiple times for larger responses, 
+ * so it reallocs + concatenates the buffer as needed.
  */
-size_t write_function( void *ptr, size_t size, size_t nmemb, void *stream)
+size_t write_function( void *ptr, size_t size, size_t nmemb, void *stream_ptr)
 {
-    /* Allocate memory and copy */
-    char* data;
+    http_res_stream_t *stream = (http_res_stream_t *) stream_ptr;
 
-    data = (char*)pkg_malloc((size* nmemb) + 1);
-    if (data == NULL) {
+    stream->buf = (char *) pkg_realloc(stream->buf, stream->curr_size + 
+				(size * nmemb) + 1);
+
+    if (stream->buf == NULL) {
 	LM_ERR("cannot allocate memory for stream\n");
 	return CURLE_WRITE_ERROR;
     }
 
-    memcpy(data, (char*)ptr, size* nmemb);
-    data[nmemb] = '\0';
-        
-    *((char**) stream) = data;
-    
-    return size* nmemb;
+    memcpy(&stream->buf[stream->pos], (char *) ptr, (size * nmemb));
+
+    stream->curr_size += ((size * nmemb) + 1);
+    stream->pos += (size * nmemb);
+
+    stream->buf[stream->pos + 1] = '\0';
+
+    return size * nmemb;
  }
 
 
@@ -77,11 +83,13 @@ int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post)
     CURLcode res;  
     str value, post_value;
     char *url, *at, *post;
-    char* stream;
+    http_res_stream_t stream;
     long stat;
     pv_spec_t *dst;
     pv_value_t val;
     double download_size;
+
+    memset(&stream, 0, sizeof(http_res_stream_t));
 
     if (fixup_get_svalue(_m, (gparam_p)_url, &value) != 0) {
 	LM_ERR("cannot get page value\n");
@@ -110,6 +118,7 @@ int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post)
 
     	if (fixup_get_svalue(_m, (gparam_p)_post, &post_value) != 0) {
 		LM_ERR("cannot get post value\n");
+		curl_easy_cleanup(curl);
 		pkg_free(url);
 		return -1;
     	}
@@ -129,7 +138,6 @@ int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post)
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, (long)1);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)http_query_timeout);
 
-    stream = NULL;
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &stream);
 
@@ -139,26 +147,35 @@ int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post)
 	pkg_free(post);
     }
 
-    if (res != CURLE_OK) {
-	LM_ERR("failed to perform curl\n");
-	curl_easy_cleanup(curl);
-	if(stream)
-	    pkg_free(stream);
-	return -1;
+	if (res != CURLE_OK) {
+		/* http://curl.haxx.se/libcurl/c/libcurl-errors.html */
+		if (res == CURLE_COULDNT_CONNECT) {
+			LM_WARN("failed to connect() to host\n");
+		} else if ( res == CURLE_COULDNT_RESOLVE_HOST ) {
+			LM_WARN("couldn't resolve host\n");
+		} else {
+			LM_ERR("failed to perform curl (%d)\n", res);
+		}
+	
+		curl_easy_cleanup(curl);
+		if(stream.buf)
+			pkg_free(stream.buf);
+		return -1;
     }
 
     curl_easy_getinfo(curl, CURLINFO_HTTP_CODE, &stat);
-    if ((stat >= 200) && (stat < 400)) {
+    if ((stat >= 200) && (stat < 500)) {
 	curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD, &download_size);
 	LM_DBG("http_query download size: %u\n", (unsigned int)download_size);
+
 	/* search for line feed */
-	at = memchr(stream, (char)10, download_size);
+	at = memchr(stream.buf, (char)10, download_size);
 	if (at == NULL) {
 	    /* not found: use whole stream */
-	    at = stream + (unsigned int)download_size;
+	    at = stream.buf + (unsigned int)download_size;
 	}
-	val.rs.s = stream;
-	val.rs.len = at - stream;
+	val.rs.s = stream.buf;
+	val.rs.len = at - stream.buf;
 	LM_DBG("http_query result: %.*s\n", val.rs.len, val.rs.s);
 	val.flags = PV_VAL_STR;
 	dst = (pv_spec_t *)_dst;
@@ -166,6 +183,6 @@ int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post)
     }
 	
     curl_easy_cleanup(curl);
-    pkg_free(stream);
+    pkg_free(stream.buf);
     return stat;
 }

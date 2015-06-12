@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -35,6 +35,7 @@
 #include "../../parser/sdp/sdp_helpr_funcs.h"
 #include "../../trim.h"
 #include "../../data_lump.h"
+#include "../../ut.h"
 
 #include "api.h"
 #include "sdpops_data.h"
@@ -47,7 +48,10 @@ static int w_sdp_remove_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_keep_codecs_by_id(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_keep_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_with_media(sip_msg_t* msg, char* media, char *bar);
+static int w_sdp_with_active_media(sip_msg_t* msg, char* media, char *bar);
 static int w_sdp_with_transport(sip_msg_t* msg, char* transport, char *bar);
+static int w_sdp_with_transport_like(sip_msg_t* msg, char* transport, char *bar);
+static int w_sdp_transport(sip_msg_t* msg, char *bar);
 static int w_sdp_with_codecs_by_id(sip_msg_t* msg, char* codec, char *bar);
 static int w_sdp_with_codecs_by_name(sip_msg_t* msg, char* codec, char *bar);
 static int w_sdp_remove_media(sip_msg_t* msg, char* media, char *bar);
@@ -55,6 +59,7 @@ static int w_sdp_remove_transport(sip_msg_t* msg, char* transport, char *bar);
 static int w_sdp_print(sip_msg_t* msg, char* level, char *bar);
 static int w_sdp_get(sip_msg_t* msg, char *bar);
 static int w_sdp_content(sip_msg_t* msg, char* foo, char *bar);
+static int w_sdp_with_ice(sip_msg_t* msg, char* foo, char *bar);
 static int w_sdp_get_line_startswith(sip_msg_t* msg, char *foo, char *bar);
 
 
@@ -77,12 +82,18 @@ static cmd_export_t cmds[] = {
 		2, fixup_spve_spve,  0, ANY_ROUTE},
 	{"sdp_with_media",             (cmd_function)w_sdp_with_media,
 		1, fixup_spve_null,  0, ANY_ROUTE},
+	{"sdp_with_active_media",       (cmd_function)w_sdp_with_active_media,
+		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_remove_media",             (cmd_function)w_sdp_remove_media,
 		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_with_transport",         (cmd_function)w_sdp_with_transport,
 		1, fixup_spve_null,  0, ANY_ROUTE},
+	{"sdp_with_transport_like",  (cmd_function)w_sdp_with_transport_like,
+		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_remove_transport",       (cmd_function)w_sdp_remove_transport,
 		1, fixup_spve_null,  0, ANY_ROUTE},
+	{"sdp_transport",              (cmd_function)w_sdp_transport,
+		1, 0,  0, ANY_ROUTE},
 	{"sdp_with_codecs_by_id",      (cmd_function)w_sdp_with_codecs_by_id,
 		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_with_codecs_by_name",    (cmd_function)w_sdp_with_codecs_by_name,
@@ -92,6 +103,8 @@ static cmd_export_t cmds[] = {
 	{"sdp_get",                  (cmd_function)w_sdp_get,
 		1, 0,  0, ANY_ROUTE},
 	{"sdp_content",                (cmd_function)w_sdp_content,
+		0, 0,  0, ANY_ROUTE},
+	{"sdp_with_ice",                (cmd_function)w_sdp_with_ice,
 		0, 0,  0, ANY_ROUTE},
 	{"sdp_get_line_startswith", (cmd_function)w_sdp_get_line_startswith,
 		2, 0,  0, ANY_ROUTE},
@@ -146,12 +159,17 @@ static int mod_init(void)
 int sdp_locate_line(sip_msg_t* msg, char *pos, str *aline)
 {
 	char *p;
+	char *bend;
+
 	p = pos;
 	while(*p!='\n') p--;
 	aline->s = p + 1;
 	p = pos;
-	while(*p!='\n') p++;
+	bend = msg->buf+msg->len;
+	while(*p!='\n' && p<bend) p++;
 	aline->len = p - aline->s + 1;
+	if(unlikely(p==bend)) aline->len--;
+
 	return 0;
 }
 
@@ -800,6 +818,86 @@ static int w_sdp_with_media(sip_msg_t* msg, char* media, char *bar)
 }
 
 /**
+ * @brief check 'media' matches the value of any 'm=value ...' lines, and that line is active
+ * @return -1 - error; 0 - not found or inactive; 1 - at least one sendrecv, recvonly or sendonly stream
+ */
+static int sdp_with_active_media(sip_msg_t *msg, str *media)
+{
+	int sdp_session_num;
+	int sdp_stream_num;
+	int port_num;
+	sdp_session_cell_t* sdp_session;
+	sdp_stream_cell_t* sdp_stream;
+
+	if(parse_sdp(msg) < 0) {
+		LM_ERR("Unable to parse sdp\n");
+		return -1;
+	}
+
+	LM_DBG("attempting to search for media type: [%.*s]\n",
+			media->len, media->s);
+
+	sdp_session_num = 0;
+	for(;;)
+	{
+		sdp_session = get_sdp_session(msg, sdp_session_num);
+		if(!sdp_session) break;
+		sdp_stream_num = 0;
+		for(;;)
+		{
+			sdp_stream = get_sdp_stream(msg, sdp_session_num, sdp_stream_num);
+			if(!sdp_stream) break;
+
+			LM_DBG("stream %d of %d - media [%.*s]\n",
+					sdp_stream_num, sdp_session_num,
+					sdp_stream->media.len, sdp_stream->media.s);
+			if(media->len==sdp_stream->media.len
+					&& strncasecmp(sdp_stream->media.s, media->s,
+						media->len)==0) {
+				port_num = atoi(sdp_stream->port.s);
+				LM_DBG("Port number is %d\n", port_num);
+				if (port_num != 0) {  /* Zero port number => inactive */
+					LM_DBG("sendrecv_mode %.*s\n", sdp_stream->sendrecv_mode.len, sdp_stream->sendrecv_mode.s);
+					if ((sdp_stream->sendrecv_mode.len == 0) || /* No send/recv mode given => sendrecv */
+						(strncasecmp(sdp_stream->sendrecv_mode.s, "inactive", 8) != 0)) { /* Explicit mode is not inactive */
+						/* Found an active stream for the correct media type */
+						return 1;
+					}
+				}
+			}
+			sdp_stream_num++;
+		}
+		sdp_session_num++;
+	}
+
+	return 0;
+}
+
+/**
+ *
+ */
+static int w_sdp_with_active_media(sip_msg_t* msg, char* media, char *bar)
+{
+	str lmedia = {0, 0};
+
+	if(media==0)
+	{
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)media, &lmedia)!=0)
+	{
+		LM_ERR("unable to get the media value\n");
+		return -1;
+	}
+
+	if(sdp_with_active_media(msg, &lmedia)<=0)
+		return -1;
+	return 1;
+}
+
+/**
  * @brief remove streams matching the m='media'
  * @return -1 - error; 0 - not found; >=1 - found
  */
@@ -899,11 +997,12 @@ static int w_sdp_remove_media(sip_msg_t* msg, char* media, char *bar)
 	return 1;
 }
 
+
 /** 
  * @brief check 'media' matches the value of any 'm=media port value ...' lines
  * @return -1 - error; 0 - not found; 1 - found
  */
-static int sdp_with_transport(sip_msg_t *msg, str *transport)
+static int sdp_with_transport(sip_msg_t *msg, str *transport, int like)
 {
 	int sdp_session_num;
 	int sdp_stream_num;
@@ -932,10 +1031,16 @@ static int sdp_with_transport(sip_msg_t *msg, str *transport)
 			LM_DBG("stream %d of %d - transport [%.*s]\n",
 					sdp_stream_num, sdp_session_num,
 					sdp_stream->transport.len, sdp_stream->transport.s);
-			if(transport->len==sdp_stream->transport.len
-					&& strncasecmp(sdp_stream->transport.s, transport->s,
-						transport->len)==0)
+			if (like == 0) {
+			    if(transport->len==sdp_stream->transport.len
+			       && strncasecmp(sdp_stream->transport.s, transport->s,
+					      transport->len)==0)
 				return 1;
+			} else {
+			    if (ser_memmem(sdp_stream->transport.s, transport->s,
+					   sdp_stream->transport.len, transport->len)!=NULL)
+				return 1;
+			}
 			sdp_stream_num++;
 		}
 		sdp_session_num++;
@@ -943,6 +1048,86 @@ static int sdp_with_transport(sip_msg_t *msg, str *transport)
 
 	return 0;
 }
+
+/** 
+ * @brief assigns common media transport (if any) of 'm' lines to pv argument
+ * @return -1 - error; 0 - not found; 1 - found
+ */
+static int w_sdp_transport(sip_msg_t* msg, char *avp)
+{
+    int_str avp_val;
+    int_str avp_name;
+    static unsigned short avp_type = 0;
+    str s;
+    pv_spec_t *avp_spec = NULL;
+    int sdp_session_num;
+    int sdp_stream_num;
+    sdp_session_cell_t* sdp_session;
+    sdp_stream_cell_t* sdp_stream;
+    str *transport;
+
+    s.s = avp; s.len = strlen(s.s);
+    if (pv_locate_name(&s) != s.len) {
+	LM_ERR("invalid avp parameter %s\n", avp);
+	return -1;
+    }
+    if (((avp_spec = pv_cache_get(&s)) == NULL)
+	|| avp_spec->type!=PVT_AVP) {
+	LM_ERR("malformed or non AVP %s\n", avp);
+	return -1;
+    }
+    if (pv_get_avp_name(0, &avp_spec->pvp, &avp_name, &avp_type) != 0) {
+	LM_ERR("invalid AVP definition %s\n", avp);
+	return -1;
+    }
+
+    if(parse_sdp(msg) < 0) {
+	LM_ERR("unable to parse sdp\n");
+	return -1;
+    }
+
+    sdp_session_num = 0;
+    transport = (str *)NULL;
+
+    for (;;) {
+	sdp_session = get_sdp_session(msg, sdp_session_num);
+	if (!sdp_session) break;
+	sdp_stream_num = 0;
+	for (;;) {
+	    sdp_stream = get_sdp_stream(msg, sdp_session_num,
+					sdp_stream_num);
+	    if (!sdp_stream) break;
+	    LM_DBG("stream %d of %d - transport [%.*s]\n",
+		   sdp_stream_num, sdp_session_num,
+		   sdp_stream->transport.len, sdp_stream->transport.s);
+	    if (transport) {
+		if (transport->len != sdp_stream->transport.len
+		    || strncasecmp(sdp_stream->transport.s, transport->s,
+				   transport->len) != 0) {
+		    LM_DBG("no common transport\n");
+		    return -2;
+		}
+	    } else {
+		transport = &sdp_stream->transport;
+	    }
+	    sdp_stream_num++;
+	}
+	sdp_session_num++;
+    }
+    if (transport) {
+	avp_val.s.s = transport->s;
+	avp_val.s.len = transport->len;
+	LM_DBG("found common transport '%.*s'\n",
+	       transport->len, transport->s);
+	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0) {
+	    LM_ERR("failed to add transport avp");
+	    return -1;
+	}
+    }
+
+    return 1;
+}
+
 
 /**
  *
@@ -963,7 +1148,31 @@ static int w_sdp_with_transport(sip_msg_t* msg, char* transport, char *bar)
 		return -1;
 	}
 
-	if(sdp_with_transport(msg, &ltransport)<=0)
+	if(sdp_with_transport(msg, &ltransport, 0)<=0)
+		return -1;
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_sdp_with_transport_like(sip_msg_t* msg, char* transport, char *bar)
+{
+	str ltransport = {0, 0};
+
+	if(transport==0)
+	{
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_p)transport, &ltransport)!=0)
+	{
+		LM_ERR("unable to get the transport value\n");
+		return -1;
+	}
+
+	if(sdp_with_transport(msg, &ltransport, 1)<=0)
 		return -1;
 	return 1;
 }
@@ -1301,6 +1510,37 @@ static int w_sdp_content(sip_msg_t* msg, char* foo, char *bar)
 	if(parse_sdp(msg)==0 && msg->body!=NULL)
 		return 1;
 	return -1;
+}
+
+/**
+ *
+ */
+static int w_sdp_with_ice(sip_msg_t* msg, char* foo, char *bar)
+{
+    str ice, body;
+
+    ice.s = "a=candidate";
+    ice.len = 11;
+
+    body.s = get_body(msg);
+    if (body.s == NULL) {
+	LM_DBG("failed to get the message body\n");
+	return -1;
+    }
+
+    body.len = msg->len -(int)(body.s - msg->buf);
+    if (body.len == 0) {
+	LM_DBG("message body has length zero\n");
+	return -1;
+    }
+
+    if (ser_memmem(body.s, ice.s, body.len, ice.len) != NULL) {
+	LM_DBG("found ice attribute\n");
+	return 1;
+    } else {
+	LM_DBG("did't find ice attribute\n");
+	return -1;
+    }
 }
 
 /**

@@ -17,15 +17,18 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #ifndef CXDX_CALLBACKS_H
 #define CXDX_CALLBACKS_H
 
+#include "../cdp/cdp_load.h"
 /**
  * Check, if a user-agent follows the indicated service-routes
  */
 int PPR_RTR_Event(void *parsed_message, int type, void *param);
+
+AAAMessage* cxdx_process_rtr(AAAMessage *request);
 
 #endif /* CXDX_CALLBACKS_H */

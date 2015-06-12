@@ -63,25 +63,31 @@
 			</itemizedlist>
 	</section>
 	</section>
-	
-	<section>
-		<title>Parameters</title>
-		<itemizedlist>
-			<listitem>
-			<para>
-				<emphasis>none</emphasis>
-			</para>
-			</listitem>
-		</itemizedlist>	
-	</section>	
 
 	<section>
-		<title>Functions</title>
-		<para>The module does not export functions to be used
-		in configuration script.</para>
-	</section>	
+	<title>Parameters</title>
 	<section>
-		<title>Exported MI functions</title>
+		<title><varname>publish_with_ob_proxy</varname> (int)</title>
+		<para>
+		If 1, pua_publish MI command has outbound proxy parameter.
+        	</para>
+		<para>
+		<emphasis>Default value is <quote>0</quote>.	
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>publish_with_ob_proxy</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pua_mi", "publish_with_ob_proxy", 1)
+...
+</programlisting>
+		</example>
+	</section>
+	</section>
+	
+	<section>
+		<title>MI Commands</title>
 		<section>
 				<title>
 				<function moreinfo="none">pua_publish</function>
@@ -139,6 +145,15 @@
 			</listitem>
 			<listitem>
 				<para>
+				  <emphasis>outbound proxy</emphasis>
+				  - SIP URI of outbound proxy to be used when
+       sending PUBLISH request or . if no outbound proxy is given.  This
+       parameter is present only when publish_with_ob_proxy module
+       parameter has value 1. 
+		                </para> 
+			</listitem>
+			<listitem>
+				<para>
 					<emphasis>extra_headers</emphasis>
 					- Extra headers added to PUBLISH
 		request or . if no extra headers.
@@ -171,7 +186,6 @@ application/pidf+xml
 ]]>
 </programlisting>
 		</example>
-		</section>
 
 	</section>		
 	<section>
@@ -208,5 +222,7 @@ application/pidf+xml
 			</listitem>	
 			</itemizedlist>
 	</section>
+	</section>
+	
 </chapter>
 

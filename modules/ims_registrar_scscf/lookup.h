@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -40,7 +40,7 @@
  * Lookup a contact in usrloc and rewrite R-URI if found
  */
 int lookup(struct sip_msg* _m, udomain_t* _d);
-
+int lookup_path_to_contact(struct sip_msg* _m, char* contact_uri);
 
 /*! \brief
  * Return true if the AOR in the Request-URI is registered,
@@ -49,6 +49,7 @@ int lookup(struct sip_msg* _m, udomain_t* _d);
  */
 int impu_registered(struct sip_msg* _m, char* _t, char* _s);
 int term_impu_registered(struct sip_msg* _m, char* _t, char* _s);
+int term_impu_has_contact(struct sip_msg* _m, udomain_t* _d, char* _s);
 
 
 #endif /* LOOKUP_H */

@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -146,6 +146,9 @@ enum {
 	AVP_EPC_Served_Party_IP_Address						= 848,
 	AVP_EPC_Authorized_QoS								= 849,
 	AVP_EPC_Application_Server_Information				= 850,
+	AVP_EPC_Trunk_Group_Id								= 851,
+	AVP_EPC_Incoming_Trunk_Group_Id						= 852,
+	AVP_EPC_Outgoing_Trunk_Group_Id						= 853,
 	AVP_EPC_Bearer_Service								= 854,
 	AVP_EPC_Service_ID									= 855,
 	AVP_EPC_Associated_URI								= 856,

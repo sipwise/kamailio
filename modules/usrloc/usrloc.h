@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
@@ -61,6 +59,7 @@ typedef enum cstate {
 typedef enum flags {
 	FL_NONE        = 0,          /*!< No flags set */
 	FL_MEM         = 1 << 0,     /*!< Update memory only */
+	FL_RPL         = 1 << 1,     /*!< DMQ replication */
 	FL_ALL         = (int)0xFFFFFFFF  /*!< All flags set */
 } flags_t;
 
@@ -91,7 +90,9 @@ typedef struct ucontact {
 	unsigned int methods;   /*!< Supported methods */
 	str instance;           /*!< SIP instance value - gruu */
 	unsigned int reg_id;    /*!< reg-id parameters */
-	int tcpconn_id;          /* unique tcp connection id */
+	int server_id;          /*!< server id */
+	int tcpconn_id;         /*!< unique tcp connection id */
+	int keepalive;          /*!< keepalive */
 #ifdef WITH_XAVP
 	sr_xavp_t * xavp;       /*!< per contact xavps */
 #endif
@@ -117,7 +118,9 @@ typedef struct ucontact_info {
 	unsigned int methods;     /*!< supported methods */
 	str instance;             /*!< SIP instance value - gruu */
 	unsigned int reg_id;      /*!< reg-id parameters */
-	int tcpconn_id;
+	int server_id;            /*!< server id */
+	int tcpconn_id;           /*!< connection id */
+	int keepalive;            /*!< keepalive */
 #ifdef WITH_XAVP
 	sr_xavp_t * xavp;         /*!< per contact xavps */
 #endif
@@ -191,6 +194,9 @@ int ul_set_keepalive_timeout(int _to);
 typedef int (*ul_refresh_keepalive_t)(unsigned int _aorhash, str *_ruid);
 int ul_refresh_keepalive(unsigned int _aorhash, str *_ruid);
 
+
+typedef void (*ul_set_max_partition_t)(unsigned int m);
+
 /*! usrloc API export structure */
 typedef struct usrloc_api {
 	int           use_domain; /*! use_domain module parameter */
@@ -223,6 +229,7 @@ typedef struct usrloc_api {
 
 	ul_set_keepalive_timeout_t set_keepalive_timeout;
 	ul_refresh_keepalive_t     refresh_keepalive;
+	ul_set_max_partition_t     set_max_partition;
 } usrloc_api_t;
 
 

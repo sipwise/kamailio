@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -75,6 +75,9 @@ int scscf_entry_expiry = 300;
 /* parameters storage */
 char* cxdx_dest_realm_s = "ims.smilecoms.com";
 str cxdx_dest_realm;
+
+str preferred_scscf_uri = str_init("sip:scscf.ims.smilecoms.com:4060");
+int use_preferred_scscf_uri = 0;
 
 //Only used if we want to force the Rx peer
 //Usually this is configured at a stack level and the first request uses realm routing
@@ -117,12 +120,14 @@ static param_export_t params[] = {
     {"route_lir_user_unknown", PARAM_STRING, &route_lir_user_unknown},
     {"route_uar_user_unknown", PARAM_STRING, &route_uar_user_unknown},
     {"scscf_entry_expiry", INT_PARAM, &scscf_entry_expiry},
-    {"db_url", 					STR_PARAM, &ims_icscf_db_url},
-    {"db_nds_table", 			STR_PARAM, &ims_icscf_db_nds_table},
-    {"db_scscf_table", 			STR_PARAM, &ims_icscf_db_scscf_table},
-    {"db_capabilities_table", 	STR_PARAM, &ims_icscf_db_capabilities_table},
-    {"cxdx_forced_peer", STR_PARAM, &cxdx_forced_peer_s},
-    {"cxdx_dest_realm", STR_PARAM, &cxdx_dest_realm_s},
+    {"db_url", 					PARAM_STRING, &ims_icscf_db_url},
+    {"db_nds_table", 			PARAM_STRING, &ims_icscf_db_nds_table},
+    {"db_scscf_table", 			PARAM_STRING, &ims_icscf_db_scscf_table},
+    {"db_capabilities_table", 	PARAM_STRING, &ims_icscf_db_capabilities_table},
+    {"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
+    {"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
+    {"preferred_scscf_uri",	PARAM_STR, &preferred_scscf_uri},
+    {"use_preferred_scscf_uri", INT_PARAM, &use_preferred_scscf_uri},
     {0, 0, 0}
 };
 
@@ -150,23 +155,12 @@ struct module_exports exports = {
     0 /* per-child init function */
 };
 
-static int fix_parameters() {
-    cxdx_forced_peer.s = cxdx_forced_peer_s;
-    cxdx_forced_peer.len = strlen(cxdx_forced_peer_s);
-
-    cxdx_dest_realm.s = cxdx_dest_realm_s;
-    cxdx_dest_realm.len = strlen(cxdx_dest_realm_s);
-    return 1;
-}
 /**
  * init module function
  */
 static int mod_init(void) {
 	cdp_avp = 0;
 	int route_no;
-
-	/* fix the parameters */
-	if (!fix_parameters()) goto error;
 
 #ifdef STATISTICS
 	if (register_module_stats( exports.name, mod_stats) != 0) {

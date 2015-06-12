@@ -1,6 +1,4 @@
 /**
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,7 +15,21 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+/*!
+ * \file
+ * \brief Module interface
+ * \ingroup xlog
+ * Module: \ref xlog
+ */
+
+/**
+ * @defgroup xlog xlog :: Kamailio xlog module
+ * @brief Kamailio xlog module
+ * Extended logging from the configuration script using pv:s.
+ * Can log to multiple channels as well as standard out.
+ *
  */
 
 #include <stdio.h>
@@ -33,6 +45,7 @@
 #include "../../sr_module.h"
 #include "../../dprint.h"
 #include "../../error.h"
+#include "../../cfg/cfg.h"
 #include "../../mem/mem.h"
 #include "../../parser/parse_param.h"
 
@@ -54,6 +67,20 @@ static int long_format=0;
 static int xlog_facility = DEFAULT_FACILITY;
 static char *xlog_facility_name = NULL;
 
+/** cfg dynamic parameters */
+struct cfg_group_xlog {
+	int methods_filter;
+};
+static struct cfg_group_xlog xlog_default_cfg = {
+	-1	/* methods filter */
+};
+static void *xlog_cfg = &xlog_default_cfg;
+static cfg_def_t xlog_cfg_def[] = {
+	{"methods_filter",		CFG_VAR_INT | CFG_ATOMIC, 	0, 0, 0, 0,
+		"Methods filter value for xlogm(...)."},
+	{0, 0, 0, 0, 0, 0}
+};
+
 /** module functions */
 static int mod_init(void);
 
@@ -66,6 +93,8 @@ static int xlogl_1(struct sip_msg*, char*, char*);
 static int xlogl_2(struct sip_msg*, char*, char*);
 static int xlogl_3(struct sip_msg*, char*, char*, char*);
 static int xdbgl(struct sip_msg*, char*, char*);
+
+static int xlogm_2(struct sip_msg*, char*, char*);
 
 static int xlog_fixup(void** param, int param_no);
 static int xlog3_fixup(void** param, int param_no);
@@ -113,6 +142,7 @@ static cmd_export_t cmds[]={
 	{"xlogl",  (cmd_function)xlogl_2,  2, xlogl_fixup, 0, ANY_ROUTE},
 	{"xlogl",  (cmd_function)xlogl_3,  3, xlogl3_fixup,0, ANY_ROUTE},
 	{"xdbgl",  (cmd_function)xdbgl,    1, xdbgl_fixup, 0, ANY_ROUTE},
+	{"xlogm",  (cmd_function)xlogm_2,  2, xlog_fixup,  0, ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
 
@@ -121,9 +151,10 @@ static param_export_t params[]={
 	{"buf_size",     INT_PARAM, &buf_size},
 	{"force_color",  INT_PARAM, &force_color},
 	{"long_format",  INT_PARAM, &long_format},
-	{"prefix",       STR_PARAM, &_xlog_prefix},
-	{"log_facility", STR_PARAM, &xlog_facility_name},
-	{"log_colors",   STR_PARAM|USE_FUNC_PARAM, (void*)xlog_log_colors_param},
+	{"prefix",       PARAM_STRING, &_xlog_prefix},
+	{"log_facility", PARAM_STRING, &xlog_facility_name},
+	{"log_colors",   PARAM_STRING|USE_FUNC_PARAM, (void*)xlog_log_colors_param},
+	{"methods_filter",  PARAM_INT, &xlog_default_cfg.methods_filter},
 	{0,0,0}
 };
 
@@ -150,6 +181,11 @@ struct module_exports exports= {
 static int mod_init(void)
 {
 	int lf;
+	if(cfg_declare("xlog", xlog_cfg_def, &xlog_default_cfg,
+				cfg_sizeof(xlog), &xlog_cfg)){
+		LM_ERR("Fail to declare the xlog cfg framework structure\n");
+		return -1;
+	}
 	if (xlog_facility_name!=NULL) {
 		lf = str2facility(xlog_facility_name);
 		if (lf != -1) {
@@ -262,6 +298,35 @@ static int xlog_2(struct sip_msg* msg, char* lev, char* frm)
 static int xlogl_2(struct sip_msg* msg, char* lev, char* frm)
 {
 	return xlog_2_helper(msg, lev, frm, 1, NOFACILITY);
+}
+
+/**
+ * print log message to level given in parameter applying methods filter
+ */
+static int xlogm_2(struct sip_msg* msg, char* lev, char* frm)
+{
+	int mfilter;
+
+	mfilter = cfg_get(xlog, xlog_cfg, methods_filter);
+
+	if(mfilter==-1)
+		return 1;
+
+	if(msg->first_line.type==SIP_REQUEST) {
+		if (msg->first_line.u.request.method_value & mfilter) {
+			return 1;
+		}
+	} else {
+		if (parse_headers(msg, HDR_CSEQ_F, 0) != 0 || msg->cseq==NULL) {
+			LM_ERR("cannot parse cseq header\n");
+			return -1;
+		}
+		if (get_cseq(msg)->method_id & mfilter) {
+			return 1;
+		}
+	}
+
+	return xlog_2_helper(msg, lev, frm, 0, NOFACILITY);
 }
 
 static int xlog_3_helper(struct sip_msg* msg, char* fac, char* lev, char* frm, int mode)

@@ -34,7 +34,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -654,7 +654,7 @@ cdp_avp_ptr		(Called_Asserted_Identity,				EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MAND
 cdp_avp_ptr		(Called_Party_Address,					EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		UTF8String,		str)	
 
 cdp_avp_ptr		(Calling_Party_Address,					EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		UTF8String,		str)	
-
+	
 cdp_avp			(Cause_Code,							EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		Integer32,		int32_t)	
 
 cdp_avp_ptr		(Content_Disposition,					EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		UTF8String,		str)	
@@ -766,6 +766,14 @@ cdp_avp_add_ptr	(Time_Stamps,							EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,	
 cdp_avp_get		(Time_Stamps,							EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		Grouped,		AAA_AVP_LIST)	
 
 cdp_avp_ptr		(User_Session_Id,						EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		UTF8String,		str)	
+	
+cdp_avp_add_ptr	(Trunk_Group_Id,				EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		Grouped,		AAA_AVP_LIST*)	
+cdp_avp_get		(Trunk_Group_Id,				EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		Grouped,		AAA_AVP_LIST)	
+	
+	
+cdp_avp_ptr		(Incoming_Trunk_Group_Id,						EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		UTF8String,		str)	
+	
+cdp_avp_ptr		(Outgoing_Trunk_Group_Id,						EPC_vendor_id_3GPP,	AAA_AVP_FLAG_MANDATORY,		UTF8String,		str)	
 
 
 

@@ -1,29 +1,29 @@
 /*
- * $Id$
  * Standalone Configuration File Parser
  *
  * Copyright (C) 2008 iptelorg GmbH
  * Written by Jan Janak <jan@iptel.org>
  *
- * This file is part of SER, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SER is free software; you can redistribute it and/or modify it under the
+ * Kamailio is free software; you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
  * Foundation; either version 2 of the License, or (at your option) any later
  * version.
  *
- * SER is distributed in the hope that it will be useful, but WITHOUT ANY
+ * Kamailio is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc., 
- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: Standalone Configuration File Parser
+ * \author Jan Janak <jan@iptel.org>
  * \ingroup core
  *
  * Module: \ref core
@@ -283,7 +283,7 @@ static void print_token(cfg_token_t* token)
 	char* buf;
 
 	if ((buf = pkg_malloc(token->val.len * 2)) == NULL) {
-		DBG("token(%d, '%.*s', <%d,%d>-<%d,%d>)\n", 
+		LM_DBG("token(%d, '%.*s', <%d,%d>-<%d,%d>)\n", 
 			token->type, STR_FMT(&token->val),
 			token->start.line, token->start.col, 
 			token->end.line, token->end.col);
@@ -298,7 +298,7 @@ static void print_token(cfg_token_t* token)
 			default: buf[j++] = token->val.s[i];
 			}
 		}
-		DBG("token(%d, '%.*s', <%d,%d>-<%d,%d>)\n", 
+		LM_DBG("token(%d, '%.*s', <%d,%d>-<%d,%d>)\n", 
 			token->type, j, buf,
 			token->start.line, token->start.col, 
 			token->end.line, token->end.col);

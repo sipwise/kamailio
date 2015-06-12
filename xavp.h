@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com) 
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -14,11 +12,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-/*
- * History:
- * --------
- *  2009-05-20  created by daniel
  */
 
 
@@ -77,7 +70,7 @@ typedef struct _sr_xavp {
 } sr_xavp_t;
 
 int xavp_init_head(void);
-void avpx_free(sr_xavp_t *xa);
+void xavp_free(sr_xavp_t *xa);
 
 int xavp_add(sr_xavp_t *xavp, sr_xavp_t **list);
 int xavp_add_last(sr_xavp_t *xavp, sr_xavp_t **list);

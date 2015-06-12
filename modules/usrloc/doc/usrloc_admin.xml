@@ -67,7 +67,7 @@
 		</itemizedlist>
 		<para>
 		To find out how to control/select the contact maching algorithm, please see the
-		module parameter matching_mode - <xref linkend="matching-mode"/>.
+		module parameter matching_mode - <xref linkend="usrloc.p.matching_mode"/>.
 		</para>
 		</section>
 	</section>
@@ -449,6 +449,66 @@ modparam("usrloc", "instance_column", "myinstance")
 		</example>
 	</section>
 
+	<section id="usrloc.p.server_id_column">
+		<title><varname>server_id_column</varname> (string)</title>
+		<para>
+		Name of database table column containing the value for server id.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>server_id</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>server_id_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "server_id_column", "srv_id")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="usrloc.p.connection_id_column">
+		<title><varname>connection_id_column</varname> (string)</title>
+		<para>
+		Name of database table column containing the value for connection id.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>connection_id</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>connection_id_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "connection_id_column", "con_id")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="usrloc.p.keepalive_column">
+		<title><varname>keepalive_column</varname> (string)</title>
+		<para>
+		Name of database table column containing the value for keepalive status.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>keepalive</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>keepalive_column</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "keepalive_column", "kalive")
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="usrloc.p.use_domain">
 		<title><varname>use_domain</varname> (integer)</title>
 		<para>
@@ -722,19 +782,19 @@ modparam("usrloc", "fetch_rows", 3000)
 		<title><varname>hash_size</varname> (integer)</title>
 		<para>
 		The number of entries of the hash table used by usrloc to store the
-		location records is 2^hash_size. For hash_size=4, the number of entries
+		location records is 2^hash_size. For hash_size=4, the number of slots
 		of the hash table is 16.
 		</para>
 		<para>
 		<emphasis>
-			Default value is <quote>9</quote>.
+			Default value is <quote>10</quote> (1024 slots).
 		</emphasis>
 		</para>
 		<example>
 		<title>Set <varname>hash_size</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("usrloc", "hash_size", 10)
+modparam("usrloc", "hash_size", 12)
 ...
 </programlisting>
 		</example>
@@ -862,14 +922,14 @@ modparam("usrloc", "xavp_contact", "ulattrs")
 		</para>
 		<para>
 		<emphasis>
-			Default value is <quote>0</quote>.
+			Default value is <quote>1</quote>.
 		</emphasis>
 		</para>
 		<example>
 		<title>Set <varname>db_ops_ruid</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("usrloc", "db_ops_ruid", 1)
+modparam("usrloc", "db_ops_ruid", 0)
 ...
 </programlisting>
 		</example>
@@ -879,7 +939,8 @@ modparam("usrloc", "db_ops_ruid", 1)
 		<title><varname>handle_lost_tcp</varname> (int)</title>
 		<para>
 			If set to 1, Kamailio will remove location records made via
-			TCP/TLS/WS/WSS transports when it looses corresponding tcp connections.
+			TCP/TLS/WS/WSS transports when it looses corresponding tcp
+            connections.  Does not currently work in DB-Only scheme.
 		</para>
 		<para>
 		<emphasis>
@@ -891,6 +952,98 @@ modparam("usrloc", "db_ops_ruid", 1)
 		<programlisting format="linespecific">
 ...
 modparam("usrloc", "handle_lost_tcp", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="usrloc.p.close_expired_tcp">
+		<title><varname>close_expired_tcp</varname> (int)</title>
+		<para>
+            If set to 1, Kamailio will close the TCP connection when a contact
+            has expired, if the corresponding transport is TCP/TLS/WS/WSS.
+        </para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>close_expired_tcp</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "close_expired_tcp", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="usrloc.p.expires_type">
+		<title><varname>expires_type</varname> (int)</title>
+		<para>
+			If set to 1, &kamailio; expects to deal with BIGINT type on
+			database columns for expires and last modified values. It
+			allows to handle better the daylight time adjustmens. If set
+			to 0, those columns are expected to be on default type
+			'DATETIME'. When it is 1, the database columns types have
+			to be changed manually to 'BIGINT'.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>expires_type</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "expires_type", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="usrloc.p.db_raw_fetch_type">
+		<title><varname>db_raw_fetch_type</varname> (int)</title>
+		<para>
+			This affect DB-only mode and controls what kind of
+			raw query is used to fetch the contacts from database for
+			specific needs (e.g., sending NAT keepalives). If it is set to 0,
+			then the common SQL query is used (working for MySQL, PostgreSQL,
+			...). If it is set to 1, the query required by Oracle is used.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>db_raw_fetch_type</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "db_raw_fetch_type", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="usrloc.p.db_insert_null">
+		<title><varname>db_insert_null</varname> (int)</title>
+		<para>
+			If set to 1, the insert operation to database will add null values
+			in the sql statement.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote> (don't add null fields in insert
+			statement).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>db_insert_null</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("usrloc", "db_insert_null", 1)
 ...
 </programlisting>
 		</example>

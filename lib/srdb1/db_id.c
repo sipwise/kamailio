@@ -1,6 +1,4 @@
 /* 
- * $Id$
- *
  * Copyright (C) 2001-2005 iptel.org
  * Copyright (C) 2007-2008 1&1 Internet AG
  *
@@ -18,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -83,7 +81,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 	};
 
 	enum state st;
-	unsigned int len, i;
+	unsigned int len, i, j, a;
 	const char* begin;
 	char* prev_token;
 
@@ -164,6 +162,14 @@ static int parse_db_url(struct db_id* id, const str* url)
 				st = ST_HOST;
 				id->username = prev_token;
 				prev_token = 0;
+				a = 0;
+				/* go to last '@' to support when it is part of password */
+				for(j = i+1; j < len; j++) {
+					if(url->s[j]=='@') {
+						a = j;
+					}
+				}
+				if(a!=0) i = a;
 				if (dupl_string(&id->password, begin, url->s + i) < 0) goto err;
 				begin = url->s + i + 1;
 				break;
@@ -239,12 +245,12 @@ struct db_id* new_db_id(const str* url, db_pooling_t pooling)
 		return 0;
 	}
 
-	ptr = (struct db_id*)pkg_malloc(sizeof(struct db_id));
+	ptr = (struct db_id*)pkg_malloc(sizeof(struct db_id) + url->len + 1);
 	if (!ptr) {
 		LM_ERR("no private memory left\n");
 		goto err;
 	}
-	memset(ptr, 0, sizeof(struct db_id));
+	memset(ptr, 0, sizeof(struct db_id)+url->len+1);
 
 	if (parse_db_url(ptr, url) < 0) {
 		LM_ERR("error while parsing database URL: '%.*s' \n", url->len, url->s);
@@ -254,6 +260,10 @@ struct db_id* new_db_id(const str* url, db_pooling_t pooling)
 	if (pooling == DB_POOLING_NONE) ptr->poolid = ++poolid;
 	else ptr->poolid = 0;
 	ptr->pid = my_pid();
+	ptr->url.s = (char*)ptr + sizeof(struct db_id);
+	ptr->url.len = url->len;
+	strncpy(ptr->url.s, url->s, url->len);
+	ptr->url.s[url->len] = '\0';
 
 	return ptr;
 

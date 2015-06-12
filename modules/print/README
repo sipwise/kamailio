@@ -1,3 +1,4 @@
+
 Print Module
 
 Andrei Pelinescu-Onciul
@@ -5,7 +6,7 @@ Andrei Pelinescu-Onciul
    FhG FOKUS
 
    Copyright © 2003 FhG FOKUS
-     __________________________________________________________________
+     _________________________________________________________________
 
    Table of Contents
 
@@ -19,7 +20,7 @@ Andrei Pelinescu-Onciul
 
         3. Functions
 
-              3.1. print(txt)
+              3.1. print(txt) 
 
    List of Examples
 
@@ -39,12 +40,12 @@ Chapter 1. Admin Guide
 
    3. Functions
 
-        3.1. print(txt)
+        3.1. print(txt) 
 
 1. Overview
 
    This is an example module. It implements only one function that prints
-   its string parameter to stdout (it won't work if ser is started in
+   its  string  parameter  to  stdout (it won't work if ser is started in
    daemon mode). It also shows how module parameters can be declared.
 
 2. Parameters
@@ -76,9 +77,9 @@ modparam("print", "int_param", 42)
 
 3. Functions
 
-   3.1. print(txt)
+   3.1. print(txt) 
 
-3.1. print(txt)
+3.1.  print(txt)
 
    Prints string to stdout.
 

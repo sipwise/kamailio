@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -62,7 +62,7 @@ int I_perform_user_authorization_request(struct sip_msg* msg, char* route, char*
     int authorization_type = AVP_IMS_UAR_REGISTRATION;
     int expires = 3600;
     struct hdr_field *hdr;
-    str realm;
+    str realm={0,0};
     contact_t *c;
     int sos_reg = 0;
     contact_body_t *b = 0;
@@ -95,8 +95,8 @@ int I_perform_user_authorization_request(struct sip_msg* msg, char* route, char*
         return -1;
     }
 
-
-    realm = cscf_get_realm_from_ruri(msg);
+	/*This should be configurable and not hardwired to RURI domain*/
+    //realm = cscf_get_realm_from_ruri(msg);
 
     //check if we received what we should, we do this even though it should be done in cfg file - double checking!
     if (msg->first_line.type != SIP_REQUEST) {
@@ -127,22 +127,20 @@ int I_perform_user_authorization_request(struct sip_msg* msg, char* route, char*
     b = cscf_parse_contacts(msg);
 
     if (!b || (!b->contacts && !b->star)) {
-        LM_DBG("DBG:I_UAR: No contacts found\n");
-        return CSCF_RETURN_ERROR;
-    }
-
-    for (c = b->contacts; c; c = c->next) {
-
-        sos_reg = cscf_get_sos_uri_param(c->uri);
-        if (sos_reg == -1) {
-            //error case
-            LM_ERR("ERR:I_UAR: MSG_400_MALFORMED_CONTACT, responding with 400\n");
-            cscf_reply_transactional(msg, 400, MSG_400_MALFORMED_CONTACT);
-            return CSCF_RETURN_BREAK;
-        } else if (sos_reg == -2) {
-            LM_ERR("ERR:I_UAR: MSG_500_SERVER_ERROR_OUT_OF_MEMORY, responding with 500\n");
-            cscf_reply_transactional(msg, 500, MSG_500_SERVER_ERROR_OUT_OF_MEMORY);
-            return CSCF_RETURN_BREAK;
+        LM_DBG("DBG:I_UAR: No contacts found - just fetching bindings\n");
+    } else {
+        for (c = b->contacts; c; c = c->next) {
+            sos_reg = cscf_get_sos_uri_param(c->uri);
+            if (sos_reg == -1) {
+                //error case
+                LM_ERR("ERR:I_UAR: MSG_400_MALFORMED_CONTACT, responding with 400\n");
+                cscf_reply_transactional(msg, 400, MSG_400_MALFORMED_CONTACT);
+                return CSCF_RETURN_BREAK;
+            } else if (sos_reg == -2) {
+                LM_ERR("ERR:I_UAR: MSG_500_SERVER_ERROR_OUT_OF_MEMORY, responding with 500\n");
+                cscf_reply_transactional(msg, 500, MSG_500_SERVER_ERROR_OUT_OF_MEMORY);
+                return CSCF_RETURN_BREAK;
+            }
         }
     }
 

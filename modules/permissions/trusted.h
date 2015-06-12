@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #ifndef TRUSTED_H
@@ -83,5 +83,7 @@ int allow_trusted_0(struct sip_msg* _msg, char* str1, char* str2);
  */
 int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp);
 
+
+int reload_trusted_table_cmd(void);
 
 #endif /* TRUSTED_H */

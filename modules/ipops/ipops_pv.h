@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -34,6 +34,14 @@ int pv_get_dns(sip_msg_t *msg, pv_param_t *param,
 int dns_init_pv(char *path);
 void dns_destroy_pv(void);
 int dns_update_pv(str *tomatch, str *name);
+
+int pv_parse_hn_name(pv_spec_p sp, str *in);
+int pv_get_hn(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
+int pv_parse_srv_name(pv_spec_t *, str *);
+int pv_get_srv(sip_msg_t *, pv_param_t *, pv_value_t *);
+int srv_update_pv(str *, str *);
 
 #endif
 

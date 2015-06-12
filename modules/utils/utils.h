@@ -17,13 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
 /*!
  * \file
- * \brief SIP-router utils :: Core
+ * \brief Kamailio utils :: Core
  * \ingroup utils
  * Module: \ref utils
  */
@@ -39,5 +39,11 @@
 extern int http_query_timeout;
 extern db1_con_t *pres_dbh;
 extern db_func_t pres_dbf;
+
+typedef struct {
+	char		*buf;
+	size_t		curr_size;
+	size_t		pos;
+} http_res_stream_t;
 
 #endif /* UTILS_H */

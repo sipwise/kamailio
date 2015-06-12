@@ -15,30 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2006-04-14  initial version (bogdan)
- * 2006-11-28  Added support for tracking the number of early dialogs, and the
- *             number of failed dialogs. This involved updates to dlg_onreply()
- *             (Jeffrey Magder - SOMA Networks)
- * 2007-03-06  syncronized state machine added for dialog state. New tranzition
- *             design based on events; removed num_1xx and num_2xx (bogdan)
- * 2007-04-30  added dialog matching without DID (dialog ID), but based only
- *             on RFC3261 elements - based on an original patch submitted
- *             by Michel Bensoussan <michel@extricom.com> (bogdan)
- * 2007-05-17  new feature: saving dialog info into a database if
- *             realtime update is set(ancuta)
- * 2007-07-06  support for saving additional dialog info : cseq, contact,
- *             route_set and socket_info for both caller and callee (ancuta)
- * 2007-07-10  Optimized dlg_match_mode 2 (DID_NONE), it now employs a proper
- *             hash table lookup and isn't dependant on the is_direction
- *             function (which requires an RR param like dlg_match_mode 0
- *             anyways.. ;) ; based on a patch from
- *             Tavis Paquette <tavis@galaxytelecom.net>
- *             and Peter Baer <pbaer@galaxytelecom.net>  (bogdan)
- * 2008-04-04  added direction reporting in dlg callbacks (bogdan)
  */
 
 
@@ -83,6 +61,7 @@ static int       default_timeout;	/*!< default dialog timeout */
 static int       seq_match_mode;	/*!< dlg_match mode */ 
 static int       shutdown_done = 0;	/*!< 1 when destroy_dlg_handlers was called */
 extern int       detect_spirals;
+extern int       dlg_timeout_noreset;
 extern int       initial_cbs_inscript;
 extern int       dlg_send_bye;
 extern int       dlg_event_rt[DLG_EVENTRT_MAX];
@@ -1060,30 +1039,59 @@ static void unref_dlg_from_cb(struct cell* t, int type, struct tmcb_params *para
 	dlg_unref(dlg, 2);
 }
 
-
-dlg_cell_t *dlg_get_msg_dialog(sip_msg_t *msg)
+/*!
+ *
+ */
+dlg_cell_t *dlg_lookup_msg_dialog(sip_msg_t *msg, unsigned int *dir)
 {
 	dlg_cell_t *dlg = NULL;
 	str callid;
 	str ftag;
 	str ttag;
-	unsigned int dir;
+	unsigned int vdir;
 
 	/* Retrieve the current dialog */
 	dlg = dlg_get_ctx_dialog();
-	if(dlg!=NULL)
+	if(dlg!=NULL) {
+		if(dir) {
+			if (pre_match_parse(msg, &callid, &ftag, &ttag, 0)<0) {
+				dlg_release(dlg);
+				return NULL;
+			}
+			if (dlg->tag[DLG_CALLER_LEG].len == ftag.len &&
+					   strncmp(dlg->tag[DLG_CALLER_LEG].s, ftag.s, ftag.len)==0 &&
+					   strncmp(dlg->callid.s, callid.s, callid.len)==0) {
+				*dir = DLG_DIR_DOWNSTREAM;
+			} else {
+				if (ttag.len>0 && dlg->tag[DLG_CALLER_LEG].len == ttag.len &&
+						   strncmp(dlg->tag[DLG_CALLER_LEG].s, ttag.s, ttag.len)==0 &&
+						   strncmp(dlg->callid.s, callid.s, callid.len)==0) {
+					*dir = DLG_DIR_UPSTREAM;
+				}
+			}
+		}
 		return dlg;
+	}
 	
 	if (pre_match_parse(msg, &callid, &ftag, &ttag, 0)<0)
 		return NULL;
-	dir = DLG_DIR_NONE;
-	dlg = get_dlg(&callid, &ftag, &ttag, &dir);
+	vdir = DLG_DIR_NONE;
+	dlg = get_dlg(&callid, &ftag, &ttag, &vdir);
 	if (dlg==NULL){
 		LM_DBG("dlg with callid '%.*s' not found\n",
 				msg->callid->body.len, msg->callid->body.s);
 		return NULL;
 	}
+	if(dir) *dir = vdir;
 	return dlg;
+}
+
+/*!
+ *
+ */
+dlg_cell_t *dlg_get_msg_dialog(sip_msg_t *msg)
+{
+	return dlg_lookup_msg_dialog(msg, NULL);
 }
 
 /*!
@@ -1102,7 +1110,7 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 	dlg_cell_t *dlg;
 	dlg_iuid_t *iuid;
 	str val, callid, ftag, ttag;
-	int h_entry, h_id, new_state, old_state, unref, event, timeout;
+	int h_entry, h_id, new_state, old_state, unref, event, timeout, reset;
 	unsigned int dir;
 	int ret = 0;
 
@@ -1293,7 +1301,9 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 		if (timeout!=default_timeout) {
 			dlg->lifetime = timeout;
 		}
-		if (new_state!=DLG_STATE_EARLY) {
+		reset = !((dlg->iflags & DLG_IFLAG_TIMER_NORESET) || dlg_timeout_noreset);
+
+		if ((new_state!=DLG_STATE_EARLY) && (old_state!=DLG_STATE_CONFIRMED || reset)) {
 			if (update_dlg_timer( &dlg->tl, dlg->lifetime )==-1) {
 				LM_ERR("failed to update dialog lifetime\n");
 			} else {
@@ -1361,10 +1371,14 @@ void dlg_ontimeout(struct dlg_tl *tl)
 	dlg_cell_t *dlg;
 	int new_state, old_state, unref;
 	sip_msg_t *fmsg;
+	void* timeout_cb = 0;
 
 	/* get the dialog tl payload */
 	dlg = ((struct dlg_cell*)((char *)(tl) -
 			(unsigned long)(&((struct dlg_cell*)0)->tl)));
+
+	/* mark dialog as expired */
+	dlg->dflags |= DLG_FLAG_EXPIRED;
 
 	if(dlg->state==DLG_STATE_CONFIRMED_NA
 				|| dlg->state==DLG_STATE_CONFIRMED)
@@ -1392,6 +1406,7 @@ void dlg_ontimeout(struct dlg_tl *tl)
 				dlg_unref(dlg, 1);
 			/* run event route for end of dlg */
 			dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
+
 			dlg_unref(dlg, 1);
 			if_update_stat(dlg_enable_stats, expired_dlgs, 1);
 			return;
@@ -1399,6 +1414,11 @@ void dlg_ontimeout(struct dlg_tl *tl)
 	}
 
 	next_state_dlg( dlg, DLG_EVENT_REQBYE, &old_state, &new_state, &unref);
+    /* used for computing duration for timed out acknowledged dialog */
+	if (DLG_STATE_CONFIRMED == old_state) {
+		timeout_cb = (void *)CONFIRMED_DIALOG_STATE;
+	}	
+
 	dlg_run_event_route(dlg, NULL, old_state, new_state);
 
 	if (new_state==DLG_STATE_DELETED && old_state!=DLG_STATE_DELETED) {
@@ -1408,7 +1428,7 @@ void dlg_ontimeout(struct dlg_tl *tl)
 			dlg->tag[DLG_CALLEE_LEG].len, dlg->tag[DLG_CALLEE_LEG].s);
 
 		/* dialog timeout */
-		run_dlg_callbacks( DLGCB_EXPIRED, dlg, NULL, NULL, DLG_DIR_NONE, 0);
+		run_dlg_callbacks( DLGCB_EXPIRED, dlg, NULL, NULL, DLG_DIR_NONE, timeout_cb);
 
 		dlg_unref(dlg, unref+1);
 

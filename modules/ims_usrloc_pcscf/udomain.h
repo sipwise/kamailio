@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -67,8 +67,8 @@ void mem_timer_udomain(udomain_t* _d);
 int mem_insert_pcontact(struct udomain* _d, str* _contact, struct pcontact_info* _ci, struct pcontact** _c);
 void mem_delete_pcontact(udomain_t* _d, struct pcontact* _r);
 
-void lock_udomain(udomain_t* _d, str *_aor);
-void unlock_udomain(udomain_t* _d, str *_aor);
+void lock_udomain(udomain_t* _d, str *_aor, str* _received_host, unsigned short int received_port);
+void unlock_udomain(udomain_t* _d, str *_aor, str* _received_host, unsigned short int received_port);
 
 void lock_ulslot(udomain_t* _d, int i);
 void unlock_ulslot(udomain_t* _d, int i);
@@ -76,9 +76,13 @@ void unlock_ulslot(udomain_t* _d, int i);
 int update_rx_regsession(struct udomain* _d, str* session_id, struct pcontact* _c);
 int update_pcontact(struct udomain* _d, struct pcontact_info* _ci, struct pcontact* _c);
 int insert_pcontact(struct udomain* _d, str* _contact, struct pcontact_info* _ci, struct pcontact** _r);
-int get_pcontact(udomain_t* _d, str* _aor, struct pcontact** _r);
+int get_pcontact(udomain_t* _d, str* _aor, str* _received_host, int received_port, struct pcontact** _r);
 int get_pcontact_by_src(udomain_t* _d, str * _host, unsigned short _port, unsigned short _proto, struct pcontact** _c);
 int assert_identity(udomain_t* _d, str * _host, unsigned short _port, unsigned short _proto, str * _identity);
-int delete_pcontact(udomain_t* _d, str* _aor, struct pcontact* _r);
+int delete_pcontact(udomain_t* _d, str* _aor, str* _received_host, int _received_port, struct pcontact* _r);
+int update_security(udomain_t* _d, security_type _t, security_t* _s, struct pcontact* _c);
+int update_temp_security(udomain_t* _d, security_type _t, security_t* _s, struct pcontact* _c);
+
+int preload_udomain(db1_con_t* _c, udomain_t* _d);
 
 #endif

@@ -16,10 +16,12 @@
 #include "dlg_hash.h"
 #include "dlg_profile.h"
 #include "dlg_handlers.h"
+#include "dlg_db_handler.h"
 
 #define MAX_LDG_LOCKS  2048
 #define MIN_LDG_LOCKS  2
 
+extern int dlg_db_mode;
 
 /*! global dialog table */
 struct dlg_table *d_table = 0;
@@ -109,7 +111,7 @@ int init_dlg_table(unsigned int size) {
 
     for (i = 0; i < size; i++) {
         memset(&(d_table->entries[i]), 0, sizeof (struct dlg_entry));
-        d_table->entries[i].next_id = rand();
+        d_table->entries[i].next_id = rand() % (3*size);
         d_table->entries[i].lock_idx = i % d_table->locks_no;
     }
 
@@ -188,6 +190,9 @@ inline void destroy_dlg(struct dlg_cell *dlg) {
                 dlg->from_tag.len, dlg->from_tag.s);
 
     }
+
+    if (dlg_db_mode)
+    	remove_dialog_in_from_db(dlg);
 
     LM_DBG("About to run dlg callback for destroy\n");
     run_dlg_callbacks(DLGCB_DESTROY, dlg, NULL, NULL, DLG_DIR_NONE, 0);
@@ -962,6 +967,7 @@ void link_dlg_out(struct dlg_cell *dlg, struct dlg_cell_out *dlg_out, int n) {
 void link_dlg(struct dlg_cell *dlg, int n) {
     struct dlg_entry *d_entry;
 
+    LM_DBG("Linking new dialog with h_entry: %u", dlg->h_entry);
     d_entry = &(d_table->entries[dlg->h_entry]);
 
     dlg_lock(d_table, d_entry);
@@ -1046,7 +1052,7 @@ static inline void log_next_state_dlg(const int event, const struct dlg_cell * d
 void next_state_dlg(struct dlg_cell *dlg, int event,
         int *old_state, int *new_state, int *unref, str * to_tag) {
     struct dlg_entry *d_entry;
-
+    
 
 
     d_entry = &(d_table->entries[dlg->h_entry]);
@@ -1061,15 +1067,32 @@ void next_state_dlg(struct dlg_cell *dlg, int event,
     struct dlg_cell_out *dlg_out;
     dlg_out = d_entry_out->first;
     int found = -1;
+    int delete = 1;
 
     switch (event) {
         case DLG_EVENT_TDEL:
             switch (dlg->state) {
                 case DLG_STATE_UNCONFIRMED:
                 case DLG_STATE_EARLY:
-                    dlg->state = DLG_STATE_DELETED;
-                    unref_dlg_unsafe(dlg, 1, d_entry);
-                    *unref = 1;
+		    if (to_tag) {
+                        LM_DBG("Going to check if there is another active branch - we only change state to DELETED if there are no other active branches\n");
+                        while (dlg_out) {
+                            if (dlg_out->to_tag.len != to_tag->len || memcmp(dlg_out->to_tag.s, to_tag->s, dlg_out->to_tag.len) != 0) {
+				if(dlg_out->deleted != 1) {
+				    LM_DBG("Found a dlg_out that is not for this event and is not in state deleted, therefore there is another active branch\n");
+				    delete = 0;
+                                    //we should delete this dlg_out tho...
+                                    dlg_out->deleted=1;
+				}
+                            }
+                            dlg_out = dlg_out->next;
+                        }
+                    } 
+		    if(delete) {
+			dlg->state = DLG_STATE_DELETED;
+			unref_dlg_unsafe(dlg, 1, d_entry);
+			*unref = 1;
+		    }
                     break;
                 case DLG_STATE_CONFIRMED:
                     unref_dlg_unsafe(dlg, 1, d_entry);
@@ -1085,7 +1108,7 @@ void next_state_dlg(struct dlg_cell *dlg, int event,
             switch (dlg->state) {
                 case DLG_STATE_UNCONFIRMED:
                 case DLG_STATE_EARLY:
-                    dlg->state = DLG_STATE_EARLY;
+		    dlg->state = DLG_STATE_EARLY;
                     break;
                 default:
                     log_next_state_dlg(event, dlg);
@@ -1095,8 +1118,22 @@ void next_state_dlg(struct dlg_cell *dlg, int event,
             switch (dlg->state) {
                 case DLG_STATE_UNCONFIRMED:
                 case DLG_STATE_EARLY:
-                    dlg->state = DLG_STATE_DELETED;
-                    *unref = 1;
+		    if (to_tag) {
+                        LM_DBG("Going to check if there is another active branch - we only change state to DELETED if there are no other active branches\n");
+                        while (dlg_out) {
+                            if (dlg_out->to_tag.len != to_tag->len || memcmp(dlg_out->to_tag.s, to_tag->s, dlg_out->to_tag.len) != 0) {
+				if(dlg_out->deleted != 1) {
+				    LM_DBG("Found a dlg_out that is not for this event and is not in state deleted, therefore there is another active branch\n");
+				    delete = 0;
+				}
+                            }
+                            dlg_out = dlg_out->next;
+                        }
+                    } 
+		    if(delete) {
+			dlg->state = DLG_STATE_DELETED;
+			*unref = 1;
+		    }
                     break;
                 default:
                     log_next_state_dlg(event, dlg);
@@ -1708,6 +1745,18 @@ error:
     free_mi_tree(rpl_tree);
 
     return NULL;
+}
+
+/*!
+ * \brief decrement dialog ref counter by 1
+ * \see dlg_unref
+ * \param dlg dialog
+ */
+void dlg_release(struct dlg_cell *dlg)
+{
+	if(dlg==NULL)
+		return;
+	unref_dlg(dlg, 1);
 }
 
 time_t api_get_dlg_expires(str *callid, str *ftag, str *ttag) {

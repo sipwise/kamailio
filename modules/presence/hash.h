@@ -1,6 +1,4 @@
 /*
- * $Id: hash.h 2583 2007-08-08 11:33:25Z anca_vamanu $
- *
  * presence module - presence server implementation
  *
  * Copyright (C) 2007 Voice Sistem S.R.L.
@@ -19,11 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2007-08-20  initial version (Anca Vamanu)
  */
 
 /*! \file
@@ -78,7 +73,7 @@ struct subscription* search_shtable(shtable_t htable, str callid,str to_tag,str 
 
 int insert_shtable(shtable_t htable, unsigned int hash_code, struct subscription* subs);
 
-int delete_shtable(shtable_t htable, unsigned int hash_code, str to_tag);
+int delete_shtable(shtable_t htable, unsigned int hash_code, struct subscription* subs);
 
 int update_shtable(shtable_t htable, unsigned int hash_code, struct subscription* subs,
 		int type);
@@ -99,7 +94,7 @@ typedef int (*insert_shtable_t)(shtable_t htable, unsigned int hash_code,
 		struct subscription* subs);
 
 typedef int (*delete_shtable_t)(shtable_t htable, unsigned int hash_code,
-		str to_tag);
+		struct subscription* subs);
 
 typedef int (*update_shtable_t)(shtable_t htable, unsigned int hash_code,
 		struct subscription* subs, int type);

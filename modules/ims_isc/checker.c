@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -397,7 +397,7 @@ isc_match* isc_checker_find(str uri, char direction, int skip,
 	//need to get the urecord
 	if ((ret = isc_ulb.get_impurecord(d, &uri, &p)) != 0) {
 		isc_ulb.unlock_udomain(d, &uri);
-		LM_ERR("Failure getting record");
+		LM_ERR("Failure getting IMPU record for [%.*s] - ISC checker find METHOD: [%.*s]\n", uri.len, uri.s, msg->first_line.u.request.method.len, msg->first_line.u.request.method.s);
 		return 0;
 	};
 

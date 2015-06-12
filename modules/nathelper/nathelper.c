@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * ---------
@@ -338,7 +338,7 @@ static struct {
  */
 static int ping_nated_only = 0;
 static const char sbuf[4] = {0, 0, 0, 0};
-static char *force_socket_str = 0;
+static str force_socket_str = STR_NULL;
 static pid_t mypid;
 static int sipping_flag = -1;
 static int natping_disable_flag = -1;
@@ -352,6 +352,7 @@ static int_str rcv_avp_name;
 
 static char *natping_socket = 0;
 static int udpping_from_path = 0;
+static int sdp_oldmediaip = 1;
 static int raw_sock = -1;
 static unsigned int raw_ip = 0;
 static unsigned short raw_port = 0;
@@ -413,17 +414,18 @@ static pv_export_t mod_pvs[] = {
 static param_export_t params[] = {
 	{"natping_interval",      INT_PARAM, &natping_interval      },
 	{"ping_nated_only",       INT_PARAM, &ping_nated_only       },
-	{"nortpproxy_str",        STR_PARAM, &nortpproxy_str.s      },
-	{"received_avp",          STR_PARAM, &rcv_avp_param         },
-	{"force_socket",          STR_PARAM, &force_socket_str      },
-	{"sipping_from",          STR_PARAM, &sipping_from.s        },
-	{"sipping_method",        STR_PARAM, &sipping_method.s      },
+	{"nortpproxy_str",        PARAM_STR, &nortpproxy_str      },
+	{"received_avp",          PARAM_STRING, &rcv_avp_param         },
+	{"force_socket",          PARAM_STR, &force_socket_str      },
+	{"sipping_from",          PARAM_STR, &sipping_from        },
+	{"sipping_method",        PARAM_STR, &sipping_method      },
 	{"sipping_bflag",         INT_PARAM, &sipping_flag          },
 	{"natping_disable_bflag", INT_PARAM, &natping_disable_flag  },
 	{"natping_processes",     INT_PARAM, &natping_processes     },
-	{"natping_socket",        STR_PARAM, &natping_socket        },
+	{"natping_socket",        PARAM_STRING, &natping_socket        },
 	{"keepalive_timeout",     INT_PARAM, &nh_keepalive_timeout  },
 	{"udpping_from_path",     INT_PARAM, &udpping_from_path     },
+	{"append_sdp_oldmediaip", INT_PARAM, &sdp_oldmediaip        },
 
 	{0, 0, 0}
 };
@@ -601,7 +603,6 @@ mod_init(void)
 	int i;
 	bind_usrloc_t bind_usrloc;
 	struct in_addr addr;
-	str socket_str;
 	pv_spec_t avp_spec;
 	str s;
 
@@ -629,10 +630,8 @@ mod_init(void)
 		rcv_avp_type = 0;
 	}
 
-	if (force_socket_str) {
-		socket_str.s=force_socket_str;
-		socket_str.len=strlen(socket_str.s);
-		force_socket=grep_sock_info(&socket_str,0,0);
+	if (force_socket_str.s && force_socket_str.len>0) {
+		force_socket=grep_sock_info(&force_socket_str,0,0);
 	}
 
 	/* create raw socket? */
@@ -643,16 +642,10 @@ mod_init(void)
 			return -1;
 	}
 
-	if (nortpproxy_str.s==NULL || nortpproxy_str.s[0]==0) {
-		nortpproxy_str.len = 0;
-		nortpproxy_str.s = NULL;
-	} else {
-		nortpproxy_str.len = strlen(nortpproxy_str.s);
+	if (nortpproxy_str.s && nortpproxy_str.len>0) {
 		while (nortpproxy_str.len > 0 && (nortpproxy_str.s[nortpproxy_str.len - 1] == '\r' ||
 			nortpproxy_str.s[nortpproxy_str.len - 1] == '\n'))
 				nortpproxy_str.len--;
-		if (nortpproxy_str.len == 0)
-			nortpproxy_str.s = NULL;
 	}
 
 	if (natping_interval > 0) {
@@ -682,17 +675,18 @@ mod_init(void)
 			LM_ERR("bad config - natping_processes must be >= 0\n");
 			return -1;
 		}
+		ul.set_max_partition(natping_processes*natping_interval);
 
 		sipping_flag = (sipping_flag==-1)?0:(1<<sipping_flag);
 		natping_disable_flag = (natping_disable_flag==-1)?0:(1<<natping_disable_flag);
 
 		/* set reply function if SIP natping is enabled */
 		if (sipping_flag) {
-			if (sipping_from.s==0 || sipping_from.s[0]==0) {
+			if (sipping_from.s==0 || sipping_from.len<=0) {
 				LM_ERR("SIP ping enabled, but SIP ping FROM is empty!\n");
 				return -1;
 			}
-			if (sipping_method.s==0 || sipping_method.s[0]==0) {
+			if (sipping_method.s==0 || sipping_method.len<=0) {
 				LM_ERR("SIP ping enabled, but SIP ping method is empty!\n");
 				return -1;
 			}
@@ -700,13 +694,11 @@ mod_init(void)
 				ul.set_keepalive_timeout(nh_keepalive_timeout);
 			}
 
-			sipping_method.len = strlen(sipping_method.s);
 			if(parse_method_name(&sipping_method, &sipping_method_id) < 0) {
 				LM_ERR("invalid SIP ping method [%.*s]!\n", sipping_method.len,
 						sipping_method.s);
 				return -1;
 			}
-			sipping_from.len = strlen(sipping_from.s);
 			exports.response_f = sipping_rpl_filter;
 			init_sip_ping();
 		}
@@ -929,8 +921,8 @@ set_contact_alias_f(struct sip_msg* msg, char* str1, char* str2)
 		pkg_free(buf);
 		return -1;
 	}
-	c->uri.s = buf;
-	c->uri.len = len;
+	c->uri.s = buf + br;
+	c->uri.len = len -2*br;
 
 	return 1;
 }
@@ -1693,7 +1685,7 @@ replace_sdp_ip(struct sip_msg* msg, str *org_body, char *line, str *ip)
 		}
 		body2.s = oldip.s + oldip.len;
 		body2.len = bodylimit - body2.s;
-		ret = alter_mediaip(msg, &body1, &oldip, pf, &newip, pf,1);
+		ret = alter_mediaip(msg, &body1, &oldip, pf, &newip, pf, sdp_oldmediaip);
 		if (ret == -1) {
 			LM_ERR("can't alter '%s' IP\n",line);
 			return -1;
@@ -2060,6 +2052,8 @@ nh_timer(unsigned int ticks, void *timer_idx)
 	int rval;
 	void *buf, *cp;
 	str c;
+	str recv;
+	str *dst_uri;
 	str opt;
 	str path;
 	str ruid;
@@ -2120,6 +2114,9 @@ nh_timer(unsigned int ticks, void *timer_idx)
 			break;
 		c.s = (char*)cp + sizeof(c.len);
 		cp =  (char*)cp + sizeof(c.len) + c.len;
+		memcpy(&(recv.len), cp, sizeof(recv.len));
+		recv.s = (char*)cp + sizeof(recv.len);
+		cp =  (char*)cp + sizeof(recv.len) + recv.len;
 		memcpy( &send_sock, cp, sizeof(send_sock));
 		cp = (char*)cp + sizeof(send_sock);
 		memcpy( &flags, cp, sizeof(flags));
@@ -2135,6 +2132,9 @@ nh_timer(unsigned int ticks, void *timer_idx)
 
 		if ((flags & natping_disable_flag)) /* always 0 if natping_disable_flag not set */
 			continue;
+
+		if(recv.len>0) dst_uri = &recv;
+		else dst_uri = &c;
 
 		/* determin the destination */
 		if ( path.len && (flags&sipping_flag)!=0 ) {
@@ -2158,14 +2158,14 @@ nh_timer(unsigned int ticks, void *timer_idx)
 				LM_ERR("could not parse path host for udpping_from_path\n");
 				continue;
 			}
-			if (parse_uri(c.s, c.len, &curi) < 0) {
-				LM_ERR("can't parse contact uri\n");
+			if (parse_uri(dst_uri->s, dst_uri->len, &curi) < 0) {
+				LM_ERR("can't parse contact/received uri\n");
 				continue;
 			}
 		} else {
 			/* send to the contact/received */
-			if (parse_uri(c.s, c.len, &curi) < 0) {
-				LM_ERR("can't parse contact uri\n");
+			if (parse_uri(dst_uri->s, dst_uri->len, &curi) < 0) {
+				LM_ERR("can't parse contact/received uri\n");
 				continue;
 			}
 		}
@@ -2232,94 +2232,7 @@ done:
 static int
 create_rcv_uri(str* uri, struct sip_msg* m)
 {
-	static char buf[MAX_URI_SIZE];
-	char* p;
-	str ip, port;
-	int len;
-	str proto;
-
-	if (!uri || !m) {
-		LM_ERR("invalid parameter value\n");
-		return -1;
-	}
-
-	ip.s = ip_addr2a(&m->rcv.src_ip);
-	ip.len = strlen(ip.s);
-
-	port.s = int2str(m->rcv.src_port, &port.len);
-
-	switch(m->rcv.proto) {
-	case PROTO_NONE:
-	case PROTO_UDP:
-		proto.s = 0; /* Do not add transport parameter, UDP is default */
-		proto.len = 0;
-		break;
-
-	case PROTO_TCP:
-		proto.s = "TCP";
-		proto.len = 3;
-		break;
-
-	case PROTO_TLS:
-		proto.s = "TLS";
-		proto.len = 3;
-		break;
-
-	case PROTO_SCTP:
-		proto.s = "SCTP";
-		proto.len = 4;
-		break;
-
-	case PROTO_WS:
-	case PROTO_WSS:
-		proto.s = "WS";
-		proto.len = 2;
-		break;
-
-	default:
-		LM_ERR("unknown transport protocol\n");
-		return -1;
-	}
-
-	len = 4 + ip.len + 2*(m->rcv.src_ip.af==AF_INET6)+ 1 + port.len;
-	if (proto.s) {
-		len += TRANSPORT_PARAM_LEN;
-		len += proto.len;
-	}
-
-	if (len > MAX_URI_SIZE) {
-		LM_ERR("buffer too small\n");
-		return -1;
-	}
-
-	p = buf;
-	memcpy(p, "sip:", 4);
-	p += 4;
-	
-	if (m->rcv.src_ip.af==AF_INET6)
-		*p++ = '[';
-	memcpy(p, ip.s, ip.len);
-	p += ip.len;
-	if (m->rcv.src_ip.af==AF_INET6)
-		*p++ = ']';
-
-	*p++ = ':';
-	
-	memcpy(p, port.s, port.len);
-	p += port.len;
-
-	if (proto.s) {
-		memcpy(p, TRANSPORT_PARAM, TRANSPORT_PARAM_LEN);
-		p += TRANSPORT_PARAM_LEN;
-
-		memcpy(p, proto.s, proto.len);
-		p += proto.len;
-	}
-
-	uri->s = buf;
-	uri->len = len;
-
-	return 0;
+	return get_src_uri(m, 0, uri);
 }
 
 

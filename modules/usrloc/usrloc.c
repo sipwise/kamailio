@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,13 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ========
- *
- * 2006-11-28 Added a new function to the usrloc_api, to retrieve the number
- *            of registered users.  (Jeffrey Magder - SOMA Networks)
  */
 
 /*! \file
@@ -81,6 +74,7 @@ int bind_usrloc(usrloc_api_t* api)
 
 	api->set_keepalive_timeout    = ul_set_keepalive_timeout;
 	api->refresh_keepalive        = ul_refresh_keepalive;
+	api->set_max_partition        = ul_set_max_partition;
 
 	api->use_domain = use_domain;
 	api->db_mode    = db_mode;

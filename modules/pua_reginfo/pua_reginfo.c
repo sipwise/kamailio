@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /* Bindings to PUA */
@@ -63,9 +63,9 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[]={
- 	{"default_domain", STR_PARAM, &default_domain.s},
-	{"outbound_proxy", STR_PARAM, &outbound_proxy.s},
-	{"server_address", STR_PARAM, &server_address.s},
+ 	{"default_domain", PARAM_STR, &default_domain},
+	{"outbound_proxy", PARAM_STR, &outbound_proxy},
+	{"server_address", PARAM_STR, &server_address},
 	{"publish_reginfo", INT_PARAM, &publish_reginfo},
 	{0, 0, 0}
 };
@@ -94,24 +94,20 @@ static int mod_init(void)
 	bind_usrloc_t bind_usrloc;
 
 	if (publish_reginfo == 1) {
-		/* Verify the default domain: */
-		if(default_domain.s == NULL ) {       
-		        LM_ERR("default domain parameter not set\n");
-		        return -1;
-		}
-		default_domain.len= strlen(default_domain.s);
+    /* Verify the default domain: */
+    if(!default_domain.s || default_domain.len<=0) {
+      LM_ERR("default domain parameter not set\n");
+      return -1;
+    }
 	}
 
-	if(server_address.s== NULL) {
+	if(!server_address.s || server_address.len<=0) {
 		LM_ERR("server_address parameter not set\n");
 		return -1;
 	}
-	server_address.len= strlen(server_address.s);
 
-	if(outbound_proxy.s == NULL)
+	if(!outbound_proxy.s || outbound_proxy.len<=0)
 		LM_DBG("No outbound proxy set\n");
-	else
-		outbound_proxy.len= strlen(outbound_proxy.s);
         
 	/* Bind to PUA: */
 	bind_pua= (bind_pua_t)find_export("bind_pua", 1,0);

@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -95,8 +95,8 @@ int subs_init_locks(void);
 /*!
  * \brief Destroy all locks on the list
  */
-void subs__unlock_locks(void);
-void subs__destroy_locks(void);
+void subs_unlock_locks(void);
+void subs_destroy_locks(void);
 
 #ifndef GEN_LOCK_T_PREFERED
 void subs__lock_idx(int idx);

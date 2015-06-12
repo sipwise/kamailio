@@ -1,6 +1,4 @@
 /* 
- * $Id$ 
- *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2007-2008 1&1 Internet AG
  *
@@ -18,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -39,12 +37,17 @@
  */
 typedef struct {
 	const str* table;      /*!< Default table that should be used              */
+	const char *tquote;    /*!< Char to quote special tokens (table/column names) */
 	unsigned long tail;    /*!< Variable length tail, database module specific */
 } db1_con_t;
 
 
 /** Return the table of the connection handle */
 #define CON_TABLE(cn)      ((cn)->table)
+/** Return the tquote of the connection handle */
+#define CON_TQUOTE(cn)     ((cn)->tquote)
+/** Return the tquote of the connection handle or empty str if null */
+#define CON_TQUOTESZ(cn)   (((cn)->tquote)?((cn)->tquote):"")
 /** Return the tail of the connection handle */
 #define CON_TAIL(cn)       ((cn)->tail)
 

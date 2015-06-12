@@ -1,6 +1,4 @@
 /* 
- * $Id$ 
- *
  * MySQL module core functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -20,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -40,6 +38,7 @@
 #include <mysql/mysql_version.h>
 #include "../../mem/mem.h"
 #include "../../dprint.h"
+#include "../../async_task.h"
 #include "../../lib/srdb1/db_query.h"
 #include "../../lib/srdb1/db_ut.h"
 #include "mysql_mod.h"
@@ -124,7 +123,68 @@ static int db_mysql_submit_query(const db1_con_t* _h, const str* _s)
 }
 
 
+/**
+ *
+ */
+void db_mysql_async_exec_task(void *param)
+{
+	str *p;
+	db1_con_t* dbc;
+	
+	p = (str*)param;
+	
+	dbc = db_mysql_init(&p[0]);
 
+	if(dbc==NULL) {
+		LM_ERR("failed to open connection for [%.*s]\n", p[0].len, p[0].s);
+		return;
+	}
+	if(db_mysql_submit_query(dbc, &p[1])<0) {
+		LM_ERR("failed to execute query [%.*s] on async worker\n",
+		       (p[1].len>100)?100:p[1].len, p[1].s);
+	}
+	db_mysql_close(dbc);
+}
+
+/**
+ * Execute a raw SQL query via core async framework.
+ * \param _h handle for the database
+ * \param _s raw query string
+ * \return zero on success, negative value on failure
+ */
+int db_mysql_submit_query_async(const db1_con_t* _h, const str* _s)
+{
+	struct db_id* di;
+	async_task_t *atask;
+	int asize;
+	str *p;
+
+	di = ((struct pool_con*)_h->tail)->id;
+
+	asize = sizeof(async_task_t) + 2*sizeof(str) + di->url.len + _s->len + 2;
+	atask = shm_malloc(asize);
+	if(atask==NULL) {
+		LM_ERR("no more shared memory to allocate %d\n", asize);
+		return -1;
+	}
+
+	atask->exec = db_mysql_async_exec_task;
+	atask->param = (char*)atask + sizeof(async_task_t);
+
+	p = (str*)((char*)atask + sizeof(async_task_t));
+	p[0].s = (char*)p + 2*sizeof(str);
+	p[0].len = di->url.len;
+	strncpy(p[0].s, di->url.s, di->url.len);
+	p[1].s = p[0].s + p[0].len + 1;
+	p[1].len = _s->len;
+	strncpy(p[1].s, _s->s, _s->len);
+
+	async_task_push(atask);
+
+	return 0;
+}
+
+static char *db_mysql_tquote = "`";
 /**
  * Initialize the database module.
  * No function should be called before this
@@ -133,7 +193,10 @@ static int db_mysql_submit_query(const db1_con_t* _h, const str* _s)
  */
 db1_con_t* db_mysql_init(const str* _url)
 {
-	return db_do_init(_url, (void *)db_mysql_new_connection);
+	db1_con_t *c;
+	c = db_do_init(_url, (void *)db_mysql_new_connection);
+	if(c) CON_TQUOTE(c) = db_mysql_tquote;
+	return c;
 }
 
 
@@ -396,6 +459,16 @@ int db_mysql_raw_query(const db1_con_t* _h, const str* _s, db1_res_t** _r)
 	db_mysql_store_result);
 }
 
+/**
+ * Execute a raw SQL query via core async framework.
+ * \param _h handle for the database
+ * \param _s raw query string
+ * \return zero on success, negative value on failure
+ */
+int db_mysql_raw_query_async(const db1_con_t* _h, const str* _s)
+{
+	return db_mysql_submit_query_async(_h, _s);
+}
 
 /**
  * Insert a row into a specified table.
@@ -712,11 +785,12 @@ done:
 		return -1;
 	}
  
-	ret = snprintf(mysql_sql_buf, sql_buffer_size, "insert into %.*s (", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+	ret = snprintf(mysql_sql_buf, sql_buffer_size, "insert into %s%.*s%s (",
+			CON_TQUOTESZ(_h), CON_TABLE(_h)->len, CON_TABLE(_h)->s, CON_TQUOTESZ(_h));
 	if (ret < 0 || ret >= sql_buffer_size) goto error;
 	off = ret;
 
-	ret = db_print_columns(mysql_sql_buf + off, sql_buffer_size - off, _k, _n);
+	ret = db_print_columns(mysql_sql_buf + off, sql_buffer_size - off, _k, _n, CON_TQUOTESZ(_h));
 	if (ret < 0) return -1;
 	off += ret;
 
@@ -765,6 +839,21 @@ int db_mysql_insert_delayed(const db1_con_t* _h, const db_key_t* _k, const db_va
 	return db_do_insert_delayed(_h, _k, _v, _n, db_mysql_val2str,
 	db_mysql_submit_query);
 }
+
+/**
+ * Insert a row into a specified table via core async framework.
+ * \param _h structure representing database connection
+ * \param _k key names
+ * \param _v values of the keys
+ * \param _n number of key=value pairs
+ * \return zero on success, negative value on failure
+ */
+int db_mysql_insert_async(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v, const int _n)
+{
+	return db_do_insert(_h, _k, _v, _n, db_mysql_val2str,
+	db_mysql_submit_query_async);
+}
+
 
 
 /**

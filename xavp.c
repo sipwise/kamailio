@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com) 
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -15,12 +13,12 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*
- * History:
- * --------
- *  2009-05-20  created by daniel
+/*!
+ * \file
+ * \brief Kamailio core :: Extended AVPs
+ * \ingroup core
+ * Module: \ref core
  */
-
 
 #ifdef WITH_XAVP
 
@@ -725,8 +723,7 @@ int xavp_insert(sr_xavp_t *xavp, int idx, sr_xavp_t **list)
 		if(crt==NULL)
 			return -1;
 		if (lst == NULL) {
-			crt->next = *list;
-			*list = crt;
+			xavp_add(crt, list);
 		} else {
 			crt->next = lst->next;
 			lst->next = crt;
@@ -734,6 +731,10 @@ int xavp_insert(sr_xavp_t *xavp, int idx, sr_xavp_t **list)
 		lst = crt;
 	}
 
+	if(lst==NULL) {
+		LM_ERR("cannot link the xavp\n");
+		return -1;
+	}
 	xavp->next = lst->next;
 	lst->next = xavp;
 

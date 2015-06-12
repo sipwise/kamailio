@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * 
  */
@@ -163,7 +163,6 @@ struct isup_parm_opt {
 	unsigned char data[0];
 };
 
-
 struct isup_iam_fixed {
 	unsigned char type;
 	unsigned char nature_of_connection;
@@ -175,13 +174,36 @@ struct isup_iam_fixed {
 	unsigned char called_party_number[0];
 };
 
+struct isup_acm_fixed {
+	unsigned char type;
+	unsigned char backwards_call_ind[2];
+	unsigned char fixed_pointer;
+	unsigned char optional_pointer;
+};
+
+struct isup_cpg_fixed {
+	unsigned char type;
+	unsigned char event_info;
+	unsigned char fixed_pointer;
+	unsigned char optional_pointer;
+};
+
+union isup_msg {
+	unsigned char type;
+	struct isup_iam_fixed iam;
+	struct isup_acm_fixed acm;
+	struct isup_cpg_fixed cpg;
+};
+
 int isup_get_hop_counter(unsigned char *buf, int len);
+int isup_get_event_info(unsigned char *buf, int len);
 int isup_get_cpc(unsigned char *buf, int len);
 int isup_get_calling_party_nai(unsigned char *buf, int len);
 int isup_get_called_party_nai(unsigned char *buf, int len);
 int isup_get_screening(unsigned char *buf, int len);
 int isup_get_presentation(unsigned char *buf, int len);
 int isup_update_destination(struct sdp_mangler * mangle, char * dest, int hops, int nai, unsigned char *buf, int len);
+int isup_update_bci_1(struct sdp_mangler * mangle, int charge_indicator, int called_status, int called_category, int e2e_indicator, unsigned char *buf, int len);
 int isup_update_calling(struct sdp_mangler * mangle, char * origin, int nai, int presentation, int screening, unsigned char * buf, int len);
 
 

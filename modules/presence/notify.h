@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * presence module -presence server implementation
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -19,11 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*! \file
@@ -101,6 +96,7 @@ extern str str_id_col;
 extern str str_sender_col;
 extern str str_updated_col;
 extern str str_updated_winfo_col;
+extern str str_priority_col;
 
 void PRINT_DLG(FILE* out, dlg_t* _d);
 

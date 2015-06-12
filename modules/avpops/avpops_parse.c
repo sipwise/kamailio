@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2004-2006 Voice Sistem SRL
  *
  * This file is part of Kamailio.
@@ -17,13 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
- * History:
- * ---------
- *  2004-10-04  first version (ramona)
- *  2004-11-11  DB scheme added (ramona)
- *  2004-11-17  aligned to new AVP core global aliases (ramona)
  */
 
 

@@ -29,6 +29,8 @@
 #include "dlg_req_within.h"
 #include "dlg_profile.h"
 #include "dlg_var.h"
+#include "dlg_db_handler.h"
+#include "dlg_ng_stats.h"
 
 static str rr_param; /*!< record-route parameter for matching */
 static int dlg_flag; /*!< flag for dialog tracking */
@@ -42,13 +44,7 @@ int spiral_detected = -1;
 
 extern struct rr_binds d_rrb; /*!< binding to record-routing module */
 extern struct tm_binds d_tmb;
-
-
-/* statistic variables */
-extern stat_var *early_dlgs; /*!< number of early dialogs */
-extern stat_var *processed_dlgs; /*!< number of processed dialogs */
-extern stat_var *expired_dlgs; /*!< number of expired dialogs */
-extern stat_var *failed_dlgs; /*!< number of failed dialogs */
+extern struct dialog_ng_counters_h dialog_ng_cnts_h;
 
 extern pv_elem_t *ruri_param_model; /*!< pv-string to get r-uri */
 
@@ -219,12 +215,11 @@ int populate_leg_info(struct dlg_cell *dlg, struct sip_msg *msg,
     } else {
         skip_recs = 0;
         /* was the 200 OK received or local generated */
-        /*skip_recs = dlg->from_rr_nb +
+        skip_recs = dlg->from_rr_nb +
                 ((t->relayed_reply_branch >= 0) ?
                 ((t->uac[t->relayed_reply_branch].flags & TM_UAC_FLAG_R2) ? 2 :
                 ((t->uac[t->relayed_reply_branch].flags & TM_UAC_FLAG_RR) ? 1 : 0))
                 : 0);
-         * */
     }
 
     if (msg->record_route) {
@@ -495,8 +490,20 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param) {
     }
 
     if (new_state == DLG_STATE_EARLY) {
-        run_dlg_callbacks(DLGCB_EARLY, dlg, req, rpl, DLG_DIR_UPSTREAM, 0);
-        return;
+	if ((dlg->dflags & DLG_FLAG_INSERTED) == 0) {
+	    dlg->dflags |= DLG_FLAG_NEW;
+	} else {
+	    dlg->dflags |= DLG_FLAG_CHANGED;
+	}
+	if (dlg_db_mode == DB_MODE_REALTIME)
+	    update_dialog_dbinfo(dlg);
+
+	if (old_state != DLG_STATE_EARLY) {
+	    counter_inc(dialog_ng_cnts_h.early);
+	}
+
+	run_dlg_callbacks(DLGCB_EARLY, dlg, req, rpl, DLG_DIR_UPSTREAM, 0);
+	return;
     }
 
     LM_DBG("new state is %i and old state is %i\n", new_state, old_state);
@@ -528,7 +535,14 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param) {
         /* save the settings to the database,
          * if realtime saving mode configured- save dialog now
          * else: the next time the timer will fire the update*/
-        dlg->dflags |= DLG_FLAG_NEW;
+        if ((dlg->dflags & DLG_FLAG_INSERTED) == 0) {
+	    dlg->dflags |= DLG_FLAG_NEW;
+	} else {
+	    dlg->dflags |= DLG_FLAG_CHANGED;
+	}
+	if (dlg_db_mode == DB_MODE_REALTIME)
+		update_dialog_dbinfo(dlg);
+	
 
         if (0 != insert_dlg_timer(&dlg->tl, dlg->lifetime)) {
             LM_CRIT("Unable to insert dlg %p [%u:%u] on event %d [%d->%d] "
@@ -540,7 +554,11 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param) {
         } else {
             ref_dlg(dlg, 1);
         }
-
+	
+	if (old_state == DLG_STATE_EARLY) 
+	    counter_add(dialog_ng_cnts_h.early, -1);
+	
+	counter_inc(dialog_ng_cnts_h.active);
         run_dlg_callbacks(DLGCB_CONFIRMED, dlg, req, rpl, DLG_DIR_UPSTREAM, 0);
 
         if (unref) unref_dlg(dlg, unref);
@@ -588,7 +606,9 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param) {
         if (unref)
             unref_dlg(dlg, unref);
 
-        return;
+		if (old_state == DLG_STATE_EARLY)
+		    counter_add(dialog_ng_cnts_h.early, -1);
+		return;
     }
 
     if (unref) unref_dlg(dlg, unref);
@@ -1179,18 +1199,19 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param) {
                     dlg->callid.len, dlg->callid.s,
                     dlg->from_tag.len, dlg->from_tag.s);
 
-        } else {
-            unref++;
-        }
-        /* dialog terminated (BYE) */
-        dlg_terminated(req, dlg, dir);
-        unref_dlg(dlg, unref);
-
+		} else {
+			unref++;
+		}
+		/* dialog terminated (BYE) */
+		dlg_terminated(req, dlg, dir);
+		unref_dlg(dlg, unref);
+		counter_add(dialog_ng_cnts_h.active, -1);
+		counter_inc(dialog_ng_cnts_h.processed);
         return;
     }
 
     if ((event == DLG_EVENT_REQ || event == DLG_EVENT_REQACK)
-            && new_state == DLG_STATE_CONFIRMED) {
+            && (new_state == DLG_STATE_CONFIRMED || new_state==DLG_STATE_EARLY)) {
 
         timeout = get_dlg_timeout(req);
         if (timeout != default_timeout) {
@@ -1204,6 +1225,10 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param) {
         } else {
             dlg->dflags |= DLG_FLAG_CHANGED;
         }
+
+		if(dlg_db_mode==DB_MODE_REALTIME && (dlg->dflags&DLG_FLAG_CHANGED)) {
+			update_dialog_dbinfo(dlg);
+		}
 
         if (old_state != DLG_STATE_CONFIRMED) {
             LM_DBG("confirming ACK successfully processed\n");
@@ -1234,7 +1259,11 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param) {
 
     if (new_state == DLG_STATE_CONFIRMED && old_state != DLG_STATE_CONFIRMED) {
         dlg->dflags |= DLG_FLAG_CHANGED;
+
+        if(dlg_db_mode == DB_MODE_REALTIME)
+        	update_dialog_dbinfo(dlg);
     }
+
     return;
 }
 
@@ -1264,9 +1293,8 @@ void dlg_ontimeout(struct dlg_tl *tl) {
         }
     }
 
-    if ((dlg->dflags & DLG_FLAG_TOBYE)
-            && (dlg->state == DLG_STATE_CONFIRMED)) {
-        //TODO: dlg_bye_all(dlg, NULL);
+    if (dlg->state == DLG_STATE_CONFIRMED) {
+        dlg_bye_all(dlg, NULL);
         unref_dlg(dlg, 1);
         return;
     }
@@ -1278,11 +1306,12 @@ void dlg_ontimeout(struct dlg_tl *tl) {
                 dlg->callid.len, dlg->callid.s,
                 dlg->from_tag.len, dlg->from_tag.s);
 
-
-        /* dialog timeout */
-        run_dlg_callbacks(DLGCB_EXPIRED, dlg, NULL, NULL, DLG_DIR_NONE, 0);
-
-        unref_dlg(dlg, unref + 1);
+		/* dialog timeout */
+		run_dlg_callbacks(DLGCB_EXPIRED, dlg, NULL, NULL, DLG_DIR_NONE, 0);
+		unref_dlg(dlg, unref + 1);
+		counter_add(dialog_ng_cnts_h.active, -1);
+		counter_inc(dialog_ng_cnts_h.expired);
+		counter_inc(dialog_ng_cnts_h.processed);
     } else {
         unref_dlg(dlg, 1);
     }
@@ -1361,6 +1390,7 @@ void internal_print_all_dlg(struct dlg_cell *dlg) {
     struct dlg_entry_out *d_entry_out = &(dlg->dlg_entry_out);
 
     LM_DBG("----------------------------");
+    LM_DBG("Dialog h_entry:h_id = [%u : %u]\n", dlg->h_entry, dlg->h_id);
     LM_DBG("Dialog call-id: %.*s\n", dlg->callid.len, dlg->callid.s);
     LM_DBG("Dialog state: %d\n", dlg->state);
     LM_DBG("Dialog ref counter: %d\n", dlg->ref);
@@ -1378,12 +1408,14 @@ void internal_print_all_dlg(struct dlg_cell *dlg) {
     while (dlg_out) {
 
         LM_DBG("----------");
+	LM_DBG("Dialog out h_entry:h_id = [%u : %u]\n", dlg_out->h_entry, dlg_out->h_id);
         LM_DBG("Dialog out did: %.*s\n", dlg_out->did.len, dlg_out->did.s);
         LM_DBG("Dialog out to_tag: %.*s\n", dlg_out->to_tag.len, dlg_out->to_tag.s);
         LM_DBG("Dialog out caller cseq: %.*s\n", dlg_out->caller_cseq.len, dlg_out->caller_cseq.s);
         LM_DBG("Dialog out callee cseq: %.*s\n", dlg_out->callee_cseq.len, dlg_out->callee_cseq.s);
         LM_DBG("Dialog out callee contact: %.*s\n", dlg_out->callee_contact.len, dlg_out->callee_contact.s);
         LM_DBG("Dialog out callee route set: %.*s\n", dlg_out->callee_route_set.len, dlg_out->callee_route_set.s);
+        LM_DBG("Dialog out state (deleted): %i\n", dlg_out->deleted);
 
         LM_DBG("----------");
         dlg_out = dlg_out->next;

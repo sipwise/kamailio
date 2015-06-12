@@ -31,6 +31,8 @@
 #include "dlg_profile.h"
 #include "dlg_var.h"
 #include "dlg_req_within.h"
+#include "dlg_db_handler.h"
+#include "dlg_ng_stats.h"
 
 MODULE_VERSION
 
@@ -55,15 +57,20 @@ int detect_spirals = 1;
 str dlg_extra_hdrs = {NULL, 0};
 int initial_cbs_inscript = 1;
 
-str dlg_bridge_controller = {"sip:controller@kamailio.org", 27};
+str dlg_bridge_controller = str_init("sip:controller@kamailio.org");
 
-str ruri_pvar_param = {"$ru", 3};
+str ruri_pvar_param = str_init("$ru");
 pv_elem_t * ruri_param_model = NULL;
 
 struct tm_binds d_tmb;
 struct rr_binds d_rrb;
 pv_spec_t timeout_avp;
 
+/* db stuff */
+int dlg_db_mode_param = DB_MODE_NONE;
+static int db_fetch_rows = 200;
+static str db_url = str_init(DEFAULT_DB_URL);
+static unsigned int db_update_period = DB_DEFAULT_UPDATE_PERIOD;
 
 /* commands wrappers and fixups */
 static int fixup_profile(void** param, int param_no);
@@ -119,18 +126,24 @@ static cmd_export_t cmds[] = {
 
 static param_export_t mod_params[] = {
     { "hash_size", INT_PARAM, &dlg_hash_size},
-    { "rr_param", STR_PARAM, &rr_param},
+    { "rr_param", PARAM_STRING, &rr_param},
     { "dlg_flag", INT_PARAM, &dlg_flag},
-    { "timeout_avp", STR_PARAM, &timeout_spec.s},
+    { "timeout_avp", PARAM_STR, &timeout_spec},
     { "default_timeout", INT_PARAM, &default_timeout},
-    { "dlg_extra_hdrs", STR_PARAM, &dlg_extra_hdrs.s},
+    { "dlg_extra_hdrs", PARAM_STR, &dlg_extra_hdrs},
     //In this new dialog module we always match using DID
     //{ "dlg_match_mode", INT_PARAM, &seq_match_mode},
-    { "detect_spirals", INT_PARAM, &detect_spirals,},
-    { "profiles_with_value", STR_PARAM, &profiles_wv_s},
-    { "profiles_no_value", STR_PARAM, &profiles_nv_s},
-    { "bridge_controller", STR_PARAM, &dlg_bridge_controller.s},
-    { "ruri_pvar", STR_PARAM, &ruri_pvar_param.s},
+
+    { "db_url",				PARAM_STR, &db_url 				},
+    { "db_mode",			INT_PARAM, &dlg_db_mode_param		},
+    { "db_update_period",	INT_PARAM, &db_update_period		},
+    { "db_fetch_rows",		INT_PARAM, &db_fetch_rows			}
+    ,
+    { "detect_spirals",		INT_PARAM, &detect_spirals			},
+    { "profiles_with_value",PARAM_STRING, &profiles_wv_s			},
+    { "profiles_no_value",	PARAM_STRING, &profiles_nv_s			},
+    { "bridge_controller",	PARAM_STR, &dlg_bridge_controller	},
+    { "ruri_pvar",			PARAM_STR, &ruri_pvar_param		},
 
     { 0, 0, 0}
 };
@@ -330,6 +343,7 @@ int load_dlg(struct dlg_binds *dlgb) {
     dlgb->lookup_terminate_dlg = w_api_lookup_terminate_dlg;
     dlgb->get_dlg_expires = api_get_dlg_expires;
     dlgb->get_dlg = dlg_get_msg_dialog;
+    dlgb->release_dlg = dlg_release;
 
     return 1;
 }
@@ -346,7 +360,11 @@ static int mod_init(void) {
         LM_ERR("failed to register RPC commands\n");
         return -1;
     }
-
+    
+    if (dialog_ng_stats_init() != 0) {
+	LM_ERR("Failed to register dialog_ng counters\n");
+	return -1;
+    }
 
     if (faked_msg_init() < 0)
         return -1;
@@ -516,21 +534,68 @@ static int mod_init(void) {
         return -1;
     }
 
+    /* if a database should be used to store the dialogs' information */
+	dlg_db_mode = dlg_db_mode_param;
+	if (dlg_db_mode==DB_MODE_NONE) {
+		db_url.s = 0; db_url.len = 0;
+	} else {
+		if (dlg_db_mode!=DB_MODE_REALTIME &&
+		dlg_db_mode!=DB_MODE_DELAYED && dlg_db_mode!=DB_MODE_SHUTDOWN ) {
+			LM_ERR("unsupported db_mode %d\n", dlg_db_mode);
+			return -1;
+		}
+		if ( !db_url.s || db_url.len==0 ) {
+			LM_ERR("db_url not configured for db_mode %d\n", dlg_db_mode);
+			return -1;
+		}
+		if (init_dlg_db(&db_url, dlg_hash_size, db_update_period, db_fetch_rows)!=0) {
+			LM_ERR("failed to initialize the DB support\n");
+			return -1;
+		}
+		run_load_callbacks();
+	}
+
     destroy_dlg_callbacks(DLGCB_LOADED);
 
     return 0;
 }
 
 static int child_init(int rank) {
+	dlg_db_mode = dlg_db_mode_param;
+
+	if ( ((dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED) &&
+		(rank>0 || rank==PROC_TIMER)) ||
+		(dlg_db_mode==DB_MODE_SHUTDOWN && (rank==PROC_MAIN)) ) {
+			if ( dlg_connect_db(&db_url) ) {
+				LM_ERR("failed to connect to database (rank=%d)\n",rank);
+				return -1;
+			}
+	}
+
+	/* in DB_MODE_SHUTDOWN only PROC_MAIN will do a DB dump at the end, so
+	 * for the rest of the processes will be the same as DB_MODE_NONE */
+	if (dlg_db_mode==DB_MODE_SHUTDOWN && rank!=PROC_MAIN)
+		dlg_db_mode = DB_MODE_NONE;
+	/* in DB_MODE_REALTIME and DB_MODE_DELAYED the PROC_MAIN have no DB handle */
+	if ( (dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED) &&
+			rank==PROC_MAIN)
+		dlg_db_mode = DB_MODE_NONE;
+
     return 0;
 }
 
 static void mod_destroy(void) {
+	if(dlg_db_mode == DB_MODE_DELAYED || dlg_db_mode == DB_MODE_SHUTDOWN) {
+		dialog_update_db(0, 0);
+		destroy_dlg_db();
+	}
+
     destroy_dlg_table();
     destroy_dlg_timer();
     destroy_dlg_callbacks(DLGCB_CREATED | DLGCB_LOADED);
     destroy_dlg_handlers();
     destroy_dlg_profiles();
+    dialog_ng_stats_destroy();
 }
 
 static int w_set_dlg_profile(struct sip_msg *msg, char *profile, char *value) {
@@ -850,14 +915,53 @@ static void rpc_end_dlg_entry_id(rpc_t *rpc, void *c) {
     dlg = lookup_dlg(h_entry, h_id);
     if (dlg) {
         //dlg_bye_all(dlg, (rpc_extra_hdrs.len>0)?&rpc_extra_hdrs:NULL);
-        unref_dlg(dlg, 1);
-    }
+    unref_dlg(dlg, 1);
+}
 }*/
+
+static const char *rpc_end_dlg_entry_id_doc[2] = {
+    "End a given dialog based on [h_entry] [h_id]", 0
+};
+
+
+
+
+
+/* Wrapper for terminating dialog from API - from other modules */
+static void rpc_end_dlg_entry_id(rpc_t *rpc, void *c) {
+    unsigned int h_entry, h_id;
+    struct dlg_cell * dlg = NULL;
+    str rpc_extra_hdrs = {NULL,0};
+    int n;
+
+    n = rpc->scan(c, "dd", &h_entry, &h_id);
+    if (n < 2) {
+	    LM_ERR("unable to read the parameters (%d)\n", n);
+	    rpc->fault(c, 500, "Invalid parameters");
+	    return;
+    }
+    if(rpc->scan(c, "*S", &rpc_extra_hdrs)<1)
+    {
+	    rpc_extra_hdrs.s = NULL;
+	    rpc_extra_hdrs.len = 0;
+    }
+
+    dlg = lookup_dlg(h_entry, h_id);//increments ref count!
+    if(dlg==NULL) {
+	    rpc->fault(c, 404, "Dialog not found");
+	    return;
+    }
+
+    unref_dlg(dlg, 1);
+
+    dlg_terminate(dlg, NULL, NULL/*reason*/, 2, NULL);
+
+}
 
 
 static rpc_export_t rpc_methods[] = {
 	{"dlg2.list", rpc_print_dlgs, rpc_print_dlgs_doc, 0},
-    //{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
+        {"dlg2.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
     {0, 0, 0, 0}
 };
 

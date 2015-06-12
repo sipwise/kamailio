@@ -1,43 +1,23 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- *
- * History:
- * --------
- *  2003-01-29  tcp buffer size ++-ed to allow for 0-terminator
- *  2003-06-30  added tcp_connection flags & state (andrei) 
- *  2003-10-27  tcp port aliases support added (andrei)
- *  2006-10-13  added tcp_req_states for STUN (vlada)
- *  2007-07-26  improved tcp connection hash function; increased aliases
- *               hash size (andrei)
- *  2007-11-26  switched to local_timer (andrei)
- *  2007-11-30  buffered write support (andrei)
  */
-
-
 
 #ifndef _tcp_conn_h
 #define _tcp_conn_h
@@ -224,6 +204,7 @@ struct tcp_connection{
 	void* extra_data; /* extra data associated to the connection, 0 for tcp*/
 	struct timer_ln timer;
 	ticks_t timeout;/* connection timeout, after this it will be removed*/
+	ticks_t lifetime;/* connection lifetime */
 	unsigned id_hash; /* hash index in the id_hash */
 	struct tcp_connection* id_next; /* next, prev in id hash table */
 	struct tcp_connection* id_prev;
@@ -328,8 +309,7 @@ static inline unsigned tcp_addr_hash(	struct ip_addr* ip,
 			(l_ip->u.addr32[0]^l_ip->u.addr32[1]^l_ip->u.addr32[2]^
 				l_ip->u.addr32[3]^l_port);
 	else{
-		LOG(L_CRIT, "tcp_addr_hash: BUG: bad len %d for an ip address\n",
-				ip->len);
+		LM_CRIT("bad len %d for an ip address\n", ip->len);
 		return 0;
 	}
 	/* make sure the first bits are influenced by all 32

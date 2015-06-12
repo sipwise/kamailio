@@ -1,43 +1,22 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2003-03-16  removed _TOTAG (jiri)
- * 2003-03-06  we keep a list of 200/INV to-tags now (jiri)
- * 2003-03-01  kr set through a function now (jiri)
- * 2003-12-04  callbacks per transaction added; completion callback
- *             merge into them as LOCAL_COMPETED (bogdan)
- * 2004-02-11  FIFO/CANCEL + alignments (hash=f(callid,cseq)) (uli+jiri)
- * 2004-02-13  t->is_invite, t->local, t->noisy_ctimer replaced
- *             with flags (bogdan)
- * 2004-08-23  avp support added - avp list linked in transaction (bogdan)
- * 2005-11-03  updated to the new timer interface (dropped tm timers) (andrei)
- * 2006-08-11  dns failover support (andrei)
- * 2007-05-29  switch ref_count to atomic and delete a cell automatically on
- *             UNREF if the ref_count reaches 0 (andrei)
- * 2007-06-01  support for different retransmissions intervals per transaction;
- *             added maximum inv. and non-inv. transaction life time (andrei)
- * 2007-06-06  switched tm bucket list to a simpler and faster clist;
- *              inlined often used functions (andrei)
  */
 
 /**  TM :: hash table, flags and other general defines.
@@ -96,7 +75,6 @@ struct async_state;
 #include "../../mem/shm_mem.h"
 #include "lock.h"
 #include "sip_msg.h"
-#include "t_reply.h"
 #include "t_hooks.h"
 #ifdef USE_DNS_FAILOVER
 #include "../../dns_cache.h"
@@ -322,6 +300,7 @@ typedef struct async_state {
 
 #define T_DISABLE_INTERNAL_REPLY (1<<13) /* don't send internal negative reply */
 #define T_ADMIN_REPLY (1<<14) /* t reply sent by admin (e.g., from cfg script) */
+#define T_ASYNC_SUSPENDED (1<<15)
 
 /* unsigned short should be enough for a retr. timer: max. 65535 ms =>
  * max retr. = 65 s which should be enough and saves us 2*2 bytes */
@@ -426,7 +405,7 @@ typedef struct cell
 	/* UA Server */
 	struct ua_server  uas;
 	/* UA Clients */
-	struct ua_client  uac[ MAX_BRANCHES ];
+	struct ua_client  *uac;
 	
 	/* store transaction state to be used for async transactions */
 	struct async_state async_backup;
@@ -448,10 +427,17 @@ typedef struct cell
 #endif
 
 	/* protection against concurrent reply processing */
-	ser_lock_t   reply_mutex;
+	ser_lock_t reply_mutex;
+	/* pid of the process that holds the reply lock */
+	atomic_t reply_locker_pid;
+	/* recursive reply lock count */
+	int reply_rec_lock_level;
+
+#ifdef ENABLE_ASYNC_MUTEX
 	/* protect against concurrent async continues */
 	ser_lock_t   async_mutex;
-		
+#endif
+
 	ticks_t fr_timeout;     /* final response interval for retr_bufs */
 	ticks_t fr_inv_timeout; /* final inv. response interval for retr_bufs */
 #ifdef TM_DIFF_RT_TIMEOUT
@@ -460,7 +446,7 @@ typedef struct cell
 #endif
 	ticks_t end_of_life; /* maximum lifetime */
 
-	/* nr of replied branch; 0..MAX_BRANCHES=branch value,
+	/* nr of replied branch; 0..sr_dst_max_branches=branch value,
 	 * -1 no reply, -2 local reply */
 	short relayed_reply_branch;
 
@@ -472,6 +458,8 @@ typedef struct cell
 	unsigned short on_reply;
 	 /* The route to take for each downstream branch separately */
 	unsigned short on_branch;
+	 /* branch route backup for late branch add (t_append_branch) */
+	unsigned short on_branch_delayed;
 
 	/* place holder for MD5checksum, MD5_LEN bytes are extra alloc'ed */
 	char md5[0];

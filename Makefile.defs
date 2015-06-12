@@ -1,3 +1,4 @@
+# Kamailio build system
 
 #
 # makefile defs (CC, LD,a.s.o)
@@ -9,75 +10,6 @@
 #   exclude_modules, skip_modules, include_modules
 #   extra_defs
 #
-# History:
-# --------
-#              created by andrei
-#  2003-02-24  added LOCALBASE, fixed doc_dir for freebsd - patch provided
-#               by Maxim Sobolev <sobomax@FreeBSD.org>
-#  2003-02-25  added -DDISABLE_NAGLE (andrei)
-#  2003-03-02  added -DDIGEST_DOMAIN (janakj)
-#  2003-03-10  added -xcode=pic32 for module compilation w/ sun cc
-#               (too many symbols for pic13)  (andrei)
-#  2003-04-16  added CC_EXTRA_OPTS, s/march/mcpu, added CPU (cpu to optimize 
-#               for, used only with gcc-3.x) (andrei)
-#  2003-05-23  check if this makefile was already included (andrei)
-#              removed -DDIGEST_DOMAIN (andrei)
-#  2003-05-30  added extra_defs (andrei)
-#  2003-06-06  moved compiler detection before DEFS (andrei)
-#  2003-06-10  removed -m32 for gcc 3.x/sparc64  -- it will use 
-#              arch. default: -m32 on solaris, -m64 on *bsd (andrei)
-#  2003-09-25  added -pthread into LIBS when compiling on FreeBSD/alpha
-#              and other FreeBSD arches for which no fast locking assembly
-#              code exists (sobomax)
-#  2003-11-08  mips1 support introduced (andrei)
-#  2003-11-24  openbsd 3.4 (elf) fixes (andrei)
-#  2004-07-27  darwin (mac os x) port  (andrei)
-#  2004-09-12  mips2 & cobalt support introduced (andrei)
-#  2004-09-28  x86_64 support introduced (andrei)
-#  2004-12-14  gcc-3.4 special case added (andrei)
-#  2004-12-15  HAVE_ALLOCA_H added (andrei)
-#  2004-12-19  amd64 transformed in x86_64 (andrei)
-#  2005-04-27  alpha support added (andrei)
-#  2005-06-01  use $(LOCALBASE) instead of /usr/{local,pkg} (andrei)
-#  2005-06-26  numeric OSREL & HAVE_KQUEUE added to the *BSD (andrei)
-#  2005-07-04  HAVE_DEVPOLL added to solaris (andrei)
-#  2005-07-06  gcc 4.0 optimizations support (andrei)
-#  2005-07-25  better solaris arch detection (andrei)
-#  2005-09-12  -mallign-double removed (too many problems) (andrei)
-#  2005-10-02  distcc get gcc version hack (andrei)
-#  2006-03-30  64 bit mode compile by default on sparc64 (-m64), added
-#              CC_GCC_LIKE_ASM and SPARC64_MODE (andrei)
-#              sparc <= v8 support (andrei)
-#  2006-03-31  armv6 & mips64 support added
-#              mips and arm set to NOSMP by default (andrei)
-#  2006-07-10  added -DPROFILING (hscholz)
-#  2007-02-09  added TLS_HOOKS and CORE_TLS support, obsoleted TLS=1
-#              added TLS_EXTRA_LIBS (andrei)
-#  2007-03-16  added LIB building options: LIB_LDFLAGS, LIB_SONAME, LIB_RPATH,
-#                INSTALL_LIB, libraries install paths (andrei)
-#  2007-05-14  futex support if linux 2.5.70+ and 
-#               use_futex=yes (default) (andrei)
-#  2007-05-26  changed darwin module link flags (instead of -bundle_loader ser
-#               -flat_namespace -undefined suppress) (andrei)
-#  2007-07-07  use isainfo -n to detect cpu type on solaris (andrei)
-#  2007-07-07  added HAVE_SCHED_SETSCHEDULER for linux (andrei)
-#  2007-07-18  added DNS_WATCHDOG_SUPPORT (Miklos)
-#  2007-07-30  added USE_DNS_CACHE_STATS and USE_DST_BLACKLIST_STATS (Gergo)
-#  2008-06-26  support for make cfg / config.mak and hack to load 
-#               automatically config.mak when included from a module, lib 
-#               a.s.o (not from the main Makefile)  (andrei)
-#  2009-03-10  replaced DEFS with C_DEFS and INCLUDES with C_INCLUDES (DEFS
-#              and INCLUDES are now used only for "temporary" defines/includes
-#              inside modules or libs) (andrei)
-#  2009-09-29  for gcc 4.2+ use -fno-strict-overflow (andrei)
-#  2009-09-30  find the target architecture from the compiler and not
-#              from the host (andrei)
-#  2009-10-01  use -fsigned-char for gcc on ppc, ppc64, arm and arm6
-#              (on those archs char is unsigned by default) (andrei)
-#  2010-03-10  added CC_MKDEP_OPTS, which contains to the list of options
-#               needed to generate dependencies on-the-fly while compiling
-#               or is empty if the compiler doesn't support it (andrei)
-
 
 # default silent, unless Q= 0|no|off|verbose|noisy
 quiet?=$(if $(filter 0 no off verbose noisy,$(Q)),verbose,silent)
@@ -163,14 +95,14 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 
 # version number
 VERSION = 4
-PATCHLEVEL = 1
-SUBLEVEL = 8
-EXTRAVERSION =
+PATCHLEVEL = 3
+SUBLEVEL = 0
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
 # 1 - q_malloc (quick malloc)
-MEMMNG ?= 1
+# 2 - tlsf_malloc (O(1) malloc and free)
+MEMMNG ?= 0
 # memory debugger switcher
 # 0 - off (no-debug mode)
 # 1 - on (debug mode)
@@ -445,7 +377,7 @@ share_dir = share/$(MAIN_NAME)/
 # lib/$(MAIN_NAME)/modules , lib/$(MAIN_NAME)/modules-s, lib/$(MAIN_NAME)/modules-k
 modules_dir = $(LIBDIR)/$(MAIN_NAME)/
 lib_dir = $(LIBDIR)/$(MAIN_NAME)/
-
+run_dir = var/run/$(MAIN_NAME)/
 doc_dir = doc/$(MAIN_NAME)/
 man_dir = man/
 data_dir = $(MAIN_NAME)/
@@ -497,6 +429,10 @@ LOCALBASE ?= /usr/local
 # Doxygen directory
 doxygen_dir=doc/doxygen
 
+BASEDIR ?= $(DESTDIR)
+basedir = $(BASEDIR)
+runbasedir = $(BASEDIR)
+
 # install location
 PREFIX ?= $(LOCALBASE)
 prefix = $(PREFIX)
@@ -506,13 +442,12 @@ prefix = $(PREFIX)
 #  basedir=/tmp
 #  prefix=/usr/local
 
-BASEDIR ?= $(DESTDIR)
-basedir = $(BASEDIR)
 # install prefixes for various stuff
 cfg_prefix = $(basedir)$(prefix)
 bin_prefix = $(basedir)$(prefix)
 modules_prefix = $(basedir)$(prefix)
 lib_prefix = $(basedir)$(prefix)
+run_prefix = $(runbasedir)
 doc_prefix = $(basedir)$(prefix)
 man_prefix = $(basedir)$(prefix)
 ut_prefix = $(basedir)$(prefix)
@@ -525,6 +460,7 @@ cfg_target = $(prefix)/$(cfg_dir)
 bin_target = $(prefix)/$(bin_dir)
 #modules_target = $(prefix)/$(modules_dir)
 lib_target = $(prefix)/$(lib_dir)
+run_target = $(run_prefix)/$(run_dir)
 doc_target = $(prefix)/$(doc_dir)
 data_target = $(prefix)/$(data_dir)
 
@@ -565,6 +501,8 @@ data_target = $(prefix)/$(data_dir)
 #		(not true anymore, q_malloc performs approx. the same)
 # -DF_MALLOC
 #		an even faster malloc, not recommended for debugging
+# -DTLSF_MALLOC=1
+#       an implemetation of the "two levels segregation fit" malloc algorithm
 # -DDL_MALLOC
 #		a malloc implementation based on Doug Lea's dl_malloc
 # -DSF_MALLOC 
@@ -681,6 +619,7 @@ C_DEFS= $(extra_defs) \
 	 -D__CPU_$(ARCH) $(os_defs) \
 	 -DSER_VER=$(SER_VER) \
 	 -DCFG_DIR='"$(cfg_target)"'\
+	 -DRUN_DIR='"$(run_target)"'\
 	 -DPKG_MALLOC \
 	 -DSHM_MEM  -DSHM_MMAP \
 	 -DDNS_IP_HACK \
@@ -725,6 +664,12 @@ ifeq 	($(MEMDBG), 1)
 		C_DEFS+= -DDBG_QM_MALLOC
 endif
 	C_DEFS+= -DMEM_JOIN_FREE
+else ifeq ($(MEMMNG), 2)
+#	use tlsf malloc
+	C_DEFS+= -DTLSF_MALLOC=1
+ifeq 	($(MEMDBG), 1)
+		C_DEFS+= -DDBG_TLSF_MALLOC
+endif
 else
 #	use f_malloc
 	C_DEFS+= -DF_MALLOC
@@ -946,7 +891,7 @@ else		# CC_NAME, gcc
 ifeq		($(CC_NAME), clang)
 $(call                          set_if_empty,CPU,athlon64)
 					C_DEFS+=-DCC_GCC_LIKE_ASM
-                                        CFLAGS+=-m32
+                                        CFLAGS+=-g -m32
                                                 $(CC_OPT) \
                                                           \
                                                 -mtune=$(CPU)
@@ -1042,7 +987,7 @@ else		# CC_NAME, gcc
 ifeq            ($(CC_NAME), clang)
 $(call                          set_if_empty,CPU,opteron)
 					C_DEFS+=-DCC_GCC_LIKE_ASM
-                                        CFLAGS+=-m64 \
+                                        CFLAGS+=-g -m64 \
                                                 $(CC_OPT)        
                                         LDFLAGS+=-m64
 else      	# CC_NAME, clang
@@ -2074,12 +2019,12 @@ saved_fixed_vars:=	MAIN_NAME  CFG_NAME SCR_NAME FLAVOUR INSTALL_FLAVOUR \
 # extra: prefix DESTDIR BASEDIR basedirt
 saved_chg_vars:=\
 		CC_EXTRA_OPTS CPU CFLAGS_RM CFLAGS MOD_CFLAGS LIB_CFLAGS UTILS_CFLAGS \
-		BASEDIR basedir DESTDIR LIBDIR \
-		PREFIX prefix\
+		BASEDIR basedir DESTDIR LIBDIR RUNBASEDIR runbasedir \
+		PREFIX prefix \
 		cfg_prefix cfg_dir bin_prefix bin_dir modules_prefix modules_dir \
 		doc_prefix doc_dir man_prefix man_dir ut_prefix ut_dir \
 		share_prefix share_dir lib_prefix lib_dir data_prefix data_dir \
-		cfg_target lib_target data_target
+		cfg_target lib_target data_target run_prefix run_dir run_target
 
 
 #export relevant variables to the sub-makes

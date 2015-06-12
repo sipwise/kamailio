@@ -1,33 +1,26 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005 iptelorg GmbH
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: UID handling
  * \ingroup core
  * Module: \ref core
  */
@@ -42,7 +35,7 @@ static str uid_name = STR_STATIC_INIT(AVP_UID);
 static str did_name = STR_STATIC_INIT(AVP_DID);
 
 
-/*
+/**
  * Set From UID
  */
 int set_from_uid(str* uid)
@@ -63,7 +56,7 @@ int set_from_uid(str* uid)
 }
 
 
-/* Extract username attribute from authorized credentials */
+/** Extract username attribute from authorized credentials */
 static inline str* cred_user(struct sip_msg* msg)
 {
 	struct hdr_field* h;
@@ -77,7 +70,7 @@ static inline str* cred_user(struct sip_msg* msg)
 	return &cred->digest.username.user;
 }
 
-/*
+/**
  * Set From UID
  */
 int get_from_uid(str* uid, struct sip_msg* msg)
@@ -100,17 +93,17 @@ int get_from_uid(str* uid, struct sip_msg* msg)
 		} else {
 			     /* Get From URI username */
 			if (parse_from_header(msg) < 0) {
-				LOG(L_ERR, "get_from_uid: Error while parsing From header\n");
+				LM_ERR("unable to parse From header\n");
 				return -1;
 			}
 			from = get_from(msg);
 			if (parse_uri(from->uri.s, from->uri.len, &puri) == -1) {
-				LOG(L_ERR, "get_from_uid: Error while parsing From URI\n");
+				LM_ERR("unable to parsie From URI\n");
 				return -1;
 			}
 		
 			if (puri.user.len > MAX_URI_SIZE) {
-				LOG(L_ERR, "get_from_uid: Username too long\n");
+				LM_ERR("username too long\n");
 				return -1;
 			}
 			memcpy(buf, puri.user.s, puri.user.len);
@@ -125,7 +118,8 @@ int get_from_uid(str* uid, struct sip_msg* msg)
 	}
 }
 
-
+/** Get to UID
+ */
 int get_to_uid(str* uid, struct sip_msg* msg)
 {
 	static char buf[MAX_URI_SIZE];
@@ -142,20 +136,19 @@ int get_to_uid(str* uid, struct sip_msg* msg)
 		if (msg->REQ_METHOD == METHOD_REGISTER) {
 			if ((msg->to==0) && 
 				(parse_headers(msg, HDR_TO_F, 0) < 0 || msg->to == 0)) {
-				DBG("get_to_uid: Error while parsing To URI: "
-					" to header bad or missing\n");
+				LM_DBG("Error while parsing To URI: to header bad or missing\n");
 				return -1;
 			}
 			to = get_to(msg);
 			if (parse_uri(to->uri.s, to->uri.len, &puri) == -1) {
-				DBG("get_to_uid: Error while parsing To URI\n");
+				LM_DBG("Error while parsing To URI\n");
 				return -1;
 			}
 			p = puri.user.s;
 			uid->len = puri.user.len;
 		} else {
 			if (!msg->parsed_uri_ok && (parse_sip_msg_uri(msg) < 0)) {
-				DBG("Error while parsing the Request-URI\n");
+				LM_DBG("Error while parsing the Request-URI\n");
 				return -1;
 			}
 			p = msg->parsed_uri.user.s;
@@ -163,11 +156,11 @@ int get_to_uid(str* uid, struct sip_msg* msg)
 		}
 			
 		if (uid->len > MAX_URI_SIZE) {
-			DBG("get_to_uid: Username too long\n");
+			LM_DBG("Username too long\n");
 			return -1;
 		}
 		if (p == NULL || uid->len == 0) {
-			DBG("get_to_uid: Username is empty\n");
+			LM_DBG("Username is empty\n");
 			return -1;
 		}
 		memcpy(buf, p, uid->len);
@@ -181,7 +174,7 @@ int get_to_uid(str* uid, struct sip_msg* msg)
 }
 
 
-/*
+/**
  * Set To UID
  */
 int set_to_uid(str* uid)
@@ -202,7 +195,7 @@ int set_to_uid(str* uid)
 }
 
 
-/*
+/**
  * Return current To domain id
  */
 int get_to_did(str* did, struct sip_msg* msg)
@@ -218,7 +211,7 @@ int get_to_did(str* did, struct sip_msg* msg)
 }
 
 
-/*
+/**
  * Return current To domain id
  */
 int get_from_did(str* did, struct sip_msg* msg)

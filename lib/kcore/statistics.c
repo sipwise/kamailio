@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2006 Voice Sistem SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,20 +15,17 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  *
- * History:
- * ---------
- *  2006-01-16  first version (bogdan)
- *  2006-11-28  added get_stat_var_from_num_code() (Jeffrey Magder -
- *              SOMA Networks)
- *  2010-08-08  removed all the parts emulated by kstats_wrapper.[ch] (andrei)
  */
 
 /*!
  * \file
  * \brief Statistics support
+ * \author bogdan, andrei
+ * \author Jeffrey Magder - SOMA Networks
+ * \ingroup libkcore
  */
 
 
@@ -375,6 +370,12 @@ static int get_used_waiting_queue(
 	int  rx_queue;
 	
 	int  waitingQueueSize = 0;
+
+#ifndef __OS_linux
+	/* /proc/net/tcp and /proc/net/udp only exists on Linux systems, so don't bother with
+	   trying to open these files */
+	return 0;
+#endif
 
 	/* Set up the file we want to open. */
 	if (forTCP) {

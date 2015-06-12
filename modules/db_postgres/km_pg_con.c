@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
@@ -26,12 +26,15 @@
  */
 
 #include "km_pg_con.h"
+#include "pg_mod.h"
 #include "../../mem/mem.h"
 #include "../../dprint.h"
 #include "../../ut.h"
 #include "../../tls_hooks_init.h" 
 #include <string.h>
 #include <time.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 
 
 /*!
@@ -46,6 +49,9 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
 {
 	struct pg_con* ptr;
 	char *ports;
+	int i = 0;
+	const char *keywords[10], *values[10];
+	char to[16];
 
 	LM_DBG("db_id = %p\n", id);
  
@@ -67,6 +73,8 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
 
 	if (id->port) {
 		ports = int2str(id->port, 0);
+		keywords[i] = "port";
+		values[i++] = ports;
 		LM_DBG("opening connection: postgres://xxxx:xxxx@%s:%d/%s\n", ZSW(id->host),
 			id->port, ZSW(id->database));
 	} else {
@@ -75,11 +83,27 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
 			ZSW(id->database));
 	}
 
+	keywords[i] = "host";
+	values[i++] = id->host;
+	keywords[i] = "dbname";
+	values[i++] = id->database;
+	keywords[i] = "user";
+	values[i++] = id->username;
+	keywords[i] = "password";
+	values[i++] = id->password;
+	if (pg_timeout > 0) {
+		snprintf(to, sizeof(to)-1, "%d", pg_timeout + 3);
+		keywords[i] = "connect_timeout";
+		values[i++] = to;
+	}
+
+	keywords[i] = values[i] = NULL;
+
 	/* don't attempt to re-init openssl if done already */
 	if(tls_loaded()) PQinitSSL(0);
 
- 	ptr->con = PQsetdbLogin(id->host, ports, NULL, NULL, id->database, id->username, id->password);
-	LM_DBG("PQsetdbLogin(%p)\n", ptr->con);
+	ptr->con = PQconnectdbParams(keywords, values, 1);
+	LM_DBG("PQconnectdbParams(%p)\n", ptr->con);
 
 	if( (ptr->con == 0) || (PQstatus(ptr->con) != CONNECTION_OK) )
 	{
@@ -91,6 +115,14 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
 	ptr->connected = 1;
 	ptr->timestamp = time(0);
 	ptr->id = id;
+
+#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
+	if (pg_keepalive) {
+		i = 1;
+		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
+		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
+	}
+#endif
 
 	return ptr;
 

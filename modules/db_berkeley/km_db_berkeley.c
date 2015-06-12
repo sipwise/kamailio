@@ -1,30 +1,25 @@
 /*
- * $Id$
- *
  * db_berkeley module, portions of this code were templated using
  * the dbtext and postgres modules.
 
  * Copyright (C) 2007 Cisco Systems
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
- * History:
- * --------
- * 2007-09-19  genesis (wiquan)
  */
 
 /*! \file
@@ -781,13 +776,13 @@ int bdb_delete(db1_con_t* _h, db_key_t* _k, db_op_t* _op, db_val_t* _v, int _n)
 	tbl_cache_p _tbc = NULL;
 	table_p _tp = NULL;
 	char kbuf[MAX_ROW_SIZE];
-	int i, j, ret, klen;
+	int ret, klen;
 	int *lkey=NULL;
 	DBT key;
 	DB *db;
 	DBC *dbcp;
 
-	i = j = ret = 0;
+	ret = 0;
 	klen=MAX_ROW_SIZE;
 
 	if (_op)
@@ -909,13 +904,13 @@ int _bdb_delete_cursor(db1_con_t* _h, db_key_t* _k, db_op_t* _op, db_val_t* _v, 
 	db1_res_t* _r   = NULL;
 	char kbuf[MAX_ROW_SIZE];
 	char dbuf[MAX_ROW_SIZE];
-	int i, ret, klen=MAX_ROW_SIZE;
+	int ret, klen=MAX_ROW_SIZE;
 	DBT key, data;
 	DB *db;
 	DBC *dbcp;
 	int *lkey=NULL;
 	
-	i = ret = 0;
+	ret = 0;
 	
 	if ((!_h) || !CON_TABLE(_h))
 		return -1;
