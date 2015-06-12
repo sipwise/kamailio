@@ -1,6 +1,6 @@
 %define name	kamailio
-%define ver	4.1.8
-%define rel	0%{dist}
+%define ver	4.3.0
+%define rel	dev0.0%{dist}
 
 
 
@@ -420,12 +420,12 @@ make cfg prefix=/usr cfg_prefix=$RPM_BUILD_ROOT basedir=$RPM_BUILD_ROOT \
 	cfg_target=/%{_sysconfdir}/kamailio/ modules_dirs="modules"
 make
 make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
-	jabber osp" \
+	jabber ndb_cassandra osp" \
 	group_include="kstandard kautheph kberkeley kcarrierroute kcpl \
-	kdnssec kgeoip kims kjava kjson kldap klua kmemcached kmi_xmlrpc \
-	kmysql koutbound kperl kpostgres kpresence kpurple kpython kradius \
-	kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils kwebsocket \
-	kxml kxmpp" 
+	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
+	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
+	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
+	kwebsocket kxml kxmpp"
 cd modules/app_java/kamailio_java_folder/java
 ant
 cd ../../../..
@@ -440,10 +440,10 @@ make install
 make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 	iptrtpproxy jabber osp" \
 	group_include="kstandard kautheph kberkeley kcarrierroute kcpl \
-	kdnssec kgeoip kims kjava kjson kldap klua kmemcached kmi_xmlrpc \
-	kmysql koutbound kperl kpostgres kpresence kpurple kpython kradius \
-	kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils kwebsocket \
-	kxml kxmpp" 
+	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
+	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
+	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
+	kwebsocket kxml kxmpp"
 
 mkdir -p $RPM_BUILD_ROOT/%{_libdir}/kamailio/java
 install -m644 modules/app_java/kamailio_java_folder/java/Kamailio.class \
@@ -566,7 +566,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.rr
 %doc %{_docdir}/kamailio/modules/README.rtimer
 %doc %{_docdir}/kamailio/modules/README.rtpproxy
-%doc %{_docdir}/kamailio/modules/README.rtpproxy-ng
+%doc %{_docdir}/kamailio/modules/README.rtpengine
 %doc %{_docdir}/kamailio/modules/README.sanity
 %doc %{_docdir}/kamailio/modules/README.sca
 %doc %{_docdir}/kamailio/modules/README.sdpops
@@ -603,6 +603,10 @@ fi
 %doc %{_docdir}/kamailio/modules/README.xhttp_rpc
 %doc %{_docdir}/kamailio/modules/README.xlog
 %doc %{_docdir}/kamailio/modules/README.xprint
+%doc %{_docdir}/kamailio/modules/README.jsonrpc-s
+%doc %{_docdir}/kamailio/modules/README.nosip
+%doc %{_docdir}/kamailio/modules/README.tsilo
+
 
 %dir %attr(-,kamailio,kamailio) %{_sysconfdir}/kamailio
 %config(noreplace) %{_sysconfdir}/kamailio/*
@@ -706,7 +710,7 @@ fi
 %{_libdir}/kamailio/modules/rr.so
 %{_libdir}/kamailio/modules/rtimer.so
 %{_libdir}/kamailio/modules/rtpproxy.so
-%{_libdir}/kamailio/modules/rtpproxy-ng.so
+%{_libdir}/kamailio/modules/rtpengine.so
 %{_libdir}/kamailio/modules/sanity.so
 %{_libdir}/kamailio/modules/sca.so
 %{_libdir}/kamailio/modules/sdpops.so
@@ -743,6 +747,10 @@ fi
 %{_libdir}/kamailio/modules/xhttp_rpc.so
 %{_libdir}/kamailio/modules/xlog.so
 %{_libdir}/kamailio/modules/xprint.so
+%{_libdir}/kamailio/modules/jsonrpc-s.so
+%{_libdir}/kamailio/modules/nosip.so
+%{_libdir}/kamailio/modules/tsilo.so
+
 
 %{_sbindir}/kamailio
 %{_sbindir}/kamctl
@@ -1047,6 +1055,11 @@ fi
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.snmpstats
 %{_libdir}/kamailio/modules/snmpstats.so
+%{_datadir}/snmp/mibs/KAMAILIO-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-REG-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-SIP-COMMON-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-SIP-SERVER-MIB
+%{_datadir}/snmp/mibs/KAMAILIO-TC
 
 
 %files		sqlite
@@ -1115,6 +1128,8 @@ fi
 
 
 %changelog
+* Tue Dec 3 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
+  - Updated version to 4.2.0
 * Mon Oct 7 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
   - Consolidating changelog for 4.1.0 into a single entry...
   - Added new modules to main package:

@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include <sys/types.h>
@@ -155,7 +155,7 @@ int hash_table_insert(struct trusted_list** table, char* src_ip,
 	}
 
 	np->src_ip.len = strlen(src_ip);
-	np->src_ip.s = (char *) shm_malloc(np->src_ip.len);
+	np->src_ip.s = (char *) shm_malloc(np->src_ip.len+1);
 
 	if (np->src_ip.s == NULL) {
 		LM_CRIT("cannot allocate shm memory for src_ip string\n");
@@ -164,6 +164,7 @@ int hash_table_insert(struct trusted_list** table, char* src_ip,
 	}
 
 	(void) strncpy(np->src_ip.s, src_ip, np->src_ip.len);
+	np->src_ip.s[np->src_ip.len] = 0;
 
 	if (pattern) {
 		np->pattern = (char *) shm_malloc(strlen(pattern)+1);

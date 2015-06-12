@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DNSSEC module
  *
  * Copyright (C) 2013 mariuszbi@gmail.com
@@ -19,11 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2013-03	initial implementation
+ */
+/*!
+ * \brief DNSsec support
+ * \ingroup DNSsec
+ * \author mariuszbi@gmail.com
  */
 
 
@@ -107,13 +107,6 @@ static int dnssec_init(void)
 {
 	LOG(L_INFO, "DNSSEC  - initializing\n");
 
-/*	if(register_mi_mod(exports.name, mi_cmds)!=0)
-	{
-		LM_ERR("failed to register MI commands\n");
-		return -1;
-	}
-*/
-	
 	//set parameters
 	if(flags) set_context_flags(flags);
 

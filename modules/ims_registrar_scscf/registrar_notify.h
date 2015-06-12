@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -49,10 +49,12 @@
 
 #include "../ims_usrloc_scscf/usrloc.h"
 #include "../../locking.h"
+#include "sem.h"
 
 
 #define MSG_REG_SUBSCRIBE_OK "Subscription to REG saved"
 #define MSG_REG_UNSUBSCRIBE_OK "Subscription to REG dropped"
+#define MSG_REG_PUBLISH_OK "Publish to REG saved"
 
 
 
@@ -85,6 +87,8 @@ typedef struct {
     gen_lock_t *lock; /**< lock for notifications ops		*/
     reg_notification *head; /**< first notification in the list	*/
     reg_notification *tail; /**< last notification in the list	*/
+    gen_sem_t *empty;
+    int size;
 } reg_notification_list;
 
 /** Events for subscriptions */
@@ -112,31 +116,39 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *str1, char *str2);
 
 int subscribe_to_reg(struct sip_msg *msg, char *str1, char *str2);
 
+int can_publish_reg(struct sip_msg *msg, char *str1, char *str2);
+
+int publish_reg(struct sip_msg *msg, char *str1, char *str2);
+
 int subscribe_reply(struct sip_msg *msg, int code, char *text, int *expires, str *contact);
 
 int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int event_type, str *presentity_uri, str *watcher_contact);
 
 
-str generate_reginfo_full(udomain_t* _t, str* impu_list, int new_subscription);
+str generate_reginfo_full(udomain_t* _t, str* impu_list, int new_subscription, str *primary_impu, int primary_locked);
 
 str get_reginfo_partial(impurecord_t *r, ucontact_t *c, int event_type);
 
 void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_passed, str *presentity_uri, str *watcher_contact, str content, int event_type);
 
-void notification_timer(unsigned int ticks, void* param);
+void notification_event_process();
 
 void free_notification(reg_notification *n);
 
 void send_notification(reg_notification * n);
 
 void add_notification(reg_notification *n);
+
 reg_notification* new_notification(str subscription_state,
-        str content_type, str content, int version, reg_subscriber* r);
+        str content_type, str content, reg_subscriber* r);
 
 dlg_t* build_dlg_t_from_notification(reg_notification* n);
 
 
 int notify_init();
 void notify_destroy();
+
+int aor_to_contact(str* aor, str* contact);
+int contact_port_ip_match(str *c1, str *c2);
 
 #endif //S_CSCF_REGISTRAR_NOTIFY_H_

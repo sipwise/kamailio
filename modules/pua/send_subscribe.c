@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * pua module - presence user agent module
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -19,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 
@@ -48,6 +46,7 @@
 #include "pua_db.h"
 #include "../presence/subscribe.h"
 
+extern db_locking_t db_table_lock;
 
 void print_subs(subs_info_t* subs)
 {
@@ -301,7 +300,7 @@ void subs_cback_func(struct cell *t, int cb_type, struct tmcb_params *ps)
 
 	if (dbmode == PUA_DB_ONLY && pua_dbf.start_transaction)
 	{
-		if (pua_dbf.start_transaction(pua_db, DB_LOCKING_WRITE) < 0)
+		if (pua_dbf.start_transaction(pua_db, db_table_lock) < 0)
 		{
 			LM_ERR("in start_transaction\n");
 			goto error;
@@ -687,7 +686,7 @@ faked_error:
 
 		if (pua_dbf.start_transaction)
 		{
-			if (pua_dbf.start_transaction(pua_db, DB_LOCKING_WRITE) < 0)
+			if (pua_dbf.start_transaction(pua_db, db_table_lock) < 0)
 			{
 				LM_ERR("in start_transaction\n");
 				goto error;
@@ -888,7 +887,7 @@ ua_pres_t* subs_cbparam_indlg(ua_pres_t* subs, int expires, int ua_flag)
 
 	CONT_COPY(hentity, hentity->contact, subs->contact)
 
-	if(subs->outbound_proxy)
+	if(subs->outbound_proxy && subs->outbound_proxy->len && subs->outbound_proxy->s)
 	{
 		hentity->outbound_proxy= (str*)((char*)hentity+ size);
 		size+= sizeof(str);
@@ -908,7 +907,7 @@ ua_pres_t* subs_cbparam_indlg(ua_pres_t* subs, int expires, int ua_flag)
 		CONT_COPY(hentity, hentity->remote_contact, subs->remote_contact)
 	}
 
-	if(subs->extra_headers)
+	if(subs->extra_headers && subs->extra_headers->s)
 	{
 		hentity->extra_headers= (str*)((char*)hentity+ size);
 		size+= sizeof(str);
@@ -986,7 +985,7 @@ int send_subscribe(subs_info_t* subs)
 
 	if (dbmode == PUA_DB_ONLY && pua_dbf.start_transaction)
 	{
-		if (pua_dbf.start_transaction(pua_db, DB_LOCKING_WRITE) < 0)
+		if (pua_dbf.start_transaction(pua_db, db_table_lock) < 0)
 		{
 			LM_ERR("in start_transaction\n");
 			goto error;

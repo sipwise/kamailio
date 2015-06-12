@@ -421,6 +421,30 @@ modparam("dispatcher", "force_dst", 1)
  </programlisting>
  		</example>
  	</section>
+	<section id="dispatcher.p.sock_avp">
+		<title><varname>sock_avp</varname> (str)</title>
+		<para>
+			The name of the avp which will hold the list with the sockets associated to the addresses stored in dst_avp avp.
+		</para>
+		<note>
+		<para>
+			If you want to do load balancing fail over, you have to set this parameter to use the correct socket for each gateway.
+		</para>
+		</note>
+		<para>
+		<emphasis>
+			Default value is <quote>null</quote> - don't add AVPs.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set the <quote>sock_avp</quote> parameter</title>
+ <programlisting format="linespecific">
+ ...
+ modparam("dispatcher", "sock_avp", "$avp(dssocket)")
+ ...
+ </programlisting>
+		</example>
+	</section>
  	<section id="dispatcher.p.hash_pvar">
  		<title><varname>hash_pvar</varname> (str)</title>
  		<para>
@@ -574,14 +598,36 @@ modparam("dispatcher", "force_dst", 1)
  		</emphasis>
  		</para>
  		<example>
- 		<title>Set the <quote>ds_probing_threshhold</quote> parameter</title>
+ 		<title>Set the <quote>ds_probing_threshold</quote> parameter</title>
  <programlisting format="linespecific">
  ...
- modparam("dispatcher", "ds_probing_threshhold", 10)
+ modparam("dispatcher", "ds_probing_threshold", 10)
  ...
  </programlisting>
  		</example>
 	</section>
+	<section id="dispatcher.p.ds_inactive_threshold">
+                <title><varname>ds_inactive_threshold</varname> (int)</title>
+                <para>
+                If you want to set a gateway into active mode (after being inactive), there can be
+                a specific number of successful requests until it will change from "inactive"
+                to "active". The number of attempts can be set with this parameter.
+                This parameter can be modified via ser config framework.
+                </para>
+                <para>
+                <emphasis>
+                Default value is <quote>1</quote> (set active with first success).
+                </emphasis>
+                </para>
+                <example>
+                <title>Set the <quote>ds_inactive_threshold</quote> parameter</title>
+ <programlisting format="linespecific">
+ ...
+ modparam("dispatcher", "ds_inactive_threshold", 10)
+ ...
+ </programlisting>
+                </example>
+        </section>
  	<section id="dispatcher.p.ds_ping_reply_codes">
  		<title><varname>ds_ping_reply_codes</varname> (string)</title>
  		<para>
@@ -731,13 +777,33 @@ modparam("dispatcher", "force_dst", 1)
  		</example>
 	</section>
 
+	<section id="dispatcher.p.ds_default_socket">
+		<title><varname>ds_default_socket</varname> (str)</title>
+		<para>
+		Default socket to be used for sending pings and dispatching requests when a gateway has no send socket configured.
+		</para>
+		<para>
+		<emphasis>
+			By default no default socket is defined, the first configuration script <emphasis>listen</emphasis> directive is used.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set the <quote>ds_default_socket</quote> parameter</title>
+ <programlisting format="linespecific">
+ ...
+ modparam("dispatcher", "ds_default_socket", "udp:192.168.0.125:5060")
+ ...
+ </programlisting>
+		</example>
+	</section>
+
 	</section>
 
 	<section>
 	<title>Functions</title>
 	<section id="dispatcher.f.ds_select_dst">
 		<title>
-		<function moreinfo="none">ds_select_dst(set, alg)</function>
+		<function moreinfo="none">ds_select_dst(set, alg[, limit])</function>
 		</title>
 		<para>
 		The method selects a destination from addresses set. It returns true if
@@ -747,9 +813,9 @@ modparam("dispatcher", "force_dst", 1)
 		</para>
 		<para>
 		If the bit 2 in 'flags' parameter is set, the rest of the addresses from
-		the destination set is stored in AVP list. You can use 'ds_next_dst()'
-		to use next address in order to achieve serial forking to all possible
-		destinations.
+		the destination set is stored in AVP list (limited with an optional 'limit'
+		parameter). You can use 'ds_next_dst()' to use next address in order to
+		achieve serial forking to all possible destinations.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -802,7 +868,7 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			<listitem>
 				<para>
-				<quote>6</quote> - random (using rand()).
+				<quote>6</quote> - random destination (using rand()).
 				</para>
 			</listitem>
 			<listitem>
@@ -813,7 +879,8 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			<listitem>
 				<para>
-				<quote>8</quote> - use first destination (good for failover).
+				<quote>8</quote> - select destination sorted by priority
+				attribute value (serial forking ordered by priority).
 				</para>
 			</listitem>
 			<listitem>
@@ -856,6 +923,14 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			</itemizedlist>
 		</listitem>
+		<listitem>
+			<para>
+			<emphasis>limit</emphasis> - the maximum number of items to be
+			stored in AVP list for further failovers (the first selected
+			destination and default destination are the first to be put in
+			the list)
+                        </para>
+                </listitem>
 		</itemizedlist>
 		<para>
 		If the bit 2 in 'flags' is set, the rest of the addresses from the
@@ -875,12 +950,14 @@ ds_select_dst("1", "0");
 $var(a) = 4;
 ds_select_dst("1", "$var(a)");
 ...
+ds_select_dst("1", "4", "3");
+...
 </programlisting>
 		</example>
 	</section>
   	<section id="dispatcher.f.ds_select_domain">
  		<title>
- 		<function moreinfo="none">ds_select_domain(set, alg)</function>
+ 		<function moreinfo="none">ds_select_domain(set, alg[, limit])</function>
  		</title>
  		<para>
  		The method selects a destination from addresses set and rewrites the
@@ -889,9 +966,9 @@ ds_select_dst("1", "$var(a)");
  		</para>
 		<para>
 		If the bit 2 in 'flags' is set, the rest of the addresses from the
-		destination set is stored in AVP list. You can use 'ds_next_domain()'
-		to use next address to achieve serial forking to all possible
-		destinations.
+		destination set is stored in AVP list (limited with an optional 'limit'
+                parameter). You can use 'ds_next_domain()' to use next address to
+		achieve serial forking to all possible destinations.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
@@ -982,30 +1059,101 @@ failure_route[tryagain] {
 </programlisting>
 		</example>
  	</section>
-  	<section  id="dispatcher.f.ds_is_from_list">
+  	<section  id="dispatcher.f.ds_list_exist">
  		<title>
- 		<function moreinfo="none">ds_is_from_list([groupid])</function>
+		<function moreinfo="none">ds_list_exist(groupid)</function>
  		</title>
  		<para>
-		This function returns true, if the current request comes from a host
-		in the given group of the dispatcher-list; otherwise false.
+		Check if a specific group is defined in dispatcher list
+		or database.
+		</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>groupid</emphasis> - A group ID to check.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+			This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>ds_list_exist</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(ds_list_exist("10")) {
+    ...
+}
+...
+</programlisting>
+	</example>
+	</section>
+  	<section  id="dispatcher.f.ds_is_from_list">
+ 		<title>
+		<function moreinfo="none">ds_is_from_list([groupid [, mode [, uri] ] ])</function>
+ 		</title>
+ 		<para>
+		This function returns true, if there is a match of source address or uri
+		with an address in the given group of the dispatcher-list; otherwise false.
+		</para>
+		<para>Description of parameters:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>groupid</emphasis> (optional) - if not given or its
+				value is -1, the matching will be done over all addresses in
+				all dispacher groups. Otherwise the matching will be done only
+				against the addresses in the specific group id. The parameter
+				can be an integer or a variable holding an integer value.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>mode</emphasis> - (optional) - a bitmask to specify
+				how the matching should be done. If is 0, all ip, port and
+				proto are matched. If bit one is set, then port is ignored.
+				If bit two is set, then protocol is ignored. The parameter
+				can be an integer or a variable holding an integer value.
+				It must be provided if the uri parameter is provided.
+			</para>
+		</listitem>
+        <listitem>
+            <para><emphasis>uri</emphasis> (optional) - if is empty or missing,
+                the matching is done against source IP, port and protocol.
+                Otherwise the value has to be a valid SIP URI, used to match
+                against addresses in the dispatcher list. Only IP, port and
+                protocol are matches, any additional parameters are ignored.
+                The parameter can be a static or dynamic (with variables)
+                string. The domain part of the URI can be an IP address or
+                a hostname.
+            </para>
+        </listitem>
+		</itemizedlist>
+
+		<para>
+		Upon a match, the variable specified by 'setid_pvname' parameter will
+		be set to groupid of matching address and the attributes will be set in
+		variable specified by 'attrs_pvname'.
  		</para>
 		<para>
-		Parameter groupid is optional, when it is missing, then the matching
-		will be done against all addresses in all groups. Upon a match, the
-		variable specified by 'setid_pvname' parameter will be set to groupid
-		of matching address and the attributes will be set in variable
-		specified by 'attrs_pvname'. The parameter can be an integer or a
-		variable holding an integer value.
+		Note that for backward compatibility mode, when no parameter is given
+		or only groupid is given, the matching is done only for IP address
+		and port (protocol is ignored).
  		</para>
 		<para>
 			This function can be used from ANY_ROUTE.
 		</para>
 		<example>
-		<title><function>ds_mark_dst</function> usage</title>
+		<title><function>ds_is_from_list</function> usage</title>
 		<programlisting format="linespecific">
 ...
+if(ds_is_from_list()) {
+    ...
+}
 if(ds_is_from_list("10")) {
+    ...
+}
+if(ds_is_from_list("10", "3")) {
+    ...
+}
+if(ds_is_from_list("10", "3", "sip:127.0.0.1:5080")) {
     ...
 }
 ...
@@ -1163,7 +1311,7 @@ onreply_route {
     </section>
 
 	<section>
-	<title>Exported RPC Commands</title>
+	<title>RPC Commands</title>
 	<section id="dispatcher.rpc.set_state">
 		<title>
 		<function moreinfo="none">dispatcher.set_state</function>
@@ -1245,7 +1393,7 @@ onreply_route {
 
    </section>
 
-	<section>
+	<section id="dispatcher.ex.install">
 	<title>Installation and Running</title>
 	<section>
 		<title>Destination List File</title>
@@ -1271,11 +1419,46 @@ onreply_route {
 			is done the initial ordering inside the set)</para>
 			</listitem>
 			<listitem>
-			<para>attributes: extra filed in form of
-			name1=value1;...;nameN=valueN. There are some predefined names
-			that are used of weight and call load dispatching.</para>
+			<para>attributes: extra fields in form of
+				name1=value1;...;nameN=valueN.
+			</para>
 			</listitem>
 		</itemizedlist>
+		<section id="dispatcher.ex.attributes">
+			<title>Special Attributes</title>
+			<para>
+			There are some predefined names:
+			<itemizedlist>
+				<listitem>
+					'duid' - used for call load dispatching. It must be an
+					unique value to identify a destination (gateway address).
+					Practically the load within the group is associated with
+					this value.
+				</listitem>
+				<listitem>
+					'maxload' - used for call load dispatching. It must be
+					a positive integer, defining the upper limit of active
+					calls per destination. When the limit is reached, then
+					the gateway is no longer selected for new calls until
+					an exiting call via that gateway is terminated. If set
+					to 0, then no active call limit is used.
+				</listitem>
+				<listitem>
+					'weight' - used for weight based load distribution. It
+					must be set to a positive integer value beteen 0 and
+					100. The value represents the percent of calls to be
+					sent to that gateways.
+				</listitem>
+				<listitem>
+					'socket' - used to set the sending socket for the gateway.
+					It is used for sending the SIP traffic as well as
+					OPTIONS keepalives.
+				</listitem>
+			</itemizedlist>
+		</para>
+		</section>
+		<section id="dispatcher.ex.fileforma">
+			<title>File Format</title>
 		<para>
 		Line format is:
 		</para>
@@ -1290,7 +1473,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 		</para>
 		<programlisting format="linespecific">
 ...
-1 sip:127.0.0.1:5080 0 0 duid=abc;my=xyz
+1 sip:127.0.0.1:5080 0 0 duid=abc;socket=udp:192.168.0.125:5060;my=xyz
 ...
 </programlisting>
 
@@ -1307,8 +1490,9 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 </programlisting>
 		</example>
 		</section>
+		</section>
 	
-		<section>
+		<section id="dispatcher.ex.config">
 		<title>&kamailio; config file</title>
 		<para>
 		Next picture shows a sample usage of the dispatcher module.
@@ -1324,7 +1508,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 	</section>
 	</section>
 
-        <section>
+        <section id="dispatcher.ex.event_routes">
         <title>Event routes</title>
         <section>
                 <title>

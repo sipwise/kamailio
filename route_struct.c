@@ -1,44 +1,28 @@
 /*
- * $Id$
- *
  * route structures helping functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-/* History:
- * --------
- *  2003-01-29  src_port introduced (jiri)
- *  2003-03-19  replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
- *  2003-04-12  FORCE_RPORT_T added (andrei)
- *  2003-10-02  added SET_ADV_ADDRESS & SET_ADV_PORT (andrei)
- *  2004-02-24  added LOAD_AVP_T and AVP_TO_URI_T (bogdan)
- *  2005-12-19  select framework added SELECT_O and SELECT_ST (mma)
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: route structures helping functions
  * \ingroup core
  * Module: \ref core
  */
@@ -94,31 +78,10 @@ struct expr* mk_exp(int op, struct expr* left, struct expr* right)
 	e->r.expr=right;
 	return e;
 error:
-	LOG(L_CRIT, "ERROR: mk_exp: memory allocation failure\n");
+	LM_CRIT("memory allocation failure\n");
 	return 0;
 }
 
-
-struct expr* mk_exp_rve(int op, void* left, void* right)
-{
-	struct expr * e;
-	e=(struct expr*)pkg_malloc(sizeof (struct expr));
-	if (e==0) goto error;
-	e->type=EXP_T;
-	e->op=op;
-	e->l.param=mk_elem(RVEXP_O, RVE_ST, left, 0, 0);
-	e->r.param=mk_elem(RVEXP_O, RVE_ST, right, 0, 0);
-	if (e->l.param==0 || e->r.param==0){
-		if (e->l.param) pkg_free(e->l.param);
-		if (e->r.param) pkg_free(e->r.param);
-		pkg_free(e);
-		goto error;
-	}
-	return e;
-error:
-	LOG(L_CRIT, "ERROR: mk_exp_rve: memory allocation failure\n");
-	return 0;
-}
 
 struct expr* mk_elem(int op, expr_l_type ltype, void* lparam,
 							 expr_r_type rtype, void* rparam)
@@ -134,7 +97,7 @@ struct expr* mk_elem(int op, expr_l_type ltype, void* lparam,
 	e->r.param=rparam;
 	return e;
 error:
-	LOG(L_CRIT, "ERROR: mk_elem: memory allocation failure\n");
+	LM_CRIT("memory allocation failure\n");
 	return 0;
 }
 
@@ -171,7 +134,7 @@ struct action* mk_action(enum action_type type, int count, ...)
 	return a;
 
 error:
-	LOG(L_CRIT, "ERROR: mk_action: memory allocation failure\n");
+	LM_CRIT("memory allocation failure\n");
 	return 0;
 }
 
@@ -192,7 +155,7 @@ struct action* append_action(struct action* a, struct action* b)
 void print_expr(struct expr* exp)
 {
 	if (exp==0){
-		LOG(L_CRIT, "ERROR: print_expr: null expression!\n");
+		LM_CRIT("null expression!\n");
 		return;
 	}
 	if (exp->type==ELEM_T){

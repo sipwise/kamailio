@@ -1,25 +1,23 @@
 /*
- * $Id$
- *
  * BDB Database Driver for SER
  *
  * Copyright (C) 2008 iptelorg GmbH
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify it under the
+ * Kamailio is free software; you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
  * Foundation; either version 2 of the License, or (at your option) any later
  * version.
  *
- * SIP-router is distributed in the hope that it will be useful, but WITHOUT ANY
+ * Kamailio is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc.,
- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
 /** \addtogroup bdb
@@ -51,11 +49,8 @@
  */
 static void bdb_con_free(db_con_t* con, bdb_con_t *payload)
 {
-	bdb_uri_t *buri;
 	if (!payload)
 		return;
-
-	buri = DB_GET_PAYLOAD(con->uri);
 
 	/* Delete the structure only if there are no more references
 	 * to it in the connection pool

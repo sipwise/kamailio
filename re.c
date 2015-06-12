@@ -1,41 +1,29 @@
 /* 
- * $Id$
- *
  * regexp and regexp substitutions implementations
  * 
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- *
- * History:
- * --------
- *   2003-08-04  created by andrei
- *   2004-11-12  minor api extension, added *count (andrei)
  */
 
 /*!
  * \file
- * \brief SIP-router core ::  regexp and regexp substitutions implementations
+ * \brief Kamailio core ::  regexp and regexp substitutions implementations
  * \ingroup core
  * Module: \ref core
  */
@@ -231,16 +219,14 @@ struct subst_expr* subst_parser(str* subst)
 	cflags=REG_EXTENDED  | REG_NEWLINE; /* don't match newline */
 	replace_all=0;
 	if (subst->len<3){
-		LOG(L_ERR, "ERROR: subst_parser: expression is too short: %.*s\n",
-				subst->len, subst->s);
+		LM_ERR("expression is too short: %.*s\n", subst->len, subst->s);
 		goto error;
 	}
 	
 	p=subst->s;
 	c=*p;
 	if (c=='\\'){
-		LOG(L_ERR, "ERROR: subst_parser: invalid separator char <%c>"
-				" in %.*s\n", c, subst->len, subst->s);
+		LM_ERR("invalid separator char <%c> in %.*s\n", c, subst->len, subst->s);
 		goto error;
 	}
 	p++;
@@ -251,13 +237,12 @@ struct subst_expr* subst_parser(str* subst)
 		/* if unescaped sep. char */
 		if ((*p==c) && (*(p-1)!='\\')) goto found_re;
 	}
-	LOG(L_ERR, "ERROR: subst_parser: no separator found: %.*s\n", subst->len, 
-			subst->s);
+	LM_ERR("no separator found: %.*s\n", subst->len, subst->s);
 	goto error;
 found_re:
 	re_end=p;
 	if (end < (p + 2)) {
-		ERR("subst_parser: String too short\n");
+		LM_ERR("String too short\n");
 		goto error;
 	}
 	repl=p+1;
@@ -279,15 +264,14 @@ found_re:
 				replace_all=1;
 				break;
 			default:
-				LOG(L_ERR, "ERROR: subst_parser: unknown flag %c in %.*s\n",
-						*p, subst->len, subst->s);
+				LM_ERR("unknown flag %c in %.*s\n", *p, subst->len, subst->s);
 				goto error;
 		}
 	}
 
 	/* compile the re */
 	if ((regex=pkg_malloc(sizeof(regex_t)))==0){
-		LOG(L_ERR, "ERROR: subst_parser: out of memory (re)\n");
+		LM_ERR("out of memory\n");
 		goto error;
 	}
 	c=*re_end; /* regcomp expects null terminated strings -- save */
@@ -296,8 +280,8 @@ found_re:
 		pkg_free(regex);
 		regex=0;
 		*re_end=c; /* restore */
-		LOG(L_ERR, "ERROR: subst_parser: bad regular expression %.*s in "
-				"%.*s\n", (int)(re_end-re), re, subst->len, subst->s);
+		LM_ERR("bad regular expression %.*s in %.*s\n",
+				(int)(re_end-re), re, subst->len, subst->s);
 		goto error;
 	}
 	*re_end=c; /* restore */
@@ -306,7 +290,7 @@ found_re:
 					((rw_no)?(rw_no-1)*sizeof(struct replace_with):0));
 		/* 1 replace_with structure is  already included in subst_expr */
 	if (se==0){
-		LOG(L_ERR, "ERROR: subst_parser: out of memory (subst_expr)\n");
+		LM_ERR("out of memory\n");
 		goto error;
 	}
 	memset((void*)se, 0, sizeof(struct subst_expr));
@@ -314,7 +298,7 @@ found_re:
 	se->replacement.len=repl_end-repl;
 	if (se->replacement.len > 0) {
 		if ((se->replacement.s=pkg_malloc(se->replacement.len))==0){
-			LOG(L_ERR, "ERROR: subst_parser: out of memory (replacement)\n");
+			LM_ERR("out of memory\n");
 			goto error;
 		}
 		/* start copying */
@@ -326,7 +310,7 @@ found_re:
 	se->n_escapes=rw_no;
 	se->max_pmatch=max_pmatch;
 	for (r=0; r<rw_no; r++) se->replace[r]=rw[r];
-	DBG("subst_parser: ok, se is %p\n", se);
+	LM_DBG("ok, se is %p\n", se);
 	return se;
 	
 error:
@@ -351,7 +335,7 @@ static int replace_build(const char* match, int nmatch, regmatch_t* pmatch,
 
 #define RBUF_APPEND(dst, src, size) \
 	if ((dst) - rbuf + (size) >= REPLACE_BUFFER_SIZE - 1) {	\
-		ERR("replace_build: Buffer too small\n");			\
+		LM_ERR("Buffer too small\n");			\
 		goto error;											\
 	}														\
 	memcpy((dst), (src), (size));							\
@@ -383,8 +367,7 @@ static int replace_build(const char* match, int nmatch, regmatch_t* pmatch,
 				break;
 			case REPLACE_URI:
 				if (msg->first_line.type!=SIP_REQUEST){
-					LOG(L_CRIT, "BUG: replace_build: uri substitution on"
-								" a reply\n");
+					LM_CRIT("uri substitution on a reply\n");
 					break; /* ignore, we can continue */
 				}
 				uri= (msg->new_uri.s)?(&msg->new_uri):
@@ -393,21 +376,20 @@ static int replace_build(const char* match, int nmatch, regmatch_t* pmatch,
 				break;
 			case REPLACE_SPEC:
 				if(pv_get_spec_value(msg, &se->replace[r].u.spec, &sv)!=0) {
-					ERR("replace_build: item substitution returned error\n");
+					LM_ERR("item substitution returned error\n");
 					break; /* ignore, we can continue */
 				}
 				RBUF_APPEND(dest, sv.rs.s, sv.rs.len);
 				break;
 			default:
-				LOG(L_CRIT, "BUG: replace_build: unknown type %d\n", 
-						se->replace[r].type);
+				LM_CRIT("unknown type %d\n", se->replace[r].type);
 				/* ignore it */
 		}
 	}
 	RBUF_APPEND(dest, p, end-p);
 	rpl->len = dest - rbuf;
 	if ((rpl->s = pkg_malloc(rpl->len)) == NULL) {
-		ERR("replace_build: Out of pkg memory\n");
+		LM_ERR("Out of pkg memory\n");
 		goto error;
 	}
 	memcpy(rpl->s, rbuf, rpl->len);
@@ -445,32 +427,32 @@ struct replace_lst* subst_run(struct subst_expr* se, const char* input,
 	/* no of () referenced + 1 for the whole string: pmatch[0] */
 	pmatch=pkg_malloc(nmatch*sizeof(regmatch_t));
 	if (pmatch==0){
-		LOG(L_ERR, "ERROR: subst_run_ out of mem. (pmatch)\n");
+		LM_ERR("out of mem\n");
 		goto error;
 	}
 	eflags=0;
 	do{
 		r=regexec(se->re, p, nmatch, pmatch, eflags);
-		DBG("subst_run: running. r=%d\n", r);
+		LM_DBG("running. r=%d\n", r);
 		/* subst */
 		if (r==0){ /* != REG_NOMATCH */
 			if (pmatch[0].rm_so==-1) {
-				ERR("subst_run: Unknown offset?\n");
+				LM_ERR("Unknown offset?\n");
 				goto error;
 			}
 			if (pmatch[0].rm_so==pmatch[0].rm_eo) {
-				ERR("subst_run: Matched string is empty, invalid regexp?\n");
+				LM_ERR("Matched string is empty, invalid regexp?\n");
 				goto error;
 			}
 			*crt=pkg_malloc(sizeof(struct replace_lst));
 			if (*crt==0){
-				LOG(L_ERR, "ERROR: subst_run: out of mem (crt)\n");
+				LM_ERR("out of mem\n");
 				goto error;
 			}
 			memset(*crt, 0, sizeof(struct replace_lst));
 			(*crt)->offset=pmatch[0].rm_so+(int)(p-input);
 			(*crt)->size=pmatch[0].rm_eo-pmatch[0].rm_so;
-			DBG("subst_run: matched (%d, %d): [%.*s]\n",
+			LM_DBG("matched (%d, %d): [%.*s]\n",
 					(*crt)->offset, (*crt)->size, 
 					(*crt)->size, input+(*crt)->offset);
 			/* create subst. string */
@@ -520,19 +502,19 @@ str* subst_str(const char *input, struct sip_msg* msg, struct subst_expr* se,
 	end=input+len;
 	lst=subst_run(se, input, msg, count);
 	if (lst==0){
-		DBG("subst_str: no match\n");
+		LM_DBG("no match\n");
 		return 0;
 	}
 	for (l=lst; l; l=l->next)
 		len+=(int)(l->rpl.len)-l->size;
 	res=pkg_malloc(sizeof(str));
 	if (res==0){
-		LOG(L_ERR, "ERROR: subst_str: mem. allocation error\n");
+		LM_ERR("mem. allocation error\n");
 		goto error;
 	}
 	res->s=pkg_malloc(len+1); /* space for null termination */
 	if (res->s==0){
-		LOG(L_ERR, "ERROR: subst_str: mem. allocation error (res->s)\n");
+		LM_ERR("mem. allocation error (res->s)\n");
 		goto error;
 	}
 	res->s[len]=0;

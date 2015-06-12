@@ -1,24 +1,23 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 1&1 Internet AG
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  */
 
 /*!
@@ -31,7 +30,6 @@
 /*!
  * \defgroup siputils SIPUTILS :: Various SIP message handling functions
  *
- * \note A Kamailio module (modules_k)
  *
    This module implement various functions and checks related to
    SIP message handling and URI handling.
@@ -175,19 +173,23 @@ static cmd_export_t cmds[]={
 		0, ANY_ROUTE},
 	{"is_first_hop",  (cmd_function)w_is_first_hop,                    0, 0,
 		0, ANY_ROUTE},
+	{"is_tel_number", (cmd_function)is_tel_number,           1, fixup_spve_null,
+		0, ANY_ROUTE},
+	{"is_numeric", (cmd_function)is_numeric,                 1, fixup_spve_null,
+		0, ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
 
 static param_export_t params[] = {
 	{"ring_timeout",            INT_PARAM, &default_siputils_cfg.ring_timeout},
-	{"options_accept",          STR_PARAM, &opt_accept.s},
-	{"options_accept_encoding", STR_PARAM, &opt_accept_enc.s},
-	{"options_accept_language", STR_PARAM, &opt_accept_lang.s},
-	{"options_support",         STR_PARAM, &opt_supported.s},
-	{"contact_flds_separator",  STR_PARAM, &contact_flds_separator},
-	{"rpid_prefix",             STR_PARAM, &rpid_prefix.s  },
-	{"rpid_suffix",             STR_PARAM, &rpid_suffix.s  },
-	{"rpid_avp",                STR_PARAM, &rpid_avp_param },
+	{"options_accept",          PARAM_STR, &opt_accept},
+	{"options_accept_encoding", PARAM_STR, &opt_accept_enc},
+	{"options_accept_language", PARAM_STR, &opt_accept_lang},
+	{"options_support",         PARAM_STR, &opt_supported},
+	{"contact_flds_separator",  PARAM_STRING, &contact_flds_separator},
+	{"rpid_prefix",             PARAM_STR, &rpid_prefix  },
+	{"rpid_suffix",             PARAM_STR, &rpid_suffix  },
+	{"rpid_avp",                PARAM_STRING, &rpid_avp_param },
 	{0, 0, 0}
 };
 
@@ -236,18 +238,10 @@ static int mod_init(void)
 		return -1;
 	}
 
-	rpid_prefix.len = strlen(rpid_prefix.s);
-	rpid_suffix.len = strlen(rpid_suffix.s);
-
 	if(cfg_declare("siputils", siputils_cfg_def, &default_siputils_cfg, cfg_sizeof(siputils), &siputils_cfg)){
 		LM_ERR("Fail to declare the configuration\n");
 		return -1;
 	}
-	
-	opt_accept.len = strlen(opt_accept.s);
-	opt_accept_enc.len = strlen(opt_accept_enc.s);
-	opt_accept_lang.len = strlen(opt_accept_lang.s);
-	opt_supported.len = strlen(opt_supported.s);
 
 	return 0;
 }

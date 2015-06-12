@@ -15,11 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*!
@@ -38,8 +35,8 @@
 #include "../../hashes.h"
 #include "../../dprint.h"
 #include "../../mem/shm_mem.h"
+#include "../../xavp.h"
 #include "../../str.h"
-#include "../alias_db/alias_db.h"
 #include "../../data_lump_rpl.h"
 #include "presentity.h"
 #include "presence.h" 
@@ -48,6 +45,9 @@
 #include "hash.h"
 #include "utils_func.h"
 
+
+/* base priority value (20150101T000000) */
+#define PRES_PRIORITY_TBASE	1420070400
 
 xmlNodePtr xmlNodeGetNodeByName(xmlNodePtr node, const char *name,
 													const char *ns);
@@ -167,7 +167,31 @@ error:
 		pkg_free(hdr_append2.s);
 
 	return -1;
-}	
+}
+
+/**
+ * get priority value for presence document
+ */
+unsigned int pres_get_priority(void)
+{
+	sr_xavp_t *vavp = NULL;
+	str vname = str_init("priority");
+
+	if(pres_xavp_cfg.s==NULL || pres_xavp_cfg.len<=0) {
+		return 0;
+	}
+
+	vavp = xavp_get_child_with_ival(&pres_xavp_cfg, &vname);
+	if(vavp!=NULL) {
+		return (unsigned int)vavp->val.v.i;
+	}
+
+	return (unsigned int)(time(NULL) - PRES_PRIORITY_TBASE);
+}
+
+/**
+ * create new presentity record
+ */
 presentity_t* new_presentity( str* domain,str* user,int expires, 
 		pres_ev_t* event, str* etag, str* sender)
 {
@@ -224,6 +248,7 @@ presentity_t* new_presentity( str* domain,str* user,int expires,
 	presentity->event= event;
 	presentity->expires = expires;
 	presentity->received_time= (int)time(NULL);
+	presentity->priority = pres_get_priority();
 	return presentity;
     
 error:
@@ -271,9 +296,9 @@ int check_if_dialog(str body, int *is_dialog)
 int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 		int new_t, int* sent_reply, char* sphere)
 {
-	db_key_t query_cols[12], update_keys[8], result_cols[5];
-	db_op_t  query_ops[12];
-	db_val_t query_vals[12], update_vals[8];
+	db_key_t query_cols[13], update_keys[9], result_cols[6];
+	db_op_t  query_ops[13];
+	db_val_t query_vals[13], update_vals[9];
 	db1_res_t *result= NULL;
 	int n_query_cols = 0;
 	int n_update_cols = 0;
@@ -377,6 +402,12 @@ int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 		query_vals[n_query_cols].type = DB1_INT;
 		query_vals[n_query_cols].nul = 0;
 		query_vals[n_query_cols].val.int_val = presentity->received_time;
+		n_query_cols++;
+
+		query_cols[n_query_cols] = &str_priority_col;
+		query_vals[n_query_cols].type = DB1_INT;
+		query_vals[n_query_cols].nul = 0;
+		query_vals[n_query_cols].val.int_val = presentity->priority;
 		n_query_cols++;
 		
 		if (presentity->expires != -1)
@@ -519,7 +550,7 @@ int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 			if(presentity->sender)
 			{
 				if(!(presentity->sender->len == sender.len && 
-				strncmp(presentity->sender->s, sender.s, sender.len)== 0))
+				presence_sip_uri_match(presentity->sender, &sender)== 0))
 					 bla_update_publish= 0;
 			}
 after_dialog_check:
@@ -678,6 +709,12 @@ after_dialog_check:
 		update_vals[n_update_cols].type = DB1_INT;
 		update_vals[n_update_cols].nul = 0;
 		update_vals[n_update_cols].val.int_val= presentity->received_time;
+		n_update_cols++;
+
+		update_keys[n_update_cols] = &str_priority_col;
+		update_vals[n_update_cols].type = DB1_INT;
+		update_vals[n_update_cols].nul = 0;
+		update_vals[n_update_cols].val.int_val= presentity->priority;
 		n_update_cols++;
 
 		if(body && body->s)
@@ -848,6 +885,7 @@ int pres_htable_restore(void)
 	int event;
 	event_t ev;
 	char* sphere= NULL;
+	static str query_str;
 
 	result_cols[user_col= n_result_cols++]= &str_username_col;
 	result_cols[domain_col= n_result_cols++]= &str_domain_col;
@@ -862,7 +900,7 @@ int pres_htable_restore(void)
 		goto error;
 	}
 
-	static str query_str = str_init("username");
+	query_str = str_username_col;
 	if (db_fetch_query(&pa_dbf, pres_fetch_rows, pa_db, 0, 0, 0, result_cols,
 				0, n_result_cols, &query_str, &result) < 0)
 	{
@@ -1025,6 +1063,7 @@ char* get_sphere(str* pres_uri)
 	int n_query_cols = 0;
 	struct sip_uri uri;
 	str body;
+	static str query_str;
 
 
 	if(!sphere_enable)
@@ -1033,7 +1072,7 @@ char* get_sphere(str* pres_uri)
 	if ( publ_cache_enabled )
 	{
 		/* search in hash table*/
-		hash_code= core_hash(pres_uri, NULL, phtable_size);
+		hash_code= core_case_hash(pres_uri, NULL, phtable_size);
 
 		lock_get(&pres_htable[hash_code].lock);
 
@@ -1090,7 +1129,11 @@ char* get_sphere(str* pres_uri)
 		return NULL;
 	}
 
-	static str query_str = str_init("received_time");
+	if(pres_retrieve_order==1) {
+		query_str = str_priority_col;
+	} else {
+		query_str = str_received_time_col;
+	}
 	if (pa_dbf.query (pa_db, query_cols, 0, query_vals,
 		 result_cols, n_query_cols, n_result_cols, &query_str ,  &result) < 0) 
 	{

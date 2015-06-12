@@ -1,6 +1,4 @@
 /* 
- * $Id$
- * 
  * Copyright (C) 2006 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -15,18 +13,10 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*
- *  atomic operations init
- */
-/* 
- * History:
- * --------
- *  2006-03-08  created by andrei
- *  2007-05-11  added lock_set support (andrei)
- */
+
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: atomic operations init
  * \ingroup core
  * Module: \ref core
  */

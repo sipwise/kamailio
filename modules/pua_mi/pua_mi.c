@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * --------
@@ -48,12 +48,23 @@ MODULE_VERSION
 
 pua_api_t pua;
 
+/** module params */
+int publish_with_ob_proxy = 0;
+
 /** module functions */
 
 static int mod_init(void);
 
 send_publish_t pua_send_publish;
 send_subscribe_t pua_send_subscribe;
+
+/*
+ * Exported params
+ */
+static param_export_t params[]={
+	{"publish_with_ob_proxy",    INT_PARAM, &publish_with_ob_proxy},
+	{0,                          0,         0}
+};
 
 /*
  * Exported MI functions
@@ -69,7 +80,7 @@ struct module_exports exports= {
 	"pua_mi",					/* module name */
 	DEFAULT_DLFLAGS,			/* dlopen flags */
 	0,							/* exported functions */
-	0,							/* exported parameters */
+	params,							/* exported parameters */
 	0,							/* exported statistics */
 	mi_cmds,					/* exported MI functions */
 	0,							/* exported pseudo-variables */

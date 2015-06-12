@@ -1,6 +1,4 @@
 /* 
- * $Id$ 
- *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2007-2008 1&1 Internet AG
  *
@@ -18,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -130,5 +128,13 @@ int db_allocate_columns(db1_res_t* _r, const unsigned int cols);
  * \return zero on success, negative on errors
  */
 int db_allocate_rows(db1_res_t* _res);
+
+/**
+ * Reallocate memory for rows.
+ * \param _res result set
+ * \param _nsize new number of rows in result set
+ * \return zero on success, negative on errors
+ */
+int db_reallocate_rows(db1_res_t* _res, int _nsize);
 
 #endif /* DB1_RES_H */

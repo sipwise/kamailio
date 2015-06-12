@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DBText module core functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,12 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * 
- * History:
- * --------
- * 2009-03-01 added support for ORDER-BY clause by Edgar Holleis
- * 2003-01-30 created by Daniel
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -96,7 +89,7 @@ db1_con_t* dbt_init(const str* _sqlurl)
 	memset(_res, 0, sizeof(db1_con_t) + sizeof(dbt_con_t));
 	_res->tail = (unsigned long)((char*)_res+sizeof(db1_con_t));
 
-	LM_INFO("using database at: %.*s", _s.len, _s.s);
+	LM_INFO("using database at: %.*s\n", _s.len, _s.s);
 	DBT_CON_CONNECTION(_res) = dbt_cache_get_db(&_s);
 	if (!DBT_CON_CONNECTION(_res))
 	{
@@ -327,12 +320,17 @@ clean:
 }
 
 /*
- * Raw SQL query -- is not the case to have this method
+ * Affected Rows
  */
-int dbt_raw_query(db1_con_t* _h, char* _s, db1_res_t** _r)
+int dbt_affected_rows(db1_con_t* _h)
 {
-	*_r = NULL;
-    return -1;
+	if (!_h || !CON_TABLE(_h))
+	{
+		LM_ERR("invalid parameter\n");
+		return -1;
+	}
+
+	return ((dbt_con_p)_h->tail)->affected;
 }
 
 /*
@@ -350,6 +348,9 @@ int dbt_insert(db1_con_t* _h, db_key_t* _k, db_val_t* _v, int _n)
 		LM_ERR("invalid parameter\n");
 		return -1;
 	}
+
+	((dbt_con_p)_h->tail)->affected = 0;
+    
 	if(!_k || !_v || _n<=0)
 	{
 		LM_ERR("no key-value to insert\n");
@@ -407,6 +408,8 @@ int dbt_insert(db1_con_t* _h, db_key_t* _k, db_val_t* _v, int _n)
 		goto clean;
 	}
 
+	((dbt_con_p)_h->tail)->affected = 1;
+    
 	/* dbt_print_table(_tbc, NULL); */
 	
 	/* unlock databse */
@@ -452,6 +455,8 @@ int dbt_delete(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v, int _n)
 		return -1;
 	}
 
+	((dbt_con_p)_h->tail)->affected = 0;
+
 	/* lock database */
 	_tbc = dbt_db_get_table(DBT_CON_CONNECTION(_h), CON_TABLE(_h));
 	if(!_tbc)
@@ -464,6 +469,7 @@ int dbt_delete(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v, int _n)
 	if(!_k || !_v || _n<=0)
 	{
 		LM_DBG("deleting all records\n");
+		((dbt_con_p)_h->tail)->affected = _tbc->nrrows;
 		dbt_table_free_rows(_tbc);
 		/* unlock databse */
 		dbt_release_table(DBT_CON_CONNECTION(_h), CON_TABLE(_h));
@@ -490,6 +496,9 @@ int dbt_delete(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v, int _n)
 			_tbc->nrrows--;
 			// free row
 			dbt_row_free(_tbc, _drp);
+
+			((dbt_con_p)_h->tail)->affected++;
+
 		}
 		_drp = _drp0;
 	}
@@ -530,7 +539,9 @@ int dbt_update(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v,
 		LM_ERR("invalid parameters\n");
 		return -1;
 	}
-	
+
+	((dbt_con_p)_h->tail)->affected = 0;
+    
 	/* lock database */
 	_tbc = dbt_db_get_table(DBT_CON_CONNECTION(_h), CON_TABLE(_h));
 	if(!_tbc)
@@ -569,6 +580,9 @@ int dbt_update(db1_con_t* _h, db_key_t* _k, db_op_t* _o, db_val_t* _v,
 					goto error;
 				}
 			}
+
+			((dbt_con_p)_h->tail)->affected++;
+
 		}
 		_drp = _drp->next;
 	}

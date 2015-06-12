@@ -1,0 +1,79 @@
+dmq_usrloc Module
+
+Andrey Rybkin
+
+   bks.tv
+   <rybkin.a@bks.tv>
+
+Edited by
+
+Andrey Rybkin
+
+   bks.tv
+   <rybkin.a@bks.tv>
+
+   Copyright © 2014
+     __________________________________________________________________
+
+   Table of Contents
+
+   1. Admin Guide
+
+        1. Overview
+        2. Dependencies
+
+              2.1. Kamailio Modules
+
+        3. Parameters
+
+              3.1. enable (int)
+
+   List of Examples
+
+   1.1. Set enable parameter
+
+Chapter 1. Admin Guide
+
+   Table of Contents
+
+   1. Overview
+   2. Dependencies
+
+        2.1. Kamailio Modules
+
+   3. Parameters
+
+        3.1. enable (int)
+
+1. Overview
+
+   The module adds user location (usrloc) records replication between
+   multiple servers via DMQ module.
+
+2. Dependencies
+
+   2.1. Kamailio Modules
+
+2.1. Kamailio Modules
+
+   The following modules must be loaded before this module:
+     * DMQ module..
+     * USRLOC module..
+
+3. Parameters
+
+   3.1. enable (int)
+
+3.1. enable (int)
+
+   The parameter controls whetner the replication is active or not. The
+   value can be:
+     * 0 - replication is disabled
+     * 1 - replication is enabled
+
+   Default value is 0.
+
+   Example 1.1. Set enable parameter
+...
+modparam("dmq_usrloc", "enable", 1)
+...

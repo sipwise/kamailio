@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com) 
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -30,6 +28,8 @@ int pv_set_xavp(struct sip_msg* msg, pv_param_t *param,
 int pv_parse_xavp_name(pv_spec_p sp, str *in);
 
 int pv_xavp_print(struct sip_msg* msg, char* s1, char *s2);
+
+int xavp_params_explode(str *params, str *xname);
 
 #endif
 #endif

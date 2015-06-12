@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -140,6 +140,17 @@ static inline str cxdx_get_avp(AAAMessage *msg,int avp_code,int vendor_id,
 	}
 	else 
 		return avp->data;
+}
+
+inline int cxdx_add_call_id(AAAMessage *msg, str data) 
+{
+    return 
+	cxdx_add_avp(msg,data.s,data.len,
+		AVP_Call_Id,
+		AAA_AVP_FLAG_VENDOR_SPECIFIC,
+		50,
+		AVP_DUPLICATE_DATA,
+		__FUNCTION__);
 }
 
 /**

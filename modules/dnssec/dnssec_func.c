@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DNSSEC module
  *
  * Copyright (C) 2013 mariuszbi@gmail.com
@@ -19,12 +17,19 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2013-03	initial implementation
  */
+/*!
+ * \brief DNSsec support
+ * \ingroup DNSsec 
+ * \author mariuszbi@gmail.com
+ */
+/*!
+ * \defgroup DNSsec DNS security extensions support
+ *
+ */
+
 
 #include <validator/validator-config.h>
 #include <validator/validator.h>

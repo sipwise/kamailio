@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -42,6 +42,8 @@ MODULE_VERSION
 /** parameters */
 
 int redis_srv_param(modparam_t type, void *val);
+int init_without_redis = 0;
+
 static int w_redis_cmd3(struct sip_msg* msg, char* ssrv, char* scmd,
 		char* sres);
 static int w_redis_cmd4(struct sip_msg* msg, char* ssrv, char* scmd,
@@ -54,7 +56,6 @@ static int fixup_redis_cmd6(void** param, int param_no);
 
 static int w_redis_free_reply(struct sip_msg* msg, char* res);
 
-static int  mod_init(void);
 static void mod_destroy(void);
 static int  child_init(int rank);
 
@@ -84,7 +85,8 @@ static cmd_export_t cmds[]={
 };
 
 static param_export_t params[]={
-	{"server",         STR_PARAM|USE_FUNC_PARAM, (void*)redis_srv_param},
+	{"server",         PARAM_STRING|USE_FUNC_PARAM, (void*)redis_srv_param},
+	{"init_without_redis", INT_PARAM, &init_without_redis},
 	{0, 0, 0}
 };
 
@@ -97,22 +99,13 @@ struct module_exports exports = {
 	0,              /* exported MI functions */
 	mod_pvs,        /* exported pseudo-variables */
 	0,              /* extra processes */
-	mod_init,       /* module initialization function */
+	0,       /* module initialization function */
 	0,              /* response function */
 	mod_destroy,    /* destroy function */
 	child_init      /* per child init function */
 };
 
 
-
-/**
- * init module function
- */
-static int mod_init(void)
-{
-	/* success code */
-	return 0;
-}
 
 /* each child get a new connection to the database */
 static int child_init(int rank)
@@ -123,8 +116,8 @@ static int child_init(int rank)
 
 	if(redisc_init()<0)
 	{
-		LM_ERR("failed to initialize redis connections\n");
-		return -1;
+	  LM_ERR("failed to initialize redis connections\n");
+	  return -1;
 	}
 	return 0;
 }

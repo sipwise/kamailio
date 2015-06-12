@@ -16,21 +16,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2006-04-14  initial version (bogdan)
- * 2006-11-28  Added num_100s and num_200s to dlg_cell, to aid in adding 
- *             statistics tracking of the number of early, and active dialogs.
- *             (Jeffrey Magder - SOMA Networks)
- * 2007-03-06  syncronized state machine added for dialog state. New tranzition
- *             design based on events; removed num_1xx and num_2xx (bogdan)
- * 2007-07-06  added flags, cseq, contact, route_set and bind_addr 
- *             to struct dlg_cell in order to store these information into db
- *             (ancuta)
- * 2008-04-17  added new dialog flag to avoid state tranzitions from DELETED to
- *             CONFIRMED_NA due delayed "200 OK" (bogdan)
  */
 
 /*!
@@ -80,11 +67,14 @@
 #define DLG_FLAG_DEL           (1<<8) /*!< delete this var */
 
 #define DLG_FLAG_TM            (1<<9) /*!< dialog is set in transaction */
+#define DLG_FLAG_EXPIRED       (1<<10)/*!< dialog is expired */
 
 /* internal flags stored in db */
 #define DLG_IFLAG_TIMEOUTBYE        (1<<0) /*!< send bye on time-out */
 #define DLG_IFLAG_KA_SRC            (1<<1) /*!< send keep alive to src */
 #define DLG_IFLAG_KA_DST            (1<<2) /*!< send keep alive to dst */
+#define DLG_IFLAG_TIMER_NORESET     (1<<3) /*!< don't reset dialog timers on in-dialog messages reception */
+#define DLG_IFLAG_CSEQ_DIFF         (1<<4) /*!< CSeq changed in dialog */
 
 #define DLG_CALLER_LEG         0 /*!< attribute that belongs to a caller leg */
 #define DLG_CALLEE_LEG         1 /*!< attribute that belongs to a callee leg */

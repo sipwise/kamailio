@@ -1,6 +1,4 @@
 /**
- * $Id$
- *
  * dmq module - distributed message queue
  *
  * Copyright (C) 2011 Bucur Marius - Ovidiu
@@ -19,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 
@@ -28,6 +26,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include "dmqnode.h"
 #include "../../lock_ops.h"
 #include "../../str.h"
 #include "../../mem/mem.h"
@@ -41,12 +40,14 @@ typedef struct peer_response {
 	str body;
 } peer_reponse_t;
 
-typedef int(*peer_callback_t)(struct sip_msg*, peer_reponse_t* resp);
+typedef int(*peer_callback_t)(struct sip_msg*, peer_reponse_t* resp, dmq_node_t* node);
+typedef int(*init_callback_t)();
 
 typedef struct dmq_peer {
 	str peer_id;
 	str description;
 	peer_callback_t callback;
+	init_callback_t init_callback;
 	struct dmq_peer* next;
 } dmq_peer_t;
 
@@ -64,7 +65,7 @@ typedef dmq_peer_t* (*register_dmq_peer_t)(dmq_peer_t*);
 
 dmq_peer_t* add_peer(dmq_peer_list_t* peer_list, dmq_peer_t* peer);
 dmq_peer_t* find_peer(str peer_id);
-int empty_peer_callback(struct sip_msg* msg, peer_reponse_t* resp);
+int empty_peer_callback(struct sip_msg* msg, peer_reponse_t* resp, dmq_node_t* dmq_node);
 
 #endif
 

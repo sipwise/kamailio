@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of sip-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,17 +14,6 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
- */
-
-/*
- * History:
- * --------
- *  2003-05-21  on sparc64 roundto 8 even in debugging mode (so malloc'ed
- *               long longs will be 64 bit aligned) (andrei)
- *  2004-07-19  support for 64 bit (2^64 mem. block) and more info
- *               for the future de-fragmentation support (andrei)
- *  2004-11-10  support for > 4Gb mem., switched to long (andrei)
- *  2007-06-23  added hash bitmap (andrei)
  */
 
 /**
@@ -96,6 +85,7 @@ struct fm_frag{
 		struct fm_frag* nxt_free;
 		long reserved;
 	}u;
+	struct fm_frag** prv_free;
 #ifdef DBG_F_MALLOC
 	const char* file;
 	const char* func;
@@ -114,12 +104,12 @@ struct fm_frag_lnk{
  * \see mem_info
  */
 struct fm_block{
+	int type;
 	unsigned long size; /** total size */
-#if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
 	unsigned long used; /** allocated size*/
 	unsigned long real_used; /** used + malloc overhead */
 	unsigned long max_real_used;
-#endif
+	unsigned long ffrags;
 	
 	struct fm_frag* first_frag;
 	struct fm_frag* last_frag;
@@ -136,7 +126,7 @@ struct fm_block{
  * \param size Size of allocation
  * \return return the fm_block
  */
-struct fm_block* fm_malloc_init(char* address, unsigned long size);
+struct fm_block* fm_malloc_init(char* address, unsigned long size, int type);
 
 
 /**

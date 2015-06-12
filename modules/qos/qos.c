@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * QoS module - support for tracking dialogs and SDP
  *
  * Copyright (C) 2007 SOMA Networks, Inc.
@@ -20,12 +18,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
  * USA
  *
- * History:
- * --------
- * 2007-07-16 initial version (osas)
  */
 
 #include <stdio.h>
@@ -115,7 +110,7 @@ static int mod_init(void)
 
 	/* Register the main (static) dialog call back.  */
 	if (load_dlg_api(&dialog_st) != 0) {
-		LM_ERR("Can't load dialog hooks");
+		LM_ERR("Can't load dialog hooks\n");
 		return(-1);
 	}
 

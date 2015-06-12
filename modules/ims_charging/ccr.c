@@ -2,8 +2,11 @@
 
 #include "ccr.h"
 #include "Ro_data.h"
+#include "ro_avp.h"
+#include "mod.h"
 
 extern cdp_avp_bind_t *cdp_avp;
+extern struct cdp_binds cdpb;
 
 int Ro_write_event_type_avps(AAA_AVP_LIST * avp_list, event_type_t * x) {
     AAA_AVP_LIST aList = {0, 0};
@@ -92,6 +95,23 @@ int Ro_write_ims_information_avps(AAA_AVP_LIST * avp_list, ims_information_t* x)
     if (x->called_party_address)
         if (!cdp_avp->epcapp.add_Called_Party_Address(&aList2, *(x->called_party_address), 0))
             goto error;
+    
+    if (x->incoming_trunk_id && x->outgoing_trunk_id) {
+	if (!cdp_avp->epcapp.add_Outgoing_Trunk_Group_Id(&aList, *(x->outgoing_trunk_id), 0))
+	    goto error;
+	    
+	if (!cdp_avp->epcapp.add_Incoming_Trunk_Group_Id(&aList, *(x->incoming_trunk_id), 0))
+	    goto error;
+	    
+	if (!cdp_avp->epcapp.add_Trunk_Group_Id(&aList2, &aList, 0))
+            goto error;
+	cdp_avp->cdp->AAAFreeAVPList(&aList);
+        aList.head = aList.tail = 0;
+    }
+    
+    if (x->access_network_info) {
+		cdp_avp->imsapp.add_Access_Network_Information(&aList2, *(x->access_network_info), 0);
+    }
 
     for (sl = x->called_asserted_identity.head; sl; sl = sl->next) {
         if (!cdp_avp->epcapp.add_Called_Asserted_Identity(&aList2, sl->data, 0))
@@ -117,6 +137,7 @@ int Ro_write_ims_information_avps(AAA_AVP_LIST * avp_list, ims_information_t* x)
 
         if (!cdp_avp->epcapp.add_Inter_Operator_Identifier(&aList2, &aList, 0))
             goto error;
+	cdp_avp->cdp->AAAFreeAVPList(&aList);
         aList.head = aList.tail = 0;
     }
 
@@ -139,6 +160,7 @@ int Ro_write_ims_information_avps(AAA_AVP_LIST * avp_list, ims_information_t* x)
 
         if (!cdp_avp->epcapp.add_Service_Specific_Info(&aList2, &aList, 0))
             goto error;
+	cdp_avp->cdp->AAAFreeAVPList(&aList);
         aList.head = aList.tail = 0;
     }
 
@@ -187,9 +209,8 @@ AAAMessage * Ro_write_CCR_avps(AAAMessage * ccr, Ro_CCR_t* x) {
     if (!ccr) return 0;
 
     if (!cdp_avp->base.add_Origin_Host(&(ccr->avpList), x->origin_host, 0)) goto error;
-
     if (!cdp_avp->base.add_Origin_Realm(&(ccr->avpList), x->origin_realm, 0)) goto error;
-    if (!cdp_avp->base.add_Destination_Realm(&(ccr->avpList), x->destination_realm, 0)) goto error;
+    if (!ro_add_destination_realm_avp(ccr, x->destination_realm)) goto error;
 
     if (!cdp_avp->base.add_Accounting_Record_Type(&(ccr->avpList), x->acct_record_type)) goto error;
     if (!cdp_avp->base.add_Accounting_Record_Number(&(ccr->avpList), x->acct_record_number)) goto error;

@@ -17,7 +17,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/** SIP-router TLS support :: Module interface.
+/** Kamailio TLS support :: Module interface.
  * @file
  * @ingroup tls
  * Module: @ref tls
@@ -82,6 +82,7 @@ static int is_peer_verified(struct sip_msg* msg, char* foo, char* foo2);
 MODULE_VERSION
 
 
+str sr_tls_xavp_cfg = {0, 0};
 /*
  * Default settings when modparams are used 
  */
@@ -99,6 +100,7 @@ static tls_domain_t mod_params = {
 	{0, },                /* Cipher list */
 	TLS_USE_TLSv1,    /* TLS method */
 	STR_STATIC_INIT(TLS_CRL_FILE), /* Certificate revocation list */
+	{0, 0},           /* Server name (SNI) */
 	0                 /* next */
 };
 
@@ -120,6 +122,7 @@ tls_domain_t srv_defaults = {
 	{0, 0},                /* Cipher list */
 	TLS_USE_TLSv1,    /* TLS method */
 	STR_STATIC_INIT(TLS_CRL_FILE), /* Certificate revocation list */
+	{0, 0},           /* Server name (SNI) */
 	0                 /* next */
 };
 
@@ -141,6 +144,7 @@ tls_domain_t cli_defaults = {
 	{0, 0},                /* Cipher list */
 	TLS_USE_TLSv1,    /* TLS method */
 	{0, 0}, /* Certificate revocation list */
+	{0, 0},           /* Server name (SNI) */
 	0                 /* next */
 };
 
@@ -170,6 +174,7 @@ static cmd_export_t cmds[] = {
  */
 static param_export_t params[] = {
 	{"tls_method",          PARAM_STR,    &default_tls_cfg.method       },
+	{"server_name",         PARAM_STR,    &default_tls_cfg.server_name  },
 	{"verify_certificate",  PARAM_INT,    &default_tls_cfg.verify_cert  },
 	{"verify_depth",        PARAM_INT,    &default_tls_cfg.verify_depth },
 	{"require_certificate", PARAM_INT,    &default_tls_cfg.require_cert },
@@ -199,6 +204,7 @@ static param_export_t params[] = {
 	{"low_mem_threshold1",  PARAM_INT,    &default_tls_cfg.low_mem_threshold1},
 	{"low_mem_threshold2",  PARAM_INT,    &default_tls_cfg.low_mem_threshold2},
 	{"renegotiation",       PARAM_INT,    &sr_tls_renegotiation},
+	{"xavp_cfg",            PARAM_STR,    &sr_tls_xavp_cfg},
 	{0, 0, 0}
 };
 
@@ -307,6 +313,7 @@ static int mod_init(void)
 	mod_params.crl_file = cfg_get(tls, tls_cfg, crl);
 	mod_params.cert_file = cfg_get(tls, tls_cfg, certificate);
 	mod_params.cipher_list = cfg_get(tls, tls_cfg, cipher_list);
+	mod_params.server_name = cfg_get(tls, tls_cfg, server_name);
 
 	tls_domains_cfg =
 			(tls_domains_cfg_t**)shm_malloc(sizeof(tls_domains_cfg_t*));
@@ -357,6 +364,7 @@ static int mod_init(void)
 #ifndef OPENSSL_NO_DH
 	LM_INFO("With Diffie Hellman\n");
 #endif
+	tls_lookup_event_routes();
 	return 0;
 error:
 	destroy_tls_h();

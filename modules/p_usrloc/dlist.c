@@ -1,6 +1,4 @@
 /*
- * $Id: dlist.c 5160 2008-11-03 17:51:22Z henningw $
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,13 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ========
- * 2006-11-28 added get_number_of_users() (Jeffrey Magder - SOMA Networks)
- * 2007-09-12 added partitioning support for fetching all ul contacts
- *            (bogdan)
  */
 
 /*! \file

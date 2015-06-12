@@ -1,37 +1,22 @@
 /*
- * $Id$
- *
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-/*
- * History:
- * --------
- *  2003-02-18  added proto to various function prototypes (andrei)
- *  2007-05-02  added unmatched_cancel & t_forward_cancel (andrei)
- */
-
 
 #ifndef _T_FWD_H
 #define _T_FWD_H
@@ -52,6 +37,7 @@ typedef int (*taddblind_f)( /*struct cell *t */ void);
 typedef int (*treplicate_uri_f)(struct sip_msg* p_msg , str *suri );
 
 void t_on_branch(unsigned int go_to);
+void set_branch_route(unsigned int on_branch);
 unsigned int get_on_branch(void);
 int t_replicate_uri(struct sip_msg *p_msg, str *suri);
 int t_replicate(struct sip_msg *p_msg, struct proxy_l * proxy, int proto);
@@ -65,6 +51,15 @@ int e2e_cancel_branch( struct sip_msg *cancel_msg, struct cell *t_cancel, struct
 int add_uac(struct cell *t, struct sip_msg *request, str *uri, str* next_hop,
 				str* path, struct proxy_l *proxy, int proto );
 */
+
+/* prepare_new_uac flags */
+#define UAC_DNS_FAILOVER_F 1 /**< new branch due to dns failover */
+#define UAC_SKIP_BR_DST_F  2 /**< don't set next hop as dst_uri for
+							   branch_route */
+int add_uac( struct cell *t, struct sip_msg *request, str *uri, str* next_hop,
+			str* path, struct proxy_l *proxy, struct socket_info* fsocket,
+			snd_flags_t snd_flags, int proto, int flags, str *instance, str *ruid,
+			str *location_ua);
 #ifdef USE_DNS_FAILOVER
 int add_uac_dns_fallback( struct cell *t, struct sip_msg* msg, 
 									struct ua_client* old_uac,

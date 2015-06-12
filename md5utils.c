@@ -23,7 +23,7 @@
 
 /*!
  * \file
- * \brief SIP-router core :: md5 hash support
+ * \brief Kamailio core :: md5 hash support
  * \ingroup core
  * Module: \ref core
  */
@@ -64,6 +64,6 @@ void MD5StringArray (char *dst, str src[], int size)
   U_MD5Final (digest, &context);
 
   string2hex(digest, 16, dst );
-  DBG("DEBUG: MD5 calculated: %.*s\n", MD5_LEN, dst );
+  LM_DBG("MD5 calculated: %.*s\n", MD5_LEN, dst );
 
 }

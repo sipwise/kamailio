@@ -1,64 +1,27 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * -------
- *  2001-??-??  created by andrei
- *  ????-??-??  lots of changes by a lot of people
- *  2003-01-23  support for determination of outbound interface added :
- *               get_out_socket (jiri)
- *  2003-01-24  reply to rport support added, contributed by
- *               Maxim Sobolev <sobomax@FreeBSD.org> and modified by andrei
- *  2003-02-11  removed calls to upd_send & tcp_send & replaced them with
- *               calls to msg_send (andrei)
- *  2003-03-19  replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
- *  2003-04-02  fixed get_send_socket for tcp fwd to udp (andrei)
- *  2003-04-03  added su_setport (andrei)
- *  2003-04-04  update_sock_struct_from_via now differentiates between
- *               local replies  & "normal" replies (andrei)
- *  2003-04-12  update_sock_struct_from via uses also FL_FORCE_RPORT for
- *               local replies (andrei)
- *  2003-08-21  check_self properly handles ipv6 addresses & refs   (andrei)
- *  2003-10-21  check_self updated to handle proto (andrei)
- *  2003-10-24  converted to the new socket_info lists (andrei)
- *  2004-10-10  modified check_self to use grep_sock_info (andrei)
- *  2004-11-08  added force_send_socket support in get_send_socket (andrei)
- *  2005-12-11  onsend_router support; forward_request to no longer
- *              pkg_malloc'ed (andrei)
- *  2006-04-12  forward_{request,reply} use now struct dest_info (andrei)
- *  2006-04-21  basic comp via param support (andrei)
- *  2006-07-31  forward_request can resolve destination on its own, uses the 
- *              dns cache and falls back on send error to other ips (andrei)
- *  2007-10-08  get_send_socket() will ignore force_send_socket if the forced
- *               socket is multicast (andrei)
  */
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: Message forwarding
  * \ingroup core
  * Module: \ref core
  */
@@ -121,6 +84,12 @@
 static int mhomed_sock_cache_disabled = 0;
 static int sock_inet = -1;
 static int sock_inet6 = -1;
+static int _forward_set_send_info = 0;
+
+void forward_set_send_info(int v)
+{
+	_forward_set_send_info = v;
+}
 
 static void apply_force_send_socket(struct dest_info* dst, struct sip_msg* msg);
 
@@ -137,7 +106,7 @@ struct socket_info* get_out_socket(union sockaddr_union* to, int proto)
 	uncon.sin.sin_family = AF_UNSPEC;
 
 	if (unlikely(proto!=PROTO_UDP)) {
-		LOG(L_CRIT, "BUG: get_out_socket can only be called for UDP\n");
+		LM_CRIT("can only be called for UDP\n");
 		return 0;
 	}
 retry:
@@ -191,27 +160,25 @@ retry:
 			}
 			goto retry;
 		}
-		LOG(L_ERR, "ERROR: get_out_socket: connect failed: %s\n",
-				strerror(errno));
+		LM_ERR("connect failed: %s\n", strerror(errno));
 		goto error;
 	}
 	len=sizeof(from);
 	if (unlikely(getsockname(*temp_sock, &from.s, &len)==-1)) {
-		LOG(L_ERR, "ERROR: get_out_socket: getsockname failed: %s\n",
-				strerror(errno));
+		LM_ERR("getsockname failed: %s\n", strerror(errno));
 		goto error;
 	}
 	su2ip_addr(&ip, &from);
 	si=find_si(&ip, 0, proto);
 	if (si==0) goto error;
-	DBG("DEBUG: get_out_socket: socket determined: %p\n", si );
+	LM_DBG("socket determined: %p\n", si );
 	if (unlikely(mhomed_sock_cache_disabled)){
 		close(*temp_sock);
 		*temp_sock=-1;
 	}
 	return si;
 error:
-	LOG(L_ERR, "ERROR: get_out_socket: no socket found\n");
+	LM_ERR("no socket found\n");
 	ERR("no corresponding socket found for(%s:%s)\n",
 			proto2a(proto), su2a(to, sizeof(*to)));
 	if (unlikely(mhomed_sock_cache_disabled && *temp_sock >=0)){
@@ -258,9 +225,7 @@ struct socket_info* get_send_socket2(struct socket_info* force_send_socket,
 											proto);
 			if (unlikely(force_send_socket == 0)){
 				if (likely(mismatch)) *mismatch=SS_MISMATCH_ADDR;
-				LOG(L_WARN, "WARNING: get_send_socket: "
-						"protocol/port mismatch (forced %s:%s:%d,"
-						" to %s:%s)\n",
+				LM_WARN("protocol/port mismatch (forced %s:%s:%d, to %s:%s)\n",
 						proto2a(orig->proto), ip_addr2a(&orig->address),
 						orig->port_no,
 						proto2a(proto), su2a(to, sizeof(*to)));
@@ -269,7 +234,7 @@ struct socket_info* get_send_socket2(struct socket_info* force_send_socket,
 			if (likely(mismatch)) *mismatch=SS_MISMATCH_PROTO;
 		}
 		if (unlikely(force_send_socket->address.af!=to->s.sa_family)){
-			DBG("get_send_socket: force_send_socket of different af"
+			LM_DBG("force_send_socket of different af"
 					" (dst %d - %s:%s forced %d -%s:%s:%d)\n",
 					to->s.sa_family, proto2a(proto), su2a(to, sizeof(*to)),
 					force_send_socket->address.af,
@@ -291,8 +256,7 @@ struct socket_info* get_send_socket2(struct socket_info* force_send_socket,
 				return force_send_socket;
 		else{
 			if (!(force_send_socket->flags & SI_IS_MCAST))
-				LOG(L_WARN, "WARNING: get_send_socket: not listening"
-							 " on the requested socket (%s:%s:%d),"
+				LM_WARN("not listening on the requested socket (%s:%s:%d),"
 							 " no fork mode?\n",
 							proto2a(force_send_socket->proto),
 							ip_addr2a(&force_send_socket->address),
@@ -306,7 +270,7 @@ not_forced:
 		if ((send_sock==0) || (send_sock->socket!=-1))
 			return send_sock; /* found or error*/
 		else if (send_sock->socket==-1){
-			LOG(L_WARN, "WARNING: get_send_socket: not listening on the"
+			LM_WARN("not listening on the"
 					" requested socket (%s:%s:%d), no fork mode?\n",
 					proto2a(send_sock->proto), ip_addr2a(&send_sock->address),
 					send_sock->port_no);
@@ -330,8 +294,8 @@ not_forced:
 								break;
 				case AF_INET6:	send_sock=sendipv6_tcp;
 								break;
-				default:	LOG(L_ERR, "get_send_socket: BUG: don't know how"
-									" to forward to af %d\n", to->s.sa_family);
+				default:	LM_ERR("don't know how to forward to af %d\n",
+									to->s.sa_family);
 			}
 			break;
 #endif
@@ -344,8 +308,8 @@ not_forced:
 								break;
 				case AF_INET6:	send_sock=sendipv6_tls;
 								break;
-				default:	LOG(L_ERR, "get_send_socket: BUG: don't know how"
-									" to forward to af %d\n", to->s.sa_family);
+				default:	LM_ERR("don't know how to forward to af %d\n",
+									to->s.sa_family);
 			}
 			break;
 #endif /* USE_TLS */
@@ -359,8 +323,7 @@ not_forced:
 									break;
 					case AF_INET6:	send_sock=sendipv6_sctp;
 									break;
-					default:	LOG(L_ERR, "get_send_socket: BUG: don't know"
-										" how to forward to af %d\n",
+					default:	LM_ERR("don't know how to forward to af %d\n",
 										to->s.sa_family);
 				}
 			}else send_sock=bind_address;
@@ -375,15 +338,13 @@ not_forced:
 									break;
 					case AF_INET6:	send_sock=sendipv6;
 									break;
-					default:	LOG(L_ERR, "get_send_socket: BUG: don't know"
-										" how to forward to af %d\n",
+					default:	LM_ERR("don't know how to forward to af %d\n",
 										to->s.sa_family);
 				}
 			}else send_sock=bind_address;
 			break;
 		default:
-			LOG(L_CRIT, "BUG: get_send_socket: unsupported proto %d (%s)\n",
-					proto, proto2a(proto));
+			LM_CRIT("unsupported proto %d (%s)\n", proto, proto2a(proto));
 	}
 	return send_sock;
 }
@@ -393,7 +354,7 @@ static struct _check_self_func {
 	struct _check_self_func *next;
 } *_check_self_func_list = NULL;
 
-/* check if _check_self_func_list is set
+/** check if _check_self_func_list is set
  * - return 1 if yes, 0 if no
  */
 int is_check_self_func_list_set(void)
@@ -401,7 +362,7 @@ int is_check_self_func_list_set(void)
 	return (_check_self_func_list)?1:0;
 }
 
-/* register a function to be called when matching for myself
+/** register a function to be called when matching for myself
  * - return 0 on success, -1 on error
  * - f must have same prototype as check_self() and return same kind of values
  */
@@ -420,7 +381,7 @@ int register_check_self_func(check_self_f f)
 	return 0;
 }
 
-/* run registered check self functions
+/** run registered check self functions
  * returns 1 if true, 0 if false
  */
 int run_check_self_func(str* host, unsigned short port, unsigned short proto)
@@ -435,7 +396,8 @@ int run_check_self_func(str* host, unsigned short port, unsigned short proto)
 	return 0;
 }
 
-/* checks if the proto: host:port is one of the address we listen on;
+/** checks if the proto: host:port is one of the address we listen on;
+ *
  * if port==0, the  port number is ignored
  * if proto==0 (PROTO_NONE) the protocol is ignored
  * returns 1 if true, 0 if false, -1 on error
@@ -447,7 +409,7 @@ int check_self(str* host, unsigned short port, unsigned short proto)
 	if (grep_sock_info(host, port, proto)) goto found;
 	/* try to look into the aliases*/
 	if (grep_aliases(host->s, host->len, port, proto)==0){
-		DBG("check_self: host != me\n");
+		LM_DBG("host != me\n");
 		return (_check_self_func_list==NULL)?0:run_check_self_func(host,
 														port, proto);
 	}
@@ -455,7 +417,7 @@ found:
 	return 1;
 }
 
-/* checks if the proto:port is one of the ports we listen on;
+/** checks if the proto:port is one of the ports we listen on;
  * if proto==0 (PROTO_NONE) the protocol is ignored
  * returns 1 if true, 0 if false, -1 on error
  */
@@ -470,7 +432,7 @@ int check_self_port(unsigned short port, unsigned short proto)
 
 
 
-/* forwards a request to dst
+/** forwards a request to dst
  * parameters:
  *   msg       - sip msg
  *   dst       - destination name, if non-null it will be resolved and
@@ -499,6 +461,7 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 	int ret;
 	struct ip_addr ip; /* debugging only */
 	char proto;
+	struct onsend_info onsnd_info = {0};
 #ifdef USE_DNS_FAILOVER
 	struct socket_info* prev_send_sock;
 	int err;
@@ -521,17 +484,15 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 			err=dns_sip_resolve2su(&dns_srv_h, &send_info->to, dst, port,
 									&proto, dns_flags);
 			if (err!=0){
-				LOG(L_ERR, "ERROR: forward_request: resolving \"%.*s\""
-						" failed: %s [%d]\n", dst->len, ZSW(dst->s),
-						dns_strerror(err), err);
+				LM_ERR("resolving \"%.*s\" failed: %s [%d]\n",
+						dst->len, ZSW(dst->s), dns_strerror(err), err);
 				ret=E_BAD_ADDRESS;
 				goto error;
 			}
 		}else
 #endif
 		if (sip_hostport2su(&send_info->to, dst, port, &proto)<0){
-			LOG(L_ERR, "ERROR: forward_request: bad host name %.*s,"
-						" dropping packet\n", dst->len, ZSW(dst->s));
+			LM_ERR("bad host name %.*s, dropping packet\n", dst->len, ZSW(dst->s));
 			ret=E_BAD_ADDRESS;
 			goto error;
 		}
@@ -544,14 +505,14 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 	   with the same branch parameter and will be match-able downstream
 	*/
 	if (!char_msg_val( msg, md5 )) 	{ /* parses transaction key */
-		LOG(L_ERR, "ERROR: forward_request: char_msg_val failed\n");
+		LM_ERR("char_msg_val failed\n");
 		ret=E_UNSPEC;
 		goto error;
 	}
 	msg->hash_index=hash( msg->callid->body, get_cseq(msg)->number);
 	if (!branch_builder( msg->hash_index, 0, md5, 0 /* 0-th branch */,
 				msg->add_to_branch_s, &msg->add_to_branch_len )) {
-		LOG(L_ERR, "ERROR: forward_request: branch_builder failed\n");
+		LM_ERR("branch_builder failed\n");
 		ret=E_UNSPEC;
 		goto error;
 	}
@@ -563,7 +524,7 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 		if (orig_send_sock==0) /* no forced send_sock => find it **/
 			send_info->send_sock=get_send_socket(msg, &send_info->to, proto);
 		if (send_info->send_sock==0){
-			LOG(L_ERR, "forward_req: ERROR: cannot forward to af %d, proto %d "
+			LM_ERR("cannot forward to af %d, proto %d "
 						"no corresponding listening socket\n",
 						send_info->to.s.sa_family, proto);
 			ret=ser_error=E_NO_SOCKET;
@@ -584,7 +545,7 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 			send_info->proto=proto;
 			buf = build_req_buf_from_sip_req(msg, &len, send_info, 0);
 			if (!buf){
-				LOG(L_ERR, "ERROR: forward_request: building failed\n");
+				LM_ERR("building failed\n");
 				ret=E_OUT_OF_MEM; /* most probable */
 				goto error;
 			}
@@ -592,15 +553,14 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 		}
 #endif
 		 /* send it! */
-		DBG("Sending:\n%.*s.\n", (int)len, buf);
-		DBG("orig. len=%d, new_len=%d, proto=%d\n",
+		LM_DBG("Sending:\n%.*s.\n", (int)len, buf);
+		LM_DBG("orig. len=%d, new_len=%d, proto=%d\n",
 				msg->len, len, send_info->proto );
 	
 		if (run_onsend(msg, send_info, buf, len)==0){
 			su2ip_addr(&ip, &send_info->to);
-			LOG(L_INFO, "forward_request: request to %s:%d(%d) dropped"
-					" (onsend_route)\n", ip_addr2a(&ip),
-						su_getport(&send_info->to), send_info->proto);
+			LM_INFO("request to %s:%d(%d) dropped (onsend_route)\n",
+				ip_addr2a(&ip), su_getport(&send_info->to), send_info->proto);
 			ser_error=E_OK; /* no error */
 			ret=E_ADM_PROHIBITED;
 #ifdef USE_DNS_FAILOVER
@@ -613,9 +573,8 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 		if (cfg_get(core, core_cfg, use_dst_blacklist)){
 			if (dst_is_blacklisted(send_info, msg)){
 				su2ip_addr(&ip, &send_info->to);
-				LOG(L_DBG, "DEBUG: blacklisted destination:%s:%d (%d)\n",
-							ip_addr2a(&ip), su_getport(&send_info->to),
-							send_info->proto);
+				LM_DBG("blacklisted destination:%s:%d (%d)\n",
+					ip_addr2a(&ip), su_getport(&send_info->to), send_info->proto);
 				ret=ser_error=E_SEND;
 #ifdef USE_DNS_FAILOVER
 				continue; /* try another ip */
@@ -625,7 +584,18 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 			}
 		}
 #endif
+
+		if(unlikely(_forward_set_send_info==1)) {
+			onsnd_info.to=&send_info->to;
+			onsnd_info.send_sock=send_info->send_sock;
+			onsnd_info.buf=buf;
+			onsnd_info.len=len;
+			onsnd_info.msg=msg;
+			p_onsend=&onsnd_info;
+		}
+
 		if (msg_send(send_info, buf, len)<0){
+			p_onsend=0;
 			ret=ser_error=E_SEND;
 #ifdef USE_DST_BLACKLIST
 			(void)dst_blacklist_add(BLST_ERR_SEND, send_info, msg);
@@ -636,6 +606,7 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 			goto error;
 #endif
 		}else{
+			p_onsend=0;
 			ret=ser_error=E_OK;
 			/* sent requests stats */
 			STATS_TX_REQUEST(  msg->first_line.u.request.method_value );
@@ -648,8 +619,7 @@ int forward_request(struct sip_msg* msg, str* dst, unsigned short port,
 			((err=dns_sip_resolve2su(&dns_srv_h, &send_info->to, dst, port,
 										&proto, dns_flags))==0));
 	if ((err!=0) && (err!=-E_DNS_EOR)){
-		LOG(L_ERR, "ERROR:  resolving %.*s host name in uri"
-							" failed: %s [%d] (dropping packet)\n",
+		LM_ERR("resolving %.*s host name in uri failed: %s [%d] (dropping packet)\n",
 									dst->len, ZSW(dst->s),
 									dns_strerror(err), err);
 		ret=ser_error=E_BAD_ADDRESS;
@@ -701,22 +671,22 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 	}else{
 		/* "normal" reply, we use rport's & received value if present */
 		if (via->rport && via->rport->value.s){
-			DBG("update_sock_struct_from_via: using 'rport'\n");
+			LM_DBG("using 'rport'\n");
 			port=str2s(via->rport->value.s, via->rport->value.len, &err);
 			if (err){
-				LOG(L_NOTICE, "ERROR: update_sock_struct_from_via: bad rport value(%.*s)\n",
+				LM_ERR("bad rport value(%.*s)\n",
 						via->rport->value.len, via->rport->value.s);
 				port=0;
 			}
 		}
 		if (via->received){
-			DBG("update_sock_struct_from_via: using 'received'\n");
+			LM_DBG("using 'received'\n");
 			name=&(via->received->value);
 			/* making sure that we won't do SRV lookup on "received"
 			 * (possible if no DNS_IP_HACK is used)*/
 			if (port==0) port=via->port?via->port:SIP_PORT; 
 		}else{
-			DBG("update_sock_struct_from_via: using via host\n");
+			LM_DBG("using via host\n");
 			name=&(via->host);
 			if (port==0) port=via->port;
 		}
@@ -729,14 +699,12 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 	    Yes -- it happened on generating a 408 by TM; -jiri
 	    sip_resolvehost now accepts str -janakj
 	*/
-	DBG("update_sock_struct_from_via: trying SRV lookup\n");
+	LM_DBG("trying SRV lookup\n");
 	proto=via->proto;
 	he=sip_resolvehost(name, &port, &proto);
 	
 	if (he==0){
-		LOG(L_NOTICE,
-				"update_sock_struct_from_via:resolve_host(%.*s) failure\n",
-				name->len, name->s);
+		LM_NOTICE("resolve_host(%.*s) failure\n", name->len, name->s);
 		return -1;
 	}
 		
@@ -746,7 +714,7 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 
 
 
-/* removes first via & sends msg to the second
+/** removes first via & sends msg to the second
  * - mode param controls if modules sip response callbacks are executed */
 static int do_forward_reply(struct sip_msg* msg, int mode)
 {
@@ -754,6 +722,7 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 	struct dest_info dst;
 	unsigned int new_len;
 	int r;
+	struct ip_addr ip;
 #ifdef USE_TCP
 	char* s;
 	int len;
@@ -765,9 +734,8 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 		if (check_self(&msg->via1->host,
 					msg->via1->port?msg->via1->port:SIP_PORT,
 					msg->via1->proto)!=1){
-			LOG(L_NOTICE, "ERROR: forward_reply: host in first via!=me :"
-					" %.*s:%d\n", msg->via1->host.len, msg->via1->host.s,
-									msg->via1->port);
+			LM_ERR("host in first via!=me : %.*s:%d\n",
+				msg->via1->host.len, msg->via1->host.s, msg->via1->port);
 			/* send error msg back? */
 			goto error;
 		}
@@ -783,13 +751,13 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 		|| (msg->via2==0) || (msg->via2->error!=PARSE_OK))
 	{
 		/* no second via => error */
-		LOG(L_DBG, "reply cannot be forwarded - no 2nd via\n");
+		LM_DBG("reply cannot be forwarded - no 2nd via\n");
 		goto error;
 	}
 
 	new_buf = build_res_buf_from_sip_res( msg, &new_len);
 	if (!new_buf){
-		LOG(L_ERR, "ERROR: forward_reply: building failed\n");
+		LM_ERR("building failed\n");
 		goto error;
 	}
 
@@ -821,11 +789,10 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 		if (msg->via1->i && msg->via1->i->value.s){
 			s=msg->via1->i->value.s;
 			len=msg->via1->i->value.len;
-			DBG("forward_reply: i=%.*s\n",len, ZSW(s));
+			LM_DBG("i=%.*s\n",len, ZSW(s));
 			if (reverse_hex2int(s, len, (unsigned int*)&dst.id)<0){
-				LOG(L_ERR, "ERROR: forward_reply: bad via i param \"%.*s\"\n",
-						len, ZSW(s));
-					dst.id=0;
+				LM_ERR("bad via i param \"%.*s\"\n", len, ZSW(s));
+				dst.id=0;
 			}
 		}		
 				
@@ -834,16 +801,36 @@ static int do_forward_reply(struct sip_msg* msg, int mode)
 
 	apply_force_send_socket(&dst, msg);
 
+	/* call onsend_route */
+	if(dst.send_sock == NULL) {
+		dst.send_sock=get_send_socket(msg, &dst.to, dst.proto);
+		if (dst.send_sock==0){
+			LM_ERR("cannot forward reply\n");
+			goto done;
+		}
+	}
+	if (onsend_route_enabled(SIP_REPLY)){
+		if (run_onsend(msg, &dst, new_buf, new_len)==0){
+			su2ip_addr(&ip, &(dst.to));
+			LOG(L_ERR, "forward_reply: reply to %s:%d(%d) dropped"
+					" (onsend_route)\n", ip_addr2a(&ip),
+						su_getport(&(dst.to)), dst.proto);
+			goto error; /* error ? */
+		}
+	}
+
 	if (msg_send(&dst, new_buf, new_len)<0)
 	{
 		STATS_RPL_FWD_DROP();
 		goto error;
 	}
+
+	done:
 #ifdef STATS
 	STATS_TX_RESPONSE(  (msg->first_line.u.reply.statuscode/100) );
 #endif
 
-	DBG(" reply forwarded to %.*s:%d\n", 
+	LM_DBG("reply forwarded to %.*s:%d\n", 
 			msg->via2->host.len, msg->via2->host.s,
 			(unsigned short) msg->via2->port);
 
@@ -856,13 +843,13 @@ error:
 	return -1;
 }
 
-/* removes first via & sends msg to the second */
+/** removes first via & sends msg to the second */
 int forward_reply(struct sip_msg* msg)
 {
 	return do_forward_reply(msg, 0);
 }
 
-/* removes first via & sends msg to the second - no module callbacks */
+/** removes first via & sends msg to the second - no module callbacks */
 int forward_reply_nocb(struct sip_msg* msg)
 {
 	return do_forward_reply(msg, 1);

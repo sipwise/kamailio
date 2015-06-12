@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE section PUBLIC "-//OASIS//DTD DocBook XML V4.2//EN"
-	"http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd">
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
+
+<!-- Include general documentation entities -->
+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
+%docentities;
+
+]>
 
 <book id="xmlrpc" xmlns:xi="http://www.w3.org/2001/XInclude">
     <bookinfo>
@@ -25,7 +31,7 @@
 	<section id="xmlrpc.design">
 	<title>Design Goals</title>
 	<para>
-	    
+
 	</para>
 	<itemizedlist>
 	    <listitem>
@@ -35,7 +41,7 @@
 		<para>API independent of transport protocols.</para>
 	    </listitem>
 	    <listitem>
-		<para>Reuse transports available in SER.</para>
+		<para>Reuse transports available in &kamailio;.</para>
 	    </listitem>
 	    <listitem>
 		<para>The possibility to encrypt all communication.</para>
@@ -50,7 +56,7 @@
 	    <listitem>
 		<para>
 		    Easy and straightforward implementation of management
-		    functions in SER modules.
+		    functions in &kamailio; modules.
 		</para>
 	    </listitem>
 	</itemizedlist>
@@ -60,7 +66,7 @@
 	<title>Overview of Operation</title>
 	<para>
 		This module implements the XML-RPC transport and encoding interface
-		for ser RPCs.
+		for &kamailio; RPCs.
 	</para>
 	<para>
 	    The XML-RPC protocol encodes the name of the method
@@ -93,7 +99,7 @@ User-Agent: Radio UserLand/7.1b7 (WinNT)
 Host: time.xmlrpc.com
 Content-Type: text/xml
 Content-length: 131
-	    
+
 <?xml version="1.0"?>
 <methodCall>
 <methodName>currentTime.getCurrentTime</methodName>
@@ -127,15 +133,15 @@ Server: UserLand Frontier/7.0.1-WinNT
 	</programlisting>
 	<para>
 	    XML-RPC specification spells HTTP as the official transport
-	    protocol for XML-RPC documents. SER does not directly support
+	    protocol for XML-RPC documents. &kamailio; does not directly support
 	    HTTP, it is a SIP server so SIP is the only protocol supported by
-	    SER. Because we would like to reuse all transport protocols
-	    available in SER, such as TCP and TLS, it would be natural to use
+	    &kamailio;. Because we would like to reuse all transport protocols
+	    available in &kamailio;, such as TCP and TLS, it would be natural to use
 	    modified version of XML-RPC which would run on top of SIP instead
 	    of HTTP. XML-RPC documents would be then encoded in the bodies of
 	    SIP requests and replies would be sent by the server in the bodies of
 	    SIP replies. This way we could reuse all transport protocols
-	    (including UDP) and message parsers available in SER.
+	    (including UDP) and message parsers available in &kamailio;.
 	</para>
 	<para>
 	    Although this approach seems to be the logical choice, there is one
@@ -149,13 +155,13 @@ Server: UserLand Frontier/7.0.1-WinNT
 	<para>
 	    Because  extending available XML-RPC implementation would be too
 	    expensive, we could also do it the other way around, keep existing
-	    XML-RPC implementations and extend SER to support HTTP. Extending
-	    SER with HTTP support is easier than it might seem at a first
+	    XML-RPC implementations and extend &kamailio; to support HTTP. Extending
+	    &kamailio; with HTTP support is easier than it might seem at a first
 	    glance, due to the similarity between SIP requests and HTTP
 	    requests.
 	</para>
 	<para>
-	    SER already supports TCP, so existing HTTP implementations can send
+	    &kamailio; already supports TCP, so existing HTTP implementations can send
 	    HTTP requests to it. HTTP requests are missing certain mandatory
 	    SIP header fields, such as Via, From, and CSeq. The contents of the
 	    header fields is mainly used for transaction matching. A SIP server
@@ -179,7 +185,7 @@ Server: UserLand Frontier/7.0.1-WinNT
 	    Nothing special is needed on the SIP server terminating the
 	    request, except that it has to know where it should send the
 	    reply. Parsing of HTTP header field bodies would fail because we do
-	    not have parsers for them in SER, but that does not matter anyway
+	    not have parsers for them in &kamailio;, but that does not matter anyway
 	    because all the information is encoded in the body of the
 	    request. HTTP requests contain no Via header fields. Via header
 	    fields are used by SIP implementations to determine the destination
@@ -246,7 +252,7 @@ Content-Length: 111
 ]]>
 	    </programlisting>
 	    This particular request calls method "statistics" from from usrloc
-	    module of SER. The method has no parameters.
+	    module of &kamailio;. The method has no parameters.
 	</para>
 	<para>
 	    The outbound SIP server receives the HTTP request and performs a
@@ -280,10 +286,10 @@ Content-Length: 111
 	<para>
 	    <emphasis>Step 3.</emphasis> The target SIP server receives the
 	    HTTP request and executes function called
-	    <function>dispatch_rpc</function> from xmlrpc SER module. This
+	    <function>dispatch_rpc</function> from xmlrpc &kamailio; module. This
 	    function will parse the XML-RPC document in the body of the request
 	    and lookup the function to be called among all RPC functions
-	    exported by the SER core and modules. Function
+	    exported by the &kamailio; core and modules. Function
 	    <function>dispatch_rpc</function> will be called from the
 	    configuration file just like any other function:
 	    <programlisting>
@@ -293,7 +299,7 @@ if (method == "POST" || method == "GET") {
 };
 	    </programlisting>
 	    This particular configuration snippet executes the function
-	    whenever SER receives GET or POST requests. These two method names
+	    whenever &kamailio; receives GET or POST requests. These two method names
 	    indicate HTTP.
 	</para>
 	<para>
@@ -301,8 +307,8 @@ if (method == "POST" || method == "GET") {
 	    <function>dispatch_rpc</function> scans through the list of all
 	    exported RPC functions searching for the
 	    <function>statistics</function> function of the usrloc module. The
-		<ulink url='http://sip-router.org/docbook/sip-router/branch/master/rpc/ser_rpc.html'>
-		SER RPC Module API</ulink>
+		<ulink url='http://rpm.kamailio.org/docbook/sip-router/branch/master/rpc/kamailio_rpc.html'>
+		&kamailio; RPC Module API</ulink>
 		describes in detail how modules export RPC functions.
 	</para>
 	<para>
@@ -361,7 +367,7 @@ Warning: 392 127.0.0.1:5060 "Noisy feedback tells:  pid=9975 req_src_ip=127.0.0
 		HTTP requests from one SIP server to another and use standard
 		SIP routing mechanisms to decide which SIP server should
 		process the request. There is no need to have multiple SIP
-		servers in simple setups, because one SIP server can both add 
+		servers in simple setups, because one SIP server can both add
 		fake Via header field and process the RPC at the same
 		time. Modified configuration file snipped could then look like
 		this:
@@ -417,7 +423,7 @@ Content-Length: 112
 ]]>
 		</programlisting>
 		The name of the method to be called in this example is
-		"listMethods". This is one of the introspection methods. SER
+		"listMethods". This is one of the introspection methods. &kamailio;
 		will call <function>dispatch_rpc</function> function of xmlrpc
 		module to handle the request. The function will parse the
 		XML-RPC document, lookup <function>listMethods</function>
@@ -429,7 +435,7 @@ Content-Length: 112
 	    <title>Replies</title>
 	    <para>
 		The module will always generate 200 OK. Other response codes
-		and classes are reserved for SER. The status code of the
+		and classes are reserved for &kamailio;. The status code of the
 		XML-RPC reply, response code, and additional data will be
 		encoded in the body of the reply. Failure replies do not
 		contain any data, just the response code and reason phrase:
@@ -487,7 +493,7 @@ Content-Length: 150
 		will be converted to XML-RPC representation according to the
 		rules described in
 		<ulink url='http://sip-router.org/docbook/sip-router/branch/master/rpc/ser_rpc.html#rpc.data_types'>
-		SER RPC Type Conversion</ulink> and
+		&kamailio; RPC Type Conversion</ulink> and
 		the reply will contain just the single value:
 		<programlisting>
 <![CDATA[
@@ -641,7 +647,7 @@ Content-Length: 276
 	<section id="xmlrpc.implementation.limitations">
 	    <title>Limitations</title>
 	    <para>
-		SER xmlrpc modules does not implement all data types allowed in
+		&kamailio; xmlrpc modules does not implement all data types allowed in
 		XML-RPC. As well it does not implement arrays and nested
 		structures. This simplification is a feature, not bug. In our
 		case the XML-RPC interface will be used mainly for management
@@ -653,8 +659,8 @@ Content-Length: 276
 	<section id="xmlrpc.interoperability_problems">
 	    <title>Interoperability Problems</title>
 	    <para>
-		Due to a bug in Python xmlrpclib there is an interoperability 
-		problem with basic clients using it: by default an xmlrpclib client 
+		Due to a bug in Python xmlrpclib there is an interoperability
+		problem with basic clients using it: by default an xmlrpclib client
 		expects the server to immediately close the connection after answering
 		and if the server does not close the connections the xmlrpclib client
 		will wait forever.
@@ -665,7 +671,7 @@ Content-Length: 276
 		make ser close the tcp connection after each request.
 		</para>
 		<para>
-		The <ulink url='http://git.sip-router.org/cgi-bin/gitweb.cgi?p=sip-router;a=blob;f=modules/xmlrpc/examples/xmlrpc_test.py'>
+		The <ulink url='https://github.com/kamailio/kamailio/blob/master/modules/xmlrpc/examples/xmlrpc_test.py'>
 		examples/xmlrpc_test.py
 		</ulink> provides a very simple example of using xmlrpclib with a
 		Transport class that works.
@@ -677,7 +683,7 @@ Content-Length: 276
 		<function>set_reply_no_connect()</function> is also recommended
 		(avoid trying to open tcp connection to xmlrpc clients that closed it).
 		Alternatively ending the XMLRPC route with return -1, exit -1 or
-		drop -1 can also be used, but note that this will not work for 
+		drop -1 can also be used, but note that this will not work for
 		async rpcs (it will close the connection immeidately and not on the
 		async response).
 		<example>
@@ -710,28 +716,35 @@ route[XMLRPC]{
 	<section id="xmlrpc.client_examples">
 	<title>Client Examples</title>
 	<!-- TODO:
-	    implement clients in various languages 
-	- pros, cons 
+	    implement clients in various languages
+	- pros, cons
 	- How failures
-	    are mapped to XMLRPC 
-	- How success replies are mapped 
+	    are mapped to XMLRPC
+	- How success replies are mapped
 	- How data
-	    types of the API are mapped to XMLRPC elements 
+	    types of the API are mapped to XMLRPC elements
 	- 200 OK with no
 	    data transformed to one value - True
 	-->
 	<para>
 	<itemizedlist>
 		<listitem><para>
-			<ulink url='http://git.sip-router.org/cgi-bin/gitweb.cgi?p=sip-router;a=blob;f=modules/xmlrpc/examples/xmlrpc_test.pl'>
+			<ulink url='https://github.com/kamailio/kamailio/blob/master/modules/xmlrpc/examples/xmlrpc_test.pl'>
 			<emphasis>examples/xmlrpc_test.pl</emphasis>
 			</ulink> (basic perl application that builds and sends an
 			<emphasis>XMLRPC</emphasis> request from its commandline
 			parameters).
 		</para></listitem>
 		<listitem><para>
-			<ulink url='http://git.sip-router.org/cgi-bin/gitweb.cgi?p=sip-router;a=blob;f=modules/xmlrpc/examples/xmlrpc_test.py'>
+			<ulink url='https://github.com/kamailio/kamailio/blob/master/modules/xmlrpc/examples/xmlrpc_test.py'>
 			<emphasis>examples/xmlrpc_test.py</emphasis>
+			</ulink> (basic python application that builds and sends an
+			<emphasis>XMLRPC</emphasis> request from its commandline
+			parameters).
+		</para></listitem>
+		<listitem><para>
+			<ulink url='https://github.com/kamailio/kamailio/blob/master/modules/xmlrpc/examples/xmlrpc_test2.py'>
+			<emphasis>examples/xmlrpc_test2.py</emphasis>
 			</ulink> (basic python application that builds and sends an
 			<emphasis>XMLRPC</emphasis> request from its commandline
 			parameters).
@@ -740,7 +753,7 @@ route[XMLRPC]{
 			<ulink url='http://git.sip-router.org/cgi-bin/gitweb.cgi?p=ser;a=tree;f=ser_ctl'>
 			<emphasis>ser_ctl</emphasis>
 			</ulink>
-			(complex python application that 
+			(complex python application that
 			uses the <emphasis>XML-RPC</emphasis> interface implemented by the
 			<emphasis>xmlrpc</emphasis> module).
 		</para></listitem>
@@ -749,7 +762,7 @@ route[XMLRPC]{
 			<emphasis>serweb</emphasis>
 			</ulink>
 			(php application that can use
-			the <emphasis>XML-RPC</emphasis> interface to call ser 
+			the <emphasis>XML-RPC</emphasis> interface to call ser
 			functions).
 		</para></listitem>
 	</itemizedlist>

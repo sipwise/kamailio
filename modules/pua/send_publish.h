@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * pua module - presence user agent module
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -19,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 
@@ -44,6 +42,7 @@ typedef struct publ_info
 	str content_type;  /*! the content_type of the body if present(optional if the
 				same as the default value for that event) */
 	str* etag;
+	str* outbound_proxy;
 	str* extra_headers;
 	void* cb_param;   /*! the parameter for the function to be called on the callback 
 				for the received reply; it must be allocated in share memory;

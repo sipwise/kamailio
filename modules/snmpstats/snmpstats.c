@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * SNMPStats Module 
  * Copyright (C) 2006 SOMA Networks, INC.
  * Written by: Jeffrey Magder (jmagder@somanetworks.com)
@@ -21,14 +19,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
  * USA
  *
- * History:
- * --------
- * 2006-11-23 initial version (jmagder)
- * 2013-04-01 updates of the MIB with core memory, tcp stats and much more (oej)
- * 
  * There are some important points to understanding the SNMPStat modules
  * architecture.
  *
@@ -60,6 +53,8 @@
  * \brief SNMP statistic module
  * \ingroup snmpstats
  * - Module: \ref snmpstats
+ * \author Jeffrey Magder (jmagder@somanetworks.com)
+ * \author Olle E. Johansson (oej@edvina.net)
  */
 
 /*!
@@ -143,7 +138,7 @@ static proc_export_t mod_procs[] = {
  */
 static param_export_t mod_params[] =
 {
-	{ "sipEntityType",          STR_PARAM|USE_FUNC_PARAM,
+	{ "sipEntityType",          PARAM_STRING|USE_FUNC_PARAM,
 			(void *)handleSipEntityType       },
 	{ "MsgQueueMinorThreshold", INT_PARAM|USE_FUNC_PARAM,
 			(void *)set_queue_minor_threshold },
@@ -153,9 +148,9 @@ static param_export_t mod_params[] =
 			(void *)set_dlg_minor_threshold   },
 	{ "dlg_major_threshold",    INT_PARAM|USE_FUNC_PARAM,
 			(void *)set_dlg_major_threshold   },
-	{ "snmpgetPath",            STR_PARAM|USE_FUNC_PARAM,
+	{ "snmpgetPath",            PARAM_STRING|USE_FUNC_PARAM,
 			(void *)set_snmpget_path          },
-	{ "snmpCommunity",          STR_PARAM|USE_FUNC_PARAM,
+	{ "snmpCommunity",          PARAM_STRING|USE_FUNC_PARAM,
 			(void *)set_snmp_community        },
 	{ "export_registrar",       INT_PARAM,
 			&snmp_export_registrar            },

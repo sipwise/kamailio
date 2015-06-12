@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -61,6 +61,10 @@
 #include "../../data_lump_rpl.h"
 #include "sip_msg.h"
 #include "regtime.h"
+#include "../../parser/hf.h"
+#include "../../lib/ims/ims_getters.h"
+
+extern struct cdp_binds cdpb;
 
 int create_return_code(int result) {
     int rc;
@@ -310,6 +314,7 @@ int cxdx_send_sar(struct sip_msg *msg, str public_identity, str private_identity
     AAAMessage *sar = 0;
     AAASession *session = 0;
     unsigned int hash = 0, label = 0;
+    struct hdr_field *hdr;
 
     session = cdpb.AAACreateSession(0);
 
@@ -320,6 +325,7 @@ int cxdx_send_sar(struct sip_msg *msg, str public_identity, str private_identity
     }
     if (!sar) goto error1;
 
+    if (!cxdx_add_call_id(sar, cscf_get_call_id(msg, &hdr)));
     if (!cxdx_add_destination_realm(sar, cxdx_dest_realm)) goto error1;
 
     if (!cxdx_add_vendor_specific_appid(sar, IMS_vendor_id_3GPP, IMS_Cx, 0 /*IMS_Cx*/)) goto error1;

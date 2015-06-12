@@ -1,28 +1,26 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2004 FhG FOKUS
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
  * \file
- * \brief SIP-router core :: Destination set handling
+ * \brief Kamailio core :: Destination set handling
  * \ingroup core
  * Module: \ref core
  */
@@ -257,5 +255,7 @@ int setbflagsval(unsigned int branch, flag_t val);
 
 int uri_add_rcv_alias(sip_msg_t *msg, str *uri, str *nuri);
 int uri_restore_rcv_alias(str *uri, str *nuri, str *suri);
+
+int init_dst_set(void);
 
 #endif /* _DSET_H */

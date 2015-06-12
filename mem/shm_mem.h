@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of sip-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,16 +18,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * History:
- * --------
- *  2003-06-29  added shm_realloc & replaced shm_resize (andrei)
- *  2003-11-19  reverted shm_resize to the old version, using
- *               realloc causes terrible fragmentation  (andrei)
- *  2005-03-02   added shm_info() & re-eneabled locking on shm_status (andrei)
- *  2007-02-23   added shm_available() (andrei)
- *  2007-06-10   support for sf_malloc (andrei)
- */
 
 /**
  * \file
@@ -66,6 +56,14 @@
 		#endif
 	#elif defined(DBG_QM_MALLOC)
 		#define DBG_F_MALLOC
+	#endif
+#elif defined TLSF_MALLOC
+	#ifdef DBG_TLSF_MALLOC
+		#ifndef DBG_QM_MALLOC
+			#define DBG_QM_MALLOC
+		#endif
+	#elif defined(DBG_QM_MALLOC)
+		#define DBG_TLSF_MALLOC
 	#endif
 #endif
 
@@ -150,8 +148,21 @@
 #	define MY_STATUS(...) 0
 #	define MY_SUMS do{}while(0)
 #	define MY_MEMINFO	mspace_info
-#	define  shm_malloc_init(buf, len) create_mspace_with_base(buf, len, 0)
+#	define  shm_malloc_init(buf, len, type) create_mspace_with_base(buf, len, 0)
 #	define shm_malloc_destroy(b) do{}while(0)
+#	define shm_malloc_on_fork() do{}while(0)
+#elif defined TLSF_MALLOC
+#	include "tlsf.h"
+	extern pool_t shm_block;
+#	define MY_MALLOC tlsf_malloc
+#	define MY_FREE tlsf_free
+#	define MY_REALLOC tlsf_realloc
+#	define MY_STATUS tlsf_status
+#	define MY_MEMINFO	tlsf_meminfo
+#	define MY_SUMS tlsf_sums
+#	define shm_malloc_init(mem, bytes, type) tlsf_create_with_pool((void*) mem, bytes)
+#	define shm_malloc_destroy(b) do{}while(0)
+#	define shm_available() tlsf_available(shm_block)
 #	define shm_malloc_on_fork() do{}while(0)
 #else
 #	include "q_malloc.h"
@@ -321,6 +332,11 @@ do{\
 #endif /* MY_SUMS */
 
 #endif /* ! SHM_SAFE_MALLOC */
+
+/* multi-process safe version of shm_available()
+ */
+unsigned long shm_available_safe();
+
 
 #endif /* shm_mem_h */
 

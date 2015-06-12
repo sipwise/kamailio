@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * TM module
  *
  *
@@ -30,65 +28,21 @@
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- */
-/*
- * History:
- * --------
- *  2003-02-18  added t_forward_nonack_{udp, tcp}, t_relay_to_{udp,tcp},
- *               t_replicate_{udp, tcp} (andrei)
- *  2003-02-19  added t_rely_{udp, tcp} (andrei)
- *  2003-03-06  voicemail changes accepted (jiri)
- *  2003-03-10  module export interface updated to the new format (andrei)
- *  2003-03-16  flags export parameter added (janakj)
- *  2003-03-19  replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
- *  2003-03-30  set_kr for requests only (jiri)
- *  2003-04-05  s/reply_route/failure_route, onreply_route introduced (jiri)
- *  2003-04-14  use protocol from uri (jiri)
- *  2003-07-07  added t_relay_to_tls, t_replicate_tls, t_forward_nonack_tls
- *              added #ifdef USE_TCP, USE_TLS
- *              removed t_relay_{udp,tcp,tls} (andrei)
- *  2003-09-26  added t_forward_nonack_uri() - same as t_forward_nonack() but
- *              takes no parameters -> forwards to uri (bogdan)
- *  2004-02-11  FIFO/CANCEL + alignments (hash=f(callid,cseq)) (uli+jiri)
- *  2004-02-18  t_reply exported via FIFO - imported from VM (bogdan)
- *  2004-10-01  added a new param.: restart_fr_on_each_reply (andrei)
- *  2005-11-14  new timer support, changed timer related module params (andrei)
- *  2005-12-09  fixup_hostport2proxy uses route_struct to access param #1
- *              when fixing param #2
- *  2005-12-09  added t_set_fr() (andrei)
- *  2006-02-07  named routes support (andrei)
- *  2006-09-28  added t_branch_replied, t_branch_timeout, t_any_replied, 
- *               t_any_timeout, t_is_canceled (andrei)
- *  2006-10-16  added a new param.: aggregate challenges (andrei)
- *  2007-05-28  two new params: reparse_invite, ac_extra_hdrs
- *              added w_t_relay_cancel() (Miklos)
- *  2007-06-05  added t_set_auto_inv_100() and auto_inv_100 (param);
- *               t_set_max_lifetime(), max_{non}inv_lifetime  (andrei)
- *  2008-02-05	module config parameters use the configuration framework (Miklos)
- *  2008-02-29  added t_grep_status(code) (andrei)
- *  2008-05-15  added t_relay(host, port) (similar to forward(host, port)) &
- *               t_relay_to_{udp,tcp,tls}(<no param>) (force protocol, but 
- *               forward to uri)  (andrei)
- *  2008-08-11  sctp support: t_relay_to_sctp, t_replicate_sctp,
- *               t_forward_nonack_sctp (andrei)
- *  2009-03-18  added a new param: auto_inv_100_reason (aheise) 
- *  2010-03-03  added new params: local_cancel_reason and e2e_cancel_reason
- *              (andrei)
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /** TM :: Module API (core).
@@ -298,6 +252,7 @@ static int t_any_timeout(struct sip_msg* msg, char*, char*);
 static int t_any_replied(struct sip_msg* msg, char*, char*);
 static int w_t_is_canceled(struct sip_msg* msg, char*, char*);
 static int t_is_expired(struct sip_msg* msg, char*, char*);
+static int w_t_is_retr_async_reply(struct sip_msg* msg, char*, char*);
 static int t_grep_status(struct sip_msg* msg, char*, char*);
 static int w_t_drop_replies(struct sip_msg* msg, char* foo, char* bar);
 static int w_t_save_lumps(struct sip_msg* msg, char* foo, char* bar);
@@ -361,6 +316,8 @@ static cmd_export_t cmds[]={
 	{"t_relay_to_sctp",       w_t_relay_to_sctp_uri,    0, 0,
 			REQUEST_ROUTE|FAILURE_ROUTE},
 #endif
+	{"t_replicate",        w_t_replicate_uri,       0, 0,
+			REQUEST_ROUTE},
 	{"t_replicate",        w_t_replicate_uri,       1, fixup_var_str_1,
 			REQUEST_ROUTE},
 	{"t_replicate",        w_t_replicate,           2, fixup_hostport2proxy,
@@ -470,6 +427,8 @@ static cmd_export_t cmds[]={
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"t_is_canceled",     w_t_is_canceled,          0, 0,
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
+        {"t_is_retr_async_reply",     w_t_is_retr_async_reply,          0, 0,
+			TM_ONREPLY_ROUTE},                
 	{"t_is_expired",      t_is_expired,             0, 0,
 			REQUEST_ROUTE|TM_ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"t_grep_status",     t_grep_status,            1, fixup_var_int_1, 
@@ -796,9 +755,9 @@ static int mod_init(void)
 
 	/* checking if we have sufficient bitmap capacity for given
 	   maximum number of  branches */
-	if (MAX_BRANCHES+1>31) {
+	if (sr_dst_max_branches+1>31) {
 		LOG(L_CRIT, "Too many max UACs for UAC branch_bm_t bitmap: %d\n",
-			MAX_BRANCHES );
+			sr_dst_max_branches );
 		return -1;
 	}
 
@@ -1608,7 +1567,7 @@ int t_replicate_uri(struct sip_msg *msg, str *suri)
 	struct sip_uri turi;
 	int r = -1;
 
-	if (suri != NULL && suri->s != NULL)
+	if (suri != NULL && suri->s != NULL && suri->len > 0)
 	{
 		memset(&turi, 0, sizeof(struct sip_uri));
 		if(parse_uri(suri->s, suri->len, &turi)!=0)
@@ -1638,6 +1597,9 @@ inline static int w_t_replicate_uri(struct sip_msg  *msg ,
 				char *_foo       /* nothing expected */ )
 {
 	str suri;
+
+	if(uri==NULL)
+		return t_replicate_uri(msg, NULL);
 
 	if(fixup_get_svalue(msg, (gparam_p)uri, &suri)!=0)
 	{
@@ -1945,6 +1907,29 @@ static int w_t_is_canceled(struct sip_msg* msg, char* foo, char* bar)
 	return t_is_canceled(msg);
 }
 
+/* script function, returns: 1 if the transaction is currently suspended, -1 if not */
+int t_is_retr_async_reply(struct sip_msg* msg)
+{
+	struct cell *t;
+	int ret;	
+	
+	if (t_check( msg , 0 )==-1) return -1;
+	t=get_t();
+	if ((t==0) || (t==T_UNDEFINED)){
+		LOG(L_ERR, "ERROR: t_is_retr_async_reply: cannot check a message "
+			"for which no T-state has been established\n");
+		ret=-1;
+	}else{
+        LOG(L_DBG, "TRANSACTION FLAGS IS %d\n", t->flags);
+		ret=(t->flags & T_ASYNC_SUSPENDED)?1:-1;
+	}
+	return ret;
+}
+static int w_t_is_retr_async_reply(struct sip_msg* msg, char* foo, char* bar)
+{
+	return t_is_retr_async_reply(msg);
+}
+
 /* script function, returns: 1 if the transaction lifetime interval has already elapsed, -1 if not */
 int t_is_expired(struct sip_msg* msg, char* foo, char* bar)
 {
@@ -2110,9 +2095,10 @@ int t_check_trans(struct sip_msg* msg)
 	int ret;
 	
 	/* already processing a T */
-	if(get_route_type()==FAILURE_ROUTE
-			|| get_route_type()==BRANCH_ROUTE
-			|| get_route_type()==TM_ONREPLY_ROUTE) {
+	if(is_route_type(FAILURE_ROUTE)
+			|| is_route_type(BRANCH_ROUTE)
+			|| is_route_type(BRANCH_FAILURE_ROUTE)
+			|| is_route_type(TM_ONREPLY_ROUTE)) {
 		return 1;
 	}
 

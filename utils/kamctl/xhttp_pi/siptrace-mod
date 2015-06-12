@@ -4,7 +4,7 @@
 			<db_table_id>sip_trace</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field></col>
+				<col><field>id</field><link_cmd>update</link_cmd></col>
 				<col><field>time_stamp</field></col>
 				<col><field>time_us</field></col>
 				<col><field>callid</field></col>
@@ -15,6 +15,7 @@
 				<col><field>fromip</field></col>
 				<col><field>toip</field></col>
 				<col><field>fromtag</field></col>
+				<col><field>totag</field></col>
 				<col><field>direction</field></col>
 			</query_cols>
 		</cmd>
@@ -32,6 +33,7 @@
 				<col><field>fromip</field></col>
 				<col><field>toip</field></col>
 				<col><field>fromtag</field></col>
+				<col><field>totag</field></col>
 				<col><field>direction</field></col>
 			</query_cols>
 		</cmd>
@@ -52,6 +54,7 @@
 				<col><field>fromip</field></col>
 				<col><field>toip</field></col>
 				<col><field>fromtag</field></col>
+				<col><field>totag</field></col>
 				<col><field>direction</field></col>
 			</query_cols>
 		</cmd>

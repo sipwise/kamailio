@@ -1,6 +1,4 @@
 /* 
- * $Id$
- *
  * Copyright (C) 2001-2004 iptel.org
  * Copyright (C) 2008 1&1 Internet AG
  *
@@ -18,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
@@ -43,7 +41,8 @@
 struct my_con* db_mysql_new_connection(const struct db_id* id)
 {
 	struct my_con* ptr;
-	char *host, *grp;
+	char *host, *grp, *egrp;
+	unsigned int connection_flag = 0;
 
 	if (!id) {
 		LM_ERR("invalid parameter value\n");
@@ -56,6 +55,7 @@ struct my_con* db_mysql_new_connection(const struct db_id* id)
 		return 0;
 	}
 
+	egrp = 0;
 	memset(ptr, 0, sizeof(struct my_con));
 	ptr->ref = 1;
 	
@@ -67,9 +67,10 @@ struct my_con* db_mysql_new_connection(const struct db_id* id)
 
 	mysql_init(ptr->con);
 
-	if (id->host[0] == '[' && (host = strchr(id->host, ']')) != NULL) {
+	if (id->host[0] == '[' && (egrp = strchr(id->host, ']')) != NULL) {
 		grp = id->host + 1;
-		*host = '\0';
+		*egrp = '\0';
+		host = egrp;
 		if (host != id->host + strlen(id->host)-1) {
 			host += 1; // host found after closing bracket
 		}
@@ -99,12 +100,16 @@ struct my_con* db_mysql_new_connection(const struct db_id* id)
 	mysql_options(ptr->con, MYSQL_OPT_READ_TIMEOUT, (const char *)&db_mysql_timeout_interval);
 	mysql_options(ptr->con, MYSQL_OPT_WRITE_TIMEOUT, (const char *)&db_mysql_timeout_interval);
 
+	if (db_mysql_update_affected_found) { 
+	    connection_flag |= CLIENT_FOUND_ROWS;
+	}
+	
 #if (MYSQL_VERSION_ID >= 40100)
 	if (!mysql_real_connect(ptr->con, host, id->username, id->password,
-				id->database, id->port, 0, CLIENT_MULTI_STATEMENTS)) {
+				id->database, id->port, 0, connection_flag|CLIENT_MULTI_STATEMENTS)) {
 #else
 	if (!mysql_real_connect(ptr->con, host, id->username, id->password,
-				id->database, id->port, 0, 0)) {
+				id->database, id->port, 0, connection_flag)) {
 #endif
 		LM_ERR("driver error: %s\n", mysql_error(ptr->con));
 		/* increase error counter */
@@ -124,11 +129,13 @@ struct my_con* db_mysql_new_connection(const struct db_id* id)
 
 	ptr->timestamp = time(0);
 	ptr->id = (struct db_id*)id;
+	if(egrp) *egrp = ']';
 	return ptr;
 
  err:
 	if (ptr && ptr->con) pkg_free(ptr->con);
 	if (ptr) pkg_free(ptr);
+	if(egrp) *egrp = ']';
 	return 0;
 }
 

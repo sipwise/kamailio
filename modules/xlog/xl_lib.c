@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * XLOG module
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,16 +17,17 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
- * --------
- * 2004-10-20 - added header name specifier (ramona)
- * 2005-06-14 - added avp name specifier (ramona)
- * 2005-06-18 - added color printing support via escape sequesnces
- *              contributed by Ingo Flaschberger (daniel)
- * 2005-06-22 - moved item methods to "items.{c,h}" (daniel)
  * 
+ */
+
+/*!
+ * \file
+ * \brief Library
+ * \ingroup xlog
+ * Module: \ref xlog
  */
 
 #include "xl_lib.h"

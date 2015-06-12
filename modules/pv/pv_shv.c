@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2007 Elena-Ramona Modroiu
  * Copyright (C) 2013 Olle E. Johansson
  *
@@ -18,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -755,7 +753,7 @@ void rpc_shv_set(rpc_t* rpc, void* c)
 		rpc->fault(c, 500, "Cannot set shared variable value");
 		LM_ERR("cannot set shv value\n");
 	} else {
-		rpc->printf(c, "Ok. Variable set to new value.");
+		rpc->rpl_printf(c, "Ok. Variable set to new value.");
 	}
 
 	unlock_shvar(shv);
@@ -810,7 +808,7 @@ int param_set_xvar( modparam_t type, void* val, int mode)
 		isv.n = ival;
 	}
 	if(mode==0) {
-		pkv = add_var(&s);
+		pkv = add_var(&s, VAR_TYPE_ZERO);
 		if(pkv==NULL)
 			goto error;
 		if(set_var_value(pkv, &isv, flags)==NULL)

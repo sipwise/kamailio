@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DBText library
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,11 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2003-02-05  created by Daniel
  * 
  */
 
@@ -59,7 +54,7 @@ static int dbt_get_columns(db1_res_t* _r, dbt_result_p _dres)
 		return -2;
 	}
 	if (db_allocate_columns(_r, RES_COL_N(_r)) != 0) {
-		LM_ERR("could not allocate columns");
+		LM_ERR("could not allocate columns\n");
 		return -3;
 	}
 
@@ -75,7 +70,7 @@ static int dbt_get_columns(db1_res_t* _r, dbt_result_p _dres)
 			db_free_columns(_r);
 			return -4;
 		}
-		LM_DBG("allocate %d bytes for RES_NAMES[%d] at %p",
+		LM_DBG("allocate %d bytes for RES_NAMES[%d] at %p\n",
 				(int)sizeof(str), col,
 				RES_NAMES(_r)[col]);
 		RES_NAMES(_r)[col]->s = _dres->colv[col].name.s;
@@ -114,7 +109,7 @@ static int dbt_convert_row(db1_res_t* _res, db_row_t* _r, dbt_row_p _r1)
 	}
 
 	if (db_allocate_row(_res, _r) != 0) {
-		LM_ERR("could not allocate row");
+		LM_ERR("could not allocate row\n");
 		return -2;
 	}
 
@@ -129,7 +124,7 @@ static int dbt_convert_row(db1_res_t* _res, db_row_t* _r, dbt_row_p _r1)
 			break;
 
 			case DB1_BIGINT:
-				LM_ERR("BIGINT not supported");
+				LM_ERR("BIGINT not supported\n");
 				return -1;
 
 			case DB1_DOUBLE:
@@ -176,6 +171,10 @@ static int dbt_convert_row(db1_res_t* _res, db_row_t* _r, dbt_row_p _r1)
 						_r1->fields[i].val.bitmap_val;
 				VAL_TYPE(&(ROW_VALUES(_r)[i])) = DB1_INT;
 			break;
+
+			default:
+				LM_ERR("val type [%d] not supported\n", RES_TYPES(_res)[i]);
+				return -1;
 		}
 	}
 	return 0;
@@ -198,7 +197,7 @@ static int dbt_convert_rows(db1_res_t* _r, dbt_result_p _dres)
 		return 0;
 	}
 	if (db_allocate_rows(_r) < 0) {
-		LM_ERR("could not allocate rows");
+		LM_ERR("could not allocate rows\n");
 		return -2;
 	}
 	row = 0;

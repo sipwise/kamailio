@@ -15,11 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*!
@@ -79,12 +76,13 @@
 MODULE_VERSION
 
 #define S_TABLE_VERSION  3
-#define P_TABLE_VERSION  3
+#define P_TABLE_VERSION  4
 #define ACTWATCH_TABLE_VERSION 11
 
 char *log_buf = NULL;
 static int clean_period=100;
 static int db_update_period=100;
+int pres_local_log_level = L_INFO;
 
 /* database connection */
 db1_con_t *pa_db = NULL;
@@ -97,6 +95,13 @@ int pres_fetch_rows = 500;
 int library_mode= 0;
 str server_address= {0, 0};
 evlist_t* EvList= NULL;
+int pres_subs_remove_match = 0;
+
+/* sip uri match */
+sip_uri_match_f presence_sip_uri_match;
+static int sip_uri_case_sensitive_match(str* s1, str* s2);
+static int sip_uri_case_insensitive_match(str* s1, str* s2);
+int pres_uri_match = 0;
 
 /* to tag prefix */
 char* to_tag_pref = "10";
@@ -137,6 +142,8 @@ char prefix='a';
 int startup_time=0;
 str db_url = {0, 0};
 int expires_offset = 0;
+int min_expires= 0;
+int min_expires_action= 1;
 int max_expires= 3600;
 int shtable_size= 9;
 shtable_t subs_htable= NULL;
@@ -148,6 +155,8 @@ int publ_cache_enabled = 1;
 int pres_waitn_time = 5;
 int pres_notifier_poll_rate = 10;
 int pres_notifier_processes = 1;
+str pres_xavp_cfg = {0};
+int pres_retrieve_order = 0;
 
 int db_table_lock_type = 1;
 db_locking_t db_table_lock = DB_LOCKING_WRITE;
@@ -181,19 +190,21 @@ static cmd_export_t cmds[]=
 };
 
 static param_export_t params[]={
-	{ "db_url",                 STR_PARAM, &db_url.s},
-	{ "presentity_table",       STR_PARAM, &presentity_table.s},
-	{ "active_watchers_table",  STR_PARAM, &active_watchers_table.s},
-	{ "watchers_table",         STR_PARAM, &watchers_table.s},
+	{ "db_url",                 PARAM_STR, &db_url},
+	{ "presentity_table",       PARAM_STR, &presentity_table},
+	{ "active_watchers_table",  PARAM_STR, &active_watchers_table},
+	{ "watchers_table",         PARAM_STR, &watchers_table},
 	{ "clean_period",           INT_PARAM, &clean_period },
 	{ "db_update_period",       INT_PARAM, &db_update_period },
 	{ "waitn_time",             INT_PARAM, &pres_waitn_time },
 	{ "notifier_poll_rate",     INT_PARAM, &pres_notifier_poll_rate },
 	{ "notifier_processes",     INT_PARAM, &pres_notifier_processes },
-	{ "to_tag_pref",            STR_PARAM, &to_tag_pref },
+	{ "to_tag_pref",            PARAM_STRING, &to_tag_pref },
 	{ "expires_offset",         INT_PARAM, &expires_offset },
 	{ "max_expires",            INT_PARAM, &max_expires },
-	{ "server_address",         STR_PARAM, &server_address.s},
+	{ "min_expires",            INT_PARAM, &min_expires },
+    { "min_expires_action",     INT_PARAM, &min_expires_action },
+	{ "server_address",         PARAM_STR, &server_address},
 	{ "subs_htable_size",       INT_PARAM, &shtable_size},
 	{ "pres_htable_size",       INT_PARAM, &phtable_size},
 	{ "subs_db_mode",           INT_PARAM, &subs_dbmode},
@@ -203,6 +214,11 @@ static param_export_t params[]={
 	{ "send_fast_notify",       INT_PARAM, &send_fast_notify},
 	{ "fetch_rows",             INT_PARAM, &pres_fetch_rows},
 	{ "db_table_lock_type",     INT_PARAM, &db_table_lock_type},
+	{ "local_log_level",        PARAM_INT, &pres_local_log_level},
+	{ "subs_remove_match",      PARAM_INT, &pres_subs_remove_match},
+	{ "xavp_cfg",               PARAM_STR, &pres_xavp_cfg},
+	{ "retrieve_order",         PARAM_INT, &pres_retrieve_order},
+	{ "sip_uri_match",          PARAM_INT, &pres_uri_match},
     {0,0,0}
 };
 
@@ -210,6 +226,11 @@ static mi_export_t mi_cmds[] = {
 	{ "refreshWatchers", mi_refreshWatchers,    0,  0,  mi_child_init},
 	{ "cleanup",         mi_cleanup,            0,  0,  mi_child_init},
 	{  0,                0,                     0,  0,  0}
+};
+
+static pv_export_t pres_mod_pvs[] = {
+	{{"subs", (sizeof("subs")-1)}, PVT_OTHER, pv_get_subscription, 0, pv_parse_subscription_name, 0, 0, 0},
+	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 };
 
 /** module exports */
@@ -220,7 +241,7 @@ struct module_exports exports= {
 	params,				/* exported parameters */
 	0,					/* exported statistics */
 	mi_cmds,   			/* exported MI functions */
-	0,					/* exported pseudo-variables */
+	pres_mod_pvs,		/* exported pseudo-variables */
 	0,					/* extra processes */
 	mod_init,			/* module initialization function */
 	0,   				/* response handling function */
@@ -233,6 +254,12 @@ struct module_exports exports= {
  */
 static int mod_init(void)
 {
+	if(pres_uri_match == 1) {
+		presence_sip_uri_match = sip_uri_case_insensitive_match;
+	} else {
+		presence_sip_uri_match = sip_uri_case_sensitive_match;
+	}
+
 	if(register_mi_mod(exports.name, mi_cmds)!=0)
 	{
 		LM_ERR("failed to register MI commands\n");
@@ -244,11 +271,7 @@ static int mod_init(void)
 		return -1;
 	}
 
-	db_url.len = db_url.s ? strlen(db_url.s) : 0;
 	LM_DBG("db_url=%s/%d/%p\n", ZSW(db_url.s), db_url.len,db_url.s);
-	presentity_table.len = strlen(presentity_table.s);
-	active_watchers_table.len = strlen(active_watchers_table.s);
-	watchers_table.len = strlen(watchers_table.s);
 
 	if(db_url.s== NULL)
 		library_mode= 1;
@@ -274,13 +297,19 @@ static int mod_init(void)
 	if(max_expires<= 0)
 		max_expires = 3600;
 
+	if(min_expires < 0)
+		min_expires = 0;
+
+	if(min_expires > max_expires)
+		min_expires = max_expires;
+
+    if(min_expires_action < 1 || min_expires_action > 2) {
+        LM_ERR("min_expires_action must be 1 = RFC 6665/3261 Reply 423, 2 = force min_expires value\n");
+        return -1;
+    }
+    
 	if(server_address.s== NULL)
 		LM_DBG("server_address parameter not set in configuration file\n");
-	
-	if(server_address.s)
-		server_address.len= strlen(server_address.s);
-	else
-		server_address.len= 0;
 
 	/* bind the SL API */
 	if (sl_load_api(&slb)!=0) {
@@ -1001,7 +1030,7 @@ int update_watchers_status(str pres_uri, pres_ev_t* ev, str* rules_doc)
 	}
 
 	LM_DBG("found %d record-uri in watchers_table\n", result->n);
-	hash_code= core_hash(&pres_uri, &ev->name, shtable_size);
+	hash_code= core_case_hash(&pres_uri, &ev->name, shtable_size);
 	subs.db_flag= hash_code;
 
 	/*must do a copy as sphere_check requires database queries */
@@ -1422,7 +1451,7 @@ static int update_pw_dialogs_dbonlymode(subs_t* subs, subs_t** subs_array)
 					* pres_notifier_processes));
 	} else {
 		db_vals[n_update_cols].val.int_val = 
-			core_hash(&subs->callid, &subs->from_tag, 0) %
+			core_case_hash(&subs->callid, &subs->from_tag, 0) %
 				  (pres_waitn_time * pres_notifier_poll_rate
 					* pres_notifier_processes);
 	}
@@ -1461,9 +1490,9 @@ static int update_pw_dialogs(subs_t* subs, unsigned int hash_code, subs_t** subs
 		if(s->event== subs->event && s->pres_uri.len== subs->pres_uri.len &&
 			s->watcher_user.len== subs->watcher_user.len && 
 			s->watcher_domain.len==subs->watcher_domain.len &&
-			strncmp(s->pres_uri.s, subs->pres_uri.s, subs->pres_uri.len)== 0 &&
-			strncmp(s->watcher_user.s, subs->watcher_user.s, s->watcher_user.len)== 0 &&
-			strncmp(s->watcher_domain.s,subs->watcher_domain.s,s->watcher_domain.len)==0)
+			presence_sip_uri_match(&s->pres_uri, &subs->pres_uri)== 0 &&
+			presence_sip_uri_match(&s->watcher_user, &subs->watcher_user)== 0 &&
+			presence_sip_uri_match(&s->watcher_domain, &subs->watcher_domain)==0)
 		{
 			i++;
 			s->status= subs->status;
@@ -1806,7 +1835,7 @@ void rpc_presence_cleanup(rpc_t* rpc, void* c)
 	(void) msg_presentity_clean(0,0);
 	(void) timer_db_update(0,0);
 		
-	rpc->printf(c, "Reload OK");
+	rpc->rpl_printf(c, "Reload OK");
 	return;
 }
 
@@ -1828,4 +1857,30 @@ static int presence_init_rpc(void)
 		return -1;
 	}
 	return 0;
+}
+
+static int sip_uri_case_sensitive_match(str* s1, str* s2)
+{
+	if(!s1) {
+		LM_ERR("null pointer (s1) in sip_uri_match\n");
+		return -1;
+	}
+	if(!s2) {
+		LM_ERR("null pointer (s2) in sip_uri_match\n");
+		return -1;
+	}
+	return strncmp(s1->s, s2->s, s2->len);
+}
+
+static int sip_uri_case_insensitive_match(str* s1, str* s2)
+{
+	if(!s1) {
+		LM_ERR("null pointer (s1) in sip_uri_match\n");
+		return -1;
+	}
+	if(!s2) {
+		LM_ERR("null pointer (s2) in sip_uri_match\n");
+		return -1;
+	}
+	return strncasecmp(s1->s, s2->s, s2->len);
 }

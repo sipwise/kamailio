@@ -1,9 +1,8 @@
 /*
- * $Id$
  *
  * Copyright (C) 2013 Robert Boisvert
  *
- * This file is part of the mohqueue module for sip-router, a free SIP server.
+ * This file is part of the mohqueue module for Kamailio, a free SIP server.
  *
  * The mohqueue module is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -61,17 +60,17 @@ static cmd_export_t mod_cmds [] = {
 };
 
 /* PARAMETERS */
-char *db_url = DEFAULT_DB_URL;
-char *db_ctable = "mohqcalls";
-char *db_qtable = "mohqueues";
+str db_url = str_init(DEFAULT_DB_URL);
+str db_ctable = str_init("mohqcalls");
+str db_qtable = str_init("mohqueues");
 char *mohdir = "";
 int moh_maxcalls = 50;
 
 static param_export_t mod_parms [] = {
-  { "db_url", STR_PARAM, &db_url },
-  { "db_ctable", STR_PARAM, &db_ctable },
-  { "db_qtable", STR_PARAM, &db_qtable },
-  { "mohdir", STR_PARAM, &mohdir },
+  { "db_url", PARAM_STR, &db_url },
+  { "db_ctable", PARAM_STR, &db_ctable },
+  { "db_qtable", PARAM_STR, &db_qtable },
+  { "mohdir", PARAM_STRING, &mohdir },
   { "moh_maxcalls", INT_PARAM, &moh_maxcalls },
   { NULL, 0, NULL },
 };
@@ -134,83 +133,83 @@ return 0;
 static int init_cfg (void)
 
 {
-/**********
-* db_url, db_ctable, db_qtable exist?
-**********/
+  int error = 0;
+  int bfnd = 0;
+  struct stat psb [1];
 
-if (!*db_url)
+  /**********
+  * db_url, db_ctable, db_qtable exist?
+  **********/
+  
+  if (!db_url.s || db_url.len<=0)
   {
-  LM_ERR ("db_url parameter not set!");
-  return 0;
-  }
-pmod_data->pcfg->db_url.s = db_url;
-pmod_data->pcfg->db_url.len = strlen (db_url);
-if (!*db_ctable)
-  {
-  LM_ERR ("db_ctable parameter not set!");
-  return 0;
-  }
-pmod_data->pcfg->db_ctable.s = db_ctable;
-pmod_data->pcfg->db_ctable.len = strlen (db_ctable);
-if (!*db_qtable)
-  {
-  LM_ERR ("db_qtable parameter not set!");
-  return 0;
-  }
-pmod_data->pcfg->db_qtable.s = db_qtable;
-pmod_data->pcfg->db_qtable.len = strlen (db_qtable);
-
-/**********
-* mohdir
-* o exists?
-* o directory?
-**********/
-
-if (!*mohdir)
-  {
-  LM_ERR ("mohdir parameter not set!");
-  return 0;
-  }
-if (strlen (mohdir) > MOHDIRLEN)
-  {
-  LM_ERR ("mohdir too long!");
-  return 0;
-  }
-pmod_data->pcfg->mohdir = mohdir;
-int bfnd = 0;
-struct stat psb [1];
-if (!lstat (mohdir, psb))
-  {
-  if ((psb->st_mode & S_IFMT) == S_IFDIR)
-    { bfnd = 1; }
-  }
-if (!bfnd)
-  {
-  LM_ERR ("mohdir is not a directory!");
-  return 0;
+    LM_ERR ("db_url parameter not set!\n");
+    error = 1;
   }
 
-/**********
-* max calls
-* o valid count?
-* o alloc memory
-**********/
-
-if (moh_maxcalls < 1 || moh_maxcalls > 5000)
+  if (!db_ctable.s || db_ctable.len<=0)
   {
-  LM_ERR ("moh_maxcalls not in range of 1-5000!");
-  return 0;
+    LM_ERR ("db_ctable parameter not set!\n");
+    error = 1;
   }
-pmod_data->pcall_lst =
-  (call_lst *) shm_malloc (sizeof (call_lst) * moh_maxcalls);
-if (!pmod_data->pcall_lst)
+
+  if (!db_qtable.s || db_qtable.len<=0)
   {
-  LM_ERR ("Unable to allocate shared memory");
+    LM_ERR ("db_qtable parameter not set!\n");
+    error = 1;
+  } 
+
+  /**********
+  * mohdir
+  * o exists?
+  * o directory?
+  **********/
+
+  if (!*mohdir) {
+    LM_ERR ("mohdir parameter not set!\n");
+    error = 1;
+  } else if (strlen(mohdir) > MOHDIRLEN) {
+    LM_ERR ("mohdir too long!");
+    error = 1;
+  }
+  if (moh_maxcalls < 1 || moh_maxcalls > 5000)
+  {
+    LM_ERR ("moh_maxcalls not in range of 1-5000!");
+    error = 1;
+  }
+  if (error == 1) {
+	return 0;
+  }
+  pmod_data->pcfg->db_qtable = db_qtable;
+  pmod_data->pcfg->db_ctable = db_ctable;
+  pmod_data->pcfg->db_url = db_url;
+  pmod_data->pcfg->mohdir = mohdir;
+
+  if (!lstat (mohdir, psb))
+  {
+    if ((psb->st_mode & S_IFMT) == S_IFDIR)
+      { bfnd = 1; }
+  }
+  if (!bfnd)
+  {
+    LM_ERR ("mohdir is not a directory!\n");
+    return 0;
+  }
+
+  /**********
+  * max calls
+  * o valid count?
+  * o alloc memory
+  **********/
+
+   pmod_data->pcall_lst = (call_lst *) shm_malloc (sizeof (call_lst) * moh_maxcalls);
+   if (!pmod_data->pcall_lst) {
+       LM_ERR ("Unable to allocate shared memory");
+       return -1;
+  }
+  memset (pmod_data->pcall_lst, 0, sizeof (call_lst) * moh_maxcalls);
+  pmod_data->call_cnt = moh_maxcalls;
   return -1;
-  }
-memset (pmod_data->pcall_lst, 0, sizeof (call_lst) * moh_maxcalls);
-pmod_data->call_cnt = moh_maxcalls;
-return -1;
 }
 
 /**********
@@ -372,47 +371,47 @@ if (!init_db ())
 
 if (sl_load_api (pmod_data->psl))
   {
-  LM_ERR ("Unable to load SL module");
+  LM_ERR ("Unable to load SL module\n");
   goto initerr;
   }
 if (load_tm_api (pmod_data->ptm))
   {
-  LM_ERR ("Unable to load TM module");
+  LM_ERR ("Unable to load TM module\n");
   goto initerr;
   }
 if (load_rr_api (pmod_data->prr))
   {
-  LM_ERR ("Unable to load RR module");
+  LM_ERR ("Unable to load RR module\n");
   goto initerr;
   }
 pmod_data->fn_rtp_answer = find_export ("rtpproxy_answer", 0, 0);
 if (!pmod_data->fn_rtp_answer)
   {
-  LM_ERR ("Unable to load rtpproxy_answer");
+  LM_ERR ("Unable to load rtpproxy_answer\n");
   goto initerr;
   }
 pmod_data->fn_rtp_offer = find_export ("rtpproxy_offer", 0, 0);
 if (!pmod_data->fn_rtp_offer)
   {
-  LM_ERR ("Unable to load rtpproxy_offer");
+  LM_ERR ("Unable to load rtpproxy_offer\n");
   goto initerr;
   }
 pmod_data->fn_rtp_stream_c = find_export ("rtpproxy_stream2uac", 2, 0);
 if (!pmod_data->fn_rtp_stream_c)
   {
-  LM_ERR ("Unable to load rtpproxy_stream2uac");
+  LM_ERR ("Unable to load rtpproxy_stream2uac\n");
   goto initerr;
   }
 pmod_data->fn_rtp_stream_s = find_export ("rtpproxy_stream2uas", 2, 0);
 if (!pmod_data->fn_rtp_stream_s)
   {
-  LM_ERR ("Unable to load rtpproxy_stream2uas");
+  LM_ERR ("Unable to load rtpproxy_stream2uas\n");
   goto initerr;
   }
 pmod_data->fn_rtp_destroy = find_export ("rtpproxy_destroy", 0, 0);
 if (!pmod_data->fn_rtp_destroy)
   {
-  LM_ERR ("Unable to load rtpproxy_destroy");
+  LM_ERR ("Unable to load rtpproxy_destroy\n");
   goto initerr;
   }
 

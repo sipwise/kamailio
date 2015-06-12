@@ -10,7 +10,17 @@
 
 #include "ro_timer.h"
 #include "../../mem/shm_mem.h"
+#include "../ims_usrloc_scscf/usrloc.h"
 #include <stdlib.h>
+
+
+/* ro session flags */
+#define RO_SESSION_FLAG_NEW          (1<<0) /*!< new ro session */
+#define RO_SESSION_FLAG_INSERTED     (1<<1) /*!< session has been written to DB */
+#define RO_SESSION_FLAG_CHANGED      (1<<2) /*!< ro session has been updated */
+#define RO_SESSION_FLAG_DELETED      (1<<3) /*!< ro session has been deleted */
+
+#define MAX_PANI_LEN 100
 
 enum ro_session_event_type {
     pending,
@@ -23,16 +33,26 @@ struct diameter_avp_value {
 	str mac;
 };
 
+//used to pass data into dialog callbacks
+struct impu_data {
+    str identity;
+    str contact;
+} impu_data_t;
+
+
 struct ro_session {
-	str cdp_session_id;
+    str cdp_session_id;
     volatile int ref;
     int direction;
     struct ro_session* next;
     struct ro_session* prev;
     str ro_session_id;
     str callid;
-    str from_uri;
-    str to_uri;
+    str asserted_identity;
+    str called_asserted_identity;
+    str incoming_trunk_id;
+    str outgoing_trunk_id;
+    str pani;
     unsigned int hop_by_hop;
     struct ro_tl ro_tl;
     unsigned int reserved_secs;
@@ -47,8 +67,10 @@ struct ro_session {
     int auth_appid;
     int auth_session_type;
     int active;
-
+    unsigned int flags;
     struct diameter_avp_value avp_value;
+    int rating_group;
+    int service_identifier;
 };
 
 /*! entries in the main ro_session table */
@@ -170,7 +192,9 @@ void link_ro_session(struct ro_session *ro_session, int n);
 
 void remove_aaa_session(str *session_id);
 
-struct ro_session* build_new_ro_session(int direction, int auth_appid, int auth_session_type, str *session_id, str *callid, str *from_uri, str* to_uri, str* mac, unsigned int dlg_h_entry, unsigned int dlg_h_id, unsigned int requested_secs, unsigned int validity_timeout);
+struct ro_session* build_new_ro_session(int direction, int auth_appid, int auth_session_type, str *session_id, str *callid, str *asserted_identity, str* called_asserted_identity, 
+	str* mac, unsigned int dlg_h_entry, unsigned int dlg_h_id, unsigned int requested_secs, unsigned int validity_timeout,
+	int active_rating_group, int active_service_identifier, str *incoming_trunk_id, str *outgoing_trunk_id, str *pani);
 
 /*!
  * \brief Refefence a ro_session with locking
@@ -189,6 +213,8 @@ void ref_ro_session(struct ro_session *ro_session, unsigned int cnt);
 void unref_ro_session(struct ro_session *ro_session, unsigned int cnt);
 
 struct ro_session* lookup_ro_session(unsigned int h_entry, str *callid, int direction, unsigned int *del);
+
+void free_impu_data(struct impu_data *impu_data);
 
 
 #endif	/* RO_SESSION_HASH_H */

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Process Table
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,17 +15,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*
- * History:
- * --------
- *  2006-06-14	added process table in shared mem (dragos)
- *  2006-09-20	added profile support (-DPROFILING) (hscholz)
- *  2006-10-25	sanity check before allowing forking w/ tcp support (is_main
- *               & tcp not started yet); set is_main=0 in childs (andrei)
- *  2007-07-04	added register_fds() and get_max_open_fds(() (andrei)
- *  2010-08-19	use daemon_status_on_fork_cleanup() (andrei)
- */
-/** internal fork functions and process table.
+/** Kamailio Core :: internal fork functions and process table.
  * @file: pt.c
  * @ingroup core
  */
@@ -122,7 +110,7 @@ int init_pt(int proc_no)
 	process_lock = lock_alloc();
 	process_lock = lock_init(process_lock);
 	if (pt==0||process_count==0||process_lock==0){
-		LOG(L_ERR, "ERROR: out  of memory\n");
+		LM_ERR("out of memory\n");
 		return -1;
 	}
 	memset(pt, 0, sizeof(struct process_table)*estimated_proc_no);
@@ -147,7 +135,7 @@ int init_pt(int proc_no)
 int register_procs(int no)
 {
 	if (pt){
-		LOG(L_CRIT, "BUG: register_procs(%d) called at runtime\n", no);
+		LM_CRIT("(%d) called at runtime\n", no);
 		return -1;
 	}
 	estimated_proc_no+=no;
@@ -160,8 +148,7 @@ int register_procs(int no)
 int get_max_procs()
 {
 	if (pt==0){
-		LOG(L_CRIT, "BUG: get_max_procs() called too early "
-				"(it must _not_ be called from mod_init())\n");
+		LM_CRIT("too early (it must _not_ be called from mod_init())\n");
 		abort(); /* crash to quickly catch offenders */
 	}
 	return estimated_proc_no;
@@ -189,8 +176,7 @@ int register_fds(int no)
 int get_max_open_fds()
 {
 	if (pt==0){
-		LOG(L_CRIT, "BUG: get_max_open_fds() called too early "
-				"(it must _not_ be called from mod_init())\n");
+		LM_CRIT("too early (it must _not_ be called from mod_init())\n");
 		abort(); /* crash to quickly catch offenders */
 	}
 	return estimated_fds_no;
@@ -272,19 +258,18 @@ int fork_process(int child_id, char *desc, int make_sock)
 		sockfd[0]=sockfd[1]=-1;
 		if(make_sock && !tcp_disable){
 			 if (!is_main){
-				 LOG(L_CRIT, "BUG: fork_process(..., 1) called from a non "
+				 LM_CRIT("called from a non "
 						 "\"main\" process! If forking from a module's "
 						 "child_init() fork only if rank==PROC_MAIN or"
 						 " give up tcp send support (use 0 for make_sock)\n");
 				 goto error;
 			 }
 			 if (tcp_main_pid){
-				 LOG(L_CRIT, "BUG: fork_process(..., 1) called, but tcp main "
-						 " is already started\n");
+				 LM_CRIT("called, but tcp main is already started\n");
 				 goto error;
 			 }
 			 if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockfd)<0){
-				LOG(L_ERR, "ERROR: fork_process(): socketpair failed: %s\n",
+				LM_ERR("socketpair failed: %s\n",
 							strerror(errno));
 				goto error;
 			}
@@ -292,8 +277,7 @@ int fork_process(int child_id, char *desc, int make_sock)
 	#endif
 	lock_get(process_lock);
 	if (*process_count>=estimated_proc_no) {
-		LOG(L_CRIT, "ERROR: fork_process(): Process limit of %d exceeded."
-					" Will simulate fork fail.\n", estimated_proc_no);
+		LM_CRIT("Process limit of %d exceeded. Will simulate fork fail.\n", estimated_proc_no);
 		lock_release(process_lock);
 		goto error;
 	}	
@@ -341,9 +325,8 @@ int fork_process(int child_id, char *desc, int make_sock)
 			}
 		#endif		
 		if ((child_id!=PROC_NOCHLDINIT) && (init_child(child_id) < 0)) {
-			LOG(L_ERR, "ERROR: fork_process(): init_child failed for "
-					" process %d, pid %d, \"%s\"\n", process_no,
-					pt[process_no].pid, pt[process_no].desc);
+			LM_ERR("init_child failed for process %d, pid %d, \"%s\"\n",
+					process_no, pt[process_no].pid, pt[process_no].desc);
 			return -1;
 		}
 		return pid;
@@ -405,36 +388,31 @@ int fork_tcp_process(int child_id, char *desc, int r, int *reader_fd_1)
 	ret=-1;
 	
 	if (!is_main){
-		 LOG(L_CRIT, "BUG: fork_tcp_process() called from a non \"main\" "
-				 	"process\n");
+		 LM_CRIT("called from a non \"main\" process\n");
 		 goto error;
 	 }
 	 if (tcp_main_pid){
-		 LOG(L_CRIT, "BUG: fork_tcp_process(..., 1) called _after_ starting"
-				 	" tcp main\n");
+		 LM_CRIT("called _after_ starting tcp main\n");
 		 goto error;
 	 }
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockfd)<0){
-		LOG(L_ERR, "ERROR: fork_tcp_process(): socketpair failed: %s\n",
-					strerror(errno));
+		LM_ERR("socketpair failed: %s\n", strerror(errno));
 		goto error;
 	}
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, reader_fd)<0){
-		LOG(L_ERR, "ERROR: fork_tcp_process(): socketpair failed: %s\n",
-					strerror(errno));
+		LM_ERR("socketpair failed: %s\n", strerror(errno));
 		goto error;
 	}
 	if (tcp_fix_child_sockets(reader_fd)<0){
-		LOG(L_ERR, "ERROR: fork_tcp_process(): failed to set non blocking"
-					"on child sockets\n");
+		LM_ERR("failed to set non blocking on child sockets\n");
 		/* continue, it's not critical (it will go slower under
 		 * very high connection rates) */
 	}
 	lock_get(process_lock);
 	/* set the local process_no */
 	if (*process_count>=estimated_proc_no) {
-		LOG(L_CRIT, "ERROR: fork_tcp_process(): Process limit of %d exceeded."
-					" Simulating fork fail\n", estimated_proc_no);
+		LM_CRIT("Process limit of %d exceeded. Simulating fork fail\n",
+					estimated_proc_no);
 		lock_release(process_lock);
 		goto error;
 	}
@@ -485,9 +463,8 @@ int fork_tcp_process(int child_id, char *desc, int r, int *reader_fd_1)
 		close(reader_fd[0]);
 		if (reader_fd_1) *reader_fd_1=reader_fd[1];
 		if ((child_id!=PROC_NOCHLDINIT) && (init_child(child_id) < 0)) {
-			LOG(L_ERR, "ERROR: fork_tcp_process(): init_child failed for "
-					"process %d, pid %d, \"%s\"\n", process_no, 
-					pt[process_no].pid, pt[process_no].desc);
+			LM_ERR("init_child failed for process %d, pid %d, \"%s\"\n",
+				process_no, pt[process_no].pid, pt[process_no].desc);
 			return -1;
 		}
 		return pid;

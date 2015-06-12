@@ -1,34 +1,22 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- *
- * History:
- * --------
- * 2003-03-06  voicemail changes accepted
- * 2009-07-14  renamed which_cancel* to prepare_to_cancel* (andrei)
  *
  */
 
@@ -49,7 +37,9 @@
 #include "callid.h"
 #include "t_cancel.h"
 #include "t_suspend.h"
+#include "t_append_branches.h"
 #include "t_stats.h"
+#include "t_serial.h"
 
 /* export not usable from scripts */
 #define NO_SCRIPT	-1
@@ -133,6 +123,10 @@ struct tm_binds {
 #else
 	void* reserved5;
 #endif
+	t_append_branches_f	t_append_branches;
+	cmd_function	t_load_contacts;
+	cmd_function	t_next_contacts;
+	tset_fr_f set_fr;
 };
 
 typedef struct tm_binds tm_api_t;
@@ -180,6 +174,7 @@ int t_is_canceled(struct sip_msg* msg);
 typedef struct tm_xbinds {
 	t_on_route_f t_on_failure;
 	t_on_route_f t_on_branch;
+	t_on_route_f t_on_branch_failure;
 	t_on_route_f t_on_reply;
 	t_no_param_f t_check_trans;
 	t_no_param_f t_is_canceled;

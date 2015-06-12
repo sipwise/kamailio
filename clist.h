@@ -1,39 +1,34 @@
 /*
- * $Id$
- *
  * circular list maintenance macros
  *
  * Copyright (C) 2005 iptelorg GmbH
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
  * \file
- * \brief SIP-router core :: circular list maintenance macros
+ * \brief Kamailio core :: circular list maintenance macros
  *
+ * \author andrei
  * \ingroup core
  * Module: \ref core
  */
 
-/* History:
- * --------
- *  2005-08-08  created by andrei
- */
 
 #ifndef _clist_h
 #define _clist_h

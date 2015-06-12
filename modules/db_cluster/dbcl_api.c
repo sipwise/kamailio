@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
@@ -33,10 +33,12 @@
 #include "../../trim.h"
 #include "../../globals.h"
 #include "../../lib/srdb1/db.h"
+#include "../../timer.h"
 
 #include "dbcl_data.h"
 #include "dbcl_api.h"
 
+extern int dbcl_max_query_length;
 
 #define DBCL_READ(qfunc, command) \
 	do {\
@@ -44,6 +46,7 @@
 	int i;\
 	int j;\
 	int k;\
+	unsigned int sec = 0;\
 	db1_con_t  *dbh=NULL;\
 	dbcl_cls_t *cls=NULL;\
 	cls = (dbcl_cls_t*)_h->tail;\
@@ -60,6 +63,7 @@
 					{\
 						LM_DBG("serial operation - cluster [%.*s] (%d/%d)\n",\
 								cls->name.len, cls->name.s, i, j);\
+						sec = get_ticks();\
 						dbh = cls->rlist[i].clist[j]->dbh;\
 						if(cls->rlist[i].clist[j]->dbf.qfunc==NULL) {\
 							LM_ERR("unsupported command by db connector\n");\
@@ -73,7 +77,10 @@
 							LM_DBG("serial operation - failre on cluster"\
 									" [%.*s] (%d/%d)\n",\
 									cls->name.len, cls->name.s, i, j);\
-							dbcl_inactive_con(cls->rlist[i].clist[j]);\
+							sec = get_ticks() - sec;\
+							if(sec >= dbcl_max_query_length){\
+								dbcl_inactive_con(cls->rlist[i].clist[j]);\
+							}\
 						}\
 					}\
 				}\
@@ -87,6 +94,7 @@
 					{\
 						LM_DBG("round robin operation - cluster [%.*s] (%d/%d)\n",\
 								cls->name.len, cls->name.s, i, j);\
+						sec = get_ticks();\
 						dbh = cls->rlist[i].clist[j]->dbh;\
 						if(cls->rlist[i].clist[j]->dbf.qfunc==NULL) {\
 							LM_ERR("unsupported command by db connector\n");\
@@ -102,7 +110,10 @@
 							LM_DBG("round robin operation - failre on cluster"\
 									" [%.*s] (%d/%d)\n",\
 									cls->name.len, cls->name.s, i, j);\
-							dbcl_inactive_con(cls->rlist[i].clist[j]);\
+							sec = get_ticks() - sec;\
+							if(sec >= dbcl_max_query_length){\
+								dbcl_inactive_con(cls->rlist[i].clist[j]);\
+							}\
 						}\
 					}\
 				}\
@@ -126,6 +137,7 @@
 	int i;\
 	int j;\
 	int k;\
+	unsigned int sec = 0;\
 	db1_con_t  *dbh=NULL;\
 	dbcl_cls_t *cls=NULL;\
 	cls = (dbcl_cls_t*)_h->tail;\
@@ -144,8 +156,9 @@
 					{\
 						LM_DBG("serial operation - cluster [%.*s] (%d/%d)\n",\
 								cls->name.len, cls->name.s, i, j);\
+						sec = get_ticks();\
 						dbh = cls->wlist[i].clist[j]->dbh;\
-						if(cls->rlist[i].clist[j]->dbf.qfunc==NULL) {\
+						if(cls->wlist[i].clist[j]->dbf.qfunc==NULL) {\
 							LM_ERR("unsupported command by db connector\n");\
 							return -1;\
 						}\
@@ -157,7 +170,10 @@
 							LM_DBG("serial operation - failure on cluster"\
 									" [%.*s] (%d/%d)\n",\
 									cls->name.len, cls->name.s, i, j);\
-							dbcl_inactive_con(cls->wlist[i].clist[j]);\
+							sec = get_ticks() - sec;\
+							if(sec >= dbcl_max_query_length){\
+								dbcl_inactive_con(cls->wlist[i].clist[j]);\
+							}\
 						}\
 					}\
 				}\
@@ -171,8 +187,9 @@
 					{\
 						LM_DBG("round robin operation - cluster [%.*s] (%d/%d)\n",\
 								cls->name.len, cls->name.s, i, j);\
+						sec = get_ticks();\
 						dbh = cls->wlist[i].clist[j]->dbh;\
-						if(cls->rlist[i].clist[j]->dbf.qfunc==NULL) {\
+						if(cls->wlist[i].clist[j]->dbf.qfunc==NULL) {\
 							LM_ERR("unsupported command by db connector\n");\
 							return -1;\
 						}\
@@ -186,7 +203,10 @@
 							LM_DBG("round robin operation - failure on cluster"\
 									" [%.*s] (%d/%d)\n",\
 									cls->name.len, cls->name.s, i, j);\
-							dbcl_inactive_con(cls->wlist[i].clist[j]);\
+							sec = get_ticks() - sec;\
+							if(sec >= dbcl_max_query_length){\
+								dbcl_inactive_con(cls->wlist[i].clist[j]);\
+							}\
 						}\
 					}\
 				}\
@@ -199,8 +219,9 @@
 					{\
 						LM_DBG("parallel operation - cluster [%.*s] (%d/%d)\n",\
 								cls->name.len, cls->name.s, i, j);\
+						sec = get_ticks();\
 						dbh = cls->wlist[i].clist[j]->dbh;\
-						if(cls->rlist[i].clist[j]->dbf.qfunc==NULL) {\
+						if(cls->wlist[i].clist[j]->dbf.qfunc==NULL) {\
 							LM_ERR("unsupported command by db connector\n");\
 							return -1;\
 						}\
@@ -212,7 +233,10 @@
 							LM_DBG("parallel operation - failure on cluster"\
 									" [%.*s] (%d/%d)\n",\
 									cls->name.len, cls->name.s, i, j);\
-							dbcl_inactive_con(cls->wlist[i].clist[j]);\
+							sec = get_ticks() - sec;\
+							if(sec >= dbcl_max_query_length){\
+								dbcl_inactive_con(cls->wlist[i].clist[j]);\
+							}\
 						}\
 						ret |= rc;\
 					}\

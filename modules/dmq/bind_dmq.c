@@ -1,5 +1,4 @@
 /**
- * $Id$
  *
  * dmq module - distributed message queue
  *
@@ -19,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 #include "dmq.h"
@@ -34,6 +33,7 @@ int bind_dmq(dmq_api_t* api) {
 	api->register_dmq_peer = register_dmq_peer;
 	api->send_message = dmq_send_message;
 	api->bcast_message = bcast_dmq_message;
+	api->find_dmq_node_uri = find_dmq_node_uri2;
 	return 0;
 }
 

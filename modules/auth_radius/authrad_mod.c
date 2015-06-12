@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * -------
@@ -65,6 +65,7 @@ static char* radius_config = DEFAULT_RADIUSCLIENT_CONF;
 static int service_type = -1;
 
 int use_ruri_flag = -1;
+int ar_radius_avps_mode = 0;
 
 static char *auth_extra_str = 0;
 struct extra_attr *auth_extra = 0;
@@ -89,10 +90,11 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"radius_config",    STR_PARAM, &radius_config   },
-	{"service_type",     INT_PARAM, &service_type    },
-	{"use_ruri_flag",    INT_PARAM, &use_ruri_flag   },
-	{"auth_extra",       STR_PARAM, &auth_extra_str  },
+	{"radius_config",    PARAM_STRING, &radius_config	},
+	{"service_type",     INT_PARAM, &service_type	},
+	{"use_ruri_flag",    INT_PARAM, &use_ruri_flag	},
+	{"auth_extra",       PARAM_STRING, &auth_extra_str	},
+	{"radius_avps_mode",	 INT_PARAM, &ar_radius_avps_mode	},
 	{0, 0, 0}
 };
 

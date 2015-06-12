@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * Copyright (C) 2007-2009 Dan Pascu
  *
  * This file is part of Kamailio, a free SIP server.
@@ -16,8 +15,23 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
+ */
+
+/*!
+ * \file
+ * \brief Module interface and functions
+ * \ingroup nat_traversal
+ * Module: \ref nat_traversal
+ */
+
+/**
+ * @defgroup nat_traversal Nat
+ * @brief Kamailio nat_traversal module
+
+   The nat_traversal module provides support for handling far-end NAT
+   traversal for SIP signaling. 
  */
 
 #include <stdio.h>
@@ -248,10 +262,10 @@ static cmd_export_t commands[] = {
 
 static param_export_t parameters[] = {
     {"keepalive_interval",       INT_PARAM, &keepalive_interval},
-    {"keepalive_method",         STR_PARAM, &keepalive_params.method},
-    {"keepalive_from",           STR_PARAM, &keepalive_params.from},
-    {"keepalive_extra_headers",  STR_PARAM, &keepalive_params.extra_headers},
-    {"keepalive_state_file",     STR_PARAM, &keepalive_state_file},
+    {"keepalive_method",         PARAM_STRING, &keepalive_params.method},
+    {"keepalive_from",           PARAM_STRING, &keepalive_params.from},
+    {"keepalive_extra_headers",  PARAM_STRING, &keepalive_params.extra_headers},
+    {"keepalive_state_file",     PARAM_STRING, &keepalive_state_file},
     {0, 0, 0}
 };
 
@@ -1460,7 +1474,7 @@ FixContact(struct sip_msg *msg)
     }
 
     offset = contact->uri.s - msg->buf;
-    anchor = del_lump(msg, offset, contact->uri.len, HDR_CONTACT_F);
+    anchor = del_lump(msg, offset, contact->uri.len, (enum _hdr_types_t)HDR_CONTACT_F);
 
     if (!anchor) {
         pkg_free(buf);
@@ -1470,7 +1484,7 @@ FixContact(struct sip_msg *msg)
     len = sprintf(buf, "%.*s%s:%d%.*s", before_host.len, before_host.s,
                   newip.s, newport, after.len, after.s);
 
-    if (insert_new_lump_after(anchor, buf, len, HDR_CONTACT_F) == 0) {
+    if (insert_new_lump_after(anchor, buf, len, (enum _hdr_types_t)HDR_CONTACT_F) == 0) {
         pkg_free(buf);
         return -1;
     }

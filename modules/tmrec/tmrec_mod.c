@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * Copyright (C) 2012 Daniel-Constantin Mierla (asipto.com)
  *
  * This file is part of Kamailio, a free SIP server.
@@ -18,8 +16,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
+ */
+/*! \file
+ * \brief The TMREC module
+ * \ingroup tmrec
+ */
+
+/*! \defgroup tmrec TMREC
+ * This module provides time recurrence matching functions.
  */
 
 #include <stdio.h>
@@ -71,7 +77,7 @@ static cmd_export_t cmds[]={
 
 static param_export_t params[]={
 	{"wday",		INT_PARAM,   &tmrec_wday},
-	{"separator",   STR_PARAM,   &tmrec_separator_param},
+	{"separator",   PARAM_STRING,   &tmrec_separator_param},
 	{0, 0, 0}
 };
 

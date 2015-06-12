@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -53,6 +53,7 @@ extern const str CR_EMPTY_PREFIX;
 
 extern int mode;
 extern int cr_match_mode;
+extern int cr_avoid_failed_dests;
 
 extern int_str cr_uris_avp;
 

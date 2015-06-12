@@ -4,28 +4,29 @@
  * Copyright (C) 2005 iptelorg GmbH
  * Copyright (C) 2006 enum.at
  *
- * This file is part of sip-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * sip-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * sip-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * Exception: permission to copy, modify, propagate, and distribute a work
  * formed by combining OpenSSL toolkit software and the code in this file,
  * such as linking with software components and libraries released under
  * OpenSSL project license.
  */
-/** SIP-router TLS support :: Select interface.
+
+/** Kamailio TLS support :: Select interface.
  * @file
  * @ingroup tls
  * Module: @ref tls
@@ -101,11 +102,21 @@ enum {
 
 
 
+static struct tcp_connection* _tls_pv_con = 0;
 
+
+void tls_set_pv_con(struct tcp_connection *c)
+{
+	_tls_pv_con = c;
+}
 
 struct tcp_connection* get_cur_connection(struct sip_msg* msg)
 {
 	struct tcp_connection* c;
+
+	if(_tls_pv_con != 0)
+		return _tls_pv_con;
+
 	if (msg->rcv.proto != PROTO_TLS) {
 		ERR("Transport protocol is not TLS (bug in config)\n");
 		return 0;

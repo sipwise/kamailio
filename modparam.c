@@ -1,41 +1,27 @@
 /*
- * $Id$
- *
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * -------
- * 2003-03-20  regex support in modparam (janakj)
- * 2004-03-12  extra flag USE_FUNC_PARAM added to modparam type -
- *             instead of copying the param value, a func is called (bogdan)
- * 2005-07-01  PARAM_STRING & PARAM_STR support
  */
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: Configuration parameters for modules (modparams)
  * \ingroup core
  * Module: \ref core
  */
@@ -64,18 +50,18 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 	str s;
 
 	if (!regex) {
-		LOG(L_ERR, "set_mod_param_regex(): Invalid mod parameter value\n");
+		LM_ERR("Invalid mod parameter value\n");
 		return -5;
 	}
 	if (!name) {
-		LOG(L_ERR, "set_mod_param_regex(): Invalid name parameter value\n");
+		LM_ERR("Invalid name parameter value\n");
 		return -6;
 	}
 
 	len = strlen(regex);
 	reg = pkg_malloc(len + 2 + 1);
 	if (reg == 0) {
-		LOG(L_ERR, "set_mod_param_regex(): No memory left\n");
+		LM_ERR("No memory left\n");
 		return -1;
 	}
 	reg[0] = '^';
@@ -84,7 +70,7 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 	reg[len + 2] = '\0';
 
 	if (regcomp(&preg, reg, REG_EXTENDED | REG_NOSUB | REG_ICASE)) {
-		LOG(L_ERR, "set_mod_param_regex(): Error while compiling regular expression\n");
+		LM_ERR("Error while compiling regular expression\n");
 		pkg_free(reg);
 		return -2;
 	}
@@ -92,8 +78,7 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 	mod_found = 0;
 	for(t = modules; t; t = t->next) {
 		if (regexec(&preg, t->exports.name, 0, 0, 0) == 0) {
-			DBG("set_mod_param_regex: '%s' matches module '%s'\n",
-					regex, t->exports.name);
+			LM_DBG("'%s' matches module '%s'\n", regex, t->exports.name);
 			mod_found = 1;
 			/* PARAM_STR (PARAM_STRING) may be assigned also to PARAM_STRING(PARAM_STR) so let get both module param */
 			ptr = find_param_export(t, name, type | ((type & (PARAM_STR|PARAM_STRING))?PARAM_STR|PARAM_STRING:0), &param_type);
@@ -109,8 +94,7 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 				} else {
 					val2 = val;
 				}
-				DBG("set_mod_param_regex: found <%s> in module %s [%s]\n",
-						name, t->exports.name, t->path);
+				LM_DBG("found <%s> in module %s [%s]\n", name, t->exports.name, t->path);
 				if (param_type & PARAM_USE_FUNC) {
 					if ( ((param_func_t)(ptr))(param_type, val2) < 0) {
 						regfree(&preg);
@@ -123,7 +107,7 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 						case PARAM_STRING:
 							*((char**)ptr) = pkg_malloc(strlen((char*)val2)+1);
 							if (!*((char**)ptr)) {
-								LOG(L_ERR, "set_mod_param_regex(): No memory left\n");
+								LM_ERR("No memory left\n");
 								regfree(&preg);
 								pkg_free(reg);
 								return -1;
@@ -134,7 +118,7 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 						case PARAM_STR:
 							((str*)ptr)->s = pkg_malloc(((str*)val2)->len+1);
 							if (!((str*)ptr)->s) {
-								LOG(L_ERR, "set_mod_param_regex(): No memory left\n");
+								LM_ERR("No memory left\n");
 								regfree(&preg);
 								pkg_free(reg);
 								return -1;
@@ -151,9 +135,8 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 				}
 			}
 			else {
-				LOG(L_ERR, "set_mod_param_regex: parameter <%s>"
-							" of type <%d> not found in"
-							" module <%s>\n", name, type, t->exports.name);
+				LM_ERR("parameter <%s> of type <%d> not found in module <%s>\n",
+						name, type, t->exports.name);
 				regfree(&preg);
 				pkg_free(reg);
 				return -3;
@@ -164,7 +147,7 @@ int set_mod_param_regex(char* regex, char* name, modparam_t type, void* val)
 	regfree(&preg);
 	pkg_free(reg);
 	if (!mod_found) {
-		LOG(L_ERR, "set_mod_param_regex: No module matching <%s> found\n", regex);
+		LM_ERR("No module matching <%s> found\n", regex);
 		return -4;
 	}
 	return 0;

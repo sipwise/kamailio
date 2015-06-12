@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * pua module - presence user agent module
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -19,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 
@@ -81,6 +79,7 @@ typedef struct ua_pres{
 	void* cb_param;
 	struct ua_pres* next;
 	int ua_flag;
+	str* outbound_proxy; /* croc-not sored in db_only mode */
 	
 	/* publish */
 	str etag;
@@ -96,7 +95,6 @@ typedef struct ua_pres{
 	int cseq;
 	int version;
 /*  int watcher_count; croc-nolonger used!! */
-	str* outbound_proxy; /* croc-not sored in db_only mode */
 	str* extra_headers;
 	str record_route;
 	str remote_contact;

@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -88,6 +88,9 @@ extern str cdr_end_str;
 extern str cdr_duration_str;
 extern str acc_cdrs_table;
 extern int cdr_log_enable;
+extern int _acc_cdr_on_failed;
+
+static int string2time( str* time_str, struct timeval* time_value);
 
 /* write all basic information to buffers(e.g. start-time ...) */
 static int cdr_core2strar( struct dlg_cell* dlg,
@@ -110,13 +113,13 @@ static int cdr_core2strar( struct dlg_cell* dlg,
     duration = dlgb.get_dlg_var( dlg, (str*)&cdr_duration_str);
 
     values[0] = ( start != NULL ? *start : empty_string);
-    types[0] = ( start != NULL ? TYPE_STR : TYPE_NULL);
+    types[0] = ( start != NULL ? TYPE_DATE : TYPE_NULL);
 
     values[1] = ( end != NULL ? *end : empty_string);
-    types[1] = ( end != NULL ? TYPE_STR : TYPE_NULL);
+    types[1] = ( end != NULL ? TYPE_DATE : TYPE_NULL);
 
     values[2] = ( duration != NULL ? *duration : empty_string);
-    types[2] = ( duration != NULL ? TYPE_STR : TYPE_NULL);
+    types[2] = ( duration != NULL ? TYPE_DOUBLE : TYPE_NULL);
 
     return MAX_CDR_CORE;
 }
@@ -131,11 +134,16 @@ static int db_write_cdr( struct dlg_cell* dialog,
                       struct sip_msg* message)
 {
 	int m = 0;
+	int n = 0;
 	int i;
 	db_func_t *df=NULL;
 	db1_con_t *dh=NULL;
 	void *vf=NULL;
 	void *vh=NULL;
+	struct timeval timeval_val;
+	long long_val;
+	double double_val;
+	char * end;
 
 	if(acc_cdrs_table.len<=0)
 		return 0;
@@ -155,17 +163,66 @@ static int db_write_cdr( struct dlg_cell* dialog,
 
 	for(i=0; i<m; i++) {
 		db_cdr_keys[i] = &cdr_attrs[i];
-		VAL_TYPE(db_cdr_vals+i)=DB1_STR;
-		VAL_NULL(db_cdr_vals+i)=0;
-		VAL_STR(db_cdr_vals+i) = cdr_value_array[i];
+		switch(cdr_type_array[i]) {
+			case TYPE_NULL:
+				VAL_NULL(db_cdr_vals+i)=1;
+				break;
+			case TYPE_INT:
+				VAL_TYPE(db_cdr_vals+i)=DB1_INT;
+				VAL_NULL(db_cdr_vals+i)=0;
+				long_val = strtol(cdr_value_array[i].s, &end, 10);
+				if(errno && (errno != EAGAIN)) {
+					LM_ERR("failed to convert string to integer - %d.\n", errno);
+					goto error;
+				}
+				VAL_INT(db_cdr_vals+i) = long_val;
+				break;
+			case TYPE_STR:
+				VAL_TYPE(db_cdr_vals+i)=DB1_STR;
+				VAL_NULL(db_cdr_vals+i)=0;
+				VAL_STR(db_cdr_vals+i) = cdr_value_array[i];
+				break;
+			case TYPE_DATE:
+				VAL_TYPE(db_cdr_vals+i)=DB1_DATETIME;
+				VAL_NULL(db_cdr_vals+i)=0;
+				if(string2time(&cdr_value_array[i], &timeval_val) < 0) {
+					LM_ERR("failed to convert string to timeval.\n");
+					goto error;
+				}
+				VAL_TIME(db_cdr_vals+i) = timeval_val.tv_sec;
+				break;
+			case TYPE_DOUBLE:
+				VAL_TYPE(db_cdr_vals+i)=DB1_DOUBLE;
+				VAL_NULL(db_cdr_vals+i)=0;
+				double_val = strtod(cdr_value_array[i].s, &end);
+				if(errno && (errno != EAGAIN)) {
+					LM_ERR("failed to convert string to double - %d.\n", errno);
+					goto error;
+				}
+				VAL_DOUBLE(db_cdr_vals+i) = double_val;
+				break;
+		}
 	}
 
     /* get extra values */
-	m += extra2strar( cdr_extra,
-						message,
-						cdr_value_array + m,
-						cdr_int_array + m,
-						cdr_type_array + m);
+    if (message)
+    {
+		n += extra2strar( cdr_extra,
+							message,
+							cdr_value_array + m,
+							cdr_int_array + m,
+							cdr_type_array + m);
+		m += n;
+    } else if (cdr_expired_dlg_enable){
+        LM_WARN( "fallback to dlg_only search because of message doesn't exist.\n");
+        m += extra2strar_dlg_only( cdr_extra,
+                dialog,
+                cdr_value_array + m,
+                cdr_int_array + m,
+                cdr_type_array +m,
+                &dlgb);
+    }
+
 	for( ; i<m; i++) {
 		db_cdr_keys[i] = &cdr_attrs[i];
 		VAL_TYPE(db_cdr_vals+i)=DB1_STR;
@@ -175,22 +232,34 @@ static int db_write_cdr( struct dlg_cell* dialog,
 
 	if (df->use_table(dh, &acc_cdrs_table /*table*/) < 0) {
 		LM_ERR("error in use_table\n");
-		return -1;
+		goto error;
 	}
 
 	if(acc_db_insert_mode==1 && df->insert_delayed!=NULL) {
 		if (df->insert_delayed(dh, db_cdr_keys, db_cdr_vals, m) < 0) {
 			LM_ERR("failed to insert delayed into database\n");
-			return -1;
+			goto error;
+		}
+	} else if(acc_db_insert_mode==2 && df->insert_async!=NULL) {
+		if (df->insert_async(dh, db_cdr_keys, db_cdr_vals, m) < 0) {
+			LM_ERR("failed to insert async into database\n");
+			goto error;
 		}
 	} else {
 		if (df->insert(dh, db_cdr_keys, db_cdr_vals, m) < 0) {
 			LM_ERR("failed to insert into database\n");
-			return -1;
+			goto error;
 		}
 	}
 
+	/* Free memory allocated by acc_extra.c/extra2strar */
+	free_strar_mem( &(cdr_type_array[m-n]), &(cdr_value_array[m-n]), n, m);
 	return 0;
+
+error:
+    /* Free memory allocated by acc_extra.c/extra2strar */
+	free_strar_mem( &(cdr_type_array[m-n]), &(cdr_value_array[m-n]), n, m);
+    return -1;
 }
 #endif
 
@@ -204,6 +273,7 @@ static int log_write_cdr( struct dlg_cell* dialog,
                                          2;// -2 because of the string ending '\n\0'
     char* message_position = NULL;
     int message_index = 0;
+	int extra_index = 0;
     int counter = 0;
 
 	if(cdr_log_enable==0)
@@ -216,11 +286,23 @@ static int log_write_cdr( struct dlg_cell* dialog,
                                     cdr_type_array);
 
     /* get extra values */
-    message_index += extra2strar( cdr_extra,
-                                  message,
-                                  cdr_value_array + message_index,
-                                  cdr_int_array + message_index,
-                                  cdr_type_array + message_index);
+    if (message)
+    {
+        extra_index += extra2strar( cdr_extra,
+                                      message,
+                                      cdr_value_array + message_index,
+                                      cdr_int_array + message_index,
+                                      cdr_type_array + message_index);
+    } else if (cdr_expired_dlg_enable){
+        LM_DBG("fallback to dlg_only search because of message does not exist.\n");
+        message_index += extra2strar_dlg_only( cdr_extra,
+                                               dialog,
+                                               cdr_value_array + message_index,
+                                               cdr_int_array + message_index,
+                                               cdr_type_array + message_index,
+                                               &dlgb);
+    }
+	message_index += extra_index;
 
     for( counter = 0, message_position = cdr_message;
          counter < message_index ;
@@ -267,6 +349,9 @@ static int log_write_cdr( struct dlg_cell* dialog,
 
     LM_GEN2( cdr_facility, log_level, "%s", cdr_message);
 
+	/* free memory allocated by extra2strar, nothing is done in case no extra strings were found by extra2strar */
+    free_strar_mem( &(cdr_type_array[message_index-extra_index]), &(cdr_value_array[message_index-extra_index]),
+				   extra_index, message_index);
     return 0;
 }
 
@@ -275,11 +360,18 @@ static int write_cdr( struct dlg_cell* dialog,
                       struct sip_msg* message)
 {
 	int ret = 0;
-    if( !dialog || !message)
-    {
-        LM_ERR( "dialog or message is empty!");
-        return -1;
-    }
+
+	if( !dialog)
+	{
+		LM_ERR( "dialog is empty!");
+		return -1;
+	}
+	/* message can be null when logging expired dialogs  */
+	if ( !cdr_expired_dlg_enable && !message ){
+		LM_ERR( "message is empty!");
+		return -1;
+	}
+
 	ret = log_write_cdr(dialog, message);
 #ifdef SQL_ACC
 	ret |= db_write_cdr(dialog, message);
@@ -551,7 +643,7 @@ void cdr_on_end_confirmed( struct dlg_cell* dialog,
                         int type,
                         struct dlg_cb_params* params)
 {
-    if( !dialog || !params || !params->req)
+    if( !dialog || !params )
     {
         LM_ERR("invalid values\n!");
         return;
@@ -600,6 +692,29 @@ static void cdr_on_expired( struct dlg_cell* dialog,
     }
 
     LM_DBG("dialog '%p' expired!\n", dialog);
+    /* compute duration for timed out acknowledged dialog */
+	if ( params && params->dlg_data ) {
+		if ( (void*)CONFIRMED_DIALOG_STATE == params->dlg_data) {
+			if( set_end_time( dialog) != 0)
+			{
+				LM_ERR( "failed to set end time!\n");
+				return;
+			}	
+			
+			if( set_duration( dialog) != 0)
+			{
+				LM_ERR( "failed to set duration!\n");
+				return;
+			}
+			
+		}
+	}
+
+    if( cdr_expired_dlg_enable  && (write_cdr( dialog, 0) != 0))
+    {
+        LM_ERR( "failed to write cdr!\n");
+        return;
+    }
 }
 
 /* callback for the cleanup of a dialog. */
@@ -638,11 +753,13 @@ static void cdr_on_create( struct dlg_cell* dialog,
         return;
     }
 
-    if( dlgb.register_dlgcb( dialog, DLGCB_FAILED, cdr_on_failed, 0, 0) != 0)
-    {
-        LM_ERR("can't register create dialog FAILED callback\n");
-        return;
-    }
+	if(_acc_cdr_on_failed==1) {
+		if( dlgb.register_dlgcb( dialog, DLGCB_FAILED, cdr_on_failed, 0, 0) != 0)
+		{
+			LM_ERR("can't register create dialog FAILED callback\n");
+			return;
+		}
+	}
 
     if( dlgb.register_dlgcb( dialog, DLGCB_TERMINATED, cdr_on_end, 0, 0) != 0)
     {

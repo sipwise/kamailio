@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -47,8 +47,10 @@
 #include "transaction.h"
 #include "receiver.h"
 #include "peerstatemachine.h"
+#include "cdp_stats.h"
 
 extern unsigned int* latency_threshold_p;	/**<max delay for Diameter call */
+extern struct cdp_counters_h cdp_cnts_h;
 
 handler_list *handlers = 0; /**< list of handlers */
 gen_lock_t *handlers_lock;	/**< lock for list of handlers */
@@ -108,8 +110,8 @@ int api_callback(peer *p,AAAMessage *msg,void* ptr)
             if (elapsed_msecs > *latency_threshold_p) {
             	LM_ERR("Received diameter response outside of threshold (%d) - %ld\n", *latency_threshold_p, elapsed_msecs);
             }
-            update_stat(replies_received, 1);
-            update_stat(replies_response_time, elapsed_msecs);
+	    counter_inc(cdp_cnts_h.replies_received);
+	    counter_add(cdp_cnts_h.replies_response_time, elapsed_msecs);
 			auto_drop = t->auto_drop;
 			if (t->cb){
 				(t->cb)(0,*(t->ptr),msg, elapsed_msecs);

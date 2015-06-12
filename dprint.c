@@ -1,35 +1,27 @@
 /*
- * $Id$
- *
  * debug print 
- *
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: Debug print
  * \ingroup core
  * Module: \ref core
  */
@@ -38,6 +30,7 @@
  
 #include "globals.h"
 #include "dprint.h"
+#include "pvar.h"
  
 #include <stdarg.h>
 #include <stdio.h>
@@ -97,8 +90,7 @@ int log_facility_fixup(void *handle, str *gname, str *name, void **val)
 	int	i;
 
 	if ((i = str2facility((char *)*val)) == -1) {
-		LOG(L_ERR, "log_facility_fixup: invalid log facility: %s\n",
-			(char *)*val);
+		LM_ERR("invalid log facility: %s\n", (char *)*val);
 		return -1;
 	}
 	*val = (void *)(long)i;
@@ -367,4 +359,44 @@ void dprint_color_update(int level, char f, char b)
 		return;
 	if(f && f!='0') _log_level_colors[level - L_MIN].f = f;
 	if(b && b!='0') _log_level_colors[level - L_MIN].b = b;
+}
+
+
+/* log_prefix functionality */
+str *log_prefix_val = NULL;
+static pv_elem_t *log_prefix_pvs = NULL;
+
+#define LOG_PREFIX_SIZE	128
+static char log_prefix_buf[LOG_PREFIX_SIZE];
+static str log_prefix_str;
+
+void log_prefix_init(void)
+{
+	str s;
+	if(log_prefix_fmt==NULL)
+		return;
+	s.s = log_prefix_fmt; s.len = strlen(s.s);
+
+	if(pv_parse_format(&s, &log_prefix_pvs)<0)
+	{
+		LM_ERR("wrong format[%s]\n", s.s);
+		return;
+	}
+}
+
+void log_prefix_set(sip_msg_t *msg)
+{
+	if(log_prefix_pvs == NULL)
+		return;
+	if(msg==NULL || !(IS_SIP(msg) || IS_SIP_REPLY(msg))) {
+		log_prefix_val = NULL;
+		return;
+	}
+	log_prefix_str.s = log_prefix_buf;
+	log_prefix_str.len = LOG_PREFIX_SIZE;
+	if(pv_printf(msg, log_prefix_pvs, log_prefix_str.s, &log_prefix_str.len)<0)
+		return;
+	if(log_prefix_str.len<=0)
+		return;
+	log_prefix_val = &log_prefix_str;
 }

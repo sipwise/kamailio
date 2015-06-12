@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -92,7 +92,7 @@ int peer_manager_init(dp_config *config)
 	*endtoend_id |= rand() & 0xFFFFF;
 
 	for(i=0;i<config->peers_cnt;i++){
-		p = new_peer(config->peers[i].fqdn,config->peers[i].realm,config->peers[i].port);
+		p = new_peer(config->peers[i].fqdn,config->peers[i].realm,config->peers[i].port,config->peers[i].src_addr);
 		if (!p) continue;
 		p->is_dynamic = 0;
 		add_peer(p);
@@ -209,6 +209,8 @@ peer *get_peer_from_sock(int sock)
 peer *get_peer_from_fqdn(str fqdn,str realm)
 {
 	peer *i;
+	str dumb;
+
 	lock_get(peer_list_lock);
 	i = peer_list->head;
 	while(i){
@@ -218,7 +220,7 @@ peer *get_peer_from_fqdn(str fqdn,str realm)
 	}
 	lock_release(peer_list_lock);
 	if (!i&&config->accept_unknown_peers){
-		i = new_peer(fqdn,realm,3868);
+		i = new_peer(fqdn,realm,3868,dumb);
 		if (i){
 			i->is_dynamic=1;
 			touch_peer(i);
@@ -264,6 +266,16 @@ int peer_timer(time_t now,void *ptr)
 	while(p){
 		lock_get(p->lock);
 		n = p->next;
+
+		if (p->disabled && (p->state != Closed || p->state != Closing)) {
+			LM_DBG("Peer [%.*s] has been disabled - shutting down\n", p->fqdn.len, p->fqdn.s);
+			if (p->state == I_Open) sm_process(p, Stop, 0, 1, p->I_sock);
+			if (p->state == R_Open) sm_process(p, Stop, 0, 1, p->R_sock);
+			lock_release(p->lock);
+			p = n;
+			continue;
+		}
+
 		if (p->activity+config->tc<=now){
 			LM_INFO("peer_timer(): Peer %.*s \tState %d \n",p->fqdn.len,p->fqdn.s,p->state);
 			switch (p->state){
@@ -274,8 +286,10 @@ int peer_timer(time_t now,void *ptr)
 						free_peer(p,1);
 						break;
 					}
-					touch_peer(p);
-					sm_process(p,Start,0,1,0);
+					if (!p->disabled) {
+						touch_peer(p);
+						sm_process(p,Start,0,1,0);
+					}
 					break;
 				/* timeouts */
 				case Wait_Conn_Ack:
@@ -293,10 +307,12 @@ int peer_timer(time_t now,void *ptr)
 						p->waitingDWA = 0;
 						if (p->state==I_Open) sm_process(p,I_Peer_Disc,0,1,p->I_sock);
 						if (p->state==R_Open) sm_process(p,R_Peer_Disc,0,1,p->R_sock);
+						LM_WARN("Inactivity on peer [%.*s] and no DWA, Closing peer...\n", p->fqdn.len, p->fqdn.s);
 					} else {
 						p->waitingDWA = 1;
 						Snd_DWR(p);
 						touch_peer(p);
+						LM_WARN("Inactivity on peer [%.*s], sending DWR... - if we don't get a reply, the peer will be closed\n", p->fqdn.len, p->fqdn.s);
 					}
 					break;
 				/* ignored states */

@@ -3,7 +3,7 @@
  * 
  * Copyright (C) 2005-2010 iptelorg GmbH
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
 /** main tls part (implements the tls hooks that are called from the tcp code).
  * @file tls_server.h
  * @ingroup tls
@@ -93,4 +94,6 @@ int tls_h_fix_read_conn(struct tcp_connection *c);
 
 int tls_connect(struct tcp_connection *c, int* error);
 int tls_accept(struct tcp_connection *c, int* error);
+
+void tls_lookup_event_routes(void);
 #endif /* _TLS_SERVER_H */

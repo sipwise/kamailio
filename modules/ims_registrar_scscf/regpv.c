@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*!
@@ -455,7 +455,7 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 		return -1;
 	}
 
-	ptr = r->contacts;
+	ptr = 0;//r->contacts;TODO
 	ptr0 = NULL;
 	n = 0;
 	while(ptr)
@@ -470,8 +470,8 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 			goto error;
 		}
 		memcpy(c0, ptr, ilen);
-		c0->domain = NULL;
-		c0->aor = NULL;
+		//c0->domain = {0,0};//NULL;TODO
+		//c0->aor = {0,0};//NULL;
 		c0->next = NULL;
 		c0->prev = NULL;
 

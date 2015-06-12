@@ -24,12 +24,6 @@
  * Module: @ref tls
  */
 
-/*
- * History:
- * --------
- *  2010-05-27  initial version (andrei)
-*/
-
 #ifndef __tls_cfg_h
 #define __tls_cfg_h
 
@@ -47,6 +41,7 @@
 struct cfg_group_tls {
 	int force_run;
 	str method;
+	str server_name;
 	int verify_cert;
 	int verify_depth;
 	int require_cert;

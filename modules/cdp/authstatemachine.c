@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
@@ -145,7 +145,7 @@ void add_auth_session_timers(cdp_auth_session_t *x, AAAMessage *msg) {
         }
         set_4bytes(data, v);
         avp = AAACreateAVP(AVP_Authorization_Lifetime, AAA_AVP_FLAG_MANDATORY, 0, data, 4, AVP_DUPLICATE_DATA);
-        if (avp) AAAAddAVPToMessage(msg, avp, 0);
+        if (avp) AAAAddAVPToMessage(msg, avp, msg->avpList.tail);
     }
     if (x->lifetime != -1) {
         avp = AAAFindMatchingAVP(msg, 0, AVP_Auth_Grace_Period, 0, 0);
@@ -153,7 +153,7 @@ void add_auth_session_timers(cdp_auth_session_t *x, AAAMessage *msg) {
             v = x->grace_period;
             set_4bytes(data, v);
             avp = AAACreateAVP(AVP_Auth_Grace_Period, AAA_AVP_FLAG_MANDATORY, 0, data, 4, AVP_DUPLICATE_DATA);
-            if (avp) AAAAddAVPToMessage(msg, avp, 0);
+            if (avp) AAAAddAVPToMessage(msg, avp, msg->avpList.tail);
         }
     }
     avp = AAAFindMatchingAVP(msg, 0, AVP_Session_Timeout, 0, 0);
@@ -165,7 +165,7 @@ void add_auth_session_timers(cdp_auth_session_t *x, AAAMessage *msg) {
         }
         set_4bytes(data, v);
         avp = AAACreateAVP(AVP_Session_Timeout, AAA_AVP_FLAG_MANDATORY, 0, data, 4, AVP_DUPLICATE_DATA);
-        if (avp) AAAAddAVPToMessage(msg, avp, 0);
+        if (avp) AAAAddAVPToMessage(msg, avp, msg->avpList.tail);
     }
 }
 
@@ -243,14 +243,12 @@ inline int auth_client_statefull_sm_process(cdp_session_t* s, int event, AAAMess
                     //LM_INFO("state machine: i was in pending and i am going to open\n");
                     break;
                 case AUTH_EV_RECV_ANS_UNSUCCESS:
-                    x->state = AUTH_ST_DISCON;
-                    //LM_INFO("state machine: i was in pending and i am going to discon\n");
-                    Send_STR(s, msg);
-                    break;
+		    LM_DBG("In state AUTH_ST_PENDING and received AUTH_EV_RECV_ANS_UNSUCCESS - nothing to do but clean up session\n");
                 case AUTH_EV_SESSION_TIMEOUT:
                 case AUTH_EV_SERVICE_TERMINATED:
                 case AUTH_EV_SESSION_GRACE_TIMEOUT:
                     cdp_session_cleanup(s, NULL);
+		    s=0;
                     break;
 
                 default:
@@ -784,7 +782,8 @@ void Send_STR(cdp_session_t* s, AAAMessage* msg) {
     AAAAddAVPToMessage(str, avp, str->avpList.tail);
     //todo - add all the other avps
 
-    p = get_routing_peer(str);
+    /* we are already locked on the auth session*/
+    p = get_routing_peer(s, str);
 
     if (!p) {
         LM_ERR("unable to get routing peer in Send_STR \n");
@@ -822,7 +821,7 @@ void Send_ASR(cdp_session_t* s, AAAMessage* msg) {
     AAAAddAVPToMessage(asr, avp, asr->avpList.tail);
     //todo - add all the other avps
 
-    p = get_routing_peer(asr);
+    p = get_routing_peer(s, asr);
     if (!p) {
         LM_ERR("unable to get routing peer in Send_ASR \n");
         if (asr) AAAFreeMessage(&asr); //needed in frequency

@@ -1,33 +1,27 @@
-
 /*
- * $Id$
- *
  * Copyright (C)  2007-2008 Voice Sistem SRL
  *
- * This file is part of SIP-router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * SIP-router is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * SIP-router is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2007-08-01 initial version (ancuta onofrei)
  */
 
 /*!
  * \file
- * \brief SIP-router dialplan :: Module interface
+ * \brief Kamailio dialplan :: Module interface
  * \ingroup dialplan
  * Module: \ref dialplan
  */
@@ -46,18 +40,25 @@
 
 #define MAX_REPLACE_WITH	10
 
-typedef struct dpl_node{
-	int dpid;
-	int pr;
-	int matchop;
-	int matchlen;
-	str match_exp, subst_exp, repl_exp; /*keeping the original strings*/
-	pcre *match_comp, *subst_comp; /*compiled patterns*/
-	struct subst_expr * repl_comp; 
-	str attrs;
+#define DP_TFLAGS_PV_MATCH		(1 << 0)
+#define DP_TFLAGS_PV_SUBST		(1 << 1)
 
-	struct dpl_node * next; /*next rule*/
-}dpl_node_t, *dpl_node_p;
+typedef struct dpl_node {
+	int dpid;         /* dialplan id */
+	int pr;           /* priority */
+	int matchop;      /* matching operator */
+	int matchlen;     /* matching value length */
+	str match_exp;    /* match-first string */
+	str subst_exp;    /* match string with subtitution groupping */
+	str repl_exp;     /* replacement expression string */
+	pcre *match_comp; /* compiled matching expression */
+	pcre *subst_comp; /* compiled substitution expression */
+	struct subst_expr *repl_comp; /* compiled replacement */
+	str attrs;        /* attributes string */
+	unsigned int tflags; /* flags for type of values for matching */
+
+	struct dpl_node * next; /* next rule */
+} dpl_node_t, *dpl_node_p;
 
 /*For every distinct length of a matching string*/
 typedef struct dpl_index{
@@ -96,5 +97,7 @@ dpl_id_p select_dpid(int id);
 struct subst_expr* repl_exp_parse(str subst);
 void repl_expr_free(struct subst_expr *se);
 int translate(struct sip_msg *msg, str user_name, str* repl_user, dpl_id_p idp, str *);
-int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule,  str *);
+int rule_translate(struct sip_msg *msg, str , dpl_node_t * rule, pcre *subst_comp,  str *);
+
+pcre *reg_ex_comp(const char *pattern, int *cap_cnt, int mtype);
 #endif

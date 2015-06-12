@@ -1,6 +1,4 @@
-/**
- * $Id$
- *
+/*
  * Copyright (C) 2008 Elena-Ramona Modroiu (asipto.com)
  *
  * This file is part of kamailio, a free SIP server.
@@ -17,12 +15,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
  * \ingroup sqlops
- * \brief SIP-router SQL-operations :: API
+ * \brief Kamailio SQL-operations :: API
  *
  * - Module: \ref sqlops
  */
@@ -199,14 +197,16 @@ sql_result_t* sql_get_result(str *name)
 			return sr;
 		sr = sr->next;
 	}
-	sr = (sql_result_t*)pkg_malloc(sizeof(sql_result_t));
+	sr = (sql_result_t*)pkg_malloc(sizeof(sql_result_t) + name->len);
 	if(sr==NULL)
 	{
 		LM_ERR("no pkg memory\n");
 		return NULL;
 	}
 	memset(sr, 0, sizeof(sql_result_t));
-	sr->name = *name;
+	memcpy(sr+1, name->s, name->len);
+	sr->name.s = (char *)(sr + 1);
+	sr->name.len = name->len;
 	sr->resid = resid;
 	sr->next = _sql_result_root;
 	_sql_result_root = sr;
@@ -261,7 +261,8 @@ int sql_do_query(sql_con_t *con, str *query, sql_result_t *res)
 	}
 	if(con->dbf.raw_query(con->dbh, query, &db_res)!=0)
 	{
-		LM_ERR("cannot do the query\n");
+		LM_ERR("cannot do the query [%.*s]\n",
+				(query->len>32)?32:query->len, query->s);
 		return -1;
 	}
 
@@ -413,6 +414,25 @@ error:
 	con->dbf.free_result(con->dbh, db_res);
 	sql_reset_result(res);
 	return -1;
+}
+
+int sql_do_query_async(sql_con_t *con, str *query)
+{
+	if(query==NULL)
+	{
+		LM_ERR("bad parameters\n");
+		return -1;
+	}
+	if(con->dbf.raw_query_async==NULL) {
+		LM_ERR("the db driver module doesn't support async query\n");
+		return -1;
+	}
+	if(con->dbf.raw_query_async(con->dbh, query)!=0)
+	{
+		LM_ERR("cannot do the query\n");
+		return -1;
+	}
+	return 1;
 }
 
 #ifdef WITH_XAVP
@@ -665,6 +685,7 @@ void sql_destroy(void)
 		pkg_free(r);
 		r = r0;
 	}
+	_sql_result_root = NULL;
 }
 
 /**
@@ -743,7 +764,7 @@ int sqlops_is_null(str *sres, int i, int j)
 		LM_ERR("row index out of bounds [%d/%d]\n", i, res->nrows);
 		goto error;
 	}
-	if(i>=res->ncols)
+	if(j>=res->ncols)
 	{
 		LM_ERR("column index out of bounds [%d/%d]\n", j, res->ncols);
 		goto error;

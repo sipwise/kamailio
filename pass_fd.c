@@ -1,44 +1,26 @@
 /*
- * $Id$
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of ser, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
- * ser is free software; you can redistribute it and/or modify
+ * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * For a license to use the ser software under conditions
- * other than those described here, or to purchase support for this
- * software, please contact iptel.org by e-mail at the following addresses:
- *    info@iptel.org
- *
- * ser is distributed in the hope that it will be useful,
+ * Kamailio is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
- /*
-  * History:
-  * --------
-  *  2002-11-29  created by andrei
-  *  2003-02-20  added solaris support (! HAVE_MSGHDR_MSG_CONTROL) (andrei)
-  *  2003-11-03  added send_all, recv_all  and updated send/get_fd
-  *               to handle signals  (andrei)
-  *  2005-06-13  added flags to recv_all & receive_fd, to allow full blocking
-  *              or semi-nonblocking mode (andrei)
-  *  2008-04-30  added MSG_WAITALL emulation for cygwin (andrei)
-  */
 
 /*!
  * \file
- * \brief SIP-router core :: 
+ * \brief Kamailio core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -61,7 +43,7 @@
 
 
 
-/* receive all the data or returns error (handles EINTR etc.)
+/** receive all the data or returns error (handles EINTR etc.)
  * params: socket
  *         data     - buffer for the results
  *         data_len - 
@@ -99,7 +81,7 @@ again:
 		if (errno==EINTR) goto again; /* signal, try again */
 		/* on EAGAIN just return (let the caller know) */
 		if ((errno==EAGAIN)||(errno==EWOULDBLOCK)) return n;
-			LOG(L_CRIT, "ERROR: recv_all: 1st recv on %d failed: %s\n",
+			LM_CRIT("1st recv on %d failed: %s\n",
 					socket, strerror(errno));
 			return n;
 	}
@@ -124,13 +106,13 @@ poll_retry:
 				n=poll(&pfd, 1, -1);
 				if (n<0){ 
 					if (errno==EINTR) goto poll_retry;
-					LOG(L_CRIT, "ERROR: recv_all: poll on %d failed: %s\n",
-								socket, strerror(errno));
+					LM_CRIT("poll on %d failed: %s\n",
+						socket, strerror(errno));
 					return n;
 				} else continue; /* try recv again */
 			}
 #endif /* NO_MSG_WAITALL */
-			LOG(L_CRIT, "ERROR: recv_all: 2nd recv on %d failed: %s\n",
+			LM_CRIT("2nd recv on %d failed: %s\n",
 					socket, strerror(errno));
 			return n;
 		}
@@ -141,7 +123,7 @@ poll_retry:
 
 
 
-/* sends all data (takes care of signals) (assumes blocking fd)
+/** sends all data (takes care of signals) (assumes blocking fd)
  * returns number of bytes sent or < 0 for an error */
 int send_all(int socket, void* data, int data_len)
 {
@@ -153,14 +135,14 @@ again:
 			/* error */
 		if (errno==EINTR) goto again; /* signal, try again */
 		if ((errno!=EAGAIN) &&(errno!=EWOULDBLOCK))
-			LOG(L_CRIT, "ERROR: send_all: send on %d failed: %s\n",
+			LM_CRIT("send on %d failed: %s\n",
 					socket, strerror(errno));
 	}
 	return n;
 }
 
 
-/* at least 1 byte must be sent! */
+/** at least 1 byte must be sent! */
 int send_fd(int unix_socket, void* data, int data_len, int fd)
 {
 	struct msghdr msg;
@@ -205,8 +187,8 @@ again:
 	if (ret<0){
 		if (errno==EINTR) goto again;
 		if ((errno!=EAGAIN) && (errno!=EWOULDBLOCK))
-			LOG(L_CRIT, "ERROR: send_fd: sendmsg failed sending %d on %d:"
-						" %s (%d)\n", fd, unix_socket, strerror(errno), errno);
+			LM_CRIT("sendmsg failed sending %d on %d: %s (%d)\n",
+				fd, unix_socket, strerror(errno), errno);
 	}
 	
 	return ret;
@@ -214,7 +196,7 @@ again:
 
 
 
-/* receives a fd and data_len data
+/** receives a fd and data_len data
  * params: unix_socket 
  *         data
  *         data_len
@@ -278,24 +260,24 @@ poll_again:
 				ret=poll(&pfd, 1, -1);
 				if (ret>=0) goto again;
 				else if (errno==EINTR) goto poll_again;
-				LOG(L_CRIT, "ERROR: receive_fd: poll on %d failed: %s\n",
-							unix_socket, strerror(errno));
+				LM_CRIT("poll on %d failed: %s\n",
+					unix_socket, strerror(errno));
 			}
 #endif /* NO_MSG_WAITALL */
 			goto error;
 		}
-		LOG(L_CRIT, "ERROR: receive_fd: recvmsg on %d failed: %s\n",
+		LM_CRIT("recvmsg on %d failed: %s\n",
 				unix_socket, strerror(errno));
 		goto error;
 	}
 	if (ret==0){
 		/* EOF */
-		LOG(L_CRIT, "ERROR: receive_fd: EOF on %d\n", unix_socket);
+		LM_CRIT("EOF on %d\n", unix_socket);
 		goto error;
 	}
 	if (ret<data_len){
-		LOG(L_WARN, "WARNING: receive_fd: too few bytes read (%d from %d)"
-				    "trying to fix...\n", ret, data_len);
+		LM_WARN("too few bytes read (%d from %d) trying to fix...\n",
+				ret, data_len);
 		/* blocking recv_all */
 		n=recv_all(unix_socket, (char*)data+ret, data_len-ret, MSG_WAITALL);
 		if (n>=0) ret+=n;
@@ -309,21 +291,20 @@ poll_again:
 	cmsg=CMSG_FIRSTHDR(&msg);
 	if ((cmsg!=0) && (cmsg->cmsg_len==CMSG_LEN(sizeof(new_fd)))){
 		if (cmsg->cmsg_type!= SCM_RIGHTS){
-			LOG(L_ERR, "ERROR: receive_fd: msg control type != SCM_RIGHTS\n");
+			LM_ERR("msg control type != SCM_RIGHTS\n");
 			ret=-1;
 			goto error;
 		}
 		if (cmsg->cmsg_level!= SOL_SOCKET){
-			LOG(L_ERR, "ERROR: receive_fd: msg level != SOL_SOCKET\n");
+			LM_ERR("msg level != SOL_SOCKET\n");
 			ret=-1;
 			goto error;
 		}
 		pi=(int*) CMSG_DATA(cmsg);
 		*fd=*pi;
 	}else{
-		/*
-		LOG(L_ERR, "ERROR: receive_fd: no descriptor passed, cmsg=%p,"
-				"len=%d\n", cmsg, (unsigned)cmsg->cmsg_len); */
+		/*LM_ERR("no descriptor passed, cmsg=%p, len=%d\n",
+			cmsg, (unsigned)cmsg->cmsg_len); */
 		*fd=-1;
 		/* it's not really an error */
 	}
@@ -331,8 +312,8 @@ poll_again:
 	if (msg.msg_accrightslen==sizeof(int)){
 		*fd=new_fd;
 	}else{
-		/*LOG(L_ERR, "ERROR: receive_fd: no descriptor passed,"
-				" accrightslen=%d\n", msg.msg_accrightslen); */
+		/*LM_ERR("no descriptor passed, accrightslen=%d\n",
+			msg.msg_accrightslen); */
 		*fd=-1;
 	}
 #endif

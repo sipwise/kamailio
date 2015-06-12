@@ -15,11 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*!
@@ -73,6 +70,7 @@ void msg_presentity_clean(unsigned int ticks,void *param)
 	int i = 0, num_watchers = 0;
 	presentity_t pres;
 	str uri = {0, 0}, event, *rules_doc = NULL;
+	static str query_str;
 
 	LM_DBG("cleaning expired presentity information\n");
 	if (pa_dbf.use_table(pa_db, &presentity_table) < 0) 
@@ -100,7 +98,7 @@ void msg_presentity_clean(unsigned int ticks,void *param)
 	result_cols[etag_col=n_result_cols++] = &str_etag_col;
 	result_cols[event_col=n_result_cols++] = &str_event_col;
 
-	static str query_str = str_init("username");
+	query_str = str_username_col;
 	if (db_fetch_query(&pa_dbf, pres_fetch_rows, pa_db, db_keys, db_ops,
 				db_vals, result_cols, n_db_cols, n_result_cols,
 				&query_str, &result) < 0)

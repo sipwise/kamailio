@@ -1,6 +1,4 @@
 /*
- * $Id: urecord.c 5241 2008-11-21 12:52:25Z henningw $ 
- *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,13 +15,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ---------
- * 2003-03-12 added replication mark and zombie state support (nils)
- * 2004-03-17 generic callbacks added (bogdan)
- * 2004-06-07 updated to the new DB api (andrei)
  */
 
 /*! \file

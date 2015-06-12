@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  *
  *
@@ -63,6 +63,10 @@
 struct AAA_AVP_List;
 struct AAAMessage;
 enum dialog_direction;
+
+int audio_default_bandwidth;
+int video_default_bandwidth;
+
 
 /*helper*/
 int rx_add_framed_ip_avp(AAA_AVP_LIST * list, str ip, uint16_t version);

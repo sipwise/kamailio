@@ -1,9 +1,8 @@
 /**
- * $Id$
  *
  * Copyright (C) 2009 SIP-Router.org
  *
- * This file is part of Extensible SIP Router, a free SIP server.
+ * This file is part of Kamailio, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +18,7 @@
  */
 /*!
  * \file
- * \brief SIP-router topoh :: 
+ * \brief Kamailio topoh :: 
  * \ingroup topoh
  * Module: \ref topoh
  */
@@ -73,7 +72,6 @@ void th_mask_init(void)
 {
 	int i;
 
-	_th_key.len = strlen(_th_key.s);
 	memcpy(_th_EB64, TH_EB64I, sizeof(TH_EB64I));
 	th_shuffle(_th_EB64, 64);
 	LM_DBG("original table: %s\n", TH_EB64I);

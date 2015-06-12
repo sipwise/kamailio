@@ -1,5 +1,4 @@
 /**
- * $Id$
  *
  * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com)
  *
@@ -17,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 		       
 #ifndef _FAKED_SIP_MSG_H_
@@ -26,6 +25,7 @@
 #include "../../parser/msg_parser.h"
 
 int faked_msg_init(void);
-struct sip_msg* faked_msg_next(void);
+sip_msg_t* faked_msg_next(void);
+sip_msg_t* faked_msg_get_next(void);
 
 #endif

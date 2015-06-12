@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DBText library
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,11 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- * 
- * History:
- * --------
- * 2003-02-03 created by Daniel
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * 
  */
 
@@ -232,7 +226,7 @@ dbt_table_p dbt_load_file(const str *tbn, const str *dbn)
 						c = fgetc(fin);
 					if(c=='N' || c=='n')
 					{
-						//LM_DBG("NULL flag set!\n");
+						LM_DBG("column[%d] NULL flag set!\n", ccol+1);
 						colp->flag |= DBT_FLAG_NULL;
 					}
 					else if(colp->type==DB1_INT && dtp->auto_col<0
@@ -408,10 +402,16 @@ dbt_table_p dbt_load_file(const str *tbn, const str *dbn)
 						
 						bp = 0;
 						if(c==DBT_DELIM || 
-								(ccol == dtp->nrcols-1
-								 && (c == DBT_DELIM_R || c==EOF)))
-							dtval.nul = 1;
-						else
+							(ccol == dtp->nrcols-1
+							 && (c == DBT_DELIM_R || c==EOF))) {
+							/* If empty_string is enabled, we'll just return
+							 * an empty string and avoid NULL
+							 */
+							if (empty_string == 0) {
+								/* Default - NULL */
+								dtval.nul = 1;
+							}
+						} else
 						{
 							dtval.nul = 0;
 							while(c!=DBT_DELIM && c!=DBT_DELIM_R && c!=EOF)

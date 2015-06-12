@@ -1,6 +1,4 @@
 /**
- * $Id$
- *
  * Copyright (C) 2008 Elena-Ramona Modroiu (asipto.com)
  *
  * This file is part of Kamailio, a free SIP server.
@@ -17,17 +15,17 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /*! \file
  * \ingroup sqlops
- * \brief SIP-router SQL-operations :: Module interface
+ * \brief Kamailio SQL-operations :: Module interface
  *
  * - Module: \ref sqlops
  */
 
-/*! \defgroup sqlops SIP-Router :: SQL Operations
+/*! \defgroup sqlops Kamailio :: SQL Operations
  *  \note Kamailio module - part of modules_k
 
  * The module adds support for raw SQL queries in the configuration file.
@@ -62,6 +60,7 @@ static int bind_sqlops(sqlops_api_t* api);
 /** module functions */
 static int sql_query(struct sip_msg*, char*, char*, char*);
 static int sql_query2(struct sip_msg*, char*, char*);
+static int sql_query_async(struct sip_msg*, char*, char*);
 #ifdef WITH_XAVP
 static int sql_xquery(struct sip_msg *msg, char *dbl, char *query, char *res);
 #endif
@@ -93,6 +92,8 @@ static cmd_export_t cmds[]={
 		ANY_ROUTE},
 	{"sql_query",  (cmd_function)sql_query2, 2, fixup_sql_query, 0, 
 		ANY_ROUTE},
+	{"sql_query_async",  (cmd_function)sql_query_async, 2, fixup_sql_query, 0, 
+		ANY_ROUTE},
 #ifdef WITH_XAVP
 	{"sql_xquery",  (cmd_function)sql_xquery, 3, fixup_sql_xquery, 0, 
 		ANY_ROUTE},
@@ -106,8 +107,8 @@ static cmd_export_t cmds[]={
 };
 
 static param_export_t params[]={
-	{"sqlcon",  STR_PARAM|USE_FUNC_PARAM, (void*)sql_con_param},
-	{"sqlres",  STR_PARAM|USE_FUNC_PARAM, (void*)sql_res_param},
+	{"sqlcon",  PARAM_STRING|USE_FUNC_PARAM, (void*)sql_con_param},
+	{"sqlres",  PARAM_STRING|USE_FUNC_PARAM, (void*)sql_res_param},
 	{0,0,0}
 };
 
@@ -213,6 +214,18 @@ static int sql_query2(struct sip_msg *msg, char *dbl, char *query)
 {
 	return sql_query(msg, dbl, query, NULL);
 }
+
+static int sql_query_async(struct sip_msg *msg, char *dbl, char *query)
+{
+	str sq;
+	if(pv_printf_s(msg, (pv_elem_t*)query, &sq)!=0)
+	{
+		LM_ERR("cannot print the sql query\n");
+		return -1;
+	}
+	return sql_do_query_async((sql_con_t*)dbl, &sq);
+}
+
 
 #ifdef WITH_XAVP
 /**

@@ -1,6 +1,4 @@
 /* 
- * $Id$
- *
  * Domain table related functions
  *
  * Copyright (C) 2002-2012 Juha Heinanen
@@ -19,14 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2004-06-07  updated to the new DB api, moved reload_table here, created 
- *               domain_db_{init.bind,ver,close} (andrei)
- *  2004-09-06  is_uri_host_local() can now be called also from
- *              failure route (juhe)
  */
 
 #include "domain_mod.h"
@@ -48,7 +40,7 @@ static db_func_t domain_dbf;
 int domain_db_bind(const str* db_url)
 {
 	if (db_bind_mod(db_url, &domain_dbf )) {
-	        LM_ERR("Cannot bind to database module!");
+	        LM_ERR("Cannot bind to database module!\n");
 		return -1;
 	}
 	return 0;

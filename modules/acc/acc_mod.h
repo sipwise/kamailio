@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  * History:
  * ---------
@@ -50,6 +50,7 @@ extern int failed_transaction_flag;
 extern unsigned short failed_filter[];
 extern int detect_direction;
 extern int acc_prepare_flag;
+extern int reason_from_hf;
 
 extern int log_facility;
 extern int log_level;
@@ -59,6 +60,7 @@ extern int log_missed_flag;
 extern int cdr_enable;
 extern int cdr_start_on_confirmed;
 extern int cdr_log_facility;
+extern int cdr_expired_dlg_enable;
 
 #ifdef RAD_ACC
 extern int radius_flag;

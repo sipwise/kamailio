@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * DBText module core functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -19,16 +17,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- * 2009-03-01 added support for ORDER-BY clause by Edgar Holleis
- * 2003-06-05 fixed bug: when comparing two values and the first was less than
- *           the second one, the result of 'dbt_row_match' was always true,
- *           thanks to Gabriel, (Daniel)
- * 2003-02-04 created by Daniel
- * 
  */
 
 #include <stdio.h>
@@ -208,6 +198,11 @@ int dbt_row_match(dbt_table_p _dtp, dbt_row_p _drp, int* _lkey,
 			if(res!=0)
 				return 0;
 		}else{
+		if(!strcmp(_op[i], OP_NEQ))
+		{
+			if(res==0)
+				return 0;
+		}else{
 		if(!strcmp(_op[i], OP_LT))
 		{
 			if(res!=-1)
@@ -229,7 +224,7 @@ int dbt_row_match(dbt_table_p _dtp, dbt_row_p _drp, int* _lkey,
 				return 0;
 		}else{
 			return 0;
-		}}}}}		
+		}}}}}}
 	}
 	return 1;
 }
@@ -456,7 +451,7 @@ int dbt_cmp_val(dbt_val_p _vp, db_val_t* _v)
 					(_vp->val.int_val>_v->val.int_val)?1:0;
 
 		case DB1_BIGINT:
-			LM_ERR("BIGINT not supported");
+			LM_ERR("BIGINT not supported\n");
 			return -1;
 
 		case DB1_DOUBLE:
@@ -501,8 +496,10 @@ int dbt_cmp_val(dbt_val_p _vp, db_val_t* _v)
 		case DB1_BITMAP:
 			return (_vp->val.int_val<_v->val.bitmap_val)?-1:
 				(_vp->val.int_val>_v->val.bitmap_val)?1:0;
+		default:
+			LM_ERR("invalid datatype %d\n", VAL_TYPE(_v));
+			return -2;
 	}
-	LM_ERR("invalid datatype %d\n", VAL_TYPE(_v));
 	return -2;
 }
 
