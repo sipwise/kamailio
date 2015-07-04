@@ -14,5 +14,5 @@ sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/parallel_build.patch
 sipwise/tcap.patch
-#TODO#sipwise/usrloc_dbro.patch
+sipwise/usrloc_dbro.patch
 #TODO#sipwise/nathelper_socket_filter.patch
