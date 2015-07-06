@@ -14,5 +14,9 @@ sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/parallel_build.patch
 sipwise/tcap.patch
+# carrier support
 sipwise/usrloc_dbro.patch
-#TODO#sipwise/nathelper_socket_filter.patch
+sipwise/0001-usrloc-support-filter-by-server_id-at-get_all_uconta.patch
+sipwise/0002-usrloc-add-module-option-to-support-preload-using-se.patch
+sipwise/0003-nathelper-support-filter-contacts-by-server_id.patch
+##
