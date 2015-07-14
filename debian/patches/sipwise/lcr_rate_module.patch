@@ -43,7 +43,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/lcr_rate/lcr_rate_mod.c
-@@ -0,0 +1,324 @@
+@@ -0,0 +1,327 @@
 +/*
 + * $Id$
 + *
@@ -124,7 +124,7 @@
 +};
 +
 +static int swrate_done;
-+static SWRATE swrate_handle;
++static SWRATE *swrate_ptr;
 +
 +struct module_exports exports = {
 +	"lcr_rate",
@@ -179,8 +179,11 @@
 +static int check_swrate_init() {
 +	if (swrate_done)
 +		return 0;
-+	if (swrate_init(&swrate_handle, db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0)) {
++	swrate_ptr = swrate_new(db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0);
++	if (!swrate_ptr || !swrate_new_ok(swrate_ptr)) {
 +		LM_ERR("failed to initialized libswrate\n");
++		if (swrate_ptr)
++			swrate_free(swrate_ptr);
 +		return -1;
 +	}
 +	swrate_done = 1;
@@ -253,7 +256,7 @@
 +		LM_DBG("finding rate for peer %u\n", j->id);
 +		j->weight = i;
 +
-+		if (swrate_get_peer_ab_rate(&rate, &swrate_handle, j->id, src_user,
++		if (swrate_get_peer_ab_rate(&rate, swrate_ptr, j->id, src_user,
 +					src_domain, dst_user, dst_domain, now)) {
 +			LM_ERR("failed to get rate for call, peer id %u, user <%s>@<%s> -> <%s>@<%s>\n",
 +				j->id, src_user, src_domain, dst_user, dst_domain);
