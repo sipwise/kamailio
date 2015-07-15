@@ -1,6 +1,25 @@
 --- a/modules/pua_reginfo/usrloc_cb.c
 +++ b/modules/pua_reginfo/usrloc_cb.c
-@@ -219,9 +219,9 @@
+@@ -102,6 +102,8 @@
+ 	buf_len = snprintf(buf, sizeof(buf), "%p", record);
+ 	xmlNewProp(registration_node, BAD_CAST "id", BAD_CAST buf);
+ 
++	LM_DBG("Updated Contact %.*s, %p\n", c->c.len, c->c.s, c);
++
+ 	ptr = record->contacts;
+ 	while (ptr) {
+ 		if (VALID_CONTACT(ptr, cur_time)) {
+@@ -178,6 +180,9 @@
+ 				goto error;
+ 			}
+ 		}
++		else {
++			LM_DBG("Non valid Contact%.*s, %p\n", ptr->c.len, ptr->c.s, ptr);
++		}
+ 		ptr = ptr->next;
+ 	}
+ 
+@@ -219,9 +224,9 @@
  	str content_type;
  	udomain_t * domain;
  	urecord_t * record;
@@ -11,7 +30,7 @@
  
  	char* at = NULL;
  	char id_buf[512];
-@@ -246,9 +246,6 @@
+@@ -246,9 +251,6 @@
  		LM_ERR("Unknown Type %i\n", type);
  		return;
  	}
@@ -21,7 +40,7 @@
  
  	/* Get the UDomain for this account */
  	res = ul.get_udomain(c->domain->s, &domain);
-@@ -257,10 +254,11 @@
+@@ -257,10 +259,11 @@
  		return;
  	}
  
