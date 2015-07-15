@@ -1,6 +1,44 @@
 --- a/modules/pua_reginfo/usrloc_cb.c
 +++ b/modules/pua_reginfo/usrloc_cb.c
-@@ -219,9 +219,9 @@
+@@ -102,10 +102,14 @@
+ 	buf_len = snprintf(buf, sizeof(buf), "%p", record);
+ 	xmlNewProp(registration_node, BAD_CAST "id", BAD_CAST buf);
+ 
++	LM_DBG("Updated Contact %.*s[%.*s], %p\n", c->c.len, c->c.s,
++		c->ruid.len, c->ruid.s, *c);
++
+ 	ptr = record->contacts;
+ 	while (ptr) {
+ 		if (VALID_CONTACT(ptr, cur_time)) {
+-			LM_DBG("Contact %.*s, %p\n", ptr->c.len, ptr->c.s, ptr);
++			LM_DBG("Contact %.*s[%.*s], %p\n", ptr->c.len, ptr->c.s,
++				ptr->ruid.len, ptr->ruid.s, *ptr);
+ 			/* Contact-Node */
+ 			contact_node =xmlNewChild(registration_node, NULL, BAD_CAST "contact", NULL) ;
+ 			if( contact_node ==NULL) {
+@@ -115,8 +119,8 @@
+ 			memset(buf, 0, sizeof(buf));
+ 			buf_len = snprintf(buf, sizeof(buf), "%p", ptr);
+ 			xmlNewProp(contact_node, BAD_CAST "id", BAD_CAST buf);
+-			/* Check, if this is the modified contact: */
+-			if (ptr == c) {
++			/* Check, if this is the modified contact: using ruid */
++			if ((c->ruid.len == ptr->ruid.len) && !memcmp(c->ruid.s, ptr->ruid.s, c->ruid.len)) {
+ 				if ((type & UL_CONTACT_INSERT) || (type & UL_CONTACT_UPDATE)) {
+ 					reg_active = 1;
+ 					xmlNewProp(contact_node, BAD_CAST "state", BAD_CAST "active");
+@@ -178,6 +182,10 @@
+ 				goto error;
+ 			}
+ 		}
++		else {
++			LM_DBG("Non valid Contact%.*s[%.*s], %p\n", ptr->c.len, ptr->c.s,
++				ptr->ruid.len, ptr->ruid.s, *ptr);
++		}
+ 		ptr = ptr->next;
+ 	}
+ 
+@@ -219,9 +227,9 @@
  	str content_type;
  	udomain_t * domain;
  	urecord_t * record;
@@ -11,7 +49,7 @@
  
  	char* at = NULL;
  	char id_buf[512];
-@@ -246,9 +246,6 @@
+@@ -246,9 +254,6 @@
  		LM_ERR("Unknown Type %i\n", type);
  		return;
  	}
@@ -21,7 +59,7 @@
  
  	/* Get the UDomain for this account */
  	res = ul.get_udomain(c->domain->s, &domain);
-@@ -257,10 +254,11 @@
+@@ -257,10 +262,11 @@
  		return;
  	}
  
