@@ -1,3 +1,12 @@
+ngcp-kamailio (4.3.0-1+0~mr4.0.2.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [edfc568] update lcr_rate for new swrate
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 22 Jul 2015 23:57:07 +0200
+
 ngcp-kamailio (4.3.0-1+0~mr4.0.1.0) unstable; urgency=low
 
   [ Victor Seva ]
