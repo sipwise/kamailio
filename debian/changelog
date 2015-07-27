@@ -1,3 +1,15 @@
+ngcp-kamailio (4.3.1-1+0~mr4.1.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [3891413] update lcr_rate for new swrate
+
+  [ Victor Seva ]
+  * [f5b58c9] MT#13917 pua_reginfo fix from 4.3 branch
+  * [a88ca52] Imported Upstream version 4.3.1
+  * [6a025a4] MT#10339 remove upstream patches already on 4.3.1
+
+ -- Victor Seva <vseva@sipwise.com>  Mon, 27 Jul 2015 11:22:57 +0200
+
 ngcp-kamailio (4.3.0-1+0~mr4.1.0.0) unstable; urgency=low
 
   [ Victor Seva ]
