@@ -1,11 +1,12 @@
 --- a/Makefile.groups
 +++ b/Makefile.groups
-@@ -20,7 +20,7 @@
+@@ -20,7 +20,8 @@
  # - extra used modules, with no extra dependency
  mod_list_extra=avp auth_diameter call_control dmq domainpolicy msrp pdb \
  			     qos sca seas sms sst timer tmrec uac_redirect xhttp \
--				 xhttp_rpc xprint jsonrpc-s nosip usrloc_dmq statsd rtjson
-+				 xhttp_rpc xprint jsonrpc-s nosip usrloc_dmq statsd rtjson cfgt
+-				 xhttp_rpc xprint jsonrpc-s nosip dmq_usrloc statsd rtjson
++				 xhttp_rpc xprint jsonrpc-s nosip dmq_usrloc statsd \
++				 rtjson cfgt
  
  # - common modules depending on database
  mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \

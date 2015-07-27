@@ -3,7 +3,7 @@ Author: Victor Seva <linuxmaniac@torreviejawireless.org>
 
 --- a/Makefile.defs
 +++ b/Makefile.defs
-@@ -360,15 +360,7 @@
+@@ -362,15 +362,7 @@
  endif
  $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
  

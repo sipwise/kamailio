@@ -1,6 +1,6 @@
 --- a/Makefile.groups
 +++ b/Makefile.groups
-@@ -106,6 +106,9 @@
+@@ -107,6 +107,9 @@
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -10,7 +10,7 @@
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -209,7 +212,8 @@
+@@ -210,7 +213,8 @@
  			   $(mod_list_ev) $(mod_list_kazoo) \
  			   $(mod_list_mongodb) $(mod_list_cnxcc) \
  			   $(mod_list_jansson) $(mod_list_geoip2) \
@@ -20,7 +20,7 @@
  
  
  
-@@ -263,6 +267,8 @@
+@@ -264,6 +268,8 @@
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
