@@ -58,7 +58,7 @@ int rtjson_init(void)
 		memset(&tmb, 0, sizeof(struct tm_binds));
 	}
 	if (load_uac_api(&uacb) < 0) {
-		LM_ERR("cannot bind to UAC API - some features are diabled\n");
+		LM_NOTICE("cannot bind to UAC API - some features are diabled\n");
 		memset(&uacb, 0, sizeof(uac_api_t));
 	}
 	return 0;
@@ -312,17 +312,19 @@ error:
  */
 int rtjson_init_serial(sip_msg_t *msg, srjson_doc_t *jdoc, sr_xavp_t *iavp)
 {
+	srjson_t *tj = NULL;
 	srjson_t *nj = NULL;
 	srjson_t *rj = NULL;
 	str val;
 	unsigned int bflags = 0;
 	unsigned int old_bflags = 0;
 
-	nj = srjson_GetObjectItem(jdoc, jdoc->root, "routes");
-	if(nj==NULL || nj->type!=srjson_Array || nj->child==NULL) {
+	tj = srjson_GetObjectItem(jdoc, jdoc->root, "routes");
+	if(tj==NULL || tj->type!=srjson_Array || tj->child==NULL) {
 		LM_ERR("missing or invalid routes field\n");
 		goto error;
 	}
+	nj = tj->child;
 
 	clear_branches();
 
@@ -330,6 +332,7 @@ int rtjson_init_serial(sip_msg_t *msg, srjson_doc_t *jdoc, sr_xavp_t *iavp)
 	if(rj!=NULL && rj->type==srjson_String && rj->valuestring!=NULL) {
 		val.s = rj->valuestring;
 		val.len = strlen(val.s);
+		LM_DBG("rewrite r-uri to: [%.*s]\n", val.len, val.s);
 		if (rewrite_uri(msg, &val) < 0) {
 			LM_ERR("unable to rewrite Request-URI\n");
 			goto error;
@@ -349,6 +352,7 @@ int rtjson_init_serial(sip_msg_t *msg, srjson_doc_t *jdoc, sr_xavp_t *iavp)
 	if(rj!=NULL && rj->type==srjson_String && rj->valuestring!=NULL) {
 		val.s = rj->valuestring;
 		val.len = strlen(val.s);
+		LM_DBG("rewrite dst-uri to: [%.*s]\n", val.len, val.s);
 		if (set_dst_uri(msg, &val) < 0) {
 			LM_ERR("unable to set destination uri\n");
 			goto error;
@@ -359,6 +363,7 @@ int rtjson_init_serial(sip_msg_t *msg, srjson_doc_t *jdoc, sr_xavp_t *iavp)
 	if(rj!=NULL && rj->type==srjson_String && rj->valuestring!=NULL) {
 		val.s = rj->valuestring;
 		val.len = strlen(val.s);
+		LM_DBG("rewrite path to: [%.*s]\n", val.len, val.s);
 		if (set_path_vector(msg, &val) < 0) {
 			LM_ERR("unable to set path\n");
 			goto error;
@@ -423,6 +428,7 @@ int rtjson_prepare_branch(sip_msg_t *msg, srjson_doc_t *jdoc, srjson_t *nj)
 	}
 
 	if(xhdr.len>4) {
+		LM_DBG("appending extra headers: [%.*s]\n", xhdr.len, xhdr.s);
 		anchor = anchor_lump(msg, msg->unparsed - msg->buf, 0, 0);
 		if(anchor == 0) {
 			LM_ERR("can't get anchor\n");
@@ -532,14 +538,16 @@ error:
  */
 int rtjson_init_parallel(sip_msg_t *msg, srjson_doc_t *jdoc, sr_xavp_t *iavp)
 {
+	srjson_t *tj = NULL;
 	srjson_t *nj = NULL;
 	int ret;
 
-	nj = srjson_GetObjectItem(jdoc, jdoc->root, "routes");
-	if(nj==NULL || nj->type!=srjson_Array || nj->child==NULL) {
+	tj = srjson_GetObjectItem(jdoc, jdoc->root, "routes");
+	if(tj==NULL || tj->type!=srjson_Array || tj->child==NULL) {
 		LM_ERR("missing or invalid routes field\n");
 		goto error;
 	}
+	nj = tj->child;
 
 	ret = rtjson_init_serial(msg, jdoc, iavp);
 	if(ret<0)
@@ -569,6 +577,7 @@ int rtjson_next_route(sip_msg_t *msg)
 	sr_xavp_t *javp = NULL;
 	sr_xavp_t *iavp = NULL;
 	srjson_doc_t tdoc;
+	srjson_t *tj = NULL;
 	srjson_t *nj = NULL;
 	str val;
 	str xname;
@@ -612,11 +621,12 @@ int rtjson_next_route(sip_msg_t *msg)
 		goto error;
 	}
 
-	nj = srjson_GetObjectItem(&tdoc, tdoc.root, "routes");
-	if(nj==NULL || nj->type!=srjson_Array || nj->child==NULL) {
+	tj = srjson_GetObjectItem(&tdoc, tdoc.root, "routes");
+	if(tj==NULL || tj->type!=srjson_Array || tj->child==NULL) {
 		LM_ERR("missing or invalid routes field\n");
 		goto error;
 	}
+	nj = tj->child;
 
 	i = 0;
 	while(nj && i<iavp->val.v.i) {
@@ -646,6 +656,7 @@ int rtjson_update_branch(sip_msg_t *msg)
 	sr_xavp_t *javp = NULL;
 	sr_xavp_t *iavp = NULL;
 	srjson_doc_t tdoc;
+	srjson_t *tj = NULL;
 	srjson_t *nj = NULL;
 	str val;
 	str xname;
@@ -664,6 +675,10 @@ int rtjson_update_branch(sip_msg_t *msg)
 	iavp = xavp_get_child_with_ival(&_rtjson_xavp_name, &xname);
 	if(iavp==NULL) {
 		LM_WARN("no idx for routing\n");
+		return -1;
+	}
+	if(iavp->val.v.i<=0) {
+		LM_WARN("invalid branch idx for routing\n");
 		return -1;
 	}
 
@@ -689,14 +704,16 @@ int rtjson_update_branch(sip_msg_t *msg)
 		goto error;
 	}
 
-	nj = srjson_GetObjectItem(&tdoc, tdoc.root, "routes");
-	if(nj==NULL || nj->type!=srjson_Array || nj->child==NULL) {
+	tj = srjson_GetObjectItem(&tdoc, tdoc.root, "routes");
+	if(tj==NULL || tj->type!=srjson_Array || tj->child==NULL) {
 		LM_ERR("missing or invalid routes field\n");
 		goto error;
 	}
+	nj = tj->child;
 
 	i = 0;
-	while(nj && i<iavp->val.v.i) {
+	/* stop at number of branches - 1 */
+	while(nj && i<iavp->val.v.i-1) {
 		nj = nj->next;
 		i++;
 	}

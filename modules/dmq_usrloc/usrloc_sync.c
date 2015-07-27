@@ -96,7 +96,7 @@ void usrloc_get_all_ucontact(dmq_node_t* node)
 {
  	int rval, len=0;
 	void *buf, *cp;
-	str c;
+	str c, recv;
 	str path;
 	str ruid;
 	unsigned int aorhash;
@@ -145,6 +145,9 @@ void usrloc_get_all_ucontact(dmq_node_t* node)
             break;
         c.s = (char*)cp + sizeof(c.len);
         cp =  (char*)cp + sizeof(c.len) + c.len;
+        memcpy(&(recv.len), cp, sizeof(recv.len));
+        recv.s = (char*)cp + sizeof(recv.len);
+        cp =  (char*)cp + sizeof(recv.len) + recv.len;
         memcpy( &send_sock, cp, sizeof(send_sock));
         cp = (char*)cp + sizeof(send_sock);
         memcpy( &flags, cp, sizeof(flags));
@@ -328,7 +331,6 @@ int usrloc_dmq_handle_msg(struct sip_msg* msg, peer_reponse_t* resp, dmq_node_t*
 			LM_ERR("unrecognized field in json object\n");
 		}
 	}
-	srjson_DestroyDoc(&jdoc);
 	memset( &ci, 0, sizeof(ucontact_info_t));
 	ci.ruid = ruid;
 	ci.c = &c;
@@ -367,16 +369,19 @@ int usrloc_dmq_handle_msg(struct sip_msg* msg, peer_reponse_t* resp, dmq_node_t*
 		default:  goto invalid;
 	}
 
+	srjson_DestroyDoc(&jdoc);
 	resp->reason = dmq_200_rpl;
 	resp->resp_code = 200;
 	return 0;
 
 invalid:
+	srjson_DestroyDoc(&jdoc);
 	resp->reason = dmq_400_rpl;
 	resp->resp_code = 400;
 	return 0;
 
 error:
+	srjson_DestroyDoc(&jdoc);
 	resp->reason = dmq_500_rpl;
 	resp->resp_code = 500;
 	return 0;
