@@ -1,0 +1,113 @@
+From 2bf511ff9fd3c6abdf74a10fdc81e68ab7f9935b Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 31 Jul 2015 10:05:50 +0200
+Subject: [PATCH] jsonrpc-c: add max_conn_attempt parameter to control max
+ number of reconnections
+
+---
+ modules/jsonrpc-c/doc/jsonrpc-c_admin.xml | 15 +++++++++++++++
+ modules/jsonrpc-c/jsonrpc_io.c            | 12 +++++++++++-
+ modules/jsonrpc-c/jsonrpc_mod.c           |  3 +++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/modules/jsonrpc-c/doc/jsonrpc-c_admin.xml b/modules/jsonrpc-c/doc/jsonrpc-c_admin.xml
+index 5776d5c..8ec6648 100644
+--- a/modules/jsonrpc-c/doc/jsonrpc-c_admin.xml
++++ b/modules/jsonrpc-c/doc/jsonrpc-c_admin.xml
+@@ -91,6 +91,21 @@ modparam("jsonrpc", "servers", "localhost:9999,2 10.10.0.1:9999,2 backup.server:
+ 				</programlisting>
+ 			</example>
+ 		</section>
++		<section>
++			<title><varname>max_conn_attempts</varname> (int)</title>
++			<para>
++				Max number of connection attempts for a server. -1 will keep reconnecting
++				forever, 0 will skip any attempt to reconnect.
++			</para>
++			<example>
++				<title>Set <varname>max_conn_attempts</varname> parameter</title>
++				<programlisting format="linespecific">
++...
++modparam("jsonrpc", "max_conn_attempts", 10)
++...
++				</programlisting>
++			</example>
++		</section>
+ 	</section>
+ 	<section>
+ 		<title>Functions</title>
+diff --git a/modules/jsonrpc-c/jsonrpc_io.c b/modules/jsonrpc-c/jsonrpc_io.c
+index a6f06e5..021b45c 100644
+--- a/modules/jsonrpc-c/jsonrpc_io.c
++++ b/modules/jsonrpc-c/jsonrpc_io.c
+@@ -44,7 +44,7 @@
+ 
+ struct jsonrpc_server {
+ 	char *host;
+-	int  port, socket, status;
++	int  port, socket, status, conn_attempts;
+ 	struct jsonrpc_server *next;
+ 	struct event *ev;
+ 	struct itimerspec *timer;
+@@ -68,6 +68,9 @@ int  connect_servers(struct jsonrpc_server_group *group);
+ int  connect_server(struct jsonrpc_server *server);
+ int  handle_server_failure(struct jsonrpc_server *server);
+ 
++/* module config from jsonrpc_mod.c */
++int _jsonrpcc_max_conn_retry = 0; /* max retries to connect. -1 forever 0 none */
++
+ int jsonrpc_io_child_process(int cmd_pipe, char* _servers)
+ {
+ 	if (parse_servers(_servers, &server_group) != 0)
+@@ -346,6 +349,7 @@ int parse_servers(char *_servers, struct jsonrpc_server_group **group_ptr)
+ 		server->port = port;
+ 		server->status = JSONRPC_SERVER_DISCONNECTED;
+ 		server->socket = 0;
++		server->conn_attempts = _jsonrpcc_max_conn_retry;
+ 
+ 		int group_cnt = 0;
+ 
+@@ -443,6 +447,7 @@ int connect_server(struct jsonrpc_server *server)
+ 
+ 	server->socket = sockfd;
+ 	server->status = JSONRPC_SERVER_CONNECTED;
++	server->conn_attempts = _jsonrpcc_max_conn_retry;
+ 
+ 	struct event *socket_ev = pkg_malloc(sizeof(struct event));
+ 	CHECK_MALLOC(socket_ev);
+@@ -507,6 +512,11 @@ int handle_server_failure(struct jsonrpc_server *server)
+ 		server->ev = NULL;
+ 	}
+ 	server->status = JSONRPC_SERVER_FAILURE;
++	server->conn_attempts--;
++	if(server->conn_attempts>=_jsonrpcc_max_conn_retry) {
++		LM_ERR("max reconnect attempts. No further attempts will be made to reconnect this server.");
++		return -1;
++	}
+ 	int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+ 	
+ 	if (timerfd == -1) {
+diff --git a/modules/jsonrpc-c/jsonrpc_mod.c b/modules/jsonrpc-c/jsonrpc_mod.c
+index 49c7162..f462a14 100644
+--- a/modules/jsonrpc-c/jsonrpc_mod.c
++++ b/modules/jsonrpc-c/jsonrpc_mod.c
+@@ -48,6 +48,8 @@ int        fixup_pvar_shm(void** param, int param_no);
+ char *servers_param;
+ int  pipe_fds[2] = {-1,-1};
+ 
++extern int _jsonrpcc_max_conn_retry; /* max retries to connect */
++
+ struct tm_binds tmb;
+ 
+ /*
+@@ -65,6 +67,7 @@ static cmd_export_t cmds[]={
+  */
+ static param_export_t mod_params[]={
+ 	{"servers", PARAM_STRING, &servers_param},
++	{"max_conn_attempts", INT_PARAM, &_jsonrpcc_max_conn_retry},
+ 	{ 0,0,0 }
+ };
+ 
+-- 
+2.1.4
+
