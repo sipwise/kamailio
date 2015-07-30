@@ -1,0 +1,27 @@
+From f6b13f7b6f2d595ba7226fc00f09beabec1bcaba Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 30 Jul 2015 16:45:25 +0200
+Subject: [PATCH] jsonrpc-c: don't fail if no connection to any of the servers
+ when module is loaded
+
+---
+ modules/jsonrpc-c/jsonrpc_io.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/modules/jsonrpc-c/jsonrpc_io.c b/modules/jsonrpc-c/jsonrpc_io.c
+index f001543..a6f06e5 100644
+--- a/modules/jsonrpc-c/jsonrpc_io.c
++++ b/modules/jsonrpc-c/jsonrpc_io.c
+@@ -85,8 +85,7 @@ int jsonrpc_io_child_process(int cmd_pipe, char* _servers)
+ 
+ 	if (!connect_servers(server_group))
+ 	{
+-		LM_ERR("failed to connect to any servers\n");
+-		return -1;
++		LM_WARN("failed to connect to any servers\n");
+ 	}
+ 
+ 	event_dispatch();
+-- 
+2.1.4
+

@@ -1,0 +1,274 @@
+From 8017453ca8e594f02be2c716317934348040be0c Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 31 Jul 2015 10:08:12 +0200
+Subject: [PATCH] jsonrpc-c: support non netstring. '\n' as delimiter
+
+- add fake_rpc in order to send params as message
+---
+ modules/jsonrpc-c/jsonrpc.c     | 92 ++++++++++++++++++++++++++++++++++-------
+ modules/jsonrpc-c/jsonrpc_io.c  | 31 ++++++++++----
+ modules/jsonrpc-c/jsonrpc_mod.c |  4 ++
+ modules/jsonrpc-c/netstring.c   | 19 +++++++++
+ modules/jsonrpc-c/netstring.h   |  1 +
+ 5 files changed, 124 insertions(+), 23 deletions(-)
+
+diff --git a/modules/jsonrpc-c/jsonrpc.c b/modules/jsonrpc-c/jsonrpc.c
+index 7baed54..4f16e9e 100644
+--- a/modules/jsonrpc-c/jsonrpc.c
++++ b/modules/jsonrpc-c/jsonrpc.c
+@@ -31,6 +31,9 @@
+ 
+ #include "jsonrpc.h"
+ 
++/* module config from jsonrpc_mod.c */
++extern int _jsonrpcc_netstring; /* enable by default */
++int _jsonrpcc_fake_rpc = 0; /* disable by default */
+ 
+ jsonrpc_request_t * request_table[JSONRPC_DEFAULT_HTABLE_SIZE] = {0};
+ int next_id = 1;
+@@ -60,28 +63,42 @@ jsonrpc_request_t* build_jsonrpc_request(char *method, json_object *params, char
+ 	if (!store_request(req))
+ 		return 0;
+ 
+-	req->payload = json_object_new_object();
+-
+-	json_object_object_add(req->payload, "id", json_object_new_int(next_id));
+-	json_object_object_add(req->payload, "jsonrpc", json_object_new_string("2.0"));
+-	json_object_object_add(req->payload, "method", json_object_new_string(method));
+-	json_object_object_add(req->payload, "params", params);
+-
++	if(_jsonrpcc_fake_rpc) {
++		/* send param json + id */
++		req->payload = params;
++		json_object_object_add(req->payload, "id",
++			json_object_new_int(next_id));
++	}
++	else {
++		req->payload = json_object_new_object();
++		json_object_object_add(req->payload, "id",
++			json_object_new_int(next_id));
++		json_object_object_add(req->payload, "jsonrpc",
++			json_object_new_string("2.0"));
++		json_object_object_add(req->payload, "method",
++			json_object_new_string(method));
++		json_object_object_add(req->payload, "params", params);
++	}
+ 	return req;
+ }
+ 
+ json_object* build_jsonrpc_notification(char *method, json_object *params) 
+ {
+-	json_object *req = json_object_new_object();
+-	json_object_object_add(req, "jsonrpc", json_object_new_string("2.0"));
+-	json_object_object_add(req, "method", json_object_new_string(method));
+-	json_object_object_add(req, "params", params);
+-
+-	return req; 
++	json_object *req;
++	if(_jsonrpcc_fake_rpc) {
++		req = params;
++	}
++	else {
++		req = json_object_new_object();
++		json_object_object_add(req, "jsonrpc", json_object_new_string("2.0"));
++		json_object_object_add(req, "method", json_object_new_string(method));
++		json_object_object_add(req, "params", params);
++	}
++	return req;
+ }
+ 
+ 
+-int handle_jsonrpc_response(json_object *response)
++int handle_jsonrpc_response_netsring(json_object *response)
+ {
+ 	jsonrpc_request_t *req;	
+ 	json_object *_id = json_object_object_get(response, "id");
+@@ -117,6 +134,53 @@ int handle_jsonrpc_response(json_object *response)
+ 	return 1;
+ }
+ 
++int handle_jsonrpc_response_no_netsring(json_object *response)
++{
++	int id;
++	json_object *t = json_object_object_get(response, "connectionPermission");
++	jsonrpc_request_t *req;
++
++	if(t) {
++		id = json_object_get_int(t);
++		LM_WARN("connectionPermission:%d", id);
++		return 0;
++	}
++	/* TODO: keepalive */
++
++	t = json_object_object_get(response, "id");
++	id = json_object_get_int(t);
++	if (!(req = get_request(id))) {
++		json_object_put(response);
++		return -1;
++	}
++
++	t = json_object_object_get(response, "errorCode");
++	if (t) {
++		req->cbfunc(t, req->cbdata, 1);
++	} else {
++		LM_ERR("Response received with neither a result nor an error.\n");
++		return -1;
++	}
++
++	if (req->timer_ev) {
++		close(req->timerfd);
++		event_del(req->timer_ev);
++		pkg_free(req->timer_ev);
++	} else {
++		LM_ERR("No timer for req id %d\n", id);
++	}
++	pkg_free(req);
++	return 1;
++}
++
++int handle_jsonrpc_response(json_object *response)
++{
++	if(_jsonrpcc_netstring)
++		return handle_jsonrpc_response_netsring(response);
++	else
++		return handle_jsonrpc_response_no_netsring(response);
++}
++
+ int id_hash(int id) {
+ 	return (id % JSONRPC_DEFAULT_HTABLE_SIZE);
+ }
+diff --git a/modules/jsonrpc-c/jsonrpc_io.c b/modules/jsonrpc-c/jsonrpc_io.c
+index 9acc149..fb3244c 100644
+--- a/modules/jsonrpc-c/jsonrpc_io.c
++++ b/modules/jsonrpc-c/jsonrpc_io.c
+@@ -70,6 +70,7 @@ int  handle_server_failure(struct jsonrpc_server *server);
+ 
+ /* module config from jsonrpc_mod.c */
+ int _jsonrpcc_max_conn_retry = 0; /* max retries to connect. -1 forever 0 none */
++int _jsonrpcc_netstring = 1; /* enable by default */
+ 
+ int jsonrpc_io_child_process(int cmd_pipe, char* _servers)
+ {
+@@ -167,10 +168,16 @@ void cmd_pipe_cb(int fd, short event, void *arg)
+ 		LM_ERR("Failed to build jsonrpc_request_t (method: %s, params: %s)\n", cmd->method, cmd->params);	
+ 		return;
+ 	}
+-	char *json = (char*)json_object_get_string(payload);
+-
+ 	char *ns; size_t bytes;
+-	bytes = netstring_encode_new(&ns, json, (size_t)strlen(json));
++
++	if(_jsonrpcc_netstring) {
++		char *json = (char*)json_object_get_string(payload);
++		bytes = netstring_encode_new(&ns, json, (size_t)strlen(json));
++	}
++	else {
++		ns = (char*)json_object_get_string(payload);
++		bytes = (size_t)strlen(ns);
++	}
+ 
+ 	struct jsonrpc_server_group *g;
+ 	int sent = 0;
+@@ -252,11 +259,16 @@ void socket_cb(int fd, short event, void *arg)
+ 	}
+ 
+ 	char *netstring;
+-
+-	int retval = netstring_read_fd(fd, &netstring);
++	int retval;
++	if (_jsonrpcc_netstring) {
++		retval = netstring_read_fd(fd, &netstring);
++	}
++	else {
++		retval = no_netstring_read_fd(fd, &netstring);
++	}
+ 
+ 	if (retval != 0) {
+-		LM_ERR("bad netstring (%d)\n", retval);
++		LM_ERR("bad %sstring (%d)\n", _jsonrpcc_netstring ? "net" : "", retval);
+ 		handle_server_failure(server);
+ 		return;
+ 	}	
+@@ -264,10 +276,11 @@ void socket_cb(int fd, short event, void *arg)
+ 	struct json_object *res = json_tokener_parse(netstring);
+ 
+ 	if (res) {
+-		handle_jsonrpc_response(res);
+-		json_object_put(res);
++		if(handle_jsonrpc_response(res))
++			json_object_put(res);
+ 	} else {
+-		LM_ERR("netstring could not be parsed: (%s)\n", netstring);
++		LM_ERR("%sstring could not be parsed: (%s)\n",
++			_jsonrpcc_netstring ? "net" : "", netstring);
+ 		handle_server_failure(server);
+ 	}
+ 	pkg_free(netstring);
+diff --git a/modules/jsonrpc-c/jsonrpc_mod.c b/modules/jsonrpc-c/jsonrpc_mod.c
+index f462a14..4e7a6e1 100644
+--- a/modules/jsonrpc-c/jsonrpc_mod.c
++++ b/modules/jsonrpc-c/jsonrpc_mod.c
+@@ -49,6 +49,8 @@ char *servers_param;
+ int  pipe_fds[2] = {-1,-1};
+ 
+ extern int _jsonrpcc_max_conn_retry; /* max retries to connect */
++extern int _jsonrpcc_netstring; /* enabled by default */
++extern int _jsonrpcc_fake_rpc; /* disabled by default */
+ 
+ struct tm_binds tmb;
+ 
+@@ -68,6 +70,8 @@ static cmd_export_t cmds[]={
+ static param_export_t mod_params[]={
+ 	{"servers", PARAM_STRING, &servers_param},
+ 	{"max_conn_attempts", INT_PARAM, &_jsonrpcc_max_conn_retry},
++	{"netstring", INT_PARAM, &_jsonrpcc_netstring},
++	{"fake_rpc", INT_PARAM, &_jsonrpcc_fake_rpc},
+ 	{ 0,0,0 }
+ };
+ 
+diff --git a/modules/jsonrpc-c/netstring.c b/modules/jsonrpc-c/netstring.c
+index 6c668e4..da1bdbe 100644
+--- a/modules/jsonrpc-c/netstring.c
++++ b/modules/jsonrpc-c/netstring.c
+@@ -29,7 +29,26 @@
+ 
+ #include "../../sr_module.h"
+ #include "../../mem/mem.h"
++#define BUFFER_SIZE 1024
+ 
++int no_netstring_read_fd(int fd, char **netstring) {
++  size_t i;
++  char buffer[BUFFER_SIZE];
++
++  i = read(fd, buffer, BUFFER_SIZE);
++  if(i>0 && buffer[i-1]=='\n') {
++    *netstring = pkg_malloc(sizeof(char)*i);
++    strncpy(*netstring, buffer, i);
++  }
++  else if(i==0) {
++    return NETSTRING_ERROR_TOO_SHORT;
++  }
++  else {
++    //TODO: realloc
++    return NETSTRING_ERROR_TOO_LONG;
++  }
++  return 0;
++}
+ 
+ int netstring_read_fd(int fd, char **netstring) {
+   int i, bytes;
+diff --git a/modules/jsonrpc-c/netstring.h b/modules/jsonrpc-c/netstring.h
+index 9af5d3f..a7ace42 100644
+--- a/modules/jsonrpc-c/netstring.h
++++ b/modules/jsonrpc-c/netstring.h
+@@ -25,6 +25,7 @@
+ 
+ #include <string.h>
+ 
++int no_netstring_read_fd(int fd, char **netstring);
+ int netstring_read_fd(int fd, char **netstring);
+ 
+ int netstring_read(char *buffer, size_t buffer_length,
+-- 
+2.1.4
+
