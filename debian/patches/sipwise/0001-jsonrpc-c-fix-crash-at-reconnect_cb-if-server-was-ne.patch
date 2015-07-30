@@ -1,0 +1,33 @@
+From 0588a7bc5f57c012b6c8d188860251f402af9be7 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 30 Jul 2015 16:01:25 +0200
+Subject: [PATCH] jsonrpc-c: fix crash at reconnect_cb if server was never
+ connected
+
+---
+ modules/jsonrpc-c/jsonrpc_io.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/modules/jsonrpc-c/jsonrpc_io.c b/modules/jsonrpc-c/jsonrpc_io.c
+index 188d2e6..f001543 100644
+--- a/modules/jsonrpc-c/jsonrpc_io.c
++++ b/modules/jsonrpc-c/jsonrpc_io.c
+@@ -338,6 +338,7 @@ int parse_servers(char *_servers, struct jsonrpc_server_group **group_ptr)
+ 	
+ 		struct jsonrpc_server *server = pkg_malloc(sizeof(struct jsonrpc_server));
+ 		CHECK_MALLOC(server);
++		memset(server, 0, sizeof(struct jsonrpc_server));
+ 		char *h = pkg_malloc(strlen(host)+1);
+ 		CHECK_MALLOC(h);
+ 
+@@ -365,6 +366,7 @@ int parse_servers(char *_servers, struct jsonrpc_server_group **group_ptr)
+ 			
+ 			selected_group = pkg_malloc(sizeof(struct jsonrpc_server_group));
+ 			CHECK_MALLOC(selected_group);
++			memset(selected_group, 0, sizeof(struct jsonrpc_server_group));
+ 			selected_group->priority = priority;
+ 			selected_group->next_server = server;
+ 			
+-- 
+2.1.4
+
