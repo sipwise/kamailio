@@ -1,0 +1,339 @@
+From 2f7f97ce32950f52c3d484d2ca8291a39bca3fdf Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 3 Aug 2015 08:32:34 +0200
+Subject: [PATCH] keepalive. WIP
+
+---
+ modules/jsonrpc-c/jsonrpc.c    |  85 ++++++++++++++++++++++++++++++++---
+ modules/jsonrpc-c/jsonrpc.h    |  11 +++++
+ modules/jsonrpc-c/jsonrpc_io.c | 100 +++++++++++++++++++++++++++++++++++++++--
+ modules/jsonrpc-c/jsonrpc_io.h |   3 ++
+ 4 files changed, 190 insertions(+), 9 deletions(-)
+
+diff --git a/modules/jsonrpc-c/jsonrpc.c b/modules/jsonrpc-c/jsonrpc.c
+index 4f16e9e..749e2b5 100644
+--- a/modules/jsonrpc-c/jsonrpc.c
++++ b/modules/jsonrpc-c/jsonrpc.c
+@@ -41,21 +41,49 @@ int next_id = 1;
+ jsonrpc_request_t* get_request(int id);
+ int store_request(jsonrpc_request_t* req);
+ 
+-
+-jsonrpc_request_t* build_jsonrpc_request(char *method, json_object *params, char *cbdata, int (*cbfunc)(json_object*, char*, int))
++int get_next_id(void)
+ {
+ 	if (next_id>JSONRPC_MAX_ID) {
+ 		next_id = 1;
+ 	} else {
+ 		next_id++;
+ 	}
++	return next_id;
++}
++
++json_object* keepalive_build_res(struct json_object *json)
++{
++	json_object *req = NULL;
++	json_object *t = json_object_object_get(json, "id");
++	int id;
+ 
++	if(t) {
++		req = json_object_new_object();
++		json_object_object_add(req, "messageType",
++			json_object_new_string(JSONRPC_KEEPALIVE_RES));
++		id = json_object_get_int(t);
++		json_object_object_add(req, "id", json_object_new_int(id));
++	}
++	return req;
++}
++
++json_object* keepalive_build_req(void)
++{
++	json_object *req = json_object_new_object();
++	json_object_object_add(req, "messageType",
++		json_object_new_string(JSONRPC_KEEPALIVE_REQ));
++	json_object_object_add(req, "id", json_object_new_int(get_next_id()));
++	return req;
++}
++
++jsonrpc_request_t* build_jsonrpc_request(char *method, json_object *params, char *cbdata, int (*cbfunc)(json_object*, char*, int))
++{
+ 	jsonrpc_request_t *req = pkg_malloc(sizeof(jsonrpc_request_t));
+ 	if (!req) {
+ 		LM_ERR("Out of memory!");
+ 		return 0;
+ 	}
+-	req->id = next_id;
++	req->id = get_next_id();
+ 	req->cbfunc = cbfunc;
+ 	req->cbdata = cbdata;
+ 	req->next = NULL;
+@@ -134,26 +162,71 @@ int handle_jsonrpc_response_netsring(json_object *response)
+ 	return 1;
+ }
+ 
++int find_fakerpc_type(char *s)
++{
++	size_t size_type = strlen(s);
++	switch(size_type) {
++		case JSONRPC_KEEPALIVE_RES_SIZE:
++			if(strncmp(s, JSONRPC_KEEPALIVE_RES, size_type)==0) return 1;
++			break;
++		case JSONRPC_KEEPALIVE_REQ_SIZE:
++			if(strncmp(s, JSONRPC_KEEPALIVE_REQ, size_type)==0) return 2;
++			break;
++		case JSONRPC_FAKERPC_RES_SIZE:
++			if(strncmp(s, JSONRPC_FAKERPC_RES, size_type)==0) return 3;
++			break;
++		case JSONRPC_FAKERPC_REQ_SIZE:
++			if(strncmp(s, JSONRPC_FAKERPC_REQ, size_type)==0) return 4;
++			break;
++		default:
++			return 0;
++	}
++	return -1;
++}
++
+ int handle_jsonrpc_response_no_netsring(json_object *response)
+ {
+ 	int id;
+ 	json_object *t = json_object_object_get(response, "connectionPermission");
+ 	jsonrpc_request_t *req;
++	char *type = NULL;
+ 
+ 	if(t) {
+ 		id = json_object_get_int(t);
+ 		LM_WARN("connectionPermission:%d", id);
+ 		return 0;
+ 	}
+-	/* TODO: keepalive */
+-
++	t = json_object_object_get(response, "messageType");
++	if(t) {
++		type = (char*)json_object_get_string(t);
++	} else {
++		LM_ERR("Response received without 'messageType'.\n");
++		return -1;
++	}
++	switch(find_fakerpc_type(type)) {
++		case 1: /* JSONRPC_KEEPALIVE_RES */
++			LM_DBG("JSONRPC_KEEPALIVE_RES\n");
++			return 0;
++		case 2: /* JSONRPC_KEEPALIVE_REQ */
++			LM_ERR("Response is a JSONRPC_KEEPALIVE_REQ\n");
++			return 2;
++		case 3: /* JSONRPC_FAKERPC_RES */
++			LM_DBG("Response is a JSONRPC_FAKERPC_RES.\n");
++			break;
++		case 4: /* JSONRPC_FAKERPC_REQ */
++			LM_ERR("Response is a JSONRPC_FAKERPC_REQ.\n");
++			return -1;
++		default:
++			LM_ERR("Response received unknown 'messageType':[%s].\n", type);
++			return -1;
++	}
+ 	t = json_object_object_get(response, "id");
+ 	id = json_object_get_int(t);
+ 	if (!(req = get_request(id))) {
+ 		json_object_put(response);
+ 		return -1;
+ 	}
+-
++	/* check error response */
+ 	t = json_object_object_get(response, "errorCode");
+ 	if (t) {
+ 		req->cbfunc(t, req->cbdata, 1);
+diff --git a/modules/jsonrpc-c/jsonrpc.h b/modules/jsonrpc-c/jsonrpc.h
+index 9aa0aeb..817e52e 100644
+--- a/modules/jsonrpc-c/jsonrpc.h
++++ b/modules/jsonrpc-c/jsonrpc.h
+@@ -29,6 +29,15 @@
+ 
+ #define JSONRPC_INTERNAL_SERVER_ERROR -32603
+ 
++#define JSONRPC_KEEPALIVE_RES "heartbeatResponse"
++#define JSONRPC_KEEPALIVE_RES_SIZE 17
++#define JSONRPC_KEEPALIVE_REQ "heartbeatRequest"
++#define JSONRPC_KEEPALIVE_REQ_SIZE 16
++#define JSONRPC_FAKERPC_RES "npResponse"
++#define JSONRPC_FAKERPC_RES_SIZE 10
++#define JSONRPC_FAKERPC_REQ "npRequest"
++#define JSONRPC_FAKERPC_REQ_SIZE 9
++
+ #include <json.h>
+ #include <event.h>
+ 
+@@ -47,5 +56,7 @@ json_object* build_jsonrpc_notification(char *method, json_object *params);
+ jsonrpc_request_t* build_jsonrpc_request(char *method, json_object *params, char *cbdata, int (*cbfunc)(json_object*, char*, int));
+ int handle_jsonrpc_response(json_object *response);
+ void void_jsonrpc_request(int id);
++json_object* keepalive_build_res(struct json_object *json);
++json_object* keepalive_build_req(void);
+ #endif /* _JSONRPC_H_ */
+ 
+diff --git a/modules/jsonrpc-c/jsonrpc_io.c b/modules/jsonrpc-c/jsonrpc_io.c
+index 3aa9c7d..fb0d812 100644
+--- a/modules/jsonrpc-c/jsonrpc_io.c
++++ b/modules/jsonrpc-c/jsonrpc_io.c
+@@ -46,8 +46,8 @@ struct jsonrpc_server {
+ 	char *host;
+ 	int  port, socket, status, conn_attempts;
+ 	struct jsonrpc_server *next;
+-	struct event *ev;
+-	struct itimerspec *timer;
++	struct event *ev, *ev_keepalive;
++	struct itimerspec *timer, *timer_keepalive;
+ };
+ 
+ struct jsonrpc_server_group {
+@@ -71,6 +71,80 @@ int  handle_server_failure(struct jsonrpc_server *server);
+ /* module config from jsonrpc_mod.c */
+ int _jsonrpcc_max_conn_retry = 0; /* max retries to connect. -1 forever 0 none */
+ int _jsonrpcc_netstring = 1; /* enable by default */
++extern int _jsonrpcc_fake_rpc; /* disable by default */
++
++void keepalive_send(struct jsonrpc_server *server, json_object *req)
++{
++	char *ns;
++	size_t bytes;
++
++	/* send throw the socket directly */
++	if (server->status == JSONRPC_SERVER_CONNECTED) {
++		ns = (char*)json_object_get_string(req);
++		bytes = (size_t)strlen(ns);
++		if (send(server->socket, ns, bytes, 0) == bytes) {
++			LM_DBG("keepalive '%s' sent\n", ns);
++		} else {
++			LM_ERR("error sending keepalive '%s'", ns);
++		}
++	}
++	else {
++		LM_DBG("server not connected!!\n");
++		handle_server_failure(server);
++	}
++}
++
++void keepalive_cb(int fd, short event, void *arg)
++{
++	struct jsonrpc_server *server = (struct jsonrpc_server*)arg;
++	json_object *req = keepalive_build_req();
++	if(req) {
++		keepalive_send(server, req);
++	}
++	event_dispatch();
++}
++
++int set_keepalive_event(struct jsonrpc_server *server)
++{
++	LM_INFO("Setting interval timer keepalive to %s on port %d in %d secs.\n",
++		server->host, server->port, JSONRPC_KEEPALIVE_INTERVAL);
++
++	if (server->ev_keepalive != NULL) {
++		event_del(server->ev_keepalive);
++		pkg_free(server->ev_keepalive);
++		server->ev_keepalive = NULL;
++	}
++
++	int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
++
++	if (timerfd == -1) {
++		LM_ERR("Could not create timerfd to schedule keepalive.");
++		return -1;
++	}
++
++	struct itimerspec *itime = pkg_malloc(sizeof(struct itimerspec));
++	CHECK_MALLOC(itime);
++	memset(itime, 0, sizeof(struct itimerspec));
++	itime->it_interval.tv_sec = JSONRPC_KEEPALIVE_INTERVAL;
++
++	if (timerfd_settime(timerfd, 0, itime, NULL) == -1)
++	{
++		LM_ERR("Could not set timer to reschedule keepalive");
++		return -1;
++	}
++	LM_DBG("timerfd value is %d\n", timerfd);
++	struct event *timer_ev = pkg_malloc(sizeof(struct event));
++	CHECK_MALLOC(timer_ev);
++	event_set(timer_ev, timerfd, EV_PERSIST, keepalive_cb, server);
++	if(event_add(timer_ev, NULL) == -1) {
++		LM_ERR("event_add failed while rescheduling keepalive (%s)",
++			strerror(errno));
++		return -1;
++	}
++	server->ev_keepalive = timer_ev;
++	server->timer_keepalive = itime;
++	return 0;
++}
+ 
+ int jsonrpc_io_child_process(int cmd_pipe, char* _servers)
+ {
+@@ -280,8 +354,15 @@ void socket_cb(int fd, short event, void *arg)
+ 	struct json_object *res = json_tokener_parse(netstring);
+ 
+ 	if (res) {
+-		if(handle_jsonrpc_response(res))
++		retval = handle_jsonrpc_response(res);
++		if(retval==1) {
+ 			json_object_put(res);
++		} else if (retval<=0) {
++			LM_DBG("discard msg[%s]\n", netstring);
++		} else { /* JSONRPC_KEEPALIVE_REQ */
++			struct json_object *r = keepalive_build_res(res);
++			if(r) keepalive_send(server, r);
++		}
+ 	} else {
+ 		LM_ERR("%sstring could not be parsed: (%s)\n",
+ 			_jsonrpcc_netstring ? "net" : "", netstring);
+@@ -471,6 +552,8 @@ int connect_server(struct jsonrpc_server *server)
+ 	event_set(socket_ev, sockfd, EV_READ | EV_PERSIST, socket_cb, server);
+ 	event_add(socket_ev, NULL);
+ 	server->ev = socket_ev;
++
++	if(_jsonrpcc_fake_rpc) set_keepalive_event(server);
+ 	return 0;
+ }
+ 
+@@ -509,9 +592,15 @@ void reconnect_cb(int fd, short event, void *arg)
+ 		pkg_free(server->ev);
+ 		server->ev = NULL;
+ 	}
++	if(server->ev_keepalive != NULL) {
++		event_del(server->ev_keepalive);
++		pkg_free(server->ev_keepalive);
++		server->ev_keepalive = NULL;
++	}
+ 
+ 	close(fd);
+ 	pkg_free(server->timer);
++	pkg_free(server->timer_keepalive);
+ 
+ 	connect_server(server);
+ }
+@@ -528,6 +617,11 @@ int handle_server_failure(struct jsonrpc_server *server)
+ 		pkg_free(server->ev);
+ 		server->ev = NULL;
+ 	}
++	if(server->ev_keepalive != NULL) {
++		event_del(server->ev_keepalive);
++		pkg_free(server->ev_keepalive);
++		server->ev_keepalive = NULL;
++	}
+ 	server->status = JSONRPC_SERVER_FAILURE;
+ 	server->conn_attempts--;
+ 	if(_jsonrpcc_max_conn_retry!=-1 && server->conn_attempts<0) {
+diff --git a/modules/jsonrpc-c/jsonrpc_io.h b/modules/jsonrpc-c/jsonrpc_io.h
+index d5dd1b0..205cc1b 100644
+--- a/modules/jsonrpc-c/jsonrpc_io.h
++++ b/modules/jsonrpc-c/jsonrpc_io.h
+@@ -34,6 +34,9 @@
+ /* interval (in seconds) at which failed servers are retried */
+ #define JSONRPC_RECONNECT_INTERVAL  3
+ 
++/* interval (in seconds) at which keepalive json msg is sent */
++#define JSONRPC_KEEPALIVE_INTERVAL  5
++
+ /* time (in ms) after which the error route is called */
+ #define JSONRPC_TIMEOUT 			500
+ 
+-- 
+2.1.4
+
