@@ -24,3 +24,9 @@ sipwise/0002-usrloc-add-module-option-to-support-preload-using-se.patch
 sipwise/0003-nathelper-support-filter-contacts-by-server_id.patch
 sipwise/0001-dmq_usrloc-update-get_all_ucontacts-API-request.patch
 ##
+# MT#14217
+sipwise/0001-jsonrpc-c-fix-crash-at-reconnect_cb-if-server-was-ne.patch
+sipwise/0002-jsonrpc-c-don-t-fail-if-no-connection-to-any-of-the-.patch
+sipwise/0003-jsonrpc-c-add-max_conn_attempt-parameter-to-control-.patch
+sipwise/jsonrpc-c-support-non-netstring.-n-as-delimiter.patch
+##
