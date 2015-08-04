@@ -43,6 +43,9 @@ PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   sqlite json mono ims outbound websocket tls \
 			   autheph sctp java lcrrate tcap
 
+# module groups to be packaged onto kamailio-extra-modules
+EXTRA_GROUPS=gzcompress uuid ev jansson
+
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
 LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)
 
@@ -81,6 +84,23 @@ define PACKAGE_GRP_INSTALL_template
 	)
 endef
 
+define PACKAGE_EXTRA_INSTALL_template
+	$(foreach grp,$(EXTRA_GROUPS),\
+		$(MAKE) install-modules-all LIBDIR=$(LIBDIR) group_include="k$(grp)" \
+		BASEDIR=$(CURDIR)/debian/$(PKG_NAME)-extra-modules \
+		cfg_prefix=$(CURDIR)/debian/$(PKG_NAME)-extra-modules \
+		doc-dir=share/doc/$(PKG_NAME)-extra-modules
+	)
+	# eliminate duplicate libs
+	-for d in $(DUP_LIBS_DIRS); do \
+		test "$$d" != "$(CURDIR)/debian/$(PKG_NAME)-extra-modules/usr/$(LIBDIR)/kamailio" &&\
+		for r in `find $$d -name 'lib*'|xargs`; do \
+			echo "removing extra lib `basename $$r` present also in $$d";\
+			rm -f $(CURDIR)/debian/$(PKG_NAME)-extra-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"` ; \
+		done ; \
+	done
+	find $(CURDIR)/debian/$(PKG_NAME)-extra-modules -depth -empty -type d -exec rmdir {} \;
+endef
 
 ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
 	CFLAGS += -g
@@ -117,6 +137,7 @@ build-stamp: configure-stamp
 	$(MAKE) -j`nproc` all
 	# make groups
 	$(call PACKAGE_GRP_BUILD_template)
+	$(call PACKAGE_EXTRA_INSTALL_template)
 	# make single-module packages
 	$(call PACKAGE_MODULE_BUILD_template)
 	touch build-stamp
