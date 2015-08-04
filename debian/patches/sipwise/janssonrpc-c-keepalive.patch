@@ -1,0 +1,104 @@
+From ff578962fa44668d9e8e27f8178f19e77a002eb1 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Wed, 5 Aug 2015 10:32:22 +0200
+Subject: [PATCH] janssonrpc-c: keepalive
+
+---
+ modules/janssonrpc-c/janssonrpc_io.c | 58 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 57 insertions(+), 1 deletion(-)
+
+diff --git a/modules/janssonrpc-c/janssonrpc_io.c b/modules/janssonrpc-c/janssonrpc_io.c
+index 8a08ec6..f1c3fab 100644
+--- a/modules/janssonrpc-c/janssonrpc_io.c
++++ b/modules/janssonrpc-c/janssonrpc_io.c
+@@ -53,15 +53,18 @@
+ struct tm_binds tmb;
+ 
+ void cmd_pipe_cb(int fd, short event, void *arg);
++void cmd_pipe_keepalive_cb(int fd, short event, void *arg);
+ void io_shutdown(int sig);
+ 
+ int jsonrpc_io_child_process(int cmd_pipe)
+ {
+ 	global_ev_base = event_base_new();
+ 	global_evdns_base = evdns_base_new(global_ev_base, 1);
++	struct timeval three_seconds = {3,0};
+ 
+ 	set_non_blocking(cmd_pipe);
+-	struct event* pipe_ev = event_new(global_ev_base, cmd_pipe, EV_READ | EV_PERSIST, cmd_pipe_cb, NULL);
++	struct event* pipe_ev = event_new(global_ev_base, cmd_pipe,
++		EV_READ | EV_PERSIST, cmd_pipe_cb, NULL);
+ 	if(!pipe_ev) {
+ 		ERR("Failed to create pipe event\n");
+ 		return -1;
+@@ -71,7 +74,19 @@ int jsonrpc_io_child_process(int cmd_pipe)
+ 		ERR("Failed to start pipe event\n");
+ 		return -1;
+ 	}
++	if(fakerpc) {
++		struct event* pipe_ev_keepalive = event_new(global_ev_base, cmd_pipe,
++			EV_TIMEOUT | EV_PERSIST, cmd_pipe_keepalive_cb, NULL);
++		if(!pipe_ev_keepalive) {
++			ERR("Failed to create pipe keepalive event\n");
++			return -1;
++		}
+ 
++		if(event_add(pipe_ev_keepalive, &three_seconds)<0) {
++			ERR("Failed to start pipe keepalive event\n");
++			return -1;
++		}
++	}
+ 	connect_servers(global_server_group);
+ 
+ #if 0
+@@ -540,6 +555,47 @@ end:
+ 	free_pipe_cmd(cmd);
+ }
+ 
++json_t* keepalive_build_req(void)
++{
++	int id;
++	json_t *return_obj = json_object();
++	json_t* t = json_string(JANSSONRPC_KEEPALIVE_REQ);
++	json_object_set(return_obj, "messageType", t); json_decref(t);
++	t = json_string(int2str(get_next_id(), &id));
++	json_object_set(return_obj, "id", t); json_decref(t);
++	return return_obj;
++}
++
++void cmd_pipe_keepalive_cb(int fd, short event, void *arg)
++{
++	LM_DBG("keepalive event\n");
++	char *ns, *json;
++	size_t bytes;
++	json_t *req;
++
++	INIT_SERVER_LOOP
++	FOREACH_SERVER_IN(global_server_group)
++		server = wgroup->server;
++		if(server->status == JSONRPC_SERVER_CONNECTED)
++		{
++			req = keepalive_build_req();
++			json = (char*)json_dumps(req, JSON_COMPACT);
++			json_decref(req);
++			bytes = strlen(json)+1;
++			ns = pkg_malloc(sizeof(char)*bytes);
++			strncpy(ns, json, bytes);
++			ns[bytes-1] = '\n';
++			if(bufferevent_write(server->bev, ns, bytes) == 0) {
++				pkg_free(ns);
++				LM_DBG("keepalive sent to server %.*s:%d for conn %.*s.\n",
++					STR(server->addr), server->port, STR(server->conn));
++			} else {
++				force_reconnect(server);
++			}
++		}
++	ENDFOR
++}
++
+ int handle_response(json_t* response)
+ {
+ 	int retval = 0;
+-- 
+2.4.6
+
