@@ -1,0 +1,339 @@
+From ba63eedeea66bd5134930766cff3f7a65b46c882 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 4 Aug 2015 10:43:42 +0200
+Subject: [PATCH] janssonrpc-c: fakerpc
+
+---
+ modules/janssonrpc-c/janssonrpc.h         |   1 +
+ modules/janssonrpc-c/janssonrpc_io.c      | 155 +++++++++++++++++++++++++++---
+ modules/janssonrpc-c/janssonrpc_io.h      |  10 ++
+ modules/janssonrpc-c/janssonrpc_mod.c     |   2 +
+ modules/janssonrpc-c/janssonrpc_request.c |  17 ++--
+ modules/janssonrpc-c/janssonrpc_request.h |   2 +
+ modules/janssonrpc-c/netstring.c          |  19 ++++
+ modules/janssonrpc-c/netstring.h          |   1 +
+ 8 files changed, 190 insertions(+), 17 deletions(-)
+
+diff --git a/modules/janssonrpc-c/janssonrpc.h b/modules/janssonrpc-c/janssonrpc.h
+index cfdf5e3..61c473f 100644
+--- a/modules/janssonrpc-c/janssonrpc.h
++++ b/modules/janssonrpc-c/janssonrpc.h
+@@ -89,6 +89,7 @@ typedef struct retry_range {
+ int cmd_pipe;
+ extern const str null_str;
+ str result_pv_str;
++extern int fakerpc;
+ retry_range_t* global_retry_ranges;
+ 
+ static inline str pkg_strdup(str src)
+diff --git a/modules/janssonrpc-c/janssonrpc_io.c b/modules/janssonrpc-c/janssonrpc_io.c
+index ffcc247..f976f58 100644
+--- a/modules/janssonrpc-c/janssonrpc_io.c
++++ b/modules/janssonrpc-c/janssonrpc_io.c
+@@ -670,23 +670,155 @@ end:
+ 	return retval;
+ }
+ 
+-void handle_netstring(jsonrpc_server_t* server)
++int find_fakerpc_type(json_t* response)
+ {
+-	unsigned int old_count = server->req_count;
+-	server->req_count--;
+-	if (server->hwm > 0
+-			&& old_count >= server->hwm
+-			&& server->req_count < server->hwm) {
+-		INFO("%.*s:%d in connection group %.*s is back to normal\n",
+-				STR(server->addr), server->port, STR(server->conn));
++	if(!response) return -1;
++	const char* s;
++	size_t size_type;
++	json_t *t = json_object_get(response, "messageType");
++	if(t) {
++		s = json_string_value(t);
++	} else {
++		LM_DBG("Response received without 'messageType'.\n");
++		return -1;
++	}
++	size_type = strlen(s);
++	switch(size_type) {
++		case JANSSONRPC_KEEPALIVE_RES_SIZE:
++			if(strncmp(s, JANSSONRPC_KEEPALIVE_RES, size_type)==0) return 1;
++			break;
++		case JANSSONRPC_KEEPALIVE_REQ_SIZE:
++			if(strncmp(s, JANSSONRPC_KEEPALIVE_REQ, size_type)==0) return 2;
++			break;
++		case JANSSONRPC_FAKERPC_RES_SIZE:
++			if(strncmp(s, JANSSONRPC_FAKERPC_RES, size_type)==0) return 3;
++			break;
++		case JANSSONRPC_FAKERPC_REQ_SIZE:
++			if(strncmp(s, JANSSONRPC_FAKERPC_REQ, size_type)==0) return 4;
++			break;
++		case JANSSONRPC_FAKERPC_CON_SIZE:
++			if(strncmp(s, JANSSONRPC_FAKERPC_CON, size_type)==0) return 5;
++			break;
+ 	}
++	return 0;
++}
+ 
+-	json_error_t error;
++int handle_response_string(json_t* response)
++{
++	int retval = 0;
++	jsonrpc_request_t* req = NULL;
++	char* freeme = NULL;
++
++
++	/* check if json object */
++	if(!json_is_object(response)){
++		WARN("jsonrpc response is not an object\n");
++		return -1;
++	}
++
++	/* check for an id */
++	json_t* _id = json_object_get(response, "id");
++	if(!_id) {
++		WARN("jsonrpc response does not have an id.\n");
++		retval = -1;
++		goto end;
++	}
++
++	int id = json_integer_value(_id);
++	if (!(req = pop_request(id))) {
++		/* don't fail the server for an unrecognized id */
++		retval = 0;
++		goto end;
++	}
++
++	json_t* error = json_object_get(response, "errorCode");
++
++	pv_value_t val;
++
++	if(jsontoval(&val, &freeme, response)<0) {
++		fail_request(
++				JRPC_ERR_TO_VAL,
++				req,
++				"Failed to convert response json to pv\n");
++		retval = -1;
++		goto end;
++	}
++
++	char* error_s = NULL;
++
++	if(send_to_script(&val, req->cmd)>=0) {
++		goto free_and_end;
++	}
+ 
++	if(error) {
++		// get code from error
++		json_t* _code = json_object_get(error, "code");
++		if(_code) {
++			int code = json_integer_value(_code);
++
++			// check if code is in global_retry_ranges
++			retry_range_t* tmpr;
++			for(tmpr = global_retry_ranges;
++					tmpr != NULL;
++					tmpr = tmpr->next) {
++				if((tmpr->start < tmpr->end
++						&& tmpr->start <= code && code <= tmpr->end)
++				|| (tmpr->end < tmpr->start
++						&& tmpr->end <= code && code <= tmpr->start)
++				|| (tmpr->start == tmpr->end && tmpr->start == code)) {
++					if(schedule_retry(req)==0) {
++						goto end;
++					}
++					break;
++				}
++			}
++
++		}
++		error_s = json_dumps(error, JSON_COMPACT);
++		if(error_s) {
++			WARN("Request received an error: \n%s\n", error_s);
++			free(error_s);
++		} else {
++			fail_request(
++					JRPC_ERR_BAD_RESP,
++					req,
++					"Could not convert 'error' response to string");
++			retval = -1;
++			goto end;
++		}
++	}
++
++
++free_and_end:
++	free_req_cmd(req->cmd);
++	free_request(req);
++
++end:
++	if(freeme) free(freeme);
++	return retval;
++}
++
++void handle_netstring(jsonrpc_server_t* server)
++{
++	json_error_t error;
+ 	json_t* res = json_loads(server->buffer->string, 0, &error);
+ 
++	int type = find_fakerpc_type(res);
++	if(!fakerpc || type == 3) {
++		unsigned int old_count = server->req_count;
++		server->req_count--;
++		if (server->hwm > 0
++				&& old_count >= server->hwm
++				&& server->req_count < server->hwm) {
++			INFO("%.*s:%d in connection group %.*s is back to normal\n",
++					STR(server->addr), server->port, STR(server->conn));
++		}
++	}
++
+ 	if (res) {
+-		if(handle_response(res)<0){
++		if(!fakerpc && handle_response(res)<0){
++			ERR("Cannot handle jsonrpc response: %s\n", server->buffer->string);
++		} else if (fakerpc && type==3 && handle_response_string(res)<0) {
+ 			ERR("Cannot handle jsonrpc response: %s\n", server->buffer->string);
+ 		}
+ 		json_decref(res);
+@@ -702,7 +834,8 @@ void bev_read_cb(struct bufferevent* bev, void* arg)
+ 	jsonrpc_server_t* server = (jsonrpc_server_t*)arg;
+ 	int retval = 0;
+ 	while (retval == 0) {
+-		int retval = netstring_read_evbuffer(bev, &server->buffer);
++		if(fakerpc) retval = string_read_evbuffer(bev, &server->buffer);
++		else retval = netstring_read_evbuffer(bev, &server->buffer);
+ 
+ 		if (retval == NETSTRING_INCOMPLETE) {
+ 			return;
+diff --git a/modules/janssonrpc-c/janssonrpc_io.h b/modules/janssonrpc-c/janssonrpc_io.h
+index 5abb75e..33ed860 100644
+--- a/modules/janssonrpc-c/janssonrpc_io.h
++++ b/modules/janssonrpc-c/janssonrpc_io.h
+@@ -86,5 +86,15 @@ typedef enum
+ , JRPC_ERR_REQ_BUILD = -1
+ } jsonrpc_error;
+ 
++#define JANSSONRPC_KEEPALIVE_RES "heartbeatResponse"
++#define JANSSONRPC_KEEPALIVE_RES_SIZE 17
++#define JANSSONRPC_KEEPALIVE_REQ "heartbeatRequest"
++#define JANSSONRPC_KEEPALIVE_REQ_SIZE 16
++#define JANSSONRPC_FAKERPC_RES "npResponse"
++#define JANSSONRPC_FAKERPC_RES_SIZE 10
++#define JANSSONRPC_FAKERPC_REQ "npRequest"
++#define JANSSONRPC_FAKERPC_REQ_SIZE 9
++#define JANSSONRPC_FAKERPC_CON "connectionPermission"
++#define JANSSONRPC_FAKERPC_CON_SIZE 20
+ 
+ #endif /* _JSONRPC_IO_H_ */
+diff --git a/modules/janssonrpc-c/janssonrpc_mod.c b/modules/janssonrpc-c/janssonrpc_mod.c
+index 7db22cc..2e9c27c 100644
+--- a/modules/janssonrpc-c/janssonrpc_mod.c
++++ b/modules/janssonrpc-c/janssonrpc_mod.c
+@@ -57,6 +57,7 @@ static int fixup_notify_free(void** param, int param_no);
+ int		  fixup_pvar_shm(void** param, int param_no);
+ 
+ int  pipe_fds[2] = {-1,-1};
++int fakerpc = 0;
+ 
+ struct tm_binds tmb;
+ 
+@@ -90,6 +91,7 @@ static param_export_t mod_params[]={
+ 	{"retry_codes",  STR_PARAM|USE_FUNC_PARAM, (void*)parse_retry_codes_param},
+ 	{"min_srv_ttl", INT_PARAM|USE_FUNC_PARAM, (void*)parse_min_ttl_param},
+ 	{"result_pv",   STR_PARAM,                &result_pv_str.s},
++	{"fakerpc",     INT_PARAM, &fakerpc},
+ 	{ 0,0,0 }
+ };
+ 
+diff --git a/modules/janssonrpc-c/janssonrpc_request.c b/modules/janssonrpc-c/janssonrpc_request.c
+index 39c7f31..774ea46 100644
+--- a/modules/janssonrpc-c/janssonrpc_request.c
++++ b/modules/janssonrpc-c/janssonrpc_request.c
+@@ -88,6 +88,16 @@ void free_request(jsonrpc_request_t* req)
+ 	pkg_free(req);
+ }
+ 
++int get_next_id(void)
++{
++	if (next_id>JSONRPC_MAX_ID) {
++		next_id = 1;
++	} else {
++		next_id++;
++	}
++	return next_id;
++}
++
+ jsonrpc_request_t* create_request(jsonrpc_req_cmd_t* cmd)
+ {
+ 	if (cmd == NULL) {
+@@ -124,12 +134,7 @@ jsonrpc_request_t* create_request(jsonrpc_req_cmd_t* cmd)
+ 	}
+ 
+ 	if(req->type == RPC_REQUEST) {
+-		if (next_id>JSONRPC_MAX_ID) {
+-			next_id = 1;
+-		} else {
+-			next_id++;
+-		}
+-		req->id = next_id;
++		req->id = get_next_id();
+ 		req->timeout = cmd->timeout;
+ 
+ 		json_t* id_js = json_integer(next_id);
+diff --git a/modules/janssonrpc-c/janssonrpc_request.h b/modules/janssonrpc-c/janssonrpc_request.h
+index e38c08e..09dac6b 100644
+--- a/modules/janssonrpc-c/janssonrpc_request.h
++++ b/modules/janssonrpc-c/janssonrpc_request.h
+@@ -62,4 +62,6 @@ int schedule_retry(jsonrpc_request_t* req);
+ int jsonrpc_send(str conn, jsonrpc_request_t* req, bool notify_only);
+ void fail_request(int code, jsonrpc_request_t* req, char* error_str);
+ 
++int get_next_id(void);
++
+ #endif /* _JSONRPC_H_ */
+diff --git a/modules/janssonrpc-c/netstring.c b/modules/janssonrpc-c/netstring.c
+index a559224..e5926d0 100644
+--- a/modules/janssonrpc-c/netstring.c
++++ b/modules/janssonrpc-c/netstring.c
+@@ -136,6 +136,25 @@ int netstring_read_evbuffer(struct bufferevent *bev, netstring_t **netstring)
+ 	return 0;
+ }
+ 
++int string_read_evbuffer(struct bufferevent *bev, netstring_t **netstring)
++{
++	int n;
++	if(*netstring == NULL) {
++		/* initialize the netstring struct */
++		*netstring = pkg_malloc(sizeof(netstring_t));
++		CHECK_MALLOC(*netstring);
++		memset(*netstring, 0, sizeof(netstring_t));
++	}
++	struct evbuffer *input = bufferevent_get_input(bev);
++	(*netstring)->length = evbuffer_get_length(input);
++	(*netstring)->buffer = pkg_malloc((*netstring)->length);
++	n = evbuffer_remove(input, (*netstring)->buffer,(*netstring)->length);
++	assert(n==(*netstring)->length);
++	(*netstring)->buffer[n-1] = '\0';
++	(*netstring)->string = (*netstring)->buffer;
++	return 0;
++}
++
+ int netstring_read_fd(int fd, netstring_t **netstring)
+ {
+ 	int bytes, offset;
+diff --git a/modules/janssonrpc-c/netstring.h b/modules/janssonrpc-c/netstring.h
+index edba4cc..dd24311 100644
+--- a/modules/janssonrpc-c/netstring.h
++++ b/modules/janssonrpc-c/netstring.h
+@@ -34,6 +34,7 @@ typedef struct {
+ 
+ void free_netstring(netstring_t* netstring);
+ 
++int string_read_evbuffer(struct bufferevent *bev, netstring_t **netstring);
+ int netstring_read_evbuffer(struct bufferevent *bev, netstring_t **netstring);
+ 
+ int netstring_read_fd(int fd, netstring_t **netstring);
+-- 
+2.1.4
+

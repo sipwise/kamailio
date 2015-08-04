@@ -11,10 +11,12 @@ Build-Depends: bison,
                libconfuse-dev,
                libcurl4-gnutls-dev,
                libdb-dev (>= 4.6.19),
+               libev-dev,
                libevent-dev,
                libexpat1-dev,
                libgeoip-dev (>= 1.4.5),
                libhiredis-dev (>= 0.10.0),
+               libjansson-dev,
                libjson0-dev,
                libldap2-dev,
                liblua5.1-0-dev,
@@ -42,7 +44,9 @@ Build-Depends: bison,
                python,
                python-dev,
                unixodbc-dev,
-               xsltproc
+               uuid-dev,
+               xsltproc,
+               zlib1g-dev
 Standards-Version: 3.9.6
 Homepage: http://www.kamailio.org/
 Vcs-Svn: svn://svn.debian.org/pkg-voip/kamailio/trunk/
@@ -625,6 +629,22 @@ Description: contains the TLS kamailio transport module
  .
  This has been split out of the main kamailio package, so that kamailio will
  not depend on openssl. This module will enable you to use the TLS transport.
+
+Package: ngcp-kamailio-extra-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ngcp-kamailio (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Conflicts: ngcp-kamailio-extra-modules
+Replaces: ngcp-kamailio-extra-modules
+Description: extra modules for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides: gzcompress uuid ev jansson janssonrpc-c
 
 Package: ngcp-kamailio-lcrrate-modules
 Architecture: any
