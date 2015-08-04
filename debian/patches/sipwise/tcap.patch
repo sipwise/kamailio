@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,297 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -36,6 +36,7 @@
 +static int mod_init(void);
 +static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq);
 +static int inap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int inap_extract_var_f(sip_msg_t *msg, char *o, char *f, char *d);
 +static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq);
 +
 +
@@ -45,6 +46,8 @@
 +		fixup_spve_str, 0, ANY_ROUTE},
 +	{"inap_extract", (cmd_function)inap_extract_f, 2,
 +		fixup_spve_str, 0, ANY_ROUTE},
++	{"inap_extract_var", (cmd_function)inap_extract_var_f, 3,
++		fixup_pvar_pvar_pvar, fixup_free_pvar_pvar_pvar, ANY_ROUTE},
 +	{"isup_decode_number", (cmd_function)isup_decode_number_f, 2,
 +		fixup_spve_str, 0, ANY_ROUTE},
 +	{0,}
@@ -204,7 +207,62 @@
 +	return -1;
 +}
 +
++static int inap_extract_var_f(sip_msg_t *msg, char *pv_orig, char *pv_field,
++	char *pv_dest)
++{
++	const char *err;
++	static char buf[1024];
++	static char cfield[512];
++	struct output_buffer out;
++	pv_spec_p orig_spec = (pv_spec_t *) pv_orig;
++	pv_spec_p field_spec = (pv_spec_t *) pv_field;
++	pv_spec_p dest_spec = (pv_spec_t *) pv_dest;
++	pv_value_t tcap, field, dest;
++	int i;
 +
++	err = "Can't get tcap PV value";
++	if (pv_get_spec_value(msg, orig_spec, &tcap) != 0)
++		goto error;
++
++	err = "orig has to be a string";
++	if(!(tcap.flags&PV_VAL_STR))
++		goto error;
++
++	err = "Can't get field PV value";
++	if (pv_get_spec_value(msg, field_spec, &field) != 0)
++		goto error;
++
++	err = "field has to be a string";
++	if (!(field.flags&PV_VAL_STR))
++		goto error;
++
++	err = "field is too big for internal buffer";
++	if (field.rs.len > 512) goto error;
++	strncpy(cfield, field.rs.s, field.rs.len);
++	cfield[field.rs.len] = '\0';
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	LM_DBG("tcap:[%.*s][%d] field:[%s]\n", tcap.rs.len, tcap.rs.s,
++		tcap.rs.len, cfield);
++	i = inap_extract(tcap.rs.s, tcap.rs.len, cfield, &out);
++	if (i<0){
++		LM_ERR("Error[%d] parsing TCAP body", i);
++		return -1;
++	}
++
++	memset(&dest, 0, sizeof(pv_value_t));
++	dest.flags = PV_VAL_STR;
++	dest.rs.s = out.buf;
++	dest.rs.len = out.used;
++	err = "Failed to set return value";
++	if(pv_set_spec_value(msg, dest_spec, 0, &dest)<0)
++		goto error;
++
++	return 1;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
 +
 +static inline char phone_digit(unsigned char d) {
 +	switch (d) {
