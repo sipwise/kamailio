@@ -6,6 +6,9 @@ sipwise/debug/0000-modules-debugger-move-json-related-from-debugger_api.patch
 sipwise/debug/0001-modules-cfgt-trace-config-and-save-to-file.patch
 sipwise/debug/mod_cfgt.patch
 #
+# upstream fixes from 4.3
+upstream/0001-pua_reginfo-use-ruid-to-fix-comparation-of-contact.patch
+##
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
