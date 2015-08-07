@@ -1,3 +1,12 @@
+ngcp-kamailio (4.3.0-1+0~mr4.0.1.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [1423606] MT#14405 fix registrar max_contacts having sip.instance
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 07 Aug 2015 14:14:14 +0200
+
 ngcp-kamailio (4.3.0-1+0~mr4.0.1.2) unstable; urgency=medium
 
   [ Victor Seva ]
