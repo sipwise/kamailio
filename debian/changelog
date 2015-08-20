@@ -1,3 +1,16 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.3.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [2f01fd6] MT#13249 fix double precision value on queries
+  * [95fd175] MT#13917 add more debug to pua_reginfo and fix contact comparation
+
+  [ Richard Fuchs ]
+  * [e1320b0] update lcr_rate for new swrate
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 20 Aug 2015 23:10:57 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.3.0) unstable; urgency=low
 
   [ Victor Seva ]
