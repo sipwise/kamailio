@@ -1,0 +1,11 @@
+--- a/modules/presence_dialoginfo/notify_body.c
++++ b/modules/presence_dialoginfo/notify_body.c
+@@ -69,7 +69,7 @@ void free_xml_body(char* body)
+ 
+ #define DIALOGINFO_EMPTY_BODY "<dialog-info>\
+ <dialog id=\"615293b33c62dec073e05d9421e9f48b\" direction=\"recipient\">\
+-<state>terminated</state>\
++<state>confirmed</state>\
+ </dialog>\
+ </dialog-info>"
+ 

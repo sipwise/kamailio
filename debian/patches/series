@@ -27,3 +27,4 @@ sipwise/0002-usrloc-add-module-option-to-support-preload-using-se.patch
 sipwise/0003-nathelper-support-filter-contacts-by-server_id.patch
 sipwise/0001-dmq_usrloc-update-get_all_ucontacts-API-request.patch
 ##
+sipwise/0014-presence-dialoginfo.patch
