@@ -1,4 +1,4 @@
-From 95948013a291286ebd332bb71cdffb09a0618606 Mon Sep 17 00:00:00 2001
+From 253ce0b0132a238712cbff9fa1007a775223cf1e Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Wed, 24 Jun 2015 22:19:24 +0200
 Subject: [PATCH] modules/cfgt: trace config and save to file
@@ -7,15 +7,15 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  modules/cfgt/Makefile           |  17 +
  modules/cfgt/cfgt.c             |  45 +++
  modules/cfgt/cfgt.h             |  40 ++
- modules/cfgt/cfgt_int.c         | 797 ++++++++++++++++++++++++++++++++++++++++
+ modules/cfgt/cfgt_int.c         | 802 ++++++++++++++++++++++++++++++++++++++++
  modules/cfgt/cfgt_int.h         |  67 ++++
- modules/cfgt/cfgt_json.c        | 389 ++++++++++++++++++++
+ modules/cfgt/cfgt_json.c        | 389 +++++++++++++++++++
  modules/cfgt/cfgt_json.h        |  38 ++
  modules/cfgt/cfgt_mod.c         | 112 ++++++
  modules/cfgt/cfgt_mod.h         |  29 ++
  modules/debugger/debugger_api.c |  19 +
  modules/debugger/debugger_mod.c |  21 ++
- 11 files changed, 1574 insertions(+)
+ 11 files changed, 1579 insertions(+)
  create mode 100644 modules/cfgt/Makefile
  create mode 100644 modules/cfgt/cfgt.c
  create mode 100644 modules/cfgt/cfgt.h
@@ -139,7 +139,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +#endif
 --- /dev/null
 +++ b/modules/cfgt/cfgt_int.c
-@@ -0,0 +1,797 @@
+@@ -0,0 +1,802 @@
 +/**
 + *
 + * Copyright (C) 2015 Victor Seva (sipwise.com)
@@ -185,6 +185,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +str cfgt_hdr_prefix = {"NGCP%", 5};
 +str cfgt_basedir = {"/tmp", 4};
 +int cfgt_mask = CFGT_DP_ALL;
++struct action *_cfgt_last_action = NULL;
 +
 +static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
 +{
@@ -731,6 +732,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +		LM_ERR("node empty\n");
 +		return -1;
 +	}
++	_cfgt_last_action = a;
 +	if (a->rname==NULL) {
 +		LM_DBG("no routename. type:%d\n", a->type);
 +		return 0;
@@ -852,6 +854,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +}
 +int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar) {
 +	str flowname = STR_NULL;
++
++	if(_cfgt_last_action && _cfgt_last_action->type == DROP_T)
++		return 1;
 +
 +	if(_cfgt_node) {
 +		LM_DBG("dump last flow\n");
