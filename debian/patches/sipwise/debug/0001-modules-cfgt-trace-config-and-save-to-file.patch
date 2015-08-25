@@ -1,4 +1,4 @@
-From 95948013a291286ebd332bb71cdffb09a0618606 Mon Sep 17 00:00:00 2001
+From 839fca856115c95cd7033b0bac1110554090fb9f Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Wed, 24 Jun 2015 22:19:24 +0200
 Subject: [PATCH] modules/cfgt: trace config and save to file
