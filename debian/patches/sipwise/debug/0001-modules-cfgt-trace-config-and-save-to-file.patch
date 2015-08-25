@@ -1,4 +1,4 @@
-From 95948013a291286ebd332bb71cdffb09a0618606 Mon Sep 17 00:00:00 2001
+From 253ce0b0132a238712cbff9fa1007a775223cf1e Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Wed, 24 Jun 2015 22:19:24 +0200
 Subject: [PATCH] modules/cfgt: trace config and save to file
@@ -7,15 +7,15 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  modules/cfgt/Makefile           |  17 +
  modules/cfgt/cfgt.c             |  45 +++
  modules/cfgt/cfgt.h             |  40 ++
- modules/cfgt/cfgt_int.c         | 797 ++++++++++++++++++++++++++++++++++++++++
+ modules/cfgt/cfgt_int.c         | 802 ++++++++++++++++++++++++++++++++++++++++
  modules/cfgt/cfgt_int.h         |  67 ++++
- modules/cfgt/cfgt_json.c        | 389 ++++++++++++++++++++
+ modules/cfgt/cfgt_json.c        | 389 +++++++++++++++++++
  modules/cfgt/cfgt_json.h        |  38 ++
  modules/cfgt/cfgt_mod.c         | 112 ++++++
  modules/cfgt/cfgt_mod.h         |  29 ++
  modules/debugger/debugger_api.c |  19 +
  modules/debugger/debugger_mod.c |  21 ++
- 11 files changed, 1574 insertions(+)
+ 11 files changed, 1579 insertions(+)
  create mode 100644 modules/cfgt/Makefile
  create mode 100644 modules/cfgt/cfgt.c
  create mode 100644 modules/cfgt/cfgt.h
@@ -26,6 +26,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  create mode 100644 modules/cfgt/cfgt_mod.c
  create mode 100644 modules/cfgt/cfgt_mod.h
 
+diff --git a/modules/cfgt/Makefile b/modules/cfgt/Makefile
+new file mode 100644
+index 0000000..7bfba62
 --- /dev/null
 +++ b/modules/cfgt/Makefile
 @@ -0,0 +1,17 @@
@@ -46,6 +49,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +SER_LIBS+=$(SERLIBPATH)/srutils/srutils
 +
 +include ../../Makefile.modules
+diff --git a/modules/cfgt/cfgt.c b/modules/cfgt/cfgt.c
+new file mode 100644
+index 0000000..256a259
 --- /dev/null
 +++ b/modules/cfgt/cfgt.c
 @@ -0,0 +1,45 @@
@@ -94,6 +100,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +	api->cfgt_process_route   = cfgt_process_route;
 +	return 0;
 +}
+diff --git a/modules/cfgt/cfgt.h b/modules/cfgt/cfgt.h
+new file mode 100644
+index 0000000..f06a87e
 --- /dev/null
 +++ b/modules/cfgt/cfgt.h
 @@ -0,0 +1,40 @@
@@ -137,9 +146,12 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +typedef int (*bind_cfgt_t)(cfgt_api_t* api);
 +
 +#endif
+diff --git a/modules/cfgt/cfgt_int.c b/modules/cfgt/cfgt_int.c
+new file mode 100644
+index 0000000..c724441
 --- /dev/null
 +++ b/modules/cfgt/cfgt_int.c
-@@ -0,0 +1,797 @@
+@@ -0,0 +1,802 @@
 +/**
 + *
 + * Copyright (C) 2015 Victor Seva (sipwise.com)
@@ -185,6 +197,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +str cfgt_hdr_prefix = {"NGCP%", 5};
 +str cfgt_basedir = {"/tmp", 4};
 +int cfgt_mask = CFGT_DP_ALL;
++struct action *_cfgt_last_action = NULL;
 +
 +static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
 +{
@@ -731,6 +744,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +		LM_ERR("node empty\n");
 +		return -1;
 +	}
++	_cfgt_last_action = a;
 +	if (a->rname==NULL) {
 +		LM_DBG("no routename. type:%d\n", a->type);
 +		return 0;
@@ -853,6 +867,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar) {
 +	str flowname = STR_NULL;
 +
++	if(_cfgt_last_action && _cfgt_last_action->type == DROP_T)
++		return 1;
++
 +	if(_cfgt_node) {
 +		LM_DBG("dump last flow\n");
 +		if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname)<0)
@@ -937,6 +954,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +	sr_event_register_cb(SREV_NET_DATA_OUT, cfgt_msgout);
 +	return 0;
 +}
+diff --git a/modules/cfgt/cfgt_int.h b/modules/cfgt/cfgt_int.h
+new file mode 100644
+index 0000000..3587264
 --- /dev/null
 +++ b/modules/cfgt/cfgt_int.h
 @@ -0,0 +1,67 @@
@@ -1007,6 +1027,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar);
 +int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar);
 +#endif
+diff --git a/modules/cfgt/cfgt_json.c b/modules/cfgt/cfgt_json.c
+new file mode 100644
+index 0000000..b4c2359
 --- /dev/null
 +++ b/modules/cfgt/cfgt_json.c
 @@ -0,0 +1,389 @@
@@ -1400,6 +1423,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +	return -1;
 +}
 \ No newline at end of file
+diff --git a/modules/cfgt/cfgt_json.h b/modules/cfgt/cfgt_json.h
+new file mode 100644
+index 0000000..7ab10b4
 --- /dev/null
 +++ b/modules/cfgt/cfgt_json.h
 @@ -0,0 +1,38 @@
@@ -1441,6 +1467,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +int cfgt_get_json(struct sip_msg* msg, unsigned int mask, srjson_doc_t *jdoc,
 +	srjson_t *head);
 +#endif
+diff --git a/modules/cfgt/cfgt_mod.c b/modules/cfgt/cfgt_mod.c
+new file mode 100644
+index 0000000..6b5ad42
 --- /dev/null
 +++ b/modules/cfgt/cfgt_mod.c
 @@ -0,0 +1,112 @@
@@ -1556,6 +1585,9 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +static void destroy(void)
 +{
 +}
+diff --git a/modules/cfgt/cfgt_mod.h b/modules/cfgt/cfgt_mod.h
+new file mode 100644
+index 0000000..1d8323d
 --- /dev/null
 +++ b/modules/cfgt/cfgt_mod.h
 @@ -0,0 +1,29 @@
@@ -1588,6 +1620,8 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +extern unsigned int init_flag;
 +
 +#endif
+diff --git a/modules/debugger/debugger_api.c b/modules/debugger/debugger_api.c
+index b1e7fe1..107fa09 100644
 --- a/modules/debugger/debugger_api.c
 +++ b/modules/debugger/debugger_api.c
 @@ -26,6 +26,7 @@
@@ -1598,7 +1632,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  #include "../../dprint.h"
  #include "../../events.h"
  #include "../../locking.h"
-@@ -70,6 +71,7 @@
+@@ -70,6 +71,7 @@ str *dbg_get_state_name(int t)
  #define DBG_CFGTRACE_ON	(1<<0)
  #define DBG_ABKPOINT_ON	(1<<1)
  #define DBG_LBKPOINT_ON	(1<<2)
@@ -1606,7 +1640,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  
  static str _dbg_status_list[] = {
  	str_init("cfgtrace-on"),
-@@ -78,6 +80,8 @@
+@@ -78,6 +80,8 @@ static str _dbg_status_list[] = {
  	str_init("abkpoint-off"),
  	str_init("lbkpoint-on"),
  	str_init("lbkpoint-off"),
@@ -1615,7 +1649,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  	{0, 0}
  };
  
-@@ -89,6 +93,8 @@
+@@ -89,6 +93,8 @@ str *dbg_get_status_name(int t)
  		return &_dbg_status_list[2];
  	if(t&DBG_LBKPOINT_ON)
  		return &_dbg_status_list[4];
@@ -1624,7 +1658,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  
  	return &_dbg_state_list[0];
  }
-@@ -189,6 +195,12 @@
+@@ -189,6 +195,12 @@ int _dbg_step_loops = 200;
  int _dbg_reset_msgid = 0;
  
  /**
@@ -1637,7 +1671,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
   *
   */
  typedef struct _dbg_cmd
-@@ -356,6 +368,11 @@
+@@ -356,6 +368,11 @@ int dbg_cfg_trace(void *data)
  				);
  		}
  	}
@@ -1649,7 +1683,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  	if(!(_dbg_pid_list[process_no].set&DBG_ABKPOINT_ON))
  	{
  		/* no breakpoints to be considered */
-@@ -590,6 +607,8 @@
+@@ -590,6 +607,8 @@ int dbg_init_mypid(void)
  		_dbg_pid_list[process_no].set |= DBG_ABKPOINT_ON;
  	if(_dbg_cfgtrace==1)
  		_dbg_pid_list[process_no].set |= DBG_CFGTRACE_ON;
@@ -1658,6 +1692,8 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  	if(_dbg_reset_msgid==1)
  	{
  		LM_DBG("[%d] create locks\n", process_no);
+diff --git a/modules/debugger/debugger_mod.c b/modules/debugger/debugger_mod.c
+index d0a35af..44c5865 100644
 --- a/modules/debugger/debugger_mod.c
 +++ b/modules/debugger/debugger_mod.c
 @@ -27,6 +27,7 @@
@@ -1668,7 +1704,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  #include "../../sr_module.h"
  #include "../../dprint.h"
  #include "../../ut.h"
-@@ -63,6 +64,10 @@
+@@ -71,6 +72,10 @@ extern char *_dbg_cfgtrace_lname;
  extern int _dbg_step_usleep;
  extern int _dbg_step_loops;
  extern int _dbg_reset_msgid;
@@ -1677,17 +1713,17 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
 +/* cfgt api */
 +extern cfgt_api_t _dbg_cfgt;
  
+ static int _dbg_sip_msg_cline;
  static char * _dbg_cfgtrace_facility_str = 0;
- static int _dbg_log_assign = 0;
-@@ -94,6 +99,7 @@
- 	{"mod_level",         PARAM_STRING|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
+@@ -111,6 +116,7 @@ static param_export_t params[]={
+ 	{"mod_facility",      PARAM_STRING|USE_FUNC_PARAM, (void*)dbg_mod_facility_param},
  	{"reset_msgid",       INT_PARAM, &_dbg_reset_msgid},
  	{"cfgpkgcheck",       INT_PARAM, &_dbg_cfgpkgcheck},
 +	{"cfgtest",           INT_PARAM, &_dbg_cfgtest},
  	{0, 0, 0}
  };
  
-@@ -119,6 +125,8 @@
+@@ -136,6 +142,8 @@ struct module_exports exports = {
  static int mod_init(void)
  {
  	int fl;
@@ -1696,7 +1732,7 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  	if (_dbg_cfgtrace_facility_str!=NULL)
  	{
  		fl = str2facility(_dbg_cfgtrace_facility_str);
-@@ -169,6 +177,19 @@
+@@ -187,6 +195,19 @@ static int mod_init(void)
  			return -1;
  		}
  	}
@@ -1716,3 +1752,6 @@ Subject: [PATCH] modules/cfgt: trace config and save to file
  	return dbg_init_bp_list();
  }
  
+-- 
+2.5.0
+
