@@ -1,0 +1,24 @@
+From b660c293d0b4aa97d57e7f43d5c9d220d472acd7 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 25 Aug 2015 15:43:29 +0200
+Subject: [PATCH] core: fix routename for event_route
+
+---
+ cfg.y | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/cfg.y b/cfg.y
+index 154cb44..d12e25f 100644
+--- a/cfg.y
++++ b/cfg.y
+@@ -1966,6 +1966,7 @@ event_route_stm: ROUTE_EVENT LBRACK EVENT_RT_NAME RBRACK LBRACE actions RBRACE {
+ 			yyerror("duplicate route");
+ 			YYABORT;
+ 		}
++		routename=$3;
+ 		push($6, &event_rt.rlist[i_tmp]);
+ 	}
+ 
+-- 
+2.5.0
+
