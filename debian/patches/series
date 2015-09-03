@@ -13,6 +13,7 @@ sipwise/debug/mod_cfgt.patch
 upstream/Revert-pua_reginfo-use-ul.get_urecord_by_ruid-instea.patch
 # upsream fixes from master
 upstream/registrar-get-instance-and-ref_id-when-using-msg.patch
+upstream/0004-registrar-Fix-insertion-of-ulrcd-xavp-into-positio.patch
 ##
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
