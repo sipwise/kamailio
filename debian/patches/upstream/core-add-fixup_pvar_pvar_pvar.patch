@@ -1,0 +1,45 @@
+From a48d6a1ed8950ba96d5e85769bba59bfbe469cfa Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Wed, 9 Sep 2015 10:30:27 +0200
+Subject: [PATCH] core: add fixup_pvar_pvar_pvar()
+
+---
+ mod_fix.c | 14 ++++++++++++++
+ mod_fix.h |  3 +++
+ 2 files changed, 17 insertions(+)
+
+--- a/mod_fix.c
++++ b/mod_fix.c
+@@ -325,6 +325,20 @@
+ }
+ 
+ 
++int fixup_pvar_pvar_pvar(void** param, int param_no)
++{
++	if (param_no > 3)
++		return E_UNSPEC;
++	return fixup_pvar_all(param, param_no);
++}
++
++int fixup_free_pvar_pvar_pvar(void** param, int param_no)
++{
++	if (param_no > 3)
++		return E_UNSPEC;
++	return fixup_free_pvar_all(param, param_no);
++}
++
+ 
+ int fixup_pvar_null(void** param, int param_no)
+ {
+--- a/mod_fix.h
++++ b/mod_fix.h
+@@ -102,6 +102,9 @@
+ int fixup_pvar_pvar(void **param, int param_no);
+ int fixup_free_pvar_pvar(void** param, int param_no);
+ 
++int fixup_pvar_pvar_pvar(void **param, int param_no);
++int fixup_free_pvar_pvar_pvar(void** param, int param_no);
++
+ int fixup_pvar_str(void** param, int param_no);
+ int fixup_free_pvar_str(void** param, int param_no);
+ 

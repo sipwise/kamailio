@@ -45,3 +45,12 @@ sipwise/pua_reginfo_fix.patch
 # backport from master
 upstream/0001-nathelper-add-append_sdp_oldmediaip-parameter.patch
 upstream/0001-usrloc-run-callbacks-after-updating-the-info-on-DB_O.patch
+## lnp
+upstream/Makefile.groups-added-grou-for-jansson-modules.patch
+upstream/jansson_modules.patch
+upstream/pv-pv_var_to_xavp.patch
+upstream/pv-pv_xavp_to_var.patch
+upstream/core-add-fixup_pvar_pvar_pvar.patch
+sipwise/janssonrpc-c-fakerpc.patch
+sipwise/janssonrpc-c-keepalive.patch
+#
