@@ -1,0 +1,170 @@
+From dad1f24bee3f33c9902e487853be6f13b274aa93 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 7 Sep 2015 15:02:42 +0200
+Subject: [PATCH] pv: pv_xavp_to_var()
+
+---
+ modules/pv/doc/pv_admin.xml | 24 +++++++++++++++++++
+ modules/pv/pv.c             | 16 +++++++++++++
+ modules/pv/pv_xavp.c        | 58 +++++++++++++++++++++++++++++++++++++++++++++
+ modules/pv/pv_xavp.h        |  1 +
+ 4 files changed, 99 insertions(+)
+
+diff --git a/modules/pv/doc/pv_admin.xml b/modules/pv/doc/pv_admin.xml
+index bed862d..4cbd6b80 100644
+--- a/modules/pv/doc/pv_admin.xml
++++ b/modules/pv/doc/pv_admin.xml
+@@ -426,6 +426,30 @@ $xavp("ok[0]=>foo") now is "foo indeed"
+ 				</programlisting>
+ 			</example>
+ 		</section>
++		<section id="pv.f.pv_xavp_to_var">
++			<title>
++				<function moreinfo="none">pv_xavp_to_var(xname)</function>
++			</title>
++			<para>
++				Copy xavp values to vars. Reverse of pv_var_to_xavp().
++			</para>
++			<para>
++			Function can be used from ANY_ROUTE.
++			</para>
++			<example>
++				<title><function>pv_xavp_to_var()</function> usage</title>
++				<programlisting format="linespecific">
++...
++$xavp("bar=>temp") = 3;
++$xavp("bar[0]=>foo") = "foo indeed";
++pv_xavp_to_var("bar");
++...
++$var("temp") now is 3
++$var("foo") now is "foo indeed"
++...
++				</programlisting>
++			</example>
++		</section>
+ 	</section>
+ 
+ 	<section>
+diff --git a/modules/pv/pv.c b/modules/pv/pv.c
+index 5e141c1..4ed9171 100644
+--- a/modules/pv/pv.c
++++ b/modules/pv/pv.c
+@@ -495,6 +495,7 @@ static int w_sbranch_set_ruri(sip_msg_t *msg, char p1, char *p2);
+ static int w_sbranch_append(sip_msg_t *msg, char p1, char *p2);
+ static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2);
+ static int w_var_to_xavp(sip_msg_t *msg, char *p1, char *p2);
++static int w_xavp_to_var(sip_msg_t *msg, char *p1);
+ 
+ static int pv_init_rpc(void);
+ 
+@@ -508,6 +509,8 @@ static cmd_export_t cmds[]={
+ 		ANY_ROUTE },
+ 	{"pv_var_to_xavp",  (cmd_function)w_var_to_xavp, 2, 0, 0,
+ 		ANY_ROUTE },
++	{"pv_xavp_to_var",  (cmd_function)w_xavp_to_var, 1, 0, 0,
++		ANY_ROUTE },
+ #endif
+ 	{"is_int", (cmd_function)is_int, 1, fixup_pvar_null, fixup_free_pvar_null,
+ 		ANY_ROUTE},
+@@ -710,6 +713,19 @@ static int w_var_to_xavp(sip_msg_t *msg, char *s1, char *s2)
+ 	return pv_var_to_xavp(&varname, &xname);
+ }
+ 
++static int w_xavp_to_var(sip_msg_t *msg, char *s1)
++{
++	str xname;
++
++	if(s1 == NULL) {
++		LM_ERR("wrong parameters\n");
++		return -1;
++	}
++
++	xname.s = s1; xname.len = strlen(s1);
++	return pv_xavp_to_var(&xname);
++}
++
+ /**
+  *
+  */
+diff --git a/modules/pv/pv_xavp.c b/modules/pv/pv_xavp.c
+index 0db1977..8c11426 100644
+--- a/modules/pv/pv_xavp.c
++++ b/modules/pv/pv_xavp.c
+@@ -674,4 +674,62 @@ error:
+ 	xavp_rm_by_name(xname, 1, NULL);
+ 	return -1;
+ }
++
++int pv_xavp_to_var_helper(sr_xavp_t *avp) {
++	script_var_t *it;
++	int_str value;
++	int flags = 0;
++
++	it = add_var(&avp->name, VAR_TYPE_ZERO);
++	if(!it)	return -1;
++	if(avp->val.type==SR_XTYPE_STR){
++		flags |= VAR_VAL_STR;
++		value.s.len = avp->val.v.s.len;
++		value.s.s = avp->val.v.s.s;
++		LM_DBG("var:[%.*s]  STR:[%.*s]\n", avp->name.len, avp->name.s,
++			value.s.len, value.s.s);
++	}
++	else if(avp->val.type==SR_XTYPE_INT) {
++		flags |= VAR_VAL_INT;
++		value.n = avp->val.v.i;
++		LM_DBG("var:[%.*s] INT:[%d]\n", avp->name.len, avp->name.s,
++			value.n);
++	} else {
++		LM_ERR("avp type not STR nor INT\n");
++		return -1;
++	}
++	set_var_value(it, &value, flags);
++
++	return 0;
++}
++
++int pv_xavp_to_var(str *xname) {
++	sr_xavp_t *xavp;
++	sr_xavp_t *avp;
++
++	LM_DBG("xname:%.*s\n", xname->len, xname->s);
++
++	xavp = xavp_get_by_index(xname, 0, NULL);
++	if(!xavp) {
++		LM_ERR("xavp [%.*s] not found\n", xname->len, xname->s);
++		return -1;
++	}
++	if(xavp->val.type!=SR_XTYPE_XAVP){
++		LM_ERR("%.*s not xavp type?\n", xname->len, xname->s);
++		return -1;
++	}
++	avp = xavp->val.v.xavp;
++	if (avp)
++	{
++		if(pv_xavp_to_var_helper(avp)<0) return -1;
++		avp = avp->next;
++	}
++
++	while(avp)
++	{
++		if(pv_xavp_to_var_helper(avp)<0) return -1;
++		avp = avp->next;
++	}
++	return 1;
++}
+ #endif
+diff --git a/modules/pv/pv_xavp.h b/modules/pv/pv_xavp.h
+index 97d2bec..f9ed6fc 100644
+--- a/modules/pv/pv_xavp.h
++++ b/modules/pv/pv_xavp.h
+@@ -33,6 +33,7 @@ int pv_xavp_print(struct sip_msg* msg, char* s1, char *s2);
+ int xavp_params_explode(str *params, str *xname);
+ 
+ int pv_var_to_xavp(str *varname, str *xname);
++int pv_xavp_to_var(str *xname);
+ 
+ #endif
+ #endif
+-- 
+2.5.1
+
