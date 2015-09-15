@@ -1,0 +1,203 @@
+From 0c25a564ae178e46747bc31e9a289a1602a537e3 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Sat, 29 Aug 2015 09:07:27 +0200
+Subject: [PATCH] pv: pv_var_to_xavp
+
+---
+ modules/pv/doc/pv_admin.xml | 31 +++++++++++++++++++++++
+ modules/pv/pv.c             | 17 +++++++++++++
+ modules/pv/pv_svar.c        |  4 +++
+ modules/pv/pv_svar.h        |  1 +
+ modules/pv/pv_xavp.c        | 61 +++++++++++++++++++++++++++++++++++++++++++++
+ modules/pv/pv_xavp.h        |  5 +++-
+ 6 files changed, 118 insertions(+), 1 deletion(-)
+
+--- a/modules/pv/doc/pv_admin.xml
++++ b/modules/pv/doc/pv_admin.xml
+@@ -266,6 +266,37 @@
+ 				</programlisting>
+ 			</example>
+ 		</section>
++		<section id="pv.f.pv_var_to_xavp">
++			<title>
++				<function moreinfo="none">pv_var_to_xavp(varname, xname)</function>
++			</title>
++			<para>
++				Copy script variables values to a xavp.
++			</para>
++			<para>
++				First parameter can be '*' in order to copy all script variables. Second parameter is the name of the destination xavp. If xavp already exists it will be reset first.
++			</para>
++			<para>
++			Function can be used from ANY_ROUTE.
++			</para>
++			<example>
++				<title><function>pv_var_to_xavp()</function> usage</title>
++				<programlisting format="linespecific">
++...
++$var("temp") = 3;
++$var("foo") = "foo indeed";
++pv_var_to_xavp("temp", "ok");
++...
++$xavp("ok[0]=>temp") now is 3
++...
++pv_var_to_xavp("*", "ok");
++...
++$xavp("ok[0]=>temp") now is 3
++$xavp("ok[0]=>foo") now is "foo indeed"
++...
++				</programlisting>
++			</example>
++		</section>
+ 	</section>
+ 
+ 	<section>
+--- a/modules/pv/pv.c
++++ b/modules/pv/pv.c
+@@ -464,6 +464,8 @@
+ static int pv_not_empty(sip_msg_t *msg, char *pv, char *s2);
+ static int pv_init_rpc(void);
+ 
++static int w_var_to_xavp(sip_msg_t *msg, char *p1, char *p2);
++
+ static cmd_export_t cmds[]={
+ 	{"pv_isset",  (cmd_function)pv_isset,  1, fixup_pvar_null, 0, 
+ 		ANY_ROUTE },
+@@ -472,6 +474,8 @@
+ #ifdef WITH_XAVP
+ 	{"pv_xavp_print",  (cmd_function)pv_xavp_print,  0, 0, 0, 
+ 		ANY_ROUTE },
++	{"pv_var_to_xavp",  (cmd_function)w_var_to_xavp, 2, 0, 0,
++		ANY_ROUTE },
+ #endif
+ 	{"is_int", (cmd_function)is_int, 1, fixup_pvar_null, fixup_free_pvar_null,
+ 		ANY_ROUTE},
+@@ -631,6 +635,20 @@
+ 	return -1;
+ }
+ 
++static int w_var_to_xavp(sip_msg_t *msg, char *s1, char *s2)
++{
++	str xname, varname;
++
++	if(s1 == NULL || s2 == NULL) {
++		LM_ERR("wrong parameters\n");
++		return -1;
++	}
++
++	varname.len = strlen(s1); varname.s = s1;
++	xname.s = s2; xname.len = strlen(s2);
++	return pv_var_to_xavp(&varname, &xname);
++}
++
+ /**
+  * Copyright (C) 2011 Juha Heinanen
+  *
+--- a/modules/pv/pv_svar.c
++++ b/modules/pv/pv_svar.c
+@@ -156,6 +156,10 @@
+ 	return 0;
+ }
+ 
++script_var_t* get_var_all(void) {
++	return script_vars;
++}
++
+ void reset_vars(void)
+ {
+ 	script_var_t *it;
+--- a/modules/pv/pv_svar.h
++++ b/modules/pv/pv_svar.h
+@@ -47,6 +47,7 @@
+ script_var_t* add_var(str *name);
+ script_var_t* set_var_value(script_var_t *var, int_str *value, int flags);
+ script_var_t* get_var_by_name(str *name);
++script_var_t* get_var_all(void);
+ 
+ void reset_vars(void);
+ void destroy_vars(void);
+--- a/modules/pv/pv_xavp.c
++++ b/modules/pv/pv_xavp.c
+@@ -557,4 +557,64 @@
+ 	return 1;
+ }
+ 
++int pv_var_to_xavp(str *varname, str *xname)
++{
++	script_var_t *it;
++	sr_xavp_t *xavp = NULL;
++	sr_xval_t xval;
++
++	LM_DBG("xname:%.*s varname:%.*s\n", xname->len, xname->s,
++		varname->len, varname->s);
++
++	// clean xavp
++	xavp_rm_by_name(xname, 1, NULL);
++
++	if(varname->len==1 && varname->s[0] == '*') {
++		for(it=get_var_all(); it; it=it->next) {
++			memset(&xval, 0, sizeof(sr_xval_t));
++			if(it->v.flags&VAR_VAL_STR)
++			{
++				if(it->v.value.s.len==0) continue;
++				xval.type = SR_XTYPE_STR;
++				xval.v.s.s = it->v.value.s.s;
++				xval.v.s.len = it->v.value.s.len;
++			} else {
++				xval.type = SR_XTYPE_INT;
++				xval.v.i = it->v.value.n;
++			}
++			xavp = xavp_add_xavp_value(xname, &it->name, &xval, NULL);
++			if(xavp==NULL) {
++				LM_ERR("can't copy [%.*s]\n", it->name.len, it->name.s);
++				goto error;
++			}
++		}
++	}
++	else {
++		it = get_var_by_name(varname);
++		if(it==NULL) {
++			LM_ERR("script var [%.*s] not found\n", varname->len, varname->s);
++			return -1;
++		}
++		memset(&xval, 0, sizeof(sr_xval_t));
++		if(it->v.flags&VAR_VAL_STR)
++		{
++			xval.type = SR_XTYPE_STR;
++			xval.v.s.s = it->v.value.s.s;
++			xval.v.s.len = it->v.value.s.len;
++		} else {
++			xval.type = SR_XTYPE_INT;
++			xval.v.i = it->v.value.n;
++		}
++		xavp = xavp_add_xavp_value(xname, &it->name, &xval, NULL);
++		if(xavp==NULL) {
++			LM_ERR("can't copy [%.*s]\n", it->name.len, it->name.s);
++			goto error;
++		}
++	}
++	return 1;
++
++error:
++	xavp_rm_by_name(xname, 1, NULL);
++	return -1;
++}
+ #endif
+--- a/modules/pv/pv_xavp.h
++++ b/modules/pv/pv_xavp.h
+@@ -22,6 +22,7 @@
+ #ifdef WITH_XAVP
+ 
+ #include "../../pvar.h"
++#include "pv_svar.h"
+ 
+ int pv_get_xavp(struct sip_msg *msg, pv_param_t *param,
+ 		pv_value_t *res);
+@@ -31,5 +32,7 @@
+ 
+ int pv_xavp_print(struct sip_msg* msg, char* s1, char *s2);
+ 
++int pv_var_to_xavp(str *varname, str *xname);
++
+ #endif
+ #endif
