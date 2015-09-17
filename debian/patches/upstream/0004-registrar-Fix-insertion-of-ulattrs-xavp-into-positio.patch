@@ -1,0 +1,26 @@
+From 12098415cda75ed10d4d7c75602630b90ef6afd1 Mon Sep 17 00:00:00 2001
+From: Hugh Waite <hugh.waite@acision.com>
+Date: Fri, 22 May 2015 09:28:52 +0100
+Subject: [PATCH] registrar: Fix insertion of ulattrs xavp into position 0
+
+- If the first entry is an XTYPE_NULL entry it is replaced, not pushed down the stack
+---
+ modules/registrar/lookup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/registrar/lookup.c b/modules/registrar/lookup.c
+index 6193327..efbe39c 100644
+--- a/modules/registrar/lookup.c
++++ b/modules/registrar/lookup.c
+@@ -345,7 +345,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
+ 
+ 		if(ptr->xavp!=NULL) {
+ 			xavp = xavp_clone_level_nodata(ptr->xavp);
+-			if(xavp_add(xavp, NULL)<0) {
++			if(xavp_insert(xavp, 0, NULL)<0) {
+ 				ret = -3;
+ 				goto done;
+ 			}
+-- 
+2.5.1
+

@@ -119,7 +119,7 @@ set xavp_rcd at registered() too
  
  	ret = -1;
  
-@@ -221,23 +264,8 @@
+@@ -221,23 +264,7 @@
  		/* reset next hop address */
  		reset_dst_uri(_m);
  
@@ -141,15 +141,15 @@ set xavp_rcd at registered() too
 -			}
 -		}
 +		xavp_rcd_helper(ptr);
-+
  		/* If a Path is present, use first path-uri in favour of
  		 * received-uri because in that case the last hop towards the uac
  		 * has to handle NAT. - agranig */
-@@ -597,6 +625,7 @@
- 			ul.release_urecord(r);
- 			ul.unlock_udomain(_d, &aor);
- 			LM_DBG("'%.*s' found in usrloc\n", aor.len, ZSW(aor.s));
+@@ -631,6 +658,8 @@
+ 				memcmp(match_contact.s, ptr->c.s, match_contact.len)))
+ 				continue;
+ 
 +			xavp_rcd_helper(ptr);
- 			return 1;
- 		}
- 	}
++
+ 			if(ptr->xavp!=NULL && match_action_flag == 1) {
+ 				sr_xavp_t *xavp = xavp_clone_level_nodata(ptr->xavp);
+ 				if(xavp_add(xavp, NULL)<0) {
