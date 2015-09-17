@@ -25,6 +25,7 @@ sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/parallel_build.patch
 sipwise/tcap.patch
+sipwise/registrar-add-contact-and-recieved-info-to-xavp_rcd-o.patch
 # carrier support
 sipwise/usrloc_dbro.patch
 sipwise/0001-usrloc-support-filter-by-server_id-at-get_all_uconta.patch
