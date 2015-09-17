@@ -1,0 +1,25 @@
+From 7b011b32be9bca6cf618e2eecd8364dce4041af6 Mon Sep 17 00:00:00 2001
+From: Luis Azedo <luis@2600hz.com>
+Date: Fri, 27 Mar 2015 01:36:45 +0000
+Subject: [PATCH] registrar: fix wrong var name
+
+---
+ modules/registrar/lookup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/registrar/lookup.c b/modules/registrar/lookup.c
+index 1a35eda..6193327 100644
+--- a/modules/registrar/lookup.c
++++ b/modules/registrar/lookup.c
+@@ -661,7 +661,7 @@ int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag, in
+ 	}
+ 
+ 	if (res == 0) {
+-		LM_DBG("searching with match flags (%d,%d)\n", match_flag, reg_match_flag_param);
++		LM_DBG("searching with match flags (%d,%d)\n", match_flag, match_action_flag);
+ 		if(reg_xavp_cfg.s!=NULL) {
+ 
+ 			if((match_flag & 1)
+-- 
+2.5.1
+

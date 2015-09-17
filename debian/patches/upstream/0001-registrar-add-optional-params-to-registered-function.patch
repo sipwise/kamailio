@@ -1,0 +1,331 @@
+From 7ba770ca43485531eef4ad4ccbefe046d8fb2223 Mon Sep 17 00:00:00 2001
+From: Luis Azedo <luis@2600hz.com>
+Date: Wed, 25 Mar 2015 11:21:21 +0000
+Subject: [PATCH] registrar : add optional params to registered function
+
+3rd parameter as flag is used to optionally restrict contacts when searching.
+values are
+  1 - match_callid
+  2 - match_received
+  3 - match_contact
+
+4th parameter as flag to optionally perform action on positive match
+values are
+  1 - set xavp_rcd with value from matched contact
+---
+ modules/registrar/doc/registrar_admin.xml | 43 +++++++++++++++-
+ modules/registrar/lookup.c                | 74 ++++++++++++++++++++++-----
+ modules/registrar/lookup.h                |  3 +-
+ modules/registrar/reg_mod.c               | 85 ++++++++++++++++++++++---------
+ modules/registrar/reg_mod.h               |  6 ++-
+ 5 files changed, 169 insertions(+), 42 deletions(-)
+
+--- a/modules/registrar/doc/registrar_admin.xml
++++ b/modules/registrar/doc/registrar_admin.xml
+@@ -1032,7 +1032,7 @@
+ 
+ 	<section>
+ 		<title>
+-		<function moreinfo="none">registered(domain [, uri])</function>
++		<function moreinfo="none">registered(domain [, uri [, match_option [, match_action]]])</function>
+ 		</title>
+ 		<para>
+ 		The function returns true if the AOR in the Request-URI is 
+@@ -1054,6 +1054,35 @@
+ 			of R-URI. It can be a dynamic string with pseudo-variables.
+ 			</para>
+ 		</listitem>
++		<listitem>
++			<para>
++			<emphasis>match_option</emphasis> (optional) - flag parameter to restrict
++			contact search. use reg_xavp_cfg to set the values to compare to.
++			</para>
++            <para>flag values is as follows:</para>
++			<itemizedlist>
++				<listitem>
++					<para>1 - match_callid</para>
++				</listiem>
++				<listitem>
++					<para>2 - match_received</para>
++				</listiem>
++				<listitem>
++					<para>4 - match_contact</para>
++				</listiem>
++			</itemizedlist>			
++		</listitem>
++		<listitem>
++			<para>
++			<emphasis>match_action</emphasis> (optional) - actions to perform when match is positive.
++			</para>
++            <para>flag values is as follows:</para>
++			<itemizedlist>
++				<listitem>
++					<para>1 - set xavp_rcd with value from matched contact</para>
++				</listiem>
++			</itemizedlist>						
++		</listitem>
+ 		</itemizedlist>
+ 		<para>
+ 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
+@@ -1067,6 +1096,13 @@
+ 	...
+ };
+ ...
++$xavp(regcfg=>match_received) = $su;
++if (registered("location","$rz:$Au", 2)) {
++	sl_send_reply("100", "Trying");
++	...
++};
++...
++
+ </programlisting>
+ 		</example>
+ 	</section>
+--- a/modules/registrar/lookup.c
++++ b/modules/registrar/lookup.c
+@@ -546,13 +546,24 @@
+  * it is similar to lookup but registered neither rewrites
+  * the Request-URI nor appends branches
+  */
+-int registered(struct sip_msg* _m, udomain_t* _d, str* _uri)
++int registered(struct sip_msg* _m, udomain_t* _d, str* _uri) {
++	return registered4(_m, _d, _uri, 0, 0);
++}
++
++int registered3(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag) {
++	return registered4(_m, _d, _uri, match_flag, 0);
++}
++
++int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag, int match_action_flag)
+ {
+ 	str uri, aor;
+ 	urecord_t* r;
+ 	ucontact_t* ptr;
+ 	int res;
+-	int_str match_callid=(int_str)0;
++	str match_callid = {0,0};
++	str match_received = {0,0};
++	str match_contact = {0,0};
++	sr_xavp_t *vavp = NULL;
+ 
+ 	if(_uri!=NULL)
+ 	{
+@@ -577,26 +588,61 @@
+ 	}
+ 
+ 	if (res == 0) {
+-		
+-		if (reg_callid_avp_name.n) {
+-			struct usr_avp *avp =
+-				search_first_avp( reg_callid_avp_type, reg_callid_avp_name, &match_callid, 0);
+-			if (!(avp && is_avp_str_val(avp)))
+-				match_callid.n = 0;
+-				match_callid.s.s = NULL;
+-		} else {
+-			match_callid.n = 0;
+-			match_callid.s.s = NULL;
++		LM_DBG("searching with match flags (%d,%d)\n", match_flag, reg_match_flag_param);
++		if(reg_xavp_cfg.s!=NULL) {
++
++			if((match_flag & 1)
++					&& (vavp = xavp_get_child_with_sval(&reg_xavp_cfg, &match_callid_name)) != NULL
++					&& vavp->val.v.s.len > 0) {
++				match_callid = vavp->val.v.s;
++				LM_DBG("matching with callid %.*s\n", match_callid.len, match_callid.s);
++			}
++
++			if((match_flag & 2)
++					&& (vavp = xavp_get_child_with_sval(&reg_xavp_cfg, &match_received_name)) != NULL
++					&& vavp->val.v.s.len > 0) {
++				match_received = vavp->val.v.s;
++				LM_DBG("matching with received %.*s\n", match_received.len, match_received.s);
++			}
++
++			if((match_flag & 4)
++					&& (vavp = xavp_get_child_with_sval(&reg_xavp_cfg, &match_contact_name)) != NULL
++					&& vavp->val.v.s.len > 0) {
++				match_contact = vavp->val.v.s;
++				LM_DBG("matching with contact %.*s\n", match_contact.len, match_contact.s);
++			}
+ 		}
+ 
+ 		for (ptr = r->contacts; ptr; ptr = ptr->next) {
+ 			if(!VALID_CONTACT(ptr, act_time)) continue;
+-			if (match_callid.s.s && /* optionally enforce tighter matching w/ Call-ID */
+-				memcmp(match_callid.s.s,ptr->callid.s,match_callid.s.len))
++			if (match_callid.s && /* optionally enforce tighter matching w/ Call-ID */
++				match_callid.len > 0 &&
++				(match_callid.len != ptr->callid.len || 
++				memcmp(match_callid.s, ptr->callid.s, match_callid.len)))
+ 				continue;
++			if (match_received.s && /* optionally enforce tighter matching w/ ip:port */
++				match_received.len > 0 &&
++				(match_received.len != ptr->received.len || 
++				memcmp(match_received.s, ptr->received.s, match_received.len)))
++				continue;
++			if (match_contact.s && /* optionally enforce tighter matching w/ Contact */
++				match_contact.len > 0 &&
++				(match_contact.len != ptr->c.len || 
++				memcmp(match_contact.s, ptr->c.s, match_contact.len)))
++				continue;
++
++			if(ptr->xavp!=NULL && match_action_flag == 1) {
++				sr_xavp_t *xavp = xavp_clone_level_nodata(ptr->xavp);
++				if(xavp_add(xavp, NULL)<0) {
++					LM_ERR("error adding xavp for %.*s after successful match\n", aor.len, ZSW(aor.s));
++					xavp_destroy_list(&xavp);
++				}
++			}
++
+ 			ul.release_urecord(r);
+ 			ul.unlock_udomain(_d, &aor);
+ 			LM_DBG("'%.*s' found in usrloc\n", aor.len, ZSW(aor.s));
++
+ 			return 1;
+ 		}
+ 	}
+--- a/modules/registrar/lookup.h
++++ b/modules/registrar/lookup.h
+@@ -53,6 +53,7 @@
+  * the Request-URI nor appends branches
+  */
+ int registered(struct sip_msg* _m, udomain_t* _d, str* _uri);
+-
++int registered3(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag);
++int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag, int match_action_flag);
+ 
+ #endif /* LOOKUP_H */
+--- a/modules/registrar/reg_mod.c
++++ b/modules/registrar/reg_mod.c
+@@ -124,10 +124,9 @@
+ int reg_regid_mode = 0;
+ int reg_flow_timer = 0;
+ 
+-/* Populate this AVP if testing for specific registration instance. */
+-char *reg_callid_avp_param = 0;
+-unsigned short reg_callid_avp_type = 0;
+-int_str reg_callid_avp_name;
++str match_callid_name = str_init("match_callid");
++str match_received_name = str_init("match_received");
++str match_contact_name = str_init("match_contact");
+ 
+ char* rcv_avp_param = 0;
+ unsigned short rcv_avp_type = 0;
+@@ -184,6 +183,10 @@
+ 			REQUEST_ROUTE | FAILURE_ROUTE },
+ 	{"registered",   (cmd_function)w_registered,  2,  domain_uri_fixup, 0,
+ 			REQUEST_ROUTE | FAILURE_ROUTE },
++	{"registered",   (cmd_function)w_registered3, 3,  registered_fixup, 0,
++			REQUEST_ROUTE | FAILURE_ROUTE },
++	{"registered",   (cmd_function)w_registered4, 4,  registered_fixup, 0,
++			REQUEST_ROUTE | FAILURE_ROUTE },
+ 	{"add_sock_hdr", (cmd_function)add_sock_hdr,  1,  fixup_str_null, 0,
+ 			REQUEST_ROUTE },
+ 	{"unregister",   (cmd_function)w_unregister,  2,  unreg_fixup, 0,
+@@ -325,24 +328,6 @@
+ 		rcv_avp_type = 0;
+ 	}
+ 
+-	if (reg_callid_avp_param && *reg_callid_avp_param) {
+-		s.s = reg_callid_avp_param; s.len = strlen(s.s);
+-		if (pv_parse_spec(&s, &avp_spec)==0
+-			|| avp_spec.type!=PVT_AVP) {
+-			LM_ERR("malformed or non AVP %s AVP definition\n", reg_callid_avp_param);
+-			return -1;
+-		}
+-
+-		if(pv_get_avp_name(0, &avp_spec.pvp, &reg_callid_avp_name, &reg_callid_avp_type)!=0)
+-		{
+-			LM_ERR("[%s]- invalid AVP definition\n", reg_callid_avp_param);
+-			return -1;
+-		}
+-	} else {
+-		reg_callid_avp_name.n = 0;
+-		reg_callid_avp_type = 0;
+-	}
+-
+ 	bind_usrloc = (bind_usrloc_t)find_export("ul_bind_usrloc", 1, 0);
+ 	if (!bind_usrloc) {
+ 		LM_ERR("can't bind usrloc\n");
+@@ -502,6 +487,46 @@
+ 	return registered(_m, (udomain_t*)_d, (uri.len>0)?&uri:NULL);
+ }
+ 
++static int w_registered3(struct sip_msg* _m, char* _d, char* _uri, char* _flags)
++{
++	str uri = {0};
++	int flags = 0;
++	if(_uri!=NULL && (fixup_get_svalue(_m, (gparam_p)_uri, &uri)!=0 || uri.len<=0))
++	{
++		LM_ERR("invalid uri parameter\n");
++		return -1;
++	}
++	if(_flags!=NULL && (fixup_get_ivalue(_m, (fparam_t*)_flags, &flags)) < 0)
++	{
++		LM_ERR("invalid flags parameter\n");
++		return -1;
++	}
++	return registered3(_m, (udomain_t*)_d, (uri.len>0)?&uri:NULL, flags);
++}
++
++static int w_registered4(struct sip_msg* _m, char* _d, char* _uri, char* _flags, char* _actionflags)
++{
++	str uri = {0};
++	int flags = 0;
++	int actionflags = 0;
++	if(_uri!=NULL && (fixup_get_svalue(_m, (gparam_p)_uri, &uri)!=0 || uri.len<=0))
++	{
++		LM_ERR("invalid uri parameter\n");
++		return -1;
++	}
++	if(_flags!=NULL && (fixup_get_ivalue(_m, (fparam_t*)_flags, &flags)) < 0)
++	{
++		LM_ERR("invalid flags parameter\n");
++		return -1;
++	}
++	if(_actionflags!=NULL && (fixup_get_ivalue(_m, (fparam_t*)_actionflags, &actionflags)) < 0)
++	{
++		LM_ERR("invalid action flag parameter\n");
++		return -1;
++	}
++	return registered4(_m, (udomain_t*)_d, (uri.len>0)?&uri:NULL, flags, actionflags);
++}
++
+ static int w_unregister(struct sip_msg* _m, char* _d, char* _uri)
+ {
+ 	str uri = {0};
+@@ -564,6 +589,19 @@
+ 	return 0;
+ }
+ 
++static int registered_fixup(void** param, int param_no)
++{
++	if (param_no == 1) {
++		return domain_fixup(param, 1);
++	} else if (param_no == 2) {
++		return fixup_spve_null(param, 1);
++	} else if (param_no == 3) {
++		return fixup_igp_null(param, 1);
++	} else if (param_no == 4) {
++		return fixup_igp_null(param, 1);
++	}
++	return 0;
++}
+ 
+ /*! \brief
+  * Convert char* parameter to udomain_t* pointer
+--- a/modules/registrar/reg_mod.h
++++ b/modules/registrar/reg_mod.h
+@@ -86,8 +86,10 @@
+ 
+ extern unsigned short rcv_avp_type;
+ extern int_str rcv_avp_name;
+-extern unsigned short reg_callid_avp_type;
+-extern int_str reg_callid_avp_name;
++
++extern str match_callid_name;
++extern str match_received_name;
++extern str match_contact_name;
+ 
+ extern str rcv_param;
+ extern int method_filtering;

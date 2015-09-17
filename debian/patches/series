@@ -5,6 +5,9 @@ upstream/presence_dialoginfo-optionally-send-dummy-dialog.patch
 upstream/presence_dialoginfo-rfc4235-in-dummy-dialog.patch
 upstream/lib-srdb1-use-6-digits-for-db_double2str.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
+upstream/0001-registrar-add-optional-params-to-registered-function.patch
+upstream/0002-registrar-fix-wrong-var-name.patch
+upstream/0003-registrar-Fix-insertion-of-ulattrs-xavp-into-positio.patch
 ## multipart bodies
 upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
 upstream/0001-core-add-str_append-helper-function.patch
@@ -39,6 +42,8 @@ sipwise/tcap.patch
 sipwise/rtpengine.patch
 sipwise/rtpengine-compatibility.patch
 sipwise/db_postgres-timeout
+sipwise/registrar-add-contact-and-recieved-info-to-xavp_rcd-o.patch
+# carrier support
 sipwise/usrloc_dbro.patch
 sipwise/nathelper_socket_filter.patch
 sipwise/pua_reginfo_fix.patch
