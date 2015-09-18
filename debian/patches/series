@@ -51,3 +51,4 @@ sipwise/pua_reginfo_fix.patch
 # backport from master
 upstream/0001-nathelper-add-append_sdp_oldmediaip-parameter.patch
 upstream/0001-usrloc-run-callbacks-after-updating-the-info-on-DB_O.patch
+upstream/0013-sdpops-don-t-return-0-if-no-match-for-sdp_get_line_s.patch
