@@ -1,3 +1,12 @@
+ngcp-kamailio (4.3.0-1+0~mr4.0.1.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [83de052] MT#14989 registrar: add contact/received info to xavp_rcd and set it at registrered() too
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 21 Sep 2015 14:24:36 +0200
+
 ngcp-kamailio (4.3.0-1+0~mr4.0.1.3) unstable; urgency=medium
 
   [ Victor Seva ]
