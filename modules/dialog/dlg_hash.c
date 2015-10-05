@@ -651,7 +651,7 @@ dlg_cell_t* dlg_get_by_iuid(dlg_iuid_t *diuid)
  * \param ftag from tag
  * \param ttag to tag
  * \param dir direction
- * \param mode let hash table slot locked if dialog is not found
+ * \param mode let hash table slot locked or not
  * \return dialog structure on success, NULL on failure
  */
 static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
@@ -669,7 +669,7 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
 		/* Check callid / fromtag / totag */
 		if (match_dialog( dlg, callid, ftag, ttag, dir)==1) {
 			ref_dlg_unsafe(dlg, 1);
-			dlg_unlock( d_table, d_entry);
+			if(likely(mode==0)) dlg_unlock( d_table, d_entry);
 			LM_DBG("dialog callid='%.*s' found on entry %u, dir=%d\n",
 				callid->len, callid->s,h_entry,*dir);
 			return dlg;
@@ -725,15 +725,15 @@ struct dlg_cell* get_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
  * referred to as a dialog."
  * Note that the caller is responsible for decrementing (or reusing)
  * the reference counter by one again if a dialog has been found.
- * If the dialog is not found, the hash slot is left locked, to allow
- * linking the structure of a new dialog.
+ * Important: the hash slot is left locked (e.g., needed to allow
+ * linking the structure of a new dialog).
  * \param callid callid
  * \param ftag from tag
  * \param ttag to tag
  * \param dir direction
  * \return dialog structure on success, NULL on failure (and slot locked)
  */
-dlg_cell_t* search_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
+dlg_cell_t* dlg_search( str *callid, str *ftag, str *ttag, unsigned int *dir)
 {
 	struct dlg_cell *dlg;
 	unsigned int he;
@@ -750,6 +750,21 @@ dlg_cell_t* search_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
 
 
 /*!
+ * \brief Lock hash table slot by call-id
+ * \param callid call-id value
+ */
+void dlg_hash_lock(str *callid)
+{
+	unsigned int he;
+	struct dlg_entry *d_entry;
+
+	he = core_hash(callid, 0, d_table->size);
+	d_entry = &(d_table->entries[he]);
+	dlg_lock(d_table, d_entry);
+}
+
+
+/*!
  * \brief Release hash table slot by call-id
  * \param callid call-id value
  */
@@ -762,7 +777,6 @@ void dlg_hash_release(str *callid)
 	d_entry = &(d_table->entries[he]);
 	dlg_unlock(d_table, d_entry);
 }
-
 
 
 /*!

@@ -69,6 +69,7 @@ int ts_append(struct sip_msg* msg, str *ruri, char *table) {
 int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table) {
 	struct cell     *t;
 	struct sip_msg *orig_msg;
+	int ret;
 
 	if(_tmb.t_lookup_ident(&t, tindex, tlabel) < 0)
 	{
@@ -76,12 +77,23 @@ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table) {
 				tindex, tlabel);
 		return -1;
 	}
+	if (t->flags & T_CANCELED) {
+		LM_DBG("trasaction [%u:%u] was cancelled\n",
+				tindex, tlabel);
+		return -2;
+	}
+	if (t->uas.status >= 200) {
+		LM_DBG("trasaction [%u:%u] sent out a final response already - %d\n",
+				tindex, tlabel, t->uas.status);
+		return -3;
+	}
 
 	orig_msg = t->uas.request;
 
-	if (_regapi.lookup_to_dset(orig_msg, table, NULL) != 1) {
-		LM_DBG("transaction %u:%u: error updating dset\n", tindex, tlabel);
-		return -1;
+	ret = _regapi.lookup_to_dset(orig_msg, table, NULL);
+	if(ret != 1) {
+		LM_DBG("transaction %u:%u: error updating dset (%d)\n", tindex, tlabel, ret);
+		return -4;
 	}
 
 	return _tmb.t_append_branches();
