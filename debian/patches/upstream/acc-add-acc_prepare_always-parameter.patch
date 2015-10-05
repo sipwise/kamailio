@@ -1,0 +1,61 @@
+From f3aa7bd4ffc489fcb7cb8a9c2f5da5569dfd9b28 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 5 Oct 2015 13:42:43 +0200
+Subject: [PATCH] acc: add acc_prepare_always parameter
+
+This will force the preparation of the request no matter
+if the flags are set at the moment of the transaction
+creation
+---
+ modules/acc/acc_logic.c | 2 +-
+ modules/acc/acc_mod.c   | 2 ++
+ modules/acc/acc_mod.h   | 1 +
+ 3 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/modules/acc/acc_logic.c b/modules/acc/acc_logic.c
+index 16a97e5..0d453a7 100644
+--- a/modules/acc/acc_logic.c
++++ b/modules/acc/acc_logic.c
+@@ -102,7 +102,7 @@ struct acc_enviroment acc_env;
+ 	(((_rq)->REQ_METHOD==METHOD_CANCEL) && report_cancels==0)
+ 
+ #define is_acc_prepare_on(_rq) \
+-	(is_acc_flag_set(_rq,acc_prepare_flag))
++	(acc_prepare_always || is_acc_flag_set(_rq,acc_prepare_flag))
+ 
+ static void tmcb_func( struct cell* t, int type, struct tmcb_params *ps );
+ 
+diff --git a/modules/acc/acc_mod.c b/modules/acc/acc_mod.c
+index 91b47d0..d412dbf 100644
+--- a/modules/acc/acc_mod.c
++++ b/modules/acc/acc_mod.c
+@@ -108,6 +108,7 @@ static char *failed_filter_str = 0;  /* by default, do not filter logging of
+ unsigned short failed_filter[MAX_FAILED_FILTER_COUNT + 1];
+ static char* leg_info_str = 0;	/*!< multi call-leg support */
+ struct acc_extra *leg_info = 0;
++int acc_prepare_always = 0; /* prepare the request always for later acc */
+ int acc_prepare_flag = -1; /*!< should the request be prepared for later acc */
+ char *acc_time_format = "%Y-%m-%d %H:%M:%S";
+ int reason_from_hf = 0; /*!< assign reason from reason hf if present */
+@@ -262,6 +263,7 @@ static param_export_t params[] = {
+ 	{"multi_leg_info",          PARAM_STRING, &leg_info_str            },
+ 	{"detect_direction",        INT_PARAM, &detect_direction        },
+ 	{"acc_prepare_flag",        INT_PARAM, &acc_prepare_flag        },
++	{"acc_prepare_always",      INT_PARAM, &acc_prepare_always      },
+ 	{"reason_from_hf",          INT_PARAM, &reason_from_hf          },
+ 	/* syslog specific */
+ 	{"log_flag",             INT_PARAM, &log_flag             },
+diff --git a/modules/acc/acc_mod.h b/modules/acc/acc_mod.h
+index c746ffb..055ac61 100644
+--- a/modules/acc/acc_mod.h
++++ b/modules/acc/acc_mod.h
+@@ -103,5 +103,6 @@ extern int acc_time_mode;
+ extern str acc_time_attr;
+ extern str acc_time_exten;
+ 
++extern int acc_prepare_always;
+ 
+ #endif
+-- 
+2.5.3
+
