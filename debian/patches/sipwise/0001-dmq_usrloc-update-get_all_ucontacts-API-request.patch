@@ -1,0 +1,31 @@
+From 160a9ae1f9bbd3451911a3a19f271142f8f6c98d Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 7 Jul 2015 13:04:00 +0200
+Subject: [PATCH] dmq_usrloc: update get_all_ucontacts API request
+
+Fixes: #236
+(cherry picked from commit 733fd5daf74963b152a2964f9eea1a6fff91858a)
+---
+ modules/dmq_usrloc/usrloc_sync.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/modules/dmq_usrloc/usrloc_sync.c
++++ b/modules/dmq_usrloc/usrloc_sync.c
+@@ -152,7 +152,7 @@
+ 		goto done;
+ 	}
+ 
+-	rval = dmq_ul.get_all_ucontacts(buf, len, 0, 0, 1);
++	rval = dmq_ul.get_all_ucontacts(buf, len, 0, 0, 1, 0);
+ 	if (rval<0) {
+ 		LM_ERR("failed to fetch contacts\n");
+ 		goto done;
+@@ -166,7 +166,7 @@
+ 			LM_ERR("out of pkg memory\n");
+ 			goto done;
+ 		}
+-		rval = dmq_ul.get_all_ucontacts(buf, len, 0, 0, 1);
++		rval = dmq_ul.get_all_ucontacts(buf, len, 0, 0, 1, 0);
+ 		if (rval != 0) {
+ 			pkg_free(buf);
+ 			goto done;
