@@ -37,3 +37,6 @@ sipwise/0001-dmq_usrloc-update-get_all_ucontacts-API-request.patch
 sipwise/janssonrpc-c-fakerpc.patch
 sipwise/janssonrpc-c-keepalive.patch
 ##
+# testing fix
+upstream/acc-add-acc_prepare_always-parameter.patch
+##
