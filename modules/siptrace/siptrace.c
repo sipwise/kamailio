@@ -535,6 +535,11 @@ static int sip_trace_prepare(sip_msg_t *msg)
 		goto error;
 	}
 
+	if(parse_to_header(msg)==-1 || msg->to==NULL || get_to(msg)==NULL) {
+		LM_ERR("cannot parse To header\n");
+		goto error;
+	}
+
 	if(parse_headers(msg, HDR_CALLID_F, 0)!=0 || msg->callid==NULL
 			|| msg->callid->body.s==NULL) {
 		LM_ERR("cannot parse call-id\n");
@@ -757,6 +762,11 @@ static int sip_trace_store(struct _siptrace_data *sto, struct dest_info *dst)
 
 static int sip_trace_store_db(struct _siptrace_data *sto)
 {
+	if(db_con==NULL) {
+		LM_DBG("database connection not initialized\n");
+		return -1;
+	}
+
 	if(trace_to_database_flag==NULL || *trace_to_database_flag==0)
 		goto done;
 
