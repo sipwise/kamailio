@@ -1,3 +1,17 @@
+ngcp-kamailio (4.3.3-1+0~mr4.1.0.0) unstable; urgency=medium
+
+  * [a6b39bc] MT#10339 refresh patches
+  * [7a2c1f8] MT#10339 add patch to fix dmq_usrloc build after usrloc patches
+  * [e82524c] MT#12691 revert pua_reginfo fix c40f56627aecf
+  * [e0b7ef1] MT#14405 fix registrar max_contacts having sip.instance
+  * [76e5e3f] MT#14721 fix routename for event_route
+  * [a47aa4f] MT#14217 janssonrpc-c: add fakerpc mode
+  * [ef0516b] MT#14989 registrar: add contact/received info to xavp_rcd and set it at registrered() too
+  * [453a2eb] Imported Upstream version 4.3.3
+  * [a468cf8] MT#15575 remove already merged patches
+
+ -- Victor Seva <vseva@sipwise.com>  Mon, 05 Oct 2015 16:15:21 +0200
+
 ngcp-kamailio (4.3.1-1+0~mr4.1.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
