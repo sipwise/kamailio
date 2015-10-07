@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.3.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [06c3b2f] MT#15555 ability to set ACC flags after transaction has been created
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 07 Oct 2015 10:22:05 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.3.2) unstable; urgency=medium
 
   [ Victor Seva ]
