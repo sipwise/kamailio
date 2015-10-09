@@ -29,13 +29,3 @@
  				if ((type & UL_CONTACT_INSERT) || (type & UL_CONTACT_UPDATE)) {
  					reg_active = 1;
  					xmlNewProp(contact_node, BAD_CAST "state", BAD_CAST "active");
-@@ -246,9 +252,6 @@
- 		LM_ERR("Unknown Type %i\n", type);
- 		return;
- 	}
--	/* make a local copy of the AOR */
--	user.len = c->aor->len;
--	user.s = c->aor->s;
- 
- 	/* Get the UDomain for this account */
- 	res = ul.get_udomain(c->domain->s, &domain);
