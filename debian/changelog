@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.3.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [5ccc03c] MT#15703 MT#13917 pua_reginfo: use get_urecord() not get_record_ruid() as previously
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 09 Oct 2015 16:21:50 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.3.3) unstable; urgency=medium
 
   [ Victor Seva ]
