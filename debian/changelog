@@ -1,3 +1,13 @@
+ngcp-kamailio (4.3.3-1+0~mr4.2.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [1a42a68] MT#15575 restore dmq_usrloc patch
+  * [ac6a0c7] MT#15555 ability to set ACC flags after transaction has been created
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 12 Oct 2015 15:31:34 +0200
+
 ngcp-kamailio (4.3.3-1+0~mr4.1.0.0) unstable; urgency=medium
 
   * [a6b39bc] MT#10339 refresh patches
