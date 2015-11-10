@@ -36,4 +36,6 @@ sipwise/0001-dmq_usrloc-update-get_all_ucontacts-API-request.patch
 # MT#14217
 sipwise/janssonrpc-c-fakerpc.patch
 sipwise/janssonrpc-c-keepalive.patch
+# MT#16305
+sipwise/0001-textops-add-hf_msgout.patch
 ##
