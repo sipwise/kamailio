@@ -1,0 +1,486 @@
+From 363027e7fc5020ba80f0b183fc87921f3d3b641b Mon Sep 17 00:00:00 2001
+From: Stefan Mititelu <stefan.mititelu@1and1.ro>
+Date: Wed, 10 Jun 2015 15:10:00 +0300
+Subject: [PATCH] debugger: add a new dbg_sip_msg() config function
+
+Added a config function which prints how the sip message would look like
+if it were to be sent out at that point in config. Displays how the message
+looks after apllying all the lumps; but it is just printing, not actual
+lump application. Updated doku.
+---
+ dprint.h                                |   3 +
+ modules/debugger/debugger_mod.c         | 171 +++++++++++++++++++++++++++++++-
+ modules/debugger/doc/debugger_admin.xml |  63 +++++++++++-
+ msg_translator.c                        |  69 +++++++++----
+ msg_translator.h                        |  17 ++++
+ 5 files changed, 300 insertions(+), 23 deletions(-)
+
+--- a/dprint.h
++++ b/dprint.h
+@@ -98,6 +98,9 @@
+ #define L_INFO   	2
+ #define L_DBG    	3
+ #define L_MAX    	3
++#define L_OFFSET   42 /* needs to be added and then substracted
++                        because L_WARN may be confused with NULL pointer
++                        (e.g. fixup_dbg_sip_msg) */
+ 
+ /** @brief This is the facility value used to indicate that the caller of the macro
+  * did not override the facility. Value 0 (the defaul) is LOG_KERN on Linux
+--- a/modules/debugger/debugger_mod.c
++++ b/modules/debugger/debugger_mod.c
+@@ -35,6 +35,7 @@
+ #include "../../parser/parse_param.h"
+ #include "../../shm_init.h"
+ #include "../../script_cb.h"
++#include "../../msg_translator.h"
+ 
+ #include "debugger_api.h"
+ #include "debugger_config.h"
+@@ -42,7 +43,7 @@
+ 
+ MODULE_VERSION
+ 
+-static int  mod_init(void);
++static int mod_init(void);
+ static int child_init(int rank);
+ static void mod_destroy(void);
+ 
+@@ -53,6 +54,12 @@
+ static int fixup_dbg_pv_dump(void** param, int param_no);
+ static int w_dbg_dump(struct sip_msg* msg, char* mask, char* level);
+ 
++static struct action *dbg_fixup_get_action(void **param, int param_no);
++static int fixup_dbg_sip_msg(void** param, int param_no);
++static int w_dbg_sip_msg(struct sip_msg* msg, char *level, char *facility);
++
++extern char* dump_lump_list(struct lump *list, int s_offset, char *s_buf);
++
+ /* parameters */
+ extern int _dbg_cfgtrace;
+ extern int _dbg_cfgpkgcheck;
+@@ -69,6 +76,7 @@
+ /* cfgt api */
+ extern cfgt_api_t _dbg_cfgt;
+ 
++static int _dbg_sip_msg_cline;
+ static char * _dbg_cfgtrace_facility_str = 0;
+ static int _dbg_log_assign = 0;
+ 
+@@ -81,6 +89,12 @@
+ 		fixup_dbg_pv_dump, 0, ANY_ROUTE},
+ 	{"dbg_pv_dump", (cmd_function)w_dbg_dump, 2,
+ 		fixup_dbg_pv_dump, 0, ANY_ROUTE},
++    {"dbg_sip_msg", (cmd_function)w_dbg_sip_msg, 0,
++        fixup_dbg_sip_msg, 0, REQUEST_ROUTE},
++    {"dbg_sip_msg", (cmd_function)w_dbg_sip_msg, 1,
++        fixup_dbg_sip_msg, 0, REQUEST_ROUTE},
++    {"dbg_sip_msg", (cmd_function)w_dbg_sip_msg, 2,
++        fixup_dbg_sip_msg, 0, REQUEST_ROUTE},
+ 	{0, 0, 0, 0, 0, 0}
+ };
+ 
+@@ -347,6 +361,161 @@
+ 		return -1;
+ 	}
+ 	return 0;
++}
++
++static int fixup_dbg_sip_msg(void** param, int param_no)
++{
++    int facility;
++    int level;
++    struct action *dbg_sip_msg_action;
++
++    switch(param_no)
++    {
++        case 2:
++            facility = str2facility((char*)*(param));
++            if (facility == -1) {
++                LM_ERR("invalid log facility configured");
++                return E_UNSPEC;
++            }
++
++                         *param = (void*)(long)facility;    
++        break;
++        case 1:
++            switch(((char*)(*param))[2])
++            {
++                /* add L_OFFSET because L_WARN is consdered null pointer */
++                case 'A': level = L_ALERT + L_OFFSET; break;
++                case 'B': level = L_BUG + L_OFFSET; break;
++                case 'C': level = L_CRIT2 + L_OFFSET; break;
++                case 'E': level = L_ERR + L_OFFSET; break;
++                case 'W': level = L_WARN + L_OFFSET; break;
++                case 'N': level = L_NOTICE + L_OFFSET; break;
++                case 'I': level = L_INFO + L_OFFSET; break;
++                case 'D': level = L_DBG + L_OFFSET; break;
++                default:
++                    LM_ERR("unknown log level\n");
++                    return E_UNSPEC;
++            }
++
++            *param = (void*)(long)level;
++        break;
++    }
++
++    /* save the config line where this config function was called */
++    dbg_sip_msg_action = dbg_fixup_get_action(param, param_no);
++    _dbg_sip_msg_cline = dbg_sip_msg_action->cline;
+ 
++     return 0;
+ }
+ 
++/**
++  * dump current SIP message and a diff lump list
++  * part of the code taken from msg_apply_changes_f
++  */
++static int w_dbg_sip_msg(struct sip_msg* msg, char *level, char *facility)
++{
++    int ilevel = cfg_get(core, core_cfg, debug);
++    int ifacility= cfg_get(core, core_cfg, log_facility);
++    int flag = FLAG_MSG_LUMPS_ONLY; // copy lumps only, not the whole message
++    unsigned int new_buf_offs=0, orig_offs = 0;
++    char *hdr_lumps = NULL;
++    char *bdy_lumps = NULL;
++    const char *start_txt = "------------------------- START OF SIP message debug --------------------------\n";
++    const char *hdr_txt =   "------------------------------ SIP header diffs -------------------------------\n";
++    const char *bdy_txt =   "------------------------------- SIP body diffs --------------------------------\n";
++    const char *end_txt =   "-------------------------- END OF SIP message debug ---------------------------\n\n";
++    struct dest_info send_info;
++    str obuf;
++
++    if (level != NULL) {
++        /* substract L_OFFSET previously added */
++        ilevel = (int)(long)level - L_OFFSET;
++    }
++
++    if (facility != NULL) {
++        ifacility = (int)(long)facility;
++    }
++
++    /* msg_apply_changes_f code needed to get the current msg */
++    init_dest_info(&send_info);
++    send_info.proto = PROTO_UDP;
++    if(msg->first_line.type == SIP_REPLY) {
++        obuf.s = generate_res_buf_from_sip_res(msg,
++                (unsigned int*)&obuf.len, BUILD_NO_VIA1_UPDATE);
++    } else {
++        obuf.s = build_req_buf_from_sip_req(msg,
++                (unsigned int*)&obuf.len, &send_info,
++                BUILD_NO_PATH|BUILD_NO_LOCAL_VIA|BUILD_NO_VIA1_UPDATE);
++    }
++
++    if(obuf.s == NULL)
++    {
++        LM_ERR("couldn't update msg buffer content\n");
++        return -1;
++    }
++
++    if(obuf.len >= BUF_SIZE)
++    {
++        LM_ERR("new buffer overflow (%d)\n", obuf.len);
++        pkg_free(obuf.s);
++        return -1;
++    }
++
++    /* skip original uri */
++    if (msg->new_uri.s){
++        orig_offs=msg->first_line.u.request.uri.s - msg->buf;
++        orig_offs=msg->first_line.u.request.uri.len;
++    }
++
++    /* alloc private mem and copy lumps */
++    hdr_lumps = pkg_malloc(BUF_SIZE);
++    bdy_lumps = pkg_malloc(BUF_SIZE);
++
++    new_buf_offs = 0;
++    process_lumps(msg, msg->add_rm, hdr_lumps, &new_buf_offs, &orig_offs, &send_info, flag);
++
++    new_buf_offs = 0;
++    process_lumps(msg, msg->body_lumps, bdy_lumps, &new_buf_offs, &orig_offs, &send_info, flag);
++
++    /* do the print */
++    if (hdr_lumps != NULL && bdy_lumps != NULL) {
++        LOG_FC(ifacility, ilevel, "CONFIG LINE %d\n%s%.*s%s%s%s%s%s",
++            _dbg_sip_msg_cline,
++            start_txt,
++            obuf.len, obuf.s,
++            hdr_txt, hdr_lumps,
++            bdy_txt, bdy_lumps,
++            end_txt);
++    } else if (hdr_lumps != NULL) {
++        LOG_FC(ifacility, ilevel, "CONFIG LINE %d\n%s%.*s%s%s%s",
++            _dbg_sip_msg_cline,
++            start_txt,
++            obuf.len, obuf.s,
++            hdr_txt, hdr_lumps,
++            end_txt);
++    } else if (bdy_lumps != NULL) {
++        LOG_FC(ifacility, ilevel, "CONFIG LINE %d\n%s%.*s%s%s%s",
++            _dbg_sip_msg_cline,
++            start_txt,
++            obuf.len, obuf.s,
++            bdy_txt, bdy_lumps,
++            end_txt);
++    } else {
++        LOG_FC(ifacility, ilevel, "CONFIG LINE %d\n%s%.*s%s",
++            _dbg_sip_msg_cline,
++            start_txt,
++            obuf.len, obuf.s,
++            end_txt);
++    }
++
++    /* free lumps */
++    if (hdr_lumps) {
++        pkg_free(hdr_lumps);
++    }
++
++    if (bdy_lumps) {
++        pkg_free(bdy_lumps);
++    }
++
++    return 1;
++}
+--- a/modules/debugger/doc/debugger_admin.xml
++++ b/modules/debugger/doc/debugger_admin.xml
+@@ -481,8 +481,69 @@
+ 	    </example>
+ 	</section>
+ 
++ 	<section id="dbg.f.dbg_sip_msg">
++	    <title>
++		<function moreinfo="none">dbg_sip_msg([log_level], [facility])</function>
++	    </title>
++	    <para>
++            Prints how the sip message <emphasis>would look</emphasis> like if it <emphasis>would be sent</emphasis> out
++            at that point in the config(i.e. if the current lump lists would
++            have been applied at that point in the config).
++
++            It also prints a diff list for both header and body of sip msg
++            which contain the lump lists content. The lumps deleted are printed
++            with "-" sign whereas the lumps added have no sign. The config line
++            where the function has been called is also printed.
++	    </para>
++	    <para>
++            NOTE that dbg_sip_msg function does not modify the initially received SIP message.
++            Just displays how it WOULD look like if it were to send it at that point.
++	    </para>
++		<para>
++			NOTE that the lump lists are usually applied only once, just before sending, to spare message reparse processing.
++            All the changes present in lump list are applied on the <emphasis>initially received</emphasis> SIP message.
++            One can force the lump application using msg_apply_changes() function from textopsx module.
++	    </para>
++		<para>
++	    </para>
++		<example>
++		<title><function>dbg_sip_msg</function> usage</title>
++		<programlisting format="linespecific">
++...
++    dbg_sip_msg();
++    dbg_sip_msg("L_ERR");
++    dbg_sip_msg("L_ERR", "LOG_LOCAL0");
++...
++        </programlisting>
++
++		<para>Output when dbg_sip_msg("L_ERR") is called after <emphasis>append_hf("P-Hint: My hint\r\n"); remove_hf("Contact");</emphasis></para>
++		<programlisting format="linespecific">
++ERROR: debugger [debugger_mod.c:467]: w_dbg_sip_msg(): CONFIG LINE 338
++------------------------- START OF SIP message debug --------------------------
++OPTIONS sip:nobody@127.0.0.1 SIP/2.0
++Via: SIP/2.0/UDP 127.0.1.1:56872;branch=z9hG4bK.6d7c487a;rport;alias
++From: sip:sipsak@127.0.1.1:56872;tag=188b7433
++To: sip:nobody@127.0.0.1
++Call-ID: 411792435@127.0.1.1
++CSeq: 1 OPTIONS
++Content-Length: 0
++Max-Forwards: 70
++User-Agent: sipsak 0.9.6
++Accept: text/plain
++P-Hint: My hintt
++
++------------------------------ SIP header diffs -------------------------------
++- Contact: sip:sipsak@127.0.1.1:56872
++P-Hint: My hint
++------------------------------- SIP body diffs --------------------------------
++-------------------------- END OF SIP message debug ---------------------------
++        </programlisting>
++	    </example>
+     </section>
+-	
++
++    </section>
++
++
+ 	<section>
+ 		<title>Exported RPC Functions</title>
+ 
+--- a/msg_translator.c
++++ b/msg_translator.c
+@@ -890,12 +890,13 @@
+ /* another helper functions, adds/Removes the lump,
+ 	code moved form build_req_from_req  */
+ 
+-static inline void process_lumps(	struct sip_msg* msg,
+-					                                struct lump* lumps,
+-									char* new_buf,
+-									unsigned int* new_buf_offs,
+-									unsigned int* orig_offs,
+-									struct dest_info* send_info)
++void process_lumps( struct sip_msg* msg,
++                    struct lump* lumps,
++                    char* new_buf,
++                    unsigned int* new_buf_offs,
++                    unsigned int* orig_offs,
++                    struct dest_info* send_info,
++                    int flag)
+ {
+ 	struct lump *t;
+ 	struct lump *r;
+@@ -1356,11 +1357,21 @@
+ 					break;
+ 				}
+ 				size=t->u.offset-s_offset;
+-				if (size){
++                if (size > 0 && flag == FLAG_MSG_ALL){
+ 					memcpy(new_buf+offset, orig+s_offset,size);
+ 					offset+=size;
+ 					s_offset+=size;
+-				}
++                } else if (flag == FLAG_MSG_LUMPS_ONLY) {
++                    /* do not copy the whole message, jump to the lumps offs */
++                    s_offset+=size;
++                }
++
++                /* the LUMP_DELs are printed with "- " before them */
++                if (t->op==LUMP_DEL && flag == FLAG_MSG_LUMPS_ONLY) {
++                    new_buf[offset++] = '-';
++                    new_buf[offset++] = ' ';
++                }
++
+ 				/* process before  */
+ 				for(r=t->before;r;r=r->before){
+ 					switch (r->op){
+@@ -1384,11 +1395,22 @@
+ 					}
+ 				}
+ skip_nop_before:
+-				/* process main (del only) */
+-				if (t->op==LUMP_DEL){
+-					/* skip len bytes from orig msg */
+-					s_offset+=t->len;
+-				}
++                /* process main (del only) */
++                if (t->op==LUMP_DEL && flag == FLAG_MSG_ALL){
++                    /* skip len bytes from orig msg */
++                    s_offset+=t->len;
++                } else if (t->op==LUMP_DEL && flag == FLAG_MSG_LUMPS_ONLY) {
++                    /* copy lump value and indent as necessarely */
++                    memcpy(new_buf+offset, orig + t->u.offset, t->len);
++                    offset+=t->len;
++                    if (new_buf[offset-1] != '\n') {
++                        new_buf[offset] = '\n';
++                        offset+=1;
++                    }
++                    /* skip len bytes from orig msg */
++                    s_offset+=t->len;
++                 }
++
+ 				/* process after */
+ 				for(r=t->after;r;r=r->after){
+ 					switch (r->op){
+@@ -1419,6 +1441,11 @@
+ 	}
+ 	*new_buf_offs=offset;
+ 	*orig_offs=s_offset;
++
++    /* add '\0' to char* lump list to print it smoothly */
++    if (flag == FLAG_MSG_LUMPS_ONLY) {
++        new_buf[offset] = '\0';
++    }
+ #undef RCVCOMP_PARAM_ADD 
+ #undef SENDCOMP_PARAM_ADD
+ }
+@@ -2142,8 +2169,8 @@
+ 	}
+ 	new_buf[new_len]=0;
+ 	/* copy msg adding/removing lumps */
+-	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, send_info);
+-	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset,send_info);
++	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, send_info, FLAG_MSG_ALL);
++	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset,send_info, FLAG_MSG_ALL);
+ 	/* copy the rest of the message */
+ 	memcpy(new_buf+offset, buf+s_offset, len-s_offset);
+ 	new_buf[new_len]=0;
+@@ -2236,8 +2263,8 @@
+ 	new_buf[new_len]=0; /* debug: print the message */
+ 	offset=s_offset=0;
+ 	/*FIXME: no send sock*/
+-	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, 0);/*FIXME:*/
+-	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset, 0);
++	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, 0, FLAG_MSG_ALL);/*FIXME:*/
++	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset, 0, FLAG_MSG_ALL);
+ 	/* copy the rest of the message */
+ 	memcpy(new_buf+offset,
+ 		buf+s_offset,
+@@ -2916,7 +2943,7 @@
+ 	offset = 0;
+ 
+ 	/* copy message lumps */
+-	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, send_info);
++	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, send_info, FLAG_MSG_ALL);
+ 	/* copy the rest of the message without body */
+ 	if (len > s_offset) {
+ 		memcpy(new_buf+offset, buf+s_offset, len-s_offset);
+@@ -2966,7 +2993,7 @@
+ 	offset = 0;
+ 
+ 	/* copy body lumps */
+-	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset, send_info);
++	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset, send_info, FLAG_MSG_ALL);
+ 	/* copy the rest of the message without body */
+ 	if (len > s_offset) {
+ 		memcpy(new_buf+offset, buf+s_offset, len-s_offset);
+@@ -3026,9 +3053,9 @@
+ 	offset = s_offset = 0;
+ 
+ 	/* copy message lumps */
+-	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, send_info);
++	process_lumps(msg, msg->add_rm, new_buf, &offset, &s_offset, send_info, FLAG_MSG_ALL);
+ 	/* copy body lumps */
+-	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset, send_info);
++	process_lumps(msg, msg->body_lumps, new_buf, &offset, &s_offset, send_info, FLAG_MSG_ALL);
+ 	/* copy the rest of the message */
+ 	memcpy(new_buf+offset, buf+s_offset, len-s_offset);
+ 	offset += (len-s_offset);
+--- a/msg_translator.h
++++ b/msg_translator.h
+@@ -31,6 +31,10 @@
+ #ifndef  _MSG_TRANSLATOR_H
+ #define _MSG_TRANSLATOR_H
+ 
++/* flags used for process_lumps flag parameter */
++#define FLAG_MSG_LUMPS_ONLY     0   /* copy just the lumps */
++#define FLAG_MSG_ALL            1   /* copy all the msg */
++
+ #define MY_HF_SEP ": "
+ #define MY_HF_SEP_LEN 2
+ 
+@@ -163,4 +167,17 @@
+ 
+ /* returns a copy in private memory of the boundary in a multipart body */
+ int get_boundary(struct sip_msg* msg, str* boundary);
++
++
++/* process the lumps of a sip msg
++ * flags =  => add also the existing header to new_buf
++ * flags =  => add only the lumps (unapplied info) to new_buf
++ **/
++void process_lumps( struct sip_msg* msg,
++                    struct lump* lumps,
++                    char* new_buf,
++                    unsigned int* new_buf_offs,
++                    unsigned int* orig_offs,
++                    struct dest_info* send_info,
++                    int flag);
+ #endif
