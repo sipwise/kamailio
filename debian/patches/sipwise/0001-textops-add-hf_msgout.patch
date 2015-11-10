@@ -1,0 +1,109 @@
+From 9ab3c8ca29cf5ec3c4dcee606028752a591d1981 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 10 Nov 2015 15:38:13 +0100
+Subject: [PATCH] textops: add hf_msgout()
+
+WIP
+---
+ modules/textops/textops.c | 73 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
+
+diff --git a/modules/textops/textops.c b/modules/textops/textops.c
+index 198332b..96645df 100644
+--- a/modules/textops/textops.c
++++ b/modules/textops/textops.c
+@@ -139,6 +139,9 @@ int fixup_regexpNL_none(void** param, int param_no);
+ static int fixup_search_hf(void** param, int param_no);
+ static int fixup_subst_hf(void** param, int param_no);
+ 
++static int get_hf_msgout_f(struct sip_msg*, char*, char*);
++static int fixup_get_hf_msgout(void **param, int param_no);
++
+ static int mod_init(void);
+ 
+ static tr_export_t mod_trans[] = {
+@@ -290,6 +293,9 @@ static cmd_export_t cmds[]={
+ 	{"remove_body_part",     (cmd_function)remove_multibody_f,    1,
+ 		fixup_spve_null, 0,
+ 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
++	{"hf_msgout",      (cmd_function)get_hf_msgout_f,         2,
++		fixup_get_hf_msgout, 0,
++		ANY_ROUTE},
+ 
+ 	{0,0,0,0,0,0}
+ };
+@@ -2946,3 +2952,70 @@ static int fixup_subst_hf(void** param, int param_no)
+ 	return 0;
+ }
+ 
++static int get_hf_msgout_f(struct sip_msg* msg, char* _hname, char* _val) {
++	gparam_t *gp = (gparam_t*)_hname;
++	pv_spec_t* res = (pv_spec_t*)_val;
++	unsigned int new_buf_offs=0, orig_offs = 0;
++	int flag = FLAG_MSG_LUMPS_ONLY; // copy lumps only, not the whole message
++	char *hdr_lumps = NULL;
++	struct dest_info send_info;
++	str obuf;
++
++	/* msg_apply_changes_f code needed to get the current msg */
++	init_dest_info(&send_info);
++	send_info.proto = PROTO_UDP;
++	if(msg->first_line.type == SIP_REPLY) {
++		obuf.s = generate_res_buf_from_sip_res(msg,
++				(unsigned int*)&obuf.len, BUILD_NO_VIA1_UPDATE);
++	} else {
++		obuf.s = build_req_buf_from_sip_req(msg,
++				(unsigned int*)&obuf.len, &send_info,
++				BUILD_NO_PATH|BUILD_NO_LOCAL_VIA|BUILD_NO_VIA1_UPDATE);
++	}
++
++	if(obuf.s == NULL)
++	{
++		LM_ERR("couldn't update msg buffer content\n");
++		return -1;
++	}
++
++	if(obuf.len >= BUF_SIZE)
++	{
++		LM_ERR("new buffer overflow (%d)\n", obuf.len);
++		pkg_free(obuf.s);
++		return -1;
++	}
++
++	/* skip original uri */
++	if (msg->new_uri.s){
++		orig_offs=msg->first_line.u.request.uri.s - msg->buf;
++		orig_offs=msg->first_line.u.request.uri.len;
++	}
++
++	/* alloc private mem and copy lumps */
++	hdr_lumps = pkg_malloc(BUF_SIZE);
++
++	new_buf_offs = 0;
++	process_lumps(msg, msg->add_rm, hdr_lumps, &new_buf_offs,
++		&orig_offs, &send_info, flag);
++
++	if (hdr_lumps != NULL) {
++		LM_WARN("hdr_lumps[%d][%p][%.*s]\n", new_buf_offs, hdr_lumps, new_buf_offs, hdr_lumps);
++	}
++
++	/* free lumps */
++	if (hdr_lumps) {
++		pkg_free(hdr_lumps);
++	}
++	return 1;
++}
++
++static int fixup_get_hf_msgout(void** param, int param_no) {
++	if (param_no == 1) {
++		return hname_fixup(param, param_no);
++	}
++	else if (param_no == 2) {
++		return fixup_pvar_pvar(param, param_no);
++	}
++	return E_UNSPEC;
++}
+\ No newline at end of file
+-- 
+2.6.2
+
