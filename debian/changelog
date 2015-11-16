@@ -1,3 +1,15 @@
+ngcp-kamailio (4.3.0-1+0~mr4.0.2.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [8c4dbed] MT#13917 restore removed patch for pua_reginfo
+  * [a46fe49] MT#14405 fix registrar max_contacts having sip.instance
+  * [43d6a27] MT#14989 registrar: add contact/received info to xavp_rcd and set it at registrered() too
+  * [8a506fd] MT#15555 ability to set ACC flags after transaction has been created
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 16 Nov 2015 14:22:59 +0100
+
 ngcp-kamailio (4.3.0-1+0~mr4.0.2.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
