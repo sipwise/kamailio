@@ -1,3 +1,19 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.5.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [bfb3db3] MT#14989 registrar: add contact/received info to xavp_rcd and set it at registrered() too
+  * [0d80e81] MT#14989 registrar: fixes from upstream
+  * [46a9379] MT#15555 ability to set ACC flags after transaction has been created
+  * [e78e53d] MT#15703 MT#13917 pua_reginfo: use get_urecord() not get_record_ruid() as previously
+  * [a31b4e0] MT#15703 MT#13917 pua_reginfo: fix e78e53dadb1
+
+  [ Andrew Pogrebennyk ]
+  * [00a07a3] MT#16329 MT#2161 backport function is_tel_number to kamailio 4.1
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 16 Nov 2015 17:09:37 +0100
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.4.0) unstable; urgency=medium
 
   [ Victor Seva ]
