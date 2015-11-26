@@ -18,9 +18,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * ---------
- * 2005-07-11  created (bogdan)
  */
 
 
@@ -123,10 +120,23 @@ static inline char* build_sipping(str *curi, struct socket_info* s, str *path,
 	static char buf[MAX_SIPPING_SIZE];
 	char *p;
 	int len;
+	str vaddr;
+	str vport;
+
+	if(s->useinfo.name.len>0)
+		vaddr = s->useinfo.name;
+	else
+		vaddr = s->address_str;
+
+	if(s->useinfo.port_no>0)
+		vport = s->useinfo.port_no_str;
+	else
+		vport = s->port_no_str;
 
 	if ( sipping_method.len + 1 + curi->len + s_len(" SIP/2.0"CRLF) +
-		s_len("Via: SIP/2.0/UDP ") + s->address_str.len +
-				1 + s->port_no_str.len + s_len(";branch=0") +
+		s_len("Via: SIP/2.0/UDP ") + vaddr.len +
+				((s->address.af==AF_INET6)?2:0) +
+				1 + vport.len + s_len(";branch=0") +
 		(path->len ? (s_len(CRLF"Route: ") + path->len) : 0) +
 		s_len(CRLF"From: ") +  sipping_from.len + s_len(";tag=") +
 				ruid->len + 1 + 8 + 1 + 8 +
@@ -146,9 +156,15 @@ static inline char* build_sipping(str *curi, struct socket_info* s, str *path,
 	*(p++) = ' ';
 	append_str( p, curi->s, curi->len);
 	append_fix( p, " SIP/2.0"CRLF"Via: SIP/2.0/UDP ");
-	append_str( p, s->address_str.s, s->address_str.len);
+	if (s->address.af == AF_INET6) {	/* Via header IP is a IPv6 reference */
+		append_fix( p, "[");
+	}
+	append_str( p, vaddr.s, vaddr.len);
+	if (s->address.af == AF_INET6) {
+		append_fix( p, "]");
+	}
 	*(p++) = ':';
-	append_str( p, s->port_no_str.s, s->port_no_str.len);
+	append_str( p, vport.s, vport.len);
 	if (path->len) {
 		append_fix( p, ";branch=0"CRLF"Route: ");
 		append_str( p, path->s, path->len);

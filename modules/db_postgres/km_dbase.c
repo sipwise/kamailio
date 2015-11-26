@@ -602,7 +602,6 @@ int db_postgres_store_result(const db1_con_t* _con, db1_res_t** _r)
 	}
 
 done:
-	db_postgres_free_query(_con);
 	return (rc);
 }
 
@@ -906,12 +905,12 @@ int db_postgres_replace(const db1_con_t* _h, const db_key_t* _k,
 						pos += VAL_UINT(&_v[i]);
 						break;
 					case DB1_STR:
-						pos += get_hash1_raw((VAL_STR(&_v[i])).s,
-									(VAL_STR(&_v[i])).len);
+						pos += ((VAL_STR(&_v[i])).s)?get_hash1_raw((VAL_STR(&_v[i])).s,
+									(VAL_STR(&_v[i])).len):0;
 						break;
 					case DB1_STRING:
-						pos += get_hash1_raw(VAL_STRING(&_v[i]),
-									strlen(VAL_STRING(&_v[i])));
+						pos += (VAL_STRING(&_v[i]))?get_hash1_raw(VAL_STRING(&_v[i]),
+									strlen(VAL_STRING(&_v[i]))):0;
 						break;
 					default:
 						break;
