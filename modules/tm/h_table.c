@@ -115,7 +115,7 @@ unsigned int transaction_count( void )
 
 
 
-void free_cell( struct cell* dead_cell )
+void free_cell_helper( struct cell* dead_cell, const char *fname, unsigned int fline )
 {
 	char *b;
 	int i;
@@ -123,6 +123,14 @@ void free_cell( struct cell* dead_cell )
 	struct totag_elem *tt, *foo;
 	struct tm_callback *cbs, *cbs_tmp;
 
+	LM_DBG("freeing transaction %p from %s:%u\n", dead_cell, fname, fline);
+
+	if(dead_cell->prev_c!=NULL && dead_cell->next_c!=NULL) {
+		LM_WARN("removed cell %p is still linked in hash table (%s:%u)\n",
+				dead_cell, fname, fline);
+		unlink_timers(dead_cell);
+		remove_from_hash_table_unsafe(dead_cell);
+	}
 	release_cell_lock( dead_cell );
 	if (unlikely(has_tran_tmcbs(dead_cell, TMCB_DESTROY)))
 		run_trans_callbacks(TMCB_DESTROY, dead_cell, 0, 0, 0);
