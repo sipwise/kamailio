@@ -1,3 +1,9 @@
+ngcp-kamailio (4.3.4-1+0~mr4.2.0.0) unstable; urgency=medium
+
+  * [51ce354] MT#16703 Imported Upstream version 4.3.4
+
+ -- Victor Seva <vseva@sipwise.com>  Thu, 26 Nov 2015 23:01:32 +0100
+
 ngcp-kamailio (4.3.3-1+0~mr4.2.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
