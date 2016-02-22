@@ -12,7 +12,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/modules/tcap/tcap_mod.c
-@@ -0,0 +1,342 @@
+@@ -0,0 +1,329 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -38,6 +38,7 @@
 +static int inap_extract_f(sip_msg_t *msg, char *su, char *sq);
 +static int inap_extract_var_f(sip_msg_t *msg, char *o, char *f, char *d);
 +static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq);
++static int isup_decode_number_hex_f(sip_msg_t *msg, char *su, char *sq);
 +
 +
 +
@@ -49,6 +50,8 @@
 +	{"inap_extract_var", (cmd_function)inap_extract_var_f, 3,
 +		fixup_pvar_pvar_pvar, fixup_free_pvar_pvar_pvar, ANY_ROUTE},
 +	{"isup_decode_number", (cmd_function)isup_decode_number_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"isup_decode_number_hex", (cmd_function)isup_decode_number_hex_f, 2,
 +		fixup_spve_str, 0, ANY_ROUTE},
 +	{0,}
 +};
@@ -309,32 +312,9 @@
 +	return -1;
 +}
 +
-+static inline char phone_digit(unsigned char d) {
-+	switch (d) {
-+		case 0:
-+		case 1:
-+		case 2:
-+		case 3:
-+		case 4:
-+		case 5:
-+		case 6:
-+		case 7:
-+		case 8:
-+		case 9:
-+			return '0' + d;
-+		case 11:
-+			return '*';
-+		case 12:
-+			return '#';
-+		case 15:
-+			return 'F';
-+		default:
-+			return '?';
-+	}
-+}
-+
-+
-+static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq) {
++static int isup_decode_number_common_f(sip_msg_t *msg, char *su, char *sq,
++		int (*func)(const char *, int, char *))
++{
 +	const char *err;
 +	str inp;
 +	char num[64];
@@ -343,7 +323,7 @@
 +	if (fixup_get_svalue(msg, (gparam_p) su, &inp))
 +		goto error;
 +	err = "Invalid encoded number";
-+	if (isup_convert_number(inp.s, inp.len, num))
++	if (func(inp.s, inp.len, num))
 +		goto error;
 +
 +	if (copy_output(msg, sq, num, strlen(num)))
@@ -354,6 +334,13 @@
 +error:
 +	LM_ERR("%s\n", err);
 +	return -1;
++}
++
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq) {
++	return isup_decode_number_common_f(msg, su, sq, isup_convert_number);
++}
++static int isup_decode_number_hex_f(sip_msg_t *msg, char *su, char *sq) {
++	return isup_decode_number_common_f(msg, su, sq, isup_convert_number_hex);
 +}
 --- a/Makefile.groups
 +++ b/Makefile.groups
