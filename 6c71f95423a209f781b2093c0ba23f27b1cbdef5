@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins <jenkins@sipwise.com>
+Code-Review+2: Richard Fuchs <rfuchs@sipwise.com>
+Code-Review+2: Alexander Lutay <alutay@sipwise.com>
+Submitted-by: Richard Fuchs <rfuchs@sipwise.com>
+Submitted-at: Tue, 23 Feb 2016 23:58:34 +0100
+Reviewed-on: http://gerrit.mgm.sipwise.com/4858
+Project: kamailio
+Branch: refs/heads/mr4.2
