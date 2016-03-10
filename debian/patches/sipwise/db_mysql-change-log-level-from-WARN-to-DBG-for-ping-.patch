@@ -1,0 +1,20 @@
+From a1c218575281a3cee606e7e536e16a4f38017f08 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 10 Mar 2016 17:00:56 +0100
+Subject: [PATCH] db_mysql: change log level from WARN to DBG for ping checks
+
+---
+ modules/db_mysql/km_dbase.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/modules/db_mysql/km_dbase.c
++++ b/modules/db_mysql/km_dbase.c
+@@ -81,7 +81,7 @@
+ 		t = time(0);
+ 		if ((t - CON_TIMESTAMP(_h)) > my_ping_interval) {
+ 			if (mysql_ping(CON_CONNECTION(_h))) {
+-				LM_WARN("driver error on ping: %s\n", mysql_error(CON_CONNECTION(_h)));
++				LM_DBG("driver error on ping: %s\n", mysql_error(CON_CONNECTION(_h)));
+ 				counter_inc(mysql_cnts_h.driver_err);
+ 			}
+ 		}
