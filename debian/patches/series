@@ -48,6 +48,7 @@ sipwise/rtpengine.patch
 sipwise/rtpengine-compatibility.patch
 sipwise/db_postgres-timeout
 sipwise/registrar-add-contact-and-recieved-info-to-xavp_rcd-o.patch
+sipwise/db_mysql-change-log-level-from-WARN-to-DBG-for-ping-.patch
 # carrier support
 sipwise/usrloc_dbro.patch
 sipwise/nathelper_socket_filter.patch
