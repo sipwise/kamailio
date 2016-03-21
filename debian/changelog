@@ -1,3 +1,20 @@
+ngcp-kamailio (4.3.4-1+0~mr4.4.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [7200781] MT#15977 ngcp-kamailio-berkeley-modules: upgrade dbX-util depends for jessie
+  * [cc6a3b4] MT#18051 db_mysql: change log level from WARN to DBG for ping checks
+
+  [ Richard Fuchs ]
+  * [e3fe85f] MT#15177 implement functions to fetch billing profile details
+  * [1d65f49] MT#18057 create new isup_decode_number_hex()
+
+  [ Michael Prokop ]
+  * [ef23b92] MT#17699 Bump Standards-Version to 3.9.7
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 21 Mar 2016 22:15:41 +0100
+
 ngcp-kamailio (4.3.4-1+0~mr4.3.0.0) unstable; urgency=medium
 
   * New release.
