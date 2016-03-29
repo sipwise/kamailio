@@ -25,6 +25,7 @@ sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/parallel_build.patch
 sipwise/tcap.patch
+sipwise/cassandra.patch
 sipwise/registrar-add-contact-and-recieved-info-to-xavp_rcd-o.patch
 sipwise/db_mysql-change-log-level-from-WARN-to-DBG-for-ping-.patch
 # carrier support

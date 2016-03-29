@@ -1,0 +1,12 @@
+--- a/Makefile.groups
++++ b/Makefile.groups
+@@ -305,6 +305,9 @@
+ # pkg unixodbc module
+ module_group_kunixodbc=$(mod_list_unixodbc)
+ 
++# pkg cassandra module
++module_group_kcassandra=$(mod_list_cassandra)
++
+ # pkg perl module
+ module_group_kperl=$(mod_list_perldeps)
+ 

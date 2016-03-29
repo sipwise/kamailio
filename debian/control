@@ -43,6 +43,7 @@ Build-Depends: bison,
                pkg-config,
                python,
                python-dev,
+               thrift-compiler,
                unixodbc-dev,
                uuid-dev,
                xsltproc,
@@ -284,6 +285,20 @@ Description: PostgreSQL database connectivity module for Kamailio
  per second even on low-budget hardware.
  .
  This package provides the PostgreSQL database driver for Kamailio.
+
+Package: ngcp-kamailio-cassandra-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ngcp-kamailio (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: Cassandra database connectivity module for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides the Cassandra database driver for Kamailio.
 
 Package: ngcp-kamailio-cpl-modules
 Architecture: any
