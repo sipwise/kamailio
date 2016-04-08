@@ -17,6 +17,8 @@ upstream/pv-pv_xavp_to_var.patch
 upstream/core-add-fixup_pvar_pvar_pvar.patch
 upstream/acc-add-acc_prepare_always-parameter.patch
 ##
+upstream/b36f7c9aed3f5cebc457b26f40ca472665da4d00.patch
+##
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
 fix_export.patch
