@@ -1,0 +1,10 @@
+--- a/modules/pv/pv_trans.c
++++ b/modules/pv/pv_trans.c
+@@ -1097,6 +1097,7 @@
+ 			_tr_uri_params = 0;
+ 		}
+ 		/* parse uri -- params only when requested */
++		LM_DBG("_tr_uri[%d][%.*s]\n", _tr_uri.len, _tr_uri.len, _tr_uri.s);
+ 		if(parse_uri(_tr_uri.s, _tr_uri.len, &_tr_parsed_uri)!=0)
+ 		{
+ 			LM_ERR("invalid uri [%.*s]\n", val->rs.len,

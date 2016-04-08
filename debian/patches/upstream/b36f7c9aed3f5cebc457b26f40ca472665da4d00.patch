@@ -1,0 +1,94 @@
+From b36f7c9aed3f5cebc457b26f40ca472665da4d00 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 7 Apr 2016 09:39:44 +0200
+Subject: [PATCH] core: new global parameter log_prefix_mode
+
+- if set to 0 (default), then log_prefix is evaluated when the sip
+  message is received and then reused (recommended if the log_prefix has
+  only variables that have same value for same message). This is the
+  current behaviour of log_prefix evaluation.
+- if set to 1, then the log prefix is evaluated before/after each config
+  action (needs to be set when the log_prefix has variables that are
+  different based on the context of config execution, e.g., $cfg(line))
+---
+ action.c | 6 ++++++
+ cfg.lex  | 2 ++
+ cfg.y    | 3 +++
+ dprint.c | 1 +
+ dprint.h | 1 +
+ 5 files changed, 13 insertions(+)
+
+--- a/action.c
++++ b/action.c
+@@ -1545,8 +1545,14 @@
+ 		if(unlikely(cfg_get(core, core_cfg, latency_limit_action)>0))
+ 			ms = TICKS_TO_MS(get_ticks_raw());
+ 		_cfg_crt_action = t;
++		if(unlikely(log_prefix_mode==1)) {
++			log_prefix_set(msg);
++		}
+ 		ret=do_action(h, t, msg);
+ 		_cfg_crt_action = 0;
++		if(unlikely(log_prefix_mode==1)) {
++			log_prefix_set(msg);
++		}
+ 		if(unlikely(cfg_get(core, core_cfg, latency_limit_action)>0)) {
+ 			ms = TICKS_TO_MS(get_ticks_raw()) - ms;
+ 			if(ms >= cfg_get(core, core_cfg, latency_limit_action)) {
+--- a/cfg.lex
++++ b/cfg.lex
+@@ -348,6 +348,7 @@
+ LOGNAME		log_name
+ LOGCOLOR	log_color
+ LOGPREFIX	log_prefix
++LOGPREFIXMODE	log_prefix_mode
+ LISTEN		listen
+ ADVERTISE	advertise|ADVERTISE
+ ALIAS		alias
+@@ -728,6 +729,7 @@
+ <INITIAL>{LOGNAME}	{ yylval.strval=yytext; return LOGNAME; }
+ <INITIAL>{LOGCOLOR}	{ yylval.strval=yytext; return LOGCOLOR; }
+ <INITIAL>{LOGPREFIX}	{ yylval.strval=yytext; return LOGPREFIX; }
++<INITIAL>{LOGPREFIXMODE}	{ yylval.strval=yytext; return LOGPREFIXMODE; }
+ <INITIAL>{LISTEN}	{ count(); yylval.strval=yytext; return LISTEN; }
+ <INITIAL>{ADVERTISE}	{ count(); yylval.strval=yytext; return ADVERTISE; }
+ <INITIAL>{ALIAS}	{ count(); yylval.strval=yytext; return ALIAS; }
+--- a/cfg.y
++++ b/cfg.y
+@@ -396,6 +396,7 @@
+ %token LOGNAME
+ %token LOGCOLOR
+ %token LOGPREFIX
++%token LOGPREFIXMODE
+ %token LISTEN
+ %token ADVERTISE
+ %token ALIAS
+@@ -850,6 +851,8 @@
+ 	| LOGCOLOR EQUAL error { yyerror("boolean value expected"); }
+ 	| LOGPREFIX EQUAL STRING { log_prefix_fmt=$3; }
+ 	| LOGPREFIX EQUAL error { yyerror("string value expected"); }
++	| LOGPREFIXMODE EQUAL NUMBER { log_prefix_mode=$3; }
++	| LOGPREFIXMODE EQUAL error { yyerror("number expected"); }
+ 	| DNS EQUAL NUMBER   { received_dns|= ($3)?DO_DNS:0; }
+ 	| DNS EQUAL error { yyerror("boolean value expected"); }
+ 	| REV_DNS EQUAL NUMBER { received_dns|= ($3)?DO_REV_DNS:0; }
+--- a/dprint.c
++++ b/dprint.c
+@@ -364,6 +364,7 @@
+ 
+ /* log_prefix functionality */
+ str *log_prefix_val = NULL;
++int log_prefix_mode = 0;
+ static pv_elem_t *log_prefix_pvs = NULL;
+ 
+ #define LOG_PREFIX_SIZE	1024
+--- a/dprint.h
++++ b/dprint.h
+@@ -120,6 +120,7 @@
+ extern int log_color;
+ extern char *log_prefix_fmt;
+ extern str *log_prefix_val;
++extern int log_prefix_mode;
+ 
+ /** @brief maps log levels to their string name and corresponding syslog level */
+ 
