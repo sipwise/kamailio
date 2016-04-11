@@ -1,21 +1,9 @@
-# kamailio-config-test
-# fix needed from upstream
-upstream/0001-core-clean-previous-routename-in-order-to-get-the-co.patch
-upstream/0002-core-fix-routename-for-event_route.patch
-upstream/0003-core-revert-from-last-clear-or-routename.patch
-#
-sipwise/debug/0000-modules-debugger-move-json-related-from-debugger_api.patch
-sipwise/debug/0001-modules-cfgt-trace-config-and-save-to-file.patch
-sipwise/debug/mod_cfgt.patch
 ##
 # upstream fixes
-# 4.3
+# 4.4
 #
 # upsream fixes from master
-upstream/pv-pv_var_to_xavp.patch
-upstream/pv-pv_xavp_to_var.patch
-upstream/core-add-fixup_pvar_pvar_pvar.patch
-upstream/acc-add-acc_prepare_always-parameter.patch
+#
 ##
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
@@ -25,14 +13,8 @@ sipwise/add_pcem_module.patch
 sipwise/lcr_rate_module.patch
 sipwise/parallel_build.patch
 sipwise/tcap.patch
-sipwise/registrar-add-contact-and-recieved-info-to-xavp_rcd-o.patch
-sipwise/db_mysql-change-log-level-from-WARN-to-DBG-for-ping-.patch
 # carrier support
 sipwise/usrloc_dbro.patch
-sipwise/0001-usrloc-support-filter-by-server_id-at-get_all_uconta.patch
-sipwise/0002-usrloc-add-module-option-to-support-preload-using-se.patch
-sipwise/0003-nathelper-support-filter-contacts-by-server_id.patch
-sipwise/0001-dmq_usrloc-update-get_all_ucontacts-API-request.patch
 ##
 # MT#14217
 sipwise/janssonrpc-c-fakerpc.patch

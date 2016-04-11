@@ -9,11 +9,9 @@ Add ro connection per child
  modules/usrloc/ul_mod.h |  2 ++
  2 files changed, 67 insertions(+)
 
-diff --git a/modules/usrloc/ul_mod.c b/modules/usrloc/ul_mod.c
-index 1ad69e3..5f56f0c 100644
 --- a/modules/usrloc/ul_mod.c
 +++ b/modules/usrloc/ul_mod.c
-@@ -155,6 +155,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta
+@@ -156,6 +156,7 @@
  str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
  
  str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
@@ -21,16 +19,16 @@ index 1ad69e3..5f56f0c 100644
  int timer_interval  = 60;				/*!< Timer interval in seconds */
  int db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
  int use_domain      = 0;				/*!< Whether usrloc should use domain part of aor */
-@@ -173,6 +174,8 @@ unsigned int init_flag = 0;
- db1_con_t* ul_dbh = 0; /* Database connection handle */
- db_func_t ul_dbf;
+@@ -187,6 +188,8 @@
+ 	{0, 0, 0, 0, 0, 0}
+ };
  
 +db1_con_t* ul_dbh_ro = 0; /* Read-Only Database connection handle */
 +db_func_t ul_dbf_ro;
  
- 
  /*! \brief
-@@ -199,6 +202,7 @@ static param_export_t params[] = {
+  * Exported parameters 
+@@ -203,6 +206,7 @@
  	{"flags_column",        PARAM_STR, &flags_col     },
  	{"cflags_column",       PARAM_STR, &cflags_col    },
  	{"db_url",              PARAM_STR, &db_url        },
@@ -38,7 +36,7 @@ index 1ad69e3..5f56f0c 100644
  	{"timer_interval",      INT_PARAM, &timer_interval  },
  	{"db_mode",             INT_PARAM, &db_mode         },
  	{"use_domain",          INT_PARAM, &use_domain      },
-@@ -271,6 +275,38 @@ struct module_exports exports = {
+@@ -278,6 +282,38 @@
  	child_init  /*!< Child initialization function */
  };
  
@@ -77,7 +75,7 @@ index 1ad69e3..5f56f0c 100644
  
  /*! \brief
   * Module initialization function
-@@ -357,6 +393,21 @@ static int mod_init(void)
+@@ -370,6 +406,21 @@
  		}
  	}
  
@@ -99,7 +97,7 @@ index 1ad69e3..5f56f0c 100644
  	if (nat_bflag==(unsigned int)-1) {
  		nat_bflag = 0;
  	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
-@@ -430,6 +481,16 @@ static int child_init(int _rank)
+@@ -443,6 +494,16 @@
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -116,7 +114,7 @@ index 1ad69e3..5f56f0c 100644
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
  	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY) {
  		/* if cache is used, populate domains from DB */
-@@ -485,6 +546,10 @@ static void destroy(void)
+@@ -498,6 +559,10 @@
  		ul_dbf.close(ul_dbh);
  	}
  
@@ -127,19 +125,14 @@ index 1ad69e3..5f56f0c 100644
  	free_all_udomains();
  	ul_destroy_locks();
  
-diff --git a/modules/usrloc/ul_mod.h b/modules/usrloc/ul_mod.h
-index 1e3b08d..acb3ef9 100644
 --- a/modules/usrloc/ul_mod.h
 +++ b/modules/usrloc/ul_mod.h
-@@ -98,6 +98,8 @@ extern str ul_xavp_contact_name;
- extern db1_con_t* ul_dbh;   /* Database connection handle */
- extern db_func_t ul_dbf;
+@@ -88,6 +88,8 @@
+ extern int close_expired_tcp;
+ extern int skip_remote_socket;
  
 +extern db1_con_t* ul_dbh_ro;   /* Read-Only Database connection handle */
 +extern db_func_t ul_dbf_ro;
  
- /*
-  * Matching algorithms
--- 
-2.1.4
-
+ /*! nat branch flag */
+ extern unsigned int nat_bflag;
