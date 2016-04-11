@@ -1,0 +1,29 @@
+From 4992dfbb9f15cfb8ade99be4e6d3087146cb8e22 Mon Sep 17 00:00:00 2001
+From: schoberw <walter.schober@neotel.at>
+Date: Fri, 1 Apr 2016 10:34:11 +0200
+Subject: [PATCH] core: skip address family AF_PACKET on -l iface_name
+
+- socket_info.c: getifaddrs() returns AF_PACKET, AF_INET and AF_INET6 addressed of an interface.
+  AF_PACKET are of no use and breaks startup with an -l eth0:5060 cmd line param
+(cherry picked from commit d7fca53e8c5409849ec044098a143e7254129c00)
+---
+ socket_info.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/socket_info.c b/socket_info.c
+index d06fdcf..1d28977 100644
+--- a/socket_info.c
++++ b/socket_info.c
+@@ -1205,6 +1205,9 @@ int add_interfaces(char* if_name, int family, unsigned short port,
+ 
+ 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+ 	{
++		/* skip AF_PACKET addr family since it is of no use later on */
++		if (ifa->ifa_addr->sa_family == AF_PACKET)
++			continue;
+ 		if (if_name && strcmp(if_name, ifa->ifa_name))
+ 			continue;
+ 		if (family && family != ifa->ifa_addr->sa_family)
+-- 
+2.8.0.rc3
+

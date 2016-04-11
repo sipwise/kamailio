@@ -1,0 +1,26 @@
+From 1ec385ccd9054952b86cc976ae1debe70dc8d297 Mon Sep 17 00:00:00 2001
+From: Camille Oudot <camille.oudot@orange.com>
+Date: Mon, 11 Apr 2016 17:02:03 +0200
+Subject: [PATCH] dialog: fix $dlg(from_bindaddr) name parsing
+
+(cherry picked from commit f95789fd39fcce7b3aa3a0ab8665664afd8bc196)
+---
+ modules/dialog/dlg_var.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/dialog/dlg_var.c b/modules/dialog/dlg_var.c
+index e8c84ed..450f8a5 100644
+--- a/modules/dialog/dlg_var.c
++++ b/modules/dialog/dlg_var.c
+@@ -877,7 +877,7 @@ int pv_parse_dlg_name(pv_spec_p sp, str *in)
+ 			else goto error;
+ 		break;
+ 		case 13: 
+-			if(strncmp(in->s, "from_bindaddr", 20)==0)
++			if(strncmp(in->s, "from_bindaddr", 13)==0)
+ 				sp->pvp.pvn.u.isname.name.n = 2;
+ 			else goto error;
+ 		break;
+-- 
+2.8.0.rc3
+

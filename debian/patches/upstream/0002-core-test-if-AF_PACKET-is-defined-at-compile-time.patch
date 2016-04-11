@@ -1,0 +1,39 @@
+From e6dd2c172be3712e8c468cbe7e55ba94d81a7b62 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Fri, 1 Apr 2016 11:10:46 +0200
+Subject: [PATCH] core: test if AF_PACKET is defined at compile time
+
+- mac os x (and perhaps *BSDs) doesn't have it
+
+(cherry picked from commit 8543993e1f702aef80887c0e72b9bf67c62c1617)
+---
+ socket_info.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/socket_info.c b/socket_info.c
+index 1d28977..cecfef9 100644
+--- a/socket_info.c
++++ b/socket_info.c
+@@ -1205,16 +1205,18 @@ int add_interfaces(char* if_name, int family, unsigned short port,
+ 
+ 	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+ 	{
++#ifdef AF_PACKET
+ 		/* skip AF_PACKET addr family since it is of no use later on */
+ 		if (ifa->ifa_addr->sa_family == AF_PACKET)
+ 			continue;
++#endif
+ 		if (if_name && strcmp(if_name, ifa->ifa_name))
+ 			continue;
+ 		if (family && family != ifa->ifa_addr->sa_family)
+ 			continue;
+ 		sockaddr2ip_addr(&addr, (struct sockaddr*)ifa->ifa_addr);
+ 		tmp=ip_addr2a(&addr);
+-		if (ifa->ifa_flags & IFF_LOOPBACK) 
++		if (ifa->ifa_flags & IFF_LOOPBACK)
+ 			flags = SI_IS_LO;
+ 		else
+ 			flags = SI_NONE;
+-- 
+2.8.0.rc3
+

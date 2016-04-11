@@ -1,0 +1,29 @@
+From 6684be6b4c405ab24dd6a5a19267ceef6aa95503 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 6 Apr 2016 18:55:57 +0200
+Subject: [PATCH] core: check if ifa_addr field is set while trying to skip
+ AF_PACKET interfaces
+
+- reported by Juha Heinanen
+
+(cherry picked from commit 1545b8de396e8e5d0ef24c9102beff18b3cf36e5)
+---
+ socket_info.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/socket_info.c b/socket_info.c
+index cecfef9..95c6ee6 100644
+--- a/socket_info.c
++++ b/socket_info.c
+@@ -1207,7 +1207,7 @@ int add_interfaces(char* if_name, int family, unsigned short port,
+ 	{
+ #ifdef AF_PACKET
+ 		/* skip AF_PACKET addr family since it is of no use later on */
+-		if (ifa->ifa_addr->sa_family == AF_PACKET)
++		if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_PACKET)
+ 			continue;
+ #endif
+ 		if (if_name && strcmp(if_name, ifa->ifa_name))
+-- 
+2.8.0.rc3
+
