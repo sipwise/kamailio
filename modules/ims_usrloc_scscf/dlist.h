@@ -95,7 +95,7 @@ void print_all_udomains(FILE* _f);
  * \brief Run timer handler of all domains
  * \return 0 if all timer return 0, != 0 otherwise
  */
-int synchronize_all_udomains(void);
+int synchronize_all_udomains(int istart, int istep);
 
 
 /*!
@@ -130,7 +130,7 @@ int synchronize_all_udomains(void);
  * \param part_max maximal part
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
-int get_all_ucontacts(void *buf, int len, unsigned int flags,
+int get_all_scontacts(void *buf, int len, unsigned int flags,
 		unsigned int part_idx, unsigned int part_max);
 
 
@@ -142,13 +142,6 @@ int get_all_ucontacts(void *buf, int len, unsigned int flags,
  * \return 0 on success, -1 on failure
  */
  int get_udomain(const char* _n, udomain_t** _d);
-
-/*!
- * \brief Loops through all domains summing up the number of users
- * \return the number of users, could be zero
- */
-unsigned long get_number_of_users(void);
-
 
 /*!
  * \brief Find a particular domain, small wrapper around find_dlist

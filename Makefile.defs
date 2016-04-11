@@ -6,7 +6,7 @@
 # Environment variables:
 #   PREFIX, LOCALBASE, BASEDIR
 #   INSTALL, TAR , CC, LEX, YACC,
-#   CPU, CC_EXTRA_OPTS, LD_EXTRA_OPTS
+#   CPUTYPE, CC_EXTRA_OPTS, LD_EXTRA_OPTS
 #   exclude_modules, skip_modules, include_modules
 #   extra_defs
 #
@@ -95,14 +95,14 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 
 # version number
 VERSION = 4
-PATCHLEVEL = 3
-SUBLEVEL = 4
+PATCHLEVEL = 4
+SUBLEVEL =  0
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
 # 1 - q_malloc (quick malloc)
 # 2 - tlsf_malloc (O(1) malloc and free)
-MEMMNG ?= 1
+MEMMNG ?= 0
 # memory debugger switcher
 # 0 - off (no-debug mode)
 # 1 - on (debug mode)
@@ -502,10 +502,12 @@ data_target = $(prefix)/$(data_dir)
 #		additional option to PKG_MALLOC which utilizes a fater then
 #		qm version
 #		(not true anymore, q_malloc performs approx. the same)
+# -DQ_MALLOC
+#		custom quick malloc, recommended for debugging
 # -DF_MALLOC
 #		an even faster malloc, not recommended for debugging
-# -DTLSF_MALLOC=1
-#       an implemetation of the "two levels segregation fit" malloc algorithm
+# -DTLSF_MALLOC
+#       an implemetation of the "two levels segregated fit" malloc algorithm
 # -DDL_MALLOC
 #		a malloc implementation based on Doug Lea's dl_malloc
 # -DSF_MALLOC 
@@ -660,26 +662,15 @@ C_DEFS= $(extra_defs) \
 # use make mode=debug all instead. Anyway no by default ser is  compiled w/ 
 # debugging symbols in all cases (-g). --andrei
 
-# set memory manager and its debug mode
-ifeq ($(MEMMNG), 1)
-#	use q_malloc
+# memory managers and related debug mode
+# enable f_malloc
+C_DEFS+= -DF_MALLOC
+# enable q_malloc
+C_DEFS+= -DQ_MALLOC
+# enable TLSF malloc
+C_DEFS+= -DTLSF_MALLOC
 ifeq 	($(MEMDBG), 1)
-		C_DEFS+= -DDBG_QM_MALLOC
-endif
-	C_DEFS+= -DMEM_JOIN_FREE
-else ifeq ($(MEMMNG), 2)
-#	use tlsf malloc
-	C_DEFS+= -DTLSF_MALLOC=1
-ifeq 	($(MEMDBG), 1)
-		C_DEFS+= -DDBG_TLSF_MALLOC
-endif
-else
-#	use f_malloc
-	C_DEFS+= -DF_MALLOC
-ifeq 	($(MEMDBG), 1)
-		C_DEFS+= -DDBG_F_MALLOC
-endif
-	C_DEFS+= -DMEM_JOIN_FREE
+	C_DEFS+= -DDBG_SR_MEMORY
 endif
 
 ifneq ($(PKG_MEM_SIZE),)
@@ -844,37 +835,37 @@ ifeq		($(CC_NAME), gcc)
 				CFLAGS=-g $(CC_OPT) -funroll-loops  -Wcast-align $(PROFILE)
 			#if gcc 5.0+, 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+ 5.0+,$(CC_SHORTVER))))
-$(call				set_if_empty,CPU,athlon64)
+$(call				set_if_empty,CPUTYPE,athlon64)
 					CFLAGS+=-m32 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
 							-fno-strict-overflow \
-							-mtune=$(CPU)
+							-mtune=$(CPUTYPE)
 					LDFLAGS+=-m32
 else
 			#if gcc 4.0+
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPU,athlon64)
+$(call				set_if_empty,CPUTYPE,athlon64)
 					CFLAGS+=-m32 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
-							-mtune=$(CPU) 
+							-mtune=$(CPUTYPE) 
 					LDFLAGS+=-m32
 else
 			#if gcc 3.4+
 ifeq			($(CC_SHORTVER), 3.4)
-$(call				set_if_empty,CPU,athlon)
+$(call				set_if_empty,CPUTYPE,athlon)
 					CFLAGS+=-m32 -minline-all-stringops \
 							-falign-loops \
-							-mtune=$(CPU) 
+							-mtune=$(CPUTYPE) 
 					LDFLAGS+=-m32
 else
 			#if gcc 3.0+
 ifeq			($(CC_SHORTVER), 3.0)
-$(call				set_if_empty,CPU,athlon)
+$(call				set_if_empty,CPUTYPE,athlon)
 					CFLAGS+=-minline-all-stringops \
 							-falign-loops \
-							-mcpu=$(CPU)
+							-mcpu=$(CPUTYPE)
 					# -m32 supported since gcc 3.2
 else
 ifeq			($(CC_SHORTVER), 2.9x) #older gcc version (2.9[1-5])
@@ -896,9 +887,9 @@ endif			# CC_SHORTVER, 5.0+, 4.5+ or 4.2+
 
 else		# CC_NAME, gcc
 ifeq		($(CC_NAME), clang)
-$(call                          set_if_empty,CPU,athlon64)
+$(call                          set_if_empty,CPUTYPE,athlon64)
 					C_DEFS+=-DCC_GCC_LIKE_ASM
-					CFLAGS+=-g -m32 $(CC_OPT) -mtune=$(CPU)
+					CFLAGS+=-g -m32 $(CC_OPT) -mtune=$(CPUTYPE)
 					LDFLAGS+=-m32
 else			# CC_NAME, clang
 ifeq		($(CC_NAME), icc)
@@ -925,9 +916,9 @@ ifeq		($(CC_NAME), gcc)
 				#common stuff
 				CFLAGS=-g $(CC_OPT) -funroll-loops  -Wcast-align $(PROFILE)
 			#if gcc 4.5+
-			# don't add '-mtune=$(CPU)' - gcc failure
+			# don't add '-mtune=$(CPUTYPE)' - gcc failure
 ifeq			($(CC_SHORTVER),$(filter $(CC_SHORTVER),4.5+ 5.0+))
-$(call				set_if_empty,CPU,opteron)
+$(call				set_if_empty,CPUTYPE,opteron)
 					CFLAGS+=-m64 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
@@ -936,36 +927,36 @@ $(call				set_if_empty,CPU,opteron)
 else
 			#if gcc 4.2+
 ifeq			($(CC_SHORTVER), 4.2+)
-$(call				set_if_empty,CPU,opteron)
+$(call				set_if_empty,CPUTYPE,opteron)
 					CFLAGS+=-m64 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
 							-fno-strict-overflow \
-							-mtune=$(CPU)
+							-mtune=$(CPUTYPE)
 					LDFLAGS+=-m64
 else
 			#if gcc 4.0+
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPU,opteron)
+$(call				set_if_empty,CPUTYPE,opteron)
 					CFLAGS+=-m64 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
-							-mtune=$(CPU) 
+							-mtune=$(CPUTYPE) 
 					LDFLAGS+=-m64
 else
 			#if gcc 3.4
 ifeq			($(CC_SHORTVER), 3.4)
-$(call				set_if_empty,CPU,athlon64)
+$(call				set_if_empty,CPUTYPE,athlon64)
 					CFLAGS+=-m64 -minline-all-stringops \
 							-falign-loops 
 					LDFLAGS+=-m64
 else
 			#if gcc 3.0
 ifeq			($(CC_SHORTVER), 3.0)
-$(call				set_if_empty,CPU,athlon64)
+$(call				set_if_empty,CPUTYPE,athlon64)
 					CFLAGS+=-minline-all-stringops \
 							-falign-loops 
-							#-mcpu=$(CPU) \ # not working on all x86_64 gccs
+							#-mcpu=$(CPUTYPE) \ # not working on all x86_64 gccs
 							#-mcpu=athlon
 					#-m64 on x86_64/x86 works starting with gcc 3.2
 else
@@ -989,7 +980,7 @@ endif			# CC_SHORTVER, 5.0+, 4.5+
 
 else		# CC_NAME, gcc
 ifeq            ($(CC_NAME), clang)
-$(call                          set_if_empty,CPU,opteron)
+$(call                          set_if_empty,CPUTYPE,opteron)
 					C_DEFS+=-DCC_GCC_LIKE_ASM
                                         CFLAGS+=-g -m64 \
                                                 $(CC_OPT)        
@@ -1022,10 +1013,10 @@ ifeq		($(CC_NAME), gcc)
 					#-Wmissing-prototypes 
 				#if gcc 5.0+, 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+ 5.0+,$(CC_SHORTVER))))
-$(call				set_if_empty,CPU,ultrasparc)
+$(call				set_if_empty,CPUTYPE,ultrasparc)
 					#use 32bit for now
 					CFLAGS+=-m64 -mcpu=ultrasparc  \
-							-mtune=$(CPU) \
+							-mtune=$(CPUTYPE) \
 							-fno-strict-overflow \
 							-ftree-vectorize
 					# use -m64 to force 64 bit (but add it also to LDFLAGS and
@@ -1036,25 +1027,25 @@ $(call				set_if_empty,CPU,ultrasparc)
 else
 				#if gcc 4.x
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPU,ultrasparc)
+$(call				set_if_empty,CPUTYPE,ultrasparc)
 					#use 32bit for now
 					CFLAGS+=-m64 -mcpu=ultrasparc  \
-							-mtune=$(CPU) \
+							-mtune=$(CPUTYPE) \
 							-ftree-vectorize
 					LDFLAGS+=-m64
 else
 				#if gcc 3.4
 ifeq			($(CC_SHORTVER), 3.4)
-$(call				set_if_empty,CPU,ultrasparc)
+$(call				set_if_empty,CPUTYPE,ultrasparc)
 					#use 32bit for now
-					CFLAGS+=-m64 -mcpu=ultrasparc -mtune=$(CPU)
+					CFLAGS+=-m64 -mcpu=ultrasparc -mtune=$(CPUTYPE)
 					LDFLAGS+=-m64
 else
 				#if gcc 3.0
 ifeq			($(CC_SHORTVER), 3.0)
-$(call				set_if_empty,CPU,ultrasparc)
+$(call				set_if_empty,CPUTYPE,ultrasparc)
 					#use 32bit for now
-					CFLAGS+=-m64 -mcpu=ultrasparc -mtune=$(CPU)   \
+					CFLAGS+=-m64 -mcpu=ultrasparc -mtune=$(CPUTYPE)   \
 					# -mcpu=v9 or ultrasparc? # -mtune implied by -mcpu
 					#-mno-epilogue #try to inline function exit code
 					#-mflat # omit save/restore
@@ -1113,30 +1104,30 @@ ifeq		($(CC_NAME), gcc)
 					#-Wmissing-prototypes 
 				#if gcc 5.0+, 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+ 5.0+,$(CC_SHORTVER))))
-$(call				set_if_empty,CPU,v8)
+$(call				set_if_empty,CPUTYPE,v8)
 					#use 32bit for now
-					CFLAGS+= -mtune=$(CPU) \
+					CFLAGS+= -mtune=$(CPUTYPE) \
 							-fno-strict-overflow \
 							-ftree-vectorize
 else
 				#if gcc 4.x
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPU,v8)
+$(call				set_if_empty,CPUTYPE,v8)
 					#use 32bit for now
-					CFLAGS+= -mtune=$(CPU) \
+					CFLAGS+= -mtune=$(CPUTYPE) \
 							-ftree-vectorize
 else
 				#if gcc 3.4
 ifeq			($(CC_SHORTVER), 3.4)
-$(call				set_if_empty,CPU,v8)
+$(call				set_if_empty,CPUTYPE,v8)
 					#use 32bit for now
-					CFLAGS+= -mtune=$(CPU)
+					CFLAGS+= -mtune=$(CPUTYPE)
 else
 				#if gcc 3.0
 ifeq			($(CC_SHORTVER), 3.0)
-$(call				set_if_empty,CPU,v8)
+$(call				set_if_empty,CPUTYPE,v8)
 					#use 32bit for now
-					CFLAGS+= -mtune=$(CPU)   \
+					CFLAGS+= -mtune=$(CPUTYPE)   \
 					#-mno-epilogue #try to inline function exit code
 					#-mflat # omit save/restore
 					#-,faster-structs #faster non Sparc ABI structure copy ops
@@ -1459,23 +1450,23 @@ ifeq		($(CC_NAME), gcc)
 				CFLAGS=
 			#if gcc 5.0+, 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+ 5.0+,$(CC_SHORTVER))))
-$(call				set_if_empty,CPU,powerpc)
+$(call				set_if_empty,CPUTYPE,powerpc)
 ifeq 				($(NOALTIVEC),)
 						CFLAGS += $(CC_OPT) -funroll-loops -fsigned-char $(PROFILE)
 						CFLAGS += -ftree-vectorize
 						CFLAGS += -maltivec
 						CFLAGS += -fno-strict-overflow
-						CFLAGS += -mtune=$(CPU)
+						CFLAGS += -mtune=$(CPUTYPE)
 endif
 else
 			#if gcc 4.0+
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPU,powerpc)
+$(call				set_if_empty,CPUTYPE,powerpc)
 ifeq 				($(NOALTIVEC),)
 						CFLAGS += $(CC_OPT) -funroll-loops -fsigned-char $(PROFILE)
 						CFLAGS += -ftree-vectorize
 						CFLAGS += -maltivec
-						CFLAGS += -mtune=$(CPU)
+						CFLAGS += -mtune=$(CPUTYPE)
 endif
 else
 			#if gcc 3.4+
@@ -1516,16 +1507,16 @@ ifeq		($(CC_NAME), gcc)
 				CFLAGS= $(CC_OPT) -funroll-loops -fsigned-char $(PROFILE)
 			#if gcc 5.0+, 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+ 5.0+,$(CC_SHORTVER))))
-$(call				set_if_empty,CPU,powerpc64)
+$(call				set_if_empty,CPUTYPE,powerpc64)
 					CFLAGS+=-ftree-vectorize \
 							-fno-strict-overflow \
-							-mtune=$(CPU) -maltivec
+							-mtune=$(CPUTYPE) -maltivec
 else
 			#if gcc 4.0+
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPU,powerpc64)
+$(call				set_if_empty,CPUTYPE,powerpc64)
 					CFLAGS+=-ftree-vectorize \
-							-mtune=$(CPU) -maltivec
+							-mtune=$(CPUTYPE) -maltivec
 else
 			#if gcc 3.4+
 ifeq			($(CC_SHORTVER), 3.4)
@@ -1793,7 +1784,7 @@ ifeq ($(CC_NAME), suncc)
 endif
 	OLD_SOLARIS= $(shell echo "$(OSREL)" | \
 				sed -e 's/^5\.[0-6][^0-9]*$$/yes/' )
-	LIBS+= -L$(LOCALBASE)/lib -lxnet -lnsl 
+	LIBS+= -L$(LOCALBASE)/lib -lxnet -lsocket -lnsl 
 ifeq	($(OLD_SOLARIS), yes)
 		LIBS+=-lposix4
 else
@@ -1852,7 +1843,8 @@ ifeq ($(OS), openbsd)
 	C_DEFS+=-DHAVE_SOCKADDR_SA_LEN  -DHAVE_GETHOSTBYNAME2 \
 		-DHAVE_UNION_SEMUN -DHAVE_MSGHDR_MSG_CONTROL \
 		-DHAVE_CONNECT_ECONNRESET_BUG -DHAVE_TIMEGM \
-		-DHAVE_NETINET_IN_SYSTM -DUSE_SIGWAIT
+		-DHAVE_NETINET_IN_SYSTM -DUSE_SIGWAIT \
+		-DHAVE_SCHED_YIELD
 	ifneq ($(found_lock_method), yes)
 		C_DEFS+= -DUSE_PTHREAD_MUTEX  # try pthread sems
 		found_lock_method=yes
@@ -1868,25 +1860,8 @@ ifeq ($(OS), openbsd)
 	endif
 	# (symbols on openbsd are prefixed by "_")
 	YACC=yacc
-	# no sched_yield on openbsd unless linking with c_r (not recommended)
 	# unfortunately pthread is needed for sigwait
 	LIBS= -lpthread
-	OPENBSD_IS_AOUT:= $(shell echo "$(OSREL)" | \
-				sed -e 's/^3\.[0-3][^0-9]*$$/yes/' |sed -e 's/^[0-2]\..*/yes/')
-# exception: on sparc openbsd 3.2 is elf and not aout
-ifeq ($(OSREL), 3.2)
-ifeq	($(ARCH), sparc)
-		OPENBSD_IS_AOUT:=no
-endif
-ifeq	($(ARCH), sparc64)
-		OPENBSD_IS_AOUT:=no
-endif
-endif
-	
-ifeq ($(OPENBSD_IS_AOUT), yes)
-		C_DEFS+=-DDLSYM_PREFIX='"_"'
-		LDFLAGS=        # openbsd ld doesn't like -O2 or -E
-endif
 endif   # if opensd
 	
 ifeq ($(OS), netbsd)
@@ -2027,7 +2002,7 @@ saved_fixed_vars:=	MAIN_NAME  CFG_NAME SCR_NAME FLAVOUR INSTALL_FLAVOUR \
 # variable changeable at compile time
 # extra: prefix DESTDIR BASEDIR basedirt
 saved_chg_vars:=\
-		CC_EXTRA_OPTS CPU CFLAGS_RM CFLAGS MOD_CFLAGS LIB_CFLAGS UTILS_CFLAGS \
+		CC_EXTRA_OPTS CPUTYPE CFLAGS_RM CFLAGS MOD_CFLAGS LIB_CFLAGS UTILS_CFLAGS \
 		BASEDIR basedir DESTDIR LIBDIR RUNBASEDIR runbasedir \
 		PREFIX prefix \
 		cfg_prefix cfg_dir bin_prefix bin_dir modules_prefix modules_dir \

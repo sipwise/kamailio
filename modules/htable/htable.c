@@ -28,6 +28,7 @@
 
 #include "../../sr_module.h"
 #include "../../timer.h"
+#include "../../timer_proc.h"
 #include "../../route.h"
 #include "../../dprint.h"
 #include "../../hashes.h"
@@ -51,6 +52,7 @@ MODULE_VERSION
 int  ht_timer_interval = 20;
 int  ht_db_expires_flag = 0;
 int  ht_enable_dmq = 0;
+int  ht_timer_procs = 0;
 
 static int htable_init_rpc(void);
 
@@ -144,6 +146,7 @@ static param_export_t params[]={
 	{"timer_interval",     INT_PARAM, &ht_timer_interval},
 	{"db_expires",         INT_PARAM, &ht_db_expires_flag},
 	{"enable_dmq",         INT_PARAM, &ht_enable_dmq},
+	{"timer_procs",        PARAM_INT, &ht_timer_procs},
 	{0,0,0}
 };
 
@@ -202,10 +205,14 @@ static int mod_init(void)
 		LM_DBG("starting auto-expire timer\n");
 		if(ht_timer_interval<=0)
 			ht_timer_interval = 20;
-		if(register_timer(ht_timer, 0, ht_timer_interval)<0)
-		{
-			LM_ERR("failed to register timer function\n");
-			return -1;
+		if(ht_timer_procs<=0) {
+			if(register_timer(ht_timer, 0, ht_timer_interval)<0)
+			{
+				LM_ERR("failed to register timer function\n");
+				return -1;
+			}
+		} else {
+			register_sync_timers(ht_timer_procs);
 		}
 	}
 
@@ -225,8 +232,22 @@ static int child_init(int rank)
 	struct sip_msg *fmsg;
 	struct run_act_ctx ctx;
 	int rtb, rt;
+	int i;
 
 	LM_DBG("rank is (%d)\n", rank);
+
+	if(rank==PROC_MAIN) {
+		if(ht_timer_procs>0) {
+			for(i=0; i<ht_timer_procs; i++) {
+				if(fork_sync_timer(PROC_TIMER, "HTable Timer", 1 /*socks flag*/,
+						ht_timer, (void*)(long)i, ht_timer_interval)<0) {
+					LM_ERR("failed to start timer routine as process\n");
+					return -1; /* error */
+				}
+			}
+		}
+	}
+
 	if (rank!=PROC_INIT)
 		return 0;
 	
@@ -326,7 +347,7 @@ static int ht_rm_name_re(struct sip_msg* msg, char* key, char* foo)
 	}
 	if(pv_printf_s(msg, hpv->pve, &sre)!=0)
 	{
-		LM_ERR("cannot get $ht expression\n");
+		LM_ERR("cannot get $sht expression\n");
 		return -1;
 	}
 	if (hpv->ht->dmqreplicate>0) {
@@ -358,7 +379,7 @@ static int ht_rm_value_re(struct sip_msg* msg, char* key, char* foo)
 	}
 	if(pv_printf_s(msg, hpv->pve, &sre)!=0)
 	{
-		LM_ERR("cannot get $ht expression\n");
+		LM_ERR("cannot get $sht expression\n");
 		return -1;
 	}
 
@@ -462,13 +483,13 @@ static int w_ht_slot_lock(struct sip_msg* msg, char* key, char* foo)
 	{
 		hpv->ht = ht_get_table(&hpv->htname);
 		if(hpv->ht==NULL) {
-			LM_ERR("cannot get $ht root\n");
+			LM_ERR("cannot get $sht root\n");
 			return -11;
 		}
 	}
 	if(pv_printf_s(msg, hpv->pve, &skey)!=0)
 	{
-		LM_ERR("cannot get $ht key\n");
+		LM_ERR("cannot get $sht key\n");
 		return -1;
 	}
 
@@ -504,13 +525,13 @@ static int w_ht_slot_unlock(struct sip_msg* msg, char* key, char* foo)
 	{
 		hpv->ht = ht_get_table(&hpv->htname);
 		if(hpv->ht==NULL) {
-			LM_ERR("cannot get $ht root\n");
+			LM_ERR("cannot get $sht root\n");
 			return -11;
 		}
 	}
 	if(pv_printf_s(msg, hpv->pve, &skey)!=0)
 	{
-		LM_ERR("cannot get $ht key\n");
+		LM_ERR("cannot get $sht key\n");
 		return -1;
 	}
 
@@ -896,7 +917,7 @@ static void htable_rpc_sets(rpc_t* rpc, void* c) {
 
 	if(ht_set_cell(ht, &keyname, AVP_VAL_STR, &keyvalue, 1)!=0)
 	{
-		LM_ERR("cannot set $ht(%.*s=>%.*s)\n", htname.len, htname.s,
+		LM_ERR("cannot set $sht(%.*s=>%.*s)\n", htname.len, htname.s,
 				keyname.len, keyname.s);
 		rpc->fault(c, 500, "Failed to set the item");
 		return;
@@ -930,7 +951,7 @@ static void htable_rpc_seti(rpc_t* rpc, void* c) {
 	
 	if(ht_set_cell(ht, &keyname, 0, &keyvalue, 1)!=0)
 	{
-		LM_ERR("cannot set $ht(%.*s=>%.*s)\n", htname.len, htname.s,
+		LM_ERR("cannot set $sht(%.*s=>%.*s)\n", htname.len, htname.s,
 				keyname.len, keyname.s);
 		rpc->fault(c, 500, "Failed to set the item");
 		return;
@@ -990,17 +1011,19 @@ static void  htable_rpc_dump(rpc_t* rpc, void* c)
 					goto error;
 				}
 				if(it->flags&AVP_VAL_STR) {
-					if(rpc->struct_add(vh, "SS",
+					if(rpc->struct_add(vh, "SSs",
 							"name",  &it->name.s,
-							"value", &it->value.s)<0)
+							"value", &it->value.s,
+							"type", "str")<0)
 					{
 						rpc->fault(c, 500, "Internal error adding item");
 						goto error;
 					}
 				} else {
-					if(rpc->struct_add(vh, "Sd",
+					if(rpc->struct_add(vh, "Sds",
 							"name",  &it->name.s,
-							"value", (int)it->value.n)<0)
+							"value", (int)it->value.n,
+							"type", "int")<0)
 					{
 						rpc->fault(c, 500, "Internal error adding item");
 						goto error;
@@ -1102,7 +1125,7 @@ static void  htable_rpc_stats(rpc_t* rpc, void* c)
 			ht_slot_unlock(ht, i);
 		}
 
-		if(rpc->struct_add(th, "Sddd",
+		if(rpc->struct_add(th, "Sdddd",
 						"name", &ht->name,	/* str */
 						"slots", (int)ht->htsize,	/* uint */
 						"all", (int)all,	/* uint */

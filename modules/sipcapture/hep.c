@@ -35,7 +35,7 @@
 #include "sipcapture.h"
 
 
-static int show_error = 0;
+
 static int count = 0;
 
 struct hep_timehdr* heptime;
@@ -56,10 +56,7 @@ int hep_msg_received(void *data)
         struct receive_info *ri;
 
         if(!hep_capture_on) {
-        	if(show_error == 0) {
-                	LOG(L_ERR, "sipcapture:hep_msg_received HEP is not enabled\n");
-                	show_error = 1;
-        	}
+                LOG(L_ERR, "sipcapture:hep_msg_received HEP is not enabled\n");
                 return -1;
         }
 
@@ -68,6 +65,9 @@ int hep_msg_received(void *data)
         buf = (char *)srevp[0];
         len = (unsigned *)srevp[1];
         ri = (struct receive_info *)srevp[2];                        
+
+	correlation_id = NULL;
+	authkey = NULL;
 
 	count++;
         struct hep_hdr *heph;
@@ -103,6 +103,9 @@ int hepv2_received(char *buf, unsigned int len, struct receive_info *ri){
         memset(heptime, 0, sizeof(struct hep_timehdr));
 
         struct hep_ip6hdr *hepip6h = NULL;
+            	        
+	correlation_id = NULL;
+	authkey = NULL;
 
 	hep_offset = 0; 
 	
@@ -274,6 +277,8 @@ int parsing_hepv3_message(char *buf, unsigned int len) {
         src_ip.af = 0;
                 	        
 	payload = NULL;
+	correlation_id = NULL;
+	authkey = NULL;
 
 	i = sizeof(hep_ctrl_t);	        
 	        
@@ -485,9 +490,11 @@ int parsing_hepv3_message(char *buf, unsigned int len) {
           
 
         if(payload != NULL ) {
-                /* and now recieve message */                
+                /* and now recieve message */
                 if (hg->proto_t->data == 5) receive_logging_json_msg(payload, payload_len, hg, "rtcp_capture");
-                else if (hg->proto_t->data == 100) receive_logging_json_msg(payload, payload_len, hg, "logs_capture");                
+                else if (hg->proto_t->data == 32) receive_logging_json_msg(payload, payload_len, hg, "report_capture");
+                else if (hg->proto_t->data == 99) receive_logging_json_msg(payload, payload_len, hg, "report_capture");
+                else if (hg->proto_t->data == 100) receive_logging_json_msg(payload, payload_len, hg, "logs_capture");
                 else receive_msg(payload, payload_len, &ri);
         }
 

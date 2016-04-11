@@ -52,6 +52,7 @@
 
 #include "th_mask.h"
 #include "th_msg.h"
+#include "api.h"
 
 MODULE_VERSION
 
@@ -95,12 +96,17 @@ static param_export_t params[]={
 	{0,0,0}
 };
 
+static cmd_export_t cmds[]={
+	{"bind_topoh",   (cmd_function)bind_topoh,  0,
+		0, 0, 0},
+	{0, 0, 0, 0, 0, 0}
+};
 
 /** module exports */
 struct module_exports exports= {
 	"topoh",
 	DEFAULT_DLFLAGS, /* dlopen flags */
-	0,
+	cmds,
 	params,
 	0,          /* exported statistics */
 	0,          /* exported MI functions */
@@ -229,7 +235,8 @@ int th_prepare_msg(sip_msg_t *msg)
 
 	if (parse_headers(msg, HDR_EOH_F, 0)==-1)
 	{
-		LM_DBG("parsing headers failed");
+		LM_DBG("parsing headers failed [[%.*s]]\n",
+				msg->len, msg->buf);
 		return 2;
 	}
 
@@ -330,7 +337,7 @@ int th_msg_received(void *data)
 		{
 			/* one Via in received reply -- it is for local generated request
 			 * - nothing to unhide unless is CANCEL/ACK */
-			if((get_cseq(&msg)->method_id)&(METHOD_CANCEL))
+			if(!((get_cseq(&msg)->method_id)&(METHOD_CANCEL)))
 				goto done;
 		}
 
@@ -475,3 +482,18 @@ done:
 	return 0;
 }
 
+/**
+ *
+ */
+int bind_topoh(topoh_api_t* api)
+{
+	if (!api) {
+		ERR("Invalid parameter value\n");
+		return -1;
+	}
+
+	memset(api, 0, sizeof(topoh_api_t));
+	api->unmask_callid = th_unmask_callid_str;
+
+	return 0;
+}

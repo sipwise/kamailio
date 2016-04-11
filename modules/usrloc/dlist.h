@@ -109,10 +109,11 @@ int synchronize_all_udomains(int istart, int istep);
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
+ * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 int get_all_ucontacts(void *buf, int len, unsigned int flags,
-		unsigned int part_idx, unsigned int part_max);
+		unsigned int part_idx, unsigned int part_max, int options);
 
 
 /*!
@@ -144,5 +145,7 @@ int find_domain(str* _d, udomain_t** _p);
  * \brief Set the value for max partition
  */
 void ul_set_max_partition(unsigned int m);
+
+int ul_db_clean_udomains(void);
 
 #endif

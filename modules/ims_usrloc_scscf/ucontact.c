@@ -114,6 +114,10 @@ ucontact_t* new_ucontact(str* _dom, str* _aor, str* _contact, ucontact_info_t* _
     /*Copy parameter list into shm**/
     param = _ci->params;
     while(param) {
+        LM_DBG("Checking param [%.*s]\n", param->name.len, param->name.s);
+        if (param->name.len == 16 && (memcmp(param->name.s, "+g.3gpp.icsi-ref", 16)==0)) {
+            c->is_3gpp = 1;
+        }
 	/*Copy first param in curr*/
 	curr = shm_malloc(sizeof (param_t));
 	curr->len = param->len;
@@ -147,7 +151,7 @@ ucontact_t* new_ucontact(str* _dom, str* _aor, str* _contact, ucontact_info_t* _
     }
     
     LM_DBG("generating hash based on [%.*s]\n", _contact->len, _contact->s);
-    c->contact_hash = core_hash(_contact, 0, contact_list->size);
+    c->sl = core_hash(_contact, 0, contact_list->size);
     c->ref_count = 1;
     c->expires = _ci->expires;
     c->q = _ci->q;
@@ -182,7 +186,7 @@ void free_ucontact(ucontact_t* _c) {
     param_t * tmp, *tmp1;
     
     if (!_c) return;
-    LM_DBG("Freeing ucontact [%.*s]\n", _c->aor.len, _c->aor.s);    
+    LM_DBG("Freeing ucontact [%p] => [%.*s]\n", _c, _c->c.len, _c->c.s);    
     if (_c->path.s) shm_free(_c->path.s);
     if (_c->received.s) shm_free(_c->received.s);
     if (_c->user_agent.s) shm_free(_c->user_agent.s);
@@ -396,7 +400,7 @@ static inline void update_contact_pos(struct impurecord* _r, ucontact_t* _c) {
  * \param _c updated contact
  * \return 0 on success, -1 on failure
  */
-int expire_ucontact(struct impurecord* _r, ucontact_t* _c) {
+int expire_scontact(struct impurecord* _r, ucontact_t* _c) {
     /* we have to update memory in any case, but database directly
      * only in db_mode 1 */
     LM_DBG("Expiring contact aor: [%.*s] and contact uri: [%.*s]\n", _c->aor.len, _c->aor.s, _c->c.len, _c->c.s);
@@ -434,7 +438,7 @@ int expire_ucontact(struct impurecord* _r, ucontact_t* _c) {
  * \param _ci new contact informations
  * \return 0 on success, -1 on failure
  */
-int update_ucontact(struct impurecord* _r, ucontact_t* _c, ucontact_info_t* _ci) {
+int update_scontact(struct impurecord* _r, ucontact_t* _c, ucontact_info_t* _ci) {
     /* we have to update memory in any case, but database directly
      * only in db_mode 1 */
     LM_DBG("Updating contact aor: [%.*s] and contact uri: [%.*s]\n", _c->aor.len, _c->aor.s, _c->c.len, _c->c.s);
@@ -503,7 +507,7 @@ int add_dialog_data_to_contact(ucontact_t* _c, unsigned int h_entry, unsigned in
  * used when this contact is part of a confirmed dialog so we can tear down the dialog if the contact is removed
  */
 int remove_dialog_data_from_contact(ucontact_t* _c, unsigned int h_entry, unsigned int h_id) {
-    struct contact_dialog_data *dialog_data, *tmp_dialog_data; 
+    struct contact_dialog_data *dialog_data, *tmp_dialog_data;     
     LM_DBG("Removing dialog data from contact <%.*s> with h_entry <%d> and h_id <%d>", _c->c.len, _c->c.s, h_entry, h_id);
     
     for (dialog_data = _c->first_dialog_data; dialog_data;) {
@@ -521,17 +525,18 @@ int remove_dialog_data_from_contact(ucontact_t* _c, unsigned int h_entry, unsign
 	    }else{
 	       _c->last_dialog_data =  tmp_dialog_data->prev;
 	    }
-	    shm_free(tmp_dialog_data);
-	    return 0;
+	    shm_free(tmp_dialog_data);            
+	    return 0; 
 	}
         
     }
-    LM_DBG("Did not find dialog data to remove from contact");
-    return 0;
+   
+      LM_DBG("Did not find dialog data to remove from contact");
+      return 1;              
 }
 
-void release_ucontact(struct ucontact* _c) {
-    lock_contact_slot_i(_c->contact_hash);
-    _c->ref_count--;
-    unlock_contact_slot_i(_c->contact_hash);
+void release_scontact(struct ucontact* _c) {
+    lock_contact_slot_i(_c->sl);
+    unref_contact_unsafe(_c);
+    unlock_contact_slot_i(_c->sl);
 }

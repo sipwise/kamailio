@@ -163,6 +163,8 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"lookup_to_dset",  (cmd_function)w_lookup_to_dset,  1,  domain_uri_fixup, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE },
+	{"lookup_to_dset",  (cmd_function)w_lookup_to_dset,  2,  domain_uri_fixup, 0,
+			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"registered",   (cmd_function)w_registered,  1,  domain_uri_fixup, 0,
 			ANY_ROUTE },
 	{"registered",   (cmd_function)w_registered,  2,  domain_uri_fixup, 0,
@@ -360,8 +362,13 @@ static int mod_init(void)
 			sock_hdr_name.len = 0;
 			sock_flag = -1;
 		}
+	} else if (reg_xavp_cfg.s) {
+		if (reg_xavp_cfg.len == 0 || sock_flag == -1) {
+			LM_WARN("empty reg_xavp_cfg or sock_flag no set -> resetting\n");
+			sock_flag = -1;
+		}
 	} else if (sock_flag!=-1) {
-		LM_WARN("sock_flag defined but no sock_hdr_name -> reseting flag\n");
+		LM_WARN("sock_flag defined but no sock_hdr_name or no reg_xavp_cfg -> resetting flag\n");
 		sock_flag = -1;
 	}
 

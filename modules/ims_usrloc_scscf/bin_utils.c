@@ -907,6 +907,9 @@ ims_subscription *bin_decode_ims_subscription(bin_data *x)
 		goto error;
 	}
 	imss->ref_count = 1;
+#ifdef EXTRA_DEBUG
+    	LM_DBG("LOCK CREATED FOR SUBSCRIPTION [%.*s]: %p\n", imss->private_identity.len, imss->private_identity.s, imss->lock);
+#endif
 
 	return imss;
 error:

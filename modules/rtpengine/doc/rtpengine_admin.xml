@@ -73,6 +73,38 @@
 		If the set was selected using setid_avp, the avp needs to be
 		set only once before rtpengine_offer() or rtpengine_manage() call.
 	</para>
+	<para>
+		From the current implementation point of view, the sets of rtpproxy nodes
+		are shared memory(shm), so all processes can see a common list of nodes.
+		There is no locking when setting the nodes enabled/disabled (to keep the
+		memory access as fast as possible). Thus, problems related to node state
+		might appear for concurent processes that might set the nodes
+		enabled/disabled(e.g. by fifo command). This robustness problems are overcomed as follows.
+	</para>
+
+	<para>
+		If the current process sees the selected node as disabled, the node is
+		<emphasis>force tested</emphasis> before the current process actually
+		takes the disabled decision. If the test succeeds, the process will set
+		the node as enabled (but other concurrent process might still see it as disabled).
+.
+	</para>
+
+	<para>
+		If the current process sees the selected node as enabled, it does no additional checks
+		and sends the command which will fail in case the machine is actually broken.
+		The process will set the node as disabled (but other concurrent process might still see it as enabled).
+	</para>
+
+	<para>
+		The 'kamctl fifo' commands (including rtpengin ones) are executed by an exclusive
+		process which operate on the same shared memory node list.
+	</para>
+
+	<para>
+		All the nodes are pinged in the beginning by all the processes,
+		even if the node list is shared memory.
+	</para>
 	</section>
 
 	<section>
@@ -178,6 +210,35 @@ modparam("rtpengine", "rtpengine_tout_ms", 2000)
 </programlisting>
 		</example>
 	</section>
+	<section id="rtpengine.p.rtpengine_allow_op">
+		<title><varname>rtpengine_allow_op</varname> (integer)</title>
+		<para>
+		Enable this to allow finishing the current sessions while denying new sessions for the
+		<emphasis>manually deactivated nodes </emphasis> via kamctl command i.e. "disabled(permanent)" nodes.
+		Probably the manually deactivated machine is still running(did not crash).
+		</para>
+		<para>
+		This is <emphasis>useful</emphasis> when deactivating a node for maintanance and reject new sessions but allow current ones to finish.
+		</para>
+		<para>
+		The behaviour is the same for a rtpengine deleted table node.
+		When the node is deleted from the table and the table reloaded (see nh_reload_rtpp) the node actually is disabled(permanent) and hidden for display.
+		Next time the same node will be added in the table, and the content reloaded, it will be updated and re-displayed.
+		</para>
+		<para>
+		<emphasis>
+		Default value is <quote>0</quote> to keep the current behaviour.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>rtpengine_allow_op</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rtpengine", "rtpengine_allow_op", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	<section id="rtpengine.p.queried_nodes_limit">
 		<title><varname>queried_nodes_limit</varname> (integer)</title>
 		<para>
@@ -238,7 +299,7 @@ modparam("rtpengine", "extra_id_pv", "$avp(extra_id)")
 		</example>
 	</section>
 
-	<section id="rtpengine.p.setid_pv">
+	<section id="rtpengine.p.setid_avp">
 		<title><varname>setid_avp</varname> (string)</title>
 		<para>
 			The parameter defines an AVP that, if set,
@@ -286,6 +347,31 @@ modparam("rtpengine", "force_send_interface", "2001:8d8:1ff:10c0:9a90:96ff:fea8:
 </programlisting>
 		</example>
 	</section>
+
+	<section id="rtpengine.p.read_sdp_pv">
+		<title><varname>read_sdp_pv</varname> (string)</title>
+		<para>
+			If this parameter is set to a valid AVP or script var specifier, rtpengine
+			will take the input SDP from this pv instead of the message body.
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<example>
+		<title>Set <varname>read_sdp_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "read_sdp_pv", "$var(sdp)")
+...
+route {
+	...
+	$var(sdp) = $rb + "a=foo:bar\r\n";
+	rtpengine_manage();
+}
+</programlisting>
+		</example>
+	</section>
+
 	<section id="rtpengine.p.write_sdp_pv">
 		<title><varname>write_sdp_pv</varname> (string)</title>
 		<para>
@@ -302,9 +388,12 @@ modparam("rtpengine", "force_send_interface", "2001:8d8:1ff:10c0:9a90:96ff:fea8:
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "write_sdp_pv", "$avp(sdp)")
-  ...  or
-modparam("rtpengine", "write_sdp_pv", "$pv(sdp)")
 ...
+route {
+	...
+	rtpengine_manage();
+	set_body("$avp(sdp)a=baz123\r\n", "application/sdp");
+}
 </programlisting>
 		</example>
 	</section>
@@ -322,13 +411,245 @@ modparam("rtpengine", "write_sdp_pv", "$pv(sdp)")
 		<title>Set <varname>rtp_inst_pvar</varname> parameter</title>
 <programlisting format="linespecific">
 ...
-modparam("rtpproxy", "rtp_inst_pvar", "$avp(RTP_INSTANCE)")
+modparam("rtpengine", "rtp_inst_pvar", "$avp(RTP_INSTANCE)")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.hash_table_size">
+		<title><varname>hash_table_size</varname> (integer)</title>
+		<para>
+			Size of the hash table. Default value is 256.
+		</para>
+		<para>
+			NOTE: If configured size is <emphasis>less than</emphasis> 1, the size will be defaulted to 1.
+		</para>
+		<example>
+		<title>Set <varname>hash_table_size</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "hash_table_size", "123")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.hash_table_tout">
+		<title><varname>hash_table_tout</varname> (integer)</title>
+		<para>
+			Number of seconds after an rtpengine hash table entry is marked for deletion.
+			By default, this parameter is set to 3600 (seconds).
+		</para>
+		<para>
+			To maintain information about a selected rtp machine node, for a given call, entries are added in a hashtable of (callid, node) pairs.
+			When command comes, lookup callid. If found, return chosen node. If not found, choose a new node, insert it in the hastable and return the chosen node.
+		</para>
+		<para>
+			NOTE: In the current implementation, the actual deletion happens <emphasis>on the fly</emphasis>,
+			while insert/remove/lookup the hastable, <emphasis>only</emphasis> for the entries in the insert/remove/lookup path.
+		</para>
+		<para>
+			NOTE: When configuring this parameter, one should consider maximum call time VS share memory for unfinished calls.
+		</para>
+		<example>
+		<title>Set <varname>hash_table_tout</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "hash_table_tout", "300")
+...
+</programlisting>
+                </example>
+        </section>
+
+
+
+
+	<section id="rtpengine.p.db_url">
+		<title><varname>db_url</varname> (string)</title>
+		<para>
+			The rtpengine datablase url. If present and valid, it activates database mode.
+			Node information is read from database, not from config.
+		</para>
+		<para>
+			By default, the datablase url is NULL (not set).
+		</para>
+		<example>
+		<title>Set <varname>db_url</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "db_url", "mysql://pass@localhost/db")
+...
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.table_name">
+		<title><varname>table_name</varname> (string)</title>
+		<para>
+			The rtpengine table name. If database mode is activated (i.e. valid db_url),
+			set the name of rtpengine table, on startup.
+		</para>
+		<para>
+			By default, the rtpengine table name is "rtpengine".
+		</para>
+		<para>
+			NOTE: One needs to add the version of the rtpengine table in the version table.
+			The current version is version 1.
+		</para>
+		<example>
+		<title>Set <varname>table_name</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "table_name", "rtpengine_table_name")
+...
+</programlisting>
+		</example>
+
+		<example>
+		<title>Setup <varname>rtpengine</varname> table</title>
+<programlisting format="linespecific">
+mysql> describe rtpengine;
++----------+------------------+------+-----+---------+-------+
+| Field    | Type             | Null | Key | Default | Extra |
++----------+------------------+------+-----+---------+-------+
+| setid    | int(10) unsigned | NO   |     | NULL    |       |
+| url      | varchar(256)     | NO   |     | NULL    |       |
+| weight   | int(10) unsigned | NO   |     | NULL    |       |
+| disabled | int(11)          | NO   |     | NULL    |       |
++----------+------------------+------+-----+---------+-------+
+
+mysql> select * from rtpengine;
++-------+---------------------------+--------+----------+
+| setid | url                       | weight | disabled |
++-------+---------------------------+--------+----------+
+|     0 | udp:rtpproxy1.domain:8800 |    100 |        0 |
+|     0 | udp:rtpproxy2.domain:8800 |    200 |        1 |
++-------+---------------------------+--------+----------+
+
+mysql> select * from version;
++---------------------------+---------------+
+| table_name                | table_version |
++---------------------------+---------------+
+| rtpengine                 |             1 |
++---------------------------+---------------+
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.setid_col">
+		<title><varname>setid_col</varname> (string)</title>
+		<para>
+			Column name in the rtpengine table. If database mode is activated (i.e. valid db_url),
+			set the setid of rtp nodes according to this column, on startup.
+			The MySQL value for this column should be INT UNSIGNED.
+		</para>
+		<para>
+			By default, the column name is "setid".
+		</para>
+		<example>
+		<title>Set <varname>setid_col</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "setid_col", "setid_column_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.url_col">
+		<title><varname>url_col</varname> (string)</title>
+		<para>
+			Column name in the rtpengine table. If database mode is activated (i.e. valid db_url),
+			set the url of rtp nodes according to this column, on startup.
+			The MySQL value for this column should be VARCHAR.
+		</para>
+		<para>
+			By default, the column name is "url".
+		</para>
+		<example>
+		<title>Set <varname>url_col</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "url_col", "url_column_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.weight_col">
+		<title><varname>weight_col</varname> (string)</title>
+		<para>
+			Column name in the rtpengine table. If database mode is activated (i.e. valid db_url),
+			set the weight of rtp nodes according to this column, on startup. The column value has
+			priority over the URL weight.
+			The MySQL value for this column should be INT UNSIGNED.
+		</para>
+		<para>
+			By default, the column name is "weight".
+		</para>
+		<example>
+		<title>Set <varname>weight_col</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "weight_col", "weight_column_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.disabled_col">
+		<title><varname>disabled_col</varname> (string)</title>
+		<para>
+			Column name in the rtpengine table. If database mode is activated (i.e. valid db_url),
+			set the state of rtp nodes according to this column, on startup.
+			The MySQL value for this column should be INT.
+		</para>
+		<para>
+			By default, the column name is "disabled".
+		</para>
+		<example>
+		<title>Set <varname>disabled_col</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "disabled_col", "disabled_column_name")
+...
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.setid_default">
+		<title><varname>setid_default</varname> (string)</title>
+		<para>
+			The default set of nodes to be used.
+		</para>
+		<para>
+			By default, the setid is 0.
+		</para>
+		<para>
+			NOTE that if setid_avp is configured, this value will be ignored and
+			the active set will be chosen according to the setid_avp.
+		</para>
+		<example>
+		<title>Set <varname>setid_default</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "setid_default", 11)
 ...
 </programlisting>
 		</example>
 	</section>
 
 	</section>
+
+
+
 
 	<section>
 	<title>Functions</title>
@@ -478,9 +799,15 @@ rtpengine_offer();
 				</para></listitem>
 				<listitem><para>
 				<emphasis>trust-address</emphasis> - flags that IP address in &sdp; should
-				be trusted. Without this flag, the &rtp; proxy ignores address in
+				be trusted. Starting with rtpengine 3.8, this is the default behaviour.
+				In older versions, without this flag the &rtp; proxy ignores the address in
 				the &sdp; and uses source address of the &sip; message as media
 				address which is passed to the &rtp; proxy.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>SIP-source-address</emphasis> - the opposite of
+				<emphasis>trust-address</emphasis>. Restores the old default behaviour
+				of ignoring endpoint addresses in the &sdp; body.
 				</para></listitem>
 				<listitem><para>
 				<emphasis>replace-origin</emphasis> - flags that IP from the origin
@@ -585,6 +912,45 @@ rtpengine_offer();
 				0 through 255, given in decimal. If this option is not specified, the TOS
 				value will revert to the default TOS (normally 184). A value of -1 may be used
 				to leave the currently used TOS unchanged.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>delete-delay=...</emphasis> - override the default delay (in seconds)
+				before a call is actually deleted from memory. Can be set to zero to effectuate
+				immediate deletion. This option only makes sense for <emphasis>delete</emphasis>
+				operations.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>strict-source</emphasis> - instructs the &rtp; proxy to check the
+				source addresses of all incoming &rtp; packets and drop the packets if the
+				address doesn't match.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>media-handover</emphasis> - the antithesis of
+				<emphasis>strict-source</emphasis>. Instructs the &rtp; proxy not only to accept
+				mismatching &rtp; source addresses (as it normally would), but also to accept
+				them as the new endpoint address of the opposite media flow. Not recommended
+				as it allows media streams to be hijacked by an attacker.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>DTLS=...</emphasis> - influence the behaviour of DTLS-SRTP. Possible
+				values are <quote>no</quote> or <quote>off</quote> to suppress offering or
+				accepting DTLS-SRTP, and <quote>passive</quote> to prefer participating in
+				DTLS-SRTP in a passive role.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>SDES-off</emphasis> - don't offer SDES when it normally would. In an SRTP
+				context, this leaves DTLS-SRTP as the only other option.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>SDES-unencrypted_srtp, SDES-unencrypted_srtcp,
+				SDES-unauthenticated_srtp</emphasis> - these directly reflect the SDES session
+				parameters from RFC 4568 and will make the &rtp; proxy offer these parameters
+				when offering SDES.
+				</para></listitem>
+				<listitem><para>
+				<emphasis>SDES-encrypted_srtp, SDES-encrypted_srtcp,
+				SDES-authenticated_srtp</emphasis> - the opposites of the flags above. Useful
+				if accepting these parameters is not desired and they should be rejected instead.
 				</para></listitem>
 			</itemizedlist>
 		</listitem>
@@ -794,21 +1160,30 @@ start_recording();
 	<section>
 		<title><acronym>MI</acronym> Commands</title>
 		<section id="rtpengine.m.nh_enable_rtpp">
-			<title><function moreinfo="none">nh_enable_rtpp</function></title>
+			<title><function moreinfo="none">nh_enable_rtpp proxy_url/all 0/1</function></title>
 			<para>
-			Enables a &rtp; proxy if parameter value is greater than 0.
-			Disables it if a zero value is given.
-			</para>
-			<para>
-			The first parameter is the &rtp; proxy url (exactly as defined in
-			the config file).
-			</para>
-			<para>
+			Enables a &rtp; proxy if the second parameter value is greater than 0. Disables it if a zero value is given.
+			The first parameter is either a specific &rtp; proxy url (exactly as defined in
+			the config file) or the keyword <emphasis>all</emphasis>.
 			The second parameter value must be a number in decimal.
 			</para>
 			<para>
-			NOTE: if a &rtp; proxy is defined multiple times (in the same or
-			diferente sete), all of its instances will be enables/disabled.
+            When try to enable the &rtp; proxy, an application ping command is sent to it.
+            If it fails, the proxy is not enabled.
+            Displays <emphasis>success</emphasis> or <emphasis>fail</emphasis> when try to enable/disable.
+			</para>
+			<para>
+			NOTE: If a &rtp; proxy is defined multiple times (in the same or diferent sets), all of its instances will be enabled/disabled.
+			</para>
+			<para>
+			NOTE: If a &rtp; proxy is in the disabled permanent state and one tries to enable it, even if the ping fails,
+            it is moved to a disabled temporary state and a recheck_ticks are given to it.
+            While the recheck_ticks are grater than 0, the proxy is considered disabled temporary, and it is not taken into consideration for sending data.
+            When the recheck_ticks are 0, the proxy is retested <emphasis>when trying to send data</emphasis>(not automatically retested), and data can be send to it on success.
+			</para>
+			<para>
+			NOTE: When specify the IPv6 &rtp; proxy url one must prefix it with <emphasis>::</emphasis>
+            to escape the :: from the IPv6 address. See the example below.
 			</para>
 			<example>
 			<title>
@@ -816,32 +1191,113 @@ start_recording();
 			<programlisting format="linespecific">
 ...
 $ &ctltool; fifo nh_enable_rtpp udp:192.168.2.133:8081 0
+$ &ctltool; fifo nh_enable_rtpp ::udp6:fe80::9a90:96ff:fea8:fd99:9999 1
+$ &ctltool; fifo nh_enable_rtpp all 1
 ...
 			</programlisting>
 			</example>
 		</section>
 
-			<section id="rtpengine.m.nh_show_rtpp">
-			<title><function moreinfo="none">nh_show_rtpp</function></title>
+	    <section id="rtpengine.m.nh_show_rtpp">
+			<title><function moreinfo="none">nh_show_rtpp proxy_url/all</function></title>
 			<para>
 			Displays all the &rtp; proxies and their information: set and
-			status (disabled or not, weight and recheck_ticks). If a RTP proxy has been disabled by a mi command
-			a "(permanent)" quote will appear when printing the disabled status. This is to differentiate from
-			a temporary disable due to the proxy being not found responsive by kamailio.
+			status (disabled or not, weight and recheck_ticks). If a &rtp; proxy has been disabled by
+            nh_enable_rtpp mi command a "(permanent)" quote will appear when printing the disabled status.
+            This is to differentiate from a temporary disable due to the proxy being not found responsive
+            by kamailio. In addition, when disabled permanent, recheck_ticks have no meaning and "N\A"
+            is printed instead of the value.
 			</para>
 			<para>
-			No parameter.
+            It takes either a specific &rtp; proxy url (exactly as defined in
+			the config file) or the keyword <emphasis>all</emphasis> as a parameter.
+			</para>
+			<para>
+			NOTE: When specify the IPv6 &rtp; proxy url one must prefix it with <emphasis>::</emphasis>
+            to escape the :: from the IPv6 address. See the example below.
 			</para>
 			<example>
 			<title>
 				<function moreinfo="none">nh_show_rtpp</function> usage</title>
 			<programlisting format="linespecific">
 ...
-$ &ctltool; fifo nh_show_rtpp
+$ &ctltool; fifo nh_show_rtpp udp:192.168.2.133:8081
+$ &ctltool; fifo nh_show_rtpp ::udp6:fe80::9a90:96ff:fea8:fd99:9999
+$ &ctltool; fifo nh_show_rtpp all
 ...
 			</programlisting>
 			</example>
 		</section>
+
+	    <section id="rtpengine.m.nh_ping_rtpp">
+			<title><function moreinfo="none">nh_ping_rtpp proxy_url/all</function></title>
+			<para>
+            Sends an application ping command to the &rtp; proxy. If the proxy does not respond,
+            it will be disabled, but not permanent. If the proxy responds, no action is taken.
+            Displays the ping result, i.e.
+            <emphasis>success</emphasis> or <emphasis>fail</emphasis> when try to ping.
+			</para>
+			<para>
+            It takes either a specific &rtp; proxy url (exactly as defined in
+			the config file) or the keyword <emphasis>all</emphasis> as a parameter.
+			</para>
+			<para>
+			NOTE: When specify the IPv6 &rtp; proxy url one must prefix it with <emphasis>::</emphasis>
+            to escape the :: from the IPv6 address. See the example below.
+			</para>
+			<example>
+			<title>
+				<function moreinfo="none">nh_ping_rtpp</function> usage</title>
+			<programlisting format="linespecific">
+...
+$ &ctltool; fifo nh_ping_rtpp udp:192.168.2.133:8081
+$ &ctltool; fifo nh_ping_rtpp ::udp6:fe80::9a90:96ff:fea8:fd99:9999
+$ &ctltool; fifo nh_ping_rtpp all
+...
+			</programlisting>
+			</example>
+		</section>
+
+
+	    <section id="rtpengine.m.nh_reload_rtpp">
+			<title><function moreinfo="none">nh_reload_rtpp</function></title>
+			<para>
+				Reloads the database node table content <emphasis>if configured</emphasis>.
+				Returns specific message related to success, failure and no db_url configured.
+			</para>
+			<para>
+				NOTE: The current behaviour updates the nodes state or creates new ones or
+				hides old ones, based on the database content. If allow_op modparam is enabled,
+				the sessions are still allowed to finish for the hidden old nodes.
+			</para>
+			<example>
+			<title>
+				<function moreinfo="none">nh_reload_rtpp</function> usage</title>
+			<programlisting format="linespecific">
+...
+$ &ctltool; fifo nh_reload_rtpp
+...
+			</programlisting>
+			</example>
+		</section>
+
+
+	    <section id="rtpengine.m.nh_show_hash_total">
+			<title><function moreinfo="none">nh_show_hash_total</function></title>
+			<para>
+				Print the total number of hash entries in the hash table at a given moment.
+			</para>
+			<example>
+			<title>
+				<function moreinfo="none">nh_show_hash_total</function> usage</title>
+			<programlisting format="linespecific">
+...
+$ &ctltool; fifo nh_show_hash_total
+...
+			</programlisting>
+			</example>
+		</section>
+
 	</section>
 
 </chapter>

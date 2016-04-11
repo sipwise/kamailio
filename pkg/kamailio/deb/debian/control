@@ -6,6 +6,7 @@ Uploaders: Victor Seva <linuxmaniac@torreviejawireless.org>,
            Tzafrir Cohen <tzafrir@debian.org>
 Build-Depends: bison,
                debhelper (>= 9),
+               dh-systemd (>= 1.5),
                docbook-xml,
                dpkg-dev (>= 1.16.1.1),
                erlang-dev,
@@ -239,7 +240,7 @@ Architecture: linux-any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: kamailio (= ${binary:Version}),
-         mysql-client,
+         mysql-client | virtual-mysql-client,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: MySQL database connectivity module for Kamailio
@@ -630,7 +631,7 @@ Pre-Depends: ${misc:Pre-Depends}
 Depends: kamailio (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
-Description: earlang modules for Kamailio
+Description: erlang modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
@@ -650,7 +651,7 @@ Description: extra modules for Kamailio
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides: gzcompress uuid ev jansson
+ This package provides: gzcompress uuid ev jansson janssonrpc-c
 
 Package: kamailio-nth
 Architecture: any

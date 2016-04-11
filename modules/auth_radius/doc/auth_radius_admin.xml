@@ -22,17 +22,18 @@
 		to the radius server we perform some sanity checks over the 
 		credentials to make sure that only well formed credentials will get to 
 		the server. We have implemented radius authentication according to 
-		draft-sterman-aaa-sip-00. This module requires radiusclient-ng
-		library version 0.5.0 or higher which is available from 
-		<ulink url='http://developer.berlios.de/projects/radiusclient-ng/'>
-		http://developer.berlios.de/projects/radiusclient-ng/</ulink>.
+		draft-sterman-aaa-sip-00. This module requires the radiusclient-ng
+		library version 0.5.0 or higheer or freeradius-client which is available from 
+		<ulink url='https://github.com/FreeRADIUS/freeradius-client/'>
+		https://github.com/FreeRADIUS/freeradius-client/</ulink>.
+		You can also install this library from distribution repositories.
 	</para>
 	</section>
 	<section>
 	<title>Additional Credentials</title>
 	<para>
-		When performing authentification, the RADIUS server may include in the
-		response additional credentials. This scheme is very useful in fetching
+		When performing authentification, the RADIUS server may include additional
+		credentials in the response. This scheme is very useful in fetching
 		additional user information from the RADIUS server without making
 		extra queries.
 	</para>
@@ -84,7 +85,7 @@
 			the listed modules must be loaded before this module):
 			<itemizedlist>
 				<listitem>
-				<para><emphasis>modules/auth</emphasis>
+				<para><emphasis>auth</emphasis>
 				-- Generic authentication functions
 				</para>
 				</listitem>
@@ -98,6 +99,16 @@
 			before compilling &kamailio; with this module loaded:
 			</para>
 			<itemizedlist>
+				<para>One of these libraries. Notice that development of
+				radiusclient-ng has stopped, as the project merged with
+				freeradius-client.</para>
+				<listitem>
+				<para>
+				<emphasis>freeradius-client</emphasis>  available from 
+				<ulink url='https://github.com/FreeRADIUS/freeradius-client/'>
+				https://github.com/FreeRADIUS/freeradius-client/</ulink>.
+				</para>
+				</listitem>
 				<listitem>
 				<para><emphasis>radiusclient-ng</emphasis> 0.5.0 or higher -- 
 				library and development files. See <ulink 
@@ -202,6 +213,23 @@ modparam("auth_radius", "use_ruri_flag", 22)
 		<title><varname>radius_avps_mode</varname> parameter usage</title>
 		<programlisting format="linespecific">
 modparam("auth_radius", "radius_avps_mode", 1)
+		</programlisting>
+		</example>
+	</section>
+	<section id="auth_radius.p.append_realm_to_username">
+		<title><varname>append_realm_to_username</varname> (integer)</title>
+		<para>
+			If set to 1, the username passed to the RADIUS server will have the
+			digest realm appended to it, if no domain is provided in the digest
+			username.
+		</para>
+		<para>
+			Default value is 1.
+		</para>
+		<example>
+		<title><varname>append_realm_to_username</varname> parameter usage</title>
+		<programlisting format="linespecific">
+modparam("auth_radius", "append_realm_to_username", 0)
 		</programlisting>
 		</example>
 	</section>

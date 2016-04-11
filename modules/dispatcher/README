@@ -10,19 +10,13 @@ Daniel-Constantin Mierla
 
    <miconda@gmail.com>
 
-Edited by
-
 Carsten Bock
 
    ng-voice GmbH
 
-Edited by
-
 Olle E. Johansson
 
    Edvina AB
-
-Edited by
 
 Alessandro Arrichiello
 
@@ -83,6 +77,7 @@ Alessandro Arrichiello
               3.30. ds_hash_check_interval (int)
               3.31. outbound_proxy (str)
               3.32. ds_default_socket (str)
+              3.33. ds_timer_mode (int)
 
         4. Functions
 
@@ -107,6 +102,7 @@ Alessandro Arrichiello
               6.1. dispatcher.set_state
               6.2. dispatcher.list
               6.3. dispatcher.reload
+              6.4. dispatcher.ping_active
 
         7. Installation and Running
 
@@ -159,13 +155,14 @@ Alessandro Arrichiello
    1.31. Set the "ds_hash_check_interval" parameter
    1.32. Set the "outbound_proxy" parameter
    1.33. Set the "ds_default_socket" parameter
-   1.34. ds_select_dst usage
-   1.35. ds_mark_dst usage
-   1.36. ds_list_exist usage
-   1.37. ds_is_from_list usage
-   1.38. ds_load_unset usage
-   1.39. dispatcher list file
-   1.40. Kamailio config script - sample dispatcher usage
+   1.34. Set the "ds_timer_mode" parameter
+   1.35. ds_select_dst usage
+   1.36. ds_mark_dst usage
+   1.37. ds_list_exist usage
+   1.38. ds_is_from_list usage
+   1.39. ds_load_unset usage
+   1.40. dispatcher list file
+   1.41. Kamailio config script - sample dispatcher usage
 
 Chapter 1. Admin Guide
 
@@ -211,6 +208,7 @@ Chapter 1. Admin Guide
         3.30. ds_hash_check_interval (int)
         3.31. outbound_proxy (str)
         3.32. ds_default_socket (str)
+        3.33. ds_timer_mode (int)
 
    4. Functions
 
@@ -235,6 +233,7 @@ Chapter 1. Admin Guide
         6.1. dispatcher.set_state
         6.2. dispatcher.list
         6.3. dispatcher.reload
+        6.4. dispatcher.ping_active
 
    7. Installation and Running
 
@@ -254,17 +253,18 @@ Chapter 1. Admin Guide
 
    This module offers SIP load balancer functionality and it can be used
    as SIP traffic dispatcher. There are many load balancing and traffic
-   dispaching algorithms that you can choose from, like: round-robin,
-   weight based load balancing, call load distribution, hashing over SIP
-   message attributes.
+   dispaching algorithms that you can choose from, for example:
+   round-robin, weight based load balancing, call load distribution, and
+   hashing over SIP message attributes.
 
-   The module can be used as a stateless load balancer, it does not depend
+   The module can be used as a stateless load balancer; it does not depend
    on any call state tracking module. It requires the TM module if you
    enable auto-discovery of active/inactive gateways.
 
    It is very lightweight, therefore suitable for handling heavy SIP
-   traffic. The module has a small footprint and ability to load balancing
-   rules from a text plain file makes it suitable for embedded systems.
+   traffic. As the module has a small footprint and the ability to load
+   balancing rules from a plain text file, it is suitable for embedded
+   systems.
 
 2. Dependencies
 
@@ -318,6 +318,7 @@ Chapter 1. Admin Guide
    3.30. ds_hash_check_interval (int)
    3.31. outbound_proxy (str)
    3.32. ds_default_socket (str)
+   3.33. ds_timer_mode (int)
 
 3.1. list_file (string)
 
@@ -674,6 +675,14 @@ Note
    valid response). This parameter can be modified via ser config
    framework.
 
+   Please note that the response codes the module accepts as valid reply
+   to the PING-Method are not only the ones generated from the remote
+   servers, but also those that are generated locally. E.g.: setting
+   code=408 or class=400 will never set a backend down even if it is,
+   because internally the Kamailio transaction layer generates a 408 in
+   the case of no response from the remote server, and this internal code
+   408 is accepted as vaild value.
+
    Default value is "" (only 200 OK is accepted).
 
    Example 1.26. Set the "ds_ping_reply_codes" parameter
@@ -684,11 +693,19 @@ Note
 
 3.26. ds_probing_mode (int)
 
-   Controls what gateways are tested to see if they are reachable. If set
-   to 0, only the gateways with state PROBING are tested; if set to 1, all
-   gateways are tested; if set to 2, only gateways in inactive state with
-   probing mode set are tested. If set to 1 and there is a failure of
-   keepalive to an active gateway, then it is set to TRYING state.
+   Controls what gateways are tested to see if they are reachable.
+     * Value 0: If set to 0, only the gateways with state PROBING are
+       tested. After a gateway is probed, the PROBING state is cleared in
+       this mode.
+     * Value 1: If set to 1, all gateways are tested. If set to 1 and
+       there is a failure of keepalive to an active gateway, then it is
+       set to TRYING state.
+     * Value 2: if set to 2, only gateways in inactive state with probing
+       mode set are tested.
+     * Value 3: If set to 3, any gateway with state PROBING is continually
+       probed without modifying/removing the PROBING state. This allows
+       selected gateways to be probed continually, regardless of state
+       changes.
 
    Default value is "0".
 
@@ -772,6 +789,26 @@ Note
  modparam("dispatcher", "ds_default_socket", "udp:192.168.0.125:5060")
  ...
 
+3.33. ds_timer_mode (int)
+
+   Specify the timer process to be used by the module for keepalives and
+   active dialogs tracking.
+
+   It can be set to:
+     * 0 - use main timer process.
+     * 1 - use secondary timer process.
+
+   On a server with a lot of traffic, using secondary timer can help with
+   performances, because the main timer can be overloaded by taking care
+   of transactions retransmissions and expirations of items in memory.
+
+   Default value is "0".
+
+   Example 1.34. Set the "ds_timer_mode" parameter
+ ...
+ modparam("dispatcher", "ds_timer_mode", 1)
+ ...
+
 4. Functions
 
    4.1. ds_select_dst(set, alg[, limit])
@@ -784,7 +821,7 @@ Note
    4.8. ds_load_update()
    4.9. ds_load_unset()
 
-4.1.  ds_select_dst(set, alg[, limit])
+4.1. ds_select_dst(set, alg[, limit])
 
    The method selects a destination from addresses set. It returns true if
    a new destination is set. The selected address is set to dst_uri field
@@ -833,6 +870,16 @@ Note
             on each address can change.
             This algorithm can be used only for dispatching INVITE
             requests as it is the only SIP method creating a SIP call.
+          + "11" - use relative weight based load distribution. You have
+            to set the attribute 'rweight' per each address in destination
+            set. Active host usage probability is rweight/(SUM of all
+            active host rweights in destination group).
+            The major difference from the weight distribution is the
+            probability recalculation according to rweight value in case
+            of host enabling/disabling
+            For example, 100 calls in 3-hosts group with rweight params
+            1/2/1 will be distributed as 25/50/25. After third host
+            failing distribution will be changed to 33/67/0.
           + "X" - if the algorithm is not implemented, the first entry in
             set is chosen.
      * limit - the maximum number of items to be stored in AVP list for
@@ -846,7 +893,7 @@ Note
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.34. ds_select_dst usage
+   Example 1.35. ds_select_dst usage
 ...
 ds_select_dst("1", "0");
 ...
@@ -856,7 +903,7 @@ ds_select_dst("1", "$var(a)");
 ds_select_dst("1", "4", "3");
 ...
 
-4.2.  ds_select_domain(set, alg[, limit])
+4.2. ds_select_domain(set, alg[, limit])
 
    The method selects a destination from addresses set and rewrites the
    host and port from R-URI. The parameters have same meaning as for
@@ -869,21 +916,21 @@ ds_select_dst("1", "4", "3");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-4.3.  ds_next_dst()
+4.3. ds_next_dst()
 
    Takes the next destination address from the AVPs with id 'dst_avp_id'
    and sets the dst_uri (outbound proxy address).
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-4.4.  ds_next_domain()
+4.4. ds_next_domain()
 
    Takes the next destination address from the AVPs with id 'dst_avp_id'
    and sets the domain part of the request URI.
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-4.5.  ds_mark_dst([state])
+4.5. ds_mark_dst([state])
 
    Mark the last used address from destination set as inactive ("i"/"I"),
    active ("a"/"A"), disabled ("d"/"D") or trying ("t"/"T"). Apart of
@@ -910,7 +957,7 @@ ds_select_dst("1", "4", "3");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.35. ds_mark_dst usage
+   Example 1.36. ds_mark_dst usage
 ...
 failure_route[tryagain] {
 ...
@@ -920,21 +967,21 @@ failure_route[tryagain] {
 }
 ...
 
-4.6.  ds_list_exist(groupid)
+4.6. ds_list_exist(groupid)
 
    Check if a specific group is defined in dispatcher list or database.
      * groupid - A group ID to check.
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.36. ds_list_exist usage
+   Example 1.37. ds_list_exist usage
 ...
 if(ds_list_exist("10")) {
     ...
 }
 ...
 
-4.7.  ds_is_from_list([groupid [, mode [, uri] ] ])
+4.7. ds_is_from_list([groupid [, mode [, uri] ] ])
 
    This function returns true, if there is a match of source address or
    uri with an address in the given group of the dispatcher-list;
@@ -970,7 +1017,7 @@ if(ds_list_exist("10")) {
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.37. ds_is_from_list usage
+   Example 1.38. ds_is_from_list usage
 ...
 if(ds_is_from_list()) {
     ...
@@ -986,7 +1033,7 @@ if(ds_is_from_list("10", "3", "sip:127.0.0.1:5080")) {
 }
 ...
 
-4.8.  ds_load_update()
+4.8. ds_load_update()
 
    Updates the load state:
      * if it is a BYE or CANCEL - remove the load from destination address
@@ -997,14 +1044,14 @@ if(ds_is_from_list("10", "3", "sip:127.0.0.1:5080")) {
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    BRANCH_ROUTE and ONREPLY_ROUTE.
 
-4.9.  ds_load_unset()
+4.9. ds_load_unset()
 
    Remove the call load for the destination that routed the call.
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
    BRANCH_ROUTE and ONREPLY_ROUTE.
 
-   Example 1.38. ds_load_unset usage
+   Example 1.39. ds_load_unset usage
 ...
 route {
     ...
@@ -1034,7 +1081,7 @@ onreply_route {
    5.2. ds_list
    5.3. ds_reload
 
-5.1.  ds_set_state
+5.1. ds_set_state
 
    Sets the status for a destination address (can be use to mark the
    destination as active or inactive).
@@ -1059,7 +1106,7 @@ onreply_route {
                 _address_
                 _empty_line_
 
-5.2.  ds_list
+5.2. ds_list
 
    It lists the groups and included destinations.
 
@@ -1071,7 +1118,7 @@ onreply_route {
                 :ds_list:_reply_fifo_file_
                 _empty_line_
 
-5.3.  ds_reload
+5.3. ds_reload
 
    It reloads the groups and included destinations. For algorithm 10 (call
    load distribution), old internal list of active calls is destroyed
@@ -1090,8 +1137,9 @@ onreply_route {
    6.1. dispatcher.set_state
    6.2. dispatcher.list
    6.3. dispatcher.reload
+   6.4. dispatcher.ping_active
 
-6.1.  dispatcher.set_state
+6.1. dispatcher.set_state
 
    Sets the state for a destination address (can be use to mark the
    destination as active or inactive).
@@ -1115,7 +1163,7 @@ onreply_route {
 kamcmd dispatcher.set_state ip 2 sip:127.0.0.1:5080
 ...
 
-6.2.  dispatcher.list
+6.2. dispatcher.list
 
    Lists the groups and included destinations.
 
@@ -1126,7 +1174,7 @@ kamcmd dispatcher.set_state ip 2 sip:127.0.0.1:5080
    Example:
                 kamcmd dispatcher.list
 
-6.3.  dispatcher.reload
+6.3. dispatcher.reload
 
    Reloads the groups and included destinations. The command is disabled
    for call load based dispatching (algorithm 10) since removal of
@@ -1138,6 +1186,27 @@ kamcmd dispatcher.set_state ip 2 sip:127.0.0.1:5080
 
    Example
                 kamcmd dispatcher.reload
+
+6.4. dispatcher.ping_active
+
+   Sets the global state for sending keepalive requests to destinations.
+
+   Name: dispatcher.ping_active
+
+   Parameters:
+     * _state_ : state of sending keepalives
+          + "0": inactive (don't send)
+          + "1": active (send)
+
+   If the state parameter is missing, the current state is returned. When
+   state is changed, new and old values of the state are returned. Default
+   value for state is 1.
+
+   Example:
+...
+# prototype: kamcmd dispatcher.ping_active _state_
+kamcmd dispatcher.ping_active 0
+...
 
 7. Installation and Running
 
@@ -1179,6 +1248,10 @@ kamcmd dispatcher.set_state ip 2 sip:127.0.0.1:5080
      * 'weight' - used for weight based load distribution. It must be set
        to a positive integer value beteen 0 and 100. The value represents
        the percent of calls to be sent to that gateways.
+     * 'rweight' - used for relative weight based load distribution. It
+       must be set to a positive integer value between 1 and 100
+       (otherwise host will be excluded from relative weight distribution
+       type).
      * 'socket' - used to set the sending socket for the gateway. It is
        used for sending the SIP traffic as well as OPTIONS keepalives.
 
@@ -1197,7 +1270,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
    For database, each element of a line resides in a different column.
    Next is a dispatcher.list file example:
 
-   Example 1.39. dispatcher list file
+   Example 1.40. dispatcher list file
 ...
 # $Id$
 # dispatcher destination sets
@@ -1222,7 +1295,7 @@ r,opt)
 
    Next picture shows a sample usage of the dispatcher module.
 
-   Example 1.40. Kamailio config script - sample dispatcher usage
+   Example 1.41. Kamailio config script - sample dispatcher usage
 ...
 #!KAMAILIO
 #
@@ -1342,6 +1415,7 @@ modparam("dispatcher", "flags", 2)
 modparam("dispatcher", "dst_avp", "$avp(AVP_DST)")
 modparam("dispatcher", "grp_avp", "$avp(AVP_GRP)")
 modparam("dispatcher", "cnt_avp", "$avp(AVP_CNT)")
+modparam("dispatcher", "sock_avp", "$avp(AVP_SOCK)")
 
 ####### Routing Logic ########
 
@@ -1513,7 +1587,7 @@ failure_route[RTF_DISPATCH] {
    8.1. dispatcher:dst-down
    8.2. dispatcher:dst-up
 
-8.1.  dispatcher:dst-down
+8.1. dispatcher:dst-down
 
    When defined, the module calls event_route[dispatcher:ds-down] when a
    destination goes down (becomes probing). A typical use case is to
@@ -1524,7 +1598,7 @@ event_route[dispatcher:dst-down] {
 }
 ...
 
-8.2.  dispatcher:dst-up
+8.2. dispatcher:dst-up
 
    When defined, the module calls event_route[dispatcher:ds-up] when a
    destination that was previously down (probing) comes up. A typical use
@@ -1545,51 +1619,51 @@ Chapter 2. Frequently Asked Questions
 
    2.1.
 
-       Does dispatcher provide a fair distribution?
+   Does dispatcher provide a fair distribution?
 
-       The algoritms doing hashing over parts of SIP message don't guarantee a
-       fair distribution. You should do some measurements to decide what
-       hashing algorithm fits better in your environment.
+   The algoritms doing hashing over parts of SIP message don't guarantee a
+   fair distribution. You should do some measurements to decide what
+   hashing algorithm fits better in your environment.
 
-       Other distribution algorithms such as round robin or call load
-       dispatching do a fair distribution in terms of delivered calls to
-       gateways.
+   Other distribution algorithms such as round robin or call load
+   dispatching do a fair distribution in terms of delivered calls to
+   gateways.
 
    2.2.
 
-       Is dispatcher dialog stateful?
+   Is dispatcher dialog stateful?
 
-       No. Dispatcher is stateless, although some distribution algorithms are
-       designed to select same destination for subsequent requests of the same
-       dialog (e.g., hashing the call-id).
+   No. Dispatcher is stateless, although some distribution algorithms are
+   designed to select same destination for subsequent requests of the same
+   dialog (e.g., hashing the call-id).
 
    2.3.
 
-       Where can I find more about Kamailio?
+   Where can I find more about Kamailio?
 
-       Take a look at http://www.kamailio.org/.
+   Take a look at http://www.kamailio.org/.
 
    2.4.
 
-       Where can I post a question about this module?
+   Where can I post a question about this module?
 
-       First at all check if your question was already answered on one of our
-       mailing lists:
-         * User Mailing List -
-           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-users
-         * Developer Mailing List -
-           http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-dev
+   First at all check if your question was already answered on one of our
+   mailing lists:
+     * User Mailing List -
+       http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-users
+     * Developer Mailing List -
+       http://lists.sip-router.org/cgi-bin/mailman/listinfo/sr-dev
 
-       E-mails regarding any stable version should be sent to
-       <sr-users@lists.sip-router.org> and e-mail regarding development
-       versions or GIT snapshots should be send to
-       <sr-dev@lists.sip-router.org>.
+   E-mails regarding any stable version should be sent to
+   <sr-users@lists.sip-router.org> and e-mail regarding development
+   versions or GIT snapshots should be send to
+   <sr-dev@lists.sip-router.org>.
 
-       If you want to keep the mail private, send it to
-       <sr-users@lists.sip-router.org>.
+   If you want to keep the mail private, send it to
+   <sr-users@lists.sip-router.org>.
 
    2.5.
 
-       How can I report a bug?
+   How can I report a bug?
 
-       Please follow the guidelines provided at: http://sip-router.org/tracker
+   Please follow the guidelines provided at: http://sip-router.org/tracker
