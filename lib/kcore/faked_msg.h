@@ -22,10 +22,6 @@
 #ifndef _FAKED_SIP_MSG_H_
 #define _FAKED_SIP_MSG_H_
 
-#include "../../parser/msg_parser.h"
-
-int faked_msg_init(void);
-sip_msg_t* faked_msg_next(void);
-sip_msg_t* faked_msg_get_next(void);
+#include "../../fmsg.h"
 
 #endif

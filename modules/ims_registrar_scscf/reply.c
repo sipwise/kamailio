@@ -65,6 +65,7 @@
 #define CONTACT_SEP_LEN (sizeof(CONTACT_SEP) - 1)
 
 extern str scscf_serviceroute_uri_str;
+extern int contact_expires_buffer_percentage;
 
 extern struct tm_binds tmb;
 
@@ -93,6 +94,7 @@ static inline unsigned int calc_buf_len(impurecord_t* impurec) {
     int qlen;
     int i=0;
     ucontact_t* c;
+    param_t *tmp;
 
     len = 0;
     while (i<MAX_CONTACTS_PER_IMPU && (c=impurec->newcontacts[i])) {
@@ -110,6 +112,27 @@ static inline unsigned int calc_buf_len(impurecord_t* impurec) {
                         + c->received.len
                         + 1 /* dquote */
                         ;
+            }
+            tmp = c->params;
+            while (tmp) {
+                if ((tmp->name.s[0] == 'R' || tmp->name.s[0]=='r') && tmp->name.len == 8 && !memcmp(tmp->name.s+1, "eceived", 7)) {
+                    tmp = tmp->next;
+                    continue;
+                }
+                if ((tmp->name.s[0] == 'Q' || tmp->name.s[0]=='q') && tmp->name.len == 1) {
+                    tmp = tmp->next;
+                    continue;
+                }
+                if ((tmp->name.s[0] == 'E' || tmp->name.s[0] == 'e') && tmp->name.len == 7 && !memcmp(tmp->name.s + 1, "xpires", 6)) {
+                    tmp = tmp->next;
+                    continue;
+                }
+                len += tmp->name.len;
+                if (tmp->body.len > 0) {
+                    len = len + 1/*=*/ + 2/*2 x "*/;
+                    len += tmp->body.len;
+                }
+                tmp=tmp->next;
             }
         }
 	i++;
@@ -399,8 +422,9 @@ int build_expired_contact(contact_t* chi, contact_for_header_t** contact_header)
 
 int build_contact(impurecord_t* impurec, contact_for_header_t** contact_header) {
     char *p, *cp;
-    int fl, len;
+    int fl, len, expires, expires_orig;
     ucontact_t* c;
+    param_t* tmp;
     *contact_header = 0;
     int i=0;
 
@@ -446,7 +470,15 @@ int build_contact(impurecord_t* impurec, contact_for_header_t** contact_header) 
 
                 memcpy(p, EXPIRES_PARAM, EXPIRES_PARAM_LEN);
                 p += EXPIRES_PARAM_LEN;
-                cp = int2str((int) (c->expires - act_time), &len);
+                
+                /* the expires we put in the contact header is decremented to give the UE some grace before we expires them */
+                expires = expires_orig = (int)(c->expires - act_time);
+                expires = expires - (contact_expires_buffer_percentage*expires/100);
+                if (expires <= 0) {
+                    LM_WARN("expires after buffer change was <= 0, not adding buffer space\n");
+                    expires = expires_orig;
+                }
+                cp = int2str(expires, &len);
                 memcpy(p, cp, len);
                 p += len;
     
@@ -459,6 +491,34 @@ int build_contact(impurecord_t* impurec, contact_for_header_t** contact_header) 
                     memcpy(p, c->received.s, c->received.len);
                     p += c->received.len;
                     *p++ = '\"';
+                }
+                
+                /* put in the rest of the params except Q and received */
+                tmp = c->params;
+                while (tmp) {
+                    if ((tmp->name.s[0] == 'R' || tmp->name.s[0]=='r') && tmp->name.len == 8 && !memcmp(tmp->name.s+1, "eceived", 7)) {
+                        tmp = tmp->next;
+                        continue;
+                    }
+                    if ((tmp->name.s[0] == 'Q' || tmp->name.s[0]=='q') && tmp->name.len == 1) {
+                        tmp = tmp->next;
+                        continue;
+                    }
+                    if ((tmp->name.s[0] == 'E' || tmp->name.s[0]=='e') && tmp->name.len == 7 && !memcmp(tmp->name.s+1, "xpires", 6)) {
+                        tmp = tmp->next;
+                        continue;
+                    }
+                    *p++ = ';';
+                    memcpy(p, tmp->name.s, tmp->name.len);
+                    p += tmp->name.len;
+                    if (tmp->body.len > 0) {
+                        *p++ = '=';
+                        *p++ = '\"';
+                        memcpy(p, tmp->body.s, tmp->body.len);
+                        p += tmp->body.len;
+                        *p++ = '\"';
+                    }
+                    tmp = tmp->next;
                 }
             }
 	    i++;

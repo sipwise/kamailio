@@ -57,6 +57,7 @@
 #include <libxml/parser.h>
 
 #include "../../lib/ims/useful_defs.h"
+#include "../ims_usrloc_scscf/udomain.h"
 
 #define STATE_ACTIVE 1
 #define STATE_TERMINATED 0
@@ -102,33 +103,32 @@ extern char *domain;
  * RFC allows only value less or equal to the one provided by UAC.
  */
 
-static inline int randomize_expires( int expires, int range )
-{
-	/* if no range is given just return expires */
-	if(range == 0) return expires;
+static inline int randomize_expires(int expires, int range) {
+    /* if no range is given just return expires */
+    if (range == 0) return expires;
 
-	int range_min = expires - (float)range/100 * expires;
+    int range_min = expires - (float) range / 100 * expires;
 
-	return range_min + (float)(rand()%100)/100 * ( expires - range_min );
+    return range_min + (float) (rand() % 100) / 100 * (expires - range_min);
 }
 
 int notify_init() {
     notification_list = shm_malloc(sizeof (reg_notification_list));
     if (!notification_list) {
-	LM_ERR("No more SHM mem\n");
-	return 0; 
+        LM_ERR("No more SHM mem\n");
+        return 0;
     }
     memset(notification_list, 0, sizeof (reg_notification_list));
     notification_list->lock = lock_alloc();
-    if (!notification_list->lock)  {
-	LM_ERR("failed to create cdp event list lock\n");
-	return 0;
+    if (!notification_list->lock) {
+        LM_ERR("failed to create cdp event list lock\n");
+        return 0;
     }
-    if (lock_init(notification_list->lock)==0){
-       lock_dealloc(notification_list->lock);
-       notification_list->lock=0;
-       LM_ERR("failed to initialize cdp event list lock\n");
-       return 0;
+    if (lock_init(notification_list->lock) == 0) {
+        lock_dealloc(notification_list->lock);
+        notification_list->lock = 0;
+        LM_ERR("failed to initialize cdp event list lock\n");
+        return 0;
     }
     notification_list->size = 0;
     sem_new(notification_list->empty, 0); //pre-locked - as we assume list is empty at start
@@ -168,29 +168,29 @@ int can_publish_reg(struct sip_msg *msg, char *_t, char *str2) {
 
     //check that this is a request
     if (msg->first_line.type != SIP_REQUEST) {
-	LM_ERR("This message is not a request\n");
-	goto error;
+        LM_ERR("This message is not a request\n");
+        goto error;
     }
 
     //check that this is a subscribe request
     if (msg->first_line.u.request.method.len != 7 ||
-	    memcmp(msg->first_line.u.request.method.s, "PUBLISH", 7) != 0) {
-	LM_ERR("This message is not a PUBLISH\n");
-	goto error;
+            memcmp(msg->first_line.u.request.method.s, "PUBLISH", 7) != 0) {
+        LM_ERR("This message is not a PUBLISH\n");
+        goto error;
     }
 
     //check that this is a reg event - currently we only support reg event!
     event = cscf_get_event(msg);
     if (event.len != 3 || strncasecmp(event.s, "reg", 3) != 0) {
-	LM_ERR("Accepting only <Event: reg>. Found: <%.*s>\n",
-		event.len, event.s);
-	goto done;
+        LM_ERR("Accepting only <Event: reg>. Found: <%.*s>\n",
+                event.len, event.s);
+        goto done;
     }
 
     asserted_id = cscf_get_asserted_identity(msg, 0);
     if (!asserted_id.len) {
-	LM_ERR("P-Asserted-Identity empty.\n");
-	goto error;
+        LM_ERR("P-Asserted-Identity empty.\n");
+        goto error;
     }
     LM_DBG("P-Asserted-Identity <%.*s>.\n", asserted_id.len, asserted_id.s);
 
@@ -202,64 +202,64 @@ int can_publish_reg(struct sip_msg *msg, char *_t, char *str2) {
     ul.lock_udomain((udomain_t*) _t, &presentity_uri);
     res = ul.get_impurecord((udomain_t*) _t, &presentity_uri, &r);
 
-    if (res > 0) {
-	LM_DBG("'%.*s' Not found in usrloc\n", presentity_uri.len, presentity_uri.s);
-	ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
-	goto done;
+    if (res != 0) {
+        LM_DBG("'%.*s' Not found in usrloc\n", presentity_uri.len, presentity_uri.s);
+        ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
+        goto done;
     }
 
     LM_DBG("<%.*s> found in usrloc\n", presentity_uri.len, presentity_uri.s);
 
     //check if the asserted identity is in the same group as that presentity uri
     if (r->public_identity.len == asserted_id.len &&
-	    strncasecmp(r->public_identity.s, asserted_id.s, asserted_id.len) == 0) {
-	LM_DBG("Identity found as AOR <%.*s>\n",
-		presentity_uri.len, presentity_uri.s);
-	ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
-	ret = CSCF_RETURN_TRUE;
-	goto done;
+            strncasecmp(r->public_identity.s, asserted_id.s, asserted_id.len) == 0) {
+        LM_DBG("Identity found as AOR <%.*s>\n",
+                presentity_uri.len, presentity_uri.s);
+        ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
+        ret = CSCF_RETURN_TRUE;
+        goto done;
     }
 
     //check if asserted identity is in service profile
-    lock_get(r->s->lock);
+    ul.lock_subscription(r->s);
     if (r->s) {
-	for (i = 0; i < r->s->service_profiles_cnt; i++)
-	    for (j = 0; j < r->s->service_profiles[i].public_identities_cnt; j++) {
-		pi = &(r->s->service_profiles[i].public_identities[j]);
-		if (!pi->barring &&
-			pi->public_identity.len == asserted_id.len &&
-			strncasecmp(pi->public_identity.s, asserted_id.s, asserted_id.len) == 0) {
-		    LM_DBG("Identity found in SP[%d][%d]\n",
-			    i, j);
-		    ret = CSCF_RETURN_TRUE;
-		    ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
-		    lock_release(r->s->lock);
-		    goto done;
-		}
-	    }
+        for (i = 0; i < r->s->service_profiles_cnt; i++)
+            for (j = 0; j < r->s->service_profiles[i].public_identities_cnt; j++) {
+                pi = &(r->s->service_profiles[i].public_identities[j]);
+                if (!pi->barring &&
+                        pi->public_identity.len == asserted_id.len &&
+                        strncasecmp(pi->public_identity.s, asserted_id.s, asserted_id.len) == 0) {
+                    LM_DBG("Identity found in SP[%d][%d]\n",
+                            i, j);
+                    ret = CSCF_RETURN_TRUE;
+                    ul.unlock_subscription(r->s);
+                    ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
+                    goto done;
+                }
+            }
     }
-    lock_release(r->s->lock);
+    ul.unlock_subscription(r->s);
     LM_DBG("Did not find p-asserted-identity <%.*s> in SP\n", asserted_id.len, asserted_id.s);
 
     //check if asserted is present in any of the path headers
-    j=0;
+    j = 0;
 
-    while (j<MAX_CONTACTS_PER_IMPU && (c=r->newcontacts[j])) {
-	if (c->path.len) {
-	    LM_DBG("Path: <%.*s>.\n",
-		    c->path.len, c->path.s);
-	    for (i = 0; i < c->path.len - (asserted_id.len - 4); i++){
-		//we compare the asserted_id without "sip:" to the path 
-		if (strncasecmp(c->path.s + i, asserted_id.s + 4, asserted_id.len - 4) == 0) {
-		    LM_DBG("Identity found in Path <%.*s>\n",
-			    c->path.len, c->path.s);
-		    ret = CSCF_RETURN_TRUE;
-		    ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
-		    goto done;
-		}
-	    }
-	}
-	j++;
+    while (j < MAX_CONTACTS_PER_IMPU && (c = r->newcontacts[j])) {
+        if (c->path.len) {
+            LM_DBG("Path: <%.*s>.\n",
+                    c->path.len, c->path.s);
+            for (i = 0; i < c->path.len - (asserted_id.len - 4); i++) {
+                //we compare the asserted_id without "sip:" to the path 
+                if (strncasecmp(c->path.s + i, asserted_id.s + 4, asserted_id.len - 4) == 0) {
+                    LM_DBG("Identity found in Path <%.*s>\n",
+                            c->path.len, c->path.s);
+                    ret = CSCF_RETURN_TRUE;
+                    ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
+                    goto done;
+                }
+            }
+        }
+        j++;
     }
     LM_DBG("Did not find p-asserted-identity <%.*s> on Path\n", asserted_id.len, asserted_id.s);
 
@@ -313,7 +313,7 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
                 event.len, event.s);
         goto done;
     }
-    
+
     //get callid, from and to tags to be able to identify dialog
     //callid
     callid = cscf_get_call_id(msg, 0);
@@ -326,24 +326,24 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
         LM_ERR("Unable to get ftag\n");
         goto error;
     }
-    
+
     //ttag
-     if (!cscf_get_to_tag(msg, &ttag)) {
+    if (!cscf_get_to_tag(msg, &ttag)) {
         LM_ERR("Unable to get ttag\n");
         goto error;
     }
-    
+
     //get presentity URI
     //check if SUBSCRIBE is initial or SUBSEQUENT
     if (ttag.len == 0) {
         LM_DBG("Msg has no ttag - this is initial subscribe - get presentity URI from req URI\n");
-	presentity_uri = cscf_get_public_identity_from_requri(msg);
+        presentity_uri = cscf_get_public_identity_from_requri(msg);
     } else {
-	presentity_uri = ul.get_presentity_from_subscriber_dialog(&callid, &ttag, &ftag);
-	if (presentity_uri.len == 0) {
-	    LM_ERR("Unable to get pres uri from subscriber dialog with callid <%.*s>, ttag <%.*s> and ftag <%.*s>\n", callid.len, callid.s, ttag.len, ttag.s, ftag.len, ftag.s);
-	    goto done;
-	}
+        presentity_uri = ul.get_presentity_from_subscriber_dialog(&callid, &ttag, &ftag);
+        if (presentity_uri.len == 0) {
+            LM_ERR("Unable to get pres uri from subscriber dialog with callid <%.*s>, ttag <%.*s> and ftag <%.*s>\n", callid.len, callid.s, ttag.len, ttag.s, ftag.len, ftag.s);
+            goto done;
+        }
     }
 
 
@@ -359,13 +359,13 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
 
     ul.lock_udomain((udomain_t*) _t, &presentity_uri);
     res = ul.get_impurecord((udomain_t*) _t, &presentity_uri, &r);
-    
-    if (res > 0) {
+
+    if (res != 0) {
         LM_DBG("'%.*s' Not found in usrloc\n", presentity_uri.len, presentity_uri.s);
         ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
         goto done;
     }
-    
+
     LM_DBG("<%.*s> found in usrloc\n", presentity_uri.len, presentity_uri.s);
 
     //check if the asserted identity is in the same group as that presentity uri
@@ -379,7 +379,7 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
     }
 
     //check if asserted identity is in service profile
-    lock_get(r->s->lock);
+    ul.lock_subscription(r->s);
     if (r->s) {
         for (i = 0; i < r->s->service_profiles_cnt; i++)
             for (j = 0; j < r->s->service_profiles[i].public_identities_cnt; j++) {
@@ -390,46 +390,46 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
                     LM_DBG("Identity found in SP[%d][%d]\n",
                             i, j);
                     ret = CSCF_RETURN_TRUE;
+                    ul.unlock_subscription(r->s);
                     ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
-                    lock_release(r->s->lock);
                     goto done;
                 }
             }
     }
-    lock_release(r->s->lock);
+    ul.unlock_subscription(r->s);
     LM_DBG("Did not find p-asserted-identity <%.*s> in SP\n", asserted_id.len, asserted_id.s);
 
     //check if asserted is present in any of the path headers
     j = 0;
     while (j < MAX_CONTACTS_PER_IMPU && (c = r->newcontacts[j])) {
-	if (c->path.len) {
-	    LM_DBG("Path: <%.*s>.\n",
-		    c->path.len, c->path.s);
-	    for (i = 0; i < c->path.len - (asserted_id.len - 4); i++) {
-		//we compare the asserted_id without "sip:" to the path 
-		if (strncasecmp(c->path.s + i, asserted_id.s + 4, asserted_id.len - 4) == 0) {
-		    LM_DBG("Identity found in Path <%.*s>\n",
-			    c->path.len, c->path.s);
-		    ret = CSCF_RETURN_TRUE;
-		    ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
-		    goto done;
-		}
-	    }
-	}
-	j++;
+        if (c->path.len) {
+            LM_DBG("Path: <%.*s>.\n",
+                    c->path.len, c->path.s);
+            for (i = 0; i < c->path.len - (asserted_id.len - 4); i++) {
+                //we compare the asserted_id without "sip:" to the path 
+                if (strncasecmp(c->path.s + i, asserted_id.s + 4, asserted_id.len - 4) == 0) {
+                    LM_DBG("Identity found in Path <%.*s>\n",
+                            c->path.len, c->path.s);
+                    ret = CSCF_RETURN_TRUE;
+                    ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
+                    goto done;
+                }
+            }
+        }
+        j++;
     }
 
     LM_DBG("Did not find p-asserted-identity <%.*s> on Path\n", asserted_id.len, asserted_id.s);
-    
+
     ul.unlock_udomain((udomain_t*) _t, &presentity_uri);
     LM_DBG("Subscribe forbidden\n");
 
 done:
-	if (presentity_uri.s) shm_free(presentity_uri.s); // shm_malloc in cscf_get_public_identity_from_requri or get_presentity_from_subscriber_dialog
-	return ret;
+    if (presentity_uri.s) shm_free(presentity_uri.s); // shm_malloc in cscf_get_public_identity_from_requri or get_presentity_from_subscriber_dialog
+    return ret;
 error:
     ret = CSCF_RETURN_ERROR;
-	if (presentity_uri.s) shm_free(presentity_uri.s); // shm_malloc in cscf_get_public_identity_from_requri or get_presentity_from_subscriber_dialog
+    if (presentity_uri.s) shm_free(presentity_uri.s); // shm_malloc in cscf_get_public_identity_from_requri or get_presentity_from_subscriber_dialog
     return ret;
 }
 
@@ -437,9 +437,7 @@ error:
  * called to deliver new event into notification process
  * return 0 on success. anything else failure
  */
-int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int event_type, str *presentity_uri, str *watcher_contact) {
-
-    str content = {0, 0};
+int event_reg(udomain_t* _d, impurecord_t* r_passed, int event_type, str *presentity_uri, str *watcher_contact) {
     impurecord_t* r;
     int num_impus;
     str* impu_list;
@@ -447,15 +445,15 @@ int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int e
     udomain_t* udomain;
 
     get_act_time();
-    
+
     LM_DBG("Sending Reg event notifies\n");
     LM_DBG("Switching on event type: %d", event_type);
     switch (event_type) {
         case IMS_REGISTRAR_NONE:
             return 0;
         case IMS_REGISTRAR_SUBSCRIBE:
-            if (r_passed || c_passed || !presentity_uri || !watcher_contact || !_d) {
-                LM_ERR("this is a subscribe called from cfg file: r_passed and c_passed should both be zero and presentity_uri, watcher_contact and _d should be valid for a subscribe");
+            if (r_passed || !presentity_uri || !watcher_contact || !_d) {
+                LM_ERR("this is a subscribe called from cfg file: r_passed be zero and presentity_uri, watcher_contact and _d should be valid for a subscribe");
                 return 0;
             }
             LM_DBG("Event type is IMS REGISTRAR SUBSCRIBE about to get reginfo_full");
@@ -472,7 +470,7 @@ int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int e
 
             //get IMPU set from the presentity's subscription
             res = ul.get_impus_from_subscription_as_string(_d, r,
-                    0/*all unbarred impus*/, &impu_list, &num_impus);
+                    0/*all unbarred impus*/, &impu_list, &num_impus, 0/*pkg*/);
             if (res != 0) {
                 LM_WARN("failed to get IMPUs from subscription\n");
                 ul.unlock_udomain(_d, presentity_uri);
@@ -482,63 +480,41 @@ int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int e
                 return 1;
             }
             ul.unlock_udomain((udomain_t*) _d, presentity_uri);
-
-            content = generate_reginfo_full(_d, impu_list,
-                    num_impus, 0, 0);
-
-            if (impu_list) {
-                pkg_free(impu_list);
-            }
-
             LM_DBG("About to ceate notification");
 
-            create_notifications(_d, r_passed, c_passed, presentity_uri, watcher_contact, content, event_type);
-            if (content.s) pkg_free(content.s);
-            //            if (send_now) notification_timer(0, 0);
+            create_notifications(_d, r_passed, presentity_uri, watcher_contact, impu_list, num_impus, event_type);
             return 0;
             break;
 
             //richard: we only use reg unreg expired and refresh
         case IMS_REGISTRAR_CONTACT_UNREGISTERED:
+        case IMS_REGISTRAR_CONTACT_UNREGISTERED_IMPLICIT:
         case IMS_REGISTRAR_CONTACT_REGISTERED:
         case IMS_REGISTRAR_CONTACT_REFRESHED:
         case IMS_REGISTRAR_CONTACT_EXPIRED:
-            if (!r_passed || !c_passed || presentity_uri || watcher_contact || _d) {
+            if (!r_passed || presentity_uri || watcher_contact || _d) {
                 LM_ERR("this is a contact change passed from ul callback: r_passed and c_passed should both be valid and presentity_uri, watcher_contact and _d should be 0 for ul callback");
                 return 0;
             }
-
-	    //content = get_reginfo_partial(r_passed, c_passed, event_type);
-	    
-	    //this is a ulcallback so r_passed domain is already locked
-	    res = ul.get_impus_from_subscription_as_string(_d, r_passed,
-                    0/*all unbarred impus*/, &impu_list, &num_impus);
-	    if (res != 0) {
+            //this is a ulcallback so r_passed domain is already locked
+            res = ul.get_impus_from_subscription_as_string(_d, r_passed,
+                    0/*all unbarred impus*/, &impu_list, &num_impus, 0/*pkg*/);
+            if (res != 0) {
                 LM_WARN("failed to get IMPUs from subscription\n");
                 if (impu_list) {
                     pkg_free(impu_list);
                 }
                 return 1;
             }
-	    
-	    //TODO this should be a configurable module param
-	    if (ul.register_udomain(domain, &udomain) < 0) {
-		LM_ERR("Unable to register usrloc domain....aborting\n");
-		return 0;
-	    }
-//	    
-	    content = generate_reginfo_full(udomain, impu_list,
-                    num_impus, &r_passed->public_identity, 1);
-//	    
-	    if (impu_list) {
-                pkg_free(impu_list);
-            }
 
+            //TODO this should be a configurable module param
+            if (ul.register_udomain(domain, &udomain) < 0) {
+                LM_ERR("Unable to register usrloc domain....aborting\n");
+                return 0;
+            }
             LM_DBG("About to ceate notification");
-	    
-            create_notifications(_d, r_passed, c_passed, presentity_uri, watcher_contact, content, event_type);
-            if (content.s) pkg_free(content.s);
-            //                        if (send_now) notification_timer(0, 0);
+
+            create_notifications(_d, r_passed, presentity_uri, watcher_contact, impu_list, num_impus, event_type);
             return 1;
 
         default:
@@ -548,347 +524,396 @@ int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int e
     }
 }
 
-int process_contact(impurecord_t* presentity_impurecord, udomain_t * _d, int expires, str contact_uri, int contact_state) {
-	
-	int ret = CSCF_RETURN_TRUE;
-	int i, j;
-	ims_public_identity* pi = 0;
-	struct ucontact* ucontact;
-	str callid = {0, 0};
-	str path = {0, 0};
-	ims_subscription* subscription = 0;
-	impurecord_t* implicit_impurecord = 0;
-
-	//first get the subscription
-	//then go through each implicit public identity (exclude the explicit identity)
-	//get the IMPU rec for each implicit public identity
-	//then get the contact for each implicit IMPU and delete if contact_state == STATE_TERMINATED
-	//then get the contact for each explicit IMPU and delete if contact_state == STATE_TERMINATED
-	
-	subscription = presentity_impurecord->s;
-	if (!subscription) {
-	    LM_DBG("No subscriber info associated with <%.*s>, so no implicit IMPUs to process\n", presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s);
-	    goto done;
-	} 
-
-	lock_get(subscription->lock);
-	subscription->ref_count++;
-	LM_DBG("subscription ref count after add is now %d\n", subscription->ref_count);
-	lock_release(subscription->lock);
-
-	//now update the implicit set
-	for (i = 0; i < subscription->service_profiles_cnt; i++) {
-	    for (j = 0; j < subscription->service_profiles[i].public_identities_cnt; j++) {
-		pi = &(subscription->service_profiles[i].public_identities[j]);
-
-		if (memcmp(presentity_impurecord->public_identity.s, pi->public_identity.s, presentity_impurecord->public_identity.len) == 0) { //we don't need to update the explicit IMPU
-		    LM_DBG("Ignoring explicit identity <%.*s>, updating later.....\n", presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s);
-		    goto next_implicit_impu;
-		}
-		ul.lock_udomain(_d, &pi->public_identity);
-		if (ul.get_impurecord(_d, &pi->public_identity, &implicit_impurecord) != 0) {
-		    LM_DBG("usrloc does not have imprecord for implicity IMPU, ignore\n");
-		    goto next_implicit_impu;
-		}
-		if (ul.get_ucontact(implicit_impurecord, &contact_uri, &callid, &path, 0/*cseq*/,  &ucontact) != 0) { //contact does not exist
-		    LM_DBG("This contact: <%.*s> is not in usrloc, ignore - NOTE: You need S-CSCF usrloc set to match_mode CONTACT_ONLY\n", contact_uri.len, contact_uri.s);
-		    goto next_implicit_impu;
-		} else {//contact exists
-			if (contact_state == STATE_TERMINATED) {
-				//delete contact
-				LM_DBG("This contact <%.*s> is in state terminated and is in usrloc so removing it from usrloc\n", contact_uri.len, contact_uri.s);
-				ul.lock_contact_slot(&contact_uri);
-				if (ul.unlink_contact_from_impu(implicit_impurecord, ucontact, 1) != 0) {
-				    LM_ERR("Failed to delete ucontact <%.*s> from implicit IMPU\n", contact_uri.len, contact_uri.s);
-				    ul.unlock_contact_slot(&contact_uri);
-				    ul.release_ucontact(ucontact);
-				    goto next_implicit_impu;	//TODO: don't need to use goto here...
-				}
-				ul.unlock_contact_slot(&contact_uri);
-			}else {//state is active
-				LM_DBG("This contact: <%.*s> is not in state terminated and is in usrloc, ignore\n", contact_uri.len, contact_uri.s);
-				ul.release_ucontact(ucontact);
-				goto next_implicit_impu;
-			}
-			ul.release_ucontact(ucontact);
-		}
-next_implicit_impu:
-		ul.unlock_udomain(_d, &pi->public_identity);
-	    }
-	}
-
-	lock_get(subscription->lock);
-	subscription->ref_count--;
-	LM_DBG("subscription ref count after sub is now %d\n", subscription->ref_count);
-	lock_release(subscription->lock);
-
-	
-	ul.lock_udomain(_d, &presentity_impurecord->public_identity);
-	
-	if (ul.get_ucontact(presentity_impurecord, &contact_uri, &callid, &path, 0/*cseq*/,  &ucontact) != 0) { //contact does not exist
-	    LM_DBG("This contact: <%.*s> is not in usrloc, ignore - NOTE: You need S-CSCF usrloc set to match_mode CONTACT_ONLY\n", contact_uri.len, contact_uri.s);
-	    goto done;
-	} else {//contact exists
-		if (contact_state == STATE_TERMINATED) {
-			//delete contact
-			LM_DBG("This contact <%.*s> is in state terminated and is in usrloc so removing it from usrloc\n", contact_uri.len, contact_uri.s);
-			ul.lock_contact_slot(&contact_uri);
-			if (ul.unlink_contact_from_impu(presentity_impurecord, ucontact, 1) != 0) {
-			    LM_ERR("Failed to delete ucontact <%.*s>\n", contact_uri.len, contact_uri.s);
-			    ret = CSCF_RETURN_FALSE;
-    			    ul.unlock_contact_slot(&contact_uri);
-			    ul.release_ucontact(ucontact);
-			    goto done;
-			}
-			ul.unlock_contact_slot(&contact_uri);
-		}else {//state is active
-			LM_DBG("This contact: <%.*s> is not in state terminated and is in usrloc, ignore\n", contact_uri.len, contact_uri.s);
-			ul.release_ucontact(ucontact);
-			goto done;
-		}
-		ul.release_ucontact(ucontact);
-	}
-	
-done:
-	    ul.unlock_udomain(_d, &presentity_impurecord->public_identity);
-	    return ret;
+int notify_subscribers(impurecord_t* impurecord) {
+    event_reg(0, impurecord, IMS_REGISTRAR_CONTACT_UNREGISTERED, 0, 0);
+    
+    return 0;
 }
 
+/*! Called to process a contact in a received publish document. No locks held when calling this function
+ * 
+ * @param subscription
+ * @param _d
+ * @param expires
+ * @param contact_uri
+ * @param contact_state
+ * @return 
+ */
+int process_contact(ims_subscription* subscription, udomain_t * _d, int expires, str contact_uri, int contact_state) {
+
+    int ret = CSCF_RETURN_TRUE;
+    int i, j;
+    ims_public_identity* pi = 0;
+    struct ucontact* ucontact;
+    str callid = {0, 0};
+    str path = {0, 0};
+    impurecord_t* implicit_impurecord = 0;
+    get_act_time();
+
+    //first get the subscription
+    //then go through each implicit public identity (exclude the explicit identity)
+    //get the IMPU rec for each implicit public identity
+    //then get the contact for each implicit IMPU and delete if contact_state == STATE_TERMINATED
+    //then get the contact for each explicit IMPU and delete if contact_state == STATE_TERMINATED
+
+
+    //now update the implicit set
+    for (i = 0; i < subscription->service_profiles_cnt; i++) {
+        for (j = 0; j < subscription->service_profiles[i].public_identities_cnt; j++) {
+            pi = &(subscription->service_profiles[i].public_identities[j]);
+
+            //            if ((presentity_aor->len == pi->public_identity.len) && memcmp(presentity_aor.s, pi->public_identity.s, presentity_aor->len) == 0) { //we don't need to update the explicit IMPU
+            //                LM_DBG("Ignoring explicit identity <%.*s>, updating later..... end of fn\n", presentity_aor.len, presentity_aor->s);
+            //                goto next_implicit_impu;
+            //            }
+            ul.lock_udomain(_d, &pi->public_identity);
+            if (ul.get_impurecord(_d, &pi->public_identity, &implicit_impurecord) != 0) {
+                LM_DBG("usrloc does not have impurecord for implicity IMPU, ignore\n");
+                goto next_implicit_impu;
+            }
+            if (ul.get_ucontact(&contact_uri, &callid, &path, 0/*cseq*/, &ucontact) != 0) { //contact does not exist
+                LM_DBG("This contact: <%.*s> is not in usrloc, ignore - NOTE: You need S-CSCF usrloc set to match_mode CONTACT_ONLY\n", contact_uri.len, contact_uri.s);
+                goto next_implicit_impu;
+            } else {//contact exists
+                if (ucontact->state != CONTACT_DELETED) {
+                    if (contact_state == STATE_TERMINATED) {
+                        //delete contact
+                        LM_DBG("This contact <%.*s> is in state terminated and is in usrloc so removing it from usrloc\n", contact_uri.len, contact_uri.s);
+                        ul.lock_contact_slot(&contact_uri);
+                        ucontact->state = CONTACT_DELETE_PENDING;
+                        if (implicit_impurecord->shead) {
+                            //send NOTIFY to all subscribers of this IMPU.
+                            notify_subscribers(implicit_impurecord);
+                        }
+                        ul.unlock_contact_slot(&contact_uri);
+                        //                        if (ul.unlink_contact_from_impu(implicit_impurecord, ucontact, 1, 0 /*implicit dereg of contact from IMPU*/) != 0) {
+                        //                            LM_ERR("Failed to delete ucontact <%.*s> from implicit IMPU\n", contact_uri.len, contact_uri.s);
+                        //                            ul.unlock_contact_slot(&contact_uri);
+                        //                            ul.release_ucontact(ucontact);
+                        //                            goto next_implicit_impu; //TODO: don't need to use goto here...
+                        //                        }
+                    } else {//state is active
+                        LM_DBG("This contact: <%.*s> is not in state terminated and is in usrloc, ignore\n", contact_uri.len, contact_uri.s);
+                        ul.release_ucontact(ucontact);
+                        goto next_implicit_impu;
+                    }
+                }
+                ul.release_ucontact(ucontact);
+            }
+next_implicit_impu:
+            ul.unlock_udomain(_d, &pi->public_identity);
+        }
+    }
+
+    if (contact_state == STATE_TERMINATED) {
+        //at this point we can assume that all notifies were sent out to the subscribers of the IMPUs related to the explicit and implicit impus.
+        //we must now change the state of the contact to deleted so they can be removed from the IMPU in the timer process...
+        if (ul.get_ucontact(&contact_uri, &callid, &path, 0/*cseq*/, &ucontact) != 0) { //contact does not exist
+            LM_DBG("This contact: <%.*s> is not in usrloc, ignore - NOTE: You need S-CSCF usrloc set to match_mode CONTACT_ONLY\n", contact_uri.len, contact_uri.s);
+        } else {
+            ul.lock_contact_slot(&contact_uri);
+            ucontact->state = CONTACT_DELETED;
+            ul.unlock_contact_slot(&contact_uri);
+            ul.release_ucontact(ucontact);
+        }
+    }
+
+    //    ul.lock_subscription(subscription);
+    //    subscription->ref_count--;
+    //    LM_DBG("subscription ref count after sub is now %d\n", subscription->ref_count);
+    //    ul.unlock_subscription(subscription);
+
+    //	ul.lock_udomain(_d, &presentity_impurecord->public_identity);
+
+    //    if (ul.get_ucontact(&contact_uri, &callid, &path, 0/*cseq*/, &ucontact) != 0) { //contact does not exist
+    //        LM_DBG("This contact: <%.*s> is not in usrloc, ignore - NOTE: You need S-CSCF usrloc set to match_mode CONTACT_ONLY\n", contact_uri.len, contact_uri.s);
+    //        return ret;
+    //    } else {//contact exists
+    //        if (VALID_CONTACT(ucontact, act_time)) {
+    //            if (contact_state == STATE_TERMINATED) {
+    //                //delete contact
+    //                LM_DBG("This contact <%.*s> is in state terminated and is in usrloc so removing it from usrloc\n", contact_uri.len, contact_uri.s);
+    ////                ul.lock_contact_slot(&contact_uri);
+    ////                if (ul.unlink_contact_from_impu(presentity_impurecord, ucontact, 1, 0 /*implicit dereg of contact from IMPU */) != 0) {
+    ////                    LM_ERR("Failed to delete ucontact <%.*s>\n", contact_uri.len, contact_uri.s);
+    ////                    ret = CSCF_RETURN_FALSE;
+    ////                    ul.unlock_contact_slot(&contact_uri);
+    ////                    ul.release_ucontact(ucontact);
+    ////                    goto done;
+    ////                }
+    ////                ul.unlock_contact_slot(&contact_uri);
+    //                ucontact->state = CONTACT_DELETE_PENDING;
+    //                if (implicit_impurecord->shead) {
+    //                    //send NOTIFY to all subscribers of this IMPU.
+    //                    notify_subscribers(implicit_impurecord);
+    //                }
+    //            } else {//state is active
+    //                LM_DBG("This contact: <%.*s> is not in state terminated and is in usrloc, ignore\n", contact_uri.len, contact_uri.s);
+    //                ul.release_ucontact(ucontact);
+    //                goto done;
+    //            }
+    //        }
+    //        ul.release_ucontact(ucontact);
+    //    }
+
+    //done:
+    //    ul.unlock_udomain(_d, &presentity_impurecord->public_identity);
+    return ret;
+}
 
 int reginfo_parse_state(char * s) {
-	if (s == NULL) {
-		return STATE_UNKNOWN;
-	}
-	switch (strlen(s)) {
-		case 6:
-			if (strncmp(s, "active", 6) ==  0) return STATE_ACTIVE;
-			break;
-		case 10:
-			if (strncmp(s, "terminated", 10) ==  0) return STATE_TERMINATED;
-			break;
-		default:
-			LM_ERR("Unknown State %s\n", s);
-			return STATE_UNKNOWN;
-	}
-	LM_ERR("Unknown State %s\n", s);
-	return STATE_UNKNOWN;
+    if (s == NULL) {
+        return STATE_UNKNOWN;
+    }
+    switch (strlen(s)) {
+        case 6:
+            if (strncmp(s, "active", 6) == 0) return STATE_ACTIVE;
+            break;
+        case 10:
+            if (strncmp(s, "terminated", 10) == 0) return STATE_TERMINATED;
+            break;
+        default:
+            LM_ERR("Unknown State %s\n", s);
+            return STATE_UNKNOWN;
+    }
+    LM_ERR("Unknown State %s\n", s);
+    return STATE_UNKNOWN;
 }
 
 int reginfo_parse_event(char * s) {
-	if (s == NULL) {
-		return EVENT_UNKNOWN;
-	}
-	switch (strlen(s)) {
-		case 7:
-			if (strncmp(s, "created", 7) ==  0) return EVENT_CREATED;
-			if (strncmp(s, "expired", 7) ==  0) return EVENT_EXPIRED;
-			break;
-		case 9:
-			if (strncmp(s, "refreshed", 9) ==  0) return EVENT_CREATED;
-			break;
-		case 10:
-			if (strncmp(s, "registered", 10) ==  0) return EVENT_REGISTERED;
-			if (strncmp(s, "terminated", 10) ==  0) return EVENT_TERMINATED;
-			break;
-		case 12:
-			if (strncmp(s, "unregistered", 12) ==  0) return EVENT_UNREGISTERED;
-			break;
-		default:
-			LM_ERR("Unknown Event %s\n", s);
-			return EVENT_UNKNOWN;
-	}
-	LM_ERR("Unknown Event %s\n", s);
-	return EVENT_UNKNOWN;
+    if (s == NULL) {
+        return EVENT_UNKNOWN;
+    }
+    switch (strlen(s)) {
+        case 7:
+            if (strncmp(s, "created", 7) == 0) return EVENT_CREATED;
+            if (strncmp(s, "expired", 7) == 0) return EVENT_EXPIRED;
+            break;
+        case 9:
+            if (strncmp(s, "refreshed", 9) == 0) return EVENT_CREATED;
+            break;
+        case 10:
+            if (strncmp(s, "registered", 10) == 0) return EVENT_REGISTERED;
+            if (strncmp(s, "terminated", 10) == 0) return EVENT_TERMINATED;
+            break;
+        case 12:
+            if (strncmp(s, "unregistered", 12) == 0) return EVENT_UNREGISTERED;
+            break;
+        default:
+            LM_ERR("Unknown Event %s\n", s);
+            return EVENT_UNKNOWN;
+    }
+    LM_ERR("Unknown Event %s\n", s);
+    return EVENT_UNKNOWN;
 }
 
 xmlNodePtr xmlGetNodeByName(xmlNodePtr parent, const char *name) {
-	xmlNodePtr cur = parent;
-	xmlNodePtr match = NULL;
-	while (cur) {
-		if (xmlStrcasecmp(cur->name, (unsigned char*)name) == 0)
-			return cur;
-		match = xmlGetNodeByName(cur->children, name);
-		if (match)
-			return match;
-		cur = cur->next;
-	}
-	return NULL;
+    xmlNodePtr cur = parent;
+    xmlNodePtr match = NULL;
+    while (cur) {
+        if (xmlStrcasecmp(cur->name, (unsigned char*) name) == 0)
+            return cur;
+        match = xmlGetNodeByName(cur->children, name);
+        if (match)
+            return match;
+        cur = cur->next;
+    }
+    return NULL;
 }
 
 char * xmlGetAttrContentByName(xmlNodePtr node, const char *name) {
-	xmlAttrPtr attr = node->properties;
-	while (attr) {
-		if (xmlStrcasecmp(attr->name, (unsigned char*)name) == 0)
-			return (char*)xmlNodeGetContent(attr->children);
-		attr = attr->next;
-	}
-	return NULL;
+    xmlAttrPtr attr = node->properties;
+    while (attr) {
+        if (xmlStrcasecmp(attr->name, (unsigned char*) name) == 0)
+            return (char*) xmlNodeGetContent(attr->children);
+        attr = attr->next;
+    }
+    return NULL;
 }
-
 
 int process_publish_body(struct sip_msg* msg, str publish_body, udomain_t * domain) {
-	xmlDocPtr doc= NULL;
-	xmlNodePtr doc_root = NULL, registrations = NULL, contacts = NULL, uris = NULL;
-	str aor = {0, 0};
-	str callid = {0, 0};
-	str contact_uri = {0, 0};
-	str received = {0,0};
-	str path = {0,0};
-	str user_agent = {0, 0};
-	int reg_state, contact_state, event, expires, result, final_result = CSCF_RETURN_FALSE;
-	char * expires_char,  * cseq_char;
-	int cseq = 0;
-	impurecord_t* presentity_impurecord;
-	
-	doc = xmlParseMemory(publish_body.s, publish_body.len);
-	if(doc== NULL)  {
-		LM_ERR("Error while parsing the xml body message, Body is:\n%.*s\n",
-			publish_body.len, publish_body.s);
-		return -1;
-	}
-	doc_root = xmlGetNodeByName(doc->children, "reginfo");
-	if(doc_root == NULL) {
-		LM_ERR("while extracting the reginfo node\n");
-		goto error;
-	}
-	registrations = doc_root->children;
-	while (registrations) {
-		/* Only process registration sub-items */
-		if (xmlStrcasecmp(registrations->name, BAD_CAST "registration") != 0)
-			goto next_registration;
-		reg_state = reginfo_parse_state(xmlGetAttrContentByName(registrations, "state"));
-		aor.s = xmlGetAttrContentByName(registrations, "aor");
-		if (aor.s == NULL) {
-			LM_ERR("No AOR for this registration!\n");		
-			goto next_registration;
-		}
-		aor.len = strlen(aor.s);
-		LM_DBG("AOR %.*s has reg_state \"%d\"\n", aor.len, aor.s, reg_state);
-		
-		//TOD get IMPU record here
-		ul.lock_udomain(domain, &aor);
-		if (ul.get_impurecord(domain, &aor, &presentity_impurecord) != 0) {
-		    LM_DBG("usrloc does not have imprecord for presentity being published too, ignore\n");
-		    ul.unlock_udomain(domain, &aor);
-		    goto next_registration;
-		}
-		ul.unlock_udomain(domain, &aor);
+    xmlDocPtr doc = NULL;
+    xmlNodePtr doc_root = NULL, registrations = NULL, contacts = NULL, uris = NULL;
+    str aor = {0, 0};
+    str callid = {0, 0};
+    str contact_uri = {0, 0};
+    str received = {0, 0};
+    str path = {0, 0};
+    str user_agent = {0, 0};
+    int reg_state, contact_state, event, expires, result, final_result = CSCF_RETURN_FALSE;
+    char * expires_char, * cseq_char;
+    int cseq = 0;
+    impurecord_t* presentity_impurecord;
+    ims_subscription* subscription = 0;
+    int subscription_locked;
 
-		LM_DBG("Received impurecord for presentity being published on [%.*s]\n", presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s);
-		
-		if (reg_state == STATE_TERMINATED) {
-		    LM_DBG("This impurecord is in STATE_TERMINATED - TODO we should should delete all contacts");
-		}
-		else {
-		    /* Now lets process the Contact's from this Registration: */
-		    contacts = registrations->children;
-		    while (contacts) {
-			    if (xmlStrcasecmp(contacts->name, BAD_CAST "contact") != 0)
-				    goto next_contact;
-			    callid.s = xmlGetAttrContentByName(contacts, "callid");
-			    if (callid.s == NULL) {
-				    LM_DBG("No Call-ID for this contact!\n");		
-				    callid.len = 0;
-			    } else {
-				    callid.len = strlen(callid.s);
-				    LM_DBG("contact has callid <%.*s>\n", callid.len, callid.s);		
-			    }	
+    doc = xmlParseMemory(publish_body.s, publish_body.len);
+    if (doc == NULL) {
+        LM_ERR("Error while parsing the xml body message, Body is:\n%.*s\n",
+                publish_body.len, publish_body.s);
+        return -1;
+    }
+    doc_root = xmlGetNodeByName(doc->children, "reginfo");
+    if (doc_root == NULL) {
+        LM_ERR("while extracting the reginfo node\n");
+        goto error;
+    }
+    registrations = doc_root->children;
+    while (registrations) {
+        subscription_locked = 0;
+        /* Only process registration sub-items */
+        if (xmlStrcasecmp(registrations->name, BAD_CAST "registration") != 0)
+            goto next_registration;
+        reg_state = reginfo_parse_state(xmlGetAttrContentByName(registrations, "state"));
+        aor.s = xmlGetAttrContentByName(registrations, "aor");
+        if (aor.s == NULL) {
+            LM_ERR("No AOR for this registration!\n");
+            goto next_registration;
+        }
+        aor.len = strlen(aor.s);
+        LM_DBG("AOR %.*s has reg_state \"%d\"\n", aor.len, aor.s, reg_state);
 
-			    received.s = xmlGetAttrContentByName(contacts, "received");
-			    if (received.s == NULL) {
-				    LM_DBG("No received for this contact!\n");
-				    received.len = 0;
-			    } else {
-				    received.len = strlen(received.s);
-				    LM_DBG("contact has received <%.*s>\n", received.len, received.s);
-			    }
+        //TOD get IMPU record here
+        ul.lock_udomain(domain, &aor);
+        if (ul.get_impurecord(domain, &aor, &presentity_impurecord) != 0) {
+            LM_DBG("usrloc does not have impurecord for presentity being published too, ignore\n");
+            ul.unlock_udomain(domain, &aor);
+            goto next_registration;
+        }
+        //get the subscription which we will use later
 
-			    path.s = xmlGetAttrContentByName(contacts, "path");	
-			    if (path.s == NULL) {
-				    LM_DBG("No path for this contact!\n");
-				    path.len = 0;
-			    } else {
-				    path.len = strlen(path.s);
-				    LM_DBG("contact has path <%.*s>\n", path.len, path.s);
-			    }
+        subscription = presentity_impurecord->s;
+        if (!subscription) {
+            LM_DBG("No subscriber info associated with <%.*s>, so no implicit IMPUs to process\n", presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s);
+            goto next_registration;
+        }
+        ul.lock_subscription(subscription);
+        subscription->ref_count++;
+        LM_DBG("subscription ref count after add is now %d\n", subscription->ref_count);
+        ul.unlock_subscription(subscription);
+        subscription_locked = 1;
 
-			    user_agent.s = xmlGetAttrContentByName(contacts, "user_agent");
-			    if (user_agent.s == NULL) {
-				    LM_DBG("No user_agent for this contact!\n");
-				    user_agent.len = 0;
-			    } else {
-				    user_agent.len = strlen(user_agent.s);
-				    LM_DBG("contact has user_agent <%.*s>\n", user_agent.len, user_agent.s);
-			    }
-			    event = reginfo_parse_event(xmlGetAttrContentByName(contacts, "event"));
-			    if (event == EVENT_UNKNOWN) {
-				    LM_ERR("No event for this contact - going to next contact!\n");		
-				    goto next_contact;
-			    }
-			    expires_char = xmlGetAttrContentByName(contacts, "expires");
-			    if (expires_char == NULL) {
-				    LM_ERR("No expires for this contact - going to next contact!\n");		
-				    goto next_contact;
-			    }
-			    expires = atoi(expires_char);
-			    if (expires < 0) {
-				    LM_ERR("No valid expires for this contact - going to next contact!\n");		
-				    goto next_contact;
-			    }
+        ul.unlock_udomain(domain, &aor);
 
-			    contact_state = reginfo_parse_state(xmlGetAttrContentByName(contacts, "state"));
-			    if (contact_state == STATE_UNKNOWN) {
-				LM_ERR("No state for this contact - going to next contact!\n");		
-				goto next_contact;
-			    } 
+        LM_DBG("Received impurecord for presentity being published on [%.*s]\n", aor.len, aor.s);
 
-			    LM_DBG("Contact state %d: Event \"%d\", expires %d\n", contact_state, event, expires);
+        if (reg_state == STATE_TERMINATED) {
+            LM_DBG("This impurecord is in STATE_TERMINATED - TODO we should should delete all contacts");
+        } else {
+            /* Now lets process the Contact's from this Registration: */
+            contacts = registrations->children;
+            while (contacts) {
+                if (xmlStrcasecmp(contacts->name, BAD_CAST "contact") != 0)
+                    goto next_contact;
+                callid.s = xmlGetAttrContentByName(contacts, "callid");
+                if (callid.s == NULL) {
+                    LM_DBG("No Call-ID for this contact!\n");
+                    callid.len = 0;
+                } else {
+                    callid.len = strlen(callid.s);
+                    LM_DBG("contact has callid <%.*s>\n", callid.len, callid.s);
+                }
 
-			    cseq_char = xmlGetAttrContentByName(contacts, "cseq");
-			    if (cseq_char == NULL) {
-				    LM_DBG("No cseq for this contact!\n");		
-			    } else {
-				    cseq = atoi(cseq_char);
-				    if (cseq < 0) {
-					    LM_DBG("No valid cseq for this contact!\n");		
-				    }
-			    }
+                received.s = xmlGetAttrContentByName(contacts, "received");
+                if (received.s == NULL) {
+                    LM_DBG("No received for this contact!\n");
+                    received.len = 0;
+                } else {
+                    received.len = strlen(received.s);
+                    LM_DBG("contact has received <%.*s>\n", received.len, received.s);
+                }
 
-			    /* Now lets process the URI's from this Contact: */
-			    uris = contacts->children;
-			    while (uris) {
-				    if (xmlStrcasecmp(uris->name, BAD_CAST "uri") != 0)
-					    goto next_uri;
-				    contact_uri.s = (char*)xmlNodeGetContent(uris);	
-				    if (contact_uri.s == NULL) {
-					    LM_ERR("No URI for this contact - going to next registration!\n");		
-					    goto next_registration;
-				    }
-				    contact_uri.len = strlen(contact_uri.s);
-				    LM_DBG("Contact: %.*s\n",
-					    contact_uri.len, contact_uri.s);
+                path.s = xmlGetAttrContentByName(contacts, "path");
+                if (path.s == NULL) {
+                    LM_DBG("No path for this contact!\n");
+                    path.len = 0;
+                } else {
+                    path.len = strlen(path.s);
+                    LM_DBG("contact has path <%.*s>\n", path.len, path.s);
+                }
 
-				    /* Add to Usrloc: */
-				    result = process_contact(presentity_impurecord, domain, expires, contact_uri, contact_state);
+                user_agent.s = xmlGetAttrContentByName(contacts, "user_agent");
+                if (user_agent.s == NULL) {
+                    LM_DBG("No user_agent for this contact!\n");
+                    user_agent.len = 0;
+                } else {
+                    user_agent.len = strlen(user_agent.s);
+                    LM_DBG("contact has user_agent <%.*s>\n", user_agent.len, user_agent.s);
+                }
+                event = reginfo_parse_event(xmlGetAttrContentByName(contacts, "event"));
+                if (event == EVENT_UNKNOWN) {
+                    LM_ERR("No event for this contact - going to next contact!\n");
+                    goto next_contact;
+                }
+                expires_char = xmlGetAttrContentByName(contacts, "expires");
+                if (expires_char == NULL) {
+                    LM_ERR("No expires for this contact - going to next contact!\n");
+                    goto next_contact;
+                }
+                expires = atoi(expires_char);
+                if (expires < 0) {
+                    LM_ERR("No valid expires for this contact - going to next contact!\n");
+                    goto next_contact;
+                }
 
-				    /* Process the result */
-				    if (final_result != CSCF_RETURN_TRUE) final_result = result;
-    next_uri:
-				    uris = uris->next;
-			    }
-    next_contact:
-			    contacts = contacts->next;
-		    }
-		}
+                contact_state = reginfo_parse_state(xmlGetAttrContentByName(contacts, "state"));
+                if (contact_state == STATE_UNKNOWN) {
+                    LM_ERR("No state for this contact - going to next contact!\n");
+                    goto next_contact;
+                }
+
+                LM_DBG("Contact state %d: Event \"%d\", expires %d\n", contact_state, event, expires);
+
+                cseq_char = xmlGetAttrContentByName(contacts, "cseq");
+                if (cseq_char == NULL) {
+                    LM_DBG("No cseq for this contact!\n");
+                } else {
+                    cseq = atoi(cseq_char);
+                    if (cseq < 0) {
+                        LM_DBG("No valid cseq for this contact!\n");
+                    }
+                }
+
+                /* Now lets process the URI's from this Contact: */
+                uris = contacts->children;
+                while (uris) {
+                    if (xmlStrcasecmp(uris->name, BAD_CAST "uri") != 0)
+                        goto next_uri;
+                    contact_uri.s = (char*) xmlNodeGetContent(uris);
+                    if (contact_uri.s == NULL) {
+                        LM_ERR("No URI for this contact - going to next registration!\n");
+                        goto next_registration;
+                    }
+                    contact_uri.len = strlen(contact_uri.s);
+                    LM_DBG("Contact: %.*s\n",
+                            contact_uri.len, contact_uri.s);
+
+                    /* Add to Usrloc: */
+                    result = process_contact(subscription, domain, expires, contact_uri, contact_state);
+
+                    /* Process the result */
+                    if (final_result != CSCF_RETURN_TRUE) final_result = result;
+next_uri:
+                    uris = uris->next;
+                }
+next_contact:
+                contacts = contacts->next;
+            }
+        }
 next_registration:
-		registrations = registrations->next;
-	}
+        registrations = registrations->next;
+    if (subscription_locked) {
+        ul.lock_subscription(subscription);
+        subscription->ref_count--;
+        LM_DBG("subscription ref count after sub is now %d\n", subscription->ref_count);
+        ul.unlock_subscription(subscription);
+    }
+    }
 error:
-	/* Free the XML-Document */
-    	if(doc) xmlFreeDoc(doc);
-	return final_result;
+    /* Free the XML-Document */
+    if (doc) xmlFreeDoc(doc);
+    return final_result;
 }
-
 
 /**
  * Modify the subscription based on publish
@@ -898,47 +923,47 @@ error:
  * @returns #CSCF_RETURN_TRUE if allowed, #CSCF_RETURN_FALSE if not, #CSCF_RETURN_ERROR on error
  */
 int publish_reg(struct sip_msg *msg, char *_t, char *str2) {
-    
+
     udomain_t* domain = (udomain_t*) _t;
     int expires = 0;
     int ret = CSCF_RETURN_FALSE;
     str body;
-    
+
     LM_DBG("Publishing reg info\n");
-    
-    
+
+
     /* If not done yet, parse the whole message now: */
     if (parse_headers(msg, HDR_EOH_F, 0) == -1) {
-	    LM_ERR("Error parsing headers\n");
-	    return -1;
+        LM_ERR("Error parsing headers\n");
+        return -1;
     }
     if (get_content_length(msg) == 0) {
-	    LM_DBG("Content length = 0\n");
-	    /* No Body? Then there is no published information available, which is ok. */
-	    goto done;
+        LM_DBG("Content length = 0\n");
+        /* No Body? Then there is no published information available, which is ok. */
+        goto done;
     } else {
-	    body.s=get_body(msg);
-	    if (body.s== NULL) {
-		    LM_ERR("cannot extract body from msg\n");
-		    goto done;
-	    }
-	    body.len = get_content_length(msg);
+        body.s = get_body(msg);
+        if (body.s == NULL) {
+            LM_ERR("cannot extract body from msg\n");
+            goto done;
+        }
+        body.len = get_content_length(msg);
     }
 
     LM_DBG("Body is %.*s\n", body.len, body.s);
 
-    ret = process_publish_body(msg, body, (udomain_t*)domain);
-    
+    ret = process_publish_body(msg, body, (udomain_t*) domain);
+
 done:
     //get expires
     expires = cscf_get_expires_hdr(msg, 0);
     if (expires == -1) expires = subscription_default_expires;
-    
-    if(ret==CSCF_RETURN_TRUE){
-	LM_DBG("Sending 200 OK to publishing user");
-	subscribe_reply(msg, 200, MSG_REG_PUBLISH_OK, &expires, &scscf_name_str);
+
+    if (ret == CSCF_RETURN_TRUE) {
+        LM_DBG("Sending 200 OK to publishing user");
+        subscribe_reply(msg, 200, MSG_REG_PUBLISH_OK, &expires, &scscf_name_str);
     }
-       
+
     return ret;
 }
 
@@ -984,15 +1009,14 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
     if (msg->first_line.type != SIP_REQUEST) {
         LM_ERR("This message is not a request\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
 
     //check that this is a subscribe
-    if (msg->first_line.u.request.method.len != 9 ||
-            memcmp(msg->first_line.u.request.method.s, "SUBSCRIBE", 9) != 0) {
+    if (msg->first_line.type != SIP_REQUEST || msg->first_line.u.request.method_value != METHOD_SUBSCRIBE) {
         LM_ERR("This message is not a SUBSCRIBE\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
 
     //check that this is a reg event  - we currently only support reg event
@@ -1001,10 +1025,9 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
         LM_WARN("Accepting only <Event: reg>. Found: <%.*s>\n",
                 event.len, event.s);
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
-    if (event.len == 0 && strncasecmp(event.s, "reg", 3) == 0)
-        event_i = IMS_EVENT_REG;
+    event_i = IMS_EVENT_REG;
 
     //get callid, from and to tags to be able to identify dialog
     //callid
@@ -1012,43 +1035,43 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
     if (callid.len <= 0 || !callid.s) {
         LM_ERR("unable to get callid\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
     //ftag
     if (!cscf_get_from_tag(msg, &ftag)) {
         LM_ERR("Unable to get ftag\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
-    
+
     //ttag
-     if (!cscf_get_to_tag(msg, &ttag)) {
+    if (!cscf_get_to_tag(msg, &ttag)) {
         LM_ERR("Unable to get ttag\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
-    
+
     //check if SUBSCRIBE is initial or SUBSEQUENT
     if (ttag.len == 0) {
         LM_DBG("Msg has no ttag - this is initial subscribe\n");
-	//to tag - doesn't exist in initial request, must use tm to get it
-	tmb.t_get_reply_totag(msg, &ttag);
-	LM_DBG("Got to tag from sent response: [%.*s]", ttag.len, ttag.s);
-	LM_DBG("This is initial subscribe - get presentity URI from req URI\n");
-	presentity_uri = cscf_get_public_identity_from_requri(msg);
-	
+        //to tag - doesn't exist in initial request, must use tm to get it
+        tmb.t_get_reply_totag(msg, &ttag);
+        LM_DBG("Got to tag from sent response: [%.*s]", ttag.len, ttag.s);
+        LM_DBG("This is initial subscribe - get presentity URI from req URI\n");
+        presentity_uri = cscf_get_public_identity_from_requri(msg);
+
     } else {
-	LM_DBG("Msg has ttag: [%.*s] - this is subsequent subscribe\n", ttag.len, ttag.s);
-	//cscf_get_to_uri(msg, &presentity_uri);
-	LM_DBG("This is subsequent subscribe - get presentity URI from stored subscriber dialog\n");
-	//get the presentity uri from To Header
-	//cscf_get_to_uri(msg, &presentity_uri);
-	presentity_uri = ul.get_presentity_from_subscriber_dialog(&callid, &ttag, &ftag);
-	if (presentity_uri.len == 0) {
-	    LM_ERR("Unable to get pres uri from subscriber dialog with callid <%.*s>, ttag <%.*s> and ftag <%.*s>\n", callid.len, callid.s, ttag.len, ttag.s, ftag.len, ftag.s);
-	    ret = CSCF_RETURN_FALSE;
-	    goto error;
-	}
+        LM_DBG("Msg has ttag: [%.*s] - this is subsequent subscribe\n", ttag.len, ttag.s);
+        //cscf_get_to_uri(msg, &presentity_uri);
+        LM_DBG("This is subsequent subscribe - get presentity URI from stored subscriber dialog\n");
+        //get the presentity uri from To Header
+        //cscf_get_to_uri(msg, &presentity_uri);
+        presentity_uri = ul.get_presentity_from_subscriber_dialog(&callid, &ttag, &ftag);
+        if (presentity_uri.len == 0) {
+            LM_ERR("Unable to get pres uri from subscriber dialog with callid <%.*s>, ttag <%.*s> and ftag <%.*s>\n", callid.len, callid.s, ttag.len, ttag.s, ftag.len, ftag.s);
+            ret = CSCF_RETURN_FALSE;
+            goto doneorerror;
+        }
     }
 
     //get cseq
@@ -1067,33 +1090,31 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
             record_route.s = NULL;
             record_route.len = 0;
             ret = CSCF_RETURN_FALSE;
-            goto error;
+            goto doneorerror;
         }
     }
 
     //get the presentity uri from To Header
     //cscf_get_to_uri(msg, &presentity_uri);
-	
+
     //get the watcher uri from the to header
     cscf_get_from_uri(msg, &watcher_impu);
 
     if (!watcher_impu.len) {
         LM_ERR("Failed to get URI from To header.\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
-    LM_DBG("To header URI (watcher URI) <%.*s>.\n",
-            watcher_impu.len, watcher_impu.s);
+    LM_DBG("To header URI (watcher URI) <%.*s>.\n", watcher_impu.len, watcher_impu.s);
 
     //get the watcher contact from contact header
     watcher_contact = cscf_get_contact(msg);
     if (!watcher_contact.len) {
         LM_ERR("ERR: Contact empty.\n");
         ret = CSCF_RETURN_FALSE;
-        goto error;
+        goto doneorerror;
     }
-    LM_DBG("watcher Contact <%.*s>.\n",
-            watcher_contact.len, watcher_contact.s);
+    LM_DBG("watcher Contact <%.*s>.\n", watcher_contact.len, watcher_contact.s);
 
     //get expires
     expires = cscf_get_expires_hdr(msg, 0);
@@ -1110,21 +1131,17 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
     subscriber_data.watcher_uri = &watcher_impu;
     subscriber_data.watcher_contact = &watcher_contact;
     subscriber_data.version = 1; /*default version starts at 1*/
-    
+
     if (expires > 0) {
         LM_DBG("expires is more than zero - SUBSCRIBE");
         event_type = IMS_REGISTRAR_SUBSCRIBE;
 
         if (expires < subscription_min_expires) expires = subscription_min_expires;
         if (expires > subscription_max_expires) expires = subscription_max_expires;
-	
-	expires = randomize_expires(expires, subscription_expires_range);
-
+        expires = randomize_expires(expires, subscription_expires_range);
         get_act_time();
         expires_time = expires + act_time;
-
         subscriber_data.expires = expires_time;
-
 
         LM_DBG("Subscription expires time <%d> expiry length <%d>\n",
                 expires_time, expires);
@@ -1133,56 +1150,55 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
         ul.lock_udomain(domain, &presentity_uri);
         res = ul.get_impurecord(domain, &presentity_uri, &presentity_impurecord);
         if (res != 0) {
-            LM_DBG("usrloc does not have imprecord for presentity being subscribed too, This a problem we shouldn't get here as offline users should have been assigned in config file\n");
+            LM_WARN("usrloc does not have impurecord for presentity being subscribed too, This a problem we shouldn't get here as offline users should have been assigned in config file\n");
             ul.unlock_udomain(domain, &presentity_uri);
             ret = CSCF_RETURN_FALSE;
-            goto error;
+            goto doneorerror;
         }
 
         LM_DBG("Received impurecord for presentity being subscribed to [%.*s]\n", presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s);
-	
+
         res = ul.get_subscriber(presentity_impurecord, &presentity_uri, &watcher_contact, event_i, &reg_subscriber);
-	if (res != 0) {
+        if (res != 0) {
             LM_DBG("this must be a new subscriber, lets add it\n");
-	    subscriber_data.presentity_uri = &presentity_impurecord->public_identity;
+            subscriber_data.presentity_uri = &presentity_impurecord->public_identity;
             res = ul.add_subscriber(presentity_impurecord, &subscriber_data, &reg_subscriber, 0 /*not a db_load*/);
             if (res != 0) {
                 LM_ERR("Failed to add new subscription\n");
                 ul.unlock_udomain(domain, &presentity_uri);
                 ret = CSCF_RETURN_FALSE;
-                goto error;
+                goto doneorerror;
             }
         } else {
-
-            if(memcmp(reg_subscriber->call_id.s, subscriber_data.callid->s, reg_subscriber->call_id.len) == 0 && 
-		    memcmp(reg_subscriber->from_tag.s, subscriber_data.ftag->s, reg_subscriber->from_tag.len) == 0 && 
-		    memcmp(reg_subscriber->to_tag.s, subscriber_data.ttag->s, reg_subscriber->to_tag.len) == 0) {
-		LM_DBG("This has same callid, fromtag and totag - must be a re subscribe, lets update it\n");
-		res = ul.update_subscriber(presentity_impurecord, &reg_subscriber, &expires_time, 0, 0);
-		if (res != 1) {
-		    LM_ERR("Failed to update subscription - expires is %d\n", expires_time);
-		    ul.unlock_udomain(domain, &presentity_uri);
-		    ret = CSCF_RETURN_FALSE;
-		    goto error;
-		}
-	    } else {
-		LM_ERR("Re-subscribe for same watcher_contact, presentity_uri, event but with different callid [%.*s], fromtag [%.*s] and totag [%.*s] for presentity [%.*s] and watcher contact [%.*s] - What happened?\n",
-			subscriber_data.callid->len, subscriber_data.callid->s,
-			subscriber_data.ftag->len, subscriber_data.ftag->s,
-			subscriber_data.ttag->len, subscriber_data.ttag->s,
-			presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s,
-			subscriber_data.watcher_contact->len, subscriber_data.watcher_contact->s);
-		LM_DBG("Removing old subscriber and adding new one\n");
-		subscriber_data.presentity_uri = &presentity_impurecord->public_identity;
-		ul.external_delete_subscriber(reg_subscriber, (udomain_t*) _t, 0 /*domain is already locked*/);
-		res = ul.add_subscriber(presentity_impurecord, &subscriber_data, &reg_subscriber, 0 /*not a db_load*/);
-		if (res != 0) {
-		    LM_ERR("Failed to add new subscription\n");
-		    ul.unlock_udomain(domain, &presentity_uri);
-		    ret = CSCF_RETURN_FALSE;
-		    goto error;
-		}
-	    }
+            if (memcmp(reg_subscriber->call_id.s, subscriber_data.callid->s, reg_subscriber->call_id.len) == 0 &&
+                    memcmp(reg_subscriber->from_tag.s, subscriber_data.ftag->s, reg_subscriber->from_tag.len) == 0 &&
+                    memcmp(reg_subscriber->to_tag.s, subscriber_data.ttag->s, reg_subscriber->to_tag.len) == 0) {
+                LM_DBG("This has same callid, fromtag and totag - must be a re subscribe, lets update it\n");
+                res = ul.update_subscriber(presentity_impurecord, &reg_subscriber, &expires_time, 0, 0);
+                if (res != 1) {
+                    LM_ERR("Failed to update subscription - expires is %d\n", expires_time);
+                    ul.unlock_udomain(domain, &presentity_uri);
+                    ret = CSCF_RETURN_FALSE;
+                    goto doneorerror;
+                }
+            } else {
+                LM_ERR("Re-subscribe for same watcher_contact, presentity_uri, event but with different callid [%.*s], fromtag [%.*s] and totag [%.*s] for presentity [%.*s] and watcher contact [%.*s] - What happened?\n",
+                        subscriber_data.callid->len, subscriber_data.callid->s,
+                        subscriber_data.ftag->len, subscriber_data.ftag->s,
+                        subscriber_data.ttag->len, subscriber_data.ttag->s,
+                        presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s,
+                        subscriber_data.watcher_contact->len, subscriber_data.watcher_contact->s);
+                LM_DBG("Removing old subscriber and adding new one\n");
+                subscriber_data.presentity_uri = &presentity_impurecord->public_identity;
+                ul.external_delete_subscriber(reg_subscriber, (udomain_t*) _t, 0 /*domain is already locked*/);
+                res = ul.add_subscriber(presentity_impurecord, &subscriber_data, &reg_subscriber, 0 /*not a db_load*/);
+                if (res != 0) {
+                    LM_ERR("Failed to add new subscription\n");
+                    ul.unlock_udomain(domain, &presentity_uri);
+                    ret = CSCF_RETURN_FALSE;
+                    goto doneorerror;
+                }
+            }
         }
 
         ul.unlock_udomain(domain, &presentity_uri);
@@ -1192,13 +1208,13 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
         subscribe_reply(msg, 200, MSG_REG_SUBSCRIBE_OK, &expires, &scscf_name_str);
 
         //do reg event every time you get a subscribe
-	if (event_reg(domain, 0, 0, event_type, &presentity_uri, &watcher_contact) != 0) {
-	    LM_ERR("failed adding notification for reg events\n");
-	    ret = CSCF_RETURN_ERROR;
-	    goto error;
-	} else {
-	    LM_DBG("success adding notification for reg events\n");
-	}
+        if (event_reg(domain, 0, event_type, &presentity_uri, &watcher_contact) != 0) {
+            LM_ERR("failed adding notification for reg events\n");
+            ret = CSCF_RETURN_ERROR;
+            goto doneorerror;
+        } else {
+            LM_DBG("success adding notification for reg events\n");
+        }
     } else {
         event_type = IMS_REGISTRAR_UNSUBSCRIBE;
         LM_DBG("expires is zero or less - UNSUBSCRIBE");
@@ -1208,7 +1224,7 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
         if (res != 0) {
             LM_DBG("usrloc does not have imprecord for presnetity being subscribed too, we should create one.... TODO\n");
             ul.unlock_udomain(domain, &presentity_uri);
-            goto error;
+            goto doneorerror;
         }
         LM_DBG("Received impurecord for presentity being unsubscribed to [%.*s]\n", presentity_impurecord->public_identity.len, presentity_impurecord->public_identity.s);
         //        //get the subscription if it exists
@@ -1219,27 +1235,22 @@ int subscribe_to_reg(struct sip_msg *msg, char *_t, char *str2) {
             LM_WARN("could not get subscriber\n");
             ret = CSCF_RETURN_FALSE;
             ul.unlock_udomain(domain, &presentity_uri);
-            goto error;
+            goto doneorerror;
         } else {
             LM_DBG("subscription s exists");
             LM_DBG("deleting subscriber from usrloc");
             ul.external_delete_subscriber(reg_subscriber, (udomain_t*) _t, 0 /*domain is already locked*/);
-	    ul.unlock_udomain(domain, &presentity_uri);
+            ul.unlock_udomain(domain, &presentity_uri);
         }
         ret = CSCF_RETURN_TRUE;
         LM_DBG("Sending 200 OK to subscribing user");
         subscribe_reply(msg, 200, MSG_REG_UNSUBSCRIBE_OK, &expires, &scscf_name_str);
     }
 
+doneorerror:
     //free memory
     if (presentity_uri.s) shm_free(presentity_uri.s); // shm_malloc in cscf_get_public_identity_from_requri or get_presentity_from_subscriber_dialog
     if (record_route.s) pkg_free(record_route.s);
-    return ret;
-error:
-    //free memory
-    if (presentity_uri.s) shm_free(presentity_uri.s); // shm_malloc in cscf_get_public_identity_from_requri or get_presentity_from_subscriber_dialog
-    if (record_route.s) pkg_free(record_route.s);
-
     return ret;
 }
 
@@ -1302,30 +1313,30 @@ int subscribe_reply(struct sip_msg *msg, int code, char *text, int *expires, str
 
 /* function to convert contact aor to only have data after @ - ie strip user part */
 int aor_to_contact(str* aor, str* contact) {
-	char* p;
-	int ret = 0;	//success
+    char* p;
+    int ret = 0; //success
 
-	contact->s = aor->s;
-	contact->len = aor->len;
-	if (memcmp(aor->s, "sip:", 4) == 0) {
-		contact->s = aor->s + 4;
-		contact->len-=4;
-	}
+    contact->s = aor->s;
+    contact->len = aor->len;
+    if (memcmp(aor->s, "sip:", 4) == 0) {
+        contact->s = aor->s + 4;
+        contact->len -= 4;
+    }
 
-	if ((p=memchr(contact->s, '@', contact->len))) {
-		contact->len -= (p - contact->s + 1);
-		contact->s = p+1;
-	}
+    if ((p = memchr(contact->s, '@', contact->len))) {
+        contact->len -= (p - contact->s + 1);
+        contact->s = p + 1;
+    }
 
-	if ((p=memchr(contact->s, ';', contact->len))) {
-		contact->len = p - contact->s;
-	}
+    if ((p = memchr(contact->s, ';', contact->len))) {
+        contact->len = p - contact->s;
+    }
 
-	if ((p=memchr(contact->s, '>', contact->len))) {
-		contact->len = p - contact->s;
-	}
+    if ((p = memchr(contact->s, '>', contact->len))) {
+        contact->len = p - contact->s;
+    }
 
-	return ret;
+    return ret;
 }
 
 /*!
@@ -1335,13 +1346,13 @@ int aor_to_contact(str* aor, str* contact) {
  * \return ptr on successfull match, 0 when they not match
  */
 int contact_port_ip_match(str *c1, str *c2) {
-    
+
     str ip_port1, ip_port2;
-    aor_to_contact(c1, &ip_port1);//strip userpart from test contact
-    aor_to_contact(c2, &ip_port2);//strip userpart from test contact
+    aor_to_contact(c1, &ip_port1); //strip userpart from test contact
+    aor_to_contact(c2, &ip_port2); //strip userpart from test contact
     LM_DBG("Matching contact using only port and ip - comparing [%.*s] and [%.*s]\n", ip_port1.len, ip_port1.s, ip_port2.len, ip_port2.s);
     if ((ip_port1.len == ip_port2.len) && !memcmp(ip_port1.s, ip_port2.s, ip_port1.len)) {
-	return 1;
+        return 1;
     }
     return 0;
 }
@@ -1356,7 +1367,7 @@ static str subs_active = {"active;expires=", 15};
  * @param content - the body content
  * @param expires - the remaining subcription expiration time in seconds
  */
-void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_passed, str *presentity_uri, str *watcher_contact, str content, int event_type) {
+void create_notifications(udomain_t* _t, impurecord_t* r_passed, str *presentity_uri, str *watcher_contact, str* impus, int num_impus, int event_type) {
 
     reg_notification *n;
     reg_subscriber *s;
@@ -1375,7 +1386,7 @@ void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_p
 
     LM_DBG("Creating notification");
 
-    if (r_passed && c_passed && !presentity_uri && !watcher_contact) {
+    if (r_passed && !presentity_uri && !watcher_contact) {
         LM_DBG("r_passed and c_passed are valid and presentity uri and watcher_contact is 0 - this must be a ul callback no need to lock domain");
         r = r_passed;
 
@@ -1397,7 +1408,7 @@ void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_p
 
         if (s->expires > act_time) {
             LM_DBG("Expires is greater than current time!");
-            subscription_state.s = pkg_malloc(32);
+            subscription_state.s = (char*) pkg_malloc(32 * sizeof (char*));
             subscription_state.len = 0;
             if (subscription_state.s) {
 
@@ -1414,21 +1425,22 @@ void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_p
             LM_DBG("Subscription state: [%.*s]", subscription_state.len, subscription_state.s);
         }
 
-	//This is a fix to ensure that when a user subscribes a full reg info is only sent to that UE
+        //This is a fix to ensure that when a user subscribes a full reg info is only sent to that UE
         if (event_type == IMS_REGISTRAR_SUBSCRIBE) {
-	    if (contact_port_ip_match(watcher_contact, &s->watcher_contact) &&
+            if (contact_port_ip_match(watcher_contact, &s->watcher_contact) &&
                     (presentity_uri->len == s->presentity_uri.len) && (memcmp(s->presentity_uri.s, presentity_uri->s, presentity_uri->len) == 0)) {
                 LM_DBG("This is a fix to ensure that we only send full reg info XML to the UE that just subscribed");
                 LM_DBG("about to make new notification!");
-		
-		LM_DBG("we always increment the local cseq and version before we send a new notification\n");
-		
-		local_cseq = s->local_cseq + 1;
-		version = s->version + 1;
-		ul.update_subscriber(r, &s, 0, &local_cseq, &version);
-		
-                n = new_notification(subscription_state, content_type, content, s);
+
+                LM_DBG("we always increment the local cseq and version before we send a new notification\n");
+
+                local_cseq = s->local_cseq + 1;
+                version = s->version + 1;
+                ul.update_subscriber(r, &s, 0, &local_cseq, &version);
+
+                n = new_notification(subscription_state, content_type, &impus, num_impus, s);
                 if (n) {
+                    n->_d = _t;
                     LM_DBG("Notification exists - about to add it");
                     add_notification(n);
                 } else {
@@ -1436,33 +1448,34 @@ void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_p
                 }
             }
         } else {
-	    
-	    if(event_type == IMS_REGISTRAR_CONTACT_UNREGISTERED && !ue_unsubscribe_on_dereg && 
-		    (contact_port_ip_match(&c_passed->c, &s->watcher_contact) &&
-	                (r_passed->public_identity.len == s->presentity_uri.len) && (memcmp(s->presentity_uri.s, r_passed->public_identity.s, r_passed->public_identity.len) == 0))){
-		//if this is UNREGISTER and the UEs do not unsubscribe to dereg and this is a UE subscribing to its own reg event
-		//then we do not send notifications
-		LM_DBG("This is a UNREGISTER event for a UE that subscribed to its own state that does not unsubscribe to dereg - therefore no notification");
-	    }
-	    else{
-		LM_DBG("about to make new notification!");
-		
-		LM_DBG("we always increment the local cseq and version before we send a new notification\n");
-		
-		local_cseq = s->local_cseq + 1;
-		version = s->version + 1;
-		ul.update_subscriber(r, &s, 0, &local_cseq, &version);
-		
-		n = new_notification(subscription_state, content_type, content, s);
-		if (n) {
-		    LM_DBG("Notification exists - about to add it");
-		    add_notification(n);
 
-		} else {
-		    LM_DBG("Notification does not exist");
-		}
-	    }
-	}
+            //TODO: we must make this optimisation to not send NOTIFYs back to UE's *(they may have disappeared)
+//            if (event_type == IMS_REGISTRAR_CONTACT_UNREGISTERED && !ue_unsubscribe_on_dereg /*&&
+//                    (contact_port_ip_match(&c_passed->c, &s->watcher_contact) */
+//                    && (r_passed->public_identity.len == s->presentity_uri.len) && (memcmp(s->presentity_uri.s, r_passed->public_identity.s, r_passed->public_identity.len) == 0)) {
+//                //if this is UNREGISTER and the UEs do not unsubscribe to dereg and this is a UE subscribing to its own reg event
+//                //then we do not send notifications
+//                LM_DBG("This is a UNREGISTER event for a UE that subscribed to its own state that does not unsubscribe to dereg - therefore no notification");
+//            } else {
+                LM_DBG("about to make new notification!");
+
+                LM_DBG("we always increment the local cseq and version before we send a new notification\n");
+
+                local_cseq = s->local_cseq + 1;
+                version = s->version + 1;
+                ul.update_subscriber(r, &s, 0, &local_cseq, &version);
+
+            n = new_notification(subscription_state, content_type, &impus, num_impus, s);
+            if (n) {
+                n->_d = _t;
+                LM_DBG("Notification exists - about to add it");
+                add_notification(n);
+
+            } else {
+                LM_DBG("Notification does not exist");
+            }
+            //            }
+        }
         s = s->next;
 
         if (subscription_state.s) {
@@ -1489,22 +1502,23 @@ static str param_expires = {"expires", 7};
 static str param_sip_instance = {"+sip.instance", 13};
 static str param_3gpp_smsip = {"+g.3gpp.smsip", 13};
 static str param_3gpp_icsi_ref = {"+g.3gpp.icsi-ref", 16};
+
 int inline supported_param(str *param_name) {
-    
-    if(strncasecmp(param_name->s, param_q.s, param_name->len) == 0) {
-	return 0;
+
+    if (strncasecmp(param_name->s, param_q.s, param_name->len) == 0) {
+        return 0;
     } else if (strncasecmp(param_name->s, param_video.s, param_name->len) == 0) {
-	return 0;
+        return 0;
     } else if (strncasecmp(param_name->s, param_expires.s, param_name->len) == 0) {
-	return 0;
+        return 0;
     } else if (strncasecmp(param_name->s, param_sip_instance.s, param_name->len) == 0) {
-	return 0;
+        return 0;
     } else if (strncasecmp(param_name->s, param_3gpp_smsip.s, param_name->len) == 0) {
-	return 0;
+        return 0;
     } else if (strncasecmp(param_name->s, param_3gpp_icsi_ref.s, param_name->len) == 0) {
-	return 0;
+        return 0;
     } else {
-	return -1;
+        return -1;
     }
 }
 
@@ -1540,6 +1554,77 @@ static str contact_e = {"\t\t</contact>\n", 13};
 static str uri_s = {"\t\t\t<uri>", 8};
 static str uri_e = {"</uri>\n", 7};
 
+static void process_xml_for_contact(str* buf, str* pad, ucontact_t* ptr) {
+    int expires;
+    param_t *param;
+
+    if (ptr->state == CONTACT_DELETED)
+        return; 
+    
+    expires = ptr->expires - act_time;
+    if (expires < 0 || (ptr->state == CONTACT_DELETE_PENDING) || (ptr->state == CONTACT_EXPIRE_PENDING_NOTIFY)) {
+        LM_WARN("Contact expires is negative - setting to 0\n");
+        expires = 0;
+    }
+    if (expires == 0) {
+        if (ptr->q != -1) {
+            float q = (float) ptr->q / 1000;
+            sprintf(pad->s, contact_s_q.s, ptr, r_terminated.len, r_terminated.s,
+                    r_expired.len, r_expired.s, expires, q);
+        } else {
+            sprintf(pad->s, contact_s_q.s, ptr, r_terminated.len, r_terminated.s,
+                    r_expired.len, r_expired.s, expires);
+        }
+    } else {
+        if (ptr->q != -1) {
+            float q = (float) ptr->q / 1000;
+            sprintf(pad->s, contact_s_q.s, ptr, r_active.len, r_active.s,
+                    r_registered.len, r_registered.s, expires,
+                    q);
+        } else {
+            sprintf(pad->s, contact_s_q.s, ptr, r_active.len, r_active.s,
+                    r_registered.len, r_registered.s, expires);
+        }
+    }
+
+    pad->len = strlen(pad->s);
+    STR_APPEND(*buf, *pad);
+    STR_APPEND(*buf, uri_s);
+
+    LM_DBG("Appending contact address: <%.*s>", ptr->c.len, ptr->c.s);
+
+    STR_APPEND(*buf, (ptr->c));
+    STR_APPEND(*buf, uri_e);
+
+    param = ptr->params;
+    while (param) {
+        if (supported_param(&param->name) != 0) {
+            param = param->next;
+            continue;
+        }
+
+        if (param->body.len > 0) {
+            LM_DBG("This contact has params name: [%.*s] body [%.*s]\n", param->name.len, param->name.s, param->body.len, param->body.s);
+            if (param->body.s[0] == '<' && param->body.s[param->body.len - 1] == '>') {
+                LM_DBG("This param body starts with '<' and ends with '>' we will clean these for the NOTIFY XML with &lt; and &gt;\n");
+                sprintf(pad->s, contact_s_params_with_body_fix.s, param->name.len, param->name.s, param->body.len - 2, param->body.s + 1);
+            } else {
+                sprintf(pad->s, contact_s_params_with_body.s, param->name.len, param->name.s, param->body.len, param->body.s);
+            }
+
+            pad->len = strlen(pad->s);
+            STR_APPEND(*buf, *pad);
+        } else {
+            LM_DBG("This contact has params name: [%.*s] \n", param->name.len, param->name.s);
+            sprintf(pad->s, contact_s_params_no_body.s, param->name.len, param->name.s);
+            pad->len = strlen(pad->s);
+            STR_APPEND(*buf, *pad);
+        }
+        param = param->next;
+    }
+    STR_APPEND(*buf, contact_e);
+}
+
 /**
  * Creates the full reginfo XML.
  * @param pv - the r_public to create for
@@ -1548,24 +1633,21 @@ static str uri_e = {"</uri>\n", 7};
  * @returns the str with the XML content
  * if its a new subscription we do things like subscribe to updates on IMPU, etc
  */
-str generate_reginfo_full(udomain_t* _t, str* impu_list, int num_impus, str *primary_impu, int primary_locked) {
+str generate_reginfo_full(udomain_t* _t, str* impu_list, int num_impus) {
     str x = {0, 0};
     str buf, pad;
     char bufc[MAX_REGINFO_SIZE], padc[MAX_REGINFO_SIZE];
     impurecord_t *r;
     int i, j, res;
     ucontact_t* ptr;
-    param_t *param;
 
     buf.s = bufc;
     buf.len = 0;
     pad.s = padc;
     pad.len = 0;
-    
-    int domain_locked = 1;
+    get_act_time();
+//    int domain_locked = 1;
     int terminate_impu = 1;
-    
-    int expires;
 
     LM_DBG("Getting reginfo_full");
 
@@ -1575,132 +1657,71 @@ str generate_reginfo_full(udomain_t* _t, str* impu_list, int num_impus, str *pri
     STR_APPEND(buf, pad);
 
     for (i = 0; i < num_impus; i++) {
-	LM_DBG("Scrolling through public identities, current one <%.*s>", impu_list[i].len, impu_list[i].s);
-	if(primary_locked && strncasecmp(impu_list[i].s, primary_impu->s, impu_list[i].len) == 0) {
-	    LM_DBG("Don't need to lock this impu [%.*s]  as its a ulcallback so already locked\n", impu_list[i].len, impu_list[i].s);
-	    domain_locked = 0;
-	} else {
-	    LM_DBG("Need to lock this impu\n");
-	    ul.lock_udomain(_t, &impu_list[i]);
-	    domain_locked = 1;
-	}
-	
-	res = ul.get_impurecord(_t, &(impu_list[i]), &r);
-	if (res != 0) {
-	    LM_WARN("impu disappeared, ignoring it\n");
-	    if(domain_locked) {
-		ul.unlock_udomain(_t, &impu_list[i]);
-	    }
-	    continue;
-	}
-	
+        LM_DBG("Scrolling through public identities, current one <%.*s>", impu_list[i].len, impu_list[i].s);
+//        if (primary_locked && strncasecmp(impu_list[i].s, primary_impu->s, impu_list[i].len) == 0) {
+//            LM_DBG("Don't need to lock this impu [%.*s]  as its a ul callback so already locked\n", impu_list[i].len, impu_list[i].s);
+//            domain_locked = 0;
+//        } else {
+//            LM_DBG("Need to lock this impu\n");
+//            ul.lock_udomain(_t, &impu_list[i]);
+//            domain_locked = 1;
+//        }
+
+        ul.lock_udomain(_t, &impu_list[i]);
+        
+        res = ul.get_impurecord(_t, (&impu_list[i]), &r);
+        if (res != 0) {
+            LM_WARN("impu disappeared, ignoring it\n");
+//            if (domain_locked) {
+                ul.unlock_udomain(_t, &impu_list[i]);
+//            }
+            continue;
+        }
+        //        domain_locked = 1;
+
         LM_DBG("Retrieved IMPU record");
-	
-	j=0;
-	terminate_impu = 1;
-	while (j<MAX_CONTACTS_PER_IMPU && (ptr=r->newcontacts[j])) {
-	    if (((ptr->expires - act_time) > 0)) {
-		LM_DBG("IMPU <%.*s> has another active contact <%.*s> so will set its state to active\n",
-			r->public_identity.len, r->public_identity.s, ptr->c.len, ptr->c.s);
-		terminate_impu = 0;
-		break;
-	    }
-	    j++;
-	}
-	if(terminate_impu) {
-	    LM_DBG("IMPU reg state has no active contacts so putting in status terminated");
+
+        j = 0;
+        terminate_impu = 1;
+        while (j < MAX_CONTACTS_PER_IMPU && (ptr = r->newcontacts[j])) {
+            if (VALID_CONTACT(ptr, act_time)) {
+                LM_DBG("IMPU <%.*s> has another active contact <%.*s> so will set its state to active\n",
+                        r->public_identity.len, r->public_identity.s, ptr->c.len, ptr->c.s);
+                terminate_impu = 0;
+                break;
+            }
+            j++;
+        }
+        if (terminate_impu) {
+            LM_DBG("IMPU reg state has no active contacts so putting in status terminated");
             sprintf(pad.s, registration_s.s, r->public_identity.len,
                     r->public_identity.s, r, r_terminated.len,
                     r_terminated.s);
-	} else {
-	    LM_DBG("IMPU has active contacts so putting in status active");
+        } else {
+            LM_DBG("IMPU has active contacts so putting in status active");
             sprintf(pad.s, registration_s.s, r->public_identity.len,
                     r->public_identity.s, r, r_active.len, r_active.s);
-	}
+        }
 
         pad.len = strlen(pad.s);
         STR_APPEND(buf, pad);
-        
-	j=0;
-	LM_DBG("Scrolling through contact for this IMPU");
-	while (j < MAX_CONTACTS_PER_IMPU && (ptr = r->newcontacts[j])) {
-	    if (ptr->q != -1) {
-		LM_DBG("q value not equal to -1");
-		float q = (float) ptr->q / 1000;
-		expires = ptr->expires - act_time;
-		if(expires < 0) {
-		    LM_WARN("Contact expires is negative - setting to 0\n");
-		    expires = 0;
-		}
-		if(expires == 0) {
-		    sprintf(pad.s, contact_s_q.s, ptr, r_terminated.len, r_terminated.s,
-			r_expired.len, r_expired.s, expires,
-			q);
-		} else {
-		    sprintf(pad.s, contact_s_q.s, ptr, r_active.len, r_active.s,
-			r_registered.len, r_registered.s, expires,
-			q);
-		}
-		
-	    } else {
-		LM_DBG("q value equal to -1");
-		expires = ptr->expires - act_time;
-		if(expires < 0) {
-		    LM_WARN("Contact expires is negative - setting to 0\n");
-		    expires = 0;
-		}
-		if(expires == 0) {
-		    sprintf(pad.s, contact_s_q.s, ptr, r_terminated.len, r_terminated.s,
-			r_expired.len, r_expired.s, expires);
-		} else {
-		    sprintf(pad.s, contact_s_q.s, ptr, r_active.len, r_active.s,
-			r_registered.len, r_registered.s, expires);
-		}
-	    }
-	    pad.len = strlen(pad.s);
-	    STR_APPEND(buf, pad);
-	    STR_APPEND(buf, uri_s);
-	    
-	    LM_DBG("Appending contact address: <%.*s>", ptr->c.len, ptr->c.s);
 
-	    STR_APPEND(buf, (ptr->c));
-	    STR_APPEND(buf, uri_e);
-	    
-	    param = ptr->params;
-	    while (param) {
-			if (supported_param(&param->name) != 0) { 
-				param = param->next;
-				continue;
-			}
-		
-		if(param->body.len > 0) {
-		    LM_DBG("This contact has params name: [%.*s] body [%.*s]\n", param->name.len, param->name.s, param->body.len, param->body.s);
-		    if (param->body.s[0] == '<' && param->body.s[param->body.len -1] == '>') {
-			LM_DBG("This param body starts with '<' and ends with '>' we will clean these for the NOTIFY XML with &lt; and &gt;\n");
-			sprintf(pad.s, contact_s_params_with_body_fix.s, param->name.len, param->name.s, param->body.len - 2, param->body.s + 1);
-		    } else {
-			sprintf(pad.s, contact_s_params_with_body.s, param->name.len, param->name.s, param->body.len, param->body.s);
-		    }
-		    
-		    pad.len = strlen(pad.s);
-		    STR_APPEND(buf, pad);
-		} else {
-		    LM_DBG("This contact has params name: [%.*s] \n", param->name.len, param->name.s);
-		    sprintf(pad.s, contact_s_params_no_body.s, param->name.len, param->name.s);
-		    pad.len = strlen(pad.s);
-		    STR_APPEND(buf, pad);
-		}
-		param = param->next;
-	    }
-	    STR_APPEND(buf, contact_e);
-	    j++;
-	}
-	
+        j = 0;
+        LM_DBG("Scrolling through contact for this IMPU");
+//        if (contact && !domain_locked /* we're dealing with the primary impu most likely related to de-reg */) {
+//            LM_DBG("We're dealing with the primary IMPU here AND a contact was passed in - must have been an explicit dereg\n");
+//            process_xml_for_contact(&buf, &pad, contact); //we do this because in the unlink_contact_from_impu the contact has already gone so we pass it in as a param...
+//        }
+        while (j < MAX_CONTACTS_PER_IMPU && (ptr = r->newcontacts[j])) {
+            process_xml_for_contact(&buf, &pad, ptr);
+            j++;
+        }
+
         STR_APPEND(buf, registration_e);
 
-	if(domain_locked) {
-	    ul.unlock_udomain(_t, &impu_list[i]);
-	}
+//        if (domain_locked) {
+            ul.unlock_udomain(_t, &impu_list[i]);
+//        }
     }
 
     STR_APPEND(buf, r_reginfo_e);
@@ -1710,6 +1731,8 @@ str generate_reginfo_full(udomain_t* _t, str* impu_list, int num_impus, str *pri
         x.len = buf.len;
         memcpy(x.s, buf.s, buf.len);
         x.s[x.len] = 0;
+    } else {
+        LM_ERR("no more pkg memory\n");
     }
 
     LM_DBG("Returned full reg-info: [%.*s]", x.len, x.s);
@@ -1736,7 +1759,7 @@ str get_reginfo_partial(impurecord_t *r, ucontact_t *c, int event_type) {
     ucontact_t *c_tmp;
     str state, event;
     param_t *param;
-    
+
     buf.s = bufc;
     buf.len = 0;
     pad.s = padc;
@@ -1750,37 +1773,36 @@ str get_reginfo_partial(impurecord_t *r, ucontact_t *c, int event_type) {
 
     if (r) {
         expires = c->expires - act_time;
-	if(expires < 0) {
-	    LM_WARN("Contact expires is negative - setting to 0\n");
-	    expires = 0;
-	}
-	
+        if (expires < 0) {
+            LM_WARN("Contact expires is negative - setting to 0\n");
+            expires = 0;
+        }
+
         if (//richard we only use expired and unregistered
                 (event_type == IMS_REGISTRAR_CONTACT_EXPIRED ||
                 event_type == IMS_REGISTRAR_CONTACT_UNREGISTERED)
-                ){
-	    //check if impu record has any other active contacts - if not then set this to terminated - if so then keep this active
-	    //check if asserted is present in any of the path headers
-	    
-	    
-	    i=0;
-	    while (i<MAX_CONTACTS_PER_IMPU && (c_tmp=r->newcontacts[i])) {
-		if ((strncasecmp(c_tmp->c.s, c->c.s, c_tmp->c.len) != 0) && ((c_tmp->expires - act_time) > 0)) {
-		    LM_DBG("IMPU <%.*s> has another active contact <%.*s> so will set its state to active\n",
-			    r->public_identity.len, r->public_identity.s, c_tmp->c.len, c_tmp->c.s);
-		    terminate_impu = 0;
-		    break;
-		}
-		i++;
-	    }
-	    if(terminate_impu)
-		sprintf(pad.s, registration_s.s, r->public_identity.len, r->public_identity.s, r, r_terminated.len, r_terminated.s);
-	    else
-		sprintf(pad.s, registration_s.s, r->public_identity.len, r->public_identity.s, r, r_active.len, r_active.s);
-	}
-        else{
-	    sprintf(pad.s, registration_s.s, r->public_identity.len, r->public_identity.s, r, r_active.len, r_active.s);
-	}
+                ) {
+            //check if impu record has any other active contacts - if not then set this to terminated - if so then keep this active
+            //check if asserted is present in any of the path headers
+
+
+            i = 0;
+            while (i < MAX_CONTACTS_PER_IMPU && (c_tmp = r->newcontacts[i])) {
+                if ((strncasecmp(c_tmp->c.s, c->c.s, c_tmp->c.len) != 0) && ((c_tmp->expires - act_time) > 0)) {
+                    LM_DBG("IMPU <%.*s> has another active contact <%.*s> so will set its state to active\n",
+                            r->public_identity.len, r->public_identity.s, c_tmp->c.len, c_tmp->c.s);
+                    terminate_impu = 0;
+                    break;
+                }
+                i++;
+            }
+            if (terminate_impu)
+                sprintf(pad.s, registration_s.s, r->public_identity.len, r->public_identity.s, r, r_terminated.len, r_terminated.s);
+            else
+                sprintf(pad.s, registration_s.s, r->public_identity.len, r->public_identity.s, r, r_active.len, r_active.s);
+        } else {
+            sprintf(pad.s, registration_s.s, r->public_identity.len, r->public_identity.s, r, r_active.len, r_active.s);
+        }
 
         pad.len = strlen(pad.s);
         STR_APPEND(buf, pad);
@@ -1812,7 +1834,7 @@ str get_reginfo_partial(impurecord_t *r, ucontact_t *c, int event_type) {
             }
             if (c->q != -1) {
                 float q = (float) c->q / 1000;
-		sprintf(pad.s, contact_s_q.s, c, state.len, state.s, event.len, event.s, expires, q);
+                sprintf(pad.s, contact_s_q.s, c, state.len, state.s, event.len, event.s, expires, q);
             } else
                 sprintf(pad.s, contact_s.s, c, state.len, state.s, event.len, event.s, expires);
             pad.len = strlen(pad.s);
@@ -1820,30 +1842,30 @@ str get_reginfo_partial(impurecord_t *r, ucontact_t *c, int event_type) {
             STR_APPEND(buf, uri_s);
             STR_APPEND(buf, (c->c));
             STR_APPEND(buf, uri_e);
-	    
-	    param = c->params;
-	    while (param && supported_param(&param->name) == 0) {
-		
-		if(param->body.len > 0) {
-		    LM_DBG("This contact has params name: [%.*s] body [%.*s]\n", param->name.len, param->name.s, param->body.len, param->body.s);
-		    if (param->body.s[0] == '<' && param->body.s[param->body.len -1] == '>') {
-			LM_DBG("This param body starts with '<' and ends with '>' we will clean these for the NOTIFY XML with &lt; and &gt;\n");
-			sprintf(pad.s, contact_s_params_with_body_fix.s, param->name.len, param->name.s, param->body.len - 2, param->body.s + 1);
-		    } else {
-			sprintf(pad.s, contact_s_params_with_body.s, param->name.len, param->name.s, param->body.len, param->body.s);
-		    }
-		    
-		    pad.len = strlen(pad.s);
-		    STR_APPEND(buf, pad);
-		} else {
-		    LM_DBG("This contact has params name: [%.*s] \n", param->name.len, param->name.s);
-		    sprintf(pad.s, contact_s_params_no_body.s, param->name.len, param->name.s);
-		    pad.len = strlen(pad.s);
-		    STR_APPEND(buf, pad);
-		}
-		param = param->next;
-	    }
-	    
+
+            param = c->params;
+            while (param && supported_param(&param->name) == 0) {
+
+                if (param->body.len > 0) {
+                    LM_DBG("This contact has params name: [%.*s] body [%.*s]\n", param->name.len, param->name.s, param->body.len, param->body.s);
+                    if (param->body.s[0] == '<' && param->body.s[param->body.len - 1] == '>') {
+                        LM_DBG("This param body starts with '<' and ends with '>' we will clean these for the NOTIFY XML with &lt; and &gt;\n");
+                        sprintf(pad.s, contact_s_params_with_body_fix.s, param->name.len, param->name.s, param->body.len - 2, param->body.s + 1);
+                    } else {
+                        sprintf(pad.s, contact_s_params_with_body.s, param->name.len, param->name.s, param->body.len, param->body.s);
+                    }
+
+                    pad.len = strlen(pad.s);
+                    STR_APPEND(buf, pad);
+                } else {
+                    LM_DBG("This contact has params name: [%.*s] \n", param->name.len, param->name.s);
+                    sprintf(pad.s, contact_s_params_no_body.s, param->name.len, param->name.s);
+                    pad.len = strlen(pad.s);
+                    STR_APPEND(buf, pad);
+                }
+                param = param->next;
+            }
+
             STR_APPEND(buf, contact_e);
             STR_APPEND(buf, registration_e);
         }
@@ -1885,12 +1907,37 @@ static int free_tm_dlg(dlg_t * td) {
 
 void send_notification(reg_notification * n) {
     str h = {0, 0};
-
+    str content = {0, 0};
     uac_req_t uac_r;
     dlg_t* td = NULL;
+    char bufc[MAX_REGINFO_SIZE];
+    str buf;
+
+    struct udomain* domain = (struct udomain*) n->_d;
+    if (!domain) {
+        ul.register_udomain("location", &domain);
+    }
+
+    LM_DBG("Have a notification to send for the following IMPUs using domain [%.*s]\n", domain->name->len, domain->name->s);
+
+
+    content = generate_reginfo_full(domain, n->impus, n->num_impus);
+    
+    if (content.len > MAX_REGINFO_SIZE) {
+        LM_ERR("content size (%d) exceeds MAX_REGINFO_SIZE (%d)!\n", content.len, MAX_REGINFO_SIZE);
+        if (content.s) {
+            pkg_free(content.s);
+        }
+        return;
+    }
+
+    sprintf(bufc, content.s, n->reginfo_s_version);
+    buf.s = bufc;
+    buf.len = strlen(bufc);
 
     str method = {"NOTIFY", 6};
 
+    LM_DBG("Notification content: [%.*s]", buf.len, buf.s);
     LM_DBG("DBG:send_notification: NOTIFY about <%.*s>\n", n->watcher_uri.len, n->watcher_uri.s);
 
     h.len = 0;
@@ -1930,17 +1977,18 @@ void send_notification(reg_notification * n) {
     if (td == NULL) {
         LM_ERR("while building dlg_t structure\n");
         free_tm_dlg(td);
+        if (content.s) {
+            pkg_free(content.s);
+        }
         return;
     }
 
-
-    if (n->content.len) {
-
+    if (buf.len) {
         LM_DBG("Notification content exists - about to send notification with subscription state: [%.*s] content_type: [%.*s] content: [%.*s] : presentity_uri: [%.*s] watcher_uri: [%.*s]",
-                n->subscription_state.len, n->subscription_state.s, n->content_type.len, n->content_type.s, n->content.len, n->content.s,
+                n->subscription_state.len, n->subscription_state.s, n->content_type.len, n->content_type.s, buf.len, buf.s,
                 n->presentity_uri.len, n->presentity_uri.s, n->watcher_uri.len, n->watcher_uri.s);
 
-        set_uac_req(&uac_r, &method, &h, &n->content, td, TMCB_LOCAL_COMPLETED,
+        set_uac_req(&uac_r, &method, &h, &buf, td, TMCB_LOCAL_COMPLETED,
                 uac_request_cb, 0);
         tmb.t_request_within(&uac_r);
     } else {
@@ -1954,6 +2002,10 @@ void send_notification(reg_notification * n) {
         tmb.t_request_within(&uac_r);
     }
     if (h.s) pkg_free(h.s);
+    if (content.s) {
+        pkg_free(content.s);
+    }
+    
     free_tm_dlg(td);
 
 }
@@ -1970,28 +2022,17 @@ void send_notification(reg_notification * n) {
  * @returns the r_notification or NULL on error
  */
 reg_notification * new_notification(str subscription_state,
-        str content_type, str content, reg_subscriber * r) {
-
+        str content_type, str** impus, int num_impus, reg_subscriber * r) {
+    int i;
     reg_notification *n = 0;
-
-    str buf;
-    char bufc[MAX_REGINFO_SIZE];
-
-    if (content.len > MAX_REGINFO_SIZE) {
-        LM_ERR("content size (%d) exceeds MAX_REGINFO_SIZE (%d)!\n", content.len, MAX_REGINFO_SIZE);
-        return 0;
-    }
-
-    sprintf(bufc, content.s, r->version);
-    buf.s = bufc;
-    buf.len = strlen(bufc);
-
-
     int len;
     char *p;
 
     len = sizeof (reg_notification) + r->call_id.len + r->from_tag.len + r->to_tag.len + r->watcher_uri.len + r->watcher_contact.len +
-            r->record_route.len + r->sockinfo_str.len + r->presentity_uri.len + subscription_state.len + content_type.len + buf.len;
+            r->record_route.len + r->sockinfo_str.len + r->presentity_uri.len + subscription_state.len + content_type.len + (num_impus)*sizeof(str); // + buf.len;
+    for (i=0; i<num_impus; i++) {
+        len += (*impus)[i].len;
+    }
 
     LM_DBG("Creating new notification");
 
@@ -2004,6 +2045,8 @@ reg_notification * new_notification(str subscription_state,
 
     p = (char*) (n + 1);
     
+    n->reginfo_s_version = r->version;
+
     n->local_cseq = r->local_cseq;
 
     n->call_id.s = p;
@@ -2066,12 +2109,17 @@ reg_notification * new_notification(str subscription_state,
     p += content_type.len;
     LM_DBG("Notification content type: [%.*s]", n->content_type.len, n->content_type.s);
 
-    n->content.s = p;
-    n->content.len = buf.len;
-    memcpy(p, buf.s, buf.len);
-    p += buf.len;
-    LM_DBG("Notification content: [%.*s]", n->content.len, n->content.s);
-
+    n->impus = (str*)p;
+    p += sizeof(str)*num_impus;
+    
+    for (i=0; i<num_impus; i++) {
+        n->impus[i].s = p;
+        memcpy(p, (*impus)[i].s, (*impus)[i].len);
+        n->impus[i].len = (*impus)[i].len;
+        p += (*impus)[i].len;
+    }
+    n->num_impus = num_impus;
+    
     if (p != (((char*) n) + len)) {
         LM_CRIT("buffer overflow\n");
         free_notification(n);
@@ -2102,17 +2150,17 @@ void add_notification(reg_notification * n) {
     notification_list->tail = n;
     if (!notification_list->head) notification_list->head = n;
     notification_list->size++;
-    if(notification_list_size_threshold > 0 && notification_list->size > notification_list_size_threshold) {
-	    LM_WARN("notification_list is size [%d] and has exceed notification_list_size_threshold of [%d]", notification_list->size, notification_list_size_threshold);
+    if (notification_list_size_threshold > 0 && notification_list->size > notification_list_size_threshold) {
+        LM_WARN("notification_list is size [%d] and has exceed notification_list_size_threshold of [%d]", notification_list->size, notification_list_size_threshold);
     }
-    
+
     sem_release(notification_list->empty);
     lock_release(notification_list->lock);
 }
 
 /**
-* Pop a notification to the list of notifications from the top
-*/
+ * Pop a notification to the list of notifications from the top
+ */
 reg_notification* get_notification() {
     reg_notification * n;
 
@@ -2142,18 +2190,17 @@ reg_notification* get_notification() {
 void notification_event_process() {
 
     reg_notification *n = 0;
-    
+
     LM_DBG("Running notification_event_process");
-    
+
     for (;;) {
         n = get_notification();
-	LM_DBG("About to send notification");
+        LM_DBG("About to send notification");
         send_notification(n);
         LM_DBG("About to free notification");
         free_notification(n);
     }
 }
-
 
 /**
  * Frees up space taken by a notification

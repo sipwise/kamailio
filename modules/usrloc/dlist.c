@@ -85,10 +85,12 @@ static inline int find_dlist(str* _n, dlist_t** _d)
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
+ * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
-								unsigned int part_idx, unsigned int part_max)
+								unsigned int part_idx, unsigned int part_max,
+								int options)
 {
 	struct socket_info *sock;
 	unsigned int dbflags;
@@ -108,9 +110,9 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 	int i;
 	void *cp;
 	int shortage, needed;
-	db_key_t keys1[3]; /* where */
-	db_val_t vals1[3];
-	db_op_t  ops1[3];
+	db_key_t keys1[4]; /* where */
+	db_val_t vals1[4];
+	db_op_t  ops1[4];
 	db_key_t keys2[6]; /* select */
 	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
 
@@ -158,6 +160,14 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 		vals1[n[0]].type = DB1_INT;
 		vals1[n[0]].nul = 0;
 		vals1[n[0]].val.int_val = 1;
+		n[0]++;
+	}
+	if(options&GAU_OPT_SERVER_ID) {
+		keys1[n[0]] = &srv_id_col;
+		ops1[n[0]] = OP_EQ;
+		vals1[n[0]].type = DB1_INT;
+		vals1[n[0]].nul = 0;
+		vals1[n[0]].val.int_val = server_id;
 		n[0]++;
 	}
 
@@ -323,10 +333,12 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
+ * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
-								unsigned int part_idx, unsigned int part_max)
+								unsigned int part_idx, unsigned int part_max,
+								int options)
 {
 	dlist_t *p;
 	urecord_t *r;
@@ -368,6 +380,9 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
 					 * flags set
 					 */
 					if ((c->cflags & flags) != flags)
+						continue;
+
+					if(options&GAU_OPT_SERVER_ID && server_id!=c->server_id)
 						continue;
 
 					if(ul_keepalive_timeout>0 && c->last_keepalive>0)
@@ -468,15 +483,17 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
+ * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 int get_all_ucontacts(void *buf, int len, unsigned int flags,
-								unsigned int part_idx, unsigned int part_max)
+								unsigned int part_idx, unsigned int part_max,
+								int options)
 {
 	if (db_mode==DB_ONLY)
-		return get_all_db_ucontacts( buf, len, flags, part_idx, part_max);
+		return get_all_db_ucontacts( buf, len, flags, part_idx, part_max, options);
 	else
-		return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max);
+		return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max, options);
 }
 
 
@@ -747,6 +764,22 @@ int synchronize_all_udomains(int istart, int istep)
 	return res;
 }
 
+/*!
+ * \brief Run timer handler to clean all domains in db
+ * \return 0 if all timer return 0, != 0 otherwise
+ */
+int ul_db_clean_udomains(void)
+{
+	int res = 0;
+	dlist_t* ptr;
+
+	get_act_time(); /* Get and save actual time */
+
+	for( ptr=root ; ptr ; ptr=ptr->next)
+		res |= db_timer_udomain(ptr->d);
+
+	return res;
+}
 
 /*!
  * \brief Find a particular domain, small wrapper around find_dlist

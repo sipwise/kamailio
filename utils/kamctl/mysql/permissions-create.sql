@@ -1,15 +1,17 @@
-INSERT INTO version (table_name, table_version) values ('trusted','5');
 CREATE TABLE `trusted` (
     `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY NOT NULL,
     `src_ip` VARCHAR(50) NOT NULL,
     `proto` VARCHAR(4) NOT NULL,
     `from_pattern` VARCHAR(64) DEFAULT NULL,
-    `tag` VARCHAR(64)
+    `ruri_pattern` VARCHAR(64) DEFAULT NULL,
+    `tag` VARCHAR(64),
+    `priority` INT DEFAULT 0 NOT NULL
 );
 
 CREATE INDEX peer_idx ON trusted (`src_ip`);
 
-INSERT INTO version (table_name, table_version) values ('address','6');
+INSERT INTO version (table_name, table_version) values ('trusted','6');
+
 CREATE TABLE `address` (
     `id` INT(10) UNSIGNED AUTO_INCREMENT PRIMARY KEY NOT NULL,
     `grp` INT(11) UNSIGNED DEFAULT 1 NOT NULL,
@@ -18,4 +20,6 @@ CREATE TABLE `address` (
     `port` SMALLINT(5) UNSIGNED DEFAULT 0 NOT NULL,
     `tag` VARCHAR(64)
 );
+
+INSERT INTO version (table_name, table_version) values ('address','6');
 

@@ -21,10 +21,13 @@
 
 #include <string.h>
 
+#include "../../sr_module.h"
+
 #include "ts_hash.h"
 #include "ts_handlers.h"
 
 extern struct tm_binds _tmb;
+extern struct ts_table *t_table;
 
 /*!
  * \brief add transaction structure to tm callbacks
@@ -60,6 +63,9 @@ void ts_onreply(struct cell* t, int type, struct tmcb_params *param)
 	ts_urecord_t* _r;
 	ts_entry_t* _e;
 	ts_transaction_t *cb_ptr, *ptr;
+
+	if(t_table==0) return;
+	if((type & (TMCB_DESTROY)) && destroy_modules_phase()) return;
 
 	cb_ptr = (ts_transaction_t*)(*param->param);
 	if (cb_ptr == NULL) {

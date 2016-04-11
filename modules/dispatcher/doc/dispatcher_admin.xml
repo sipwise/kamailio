@@ -18,19 +18,19 @@
 	<para>
 		This module offers SIP load balancer functionality and it can be
 		used as SIP traffic dispatcher. There are many load balancing and
-		traffic dispaching algorithms that you can choose from, like:
+		traffic dispaching algorithms that you can choose from, for example:
 		round-robin, weight based load balancing, call load distribution,
-		hashing over SIP message attributes.
+		and hashing over SIP message attributes.
 	</para>
 	<para>
-		The module can be used as a stateless load balancer, it does not
+		The module can be used as a stateless load balancer; it does not
 		depend on any call state tracking module. It requires the TM module if
 		you enable auto-discovery of active/inactive gateways.
 	</para>
 	<para>
 		It is very lightweight, therefore suitable for handling heavy SIP
-		traffic. The module has a small footprint and ability to load balancing rules
-		from a text plain file makes it suitable for embedded systems.
+		traffic. As the module has a small footprint and the ability to load 
+		balancing rules from a plain text file, it is suitable for embedded systems.
 	</para>
 	</section>
 	<section>
@@ -636,6 +636,14 @@ modparam("dispatcher", "force_dst", 1)
 		This parameter can be modified via ser config framework.
  		</para>
  		<para>
+			Please note that the response codes the module accepts as valid reply to the
+			PING-Method are not only the ones generated from the remote servers, but also those
+			that are generated locally. E.g.: setting code=408 or class=400 will never set
+			a backend down even if it is, because internally the Kamailio transaction layer
+			generates a 408 in the case of no response from the remote server, and this 
+			internal code 408 is accepted as vaild value.
+ 		</para>
+ 		<para>
  		<emphasis>
  			Default value is <quote></quote> (only 200 OK is accepted).
  		</emphasis>
@@ -652,12 +660,28 @@ modparam("dispatcher", "force_dst", 1)
  	<section id="dispatcher.p.ds_probing_mode">
  		<title><varname>ds_probing_mode</varname> (int)</title>
  		<para>
-		Controls what gateways are tested to see if they are reachable. If set
-		to 0, only the gateways with state PROBING are tested; if set to 1, all
-		gateways are tested; if set to 2, only gateways in inactive state with
-		probing mode set are tested. If set to 1 and there is a failure of keepalive
-		to an active gateway, then it is set to TRYING state.
- 		</para>
+		Controls what gateways are tested to see if they are reachable. 
+		</para>
+
+		<itemizedlist>
+		<listitem>
+			<para>Value 0: If set to 0, only the gateways with state PROBING are tested.
+                              After a gateway is probed, the PROBING state is cleared in this mode.</para>
+		</listitem>
+		<listitem>
+			<para>Value 1: If set to 1, all gateways are tested.  If set to 1 and there is a failure of keepalive
+		    		to an active gateway, then it is set to TRYING state.</para>
+		</listitem>
+		<listitem>
+			<para>Value 2: if set to 2, only gateways in inactive state with probing mode set are tested.</para>
+		</listitem>
+		<listitem>
+			<para>Value 3: If set to 3, any gateway with state PROBING is continually probed
+ 				without modifying/removing the PROBING state.  This allows selected gateways
+				to be probed continually, regardless of state changes.</para>
+		</listitem>
+		</itemizedlist>
+
  		<para>
  		<emphasis>
  			Default value is <quote>0</quote>.
@@ -780,11 +804,13 @@ modparam("dispatcher", "force_dst", 1)
 	<section id="dispatcher.p.ds_default_socket">
 		<title><varname>ds_default_socket</varname> (str)</title>
 		<para>
-		Default socket to be used for sending pings and dispatching requests when a gateway has no send socket configured.
+			Default socket to be used for sending pings and dispatching requests
+			when a gateway has no send socket configured.
 		</para>
 		<para>
 		<emphasis>
-			By default no default socket is defined, the first configuration script <emphasis>listen</emphasis> directive is used.
+			By default no default socket is defined, the first configuration
+			script <emphasis>listen</emphasis> directive is used.
 		</emphasis>
 		</para>
 		<example>
@@ -795,6 +821,45 @@ modparam("dispatcher", "force_dst", 1)
  ...
  </programlisting>
 		</example>
+	</section>
+
+ 	<section id="dispatcher.p.ds_timer_mode">
+ 		<title><varname>ds_timer_mode</varname> (int)</title>
+ 		<para>
+			Specify the timer process to be used by the module for
+			keepalives and active dialogs tracking. 
+		</para>
+		<para>
+			It can be set to:
+		</para>
+		<itemizedlist>
+		<listitem>
+			<para>0 - use main timer process.</para>
+		</listitem>
+		<listitem>
+			<para>1 - use secondary timer process.</para>
+		</listitem>
+		</itemizedlist>
+
+ 		<para>
+			On a server with a lot of traffic, using secondary
+			timer can help with performances, because the main timer
+			can be overloaded by taking care of transactions retransmissions
+			and expirations of items in memory.
+		</para>
+		<para>
+ 		<emphasis>
+ 			Default value is <quote>0</quote>.
+ 		</emphasis>
+ 		</para>
+ 		<example>
+ 		<title>Set the <quote>ds_timer_mode</quote> parameter</title>
+ <programlisting format="linespecific">
+ ...
+ modparam("dispatcher", "ds_timer_mode", 1)
+ ...
+ </programlisting>
+ 		</example>
 	</section>
 
 	</section>
@@ -913,6 +978,24 @@ modparam("dispatcher", "force_dst", 1)
 				<para>
 				This algorithm can be used only for dispatching INVITE
 				requests as it is the only SIP method creating a SIP call.
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				<quote>11</quote> - use relative weight based load distribution.
+				You have to set the attribute 'rweight' per each address in
+				destination set. Active host usage probability is 
+				rweight/(SUM of all active host rweights in destination group). 
+				</para>
+				<para>
+				The major difference from the weight distribution is the
+				probability recalculation according to rweight value in case of 
+				host enabling/disabling
+				</para>
+				<para>
+				For example, 100 calls in 3-hosts group with rweight params 1/2/1  
+				will be distributed as 25/50/25. After third host failing 
+				distribution will be changed to 33/67/0.
 				</para>
 			</listitem>
 			<listitem>
@@ -1391,6 +1474,41 @@ onreply_route {
 		</programlisting>
     </section>
 
+	<section id="dispatcher.rpc.ping_active">
+		<title>
+		<function moreinfo="none">dispatcher.ping_active</function>
+		</title>
+		<para>
+		Sets the global state for sending keepalive requests to destinations.
+		</para>
+		<para>
+		Name: <emphasis>dispatcher.ping_active</emphasis>
+		</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>_state_ : state of sending keepalives</para>
+			    <itemizedlist>
+	               <listitem><para> <quote>0</quote>: inactive (don't send)</para></listitem>
+			       <listitem><para> <quote>1</quote>: active (send)</para></listitem>
+				</itemizedlist>
+			</listitem>
+		</itemizedlist>
+		<para>
+			If the state parameter is missing, the current state is returned.
+			When state is changed, new and old values of the state are returned.
+			Default value for state is 1.
+		</para>
+		<para>
+		Example:
+		</para>
+<programlisting  format="linespecific">
+...
+# prototype: &kamcmd; dispatcher.ping_active _state_
+&kamcmd; dispatcher.ping_active 0
+...
+</programlisting>
+    </section>
+
    </section>
 
 	<section id="dispatcher.ex.install">
@@ -1448,6 +1566,12 @@ onreply_route {
 					must be set to a positive integer value beteen 0 and
 					100. The value represents the percent of calls to be
 					sent to that gateways.
+				</listitem>
+				<listitem>
+					'rweight' - used for relative weight based load 
+					distribution. It must be set to a positive integer value 
+					between 1 and 100 (otherwise host will be excluded from 
+					relative weight distribution type). 
 				</listitem>
 				<listitem>
 					'socket' - used to set the sending socket for the gateway.

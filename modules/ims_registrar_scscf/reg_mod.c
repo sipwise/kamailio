@@ -118,6 +118,7 @@ static void mod_destroy(void);
 static int w_save(struct sip_msg* _m, char * _route, char* _d, char* mode, char* _cflags);
 static int w_assign_server_unreg(struct sip_msg* _m, char* _route, char* _d, char* _direction);
 static int w_lookup(struct sip_msg* _m, char* _d, char* _p2);
+static int w_lookup_ue_type(struct sip_msg* _m, char* _d, char* _p2);
 static int w_lookup_path_to_contact(struct sip_msg* _m, char* contact_uri);
 
 /*! \brief Fixup functions */
@@ -162,9 +163,11 @@ int subscription_default_expires = 3600; /**< the default value for expires if n
 int subscription_min_expires = 10; /**< minimum subscription expiration time 		*/
 int subscription_max_expires = 1000000; /**< maximum subscription expiration time 		*/
 int subscription_expires_range = 0;
+int contact_expires_buffer_percentage = 10;     /**< percentage we expiry for contact we will substrace from reg response to UE */
 
 int notification_list_size_threshold = 0; /**Threshold for size of notification list after which a warning is logged */
 
+int notification_processes = 4; /*Number of processes that processes the notification queue*/
 
 extern reg_notification_list *notification_list; /**< list of notifications for reg to be sent			*/
 
@@ -200,6 +203,7 @@ static pv_export_t mod_pvs[] = {
 static cmd_export_t cmds[] = {
     {"save", (cmd_function) w_save, 2, assign_save_fixup3_async, 0, REQUEST_ROUTE | ONREPLY_ROUTE},
     {"lookup", (cmd_function) w_lookup, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
+    {"lookup", (cmd_function) w_lookup_ue_type, 2, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"lookup_path_to_contact", (cmd_function) w_lookup_path_to_contact, 1, fixup_var_str_12, 0, REQUEST_ROUTE},
     {"term_impu_registered", (cmd_function) term_impu_registered, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
     {"term_impu_has_contact", (cmd_function) term_impu_has_contact, 1, domain_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE},
@@ -258,10 +262,12 @@ static param_export_t params[] = {
     {"subscription_default_expires", INT_PARAM, &subscription_default_expires},
     {"subscription_min_expires", INT_PARAM, &subscription_min_expires},
     {"subscription_max_expires", INT_PARAM, &subscription_max_expires},
+    {"expires_buffer_percent", INT_PARAM, &contact_expires_buffer_percentage},
     {"ue_unsubscribe_on_dereg", INT_PARAM, &ue_unsubscribe_on_dereg},
     {"subscription_expires_range", INT_PARAM, &subscription_expires_range},
     {"user_data_always", INT_PARAM, &user_data_always},
     {"notification_list_size_threshold", INT_PARAM, &notification_list_size_threshold},
+    {"notification_processes", INT_PARAM, &notification_processes},
 
     {0, 0, 0}
 };
@@ -320,6 +326,11 @@ static int mod_init(void) {
         LM_ERR("Unable to allocate memory for service route uri\n");
         return -1;
     }
+    
+    if (contact_expires_buffer_percentage < 0 || contact_expires_buffer_percentage > 90) {
+        LM_ERR("contact expires percentage not valid, must be >0 and <=90");
+        return -1;
+    }
 
     memcpy(scscf_serviceroute_uri_str.s, orig_prefix.s, orig_prefix.len);
     scscf_serviceroute_uri_str.len = orig_prefix.len;
@@ -348,9 +359,10 @@ static int mod_init(void) {
     }
 #endif
 
-    /*register space for notification processor*/
-    register_procs(1);
-
+    /*register space for notification processors*/
+    register_procs(notification_processes);
+    cfg_register_child(notification_processes);
+    
     /* bind the SL API */
     if (sl_load_api(&slb) != 0) {
         LM_ERR("cannot bind to SL API\n");
@@ -496,18 +508,27 @@ static int mod_init(void) {
 }
 
 static int child_init(int rank) {
-    LM_DBG("Initialization of module in child [%d] \n", rank);
     int pid;
+    int k=0;
     
-    if (rank == PROC_MAIN) {
-        pid = fork_process(PROC_MIN, "sip_notification_event_process", 1);
-        if (pid < 0)
-            return -1; //error
-        if (pid == 0) {
-            if (cfg_child_init())
-                return -1; //error
-            notification_event_process();
-        }
+    LM_DBG("Initialization of module in child [%d] \n", rank);
+
+if (rank == PROC_MAIN) {
+    
+        /* fork notification workers */
+	for(k=0;k<notification_processes;k++){
+		pid = fork_process(1001+k,"notification_worker",1);
+		if (pid==-1){
+			LM_CRIT("init_notification_worker(): Error on fork() for worker!\n");
+			return 0;
+		}
+		if (pid==0) {
+			if (cfg_child_init()) return 0;
+			notification_event_process();
+			LM_CRIT("init_notification_worker():: worker_process finished without exit!\n");
+			exit(-1);
+		}
+	}
     }
     
     
@@ -599,12 +620,13 @@ static int w_lookup_path_to_contact(struct sip_msg* _m, char* contact_uri) {
  * Wrapper to lookup(location)
  */
 static int w_lookup(struct sip_msg* _m, char* _d, char* _p2) {
-    return lookup(_m, (udomain_t*) _d);
+    return lookup(_m, (udomain_t*) _d, "any");
 }
 
-/*! \brief
- * Convert char* parameter to udomain_t* pointer
- */
+static int w_lookup_ue_type(struct sip_msg* _m, char* _d, char* _p2) {
+    return lookup(_m, (udomain_t*) _d, _p2);
+}
+
 static int domain_fixup(void** param, int param_no) {
     udomain_t* d;
 

@@ -36,15 +36,15 @@ Richard Fuchs
 
    Sipwise GmbH
 
-   Copyright (c) 2003-2008 Sippy Software, Inc.
+   Copyright © 2003-2008 Sippy Software, Inc.
 
-   Copyright (c) 2005 Voice Sistem SRL
+   Copyright © 2005 Voice Sistem SRL
 
-   Copyright (c) 2009-2014 TuTPro Inc.
+   Copyright © 2009-2014 TuTPro Inc.
 
-   Copyright (c) 2010 VoIPEmbedded Inc.
+   Copyright © 2010 VoIPEmbedded Inc.
 
-   Copyright (c) 2013-2014 Sipwise GmbH
+   Copyright © 2013-2015 Sipwise GmbH
      __________________________________________________________________
 
    Table of Contents
@@ -86,8 +86,9 @@ Richard Fuchs
 
         7. MI Commands
 
-              7.1. nh_enable_rtpp
-              7.2. nh_show_rtpp
+              7.1. nh_enable_rtpp proxy_url/all 0/1
+              7.2. nh_show_rtpp proxy_url/all
+              7.3. nh_ping_rtpp proxy_url/all
 
    2. Frequently Asked Questions
 
@@ -112,6 +113,7 @@ Richard Fuchs
    1.17. $rtpstat Usage
    1.18. nh_enable_rtpp usage
    1.19. nh_show_rtpp usage
+   1.20. nh_ping_rtpp usage
 
 Chapter 1. Admin Guide
 
@@ -152,8 +154,9 @@ Chapter 1. Admin Guide
 
    7. MI Commands
 
-        7.1. nh_enable_rtpp
-        7.2. nh_show_rtpp
+        7.1. nh_enable_rtpp proxy_url/all 0/1
+        7.2. nh_show_rtpp proxy_url/all
+        7.3. nh_ping_rtpp proxy_url/all
 
 1. Overview
 
@@ -331,15 +334,22 @@ modparam("rtpengine", "setid_avp", "$avp(setid)")
 4.8. force_send_interface (string)
 
    Forces all control messages between the SIP proxy and the RTP proxy to
-   be sent from the specified local interface. Only IPv4 addresses are
-   supported so far. If not specified, the default interface selected by
-   the operating system will be used.
+   be sent from the specified local interface. Both IPv4 and IPv6
+   addresses are supported. If not specified, the default interface
+   selected by the operating system will be used. Note: when
+   rtpengine_sock is a IPv6 link-local address, one _must_ set this
+   parameter in order to successfully connect to RTP engine. This is
+   necessarely because OS needs additional scope_id hint to communicate
+   over IPv6 link locals. The scope_id is resolved based on the given
+   IPv6.
 
    There is no default value.
 
    Example 1.8. Set force_send_interface parameter
 ...
 modparam("rtpengine", "force_send_interface", "10.3.7.123")
+modparam("rtpengine", "force_send_interface", "2001:8d8:1ff:10c0:9a90:96ff:fea8:
+fd99")
 ...
 
 4.9. write_sdp_pv (string)
@@ -379,7 +389,7 @@ modparam("rtpproxy", "rtp_inst_pvar", "$avp(RTP_INSTANCE)")
    5.5. rtpengine_manage([flags])
    5.6. start_recording()
 
-5.1.  set_rtpengine_set(setid[, setid])
+5.1. set_rtpengine_set(setid[, setid])
 
    Sets the ID of the RTP proxy set to be used for the next
    rtpengine_delete(), rtpengine_offer(), rtpengine_answer() or
@@ -407,7 +417,7 @@ set_rtpengine_set("2");
 rtpengine_offer();
 ...
 
-5.2.  rtpengine_offer([flags])
+5.2. rtpengine_offer([flags])
 
    Rewrites SDP body to ensure that media is passed through an RTP proxy.
    To be invoked on INVITE for the cases the SDP bodies are in INVITE and
@@ -489,9 +499,13 @@ rtpengine_offer();
             already goes through another proxy. Allows creating a chain of
             proxies. Not supported and ignored by Sipwise rtpengine.
           + trust-address - flags that IP address in SDP should be
-            trusted. Without this flag, the RTP proxy ignores address in
-            the SDP and uses source address of the SIP message as media
-            address which is passed to the RTP proxy.
+            trusted. Starting with rtpengine 3.8, this is the default
+            behaviour. In older versions, without this flag the RTP proxy
+            ignores the address in the SDP and uses source address of the
+            SIP message as media address which is passed to the RTP proxy.
+          + SIP-source-address - the opposite of trust-address. Restores
+            the old default behaviour of ignoring endpoint addresses in
+            the SDP body.
           + replace-origin - flags that IP from the origin description
             (o=) should be also changed.
           + replace-session-connection - flags to change the session-level
@@ -568,6 +582,33 @@ rtpengine_offer();
             TOS value will revert to the default TOS (normally 184). A
             value of -1 may be used to leave the currently used TOS
             unchanged.
+          + delete-delay=... - override the default delay (in seconds)
+            before a call is actually deleted from memory. Can be set to
+            zero to effectuate immediate deletion. This option only makes
+            sense for delete operations.
+          + strict-source - instructs the RTP proxy to check the source
+            addresses of all incoming RTP packets and drop the packets if
+            the address doesn't match.
+          + media-handover - the antithesis of strict-source. Instructs
+            the RTP proxy not only to accept mismatching RTP source
+            addresses (as it normally would), but also to accept them as
+            the new endpoint address of the opposite media flow. Not
+            recommended as it allows media streams to be hijacked by an
+            attacker.
+          + DTLS=... - influence the behaviour of DTLS-SRTP. Possible
+            values are "no" or "off" to suppress offering or accepting
+            DTLS-SRTP, and "passive" to prefer participating in DTLS-SRTP
+            in a passive role.
+          + SDES-off - don't offer SDES when it normally would. In an SRTP
+            context, this leaves DTLS-SRTP as the only other option.
+          + SDES-unencrypted_srtp, SDES-unencrypted_srtcp,
+            SDES-unauthenticated_srtp - these directly reflect the SDES
+            session parameters from RFC 4568 and will make the RTP proxy
+            offer these parameters when offering SDES.
+          + SDES-encrypted_srtp, SDES-encrypted_srtcp,
+            SDES-authenticated_srtp - the opposites of the flags above.
+            Useful if accepting these parameters is not desired and they
+            should be rejected instead.
 
    This function can be used from ANY_ROUTE.
 
@@ -603,7 +644,7 @@ onreply_route[2]
 ...
 }
 
-5.3.  rtpengine_answer([flags])
+5.3. rtpengine_answer([flags])
 
    Rewrites SDP body to ensure that media is passed through an RTP proxy.
    To be invoked on 200 OK for the cases the SDP bodies are in INVITE and
@@ -619,7 +660,7 @@ onreply_route[2]
 
    See rtpengine_offer() function example above for example.
 
-5.4.  rtpengine_delete([flags])
+5.4. rtpengine_delete([flags])
 
    Tears down the RTPProxy session for the current call.
 
@@ -633,7 +674,7 @@ onreply_route[2]
 rtpengine_delete();
 ...
 
-5.5.  rtpengine_manage([flags])
+5.5. rtpengine_manage([flags])
 
    Manage the RTPProxy session - it combines the functionality of
    rtpengine_offer(), rtpengine_answer() and rtpengine_delete(), detecting
@@ -663,7 +704,7 @@ rtpengine_delete();
 rtpengine_manage();
 ...
 
-5.6.  start_recording()
+5.6. start_recording()
 
    This function will send a signal to the RTP proxy to record the RTP
    stream on the RTP proxy. This function is not supported by Sipwise
@@ -694,40 +735,84 @@ start_recording();
 
 7. MI Commands
 
-   7.1. nh_enable_rtpp
-   7.2. nh_show_rtpp
+   7.1. nh_enable_rtpp proxy_url/all 0/1
+   7.2. nh_show_rtpp proxy_url/all
+   7.3. nh_ping_rtpp proxy_url/all
 
-7.1. nh_enable_rtpp
+7.1. nh_enable_rtpp proxy_url/all 0/1
 
-   Enables a RTP proxy if parameter value is greater than 0. Disables it
-   if a zero value is given.
+   Enables a RTP proxy if the second parameter value is greater than 0.
+   Disables it if a zero value is given. The first parameter is either a
+   specific RTP proxy url (exactly as defined in the config file) or the
+   keyword all. The second parameter value must be a number in decimal.
 
-   The first parameter is the RTP proxy url (exactly as defined in the
-   config file).
+   When try to enable the RTP proxy, an application ping command is sent
+   to it. If it fails, the proxy is not enabled. Displays success or fail
+   when try to enable/disable.
 
-   The second parameter value must be a number in decimal.
+   NOTE: If a RTP proxy is defined multiple times (in the same or diferent
+   sets), all of its instances will be enabled/disabled.
 
-   NOTE: if a RTP proxy is defined multiple times (in the same or
-   diferente sete), all of its instances will be enables/disabled.
+   NOTE: If a RTP proxy is in the disabled permanent state and one tries
+   to enable it, even if the ping fails, it is moved to a disabled
+   temporary state and a recheck_ticks are given to it. While the
+   recheck_ticks are grater than 0, the proxy is considered disabled
+   temporary, and it is not taken into consideration for sending data.
+   When the recheck_ticks are 0, the proxy is retested when trying to send
+   data(not automatically retested), and data can be send to it on
+   success.
 
-   Example 1.18.  nh_enable_rtpp usage
+   NOTE: When specify the IPv6 RTP proxy url one must prefix it with :: to
+   escape the :: from the IPv6 address. See the example below.
+
+   Example 1.18. nh_enable_rtpp usage
 ...
 $ kamctl fifo nh_enable_rtpp udp:192.168.2.133:8081 0
+$ kamctl fifo nh_enable_rtpp ::udp6:fe80::9a90:96ff:fea8:fd99:9999 1
+$ kamctl fifo nh_enable_rtpp all 1
 ...
 
-7.2. nh_show_rtpp
+7.2. nh_show_rtpp proxy_url/all
 
    Displays all the RTP proxies and their information: set and status
    (disabled or not, weight and recheck_ticks). If a RTP proxy has been
-   disabled by a mi command a "(permanent)" quote will appear when
-   printing the disabled status. This is to differentiate from a temporary
-   disable due to the proxy being not found responsive by kamailio.
+   disabled by nh_enable_rtpp mi command a "(permanent)" quote will appear
+   when printing the disabled status. This is to differentiate from a
+   temporary disable due to the proxy being not found responsive by
+   kamailio. In addition, when disabled permanent, recheck_ticks have no
+   meaning and "N\A" is printed instead of the value.
 
-   No parameter.
+   It takes either a specific RTP proxy url (exactly as defined in the
+   config file) or the keyword all as a parameter.
 
-   Example 1.19.  nh_show_rtpp usage
+   NOTE: When specify the IPv6 RTP proxy url one must prefix it with :: to
+   escape the :: from the IPv6 address. See the example below.
+
+   Example 1.19. nh_show_rtpp usage
 ...
-$ kamctl fifo nh_show_rtpp
+$ kamctl fifo nh_show_rtpp udp:192.168.2.133:8081
+$ kamctl fifo nh_show_rtpp ::udp6:fe80::9a90:96ff:fea8:fd99:9999
+$ kamctl fifo nh_show_rtpp all
+...
+
+7.3. nh_ping_rtpp proxy_url/all
+
+   Sends an application ping command to the RTP proxy. If the proxy does
+   not respond, it will be disabled, but not permanent. If the proxy
+   responds, no action is taken. Displays the ping result, i.e. success or
+   fail when try to ping.
+
+   It takes either a specific RTP proxy url (exactly as defined in the
+   config file) or the keyword all as a parameter.
+
+   NOTE: When specify the IPv6 RTP proxy url one must prefix it with :: to
+   escape the :: from the IPv6 address. See the example below.
+
+   Example 1.20. nh_ping_rtpp usage
+...
+$ kamctl fifo nh_ping_rtpp udp:192.168.2.133:8081
+$ kamctl fifo nh_ping_rtpp ::udp6:fe80::9a90:96ff:fea8:fd99:9999
+$ kamctl fifo nh_ping_rtpp all
 ...
 
 Chapter 2. Frequently Asked Questions

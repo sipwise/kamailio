@@ -95,6 +95,7 @@ static int mod_init(void);                          /*!< Module initialization f
 static void destroy(void);                          /*!< Module destroy function */
 static void ul_core_timer(unsigned int ticks, void* param);  /*!< Core timer handler */
 static void ul_local_timer(unsigned int ticks, void* param); /*!< Local timer handler */
+static void ul_db_clean_timer(unsigned int ticks, void* param); /*!< DB clean timer handler */
 static int child_init(int rank);                    /*!< Per-child init function */
 static int mi_child_init(void);
 
@@ -161,10 +162,12 @@ int use_domain      = 0;				/*!< Whether usrloc should use domain part of aor */
 int desc_time_order = 0;				/*!< By default do not enable timestamp ordering */
 int handle_lost_tcp = 0;				/*!< By default do not remove contacts before expiration time */
 int close_expired_tcp = 0;				/*!< By default do not close TCP connections for expired contacts */
+int skip_remote_socket = 0;				/*!< By default do not skip remote socket */
 
 int ul_fetch_rows = 2000;				/*!< number of rows to fetch from result */
 int ul_hash_size = 10;
 int ul_db_insert_null = 0;
+int ul_db_timer_clean = 0;
 
 /* flags */
 unsigned int nat_bflag = (unsigned int)-1;
@@ -173,7 +176,8 @@ unsigned int init_flag = 0;
 db1_con_t* ul_dbh = 0; /* Database connection handle */
 db_func_t ul_dbf;
 
-
+/* filter on load by server id */
+unsigned int ul_db_srvid = 0;
 
 /*! \brief
  * Exported functions
@@ -220,6 +224,7 @@ static param_export_t params[] = {
 	{"nat_bflag",           INT_PARAM, &nat_bflag       },
 	{"handle_lost_tcp",     INT_PARAM, &handle_lost_tcp },
 	{"close_expired_tcp",   INT_PARAM, &close_expired_tcp },
+	{"skip_remote_socket",  INT_PARAM, &skip_remote_socket },
 	{"preload",             PARAM_STRING|USE_FUNC_PARAM, (void*)ul_preload_param},
 	{"db_update_as_insert", INT_PARAM, &ul_db_update_as_insert},
 	{"timer_procs",         INT_PARAM, &ul_timer_procs},
@@ -229,6 +234,8 @@ static param_export_t params[] = {
 	{"expires_type",        PARAM_INT, &ul_expires_type},
 	{"db_raw_fetch_type",   PARAM_INT, &ul_db_raw_fetch_type},
 	{"db_insert_null",      PARAM_INT, &ul_db_insert_null},
+	{"server_id_filter",    PARAM_INT, &ul_db_srvid},
+	{"db_timer_clean",      PARAM_INT, &ul_db_timer_clean},
 	{0, 0, 0}
 };
 
@@ -314,6 +321,7 @@ static int mod_init(void)
 		case CONTACT_ONLY:
 		case CONTACT_CALLID:
 		case CONTACT_PATH:
+		case CONTACT_CALLID_ONLY:
 			break;
 		default:
 			LM_ERR("invalid matching mode %d\n", matching_mode);
@@ -354,6 +362,11 @@ static int mod_init(void)
 		if(ul_fetch_rows<=0) {
 			LM_ERR("invalid fetch_rows number '%d'\n", ul_fetch_rows);
 			return -1;
+		}
+	}
+	if(db_mode==WRITE_THROUGH || db_mode==WRITE_BACK) {
+		if(ul_db_timer_clean!=0) {
+			sr_wtimer_add(ul_db_clean_timer, 0, timer_interval);
 		}
 	}
 
@@ -511,6 +524,14 @@ static void ul_local_timer(unsigned int ticks, void* param)
 	if (synchronize_all_udomains((int)(long)param, ul_timer_procs) != 0) {
 		LM_ERR("synchronizing cache failed\n");
 	}
+}
+
+/*! \brief
+ * DB dlean timer handler
+ */
+static void ul_db_clean_timer(unsigned int ticks, void* param)
+{
+	ul_db_clean_udomains();
 }
 
 /*! \brief

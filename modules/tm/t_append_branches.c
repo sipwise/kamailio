@@ -216,8 +216,9 @@ canceled:
 	setbflagsval(0, backup_bflags);
 	/* update message flags, if changed in branch route */
 	t->uas.request->flags = faked_req.flags;
-	/* restore the number of outgoing branches
-	 * since new branches have not been completed */
+	/* if needed unlock transaction's replies */
+		/* restore the number of outgoing branches
+		 * since new branches have not been completed */
 	t->nr_of_outgoings = outgoings;
 	ser_error=E_CANCELED;
 	ret = -1;

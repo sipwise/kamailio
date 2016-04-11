@@ -48,6 +48,7 @@
 #define DS_PROBE_NONE		0
 #define DS_PROBE_ALL		1
 #define DS_PROBE_INACTIVE	2
+#define DS_PROBE_ONLYFLAGGED	3
 
 #define DS_MATCH_ALL		0
 #define DS_MATCH_NOPORT		1
@@ -149,6 +150,7 @@ typedef struct _ds_attrs
 	str socket;
 	int maxload;
 	int weight;
+	int rweight;
 } ds_attrs_t;
 
 typedef struct _ds_dest
@@ -172,12 +174,19 @@ typedef struct _ds_set
 	int nr;				/*!< number of items in dst set */
 	int last;			/*!< last used item in dst set (round robin) */
 	int wlast;			/*!< last used item in dst set (by weight) */
+	int rwlast;			/*!< last used item in dst set (by relaitive weight) */
 	ds_dest_t *dlist;
 	unsigned int wlist[100];
+	unsigned int rwlist[100];
 	struct _ds_set *next;
 } ds_set_t;
 
 ds_set_t *ds_get_list(void);
 int ds_get_list_nr(void);
+
+int ds_ping_active_init(void);
+int ds_ping_active_get(void);
+int ds_ping_active_set(int v);
+
 #endif
 

@@ -54,7 +54,7 @@ void ul_impu_inserted(impurecord_t* r, ucontact_t* c, int type, void* param) {
 
     LM_DBG("Registering for callbacks on this IMPU for contact insert, update, delete or expire to send notifications if there are any subscriptions");
     ul.register_ulcb(r, 0, UL_IMPU_NEW_CONTACT, ul_contact_changed, 0); //this allows us to receive cbs on new contact for IMPU
-    ul.register_ulcb(r, 0, UL_IMPU_UPDATE_CONTACT | UL_IMPU_EXPIRE_CONTACT | UL_IMPU_DELETE_CONTACT, ul_contact_changed, 0);
+    ul.register_ulcb(r, 0, UL_IMPU_UPDATE_CONTACT | UL_IMPU_EXPIRE_CONTACT | UL_IMPU_DELETE_CONTACT | UL_IMPU_DELETE_CONTACT_IMPLICIT, ul_contact_changed, 0);
 
     LM_DBG("Selectively asking for expire or no contact delete callbacks only on the anchor of the implicit set so that we only send one SAR per implicit set");
     if (r->is_primary) {
@@ -87,24 +87,13 @@ void ul_contact_changed(impurecord_t* r, ucontact_t* c, int type, void* param) {
 
     LM_DBG("Received notification of type %d on contact Address <%.*s>", type, c->c.len, c->c.s);
     
-    if(!r->shead){
+    if(!r->shead) {
         LM_DBG("There are no subscriptions for this IMPU therefore breaking out now as nothing to do");
         return;
     }
-    
+//    
     if (type == UL_IMPU_DELETE_CONTACT) {
         LM_DBG("Received notification of UL CONTACT DELETE");
-        event_reg(0, r, c, IMS_REGISTRAR_CONTACT_UNREGISTERED, 0, 0);
-    } else if (type == UL_IMPU_EXPIRE_CONTACT) {
-        LM_DBG("Received notification of UL CONTACT EXPIRE");
-        event_reg(0, r, c, IMS_REGISTRAR_CONTACT_EXPIRED, 0, 0);
-    } else if (type == UL_IMPU_UPDATE_CONTACT) {
-        LM_DBG("Received notification of UL CONTACT UPDATE");
-        event_reg(0, r, c, IMS_REGISTRAR_CONTACT_REFRESHED, 0, 0);
-    } else if (type == UL_IMPU_NEW_CONTACT) {
-        LM_DBG("Received notification of UL IMPU CONTACT INSERT");
-        event_reg(0, r, c, IMS_REGISTRAR_CONTACT_REGISTERED, 0, 0);
-    } else {
-        LM_DBG("This type of callback not supported here");
+        event_reg(0, r, IMS_REGISTRAR_CONTACT_UNREGISTERED, 0, 0);
     }
 }

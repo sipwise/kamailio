@@ -1,7 +1,8 @@
 table_name(string) table_version(int) 
+version:1
 acc:5
 acc_cdrs:2
-active_watchers:11
+active_watchers:12
 address:6
 aliases:8
 carrier_name:1
@@ -45,14 +46,17 @@ purplemap:1
 re_grp:1
 rls_presentity:1
 rls_watchers:3
+rtpengine:1
 rtpproxy:1
 sca_subscriptions:1
 silo:8
 sip_trace:4
 speed_dial:2
 subscriber:6
-trusted:5
-uacreg:1
+topos_d:1
+topos_t:1
+trusted:6
+uacreg:2
 uid_credentials:7
 uid_domain:2
 uid_domain_attrs:1

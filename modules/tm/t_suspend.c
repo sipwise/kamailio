@@ -460,6 +460,7 @@ done:
 	/*This transaction is no longer suspended so unsetting the SUSPEND flag*/
 	t->flags &= ~T_ASYNC_SUSPENDED;
 
+
 	return 0;
 
 kill_trans:

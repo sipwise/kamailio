@@ -143,12 +143,16 @@ typedef enum cstate {
 
 typedef enum contact_state {
     CONTACT_VALID,
-    CONTACT_EXPIRED,
-    CONTACT_DELETED
+    CONTACT_DELETE_PENDING,
+    CONTACT_EXPIRE_PENDING_NOTIFY,
+    CONTACT_DELETED,
+    CONTACT_DELAYED_DELETE
 } contact_state_t;
 
 /*! \brief Valid contact is a contact that either didn't expire yet or is permanent */
-#define VALID_CONTACT(c, t)   ((c->expires>t) || (c->expires==0))
+#define VALID_CONTACT(c, t)   (((c->expires>t) || (c->expires==0)) && c->state!=CONTACT_DELETED && c->state!=CONTACT_DELETE_PENDING && c->state!=CONTACT_EXPIRE_PENDING_NOTIFY && c->state!=CONTACT_DELAYED_DELETE)
+
+#define VALID_UE_TYPE(c, t)   ((t==0) || (t==1 && c->is_3gpp) || (t==2 && !c->is_3gpp))
 
 struct hslot;
 /*!< Hash table slot */
@@ -234,7 +238,7 @@ typedef struct {
 typedef struct ims_subscription_s {
     str private_identity; /**< private identity 				*/
     struct hslot_sp* slot; /*!< Collision slot in the hash table array we belong to */
-    unsigned int impu_hash; /**< hash over public_identity */
+    int sl;                 /*!< slot number we belong to */
     int wpsi; /** This is not in the standards
 	 	 	 	 	 	 	 	 	 	 	 	0 normal user or distinct psi inside
 	 	 	 	 	 	 	 	 	 	 	 	1 wildcarded psi
@@ -295,8 +299,9 @@ typedef struct contact_dialog_data {
 typedef struct ucontact {
     gen_lock_t *lock;           /**< we have to lock the contact as it is shared by many impu structs and has reference conting	*/
     struct contact_hslot* slot; /*!< Collision slot in the hash table array we belong to */
-    unsigned int contact_hash; 			/*!< Hash over contact */
+    unsigned int sl; 			/*!< Hash slot number we belong to */
     int ref_count;
+    int is_3gpp;
     contact_state_t state;
     str domain; /*!< Pointer to domain name (NULL terminated) */
     str aor; /*!< Pointer to the AOR string in record structure*/
@@ -372,13 +377,26 @@ static inline char* get_impu_regstate_as_string(enum pi_reg_states reg_state) {
     }
 }
 
+typedef struct _contact_ptr {
+    ucontact_t* contact;
+    struct contact_ptr* prev;
+    struct contact_ptr* next;
+} contact_ptr;
+
+typedef struct _contact_ptr_list {
+    int n;
+    gen_lock_t* lock;
+    struct contact_ptr* first; 
+} contact_ptr_list;
+
 /*! \brief
  * Basic hash table element
  */
 typedef struct impurecord {
-    str* domain; 					/*!< Pointer to domain we belong to (null terminated string) */
-    int is_primary;					/*!< first IMPU (in implicit set this is the one that will trigger a SAR, if no implicit set - we should still be safe with first) */
+    str* domain; 				/*!< Pointer to domain we belong to (null terminated string) */
+    int is_primary;				/*!< first IMPU (in implicit set this is the one that will trigger a SAR, if no implicit set - we should still be safe with first) */
     str public_identity; 			/*!< Address of record */
+    str private_identity;                       /*!< Subscription to which we be long */
     unsigned int aorhash; 			/*!< Hash over address of record */
     int barring;
     enum pi_reg_states reg_state;
@@ -407,10 +425,18 @@ typedef struct impurecord_info {
 typedef struct contact_list {
     struct contact_hslot* slot;
     int size;
+    int max_collisions;
 //    stat_var *contacts;        /*!< no of contacts in table */
 }contact_list_t;
 
-typedef int (*insert_impurecord_t)(struct udomain* _d, str* public_identity, int reg_state, int barring,
+typedef struct ims_subscription_list {
+    struct hslot_sp* slot;
+    int size;               /* size of list (slots) */
+    int subscriptions;      /* total number of subscriptions in storage */
+    int max_collisions;
+}ims_subscription_list_t;
+
+typedef int (*insert_impurecord_t)(struct udomain* _d, str* public_identity, str* private_identity, int reg_state, int barring,
         ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2,
         struct impurecord** _r);
 
@@ -418,7 +444,7 @@ typedef int (*get_impurecord_t)(struct udomain* _d, str* _aor, struct impurecord
 
 typedef int (*delete_impurecord_t)(struct udomain* _d, str* _aor, struct impurecord* _r);
 
-typedef int (*update_impurecord_t)(struct udomain* _d, str* public_identity, int reg_state, int send_sar_on_delete, int barring, int is_primary, ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2, struct impurecord** _r);
+typedef int (*update_impurecord_t)(struct udomain* _d, str* public_identity, impurecord_t* impu_rec, int reg_state, int send_sar_on_delete, int barring, int is_primary, ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2, struct impurecord** _r);
 
 typedef void (*lock_contact_slot_t)(str* contact_uri);
 
@@ -428,11 +454,17 @@ typedef void (*lock_contact_slot_i_t)(int sl);
 
 typedef void (*unlock_contact_slot_i_t)(int sl);
 
+typedef void (*lock_subscription_t)(ims_subscription* s);
+
+typedef void (*unlock_subscription_t)(ims_subscription* s);
+typedef void (*unref_subscription_t) (ims_subscription* s);
+typedef void (*ref_subscription_t) (ims_subscription* s);
+
 typedef int (*update_ucontact_t)(struct impurecord* _r, struct ucontact* _c, struct ucontact_info* _ci);
 
 typedef int (*expire_ucontact_t)(struct impurecord* _r, struct ucontact* _c);
 
-typedef int (*unlink_contact_from_impu_t)(struct impurecord* _r, struct ucontact* _c, int write_to_db);
+typedef int (*unlink_contact_from_impu_t)(struct impurecord* _r, struct ucontact* _c, int write_to_db, int is_explicit);
 
 typedef int (*link_contact_to_impu_t)(struct impurecord* _r, struct ucontact* _c, int wirte_to_db);
 
@@ -440,7 +472,7 @@ typedef int (*insert_ucontact_t)(struct impurecord* _r, str* _contact, struct uc
 
 typedef int (*delete_ucontact_t)(struct ucontact* _c);
 
-typedef int (*get_ucontact_t)(struct impurecord* _r, str* _c, str* _callid, str* _path, int _cseq, struct ucontact** _co);
+typedef int (*get_ucontact_t)(str* _c, str* _callid, str* _path, int _cseq, struct ucontact** _co);
 
 typedef void (*release_ucontact_t)(struct ucontact* _c);
 
@@ -468,7 +500,7 @@ typedef int (*get_subscriber_t)(impurecord_t* urec, str *watcher_contact, str *p
 typedef int (*add_subscriber_t)(impurecord_t* urec,
 		subscriber_data_t* subscriber_data, reg_subscriber** _reg_subscriber, int db_load);
 
-typedef int (*get_impus_from_subscription_as_string_t)(udomain_t* _d, impurecord_t* impu_rec, int barring, str** impus, int* num_impus);
+typedef int (*get_impus_from_subscription_as_string_t)(udomain_t* _d, impurecord_t* impu_rec, int barring, str** impus, int* num_impus, int is_shm);
 
 typedef str (*get_presentity_from_subscriber_dialog_t)(str *callid, str *to_tag, str *from_tag);
 
@@ -492,6 +524,11 @@ typedef struct usrloc_api {
     unlock_contact_slot_t unlock_contact_slot;
     lock_contact_slot_i_t lock_contact_slot_i;
     unlock_contact_slot_i_t unlock_contact_slot_i;
+    lock_subscription_t lock_subscription;
+    unlock_subscription_t unlock_subscription;
+    unref_subscription_t unref_subscription;
+    ref_subscription_t ref_subscription;
+    
     insert_ucontact_t insert_ucontact;
     delete_ucontact_t delete_ucontact;
     get_ucontact_t get_ucontact;
