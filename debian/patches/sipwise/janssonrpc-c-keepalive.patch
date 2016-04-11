@@ -99,7 +99,7 @@ Subject: [PATCH] janssonrpc-c: keepalive
  int handle_response(json_t* response)
  {
  	int retval = 0;
-@@ -836,14 +894,23 @@
+@@ -839,14 +897,23 @@
  
  	if (res) {
  		if(fakerpc) {
