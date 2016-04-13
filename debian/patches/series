@@ -27,3 +27,4 @@ sipwise/usrloc_dbro.patch
 sipwise/janssonrpc-c-fakerpc.patch
 sipwise/janssonrpc-c-keepalive.patch
 ##
+sipwise/rtpengine_next_branch_parm.patch
