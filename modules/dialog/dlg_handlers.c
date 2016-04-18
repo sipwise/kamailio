@@ -992,7 +992,29 @@ static inline int parse_dlg_rr_param(char *p, char *end, int *h_entry, int *h_id
 {
 	char *s;
 
+	/* sanity checks */
+	if (!p) {
+		LM_ERR("NULL start of parameter string");
+		return -1;
+	}
+
+	if (!end) {
+		LM_ERR("NULL end of parameter string");
+		return -1;
+	}
+
+	if (!h_entry) {
+		LM_ERR("NULL h_entry");
+		return -1;
+	}
+
+	if (!h_id) {
+		LM_ERR("NULL h_id");
+		return -1;
+	}
+
 	for ( s=p ; p<end && *p!=DLG_SEPARATOR ; p++ );
+
 	if (*p!=DLG_SEPARATOR) {
 		LM_ERR("malformed rr param '%.*s'\n", (int)(long)(end-s), s);
 		return -1;
@@ -1388,8 +1410,13 @@ void dlg_ontimeout(struct dlg_tl *tl)
 
 		if(dlg->iflags&DLG_IFLAG_TIMEOUTBYE)
 		{
+			/* set the dialog context so that it's available in
+			 * tm:local-request event route */
+			dlg_set_ctx_iuid(dlg);
 			if(dlg_bye_all(dlg, NULL)<0)
 				dlg_unref(dlg, 1);
+			dlg_reset_ctx_iuid();
+
 			/* run event route for end of dlg */
 			dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
 			dlg_unref(dlg, 1);

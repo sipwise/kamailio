@@ -199,14 +199,16 @@ sql_result_t* sql_get_result(str *name)
 			return sr;
 		sr = sr->next;
 	}
-	sr = (sql_result_t*)pkg_malloc(sizeof(sql_result_t));
+	sr = (sql_result_t*)pkg_malloc(sizeof(sql_result_t) + name->len);
 	if(sr==NULL)
 	{
 		LM_ERR("no pkg memory\n");
 		return NULL;
 	}
 	memset(sr, 0, sizeof(sql_result_t));
-	sr->name = *name;
+	memcpy(sr+1, name->s, name->len);
+	sr->name.s = (char *)(sr + 1);
+	sr->name.len = name->len;
 	sr->resid = resid;
 	sr->next = _sql_result_root;
 	_sql_result_root = sr;
@@ -261,7 +263,8 @@ int sql_do_query(sql_con_t *con, str *query, sql_result_t *res)
 	}
 	if(con->dbf.raw_query(con->dbh, query, &db_res)!=0)
 	{
-		LM_ERR("cannot do the query\n");
+		LM_ERR("cannot do the query [%.*s]\n",
+				(query->len>32)?32:query->len, query->s);
 		return -1;
 	}
 
@@ -665,6 +668,7 @@ void sql_destroy(void)
 		pkg_free(r);
 		r = r0;
 	}
+	_sql_result_root = NULL;
 }
 
 /**
@@ -743,7 +747,7 @@ int sqlops_is_null(str *sres, int i, int j)
 		LM_ERR("row index out of bounds [%d/%d]\n", i, res->nrows);
 		goto error;
 	}
-	if(i>=res->ncols)
+	if(j>=res->ncols)
 	{
 		LM_ERR("column index out of bounds [%d/%d]\n", j, res->ncols);
 		goto error;
