@@ -1,4 +1,6 @@
 /*
+ * $Id$ 
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2008-2009 1&1 Internet AG
  *
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "db_ut.h"
@@ -44,7 +46,6 @@ int db_str2val(const db_type_t _t, db_val_t* _v, const char* _s, const int _l,
 		const unsigned int _cpy)
 {
 	static str dummy_string = {"", 0};
-	static char dummy_string_buf[2];
 	
 	if (!_v) {
 		LM_ERR("invalid parameter value\n");
@@ -58,8 +59,6 @@ int db_str2val(const db_type_t _t, db_val_t* _v, const char* _s, const int _l,
 			 * string so that we do not crash when the NULL flag
 			 * is set but the module does not check it properly
 			 */
-		dummy_string_buf[0] = '\0';
-		dummy_string.s = dummy_string_buf;
 		VAL_STRING(_v) = dummy_string.s;
 		VAL_STR(_v) = dummy_string;
 		VAL_BLOB(_v) = dummy_string;
@@ -184,9 +183,6 @@ int db_str2val(const db_type_t _t, db_val_t* _v, const char* _s, const int _l,
 		VAL_BLOB(_v).len = _l;
 		VAL_TYPE(_v) = DB1_BLOB;
 		return 0;
-
-	default:
-		return -10;
 	}
 	return -10;
 }

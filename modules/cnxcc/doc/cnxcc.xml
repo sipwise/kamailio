@@ -15,7 +15,7 @@
     <authorgroup>
 	<author>
 	<firstname>Carlos</firstname>
-	<surname>Ruiz Díaz</surname>
+	<surname>Ruiz Diaz</surname>
 	<affiliation>
 	    <orgname>ConexionGroup S.A.</orgname>
 	</affiliation>
@@ -26,13 +26,8 @@
     </authorgroup>
     <copyright>
 	<year>2013</year>
-	<holder>Carlos Ruiz Díaz, carlos.ruizdiaz@gmail.com</holder>
+	<holder>Carlos Ruiz Diaz, carlos.ruizdiaz@gmail.com</holder>
     </copyright>
-    <copyright>
-	<year>2014</year>
-	<holder>Carlos Ruiz Díaz, carlos@latamvoices.com</holder>
-    </copyright>
-
     </bookinfo>
 
     <toc></toc>

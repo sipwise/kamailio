@@ -1,3 +1,4 @@
+# $Id$
 #
 # registrar module makefile
 #

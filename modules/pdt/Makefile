@@ -1,5 +1,6 @@
+# $Id$
 #
-# pdt example module makefile
+# print example module makefile
 #
 # 
 # WARNING: do not run this directly, it should be run by the master Makefile

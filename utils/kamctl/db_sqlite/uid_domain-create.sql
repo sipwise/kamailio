@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('uid_domain','2');
 CREATE TABLE uid_domain (
     id INTEGER PRIMARY KEY NOT NULL,
     did VARCHAR(64) NOT NULL,
@@ -8,8 +9,7 @@ CREATE TABLE uid_domain (
 
 CREATE INDEX uid_domain_did_idx ON uid_domain (did);
 
-INSERT INTO version (table_name, table_version) values ('uid_domain','2');
-
+INSERT INTO version (table_name, table_version) values ('uid_domain_attrs','1');
 CREATE TABLE uid_domain_attrs (
     id INTEGER PRIMARY KEY NOT NULL,
     did VARCHAR(64),
@@ -21,6 +21,4 @@ CREATE TABLE uid_domain_attrs (
 );
 
 CREATE INDEX uid_domain_attrs_domain_did ON uid_domain_attrs (did, flags);
-
-INSERT INTO version (table_name, table_version) values ('uid_domain_attrs','1');
 

@@ -16,20 +16,19 @@
 #
 # You should have received a copy of the GNU General Public License 
 # along with this program; if not, write to the Free Software 
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 # Small helper script for germany:
 # Download the directory of german carrier names and the respective IDs from
 # the 'Bundesnetzagentur' and convert this into the format which the pdbt tool
 # understands.
 
-#old_url="http://www.bundesnetzagentur.de/cln_1912/DE/Sachgebiete/Telekommunikation/RegulierungTelekommunikation/Nummernverwaltung/TechnischeNummern/Portierungskennung/VerzeichnisPortKenn_Basepage.html"
-url="http://www.bundesnetzagentur.de/cln_1421/DE/Sachgebiete/Telekommunikation/Unternehmen_Institutionen/Nummerierung/Technische%20Nummern/Portierungskennungen/VerzeichnisPortKenn_Basepage.html?nn=268376#Inhalt"
+url="http://www.bundesnetzagentur.de/cln_1912/DE/Sachgebiete/Telekommunikation/RegulierungTelekommunikation/Nummernverwaltung/TechnischeNummern/Portierungskennung/VerzeichnisPortKenn_Basepage.html"
 
-# fix LOCALE problem during filtering
+# fix LOCALE problem during filtering 
 export LANG="C"
 
-wget -O - "$url" | recode latin1..utf8 | sed 's/^*.Verzeichnis der Portierungskennungen//' | awk '/<tbody>/, /<\/tbody>/' | tr -d '\r' | tr '\n' '@' | sed 's/<\/table>.*$//' | sed 's/<\/tbody>.*$//' | awk -F "</td" -v RS="</tr" '{ gsub(/.*>/,"",$1) gsub(/.*>/,"",$2); if ( $1 != "") { printf "%s %s\n",$2,$1 } }'
+wget -O - "$url" | recode latin1..utf8 | sed 's/^*.Verzeichnis der Portierungskennungen//' | awk '/<tbody>/, /<\/tbody>/' | tr -d '\r' | tr '\n' '@' | sed 's/<\/table>.*$//' | sed 's/<\/tbody>.*$//'
 
 # probably also possible to use this:
 # http://www.bundesnetzagentur.de/cae/servlet/contentblob/156772/publicationFile/8492/KonsolidiertesVerzPortierungsk.zip

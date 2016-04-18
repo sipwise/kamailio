@@ -1,7 +1,6 @@
-/*
- * shared memory, multi-process safe, pool based version of f_malloc
+/* $Id$
  *
- * This file is part of Kamailio, a free SIP server.
+ * shared memory, multi-process safe, pool based version of f_malloc
  *
  * Copyright (C) 2007 iptelorg GmbH
  *
@@ -17,6 +16,24 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * History:
+ * --------
+ *              created by andrei
+ *  2003-07-06  added fm_realloc (andrei)
+ *  2004-07-19  fragments book keeping code and support for 64 bits
+ *               memory blocks (64 bits machine & size >=2^32) 
+ *              GET_HASH s/</<=/ (avoids waste of 1 hash cell)   (andrei)
+ *  2004-11-10  support for > 4Gb mem., switched to long (andrei)
+ *  2005-03-02  added fm_info() (andrei)
+ *  2005-12-12  fixed realloc shrink real_used accounting (andrei)
+ *              fixed initial size (andrei)
+ *  2006-02-03  fixed realloc out of mem. free bug (andrei)
+ *  2006-04-07  s/DBG/MDBG (andrei)
+ *  2007-02-23  added fm_available() (andrei)
+ *  2007-06-09  forked from the fm_maloc code (andrei)
+ */
+
 
 #ifdef SF_MALLOC
 
@@ -323,7 +340,7 @@ void sfm_split_frag(struct sfm_block* qm, struct sfm_frag* frag,
 
 
 /* init malloc and return a sfm_block*/
-struct sfm_block* sfm_malloc_init(char* address, unsigned long size, int type)
+struct sfm_block* sfm_malloc_init(char* address, unsigned long size)
 {
 	char* start;
 	char* end;
@@ -359,7 +376,6 @@ struct sfm_block* sfm_malloc_init(char* address, unsigned long size, int type)
 	qm=(struct sfm_block*)start;
 	memset(qm, 0, sizeof(struct sfm_block));
 	qm->size=size;
-	qm->type = type;
 	size-=init_overhead;
 	
 	qm->first_frag=(struct sfm_frag*)(start+ROUNDUP(sizeof(struct sfm_block)));

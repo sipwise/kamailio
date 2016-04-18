@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -56,7 +56,8 @@ struct tm_binds isc_tmb;
 usrloc_api_t isc_ulb; /*!< Structure containing pointers to usrloc functions*/
 
 /* fixed parameter storage */
-str isc_my_uri = str_init("scscf.ims.smilecoms.com:6060"); /**< Uri of myself to loop the message in str	*/
+char *isc_my_uri_c = "scscf.ims.smilecoms.com:6060"; /**< Uri of myself to loop the message*/
+str isc_my_uri = {0, 0}; /**< Uri of myself to loop the message in str	*/
 str isc_my_uri_sip = {0, 0}; /**< Uri of myself to loop the message in str with leading "sip:" */
 int isc_expires_grace = 120; /**< expires value to add to the expires in the 3rd party register*/
 int isc_fr_timeout = 5000; /**< default ISC response timeout in ms */
@@ -82,7 +83,7 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-    { "my_uri", PARAM_STR, &isc_my_uri}, /**< SIP Uri of myself for getting the messages back */
+    { "my_uri", STR_PARAM, &isc_my_uri_c}, /**< SIP Uri of myself for getting the messages back */
     { "expires_grace", INT_PARAM, &isc_expires_grace}, /**< expires value to add to the expires in the 3rd party register to prevent expiration in AS */
     { "isc_fr_timeout", INT_PARAM, &isc_fr_timeout}, /**< Time in ms that we are waiting for a AS response until we
  	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 consider it dead. Has to be lower than SIP transaction timeout
@@ -167,11 +168,13 @@ static int mod_init(void) {
     }
 
     /* Init the isc_my_uri parameter */
-    if (!isc_my_uri.s || isc_my_uri.len<=0) {
+    if (!isc_my_uri_c) {
         LM_CRIT("mandatory parameter \"isc_my_uri\" found empty\n");
         goto error;
     }
 
+    isc_my_uri.s = isc_my_uri_c;
+    isc_my_uri.len = strlen(isc_my_uri_c);
     isc_my_uri_sip.len = 4 + isc_my_uri.len;
     isc_my_uri_sip.s = shm_malloc(isc_my_uri_sip.len + 1);
     memcpy(isc_my_uri_sip.s, "sip:", 4);
@@ -401,13 +404,6 @@ done:
     return ret;
 }
 
-void clean_impu_str(str* impu_s) {
-    char *p;
-    
-    if ((p = memchr(impu_s->s, ';', impu_s->len))) {
-	impu_s->len = p - impu_s->s;
-    }
-}
 /**
  * Checks if there is a match on REGISTER.
  * Inserts route headers and set the dst_uri
@@ -443,10 +439,7 @@ int isc_match_filter_reg(struct sip_msg *msg, char *str1, udomain_t* d) {
             else
                 k = 1;
 
-	    LM_DBG("Orig User before clean: <%.*s> [%d]\n", s.len, s.s, k);
-	    clean_impu_str(&s);
-            LM_DBG("Orig User after clean: <%.*s> [%d]\n", s.len, s.s, k);
-	    
+            LM_DBG("Orig User <%.*s> [%d]\n", s.len, s.s, k);
             m = isc_checker_find(s, old_mark.direction, old_mark.skip, msg, k, d);
             while (m) {
                 LM_DBG("REGISTER match found in filter criteria\n");

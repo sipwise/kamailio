@@ -3,22 +3,39 @@
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ---------
+ *  2003-02-28  scratchpad compatibility abandoned (jiri)
+ *  2003-01-29  scrathcpad removed (jiri)
+ *  2003-01-27  next baby-step to removing ZT - PRESERVE_ZT (jiri)
+ *  2003-03-31  removed msg->repl_add_rm (andrei)
+ *  2003-04-26 ZSW (jiri)
+ *  2003-05-01  parser extended to support Accept header field (janakj)
+ *  2005-02-23  parse_headers uses hdr_flags_t now (andrei)
+ *  2005-03-02  free_via_list(vb) on via parse error (andrei)
+ *  2007-01-26  parser extended to support Identity, Identity-info and Date
+ *		header fields (gergo)
  */
 
 /** Parser :: SIP Message header proxy parser.
@@ -589,11 +606,9 @@ int parse_msg(char* const buf, const unsigned int len, struct sip_msg* const msg
 	int offset;
 	hdr_flags_t flags;
 
-	/* eat crlf & whitespaces from the beginning */
-	for (tmp=buf; (tmp-buf < len)
-			&& (*tmp=='\n' || *tmp=='\r' || *tmp=='\0'
-				|| *tmp=='\t' || *tmp==' ');
-			tmp++);
+	/* eat crlf from the beginning */
+	for (tmp=buf; (*tmp=='\n' || *tmp=='\r')&&
+			tmp-buf < len ; tmp++);
 	offset=tmp-buf;
 	fl=&(msg->first_line);
 	rest=parse_first_line(tmp, len-offset, fl);
@@ -814,13 +829,11 @@ int set_path_vector(struct sip_msg* msg, str* path)
 
 void reset_path_vector(struct sip_msg* const msg)
 {
-	/* only free path vector from pkg IFF it is still in pkg... - ie. if msg is shm we don't free... */
-	if (!(msg->msg_flags&FL_SHM_CLONE)) {
-		if (msg->path_vec.s)
-			pkg_free(msg->path_vec.s);
-		msg->path_vec.s = 0;
-		msg->path_vec.len = 0;
+	if(msg->path_vec.s != 0) {
+		pkg_free(msg->path_vec.s);
 	}
+	msg->path_vec.s = 0;
+	msg->path_vec.len = 0;
 }
 
 
@@ -1034,87 +1047,4 @@ int msg_set_time(sip_msg_t* const msg)
 	if(msg->tval.tv_sec!=0)
 		return 0;
 	return gettimeofday(&msg->tval, NULL);
-}
-
-/**
- * get source ip, port and protocol in SIP URI format
- * - tmode - 0: short format (transport=udp is not added, being default)
- */
-int get_src_uri(sip_msg_t *m, int tmode, str *uri)
-{
-	static char buf[MAX_URI_SIZE];
-	char* p;
-	str ip, port;
-	int len;
-	str proto;
-
-	if (!uri || !m) {
-		LM_ERR("invalid parameter value\n");
-		return -1;
-	}
-
-	if(tmode==0) {
-		switch(m->rcv.proto) {
-			case PROTO_NONE:
-			case PROTO_UDP:
-				proto.s = 0; /* Do not add transport parameter, UDP is default */
-				proto.len = 0;
-			break;
-			default:
-				if(get_valid_proto_string(m->rcv.proto, 1, 0, &proto)<0) {
-					LM_ERR("unknown transport protocol\n");
-					return -1;
-				}
-		}
-	} else {
-		if(get_valid_proto_string(m->rcv.proto, 1, 0, &proto)<0) {
-			LM_ERR("unknown transport protocol\n");
-			return -1;
-		}
-	}
-
-	ip.s = ip_addr2a(&m->rcv.src_ip);
-	ip.len = strlen(ip.s);
-
-	port.s = int2str(m->rcv.src_port, &port.len);
-
-	len = 4 + ip.len + 2*(m->rcv.src_ip.af==AF_INET6)+ 1 + port.len;
-	if (proto.s) {
-		len += TRANSPORT_PARAM_LEN;
-		len += proto.len;
-	}
-
-	if (len > MAX_URI_SIZE) {
-		LM_ERR("buffer too small\n");
-		return -1;
-	}
-
-	p = buf;
-	memcpy(p, "sip:", 4);
-	p += 4;
-
-	if (m->rcv.src_ip.af==AF_INET6)
-		*p++ = '[';
-	memcpy(p, ip.s, ip.len);
-	p += ip.len;
-	if (m->rcv.src_ip.af==AF_INET6)
-		*p++ = ']';
-
-	*p++ = ':';
-
-	memcpy(p, port.s, port.len);
-	p += port.len;
-
-	if (proto.s) {
-		memcpy(p, TRANSPORT_PARAM, TRANSPORT_PARAM_LEN);
-		p += TRANSPORT_PARAM_LEN;
-
-		memcpy(p, proto.s, proto.len);
-		p += proto.len;
-	}
-
-	uri->s = buf;
-	uri->len = len;
-
-	return 0;
 }

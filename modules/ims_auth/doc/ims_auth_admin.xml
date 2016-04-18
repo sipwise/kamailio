@@ -223,10 +223,7 @@ modparam("ims_auth", "registration_qop", "auth-int")
     <section>
       <title><varname>cxdx_forced_peer</varname> (string)</title>
 
-      <para>FQDN of Diameter Peer (HSS) to use for communication (MAR). If you
-      use this, the routing defined in your diameter xml configuration file
-      (CDP) will be ignored and as a result you will lose the benefits of load
-      balancing and failover. </para>
+      <para>FQDN of Diameter Peer (HSS) to use for communication (MAR)</para>
 
       <para>Default value is <quote/>.</para>
 
@@ -244,7 +241,7 @@ modparam("ims_auth", "cxdx_forced_peer", "hss.ims.smilecoms.com")
     <section>
       <title><varname>cxdx_dest_realm</varname> (string)</title>
 
-      <para>Destination realm to be used in Diameter messages to HSS</para>
+      <para>Destination realm to be used in Diameter messags to HSS</para>
 
       <para>Default value is <quote>ims.smilecoms.com</quote>.</para>
 
@@ -260,28 +257,9 @@ modparam("ims_auth", "cxdx_dest_realm", "ims.smilecoms.com")
     </section>
 
     <section>
-      <title><varname>cxdx_dest_host</varname> (string)</title>
-
-      <para>Destination Host to be used in Diameter-MAR messages to HSS</para>
-
-      <para>Default value is <quote></quote> (not set).</para>
-
-      <example>
-        <title><varname>cxdx_dest_host</varname> parameter usage</title>
-
-        <programlisting format="linespecific">
-...
-modparam("ims_auth", "cxdx_dest_host", "hss.ims.ng-voice.com")
-...
-</programlisting>
-      </example>
-    </section>
-
-    <section>
       <title><varname>max_nonce_reuse</varname> (integer)</title>
 
-      <para>Defines, how many times a nonce can be reused (provided nc is
-      incremented)</para>
+      <para>Defines, how many times a nonce can be reused (provided nc is incremented)</para>
 
       <para>Default value is <quote>0</quote> (don't allow reuse).</para>
 
@@ -299,11 +277,9 @@ modparam("ims_auth", "max_nonce_reuse", 1)
     <section>
       <title><varname>add_authinfo_hdr</varname> (integer)</title>
 
-      <para>Should an Authentication-Info header be added on 200 OK
-      responses?</para>
+      <para>Should an Authentication-Info header be added on 200 OK responses?</para>
 
-      <para>Default value is <quote>1</quote> (add Authentication-Info
-      header).</para>
+      <para>Default value is <quote>1</quote> (add Authentication-Info header).</para>
 
       <example>
         <title><varname>add_authinfo_hdr</varname> parameter usage</title>
@@ -320,12 +296,9 @@ modparam("ims_auth", "add_authinfo_hdr", 0)
       <title><varname>ignore_failed_auth</varname> (integer)</title>
 
       <para>Ignore invalid passwords (only IMPI/IMPU is checked).</para>
+      <para>It should be used only for testing, e.g. load balancing with SIPP where we don't want to worry about auth.</para>
 
-      <para>It should be used only for testing, e.g. load balancing with SIPP
-      where we don't want to worry about auth.</para>
-
-      <para>Default value is <quote>0</quote> (don't ingnore the failed
-      authentication).</para>
+      <para>Default value is <quote>0</quote> (don't ingnore the failed authentication).</para>
 
       <example>
         <title><varname>ignore_failed_auth</varname> parameter usage</title>
@@ -341,16 +314,10 @@ modparam("ims_auth", "ignore_failed_auth", 1)
     <section>
       <title><varname>av_check_only_impu</varname> (integer)</title>
 
-      <para>When storing the authentication vectors for an account, use either
-      IMPI/IMPU (=0, default) or IMPU (=1).</para>
-
-      <para>In case the IMPI is different from the IMPU, this option needs to
-      be enabled to allow registration from classic "SIP-clients", such as
-      Snom phones and others, as they do not send an authentication username
-      in the first REGISTER.</para>
-
-      <para>Default value is <quote>0</quote> (store authentication vectors
-      based on IMPI/IMPU).</para>
+      <para>When storing the authentication vectors for an account, use either IMPI/IMPU (=0, default) or IMPU (=1).</para>
+      <para>In case the IMPI is different from the IMPU, this option needs to be enabled to allow registration from
+        classic "SIP-clients", such as Snom phones and others, as they do not send an authentication username in the first REGISTER.</para>
+      <para>Default value is <quote>0</quote> (store authentication vectors based on IMPI/IMPU).</para>
 
       <example>
         <title><varname>av_check_only_impu</varname> parameter usage</title>
@@ -362,6 +329,9 @@ modparam("ims_auth", "av_check_only_impu", 1)
 </programlisting>
       </example>
     </section>
+
+
+
   </section>
 
   <section>
@@ -440,17 +410,17 @@ if (!www_authorize("kamailio.org", "subscriber")) {
     </section>
 
     <section>
-      <title><function
-      moreinfo="none">ims_www_authenticate(realm)</function></title>
+      <title><function moreinfo="none">ims_www_authenticate(realm,
+      table)</function></title>
 
-      <para>It is the same function as www_authenticate(realm, table). This
-      name is kept for backward compatibility, since it was named this way
-      first time by it actually does user authentication.</para>
+      <para>It is same function as www_authenticate(realm, table). This name
+      is kept for backward compatibility, since it was named this way first
+      time by it actually does user authentication.</para>
     </section>
 
     <section>
-      <title><function moreinfo="none">ims_www_challenge(route_block,
-      realm)</function></title>
+      <title><function moreinfo="none">ims_www_challenge(route_block, realm,
+      table)</function></title>
 
       <para>Name alias: proxy_authorize(realm, table)</para>
 
@@ -472,7 +442,6 @@ if (!www_authorize("kamailio.org", "subscriber")) {
         <listitem>
           <para>Route block to resume after async MAR Diameter reply.</para>
         </listitem>
-
         <listitem>
           <para><emphasis>realm</emphasis> - Realm is a opaque string that the
           user agent should present to the user so he can decide what username
@@ -489,12 +458,17 @@ if (!www_authorize("kamailio.org", "subscriber")) {
 
           <para>The string may contain pseudo variables.</para>
         </listitem>
+
+        <listitem>
+          <para><emphasis>table</emphasis> - Table to be used to lookup
+          usernames and passwords (usually subscribers table).</para>
+        </listitem>
       </itemizedlist>
 
       <para>This function can be used from REQUEST_ROUTE.</para>
 
       <example>
-        <title>ims_www_challenge usage</title>
+        <title>proxy_authorize usage</title>
 
         <programlisting format="linespecific">
 ...
@@ -531,53 +505,6 @@ route[REG_MAR_REPLY]
     </section>
 
     <section>
-      <title><function moreinfo="none">ims_www_challenge(route_block, realm,
-      algorithm)</function></title>
-
-      <para>Same as 4.3 except here there is the addiional option to specify
-      the authorisation algorithm</para>
-
-      <itemizedlist>
-        <listitem>
-          <para><emphasis>algorithm</emphasis> - The algorithm to be used when
-          challenging the client. Can be AKAv1-MD5, AKAv2-MD5, MD5, or
-          HSS-Selected. If left as an empty string, the default algorithm will
-          be chosen according to the parameter registration_default_algorithm
-          (see section 3.7)</para>
-        </listitem>
-      </itemizedlist>
-
-      <para>This function can be used from REQUEST_ROUTE.</para>
-
-      <example>
-        <title>ims_www_challenge usage</title>
-
-        <programlisting format="linespecific">
-...
- if (!ims_www_authenticate(NETWORKNAME)) {
-                #user has not been authenticated. Lets send a challenge via 401 Unauthorized
-                if ($? == -2) {
-                        t_reply("403", "Authentication Failed");
-                        exit;
-                } else if ($? == -3) {
-                        t_reply("400", "Bad Request");
-                        exit;
-                } else if ($? == -9) {
-                        xlog("L_DBG", "Authentication re-sync requested\n");
-                        ims_www_resync_auth("REG_RESYNC_REPLY", "$td");
-                        exit;
-                } else {
-                        xlog("L_DBG","About to challenge! auth_ims\n"); 
-                        ims_www_challenge("REG_MAR_REPLY", "$td", "MD5");
-                        exit;
-                }
-        }
-
-</programlisting>
-      </example>
-    </section>
-
-    <section>
       <title><function moreinfo="none">ims_proxy_challenge(route_block, realm,
       table)</function></title>
 
@@ -601,7 +528,6 @@ route[REG_MAR_REPLY]
         <listitem>
           <para>Route block to resume after async MAR Diameter reply.</para>
         </listitem>
-
         <listitem>
           <para><emphasis>realm</emphasis> - Realm is a opaque string that the
           user agent should present to the user so he can decide what username

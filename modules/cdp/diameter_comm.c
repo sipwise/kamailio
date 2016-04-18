@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -132,19 +132,12 @@ AAAReturnCode AAASendMessage(
 		AAATransactionCallback_f *callback_f,
 		void *callback_param)
 {
-        cdp_session_t* cdp_session;
 	peer *p;
-        cdp_session = cdp_get_session(message->sessionId->data);
-        
-	p = get_routing_peer(cdp_session, message);
-        if (cdp_session) {
-            AAASessionsUnlock(cdp_session->hash);
-        }
+	p = get_routing_peer(message);
 	if (!p) {
 		LM_ERR("AAASendMessage(): Can't find a suitable connected peer in the routing table.\n");
 		goto error;
 	}
-	LM_DBG("Found diameter peer [%.*s] from routing table\n", p->fqdn.len, p->fqdn.s);
 	if (p->state!=I_Open && p->state!=R_Open){
 		LM_ERR("AAASendMessage(): Peer not connected to %.*s\n",p->fqdn.len,p->fqdn.s);
 		goto error;
@@ -201,7 +194,7 @@ AAAReturnCode AAASendMessageToPeer(
 			LM_ERR("AAASendMessageToPeer(): can't add transaction callback for answer.\n");
 	}
 
-	p->last_selected = time(NULL);
+//	if (!peer_send_msg(p,message))
 	if (!sm_process(p,Send_Message,message,0,0))
 		goto error;
 
@@ -244,16 +237,12 @@ AAAMessage* AAASendRecvMessage(AAAMessage *message)
 	gen_sem_t *sem=0;
 	cdp_trans_t *t;
 	AAAMessage *ans;
-        struct timeval start, stop;
-        long elapsed_usecs=0, elapsed_millis=0;
-        cdp_session_t* cdp_session;
+    struct timeval start, stop;
+    long elapsed_usecs=0, elapsed_millis=0;
 
-        gettimeofday(&start, NULL);
-        cdp_session = cdp_get_session(message->sessionId->data);
-	p = get_routing_peer(cdp_session, message);
-        if (cdp_session) {
-            AAASessionsUnlock(cdp_session->hash);
-        }
+    gettimeofday(&start, NULL);
+
+	p = get_routing_peer(message);
 	if (!p) {
 		LM_ERR("AAASendRecvMessage(): Can't find a suitable connected peer in the routing table.\n");
 		goto error;

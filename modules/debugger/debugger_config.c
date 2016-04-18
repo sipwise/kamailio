@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -32,7 +32,6 @@
 
 struct cfg_group_dbg	default_dbg_cfg = {
 	0, /* level_mode */
-	0, /* facility_mode */
 	0  /* hash_size */
 };
 
@@ -40,11 +39,8 @@ void *dbg_cfg = &default_dbg_cfg;
 
 cfg_def_t dbg_cfg_def[] = {
 	{"mod_level_mode", CFG_VAR_INT|CFG_ATOMIC, 0, 1,
-		dbg_mode_fixup, 0,
+		dbg_level_mode_fixup, 0,
 		"Enable or disable per module log level (0 - disabled, 1 - enabled)"},
-	{"mod_facility_mode", CFG_VAR_INT|CFG_ATOMIC, 0, 1,
-		dbg_mode_fixup, 0,
-		"Enable or disable per module log facility (0 - disabled, 1 - enabled)"},
 	{"mod_hash_size", CFG_VAR_INT|CFG_READONLY, 0, 0,
 		0, 0,
 		"power of two as size of internal hash table to store levels per module"},

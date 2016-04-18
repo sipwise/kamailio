@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ * 
  * Accounting module
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,8 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * -------
+ * 2010-07-28 - moved out radius account out of acc module (daniel)
  */
 
 /*! \file
@@ -44,7 +49,6 @@
 #include "../../lib/kcore/radius.h"
 #include "../../modules/acc/acc_api.h"
 #include "acc_radius_mod.h"
-#include "../../modules/acc/acc_extra.h"
 
 MODULE_VERSION
 
@@ -74,7 +78,6 @@ static char *radius_config = 0;
 int radius_flag = -1;
 int radius_missed_flag = -1;
 static int service_type = -1;
-int rad_time_mode=0;
 void *rh;
 /* rad extra variables */
 static char *rad_extra_str = 0;
@@ -92,12 +95,11 @@ static cmd_export_t cmds[] = {
 
 
 static param_export_t params[] = {
-	{"radius_config",        PARAM_STRING, &radius_config     },
+	{"radius_config",        STR_PARAM, &radius_config        },
 	{"radius_flag",          INT_PARAM, &radius_flag          },
 	{"radius_missed_flag",   INT_PARAM, &radius_missed_flag   },
 	{"service_type",         INT_PARAM, &service_type         },
-	{"radius_extra",         PARAM_STRING, &rad_extra_str     },
-	{"rad_time_mode",          INT_PARAM, &rad_time_mode      },
+	{"radius_extra",         STR_PARAM, &rad_extra_str        },
 	{0,0,0}
 };
 
@@ -127,7 +129,7 @@ static int mod_init( void )
 		LM_ERR("radius config file not set\n");
 		return -1;
 	}
-
+	
 	/* bind the ACC API */
 	if (acc_load_api(&accb)<0) {
 		LM_ERR("cannot bind to ACC API\n");
@@ -139,7 +141,7 @@ static int mod_init( void )
 		LM_ERR("failed to parse rad_extra param\n");
 		return -1;
 	}
-
+		
 	memset(&_acc_radius_engine, 0, sizeof(acc_engine_t));
 
 	if(radius_flag != -1)
@@ -194,7 +196,7 @@ static int acc_api_fixup(void** param, int param_no)
 		accp->reason.len = strlen(p);
 		/* any code? */
 		if (accp->reason.len>=3 && isdigit((int)p[0])
-				&& isdigit((int)p[1]) && isdigit((int)p[2]) ) {
+		&& isdigit((int)p[1]) && isdigit((int)p[2]) ) {
 			accp->code = (p[0]-'0')*100 + (p[1]-'0')*10 + (p[2]-'0');
 			accp->code_s.s = p;
 			accp->code_s.len = 3;
@@ -231,7 +233,7 @@ enum { RA_ACCT_STATUS_TYPE=0, RA_SERVICE_TYPE, RA_SIP_RESPONSE_CODE,
 enum {RV_STATUS_START=0, RV_STATUS_STOP, RV_STATUS_ALIVE, RV_STATUS_FAILED,
 	RV_SIP_SESSION, RV_STATIC_MAX};
 static struct attr
-		rd_attrs[RA_STATIC_MAX+ACC_CORE_LEN-2+MAX_ACC_EXTRA+MAX_ACC_LEG];
+	rd_attrs[RA_STATIC_MAX+ACC_CORE_LEN-2+MAX_ACC_EXTRA+MAX_ACC_LEG];
 static struct val rd_vals[RV_STATIC_MAX];
 
 int init_acc_rad(acc_extra_t *leg_info, char *rad_cfg, int srv_type)
@@ -295,30 +297,30 @@ int acc_radius_init(acc_init_info_t *inf)
 
 static inline uint32_t rad_status( struct sip_msg *req, int code )
 {
-	str tag;
-	unsigned int in_dialog_req = 0;
+        str tag;
+        unsigned int in_dialog_req = 0;
 
-	tag = get_to(req)->tag_value;
-	if(tag.s!=0 && tag.len!=0)
+        tag = get_to(req)->tag_value;
+        if(tag.s!=0 && tag.len!=0)
 		in_dialog_req = 1;
 
 	if (req->REQ_METHOD==METHOD_INVITE && in_dialog_req == 0
-			&& code>=200 && code<300)
-		return rd_vals[RV_STATUS_START].v;
-	if ((req->REQ_METHOD==METHOD_BYE || req->REQ_METHOD==METHOD_CANCEL))
-		return rd_vals[RV_STATUS_STOP].v;
+	            && code>=200 && code<300)
+ 		return rd_vals[RV_STATUS_START].v;
+ 	if ((req->REQ_METHOD==METHOD_BYE || req->REQ_METHOD==METHOD_CANCEL))
+ 		return rd_vals[RV_STATUS_STOP].v;
 	if (in_dialog_req != 0)
 		return rd_vals[RV_STATUS_ALIVE].v;
-	return rd_vals[RV_STATUS_FAILED].v;
-}
+ 	return rd_vals[RV_STATUS_FAILED].v;
+ }
 
 #define ADD_RAD_AVPAIR(_attr,_val,_len)		\
-	do {								\
-		if (!rc_avpair_add(rh, &send, rd_attrs[_attr].v, _val, _len, 0)) { \
-			LM_ERR("failed to add %s, %d\n", rd_attrs[_attr].n, _attr);	\
-			goto error;							\
-		} \
-	}while(0)
+    do {								\
+	if (!rc_avpair_add(rh, &send, rd_attrs[_attr].v, _val, _len, 0)) { \
+	    LM_ERR("failed to add %s, %d\n", rd_attrs[_attr].n, _attr);	\
+	    goto error;							\
+	} \
+    }while(0)
 
 int acc_radius_send_request(struct sip_msg *req, acc_info_t *inf)
 {
@@ -327,12 +329,7 @@ int acc_radius_send_request(struct sip_msg *req, acc_info_t *inf)
 	uint32_t av_type;
 	int offset;
 	int i;
-	int m=0;
-	int o=0;
-	int rc_result=-1;
-	double tsecmicro;
-	char smicrosec[18];
-	
+
 	send=NULL;
 
 	attr_cnt = accb.get_core_attrs( req, inf->varr, inf->iarr, inf->tarr );
@@ -351,40 +348,28 @@ int acc_radius_send_request(struct sip_msg *req, acc_info_t *inf)
 	av_type = req->REQ_METHOD; /* method */
 	ADD_RAD_AVPAIR( RA_SIP_METHOD, &av_type, -1);
 
-	// Event Time Stamp with Microseconds
-        if(rad_time_mode==1){
-                gettimeofday(&inf->env->tv, NULL);
-                tsecmicro=inf->env->tv.tv_sec+((double)inf->env->tv.tv_usec/1000000.0);
-                //radius client doesn t support double so convert it
-                sprintf(smicrosec,"%17.6f",tsecmicro);
-                ADD_RAD_AVPAIR(RA_TIME_STAMP, &smicrosec, -1);
-        }else{
-                av_type = (uint32_t)inf->env->ts;
-                ADD_RAD_AVPAIR(RA_TIME_STAMP, &av_type, -1);
-        }
-
+	/* unix time */
+	av_type = (uint32_t)inf->env->ts;
+	ADD_RAD_AVPAIR( RA_TIME_STAMP, &av_type, -1);
 
 	/* add extra also */
-	o = accb.get_extra_attrs(rad_extra, req, inf->varr+attr_cnt,
-			inf->iarr+attr_cnt, inf->tarr+attr_cnt);
-	attr_cnt += o;
-	m = attr_cnt;
-
+	attr_cnt += accb.get_extra_attrs(rad_extra, req, inf->varr+attr_cnt,
+				inf->iarr+attr_cnt, inf->tarr+attr_cnt);
 
 	/* add the values for the vector - start from 1 instead of
 	 * 0 to skip the first value which is the METHOD as string */
 	offset = RA_STATIC_MAX-1;
 	for( i=1; i<attr_cnt; i++) {
-		switch (inf->tarr[i]) {
-			case TYPE_STR:
-				ADD_RAD_AVPAIR(offset+i, inf->varr[i].s, inf->varr[i].len);
-				break;
-			case TYPE_INT:
-				ADD_RAD_AVPAIR(offset+i, &(inf->iarr[i]), -1);
-				break;
-			default:
-				break;
-		}
+	    switch (inf->tarr[i]) {
+	    case TYPE_STR:
+		ADD_RAD_AVPAIR(offset+i, inf->varr[i].s, inf->varr[i].len);
+		break;
+	    case TYPE_INT:
+		ADD_RAD_AVPAIR(offset+i, &(inf->iarr[i]), -1);
+		break;
+	    default:
+		break;
+	    }
 	}
 
 	/* call-legs attributes also get inserted */
@@ -395,39 +380,18 @@ int acc_radius_send_request(struct sip_msg *req, acc_info_t *inf)
 			for (i=0; i<attr_cnt; i++)
 				ADD_RAD_AVPAIR( offset+i, inf->varr[i].s, inf->varr[i].len );
 		}while ( (attr_cnt=accb.get_leg_attrs(inf->leg_info,req,inf->varr,inf->iarr,
-						inf->tarr, 0))!=0 );
+					      inf->tarr, 0))!=0 );
 	}
 
-	rc_result=rc_acct(rh, SIP_PORT, send);
-
-        if (rc_result==ERROR_RC) {
-                LM_ERR("Radius accounting - ERROR - \n");
-                goto error;
-        }else if(rc_result==BADRESP_RC){
-                LM_ERR("Radius accounting - BAD RESPONSE \n");
-                goto error;
-        }else if(rc_result==TIMEOUT_RC){
-                LM_ERR("Radius accounting - TIMEOUT \n");
-                goto error;
-        }else if(rc_result==REJECT_RC){
-                LM_ERR("Radius accounting - REJECTED \n");
-                goto error;
-        }else if(rc_result==OK_RC){
-                LM_DBG("Radius accounting - OK \n");
-        }else{
-        	LM_ERR("Radius accounting - Unkown response \n");
-                goto error;
-        }
-
-        rc_avpair_free(send);
-        /* free memory allocated by extra2strar */
-        free_strar_mem( &(inf->tarr[m-o]), &(inf->varr[m-o]), o, m);
-        return 1;
+	if (rc_acct(rh, SIP_PORT, send)!=OK_RC) {
+		LM_ERR("radius-ing failed\n");
+		goto error;
+	}
+	rc_avpair_free(send);
+	return 1;
 
 error:
 	rc_avpair_free(send);
-	/* free memory allocated by extra2strar */
-	free_strar_mem( &(inf->tarr[m-o]), &(inf->varr[m-o]), o, m);
 	return -1;
 }
 

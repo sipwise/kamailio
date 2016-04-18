@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 iptelorg GmbH 
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,10 +15,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * tls hooks for modules
+ *
+ * History:
+ * --------
+ *  2007-02-09  created by andrei
+ */
 
 /**
  * @file
- * @brief Kamailio TLS support :: TLS hooks for modules
+ * @brief SIP-router TLS support :: TLS hooks for modules
  * @ingroup tls
  * Module: @ref tls
  */
@@ -28,7 +37,7 @@
 
 #ifdef TLS_HOOKS
 
-struct tls_hooks tls_hook= {0};
+struct tls_hooks tls_hook= {0,0,0,0,0,0,0,0};
 
 static int tls_hooks_loaded=0;
 

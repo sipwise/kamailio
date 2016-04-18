@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  *
  *
@@ -63,10 +63,6 @@
 struct AAA_AVP_List;
 struct AAAMessage;
 enum dialog_direction;
-
-int audio_default_bandwidth;
-int video_default_bandwidth;
-
 
 /*helper*/
 int rx_add_framed_ip_avp(AAA_AVP_LIST * list, str ip, uint16_t version);
@@ -93,6 +89,5 @@ AAA_AVP* rx_create_codec_data_avp(str *raw_sdp_stream, int number, int direction
 inline int rx_get_result_code(AAAMessage *msg, unsigned int *data);
 unsigned int rx_get_abort_cause(AAAMessage *msg);
 
-inline int rx_add_specific_action_avp(AAAMessage *msg, unsigned int data);
 
 #endif /*__PCC_AVP_H*/

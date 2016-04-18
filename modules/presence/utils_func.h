@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * presence module - presence server implementation
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -17,8 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*! \file
@@ -42,7 +47,6 @@
 
 #define LCONTACT_BUF_SIZE 1024
 #define BAD_EVENT_CODE 489
-#define INTERVAL_TOO_BRIEF 423
 
 
 #define EVENT_DIALOG_SLA(ev) \
@@ -124,18 +128,15 @@ static inline int ps_fill_local_contact(struct sip_msg* msg, str *contact)
 		goto error;
 	}	
 	
-	if(msg->rcv.bind_address->useinfo.name.len>0) {
-		ip = msg->rcv.bind_address->useinfo.name;
-	} else {
-		ip = msg->rcv.bind_address->address_str;
+	ip.s= ip_addr2a(&msg->rcv.dst_ip);
+	if(ip.s== NULL)
+	{
+		LM_ERR("transforming ip_addr to ascii\n");
+		goto error;
 	}
+	ip.len= strlen(ip.s);
+	port = msg->rcv.dst_port;
 
-	if(msg->rcv.bind_address->useinfo.port_no>0) {
-		port = msg->rcv.bind_address->useinfo.port_no;
-	} else {
-		port = msg->rcv.bind_address->port_no;
-	}
-	
 	if(strncmp(ip.s, "sip:", 4)!=0)
 	{
 		strncpy(contact->s, "sip:", 4);

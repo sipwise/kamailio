@@ -1,4 +1,5 @@
 /**
+ * $Id$
  *
  * Copyright (C) 2008 Elena-Ramona Modroiu (asipto.com)
  *
@@ -16,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <stdio.h>
@@ -53,9 +54,15 @@ int ht_db_init_params(void)
 
 	if(ht_fetch_rows<=0)
 		ht_fetch_rows = 100;
-	if(ht_array_size_suffix.s==NULL || ht_array_size_suffix.len<=0)
+	if(ht_array_size_suffix.s==NULL || ht_array_size_suffix.s[0]=='\0')
 		ht_array_size_suffix.s = "::size";
+	ht_array_size_suffix.len = strlen(ht_array_size_suffix.s);
 
+	ht_db_url.len   = strlen(ht_db_url.s);
+	ht_db_name_column.len   = strlen(ht_db_name_column.s);
+	ht_db_ktype_column.len  = strlen(ht_db_ktype_column.s);
+	ht_db_vtype_column.len  = strlen(ht_db_vtype_column.s);
+	ht_db_value_column.len  = strlen(ht_db_value_column.s);
 	return 0;
 }
 
@@ -111,68 +118,13 @@ int ht_db_close_con(void)
 #define HT_NAME_BUF_SIZE	256
 static char ht_name_buf[HT_NAME_BUF_SIZE];
 
-static int ht_pack_values(ht_t *ht, db1_res_t* db_res,
-		int row, int cols, str *hvalue)
-{
-	static char vbuf[4096];
-	int c;
-	int len;
-	char *p;
-	str iv;
-
-	len = 0;
-	for(c=1; c<cols; c++) {
-		if(VAL_NULL(&RES_ROWS(db_res)[row].values[c])) {
-			len += 1;
-		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STRING) {
-			len += strlen(RES_ROWS(db_res)[row].values[c].val.string_val);
-		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STR) {
-			len += RES_ROWS(db_res)[row].values[c].val.str_val.len;
-		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_INT) {
-			len += 12;
-		} else {
-			LM_ERR("unsupported data type for column %d\n", c);
-			return -1;
-		}
-	}
-	if(len + c>=4096) {
-		LM_ERR("too large values (need %d)\n", len+c);
-		return -1;
-	}
-	p = vbuf;
-	for(c=1; c<cols; c++) {
-		if(VAL_NULL(&RES_ROWS(db_res)[row].values[c])) {
-			*p = ht->pack[2];
-			p++;
-		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STRING) {
-			strcpy(p, RES_ROWS(db_res)[row].values[c].val.string_val);
-			p += strlen(RES_ROWS(db_res)[row].values[c].val.string_val);
-		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_STR) {
-			strncpy(p, RES_ROWS(db_res)[row].values[c].val.str_val.s,
-				RES_ROWS(db_res)[row].values[c].val.str_val.len);
-			p += RES_ROWS(db_res)[row].values[c].val.str_val.len;
-		} else if(RES_ROWS(db_res)[row].values[c].type == DB1_INT) {
-			iv.s = sint2str(RES_ROWS(db_res)[row].values[c].val.int_val, &iv.len);
-			strncpy(p, iv.s, iv.len);
-			p += iv.len;
-		}
-		if(c+1<cols) {
-			*p = ht->pack[1];
-			p++;
-		}
-	}
-	hvalue->s = vbuf;
-	hvalue->len = p - vbuf;
-	LM_DBG("packed: [%.*s]\n", hvalue->len, hvalue->s);
-	return 0;
-}
-
 /**
  * load content of a db table in hash table
  */
 int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 {
-	db_key_t db_cols[HT_MAX_COLS];
+	db_key_t db_cols[5] = {&ht_db_name_column, &ht_db_ktype_column,
+		&ht_db_vtype_column, &ht_db_value_column, &ht_db_expires_column};
 	db_key_t db_ord = &ht_db_name_column;
 	db1_res_t* db_res = NULL;
 	str kname;
@@ -190,7 +142,6 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 	int cnt;
 	int now;
 	int ncols;
-	int c;
 
 	if(ht_db_con==NULL)
 	{
@@ -203,25 +154,13 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 		LM_ERR("failed to use_table\n");
 		return -1;
 	}
-	if(ht->ncols>0) {
-		for(c=0; c<ht->ncols; c++) {
-			db_cols[c] = &ht->scols[c];
-		}
-		ncols = c;
-	} else {
-		db_cols[0] = &ht_db_name_column;
-		db_cols[1] = &ht_db_ktype_column;
-		db_cols[2] = &ht_db_vtype_column;
-		db_cols[3] = &ht_db_value_column;
-		db_cols[4] = &ht_db_expires_column;
-		ncols = 4;
-		if(ht->htexpire > 0 && ht_db_expires_flag!=0)
-			ncols = 5;
-	}
 
 	LM_DBG("=============== loading hash table [%.*s] from database [%.*s]\n",
 			ht->name.len, ht->name.s, dbtable->len, dbtable->s);
 	cnt = 0;
+	ncols = 4;
+	if(ht->htexpire > 0 && ht_db_expires_flag!=0)
+		ncols = 5;
 
 	if (DB_CAPABILITY(ht_dbf, DB_CAP_FETCH)) {
 		if(ht_dbf.query(ht_db_con,0,0,0,db_cols,0,ncols,db_ord,0) < 0)
@@ -265,17 +204,11 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 	do {
 		for(i=0; i<RES_ROW_N(db_res); i++)
 		{
-			if(VAL_NULL(&RES_ROWS(db_res)[i].values[0])) {
-				LM_ERR("key value must not be null\n");
+			if(RES_ROWS(db_res)[i].values[0].type!=DB1_STRING
+					|| VAL_NULL(&RES_ROWS(db_res)[i].values[0])) {
+				LM_ERR("key type must be string and its value not null\n");
 				goto error;
 			}
-
-			if(RES_ROWS(db_res)[i].values[0].type!=DB1_STRING) {
-				LM_ERR("key type must be string (type=%d)\n",
-						RES_ROWS(db_res)[i].values[0].type);
-				goto error;
-			}
-
 			kname.s = (char*)(RES_ROWS(db_res)[i].values[0].val.string_val);
 			if(kname.s==NULL) {
 				LM_ERR("null key in row %d\n", i);
@@ -283,172 +216,85 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 			}
 			kname.len = strlen(kname.s);
 
-			if(ht->ncols>0) {
-				if(ht_pack_values(ht, db_res, i, ncols, &val.s)<0) {
-					LM_ERR("Error packing values\n");
-					goto error;
+			expires.n = 0;
+			if(ht->htexpire > 0 && ht_db_expires_flag!=0) {
+				expires.n = RES_ROWS(db_res)[i].values[4].val.int_val;
+				if (expires.n > 0 && expires.n < now) {
+					LM_DBG("skipping expired entry [%.*s] (%d)\n", kname.len,
+							kname.s, expires.n-now);
+					continue;
 				}
-				if(ht_set_cell(ht, &kname, AVP_VAL_STR, &val, mode))
-				{
-					LM_ERR("error adding to hash table\n");
-					goto error;
-				}
-			} else {
-				expires.n = 0;
-				if(ht->htexpire > 0 && ht_db_expires_flag!=0) {
-					expires.n = RES_ROWS(db_res)[i].values[4].val.int_val;
-					if (expires.n > 0 && expires.n < now) {
-						LM_DBG("skipping expired entry [%.*s] (%d)\n", kname.len,
-								kname.s, expires.n-now);
-						continue;
-					}
-				}
+			}
 
-				cnt++;
-				switch(RES_ROWS(db_res)[i].values[1].type)
+			cnt++;
+			ktype = RES_ROWS(db_res)[i].values[1].val.int_val;
+			if(last_ktype==1)
+			{
+				if(pname.len>0
+						&& (pname.len!=kname.len
+							|| strncmp(pname.s, kname.s, pname.len)!=0))
 				{
-					case DB1_INT:
-						ktype = RES_ROWS(db_res)[i].values[1].val.int_val;
-					break;
-				case DB1_BIGINT:
-					ktype = RES_ROWS(db_res)[i].values[1].val.ll_val;
-					break;
-				default:
-					LM_ERR("Wrong db type [%d] for key_type column\n",
-						RES_ROWS(db_res)[i].values[1].type);
-					goto error;
-				}
-				if(last_ktype==1)
-				{
-					if(pname.len>0
-							&& (pname.len!=kname.len
-								|| strncmp(pname.s, kname.s, pname.len)!=0))
-					{
-						/* new key name, last was an array => add its size */
-						snprintf(ht_name_buf, HT_NAME_BUF_SIZE, "%.*s%.*s",
-								pname.len, pname.s, ht_array_size_suffix.len,
-								ht_array_size_suffix.s);
-						hname.s = ht_name_buf;
-						hname.len = strlen(ht_name_buf);
-						val.n = n;
-
-						if(ht_set_cell(ht, &hname, 0, &val, mode))
-						{
-							LM_ERR("error adding array size to hash table.\n");
-							goto error;
-						}
-						pname.len = 0;
-						pname.s = "";
-						n = 0;
-					}
-				}
-				last_ktype = ktype;
-				pname = kname;
-				if(ktype==1)
-				{
-					snprintf(ht_name_buf, HT_NAME_BUF_SIZE, "%.*s[%d]",
-							kname.len, kname.s, n);
+					/* new key name, last was an array => add its size */
+					snprintf(ht_name_buf, HT_NAME_BUF_SIZE, "%.*s%.*s",
+						pname.len, pname.s, ht_array_size_suffix.len,
+						ht_array_size_suffix.s);
 					hname.s = ht_name_buf;
 					hname.len = strlen(ht_name_buf);
-					n++;
-				} else {
-					hname = kname;
-				}
-				switch(RES_ROWS(db_res)[i].values[2].type)
-				{
-					case DB1_INT:
-						vtype = RES_ROWS(db_res)[i].values[2].val.int_val;
-						break;
-					case DB1_BIGINT:
-						vtype = RES_ROWS(db_res)[i].values[2].val.ll_val;
-						break;
-					default:
-						LM_ERR("Wrong db type [%d] for value_type column\n",
-								RES_ROWS(db_res)[i].values[2].type);
-						goto error;
-				}
+					val.n = n;
 
-				/* add to hash */
-				if(vtype==1)
-				{
-					switch(RES_ROWS(db_res)[i].values[3].type)
+					if(ht_set_cell(ht, &hname, 0, &val, mode))
 					{
-						case DB1_STR:
-							kvalue = RES_ROWS(db_res)[i].values[3].val.str_val;
-							if(kvalue.s==NULL) {
-								LM_ERR("null value in row %d\n", i);
-								goto error;
-							}
-							str2sint(&kvalue, &val.n);
-							break;
-						case DB1_STRING:
-							kvalue.s = (char*)(RES_ROWS(db_res)[i].values[3].val.string_val);
-							if(kvalue.s==NULL) {
-								LM_ERR("null value in row %d\n", i);
-								goto error;
-							}
-							kvalue.len = strlen(kvalue.s);
-							str2sint(&kvalue, &val.n);
-							break;
-						case DB1_INT:
-							val.n = RES_ROWS(db_res)[i].values[3].val.int_val;
-							break;
-						case DB1_BIGINT:
-							val.n = RES_ROWS(db_res)[i].values[3].val.ll_val;
-							break;
-						default:
-							LM_ERR("Wrong db type [%d] for key_value column\n",
-									RES_ROWS(db_res)[i].values[3].type);
-							goto error;
+						LM_ERR("error adding array size to hash table.\n");
+						goto error;
 					}
-				} else {
-					switch(RES_ROWS(db_res)[i].values[3].type)
-					{
-						case DB1_STR:
-							kvalue = RES_ROWS(db_res)[i].values[3].val.str_val;
-							if(kvalue.s==NULL) {
-								LM_ERR("null value in row %d\n", i);
-								goto error;
-							}
-							val.s = kvalue;
-							break;
-						case DB1_STRING:
-							kvalue.s = (char*)(RES_ROWS(db_res)[i].values[3].val.string_val);
-							if(kvalue.s==NULL) {
-								LM_ERR("null value in row %d\n", i);
-								goto error;
-							}
-							kvalue.len = strlen(kvalue.s);
-							val.s = kvalue;
-							break;
-						case DB1_INT:
-							kvalue.s = int2str(RES_ROWS(db_res)[i].values[3].val.int_val, &kvalue.len);
-							val.s = kvalue;
-							break;
-						case DB1_BIGINT:
-							kvalue.s = int2str(RES_ROWS(db_res)[i].values[3].val.ll_val, &kvalue.len);
-							val.s = kvalue;
-							break;
-						default:
-							LM_ERR("Wrong db type [%d] for key_value column\n",
-									RES_ROWS(db_res)[i].values[3].type);
-							goto error;
-					}
+					pname.len = 0;
+					pname.s = "";
+					n = 0;
 				}
+			}
+			last_ktype = ktype;
+			pname = kname;
+			if(ktype==1)
+			{
+				snprintf(ht_name_buf, HT_NAME_BUF_SIZE, "%.*s[%d]",
+						kname.len, kname.s, n);
+				hname.s = ht_name_buf;
+				hname.len = strlen(ht_name_buf);
+				n++;
+			} else {
+				hname = kname;
+			}
+			vtype = RES_ROWS(db_res)[i].values[2].val.int_val;
+			if (RES_ROWS(db_res)[i].values[3].type != DB1_STRING) {
+				LM_ERR("Wrong db type [%d] for key_value column\n",
+					RES_ROWS(db_res)[i].values[3].type);
+				goto error;
+			}
+			kvalue.s = (char*)(RES_ROWS(db_res)[i].values[3].val.string_val);
+			if(kvalue.s==NULL) {
+				LM_ERR("null value in row %d\n", i);
+				goto error;
+			}
+			kvalue.len = strlen(kvalue.s);
+
+			/* add to hash */
+			if(vtype==1)
+				str2sint(&kvalue, &val.n);
+			else
+				val.s = kvalue;
 				
-				if(ht_set_cell(ht, &hname, (vtype)?0:AVP_VAL_STR, &val, mode))
-				{
-					LM_ERR("error adding to hash table\n");
-					goto error;
-				}
+			if(ht_set_cell(ht, &hname, (vtype)?0:AVP_VAL_STR, &val, mode))
+			{
+				LM_ERR("error adding to hash table\n");
+				goto error;
+			}
 
-				/* set expiry */
-				if (ht->htexpire > 0 && expires.n > 0) {
-					expires.n -= now;
-					if(ht_set_cell_expire(ht, &hname, 0, &expires)) {
-						LM_ERR("error setting expires to hash entry [%*.s]\n", hname.len, hname.s);
-						goto error;
-					}
+			/* set expiry */
+			if (ht->htexpire > 0 && expires.n > 0) {
+				expires.n -= now;
+				if(ht_set_cell_expire(ht, &hname, 0, &expires)) {
+					LM_ERR("error setting expires to hash entry [%*.s]\n", hname.len, hname.s);
+					goto error;
 				}
 			}
 	 	}
@@ -507,12 +353,6 @@ int ht_db_save_table(ht_t *ht, str *dbtable)
 		return -1;
 	}
 
-	if(ht->ncols>0) {
-		LM_WARN("saving htable [%.*s] with custom db columns is not available\n",
-				ht->name.len, ht->name.s);
-		return 0;
-	}
-
 	if (ht_dbf.use_table(ht_db_con, dbtable) < 0)
 	{
 		LM_ERR("failed to use_table\n");
@@ -526,7 +366,7 @@ int ht_db_save_table(ht_t *ht, str *dbtable)
 
 	for(i=0; i<ht->htsize; i++)
 	{
-		ht_slot_lock(ht, i);
+		lock_get(&ht->entries[i].lock);
 		it = ht->entries[i].first;
 		while(it)
 		{
@@ -586,7 +426,6 @@ int ht_db_save_table(ht_t *ht, str *dbtable)
 			}
 			it = it->next;
 		}
-		ht_slot_unlock(ht, i);
 	}
 	return 0;
 }

@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /**
@@ -490,15 +490,7 @@ static int get_fifo_opts(str * buf, fifo_opt_t * opts, unsigned int opt_set[]) {
 		LM_DBG("token %.*s", opt_argv[i].len, opt_argv[i].s);
 		if (opt_argv[i].len >= 1) {
 			switch(*opt_argv[i].s) {
-					case '-': 
-						  /* -{OPTION}{PARAMETER} is not allowed */
-                                                  if (opt_argv[i].len != 2) {
-                                                        FIFO_ERR(E_WRONGOPT);
-                                                        LM_DBG("Unknown option: %.*s\n", opt_argv[i].len, opt_argv[i].s);
-                                                        return -1;
-                                                  }
-
-						  switch(opt_argv[i].s[1]) {
+					case '-': switch(opt_argv[i].s[1]) {
 							case OPT_DOMAIN_CHR:
 							op = OPT_DOMAIN;
 							used_opts |= O_DOMAIN;

@@ -1,24 +1,26 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2005 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/** Kamailio Core :: core rpcs.
+/** core rpcs.
  * @file core_cmd.c
  * @ingroup core
  */
@@ -757,7 +759,7 @@ static void core_tcp_list(rpc_t* rpc, void* c)
 	char* state;
 	char* type;
 	struct tcp_connection* con;
-	int i, len, timeout, lifetime;
+	int i, len, timeout;
 
 	if (tcp_disable) {
 		rpc->fault(c, 500, "tcp support disabled");
@@ -789,7 +791,6 @@ static void core_tcp_list(rpc_t* rpc, void* c)
 				BUG("failed to convert destination ip");
 			dst_ip[len] = 0;
 			timeout = TICKS_TO_S(con->timeout - get_ticks_raw());
-			lifetime = TICKS_TO_S(con->lifetime);
 			switch(con->state) {
 				case S_CONN_ERROR:
 					state = "CONN_ERROR";
@@ -815,12 +816,11 @@ static void core_tcp_list(rpc_t* rpc, void* c)
 				default:
 					state = "UNKNOWN";
 			}
-			rpc->struct_add(handle, "dssdddsdsd",
+			rpc->struct_add(handle, "dssddsdsd",
 					"id", con->id,
 					"type", type,
 					"state", state,
 					"timeout", timeout,
-					"lifetime", lifetime,
 					"ref_count", con->refcnt,
 					"src_ip", src_ip,
 					"src_port", con->rcv.src_port,
@@ -925,7 +925,7 @@ static void core_sockets_list(rpc_t* rpc, void* c)
 					rpc->struct_add(ha, "ss",
 						"address", ai->address_str.s);
 				rpc->struct_add(ha, "sss",
-						"port", si->port_no_str.s,
+						"proto", si->port_no_str.s,
 						"mcast", si->flags & SI_IS_MCAST ? "yes" : "no",
 						"mhomed", si->flags & SI_IS_MHOMED ? "yes" : "no");
 			} else {
@@ -939,7 +939,7 @@ static void core_sockets_list(rpc_t* rpc, void* c)
 					rpc->struct_add(ha, "s",
 						"ipaddress", si->address_str.s);
 				rpc->struct_add(ha, "sss",
-						"port", si->port_no_str.s,
+						"proto", si->port_no_str.s,
 						"mcast", si->flags & SI_IS_MCAST ? "yes" : "no",
 						"mhomed", si->flags & SI_IS_MHOMED ? "yes" : "no");
 			}
@@ -969,7 +969,7 @@ static rpc_export_t core_rpc_methods[] = {
 		0        },
 	{"core.uptime",            core_uptime,            core_uptime_doc,            0        },
 	{"core.ps",                core_ps,                core_ps_doc,                RET_ARRAY},
-	{"core.psx",               core_psx,               core_psx_doc,               RET_ARRAY},
+	{"core.psx",               core_psx,               core_psx_doc,                0},
 	{"core.pwd",               core_pwd,               core_pwd_doc,               RET_ARRAY},
 	{"core.arg",               core_arg,               core_arg_doc,               RET_ARRAY},
 	{"core.kill",              core_kill,              core_kill_doc,              0        },

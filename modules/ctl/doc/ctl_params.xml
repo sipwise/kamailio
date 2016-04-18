@@ -63,8 +63,7 @@
 		setting the parameter multiple times.
 	</para>
 	<para>
-		<emphasis>Default:</emphasis>
-		"unix:/var/run/&kamailiobinary;/&kamailiobinary;_ctl" (Unix stream socket).
+		<emphasis>Default:</emphasis>"unix:/tmp/&ctlsocket;" (Unix stream socket).
 		The default value is used <emphasis>only</emphasis> if no
 		<varname>binrpc</varname> parameter is found in the config file.
 	</para>
@@ -200,13 +199,13 @@ modparam("ctl", "autoconversion", 1)
 		kilobytes.
 	</para>
 	<para>
-		Default: 32 (meaning 32KB);
+		Default: 4 (meaning 4KB);
 	</para>
 	<example>
 		<title>Set the <varname>binrpc_max_body_size</varname> parameter
 		</title>
 		<programlisting>
-modparam("ctl", "binrpc_max_body_size", 16)
+modparam("ctl", "binrpc_max_body_size", 10)
 		</programlisting>
 	</example>
 	</section>
@@ -218,13 +217,13 @@ modparam("ctl", "binrpc_max_body_size", 16)
 		kilobytes.
 	</para>
 	<para>
-		Default: 8 (meaning 8KB);
+		Default: 1 (meaning 1KB);
 	</para>
 	<example>
 		<title>Set the <varname>binrpc_struct_max_body_size</varname> parameter
 		</title>
 		<programlisting>
-modparam("ctl", "binrpc_struct_max_body_size", 4)
+modparam("ctl", "binrpc_struct_max_body_size", 3)
 		</programlisting>
 	</example>
 	</section>

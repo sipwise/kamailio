@@ -1,7 +1,9 @@
 /*
- * Copyright (C) 2013-15 Robert Boisvert
+ * $Id$
  *
- * This file is part of the mohqueue module for Kamailio, a free SIP server.
+ * Copyright (C) 2013 Robert Boisvert
+ *
+ * This file is part of the mohqueue module for sip-router, a free SIP server.
  *
  * The mohqueue module is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -51,7 +53,6 @@
 #include "../../parser/contact/parse_contact.h"
 #include "../../parser/parse_expires.h"
 #include "../../parser/parse_from.h"
-#include "../../parser/parse_rr.h"
 #include "../../parser/sdp/sdp.h"
 
 /* convenience macros */
@@ -68,7 +69,7 @@
 
 #define MOHQ_STR_APPEND_L( str1, str1_lim, s2, s2_len ) \
 	if ((str1)->len + (s2_len) >= (str1_lim)) { \
-	    LM_ERR( "Failed to append to str: too long!\n" ); \
+	    LM_ERR( "Failed to append to str: too long" ); \
 	} else { \
 	    MOHQ_STR_APPEND((str1), (s2), (s2_len)); \
 	    (str1_lim) -= (s2_len); \
@@ -83,7 +84,7 @@
 
 #define MOHQ_STR_APPEND_CSTR_L( str1, str1_lim, cstr1 ) \
 	if ((str1)->len + strlen(cstr1) >= (str1_lim)) { \
-	    LM_ERR( "Failed to append to str: too long!\n" ); \
+	    LM_ERR( "Failed to append to str: too long" ); \
 	} else { \
 	    MOHQ_STR_APPEND_CSTR((str1), (cstr1)); \
 	}

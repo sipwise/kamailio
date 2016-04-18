@@ -47,9 +47,9 @@
 		<table_name>acc_cdrs</table_name>
 		<db_url_id>mysql</db_url_id>
 		<column><field>id</field><type>DB1_INT</type></column>
-		<column><field>start_time</field><type>DB1_DATETIME</type></column>
-		<column><field>end_time</field><type>DB1_DATETIME</type></column>
-		<column><field>duration</field><type>DB1_DOUBLE</type></column>
+		<column><field>start_time</field><type>DB1_STR</type></column>
+		<column><field>end_time</field><type>DB1_STR</type></column>
+		<column><field>duration</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of missed_calls table-->
 	<db_table id="missed_calls">
@@ -468,9 +468,7 @@
 		<column><field>src_ip</field><type>DB1_STR</type></column>
 		<column><field>proto</field><type>DB1_STR</type></column>
 		<column><field>from_pattern</field><type>DB1_STR</type></column>
-		<column><field>ruri_pattern</field><type>DB1_STR</type></column>
 		<column><field>tag</field><type>DB1_STR</type></column>
-		<column><field>priority</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of address table-->
 	<db_table id="address">
@@ -505,7 +503,6 @@
 		<column><field>received_time</field><type>DB1_INT</type></column>
 		<column><field>body</field><type>DB1_BLOB</type></column>
 		<column><field>sender</field><type>DB1_STR</type></column>
-		<column><field>priority</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of active_watchers table-->
 	<db_table id="active_watchers">
@@ -536,8 +533,6 @@
 		<column><field>from_domain</field><type>DB1_STR</type></column>
 		<column><field>updated</field><type>DB1_INT</type></column>
 		<column><field>updated_winfo</field><type>DB1_INT</type></column>
-		<column><field>flags</field><type>DB1_INT</type></column>
-		<column><field>user_agent</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of watchers table-->
 	<db_table id="watchers">
@@ -623,10 +618,6 @@
 		<column><field>methods</field><type>DB1_INT</type></column>
 		<column><field>instance</field><type>DB1_STR</type></column>
 		<column><field>reg_id</field><type>DB1_INT</type></column>
-		<column><field>server_id</field><type>DB1_INT</type></column>
-		<column><field>connection_id</field><type>DB1_INT</type></column>
-		<column><field>keepalive</field><type>DB1_INT</type></column>
-		<column><field>partition</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of rls_presentity table-->
 	<db_table id="rls_presentity">
@@ -670,16 +661,6 @@
 		<column><field>from_user</field><type>DB1_STR</type></column>
 		<column><field>from_domain</field><type>DB1_STR</type></column>
 		<column><field>updated</field><type>DB1_INT</type></column>
-	</db_table>
-	<!-- Declaration of rtpengine table-->
-	<db_table id="rtpengine">
-		<table_name>rtpengine</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>setid</field><type>DB1_INT</type></column>
-		<column><field>url</field><type>DB1_STR</type></column>
-		<column><field>weight</field><type>DB1_INT</type></column>
-		<column><field>disabled</field><type>DB1_INT</type></column>
-		<column><field>stamp</field><type>DB1_DATETIME</type></column>
 	</db_table>
 	<!-- Declaration of rtpproxy table-->
 	<db_table id="rtpproxy">
@@ -725,7 +706,6 @@
 		<column><field>fromip</field><type>DB1_STR</type></column>
 		<column><field>toip</field><type>DB1_STR</type></column>
 		<column><field>fromtag</field><type>DB1_STR</type></column>
-		<column><field>totag</field><type>DB1_STR</type></column>
 		<column><field>direction</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of speed_dial table-->
@@ -749,65 +729,6 @@
 		<column><field>table_name</field><type>DB1_STR</type></column>
 		<column><field>table_version</field><type>DB1_INT</type></column>
 	</db_table>
-	<!-- Declaration of topos_d table-->
-	<db_table id="topos_d">
-		<table_name>topos_d</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>id</field><type>DB1_INT</type></column>
-		<column><field>rectime</field><type>DB1_DATETIME</type></column>
-		<column><field>s_method</field><type>DB1_STR</type></column>
-		<column><field>s_cseq</field><type>DB1_STR</type></column>
-		<column><field>a_callid</field><type>DB1_STR</type></column>
-		<column><field>a_uuid</field><type>DB1_STR</type></column>
-		<column><field>b_uuid</field><type>DB1_STR</type></column>
-		<column><field>a_contact</field><type>DB1_STR</type></column>
-		<column><field>b_contact</field><type>DB1_STR</type></column>
-		<column><field>as_contact</field><type>DB1_STR</type></column>
-		<column><field>bs_contact</field><type>DB1_STR</type></column>
-		<column><field>a_tag</field><type>DB1_STR</type></column>
-		<column><field>b_tag</field><type>DB1_STR</type></column>
-		<column><field>a_rr</field><type>DB1_BLOB</type></column>
-		<column><field>b_rr</field><type>DB1_BLOB</type></column>
-		<column><field>s_rr</field><type>DB1_BLOB</type></column>
-		<column><field>iflags</field><type>DB1_INT</type></column>
-		<column><field>a_uri</field><type>DB1_STR</type></column>
-		<column><field>b_uri</field><type>DB1_STR</type></column>
-		<column><field>r_uri</field><type>DB1_STR</type></column>
-		<column><field>a_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>b_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>a_socket</field><type>DB1_STR</type></column>
-		<column><field>b_socket</field><type>DB1_STR</type></column>
-	</db_table>
-	<!-- Declaration of topos_t table-->
-	<db_table id="topos_t">
-		<table_name>topos_t</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>id</field><type>DB1_INT</type></column>
-		<column><field>rectime</field><type>DB1_DATETIME</type></column>
-		<column><field>s_method</field><type>DB1_STR</type></column>
-		<column><field>s_cseq</field><type>DB1_STR</type></column>
-		<column><field>a_callid</field><type>DB1_STR</type></column>
-		<column><field>a_uuid</field><type>DB1_STR</type></column>
-		<column><field>b_uuid</field><type>DB1_STR</type></column>
-		<column><field>direction</field><type>DB1_INT</type></column>
-		<column><field>x_via</field><type>DB1_BLOB</type></column>
-		<column><field>x_vbranch</field><type>DB1_STR</type></column>
-		<column><field>x_rr</field><type>DB1_BLOB</type></column>
-		<column><field>y_rr</field><type>DB1_BLOB</type></column>
-		<column><field>s_rr</field><type>DB1_BLOB</type></column>
-		<column><field>x_uri</field><type>DB1_STR</type></column>
-		<column><field>a_contact</field><type>DB1_STR</type></column>
-		<column><field>b_contact</field><type>DB1_STR</type></column>
-		<column><field>as_contact</field><type>DB1_STR</type></column>
-		<column><field>bs_contact</field><type>DB1_STR</type></column>
-		<column><field>x_tag</field><type>DB1_STR</type></column>
-		<column><field>a_tag</field><type>DB1_STR</type></column>
-		<column><field>b_tag</field><type>DB1_STR</type></column>
-		<column><field>a_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>b_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>a_socket</field><type>DB1_STR</type></column>
-		<column><field>b_socket</field><type>DB1_STR</type></column>
-	</db_table>
 	<!-- Declaration of uacreg table-->
 	<db_table id="uacreg">
 		<table_name>uacreg</table_name>
@@ -823,8 +744,6 @@
 		<column><field>auth_password</field><type>DB1_STR</type></column>
 		<column><field>auth_proxy</field><type>DB1_STR</type></column>
 		<column><field>expires</field><type>DB1_INT</type></column>
-		<column><field>flags</field><type>DB1_INT</type></column>
-		<column><field>reg_delay</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of uid_credentials table-->
 	<db_table id="uid_credentials">
@@ -957,10 +876,6 @@
 		<column><field>methods</field><type>DB1_INT</type></column>
 		<column><field>instance</field><type>DB1_STR</type></column>
 		<column><field>reg_id</field><type>DB1_INT</type></column>
-		<column><field>server_id</field><type>DB1_INT</type></column>
-		<column><field>connection_id</field><type>DB1_INT</type></column>
-		<column><field>keepalive</field><type>DB1_INT</type></column>
-		<column><field>partition</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of location_attrs table-->
 	<db_table id="location_attrs">
@@ -991,8 +906,6 @@
 		Each col will have:
 		- a mandatory 'field' identifying the name of the field
 		- an optional 'value' identifing the given value
-		- an optional 'link_cmd' identifing the update cmd with prepared values
-			* only for query_cols for DB1_QUERY commands
 		- a mandatory 'operator' only for 'clause_cols'
 		The [clause|query|order_by]_cols can be:
 		- ov : optional with multiple 'col' with optional 'value'
@@ -1021,7 +934,7 @@
 			<db_table_id>acc</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>method</field></col>
 				<col><field>from_tag</field></col>
 				<col><field>to_tag</field></col>
@@ -1074,7 +987,7 @@
 			<db_table_id>acc_cdrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>start_time</field></col>
 				<col><field>end_time</field></col>
 				<col><field>duration</field></col>
@@ -1115,7 +1028,7 @@
 			<db_table_id>missed_calls</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>method</field></col>
 				<col><field>from_tag</field></col>
 				<col><field>to_tag</field></col>
@@ -1168,7 +1081,7 @@
 			<db_table_id>dbaliases</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>alias_username</field></col>
 				<col><field>alias_domain</field></col>
 				<col><field>username</field></col>
@@ -1212,7 +1125,7 @@
 			<db_table_id>subscriber</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>password</field></col>
@@ -1265,7 +1178,7 @@
 			<db_table_id>usr_preferences</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>uuid</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
@@ -1318,7 +1231,7 @@
 			<db_table_id>carrierroute</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>carrier</field></col>
 				<col><field>domain</field></col>
 				<col><field>scan_prefix</field></col>
@@ -1383,7 +1296,7 @@
 			<db_table_id>carrierfailureroute</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>carrier</field></col>
 				<col><field>domain</field></col>
 				<col><field>scan_prefix</field></col>
@@ -1442,7 +1355,7 @@
 			<db_table_id>carrier_name</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>carrier</field></col>
 			</query_cols>
 		</cmd>
@@ -1477,7 +1390,7 @@
 			<db_table_id>domain_name</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>domain</field></col>
 			</query_cols>
 		</cmd>
@@ -1512,7 +1425,7 @@
 			<db_table_id>cpl</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>cpl_xml</field></col>
@@ -1556,7 +1469,7 @@
 			<db_table_id>dialog</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>hash_entry</field></col>
 				<col><field>hash_id</field></col>
 				<col><field>callid</field></col>
@@ -1657,7 +1570,7 @@
 			<db_table_id>dialog_vars</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>hash_entry</field></col>
 				<col><field>hash_id</field></col>
 				<col><field>dialog_key</field></col>
@@ -1701,7 +1614,7 @@
 			<db_table_id>dialplan</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>dpid</field></col>
 				<col><field>pr</field></col>
 				<col><field>match_op</field></col>
@@ -1757,7 +1670,7 @@
 			<db_table_id>dispatcher</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>setid</field></col>
 				<col><field>destination</field></col>
 				<col><field>flags</field></col>
@@ -1807,7 +1720,7 @@
 			<db_table_id>domain</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>domain</field></col>
 				<col><field>did</field></col>
 				<col><field>last_modified</field></col>
@@ -1848,7 +1761,7 @@
 			<db_table_id>domain_attrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>did</field></col>
 				<col><field>name</field></col>
 				<col><field>type</field></col>
@@ -1895,7 +1808,7 @@
 			<db_table_id>domainpolicy</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>rule</field></col>
 				<col><field>type</field></col>
 				<col><field>att</field></col>
@@ -1942,7 +1855,7 @@
 			<db_table_id>dr_gateways</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>gwid</field><link_cmd>update</link_cmd></col>
+				<col><field>gwid</field></col>
 				<col><field>type</field></col>
 				<col><field>address</field></col>
 				<col><field>strip</field></col>
@@ -1992,7 +1905,7 @@
 			<db_table_id>dr_rules</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>ruleid</field><link_cmd>update</link_cmd></col>
+				<col><field>ruleid</field></col>
 				<col><field>groupid</field></col>
 				<col><field>prefix</field></col>
 				<col><field>timerec</field></col>
@@ -2045,7 +1958,7 @@
 			<db_table_id>dr_gw_lists</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>gwlist</field></col>
 				<col><field>description</field></col>
 			</query_cols>
@@ -2083,7 +1996,7 @@
 			<db_table_id>dr_groups</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>groupid</field></col>
@@ -2127,7 +2040,7 @@
 			<db_table_id>grp</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>grp</field></col>
@@ -2171,7 +2084,7 @@
 			<db_table_id>re_grp</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>reg_exp</field></col>
 				<col><field>group_id</field></col>
 			</query_cols>
@@ -2209,7 +2122,7 @@
 			<db_table_id>htable</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>key_name</field></col>
 				<col><field>key_type</field></col>
 				<col><field>value_type</field></col>
@@ -2256,7 +2169,7 @@
 			<db_table_id>imc_rooms</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>name</field></col>
 				<col><field>domain</field></col>
 				<col><field>flag</field></col>
@@ -2297,7 +2210,7 @@
 			<db_table_id>imc_members</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>room</field></col>
@@ -2341,7 +2254,7 @@
 			<db_table_id>lcr_gw</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>lcr_id</field></col>
 				<col><field>gw_name</field></col>
 				<col><field>ip_addr</field></col>
@@ -2412,7 +2325,7 @@
 			<db_table_id>lcr_rule_target</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>lcr_id</field></col>
 				<col><field>rule_id</field></col>
 				<col><field>gw_id</field></col>
@@ -2459,7 +2372,7 @@
 			<db_table_id>lcr_rule</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>lcr_id</field></col>
 				<col><field>prefix</field></col>
 				<col><field>from_uri</field></col>
@@ -2530,7 +2443,7 @@
 			<db_table_id>mohqcalls</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>mohq_id</field></col>
 				<col><field>call_id</field></col>
 				<col><field>call_status</field></col>
@@ -2580,7 +2493,7 @@
 			<db_table_id>mohqueues</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>name</field></col>
 				<col><field>uri</field></col>
 				<col><field>mohdir</field></col>
@@ -2627,7 +2540,7 @@
 			<db_table_id>silo</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>src_addr</field></col>
 				<col><field>dst_addr</field></col>
 				<col><field>username</field></col>
@@ -2695,7 +2608,7 @@
 			<db_table_id>mtree</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>tprefix</field></col>
 				<col><field>tvalue</field></col>
 			</query_cols>
@@ -2733,7 +2646,7 @@
 			<db_table_id>mtrees</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>tname</field></col>
 				<col><field>tprefix</field></col>
 				<col><field>tvalue</field></col>
@@ -2774,7 +2687,7 @@
 			<db_table_id>pdt</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>sdomain</field></col>
 				<col><field>prefix</field></col>
 				<col><field>domain</field></col>
@@ -2815,13 +2728,11 @@
 			<db_table_id>trusted</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>src_ip</field></col>
 				<col><field>proto</field></col>
 				<col><field>from_pattern</field></col>
-				<col><field>ruri_pattern</field></col>
 				<col><field>tag</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -2831,9 +2742,7 @@
 				<col><field>src_ip</field></col>
 				<col><field>proto</field></col>
 				<col><field>from_pattern</field></col>
-				<col><field>ruri_pattern</field></col>
 				<col><field>tag</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -2846,9 +2755,7 @@
 				<col><field>src_ip</field></col>
 				<col><field>proto</field></col>
 				<col><field>from_pattern</field></col>
-				<col><field>ruri_pattern</field></col>
 				<col><field>tag</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -2865,7 +2772,7 @@
 			<db_table_id>address</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>grp</field></col>
 				<col><field>ip_addr</field></col>
 				<col><field>mask</field></col>
@@ -2912,7 +2819,7 @@
 			<db_table_id>pl_pipes</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>pipeid</field></col>
 				<col><field>algorithm</field></col>
 				<col><field>plimit</field></col>
@@ -2953,7 +2860,7 @@
 			<db_table_id>presentity</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>event</field></col>
@@ -2962,7 +2869,6 @@
 				<col><field>received_time</field></col>
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -2977,7 +2883,6 @@
 				<col><field>received_time</field></col>
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -2995,7 +2900,6 @@
 				<col><field>received_time</field></col>
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -3012,7 +2916,7 @@
 			<db_table_id>active_watchers</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>presentity_uri</field></col>
 				<col><field>watcher_username</field></col>
 				<col><field>watcher_domain</field></col>
@@ -3037,8 +2941,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -3069,8 +2971,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -3104,8 +3004,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -3122,7 +3020,7 @@
 			<db_table_id>watchers</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>presentity_uri</field></col>
 				<col><field>watcher_username</field></col>
 				<col><field>watcher_domain</field></col>
@@ -3175,7 +3073,7 @@
 			<db_table_id>xcap</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>doc</field></col>
@@ -3231,7 +3129,7 @@
 			<db_table_id>pua</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>pres_uri</field></col>
 				<col><field>pres_id</field></col>
 				<col><field>event</field></col>
@@ -3317,7 +3215,7 @@
 			<db_table_id>purplemap</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>sip_user</field></col>
 				<col><field>ext_user</field></col>
 				<col><field>ext_prot</field></col>
@@ -3361,7 +3259,7 @@
 			<db_table_id>aliases</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>ruid</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
@@ -3380,10 +3278,6 @@
 				<col><field>methods</field></col>
 				<col><field>instance</field></col>
 				<col><field>reg_id</field></col>
-				<col><field>server_id</field></col>
-				<col><field>connection_id</field></col>
-				<col><field>keepalive</field></col>
-				<col><field>partition</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -3408,10 +3302,6 @@
 				<col><field>methods</field></col>
 				<col><field>instance</field></col>
 				<col><field>reg_id</field></col>
-				<col><field>server_id</field></col>
-				<col><field>connection_id</field></col>
-				<col><field>keepalive</field></col>
-				<col><field>partition</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -3439,10 +3329,6 @@
 				<col><field>methods</field></col>
 				<col><field>instance</field></col>
 				<col><field>reg_id</field></col>
-				<col><field>server_id</field></col>
-				<col><field>connection_id</field></col>
-				<col><field>keepalive</field></col>
-				<col><field>partition</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -3459,7 +3345,7 @@
 			<db_table_id>rls_presentity</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>rlsubs_did</field></col>
 				<col><field>resource_uri</field></col>
 				<col><field>content_type</field></col>
@@ -3515,7 +3401,7 @@
 			<db_table_id>rls_watchers</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>presentity_uri</field></col>
 				<col><field>to_user</field></col>
 				<col><field>to_domain</field></col>
@@ -3610,38 +3496,13 @@
 			</clause_cols>
 		</cmd>
 	</mod>
-	<!-- rtpengine provisionning -->
-	<mod><mod_name>rtpengine</mod_name>
-		<cmd><cmd_name>show</cmd_name>
-			<db_table_id>rtpengine</db_table_id>
-			<cmd_type>DB1_QUERY</cmd_type>
-			<query_cols>
-				<col><field>setid</field></col>
-				<col><field>url</field></col>
-				<col><field>weight</field></col>
-				<col><field>disabled</field></col>
-				<col><field>stamp</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>add</cmd_name>
-			<db_table_id>rtpengine</db_table_id>
-			<cmd_type>DB1_INSERT</cmd_type>
-			<query_cols>
-				<col><field>setid</field></col>
-				<col><field>url</field></col>
-				<col><field>weight</field></col>
-				<col><field>disabled</field></col>
-				<col><field>stamp</field></col>
-			</query_cols>
-		</cmd>
-	</mod>
 	<!-- rtpproxy provisionning -->
 	<mod><mod_name>rtpproxy</mod_name>
 		<cmd><cmd_name>show</cmd_name>
 			<db_table_id>rtpproxy</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>setid</field></col>
 				<col><field>url</field></col>
 				<col><field>flags</field></col>
@@ -3688,7 +3549,7 @@
 			<db_table_id>sca_subscriptions</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>subscriber</field></col>
 				<col><field>aor</field></col>
 				<col><field>event</field></col>
@@ -3756,7 +3617,7 @@
 			<db_table_id>sip_trace</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>time_stamp</field></col>
 				<col><field>time_us</field></col>
 				<col><field>callid</field></col>
@@ -3767,7 +3628,6 @@
 				<col><field>fromip</field></col>
 				<col><field>toip</field></col>
 				<col><field>fromtag</field></col>
-				<col><field>totag</field></col>
 				<col><field>direction</field></col>
 			</query_cols>
 		</cmd>
@@ -3785,7 +3645,6 @@
 				<col><field>fromip</field></col>
 				<col><field>toip</field></col>
 				<col><field>fromtag</field></col>
-				<col><field>totag</field></col>
 				<col><field>direction</field></col>
 			</query_cols>
 		</cmd>
@@ -3806,7 +3665,6 @@
 				<col><field>fromip</field></col>
 				<col><field>toip</field></col>
 				<col><field>fromtag</field></col>
-				<col><field>totag</field></col>
 				<col><field>direction</field></col>
 			</query_cols>
 		</cmd>
@@ -3824,7 +3682,7 @@
 			<db_table_id>speed_dial</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>sd_username</field></col>
@@ -3893,218 +3751,13 @@
 			</query_cols>
 		</cmd>
 	</mod>
-	<!-- topos_d provisionning -->
-	<mod><mod_name>topos_d</mod_name>
-		<cmd><cmd_name>show</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_QUERY</cmd_type>
-			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_rr</field></col>
-				<col><field>b_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>iflags</field></col>
-				<col><field>a_uri</field></col>
-				<col><field>b_uri</field></col>
-				<col><field>r_uri</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>add</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_INSERT</cmd_type>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_rr</field></col>
-				<col><field>b_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>iflags</field></col>
-				<col><field>a_uri</field></col>
-				<col><field>b_uri</field></col>
-				<col><field>r_uri</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>update</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_UPDATE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_rr</field></col>
-				<col><field>b_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>iflags</field></col>
-				<col><field>a_uri</field></col>
-				<col><field>b_uri</field></col>
-				<col><field>r_uri</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>delete</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_DELETE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-		</cmd>
-	</mod>
-	<!-- topos_t provisionning -->
-	<mod><mod_name>topos_t</mod_name>
-		<cmd><cmd_name>show</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_QUERY</cmd_type>
-			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>direction</field></col>
-				<col><field>x_via</field></col>
-				<col><field>x_vbranch</field></col>
-				<col><field>x_rr</field></col>
-				<col><field>y_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>x_uri</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>x_tag</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>add</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_INSERT</cmd_type>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>direction</field></col>
-				<col><field>x_via</field></col>
-				<col><field>x_vbranch</field></col>
-				<col><field>x_rr</field></col>
-				<col><field>y_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>x_uri</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>x_tag</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>update</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_UPDATE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>direction</field></col>
-				<col><field>x_via</field></col>
-				<col><field>x_vbranch</field></col>
-				<col><field>x_rr</field></col>
-				<col><field>y_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>x_uri</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>x_tag</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>delete</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_DELETE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-		</cmd>
-	</mod>
 	<!-- uacreg provisionning -->
 	<mod><mod_name>uacreg</mod_name>
 		<cmd><cmd_name>show</cmd_name>
 			<db_table_id>uacreg</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>l_uuid</field></col>
 				<col><field>l_username</field></col>
 				<col><field>l_domain</field></col>
@@ -4115,8 +3768,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -4133,8 +3784,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -4154,8 +3803,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -4172,7 +3819,7 @@
 			<db_table_id>uid_credentials</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>auth_username</field></col>
 				<col><field>did</field></col>
 				<col><field>realm</field></col>
@@ -4228,7 +3875,7 @@
 			<db_table_id>uid_user_attrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>uid</field></col>
 				<col><field>name</field></col>
 				<col><field>value</field></col>
@@ -4275,7 +3922,7 @@
 			<db_table_id>uid_domain</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>did</field></col>
 				<col><field>domain</field></col>
 				<col><field>flags</field></col>
@@ -4316,7 +3963,7 @@
 			<db_table_id>uid_domain_attrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>did</field></col>
 				<col><field>name</field></col>
 				<col><field>type</field></col>
@@ -4363,7 +4010,7 @@
 			<db_table_id>uid_global_attrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>name</field></col>
 				<col><field>type</field></col>
 				<col><field>value</field></col>
@@ -4407,7 +4054,7 @@
 			<db_table_id>uid_uri</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>uid</field></col>
 				<col><field>did</field></col>
 				<col><field>username</field></col>
@@ -4454,7 +4101,7 @@
 			<db_table_id>uid_uri_attrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>did</field></col>
 				<col><field>name</field></col>
@@ -4507,7 +4154,7 @@
 			<db_table_id>uri</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>uri_user</field></col>
@@ -4551,7 +4198,7 @@
 			<db_table_id>userblacklist</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>prefix</field></col>
@@ -4595,7 +4242,7 @@
 			<db_table_id>globalblacklist</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>prefix</field></col>
 				<col><field>whitelist</field></col>
 				<col><field>description</field></col>
@@ -4636,7 +4283,7 @@
 			<db_table_id>location</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>ruid</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
@@ -4655,10 +4302,6 @@
 				<col><field>methods</field></col>
 				<col><field>instance</field></col>
 				<col><field>reg_id</field></col>
-				<col><field>server_id</field></col>
-				<col><field>connection_id</field></col>
-				<col><field>keepalive</field></col>
-				<col><field>partition</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -4683,10 +4326,6 @@
 				<col><field>methods</field></col>
 				<col><field>instance</field></col>
 				<col><field>reg_id</field></col>
-				<col><field>server_id</field></col>
-				<col><field>connection_id</field></col>
-				<col><field>keepalive</field></col>
-				<col><field>partition</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -4714,10 +4353,6 @@
 				<col><field>methods</field></col>
 				<col><field>instance</field></col>
 				<col><field>reg_id</field></col>
-				<col><field>server_id</field></col>
-				<col><field>connection_id</field></col>
-				<col><field>keepalive</field></col>
-				<col><field>partition</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -4734,7 +4369,7 @@
 			<db_table_id>location_attrs</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>ruid</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>

@@ -72,7 +72,7 @@ Chapter 1. Admin Guide
    based on the user part of the current Request-URI. These functions
    assume that the Request URI user part consists of an international
    phone number of the form +decimal-digits, where the number of digits is
-   at least 2 and at most 20. Out of this number enum_query forms a domain
+   at least 2 and at most 15. Out of this number enum_query forms a domain
    name, where the digits are in reverse order and separated by dots
    followed by domain suffix that by default is "e164.arpa.". For example,
    if the user part is +35831234567, the domain name will be
@@ -185,9 +185,9 @@ modparam("enum", "branchlabel", "i")
 
 3.5. bl_algorithm (string)
 
-   This parameter determines which algorithm the i_enum_query() function
-   will use to select the position in the DNS tree where the
-   infrastructure tree branches off the user ENUM tree.
+   This parameter determines which algorithm i_enum_query() will use to
+   select the position in the DNS tree where the infrastructure tree
+   branches off the user ENUM tree.
 
    If set to "cc", i_enum_query() will always insert the label at the
    country-code level. Examples: i.1.e164.arpa, i.3.4.e164.arpa,

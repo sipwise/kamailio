@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Export vontact attrs as PV
  *
  * Copyright (C) 2008 Daniel-Constantin Mierla (asipto.com)
@@ -17,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
@@ -269,10 +271,6 @@ int pv_get_ulc(struct sip_msg *msg,  pv_param_t *param,
 			if(c->instance.len>0)
 				return  pv_get_strval(msg, param, res, &c->instance);
 		break;
-		case 21: /* conid */
-			if (c->sock && (c->sock->proto == PROTO_TCP || c->sock->proto == PROTO_TLS || c->sock->proto == PROTO_WS || c->sock->proto == PROTO_WSS))
-				return pv_get_sintval(msg, param, res, c->tcpconn_id);
-		break;
 	}
 
 	return pv_get_null(msg, param, res);
@@ -367,8 +365,6 @@ int pv_parse_ulc_name(pv_spec_p sp, str *in)
 				rp->attr = 17;
 			else if(strncmp(pa.s, "regid", 5)==0)
 				rp->attr = 19;
-			else if(strncmp(pa.s, "conid", 5)==0)
-				rp->attr = 21;
 			else goto error;
 		break;
 		case 6: 
@@ -543,10 +539,6 @@ int pv_fetch_contacts(struct sip_msg* msg, char* table, char* uri,
 			memcpy(c0->instance.s, ptr->instance.s, ptr->instance.len);
 			c0->instance.len = ptr->instance.len;
 			p += c0->instance.len;
-		}
-		if ((ptr->sock) && (ptr->sock->proto == PROTO_TCP || ptr->sock->proto == PROTO_TLS || ptr->sock->proto == PROTO_WS || ptr->sock->proto == PROTO_WSS))
-		{
-			c0->tcpconn_id = ptr->tcpconn_id;
 		}
 
 		if(ptr0==NULL)

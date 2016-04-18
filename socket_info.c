@@ -1,32 +1,51 @@
 
-/* 
+/* $Id$
+ *
  * find & manage listen addresses 
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ * This file contains code that initializes and handles ser listen addresses
+ * lists (struct socket_info). It is used mainly on startup.
+ * 
+ * History:
+ * --------
+ *  2003-10-22  created by andrei
+ *  2004-10-10  added grep_sock_info (andrei)
+ *  2004-11-08  added find_si (andrei)
+ *  2007-08-23  added detection for INADDR_ANY types of sockets (andrei)
+ *  2008-08-08  sctp support (andrei)
+ *  2008-08-15  support for handling sctp multihomed sockets (andrei)
+ *  2008-10-15  fixed protocol list iteration when some protocols are
+ *               compile time disabled (andrei)
+ */
+
 
 /*!
  * \file
- * \brief Kamailio core :: find & manage listen addresses 
- *
- * This file contains code that initializes and handles Kamailio listen addresses
- * lists (struct socket_info). It is used mainly on startup.
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -41,7 +60,6 @@
 
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include <ifaddrs.h>
 #ifdef HAVE_SYS_SOCKIO_H
 #include <sys/sockio.h>
 #endif
@@ -141,7 +159,7 @@ static int init_addr_info(struct addr_info* a,
 	a->flags=flags;
 	return 0;
 error:
-	LM_ERR("memory allocation error\n");
+	LOG(L_ERR, "ERROR: init_addr_info: memory allocation error\n");
 	return -1;
 }
 
@@ -160,7 +178,7 @@ static inline struct addr_info* new_addr_info(char* name,
 	if (init_addr_info(al, name, gf)!=0) goto error;
 	return al;
 error:
-	LM_ERR("memory allocation error\n");
+	LOG(L_ERR, "ERROR: new_addr_info: memory allocation error\n");
 	if (al){
 		if (al->name.s) pkg_free(al->name.s);
 		pkg_free(al);
@@ -242,7 +260,7 @@ static inline struct socket_info* new_sock_info(	char* name,
 	si->addr_info_lst=0;
 	for (n=addr_l; n; n=n->next){
 		if (new_addr_info2list(n->name, n->flags, &si->addr_info_lst)!=0){
-			LM_ERR("new_addr_info2list failed\n");
+			LOG(L_ERR, "ERROR: new_sockk_info:new_addr_info2list failed\n");
 			goto error;
 		}
 	}
@@ -278,14 +296,14 @@ static inline struct socket_info* new_sock_info(	char* name,
 
 		he=resolvehost(si->useinfo.name.s);
 		if (he==0){
-			LM_ERR("unable to resolve advertised name %s\n", si->useinfo.name.s);
+			LM_ERR(" unable to resolve advertised name %s\n", si->useinfo.name.s);
 			goto error;
 		}
 		hostent2ip_addr(&si->useinfo.address, he, 0);
 	}
 	return si;
 error:
-	LM_ERR("memory allocation error\n");
+	LOG(L_ERR, "ERROR: new_sock_info: memory allocation error\n");
 	if (si) {
 		if(si->name.s)
 			pkg_free(si->name.s);
@@ -419,7 +437,7 @@ static int fix_sock_str(struct socket_info* si)
 	
 	si->sock_str.s = pkg_malloc(len + 1);
 	if (si->sock_str.s == NULL) {
-		LM_ERR("No memory left\n");
+		ERR("fix_sock_str: No memory left\n");
 		return -1;
 	}
 	if (socketinfo2str(si->sock_str.s, &len, si, 0) < 0) {
@@ -436,7 +454,7 @@ static int fix_sock_str(struct socket_info* si)
 
 		si->useinfo.sock_str.s = pkg_malloc(len + 1);
 		if (si->useinfo.sock_str.s == NULL) {
-			LM_ERR("No memory left\n");
+			ERR("fix_sock_str: No memory left\n");
 			return -1;
 		}
 		if (socketinfo2str(si->useinfo.sock_str.s, &len, si, 1) < 0) {
@@ -477,7 +495,7 @@ struct socket_info** get_sock_info_list(unsigned short proto)
 #endif
 			break;
 		default:
-			LM_CRIT("invalid proto %d\n", proto);
+			LOG(L_CRIT, "BUG: get_sock_info_list: invalid proto %d\n", proto);
 	}
 	return 0;
 }
@@ -556,14 +574,16 @@ retry:
 		if (list==0) /* disabled or unknown protocol */
 			continue;
 		for (si=*list; si; si=si->next){
-			LM_DBG("checking if host==us: %d==%d && [%.*s] == [%.*s]\n",
+			DBG("grep_sock_info - checking if host==us: %d==%d &&"
+					" [%.*s] == [%.*s]\n",
 						hname.len,
 						si->name.len,
 						hname.len, hname.s,
 						si->name.len, si->name.s
 				);
 			if (port) {
-				LM_DBG("checking if port %d (advertise %d) matches port %d\n",
+				DBG("grep_sock_info - checking if port %d (advertise %d)"
+						" matches port %d\n",
 						si->port_no, si->useinfo.port_no, port);
 				if (si->port_no!=port && si->useinfo.port_no!=port) {
 					continue;
@@ -574,7 +594,7 @@ retry:
 				goto found;
 			if(si->useinfo.name.s!=NULL)
 			{
-				LM_DBG("checking advertise if host==us:"
+				DBG("grep_sock_info - checking advertise if host==us:"
 						" %d==%d && [%.*s] == [%.*s]\n",
 						hname.len,
 						si->useinfo.name.len,
@@ -631,7 +651,8 @@ struct socket_info* grep_sock_info_by_port(unsigned short port,
 			continue;
 		
 		for (si=*list; si; si=si->next){
-			LM_DBG("checking if port %d matches port %d\n", si->port_no, port);
+			DBG("grep_sock_info_by_port - checking if port %d matches"
+					" port %d\n", si->port_no, port);
 			if (si->port_no==port) {
 				goto found;
 			}
@@ -705,7 +726,7 @@ static struct socket_info* new_sock2list(char* name, struct name_lst* addr_l,
 	
 	si=new_sock_info(name, addr_l, port, proto, usename, useport, flags);
 	if (si==0){
-		LM_ERR("new_sock_info failed\n");
+		LOG(L_ERR, "ERROR: new_sock2list: new_sock_info failed\n");
 		goto error;
 	}
 	if(socket_workers>0) {
@@ -735,7 +756,7 @@ static struct socket_info* new_sock2list_after(char* name,
 	
 	si=new_sock_info(name, addr_l, port, proto, usename, useport, flags);
 	if (si==0){
-		LM_ERR("new_sock_info failed\n");
+		LOG(L_ERR, "ERROR: new_sock2list_after: new_sock_info failed\n");
 		goto error;
 	}
 	sock_listins(si, after);
@@ -783,7 +804,7 @@ int add_listen_advertise_iface(char* name, struct name_lst* addr_l,
 		if (c_proto!=PROTO_SCTP){
 			if (new_sock2list(name, 0, c_port, c_proto, usename, useport,
 								flags & ~SI_IS_MHOMED, list)==0){
-				LM_ERR("new_sock2list failed\n");
+				LOG(L_ERR, "ERROR: add_listen_iface: new_sock2list failed\n");
 				goto error;
 			}
 			/* add the other addresses in the list as separate sockets
@@ -792,14 +813,15 @@ int add_listen_advertise_iface(char* name, struct name_lst* addr_l,
 				if (new_sock2list(a_l->name, 0, c_port, 
 									c_proto, usename, useport,
 									flags & ~SI_IS_MHOMED, list)==0){
-					LM_ERR("new_sock2list failed\n");
+					LOG(L_ERR, "ERROR: add_listen_iface: new_sock2list"
+								" failed\n");
 					goto error;
 				}
 			}
 		}else{
 			if (new_sock2list(name, addr_l, c_port, c_proto, usename, useport,
 						flags, list)==0){
-				LM_ERR("new_sock2list failed\n");
+				LOG(L_ERR, "ERROR: add_listen_iface: new_sock2list failed\n");
 				goto error;
 			}
 		}
@@ -1130,8 +1152,7 @@ error:
 	return -1;
 
 }
-/* add all family type addresses of interface if_name to the socket_info array
- * if family ==0, uses all families
+/* add all family type addresses of interface if_to the socket_info array
  * if if_name==0, adds all addresses on all interfaces
  * uses RTNETLINK sockets to get addresses on the present interface on LINUX
  * return: -1 on error, 0 on success
@@ -1159,10 +1180,9 @@ int add_interfaces_via_netlink(char* if_name, int family, unsigned short port,
 			//if(! (ifaces[i].flags & IFF_UP) ) continue;
 
 			for(tmp = ifaces[i].addresses; tmp; tmp = tmp->next){
-				LM_DBG("in add_iface_via_netlink Name %s Address %s\n",
-							ifaces[i].name, tmp->addr);
-					/* match family */
-					if (family && family == tmp->family){
+				LM_DBG("\t in add_iface_via_netlink Name %s Address %s\n", ifaces[i].name, tmp->addr);
+		                /* match family */
+                                if (family == tmp->family){
 					/* check if loopback */
 					if (ifaces[i].flags & IFF_LOOPBACK){
 						LM_DBG("INTERFACE %s is loopback", ifaces[i].name);
@@ -1170,7 +1190,8 @@ int add_interfaces_via_netlink(char* if_name, int family, unsigned short port,
 					}
 					/* save the info */
 					if (new_addr_info2list(tmp->addr, flags, ai_l)!=0){
-						LM_ERR("new_addr_info2list failed\n");
+						LOG(L_ERR, "ERROR: add_interfaces: "
+							"new_addr_info2list failed\n");
 						goto error;
 			    		}
 				}
@@ -1184,51 +1205,131 @@ error:
 #endif /* __OS_linux */
 
 /* add all family type addresses of interface if_name to the socket_info array
- * if family ==0, uses all families
  * if if_name==0, adds all addresses on all interfaces
+ * WARNING: it only works with ipv6 addresses on FreeBSD
  * return: -1 on error, 0 on success
  */
 int add_interfaces(char* if_name, int family, unsigned short port,
 					unsigned short proto,
 					struct addr_info** ai_l)
 {
+	struct ifconf ifc;
+	struct ifreq ifr;
+	struct ifreq ifrcopy;
+	char*  last;
+	char* p;
+	int size;
+	int lastlen;
+	int s;
 	char* tmp;
 	struct ip_addr addr;
-	int ret = -1;
+	int ret;
 	enum si_flags flags;
-	struct ifaddrs *ifap, *ifa;
 
-	if (getifaddrs (&ifap) != 0) {
-		LM_ERR("getifaddrs failed\n");
-		return -1;
-        }
-
-	for (ifa = ifap; ifa; ifa = ifa->ifa_next)
-	{
-		if (if_name && strcmp(if_name, ifa->ifa_name))
-			continue;
-		if (family && family != ifa->ifa_addr->sa_family)
-			continue;
-		sockaddr2ip_addr(&addr, (struct sockaddr*)ifa->ifa_addr);
-		tmp=ip_addr2a(&addr);
-		if (ifa->ifa_flags & IFF_LOOPBACK) 
-			flags = SI_IS_LO;
-		else
-			flags = SI_NONE;
-		if (new_addr_info2list(tmp, flags, ai_l)!=0)
-		{
-			LM_ERR("new_addr_info2list failed\n");
-			ret = -1;
-			break;
+#ifdef HAVE_SOCKADDR_SA_LEN
+	#ifndef MAX
+		#define MAX(a,b) ( ((a)>(b))?(a):(b))
+	#endif
+#endif
+	/* ipv4 or ipv6 only*/
+	flags=SI_NONE;
+	s=socket(family, SOCK_DGRAM, 0);
+	ret=-1;
+	lastlen=0;
+	ifc.ifc_req=0;
+	for (size=100; ; size*=2){
+		ifc.ifc_len=size*sizeof(struct ifreq);
+		ifc.ifc_req=(struct ifreq*) pkg_malloc(size*sizeof(struct ifreq));
+		if (ifc.ifc_req==0){
+			LOG(L_ERR, "ERROR: add_interfaces: memory allocation failure\n");
+			goto error;
 		}
-		LM_DBG("If: %8s Fam: %8x Flg: %16lx Adr: %s\n",
-				ifa->ifa_name, ifa->ifa_addr->sa_family,
-				(unsigned long)ifa->ifa_flags, tmp);
-
-		ret = 0;
+		if (ioctl(s, SIOCGIFCONF, &ifc)==-1){
+			if(errno==EBADF) return 0; /* invalid descriptor => no such ifs*/
+			LOG(L_ERR, "ERROR: add_interfaces: ioctl failed: %s\n",
+					strerror(errno));
+			goto error;
+		}
+		if  ((lastlen) && (ifc.ifc_len==lastlen)) break; /*success,
+														   len not changed*/
+		lastlen=ifc.ifc_len;
+		/* try a bigger array*/
+		pkg_free(ifc.ifc_req);
 	}
-	freeifaddrs(ifap);
+	
+	last=(char*)ifc.ifc_req+ifc.ifc_len;
+	for(p=(char*)ifc.ifc_req; p<last;
+			p+=
+			#ifdef __OS_linux
+				sizeof(ifr) /* works on x86_64 too */
+			#else
+				(sizeof(ifr.ifr_name)+
+				#ifdef  HAVE_SOCKADDR_SA_LEN
+					MAX(ifr.ifr_addr.sa_len, sizeof(struct sockaddr))
+				#else
+					( (ifr.ifr_addr.sa_family==AF_INET)?
+						sizeof(struct sockaddr_in):
+						((ifr.ifr_addr.sa_family==AF_INET6)?
+						sizeof(struct sockaddr_in6):sizeof(struct sockaddr)) )
+				#endif
+				)
+			#endif
+		)
+	{
+		/* copy contents into ifr structure
+		 * warning: it might be longer (e.g. ipv6 address) */
+		memcpy(&ifr, p, sizeof(ifr));
+		if (ifr.ifr_addr.sa_family!=family){
+			/*printf("strange family %d skipping...\n",
+					ifr->ifr_addr.sa_family);*/
+			continue;
+		}
+		
+		/*get flags*/
+		ifrcopy=ifr;
+		if (ioctl(s, SIOCGIFFLAGS,  &ifrcopy)!=-1){ /* ignore errors */
+			/* ignore down ifs only if listening on all of them*/
+			if (if_name==0){ 
+				/* if if not up, skip it*/
+				if (!(ifrcopy.ifr_flags & IFF_UP)) continue;
+			}
+		}
+		
+		
+		
+		if ((if_name==0)||
+			(strncmp(if_name, ifr.ifr_name, sizeof(ifr.ifr_name))==0)){
+			
+			/*add address*/
+			sockaddr2ip_addr(&addr, 
+					(struct sockaddr*)(p+(long)&((struct ifreq*)0)->ifr_addr));
+			if ((tmp=ip_addr2a(&addr))==0) goto error;
+			/* check if loopback */
+			if (ifrcopy.ifr_flags & IFF_LOOPBACK) 
+				flags|=SI_IS_LO;
+			/* save the info */
+			if (new_addr_info2list(tmp, flags, ai_l)!=0){
+				LOG(L_ERR, "ERROR: add_interfaces: "
+						"new_addr_info2list failed\n");
+				goto error;
+			}
+			ret=0;
+		}
+			/*
+			printf("%s:\n", ifr->ifr_name);
+			printf("        ");
+			print_sockaddr(&(ifr->ifr_addr));
+			printf("        ");
+			ls_ifflags(ifr->ifr_name, family, options);
+			printf("\n");*/
+	}
+	pkg_free(ifc.ifc_req); /*clean up*/
+	close(s);
 	return  ret;
+error:
+	if (ifc.ifc_req) pkg_free(ifc.ifc_req);
+	close(s);
+	return -1;
 }
 
 
@@ -1249,20 +1350,20 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 	/* get "official hostnames", all the aliases etc. */
 	he=resolvehost(name->s);
 	if (he==0){
-		LM_ERR("could not resolve %s\n", name->s);
+		LOG(L_ERR, "ERROR: fix_hostname: could not resolve %s\n", name->s);
 		goto error;
 	}
 	/* check if we got the official name */
 	if (strcasecmp(he->h_name, name->s)!=0){
 		if (sr_auto_aliases && 
 				add_alias(name->s, name->len, s->port_no, s->proto)<0){
-			LM_ERR("add_alias failed\n");
+			LOG(L_ERR, "ERROR: fix_hostname: add_alias failed\n");
 		}
 		/* change the official name */
 		pkg_free(name->s);
 		name->s=(char*)pkg_malloc(strlen(he->h_name)+1);
 		if (name->s==0){
-			LM_ERR("out of memory.\n");
+			LOG(L_ERR,  "ERROR: fix_hostname: out of memory.\n");
 			goto error;
 		}
 		name->len=strlen(he->h_name);
@@ -1271,7 +1372,7 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 	/* add the aliases*/
 	for(h=he->h_aliases; sr_auto_aliases && h && *h; h++)
 		if (add_alias(*h, strlen(*h), s->port_no, s->proto)<0){
-			LM_ERR("add_alias failed\n");
+			LOG(L_ERR, "ERROR: fix_hostname: add_alias failed\n");
 		}
 	hostent2ip_addr(address, he, 0); /*convert to ip_addr format*/
 	if (type_flags){
@@ -1280,7 +1381,7 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 	if ((tmp=ip_addr2a(address))==0) goto error;
 	address_str->s=pkg_malloc(strlen(tmp)+1);
 	if (address_str->s==0){
-		LM_ERR("out of memory.\n");
+		LOG(L_ERR, "ERROR: fix_hostname: out of memory.\n");
 		goto error;
 	}
 	strncpy(address_str->s, tmp, strlen(tmp)+1);
@@ -1292,16 +1393,17 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 		/* do rev. DNS on it (for aliases)*/
 		he=rev_resolvehost(address);
 		if (he==0){
-			LM_WARN("could not rev. resolve %s\n", name->s);
+			LOG(L_WARN, "WARNING: fix_hostname: could not rev. resolve %s\n",
+					name->s);
 		}else{
 			/* add the aliases*/
 			if (add_alias(he->h_name, strlen(he->h_name), s->port_no,
 							s->proto)<0){
-				LM_ERR("add_alias failed\n");
+				LOG(L_ERR, "ERROR: fix_hostname: add_alias failed\n");
 			}
 			for(h=he->h_aliases; h && *h; h++)
 				if (add_alias(*h, strlen(*h), s->port_no, s->proto) < 0){
-					LM_ERR("add_alias failed\n");
+					LOG(L_ERR, "ERROR: fix_hostname: add_alias failed\n");
 				}
 		}
 	}
@@ -1398,7 +1500,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 	for (si=*list;si;){
 		next=si->next;
 		ai_lst=0;
-		if (add_interfaces(si->name.s, 0, si->port_no,
+		if (add_interfaces(si->name.s, AF_INET, si->port_no,
 							si->proto, &ai_lst)!=-1){
 			if (si->flags & SI_IS_MHOMED){
 				if((new_si=new_sock2list_after(ai_lst->name.s, 0, si->port_no,
@@ -1464,7 +1566,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 	}
 	/* get ips & fill the port numbers*/
 #ifdef EXTRA_DEBUG
-	LM_DBG("Listening on\n");
+	DBG("Listening on \n");
 #endif
 	for (si=*list;si;si=si->next){
 		/* fix port number, port_no should be !=0 here */
@@ -1477,12 +1579,13 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 		}
 		tmp=int2str(si->port_no, &len);
 		if (len>=MAX_PORT_LEN){
-			LM_ERR("bad port number: %d\n", si->port_no);
+			LOG(L_ERR, "ERROR: fix_socket_list: bad port number: %d\n", 
+						si->port_no);
 			goto error;
 		}
 		si->port_no_str.s=(char*)pkg_malloc(len+1);
 		if (si->port_no_str.s==0){
-			LM_ERR("out of memory.\n");
+			LOG(L_ERR, "ERROR: fix_socket_list: out of memory.\n");
 			goto error;
 		}
 		strncpy(si->port_no_str.s, tmp, len+1);
@@ -1669,7 +1772,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 #endif
 			){
 			if (si->flags & SI_IS_MCAST){
-				LM_WARN("removing entry %s:%s [%s]:%s\n",
+				LOG(L_WARN, "WARNING: removing entry %s:%s [%s]:%s\n",
 					get_valid_proto_name(si->proto), si->name.s, 
 					si->address_str.s, si->port_no_str.s);
 				l = si;
@@ -1680,7 +1783,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 				ail=si->addr_info_lst;
 				while(ail){
 					if (ail->flags & SI_IS_MCAST){
-						LM_WARN("removing mh entry %s:%s"
+						LOG(L_WARN, "WARNING: removing mh entry %s:%s"
 								" [%s]:%s\n",
 								get_valid_proto_name(si->proto), ail->name.s, 
 								ail->address_str.s, si->port_no_str.s);
@@ -1789,18 +1892,21 @@ int fix_all_socket_lists()
 			/* if error fall back to get hostname */
 			/* get our address, only the first one */
 			if (uname (&myname) <0){
-				LM_ERR("cannot determine hostname, try -l address\n");
+				LOG(L_ERR, "ERROR: fix_all_socket_lists: cannot determine"
+						" hostname, try -l address\n");
 				goto error;
 			}
 			if (add_listen_iface(myname.nodename, 0, 0, 0, 0)!=0){
-				LM_ERR("add_listen_iface failed \n");
+				LOG(L_ERR, "ERROR: fix_all_socket_lists: add_listen_iface "
+						"failed \n");
 				goto error;
 			}
 		}
 	}
 	flags=0;
 	if (fix_socket_list(&udp_listen, &flags)!=0){
-		LM_ERR("fix_socket_list udp failed\n");
+		LOG(L_ERR, "ERROR: fix_all_socket_lists: fix_socket_list"
+				" udp failed\n");
 		goto error;
 	}
 	if (flags){
@@ -1809,7 +1915,8 @@ int fix_all_socket_lists()
 #ifdef USE_TCP
 	flags=0;
 	if (!tcp_disable && (fix_socket_list(&tcp_listen, &flags)!=0)){
-		LM_ERR("fix_socket_list tcp failed\n");
+		LOG(L_ERR, "ERROR: fix_all_socket_lists: fix_socket_list"
+				" tcp failed\n");
 		goto error;
 	}
 	if (flags){
@@ -1818,7 +1925,8 @@ int fix_all_socket_lists()
 #ifdef USE_TLS
 	flags=0;
 	if (!tls_disable && (fix_socket_list(&tls_listen, &flags)!=0)){
-		LM_ERR("fix_socket_list tls failed\n");
+		LOG(L_ERR, "ERROR: fix_all_socket_lists: fix_socket_list"
+				" tls failed\n");
 		goto error;
 	}
 	if (flags){
@@ -1829,7 +1937,8 @@ int fix_all_socket_lists()
 #ifdef USE_SCTP
 	flags=0;
 	if (!sctp_disable && (fix_socket_list(&sctp_listen, &flags)!=0)){
-		LM_ERR("fix_socket_list sctp failed\n");
+		LOG(L_ERR, "ERROR: fix_all_socket_lists: fix_socket_list"
+				" sctp failed\n");
 		goto error;
 	}
 	if (flags){
@@ -1847,7 +1956,7 @@ int fix_all_socket_lists()
 			&& (sctp_listen==0)
 #endif
 		){
-		LM_ERR("no listening sockets\n");
+		LOG(L_ERR, "ERROR: fix_all_socket_lists: no listening sockets\n");
 		goto error;
 	}
 	return 0;
@@ -2018,16 +2127,16 @@ int parse_protohostport(str* ins, sr_phostp_t *r)
 end:
 	return 0;
 error_brackets:
-	LM_ERR("too many brackets in %.*s\n", ins->len, ins->s);
+	LOG(L_ERR, "too many brackets in %.*s\n", ins->len, ins->s);
 	return -1;
 error_colons:
-	LM_ERR("too many colons in %.*s\n", ins->len, ins->s);
+	LOG(L_ERR, "too many colons in %.*s\n", ins->len, ins->s);
 	return -1;
 error_proto:
-	LM_ERR("bad protocol in %.*s\n", ins->len, ins->s);
+	LOG(L_ERR, "bad protocol in %.*s\n", ins->len, ins->s);
 	return -1;
 error_port:
-	LM_ERR("bad port number in %.*s\n", ins->len, ins->s);
+	LOG(L_ERR, "bad port number in %.*s\n", ins->len, ins->s);
 	return -1;
 }
 

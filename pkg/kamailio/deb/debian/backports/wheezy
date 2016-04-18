@@ -8,11 +8,6 @@ DIST=wheezy
 rm -rf ${DIST}
 cp -r debian ${DIST}
 
-# No systemd
-sed -i -e '/dh-systemd/d' ${DIST}/control
-sed -i -e '/dh_systemd/d' ${DIST}/rules
-rm ${DIST}/kamailio.service
-
 # No purple module:
 sed -i -e '/libpurple-dev/d' -e '/^Package: kamailio-purple-modules/,/^$/d' \
 	${DIST}/control
@@ -37,17 +32,6 @@ sed -i -e '/FREERADIUS/d' ${DIST}/rules
 
 # use old json
 sed -i 's/libjson-c-dev/libjson0-dev/' ${DIST}/control
-
-# no kazoo module
-sed -i -e '/librabbitmq-dev/d' -e '/^Package: kamailio-kazoo-modules/,/^$/d' \
-	${DIST}/control
-sed -i -e 's/ kazoo[ ,$]*/ /' ${DIST}/rules
-sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ kazoo/' ${DIST}/rules
-
-# no cnxcc module
-sed -i -e '/^Package: kamailio-cnxcc-modules/,/^$/d' ${DIST}/control
-sed -i -e 's/ cnxcc[ ,$]*/ /' ${DIST}/rules
-sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ cnxcc/' ${DIST}/rules
 
 # clean backports scripts
 rm -rf ${DIST}/backports

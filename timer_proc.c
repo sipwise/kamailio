@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2009 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,10 +15,19 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * timer_proc.c  - separate process timers
+ * (unrelated to the main fast and slow timers)
+ */
+/*
+ * History:
+ * --------
+ *  2009-03-10  initial version (andrei)
+*/
 
 /**
  * @file
- * @brief Kamailio core ::  timer - separate process timers
+ * @brief SIP-router core ::  timer - separate process timers
  *
  *  (unrelated to the main fast and slow timers)
  *
@@ -85,19 +96,19 @@ int fork_basic_timer(int child_id, char* desc, int make_sock,
 }
 
 /**
- * \brief Forks a separate simple microsecond-sleep() periodic timer
+ * \brief Forks a separate simple milisecond-sleep() periodic timer
  * 
- * Forks a very basic periodic timer process, that just us-sleep()s for 
+ * Forks a very basic periodic timer process, that just ms-sleep()s for 
  * the specified interval and then calls the timer function.
- * The new "basic timer" process execution start immediately, the us-sleep()
+ * The new "basic timer" process execution start immediately, the ms-sleep()
  * is called first (so the first call to the timer function will happen
- * \<interval\> microseconds after the call to fork_basic_utimer)
+ * \<interval\> seconds after the call to fork_basic_utimer)
  * @param child_id  @see fork_process()
  * @param desc      @see fork_process()
  * @param make_sock @see fork_process()
  * @param f         timer function/callback
  * @param param     parameter passed to the timer function
- * @param uinterval  interval in micro-seconds.
+ * @param uinterval  interval in mili-seconds.
  * @return pid of the new process on success, -1 on error
  * (doesn't return anything in the child process)
  */
@@ -211,20 +222,16 @@ int fork_sync_timer(int child_id, char* desc, int make_sock,
 	if (pid<0) return -1;
 	if (pid==0){
 		/* child */
-		interval *= 1000;  /* miliseconds */
 		ts2 = interval;
 		if (cfg_child_init()) return -1;
 		for(;;){
-			if (ts2>interval)
-				sleep_us(1000);    /* 1 milisecond sleep to catch up */
-			else
-				sleep_us(ts2*1000); /* microseconds sleep */
-			ts1 = get_ticks_raw();
+			if(ts2>0) sleep(ts2);
+			else sleep(1);
+			ts1 = get_ticks();
 			cfg_update();
-			f(TICKS_TO_S(ts1), param); /* ticks in sec for compatibility with old
+			f(get_ticks(), param); /* ticks in s for compatibility with old
 									  timers */
-			/* adjust the next sleep duration */
-			ts2 = interval - TICKS_TO_MS(get_ticks_raw()) + TICKS_TO_MS(ts1);
+			ts2 = interval - get_ticks() + ts1;
 		}
 	}
 	/* parent */
@@ -233,19 +240,19 @@ int fork_sync_timer(int child_id, char* desc, int make_sock,
 
 
 /**
- * \brief Forks a separate simple microsecond-sleep() -&- sync periodic timer
+ * \brief Forks a separate simple milisecond-sleep() -&- sync periodic timer
  *
- * Forks a very basic periodic timer process, that just us-sleep()s for 
+ * Forks a very basic periodic timer process, that just ms-sleep()s for 
  * the specified interval and then calls the timer function.
- * The new "sync timer" process execution start immediately, the us-sleep()
+ * The new "sync timer" process execution start immediately, the ms-sleep()
  * is called first (so the first call to the timer function will happen
- * \<interval\> microseconds after the call to fork_basic_utimer)
+ * \<interval\> seconds after the call to fork_basic_utimer)
  * @param child_id  @see fork_process()
  * @param desc      @see fork_process()
  * @param make_sock @see fork_process()
  * @param f         timer function/callback
  * @param param     parameter passed to the timer function
- * @param uinterval  interval in micro-seconds.
+ * @param uinterval  interval in mili-seconds.
  * @return pid of the new process on success, -1 on error
  * (doesn't return anything in the child process)
  */
@@ -263,10 +270,8 @@ int fork_sync_utimer(int child_id, char* desc, int make_sock,
 		ts2 = uinterval;
 		if (cfg_child_init()) return -1;
 		for(;;){
-			if(ts2>uinterval)
-				sleep_us(1);
-			else
-				sleep_us(ts2);
+			if(ts2>0) sleep_us(uinterval);
+			else sleep_us(1);
 			ts1 = get_ticks_raw();
 			cfg_update();
 			f(TICKS_TO_MS(ts1), param); /* ticks in mili-seconds */
@@ -277,149 +282,5 @@ int fork_sync_utimer(int child_id, char* desc, int make_sock,
 	return pid;
 }
 
-
-/* number of slots in the wheel timer */
-#define SR_WTIMER_SIZE	16
-
-typedef struct sr_wtimer_node {
-	struct sr_wtimer_node *next;
-	uint32_t interval;  /* frequency of execution (secs) */
-	uint32_t steps;     /* init: interval = loops * SR_WTIMER_SIZE + steps */
-	uint32_t loops;
-	uint32_t eloop;
-	timer_function* f;
-	void* param;
-} sr_wtimer_node_t;
-
-typedef struct sr_wtimer {
-	uint32_t itimer;
-	sr_wtimer_node_t *wlist[SR_WTIMER_SIZE];
-} sr_wtimer_t;
-
-static sr_wtimer_t *_sr_wtimer = NULL;;
-
-/**
- *
- */
-int sr_wtimer_init(void)
-{
-	if(_sr_wtimer!=NULL)
-		return 0;
-	_sr_wtimer = (sr_wtimer_t *)pkg_malloc(sizeof(sr_wtimer_t));
-	if(_sr_wtimer==NULL) {
-		LM_ERR("no more pkg memory\n");
-		return -1;
-	}
-
-	memset(_sr_wtimer, 0, sizeof(sr_wtimer_t));
-	register_sync_timers(1);
-	return 0;
-}
-
-/**
- *
- */
-int sr_wtimer_add(timer_function* f, void* param, int interval)
-{
-	sr_wtimer_node_t *wt;
-	if(_sr_wtimer==NULL) {
-		LM_ERR("wtimer not intialized\n");
-		return -1;
-	}
-
-	wt = (sr_wtimer_node_t*)pkg_malloc(sizeof(sr_wtimer_node_t));
-	if(wt==NULL) {
-		LM_ERR("no more pkg memory\n");
-		return -1;
-	}
-	memset(wt, 0, sizeof(sr_wtimer_node_t));
-	wt->f = f;
-	wt->param = param;
-	wt->interval = interval;
-	wt->steps = interval % SR_WTIMER_SIZE;
-	wt->loops = interval / SR_WTIMER_SIZE;
-	wt->eloop = wt->loops;
-	wt->next = _sr_wtimer->wlist[wt->steps];
-	_sr_wtimer->wlist[wt->steps] = wt;
-
-	return 0;
-}
-
-/**
- *
- */
-int sr_wtimer_reinsert(uint32_t cs, sr_wtimer_node_t *wt)
-{
-	uint32_t ts;
-
-	ts = (cs + wt->interval) % SR_WTIMER_SIZE;
-	wt->eloop = wt->interval / SR_WTIMER_SIZE;
-	wt->next = _sr_wtimer->wlist[ts];
-	_sr_wtimer->wlist[ts] = wt;
-
-	return 0;
-}
-
-/**
- *
- */
-void sr_wtimer_exec(unsigned int ticks, void *param)
-{
-	sr_wtimer_node_t *wt;
-	sr_wtimer_node_t *wn;
-	sr_wtimer_node_t *wp;
-	uint32_t cs;
-
-	if(_sr_wtimer==NULL) {
-		LM_ERR("wtimer not intialized\n");
-		return;
-	}
-
-	_sr_wtimer->itimer++;
-	cs = _sr_wtimer->itimer % SR_WTIMER_SIZE;
-	/* uint32_t cl;
-	cl = _sr_wtimer->itimer / SR_WTIMER_SIZE;
-	LM_DBG("wtimer - loop: %u - slot: %u\n", cl, cs); */
-
-	wp = NULL;
-	wt=_sr_wtimer->wlist[cs];
-	while(wt) {
-		wn = wt->next;
-		if(wt->eloop==0) {
-			/* execute timer callback function */
-			wt->f(ticks, wt->param);
-			/* extract and reinsert timer item */
-			if(wp==NULL) {
-				_sr_wtimer->wlist[cs] = wn;
-			} else {
-				wp->next = wn;
-			}
-			sr_wtimer_reinsert(cs, wt);
-		} else {
-			wt->eloop--;
-			wp = wt;
-		}
-		wt = wn;
-	}
-}
-
-/**
- *
- */
-int sr_wtimer_start(void)
-{
-	if(_sr_wtimer==NULL) {
-		LM_ERR("wtimer not intialized\n");
-		return -1;
-	}
-
-	if(fork_sync_timer(-1 /*PROC_TIMER*/, "secondary timer", 1,
-				sr_wtimer_exec, NULL, 1)<0) {
-		LM_ERR("wtimer starting failed\n");
-		return -1;
-	}
-
-	return 0;
-}
 
 /* vi: set ts=4 sw=4 tw=79:ai:cindent: */

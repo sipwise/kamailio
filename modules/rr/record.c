@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
@@ -40,7 +42,6 @@
 #include "../../data_lump.h"
 #include "record.h"
 #include "rr_mod.h"
-#include "loose.h"
 
 
 #define RR_PREFIX_SIP "Record-Route: <sip:"
@@ -284,8 +285,7 @@ static inline int build_rr(struct lump* _l, struct lump* _l2, str* user,
 	if (_l ==0 )
 		goto lump_err;
 	if (enable_double_rr) {
-		if (!(_l = insert_cond_lump_after(_l,
-				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS, 0)))
+		if (!(_l = insert_cond_lump_after(_l, COND_IF_DIFF_REALMS, 0)))
 			goto lump_err;
 		if (!(_l = insert_new_lump_after(_l, r2, RR_R2_LEN, 0)))
 			goto lump_err;
@@ -376,6 +376,7 @@ int record_route(struct sip_msg* _m, str *params)
 {
 	struct lump* l, *l2;
 	str user = {NULL, 0};
+	struct to_body* from = NULL;
 	str* tag;
 	int use_ob = rr_obb.use_outbound ? rr_obb.use_outbound(_m) : 0;
 	int sips;
@@ -404,21 +405,13 @@ int record_route(struct sip_msg* _m, str *params)
 	}
 
 	if (append_fromtag) {
-		if (is_direction(_m, RR_FLOW_UPSTREAM) == 0) {
-			if (parse_to_header(_m) < 0) {
-				LM_ERR("To parsing failed\n");
-				ret = -2;
-				goto error;
-			}
-			tag = &((struct to_body*)_m->to->parsed)->tag_value;
-		} else {
-			if (parse_from_header(_m) < 0) {
-				LM_ERR("From parsing failed\n");
-				ret = -2;
-				goto error;
-			}
-			tag = &((struct to_body*)_m->from->parsed)->tag_value;
+		if (parse_from_header(_m) < 0) {
+			LM_ERR("From parsing failed\n");
+			ret = -2;
+			goto error;
 		}
+		from = (struct to_body*)_m->from->parsed;
+		tag = &from->tag_value;
 	} else {
 		tag = 0;
 	}
@@ -438,10 +431,8 @@ int record_route(struct sip_msg* _m, str *params)
 			ret = -5;
 			goto error;
 		}
-		l = insert_cond_lump_after(l,
-				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS, 0);
-		l2 = insert_cond_lump_before(l2,
-				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS, 0);
+		l = insert_cond_lump_after(l, COND_IF_DIFF_REALMS, 0);
+		l2 = insert_cond_lump_before(l2, COND_IF_DIFF_REALMS, 0);
 		if (!l || !l2) {
 			LM_ERR("failed to insert conditional lump\n");
 			ret = -6;
@@ -717,16 +708,14 @@ static inline int build_advertised_rr(struct lump* _l, struct lump* _l2, str *_d
 		goto lump_err;
 	}
 	hdr = NULL;
-	if (!(_l = insert_cond_lump_after(_l,
-				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_PROTO, 0)))
+	if (!(_l = insert_cond_lump_after(_l, COND_IF_DIFF_PROTO, 0)))
 		goto lump_err;
 	if (!(_l = insert_new_lump_after(_l, trans, RR_TRANS_LEN, 0)))
 		goto lump_err;
 	if (!(_l = insert_subst_lump_after(_l, _inbound?SUBST_RCV_PROTO:SUBST_SND_PROTO, 0)))
 		goto lump_err;
 	if (enable_double_rr) {
-		if (!(_l = insert_cond_lump_after(_l,
-					(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_REALMS, 0)))
+		if (!(_l = insert_cond_lump_after(_l, COND_IF_DIFF_REALMS, 0)))
 			goto lump_err;
 		if (!(_l = insert_new_lump_after(_l, r2, RR_R2_LEN, 0)))
 			goto lump_err;
@@ -785,23 +774,12 @@ int record_route_advertised_address(struct sip_msg* _m, str* _data)
 	}
 
 	if (append_fromtag) {
-		if (is_direction(_m, RR_FLOW_UPSTREAM) == 0) {
-			if (parse_to_header(_m) < 0) {
-				LM_ERR("To parsing failed\n");
-				ret = -2;
-				goto error;
-			}
-			tag = &((struct to_body*)_m->to->parsed)->tag_value;
-		} else {
-			if (parse_from_header(_m) < 0) {
-				LM_ERR("From parsing failed\n");
-				ret = -2;
-				goto error;
-			}
-			tag = &((struct to_body*)_m->from->parsed)->tag_value;
+		if (parse_from_header(_m) < 0) {
+			LM_ERR("From parsing failed\n");
+			ret = -2;
+			goto error;
 		}
-	} else {
-		tag = 0;
+		tag = &((struct to_body*)_m->from->parsed)->tag_value;
 	}
 
 	sips = rr_is_sips(_m);
@@ -814,10 +792,8 @@ int record_route_advertised_address(struct sip_msg* _m, str* _data)
 			ret = -3;
 			goto error;
 		}
-		l = insert_cond_lump_after(l,
-				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_PROTO, 0);
-		l2 = insert_cond_lump_before(l2,
-				(enable_double_rr == 2) ? COND_TRUE : COND_IF_DIFF_PROTO, 0);
+		l = insert_cond_lump_after(l, COND_IF_DIFF_PROTO, 0);
+		l2 = insert_cond_lump_before(l2, COND_IF_DIFF_PROTO, 0);
 		if (!l || !l2) {
 			LM_ERR("failed to insert conditional lump\n");
 			ret = -4;

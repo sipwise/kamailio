@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -98,7 +98,7 @@ int I_perform_location_information_request(struct sip_msg* msg, char* route, cha
 
     /* extract data from message */
     if (orig) {
-        public_identity = cscf_get_asserted_identity(msg, 0);
+        public_identity = cscf_get_asserted_identity(msg);
     } else {
         public_identity = cscf_get_public_identity_from_requri(msg);
     }
@@ -143,7 +143,7 @@ int I_perform_location_information_request(struct sip_msg* msg, char* route, cha
     create_lia_return_code(CSCF_RETURN_ERROR);
     
     LM_DBG("Suspending SIP TM transaction\n");
-    if (tmb.t_suspend(msg, &saved_t->tindex, &saved_t->tlabel) != 0) {
+    if (tmb.t_suspend(msg, &saved_t->tindex, &saved_t->tlabel) < 0) {
         LM_ERR("failed to suspend the TM processing\n");
         free_saved_lir_transaction_data(saved_t);
 

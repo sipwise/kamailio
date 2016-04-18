@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Process REGISTER request and send reply
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -16,16 +18,31 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * You should have received a copy of the GNU General Public License 
+ * along with this program; if not, write to the Free Software 
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ----------
+ * 2003-01-27 next baby-step to removing ZT - PRESERVE_ZT (jiri)
+ * 2003-02-28 scrathcpad compatibility abandoned (jiri)
+ * 2003-03-21 save_noreply added, patch provided by Maxim Sobolev 
+ *            <sobomax@portaone.com> (janakj)
+ * 2005-07-11 added sip_natping_flag for nat pinging with SIP method
+ *            instead of UDP package (bogdan)
+ * 2006-04-13 added tcp_persistent_flag for keeping the TCP connection as long
+ *            as a TCP contact is registered (bogdan)
+ * 2006-11-22 save_noreply and save_memory merged into save() (bogdan)
+ * 2006-11-28 Added statistic support for the number of accepted/rejected 
+ *            registrations. (Jeffrey Magder - SOMA Networks) 
+ * 2007-02-24  sip_natping_flag moved into branch flags, so migrated to 
+ *             nathelper module (bogdan)
  */
 /*!
  * \file
  * \brief SIP registrar module - Process REGISTER request and send reply
- * \ingroup registrar
- */
+ * \ingroup registrar   
+ */  
 
 
 #include "../../str.h"
@@ -70,8 +87,8 @@ static int q_override_msg_id;
 static qvalue_t q_override_value;
 
 /*! \brief
- * Process request that contained a star, in that case,
- * we will remove all bindings with the given username
+ * Process request that contained a star, in that case, 
+ * we will remove all bindings with the given username 
  * from the usrloc and return 200 OK response
  */
 static inline int star(sip_msg_t *_m, udomain_t* _d, str* _a, str *_h)
@@ -217,8 +234,7 @@ static inline int no_contacts(sip_msg_t *_m, udomain_t* _d, str* _a, str* _h)
 /*! \brief
  * Fills the common part (for all contacts) of the info structure
  */
-static inline ucontact_info_t* pack_ci( struct sip_msg* _m, contact_t* _c,
-		unsigned int _e, unsigned int _f, int _use_regid)
+static inline ucontact_info_t* pack_ci( struct sip_msg* _m, contact_t* _c, unsigned int _e, unsigned int _f, int _use_regid)
 {
 	static ucontact_info_t ci;
 	static str no_ua = str_init("n/a");
@@ -306,7 +322,6 @@ static inline ucontact_info_t* pack_ci( struct sip_msg* _m, contact_t* _c,
 			ci.received = path_received;
 		}
 
-		ci.server_id = server_id;
 		if(_m->contact) {
 			_c = (((contact_body_t*)_m->contact->parsed)->contacts);
 			if(_c->instance!=NULL && _c->instance->body.len>0) {
@@ -400,7 +415,6 @@ static inline ucontact_info_t* pack_ci( struct sip_msg* _m, contact_t* _c,
 			if(str2int(&_c->reg_id->body, &ci.reg_id)<0 || ci.reg_id==0)
 			{
 				LM_ERR("invalid reg-id value\n");
-				rerrno = R_INV_REGID;
 				goto error;
 			}
 		}
@@ -489,7 +503,7 @@ static inline int insert_contacts(struct sip_msg* _m, udomain_t* _d, str* _a, in
 
 
 		if (maxc > 0 && num >= maxc) {
-			LM_INFO("too many contacts (%d) for AOR <%.*s>\n",
+			LM_INFO("too many contacts (%d) for AOR <%.*s>\n", 
 					num, _a->len, _a->s);
 			rerrno = R_TOO_MANY;
 			goto error;
@@ -534,7 +548,7 @@ static inline int insert_contacts(struct sip_msg* _m, udomain_t* _d, str* _a, in
 		if (tcp_check) {
 			/* parse contact uri to see if transport is TCP */
 			if (parse_uri( _c->uri.s, _c->uri.len, &uri)<0) {
-				LM_ERR("failed to parse contact <%.*s>\n",
+				LM_ERR("failed to parse contact <%.*s>\n", 
 						_c->uri.len, _c->uri.s);
 			} else if (uri.proto==PROTO_TCP || uri.proto==PROTO_TLS || uri.proto==PROTO_WS || uri.proto==PROTO_WSS) {
 				if (e_max) {
@@ -753,10 +767,10 @@ static inline int update_contacts(struct sip_msg* _m, urecord_t* _r, int _mode, 
 					updated=1;
 				}
 				/* If call-id has changed then delete all records with this sip.instance
-				 * then insert new record */
+				   then insert new record */
 				if (ci->instance.s != NULL &&
 						(ci->callid->len != c->callid.len ||
-						strncmp(ci->callid->s, c->callid.s, ci->callid->len) != 0))
+						 strncmp(ci->callid->s, c->callid.s, ci->callid->len) != 0))
 				{
 					ptr = _r->contacts;
 					while (ptr)
@@ -783,7 +797,7 @@ static inline int update_contacts(struct sip_msg* _m, urecord_t* _r, int _mode, 
 		if (tcp_check) {
 			/* parse contact uri to see if transport is TCP */
 			if (parse_uri( _c->uri.s, _c->uri.len, &uri)<0) {
-				LM_ERR("failed to parse contact <%.*s>\n",
+				LM_ERR("failed to parse contact <%.*s>\n", 
 						_c->uri.len, _c->uri.s);
 			} else if (uri.proto==PROTO_TCP || uri.proto==PROTO_TLS || uri.proto==PROTO_WS || uri.proto==PROTO_WSS) {
 				if (e_max>0) {

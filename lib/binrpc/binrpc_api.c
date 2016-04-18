@@ -1,26 +1,37 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2006 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
  
-/**
+/*
  * send commands using binrpc
  *
+ * History:
+ * --------
+ *  2006-11-09  created by vlada
+ *  2006-12-20  extended by tma
  */
 
 #include <sys/types.h>
@@ -815,7 +826,7 @@ int binrpc_print_response(struct binrpc_response_handle *resp_handle, char* fmt)
 read_value:
 		val.name.s=0;
 		val.name.len=0;
-		p=binrpc_read_record(&resp_handle->in_pkt, p, end, &val, 0, &ret);
+		p=binrpc_read_record(&resp_handle->in_pkt, p, end, &val, &ret);
 		if (ret<0){
 			if (fmt)
 				putchar('\n');
@@ -898,7 +909,7 @@ int binrpc_parse_response(struct binrpc_val** vals, int* val_count,
 		val.type = BINRPC_T_ALL;
 		val.name.s = 0;
 		val.name.len = 0;
-		p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, 0, &ret);
+		p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, &ret);
 		if (ret<0){
 			if (ret==E_BINRPC_EOP){
 				break;
@@ -982,7 +993,7 @@ int binrpc_parse_error_response(
 	val.type=BINRPC_T_INT;
 	val.name.s=0;
 	val.name.len=0;
-	p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, 0, &ret);
+	p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, &ret);
 	if (ret < 0) {
 		snprintf(binrpc_last_errs, sizeof(binrpc_last_errs)-1,
 			"parse_error_response: error when parsing reply (code): %s", binrpc_error(ret)
@@ -992,7 +1003,7 @@ int binrpc_parse_error_response(
 	*err_no = val.u.intval;
 
 	val.type=BINRPC_T_STR;
-	p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, 0, &ret);
+	p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, &ret);
 	if (ret < 0) {
 		snprintf(binrpc_last_errs, sizeof(binrpc_last_errs)-1,
 			"parse_error_response: error when parsing reply (str): %s", binrpc_error(ret)
@@ -1151,7 +1162,6 @@ int binrpc_response_to_text(
 		goto error;
 	}
 
-	memset(&val, 0, sizeof(struct binrpc_val));
 	resp_handle->in_pkt.offset = resp_handle->in_pkt.in_struct = resp_handle->in_pkt.in_array = 0;
 	
 	p=resp_handle->reply_buf;
@@ -1170,7 +1180,7 @@ int binrpc_response_to_text(
 		val.type=BINRPC_T_ALL;
 		val.name.s=0;
 		val.name.len=0;
-		p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, 0, &ret);
+		p = binrpc_read_record(&resp_handle->in_pkt, p, end, &val, &ret);
 		if (ret < 0) {
 			if (ret == E_BINRPC_EOP) {
 				printf("end of message detected\n");

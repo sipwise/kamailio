@@ -1,27 +1,33 @@
 /*
+ * $Id$
+ *
  * SIP Session Timer (sst) module - support for tracking dialogs and
  * SIP Session Timers.
  *
  * Copyright (C) 2006 SOMA Networks, INC.
  * Written by: Ron Winacott (karwin)
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify it
+ * SIP-router is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful, but
+ * SIP-router is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
  * USA
  *
+ * History:
+ * --------
+ * 2006-05-11 initial version (karwin)
+ * 2006-10-10 RFC compilent changes. Added the other flags (karwin)
  */
 
 /*! \file sst/sst.c
@@ -109,7 +115,7 @@ static cmd_export_t cmds[]={
 static param_export_t mod_params[]={
 	{ "enable_stats", INT_PARAM, &sst_enable_stats			},
 	{ "min_se", INT_PARAM, &sst_minSE				},
-	{ "timeout_avp", PARAM_STRING, &timeout_spec			},
+	{ "timeout_avp", STR_PARAM, &timeout_spec			},
 	{ "reject_to_small",		INT_PARAM, &sst_reject 		},
 	{ "sst_flag",				INT_PARAM, &sst_flag	},
 	{ 0,0,0 }

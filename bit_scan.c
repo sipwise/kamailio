@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2007 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,10 +15,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
+/*
+ *  bit scan operations, see bit_scan.h.
+ */
+/* 
+ * History:
+ * --------
+ *  2007-06-23  created by andrei
+ */
 /*!
  * \file
- * \brief Kamailio core ::  bit scan operations, see bit_scan.h.
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */

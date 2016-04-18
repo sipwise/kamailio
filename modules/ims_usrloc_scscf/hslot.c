@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -204,20 +204,19 @@ void slot_add(hslot_t* _s, struct impurecord* _r)
  */
 void slot_rem(hslot_t* _s, struct impurecord* _r)
 {
-    LM_DBG("Removing IMPU [%.*s] from hashtable\n", _r->public_identity.len, _r->public_identity.s);
-    if (_r->prev) {
-        _r->prev->next = _r->next;
-    } else {
-        _s->first = _r->next;
-    }
+	if (_r->prev) {
+		_r->prev->next = _r->next;
+	} else {
+		_s->first = _r->next;
+	}
 
-    if (_r->next) {
-        _r->next->prev = _r->prev;
-    } else {
-        _s->last = _r->prev;
-    }
+	if (_r->next) {
+		_r->next->prev = _r->prev;
+	} else {
+		_s->last = _r->prev;
+	}
 
-    _r->prev = _r->next = 0;
-    _r->slot = 0;
-    _s->n--;
+	_r->prev = _r->next = 0;
+	_r->slot = 0;
+	_s->n--;
 }

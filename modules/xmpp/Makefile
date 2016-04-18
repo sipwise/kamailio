@@ -1,3 +1,4 @@
+# $Id$
 #
 # xmpp module makefile
 #

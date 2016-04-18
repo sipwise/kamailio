@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2007 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,13 +15,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*!
-* \file
-* \brief Kamailio core :: locks
-* \author andrei
-* \ingroup core
-* Module: \ref core
- *
+/*
  * futex based lock (mutex) implementation  (linux 2.6+ only)
  * based on Ulrich Drepper implementation in "Futexes Are Tricky"
  * (http://people.redhat.com/drepper/futex.pdf)
@@ -32,6 +28,12 @@
  *                                              (1 or 2)
  *
  *  Config defines:
+ */
+/* 
+ * History:
+ * --------
+ *  2007-05-13  created by andrei
+ *  2007-06-12  added ADAPTIVE_WAIT busy waiting (andrei)
  */
 
 #ifndef _futexlock_h
@@ -142,7 +144,7 @@ static inline int futex_try(futex_lock_t* lock)
 {
 	int c;
 	c=atomic_cmpxchg(lock, 0, 1);
-	if (likely(c==0))
+	if (likely(c))
 		membar_enter_lock();
 	return c;
 }

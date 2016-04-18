@@ -1,32 +1,43 @@
 /*
+ * $Id$
  *
  * adding/removing headers or any other data chunk from a message
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
-* \file
-* \brief Kamailio core :: Adding/removing headers or any other data chunk from a message
-* \ingroup core
-* \author jiri, andrei, janakj
-* Module: \ref core
-*/
+/* History:
+ * --------
+ *  2003-01-29  s/int/enum ... more convenient for gdb (jiri)
+ *  2003-03-31  added subst lumps -- they expand in ip addr, port a.s.o (andrei)
+ *  2003-04-01  added opt (condition) lumps (andrei)
+ *  2003-04-02  added more subst lumps: SUBST_{SND,RCV}_ALL  
+ *              => ip:port;transport=proto (andrei)
+ *  2003-10-20  split from data_lump.h (andrei)
+ *  2005-03-24  the type of type attribute changed to enum _hdr_types_t (janakj)
+ *
+ */
+
 
 #ifndef lump_struct_h
 #define lump_struct_h
@@ -70,7 +81,7 @@ enum lump_flag { LUMPFLAG_NONE=0, LUMPFLAG_DUPED=1, LUMPFLAG_SHMEM=2,
 #define LUMP_SET_COND_TRUE(_lump)	 (_lump)->flags |= LUMPFLAG_COND_TRUE
 #define LUMP_IS_COND_TRUE(_lump)	 ((_lump)->flags & LUMPFLAG_COND_TRUE)
 
-typedef struct lump{
+struct lump{
 	enum _hdr_types_t type; /* HDR_VIA_T, HDR_OTHER_T (0), ... */
 	enum lump_op op;   /* DEL, ADD, NOP, UNSPEC(=0) */
 	
@@ -91,7 +102,7 @@ typedef struct lump{
 	struct lump* next;
 
 	enum lump_flag flags; /* additional hints for use from TM's shmem */
-} sr_lump_t;
+};
 
 
 /*

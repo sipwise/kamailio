@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -55,9 +55,7 @@ extern str trusted_table; /* Name of trusted table */
 extern str source_col;    /* Name of source address column */
 extern str proto_col;     /* Name of protocol column */
 extern str from_col;      /* Name of from pattern column */
-extern str ruri_col;      /* Name of RURI pattern column */
 extern str tag_col;       /* Name of tag column */
-extern str priority_col;  /* Name of priority column */
 extern str address_table; /* Name of address table */
 extern str grp_col;       /* Name of address group column */
 extern str ip_addr_col;   /* Name of ip address column */

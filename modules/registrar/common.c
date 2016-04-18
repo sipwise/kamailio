@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Common stuff
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,9 +19,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *	
- */
+ * History
+ * ------
+ * 2003-02-14 un-escaping added (janakj)
+ * 2006-09-19 AOR may be provided via an AVP instead of being fetched
+ *            from URI (bogdan)
+*/
 
 /*!
  * \file

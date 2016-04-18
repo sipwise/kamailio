@@ -4,7 +4,7 @@
 			<db_table_id>uacreg</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>l_uuid</field></col>
 				<col><field>l_username</field></col>
 				<col><field>l_domain</field></col>
@@ -15,8 +15,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -33,8 +31,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -54,8 +50,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>

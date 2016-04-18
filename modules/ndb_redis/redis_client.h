@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -67,5 +67,4 @@ int redisc_exec(str *srv, str *res, str *cmd, ...);
 void* redisc_exec_argv(redisc_server_t *rsrv, int argc, const char **argv, const size_t *argvlen);
 redisc_reply_t *redisc_get_reply(str *name);
 int redisc_free_reply(str *name);
-int redisc_check_auth(redisc_server_t *rsrv, char *pass);
 #endif

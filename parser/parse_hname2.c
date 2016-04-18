@@ -3,22 +3,34 @@
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2003-02-28 scratchpad compatibility abandoned (jiri)
+ * 2003-01-27 next baby-step to removing ZT - PRESERVE_ZT (jiri)
+ * 2003-05-01 added support for Accept HF (janakj)
+ * 2007-01-26 Date, Identity, Identity_info HF support added (gergo)
+ * 2007-07-27 added support for Retry-After (andrei)
  */
 
 /** Parser :: Fast 32-bit Header Field Name Parser.
@@ -95,26 +107,11 @@ static inline char* skip_ws(char* p, unsigned int size)
 
 /*@} */
 
-#define SAFE_READ(val, len) \
-((len) == 1 ? READ1(val) : ((len) == 2 ? READ2(val) : ((len) == 3 ? READ3(val) : ((len) > 3 ? READ4(val) : READ0(val)))))
-
 #define READ(val) \
-READ4(val)
-
-#define READ4(val) \
-(*((val) + 0) + (*((val) + 1) << 8) + (*((val) + 2) << 16) + (*((val) + 3) << 24))
+(*(val + 0) + (*(val + 1) << 8) + (*(val + 2) << 16) + (*(val + 3) << 24))
 
 #define READ3(val) \
-(*((val) + 0) + (*((val) + 1) << 8) + (*((val) + 2) << 16))
-
-#define READ2(val) \
-(*((val) + 0) + (*((val) + 1) << 8))
-
-#define READ1(val) \
-(*((val) + 0))
-
-#define READ0(val) \
-(0)
+(*(val + 0) + (*(val + 1) << 8) + (*(val + 2) << 16))
 
 #define FIRST_QUATERNIONS       \
         case _via1_: via1_CASE; \
@@ -257,37 +254,3 @@ char* parse_hname2(char* const begin, const char* const end, struct hdr_field* c
 	}
 }
 
-/**
- * parse_hname2_short() - safer version to parse header name stored in short buffers
- *   - parse_hanem2() reads 4 bytes at once, expecting to walk through a buffer
- *   that contains more than the header name (e.g., sip msg buf, full header buf
- *   with name and body)
- */
-char* parse_hname2_short(char* const begin, const char* const end, struct hdr_field* const hdr)
-{
-#define HBUF_MAX_SIZE 256
-	char hbuf[HBUF_MAX_SIZE];
-	char *p;
-
-	if(end-begin>=HBUF_MAX_SIZE-4) {
-		p = q_memchr(begin, ':', end - begin);
-		if(p && p-4> begin) {
-			/* header name termination char found and enough space in buffer after it */
-			return parse_hname2(begin, end, hdr);
-		}
-		/* not enough space */
-		LM_ERR("not enough space to parse the header name in [%.*s] (%d)\n",
-				(int)(end-begin), begin, (int)(end-begin));
-		return NULL;
-	}
-	/* pad with whitespace - tipycal char after the ':' of the header name */
-	memset(hbuf, ' ', HBUF_MAX_SIZE);
-	memcpy(hbuf, begin, end-begin);
-	p = parse_hname2(hbuf, hbuf + 4 + (end-begin), hdr);
-	if(!p) {
-		LM_ERR("failed to parse the header name in [%.*s] (%d)\n",
-				(int)(end-begin), begin, (int)(end-begin));
-		return NULL;
-	}
-	return begin + (p-hbuf);
-}

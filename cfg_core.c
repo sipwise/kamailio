@@ -1,25 +1,30 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History
+ * -------
+ *  2007-12-03	Initial version (Miklos)
+ *  2008-01-31  added DNS resolver parameters (Miklos)
  */
-
-/** Kamailio core :: core runtime config.
+/** core runtime config.
  * @file cfg_core.c
  * @ingroup core
  * Module: @ref core
@@ -59,7 +64,7 @@
 struct cfg_group_core default_core_cfg = {
 	L_WARN, 	/*!<  print only msg. < L_WARN */
 	LOG_DAEMON,	/*!< log_facility -- see syslog(3) */
-	L_DBG+1,    /*!< memdbg */
+	L_DBG,  /*!< memdbg */
 #ifdef USE_DST_BLACKLIST
 	/* blacklist */
 	0, /*!< dst blacklist is disabled by default */
@@ -110,7 +115,7 @@ struct cfg_group_core default_core_cfg = {
 	1500, /**< udp4_raw_mtu (1500 by default) */
 	-1,  /**< udp4_raw_ttl (auto detect by default) */
 	0,  /*!< force_rport */
-	L_DBG+1, /*!< memlog */
+	L_DBG, /*!< memlog */
 	3, /*!< mem_summary -flags: 0 off, 1 pkg_status, 2 shm_status,
 		4 pkg_sums, 8 shm_sums, 16 short_status */
 	0, /*!< mem_safety - 0 disabled */

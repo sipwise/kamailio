@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('sip_trace','3');
 CREATE TABLE sip_trace (
     id NUMBER(10) PRIMARY KEY,
     time_stamp DATE DEFAULT to_date('1900-01-01 00:00:01','yyyy-mm-dd hh24:mi:ss'),
@@ -10,7 +11,6 @@ CREATE TABLE sip_trace (
     fromip VARCHAR2(50) DEFAULT '',
     toip VARCHAR2(50) DEFAULT '',
     fromtag VARCHAR2(64) DEFAULT '',
-    totag VARCHAR2(64) DEFAULT '',
     direction VARCHAR2(4) DEFAULT ''
 );
 
@@ -26,6 +26,4 @@ CREATE INDEX sip_trace_traced_user_idx  ON sip_trace (traced_user);
 CREATE INDEX sip_trace_date_idx  ON sip_trace (time_stamp);
 CREATE INDEX sip_trace_fromip_idx  ON sip_trace (fromip);
 CREATE INDEX sip_trace_callid_idx  ON sip_trace (callid);
-
-INSERT INTO version (table_name, table_version) values ('sip_trace','4');
 

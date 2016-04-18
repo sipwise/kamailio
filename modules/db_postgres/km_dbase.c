@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History
  * -------
@@ -167,10 +167,6 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
 	int i, retries;
 	ExecStatusType pqresult;
 	PGresult *res = NULL;
-	int sock, ret;
-	fd_set fds;
-	time_t max_time;
-	struct timeval wait_time;
 
 	if(! _con || !_s || !_s->s)
 	{
@@ -221,44 +217,6 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
 		/* exec the query */
 
 		if (PQsendQuery(CON_CONNECTION(_con), s)) {
-			if (pg_timeout <= 0)
-				goto do_read;
-
-			max_time = time(NULL) + pg_timeout;
-
-			while (1) {
-				sock = PQsocket(CON_CONNECTION(_con));
-				FD_ZERO(&fds);
-				FD_SET(sock, &fds);
-
-				wait_time.tv_usec = 0;
-				wait_time.tv_sec = max_time - time(NULL);
-				if (wait_time.tv_sec <= 0 || wait_time.tv_sec > 0xffffff)
-					goto timeout;
-
-				ret = select(sock + 1, &fds, NULL, NULL, &wait_time);
-				if (ret < 0) {
-					if (errno == EINTR)
-						continue;
-					LM_WARN("select() error\n");
-					goto reset;
-				}
-				if (!ret) {
-timeout:
-					LM_WARN("timeout waiting for postgres reply\n");
-					goto reset;
-				}
-
-				if (!PQconsumeInput(CON_CONNECTION(_con))) {
-					LM_WARN("error reading data from postgres server: %s\n",
-							PQerrorMessage(CON_CONNECTION(_con)));
-					goto reset;
-				}
-				if (!PQisBusy(CON_CONNECTION(_con)))
-					break;
-			}
-
-do_read:
 			/* Get the result of the query */
 			while ((res = PQgetResult(CON_CONNECTION(_con))) != NULL) {
 				db_postgres_free_query(_con);
@@ -281,7 +239,6 @@ do_read:
 				PQerrorMessage(CON_CONNECTION(_con)));
 		if(PQstatus(CON_CONNECTION(_con))!=CONNECTION_OK)
 		{
-reset:
 			LM_DBG("reseting the connection to postgress server\n");
 			PQreset(CON_CONNECTION(_con));
 		}
@@ -602,6 +559,7 @@ int db_postgres_store_result(const db1_con_t* _con, db1_res_t** _r)
 	}
 
 done:
+	db_postgres_free_query(_con);
 	return (rc);
 }
 
@@ -905,12 +863,12 @@ int db_postgres_replace(const db1_con_t* _h, const db_key_t* _k,
 						pos += VAL_UINT(&_v[i]);
 						break;
 					case DB1_STR:
-						pos += ((VAL_STR(&_v[i])).s)?get_hash1_raw((VAL_STR(&_v[i])).s,
-									(VAL_STR(&_v[i])).len):0;
+						pos += get_hash1_raw((VAL_STR(&_v[i])).s,
+									(VAL_STR(&_v[i])).len);
 						break;
 					case DB1_STRING:
-						pos += (VAL_STRING(&_v[i]))?get_hash1_raw(VAL_STRING(&_v[i]),
-									strlen(VAL_STRING(&_v[i]))):0;
+						pos += get_hash1_raw(VAL_STRING(&_v[i]),
+									strlen(VAL_STRING(&_v[i])));
 						break;
 					default:
 						break;

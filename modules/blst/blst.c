@@ -1,4 +1,5 @@
-/*
+/*$Id$
+ *
  * Copyright (C) 2007 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,11 +14,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/*! \file
- * \brief
- * blst module :: Blacklist related script functions
+/*
  *
+ * Blacklist related script functions
+ *
+ * History:
+ * -------
+ *  2007-07-30  created by andrei
  */
 
 

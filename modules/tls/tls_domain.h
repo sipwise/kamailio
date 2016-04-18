@@ -18,7 +18,7 @@
  */
 
 /**
- * Kamailio TLS support :: virtual domain configuration support
+ * SIP-router TLS support :: virtual domain configuration support
  * @file
  * @ingroup tls
  * Module: @ref tls
@@ -30,50 +30,32 @@
 
 #include "../../str.h"
 #include "../../ip_addr.h"
-#include "../../atomic_ops.h"
 #include <openssl/ssl.h>
 
-
-#define TLS_OP_SSLv2_PLUS   0
-#define TLS_OP_SSLv3_PLUS   (TLS_OP_SSLv2_PLUS   | SSL_OP_NO_SSLv2)
-#define TLS_OP_TLSv1_PLUS   (TLS_OP_SSLv3_PLUS   | SSL_OP_NO_SSLv3)
-
-#ifdef SSL_OP_NO_TLSv1
-#  define TLS_OP_TLSv1_1_PLUS (TLS_OP_TLSv1_PLUS   | SSL_OP_NO_TLSv1)
-
-#  ifdef SSL_OP_NO_TLSv1_1
-#    define TLS_OP_TLSv1_2_PLUS (TLS_OP_TLSv1_1_PLUS | SSL_OP_NO_TLSv1_1)
-#  endif /*SSL_OP_NO_TLSv1_1*/
-
-#endif /*SSL_OP_NO_TLSv1*/
 
 /**
  * Available TLS methods
  */
 enum tls_method {
 	TLS_METHOD_UNSPEC = 0,
-	TLS_USE_SSLv23_cli,
-	TLS_USE_SSLv23_srv,
-	TLS_USE_SSLv23,     /* any SSL/TLS version */
 	TLS_USE_SSLv2_cli,
 	TLS_USE_SSLv2_srv,
-	TLS_USE_SSLv2,      /* only SSLv2 (deprecated) */
+	TLS_USE_SSLv2,
 	TLS_USE_SSLv3_cli,
 	TLS_USE_SSLv3_srv,
-	TLS_USE_SSLv3,      /* only SSLv3 (insecure) */
+	TLS_USE_SSLv3,
 	TLS_USE_TLSv1_cli,
 	TLS_USE_TLSv1_srv,
-	TLS_USE_TLSv1,      /* only TLSv1.0 */
+	TLS_USE_TLSv1,
+	TLS_USE_SSLv23_cli,
+	TLS_USE_SSLv23_srv,
+	TLS_USE_SSLv23,
 	TLS_USE_TLSv1_1_cli,
 	TLS_USE_TLSv1_1_srv,
-	TLS_USE_TLSv1_1,    /* only TLSv1.1 */
+	TLS_USE_TLSv1_1,
 	TLS_USE_TLSv1_2_cli,
 	TLS_USE_TLSv1_2_srv,
-	TLS_USE_TLSv1_2,    /* only TLSv1.2 */
-	TLS_USE_TLSvRANGE,    /* placeholder - TLSvX ranges must be after it */
-	TLS_USE_TLSv1_PLUS,   /* TLSv1.0 or greater */
-	TLS_USE_TLSv1_1_PLUS, /* TLSv1.1 or greater */
-	TLS_USE_TLSv1_2_PLUS, /* TLSv1.1 or greater */
+	TLS_USE_TLSv1_2,
 	TLS_METHOD_MAX
 };
 
@@ -105,8 +87,6 @@ typedef struct tls_domain {
 	str cipher_list;
 	enum tls_method method;
 	str crl_file;
-	str server_name;
-	str server_id;
 	struct tls_domain* next;
 } tls_domain_t;
 
@@ -120,7 +100,7 @@ typedef struct tls_domains_cfg {
 	tls_domain_t* srv_list;    /**< Server domain list */
 	tls_domain_t* cli_list;    /**< Client domain list */
 	struct tls_domains_cfg* next; /**< Next element in the garbage list */
-	atomic_t ref_count;        /**< How many connections use this configuration */
+	volatile int ref_count;             /**< How many connections use this configuration */
 } tls_domains_cfg_t;
 
 
@@ -191,11 +171,10 @@ int tls_fix_domains_cfg(tls_domains_cfg_t* cfg, tls_domain_t* srv_defaults,
  * @param type type of configuration
  * @param ip IP for configuration
  * @param port port for configuration
- * @param sname server name
  * @return found configuration or default, if not found
  */
 tls_domain_t* tls_lookup_cfg(tls_domains_cfg_t* cfg, int type,
-			struct ip_addr* ip, unsigned short port, str *sname, str *srvid);
+								struct ip_addr* ip, unsigned short port);
 
 
 /**

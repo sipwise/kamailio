@@ -1,4 +1,6 @@
 /*
+ * $Id: udomain.c 5272 2008-11-27 12:32:26Z henningw $ 
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,8 +17,15 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ---------
+ * 2003-03-11 changed to the new locking scheme: locking.h (andrei)
+ * 2003-03-12 added replication mark and zombie state (nils)
+ * 2004-06-07 updated to the new DB api (andrei)
+ * 2004-08-23  hash function changed to process characters as unsigned
+ *             -> no negative results occur (jku)
  */
 
 /*! \file
@@ -499,8 +508,8 @@ urecord_t* db_load_urecord_by_ruid(udomain_t* _d, str *_ruid)
 	columns[12] = &last_mod_col;
 	columns[13] = &ruid_col;
 	columns[14] = &instance_col;
-	columns[15] = &reg_id_col;
-	columns[16] = &user_col;
+	columns[15] = &user_col;
+	columns[16] = &reg_id_col;
 	columns[17] = &domain_col;
 
 	if (desc_time_order)

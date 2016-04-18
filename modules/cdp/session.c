@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -123,9 +123,7 @@ void free_session(cdp_session_t *x)
 
 		if(x->dest_host.s) shm_free(x->dest_host.s);
 		if(x->dest_realm.s) shm_free(x->dest_realm.s);
-                if (x->sticky_peer_fqdn_buflen && x->sticky_peer_fqdn.s) {
-                    shm_free(x->sticky_peer_fqdn.s);
-                }
+
 		shm_free(x);
 	}
 }
@@ -403,13 +401,12 @@ void cdp_sessions_log()
 			switch (x->type){
 				case AUTH_CLIENT_STATEFULL:
 				case AUTH_SERVER_STATEFULL:
-					LM_DBG(ANSI_GRAY"\tAuth State [%d] Timeout [%d] Lifetime [%d] Grace [%d] Generic [%p] Class [%d]\n",
+					LM_DBG(ANSI_GRAY"\tAuth State [%d] Timeout [%d] Lifetime [%d] Grace [%d] Generic [%p]\n",
 							x->u.auth.state,
 							(int)(x->u.auth.timeout-time(0)),
 							x->u.auth.lifetime?(int)(x->u.auth.lifetime-time(0)):-1,
 							(int)(x->u.auth.grace_period),
-							x->u.auth.generic_data, 
-                                                        x->u.auth.class);
+							x->u.auth.generic_data);
 					break;
 				case ACCT_CC_CLIENT:
 					LM_DBG(ANSI_GRAY"\tCCAcct State [%d] Charging Active [%c (%d)s] Reserved Units(valid=%ds) [%d] Generic [%p]\n",
@@ -586,8 +583,6 @@ AAASession* cdp_new_auth_session(str id,int is_client,int is_statefull)
 		s->u.auth.timeout=time(0)+config->default_auth_session_timeout;
 		s->u.auth.lifetime=0;
 		s->u.auth.grace_period=0;
-                s->u.auth.class = AUTH_CLASS_UNKNOWN;
-                s->u.auth.last_requested_grace = s->u.auth.last_requested_lifetime = s->u.auth.last_requested_timeout = 0;
 		cdp_add_session(s);
 	}
 	return s;

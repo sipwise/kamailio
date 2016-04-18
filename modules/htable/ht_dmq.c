@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -59,7 +59,6 @@ int ht_dmq_initialize()
         }
 
 	not_peer.callback = ht_dmq_handle_msg;
-	not_peer.init_callback = NULL;
 	not_peer.description.s = "htable";
 	not_peer.description.len = 6;
 	not_peer.peer_id.s = "htable";
@@ -89,7 +88,7 @@ int ht_dmq_broadcast(str* body) {
 /**
  * @brief ht dmq callback
  */
-int ht_dmq_handle_msg(struct sip_msg* msg, peer_reponse_t* resp, dmq_node_t* dmq_node)
+int ht_dmq_handle_msg(struct sip_msg* msg, peer_reponse_t* resp)
 {
 	int content_length;
 	str body;

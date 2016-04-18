@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * pua module - presence user agent module
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -17,8 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2006-11-29  initial version (anca)
  */
 
 
@@ -43,8 +48,6 @@
 #include "pua_callback.h"
 #include "event_list.h"
 #include "pua_db.h"
-
-extern db_locking_t db_table_lock;
 
 str* publ_build_hdr(int expires, pua_event_t* ev, str* content_type, str* etag,
 		str* extra_headers, int is_body)
@@ -213,7 +216,7 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 
 	if (dbmode == PUA_DB_ONLY && pua_dbf.start_transaction)
 	{
-		if (pua_dbf.start_transaction(pua_db, db_table_lock) < 0)
+		if (pua_dbf.start_transaction(pua_db, DB_LOCKING_WRITE) < 0)
 		{
 			LM_ERR("in start_transaction\n");
 			goto error;
@@ -271,7 +274,6 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 			publ.content_type= hentity->content_type;	
 			publ.id= hentity->id;
 			publ.extra_headers= hentity->extra_headers;
-			publ.outbound_proxy = hentity->outbound_proxy;
 			publ.cb_param= hentity->cb_param;
 
 			if (dbmode == PUA_DB_ONLY && pua_dbf.end_transaction)
@@ -499,7 +501,7 @@ int send_publish( publ_info_t* publ )
 	
 	if (dbmode == PUA_DB_ONLY && pua_dbf.start_transaction)
 	{
-		if (pua_dbf.start_transaction(pua_db, db_table_lock) < 0)
+		if (pua_dbf.start_transaction(pua_db, DB_LOCKING_WRITE) < 0)
 		{
 			LM_ERR("in start_transaction\n");
 			goto error;
@@ -690,9 +692,8 @@ send_publish:
 	result= tmb.t_request(&uac_r,
 			publ->pres_uri,			/*! Request-URI */
 			publ->pres_uri,			/*! To */
- 		        publ->pres_uri,			/*! From */
-		        publ->outbound_proxy?
-			      publ->outbound_proxy:&outbound_proxy /*! Outbound proxy*/
+			publ->pres_uri,			/*! From */
+			&outbound_proxy		/*! Outbound proxy*/
 			);
 
 	if(result< 0)
@@ -755,9 +756,6 @@ ua_pres_t* publish_cbparam(publ_info_t* publ,str* body,str* tuple_id,
 
 	size= sizeof(ua_pres_t)+ sizeof(str)+ (publ->pres_uri->len+ 
 		+ publ->content_type.len+ publ->id.len+ 1)*sizeof(char);
-
-	if(publ->outbound_proxy)
-		size+= sizeof(str)+ publ->outbound_proxy->len* sizeof(char);
 	if(body && body->s && body->len)
 		size+= sizeof(str)+ body->len* sizeof(char);
 	if(publ->etag)
@@ -823,16 +821,6 @@ ua_pres_t* publish_cbparam(publ_info_t* publ,str* body,str* tuple_id,
 		cb_param->extra_headers->len= publ->extra_headers->len;
 		size+= publ->extra_headers->len;
 	}	
-	if(publ->outbound_proxy)
-	{
-		cb_param->outbound_proxy = (str*)((char*)cb_param + size);
-		size += sizeof(str);
-		cb_param->outbound_proxy->s = (char*)cb_param + size;
-		memcpy(cb_param->outbound_proxy->s, publ->outbound_proxy->s,
-		       publ->outbound_proxy->len);
-		cb_param->outbound_proxy->len = publ->outbound_proxy->len;
-		size+= publ->outbound_proxy->len;
-	}	
 
 	if(publ->content_type.s && publ->content_type.len)
 	{
@@ -848,7 +836,6 @@ ua_pres_t* publish_cbparam(publ_info_t* publ,str* body,str* tuple_id,
 		cb_param->tuple_id.len= tuple_id->len;
 		size+= tuple_id->len;
 	}
-
 	cb_param->event= publ->event;
 	cb_param->flag|= publ->source_flag;
 	cb_param->cb_param= publ->cb_param;

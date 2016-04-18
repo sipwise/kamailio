@@ -1,29 +1,42 @@
 /*
+ * $Id$
+ *
  * proxy list & assoc. functions
  *
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+ /*
+  * History:
+  * -------
+  *  2003-02-13  all *proxy functions are now proto aware (andrei)
+  *  2003-03-19  replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
+  */
 
 /*!
  * \file
- * \brief Kamailio core :: proxy list & assoc. functions
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -176,7 +189,7 @@ static int hostent_cpy(struct hostent *dst, struct hostent* src)
 	int ret;
 	HOSTENT_CPY(dst, src, pkg_malloc, pkg_free);
 error:
-	LM_CRIT("memory allocation failure\n");
+	LOG(L_CRIT, "ERROR: hostent_cpy: memory allocation failure\n");
 	return ret;
 }
 
@@ -186,7 +199,7 @@ static int hostent_shm_cpy(struct hostent *dst, struct hostent* src)
 	int ret;
 	HOSTENT_CPY(dst, src, shm_malloc, shm_free);
 error:
-	LM_CRIT("memory allocation failure\n");
+	LOG(L_CRIT, "ERROR: hostent_shm_cpy: memory allocation failure\n");
 	return ret;
 }
 
@@ -228,19 +241,19 @@ error:
 		p=(struct proxy_l*) p_malloc(sizeof(struct proxy_l));			\
 		if (p==0){														\
 			ser_error=E_OUT_OF_MEM;										\
-			LM_ERR("memory allocation failure\n");						\
+			ERR("ERROR: mk_proxy: memory allocation failure\n");		\
 			goto error;													\
 		}																\
 		memset(p,0,sizeof(struct proxy_l));								\
 		p->name=*name;													\
 		p->port=port;													\
 																		\
-		LM_DBG("doing DNS lookup...\n");								\
+		DBG("DEBUG: mk_proxy: doing DNS lookup...\n");					\
 		proto=protocol;													\
 		he=sip_resolvehost(name, &(p->port), &proto);					\
 		if (he==0){														\
 			ser_error=E_BAD_ADDRESS;									\
-			LM_CRIT("could not resolve hostname:"						\
+			LOG(L_CRIT, "ERROR: mk_proxy: could not resolve hostname:"	\
 				" \"%.*s\"\n", name->len, name->s);						\
 			p_free(p);													\
 			goto error;													\
@@ -281,7 +294,7 @@ struct proxy_l* mk_proxy_from_ip(struct ip_addr* ip, unsigned short port,
 
 	p=(struct proxy_l*) pkg_malloc(sizeof(struct proxy_l));
 	if (p==0){
-		LM_CRIT("memory allocation failure\n");
+		LOG(L_CRIT, "ERROR: mk_proxy_from_ip: memory allocation failure\n");
 		goto error;
 	}
 	memset(p,0,sizeof(struct proxy_l));

@@ -50,18 +50,10 @@
 			</para>
 			<itemizedlist>
 				<listitem>
-				<para><emphasis>radiusclient-ng</emphasis> 0.5.0 or freeradius-client 
-				or higher.
+				<para><emphasis>radiusclient-ng</emphasis> 0.5.0 or higher.
 				See <ulink 
-				url='https://github.com/FreeRADIUS/freeradius-client/'>
-				https://github.com/FreeRADIUS/freeradius-client/</ulink>.
-				</para>
-				</listitem>
-				<listitem>
-				<para>
-				<emphasis>freeradius-client</emphasis> library can be used after 
-				setting FREERADIUS variable in source code with 
-				<emphasis>'export FREERADIUS=1'</emphasis> before compile.
+				url='http://developer.berlios.de/projects/radiusclient-ng/'>
+				http://developer.berlios.de/projects/radiusclient-ng/</ulink>.
 				</para>
 				</listitem>
 			</itemizedlist>
@@ -166,39 +158,6 @@ modparam("acc_radius", "radius_extra", "via=$hdr(Via[*]); email=$avp(s:email)")
 </programlisting>
 		</example>
 	</section>
-	<section>
-		<title><varname>rad_time_mode</varname>(integer)</title>
-		<para>
-		Radius Event-Timestamp for accounting. 
-		</para>
-		<para>
-		Values can be:
-		</para>
-		<itemizedlist>
-		<listitem>
-			<para><emphasis>0</emphasis> -  (default), format is only unix
-				timestamp for Event-Timestamp (For example: 1445590624)</para>
-		</listitem>
-		<listitem>
-			<para><emphasis>1</emphasis> - format is unix timestamp with microseconds
-			in Addition, it needs to change Event-Timestamp attribute type in dictionary to string
-			both radius server and client
-			(For example: 1445590624.377372)   </para>
-		</listitem>
- 		</itemizedlist>
-		
-		<para>
-		Default value is 0 (Unix timestamp).
-		</para>
-		<example>
-		<title>rad_time_mode example</title>
-		<programlisting format="linespecific">
-...
-modparam("acc_radius", "rad_time_mode", 1)
-...
-</programlisting>
-		</example>
-</section>
 	</section>
 
 	<section>

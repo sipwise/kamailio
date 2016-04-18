@@ -16,7 +16,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*! \defgroup tls Kamailio TLS support
+/*! \defgroup tls SIP-router TLS support
  *
  * This modules implements SIP over TCP with TLS encryption.
  * Make sure you read the README file that describes configuration
@@ -27,7 +27,7 @@
  */
 /*!
  * \file
- * \brief Kamailio TLS support :: Initialization
+ * \brief SIP-router TLS support :: Initialization
  * \ingroup tls
  * Module: \ref tls
  */
@@ -137,8 +137,6 @@ const SSL_METHOD* ssl_methods[TLS_METHOD_MAX];
 #define RAND_NULL_MALLOC (1024)
 #define NULL_GRACE_PERIOD 10U
 */
-
-
 
 inline static char* buf_append(char* buf, char* end, char* str, int str_len)
 {
@@ -332,27 +330,23 @@ static void init_ssl_methods(void)
 {
 	memset(ssl_methods, 0, sizeof(ssl_methods));
 
-	/* any SSL/TLS version */
-	ssl_methods[TLS_USE_SSLv23_cli - 1] = SSLv23_client_method();
-	ssl_methods[TLS_USE_SSLv23_srv - 1] = SSLv23_server_method();
-	ssl_methods[TLS_USE_SSLv23 - 1] = SSLv23_method();
-
-	/* only specific SSL or TLS version */
 #ifndef OPENSSL_NO_SSL2
 	ssl_methods[TLS_USE_SSLv2_cli - 1] = SSLv2_client_method();
 	ssl_methods[TLS_USE_SSLv2_srv - 1] = SSLv2_server_method();
 	ssl_methods[TLS_USE_SSLv2 - 1] = SSLv2_method();
 #endif
 
-#ifndef OPENSSL_NO_SSL3_METHOD
 	ssl_methods[TLS_USE_SSLv3_cli - 1] = SSLv3_client_method();
 	ssl_methods[TLS_USE_SSLv3_srv - 1] = SSLv3_server_method();
 	ssl_methods[TLS_USE_SSLv3 - 1] = SSLv3_method();
-#endif
 
 	ssl_methods[TLS_USE_TLSv1_cli - 1] = TLSv1_client_method();
 	ssl_methods[TLS_USE_TLSv1_srv - 1] = TLSv1_server_method();
 	ssl_methods[TLS_USE_TLSv1 - 1] = TLSv1_method();
+
+	ssl_methods[TLS_USE_SSLv23_cli - 1] = SSLv23_client_method();
+	ssl_methods[TLS_USE_SSLv23_srv - 1] = SSLv23_server_method();
+	ssl_methods[TLS_USE_SSLv23 - 1] = SSLv23_method();
 
 #if OPENSSL_VERSION_NUMBER >= 0x1000100fL
 	ssl_methods[TLS_USE_TLSv1_1_cli - 1] = TLSv1_1_client_method();
@@ -364,17 +358,6 @@ static void init_ssl_methods(void)
 	ssl_methods[TLS_USE_TLSv1_2_cli - 1] = TLSv1_2_client_method();
 	ssl_methods[TLS_USE_TLSv1_2_srv - 1] = TLSv1_2_server_method();
 	ssl_methods[TLS_USE_TLSv1_2 - 1] = TLSv1_2_method();
-#endif
-
-	/* ranges of TLS versions (require a minimum TLS version) */
-	ssl_methods[TLS_USE_TLSv1_PLUS - 1] = (void*)TLS_OP_TLSv1_PLUS;
-
-#if OPENSSL_VERSION_NUMBER >= 0x1000100fL
-	ssl_methods[TLS_USE_TLSv1_1_PLUS - 1] = (void*)TLS_OP_TLSv1_1_PLUS;
-#endif
-
-#if OPENSSL_VERSION_NUMBER >= 0x1000105fL
-	ssl_methods[TLS_USE_TLSv1_2_PLUS - 1] = (void*)TLS_OP_TLSv1_2_PLUS;
 #endif
 }
 
@@ -548,11 +531,11 @@ int init_tls_h(void)
 	 * (e.g. 0.9.8a & 0.9.8c are ok, but 0.9.8 and 0.9.9x are not) */
 	if ((ssl_version>>8)!=(OPENSSL_VERSION_NUMBER>>8)){
 		LOG(L_CRIT, "ERROR: tls: init_tls_h: installed openssl library "
-				"version is too different from the library the Kamailio tls module "
+				"version is too different from the library the ser tls module "
 				"was compiled with: installed \"%s\" (0x%08lx), compiled "
 				"\"%s\" (0x%08lx).\n"
 				" Please make sure a compatible version is used"
-				" (tls_force_run in kamailio.cfg will override this check)\n",
+				" (tls_force_run in ser.cfg will override this check)\n",
 				SSLeay_version(SSLEAY_VERSION), ssl_version,
 				OPENSSL_VERSION_TEXT, (long)OPENSSL_VERSION_NUMBER);
 		if (cfg_get(tls, tls_cfg, force_run))
@@ -601,8 +584,8 @@ int init_tls_h(void)
 		if (lib_kerberos!=-1){
 			LOG(L_CRIT, "ERROR: tls: init_tls_h: openssl compile options"
 						" mismatch: library has kerberos support"
-						" %s and Kamailio tls %s (unstable configuration)\n"
-						" (tls_force_run in kamailio.cfg will override this"
+						" %s and ser tls %s (unstable configuration)\n"
+						" (tls_force_run in ser.cfg will override this"
 						" check)\n",
 						lib_kerberos?"enabled":"disabled",
 						kerberos_support?"enabled":"disabled"
@@ -653,7 +636,7 @@ int init_tls_h(void)
 				low_mem_threshold1, low_mem_threshold2);
 	
 	if (shm_available()==(unsigned long)(-1)){
-		LOG(L_WARN, "tls: Kamailio is compiled without MALLOC_STATS support:"
+		LOG(L_WARN, "tls: ser compiled without MALLOC_STATS support:"
 				" the workaround for low mem. openssl bugs will _not_ "
 				"work\n");
 		low_mem_threshold1=0;

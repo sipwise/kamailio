@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('location','6');
 CREATE TABLE location (
     id NUMBER(10) PRIMARY KEY,
     ruid VARCHAR2(64) DEFAULT '',
@@ -18,10 +19,6 @@ CREATE TABLE location (
     methods NUMBER(10) DEFAULT NULL,
     instance VARCHAR2(255) DEFAULT NULL,
     reg_id NUMBER(10) DEFAULT 0 NOT NULL,
-    server_id NUMBER(10) DEFAULT 0 NOT NULL,
-    connection_id NUMBER(10) DEFAULT 0 NOT NULL,
-    keepalive NUMBER(10) DEFAULT 0 NOT NULL,
-    partition NUMBER(10) DEFAULT 0 NOT NULL,
     CONSTRAINT location_ruid_idx  UNIQUE (ruid)
 );
 
@@ -35,10 +32,8 @@ BEGIN map2users('location'); END;
 /
 CREATE INDEX location_account_contact_idx  ON location (username, domain, contact);
 CREATE INDEX location_expires_idx  ON location (expires);
-CREATE INDEX location_connection_idx  ON location (server_id, connection_id);
 
-INSERT INTO version (table_name, table_version) values ('location','8');
-
+INSERT INTO version (table_name, table_version) values ('location_attrs','1');
 CREATE TABLE location_attrs (
     id NUMBER(10) PRIMARY KEY,
     ruid VARCHAR2(64) DEFAULT '',
@@ -60,6 +55,4 @@ BEGIN map2users('location_attrs'); END;
 /
 CREATE INDEX ORA_account_record_idx  ON location_attrs (username, domain, ruid);
 CREATE INDEX ORA_last_modified_idx  ON location_attrs (last_modified);
-
-INSERT INTO version (table_name, table_version) values ('location_attrs','1');
 

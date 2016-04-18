@@ -15,10 +15,17 @@
  */
 
 /**
- * @brief Kamailio core :: counters/stats
+ * @brief counters/stats
  * @file
  * @ingroup: core
  */
+
+/*
+ * History:
+ * --------
+ *  2010-08-06  initial version (andrei)
+ *  2010-08-24  counters can be used (inc,add) before prefork_init (andrei)
+*/
 
 #include "counters.h"
 #include "str_hash.h"

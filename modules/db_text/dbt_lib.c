@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * DBText library
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,7 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * 
+ * History:
+ * --------
+ * 2003-01-30 created by Daniel
  * 
  */
 
@@ -258,7 +264,7 @@ dbt_table_p dbt_db_get_table(dbt_cache_p _dc, const str *_s)
 	int hashidx;
 
 	if(!_dbt_cachetbl || !_dc || !_s || !_s->s || _s->len<=0) {
-		LM_ERR("invalid parameter\n");
+		LM_ERR("invalid parameter");
 		return NULL;
 	}
 
@@ -298,7 +304,7 @@ dbt_table_p dbt_db_get_table(dbt_cache_p _dc, const str *_s)
 
 	if(!_tbc)
 	{
-		LM_ERR("could not load database from file [%.*s]\n", _s->len, _s->s);
+		LM_ERR("could not load database from file [%.*s]", _s->len, _s->s);
 		lock_release(&_dbt_cachetbl[hashidx].sem);
 		return NULL;
 	}
@@ -432,7 +438,7 @@ int dbt_is_neq_type(db_type_t _t0, db_type_t _t1)
 				return 0;
 
 		case DB1_BIGINT:
-			LM_ERR("BIGINT not supported\n");
+			LM_ERR("BIGINT not supported");
 			return 0;
 
 		case DB1_DATETIME:
@@ -443,20 +449,17 @@ int dbt_is_neq_type(db_type_t _t0, db_type_t _t1)
 		case DB1_DOUBLE:
 			break;
 		case DB1_STRING:
-			if(_t0==DB1_STR || _t0==DB1_BLOB)
+			if(_t0==DB1_STR)
 				return 0;
 		case DB1_STR:
 			if(_t0==DB1_STRING || _t0==DB1_BLOB)
 				return 0;
 		case DB1_BLOB:
-			if(_t0==DB1_STR || _t0==DB1_STRING)
+			if(_t0==DB1_STR)
 				return 0;
 		case DB1_BITMAP:
 			if (_t0==DB1_INT)
 				return 0;
-		default:
-			LM_ERR("invalid datatype %d\n", _t1);
-			return 1;
 	}
 	return 1;
 }

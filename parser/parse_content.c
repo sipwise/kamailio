@@ -1,22 +1,30 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * You should have received a copy of the GNU General Public License 
+ * along with this program; if not, write to the Free Software 
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * 2003-08-04 parse_content_type_hdr separates type from subtype inside
+ * the mime type (bogdan)
+ * 2003-08-04 CPL subtype added (bogdan)
+ * 2003-08-05 parse_accept_hdr function added (bogdan)
+ * 2008-05-23 reset the type/subtype to unknown, if the end of
+ *		tree has reached, but the type/subtype has still
+ *		some remaining characters (Miklos)
  */
 
 /*! \file
@@ -38,7 +46,7 @@
 
 
 #define is_mime_char(_c_) \
-	(isalpha((int)_c_) || (_c_)=='-' || (_c_)=='+' || (_c_)=='.' || (_c_)=='_')
+	(isalpha((int)_c_) || (_c_)=='-' || (_c_)=='+' || (_c_)=='.')
 #define is_char_equal(_c_,_cs_) \
 	( (isalpha((int)_c_)?(((_c_)|0x20)==(_cs_)):((_c_)==(_cs_)))==1 )
 
@@ -180,7 +188,7 @@ static type_node_t subtype_tree[] = {
 									{'c',SUBTYPE_UNKNOWN,1,-1},
 										{'.',SUBTYPE_UNKNOWN,1,-1},
 											{'p',SUBTYPE_UNKNOWN,1,-1},
-												{'i',SUBTYPE_UNKNOWN,1,-1},
+												{'i',SUBTYPE_UNKNOWN,1,-1}, 
 													{'d',SUBTYPE_UNKNOWN,1,-1},
 														{'f',SUBTYPE_XML_MSRTC_PIDF,0,-1},
 	{'e',SUBTYPE_UNKNOWN,1,107}, /* 94 */
@@ -327,7 +335,7 @@ char* decode_mime_type(char* const start, const char* const end, unsigned int* c
 			if (node!=-1) {
 				type_candidate = subtype_tree[node].final;
 				if (subtype_tree[node].nr_sons)
-					node++;
+        				node++;
 				else
 					node = -1;
 			} else {
@@ -432,10 +440,10 @@ int parse_accept_body(struct hdr_field* const hdr)
 	char *ret;
 
 	if (!hdr) return -1;
-
+	
 	/* maybe the header is already parsed! */
 	if (hdr->parsed!=0) return 1;
-
+	
 	/* it seams we have to parse it! :-( */
 	ret = hdr->body.s;
 	end = ret + hdr->body.len;

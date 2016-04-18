@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -78,35 +78,17 @@ int bind_usrloc(usrloc_api_t* api) {
 
 	api->insert_impurecord = insert_impurecord;
 	api->delete_impurecord = delete_impurecord;
-	api->get_impurecord = get_impurecord;           // get impu - assume no lock on domain yet. returns with lock on doma
+	api->get_impurecord = get_impurecord;
 	api->update_impurecord = update_impurecord;
 
 	api->lock_udomain = lock_udomain;
 	api->unlock_udomain = unlock_udomain;
 
-	api->lock_contact_slot = lock_contact_slot;
-	api->unlock_contact_slot = unlock_contact_slot;
-	api->lock_contact_slot_i = lock_contact_slot_i;
-	api->unlock_contact_slot_i = unlock_contact_slot_i;	
-
-        api->lock_subscription = lock_subscription;
-        api->unlock_subscription = unlock_subscription;
-        api->ref_subscription = ref_subscription;
-        api->unref_subscription = unref_subscription;
-
-	api->get_all_ucontacts = get_all_scontacts;
-	api->insert_ucontact = insert_scontact;
-	api->delete_ucontact = delete_scontact;
-	api->get_ucontact = get_scontact;
-	api->release_ucontact = release_scontact;
-	api->update_ucontact = update_scontact;
-	api->expire_ucontact = expire_scontact;
-
-	api->add_dialog_data_to_contact = add_dialog_data_to_contact;
-	api->remove_dialog_data_from_contact = remove_dialog_data_from_contact;
-
-	api->unlink_contact_from_impu = unlink_contact_from_impu;
-	api->link_contact_to_impu = link_contact_to_impu;
+	api->get_all_ucontacts = get_all_ucontacts;
+	api->insert_ucontact = insert_ucontact;
+	api->delete_ucontact = delete_ucontact;
+	api->get_ucontact = get_ucontact;
+	api->update_ucontact = update_ucontact;
 
 	api->get_subscriber = get_subscriber;
 	api->add_subscriber = add_subscriber;
@@ -114,9 +96,8 @@ int bind_usrloc(usrloc_api_t* api) {
 	api->update_subscriber = update_subscriber;
 
 	api->get_impus_from_subscription_as_string = get_impus_from_subscription_as_string;
-	api->get_presentity_from_subscriber_dialog = get_presentity_from_subscriber_dialog;
         
-	api->register_ulcb = register_ulcb;
+    api->register_ulcb = register_ulcb;
 
 	//api->update_user_profile = update_user_profile;
 	api->nat_flag = nat_bflag;

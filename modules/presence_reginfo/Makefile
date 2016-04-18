@@ -1,5 +1,5 @@
 #
-# Presence_reginfo Makefile
+# Presence_MWI Makefile
 # 
 # 
 # WARNING: do not run this directly, it should be run by the master Makefile

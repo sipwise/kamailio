@@ -2,14 +2,18 @@
  * Copyright (C) 2005 iptelorg GmbH
  * Written by Jan Janak <jan@iptel.org>
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SER, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify it under the
+ * SER is free software; you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
  * Foundation; either version 2 of the License, or (at your option) any later
  * version
  *
- * Kamailio is distributed in the hope that it will be useful, but WITHOUT ANY
+ * For a license to use the SER software under conditions other than those
+ * described here, or to purchase support for this software, please contact
+ * iptel.org by e-mail at the following addresses: info@iptel.org
+ *
+ * SER is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
@@ -103,7 +107,7 @@
  * 
  * <h2>Memory Management</h2> 
  * The module provides implementation for all the functions required by the
- * management interface in SER, such as rpc->rpl_printf, rpc->add, rpc->struct_add
+ * management interface in SER, such as rpc->printf, rpc->add, rpc->struct_add
  * and so on. Whenever the management function calls one of the functions then
  * corresponding function in this module will be called to handle the request.
  *
@@ -278,10 +282,10 @@ static struct garbage {
 						   * type needs to be freed differently as it may
 						   * contain more allocated memory blocks
 						   */
-		JUNK_PKGCHAR 	  /** This type indicates a mxr_malloc'ed string */
+		JUNK_PKGCHAR 	  /** This type indicates a pkg_malloc'ed string */
 	} type;               /**< Type of the memory block */
 	void* ptr;            /**< Pointer to the memory block obtained from
-							 mxr_malloc */
+							 pkg_malloc */
 	struct garbage* next; /**< The linked list of all allocated memory
 							 blocks */
 } *waste_bin = 0;
@@ -345,7 +349,6 @@ typedef struct rpc_ctx {
  * @sa http://www.xml-rpc.com
  */
 struct rpc_struct {
-	int vtype;
 	xmlNodePtr struct_in;           /**< Pointer to the structure parameter */
 	struct xmlrpc_reply struct_out; /**< Structure to be sent in reply */
 	struct xmlrpc_reply* reply;     /**< Print errors here */
@@ -476,7 +479,7 @@ static int add_xmlrpc_reply_esc(struct xmlrpc_reply* reply, str* text)
     for(i = 0; i < text->len; i++) {
 		/* 10 must be bigger than size of longest escape sequence */
 		if (reply->body.len >= reply->buf.len - 10) { 
-			p = mxr_malloc(reply->buf.len + 1024);
+			p = pkg_malloc(reply->buf.len + 1024);
 			if (!p) {
 				set_fault(reply, 500, 
 						  "Internal Server Error (No memory left)");
@@ -484,7 +487,7 @@ static int add_xmlrpc_reply_esc(struct xmlrpc_reply* reply, str* text)
 				return -1;
 			}
 			memcpy(p, reply->body.s, reply->body.len);
-			mxr_free(reply->buf.s);
+			pkg_free(reply->buf.s);
 			reply->buf.s = p;
 			reply->buf.len += 1024;
 			reply->body.s = p;
@@ -538,14 +541,14 @@ static int add_xmlrpc_reply(struct xmlrpc_reply* reply, str* text)
 {
 	char* p;
 	if (text->len > (reply->buf.len - reply->body.len)) {
-		p = mxr_malloc(reply->buf.len + text->len + 1024);
+		p = pkg_malloc(reply->buf.len + text->len + 1024);
 		if (!p) {
 			set_fault(reply, 500, "Internal Server Error (No memory left)");
 			ERR("No memory left: %d\n", reply->buf.len + text->len + 1024);
 			return -1;
 		}
 		memcpy(p, reply->body.s, reply->body.len);
-		mxr_free(reply->buf.s);
+		pkg_free(reply->buf.s);
 		reply->buf.s = p;
 		reply->buf.len += text->len + 1024;
 		reply->body.s = p;
@@ -576,14 +579,14 @@ static int add_xmlrpc_reply_offset(struct xmlrpc_reply* reply, unsigned int offs
 {
 	char* p;
 	if (text->len > (reply->buf.len - reply->body.len)) {
-		p = mxr_malloc(reply->buf.len + text->len + 1024);
+		p = pkg_malloc(reply->buf.len + text->len + 1024);
 		if (!p) {
 			set_fault(reply, 500, "Internal Server Error (No memory left)");
 			ERR("No memory left: %d\n", reply->buf.len + text->len + 1024);
 			return -1;
 		}
 		memcpy(p, reply->body.s, reply->body.len);
-		mxr_free(reply->buf.s);
+		pkg_free(reply->buf.s);
 		reply->buf.s = p;
 		reply->buf.len += text->len + 1024;
 		reply->body.s = p;
@@ -631,7 +634,7 @@ static int init_xmlrpc_reply(struct xmlrpc_reply* reply)
 {
 	reply->code = 200;
 	reply->reason = "OK";
-	reply->buf.s = mxr_malloc(1024);
+	reply->buf.s = pkg_malloc(1024);
 	if (!reply->buf.s) {
 		set_fault(reply, 500, "Internal Server Error (No memory left)");
 		ERR("No memory left\n");
@@ -671,7 +674,7 @@ static int fix_delayed_reply_ctx(rpc_ctx_t* ctx)
 /** Free all memory used by the XML-RPC reply structure. */
 static void clean_xmlrpc_reply(struct xmlrpc_reply* reply)
 {
-	if (reply->buf.s) mxr_free(reply->buf.s);
+	if (reply->buf.s) pkg_free(reply->buf.s);
 }
 
 /** Create XML-RPC reply that indicates an error to the caller.
@@ -711,7 +714,7 @@ static int add_garbage(int type, void* ptr, struct xmlrpc_reply* reply)
 {
 	struct garbage* p;
 
-	p = (struct garbage*)mxr_malloc(sizeof(struct garbage));
+	p = (struct garbage*)pkg_malloc(sizeof(struct garbage));
 	if (!p) {
 		set_fault(reply, 500, "Internal Server Error (No memory left)");
 		ERR("Not enough memory\n");
@@ -743,13 +746,13 @@ static void collect_garbage(void)
 
 		case JUNK_RPCSTRUCT:
 			s = (struct rpc_struct*)p->ptr;
-			if (s && s->struct_out.buf.s) mxr_free(s->struct_out.buf.s);
-			if (s) mxr_free(s);
+			if (s && s->struct_out.buf.s) pkg_free(s->struct_out.buf.s);
+			if (s) pkg_free(s);
 			break;
 
 		case JUNK_PKGCHAR:
 			if (p->ptr){
-				mxr_free(p->ptr);
+				pkg_free(p->ptr);
 				p->ptr=0;
 			}
 			break;
@@ -757,7 +760,7 @@ static void collect_garbage(void)
 		default:
 			ERR("BUG: Unsupported junk type\n");
 		}
-		mxr_free(p);
+		pkg_free(p);
 	}
 }
 
@@ -810,19 +813,11 @@ static int flatten_nests(struct rpc_struct* st, struct xmlrpc_reply* reply) {
 		return 1;
 
 	if (!st->nnext) {
-		if(st->vtype == RET_ARRAY) {
-			if (add_xmlrpc_reply(&st->struct_out, &array_suffix) < 0) return -1;
-		} else {
-			if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
-		}
+		if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
 		if (add_xmlrpc_reply_offset(&st->parent->struct_out, st->offset, &st->struct_out.body) < 0) return -1;
 	} else {
 		flatten_nests(st->nnext, reply);
-		if(st->vtype == RET_ARRAY) {
-			if (add_xmlrpc_reply(&st->struct_out, &array_suffix) < 0) return -1;
-		} else {
-			if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
-		}
+		if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
 		if (add_xmlrpc_reply_offset(&st->parent->struct_out, st->offset, &st->struct_out.body) < 0) return -1;
 	}
 	return 1;
@@ -833,11 +828,7 @@ static int print_structures(struct xmlrpc_reply* reply,
 {
 	while(st) {
 		     /* Close the structure first */
-		if(st->vtype == RET_ARRAY) {
-			if (add_xmlrpc_reply(&st->struct_out, &array_suffix) < 0) return -1;
-		} else {
-			if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
-		}
+		if (add_xmlrpc_reply(&st->struct_out, &struct_suffix) < 0) return -1;
 		if (flatten_nests(st->nnext, &st->struct_out) < 0) return -1;
 		if (add_xmlrpc_reply_offset(reply, st->offset, &st->struct_out.body) < 0) return -1;
 		st = st->next;
@@ -938,11 +929,11 @@ static void rpc_fault(rpc_ctx_t* ctx, int code, char* fmt, ...)
  *              coming from a XML-RPC request.
  */
 static struct rpc_struct* new_rpcstruct(xmlDocPtr doc, xmlNodePtr structure, 
-										struct xmlrpc_reply* reply, int vtype)
+										struct xmlrpc_reply* reply)
 {
 	struct rpc_struct* p;
 
-	p = (struct rpc_struct*)mxr_malloc(sizeof(struct rpc_struct));
+	p = (struct rpc_struct*)pkg_malloc(sizeof(struct rpc_struct));
 	if (!p) {
 		set_fault(reply, 500, "Internal Server Error (No Memory Left");
 		return 0;
@@ -952,7 +943,6 @@ static struct rpc_struct* new_rpcstruct(xmlDocPtr doc, xmlNodePtr structure,
 
 	p->reply = reply;
 	p->n = 0;
-	p->vtype = vtype;
 	if (doc && structure) {
 		     /* We will be parsing structure from request */
 		p->doc = doc;
@@ -960,18 +950,15 @@ static struct rpc_struct* new_rpcstruct(xmlDocPtr doc, xmlNodePtr structure,
 	} else {
 		     /* We will build a reply structure */
 		if (init_xmlrpc_reply(&p->struct_out) < 0) goto err;
-		if(vtype==RET_ARRAY) {
-			if (add_xmlrpc_reply(&p->struct_out, &array_prefix) < 0) goto err;
-		} else {
-			if (add_xmlrpc_reply(&p->struct_out, &struct_prefix) < 0) goto err;
-		}
+		if (add_xmlrpc_reply(&p->struct_out, &struct_prefix) < 0) goto err;
+
 	}
 	if (add_garbage(JUNK_RPCSTRUCT, p, reply) < 0) goto err;
 	return p;
 
  err:
-	if (p->struct_out.buf.s) mxr_free(p->struct_out.buf.s);
-	mxr_free(p);
+	if (p->struct_out.buf.s) pkg_free(p->struct_out.buf.s);
+	pkg_free(p);
 	return 0;
 }
 
@@ -1007,12 +994,6 @@ static int print_value(struct xmlrpc_reply* res,
 		prefix = int_prefix;
 		suffix = int_suffix;
 		body.s = sint2str(va_arg(*ap, int), &body.len);
-		break;
-
-	case 'u':
-		prefix = int_prefix;
-		suffix = int_suffix;
-		body.s = int2str(va_arg(*ap, unsigned int), &body.len);
 		break;
 
 	case 'f':
@@ -1095,9 +1076,9 @@ static int rpc_add(rpc_ctx_t* ctx, char* fmt, ...)
 	while(*fmt) {
 		if (ctx->flags & RET_ARRAY && 
 			add_xmlrpc_reply(reply, &value_prefix) < 0) goto err;
-		if (*fmt == '{' || *fmt == '[') {
+		if (*fmt == '{') {
 			void_ptr = va_arg(ap, void**);
-			p = new_rpcstruct(0, 0, reply, (*fmt=='[')?RET_ARRAY:0);
+			p = new_rpcstruct(0, 0, reply);
 			if (!p) goto err;
 			*(struct rpc_struct**)void_ptr = p;
 			p->offset = get_reply_len(reply);
@@ -1469,14 +1450,14 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 				ret=-1;
 			}else{
 				s=sint2str(i, &len);
-				p=mxr_malloc(len+1);
+				p=pkg_malloc(len+1);
 				if (p && add_garbage(JUNK_PKGCHAR, p, reply) == 0){
 					memcpy(p, s, len);
 					p[len]=0;
 					*val=p;
 				}else{
 					ret=-1;
-					if (p) mxr_free(p);
+					if (p) pkg_free(p);
 				}
 			}
 			xmlFree(val_str);
@@ -1503,9 +1484,7 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 {
 	int read;
-	int ival;
 	int* int_ptr;
-	unsigned int* uint_ptr;
 	char** char_ptr;
 	str* str_ptr;
 	double* double_ptr;
@@ -1516,7 +1495,6 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 	int modifiers;
 	int f;
 	va_list ap;
-	int nofault;
 
 	reply = &ctx->reply;
 	/* clear the previously saved error code */
@@ -1525,7 +1503,6 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 	va_start(ap, fmt);
 	modifiers=0;
 	read = 0;
-	nofault = 0;
 	f=(autoconvert?GET_X_AUTOCONV:0) |
 		(lflf2crlf?GET_X_LFLF2CRLF:0);
 	while(*fmt) {
@@ -1537,8 +1514,6 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 			modifiers++;
 			read++;
 			fmt++;
-			nofault=1;
-			f|=GET_X_NOREPLY;
 			continue; /* do not advance ctx->act-param */
 		case '.': /* autoconvert */
 			modifiers++;
@@ -1551,12 +1526,6 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 		case 'd': /* Integer */
 			int_ptr = va_arg(ap, int*);
 			if (get_int(int_ptr, reply, ctx->doc, value, f) < 0) goto error;
-			break;
-
-		case 'u': /* Integer */
-			uint_ptr = va_arg(ap, unsigned int*);
-			if (get_int(&ival, reply, ctx->doc, value, f) < 0) goto error;
-			*uint_ptr = (unsigned int)ival;
 			break;
 			
 		case 'f': /* double */
@@ -1583,7 +1552,7 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 		case '{':
 			void_ptr = va_arg(ap, void**);
 			if (!value->xmlChildrenNode) goto error;
-			p = new_rpcstruct(ctx->doc, value->xmlChildrenNode, reply, 0);
+			p = new_rpcstruct(ctx->doc, value->xmlChildrenNode, reply);
 			if (!p) goto error;
 			*void_ptr = p;
 			break;
@@ -1605,22 +1574,19 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 
  error:
 	va_end(ap);
-	if(nofault==0)
-		return -(read-modifiers);
-	else
-		return read-modifiers;
+	return -(read-modifiers);
 }
 
 #define RPC_BUF_SIZE 1024
 
 
-/** Implementation of rpc_rpl_printf function required by the management API in
+/** Implementation of rpc_printf function required by the management API in
  *	SER.
  *
  * This function will be called whenever a management function in SER calls
  * rpc-printf to add a parameter to the XML-RPC reply being constructed.
  */
-static int rpc_rpl_printf(rpc_ctx_t* ctx, char* fmt, ...)
+static int rpc_printf(rpc_ctx_t* ctx, char* fmt, ...)
 {
 	int n, buf_size;
 	char* buf;
@@ -1630,7 +1596,7 @@ static int rpc_rpl_printf(rpc_ctx_t* ctx, char* fmt, ...)
 
 	fix_delayed_reply_ctx(ctx);
 	reply = &ctx->reply;
-	buf = (char*)mxr_malloc(RPC_BUF_SIZE);
+	buf = (char*)pkg_malloc(RPC_BUF_SIZE);
 	if (!buf) {
 		set_fault(reply, 500, "Internal Server Error (No memory left)");
 		ERR("No memory left\n");
@@ -1655,7 +1621,7 @@ static int rpc_rpl_printf(rpc_ctx_t* ctx, char* fmt, ...)
 			if (ctx->flags & RET_ARRAY && 
 				add_xmlrpc_reply(reply, &value_suffix) < 0) goto err;
 			if (add_xmlrpc_reply(reply, &lf) < 0) goto err;
-			mxr_free(buf);
+			pkg_free(buf);
 			return 0;
 		}
 		     /* Else try again with more space. */
@@ -1664,7 +1630,7 @@ static int rpc_rpl_printf(rpc_ctx_t* ctx, char* fmt, ...)
 		} else {          /* glibc 2.0 */
 			buf_size *= 2;  /* twice the old size */
 		}
-		if ((buf = mxr_realloc(buf, buf_size)) == 0) {
+		if ((buf = pkg_realloc(buf, buf_size)) == 0) {
 			set_fault(reply, 500, "Internal Server Error (No memory left)");
 			ERR("No memory left\n");
 			goto err;
@@ -1672,7 +1638,7 @@ static int rpc_rpl_printf(rpc_ctx_t* ctx, char* fmt, ...)
 	}
 	return 0;
  err:
-	if (buf) mxr_free(buf);
+	if (buf) pkg_free(buf);
 	return -1;
 }
 
@@ -1749,18 +1715,14 @@ static int rpc_struct_add(struct rpc_struct* s, char* fmt, ...)
 		member_name.s = va_arg(ap, char*);
 		member_name.len = (member_name.s ? strlen(member_name.s) : 0);
 
-		if(s->vtype==RET_ARRAY && *fmt == '{') {
-			if (add_xmlrpc_reply(reply, &value_prefix) < 0) goto err;
-			if (add_xmlrpc_reply(reply, &struct_prefix) < 0) goto err;
-		}
 		if (add_xmlrpc_reply(reply, &member_prefix) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &name_prefix) < 0) goto err;
 		if (add_xmlrpc_reply_esc(reply, &member_name) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &name_suffix) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &value_prefix) < 0) goto err;
-		if (*fmt == '{' || *fmt == '[') {
+		if (*fmt == '{') {
 			void_ptr = va_arg(ap, void**);
-			p = new_rpcstruct(0, 0, s->reply, (*fmt=='[')?RET_ARRAY:0);
+			p = new_rpcstruct(0, 0, s->reply);
 			if (!p)
 				goto err;
 			*(struct rpc_struct**) void_ptr = p;
@@ -1777,54 +1739,6 @@ static int rpc_struct_add(struct rpc_struct* s, char* fmt, ...)
 		}
 		if (add_xmlrpc_reply(reply, &value_suffix) < 0) goto err;
 		if (add_xmlrpc_reply(reply, &member_suffix) < 0) goto err;
-		if(s->vtype==RET_ARRAY && *fmt == '{') {
-			if (add_xmlrpc_reply(reply, &struct_suffix) < 0) goto err;
-			if (add_xmlrpc_reply(reply, &value_suffix) < 0) goto err;
-		}
-		fmt++;
-	}
-
-	va_end(ap);
-	return 0;
- err:
-	va_end(ap);
-	return -1;
-}
-
-/** Adds a new value to an array.
- */
-static int rpc_array_add(struct rpc_struct* s, char* fmt, ...)
-{
-	va_list ap;
-	struct xmlrpc_reply* reply;
-	void* void_ptr;
-	struct rpc_struct* p, *tmp;
-
-	reply = &s->struct_out;
-	if(s->vtype!=RET_ARRAY) {
-		LM_ERR("parent structure is not an array\n");
-		goto err;
-	}
-
-	va_start(ap, fmt);
-	while(*fmt) {
-		if (*fmt == '{' || *fmt == '[') {
-			void_ptr = va_arg(ap, void**);
-			p = new_rpcstruct(0, 0, s->reply, (*fmt=='[')?RET_ARRAY:0);
-			if (!p)
-				goto err;
-			*(struct rpc_struct**) void_ptr = p;
-			p->offset = get_reply_len(reply);
-			p->parent = s;
-			if (!s->nnext) {
-				s->nnext = p;
-			} else {
-				for (tmp = s; tmp->nnext; tmp=tmp->nnext);
-				tmp->nnext = p;
-			}
-		} else {
-			if (print_value(reply, reply, *fmt, &ap) < 0) goto err;
-		}
 		fmt++;
 	}
 
@@ -1848,7 +1762,7 @@ static int rpc_struct_printf(struct rpc_struct* s, char* member_name,
 	struct xmlrpc_reply* out;
 
 	out = &s->struct_out;
-	buf = (char*)mxr_malloc(RPC_BUF_SIZE);
+	buf = (char*)pkg_malloc(RPC_BUF_SIZE);
 	reply = s->reply;
 	if (!buf) {
 		set_fault(reply, 500, "Internal Server Error (No memory left)");
@@ -1891,7 +1805,7 @@ static int rpc_struct_printf(struct rpc_struct* s, char* member_name,
 		} else {          /* glibc 2.0 */
 			buf_size *= 2;  /* twice the old size */
 		}
-		if ((buf = mxr_realloc(buf, buf_size)) == 0) {
+		if ((buf = pkg_realloc(buf, buf_size)) == 0) {
 			set_fault(reply, 500, "Internal Server Error (No memory left)");
 			ERR("No memory left\n");
 			goto err;
@@ -1899,7 +1813,7 @@ static int rpc_struct_printf(struct rpc_struct* s, char* member_name,
 	}
 	return 0;
  err:
-	if (buf) mxr_free(buf);
+	if (buf) pkg_free(buf);
 	return -1;
 
 }
@@ -1908,10 +1822,8 @@ static int rpc_struct_printf(struct rpc_struct* s, char* member_name,
 static int rpc_struct_scan(struct rpc_struct* s, char* fmt, ...)
 {
 	int read;
-	int ival;
 	va_list ap;
 	int* int_ptr;
-	unsigned int* uint_ptr;
 	double* double_ptr;
 	char** char_ptr;
 	str* str_ptr;
@@ -1941,12 +1853,6 @@ static int rpc_struct_scan(struct rpc_struct* s, char* fmt, ...)
 			if (get_int(int_ptr, reply, s->doc, value, f) < 0) goto error;
 			break;
 
-		case 'u': /* Integer */
-			uint_ptr = va_arg(ap, unsigned int*);
-			if (get_int(&ival, reply, s->doc, value, f) < 0) goto error;
-			*uint_ptr = (unsigned int)ival;
-			break;
-			
 		case 'f': /* double */
 			double_ptr = va_arg(ap, double*);
 			if (get_double(double_ptr, reply, s->doc, value, f) < 0)
@@ -2194,8 +2100,8 @@ static void clean_context(rpc_ctx_t* ctx)
 
 /** Creates a SIP message (in "buffer" form) from a HTTP XML-RPC request).
  * 
- * NOTE: the result must be mxr_free()'ed when not needed anymore.  
- * @return 0 on error, buffer allocated using mxr_malloc on success.
+ * NOTE: the result must be pkg_free()'ed when not needed anymore.  
+ * @return 0 on error, buffer allocated using pkg_malloc on success.
  */
 static char* http_xmlrpc2sip(sip_msg_t* msg, int* new_msg_len)
 {
@@ -2221,7 +2127,7 @@ static char* http_xmlrpc2sip(sip_msg_t* msg, int* new_msg_len)
 		XMLRPC_URI_LEN + 1 /* space */ + 
 		msg->first_line.u.request.version.len + CRLF_LEN + via_len + 
 		(msg->len-msg->first_line.len);
-	p = new_msg = mxr_malloc(len + 1);
+	p = new_msg = pkg_malloc(len + 1);
 	if (new_msg == 0) {
 		DEBUG("memory allocation failure (%d bytes)\n", len);
 		pkg_free(via);
@@ -2384,7 +2290,7 @@ static int process_xmlrpc(sip_msg_t* msg)
 					fake_msg_len, fake_msg_len, fake_msg);
 				if (em_receive_request(msg, fake_msg, fake_msg_len)<0)
 					ret=NONSIP_MSG_ERROR;
-				mxr_free(fake_msg);
+				pkg_free(fake_msg);
 			}
 			return ret; /* we "ate" the message, stop processing */
 		} else { /* the message has a via */
@@ -2565,14 +2471,12 @@ static int mod_init(void)
 		return -1;
 	}
 
-	memset(&func_param, 0, sizeof(func_param));
 	func_param.send = (rpc_send_f)rpc_send;
 	func_param.fault = (rpc_fault_f)rpc_fault;
 	func_param.add = (rpc_add_f)rpc_add;
 	func_param.scan = (rpc_scan_f)rpc_scan;
-	func_param.rpl_printf = (rpc_rpl_printf_f)rpc_rpl_printf;
+	func_param.printf = (rpc_printf_f)rpc_printf;
 	func_param.struct_add = (rpc_struct_add_f)rpc_struct_add;
-	func_param.array_add = (rpc_array_add_f)rpc_array_add;
 	func_param.struct_scan = (rpc_struct_scan_f)rpc_struct_scan;
 	func_param.struct_printf = (rpc_struct_printf_f)rpc_struct_printf;
 	func_param.capabilities = (rpc_capabilities_f)rpc_capabilities;

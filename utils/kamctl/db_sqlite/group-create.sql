@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('grp','2');
 CREATE TABLE grp (
     id INTEGER PRIMARY KEY NOT NULL,
     username VARCHAR(64) DEFAULT '' NOT NULL,
@@ -7,8 +8,7 @@ CREATE TABLE grp (
     CONSTRAINT grp_account_group_idx UNIQUE (username, domain, grp)
 );
 
-INSERT INTO version (table_name, table_version) values ('grp','2');
-
+INSERT INTO version (table_name, table_version) values ('re_grp','1');
 CREATE TABLE re_grp (
     id INTEGER PRIMARY KEY NOT NULL,
     reg_exp VARCHAR(128) DEFAULT '' NOT NULL,
@@ -16,6 +16,4 @@ CREATE TABLE re_grp (
 );
 
 CREATE INDEX re_grp_group_idx ON re_grp (group_id);
-
-INSERT INTO version (table_name, table_version) values ('re_grp','1');
 

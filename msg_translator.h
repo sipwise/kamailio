@@ -1,39 +1,41 @@
-/*
+/*$Id$
+ * 
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2003-03-06  totags in outgoing replies bookmarked to enable
+ *             ACK/200 tag matching
+ *
+ * 2003-03-01 VOICE_MAIL defs removed (jiri)
+ * 2003-10-08 receive_test function-alized (jiri)
  */
-
-/*!
-* \file
-* \brief Kamailio core :: Message translations
-* \author jiri
-* \ingroup core
-* Module: \ref core
-*/
 
 
 #ifndef  _MSG_TRANSLATOR_H
 #define _MSG_TRANSLATOR_H
-
-/* flags used for process_lumps flag parameter */
-#define FLAG_MSG_LUMPS_ONLY     0   /* copy just the lumps */
-#define FLAG_MSG_ALL            1   /* copy all the msg */
 
 #define MY_HF_SEP ": "
 #define MY_HF_SEP_LEN 2
@@ -164,20 +166,4 @@ void fix_global_req_flags(str* gname, str* name);
 
 int build_sip_msg_from_buf(struct sip_msg *msg, char *buf, int len,
 		unsigned int id);
-
-/* returns a copy in private memory of the boundary in a multipart body */
-int get_boundary(struct sip_msg* msg, str* boundary);
-
-
-/* process the lumps of a sip msg
- * flags =  => add also the existing header to new_buf
- * flags =  => add only the lumps (unapplied info) to new_buf
- **/
-void process_lumps( struct sip_msg* msg,
-                    struct lump* lumps,
-                    char* new_buf,
-                    unsigned int* new_buf_offs,
-                    unsigned int* orig_offs,
-                    struct dest_info* send_info,
-                    int flag);
 #endif

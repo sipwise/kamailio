@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 voice-system.ro
  * Copyright (C) 2009 asipto.com
  *
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -45,7 +47,6 @@
 #include "../../parser/parse_nameaddr.h"
 
 #include "../../lib/kcore/strcommon.h"
-#include "../../lib/srutils/shautils.h"
 #include "pv_trans.h"
 
 
@@ -177,75 +178,6 @@ static int urldecode_param(str *sin, str *sout) {
 	return 0;
 }
 
-/* Encode 7BIT PDU */
-static int pdu_7bit_encode(str sin) {
-	int i, j;
-	unsigned char hex;
-	unsigned char nleft;
-	unsigned char fill;
-	char HexTbl[] = {"0123456789ABCDEF"};
-
-	nleft = 1;
-	j = 0;
-	for(i = 0; i < sin.len; i++) {
-		hex = *(sin.s) >> (nleft - 1);
-		fill = *(sin.s+1) << (8-nleft);
-		hex = hex | fill;
-		_tr_buffer[j++] = HexTbl[hex >> 4];
-		_tr_buffer[j++] = HexTbl[hex & 0x0F];
-		nleft++;
-		if(nleft == 8) {
-			sin.s++;
-			i++;
-			nleft = 1;
-		}	   										 	
-		sin.s++;
-	}
-	_tr_buffer[j] = '\0';
-	return j;
-}
-
-/* Decode 7BIT PDU */
-static int pdu_7bit_decode(str sin) {
-	int i, j;
-	unsigned char nleft = 1;
-	unsigned char fill = 0;
-	unsigned char oldfill = 0;
-	j = 0;
-	for(i = 0; i < sin.len; i += 2) {
-		_tr_buffer[j] = (unsigned char)pv_from_hex(sin.s[i]) << 4;
-		_tr_buffer[j] |= (unsigned char)pv_from_hex(sin.s[i+1]);
-		fill = (unsigned char)_tr_buffer[j];
-		fill >>= (8 - nleft);
-		_tr_buffer[j] <<= (nleft -1 );
-		_tr_buffer[j] &= 0x7F;
-		_tr_buffer[j] |= oldfill;
-		oldfill = fill;
-		j++;
-		nleft++;
-		if(nleft == 8) {
-			_tr_buffer[j++] = oldfill;
-			nleft = 1;
-			oldfill = 0;
-		}
-	}
-	_tr_buffer[j] = '\0';
-	return j;	
-}
-
-/* Get only the numeric part of string, e.g.
-   040/123-456 => 040123456 */
-static int getNumericValue(str sin) {
-	int i, j = 0;
-	for(i = 0; i < sin.len; i ++) {
-		if (sin.s[i] >= '0' && sin.s[i] <= '9') {
-			_tr_buffer[j++] = sin.s[i];
-		}
-	}
-	_tr_buffer[j] = '\0';
-	return j;
-}
-
 /* -- transformations functions */
 
 /*!
@@ -303,36 +235,6 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			val->rs.s = _tr_buffer;
 			val->rs.len = MD5_LEN;
 			break;
-		case TR_S_SHA256:
-			if(!(val->flags&PV_VAL_STR))
-				val->rs.s = int2str(val->ri, &val->rs.len);
-			compute_sha256(_tr_buffer, (u_int8_t*)val->rs.s, val->rs.len);
-			_tr_buffer[SHA256_DIGEST_STRING_LENGTH -1] = '\0';
-			val->flags = PV_VAL_STR;
-			val->ri = 0;
-			val->rs.s = _tr_buffer;
-			val->rs.len = SHA256_DIGEST_STRING_LENGTH -1 ;
-			break;
-		case TR_S_SHA384:
-			if(!(val->flags&PV_VAL_STR))
-				val->rs.s = int2str(val->ri, &val->rs.len);
-			compute_sha384(_tr_buffer, (u_int8_t*)val->rs.s, val->rs.len);
-			_tr_buffer[SHA384_DIGEST_STRING_LENGTH -1] = '\0';
-			val->flags = PV_VAL_STR;
-			val->ri = 0;
-			val->rs.s = _tr_buffer;
-			val->rs.len = SHA384_DIGEST_STRING_LENGTH -1;
-			break;
-		case TR_S_SHA512:
-			if(!(val->flags&PV_VAL_STR))
-				val->rs.s = int2str(val->ri, &val->rs.len);
-			compute_sha512(_tr_buffer, (u_int8_t*)val->rs.s, val->rs.len);
-			_tr_buffer[SHA512_DIGEST_STRING_LENGTH -1] = '\0';
-			val->flags = PV_VAL_STR;
-			val->ri = 0;
-			val->rs.s = _tr_buffer;
-			val->rs.len = SHA512_DIGEST_STRING_LENGTH -1;
-			break;
 		case TR_S_ENCODEHEXA:
 			if(!(val->flags&PV_VAL_STR))
 				val->rs.s = int2str(val->ri, &val->rs.len);
@@ -374,39 +276,6 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 				else return -1;
 			}
 			_tr_buffer[i] = '\0';
-			memset(val, 0, sizeof(pv_value_t));
-			val->flags = PV_VAL_STR;
-			val->rs.s = _tr_buffer;
-			val->rs.len = i;
-			break;
-		case TR_S_ENCODE7BIT:
-			if(!(val->flags&PV_VAL_STR))
-				val->rs.s = int2str(val->ri, &val->rs.len);
-			if(val->rs.len > (TR_BUFFER_SIZE*7/8) -1)
-				return -1;
-			i = pdu_7bit_encode(val->rs);
-			memset(val, 0, sizeof(pv_value_t));
-			val->flags = PV_VAL_STR;
-			val->rs.s = _tr_buffer;
-			val->rs.len = i;
-			break;
-		case TR_S_DECODE7BIT:
-			if(!(val->flags&PV_VAL_STR))
-				val->rs.s = int2str(val->ri, &val->rs.len);
-			if(val->rs.len>TR_BUFFER_SIZE/2-1)
-				return -1;
-			i = pdu_7bit_decode(val->rs);
-			memset(val, 0, sizeof(pv_value_t));
-			val->flags = PV_VAL_STR;
-			val->rs.s = _tr_buffer;
-			val->rs.len = i;
-			break;
-		case TR_S_NUMERIC:
-			if(!(val->flags&PV_VAL_STR))
-				return -1;
-			if(val->rs.len>TR_BUFFER_SIZE)
-				return -1;
-			i = getNumericValue(val->rs);
 			memset(val, 0, sizeof(pv_value_t));
 			val->flags = PV_VAL_STR;
 			val->rs.s = _tr_buffer;
@@ -2039,35 +1908,17 @@ char* tr_parse_string(str* in, trans_t *t)
 	} else if(name.len==3 && strncasecmp(name.s, "md5", 3)==0) {
 		t->subtype = TR_S_MD5;
 		goto done;
-	} else if(name.len==6 && strncasecmp(name.s, "sha256", 6)==0) {
-		t->subtype = TR_S_SHA256;
-		goto done;
-	} else if(name.len==6 && strncasecmp(name.s, "sha384", 6)==0) {
-		t->subtype = TR_S_SHA384;
-		goto done;
-	} else if(name.len==6 && strncasecmp(name.s, "sha512", 6)==0) {
-		t->subtype = TR_S_SHA512;
-		goto done;
 	} else if(name.len==7 && strncasecmp(name.s, "tolower", 7)==0) {
 		t->subtype = TR_S_TOLOWER;
 		goto done;
 	} else if(name.len==7 && strncasecmp(name.s, "toupper", 7)==0) {
 		t->subtype = TR_S_TOUPPER;
 		goto done;
-	} else if(name.len==7 && strncasecmp(name.s, "numeric", 7)==0) {
-		t->subtype = TR_S_NUMERIC;
-		goto done;
 	} else if(name.len==11 && strncasecmp(name.s, "encode.hexa", 11)==0) {
 		t->subtype = TR_S_ENCODEHEXA;
 		goto done;
 	} else if(name.len==11 && strncasecmp(name.s, "decode.hexa", 11)==0) {
 		t->subtype = TR_S_DECODEHEXA;
-		goto done;
-	} else if(name.len==11 && strncasecmp(name.s, "encode.7bit", 11)==0) {
-		t->subtype = TR_S_ENCODE7BIT;
-		goto done;
-	} else if(name.len==11 && strncasecmp(name.s, "decode.7bit", 11)==0) {
-		t->subtype = TR_S_DECODE7BIT;
 		goto done;
 	} else if(name.len==13 && strncasecmp(name.s, "encode.base64", 13)==0) {
 		t->subtype = TR_S_ENCODEBASE64;

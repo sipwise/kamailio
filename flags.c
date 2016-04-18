@@ -1,26 +1,39 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/*
+ * History:
+ * --------
+ *  2003-03-19  replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
+ *  2006-02-02  named flags support (andrei)
  */
 
 /*!
  * \file
- * \brief Kamailio core :: Flags
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -57,11 +70,13 @@ int isflagset( struct sip_msg* msg, flag_t flag ) {
 
 int flag_in_range( flag_t flag ) {
 	if (flag > MAX_FLAG ) {
-		LM_ERR("message flag %d too high; MAX=%d\n", flag, MAX_FLAG );
+		LOG(L_ERR, "ERROR: message flag %d too high; MAX=%d\n",
+			flag, MAX_FLAG );
 		return 0;
 	}
 	if ((int)flag<0) {
-		LM_ERR("message flag (%d) must be in range 0..%d\n", flag, MAX_FLAG );
+		LOG(L_ERR, "ERROR: message flag (%d) must be in range %d..%d\n",
+			flag, 0, MAX_FLAG );
 		return 0;
 	}
 	return 1;
@@ -137,7 +152,8 @@ int check_flag(int n)
 	if (!flag_in_range(n))
 		return -1;
 	if (registered_flags[n]){
-		LM_WARN("flag %d is already used by a named flag\n", n);
+		LOG(L_WARN, "WARNING: check_flag: flag %d is already used by "
+					" a named flag\n", n);
 	}
 	return 0;
 }
@@ -203,18 +219,20 @@ int register_flag(char* name, int pos)
 	/* check if the name already exists */
 	e=flag_search(&name2flags[h], name, len);
 	if (e){
-		LM_ERR("flag %.*s already registered\n", len, name);
+		LOG(L_ERR, "ERROR: register_flag: flag %.*s already registered\n",
+					len, name);
 		return -2;
 	}
 	/* check if there is already another flag registered at pos */
 	if (pos!=-1){
 		if ((pos<0) || (pos>MAX_FLAG)){
-			LM_ERR("invalid flag %.*s position(%d)\n", len, name, pos);
+			LOG(L_ERR, "ERROR: register_flag: invalid flag %.*s "
+					"position(%d)\n", len, name, pos);
 			return -4;
 		}
 		if (registered_flags[pos]!=0){
-			LM_WARN("%.*s:  flag %d already in use under another name\n",
-					len, name, pos);
+			LOG(L_WARN, "WARNING: register_flag:  %.*s:  flag %d already in "
+					"use under another name\n", len, name, pos);
 			/* continue */
 		}
 	}else{
@@ -228,7 +246,8 @@ int register_flag(char* name, int pos)
 			}
 		}
 		if (pos==-1){
-			LM_ERR("could not register %.*s - too many flags\n", len, name);
+			LOG(L_ERR, "ERROR: register_flag: could not register %.*s"
+					" - too many flags\n", len, name);
 			return -5;
 		}
 	}
@@ -236,7 +255,7 @@ int register_flag(char* name, int pos)
 	
 	e=pkg_malloc(sizeof(struct flag_entry));
 	if (e==0){
-		LM_ERR("memory allocation failure\n");
+		LOG(L_ERR, "ERROR: register_flag: memory allocation failure\n");
 		return -3;
 	}
 	e->name.s=name;
@@ -257,10 +276,11 @@ static int fixup_t_flag(void** param, int param_no)
 	char *c;
 	int token;
 
-	LM_DBG("fixing flag: %s\n", (char *) (*param));
+	DBG("DEBUG: fixing flag: %s\n", (char *) (*param));
 
 	if (param_no!=1) {
-		LM_ERR("TM module: only parameter #1 for flags can be fixed\n");
+		LOG(L_ERR, "ERROR: TM module: only parameter #1 for flags can be"
+					" fixed\n");
 		return E_BUG;
 	};
 
@@ -285,7 +305,7 @@ static int fixup_t_flag(void** param, int param_no)
 		while ( *c && *c>='0' && *c<='9' ) {
 			*code = *code*10+ *c-'0';
 			if (*code > (sizeof( flag_t ) * CHAR_BIT - 1 )) {
-				LM_ERR("TM module: too big flag number: %s; MAX=%d\n",
+				LOG(L_ERR, "ERROR: TM module: too big flag number: %s; MAX=%d\n",
 					(char *) (*param), sizeof( flag_t ) * CHAR_BIT - 1 );
 				goto error;
 			}
@@ -295,12 +315,12 @@ static int fixup_t_flag(void** param, int param_no)
 	while ( *c && (*c==' ' || *c=='\t')) c++; /* terminating whitespaces */
 
 	if ( *code == 0 ) {
-		LM_ERR("TM module: bad flag number: %s\n", (char *) (*param));
+		LOG(L_ERR, "ERROR: TM module: bad flag number: %s\n", (char *) (*param));
 		goto error;
 	}
 
 	if (*code < FL_MAX && token==0) {
-		LM_ERR("TM module: too high flag number: %s (%d)\n; lower number"
+		LOG(L_ERR, "ERROR: TM module: too high flag number: %s (%d)\n; lower number"
 			" bellow %d reserved\n", (char *) (*param), *code, FL_MAX );
 		goto error;
 	}

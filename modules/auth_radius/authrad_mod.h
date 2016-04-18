@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * -------
@@ -40,8 +40,6 @@ extern void *rh;
 extern struct extra_attr *auth_extra;
 
 extern int use_ruri_flag;
-extern int ar_radius_avps_mode;
-extern int append_realm_to_username;
 
 extern auth_api_s_t auth_api;
 

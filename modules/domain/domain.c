@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ *
  * Domain table related functions
  *
  * Copyright (C) 2002-2012 Juha Heinanen
@@ -17,8 +19,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2004-06-07  updated to the new DB api, moved reload_table here, created 
+ *               domain_db_{init.bind,ver,close} (andrei)
+ *  2004-09-06  is_uri_host_local() can now be called also from
+ *              failure route (juhe)
  */
 
 #include "domain_mod.h"
@@ -40,7 +48,7 @@ static db_func_t domain_dbf;
 int domain_db_bind(const str* db_url)
 {
 	if (db_bind_mod(db_url, &domain_dbf )) {
-	        LM_ERR("Cannot bind to database module!\n");
+	        LM_ERR("Cannot bind to database module!");
 		return -1;
 	}
 	return 0;
@@ -314,7 +322,7 @@ int reload_tables ( void )
     cols[2] = &type_col;
     cols[3] = &value_col;
 
-    if (domain_db_init(&d_db_url) < 0) {
+    if (domain_db_init(&db_url) < 0) {
 	LM_ERR("unable to open database connection\n");
 	return -1;
     }
@@ -362,16 +370,11 @@ int reload_tables ( void )
 	}
 
 	if ((VAL_NULL(ROW_VALUES(row) + 2) == 1) ||
-	    ((VAL_TYPE(ROW_VALUES(row) + 2) != DB1_INT) &&
-	     (VAL_TYPE(ROW_VALUES(row) + 2) != DB1_BIGINT))) {
+	    (VAL_TYPE(ROW_VALUES(row) + 2) != DB1_INT)) {
 	    LM_ERR("type at row <%u> is null or not int\n", i);
 	    goto err;
 	}
-	if(VAL_TYPE(ROW_VALUES(row) + 2) == DB1_BIGINT) {
-		type = (int)VAL_BIGINT(ROW_VALUES(row) + 2);
-	} else {
-		type = (int)VAL_INT(ROW_VALUES(row) + 2);
-	}
+	type = (int)VAL_INT(ROW_VALUES(row) + 2);
 	if ((type != 0) && (type != 2)) {
 	    LM_ERR("unknown type <%d> at row <%u>\n", type, i);
 	    goto err;

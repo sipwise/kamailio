@@ -64,7 +64,7 @@
 
 	<section>
 	<title>Parameters</title>
-	<section id="auth_db.p.db_url">
+	<section>
 		<title><varname>db_url</varname> (string)</title>
 		<para>
 		This is URL of the database to be used. Value of the parameter depends 
@@ -88,7 +88,7 @@ modparam("auth_db", "db_url", "&exampledb;")
 		</example>
 	</section>
 
-	<section id="auth_db.p.user_column">
+	<section>
 		<title><varname>user_column</varname> (string)</title>
 		<para>
 		This is the name of the column holding usernames. Default value is 
@@ -107,7 +107,7 @@ modparam("auth_db", "user_column", "user")
 		</example>
 	</section>
 
-	<section id="auth_db.p.domain_column">
+	<section>
 		<title><varname>domain_column</varname> (string)</title>
 		<para>
 		This is the name of the column holding domains of users. Default value 
@@ -127,7 +127,7 @@ modparam("auth_db", "domain_column", "domain")
 		</example>
 	</section>
 
-	<section id="auth_db.p.password_column">
+	<section>
 		<title><varname>password_column</varname> (string)</title>
 		<para>
 		This is the name of the column holding passwords. Passwords can be 
@@ -149,7 +149,7 @@ modparam("auth_db", "password_column", "password")
 		</example>
 	</section>
 
-	<section id="auth_db.p.2password_column_2">
+	<section>
 		<title><varname>password_column_2</varname> (string)</title>
 		<para>
 		As described in the previous section this parameter contains name of 
@@ -171,7 +171,7 @@ modparam("auth_db", "password_column_2", "ha1_2")
 		</example>
 	</section>
 
-	<section id="auth_db.p.calculate_ha1">
+	<section>
 		<title><varname>calculate_ha1</varname> (integer)</title>
 		<para>
 		This parameter tells the server whether it should use a pre-calculated
@@ -216,7 +216,7 @@ modparam("auth_db", "calculate_ha1", 1)
 		</example>
 	</section>
 
-	<section id="auth_db.p.use_domain">
+	<section>
 		<title><varname>use_domain</varname> (integer)</title>
 		<para>
 		If true (not 0), domain will be also used when looking up in the 
@@ -242,7 +242,7 @@ modparam("auth_db", "use_domain", 1)
 		</example>
 	</section>
 
-	<section id="auth_db.p.load_credentials">
+	<section>
 		<title><varname>load_credentials</varname> (string)</title>
 		<para>
 		This parameter specifies of credentials to be fetch from database when
@@ -266,8 +266,7 @@ modparam("auth_db", "use_domain", 1)
 		</itemizedlist>
 		</para>
 		<para>
-		Default value of this parameter is <quote>NULL</quote> (no credientials
-		loaded).
+		Default value of this parameter is <quote>rpid</quote>.
 		</para>
 		<example>
 		<title><varname>load_credentials</varname> parameter usage</title>
@@ -281,7 +280,7 @@ modparam("auth_db", "load_credentials", "$avp(i:123)=rpid;email_address")
 		</example>
 	</section>
 
-	<section id="auth_db.p.version_table">
+	<section>
 		<title><varname>version_table</varname> (integer)</title>
 		<para>
 		If set to 0, the module will skip checking the version
@@ -304,7 +303,7 @@ modparam("auth_db", "version_table", 0)
 
 	<section>
 	<title>Functions</title>
-	<section id="auth_db.f.www_authenticate">
+	<section>
 		<title>
 			<function moreinfo="none">www_authenticate(realm, table [, method])</function>
 		</title>
@@ -395,7 +394,7 @@ if (!www_authorize("kamailio.org", "subscriber")) {
 		</example>
 	</section>
 
-	<section id="auth_db.f.www_authorize">
+	<section>
 		<title>
 			<function moreinfo="none">www_authorize(realm, table)</function>
 		</title>
@@ -406,7 +405,7 @@ if (!www_authorize("kamailio.org", "subscriber")) {
 		</para>
 	</section>
 
-	<section id="auth_db.f.proxy_authenticate">
+	<section>
 		<title>
 			<function moreinfo="none">proxy_authenticate(realm, table)</function>
 		</title>
@@ -469,7 +468,7 @@ if (!proxy_authorize("$fd", "subscriber)) {
 		</example>
 	</section>
 
-	<section id="auth_db.f.proxy_authorize">
+	<section>
 		<title>
 			<function moreinfo="none">proxy_authorize(realm, table)</function>
 		</title>
@@ -480,7 +479,7 @@ if (!proxy_authorize("$fd", "subscriber)) {
 		</para>
 	</section>
 
-	<section id="auth_db.f.auth_check">
+	<section>
 		<title>
 			<function moreinfo="none">auth_check(realm, table, flags)</function>
 		</title>
@@ -528,9 +527,7 @@ if (!proxy_authorize("$fd", "subscriber)) {
 			From header username. REGISTER requests: From and To must match the 
 			authentication user. PUBLISH requests: From, To and Request-URI must
 			match the authentication user. All other requests: From header must
-			match the authentication user. If bit 2 is set as well (flags==3),
-			the ID check is skipped for INVITE, BYE, PRACK, UPDATE, MESSAGE
-			- these requests can come with anonymoys caller id.
+			match the authentication user.
 			</para>
 			<para>
 			Additionally all domains in the checked URIs and the realm in the 
@@ -557,8 +554,9 @@ if (!auth_check("$fd", "subscriber", "1")) {
 		</example>
 	</section>
 
+
 	<section>
-		<title id="auth_db.f.is_subscriber">
+		<title>
 			<function moreinfo="none">is_subscriber(uri, dbtable, flags)</function>
 		</title>
 		<para>The function checks if there is a subscriber corresponding to
@@ -585,10 +583,8 @@ if (!auth_check("$fd", "subscriber", "1")) {
 		</listitem>
 		<listitem>
 			<para><emphasis>flags</emphasis> - set of flags to control the
-			behaviour of the function. If 1st bit is set, then the function will
+			behaviour of the function. If it is 1, then the function will
 			use the domain part of the URI to perform the database table search.
-			If 2nd bit is set, then the credentials are not loaded in variables
-			(a simple check if subscriber exists).
 			</para>
 			<para>
 			The parameter may be a pseudo variable.
@@ -602,7 +598,7 @@ if (!auth_check("$fd", "subscriber", "1")) {
 		<title>is_subscriber usage</title>
 		<programlisting format="linespecific">
 ...
-if (!is_subscriber("$ru", "subscriber", "3")) {
+if (!is_subscriber("$ru", "subscriber", "1")) {
     # callee is not a local subscriber
     ...
 }

@@ -17,13 +17,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*!
- * \file
- * \brief Kamailio TLS support :: Common functions
- * \ingroup tls
- * Module: \ref tls
- */
-
 
 #define _GNU_SOURCE 1 /* Needed for strndup */
 
@@ -34,6 +27,13 @@
 #include "../../dprint.h"
 #include "tls_mod.h"
 #include "tls_util.h"
+/*!
+ * \file
+ * \brief SIP-router TLS support :: Common functions
+ * \ingroup tls
+ * Module: \ref tls
+ */
+
 
 
 /*
@@ -83,7 +83,7 @@ void collect_garbage(void)
 
 	while(cur) {
 		next = cur->next;
-		if (atomic_get(&cur->ref_count) == 0) {
+		if (cur->ref_count == 0) {
 			/* Not referenced by any existing connection */
 			prev->next = cur->next;
 			tls_free_cfg(cur);

@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('dialog','7');
 CREATE TABLE dialog (
     id NUMBER(10) PRIMARY KEY,
     hash_entry NUMBER(10),
@@ -35,8 +36,7 @@ BEGIN map2users('dialog'); END;
 /
 CREATE INDEX dialog_hash_idx  ON dialog (hash_entry, hash_id);
 
-INSERT INTO version (table_name, table_version) values ('dialog','7');
-
+INSERT INTO version (table_name, table_version) values ('dialog_vars','1');
 CREATE TABLE dialog_vars (
     id NUMBER(10) PRIMARY KEY,
     hash_entry NUMBER(10),
@@ -54,6 +54,4 @@ END dialog_vars_tr;
 BEGIN map2users('dialog_vars'); END;
 /
 CREATE INDEX dialog_vars_hash_idx  ON dialog_vars (hash_entry, hash_id);
-
-INSERT INTO version (table_name, table_version) values ('dialog_vars','1');
 

@@ -1,4 +1,6 @@
-/*
+/**
+ * $Id$
+ *
  * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com)
  * Copyright (C) 2011 Carsten Bock, carsten@ng-voice.com
  *
@@ -16,14 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- */
-
-/*!
- * \file
- * \brief Dialog variables
- * \ingroup dialog
- * Module: \ref dialog
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 		       
 #include "../../route.h"
@@ -40,7 +35,7 @@ dlg_ctx_t _dlg_ctx;
 extern int spiral_detected;
 
 /*! global variable table, in case the dialog does not exist yet */
-static struct dlg_var *_dlg_var_table = 0;
+struct dlg_var * var_table = 0;
 /*! ID of the current message */
 int msg_id;
 
@@ -56,10 +51,10 @@ int dlg_cfg_cb(sip_msg_t *msg, unsigned int flags, void *cbp)
 					/* release to destroy dialog if created by this process
 					 * and request was not forwarded */
 					if(dlg->state==DLG_STATE_UNCONFIRMED) {
-						LM_DBG("new dialog with no transaction after config"
+						LM_DBG("new dialog with no trasaction after config"
 									" execution\n");
 					} else {
-						LM_DBG("dialog with no expected transaction after"
+						LM_DBG("dialog with no expected trasaction after"
 								" config execution\n");
 					}
 					dlg_release(dlg);
@@ -99,21 +94,20 @@ static inline struct dlg_var *new_dlg_var(str *key, str *val)
 		LM_ERR("no more shm mem\n");
 		return NULL;
 	}
-	memset(var, 0, sizeof(struct dlg_var));
+	var->next = NULL;
 	var->vflags = DLG_FLAG_NEW;
 	/* set key */
 	var->key.len = key->len;
-	var->key.s = (char*)shm_malloc(var->key.len+1);
+	var->key.s = (char*)shm_malloc(var->key.len);
 	if (var->key.s==NULL) {
 		shm_free(var);			
 		LM_ERR("no more shm mem\n");
 		return NULL;
 	}
 	memcpy(var->key.s, key->s, key->len);
-	var->key.s[var->key.len] = '\0';
 	/* set value */
 	var->value.len = val->len;
-	var->value.s = (char*)shm_malloc(var->value.len+1);
+	var->value.s = (char*)shm_malloc(var->value.len);
 	if (var->value.s==NULL) {
 		shm_free(var->key.s);			
 		shm_free(var);			
@@ -121,21 +115,19 @@ static inline struct dlg_var *new_dlg_var(str *key, str *val)
 		return NULL;
 	}
 	memcpy(var->value.s, val->s, val->len);
-	var->value.s[var->value.len] = '\0';
 	return var;
 }
 
 /*! Delete the current var-list */
 void free_local_varlist() {
 	struct dlg_var *var;
-	while (_dlg_var_table) {
-		var = _dlg_var_table;
-		_dlg_var_table = _dlg_var_table->next;
+	while (var_table) {
+		var = var_table;
+		var_table = var_table->next;
 		shm_free(var->key.s);
 		shm_free(var->value.s);
 		shm_free(var);
 	}
-	_dlg_var_table = NULL;
 }
 
 /*! Retrieve the local var-list pointer */
@@ -146,9 +138,9 @@ struct dlg_var * get_local_varlist_pointer(struct sip_msg *msg, int clear_pointe
 		free_local_varlist();
 		msg_id = msg->id;
 	}
-	var = _dlg_var_table;
+	var = var_table;
 	if (clear_pointer)
-		_dlg_var_table = NULL;
+		var_table = NULL;
 	return var;
 }
 
@@ -163,7 +155,7 @@ int set_dlg_variable_unsafe(struct dlg_cell *dlg, str *key, str *val)
 	if (dlg) 
 		var_list = &dlg->vars;
 	else 
-		var_list = &_dlg_var_table;
+		var_list = &var_table;
 
 	if ( val && (var=new_dlg_var(key, val))==NULL) {
 		LM_ERR("failed to create new dialog variable\n");
@@ -218,7 +210,7 @@ str * get_dlg_variable_unsafe(struct dlg_cell *dlg, str *key)
 	if (dlg) 
 		var_list = dlg->vars;
 	else
-		var_list = _dlg_var_table;
+		var_list = var_table;
 
 	/* iterate the list */
 	for(var=var_list ; var ; var=var->next) {
@@ -246,7 +238,7 @@ int pv_parse_dialog_var_name(pv_spec_p sp, str *in)
 /*! Internal debugging function: Prints the list of dialogs */
 void print_lists(struct dlg_cell *dlg) {
 	struct dlg_var *varlist;
-	varlist = _dlg_var_table;
+	varlist = var_table;
 	LM_DBG("Internal var-list (%p):\n", varlist);
 	while (varlist) {
 		LM_DBG("%.*s=%.*s (flags %i)\n",

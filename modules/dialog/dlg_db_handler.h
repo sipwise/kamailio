@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 Voice System SRL
  * Copyright (C) 2011 Carsten Bock, carsten@ng-voice.com
  *
@@ -16,16 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2007-05-10  initial version (ancuta)
  */
 
-/*!
- * \file
- * \brief Database interface
- * \ingroup dialog
- * Module: \ref dialog
- */
 
 #ifndef _DLG_DB_HANDLER_H_
 #define _DLG_DB_HANDLER_H_
@@ -112,7 +111,7 @@ extern str vars_value_column;
 extern str dialog_vars_table_name;
 
 
-int init_dlg_db(const str *db_url, int dlg_hash_size , int db_update_period, int fetch_num_rows, int db_skip_load);
+int init_dlg_db(const str *db_url, int dlg_hash_size, int db_update_period, int fetch_num_rows);
 int dlg_connect_db(const str *db_url);
 void destroy_dlg_db(void);
 

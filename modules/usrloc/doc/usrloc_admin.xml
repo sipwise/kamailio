@@ -64,17 +64,10 @@
 				case.
 			</para>
 			</listitem>
-			<listitem>
-			<para>
-				<emphasis>Call-id only based</emphasis> - it is not
-				according to RFC3261, as it will check the Call-ID only
-				(independent of the Contact-Header or Path).
-			</para>
-			</listitem>
 		</itemizedlist>
 		<para>
 		To find out how to control/select the contact maching algorithm, please see the
-		module parameter matching_mode - <xref linkend="usrloc.p.matching_mode"/>.
+		module parameter matching_mode - <xref linkend="matching-mode"/>.
 		</para>
 		</section>
 	</section>
@@ -456,66 +449,6 @@ modparam("usrloc", "instance_column", "myinstance")
 		</example>
 	</section>
 
-	<section id="usrloc.p.server_id_column">
-		<title><varname>server_id_column</varname> (string)</title>
-		<para>
-		Name of database table column containing the value for server id.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>server_id</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>server_id_column</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "server_id_column", "srv_id")
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.connection_id_column">
-		<title><varname>connection_id_column</varname> (string)</title>
-		<para>
-		Name of database table column containing the value for connection id.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>connection_id</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>connection_id_column</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "connection_id_column", "con_id")
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.keepalive_column">
-		<title><varname>keepalive_column</varname> (string)</title>
-		<para>
-		Name of database table column containing the value for keepalive status.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>keepalive</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>keepalive_column</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "keepalive_column", "kalive")
-...
-</programlisting>
-		</example>
-	</section>
-
 	<section id="usrloc.p.use_domain">
 		<title><varname>use_domain</varname> (integer)</title>
 		<para>
@@ -715,12 +648,6 @@ modparam("usrloc", "db_mode", 2)
 				If no path is available, it defaults to mode 0.
 				</para>
 			</listitem>
-			<listitem>
-				<para><emphasis>3</emphasis> - CALLID only based 
-				matching algorithm. This mode will discard any duplicate
-				registration coming through different paths.
-				</para>
-			</listitem>
 		</itemizedlist>
 		<para>
 		<emphasis>
@@ -795,19 +722,19 @@ modparam("usrloc", "fetch_rows", 3000)
 		<title><varname>hash_size</varname> (integer)</title>
 		<para>
 		The number of entries of the hash table used by usrloc to store the
-		location records is 2^hash_size. For hash_size=4, the number of slots
+		location records is 2^hash_size. For hash_size=4, the number of entries
 		of the hash table is 16.
 		</para>
 		<para>
 		<emphasis>
-			Default value is <quote>10</quote> (1024 slots).
+			Default value is <quote>9</quote>.
 		</emphasis>
 		</para>
 		<example>
 		<title>Set <varname>hash_size</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("usrloc", "hash_size", 12)
+modparam("usrloc", "hash_size", 10)
 ...
 </programlisting>
 		</example>
@@ -908,10 +835,8 @@ modparam("usrloc", "timer_procs", 4)
 	<section id="usrloc.p.xavp_contact">
 		<title><varname>xavp_contact</varname> (string)</title>
 		<para>
-		The name of XAVP storing the attributes per contact. They are saved
-		in location record and restored at lookup. The tm module parameter
-		<varname>xavp_contact</varname> must also be set to the same value to use the
-		<varname>t_load_contacts</varname> and <varname>t_next_contacts</varname> functions.
+		The name of XAVP storring the attributes per contact. They are saved
+		in location record and restored at lookup.
 		</para>
 		<para>
 		<emphasis>
@@ -937,14 +862,14 @@ modparam("usrloc", "xavp_contact", "ulattrs")
 		</para>
 		<para>
 		<emphasis>
-			Default value is <quote>1</quote>.
+			Default value is <quote>0</quote>.
 		</emphasis>
 		</para>
 		<example>
 		<title>Set <varname>db_ops_ruid</varname> parameter</title>
 		<programlisting format="linespecific">
 ...
-modparam("usrloc", "db_ops_ruid", 0)
+modparam("usrloc", "db_ops_ruid", 1)
 ...
 </programlisting>
 		</example>
@@ -954,8 +879,7 @@ modparam("usrloc", "db_ops_ruid", 0)
 		<title><varname>handle_lost_tcp</varname> (int)</title>
 		<para>
 			If set to 1, Kamailio will remove location records made via
-			TCP/TLS/WS/WSS transports when it looses corresponding tcp
-            connections.  Does not currently work in DB-Only scheme.
+			TCP/TLS/WS/WSS transports when it looses corresponding tcp connections.
 		</para>
 		<para>
 		<emphasis>
@@ -967,142 +891,6 @@ modparam("usrloc", "db_ops_ruid", 0)
 		<programlisting format="linespecific">
 ...
 modparam("usrloc", "handle_lost_tcp", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.close_expired_tcp">
-		<title><varname>close_expired_tcp</varname> (int)</title>
-		<para>
-            If set to 1, Kamailio will close the TCP connection when a contact
-            has expired, if the corresponding transport is TCP/TLS/WS/WSS.
-        </para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>close_expired_tcp</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "close_expired_tcp", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.expires_type">
-		<title><varname>expires_type</varname> (int)</title>
-		<para>
-			If set to 1, &kamailio; expects to deal with BIGINT type on
-			database columns for expires and last modified values. It
-			allows to handle better the daylight time adjustmens. If set
-			to 0, those columns are expected to be on default type
-			'DATETIME'. When it is 1, the database columns types have
-			to be changed manually to 'BIGINT'.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>expires_type</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "expires_type", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.db_raw_fetch_type">
-		<title><varname>db_raw_fetch_type</varname> (int)</title>
-		<para>
-			This affect DB-only mode and controls what kind of
-			raw query is used to fetch the contacts from database for
-			specific needs (e.g., sending NAT keepalives). If it is set to 0,
-			then the common SQL query is used (working for MySQL, PostgreSQL,
-			...). If it is set to 1, the query required by Oracle is used.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>db_raw_fetch_type</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "db_raw_fetch_type", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.db_insert_null">
-		<title><varname>db_insert_null</varname> (int)</title>
-		<para>
-			If set to 1, the insert operation to database will add null values
-			in the sql statement.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote> (don't add null fields in insert
-			statement).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>db_insert_null</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "db_insert_null", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.skip_remote_socket">
-		<title><varname>skip_remote_socket</varname> (int)</title>
-		<para>
-			If set to 1, Kamailio will skip location record when loading from
-			database, if socket value of the record does not in kamailio
-			listening socket list.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>skip_remote_socket</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "skip_remote_socket", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="usrloc.p.db_timer_clean">
-		<title><varname>db_timer_clean</varname> (int)</title>
-		<para>
-			Enable (1) or disable (0) cleaning of expired db records on
-			timer basis for db_mode WRITE-BACK and WRITE-THROUGH. It uses
-			the secondary timer process.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>db_timer_clean</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("usrloc", "db_timer_clean", 1)
 ...
 </programlisting>
 		</example>

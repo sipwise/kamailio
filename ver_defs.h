@@ -1,23 +1,26 @@
 /*
+ * $Id$
+ *
  * version and compile flags macros 
+ *
  *
  * Copyright (C) 2004 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /** compile flags and other version related defines.
@@ -135,12 +138,6 @@
 #define F_MALLOC_STR ""
 #endif
 
-#ifdef Q_MALLOC
-#define Q_MALLOC_STR ", Q_MALLOC"
-#else
-#define Q_MALLOC_STR ""
-#endif
-
 #ifdef DL_MALLOC
 #define DL_MALLOC_STR ", DL_MALLOC"
 #else
@@ -159,22 +156,10 @@
 #define LL_MALLOC_STR ""
 #endif
 
-#ifdef TLSF_MALLOC
-#define TLSF_MALLOC_STR ", TLSF_MALLOC"
-#else
-#define TLSF_MALLOC_STR ""
-#endif
-
 #ifdef USE_SHM_MEM
 #define USE_SHM_MEM_STR ", USE_SHM_MEM"
 #else
 #define USE_SHM_MEM_STR ""
-#endif
-
-#ifdef DBG_SR_MEMORY
-#define DBG_SR_MEMORY_STR ", DBG_SR_MEMORY"
-#else
-#define DBG_SR_MEMORY_STR ""
 #endif
 
 #ifdef DBG_QM_MALLOC
@@ -189,6 +174,12 @@
 #define DBG_F_MALLOC_STR ""
 #endif
 
+#ifdef DEBUG_DMALLOC
+#define DEBUG_DMALLOC_STR ", DEBUG_DMALLOC"
+#else
+#define DEBUG_DMALLOC_STR ""
+#endif
+
 #ifdef DBG_SF_MALLOC
 #define DBG_SF_MALLOC_STR ", DBG_SF_MALLOC"
 #else
@@ -199,12 +190,6 @@
 #define DBG_LL_MALLOC_STR ", DBG_SF_MALLOC"
 #else
 #define DBG_LL_MALLOC_STR ""
-#endif
-
-#ifdef DBG_TLSF_MALLOC
-#define DBG_TLSF_MALLOC_STR ", DBG_TLSF_MALLOC"
-#else
-#define DBG_TLSF_MALLOC_STR ""
 #endif
 
 #ifdef TIMER_DEBUG
@@ -338,14 +323,15 @@
 
 #define SER_COMPILE_FLAGS \
 	STATS_STR EXTRA_DEBUG_STR USE_TCP_STR USE_TLS_STR \
-	USE_SCTP_STR CORE_TLS_STR TLS_HOOKS_STR USE_RAW_SOCKS_STR \
+	USE_SCTP_STR CORE_TLS_STR TLS_HOOKS_STR  USE_RAW_SOCKS_STR \
 	DISABLE_NAGLE_STR USE_MCAST_STR NO_DEBUG_STR NO_LOG_STR \
-	NO_SIG_DEBUG_STR DNS_IP_HACK_STR \
-	USE_SHM_MEM_STR SHM_MEM_STR SHM_MMAP_STR PKG_MALLOC_STR \
-	Q_MALLOC_STR F_MALLOC_STR DL_MALLOC_STR SF_MALLOC_STR LL_MALLOC_STR TLSF_MALLOC_STR \
-	DBG_SR_MEMORY_STR DBG_QM_MALLOC_STR DBG_F_MALLOC_STR \
-	DBG_SF_MALLOC_STR DBG_LL_MALLOC_STR DBG_TLSF_MALLOC_STR \
-	TIMER_DEBUG_STR USE_FUTEX_STR \
+	NO_SIG_DEBUG_STR DNS_IP_HACK_STR  SHM_MEM_STR SHM_MMAP_STR PKG_MALLOC_STR \
+	F_MALLOC_STR DL_MALLOC_STR SF_MALLOC_STR  LL_MALLOC_STR \
+	USE_SHM_MEM_STR \
+	DBG_QM_MALLOC_STR \
+	DBG_F_MALLOC_STR DEBUG_DMALLOC_STR DBG_SF_MALLOC_STR DBG_LL_MALLOC_STR \
+	TIMER_DEBUG_STR \
+	USE_FUTEX_STR \
 	FAST_LOCK_STR NOSMP_STR USE_PTHREAD_MUTEX_STR USE_POSIX_SEM_STR \
 	USE_SYSV_SEM_STR USE_COMP_STR USE_DNS_CACHE_STR USE_DNS_FAILOVER_STR \
 	DNS_WATCHDOG_SUPPORT_STR USE_NAPTR_STR USE_DST_BLACKLIST_STR \

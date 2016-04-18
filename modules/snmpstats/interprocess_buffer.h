@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * SNMPStats Module 
  * Copyright (C) 2006 SOMA Networks, INC.
  * Written by: Jeffrey Magder (jmagder@somanetworks.com)
@@ -17,9 +19,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
  * USA
  *
+ * History:
+ * --------
+ * 2006-11-23 initial version (jmagder)
  */
 
 /*!
@@ -35,7 +40,7 @@
  * instead of adding/removing users/contacts from the SNMP tables directly, the
  * callbacks add an add/delete command to the interprocessBuffer.
  *
- * When an snmp request is received by the SNMPStats sub-process, it will
+ * When an snmp request is recieved by the SNMPStats sub-process, it will
  * consume this interprocess buffer, adding and deleting users.  When it is
  * finished, it can service the SNMP request.
  *

@@ -1,3 +1,4 @@
+# $Id$
 #
 # cfg_db module makefile
 # 

@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('subscriber','6');
 CREATE TABLE subscriber (
     id INTEGER PRIMARY KEY NOT NULL,
     username VARCHAR(64) DEFAULT '' NOT NULL,
@@ -11,6 +12,4 @@ CREATE TABLE subscriber (
 );
 
 CREATE INDEX subscriber_username_idx ON subscriber (username);
-
-INSERT INTO version (table_name, table_version) values ('subscriber','6');
 

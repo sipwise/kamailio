@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
@@ -34,6 +34,8 @@
 #define _PUA_UL_
 #include "../pua/pua_bind.h"
 
+extern send_publish_t pua_send_publish;
+extern send_subscribe_t pua_send_subscribe;
 void ul_publish(ucontact_t* c, int type, void* param);
 int pua_unset_publish(struct sip_msg* msg, unsigned int flags, void* param);
 
@@ -41,5 +43,4 @@ extern str pres_prefix;
 extern int pua_ul_bflag;
 extern int pua_ul_bmask;
 
-extern pua_api_t _pu_pua;
 #endif

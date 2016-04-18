@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ *
  * Copyright (C) 2001-2005 iptel.org
  * Copyright (C) 2007-2008 1&1 Internet AG
  *
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /**
@@ -55,30 +57,6 @@ static int dupl_string(char** dst, const char* begin, const char* end)
 	return 0;
 }
 
-/**
- * Duplicate a string name (until a params separator found)
- * \param dst destination
- * \param begin start of the string
- * \param end end of the string
- */
-static int dupl_string_name(char** dst, const char* begin, const char* end)
-{
-	char *p;
-	if (*dst) pkg_free(*dst);
-
-	for(p=(char*)begin; p<end; p++) {
-		if(*p=='?') break;
-	}
-	*dst = pkg_malloc(p - begin + 1);
-	if ((*dst) == NULL) {
-		return -1;
-	}
-
-	memcpy(*dst, begin, p - begin);
-	(*dst)[p - begin] = '\0';
-	return 0;
-}
-
 
 /**
  * Parse a database URL of form 
@@ -105,7 +83,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 	};
 
 	enum state st;
-	unsigned int len, i, j, a;
+	unsigned int len, i;
 	const char* begin;
 	char* prev_token;
 
@@ -175,7 +153,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 
 			case '/':
 				if (dupl_string(&id->host, begin, url->s + i) < 0) goto err;
-				if (dupl_string_name(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
+				if (dupl_string(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
 				return 0;
 			}
 			break;
@@ -186,14 +164,6 @@ static int parse_db_url(struct db_id* id, const str* url)
 				st = ST_HOST;
 				id->username = prev_token;
 				prev_token = 0;
-				a = 0;
-				/* go to last '@' to support when it is part of password */
-				for(j = i+1; j < len; j++) {
-					if(url->s[j]=='@') {
-						a = j;
-					}
-				}
-				if(a!=0) i = a;
 				if (dupl_string(&id->password, begin, url->s + i) < 0) goto err;
 				begin = url->s + i + 1;
 				break;
@@ -202,7 +172,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 				id->host = prev_token;
 				prev_token = 0;
 				id->port = str2s(begin, url->s + i - begin, 0);
-				if (dupl_string_name(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
+				if (dupl_string(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
 				return 0;
 			}
 			break;
@@ -217,7 +187,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 
 			case '/':
 				if (dupl_string(&id->host, begin, url->s + i) < 0) goto err;
-				if (dupl_string_name(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
+				if (dupl_string(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
 				return 0;
 			}
 			break;
@@ -226,7 +196,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 			switch(url->s[i]) {
 			case '/':
 				id->port = str2s(begin, url->s + i - begin, 0);
-				if (dupl_string_name(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
+				if (dupl_string(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
 				return 0;
 			}
 			break;
@@ -269,12 +239,12 @@ struct db_id* new_db_id(const str* url, db_pooling_t pooling)
 		return 0;
 	}
 
-	ptr = (struct db_id*)pkg_malloc(sizeof(struct db_id) + url->len + 1);
+	ptr = (struct db_id*)pkg_malloc(sizeof(struct db_id));
 	if (!ptr) {
 		LM_ERR("no private memory left\n");
 		goto err;
 	}
-	memset(ptr, 0, sizeof(struct db_id)+url->len+1);
+	memset(ptr, 0, sizeof(struct db_id));
 
 	if (parse_db_url(ptr, url) < 0) {
 		LM_ERR("error while parsing database URL: '%.*s' \n", url->len, url->s);
@@ -284,10 +254,6 @@ struct db_id* new_db_id(const str* url, db_pooling_t pooling)
 	if (pooling == DB_POOLING_NONE) ptr->poolid = ++poolid;
 	else ptr->poolid = 0;
 	ptr->pid = my_pid();
-	ptr->url.s = (char*)ptr + sizeof(struct db_id);
-	ptr->url.len = url->len;
-	strncpy(ptr->url.s, url->s, url->len);
-	ptr->url.s[url->len] = '\0';
 
 	return ptr;
 

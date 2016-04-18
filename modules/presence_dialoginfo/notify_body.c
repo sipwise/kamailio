@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -56,7 +56,6 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n);
 int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array, int total_nodes);
 
 extern int force_single_dialog;
-extern int force_dummy_dialog;
 
 void free_xml_body(char* body)
 {
@@ -67,58 +66,6 @@ void free_xml_body(char* body)
 	body= NULL;
 }
 
-#define DIALOGINFO_EMPTY_BODY "<dialog-info>\
-<dialog id=\"615293b33c62dec073e05d9421e9f48b\" direction=\"recipient\">\
-<state>terminated</state>\
-</dialog>\
-</dialog-info>"
-
-#define DIALOGINFO_EMPTY_BODY_SIZE 512
-
-str* dlginfo_agg_nbody_empty(str* pres_user, str* pres_domain)
-{
-	str* n_body= NULL;
-	str* body_array;
-	char* body;
-
-	LM_DBG("creating empty dialog for [pres_user]=%.*s [pres_domain]= %.*s\n",
-			pres_user->len, pres_user->s, pres_domain->len, pres_domain->s);
-
-	/* dcm: note to double check - pkg allocation might not be needed */
-	body_array = (str*)pkg_malloc(sizeof(str));
-	if(body_array==NULL) {
-		LM_ERR("No more pkg\n");
-		return NULL;
-	}
-	body = (char*)pkg_malloc(DIALOGINFO_EMPTY_BODY_SIZE);
-	if(body==NULL) {
-		LM_ERR("No more pkg\n");
-		pkg_free(body_array);
-		return NULL;
-	}
-
-	sprintf(body, DIALOGINFO_EMPTY_BODY);//, pres_user->len, pres_user->s, pres_domain->len, pres_domain->s);
-	body_array->s = body;
-	body_array->len = strlen(body);
-
-
-	n_body= agregate_xmls(pres_user, pres_domain, &body_array, 1);
-	LM_DBG("[n_body]=%p\n", n_body);
-	if(n_body!=NULL) {
-		LM_DBG("[*n_body]=%.*s\n",n_body->len, n_body->s);
-	} else {
-		LM_ERR("issues while aggregating body\n");
-	}
-
-	pkg_free(body);
-	pkg_free(body_array);
-
-
-	xmlCleanupParser();
-	xmlMemoryDump();
-
-	return n_body;
-}
 
 str* dlginfo_agg_nbody(str* pres_user, str* pres_domain, str** body_array, int n, int off_index)
 {
@@ -127,11 +74,8 @@ str* dlginfo_agg_nbody(str* pres_user, str* pres_domain, str** body_array, int n
 	LM_DBG("[pres_user]=%.*s [pres_domain]= %.*s, [n]=%d\n",
 			pres_user->len, pres_user->s, pres_domain->len, pres_domain->s, n);
 
-	if(body_array== NULL && (!force_dummy_dialog))
-		return NULL;
-
 	if(body_array== NULL)
-		return dlginfo_agg_nbody_empty(pres_user, pres_domain);
+		return NULL;
 
 	n_body= agregate_xmls(pres_user, pres_domain, body_array, n);
 	LM_DBG("[n_body]=%p\n", n_body);
@@ -212,8 +156,9 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 
 	if(j== 0)  /* no body */
 	{
-		LM_DBG("no body to be built\n");
-		goto error;
+		if(xml_array)
+			pkg_free(xml_array);
+		return NULL;
 	}
 
 	/* n: number of bodies in total */
@@ -224,7 +169,7 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 	/* create the new NOTIFY body  */
 	if ( (pres_user->len + pres_domain->len + 1 + 4 + 1) >= MAX_URI_SIZE) {
 		LM_ERR("entity URI too long, maximum=%d\n", MAX_URI_SIZE);
-		goto error;
+		return NULL;
 	}
 	memcpy(buf, "sip:", 4);
 	memcpy(buf+4, pres_user->s, pres_user->len);
@@ -233,10 +178,8 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 	buf[pres_user->len + 5 + pres_domain->len]= '\0';
 
 	doc = xmlNewDoc(BAD_CAST "1.0");
-	if(doc==0) {
-		LM_ERR("unable to create xml document\n");
-		goto error;
-	}
+	if(doc==0)
+		return NULL;
 
 	root_node = xmlNewNode(NULL, BAD_CAST "dialog-info");
 	if(root_node==0)
@@ -285,7 +228,6 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 					if (!force_single_dialog || (j==1)) {
 						xmlUnlinkNode(node);
 						if(xmlAddChild(root_node, node)== NULL) {
-							xmlFreeNode(node);
 							LM_ERR("while adding child\n");
 							goto error;
 						}
@@ -296,14 +238,9 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 						 */
 						if(strcasecmp((char*)node->name,"dialog") == 0)
 						{
-							if(dialog_id) xmlFree(dialog_id);
+							node_id = i;
 							dialog_id = xmlGetProp(node,(const xmlChar *)"id");
-							if(dialog_id) {
-								node_id = i;
-								LM_DBG("Dialog id for this node : %s\n", dialog_id);
-							} else {
-								LM_DBG("No dialog id for this node - index: %d\n", i);
-							}
+							LM_DBG("Dialog id for this node : %s\n", dialog_id);
 						}
 						state = xmlNodeGetNodeContentByName(node, "state", NULL);
 						if(state) {
@@ -389,7 +326,6 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 		}
 		xmlUnlinkNode(winner_dialog_node);
 		if(xmlAddChild(root_node, winner_dialog_node)== NULL) {
-			xmlFreeNode(winner_dialog_node);
 			LM_ERR("while adding winner-child\n");
 			goto error;
 		}
@@ -403,13 +339,15 @@ str* agregate_xmls(str* pres_user, str* pres_domain, str** body_array, int n)
 	xmlDocDumpFormatMemory(doc,(xmlChar**)(void*)&body->s, 
 			&body->len, 1);	
 
-	if(dialog_id!=NULL) xmlFree(dialog_id);
-	for(i=0; i<j; i++) {
+	for(i=0; i<j; i++)
+	{
 		if(xml_array[i]!=NULL)
 			xmlFreeDoc( xml_array[i]);
 	}
-	if(doc) xmlFreeDoc(doc);
-	if(xml_array) pkg_free(xml_array);
+	if (doc)
+		xmlFreeDoc(doc);
+	if(xml_array!=NULL)
+		pkg_free(xml_array);
 
 	xmlCleanupParser();
 	xmlMemoryDump();
@@ -426,9 +364,8 @@ error:
 		}
 		pkg_free(xml_array);
 	}
-	if(body) pkg_free(body);
-	if(dialog_id) xmlFree(dialog_id);
-	if(doc) xmlFreeDoc(doc);
+	if(body)
+		pkg_free(body);
 
 	return NULL;
 }
@@ -476,9 +413,8 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array, int total_
 						{
 							/* Getting the node id so we would be sure
 							 * that terminate state from same one the same */
-							if(dialog_id_tmp) xmlFree(dialog_id_tmp);
 							dialog_id_tmp = xmlGetProp (node, (const xmlChar *) "id");
-							if(dialog_id_tmp) node_id = i;
+							node_id = i;
 						}
 						state = xmlNodeGetNodeContentByName (node, "state", NULL);
 						if (state)
@@ -522,13 +458,13 @@ int check_relevant_state (xmlChar * dialog_id, xmlDocPtr * xml_array, int total_
 								result += DEF_TRYING_NODE;
 							}
 
+
 							xmlFree (state);
 						}
 					}
 				}
 		}
 	}
-	if(dialog_id_tmp) xmlFree(dialog_id_tmp);
 	LM_DBG ("result cheching dialog %s is %d\n", dialog_id, result);
 	return result;
 }
@@ -538,7 +474,6 @@ str *dlginfo_body_setversion(subs_t *subs, str *body) {
 	char *version_start=0;
 	char version[MAX_INT_LEN + 2]; /* +2 becasue of trailing " and \0 */
 	int version_len;
-	str* aux_body = NULL;
 
 	if (!body) {
 		return NULL;
@@ -565,29 +500,9 @@ str *dlginfo_body_setversion(subs_t *subs, str *body) {
 	version_len = snprintf(version, MAX_INT_LEN + 2,"%d\"", subs->version);
 	if (version_len >= MAX_INT_LEN + 2) {
 		LM_ERR("failed to convert 'version' to string\n");
+		memcpy(version_start, "00000000000\"", 12);
 		return NULL;
 	}
-
-	aux_body= (str*)pkg_malloc(sizeof(str));
-	if(aux_body== NULL)
-	{
-		LM_ERR("error allocating memory for aux body str\n");
-		return NULL;
-	}
-	memset(aux_body, 0, sizeof(str));
-	aux_body->s= (char*)pkg_malloc( body->len * sizeof(char));
-	if(aux_body->s== NULL)
-	{
-		pkg_free(aux_body);
-		LM_ERR("error allocating memory for aux body buffer\n");
-		return NULL;
-	}
-	memcpy(aux_body->s, body->s, body->len);
-	aux_body->len= body->len;
-
-	/* again but on the copied str, no checks needed */
-	version_start = strstr(aux_body->s + 34, "version=");
-	version_start += 9;
 	/* Replace the placeholder 00000000000 with the version.
 	 * Put the padding behind the ""
 	 */
@@ -595,18 +510,5 @@ str *dlginfo_body_setversion(subs_t *subs, str *body) {
 	memcpy(version_start, version, version_len);
 	memset(version_start + version_len, ' ', 12 - version_len);
 
-	xmlDocPtr doc = xmlReadMemory(aux_body->s, aux_body->len, "noname.xml", NULL, 0);
-        if (doc == NULL) {
-		LM_ERR("error allocation xmldoc\n");
-		pkg_free(aux_body->s);
-		pkg_free(aux_body);
-		return NULL;
-	}
-	pkg_free(aux_body->s);
-        xmlDocDumpFormatMemory(doc,(xmlChar**)(void*)&aux_body->s, &aux_body->len, 1);
-	xmlFreeDoc(doc);
-        xmlCleanupParser();
-        xmlMemoryDump();
-
-	return aux_body;
+	return NULL;
 }

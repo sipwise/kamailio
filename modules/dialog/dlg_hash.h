@@ -16,8 +16,21 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2006-04-14  initial version (bogdan)
+ * 2006-11-28  Added num_100s and num_200s to dlg_cell, to aid in adding 
+ *             statistics tracking of the number of early, and active dialogs.
+ *             (Jeffrey Magder - SOMA Networks)
+ * 2007-03-06  syncronized state machine added for dialog state. New tranzition
+ *             design based on events; removed num_1xx and num_2xx (bogdan)
+ * 2007-07-06  added flags, cseq, contact, route_set and bind_addr 
+ *             to struct dlg_cell in order to store these information into db
+ *             (ancuta)
+ * 2008-04-17  added new dialog flag to avoid state tranzitions from DELETED to
+ *             CONFIRMED_NA due delayed "200 OK" (bogdan)
  */
 
 /*!
@@ -33,7 +46,6 @@
 #include "../../locking.h"
 #include "../../lib/kmi/mi.h"
 #include "../../timer.h"
-#include "../../atomic_ops.h"
 #include "dlg_timer.h"
 #include "dlg_cb.h"
 
@@ -68,15 +80,11 @@
 #define DLG_FLAG_DEL           (1<<8) /*!< delete this var */
 
 #define DLG_FLAG_TM            (1<<9) /*!< dialog is set in transaction */
-#define DLG_FLAG_EXPIRED       (1<<10)/*!< dialog is expired */
 
 /* internal flags stored in db */
 #define DLG_IFLAG_TIMEOUTBYE        (1<<0) /*!< send bye on time-out */
 #define DLG_IFLAG_KA_SRC            (1<<1) /*!< send keep alive to src */
 #define DLG_IFLAG_KA_DST            (1<<2) /*!< send keep alive to dst */
-#define DLG_IFLAG_TIMER_NORESET     (1<<3) /*!< don't reset dialog timers on in-dialog messages reception */
-#define DLG_IFLAG_CSEQ_DIFF         (1<<4) /*!< CSeq changed in dialog */
-#define DLG_IFLAG_PRACK             (1<<5) /*!< PRACK was routed during initial state */
 
 #define DLG_CALLER_LEG         0 /*!< attribute that belongs to a caller leg */
 #define DLG_CALLEE_LEG         1 /*!< attribute that belongs to a callee leg */
@@ -108,7 +116,6 @@ typedef struct dlg_cell
 	unsigned int         lifetime;		/*!< dialog lifetime */
 	unsigned int         init_ts;		/*!< init (creation) time (absolute UNIX ts)*/
 	unsigned int         start_ts;		/*!< start time  (absolute UNIX ts)*/
-	unsigned int         end_ts;		/*!< end time  (absolute UNIX ts)*/
 	unsigned int         dflags;		/*!< internal dialog memory flags */
 	unsigned int         iflags;		/*!< internal dialog persistent flags */
 	unsigned int         sflags;		/*!< script dialog persistent flags */
@@ -137,9 +144,7 @@ typedef struct dlg_entry
 	struct dlg_cell    *first;	/*!< dialog list */
 	struct dlg_cell    *last;	/*!< optimisation, end of the dialog list */
 	unsigned int       next_id;	/*!< next id */
-	gen_lock_t lock;     /* mutex to access items in the slot */
-	atomic_t locker_pid; /* pid of the process that holds the lock */
-	int rec_lock_level;  /* recursive lock count */
+	unsigned int       lock_idx;	/*!< lock index */
 } dlg_entry_t;
 
 
@@ -148,6 +153,8 @@ typedef struct dlg_table
 {
 	unsigned int       size;	/*!< size of the dialog table */
 	struct dlg_entry   *entries;	/*!< dialog hash table */
+	unsigned int       locks_no;	/*!< number of locks */
+	gen_lock_set_t     *locks;	/*!< lock table */
 } dlg_table_t;
 
 
@@ -163,22 +170,12 @@ extern dlg_table_t *d_table;
 
 
 /*!
- * \brief Set a dialog lock (re-entrant)
+ * \brief Set a dialog lock
  * \param _table dialog table
  * \param _entry locked entry
  */
 #define dlg_lock(_table, _entry) \
-		do { \
-			int mypid; \
-			mypid = my_pid(); \
-			if (likely(atomic_get( &(_entry)->locker_pid) != mypid)) { \
-				lock_get( &(_entry)->lock); \
-				atomic_set( &(_entry)->locker_pid, mypid); \
-			} else { \
-				/* locked within the same process that executed us */ \
-				(_entry)->rec_lock_level++; \
-			} \
-		} while(0)
+		lock_set_get( (_table)->locks, (_entry)->lock_idx);
 
 
 /*!
@@ -187,15 +184,7 @@ extern dlg_table_t *d_table;
  * \param _entry locked entry
  */
 #define dlg_unlock(_table, _entry) \
-		do { \
-			if (likely((_entry)->rec_lock_level == 0)) { \
-				atomic_set( &(_entry)->locker_pid, 0); \
-				lock_release( &(_entry)->lock); \
-			} else  { \
-				/* recursive locked => decrease lock count */ \
-				(_entry)->rec_lock_level--; \
-			} \
-		} while(0)
+		lock_set_release( (_table)->locks, (_entry)->lock_idx);
 
 /*!
  * \brief Unlink a dialog from the list without locking
@@ -269,16 +258,6 @@ int dlg_set_leg_info(dlg_cell_t *dlg, str* tag, str *rr, str *contact,
 
 
 /*!
- * \brief Update or set the Contact for an existing dialog
- * \param dlg dialog
- * \param leg must be either DLG_CALLER_LEG, or DLG_CALLEE_LEG
- * \param ct Contact of caller or callee
- * \return 0 on success, -1 on failure
- */
-int dlg_update_contact(struct dlg_cell * dlg, unsigned int leg, str *ct);
-
-
-/*!
  * \brief Update or set the CSEQ for an existing dialog
  * \param dlg dialog
  * \param leg must be either DLG_CALLER_LEG, or DLG_CALLEE_LEG
@@ -347,22 +326,15 @@ dlg_cell_t* get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir);
  * referred to as a dialog."
  * Note that the caller is responsible for decrementing (or reusing)
  * the reference counter by one again if a dialog has been found.
- * Important: the hash slot is left locked (e.g., needed to allow
- * linking the structure of a new dialog).
+ * If the dialog is not found, the hash slot is left locked, to allow
+ * linking the structure of a new dialog.
  * \param callid callid
  * \param ftag from tag
  * \param ttag to tag
  * \param dir direction
  * \return dialog structure on success, NULL on failure (and slot locked)
  */
-dlg_cell_t* dlg_search(str *callid, str *ftag, str *ttag, unsigned int *dir);
-
-
-/*!
- * \brief Lock hash table slot by call-id
- * \param callid call-id value
- */
-void dlg_hash_lock(str *callid);
+dlg_cell_t* search_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir);
 
 
 /*!

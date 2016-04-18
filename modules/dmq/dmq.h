@@ -1,4 +1,6 @@
 /**
+ * $Id$
+ *
  * dmq module - distributed message queue
  *
  * Copyright (C) 2011 Bucur Marius - Ovidiu
@@ -17,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -34,7 +36,7 @@
 #include "worker.h"
 
 #define DEFAULT_NUM_WORKERS	2
-#define MIN_PING_INTERVAL	5
+#define MIN_PING_INTERVAL	60
 
 extern int num_workers;
 extern dmq_worker_t* workers;
@@ -42,10 +44,8 @@ extern dmq_peer_t* dmq_notification_peer;
 extern str dmq_server_address;
 extern dmq_peer_list_t* peer_list;
 extern str dmq_request_method;
-extern str dmq_server_socket;
 extern struct sip_uri dmq_server_uri;
 extern str dmq_notification_address;
-extern int multi_notify;
 extern struct sip_uri dmq_notification_uri;
 /* sl and tm */
 extern struct tm_binds tmb;

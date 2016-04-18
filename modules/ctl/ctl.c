@@ -1,23 +1,36 @@
 /*
+ * $Id$
  *
  * Copyright (C) 2006 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/* History:
+ * --------
+ *  2006-02-08  created by andrei
+ *  2007-01-18  use PROC_RPC rank when forking (andrei)
+ */
+
+
 
 #include "../../sr_module.h"
 #include "../../ut.h"
@@ -37,7 +50,6 @@
 MODULE_VERSION
 
 #include "ctl_defaults.h"
-#include "binrpc_run.h"
 #ifdef USE_FIFO
 #include "fifo_server.h"
 #endif
@@ -217,8 +229,6 @@ static int mod_init(void)
 {
 	struct id_list* l;
 
-	binrpc_callbacks_init();
-
 	if(binrpc_max_body_size<=0)
 		binrpc_max_body_size = 4;
 	if(binrpc_struct_max_body_size<=0)
@@ -264,9 +274,6 @@ static int mod_init(void)
 				goto error;
 			}
 	}
-	/* get the uid/gid from core if not set for the module */
-	if(usock_uid==-1 && sock_uid!=-1) usock_uid = sock_uid;
-	if(usock_gid==-1 && sock_gid!=-1) usock_gid = sock_gid;
 	/* open socket now, before suid */
 	if (init_ctrl_sockets(&ctrl_sock_lst, listen_lst, DEFAULT_CTL_PORT,
 			usock_mode, usock_uid, usock_gid)<0){

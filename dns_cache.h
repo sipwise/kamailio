@@ -1,30 +1,37 @@
 /*
+ * $Id$
+ *
  * resolver/dns related functions, dns cache and failover
  *
  * Copyright (C) 2006 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* History:
+ * --------
+ *  2006-07-13  created by andrei
+ *  2007-06-16  naptr support (andrei)
+ *  2007-07-30  DNS cache measurements added (Gergo)
+ */
 
 /**
  * @file
- * @brief Kamailio core :: resolver/dns related functions, dns cache and failover
- * @author andrei
+ * @brief SIP-router core :: resolver/dns related functions, dns cache and failover
  * @ingroup core
  * Module: @ref core
  */
@@ -159,8 +166,10 @@ struct dns_hash_entry{
 };
 
 
-/* to fit in the limit of MAX_BRANCHES */
-#if MAX_BRANCHES_LIMIT < 32
+#if MAX_BRANCHES < 16
+/* forking is limited by tm to 12 by default */
+typedef unsigned short srv_flags_t;
+#elif MAX_BRANCHES < 32
 typedef unsigned int srv_flags_t;
 #else
 typedef unsigned long long srv_flags_t;

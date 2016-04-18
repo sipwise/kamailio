@@ -19,12 +19,6 @@
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
   THE SOFTWARE.
 */
-/*!
-* \file
-* \brief srutils :: SRjson
-* \ingroup srutils
-* Module: \ref srutils
-*/
 
 #ifndef _srjson__h_
 #define _srjson__h_

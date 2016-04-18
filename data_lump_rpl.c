@@ -1,26 +1,42 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * 2002-02-14 : created by bogdan
+ * 2003-09-11 : lump_rpl type added - LUMP_RPL_BODY & LUMP_RPL_HDR (bogdan)
+ * 2003-11-11 : build_lump_rpl merged into add_lump_rpl; types -> flags ;
+ *              flags LUMP_RPL_NODUP and LUMP_RPL_NOFREE added (bogdan)
+ * 2006-10-16   add_lump_rpl2 added: same as the old add_lump_rpl, but
+ *               returns a lump_rpl**, making a specific lump removal much
+ *               more easy (andrei)
  */
 /*!
  * \file
- * \brief Kamailio core :: Data lump handling
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -44,11 +60,11 @@ struct lump_rpl** add_lump_rpl2(struct sip_msg *msg, char *s,
 	/* some checking */
 	if ( (flags&(LUMP_RPL_HDR|LUMP_RPL_BODY))==(LUMP_RPL_HDR|LUMP_RPL_BODY)
 	|| (flags&(LUMP_RPL_HDR|LUMP_RPL_BODY))==0 || (flags&LUMP_RPL_SHMEM) ) {
-		LM_ERR("bad flags combination (%d)!\n",flags);
+		LOG(L_ERR,"ERROR:add_lump_rpl: bad flags combination (%d)!\n",flags);
 		goto error;
 	}
 	if (len<=0 || s==0) {
-		LM_ERR("I won't add an empty lump!\n");
+		LOG(L_ERR,"ERROR:add_lump_rpl: I won't add an empty lump!\n");
 		goto error;
 	}
 
@@ -56,7 +72,7 @@ struct lump_rpl** add_lump_rpl2(struct sip_msg *msg, char *s,
 	lump = (struct lump_rpl*) pkg_malloc
 		( sizeof(struct lump_rpl) + ((flags&LUMP_RPL_NODUP)?0:len) );
 	if (!lump) {
-		LM_ERR("no free pkg memory !\n");
+		LOG(L_ERR,"ERROR:add_lump_rpl : no free pkg memory !\n");
 		goto error;
 	}
 
@@ -80,7 +96,8 @@ struct lump_rpl** add_lump_rpl2(struct sip_msg *msg, char *s,
 		else
 			for(foo=msg->reply_lump; ;foo=foo->next) {
 				if (foo->flags&LUMP_RPL_BODY) {
-					LM_ERR("LUMP_RPL_BODY already added!\n");
+					LOG(L_ERR,"ERROR:add_lump_rpl: LUMP_RPL_BODY "
+						"already added!\n");
 					pkg_free(lump);
 					goto error;
 				}

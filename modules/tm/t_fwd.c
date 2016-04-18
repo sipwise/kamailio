@@ -1,21 +1,89 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/*
+ * History:
+ * -------
+ *  2003-02-13  proto support added (andrei)
+ *  2003-02-24  s/T_NULL/T_NULL_CELL/ to avoid redefinition conflict w/
+ *              nameser_compat.h (andrei)
+ *  2003-03-01  kr set through a function now (jiri)
+ *  2003-03-06  callbacks renamed; "blind UAC" introduced, which makes
+ *              transaction behave as if it was forwarded even if it was
+ *              not -- good for local UAS, like VM (jiri)
+ *  2003-03-19  replaced all the mallocs/frees w/ pkg_malloc/pkg_free (andrei)
+ *  2003-03-30  we now watch downstream delivery and if it fails, send an
+ *              error message upstream (jiri)
+ *  2003-04-14  use protocol from uri (jiri)
+ *  2003-12-04  global TM callbacks switched to per transaction callbacks
+ *              (bogdan)
+ *  2004-02-13: t->is_invite and t->local replaced with flags (bogdan)
+ *  2005-08-04  msg->parsed_uri and parsed_uri_ok are no saved & restored
+ *               before & after handling the branches (andrei)
+ *  2005-12-11  onsend_route support added for forwarding (andrei)
+ *  2006-01-27  t_forward_no_ack will return error if a forward on an 
+ *              already canceled transaction is attempted (andrei)
+ *  2006-02-07  named routes support (andrei)
+ *  2006-04-18  add_uac simplified + switched to struct dest_info (andrei)
+ *  2006-04-20  pint_uac_request uses now struct dest_info (andrei)
+ *  2006-08-11  dns failover support (andrei)
+ *              t_forward_non_ack won't start retransmission on send errors
+ *               anymore (WARNING: callers should release/kill the transaction
+ *               if error is returned) (andrei)
+ *  2006-09-15  e2e_cancel uses t_reply_unsafe when called from the 
+ *               failure_route and replying to a cancel (andrei)
+ *  2006-10-10  e2e_cancel update for the new/modified 
+ *               which_cancel()/should_cancel() (andrei)
+ *  2006-10-11  don't fork a new branch if the transaction or branch was
+ *               canceled, or a 6xx was received
+ *              stop retr. timers fix on cancel for non-invites     (andrei)
+ *  2006-11-20  new_uri is no longer saved/restore across add_uac calls, since
+ *              print_uac_request is now uri safe (andrei)
+ *  2007-03-15  TMCB_ONSEND hooks added (andrei)
+ *  2007-05-02  added t_forward_cancel(unmatched_cancel) (andrei)
+ *  2007-05-24  added TMCB_E2ECANCEL_IN hook support (andrei)
+ *  2007-05-28: e2e_cancel_branch() constructs the CANCEL from the
+ *              outgoing INVITE instead of applying the lumps to the
+ *              incomming one. (it can be disabled with reparse_invite=0) (Miklos)
+ *              t_relay_cancel() introduced -- can be used to relay CANCELs
+ *              at the beginning of the script. (Miklos)
+ * 2007-06-04  running transaction are canceled hop by hop (andrei)
+ * 2007-08-37  In case of DNS failover the new SIP message is constructed
+ *              from the message buffer of the failed branch instead of
+ *              applying the lumps again, because the per-branch lumps are no
+ *              t saved, thus, are not available. Set reparse_on_dns_failover
+ *              to 0 to revert the change. (Miklos)
+ * 2008-06-04  T_CANCELED is now set each time a CANCEL is received (andrei)
+ * 2009-06-01  Pre- and post-script callbacks of branch route are 
+ *             executed (Miklos)
+ * 2009-10-26  support for changing dst_uri in branch routes,
+ *             s/print_uac_request/prepare_new_uac/ (andrei)
+ * 2009-10-28  support for changing r-uris and path in branch routes; more of
+ *             add_uac() functionality moved into prepare_new_uac()  (andrei)
  */
 
 #include "defs.h"
@@ -44,8 +112,6 @@
 #include "t_cancel.h"
 #include "t_lookup.h"
 #include "t_fwd.h"
-#include "t_reply.h"
-#include "h_table.h"
 #include "../../fix_lumps.h"
 #include "config.h"
 #ifdef USE_DNS_FAILOVER
@@ -84,12 +150,12 @@ unsigned int get_on_branch(void)
 	return goto_on_branch;
 }
 
-void set_branch_route( unsigned int on_branch)
-{
-	branch_route = on_branch;
-}
 
 
+/* prepare_new_uac flags */
+#define UAC_DNS_FAILOVER_F 1 /**< new branch due to dns failover */
+#define UAC_SKIP_BR_DST_F  2 /**< don't set next hop as dst_uri for
+							   branch_route */
 
 
 /** prepares a new branch "buffer".
@@ -146,7 +212,6 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	str ua_bak;
 	int free_ua;
 	int backup_route_type;
-	int test_dst;
 	snd_flags_t fwd_snd_flags_bak;
 	snd_flags_t rpl_snd_flags_bak;
 	struct socket_info *force_send_socket_bak;
@@ -428,14 +493,14 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 	if (likely(next_hop!=0 || (flags & UAC_DNS_FAILOVER_F))){
 		/* next_hop present => use it for dns resolution */
 #ifdef USE_DNS_FAILOVER
-		test_dst = (uri2dst2(&t->uac[branch].dns_h, dst, fsocket, snd_flags,
-							next_hop?next_hop:uri, fproto) == 0);
+		if (uri2dst2(&t->uac[branch].dns_h, dst, fsocket, snd_flags,
+							next_hop?next_hop:uri, fproto) == 0)
 #else
 		/* dst filled from the uri & request (send_socket) */
-		test_dst = (uri2dst2(dst, fsocket, snd_flags,
-							next_hop?next_hop:uri, fproto)==0);
+		if (uri2dst2(dst, fsocket, snd_flags,
+							next_hop?next_hop:uri, fproto)==0)
 #endif
-		if (test_dst){
+		{
 			ret=E_BAD_ADDRESS;
 			goto error01;
 		}
@@ -690,7 +755,7 @@ int add_blind_uac( /*struct cell *t*/ )
 	}
 
 	branch=t->nr_of_outgoings;	
-	if (branch==sr_dst_max_branches) {
+	if (branch==MAX_BRANCHES) {
 		LOG(L_ERR, "ERROR: add_blind_uac: "
 			"maximum number of branches exceeded\n");
 		return -1;
@@ -741,7 +806,7 @@ int add_blind_uac( /*struct cell *t*/ )
  *                    @see prepare_new_uac().
  *  @returns branch id (>=0) or error (<0)
 */
-int add_uac( struct cell *t, struct sip_msg *request, str *uri,
+static int add_uac( struct cell *t, struct sip_msg *request, str *uri,
 					str* next_hop, str* path, struct proxy_l *proxy,
 					struct socket_info* fsocket, snd_flags_t snd_flags,
 					int proto, int flags, str *instance, str *ruid,
@@ -752,7 +817,7 @@ int add_uac( struct cell *t, struct sip_msg *request, str *uri,
 	unsigned short branch;
 
 	branch=t->nr_of_outgoings;
-	if (branch==sr_dst_max_branches) {
+	if (branch==MAX_BRANCHES) {
 		LOG(L_ERR, "ERROR: add_uac: maximum number of branches exceeded\n");
 		ret=ser_error=E_TOO_MANY_BRANCHES;
 		goto error;
@@ -832,7 +897,7 @@ static int add_uac_from_buf( struct cell *t, struct sip_msg *request,
 	unsigned int len;
 
 	branch=t->nr_of_outgoings;
-	if (branch==sr_dst_max_branches) {
+	if (branch==MAX_BRANCHES) {
 		LOG(L_ERR, "ERROR: add_uac_from_buf: maximum number of branches"
 					" exceeded\n");
 		ret=ser_error=E_TOO_MANY_BRANCHES;
@@ -994,7 +1059,7 @@ int add_uac_dns_fallback(struct cell *t, struct sip_msg* msg,
 					return ret;
 				}
 			}
-			if (t->nr_of_outgoings >= sr_dst_max_branches){
+			if (t->nr_of_outgoings >= MAX_BRANCHES){
 				LOG(L_ERR, "ERROR: add_uac_dns_fallback: maximum number of "
 							"branches exceeded\n");
 				if (lock_replies)
@@ -1624,10 +1689,6 @@ int t_forward_nonack( struct cell *t, struct sip_msg* p_msg ,
 	if (t->on_branch) {
 		/* tell add_uac that it should run branch route actions */
 		branch_route = t->on_branch;
-		/* save the branch route so that it
-		 * can be used for adding branches later
-		 */
-		t->on_branch_delayed = t->on_branch;
 		/* reset the flag before running the actions (so that it
 		 * could be set again in branch_route if needed
 		 */

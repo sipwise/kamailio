@@ -18,9 +18,7 @@
 	<title>Overview</title>
 	<para>
 		This module allows real-time queries against the Max Mind GeoIP 
-		database to be performed from the config script. It uses the old
-		version of API, still very common on OS distributions. For using
-		the new version of GeoIP API, see geoip2 module.
+		database to be performed from the config script.  
 	</para>
 	<para>
 		The Max Mind GeoIP database is a map of IP network address assignments 
@@ -183,9 +181,6 @@ if(geoip_match("$si", "src"))
 				</para></listitem>
 				<listitem><para>
 					<emphasis>metro</emphasis> - metro code
-				</para></listitem>
-				<listitem><para>
-					<emphasis>contc</emphasis> - continent code
 				</para></listitem>
 			</itemizedlist>
 			</listitem>

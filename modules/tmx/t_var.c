@@ -1,4 +1,5 @@
-/*
+/**
+ * $Id$
  *
  * Copyright (C) 2008 Elena-Ramona Modroiu (asipto.com)
  *
@@ -16,13 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- */
-/*! \file
- * \brief TMX :: var functions
- *
- * \ingroup tm
- * - Module: \ref tm
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "../../mem/mem.h"
@@ -43,6 +38,8 @@ struct _pv_tmx_data {
 static struct _pv_tmx_data _pv_treq;
 static struct _pv_tmx_data _pv_trpl;
 static struct _pv_tmx_data _pv_tinv;
+
+static str _empty_str = {"", 0};
 
 void pv_tmx_data_init(void)
 {
@@ -325,21 +322,6 @@ int pv_get_t_var_rpl(struct sip_msg *msg,  pv_param_t *param,
 	return pv_get_spec_value(&_pv_trpl.msg, pv, res);
 }
 
-int pv_get_t_var_branch(struct sip_msg *msg,  pv_param_t *param,
-		pv_value_t *res)
-{
-	pv_spec_t *pv=NULL;
-
-	if(pv_t_update_rpl(msg))
-		return pv_get_null(msg, param, res);
-
-	pv = (pv_spec_t*)param->pvn.u.dname;
-	if(pv==NULL || pv_alter_context(pv))
-		return pv_get_null(msg, param, res);
-
-	return pv_get_spec_value(&_pv_trpl.msg, pv, res);
-}
-
 int pv_get_t_var_inv(struct sip_msg *msg,  pv_param_t *param,
 		pv_value_t *res)
 {
@@ -440,7 +422,6 @@ int pv_get_tm_reply_ruid(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
 {
 	struct cell *t;
-	tm_ctx_t *tcx = 0;
 	int branch;
 
 	if(msg==NULL || res==NULL)
@@ -450,7 +431,7 @@ int pv_get_tm_reply_ruid(struct sip_msg *msg, pv_param_t *param,
 	if (_tmx_tmb.t_check( msg , 0 )==-1) return -1;
 	if ( (t=_tmx_tmb.t_gett())==0) {
 		/* no T */
-		return pv_get_strempty(msg, param, res);
+		res->rs = _empty_str;
 	} else {
 		switch (get_route_type()) {
 			case FAILURE_ROUTE:
@@ -459,27 +440,18 @@ int pv_get_tm_reply_ruid(struct sip_msg *msg, pv_param_t *param,
 				if ( (branch=_tmx_tmb.t_get_picked_branch())<0 ) {
 					LM_CRIT("no picked branch (%d) for a final response"
 							" in MODE_ONFAILURE\n", branch);
-					return pv_get_strempty(msg, param, res);
+					return -1;
 				}
-				LM_DBG("reply ruid is [%.*s]\n", t->uac[branch].ruid.len, t->uac[branch].ruid.s);
-				return pv_get_strval(msg, param, res, &t->uac[branch].ruid);
+				res->rs = t->uac[branch].ruid;
 				break;
-			case TM_ONREPLY_ROUTE:
-				tcx = _tmx_tmb.tm_ctx_get();
-				if(tcx == NULL) {
-					return pv_get_strempty(msg, param, res);
-				}
-				branch = tcx->branch_index;
-				if(branch<0 || branch>=t->nr_of_outgoings) {
-					return pv_get_strempty(msg, param, res);
-				}
-				LM_DBG("reply ruid is [%.*s]\n", t->uac[branch].ruid.len, t->uac[branch].ruid.s);
-				return pv_get_strval(msg, param, res, &t->uac[branch].ruid);
 			default:
 				LM_ERR("unsupported route_type %d\n", get_route_type());
-				return pv_get_strempty(msg, param, res);
+				return -1;
 		}
 	}
+	LM_DBG("reply ruid is [%.*s]\n", res->rs.len, res->rs.s);
+	res->flags = PV_VAL_STR;
+	return 0;
 }
 
 int pv_get_tm_reply_code(struct sip_msg *msg, pv_param_t *param,
@@ -491,14 +463,6 @@ int pv_get_tm_reply_code(struct sip_msg *msg, pv_param_t *param,
 
 	if(msg==NULL || res==NULL)
 		return -1;
-
-	switch (get_route_type()) {
-		case CORE_ONREPLY_ROUTE:
-		case TM_ONREPLY_ROUTE:
-			/* use the status of the current reply */
-			code = msg->first_line.u.reply.statuscode;
-			goto done;
-	}
 
 	/* first get the transaction */
 	if (_tmx_tmb.t_check( msg , 0 )==-1) return -1;
@@ -512,6 +476,16 @@ int pv_get_tm_reply_code(struct sip_msg *msg, pv_param_t *param,
 				/* use the status of the last sent reply */
 				code = t->uas.status;
 				break;
+			case CORE_ONREPLY_ROUTE:
+				/*  t_check() above has the side effect of setting T and
+				    REFerencing T => we must unref and unset it for the 
+				    main/core onreply_route. */
+				_tmx_tmb.t_unref(msg);
+				/* no break */
+			case TM_ONREPLY_ROUTE:
+				/* use the status of the current reply */
+				code = msg->first_line.u.reply.statuscode;
+				break;
 			case FAILURE_ROUTE:
 			case BRANCH_FAILURE_ROUTE:
 				/* use the status of the winning reply */
@@ -524,16 +498,17 @@ int pv_get_tm_reply_code(struct sip_msg *msg, pv_param_t *param,
 				}
 				break;
 			default:
-				LM_INFO("unsupported route_type %d - code set to 0\n",
-						get_route_type());
+				LM_ERR("unsupported route_type %d\n", get_route_type());
 				code = 0;
 		}
 	}
 
-done:
-	LM_DBG("reply code is <%d>\n", code);
-	return pv_get_sintval(msg, param, res, code);
+	LM_DBG("reply code is <%d>\n",code);
 
+	res->rs.s = int2str( code, &res->rs.len);
+
+	res->ri = code;
+	res->flags = PV_VAL_STR|PV_VAL_INT|PV_TYPE_INT;
 	return 0;
 }
 
@@ -551,13 +526,13 @@ int pv_get_tm_reply_reason(struct sip_msg *msg, pv_param_t *param,
 	if (_tmx_tmb.t_check( msg , 0 )==-1) return -1;
 	if ( (t=_tmx_tmb.t_gett())==0) {
 		/* no T */
-		return pv_get_strempty(msg, param, res);
+		res->rs = _empty_str;
 	} else {
 		switch (get_route_type()) {
 			case CORE_ONREPLY_ROUTE:
 				/*  t_check() above has the side effect of setting T and
-					REFerencing T => we must unref and unset it for the 
-					main/core onreply_route. */
+				    REFerencing T => we must unref and unset it for the 
+				    main/core onreply_route. */
 				_tmx_tmb.t_unref(msg);
 				/* no break */
 			case TM_ONREPLY_ROUTE:
@@ -641,40 +616,25 @@ int pv_parse_t_name(pv_spec_p sp, str *in)
 
 	switch(in->len)
 	{
-		case 3:
-			if(strncmp(in->s, "uri", 3) == 0)
-				sp->pvp.pvn.u.isname.name.n = 6;
-			else goto error;
-			break;
-		case 4:
-			if(strncmp(in->s, "ruid", 4) == 0)
-				sp->pvp.pvn.u.isname.name.n = 7;
-			else goto error;
-			break;
-		case 5:
-			if(strncmp(in->s, "flags", 5) == 0)
-				sp->pvp.pvn.u.isname.name.n = 5;
-			else goto error;
-			break;
 		case 8:
 			if(strncmp(in->s, "id_label", 8)==0)
 				sp->pvp.pvn.u.isname.name.n = 0;
 			else if(strncmp(in->s, "id_index", 8)==0)
 				sp->pvp.pvn.u.isname.name.n = 1;
 			else goto error;
-			break;
+		break;
 		case 10:
 			if(strncmp(in->s, "reply_code", 10)==0)
 				sp->pvp.pvn.u.isname.name.n = 2;
 			else if(strncmp(in->s, "reply_type", 10)==0)
 				sp->pvp.pvn.u.isname.name.n = 3;
 			else goto error;
-			break;
+		break;
 		case 12:
 			if(strncmp(in->s, "branch_index", 12)==0)
 				sp->pvp.pvn.u.isname.name.n = 4;
 			else goto error;
-			break;
+		break;
 		default:
 			goto error;
 	}
@@ -684,7 +644,7 @@ int pv_parse_t_name(pv_spec_p sp, str *in)
 	return 0;
 
 error:
-	LM_ERR("unknown PV name %.*s\n", in->len, in->s);
+	LM_ERR("unknown PV time name %.*s\n", in->len, in->s);
 	return -1;
 
 }
@@ -726,71 +686,4 @@ int pv_get_t(struct sip_msg *msg,  pv_param_t *param,
 		default:
 			return pv_get_uintval(msg, param, res, t->label);
 	}
-}
-
-int pv_get_t_branch(struct sip_msg *msg,  pv_param_t *param,
-		pv_value_t *res)
-{
-	tm_ctx_t *tcx = 0;
-	tm_cell_t *t;
-	int branch;
-
-	if ((msg == NULL) || (param == NULL)) return -1;
-
-	t = _tmx_tmb.t_gett();
-	if ((t == NULL) || (t == T_UNDEFINED)) {
-		/* no T */
-		return pv_get_null(msg, param, res);
-	}
-
-	switch(param->pvn.u.isname.name.n) {
-		case 5: /* $T_branch(flags) */
-			switch (get_route_type()) {
-				case FAILURE_ROUTE:
-				case BRANCH_FAILURE_ROUTE:
-					/* use the reason of the winning reply */
-					if ((branch=_tmx_tmb.t_get_picked_branch()) < 0) {
-						LM_CRIT("no picked branch (%d) for a final response"
-								" in MODE_ONFAILURE\n", branch);
-						return pv_get_null(msg, param, res);
-					}
-					res->ri = t->uac[branch].branch_flags;
-					res->flags = PV_VAL_INT;
-					LM_DBG("branch flags is [%u]\n", res->ri);
-					break;
-				default:
-					LM_ERR("unsupported route_type %d\n", get_route_type());
-					return pv_get_null(msg, param, res);
-			}
-			break;
-		case 6: /* $T_branch(uri) */
-			if (get_route_type() != TM_ONREPLY_ROUTE) {
-				LM_ERR("$T_branch(uri) - unsupported route_type %d\n",
-						get_route_type());
-				return pv_get_null(msg, param, res);
-			}
-			tcx = _tmx_tmb.tm_ctx_get();
-			if(tcx == NULL) {
-				return pv_get_null(msg, param, res);
-			}
-			branch = tcx->branch_index;
-			if(branch<0 || branch>=t->nr_of_outgoings) {
-				return pv_get_null(msg, param, res);
-			}
-			return pv_get_strval(msg, param, res, &t->uac[branch].uri);
-		case 7: /* $T_branch(ruid) */
-			switch(route_type) {
-				case BRANCH_ROUTE:
-					/* branch and branch_failure routes have their index set */
-					tcx = _tmx_tmb.tm_ctx_get();
-					if(tcx == NULL)
-						return pv_get_null(msg, param, res);
-					return pv_get_strval(msg, param, res, &t->uac[tcx->branch_index].ruid);
-				break;
-				default:
-					return pv_get_tm_reply_ruid(msg, param, res);
-			}
-
-	}
-	return 0;
 }

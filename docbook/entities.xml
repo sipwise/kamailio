@@ -9,11 +9,9 @@
 <!ENTITY kamailiobinary "kamailio">
 <!ENTITY kamailioname "Kamailio SIP Server Platform">
 <!ENTITY kamailioconfig "kamailio.cfg">
-<!ENTITY kamailioconfdir "/usr/local/etc/kamailio">
 
 <!ENTITY kamwiki "http://www.kamailio.org/wiki/">
 <!ENTITY kamwikilink "<ulink url='&kamwiki;'>&kamwiki;</ulink>">
-<!ENTITY kamcmd "kamcmd">
 
 <!ENTITY kamailiohome "http://www.kamailio.org/">
 <!ENTITY kamailiobugs "http://sip-router.org/tracker">
@@ -49,7 +47,7 @@
 <!ENTITY ser "SER">
 <!ENTITY sername "SIP Express Router">
 <!ENTITY sercmd "kamcmd">
-<!ENTITY ctlsocket "kamailio_ctl">
+<!ENTITY ctlsocket "ser_ctl">
 
 <!ENTITY serhome "http://iptel.org/ser">
 <!ENTITY serbugs "http://sip-router.org/tracker">

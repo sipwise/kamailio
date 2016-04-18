@@ -1,4 +1,5 @@
 /* 
+ * $Id$
  * 
  * Copyright (C) 2008 iptelorg GmbH
  *
@@ -16,8 +17,12 @@
  */
 /**
  * @file 
- * @brief Kamailio core :: lvalues (assignment)
- * @author andrei
+ * @brief lvalues (assignment)
+ */
+/* 
+ * History:
+ * --------
+ *  2008-11-30  initial version (andrei)
  */
 
 #ifndef __lvalue_h_

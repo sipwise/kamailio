@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2008 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,13 +15,10 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
 /**
  * @file mod_fix.h
- * @brief Kamailio core :: Generic fixup functions for module function parameter.
+ * @brief Generic fixup functions for module function parameter.
  * (kamailio compatibility)
- * @ingroup core
- * Module: \ref core
  */
 
 #ifndef _mod_fix_h_
@@ -102,9 +101,6 @@ int fixup_free_pvar_none(void** param, int param_no);
 
 int fixup_pvar_pvar(void **param, int param_no);
 int fixup_free_pvar_pvar(void** param, int param_no);
-
-int fixup_pvar_pvar_pvar(void **param, int param_no);
-int fixup_free_pvar_pvar_pvar(void** param, int param_no);
 
 int fixup_pvar_str(void** param, int param_no);
 int fixup_free_pvar_str(void** param, int param_no);

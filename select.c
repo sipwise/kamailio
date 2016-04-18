@@ -1,27 +1,44 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2005-2006 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * History:
+ * --------
+ *  2005-12-19  select framework (mma)
+ *  2006-01-19  multiple nested calls, IS_ALIAS -> NESTED flag renamed (mma)
+ *              DIVERSION flag checked
+ *  2006-02-26  don't free str when changing type STR -> DIVERSION (mma)
+ *				it can't be freeable sometimes (e.g. xlog's select)
+ *	2006-05-30  parse_select (mma)
+ *	2006-06-02  shm_parse_select (mma)
  *
  */
 
 /*!
  * \file
- * \brief Kamailio core :: The Select framework
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -38,19 +55,19 @@
 #include "mem/mem.h"
 #include "mem/shm_mem.h"
 
-/**
+/*
  * The main parser table list placeholder
  * at startup use core table, modules can
  * add their own via register_select_table call
  */
 static select_table_t *select_list = &select_core_table;
 
-/** the level of the select call that is beeing evaluated
+/* the level of the select call that is beeing evaluated
  * by the child process
  */
 int select_level = 0;
 
-/** pointer to the SIP uri beeing processed.
+/* pointer to the SIP uri beeing processed.
  * Nested function calls can pass information to each
  * other using this pointer. Only for performace reasons.
  * (Miklos)
@@ -99,7 +116,7 @@ int w_parse_select(char**p, select_t* sel)
 	sel->n=0;
 	while (isalpha((unsigned char)*(*p))) {
 		if (sel->n > MAX_SELECT_PARAMS -2) {
-			LM_ERR("select depth exceeds max\n");
+			ERR("parse_select: select depth exceeds max\n");
 			goto error;
 		}
 		name.s=(*p);
@@ -108,7 +125,7 @@ int w_parse_select(char**p, select_t* sel)
 		name.len=(*p)-name.s;
 		sel->params[sel->n].type=SEL_PARAM_STR;
 		sel->params[sel->n].v.s=name;
-		LM_DBG("part %d: %.*s\n", sel->n, sel->params[sel->n].v.s.len, sel->params[sel->n].v.s.s);
+		DBG("parse_select: part %d: %.*s\n", sel->n, sel->params[sel->n].v.s.len, sel->params[sel->n].v.s.s);
 		sel->n++;
 		if (*(*p)=='[') {
 			(*p)++; 
@@ -118,33 +135,33 @@ int w_parse_select(char**p, select_t* sel)
 				name.s=(*p);
 				while ((*(*p)!='\0') && (*(*p)!='"')) (*p)++;
 				if (*(*p)!='"') {
-					LM_ERR("end of string is missing\n");
+					ERR("parse_select: end of string is missing\n");
 					goto error;
 				}
 				name.len=(*p)-name.s;
 				if (*((*p)-1)=='\\') name.len--;
 				(*p)++;
 				if (*(*p)!=']') {
-					LM_ERR("invalid string index, no closing ]\n");
+					ERR("parse_select: invalid string index, no closing ]\n");
 					goto error;
 				};
 				(*p)++;
 				sel->params[sel->n].type=SEL_PARAM_STR;
 				sel->params[sel->n].v.s=name;
-				LM_DBG("part %d: [\"%.*s\"]\n", sel->n, sel->params[sel->n].v.s.len, sel->params[sel->n].v.s.s);
+				DBG("parse_select: part %d: [\"%.*s\"]\n", sel->n, sel->params[sel->n].v.s.len, sel->params[sel->n].v.s.s);
 			} else {
 				name.s=(*p);
 				if (*(*p)=='-') (*p)++;
 				while (isdigit((unsigned char)*(*p))) (*p)++;
 				name.len=(*p)-name.s;
 				if (*(*p)!=']') {
-					LM_ERR("invalid index, no closing ]\n");
+					ERR("parse_select: invalid index, no closing ]\n");
 					goto error;
 				};
 				(*p)++;
 				sel->params[sel->n].type=SEL_PARAM_INT;
 				sel->params[sel->n].v.i=atoi(name.s);
-				LM_DBG("part %d: [%d]\n", sel->n, sel->params[sel->n].v.i);
+				DBG("parse_select: part %d: [%d]\n", sel->n, sel->params[sel->n].v.i);
 			}
 			sel->n++;
 		}
@@ -152,12 +169,12 @@ int w_parse_select(char**p, select_t* sel)
 		(*p)++;
 	};
 	if (sel->n==0) {
-		LM_ERR("invalid select '%.*s'\n", (int)(*p - select_name), select_name);
+		ERR("parse_select: invalid select '%.*s'\n", (int)(*p - select_name), select_name);
 		goto error;
 	};
-	LM_DBG("end, total elements: %d, calling resolve_select\n", sel->n);
+	DBG("parse_select: end, total elements: %d, calling resolve_select\n", sel->n);
 	if (resolve_select(sel)<0) {
-		LM_ERR("error while resolve_select '%.*s'\n", (int)(*p - select_name), select_name);
+		ERR("parse_select: error while resolve_select '%.*s'\n", (int)(*p - select_name), select_name);
 		goto error;
 	}
 	return 0;
@@ -203,7 +220,7 @@ int parse_select (char** p, select_t** s)
 	
 	sel=(select_t*)pkg_malloc(sizeof(select_t));
 	if (!sel) {
-		LM_ERR("no free memory\n");
+		ERR("parse_select: no free memory\n");
 		return -1;
 	}
 	memset(sel, 0, sizeof(select_t));
@@ -233,7 +250,7 @@ int shm_parse_select (char** p, select_t** s)
 	
 	sel=(select_t*)shm_malloc(sizeof(select_t));
 	if (!sel) {
-		LM_ERR("no free shared memory\n");
+		ERR("parse_select: no free shared memory\n");
 		return -1;
 	}
 	if (w_parse_select(p, sel)<0) {
@@ -260,10 +277,10 @@ int resolve_select(select_t* s)
 		accept = 0;
 		switch (s->params[param_idx].type) {
 		case SEL_PARAM_STR:
-			LM_DBG("'%.*s'\n", s->params[param_idx].v.s.len, s->params[param_idx].v.s.s);
+			DBG("resolve_select: '%.*s'\n", s->params[param_idx].v.s.len, s->params[param_idx].v.s.s);
 			break;
 		case SEL_PARAM_INT:
-			LM_DBG("[%d]\n", s->params[param_idx].v.i);
+			DBG("resolve_select: [%d]\n", s->params[param_idx].v.i);
 			break;
 		default:
 			/* just to avoid the warning */
@@ -296,10 +313,10 @@ int resolve_select(select_t* s)
 		}
 		switch (s->params[param_idx].type) {
 			case SEL_PARAM_STR:
-				LM_ERR("Unable to resolve select '%.*s' at level %d\n", s->params[param_idx].v.s.len, s->params[param_idx].v.s.s, param_idx);
+				LOG(L_ERR, "Unable to resolve select '%.*s' at level %d\n", s->params[param_idx].v.s.len, s->params[param_idx].v.s.s, param_idx);
 				break;
 			case SEL_PARAM_INT:
-				LM_ERR("Unable to resolve select [%d] at level %d\n", s->params[param_idx].v.i, param_idx);
+				LOG(L_ERR, "Unable to resolve select [%d] at level %d\n", s->params[param_idx].v.i, param_idx);
 				break;
 			default:
 				BUG ("Unable to resolve select at level %d\n", param_idx);
@@ -409,7 +426,7 @@ int run_select(str* res, select_t* s, struct sip_msg* msg)
 		BUG("Select structure has not been resolved\n");
 		return -1;
 	}
-	LM_DBG("Calling SELECT %p\n", s->f);
+	DBG("Calling SELECT %p \n", s->f);
 
 	/* reset the uri pointer */
 	select_uri_p = NULL;
@@ -447,7 +464,7 @@ int register_select_table(select_row_t* mod_tab)
 	select_table_t* t;
 	t=(select_table_t*)pkg_malloc(sizeof(select_table_t));
 	if (!t) {
-		LM_ERR("No memory for new select_table structure\n");
+		ERR("No memory for new select_table structure\n");
 		return -1;
 	}
 

@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * dmq module - distributed message queue
  *
  * Copyright (C) 2011 Bucur Marius - Ovidiu
@@ -17,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -27,8 +29,6 @@
 #include "../../data_lump_rpl.h"
 #include "../../mod_fix.h"
 #include "../../sip_msg_clone.h"
-#include "../../parser/parse_from.h"
-#include "../../parser/parse_to.h"
 
 /**
  * @brief set the body of a response
@@ -37,9 +37,13 @@ static int set_reply_body(struct sip_msg* msg, str* body, str* content_type)
 {
 	char* buf;
 	int len;
+	int value_len;
+	str nb = *body;
+	str nc = *content_type;
 
 	/* add content-type */
-	len=sizeof("Content-Type: ") - 1 + content_type->len + CRLF_LEN;
+	value_len = nc.len;
+	len=sizeof("Content-Type: ") - 1 + value_len + CRLF_LEN;
 	buf=pkg_malloc(sizeof(char)*(len));
 
 	if (buf==0) {
@@ -47,8 +51,8 @@ static int set_reply_body(struct sip_msg* msg, str* body, str* content_type)
 		return -1;
 	}
 	memcpy(buf, "Content-Type: ", sizeof("Content-Type: ") - 1);
-	memcpy(buf+sizeof("Content-Type: ") - 1, content_type->s, content_type->len);
-	memcpy(buf+sizeof("Content-Type: ") - 1 + content_type->len, CRLF, CRLF_LEN);
+	memcpy(buf+sizeof("Content-Type: ") - 1, nc.s, value_len);
+	memcpy(buf+sizeof("Content-Type: ") - 1 + value_len, CRLF, CRLF_LEN);
 	if (add_lump_rpl(msg, buf, len, LUMP_RPL_HDR) == 0) {
 		LM_ERR("failed to insert content-type lump\n");
 		pkg_free(buf);
@@ -57,7 +61,7 @@ static int set_reply_body(struct sip_msg* msg, str* body, str* content_type)
 	pkg_free(buf);
 
 	/* add body */
-	if (add_lump_rpl(msg, body->s, body->len, LUMP_RPL_BODY) == 0) {
+	if (add_lump_rpl(msg, nb.s, nb.len, LUMP_RPL_BODY) == 0) {
 		LM_ERR("cannot add body lump\n");
 		return -1;
 	}
@@ -74,8 +78,6 @@ void worker_loop(int id)
 	dmq_job_t* current_job;
 	peer_reponse_t peer_response;
 	int ret_value;
-	int not_parsed;
-	dmq_node_t *dmq_node = NULL;
 
 	worker = &workers[id];
 	for(;;) {
@@ -90,19 +92,7 @@ void worker_loop(int id)
 			current_job = job_queue_pop(worker->queue);
 			/* job_queue_pop might return NULL if queue is empty */
 			if(current_job) {
-				/* extract the from uri */
-				if (current_job->msg->from->parsed) {
-					not_parsed = 0;
-				} else {
-					not_parsed = 1;
-				}
-				if (parse_from_header(current_job->msg) < 0) {
-					LM_ERR("bad sip message or missing From hdr\n");
-				} else {
-					dmq_node = find_dmq_node_uri(node_list, &((struct to_body*)current_job->msg->from->parsed)->uri);
-				}
-
-				ret_value = current_job->f(current_job->msg, &peer_response, dmq_node);
+				ret_value = current_job->f(current_job->msg, &peer_response);
 				if(ret_value < 0) {
 					LM_ERR("running job failed\n");
 					continue;
@@ -127,10 +117,6 @@ void worker_loop(int id)
 					del_nonshm_lump_rpl(&current_job->msg->reply_lump);
 					pkg_free(peer_response.body.s);
 				}
-				if((current_job->msg->from->parsed)&&(not_parsed)){
-					free_to(current_job->msg->from->parsed);
-				}
-
 				LM_DBG("sent reply\n");
 				shm_free(current_job->msg);
 				shm_free(current_job);
@@ -170,10 +156,6 @@ int add_dmq_job(struct sip_msg* msg, dmq_peer_t* peer)
 	new_job.orig_peer = peer;
 	if(!num_workers) {
 		LM_ERR("error in add_dmq_job: no workers spawned\n");
-		goto error;
-	}
-	if (!workers[0].queue) {
-		LM_ERR("workers not (yet) initialized\n");
 		goto error;
 	}
 	/* initialize the worker with the first one */

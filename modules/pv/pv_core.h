@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2005 FhG Fokus
  * Copyright (C) 2008 Daniel-Constantin Mierla (asipto.com)
  *
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef _PV_CORE_H_
@@ -128,12 +130,6 @@ int pv_get_srcip(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_get_srcport(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res);
-
-int pv_get_srcaddr_uri(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res);
-
-int pv_get_srcaddr_uri_full(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_get_rcvip(struct sip_msg *msg, pv_param_t *param,
@@ -302,7 +298,6 @@ int pv_set_from_display(struct sip_msg* msg, pv_param_t *param,
 /********* end PV set functions *********/
 
 int pv_parse_scriptvar_name(pv_spec_p sp, str *in);
-int pv_parse_scriptvarnull_name(pv_spec_p sp, str *in);
 
 int pv_parse_hdr_name(pv_spec_p sp, str *in);
 
@@ -323,11 +318,6 @@ int pv_parse_flag_param(pv_spec_p sp, str *in);
 int pv_parse__s_name(pv_spec_p sp, str *in);
 
 int pv_get__s(sip_msg_t *msg, pv_param_t *param,
-		pv_value_t *res);
-
-int pv_parse_expires_name(pv_spec_p sp, str *in);
-
-int pv_get_expires(sip_msg_t *msg, pv_param_t *param,
 		pv_value_t *res);
 
 #endif

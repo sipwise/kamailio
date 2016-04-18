@@ -1,3 +1,4 @@
+/* $Id$*/
 
 #ifndef _CRC_H_
 #define _CRC_H_

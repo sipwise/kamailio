@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2009 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,10 +15,19 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * switch.c
+ */
+/*
+ * History:
+ * --------
+ *  2009-02-02  initial version (andrei)
+ *  2009-02-19  string and RE switch support added (andrei)
+*/
 
 /*!
  * \file
- * \brief Kamailio core :: 
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -173,11 +184,11 @@ int fix_switch(struct action* t)
 			rve_destroy(sw_rve);
 			t->val[0].type=BLOCK_ST;
 			t->val[0].u.data=0;
-			LM_DBG("null switch optimized away\n");
+			DBG("SWITCH: null switch optimized away\n");
 		}else{
 			t->type=EVAL_T;
 			t->val[0].type=RVE_ST;
-			LM_DBG("null switch turned to EVAL_T\n");
+			DBG("SWITCH: null switch turned to EVAL_T\n");
 		}
 		return 0;
 	}
@@ -186,16 +197,19 @@ int fix_switch(struct action* t)
 	for (c=(struct case_stms*)t->val[1].u.data; c; c=c->next){
 		if (c->ct_rve){
 			if (c->type!=MATCH_INT){
-				LM_ERR("wrong case type %d (int expected)\n", c->type);
+				LOG(L_ERR, "ERROR: fix_switch: wrong case type %d (int"
+							"expected)\n", c->type);
 				return E_UNSPEC;
 			}
 			if (!rve_is_constant(c->ct_rve)){
-				LM_ERR("non constant expression in case\n");
+				LOG(L_ERR, "ERROR: fix_switch: non constant "
+						"expression in case\n");
 				return E_BUG;
 			}
 			if (rval_expr_eval_int(0, 0,  &c->label.match_int, c->ct_rve)
 					<0){
-				LM_ERR("case expression (%d,%d) has non-interger type\n",
+				LOG(L_ERR, "ERROR: fix_switch: case expression"
+						" (%d,%d) has non-interger type\n",
 						c->ct_rve->fpos.s_line,
 						c->ct_rve->fpos.s_col);
 				return E_BUG;
@@ -204,7 +218,7 @@ int fix_switch(struct action* t)
 			n++; /* count only non-default cases */
 		}else{
 			if (default_found){
-				LM_ERR("more then one \"default\"");
+				LOG(L_ERR, "ERROR: fix_switch: more then one \"default\"");
 				return E_UNSPEC;
 			}
 			default_found=1;
@@ -215,7 +229,7 @@ int fix_switch(struct action* t)
 		if ( c->actions && ((ret=fix_actions(c->actions))<0))
 			goto error;
 	}
-	LM_DBG("%d cases, %d default\n", n, default_found);
+	DBG("SWITCH: %d cases, %d default\n", n, default_found);
 	/*: handle n==0 (no case only a default:) */
 	if (n==0){
 		if (default_found){
@@ -227,14 +241,13 @@ int fix_switch(struct action* t)
 				t->val[0].u.data=def_a;
 				t->val[1].type=0;
 				t->val[1].u.data=0;
-				LM_DBG("default only switch optimized away (BLOCK_T)\n");
+				DBG("SWITCH: default only switch optimized away (BLOCK_T)\n");
 				return 0;
 			}
-			LM_CRIT("default only switch with side-effect not expected at this point\n");
-			ret=E_BUG;
-			goto error;
+			DBG("SWITCH: default only switch with side-effect...\n");
 		}else{
-			LM_CRIT("empty switch not expected at this point\n");
+			LOG(L_CRIT, "BUG: fix_switch: empty switch not expected at this"
+					" point\n");
 			ret=E_BUG;
 			goto error;
 		}
@@ -242,7 +255,7 @@ int fix_switch(struct action* t)
 	cond=pkg_malloc(sizeof(cond[0])*n);
 	jmp_bm=pkg_malloc(sizeof(jmp_bm[0])*n);
 	if (cond==0 || jmp_bm==0){
-		LM_ERR("memory allocation failure\n");
+		LOG(L_ERR, "ERROR: fix_switch: memory allocation failure\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -267,7 +280,7 @@ int fix_switch(struct action* t)
 		} else {
 			for (j=0; j<n; j++){
 				if (cond[j]==c->label.match_int){
-					LM_ERR("duplicate case (%d,%d)\n",
+					LOG(L_ERR, "ERROR: fix_switch: duplicate case (%d,%d)\n",
 							c->ct_rve->fpos.s_line, c->ct_rve->fpos.s_col);
 					ret=E_UNSPEC;
 					goto error;
@@ -285,7 +298,8 @@ int fix_switch(struct action* t)
 	if ( (scr_opt_lev>=2) &&
 			!rve_has_side_effects(sw_rve) && rve_is_constant(sw_rve)){
 		if (rval_expr_eval_int(0, 0,  &val, sw_rve) <0){
-			LM_ERR("wrong type for switch(...) expression (%d,%d)\n", 
+			LOG(L_ERR, "ERROR: fix_switch: wrong type for switch(...) "
+					"expression (%d,%d)\n", 
 					sw_rve->fpos.s_line, sw_rve->fpos.s_col);
 			ret=E_UNSPEC;
 			goto error;
@@ -306,7 +320,7 @@ int fix_switch(struct action* t)
 		t->val[1].type=0;
 		t->val[1].u.data=0;
 		ret=0;
-		LM_DBG("constant switch(%d) with %d cases optimized away to case"
+		DBG("SWITCH: constant switch(%d) with %d cases optimized away to case "
 				" %d \n", val, n, i);
 		goto end;
 	}
@@ -341,7 +355,7 @@ int fix_switch(struct action* t)
 		 with a n-best_hits normal switch table */
 		jmp=mk_switch_jmp_table(end-start+1, n-best_hits);
 		if (jmp==0){
-			LM_ERR("memory allocation error\n");
+			LOG(L_ERR, "ERROR: fix_switch: memory allocation error\n");
 			ret=E_OUT_OF_MEM;
 			goto error;
 		}
@@ -365,13 +379,13 @@ int fix_switch(struct action* t)
 		t->val[1].type=JUMPTABLE_ST;
 		t->val[1].u.data=jmp;
 		ret=0;
-		LM_DBG("optimized to jumptable [%d, %d] and %d condtable,"
-				" default: %s\n ",
+		DBG("SWITCH: optimized to jumptable [%d, %d] and %d condtable,"
+				"default: %s\n ",
 				jmp->first, jmp->last, jmp->rest.n, jmp->rest.def?"yes":"no");
 	}else{
 		sct=mk_switch_cond_table(n);
 		if (sct==0){
-			LM_ERR("memory allocation error\n");
+			LOG(L_ERR, "ERROR: fix_switch: memory allocation error\n");
 			ret=E_OUT_OF_MEM;
 			goto error;
 		}
@@ -384,7 +398,7 @@ int fix_switch(struct action* t)
 		t->type=SWITCH_COND_T;
 		t->val[1].type=CONDTABLE_ST;
 		t->val[1].u.data=sct;
-		LM_DBG("optimized to condtable (%d) default: %s\n",
+		DBG("SWITCH: optimized to condtable (%d) default: %s\n ",
 				sct->n, sct->def?"yes":"no");
 		ret=0;
 	}
@@ -441,11 +455,11 @@ static int fix_match(struct action* t)
 			rve_destroy(m_rve);
 			t->val[0].type=BLOCK_ST;
 			t->val[0].u.data=0;
-			LM_DBG("null switch optimized away\n");
+			DBG("MATCH: null switch optimized away\n");
 		}else{
 			t->type=EVAL_T;
 			t->val[0].type=RVE_ST;
-			LM_DBG("null switch turned to EVAL_T\n");
+			DBG("MATCH: null switch turned to EVAL_T\n");
 		}
 		return 0;
 	}
@@ -454,24 +468,26 @@ static int fix_match(struct action* t)
 	for (c=(struct case_stms*)t->val[1].u.data; c; c=c->next){
 		if (c->ct_rve){
 			if (c->type!=MATCH_STR && c->type!=MATCH_RE){
-				LM_ERR("wrong case type %d (string"
+				LOG(L_ERR, "ERROR: fix_match: wrong case type %d (string"
 							"or RE expected)\n", c->type);
 				return E_UNSPEC;
 			}
 			if (!rve_is_constant(c->ct_rve)){
-				LM_ERR("non constant expression in case\n");
+				LOG(L_ERR, "ERROR: fix_match: non constant "
+						"expression in case\n");
 				ret=E_BUG;
 				goto error;
 			}
 			if ((rv=rval_expr_eval(0, 0, c->ct_rve)) == 0 ){
-				LM_ERR("bad case expression (%d,%d)\n",
+				LOG(L_ERR, "ERROR: fix_match: bad case expression"
+						" (%d,%d)\n",
 						c->ct_rve->fpos.s_line,
 						c->ct_rve->fpos.s_col);
 				ret=E_BUG;
 				goto error;
 			}
 			if (rval_get_str(0, 0, &s, rv, 0)<0){
-				LM_ERR("(%d,%d): out of memory?\n",
+				LOG(L_ERR, "ERROR: fix_match (%d,%d): out of memory?\n",
 						c->ct_rve->fpos.s_line,
 						c->ct_rve->fpos.s_col);
 				ret=E_BUG;
@@ -479,7 +495,7 @@ static int fix_match(struct action* t)
 			}
 			if (c->type==MATCH_RE){
 				if ((regex=pkg_malloc(sizeof(regex_t))) == 0){
-					LM_ERR("out of memory\n");
+					LOG(L_ERR, "ERROR: fix_match: out of memory\n");
 					ret=E_OUT_OF_MEM;
 					goto error;
 				}
@@ -487,7 +503,8 @@ static int fix_match(struct action* t)
 							REG_EXTENDED | REG_NOSUB | c->re_flags) !=0){
 					pkg_free(regex);
 					regex=0;
-					LM_ERR("(%d, %d): bad regular expression %.*s\n",
+					LOG(L_ERR, "ERROR: fix_match (%d, %d): bad regular"
+								" expression %.*s\n",
 							c->ct_rve->fpos.s_line,
 							c->ct_rve->fpos.s_col,
 							s.len, ZSW(s.s));
@@ -501,7 +518,7 @@ static int fix_match(struct action* t)
 				s.s=0;
 				s.len=0;
 			}else{
-				LM_CRIT("(%d,%d): wrong case type %d\n",
+				LOG(L_CRIT, "BUG: fix_match (%d,%d): wrong case type %d\n",
 						c->ct_rve->fpos.s_line, c->ct_rve->fpos.s_col,
 						c->type);
 				ret=E_BUG;
@@ -519,7 +536,8 @@ static int fix_match(struct action* t)
 			}
 		}else{
 			if (default_found){
-				LM_ERR("more then one \"default\" label found (%d, %d)\n",
+				LOG(L_ERR, "ERROR: fix_match: more then one \"default\""
+						" label found (%d, %d)\n",
 						(c->ct_rve)?c->ct_rve->fpos.s_line:0,
 						(c->ct_rve)?c->ct_rve->fpos.s_col:0);
 				ret=E_UNSPEC;
@@ -532,7 +550,7 @@ static int fix_match(struct action* t)
 		if ( c->actions && ((ret=fix_actions(c->actions))<0))
 			goto error;
 	}
-	LM_DBG("%d cases, %d default\n", n, default_found);
+	DBG("MATCH: %d cases, %d default\n", n, default_found);
 	/*: handle n==0 (no case only a default:) */
 	if (n==0){
 		if (default_found){
@@ -544,14 +562,13 @@ static int fix_match(struct action* t)
 				t->val[0].u.data=def_a;
 				t->val[1].type=0;
 				t->val[1].u.data=0;
-				LM_DBG("default only switch optimized away (BLOCK_T)\n");
+				DBG("MATCH: default only switch optimized away (BLOCK_T)\n");
 				return 0;
 			}
-			LM_CRIT("default only switch with side-effect not expected at this point\n");
-			ret=E_BUG;
-			goto error;
+			DBG("MATCH: default only switch with side-effect...\n");
 		}else{
-			LM_CRIT("empty switch not expected at this point\n");
+			LOG(L_CRIT, "BUG: fix_match: empty switch not expected at this"
+					" point\n");
 			ret=E_BUG;
 			goto error;
 		}
@@ -560,7 +577,7 @@ static int fix_match(struct action* t)
 	match=pkg_malloc(sizeof(match[0])*n);
 	jmp_bm=pkg_malloc(sizeof(jmp_bm[0])*n);
 	if (match==0 || jmp_bm==0){
-		LM_ERR("memory allocation failure\n");
+		LOG(L_ERR, "ERROR: fix_match: memory allocation failure\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -590,8 +607,8 @@ static int fix_match(struct action* t)
 						 match[j].l.s.len ==  c->label.match_str.len &&
 						 memcmp(match[j].l.s.s, c->label.match_str.s,
 							 		match[j].l.s.len) == 0 ){
-						LM_ERR("duplicate case (%d,%d)\n",
-								c->ct_rve->fpos.s_line,
+						LOG(L_ERR, "ERROR: fix_match: duplicate case"
+								" (%d,%d)\n", c->ct_rve->fpos.s_line,
 								c->ct_rve->fpos.s_col);
 						ret=E_UNSPEC;
 						goto error;
@@ -617,13 +634,13 @@ static int fix_match(struct action* t)
 	if ( (scr_opt_lev>=2) &&
 			!rve_has_side_effects(m_rve) && rve_is_constant(m_rve)){
 		if ((rv=rval_expr_eval(0, 0, m_rve)) == 0){
-			LM_ERR("bad expression (%d,%d)\n", 
+			LOG(L_ERR, "ERROR: fix_match: bad expression (%d,%d)\n", 
 					m_rve->fpos.s_line, m_rve->fpos.s_col);
 			ret=E_UNSPEC;
 			goto error;
 		}
 		if (rval_get_str(0, 0, &s, rv, 0) < 0 ){
-				LM_ERR("(%d,%d): bad string expression\n",
+				LOG(L_ERR, "ERROR: fix_match (%d,%d): bad string expression\n",
 						m_rve->fpos.s_line,
 						m_rve->fpos.s_col);
 			ret=E_UNSPEC;
@@ -640,7 +657,7 @@ static int fix_match(struct action* t)
 				break;
 			}
 		}
-		LM_DBG("constant switch(\"%.*s\") with %d cases optimized away"
+		DBG("MATCH: constant switch(\"%.*s\") with %d cases optimized away"
 				" to case no. %d\n", s.len, ZSW(s.s), n, i);
 		/* cleanup */
 		rval_destroy(rv);
@@ -661,7 +678,7 @@ static int fix_match(struct action* t)
 	}
 	mct=mk_match_cond_table(n);
 	if (mct==0){
-		LM_ERR("memory allocation error\n");
+		LOG(L_ERR, "ERROR: fix_match: memory allocation error\n");
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -674,7 +691,7 @@ static int fix_match(struct action* t)
 	t->type=MATCH_COND_T;
 	t->val[1].type=MATCH_CONDTABLE_ST;
 	t->val[1].u.data=mct;
-	LM_DBG("optimized to match condtable (%d) default: %s\n",
+	DBG("MATCH: optimized to match condtable (%d) default: %s\n ",
 				mct->n, mct->def?"yes":"no");
 		ret=0;
 end:

@@ -93,46 +93,6 @@ modparam("utils", "http_query_timeout", 2)
 				</programlisting>
 			</example>
 		</section>
-		<section id="utils.p.http_response_mode">
-			<title><varname>http_response_mode</varname> (int)</title>
-			<para>
-			Control what part of the HTTP reponse is returned: only
-			first line (for value 0), or all response (for value 1).
-			</para>
-			<para>
-			<emphasis>
-				Default value is 0 (return only the first line).
-			</emphasis>
-			</para>
-			<example>
-			<title>Set <varname>http_response_mode</varname> parameter</title>
-				<programlisting format="linespecific">
-...
-modparam("utils", "http_response_mode", 1)
-...
-				</programlisting>
-			</example>
-		</section>
-		<section id="utils.p.http_response_trim">
-			<title><varname>http_response_trim</varname> (int)</title>
-			<para>
-			Control if white space, tab and end of line characters should be
-			trimmed from leading and trailing parts of HTTP response.
-			</para>
-			<para>
-			<emphasis>
-				Default value is 0 (don't trim).
-			</emphasis>
-			</para>
-			<example>
-			<title>Set <varname>http_response_trim</varname> parameter</title>
-				<programlisting format="linespecific">
-...
-modparam("utils", "http_response_trim", 1)
-...
-				</programlisting>
-			</example>
-		</section>
 		<section id="utils.p.forward_active">
 			<title><varname>forward_active</varname> (int)</title>
 			<para>
@@ -198,7 +158,7 @@ modparam("utils", "xcap_table", "pres_xcap")
 	<title>Functions</title>
 		<section id="utils.f.http_query">
 			<title>
-				<function moreinfo="none">http_query(url, [post-data], [header-data], result)</function>
+				<function moreinfo="none">http_query(url, [post-data], result)</function>
 			</title>
 			<para>
 			Sends HTTP GET or POST request according to URL given in
@@ -208,17 +168,10 @@ modparam("utils", "xcap_table", "pres_xcap")
 			<para>
 			If you want to make a POST-Request, you have to define
 			the <quote>post</quote>-data, that should be submitted
-			in that request as the second parameter. If this
-			parameter is empty, it is not set.
-	    	        </para>
-			<para>
-			If you want to add additional headers to the request, 
-			you have to define the <quote>header</quote>-data,
-			that should be submitted in that request as the third
-			parameter. If this parameter is empty, it is not set.
+			in that request as the second parameter.
 	    	        </para>
 		        <para>
-			If HTTP server returns a class 2xx, 3xx or 4xx reply,
+			If HTTP server returns a class 2xx or 3xx reply,
 			the first line of the reply's body (if any) is
 			stored in <quote>result</quote> parameter,
 			which must be a	writable pseudo	variable.
@@ -247,16 +200,6 @@ switch ($retcode) {
 ...
 # POST-Request
 http_query("http://tutpro.com/index.php", "r_uri=$(ru{s.escape.param})&amp;f_uri=$(fu{s.escape.param})",
-           "$var(result)")
-switch ($retcode) {
-       ...
-}
-...
-				</programlisting>
-				<programlisting format="linespecific">
-...
-# GET-Request with additional headers and Post-Data.
-http_query("http://tutpro.com/index.php", "{ "alert": "Alert text goes here" }", "Content-Type: application/json"
            "$var(result)")
 switch ($retcode) {
        ...

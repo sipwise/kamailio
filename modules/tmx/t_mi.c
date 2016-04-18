@@ -1,4 +1,6 @@
 /*
+ * $Id: mi.c 5299 2008-12-04 18:12:33Z henningw $
+ *
  * Header file for TM MI functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -18,12 +20,15 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2006-12-04  created (bogdan)
  */
 
 /*! \file
- * \brief TMX :: MI functions
+ * \brief TM :: MI functions
  *
  * \ingroup tm
  * - Module: \ref tm
@@ -228,10 +233,6 @@ static inline char *get_hfblock( str *uri, struct hdr_field *hf, int *l, struct 
 		LM_DBG("one more hf processed\n");
 	} /* header loop */
 
-	if(total_len==0) {
-		LM_DBG("empty result\n");
-		goto error;
-	}
 
 	/* construct a single header block now */
 	ret=pkg_malloc(total_len);

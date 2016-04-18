@@ -1,4 +1,6 @@
 /*
+ * $Id: pv_shv.h 5291 2008-12-03 16:47:50Z miconda $
+ *
  * Copyright (C) 2007 Elena-Ramona Modroiu
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -25,14 +27,10 @@
 #include "../../pvar.h"
 
 int pv_parse_time_name(pv_spec_p sp, str *in);
-int pv_get_local_time(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res);
-int pv_get_utc_time(struct sip_msg *msg, pv_param_t *param,
+int pv_get_time(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 int pv_parse_strftime_name(pv_spec_p sp, str *in);
-int pv_get_local_strftime(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res);
-int pv_get_utc_strftime(struct sip_msg *msg, pv_param_t *param,
+int pv_get_strftime(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 int pv_get_timenows(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);

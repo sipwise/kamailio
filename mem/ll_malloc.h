@@ -1,8 +1,7 @@
-/*
+/* $Id$
+ *
  * shared memory, multi-process safe, pool based, mostly lockless version of 
  *  f_malloc
- *
- * This file is part of Kamailio, a free SIP server.
  *
  * Copyright (C) 2007 iptelorg GmbH
  *
@@ -18,6 +17,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ * History:
+ * --------
+ *  2003-05-21  on sparc64 roundto 8 even in debugging mode (so malloc'ed
+ *               long longs will be 64 bit aligned) (andrei)
+ *  2004-07-19  support for 64 bit (2^64 mem. block) and more info
+ *               for the future de-fragmentation support (andrei)
+ *  2004-11-10  support for > 4Gb mem., switched to long (andrei)
+ *  2007-06-11  forked from the sf_malloc code (andrei)
+ */
+
 
 #if !defined(ll_malloc_h)  
 #define ll_malloc_h
@@ -121,7 +131,6 @@ struct sfm_block{
 	gen_lock_t lock;
 #endif
 	atomic_t crt_id; /* current pool */
-	int type; /* type of pool */
 	unsigned long size; /* total size */
 	/* stats are kept now per bucket */
 	struct sfm_frag* first_frag;
@@ -136,7 +145,7 @@ struct sfm_block{
 
 
 
-struct sfm_block* sfm_malloc_init(char* address, unsigned long size, int type);
+struct sfm_block* sfm_malloc_init(char* address, unsigned long size);
 void sfm_malloc_destroy(struct sfm_block* qm);
 int sfm_pool_reset();
 

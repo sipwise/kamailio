@@ -1,6 +1,8 @@
 /*
  * fast pseudo random generation 
  *
+ * $Id$
+ *
  * Copyright (C) 2007 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any

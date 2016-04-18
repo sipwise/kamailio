@@ -121,11 +121,6 @@
 				<emphasis>RR</emphasis> - Record-Route module
 			</para>
 			</listitem>
-			<listitem>
-			<para>
-				<emphasis>PV</emphasis> - Pseudovariables module
-			</para>
-			</listitem>
 			</itemizedlist>
 		</para>
 	</section>
@@ -472,7 +467,7 @@ modparam("dialog", "db_update_period", 120)
 		<para>
 			The number of the rows to be fetched at once from database when loading the dialog records at startup from the database.
 			This value can be used to tune the load time at startup. For 1MB of private memory (default), it should be below 400.
-			The database driver must support the fetch_result() capability. A value of 0 means the database fetch is not limited.
+			The database driver must support the fetch_result() capability. A value of 0 means the functionality is disabled.
 		</para>
 		<para>
 		<emphasis>
@@ -488,28 +483,6 @@ modparam("dialog", "db_fetch_rows", 500)
 </programlisting>
 		</example>
 	</section>
-
-<section>
-		<title><varname>db_skip_load</varname> (integer)</title>
-		<para>
-			Set db_skip_load to 1, to skip the loading of dialogs from the database alltogether.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote> ( not skipped ).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>db_skip_load</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("dialog", "db_skip_load", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-
 
 	<section>
 		<title><varname>table_name</varname> (string)</title>
@@ -1262,99 +1235,6 @@ modparam("dialog", "ka_interval", 300)
 		</example>
 	</section>
 
-	<section>
-		<title><varname>timeout_noreset</varname> (int)</title>
-		<para>
-           If set to 1, the dialog timeout won't be reset each
-			time a sequential request is processed.
-			It is an alternative to dlg_set_property("timeout-noreset") for all dialogs.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>timeout_noreset</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("dialog", "timeout_noreset", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="dialog.p.timer_procs">
-		<title><varname>timer_procs</varname> (int)</title>
-		<para>
-			If set to 1, the dialog will run own timer process to execute
-			dialog timeout tasks.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote> (use core time process).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>timer_procs</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("dialog", "timer_procs", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="dialog.p.track_cseq_updates">
-		<title><varname>track_cseq_updates</varname> (int)</title>
-		<para>
-			Enable the callbacks for tracking if CSeq number needs to
-			be updated. It is the case when the INVITE has to be
-			authenticated to downstream provider using uac_auth() from
-			uac module.
-		</para>
-		<para>
-			This is done only for requests in downstream direction. The
-			CSeq difference is stored in $dlg_var(cseq_diff), be sure
-			this variable is not overwritten via config operation.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote> (disabled).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>track_cseq_updates</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("dialog", "track_cseq_updates", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-	<section id="dialog.p.lreq_callee_headers">
-		<title><varname>lreq_callee_headers</varname> (string)</title>
-		<para>
-			SIP headers to be added when sending local generated requests
-			(e.g., BYE) to callee. It can be useful when you use topoh module
-			with call-id masking (see the docs of topoh module).
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>null</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>lreq_callee_headers</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("dialog", "lreq_callee_headers", "TH: dlh\r\n")
-...
-</programlisting>
-		</example>
-	</section>
-
 	</section>
 
 
@@ -1922,17 +1802,8 @@ dlg_set_timeout_by_profile("users", "abc123", "3");
 		<itemizedlist>
 		<listitem>
 			<para><emphasis>attr</emphasis> - name of property. It can be:
-				<itemizedlist>
-					<listitem>
-						'ka-src' - send keep alive OPTION requests to caller
-					</listitem>
-					<listitem>
-						'ka-dst' - send keep alive OPTION requests to callee
-					</listitem>
-					<listitem>
-						'timeout-noreset' - don't reset timeout on in-dialog messages reception
-					</listitem>
-				</itemizedlist>
+				'ka-src' - send keep alive OPTION requests to caller;
+				'ka-dst' - send keep alive OPTION requests to callee.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -1942,11 +1813,7 @@ dlg_set_timeout_by_profile("users", "abc123", "3");
 			within dialog, with the scope of detecting if the destination is
 			still in the call. If the keep alive request results in a local
 			timeout or '481 Call Leg/Transaction Does Not Exist', then the
-            dialog is ended from the server.
-		</para>
-		<para>
-            If 'timeout-noreset' is set, dialog timeout won't be reset upon reception
-            of in-dialog messages (default behavior).
+			dialog is ended from the server.
 		</para>
 		<para>
 		This function can be used from ANY_ROUTE.
@@ -1957,63 +1824,11 @@ dlg_set_timeout_by_profile("users", "abc123", "3");
 ...
 dlg_set_property("ka-src");
 dlg_set_property("ka-dst");
-dlg_set_property("timeout-noreset");
 ...
 </programlisting>
 		</example>
 	</section>
 
-	<section id="dialog.f.dlg_remote_profile">
-		<title>
-		<function moreinfo="none">dlg_remote_profile(cmd, profile, value, uid, expires)</function>
-		</title>
-		<para>
-			Manage remote profile via config file. A remote profile item is considered when
-			the dialog is not managed by this server instance. The notification to add/remove
-			can be received via SIP or a RPC command, the operation can be then triggered
-			from configuration file. This should allow counting active dialogs in a profile
-			that are managed by multiple SIP server instances.
-		</para>
-		<para>Meaning of the parameters is as follows:</para>
-		<itemizedlist>
-		<listitem>
-			<para>
-				<emphasis>cmd</emphasis> - the operations to do: add - add an item in
-				profile; rm - remove an item from profile
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				<emphasis>profile</emphasis> - name of profile
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				<emphasis>value</emphasis> - value for profile (if no value is needed
-				for that profile, use an empty string.
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				<emphasis>expires</emphasis> - absolute time (unix timestamp) when this
-				profile item should be removed automatically (time based),
-				if still in the profile
-			</para>
-		</listitem>
-		</itemizedlist>
-		<para>
-		This function can be used from ANY_ROUTE.
-		</para>
-		<example>
-		<title><function>dlg_remote_profile</function> usage</title>
-		<programlisting format="linespecific">
-...
-$var(exp) = 3600 + $Ts;
-dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
-...
-</programlisting>
-		</example>
-	</section>
 	</section>
 
 

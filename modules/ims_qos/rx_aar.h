@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  *
  *
@@ -71,18 +71,11 @@ typedef struct saved_transaction {
         str callid;
         str ftag;
         str ttag;
-	unsigned int aar_update;
 } saved_transaction_t;
 
 typedef struct saved_transaction_local {
 	int is_rereg;
-        str contact;                /* contact AOR */
-	str via_host;                   /* host address of UE - first via for REQUEST, last via for REPLY */
-        unsigned short via_port;        /* port of UE based on VIA */
-        unsigned short via_proto;       /* via proto */
-        str recv_host;                   /* host address of UE - first via for REQUEST, last via for REPLY */
-        unsigned short recv_port;        /* port of UE based on VIA */
-        unsigned short recv_proto;       /* via proto */
+	str contact;
 	str auth_session_id;
 	saved_transaction_t* global_data;
 } saved_transaction_local_t;
@@ -104,13 +97,9 @@ void free_saved_transaction_global_data(saved_transaction_t* data);
 //AAAMessage *rx_send_aar(struct sip_msg *req, struct sip_msg *res, AAASession* auth, str *callid, str *ftag, str *ttag, char *direction, rx_authsessiondata_t **rx_authdata);
 int rx_send_aar(struct sip_msg *req, struct sip_msg *res, AAASession* auth, char *direction, saved_transaction_t* saved_t_data);
 
-//send AAR to remove video after failed AAR update that added video
-int rx_send_aar_update_no_video(AAASession* auth);
-
-
 //TODOD remove - no longer user AOR parm
 //int rx_send_aar_register(struct sip_msg *msg, AAASession* auth, str *ip_address, uint16_t *ip_version, str *aor, saved_transaction_local_t* saved_t_data);
-int rx_send_aar_register(struct sip_msg *msg, AAASession* auth, saved_transaction_local_t* saved_t_data);
+int rx_send_aar_register(struct sip_msg *msg, AAASession* auth, str *ip_address, uint16_t *ip_version, saved_transaction_local_t* saved_t_data);
 
 int rx_process_aaa(AAAMessage *aaa, unsigned int * rc);
 enum dialog_direction get_dialog_direction(char *direction);

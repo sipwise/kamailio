@@ -1,4 +1,5 @@
-/*
+/**
+ * $Id$
  *
  * Copyright (C) 2011 Flowroute LLC (flowroute.com)
  *
@@ -17,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -48,8 +49,6 @@ int        fixup_pvar_shm(void** param, int param_no);
 char *servers_param;
 int  pipe_fds[2] = {-1,-1};
 
-extern int _jsonrpcc_max_conn_retry; /* max retries to connect */
-
 struct tm_binds tmb;
 
 /*
@@ -66,8 +65,7 @@ static cmd_export_t cmds[]={
  * Script Parameters
  */
 static param_export_t mod_params[]={
-	{"servers", PARAM_STRING, &servers_param},
-	{"max_conn_attempts", INT_PARAM, &_jsonrpcc_max_conn_retry},
+	{"servers", STR_PARAM, &servers_param},
 	{ 0,0,0 }
 };
 

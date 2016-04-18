@@ -1,28 +1,63 @@
+
 /*
+ * $Id$
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ---------
+ *  2003-02-28  scratchpad compatibility abandoned (jiri)
+ *  2003-01-29  removed scratchpad (jiri)
+ *  2003-03-19  fixed set* len calculation bug & simplified a little the code
+ *              (should be a little faster now) (andrei)
+ *              replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
+ *  2003-04-01  Added support for loose routing in forward (janakj)
+ *  2003-04-12  FORCE_RPORT_T added (andrei)
+ *  2003-04-22  strip_tail added (jiri)
+ *  2003-10-02  added SET_ADV_ADDR_T & SET_ADV_PORT_T (andrei)
+ *  2003-10-29  added FORCE_TCP_ALIAS_T (andrei)
+ *  2004-11-30  added FORCE_SEND_SOCKET_T (andrei)
+ *  2005-12-12  return & drop/exit differentiation (andrei)
+ *  2005-12-19  select framework (mma)
+ *  2006-04-12  updated *_send() calls to use a struct dest_info (andrei)
+ *  2006-07-27  dns cache and dns based send address failover support (andrei)
+ *  2006-12-06  on popular request last_retcode set also by module functions
+ *              (andrei)
+ *  2007-06-14  run_actions & do_action need a ctx or handle now, no more
+ *               static vars (andrei)
+ *  2008-11-18  support for variable parameter module functions (andrei)
+ *  2008-12-03  use lvalues/rvalues for assignments (andrei)
+ *  2008-12-17  added UDP_MTU_TRY_PROTO_T (andrei)
+ *  2009-05-04  switched IF_T to rval_expr (andrei)
+ *  2009-09-15  added SET_{FWD,RPL}_NO_CONNECT, SET_{FWD,RPL}_CLOSE (andrei)
+ *  2010-06-01  special hack/support for fparam fixups so that they can handle
+ *               variable RVEs (andrei)
  */
 
 /*!
  * \file
- * \brief Kamailio core :: Config file actions
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -49,7 +84,6 @@
 #include "globals.h"
 #include "dset.h"
 #include "onsend.h"
-#include "fmsg.h"
 #include "resolve.h"
 #ifdef USE_TCP
 #include "tcp_server.h"
@@ -79,14 +113,6 @@ struct onsend_info* p_onsend=0; /* onsend route send info */
 
 /* current action executed from config file */
 static cfg_action_t *_cfg_crt_action = 0;
-
-/*!< maximum number of recursive calls for blocks of actions */
-static unsigned int max_recursive_level = 256;
-
-void set_max_recursive_level(unsigned int lev)
-{
-	max_recursive_level = lev;
-}
 
 /* return current action executed from config file */
 cfg_action_t *get_cfg_crt_action(void)
@@ -392,7 +418,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 				}
 
 				if (ret<0) {
-					LM_ERR("forward: bad_uri dropping packet\n");
+					LOG(L_ERR, "ERROR: do_action: forward: bad_uri "
+								" dropping packet\n");
 					goto error;
 				}
 
@@ -404,7 +431,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 									port=a->val[1].u.number;
 									break;
 					default:
-							LM_CRIT("bad forward 2nd param type (%d)\n", a->val[1].type);
+							LOG(L_CRIT, "BUG: do_action bad forward 2nd"
+										" param type (%d)\n", a->val[1].type);
 							ret=E_UNSPEC;
 							goto error_fwd_uri;
 				}
@@ -430,14 +458,16 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 							dst.proto=u->proto;
 							break;
 						default:
-							LM_ERR("forward: bad uri transport %d\n", u->proto);
+							LOG(L_ERR,"ERROR: do action: forward: bad uri"
+									" transport %d\n", u->proto);
 							ret=E_BAD_PROTO;
 							goto error_fwd_uri;
 					}
 #ifdef USE_TLS
 					if (u->type==SIPS_URI_T){
 						if (u->proto==PROTO_UDP){
-							LM_ERR("forward: secure uri incompatible with transport %d\n",
+							LOG(L_ERR, "ERROR: do_action: forward: secure uri"
+									" incompatible with transport %d\n",
 									u->proto);
 							ret=E_BAD_PROTO;
 							goto error_fwd_uri;
@@ -474,7 +504,7 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					proxy_mark((struct proxy_l*)a->val[0].u.data, ret);
 				}
 			}else{
-				LM_CRIT("bad forward() types %d, %d\n",
+				LOG(L_CRIT, "BUG: do_action: bad forward() types %d, %d\n",
 						a->val[0].type, a->val[1].type);
 				ret=E_BUG;
 				goto error;
@@ -482,7 +512,7 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			break;
 		case LOG_T:
 			if ((a->val[0].type!=NUMBER_ST)|(a->val[1].type!=STRING_ST)){
-				LM_CRIT("bad log() types %d, %d\n",
+				LOG(L_CRIT, "BUG: do_action: bad log() types %d, %d\n",
 						a->val[0].type, a->val[1].type);
 				ret=E_BUG;
 				goto error;
@@ -495,7 +525,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 		/* jku -- introduce a new branch */
 		case APPEND_BRANCH_T:
 			if (unlikely(a->val[0].type!=STR_ST)) {
-				LM_CRIT("bad append_branch_t %d\n", a->val[0].type );
+				LOG(L_CRIT, "BUG: do_action: bad append_branch_t %d\n",
+					a->val[0].type );
 				ret=E_BUG;
 				goto error;
 			}
@@ -529,11 +560,12 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 		/* jku begin: is_length_greater_than */
 		case LEN_GT_T:
 			if (a->val[0].type!=NUMBER_ST) {
-				LM_CRIT("bad len_gt type %d\n", a->val[0].type );
+				LOG(L_CRIT, "BUG: do_action: bad len_gt type %d\n",
+					a->val[0].type );
 				ret=E_BUG;
 				goto error;
 			}
-			/* LM_DBG("message length %d, max %d\n",
+			/* DBG("XXX: message length %d, max %d\n",
 				msg->len, a->val[0].u.number ); */
 			ret = msg->len >= a->val[0].u.number ? 1 : -1;
 			break;
@@ -543,7 +575,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 
 		case SETFLAG_T:
 			if (a->val[0].type!=NUMBER_ST) {
-				LM_CRIT("bad setflag() type %d\n", a->val[0].type );
+				LOG(L_CRIT, "BUG: do_action: bad setflag() type %d\n",
+					a->val[0].type );
 				ret=E_BUG;
 				goto error;
 			}
@@ -557,7 +590,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 
 		case RESETFLAG_T:
 			if (a->val[0].type!=NUMBER_ST) {
-				LM_CRIT("bad resetflag() type %d\n", a->val[0].type );
+				LOG(L_CRIT, "BUG: do_action: bad resetflag() type %d\n",
+					a->val[0].type );
 				ret=E_BUG;
 				goto error;
 			}
@@ -571,7 +605,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 
 		case ISFLAGSET_T:
 			if (a->val[0].type!=NUMBER_ST) {
-				LM_CRIT("bad isflagset() type %d\n", a->val[0].type );
+				LOG(L_CRIT, "BUG: do_action: bad isflagset() type %d\n",
+					a->val[0].type );
 				ret=E_BUG;
 				goto error;
 			}
@@ -627,11 +662,12 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			break;
 		case ERROR_T:
 			if ((a->val[0].type!=STRING_ST)|(a->val[1].type!=STRING_ST)){
-				LM_CRIT("bad error() types %d, %d\n", a->val[0].type, a->val[1].type);
+				LOG(L_CRIT, "BUG: do_action: bad error() types %d, %d\n",
+						a->val[0].type, a->val[1].type);
 				ret=E_BUG;
 				goto error;
 			}
-			LM_NOTICE("error(\"%s\", \"%s\") "
+			LOG(L_NOTICE, "WARNING: do_action: error(\"%s\", \"%s\") "
 					"not implemented yet\n", a->val[0].u.string, a->val[1].u.string);
 			ret=1;
 			break;
@@ -663,12 +699,13 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 				rval_cache_clean(&c1);
 				s.s = 0;
 			} else {
-				LM_CRIT("bad route() type %d\n", a->val[0].type);
+				LOG(L_CRIT, "BUG: do_action: bad route() type %d\n",
+						a->val[0].type);
 				ret=E_BUG;
 				goto error;
 			}
 			if (unlikely((i>=main_rt.idx)||(i<0))){
-				LM_ERR("invalid routing table number in"
+				LOG(L_ERR, "ERROR: invalid routing table number in"
 							"route(%lu) at %s:%d\n", a->val[0].u.number,
 							(a->cfile)?a->cfile:"line", a->cline);
 				ret=E_CFG;
@@ -682,15 +719,16 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			break;
 		case EXEC_T:
 			if (a->val[0].type!=STRING_ST){
-				LM_CRIT("bad exec() type %d\n", a->val[0].type);
+				LOG(L_CRIT, "BUG: do_action: bad exec() type %d\n",
+						a->val[0].type);
 				ret=E_BUG;
 				goto error;
 			}
-			LM_NOTICE("exec(\"%s\") not fully implemented,"
+			LOG(L_NOTICE, "WARNING: exec(\"%s\") not fully implemented,"
 						" using dumb version...\n", a->val[0].u.string);
 			ret=system(a->val[0].u.string);
 			if (ret!=0){
-				LM_NOTICE("exec() returned %d\n", ret);
+				LOG(L_NOTICE, "WARNING: exec() returned %d\n", ret);
 			}
 			ret=1;
 			break;
@@ -719,13 +757,15 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 				user=0;
 				if (a->type==STRIP_T || a->type==STRIP_TAIL_T) {
 					if (a->val[0].type!=NUMBER_ST) {
-						LM_CRIT("bad set*() type %d\n", a->val[0].type);
+						LOG(L_CRIT, "BUG: do_action: bad set*() type %d\n",
+							a->val[0].type);
 						ret=E_BUG;
 						goto error;
 					}
 				} else if (a->type!=SET_USERPHONE_T) {
 					if (a->val[0].type!=STRING_ST) {
-						LM_CRIT("bad set*() type %d\n", a->val[0].type);
+						LOG(L_CRIT, "BUG: do_action: bad set*() type %d\n",
+							a->val[0].type);
 						ret=E_BUG;
 						goto error;
 					}
@@ -739,7 +779,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					len=strlen(a->val[0].u.string);
 					msg->new_uri.s=pkg_malloc(len+1);
 					if (msg->new_uri.s==0){
-						LM_ERR("memory allocation failure\n");
+						LOG(L_ERR, "ERROR: do_action: memory allocation"
+								" failure\n");
 						ret=E_OUT_OF_MEM;
 						goto error;
 					}
@@ -760,7 +801,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 						len=msg->first_line.u.request.uri.len;
 					}
 					if (parse_uri(tmp, len, &uri)<0){
-						LM_ERR("bad uri <%s>, dropping packet\n", tmp);
+						LOG(L_ERR, "ERROR: do_action: bad uri <%s>, dropping"
+									" packet\n", tmp);
 						ret=E_UNSPEC;
 						goto error;
 					}
@@ -782,14 +824,15 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					&& ((uri.type==TEL_URI_T) || (uri.type==TELS_URI_T))
 					&& ((uri.flags & URI_SIP_USER_PHONE)==0)
 				) {
-					LM_ERR("port number of a tel: URI cannot be set\n");
+					LOG(L_ERR, "ERROR: do_action: port number of a tel: URI cannot be set\n");
 					ret=E_UNSPEC;
 					goto error;
 				}
 
 				new_uri=pkg_malloc(MAX_URI_SIZE);
 				if (new_uri==0){
-					LM_ERR("memory allocation failure\n");
+					LOG(L_ERR, "ERROR: do_action: memory allocation "
+								" failure\n");
 					ret=E_OUT_OF_MEM;
 					goto error;
 				}
@@ -838,7 +881,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					break;
 
 				default:
-					LM_ERR("Unsupported URI scheme (%d), reverted to sip:\n",
+					LOG(L_ERR, "ERROR: Unsupported URI scheme (%d), "
+						"reverted to sip:\n",
 						uri.type);
 					len=s_sip.len;
 					tmp=s_sip.s;
@@ -864,7 +908,8 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					len=strlen(tmp);
 				} else if (a->type==STRIP_T) {
 					if (a->val[0].u.number>uri.user.len) {
-						LM_WARN("too long strip asked; deleting username: %lu of <%.*s>\n",
+						LOG(L_WARN, "Error: too long strip asked; "
+									" deleting username: %lu of <%.*s>\n",
 									a->val[0].u.number, uri.user.len, uri.user.s );
 						len=0;
 					} else if (a->val[0].u.number==uri.user.len) {
@@ -875,7 +920,7 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					}
 				} else if (a->type==STRIP_TAIL_T) {
 					if (a->val[0].u.number>uri.user.len) {
-						LM_WARN("too long strip_tail asked; "
+						LOG(L_WARN, "WARNING: too long strip_tail asked; "
 									" deleting username: %lu of <%.*s>\n",
 									a->val[0].u.number, uri.user.len, uri.user.s );
 						len=0;
@@ -1343,7 +1388,8 @@ match_cleanup:
 					i++;
 
 				if (unlikely(i > cfg_get(core, core_cfg, max_while_loops))){
-					LM_ERR("runaway while (%d, %d): more then %d loops\n", 
+					LOG(L_ERR, "ERROR: runaway while (%d, %d): more then"
+								" %d loops\n", 
 								rve->fpos.s_line, rve->fpos.s_col,
 								cfg_get(core, core_cfg, max_while_loops));
 					ret=-1;
@@ -1371,7 +1417,8 @@ match_cleanup:
 			break;
 		case SET_ADV_ADDR_T:
 			if (a->val[0].type!=STR_ST){
-				LM_CRIT("bad set_advertised_address() type %d\n", a->val[0].type);
+				LOG(L_CRIT, "BUG: do_action: bad set_advertised_address() "
+						"type %d\n", a->val[0].type);
 				ret=E_BUG;
 				goto error;
 			}
@@ -1380,7 +1427,8 @@ match_cleanup:
 			break;
 		case SET_ADV_PORT_T:
 			if (a->val[0].type!=STR_ST){
-				LM_CRIT("bad set_advertised_port() type %d\n", a->val[0].type);
+				LOG(L_CRIT, "BUG: do_action: bad set_advertised_port() "
+						"type %d\n", a->val[0].type);
 				ret=E_BUG;
 				goto error;
 			}
@@ -1398,7 +1446,7 @@ match_cleanup:
 				if (a->val[0].type==NOSUBTYPE)	port=msg->via1->port;
 				else if (a->val[0].type==NUMBER_ST) port=(int)a->val[0].u.number;
 				else{
-					LM_CRIT("bad force_tcp_alias"
+					LOG(L_CRIT, "BUG: do_action: bad force_tcp_alias"
 							" port type %d\n", a->val[0].type);
 					ret=E_BUG;
 					goto error;
@@ -1406,7 +1454,7 @@ match_cleanup:
 
 				if (tcpconn_add_alias(msg->rcv.proto_reserved1, port,
 									msg->rcv.proto)!=0){
-					LM_ERR("receive_msg: tcp alias failed\n");
+					LOG(L_ERR, " ERROR: receive_msg: tcp alias failed\n");
 					ret=E_UNSPEC;
 					goto error;
 				}
@@ -1416,7 +1464,7 @@ match_cleanup:
 			break;
 		case FORCE_SEND_SOCKET_T:
 			if (a->val[0].type!=SOCKETINFO_ST){
-				LM_CRIT("bad force_send_socket argument"
+				LOG(L_CRIT, "BUG: do_action: bad force_send_socket argument"
 						" type: %d\n", a->val[0].type);
 				ret=E_BUG;
 				goto error;
@@ -1488,14 +1536,14 @@ match_cleanup:
 			break;
 /*
 		default:
-			LM_CRIT("unknown type %d\n", a->type);
+			LOG(L_CRIT, "BUG: do_action: unknown type %d\n", a->type);
 */
 	}
 skip:
 	return ret;
 
 error_uri:
-	LM_ERR("set*: uri too long\n");
+	LOG(L_ERR, "ERROR: do_action: set*: uri too long\n");
 	if (new_uri) pkg_free(new_uri);
 	LM_ERR("run action error at: %s:%d\n", (a->cfile)?a->cfile:"", a->cline);
 	return E_UNSPEC;
@@ -1519,8 +1567,9 @@ int run_actions(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 
 	ret=E_UNSPEC;
 	h->rec_lev++;
-	if (unlikely(h->rec_lev>max_recursive_level)){
-		LM_ERR("too many recursive routing table lookups (%d) giving up!\n", h->rec_lev);
+	if (unlikely(h->rec_lev>ROUTE_MAX_REC_LEV)){
+		LOG(L_ERR, "WARNING: too many recursive routing table lookups (%d)"
+					" giving up!\n", h->rec_lev);
 		ret=E_UNSPEC;
 		goto error;
 	}
@@ -1538,7 +1587,8 @@ int run_actions(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 	}
 
 	if (unlikely(a==0)){
-		LM_DBG("null action list (rec_level=%d)\n", h->rec_lev);
+		DBG("DEBUG: run_actions: null action list (rec_level=%d)\n",
+				h->rec_lev);
 		ret=1;
 	}
 
@@ -1635,37 +1685,4 @@ int run_top_route(struct action* a, sip_msg_t* msg, struct run_act_ctx *c)
 	ret = run_actions(p, a, msg);
 	setsflagsval(sfbk);
 	return ret;
-}
-
-
-/**
- *
- */
-int run_child_one_init_route(void)
-{
-	struct sip_msg *fmsg;
-	struct run_act_ctx ctx;
-	int rtb, rt;
-
-	LM_DBG("attempting to run event_route[core:worker-one-init]\n");
-
-	rt = route_get(&event_rt, "core:worker-one-init");
-	if(rt>=0 && event_rt.rlist[rt]!=NULL) {
-		LM_DBG("executing event_route[core:worker-one-init] (%d)\n", rt);
-		if(faked_msg_init()<0)
-			return -1;
-		fmsg = faked_msg_next();
-		rtb = get_route_type();
-		set_route_type(REQUEST_ROUTE);
-		init_run_actions_ctx(&ctx);
-		run_top_route(event_rt.rlist[rt], fmsg, &ctx);
-		if(ctx.run_flags&DROP_R_F)
-		{
-			LM_ERR("exit due to 'drop' in event route\n");
-			return -1;
-		}
-		set_route_type(rtb);
-	}
-
-	return 0;
 }

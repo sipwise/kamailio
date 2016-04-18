@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -67,6 +67,7 @@ static void destroy(void);
 static int mod_init(void);
 
 static int auth_fixup(void** param, int param_no);
+static int auth_fixup_async(void** param, int param_no);
 static int challenge_fixup_async(void** param, int param_no);
 
 struct cdp_binds cdpb;
@@ -84,26 +85,30 @@ int auth_data_timeout = 60; /**< timeout for a hash entry to expire when empty i
 int add_authinfo_hdr = 1; /**< should an Authentication-Info header be added on 200 OK responses? 	*/
 int av_request_at_once = 1; /**< how many auth vectors to request in a MAR 				*/
 int av_request_at_sync = 1; /**< how many auth vectors to request in a sync MAR 		*/
-static str registration_qop = str_init("auth,auth-int"); /**< the qop options to put in the authorization challenges */
-static str invite_qop = str_init("auth"); /**< the qop options to put in the authorization challenges for INVITE*/
-str registration_qop_str = STR_NULL; /**< the qop options to put in the authorization challenges */
-str invite_qop_str = STR_NULL;
+char *registration_qop = "auth,auth-int"; /**< the qop options to put in the authorization challenges */
+str registration_qop_str = {0, 0}; /**< the qop options to put in the authorization challenges */
 int av_check_only_impu = 0; /**< Should we check IMPU (0) or IMPU and IMPI (1), when searching for authentication vectors? */
-static str s_qop_s = str_init(", qop=\"");
-static str s_qop_e = str_init("\"");
+static str s_qop_s = {", qop=\"", 7};
+static str s_qop_e = {"\"", 1};
 
-static str registration_default_algorithm = str_init("AKAv1-MD5"); /**< default algorithm for registration (if none present)*/
+char* registration_default_algorithm = "AKAv1-MD5"; /**< default algorithm for registration (if none present)*/
 unsigned char registration_default_algorithm_type = 1; /**< fixed default algorithm for registration (if none present)	 */
 
-str cxdx_dest_realm = str_init("ims.smilecoms.com");
-str cxdx_dest_host = str_init("");
+/* parameters storage */
+char* scscf_name = "sip:scscf.ims.smilecoms.com:6060"; /**< name of the S-CSCF */
+
+/* parameters storage */
+char* cxdx_dest_realm_s = "ims.smilecoms.com";
+str cxdx_dest_realm;
 
 //Only used if we want to force the Rx peer
 //Usually this is configured at a stack level and the first request uses realm routing
-str cxdx_forced_peer = str_init("");
+char* cxdx_forced_peer_s = "";
+str cxdx_forced_peer;
+
 
 /* fixed parameter storage */
-str scscf_name_str = str_init("sip:scscf.ims.smilecoms.com:6060"); /**< fixed name of the S-CSCF 							*/
+str scscf_name_str; /**< fixed name of the S-CSCF 							*/
 
 /* used mainly in testing - load balancing with SIPP where we don't want to worry about auth */
 int ignore_failed_auth = 0;
@@ -113,11 +118,9 @@ int ignore_failed_auth = 0;
  */
 static cmd_export_t cmds[] = {
     {"ims_www_authenticate", (cmd_function) www_authenticate, 1, auth_fixup, 0, REQUEST_ROUTE},
-    {"ims_www_challenge", (cmd_function) www_challenge2, 2, challenge_fixup_async, 0, REQUEST_ROUTE},
-    {"ims_www_challenge", (cmd_function) www_challenge3, 3, challenge_fixup_async, 0, REQUEST_ROUTE},
-    {"ims_www_resync_auth", (cmd_function) www_resync_auth, 2, challenge_fixup_async, 0, REQUEST_ROUTE},
+    {"ims_www_challenge", (cmd_function) www_challenge, 2, challenge_fixup_async, 0, REQUEST_ROUTE},
     {"ims_proxy_authenticate", (cmd_function) proxy_authenticate, 1, auth_fixup, 0, REQUEST_ROUTE},
-    {"ims_proxy_challenge", (cmd_function) proxy_challenge, 3, challenge_fixup_async, 0, REQUEST_ROUTE},
+    {"ims_proxy_challenge", (cmd_function) proxy_challenge, 2, auth_fixup_async, 0, REQUEST_ROUTE},
     {"bind_ims_auth", (cmd_function) bind_ims_auth, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 0}
 };
@@ -126,7 +129,7 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-    {"name", PARAM_STR, &scscf_name_str},
+    {"name", STR_PARAM, &scscf_name},
     {"auth_data_hash_size", INT_PARAM, &auth_data_hash_size},
     {"auth_vector_timeout", INT_PARAM, &auth_vector_timeout},
     {"auth_used_vector_timeout", INT_PARAM, &auth_used_vector_timeout},
@@ -135,14 +138,12 @@ static param_export_t params[] = {
     {"add_authinfo_hdr", INT_PARAM, &add_authinfo_hdr},
     {"av_request_at_once", INT_PARAM, &av_request_at_once},
     {"av_request_at_sync", INT_PARAM, &av_request_at_sync},
-    {"registration_default_algorithm", PARAM_STR, &registration_default_algorithm},
-    {"registration_qop", PARAM_STR, &registration_qop},
-	{"invite_qop", PARAM_STR, &invite_qop},
+    {"registration_default_algorithm", STR_PARAM, &registration_default_algorithm},
+    {"registration_qop", STR_PARAM, &registration_qop},
     {"ignore_failed_auth", INT_PARAM, &ignore_failed_auth},
     {"av_check_only_impu", INT_PARAM, &av_check_only_impu},
-    {"cxdx_forced_peer", PARAM_STR, &cxdx_forced_peer},
-    {"cxdx_dest_realm", PARAM_STR, &cxdx_dest_realm},
-    {"cxdx_dest_host", PARAM_STR, &cxdx_dest_host},
+    {"cxdx_forced_peer", STR_PARAM, &cxdx_forced_peer_s},
+    {"cxdx_dest_realm", STR_PARAM, &cxdx_dest_realm_s},
     {0, 0, 0}
 };
 
@@ -171,7 +172,22 @@ struct module_exports exports = {
 };
 
 static int mod_init(void) {
-    registration_default_algorithm_type = get_algorithm_type(registration_default_algorithm);
+    str algo;
+
+    /*get parameters */
+
+    cxdx_forced_peer.s = cxdx_forced_peer_s;
+    cxdx_forced_peer.len = strlen(cxdx_forced_peer_s);
+
+    cxdx_dest_realm.s = cxdx_dest_realm_s;
+    cxdx_dest_realm.len = strlen(cxdx_dest_realm_s);
+
+    scscf_name_str.s = scscf_name;
+    scscf_name_str.len = strlen(scscf_name);
+
+    algo.s = registration_default_algorithm;
+    algo.len = strlen(registration_default_algorithm);
+    registration_default_algorithm_type = get_algorithm_type(algo);
 
 #ifdef STATISTICS
 	/* register statistics */
@@ -217,8 +233,8 @@ static int mod_init(void) {
     }
 
     /* set default qop */
-    if (registration_qop.s && registration_qop.len > 0) {
-        registration_qop_str.len = s_qop_s.len + registration_qop.len
+    if (registration_qop && strlen(registration_qop) > 0) {
+        registration_qop_str.len = s_qop_s.len + strlen(registration_qop)
                 + s_qop_e.len;
         registration_qop_str.s = pkg_malloc(registration_qop_str.len);
         if (!registration_qop_str.s) {
@@ -229,32 +245,12 @@ static int mod_init(void) {
         registration_qop_str.len = 0;
         STR_APPEND(registration_qop_str, s_qop_s);
         memcpy(registration_qop_str.s + registration_qop_str.len,
-            registration_qop.s, registration_qop.len);
-        registration_qop_str.len += registration_qop.len;
+                registration_qop, strlen(registration_qop));
+        registration_qop_str.len += strlen(registration_qop);
         STR_APPEND(registration_qop_str, s_qop_e);
     } else {
         registration_qop_str.len = 0;
         registration_qop_str.s = 0;
-    }
-	
-	if (invite_qop.s && invite_qop.len > 0) {
-        invite_qop_str.len = s_qop_s.len + invite_qop.len
-                + s_qop_e.len;
-        invite_qop_str.s = pkg_malloc(invite_qop_str.len);
-        if (!invite_qop_str.s) {
-            LM_ERR("Error allocating %d bytes\n", invite_qop_str.len);
-            invite_qop_str.len = 0;
-            return 0;
-        }
-        invite_qop_str.len = 0;
-        STR_APPEND(invite_qop_str, s_qop_s);
-        memcpy(invite_qop_str.s + invite_qop_str.len,
-            invite_qop.s, invite_qop.len);
-        invite_qop_str.len += invite_qop.len;
-        STR_APPEND(invite_qop_str, s_qop_e);
-    } else {
-        invite_qop_str.len = 0;
-        invite_qop_str.s = 0;
     }
 
     /* Register the auth vector timer */
@@ -286,12 +282,7 @@ static int challenge_fixup_async(void** param, int param_no) {
         return 0;
     } else if (param_no == 2) {
         if (fixup_var_str_12(param, 1) == -1) {
-            LM_ERR("Error doing fixup on challenge");
-            return -1;
-        }
-    } else if (param_no == 3) /* algorithm */ {
-	if (fixup_var_str_12(param, 1) == -1) {
-            LM_ERR("Error doing fixup on challenge");
+            LM_ERR("Erroring doing fixup on challenge");
             return -1;
         }
     }
@@ -309,6 +300,29 @@ static int auth_fixup(void** param, int param_no) {
     }
 
     if (param_no == 1) {
+        if (fixup_var_str_12(param, 1) == -1) {
+            LM_ERR("Erroring doing fixup on auth");
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+/*
+ * Convert the char* parameters
+ */
+static int auth_fixup_async(void** param, int param_no) {
+    if (strlen((char*) *param) <= 0) {
+        LM_ERR("empty parameter %d not allowed\n", param_no);
+        return -1;
+    }
+
+    if (param_no == 1) {        //route name - static or dynamic string (config vars)
+        if (fixup_spve_null(param, param_no) < 0)
+            return -1;
+        return 0;
+    } else if (param_no == 2) {
         if (fixup_var_str_12(param, 1) == -1) {
             LM_ERR("Erroring doing fixup on auth");
             return -1;

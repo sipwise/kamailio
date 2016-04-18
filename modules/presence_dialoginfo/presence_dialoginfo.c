@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -51,7 +51,6 @@ add_event_t pres_add_event;
 
 /* module parameters */
 int force_single_dialog = 0;
-int force_dummy_dialog = 0;
 
 /* module exported commands */
 static cmd_export_t cmds[] =
@@ -62,7 +61,6 @@ static cmd_export_t cmds[] =
 /* module exported paramaters */
 static param_export_t params[] = {
 	{ "force_single_dialog", INT_PARAM, &force_single_dialog },
-	{ "force_dummy_dialog", INT_PARAM, &force_dummy_dialog },
 	{0, 0, 0}
 };
 

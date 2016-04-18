@@ -15,10 +15,9 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
 /*!
  * \file
- * \brief Kamailio TLS support :: OpenSSL initialization funtions
+ * \brief SIP-router TLS support :: OpenSSL initialization funtions
  * \ingroup tls
  * Module: \ref tls
  */

@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -58,14 +58,14 @@
 
 MODULE_VERSION
 
-str default_domain= STR_NULL;
+str default_domain= {NULL, 0};
 
 int pua_ul_publish = 0;
 int pua_ul_bflag = -1;
 int pua_ul_bmask = 0;
 
-pua_api_t _pu_pua;
-str pres_prefix= STR_NULL;
+pua_api_t pua;
+str pres_prefix= {0, 0};
 
 /*! \brief Structure containing pointers to usrloc functions */
 usrloc_api_t ul;
@@ -76,6 +76,9 @@ static int mod_init(void);
 
 int pua_set_publish(struct sip_msg* , char*, char*);
 
+send_publish_t pua_send_publish;
+send_subscribe_t pua_send_subscribe;
+
 static cmd_export_t cmds[]=
 {
 	{"pua_set_publish", (cmd_function)pua_set_publish, 0, 0, 0, REQUEST_ROUTE},
@@ -84,8 +87,8 @@ static cmd_export_t cmds[]=
 };
 
 static param_export_t params[]={
-	{"default_domain",	 PARAM_STR, &default_domain	 },
-	{"entity_prefix",	 PARAM_STR, &pres_prefix		 },
+	{"default_domain",	 STR_PARAM, &default_domain.s	 },
+	{"entity_prefix",	 STR_PARAM, &pres_prefix.s		 },
 	{"branch_flag",	     INT_PARAM, &pua_ul_bflag		 },
 	{0,							 0,			0            }
 };
@@ -113,14 +116,19 @@ static int mod_init(void)
 	bind_usrloc_t bind_usrloc;
 	bind_pua_t bind_pua;
 	
-	if(!default_domain.s || default_domain.len<=0)
+	if(default_domain.s == NULL )
 	{	
 		LM_ERR("default domain parameter not set\n");
 		return -1;
 	}
+	default_domain.len= strlen(default_domain.s);
 	
-	if(!pres_prefix.s || pres_prefix.len<=0)
+	if(pres_prefix.s == NULL )
+	{	
 		LM_DBG("No pres_prefix configured\n");
+	}
+	else
+		pres_prefix.len= strlen(pres_prefix.s);
 
 	bind_usrloc = (bind_usrloc_t)find_export("ul_bind_usrloc", 1, 0);
 	if (!bind_usrloc)
@@ -171,22 +179,24 @@ static int mod_init(void)
 		return -1;
 	}
 	
-	if (bind_pua(&_pu_pua) < 0)
+	if (bind_pua(&pua) < 0)
 	{
 		LM_ERR("Can't bind pua\n");
 		return -1;
 	}
-	if(_pu_pua.send_publish == NULL)
+	if(pua.send_publish == NULL)
 	{
 		LM_ERR("Could not import send_publish\n");
 		return -1;
 	}
+	pua_send_publish= pua.send_publish;
 
-	if(_pu_pua.send_subscribe == NULL)
+	if(pua.send_subscribe == NULL)
 	{
 		LM_ERR("Could not import send_subscribe\n");
 		return -1;
 	}
+	pua_send_subscribe= pua.send_subscribe;
 	
 	/* register post-script pua_unset_publish unset function */
 	if(register_script_cb(pua_unset_publish, POST_SCRIPT_CB|REQUEST_CB, 0)<0)

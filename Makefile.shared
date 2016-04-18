@@ -1,8 +1,12 @@
-# Kamailio build system
+#
+# $Id$
 #
 # shared functions 
 #
 #
+# History:
+# --------
+#  2008-06-27  initial version (andrei)
 #
 
 escape_values=$(subst $$,\$$,$(subst ",\", $(1)))

@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2007-2008 1&1 Internet AG
  *
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /**
@@ -270,7 +272,7 @@ inline int db_time2str(time_t _v, char* _s, int* _l)
 /*
  * Print list of columns separated by comma
  */
-int db_print_columns(char* _b, const int _l, const db_key_t* _c, const int _n, const char *_tq)
+inline int db_print_columns(char* _b, const int _l, const db_key_t* _c, const int _n)
 {
 	int i, ret, len = 0;
 
@@ -281,11 +283,11 @@ int db_print_columns(char* _b, const int _l, const db_key_t* _c, const int _n, c
 
 	for(i = 0; i < _n; i++)	{
 		if (i == (_n - 1)) {
-			ret = snprintf(_b + len, _l - len, "%s%.*s%s ", _tq, _c[i]->len, _c[i]->s, _tq);
+			ret = snprintf(_b + len, _l - len, "%.*s ", _c[i]->len, _c[i]->s);
 			if (ret < 0 || ret >= (_l - len)) goto error;
 			len += ret;
 		} else {
-			ret = snprintf(_b + len, _l - len, "%s%.*s%s,", _tq, _c[i]->len, _c[i]->s, _tq);
+			ret = snprintf(_b + len, _l - len, "%.*s,", _c[i]->len, _c[i]->s);
 			if (ret < 0 || ret >= (_l - len)) goto error;
 			len += ret;
 		}
@@ -350,19 +352,16 @@ int db_print_where(const db1_con_t* _c, char* _b, const int _l, const db_key_t* 
 				LM_ERR("Error while converting value to string\n");
 				return -1;
 			}
-			ret = snprintf(_b + len, _l - len, "%s%.*s%s&%.*s=%.*s", CON_TQUOTESZ(_c),
-					_k[i]->len, _k[i]->s, CON_TQUOTESZ(_c), tmp_len, tmp_buf, tmp_len, tmp_buf);
+			ret = snprintf(_b + len, _l - len, "%.*s&%.*s=%.*s", _k[i]->len, _k[i]->s, tmp_len, tmp_buf, tmp_len, tmp_buf);
 			if (ret < 0 || ret >= (_l - len)) goto error;
 			len += ret;
 		} else {
 			if (_o) {
-				ret = snprintf(_b + len, _l - len, "%s%.*s%s%s", CON_TQUOTESZ(_c),
-						_k[i]->len, _k[i]->s, CON_TQUOTESZ(_c), _o[i]);
+				ret = snprintf(_b + len, _l - len, "%.*s%s", _k[i]->len, _k[i]->s, _o[i]);
 				if (ret < 0 || ret >= (_l - len)) goto error;
 				len += ret;
 			} else {
-				ret = snprintf(_b + len, _l - len, "%s%.*s%s=", CON_TQUOTESZ(_c),
-						_k[i]->len, _k[i]->s, CON_TQUOTESZ(_c));
+				ret = snprintf(_b + len, _l - len, "%.*s=", _k[i]->len, _k[i]->s);
 				if (ret < 0 || ret >= (_l - len)) goto error;
 				len += ret;
 			}
@@ -403,8 +402,7 @@ int db_print_set(const db1_con_t* _c, char* _b, const int _l, const db_key_t* _k
 	}
 
 	for(i = 0; i < _n; i++) {
-		ret = snprintf(_b + len, _l - len, "%s%.*s%s=",
-				CON_TQUOTESZ(_c), _k[i]->len, _k[i]->s, CON_TQUOTESZ(_c));
+		ret = snprintf(_b + len, _l - len, "%.*s=", _k[i]->len, _k[i]->s);
 		if (ret < 0 || ret >= (_l - len)) goto error;
 		len += ret;
 

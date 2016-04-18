@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -49,12 +49,21 @@
 #include "../../sr_module.h"
 #include "../../modules/tm/tm_load.h"
 #include "mod.h"
-#include <limits.h>
+#ifndef __OS_darwin
+#include <values.h>
+#endif
 #include "../../mem/shm_mem.h"
 
 #include "../../dset.h"
 
 #include "../../timer.h"
+
+#ifdef __OS_darwin
+#ifndef MAXINT
+#define MAXINT INT_MAX
+#endif
+#endif
+
 
 /** S-CSCF list element */ 
 typedef struct _scscf_entry {

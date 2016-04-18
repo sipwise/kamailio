@@ -1,3 +1,4 @@
+$Id$
 
 ( - todo, x - done)
 x change subst_run/str to return error (different from not found)

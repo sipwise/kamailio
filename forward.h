@@ -1,29 +1,45 @@
 /*
+ *  $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
-* \file
-* \brief Kamailio core :: Message forwarding
-* \author andrei
-* \ingroup core
-* Module: \ref core
-*/
+/*
+ * History:
+ * -------
+ *  2001-??-?? created by andrei
+ *  ????-??-?? lots of changes by a lot of people
+ *  2003-02-11 added inline msg_send (andrei)
+ *  2003-04-07 changed all ports to host byte order (andrei)
+ *  2003-04-12  FORCE_RPORT_T added (andrei)
+ *  2003-04-15  added tcp_disable support (andrei)
+ *  2006-04-12  reduced msg_send() parameter list: it uses now a struct 
+ *               dest_info param. (andrei)
+ *  2007-10-08  msg_send() will ignore a mcast send_sock and choose another
+ *               one by itself (andrei)
+ */
+
+
 
 #ifndef forward_h
 #define forward_h
@@ -55,7 +71,6 @@ enum ss_mismatch {
 	SS_MISMATCH_AF,    /* af mismatch */
 	SS_MISMATCH_MCAST  /* mcast forced send socket */
 };
-
 
 struct socket_info* get_send_socket2(struct socket_info* force_send_socket,
 									union sockaddr_union* su, int proto,
@@ -94,11 +109,8 @@ int update_sock_struct_from_via( union sockaddr_union* to,
 int forward_reply( struct sip_msg* msg);
 int forward_reply_nocb( struct sip_msg* msg);
 
-void forward_set_send_info(int v);
-
 int is_check_self_func_list_set(void);
 
-#define msg_send(_dst, _buf, _len) msg_send_buffer((_dst), (_buf), (_len), 0)
 
 /* params:
  * dst = struct dest_info containing:
@@ -111,17 +123,12 @@ int is_check_self_func_list_set(void);
  *        (useful for sending replies on  the same connection as the request
  *         that generated them; use 0 if you don't want this)
  * buf, len = buffer
- * flags = control internal behavior
- *    * 1 - skip executing event SREV_NET_DATA_OUT
  * returns: 0 if ok, -1 on error*/
 
-static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
-		int flags)
+static inline int msg_send(struct dest_info* dst, char* buf, int len)
 {
 	struct dest_info new_dst;
 	str outb;
-	sr_net_info_t netinfo;
-
 #ifdef USE_TCP 
 	int port;
 	struct ip_addr ip;
@@ -134,9 +141,7 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 	
 	outb.s = buf;
 	outb.len = len;
-	if(!(flags&1)) {
-		sr_event_exec(SREV_NET_DATA_OUT, (void*)&outb);
-	}
+	sr_event_exec(SREV_NET_DATA_OUT, (void*)&outb);
 
 	if(outb.s==NULL) {
 		LM_ERR("failed to update outgoing buffer\n");
@@ -164,7 +169,7 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 		else if (likely(dst->id))
 			con = tcpconn_get(dst->id, 0, 0, 0, 0);
 		else {
-			LM_CRIT("null_id & to\n");
+			LM_CRIT("BUG: msg_send called with null_id & to\n");
 			goto error;
 		}
 
@@ -191,14 +196,14 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 			new_dst=*dst;
 			new_dst.send_sock=get_send_socket(0, &dst->to, dst->proto);
 			if (unlikely(new_dst.send_sock==0)){
-				LM_ERR("no sending socket found\n");
+				LOG(L_ERR, "msg_send: ERROR: no sending socket found\n");
 				goto error;
 			}
 			dst=&new_dst;
 		}
 		if (unlikely(udp_send(dst, outb.s, outb.len)==-1)){
 			STATS_TX_DROPS;
-			LOG(cfg_get(core, core_cfg, corelog), "udp_send failed\n");
+			LOG(L_ERR, "msg_send: ERROR: udp_send failed\n");
 			goto error;
 		}
 	}
@@ -206,7 +211,8 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 	else if (dst->proto==PROTO_TCP){
 		if (unlikely(tcp_disable)){
 			STATS_TX_DROPS;
-			LM_WARN("attempt to send on tcp and tcp support is disabled\n");
+			LOG(L_WARN, "msg_send: WARNING: attempt to send on tcp and tcp"
+					" support is disabled\n");
 			goto error;
 		}else{
 			if (unlikely((dst->send_flags.f & SND_F_FORCE_SOCKET) &&
@@ -217,7 +223,7 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 			}
 			if (unlikely(tcp_send(dst, from, outb.s, outb.len)<0)){
 				STATS_TX_DROPS;
-				LOG(cfg_get(core, core_cfg, corelog), "tcp_send failed\n");
+				LOG(L_ERR, "msg_send: ERROR: tcp_send failed\n");
 				goto error;
 			}
 		}
@@ -226,7 +232,8 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 	else if (dst->proto==PROTO_TLS){
 		if (unlikely(tls_disable)){
 			STATS_TX_DROPS;
-			LM_WARN("attempt to send on tls and tls support is disabled\n");
+			LOG(L_WARN, "msg_send: WARNING: attempt to send on tls and tls"
+					" support is disabled\n");
 			goto error;
 		}else{
 			if (unlikely((dst->send_flags.f & SND_F_FORCE_SOCKET) &&
@@ -237,7 +244,7 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 			}
 			if (unlikely(tcp_send(dst, from, outb.s, outb.len)<0)){
 				STATS_TX_DROPS;
-				LOG(cfg_get(core, core_cfg, corelog), "tcp_send failed\n");
+				LOG(L_ERR, "msg_send: ERROR: tcp_send failed\n");
 				goto error;
 			}
 		}
@@ -248,41 +255,33 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 	else if (dst->proto==PROTO_SCTP){
 		if (unlikely(sctp_disable)){
 			STATS_TX_DROPS;
-			LM_WARN("attempt to send on sctp and sctp support is disabled\n");
+			LOG(L_WARN, "msg_send: WARNING: attempt to send on sctp and sctp"
+					" support is disabled\n");
 			goto error;
 		}else{
 			if (unlikely(dst->send_sock==0)){
 				new_dst=*dst;
 				new_dst.send_sock=get_send_socket(0, &dst->to, dst->proto);
 				if (unlikely(new_dst.send_sock==0)){
-					LM_ERR("no sending SCTP socket found\n");
+					LOG(L_ERR, "msg_send: ERROR: no sending SCTP socket found\n");
 					goto error;
 				}
 				dst=&new_dst;
 			}
 			if (unlikely(sctp_core_msg_send(dst, outb.s, outb.len)<0)){
 				STATS_TX_DROPS;
-				LOG(cfg_get(core, core_cfg, corelog), "sctp_msg_send failed\n");
+				LOG(L_ERR, "msg_send: ERROR: sctp_msg_send failed\n");
 				goto error;
 			}
 		}
 	}
 #endif /* USE_SCTP */
 	else{
-			LM_CRIT("unknown proto %d\n", dst->proto);
+			LOG(L_CRIT, "BUG: msg_send: unknown proto %d\n", dst->proto);
 			goto error;
 	}
 	ret = 0;
 done:
-
-	if(!(flags&1)) {
-		memset(&netinfo, 0, sizeof(sr_net_info_t));
-		netinfo.data.s = outb.s;
-		netinfo.data.len = outb.len;
-		netinfo.dst = dst;
-		sr_event_exec(SREV_NET_DATA_SEND, (void*)&netinfo);
-	}
-
 	if(outb.s != buf)
 		pkg_free(outb.s);
 	return ret;

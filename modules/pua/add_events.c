@@ -1,4 +1,6 @@
 /*
+ * $Id: add_events.c  2007-05-03 15:05:20Z anca_vamanu $
+ *
  * pua module - presence user agent module
  *
  * Copyright (C) 2007 Voice Sistem S.R.L.
@@ -17,8 +19,9 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ *	initial version 2007-05-03 (anca)
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -194,7 +197,6 @@ int pres_process_body(publ_info_t* publ, str** fin_body, int ver, str** tuple_pa
 				LM_ERR("No more memory\n");
 				goto error;
 			}
-			alloc_tuple= 1;
 			tuple->s= (char*)pkg_malloc(tuple_id_len* sizeof(char));
 			if(tuple->s== NULL)
 			{
@@ -204,6 +206,7 @@ int pres_process_body(publ_info_t* publ, str** fin_body, int ver, str** tuple_pa
 			memcpy(tuple->s, tuple_id, tuple_id_len);
 			tuple->len= tuple_id_len;
 			*tuple_param= tuple;
+			alloc_tuple= 1;
 		}
 	}
 

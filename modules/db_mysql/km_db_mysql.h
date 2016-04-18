@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * MySQL module interface
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -18,8 +20,12 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2003-03-11  updated to the new module exports interface (andrei)
+ *  2003-03-16  flags export parameter added (janakj)
  */
 
 /*! \file
@@ -37,7 +43,6 @@
 extern unsigned int db_mysql_timeout_interval;
 extern unsigned int db_mysql_auto_reconnect;
 extern unsigned int db_mysql_insert_all_delayed;
-extern unsigned int db_mysql_update_affected_found;
 
 int db_mysql_bind_api(db_func_t *dbb);
 

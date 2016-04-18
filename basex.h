@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * convert/decode to/from ascii using various bases
  *
  * Copyright (C) 2008 iptelorg GmbH
@@ -18,9 +20,8 @@
 
 /*!
  * \file
- * \brief Kamailio core :: convert/decode to/from ascii using various bases
+ * \brief SIP-router core :: convert/decode to/from ascii using various bases
  *
- * Copyright (C) 2008 iptelorg GmbH
  * \ingroup core
  *
  * Module: \ref core

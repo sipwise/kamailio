@@ -21,7 +21,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <stdio.h>
@@ -84,8 +84,6 @@ static cmd_export_t cmds[] = {
 		change_reply_status_fixup, ONREPLY_ROUTE },
 	{"remove_body",          (cmd_function)w_remove_body_f,         0,
 		0, ANY_ROUTE },
-	{"keep_hf",              (cmd_function)w_keep_hf_f,             0,
-		fixup_regexp_null, ANY_ROUTE },
 	{"keep_hf",              (cmd_function)w_keep_hf_f,             1,
 		fixup_regexp_null, ANY_ROUTE },
 	{"fnmatch",              (cmd_function)w_fnmatch2_f,            2,
@@ -166,11 +164,6 @@ static int msg_apply_changes_f(sip_msg_t *msg, char *str1, char *str2)
 		obuf.s = generate_res_buf_from_sip_res(msg,
 				(unsigned int*)&obuf.len, BUILD_NO_VIA1_UPDATE);
 	} else {
-		if(msg->msg_flags & FL_RR_ADDED) {
-			LM_ERR("cannot apply msg changes after adding record-route"
-					" header - it breaks conditional 2nd header\n");
-			return -1;
-		}
 		obuf.s = build_req_buf_from_sip_req(msg,
 				(unsigned int*)&obuf.len, &dst,
 				BUILD_NO_PATH|BUILD_NO_LOCAL_VIA|BUILD_NO_VIA1_UPDATE);
@@ -358,11 +351,7 @@ static int w_keep_hf_f(struct sip_msg* msg, char* key, char* foo)
 	char c;
 	struct lump* l;
 
-	if(key) {
-		re = (regex_t*)key;
-	} else {
-		re = NULL;
-	}
+	re = (regex_t*)key;
 
 	/* we need to be sure we have seen all HFs */
 	parse_headers(msg, HDR_EOH_F, 0);
@@ -386,32 +375,20 @@ static int w_keep_hf_f(struct sip_msg* msg, char* key, char* foo)
 				;
 		}
 
-		if(re==NULL) {
-			/* no regex to match => remove all */
+		c = hf->name.s[hf->name.len];
+		hf->name.s[hf->name.len] = '\0';
+		if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
+		{
+			/* no match => remove */
+			hf->name.s[hf->name.len] = c;
 			l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
 			if (l==0)
 			{
-				LM_ERR("cannot remove header [%.*s]\n",
-						hf->name.len, hf->name.s);
+				LM_ERR("cannot remove header\n");
 				return -1;
 			}
 		} else {
-			c = hf->name.s[hf->name.len];
-			hf->name.s[hf->name.len] = '\0';
-			if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
-			{
-				/* no match => remove */
-				hf->name.s[hf->name.len] = c;
-				l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
-				if (l==0)
-				{
-					LM_ERR("cannot remove header [%.*s]\n",
-							hf->name.len, hf->name.s);
-					return -1;
-				}
-			} else {
-				hf->name.s[hf->name.len] = c;
-			}
+			hf->name.s[hf->name.len] = c;
 		}
 	}
 
@@ -562,7 +539,7 @@ static int fixup_hname_param(char *hname, struct hname_data** h) {
 	(*h)->hname.len = hname - (*h)->hname.s;
 	savec = *hname;
 	*hname = ':';
-	parse_hname2_short((*h)->hname.s, (*h)->hname.s+(*h)->hname.len+1, &hdr);
+	parse_hname2((*h)->hname.s, (*h)->hname.s+(*h)->hname.len+3, &hdr);
 	*hname = savec;
 
 	if (hdr.type == HDR_ERROR_T) goto err;
@@ -881,7 +858,7 @@ static int find_hf_value2_param(struct hname_data* hname, str* param_area, str* 
 			while (i<param_area->len && is_space(param_area->s[i])) i++;
 		}
 		else {
-			while (i<param_area->len && !is_space(param_area->s[i]) && !(param_area->s[i]!=',')) i++;
+			while (i<param_area->len && !is_space(param_area->s[i]) && !param_area->s[i]!=',') i++;
 		}
 	}
 	lump_del->s = param_area->s + i;

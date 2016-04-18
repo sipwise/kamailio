@@ -1,4 +1,5 @@
-# Kamailio build system
+#
+# $Id$
 #
 # common Makefile variables 
 # (source files, objs, etc)

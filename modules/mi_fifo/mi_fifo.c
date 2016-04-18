@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  *
  * History:
@@ -60,7 +60,7 @@ static void fifo_process(int rank);
 static int mi_destroy(void);
 
 /* FIFO server vars */
-static char *mi_fifo = NAME "_fifo";		/*!< FIFO name */
+static char *mi_fifo = 0;		 		/*!< FIFO name */
 static char *mi_fifo_reply_dir = DEFAULT_MI_REPLY_DIR; 	/*!< dir where reply fifos are allowed */
 static char *mi_reply_indent = DEFAULT_MI_REPLY_IDENT;
 static int  mi_fifo_uid = -1;				/*!< Fifo default UID */
@@ -74,14 +74,14 @@ MODULE_VERSION
 
 /*! \brief Configuration parameters in .cfg file */
 static param_export_t mi_params[] = {			
-	{"fifo_name",        PARAM_STRING, &mi_fifo},
+	{"fifo_name",        STR_PARAM, &mi_fifo},
 	{"fifo_mode",        INT_PARAM, &mi_fifo_mode},
-	{"fifo_group",       PARAM_STRING, &mi_fifo_gid_s},
+	{"fifo_group",       STR_PARAM, &mi_fifo_gid_s},
 	{"fifo_group",       INT_PARAM, &mi_fifo_gid},
-	{"fifo_user",        PARAM_STRING, &mi_fifo_uid_s},
+	{"fifo_user",        STR_PARAM, &mi_fifo_uid_s},
 	{"fifo_user",        INT_PARAM, &mi_fifo_uid},
-	{"reply_dir",        PARAM_STRING, &mi_fifo_reply_dir},
-	{"reply_indent",     PARAM_STRING, &mi_reply_indent},
+	{"reply_dir",        STR_PARAM, &mi_fifo_reply_dir},
+	{"reply_indent",     STR_PARAM, &mi_reply_indent},
 	{0,0,0}
 };
 
@@ -114,34 +114,11 @@ static int mi_mod_init(void)
 {
 	int n;
 	struct stat filestat;
-	int len;
-	int sep;
-	char *p;
 
 	/* checking the mi_fifo module param */
 	if (mi_fifo==NULL || *mi_fifo == 0) {
 		LM_ERR("No MI fifo configured\n");
 		return -1;
-	}
-	if(*mi_fifo != '/') {
-		if(runtime_dir!=NULL && *runtime_dir!=0) {
-			len = strlen(runtime_dir);
-			sep = 0;
-			if(runtime_dir[len-1]!='/') {
-				sep = 1;
-			}
-			len += sep + strlen(mi_fifo);
-			p = pkg_malloc(len + 1);
-			if(p==NULL) {
-				LM_ERR("no more pkg\n");
-				return -1;
-			}
-			strcpy(p, runtime_dir);
-			if(sep) strcat(p, "/");
-			strcat(p, mi_fifo);
-			mi_fifo = p;
-			LM_DBG("fifo path is [%s]\n", mi_fifo);
-		}
 	}
 
 	LM_DBG("testing mi_fifo existance ...\n");

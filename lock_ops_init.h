@@ -1,4 +1,5 @@
 /* 
+ * $Id$
  * 
  * Copyright (C) 2007 iptelorg GmbH
  *
@@ -14,12 +15,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*!
-* \file
-* \brief Kamailio core :: lock_ops init functions
-* \ingroup core
-* \author andrei
-* Module: \ref core
+/*
+ * lock_ops init functions
+ */
+/* 
+ * History:
+ * --------
+ *  2007-05-14  created by andrei
  */
 
 #ifndef __lock_ops_init_h

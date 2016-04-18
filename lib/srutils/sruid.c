@@ -1,4 +1,5 @@
 /*
+ * $Id$
  *
  * sruid - unique id generator
  *
@@ -18,14 +19,8 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
-* \file
-* \brief srutils :: Unique ID generator
-* \ingroup srutils
-* Module: \ref srutils
-*/
 
 #include <stdio.h>
 #include <unistd.h>
@@ -101,7 +96,6 @@ int sruid_init(sruid_t *sid, char sep, char *cid, int mode)
 	sid->out = sid->buf + i + 5;
 	sid->uid.s = sid->buf;
 	sid->mode = (sruid_mode_t)mode;
-	sid->pid = my_pid();
 	LM_DBG("root for sruid is [%.*s] (%u / %d)\n", i+5, sid->uid.s,
 			sid->counter, i+5);
 	return 0;
@@ -137,7 +131,6 @@ int sruid_reinit(sruid_t *sid, int mode)
 	sid->out = sid->buf + i + 5;
 	sid->uid.s = sid->buf;
 	sid->mode = (sruid_mode_t)mode;
-	sid->pid = my_pid();
 	LM_DBG("re-init root for sruid is [%.*s] (%u / %d)\n", i+5, sid->uid.s,
 			sid->counter, i+5);
 	return 0;
@@ -184,11 +177,3 @@ int sruid_next(sruid_t *sid)
 	return 0;
 }
 
-/**
- *
- */
-int sruid_next_safe(sruid_t *sid)
-{
-	if(unlikely(sid->pid!=my_pid())) sruid_reinit(sid, sid->mode);
-	return sruid_next(sid);
-}

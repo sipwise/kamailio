@@ -1,31 +1,41 @@
-/* 
+/* $Id$
  *
  * ip address family related structures
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
-* \file
-* \brief Kamailio core :: ip address family related structures
-* \ingroup core
-* Module: \ref core
-*/
+/*
+ * History:
+ * --------
+ *  2003-02-13  added struct dest_info (andrei)
+ *  2003-04-06  all ports are stored/passed in host byte order now (andrei)
+ *  2006-04-20  comp support in recv_info and dest_info (andrei)
+ *  2006-04-21  added init_dst_from_rcv (andrei)
+ *  2007-06-26  added ip_addr_mk_any() (andrei)
+ *  2008-05-21  added su2a(), ip_addr2sbuf(), ip4tosbuf(), ip62sbuf() (andrei)
+ *  2009-09-14  added send flags support to dest_info (andrei)
+ */
 
 #ifndef ip_addr_h
 #define ip_addr_h
@@ -136,11 +146,6 @@ struct receive_info{
 	/* no need for dst_su yet */
 };
 
-typedef struct sr_net_info {
-	str data;
-	struct dest_info* dst;
-	struct receive_info* rcv;
-} sr_net_info_t;
 
 /* send flags */
 #define SND_F_FORCE_CON_REUSE	1 /* reuse an existing connection or fail */
@@ -250,8 +255,7 @@ void print_net(struct net* net);
 char* get_proto_name(unsigned int proto);
 #define proto2a get_proto_name
 
-int get_valid_proto_string(unsigned int iproto, int utype, int vtype,
-		str *sproto);
+
 
 #ifdef USE_MCAST
 /* Returns 1 if the given address is a multicast address */
@@ -347,7 +351,8 @@ static inline void sockaddr2ip_addr(struct ip_addr* ip, struct sockaddr* sa)
 			memcpy(ip->u.addr, &((struct sockaddr_in6*)sa)->sin6_addr, 16);
 			break;
 	default:
-			LM_CRIT("unknown address family %d\n", sa->sa_family);
+			LOG(L_CRIT, "sockaddr2ip_addr: BUG: unknown address family %d\n",
+					sa->sa_family);
 	}
 }
 
@@ -373,7 +378,8 @@ static inline int su_cmp(const union sockaddr_union* s1,
 			return (s1->sin6.sin6_port==s2->sin6.sin6_port)&&
 					(memcmp(&s1->sin6.sin6_addr, &s2->sin6.sin6_addr, 16)==0);
 		default:
-			LM_CRIT("unknown address family %d\n", s1->s.sa_family);
+			LOG(L_CRIT,"su_cmp: BUG: unknown address family %d\n",
+						s1->s.sa_family);
 			return 0;
 	}
 }
@@ -389,7 +395,8 @@ static inline unsigned short su_getport(const union sockaddr_union* su)
 		case AF_INET6:
 			return ntohs(su->sin6.sin6_port);
 		default:
-			LM_CRIT("unknown address family %d\n", su->s.sa_family);
+			LOG(L_CRIT,"su_get_port: BUG: unknown address family %d\n",
+						su->s.sa_family);
 			return 0;
 	}
 }
@@ -407,7 +414,8 @@ static inline void su_setport(union sockaddr_union* su, unsigned short port)
 			 su->sin6.sin6_port=htons(port);
 			 break;
 		default:
-			LM_CRIT("unknown address family %d\n", su->s.sa_family);
+			LOG(L_CRIT,"su_set_port: BUG: unknown address family %d\n",
+						su->s.sa_family);
 	}
 }
 
@@ -428,7 +436,8 @@ static inline void su2ip_addr(struct ip_addr* ip, union sockaddr_union* su)
 					memcpy(ip->u.addr, &su->sin6.sin6_addr, 16);
 					break;
 	default:
-					LM_CRIT("unknown address family %d\n", su->s.sa_family);
+					LOG(L_CRIT,"su2ip_addr: BUG: unknown address family %d\n",
+							su->s.sa_family);
 	}
 }
 
@@ -461,7 +470,7 @@ static inline int init_su( union sockaddr_union* su,
 		su->sin.sin_port=htons(port);
 		break;
 	default:
-		LM_CRIT("unknown address family %d\n", ip->af);
+		LOG(L_CRIT, "init_ss: BUG: unknown address family %d\n", ip->af);
 		return -1;
 	}
 	return 0;
@@ -496,7 +505,8 @@ static inline int hostent2su( union sockaddr_union* su,
 		su->sin.sin_port=htons(port);
 		break;
 	default:
-		LM_CRIT("unknown address family %d\n", he->h_addrtype);
+		LOG(L_CRIT, "hostent2su: BUG: unknown address family %d\n", 
+				he->h_addrtype);
 		return -1;
 	}
 	return 0;
@@ -655,7 +665,8 @@ static inline int ip_addr2sbuf(struct ip_addr* ip, char* buff, int len)
 			return ip4tosbuf(ip->u.addr, buff, len);
 			break;
 		default:
-			LM_CRIT("unknown address family %d\n", ip->af);
+			LOG(L_CRIT, "BUG: ip_addr2sbuf: unknown address family %d\n",
+					ip->af);
 			return 0;
 	}
 	return 0;

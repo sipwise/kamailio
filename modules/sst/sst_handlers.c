@@ -1,22 +1,24 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2006 SOMA Networks, Inc.
  * Written by Ron Winacott (karwin)
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify it
+ * SIP-router is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful, but
+ * SIP-router is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
  * USA
  */
 
@@ -173,19 +175,13 @@ static inline int sst_build_minse_hdr(int seval, str *sehdr)
 	sehdr->s = sst_se_buf;
 	return 0;
 }
-static inline int sst_build_se_hdr(int seval, str *sehdr, char *refresher)
+static inline int sst_build_se_hdr(int seval, str *sehdr)
 {
 	if(sehdr==NULL)
 		return -1;
 
-	if(refresher==NULL) {
-		sehdr->len = snprintf(sst_se_buf, SST_SE_BUF_SIZE,
-				"Session-Expires: %d\r\n", seval);
-	}
-	else {
-		sehdr->len = snprintf(sst_se_buf, SST_SE_BUF_SIZE,
-				"Session-Expires: %d;refresher=%s\r\n", seval, refresher);
-	}
+	sehdr->len = snprintf(sst_se_buf, SST_SE_BUF_SIZE,
+			"Session-Expires: %d\r\n", seval);
 	sehdr->s = sst_se_buf;
 	return 0;
 }
@@ -348,7 +344,7 @@ void sst_dialog_created_CB(struct dlg_cell *did, int type,
 		}
 		
 		info->requester = SST_PXY;
-		sst_build_se_hdr(info->interval, &msehdr, NULL);
+		sst_build_se_hdr(info->interval, &msehdr);
 		if (append_header(msg, msehdr.s)) {
 			LM_ERR("failed to append Session-Expires header to proxy "
 					"requested SST.\n");
@@ -568,7 +564,7 @@ static void sst_dialog_response_fwded_CB(struct dlg_cell* did, int type,
 					 * header and forward back to the UAC and it will
 					 * deal with refreshing the session.
 					 */
-					sst_build_se_hdr(info->interval, &sehdr, "uac");
+					sst_build_se_hdr(info->interval, &sehdr);
 					if (append_header(msg, sehdr.s)) {
 						LM_ERR("failed to append Session-Expires header\n");
 						return;

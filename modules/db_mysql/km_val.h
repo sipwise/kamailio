@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2008 1&1 Internet AG
  *
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*! \file
@@ -29,7 +31,7 @@
 #ifndef KM_VAL_H
 #define KM_VAL_H
 
-#include <mysql.h>
+#include <mysql/mysql.h>
 #include "../../lib/srdb1/db_val.h"
 #include "../../lib/srdb1/db.h"
 

@@ -1,4 +1,6 @@
-/*
+/**
+ * $Id$
+ *
  * Copyright (C) 2008 Daniel-Constantin Mierla (asipto.com)
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <stdio.h>
@@ -40,7 +42,6 @@
 #ifdef WITH_XAVP
 #include "pv_xavp.h"
 #endif
-#include "pv_api.h"
 
 MODULE_VERSION
 
@@ -69,9 +70,6 @@ static pv_export_t mod_pvs[] = {
 	{ {"branch", sizeof("branch")-1}, /* branch attributes */
 		PVT_CONTEXT, pv_get_branchx, pv_set_branchx,
 		pv_parse_branchx_name, pv_parse_index, 0, 0 },
-	{ {"sbranch", sizeof("sbranch")-1}, /* static branch attributes */
-		PVT_CONTEXT, pv_get_sbranch, pv_set_sbranch,
-		pv_parse_branchx_name, 0, 0, 0 },
 	{ {"mi", (sizeof("mi")-1)}, /* message id */
 		PVT_OTHER, pv_get_msgid, 0,
 		0, 0, 0, 0},
@@ -99,10 +97,6 @@ static pv_export_t mod_pvs[] = {
 		pv_parse_index, 0, 0},
 	{{"var", (sizeof("var")-1)}, PVT_SCRIPTVAR, pv_get_scriptvar,
 		pv_set_scriptvar, pv_parse_scriptvar_name, 0, 0, 0},
-	{{"vz", (sizeof("vz")-1)}, PVT_SCRIPTVAR, pv_get_scriptvar,
-		pv_set_scriptvar, pv_parse_scriptvar_name, 0, 0, 0},
-	{{"vn", (sizeof("vn")-1)}, PVT_SCRIPTVAR, pv_get_scriptvar,
-		pv_set_scriptvar, pv_parse_scriptvarnull_name, 0, 0, 0},
 	{{"ai", (sizeof("ai")-1)}, /* */
 		PVT_OTHER, pv_get_pai, 0,
 		0, pv_parse_index, 0, 0},
@@ -121,21 +115,6 @@ static pv_export_t mod_pvs[] = {
 	{{"aU", (sizeof("aU")-1)}, /* */
 		PVT_OTHER, pv_get_authattr, 0,
 		0, 0, pv_init_iname, 5},
-	{{"aa", (sizeof("aa")-1)}, /* auth algorithm */
-		PVT_OTHER, pv_get_authattr, 0,
-		0, 0, pv_init_iname, 6},	
-	{{"adn", (sizeof("adn")-1)}, /* auth nonce */
-		PVT_OTHER, pv_get_authattr, 0,
-		0, 0, pv_init_iname, 7},	
-	{{"adc", (sizeof("adc")-1)}, /* auth cnonce */
-		PVT_OTHER, pv_get_authattr, 0,
-		0, 0, pv_init_iname, 8},	
-	{{"adr", (sizeof("adr")-1)}, /* auth response */
-		PVT_OTHER, pv_get_authattr, 0,
-		0, 0, pv_init_iname, 9},	
-	{{"ado", (sizeof("ado")-1)}, /* auth opaque */
-		PVT_OTHER, pv_get_authattr, 0,
-		0, 0, pv_init_iname, 10},	
 	{{"Au", (sizeof("Au")-1)}, /* */
 		PVT_OTHER, pv_get_acc_username, 0,
 		0, 0, pv_init_iname, 1},
@@ -391,15 +370,9 @@ static pv_export_t mod_pvs[] = {
 	{{"sp", (sizeof("sp")-1)}, /* */
 		PVT_OTHER, pv_get_srcport, 0,
 		0, 0, 0, 0},
-	{{"su", (sizeof("su")-1)}, /* */
-		PVT_OTHER, pv_get_srcaddr_uri, 0,
-		0, 0, 0, 0},
 	{{"td", (sizeof("td")-1)}, /* */
 		PVT_OTHER, pv_get_to_attr, pv_set_to_domain,
 		0, 0, pv_init_iname, 3},
-	{{"sut", (sizeof("sut")-1)}, /* */
-		PVT_OTHER, pv_get_srcaddr_uri_full, 0,
-		0, 0, 0, 0},
 	{{"to.domain", (sizeof("to.domain")-1)}, /* */
 		PVT_OTHER, pv_get_to_attr, pv_set_to_domain,
 		0, 0, pv_init_iname, 3},
@@ -451,13 +424,9 @@ static pv_export_t mod_pvs[] = {
 
 	{ {"shv", (sizeof("shv")-1)}, PVT_OTHER, pv_get_shvar,
 		pv_set_shvar, pv_parse_shvar_name, 0, 0, 0},
-	{ {"time", (sizeof("time")-1)}, PVT_CONTEXT, pv_get_local_time,
+	{ {"time", (sizeof("time")-1)}, PVT_CONTEXT, pv_get_time,
 		0, pv_parse_time_name, 0, 0, 0},
-	{ {"timef", (sizeof("timef")-1)}, PVT_CONTEXT, pv_get_local_strftime,
-		0, pv_parse_strftime_name, 0, 0, 0},
-	{ {"utime", (sizeof("utime")-1)}, PVT_CONTEXT, pv_get_utc_time,
-		0, pv_parse_time_name, 0, 0, 0},
-	{ {"utimef", (sizeof("utimef")-1)}, PVT_CONTEXT, pv_get_utc_strftime,
+	{ {"timef", (sizeof("timef")-1)}, PVT_CONTEXT, pv_get_strftime,
 		0, pv_parse_strftime_name, 0, 0, 0},
 	{ {"TV", (sizeof("TV")-1)}, PVT_OTHER, pv_get_timeval,
 		0, pv_parse_timeval_name, 0, 0, 0},
@@ -467,8 +436,6 @@ static pv_export_t mod_pvs[] = {
 		0, pv_parse_sr_version_name, 0, 0, 0},
 	{ {"K", (sizeof("K")-1)}, PVT_OTHER, pv_get_K, 0,
 		pv_parse_K_name, 0, 0, 0 },
-	{ {"expires", (sizeof("expires")-1)}, PVT_OTHER, pv_get_expires, 0,
-		pv_parse_expires_name, 0, 0, 0 },
 
 	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 };
@@ -476,9 +443,9 @@ static pv_export_t mod_pvs[] = {
 static int add_avp_aliases(modparam_t type, void* val);
 
 static param_export_t params[]={ 
-	{"shvset",              PARAM_STRING|USE_FUNC_PARAM, (void*)param_set_shvar },
-	{"varset",              PARAM_STRING|USE_FUNC_PARAM, (void*)param_set_var },
-	{"avp_aliases",         PARAM_STRING|USE_FUNC_PARAM, (void*)add_avp_aliases },
+	{"shvset",              STR_PARAM|USE_FUNC_PARAM, (void*)param_set_shvar },
+	{"varset",              STR_PARAM|USE_FUNC_PARAM, (void*)param_set_var },
+	{"avp_aliases",         STR_PARAM|USE_FUNC_PARAM, (void*)add_avp_aliases },
 	{0,0,0}
 };
 
@@ -495,15 +462,7 @@ static int pv_unset(struct sip_msg* msg, char* pvid, char *foo);
 static int is_int(struct sip_msg* msg, char* pvar, char* s2);
 static int pv_typeof(sip_msg_t *msg, char *pv, char *t);
 static int pv_not_empty(sip_msg_t *msg, char *pv, char *s2);
-static int w_xavp_params_explode(sip_msg_t *msg, char *pparams, char *pxname);
-static int w_sbranch_set_ruri(sip_msg_t *msg, char p1, char *p2);
-static int w_sbranch_append(sip_msg_t *msg, char p1, char *p2);
-static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2);
-static int w_var_to_xavp(sip_msg_t *msg, char *p1, char *p2);
-static int w_xavp_to_var(sip_msg_t *msg, char *p1);
-
 static int pv_init_rpc(void);
-int pv_register_api(pv_api_t*);
 
 static cmd_export_t cmds[]={
 	{"pv_isset",  (cmd_function)pv_isset,  1, fixup_pvar_null, 0, 
@@ -512,10 +471,6 @@ static cmd_export_t cmds[]={
 		ANY_ROUTE },
 #ifdef WITH_XAVP
 	{"pv_xavp_print",  (cmd_function)pv_xavp_print,  0, 0, 0, 
-		ANY_ROUTE },
-	{"pv_var_to_xavp",  (cmd_function)w_var_to_xavp, 2, 0, 0,
-		ANY_ROUTE },
-	{"pv_xavp_to_var",  (cmd_function)w_xavp_to_var, 1, 0, 0,
 		ANY_ROUTE },
 #endif
 	{"is_int", (cmd_function)is_int, 1, fixup_pvar_null, fixup_free_pvar_null,
@@ -526,17 +481,7 @@ static cmd_export_t cmds[]={
 	{"not_empty", (cmd_function)pv_not_empty, 1, fixup_pvar_null,
 		fixup_free_pvar_null,
 		ANY_ROUTE},
-	{"xavp_params_explode", (cmd_function)w_xavp_params_explode,
-		2, fixup_spve_spve, fixup_free_spve_spve,
-		ANY_ROUTE},
-	{"sbranch_set_ruri",  (cmd_function)w_sbranch_set_ruri,  0, 0, 0,
-		ANY_ROUTE },
-	{"sbranch_append",    (cmd_function)w_sbranch_append,    0, 0, 0,
-		ANY_ROUTE },
-	{"sbranch_reset",     (cmd_function)w_sbranch_reset,     0, 0, 0,
-		ANY_ROUTE },
-	/* API exports */
-	{"pv_register_api",   (cmd_function)pv_register_api,     NO_SCRIPT, 0, 0},
+
 	{0,0,0,0,0,0}
 };
 
@@ -566,11 +511,10 @@ static int mod_init(void)
 		return -1;
 	}
 	if(pv_init_rpc()!=0)
-	{
-		LM_ERR("failed to register RPC commands\n");
-		return -1;
-    }
-	pv_init_sbranch();
+        {
+                LM_ERR("failed to register RPC commands\n");
+                return -1;
+        }
 
 	return 0;
 }
@@ -704,86 +648,6 @@ static int is_int(struct sip_msg* msg, char* pvar, char* s2)
 	}
 
 	return -1;
-}
-
-static int w_var_to_xavp(sip_msg_t *msg, char *s1, char *s2)
-{
-	str xname, varname;
-
-	if(s1 == NULL || s2 == NULL) {
-		LM_ERR("wrong parameters\n");
-		return -1;
-	}
-
-	varname.len = strlen(s1); varname.s = s1;
-	xname.s = s2; xname.len = strlen(s2);
-	return pv_var_to_xavp(&varname, &xname);
-}
-
-static int w_xavp_to_var(sip_msg_t *msg, char *s1)
-{
-	str xname;
-
-	if(s1 == NULL) {
-		LM_ERR("wrong parameters\n");
-		return -1;
-	}
-
-	xname.s = s1; xname.len = strlen(s1);
-	return pv_xavp_to_var(&xname);
-}
-
-/**
- *
- */
-static int w_xavp_params_explode(sip_msg_t *msg, char *pparams, char *pxname)
-{
-	str sparams;
-	str sxname;
-
-	if(fixup_get_svalue(msg, (gparam_t*)pparams, &sparams)!=0) {
-		LM_ERR("cannot get the params\n");
-		return -1;
-	}
-	if(fixup_get_svalue(msg, (gparam_t*)pxname, &sxname)!=0) {
-		LM_ERR("cannot get the xavp name\n");
-		return -1;
-	}
-
-	if(xavp_params_explode(&sparams, &sxname)<0)
-		return -1;
-
-	return 1;
-}
-
-/**
- *
- */
-static int w_sbranch_set_ruri(sip_msg_t *msg, char p1, char *p2)
-{
-	if(sbranch_set_ruri(msg)<0)
-		return -1;
-	return 1;
-}
-
-/**
- *
- */
-static int w_sbranch_append(sip_msg_t *msg, char p1, char *p2)
-{
-	if(sbranch_append(msg)<0)
-		return -1;
-	return 1;
-}
-
-/**
- *
- */
-static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2)
-{
-	if(sbranch_reset()<0)
-		return -1;
-	return 1;
 }
 
 static const char* rpc_shv_set_doc[2] = {

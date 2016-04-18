@@ -1,7 +1,9 @@
 /*
+ * $Id$
+ *
  * hep related structure
  *
- * Copyright (C) 2011-2014 Alexandr Dubovikov (QSC AG) (alexandr.dubovikov@gmail.com)
+ * Copyright (C) 2011 Alexandr Dubovikov (QSC AG) (alexandr.dubovikov@gmail.com)
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -17,24 +19,18 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-
-#ifndef _sipcapture_h
-#define _sipcapture_h
 
 struct _sipcapture_object {
 	str method;
 	str reply_reason;
 	str ruri;
 	str ruri_user;
-	str ruri_domain;
 	str from_user;
-	str from_domain;
 	str from_tag;
 	str to_user;
-	str to_domain;
 	str to_tag;
 	str pid_user;
 	str contact_user;
@@ -61,17 +57,10 @@ struct _sipcapture_object {
 	int family;
 	str rtp_stat;
 	int type;
-	long long tmstamp;
-	long timestamp;
+        long long tmstamp;
 	str node;
 	str msg;
 #ifdef STATISTICS
 	stat_var *stat;
 #endif
 };
-
-
-struct hep_generic_recv;
-int receive_logging_json_msg(char * buf, unsigned int len, struct hep_generic_recv *hg, char *log_table);
-
-#endif /* _sipcapture_h */

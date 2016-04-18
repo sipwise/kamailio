@@ -39,19 +39,16 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
 #include "hslot_sp.h"
-#include "ul_scscf_stats.h"
 
 /*! number of locks */
 int subs_locks_no=4;
 /*! global list of locks */
 gen_lock_set_t* subs_locks=0;
-
-extern struct ims_subscription_list* ims_subscription_list;
 
 
 /*!
@@ -192,7 +189,6 @@ void subs_slot_add(hslot_sp_t* _s, struct ims_subscription_s* _r)
 		_s->last = _r;
 	}
 	_s->n++;
-        counter_inc(ul_scscf_cnts_h.active_subscriptions);
 	_r->slot = _s;
 }
 
@@ -219,9 +215,4 @@ void subs_slot_rem(hslot_sp_t* _s, struct ims_subscription_s* _r)
 	_r->prev = _r->next = 0;
 	_r->slot = 0;
 	_s->n--;
-        counter_add(ul_scscf_cnts_h.active_subscriptions, -1);
-        if (_s->n < 0) {
-            LM_WARN("we should not go negative....\n");
-            _s->n = 0;
-        }
 }

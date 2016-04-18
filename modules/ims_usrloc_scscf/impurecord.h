@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -65,7 +65,7 @@ struct hslot; /*!< Hash table slot */
  * \param _r pointer to the new record
  * \return 0 on success, negative on failure
  */
-int new_impurecord(str* _dom, str* public_identity, str* private_identity, int reg_state, int barring, ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2, impurecord_t** _r);
+int new_impurecord(str* _dom, str* public_identity, int reg_state, int barring, ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2, impurecord_t** _r);
 
 
 /*!
@@ -97,21 +97,23 @@ void print_impurecord(FILE* _f, impurecord_t* _r);
  * \param _ci contact information
  * \return pointer to new created contact on success, 0 on failure
  */
-ucontact_t* mem_insert_scontact(impurecord_t* _r, str* _c, ucontact_info_t* _ci);
+ucontact_t* mem_insert_ucontact(impurecord_t* _r, str* _c, ucontact_info_t* _ci);
 
 
 /*!
  * \brief Remove the contact from lists in memory
-  * \param _c contact to remove
+ * \param _r record this contact belongs to
+ * \param _c removed contact
  */
-void mem_remove_ucontact(ucontact_t* _c);
+void mem_remove_ucontact(impurecord_t* _r, ucontact_t* _c);
 
 
 /*!
  * \brief Remove contact in memory from the list and delete it
- * \param _c contact to delete
+ * \param _r record this contact belongs to
+ * \param _c deleted contact
  */
-void mem_delete_ucontact(ucontact_t* _c);
+void mem_delete_ucontact(impurecord_t* _r, ucontact_t* _c);
 
 
 /*!
@@ -122,6 +124,14 @@ void mem_delete_ucontact(ucontact_t* _c);
  * \param _r processed record
  */
 void timer_impurecord(impurecord_t* _r);
+
+
+/*!
+ * \brief Delete a record from the database
+ * \param _r deleted record
+ * \return 0 on success, -1 on failure
+ */
+int db_delete_impurecord(impurecord_t* _r);
 
 
 /* ===== Module interface ======== */
@@ -142,7 +152,7 @@ void free_ims_subscription_data(ims_subscription *s);
  * \param _c new created contact
  * \return 0 on success, -1 on failure
  */
-int insert_scontact(impurecord_t* _r, str* _contact,
+int insert_ucontact(impurecord_t* _r, str* _contact,
 		ucontact_info_t* _ci, ucontact_t** _c);
 
 
@@ -152,7 +162,7 @@ int insert_scontact(impurecord_t* _r, str* _contact,
  * \param _c deleted contact
  * \return 0 on success, -1 on failure
  */
-int delete_scontact(struct ucontact* _c);
+int delete_ucontact(impurecord_t* _r, struct ucontact* _c);
 
 
 /*!
@@ -166,19 +176,10 @@ int delete_scontact(struct ucontact* _c);
  * \return 0 - found, 1 - not found, -1 - invalid found, 
  * -2 - found, but to be skipped (same cseq)
  */
-int get_scontact(str* _c, str* _callid, str* _path,
+int get_ucontact(impurecord_t* _r, str* _c, str* _callid, str* _path,
 		int _cseq,
 		struct ucontact** _co);
 
-int update_impurecord(struct udomain* _d, str* public_identity, impurecord_t* impu_rec, int reg_state, int send_sar_on_delete, int barring, int is_primary, ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2, struct impurecord** _r);
-
-int link_contact_to_impu(impurecord_t* impu, ucontact_t* contact, int write_to_db);
-int unlink_contact_from_impu(impurecord_t* impu, ucontact_t* contact, int write_to_db, int is_explicit);
-
-void ref_subscription_unsafe(ims_subscription* s);
-void unref_subscription_unsafe(ims_subscription* s);
-void ref_subscription(ims_subscription* s);
-void unref_subscription(ims_subscription* s);
+int update_impurecord(struct udomain* _d, str* public_identity, int reg_state, int barring, int is_primary, ims_subscription** s, str* ccf1, str* ccf2, str* ecf1, str* ecf2, struct impurecord** _r);
 
 #endif
-

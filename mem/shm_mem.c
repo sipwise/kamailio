@@ -1,7 +1,9 @@
 /*
+
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of sip-router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +18,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * History:
+ * --------
+ *  2003-03-12  split shm_mem_init in shm_getmem & shm_mem_init_mallocs
+ *               (andrei)
+ *  2004-07-27  ANON mmap support, needed on darwin (andrei)
+ *  2004-09-19  shm_mem_destroy: destroy first the lock & then unmap (andrei)
+ *  2007-06-10   support for sfm_malloc & shm_malloc_destroy() (andrei)
+ */
+
 /**
  * \file
  * \brief  Shared memory functions
@@ -24,8 +36,6 @@
 
 
 #ifdef SHM_MEM
-
-#if 0
 
 #include <stdlib.h>
 
@@ -66,8 +76,6 @@ static void* shm_mempool=(void*)-1;
 	struct fm_block* shm_block;
 #elif DL_MALLOC
 	mspace shm_block;
-#elif TLSF_MALLOC
-	tlsf_t shm_block;
 #else
 	struct qm_block* shm_block;
 #endif
@@ -94,7 +102,7 @@ inline static void* sh_realloc(void* p, unsigned int size)
 
 #ifdef DBG_QM_MALLOC
 void* _shm_resize( void* p, unsigned int s, const char* file, const char* func,
-							int line, const char *mname)
+							int line)
 #else
 void* _shm_resize( void* p , unsigned int s)
 #endif
@@ -170,7 +178,7 @@ int shm_getmem(void)
 int shm_mem_init_mallocs(void* mempool, unsigned long pool_size)
 {
 	/* init it for malloc*/
-	shm_block=shm_malloc_init(mempool, pool_size, MEM_TYPE_SHM);
+	shm_block=shm_malloc_init(mempool, pool_size);
 	if (shm_block==0){
 		LOG(L_CRIT, "ERROR: shm_mem_init: could not initialize shared"
 				" malloc\n");
@@ -258,15 +266,5 @@ void shm_mem_destroy(void)
 #endif
 }
 
-unsigned long shm_available_safe()
-{
-	unsigned long ret;
-	shm_lock();
-	ret = shm_available();
-	shm_unlock();
-	return ret;
-}
-
-#endif
 
 #endif

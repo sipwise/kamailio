@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  *
  *
@@ -51,7 +51,7 @@
 
 
 #include "../cdp_avp/mod_export.h"
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "../ims_usrloc_pcscf/usrloc.h"
 #include "rx_authdata.h"
 #include "mod.h"
@@ -106,8 +106,7 @@ int rx_send_str(str *rx_session_id) {
         // If we are in DISCON is because an STR was already sent
         // so just wait for STA or for Grace Timout to happen
         LM_DBG("Hmmm, auth session already in disconnected state\n");
-        cdpb.AAASessionsUnlock(auth->hash);
-        return CSCF_RETURN_FALSE;
+        goto error;
     }
 
     LM_DBG("Creating STR\n");

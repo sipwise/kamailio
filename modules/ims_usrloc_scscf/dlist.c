@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -87,6 +87,7 @@ static inline int find_dlist(str* _n, dlist_t** _d)
 	return 1;
 }
 
+
 /*!
  * \brief Get all contacts from the memory, in partitions if wanted
  * \see get_all_ucontacts
@@ -98,106 +99,104 @@ static inline int find_dlist(str* _n, dlist_t** _d)
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
-	unsigned int part_idx, unsigned int part_max) {
-    dlist_t *p;
-    impurecord_t *r;
-    ucontact_t *c;
-    void *cp;
-    int shortage;
-    int needed;
-    int i,j=0;
-    cp = buf;
-    shortage = 0;
-    /* Reserve space for terminating 0000 */
-    len -= sizeof (c->c.len);
+								unsigned int part_idx, unsigned int part_max)
+{
+	dlist_t *p;
+	impurecord_t *r;
+	ucontact_t *c;
+	void *cp;
+	int shortage;
+	int needed;
+	int i = 0;
+	cp = buf;
+	shortage = 0;
+	/* Reserve space for terminating 0000 */
+	len -= sizeof(c->c.len);
 
-    for (p = root; p != NULL; p = p->next) {
+	for (p = root; p != NULL; p = p->next) {
 
-	for (i = 0; i < p->d->size; i++) {
+		for(i=0; i<p->d->size; i++) {
 
-	    if ((i % part_max) != part_idx)
-		continue;
-	    LM_DBG("LOCKING ULSLOT %d\n", i);
-	    lock_ulslot(p->d, i);
-	    if (p->d->table[i].n <= 0) {
-	    	LM_DBG("UNLOCKING ULSLOT %d\n", i);
-		unlock_ulslot(p->d, i);
-		continue;
-	    }
-	    for (r = p->d->table[i].first; r != NULL; r = r->next) {
-		while (j<MAX_CONTACTS_PER_IMPU && (c = r->newcontacts[j++])) {
-		    if (c->c.len <= 0)
-			continue;
-		    /*
-		     * List only contacts that have all requested
-		     * flags set
-		     */
-		    if ((c->cflags & flags) != flags)
-			continue;
-		    if (c->received.s) {
-			needed = (int) (sizeof (c->received.len)
-				+ c->received.len + sizeof (c->sock)
-				+ sizeof (c->cflags) + sizeof (c->path.len)
-				+ c->path.len);
-			if (len >= needed) {
-			    memcpy(cp, &c->received.len, sizeof (c->received.len));
-			    cp = (char*) cp + sizeof (c->received.len);
-			    memcpy(cp, c->received.s, c->received.len);
-			    cp = (char*) cp + c->received.len;
-			    memcpy(cp, &c->sock, sizeof (c->sock));
-			    cp = (char*) cp + sizeof (c->sock);
-			    memcpy(cp, &c->cflags, sizeof (c->cflags));
-			    cp = (char*) cp + sizeof (c->cflags);
-			    memcpy(cp, &c->path.len, sizeof (c->path.len));
-			    cp = (char*) cp + sizeof (c->path.len);
-			    memcpy(cp, c->path.s, c->path.len);
-			    cp = (char*) cp + c->path.len;
-			    len -= needed;
-			} else {
-			    shortage += needed;
+			if ( (i % part_max) != part_idx )
+				continue;
+
+			lock_ulslot(p->d, i);
+			if(p->d->table[i].n<=0)
+			{
+				unlock_ulslot(p->d, i);
+				continue;
 			}
-		    } else {
-			needed = (int) (sizeof (c->c.len) + c->c.len +
-				sizeof (c->sock) + sizeof (c->cflags) +
-				sizeof (c->path.len) + c->path.len);
-			if (len >= needed) {
-			    memcpy(cp, &c->c.len, sizeof (c->c.len));
-			    cp = (char*) cp + sizeof (c->c.len);
-			    memcpy(cp, c->c.s, c->c.len);
-			    cp = (char*) cp + c->c.len;
-			    memcpy(cp, &c->sock, sizeof (c->sock));
-			    cp = (char*) cp + sizeof (c->sock);
-			    memcpy(cp, &c->cflags, sizeof (c->cflags));
-			    cp = (char*) cp + sizeof (c->cflags);
-			    memcpy(cp, &c->path.len, sizeof (c->path.len));
-			    cp = (char*) cp + sizeof (c->path.len);
-			    memcpy(cp, c->path.s, c->path.len);
-			    cp = (char*) cp + c->path.len;
-			    len -= needed;
-			} else {
-			    shortage += needed;
+			for (r = p->d->table[i].first; r != NULL; r = r->next) {
+				for (c = r->contacts; c != NULL; c = c->next) {
+					if (c->c.len <= 0)
+						continue;
+					/*
+					 * List only contacts that have all requested
+					 * flags set
+					 */
+					if ((c->cflags & flags) != flags)
+						continue;
+					if (c->received.s) {
+						needed = (int)(sizeof(c->received.len)
+								+ c->received.len + sizeof(c->sock)
+								+ sizeof(c->cflags) + sizeof(c->path.len)
+								+ c->path.len);
+						if (len >= needed) {
+							memcpy(cp,&c->received.len,sizeof(c->received.len));
+							cp = (char*)cp + sizeof(c->received.len);
+							memcpy(cp, c->received.s, c->received.len);
+							cp = (char*)cp + c->received.len;
+							memcpy(cp, &c->sock, sizeof(c->sock));
+							cp = (char*)cp + sizeof(c->sock);
+							memcpy(cp, &c->cflags, sizeof(c->cflags));
+							cp = (char*)cp + sizeof(c->cflags);
+							memcpy(cp, &c->path.len, sizeof(c->path.len));
+							cp = (char*)cp + sizeof(c->path.len);
+							memcpy(cp, c->path.s, c->path.len);
+							cp = (char*)cp + c->path.len;
+							len -= needed;
+						} else {
+							shortage += needed;
+						}
+					} else {
+						needed = (int)(sizeof(c->c.len) + c->c.len +
+							sizeof(c->sock) + sizeof(c->cflags) +
+							sizeof(c->path.len) + c->path.len);
+						if (len >= needed) {
+							memcpy(cp, &c->c.len, sizeof(c->c.len));
+							cp = (char*)cp + sizeof(c->c.len);
+							memcpy(cp, c->c.s, c->c.len);
+							cp = (char*)cp + c->c.len;
+							memcpy(cp, &c->sock, sizeof(c->sock));
+							cp = (char*)cp + sizeof(c->sock);
+							memcpy(cp, &c->cflags, sizeof(c->cflags));
+							cp = (char*)cp + sizeof(c->cflags);
+							memcpy(cp, &c->path.len, sizeof(c->path.len));
+							cp = (char*)cp + sizeof(c->path.len);
+							memcpy(cp, c->path.s, c->path.len);
+							cp = (char*)cp + c->path.len;
+							len -= needed;
+						} else {
+							shortage += needed;
+						}
+					}
+				}
 			}
-		    }
+			unlock_ulslot(p->d, i);
 		}
-	    }
-#ifdef EXTRA_DEBUG
-	    LM_DBG("UN-LOCKING ULSLOT %d\n", i);
-#endif
-	    unlock_ulslot(p->d, i);
 	}
-    }
-    /* len < 0 is possible, if size of the buffer < sizeof(c->c.len) */
-    if (len >= 0)
-	memset(cp, 0, sizeof (c->c.len));
+	/* len < 0 is possible, if size of the buffer < sizeof(c->c.len) */
+	if (len >= 0)
+		memset(cp, 0, sizeof(c->c.len));
 
-    /* Shouldn't happen */
-    if (shortage > 0 && len > shortage) {
-	abort();
-    }
+	/* Shouldn't happen */
+	if (shortage > 0 && len > shortage) {
+		abort();
+	}
 
-    shortage -= len;
+	shortage -= len;
 
-    return shortage > 0 ? shortage : 0;
+	return shortage > 0 ? shortage : 0;
 }
 
 
@@ -234,7 +233,7 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
  * \param part_max maximal part
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
-int get_all_scontacts(void *buf, int len, unsigned int flags,
+int get_all_ucontacts(void *buf, int len, unsigned int flags,
 								unsigned int part_idx, unsigned int part_max)
 {
 	return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max);
@@ -385,10 +384,32 @@ void print_all_udomains(FILE* _f)
 
 
 /*!
+ * \brief Loops through all domains summing up the number of users
+ * \return the number of users, could be zero
+ */
+unsigned long get_number_of_users(void)
+{
+	long numberOfUsers = 0;
+
+	dlist_t* current_dlist;
+	
+	current_dlist = root;
+
+	while (current_dlist)
+	{
+		numberOfUsers += get_stat_val(current_dlist->d->users); 
+		current_dlist  = current_dlist->next;
+	}
+
+	return numberOfUsers;
+}
+
+
+/*!
  * \brief Run timer handler of all domains
  * \return 0 if all timer return 0, != 0 otherwise
  */
-int synchronize_all_udomains(int istart, int istep)
+int synchronize_all_udomains(void)
 {
 	int res = 0;
 	dlist_t* ptr;
@@ -396,7 +417,7 @@ int synchronize_all_udomains(int istart, int istep)
 	get_act_time(); /* Get and save actual time */
 
 	for( ptr=root ; ptr ; ptr=ptr->next)
-		mem_timer_udomain(ptr->d, istart, istep);
+		mem_timer_udomain(ptr->d);
 
 	return res;
 }

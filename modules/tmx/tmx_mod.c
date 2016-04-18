@@ -1,9 +1,11 @@
 /**
+ * $Id$
+ *
  * Copyright (C) 2009
  *
- * This file is part of Kamailio.org, a free SIP server.
+ * This file is part of SIP-Router.org, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-Router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
@@ -15,13 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- */
-/*! \file
- * \brief TMX :: Module interface
- *
- * \ingroup tm
- * - Module: \ref tm
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <stdio.h>
@@ -32,14 +28,11 @@
 #include "../../dprint.h"
 #include "../../mod_fix.h"
 #include "../../route.h"
-#include "../../script_cb.h"
 #include "../../modules/tm/tm_load.h"
 #include "../../lib/kcore/kstats_wrapper.h"
-#include "../../dset.h"
 
 #include "t_var.h"
 #include "t_mi.h"
-#include "tmx_pretran.h"
 #include "api.h"
 
 MODULE_VERSION
@@ -52,15 +45,12 @@ struct tm_binds _tmx_tmb;
 
 /** module functions */
 static int mod_init(void);
-static int child_init(int rank);
 static void destroy(void);
 
 static int t_cancel_branches(struct sip_msg* msg, char *k, char *s2);
 static int fixup_cancel_branches(void** param, int param_no);
-static int w_t_cancel_callid_3(struct sip_msg* msg, char *cid, char *cseq,
+static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq,
 				char *flag);
-static int w_t_cancel_callid_4(struct sip_msg* msg, char *cid, char *cseq,
-				char *flag, char *creason);
 static int fixup_cancel_callid(void** param, int param_no);
 static int t_reply_callid(struct sip_msg* msg, char *cid, char *cseq,
 				char *rc, char *rs);
@@ -70,19 +60,12 @@ static int t_flush_flags(struct sip_msg* msg, char*, char* );
 static int t_is_failure_route(struct sip_msg* msg, char*, char* );
 static int t_is_branch_route(struct sip_msg* msg, char*, char* );
 static int t_is_reply_route(struct sip_msg* msg, char*, char*);
-static int t_is_request_route(struct sip_msg* msg, char*, char*);
 
 static int w_t_suspend(struct sip_msg* msg, char*, char*);
 static int w_t_continue(struct sip_msg* msg, char *idx, char *lbl, char *rtn);
-static int w_t_reuse_branch(struct sip_msg* msg, char*, char*);
 static int fixup_t_continue(void** param, int param_no);
-static int w_t_precheck_trans(sip_msg_t*, char*, char*);
-
-static int tmx_cfg_callback(sip_msg_t *msg, unsigned int flags, void *cbp);
 
 static int bind_tmx(tmx_api_t* api);
-
-static int _tmx_precheck_trans = 1;
 
 /* statistic variables */
 stat_var *tm_rcv_rpls;
@@ -109,27 +92,23 @@ unsigned long tmx_stats_trans_6xx(void);
 unsigned long tmx_stats_trans_inuse(void);
 unsigned long tmx_stats_trans_active(void);
 unsigned long tmx_stats_rcv_rpls(void);
-unsigned long tmx_stats_abs_rpls(void);
-unsigned long tmx_stats_rld_rcv_rpls(void);
-unsigned long tmx_stats_rld_loc_rpls(void);
-unsigned long tmx_stats_rld_tot_rpls(void);
+unsigned long tmx_stats_rld_rpls(void);
+unsigned long tmx_stats_loc_rpls(void);
 
 static stat_export_t mod_stats[] = {
-	{"UAS_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_uas_trans   },
-	{"UAC_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_uac_trans   },
-	{"2xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_2xx   },
-	{"3xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_3xx   },
-	{"4xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_4xx   },
-	{"5xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_5xx   },
-	{"6xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_6xx   },
-	{"inuse_transactions",  STAT_IS_FUNC, (stat_var**)tmx_stats_trans_inuse },
-	{"active_transactions", STAT_IS_FUNC, (stat_var**)tmx_stats_trans_active},
-	{"rpl_received",        STAT_IS_FUNC, (stat_var**)tmx_stats_rcv_rpls    },
-	{"rpl_absorbed",        STAT_IS_FUNC, (stat_var**)tmx_stats_abs_rpls    },
-	{"rpl_generated",       STAT_IS_FUNC, (stat_var**)tmx_stats_rld_loc_rpls},
-	{"rpl_relayed",         STAT_IS_FUNC, (stat_var**)tmx_stats_rld_rcv_rpls},
-	{"rpl_sent",            STAT_IS_FUNC, (stat_var**)tmx_stats_rld_tot_rpls},
-	{0, 0, 0}
+	{"UAS_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_uas_trans   },
+	{"UAC_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_uac_trans   },
+	{"2xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_2xx   },
+	{"3xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_3xx   },
+	{"4xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_4xx   },
+	{"5xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_5xx   },
+	{"6xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_6xx   },
+	{"inuse_transactions" ,  STAT_IS_FUNC, (stat_var**)tmx_stats_trans_inuse },
+	{"active_transactions" , STAT_IS_FUNC, (stat_var**)tmx_stats_trans_active},
+	{"received_replies" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_rcv_rpls    },
+	{"relayed_replies" ,     STAT_IS_FUNC, (stat_var**)tmx_stats_rld_rpls    },
+	{"local_replies" ,       STAT_IS_FUNC, (stat_var**)tmx_stats_loc_rpls    },
+	{0,0,0}
 };
 #endif
 
@@ -160,8 +139,6 @@ static pv_export_t mod_pvs[] = {
 		pv_parse_t_var_name, 0, 0, 0 },
 	{ {"T", sizeof("T")-1}, PVT_OTHER, pv_get_t, 0,
 		pv_parse_t_name, 0, 0, 0 },
-	{ {"T_branch", sizeof("T_branch")-1}, PVT_OTHER, pv_get_t_branch, 0,
-		pv_parse_t_name, 0, 0, 0 },
 	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -178,9 +155,7 @@ static mi_export_t mi_cmds [] = {
 static cmd_export_t cmds[]={
 	{"t_cancel_branches", (cmd_function)t_cancel_branches,  1,
 		fixup_cancel_branches, 0, ONREPLY_ROUTE },
-	{"t_cancel_callid", (cmd_function)w_t_cancel_callid_3,  3,
-		fixup_cancel_callid, 0, ANY_ROUTE },
-	{"t_cancel_callid", (cmd_function)w_t_cancel_callid_4,  4,
+	{"t_cancel_callid", (cmd_function)t_cancel_callid,  3,
 		fixup_cancel_callid, 0, ANY_ROUTE },
 	{"t_reply_callid", (cmd_function)t_reply_callid,    4,
 		fixup_reply_callid, 0, ANY_ROUTE },
@@ -192,23 +167,16 @@ static cmd_export_t cmds[]={
 			0, ANY_ROUTE  },
 	{"t_is_reply_route",    (cmd_function)t_is_reply_route,    0, 0,
 			0, ANY_ROUTE  },
-	{"t_is_request_route",    (cmd_function)t_is_request_route,    0, 0,
-			0, ANY_ROUTE  },
 	{"t_suspend",    (cmd_function)w_t_suspend,    0, 0,
 			0, ANY_ROUTE  },
 	{"t_continue", (cmd_function)w_t_continue,     3,
 		fixup_t_continue, 0, ANY_ROUTE },
-	{"t_reuse_branch", (cmd_function)w_t_reuse_branch, 0, 0, 0,
-		EVENT_ROUTE },
-	{"t_precheck_trans", (cmd_function)w_t_precheck_trans, 0, 0, 0,
-		REQUEST_ROUTE },
 	{"bind_tmx", (cmd_function)bind_tmx, 1,
 		0, 0, ANY_ROUTE },
 	{0,0,0,0,0,0}
 };
 
 static param_export_t params[]={
-	{"precheck_trans", PARAM_INT, &_tmx_precheck_trans},
 	{0,0,0}
 };
 
@@ -230,7 +198,7 @@ struct module_exports exports= {
 	mod_init,   /* module initialization function */
 	0,
 	(destroy_function) destroy,
-	child_init  /* per-child init function */
+	0           /* per-child init function */
 };
 
 /**
@@ -258,25 +226,6 @@ static int mod_init(void)
 #endif
 	pv_tmx_data_init();
 
-	if (register_script_cb(tmx_cfg_callback,
-				POST_SCRIPT_CB|REQUEST_CB,0)<0) {
-		LM_ERR("cannot register post-script callback\n");
-		return -1;
-	}
-
-	return 0;
-}
-
-/**
- * child init function
- */
-static int child_init(int rank)
-{
-	LM_DBG("rank is (%d)\n", rank);
-	if (rank==PROC_INIT) {
-		if(_tmx_precheck_trans!=0)
-			return tmx_init_pretran_table();
-	}
 	return 0;
 }
 
@@ -378,7 +327,7 @@ static int fixup_cancel_callid(void** param, int param_no)
 /**
  *
  */
-static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *flag, char *creason)
+static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *flag)
 {
 	struct cell *trans;
 	struct cell *bkt;
@@ -387,9 +336,7 @@ static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *fla
 	str cseq_s;
 	str callid_s;
 	int fl;
-	int rcode;
 
-	rcode = 0;
 	fl = -1;
 
 	if(fixup_get_svalue(msg, (gparam_p)cid, &callid_s)<0)
@@ -409,14 +356,6 @@ static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *fla
 		LM_ERR("cannot get flag\n");
 		return -1;
 	}
-	if(creason!=NULL && fixup_get_ivalue(msg, (gparam_p)creason, &rcode)<0)
-	{
-		LM_ERR("cannot get flag\n");
-		return -1;
-	}
-	if(rcode<100 || rcode>699)
-		rcode = 0;
-
 
 	bkt = _tmx_tmb.t_gett();
 	bkb = _tmx_tmb.t_gett_branch();
@@ -429,7 +368,6 @@ static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *fla
 	if(trans->uas.request && fl>0 && fl<32)
 		setflag(trans->uas.request, fl);
 	init_cancel_info(&cancel_data);
-	cancel_data.reason.cause = rcode;
 	cancel_data.cancel_bitmap = 0;
 	_tmx_tmb.prepare_to_cancel(trans, &cancel_data.cancel_bitmap, 0);
 	_tmx_tmb.cancel_uacs(trans, &cancel_data, 0);
@@ -443,28 +381,12 @@ static int t_cancel_callid(struct sip_msg* msg, char *cid, char *cseq, char *fla
 /**
  *
  */
-static int w_t_cancel_callid_3(struct sip_msg* msg, char *cid, char *cseq, char *flag)
-{
-	return t_cancel_callid(msg, cid, cseq, flag, NULL);
-}
-
-/**
- *
- */
-static int w_t_cancel_callid_4(struct sip_msg* msg, char *cid, char *cseq, char *flag, char *creason)
-{
-	return t_cancel_callid(msg, cid, cseq, flag, creason);
-}
-
-/**
- *
- */
 static int fixup_reply_callid(void** param, int param_no)
 {
 	if (param_no==1 || param_no==2 || param_no==4) {
 		return fixup_spve_null(param, 1);
 	}
-	if (param_no==3 || param_no==4) {
+	if (param_no==3) {
 		return fixup_igp_null(param, 1);
 	}
 	return 0;
@@ -569,16 +491,6 @@ static int t_is_reply_route(struct sip_msg* msg, char *foo, char *bar)
 /**
  *
  */
-static int t_is_request_route(struct sip_msg* msg, char *foo, char *bar)
-{
-	if(route_type == REQUEST_ROUTE)
-		return 1;
-	return -1;
-}
-
-/**
- *
- */
 static int w_t_suspend(struct sip_msg* msg, char *p1, char *p2)
 {
 	unsigned int tindex;
@@ -655,55 +567,12 @@ static int w_t_continue(struct sip_msg* msg, char *idx, char *lbl, char *rtn)
 
 	if(_tmx_tmb.t_continue(tindex, tlabel, act)<0)
 	{
-		LM_WARN("resuming the processing of transaction [%u:%u] failed\n",
+		LM_ERR("resuming the processing of transaction [%u:%u] failed\n",
 				tindex, tlabel);
 		return -1;
 	}
 	return 1;
 }
-
-/**
- * Creates new "main" branch by making copy of branch-failure branch.
- * Currently the following branch attributes are included:
- * request-uri, ruid, path, instance, and branch flags.
- */
-static int w_t_reuse_branch(struct sip_msg* msg, char *p1, char *p2)
-{
-	struct cell *t;
-	int branch;
-
-	if (msg == NULL) return -1;
-
-	/* first get the transaction */
-	if (_tmx_tmb.t_check(msg, 0) == -1) return -1;
-	if ((t = _tmx_tmb.t_gett()) == 0) {
-	    LM_ERR("no transaction\n");
-	    return -1;
-	}
-	switch (get_route_type()) {
-	case BRANCH_FAILURE_ROUTE:
-	    /* use the reason of the winning reply */
-	    if ((branch = _tmx_tmb.t_get_picked_branch()) < 0) {
-		LM_CRIT("no picked branch (%d) for a final response"
-			" in MODE_ONFAILURE\n", branch);
-		return -1;
-	    }
-	    rewrite_uri(msg, &(t->uac[branch].uri));
-	    set_ruid(msg, &(t->uac[branch].ruid));
-	    if (t->uac[branch].path.len) {
-		set_path_vector(msg, &(t->uac[branch].path));
-	    } else {
-		reset_path_vector(msg);
-	    }
-	    setbflagsval(0, t->uac[branch].branch_flags);
-	    set_instance(msg, &(t->uac[branch].instance));
-	    return 1;
-	default:
-	    LM_ERR("unsupported route_type %d\n", get_route_type());
-	    return -1;
-	}
-}
-
 
 /**
  *
@@ -718,31 +587,6 @@ static int fixup_t_continue(void** param, int param_no)
 	}
 
 	return 0;
-}
-
-/**
- *
- */
-static int w_t_precheck_trans(sip_msg_t *msg, char *p1, char *p2)
-{
-	int ret;
-
-	ret = tmx_check_pretran(msg);
-	if(ret>0)
-		return 1;
-	return (ret-1);
-}
-
-/**
- *
- */
-static int tmx_cfg_callback(sip_msg_t *msg, unsigned int flags, void *cbp)
-{
-	if(flags&POST_SCRIPT_CB) {
-		tmx_pretran_unlink();
-	}
-
-	return 1;
 }
 
 static int bind_tmx(tmx_api_t* api)
@@ -827,31 +671,28 @@ unsigned long tmx_stats_trans_active(void)
 unsigned long tmx_stats_rcv_rpls(void)
 {
 	tmx_stats_update();
-	return _tmx_stats_all.rpl_received;
+	return _tmx_stats_all.completed_6xx
+		+ _tmx_stats_all.completed_5xx
+		+ _tmx_stats_all.completed_4xx
+		+ _tmx_stats_all.completed_3xx
+		+ _tmx_stats_all.completed_2xx;
 }
 
-unsigned long tmx_stats_abs_rpls(void)
+unsigned long tmx_stats_rld_rpls(void)
 {
 	tmx_stats_update();
-	return _tmx_stats_all.rpl_received - tmx_stats_rld_rcv_rpls();
+	return _tmx_stats_all.completed_6xx
+		+ _tmx_stats_all.completed_5xx
+		+ _tmx_stats_all.completed_4xx
+		+ _tmx_stats_all.completed_3xx
+		+ _tmx_stats_all.completed_2xx
+		- _tmx_stats_all.replied_locally;
 }
 
-unsigned long tmx_stats_rld_loc_rpls(void)
+unsigned long tmx_stats_loc_rpls(void)
 {
 	tmx_stats_update();
-	return _tmx_stats_all.rpl_generated;
-}
-
-unsigned long tmx_stats_rld_tot_rpls(void)
-{
-	tmx_stats_update();
-	return _tmx_stats_all.rpl_sent;
-}
-
-unsigned long tmx_stats_rld_rcv_rpls(void)
-{
-	tmx_stats_update();
-	return _tmx_stats_all.rpl_sent - _tmx_stats_all.rpl_generated;
+	return _tmx_stats_all.replied_locally;
 }
 
 #endif

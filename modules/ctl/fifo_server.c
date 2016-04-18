@@ -1,32 +1,30 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2005 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
- */
-
-/*! \file
- * \brief ctl module
- * \ingroup ctl
- *
- */
-
-/*! \defgroup ctl Control binrpc socket
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Fifo server is a very powerful tool used to access easily
  * ser's internals via textual interface, similarly to
@@ -54,6 +52,22 @@
  * File test/transaction.fifo illustrates example of use
  * of t_uac command (part of TM module).
  *
+ * History:
+ * --------
+ *  2003-03-29  destroy pkg mem introduced (jiri)
+ *  2003-03-19  replaced all mallocs/frees w/ ctl_malloc/ctl_free (andrei)
+ *  2003-01-29  new built-in fifo commands: arg and pwd (jiri)
+ *  2003-10-07  fifo security fixes: permissions, always delete old fifo,
+ *               reply fifo checks -- added fifo_check (andrei)
+ *  2003-10-13  added fifo_dir for reply fifos (andrei)
+ *  2003-10-30  DB interface exported via FIFO (bogdan)
+ *  2004-03-09  open_fifo_server split into init_ and start_ (andrei)
+ *  2004-04-29  added chown(sock_user, sock_group)  (andrei)
+ *  2004-06-06  updated to the new DB interface  & init_db_fifo (andrei)
+ *  2004-09-19  fifo is deleted on exit (destroy_fifo)  (andrei)
+ *  2005-03-02  meminfo fifo cmd added (andrei)
+ *  2006-02-17  hacked to process fifo request as a part of the ctrl module
+ *              and to work also over tcp, udp or unix sockets (andrei)
  */
 
 #ifdef USE_FIFO
@@ -177,7 +191,7 @@ static int  rpc_send         (rpc_ctx_t* ctx);                                 /
 static void rpc_fault        (rpc_ctx_t* ctx,       int code, char* fmt, ...); /* Signal a failure to the client */
 static int  rpc_add          (rpc_ctx_t* ctx,       char* fmt, ...);           /* Add a new piece of data to the result */
 static int  rpc_scan         (rpc_ctx_t* ctx,       char* fmt, ...);           /* Retrieve request parameters */
-static int  rpc_rpl_printf   (rpc_ctx_t* ctx,       char* fmt, ...);           /* Add printf-like formated data to the result set */
+static int  rpc_printf       (rpc_ctx_t* ctx,       char* fmt, ...);           /* Add printf-like formated data to the result set */
 static int  rpc_struct_add   (struct text_chunk* s, char* fmt, ...);           /* Create a new structure */
 static int  rpc_struct_scan  (struct rpc_struct* s, char* fmt, ...);           /* Scan attributes of a structure */
 static int  rpc_struct_printf(struct text_chunk* s, char* name, char* fmt, ...);
@@ -891,15 +905,12 @@ int init_fifo_fd(char* fifo, int fifo_mode, int fifo_uid, int fifo_gid,
 
 int fifo_rpc_init()
 {
-	memset(&func_param, 0, sizeof(func_param));
 	func_param.send = (rpc_send_f)rpc_send;
 	func_param.fault = (rpc_fault_f)rpc_fault;
 	func_param.add = (rpc_add_f)rpc_add;
 	func_param.scan = (rpc_scan_f)rpc_scan;
-	func_param.rpl_printf = (rpc_rpl_printf_f)rpc_rpl_printf;
+	func_param.printf = (rpc_printf_f)rpc_printf;
 	func_param.struct_add = (rpc_struct_add_f)rpc_struct_add;
-	/* use rpc_struct_add for array_add */
-	func_param.array_add = (rpc_array_add_f)rpc_struct_add;
 	func_param.struct_scan = (rpc_struct_scan_f)rpc_struct_scan;	
 	func_param.struct_printf = (rpc_struct_printf_f)rpc_struct_printf;
 	return 0;
@@ -1174,7 +1185,7 @@ static int rpc_add(rpc_ctx_t* ctx, char* fmt, ...)
 
 	va_start(ap, fmt);
 	while(*fmt) {
-		if (*fmt == '{' || *fmt == '[') {
+		if (*fmt == '{') {
 			void_ptr = va_arg(ap, void**);
 			l = new_chunk(&s);
 			if (!l) {
@@ -1271,7 +1282,7 @@ static int rpc_struct_printf(struct text_chunk* c, char* name, char* fmt, ...)
 }
 
 
-static int rpc_rpl_printf(rpc_ctx_t* ctx, char* fmt, ...)
+static int rpc_printf(rpc_ctx_t* ctx, char* fmt, ...)
 {
 	int n, buf_size;
 	char* buf;
@@ -1430,11 +1441,11 @@ static int rpc_scan(rpc_ctx_t* ctx, char* fmt, ...)
 }
 
 
+
 static int rpc_struct_add(struct text_chunk* s, char* fmt, ...)
 {
 	static char buf[MAX_LINE_BUFFER];
 	str st, *sp;
-	void** void_ptr;
 	va_list ap;
 	struct text_chunk* m, *c;
 	rpc_ctx_t* ctx;
@@ -1452,67 +1463,61 @@ static int rpc_struct_add(struct text_chunk* s, char* fmt, ...)
 		}
 		m->flags |= CHUNK_MEMBER_NAME;
 		
-		if(*fmt=='{' || *fmt=='[') {
-			void_ptr = va_arg(ap, void**);
-			m->ctx=ctx;
-			append_chunk(ctx, m);
-			*void_ptr = m;
-		} else {
-			switch(*fmt) {
-			case 'd':
-			case 't':
-				st.s = int2str(va_arg(ap, int), &st.len);
-				c = new_chunk(&st);
-				break;
-
-			case 'f':
-				st.s = buf;
-				st.len = snprintf(buf, 256, "%f", va_arg(ap, double));
-				if (st.len < 0) {
-					rpc_fault(ctx, 400, "Error While Converting double");
-					ERR("Error while converting double\n");
-					goto err;
-				}
-				c = new_chunk(&st);
-				break;
-
-				case 'b':
-					st.len = 1;
-					st.s = ((va_arg(ap, int) == 0) ? "0" : "1");
-					c = new_chunk(&st);
-				break;
-
-			case 's':
-				st.s = va_arg(ap, char*);
-				st.len = strlen(st.s);
-				c = new_chunk_escape(&st, 1);
-				break;
-
-			case 'S':
-				sp = va_arg(ap, str*);
-				c = new_chunk_escape(sp, 1);
-				break;
-
-			default:
-				rpc_fault(ctx, 500, "Bug In SER (Invalid formatting character %c)",
-						*fmt);
-				ERR("Invalid formatting character\n");
+		switch(*fmt) {
+		case 'd':
+		case 't':
+			st.s = int2str(va_arg(ap, int), &st.len);
+			c = new_chunk(&st);
+			break;
+			
+		case 'f':
+			st.s = buf;
+			st.len = snprintf(buf, 256, "%f", va_arg(ap, double));
+			if (st.len < 0) {
+				rpc_fault(ctx, 400, "Error While Converting double");
+				ERR("Error while converting double\n");
 				goto err;
 			}
-
-			if (!c) {
-				rpc_fault(ctx, 500, "Internal Server Error");
-				goto err;
-			}
-			c->flags |= CHUNK_MEMBER_VALUE;
-			c->next = s->next;
-			s->next = c;
-			if (s == ctx->last) ctx->last = c;
-
-			m->next = s->next;
-			s->next = m;
-			if (s == ctx->last) ctx->last = m;
+			c = new_chunk(&st);
+			break;
+			
+		case 'b':
+			st.len = 1;
+			st.s = ((va_arg(ap, int) == 0) ? "0" : "1");
+			c = new_chunk(&st);
+			break;
+			
+		case 's':
+			st.s = va_arg(ap, char*);
+			st.len = strlen(st.s);
+			c = new_chunk_escape(&st, 1);
+			break;
+			
+		case 'S':
+			sp = va_arg(ap, str*);
+			c = new_chunk_escape(sp, 1);
+			break;
+			
+		default:
+			rpc_fault(ctx, 500, "Bug In SER (Invalid formatting character %c)",
+					*fmt);
+			ERR("Invalid formatting character\n");
+			goto err;
 		}
+
+		if (!c) {
+			rpc_fault(ctx, 500, "Internal Server Error");
+			goto err;
+		}
+		c->flags |= CHUNK_MEMBER_VALUE;
+		c->next = s->next;
+		s->next = c;
+		if (s == ctx->last) ctx->last = c;
+
+		m->next = s->next;
+		s->next = m;
+		if (s == ctx->last) ctx->last = m;
+
 		fmt++;
 	}
 	va_end(ap);

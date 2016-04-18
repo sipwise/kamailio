@@ -1,12 +1,14 @@
 p_usrloc - Distributed databases
 
+Jonas Appel
+
+   1&1 Internet AG
+
 Henning Westerholt
 
    1&1 Internet AG
 
-Edited by
-
-Patric Marschall
+Marius Zbihlei
 
    1&1 Internet AG
 
@@ -48,8 +50,6 @@ Patric Marschall
               3.21. alg_location (int)
               3.22. domain_db(str)
               3.23. default_db_type(str)
-              3.24. db_ops_ruid (int)
-              3.25. db_update_as_insert (string)
 
         4. default_db_url(str)
         5. Changes from usrloc module
@@ -117,11 +117,9 @@ Patric Marschall
    1.21. Set alg_location parameter
    1.22. Set domain_db parameter
    1.23. Set default_db_type parameter
-   1.24. Set db_ops_ruid parameter
-   1.25. Set db_update_as_insert parameter
-   1.26. Set default_db_type parameter
-   1.27. Set db_mode parameter
-   1.28. Example database content - reg_table (locdb) table
+   1.24. Set default_db_type parameter
+   1.25. Set db_mode parameter
+   1.26. Example database content - reg_table (locdb) table
 
 Chapter 1. User's Guide
 
@@ -158,8 +156,6 @@ Chapter 1. User's Guide
         3.21. alg_location (int)
         3.22. domain_db(str)
         3.23. default_db_type(str)
-        3.24. db_ops_ruid (int)
-        3.25. db_update_as_insert (string)
 
    4. default_db_url(str)
    5. Changes from usrloc module
@@ -274,14 +270,12 @@ Warning
    3.21. alg_location (int)
    3.22. domain_db(str)
    3.23. default_db_type(str)
-   3.24. db_ops_ruid (int)
-   3.25. db_update_as_insert (string)
 
 3.1. write_db_url (string)
 
    The url to the master database where errors are written to.
 
-   Default value is "mysql://kamailio:kamailiorw@localhost/kamailio"
+   Default value is "mysql://openser:openserrw@localhost/openser"
 
    Example 1.1. Set write_db_url parameter
 ...
@@ -295,7 +289,7 @@ sename")
    from. It is seperated from write access, so for better performance, a
    local replicate can be used for read access.
 
-   Default value is mysql://kamailio:kamailiorw@localhost/kamailio .
+   Default value is mysql://openser:openserrw@localhost/openser .
 
    Example 1.2. Set read_db_url parameter
 ...
@@ -584,32 +578,6 @@ modparam("p_usrloc", "domain_db", "location=cluster,cfa=single")
 modparam("p_usrloc", "default_db_type", "cluster")
 ...
 
-3.24. db_ops_ruid (int)
-
-   If set to 1, database queries for update or delete are done using ruid
-   value. If it is set to 0, the old style using aor, contact and call-id
-   is done.
-
-   Default value is "1".
-
-   Example 1.24. Set db_ops_ruid parameter
-...
-modparam("p_usrloc", "db_ops_ruid", 0)
-...
-
-3.25. db_update_as_insert (string)
-
-   Set this parameter if you want to do INSERT DB operations instead of
-   UPDATE DB operations. It is recommended to set this parameter if you
-   use Cassandra as a DB backend.
-
-   Default value is "0".
-
-   Example 1.25. Set db_update_as_insert parameter
-...
-modparam("usrloc", "db_update_as_insert", 1)
-...
-
 4. default_db_url(str)
 
    The URL of the default database for Location domains (for domains that
@@ -617,7 +585,7 @@ modparam("usrloc", "db_update_as_insert", 1)
 
    Default value is "DEFAULT_DB_URL".
 
-   Example 1.26. Set default_db_type parameter
+   Example 1.24. Set default_db_type parameter
 ...
 modparam("p_usrloc", "default_db_url", "mysql://ser:ser@localhost/ser")
 ...
@@ -644,7 +612,7 @@ modparam("p_usrloc", "default_db_url", "mysql://ser:ser@localhost/ser")
 
    Default value is 3.
 
-   Example 1.27. Set db_mode parameter
+   Example 1.25. Set db_mode parameter
 ...
 modparam("p_usrloc", "db_mode", 2)
 ...
@@ -678,7 +646,7 @@ modparam("p_usrloc", "db_mode", 2)
    complete database documentation on the project webpage,
    http://www.kamailio.org/docs/db-tables/kamailio-db-devel.html.
 
-   Example 1.28. Example database content - reg_table (locdb) table
+   Example 1.26. Example database content - reg_table (locdb) table
 ...
 +----+----+------+--------+--------+---------------------+-------+----+
 | id | no | url  | status | errors | failover            | spare | rg |
@@ -691,9 +659,9 @@ modparam("p_usrloc", "db_mode", 2)
 ...
 
    The URLs are omitted for a better overview, but you can use standard
-   Kamailio database URLs like
-   mysql://kamailio:kamailiorw@localhost/kamailio Databases don't need to
-   be on different hosts, e.g. for testing purposes.
+   Kamailio database URLs like mysql://openser:openserrw@localhost/openser
+   Databases don't need to be on different hosts, e.g. for testing
+   purposes.
 
    This table contains two database groups. The first with id one, and the
    second with the id two.

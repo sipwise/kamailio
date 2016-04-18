@@ -1,26 +1,26 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-Router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-Router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-Router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
  * \file
- * \brief Kamailio core :: PV API specification
+ * \brief SIP-router core :: PV API specification
  * \ingroup core
  * Module: \ref core
  */
@@ -539,21 +539,6 @@ int pv_get_strzval(struct sip_msg *msg, pv_param_t *param,
 }
 
 /**
- * convert char* with len to pv_value_t
- */
-int pv_get_strlval(struct sip_msg *msg, pv_param_t *param,
-		pv_value_t *res, char *sval, int slen)
-{
-	if(res==NULL)
-		return -1;
-
-	res->rs.s = sval;
-	res->rs.len = slen;
-	res->flags = PV_VAL_STR;
-	return 0;
-}
-
-/**
  * convert str-int to pv_value_t (type is str)
  */
 int pv_get_strintval(struct sip_msg *msg, pv_param_t *param,
@@ -592,9 +577,6 @@ static int pv_get_marker(struct sip_msg *msg, pv_param_t *param,
 			(int)pv_str_marker.s[0]);
 }
 
-static char pv_str_empty_buf[2];
-static char pv_str_null_buf[8];
-
 static str pv_str_empty  = { "", 0 };
 static str pv_str_null   = { "<null>", 6 };
 int pv_get_null(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
@@ -607,21 +589,6 @@ int pv_get_null(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 	res->flags = PV_VAL_NULL;
 	return 0;
 }
-
-/**
- *
- */
-int pv_get_strempty(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
-{
-	if(res==NULL)
-		return -1;
-
-	res->rs = pv_str_empty;
-	res->ri = 0;
-	res->flags = PV_VAL_STR;
-	return 0;
-}
-
 
 /**
  *
@@ -698,11 +665,6 @@ int pv_parse_index(pv_spec_p sp, str *in)
 	if(*p=='*' && in->len==1)
 	{
 		sp->pvp.pvi.type = PV_IDX_ALL;
-		return 0;
-	}
-	if(*p=='+' && in->len==1)
-	{
-		sp->pvp.pvi.type = PV_IDX_ITR;
 		return 0;
 	}
 	sign = 1;
@@ -1263,10 +1225,7 @@ int pv_get_spec_index(struct sip_msg* msg, pv_param_p ip, int *idx, int *flags)
 		*flags = PV_IDX_ALL;
 		return 0;
 	}
-	if(ip->pvi.type == PV_IDX_ITR) {
-		*flags = PV_IDX_ITR;
-		return 0;
-	}
+	
 	if(ip->pvi.type == PV_IDX_INT)
 	{
 		*idx = ip->pvi.u.ival;
@@ -1908,13 +1867,6 @@ int pv_init_api(void)
 	tr_init_table();
 	if(pv_init_buffer()<0)
 		return -1;
-
-	pv_str_empty_buf[0] = '\0';
-	pv_str_empty_buf[1] = '\0';
-	pv_str_empty.s = pv_str_empty_buf;
-	strcpy(pv_str_null_buf, "<null>");
-	pv_str_null.s = pv_str_null_buf;
-
 	if(register_pvars_mod("core", _core_pvs)<0)
 		return -1;
 	return 0;
@@ -1935,7 +1887,7 @@ void pv_destroy_api(void)
  * - buffer to print PVs
  */
 static char **_pv_print_buffer = NULL;
-#define PV_DEFAULT_PRINT_BUFFER_SIZE 8192 /* 8kB */
+#define PV_DEFAULT_PRINT_BUFFER_SIZE 1024
 static int _pv_print_buffer_size  = PV_DEFAULT_PRINT_BUFFER_SIZE;
 static int _pv_print_buffer_size_active  = 0;
 /* 6 mod params + 4 direct usage from mods */

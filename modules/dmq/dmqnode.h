@@ -1,4 +1,6 @@
 /**
+ * $Id$
+ *
  * dmq module - distributed message queue
  *
  * Copyright (C) 2011 Bucur Marius - Ovidiu
@@ -17,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -42,7 +44,7 @@ typedef struct dmq_node {
 	int local; /* local type set means the dmq dmqnode == self */
 	str orig_uri; /* original uri string - e.g. sip:127.0.0.1:5060;passive=true */
 	struct sip_uri uri; /* parsed uri string */
-	struct ip_addr ip_address; /* resolved IP address */
+	param_t* params; /* uri parameters */
 	int status; /* reserved - maybe something like active,timeout,disabled */
 	int last_notification; /* last notificatino receied from the node */
 	struct dmq_node* next; /* pointer to the next struct dmq_node */
@@ -63,7 +65,6 @@ int update_node_list(dmq_node_list_t* remote_list);
 dmq_node_t* add_dmq_node(dmq_node_list_t* list, str* uri);
 dmq_node_t* find_dmq_node(dmq_node_list_t* list, dmq_node_t* node);
 dmq_node_t* find_dmq_node_uri(dmq_node_list_t* list, str* uri);
-dmq_node_t* find_dmq_node_uri2(str* uri);
 int del_dmq_node(dmq_node_list_t* list, dmq_node_t* node);
 int cmp_dmq_node(dmq_node_t* node, dmq_node_t* cmpnode);
 dmq_node_t* shm_dup_node(dmq_node_t* node);

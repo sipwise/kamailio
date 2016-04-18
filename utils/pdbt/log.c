@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "log.h"
@@ -55,10 +55,10 @@ void destroy_log(void) {
 
 
 
-void log_stderr(char * format, va_list ap)
+void log_stdout(char * format, va_list ap)
 {
-	vfprintf(stderr, format, ap);
-	fflush(stderr);
+	vfprintf(stdout, format, ap);
+	fflush(stdout);
 }
 
 
@@ -70,7 +70,7 @@ void pdb_log(int priority, char * format, ...) {
 	if (priority<=log_level) {
 		va_start(ap, format);
 		if (use_syslog) vsyslog(priority, format, ap);
-		else log_stderr(format, ap);
+		else log_stdout(format, ap);
 		va_end(ap);
 	}
 }

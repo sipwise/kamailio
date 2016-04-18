@@ -1,4 +1,6 @@
-/*
+/**
+ * $Id$
+ *
  * Copyright (C) 2013 Konstantin Mosesov
  *
  * This file is part of Kamailio, a free SIP server.
@@ -16,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -30,7 +32,7 @@
 #include "global.h"
 
 #include "utils.h"
-#include "app_java_mod.h"
+#include "java_mod.h"
 #include "java_iface.h"
 #include "java_support.h"
 
@@ -169,7 +171,7 @@ void handle_exception(void)
 	(*env)->DeleteLocalRef(env, exception);
     }
 
-    LM_ERR("%s: Exception:\n%s\n", APP_NAME, error_msg == NULL ? "(no info)" : error_msg);
+    LM_ERR("Exception:\n%s\n", error_msg == NULL ? "(no info)" : error_msg);
 
 }
 
@@ -192,25 +194,25 @@ void handle_VM_init_failure(int res)
     switch(res)
     {
 	    case -1:
-		LM_ERR("%s: Couldn't initialize Java VM: unknown error\n", APP_NAME);
+		LM_ERR("Couldn't initialize Java VM: unknown error\n");
 		break;
 	    case -2:
-		LM_ERR("%s: Couldn't initialize Java VM: thread detached from the VM\n", APP_NAME);
+		LM_ERR("Couldn't initialize Java VM: thread detached from the VM\n");
 	        break;
 	    case -3:
-		LM_ERR("%s: Couldn't initialize Java VM: JNI version error\n", APP_NAME);
+		LM_ERR("Couldn't initialize Java VM: JNI version error\n");
 		break;
 	    case -4:
-		LM_ERR("%s: Couldn't initialize Java VM: not enough memory\n", APP_NAME);
+		LM_ERR("Couldn't initialize Java VM: not enough memory\n");
 		break;
 	    case -5:
-		LM_ERR("%s: Couldn't initialize Java VM: VM already created\n", APP_NAME);
+		LM_ERR("Couldn't initialize Java VM: VM already created\n");
 		break;
 	    case -6:
-		LM_ERR("%s: Couldn't initialize Java VM: invalid arguments\n", APP_NAME);
+		LM_ERR("Couldn't initialize Java VM: invalid arguments\n");
 		break;
 	    default:
-		LM_ERR("%s: Couldn't initialize Java VM. Error code: %d\n", APP_NAME, res);
+		LM_ERR("Couldn't initialize Java VM. Error code: %d\n", res);
 		break;
     }
 }

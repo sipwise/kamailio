@@ -1,26 +1,33 @@
 /*
+ * $Id$
+ *
  * destination set
  *
  * Copyright (C) 2001-2004 FhG FOKUS
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/** Kamailio core :: destination set / branches support.
+/** destination set / branches support.
  * @file dset.c
  * @ingroup core
  * Module: @ref core
@@ -32,7 +39,6 @@
 #include "parser/parser_f.h"
 #include "parser/parse_uri.h"
 #include "parser/msg_parser.h"
-#include "globals.h"
 #include "ut.h"
 #include "hash_func.h"
 #include "error.h"
@@ -52,9 +58,9 @@
 
 /* 
  * Where we store URIs of additional transaction branches
- * (sr_dst_max_branches - 1 : because of the default branch for r-uri, #0 in tm)
+ * (-1 because of the default branch, #0)
  */
-static struct branch *branches = NULL;
+static struct branch branches[MAX_BRANCHES - 1];
 
 /* how many of them we have */
 unsigned int nr_branches = 0;
@@ -71,23 +77,6 @@ static qvalue_t ruri_q = Q_UNSPECIFIED;
 /* Branch flags of the Request-URI */
 static flag_t ruri_bflags;
 
-
-int init_dst_set(void)
-{
-	if(sr_dst_max_branches<=0 || sr_dst_max_branches>=MAX_BRANCHES_LIMIT) {
-		LM_ERR("invalid value for max branches parameter: %u\n",
-				sr_dst_max_branches);
-		return -1;
-	}
-	/* sr_dst_max_branches - 1 : because of the default branch for r-uri, #0 in tm */
-	branches = (branch_t*)pkg_malloc((sr_dst_max_branches-1)*sizeof(branch_t));
-	if(branches==NULL) {
-		LM_ERR("not enough memory to initialize destination branches\n");
-		return -1;
-	}
-	memset(branches, 0, (sr_dst_max_branches-1)*sizeof(branch_t));
-	return 0;
-}
 
 /*! \brief
  * Return pointer to branch[idx] structure
@@ -122,14 +111,14 @@ int drop_sip_branch(int idx)
 		return 0;
 	if(idx<0 && (int)nr_branches+idx<0)
 		return 0;
-	if(idx<0)
-		idx += nr_branches;
 	/* last branch */
 	if(idx==nr_branches-1)
 	{
 		nr_branches--;
 		return 0;
 	}
+	if(idx<0)
+		idx = nr_branches+idx;
 	/* shift back one position */
 	for(; idx<nr_branches-1; idx++)
 		memcpy(&branches[idx], &branches[idx+1], sizeof(branch_t));
@@ -344,8 +333,8 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* if we have already set up the maximum number
 	 * of branches, don't try new ones 
 	 */
-	if (unlikely(nr_branches == sr_dst_max_branches - 1)) {
-		LM_ERR("max nr of branches exceeded\n");
+	if (unlikely(nr_branches == MAX_BRANCHES - 1)) {
+		LOG(L_ERR, "max nr of branches exceeded\n");
 		ser_error = E_TOO_MANY_BRANCHES;
 		return -1;
 	}
@@ -366,14 +355,14 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	}
 
 	if (unlikely(luri.len > MAX_URI_SIZE - 1)) {
-		LM_ERR("too long uri: %.*s\n", luri.len, luri.s);
+		LOG(L_ERR, "too long uri: %.*s\n", luri.len, luri.s);
 		return -1;
 	}
 
 	/* copy the dst_uri */
 	if (dst_uri && dst_uri->len && dst_uri->s) {
 		if (unlikely(dst_uri->len > MAX_URI_SIZE - 1)) {
-			LM_ERR("too long dst_uri: %.*s\n", dst_uri->len, dst_uri->s);
+			LOG(L_ERR, "too long dst_uri: %.*s\n", dst_uri->len, dst_uri->s);
 			return -1;
 		}
 		memcpy(branches[nr_branches].dst_uri, dst_uri->s, dst_uri->len);
@@ -387,7 +376,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* copy the path string */
 	if (unlikely(path && path->len && path->s)) {
 		if (unlikely(path->len > MAX_PATH_SIZE - 1)) {
-			LM_ERR("too long path: %.*s\n", path->len, path->s);
+			LOG(L_ERR, "too long path: %.*s\n", path->len, path->s);
 			return -1;
 		}
 		memcpy(branches[nr_branches].path, path->s, path->len);
@@ -410,7 +399,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* copy instance string */
 	if (unlikely(instance && instance->len && instance->s)) {
 		if (unlikely(instance->len > MAX_INSTANCE_SIZE - 1)) {
-			LM_ERR("too long instance: %.*s\n",
+			LOG(L_ERR, "too long instance: %.*s\n",
 			    instance->len, instance->s);
 			return -1;
 		}
@@ -429,7 +418,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	/* copy ruid string */
 	if (unlikely(ruid && ruid->len && ruid->s)) {
 		if (unlikely(ruid->len > MAX_RUID_SIZE - 1)) {
-			LM_ERR("too long ruid: %.*s\n",
+			LOG(L_ERR, "too long ruid: %.*s\n",
 			    ruid->len, ruid->s);
 			return -1;
 		}
@@ -444,7 +433,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 
 	if (unlikely(location_ua && location_ua->len && location_ua->s)) {
 		if (unlikely(location_ua->len > MAX_UA_SIZE)) {
-			LM_ERR("too long location_ua: %.*s\n",
+			LOG(L_ERR, "too long location_ua: %.*s\n",
 			    location_ua->len, location_ua->s);
 			return -1;
 		}
@@ -508,7 +497,7 @@ char* print_dset(struct sip_msg* msg, int* len)
 	*len += CONTACT_LEN + CRLF_LEN + (cnt - 1) * CONTACT_DELIM_LEN;
 
 	if (*len + 1 > MAX_REDIRECTION_LEN) {
-		LM_ERR("redirection buffer length exceed\n");
+		LOG(L_ERR, "ERROR: redirection buffer length exceed\n");
 		goto error;
 	}
 
@@ -892,23 +881,4 @@ int uri_restore_rcv_alias(str *uri, str *nuri, str *suri)
 			uri->len, uri->s, nuri->len, nuri->s, suri->len, suri->s);
 
 	return 0;
-}
-
-/* address of record (aor) management */
-
-/* address of record considered case sensitive
- * - 0 = no; 1 = yes */
-static int aor_case_sensitive=0;
-
-int set_aor_case_sensitive(int mode)
-{
-	int r;
-	r = aor_case_sensitive;
-	aor_case_sensitive = mode;
-	return r;
-}
-
-int get_aor_case_sensitive(void)
-{
-	return aor_case_sensitive;
 }

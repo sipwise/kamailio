@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  * Copyright (C) 2007-2008 1&1 Internet AG
  * 
@@ -16,8 +18,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+ /*
+  * History:
+  * --------
+  *  2004-06-06  bind_dbmod takes dbf as parameter (andrei)
+  *  2006-10-10  Added support for retrieving the last inserted ID (Carsten Bock, BASIS AudioNet GmbH)
+  */
 
 /**
  * \file lib/srdb1/db.c
@@ -70,19 +78,19 @@ int db_check_api(db_func_t* dbf, char *mname)
 
 	/* All modules must export db_use_table */
 	if (dbf->use_table == 0) {
-		LM_ERR("module %s does not export db_use_table function. Please check if module is loaded.\n", mname);
+		LM_ERR("module %s does not export db_use_table function\n", mname);
 		goto error;
 	}
 
 	/* All modules must export db_init */
 	if (dbf->init == 0) {
-		LM_ERR("module %s does not export db_init function. Please check if module is loaded.\n", mname);
+		LM_ERR("module %s does not export db_init function\n", mname);
 		goto error;
 	}
 
 	/* All modules must export db_close */
 	if (dbf->close == 0) {
-		LM_ERR("module %s does not export db_close function. Please check if module is loaded.\n", mname);
+		LM_ERR("module %s does not export db_close function\n", mname);
 		goto error;
 	}
 
@@ -199,10 +207,6 @@ int db_bind_mod(const str* mod, db_func_t* mydbf)
 		tmp = name;
 	}
 
-	if (!find_module_by_name(tmp)) {
-		LM_ERR("Module %s not found. Missing loadmodule? \n", tmp);
-		goto error;
-	}
 	dbind = (db_bind_api_f)find_mod_export(tmp, "db_bind_api", 0, 0);
 	if(dbind != NULL)
 	{

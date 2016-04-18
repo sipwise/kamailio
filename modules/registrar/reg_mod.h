@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * registrar module interface
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,8 +19,18 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *
+ * 2005-07-11  added sip_natping_flag for nat pinging with SIP method
+ *             instead of UDP package (bogdan)
+ * 2006-11-28  Added statistics tracking for the number of accepted/rejected
+ *             registrations, as well as for the max expiry time, max contacts,
+ *             and default expiry time. (Jeffrey Magder - SOMA Networks)
+ * 2007-02-24  sip_natping_flag moved into branch flags, so migrated to 
+ *             nathelper module (bogdan)
  */
 
 /*!
@@ -74,17 +86,14 @@ extern float def_q;
 
 extern unsigned short rcv_avp_type;
 extern int_str rcv_avp_name;
-
-extern str match_callid_name;
-extern str match_received_name;
-extern str match_contact_name;
+extern unsigned short reg_callid_avp_type;
+extern int_str reg_callid_avp_name;
 
 extern str rcv_param;
 extern int method_filtering;
 extern int path_enabled;
 extern int path_mode;
 extern int path_use_params;
-extern int path_check_local;
 extern int reg_gruu_enabled;
 extern int reg_outbound_mode;
 extern int reg_regid_mode;

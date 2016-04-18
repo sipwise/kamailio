@@ -1,29 +1,42 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/* local, per process timer routines
+ * WARNING: this should be used only within the same process, the timers
+ *  are not multi-process safe or multi-thread safe
+ *  (there are no locks)
+ *
+ * History:
+ * --------
+ *  2006-02-03  created by andrei
  */
 
 /*!
  * \file
- * \brief Kamailio core :: local, per process timer routines
- * WARNING: this should be used only within the same process, the timers
- *  are not multi-process safe or multi-thread safe
- *  (there are no locks)
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -40,7 +53,7 @@
 
 
 
-/** init a local_timer handle
+/* init a local_timer handle
  * returns 0 on success, -1 on error */
 int init_local_timer(struct local_timer *t, ticks_t crt_ticks)
 {
@@ -57,7 +70,7 @@ int init_local_timer(struct local_timer *t, ticks_t crt_ticks)
 	for (r=0; r<H2_ENTRIES; r++)
 		_timer_init_list(&t->timer_lst.h2[r]);
 	_timer_init_list(&t->timer_lst.expired);
-	LM_DBG("timer_list between %p and %p\n",
+	DBG("init_local_timer: timer_list between %p and %p\n",
 			&t->timer_lst.h0[0], &t->timer_lst.h2[H2_ENTRIES]);
 	return 0;
 }
@@ -70,7 +83,7 @@ void destroy_local_timer(struct local_timer* lt)
 
 
 
-/** generic add timer entry to the timer lists function (see _timer_add)
+/* generic add timer entry to the timer lists function (see _timer_add)
  * tl->expire must be set previously, delta is the difference in ticks
  * from current time to the timer desired expire (should be tl->expire-*tick)
  * If you don't know delta, you probably want to call _timer_add instead.
@@ -80,7 +93,8 @@ static inline int _local_timer_dist_tl(struct local_timer* h,
 {
 	if (likely(delta<H0_ENTRIES)){
 		if (unlikely(delta==0)){
-			LM_WARN("0 expire timer added\n");
+			LOG(L_WARN, "WARNING: local_timer: add_timeout: 0 expire timer"
+						" added\n");
 			_timer_add_list(&h->timer_lst.expired, tl);
 		}else{
 			_timer_add_list( &h->timer_lst.h0[tl->expire & H0_MASK], tl);
@@ -111,7 +125,7 @@ static inline void local_timer_redist(struct local_timer* l,
 
 
 
-/** local timer add function (no lock, not multithread or multiprocess safe,
+/* local timer add function (no lock, not multithread or multiprocess safe,
  * designed for local process use only)
  * t = current ticks
  * tl must be filled (the intial_timeout and flags must be set)
@@ -128,7 +142,7 @@ static inline int _local_timer_add(struct local_timer *h, ticks_t t,
 
 
 
-/** "public", safe timer add functions (local process use only)
+/* "public", safe timer add functions (local process use only)
  * adds a timer at delta ticks from the current time
  * returns -1 on error, 0 on success
  * WARNING: to re-add a deleted or expired timer you must call
@@ -141,14 +155,15 @@ int local_timer_add(struct local_timer* h, struct timer_ln* tl, ticks_t delta,
 	int ret;
 	
 	if (unlikely(tl->flags & F_TIMER_ACTIVE)){
-		LM_DBG("called on an active timer %p (%p, %p), flags %x\n",
-				tl, tl->next, tl->prev, tl->flags);
+		DBG("timer_add called on an active timer %p (%p, %p),"
+					" flags %x\n", tl, tl->next, tl->prev, tl->flags);
 		ret=-1; /* refusing to add active or non-reinit. timer */
 		goto error;
 	}
 	tl->initial_timeout=delta;
 	if (unlikely((tl->next!=0) || (tl->prev!=0))){
-		LM_CRIT("called with linked timer: %p (%p, %p)\n", tl, tl->next, tl->prev);
+		LOG(L_CRIT, "BUG: tcp_timer_add: called with linked timer:"
+				" %p (%p, %p)\n", tl, tl->next, tl->prev);
 		ret=-1;
 		goto error;
 	}
@@ -160,7 +175,7 @@ error:
 
 
 
-/** safe timer delete
+/* safe timer delete
  * deletes tl and inits the list pointer to 0
  * WARNING: to be able to reuse a deleted timer you must call
  *          timer_reinit(tl) on it
@@ -170,29 +185,32 @@ void local_timer_del(struct local_timer* h, struct timer_ln* tl)
 {
 	/* quick exit if timer inactive */
 	if (unlikely(!(tl->flags & F_TIMER_ACTIVE))){
-		LM_DBG("called on an inactive timer %p (%p, %p), flags %x\n",
-				tl, tl->next, tl->prev, tl->flags);
+		DBG("timer_del called on an inactive timer %p (%p, %p),"
+					" flags %x\n", tl, tl->next, tl->prev, tl->flags);
 		return;
 	}
 	if (likely((tl->next!=0)&&(tl->prev!=0))){
 		_timer_rm_list(tl); /* detach */
 		tl->next=tl->prev=0;
 	}else{
-		LM_DBG("(f) timer %p (%p, %p) flags %x already detached\n",
+		DBG("timer_del: (f) timer %p (%p, %p) flags %x "
+			"already detached\n",
 			tl, tl->next, tl->prev, tl->flags);
 	}
 }
 
 
 
-/** called from timer_handle*/
+/* called from timer_handle*/
 inline static void local_timer_list_expire(struct local_timer* l, 
 											ticks_t t, struct timer_head* h)
 {
 	struct timer_ln * tl;
 	ticks_t ret;
 	
-	/*LM_DBG("@ ticks = %lu, list =%p\n", (unsigned long) *ticks, h); */
+	/*DBG("timer_list_expire @ ticks = %lu, list =%p\n",
+			(unsigned long) *ticks, h);
+	*/
 	while(h->next!=(struct timer_ln*)h){
 		tl=h->next;
 		_timer_rm_list(tl); /* detach */
@@ -210,7 +228,7 @@ inline static void local_timer_list_expire(struct local_timer* l,
 
 
 
-/** run all the handler that expire at t ticks */
+/* run all the handler that expire at t ticks */
 static inline void local_timer_expire(struct local_timer* h, ticks_t t)
 {
 	/* trust the compiler for optimizing */
@@ -229,7 +247,7 @@ static inline void local_timer_expire(struct local_timer* h, ticks_t t)
 
 
 
-/** "main" local timer routine, should be called with a proper ticks value
+/* "main" local timer routine, should be called with a proper ticks value
  * WARNING: it should never be called twice for the same ticks value
  * (it could cause too fast expires for long timers), ticks must be also
  *  always increasing */
@@ -238,7 +256,7 @@ void local_timer_run(struct local_timer* lt, ticks_t saved_ticks)
 	
 		/* protect against time running backwards */
 		if (unlikely(lt->prev_ticks>=saved_ticks)){
-			LM_CRIT("backwards or still time\n");
+			LOG(L_CRIT, "BUG: local_timer: backwards or still time\n");
 			/* try to continue */
 			lt->prev_ticks=saved_ticks-1;
 			return;

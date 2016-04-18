@@ -25,6 +25,12 @@
  * Module: @ref tls
  */
 
+/*
+ * History:
+ * --------
+ *  2010-03-31  initial version (andrei)
+*/
+
 #ifndef __tls_ct_wrq_h
 #define __tls_ct_wrq_h
 

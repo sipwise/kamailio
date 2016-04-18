@@ -1,8 +1,9 @@
 /**
+ * $Id$
  *
  * Copyright (C) 2010 Daniel-Constantin Mierla (asipto.com)
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of kamailio, a free SIP server.
  *
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 		       
 #ifndef _DS_HT_H_
@@ -32,13 +33,13 @@
 
 typedef struct _ds_cell
 {
-    unsigned int cellid;   /* item hash id */
-	str callid;            /* sip call-id */
-	str duid;              /* destination unique id (duid attribute) */
-	int dset;              /* destination set */
-	int state;             /* state */
-	time_t  expire;        /* expiration of the item */
-	time_t  initexpire;    /* expiration in initial state of the item */
+    unsigned int cellid;
+	str callid;
+	str duid;
+	int dset;
+	int state;
+	time_t  expire;
+	time_t  initexpire;
     struct _ds_cell *prev;
     struct _ds_cell *next;
 } ds_cell_t;

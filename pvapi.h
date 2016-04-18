@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2009 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,11 +15,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*!
- * \file
- * \brief Kamailio core :: pvapi init and destroy functions.
- * \ingroup core
- * Module: \ref core
+/*
+ * pvapi.h - pvapi init and destroy functions.
  */
 
 #ifndef __pvapi_h__

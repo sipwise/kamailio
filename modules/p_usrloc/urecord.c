@@ -1,4 +1,6 @@
 /*
+ * $Id: urecord.c 5241 2008-11-21 12:52:25Z henningw $ 
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,8 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ---------
+ * 2003-03-12 added replication mark and zombie state support (nils)
+ * 2004-03-17 generic callbacks added (bogdan)
+ * 2004-06-07 updated to the new DB api (andrei)
  */
 
 /*! \file
@@ -304,7 +311,7 @@ static inline void wb_timer(urecord_t* _r)
 {
 	ucontact_t* ptr, *t;
 	cstate_t old_state;
-	int op, res;
+	int op;
 
 	ptr = _r->contacts;
 
@@ -348,11 +355,7 @@ static inline void wb_timer(urecord_t* _r)
 				break;
 
 			case 2: /* update */
-				if (ul_db_update_as_insert)
-				    res = db_insert_ucontact(ptr);
-                else
-                    res = db_update_ucontact(ptr);
-                if (res < 0) {
+				if (db_update_ucontact(ptr) < 0) {
 					LM_ERR("updating contact in db failed\n");
 					ptr->state = old_state;
 				}
@@ -577,7 +580,6 @@ static inline struct ucontact* contact_path_match( ucontact_t* ptr, str* _c, str
  * \param _r record where to search the contacts
  * \param _c contact string
  * \param _callid callid
- * \param _path path
  * \param _cseq CSEQ number
  * \param _co found contact
  * \return 0 - found, 1 - not found, -1 - invalid found, 

@@ -1,31 +1,91 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * -------
+ *  2002-01-29  argc/argv globalized via my_{argc|argv} (jiri)
+ *  2003-01-23  mhomed added (jiri)
+ *  2003-03-19  replaced all malloc/frees w/ pkg_malloc/pkg_free (andrei)
+ *  2003-03-29  pkg cleaners for fifo and script callbacks introduced (jiri)
+ *  2003-03-31  removed snmp part (obsolete & no place in core) (andrei)
+ *  2003-04-06  child_init called in all processes (janakj)
+ *  2003-04-08  init_mallocs split into init_{pkg,shm}_mallocs and
+ *               init_shm_mallocs called after cmd. line parsing (andrei)
+ *  2003-04-15  added tcp_disable support (andrei)
+ *  2003-05-09  closelog() before openlog to force opening a new fd
+ *               (needed on solaris) (andrei)
+ *  2003-06-11  moved all signal handlers init. in install_sigs and moved it
+ *               after daemonize (so that we won't catch anymore our own
+ *               SIGCHLD generated when becoming session leader) (andrei)
+ *              changed is_main default value to 1 (andrei)
+ *  2003-06-28  kill_all_children is now used instead of kill(0, sig)
+ *                see comment above it for explanations. (andrei)
+ *  2003-06-29  replaced port_no_str snprintf w/ int2str (andrei)
+ *  2003-10-10  added switch for config check (-c) (andrei)
+ *  2003-10-24  converted to the new socket_info lists (andrei)
+ *  2004-03-30  core dump is enabled by default
+ *              added support for increasing the open files limit    (andrei)
+ *  2004-04-28  sock_{user,group,uid,gid,mode} added
+ *              user2uid() & user2gid() added  (andrei)
+ *  2004-09-11  added timeout on children shutdown and final cleanup
+ *               (if it takes more than 60s => something is definitely wrong
+ *                => kill all or abort)  (andrei)
+ *              force a shm_unlock before cleaning-up, in case we have a
+ *               crashed childvwhich still holds the lock  (andrei)
+ *  2004-12-02  removed -p, extended -l to support [proto:]address[:port],
+ *               added parse_phostport, parse_proto (andrei)
+ *  2005-06-16  always record the pid in pt[process_no].pid twice: once in the
+ *               parent & once in the child to avoid a short window when one
+ *               of them might use it "unset" (andrei)
+ *  2005-07-25  use sigaction for setting the signal handlers (andrei)
+ *  2006-07-13  added dns cache/failover init. (andrei)
+ *  2006-10-13  added global variables stun_refresh_interval, stun_allow_stun
+ *               and stun_allow_fp (vlada)
+ *  2006-10-25  don't log messages from signal handlers if NO_SIG_DEBUG is
+ *               defined; improved exit kill timeout (andrei)
+ *              init_childs(PROC_MAIN) before starting tcp_main, to allow
+ *               tcp usage for module started processes (andrei)
+ * 2007-01-18  children shutdown procedure moved into shutdown_children;
+ *               safer shutdown on start-up error (andrei)
+ * 2007-02-09  TLS support split into tls-in-core (CORE_TLS) and generic TLS
+ *             (USE_TLS)  (andrei)
+ * 2007-06-07  added support for locking pages in mem. and using real time
+ *              scheduling policies (andrei)
+ * 2007-07-30  dst blacklist and DNS cache measurements added (Gergo)
+ * 2008-08-08  sctp support (andrei)
+ * 2008-08-19  -l support for mmultihomed addresses/addresses lists
+ *                (e.g. -l (eth0, 1.2.3.4, foo.bar) ) (andrei)
+ * 2010-04-19  added daemon_status_fd pipe to communicate the parent process
+ *              with the main process in daemonize mode, so the parent process
+ *              can return the proper exit status code (ibc)
+ * 2010-08-19  moved the daemon status stuff to daemonize.c (andrei)
  */
 
-/** Kamailio core :: main file (init, daemonize, startup) 
+/** main file (init, daemonize, startup) 
  * @file main.c
  * @ingroup core
  * Module: core
  */
 
-/*! @defgroup core Kamailio core
+/*! @defgroup core SIP-router core
  *
  * sip router core part.
  */
@@ -130,9 +190,6 @@
 #include "pv_core.h" /* register core pvars */
 #include "ppcfg.h"
 #include "sock_ut.h"
-#include "async_task.h"
-#include "dset.h"
-#include "timer_proc.h"
 
 #ifdef DEBUG_DMALLOC
 #include <dmalloc.h>
@@ -201,11 +258,7 @@ Options:\n\
     -O nr        Script optimization level (debugging option)\n\
     -a mode      Auto aliases mode: enable with yes or on,\n\
                   disable with no or off\n\
-    -A define    Add config pre-processor define (e.g., -A WITH_AUTH)\n\
-    -x name      Specify internal manager for shared memory (shm)\n\
-                  - can be: fm, qm or tlsf\n\
-    -X name      Specify internal manager for private memory (pkg)\n\
-                  - if omitted, the one for shm is used\n"
+    -A define    Add config pre-processor define (e.g., -A WITH_AUTH)\n"
 #ifdef STATS
 "    -s file     File to which statistics is dumped (disabled otherwise)\n"
 #endif
@@ -327,7 +380,6 @@ int log_stderr = 0;
 int log_color = 0;
 /* set custom app name for syslog printing */
 char *log_name = 0;
-char *log_prefix_fmt = 0;
 pid_t creator_pid = (pid_t) -1;
 int config_check = 0;
 /* check if reply first via host==us */
@@ -358,7 +410,6 @@ int received_dns = 0;
 int sr_auto_aliases=1;
 char* working_dir = 0;
 char* chroot_dir = 0;
-char* runtime_dir = "" RUN_DIR;
 char* user=0;
 char* group=0;
 int uid = 0;
@@ -371,14 +422,8 @@ int sock_mode= S_IRUSR| S_IWUSR| S_IRGRP| S_IWGRP; /* rw-rw---- */
 
 int server_id = 0; /* Configurable unique ID of the server */
 
-/* maximum number of branches for transaction */
-unsigned int sr_dst_max_branches = MAX_BRANCHES_DEFAULT;
-
 /* set timeval for each received sip message */
 int sr_msg_time = 1;
-
-/* onsend_route is executed for replies*/
-int onsend_route_reply = 0;
 
 /* more config stuff */
 int disable_core_dump=0; /* by default enabled */
@@ -502,12 +547,6 @@ char* pid_file = 0; /* filename as asked by use */
 char* pgid_file = 0;
 
 
-/* memory manager */
-#define SR_MEMMNG_DEFAULT	"fm"
-
-char *sr_memmng_pkg = NULL;
-char *sr_memmng_shm = NULL;
-
 /* call it before exiting; if show_status==1, mem status is displayed */
 void cleanup(show_status)
 {
@@ -515,7 +554,7 @@ void cleanup(show_status)
 	
 	/*clean-up*/
 #ifndef SHM_SAFE_MALLOC
-	if (_shm_lock)
+	if (mem_lock)
 		shm_unlock(); /* hack: force-unlock the shared memory lock in case
 					 some process crashed and let it locked; this will
 					 allow an almost gracious shutdown */
@@ -582,12 +621,12 @@ void cleanup(show_status)
 		}
 	}
 	/* zero all shmem alloc vars that we still use */
-	shm_destroy_manager();
+	shm_mem_destroy();
 #endif
 	destroy_lock_ops();
 	if (pid_file) unlink(pid_file);
 	if (pgid_file) unlink(pgid_file);
-	pkg_destroy_manager();
+	destroy_pkg_mallocs();
 }
 
 
@@ -619,7 +658,7 @@ static void kill_all_children(int signum)
 			if (pt[r].pid) {
 				kill(pt[r].pid, signum);
 			}
-			else LM_CRIT("killing: %s > %d no pid!!!\n",
+			else LOG(L_CRIT, "BUG: killing: %s > %d no pid!!!\n",
 							pt[r].desc, pt[r].pid);
 		}
 		if (!is_main) lock_release(process_lock);
@@ -645,7 +684,7 @@ static void sig_alarm_kill(int signo)
 static void sig_alarm_abort(int signo)
 {
 	/* LOG is not signal safe, but who cares, we are abort-ing anyway :-) */
-	LM_CRIT("shutdown timeout triggered, dying...");
+	LOG(L_CRIT, "BUG: shutdown timeout triggered, dying...");
 	abort();
 }
 
@@ -655,7 +694,7 @@ static void shutdown_children(int sig, int show_status)
 {
 	kill_all_children(sig);
 	if (set_sig_h(SIGALRM, sig_alarm_kill) == SIG_ERR ) {
-		LM_ERR("could not install SIGALARM handler\n");
+		LOG(L_ERR, "ERROR: shutdown: could not install SIGALARM handler\n");
 		/* continue, the process will die anyway if no
 		 * alarm is installed which is exactly what we want */
 	}
@@ -682,16 +721,16 @@ void handle_sigs(void)
 				/* SIGPIPE might be rarely received on use of
 				   exec module; simply ignore it
 				 */
-				LM_WARN("SIGPIPE received and ignored\n");
+				LOG(L_WARN, "WARNING: SIGPIPE received and ignored\n");
 				break;
 		case SIGINT:
 		case SIGTERM:
 			/* we end the program in all these cases */
 			if (sig_flag==SIGINT)
-				LM_DBG("INT received, program terminates\n");
+				DBG("INT received, program terminates\n");
 			else
-				LM_DBG("SIGTERM received, program terminates\n");
-			LM_NOTICE("Thank you for flying " NAME "!!!\n");
+				DBG("SIGTERM received, program terminates\n");
+			LOG(L_NOTICE, "Thank you for flying " NAME "!!!\n");
 			/* shutdown/kill all the children */
 			shutdown_children(SIGTERM, 1);
 			exit(0);
@@ -731,43 +770,39 @@ void handle_sigs(void)
 		case SIGCHLD:
 			while ((chld=waitpid( -1, &chld_status, WNOHANG ))>0) {
 				if (WIFEXITED(chld_status))
-					LM_ALERT("child process %ld exited normally,"
+					LOG(L_ALERT, "child process %ld exited normally,"
 							" status=%d\n", (long)chld,
 							WEXITSTATUS(chld_status));
 				else if (WIFSIGNALED(chld_status)) {
-					LM_ALERT("child process %ld exited by a signal"
+					LOG(L_ALERT, "child process %ld exited by a signal"
 							" %d\n", (long)chld, WTERMSIG(chld_status));
 #ifdef WCOREDUMP
-					LM_ALERT("core was %sgenerated\n",
+					LOG(L_ALERT, "core was %sgenerated\n",
 							 WCOREDUMP(chld_status) ?  "" : "not " );
 #endif
 				}else if (WIFSTOPPED(chld_status))
-					LM_ALERT("child process %ld stopped by a"
+					LOG(L_ALERT, "child process %ld stopped by a"
 								" signal %d\n", (long)chld,
 								 WSTOPSIG(chld_status));
 			}
 #ifndef STOP_JIRIS_CHANGES
 			if (dont_fork) {
-				LM_INFO("dont_fork turned on, living on\n");
+				LOG(L_INFO, "INFO: dont_fork turned on, living on\n");
 				break;
 			}
-			LM_INFO("terminating due to SIGCHLD\n");
+			LOG(L_INFO, "INFO: terminating due to SIGCHLD\n");
 #endif
-			LM_DBG("terminating due to SIGCHLD\n");
 			/* exit */
 			shutdown_children(SIGTERM, 1);
-			if (WIFSIGNALED(chld_status)) {
-				exit(1);
-			} else {
-				exit(0);
-			}
+			DBG("terminating due to SIGCHLD\n");
+			exit(0);
 			break;
 
 		case SIGHUP: /* ignoring it*/
-					LM_DBG("SIGHUP received, ignoring it\n");
+					DBG("SIGHUP received, ignoring it\n");
 					break;
 		default:
-			LM_CRIT("unhandled signal %d\n", sig_flag);
+			LOG(L_CRIT, "WARNING: unhandled signal %d\n", sig_flag);
 	}
 	sig_flag=0;
 }
@@ -800,13 +835,13 @@ void sig_usr(int signo)
 		switch(signo){
 			case SIGPIPE:
 #ifdef SIG_DEBUG /* signal unsafe stuff follows */
-					LM_INFO("signal %d received\n", signo);
+					LOG(L_INFO, "INFO: signal %d received\n", signo);
 #endif
 				break;
 			case SIGINT:
 			case SIGTERM:
 #ifdef SIG_DEBUG /* signal unsafe stuff follows */
-					LM_INFO("signal %d received\n", signo);
+					LOG(L_INFO, "INFO: signal %d received\n", signo);
 					/* print memory stats for non-main too */
 					#ifdef PKG_MALLOC
 					/* make sure we have current cfg values, but update only
@@ -840,7 +875,7 @@ void sig_usr(int signo)
 			case SIGCHLD:
 #ifndef 			STOP_JIRIS_CHANGES
 #ifdef SIG_DEBUG /* signal unsafe stuff follows */
-					LM_DBG("SIGCHLD received: "
+					DBG("SIGCHLD received: "
 						"we do not worry about grand-children\n");
 #endif
 #else
@@ -1133,16 +1168,16 @@ int parse_phostport(char* s, char** host, int* hlen,
 end:
 	return 0;
 error_brackets:
-	LM_ERR("too many brackets in %s\n", s);
+	LOG(L_ERR, "ERROR: parse_phostport: too many brackets in %s\n", s);
 	return -1;
 error_colons:
-	LM_ERR("too many colons in %s\n", s);
+	LOG(L_ERR, "ERROR: parse_phostport: too many colons in %s\n", s);
 	return -1;
 error_proto:
-	LM_ERR("bad protocol in %s\n", s);
+	LOG(L_ERR, "ERROR: parse_phostport: bad protocol in %s\n", s);
 	return -1;
 error_port:
-	LM_ERR("bad port number in %s\n", s);
+	LOG(L_ERR, "ERROR: parse_phostport: bad port number in %s\n", s);
 	return -1;
 }
 
@@ -1192,7 +1227,6 @@ int fix_cfg_file(void)
 	
 	if (cfg_file == NULL) cfg_file = CFG_FILE;
 	if (cfg_file[0] == '/') return 0;
-	if (cfg_file[0] == '-' && strlen(cfg_file)==1) return 0;
 	
 	/* cfg_file contains a relative pathname, get the current
 	 * working directory and add it at the beginning
@@ -1233,7 +1267,6 @@ int main_loop(void)
 	int r;
 #endif
 	int nrprocs;
-	int woneinit;
 
 	/* one "main" process and n children handling i/o */
 	if (dont_fork){
@@ -1241,7 +1274,7 @@ int main_loop(void)
 		setstats( 0 );
 #endif
 		if (udp_listen==0){
-			LM_ERR("no fork mode requires at least one"
+			LOG(L_ERR, "ERROR: no fork mode requires at least one"
 					" udp listen address, exiting...\n");
 			goto error;
 		}
@@ -1270,7 +1303,7 @@ int main_loop(void)
 			if (default_core_cfg.udp4_raw < 0) {
 				/* auto-detect => use it */
 				default_core_cfg.udp4_raw = 1; /* enabled */
-				LM_DBG("raw socket possible => turning it on\n");
+				DBG("raw socket possible => turning it on\n");
 			}
 			if (default_core_cfg.udp4_raw_ttl < 0) {
 				/* auto-detect */
@@ -1286,7 +1319,8 @@ int main_loop(void)
 		} else
 			sendipv6=bind_address;
 		if (udp_listen->next){
-			LM_WARN("using only the first listen address (no fork)\n");
+			LOG(L_WARN, "WARNING: using only the first listen address"
+						" (no fork)\n");
 		}
 
 		/* delay cfg_shmize to the last moment (it must be called _before_
@@ -1294,7 +1328,7 @@ int main_loop(void)
 		   ignored.
 		*/
 		if (cfg_shmize() < 0) {
-			LM_CRIT("could not initialize shared configuration\n");
+			LOG(L_CRIT, "could not initialize shared configuration\n");
 			goto error;
 		}
 	
@@ -1303,7 +1337,6 @@ int main_loop(void)
 		cfg_register_child(
 				1   /* main = udp listener */
 				+ 1 /* timer */
-				+ 1 /* wtimer */
 #ifdef USE_SLOW_TIMER
 				+ 1 /* slow timer */
 #endif
@@ -1318,9 +1351,6 @@ int main_loop(void)
 		 */
 		cfg_main_set_local();
 
-		/* init log prefix format */
-		log_prefix_init();
-
 		/* init childs with rank==PROC_INIT before forking any process,
 		 * this is a place for delayed (after mod_init) initializations
 		 * (e.g. shared vars that depend on the total number of processes
@@ -1329,7 +1359,8 @@ int main_loop(void)
 		 * for the "main" process with rank PROC_MAIN (make sure things are
 		 * not initialized twice)*/
 		if (init_child(PROC_INIT) < 0) {
-			LM_ERR("init_child(PROC_INT) -- exiting\n");
+			LOG(L_ERR, "ERROR: main_dontfork: init_child(PROC_INT) --"
+						" exiting\n");
 			cfg_main_reset_local();
 			goto error;
 		}
@@ -1340,7 +1371,7 @@ int main_loop(void)
 		/* we need another process to act as the "slow" timer*/
 				pid = fork_process(PROC_TIMER, "slow timer", 0);
 				if (pid<0){
-					LM_CRIT("Cannot fork\n");
+					LOG(L_CRIT,  "ERROR: main_loop: Cannot fork\n");
 					goto error;
 				}
 				if (pid==0){
@@ -1359,7 +1390,7 @@ int main_loop(void)
 				/* we need another process to act as the "main" timer*/
 				pid = fork_process(PROC_TIMER, "timer", 0);
 				if (pid<0){
-					LM_CRIT("Cannot fork\n");
+					LOG(L_CRIT,  "ERROR: main_loop: Cannot fork\n");
 					goto error;
 				}
 				if (pid==0){
@@ -1373,10 +1404,6 @@ int main_loop(void)
 				}else{
 				}
 
-		if(sr_wtimer_start()<0) {
-			LM_CRIT("Cannot start wtimer\n");
-			goto error;
-		}
 		/* main process, receive loop */
 		process_no=0; /*main process number*/
 		pt[process_no].pid=getpid();
@@ -1387,7 +1414,8 @@ int main_loop(void)
 		/* call it also w/ PROC_MAIN to make sure modules that init things 
 		 * only in PROC_MAIN get a chance to run */
 		if (init_child(PROC_MAIN) < 0) {
-			LM_ERR("init_child(PROC_MAIN) -- exiting\n");
+			LOG(L_ERR, "ERROR: main_dontfork: init_child(PROC_MAIN) "
+						"-- exiting\n");
 			goto error;
 		}
 
@@ -1397,7 +1425,7 @@ int main_loop(void)
 		 */
 
 		if (init_child(PROC_SIPINIT) < 0) {
-			LM_ERR("init_child failed\n");
+			LOG(L_ERR, "main_dontfork: init_child failed\n");
 			goto error;
 		}
 		return udp_rcv_loop();
@@ -1408,7 +1436,6 @@ int main_loop(void)
 		 * will be added later.) */
 		cfg_register_child(
 				1   /* timer */
-				+ 1   /* wtimer */
 #ifdef USE_SLOW_TIMER
 				+ 1 /* slow timer */
 #endif
@@ -1449,7 +1476,7 @@ int main_loop(void)
 				if (default_core_cfg.udp4_raw < 0) {
 					/* auto-detect => use it */
 					default_core_cfg.udp4_raw = 1; /* enabled */
-					LM_DBG("raw socket possible => turning it on\n");
+					DBG("raw socket possible => turning it on\n");
 				}
 				if (default_core_cfg.udp4_raw_ttl < 0) {
 					/* auto-detect */
@@ -1528,7 +1555,7 @@ int main_loop(void)
 		   ignored (cfg_shmize() will copy the default cfgs into shmem).
 		*/
 		if (cfg_shmize() < 0) {
-			LM_CRIT("could not initialize shared configuration\n");
+			LOG(L_CRIT, "could not initialize shared configuration\n");
 			goto error;
 		}
 
@@ -1536,9 +1563,6 @@ int main_loop(void)
 		 * to make the group instances available in PROC_INIT.
 		 */
 		cfg_main_set_local();
-
-		/* init log prefix format */
-		log_prefix_init();
 
 		/* init childs with rank==PROC_INIT before forking any process,
 		 * this is a place for delayed (after mod_init) initializations
@@ -1548,7 +1572,8 @@ int main_loop(void)
 		 * for the "main" process with rank PROC_MAIN (make sure things are
 		 * not initialized twice)*/
 		if (init_child(PROC_INIT) < 0) {
-			LM_ERR("error in init_child(PROC_INT) -- exiting\n");
+			LOG(L_ERR, "ERROR: main: error in init_child(PROC_INT) --"
+					" exiting\n");
 			cfg_main_reset_local();
 			goto error;
 		}
@@ -1556,7 +1581,6 @@ int main_loop(void)
 		if (counters_prefork_init(get_max_procs()) == -1) goto error;
 
 
-		woneinit = 0;
 		/* udp processes */
 		for(si=udp_listen; si; si=si->next){
 			nrprocs = (si->workers>0)?si->workers:children_no;
@@ -1585,7 +1609,7 @@ int main_loop(void)
 				child_rank++;
 				pid = fork_process(child_rank, si_desc, 1);
 				if (pid<0){
-					LM_CRIT("Cannot fork\n");
+					LOG(L_CRIT,  "main_loop: Cannot fork\n");
 					goto error;
 				}else if (pid==0){
 					/* child */
@@ -1593,13 +1617,8 @@ int main_loop(void)
 #ifdef STATS
 					setstats( i+r*children_no );
 #endif
-					if(woneinit==0) {
-						if(run_child_one_init_route()<0)
-							goto error;
-					}
 					return udp_rcv_loop();
 				}
-				woneinit = 1;
 			}
 			/*parent*/
 			/*close(udp_sock)*/; /*if it's closed=>sendto invalid fd errors?*/
@@ -1622,7 +1641,7 @@ int main_loop(void)
 					child_rank++;
 					pid = fork_process(child_rank, si_desc, 1);
 					if (pid<0){
-						LM_CRIT("Cannot fork\n");
+						LOG(L_CRIT,  "main_loop: Cannot fork\n");
 						goto error;
 					}else if (pid==0){
 						/* child */
@@ -1646,7 +1665,7 @@ int main_loop(void)
 		/* fork again for the "slow" timer process*/
 		pid = fork_process(PROC_TIMER, "slow timer", 1);
 		if (pid<0){
-			LM_CRIT("cannot fork \"slow\" timer process\n");
+			LOG(L_CRIT, "main_loop: cannot fork \"slow\" timer process\n");
 			goto error;
 		}else if (pid==0){
 			/* child */
@@ -1662,7 +1681,7 @@ int main_loop(void)
 		/* fork again for the "main" timer process*/
 		pid = fork_process(PROC_TIMER, "timer", 1);
 		if (pid<0){
-			LM_CRIT("cannot fork timer process\n");
+			LOG(L_CRIT, "main_loop: cannot fork timer process\n");
 			goto error;
 		}else if (pid==0){
 			/* child */
@@ -1671,16 +1690,12 @@ int main_loop(void)
 			if (arm_timer()<0) goto error;
 			timer_main();
 		}
-		if(sr_wtimer_start()<0) {
-			LM_CRIT("Cannot start wtimer\n");
-			goto error;
-		}
 
 	/* init childs with rank==MAIN before starting tcp main (in case they want
 	 * to fork  a tcp capable process, the corresponding tcp. comm. fds in
 	 * pt[] must be set before calling tcp_main_loop()) */
 		if (init_child(PROC_MAIN) < 0) {
-			LM_ERR("error in init_child\n");
+			LOG(L_ERR, "ERROR: main: error in init_child\n");
 			goto error;
 		}
 
@@ -1691,7 +1706,8 @@ int main_loop(void)
 				/* start tcp+tls master proc */
 			pid = fork_process(PROC_TCP_MAIN, "tcp main process", 0);
 			if (pid<0){
-				LM_CRIT("cannot fork tcp main process: %s\n", strerror(errno));
+				LOG(L_CRIT, "main_loop: cannot fork tcp main process: %s\n",
+							strerror(errno));
 				goto error;
 			}else if (pid==0){
 				/* child */
@@ -1703,7 +1719,7 @@ int main_loop(void)
 		}
 #endif
 		/* main */
-		strncpy(pt[0].desc, "main process - attendant", MAX_PT_DESC );
+		strncpy(pt[0].desc, "attendant", MAX_PT_DESC );
 #ifdef USE_TCP
 		close_extra_socks(PROC_ATTENDANT, get_proc_no());
 		if(!tcp_disable){
@@ -1720,7 +1736,7 @@ int main_loop(void)
 			fprintf(stderr, "% 3d   % 5d - %s\n", r, pt[r].pid, pt[r].desc);
 		}
 #endif
-		LM_DBG("Expect maximum %d  open fds\n", get_max_open_fds());
+		DBG("Expect maximum %d  open fds\n", get_max_open_fds());
 		/* in daemonize mode send the exit code back to the parent process */
 		if (!dont_daemonize) {
 			if (daemon_status_send(0) < 0) {
@@ -1799,7 +1815,6 @@ static int calc_proc_no(void)
 #ifdef USE_SLOW_TIMER
 		+ 1 /* slow timer process */
 #endif
-		+ 1 /* wtimer process */
 #ifdef USE_TCP
 		+((!tcp_disable)?( 1/* tcp main */ + tcp_listeners ):0)
 #endif
@@ -1826,7 +1841,6 @@ int main(int argc, char** argv)
 	int dont_fork_cnt;
 	struct name_lst* n_lst;
 	char *p;
-	struct stat st = {0};
 
 	/*init*/
 	time(&up_since);
@@ -1841,7 +1855,7 @@ int main(int argc, char** argv)
 	dprint_init_colors();
 
 	/* command line options */
-	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:"
+	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:"
 #ifdef STATS
 		"s:"
 #endif
@@ -1875,12 +1889,6 @@ int main(int argc, char** argv)
 						goto error;
 					};
 					break;
-			case 'x':
-					sr_memmng_shm = optarg;
-					break;
-			case 'X':
-					sr_memmng_pkg = optarg;
-					break;
 			default:
 					if (c == 'h' || (optarg && strcmp(optarg, "-h") == 0)) {
 						printf("version: %s\n", full_version);
@@ -1890,26 +1898,12 @@ int main(int argc, char** argv)
 					break;
 		}
 	}
-
-	if(sr_memmng_pkg==NULL) {
-		if(sr_memmng_shm!=NULL) {
-			sr_memmng_pkg = sr_memmng_shm;
-		} else {
-			sr_memmng_pkg = SR_MEMMNG_DEFAULT;
-		}
-	}
-	if(sr_memmng_shm==NULL) {
-		sr_memmng_shm = SR_MEMMNG_DEFAULT;
-	}
-	shm_set_mname(sr_memmng_shm);
-	if (pkg_mem_size == 0) {
-		pkg_mem_size = PKG_MEM_POOL_SIZE;
-	}
-
+	
 	/*init pkg mallocs (before parsing cfg or the rest of the cmd line !)*/
 	if (pkg_mem_size)
-		LM_INFO("private (per process) memory: %ld bytes\n", pkg_mem_size );
-	if (pkg_init_manager(sr_memmng_pkg)<0)
+		LOG(L_INFO, " private (per process) memory: %ld bytes\n",
+								pkg_mem_size );
+	if (init_pkg_mallocs()==-1)
 		goto error;
 
 #ifdef DBG_MSG_QA
@@ -1923,17 +1917,11 @@ int main(int argc, char** argv)
 #ifdef USE_TCP
 	init_tcp_options(); /* set the defaults before the config */
 #endif
-
 	/* process command line (cfg. file path etc) */
 	optind = 1;  /* reset getopt */
 	/* switches required before script processing */
 	while((c=getopt(argc,argv,options))!=-1) {
 		switch(c) {
-			case 'M':
-			case 'x':
-			case 'X':
-					/* ignore, they were parsed immediately after startup */
-					break;
 			case 'f':
 					cfg_file=optarg;
 					break;
@@ -1952,7 +1940,12 @@ int main(int argc, char** argv)
 										optarg);
 						goto error;
 					};
-					LM_INFO("shared memory: %ld bytes\n", shm_mem_size );
+					LOG(L_INFO, "ser: shared memory: %ld bytes\n",
+									shm_mem_size );
+					break;
+			case 'M':
+					/* ignore it, it was parsed immediately after startup,
+					   the pkg mem. is already initialized at this point */
 					break;
 			case 'd':
 					/* ignore it, was parsed immediately after startup */
@@ -1963,12 +1956,8 @@ int main(int argc, char** argv)
 					printf("flags: %s\n", ver_flags );
 					print_ct_constants();
 					printf("id: %s\n", ver_id);
-					if(strlen(ver_compiled_time)>0)
-						printf("compiled on %s with %s\n",
+					printf("compiled on %s with %s\n",
 							ver_compiled_time, ver_compiler );
-					else
-						printf("compiled with %s\n",
-							ver_compiler );
 
 					exit(0);
 					break;
@@ -2054,9 +2043,6 @@ int main(int argc, char** argv)
 					abort();
 		}
 	}
-	if (shm_mem_size == 0) {
-		shm_mem_size = SHM_MEM_POOL_SIZE;
-	}
 
 	if (endianness_sanity_check() != 0){
 		fprintf(stderr, "BUG: endianness sanity tests failed\n");
@@ -2074,11 +2060,7 @@ int main(int argc, char** argv)
 	if (fix_cfg_file() < 0) goto error;
 
 	/* load config file or die */
-	if (cfg_file[0] == '-' && strlen(cfg_file)==1) {
-		cfg_stream=stdin;
-	} else {
-		cfg_stream=fopen (cfg_file, "r");
-	}
+	cfg_stream=fopen (cfg_file, "r");
 	if (cfg_stream==0){
 		fprintf(stderr, "ERROR: loading config file(%s): %s\n", cfg_file,
 				strerror(errno));
@@ -2092,19 +2074,20 @@ int main(int argc, char** argv)
 try_again:
 		if (read(rfd, (void*)&seed, sizeof(seed))==-1){
 			if (errno==EINTR) goto try_again; /* interrupted by signal */
-			LM_WARN("could not read from /dev/urandom (%d)\n", errno);
+			LOG(L_WARN, "WARNING: could not read from /dev/urandom (%d)\n",
+						errno);
 		}
-		LM_DBG("read %u from /dev/urandom\n", seed);
+		DBG("read %u from /dev/urandom\n", seed);
 			close(rfd);
 	}else{
-		LM_WARN("could not open /dev/urandom (%d)\n", errno);
+		LOG(L_WARN, "WARNING: could not open /dev/urandom (%d)\n", errno);
 	}
 	seed+=getpid()+time(0);
-	LM_DBG("seeding PRNG with %u\n", seed);
+	DBG("seeding PRNG with %u\n", seed);
 	srand(seed);
 	fastrand_seed(rand());
 	srandom(rand()+time(0));
-	LM_DBG("test random numbers %u %lu %u\n", rand(), random(), fastrand());
+	DBG("test random numbers %u %lu %u\n", rand(), random(), fastrand());
 
 	/*register builtin  modules*/
 	register_builtin_modules();
@@ -2116,8 +2099,6 @@ try_again:
 	debug_save = default_core_cfg.debug;
 	if ((yyparse()!=0)||(cfg_errors)){
 		fprintf(stderr, "ERROR: bad config file (%d errors)\n", cfg_errors);
-		if (debug_flag) default_core_cfg.debug = debug_save;
-		pp_ifdef_level_check();
 
 		goto error;
 	}
@@ -2125,13 +2106,8 @@ try_again:
 		fprintf(stderr, "%d config warnings\n", cfg_warnings);
 	}
 	if (debug_flag) default_core_cfg.debug = debug_save;
-	pp_ifdef_level_check();
 	print_rls();
 
-	if(init_dst_set()<0) {
-		LM_ERR("failed to initialize destination set structure\n");
-		goto error;
-	}
 	/* options with higher priority than cfg file */
 	optind = 1;  /* reset getopt */
 	while((c=getopt(argc,argv,options))!=-1) {
@@ -2362,29 +2338,11 @@ try_again:
 			fprintf(stderr, "bad user name/uid number: -u %s\n", user);
 			goto error;
 		}
-		sock_uid = uid;
-		sock_gid = gid;
 	}
 	if (group){
 		if (group2gid(&gid, group)<0){
 				fprintf(stderr, "bad group name/gid number: -u %s\n", group);
 			goto error;
-		}
-		sock_gid = gid;
-	}
-	/* create runtime dir if doesn't exist */
-	if (stat(runtime_dir, &st) == -1) {
-		if(mkdir(runtime_dir, 0700) == -1) {
-			LM_ERR("failed to create runtime dir %s\n", runtime_dir);
-			fprintf(stderr,  "failed to create runtime dir %s\n", runtime_dir);
-			goto error;
-		}
-		if(sock_uid!=-1 || sock_gid!=-1) {
-			if(chown(runtime_dir, sock_uid, sock_gid) == -1) {
-				LM_ERR("failed to change owner of runtime dir %s\n", runtime_dir);
-				fprintf(stderr,  "failed to change owner of runtime dir %s\n", runtime_dir);
-				goto error;
-			}
 		}
 	}
 	if (fix_all_socket_lists()!=0){
@@ -2432,64 +2390,56 @@ try_again:
 	if (!shm_initialized() && init_shm()<0)
 		goto error;
 #endif /* SHM_MEM */
-	pkg_print_manager();
-	shm_print_manager();
 	if (init_atomic_ops()==-1)
 		goto error;
 	if (init_basex() != 0){
-		LM_CRIT("could not initialize base* framework\n");
+		LOG(L_CRIT, "could not initialize base* framework\n");
 		goto error;
 	}
 	if (sr_cfg_init() < 0) {
-		LM_CRIT("could not initialize configuration framework\n");
+		LOG(L_CRIT, "could not initialize configuration framework\n");
 		goto error;
 	}
 	/* declare the core cfg before the module configs */
 	if (cfg_declare("core", core_cfg_def, &default_core_cfg, cfg_sizeof(core),
 			&core_cfg)
 	) {
-		LM_CRIT("could not declare the core configuration\n");
+		LOG(L_CRIT, "could not declare the core configuration\n");
 		goto error;
 	}
 #ifdef USE_TCP
 	if (tcp_register_cfg()){
-		LM_CRIT("could not register the tcp configuration\n");
+		LOG(L_CRIT, "could not register the tcp configuration\n");
 		goto error;
 	}
 #endif /* USE_TCP */
 	/*init timer, before parsing the cfg!*/
 	if (init_timer()<0){
-		LM_CRIT("could not initialize timer, exiting...\n");
+		LOG(L_CRIT, "could not initialize timer, exiting...\n");
 		goto error;
 	}
-	/* init wtimer */
-	if(sr_wtimer_init()<0) {
-		LM_CRIT("could not initialize wtimer, exiting...\n");
-		goto error;
-	}
-
 #ifdef USE_DNS_CACHE
 	if (init_dns_cache()<0){
-		LM_CRIT("could not initialize the dns cache, exiting...\n");
+		LOG(L_CRIT, "could not initialize the dns cache, exiting...\n");
 		goto error;
 	}
 #ifdef USE_DNS_CACHE_STATS
 	/* preinitializing before the nubmer of processes is determined */
 	if (init_dns_cache_stats(1)<0){
-		LM_CRIT("could not initialize the dns cache measurement\n");
+		LOG(L_CRIT, "could not initialize the dns cache measurement\n");
 		goto error;
 	}
 #endif /* USE_DNS_CACHE_STATS */
 #endif
 #ifdef USE_DST_BLACKLIST
 	if (init_dst_blacklist()<0){
-		LM_CRIT("could not initialize the dst blacklist, exiting...\n");
+		LOG(L_CRIT, "could not initialize the dst blacklist, exiting...\n");
 		goto error;
 	}
 #ifdef USE_DST_BLACKLIST_STATS
 	/* preinitializing before the number of processes is determined */
 	if (init_dst_blacklist_stats(1)<0){
-		LM_CRIT("could not initialize the dst blacklist measurement\n");
+		LOG(L_CRIT, "could not initialize the dst blacklist measurement\n");
 		goto error;
 	}
 #endif /* USE_DST_BLACKLIST_STATS */
@@ -2501,7 +2451,7 @@ try_again:
 	if (!tcp_disable){
 		/*init tcp*/
 		if (init_tcp()<0){
-			LM_CRIT("could not initialize tcp, exiting...\n");
+			LOG(L_CRIT, "could not initialize tcp, exiting...\n");
 			goto error;
 		}
 	}
@@ -2509,7 +2459,7 @@ try_again:
 #ifdef USE_SCTP
 	if (!sctp_disable){
 		if (sctp_core_init()<0){
-			LM_CRIT("Could not initialize sctp, exiting...\n");
+			LOG(L_CRIT, "Could not initialize sctp, exiting...\n");
 			goto error;
 		}
 	}
@@ -2567,14 +2517,14 @@ try_again:
 #ifdef USE_TLS
 	if (!tls_disable){
 		if (!tls_loaded()){
-			LM_WARN("tls support enabled, but no tls engine "
+			LOG(L_WARN, "WARNING: tls support enabled, but no tls engine "
 						" available (forgot to load the tls module?)\n");
-			LM_WARN("disabling tls...\n");
+			LOG(L_WARN, "WARNING: disabling tls...\n");
 			tls_disable=1;
 		}
 		/* init tls*/
 		if (init_tls()<0){
-			LM_CRIT("could not initialize tls, exiting...\n");
+			LOG(L_CRIT, "could not initialize tls, exiting...\n");
 			goto error;
 		}
 	}
@@ -2585,18 +2535,18 @@ try_again:
 	 * function being called before this point may rely on the
 	 * number of processes !
 	 */
-	LM_DBG("Expect (at least) %d kamailio processes in your process list\n",
+	DBG("Expect (at least) %d SER processes in your process list\n",
 			get_max_procs());
 
 #if defined USE_DNS_CACHE && defined USE_DNS_CACHE_STATS
 	if (init_dns_cache_stats(get_max_procs())<0){
-		LM_CRIT("could not initialize the dns cache measurement\n");
+		LOG(L_CRIT, "could not initialize the dns cache measurement\n");
 		goto error;
 	}
 #endif
 #if defined USE_DST_BLACKLIST && defined USE_DST_BLACKLIST_STATS
 	if (init_dst_blacklist_stats(get_max_procs())<0){
-		LM_CRIT("could not initialize the dst blacklist measurement\n");
+		LOG(L_CRIT, "could not initialize the dst blacklist measurement\n");
 		goto error;
 	}
 #endif

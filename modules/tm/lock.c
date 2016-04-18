@@ -1,21 +1,37 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/*
+ * History:
+ * --------
+ *  2003-03-17  converted to locking.h (andrei)
+ *  2004-07-28  s/lock_set_t/gen_lock_set_t/ because of a type conflict
+ *              on darwin (andrei)
+ *  2006-03-07  removed timer_semaphore, timer_group_lock and related functions
+ *              since timers are now handled outside tm (andrei)
  */
 
 
@@ -55,9 +71,7 @@
 static int sem_nr;
 gen_lock_set_t* entry_semaphore=0;
 gen_lock_set_t* reply_semaphore=0;
-#ifdef ENABLE_ASYNC_MUTEX
 gen_lock_set_t* async_semaphore=0;
-#endif
 #endif
 
 
@@ -87,12 +101,11 @@ again:
 			lock_set_destroy(reply_semaphore);
 			lock_set_dealloc(reply_semaphore);
 		}
-#ifdef ENABLE_ASYNC_MUTEX
 		if (async_semaphore!=0){
 			lock_set_destroy(async_semaphore);
 			lock_set_dealloc(async_semaphore);
 		}
-#endif
+		
 		if (i==0){
 			LOG(L_CRIT, "lock_initialize: could not allocate semaphore"
 					" sets\n");
@@ -146,7 +159,6 @@ again:
 			i--;
 			goto again;
 	}
-#ifdef ENABLE_ASYNC_MUTEX
 	i++;
 	if (((async_semaphore=lock_set_alloc(i))==0)||
 		(lock_set_init(async_semaphore)==0)){
@@ -160,7 +172,7 @@ again:
 			i--;
 			goto again;
 	}
-#endif
+	
 
 	/* return success */
 	LOG(L_INFO, "INFO: semaphore arrays of size %d allocated\n", sem_nr );
@@ -200,14 +212,11 @@ void lock_cleanup()
 		lock_set_destroy(reply_semaphore);
 		lock_set_dealloc(reply_semaphore);
 	};
-#ifdef ENABLE_ASYNC_MUTEX
 	if (async_semaphore !=0) {
 		lock_set_destroy(async_semaphore);
 		lock_set_dealloc(async_semaphore);
-	}
-	async_semaphore = 0;
-#endif
-	entry_semaphore =  reply_semaphore = 0;
+	};
+	entry_semaphore =  reply_semaphore = async_semaphore = 0;
 
 }
 #endif /*GEN_LOCK_T_PREFERED*/
@@ -245,17 +254,12 @@ int init_entry_lock( struct s_table* ht, struct entry *entry )
 
 int init_async_lock( struct cell *cell )
 {
-#ifdef ENABLE_ASYNC_MUTEX
-
 #ifdef GEN_LOCK_T_PREFERED
 	lock_init(&cell->async_mutex);
 #else
 	cell->async_mutex.semaphore_set=async_semaphore;
 	cell->async_mutex.semaphore_index = cell->hash_index % sem_nr;
 #endif /* GEN_LOCK_T_PREFERED */
-
-#endif /* ENABLE_ASYNC_MUTEX */
-
 	return 0;
 }
 

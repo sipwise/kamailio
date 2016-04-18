@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * ---------
@@ -337,8 +337,6 @@ struct rtpp_set * default_rtpp_set=0;
 static char *ice_candidate_priority_avp_param = NULL;
 static int ice_candidate_priority_avp_type;
 static int_str ice_candidate_priority_avp;
-static str rtp_inst_pv_param = {NULL, 0};
-static pv_spec_t *rtp_inst_pvar = NULL;
 
 /* array with the sockets used by rtpporxy (per process)*/
 static unsigned int rtpp_no = 0;
@@ -427,19 +425,18 @@ static pv_export_t mod_pvs[] = {
 };
 
 static param_export_t params[] = {
-	{"nortpproxy_str",        PARAM_STR, &nortpproxy_str      },
-	{"rtpproxy_sock",         PARAM_STRING|USE_FUNC_PARAM,
+	{"nortpproxy_str",        STR_PARAM, &nortpproxy_str.s      },
+	{"rtpproxy_sock",         STR_PARAM|USE_FUNC_PARAM,
 	                         (void*)rtpproxy_set_store          },
 	{"rtpproxy_disable_tout", INT_PARAM, &rtpproxy_disable_tout },
 	{"rtpproxy_retr",         INT_PARAM, &rtpproxy_retr         },
 	{"rtpproxy_tout",         INT_PARAM, &rtpproxy_tout         },
-	{"timeout_socket",    	  PARAM_STR, &timeout_socket_str  },
-	{"ice_candidate_priority_avp", PARAM_STRING,
+	{"timeout_socket",    	  STR_PARAM, &timeout_socket_str.s  },
+	{"ice_candidate_priority_avp", STR_PARAM,
 	 &ice_candidate_priority_avp_param},
-	{"extra_id_pv",           PARAM_STR, &extra_id_pv_param },
-	{"db_url",                PARAM_STR, &rtpp_db_url },
-	{"table_name",            PARAM_STR, &rtpp_table_name },
-	{"rtp_inst_pvar",         PARAM_STR, &rtp_inst_pv_param },
+	{"extra_id_pv",           STR_PARAM, &extra_id_pv_param.s },
+	{"db_url",                STR_PARAM, &rtpp_db_url.s },
+	{"table_name",            STR_PARAM, &rtpp_table_name.s },
 	{0, 0, 0}
 };
 
@@ -916,16 +913,21 @@ mod_init(void)
 	}
 	memset(rtpp_set_list, 0, sizeof(struct rtpp_set_head));
 
-	if (nortpproxy_str.s==NULL || nortpproxy_str.len<=0) {
+	if (nortpproxy_str.s==NULL || nortpproxy_str.s[0]==0) {
 		nortpproxy_str.len = 0;
+		nortpproxy_str.s = NULL;
 	} else {
+		nortpproxy_str.len = strlen(nortpproxy_str.s);
 		while (nortpproxy_str.len > 0 && (nortpproxy_str.s[nortpproxy_str.len - 1] == '\r' ||
 		    nortpproxy_str.s[nortpproxy_str.len - 1] == '\n'))
 			nortpproxy_str.len--;
+		if (nortpproxy_str.len == 0)
+			nortpproxy_str.s = NULL;
 	}
 
 	if (rtpp_db_url.s != NULL)
 	{
+		rtpp_db_url.len = strlen(rtpp_db_url.s);
 		init_rtpproxy_db();
 		if (rtpp_sets > 0)
 		{
@@ -948,6 +950,13 @@ mod_init(void)
 			pkg_free(rtpp_strings[i]);
 	}
 
+	if (timeout_socket_str.s==NULL || timeout_socket_str.s[0]==0) {
+		timeout_socket_str.len = 0;
+		timeout_socket_str.s = NULL;
+	} else {
+		timeout_socket_str.len = strlen(timeout_socket_str.s);
+	}
+
 	if (ice_candidate_priority_avp_param) {
 	    s.s = ice_candidate_priority_avp_param; s.len = strlen(s.s);
 	    if (pv_parse_spec(&s, &avp_spec) == 0 || avp_spec.type != PVT_AVP) {
@@ -961,18 +970,8 @@ mod_init(void)
 	    ice_candidate_priority_avp_type = avp_flags;
 	}
 
-	if (rtp_inst_pv_param.s) {
-	    rtp_inst_pvar = pv_cache_get(&rtp_inst_pv_param);
-	    if ((rtp_inst_pvar == NULL) ||
-	    	((rtp_inst_pvar->type != PVT_AVP) &&
-	    	 (rtp_inst_pvar->type != PVT_XAVP) &&
-	    	 (rtp_inst_pvar->type != PVT_SCRIPTVAR))) {
-		LM_ERR("Invalid pvar name <%.*s>\n", rtp_inst_pv_param.len, rtp_inst_pv_param.s);
-		return -1;
-	    }
-	}
-
 	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
+		extra_id_pv_param.len = strlen(extra_id_pv_param.s);
 		if(pv_parse_format(&extra_id_pv_param, &extra_id_pv) < 0) {
 			LM_ERR("malformed PV string: %s\n", extra_id_pv_param.s);
 			return -1;
@@ -1961,7 +1960,6 @@ unforce_rtp_proxy(struct sip_msg* msg, char* flags)
 		LM_ERR("no available proxies\n");
 		return -1;
 	}
-    	set_rtp_inst_pvar(msg, &node->rn_url);
 	send_rtpp_command(node, v, (to_tag.len > 0) ? 10 : 8);
 
 	return 1;
@@ -2227,22 +2225,16 @@ free_opts(struct options *op1, struct options *op2, struct options *op3)
 	return (e); \
     } while (0);
 
-struct new_mediaip {
-	str strip;
-	int pf;
-};
-
 static int
 force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forcedIP)
 {
-	str body, body1, oldport, oldip, newport;
-	struct new_mediaip newip;
+	str body, body1, oldport, oldip, newport, newip;
 	str callid, from_tag, to_tag, tmp, payload_types;
 	str newrtcp = {0, 0};
 	str viabranch;
 	int create, port, len, flookup, argc, proxied, real, via, ret;
 	int orgip, commip;
-	int pf, force;
+	int pf, pf1, force;
 	struct options opts, rep_opts, pt_opts;
 	char *cp, *cp1;
 	char  *cpend, *next;
@@ -2581,12 +2573,10 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 			medianum++;
 
 			if (real != 0) {
-				newip.strip = oldip;
-				newip.pf = pf;
+				newip = oldip;
 			} else {
-				newip.strip.s = ip_addr2a(&msg->rcv.src_ip);
-				newip.strip.len = strlen(newip.strip.s);
-				newip.pf = msg->rcv.src_ip.af;
+				newip.s = ip_addr2a(&msg->rcv.src_ip);
+				newip.len = strlen(newip.s);
 			}
 			/* XXX must compare address families in all addresses */
 			if (pf == AF_INET6) {
@@ -2619,10 +2609,10 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				}
 			}
 
-			STR2IOVEC(newip.strip, v[9]);
+			STR2IOVEC(newip, v[9]);
 			STR2IOVEC(oldport, v[11]);
 #ifdef EXTRA_DEBUG
-			LM_DBG("STR2IOVEC(newip[%.*s], v[9])", newip.strip.len, newip.strip.s);
+			LM_DBG("STR2IOVEC(newip[%.*s], v[9])", newip.len, newip.s);
 			LM_DBG("STR2IOVEC(oldport[%.*s], v[11])", oldport.len, oldport.s);
 #endif
 			if (1 || media_multi) /* XXX netch: can't choose now*/
@@ -2646,7 +2636,6 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 					LM_ERR("no available proxies\n");
 					FORCE_RTP_PROXY_RET (-3);
 				}
-				set_rtp_inst_pvar(msg, &node->rn_url);
 				if (rep_opts.oidx > 0) {
 					if (node->rn_rep_supported == 0) {
 						LM_WARN("re-packetization is requested but is not "
@@ -2736,46 +2725,26 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				FORCE_RTP_PROXY_RET (-1);
 			}
 
-			/*
-			 * if (argc == 1) {
-			 *      Assume AF in reply stays the same as one in
-			 *      the original request.
-			 * }
-			 */
-			if (argc == 2) {
-				/*
-				 * For historical reasons, if rtpproxy returns
-				 * bare address without AF flag, this means
-				 * IPv4.
-				 */
-				newip.pf = AF_INET;
-			} else if (argc >= 3) {
-				/*
-				 * When rtpproxy returns explicit address +
-				 * "AF" flag, use that.
-				 */
-				newip.pf = (argv[2][0] == '6') ? AF_INET6 : AF_INET;
-			}
+			pf1 = (argc >= 3 && argv[2][0] == '6') ? AF_INET6 : AF_INET;
 
 			if (isnulladdr(&oldip, pf)) {
-				if (newip.pf == AF_INET6) {
-					newip.strip.s = "::";
-					newip.strip.len = 2;
+				if (pf1 == AF_INET6) {
+					newip.s = "::";
+					newip.len = 2;
 				} else {
-					newip.strip.s = "0.0.0.0";
-					newip.strip.len = 7;
+					newip.s = "0.0.0.0";
+					newip.len = 7;
 				}
 			} else {
 				if (forcedIP) {
-					newip.strip.s = str2;
-					newip.strip.len = strlen(newip.strip.s);
+					newip.s = str2;
+					newip.len = strlen(newip.s);
 #ifdef EXTRA_DEBUG
-					LM_DBG("forcing IP='%.*s'\n", newip.strip.len,
-					    newip.strip.s);
+					LM_DBG("forcing IP='%.*s'\n", newip.len, newip.s);
 #endif
 				} else {
-					newip.strip.s = (argc < 2) ? str2 : argv[1];
-					newip.strip.len = strlen(newip.strip.s);
+					newip.s = (argc < 2) ? str2 : argv[1];
+					newip.len = strlen(newip.s);
 				}
 			}
 			/* marker to double check : newport goes: str -> int -> str ?!?! */
@@ -2824,7 +2793,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 				body1.s = sdp_stream->ice_attr->foundation.s - 12;
 				body1.len = bodylimit - body1.s;
 				if (insert_candidates(msg, sdp_stream->ice_attr->foundation.s - 12,
-						&newip.strip, port, ice_candidate_priority_val.n) == -1) {
+						&newip, port, ice_candidate_priority_val.n) == -1) {
 					FORCE_RTP_PROXY_RET (-1);
 				}
 			}
@@ -2841,7 +2810,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 #ifdef EXTRA_DEBUG
 				LM_DBG("alter ip body1='%.*s'\n", body1.len, body1.s);
 #endif
-				if (alter_mediaip(msg, &body1, &oldip, pf, &newip.strip, newip.pf, 0)==-1) {
+				if (alter_mediaip(msg, &body1, &oldip, pf, &newip, pf1, 0)==-1) {
 					FORCE_RTP_PROXY_RET (-1);
 				}
 				if (!c2p)
@@ -2856,8 +2825,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 #ifdef EXTRA_DEBUG
 				LM_DBG("alter common ip body1='%.*s'\n", body1.len, body1.s);
 #endif
-				if (alter_mediaip(msg, &body1, &sdp_session->ip_addr,
-				    sdp_session->pf, &newip.strip, newip.pf, 0)==-1) {
+				if (alter_mediaip(msg, &body1, &sdp_session->ip_addr, sdp_session->pf, &newip, pf1, 0)==-1) {
 					FORCE_RTP_PROXY_RET (-1);
 				}
 				c1p_altered = 1;
@@ -2871,8 +2839,7 @@ force_rtp_proxy(struct sip_msg* msg, char* str1, char* str2, int offer, int forc
 #ifdef EXTRA_DEBUG
 				LM_DBG("alter media ip body1='%.*s'\n", body1.len, body1.s);
 #endif
-				if (alter_mediaip(msg, &body1, &sdp_session->o_ip_addr,
-				    sdp_session->o_pf, &newip.strip, newip.pf, 0)==-1) {
+				if (alter_mediaip(msg, &body1, &sdp_session->o_ip_addr, sdp_session->o_pf, &newip, pf1, 0)==-1) {
 					FORCE_RTP_PROXY_RET (-1);
 				}
 				o1p = 0;
@@ -2948,7 +2915,6 @@ static int start_recording_f(struct sip_msg* msg, char *foo, char *bar)
 		LM_ERR("no available proxies\n");
 		return -1;
 	}
-	set_rtp_inst_pvar(msg, &node->rn_url);
 
 	nitems = 8;
 	if (msg->first_line.type == SIP_REPLY) {
@@ -3007,7 +2973,6 @@ pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param,
         LM_ERR("no available proxies\n");
         return -1;
     }
-    set_rtp_inst_pvar(msg, &node->rn_url);
     nitems = 8;
     if (msg->first_line.type == SIP_REPLY) {
         if (to_tag.len == 0)
@@ -3025,23 +2990,5 @@ pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param,
 		return pv_get_null(msg, param, res);
     ret_val.len = strlen(ret_val.s);
     return pv_get_strval(msg, param, res, &ret_val);
-}
-
-int set_rtp_inst_pvar(struct sip_msg *msg, const str * const uri) {
-	pv_value_t val;
-
-	if (rtp_inst_pvar == NULL)
-		return 0;
-
-	memset(&val, 0, sizeof(pv_value_t));
-	val.flags = PV_VAL_STR;
-	val.rs = *uri;
-
-	if (rtp_inst_pvar->setf(msg, &rtp_inst_pvar->pvp, (int)EQ_T, &val) < 0)
-	{
-		LM_ERR("Failed to add RTPProxy URI to pvar\n");
-		return -1;
-	}
-	return 0;
 }
 

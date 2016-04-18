@@ -1,21 +1,33 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2008 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * History:
+ * --------
+ *  2008-11-10	Initial version (Miklos)
+ *  2009-06-01  Pre- and post-script callbacks of failure route are executed (Miklos)
  *
  */
 
@@ -37,15 +49,6 @@
 
 #include "../../data_lump.h"
 #include "../../data_lump_rpl.h"
-
-
-#ifdef ENABLE_ASYNC_MUTEX
-#define LOCK_ASYNC_CONTINUE(_t) lock(&(_t)->async_mutex )
-#define UNLOCK_ASYNC_CONTINUE(_t) unlock(&(_t)->async_mutex )
-#else
-#define LOCK_ASYNC_CONTINUE(_t) LOCK_REPLIES(_t)
-#define UNLOCK_ASYNC_CONTINUE(_t) UNLOCK_REPLIES(_t)
-#endif
 
 /* Suspends the transaction for later use.
  * Save the returned hash_index and label to get
@@ -73,11 +76,6 @@ int t_suspend(struct sip_msg *msg,
 		LM_DBG("trying to suspend an already canceled transaction\n");
 		ser_error = E_CANCELED;
 		return 1;
-	}
-	if (t->uas.status >= 200) {
-		LM_DBG("trasaction sent out a final response already - %d\n",
-				t->uas.status);
-		return -3;
 	}
 
 	if (msg->first_line.type != SIP_REPLY) {
@@ -107,11 +105,6 @@ int t_suspend(struct sip_msg *msg,
 			LM_ERR("failed to add the blind UAC\n");
 			return -1;
 		}
-		/* propagate failure route to new branch
-		 * - failure route to be executed if the branch is not continued
-		 *   before timeout */
-		t->uac[t->async_backup.blind_uac].on_failure = t->on_failure;
-		t->flags |= T_ASYNC_SUSPENDED;
 	} else {
 		LM_DBG("this is a suspend on reply - setting msg flag to SUSPEND\n");
 		msg->msg_flags |= FL_RPL_SUSPENDED;
@@ -136,7 +129,6 @@ int t_suspend(struct sip_msg *msg,
 
 		LM_DBG("saving transaction data\n");
 		t->uac[branch].reply->flags = msg->flags;
-		t->flags |= T_ASYNC_SUSPENDED;
 	}
 
 	*hash_index = t->hash_index;
@@ -182,13 +174,7 @@ int t_continue(unsigned int hash_index, unsigned int label,
 		return -1;
 	}
 
-	if (!(t->flags & T_ASYNC_SUSPENDED)) {
-		LM_WARN("transaction is not suspended [%u:%u]\n", hash_index, label);
-		return -2;
-	}
-
 	if (t->flags & T_CANCELED) {
-		t->flags &= ~T_ASYNC_SUSPENDED;
 		/* The transaction has already been canceled,
 		 * needless to continue */
 		UNREF(t); /* t_unref would kill the transaction */
@@ -201,9 +187,9 @@ int t_continue(unsigned int hash_index, unsigned int label,
 	 * form calling t_continue() multiple times simultaneously */
 	LOCK_ASYNC_CONTINUE(t);
 
-	t->flags |= T_ASYNC_CONTINUE;   /* we can now know anywhere in kamailio
+	t->flags |= T_ASYNC_CONTINUE;   /* we can now know anywhere in kamailio 
 					 * that we are executing post a suspend */
-
+	
 	/* which route block type were we in when we were suspended */
 	cb_type =  FAILURE_CB_TYPE;;
 	switch (t->async_backup.backup_route) {
@@ -231,33 +217,22 @@ int t_continue(unsigned int hash_index, unsigned int label,
 				/* Either t_continue() has already been
 				* called or the branch has already timed out.
 				* Needless to continue. */
-				t->flags &= ~T_ASYNC_SUSPENDED;
 				UNLOCK_ASYNC_CONTINUE(t);
 				UNREF(t); /* t_unref would kill the transaction */
 				return 1;
 			}
 
-			/* Set last_received to something >= 200,
-			 * the actual value does not matter, the branch
-			 * will never be picked up for response forwarding.
-			 * If last_received is lower than 200,
-			 * then the branch may tried to be cancelled later,
-			 * for example when t_reply() is called from
-			 * a failure route => deadlock, because both
-			 * of them need the reply lock to be held. */
-			t->uac[branch].last_received=500;
+			/*we really don't need this next line anymore otherwise we will 
+			never be able to forward replies after a (t_relay) on this branch.
+			We want to try and treat this branch as 'normal' (as if it were a normal req, not async)' */
+			//t->uac[branch].last_received=500;
 			uac = &t->uac[branch];
 		}
 		/* else
 			Not a huge problem, fr timer will fire, but CANCEL
 			will not be sent. last_received will be set to 408. */
 
-		/* We should not reset kr here to 0 as it's quite possible before continuing the dev. has correctly set the
-		 * kr by, for example, sending a transactional reply in code - resetting here will cause a dirty log message
-		 * "WARNING: script writer didn't release transaction" to appear in log files. TODO: maybe we need to add 
-		 * a special kr for async?
-		 * reset_kr();
-		 */
+		reset_kr();
 
 		/* fake the request and the environment, like in failure_route */
 		if (!fake_req(&faked_req, t->uas.request, 0 /* extra flags */, uac)) {
@@ -311,13 +286,7 @@ int t_continue(unsigned int hash_index, unsigned int label,
 		LM_DBG("continuing from a suspended reply"
 				" - resetting the suspend branch flag\n");
 
-		if (t->uac[branch].reply) {
 		t->uac[branch].reply->msg_flags &= ~FL_RPL_SUSPENDED;
-                } else {
-			LM_WARN("no reply in t_continue for branch. not much we can do\n");
-			return 0;
-		}
-                
 		if (t->uas.request) t->uas.request->msg_flags&= ~FL_RPL_SUSPENDED;
 
 		faked_env( t, t->uac[branch].reply, 1);
@@ -456,15 +425,9 @@ done:
 		sip_msg_free(t->uac[branch].reply);
 		t->uac[branch].reply = 0;
 	}
-
-	/*This transaction is no longer suspended so unsetting the SUSPEND flag*/
-	t->flags &= ~T_ASYNC_SUSPENDED;
-
-
 	return 0;
 
 kill_trans:
-	t->flags &= ~T_ASYNC_SUSPENDED;
 	/* The script has hopefully set the error code. If not,
 	 * let us reply with a default error. */
 	if ((kill_transaction_unsafe(t,

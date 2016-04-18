@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Digest Authentication - Database support
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -15,10 +17,19 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * You should have received a copy of the GNU General Public License 
+ * along with this program; if not, write to the Free Software 
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * history:
+ * ---------
+ * 2003-02-28 scratchpad compatibility abandoned
+ * 2003-01-27 next baby-step to removing ZT - PRESERVE_ZT (jiri)
+ * 2004-06-06 updated to the new DB api, added auth_db_{init,bind,close,ver}
+ *             (andrei)
+ * 2005-05-31 general definition of AVPs in credentials now accepted - ID AVP,
+ *            STRING AVP, AVP aliases (bogdan)
+ * 2006-03-01 pseudo variables support for domain name (bogdan)
  */
 
 
@@ -38,7 +49,7 @@
 #include "../../mod_fix.h"
 #include "../../mem/mem.h"
 #include "api.h"
-#include "auth_db_mod.h"
+#include "authdb_mod.h"
 #include "authorize.h"
 
 
@@ -62,16 +73,13 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table, int fl
 		LM_ERR("no more pkg memory\n");
 		return -1;
 	}
+	col[0] = &user_column;
 
 	keys[0] = &user_column;
 	keys[1] = &domain_column;
 
-	if(flags&AUTH_DB_SUBS_SKIP_CREDENTIALS) {
-		col[0] = &user_column;
-	} else {
-		for (n = 0, cred=credentials; cred ; n++, cred=cred->next) {
-			col[n] = &cred->text;
-		}
+	for (n = 0, cred=credentials; cred ; n++, cred=cred->next) {
+		col[n] = &cred->text;
 	}
 
 	VAL_TYPE(vals) = VAL_TYPE(vals + 1) = DB1_STR;
@@ -129,7 +137,7 @@ done:
 }
 
 static inline int get_ha1(struct username* _username, str* _domain,
-		const str* _table, char* _ha1, db1_res_t** res)
+			  const str* _table, char* _ha1, db1_res_t** res)
 {
 	pv_elem_t *cred;
 	db_key_t keys[2];
@@ -499,10 +507,10 @@ int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags)
 
 	if(ret==AUTH_OK && hdr!=NULL && (iflags&AUTH_CHECK_ID_F)) {
 		srealm = ((auth_body_t*)(hdr->parsed))->digest.username.user;
-
+			
 		if((furi=parse_from_uri(_m))==NULL)
 			return AUTH_ERROR;
-
+		
 		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
 			if((turi=parse_to_uri(_m))==NULL)
 				return AUTH_ERROR;
@@ -510,45 +518,30 @@ int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags)
 		} else {
 			uri = furi;
 		}
-		if(!((iflags&AUTH_CHECK_SKIPFWD_F)
-				&& (_m->REQ_METHOD==METHOD_INVITE || _m->REQ_METHOD==METHOD_BYE
-					|| _m->REQ_METHOD==METHOD_PRACK || _m->REQ_METHOD==METHOD_UPDATE
-					|| _m->REQ_METHOD==METHOD_MESSAGE))) {
-			if(srealm.len!=uri->user.len
-						|| strncmp(srealm.s, uri->user.s, srealm.len)!=0) {
-				LM_DBG("authentication username mismatch with from/to username\n");
-				return AUTH_USER_MISMATCH;
-			}
-		}
+		if(srealm.len!=uri->user.len
+					|| strncmp(srealm.s, uri->user.s, srealm.len)!=0)
+			return AUTH_USER_MISMATCH;
 
 		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
 			/* check from==to */
 			if(furi->user.len!=turi->user.len
-					|| strncmp(furi->user.s, turi->user.s, furi->user.len)!=0) {
-				LM_DBG("from username mismatch with to username\n");
+					|| strncmp(furi->user.s, turi->user.s, furi->user.len)!=0)
 				return AUTH_USER_MISMATCH;
-			}
 			if(use_domain!=0 && (furi->host.len!=turi->host.len
-					|| strncmp(furi->host.s, turi->host.s, furi->host.len)!=0)) {
-				LM_DBG("from domain mismatch with to domain\n");
+					|| strncmp(furi->host.s, turi->host.s, furi->host.len)!=0))
 				return AUTH_USER_MISMATCH;
-			}
 			/* check r-uri==from for publish */
 			if(_m->REQ_METHOD==METHOD_PUBLISH) {
 				if(parse_sip_msg_uri(_m)<0)
 					return AUTH_ERROR;
 				uri = &_m->parsed_uri;
 				if(furi->user.len!=uri->user.len
-						|| strncmp(furi->user.s, uri->user.s, furi->user.len)!=0) {
-					LM_DBG("from username mismatch with r-uri username\n");
+						|| strncmp(furi->user.s, uri->user.s, furi->user.len)!=0)
 					return AUTH_USER_MISMATCH;
-				}
 				if(use_domain!=0 && (furi->host.len!=uri->host.len
-						|| strncmp(furi->host.s, uri->host.s, furi->host.len)!=0)) {
-					LM_DBG("from domain mismatch with r-uri domain\n");
+						|| strncmp(furi->host.s, uri->host.s, furi->host.len)!=0))
 					return AUTH_USER_MISMATCH;
 				}
-			}
 		}
 		return AUTH_OK;
 	}

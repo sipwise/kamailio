@@ -1,4 +1,6 @@
 /*
+ * $Id: dlist.c 5160 2008-11-03 17:51:22Z henningw $
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,8 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ========
+ * 2006-11-28 added get_number_of_users() (Jeffrey Magder - SOMA Networks)
+ * 2007-09-12 added partitioning support for fetching all ul contacts
+ *            (bogdan)
  */
 
 /*! \file
@@ -52,7 +59,7 @@ static inline struct domain_list_item * find_dlist (str *name) {
 
 	for (item = domain_list; item != NULL; item = item->next) {
 		if (item->name.len == name->len
-				&& memcmp (item->name.s, name->s, name->len) == 0) {
+		        && memcmp (item->name.s, name->s, name->len) == 0) {
 			return item;
 		}
 	}
@@ -64,17 +71,16 @@ static inline struct domain_list_item * find_dlist (str *name) {
 
 static inline struct domain_list_item * add_to_dlist (str *name, int type) {
 	struct domain_list_item *item;
-	int i;
+        int i;
 	item = (struct domain_list_item *)
-				pkg_malloc (sizeof (struct domain_list_item));
+	       pkg_malloc (sizeof (struct domain_list_item));
 	if (item == NULL) {
-		LM_ERR("Out of pkg memory.\n");
+		LM_ERR("Out of shared memory.\n");
 		return NULL;
 	}
 	item->name.s = (char *) pkg_malloc (name->len + 1);
 	if (item->name.s == NULL) {
-		LM_ERR("Out of pkg memory (1).\n");
-		pkg_free(item);
+		LM_ERR("Out of shared memory.\n");
 		return NULL;
 	}
 	memcpy (item->name.s, name->s, name->len);
@@ -87,9 +93,7 @@ static inline struct domain_list_item * add_to_dlist (str *name, int type) {
 
 	item->domain.table = (hslot_t*)pkg_malloc(sizeof(hslot_t) * ul_hash_size);
 	if (!item->domain.table) {
-		LM_ERR("Out of pkg memory (2)\n");
-		pkg_free(item->name.s);
-		pkg_free(item);
+		LM_ERR("no memory left 2\n");
 		return NULL;
 	}
 
@@ -156,7 +160,7 @@ unsigned long get_number_of_users(void)
 
 
 int get_all_ucontacts(void *buf, int len, unsigned int flags,
-                         unsigned int part_idx, unsigned int part_max, int options)
+                         unsigned int part_idx, unsigned int part_max)
 {
 	LM_INFO("not available with partitioned interface");
 	return -1;

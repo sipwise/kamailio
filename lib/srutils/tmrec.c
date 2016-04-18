@@ -1,4 +1,5 @@
 /*
+ * $Id$
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
@@ -16,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -24,9 +25,7 @@
  * Time Recurence Library according to iCalendar (RFC 2445)
  * - implemented at FhG Fokus, 2003 - external link:
  *   https://github.com/miconda/tmrec
- * \brief srutils :: <description of this file>
- * \ingroup srutils
- * Module: \ref srutils
+ * - this is a clone adapted for kamailio/ser
  */
 
 #include <stdio.h>

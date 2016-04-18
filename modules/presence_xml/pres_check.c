@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -140,7 +140,7 @@ int presxml_check_activities(struct sip_msg *msg, str presentity_uri, str activi
 	if (presentity == NULL || presentity->len <= 0 || presentity->s == NULL)
 	{
 		LM_DBG("cannot get presentity for %.*s\n", presentity_uri.len, presentity_uri.s);
-		goto error;
+		return -1;
 	}
 
 	if ((xmlDoc = xmlParseMemory(presentity->s, presentity->len)) == NULL)
@@ -192,7 +192,6 @@ error:
 		pkg_free(nodeName);
 	if (xmlDoc != NULL)
 		xmlFreeDoc(xmlDoc);
-	if(presentity != NULL)
-		pres_free_presentity(presentity, ev);
+	pres_free_presentity(presentity, ev);
 	return retval;
 }

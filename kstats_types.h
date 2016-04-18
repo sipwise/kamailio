@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,8 +15,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/** Kamailio Core :: kamailio statistics types.
+/** kamailio statistics types.
  * This file contains type declaration for kamailio statistics.
  * They are needed when modules are loaded (sr_module.c).
  * The rest of kamailio stats are in lib/kcore (include
@@ -23,9 +24,13 @@
  * Note: kamailio statistics are obsolete. Use sr counters in new code
  * (counters.h).
  * @file kstats_types.h
- * @ingroup core
- * @author andrei
+ * @ingroup: core
  */
+/*
+ * History:
+ * --------
+ *  2010-08-18  initial version (andrei)
+*/
 
 #ifndef __kstats_types_h
 #define __kstats_types_h

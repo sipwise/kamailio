@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -210,8 +210,6 @@ int pv_parse_geoip_name(pv_spec_p sp, str *in)
 		case 5: 
 			if(strncmp(pvs.s, "metro", 5)==0)
 				gpv->type = 12;
-			else if(strncmp(pvs.s, "contc", 5)==0)
-				gpv->type = 13;
 			else goto error;
 		break;
 		default:
@@ -351,11 +349,6 @@ int pv_get_geoip(struct sip_msg *msg, pv_param_t *param,
 				return pv_get_null(msg, param, res);
 			return pv_get_sintval(msg, param, res,
 					gpv->item->r.record->metro_code);
-		case 13: /* contc */
-			if(gpv->item->r.record==NULL)
-				return pv_get_null(msg, param, res);
-			return pv_geoip_get_strzval(msg, param, res,
-					gpv->item->r.record->continent_code);
 		default: /* cc */
 			if(gpv->item->r.record==NULL)
 				return pv_get_null(msg, param, res);

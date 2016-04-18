@@ -1,3 +1,4 @@
+# $Id$
 #
 # rr module makefile
 #

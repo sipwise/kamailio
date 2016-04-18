@@ -1,4 +1,5 @@
-/*
+/*$Id$
+ *
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -19,14 +20,15 @@
  * @file
  * @ingroup counters
  * Module: counters.
- * @author andrei
- */
-
-/*!
- * \defgroup counters Counters/statistics
- * 
  */
  
+/*
+ * History:
+ * -------
+ *  2010-08-06  created by andrei
+ */
+
+
 #include "../../modparam.h"
 #include "../../dprint.h"
 #include "../../compiler_opt.h"

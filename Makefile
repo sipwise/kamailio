@@ -1,8 +1,69 @@
-# Kamailio makefile
+# $Id$
+#
+# sip_router makefile
 #
 # WARNING: requires gmake (GNU Make)
 #  Arch supported: Linux, FreeBSD, SunOS (tested on Solaris 8), OpenBSD (3.2),
-#  NetBSD (1.6), OS/X
+#  NetBSD (1.6).
+#
+#  History:
+#  --------
+#              created by andrei
+#  2003-02-24  make install no longer overwrites ser.cfg  - patch provided
+#               by Maxim Sobolev   <sobomax@FreeBSD.org> and 
+#                  Tomas Björklund <tomas@webservices.se>
+#  2003-03-11  PREFIX & LOCALBASE must also be exported (andrei)
+#  2003-04-07  hacked to work with solaris install (andrei)
+#  2003-04-17  exclude modules overwritable from env. or cmd. line,
+#               added include_modules and skip_modules (andrei)
+#  2003-05-30  added extra_defs & EXTRA_DEFS
+#               Makefile.defs force-included to allow recursive make
+#               calls -- see comment (andrei)
+#  2003-06-02  make tar changes -- unpacks in $NAME-$RELEASE  (andrei)
+#  2003-06-03  make install-cfg will properly replace the module path
+#               in the cfg (re: /usr/.*lib/ser/modules)
+#              ser.cfg.default is installed only if there is a previous
+#               cfg. -- fixes packages containing ser.cfg.default (andrei)
+#  2003-08-29  install-modules-doc split from install-doc, added 
+#               install-modules-all, removed README.cfg (andrei)
+#              added skip_cfg_install (andrei)
+#  2004-09-02  install-man will automatically "fix" the path of the files
+#               referred in the man pages
+#  2006-02-14  added utils & install-utils (andrei)
+#  2006-03-15  added nodeb parameter for make tar (andrei)
+#  2006-09-29  added modules-doc as target and doc_format= as make option (greger)
+#  2006-12-09  added new group_include as make option and defined groups 
+#               defining which modules to include. Also added new target 
+#               print-modules that you can use to check which modules will be 
+#               compiled (greger)
+#  2007-01-10  added new group_include targets mysql, radius, and presence 
+#               improved print-modules output fixed problem in include/exclude
+#               logic when using group_include (greger)
+#  2007-03-01  fail if a module or a required utility make fail unless 
+#              err_fail=0; don't try to make modules with no Makefiles (andrei)
+#  2007-03-16  moved the exports to Makefile.defs (andrei)
+#  2007-03-29  install-modules changed to use make -C modpath install (andrei)
+#  2007-05-04  "if ! foo" not supported in standard sh, switched to 
+#                "if foo; then :; else ... ; fi" (andrei)
+#  2008-06-23  added 2 new targets: README and man (re-generate the README
+#              or manpages for all the modules) (andrei)
+#  2008-06-25  make cfg support (use a pre-built cfg.: config.mak) (andrei)
+#  2008-06-28  added clean-all, proper-all, install-modules-man and error 
+#               checks for install-utils & doc (andrei)
+#  2008-07-01  split module list from config.mak into modules.lst so that
+#               the modules list can be changed without rebuilding the whole
+#               ser (andrei)
+#              added cfg-defs, new target that only rebuilds config.mak
+#  2009-03-10  replaced DEFS with C_DEFS (DEFS are now used only for
+#              "temporary" defines inside modules or libs) (andrei)
+#  2009-03-27  multiple modules directory support, see modules_dirs (andrei)
+#  2009-04-02  workaround for export not supported in gnu make 3.80
+#               target specific variables: use mk_params for each
+#               $(MAKE) invocation (andrei)
+#  2009-04-22  don't rebuild config.mak or modules.lst if not needed
+#              (e.g. on clean) (andrei)
+#  2009-06-24  auto-generate autover.h, containing the REPO_VER macro, defined
+#               to the top git commit sha (if git is found) (andrei)
 #
 
 # check make version
@@ -202,10 +263,10 @@ cmodules=$(foreach mods,$(modules_dirs), $($(mods)))
 
 
 # list of utils directories that should be compiled by make utils
-C_COMPILE_UTILS=	utils/kamcmd
+C_COMPILE_UTILS=	utils/sercmd
 # list of binaries that should be installed alongside
 # (they should be created after make utils, see C_COMPILE_UTILS)
-C_INSTALL_BIN=	# kamcmd is now installed by ctl
+C_INSTALL_BIN=	# sercmd is now installed by ctl
 
 # which utils know to install themselves and should be installed
 # along the core (list of utils directories)
@@ -671,9 +732,6 @@ mk-install_dirs: $(cfg_prefix)/$(cfg_dir) $(bin_prefix)/$(bin_dir) \
 $(cfg_prefix)/$(cfg_dir): 
 		mkdir -p $(cfg_prefix)/$(cfg_dir)
 
-$(run_prefix)/$(run_dir): 
-		mkdir -p $(run_prefix)/$(run_dir)
-
 $(bin_prefix)/$(bin_dir):
 		mkdir -p $(bin_prefix)/$(bin_dir)
 
@@ -697,7 +755,7 @@ $(man_prefix)/$(man_dir)/man5:
 
 # note: sed with POSIX.1 regex doesn't support |, + or ? (darwin, solaris ...) 
 install-cfg: $(cfg_prefix)/$(cfg_dir)
-	@if [ -f etc/$(CFG_NAME).cfg ]; then \
+		@if [ -f etc/$(CFG_NAME).cfg ]; then \
 			sed $(foreach m,$(modules_dirs),\
 					-e "s#/usr/[^:]*lib/$(CFG_NAME)/$(m)\([:/\"]\)#$($(m)_target)\1#g") \
 					-e "s#/usr/local/etc/$(CFG_NAME)/#$(cfg_target)#g" \
@@ -710,7 +768,7 @@ install-cfg: $(cfg_prefix)/$(cfg_dir)
 					$(cfg_prefix)/$(cfg_dir)$(MAIN_NAME).cfg; \
 			fi; \
 		fi
-	@if [ -f etc/$(CFG_NAME)-basic.cfg ]; then \
+		@if [ -f etc/$(CFG_NAME)-basic.cfg ]; then \
 			sed $(foreach m,$(modules_dirs),\
 					-e "s#/usr/[^:]*lib/$(CFG_NAME)/$(m)\([:/\"]\)#$($(m)_target)\1#g") \
 					-e "s#/usr/local/etc/$(CFG_NAME)/#$(cfg_target)#g" \
@@ -723,7 +781,7 @@ install-cfg: $(cfg_prefix)/$(cfg_dir)
 					$(cfg_prefix)/$(cfg_dir)$(MAIN_NAME)-basic.cfg; \
 			fi; \
 		fi
-	@if [ -f etc/$(CFG_NAME)-oob.cfg ]; then \
+		@if [ -f etc/$(CFG_NAME)-oob.cfg ]; then \
 			sed $(foreach m,$(modules_dirs),\
 					-e "s#/usr/[^:]*lib/$(CFG_NAME)/$(m)\([:/\"]\)#$($(m)_target)\1#g") \
 					-e "s#/usr/local/etc/$(CFG_NAME)/#$(cfg_target)#g" \
@@ -737,8 +795,8 @@ install-cfg: $(cfg_prefix)/$(cfg_dir)
 					$(cfg_prefix)/$(cfg_dir)$(MAIN_NAME)-advanced.cfg; \
 			fi; \
 		fi
-	@# other configs
-	@for r in $(C_INSTALL_CFGS) ""; do \
+		@# other configs
+		@for r in $(C_INSTALL_CFGS) ""; do \
 			if [ -n "$$r" ]; then \
 				if [ -f "$$r" ]; then \
 					n=`basename "$$r"` ; \
@@ -760,15 +818,14 @@ install-cfg: $(cfg_prefix)/$(cfg_dir)
 					fi ; \
 				fi ; \
 			fi ; \
-			: ; done; true
-	@# radius dictionary
-	@$(INSTALL_TOUCH) $(cfg_prefix)/$(cfg_dir)/dictionary.$(CFG_NAME)
-	@$(INSTALL_CFG) etc/dictionary.$(CFG_NAME) $(cfg_prefix)/$(cfg_dir)
-	@echo "config files installed"
+		done; true
+		# radius dictionary
+		$(INSTALL_TOUCH) $(cfg_prefix)/$(cfg_dir)/dictionary.$(CFG_NAME)
+		$(INSTALL_CFG) etc/dictionary.$(CFG_NAME) $(cfg_prefix)/$(cfg_dir)
 
 install-bin: $(bin_prefix)/$(bin_dir) $(NAME)
-	$(INSTALL_TOUCH) $(bin_prefix)/$(bin_dir)/$(NAME)
-	$(INSTALL_BIN) $(NAME) $(bin_prefix)/$(bin_dir)
+		$(INSTALL_TOUCH) $(bin_prefix)/$(bin_dir)/$(NAME)
+		$(INSTALL_BIN) $(NAME) $(bin_prefix)/$(bin_dir)
 
 
 install-share: $(share_prefix)/$(share_dir)
@@ -920,10 +977,10 @@ clean: clean-libs
 clean-extra-names:
 	@rm -f $(filter-out $(MAIN_NAME), sip-router ser kamailio)
 
-# proper/distclean-old a.s.o modules, utils and libs too
+# proper/distclean a.s.o modules, utils and libs too
 
 proper: clean-extra-names proper-modules proper-utils proper-libs
-distclean-old: distclean-modules distclean-utils distclean-libs
+distclean: distclean-modules distclean-utils distclean-libs
 realclean: realclean-modules realclean-utils realclean-libs
 maintainer-clean: maintainer-clean-modules maintainer-clean-utils \
  maintainer-clean-libs
@@ -936,7 +993,7 @@ clean-all: clean
 maintainer-clean: modules=$(modules_all)
 
 # on make proper clean also the build config (w/o module list)
-proper realclean distclean-old maintainer-clean: clean_cfg
+proper realclean distclean maintainer-clean: clean_cfg
 
 # on maintainer clean, remove also the configured module list
 maintainer-clean: clean_modules_cfg clean_makefile_vars
@@ -959,7 +1016,7 @@ clean_modules_cfg clean-modules-cfg:
 
 # clean everything generated - shortcut on maintainer-clean
 .PHONY: pure
-pure distclean: maintainer-clean
+pure: maintainer-clean
 
 .PHONY: install_initd_debian install-initd-debian
 install_initd_debian install-initd-debian:
@@ -997,11 +1054,9 @@ install_initd_centos install-initd-centos:
 		-e "s#GROUP=kamailio#GROUP=$(NAME)#g" \
 		< pkg/kamailio/rpm/kamailio.default \
 		> /etc/default/$(NAME)
-	mkdir -p /var/run/$(NAME)
 	/usr/sbin/groupadd -r $(NAME)
 	/usr/sbin/useradd -r -g $(NAME) -s /bin/false -c "Kamailio Daemon" \
-                  -d /var/run/$(NAME) $(NAME)
-	chown $(NAME):$(NAME) /var/run/$(NAME)
+                  -d ${lib_prefix}/${lib_dir} $(NAME)
 
 .PHONY: dbschema
 dbschema:
@@ -1029,7 +1084,6 @@ uninstall:
 	@echo " *LIBDIR Path is: ${lib_prefix}/${lib_dir}"
 	@echo " *MANDIR Path is: ${man_prefix}/${man_dir}"
 	@echo " *SHRDIR Path is: ${share_prefix}/${share_dir}"
-	@echo " *RUNDIR Path is: $(run_prefix)/$(run_dir)"
 	@if [ "${PREFIX}" != "/usr/local" ] ; then \
 		echo "-Custom PREFIX Path" ; \
 		if [ "${PREFIX}" = "/" -o "${PREFIX}" = "/usr" ] ; then \
@@ -1060,7 +1114,6 @@ uninstall:
 		echo "rm -rf ${doc_prefix}/${doc_dir}" ; \
 		echo "rm -rf ${lib_prefix}/${lib_dir}" ; \
 		echo "rm -rf ${share_prefix}/${share_dir}" ; \
-		echo "rm -rf $(run_prefix)/$(run_dir)" ; \
 		echo ; \
 		echo "-WARNING: before running the commands, be sure they don't delete any system directory or file" ; \
 	fi ;

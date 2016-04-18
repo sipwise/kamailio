@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * ratelimit module
  *
  * Copyright (C) 2006 Hendrik Scholz <hscholz@raisdorf.net>
@@ -18,8 +20,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ---------
+ *
+ * 2008-01-10 ported from SER project (osas)
+ * 2008-01-16 ported enhancements from openims project (osas)
+ * 2020-04-28 add sip-router rpc interface (osas)
  */
 
 #include <stdio.h>
@@ -212,10 +220,10 @@ static cmd_export_t cmds[]={
 };
 static param_export_t params[]={
 	{"timer_interval", INT_PARAM,                &timer_interval},
-	{"queue",          PARAM_STRING|USE_FUNC_PARAM, (void *)add_queue_params},
-	{"pipe",           PARAM_STRING|USE_FUNC_PARAM, (void *)add_pipe_params},
+	{"queue",          STR_PARAM|USE_FUNC_PARAM, (void *)add_queue_params},
+	{"pipe",           STR_PARAM|USE_FUNC_PARAM, (void *)add_pipe_params},
 	/* RESERVED for future use
-	{"load_source",    PARAM_STRING|USE_FUNC_PARAM, (void *)set_load_source},
+	{"load_source",    STR_PARAM|USE_FUNC_PARAM, (void *)set_load_source},
 	*/
 	{0,0,0}
 };
@@ -325,14 +333,9 @@ static int get_cpuload(double * load)
 	FILE * f = fopen("/proc/stat", "r");
 	double vload;
 	int ncpu;
-	static int errormsg = 0;
 
 	if (! f) {
-		/* Only output this error message five times */
-		if (errormsg < 5) {
-			LM_ERR("could not open /proc/stat\n");
-			errormsg++;
-		}
+		LM_ERR("could not open /proc/stat\n");
 		return -1;
 	}
 	if (fscanf(f, "cpu  %lld%lld%lld%lld%lld%lld%lld%lld",
@@ -1143,7 +1146,7 @@ static void rpc_stats(rpc_t *rpc, void *c) {
 
 	LOCK_GET(rl_lock);
 	for (i=0; i<MAX_PIPES; i++) {
-		if (rpc->rpl_printf(c, "PIPE[%d]: %d/%d (drop rate: %d)",
+		if (rpc->printf(c, "PIPE[%d]: %d/%d (drop rate: %d)",
 			i, *pipes[i].last_counter, *pipes[i].limit,
 			*pipes[i].load) < 0) goto error;
 	}
@@ -1160,7 +1163,7 @@ static void rpc_get_pipes(rpc_t *rpc, void *c) {
 		if (*pipes[i].algo != PIPE_ALGO_NOP) {
 			if (str_map_int(algo_names, *pipes[i].algo, &algo))
 				goto error;
-			if (rpc->rpl_printf(c, "PIPE[%d]: %d:%.*s %d/%d (drop rate: %d) [%d]",
+			if (rpc->printf(c, "PIPE[%d]: %d:%.*s %d/%d (drop rate: %d) [%d]",
 				i, *pipes[i].algo, algo.len, algo.s,
 				*pipes[i].last_counter, *pipes[i].limit,
 				*pipes[i].load, *pipes[i].counter) < 0) goto error;
@@ -1210,7 +1213,7 @@ static void rpc_get_queues(rpc_t *rpc, void *c) {
 	LOCK_GET(rl_lock);
 	for (i=0; i<MAX_QUEUES; i++) {
 		if (queues[i].pipe) {
-			if (rpc->rpl_printf(c, "QUEUE[%d]: %d:%.*s",
+			if (rpc->printf(c, "QUEUE[%d]: %d:%.*s",
 				i, *queues[i].pipe,
 				(*queues[i].method).len,
 				(*queues[i].method).s) < 0) goto error;
@@ -1256,7 +1259,7 @@ static void rpc_set_queue(rpc_t *rpc, void *c) {
 }
 
 static void rpc_get_pid(rpc_t *rpc, void *c) {
-	rpc->rpl_printf(c, "ki[%f] kp[%f] kd[%f] ", *pid_ki, *pid_kp, *pid_kd);
+	rpc->printf(c, "ki[%f] kp[%f] kd[%f] ", *pid_ki, *pid_kp, *pid_kd);
 }
 
 static void rpc_set_pid(rpc_t *rpc, void *c) {

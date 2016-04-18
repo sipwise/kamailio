@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 Voice System SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,16 +17,15 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2007-07-10  initial version (ancuta)
 */
 
-/*!
- * \file
- * \brief Request
- * \ingroup dialog
- * Module: \ref dialog
- */
+
+
 
 #ifndef DLG_REQUEST_WITHIN_H
 #define DLG_REQUEST_WITHIN_H
@@ -51,6 +52,6 @@ dlg_t* build_dlg_t(struct dlg_cell * cell, int dir);
 int free_tm_dlg(dlg_t *td);
 int dlg_bye(struct dlg_cell *dlg, str *hdrs, int side);
 int dlg_bye_all(struct dlg_cell *dlg, str *hdrs);
-int dlg_send_ka(dlg_cell_t *dlg, int dir);
+int dlg_send_ka(dlg_cell_t *dlg, int dir, str *hdrs);
 
 #endif

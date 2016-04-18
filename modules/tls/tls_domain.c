@@ -18,7 +18,7 @@
  */
 
 /**
- * Kamailio TLS support :: Virtual domain configuration support
+ * SIP-router TLS support :: Virtual domain configuration support
  * @file
  * @ingroup tls
  * Module: @ref tls
@@ -35,7 +35,6 @@
 #include "../../pt.h"
 #include "../../cfg/cfg.h"
 #include "../../dprint.h"
-#include "tls_config.h"
 #include "tls_server.h"
 #include "tls_util.h"
 #include "tls_mod.h"
@@ -182,8 +181,6 @@ void tls_free_domain(tls_domain_t* d)
 	if (d->crl_file.s) shm_free(d->crl_file.s);
 	if (d->pkey_file.s) shm_free(d->pkey_file.s);
 	if (d->cert_file.s) shm_free(d->cert_file.s);
-	if (d->server_name.s) shm_free(d->server_name.s);
-	if (d->server_id.s) shm_free(d->server_id.s);
 	shm_free(d);
 }
 
@@ -881,71 +878,6 @@ static int tls_ssl_ctx_set_read_ahead(SSL_CTX* ctx, long val, void* unused)
 	return 0;
 }
 
-
-#ifndef OPENSSL_NO_TLSEXT
-
-/**
- * @brief SNI callback function
- *
- * callback on server_name -> trigger context switch if a TLS domain
- * for the server_name is found (checks socket too) */
-static int tls_server_name_cb(SSL *ssl, int *ad, void *private)
-{
-    tls_domain_t *orig_domain, *new_domain;
-	str server_name;
-
-	orig_domain = (tls_domain_t*)private;
-	server_name.s = (char*)SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-	if (server_name.s)  {
-		LM_DBG("received server_name (TLS extension): '%s'\n", server_name.s);
-	} else {
-		LM_DBG("SSL_get_servername returned NULL: return SSL_TLSEXT_ERR_NOACK\n");
-		return SSL_TLSEXT_ERR_NOACK;
-	}
-
-	server_name.len = strlen(server_name.s);
-
-	new_domain = tls_lookup_cfg(*tls_domains_cfg, TLS_DOMAIN_SRV,
-			&orig_domain->ip, orig_domain->port, &server_name, 0);
-	if (new_domain==NULL) {
-		LM_DBG("TLS domain for socket [%s:%d] and server_name='%s' "
-			"not found\n", ip_addr2a(&orig_domain->ip),
-			orig_domain->port, server_name.s);
-		/* we do not perform SSL_CTX switching, thus the default server domain
-		   for this socket (or the default server domain) will be used. */
-		return SSL_TLSEXT_ERR_ALERT_WARNING;
-	}
-
-	LM_DBG("TLS cfg domain selected for received server name [%s]:"
-		" socket [%s:%d] server name='%s' -"
-		" switching SSL CTX to %p dom %p%s\n",
-		server_name.s, ip_addr2a(&new_domain->ip),
-		new_domain->port, ZSW(new_domain->server_name.s),
-		new_domain->ctx[process_no], new_domain,
-		(new_domain->type & TLS_DOMAIN_DEF)?" (default)":"");
-	SSL_set_SSL_CTX(ssl, new_domain->ctx[process_no]);
-	/* SSL_set_SSL_CTX only sets the correct certificate parameters, but does
-	   set the proper verify options. Thus this will be done manually! */
-
-	SSL_set_options(ssl, SSL_CTX_get_options(ssl->ctx));
-	if ((SSL_get_verify_mode(ssl) == SSL_VERIFY_NONE) ||
-				(SSL_num_renegotiations(ssl) == 0)) {
-		/*
-		 * Only initialize the verification settings from the ctx
-		 * if they are not yet set, or if we're called when a new
-		 * SSL connection is set up (num_renegotiations == 0).
-		 * Otherwise, we would possibly reset a per-directory
-		 * configuration which was put into effect by ssl_hook_access.
-		 */
-		SSL_set_verify(ssl, SSL_CTX_get_verify_mode(ssl->ctx),
-			SSL_CTX_get_verify_callback(ssl->ctx));
-	}
-
-	return SSL_TLSEXT_ERR_OK;
-}
-#endif
-
-
 /**
  * @brief Initialize all domain attributes from default domains if necessary
  * @param d initialized TLS domain
@@ -964,55 +896,15 @@ static int fix_domain(tls_domain_t* d, tls_domain_t* def)
 		ERR("%s: Cannot allocate shared memory\n", tls_domain_str(d));
 		return -1;
 	}
-	if(d->method>TLS_USE_TLSvRANGE) {
-		LM_DBG("using tls methods range: %d\n", d->method);
-	} else {
-		LM_DBG("using one tls method version: %d\n", d->method);
-	}
 	memset(d->ctx, 0, sizeof(SSL_CTX*) * procs_no);
 	for(i = 0; i < procs_no; i++) {
-		if(d->method>TLS_USE_TLSvRANGE) {
-			d->ctx[i] = SSL_CTX_new(SSLv23_method());
-		} else {
-			d->ctx[i] = SSL_CTX_new((SSL_METHOD*)ssl_methods[d->method - 1]);
-		}
+		d->ctx[i] = SSL_CTX_new((SSL_METHOD*)ssl_methods[d->method - 1]);
 		if (d->ctx[i] == NULL) {
 			ERR("%s: Cannot create SSL context\n", tls_domain_str(d));
 			return -1;
 		}
-		if(d->method>TLS_USE_TLSvRANGE) {
-			SSL_CTX_set_options(d->ctx[i], (long)ssl_methods[d->method - 1]);
-		}
-#ifndef OPENSSL_NO_TLSEXT
-		/*
-		* check server domains for server_name extension and register
-		* callback function
-		*/
-		if ((d->type & TLS_DOMAIN_SRV) && d->server_name.len>0) {
-			if (!SSL_CTX_set_tlsext_servername_callback(d->ctx[i], tls_server_name_cb)) {
-				LM_ERR("register server_name callback handler for socket "
-					"[%s:%d], server_name='%s' failed for proc %d\n",
-					ip_addr2a(&d->ip), d->port, d->server_name.s, i);
-				return -1;
-			}
-			if (!SSL_CTX_set_tlsext_servername_arg(d->ctx[i], d)) {
-				LM_ERR("register server_name callback handler data for socket "
-					"[%s:%d], server_name='%s' failed for proc %d\n",
-					ip_addr2a(&d->ip), d->port, d->server_name.s, i);
-				return -1;
-			}
-		}
-#endif
 	}
-
-#ifndef OPENSSL_NO_TLSEXT
-	if ((d->type & TLS_DOMAIN_SRV) && d->server_name.len>0) {
-		LM_NOTICE("registered server_name callback handler for socket "
-			"[%s:%d], server_name='%s' ...\n", ip_addr2a(&d->ip), d->port,
-			d->server_name.s);
-	}
-#endif
-
+	
 	if (load_cert(d) < 0) return -1;
 	if (load_ca_list(d) < 0) return -1;
 	if (load_crl(d) < 0) return -1;
@@ -1277,7 +1169,6 @@ tls_domains_cfg_t* tls_new_cfg(void)
 		return 0;
 	}
 	memset(r, 0, sizeof(tls_domains_cfg_t));
-	atomic_set(&r->ref_count, 0);
 	return r;
 }
 
@@ -1291,7 +1182,7 @@ tls_domains_cfg_t* tls_new_cfg(void)
  * @return found configuration or default, if not found
  */
 tls_domain_t* tls_lookup_cfg(tls_domains_cfg_t* cfg, int type,
-		struct ip_addr* ip, unsigned short port, str *sname, str *srvid)
+								struct ip_addr* ip, unsigned short port)
 {
 	tls_domain_t *p;
 
@@ -1304,35 +1195,8 @@ tls_domain_t* tls_lookup_cfg(tls_domains_cfg_t* cfg, int type,
 	}
 
 	while (p) {
-		if(srvid && srvid->len>0) {
-			LM_DBG("comparing addr: [%s:%d]  [%s:%d] -- id: [%.*s] [%.*s]\n",
-				ip_addr2a(&p->ip), p->port, ip_addr2a(ip), port,
-				p->server_id.len, ZSW(p->server_id.s),
-				srvid->len, ZSW(srvid->s));
-			if(p->server_id.s && p->server_id.len==srvid->len
-					&& strncasecmp(p->server_name.s, srvid->s, srvid->len)==0) {
-				LM_DBG("TLS config found by server id\n");
-				return p;
-			}
-
-		}
-		if(sname) {
-			LM_DBG("comparing addr: [%s:%d]  [%s:%d] -- sni: [%.*s] [%.*s]\n",
-				ip_addr2a(&p->ip), p->port, ip_addr2a(ip), port,
-				p->server_name.len, ZSW(p->server_name.s),
-				sname->len, ZSW(sname->s));
-		}
-		if ((p->port==0 || p->port == port) && ip_addr_cmp(&p->ip, ip)) {
-			if(sname && sname->len>0) {
-				if(p->server_name.s && p->server_name.len==sname->len
-					&& strncasecmp(p->server_name.s, sname->s, sname->len)==0) {
-					LM_DBG("socket+server_name based TLS server domain found\n");
-					return p;
-				}
-			} else {
-				return p;
-			}
-		}
+		if ((p->port == port) && ip_addr_cmp(&p->ip, ip))
+			return p;
 		p = p->next;
 	}
 
@@ -1361,13 +1225,8 @@ static int domain_exists(tls_domains_cfg_t* cfg, tls_domain_t* d)
 	}
 
 	while (p) {
-		if ((p->port == d->port) && ip_addr_cmp(&p->ip, &d->ip)) {
-			if(p->server_name.len==0) {
-				LM_WARN("another tls domain with same address was defined"
-						" and no server name provided\n");
-				return 1;
-			}
-		}
+		if ((p->port == d->port) && ip_addr_cmp(&p->ip, &d->ip))
+			return 1;
 		p = p->next;
 	}
 

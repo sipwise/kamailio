@@ -3,29 +3,30 @@
  *
  * Copyright (C) 2001-2003 FhG FOKUS
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
- * \file
- * \brief Kamailio core :: Radius include file
- * \ingroup core
- * Module: \ref core
- *
- * \note WARNING: Don't forget to update sip_router/etc/dictionary.sip-router if you 
+
+/*
+ * WARNING: Don't forget to update sip_router/etc/dictionary.sip-router if you 
  * update this file !
  */
 
@@ -146,8 +147,8 @@ typedef enum rad_val {
 			continue;					\
 		da = rc_dict_findattr(rh, at[i].n);			\
 		if (da == NULL) {					\
-			LM_ERR("%s: can't get code for %s attr\n",	\
-					fn, at[i].n);			\
+			LOG(L_ERR, "ERROR: %s: can't get code for the "	\
+				   "%s attribute\n", fn, at[i].n);	\
 			return e1;					\
 		}							\
 		at[i].v = da->value;					\
@@ -157,8 +158,8 @@ typedef enum rad_val {
 			continue;					\
 		dv = rc_dict_findval(rh, vl[i].n);			\
 		if (dv == NULL) {					\
-			LM_ERR("%s: can't get code for %s attr value\n",\
-					fn, vl[i].n);			\
+			LOG(L_ERR, "ERROR: %s: can't get code for the "	\
+				   "%s attribute value\n", fn, vl[i].n);\
 			return e2;					\
 		}							\
 		vl[i].v = dv->value;					\

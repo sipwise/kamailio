@@ -22,18 +22,14 @@ Olle E. Johansson
 
    <oej@edvina.net>
 
-Juha Heinanen
-
-   <jh@tutpro.com>
-
 Edited by
 
 Daniel-Constantin Mierla
 
    <miconda@gmail.com>
 
-   Copyright © 2014, 2013, 2007, 2008, 2004 Edvina AB, 1und1 Internet AG,
-   BASIS AudioNet GmbH, Elena-Ramona Modroiu, Juha Heinanen, FhG FOKUS
+   Copyright © 2013, 2007, 2008, 2004 Edvina AB, 1und1 Internet AG, BASIS
+   AudioNet GmbH, Elena-Ramona Modroiu, FhG FOKUS
      __________________________________________________________________
 
    Table of Contents
@@ -83,15 +79,9 @@ Daniel-Constantin Mierla
               5.8. is_gflag
               5.9. get_gflags
 
-        6. RPC Commands
+        6. Exported pseudo-variables
 
-              6.1. cfgutils.set_gflag
-              6.2. cfgutils.reset_gflag
-              6.3. cfgutils.is_gflag
-
-        7. Exported pseudo-variables
-
-              7.1. $RANDOM
+              6.1. $RANDOM
 
    List of Examples
 
@@ -127,10 +117,7 @@ Daniel-Constantin Mierla
    1.30. reset_gflag usage
    1.31. is_gflag usage
    1.32. get_gflags usage
-   1.33. cfgutils.set_gflag usage
-   1.34. cfgutils.reset_gflag usage
-   1.35. cfgutils.is_gflag usage
-   1.36. RANDOM pseudo-variable usage
+   1.33. RANDOM pseudo-variable usage
 
 Chapter 1. Admin Guide
 
@@ -179,15 +166,9 @@ Chapter 1. Admin Guide
         5.8. is_gflag
         5.9. get_gflags
 
-   6. RPC Commands
+   6. Exported pseudo-variables
 
-        6.1. cfgutils.set_gflag
-        6.2. cfgutils.reset_gflag
-        6.3. cfgutils.is_gflag
-
-   7. Exported pseudo-variables
-
-        7.1. $RANDOM
+        6.1. $RANDOM
 
 1. Overview
 
@@ -237,8 +218,8 @@ Chapter 1. Admin Guide
    The size of bitmap is 32.
 
    The module exports external commands that can be used to change the
-   global flags via Management Interface and RPC. See relevant sections
-   below.
+   global flags via Management Interface. The MI commands are:
+   "set_gflag", "reset_gflag" and "is_gflag".
 
 2. Dependencies
 
@@ -362,10 +343,10 @@ rand_get_prob();
    Waits "time" seconds.
 
    Meaning of the parameters is as follows:
-     * time - Time to wait in seconds. It can be an integer or a variable
-       holding an integer.
+     * time - Time to wait in seconds.
 
-   This function can be used from ANY_ROUTE.
+   This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
+   FAILURE_ROUTE, BRANCH_ROUTE.
 
    Example 1.9. sleep usage
 ...
@@ -377,10 +358,10 @@ sleep("1");
    Waits "time" micro-seconds.
 
    Meaning of the parameters is as follows:
-     * time - Time to wait in micro-seconds (1/1000000 of a second). It
-       can be an integer or a variable holding an integer.
+     * time - Time to wait in micro-seconds (1/1000000 of a second).
 
-   This function can be used from ANY_ROUTE.
+   This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
+   FAILURE_ROUTE, BRANCH_ROUTE.
 
    Example 1.10. usleep usage
 ...
@@ -742,67 +723,15 @@ $ kamctl fifo get_gflags
 12345
 ...
 
-6. RPC Commands
+6. Exported pseudo-variables
 
-   6.1. cfgutils.set_gflag
-   6.2. cfgutils.reset_gflag
-   6.3. cfgutils.is_gflag
+   6.1. $RANDOM
 
-6.1. cfgutils.set_gflag
-
-   Set the value of some flags (specified by bitmask) to 1.
-
-   The parameter value must be a bitmask in decimal or hexadecimal format.
-   The bitmask has a 32 bit size.
-
-   Example 1.33. cfgutils.set_gflag usage
-...
-$ kamctl cfgutils.set_gflag s:1
-...
-
-6.2. cfgutils.reset_gflag
-
-   Reset the value of some flags to 0.
-
-   Reset the value of some flags (specified by bitmask) to 1.
-
-   The parameter value must be a bitmask in decimal or hexadecimal format.
-   The bitmask has a 32 bit size.
-
-   Example 1.34. cfgutils.reset_gflag usage
-...
-$ kamctl cfgutils.reset_gflag s:0x1
-...
-
-6.3. cfgutils.is_gflag
-
-   Returns string "TRUE" if all the flags from the given set are set and
-   "FALSE" if at least one is not set.
-
-   The parameter value must be a bitmask in decimal or hexadecimal format.
-   The bitmask has a 32 bit size.
-
-   Example 1.35. cfgutils.is_gflag usage
-...
-$ kamctl cfgutils.set_gflag s:1024
-$ kamctl cfgutils.is_gflag s:1024
-TRUE
-$ kamctl cfgutils.is_gflag s:1023
-FALSE
-$ kamctl cfgutils.set_gflag s:0x7FFF
-$ kamctl cfgutils.is_gflag s:1023
-TRUE
-...
-
-7. Exported pseudo-variables
-
-   7.1. $RANDOM
-
-7.1. $RANDOM
+6.1. $RANDOM
 
    Returns a random value from the [0 - 2^31) range.
 
-   Example 1.36. RANDOM pseudo-variable usage
+   Example 1.33. RANDOM pseudo-variable usage
 ...
 if (rand_event()) {
   $avp(i:10) = ($RANDOM / 16777216); # 2^24

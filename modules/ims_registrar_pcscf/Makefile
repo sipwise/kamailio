@@ -1,3 +1,4 @@
+# $Id$
 #
 # registrar module makefile
 #
@@ -23,7 +24,6 @@ endif
 
 ifneq ($(OS),darwin)
 	LIBS += -lrt
-	LIBS += -lpthread
 endif
 
 DEFS+=-DOPENSER_MOD_INTERFACE

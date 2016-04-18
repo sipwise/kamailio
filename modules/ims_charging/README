@@ -47,27 +47,20 @@ Carlos Ruiz Diaz
               4.7. cdp_event_latency(integer)
               4.8. cdp_event_threshold(integer)
               4.9. cdp_event_latency_log(integer)
-              4.10. single_ro_session_per_dialog(integer)
-              4.11. origin_host(string)
-              4.12. origin_realm(string)
-              4.13. destination_host(string)
-              4.14. destination_realm(string)
-              4.15. service_context_id_root(string)
-              4.16. service_context_id_ext(string)
-              4.17. service_context_id_mnc(string)
-              4.18. voice_service_identifier(string)
-              4.19. voice_rating_group(string)
-              4.20. video_service_identifier(string)
-              4.21. video_rating_group(string)
-              4.22. service_context_id_mcc(string)
-              4.23. service_context_id_release(string)
+              4.10. origin_host(string)
+              4.11. origin_realm(string)
+              4.12. destination_host(string)
+              4.13. destination_realm(string)
+              4.14. service_context_id_root(string)
+              4.15. service_context_id_ext(string)
+              4.16. service_context_id_mnc(string)
+              4.17. service_context_id_mcc(string)
+              4.18. service_context_id_release(string)
 
         5. Functions
 
-              5.1. Ro_CCR(route_name, direction, reservation_units,
-                      domain, incoming_trunk_id, outgoing_trunk_id
-
-              5.2. Ro_set_session_id_avp()
+              5.1. Ro_CCR(route_name, direction, charge_type, unit_type,
+                      reservation_units)
 
         6. Statistics
 
@@ -99,22 +92,16 @@ Carlos Ruiz Diaz
    1.7. cdp_event_latencyparameter usage
    1.8. cdp_event_thresholdparameter usage
    1.9. cdp_event_latency_logparameter usage
-   1.10. single_ro_session_per_dialogparameter usage
-   1.11. origin_hostparameter usage
-   1.12. origin_realmparameter usage
-   1.13. destination_hostparameter usage
-   1.14. destination_realmparameter usage
-   1.15. service_context_id_rootparameter usage
-   1.16. service_context_id_extparameter usage
-   1.17. service_context_id_mncparameter usage
-   1.18. voice_service_identifierparameter usage
-   1.19. voice_rating_groupparameter usage
-   1.20. video_service_identifierparameter usage
-   1.21. video_rating_groupparameter usage
-   1.22. service_context_id_mccparameter usage
-   1.23. service_context_id_releaseparameter usage
-   1.24. Ro_CCR
-   1.25. Ro_set_session_id_avp
+   1.10. origin_hostparameter usage
+   1.11. origin_realmparameter usage
+   1.12. destination_hostparameter usage
+   1.13. destination_realmparameter usage
+   1.14. service_context_id_rootparameter usage
+   1.15. service_context_id_extparameter usage
+   1.16. service_context_id_mncparameter usage
+   1.17. service_context_id_mccparameter usage
+   1.18. service_context_id_releaseparameter usage
+   1.19. Ro_CCR
 
 Chapter 1. Admin Guide
 
@@ -143,27 +130,20 @@ Chapter 1. Admin Guide
         4.7. cdp_event_latency(integer)
         4.8. cdp_event_threshold(integer)
         4.9. cdp_event_latency_log(integer)
-        4.10. single_ro_session_per_dialog(integer)
-        4.11. origin_host(string)
-        4.12. origin_realm(string)
-        4.13. destination_host(string)
-        4.14. destination_realm(string)
-        4.15. service_context_id_root(string)
-        4.16. service_context_id_ext(string)
-        4.17. service_context_id_mnc(string)
-        4.18. voice_service_identifier(string)
-        4.19. voice_rating_group(string)
-        4.20. video_service_identifier(string)
-        4.21. video_rating_group(string)
-        4.22. service_context_id_mcc(string)
-        4.23. service_context_id_release(string)
+        4.10. origin_host(string)
+        4.11. origin_realm(string)
+        4.12. destination_host(string)
+        4.13. destination_realm(string)
+        4.14. service_context_id_root(string)
+        4.15. service_context_id_ext(string)
+        4.16. service_context_id_mnc(string)
+        4.17. service_context_id_mcc(string)
+        4.18. service_context_id_release(string)
 
    5. Functions
 
-        5.1. Ro_CCR(route_name, direction, reservation_units, domain,
-                incoming_trunk_id, outgoing_trunk_id
-
-        5.2. Ro_set_session_id_avp()
+        5.1. Ro_CCR(route_name, direction, charge_type, unit_type,
+                reservation_units)
 
    6. Statistics
 
@@ -200,7 +180,7 @@ Chapter 1. Admin Guide
 2.1. Kamailio Modules
 
    The Following mouldes must be loaded before this module:
-     * ims_dialog
+     * Dialog_ng
      * TM - Transaction Manager
      * CDP - C Diameter Peer
      * CDP_AVP - CDP AVP Applications
@@ -340,20 +320,15 @@ Chapter 1. Admin Guide
    4.7. cdp_event_latency(integer)
    4.8. cdp_event_threshold(integer)
    4.9. cdp_event_latency_log(integer)
-   4.10. single_ro_session_per_dialog(integer)
-   4.11. origin_host(string)
-   4.12. origin_realm(string)
-   4.13. destination_host(string)
-   4.14. destination_realm(string)
-   4.15. service_context_id_root(string)
-   4.16. service_context_id_ext(string)
-   4.17. service_context_id_mnc(string)
-   4.18. voice_service_identifier(string)
-   4.19. voice_rating_group(string)
-   4.20. video_service_identifier(string)
-   4.21. video_rating_group(string)
-   4.22. service_context_id_mcc(string)
-   4.23. service_context_id_release(string)
+   4.10. origin_host(string)
+   4.11. origin_realm(string)
+   4.12. destination_host(string)
+   4.13. destination_realm(string)
+   4.14. service_context_id_root(string)
+   4.15. service_context_id_ext(string)
+   4.16. service_context_id_mnc(string)
+   4.17. service_context_id_mcc(string)
+   4.18. service_context_id_release(string)
 
 4.1. hash_size(int)
 
@@ -400,10 +375,8 @@ modparam("ims_charging", "timer_buffer", 10)
 
 4.4. ro_forced_peer(string)
 
-   FQDN of Diameter Peer (OCS) to use for communication (CCR). If you use
-   this, the routing defined in your diameter xml configuration file (CDP)
-   will be ignored and as a result you will lose the benefits of load
-   balancing and failover.
+   This is the optional name of the origin host of the Diameter server
+   (typically a Charging Server). If not set then realm routing is used.
 
    Default value is ''.
 
@@ -475,67 +448,51 @@ modparam("ims_charging", "cdp_event_threshold", 500)
 modparam("ims_charging", "cdp_event_latency_log", 1)
 ...
 
-4.10. single_ro_session_per_dialog(integer)
-
-   This tells the module whether it should do a single ro session per
-   dialog no matter how many times Ro_send_CCR is called from the config
-   file or initiate an ro session each time Ro_send_CCR is called. It is
-   useful for IMS charging where you might want to charge for on-net
-   originating and off-net originating calls but always have only a single
-   ro session.
-
-   Default value is 0.
-
-   Example 1.10. single_ro_session_per_dialogparameter usage
-...
-modparam("ims_charging", "single_ro_session_per_dialog", 1)
-...
-
-4.11. origin_host(string)
+4.10. origin_host(string)
 
    Origin host to be used in Diameter messages to charging-server.
 
    Default value is "scscf.ims.smilecoms.com".
 
-   Example 1.11. origin_hostparameter usage
+   Example 1.10. origin_hostparameter usage
 ...
 modparam("ims_charging", "origin_host", "scscf.kamailio-ims.org")
 ...
 
-4.12. origin_realm(string)
+4.11. origin_realm(string)
 
    Origin Realm to be used in Diameter messages to charging-server.
 
    Default value is "ims.smilecome.com".
 
-   Example 1.12. origin_realmparameter usage
+   Example 1.11. origin_realmparameter usage
 ...
 modparam("ims_charging", "origin_realm", "kamailio-ims.org")
 ...
 
-4.13. destination_host(string)
+4.12. destination_host(string)
 
    Destination host to be used in Diameter messages to charging-server.
 
    Default value is 5s.
 
-   Example 1.13. destination_hostparameter usage
+   Example 1.12. destination_hostparameter usage
 ...
 modparam("ims_charging", "destination_host", "ocs.kamailio-ims.org")
 ...
 
-4.14. destination_realm(string)
+4.13. destination_realm(string)
 
    Destination realm to be used in Diameter messages to charging-server.
 
    Default value is "ims.smilecoms.com".
 
-   Example 1.14. destination_realmparameter usage
+   Example 1.13. destination_realmparameter usage
 ...
 modparam("ims_charging", "destination_realm", "kamailio-ims.org")
 ...
 
-4.15. service_context_id_root(string)
+4.14. service_context_id_root(string)
 
    This defines a root-element of the Service-Context-Id AVP used in the
    diameter-message
@@ -566,80 +523,36 @@ modparam("ims_charging", "destination_realm", "kamailio-ims.org")
 
    Default value is "32260@3gpp.org".
 
-   Example 1.15. service_context_id_rootparameter usage
+   Example 1.14. service_context_id_rootparameter usage
 ...
 modparam("ims_charging", "service_context_id_root", "calls@kamailio-ims.org")
 ...
 
-4.16. service_context_id_ext(string)
+4.15. service_context_id_ext(string)
 
    This defines the extension of the Service-Context-Id AVP used in the
    diameter-message.
 
    Default value is "ext".
 
-   Example 1.16. service_context_id_extparameter usage
+   Example 1.15. service_context_id_extparameter usage
 ...
 modparam("ims_charging", "service_context_id_ext", "ext2")
 ...
 
-4.17. service_context_id_mnc(string)
+4.16. service_context_id_mnc(string)
 
    This defines Mobile-Network-Code (MNC) of the Service-Context-Id AVP
    used in the diameter-message.
 
    Default value is "01".
 
-   Example 1.17. service_context_id_mncparameter usage
+   Example 1.16. service_context_id_mncparameter usage
 ...
 modparam("ims_charging", "service_context_id_mnc", "42")
 ...
 
-4.18. voice_service_identifier(string)
-
-   This defines the service identifier to be used for charging voice.
-
-   Default value is "1000".
-
-   Example 1.18. voice_service_identifierparameter usage
-...
-modparam("ims_charging", "voice_service_identifier", "1000")
-...
-
-4.19. voice_rating_group(string)
-
-   This defines the rating group to be used for charging voice.
-
-   Default value is "100".
-
-   Example 1.19. voice_rating_groupparameter usage
-...
-modparam("ims_charging", "voice_rating_group", "100")
-...
-
-4.20. video_service_identifier(string)
-
-   This defines the service identifier to be used for charging video.
-
-   Default value is "1001".
-
-   Example 1.20. video_service_identifierparameter usage
-...
-modparam("ims_charging", "video_service_identifier", "1000")
-...
-
-4.21. video_rating_group(string)
-
-   This defines the rating group to be used for charging video.
-
-   Default value is "200".
-
-   Example 1.21. video_rating_groupparameter usage
-...
-modparam("ims_charging", "video_rating_group", "100")
-...
-
-4.22. service_context_id_mcc(string)
+4.17. service_context_id_mcc(string)
 
    This defines Mobile-Country-Code (MCC) of the Service-Context-Id AVP
    used in the diameter-message.
@@ -649,55 +562,53 @@ modparam("ims_charging", "video_rating_group", "100")
 
    Default value is "001".
 
-   Example 1.22. service_context_id_mccparameter usage
+   Example 1.17. service_context_id_mccparameter usage
 ...
 modparam("ims_charging", "service_context_id_mcc", "262")
 ...
 
-4.23. service_context_id_release(string)
+4.18. service_context_id_release(string)
 
    This defines Release of the Service-Context-Id AVP used in the
    diameter-message.
 
    Default value is "8" (Release 8).
 
-   Example 1.23. service_context_id_releaseparameter usage
+   Example 1.18. service_context_id_releaseparameter usage
 ...
 modparam("ims_charging", "service_context_id_release", "262")
 ...
 
 5. Functions
 
-   5.1. Ro_CCR(route_name, direction, reservation_units, domain,
-          incoming_trunk_id, outgoing_trunk_id
+   5.1. Ro_CCR(route_name, direction, charge_type, unit_type,
+          reservation_units)
 
-   5.2. Ro_set_session_id_avp()
-
-5.1. Ro_CCR(route_name, direction, reservation_units, domain,
-incoming_trunk_id, outgoing_trunk_id
+5.1. Ro_CCR(route_name, direction, charge_type, unit_type, reservation_units)
 
    Perform a CCR on Diameter Ro interface for Charging
 
    Meaning of the parameters is as follows:
-     * route_name route to be executed upon reception of charging requests
-     * direction "orig"inating or "term"inating
-     * reservation_units how many units (at the moment seconds) should be
+     * route_nameroute to be executed upon reception of charging requests
+     * direction"orig"inating or "term"inating
+     * charge_type"IEC" = Immediate Event Charging, "ECUR" - Event
+       Charging with Unit Reservation or "SCUR" - Session Charging with
+       Unit Reservation.
+       (Note: At the moment only SCUR is supported)
+     * unit_typeTypes of the unit to be requested
+       (unused at the moment)
+     * reservation_unitshow many units (at the moment seconds) should be
        reservated at the moment.
-     * domain Logical domain within registrar.
-     * incoming_trunk_id Identifies the trunk group from which this
-       originates.
-     * outgoing_trunk_id Identifies the trunk group where this will be
-       terminated.
 
    This function can be used from REQUEST_ROUTE.
 
    This method is executed asynchronously. See example on how to retrieve
    return value.
 
-   Example 1.24. Ro_CCR
+   Example 1.19. Ro_CCR
 ...
   xlog("L_DBG","Sending initial CCR Request for call\n");
-    Ro_CCR("RO_ASYNC_TERM_REPLY", "term", 30, "1", "1");
+  Ro_CCR("CHARGING_CCR_REPLY", "orig", "SCUR", "", "30");
 }
 
 route[CHARGING_CCR_REPLY]
@@ -722,18 +633,6 @@ n");
   }
   exit;
   }
-...
-
-5.2. Ro_set_session_id_avp()
-
-   Sets the Ro session ID to an AVP for use in the config file
-
-   This function can be used from REQUEST_ROUTE or ONREPLY_ROUTE.
-
-   Example 1.25. Ro_set_session_id_avp
-...
-            Ro_set_session_id_avp();
-            xlog("L_DBG","Ro session AVP has been set: $avp(ro_session_id)\n");
 ...
 
 6. Statistics

@@ -1,22 +1,35 @@
 /*
  *
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/*
+ * History:
+ * --------
+ *  2003-06-27  tm_stats & friends freed on exit only if non-null (andrei)
  */
 
 
@@ -93,9 +106,7 @@ void free_tm_stats()
 		(res)->completed_5xx=(s1)->completed_5xx+(s2)->completed_5xx; \
 		(res)->completed_6xx=(s1)->completed_6xx+(s2)->completed_6xx; \
 		(res)->completed_2xx=(s1)->completed_2xx+(s2)->completed_2xx; \
-		(res)->rpl_received=(s1)->rpl_received+(s2)->rpl_received; \
-		(res)->rpl_generated=(s1)->rpl_generated+(s2)->rpl_generated; \
-		(res)->rpl_sent=(s1)->rpl_sent+(s2)->rpl_sent; \
+		(res)->replied_locally=(s1)->replied_locally+(s2)->replied_locally; \
 		(res)->deleted=(s1)->deleted+(s2)->deleted; \
 	}while(0)
 
@@ -138,9 +149,7 @@ void tm_rpc_stats(rpc_t* rpc, void* c)
 										 (unsigned) waiting);
 	rpc->struct_add(st, "d", "total", (unsigned) all.transactions);
 	rpc->struct_add(st, "d", "total_local", (unsigned)all.client_transactions);
-	rpc->struct_add(st, "d", "rpl_received", (unsigned)all.rpl_received);
-	rpc->struct_add(st, "d", "rpl_generated", (unsigned)all.rpl_generated);
-	rpc->struct_add(st, "d", "rpl_sent", (unsigned)all.rpl_sent);
+	rpc->struct_add(st, "d", "replied_locally", (unsigned)all.replied_locally);
 	rpc->struct_add(st, "ddddd", 
 			"6xx", (unsigned int)all.completed_6xx,
 			"5xx", (unsigned int)all.completed_5xx,

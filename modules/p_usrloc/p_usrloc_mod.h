@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * User location module interface
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,8 +19,10 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ---------
  */
 
 /*! \file
@@ -92,7 +96,7 @@ extern int desc_time_order;
 extern int cseq_delay;
 extern int ul_fetch_rows;
 extern int ul_hash_size;
-extern int ul_db_update_as_insert;
+
 
 
 extern str default_db_url;
@@ -102,7 +106,6 @@ extern str domain_db;
 extern int expire;
 
 extern int matching_mode;
-extern int ul_db_ops_ruid;
 
 struct mi_root* mi_ul_db_refresh(struct mi_root* cmd, void* param);
 struct mi_root* mi_loc_nr_refresh(struct mi_root* cmd, void* param);

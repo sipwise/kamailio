@@ -1,28 +1,45 @@
 /*
+ * $Id$
+ *
  * resolver related functions
  *
  * Copyright (C) 2006 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/* History:
+ * --------
+ *  2006-07-29  created by andrei
+ *  2007-05-39  added hooks for add; more locks to reduce contention (andrei)
+ *  2007-06-26  added hooks for search (andrei)
+ *  2007-07-30  added dst_blacklist_del() and dst_blacklist_add_to()  (andrei)
+ *  2007-07-30  dst blacklist measurements added (Gergo)
+ *  2008-02-11  dns_blacklist_init cfg parameter is introduced (Miklos)
+ *  2009-02-26  added dst_blacklist_su* variant (andrei)
  */
 
 /*!
  * \file
- * \brief Kamailio core :: resolver related functions
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -205,7 +222,7 @@ static int init_blacklist_hooks()
 		goto error;
 	return 0;
 error:
-	LM_ERR("failure initializing internal lists\n");
+	LOG(L_ERR, "blacklist_hooks: failure initializing internal lists\n");
 	destroy_blacklist_hooks();
 	return -1;
 }
@@ -223,7 +240,7 @@ int register_blacklist_hook(struct blacklist_hook *h, int type)
 	int new_max_hooks;
 
 	if (dst_blacklist_init==0) {
-		LM_ERR("blacklist is turned off, "
+		LOG(L_ERR, "register_blacklist_hook: blacklist is turned off, "
 			"the hook cannot be registered\n");
 		goto error;
 	}
@@ -483,7 +500,7 @@ int init_dst_blacklist()
 	if (blst_timer_interval){
 		timer_init(blst_timer_h, blst_timer, 0 ,0); /* slow timer */
 		if (timer_add(blst_timer_h, S_TO_TICKS(blst_timer_interval))<0){
-			LM_CRIT("failed to add the timer\n");
+			LOG(L_CRIT, "BUG: init_dst_blacklist: failed to add the timer\n");
 			timer_free(blst_timer_h);
 			blst_timer_h=0;
 			goto error;
@@ -668,7 +685,7 @@ inline static int dst_blacklist_clean_expired(unsigned int target,
 			/* check for timeout only "between" hash cells */
 			now=get_ticks_raw();
 			if ((now-start_time)>=timeout){
-				LM_DBG("timeout: %d > %d\n",
+				DBG("_dst_blacklist_clean_expired_unsafe: timeout: %d > %d\n",
 						TICKS_TO_MS(now-start_time), TICKS_TO_MS(timeout));
 				goto skip;
 			}
@@ -677,7 +694,7 @@ inline static int dst_blacklist_clean_expired(unsigned int target,
 skip:
 	start=h; /* next time we start where we left */
 	if (no){
-		LM_DBG("%d entries removed\n", no);
+		DBG("dst_blacklist_clean_expired, %d entries removed\n", no);
 	}
 	return no;
 }
@@ -1058,11 +1075,11 @@ void dst_blst_view(rpc_t* rpc, void* ctx)
 				continue;
 			}
 			dst_blst_entry2ip(&ip, e);
-			rpc->rpl_printf(ctx, "{\n    protocol: %s", get_proto_name(e->proto));
-			rpc->rpl_printf(ctx, "    ip: %s", ip_addr2a(&ip));
-			rpc->rpl_printf(ctx, "    port: %d", e->port);
-			rpc->rpl_printf(ctx, "    expires in (s): %d", expires); 
-			rpc->rpl_printf(ctx, "    flags: %d\n}", e->flags);
+			rpc->printf(ctx, "{\n    protocol: %s", get_proto_name(e->proto));
+			rpc->printf(ctx, "    ip: %s", ip_addr2a(&ip));
+			rpc->printf(ctx, "    port: %d", e->port);
+			rpc->printf(ctx, "    expires in (s): %d", expires); 
+			rpc->printf(ctx, "    flags: %d\n}", e->flags);
 		}
 		UNLOCK_BLST(h);
 	}
@@ -1156,7 +1173,8 @@ void dst_blst_add(rpc_t* rpc, void* ctx)
 int use_dst_blacklist_fixup(void *handle, str *gname, str *name, void **val)
 {
 	if ((int)(long)(*val) && !dst_blacklist_init) {
-		LM_ERR("dst blacklist is turned off by dst_blacklist_init=0, "
+		LOG(L_ERR, "ERROR: use_dst_blacklist_fixup(): "
+			"dst blacklist is turned off by dst_blacklist_init=0, "
 			"it cannot be enabled runtime.\n");
 		return -1;
 	}

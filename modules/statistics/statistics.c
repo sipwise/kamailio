@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * statistics module - script interface to internal statistics manager
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -17,17 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- */
-
-/*!
- * \defgroup statistics The statistics module
- */
-/*!
- * \brief Script interface
- * \ingroup statistics
- * \author bogdan
+ * History:
+ * --------
+ *  2006-03-14  initial version (bogdan)
  */
 
 
@@ -72,7 +68,7 @@ static cmd_export_t cmds[]={
 };
 
 static param_export_t mod_params[]={
-	{ "variable",  PARAM_STRING|USE_FUNC_PARAM, (void*)reg_param_stat },
+	{ "variable",  STR_PARAM|USE_FUNC_PARAM, (void*)reg_param_stat },
 	{ 0,0,0 }
 };
 

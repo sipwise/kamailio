@@ -29,7 +29,7 @@
 	</para>
 	<para>
 		This modules scales up to more than a few million users, and is able to handle
-		more than several hundred thousand routing table entries. We received reports of
+		more than several hundred thousand routing table entries. We recieved reports of
 		some setups that used more than a million routing table entries. It also supports
 		a large number of carriers and domains which can be efficiently looked up in most of
 		the cases (see below for more informations). In load balancing scenarios the usage
@@ -311,27 +311,7 @@ modparam("carrierroute", "fetch_rows", 3000)
 </programlisting>
 		</example>
 	</section>
-<section>
-		<title><varname>db_load_description</varname> (integer)</title>
-		<para>
-		Toggle on/off loading in memory the description column in the 
-		carrierroute/carrierfailureroute database tables. This reduces the 
-		shared memory used by the module.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>1</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Unset <varname>db_load_description</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("carrierroute", "db_load_description", 0)
-...
-</programlisting>
-		</example>
-	</section>
+
 	<section>
 		<title><varname>match_mode</varname> (integer)</title>
 		<para>
@@ -357,29 +337,6 @@ modparam("carrierroute", "match_mode", 10)
 </programlisting>
 		</example>
 	</section>
-
-	<section>
-		<title><varname>avoid_failed_destinations</varname> (integer)</title>
-		<para>
-		Integer parameter to toggle on/off the possibility that in the failurerouting cases 
-		destinations that previously failed are avoided. Possible values are 0 (off), 1 (on).
-		Also see cr_route section.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>1</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>avoid_failed_destinations</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("carrierroute", "avoid_failed_destinations", 0)
-...
-</programlisting>
-		</example>
-	</section>
-
 </section>
 
     <section>
@@ -457,8 +414,7 @@ cr_tree_rewrite_uri(tree, domain)
         number of channels.
 		</para>
 		<para>
-		Depending on the value of the avoid_failed_destinations module parameter,
-		the function pays special attention to the failurerouting cases, so that
+		The function pays special attention to the failurerouting cases, so that
 		any destination that has failed to provide a successful response will not
 		be reused in a subsequent call of cr_route. This situation can appear when
 		different route domains contain a set of common gateways.

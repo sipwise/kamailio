@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2004 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
@@ -757,7 +759,7 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	int status = RR_DRIVEN;
 	str uri;
 	struct socket_info *si;
-	int uri_is_myself;
+	int uri_is_myself, next_is_strict;
 	int use_ob = 0;
 
 	hdr = _m->route;
@@ -768,11 +770,11 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	routed_msg_id = 0;
 
 	if (parse_uri(uri.s, uri.len, &puri) < 0) {
-		LM_ERR("failed to parse the first route URI (%.*s)\n",
-				uri.len, ZSW(uri.s));
+		LM_ERR("failed to parse the first route URI\n");
 		return RR_ERROR;
 	}
 
+	next_is_strict = is_strict(&puri.params);
 	routed_params = puri.params;
 	uri_is_myself = is_myself(&puri);
 
@@ -815,8 +817,7 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 			/* double route may occure due different IP and port, so force as
 			 * send interface the one advertise in second Route */
 			if (parse_uri(rt->nameaddr.uri.s,rt->nameaddr.uri.len,&puri)<0) {
-				LM_ERR("failed to parse the double route URI (%.*s)\n",
-						rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
+				LM_ERR("failed to parse the double route URI\n");
 				return RR_ERROR;
 			}
 
@@ -853,8 +854,7 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 		
 		uri = rt->nameaddr.uri;
 		if (parse_uri(uri.s, uri.len, &puri) < 0) {
-			LM_ERR("failed to parse the next route URI (%.*s)\n",
-					uri.len, ZSW(uri.s));
+			LM_ERR("failed to parse the first route URI\n");
 			return RR_ERROR;
 		}
 	} else {
@@ -869,7 +869,7 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	}
 
 	LM_DBG("URI to be processed: '%.*s'\n", uri.len, ZSW(uri.s));
-	if (is_strict(&puri.params)) {
+	if (next_is_strict) {
 		LM_DBG("Next URI is a strict router\n");
 		if (handle_sr(_m, hdr, rt) < 0) {
 			LM_ERR("failed to handle strict router\n");

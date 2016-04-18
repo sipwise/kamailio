@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2009 1&1 Internet AG
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,12 +17,12 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
  * \file
- * \brief Kamailio utils :: 
+ * \brief SIP-router utils :: 
  * \ingroup utils
  * Module: \ref utils
  */

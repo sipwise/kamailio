@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * regex module - pcre operations
  *
  * Copyright (C) 2008 Iñaki Baz Castillo
@@ -17,9 +19,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2011-02-22  pcre_match_group() allows now pseudo-variable as group argument.
+ *  2009-01-14  initial version (Iñaki Baz Castillo).
  */
+
 
 /*!
  * \file
@@ -125,7 +132,7 @@ static cmd_export_t cmds[] =
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"file",                PARAM_STRING,  &file                },
+	{"file",                STR_PARAM,  &file                },
 	{"max_groups",          INT_PARAM,  &max_groups          },
 	{"group_max_size",      INT_PARAM,  &group_max_size      },
 	{"pcre_caseless",       INT_PARAM,  &pcre_caseless       },
@@ -274,8 +281,9 @@ static int load_pcres(int action)
 		fclose(f);
 		goto err;
 	}
-	memset(patterns, 0, sizeof(char*) * max_groups);
-
+	for (i=0; i<max_groups; i++) {
+		patterns[i] = NULL;
+	}
 	for (i=0; i<max_groups; i++) {
 		if ((patterns[i] = pkg_malloc(sizeof(char) * group_max_size)) == 0) {
 			LM_ERR("no more memory for patterns[%d]\n", i);

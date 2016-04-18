@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2009 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -16,6 +18,11 @@
 /*
  * modules/tm/rpc_uac.c
  */
+/*
+ * History:
+ * --------
+ *  2009-07-20  initial version (andrei)
+*/
 
 #include "rpc_uac.h"
 #include "../../rpc.h"
@@ -211,12 +218,7 @@ static char *get_hfblock(str *uri, struct hdr_field *hf, int proto,
 		DBG("get_hfblock: one more hf processed\n");
 	} /* header loop */
 	
-	if(total_len==0) {
-		LM_DBG("empty result for headers block\n");
-		goto error;
-	}
-
-	/* construct a single header block now */
+	     /* construct a single header block now */
 	ret = pkg_malloc(total_len);
 	if (!ret) {
 		LOG(L_ERR, "get_hfblock: no pkg mem for hf block\n");

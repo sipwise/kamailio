@@ -1,5 +1,5 @@
 /* 
- * Kamailio TLS module
+ * TLS module
  *
  * Copyright (C) 2010 iptelorg GmbH
  *
@@ -20,6 +20,11 @@
  * @ingroup: tls
  * Module: @ref tls
  */
+/*
+ * History:
+ * --------
+ *  2010-03-31  initial version, based on tcp_conn.h tcp_wbuffer_queue (andrei)
+*/
 
 #ifndef __sbufq_h
 #define __sbufq_h

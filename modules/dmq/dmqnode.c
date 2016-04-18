@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * dmq module - distributed message queue
  *
  * Copyright (C) 2011 Bucur Marius - Ovidiu
@@ -17,12 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
 #include "../../ut.h"
-#include "../../resolve.h"
 #include "dmqnode.h"
 #include "dmq.h"
 
@@ -113,12 +114,12 @@ int set_dmq_node_params(dmq_node_t* node, param_t* params)
 	}
 	status = get_param_value(params, &dmq_node_status_str);
 	if(status) {
-		if(STR_EQ(*status, dmq_node_active_str)) {
+		if(str_strcmp(status, &dmq_node_active_str)) {
 			node->status = DMQ_NODE_ACTIVE;
-		} else if(STR_EQ(*status, dmq_node_timeout_str)) {
-			node->status = DMQ_NODE_TIMEOUT;
-		} else if(STR_EQ(*status, dmq_node_disabled_str)) {
-			node->status = DMQ_NODE_DISABLED;
+		} else if(str_strcmp(status, &dmq_node_timeout_str)) {
+			node->status = DMQ_NODE_ACTIVE;
+		} else if(str_strcmp(status, &dmq_node_disabled_str)) {
+			node->status = DMQ_NODE_ACTIVE;
 		} else {
 			LM_ERR("invalid status parameter: %.*s\n", STR_FMT(status));
 			goto error;
@@ -145,11 +146,7 @@ dmq_node_t* build_dmq_node(str* uri, int shm) {
 	dmq_node_t* ret = NULL;
 	param_hooks_t hooks;
 	param_t* params;
-
-        /* For DNS-Lookups */
-        static char hn[256];
-        struct hostent* he;
-
+	
 	LM_DBG("build_dmq_node %.*s with %s memory\n", STR_FMT(uri), shm?"shm":"private");
 	
 	if(shm) {
@@ -174,7 +171,7 @@ dmq_node_t* build_dmq_node(str* uri, int shm) {
 		}
 	}
 	set_default_dmq_node_params(ret);
-	if(parse_uri(ret->orig_uri.s, ret->orig_uri.len, &ret->uri) < 0 || ret->uri.host.len > 254) {
+	if(parse_uri(ret->orig_uri.s, ret->orig_uri.len, &ret->uri) < 0) {
 		LM_ERR("error parsing uri\n");
 		goto error;
 	}
@@ -185,25 +182,23 @@ dmq_node_t* build_dmq_node(str* uri, int shm) {
 	}
 	/* if any params found */
 	if(params) {
-		if(set_dmq_node_params(ret, params) < 0) {
+		if(shm) {
+			if(shm_duplicate_params(&ret->params, params) < 0) {
+				LM_ERR("error duplicating params\n");
+				free_params(params);
+				goto error;
+			}
 			free_params(params);
+		} else {
+			ret->params = params;
+		}
+		if(set_dmq_node_params(ret, ret->params) < 0) {
 			LM_ERR("error setting parameters\n");
 			goto error;
 		}
-		free_params(params);
 	} else {
 		LM_DBG("no dmqnode params found\n");		
 	}
-	/* resolve hostname */
-	strncpy(hn, ret->uri.host.s, ret->uri.host.len);
-	hn[ret->uri.host.len]='\0';
-	he=resolvehost(hn);
-	if (he==0) {
-		LM_ERR("could not resolve %.*s\n", ret->uri.host.len, ret->uri.host.s);
-		goto error;
-	}
-	hostent2ip_addr(&ret->ip_address, he, 0);
-
 	return ret;
 
 error:
@@ -218,20 +213,13 @@ error:
  */
 dmq_node_t* find_dmq_node_uri(dmq_node_list_t* list, str* uri)
 {
-	dmq_node_t *ret, find;
-
-	memset(&find, 0, sizeof(find));
-	if(parse_uri(uri->s, uri->len, &find.uri) < 0) {
-		LM_ERR("error parsing uri\n");
+	dmq_node_t *ret, *find;
+	find =  build_dmq_node(uri, 0);
+	if(find==NULL)
 		return NULL;
-	}
-	ret = find_dmq_node(list, &find);
+	ret = find_dmq_node(list, find);
+	destroy_dmq_node(find, 0);
 	return ret;
-}
-
-dmq_node_t* find_dmq_node_uri2(str* uri)
-{
-	return find_dmq_node_uri(node_list, uri);
 }
 
 /**
@@ -240,8 +228,12 @@ dmq_node_t* find_dmq_node_uri2(str* uri)
 void destroy_dmq_node(dmq_node_t* node, int shm)
 {
 	if(shm) {
+		if (node->params!=NULL)
+			shm_free_params(node->params);
 		shm_free_node(node);
 	} else {
+		if (node->params!=NULL)
+			free_params(node->params);
 		pkg_free_node(node);
 	}
 }
@@ -267,15 +259,6 @@ dmq_node_t* find_dmq_node(dmq_node_list_t* list, dmq_node_t* node)
 dmq_node_t* shm_dup_node(dmq_node_t* node)
 {
 	dmq_node_t* newnode;
-	if (!node) {
-		LM_ERR("node is null\n");
-		return NULL;
-	}
-	if (!node->orig_uri.s) {
-		LM_ERR("nod->orig_uri.s is null\n");
-		return NULL;
-	}
-
 	newnode = shm_malloc(sizeof(dmq_node_t));
 	if(newnode==NULL) {
 		LM_ERR("no more shm\n");

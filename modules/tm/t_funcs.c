@@ -1,23 +1,56 @@
 /*
+ * $Id$
+ *
  * transaction maintenance functions
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/*
+ * History:
+ * -------
+ *  2003-03-31  200 for INVITE/UAS resent even for UDP (jiri)
+ *               info only if compiling w/ -DEXTRA_DEBUG (andrei)
+ *  2003-03-19  replaced all mallocs/frees w/ pkg_malloc/pkg_free (andrei)
+ *  2003-03-13  send_pr_buffer is called w/ file/function/line debugging
+ *  2003-03-01  start_retr changed to retransmit only for UDP
+ *  2003-02-13  modified send_pr_buffer to use msg_send & rb->dst (andrei)
+ *  2003-04-14  use protocol from uri (jiri)
+ *  2003-04-25  do it (^) really everywhere (jiri)
+ *  2003-04-26  do it (^) really really really everywhere (jiri)
+ *  2003-07-07  added get_proto calls when proxy!=0 (andrei)
+ *  2004-02-13  t->is_invite and t->local replaced with flags (bogdan)
+ *  2005-02-16  fr_*_timer acceps full AVP specifications; empty AVP
+ *              desable variable timer feature (bogdan)
+ *  2005-12-11  t_relay doesn't return 0 (stop script) on send error 
+ *              anymore (andrei)
+ *  2006-08-11  updated forward_request usage (andrei)
+ *              t_relay_to releases the transaction if t_forward_non_ack
+ *              fails and t_kill fails or this is a failed replication (andrei)
+ *  2007-05-02  t_relay_to() uses now t_forward_cancel for cancels (andrei)
+ *  2007-06-05  delay t_relay() replies till script end so that they can be
+ *               overwritten by the script user; generate 100 automatically
+ *               only if T_NO_100 is not set (andrei)
  */
 
 #include <limits.h>
@@ -36,7 +69,6 @@
 #include "t_funcs.h"
 #include "t_fwd.h"
 #include "t_lookup.h"
-#include "t_reply.h"
 #include "config.h"
 #include "t_stats.h"
 
@@ -150,12 +182,6 @@ void put_on_wait(  struct cell  *Trans  )
 }
 
 
-int t_on_wait(tm_cell_t *Trans)
-{
-	if(Trans->wait_timer.prev!=NULL || Trans->wait_timer.next!=NULL)
-		return 1;
-	return 0;
-}
 
 /* WARNING: doesn't work from failure route (deadlock, uses t_reply =>
  *  tries to get the reply lock again) */

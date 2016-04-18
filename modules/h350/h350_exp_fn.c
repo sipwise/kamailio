@@ -1,9 +1,12 @@
 /*
+ * $Id: $
+ *
  * Kamailio H.350 Module
  *
  * Copyright (C) 2007 University of North Carolina
  *
  * Original author: Christian Schlatter, cs@unc.edu
+ *
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -19,8 +22,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2007-03-12: Initial version
  */
 
 #include <regex.h>
@@ -78,8 +84,8 @@ int h350_sipuri_lookup(struct sip_msg* _msg, pv_elem_t* _sip_uri)
 	 * do ldap search
 	 */
 	if (ldap_api.ldap_params_search(&ld_result_count,
-					h350_ldap_session,
-					h350_base_dn,
+					h350_ldap_session.s,
+					h350_base_dn.s,
 					h350_search_scope_int,
 					NULL,
 					H350_SIPURI_LOOKUP_LDAP_FILTER,
@@ -198,8 +204,8 @@ int h350_auth_lookup(
 
 	/* do ldap search */
 	if (ldap_api.ldap_params_search(&ld_result_count,
-                                        h350_ldap_session,
-                                        h350_base_dn,
+                                        h350_ldap_session.s,
+                                        h350_base_dn.s,
                                         h350_search_scope_int,
                                         NULL,
                                         H350_AUTH_FILTER_PATTERN,

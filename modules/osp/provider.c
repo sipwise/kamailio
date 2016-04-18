@@ -25,7 +25,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <osp/osp.h>
@@ -62,7 +62,7 @@ int ospSetupProvider(void)
     cacerts[0] = &cacert;
 
     if ((result = OSPPInit(_osp_crypto_hw)) != 0) {
-        LM_ERR("failed to initialize OSP (%d)\n", result);
+        LM_ERR("failed to initalize OSP (%d)\n", result);
     } else if (OSPPUtilLoadPEMPrivateKey(_osp_private_key, &privatekey) != 0) {
         LM_ERR("failed to load private key from '%s'\n", _osp_private_key);
     } else if (OSPPUtilLoadPEMCert(_osp_local_certificate, &localcert) != 0) {

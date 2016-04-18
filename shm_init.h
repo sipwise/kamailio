@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,12 +15,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*!
-* \file
-* \brief Kamailio core :: Shared memory initialization
-* \ingroup core
-* \author andrei
-* Module: \ref core
+/*
+ * shm_init.h
+ */
+/*
+ * History:
+ * --------
+ *  2010-01-10  initial version (andrei)
 */
 
 #ifndef __shm_init_h
@@ -26,7 +29,6 @@
 
 int shm_initialized(void);
 int init_shm(void);
-void shm_set_mname(char *mname);
 
 #endif /*__shm_init_h*/
 

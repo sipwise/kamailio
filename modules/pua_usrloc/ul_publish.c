@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*!
@@ -321,7 +321,7 @@ void ul_publish(ucontact_t* c, int type, void* param)
 	publ->event|= PRESENCE_EVENT;
 	publ->extra_headers= NULL;
 	print_publ(publ);
-	if((error=_pu_pua.send_publish(publ))< 0)
+	if((error=pua_send_publish(publ))< 0)
 	{
 		LM_ERR("while sending publish for ul event %d\n", type);
 		if((type & UL_CONTACT_UPDATE) && error == ERR_PUBLISH_NO_BODY) {

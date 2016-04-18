@@ -1,22 +1,46 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History
+ * -------
+ * 2003-03-06  200/INV to-tag list deallocation added;
+ *             setting "kill_reason" moved in here -- it is moved
+ *             from transaction state to a static var(jiri)
+ * 2003-03-16  removed _TOTAG (jiri)
+ * 2003-03-30  set_kr for requests only (jiri)
+ * 2003-04-04  bug_fix: REQ_IN callback not called for local 
+ *             UAC transactions (jiri)
+ * 2003-09-12  timer_link->tg will be set only if EXTRA_DEBUG (andrei)
+ * 2003-12-04  global callbacks replaceed with callbacks per transaction;
+ *             completion callback merged into them as LOCAL_COMPETED (bogdan)
+ * 2004-02-11  FIFO/CANCEL + alignments (hash=f(callid,cseq)) (uli+jiri)
+ * 2004-02-13  t->is_invite and t->local replaced with flags;
+ *             timer_link.payload removed (bogdan)
+ * 2004-08-23  avp support added - move and remove avp list to/from
+ *             transactions (bogdan)
+ * 2006-08-11  dns failover support (andrei)
+ * 2007-05-16  callbacks called on destroy (andrei)
+ * 2007-06-06  don't allocate extra space for md5 if not used: syn_branch==1 
+ *              (andrei)
+ * 2007-06-06  switched tm bucket list to a simpler and faster clist (andrei)
  */
 
 /*!
@@ -40,7 +64,6 @@
 #include "t_reply.h"
 #include "t_cancel.h"
 #include "t_stats.h"
-#include "t_funcs.h"
 #include "h_table.h"
 #include "../../fix_lumps.h" /* free_via_clen_lump */
 #include "timer.h"
@@ -116,7 +139,7 @@ unsigned int transaction_count( void )
 
 
 
-void free_cell_helper(tm_cell_t* dead_cell, int silent, const char *fname, unsigned int fline )
+void free_cell( struct cell* dead_cell )
 {
 	char *b;
 	int i;
@@ -124,22 +147,6 @@ void free_cell_helper(tm_cell_t* dead_cell, int silent, const char *fname, unsig
 	struct totag_elem *tt, *foo;
 	struct tm_callback *cbs, *cbs_tmp;
 
-	LM_DBG("freeing transaction %p from %s:%u\n", dead_cell, fname, fline);
-
-	if(dead_cell->prev_c!=NULL && dead_cell->next_c!=NULL) {
-		if(likely(silent==0)) {
-			LM_WARN("removed cell %p is still linked in hash table (%s:%u)\n",
-				dead_cell, fname, fline);
-			if(t_on_wait(dead_cell)) {
-				INIT_REF(dead_cell, 1);
-				LM_WARN("cell %p is still linked in wait timer (%s:%u)"
-						" - skip freeing now\n", dead_cell, fname, fline);
-				return;
-			}
-		}
-		unlink_timers(dead_cell);
-		remove_from_hash_table_unsafe(dead_cell);
-	}
 	release_cell_lock( dead_cell );
 	if (unlikely(has_tran_tmcbs(dead_cell, TMCB_DESTROY)))
 		run_trans_callbacks(TMCB_DESTROY, dead_cell, 0, 0, 0);
@@ -283,7 +290,7 @@ static void inline init_branches(struct cell *t)
 	unsigned int i;
 	struct ua_client *uac;
 
-	for(i=0;i<sr_dst_max_branches;i++)
+	for(i=0;i<MAX_BRANCHES;i++)
 	{
 		uac=&t->uac[i];
 		uac->request.my_T = t;
@@ -306,29 +313,21 @@ struct cell*  build_cell( struct sip_msg* p_msg )
 #ifdef WITH_XAVP
 	sr_xavp_t** xold;
 #endif
-	unsigned int cell_size;
 
-	/* allocs a new cell, add space for:
-	 * md5 (MD5_LEN - sizeof(struct cell.md5))
-	 * uac (sr_dst_max_banches * sizeof(struct ua_client) ) */
-	cell_size = sizeof( struct cell ) + MD5_LEN - sizeof(((struct cell*)0)->md5)
-				+ (sr_dst_max_branches * sizeof(struct ua_client));
-
-	new_cell = (struct cell*)shm_malloc( cell_size );
+	/* allocs a new cell, add space for md5 (MD5_LEN - sizeof(struct cell.md5)) */
+	new_cell = (struct cell*)shm_malloc( sizeof( struct cell )+
+			MD5_LEN-sizeof(((struct cell*)0)->md5) );
 	if  ( !new_cell ) {
 		ser_error=E_OUT_OF_MEM;
 		return NULL;
 	}
 
 	/* filling with 0 */
-	memset( new_cell, 0, cell_size );
+	memset( new_cell, 0, sizeof( struct cell ) );
 
 	/* UAS */
 	new_cell->uas.response.my_T=new_cell;
 	init_rb_timers(&new_cell->uas.response);
-	/* UAC */
-	new_cell->uac = (struct ua_client*)((char*)new_cell + sizeof(struct cell)
-							+ MD5_LEN - sizeof(((struct cell*)0)->md5));
 	/* timers */
 	init_cell_timers(new_cell);
 
@@ -446,7 +445,7 @@ void free_hash_table(  )
 			/* delete all synonyms at hash-collision-slot i */
 			clist_foreach_safe(&_tm_table->entries[i], p_cell, tmp_cell,
 									next_c){
-				free_cell_silent(p_cell);
+				free_cell(p_cell);
 			}
 		}
 		shm_free(_tm_table);

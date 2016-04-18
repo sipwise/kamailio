@@ -1,22 +1,52 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ----------
+ * 2003-04-14  checking if a reply sent before cancel is initiated
+ *             moved here (jiri)
+ * 2004-02-11  FIFO/CANCEL + alignments (hash=f(callid,cseq)) (uli+jiri)
+ * 2004-02-13  timer_link.payload removed (bogdan)
+ * 2006-10-10  cancel_uacs  & cancel_branch take more options now (andrei)
+ * 2007-03-15  TMCB_ONSEND hooks added (andrei)
+ * 2007-05-28: cancel_branch() constructs the CANCEL from the
+ *             outgoing INVITE instead of the incomming one.
+ *             (it can be disabled with reparse_invite=0) (Miklos)
+ * 2007-06-04  cancel_branch() can operate in lockless mode (with a lockless
+ *              should_cancel()) (andrei)
+ * 2008-03-07  cancel_branch() takes a new flag: F_CANCEL_B_FORCE_RETR (andrei)
+ * 2008-03-08  e2e_cancel handles non replied branches in 3 different ways,
+ *              selectable by the tm cancel_b_method parameter: fake reply,
+ *              retransmit request and send cancel on branch (andrei)
+ * 2009-07-14  renamed which_cancel() to prepare_to_cancel() for better
+ *              reflecting its purpose
+ *             prepare_to_cancel() takes now an additional skip_branches
+ *              bitmap parameter (andrei)
+ * 2010-02-26  cancel reason (rfc3326) basic support (andrei)
  */
 
 #include <stdio.h> /* for FILE* in fifo_uac_cancel */
@@ -36,36 +66,6 @@
 #include "t_lookup.h" /* for t_lookup_callid in fifo_uac_cancel */
 #include "t_hooks.h"
 
-
-typedef struct cancel_reason_map {
-	int code;
-	str text;
-} cancel_reason_map_t;
-
-static cancel_reason_map_t _cancel_reason_map[] = {
-	{ 200, str_init("Answered elsewhere") },
-	{ 0, {0, 0} }
-};
-
-/**
- *
- */
-void cancel_reason_text(struct cancel_info* cancel_data)
-{
-	int i;
-
-	if(cancel_data->reason.cause<=0
-			|| cancel_data->reason.u.text.s!=NULL) return;
-
-	for(i=0; _cancel_reason_map[i].text.s!=0; i++) {
-		if(_cancel_reason_map[i].code==cancel_data->reason.cause) {
-			cancel_data->reason.u.text = _cancel_reason_map[i].text;
-			return;
-		}
-	}
-
-	return;
-}
 
 /** Prepare to cancel a transaction.
  * Determine which branches should be canceled and prepare them (internally
@@ -117,9 +117,6 @@ int cancel_uacs( struct cell *t, struct cancel_info* cancel_data, int flags)
 	int r;
 
 	ret=0;
-
-	cancel_reason_text(cancel_data);
-
 	/* cancel pending client transactions, if any */
 	for( i=0 ; i<t->nr_of_outgoings ; i++ ) 
 		if (cancel_data->cancel_bitmap & (1<<i)){

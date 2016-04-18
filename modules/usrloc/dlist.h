@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,8 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ========
+ * 2006-11-28 Added get_number_of_users() (Jeffrey Magder - SOMA Networks)
+ * 2007-09-12 added partitioning support for fetching all ul contacts
+ *            (bogdan)
  */
 
 /*! \file
@@ -109,11 +116,10 @@ int synchronize_all_udomains(int istart, int istep);
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 int get_all_ucontacts(void *buf, int len, unsigned int flags,
-		unsigned int part_idx, unsigned int part_max, int options);
+		unsigned int part_idx, unsigned int part_max);
 
 
 /*!
@@ -140,12 +146,5 @@ unsigned long get_number_of_users(void);
  */
 int find_domain(str* _d, udomain_t** _p);
 
-
-/*!
- * \brief Set the value for max partition
- */
-void ul_set_max_partition(unsigned int m);
-
-int ul_db_clean_udomains(void);
 
 #endif

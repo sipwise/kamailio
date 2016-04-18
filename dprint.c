@@ -1,27 +1,35 @@
 /*
+ * $Id$
+ *
  * debug print 
+ *
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*!
  * \file
- * \brief Kamailio core :: Debug print
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -30,24 +38,10 @@
  
 #include "globals.h"
 #include "dprint.h"
-#include "pvar.h"
  
 #include <stdarg.h>
 #include <stdio.h>
 #include <strings.h>
-
-char *_km_log_engine_type = NULL;
-char *_km_log_engine_data = NULL;
-
-km_log_f _km_log_func = &syslog;
-
-/**
- *
- */
-void km_log_func_set(km_log_f f)
-{
-	_km_log_func = f;
-}
 
 #ifndef NO_SIG_DEBUG
 /* signal protection: !=0 when LOG/DBG/... are printing */
@@ -90,25 +84,11 @@ int str2facility(char *s)
 {
 	int i;
 
-	for (i=0; str_fac[i]; i++) {
+	for( i=0; str_fac[i] ; i++) {
 		if (!strcasecmp(s,str_fac[i]))
 			return int_fac[i];
 	}
 	return -1;
-}
-
-char* facility2str(int fl, int *len)
-{
-	int i;
-
-	for (i=0; str_fac[i]; i++) {
-		if (fl == int_fac[i]) {
-			*len = strlen(str_fac[i]);
-			return str_fac[i];
-		}
-	}
-
-	return NULL;
 }
 
 /* fixup function for log_facility cfg parameter */
@@ -117,7 +97,8 @@ int log_facility_fixup(void *handle, str *gname, str *name, void **val)
 	int	i;
 
 	if ((i = str2facility((char *)*val)) == -1) {
-		LM_ERR("invalid log facility: %s\n", (char *)*val);
+		LOG(L_ERR, "log_facility_fixup: invalid log facility: %s\n",
+			(char *)*val);
 		return -1;
 	}
 	*val = (void *)(long)i;
@@ -130,15 +111,12 @@ int log_facility_fixup(void *handle, str *gname, str *name, void **val)
  */
 
 /* value for unset local log level  */
-#define UNSET_LOCAL_DEBUG_LEVEL	    -255
-#define UNSET_LOCAL_DEBUG_FACILITY  -255
+#define UNSET_LOCAL_DEBUG_LEVEL	-255
 
 /* the local debug log level */
 static int _local_debug_level = UNSET_LOCAL_DEBUG_LEVEL;
-static int _local_debug_facility = UNSET_LOCAL_DEBUG_FACILITY;
 /* callback to get per module debug level */
 static get_module_debug_level_f _module_debug_level = NULL;
-static get_module_debug_facility_f _module_debug_facility = NULL;
 
 /**
  * @brief set callback function for per module debug level
@@ -148,17 +126,12 @@ void set_module_debug_level_cb(get_module_debug_level_f f)
 	_module_debug_level = f;
 }
 
-void set_module_debug_facility_cb(get_module_debug_facility_f f)
-{
-	_module_debug_facility = f;
-}
-
 /**
  * @brief return the log level - the local one if it set,
  *   otherwise the global value
  */
 int get_debug_level(char *mname, int mnlen) {
-	int mlevel;
+	int mlevel = L_DBG;
 	/*important -- no LOGs inside, because it will loop */
 	if(unlikely(_module_debug_level!=NULL && mnlen>0)) {
 		if(_module_debug_level(mname, mnlen, &mlevel)==0) {
@@ -168,23 +141,6 @@ int get_debug_level(char *mname, int mnlen) {
 	return (_local_debug_level != UNSET_LOCAL_DEBUG_LEVEL) ?
 				_local_debug_level : cfg_get(core, core_cfg, debug);
 }
-
-/**
- * @brief return the log facility - the local one if it set,
- *   otherwise the global value
- */
-int get_debug_facility(char *mname, int mnlen) {
-	int mfacility;
-	/*important -- no LOGs inside, because it will loop */
-	if(unlikely(_module_debug_facility!=NULL && mnlen>0)) {
-		if(_module_debug_facility(mname, mnlen, &mfacility)==0) {
-			return mfacility;
-		}
-	}
-	return (_local_debug_facility != UNSET_LOCAL_DEBUG_FACILITY) ?
-				_local_debug_facility : cfg_get(core, core_cfg, log_facility);
-}
-
 
 /**
  * @brief set the local debug log level
@@ -200,22 +156,6 @@ void set_local_debug_level(int level)
 void reset_local_debug_level(void)
 {
 	_local_debug_level = UNSET_LOCAL_DEBUG_LEVEL;
-}
-
-/**
- * @brief set the local debug log facility
- */
-void set_local_debug_facility(int facility)
-{
-	_local_debug_facility = facility;
-}
-
-/**
- * @brief reset the local debug log facility
- */
-void reset_local_debug_facility(void)
-{
-	_local_debug_facility = UNSET_LOCAL_DEBUG_FACILITY;
 }
 
 typedef struct log_level_color {
@@ -427,44 +367,4 @@ void dprint_color_update(int level, char f, char b)
 		return;
 	if(f && f!='0') _log_level_colors[level - L_MIN].f = f;
 	if(b && b!='0') _log_level_colors[level - L_MIN].b = b;
-}
-
-
-/* log_prefix functionality */
-str *log_prefix_val = NULL;
-static pv_elem_t *log_prefix_pvs = NULL;
-
-#define LOG_PREFIX_SIZE	1024
-static char log_prefix_buf[LOG_PREFIX_SIZE];
-static str log_prefix_str;
-
-void log_prefix_init(void)
-{
-	str s;
-	if(log_prefix_fmt==NULL)
-		return;
-	s.s = log_prefix_fmt; s.len = strlen(s.s);
-
-	if(pv_parse_format(&s, &log_prefix_pvs)<0)
-	{
-		LM_ERR("wrong format[%s]\n", s.s);
-		return;
-	}
-}
-
-void log_prefix_set(sip_msg_t *msg)
-{
-	if(log_prefix_pvs == NULL)
-		return;
-	if(msg==NULL || !(IS_SIP(msg) || IS_SIP_REPLY(msg))) {
-		log_prefix_val = NULL;
-		return;
-	}
-	log_prefix_str.s = log_prefix_buf;
-	log_prefix_str.len = LOG_PREFIX_SIZE;
-	if(pv_printf(msg, log_prefix_pvs, log_prefix_str.s, &log_prefix_str.len)<0)
-		return;
-	if(log_prefix_str.len<=0)
-		return;
-	log_prefix_val = &log_prefix_str;
 }

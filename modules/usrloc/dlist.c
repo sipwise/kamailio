@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,8 +17,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * ========
+ * 2005-07-11 get_all_ucontacts returns also the contact's flags (bogdan)
+ * 2006-11-28 added get_number_of_users() (Jeffrey Magder - SOMA Networks)
+ * 2007-09-12 added partitioning support for fetching all ul contacts
+ *            (bogdan)
  */
 
 /*! \file
@@ -46,12 +54,6 @@
 /*! \brief Global list of all registered domains */
 dlist_t* root = 0;
 
-unsigned int _ul_max_partition = 0;
-
-void ul_set_max_partition(unsigned int m)
-{
-	_ul_max_partition = m;
-}
 
 /*!
  * \brief Find domain with the given name
@@ -77,6 +79,7 @@ static inline int find_dlist(str* _n, dlist_t** _d)
 	return 1;
 }
 
+
 /*!
  * \brief Get all contacts from the database, in partitions if wanted
  * \see get_all_ucontacts
@@ -85,24 +88,24 @@ static inline int find_dlist(str* _n, dlist_t** _d)
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
-								unsigned int part_idx, unsigned int part_max,
-								int options)
+								unsigned int part_idx, unsigned int part_max)
 {
+	static char query_buf[512];
+	static str query_str;
+
 	struct socket_info *sock;
 	unsigned int dbflags;
 	db1_res_t* res = NULL;
 	db_row_t *row;
 	dlist_t *dom;
-	str now;
 	char now_s[25];
+	int now_len;
 	int port, proto;
 	char *p;
 	str addr;
-	str recv;
 	str path;
 	str ruid;
 	str host;
@@ -110,11 +113,11 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 	int i;
 	void *cp;
 	int shortage, needed;
-	db_key_t keys1[4]; /* where */
-	db_val_t vals1[4];
-	db_op_t  ops1[4];
-	db_key_t keys2[6]; /* select */
-	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
+
+	if(ul_dbf.raw_query==NULL) {
+		LM_WARN("DB raw query support is required, but not implemented\n");
+		return -1;
+	}
 
 	cp = buf;
 	shortage = 0;
@@ -122,65 +125,41 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 	len -= sizeof(addr.len);
 
 	/* get the current time in DB format */
-	now.len = 25;
-	now.s = now_s;
-	if (db_time2str( time(0), now.s, &now.len)!=0) {
+	now_len = 25;
+	if (db_time2str( time(0), now_s, &now_len)!=0) {
 		LM_ERR("failed to print now time\n");
 		return -1;
 	}
 	aorhash = 0;
 
-	/* select fields */
-	keys2[0] = &received_col;
-	keys2[1] = &contact_col;
-	keys2[2] = &sock_col;
-	keys2[3] = &cflags_col;
-	keys2[4] = &path_col;
-	keys2[5] = &ruid_col;
-
-	/* where fields */
-	keys1[0] = &expires_col;
-	ops1[0] = OP_GT;
-	vals1[0].type = DB1_STR;
-	vals1[0].nul = 0;
-	vals1[0].val.str_val = now;
-
-	keys1[1] = &partition_col;
-	ops1[1] = OP_EQ;
-	vals1[1].type = DB1_INT;
-	vals1[1].nul = 0;
-	if(_ul_max_partition>0)
-		vals1[1].val.int_val = part_idx;
-	else
-		vals1[1].val.int_val = 0;
-
-	if (flags & nat_bflag) {
-		keys1[n[0]] = &keepalive_col;
-		ops1[n[0]] = OP_EQ;
-		vals1[n[0]].type = DB1_INT;
-		vals1[n[0]].nul = 0;
-		vals1[n[0]].val.int_val = 1;
-		n[0]++;
-	}
-	if(options&GAU_OPT_SERVER_ID) {
-		keys1[n[0]] = &srv_id_col;
-		ops1[n[0]] = OP_EQ;
-		vals1[n[0]].type = DB1_INT;
-		vals1[n[0]].nul = 0;
-		vals1[n[0]].val.int_val = server_id;
-		n[0]++;
-	}
-
-	/* TODO: use part_idx and part_max on keys1 */
-
 	for (dom = root; dom!=NULL ; dom=dom->next) {
-		if (ul_dbf.use_table(ul_dbh, dom->d->name) < 0) {
-			LM_ERR("sql use_table failed\n");
+		/* build query */
+		i = snprintf( query_buf, sizeof(query_buf), "select %.*s, %.*s, %.*s,"
+			" %.*s, %.*s, %.*s from %s where %.*s > %.*s and"
+#ifdef ORACLE_USRLOC
+			" bitand(%.*s, %d) = %d and mod(id, %u) = %u",
+#else
+			" %.*s & %d = %d and id %% %u = %u",
+#endif
+			received_col.len, received_col.s,
+			contact_col.len, contact_col.s,
+			sock_col.len, sock_col.s,
+			cflags_col.len, cflags_col.s,
+			path_col.len, path_col.s,
+			ruid_col.len, ruid_col.s,
+			dom->d->name->s,
+			expires_col.len, expires_col.s,
+			now_len, now_s,
+			cflags_col.len, cflags_col.s,
+			flags, flags, part_max, part_idx);
+		if ( i>=sizeof(query_buf) ) {
+			LM_ERR("DB query too long\n");
 			return -1;
 		}
-		if (ul_dbf.query(ul_dbh, keys1, ops1, vals1, keys2,
-							n[0], n[1], NULL, &res) <0 ) {
-			LM_ERR("query error\n");
+		query_str.s = query_buf;
+		query_str.len = i;
+		if ( ul_dbf.raw_query( ul_dbh, &query_str, &res)<0 ) {
+			LM_ERR("raw_query failed\n");
 			return -1;
 		}
 		if( RES_ROW_N(res)==0 ) {
@@ -191,26 +170,17 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 		for(i = 0; i < RES_ROW_N(res); i++) {
 			row = RES_ROWS(res) + i;
 
-
 			/* received */
-			recv.s = (char*)VAL_STRING(ROW_VALUES(row));
-			if ( VAL_NULL(ROW_VALUES(row)) || recv.s==0 || recv.s[0]==0 ) {
-				recv.s = NULL;
-				recv.len = 0;
+			addr.s = (char*)VAL_STRING(ROW_VALUES(row));
+			if ( VAL_NULL(ROW_VALUES(row)) || addr.s==0 || addr.s[0]==0 ) {
+				/* contact */
+				addr.s = (char*)VAL_STRING(ROW_VALUES(row)+1);
+				if (VAL_NULL(ROW_VALUES(row)+1) || addr.s==0 || addr.s[0]==0) {
+					LM_ERR("empty contact -> skipping\n");
+					continue;
+				}
 			}
-			else {
-				recv.len = strlen(recv.s);
-			}
-
-			/* contact */
-			addr.s = (char*)VAL_STRING(ROW_VALUES(row)+1);
-			if (VAL_NULL(ROW_VALUES(row)+1) || addr.s==0 || addr.s[0]==0) {
-				LM_ERR("empty contact -> skipping\n");
-				continue;
-			}
-			else {
-				addr.len = strlen(addr.s);
-			}
+			addr.len = strlen(addr.s);
 
 			/* path */
 			path.s = (char*)VAL_STRING(ROW_VALUES(row)+4);
@@ -231,7 +201,6 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 			}
 
 			needed = (int)(sizeof(addr.len) + addr.len
-					+ sizeof(recv.len) + recv.len
 					+ sizeof(sock) + sizeof(dbflags)
 					+ sizeof(path.len) + path.len
 					+ sizeof(ruid.len) + ruid.len
@@ -241,20 +210,11 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 				continue;
 			}
 
-			/* write contact */
+			/* write received/contact */
 			memcpy(cp, &addr.len, sizeof(addr.len));
 			cp = (char*)cp + sizeof(addr.len);
 			memcpy(cp, addr.s, addr.len);
 			cp = (char*)cp + addr.len;
-
-			/* write received */
-			memcpy(cp, &recv.len, sizeof(recv.len));
-			cp = (char*)cp + sizeof(recv.len);
-			/* copy received only if exist */
-			if(recv.len){
-				memcpy(cp, recv.s, recv.len);
-				cp = (char*)cp + recv.len;
-			}
 
 			/* sock */
 			p  = (char*)VAL_STRING(ROW_VALUES(row) + 2);
@@ -333,12 +293,10 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
-								unsigned int part_idx, unsigned int part_max,
-								int options)
+								unsigned int part_idx, unsigned int part_max)
 {
 	dlist_t *p;
 	urecord_t *r;
@@ -382,9 +340,6 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
 					if ((c->cflags & flags) != flags)
 						continue;
 
-					if(options&GAU_OPT_SERVER_ID && server_id!=c->server_id)
-						continue;
-
 					if(ul_keepalive_timeout>0 && c->last_keepalive>0)
 					{
 						if(c->sock!=NULL && c->sock->proto==PROTO_UDP)
@@ -399,38 +354,65 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
 						}
 					}
 
-					needed = (int)(sizeof(c->c.len) + c->c.len
-							+ sizeof(c->received.len) + c->received.len
+					if (c->received.s) {
+						needed = (int)(sizeof(c->received.len)
+								+ c->received.len
+								+ sizeof(c->sock) + sizeof(c->cflags)
+								+ sizeof(c->path.len) + c->path.len
+								+ sizeof(c->ruid.len) + c->ruid.len
+								+ sizeof(r->aorhash));
+						if (len >= needed) {
+							memcpy(cp,&c->received.len,sizeof(c->received.len));
+							cp = (char*)cp + sizeof(c->received.len);
+							memcpy(cp, c->received.s, c->received.len);
+							cp = (char*)cp + c->received.len;
+							memcpy(cp, &c->sock, sizeof(c->sock));
+							cp = (char*)cp + sizeof(c->sock);
+							memcpy(cp, &c->cflags, sizeof(c->cflags));
+							cp = (char*)cp + sizeof(c->cflags);
+							memcpy(cp, &c->path.len, sizeof(c->path.len));
+							cp = (char*)cp + sizeof(c->path.len);
+							memcpy(cp, c->path.s, c->path.len);
+							cp = (char*)cp + c->path.len;
+							memcpy(cp, &c->ruid.len, sizeof(c->ruid.len));
+							cp = (char*)cp + sizeof(c->ruid.len);
+							memcpy(cp, c->ruid.s, c->ruid.len);
+							cp = (char*)cp + c->ruid.len;
+							memcpy(cp, &r->aorhash, sizeof(r->aorhash));
+							cp = (char*)cp + sizeof(r->aorhash);
+							len -= needed;
+						} else {
+							shortage += needed;
+						}
+					} else {
+						needed = (int)(sizeof(c->c.len) + c->c.len
 							+ sizeof(c->sock) + sizeof(c->cflags)
 							+ sizeof(c->path.len) + c->path.len
 							+ sizeof(c->ruid.len) + c->ruid.len
 							+ sizeof(r->aorhash));
-					if (len >= needed) {
-						memcpy(cp, &c->c.len, sizeof(c->c.len));
-						cp = (char*)cp + sizeof(c->c.len);
-						memcpy(cp, c->c.s, c->c.len);
-						cp = (char*)cp + c->c.len;
-						memcpy(cp,&c->received.len,sizeof(c->received.len));
-						cp = (char*)cp + sizeof(c->received.len);
-						memcpy(cp, c->received.s, c->received.len);
-						cp = (char*)cp + c->received.len;
-						memcpy(cp, &c->sock, sizeof(c->sock));
-						cp = (char*)cp + sizeof(c->sock);
-						memcpy(cp, &c->cflags, sizeof(c->cflags));
-						cp = (char*)cp + sizeof(c->cflags);
-						memcpy(cp, &c->path.len, sizeof(c->path.len));
-						cp = (char*)cp + sizeof(c->path.len);
-						memcpy(cp, c->path.s, c->path.len);
-						cp = (char*)cp + c->path.len;
-						memcpy(cp, &c->ruid.len, sizeof(c->ruid.len));
-						cp = (char*)cp + sizeof(c->ruid.len);
-						memcpy(cp, c->ruid.s, c->ruid.len);
-						cp = (char*)cp + c->ruid.len;
-						memcpy(cp, &r->aorhash, sizeof(r->aorhash));
-						cp = (char*)cp + sizeof(r->aorhash);
-						len -= needed;
-					} else {
-						shortage += needed;
+						if (len >= needed) {
+							memcpy(cp, &c->c.len, sizeof(c->c.len));
+							cp = (char*)cp + sizeof(c->c.len);
+							memcpy(cp, c->c.s, c->c.len);
+							cp = (char*)cp + c->c.len;
+							memcpy(cp, &c->sock, sizeof(c->sock));
+							cp = (char*)cp + sizeof(c->sock);
+							memcpy(cp, &c->cflags, sizeof(c->cflags));
+							cp = (char*)cp + sizeof(c->cflags);
+							memcpy(cp, &c->path.len, sizeof(c->path.len));
+							cp = (char*)cp + sizeof(c->path.len);
+							memcpy(cp, c->path.s, c->path.len);
+							cp = (char*)cp + c->path.len;
+							memcpy(cp, &c->ruid.len, sizeof(c->ruid.len));
+							cp = (char*)cp + sizeof(c->ruid.len);
+							memcpy(cp, c->ruid.s, c->ruid.len);
+							cp = (char*)cp + c->ruid.len;
+							memcpy(cp, &r->aorhash, sizeof(r->aorhash));
+							cp = (char*)cp + sizeof(r->aorhash);
+							len -= needed;
+						} else {
+							shortage += needed;
+						}
 					}
 				}
 			}
@@ -483,17 +465,15 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 int get_all_ucontacts(void *buf, int len, unsigned int flags,
-								unsigned int part_idx, unsigned int part_max,
-								int options)
+								unsigned int part_idx, unsigned int part_max)
 {
 	if (db_mode==DB_ONLY)
-		return get_all_db_ucontacts( buf, len, flags, part_idx, part_max, options);
+		return get_all_db_ucontacts( buf, len, flags, part_idx, part_max);
 	else
-		return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max, options);
+		return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max);
 }
 
 
@@ -764,22 +744,6 @@ int synchronize_all_udomains(int istart, int istep)
 	return res;
 }
 
-/*!
- * \brief Run timer handler to clean all domains in db
- * \return 0 if all timer return 0, != 0 otherwise
- */
-int ul_db_clean_udomains(void)
-{
-	int res = 0;
-	dlist_t* ptr;
-
-	get_act_time(); /* Get and save actual time */
-
-	for( ptr=root ; ptr ; ptr=ptr->next)
-		res |= db_timer_udomain(ptr->d);
-
-	return res;
-}
 
 /*!
  * \brief Find a particular domain, small wrapper around find_dlist

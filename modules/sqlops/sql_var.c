@@ -1,4 +1,6 @@
 /**
+ * $Id$
+ *
  * Copyright (C) 2008 Elena-Ramona Modroiu (asipto.com)
  *
  * This file is part of kamailio, a free SIP server.
@@ -15,12 +17,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*! \file
  * \ingroup sqlops
- * \brief Kamailio SQL-operations :: Variables
+ * \brief SIP-router SQL-operations :: Variables
  *
  * - Module: \ref sqlops
  */
@@ -104,6 +106,7 @@ int sql_parse_index(str *in, gparam_t *gp)
 		if (gp->v.pvs == NULL)
 		{
 			LM_ERR("no pkg memory left for pv_spec_t\n");
+		    pkg_free(gp);
 		    return -1;
 		}
 
@@ -111,6 +114,7 @@ int sql_parse_index(str *in, gparam_t *gp)
 		{
 			LM_ERR("invalid PV identifier\n");
 		    pkg_free(gp->v.pvs);
+		    pkg_free(gp);
 			return -1;
 		}
 	} else {
@@ -255,9 +259,7 @@ int pv_parse_dbr_name(pv_spec_p sp, str *in)
 		if(p>in->s+in->len || *p=='\0' || *p!=']')
 			goto error_index;
 	} else {
-		LM_ERR("unknown key [%.*s]\n", pvs.len, pvs.s);
-		if(spv!=NULL)
-			pkg_free(spv);
+		LM_ERR("unknow key [%.*s]\n", pvs.len, pvs.s);
 		return -1;
 	}
 	sp->pvp.pvn.u.dname = (void*)spv;

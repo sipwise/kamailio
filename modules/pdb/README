@@ -1,18 +1,15 @@
 pdb Module
 
+Hardy Kahl
+
+   1&1 Internet AG
+
 Edited by
 
 Henning Westerholt
 
    1&1 Internet AG
    <henning.westerholt@1und1.de>
-
-Edited by
-
-Pawel Kuzak
-
-   1&1 Internet AG
-   <pawel.kuzak@1und1.de>
 
    Copyright © 2009 1&1 Internet AG
      __________________________________________________________________
@@ -89,10 +86,6 @@ Chapter 1. Admin Guide
    and use the first answer, that comes back. A timeout for the query can
    be defined in milliseconds. The queying can be activated and
    deactivated using FIFO commands.
-
-   More about the new communication protocol between this module and
-   pdb_server can be found in utils/pdbt/docs/network_protocol.txt. The
-   current version is 1.
 
 2. Dependencies
 

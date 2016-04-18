@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <sys/time.h>
@@ -73,13 +73,13 @@ extern struct statstable *seas_stats_table;
  */
 struct statstable* init_seas_stats_table(void);
 int stop_stats_server(void);
-void destroy_seas_stats_table(void);
+static inline void destroy_seas_stats_table(void);
 /** Statistics server process
  * functions
  */
 void serve_stats(int fd);
 int start_stats_server(char *socket);
-int print_stats_info(int f,int sock);
+static inline int print_stats_info(int f,int sock);
 /**
  * Statistics functions
  */

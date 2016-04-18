@@ -4,7 +4,7 @@
 			<db_table_id>presentity</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>event</field></col>
@@ -13,7 +13,6 @@
 				<col><field>received_time</field></col>
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -28,7 +27,6 @@
 				<col><field>received_time</field></col>
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -46,7 +44,6 @@
 				<col><field>received_time</field></col>
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -63,7 +60,7 @@
 			<db_table_id>active_watchers</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>presentity_uri</field></col>
 				<col><field>watcher_username</field></col>
 				<col><field>watcher_domain</field></col>
@@ -88,8 +85,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -120,8 +115,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -155,8 +148,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -173,7 +164,7 @@
 			<db_table_id>watchers</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>presentity_uri</field></col>
 				<col><field>watcher_username</field></col>
 				<col><field>watcher_domain</field></col>
@@ -226,7 +217,7 @@
 			<db_table_id>xcap</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>username</field></col>
 				<col><field>domain</field></col>
 				<col><field>doc</field></col>
@@ -282,7 +273,7 @@
 			<db_table_id>pua</db_table_id>
 			<cmd_type>DB1_QUERY</cmd_type>
 			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
+				<col><field>id</field></col>
 				<col><field>pres_uri</field></col>
 				<col><field>pres_id</field></col>
 				<col><field>event</field></col>

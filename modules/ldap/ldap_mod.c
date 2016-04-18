@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Kamailio LDAP Module
  *
  * Copyright (C) 2007 University of North Carolina
@@ -20,8 +22,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2007-02-18: Initial version
  */
 
 
@@ -123,7 +128,7 @@ static cmd_export_t cmds[] = {
 */
 static param_export_t params[] = {
 
-	{"config_file",          PARAM_STR, &ldap_config},
+	{"config_file",          STR_PARAM, &ldap_config},
 	{0, 0, 0}
 };
 
@@ -194,7 +199,7 @@ static int mod_init(void)
 	/*
 	* read config file
 	*/
-	if (ldap_config.len <= 0)
+	if (strlen(ldap_config.s) == 0)
 	{
 		LM_ERR("config_file is empty - this module param is mandatory\n");
 		return -2;

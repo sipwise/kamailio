@@ -1,4 +1,5 @@
-/*
+/* $Id$
+ *
  * Copyright (C) 2007-2009 Dan Pascu
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,26 +16,10 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
-/*!
- * \file
- * \brief Module interface and functions
- * \ingroup nat_traversal
- * Module: \ref nat_traversal
- */
-
-/**
- * @defgroup nat_traversal Nat
- * @brief Kamailio nat_traversal module
-
-   The nat_traversal module provides support for handling far-end NAT
-   traversal for SIP signaling. 
- */
-
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -99,7 +84,12 @@ MODULE_VERSION
 #define STR_HAS_IPREFIX(str, prefix) ((str).len>(prefix).len && strncasecmp((prefix).s, (str).s, (prefix).len)==0)
 
 
-typedef bool (*NatTestFunction)(struct sip_msg *msg);
+typedef int Bool;
+#define True  1
+#define False 0
+
+
+typedef Bool (*NatTestFunction)(struct sip_msg *msg);
 
 typedef enum {
     NTNone=0,
@@ -158,7 +148,7 @@ typedef struct Dialog_Param {
     char *caller_uri;
     char *callee_uri;
     time_t expire;
-    bool confirmed;
+    Bool confirmed;
     gen_lock_t lock;
     struct {
         char **uri;
@@ -190,9 +180,9 @@ static int NAT_Keepalive(struct sip_msg *msg);
 static int FixContact(struct sip_msg *msg);
 static int ClientNatTest(struct sip_msg *msg, unsigned int tests);
 
-static bool test_private_contact(struct sip_msg *msg);
-static bool test_source_address(struct sip_msg *msg);
-static bool test_private_via(struct sip_msg *msg);
+static Bool test_private_contact(struct sip_msg *msg);
+static Bool test_source_address(struct sip_msg *msg);
+static Bool test_private_via(struct sip_msg *msg);
 
 static INLINE char* shm_strdup(char *source);
 
@@ -211,7 +201,7 @@ static int pv_get_source_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t 
 //
 static HashTable *nat_table = NULL;
 
-static bool keepalive_disabled = false;
+static Bool keepalive_disabled = False;
 
 static unsigned int keepalive_interval = 60;
 
@@ -221,7 +211,7 @@ static Keepalive_Params keepalive_params = {"NOTIFY", NULL, "", "", 0, 0, ""};
 
 struct tm_binds  tm_api;
 struct dlg_binds dlg_api;
-bool have_dlg_api = false;
+Bool have_dlg_api = False;
 
 static int dialog_flag = -1;
 static unsigned dialog_default_timeout = 12*3600;  // 12 hours
@@ -258,10 +248,10 @@ static cmd_export_t commands[] = {
 
 static param_export_t parameters[] = {
     {"keepalive_interval",       INT_PARAM, &keepalive_interval},
-    {"keepalive_method",         PARAM_STRING, &keepalive_params.method},
-    {"keepalive_from",           PARAM_STRING, &keepalive_params.from},
-    {"keepalive_extra_headers",  PARAM_STRING, &keepalive_params.extra_headers},
-    {"keepalive_state_file",     PARAM_STRING, &keepalive_state_file},
+    {"keepalive_method",         STR_PARAM, &keepalive_params.method},
+    {"keepalive_from",           STR_PARAM, &keepalive_params.from},
+    {"keepalive_extra_headers",  STR_PARAM, &keepalive_params.extra_headers},
+    {"keepalive_state_file",     STR_PARAM, &keepalive_state_file},
     {0, 0, 0}
 };
 
@@ -462,7 +452,7 @@ NAT_Contact_del(NAT_Contact *contact)
 }
 
 
-static bool
+static Bool
 NAT_Contact_match(NAT_Contact *contact, const char *uri)
 {
     return strcmp(contact->uri, uri)==0;
@@ -670,24 +660,24 @@ Dialog_Param_del(Dialog_Param *param)
 
 // This function assumes the caller has locked the Dialog_Param while operating on it
 //
-static bool
+static Bool
 Dialog_Param_has_candidate(Dialog_Param *param, char *candidate)
 {
     int i;
 
     for (i=0; i<param->callee_candidates.count; i++) {
         if (strcmp(candidate, param->callee_candidates.uri[i])==0) {
-            return true;
+            return True;
         }
     }
 
-    return false;
+    return False;
 }
 
 
 // This function assumes the caller has locked the Dialog_Param while operating on it
 //
-static bool
+static Bool
 Dialog_Param_add_candidate(Dialog_Param *param, char *candidate)
 {
     char **new_uri, *new_candidate;
@@ -699,7 +689,7 @@ Dialog_Param_add_candidate(Dialog_Param *param, char *candidate)
         new_uri = shm_realloc(param->callee_candidates.uri, new_size * sizeof(char*));
         if (!new_uri) {
             LM_ERR("failed to grow callee_candidates uri list\n");
-            return false;
+            return False;
         }
         param->callee_candidates.uri = new_uri;
         param->callee_candidates.size = new_size;
@@ -708,13 +698,13 @@ Dialog_Param_add_candidate(Dialog_Param *param, char *candidate)
     new_candidate = shm_strdup(candidate);
     if (!new_candidate) {
         LM_ERR("cannot allocate shared memory for new candidate uri\n");
-        return false;
+        return False;
     }
 
     param->callee_candidates.uri[param->callee_candidates.count] = new_candidate;
     param->callee_candidates.count++;
 
-    return true;
+    return True;
 }
 
 
@@ -770,30 +760,30 @@ shm_strdup(char *source)
 }
 
 
-static bool
+static Bool
 get_contact_uri(struct sip_msg* msg, struct sip_uri *uri, contact_t **_c)
 {
 
     if ((parse_headers(msg, HDR_CONTACT_F, 0) == -1) || !msg->contact)
-        return false;
+        return False;
 
     if (!msg->contact->parsed && parse_contact(msg->contact) < 0) {
         LM_ERR("cannot parse the Contact header\n");
-        return false;
+        return False;
     }
 
     *_c = ((contact_body_t*)msg->contact->parsed)->contacts;
 
     if (*_c == NULL) {
-        return false;
+        return False;
     }
 
     if (parse_uri((*_c)->uri.s, (*_c)->uri.len, uri) < 0 || uri->host.len <= 0) {
         LM_ERR("cannot parse the Contact URI\n");
-        return false;
+        return False;
     }
 
-    return true;
+    return True;
 }
 
 
@@ -824,10 +814,10 @@ rfc1918address(str *address)
 
 
 // Test if address of signaling is different from address in 1st Via field
-static bool
+static Bool
 test_source_address(struct sip_msg *msg)
 {
-    bool different_ip, different_port;
+    Bool different_ip, different_port;
     int via1_port;
 
     different_ip = received_via_test(msg);
@@ -839,21 +829,21 @@ test_source_address(struct sip_msg *msg)
 
 
 // Test if Contact field contains a private IP address as defined in RFC1918
-static bool
+static Bool
 test_private_contact(struct sip_msg *msg)
 {
     struct sip_uri uri;
     contact_t* contact;
 
     if (!get_contact_uri(msg, &uri, &contact))
-        return false;
+        return False;
 
     return is_private_address(&(uri.host));
 }
 
 
 // Test if top Via field contains a private IP address as defined in RFC1918
-static bool
+static Bool
 test_private_via(struct sip_msg *msg)
 {
     return is_private_address(&(msg->via1->host));
@@ -894,7 +884,7 @@ get_register_expire(struct sip_msg *request, struct sip_msg *reply)
     param_t *expires_param;
     time_t now, expire=0;
     unsigned exp;
-    bool matched;
+    Bool matched;
 
     if (!request->contact)
         return 0;
@@ -931,7 +921,7 @@ get_register_expire(struct sip_msg *request, struct sip_msg *reply)
         }
 
         for (contact=contact_body->contacts; contact; contact=contact->next) {
-            for (r_hdr=reply->contact, matched=false; r_hdr && !matched; r_hdr=next_sibling_hdr(r_hdr)) {
+            for (r_hdr=reply->contact, matched=False; r_hdr && !matched; r_hdr=next_sibling_hdr(r_hdr)) {
                 if (!r_hdr->parsed && parse_contact(r_hdr) < 0) {
                     LM_ERR("failed to parse the Contact header body in reply\n");
                     continue;
@@ -942,7 +932,7 @@ get_register_expire(struct sip_msg *request, struct sip_msg *reply)
                         expires_param = r_contact->expires;
                         if (expires_param && expires_param->body.len && str2int(&expires_param->body, &exp) == 0)
                             expire = max(expire, exp);
-                        matched = true;
+                        matched = True;
                         break;
                     }
                 }
@@ -1088,7 +1078,7 @@ __dialog_confirmed(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params
 
     lock_get(&param->lock);
 
-    param->confirmed = true;
+    param->confirmed = True;
 
     callee_uri = get_source_uri(_params->rpl);
 
@@ -1470,7 +1460,7 @@ FixContact(struct sip_msg *msg)
     }
 
     offset = contact->uri.s - msg->buf;
-    anchor = del_lump(msg, offset, contact->uri.len, (enum _hdr_types_t)HDR_CONTACT_F);
+    anchor = del_lump(msg, offset, contact->uri.len, HDR_CONTACT_F);
 
     if (!anchor) {
         pkg_free(buf);
@@ -1480,7 +1470,7 @@ FixContact(struct sip_msg *msg)
     len = sprintf(buf, "%.*s%s:%d%.*s", before_host.len, before_host.s,
                   newip.s, newport, after.len, after.s);
 
-    if (insert_new_lump_after(anchor, buf, len, (enum _hdr_types_t)HDR_CONTACT_F) == 0) {
+    if (insert_new_lump_after(anchor, buf, len, HDR_CONTACT_F) == 0) {
         pkg_free(buf);
         return -1;
     }
@@ -1680,7 +1670,7 @@ restore_keepalive_state(void)
 
     res = fscanf(f, STATE_FILE_HEADER); // skip header
 
-    while (true) {
+    while (True) {
         res = fscanf(f, "%63s %63s %ld %ld", uri, socket, &rtime, &stime);
         if (res == EOF) {
             if (ferror(f))
@@ -1730,7 +1720,7 @@ mod_init(void)
 
     if (keepalive_interval <= 0) {
         LM_NOTICE("keepalive functionality is disabled from the configuration\n");
-        keepalive_disabled = true;
+        keepalive_disabled = True;
         return 0;
     }
 
@@ -1760,7 +1750,7 @@ mod_init(void)
         param = find_param_export(find_module_by_name("dialog"),
 				"dlg_flag", INT_PARAM, &type);
         if (param) {
-		have_dlg_api = true;
+		have_dlg_api = True;
 
 		dialog_flag = *param;
 

@@ -1,8 +1,9 @@
 /**
+ * $Id$
  *
  * Copyright (C) 2009 SIP-Router.org
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of Extensible SIP Router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -56,7 +57,6 @@ extern str th_vparam_name;
 extern str th_vparam_prefix;
 
 extern int th_param_mask_callid;
-extern int th_mask_addr_myself;
 
 int th_skip_rw(char *s, int len)
 {
@@ -126,37 +126,34 @@ int th_get_uri_type(str *uri, int *mode, str *value)
 	if(parse_uri(uri->s, uri->len, &puri)<0)
 		return -1;
 
-	LM_DBG("PARAMS [%.*s]\n", puri.params.len, puri.params.s);
+	LM_DBG("+++++++++++ PARAMS [%.*s]\n", puri.params.len, puri.params.s);
 	if(puri.host.len==th_ip.len
 			&& strncasecmp(puri.host.s, th_ip.s, th_ip.len)==0)
 	{
 		/* host matches TH ip */
 		ret = th_get_param_value(&puri.params, &th_uparam_name, value);
 		if(ret<0)
-			return -1; /* eroor parsing parameters */
-		if(ret==0)
-			return 2; /* param found - decode */
-		if(th_mask_addr_myself==0)
-			return 0; /* param not found - skip */
-	}
-
-	if(check_self(&puri.host, puri.port_no, 0)==1)
-	{
-		/* myself -- matched on all protos */
-		ret = th_get_param_value(&puri.params, &r2, value);
-		if(ret<0)
 			return -1;
-		if(ret==1) /* not found */
+		return 2; /* decode */
+	} else {
+		if(check_self(&puri.host, (puri.port_no)?puri.port_no:0, 0)==1)
+		{
+			/* myself -- matched on all protos */
+			ret = th_get_param_value(&puri.params, &r2, value);
+			if(ret<0)
+				return -1;
+			if(ret==1) /* not found */
+				return 0; /* skip */
+			LM_DBG("+++++++++++++++++++************ [%.*s]\n",
+					value->len, value->s);
+			if(value->len==2 && strncasecmp(value->s, "on", 2)==0)
+				*mode = 1;
+			memset(value, 0, sizeof(str));
 			return 0; /* skip */
-		LM_DBG("VALUE [%.*s]\n",
-				value->len, value->s);
-		if(value->len==2 && strncasecmp(value->s, "on", 2)==0)
-			*mode = 1;
-		memset(value, 0, sizeof(str));
-		return 0; /* skip */
+		} else {
+			return 1; /* encode */
+		}
 	}
-	/* not myself & not mask ip */
-	return 1; /* encode */
 }
 
 int th_mask_via(sip_msg_t *msg)
@@ -496,47 +493,6 @@ int th_unmask_callid(sip_msg_t *msg)
 		pkg_free(out.s);
 		return -1;
 	}
-
-	return 0;
-}
-
-#define TH_CALLID_SIZE	256
-int th_unmask_callid_str(str *icallid, str *ocallid)
-{
-	static char th_callid_buf[TH_CALLID_SIZE];
-	str out;
-
-	if(th_param_mask_callid==0)
-		return 0;
-
-	if(icallid->s==NULL) {
-		LM_ERR("invalid Call-Id value\n");
-		return -1;
-	}
-
-	if(th_callid_prefix.len>0) {
-		if(th_callid_prefix.len >= icallid->len) {
-			return 1;
-		}
-		if(strncmp(icallid->s, th_callid_prefix.s, th_callid_prefix.len)!=0) {
-			return 1;
-		}
-	}
-	out.s = th_mask_decode(icallid->s, icallid->len,
-					&th_callid_prefix, 0, &out.len);
-	if(out.len>=TH_CALLID_SIZE) {
-		pkg_free(out.s);
-		LM_ERR("not enough callid buf size (needed %d)\n", out.len);
-		return -2;
-	}
-
-	memcpy(th_callid_buf, out.s, out.len);
-	th_callid_buf[out.len] = '\0';
-
-	pkg_free(out.s);
-
-	ocallid->s = th_callid_buf;
-	ocallid->len = out.len;
 
 	return 0;
 }
@@ -947,7 +903,7 @@ int th_add_hdr_cookie(sip_msg_t *msg)
 		pkg_free(h.s);
 		return -1;
 	}
-	LM_DBG("added cookie header [%s]\n", h.s);
+	LM_DBG("+++++++++++++ added cookie header [%s]\n", h.s);
 	return 0;
 }
 
@@ -1042,15 +998,6 @@ int th_del_cookie(sip_msg_t *msg)
 }
 
 
-/**
- * return the special topoh cookie
- * - TH header of TH Via parame
- * - value is 3 chars
- *   [0] - direction:    d - downstream; u - upstream
- *   [1] - request type: i - initial; c - in-dialog; l - local in-dialog
- *   [2] - location:     h - header; v - via param
- * - if not found, returns 'xxx'
- */
 char* th_get_cookie(sip_msg_t *msg, int *clen)
 {
 	hdr_field_t *hf;

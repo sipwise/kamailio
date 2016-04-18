@@ -1,8 +1,6 @@
 /* 
  * Copyright (C) 2009 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
- *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -15,6 +13,12 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+/*
+ * History:
+ * --------
+ *  2009-10-08  initial version (andrei)
+*/
 
 /**
  * \file
@@ -68,7 +72,7 @@
 #	ifdef MOD_NAME
 #		define _SRC_MODULE_ MOD_NAME
 #	else
-#		define _SRC_MODULE_ "core"
+#		define _SRC_MODULE_ "<core>"
 #	endif /* MOD_NAME */
 #endif /* _SRC_MODULE_ */
 

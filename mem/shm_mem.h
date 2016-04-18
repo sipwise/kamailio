@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of sip-router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,16 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * History:
+ * --------
+ *  2003-06-29  added shm_realloc & replaced shm_resize (andrei)
+ *  2003-11-19  reverted shm_resize to the old version, using
+ *               realloc causes terrible fragmentation  (andrei)
+ *  2005-03-02   added shm_info() & re-eneabled locking on shm_status (andrei)
+ *  2007-02-23   added shm_available() (andrei)
+ *  2007-06-10   support for sf_malloc (andrei)
+ */
 
 /**
  * \file
@@ -30,10 +40,6 @@
 
 #ifndef shm_mem_h
 #define shm_mem_h
-
-#include "shm.h"
-
-#if 0
 
 #include <string.h>
 #include <errno.h>
@@ -60,14 +66,6 @@
 		#endif
 	#elif defined(DBG_QM_MALLOC)
 		#define DBG_F_MALLOC
-	#endif
-#elif defined TLSF_MALLOC
-	#ifdef DBG_TLSF_MALLOC
-		#ifndef DBG_QM_MALLOC
-			#define DBG_QM_MALLOC
-		#endif
-	#elif defined(DBG_QM_MALLOC)
-		#define DBG_TLSF_MALLOC
 	#endif
 #endif
 
@@ -152,21 +150,8 @@
 #	define MY_STATUS(...) 0
 #	define MY_SUMS do{}while(0)
 #	define MY_MEMINFO	mspace_info
-#	define  shm_malloc_init(buf, len, type) create_mspace_with_base(buf, len, 0)
+#	define  shm_malloc_init(buf, len) create_mspace_with_base(buf, len, 0)
 #	define shm_malloc_destroy(b) do{}while(0)
-#	define shm_malloc_on_fork() do{}while(0)
-#elif defined TLSF_MALLOC
-#	include "tlsf.h"
-	extern pool_t shm_block;
-#	define MY_MALLOC tlsf_malloc
-#	define MY_FREE tlsf_free
-#	define MY_REALLOC tlsf_realloc
-#	define MY_STATUS tlsf_status
-#	define MY_MEMINFO	tlsf_meminfo
-#	define MY_SUMS tlsf_sums
-#	define shm_malloc_init(mem, bytes, type) tlsf_create_with_pool((void*) mem, bytes)
-#	define shm_malloc_destroy(b) do{}while(0)
-#	define shm_available() tlsf_available(shm_block)
 #	define shm_malloc_on_fork() do{}while(0)
 #else
 #	include "q_malloc.h"
@@ -211,41 +196,41 @@ void shm_mem_destroy(void);
 #include "src_loc.h"
 
 #define shm_malloc_unsafe(_size ) \
-	MY_MALLOC(shm_block, (_size), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+	MY_MALLOC(shm_block, (_size), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 
 inline static void* _shm_malloc(unsigned int size, 
-	const char *file, const char *function, int line, const char *mname)
+	const char *file, const char *function, int line )
 {
 	void *p;
 	
 	shm_lock();
-	p=MY_MALLOC(shm_block, size, file, function, line, mname);
+	p=MY_MALLOC(shm_block, size, file, function, line );
 	shm_unlock();
 	return p; 
 }
 
 
 inline static void* _shm_realloc(void *ptr, unsigned int size, 
-		const char* file, const char* function, int line, const char *mname)
+		const char* file, const char* function, int line )
 {
 	void *p;
 	shm_lock();
-	p=MY_REALLOC(shm_block, ptr, size, file, function, line, mname);
+	p=MY_REALLOC(shm_block, ptr, size, file, function, line);
 	shm_unlock();
 	return p;
 }
 
 #define shm_malloc( _size ) _shm_malloc((_size), \
-	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ , _SRC_MODULE_)
+	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 #define shm_realloc( _ptr, _size ) _shm_realloc( (_ptr), (_size), \
-	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 
 
 #define shm_free_unsafe( _p  ) \
-	MY_FREE( shm_block, (_p), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+	MY_FREE( shm_block, (_p), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 #define shm_free(_p) \
 do { \
@@ -257,9 +242,9 @@ do { \
 
 
 void* _shm_resize(void* ptr, unsigned int size, const char* f, const char* fn,
-					int line, const char *mname);
+					int line);
 #define shm_resize(_p, _s ) _shm_resize((_p), (_s), \
-		_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+		_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 /*#define shm_resize(_p, _s ) shm_realloc( (_p), (_s))*/
 
 
@@ -336,12 +321,6 @@ do{\
 #endif /* MY_SUMS */
 
 #endif /* ! SHM_SAFE_MALLOC */
-
-/* multi-process safe version of shm_available()
- */
-unsigned long shm_available_safe();
-
-#endif
 
 #endif /* shm_mem_h */
 

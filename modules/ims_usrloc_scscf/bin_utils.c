@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -898,18 +898,8 @@ ims_subscription *bin_decode_ims_subscription(bin_data *x)
 		if (!bin_decode_service_profile(x,imss->service_profiles+i)) goto error;
 
 	imss->lock = lock_alloc();
-	if (imss->lock==0){
-		goto error;
-	}
-	if (lock_init(imss->lock)==0){
-		lock_dealloc(imss->lock);
-		imss->lock=0;
-		goto error;
-	}
+	imss->lock = lock_init(imss->lock);
 	imss->ref_count = 1;
-#ifdef EXTRA_DEBUG
-    	LM_DBG("LOCK CREATED FOR SUBSCRIPTION [%.*s]: %p\n", imss->private_identity.len, imss->private_identity.s, imss->lock);
-#endif
 
 	return imss;
 error:

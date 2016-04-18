@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -331,12 +331,7 @@ dp_config* parse_dp_config(xmlDocPtr doc)
 				x->peers[x->peers_cnt].port = atoi((char*)xc);
 				xmlFree(xc);
 			}
-			xc = xmlGetProp(child,(xmlChar*)"src_addr");
-			if (xc){
-				quote_trim_dup(&(x->peers[x->peers_cnt].src_addr),(char*)xc);
-				xmlFree(xc);
-			}
-			x->peers_cnt++;
+			x->peers_cnt++;		
 		}
 		else if (xmlStrlen(child->name)==8 && strncasecmp((char*)child->name,"Acceptor",8)==0){
 			//Acceptor
@@ -464,7 +459,7 @@ dp_config* parse_dp_config(xmlDocPtr doc)
 												rei->next = re;
 												break;
 											}
-										}					
+										} 					
 								}
 							}
 						}

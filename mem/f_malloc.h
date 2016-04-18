@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of sip-router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,17 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * History:
+ * --------
+ *  2003-05-21  on sparc64 roundto 8 even in debugging mode (so malloc'ed
+ *               long longs will be 64 bit aligned) (andrei)
+ *  2004-07-19  support for 64 bit (2^64 mem. block) and more info
+ *               for the future de-fragmentation support (andrei)
+ *  2004-11-10  support for > 4Gb mem., switched to long (andrei)
+ *  2007-06-23  added hash bitmap (andrei)
+ */
+
 /**
  * \file
  * \brief Simple, very fast, malloc library
@@ -23,16 +34,17 @@
  */
 
 
-#if defined(F_MALLOC)
-
 #if !defined(f_malloc_h)
 #define f_malloc_h
 
+#ifdef DBG_QM_MALLOC
+#ifndef DBG_F_MALLOC
+	#define DBG_F_MALLOC
+#endif /* DBG_F_MALLOC */
+#endif /* DBG_QM_MALLOC */
+
 #include "meminfo.h"
 
-#ifdef DBG_SR_MEMORY
-#define DBG_F_MALLOC
-#endif
 
 /**
  * Use a bitmap to quickly find free fragments, should speed up
@@ -79,17 +91,17 @@ typedef unsigned long fm_hash_bitmap_t;
  * - +1 .... end -  size = 2^k, big buckets
  */
 struct fm_frag{
-	unsigned long size;         /* size of fragment */
-	struct fm_frag* next_free;  /* next free frag in slot */
-	struct fm_frag* prev_free;  /* prev free frag in slot - for faster join/defrag */
-	unsigned int is_free;       /* used to detect if fragment is free (when not 0) */
+	unsigned long size;
+	union{
+		struct fm_frag* nxt_free;
+		long reserved;
+	}u;
 #ifdef DBG_F_MALLOC
 	const char* file;
 	const char* func;
-	const char* mname;
 	unsigned long line;
+	unsigned long check;
 #endif
-	unsigned int check;
 };
 
 struct fm_frag_lnk{
@@ -102,12 +114,12 @@ struct fm_frag_lnk{
  * \see mem_info
  */
 struct fm_block{
-	int type;
 	unsigned long size; /** total size */
+#if defined(DBG_F_MALLOC) || defined(MALLOC_STATS)
 	unsigned long used; /** allocated size*/
 	unsigned long real_used; /** used + malloc overhead */
 	unsigned long max_real_used;
-	unsigned long ffrags;
+#endif
 	
 	struct fm_frag* first_frag;
 	struct fm_frag* last_frag;
@@ -124,7 +136,7 @@ struct fm_block{
  * \param size Size of allocation
  * \return return the fm_block
  */
-struct fm_block* fm_malloc_init(char* address, unsigned long size, int type);
+struct fm_block* fm_malloc_init(char* address, unsigned long size);
 
 
 /**
@@ -134,11 +146,10 @@ struct fm_block* fm_malloc_init(char* address, unsigned long size, int type);
  * \return address of allocated memory
  */
 #ifdef DBG_F_MALLOC
-void* fm_malloc(void* qmp, unsigned long size,
-					const char* file, const char* func, unsigned int line,
-					const char* mname);
+void* fm_malloc(struct fm_block* qm, unsigned long size,
+					const char* file, const char* func, unsigned int line);
 #else
-void* fm_malloc(void* qmp, unsigned long size);
+void* fm_malloc(struct fm_block* qm, unsigned long size);
 #endif
 
 
@@ -150,10 +161,10 @@ void* fm_malloc(void* qmp, unsigned long size);
  * \param p freed memory
  */
 #ifdef DBG_F_MALLOC
-void fm_free(void* qmp, void* p, const char* file, const char* func,
-				unsigned int line, const char* mname);
+void  fm_free(struct fm_block* qm, void* p, const char* file, const char* func, 
+				unsigned int line);
 #else
-void  fm_free(void* qmp, void* p);
+void  fm_free(struct fm_block* qm, void* p);
 #endif
 
 
@@ -167,10 +178,10 @@ void  fm_free(void* qmp, void* p);
  * \return reallocated memory block
  */
 #ifdef DBG_F_MALLOC
-void* fm_realloc(void* qmp, void* p, unsigned long size,
-					const char* file, const char* func, unsigned int line, const char *mname);
+void*  fm_realloc(struct fm_block* qm, void* p, unsigned long size, 
+					const char* file, const char* func, unsigned int line);
 #else
-void*  fm_realloc(void* qmp, void* p, unsigned long size);
+void*  fm_realloc(struct fm_block* qm, void* p, unsigned long size);
 #endif
 
 
@@ -178,7 +189,7 @@ void*  fm_realloc(void* qmp, void* p, unsigned long size);
  * \brief Report internal memory manager status
  * \param qm memory block
  */
-void fm_status(void* qmp);
+void fm_status(struct fm_block* qm);
 
 
 /**
@@ -189,7 +200,7 @@ void fm_status(void* qmp);
  * \param qm memory block
  * \param info memory information
  */
-void fm_info(void* qmp, struct mem_info* info);
+void fm_info(struct fm_block* qm, struct mem_info* info);
 
 
 /**
@@ -198,28 +209,17 @@ void fm_info(void* qmp, struct mem_info* info);
  * \return Returns how much free memory is available, on error (not compiled
  * with bookkeeping code) returns (unsigned long)(-1)
  */
-unsigned long fm_available(void* qmp);
+unsigned long fm_available(struct fm_block* qm);
 
 
 /**
  * \brief Debugging helper, summary and logs all allocated memory blocks
  * \param qm memory block
  */
-void fm_sums(void* qmp);
-void fm_mod_get_stats(void* qm, void **fm_root);
-void fm_mod_free_stats(void *root);
+#ifdef DBG_F_MALLOC
+void fm_sums(struct fm_block* qm);
+#else
+#define fm_sums(qm) do{}while(0)
+#endif /* DBG_F_MALLOC */
 
-typedef struct _mem_counter{
-	const char *file;
-	const char *func;
-	const char *mname;
-	unsigned long line;
-
-	unsigned long size;
-	int count;
-
-	struct _mem_counter *next;
-} mem_counter;
-
-#endif
 #endif

@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Domain module
  *
  * Copyright (C) 2002-2012 Juha Heinanen
@@ -17,7 +19,17 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * History:
+ * -------
+ * 2003-03-11: New module interface (janakj)
+ * 2003-03-16: flags export parameter added (janakj)
+ * 2003-04-05: default_uri #define used (jiri)
+ * 2003-04-06: db connection closed in mod_init (janakj)
+ * 2004-06-06: updated to the new DB api, cleanup: static dbf & handler,
+ *             calls to domain_db_{bind,init,close,ver} (andrei)
+ * 2006-01-22: added is_domain_local(variable) function (dan)
  *
  */
 
@@ -56,26 +68,39 @@ MODULE_VERSION
 #define DOMAIN_ATTRS_TABLE_VERSION 1
 
 #define DOMAIN_TABLE "domain"
+#define DOMAIN_TABLE_LEN (sizeof(DOMAIN_TABLE) - 1)
+
 #define DOMAIN_ATTRS_TABLE "domain_attrs"
+#define DOMAIN_ATTRS_TABLE_LEN (sizeof(DOMAIN_ATTRS_TABLE) - 1)
+
 #define DID_COL "did"
+#define DID_COL_LEN (sizeof(DID_COL) - 1)
+
 #define DOMAIN_COL "domain"
+#define DOMAIN_COL_LEN (sizeof(DOMAIN_COL) - 1)
+
 #define NAME_COL "name"
+#define NAME_COL_LEN (sizeof(NAME_COL) - 1)
+
 #define TYPE_COL "type"
+#define TYPE_COL_LEN (sizeof(TYPE_COL) - 1)
+
 #define VALUE_COL "value"
+#define VALUE_COL_LEN (sizeof(VALUE_COL) - 1)
 
 static int domain_init_rpc(void);
 
 /*
  * Module parameter variables
  */
-str d_db_url = str_init(DEFAULT_RODB_URL);
-str domain_table = str_init(DOMAIN_TABLE); /* Name of domain table */
-str domain_attrs_table = str_init(DOMAIN_ATTRS_TABLE);
-str did_col = str_init(DID_COL);       /* Name of domain id column */
-str domain_col = str_init(DOMAIN_COL);       /* Name of domain column */
-str name_col = str_init(NAME_COL);   /* Name of attribute name column */
-str type_col = str_init(TYPE_COL);   /* Name of attribute type column */
-str value_col = str_init(VALUE_COL); /* Name of attribute value column */
+str db_url = {DEFAULT_RODB_URL, DEFAULT_RODB_URL_LEN};
+str domain_table = {DOMAIN_TABLE, DOMAIN_TABLE_LEN}; /* Name of domain table */
+str domain_attrs_table = {DOMAIN_ATTRS_TABLE, DOMAIN_ATTRS_TABLE_LEN};
+str did_col = {DID_COL, DID_COL_LEN};       /* Name of domain id column */
+str domain_col = {DOMAIN_COL, DOMAIN_COL_LEN};       /* Name of domain column */
+str name_col = {NAME_COL, NAME_COL_LEN};   /* Name of attribute name column */
+str type_col = {TYPE_COL, TYPE_COL_LEN};   /* Name of attribute type column */
+str value_col = {VALUE_COL, VALUE_COL_LEN}; /* Name of attribute value column */
 int domain_reg_myself = 0;
 
 /*
@@ -112,14 +137,14 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"db_url",         PARAM_STR, &d_db_url      },
-	{"domain_table",   PARAM_STR, &domain_table},
-	{"domain_attrs_table",   PARAM_STR, &domain_attrs_table},
-	{"did_col",        PARAM_STR, &did_col  },
-	{"domain_col",     PARAM_STR, &domain_col  },
-	{"name_col",       PARAM_STR, &name_col  },
-	{"type_col",       PARAM_STR, &type_col  },
-	{"value_col",      PARAM_STR, &value_col  },
+	{"db_url",         STR_PARAM, &db_url.s      },
+	{"domain_table",   STR_PARAM, &domain_table.s},
+	{"domain_attrs_table",   STR_PARAM, &domain_attrs_table.s},
+	{"did_col",        STR_PARAM, &did_col.s  },
+	{"domain_col",     STR_PARAM, &domain_col.s  },
+	{"name_col",       STR_PARAM, &name_col.s  },
+	{"type_col",       STR_PARAM, &type_col.s  },
+	{"value_col",      STR_PARAM, &value_col.s  },
 	{"register_myself",INT_PARAM, &domain_reg_myself},
 	{0, 0, 0}
 };
@@ -174,15 +199,23 @@ static int mod_init(void)
 	}
     }
 
+    db_url.len = strlen(db_url.s);
+    domain_table.len = strlen(domain_table.s);
+    domain_attrs_table.len = strlen(domain_attrs_table.s);
+    did_col.len = strlen(did_col.s);
+    domain_col.len = strlen(domain_col.s);
+    name_col.len = strlen(name_col.s);
+    type_col.len = strlen(type_col.s);
+    value_col.len = strlen(value_col.s);
+
     /* Bind database */
-    if (domain_db_bind(&d_db_url)) {
-	LM_DBG("Usign db_url [%.*s]\n", d_db_url.len, d_db_url.s);
-	LM_ERR("no database module found. Have you configure thed \"db_url\" modparam properly?\n");
+    if (domain_db_bind(&db_url)) {
+	LM_ERR("no database module found\n");
 	return -1;
     }
 
     /* Check table versions */
-    if (domain_db_init(&d_db_url) < 0) {
+    if (domain_db_init(&db_url) < 0) {
 	LM_ERR("unable to open database connection\n");
 	return -1;
     }
@@ -210,9 +243,9 @@ static int mod_init(void)
 	goto error;
     }
     memset(hash_table_1, 0, sizeof(struct domain_list *) *
-	   (DOM_HASH_SIZE + 1));
+	   DOM_HASH_SIZE + 1);
     memset(hash_table_2, 0, sizeof(struct domain_list *) *
-	   (DOM_HASH_SIZE + 1));
+	   DOM_HASH_SIZE + 1);
     *hash_table = hash_table_1;
 
     /* Allocate and initialize locks */

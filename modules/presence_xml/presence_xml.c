@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -88,7 +88,6 @@ pres_get_sphere_t pres_get_sphere;
 str xcap_table= str_init("xcap");
 str db_url = str_init(DEFAULT_DB_URL);
 int force_active= 0;
-int force_dummy_presence = 0;
 int integrated_xcap_server= 0;
 xcap_serv_t* xs_list= NULL;
 int disable_presence = 0;
@@ -120,18 +119,17 @@ static cmd_export_t cmds[]={
 };
 
 static param_export_t params[]={
-	{ "db_url",		PARAM_STR, &db_url},
-	{ "xcap_table",		PARAM_STR, &xcap_table},
+	{ "db_url",		STR_PARAM, &db_url.s},
+	{ "xcap_table",		STR_PARAM, &xcap_table.s},
 	{ "force_active",	INT_PARAM, &force_active },
 	{ "integrated_xcap_server", INT_PARAM, &integrated_xcap_server},
-	{ "xcap_server",     	PARAM_STRING|USE_FUNC_PARAM,(void*)pxml_add_xcap_server},
+	{ "xcap_server",     	STR_PARAM|USE_FUNC_PARAM,(void*)pxml_add_xcap_server},
 	{ "disable_presence",	INT_PARAM, &disable_presence },
 	{ "disable_winfo",		INT_PARAM, &disable_winfo },
 	{ "disable_bla",		INT_PARAM, &disable_bla },
 	{ "disable_xcapdiff",	INT_PARAM, &disable_xcapdiff },
 	{ "passive_mode",		INT_PARAM, &passive_mode },
-	{ "xcapauth_userdel_reason", PARAM_STR, &xcapauth_userdel_reason},
-	{ "force_dummy_presence",       INT_PARAM, &force_dummy_presence },
+	{ "xcapauth_userdel_reason", STR_PARAM, &xcapauth_userdel_reason.s},
 	{ 0, 0, 0}
 };
 
@@ -174,7 +172,12 @@ static int mod_init(void)
 		return -1;
 	}
 
+	xcapauth_userdel_reason.len = strlen(xcapauth_userdel_reason.s);
+
+	db_url.len = db_url.s ? strlen(db_url.s) : 0;
 	LM_DBG("db_url=%s/%d/%p\n",ZSW(db_url.s),db_url.len, db_url.s);
+	xcap_table.len = xcap_table.s ? strlen(xcap_table.s) : 0;
+	
 
 	/* bind the SL API */
 	if (sl_load_api(&slb)!=0) {
@@ -384,7 +387,7 @@ static int pxml_add_xcap_server( modparam_t type, void* val)
 			LM_ERR("while converting string to int\n");
 			goto error;
 		}
-		if(port< 1 || port> 65535)
+		if(port< 0 || port> 65535)
 		{
 			LM_ERR("wrong port number\n");
 			goto error;

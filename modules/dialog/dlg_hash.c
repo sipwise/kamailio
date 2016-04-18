@@ -16,8 +16,29 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2006-04-14  initial version (bogdan)
+ * 2007-03-06  syncronized state machine added for dialog state. New tranzition
+ *             design based on events; removed num_1xx and num_2xx (bogdan)
+ * 2007-04-30  added dialog matching without DID (dialog ID), but based only
+ *             on RFC3261 elements - based on an original patch submitted 
+ *             by Michel Bensoussan <michel@extricom.com> (bogdan)
+ * 2007-07-06  additional information stored in order to save it in the db:
+ *             cseq, route_set, contact and sock_info for both caller and 
+ *             callee (ancuta)
+ * 2007-07-10  Optimized dlg_match_mode 2 (DID_NONE), it now employs a proper
+ *             hash table lookup and isn't dependant on the is_direction 
+ *             function (which requires an RR param like dlg_match_mode 0 
+ *             anyways.. ;) ; based on a patch from 
+ *             Tavis Paquette <tavis@galaxytelecom.net> 
+ *             and Peter Baer <pbaer@galaxytelecom.net>  (bogdan)
+ * 2008-04-17  added new type of callback to be triggered right before the
+ *              dialog is destroyed (deleted from memory) (bogdan)
+ * 2008-04-17  added new dialog flag to avoid state tranzitions from DELETED to
+ *             CONFIRMED_NA due delayed "200 OK" (bogdan)
  */
 
 
@@ -41,6 +62,9 @@
 #include "dlg_profile.h"
 #include "dlg_req_within.h"
 #include "dlg_db_handler.h"
+
+#define MAX_LDG_LOCKS  2048
+#define MIN_LDG_LOCKS  2
 
 extern int dlg_ka_interval;
 
@@ -166,9 +190,8 @@ int dlg_ka_run(ticks_t ti)
 		if(*dlg_ka_list_head == *dlg_ka_list_tail) {
 			*dlg_ka_list_head = NULL;
 			*dlg_ka_list_tail = NULL;
-		} else {
-			*dlg_ka_list_head = dka->next;
 		}
+		*dlg_ka_list_head = dka->next;
 		lock_release(dlg_ka_list_lock);
 
 		/* send keep-alive for dka */
@@ -177,16 +200,10 @@ int dlg_ka_run(ticks_t ti)
 			shm_free(dka);
 			dka = NULL;
 		} else {
-			if((dka->iflags & DLG_IFLAG_KA_SRC)
-					&& (dlg->state==DLG_STATE_CONFIRMED))
-				dlg_send_ka(dlg, DLG_CALLER_LEG);
-			if((dka->iflags & DLG_IFLAG_KA_DST)
-					&& (dlg->state==DLG_STATE_CONFIRMED))
-				dlg_send_ka(dlg, DLG_CALLEE_LEG);
-			if(dlg->state==DLG_STATE_DELETED) {
-				shm_free(dka);
-				dka = NULL;
-			}
+			if(dka->iflags & DLG_IFLAG_KA_SRC)
+				dlg_send_ka(dlg, DLG_CALLER_LEG, 0);
+			if(dka->iflags & DLG_IFLAG_KA_DST)
+				dlg_send_ka(dlg, DLG_CALLEE_LEG, 0);
 			dlg_release(dlg);
 		}
 		/* append to tail */
@@ -220,7 +237,7 @@ int dlg_clean_run(ticks_t ti)
 	tm = (unsigned int)time(NULL);
 	for(i=0; i<d_table->size; i++)
 	{
-		dlg_lock(d_table, &d_table->entries[i]);
+		lock_set_get(d_table->locks, d_table->entries[i].lock_idx);
 		dlg = d_table->entries[i].first;
 		while (dlg) {
 			tdlg = dlg;
@@ -239,15 +256,8 @@ int dlg_clean_run(ticks_t ti)
 				tdlg->lifetime = 10;
 				tdlg->dflags |= DLG_FLAG_CHANGED;
 			}
-			if(tdlg->state==DLG_STATE_DELETED && tdlg->end_ts<tm-300) {
-				/* dialog in deleted state older than 5min */
-				LM_NOTICE("dialog in delete state is too old (%p ref %d)\n",
-						tdlg, tdlg->ref);
-				unlink_unsafe_dlg(&d_table->entries[i], tdlg);
-				destroy_dlg(tdlg);
-			}
 		}
-		dlg_unlock(d_table, &d_table->entries[i]);
+		lock_set_release(d_table->locks, d_table->entries[i].lock_idx);
 	}
 	return 0;
 }
@@ -259,6 +269,7 @@ int dlg_clean_run(ticks_t ti)
  */
 int init_dlg_table(unsigned int size)
 {
+	unsigned int n;
 	unsigned int i;
 
 	dlg_ka_list_head = (dlg_ka_t **)shm_malloc(sizeof(dlg_ka_t *));
@@ -291,13 +302,30 @@ int init_dlg_table(unsigned int size)
 	d_table->size = size;
 	d_table->entries = (struct dlg_entry*)(d_table+1);
 
+	n = (size<MAX_LDG_LOCKS)?size:MAX_LDG_LOCKS;
+	for(  ; n>=MIN_LDG_LOCKS ; n-- ) {
+		d_table->locks = lock_set_alloc(n);
+		if (d_table->locks==0)
+			continue;
+		if (lock_set_init(d_table->locks)==0) {
+			lock_set_dealloc(d_table->locks);
+			d_table->locks = 0;
+			continue;
+		}
+		d_table->locks_no = n;
+		break;
+	}
+
+	if (d_table->locks==0) {
+		LM_ERR("unable to allocted at least %d locks for the hash table\n",
+			MIN_LDG_LOCKS);
+		goto error1;
+	}
+
 	for( i=0 ; i<size; i++ ) {
 		memset( &(d_table->entries[i]), 0, sizeof(struct dlg_entry) );
-		if(lock_init(&d_table->entries[i].lock)<0) {
-			LM_ERR("failed to init lock for slot: %d\n", i);
-			goto error1;
-		}
 		d_table->entries[i].next_id = rand() % (3*size);
+		d_table->entries[i].lock_idx = i % d_table->locks_no;
 	}
 
 	return 0;
@@ -362,12 +390,6 @@ void destroy_dlg(struct dlg_cell *dlg)
 	if (dlg->tag[DLG_CALLEE_LEG].s)
 		shm_free(dlg->tag[DLG_CALLEE_LEG].s);
 
-	if (dlg->contact[DLG_CALLER_LEG].s)
-		shm_free(dlg->contact[DLG_CALLER_LEG].s);
-
-	if (dlg->contact[DLG_CALLEE_LEG].s)
-		shm_free(dlg->contact[DLG_CALLEE_LEG].s);
-
 	if (dlg->cseq[DLG_CALLER_LEG].s)
 		shm_free(dlg->cseq[DLG_CALLER_LEG].s);
 
@@ -403,6 +425,11 @@ void destroy_dlg_table(void)
 	if (d_table==0)
 		return;
 
+	if (d_table->locks) {
+		lock_set_destroy(d_table->locks);
+		lock_set_dealloc(d_table->locks);
+	}
+
 	for( i=0 ; i<d_table->size; i++ ) {
 		dlg = d_table->entries[i].first;
 		while (dlg) {
@@ -410,7 +437,7 @@ void destroy_dlg_table(void)
 			dlg = dlg->next;
 			destroy_dlg(l_dlg);
 		}
-		lock_destroy(&d_table->entries[i].lock);
+
 	}
 
 	shm_free(d_table);
@@ -506,7 +533,7 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 
 	if(dlg->tag[leg].s)
 		shm_free(dlg->tag[leg].s);
-	dlg->tag[leg].s = (char*)shm_malloc( tag->len + rr->len );
+	dlg->tag[leg].s = (char*)shm_malloc( tag->len + rr->len + contact->len );
 
 	if(dlg->cseq[leg].s) {
 		if (dlg->cseq[leg].len < cs.len) {
@@ -517,17 +544,7 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 		dlg->cseq[leg].s = (char*)shm_malloc( cs.len );
 	}
 
-	if(dlg->contact[leg].s) {
-		if (dlg->contact[leg].len < contact->len) {
-			shm_free(dlg->contact[leg].s);
-			dlg->contact[leg].s = (char*)shm_malloc(contact->len);
-		}
-	} else {
-		dlg->contact[leg].s = (char*)shm_malloc( contact->len );
-	}
-
-	if ( dlg->tag[leg].s==NULL || dlg->cseq[leg].s==NULL
-			|| dlg->contact[leg].s==NULL) {
+	if ( dlg->tag[leg].s==NULL || dlg->cseq[leg].s==NULL) {
 		LM_ERR("no more shm mem\n");
 		if (dlg->tag[leg].s)
 		{
@@ -539,12 +556,6 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 			shm_free(dlg->cseq[leg].s);
 			dlg->cseq[leg].s = NULL;
 		}
-		if (dlg->contact[leg].s)
-		{
-			shm_free(dlg->contact[leg].s);
-			dlg->contact[leg].s = NULL;
-		}
-
 		return -1;
 	}
 	p = dlg->tag[leg].s;
@@ -553,6 +564,11 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 	dlg->tag[leg].len = tag->len;
 	memcpy( p, tag->s, tag->len);
 	p += tag->len;
+	/* contact */
+	dlg->contact[leg].s = p;
+	dlg->contact[leg].len = contact->len;
+	memcpy( p, contact->s, contact->len);
+	p += contact->len;
 	/* rr */
 	if (rr->len) {
 		dlg->route_set[leg].s = p;
@@ -560,9 +576,6 @@ int dlg_set_leg_info(struct dlg_cell *dlg, str* tag, str *rr, str *contact,
 		memcpy( p, rr->s, rr->len);
 	}
 
-	/* contact */
-	dlg->contact[leg].len = contact->len;
-	memcpy(dlg->contact[leg].s, contact->s, contact->len);
 	/* cseq */
 	dlg->cseq[leg].len = cs.len;
 	memcpy( dlg->cseq[leg].s, cs.s, cs.len);
@@ -603,55 +616,6 @@ int dlg_update_cseq(struct dlg_cell * dlg, unsigned int leg, str *cseq)
 
 	LM_DBG("cseq of leg[%d] is %.*s\n", leg,
 			dlg->cseq[leg].len, dlg->cseq[leg].s);
-	dlg_unlock(d_table, d_entry);
-	return 0;
-error:
-	dlg_unlock(d_table, d_entry);
-	LM_ERR("not more shm mem\n");
-	return -1;
-}
-
-
-/*!
- * \brief Update or set the Contact for an existing dialog
- * \param dlg dialog
- * \param leg must be either DLG_CALLER_LEG, or DLG_CALLEE_LEG
- * \param ct Contact of caller or callee
- * \return 0 on success, -1 on failure
- */
-int dlg_update_contact(struct dlg_cell * dlg, unsigned int leg, str *ct)
-{
-	dlg_entry_t *d_entry;
-
-	d_entry = &(d_table->entries[dlg->h_entry]);
-
-	dlg_lock(d_table, d_entry);
-
-	if ( dlg->contact[leg].s ) {
-		if(dlg->contact[leg].len == ct->len
-				&& memcmp(dlg->contact[leg].s, ct->s, ct->len)==0) {
-			LM_DBG("same contact for leg[%d] - [%.*s]\n", leg,
-				dlg->contact[leg].len, dlg->contact[leg].s);
-			goto done;
-		}
-		if (dlg->contact[leg].len < ct->len) {
-			shm_free(dlg->contact[leg].s);
-			dlg->contact[leg].s = (char*)shm_malloc(ct->len);
-			if (dlg->contact[leg].s==NULL)
-				goto error;
-		}
-	} else {
-		dlg->contact[leg].s = (char*)shm_malloc(ct->len);
-		if (dlg->contact[leg].s==NULL)
-			goto error;
-	}
-
-	memcpy( dlg->contact[leg].s, ct->s, ct->len );
-	dlg->contact[leg].len = ct->len;
-
-	LM_DBG("contact of leg[%d] is %.*s\n", leg,
-			dlg->contact[leg].len, dlg->contact[leg].s);
-done:
 	dlg_unlock(d_table, d_entry);
 	return 0;
 error:
@@ -727,7 +691,7 @@ dlg_cell_t* dlg_get_by_iuid(dlg_iuid_t *diuid)
  * \param ftag from tag
  * \param ttag to tag
  * \param dir direction
- * \param mode let hash table slot locked or not
+ * \param mode let hash table slot locked if dialog is not found
  * \return dialog structure on success, NULL on failure
  */
 static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
@@ -745,7 +709,7 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
 		/* Check callid / fromtag / totag */
 		if (match_dialog( dlg, callid, ftag, ttag, dir)==1) {
 			ref_dlg_unsafe(dlg, 1);
-			if(likely(mode==0)) dlg_unlock( d_table, d_entry);
+			dlg_unlock( d_table, d_entry);
 			LM_DBG("dialog callid='%.*s' found on entry %u, dir=%d\n",
 				callid->len, callid->s,h_entry,*dir);
 			return dlg;
@@ -801,15 +765,15 @@ struct dlg_cell* get_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
  * referred to as a dialog."
  * Note that the caller is responsible for decrementing (or reusing)
  * the reference counter by one again if a dialog has been found.
- * Important: the hash slot is left locked (e.g., needed to allow
- * linking the structure of a new dialog).
+ * If the dialog is not found, the hash slot is left locked, to allow
+ * linking the structure of a new dialog.
  * \param callid callid
  * \param ftag from tag
  * \param ttag to tag
  * \param dir direction
  * \return dialog structure on success, NULL on failure (and slot locked)
  */
-dlg_cell_t* dlg_search( str *callid, str *ftag, str *ttag, unsigned int *dir)
+dlg_cell_t* search_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
 {
 	struct dlg_cell *dlg;
 	unsigned int he;
@@ -826,21 +790,6 @@ dlg_cell_t* dlg_search( str *callid, str *ftag, str *ttag, unsigned int *dir)
 
 
 /*!
- * \brief Lock hash table slot by call-id
- * \param callid call-id value
- */
-void dlg_hash_lock(str *callid)
-{
-	unsigned int he;
-	struct dlg_entry *d_entry;
-
-	he = core_hash(callid, 0, d_table->size);
-	d_entry = &(d_table->entries[he]);
-	dlg_lock(d_table, d_entry);
-}
-
-
-/*!
  * \brief Release hash table slot by call-id
  * \param callid call-id value
  */
@@ -853,6 +802,7 @@ void dlg_hash_release(str *callid)
 	d_entry = &(d_table->entries[he]);
 	dlg_unlock(d_table, d_entry);
 }
+
 
 
 /*!
@@ -1075,8 +1025,6 @@ void next_state_dlg(dlg_cell_t *dlg, int event,
 			switch (dlg->state) {
 				case DLG_STATE_EARLY:
 				case DLG_STATE_CONFIRMED_NA:
-					dlg->iflags |= DLG_IFLAG_PRACK;
-					break;
 				case DLG_STATE_DELETED:
 					break;
 				default:

@@ -1,5 +1,3 @@
-# cdp Makefile
-
 include ../../Makefile.defs
 auto_gen=
 NAME=cdp.so
@@ -23,7 +21,6 @@ endif
 
 ifneq ($(OS),darwin)
 	LIBS += -lrt
-	LIBS += -lpthread
 endif
 
 include ../../Makefile.modules

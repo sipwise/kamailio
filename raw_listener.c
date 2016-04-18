@@ -13,11 +13,15 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/** Kamailio core :: raw socket udp listen functions.
+/** raw socket udp listen functions.
  *  @file raw_listener.c
  *  @ingroup core
  *  Module: @ref core
+ */
+/*
+ * History:
+ * --------
+ *  2010-06-09  intial version (from older code) andrei
  */
 
 #ifdef USE_RAW_SOCKS
@@ -97,13 +101,14 @@ int raw_udp4_rcv_loop(int rsock, int port1, int port2)
 		len=raw_udp4_recv(rsock, &p, BUF_SIZE, &from, &to, &rf);
 		if (len<0){
 			if (len==-1){
-				LM_ERR("%s [%d]\n", strerror(errno), errno);
+				LOG(L_ERR, "ERROR: raw_udp4_rcv_loop:raw_udp4_recv: %s [%d]\n",
+						strerror(errno), errno);
 				if ((errno==EINTR)||(errno==EWOULDBLOCK))
 					continue;
 				else
 					goto error;
 			}else{
-				LM_DBG("error len: %d\n", len);
+				DBG("raw_udp4_rcv_loop: raw_udp4_recv error: %d\n", len);
 				continue;
 			}
 		}
@@ -117,17 +122,18 @@ int raw_udp4_rcv_loop(int rsock, int port1, int port2)
 		/* sanity checks */
 		if (len<MIN_UDP_PACKET){
 			tmp=ip_addr2a(&ri.src_ip);
-			LM_DBG("probing packet received from %s %d\n",
+			DBG("raw_udp4_rcv_loop: probing packet received from %s %d\n",
 					tmp, htons(ri.src_port));
 			continue;
 		}
 		if (ri.src_port==0){
 			tmp=ip_addr2a(&ri.src_ip);
-			LM_INFO("dropping 0 port packet from %s\n", tmp);
+			LOG(L_INFO, "raw_udp4_rcv_loop: dropping 0 port packet from %s\n",
+						tmp);
 			continue;
 		}
 		tmp=ip_addr2a(&ri.src_ip);
-		LM_DBG("received from %s:\n[%.*s]\n", tmp, len, p);
+		DBG("raw_udp4_rcv_loop: received from %s:\n[%.*s]\n", tmp, len, p);
 		receive_msg(p, len, &ri);
 	}
 error:

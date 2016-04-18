@@ -1,3 +1,4 @@
+# $Id$
 #
 # Digest Authentication - Database support
 #

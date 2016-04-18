@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
   
@@ -52,8 +52,8 @@
 #define MSG_400_MALFORMED_CONTACT "Bad Request - Error parsing Contact parameters"
 #define MSG_400_NO_VISITED "Bad Request - P-Visited-Network-ID header missing" 
 
-#define MSG_500_UNKOWN_EXPERIMENTAL_RC "Forbidden - HSS responded with unknown Experimental Result Code"
-#define MSG_500_UNABLE_TO_COMPLY "Forbidden - HSS Unable to comply"
+#define MSG_403_UNKOWN_EXPERIMENTAL_RC "Forbidden - HSS responded with unknown Experimental Result Code"
+#define MSG_403_UNABLE_TO_COMPLY "Forbidden - HSS Unable to comply"
 #define MSG_403_UNKOWN_RC "Forbidden - HSS responded with unknown Result Code"
 #define MSG_403_USER_UNKNOWN "Forbidden - HSS User Unknown"
 #define MSG_403_IDENTITIES_DONT_MATCH "Forbidden - HSS Identities don't match"

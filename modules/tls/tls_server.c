@@ -4,7 +4,7 @@
  * Copyright (C) 2005-2010 iptelorg GmbH
  * Copyright (C) 2013 Motorola Solutions, Inc.
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,7 +18,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
+/*
+ * History:
+ * --------
+ *  2007-01-26  openssl kerberos malloc bug detection/workaround (andrei)
+ *  2007-02-23  openssl low memory bugs workaround (andrei)
+ *  2009-09-21  tls connection state is now kept in c->extra_data (no
+ *               longer shared with tcp state) (andrei)
+ */
 /** main tls part (implements the tls hooks that are called from the tcp code).
  * @file tls_server.c
  * @ingroup tls
@@ -39,30 +46,23 @@
 #include "../../tcp_int_send.h"
 #include "../../tcp_read.h"
 #include "../../cfg/cfg.h"
-#include "../../route.h"
-#include "../../forward.h"
-#include "../../onsend.h"
-#include "../../xavp.h"
 
 #include "tls_init.h"
 #include "tls_domain.h"
 #include "tls_util.h"
 #include "tls_mod.h"
 #include "tls_server.h"
-#include "tls_select.h"
 #include "tls_bio.h"
 #include "tls_dump_vf.h"
 #include "tls_cfg.h"
 
-int tls_run_event_routes(struct tcp_connection *c);
-
 /* low memory treshold for openssl bug #1491 workaround */
 #define LOW_MEM_NEW_CONNECTION_TEST() \
 	(cfg_get(tls, tls_cfg, low_mem_threshold1) && \
-	  (shm_available_safe() < cfg_get(tls, tls_cfg, low_mem_threshold1)))
+	  (shm_available() < cfg_get(tls, tls_cfg, low_mem_threshold1)))
 #define LOW_MEM_CONNECTED_TEST() \
 	(cfg_get(tls, tls_cfg, low_mem_threshold2) && \
-	  (shm_available_safe() <  cfg_get(tls, tls_cfg, low_mem_threshold2)))
+	  (shm_available() <  cfg_get(tls, tls_cfg, low_mem_threshold2)))
 
 #define TLS_RD_MBUF_SZ	65536
 #define TLS_WR_MBUF_SZ	65536
@@ -128,45 +128,6 @@ int tls_run_event_routes(struct tcp_connection *c);
 #endif /* TLS_RD_DEBUG */
 
 
-extern str sr_tls_xavp_cfg;
-
-static str *tls_get_connect_server_id(void)
-{
-	sr_xavp_t *vavp = NULL;
-	str sid = {"server_id", 9};
-	if(sr_tls_xavp_cfg.s!=NULL)
-		vavp = xavp_get_child_with_sval(&sr_tls_xavp_cfg, &sid);
-	if(vavp==NULL || vavp->val.v.s.len<=0) {
-		LM_DBG("xavp with outbound server id not found\n");
-		return NULL;
-	}
-	LM_DBG("found xavp with outbound server id: %s\n", vavp->val.v.s.s);
-	return &vavp->val.v.s;
-
-}
-
-/**
- * get the server name (sni) for outbound connections from xavp
- */
-static str *tls_get_connect_server_name(void)
-{
-#ifndef OPENSSL_NO_TLSEXT
-	sr_xavp_t *vavp = NULL;
-	str sname = {"server_name", 11};
-
-	if(sr_tls_xavp_cfg.s!=NULL)
-		vavp = xavp_get_child_with_sval(&sr_tls_xavp_cfg, &sname);
-	if(vavp==NULL || vavp->val.v.s.len<=0) {
-		LM_DBG("xavp with outbound server name not found\n");
-		return NULL;
-	}
-	LM_DBG("found xavp with outbound server name: %s\n", vavp->val.v.s.s);
-	return &vavp->val.v.s;
-#else
-	return NULL;
-#endif
-}
-
 /** finish the ssl init.
  * Creates the SSL context + internal tls_extra_data and sets
  * extra_data to it.
@@ -181,20 +142,15 @@ static int tls_complete_init(struct tcp_connection* c)
 	struct tls_extra_data* data = 0;
 	tls_domains_cfg_t* cfg;
 	enum tls_conn_states state;
-	str *sname = NULL;
-	str *srvid = NULL;
 
 	if (LOW_MEM_NEW_CONNECTION_TEST()){
 		ERR("tls: ssl bug #1491 workaround: not enough memory for safe"
-				" operation: shm=%lu threshold1=%d\n", shm_available_safe(),
-				cfg_get(tls, tls_cfg, low_mem_threshold1));
+				" operation: %lu\n", shm_available());
 		goto error2;
 	}
 	     /* Get current TLS configuration and increase reference
 	      * count immediately.
 	      */
-
-	LM_DBG("completing tls connection initialization\n");
 
 	lock_get(tls_domains_cfg_lock);
 	cfg = *tls_domains_cfg;
@@ -203,27 +159,23 @@ static int tls_complete_init(struct tcp_connection* c)
 	      * is to ensure that, while on the garbage queue, the configuration does
 	      * not get deleted if there are still connection referencing its SSL_CTX
 	      */
-	atomic_inc(&cfg->ref_count);
+	cfg->ref_count++;
 	lock_release(tls_domains_cfg_lock);
 
 	if (c->flags & F_CONN_PASSIVE) {
 		state=S_TLS_ACCEPTING;
 		dom = tls_lookup_cfg(cfg, TLS_DOMAIN_SRV,
-								&c->rcv.dst_ip, c->rcv.dst_port, 0, 0);
+								&c->rcv.dst_ip, c->rcv.dst_port);
 	} else {
 		state=S_TLS_CONNECTING;
-		sname = tls_get_connect_server_name();
-		srvid = tls_get_connect_server_id();
 		dom = tls_lookup_cfg(cfg, TLS_DOMAIN_CLI,
-						&c->rcv.dst_ip, c->rcv.dst_port, sname, srvid);
+								&c->rcv.dst_ip, c->rcv.dst_port);
 	}
 	if (unlikely(c->state<0)) {
 		BUG("Invalid connection (state %d)\n", c->state);
 		goto error;
 	}
-	DBG("Using initial TLS domain %s (dom %p ctx %p sn [%s])\n",
-			tls_domain_str(dom), dom, dom->ctx[process_no],
-			ZSW(dom->server_name.s));
+	DBG("Using TLS domain %s\n", tls_domain_str(dom));
 
 	data = (struct tls_extra_data*)shm_malloc(sizeof(struct tls_extra_data));
 	if (!data) {
@@ -244,20 +196,6 @@ static int tls_complete_init(struct tcp_connection* c)
 			BIO_free(data->rwbio);
 		goto error;
 	}
-
-#ifndef OPENSSL_NO_TLSEXT
-	if (sname!=NULL) {
-		if(!SSL_set_tlsext_host_name(data->ssl, sname->s)) {
-			if (data->ssl)
-				SSL_free(data->ssl);
-			if (data->rwbio)
-				BIO_free(data->rwbio);
-			goto error;
-		}
-		LM_DBG("outbound TLS server name set to: %s\n", sname->s);
-	}
-#endif
-
 #ifdef TLS_KSSL_WORKARROUND
 	 /* if needed apply workaround for openssl bug #1467 */
 	if (data->ssl->kssl_ctx && openssl_kssl_malloc_bug){
@@ -270,10 +208,11 @@ static int tls_complete_init(struct tcp_connection* c)
 
 	/* link the extra data struct inside ssl connection*/
 	SSL_set_app_data(data->ssl, data);
+
 	return 0;
 
  error:
-	atomic_dec(&cfg->ref_count);
+	cfg->ref_count--;
 	if (data) shm_free(data);
  error2:
 	return -1;
@@ -295,8 +234,7 @@ static int tls_fix_connection_unsafe(struct tcp_connection* c)
 		}
 	}else if (unlikely(LOW_MEM_CONNECTED_TEST())){
 		ERR("tls: ssl bug #1491 workaround: not enough memory for safe"
-				" operation: shm=%lu threshold2=%d\n", shm_available_safe(),
-				cfg_get(tls, tls_cfg, low_mem_threshold2));
+				" operation: %lu\n", shm_available());
 		return -1;
 	}
 	return 0;
@@ -326,8 +264,7 @@ static int tls_fix_connection(struct tcp_connection* c)
 	}
 	if (unlikely(LOW_MEM_CONNECTED_TEST())){
 		ERR("tls: ssl bug #1491 workaround: not enough memory for safe"
-				" operation: shm=%lu threshold2=%d\n", shm_available_safe(),
-				cfg_get(tls, tls_cfg, low_mem_threshold2));
+				" operation: %lu\n", shm_available());
 		return -1;
 	}
 	return 0;
@@ -498,7 +435,6 @@ int tls_connect(struct tcp_connection *c, int* error)
 			LOG(tls_log, "tls_connect: server did not "
 							"present a certificate\n");
 		}
-		tls_run_event_routes(c);
 	} else { /* 0 or < 0 */
 		*error = SSL_get_error(ssl, ret);
 	}
@@ -530,8 +466,7 @@ static int tls_shutdown(struct tcp_connection *c)
 		return 0;
 	if (unlikely(LOW_MEM_CONNECTED_TEST())){
 		ERR("tls: ssl bug #1491 workaround: not enough memory for safe"
-				" operation: shm=%lu threshold2=%d\n", shm_available_safe(),
-				cfg_get(tls, tls_cfg, low_mem_threshold2));
+				" operation: %lu\n", shm_available());
 		goto err;
 	}
 	
@@ -612,7 +547,6 @@ int tls_h_tcpconn_init(struct tcp_connection *c, int sock)
 	c->type = PROTO_TLS;
 	c->rcv.proto = PROTO_TLS;
 	c->timeout = get_ticks_raw() + cfg_get(tls, tls_cfg, con_lifetime);
-	c->lifetime = cfg_get(tls, tls_cfg, con_lifetime);
 	c->extra_data = 0;
 	return 0;
 }
@@ -633,7 +567,7 @@ void tls_h_tcpconn_clean(struct tcp_connection *c)
 	if (c->extra_data) {
 		extra = (struct tls_extra_data*)c->extra_data;
 		SSL_free(extra->ssl);
-		atomic_dec(&extra->cfg->ref_count);
+		extra->cfg->ref_count--;
 		if (extra->ct_wq)
 			tls_ct_wq_free(&extra->ct_wq);
 		if (extra->enc_rd_buf) {
@@ -1408,43 +1342,4 @@ bug:
 	TLS_RD_TRACE("(%p, %p) end error => %d (*flags=%d)\n",
 					c, flags, ssl_read, *flags);
 	return -1;
-}
-
-
-static int _tls_evrt_connection_out = -1; /* default disabled */
-
-/*!
- * lookup tls event routes
- */
-void tls_lookup_event_routes(void)
-{
-	_tls_evrt_connection_out=route_lookup(&event_rt, "tls:connection-out");
-	if (_tls_evrt_connection_out>=0 && event_rt.rlist[_tls_evrt_connection_out]==0)
-		_tls_evrt_connection_out=-1; /* disable */
-	if(_tls_evrt_connection_out!=-1)
-		forward_set_send_info(1);
-}
-
-/**
- *
- */
-int tls_run_event_routes(struct tcp_connection *c)
-{
-	int backup_rt;
-	struct run_act_ctx ctx;
-	sip_msg_t tmsg;
-
-	if(_tls_evrt_connection_out<0)
-		return 0;
-	if(p_onsend==0 || p_onsend->msg==0)
-		return 0;
-
-	backup_rt = get_route_type();
-	set_route_type(LOCAL_ROUTE);
-	init_run_actions_ctx(&ctx);
-	tls_set_pv_con(c);
-	run_top_route(event_rt.rlist[_tls_evrt_connection_out], &tmsg, 0);
-	tls_set_pv_con(0);
-	set_route_type(backup_rt);
-	return 0;
 }

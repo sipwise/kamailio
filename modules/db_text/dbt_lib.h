@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * DBText library
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -17,7 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * 
+ * History:
+ * --------
+ * 2003-01-30 created by Daniel
  * 
  */
 
@@ -48,8 +54,6 @@
  *  * Module parameters variables
  *   */
 extern int db_mode; /* Database usage mode: 0 = no cache, 1 = cache */
-extern int empty_string; /* If TRUE, an empty string is an empty string, otherwise NULL */
-extern int _db_text_read_buffer_size; /* size of the buffer to allocate when reading file */
 
 typedef db_val_t dbt_val_t, *dbt_val_p;
 

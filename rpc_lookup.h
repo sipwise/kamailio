@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2009 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,13 +15,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*!
- * \file
- * \brief Kamailio core :: Kamailio RPC lookup and register functions
- * \ingroup core
- * Module: \ref core
- * \author andrei
+/*
+ * SER RPC lookup and register functions
  */
+/*
+ * History:
+ * --------
+ *  2009-05-11  initial version (andrei)
+*/
 
 #ifndef __rpc_lookup_h
 #define __rpc_lookup_h

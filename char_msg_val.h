@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,13 +15,20 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
+/*
+ * char_msg_val.h
+ */
+/*
+ * History:
+ * --------
+ *  2010-02-10  moved from parser/msg_parser.h and added tag only mode
+ *               by default (andrei)
+*/
 /** compute the characteristic value of a message.
  * @file
  * @ingroup core
- * \author andrei
- *
- * Defines:
+ */
+/* Defines:
  *  BRANCH_INCLUDE_FROMTO_BODY - if defined the old (pre 3.1) mode of
  *   including the full from & to bodies will be used (instead of only the
  *   tags).
@@ -48,7 +57,8 @@ inline static int char_msg_val( struct sip_msg *msg, char *cv )
 	str src[8];
 
 	if (unlikely(!check_transaction_quadruple(msg))) {
-		LM_ERR("can't calculate char_value due to a parsing error\n");
+		LOG(L_ERR, "ERROR: can't calculate char_value due "
+			"to a parsing error\n");
 		memset( cv, '0', MD5_LEN );
 		return 0;
 	}
@@ -71,7 +81,7 @@ inline static int char_msg_val( struct sip_msg *msg, char *cv )
 	if (msg->from->parsed==0){
 		/* parse from body */
 		if (unlikely(parse_from_header(msg) == -1)){
-			LM_ERR("error while parsing From header\n");
+			LOG(L_ERR, "error while parsing From header\n");
 			return 0;
 		}
 	}

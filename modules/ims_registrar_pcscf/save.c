@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -47,17 +47,11 @@
 #include "save.h"
 #include "reg_mod.h"
 #include "ul_callback.h"
-#include "subscribe.h"
-
-#include "../pua/pua_bind.h"
 
 extern struct tm_binds tmb;
 extern usrloc_api_t ul;
 extern time_t time_now;
 extern unsigned int pending_reg_expires;
-extern int subscribe_to_reginfo;
-extern int subscription_expires;
-extern pua_api_t pua;
 
 struct sip_msg* get_request_from_reply(struct sip_msg* reply)
 {
@@ -118,9 +112,11 @@ static inline int update_contacts(struct sip_msg *req,struct sip_msg *rpl, udoma
 	struct hdr_field* h;
 	contact_t* c;
 	struct sip_uri puri;
+	struct sip_uri parsed_received;
 	struct pcontact_info ci;
 	pcontact_t* pcontact;
-        unsigned short port;
+	char srcip[50];
+	int_str val;
 
 	pcscf_act_time();
 	local_time_now = time_now;
@@ -129,10 +125,6 @@ static inline int update_contacts(struct sip_msg *req,struct sip_msg *rpl, udoma
 		 * then, we will update on NOTIFY */
 		return 0;
 	}
-
-	// Set the structure to "0", to make sure it's properly initialized
-	memset(&ci, 0, sizeof(struct pcontact_info));
-
 	for (h = rpl->contact; h; h = h->next) {
 		if (h->type == HDR_CONTACT_T && h->parsed)
 			for (c = ((contact_body_t*) h->parsed)->contacts; c; c = c->next) {
@@ -142,73 +134,82 @@ static inline int update_contacts(struct sip_msg *req,struct sip_msg *rpl, udoma
 					continue;
 				}
 				//build contact info
-				ci.aor = c->uri;
 				ci.expires = expires;
 				ci.public_ids = public_id;
 				ci.num_public_ids = public_id_cnt;
 				ci.service_routes = service_route;
 				ci.num_service_routes = service_route_cnt;
-				ci.reg_state = PCONTACT_REGISTERED|PCONTACT_REG_PENDING|PCONTACT_REG_PENDING_AAR;   //we don't want to add contacts that did not come through us (pcscf)
+				ci.reg_state = PCONTACT_REGISTERED;
 
-                                if (c->uri.len > 6 && (_strnistr(c->uri.s, "alias=", c->uri.len))) {
-                                    LM_DBG("contact has an alias - we can use that as the received.... - TODO\n");
-                                }
 				ci.received_host.len = 0;
 				ci.received_host.s = 0;
 				ci.received_port = 0;
 				ci.received_proto = 0;
-				port = puri.port_no?puri.port_no:5060;
-                                ci.via_host = puri.host;
-                                ci.via_port = port;
-                                ci.via_prot = puri.proto;
-				ul.lock_udomain(_d, &puri.host, port, puri.proto);
-				if (ul.get_pcontact(_d, &ci, &pcontact) != 0) { //need to insert new contact
-					if ((expires-local_time_now)<=0) { //remove contact - de-register
-						LM_DBG("This is a de-registration for contact <%.*s> but contact is not in usrloc - ignore\n", c->uri.len, c->uri.s);
-						goto next_contact;
-					} 
-				    
-                                        LM_DBG("We don't add contact from the 200OK that did not go through us (ie, not present in explicit REGISTER that went through us\n");
-//					LM_DBG("Adding pcontact: <%.*s>, expires: %d which is in %d seconds\n", c->uri.len, c->uri.s, expires, expires-local_time_now);
-//					ci.reg_state = PCONTACT_REGISTERED;
-//					if (ul.insert_pcontact(_d, &c->uri, &ci, &pcontact) != 0) {
-//						LM_ERR("Failed inserting new pcontact\n");
-//					} else {
-//						//register for callbacks on this contact so we can send PUBLISH to SCSCF should status change
-//						LM_DBG("registering for UL callback\n");
-//						ul.register_ulcb(pcontact, PCSCF_CONTACT_DELETE | PCSCF_CONTACT_EXPIRE, callback_pcscf_contact_cb, NULL);
-//						//we also need to subscribe to reg event of this contact at SCSCF
-//					}
+
+				ul.lock_udomain(_d, &c->uri);
+				if (ul.get_pcontact(_d, &c->uri, &pcontact) != 0) { //need to insert new contact
+					LM_DBG("Adding pcontact: <%.*s>, expires: %d which is in %d seconds\n", c->uri.len, c->uri.s, expires, expires-local_time_now);
+
+					// Received Info: First try AVP, otherwise simply take the source of the request:
+					memset(&val, 0, sizeof(int_str));
+					if (rcv_avp_name.n!=0 && search_first_avp(rcv_avp_type, rcv_avp_name, &val, 0) && val.s.len > 0) {
+						if (val.s.len>RECEIVED_MAX_SIZE) {
+							LM_ERR("received too long\n");
+							goto error;
+						}
+						if (parse_uri(val.s.s, val.s.len, &parsed_received) < 0) {
+							LM_DBG("Error parsing Received URI <%.*s>\n", val.s.len, val.s.s);
+							continue;
+						}
+						ci.received_host = parsed_received.host;
+						ci.received_port = parsed_received.port_no;
+						ci.received_proto = parsed_received.proto;
+					} else {
+						ci.received_host.len = ip_addr2sbuf(&req->rcv.src_ip, srcip, sizeof(srcip));
+						ci.received_host.s = srcip;
+						ci.received_port = req->rcv.src_port;
+						ci.received_proto = req->rcv.proto;
+					}
+					// Set to default, if not set:
+					if (ci.received_port == 0) ci.received_port = 5060;
+
+					if (ul.insert_pcontact(_d, &c->uri, &ci, &pcontact) != 0) {
+						LM_ERR("Failed inserting new pcontact\n");
+					} else {
+						//register for callbacks on this contact so we can send PUBLISH to SCSCF should status change
+						LM_DBG("registering for UL callback\n");
+						ul.register_ulcb(pcontact, PCSCF_CONTACT_DELETE | PCSCF_CONTACT_EXPIRE, callback_pcscf_contact_cb, NULL);
+						//we also need to subscribe to reg event of this contact at SCSCF
+					}
 				} else { //contact already exists - update
 					LM_DBG("contact already exists and is in state (%d) : [%s]\n",pcontact->reg_state, reg_state_to_string(pcontact->reg_state));
 					if ((expires-local_time_now)<=0) { //remove contact - de-register
 						LM_DBG("This is a de-registration for contact <%.*s>\n", c->uri.len, c->uri.s);
-//						if (ul.delete_pcontact(_d, &c->uri, &ci.received_host, ci.received_port, pcontact) != 0) {
-//							LM_ERR("failed to delete pcscf contact <%.*s>\n", c->uri.len, c->uri.s);
-//						}
-                                                //TODO_LATEST replace above
+						if (ul.delete_pcontact(_d, &c->uri, pcontact) != 0) {
+							LM_ERR("failed to delete pcscf contact <%.*s>\n", c->uri.len, c->uri.s);
+						}
 					} else { //update contact
 						LM_DBG("Updating contact: <%.*s>, old expires: %li, new expires: %i which is in %i seconds\n", c->uri.len, c->uri.s,
 								pcontact->expires-local_time_now,
 								expires,
 								expires-local_time_now);
-						ci.reg_state = PCONTACT_REGISTERED;
 						if (ul.update_pcontact(_d, &ci, pcontact) != 0) {
 							LM_ERR("failed to update pcscf contact\n");
 						}
 						pcontact->expires = expires;
 					}
 				}
-next_contact:
-				ul.unlock_udomain(_d, &puri.host, port, puri.proto);
+				ul.unlock_udomain(_d, &c->uri);
 			}
 	}
 	return 1;
+error:
+	return 0;
 }
 
 /**
  * Save contact based on REGISTER request. this will be a pending save, until we receive response
- * from SCSCF. If no response after pending_timeout seconds, the contacts is removed. Can only be used from REQUEST ROUTE
+ * from SCSCF. If no response after pending_timeout seconds, the contacts is removed
  */
 int save_pending(struct sip_msg* _m, udomain_t* _d) {
 	contact_body_t* cb = 0;
@@ -216,25 +217,22 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 	pcontact_t* pcontact;
 	contact_t* c;
 	struct pcontact_info ci;
-        struct via_body* vb;
-        unsigned short port, proto;
 	int_str val;
 	struct sip_uri parsed_received;
 	char srcip[50];
 
 	memset(&ci, 0, sizeof(struct pcontact_info));
-        
-        vb = cscf_get_ue_via(_m);
-        port = vb->port?vb->port:5060;
-        proto = vb->proto;
 
 	cb = cscf_parse_contacts(_m);
 	if (!cb || (!cb->contacts)) {
 		LM_ERR("No contact headers\n");
 		goto error;
 	}
-        
-        c = cb->contacts;
+	c = cb->contacts;
+	if (!c) {
+		LM_ERR("no valid contact to register\n");
+		goto error;
+	}
 	//TODO: need support for multiple contacts - currently assume one contact
 	//make sure this is not a de-registration
 	int expires_hdr = cscf_get_expires_hdr(_m, 0);
@@ -248,7 +246,6 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 			return 1;
 		}
 	}
-        
 	pcscf_act_time();
 	int local_time_now = time_now;
 	int expires = calc_contact_expires(c, expires_hdr, local_time_now);
@@ -256,19 +253,13 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 		LM_DBG("not doing pending reg on de-registration\n");
 		return 1;
 	}
-        LM_DBG("Save Pending");
 	LM_DBG("contact requesting to expire in %d seconds\n", expires-local_time_now);
 
 	/*populate CI with bare minimum*/
-        ci.via_host = vb->host;
-        ci.via_port = port;
-        ci.via_prot = proto;
-        ci.aor = c->uri;
 	ci.num_public_ids=0;
 	ci.num_service_routes=0;
 	ci.expires=local_time_now + pending_reg_expires;
-	ci.reg_state=PCONTACT_ANY;
-        ci.searchflag=SEARCH_RECEIVED;  //we want to make sure we are very specific with this search to make sure we get the correct contact to put into reg_pending.
+	ci.reg_state=PCONTACT_REG_PENDING;
 
 	// Received Info: First try AVP, otherwise simply take the source of the request:
 	memset(&val, 0, sizeof(int_str));
@@ -292,16 +283,14 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 		ci.received_host.s = srcip;
 		ci.received_port = _m->rcv.src_port;
 		ci.received_proto = _m->rcv.proto;
-                
 	}
 	// Set to default, if not set:
 	if (ci.received_port == 0)
 		ci.received_port = 5060;
 
-	ul.lock_udomain(_d, &ci.via_host, ci.via_port, ci.via_prot);
-	if (ul.get_pcontact(_d, &ci, &pcontact) != 0) { //need to insert new contact
+	ul.lock_udomain(_d, &c->uri);
+	if (ul.get_pcontact(_d, &c->uri, &pcontact) != 0) { //need to insert new contact
 		LM_DBG("Adding pending pcontact: <%.*s>\n", c->uri.len, c->uri.s);
-		ci.reg_state=PCONTACT_REG_PENDING;
 		if (ul.insert_pcontact(_d, &c->uri, &ci, &pcontact) != 0) {
 			LM_ERR("Failed inserting new pcontact\n");
 		} else {
@@ -311,7 +300,7 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 	} else { //contact already exists - update
 		LM_DBG("Contact already exists - not doing anything for now\n");
 	}
-	ul.unlock_udomain(_d, &ci.via_host, ci.via_port, ci.via_prot);
+	ul.unlock_udomain(_d, &c->uri);
 
 	return 1;
 
@@ -335,8 +324,7 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags) {
 	int num_public_ids = 0;
 	str *service_routes=0;
 	int num_service_routes = 0;
-	pv_elem_t *presentity_uri_pv;
-	
+
 	//get request from reply
 	req = get_request_from_reply(_m);
 	if (!req) {
@@ -346,7 +334,7 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags) {
 	expires_hdr = cscf_get_expires_hdr(_m, 0);
 	cb = cscf_parse_contacts(_m);
 	if (!cb || (!cb->contacts && !cb->star)) {
-		LM_DBG("No contact headers and not *\n");
+		LM_ERR("No contact headers and not *\n");
 		goto error;
 	}
 	cscf_get_p_associated_uri(_m, &public_ids, &num_public_ids, 1);
@@ -358,46 +346,8 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags) {
 		goto error;
 	}
 
-	if(subscribe_to_reginfo == 1){
-	    
-	    //use the first p_associated_uri - i.e. the default IMPU
-	    LM_DBG("Subscribe to reg event for primary p_associated_uri");
-	    if(num_public_ids > 0){
-		//find the first routable (not a tel: URI and use that that presentity)
-		//if you can not find one then exit
-		int i = 0;
-		int found_presentity_uri=0;
-		while (i < num_public_ids && found_presentity_uri == 0)
-		{
-		    //check if public_id[i] is NOT a tel URI - if it isn't then concert to pv format and set found presentity_uri to 1
-		    if (strncasecmp(public_ids[i].s,"tel:",4)==0) {
-			LM_DBG("This is a tel URI - it is not routable so we don't use it to subscribe");
-			i++;
-		    }
-		    else {
-			//convert primary p_associated_uri to pv_elem_t
-			if(pv_parse_format(&public_ids[i], &presentity_uri_pv)<0) {
-				LM_ERR("wrong format[%.*s]\n",public_ids[i].len, public_ids[i].s);
-				goto error;
-			}
-			found_presentity_uri=1;
-		    }
-		}
-		if(found_presentity_uri!=1){
-		    LM_ERR("Could not find routable URI in p_assoiated_uri list - failed to subscribe");
-		    goto error;
-		}
-	    }else{
-		//Now some how check if there is a pua record and what the presentity uri is from there - if nothing there
-		LM_DBG("No p_associated_uri in 200 OK this must be a de-register - we ignore this - will unsubscribe when the notify is received");
-		goto done;
-		
-	    }
-	    reginfo_subscribe_real(_m, presentity_uri_pv, service_routes, subscription_expires);
-	    pv_elem_free_all(presentity_uri_pv);
-	}
-    
-done:
+	//TODO: we need to subscribe to SCSCF for reg events on the impu!
+
 	if (public_ids && public_ids->s) pkg_free(public_ids);
 	if (service_routes && service_routes->s) pkg_free(service_routes);
 	return 1;

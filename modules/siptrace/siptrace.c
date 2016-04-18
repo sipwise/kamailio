@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * siptrace module - helper module to trace sip messages
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -18,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -50,7 +52,6 @@
 #include "../../modules/sl/sl.h"
 #include "../../str.h"
 #include "../../onsend.h"
-#include "../../events.h"
 
 #include "../../modules/sipcapture/hep.h"
 
@@ -71,7 +72,6 @@ struct _siptrace_data {
 	char *dir;
 	str fromtag;
 	str fromip;
-	str totag;
 	str toip;
 	char toip_buff[IP_ADDR_MAX_STR_SIZE+12];
 	char fromip_buff[IP_ADDR_MAX_STR_SIZE+12];
@@ -91,11 +91,10 @@ static int mod_init(void);
 static int siptrace_init_rpc(void);
 static int child_init(int rank);
 static void destroy(void);
-static int sip_trace(struct sip_msg*, struct dest_info*, char*);
-static int fixup_siptrace(void ** param, int param_no);
+static int sip_trace(struct sip_msg*, char*, char*);
 
 static int sip_trace_store_db(struct _siptrace_data* sto);
-static int trace_send_duplicate(char *buf, int len, struct dest_info*);
+static int trace_send_duplicate(char *buf, int len);
 
 static void trace_onreq_in(struct cell* t, int type, struct tmcb_params *ps);
 static void trace_onreq_out(struct cell* t, int type, struct tmcb_params *ps);
@@ -104,12 +103,8 @@ static void trace_onreply_out(struct cell* t, int type, struct tmcb_params *ps);
 static void trace_sl_onreply_out(sl_cbp_t *slcb);
 static void trace_sl_ack_in(sl_cbp_t *slcb);
 
-static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_info*);
+static int trace_send_hep_duplicate(str *body, str *from, str *to);
 static int pipport2su (char *pipport, union sockaddr_union *tmp_su, unsigned int *proto);
-
-int siptrace_net_data_recv(void *data);
-int siptrace_net_data_send(void *data);
-static int _siptrace_mode = 0;
 
 
 static struct mi_root* sip_trace_mi(struct mi_root* cmd, void* param );
@@ -127,10 +122,8 @@ static str toip_column        = str_init("toip");        /* 07 */
 static str fromtag_column     = str_init("fromtag");     /* 08 */
 static str direction_column   = str_init("direction");   /* 09 */
 static str time_us_column     = str_init("time_us");     /* 10 */
-static str totag_column       = str_init("totag");       /* 11 */
 
-#define NR_KEYS 12
-#define SIP_TRACE_TABLE_VERSION 4
+#define NR_KEYS 11
 
 #define XHEADERS_BUFSIZE 512
 
@@ -146,9 +139,6 @@ int hep_capture_id = 1;
 
 int xheaders_write = 0;
 int xheaders_read = 0;
-
-str force_send_sock_str = {0, 0};
-struct sip_uri * force_send_sock_uri = 0;
 
 str    dup_uri_str      = {0, 0};
 struct sip_uri *dup_uri = 0;
@@ -179,7 +169,7 @@ db_func_t db_funcs;      		/*!< Database functions */
  */
 static cmd_export_t cmds[] = {
 	{"sip_trace", (cmd_function)sip_trace, 0, 0, 0, ANY_ROUTE},
-	{"sip_trace", (cmd_function)sip_trace, 1, fixup_siptrace, 0, ANY_ROUTE},
+	{"sip_trace", (cmd_function)sip_trace, 1, 0, 0, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -188,35 +178,32 @@ static cmd_export_t cmds[] = {
  * Exported parameters
  */
 static param_export_t params[] = {
-	{"db_url",             PARAM_STR, &db_url            },
-	{"table",              PARAM_STR, &siptrace_table     },
-	{"date_column",        PARAM_STR, &date_column        },
-	{"callid_column",      PARAM_STR, &callid_column      },
-	{"traced_user_column", PARAM_STR, &traced_user_column },
-	{"msg_column",         PARAM_STR, &msg_column         },
-	{"method_column",      PARAM_STR, &method_column      },
-	{"status_column",      PARAM_STR, &status_column      },
-	{"fromip_column",      PARAM_STR, &fromip_column      },
-	{"toip_column",        PARAM_STR, &toip_column        },
-	{"fromtag_column",     PARAM_STR, &fromtag_column     },
-	{"totag_column",       PARAM_STR, &totag_column       },
-	{"direction_column",   PARAM_STR, &direction_column   },
+	{"db_url",             STR_PARAM, &db_url.s             },
+	{"table",              STR_PARAM, &siptrace_table.s     },
+	{"date_column",        STR_PARAM, &date_column.s        },
+	{"callid_column",      STR_PARAM, &callid_column.s      },
+	{"traced_user_column", STR_PARAM, &traced_user_column.s },
+	{"msg_column",         STR_PARAM, &msg_column.s         },
+	{"method_column",      STR_PARAM, &method_column.s      },
+	{"status_column",      STR_PARAM, &status_column.s      },
+	{"fromip_column",      STR_PARAM, &fromip_column.s      },
+	{"toip_column",        STR_PARAM, &toip_column.s        },
+	{"fromtag_column",     STR_PARAM, &fromtag_column.s     },
+	{"direction_column",   STR_PARAM, &direction_column.s   },
 	{"trace_flag",         INT_PARAM, &trace_flag           },
 	{"trace_on",           INT_PARAM, &trace_on             },
-	{"traced_user_avp",    PARAM_STR, &traced_user_avp_str},
-	{"trace_table_avp",    PARAM_STR, &trace_table_avp_str},
-	{"duplicate_uri",      PARAM_STR, &dup_uri_str        },
+	{"traced_user_avp",    STR_PARAM, &traced_user_avp_str.s},
+	{"trace_table_avp",    STR_PARAM, &trace_table_avp_str.s},
+	{"duplicate_uri",      STR_PARAM, &dup_uri_str.s        },
 	{"trace_to_database",  INT_PARAM, &trace_to_database    },
-	{"trace_local_ip",     PARAM_STR, &trace_local_ip     },
+	{"trace_local_ip",     STR_PARAM, &trace_local_ip.s     },
 	{"trace_sl_acks",      INT_PARAM, &trace_sl_acks        },
 	{"xheaders_write",     INT_PARAM, &xheaders_write       },
 	{"xheaders_read",      INT_PARAM, &xheaders_read        },
 	{"hep_mode_on",        INT_PARAM, &hep_mode_on          },	 
-	{"force_send_sock",    PARAM_STR, &force_send_sock_str	},
 	{"hep_version",        INT_PARAM, &hep_version          },
 	{"hep_capture_id",     INT_PARAM, &hep_capture_id       },	        
 	{"trace_delayed",      INT_PARAM, &trace_delayed        },
-	{"trace_mode",         PARAM_INT, &_siptrace_mode       },
 	{0, 0, 0}
 };
 
@@ -287,6 +274,27 @@ static int mod_init(void)
 		return -1;
 	}
 
+	db_url.len = strlen(db_url.s);
+	siptrace_table.len = strlen(siptrace_table.s);
+	date_column.len = strlen(date_column.s);
+	callid_column.len = strlen(callid_column.s);
+	traced_user_column.len = strlen(traced_user_column.s);
+	msg_column.len = strlen(msg_column.s);
+	method_column.len = strlen(method_column.s);
+	status_column.len = strlen(status_column.s);
+	fromip_column.len = strlen(fromip_column.s);
+	toip_column.len = strlen(toip_column.s);
+	fromtag_column.len = strlen(fromtag_column.s);
+	direction_column.len = strlen(direction_column.s);
+	if (traced_user_avp_str.s)
+		traced_user_avp_str.len = strlen(traced_user_avp_str.s);
+	if (trace_table_avp_str.s)
+		trace_table_avp_str.len = strlen(trace_table_avp_str.s);
+	if (dup_uri_str.s)
+		dup_uri_str.len = strlen(dup_uri_str.s);
+	if (trace_local_ip.s)
+		trace_local_ip.len = strlen(trace_local_ip.s);
+
 	if (trace_flag<0 || trace_flag>(int)MAX_FLAG)
 	{
 		LM_ERR("invalid trace flag %d\n", trace_flag);
@@ -301,11 +309,6 @@ static int mod_init(void)
 	}
 
 	*trace_to_database_flag = trace_to_database;
-
-	if(hep_version != 1 && hep_version != 2) {
-		LM_ERR("unsupported version of HEP");
-		return -1;
-	}
 
 	/* Find a database module if needed */
 	if(trace_to_database_flag!=NULL && *trace_to_database_flag!=0) {
@@ -322,11 +325,12 @@ static int mod_init(void)
 		}
 	}
 
-	if(hep_version != 1 && hep_version != 2) {
+        if(hep_version != 1 && hep_version != 2) {
+  
+                  LM_ERR("unsupported version of HEP");
+                  return -1;
+        }                                          
 
-		LM_ERR("unsupported version of HEP");
-		return -1;
-	}
 
 	trace_on_flag = (int*)shm_malloc(sizeof(int));
 	if(trace_on_flag==NULL) {
@@ -380,6 +384,7 @@ static int mod_init(void)
 
 	if(dup_uri_str.s!=0)
 	{
+		dup_uri_str.len = strlen(dup_uri_str.s);
 		dup_uri = (struct sip_uri *)pkg_malloc(sizeof(struct sip_uri));
 		if(dup_uri==0)
 		{
@@ -388,23 +393,6 @@ static int mod_init(void)
 		}
 		memset(dup_uri, 0, sizeof(struct sip_uri));
 		if(parse_uri(dup_uri_str.s, dup_uri_str.len, dup_uri)<0)
-		{
-			LM_ERR("bad dup uri\n");
-			return -1;
-		}
-	}
-
-	if(force_send_sock_str.s!=0)
-	{
-		force_send_sock_str.len = strlen(force_send_sock_str.s);
-		force_send_sock_uri = (struct sip_uri *)pkg_malloc(sizeof(struct sip_uri));
-		if(force_send_sock_uri==0)
-		{
-			LM_ERR("no more pkg memory left\n");
-			return -1;
-		}
-		memset(force_send_sock_uri, 0, sizeof(struct sip_uri));
-		if(parse_uri(force_send_sock_str.s, force_send_sock_str.len, force_send_sock_uri)<0)
 		{
 			LM_ERR("bad dup uri\n");
 			return -1;
@@ -454,10 +442,6 @@ static int mod_init(void)
 		trace_table_avp_type = 0;
 	}
 
-	if(_siptrace_mode==1) {
-		sr_event_register_cb(SREV_NET_DATA_RECV, siptrace_net_data_recv);
-		sr_event_register_cb(SREV_NET_DATA_SEND, siptrace_net_data_send);
-	}
 	return 0;
 }
 
@@ -472,12 +456,6 @@ static int child_init(int rank)
 		if (!db_con)
 		{
 			LM_ERR("unable to connect to database. Please check configuration.\n");
-			return -1;
-		}
-		if (db_check_table_version(&db_funcs, db_con, &siptrace_table,
-					SIP_TRACE_TABLE_VERSION) < 0) {
-			LM_ERR("error during table version check\n");
-			db_funcs.close(db_con);		
 			return -1;
 		}
 	}
@@ -541,11 +519,6 @@ static int sip_trace_prepare(sip_msg_t *msg)
 {
 	if(parse_from_header(msg)==-1 || msg->from==NULL || get_from(msg)==NULL) {
 		LM_ERR("cannot parse FROM header\n");
-		goto error;
-	}
-
-	if(parse_to_header(msg)==-1 || msg->to==NULL || get_to(msg)==NULL) {
-		LM_ERR("cannot parse To header\n");
 		goto error;
 	}
 
@@ -743,7 +716,7 @@ static int sip_trace_xheaders_free(struct _siptrace_data *sto)
 	return 0;
 }
 
-static int sip_trace_store(struct _siptrace_data *sto, struct dest_info *dst)
+static int sip_trace_store(struct _siptrace_data *sto)
 {
 	if(sto==NULL)
 	{
@@ -760,8 +733,8 @@ static int sip_trace_store(struct _siptrace_data *sto, struct dest_info *dst)
 	if (sip_trace_xheaders_write(sto) != 0)
 		return -1;
 
-	if(hep_mode_on) trace_send_hep_duplicate(&sto->body, &sto->fromip, &sto->toip, dst);
-	else trace_send_duplicate(sto->body.s, sto->body.len, dst);
+	if(hep_mode_on) trace_send_hep_duplicate(&sto->body, &sto->fromip, &sto->toip);
+	else trace_send_duplicate(sto->body.s, sto->body.len);
 
 	if (sip_trace_xheaders_free(sto) != 0)
 		return -1;
@@ -771,11 +744,6 @@ static int sip_trace_store(struct _siptrace_data *sto, struct dest_info *dst)
 
 static int sip_trace_store_db(struct _siptrace_data *sto)
 {
-	if(db_con==NULL) {
-		LM_DBG("database connection not initialized\n");
-		return -1;
-	}
-
 	if(trace_to_database_flag==NULL || *trace_to_database_flag==0)
 		goto done;
 
@@ -835,11 +803,6 @@ static int sip_trace_store_db(struct _siptrace_data *sto)
 	db_vals[10].type = DB1_INT;
 	db_vals[10].nul = 0;
 	db_vals[10].val.int_val = sto->tv.tv_usec;
-
-	db_keys[11] = &totag_column;
-	db_vals[11].type = DB1_STR;
-	db_vals[11].nul = 0;
-	db_vals[11].val.str_val = sto->totag;
 
 	db_funcs.use_table(db_con, siptrace_get_table());
 
@@ -910,75 +873,10 @@ error:
 	return -1;
 }
 
-static int fixup_siptrace(void** param, int param_no) {
-	char *duri = (char*) *param;
-	struct sip_uri dup_uri;
-	struct dest_info *dst = NULL;
-	struct proxy_l * p = NULL;
-	str dup_uri_str = { 0, 0 };
-
-	if (param_no != 1) {
-		LM_DBG("params:%s\n", (char*)*param);
-		return 0;
-	}
-	if (!(*duri)) {
-		LM_ERR("invalid dup URI\n");
-		return -1;
-	}
-	LM_DBG("sip_trace URI:%s\n", (char*)*param);
-
-	dup_uri_str.s = duri;
-	dup_uri_str.len = strlen(dup_uri_str.s);
-	memset(&dup_uri, 0, sizeof(struct sip_uri));
-
-	if (parse_uri(dup_uri_str.s, dup_uri_str.len, &dup_uri) < 0) {
-		LM_ERR("bad dup uri\n");
-		return -1;
-	}
-
-	dst = (struct dest_info *) pkg_malloc(sizeof(struct dest_info));
-	if (dst == 0) {
-		LM_ERR("no more pkg memory left\n");
-		return -1;
-	}
-	init_dest_info(dst);
-	/* create a temporary proxy*/
-	dst->proto = PROTO_UDP;
-	p = mk_proxy(&dup_uri.host, (dup_uri.port_no) ? dup_uri.port_no : SIP_PORT,
-			dst->proto);
-	if (p == 0) {
-		LM_ERR("bad host name in uri\n");
-		pkg_free(dst);
-		return -1;
-	}
-	hostent2su(&dst->to, &p->host, p->addr_idx, (p->port) ? p->port : SIP_PORT);
-
-	pkg_free(*param);
-	/* free temporary proxy*/
-	if (p) {
-		free_proxy(p); /* frees only p content, not p itself */
-		pkg_free(p);
-	}
-
-	*param = (void*) dst;
-	return 0;
-}
-
-static int sip_trace(struct sip_msg *msg, struct dest_info * dst, char *dir)
+static int sip_trace(struct sip_msg *msg, char *dir, char *s2)
 {
 	struct _siptrace_data sto;
 	struct onsend_info *snd_inf = NULL;
-
-	if (dst){
-		if (dst->send_sock == 0){
-			dst->send_sock=get_send_socket(0, &dst->to, dst->proto);
-			if (dst->send_sock==0){
-				LM_ERR("can't forward to af %d, proto %d no corresponding"
-						" listening socket\n", dst->to.s.sa_family, dst->proto);
-				return -1;
-			}
-		}
-	}
 
 	if(msg==NULL) {
 		LM_DBG("nothing to trace\n");
@@ -1022,41 +920,29 @@ static int sip_trace(struct sip_msg *msg, struct dest_info * dst, char *dir)
 		sto.body.s = msg->buf;
 		sto.body.len = msg->len;
 
+		siptrace_copy_proto(msg->rcv.proto, sto.fromip_buff);
+		strcat(sto.fromip_buff, ip_addr2a(&msg->rcv.src_ip));
+		strcat(sto.fromip_buff,":");
+		strcat(sto.fromip_buff, int2str(msg->rcv.src_port, NULL));
+		sto.fromip.s = sto.fromip_buff;
+		sto.fromip.len = strlen(sto.fromip_buff);
+
+		siptrace_copy_proto(msg->rcv.proto, sto.toip_buff);
+		strcat(sto.toip_buff, ip_addr2a(&msg->rcv.dst_ip));
+		strcat(sto.toip_buff,":");
+		strcat(sto.toip_buff, int2str(msg->rcv.dst_port, NULL));
+		sto.toip.s = sto.toip_buff;
+		sto.toip.len = strlen(sto.toip_buff);
+
 		sto.dir = (dir)?dir:"in";
-
-		if (trace_local_ip.s && trace_local_ip.len > 0 && strncmp(sto.dir, "out", 3) == 0) {
-			sto.fromip = trace_local_ip;
-		} else {
-			siptrace_copy_proto(msg->rcv.proto, sto.fromip_buff);
-			strcat(sto.fromip_buff, ip_addr2a(&msg->rcv.src_ip));
-			strcat(sto.fromip_buff,":");
-			strcat(sto.fromip_buff, int2str(msg->rcv.src_port, NULL));
-			sto.fromip.s = sto.fromip_buff;
-			sto.fromip.len = strlen(sto.fromip_buff);
-		}
-
-		if (trace_local_ip.s && trace_local_ip.len > 0 && strncmp(sto.dir, "in", 2) == 0) {
-			sto.toip = trace_local_ip;
-		} else {
-			siptrace_copy_proto(msg->rcv.proto, sto.toip_buff);
-			strcat(sto.toip_buff, ip_addr2a(&msg->rcv.dst_ip));
-			strcat(sto.toip_buff,":");
-			strcat(sto.toip_buff, int2str(msg->rcv.dst_port, NULL));
-			sto.toip.s = sto.toip_buff;
-			sto.toip.len = strlen(sto.toip_buff);
-		}
 	} else {
 		sto.body.s   = snd_inf->buf;
 		sto.body.len = snd_inf->len;
 
-		if (trace_local_ip.s && trace_local_ip.len > 0) {
-			sto.fromip = trace_local_ip;
-		} else {
-			strncpy(sto.fromip_buff, snd_inf->send_sock->sock_str.s,
-					snd_inf->send_sock->sock_str.len);
-			sto.fromip.s = sto.fromip_buff;
-			sto.fromip.len = strlen(sto.fromip_buff);
-		}
+		strncpy(sto.fromip_buff, snd_inf->send_sock->sock_str.s,
+				snd_inf->send_sock->sock_str.len);
+		sto.fromip.s = sto.fromip_buff;
+		sto.fromip.len = strlen(sto.fromip_buff);
 
 		siptrace_copy_proto(snd_inf->send_sock->proto, sto.toip_buff);
 		strcat(sto.toip_buff, suip2a(snd_inf->to, sizeof(*snd_inf->to)));
@@ -1069,7 +955,6 @@ static int sip_trace(struct sip_msg *msg, struct dest_info * dst, char *dir)
 	}
 
 	sto.fromtag = get_from(msg)->tag_value;
-	sto.totag = get_to(msg)->tag_value;
 
 #ifdef STATISTICS
 	if(msg->first_line.type==SIP_REPLY) {
@@ -1078,7 +963,7 @@ static int sip_trace(struct sip_msg *msg, struct dest_info * dst, char *dir)
 		sto.stat = siptrace_req;
 	}
 #endif
-	return sip_trace_store(&sto, dst);
+	return sip_trace_store(&sto);
 }
 
 #define trace_is_off(_msg) \
@@ -1255,13 +1140,12 @@ static void trace_onreq_out(struct cell* t, int type, struct tmcb_params *ps)
 	sto.dir = "out";
 
 	sto.fromtag = get_from(msg)->tag_value;
-	sto.totag = get_to(msg)->tag_value;
 
 #ifdef STATISTICS
 	sto.stat = siptrace_req;
 #endif
 
-	sip_trace_store(&sto, NULL);
+	sip_trace_store(&sto);
 	return;
 }
 
@@ -1328,12 +1212,11 @@ static void trace_onreply_in(struct cell* t, int type, struct tmcb_params *ps)
 	sto.dir = "in";
 
 	sto.fromtag = get_from(msg)->tag_value;
-	sto.totag = get_to(msg)->tag_value;
 #ifdef STATISTICS
 	sto.stat = siptrace_rpl;
 #endif
 
-	sip_trace_store(&sto, NULL);
+	sip_trace_store(&sto);
 	return;
 }
 
@@ -1437,13 +1320,12 @@ static void trace_onreply_out(struct cell* t, int type, struct tmcb_params *ps)
 
 	sto.dir = "out";
 	sto.fromtag = get_from(msg)->tag_value;
-	sto.totag = get_to(msg)->tag_value;
 
 #ifdef STATISTICS
 	sto.stat = siptrace_rpl;
 #endif
 
-	sip_trace_store(&sto, NULL);
+	sip_trace_store(&sto);
 	return;
 }
 
@@ -1524,13 +1406,12 @@ static void trace_sl_onreply_out(sl_cbp_t *slcbp)
 
 	sto.dir = "out";
 	sto.fromtag = get_from(msg)->tag_value;
-	sto.totag = get_to(msg)->tag_value;
 
 #ifdef STATISTICS
 	sto.stat = siptrace_rpl;
 #endif
 
-	sip_trace_store(&sto, NULL);
+	sip_trace_store(&sto);
 	return;
 }
 
@@ -1582,10 +1463,10 @@ static struct mi_root* sip_trace_mi(struct mi_root* cmd_tree, void* param )
 	}
 }
 
-static int trace_send_duplicate(char *buf, int len, struct dest_info *dst2)
+static int trace_send_duplicate(char *buf, int len)
 {
 	struct dest_info dst;
-	struct proxy_l * p = NULL;
+	struct proxy_l * p;
 
 	if(buf==NULL || len <= 0)
 		return -1;
@@ -1604,50 +1485,34 @@ static int trace_send_duplicate(char *buf, int len, struct dest_info *dst2)
 		return -1;
 	}
 
-	if (!dst2){
-		init_dest_info(&dst);
-		/* create a temporary proxy*/
-		dst.proto = PROTO_UDP;
-		p=mk_proxy(&dup_uri->host, (dup_uri->port_no)?dup_uri->port_no:SIP_PORT,
-				dst.proto);
-		if (p==0){
-			LM_ERR("bad host name in uri\n");
-			return -1;
-		}
-		hostent2su(&dst.to, &p->host, p->addr_idx, (p->port)?p->port:SIP_PORT);
+	hostent2su(&dst.to, &p->host, p->addr_idx, (p->port)?p->port:SIP_PORT);
 
-		dst.send_sock=get_send_socket(0, &dst.to, dst.proto);
-		if (dst.send_sock==0){
-			LM_ERR("can't forward to af %d, proto %d no corresponding"
-					" listening socket\n", dst.to.s.sa_family, dst.proto);
-			goto error;
-		}
+	dst.send_sock=get_send_socket(0, &dst.to, dst.proto);
+	if (dst.send_sock==0)
+	{
+		LM_ERR("can't forward to af %d, proto %d no corresponding"
+				" listening socket\n", dst.to.s.sa_family, dst.proto);
+		goto error;
 	}
 
-	if (msg_send((dst2)?dst2:&dst, buf, len)<0)
+	if (msg_send(&dst, buf, len)<0)
 	{
 		LM_ERR("cannot send duplicate message\n");
 		goto error;
 	}
 
-	if (p){
-		free_proxy(p); /* frees only p content, not p itself */
-		pkg_free(p);
-	}
+	free_proxy(p); /* frees only p content, not p itself */
+	pkg_free(p);
 	return 0;
 error:
-	if (p){
-		free_proxy(p); /* frees only p content, not p itself */
-		pkg_free(p);
-	}
+	free_proxy(p); /* frees only p content, not p itself */
+	pkg_free(p);
 	return -1;
 }
 
-static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_info * dst2)
+static int trace_send_hep_duplicate(str *body, str *from, str *to)
 {
 	struct dest_info dst;
-	struct socket_info *si;
-	struct dest_info* dst_fin = NULL;
 	struct proxy_l * p=NULL /* make gcc happy */;
 	void* buffer = NULL;
 	union sockaddr_union from_su;
@@ -1658,7 +1523,7 @@ static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_i
 	struct hep_timehdr hep_time;
 	struct timeval tvb;
 	struct timezone tz;
-
+	                 
 	struct hep_ip6hdr hep_ip6header;
 
 	if(body->s==NULL || body->len <= 0)
@@ -1668,8 +1533,8 @@ static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_i
 		return 0;
 
 
-	gettimeofday( &tvb, &tz );
-
+        gettimeofday( &tvb, &tz );
+        
 
 	/* message length */
 	len = body->len 
@@ -1688,49 +1553,29 @@ static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_i
 
 	/* check if from and to are in the same family*/
 	if(from_su.s.sa_family != to_su.s.sa_family) {
-		LM_ERR("interworking detected ?\n");
+		LOG(L_ERR, "ERROR: trace_send_hep_duplicate: interworking detected ?\n");
 		goto error;
 	}
 
-	if (!dst2){
-		init_dest_info(&dst);
-		/* create a temporary proxy*/
-		dst.proto = PROTO_UDP;
-		p=mk_proxy(&dup_uri->host, (dup_uri->port_no)?dup_uri->port_no:SIP_PORT,
-				dst.proto);
-		if (p==0)
-		{
-			LM_ERR("bad host name in uri\n");
-			goto error;
-		}
-
-		hostent2su(&dst.to, &p->host, p->addr_idx, (p->port)?p->port:SIP_PORT);
-		LM_DBG("setting up the socket_info\n");
-		dst_fin = &dst;
-	} else {
-		dst_fin = dst2;
+	init_dest_info(&dst);
+	/* create a temporary proxy*/
+	dst.proto = PROTO_UDP;
+	p=mk_proxy(&dup_uri->host, (dup_uri->port_no)?dup_uri->port_no:SIP_PORT,
+			dst.proto);
+	if (p==0)
+	{
+		LM_ERR("bad host name in uri\n");
+		goto error;
 	}
 
-	if (force_send_sock_str.s) {
-		LM_DBG("force_send_sock activated, grep for the sock_info\n");
-		si = grep_sock_info(&force_send_sock_uri->host,
-				(force_send_sock_uri->port_no)?force_send_sock_uri->port_no:SIP_PORT,
-				PROTO_UDP);
-		if (!si) {
-			LM_WARN("cannot grep socket info\n");
-		} else {
-			LM_DBG("found socket while grep: [%.*s] [%.*s]\n", si->name.len, si->name.s, si->address_str.len, si->address_str.s);
-			dst_fin->send_sock = si;
-		}
-	}
+	hostent2su(&dst.to, &p->host, p->addr_idx, (p->port)?p->port:SIP_PORT);
 
-	if (dst_fin->send_sock == 0) {
-		dst_fin->send_sock=get_send_socket(0, &dst_fin->to, dst_fin->proto);
-		if (dst_fin->send_sock == 0) {
-			LM_ERR("can't forward to af %d, proto %d no corresponding"
-					" listening socket\n", dst_fin->to.s.sa_family, dst_fin->proto);
-			goto error;
-		}
+	dst.send_sock=get_send_socket(0, &dst.to, dst.proto);
+	if (dst.send_sock==0)
+	{
+		LM_ERR("can't forward to af %d, proto %d no corresponding"
+				" listening socket\n", dst.to.s.sa_family, dst.proto);
+		goto error;
 	}
 
 	/* Version && proto && length */
@@ -1765,7 +1610,7 @@ static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_i
 		len = sizeof(struct hep_ip6hdr);
 	}
 	else {
-		LM_ERR("Unsupported protocol family\n");
+		LOG(L_ERR, "ERROR: trace_send_hep_duplicate: Unsupported protocol family\n");
 		goto error;;
 	}
 
@@ -1776,7 +1621,7 @@ static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_i
 	len += sizeof(struct hep_hdr) + body->len;
 	buffer = (void *)pkg_malloc(len+1);
 	if (buffer==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: trace_send_hep_duplicate: out of memory\n");
 		goto error;
 	}
 
@@ -1799,28 +1644,26 @@ static int trace_send_hep_duplicate(str *body, str *from, str *to, struct dest_i
 
 	if(hep_version == 2) {
 
-		hep_time.tv_sec = tvb.tv_sec;
-		hep_time.tv_usec = tvb.tv_usec;
-		hep_time.captid = hep_capture_id;
+                hep_time.tv_sec = tvb.tv_sec;
+                hep_time.tv_usec = tvb.tv_usec;
+                hep_time.captid = hep_capture_id;
 
-		memcpy((void*)buffer+buflen, &hep_time, sizeof(struct hep_timehdr));
-		buflen += sizeof(struct hep_timehdr);
-	}
+                memcpy((void*)buffer+buflen, &hep_time, sizeof(struct hep_timehdr));
+                buflen += sizeof(struct hep_timehdr);
+        }
 
 	/* PAYLOAD */
 	memcpy((void*)(buffer + buflen) , (void*)body->s, body->len);
 	buflen +=body->len;
 
-	if (msg_send_buffer(dst_fin, buffer, buflen, 1)<0)
+	if (msg_send(&dst, buffer, buflen)<0)
 	{
 		LM_ERR("cannot send hep duplicate message\n");
 		goto error;
 	}
 
-	if (p) {
-		free_proxy(p); /* frees only p content, not p itself */
-		pkg_free(p);
-	}
+	free_proxy(p); /* frees only p content, not p itself */
+	pkg_free(p);
 	pkg_free(buffer);
 	return 0;
 error:
@@ -1864,14 +1707,14 @@ static int pipport2su (char *pipport, union sockaddr_union *tmp_su, unsigned int
 		LM_ERR("bad protocol %s\n", pipport);
 		return -1;
 	}
-
+	
 	if((len = strlen(pipport)) >= 256) {
 		LM_ERR("too big pipport\n");
 		goto error;
 	}
 
 	/* our tmp string */
-	strncpy(tmp_piport, pipport, len+1);
+        strncpy(tmp_piport, pipport, len+1);
 
 	len = 0;
 
@@ -1888,19 +1731,19 @@ static int pipport2su (char *pipport, union sockaddr_union *tmp_su, unsigned int
 		port_no = 0;
 	}
 	else {
-		/*the address contains a port number*/
-		*p = '\0';
-		p++;
-		port_str.s = p;
-		port_str.len = strlen(p);
-		LM_DBG("the port string is %s\n", p);
-		if(str2int(&port_str, &port_no) != 0 ) {
-			LM_ERR("there is not a valid number port\n");
-			goto error;
-		}
-		*p = '\0';
-	}
-
+        	/*the address contains a port number*/
+        	*p = '\0';
+        	p++;
+        	port_str.s = p;
+        	port_str.len = strlen(p);
+        	LM_DBG("the port string is %s\n", p);
+        	if(str2int(&port_str, &port_no) != 0 ) {
+	        	LM_ERR("there is not a valid number port\n");
+	        	goto error;
+        	}
+        	*p = '\0';
+        }
+        
 	/* now IPv6 address has no brakets. It should be fixed! */
 	if (host_s[0] == '[') {
 		len = strlen(host_s + 1) - 1;
@@ -1928,95 +1771,6 @@ error:
 	return -1;
 }
 
-
-/**
- *
- */
-int siptrace_net_data_recv(void *data)
-{
-	sr_net_info_t *nd;
-	struct _siptrace_data sto;
-
-	if(data==0)
-		return -1;
-
-	nd = (sr_net_info_t*)data;
-	if(nd->rcv==NULL || nd->data.s==NULL || nd->data.len<=0)
-		return -1;
-
-	memset(&sto, 0, sizeof(struct _siptrace_data));
-
-	sto.body.s   = nd->data.s;
-	sto.body.len = nd->data.len;
-
-	siptrace_copy_proto(nd->rcv->proto, sto.fromip_buff);
-	strcat(sto.fromip_buff, ip_addr2a(&nd->rcv->src_ip));
-	strcat(sto.fromip_buff,":");
-	strcat(sto.fromip_buff, int2str(nd->rcv->src_port, NULL));
-	sto.fromip.s = sto.fromip_buff;
-	sto.fromip.len = strlen(sto.fromip_buff);
-
-	siptrace_copy_proto(nd->rcv->proto, sto.toip_buff);
-	strcat(sto.toip_buff, ip_addr2a(&nd->rcv->dst_ip));
-	strcat(sto.toip_buff,":");
-	strcat(sto.toip_buff, int2str(nd->rcv->dst_port, NULL));
-	sto.toip.s = sto.toip_buff;
-	sto.toip.len = strlen(sto.toip_buff);
-
-	sto.dir = "in";
-
-	trace_send_hep_duplicate(&sto.body, &sto.fromip, &sto.toip, NULL);
-	return 0;
-
-}
-
-/**
- *
- */
-int siptrace_net_data_send(void *data)
-{
-	sr_net_info_t *nd;
-	struct dest_info new_dst;
-	struct _siptrace_data sto;
-
-	if(data==0)
-		return -1;
-
-	nd = (sr_net_info_t*)data;
-	if(nd->dst==NULL || nd->data.s==NULL || nd->data.len<=0)
-		return -1;
-
-	new_dst=*nd->dst;
-	new_dst.send_sock=get_send_socket(0, &nd->dst->to, nd->dst->proto);
-
-	memset(&sto, 0, sizeof(struct _siptrace_data));
-
-	sto.body.s   = nd->data.s;
-	sto.body.len = nd->data.len;
-
-	if (unlikely(new_dst.send_sock==0)) {
-		LM_WARN("no sending socket found\n");
-		strcpy(sto.fromip_buff, "any:255.255.255.255:5060");
-	} else {
-		strncpy(sto.fromip_buff, new_dst.send_sock->sock_str.s,
-			new_dst.send_sock->sock_str.len);
-	}
-	sto.fromip.s = sto.fromip_buff;
-	sto.fromip.len = strlen(sto.fromip_buff);
-
-	siptrace_copy_proto(new_dst.send_sock->proto, sto.toip_buff);
-	strcat(sto.toip_buff, suip2a(&new_dst.to, sizeof(new_dst.to)));
-	strcat(sto.toip_buff,":");
-	strcat(sto.toip_buff, int2str((int)su_getport(&new_dst.to), NULL));
-	sto.toip.s = sto.toip_buff;
-	sto.toip.len = strlen(sto.toip_buff);
-
-	sto.dir = "out";
-
-	trace_send_hep_duplicate(&sto.body, &sto.fromip, &sto.toip, NULL);
-	return 0;
-}
-
 static void siptrace_rpc_status (rpc_t* rpc, void* c) {
 	str status = {0, 0};
 
@@ -2032,16 +1786,16 @@ static void siptrace_rpc_status (rpc_t* rpc, void* c) {
 
 	if (strncasecmp(status.s, "on", strlen("on")) == 0) {
 		*trace_on_flag = 1;
-		rpc->rpl_printf(c, "Enabled");
+		rpc->printf(c, "Enabled");
 		return;
 	}
 	if (strncasecmp(status.s, "off", strlen("off")) == 0) {
 		*trace_on_flag = 0;
-		rpc->rpl_printf(c, "Disabled");
+		rpc->printf(c, "Disabled");
 		return;
 	}
 	if (strncasecmp(status.s, "check", strlen("check")) == 0) {
-		rpc->rpl_printf(c, *trace_on_flag ? "Enabled" : "Disabled");
+		rpc->printf(c, *trace_on_flag ? "Enabled" : "Disabled");
 		return;
 	} 
 	rpc->fault(c, 500, "Bad parameter (on, off or check)");
@@ -2049,8 +1803,8 @@ static void siptrace_rpc_status (rpc_t* rpc, void* c) {
 }
 
 static const char* siptrace_status_doc[2] = {
-	"Get status or turn on/off siptrace. Parameters: on, off or check.",
-	0
+        "Get status or turn on/off siptrace. Parameters: on, off or check.",
+        0
 };
 
 rpc_export_t siptrace_rpc[] = {
@@ -2067,3 +1821,4 @@ static int siptrace_init_rpc(void)
 	}
 	return 0;
 }
+

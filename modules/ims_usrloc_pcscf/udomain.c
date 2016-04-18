@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -56,17 +56,8 @@
 #include "usrloc.h"
 #include "utime.h"
 #include "usrloc.h"
-#include "usrloc_db.h"
-#include "../../parser/parse_uri.h"
 
 #include "../../lib/ims/useful_defs.h"
-#include "../../modules/presence/presence.h"
-
-extern int db_mode;
-extern int db_mode_ext;
-extern unsigned int hashing_type;
-extern int lookup_check_received;
-extern int match_contact_host_port;
 
 #ifdef STATISTICS
 static char *build_stat_name( str* domain, char *var_name)
@@ -231,8 +222,6 @@ int mem_insert_pcontact(struct udomain* _d, str* _contact, struct pcontact_info*
 	}
 
 	sl = ((*_c)->aorhash) & (_d->size - 1);
-	(*_c)->sl = sl;
-        LM_DBG("Putting contact into slot [%d]\n", sl);
 	slot_add(&_d->table[sl], *_c);
 	update_stat(_d->contacts, 1);
 	return 0;
@@ -247,7 +236,7 @@ void mem_delete_pcontact(udomain_t* _d, struct pcontact* _c)
 
 void mem_timer_udomain(udomain_t* _d)
 {
-	struct pcontact* ptr, *tmp;
+	struct pcontact* ptr;
 	int i;
 
 	for(i=0; i<_d->size; i++)
@@ -257,20 +246,25 @@ void mem_timer_udomain(udomain_t* _d)
 		ptr = _d->table[i].first;
 
 		while(ptr) {
-		    tmp = ptr;
+			timer_pcontact(ptr);
+			/* Remove the entire record if it is empty */
+			//if (ptr->contacts == 0) {
+			//	t = ptr;
+			//	ptr = ptr->next;
+			//	mem_delete_pcontact(_d, t);
+			//}//// else {
+			//	ptr = ptr->next;
+			//}
 			ptr = ptr->next;
-		    timer_pcontact(tmp);
 		}
-		
 		unlock_ulslot(_d, i);
 	}
 }
 
-void lock_udomain(udomain_t* _d, str* via_host, unsigned short via_port, unsigned short via_proto)
+void lock_udomain(udomain_t* _d, str* _aor)
 {
 	unsigned int sl;
-	
-	sl = get_hash_slot(_d, via_host, via_port, via_proto);
+	sl = core_hash(_aor, 0, _d->size);
 
 #ifdef GEN_LOCK_T_PREFERED
 	lock_get(_d->table[sl].lock);
@@ -279,10 +273,10 @@ void lock_udomain(udomain_t* _d, str* via_host, unsigned short via_port, unsigne
 #endif
 }
 
-void unlock_udomain(udomain_t* _d, str* via_host, unsigned short via_port, unsigned short via_proto)
+void unlock_udomain(udomain_t* _d, str* _aor)
 {
 	unsigned int sl;
-	sl = get_hash_slot(_d, via_host, via_port, via_proto);
+	sl = core_hash(_aor, 0, _d->size);
 #ifdef GEN_LOCK_T_PREFERED
 	lock_release(_d->table[sl].lock);
 #else
@@ -309,7 +303,6 @@ void unlock_ulslot(udomain_t* _d, int i)
 #endif
 }
 
-//TODO: this should be removed...
 int update_rx_regsession(struct udomain* _d, str* session_id, struct pcontact* _c) {
 	if (session_id->len > 0 && session_id->s) {
 		if (_c->rx_session_id.len > 0 && _c->rx_session_id.s) {
@@ -329,13 +322,6 @@ int update_rx_regsession(struct udomain* _d, str* session_id, struct pcontact* _
 	return 0;
 }
 
-/**
- * assume locked before calling this - lock the contact slot...
- * @param _d
- * @param _ci
- * @param _c
- * @return 
- */
 int update_pcontact(struct udomain* _d, struct pcontact_info* _ci, struct pcontact* _c) //TODO: should prob move this to pcontact
 {
 	int is_default = 1;
@@ -354,10 +340,10 @@ int update_pcontact(struct udomain* _d, struct pcontact_info* _ci, struct pconta
 			for (i=0; i<_c->num_service_routes; i++) {
 				if (_c->service_routes[i].s)
 					shm_free(_c->service_routes[i].s);
+				shm_free(_c->service_routes);
+				_c->service_routes=0;
+				_c->num_service_routes=0;
 			}
-			shm_free(_c->service_routes);
-			_c->service_routes=0;
-			_c->num_service_routes=0;
 		}
 		//now add the new service routes
 		if (_ci->num_service_routes > 0) {
@@ -390,28 +376,16 @@ int update_pcontact(struct udomain* _d, struct pcontact_info* _ci, struct pconta
 		}
 	}
 
-	//update Rx reg session information
-	if (_ci->rx_regsession_id && _ci->rx_regsession_id->len>0 && _ci->rx_regsession_id->s) {
-		if (_c->rx_session_id.len > 0 && _c->rx_session_id.s) {
-			_c->rx_session_id.len = 0;
-			shm_free(_c->rx_session_id.s);
-		}
-		_c->rx_session_id.s = shm_malloc(_ci->rx_regsession_id->len);
-		if (!_c->rx_session_id.s) {
-			LM_ERR("no more shm_mem\n");
-			return -1;
-		}
-		memcpy(_c->rx_session_id.s, _ci->rx_regsession_id->s, _ci->rx_regsession_id->len);
-		_c->rx_session_id.len = _ci->rx_regsession_id->len;
+	// update received info (if info is available):
+	if (_ci->received_host.len > 0) {
+		if (_c->received_host.s)
+			shm_free(_c->received_host.s);
+		STR_SHM_DUP(_c->received_host, _ci->received_host, "update_pcontact");
 	}
+	if (_ci->received_port > 0) _c->received_port = _ci->received_port;
+	if (_ci->received_proto > 0) _c->received_proto = _ci->received_proto;
 
 	//TODO: update path, etc
-
-	if (db_mode == WRITE_THROUGH && db_update_pcontact(_c) != 0) {
-		LM_ERR("Error updating record in DB");
-		return -1;
-	}
-
 	run_ul_callbacks(PCSCF_CONTACT_UPDATE, _c);
 	return 0;
 
@@ -428,139 +402,65 @@ int insert_pcontact(struct udomain* _d, str* _contact, struct pcontact_info* _ci
     if (exists_ulcb_type(PCSCF_CONTACT_INSERT)) {
 		run_ul_create_callbacks(*_c);
 	}
-
-	if (db_mode == WRITE_THROUGH && db_insert_pcontact(*_c) != 0) {
-		LM_ERR("error inserting contact into db");
-		goto error;
-	}
-
     return 0;
 
 error:
     return -1;
 }
 
-/*
- * search for P-CSCF contact in usrloc
- * @udomain_t* _d - domain to search in
- * @str* _contact - contact to search for - should be a SIP URI
- * @struct pontact** _c - contact to return to if found (null if not found)
- * @return 0 if found <>0 if not
- */
-int get_pcontact(udomain_t* _d, pcontact_info_t* contact_info, struct pcontact** _c) {
-	unsigned int sl, i, aorhash, params_len, has_rinstance=0;
+int get_pcontact(udomain_t* _d, str* _contact, struct pcontact** _c) {
+	unsigned int sl, i, aorhash;
 	struct pcontact* c;
-	struct sip_uri needle_uri;
-        char *params, *sep;
-        str rinstance = {0, 0};
-        
-        LM_DBG("Searching for contact with AOR [%.*s] in P-CSCF usrloc based on VIA [%d://%.*s:%d] Received [%d://%.*s:%d], Search flag is %d\n",
-				contact_info->aor.len, contact_info->aor.s, contact_info->via_prot, contact_info->via_host.len, contact_info->via_host.s, contact_info->via_port,
-                contact_info->received_proto, contact_info->received_host.len, contact_info->received_host.s, contact_info->received_port, contact_info->searchflag);
-	
-            /* parse the uri in the NOTIFY */
-        if (contact_info->aor.len>0 && contact_info->aor.s){
-            LM_DBG("Have an AOR to search for\n");
-            if (parse_uri(contact_info->aor.s, contact_info->aor.len, &needle_uri) != 0) {
-                LM_ERR("Unable to parse contact aor in get_pcontact [%.*s]\n", contact_info->aor.len, contact_info->aor.s);
-                return 0;
-            }
-            LM_DBG("checking for rinstance");
-            /*check for alias - NAT */
-            params = needle_uri.sip_params.s;
-            params_len = needle_uri.sip_params.len;
 
-            while (params_len >= RINSTANCE_LEN) {
-                if (strncmp(params, RINSTANCE, RINSTANCE_LEN) == 0) {
-                    has_rinstance = 1;
-                    break;
-                }
-                sep = memchr(params, 59 /* ; */, params_len);
-                if (sep == NULL) {
-                    LM_DBG("no rinstance param\n");
-                    break;
-                } else {
-                    params_len = params_len - (sep - params + 1);
-                    params = sep + 1;
-                }
-            }
-            if (has_rinstance) {
-                rinstance.s = params + RINSTANCE_LEN;
-                rinstance.len = params_len - RINSTANCE_LEN;
-                sep = (char*)memchr(rinstance.s, 59 /* ; */, rinstance.len);
-                if (sep != NULL){
-                    rinstance.len = (sep-rinstance.s);
-                }
-                LM_DBG("rinstance found [%.*s]\n", rinstance.len, rinstance.s);
-            }
-        }
-             
-    
 	/* search in cache */
-	aorhash = get_aor_hash(_d, &contact_info->via_host, contact_info->via_port, contact_info->via_prot);
+	aorhash = core_hash(_contact, 0, 0);
 	sl = aorhash & (_d->size - 1);
-        
-        LM_DBG("get_pcontact slot is [%d]\n", sl);
 	c = _d->table[sl].first;
 
 	for (i = 0; i < _d->table[sl].n; i++) {
-            LM_DBG("comparing contact with aorhash [%u], aor [%.*s]\n", c->aorhash, c->aor.len, c->aor.s);
-            LM_DBG("  contact host [%.*s:%d]\n", c->contact_host.len, c->contact_host.s, c->contact_port);
-		LM_DBG("contact received [%d:%.*s:%d]\n", c->received_proto, c->received_host.len, c->received_host.s, c->received_port);
-
-		if ((c->aorhash == aorhash) && 
-				(((c->contact_host.len == contact_info->via_host.len) 
-				&& (memcmp(contact_info->via_host.s, c->contact_host.s, c->contact_host.len) == 0) 
-				&& (c->contact_port == contact_info->via_port)
-				&& !(contact_info->searchflag & SEARCH_RECEIVED)) 
-		|| ((contact_info->searchflag & SEARCH_RECEIVED)
-				&& ((c->received_host.len == contact_info->received_host.len) && (memcmp(c->received_host.s, contact_info->received_host.s, contact_info->received_host.len) == 0))
-				&& ((c->received_port == contact_info->received_port) || (c->contact_port == contact_info->received_port))))) { /*volte comes from a different port.... typically uses 4060*/
-			LM_DBG("found contact with URI [%.*s]\n", c->aor.len, c->aor.s);
-			if (has_rinstance) {
-				LM_DBG("confirming rinstance is the same - search has [%.*s] and proposed found contact has [%.*s]",
-						rinstance.len, rinstance.s,
-						c->rinstance.len, c->rinstance.s);
-				if ((rinstance.len == c->rinstance.len) && memcmp(rinstance.s, c->rinstance.s, rinstance.len) != 0) {
-					LM_DBG("rinstance does not match - no match here...\n");
-					c = c->next;
-					continue;
-				}
-			}
-			//finally check state being searched for
-			if ( (contact_info->reg_state != PCONTACT_ANY) && ((contact_info->reg_state & c->reg_state) == 0)) {
-				LM_DBG("can't find contact for requested reg state [%d] - (have [%d])\n", contact_info->reg_state, c->reg_state);
-				c = c->next;
-				continue;
-                        }
-                    *_c = c;
-                    return 0;
+		if ((c->aorhash == aorhash) && (c->aor.len == _contact->len)
+				&& !memcmp(c->aor.s, _contact->s, _contact->len)) {
+			*_c = c;
+			return 0;
 		}
-		
+
 		c = c->next;
 	}
-        
-        LM_DBG("contact not found in memory\n");
-        
 	return 1; /* Nothing found */
 }
 
-int update_security(udomain_t* _d, security_type _t, security_t* _s, struct pcontact* _c) {
-	if (db_mode == WRITE_THROUGH && db_update_pcontact_security(_c, _t, _s) != 0) {
-		LM_ERR("Error updating security for contact in DB\n");
-		return -1;
-	}
-	_c->security = _s;
-	return 0;
-}
+int get_pcontact_by_src(udomain_t* _d, str * _host, unsigned short _port, unsigned short _proto, struct pcontact** _c) {
+	int i;
+	struct pcontact* c;
 
-int update_temp_security(udomain_t* _d, security_type _t, security_t* _s, struct pcontact* _c) {
-	if (db_mode == WRITE_THROUGH && db_update_pcontact_security_temp(_c, _t, _s) != 0) {
-		LM_ERR("Error updating temp security for contact in DB\n");
-		return -1;
+	for(i=0; i<_d->size; i++)
+	{
+		c = _d->table[i].first;
+		while(c) {
+			LM_DBG("Port %d (search %d), Proto %d (search %d), reg_state %s (search %s)\n",
+				c->received_port, _port, c->received_proto, _proto, 
+				reg_state_to_string(c->reg_state), reg_state_to_string(PCONTACT_REGISTERED)
+				);
+			// First check, if Proto and Port matches:
+			if ((c->reg_state == PCONTACT_REGISTERED) && (c->received_port == _port) && (c->received_proto == _proto)) {
+				LM_DBG("Received host len %d (search %d)\n", c->received_host.len, _host->len);
+				// Then check the length:
+				if (c->received_host.len == _host->len) {
+					LM_DBG("Received host %.*s (search %.*s)\n",
+						c->received_host.len, c->received_host.s,
+						_host->len, _host->s);
+
+					// Finally really compare the "received_host"
+					if (!memcmp(c->received_host.s, _host->s, _host->len)) {
+						*_c = c;
+						return 0;
+					}
+				}
+			}
+			c = c->next;
+		}
 	}
-	_c->security_temp = _s;
-	return 0;
+	return 1; /* Nothing found */
 }
 
 
@@ -609,381 +509,17 @@ int assert_identity(udomain_t* _d, str * _host, unsigned short _port, unsigned s
 	return 0; /* Nothing found */
 }
 
-int delete_pcontact(udomain_t* _d, /*str* _aor, str* _received_host, int _received_port,*/ struct pcontact* _c)
+int delete_pcontact(udomain_t* _d, str* _aor, struct pcontact* _c)
 {
 	if (_c==0) {
-            return 0;
+		if (get_pcontact(_d, _aor, &_c) > 0) {
+			return 0;
+		}
 	}
-
 	if (exists_ulcb_type(PCSCF_CONTACT_DELETE)) {
 		run_ul_callbacks(PCSCF_CONTACT_DELETE, _c);
 	}
-
-	if (db_mode == WRITE_THROUGH && db_delete_pcontact(_c) != 0) {
-		LM_ERR("Error deleting contact from DB");
-		return -1;
-	}
-
 	mem_delete_pcontact(_d, _c);
 
 	return 0;
 }
-
-/*!
- * \brief Convert database values into pcontact_info
- *
- * Convert database values into pcontact_info,
- * expects 15 rows (aor, host, port, protocol, received, received_port, received_proto, rx_session_id_col
- * reg_state, expires, socket, service_routes_col, public_ids, path
- * \param vals database values
- * \param contact contact
- * \return pointer to the ucontact_info on success, 0 on failure
- */
-static inline pcontact_info_t* dbrow2info( db_val_t *vals, str *contact)
-{
-	static pcontact_info_t ci;
-	static str host, received, path, rx_session_id, implicit_impus, tmpstr, service_routes;
-	static str *impu_list, *service_route_list;
-	int flag=0, n;
-	char *p, *q=0;
-
-	memset( &ci, 0, sizeof(pcontact_info_t));
-
-        host.s = (char*) VAL_STRING(vals + 1);
-	if (VAL_NULL(vals+1) || !host.s || !host.s[0]) {
-		host.len = 0;
-		host.s = 0;
-	} else {
-		host.len = strlen(host.s);
-	}
-	ci.via_host = host;
-        ci.via_port = VAL_INT(vals + 2);
-        ci.via_prot = VAL_INT(vals + 3);
-	received.s = (char*) VAL_STRING(vals + 4);
-	if (VAL_NULL(vals+4) || !received.s || !received.s[0]) {
-		LM_DBG("Empty received for contact [%.*s]....\n", contact->len, contact->s);	/*this could happen if you have been notified about a contact from S-CSCF*/
-		received.len = 0;
-		received.s = 0;
-	} else {
-		received.len = strlen(received.s);
-	}
-	ci.received_host = received;
-	ci.received_port = VAL_INT(vals + 5);
-	ci.received_proto = VAL_INT(vals + 6);
-
-	rx_session_id.s = (char*) VAL_STRING(vals + 7);
-	if (VAL_NULL(vals+7) || !rx_session_id.s || !rx_session_id.s[0]) {
-		rx_session_id.len = 0;
-		rx_session_id.s = 0;
-	} else {
-		rx_session_id.len = strlen(rx_session_id.s);
-	}
-	ci.rx_regsession_id = &rx_session_id;
-	if (VAL_NULL(vals + 8)) {
-		LM_ERR("empty registration state in DB\n");
-		return 0;
-	}
-	ci.reg_state = VAL_INT(vals + 8);
-	
-        if (VAL_NULL(vals + 9)) {
-		LM_ERR("empty expire\n");
-		return 0;
-	}
-	ci.expires = VAL_TIME(vals + 9);
-	path.s  = (char*)VAL_STRING(vals+13);
-		if (VAL_NULL(vals+13) || !path.s || !path.s[0]) {
-			path.len = 0;
-			path.s = 0;
-		} else {
-			path.len = strlen(path.s);
-		}
-	ci.path = &path;
-
-	//public IDs - implicit set
-	implicit_impus.s = (char*) VAL_STRING(vals + 12);
-	if (!VAL_NULL(vals + 12) && implicit_impus.s && implicit_impus.s[0]) {
-		//how many
-		n=0;
-		p = implicit_impus.s;
-		while (*p) {
-			if ((*p) == '<') {
-				n++;
-			}
-			p++;
-		}
-		impu_list = pkg_malloc(sizeof(str) * n);
-
-		n=0;
-		p = implicit_impus.s;
-		while (*p) {
-			if (*p == '<') {
-				q = p + 1;
-				flag = 1;
-			}
-			if (*p == '>') {
-				if (flag) {
-					tmpstr.s = q;
-					tmpstr.len = p - q;
-					impu_list[n++] = tmpstr;
-				}
-				flag = 0;
-			}
-			p++;
-		}
-		ci.num_public_ids = n;
-		ci.public_ids = impu_list;
-	}
-
-	//service routes
-	service_routes.s = (char*) VAL_STRING(vals + 11);
-	if (!VAL_NULL(vals + 11) && service_routes.s && service_routes.s[0]) {
-		//how many
-		n = 0;
-		p = service_routes.s;
-		while (*p) {
-			if ((*p) == '<') {
-				n++;
-			}
-			p++;
-		}
-		service_route_list = pkg_malloc(sizeof(str) * n);
-
-		n = 0;
-		p = service_routes.s;
-		while (*p) {
-			if (*p == '<') {
-				q = p + 1;
-				flag = 1;
-			}
-			if (*p == '>') {
-				if (flag) {
-					tmpstr.s = q;
-					tmpstr.len = p - q;
-					service_route_list[n++] = tmpstr;
-				}
-				flag = 0;
-			}
-			p++;
-		}
-		ci.num_service_routes = n;
-		ci.service_routes = service_route_list;
-	}
-
-	return &ci;
-}
-
-/*!
- * \brief Load all records from a udomain
- *
- * Load all records from a udomain, useful to populate the
- * memory cache on startup.
- * \param _c database connection
- * \param _d loaded domain
- * \return 0 on success, -1 on failure
- */
-int preload_udomain(db1_con_t* _c, udomain_t* _d)
-{
-	pcontact_info_t *ci;
-	db_row_t *row;
-	db_key_t columns[15];
-	db1_res_t* res = NULL;
-	str aor;
-	int i, n;
-
-	pcontact_t* c;
-
-	LM_DBG("pre-loading domain from DB\n");
-
-	columns[0] = &domain_col;
-	columns[1] = &aor_col;
-        columns[2] = &host_col;
-        columns[3] = &port_col;
-        columns[4] = &protocol_col;
-	columns[5] = &received_col;
-	columns[6] = &received_port_col;
-	columns[7] = &received_proto_col;
-	columns[8] = &rx_session_id_col;
-	columns[9] = &reg_state_col;
-	columns[10] = &expires_col;
-	columns[11] = &socket_col;
-	columns[12] = &service_routes_col;
-	columns[13] = &public_ids_col;
-	columns[14] = &path_col;
-
-	if (ul_dbf.use_table(_c, _d->name) < 0) {
-		LM_ERR("sql use_table failed\n");
-		return -1;
-	}
-
-#ifdef EXTRA_DEBUG
-	LM_NOTICE("load start time [%d]\n", (int)time(NULL));
-#endif
-
-	if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
-		if (ul_dbf.query(_c, 0, 0, 0, columns, 0, 15, 0, 0) < 0) {
-			LM_ERR("db_query (1) failed\n");
-			return -1;
-		}
-		if(ul_dbf.fetch_result(_c, &res, ul_fetch_rows)<0) {
-			LM_ERR("fetching rows failed\n");
-			return -1;
-		}
-	} else {
-		if (ul_dbf.query(_c, 0, 0, 0, columns, 0, 15, 0, &res) < 0) {
-			LM_ERR("db_query failed\n");
-			return -1;
-		}
-	}
-
-	if (RES_ROW_N(res) == 0) {
-		LM_DBG("table is empty\n");
-		ul_dbf.free_result(_c, res);
-		return 0;
-	}
-
-	LM_DBG("%d rows returned in preload\n", RES_ROW_N(res));
-
-	n = 0;
-	do {
-		LM_DBG("loading records - cycle [%d]\n", ++n);
-		for(i = 0; i < RES_ROW_N(res); i++) {
-			row = RES_ROWS(res) + i;
-
-			aor.s = (char*) VAL_STRING(ROW_VALUES(row) + 1);
-			if (VAL_NULL(ROW_VALUES(row) + 1) || aor.s == 0 || aor.s[0] == 0) {
-				LM_CRIT("empty aor record in table %s...skipping\n", _d->name->s);
-				continue;
-			}
-			aor.len = strlen(aor.s);
-                        ci = dbrow2info(ROW_VALUES(row) + 1, &aor);
-                        if (!ci) {
-                            LM_WARN("Failed to get contact info from DB.... continuing...\n");
-                            continue;
-                        }
-			lock_udomain(_d, &ci->via_host, ci->via_port, ci->via_prot);
-
-			if ( (mem_insert_pcontact(_d, &aor, ci, &c)) != 0) {
-				LM_ERR("inserting contact failed\n");
-				unlock_udomain(_d, &ci->via_host, ci->via_port, ci->via_prot);
-				goto error1;
-			}
-                        //c->flags = c->flags|(1<<FLAG_READFROMDB);
-                        //TODO: need to subscribe to s-cscf for first public identity
-			unlock_udomain(_d, &ci->via_host, ci->via_port, ci->via_prot);
-		}
-
-		if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
-			if(ul_dbf.fetch_result(_c, &res, ul_fetch_rows)<0) {
-				LM_ERR("fetching rows (1) failed\n");
-				ul_dbf.free_result(_c, res);
-				return -1;
-			}
-		} else {
-			break;
-		}
-	} while(RES_ROW_N(res)>0);
-
-	ul_dbf.free_result(_c, res);
-
-#ifdef EXTRA_DEBUG
-	LM_NOTICE("load end time [%d]\n", (int)time(NULL));
-#endif
-
-	return 0;
-error1:
-	free_pcontact(c);
-
-	ul_dbf.free_result(_c, res);
-	return -1;
-}
-
-pcontact_t* db_load_pcontact(db1_con_t* _c, udomain_t* _d, str *_aor)
-{
-	pcontact_info_t *ci;
-	db_key_t columns[15];
-	db_key_t keys[1];
-	db_val_t vals[1];
-	db1_res_t* res = NULL;
-	db_row_t *row;
-	int i;
-        str aor;
-
-	pcontact_t* c;
-
-	keys[0] = &aor_col;
-	vals[0].type = DB1_STR;
-	vals[0].nul = 0;
-	vals[0].val.str_val = *_aor;
-
-        columns[0] = &domain_col;
-	columns[1] = &aor_col;
-        columns[2] = &host_col;
-        columns[3] = &port_col;
-        columns[4] = &protocol_col;
-	columns[5] = &received_col;
-	columns[6] = &received_port_col;
-	columns[7] = &received_proto_col;
-	columns[8] = &rx_session_id_col;
-	columns[9] = &reg_state_col;
-	columns[10] = &expires_col;
-	columns[11] = &socket_col;
-	columns[12] = &service_routes_col;
-	columns[13] = &public_ids_col;
-	columns[14] = &path_col;
-        
-        LM_DBG("Querying database for P-CSCF contact [%.*s]\n", _aor->len, _aor->s);
-        
-	if (ul_dbf.use_table(_c, _d->name) < 0) {
-		LM_ERR("failed to use table %.*s\n", _d->name->len, _d->name->s);
-		return 0;
-	}
-
-	if (ul_dbf.query(_c, keys, 0, vals, columns, 1, 15, 0, &res) < 0) {
-		LM_ERR("db_query failed\n");
-		return 0;
-	}
-
-	if (RES_ROW_N(res) == 0) {
-		LM_DBG("aor %.*s not found in table %.*s\n",_aor->len, _aor->s, _d->name->len, _d->name->s);
-		ul_dbf.free_result(_c, res);
-		return 0;
-	}
-
-	for(i = 0; i < RES_ROW_N(res); i++) {
-                        row = RES_ROWS(res) + i;
-
-			aor.s = (char*) VAL_STRING(ROW_VALUES(row) + 1);
-			if (VAL_NULL(ROW_VALUES(row) + 1) || aor.s == 0 || aor.s[0] == 0) {
-				LM_CRIT("empty aor record in table %s...skipping\n", _d->name->s);
-				continue;
-			}
-			aor.len = strlen(aor.s);
-                        ci = dbrow2info(ROW_VALUES(row) + 1, &aor);
-                        if (!ci) {
-                            LM_WARN("Failed to get contact info from DB.... continuing...\n");
-                            continue;
-                        }
-			lock_udomain(_d, &ci->via_host, ci->via_port, ci->via_prot);
-
-			if ( (mem_insert_pcontact(_d, &aor, ci, &c)) != 0) {
-				LM_ERR("inserting contact failed\n");
-				unlock_udomain(_d, &ci->via_host, ci->via_port, ci->via_prot);
-				goto error;
-			}
-                        //c->flags = c->flags|(1<<FLAG_READFROMDB);
-                        //TODO: need to subscribe to s-cscf for first public identity
-			unlock_udomain(_d, &ci->via_host, ci->via_port, ci->via_prot);
-	}
-
-	ul_dbf.free_result(_c, res);
-
-	return c;
-
-error:
-        free_pcontact(c);
-
-	ul_dbf.free_result(_c, res);
-	return 0;
-}
-
-

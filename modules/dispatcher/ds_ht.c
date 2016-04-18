@@ -1,4 +1,6 @@
 /**
+ * $Id$
+ *
  * Copyright (C) 2010 Daniel-Constantin Mierla (asipto.com)
  *
  * This file is part of kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <stddef.h>
@@ -103,7 +105,7 @@ ds_ht_t *ds_ht_init(unsigned int htsize, int expire, int initexpire)
 	{
 		if(lock_init(&dsht->entries[i].lock)==0)
 		{
-			LM_ERR("cannot initialize lock[%d]\n", i);
+			LM_ERR("cannot initalize lock[%d]\n", i);
 			i--;
 			while(i>=0)
 			{

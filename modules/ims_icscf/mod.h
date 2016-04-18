@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
  
@@ -69,7 +69,7 @@
 #include "location.h"
 #include "../../sr_module.h"
 #include "../../modules/tm/tm_load.h"
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "../cdp_avp/mod_export.h"
 
 #define MOD_NAME "ims_icscf"

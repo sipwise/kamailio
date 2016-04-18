@@ -18,19 +18,19 @@
 	<para>
 		This module offers SIP load balancer functionality and it can be
 		used as SIP traffic dispatcher. There are many load balancing and
-		traffic dispaching algorithms that you can choose from, for example:
+		traffic dispaching algorithms that you can choose from, like:
 		round-robin, weight based load balancing, call load distribution,
-		and hashing over SIP message attributes.
+		hashing over SIP message attributes.
 	</para>
 	<para>
-		The module can be used as a stateless load balancer; it does not
+		The module can be used as a stateless load balancer, it does not
 		depend on any call state tracking module. It requires the TM module if
 		you enable auto-discovery of active/inactive gateways.
 	</para>
 	<para>
 		It is very lightweight, therefore suitable for handling heavy SIP
-		traffic. As the module has a small footprint and the ability to load 
-		balancing rules from a plain text file, it is suitable for embedded systems.
+		traffic. The module has a small footprint and ability to load balancing rules
+		from a text plain file makes it suitable for embedded systems.
 	</para>
 	</section>
 	<section>
@@ -421,30 +421,6 @@ modparam("dispatcher", "force_dst", 1)
  </programlisting>
  		</example>
  	</section>
-	<section id="dispatcher.p.sock_avp">
-		<title><varname>sock_avp</varname> (str)</title>
-		<para>
-			The name of the avp which will hold the list with the sockets associated to the addresses stored in dst_avp avp.
-		</para>
-		<note>
-		<para>
-			If you want to do load balancing fail over, you have to set this parameter to use the correct socket for each gateway.
-		</para>
-		</note>
-		<para>
-		<emphasis>
-			Default value is <quote>null</quote> - don't add AVPs.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set the <quote>sock_avp</quote> parameter</title>
- <programlisting format="linespecific">
- ...
- modparam("dispatcher", "sock_avp", "$avp(dssocket)")
- ...
- </programlisting>
-		</example>
-	</section>
  	<section id="dispatcher.p.hash_pvar">
  		<title><varname>hash_pvar</varname> (str)</title>
  		<para>
@@ -598,50 +574,20 @@ modparam("dispatcher", "force_dst", 1)
  		</emphasis>
  		</para>
  		<example>
- 		<title>Set the <quote>ds_probing_threshold</quote> parameter</title>
+ 		<title>Set the <quote>ds_probing_threshhold</quote> parameter</title>
  <programlisting format="linespecific">
  ...
- modparam("dispatcher", "ds_probing_threshold", 10)
+ modparam("dispatcher", "ds_probing_threshhold", 10)
  ...
  </programlisting>
  		</example>
 	</section>
-	<section id="dispatcher.p.ds_inactive_threshold">
-                <title><varname>ds_inactive_threshold</varname> (int)</title>
-                <para>
-                If you want to set a gateway into active mode (after being inactive), there can be
-                a specific number of successful requests until it will change from "inactive"
-                to "active". The number of attempts can be set with this parameter.
-                This parameter can be modified via ser config framework.
-                </para>
-                <para>
-                <emphasis>
-                Default value is <quote>1</quote> (set active with first success).
-                </emphasis>
-                </para>
-                <example>
-                <title>Set the <quote>ds_inactive_threshold</quote> parameter</title>
- <programlisting format="linespecific">
- ...
- modparam("dispatcher", "ds_inactive_threshold", 10)
- ...
- </programlisting>
-                </example>
-        </section>
  	<section id="dispatcher.p.ds_ping_reply_codes">
  		<title><varname>ds_ping_reply_codes</varname> (string)</title>
  		<para>
 		This parameter defines the valid response codes, which are accepted as a valid reply to the PING-Method.
 		It is a list separated by colons, whery you may define either a single code (e.g. "code=202" would accept 202 as an additional, valid response) or a class of responses, you want to accept (e.g. "class=2" would accept everything from 200 to 299 as valid response).
 		This parameter can be modified via ser config framework.
- 		</para>
- 		<para>
-			Please note that the response codes the module accepts as valid reply to the
-			PING-Method are not only the ones generated from the remote servers, but also those
-			that are generated locally. E.g.: setting code=408 or class=400 will never set
-			a backend down even if it is, because internally the Kamailio transaction layer
-			generates a 408 in the case of no response from the remote server, and this 
-			internal code 408 is accepted as vaild value.
  		</para>
  		<para>
  		<emphasis>
@@ -660,28 +606,12 @@ modparam("dispatcher", "force_dst", 1)
  	<section id="dispatcher.p.ds_probing_mode">
  		<title><varname>ds_probing_mode</varname> (int)</title>
  		<para>
-		Controls what gateways are tested to see if they are reachable. 
-		</para>
-
-		<itemizedlist>
-		<listitem>
-			<para>Value 0: If set to 0, only the gateways with state PROBING are tested.
-                              After a gateway is probed, the PROBING state is cleared in this mode.</para>
-		</listitem>
-		<listitem>
-			<para>Value 1: If set to 1, all gateways are tested.  If set to 1 and there is a failure of keepalive
-		    		to an active gateway, then it is set to TRYING state.</para>
-		</listitem>
-		<listitem>
-			<para>Value 2: if set to 2, only gateways in inactive state with probing mode set are tested.</para>
-		</listitem>
-		<listitem>
-			<para>Value 3: If set to 3, any gateway with state PROBING is continually probed
- 				without modifying/removing the PROBING state.  This allows selected gateways
-				to be probed continually, regardless of state changes.</para>
-		</listitem>
-		</itemizedlist>
-
+		Controls what gateways are tested to see if they are reachable. If set
+		to 0, only the gateways with state PROBING are tested; if set to 1, all
+		gateways are tested; if set to 2, only gateways in inactive state with
+		probing mode set are tested. If set to 1 and there is a failure of keepalive
+		to an active gateway, then it is set to TRYING state.
+ 		</para>
  		<para>
  		<emphasis>
  			Default value is <quote>0</quote>.
@@ -801,74 +731,13 @@ modparam("dispatcher", "force_dst", 1)
  		</example>
 	</section>
 
-	<section id="dispatcher.p.ds_default_socket">
-		<title><varname>ds_default_socket</varname> (str)</title>
-		<para>
-			Default socket to be used for sending pings and dispatching requests
-			when a gateway has no send socket configured.
-		</para>
-		<para>
-		<emphasis>
-			By default no default socket is defined, the first configuration
-			script <emphasis>listen</emphasis> directive is used.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set the <quote>ds_default_socket</quote> parameter</title>
- <programlisting format="linespecific">
- ...
- modparam("dispatcher", "ds_default_socket", "udp:192.168.0.125:5060")
- ...
- </programlisting>
-		</example>
-	</section>
-
- 	<section id="dispatcher.p.ds_timer_mode">
- 		<title><varname>ds_timer_mode</varname> (int)</title>
- 		<para>
-			Specify the timer process to be used by the module for
-			keepalives and active dialogs tracking. 
-		</para>
-		<para>
-			It can be set to:
-		</para>
-		<itemizedlist>
-		<listitem>
-			<para>0 - use main timer process.</para>
-		</listitem>
-		<listitem>
-			<para>1 - use secondary timer process.</para>
-		</listitem>
-		</itemizedlist>
-
- 		<para>
-			On a server with a lot of traffic, using secondary
-			timer can help with performances, because the main timer
-			can be overloaded by taking care of transactions retransmissions
-			and expirations of items in memory.
-		</para>
-		<para>
- 		<emphasis>
- 			Default value is <quote>0</quote>.
- 		</emphasis>
- 		</para>
- 		<example>
- 		<title>Set the <quote>ds_timer_mode</quote> parameter</title>
- <programlisting format="linespecific">
- ...
- modparam("dispatcher", "ds_timer_mode", 1)
- ...
- </programlisting>
- 		</example>
-	</section>
-
 	</section>
 
 	<section>
 	<title>Functions</title>
 	<section id="dispatcher.f.ds_select_dst">
 		<title>
-		<function moreinfo="none">ds_select_dst(set, alg[, limit])</function>
+		<function moreinfo="none">ds_select_dst(set, alg)</function>
 		</title>
 		<para>
 		The method selects a destination from addresses set. It returns true if
@@ -878,9 +747,9 @@ modparam("dispatcher", "force_dst", 1)
 		</para>
 		<para>
 		If the bit 2 in 'flags' parameter is set, the rest of the addresses from
-		the destination set is stored in AVP list (limited with an optional 'limit'
-		parameter). You can use 'ds_next_dst()' to use next address in order to
-		achieve serial forking to all possible destinations.
+		the destination set is stored in AVP list. You can use 'ds_next_dst()'
+		to use next address in order to achieve serial forking to all possible
+		destinations.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>
@@ -933,7 +802,7 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			<listitem>
 				<para>
-				<quote>6</quote> - random destination (using rand()).
+				<quote>6</quote> - random (using rand()).
 				</para>
 			</listitem>
 			<listitem>
@@ -944,8 +813,7 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			<listitem>
 				<para>
-				<quote>8</quote> - select destination sorted by priority
-				attribute value (serial forking ordered by priority).
+				<quote>8</quote> - use first destination (good for failover).
 				</para>
 			</listitem>
 			<listitem>
@@ -982,38 +850,12 @@ modparam("dispatcher", "force_dst", 1)
 			</listitem>
 			<listitem>
 				<para>
-				<quote>11</quote> - use relative weight based load distribution.
-				You have to set the attribute 'rweight' per each address in
-				destination set. Active host usage probability is 
-				rweight/(SUM of all active host rweights in destination group). 
-				</para>
-				<para>
-				The major difference from the weight distribution is the
-				probability recalculation according to rweight value in case of 
-				host enabling/disabling
-				</para>
-				<para>
-				For example, 100 calls in 3-hosts group with rweight params 1/2/1  
-				will be distributed as 25/50/25. After third host failing 
-				distribution will be changed to 33/67/0.
-				</para>
-			</listitem>
-			<listitem>
-				<para>
 				<quote>X</quote> - if the algorithm is not implemented, the
 				first entry in set is chosen.
 				</para>
 			</listitem>
 			</itemizedlist>
 		</listitem>
-		<listitem>
-			<para>
-			<emphasis>limit</emphasis> - the maximum number of items to be
-			stored in AVP list for further failovers (the first selected
-			destination and default destination are the first to be put in
-			the list)
-                        </para>
-                </listitem>
 		</itemizedlist>
 		<para>
 		If the bit 2 in 'flags' is set, the rest of the addresses from the
@@ -1033,14 +875,12 @@ ds_select_dst("1", "0");
 $var(a) = 4;
 ds_select_dst("1", "$var(a)");
 ...
-ds_select_dst("1", "4", "3");
-...
 </programlisting>
 		</example>
 	</section>
   	<section id="dispatcher.f.ds_select_domain">
  		<title>
- 		<function moreinfo="none">ds_select_domain(set, alg[, limit])</function>
+ 		<function moreinfo="none">ds_select_domain(set, alg)</function>
  		</title>
  		<para>
  		The method selects a destination from addresses set and rewrites the
@@ -1049,9 +889,9 @@ ds_select_dst("1", "4", "3");
  		</para>
 		<para>
 		If the bit 2 in 'flags' is set, the rest of the addresses from the
-		destination set is stored in AVP list (limited with an optional 'limit'
-                parameter). You can use 'ds_next_domain()' to use next address to
-		achieve serial forking to all possible destinations.
+		destination set is stored in AVP list. You can use 'ds_next_domain()'
+		to use next address to achieve serial forking to all possible
+		destinations.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
@@ -1142,101 +982,30 @@ failure_route[tryagain] {
 </programlisting>
 		</example>
  	</section>
-  	<section  id="dispatcher.f.ds_list_exist">
- 		<title>
-		<function moreinfo="none">ds_list_exist(groupid)</function>
- 		</title>
- 		<para>
-		Check if a specific group is defined in dispatcher list
-		or database.
-		</para>
-		<itemizedlist>
-		<listitem>
-			<para><emphasis>groupid</emphasis> - A group ID to check.
-			</para>
-		</listitem>
-		</itemizedlist>
-		<para>
-			This function can be used from ANY_ROUTE.
-		</para>
-		<example>
-		<title><function>ds_list_exist</function> usage</title>
-		<programlisting format="linespecific">
-...
-if(ds_list_exist("10")) {
-    ...
-}
-...
-</programlisting>
-	</example>
-	</section>
   	<section  id="dispatcher.f.ds_is_from_list">
  		<title>
-		<function moreinfo="none">ds_is_from_list([groupid [, mode [, uri] ] ])</function>
+ 		<function moreinfo="none">ds_is_from_list([groupid])</function>
  		</title>
  		<para>
-		This function returns true, if there is a match of source address or uri
-		with an address in the given group of the dispatcher-list; otherwise false.
-		</para>
-		<para>Description of parameters:</para>
-		<itemizedlist>
-		<listitem>
-			<para><emphasis>groupid</emphasis> (optional) - if not given or its
-				value is -1, the matching will be done over all addresses in
-				all dispacher groups. Otherwise the matching will be done only
-				against the addresses in the specific group id. The parameter
-				can be an integer or a variable holding an integer value.
-			</para>
-		</listitem>
-		<listitem>
-			<para><emphasis>mode</emphasis> - (optional) - a bitmask to specify
-				how the matching should be done. If is 0, all ip, port and
-				proto are matched. If bit one is set, then port is ignored.
-				If bit two is set, then protocol is ignored. The parameter
-				can be an integer or a variable holding an integer value.
-				It must be provided if the uri parameter is provided.
-			</para>
-		</listitem>
-        <listitem>
-            <para><emphasis>uri</emphasis> (optional) - if is empty or missing,
-                the matching is done against source IP, port and protocol.
-                Otherwise the value has to be a valid SIP URI, used to match
-                against addresses in the dispatcher list. Only IP, port and
-                protocol are matches, any additional parameters are ignored.
-                The parameter can be a static or dynamic (with variables)
-                string. The domain part of the URI can be an IP address or
-                a hostname.
-            </para>
-        </listitem>
-		</itemizedlist>
-
-		<para>
-		Upon a match, the variable specified by 'setid_pvname' parameter will
-		be set to groupid of matching address and the attributes will be set in
-		variable specified by 'attrs_pvname'.
+		This function returns true, if the current request comes from a host
+		in the given group of the dispatcher-list; otherwise false.
  		</para>
 		<para>
-		Note that for backward compatibility mode, when no parameter is given
-		or only groupid is given, the matching is done only for IP address
-		and port (protocol is ignored).
+		Parameter groupid is optional, when it is missing, then the matching
+		will be done against all addresses in all groups. Upon a match, the
+		variable specified by 'setid_pvname' parameter will be set to groupid
+		of matching address and the attributes will be set in variable
+		specified by 'attrs_pvname'. The parameter can be an integer or a
+		variable holding an integer value.
  		</para>
 		<para>
 			This function can be used from ANY_ROUTE.
 		</para>
 		<example>
-		<title><function>ds_is_from_list</function> usage</title>
+		<title><function>ds_mark_dst</function> usage</title>
 		<programlisting format="linespecific">
 ...
-if(ds_is_from_list()) {
-    ...
-}
 if(ds_is_from_list("10")) {
-    ...
-}
-if(ds_is_from_list("10", "3")) {
-    ...
-}
-if(ds_is_from_list("10", "3", "sip:127.0.0.1:5080")) {
     ...
 }
 ...
@@ -1394,7 +1163,7 @@ onreply_route {
     </section>
 
 	<section>
-	<title>RPC Commands</title>
+	<title>Exported RPC Commands</title>
 	<section id="dispatcher.rpc.set_state">
 		<title>
 		<function moreinfo="none">dispatcher.set_state</function>
@@ -1474,44 +1243,9 @@ onreply_route {
 		</programlisting>
     </section>
 
-	<section id="dispatcher.rpc.ping_active">
-		<title>
-		<function moreinfo="none">dispatcher.ping_active</function>
-		</title>
-		<para>
-		Sets the global state for sending keepalive requests to destinations.
-		</para>
-		<para>
-		Name: <emphasis>dispatcher.ping_active</emphasis>
-		</para>
-		<para>Parameters:</para>
-		<itemizedlist>
-			<listitem><para>_state_ : state of sending keepalives</para>
-			    <itemizedlist>
-	               <listitem><para> <quote>0</quote>: inactive (don't send)</para></listitem>
-			       <listitem><para> <quote>1</quote>: active (send)</para></listitem>
-				</itemizedlist>
-			</listitem>
-		</itemizedlist>
-		<para>
-			If the state parameter is missing, the current state is returned.
-			When state is changed, new and old values of the state are returned.
-			Default value for state is 1.
-		</para>
-		<para>
-		Example:
-		</para>
-<programlisting  format="linespecific">
-...
-# prototype: &kamcmd; dispatcher.ping_active _state_
-&kamcmd; dispatcher.ping_active 0
-...
-</programlisting>
-    </section>
-
    </section>
 
-	<section id="dispatcher.ex.install">
+	<section>
 	<title>Installation and Running</title>
 	<section>
 		<title>Destination List File</title>
@@ -1537,52 +1271,11 @@ onreply_route {
 			is done the initial ordering inside the set)</para>
 			</listitem>
 			<listitem>
-			<para>attributes: extra fields in form of
-				name1=value1;...;nameN=valueN.
-			</para>
+			<para>attributes: extra filed in form of
+			name1=value1;...;nameN=valueN. There are some predefined names
+			that are used of weight and call load dispatching.</para>
 			</listitem>
 		</itemizedlist>
-		<section id="dispatcher.ex.attributes">
-			<title>Special Attributes</title>
-			<para>
-			There are some predefined names:
-			<itemizedlist>
-				<listitem>
-					'duid' - used for call load dispatching. It must be an
-					unique value to identify a destination (gateway address).
-					Practically the load within the group is associated with
-					this value.
-				</listitem>
-				<listitem>
-					'maxload' - used for call load dispatching. It must be
-					a positive integer, defining the upper limit of active
-					calls per destination. When the limit is reached, then
-					the gateway is no longer selected for new calls until
-					an exiting call via that gateway is terminated. If set
-					to 0, then no active call limit is used.
-				</listitem>
-				<listitem>
-					'weight' - used for weight based load distribution. It
-					must be set to a positive integer value beteen 0 and
-					100. The value represents the percent of calls to be
-					sent to that gateways.
-				</listitem>
-				<listitem>
-					'rweight' - used for relative weight based load 
-					distribution. It must be set to a positive integer value 
-					between 1 and 100 (otherwise host will be excluded from 
-					relative weight distribution type). 
-				</listitem>
-				<listitem>
-					'socket' - used to set the sending socket for the gateway.
-					It is used for sending the SIP traffic as well as
-					OPTIONS keepalives.
-				</listitem>
-			</itemizedlist>
-		</para>
-		</section>
-		<section id="dispatcher.ex.fileforma">
-			<title>File Format</title>
 		<para>
 		Line format is:
 		</para>
@@ -1597,7 +1290,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 		</para>
 		<programlisting format="linespecific">
 ...
-1 sip:127.0.0.1:5080 0 0 duid=abc;socket=udp:192.168.0.125:5060;my=xyz
+1 sip:127.0.0.1:5080 0 0 duid=abc;my=xyz
 ...
 </programlisting>
 
@@ -1614,9 +1307,8 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 </programlisting>
 		</example>
 		</section>
-		</section>
 	
-		<section id="dispatcher.ex.config">
+		<section>
 		<title>&kamailio; config file</title>
 		<para>
 		Next picture shows a sample usage of the dispatcher module.
@@ -1632,7 +1324,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 	</section>
 	</section>
 
-        <section id="dispatcher.ex.event_routes">
+        <section>
         <title>Event routes</title>
         <section>
                 <title>

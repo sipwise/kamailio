@@ -1,4 +1,6 @@
 /* 
+ * $Id$ 
+ *
  * MySQL module interface
  *
  * Copyright (C) 2001-2003 FhG Fokus
@@ -18,7 +20,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+/*
+ * History:
+ * --------
+ *  2003-03-11  updated to the new module exports interface (andrei)
+ *  2003-03-16  flags export parameter added (janakj)
  */
 
 /*! \file
@@ -38,12 +46,11 @@
 #include "km_dbase.h"
 #include "km_db_mysql.h"
 
-#include <mysql.h>
+#include <mysql/mysql.h>
 
 unsigned int db_mysql_timeout_interval = 2;   /* Default is 6 seconds */
 unsigned int db_mysql_auto_reconnect = 1;     /* Default is enabled   */
 unsigned int db_mysql_insert_all_delayed = 0; /* Default is off */
-unsigned int db_mysql_update_affected_found = 0; /* Default is off */
 
 /* MODULE_VERSION */
 
@@ -112,8 +119,6 @@ int db_mysql_bind_api(db_func_t *dbb)
 	dbb->start_transaction= db_mysql_start_transaction;
 	dbb->end_transaction  = db_mysql_end_transaction;
 	dbb->abort_transaction= db_mysql_abort_transaction;
-	dbb->raw_query_async  = db_mysql_raw_query_async;
-	dbb->insert_async     = db_mysql_insert_async;
 
 	return 0;
 }

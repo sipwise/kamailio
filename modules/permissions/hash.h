@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef _PERM_HASH_H_
@@ -41,9 +41,7 @@ struct trusted_list {
 	str src_ip;                 /* Source IP of SIP message */
 	int proto;                  /* Protocol -- UDP, TCP, TLS, or SCTP */
 	char *pattern;              /* Pattern matching From header field */
-	char *ruri_pattern;         /* Pattern matching Request URI */
 	str tag;                    /* Tag to be assigned to AVP */
-	int priority;               /* priority */
 	struct trusted_list *next;  /* Next element in the list */
 };
 
@@ -79,16 +77,16 @@ void destroy_hash_table(struct trusted_list** table);
 
 
 /* 
- * Add <src_ip, proto, pattern, ruri_pattern, priority> into hash table, where proto is integer
+ * Add <src_ip, proto, pattern> into hash table, where proto is integer
  * representation of string argument proto.
  */
 int hash_table_insert(struct trusted_list** hash_table, char* src_ip,
-		      char* proto, char* pattern, char* ruri_pattern, char* tag, int priority);
+		      char* proto, char* pattern, char* tag);
 
 
 /* 
  * Check if an entry exists in hash table that has given src_ip and protocol
- * value and pattern or ruri_pattern that matches to From URI.
+ * value and pattern that matches to From URI.
  */
 int match_hash_table(struct trusted_list** table, struct sip_msg* msg,
 		     char *scr_ip, int proto);
@@ -175,6 +173,8 @@ int addr_hash_table_rpc_print(struct addr_list** table, rpc_t* rpc, void* c);
  */
 void empty_addr_hash_table(struct addr_list** hash_table);
 
+
+#define PERM_MAX_SUBNETS 128 
 
 
 /*

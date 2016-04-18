@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -263,39 +263,34 @@ int radius_load_caller_avps(struct sip_msg* _m, char* _caller, char* _s2)
 					val_arr[i].s, val_arr[i].len );
 		}
 	}
-	
- 	res = rc_auth(rh, 0, send, &received, msg);
 
-        if (res == OK_RC) {
-                LM_DBG("Radius Load Caller Success\n");
-                rc_avpair_free(send);
-                if (common_response) {
-                        generate_avps_rad(received);
-                } else {
-                        generate_avps(caller_attrs, received);
-                }
-                rc_avpair_free(received);
-                return 1;
-        } else if(res == BADRESP_RC){
-                LM_ERR("Authz radius - Load Caller - BAD RESPONSE \n");
-        } else if(res == ERROR_RC){
-                LM_ERR("Authz radius - Load Caller - ERROR \n");
-        } else if(res == TIMEOUT_RC){
-                LM_ERR("Authz radius - Load Caller - TIMEOUT \n");
-        } else if(res == REJECT_RC){
-                LM_ERR("Authz radius - Load Caller - REJECTED \n");
-        } else{
-                LM_ERR("Authz radius - Load Caller - Unkown Response \n");
-        }
-
-        rc_avpair_free(send);
-
-        if (common_response){
-                generate_avps_rad(received);
-        }
-        
-	rc_avpair_free(received);
-        return -1;
+	if ((res = rc_auth(rh, 0, send, &received, msg)) == OK_RC) {
+		LM_DBG("success\n");
+		rc_avpair_free(send);
+		if (common_response) {
+			generate_avps_rad(received);
+		} else {
+			generate_avps(caller_attrs, received);
+		}
+		rc_avpair_free(received);
+		return 1;
+	} else {
+		rc_avpair_free(send);
+		if (common_response) generate_avps_rad(received);
+		rc_avpair_free(received);
+#ifdef REJECT_RC
+		if (res == REJECT_RC) {
+			LM_DBG("rejected\n");
+			return -1;
+		} else {
+			LM_ERR("failure\n");
+			return -2;
+		}
+#else
+		LM_DBG("failure\n");
+		return -1;
+#endif
+	}
 
 error:
 	rc_avpair_free(send);
@@ -355,38 +350,33 @@ int radius_load_callee_avps(struct sip_msg* _m, char* _callee, char* _s2)
 		}
 	}
 
-        res = rc_auth(rh, 0, send, &received, msg);
-
-        if (res == OK_RC) {
-                LM_DBG("Radius Load Callee Success\n");
-                rc_avpair_free(send);
-                if (common_response) {
-                        generate_avps_rad(received);
-                } else {
-                        generate_avps(callee_attrs, received);
-                }
-                rc_avpair_free(received);
-                return 1;
-        } else if(res == BADRESP_RC){
-                LM_ERR("Authz radius - Load Callee - BAD RESPONSE \n");
-        } else if(res == ERROR_RC){
-                LM_ERR("Authz radius - Load Callee - ERROR \n");
-        } else if(res == TIMEOUT_RC){
-                LM_ERR("Authz radius - Load Callee - TIMEOUT \n");
-        } else if(res == REJECT_RC){
-                LM_ERR("Authz radius - Load Callee - REJECTED \n");
-        } else {
-                LM_ERR("Authz radius - Load Callee - Unkown response \n");
-        }
-        rc_avpair_free(send);
-
-        if (common_response){
-                generate_avps_rad(received);
-        }
-
-        rc_avpair_free(received);
-        return -1;
-
+	if ((res = rc_auth(rh, 0, send, &received, msg)) == OK_RC) {
+		LM_DBG("success\n");
+		rc_avpair_free(send);
+		if (common_response) {
+			generate_avps_rad(received);
+		} else {
+			generate_avps(callee_attrs, received);
+		}
+		rc_avpair_free(received);
+		return 1;
+	} else {
+		rc_avpair_free(send);
+		if (common_response) generate_avps_rad(received);
+		rc_avpair_free(received);
+#ifdef REJECT_RC
+		if (res == REJECT_RC) {
+			LM_DBG("rejected\n");
+			return -1;
+		} else {
+			LM_ERR("failure\n");
+			return -2;
+		}
+#else
+		LM_DBG("failure\n");
+		return -1;
+#endif
+	}
 
 error:
 	rc_avpair_free(send);
@@ -459,29 +449,28 @@ int radius_is_user_in(struct sip_msg* _m, char* _user, char* _group)
 		}
 	}
 
-	res = rc_auth(rh, 0, send, &received, msg);
-
-        if (res == OK_RC) {
-                LM_DBG("Authz radius - success\n");
-                rc_avpair_free(send);
-                generate_avps(group_attrs, received);
-                rc_avpair_free(received);
-                return 1;
-        } else if(res == BADRESP_RC){
-                LM_ERR("Authz radius - BAD RESPONSE \n");
-        } else if(res == ERROR_RC){
-                LM_ERR("Authz radius - ERROR \n");
-        } else if(res == TIMEOUT_RC){
-                LM_ERR("Authz radius - TIMEOUT \n");
-        } else if(res == REJECT_RC){
-                LM_ERR("Authz radius - REJECTED \n");
-        } else{
-                LM_ERR("Authz radius - Unkown Response \n");
-        }
-
-        rc_avpair_free(send);
-        rc_avpair_free(received);
-        return -1;
+	if ((res = rc_auth(rh, 0, send, &received, msg)) == OK_RC) {
+		LM_DBG("success\n");
+		rc_avpair_free(send);
+		generate_avps(group_attrs, received);
+		rc_avpair_free(received);
+		return 1;
+	} else {
+		rc_avpair_free(send);
+		rc_avpair_free(received);
+#ifdef REJECT_RC
+		if (res == REJECT_RC) {
+			LM_DBG("rejected\n");
+			return -1;
+		} else {
+			LM_ERR("failure\n");
+			return -2;
+		}
+#else
+		LM_DBG("failure\n");
+		return -1;
+#endif
+	}
 
 error:
 	rc_avpair_free(send);
@@ -702,31 +691,30 @@ int radius_does_uri_user_exist(struct sip_msg* _m, str user)
 					val_arr[i].s, val_arr[i].len );
 		}
 	}
-	
-	res = rc_auth(rh, 0, send, &received, msg);
 
-	if (res == OK_RC) {
-		LM_DBG("Radius Success\n");
+	if ((res = rc_auth(rh, 0, send, &received, msg)) == OK_RC) {
+		LM_DBG("success\n");
 		rc_avpair_free(send);
 		generate_avps(uri_attrs, received);
 		rc_avpair_free(received);
 		return 1;
-	} else if(res == BADRESP_RC){
-                LM_ERR("Authz radius  - BAD RESPONSE \n");
-        } else if(res == ERROR_RC){
-                LM_ERR("Authz radius  - ERROR \n");
-        } else if(res == TIMEOUT_RC){
-                LM_ERR("Authz radius  - TIMEOUT \n");
-        } else if(res == REJECT_RC){
-                LM_ERR("Authz radius  - REJECTED \n");
-        } else {
-                LM_ERR("Authz radius  - Unkown response \n");
-        }
- 	
- 	rc_avpair_free(send);
-	rc_avpair_free(received);
-	
-	return -1;
+	} else {
+		rc_avpair_free(send);
+		rc_avpair_free(received);
+#ifdef REJECT_RC
+		if (res == REJECT_RC) {
+			LM_DBG("rejected\n");
+			return -1;
+		} else {
+			LM_ERR("failure\n");
+			return -2;
+		}
+#else
+		LM_DBG("failure\n");
+		return -1;
+#endif
+	}
+
 error:
 	rc_avpair_free(send);
 	return -1;

@@ -1,29 +1,36 @@
 /*
+ *  $Id$
+ *
  * Copyright (C) 2005 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
- * \file
- * \brief Kamailio core :: IP address handling
- * \author andrei
- * \ingroup core
- * Module: \ref core
+/*
+ * History:
+ * -------
+ *  2005-12-11 created by andrei
+ *  2009-06-01 Pre- and post-script callbacks of onsend route are executed (Miklos)
  */
+
 
 #ifndef onsend_h
 #define onsend_h
@@ -36,11 +43,10 @@
 #include "sr_compat.h"
 
 struct onsend_info{
-	union sockaddr_union* to;       /* dest info */
-	struct socket_info* send_sock;  /* local send socket */
-	char* buf;                      /* outgoing buffer */
-	int len;                        /* outgoing buffer len */
-	sip_msg_t *msg;                 /* original sip msg struct */
+	union sockaddr_union* to;
+	struct socket_info* send_sock;
+	char* buf;
+	int len;
 };
 
 extern struct onsend_info* p_onsend;
@@ -55,7 +61,7 @@ extern struct onsend_info* p_onsend;
 static inline int run_onsend(struct sip_msg* orig_msg, struct dest_info* dst,
 								char* buf, int len)
 {
-	struct onsend_info onsnd_info = {0};
+	struct onsend_info onsnd_info;
 	int ret;
 	struct run_act_ctx ra_ctx;
 	int backup_route_type;
@@ -68,7 +74,6 @@ static inline int run_onsend(struct sip_msg* orig_msg, struct dest_info* dst,
 		onsnd_info.send_sock=dst->send_sock;
 		onsnd_info.buf=buf;
 		onsnd_info.len=len;
-		onsnd_info.msg=orig_msg;
 		p_onsend=&onsnd_info;
 		backup_route_type=get_route_type();
 		set_route_type(ONSEND_ROUTE);
@@ -97,6 +102,5 @@ static inline int run_onsend(struct sip_msg* orig_msg, struct dest_info* dst,
 	return ret;
 }
 
-#define onsend_route_enabled(rtype) (onsend_rt.rlist[DEFAULT_RT]?((rtype==SIP_REPLY)?onsend_route_reply:1):0)
 
 #endif

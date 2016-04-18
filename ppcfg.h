@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2010 Daniel-Constantin Mierla (asipto.com)
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,11 +15,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/*!
- * \file
- * \brief Kamailio core :: Config preprocessor directives
- * \ingroup core
- * Module: \ref core
+/*
+ * ppcfg.h - config preprocessor directives
  */
 
 #ifndef _PPCFG_H_
@@ -30,9 +29,6 @@ int pp_subst_run(char **data);
 int  pp_define(int len, const char *text);
 int  pp_define_set(int len, char *text);
 int  pp_define_set_type(int type);
-
-void pp_ifdef_level_update(int val);
-void pp_ifdef_level_check(void);
 
 #endif /*_PPCFG_H_*/
 

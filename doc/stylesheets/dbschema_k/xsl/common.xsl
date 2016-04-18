@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 -->
@@ -40,17 +40,6 @@
     <!-- Do not output text -->
     <xsl:template match="text()|@*"/>
     <xsl:template match="text()|@*" mode="drop"/>
-
-    <xsl:template name="quotechar">
-	<xsl:choose>
-	    <xsl:when test="$db='mysql'">
-			<xsl:text>`</xsl:text>
-	    </xsl:when>
-	    <xsl:otherwise>
-			<xsl:text></xsl:text>
-		</xsl:otherwise>
-	</xsl:choose>
-    </xsl:template>
 
     <!-- Return the name of the context element, first look for a database
          specific name, use the common name if no database-specific name

@@ -197,8 +197,7 @@ modparam("pua", "update_period", 100)
 		<title><varname>outbound_proxy</varname> (str)</title>
 		<para>
 		SIP URI of outbound proxy to be used when sending
-		PUBLISH requests if no outbound proxy is given in
-                outbound_proxy field of struct publ_info.
+		PUBLISH requests.
 		</para>
 		<para>
 		<emphasis>By default, no outbound proxy has been defined.
@@ -286,28 +285,6 @@ modparam("pua", "db_mode", 0)
 </programlisting>
 		</example>
 	</section>
-	<section>
-	    <title><varname>db_table_lock_write</varname> (integer)</title>
-	    <para>
-		Enable (=1) or disable (=0) the Locks for table during an transaction.
-		Locking only the "current" table causes problems with a MySQL-Databases
-		in "DB-Only" mode.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is 1 (Write Lock for the Tables).
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>db_table_lock_write</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("pua", "db_table_lock_write", 0)
-...
-</programlisting>
-	    </example>
-	</section>
-	
 	<section>
 		<title><varname>check_remote_contact</varname> (int)</title>
 		<para>

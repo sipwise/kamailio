@@ -31,30 +31,9 @@
 #define DATETIME_LENGTH		DATETIME_SIZE - 1
 
 
-static inline unsigned int get_current_timestamp()
-{
-	return time(NULL);
-}
-
-static inline int timestamp2isodt(str *dest, unsigned int timestamp)
-{
-	time_t  		tim;
-	struct tm 		*tmPtr;
-
-	tim 		= timestamp;
-	tmPtr 		= localtime(&tim);
-
-	strftime( dest->s, DATETIME_SIZE, "%Y-%m-%d %H:%M:%S", tmPtr);
-	dest->len	= DATETIME_LENGTH;
-
-	return 0;
-}
-
-static inline void get_datetime(str *dest)
-{
-	timestamp2isodt(dest, get_current_timestamp());
-}
-
+void get_datetime(str *dest);
+unsigned int get_current_timestamp();
+int timestamp2isodt(str *dest, unsigned int timestamp);
 double str2double(str *string);
 
 #endif /* _CNXCC_H */

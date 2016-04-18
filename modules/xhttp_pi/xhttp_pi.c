@@ -15,18 +15,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- */
-
-/*!
- * \file
- * \brief XHTTP_PI :: Module interface (main file)
- * \ingroup xhttp_pi
- * Module: \ref xhttp_pi
- *
- * This is the main file of xhttp_pi module which contains all the functions
- * related to http processing, as well as the module interface.
+ * 2012-10-18  initial version (osas)
  */
 
 #include <string.h>
@@ -52,6 +43,11 @@
  * It is built on top of the xhttp API module.
  */
 
+/** @file
+ *
+ * This is the main file of xhttp_pi module which contains all the functions
+ * related to http processing, as well as the module interface.
+ */
 
 MODULE_VERSION
 
@@ -81,7 +77,7 @@ gen_lock_t* ph_lock;
 
 
 str xhttp_pi_root = str_init("pi");
-str filename = STR_NULL;
+str filename = {NULL, 0};
 
 int buf_size = 0;
 char error_buf[ERROR_REASON_BUF_LEN];
@@ -92,9 +88,9 @@ static cmd_export_t cmds[] = {
 };
 
 static param_export_t params[] = {
-	{"xhttp_pi_root",	PARAM_STR,	&xhttp_pi_root},
+	{"xhttp_pi_root",	STR_PARAM,	&xhttp_pi_root.s},
 	{"xhttp_pi_buf_size",	INT_PARAM,	&buf_size},
-	{"framework",	PARAM_STR,	&filename},
+	{"framework",	STR_PARAM,	&filename.s},
 	{0, 0, 0}
 };
 
@@ -262,6 +258,7 @@ static int mod_init(void)
 		buf_size = pkg_mem_size/3;
 
 	/* Check xhttp_pi_root param */
+	xhttp_pi_root.len = strlen(xhttp_pi_root.s);
 	for(i=0;i<xhttp_pi_root.len;i++){
 		if ( !isalnum(xhttp_pi_root.s[i]) && xhttp_pi_root.s[i]!='_') {
 			LM_ERR("bad xhttp_pi_root param [%.*s], char [%c] "
@@ -273,10 +270,11 @@ static int mod_init(void)
 	}
 
 	/* Check framework param */
-	if (!filename.s || filename.len<=0) {
+	if (filename.s==NULL) {
 		LM_ERR("missing framework\n");
 		return -1;
 	}
+	filename.len = strlen(filename.s);
 
 		/* building a cache of pi module commands */
 		if (0!=ph_init_cmds(&ph_framework_data, filename.s))
@@ -379,9 +377,9 @@ static const char *rpc_reload_doc[2] = {
 static void rpc_reload(rpc_t *rpc, void *c) {
 	lock_get(ph_lock);
 	if (0!=ph_init_cmds(&ph_framework_data, filename.s)) {
-		rpc->rpl_printf(c, "Reload failed");
+		rpc->printf(c, "Reload failed");
 	} else {
-		rpc->rpl_printf(c, "Reload OK");
+		rpc->printf(c, "Reload OK");
 	}
 	lock_release(ph_lock);
 	return;

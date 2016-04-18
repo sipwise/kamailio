@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * presence module -presence server implementation
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -17,8 +19,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2006-08-15  initial version (Anca Vamanu)
  */
 
 /*! \file
@@ -96,13 +101,6 @@ extern str str_id_col;
 extern str str_sender_col;
 extern str str_updated_col;
 extern str str_updated_winfo_col;
-extern str str_priority_col;
-extern str str_flags_col;
-extern str str_user_agent_col;
-
-extern int goto_on_notify_reply;
-int pv_parse_notify_reply_var_name(pv_spec_p sp, str *in);
-int pv_get_notify_reply(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res);
 
 void PRINT_DLG(FILE* out, dlg_t* _d);
 

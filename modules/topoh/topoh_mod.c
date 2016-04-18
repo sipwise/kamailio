@@ -1,7 +1,9 @@
-/*
+/**
+ * $Id$
+ *
  * Copyright (C) 2009 SIP-Router.org
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of Extensible SIP Router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,12 +20,12 @@
 
 /*!
  * \file
- * \brief Kamailio topoh :: Module interface
+ * \brief SIP-router topoh :: Module interface
  * \ingroup topoh
  * Module: \ref topoh
  */
 
-/*! \defgroup topoh Kamailio :: Topology hiding
+/*! \defgroup topoh SIP-router :: Topology hiding
  *
  * This module hides the SIP routing headers that show topology details.
  * It it is not affected by the server being transaction stateless or
@@ -42,9 +44,7 @@
 #include "../../tcp_options.h"
 #include "../../ut.h"
 #include "../../forward.h"
-#include "../../config.h"
 #include "../../parser/msg_parser.h"
-#include "../../parser/parse_uri.h"
 #include "../../parser/parse_to.h"
 #include "../../parser/parse_from.h"
 
@@ -52,22 +52,21 @@
 
 #include "th_mask.h"
 #include "th_msg.h"
-#include "api.h"
 
 MODULE_VERSION
 
 
 /** module parameters */
-str _th_key = str_init("aL9.n8~Hm]Z");
-str th_cookie_name = str_init("TH"); /* lost parameter? */
-str th_cookie_value = {0, 0};        /* lost parameter? */
-str th_ip = str_init("127.0.0.8");
-str th_uparam_name = str_init("line");
-str th_uparam_prefix = str_init("sr-");
-str th_vparam_name = str_init("branch");
-str th_vparam_prefix = str_init("z9hG4bKsr-");
+str _th_key = { "aL9.n8~Hm]Z", 0 };
+str th_cookie_name = {"TH", 0};
+str th_cookie_value = {0, 0};
+str th_ip = {"10.1.1.10", 0};
+str th_uparam_name = {"line", 0};
+str th_uparam_prefix = {"sr-", 0};
+str th_vparam_name = {"branch", 0};
+str th_vparam_prefix = {"z9hG4bKsr-", 0};
 
-str th_callid_prefix = str_init("!!:");
+str th_callid_prefix = {"!!:", 3};
 str th_via_prefix = {0, 0};
 str th_uri_prefix = {0, 0};
 
@@ -75,7 +74,6 @@ int th_param_mask_callid = 0;
 
 int th_sanity_checks = 0;
 sanity_api_t scb;
-int th_mask_addr_myself = 0;
 
 int th_msg_received(void *data);
 int th_msg_sent(void *data);
@@ -84,29 +82,24 @@ int th_msg_sent(void *data);
 static int mod_init(void);
 
 static param_export_t params[]={
-	{"mask_key",		PARAM_STR, &_th_key},
-	{"mask_ip",			PARAM_STR, &th_ip},
-	{"mask_callid",		PARAM_INT, &th_param_mask_callid},
-	{"uparam_name",		PARAM_STR, &th_uparam_name},
-	{"uparam_prefix",	PARAM_STR, &th_uparam_prefix},
-	{"vparam_name",		PARAM_STR, &th_vparam_name},
-	{"vparam_prefix",	PARAM_STR, &th_vparam_prefix},
-	{"callid_prefix",	PARAM_STR, &th_callid_prefix},
-	{"sanity_checks",	PARAM_INT, &th_sanity_checks},
+	{"mask_key",		STR_PARAM, &_th_key.s},
+	{"mask_ip",			STR_PARAM, &th_ip.s},
+	{"mask_callid",		INT_PARAM, &th_param_mask_callid},
+	{"uparam_name",		STR_PARAM, &th_uparam_name.s},
+	{"uparam_prefix",	STR_PARAM, &th_uparam_prefix.s},
+	{"vparam_name",		STR_PARAM, &th_vparam_name.s},
+	{"vparam_prefix",	STR_PARAM, &th_vparam_prefix.s},
+	{"callid_prefix",	STR_PARAM, &th_callid_prefix.s},
+	{"sanity_checks",	INT_PARAM, &th_sanity_checks},
 	{0,0,0}
 };
 
-static cmd_export_t cmds[]={
-	{"bind_topoh",   (cmd_function)bind_topoh,  0,
-		0, 0, 0},
-	{0, 0, 0, 0, 0, 0}
-};
 
 /** module exports */
 struct module_exports exports= {
 	"topoh",
 	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,
+	0,
 	params,
 	0,          /* exported statistics */
 	0,          /* exported MI functions */
@@ -123,9 +116,6 @@ struct module_exports exports= {
  */
 static int mod_init(void)
 {
-	sip_uri_t puri;
-	char buri[MAX_URI_SIZE];
-
 	if(th_sanity_checks!=0)
 	{
 		if(sanity_load_api(&scb)<0)
@@ -134,30 +124,23 @@ static int mod_init(void)
 			goto error;
 		}
 	}
+	th_cookie_name.len = strlen(th_cookie_name.s);
+	th_ip.len = strlen(th_ip.s);
 	if(th_ip.len<=0)
 	{
 		LM_ERR("mask IP parameter is invalid\n");
 		goto error;
 	}
-
-	if(th_ip.len + 32 >= MAX_URI_SIZE) {
-		LM_ERR("mask address is too long\n");
-		goto error;
-	}
-	memcpy(buri, "sip:", 4);
-	memcpy(buri+4, th_ip.s, th_ip.len);
-	buri[th_ip.len+8] = '\0';
-
-	if(parse_uri(buri, th_ip.len+4, &puri)<0) {
-		LM_ERR("mask uri is invalid\n");
-		goto error;
-	}
-	if(check_self(&puri.host, puri.port_no, 0)==1)
+	if(check_self(&th_ip, 0, 0)==1)
 	{
-		th_mask_addr_myself = 1;
-		LM_INFO("mask address matches myself [%.*s]\n",
-				th_ip.len, th_ip.s);
+		LM_ERR("mask IP must be different than SIP server local IP\n");
+		goto error;
 	}
+	th_uparam_name.len = strlen(th_uparam_name.s);
+	th_uparam_prefix.len = strlen(th_uparam_prefix.s);
+	th_vparam_name.len = strlen(th_vparam_name.s);
+	th_vparam_prefix.len = strlen(th_vparam_prefix.s);
+	th_callid_prefix.len = strlen(th_callid_prefix.s);
 
 	/* 'SIP/2.0/UDP ' + ip + ';' + param + '=' + prefix (+ '\0') */
 	th_via_prefix.len = 12 + th_ip.len + 1 + th_vparam_name.len + 1
@@ -235,8 +218,7 @@ int th_prepare_msg(sip_msg_t *msg)
 
 	if (parse_headers(msg, HDR_EOH_F, 0)==-1)
 	{
-		LM_DBG("parsing headers failed [[%.*s]]\n",
-				msg->len, msg->buf);
+		LM_DBG("parsing headers failed");
 		return 2;
 	}
 
@@ -337,7 +319,7 @@ int th_msg_received(void *data)
 		{
 			/* one Via in received reply -- it is for local generated request
 			 * - nothing to unhide unless is CANCEL/ACK */
-			if(!((get_cseq(&msg)->method_id)&(METHOD_CANCEL)))
+			if((get_cseq(&msg)->method_id)&(METHOD_CANCEL))
 				goto done;
 		}
 
@@ -352,8 +334,6 @@ int th_msg_received(void *data)
 		}
 		th_cookie_value.len = 2;
 	}
-
-	LM_DBG("adding cookie: %.*s\n", th_cookie_value.len, th_cookie_value.s);
 
 	th_add_cookie(&msg);
 	nbuf = th_msg_update(&msg, (unsigned int*)&obuf->len);
@@ -408,24 +388,13 @@ int th_msg_sent(void *data)
 	{
 		direction = (th_cookie_value.s[0]=='u')?1:0; /* upstream/downstram */
 		dialog = (get_to(&msg)->tag_value.len>0)?1:0;
-
-		if(msg.via2==0) {
-			local = 1;
-			if(direction==0 && th_cookie_value.s[1]=='l') {
-				/* downstream local request (e.g., dlg bye) */
-				local = 2;
-			}
-		} else {
-			/* more than one Via, but no received th cookie */
-			local = (th_cookie_value.s[0]!='d' && th_cookie_value.s[0]!='u')?1:0;
-		}
+		local = (th_cookie_value.s[0]!='d'&&th_cookie_value.s[0]!='u')?1:0;
 		/* local generated requests */
 		if(local)
 		{
 			/* ACK and CANCEL go downstream */
 			if(get_cseq(&msg)->method_id==METHOD_ACK
-					|| get_cseq(&msg)->method_id==METHOD_CANCEL
-					|| local==2)
+					|| get_cseq(&msg)->method_id==METHOD_CANCEL)
 			{
 				th_mask_callid(&msg);
 				goto ready;
@@ -482,18 +451,3 @@ done:
 	return 0;
 }
 
-/**
- *
- */
-int bind_topoh(topoh_api_t* api)
-{
-	if (!api) {
-		ERR("Invalid parameter value\n");
-		return -1;
-	}
-
-	memset(api, 0, sizeof(topoh_api_t));
-	api->unmask_callid = th_unmask_callid_str;
-
-	return 0;
-}

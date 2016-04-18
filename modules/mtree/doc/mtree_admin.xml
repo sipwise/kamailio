@@ -17,18 +17,8 @@
     <section>
 	<title>Overview</title>
 	<para>
-		This module loads (prefix, value) records from database and indexes
-		them in a named memory tree. Name of the tree is specified for each
-		record or as module parameter.
-	</para>
-	<para>	
-		It exports to configuration file functions to match against in-memory
-		trees and return the values (raw or precompiled) associated with
-		matched prefixes.
-	</para>
-	<para>	
-		The maximum size of the prefix is limited internally to 63, database
-		table definition may enforce lower maximum size.
+		This module loads data indexed by prefixes from database and returns
+		associated string or precompiled value.
 	</para>
     </section>
     <section>
@@ -107,52 +97,13 @@ modparam("mtree", "db_table", "mymtrees")
 	<section>
 	    <title><varname>mtree</varname> (string)</title>
 	    <para>
-			Definition of memory tree with using a prameters format string.
-			The parameter names can be:
-		<itemizedlist>
-		<listitem>
-			<para>
-				name - the name of the tree to be used for referencing
-				inside configuration file.
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				dbtable - the name of the database table from where to
-				load the records stored in the tree.
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				cols - the column names of the database table. They must
-				be enclosed in quotes in order to form a valid SIP parameter
-				value and be separated by comma. The first column corresponds
-				to tprefix. When specified, there must be at least two columns.
-				If this attribute is not specified, then the global module
-				parameters for tprefix and tvalue are used. If more than one
-				value columns are specified, the tree will pack the column
-				values in a comma separated string, which will be associated
-				with the prefix (string transformation {s.select,...) can be
-				used in configuration file to extract a specific column value).
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				type - the  type of tree elements (0 = string, 2 = integer).
-				It is valid only when the (tprefix, tvalue) pairs are loaded
-				(not for muti-column values).
-			</para>
-		</listitem>
-		<listitem>
-			<para>
-				multi - tells if dbtable can contain more than one tree
-				(0 = one tree, 1 = more than one tree identified by tname
-				column). It is valid only when the (tprefix, tvalue) pairs
-				are loaded (not for muti-column values).
-			</para>
-		</listitem>
-		</itemizedlist>
-		</para>
+		Definition of memory tree with parameters name, dbtable,
+		type, and multi.  Name is name of the tree, dbtable is name
+		of dbtable where tree is stored, type is type of tree elements
+		(0 = string, 2 = integer), and multi tells if dbtable can
+		contain more than one tree (0 = one tree, 1 = more than
+		one tree identified by tname column). 
+	    </para>
 	    <para>
 	    This parameter can be set many times to add more trees in
 	    memory.
@@ -168,8 +119,6 @@ modparam("mtree", "db_table", "mymtrees")
 ...
 modparam("mtree", "mtree", "name=mytree1;dbtable=routes1;type=0")
 modparam("mtree", "mtree", "name=mytree2;dbtable=routes2;type=0;multi=1")
-modparam("mtree", "mtree",
-    "name=mytree1;dbtable=routes1;cols='key1,val1,val2,val3'")
 ...
 </programlisting>
 	    </example>
@@ -299,8 +248,8 @@ modparam("mtree", "pv_value", "$var(mtval)")
 	<section>
 	    <title><varname>pv_values</varname> (string)</title>
 	    <para>
-		The AVP where to store the matched values when mtree is of type
-		0 or 2 and mode of mt_match() call has value 2.
+		The PV spec where to store the matched values when mtree is of type
+		0 or 2 and mode of mt_match() call has value 2. It can be any AVP.
 		</para>
 	    <para>
 		<emphasis>
@@ -395,9 +344,6 @@ modparam("mtree", "mt_allow_duplicates", 1)
 		matching prefix is in avp index 0.  Parameter 'mode' can be an integer
 		constant or a pseudo variable with integer value.
 	    </para>
-	    <para>
-	      Returns 1 if match succeeded and -1 otherwise.
-	    </para>
 		<example>
 		<title><function>mt_match</function> usage</title>
 		<programlisting format="linespecific">
@@ -480,40 +426,6 @@ mt_match("mytree", "$rU", "0");
 		_empty_line_
 		</programlisting>
     </section>
-
-    <section>
-		<title>
-		<function moreinfo="none">mt_match</function>
-		</title>
-		<para>
-		Match prefix value against mtree.
-		</para>
-		<para>
-		Name: <emphasis>mt_match</emphasis>
-		</para>
-		<para>Parameters: <emphasis>3</emphasis></para>
-		<itemizedlist>
-            <listitem>
-            <para><emphasis>Name of mtree</emphasis></para>
-            </listitem>
-            <listitem>
-            <para><emphasis>Prefix to match</emphasis></para>
-            </listitem>
-            <listitem>
-            <para><emphasis>Mode of matching</emphasis></para>
-            </listitem>
-        </itemizedlist>
-		<para>
-		MI FIFO Command Format:
-		</para>
-        <programlisting  format="linespecific">
-		:mt_match:_reply_fifo_file_
-		_mtree_
-		_prefix_
-		_mode_
-		_empty_line_
-		</programlisting>
-    </section>
     </section><!-- MI commands -->
 	<section>
 	<title>RPC Commands</title>
@@ -522,13 +434,9 @@ mt_match("mytree", "$rU", "0");
 		<function moreinfo="none">mtree.summary</function>
 		</title>
 		<para>
-			List usage summary for all trees or for the tree whose name is
-			given as parameter.
+		List usage summary for all trees.
 		</para>
-		<para>Parameters:</para>
-		<itemizedlist>
-			<listitem><para>_mtree_ - (optional) the name of the tree.</para></listitem>
-		</itemizedlist>
+		<para>Parameters: none.</para>
         </section>
 	<section>
 		<title>
@@ -539,21 +447,7 @@ mt_match("mytree", "$rU", "0");
 		</para>
 		<para>Parameters:</para>
 		<itemizedlist>
-			<listitem><para>_mtree_</para> - name of mtree or empty string meaning all mtrees</listitem>
-		</itemizedlist>
-        </section>
-    <section>
-		<title>
-		<function moreinfo="none">mtree.match</function>
-		</title>
-		<para>
-		Match prefix value against mtree
-		</para>
-		<para>Parameters:</para>
-		<itemizedlist>
-			<listitem><para>_mtree_</para> - name of mtree</listitem>
-			<listitem><para>_prefix_</para> - match prefix</listitem>
-			<listitem><para>_mode_</para> - matching mode</listitem>
+			<listitem><para>_mtree_</para> - name of mtree or empty string meaning all mtrees</listitem>	  
 		</itemizedlist>
         </section>
     	</section><!-- RPC commands -->

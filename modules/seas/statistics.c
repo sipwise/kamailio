@@ -16,7 +16,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <stdlib.h>
@@ -79,7 +79,7 @@ struct statstable* init_seas_stats_table(void)
    return seas_stats_table;
 }
 
-void destroy_seas_stats_table(void)
+static inline void destroy_seas_stats_table(void)
 {
    /*deallocs the table*/
    if(seas_stats_table){
@@ -370,7 +370,7 @@ void serve_stats(int fd)
  * this limit then the return value is the number of characters (not including the trailing '\\0') which would have been written to the final string
  * if  enough space had been available. Thus, a return value of size or more means that the output was truncated."
  */
-int print_stats_info(int f,int sock)
+static inline int print_stats_info(int f,int sock)
 {
 #define STATS_BUF_SIZE  400
    int j,k,writen;

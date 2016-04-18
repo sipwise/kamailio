@@ -15,7 +15,7 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/** Kamailio TLS support :: module interface.
+/** SIP-router TLS support :: module interface.
  * @file
  * @ingroup tls
  * Module: @ref tls

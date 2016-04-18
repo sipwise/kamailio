@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -55,7 +55,6 @@ struct parsed_maa;
 extern struct cdp_binds cdpb;
 extern str cxdx_forced_peer; /**< FQDN of the Diameter peer to send requests to */
 extern str cxdx_dest_realm;
-extern str cxdx_dest_host;
 extern struct tm_binds tmb;
 
 typedef struct saved_transaction {
@@ -64,7 +63,6 @@ typedef struct saved_transaction {
 	unsigned int ticks;
 	cfg_action_t *act;
 	int is_proxy_auth;
-	int is_resync;
     str realm;
 } saved_transaction_t;
 

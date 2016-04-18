@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,11 +15,15 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-/** Kamailio core :: various socket related functions.
+/** various socket related functions.
  * @file sock_ut.c
  * @ingroup: core 
  */
+/*
+ * History:
+ * --------
+ *  2010-08-09  initial version (andrei)
+*/
 
 #include "sock_ut.h"
 
@@ -35,8 +41,8 @@
  */
 int sock_get_ttl(int sock)
 {
-	int ioptval = 0;
-	unsigned int ioptvallen = 0;
+	int ioptval;
+	unsigned int ioptvallen;
 
 	ioptvallen=sizeof(ioptval);
 	if (getsockopt( sock, IPPROTO_IP, IP_TTL, (void*) &ioptval,
@@ -54,7 +60,7 @@ int sock_get_ttl(int sock)
  */
 int sock_set_ttl(int sock, int ttl)
 {
-	int ioptval = 0;
+	int ioptval;
 
 	if (setsockopt( sock, IPPROTO_IP, IP_TTL, (void*) &ioptval,
 					sizeof(ioptval)) == -1 )

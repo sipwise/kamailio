@@ -81,7 +81,7 @@
 	
 	<section>
 	<title>Parameters</title>
-	<section id="presence.p.db_url">
+	<section>
 		<title><varname>db_url</varname>(str)</title>
 		<para>
 		The database url.
@@ -103,7 +103,7 @@ modparam("presence", "db_url",
 </programlisting>
 		</example>
 	</section>
-	<section id="presence.p.presentity_table">
+	<section>
 		<title><varname>presentity_table</varname>(str)</title>
 		<para>
 		The name of the db table where PUBLISH presence information is stored.
@@ -121,7 +121,7 @@ modparam("presence", "presentity_table", "presentity")
 </programlisting>
 		</example>
 	</section>
-	<section id="presence.p.active_watchers_table">
+	<section>
 		<title><varname>active_watchers_table</varname>(str)</title>
 		<para>
 		The name of the db table where active subscription information is stored. 
@@ -139,7 +139,7 @@ modparam("presence", "active_watchers_table", "active_watchers")
 </programlisting>
 		</example>
 	</section>
-	<section id="presence.p.watchers_table">
+	<section>
 		<title><varname>watchers_table</varname>(str)</title>
 		<para>
 		The name of the db table where subscription states are stored.
@@ -157,7 +157,7 @@ modparam("presence", "watchers_table", "watchers")
 </programlisting>
 		</example>
 	</section>
-	<section id="presence.p.clean_period">
+	<section>
 		<title><varname>clean_period</varname> (int)</title>
 		<para>
 		The period in seconds between checks if there are expired messages stored in database.
@@ -175,7 +175,7 @@ modparam("presence", "clean_period", 100)
 </programlisting>
 		</example>
 	</section>
-	<section id="presence.p.db_update_period">
+	<section>
 		<title><varname>db_update_period</varname> (int)</title>
 		<para>
 		The period at which to synchronize cached subscriber info with the
@@ -195,7 +195,7 @@ modparam("presence", "db_update_period", 100)
 		</example>
 	</section>
 
-	<section id="presence.p.waitn_time">
+	<section>
 		<title><varname>waitn_time</varname> (int)</title>
 		<para>
 		The maximum time period that NOTIFY requests will
@@ -221,7 +221,7 @@ modparam("presence", "waitn_time", 10)
 		</example>
 	</section>
 
-	<section id="presence.p.notifier_poll_rate">
+	<section>
 		<title><varname>notifier_poll_rate</varname> (int)</title>
 		<para>
 		The number of times per second that the notifier processes
@@ -247,7 +247,7 @@ modparam("presence", "notifier_poll_rate", 20)
 		</example>
 	</section>
 
-	<section id="presence.p.notifier_processes">
+	<section>
 		<title><varname>notifier_processes</varname> (int)</title>
 		<para>
 		The number of notifier processes that should be started.
@@ -278,7 +278,7 @@ modparam("presence", "notifier_processes", 2)
 		</example>
 	</section>
 
-	<section id="presence.p.to_tag_pref">
+	<section>
 		<title><varname>to_tag_pref</varname> (str)</title>
 		<para>
 		The prefix used when generating to_tag when sending replies for
@@ -298,7 +298,7 @@ modparam("presence", "to_tag_pref", 'pres')
 		</example>
 	</section>
 
-	<section id="presence.p.expires_offset">
+	<section>
 		<title><varname>expires_offset</varname> (int)</title>
 		<para>
 		The value in seconds that should be subtracted from the expires value when
@@ -319,10 +319,10 @@ modparam("presence", "expires_offset", 10)
 		</example>
 
 </section>
-       <section id="presence.p.max_expires">
+       <section>
                <title><varname>max_expires</varname> (int)</title>
                <para>
-               The maximum admissible expires value for PUBLISH/SUBSCRIBE
+               The the maximum admissible expires value for PUBLISH/SUBSCRIBE
                message (in seconds).
                </para>
                <para>
@@ -339,62 +339,7 @@ modparam("presence", "max_expires", 3600)
 	</example>
 </section>
 
-<section id="presence.p.min_expires">
-    <title><varname>min_expires</varname> (int)</title>
-    <para>
-        The minimum admissible expires value for PUBLISH/SUBSCRIBE
-        message (in seconds).
-    </para>
-    <para>
-        If &gt; 0 then min_expires_action parameter determines the response.
-    </para>
-    <para>
-        <emphasis>Default value is <quote>0</quote>.
-        </emphasis>
-    </para>
-    <example>
-        <title>Set <varname>min_expires</varname> parameter</title>
-        <programlisting format="linespecific">
-            ...
-            modparam("presence", "min_expires", 1800)
-            ...
-        </programlisting>
-    </example>
-</section>
-
-<section id="presence.p.min_expires_action">
-    <title><varname>min_expires_action</varname> (int)</title>
-    <para>
-        The action to take when UA sends a expires value less then min_expires.
-    </para>
-    <para>
-        <itemizedlist>
-            <title>Possible Values</title>
-            <listitem>
-                <para> 1 : RFC Compliant, returns <quote>423 Interval Too Brief</quote></para>
-            </listitem>
-            <listitem>
-                <para> 2 : forces the min_expires value in the subscription</para>
-            </listitem>
-        </itemizedlist>
-    </para>
-    <para>
-        If &gt; 0 then min_expires_action parameter determines the response.
-    </para>
-    <para>
-        <emphasis>Default value is <quote>1</quote>.</emphasis>
-    </para>
-    <example>
-        <title>Set <varname>min_expires</varname> parameter</title>
-        <programlisting format="linespecific">
-            ...
-            modparam("presence", "min_expires", 1800)
-            ...
-        </programlisting>
-    </example>
-</section>
-
-<section id="presence.p.server_address">
+<section>
 		<title><varname>server_address</varname> (str)</title>
 		<para>
 		The presence server address which will become the value of Contact header filed 
@@ -410,7 +355,7 @@ modparam("presence", "server_address", "sip:10.10.10.10:5060")
 		</example>
 	</section>
 
-<section id="presence.p.subs_db_mode">
+<section>
 		<title><varname>subs_db_mode</varname> (int)</title>
 		<para>
 		The presence module can utilize database for persistent subscription storage.
@@ -475,7 +420,7 @@ modparam("presence", "subs_db_mode", 1)
 		</example>
 	</section>
 
-	<section id="presence.p.publ_cache">
+	<section>
 		<title><varname>publ_cache</varname> (int)</title>
 		<para>
 		To improve performance, the presence module holds by default a
@@ -505,7 +450,7 @@ modparam("presence", "publ_cache", 0)
 		</example>
 	</section>
 
-	<section id="presence.p.subs_htable_size">
+	<section>
 		<title><varname>subs_htable_size</varname> (int)</title>
 		<para>
 		The size of the in-memory hash table to store subscription dialogs.
@@ -525,7 +470,7 @@ modparam("presence", "subs_htable_size", 11)
 		</example>
 	</section>
 
-	<section id="presence.p.pres_htable_size">
+	<section>
 		<title><varname>pres_htable_size</varname> (int)</title>
 		<para>
         	The size of the in-memory hash table to store publish records.
@@ -544,7 +489,7 @@ modparam("presence", "pres_htable_size", 11)
 	</programlisting>
 		</example>
 	</section>
-	<section id="presence.p.send_fast_notify">
+	<section>
 		<title><varname>send_fast_notify</varname> (int)</title>
 		<para>
 		This parameter enables or disables the sending of an initial empty NOTIFY after a SUBSCRIBE/reSUBSCRIBE. 
@@ -565,7 +510,7 @@ modparam("presence", "send_fast_notify", 0)
 		</example>
 	</section>
 
-	<section id="presence.p.enable_sphere_check">
+	<section>
 		<title><varname>enable_sphere_check</varname> (int)</title>
 		<para>
 		This parameter is a flag that should be set if permission rules include
@@ -589,7 +534,7 @@ modparam("presence", "enable_sphere_check", 1)
 		</example>
 	</section>
 
-	<section id="presence.p.timeout_rm_subs">
+	<section>
 		<title><varname>timeout_rm_subs</varname> (int)</title>
 		<para>
 		This parameter is a flag that should be set if subscriptions should be
@@ -611,7 +556,7 @@ modparam("presence", "timeout_rm_subs", 0)
 	</programlisting>
 		</example>
 	</section>
-	<section id="presence.p.fetch_rows">
+	<section>
 	    <title><varname>fetch_rows</varname> (integer)</title>
 	    <para>
 		Number of rows to be loaded in one step from database.
@@ -630,7 +575,7 @@ modparam("presence", "fetch_rows", 1000)
 </programlisting>
 	    </example>
 	</section>
-	<section id="presence.p.db_table_lock_type">
+	<section>
 	    <title><varname>db_table_lock_type</varname> (integer)</title>
 	    <para>
 		Enable (=1) or disable (=0) the Locks for table during an
@@ -657,141 +602,15 @@ modparam("presence", "db_table_lock_type", 0)
 </programlisting>
 	    </example>
 	</section>
-	<section id="presence.p.local_log_level">
-	    <title><varname>local_log_level</varname> (int)</title>
-	    <para>
-		Control log level for some debug messages inside the module.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is 2 (L_INFO).
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>local_log_level</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("presence", "local_log_level", 3)
-...
-</programlisting>
-	    </example>
-	</section>
-	<section id="presence.p.subs_remove_match">
-	    <title><varname>subs_remove_match</varname> (int)</title>
-	    <para>
-		Control how to match the subscriptions to remove from memory.
-		If set to 0, then the match is done on To-Tag (local generated),
-		if set to 1, then the match is done on all dialog attributes
-		(Call-Id, From-Tag, To-Tag).
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is 0.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>subs_remove_match</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("presence", "subs_remove_match", 1)
-...
-</programlisting>
-	    </example>
-	</section>
-	<section id="presence.p.xavp_cfg">
-    <title><varname>xavp_cfg</varname> (str)</title>
-    <para>
-		The name of the xavp to be used to specify attributes for internal
-		processing of presence module.
-    </para>
-    <para>
-		Inner attributes inside xavp can be:
-    </para>
-    <itemizedlist>
-        <listitem>
-			<para><emphasis>priority</emphasis> - integer value to set the
-			priority of the presence document (higher value, higher priority).
-			It can set the order of the aggregated presence documents sent by
-			NOTIFY (first the document with higher priority). If xavp_cfg
-			parameter is set but this attribute is not in the avp,
-			the priority of the presence document is based on timestamp,
-			so newer documents have higher priority.</para>
-        </listitem>
-     </itemizedlist>
-    <para>
-        Default value is <emphasis>empty</emphasis> (not set).
-    </para>
-    <example>
-        <title>Set <varname>xavp_cfg</varname> parameter</title>
-        <programlisting format="linespecific">
-...
-modparam("presence", "xavp_cfg", "pres")
-...
-if(is_method("PUBLISH")) {
-    $xavp(pres=>priority) = 100;
-}
-...
-</programlisting>
-    </example>
-	</section>
 
-	<section id="presence.p.retrieve_order">
-	    <title><varname>retrieve_order</varname> (int)</title>
-	    <para>
-		If set to 0, presentity records are retrieve by received_time order.
-		if set to 1, presentity records are retrieve by priority order.
-	    </para>
-	    <para>
-		<emphasis>
-		    Default value is 0.
-		</emphasis>
-	    </para>
-	    <example>
-		<title>Set <varname>retrieve_order</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("presence", "retrieve_order", 1)
-...
-</programlisting>
-	    </example>
-	</section>
-
-<section id="presence.p.sip_uri_match">
-    <title><varname>sip_uri_match</varname> (int)</title>
-    <para>
-        The mode used when comparing uris.
-    </para>
-    <para>
-        <itemizedlist>
-            <title>Possible Values</title>
-            <listitem>
-                <para> 0 : case sensitive</para>
-            </listitem>
-            <listitem>
-                <para> 1 : case insensitive</para>
-            </listitem>
-        </itemizedlist>
-    </para>
-    <para>
-        <emphasis>Default value is <quote>0</quote>.</emphasis>
-    </para>
-    <example>
-        <title>Set <varname>sip_uri_match</varname> parameter</title>
-        <programlisting format="linespecific">
-            ...
-            modparam("presence", "sip_uri_match", 1)
-            ...
-        </programlisting>
-    </example>
-</section>
 
 </section>
 
 <section>
 	<title>Functions</title>
-	<section id="presence.f.handle_publish">
+	<section>
 		<title>
-		<function moreinfo="none">handle_publish([sender_uri])</function>
+		<function moreinfo="none">handle_publish(char* sender_uri)</function>
 		</title>
 		<para>
 		Handles PUBLISH requests by storing and updating 
@@ -846,7 +665,7 @@ modparam("presence", "retrieve_order", 1)
 		</example>
 	</section>
 
-	<section id="presence.f.handle_subscribe">
+	<section>
 		<title>
 		<function moreinfo="none">handle_subscribe([watcher_uri])</function>
 		</title>
@@ -895,7 +714,7 @@ if(method=="SUBSCRIBE")
 		</example>
 	</section>
 
-	<section id="presence.f.pres_auth_status">
+	<section>
 		<title>
 		<function moreinfo="none">pres_auth_status(watcher_uri, presentity_uri)</function>
 		</title>
@@ -930,7 +749,7 @@ if (method=="MESSAGE") {
 		</example>
 	</section>
 
-	<section id="presence.f.pres_refresh_watchers">
+	<section>
 		<title>
 		<function moreinfo="none">pres_refresh_watchers(uri, event, type[, file_uri, filename])</function>
 		</title>
@@ -990,7 +809,7 @@ pres_refresh_watchers("sip:test@kamailio.org", "presence", 1);
 		</example>
 	</section>
 
-	<section id="presence.f.pres_update_whatchers">
+	<section>
 		<title>
 		<function moreinfo="none">pres_update_watchers(uri, event)</function>
 		</title>
@@ -1127,193 +946,6 @@ pres_update_watchers("sip:test@kamailio.org", "presence");
 	  <para>Parameters: <emphasis>none</emphasis></para>
 
 	</section>
-</section>
-
-<section>
-	<title>Pseudo Variables</title>
-		
-		<section>
-			<title><varname>$subs(attr)</varname></title>
-			<para>
-				Access the attributes of handled subscription. 
-				It must be used after a successful call of
-				<quote>handle_subscription()</quote> or in the following events.
-			<itemizedlist>
-				<listitem>
-				<para><emphasis>tm:local-request</emphasis> - before notify is sent
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>present:notify-reply</emphasis> - after notify is sent
-				</para>
-				</listitem>
-			</itemizedlist>	  
-			</para>
-			<para>
-			The <quote>attr</quote> can be:
-			</para>
-			<itemizedlist>
-				<listitem>
-				<para><emphasis>uri</emphasis> - subscription presentity uri
-				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>pres_uri</emphasis> - alias for presentity uri
-				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>to_user</emphasis>
-				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>to_domain</emphasis>
-				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>from_user</emphasis>
-				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>from_domain</emphasis>
-				</para>
-				</listitem>	  
-				<listitem>
-				<para><emphasis>watcher_username</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>watcher_domain</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>event</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>event_id</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>to_tag</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>from_tag</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>callid</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>remote_cseq</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>local_cseq</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>contact</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>local_contact</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>record_route</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>expires</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>status</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>reason</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>version</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>flags</emphasis>
-				</para>
-				</listitem>
-				<listitem>
-				<para><emphasis>user_agent</emphasis>
-				</para>
-				</listitem>
-			</itemizedlist>
-
-			<example>
-			<title><function moreinfo="none">$subs(name)</function> usage</title>
-<programlisting format="linespecific">
-...
-if(handle_subscription())
-{
-  xlog("presentity=$subs(uri)\n");
-}
-...
-				 </programlisting>
-			</example>
-		</section>
-		
-		<section>
-			<title><varname>$notify_reply(attr)</varname></title>
-			<para>
-				Access the reply message received when notifying subscriber. 
-				It must be used in the following events.
-			<itemizedlist>
-				<listitem>
-				<para><emphasis>present:notify-reply</emphasis> - after notify is sent
-				</para>
-				</listitem>
-			</itemizedlist>	  
-			</para>
-			<para>
-			The <quote>attr</quote> can be any pseudo var that accesses attributes of msg
-			</para>
-
-			<example>
-			<title><function moreinfo="none">$notify_reply(name)</function> usage</title>
-<programlisting format="linespecific">
-...
-event_route[presence:notify-reply]
-{
-  xlog("received message = $notify_reply($mb)\n");
-}
-...
-				 </programlisting>
-			</example>
-		</section>
-</section>
-
-<section>
-	<title>Events</title>
-		<section>
-			<title><varname>present:notify-reply</varname></title>
-			<para>
-				Fired after notify reply is received or timeout.
-			</para>
-
-			<example>
-			<title><function moreinfo="none">$notify_reply(name)</function> usage</title>
-<programlisting format="linespecific">
-...
-event_route[presence:notify-reply]
-{
-  xlog("received message = $notify_reply($mb)\n");
-}
-...
-				 </programlisting>
-			</example>
-		</section>
 </section>
 
 <section>

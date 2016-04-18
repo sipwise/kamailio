@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -836,7 +836,7 @@ int peer_connect(peer *p)
 	int sock;
 	unsigned int option = 1;
 
-	struct addrinfo *ainfo=0,*res=0,*sainfo=0,hints;
+	struct addrinfo *ainfo=0,*res=0,hints;
 	char buf[256],host[256],serv[256];
 	int error;
 
@@ -868,25 +868,6 @@ int peer_connect(peer *p)
 			LM_ERR("peer_connect(): error creating client socket to %s port %s >"
 				" %s\n",host,serv,strerror(errno));
 			continue;
-		}
-
-		/* try to set the local socket used to connect to the peer */
-		if (p->src_addr.s && p->src_addr.len > 0) {
-			LM_DBG("peer_connect(): connetting to peer via src addr=%.*s",p->src_addr.len, p->src_addr.s);
-			memset (&hints, 0, sizeof(hints));
-			hints.ai_flags = AI_NUMERICHOST;
-			hints.ai_socktype = SOCK_STREAM;
-			error = getaddrinfo(p->src_addr.s, NULL, &hints, &sainfo);
-
-			if (error!=0){
-				LM_WARN("peer_connect(): error getting client socket on %.*s:%s\n",
-					p->src_addr.len,p->src_addr.s,gai_strerror(error));
-			} else {
-				if (bind(sock, sainfo->ai_addr, sainfo->ai_addrlen )) {
-					LM_WARN("peer_connect(): error opening client socket on %.*s:%s\n",
-						p->src_addr.len,p->src_addr.s,strerror(errno));
-				}
-			}
 		}
 
 		{// Connect with timeout

@@ -1,3 +1,5 @@
+$Id$
+
 Wrapper functions for regcomp, regexec, regfree, and regerror using shared
 memory allocators instead of libc malloc/realloc/free. The original functions
 are prefixed with "shm_".

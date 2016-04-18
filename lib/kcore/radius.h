@@ -15,16 +15,21 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * WARNING: Don't forget to update the dictionary if you update this file !!!
+ *
+ * History:
+ * --------
+ * 2005-06-28  multi leg call support added (bogdan)
+ * 2008-09-03  added type field to attribute structure, which is set
+ *             during INIT_AV.
  *
  */
 
 /*!
  * \file
  * \brief Radius support
- * \ingroup libkcore
  */
 
 

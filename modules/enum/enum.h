@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Header file for Enum and E164 related functions
  *
  * Copyright (C) 2002-2008 Juha Heinanen
@@ -17,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 /*!
  * \file
@@ -35,7 +37,7 @@
 
 
 #define MAX_DOMAIN_SIZE 256
-#define MAX_NUM_LEN 33
+#define MAX_NUM_LEN 22
 #define MAX_COMPONENT_SIZE (MAX_NUM_LEN * 2)  /* separator, apex, ... This simplifies checks */
 
 

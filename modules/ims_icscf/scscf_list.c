@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -47,12 +47,14 @@
 #include "db.h"
 #include "../../lib/ims/useful_defs.h"
 
+#if defined (__OS_freebsd)
+#include "sys/limits.h"
+#define MAXINT INT_MAX
+#endif
+
 extern int scscf_entry_expiry; //time for scscf entries to remain the scscf_list
 
 extern struct tm_binds tmb; //Structure with pointers to tm funcs
-
-extern int use_preferred_scscf_uri;
-extern str preferred_scscf_uri;
 
 int i_hash_size;
 i_hash_slot *i_hash_table = 0;
@@ -183,10 +185,10 @@ scscf_entry* I_get_capab_ordered(str scscf_name, int *m, int mcnt, int *o, int o
     scscf_entry *list = 0;
     int i, r;
 
-    if (scscf_name.len) list = I_add_to_scscf_list(list, scscf_name, INT_MAX, orig);
+    if (scscf_name.len) list = I_add_to_scscf_list(list, scscf_name, MAXINT, orig);
 
     for (i = 0; i < pcnt; i++)
-        list = I_add_to_scscf_list(list, p[i], INT_MAX - i, orig);
+        list = I_add_to_scscf_list(list, p[i], MAXINT - i, orig);
 
     for (i = 0; i < SCSCF_Capabilities_cnt; i++) {
         r = I_get_capab_match(SCSCF_Capabilities + i, m, mcnt, o, ocnt);
@@ -425,51 +427,19 @@ out_of_memory:
 str take_scscf_entry(str call_id) {
     str scscf = {0, 0};
     scscf_list *l = 0;
-    scscf_entry *scscf_entry = 0;
     unsigned int hash = get_call_id_hash(call_id, i_hash_size);
 
-    LM_DBG("Getting scscf entry from list\n");
-    
     i_lock(hash);
     l = i_hash_table[hash].head;
-    
-    //if use_preferred_scscf_uri then check the table for the preferred scscf set
-    if(use_preferred_scscf_uri) {
-	LM_DBG("use_preferred_scscf_uri is set so will check for preferred_scscf_uri first [%.*s]\n", preferred_scscf_uri.len, preferred_scscf_uri.s);
-	while (l) {
-	    if (l->call_id.len == call_id.len &&
-		    strncasecmp(l->call_id.s, call_id.s, call_id.len) == 0) {
-		scscf_entry = l->list;
-		while (scscf_entry) {
-		    LM_DBG("scscf_entry [%.*s]\n", scscf_entry->scscf_name.len, scscf_entry->scscf_name.s);
-		    if (strncasecmp(scscf_entry->scscf_name.s, preferred_scscf_uri.s, preferred_scscf_uri.len) == 0) {
-			LM_DBG("scscf_entry matches\n");
-			scscf = scscf_entry->scscf_name;
-			break;
-		    }
-		    scscf_entry = scscf_entry->next;
-		}
-		
-		break;
-	    }
-	    l = l->next;
-	}
-    }
-    
-    // if scscf has not yet been set then find the first scscf that matches
-    if(scscf.len <= 0 ) {
-	LM_DBG("scscf has not been set so we just look for first match\n");
-	while (l) {
-	    if (l->call_id.len == call_id.len &&
-		    strncasecmp(l->call_id.s, call_id.s, call_id.len) == 0) {
-		if (l->list) {
-		    LM_DBG("scscf_entry [%.*s]\n", l->list->scscf_name.len, l->list->scscf_name.s);
-		    scscf = l->list->scscf_name;
-		}
-		break;
-	    }
-	    l = l->next;
-	}
+    while (l) {
+        if (l->call_id.len == call_id.len &&
+                strncasecmp(l->call_id.s, call_id.s, call_id.len) == 0) {
+            if (l->list) {
+                scscf = l->list->scscf_name;
+            }
+            break;
+        }
+        l = l->next;
     }
     i_unlock(hash);
     return scscf;

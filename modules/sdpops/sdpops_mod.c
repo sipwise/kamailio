@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -35,8 +35,6 @@
 #include "../../parser/sdp/sdp_helpr_funcs.h"
 #include "../../trim.h"
 #include "../../data_lump.h"
-#include "../../ut.h"
-#include "../../parser/parse_content.h"
 
 #include "api.h"
 #include "sdpops_data.h"
@@ -49,10 +47,7 @@ static int w_sdp_remove_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_keep_codecs_by_id(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_keep_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar);
 static int w_sdp_with_media(sip_msg_t* msg, char* media, char *bar);
-static int w_sdp_with_active_media(sip_msg_t* msg, char* media, char *bar);
 static int w_sdp_with_transport(sip_msg_t* msg, char* transport, char *bar);
-static int w_sdp_with_transport_like(sip_msg_t* msg, char* transport, char *bar);
-static int w_sdp_transport(sip_msg_t* msg, char *bar);
 static int w_sdp_with_codecs_by_id(sip_msg_t* msg, char* codec, char *bar);
 static int w_sdp_with_codecs_by_name(sip_msg_t* msg, char* codec, char *bar);
 static int w_sdp_remove_media(sip_msg_t* msg, char* media, char *bar);
@@ -60,8 +55,6 @@ static int w_sdp_remove_transport(sip_msg_t* msg, char* transport, char *bar);
 static int w_sdp_print(sip_msg_t* msg, char* level, char *bar);
 static int w_sdp_get(sip_msg_t* msg, char *bar);
 static int w_sdp_content(sip_msg_t* msg, char* foo, char *bar);
-static int w_sdp_content_sloppy(sip_msg_t* msg, char* foo, char *bar);
-static int w_sdp_with_ice(sip_msg_t* msg, char* foo, char *bar);
 static int w_sdp_get_line_startswith(sip_msg_t* msg, char *foo, char *bar);
 
 
@@ -84,18 +77,12 @@ static cmd_export_t cmds[] = {
 		2, fixup_spve_spve,  0, ANY_ROUTE},
 	{"sdp_with_media",             (cmd_function)w_sdp_with_media,
 		1, fixup_spve_null,  0, ANY_ROUTE},
-	{"sdp_with_active_media",       (cmd_function)w_sdp_with_active_media,
-		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_remove_media",             (cmd_function)w_sdp_remove_media,
 		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_with_transport",         (cmd_function)w_sdp_with_transport,
 		1, fixup_spve_null,  0, ANY_ROUTE},
-	{"sdp_with_transport_like",  (cmd_function)w_sdp_with_transport_like,
-		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_remove_transport",       (cmd_function)w_sdp_remove_transport,
 		1, fixup_spve_null,  0, ANY_ROUTE},
-	{"sdp_transport",              (cmd_function)w_sdp_transport,
-		1, 0,  0, ANY_ROUTE},
 	{"sdp_with_codecs_by_id",      (cmd_function)w_sdp_with_codecs_by_id,
 		1, fixup_spve_null,  0, ANY_ROUTE},
 	{"sdp_with_codecs_by_name",    (cmd_function)w_sdp_with_codecs_by_name,
@@ -105,10 +92,6 @@ static cmd_export_t cmds[] = {
 	{"sdp_get",                  (cmd_function)w_sdp_get,
 		1, 0,  0, ANY_ROUTE},
 	{"sdp_content",                (cmd_function)w_sdp_content,
-		0, 0,  0, ANY_ROUTE},
-	{"sdp_content",                (cmd_function)w_sdp_content_sloppy,
-		1, 0,  0, ANY_ROUTE},
-	{"sdp_with_ice",                (cmd_function)w_sdp_with_ice,
 		0, 0,  0, ANY_ROUTE},
 	{"sdp_get_line_startswith", (cmd_function)w_sdp_get_line_startswith,
 		2, 0,  0, ANY_ROUTE},
@@ -378,21 +361,25 @@ int sdp_remove_codecs_by_id(sip_msg_t* msg, str* codecs)
 	return 0;
 }
 
-/**
- * @brief remove all SDP lines that begin with prefix
- * @return -1 - error; 0 - no lines found ; 1..N - N lines deleted
- */
+// removes consecutive blocks of SDP lines that begin with script provided prefix
 int sdp_remove_line_by_prefix(sip_msg_t* msg, str* prefix)
 {
 	str body = {NULL, 0};
+	str remove = {NULL, 0};
+	str line = {NULL, 0};
+	char* del_lump_start = NULL;
+	char* del_lump_end = NULL;
+	int del_lump_flag = 0;
+	struct lump *anchor;
+	char* p = NULL;
 
 	if(parse_sdp(msg) < 0) {
-		LM_ERR("Unable to parse SDP\n");
+		LM_ERR("Unable to parse sdp\n");
 		return -1;
 	}
 
 	if(msg->body == NULL) {
-		LM_DBG("No SDP body\n");
+		LM_DBG("No sdp body\n");
 		return -1;
 	}
 
@@ -409,77 +396,69 @@ int sdp_remove_line_by_prefix(sip_msg_t* msg, str* prefix)
 		return -1;
 	}
 
-	char *ptr = NULL;
-	str line = {NULL, 0};
-	str remove = {NULL, 0};
-	int found = 0;
-	struct lump *anchor = NULL;
-
-	ptr = find_sdp_line(body.s, body.s + body.len, prefix->s[0]);
-	while (ptr)
+	p = find_sdp_line(body.s, body.s+body.len, prefix->s[0]);
+	while (p != NULL)
 	{
-		if (sdp_locate_line(msg, ptr, &line) != 0)
+		if (sdp_locate_line(msg, p, &line) != 0)
 		{
-			LM_ERR("sdp_locate_line() failed\n");
+			LM_ERR("sdp_locate_line fail\n");
 			return -1;
 		}
 
-		if (body.s + body.len < line.s + prefix->len) // check if strncmp would run too far
-		{
-			//LM_DBG("done searching, prefix string >%.*s< (%d) does not fit into remaining buffer space (%ld) \n", prefix->len, prefix->s, prefix->len, body.s + body.len - line.s);
-			break;
-		}
+		//LM_DBG("line.s: %.*s\n", line.len, line.s);
 
-		if (strncmp(line.s, prefix->s, prefix->len ) == 0)
+		if (extract_field(&line, &remove, *prefix) == 0)
 		{
-			//LM_DBG("current remove >%.*s< (%d)\n", remove.len, remove.s, remove.len);
-			if (!found) {
-				//LM_DBG("first match >%.*s< (%d)\n", line.len,line.s,line.len);
-				remove.s = line.s;
-				remove.len = line.len;
-			} else {
-				//LM_DBG("cont. match >%.*s< (%d)\n", line.len,line.s,line.len);
-				if (remove.s + remove.len == line.s) {
-					//LM_DBG("this match is right after previous match\n");
-					remove.len += line.len;
-				} else {
-					//LM_DBG("there is gap between this and previous match, remove now\n");
-					anchor = del_lump(msg, remove.s - msg->buf, remove.len, HDR_OTHER_T);
-					if (anchor==NULL)
-					{
-						LM_ERR("failed to remove lump\n");
-						return -1;
-					}
-					remove.s = line.s;
-					remove.len = line.len;
-				}
+			//LM_DBG("line range: %d - %d\n", line.s - body.s, line.s + line.len - body.s);
+
+			if (del_lump_start == NULL)
+			{
+				del_lump_start = line.s;
+				del_lump_end = line.s + line.len;
+				//LM_DBG("first match, prepare new lump  (len=%d)\n", line.len);
 			}
-			found++;
-			//LM_DBG("updated remove >%.*s< (%d)\n", remove.len, remove.s, remove.len);
+			else if ( p == del_lump_end )  // current line is same as del_lump_end
+			{
+				del_lump_end = line.s + line.len;
+				//LM_DBG("cont. match, made lump longer  (len+=%d)\n", line.len);
+			}
 
+			if (del_lump_end >= body.s + body.len)
+			{
+				//LM_DBG("end of buffer, delete lump\n");
+				del_lump_flag = 1;
+			}
+			//LM_DBG("lump pos: %d - %d\n", del_lump_start - body.s, del_lump_end - body.s);
 		}
-		ptr = find_next_sdp_line(ptr, body.s + body.len, prefix->s[0], NULL);
-	}
-
-	if (found) {
-		//LM_DBG("remove >%.*s< (%d)\n", remove.len, remove.s, remove.len);
-		anchor = del_lump(msg, remove.s - msg->buf, remove.len, HDR_OTHER_T);
-		if (anchor==NULL)
+		else if ( del_lump_end != NULL)
 		{
-			LM_ERR("failed to remove lump\n");
-			return -1;
+			//LM_DBG("line does not start with search pattern, delete current lump\n");
+			del_lump_flag = 1;
 		}
-		return found;
-	}
 
-	LM_DBG("no match\n");
+		if (del_lump_flag && del_lump_start && del_lump_end)
+		{
+			LM_DBG("del_lump range: %d - %d  len: %d\n", (int)(del_lump_start - body.s),
+					(int)(del_lump_end - body.s), (int)(del_lump_end - del_lump_start));
+
+			anchor = del_lump(msg, del_lump_start - msg->buf, del_lump_end - del_lump_start, HDR_OTHER_T);
+			if (anchor == NULL)
+			{
+				LM_ERR("failed to remove lump\n");
+				return -1;
+			}
+
+			del_lump_start = NULL;
+			del_lump_end = NULL;
+			del_lump_flag = 0;
+			//LM_DBG("succesful lump deletion\n");
+		}
+
+		p = find_sdp_line(line.s + line.len, body.s + body.len, prefix->s[0]);
+	}
 	return 0;
 }
 
-/**
- * removes all SDP lines that begin with script provided prefix
- * @return -1 - error; 1 - found
- */
 static int w_sdp_remove_line_by_prefix(sip_msg_t* msg, char* prefix, char* bar)
 {
 	str prfx = {NULL, 0};
@@ -497,7 +476,7 @@ static int w_sdp_remove_line_by_prefix(sip_msg_t* msg, char* prefix, char* bar)
 	}
 	LM_DBG("Removing SDP lines with prefix: %.*s\n", prfx.len, prfx.s);
 
-	if ( sdp_remove_line_by_prefix(msg, &prfx) < 0)
+	if(sdp_remove_line_by_prefix(msg, &prfx)<0)
 		return -1;
 	return 1;
 }
@@ -826,86 +805,6 @@ static int w_sdp_with_media(sip_msg_t* msg, char* media, char *bar)
 }
 
 /**
- * @brief check 'media' matches the value of any 'm=value ...' lines, and that line is active
- * @return -1 - error; 0 - not found or inactive; 1 - at least one sendrecv, recvonly or sendonly stream
- */
-static int sdp_with_active_media(sip_msg_t *msg, str *media)
-{
-	int sdp_session_num;
-	int sdp_stream_num;
-	int port_num;
-	sdp_session_cell_t* sdp_session;
-	sdp_stream_cell_t* sdp_stream;
-
-	if(parse_sdp(msg) < 0) {
-		LM_ERR("Unable to parse sdp\n");
-		return -1;
-	}
-
-	LM_DBG("attempting to search for media type: [%.*s]\n",
-			media->len, media->s);
-
-	sdp_session_num = 0;
-	for(;;)
-	{
-		sdp_session = get_sdp_session(msg, sdp_session_num);
-		if(!sdp_session) break;
-		sdp_stream_num = 0;
-		for(;;)
-		{
-			sdp_stream = get_sdp_stream(msg, sdp_session_num, sdp_stream_num);
-			if(!sdp_stream) break;
-
-			LM_DBG("stream %d of %d - media [%.*s]\n",
-					sdp_stream_num, sdp_session_num,
-					sdp_stream->media.len, sdp_stream->media.s);
-			if(media->len==sdp_stream->media.len
-					&& strncasecmp(sdp_stream->media.s, media->s,
-						media->len)==0) {
-				port_num = atoi(sdp_stream->port.s);
-				LM_DBG("Port number is %d\n", port_num);
-				if (port_num != 0) {  /* Zero port number => inactive */
-					LM_DBG("sendrecv_mode %.*s\n", sdp_stream->sendrecv_mode.len, sdp_stream->sendrecv_mode.s);
-					if ((sdp_stream->sendrecv_mode.len == 0) || /* No send/recv mode given => sendrecv */
-						(strncasecmp(sdp_stream->sendrecv_mode.s, "inactive", 8) != 0)) { /* Explicit mode is not inactive */
-						/* Found an active stream for the correct media type */
-						return 1;
-					}
-				}
-			}
-			sdp_stream_num++;
-		}
-		sdp_session_num++;
-	}
-
-	return 0;
-}
-
-/**
- *
- */
-static int w_sdp_with_active_media(sip_msg_t* msg, char* media, char *bar)
-{
-	str lmedia = {0, 0};
-
-	if(media==0)
-	{
-		LM_ERR("invalid parameters\n");
-		return -1;
-	}
-
-	if(fixup_get_svalue(msg, (gparam_p)media, &lmedia)!=0)
-	{
-		LM_ERR("unable to get the media value\n");
-		return -1;
-	}
-
-	if(sdp_with_active_media(msg, &lmedia)<=0)
-		return -1;
-	return 1;
-}
-
-/**
  * @brief remove streams matching the m='media'
  * @return -1 - error; 0 - not found; >=1 - found
  */
@@ -1005,12 +904,11 @@ static int w_sdp_remove_media(sip_msg_t* msg, char* media, char *bar)
 	return 1;
 }
 
-
 /** 
  * @brief check 'media' matches the value of any 'm=media port value ...' lines
  * @return -1 - error; 0 - not found; 1 - found
  */
-static int sdp_with_transport(sip_msg_t *msg, str *transport, int like)
+static int sdp_with_transport(sip_msg_t *msg, str *transport)
 {
 	int sdp_session_num;
 	int sdp_stream_num;
@@ -1039,16 +937,10 @@ static int sdp_with_transport(sip_msg_t *msg, str *transport, int like)
 			LM_DBG("stream %d of %d - transport [%.*s]\n",
 					sdp_stream_num, sdp_session_num,
 					sdp_stream->transport.len, sdp_stream->transport.s);
-			if (like == 0) {
-			    if(transport->len==sdp_stream->transport.len
-			       && strncasecmp(sdp_stream->transport.s, transport->s,
-					      transport->len)==0)
+			if(transport->len==sdp_stream->transport.len
+					&& strncasecmp(sdp_stream->transport.s, transport->s,
+						transport->len)==0)
 				return 1;
-			} else {
-			    if (ser_memmem(sdp_stream->transport.s, transport->s,
-					   sdp_stream->transport.len, transport->len)!=NULL)
-				return 1;
-			}
 			sdp_stream_num++;
 		}
 		sdp_session_num++;
@@ -1056,86 +948,6 @@ static int sdp_with_transport(sip_msg_t *msg, str *transport, int like)
 
 	return 0;
 }
-
-/** 
- * @brief assigns common media transport (if any) of 'm' lines to pv argument
- * @return -1 - error; 0 - not found; 1 - found
- */
-static int w_sdp_transport(sip_msg_t* msg, char *avp)
-{
-    int_str avp_val;
-    int_str avp_name;
-    static unsigned short avp_type = 0;
-    str s;
-    pv_spec_t *avp_spec = NULL;
-    int sdp_session_num;
-    int sdp_stream_num;
-    sdp_session_cell_t* sdp_session;
-    sdp_stream_cell_t* sdp_stream;
-    str *transport;
-
-    s.s = avp; s.len = strlen(s.s);
-    if (pv_locate_name(&s) != s.len) {
-	LM_ERR("invalid avp parameter %s\n", avp);
-	return -1;
-    }
-    if (((avp_spec = pv_cache_get(&s)) == NULL)
-	|| avp_spec->type!=PVT_AVP) {
-	LM_ERR("malformed or non AVP %s\n", avp);
-	return -1;
-    }
-    if (pv_get_avp_name(0, &avp_spec->pvp, &avp_name, &avp_type) != 0) {
-	LM_ERR("invalid AVP definition %s\n", avp);
-	return -1;
-    }
-
-    if(parse_sdp(msg) < 0) {
-	LM_ERR("unable to parse sdp\n");
-	return -1;
-    }
-
-    sdp_session_num = 0;
-    transport = (str *)NULL;
-
-    for (;;) {
-	sdp_session = get_sdp_session(msg, sdp_session_num);
-	if (!sdp_session) break;
-	sdp_stream_num = 0;
-	for (;;) {
-	    sdp_stream = get_sdp_stream(msg, sdp_session_num,
-					sdp_stream_num);
-	    if (!sdp_stream) break;
-	    LM_DBG("stream %d of %d - transport [%.*s]\n",
-		   sdp_stream_num, sdp_session_num,
-		   sdp_stream->transport.len, sdp_stream->transport.s);
-	    if (transport) {
-		if (transport->len != sdp_stream->transport.len
-		    || strncasecmp(sdp_stream->transport.s, transport->s,
-				   transport->len) != 0) {
-		    LM_DBG("no common transport\n");
-		    return -2;
-		}
-	    } else {
-		transport = &sdp_stream->transport;
-	    }
-	    sdp_stream_num++;
-	}
-	sdp_session_num++;
-    }
-    if (transport) {
-	avp_val.s.s = transport->s;
-	avp_val.s.len = transport->len;
-	LM_DBG("found common transport '%.*s'\n",
-	       transport->len, transport->s);
-	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0) {
-	    LM_ERR("failed to add transport avp");
-	    return -1;
-	}
-    }
-
-    return 1;
-}
-
 
 /**
  *
@@ -1156,31 +968,7 @@ static int w_sdp_with_transport(sip_msg_t* msg, char* transport, char *bar)
 		return -1;
 	}
 
-	if(sdp_with_transport(msg, &ltransport, 0)<=0)
-		return -1;
-	return 1;
-}
-
-/**
- *
- */
-static int w_sdp_with_transport_like(sip_msg_t* msg, char* transport, char *bar)
-{
-	str ltransport = {0, 0};
-
-	if(transport==0)
-	{
-		LM_ERR("invalid parameters\n");
-		return -1;
-	}
-
-	if(fixup_get_svalue(msg, (gparam_p)transport, &ltransport)!=0)
-	{
-		LM_ERR("unable to get the transport value\n");
-		return -1;
-	}
-
-	if(sdp_with_transport(msg, &ltransport, 1)<=0)
+	if(sdp_with_transport(msg, &ltransport)<=0)
 		return -1;
 	return 1;
 }
@@ -1388,40 +1176,12 @@ static int w_sdp_with_codecs_by_id(sip_msg_t* msg, char* codecs, char *bar)
 /**
  *
  */
-int sdp_with_codecs_by_name(sip_msg_t* msg, str* codecs)
-{
-	str idslist;
-	sdp_info_t *sdp = NULL;
-	int ret;
-
-	if(parse_sdp(msg) < 0) {
-		LM_ERR("Unable to parse sdp\n");
-		return -1;
-	}
-
-	sdp = (sdp_info_t*)msg->body;
-
-	if(sdp==NULL) {
-		LM_DBG("No sdp body\n");
-		return -1;
-	}
-
-	if(sdpops_build_ids_list(sdp, codecs, &idslist)<0)
-		return -1;
-
-	ret = sdp_with_codecs_by_id(msg, &idslist);
-	/* ret: -1 error; 0 not found */
-	if(ret<=0)
-		return (ret - 1);
-	return ret;
-}
-
-/**
- *
- */
 static int w_sdp_with_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar)
 {
 	str lcodecs = {0, 0};
+	str idslist;
+	sdp_info_t *sdp = NULL;
+	int ret;
 
 	if(codecs==0)
 	{
@@ -1435,7 +1195,26 @@ static int w_sdp_with_codecs_by_name(sip_msg_t* msg, char* codecs, char *bar)
 		return -1;
 	}
 
-	return sdp_with_codecs_by_name(msg, &lcodecs);
+	if(parse_sdp(msg) < 0) {
+		LM_ERR("Unable to parse sdp\n");
+		return -1;
+	}
+
+	sdp = (sdp_info_t*)msg->body;
+
+	if(sdp==NULL) {
+		LM_DBG("No sdp body\n");
+		return -1;
+	}
+
+	if(sdpops_build_ids_list(sdp, &lcodecs, &idslist)<0)
+		return -1;
+
+	ret = sdp_with_codecs_by_id(msg, &idslist);
+	/* ret: -1 error; 0 not found */
+	if(ret<=0)
+		return (ret - 1);
+	return ret;
 }
 
 /**
@@ -1527,80 +1306,6 @@ static int w_sdp_content(sip_msg_t* msg, char* foo, char *bar)
 	if(parse_sdp(msg)==0 && msg->body!=NULL)
 		return 1;
 	return -1;
-}
-
-/**
- *
- */
-static int w_sdp_content_sloppy(sip_msg_t* msg, char* foo, char *bar)
-{
-	str body;
-	int mime;
-
-	body.s = get_body(msg);
-	if (body.s == NULL) return -1;
-	body.len = msg->len - (int)(body.s - msg->buf);
-	if (body.len == 0) return -1;
-
-	mime = parse_content_type_hdr(msg);
-	if (mime < 0) return -1;  /* error */
-	if (mime == 0) return 1;  /* default is application/sdp */
-
-	switch (((unsigned int)mime) >> 16) {
-	case TYPE_APPLICATION:
-		if ((mime & 0x00ff) == SUBTYPE_SDP) return 1; else return -1;
-	case TYPE_MULTIPART:
-		if ((mime & 0x00ff) == SUBTYPE_MIXED) {
-			if (_strnistr(body.s, "application/sdp", body.len) == NULL) {
-				return -1;
-			} else {
-				return 1;
-			}
-		} else {
-			return -1;
-		}
-	default:
-		return -1;
-	}
-}
-
-/**
- *
- */
-int sdp_with_ice(sip_msg_t* msg)
-{
-    str ice, body;
-
-    ice.s = "a=candidate";
-    ice.len = 11;
-
-    body.s = get_body(msg);
-    if (body.s == NULL) {
-	LM_DBG("failed to get the message body\n");
-	return -1;
-    }
-
-    body.len = msg->len -(int)(body.s - msg->buf);
-    if (body.len == 0) {
-	LM_DBG("message body has length zero\n");
-	return -1;
-    }
-
-    if (ser_memmem(body.s, ice.s, body.len, ice.len) != NULL) {
-	LM_DBG("found ice attribute\n");
-	return 1;
-    } else {
-	LM_DBG("didn't find ice attribute\n");
-	return -1;
-    }
-}
-
-/**
- *
- */
-static int w_sdp_with_ice(sip_msg_t* msg, char* foo, char *bar)
-{
-    return sdp_with_ice(msg);
 }
 
 /**
@@ -1717,7 +1422,7 @@ static int w_sdp_get_line_startswith(sip_msg_t *msg, char *avp, char *s_line)
 		p = find_sdp_line(line.s + line.len, body.s + body.len, sline.s[0]);
 	}
 
-	return -1;
+	return 0;
 }
 
 /**
@@ -1729,17 +1434,5 @@ int bind_sdpops(struct sdpops_binds *sob){
 		return -1;
 	}
 	sob->sdp_with_media = sdp_with_media;
-	sob->sdp_with_active_media = sdp_with_active_media;
-	sob->sdp_with_transport = sdp_with_transport;
-	sob->sdp_with_codecs_by_id = sdp_with_codecs_by_id;
-	sob->sdp_with_codecs_by_name = sdp_with_codecs_by_name;
-	sob->sdp_with_ice = sdp_with_ice;
-	sob->sdp_keep_codecs_by_id = sdp_keep_codecs_by_id;
-	sob->sdp_keep_codecs_by_name = sdp_keep_codecs_by_name;
-	sob->sdp_remove_media = sdp_remove_media;
-	sob->sdp_remove_transport = sdp_remove_transport;
-	sob->sdp_remove_line_by_prefix = sdp_remove_line_by_prefix;
-	sob->sdp_remove_codecs_by_id = sdp_remove_codecs_by_id;
-	sob->sdp_remove_codecs_by_name = sdp_remove_codecs_by_name;
 	return 0;
 }

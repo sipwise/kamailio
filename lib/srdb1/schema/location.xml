@@ -9,7 +9,7 @@
 
 <table id="location" xmlns:db="http://docbook.org/ns/docbook">
     <name>location</name>
-    <version>8</version>
+    <version>6</version>
     <type db="mysql">&MYSQL_TABLE_TYPE;</type>
     <description>
         <db:para>Persistent user location information for the usrloc module. More information can be found at: &KAMAILIO_MOD_DOC;usrloc.html
@@ -179,39 +179,6 @@
         <description>The value of reg-id contact parameter</description>
     </column>
 
-    <column id="server_id">
-        <name>server_id</name>
-        <type>int</type>
-        <size>11</size>
-        <default>0</default>
-        <description>The value of server_id from configuration file</description>
-    </column>
-
-    <column id="connection_id">
-        <name>connection_id</name>
-        <type>int</type>
-        <size>11</size>
-        <default>0</default>
-        <description>The value of connection id for location record</description>
-    </column>
-
-    <column>
-        <name>keepalive</name>
-        <type>int</type>
-        <size>11</size>
-        <default>0</default>
-        <description>The value to control sending keep alive requests</description>
-    </column>
-
-
-    <column>
-        <name>partition</name>
-        <type>int</type>
-        <size>11</size>
-        <default>0</default>
-        <description>The value to of the partition for keep alive requests</description>
-    </column>
-
 
     <index>
         <name>account_contact_idx</name>
@@ -227,11 +194,6 @@
     <index>
         <name>expires_idx</name>
         <colref linkend="expires"/>
-    </index>
-    <index>
-        <name>connection_idx</name>
-        <colref linkend="server_id"/>
-        <colref linkend="connection_id"/>
     </index>
 
 

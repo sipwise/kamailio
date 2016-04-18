@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -57,7 +57,6 @@ int dlginfo_add_events(void)
 
 	/* modify XML body for each watcher to set the correct "version" */
     event.aux_body_processing = dlginfo_body_setversion;
-    event.aux_free_body = free_xml_body;
 
 	
     if (pres_add_event(&event) < 0) {

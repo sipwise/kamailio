@@ -1,27 +1,39 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
 
 #ifndef _T_REPLY_H
 #define _T_REPLY_H
+
+/* CANCEL_REASON_SUPPORT on by default */
+#ifndef NO_CANCEL_REASON_SUPPORT
+#define CANCEL_REASON_SUPPORT
+#endif /* NO_CANCEL_REASON_SUPPORT */
 
 #include "defs.h"
 #include "../../rpc.h"
@@ -134,11 +146,8 @@ int w_t_reply_wrp(struct sip_msg *m, unsigned int code, char *txt);
 typedef int (*tget_reply_totag_f)(struct sip_msg *, str *);
 int t_get_reply_totag(struct sip_msg *msg, str *totag);
 
-void tm_reply_mutex_lock(tm_cell_t *t);
-void tm_reply_mutex_unlock(tm_cell_t *t);
-
-#define LOCK_REPLIES(_t) tm_reply_mutex_lock((_t))
-#define UNLOCK_REPLIES(_t) tm_reply_mutex_unlock((_t))
+#define LOCK_REPLIES(_t) lock(&(_t)->reply_mutex )
+#define UNLOCK_REPLIES(_t) unlock(&(_t)->reply_mutex )
 
 /* This function is called whenever a reply for our module is received;
  * we need to register this function on module initialization;

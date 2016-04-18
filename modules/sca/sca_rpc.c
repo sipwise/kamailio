@@ -1,7 +1,9 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2012 Andrew Mortensen
  *
- * This file is part of the sca module for Kamailio, a free SIP server.
+ * This file is part of the sca module for sip-router, a free SIP server.
  *
  * The sca module is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  *
  */
@@ -113,7 +115,7 @@ sca_rpc_show_all_subscriptions( rpc_t *rpc, void *ctx )
 				&sub_uri );
 	    }
 	    if ( rc >= 0 ) {
-		rc = rpc->rpl_printf( ctx, "%.*s %.*s%s%.*s %s %ld %.*s",
+		rc = rpc->printf( ctx, "%.*s %.*s%s%.*s %s %ld %.*s",
 				    STR_FMT( &aor_uri.user ),
 				    STR_FMT( &sub_uri.host ),
 				    (sub_uri.port.len ? ":" : "" ),
@@ -125,7 +127,7 @@ sca_rpc_show_all_subscriptions( rpc_t *rpc, void *ctx )
 		LM_ERR( "sca_rpc_show_all_subscriptions: parse_uri %.*s "
 			"failed, dumping unparsed info",
 			STR_FMT( &sub->target_aor ));
-		rc = rpc->rpl_printf( ctx, "%.*s %.*s %s %ld %.*s",
+		rc = rpc->printf( ctx, "%.*s %.*s %s %ld %.*s",
 				    STR_FMT( &sub->target_aor ),
 				    STR_FMT( &sub->subscriber ),
 				    sca_event_name_from_type( sub->event ),
@@ -190,7 +192,7 @@ sca_rpc_subscription_count( rpc_t *rpc, void *ctx )
 	sca_hash_table_unlock_index( ht, i );
     }
 
-    rpc->rpl_printf( ctx, "%ld %.*s", sub_count, STR_FMT( &event_name ));
+    rpc->printf( ctx, "%ld %.*s", sub_count, STR_FMT( &event_name ));
 }
 
     void
@@ -215,7 +217,7 @@ sca_rpc_deactivate_all_subscriptions( rpc_t *rpc, void *ctx )
 	    sub->expires = 0;
 	    sub->dialog.notify_cseq += 1;
 
-	    rpc->rpl_printf( ctx, "Deactivating %s subscription from %.*s",
+	    rpc->printf( ctx, "Deactivating %s subscription from %.*s",
 			sca_event_name_from_type( sub->event ),
 			STR_FMT( &sub->subscriber ));
 	    if ( rc < 0 ) {
@@ -306,7 +308,7 @@ sca_rpc_show_subscription( rpc_t *rpc, void *ctx )
 	    }
 	}
 
-	rc = rpc->rpl_printf( ctx, "%.*s %s %.*s %d",
+	rc = rpc->printf( ctx, "%.*s %s %.*s %d",
 			    STR_FMT( &sub->target_aor ),
 			    sca_event_name_from_type( sub->event ),
 			    STR_FMT( &sub->subscriber ),
@@ -356,7 +358,7 @@ sca_rpc_show_all_appearances( rpc_t *rpc, void *ctx )
 	    app_list = (sca_appearance_list *)ent->value;
 	    for ( app = app_list->appearances; app != NULL; app = app->next ) {
 		sca_appearance_state_to_str( app->state, &state_str );
-		rc = rpc->rpl_printf( ctx, "%.*s %d %.*s %ld %.*s %.*s "
+		rc = rpc->printf( ctx, "%.*s %d %.*s %ld %.*s %.*s "
 				"%.*s %.*s %.*s",
 				STR_FMT( &app_list->aor ),
 				app->index,
@@ -411,7 +413,7 @@ sca_rpc_seize_appearance( rpc_t *rpc, void *ctx )
 	return;
     }
 
-    rpc->rpl_printf( ctx, "Seized %.*s appearance-index %d for %.*s",
+    rpc->printf( ctx, "Seized %.*s appearance-index %d for %.*s",
 		STR_FMT( &aor ), app_idx, STR_FMT( &owner ));
 
     if ( sca_notify_call_info_subscribers( sca, &aor ) < 0 ) {

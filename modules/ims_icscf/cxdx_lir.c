@@ -39,17 +39,22 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
 #include "stats.h"
 #include "../cdp/cdp_load.h"
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "cxdx_avp.h"
 #include "cxdx_lir.h"
 #include "mod.h"
 #include "location.h"
+
+#if defined (__OS_freebsd)
+#include "sys/limits.h"
+#define MAXINT INT_MAX
+#endif
 
 //we use pseudo variables to communicate back to config file this takes the result and converys to a return code, publishes it a pseudo variable
 int create_lia_return_code(int result) {
@@ -156,14 +161,14 @@ void async_cdp_lir_callback(int is_timeout, void *param, AAAMessage *lia, long e
                     goto success;
 
                 default:
-                    cscf_reply_transactional_async(t, t->uas.request, 500, MSG_500_UNKOWN_EXPERIMENTAL_RC);
+                    cscf_reply_transactional_async(t, t->uas.request, 403, MSG_403_UNKOWN_EXPERIMENTAL_RC);
                     result = CSCF_RETURN_BREAK;
                     goto done;
             }
             break;
 
         case AAA_UNABLE_TO_COMPLY:
-            cscf_reply_transactional_async(t, t->uas.request, 500, MSG_500_UNABLE_TO_COMPLY);
+            cscf_reply_transactional_async(t, t->uas.request, 403, MSG_403_UNABLE_TO_COMPLY);
             result = CSCF_RETURN_BREAK;
             goto done;
 
@@ -178,7 +183,7 @@ void async_cdp_lir_callback(int is_timeout, void *param, AAAMessage *lia, long e
 
 success:
     if (server_name.len) {
-        list = new_scscf_entry(server_name, INT_MAX, data->orig);
+        list = new_scscf_entry(server_name, MAXINT, data->orig);
     } else {
         list = I_get_capab_ordered(server_name, m_capab, m_capab_cnt, o_capab, o_capab_cnt, p_server_names, p_server_names_cnt, data->orig);
     }

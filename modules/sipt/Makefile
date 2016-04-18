@@ -1,3 +1,4 @@
+# $Id: $
 #
 # sipt module makefile
 #

@@ -1,4 +1,6 @@
 /**
+ * $Id$
+ *
  * Copyright (C) 2010 Daniel-Constantin Mierla (asipto.com)
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -214,7 +216,7 @@ int lua_sr_init_probe(void)
 	sr_lua_load_t *li;
 	struct stat sbuf;
 
-	L = luaL_newstate();
+	L = lua_open();
 	if(L==NULL)
 	{
 		LM_ERR("cannot open lua\n");
@@ -265,7 +267,7 @@ int lua_sr_init_child(void)
 	char *txt;
 
 	memset(&_sr_L_env, 0, sizeof(sr_lua_env_t));
-	_sr_L_env.L = luaL_newstate();
+	_sr_L_env.L = lua_open();
 	if(_sr_L_env.L==NULL)
 	{
 		LM_ERR("cannot open lua\n");
@@ -275,14 +277,10 @@ int lua_sr_init_child(void)
 	lua_sr_openlibs(_sr_L_env.L);
 
 	/* set SR lib version */
-#if LUA_VERSION_NUM >= 502
-	lua_pushstring(_sr_L_env.L, SRVERSION);
-	lua_setglobal(_sr_L_env.L, "SRVERSION");
-#else
 	lua_pushstring(_sr_L_env.L, "SRVERSION");
 	lua_pushstring(_sr_L_env.L, SRVERSION);
 	lua_settable(_sr_L_env.L, LUA_GLOBALSINDEX);
-#endif
+
 	if(_sr_lua_load_list != NULL)
 	{
 		_sr_L_env.LL = luaL_newstate();
@@ -295,14 +293,10 @@ int lua_sr_init_child(void)
 		lua_sr_openlibs(_sr_L_env.LL);
 
 		/* set SR lib version */
-#if LUA_VERSION_NUM >= 502
-		lua_pushstring(_sr_L_env.L, SRVERSION);
-		lua_setglobal(_sr_L_env.L, "SRVERSION");
-#else
 		lua_pushstring(_sr_L_env.LL, "SRVERSION");
 		lua_pushstring(_sr_L_env.LL, SRVERSION);
 		lua_settable(_sr_L_env.LL, LUA_GLOBALSINDEX);
-#endif
+
 		/* force loading lua lib now */
 		if(luaL_dostring(_sr_L_env.LL, "sr.probe()")!=0)
 		{

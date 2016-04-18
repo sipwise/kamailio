@@ -1,36 +1,40 @@
 /*
+ *  $Id$
+ *
  * Copyright (C)  2007-2008 Voice Sistem SRL
  *
  * Copyright (C)  2008 Juha Heinanen
  *
- * Copyright (C)  2014 Olle E. Johansson, Edvina AB
+ * This file is part of SIP-router, a free SIP server.
  *
- * This file is part of Kamailio, a free SIP server.
- *
- * Kamailio is free software; you can redistribute it and/or modify
+ * SIP-router is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * SIP-router is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2007-08-01 initial version (ancuta onofrei)
+ *  2008-10-09 module is now using pcre regexp lib (juha heinanen)
  */
 
 /*!
  * \file
- * \brief Kamailio dialplan :: Module interface
+ * \brief SIP-router dialplan :: Module interface
  * \ingroup dialplan
  * Module: \ref dialplan
  */
 
-/*! \defgroup dialplan Kamailio dialplan transformations module
+/*! \defgroup dialplan SIP-router dialplan transformations module
  *
  */
 
@@ -60,7 +64,7 @@
 
 MODULE_VERSION
 
-#define DEFAULT_PARAM    "$rU"
+#define DEFAULT_PARAM    "$ruri.user"
 
 static int mod_init(void);
 static int child_init(int rank);
@@ -74,29 +78,28 @@ static struct mi_root * mi_translate(struct mi_root *cmd_tree, void *param);
 static int dp_translate_f(struct sip_msg* msg, char* str1, char* str2);
 static int dp_trans_fixup(void ** param, int param_no);
 
-str attr_pvar_s = STR_NULL;
+str attr_pvar_s = {NULL,0};
 pv_spec_t * attr_pvar = NULL;
 
 str default_param_s = str_init(DEFAULT_PARAM);
 dp_param_p default_par2 = NULL;
 
 int dp_fetch_rows = 1000;
-int dp_match_dynamic = 0;
 
 static param_export_t mod_params[]={
-	{ "db_url",			PARAM_STR,	&dp_db_url },
-	{ "table_name",		PARAM_STR,	&dp_table_name },
-	{ "dpid_col",		PARAM_STR,	&dpid_column },
-	{ "pr_col",			PARAM_STR,	&pr_column },
-	{ "match_op_col",	PARAM_STR,	&match_op_column },
-	{ "match_exp_col",	PARAM_STR,	&match_exp_column },
-	{ "match_len_col",	PARAM_STR,	&match_len_column },
-	{ "subst_exp_col",	PARAM_STR,	&subst_exp_column },
-	{ "repl_exp_col",	PARAM_STR,	&repl_exp_column },
-	{ "attrs_col",		PARAM_STR,	&attrs_column },
-	{ "attrs_pvar",	    PARAM_STR,	&attr_pvar_s },
-	{ "fetch_rows",		PARAM_INT,	&dp_fetch_rows },
-	{ "match_dynamic",	PARAM_INT,	&dp_match_dynamic },
+	{ "db_url",			STR_PARAM,	&dp_db_url.s },
+	{ "table_name",		STR_PARAM,	&dp_table_name.s },
+	{ "dpid_col",		STR_PARAM,	&dpid_column.s },
+	{ "pr_col",			STR_PARAM,	&pr_column.s },
+	{ "match_op_col",	STR_PARAM,	&match_op_column.s },
+	{ "match_exp_col",	STR_PARAM,	&match_exp_column.s },
+	{ "match_len_col",	STR_PARAM,	&match_len_column.s },
+	{ "subst_exp_col",	STR_PARAM,	&subst_exp_column.s },
+	{ "repl_exp_col",	STR_PARAM,	&repl_exp_column.s },
+	{ "attrs_col",		STR_PARAM,	&attrs_column.s },
+	{ "attrs_pvar",	    STR_PARAM,	&attr_pvar_s.s},
+	{ "attribute_pvar",	STR_PARAM,	&attr_pvar_s.s},
+	{ "fetch_rows",		INT_PARAM,	&dp_fetch_rows},
 	{0,0,0}
 };
 
@@ -143,9 +146,22 @@ static int mod_init(void)
 		return -1;
 	}
 
-	LM_DBG("db_url=%s/%d/%p\n", ZSW(dp_db_url.s), dp_db_url.len,dp_db_url.s);
 
-	if(attr_pvar_s.s && attr_pvar_s.len>0) {
+	dp_db_url.len = dp_db_url.s ? strlen(dp_db_url.s) : 0;
+	LM_DBG("db_url=%s/%d/%p\n", ZSW(dp_db_url.s), dp_db_url.len,dp_db_url.s);
+	dp_table_name.len   = strlen(dp_table_name.s);
+	dpid_column.len     = strlen( dpid_column.s);
+	pr_column.len       = strlen(pr_column.s);
+	match_op_column.len = strlen(match_op_column.s);
+	match_exp_column.len= strlen(match_exp_column.s);
+	match_len_column.len= strlen(match_len_column.s);
+	subst_exp_column.len= strlen(subst_exp_column.s);
+	repl_exp_column.len = strlen(repl_exp_column.s);
+	attrs_column.len    = strlen(attrs_column.s);
+
+	if(attr_pvar_s.s) {
+
+		attr_pvar_s.len = strlen(attr_pvar_s.s);
 		attr_pvar = pv_cache_get(&attr_pvar_s);
 		if( (attr_pvar==NULL) ||
 				((attr_pvar->type != PVT_AVP) &&
@@ -163,7 +179,6 @@ static int mod_init(void)
 	}
 	memset(default_par2, 0, sizeof(dp_param_t));
 
-	/* emulate "$rU/$rU" as second parameter for dp_translate() */
 	default_param_s.len = strlen(default_param_s.s);
 	default_par2->v.sp[0] = pv_cache_get(&default_param_s);
 	if (default_par2->v.sp[0]==NULL) {
@@ -339,7 +354,7 @@ static int dp_translate_f(struct sip_msg* msg, char* str1, char* str2)
 	LM_DBG("input %.*s with dpid %i => output %.*s\n",
 			input.len, input.s, idp->dp_id, output.len, output.s);
 
-	/* set the output */
+	/*set the output*/
 	if (dp_update(msg, repl_par->v.sp[0], repl_par->v.sp[1],
 				&output, attrs_par) !=0){
 		LM_ERR("cannot set the output\n");
@@ -653,108 +668,12 @@ static void dialplan_rpc_translate(rpc_t* rpc, void* ctx)
 	return;
 }
 
-/*
- * RPC command to dump dialplan 
- */
-static void dialplan_rpc_dump(rpc_t* rpc, void* ctx)
-{
-	dpl_id_p idp;
-	dpl_index_p indexp;
-	dpl_node_p rulep;
-	int dpid;
-	void* th;
-	void* ih;
-	void* sh;
-
-	if (rpc->scan(ctx, "d", &dpid) < 1)
-	{
-		rpc->fault(ctx, 500, "Missing parameter");
-		return;
-	}
-
-	if ((idp = select_dpid(dpid)) == 0 ) {
-		LM_ERR("no information available for dpid %i\n", dpid);
-		rpc->fault(ctx, 500, "Dialplan ID not matched");
-		return;
-	}
-
-	LM_DBG("trying to dump dpid %i\n", idp->dp_id);
-
-	/* add entry node */
-	if (rpc->add(ctx, "{", &th) < 0)
-	{
-		rpc->fault(ctx, 500, "Internal error root reply");
-		return;
-	}
-
-	if(rpc->struct_add(th, "d[",
-				"DPID",  dpid,
-				"ENTRIES", &ih)<0)
-	{
-		rpc->fault(ctx, 500, "Internal error sets structure");
-		return;
-	}
-
-	for(indexp=idp->first_index; indexp!=NULL;indexp=indexp->next) {
-		LM_DBG("INDEX LEN: %i\n", indexp->len);
-                for(rulep = indexp->first_rule; rulep!= NULL;rulep = rulep->next) {
-			LM_DBG("DPID: %i PRIO : %i\n", rulep->dpid, rulep->pr);
-			if (rpc->struct_add(ih, "{","ENTRY", &sh) < 0)
-			{
-				rpc->fault(ctx, 500, "Internal error root reply");
-				return;
-			}
-
-			if (rpc->struct_add(sh, "dd", "PRIO", rulep->pr, 
-				"MATCHOP", rulep->matchop)<0)
-			{
-				rpc->fault(ctx, 500, "Internal error adding prio");
-				return;
-			}
-			if (rpc->struct_add(sh, "s", "MATCHEXP", rulep->match_exp) < 0 )
-			{
-				rpc->fault(ctx, 500, "Internal error adding match exp");
-				return;
-			}
-			if (rpc->struct_add(sh, "d", "MATCHLEN", rulep->matchlen) < 0 )
-			{
-				rpc->fault(ctx, 500, "Internal error adding expression data and attribute");
-				return;
-			}
-			if (rpc->struct_add(sh, "s", "SUBSTEXP", rulep->subst_exp) < 0 )
-			{
-				rpc->fault(ctx, 500, "Internal error adding subst exp");
-				return;
-			}
-			if (rpc->struct_add(sh, "s", "REPLEXP", rulep->repl_exp) < 0 )
-			{
-				rpc->fault(ctx, 500, "Internal error adding replace exp ");
-				return;
-			}
-			if (rpc->struct_add(sh, "s", "ATTRS", rulep->attrs) < 0 )
-			{
-				rpc->fault(ctx, 500, "Internal error adding attribute");
-				return;
-			}
-		}
-	}
-
-	return;
-}
-
-static const char* dialplan_rpc_dump_doc[2] = {
-	"Dump dialplan content",
-	0
-};
-
 
 rpc_export_t dialplan_rpc_list[] = {
 	{"dialplan.reload", dialplan_rpc_reload,
 		dialplan_rpc_reload_doc, 0},
 	{"dialplan.translate",   dialplan_rpc_translate,
 		dialplan_rpc_translate_doc, 0},
-	{"dialplan.dump",   dialplan_rpc_dump,
-		dialplan_rpc_dump_doc, 0},
 	{0, 0, 0, 0}
 };
 

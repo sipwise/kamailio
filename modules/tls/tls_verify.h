@@ -17,7 +17,7 @@
  */
 /*!
  * \file
- * \brief Kamailio TLS support :: Certificate verification function
+ * \brief SIP-router TLS support :: Certificate verification function
  * \ingroup tls
  * Module: \ref tls
  */

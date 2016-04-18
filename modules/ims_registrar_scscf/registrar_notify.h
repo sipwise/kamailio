@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -49,12 +49,10 @@
 
 #include "../ims_usrloc_scscf/usrloc.h"
 #include "../../locking.h"
-#include "sem.h"
 
 
 #define MSG_REG_SUBSCRIBE_OK "Subscription to REG saved"
 #define MSG_REG_UNSUBSCRIBE_OK "Subscription to REG dropped"
-#define MSG_REG_PUBLISH_OK "Publish to REG saved"
 
 
 
@@ -62,23 +60,19 @@ typedef struct _reg_notification {
     
     str subscription_state; /**< Subscription-state header value*/
     str content_type; /**< content type					*/
+    str content; /**< content						*/
     
     str watcher_contact;
     str watcher_uri;
     str presentity_uri;
     
-    struct udomain* _d;
-    str* impus;
-    int num_impus;
     
     unsigned int local_cseq;
-    unsigned int reginfo_s_version;
     str call_id;
     str from_tag;
     str to_tag;
     str record_route;
     str sockinfo_str;
-    
     
     struct _reg_notification *next; /**< next notification in the list	*/
     struct _reg_notification *prev; /**< previous notification in the list	*/
@@ -91,8 +85,6 @@ typedef struct {
     gen_lock_t *lock; /**< lock for notifications ops		*/
     reg_notification *head; /**< first notification in the list	*/
     reg_notification *tail; /**< last notification in the list	*/
-    gen_sem_t *empty;
-    int size;
 } reg_notification_list;
 
 /** Events for subscriptions */
@@ -113,7 +105,6 @@ enum {
     IMS_REGISTRAR_CONTACT_REFRESHED, /**< The expiration was refreshed					*/
     IMS_REGISTRAR_CONTACT_EXPIRED, /**< A contact has expired and will be removed		*/
     IMS_REGISTRAR_CONTACT_UNREGISTERED, /**< User unregistered with Expires 0				*/
-    IMS_REGISTRAR_CONTACT_UNREGISTERED_IMPLICIT, /**< User unregistered implicitly, ie not via explicit deregister	*/
 } IMS_Registrar_events;
 
 
@@ -121,41 +112,31 @@ int can_subscribe_to_reg(struct sip_msg *msg, char *str1, char *str2);
 
 int subscribe_to_reg(struct sip_msg *msg, char *str1, char *str2);
 
-int can_publish_reg(struct sip_msg *msg, char *str1, char *str2);
-
-int publish_reg(struct sip_msg *msg, char *str1, char *str2);
-
 int subscribe_reply(struct sip_msg *msg, int code, char *text, int *expires, str *contact);
 
-int event_reg(udomain_t* _d, impurecord_t* r_passed, int event_type, str *presentity_uri, str *watcher_contact);
+int event_reg(udomain_t* _d, impurecord_t* r_passed, ucontact_t* c_passed, int event_type, str *presentity_uri, str *watcher_contact);
 
 
 str generate_reginfo_full(udomain_t* _t, str* impu_list, int new_subscription);
 
 str get_reginfo_partial(impurecord_t *r, ucontact_t *c, int event_type);
 
-void create_notifications(udomain_t* _t, impurecord_t* r_passed, str *presentity_uri, str *watcher_contact, str* impus, int num_impus, int event_type);
+void create_notifications(udomain_t* _t, impurecord_t* r_passed, ucontact_t* c_passed, str *presentity_uri, str *watcher_contact, str content, int event_type);
 
-void notification_event_process();
+void notification_timer(unsigned int ticks, void* param);
 
 void free_notification(reg_notification *n);
 
 void send_notification(reg_notification * n);
 
 void add_notification(reg_notification *n);
-
 reg_notification* new_notification(str subscription_state,
-        str content_type, str** impus, int num_impus, reg_subscriber* r);
+        str content_type, str content, int version, reg_subscriber* r);
 
 dlg_t* build_dlg_t_from_notification(reg_notification* n);
 
 
 int notify_init();
 void notify_destroy();
-
-int aor_to_contact(str* aor, str* contact);
-int contact_port_ip_match(str *c1, str *c2);
-
-int notify_subscribers(impurecord_t* impurecord);
 
 #endif //S_CSCF_REGISTRAR_NOTIFY_H_

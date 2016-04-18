@@ -1,5 +1,5 @@
 /* 
- * Kamailio TLS module
+ * TLS module
  *
  * Copyright (C) 2010 iptelorg GmbH
  *
@@ -21,6 +21,12 @@
  * @ingroup tls
  */
  
+/*
+ * History:
+ * --------
+ *  2010-03-25  initial version (andrei)
+*/
+
 #ifndef __tls_bio_h
 #define __tls_bio_h
 

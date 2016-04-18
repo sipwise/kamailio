@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -26,16 +26,21 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../cfgt/cfgt.h"
 #include "../../dprint.h"
-#include "../../events.h"
-#include "../../locking.h"
-#include "../../lvalue.h"
+#include "../../ut.h"
 #include "../../pt.h"
-#include "../../route_struct.h"
+#include "../../events.h"
+#include "../../pvar.h"
 #include "../../rpc.h"
 #include "../../rpc_lookup.h"
-#include "../../ut.h"
+#include "../../route_struct.h"
+#include "../../mem/shm_mem.h"
+#include "../../locking.h"
+#include "../../lvalue.h"
+#include "../../hashes.h"
+#include "../../lib/srutils/srjson.h"
+#include "../../xavp.h"
+#include "../pv/pv_xavp.h"
 
 #include "debugger_act.h"
 #include "debugger_api.h"
@@ -71,7 +76,6 @@ str *dbg_get_state_name(int t)
 #define DBG_CFGTRACE_ON	(1<<0)
 #define DBG_ABKPOINT_ON	(1<<1)
 #define DBG_LBKPOINT_ON	(1<<2)
-#define DBG_CFGTEST_ON	(1<<3)
 
 static str _dbg_status_list[] = {
 	str_init("cfgtrace-on"),
@@ -80,8 +84,6 @@ static str _dbg_status_list[] = {
 	str_init("abkpoint-off"),
 	str_init("lbkpoint-on"),
 	str_init("lbkpoint-off"),
-	str_init("cfgtest-on"),
-	str_init("cfgtest-off"),
 	{0, 0}
 };
 
@@ -93,8 +95,6 @@ str *dbg_get_status_name(int t)
 		return &_dbg_status_list[2];
 	if(t&DBG_LBKPOINT_ON)
 		return &_dbg_status_list[4];
-	if(t&DBG_CFGTEST_ON)
-		return &_dbg_status_list[6];
 
 	return &_dbg_state_list[0];
 }
@@ -177,11 +177,6 @@ char *_dbg_cfgtrace_prefix = "*** cfgtrace:";
 /**
  *
  */
-char *_dbg_cfgtrace_lname = NULL;
-
-/**
- *
- */
 int _dbg_step_usleep = 100000;
 
 /**
@@ -193,12 +188,6 @@ int _dbg_step_loops = 200;
  * disabled by default
  */
 int _dbg_reset_msgid = 0;
-
-/**
- * disabled by default
- */
-int _dbg_cfgtest = 0;
-cfgt_api_t _dbg_cfgt;
 
 /**
  *
@@ -293,32 +282,6 @@ int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar)
 	return 1;
 }
 
-char* get_current_route_type_name()
-{
-	switch(route_type){
-		case REQUEST_ROUTE:
-			return "request_route";
-		case FAILURE_ROUTE:
-			return "failure_route";
-		case TM_ONREPLY_ROUTE:
-		case CORE_ONREPLY_ROUTE:
-		case ONREPLY_ROUTE:
-			return "onreply_route";
-		case BRANCH_ROUTE:
-			return "branch_route";
-		case ONSEND_ROUTE:
-			return "onsend_route";
-		case ERROR_ROUTE:
-			return "error_route";
-		case LOCAL_ROUTE:
-			return "local_route";
-		case BRANCH_FAILURE_ROUTE:
-			return "branch_failure_route";
-		default:
-			return "unknown_route";
-	}
-}
-
 /**
  * callback executed for each cfg action
  */
@@ -359,19 +322,12 @@ int dbg_cfg_trace(void *data)
 	{
 		if(is_printable(_dbg_cfgtrace_level))
 		{
-			LOG__(_dbg_cfgtrace_facility, _dbg_cfgtrace_level,
-					_dbg_cfgtrace_lname, _dbg_cfgtrace_prefix,
-					"%s=[%s] c=[%s] l=%d a=%d n=%.*s\n",
-					get_current_route_type_name(), ZSW(a->rname),
-					ZSW(a->cfile), a->cline,
-					a->type, an->len, ZSW(an->s)
+			LOG_(_dbg_cfgtrace_facility, _dbg_cfgtrace_level,
+					_dbg_cfgtrace_prefix,
+					" c=[%s] l=%d a=%d n=%.*s\n",
+					ZSW(a->cfile), a->cline, a->type, an->len, ZSW(an->s)
 				);
 		}
-	}
-	if(_dbg_pid_list[process_no].set&DBG_CFGTEST_ON)
-	{
-		if(_dbg_cfgt.cfgt_process_route(msg, a)<0)
-				LM_ERR("Error processing route\n");
 	}
 	if(!(_dbg_pid_list[process_no].set&DBG_ABKPOINT_ON))
 	{
@@ -607,8 +563,6 @@ int dbg_init_mypid(void)
 		_dbg_pid_list[process_no].set |= DBG_ABKPOINT_ON;
 	if(_dbg_cfgtrace==1)
 		_dbg_pid_list[process_no].set |= DBG_CFGTRACE_ON;
-	if(_dbg_cfgtest==1)
-		_dbg_pid_list[process_no].set |= DBG_CFGTEST_ON;
 	if(_dbg_reset_msgid==1)
 	{
 		LM_DBG("[%d] create locks\n", process_no);
@@ -981,12 +935,12 @@ static void  dbg_rpc_trace(rpc_t* rpc, void* ctx)
 /**
  *
  */
-static const char* dbg_rpc_set_mod_level_doc[2] = {
-	"Set module log level",
+static const char* dbg_rpc_mod_level_doc[2] = {
+	"Specify module log level",
 	0
 };
 
-static void dbg_rpc_set_mod_level(rpc_t* rpc, void* ctx){
+static void dbg_rpc_mod_level(rpc_t* rpc, void* ctx){
 	int l;
 	str value = {0,0};
 
@@ -998,92 +952,11 @@ static void dbg_rpc_set_mod_level(rpc_t* rpc, void* ctx){
 
 	if(dbg_set_mod_debug_level(value.s, value.len, &l)<0)
 	{
-		rpc->fault(ctx, 500, "cannot store parameter");
+		rpc->fault(ctx, 500, "cannot store parameter\n");
 		return;
 	}
 	rpc->add(ctx, "s", "200 ok");
 }
-
-/**
- *
- */
-static const char* dbg_rpc_set_mod_facility_doc[2] = {
-	"Set module log facility",
-	0
-};
-
-static void dbg_rpc_set_mod_facility(rpc_t* rpc, void* ctx) {
-	int fl;
-	str value = {0, 0};
-	str facility = {0, 0};
-
-	if (rpc->scan(ctx, "SS", &value, &facility) < 1)
-	{
-	    rpc->fault(ctx, 500, "invalid parameters");
-	    return;
-	}
-
-	if ((fl = str2facility(facility.s)) == -1) {
-	    rpc->fault(ctx, 500, "facility not found");
-	    return;
-	}
-
-	if(dbg_set_mod_debug_facility(value.s, value.len, &fl) < 0)
-	{
-	    rpc->fault(ctx, 500, "cannot store parameter");
-	    return;
-	}
-	rpc->add(ctx, "s", "200 ok");
-}
-
-/**
- *
- */
-static const char* dbg_rpc_get_mod_level_doc[2] = {
-	"Get module log level",
-	0
-};
-
-static void dbg_rpc_get_mod_level(rpc_t* rpc, void* ctx){
-	int l;
-	str value = {0,0};
-
-	if (rpc->scan(ctx, "S", &value) < 1)
-	{
-		rpc->fault(ctx, 500, "invalid parameters");
-		return;
-	}
-
-	l = get_debug_level(value.s, value.len);
-
-	rpc->add(ctx, "d", l);
-}
-
-/**
- *
- */
-static const char* dbg_rpc_get_mod_facility_doc[2] = {
-	"Get module log facility",
-	0
-};
-
-static void dbg_rpc_get_mod_facility(rpc_t* rpc, void* ctx) {
-	int fl;
-	str value = {0, 0};
-	str facility = {0, 0};
-
-	if (rpc->scan(ctx, "S", &value) < 1)
-	{
-	    rpc->fault(ctx, 500, "invalid parameters");
-	    return;
-	}
-
-	fl = get_debug_facility(value.s, value.len);
-	facility.s = facility2str(fl, &facility.len);
-
-	rpc->add(ctx, "S", &facility);
-}
-
 
 /**
  *
@@ -1125,10 +998,7 @@ rpc_export_t dbg_rpc[] = {
 	{"dbg.bp",        dbg_rpc_bp,        dbg_rpc_bp_doc,        0},
 	{"dbg.ls",        dbg_rpc_list,      dbg_rpc_list_doc,      0},
 	{"dbg.trace",     dbg_rpc_trace,     dbg_rpc_trace_doc,     0},
-	{"dbg.set_mod_level", dbg_rpc_set_mod_level, dbg_rpc_set_mod_level_doc, 0},
-	{"dbg.set_mod_facility", dbg_rpc_set_mod_facility, dbg_rpc_set_mod_facility_doc, 0},
-	{"dbg.get_mod_level", dbg_rpc_get_mod_level, dbg_rpc_get_mod_level_doc, 0},
-	{"dbg.get_mod_facility", dbg_rpc_get_mod_facility, dbg_rpc_get_mod_facility_doc, 0},
+	{"dbg.mod_level", dbg_rpc_mod_level, dbg_rpc_mod_level_doc, 0},
 	{"dbg.reset_msgid", dbg_rpc_reset_msgid, dbg_rpc_reset_msgid_doc, 0},
 	{0, 0, 0, 0}
 };
@@ -1153,19 +1023,10 @@ typedef struct _dbg_mod_level {
 	struct _dbg_mod_level *next;
 } dbg_mod_level_t;
 
-typedef struct _dbg_mod_facility {
-	str name;
-	unsigned int hashid;
-	int facility;
-	struct _dbg_mod_facility *next;
-} dbg_mod_facility_t;
-
 typedef struct _dbg_mod_slot
 {
 	dbg_mod_level_t *first;
 	gen_lock_t lock;
-	dbg_mod_facility_t *first_ft;
-	gen_lock_t lock_ft;
 } dbg_mod_slot_t;
 
 static dbg_mod_slot_t *_dbg_mod_table = NULL;
@@ -1189,19 +1050,16 @@ int dbg_init_mod_levels(int dbg_mod_hash_size)
 		return -1;
 	}
 	memset(_dbg_mod_table, 0, _dbg_mod_table_size*sizeof(dbg_mod_slot_t));
-	LM_DBG("Created _dbg_mod_table, size %d\n", _dbg_mod_table_size);
 
 	for(i=0; i<_dbg_mod_table_size; i++)
 	{
-		if(lock_init(&_dbg_mod_table[i].lock)==0 ||
-		   lock_init(&_dbg_mod_table[i].lock_ft)==0)
+		if(lock_init(&_dbg_mod_table[i].lock)==0)
 		{
-			LM_ERR("cannot initialize lock[%d]\n", i);
+			LM_ERR("cannot initalize lock[%d]\n", i);
 			i--;
 			while(i>=0)
 			{
 				lock_destroy(&_dbg_mod_table[i].lock);
-				lock_destroy(&_dbg_mod_table[i].lock_ft);
 				i--;
 			}
 			shm_free(_dbg_mod_table);
@@ -1209,63 +1067,6 @@ int dbg_init_mod_levels(int dbg_mod_hash_size)
 			return -1;
 		}
 	}
-	return 0;
-}
-
-/**
- *
- */
-int dbg_destroy_mod_levels()
-{
-	int i;
-	dbg_mod_level_t *itl = NULL;
-	dbg_mod_level_t *itlp = NULL;
-
-	dbg_mod_facility_t *itf = NULL;
-	dbg_mod_facility_t *itfp = NULL;
-
-	if (_dbg_mod_table_size <= 0)
-		return 0;
-
-	if (_dbg_mod_table == NULL)
-		return 0;
-
-	for (i = 0; i < _dbg_mod_table_size; i++) {
-		// destroy level list
-		lock_get(&_dbg_mod_table[i].lock);
-		itl = _dbg_mod_table[i].first;
-		while (itl) {
-			itlp = itl;
-			itl = itl->next;
-			shm_free(itlp);
-		}
-		lock_release(&_dbg_mod_table[i].lock);
-
-		// destroy facility list
-		lock_get(&_dbg_mod_table[i].lock_ft);
-		itf = _dbg_mod_table[i].first_ft;
-		while (itf) {
-			itfp = itf;
-			itf = itf->next;
-			shm_free(itfp);
-		}
-		lock_release(&_dbg_mod_table[i].lock_ft);
-
-		// destroy locks
-		lock_destroy(&_dbg_mod_table[i].lock);
-		lock_destroy(&_dbg_mod_table[i].lock_ft);
-
-		// reset all
-		_dbg_mod_table[i].first = NULL;
-		_dbg_mod_table[i].first_ft = NULL;
-	}
-
-	// free table
-	shm_free(_dbg_mod_table);
-	_dbg_mod_table = NULL;
-
-	LM_DBG("Destroyed _dbg_mod_table, size %d\n", _dbg_mod_table_size);
-
 	return 0;
 }
 
@@ -1344,14 +1145,15 @@ int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel)
 		itp = it;
 		it = it->next;
 	}
-	lock_release(&_dbg_mod_table[idx].lock);
 	/* not found - add */
 	if(mlevel==NULL) {
+		lock_release(&_dbg_mod_table[idx].lock);
 		return 0;
 	}
 	itn = (dbg_mod_level_t*)shm_malloc(sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
 	if(itn==NULL) {
 		LM_ERR("no more shm\n");
+		lock_release(&_dbg_mod_table[idx].lock);
 		return -1;
 	}
 	memset(itn, 0, sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
@@ -1362,7 +1164,6 @@ int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel)
 	strncpy(itn->name.s, mname, mnlen);
 	itn->name.s[itn->name.len] = '\0';
 
-	lock_get(&_dbg_mod_table[idx].lock);
 	if(itp==NULL) {
 		itn->next = _dbg_mod_table[idx].first;
 		_dbg_mod_table[idx].first = itn;
@@ -1371,82 +1172,6 @@ int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel)
 		itp->next = itn;
 	}
 	lock_release(&_dbg_mod_table[idx].lock);
-	return 0;
-
-}
-
-int dbg_set_mod_debug_facility(char *mname, int mnlen, int *mfacility)
-{
-	unsigned int idx;
-	unsigned int hid;
-	dbg_mod_facility_t *it;
-	dbg_mod_facility_t *itp;
-	dbg_mod_facility_t *itn;
-
-	if(_dbg_mod_table==NULL)
-		return -1;
-
-	hid = dbg_compute_hash(mname, mnlen);
-	idx = hid&(_dbg_mod_table_size-1);
-
-	lock_get(&_dbg_mod_table[idx].lock_ft);
-	it = _dbg_mod_table[idx].first_ft;
-	itp = NULL;
-	while(it!=NULL && it->hashid < hid) {
-		itp = it;
-		it = it->next;
-	}
-	while(it!=NULL && it->hashid==hid)
-	{
-		if(mnlen==it->name.len
-				&& strncmp(mname, it->name.s, mnlen)==0)
-		{
-			/* found */
-			if(mfacility==NULL) {
-				/* remove */
-				if(itp!=NULL) {
-					itp->next = it->next;
-				} else {
-					_dbg_mod_table[idx].first_ft = it->next;
-				}
-				shm_free(it);
-			} else {
-				/* set */
-				it->facility = *mfacility;
-			}
-			lock_release(&_dbg_mod_table[idx].lock_ft);
-			return 0;
-		}
-		itp = it;
-		it = it->next;
-	}
-	lock_release(&_dbg_mod_table[idx].lock_ft);
-	/* not found - add */
-	if(mfacility==NULL) {
-		return 0;
-	}
-	itn = (dbg_mod_facility_t*)shm_malloc(sizeof(dbg_mod_facility_t) + (mnlen+1)*sizeof(char));
-	if(itn==NULL) {
-		LM_ERR("no more shm\n");
-		return -1;
-	}
-	memset(itn, 0, sizeof(dbg_mod_facility_t) + (mnlen+1)*sizeof(char));
-	itn->facility = *mfacility;
-	itn->hashid   = hid;
-	itn->name.s   = (char*)(itn) + sizeof(dbg_mod_facility_t);
-	itn->name.len = mnlen;
-	strncpy(itn->name.s, mname, mnlen);
-	itn->name.s[itn->name.len] = '\0';
-
-	lock_get(&_dbg_mod_table[idx].lock_ft);
-	if(itp==NULL) {
-		itn->next = _dbg_mod_table[idx].first_ft;
-		_dbg_mod_table[idx].first_ft = itn;
-	} else {
-		itn->next = itp->next;
-		itp->next = itn;
-	}
-	lock_release(&_dbg_mod_table[idx].lock_ft);
 	return 0;
 
 }
@@ -1498,53 +1223,6 @@ int dbg_get_mod_debug_level(char *mname, int mnlen, int *mlevel)
 	return -1;
 }
 
-static int _dbg_get_mod_debug_facility = 0;
-int dbg_get_mod_debug_facility(char *mname, int mnlen, int *mfacility)
-{
-	unsigned int idx;
-	unsigned int hid;
-	dbg_mod_facility_t *it;
-	/* no LOG*() usage in this function and those executed insite it
-	 * - use fprintf(stderr, ...) if need for troubleshooting
-	 * - it will loop otherwise */
-	if(_dbg_mod_table==NULL)
-		return -1;
-
-	if (!dbg_cfg) {
-		return -1;
-	}
-
-	if(cfg_get(dbg, dbg_cfg, mod_facility_mode)==0)
-		return -1;
-
-	if(_dbg_get_mod_debug_facility!=0)
-		return -1;
-	_dbg_get_mod_debug_facility = 1;
-
-	hid = dbg_compute_hash(mname, mnlen);
-	idx = hid&(_dbg_mod_table_size-1);
-	lock_get(&_dbg_mod_table[idx].lock_ft);
-	it = _dbg_mod_table[idx].first_ft;
-	while(it!=NULL && it->hashid < hid)
-		it = it->next;
-	while(it!=NULL && it->hashid == hid)
-	{
-		if(mnlen==it->name.len
-				&& strncmp(mname, it->name.s, mnlen)==0)
-		{
-			/* found */
-			*mfacility = it->facility;
-		    lock_release(&_dbg_mod_table[idx].lock_ft);
-			_dbg_get_mod_debug_facility = 0;
-			return 0;
-		}
-		it = it->next;
-	}
-	lock_release(&_dbg_mod_table[idx].lock_ft);
-	_dbg_get_mod_debug_facility = 0;
-	return -1;
-}
-
 /**
  *
  */
@@ -1553,13 +1231,6 @@ void dbg_enable_mod_levels(void)
 	if(_dbg_mod_table==NULL)
 		return;
 	set_module_debug_level_cb(dbg_get_mod_debug_level);
-}
-
-void dbg_enable_mod_facilities(void)
-{
-	if(_dbg_mod_table==NULL)
-		return;
-	set_module_debug_facility_cb(dbg_get_mod_debug_facility);
 }
 
 #define DBG_PVCACHE_SIZE 32
@@ -1723,7 +1394,7 @@ void dbg_enable_log_assign(void)
 	set_log_assign_action_cb(dbg_log_assign);
 }
 
-int dbg_mode_fixup(void *temp_handle,
+int dbg_level_mode_fixup(void *temp_handle,
 	str *group_name, str *var_name, void **value){
 	if(_dbg_mod_table==NULL)
 	{
@@ -1731,4 +1402,377 @@ int dbg_mode_fixup(void *temp_handle,
 		return -1;
 	}
 	return 0;
+}
+
+int _dbg_get_array_avp_vals(struct sip_msg *msg,
+		pv_param_t *param, srjson_doc_t *jdoc, srjson_t **jobj,
+		str *item_name)
+{
+	struct usr_avp *avp;
+	unsigned short name_type;
+	int_str avp_name;
+	int_str avp_value;
+	struct search_state state;
+	srjson_t *jobjt;
+	memset(&state, 0, sizeof(struct search_state));
+
+	if(pv_get_avp_name(msg, param, &avp_name, &name_type)!=0)
+	{
+		LM_ERR("invalid name\n");
+		return -1;
+	}
+	*jobj = srjson_CreateArray(jdoc);
+	if(*jobj==NULL)
+	{
+		LM_ERR("cannot create json object\n");
+		return -1;
+	}
+	if ((avp=search_first_avp(name_type, avp_name, &avp_value, &state))==0)
+	{
+		goto ok;
+	}
+	do
+	{
+		if(avp->flags & AVP_VAL_STR)
+		{
+			jobjt = srjson_CreateStr(jdoc, avp_value.s.s, avp_value.s.len);
+			if(jobjt==NULL)
+			{
+				LM_ERR("cannot create json object\n");
+				return -1;
+			}
+		} else {
+			jobjt = srjson_CreateNumber(jdoc, avp_value.n);
+			if(jobjt==NULL)
+			{
+				LM_ERR("cannot create json object\n");
+				return -1;
+			}
+		}
+		srjson_AddItemToArray(jdoc, *jobj, jobjt);
+	} while ((avp=search_next_avp(&state, &avp_value))!=0);
+ok:
+	item_name->s = avp_name.s.s;
+	item_name->len = avp_name.s.len;
+	return 0;
+}
+#define DBG_XAVP_DUMP_SIZE 32
+static str* _dbg_xavp_dump[DBG_XAVP_DUMP_SIZE];
+int _dbg_xavp_dump_lookup(pv_param_t *param)
+{
+	unsigned int i = 0;
+	pv_xavp_name_t *xname;
+
+	if(param==NULL)
+		return -1;
+
+	xname = (pv_xavp_name_t*)param->pvn.u.dname;
+
+	while(_dbg_xavp_dump[i]!=NULL&&i<DBG_XAVP_DUMP_SIZE)
+	{
+		if(_dbg_xavp_dump[i]->len==xname->name.len)
+		{
+			if(strncmp(_dbg_xavp_dump[i]->s, xname->name.s, xname->name.len)==0)
+				return 1; /* already dump before */
+		}
+		i++;
+	}
+	if(i==DBG_XAVP_DUMP_SIZE)
+	{
+		LM_WARN("full _dbg_xavp_dump cache array\n");
+		return 0; /* end cache names */
+	}
+	_dbg_xavp_dump[i] = &xname->name;
+	return 0;
+}
+
+void _dbg_get_obj_xavp_val(sr_xavp_t *avp, srjson_doc_t *jdoc, srjson_t **jobj)
+{
+	static char _pv_xavp_buf[128];
+	int result = 0;
+
+	switch(avp->val.type) {
+		case SR_XTYPE_NULL:
+			*jobj = srjson_CreateNull(jdoc);
+		break;
+		case SR_XTYPE_INT:
+			*jobj = srjson_CreateNumber(jdoc, avp->val.v.i);
+		break;
+		case SR_XTYPE_STR:
+			*jobj = srjson_CreateStr(jdoc, avp->val.v.s.s, avp->val.v.s.len);
+		break;
+		case SR_XTYPE_TIME:
+			result = snprintf(_pv_xavp_buf, 128, "%lu", (long unsigned)avp->val.v.t);
+		break;
+		case SR_XTYPE_LONG:
+			result = snprintf(_pv_xavp_buf, 128, "%ld", (long unsigned)avp->val.v.l);
+		break;
+		case SR_XTYPE_LLONG:
+			result = snprintf(_pv_xavp_buf, 128, "%lld", avp->val.v.ll);
+		break;
+		case SR_XTYPE_XAVP:
+			result = snprintf(_pv_xavp_buf, 128, "<<xavp:%p>>", avp->val.v.xavp);
+		break;
+		case SR_XTYPE_DATA:
+			result = snprintf(_pv_xavp_buf, 128, "<<data:%p>>", avp->val.v.data);
+		break;
+		default:
+			LM_WARN("unknown data type\n");
+			*jobj = srjson_CreateNull(jdoc);
+	}
+	if(result<0)
+	{
+		LM_ERR("cannot convert to str\n");
+		*jobj = srjson_CreateNull(jdoc);
+	}
+	else if(*jobj==NULL)
+	{
+		*jobj = srjson_CreateStr(jdoc, _pv_xavp_buf, 128);
+	}
+}
+
+int _dbg_get_obj_avp_vals(str name, sr_xavp_t *xavp, srjson_doc_t *jdoc, srjson_t **jobj)
+{
+	sr_xavp_t *avp = NULL;
+	srjson_t *jobjt = NULL;
+
+	*jobj = srjson_CreateArray(jdoc);
+	if(*jobj==NULL)
+	{
+		LM_ERR("cannot create json object\n");
+		return -1;
+	}
+	avp = xavp;
+	while(avp!=NULL&&!STR_EQ(avp->name,name))
+	{
+		avp = avp->next;
+	}
+	while(avp!=NULL)
+	{
+		_dbg_get_obj_xavp_val(avp, jdoc, &jobjt);
+		srjson_AddItemToArray(jdoc, *jobj, jobjt);
+		jobjt = NULL;
+		avp = xavp_get_next(avp);
+	}
+
+	return 0;
+}
+
+int _dbg_get_obj_xavp_vals(struct sip_msg *msg,
+		pv_param_t *param, srjson_doc_t *jdoc, srjson_t **jobjr,
+		str *item_name)
+{
+	pv_xavp_name_t *xname = (pv_xavp_name_t*)param->pvn.u.dname;
+	sr_xavp_t *xavp = NULL;
+	sr_xavp_t *avp = NULL;
+	srjson_t *jobj = NULL;
+	srjson_t *jobjt = NULL;
+	struct str_list *keys;
+	struct str_list *k;
+
+	*jobjr = srjson_CreateArray(jdoc);
+	if(*jobjr==NULL)
+	{
+		LM_ERR("cannot create json object\n");
+		return -1;
+	}
+
+	item_name->s = xname->name.s;
+	item_name->len = xname->name.len;
+	xavp = xavp_get_by_index(&xname->name, 0, NULL);
+	if(xavp==NULL)
+	{
+		return 0; /* empty */
+	}
+
+	do
+	{
+		if(xavp->val.type==SR_XTYPE_XAVP)
+		{
+			avp = xavp->val.v.xavp;
+			jobj = srjson_CreateObject(jdoc);
+			if(jobj==NULL)
+			{
+				LM_ERR("cannot create json object\n");
+				return -1;
+			}
+			keys = xavp_get_list_key_names(xavp);
+			if(keys!=NULL)
+			{
+				do
+				{
+					_dbg_get_obj_avp_vals(keys->s, avp, jdoc, &jobjt);
+					srjson_AddStrItemToObject(jdoc, jobj, keys->s.s,
+						keys->s.len, jobjt);
+					k = keys;
+					keys = keys->next;
+					pkg_free(k);
+					jobjt = NULL;
+				}while(keys!=NULL);
+			}
+		}
+		if(jobj!=NULL)
+		{
+			srjson_AddItemToArray(jdoc, *jobjr, jobj);
+			jobj = NULL;
+		}
+	}while((xavp = xavp_get_next(xavp))!=0);
+
+	return 0;
+}
+
+int dbg_dump_json(struct sip_msg* msg, unsigned int mask, int level)
+{
+	int i;
+	pv_value_t value;
+	pv_cache_t **_pv_cache = pv_cache_get_table();
+	pv_cache_t *el = NULL;
+	srjson_doc_t jdoc;
+	srjson_t *jobj = NULL;
+	char *output = NULL;
+	str item_name = STR_NULL;
+	static char iname[128];
+	int result = -1;
+
+	if(_pv_cache==NULL)
+	{
+		LM_ERR("cannot access pv_cache\n");
+		return -1;
+	}
+
+	memset(_dbg_xavp_dump, 0, sizeof(str*)*DBG_XAVP_DUMP_SIZE);
+	srjson_InitDoc(&jdoc, NULL);
+	if(jdoc.root==NULL)
+	{
+		jdoc.root = srjson_CreateObject(&jdoc);
+		if(jdoc.root==NULL)
+		{
+			LM_ERR("cannot create json root\n");
+			goto error;
+		}
+	}
+	for(i=0;i<PV_CACHE_SIZE;i++)
+	{
+		el = _pv_cache[i];
+		while(el)
+		{
+			if(!(el->spec.type==PVT_AVP||
+				el->spec.type==PVT_SCRIPTVAR||
+				el->spec.type==PVT_XAVP||
+				el->spec.type==PVT_OTHER)||
+				!((el->spec.type==PVT_AVP&&mask&DBG_DP_AVP)||
+				(el->spec.type==PVT_XAVP&&mask&DBG_DP_XAVP)||
+				(el->spec.type==PVT_SCRIPTVAR&&mask&DBG_DP_SCRIPTVAR)||
+				(el->spec.type==PVT_OTHER&&mask&DBG_DP_OTHER))||
+				(el->spec.trans!=NULL))
+			{
+				el = el->next;
+				continue;
+			}
+			jobj = NULL;
+			item_name.len = 0;
+			item_name.s = 0;
+			iname[0] = '\0';
+			if(el->spec.type==PVT_AVP)
+			{
+				if(el->spec.pvp.pvi.type==PV_IDX_ALL||
+					(el->spec.pvp.pvi.type==PV_IDX_INT&&el->spec.pvp.pvi.u.ival!=0))
+				{
+					el = el->next;
+					continue;
+				}
+				else
+				{
+					if(_dbg_get_array_avp_vals(msg, &el->spec.pvp, &jdoc, &jobj, &item_name)!=0)
+					{
+						LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
+						el = el->next;
+						continue;
+					}
+					if(srjson_GetArraySize(&jdoc, jobj)==0 && !(mask&DBG_DP_NULL))
+					{
+						el = el->next;
+						continue;
+					}
+					snprintf(iname, 128, "$avp(%.*s)", item_name.len, item_name.s);
+				}
+			}
+			else if(el->spec.type==PVT_XAVP)
+			{
+				if(_dbg_xavp_dump_lookup(&el->spec.pvp)!=0)
+				{
+					el = el->next;
+					continue;
+				}
+				if(_dbg_get_obj_xavp_vals(msg, &el->spec.pvp, &jdoc, &jobj, &item_name)!=0)
+				{
+					LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
+					el = el->next;
+					continue;
+				}
+				if(srjson_GetArraySize(&jdoc, jobj)==0 && !(mask&DBG_DP_NULL))
+				{
+					el = el->next;
+					continue;
+				}
+				snprintf(iname, 128, "$xavp(%.*s)", item_name.len, item_name.s);
+			}
+			else
+			{
+				if(pv_get_spec_value(msg, &el->spec, &value)!=0)
+				{
+					LM_WARN("can't get value[%.*s]\n", el->pvname.len, el->pvname.s);
+					el = el->next;
+					continue;
+				}
+				if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE))
+				{
+					if(mask&DBG_DP_NULL)
+					{
+						jobj = srjson_CreateNull(&jdoc);
+					}
+					else
+					{
+						el = el->next;
+						continue;
+					}
+				}else if(value.flags&(PV_VAL_INT)){
+					jobj = srjson_CreateNumber(&jdoc, value.ri);
+				}else if(value.flags&(PV_VAL_STR)){
+					jobj = srjson_CreateStr(&jdoc, value.rs.s, value.rs.len);
+				}else {
+					LM_WARN("el->pvname[%.*s] value[%d] unhandled\n", el->pvname.len, el->pvname.s,
+						value.flags);
+					el = el->next;
+					continue;
+				}
+				if(jobj==NULL)
+				{
+					LM_ERR("el->pvname[%.*s] empty json object\n", el->pvname.len,
+						el->pvname.s);
+					goto error;
+				}
+				snprintf(iname, 128, "%.*s", el->pvname.len, el->pvname.s);
+			}
+			if(jobj!=NULL)
+			{
+				srjson_AddItemToObject(&jdoc, jdoc.root, iname, jobj);
+			}
+			el = el->next;
+		}
+	}
+	output = srjson_PrintUnformatted(&jdoc, jdoc.root);
+	if(output==NULL)
+	{
+		LM_ERR("cannot print json doc\n");
+		goto error;
+	}
+	LOG(level, "%s\n", output);
+	result = 0;
+
+error:
+	if(output!=NULL) jdoc.free_fn(output);
+	srjson_DestroyDoc(&jdoc);
+
+	return result;
 }

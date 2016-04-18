@@ -39,14 +39,14 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
 #include "stats.h"
 #include "../cdp/cdp_load.h"
 #include "../../modules/tm/tm_load.h"
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "../ims_usrloc_scscf/usrloc.h"
 #include "api.h"
 #include "cxdx_avp.h"
@@ -61,11 +61,6 @@
 #include "../../data_lump_rpl.h"
 #include "sip_msg.h"
 #include "regtime.h"
-#include "../../parser/hf.h"
-#include "../../lib/ims/ims_getters.h"
-#include "registrar_notify.h"
-
-extern struct cdp_binds cdpb;
 
 int create_return_code(int result) {
     int rc;
@@ -199,7 +194,7 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *saa, long elaps
                 goto error;
 
             case AAA_SUCCESS:
-                LM_DBG("received AAA success for SAR - SAA\n");
+                LM_DBG("received AAA success\n");
                 break;
 
             default:
@@ -225,8 +220,7 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *saa, long elaps
                 rerrno = R_SAR_FAILED;
                 goto error;
             }
-            LM_DBG("Successfully parse user data XML setting ref to 1 (we are referencing it)\n");
-            s->ref_count = 1; //no need to lock as nobody else will be referencing this piece of memory just yet
+            LM_DBG("Successfully parse user data XML\n");
         } else {
             if (data->require_user_data) {
                 LM_ERR("We require User data for this assignment/register and none was supplied\n");
@@ -245,7 +239,7 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *saa, long elaps
         }
 
         //here we update the contacts and also build the new contact header for the 200 OK reply
-        if (update_contacts(t->uas.request, data->domain, &data->public_identity, data->sar_assignment_type, &s, &ccf1, &ccf2, &ecf1, &ecf2, &data->contact_header) <= 0) {
+        if (update_contacts_new(t->uas.request, data->domain, &data->public_identity, data->sar_assignment_type, &s, &ccf1, &ccf2, &ecf1, &ecf2, &data->contact_header) <= 0) {
             LM_ERR("Error processing REGISTER\n");
             rerrno = R_SAR_FAILED;
             goto error;
@@ -269,10 +263,6 @@ done:
 
     create_return_code(result);
 
-    //release our reference on subscription (s)
-    if (s) 
-        ul.unref_subscription(s);
-    
     //free memory
     if (saa) cdpb.AAAFreeMessage(&saa);
     if (t) {
@@ -287,10 +277,11 @@ done:
     return;
 
 error:
-    create_return_code(-2);
     if (data->sar_assignment_type != AVP_IMS_SAR_UNREGISTERED_USER)
         reg_send_reply_transactional(t->uas.request, data->contact_header, t);
 		
+    create_return_code(-2);
+
 error_no_send: //if we don't have the transaction then we can't send a transaction response
     update_stat(rejected_registrations, 1);
     //free memory
@@ -319,7 +310,6 @@ int cxdx_send_sar(struct sip_msg *msg, str public_identity, str private_identity
     AAAMessage *sar = 0;
     AAASession *session = 0;
     unsigned int hash = 0, label = 0;
-    struct hdr_field *hdr;
 
     session = cdpb.AAACreateSession(0);
 
@@ -330,7 +320,6 @@ int cxdx_send_sar(struct sip_msg *msg, str public_identity, str private_identity
     }
     if (!sar) goto error1;
 
-    if (!cxdx_add_call_id(sar, cscf_get_call_id(msg, &hdr))) goto error1;
     if (!cxdx_add_destination_realm(sar, cxdx_dest_realm)) goto error1;
 
     if (!cxdx_add_vendor_specific_appid(sar, IMS_vendor_id_3GPP, IMS_Cx, 0 /*IMS_Cx*/)) goto error1;

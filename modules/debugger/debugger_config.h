@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -34,7 +34,6 @@
 
 struct cfg_group_dbg {
 	unsigned int mod_level_mode;
-	unsigned int mod_facility_mode;
 	unsigned int mod_hash_size;
 };
 
@@ -42,6 +41,6 @@ extern struct cfg_group_dbg	default_dbg_cfg;
 extern void	*dbg_cfg;
 extern cfg_def_t dbg_cfg_def[];
 
-extern int dbg_mode_fixup(void *temp_handle,
+extern int dbg_level_mode_fixup(void *temp_handle,
 	str *group_name, str *var_name, void **value);
 #endif

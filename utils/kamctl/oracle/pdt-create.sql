@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('pdt','1');
 CREATE TABLE pdt (
     id NUMBER(10) PRIMARY KEY,
     sdomain VARCHAR2(128),
@@ -14,5 +15,3 @@ END pdt_tr;
 /
 BEGIN map2users('pdt'); END;
 /
-INSERT INTO version (table_name, table_version) values ('pdt','1');
-

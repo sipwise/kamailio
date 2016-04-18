@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * History:
  * --------
@@ -48,7 +48,6 @@ typedef struct acc_param {
 	int code;
 	str code_s;
 	str reason;
-	pv_elem_p  elem;
 } acc_param_t;
 
 /* various acc variables */
@@ -110,7 +109,7 @@ typedef struct acc_engine {
 #define ACC_CORE_LEN  6
 
 
-enum {TYPE_NULL = 0, TYPE_INT, TYPE_STR, TYPE_DOUBLE, TYPE_DATE};
+enum {TYPE_NULL = 0, TYPE_INT, TYPE_STR};
 
 
 typedef int (*register_engine_f)(acc_engine_t *eng);

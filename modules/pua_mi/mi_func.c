@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
  
 #include <stdio.h>
@@ -33,6 +33,7 @@
 #include "../../lib/kcore/cmpapi.h"
 
 #include "../pua/pua_bind.h"
+#include "../pua/pua.h"
 #include "pua_mi.h"
 
 /*
@@ -41,11 +42,8 @@
  *		<expires>
  *		<event package>
  *		<content_type>     - body type if body of a type different from default
- *		                     event content-type or .
- *		<id>               - id for a series of related PUBLISHes to the same
- *		                     presentity-uri or .
+ *                            event content-type or . 
  *		<ETag>             - ETag that publish should match or . if no ETag
- *		<outbound_proxy>   - outbound proxy or .
  *		<extra_headers>    - extra headers to be added to the request or .
  *		<publish_body>     - may not be present in case of update for expire
  */
@@ -62,7 +60,6 @@ struct mi_root* mi_pua_publish(struct mi_root* cmd, void* param)
 	str content_type;
 	str id;
 	str etag;
-	str outbound_proxy;
 	str extra_headers;
 	int result;
 	int sign= 1;
@@ -172,21 +169,6 @@ struct mi_root* mi_pua_publish(struct mi_root* cmd, void* param)
 	if(node == NULL)
 		return 0;
 
-	/* Get outbound_proxy */
-	if (publish_with_ob_proxy) {
-
-		outbound_proxy = node->value;
-		if(outbound_proxy.s== NULL || outbound_proxy.len== 0) {
-			LM_ERR("empty outbound proxy parameter\n");
-			return init_mi_tree(400, "Empty outbound proxy", 20);
-		}
-		LM_DBG("outbound_proxy '%.*s'\n",
-		       outbound_proxy.len, outbound_proxy.s);
-	
-		node = node->next;
-		if(node == NULL) return 0;
-	}
-
 	/* Get extra_headers */
 	extra_headers = node->value;
 	if(extra_headers.s== NULL || extra_headers.len== 0)
@@ -257,21 +239,9 @@ struct mi_root* mi_pua_publish(struct mi_root* cmd, void* param)
 	}	
 	publ.expires= exp;
 
-	if (publish_with_ob_proxy) {
-		if (!((outbound_proxy.len == 1) &&
-		      (outbound_proxy.s[0] == '.')))
-			publ.outbound_proxy = &outbound_proxy;
-	}
-
 	if (!(extra_headers.len == 1 && extra_headers.s[0] == '.')) {
 	    publ.extra_headers = &extra_headers;
 	}
-
-	if (!(etag.len== 1 && etag.s[0]== '.'))
-	{
-		publ.etag= &etag;
-	}	
-	publ.expires= exp;
 
 	if (cmd->async_hdl!=NULL)
 	{

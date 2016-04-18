@@ -1,4 +1,6 @@
-/*
+/**
+ * $Id$
+ *
  * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com)
  *
  * This file is part of kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 		       
 #ifndef _UAC_SEND_H_
@@ -29,7 +31,6 @@ int pv_set_uac_req(struct sip_msg* msg, pv_param_t *param,
 		int op, pv_value_t *val);
 int pv_parse_uac_req_name(pv_spec_p sp, str *in);
 void uac_req_init(void);
-int uac_req_send(void);
-int w_uac_req_send(struct sip_msg *msg, char *s1, char *s2);
+int uac_req_send(struct sip_msg *msg, char *s1, char *s2);
 
 #endif

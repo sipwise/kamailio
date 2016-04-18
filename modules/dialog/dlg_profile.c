@@ -15,7 +15,11 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * History:
+ * --------
+ * 2008-04-20  initial version (bogdan)
  *
  */
 
@@ -35,7 +39,6 @@
 #include "../../ut.h"
 #include "../../route.h"
 #include "../../modules/tm/tm_load.h"
-#include "../../lib/srutils/sruid.h"
 #include "dlg_hash.h"
 #include "dlg_var.h"
 #include "dlg_handlers.h"
@@ -63,8 +66,6 @@ static dlg_profile_table_t* new_dlg_profile( str *name,
 		unsigned int size, unsigned int has_value);
 
 extern int update_dlg_timeout(dlg_cell_t *, int);
-
-static sruid_t _dlg_profile_sruid;
 
 /*!
  * \brief Add profile definitions to the global list
@@ -105,9 +106,9 @@ int add_profile_definitions( char* profiles, unsigned int has_value)
 
 		/* check the name format */
 		for(i=0;i<name.len;i++) {
-			if ( !isalnum(name.s[i]) && name.s[i] != '_' ) {
+			if ( !isalnum(name.s[i]) ) {
 				LM_ERR("bad profile name <%.*s>, char %c - use only "
-					"alphanumerical characters or '_'\n", name.len,name.s,name.s[i]);
+					"alphanumerical characters\n", name.len,name.s,name.s[i]);
 				return -1;
 			}
 		}
@@ -213,12 +214,10 @@ static struct dlg_profile_table* new_dlg_profile( str *name, unsigned int size,
 
 	/* link profile */
 	for( ptmp=profiles ; ptmp && ptmp->next; ptmp=ptmp->next );
-	if (ptmp==NULL) {
+	if (ptmp==NULL)
 		profiles = profile;
-		sruid_init(&_dlg_profile_sruid, '-', "dlgp", SRUID_INC);
-	} else {
+	else
 		ptmp->next = profile;
-	}
 
 	return profile;
 }
@@ -293,119 +292,6 @@ void destroy_linkers(struct dlg_profile_link *linker)
 
 
 /*!
- * \brief Calculate the hash profile from a dialog
- * \see core_hash
- * \param value hash source
- * \param dlg dialog cell
- * \param profile dialog profile table (for hash size)
- * \return value hash if the value has a value, hash over dialog otherwise
- */
-inline static unsigned int calc_hash_profile(str *value1, str *value2,
-		dlg_profile_table_t *profile)
-{
-	if (profile->has_value) {
-		/* do hash over the value1 */
-		return core_hash( value1, NULL, profile->size);
-	} else {
-		/* do hash over the value2 */
-		if(value2)
-			return core_hash( value2, NULL, profile->size);
-		return 0;
-	}
-}
-
-
-/*!
- * \brief Remove remote profile items that are expired
- * \param te expiration time
- */
-void remove_expired_remote_profiles(time_t te)
-{
-	struct dlg_profile_table *profile;
-	struct dlg_profile_entry *p_entry;
-	struct dlg_profile_hash *lh;
-	struct dlg_profile_hash *kh;
-	int i;
-
-	for( profile=profiles ; profile ; profile=profile->next ) {
-		if(profile->flags&FLAG_PROFILE_REMOTE) {
-			for(i=0; i<profile->size; i++) {
-				/* space for optimization */
-				lock_get(&profile->lock);
-				p_entry = &profile->entries[i];
-				lh = p_entry->first;
-				while(lh) {
-					kh = lh->next;
-					if(lh->dlg==NULL && lh->expires>0 && lh->expires<te) {
-						/* last element on the list? */
-						if (lh==lh->next) {
-							p_entry->first = NULL;
-						} else {
-							if (p_entry->first==lh)
-								p_entry->first = lh->next;
-							lh->next->prev = lh->prev;
-							lh->prev->next = lh->next;
-						}
-						lh->next = lh->prev = NULL;
-						if(lh->linker) shm_free(lh->linker);
-						p_entry->content--;
-						lock_release(&profile->lock);
-						return;
-					}
-					lh = kh;
-				}
-				lock_release(&profile->lock);
-			}
-		}
-	}
-}
-
-/*!
- * \brief Remove profile
- * \param profile pointer to profile
- * \param value profile value
- * \param puid profile unique id
- */
-int remove_profile(dlg_profile_table_t *profile, str *value, str *puid)
-{
-	unsigned int hash;
-	struct dlg_profile_entry *p_entry;
-	struct dlg_profile_hash *lh;
-
-	hash = calc_hash_profile(value, puid, profile);
-	lock_get(&profile->lock );
-	p_entry = &profile->entries[hash];
-	lh = p_entry->first;
-	if(lh) {
-		do {
-			if(lh->dlg==NULL && lh->puid_len==puid->len
-					&& lh->value.len==value->len
-					&& strncmp(lh->puid, puid->s, puid->len)==0
-					&& strncmp(lh->value.s, value->s, value->len)==0) {
-				/* last element on the list? */
-				if (lh==lh->next) {
-					p_entry->first = NULL;
-				} else {
-					if (p_entry->first==lh)
-						p_entry->first = lh->next;
-					lh->next->prev = lh->prev;
-					lh->prev->next = lh->next;
-				}
-				lh->next = lh->prev = NULL;
-				if(lh->linker) shm_free(lh->linker);
-				p_entry->content--;
-				lock_release(&profile->lock );
-				return 1;
-			}
-			lh = lh->next;
-		} while(lh != p_entry->first);
-	}
-	lock_release(&profile->lock );
-	return 0;
-}
-
-
-/*!
  * \brief Callback for cleanup of profile local vars
  * \param msg SIP message
  * \param flags unused
@@ -458,35 +344,27 @@ int profile_cleanup( struct sip_msg *msg, unsigned int flags, void *param )
 }
 
 
+
 /*!
- * \brief Link a dialog profile
- * \param linker dialog linker
- * \param vkey key for profile hash table
+ * \brief Calculate the hash profile from a dialog
+ * \see core_hash
+ * \param value hash source
+ * \param dlg dialog cell
+ * \param profile dialog profile table (for hash size)
+ * \return value hash if the value has a value, hash over dialog otherwise
  */
-static void link_profile(struct dlg_profile_link *linker, str *vkey)
+inline static unsigned int calc_hash_profile(str *value, dlg_cell_t *dlg,
+		dlg_profile_table_t *profile)
 {
-	unsigned int hash;
-	struct dlg_profile_entry *p_entry;
-
-	/* calculate the hash position */
-	hash = calc_hash_profile(&linker->hash_linker.value, vkey, linker->profile);
-	linker->hash_linker.hash = hash;
-
-	/* insert into profile hash table */
-	p_entry = &linker->profile->entries[hash];
-	lock_get( &linker->profile->lock );
-	if (p_entry->first) {
-		linker->hash_linker.prev = p_entry->first->prev;
-		linker->hash_linker.next = p_entry->first;
-		p_entry->first->prev->next = &linker->hash_linker;
-		p_entry->first->prev = &linker->hash_linker;
+	if (profile->has_value) {
+		/* do hash over the value */
+		return core_hash( value, NULL, profile->size);
 	} else {
-		p_entry->first = linker->hash_linker.next 
-			= linker->hash_linker.prev = &linker->hash_linker;
+		/* do hash over dialog pointer */
+		return ((unsigned long)dlg) % profile->size ;
 	}
-	p_entry->content ++;
-	lock_release( &linker->profile->lock );
 }
+
 
 /*!
  * \brief Link a dialog profile
@@ -495,6 +373,8 @@ static void link_profile(struct dlg_profile_link *linker, str *vkey)
  */
 static void link_dlg_profile(struct dlg_profile_link *linker, struct dlg_cell *dlg)
 {
+	unsigned int hash;
+	struct dlg_profile_entry *p_entry;
 	struct dlg_entry *d_entry;
 
 	/* add the linker to the dialog */
@@ -513,7 +393,24 @@ static void link_dlg_profile(struct dlg_profile_link *linker, struct dlg_cell *d
 		linker->hash_linker.dlg = dlg;
 	}
 
-	link_profile(linker, &dlg->callid);
+	/* calculate the hash position */
+	hash = calc_hash_profile(&linker->hash_linker.value, dlg, linker->profile);
+	linker->hash_linker.hash = hash;
+
+	/* insert into profile hash table */
+	p_entry = &linker->profile->entries[hash];
+	lock_get( &linker->profile->lock );
+	if (p_entry->first) {
+		linker->hash_linker.prev = p_entry->first->prev;
+		linker->hash_linker.next = p_entry->first;
+		p_entry->first->prev->next = &linker->hash_linker;
+		p_entry->first->prev = &linker->hash_linker;
+	} else {
+		p_entry->first = linker->hash_linker.next 
+			= linker->hash_linker.prev = &linker->hash_linker;
+	}
+	p_entry->content ++;
+	lock_release( &linker->profile->lock );
 }
 
 
@@ -578,9 +475,8 @@ int set_dlg_profile(struct sip_msg *msg, str *value, struct dlg_profile_table *p
 	}
 	memset(linker, 0, sizeof(struct dlg_profile_link));
 
-	/* set backpointers to profile and linker (itself) */
+	/* set backpointer to profile */
 	linker->profile = profile;
-	linker->hash_linker.linker = linker;
 
 	/* set the value */
 	if (profile->has_value) {
@@ -588,9 +484,6 @@ int set_dlg_profile(struct sip_msg *msg, str *value, struct dlg_profile_table *p
 		memcpy( linker->hash_linker.value.s, value->s, value->len);
 		linker->hash_linker.value.len = value->len;
 	}
-	sruid_next_safe(&_dlg_profile_sruid);
-	strcpy(linker->hash_linker.puid, _dlg_profile_sruid.uid.s);
-	linker->hash_linker.puid_len = _dlg_profile_sruid.uid.len;
 
 	if (dlg!=NULL) {
 		/* add linker directly to the dialog and profile */
@@ -628,52 +521,34 @@ error:
  * \param profile dialog profile table
  * \return 0 on success, -1 on failure
  */
-int dlg_add_profile(dlg_cell_t *dlg, str *value, struct dlg_profile_table *profile,
-		str *puid, time_t expires, int flags)
+int dlg_add_profile(dlg_cell_t *dlg, str *value, struct dlg_profile_table *profile)
 {
 	dlg_profile_link_t *linker;
-	str vkey;
+
+	if (dlg==NULL)
+		return -1;
 
 	/* build new linker */
 	linker = (struct dlg_profile_link*)shm_malloc(
-		sizeof(struct dlg_profile_link) + (profile->has_value?(value->len+1):0) );
+		sizeof(struct dlg_profile_link) + (profile->has_value?value->len:0) );
 	if (linker==NULL) {
 		LM_ERR("no more shm memory\n");
 		goto error;
 	}
 	memset(linker, 0, sizeof(struct dlg_profile_link));
 
-	/* set backpointers to profile and linker (itself) */
+	/* set backpointer to profile */
 	linker->profile = profile;
-	linker->hash_linker.linker = linker;
 
 	/* set the value */
 	if (profile->has_value) {
 		linker->hash_linker.value.s = (char*)(linker+1);
 		memcpy( linker->hash_linker.value.s, value->s, value->len);
 		linker->hash_linker.value.len = value->len;
-		linker->hash_linker.value.s[value->len] = '\0';
 	}
-	if(puid && puid->s && puid->len>0 && puid->len<SRUID_SIZE) {
-		strcpy(linker->hash_linker.puid, puid->s);
-		linker->hash_linker.puid_len = puid->len;
-	} else {
-		sruid_next_safe(&_dlg_profile_sruid);
-		strcpy(linker->hash_linker.puid, _dlg_profile_sruid.uid.s);
-		linker->hash_linker.puid_len = _dlg_profile_sruid.uid.len;
-	}
-	linker->hash_linker.expires = expires;
-	linker->hash_linker.flags = flags;
 
 	/* add linker directly to the dialog and profile */
-	if(dlg!=NULL) {
-		link_dlg_profile(linker, dlg);
-	} else {
-		vkey.s = linker->hash_linker.puid;
-		vkey.len = linker->hash_linker.puid_len;
-		profile->flags |= FLAG_PROFILE_REMOTE;
-		link_profile(linker, &vkey);
-	}
+	link_dlg_profile( linker, dlg);
 	return 0;
 error:
 	return -1;
@@ -1155,8 +1030,8 @@ error:
 int dlg_profiles_to_json(dlg_cell_t *dlg, srjson_doc_t *jdoc)
 {
 	dlg_profile_link_t *l;
-	srjson_t *aj = NULL;
-	srjson_t *pj = NULL;
+	srjson_t *sj = NULL;
+	srjson_t *dj = NULL;
 
 	LM_DBG("serializing profiles for dlg[%u:%u]\n",
 				dlg->h_entry, dlg->h_id);
@@ -1166,38 +1041,33 @@ int dlg_profiles_to_json(dlg_cell_t *dlg, srjson_doc_t *jdoc)
 				dlg->h_entry, dlg->h_id);
 
 	for (l = dlg->profile_links ; l ; l=l->next) {
-		if(aj==NULL)
-		{
-			aj = srjson_CreateArray(jdoc);
-			if(aj==NULL)
-			{
-				LM_ERR("cannot create json profiles array object\n");
-				goto error;
-			}
-		}
-		pj = srjson_CreateObject(jdoc);
-		if(pj==NULL)
-		{
-			LM_ERR("cannot create json dynamic profiles obj\n");
-			goto error;
-		}
-
-		srjson_AddStrStrToObject(jdoc, pj,
-					"name", 4,
-					l->profile->name.s, l->profile->name.len);
 		if(l->profile->has_value)
 		{
-			srjson_AddStrStrToObject(jdoc, pj,
-					"value", 5,
+			if(dj==NULL)
+			{
+				dj = srjson_CreateObject(jdoc);
+				if(dj==NULL)
+				{
+					LM_ERR("cannot create json dynamic profiles obj\n");
+					goto error;
+				}
+			}
+			srjson_AddStrStrToObject(jdoc, dj,
+					l->profile->name.s, l->profile->name.len,
 					l->hash_linker.value.s, l->hash_linker.value.len);
+		} else {
+			if(sj==NULL)
+			{
+				sj = srjson_CreateArray(jdoc);
+				if(sj==NULL)
+				{
+					LM_ERR("cannot create json static profiles obj\n");
+					goto error;
+				}
+			}
+			srjson_AddItemToArray(jdoc, sj,
+					srjson_CreateStr(jdoc, l->profile->name.s, l->profile->name.len));
 		}
-		if(l->hash_linker.puid[0]!='\0')
-			srjson_AddStringToObject(jdoc, pj, "puid", l->hash_linker.puid);
-		if(l->hash_linker.expires!=0)
-			srjson_AddNumberToObject(jdoc, pj, "expires", l->hash_linker.expires);
-		if(l->hash_linker.flags!=0)
-			srjson_AddNumberToObject(jdoc, pj, "flags", l->hash_linker.flags);
-		srjson_AddItemToArray(jdoc, aj, pj);
 	}
 
 	if(jdoc->root==NULL)
@@ -1209,8 +1079,10 @@ int dlg_profiles_to_json(dlg_cell_t *dlg, srjson_doc_t *jdoc)
 			goto error;
 		}
 	}
-	if(aj!=NULL)
-		srjson_AddItemToObject(jdoc, jdoc->root, "profiles", aj);
+	if(dj!=NULL)
+		srjson_AddItemToObject(jdoc, jdoc->root, "dprofiles", dj);
+	if(sj!=NULL)
+		srjson_AddItemToObject(jdoc, jdoc->root, "sprofiles", sj);
 	if(jdoc->buf.s != NULL)
 	{
 		jdoc->free_fn(jdoc->buf.s);
@@ -1228,7 +1100,8 @@ int dlg_profiles_to_json(dlg_cell_t *dlg, srjson_doc_t *jdoc)
 	return -1;
 
 error:
-	srjson_Delete(jdoc, aj);
+	srjson_Delete(jdoc, dj);
+	srjson_Delete(jdoc, sj);
 	return -1;
 }
 
@@ -1238,15 +1111,12 @@ error:
  */
 int dlg_json_to_profiles(dlg_cell_t *dlg, srjson_doc_t *jdoc)
 {
-	srjson_t *aj = NULL;
+	srjson_t *sj = NULL;
+	srjson_t *dj = NULL;
 	srjson_t *it = NULL;
-	srjson_t *jt = NULL;
 	dlg_profile_table_t *profile;
 	str name;
 	str val;
-	str puid;
-	time_t expires;
-	int flags;
 
 	if(dlg==NULL || jdoc==NULL || jdoc->buf.s==NULL)
 		return -1;
@@ -1260,102 +1130,51 @@ int dlg_json_to_profiles(dlg_cell_t *dlg, srjson_doc_t *jdoc)
 			return -1;
 		}
 	}
-	aj = srjson_GetObjectItem(jdoc, jdoc->root, "profiles");
-	if(aj!=NULL)
+	dj = srjson_GetObjectItem(jdoc, jdoc->root, "dprofiles");
+	sj = srjson_GetObjectItem(jdoc, jdoc->root, "sprofiles");
+	if(dj!=NULL)
 	{
-		for(it=aj->child; it; it = it->next)
+		for(it=dj->child; it; it = it->next)
 		{
-			name.s = val.s = puid.s = NULL;
-			expires = 0; flags = 0;
-			for(jt = it->child; jt; jt = jt->next) {
-				if(strcmp(jt->string, "name")==0) {
-					name.s = jt->valuestring;
-					name.len = strlen(name.s);
-				} else if(strcmp(jt->string, "value")==0) {
-					val.s = jt->valuestring;
-					val.len = strlen(val.s);
-				} else if(strcmp(jt->string, "puid")==0) {
-					puid.s = jt->valuestring;
-					puid.len = strlen(puid.s);
-				} else if(strcmp(jt->string, "expires")==0) {
-					expires = (time_t)jt->valueint;
-				} else if(strcmp(jt->string, "flags")==0) {
-					flags = jt->valueint;
-				}
-			}
-			if(name.s==NULL)
-				continue;
+			name.s = it->string;
+			name.len = strlen(name.s);
+			val.s = it->valuestring;
+			val.len = strlen(val.s);
 			profile = search_dlg_profile(&name);
 			if(profile==NULL)
 			{
 				LM_ERR("profile [%.*s] not found\n", name.len, name.s);
 				continue;
 			}
-			if(val.s!=NULL) {
-				if(profile->has_value)
-				{
-					if(dlg_add_profile(dlg, &val, profile, &puid, expires, flags) < 0)
-						LM_ERR("dynamic profile cannot be added, ignore!\n");
-					else
-						LM_DBG("dynamic profile added [%s : %s]\n", name.s, val.s);
-				}
-			} else {
-				if(!profile->has_value)
-				{
-					if(dlg_add_profile(dlg, NULL, profile, &puid, expires, flags) < 0)
-						LM_ERR("static profile cannot be added, ignore!\n");
-					else
-						LM_DBG("static profile added [%s]\n", name.s);
-				}
+			if(profile->has_value)
+			{
+				if(dlg_add_profile(dlg, &val, profile) < 0)
+					LM_ERR("dynamic profile cannot be added, ignore!\n");
+				else
+					LM_DBG("dynamic profile added [%s : %s]\n", name.s, val.s);
 			}
 		}
 	}
-	return 0;
-}
-
-/*!
- *
- */
-int dlg_cmd_remote_profile(str *cmd, str *pname, str *value, str *puid,
-		time_t expires, int flags)
-{
-	dlg_profile_table_t *dprofile;
-	int ret;
-
-	if(cmd==NULL || cmd->s==NULL || cmd->len<=0
-			|| pname==NULL || pname->s==NULL || pname->len<=0
-			|| puid==NULL || puid->s==NULL || puid->len<=0) {
-		LM_ERR("invalid parameters\n");
-		return -1;
-	}
-	dprofile = search_dlg_profile(pname);
-	if(dprofile==NULL) {
-		LM_ERR("profile [%.*s] not found\n", pname->len, pname->s);
-		return -1;
-	}
-	if(dprofile->has_value) {
-		if(value==NULL || value->s==NULL || value->len<=0) {
-			LM_ERR("profile [%.*s] requires a value\n", pname->len, pname->s);
-			return -1;
+	if(sj!=NULL)
+	{
+		for(it=sj->child; it; it = it->next)
+		{
+			name.s = it->valuestring;
+			name.len = strlen(name.s);
+			profile = search_dlg_profile(&name);
+			if(profile==NULL)
+			{
+				LM_ERR("profile [%.*s] not found\n", name.len, name.s);
+				continue;
+			}
+			if(!profile->has_value)
+			{
+				if(dlg_add_profile(dlg, NULL, profile) < 0)
+					LM_ERR("static profile cannot be added, ignore!\n");
+				else
+					LM_DBG("static profile added [%s]\n", name.s);
+			}
 		}
-	}
-
-	if(cmd->len==3 && strncmp(cmd->s, "add", 3)==0) {
-		if(value && value->s && value->len>0) {
-			ret = dlg_add_profile(NULL, value, dprofile, puid, expires, flags);
-		} else {
-			ret = dlg_add_profile(NULL, NULL, dprofile, puid, expires, flags);
-		}
-		if(ret<0) {
-			LM_ERR("failed to add to profile [%.*s]\n", pname->len, pname->s);
-			return -1;
-		}
-	} else if(cmd->len==2 && strncmp(cmd->s, "rm", 2)==0) {
-		ret = remove_profile(dprofile, value, puid);
-		return ret;
-	} else {
-		LM_ERR("unknown command [%.*s]\n", cmd->len, cmd->s);
-		return -1;
 	}
 	return 0;
 }

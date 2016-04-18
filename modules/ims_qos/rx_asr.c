@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  *
  *
@@ -53,16 +53,13 @@
 
 #include "../cdp_avp/mod_export.h"
 
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "../ims_usrloc_pcscf/usrloc.h"
 #include "rx_authdata.h"
 
 #include "rx_asr.h"
 #include "rx_avp.h"
 #include "../../lib/ims/ims_getters.h"
-#include "ims_qos_stats.h"
-
-extern struct ims_qos_counters_h ims_qos_cnts_h;
 
 /*
  * Called upon receipt of an ASR. Terminates the user session and returns the ASA.
@@ -79,15 +76,13 @@ AAAMessage* rx_process_asr(AAAMessage *request) {
 
     if (!request || !request->sessionId) return 0;
 
-    counter_inc(ims_qos_cnts_h.asrs);
-    
     session = cdpb.AAAGetAuthSession(request->sessionId->data);
 
     if (!session) {
         LM_DBG("received an ASR but the session is already deleted\n");
         return 0;
     }
-    
+
     code = rx_get_abort_cause(request);
     LM_DBG("abort-cause code is %u\n", code);
 

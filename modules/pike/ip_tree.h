@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,8 +17,16 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ *  2004-07-28  s/lock_set_t/gen_lock_set_t/ because of a type conflict
+ *              on darwin (andrei)
+ *  2004-11-05  adaptiv init lock (bogdan)
+ *  2005-06-02  flags added to ip_node structure (bogdan)
+ *  2008-04-17  the leaf nodes memorize (via flags) if they are in RED state
+ *               (detected) or not -> better logging and MI (bogdan)
  */
 
 #ifndef _IP_TREE_H

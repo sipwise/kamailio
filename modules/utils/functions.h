@@ -18,13 +18,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
 /*!
  * \file
- * \brief Kamailio utils :: 
+ * \brief SIP-router utils :: 
  * \ingroup utils
  * Module: \ref utils
  */
@@ -40,7 +40,7 @@
  * Performs http_query and saves possible result (first body line of reply)
  * to pvar.
  */
-int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post, char* _hdr);
+int http_query(struct sip_msg* _m, char* _url, char* _dst, char* _post);
 
 
 #endif /* UTILS_FUNCTIONS_H */

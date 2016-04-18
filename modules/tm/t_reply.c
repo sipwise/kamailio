@@ -1,25 +1,106 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * History:
+ * --------
+ *  2003-01-19  faked lump list created in on_reply handlers
+ *  2003-01-27  next baby-step to removing ZT - PRESERVE_ZT (jiri)
+ *  2003-02-13  updated to use rb->dst (andrei)
+ *  2003-02-18  replaced TOTAG_LEN w/ TOTAG_VALUE_LEN (TOTAG_LEN was defined
+ *               twice with different values!)  (andrei)
+ *  2003-02-28  scratchpad compatibility abandoned (jiri)
+ *  2003-03-01  kr set through a function now (jiri)
+ *  2003-03-06  saving of to-tags for ACK/200 matching introduced,
+ *              voicemail changes accepted, updated to new callback
+ *              names (jiri)
+ *  2003-03-10  fixed new to tag bug/typo (if w/o {})  (andrei)
+ *  2003-03-16  removed _TOTAG (jiri)
+ *  2003-03-31  200 for INVITE/UAS resent even for UDP (jiri)
+ *  2003-03-31  removed msg->repl_add_rm (andrei)
+ *  2003-04-05  s/reply_route/failure_route, onreply_route introduced (jiri)
+ *  2003-04-14  local acks generated before reply processing to avoid
+ *              delays in length reply processing (like opening TCP
+ *              connection to an unavailable destination) (jiri)
+ *  2003-09-11  updates to new build_res_buf_from_sip_req() interface (bogdan)
+ *  2003-09-11  t_reply_with_body() reshaped to use reply_lumps +
+ *              build_res_buf_from_sip_req() instead of
+ *              build_res_buf_with_body_from_sip_req() (bogdan)
+ *  2003-11-05  flag context updated from failure/reply handlers back
+ *              to transaction context (jiri)
+ *  2003-11-11: build_lump_rpl() removed, add_lump_rpl() has flags (bogdan)
+ *  2003-12-04  global TM callbacks switched to per transaction callbacks
+ *              (bogdan)
+ *  2004-02-06: support for user pref. added - destroy_avps (bogdan)
+ *  2003-11-05  flag context updated from failure/reply handlers back
+ *              to transaction context (jiri)
+ *  2003-11-11: build_lump_rpl() removed, add_lump_rpl() has flags (bogdan)
+ *  2004-02-13: t->is_invite and t->local replaced with flags (bogdan)
+ *  2004-02-18  fifo_t_reply imported from vm module (bogdan)
+ *  2004-08-23  avp list is available from failure/on_reply routes (bogdan)
+ *  2004-10-01  added a new param.: restart_fr_on_each_reply (andrei)
+ *  2005-03-01  force for statefull replies the incoming interface of
+ *              the request (bogdan)
+ *  2005-09-01  reverted to the old way of checking response.dst.send_sock
+ *               in t_retransmit_reply & reply_light (andrei)
+ *  2005-11-09  updated to the new timers interface (andrei)
+ *  2006-02-07  named routes support (andrei)
+ *  2006-09-13  t_pick_branch will skip also over branches with empty reply 
+ *              t_should_relay_response will re-pick the branch if failure 
+ *               route /handlers added new branches (andrei)
+ * 2006-10-05  better final reply selection: t_pick_branch will prefer 6xx,
+ *              if no 6xx reply => lowest class/code; if class==4xx =>
+ *              prefer 401, 407, 415, 420 and 484   (andrei)
+ * 2006-10-12  dns failover when a 503 is received
+ *              replace a 503 final relayed reply by a 500 (andrei)
+ * 2006-10-16  aggregate all the authorization headers/challenges when
+ *               the final response is 401 or 407 (andrei)
+ * 2007-03-08  membar_write() used in update_totag_set(...)(andrei)
+ * 2007-03-15  build_local_ack: removed next_hop and replaced with dst to 
+ *              avoid resolving next_hop twice
+ *              added TMCB_ONSEND callbacks support for replies & ACKs (andrei)
+ * 2007-05-28: build_ack() constructs the ACK from the
+ *             outgoing INVITE instead of the incomming one.
+ *             (it can be disabled with reparse_invite=0) (Miklos)
+ * 2007-09-03: drop_replies() has been introduced (Miklos)
+ * 2008-03-12  use cancel_b_method on 6xx (andrei)
+ * 2008-05-30  make sure the wait timer is started after we don't need t
+ *             anymore to allow safe calls from fr_timer (andrei)
+ * 2009-06-01  Pre- and post-script callbacks of branch route are 
+ *             executed (Miklos)
+ * 2009-12-10  reply route is executed under lock to protect the avps (andrei)
+ * 2010-02-22  _reply() will cleanup any reply lumps that it might have added
+ *             (andrei)
+ * 2010-02-26  added experimental support for final reply dropping, not
+ *             enabled by default (performance hit) (andrei)
+ * 2010-02-26  cancel reason (rfc3326) basic support (andrei)
  *
  */
 
- /** Defines:
+ /* Defines:
   *           TM_ONREPLY_FINAL_DROP_OK - allows dropping the final reply
   *            from the tm onreply_routes, but comes with a small performance
   *            hit (extra unlock()/lock() for each final reply when a onreply
@@ -110,7 +191,7 @@ extern int tm_remap_503_500;
  * - 3 - all branches are discarded if a new leg of serial forking
  *       is started (default kamailio 1.5.x behaviour)
  */
-int failure_reply_mode = 3;
+int failure_reply_mode = 0;
 
 /* responses priority (used by t_pick_branch)
  *  0xx is used only for the initial value (=> should have no chance to be
@@ -554,8 +635,7 @@ static int _reply_light( struct cell *trans, char* buf, unsigned int len,
 	/* t_update_timers_after_sending_reply( rb ); */
 	update_reply_stats( code );
 	trans->relayed_reply_branch=-2;
-	t_stats_rpl_generated();
-	t_stats_rpl_sent();
+	t_stats_replied_locally();
 	if (lock) UNLOCK_REPLIES( trans );
 
 	/* do UAC cleanup procedures in case we generated
@@ -820,31 +900,7 @@ void faked_env(struct cell *t, struct sip_msg *msg, int is_async_env) {
 	}
 }
 
-/**
- * helper function to clone back to pkg fields that can change in fake_req
- */
-int fake_req_clone_str_helper(str *src, str *dst, char *txt)
-{
-	/* src string can change -- make a private copy */
-	if (src->s!=0 && src->len!=0) {
-		dst->s=pkg_malloc(src->len+1);
-		if (!dst->s) {
-			LM_ERR("no pkg mem to clone %s back to faked msg\n", txt);
-			return -1;
-		}
-		dst->len=src->len;
-		memcpy(dst->s, src->s, dst->len);
-		dst->s[dst->len]=0;
-	}else{
-		/* in case src->len==0, but src->s!=0 (extra safety) */
-		dst->s = 0;
-	}
-	return 0;
-}
 
-/**
- * fake a semi-private sip message using transaction's shared memory message
- */
 int fake_req(struct sip_msg *faked_req,
 		struct sip_msg *shmem_msg, int extra_flags, struct ua_client *uac)
 {
@@ -864,40 +920,47 @@ int fake_req(struct sip_msg *faked_req,
 	
 	faked_req->msg_flags|=extra_flags; /* set the extra tm flags */
 
-	/* path_vec was cloned in shm and can change -- make a private copy */
-	if(fake_req_clone_str_helper(&shmem_msg->path_vec, &faked_req->path_vec,
-				"path_vec")<0) {
-		goto error00;
+	/* dst_uri can change ALSO!!! -- make a private copy */
+	if (shmem_msg->dst_uri.s!=0 && shmem_msg->dst_uri.len!=0) {
+		faked_req->dst_uri.s=pkg_malloc(shmem_msg->dst_uri.len+1);
+		if (!faked_req->dst_uri.s) {
+			LOG(L_ERR, "ERROR: fake_req: no uri/pkg mem\n");
+			goto error01;
+		}
+		faked_req->dst_uri.len=shmem_msg->dst_uri.len;
+		memcpy( faked_req->dst_uri.s, shmem_msg->dst_uri.s,
+			faked_req->dst_uri.len);
+		faked_req->dst_uri.s[faked_req->dst_uri.len]=0;
+	}else{
+		/* in case len==0, but shmem_msg->dst_uri.s!=0 (extra safety) */
+		faked_req->dst_uri.s = 0;
 	}
-	/* dst_uri was cloned in shm and can change -- make a private copy */
-	if(fake_req_clone_str_helper(&shmem_msg->dst_uri, &faked_req->dst_uri,
-				"dst_uri")<0) {
-		goto error01;
+	/* new_uri can change -- make a private copy */
+	if (shmem_msg->new_uri.s!=0 && shmem_msg->new_uri.len!=0) {
+		faked_req->new_uri.s=pkg_malloc(shmem_msg->new_uri.len+1);
+		if (!faked_req->new_uri.s) {
+			LOG(L_ERR, "ERROR: fake_req: no uri/pkg mem\n");
+			goto error00;
+		}
+		faked_req->new_uri.len=shmem_msg->new_uri.len;
+		memcpy( faked_req->new_uri.s, shmem_msg->new_uri.s,
+			faked_req->new_uri.len);
+		faked_req->new_uri.s[faked_req->new_uri.len]=0;
+	}else{
+		/* in case len==0, but shmem_msg->new_uri.s!=0  (extra safety)*/
+		faked_req->new_uri.s = 0;
 	}
-	/* new_uri was cloned in shm and can change -- make a private copy */
-	if(fake_req_clone_str_helper(&shmem_msg->new_uri, &faked_req->new_uri,
-				"new_uri")<0) {
-		goto error02;
-	}
-
 	if(uac) setbflagsval(0, uac->branch_flags);
 	else setbflagsval(0, 0);
 
 	return 1;
-
-error02:
+error00:
 	if (faked_req->dst_uri.s) {
 		pkg_free(faked_req->dst_uri.s);
 		faked_req->dst_uri.s = 0;
 		faked_req->dst_uri.len = 0;
 	}
 error01:
-	if (faked_req->path_vec.s) {
-		pkg_free(faked_req->path_vec.s);
-		faked_req->path_vec.s = 0;
-		faked_req->path_vec.len = 0;
-	}
-error00:
 	return 0;
 }
 
@@ -983,8 +1046,6 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 		 * set next failure route, failure_route will not be reentered
 		 * on failure */
 		t->on_failure=0;
-		/* if continuing on timeout of a suspended transaction, reset the flag */
-		t->flags &= ~T_ASYNC_SUSPENDED;
 		if (exec_pre_script_cb(&faked_req, FAILURE_CB_TYPE)>0) {
 			/* run a failure_route action if some was marked */
 			if (run_top_route(failure_rt.rlist[on_failure], &faked_req, 0)<0)
@@ -1732,7 +1793,6 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 	str* to_tag;
 	str reason;
 	struct tmcb_params onsend_params;
-	struct ip_addr ip;
 
 	/* keep compiler warnings about use of uninit vars silent */
 	res_len=0;
@@ -1740,6 +1800,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 	relayed_msg=0;
 	relayed_code=0;
 	totag_retr=0;
+
 
 	/* remember, what was sent upstream to know whether we are
 	 * forwarding a first final reply or not */
@@ -1867,7 +1928,6 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 			}
 		}
 		update_reply_stats( relayed_code );
-		t_stats_rpl_sent();
 		if (!buf) {
 			LOG(L_ERR, "ERROR: relay_reply: "
 				"no mem for outbound reply buffer\n");
@@ -1890,9 +1950,9 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		memcpy( uas_rb->buffer, buf, res_len );
 		if (relayed_msg==FAKED_REPLY) { /* to-tags for local replies */
 			update_local_tags(t, &bm, uas_rb->buffer, buf);
-			t_stats_rpl_generated();
+			t_stats_replied_locally();
 		}
-
+		
 		/* update the status ... */
 		t->uas.status = relayed_code;
 		t->relayed_reply_branch = relay;
@@ -1925,41 +1985,22 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		if (reply_status == RPS_COMPLETED) {
 			start_final_repl_retr(t);
 		}
-		if (likely(uas_rb->dst.send_sock)) {
-			if (onsend_route_enabled(SIP_REPLY) && p_msg && (p_msg != FAKED_REPLY)) {
-				if (run_onsend(p_msg, &uas_rb->dst, buf, res_len)==0){
-					su2ip_addr(&ip, &(uas_rb->dst.to));
-					LOG(L_ERR, "forward_reply: reply to %s:%d(%d) dropped"
-							" (onsend_route)\n", ip_addr2a(&ip),
-								su_getport(&(uas_rb->dst.to)), uas_rb->dst.proto);
-					/* workaround for drop - reset send_sock to skip sending out */
-					uas_rb->dst.send_sock = 0;
-				}
+		if (likely(uas_rb->dst.send_sock &&
+					SEND_PR_BUFFER( uas_rb, buf, res_len ) >= 0)){
+			if (unlikely(!totag_retr && has_tran_tmcbs(t, TMCB_RESPONSE_OUT))){
+				run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb, t->uas.request,
+				                              relayed_msg, relayed_code);
 			}
-		}
-
-		if (likely(uas_rb->dst.send_sock)) {
-			if (SEND_PR_BUFFER( uas_rb, buf, res_len ) >= 0){
-				if (unlikely(!totag_retr && has_tran_tmcbs(t, TMCB_RESPONSE_OUT))){
-					LOCK_REPLIES( t );
-					run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb, t->uas.request,
-												  relayed_msg, relayed_code);
-					UNLOCK_REPLIES( t );
-				}
-				if (unlikely(has_tran_tmcbs(t, TMCB_RESPONSE_SENT))){
-					INIT_TMCB_ONSEND_PARAMS(onsend_params, t->uas.request,
-										relayed_msg, uas_rb, &uas_rb->dst, buf,
-										res_len,
-										(relayed_msg==FAKED_REPLY)?TMCB_LOCAL_F:0,
-										uas_rb->branch, relayed_code);
-					LOCK_REPLIES( t );
-					run_trans_callbacks_off_params(TMCB_RESPONSE_SENT, t, &onsend_params);
-					UNLOCK_REPLIES( t );
-				}
+			if (unlikely(has_tran_tmcbs(t, TMCB_RESPONSE_SENT))){
+				INIT_TMCB_ONSEND_PARAMS(onsend_params, t->uas.request,
+									relayed_msg, uas_rb, &uas_rb->dst, buf,
+									res_len,
+									(relayed_msg==FAKED_REPLY)?TMCB_LOCAL_F:0,
+									uas_rb->branch, relayed_code);
+				run_trans_callbacks_off_params(TMCB_RESPONSE_SENT, t, &onsend_params);
 			}
-		} else {
-			LM_NOTICE("dst no longer set - skiped sending the reply out\n");
-		}
+		} else if (unlikely(uas_rb->dst.send_sock == 0))
+			ERR("no resolved dst to send reply to\n");
 		/* Call put_on_wait() only if we really send out
 		* the reply. It can happen that the reply has been already sent from
 		* failure_route  or from a callback and the timer has been already
@@ -2041,7 +2082,7 @@ enum rps local_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		winning_msg= branch==local_winner
 			? p_msg :  t->uac[local_winner].reply;
 		if (winning_msg==FAKED_REPLY) {
-			t_stats_rpl_generated();
+			t_stats_replied_locally();
 			winning_code = branch==local_winner
 				? msg_status : t->uac[local_winner].last_received;
 		} else {
@@ -2049,7 +2090,6 @@ enum rps local_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		}
 		t->uas.status = winning_code;
 		update_reply_stats( winning_code );
-		t_stats_rpl_sent();
 		if (unlikely(is_invite(t) && winning_msg!=FAKED_REPLY &&
 					 winning_code>=200 && winning_code <300 &&
 					 has_tran_tmcbs(t, TMCB_LOCAL_COMPLETED) ))  {
@@ -2142,9 +2182,6 @@ int reply_received( struct sip_msg  *p_msg )
 	t=get_t();
 	if ( (t==0)||(t==T_UNDEFINED))
 		goto trans_not_found;
-
-	/* if transaction found, increment the rpl_received counter */
-	t_stats_rpl_received();
 
 	if (unlikely(branch==T_BR_UNDEFINED))
 		BUG("invalid branch, please report to sr-dev@sip-router.org\n");
@@ -2309,21 +2346,10 @@ int reply_received( struct sip_msg  *p_msg )
 		backup_xavps = xavp_set_list(&t->xavps_list);
 #endif
 		setbflagsval(0, uac->branch_flags);
-		if(msg_status>last_uac_status) {
-			/* current response (msg) status is higher that the last received
-			 * on the same branch - set it temporarily so functions in onreply_route
-			 * can access it (e.g., avoid sending CANCEL by forcing another t_relply()
-			 * in onreply_route when a negative sip response was received) */
-			uac->last_received = msg_status;
-		}
-
 		/* Pre- and post-script callbacks have already
 		 * been executed by the core. (Miklos)
 		 */
 		run_top_route(onreply_rt.rlist[onreply_route], p_msg, &ctx);
-
-		/* restore brach last_received as before executing onreply_route */
-		uac->last_received = last_uac_status;
 		/* transfer current message context back to t */
 		if (t->uas.request) t->uas.request->flags=p_msg->flags;
 		getbflagsval(0, &uac->branch_flags);
@@ -2825,36 +2851,5 @@ void rpc_reply(rpc_t* rpc, void* c)
 		ERR("Reply failed\n");
 		rpc->fault(c, 500, "Reply failed");
 		return;
-	}
-}
-
-/**
- * re-entrant locking of reply mutex
- */
-void tm_reply_mutex_lock(tm_cell_t *t)
-{
-	int mypid;
-
-	mypid = my_pid();
-	if (likely(atomic_get(&t->reply_locker_pid) != mypid)) {
-		lock(&t->reply_mutex);
-		atomic_set(&t->reply_locker_pid, mypid);
-	} else {
-		/* locked within the same process that called us*/
-		t->reply_rec_lock_level++;
-	}
-}
-
-/**
- * re-entrant unlocking of reply mutex
- */
-void tm_reply_mutex_unlock(tm_cell_t *t)
-{
-	if (likely(t->reply_rec_lock_level == 0)) {
-		atomic_set(&t->reply_locker_pid, 0);
-		unlock(&t->reply_mutex);
-	} else  {
-		/* recursive locked => decrease rec. lock count */
-		t->reply_rec_lock_level--;
 	}
 }

@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /**
@@ -50,7 +50,6 @@
 #include "cr_func.h"
 #include "db_carrierroute.h"
 #include "config.h"
-#include "cr_db.h"
 #include <sys/stat.h>
 
 #define AVP_CR_URIS "_cr_uris"
@@ -64,7 +63,6 @@ str subscriber_table = str_init("subscriber");
 static str subscriber_username_col = str_init("username");
 static str subscriber_domain_col = str_init("domain");
 static str cr_preferred_carrier_col = str_init("cr_preferred_carrier");
-static int cr_load_comments = 1;
 
 str * subscriber_columns[SUBSCRIBER_COLUMN_NUM] = {
 	&subscriber_username_col,
@@ -80,7 +78,7 @@ const str CR_EMPTY_PREFIX = str_init("null");
 
 int mode = 0;
 int cr_match_mode = 10;
-int cr_avoid_failed_dests = 1;
+
 
 /************* Declaration of Interface Functions **************************/
 static int mod_init(void);
@@ -110,19 +108,17 @@ static param_export_t params[]= {
 	carrierfailureroute_DB_COLS
 	carrier_name_DB_COLS
 	domain_name_DB_COLS
-	{"subscriber_table",          PARAM_STR, &subscriber_table },
-	{"subscriber_user_col",       PARAM_STR, &subscriber_username_col },
-	{"subscriber_domain_col",     PARAM_STR, &subscriber_domain_col },
-	{"subscriber_carrier_col",    PARAM_STR, &cr_preferred_carrier_col },
-	{"config_source",             PARAM_STRING, &config_source },
-	{"default_tree",              PARAM_STR, &default_tree },
-	{"config_file",               PARAM_STRING, &config_file },
-	{"use_domain",                INT_PARAM, &default_carrierroute_cfg.use_domain },
-	{"fallback_default",          INT_PARAM, &default_carrierroute_cfg.fallback_default },
-	{"fetch_rows",                INT_PARAM, &default_carrierroute_cfg.fetch_rows },
-	{"db_load_description", 	  INT_PARAM, &cr_load_comments },
-	{"match_mode",                INT_PARAM, &cr_match_mode },
-	{"avoid_failed_destinations", INT_PARAM, &cr_avoid_failed_dests },
+	{"subscriber_table",       STR_PARAM, &subscriber_table.s },
+	{"subscriber_user_col",    STR_PARAM, &subscriber_username_col.s },
+	{"subscriber_domain_col",  STR_PARAM, &subscriber_domain_col.s },
+	{"subscriber_carrier_col", STR_PARAM, &cr_preferred_carrier_col.s },
+	{"config_source",          STR_PARAM, &config_source },
+	{"default_tree",           STR_PARAM, &default_tree.s },
+	{"config_file",            STR_PARAM, &config_file },
+	{"use_domain",             INT_PARAM, &default_carrierroute_cfg.use_domain },
+	{"fallback_default",       INT_PARAM, &default_carrierroute_cfg.fallback_default },
+	{"fetch_rows",             INT_PARAM, &default_carrierroute_cfg.fetch_rows },
+	{"match_mode",             INT_PARAM, &cr_match_mode },
 	{0,0,0}
 };
 
@@ -179,25 +175,21 @@ static int mod_init(void) {
 		return -1;
 	}
 
+	subscriber_table.len = strlen(subscriber_table.s);
+	subscriber_username_col.len = strlen(subscriber_username_col.s);
+	subscriber_domain_col.len = strlen(subscriber_domain_col.s);
+	cr_preferred_carrier_col.len = strlen(cr_preferred_carrier_col.s);
+	default_tree.len = strlen(default_tree.s);
+
+	carrierroute_db_vars();
+
 	if (cr_match_mode != 10 && cr_match_mode != 128) {
 		LM_ERR("invalid matching mode %d specific, please use 10 or 128\n", cr_match_mode);
 		return -1;
 	}
 
-	if (cr_avoid_failed_dests != 0 && cr_avoid_failed_dests != 1) {
-		LM_ERR("avoid_failed_dests must be 0 or 1");
-		return -1;
-	}
-
-	if (cr_load_comments != 0 && cr_load_comments != 1) {
-		LM_ERR("db_load_comments must be 0 or 1");
-		return -1;
-	}
-
 	if (strcmp(config_source, "db") == 0) {
 		mode = CARRIERROUTE_MODE_DB;
-
-		set_load_comments_params(cr_load_comments);
 
 		LM_INFO("use database as configuration source\n");
 		if(carrierroute_db_init() < 0){

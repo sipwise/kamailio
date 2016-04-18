@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /**
@@ -95,7 +95,7 @@ int add_route_rule(struct route_flags *rf, const str * prefix,
 		goto mem_error;
 	}
 
-	if (comment && shm_str_dup(&shm_rr->comment, comment) != 0) {
+	if (shm_str_dup(&shm_rr->comment, comment) != 0) {
 		goto mem_error;
 	}
 
@@ -360,7 +360,7 @@ struct failure_route_rule *add_failure_route_rule(struct failure_route_rule **fr
 	shm_frr->mask = mask;
 	shm_frr->next_domain = next_domain;
 	
-	if (comment && shm_str_dup(&shm_frr->comment, comment) != 0) {
+	if (shm_str_dup(&shm_frr->comment, comment) != 0) {
 		goto mem_error;
 	}
 	

@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2012-2013 Crocodile RCS Ltd
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Exception: permission to copy, modify, propagate, and distribute a work
  * formed by combining OpenSSL toolkit software and the code in this file,
@@ -201,20 +203,19 @@ int wsconn_add(struct receive_info rcv, unsigned int sub_protocol)
 	LM_DBG("wsconn_add id [%d]\n", id);
 
 	/* Allocate and fill in new WebSocket connection */
-	wsc = shm_malloc(sizeof(ws_connection_t) + BUF_SIZE);
+	wsc = shm_malloc(sizeof(ws_connection_t));
 	if (wsc == NULL)
 	{
 		LM_ERR("allocating shared memory\n");
 		return -1;
 	}
-	memset(wsc, 0, sizeof(ws_connection_t) + BUF_SIZE);
+	memset(wsc, 0, sizeof(ws_connection_t));
 	wsc->id = id;
 	wsc->id_hash = id_hash;
 	wsc->state = WS_S_OPEN;
 	wsc->rcv = rcv;
 	wsc->sub_protocol = sub_protocol;
 	wsc->run_event = 0;
-	wsc->frag_buf.s = ((char*)wsc) + sizeof(ws_connection_t);
 	atomic_set(&wsc->refcnt, 0);
 
 	LM_DBG("wsconn_add new wsc => [%p], ref => [%d]\n", wsc, atomic_get(&wsc->refcnt));

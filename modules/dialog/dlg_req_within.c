@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2007 Voice System SRL
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,17 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * History:
+ * --------
+ * 2007-07-10  initial version (ancuta)
+ * 2008-04-04  added direction reporting in dlg callbacks (bogdan)
 */
-
-
-/*!
- * \file
- * \brief Requests
- * \ingroup dialog
- * Module: \ref dialog
- */
 
 #include <stdlib.h>
 #include <string.h>
@@ -52,7 +50,7 @@
 #define MAX_FWD_HDR_LEN    (sizeof(MAX_FWD_HDR) - 1)
 
 extern str dlg_extra_hdrs;
-extern str dlg_lreq_callee_headers;
+
 
 
 int free_tm_dlg(dlg_t *td)
@@ -216,7 +214,7 @@ void bye_reply_cb(struct cell* t, int type, struct tmcb_params* ps){
 			unref++;
 		}
 		/* dialog terminated (BYE) */
-		run_dlg_callbacks( DLGCB_TERMINATED_CONFIRMED, dlg, ps->req, ps->rpl, DLG_DIR_NONE, 0);
+		run_dlg_callbacks( DLGCB_TERMINATED, dlg, ps->req, ps->rpl, DLG_DIR_NONE, 0);
 
 		LM_DBG("first final reply\n");
 		/* derefering the dialog */
@@ -264,10 +262,6 @@ void dlg_ka_cb(struct cell* t, int type, struct tmcb_params* ps){
 	}
 
 	if(ps->code==408 || ps->code==481) {
-		if (dlg->state != DLG_STATE_CONFIRMED) {
-			LM_DBG("skip updating non-confirmed dialogs\n");
-			goto done;
-		}
 		if(update_dlg_timer(&dlg->tl, 10)<0) {
 			LM_ERR("failed to update dialog lifetime\n");
 			goto done;
@@ -286,19 +280,12 @@ static inline int build_extra_hdr(struct dlg_cell * cell, str *extra_hdrs,
 		str *str_hdr)
 {
 	char *p;
-	int blen;
 
 	str_hdr->len = MAX_FWD_HDR_LEN + dlg_extra_hdrs.len;
 	if(extra_hdrs && extra_hdrs->len>0)
 		str_hdr->len += extra_hdrs->len;
 
-	blen = str_hdr->len + 1 /* '\0' */;
-
-	/* reserve space for callee headers in local requests */
-	if(dlg_lreq_callee_headers.len>0)
-		blen += dlg_lreq_callee_headers.len + 2 /* '\r\n' */;
-
-	str_hdr->s = (char*)pkg_malloc( blen * sizeof(char) );
+	str_hdr->s = (char*)pkg_malloc( str_hdr->len * sizeof(char) );
 	if(!str_hdr->s){
 		LM_ERR("out of pkg memory\n");
 		goto error;
@@ -333,7 +320,6 @@ static inline int send_bye(struct dlg_cell * cell, int dir, str *hdrs)
 	str met = {"BYE", 3};
 	int result;
 	dlg_iuid_t *iuid = NULL;
-	str lhdrs;
 
 	/* do not send BYE request for non-confirmed dialogs (not supported) */
 	if (cell->state != DLG_STATE_CONFIRMED_NA && cell->state != DLG_STATE_CONFIRMED) {
@@ -348,11 +334,6 @@ static inline int send_bye(struct dlg_cell * cell, int dir, str *hdrs)
 		goto err;
 	}
 
-	/* safety bump of cseq if prack was involved in call setup */
-	if(cell->iflags & DLG_IFLAG_PRACK) {
-		dialog_info->loc_seq.value += 80;
-	}
-
 	LM_DBG("sending BYE to %s\n", (dir==DLG_CALLER_LEG)?"caller":"callee");
 
 	iuid = dlg_get_iuid_shm_clone(cell);
@@ -362,20 +343,7 @@ static inline int send_bye(struct dlg_cell * cell, int dir, str *hdrs)
 		goto err;
 	}
 
-	lhdrs = *hdrs;
-
-	if(dir==DLG_CALLEE_LEG && dlg_lreq_callee_headers.len>0) {
-		/* space allocated in hdrs->s by build_extra_hdrs() */
-		memcpy(lhdrs.s+lhdrs.len, dlg_lreq_callee_headers.s,
-				dlg_lreq_callee_headers.len);
-		lhdrs.len += dlg_lreq_callee_headers.len;
-		if(dlg_lreq_callee_headers.s[dlg_lreq_callee_headers.len-1]!='\n') {
-			strncpy(lhdrs.s+lhdrs.len, CRLF, CRLF_LEN);
-			lhdrs.len += CRLF_LEN;
-		}
-	}
-
-	set_uac_req(&uac_r, &met, &lhdrs, NULL, dialog_info, TMCB_LOCAL_COMPLETED,
+	set_uac_req(&uac_r, &met, hdrs, NULL, dialog_info, TMCB_LOCAL_COMPLETED,
 				bye_reply_cb, (void*)iuid);
 	result = d_tmb.t_request_within(&uac_r);
 
@@ -402,7 +370,7 @@ err:
  * 		DLG_CALLER_LEG (0): caller
  * 		DLG_CALLEE_LEG (1): callee
  */
-int dlg_send_ka(dlg_cell_t *dlg, int dir)
+int dlg_send_ka(dlg_cell_t *dlg, int dir, str *hdrs)
 {
 	uac_req_t uac_r;
 	dlg_t* di;
@@ -438,13 +406,8 @@ int dlg_send_ka(dlg_cell_t *dlg, int dir)
 		goto err;
 	}
 
-	if(dir==DLG_CALLEE_LEG && dlg_lreq_callee_headers.len>0) {
-		set_uac_req(&uac_r, &met, &dlg_lreq_callee_headers, NULL, di,
-				TMCB_LOCAL_COMPLETED, dlg_ka_cb, (void*)iuid);
-	} else {
-		set_uac_req(&uac_r, &met, NULL, NULL, di, TMCB_LOCAL_COMPLETED,
+	set_uac_req(&uac_r, &met, hdrs, NULL, di, TMCB_LOCAL_COMPLETED,
 				dlg_ka_cb, (void*)iuid);
-	}
 	result = d_tmb.t_request_within(&uac_r);
 
 	if(result < 0){
@@ -550,9 +513,6 @@ int dlg_bye(struct dlg_cell *dlg, str *hdrs, int side)
 	}
 	ret = send_bye(dlg, side, &all_hdrs);
 	pkg_free(all_hdrs.s);
-
-	dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
-
 	return ret;
 }
 
@@ -560,9 +520,6 @@ int dlg_bye_all(struct dlg_cell *dlg, str *hdrs)
 {
 	str all_hdrs = { 0, 0 };
 	int ret;
-
-	/* run dialog terminated callbacks */
-	run_dlg_callbacks( DLGCB_TERMINATED, dlg, NULL, NULL, DLG_DIR_NONE, 0);
 
 	if ((build_extra_hdr(dlg, hdrs, &all_hdrs)) != 0)
 	{
@@ -574,9 +531,6 @@ int dlg_bye_all(struct dlg_cell *dlg, str *hdrs)
 	ret |= send_bye(dlg, DLG_CALLEE_LEG, &all_hdrs);
 	
 	pkg_free(all_hdrs.s);
-
-	dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
-
 	return ret;
 
 }

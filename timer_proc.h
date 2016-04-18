@@ -14,9 +14,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * History:
+ * --------
+ *  2009-03-10  initial version (andrei)
+*/
+
 /**
  * @file
- * @brief Kamailio core :: timer_proc.h - separate process timers
+ * @brief SIP-router core :: timer_proc.h - separate process timers
  *
  * (unrelated to the main fast and slow timers)
  * @ingroup core
@@ -121,10 +127,6 @@ int fork_sync_timer(int child_id, char* desc, int make_sock,
 
 int fork_sync_utimer(int child_id, char* desc, int make_sock,
 						utimer_function* f, void* param, int uinterval);
-
-int sr_wtimer_init(void);
-int sr_wtimer_add(timer_function* f, void* param, int interval);
-int sr_wtimer_start(void);
 
 #endif /*__timer_proc_h*/
 

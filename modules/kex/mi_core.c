@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  *
  * history:
@@ -51,15 +51,7 @@
 #include "../../cfg/cfg.h"
 #include "../../cfg/cfg_ctx.h"
 
-#ifdef VERSION_NODATE
-#define BUILD_STR __FILE__ " compiled with " COMPILER "\n"
-#else
-#ifdef VERSION_DATE
-#define BUILD_STR __FILE__ " compiled on " VERSION_DATE " with " COMPILER "\n"
-#else
 #define BUILD_STR __FILE__ " compiled on "__TIME__ " " __DATE__ " with " COMPILER "\n"
-#endif
-#endif
 #define BUILD_STR_LEN (sizeof(BUILD_STR)-1)
 
 #ifndef SVNREVISION

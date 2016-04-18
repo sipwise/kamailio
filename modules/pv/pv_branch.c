@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2008 Daniel-Constantin Mierla (asipto.com)
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 
@@ -27,37 +29,31 @@
 #include "pv_core.h"
 #include "pv_branch.h"
 
-static branch_t _pv_sbranch;
-
-void pv_init_sbranch(void)
-{
-	memset(&_pv_sbranch, 0, sizeof(branch_t));
-}
-
-int pv_get_branchx_helper(sip_msg_t *msg, pv_param_t *param,
-		pv_value_t *res, int btype)
+int pv_get_branchx(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
 {
 	int idx = 0;
 	int idxf = 0;
-	branch_t *br;
+	str uri;
+	str duri;
+	int lq = 0;
+	str path;
+	unsigned int fl = 0;
+	struct socket_info* fsocket = NULL;
+	str ruid;
+	str location_ua;
 
-	if(btype==1) {
-		br = &_pv_sbranch;
-	} else {
-		/* get the index */
-		if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
-		{
-			LM_ERR("invalid index\n");
-			return pv_get_null(msg, param, res);
-		}
-		br = get_sip_branch(idx);
-		if(br==NULL) {
-			return pv_get_null(msg, param, res);
-		}
+	/* get the index */
+	if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
+	{
+		LM_ERR("invalid index\n");
+		return pv_get_null(msg, param, res);
 	}
 
+	uri.s = get_branch(idx, &uri.len, &lq, &duri, &path, &fl, &fsocket, &ruid, 0, &location_ua);
+
 	/* branch(count) doesn't need a valid branch, everything else does */
-	if(br->len == 0 && ( param->pvn.u.isname.name.n != 5/* count*/ ))
+	if(uri.s == 0 && ( param->pvn.u.isname.name.n != 5/* count*/ ))
 	{
 		LM_ERR("error accessing branch [%d]\n", idx);
 		return pv_get_null(msg, param, res);
@@ -66,49 +62,43 @@ int pv_get_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 	switch(param->pvn.u.isname.name.n)
 	{
 		case 1: /* dst uri */
-			if(br->dst_uri_len==0)
+			if(duri.len==0)
 				return pv_get_null(msg, param, res);
-			return pv_get_strlval(msg, param, res, br->dst_uri, br->dst_uri_len);
+			return pv_get_strval(msg, param, res, &duri);
 		case 2: /* path */
-			if(br->path_len==0)
+			if(path.len==0)
 				return pv_get_null(msg, param, res);
-			return pv_get_strlval(msg, param, res, br->path, br->path_len);
+			return pv_get_strval(msg, param, res, &path);
 		case 3: /* Q */
-			if(br->q == Q_UNSPECIFIED)
+			if(lq == Q_UNSPECIFIED)
 				return pv_get_null(msg, param, res);
-			return pv_get_sintval(msg, param, res, br->q);
+			return pv_get_sintval(msg, param, res, lq);
 		case 4: /* send socket */
-			if(br->force_send_socket!=0)
-				return pv_get_strval(msg, param, res, &br->force_send_socket->sock_str);
+			if(fsocket!=0)
+				return pv_get_strval(msg, param, res, &fsocket->sock_str);
 			return pv_get_null(msg, param, res);
 		case 5: /* count */
 			return pv_get_uintval(msg, param, res, nr_branches);
 		case 6: /* flags */
-			return pv_get_uintval(msg, param, res, br->flags);
+			return pv_get_uintval(msg, param, res, fl);
 		case 7: /* ruid */
-			if(br->ruid_len==0)
+			if(ruid.len==0)
 				return pv_get_null(msg, param, res);
-			return pv_get_strlval(msg, param, res, br->ruid, br->ruid_len);
+			return pv_get_strval(msg, param, res, &ruid);
 		case 8: /* location_ua */
-			if(br->location_ua_len==0)
+			if(location_ua.len==0)
 				return pv_get_null(msg, param, res);
-			return pv_get_strlval(msg, param, res, br->location_ua, br->location_ua_len);
+			return pv_get_strval(msg, param, res, &location_ua);
 		default:
 			/* 0 - uri */
-			return pv_get_strlval(msg, param, res, br->uri, br->len);
+			return pv_get_strval(msg, param, res, &uri);
 	}
 
 	return 0;
 }
 
-int pv_get_branchx(sip_msg_t *msg, pv_param_t *param,
-		pv_value_t *res)
-{
-	return pv_get_branchx_helper(msg, param, res, 0);
-}
-
-int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
-		int op, pv_value_t *val, int btype)
+int pv_set_branchx(struct sip_msg* msg, pv_param_t *param,
+		int op, pv_value_t *val)
 {
 	int idx = 0;
 	int idxf = 0;
@@ -124,27 +114,14 @@ int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 		return -1;
 	}
 
-	if(btype==1) {
-		br = &_pv_sbranch;
-	} else {
-		/* get the index */
-		if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
-		{
-			LM_ERR("invalid index\n");
-			return -1;
-		}
-		if(idx<0)
-		{
-			if((int)nr_branches + idx >= 0) {
-				idx += nr_branches;
-			} else {
-				LM_ERR("index too low: %d (%u)\n", idx, nr_branches);
-				return -1;
-			}
-		}
-		LM_DBG("managing branch index %d (%u)\n", idx, nr_branches);
-		br = get_sip_branch(idx);
+	/* get the index */
+	if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
+	{
+		LM_ERR("invalid index\n");
+		return -1;
 	}
+
+	br = get_sip_branch(idx);
 
 	if(br==NULL)
 	{
@@ -288,11 +265,7 @@ int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 			/* 0 - uri */
 			if(val==NULL || (val->flags&PV_VAL_NULL))
 			{
-				if(btype==1) {
-					memset(br, 0, sizeof(branch_t));
-				} else {
-					drop_sip_branch(idx);
-				}
+				drop_sip_branch(idx);
 			} else {
 				if(!(val->flags&PV_VAL_STR))
 				{
@@ -301,11 +274,7 @@ int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 				}
 				if(val->rs.len<=0)
 				{
-					if(btype==1) {
-						memset(br, 0, sizeof(branch_t));
-					} else {
-						drop_sip_branch(idx);
-					}
+					drop_sip_branch(idx);
 				} else {
 					if (unlikely(val->rs.len > MAX_URI_SIZE - 1))
 					{
@@ -321,12 +290,6 @@ int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 	}
 
 	return 0;
-}
-
-int pv_set_branchx(sip_msg_t *msg, pv_param_t *param,
-		int op, pv_value_t *val)
-{
-	return pv_set_branchx_helper(msg, param, op, val, 0);
 }
 
 int pv_parse_branchx_name(pv_spec_p sp, str *in)
@@ -385,18 +348,6 @@ error:
 	return -1;
 }
 
-int pv_get_sbranch(sip_msg_t *msg, pv_param_t *param,
-		pv_value_t *res)
-{
-	return pv_get_branchx_helper(msg, param, res, 1);
-}
-
-int pv_set_sbranch(sip_msg_t *msg, pv_param_t *param,
-		int op, pv_value_t *val)
-{
-	return pv_set_branchx_helper(msg, param, op, val, 1);
-}
-
 int pv_get_sndfrom(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
 {
@@ -425,11 +376,6 @@ int pv_get_sndfrom(struct sip_msg *msg, pv_param_t *param,
 		case 5: /* len */
 			return pv_get_uintval(msg, param, res,
 					(int)snd_inf->len);
-		case 6: /* sproto */
-			if(get_valid_proto_string((int)snd_inf->send_sock->proto,
-						0, 0, &s)<0)
-				return pv_get_null(msg, param, res);
-			return pv_get_strval(msg, param, res, &s);
 		default:
 			/* 0 - ip */
 			return pv_get_strval(msg, param, res,
@@ -468,11 +414,6 @@ int pv_get_sndto(struct sip_msg *msg, pv_param_t *param,
 		case 5: /* len */
 			return pv_get_uintval(msg, param, res,
 					(int)snd_inf->len);
-		case 6: /* sproto */
-			if(get_valid_proto_string((int)snd_inf->send_sock->proto,
-						0, 0, &s)<0)
-				return pv_get_null(msg, param, res);
-			return pv_get_strval(msg, param, res, &s);
 		default:
 			/* 0 - ip */
 			su2ip_addr(&ip, snd_inf->to);
@@ -513,11 +454,6 @@ int pv_parse_snd_name(pv_spec_p sp, str *in)
 		case 5:
 			if(strncmp(in->s, "proto", 5)==0)
 				sp->pvp.pvn.u.isname.name.n = 3;
-			else goto error;
-		break;
-		case 6:
-			if(strncmp(in->s, "sproto", 6)==0)
-				sp->pvp.pvn.u.isname.name.n = 6;
 			else goto error;
 		break;
 		default:
@@ -622,146 +558,3 @@ error:
 	return -1;
 }
 
-/**
- *
- */
-int sbranch_set_ruri(sip_msg_t *msg)
-{
-	str sv;
-	flag_t old_bflags;
-	branch_t *br;
-	int ret;
-
-	ret = 0;
-	br = &_pv_sbranch;
-	if(br->len==0)
-		return -1;
-
-	sv.s = br->uri;
-	sv.len = br->len;
-
-	if (rewrite_uri(msg, &sv) < 0) {
-		LM_ERR("unable to rewrite Request-URI\n");
-		ret = -3;
-		goto error;
-	}
-
-	/* reset next hop address */
-	reset_dst_uri(msg);
-	if(br->dst_uri_len>0) {
-		sv.s = br->dst_uri;
-		sv.len = br->dst_uri_len;
-		if (set_dst_uri(msg, &sv) < 0) {
-			ret = -3;
-			goto error;
-		}
-	}
-
-	reset_path_vector(msg);
-	if(br->path_len==0) {
-		sv.s = br->path;
-		sv.len = br->path_len;
-		if(set_path_vector(msg, &sv) < 0) {
-			ret = -4;
-			goto error;
-		}
-	}
-
-	reset_instance(msg);
-	if (br->instance_len) {
-		sv.s = br->instance;
-		sv.len = br->instance_len;
-	    if (set_instance(msg, &sv) < 0) {
-			ret = -5;
-			goto error;
-	    }
-	}
-
-	reset_ruid(msg);
-	if (br->ruid_len) {
-		sv.s = br->ruid;
-		sv.len = br->ruid_len;
-	    if (set_ruid(msg, &sv) < 0) {
-			ret = -6;
-			goto error;
-	    }
-	}
-
-	reset_ua(msg);
-	if (br->location_ua_len) {
-		sv.s = br->location_ua;
-		sv.len = br->location_ua_len;
-	    if (set_ua(msg, &sv) < 0) {
-			ret = -7;
-			goto error;
-	    }
-	}
-
-	if (br->force_send_socket)
-		set_force_socket(msg, br->force_send_socket);
-
-	msg->reg_id = br->reg_id;
-	set_ruri_q(br->q);
-	old_bflags = 0;
-	getbflagsval(0, &old_bflags);
-	setbflagsval(0, old_bflags|br->flags);
-
-	return 0;
-error:
-	return ret;
-}
-
-/**
- *
- */
-int sbranch_append(sip_msg_t *msg)
-{
-	str uri = {0};
-	str duri = {0};
-	str path = {0};
-	str ruid = {0};
-	str location_ua = {0};
-	branch_t *br;
-
-	br = &_pv_sbranch;
-	if(br->len==0)
-		return -1;
-
-	uri.s = br->uri;
-	uri.len = br->len;
-
-	if(br->dst_uri_len==0) {
-		duri.s = br->dst_uri;
-		duri.len = br->dst_uri_len;
-	}
-	if(br->path_len==0) {
-		path.s = br->path;
-		path.len = br->path_len;
-	}
-	if(br->ruid_len==0) {
-		ruid.s = br->ruid;
-		ruid.len = br->ruid_len;
-	}
-	if(br->location_ua_len==0) {
-		location_ua.s = br->location_ua;
-		location_ua.len = br->location_ua_len;
-	}
-
-	if (append_branch(msg, &uri, &duri, &path, br->q, br->flags,
-					  br->force_send_socket, 0 /*instance*/, br->reg_id,
-					  &ruid, &location_ua)
-			    == -1) {
-		LM_ERR("failed to append static branch\n");
-		return -1;
-	}
-	return 0;
-}
-
-/**
- *
- */
-int sbranch_reset(void)
-{
-	memset(&_pv_sbranch, 0, sizeof(branch_t));
-	return 0;
-}

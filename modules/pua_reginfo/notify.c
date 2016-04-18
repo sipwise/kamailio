@@ -18,7 +18,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include "notify.h"
@@ -216,22 +216,18 @@ int reginfo_parse_event(char * s) {
 
 int process_body(str notify_body, udomain_t * domain) {
 	xmlDocPtr doc= NULL;
-	xmlNodePtr doc_root = NULL, registrations = NULL, contacts = NULL, uris = NULL, params = NULL;
+	xmlNodePtr doc_root = NULL, registrations = NULL, contacts = NULL, uris = NULL;
 	char uri[MAX_URI_SIZE];
 	str aor_key = {0, 0};
 	str aor = {0, 0};
 	str callid = {0, 0};
-	str contact = {0, 0};
 	str contact_uri = {0, 0};
-	str contact_params = {0, 0};
-	str param = {0, 0};
 	str received = {0,0};
 	str path = {0,0};
 	str user_agent = {0, 0};
 	int state, event, expires, result, final_result = RESULT_ERROR;
 	char * expires_char,  * cseq_char;
 	int cseq = 0;
-	int len;
 	urecord_t * ul_record;
 	ucontact_t * ul_contact;
 	struct sip_uri parsed_aor;
@@ -320,13 +316,12 @@ int process_body(str notify_body, udomain_t * domain) {
 			while (contacts) {
 				if (xmlStrcasecmp(contacts->name, BAD_CAST "contact") != 0)
 					goto next_contact;
-				callid.len = 0;
 				callid.s = xmlGetAttrContentByName(contacts, "callid");
-				// If no CallID present, try the "id"-field instead:
-				if (callid.s == NULL)
-					callid.s = xmlGetAttrContentByName(contacts, "id");
+				if (callid.s == NULL) {
+					LM_ERR("No Call-ID for this contact!\n");		
+					goto next_contact;
+				}
 				callid.len = strlen(callid.s);
-				LM_DBG("Got Call-ID \"%.*s\"\n", callid.len, callid.s);
 				received.s = xmlGetAttrContentByName(contacts, "received");
 				if (received.s == NULL) {
                     LM_DBG("No received for this contact!\n");
@@ -370,54 +365,12 @@ int process_body(str notify_body, udomain_t * domain) {
 
 				cseq_char = xmlGetAttrContentByName(contacts, "cseq");
 				if (cseq_char == NULL) {
-					LM_DBG("No cseq for this contact!\n");		
+					LM_WARN("No cseq for this contact!\n");		
 				} else {
 					cseq = atoi(cseq_char);
 					if (cseq < 0) {
 						LM_WARN("No valid cseq for this contact!\n");		
 					}
-				}
-
-				// <unknown-param name="+g.oma.sip-im"></unknown-param>
-				// <unknown-param name="language">en,fr</unknown-param>
-				/* 1) Iterate through the params, to get the full content-length */
-				params = contacts->children;
-				contact_params.len = 0;
-				len = 0;
-				while (params) {
-					if (xmlStrcasecmp(params->name, BAD_CAST "unknown-param") != 0)
-						goto next_param;
-					len += 1 /* ; */ + strlen(xmlGetAttrContentByName(params, "name"));
-					param.s = (char*)xmlNodeGetContent(params);
-					param.len = strlen(param.s);
-					if (param.len > 0)
-						len += 1 /* = */ + param.len;
-next_param:
-					params = params->next;
-				}
-				LM_DBG("Calculated length for params: %i\n", len);
-
-				if (len > 0) {
-					len += 1;
-					if (contact_params.s) pkg_free(contact_params.s);
-					contact_params.s = pkg_malloc(len);
-					params = contacts->children;
-					contact_params.len = 0;
-					while (params) {
-						if (xmlStrcasecmp(params->name, BAD_CAST "unknown-param") != 0)
-							goto next_param2;
-						contact_params.len += snprintf(contact_params.s + contact_params.len, len - contact_params.len, ";%s", xmlGetAttrContentByName(params, "name"));
-						param.s = (char*)xmlNodeGetContent(params);
-						param.len = strlen(param.s);
-						if (param.len > 0)
-							contact_params.len += snprintf(contact_params.s + contact_params.len, len - contact_params.len, "=%.*s", param.len, param.s);
-
-						LM_DBG("Contact params are: %.*s\n", contact_params.len, contact_params.s);
-			
-next_param2:
-						params = params->next;
-					}
-					LM_DBG("Contact params are: %.*s\n", contact_params.len, contact_params.s);
 				}
 
 				/* Now lets process the URI's from this Contact: */
@@ -431,22 +384,11 @@ next_param2:
 						goto next_registration;
 					}
 					contact_uri.len = strlen(contact_uri.s);
-					if (contact_params.len > 0) {
-						if (contact.s) pkg_free(contact.s);
-						contact.s = (char*)pkg_malloc(contact_uri.len + contact_params.len + 1);
-						contact.len = snprintf(contact.s, contact_uri.len + contact_params.len + 1, "%.*s%.*s", contact_uri.len, contact_uri.s, contact_params.len, contact_params.s);
-						LM_DBG("Contact: %.*s\n",
-							contact.len, contact.s);
+					LM_DBG("Contact: %.*s\n",
+						contact_uri.len, contact_uri.s);
 
-						/* Add to Usrloc: */
-						result = process_contact(domain, &ul_record, aor_key, callid, cseq, expires, event, contact);
-					} else {
-						LM_DBG("Contact: %.*s\n",
-							contact_uri.len, contact_uri.s);
-
-						/* Add to Usrloc: */
-						result = process_contact(domain, &ul_record, aor_key, callid, cseq, expires, event, contact_uri);
-					}
+					/* Add to Usrloc: */
+					result = process_contact(domain, &ul_record, aor_key, callid, cseq, expires, event, contact_uri);
 				
 					/* Process the result */
 					if (final_result != RESULT_CONTACTS_FOUND) final_result = result;
@@ -466,10 +408,7 @@ next_registration:
 		registrations = registrations->next;
 	}
 error:
-	if (contact.s) pkg_free(contact.s);
-	if (contact_params.s) pkg_free(contact_params.s);
 	/* Free the XML-Document */
-
     	if(doc) xmlFreeDoc(doc);
 	return final_result;
 }

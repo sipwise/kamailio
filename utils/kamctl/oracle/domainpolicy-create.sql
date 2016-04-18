@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('domainpolicy','2');
 CREATE TABLE domainpolicy (
     id NUMBER(10) PRIMARY KEY,
     rule VARCHAR2(255),
@@ -17,6 +18,4 @@ END domainpolicy_tr;
 BEGIN map2users('domainpolicy'); END;
 /
 CREATE INDEX domainpolicy_rule_idx  ON domainpolicy (rule);
-
-INSERT INTO version (table_name, table_version) values ('domainpolicy','2');
 

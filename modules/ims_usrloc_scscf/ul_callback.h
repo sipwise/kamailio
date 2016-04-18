@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -63,11 +63,10 @@ struct impurecord;
 #define UL_IMPU_INSERT		   	(1<<8)		/* new IMPU record has been added */
 #define UL_IMPU_UPDATE		   	(1<<9)		/* IMPU record has been updated */
 #define UL_IMPU_NEW_CONTACT		(1<<10)		/* a new contact has been inserted for this IMPU */
-#define UL_IMPU_UPDATE_CONTACT		(1<<11)		/* contact has been updated */
-#define UL_IMPU_DELETE_CONTACT		(1<<12)		/* explciti contact delete from IMPU (dereg) */
-#define UL_IMPU_DELETE_CONTACT_IMPLICIT	(1<<13)		/* implicit contact delete frim IMPU (expiry, etc) */
-#define UL_IMPU_EXPIRE_CONTACT		(1<<14)		/* a new contact has been inserted for this IMPU */
-#define ULCB_MAX               	((1<<15)-1)
+#define UL_IMPU_UPDATE_CONTACT		(1<<11)		/* a new contact has been inserted for this IMPU */
+#define UL_IMPU_DELETE_CONTACT		(1<<12)		/* a new contact has been inserted for this IMPU */
+#define UL_IMPU_EXPIRE_CONTACT		(1<<13)		/* a new contact has been inserted for this IMPU */
+#define ULCB_MAX               	((1<<14)-1)
 
 /*! \brief callback function prototype */
 typedef void (ul_cb) (struct impurecord* r, struct ucontact *c, int type, void *param);
@@ -83,12 +82,14 @@ struct ul_callback {
 	struct ul_callback* next;
 };
 
-    struct ulcb_head_list {
+struct ulcb_head_list {
 	struct ul_callback *first;
 	int reg_types;
 };
 
+
 extern struct ulcb_head_list*  ulcb_list;
+
 
 static inline int exists_ulcb_type(struct ulcb_head_list* list, int types) {
 	if (list==NULL)
@@ -100,6 +101,7 @@ static inline int exists_ulcb_type(struct ulcb_head_list* list, int types) {
 int init_ulcb_list(void);
 
 void destroy_ulcb_list(void);
+
 
 /*! \brief register a callback for several types of events */
 int register_ulcb( struct impurecord* r, struct ucontact* c, int types, ul_cb f, void *param );

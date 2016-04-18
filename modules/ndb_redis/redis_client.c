@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
@@ -41,14 +41,12 @@ static redisc_server_t *_redisc_srv_list=NULL;
 
 static redisc_reply_t *_redisc_rpl_list=NULL;
 
-extern int init_without_redis;
-
 /**
  *
  */
 int redisc_init(void)
 {
-	char *addr, *pass, *unix_sock_path = NULL;
+	char *addr, *unix_sock_path = NULL;
 	unsigned int port, db;
 	redisc_server_t *rsrv=NULL;
 	param_t *pit = NULL;
@@ -68,8 +66,6 @@ int redisc_init(void)
 		addr = "127.0.0.1";
 		port = 6379;
 		db = 0;
-		pass = NULL;
-
 		for (pit = rsrv->attrs; pit; pit=pit->next)
 		{
 			if(pit->name.len==4 && strncmp(pit->name.s, "unix", 4)==0) {
@@ -84,9 +80,6 @@ int redisc_init(void)
 			} else if(pit->name.len==2 && strncmp(pit->name.s, "db", 2)==0) {
 				if(str2int(&pit->body, &db) < 0)
 					db = 0;
-			} else if(pit->name.len==4 && strncmp(pit->name.s, "pass", 4)==0) {
-				pass = pit->body.s;
-				pass[pit->body.len] = '\0';
 			}
 		}
 
@@ -100,8 +93,6 @@ int redisc_init(void)
 		if(!rsrv->ctxRedis)
 			goto err;
 		if (rsrv->ctxRedis->err)
-			goto err2;
-		if ((pass != NULL) && redisc_check_auth(rsrv, pass))
 			goto err2;
 		if (redisCommandNR(rsrv->ctxRedis, "PING"))
 			goto err2;
@@ -120,12 +111,6 @@ err2:
 		LM_ERR("error communicating with redis server [%.*s] (%s:%d/%d): %s\n",
 			   rsrv->sname->len, rsrv->sname->s, addr, port, db, rsrv->ctxRedis->errstr);
 	}
-	if (init_without_redis==1)
-	{
-		LM_WARN("failed to initialize redis connections, but initializing module anyway.\n");
-		return 0;
-	}
-
 	return -1;
 err:
 	if (unix_sock_path != NULL) {
@@ -135,12 +120,6 @@ err:
 		LM_ERR("failed to connect to redis server [%.*s] (%s:%d/%d)\n",
 			   rsrv->sname->len, rsrv->sname->s, addr, port, db);
 	}
-	if (init_without_redis==1)
-	{
-		LM_WARN("failed to initialize redis connections, but initializing module anyway.\n");
-		return 0;
-	}
-
 	return -1;
 }
 
@@ -263,7 +242,7 @@ redisc_server_t *redisc_get_server(str *name)
  */
 int redisc_reconnect_server(redisc_server_t *rsrv)
 {
-	char *addr, *pass, *unix_sock_path = NULL;
+	char *addr, *unix_sock_path = NULL;
 	unsigned int port, db;
 	param_t *pit = NULL;
 	struct timeval tv;
@@ -273,7 +252,6 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 	addr = "127.0.0.1";
 	port = 6379;
 	db = 0;
-	pass = NULL;
 	for (pit = rsrv->attrs; pit; pit=pit->next)
 	{
 		if(pit->name.len==4 && strncmp(pit->name.s, "unix", 4)==0) {
@@ -288,9 +266,6 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 		} else if(pit->name.len==2 && strncmp(pit->name.s, "db", 2)==0) {
 			if(str2int(&pit->body, &db) < 0)
 				db = 0;
-		} else if(pit->name.len==4 && strncmp(pit->name.s, "pass", 4)==0) {
-			pass = pit->body.s;
-			pass[pit->body.len] = '\0';
 		}
 	}
 	if(rsrv->ctxRedis!=NULL) {
@@ -306,8 +281,6 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 	if(!rsrv->ctxRedis)
 		goto err;
 	if (rsrv->ctxRedis->err)
-		goto err2;
-	if ((pass != NULL) && redisc_check_auth(rsrv, pass))
 		goto err2;
 	if (redisCommandNR(rsrv->ctxRedis, "PING"))
 		goto err2;
@@ -429,8 +402,7 @@ void * redisc_exec_argv(redisc_server_t *rsrv, int argc, const char **argv, cons
 	if(rsrv==NULL || rsrv->ctxRedis==NULL)
 	{
 		LM_ERR("no redis context found for server %.*s\n",
-			  (rsrv)?rsrv->sname->len:0,
-			  (rsrv)?rsrv->sname->s:"");
+			   rsrv->sname->len, rsrv->sname->s);
 		return NULL;
 	}
 	if(argc<=0)
@@ -542,18 +514,4 @@ int redisc_free_reply(str *name)
 
 	/* reply entry not found. */
 	return -1;
-}
-
-int redisc_check_auth(redisc_server_t *rsrv, char *pass)
-{
-	redisReply *reply;
-	int retval = 0;
-
-	reply = redisCommand(rsrv->ctxRedis, "AUTH %s", pass);
-	if (reply->type == REDIS_REPLY_ERROR) {
-		LM_ERR("Redis authentication error\n");
-		retval = -1;
-	}
-	freeReplyObject(reply);
-	return retval;
 }

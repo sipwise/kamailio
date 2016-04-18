@@ -39,13 +39,12 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
 #include "globals.h"
 #include "utils.h"
-#include "../../mem/shm_mem.h"
 
 //str aaa_fqdn={"unset_fqdn",10};
 //str aaa_realm={"unset_realm",11};
@@ -84,6 +83,31 @@
 /** call it before exiting; if show_status==1, mem status is displayed */
 void destroy_memory(int show_status)
 {
+	/*clean-up*/
+	if (mem_lock)
+	    shm_unlock(); /* hack: force-unlock the shared memory lock in case
+	                             some process crashed and let it locked; this will
+	                             allow an almost gracious shutdown */
+#ifdef SHM_MEM
+	if (show_status){
+		LM_DBG( "Memory status (shm):\n");
+		//shm_status();
+#ifndef SER_MOD_INTERFACE
+		shm_sums();
+#endif		
+	}
+	/* zero all shmem alloc vars that we still use */
+	shm_mem_destroy();
+#endif
+#ifdef PKG_MALLOC
+	if (show_status){
+		LM_DBG( "Memory status (pkg):\n");
+		//pkg_status();
+#ifndef SER_MOD_INTERFACE
+		pkg_sums();
+#endif
+	}
+#endif
 }
 
 

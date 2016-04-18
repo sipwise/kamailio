@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2010 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -29,10 +31,13 @@
  * @file kstats_wrapper.h
  * @ingroup: libkcore
  */
-
-/*! @defgroup libkcore Kamailio compatibility core library
- *
- */
+/*
+ * History:
+ * --------
+ *  2010-08-08  initial version (andrei)
+ *  2010-08-18  type declaration needed by sr_module.c moved to
+ *               ../../kstats_types.h (andrei)
+*/
 
 #ifndef __kstats_wrapper_h
 #define __kstats_wrapper_h

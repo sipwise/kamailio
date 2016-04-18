@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of sip-router, a free SIP server.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  *
+ * History:
+ * --------
+ *  2003-04-08  init_mallocs split into init_{pkg,shm}_malloc (andrei)
+ * 
  */
 
 /**
@@ -42,8 +46,6 @@
 #include "shm_mem.h"
 #endif
 
-#if 0
-
 #ifdef PKG_MALLOC
 	#ifndef DL_MALLOC
 	char* mem_pool = 0;
@@ -53,8 +55,6 @@
 		struct fm_block* mem_block = 0;
 	#elif defined DL_MALLOC
 		/* don't need this */
-	#elif defined TLSF_MALLOC
-		tlsf_t mem_block = 0;
 	#else
 		struct qm_block* mem_block = 0;
 	#endif
@@ -76,14 +76,12 @@ int init_pkg_mallocs(void)
 	#endif
 	#ifdef F_MALLOC
 		if (mem_pool)
-			mem_block=fm_malloc_init(mem_pool, pkg_mem_size, MEM_TYPE_PKG);
+			mem_block=fm_malloc_init(mem_pool, pkg_mem_size);
 	#elif DL_MALLOC
 		/* don't need this */
-	#elif TLSF_MALLOC
-		mem_block = tlsf_create_with_pool(mem_pool, pkg_mem_size);
 	#else
 		if (mem_pool)
-			mem_block=qm_malloc_init(mem_pool, pkg_mem_size, MEM_TYPE_PKG);
+			mem_block=qm_malloc_init(mem_pool, pkg_mem_size);
 	#endif
 	#ifndef DL_MALLOC
 	if (mem_block==0){
@@ -132,4 +130,3 @@ int init_shm_mallocs(int force_alloc)
 #endif
 	return 0;
 }
-#endif 

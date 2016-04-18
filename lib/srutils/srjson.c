@@ -20,11 +20,8 @@
    THE SOFTWARE.
    */
 
-/*!
- * \file
- * \brief srutils :: SRjson - JSON parser in C - MIT License
- * \ingroup srutils
- * Module: \ref srutils
+/**
+ * srjson - JSON parser in C - MIT License
  * - addapted from cJSON to fit better within Kamailio/SER environment
  */
 

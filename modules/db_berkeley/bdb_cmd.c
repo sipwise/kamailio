@@ -1,23 +1,25 @@
 /*
- * BDB Database Driver for Kamailio
+ * $Id$
+ *
+ * BDB Database Driver for SIP-router
  *
  * Copyright (C) 2008 iptelorg GmbH
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of SIP-router, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify it under the
+ * SIP-router is free software; you can redistribute it and/or modify it under the
  * terms of the GNU General Public License as published by the Free Software
  * Foundation; either version 2 of the License, or (at your option) any later
  * version.
  *
- * Kamailio is distributed in the hope that it will be useful, but WITHOUT ANY
+ * SIP-router is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
  *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
  */
 
 /*! \addtogroup bdb
@@ -507,11 +509,17 @@ int bdb_cmd_first(db_res_t* res)
 
 int bdb_cmd_next(db_res_t* res)
 {
+	db_con_t *con;
+	bdb_res_t *bres;
+	bdb_con_t *bcon;
 	bdb_cmd_t *bcmd;
 	DBT key, data;
 	int ret;
 	static char dbuf[MAX_ROW_SIZE];
 
+	con = res->cmd->ctx->con[db_payload_idx];
+	bres = DB_GET_PAYLOAD(res);
+	bcon = DB_GET_PAYLOAD(con);
 	bcmd = DB_GET_PAYLOAD(res->cmd);
 
 	if (bcmd->next_flag == 2 || bcmd->next_flag == -2) return 1;

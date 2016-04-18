@@ -1,29 +1,43 @@
 /*
+ * $Id$
+ *
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-/*!
- * \file
- * \brief Kamailio core :: Route structure
- * \ingroup core
- * Module: \ref core
- * \author andrei, bogdan
+/* History:
+ * --------
+ *
+ *  2003-04-12  FORCE_RPORT_T added (andrei)
+ *  2003-04-22  strip_tail added (jiri)
+ *  2003-10-10  >,<,>=,<=, != and MSGLEN_O added (andrei)
+ *  2003-10-28  FORCE_TCP_ALIAS added (andrei)
+ *  2004-02-24  added LOAD_AVP_T and AVP_TO_URI_T (bogdan)
+ *  2005-12-11  added SND{IP,PORT,PROTO,AF}_O & TO{IP,PORT}_O (andrei)
+ *  2005-12-19  select framework added SELECT_O and SELECT_ST (mma)
+ *  2008-12-17  added UDP_MTU_TRY_PROTO_T (andrei)
  */
+
 
 #ifndef route_struct_h
 #define route_struct_h
@@ -142,7 +156,6 @@ struct cfg_pos{
 	unsigned short s_col;
 	unsigned short e_col;
 	char *fname;
-	char *rname;
 };
 
 
@@ -189,7 +202,6 @@ typedef struct {
 struct action{
 	int cline;
 	char *cfile;
-	char *rname;
 	enum action_type type;  /* forward, drop, log, send ...*/
 	int count;
 	struct action* next;

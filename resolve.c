@@ -1,26 +1,57 @@
+/* $Id$*/
 /*
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+/*
+ * History:
+ * -------
+ *  2003-02-13  added proto to sip_resolvehost, for SRV lookups (andrei)
+ *  2003-07-03  default port value set according to proto (andrei)
+ *  2005-07-11  added resolv_init (timeouts a.s.o) (andrei)
+ *  2006-04-13  added sip_hostport2su()  (andrei)
+ *  2006-07-13  rdata structures put on diet (andrei)
+ *  2006-07-17  rdata contains now also the record name (andrei)
+ *  2006-08-18  get_record can append also the additional records to the
+ *               returned list (andrei)
+ *  2007-06-15  naptr support (andrei)
+ *  2007-10-10  short name resolution using search list supported (mma)
+ *              set dns_use_search_list=1 (default on)
+ *              new option dns_search_full_match (default on) controls
+ *              whether rest of the name is matched against search list
+ *              or blindly accepted (better performance but exploitable)
+ *  2008-01-31  resolver options use the configuration framework, and the
+ *               resolver is reinitialized when the options change (Miklos)
+ *  2008-08-12  sctp preference support for NAPTR queries (andrei)
+ *  2009-03-30  TXT record support (andrei)
+ *  2009-03-31  EBL record support (andrei)
+ *  2009-04-01  PTR record support (andrei)
+ */ 
 
 /*!
  * \file
- * \brief Kamailio core :: DNS resolver
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -120,7 +151,8 @@ static on_resolv_reinit	on_resolv_reinit_cb = NULL;
 int register_resolv_reinit_cb(on_resolv_reinit cb)
 {
 	if (on_resolv_reinit_cb) {
-		LM_ERR("callback function has been already registered\n");
+		LOG(L_ERR, "ERROR: register_resolv_reinit_cb(): "
+			"callback function has been already registered\n");
 		return -1;
 	}
 	on_resolv_reinit_cb = cb;
@@ -140,7 +172,7 @@ error:
 	return -1;
 }
 
-/** init. the resolver
+/* init. the resolver
  * params: retr_time  - time before retransmitting (must be >0)
  *         retr_no    - retransmissions number
  *         servers_no - how many dns servers will be used
@@ -169,12 +201,13 @@ static int _resolv_init(void)
 		_res.options&=~(RES_DEFNAMES|RES_DNSRCH);
 #else
 #warning "no resolv timeout support"
-	LM_WARN("no resolv options support - resolv options will be ignored\n");
+	LOG(L_WARN, "WARNING: _resolv_init: no resolv options support - resolv"
+			" options will be ignored\n");
 #endif
 	return 0;
 }
 
-/** wrapper function to initialize the resolver at startup */
+/* wrapper function to initialize the resolver at startup */
 int resolv_init(void)
 {
 	int res = -1;
@@ -188,7 +221,7 @@ int resolv_init(void)
 	return res;
 }
 
-/** wrapper function to reinitialize the resolver
+/* wrapper function to reinitialize the resolver
  * This function must be called by each child process whenever
  * a resolver option changes
  */
@@ -199,10 +232,11 @@ void resolv_reinit(str *gname, str *name)
 #ifdef DNS_WATCHDOG_SUPPORT
 	if (on_resolv_reinit_cb) on_resolv_reinit_cb(name);
 #endif
-	LM_DBG("DNS resolver has been reinitialized\n");
+	LOG(L_DBG, "DEBUG: resolv_reinit(): "
+		"DNS resolver has been reinitialized\n");
 }
 
-/** fixup function for dns_reinit variable
+/* fixup function for dns_reinit variable
  * (resets the variable to 0)
  */
 int dns_reinit_fixup(void *handle, str *gname, str *name, void **val)
@@ -211,7 +245,7 @@ int dns_reinit_fixup(void *handle, str *gname, str *name, void **val)
 	return 0;
 }
 
-/** wrapper function to recalculate the naptr and srv protocol preferences */
+/* wrapper function to recalculate the naptr and srv protocol preferences */
 void reinit_proto_prefs(str *gname, str *name)
 {
 #ifdef USE_NAPTR
@@ -220,20 +254,21 @@ void reinit_proto_prefs(str *gname, str *name)
 	init_srv_proto_prefs();
 }
 
-/** fixup function for dns_try_ipv6
- * verifies that Kamailio really listens on an ipv6 interface
+/* fixup function for dns_try_ipv6
+ * verifies that SER really listens on an ipv6 interface
  */
 int dns_try_ipv6_fixup(void *handle, str *gname, str *name, void **val)
 {
 	if ((int)(long)(*val) && !(socket_types & SOCKET_T_IPV6)) {
-		LM_ERR("SER does not listen on any ipv6 interface, "
+		LOG(L_ERR, "ERROR: dns_try_ipv6_fixup(): "
+			"SER does not listen on any ipv6 interface, "
 			"there is no point in resolving ipv6 addresses\n");
 		return -1;
 	}
 	return 0;
 }
 
-/**  skips over a domain name in a dns message
+ /*  skips over a domain name in a dns message
  *  (it can be  a sequence of labels ending in \0, a pointer or
  *   a sequence of labels ending in a pointer -- see rfc1035
  *   returns pointer after the domain name or null on error*/
@@ -259,14 +294,13 @@ unsigned char* dns_skipname(unsigned char* p, unsigned char* end)
 
 
 
-/** parses the srv record into a srv_rdata structure
+/* parses the srv record into a srv_rdata structure
  *   msg   - pointer to the dns message
  *   end   - pointer to the end of the message
  *   eor   - pointer to the end of the record/rdata
  *   rdata - pointer  to the rdata part of the srv answer
- * returns 0 on error, or a dyn. alloc'ed srv_rdata structure 
- *
- * SRV rdata format:
+ * returns 0 on error, or a dyn. alloc'ed srv_rdata structure */
+/* SRV rdata format:
  *            111111
  *  0123456789012345
  * +----------------+
@@ -307,7 +341,7 @@ struct srv_rdata* dns_srv_parser( unsigned char* msg, unsigned char* end,
 	/* alloc enought space for the struct + null terminated name */
 	srv=local_malloc(sizeof(struct srv_rdata)-1+len+1);
 	if (srv==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_srv_parser: out of memory\n");
 		goto error;
 	}
 	srv->priority=ntohs(priority);
@@ -324,13 +358,12 @@ error:
 }
 
 
-/** parses the naptr record into a naptr_rdata structure
+/* parses the naptr record into a naptr_rdata structure
  *   msg   - pointer to the dns message
  *   end   - pointer to the end of the message
  *   eor   - pointer to the end of the record/rdata
  *   rdata - pointer  to the rdata part of the naptr answer
  * returns 0 on error, or a dyn. alloc'ed naptr_rdata structure */
-
 /* NAPTR rdata format:
  *            111111
  *  0123456789012345
@@ -394,7 +427,7 @@ struct naptr_rdata* dns_naptr_parser( unsigned char* msg, unsigned char* end,
 	naptr=local_malloc(sizeof(struct naptr_rdata)+flags_len+services_len+
 						regexp_len+len+1-1);
 	if (naptr == 0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_naptr_parser: out of memory\n");
 		goto error;
 	}
 	naptr->order=ntohs(order);
@@ -422,7 +455,7 @@ error:
 
 
 
-/** parses a CNAME record into a cname_rdata structure */
+/* parses a CNAME record into a cname_rdata structure */
 struct cname_rdata* dns_cname_parser( unsigned char* msg, unsigned char* end,
 									  unsigned char* rdata)
 {
@@ -439,7 +472,7 @@ struct cname_rdata* dns_cname_parser( unsigned char* msg, unsigned char* end,
 	/* alloc sizeof struct + space for the null terminated name */
 	cname=local_malloc(sizeof(struct cname_rdata)-1+len+1);
 	if(cname==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_cname_parser: out of memory\n");
 		goto error;
 	}
 	cname->name_len=len;
@@ -453,7 +486,7 @@ error:
 
 
 
-/** parses an A record rdata into an a_rdata structure
+/* parses an A record rdata into an a_rdata structure
  * returns 0 on error or a dyn. alloc'ed a_rdata struct
  */
 struct a_rdata* dns_a_parser(unsigned char* rdata, unsigned char* eor)
@@ -463,7 +496,7 @@ struct a_rdata* dns_a_parser(unsigned char* rdata, unsigned char* eor)
 	if (rdata+4>eor) goto error;
 	a=(struct a_rdata*)local_malloc(sizeof(struct a_rdata));
 	if (a==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_a_parser: out of memory\n");
 		goto error;
 	}
 	memcpy(a->ip, rdata, 4);
@@ -474,7 +507,7 @@ error:
 
 
 
-/** parses an AAAA (ipv6) record rdata into an aaaa_rdata structure
+/* parses an AAAA (ipv6) record rdata into an aaaa_rdata structure
  * returns 0 on error or a dyn. alloc'ed aaaa_rdata struct */
 struct aaaa_rdata* dns_aaaa_parser(unsigned char* rdata, unsigned char* eor)
 {
@@ -483,7 +516,7 @@ struct aaaa_rdata* dns_aaaa_parser(unsigned char* rdata, unsigned char* eor)
 	if (rdata+16>eor) goto error;
 	aaaa=(struct aaaa_rdata*)local_malloc(sizeof(struct aaaa_rdata));
 	if (aaaa==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_aaaa_parser: out of memory\n");
 		goto error;
 	}
 	memcpy(aaaa->ip6, rdata, 16);
@@ -534,7 +567,7 @@ static struct txt_rdata* dns_txt_parser(unsigned char* msg, unsigned char* end,
 	txt=local_malloc(sizeof(struct txt_rdata) +(n-1)*sizeof(struct dns_cstr)+
 						str_size);
 	if(unlikely(txt==0)){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_txt_parser: out of memory\n");
 		goto error;
 	}
 	/* string table */
@@ -604,7 +637,7 @@ static struct ebl_rdata* dns_ebl_parser(unsigned char* msg, unsigned char* end,
 	/* alloc sizeof struct + space for the 2 null-terminated strings */
 	ebl=local_malloc(sizeof(struct ebl_rdata)-1+sep_len+1+apex_len+1);
 	if (ebl==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_ebl_parser: out of memory\n");
 		goto error;
 	}
 	ebl->position=rdata[0];
@@ -625,7 +658,7 @@ error:
 
 
 
-/** parses a PTR record into a ptr_rdata structure */
+/* parses a PTR record into a ptr_rdata structure */
 struct ptr_rdata* dns_ptr_parser( unsigned char* msg, unsigned char* end,
 									  unsigned char* rdata)
 {
@@ -642,7 +675,7 @@ struct ptr_rdata* dns_ptr_parser( unsigned char* msg, unsigned char* end,
 	/* alloc sizeof struct + space for the null terminated name */
 	pname=local_malloc(sizeof(struct ptr_rdata)-1+len+1);
 	if(pname==0){
-		LM_ERR("out of memory\n");
+		LOG(L_ERR, "ERROR: dns_ptr_parser: out of memory\n");
 		goto error;
 	}
 	pname->ptrdname_len=len;
@@ -656,7 +689,7 @@ error:
 
 
 
-/** frees completely a struct rdata list */
+/* frees completely a struct rdata list */
 void free_rdata_list(struct rdata* head)
 {
 	struct rdata* l;
@@ -672,7 +705,7 @@ void free_rdata_list(struct rdata* head)
 }
 
 #ifdef HAVE_RESOLV_RES
-/** checks whether supplied name exists in the resolver search list
+/* checks whether supplied name exists in the resolver search list
  * returns 1 if found
  *         0 if not found
  */
@@ -686,7 +719,7 @@ int match_search_list(const struct __res_state* res, char* name) {
 }
 #endif
 
-/** gets the DNS records for name:type
+/* gets the DNS records for name:type
  * returns a dyn. alloc'ed struct rdata linked list with the parsed responses
  * or 0 on error
  * see rfc1035 for the query/response format */
@@ -738,7 +771,7 @@ struct rdata* get_record(char* name, int type, int flags)
 	size=dns_func.sr_res_search(name, C_IN, type, buff.buff, sizeof(buff));
 
 	if (unlikely(size<0)) {
-		LM_DBG("lookup(%s, %d) failed\n", name, type);
+		DBG("get_record: lookup(%s, %d) failed\n", name, type);
 		goto not_found;
 	}
 	else if (unlikely(size > sizeof(buff))) size=sizeof(buff);
@@ -753,7 +786,7 @@ struct rdata* get_record(char* name, int type, int flags)
 	for (r=0; r<qno; r++){
 		/* skip the name of the question */
 		if (unlikely((p=dns_skipname(p, end))==0)) {
-			LM_ERR("skipname==0\n");
+			LOG(L_ERR, "ERROR: get_record: skipname==0\n");
 			goto error;
 		}
 		p+=2+2; /* skip QCODE & QCLASS */
@@ -762,7 +795,7 @@ struct rdata* get_record(char* name, int type, int flags)
 		p+=1+2+2; /* skip the ending  '\0, QCODE and QCLASS */
 	#endif
 		if (unlikely(p>end)) {
-			LM_ERR("p>=end\n");
+			LOG(L_ERR, "ERROR: get_record: p>=end\n");
 			goto error;
 		}
 	};
@@ -772,21 +805,21 @@ again:
 #if 0
 		/*  ignore it the default domain name */
 		if ((p=dns_skipname(p, end))==0) {
-			LM_ERR("get_record: skip_name=0 (#2)\n");
+			LOG(L_ERR, "ERROR: get_record: skip_name=0 (#2)\n");
 			goto error;
 		}
 #else
 		if (unlikely((skip=dn_expand(buff.buff, end, p, rec_name,
 							MAX_DNS_NAME-1))==-1)){
-			LM_ERR("dn_expand(rec_name) failed\n");
+			LOG(L_ERR, "ERROR: get_record: dn_expand(rec_name) failed\n");
 			goto error;
 		}
 #endif
 		p+=skip;
 		rec_name_len=strlen(rec_name);
 		if (unlikely(rec_name_len>255)){
-			LM_ERR("dn_expand(rec_name): name too long (%d)\n",
-					rec_name_len);
+			LOG(L_ERR, "ERROR: get_record: dn_expand(rec_name): name too"
+					" long  (%d)\n", rec_name_len);
 			goto error;
 		}
 		/* check if enough space is left for type, class, ttl & size */
@@ -819,7 +852,7 @@ again:
 		rd=(struct rdata*) local_malloc(sizeof(struct rdata)+rec_name_len+
 										1-1);
 		if (rd==0){
-			LM_ERR("out of memory\n");
+			LOG(L_ERR, "ERROR: get_record: out of memory\n");
 			goto error;
 		}
 		rd->type=rtype;
@@ -921,7 +954,7 @@ again:
 				last=&(rd->next);
 				break;
 			default:
-				LM_ERR("unknown type %d\n", rtype);
+				LOG(L_ERR, "WARNING: get_record: unknown type %d\n", rtype);
 				rd->rdata=0;
 				*last=rd;
 				last=&(rd->next);
@@ -934,12 +967,13 @@ again:
 		flags&=~RES_AR;
 		answers_no=ntohs((unsigned short)buff.hdr.nscount);
 #ifdef RESOLVE_DBG
-		LM_DBG("skipping %d NS (p=%p, end=%p)\n", answers_no, p, end);
+		DBG("get_record: skipping %d NS (p=%p, end=%p)\n", answers_no, p,
+				end);
 #endif
 		for (r=0; (r<answers_no) && (p<end); r++){
 			/* skip over the ns records */
 			if ((p=dns_skipname(p, end))==0) {
-				LM_ERR("skip_name=0 (#3)\n");
+				LOG(L_ERR, "ERROR: get_record: skip_name=0 (#3)\n");
 				goto error;
 			}
 			/* check if enough space is left for type, class, ttl & size */
@@ -949,7 +983,8 @@ again:
 		}
 		answers_no=ntohs((unsigned short)buff.hdr.arcount);
 #ifdef RESOLVE_DBG
-		LM_DBG("parsing %d ARs (p=%p, end=%p)\n", answers_no, p, end);
+		DBG("get_record: parsing %d ARs (p=%p, end=%p)\n", answers_no, p,
+				end);
 #endif
 		goto again; /* add also the additional records */
 	}
@@ -961,7 +996,7 @@ again:
 	if ((search_list_used==1)&&(fullname_rd!=0)) {
 		rd=(struct rdata*) local_malloc(sizeof(struct rdata)+name_len+1-1);
 		if (unlikely(rd==0)){
-			LM_ERR("out of memory\n");
+			LOG(L_ERR, "ERROR: get_record: out of memory\n");
 			goto error;
 		}
 		rd->type=T_CNAME;
@@ -975,7 +1010,7 @@ again:
 		rd->rdata=(void*)local_malloc(sizeof(struct cname_rdata)-1+
 										head->name_len+1);
 		if(unlikely(rd->rdata==0)){
-			LM_ERR("out of memory\n");
+			LOG(L_ERR, "ERROR: get_record: out of memory\n");
 			goto error_rd;
 		}
 		((struct cname_rdata*)(rd->rdata))->name_len=fullname_rd->name_len;
@@ -987,19 +1022,19 @@ again:
 
 	return head;
 error_boundary:
-		LM_ERR("end of query buff reached\n");
+		LOG(L_ERR, "ERROR: get_record: end of query buff reached\n");
 		if (head) free_rdata_list(head);
 		return 0;
 error_parse:
-		LM_ERR("rdata parse error (%s, %d), %p-%p"
-				" rtype=%d, class=%d, ttl=%d, rdlength=%d\n",
+		LOG(L_ERR, "ERROR: get_record: rdata parse error (%s, %d), %p-%p"
+						" rtype=%d, class=%d, ttl=%d, rdlength=%d \n",
 				name, type,
 				p, end, rtype, class, ttl, rdlength);
 error_rd:
 		if (rd) local_free(rd); /* rd->rdata=0 & rd is not linked yet into
 								   the list */
 error:
-		LM_ERR("get_record\n");
+		LOG(L_ERR, "ERROR: get_record \n");
 		if (head) free_rdata_list(head);
 not_found:
 	/* increment error counter */
@@ -1018,7 +1053,7 @@ not_found:
 #define SIPS_D2T	0x7432642b
 
 
-/** get protocol from a naptr rdata and check for validity
+/* get protocol from a naptr rdata and check for validity
  * returns > 0 (PROTO_UDP, PROTO_TCP, PROTO_SCTP or PROTO_TLS)
  *         <=0  on error 
  */
@@ -1095,7 +1130,7 @@ inline static int srv_proto_pref_score(char proto)
 
 
 
-/** returns true if we support the protocol */
+/* returns true if we support the protocol */
 int naptr_proto_supported(char proto)
 {
 	if (naptr_proto_pref_score(proto)<0)
@@ -1122,21 +1157,21 @@ int naptr_proto_supported(char proto)
 
 
 
-/** returns true if new_proto is preferred over old_proto */
+/* returns true if new_proto is preferred over old_proto */
 int naptr_proto_preferred(char new_proto, char old_proto)
 {
 	return naptr_proto_pref_score(new_proto)>naptr_proto_pref_score(old_proto);
 }
 
 
-/** choose between 2 naptr records, should take into account local
+/* choose between 2 naptr records, should take into account local
  * preferences too
  * returns 1 if the new record was selected, 0 otherwise */
 int naptr_choose (struct naptr_rdata** crt, char* crt_proto,
 									struct naptr_rdata* n , char n_proto)
 {
 #ifdef NAPTR_DBG
-	LM_DBG("o:%d w:%d p:%d, o:%d w:%d p:%d\n",
+	DBG("naptr_choose(o: %d w: %d p:%d , o: %d w:%d p:%d)\n",
 			*crt?(int)(*crt)->order:-1, *crt?(int)(*crt)->pref:-1,
 			(int)*crt_proto,
 			(int)n->order, (int)n->pref, (int)n_proto);
@@ -1150,12 +1185,12 @@ int naptr_choose (struct naptr_rdata** crt, char* crt_proto,
 			goto change;
 	}
 #ifdef NAPTR_DBG
-	LM_DBG("no change\n");
+	DBG("naptr_choose: no change\n");
 #endif
 	return 0;
 change:
 #ifdef NAPTR_DBG
-	LM_DBG("changed\n");
+	DBG("naptr_choose: changed\n");
 #endif
 	*crt_proto=n_proto;
 	*crt=n;
@@ -1165,7 +1200,7 @@ change:
 
 
 
-/** internal sip srv resolver: resolves a host name trying:
+/* internal sip srv resolver: resolves a host name trying:
  * - SRV lookup if the address is not an ip *port==0. The result of the SRV
  *   query will be used for an A/AAAA lookup.
  *  - normal A/AAAA lookup (either fallback from the above or if *port!=0
@@ -1183,7 +1218,7 @@ change:
  *  0 on error
  */
 struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
-	char* proto, int is_srv, struct rdata* ars)
+									char* proto, int is_srv, struct rdata* ars)
 {
 	struct hostent* he;
 	struct ip_addr* ip;
@@ -1199,12 +1234,12 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 	srv_head=0;
 	srv_target=0;
 	if (name->len >= MAX_DNS_NAME) {
-		LM_ERR("domain name too long\n");
+		LOG(L_ERR, "srv_sip_resolvehost: domain name too long\n");
 		he=0;
 		goto end;
 	}
 #ifdef RESOLVE_DBG
-	LM_DBG("%.*s:%d proto=%d\n", name->len, name->s,
+	DBG("srv_sip_resolvehost: %.*s:%d proto=%d\n", name->len, name->s,
 			port?(int)*port:-1, proto?(int)*proto:-1);
 #endif
 	if (is_srv){
@@ -1242,8 +1277,8 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 			goto end;
 		}
 		if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-			LM_WARN("domain name too long (%d), unable to perform SRV lookup\n",
-						name->len);
+			LOG(L_WARN, "WARNING: srv_sip_resolvehost: domain name too long (%d),"
+						" unable to perform SRV lookup\n", name->len);
 		}else{
 			
 			switch(srv_proto){
@@ -1254,7 +1289,8 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 					create_srv_name(srv_proto, name, tmp);
 					break;
 				default:
-					LM_CRIT("unknown proto %d\n", srv_proto);
+					LOG(L_CRIT, "BUG: srv_sip_resolvehost: unknown proto %d\n",
+							srv_proto);
 					he=0;
 					goto end;
 			}
@@ -1265,7 +1301,7 @@ do_srv:
 				if (l->type!=T_SRV) continue; 
 				srv=(struct srv_rdata*) l->rdata;
 				if (srv==0){
-					LM_CRIT("null rdata\n");
+					LOG(L_CRIT, "srv_sip_resolvehost: BUG: null rdata\n");
 					/* cleanup on exit only */
 					break;
 				}
@@ -1273,7 +1309,7 @@ do_srv:
 				if (he!=0){
 					/* we found it*/
 #ifdef RESOLVE_DBG
-					LM_DBG("found SRV(%s) = %s:%d in AR\n",
+					DBG("srv_sip_resolvehost: found SRV(%s) = %s:%d in AR\n",
 							srv_target, srv->name, srv->port);
 #endif
 					*port=srv->port;
@@ -1286,7 +1322,7 @@ do_srv:
 				if (l->type!=T_SRV) continue; /*should never happen*/
 				srv=(struct srv_rdata*) l->rdata;
 				if (srv==0){
-					LM_CRIT("null rdata\n");
+					LOG(L_CRIT, "srv_sip_resolvehost: BUG: null rdata\n");
 					/* cleanup on exit only */
 					break;
 				}
@@ -1294,7 +1330,7 @@ do_srv:
 				if (he!=0){
 					/* we found it*/
 #ifdef RESOLVE_DBG
-					LM_DBG("SRV(%s) = %s:%d\n",
+					DBG("srv_sip_resolvehost: SRV(%s) = %s:%d\n",
 							srv_target, srv->name, srv->port);
 #endif
 					*port=srv->port;
@@ -1310,7 +1346,7 @@ do_srv:
 			}
 			/* cleanup on exit */
 #ifdef RESOLVE_DBG
-			LM_DBG("no SRV record found for %.*s," 
+			DBG("srv_sip_resolvehost: no SRV record found for %.*s," 
 					" trying 'normal' lookup...\n", name->len, name->s);
 #endif
 		}
@@ -1324,7 +1360,7 @@ do_srv:
 	}
 end:
 #ifdef RESOLVE_DBG
-	LM_DBG("returning %p (%.*s:%d proto=%d)\n",
+	DBG("srv_sip_resolvehost: returning %p (%.*s:%d proto=%d)\n",
 			he, name->len, name->s,
 			port?(int)*port:-1, proto?(int)*proto:-1);
 #endif
@@ -1338,7 +1374,7 @@ end:
 #ifdef USE_NAPTR 
 
 
-/** iterates over a naptr rr list, returning each time a "good" naptr record
+/* iterates over a naptr rr list, returning each time a "good" naptr record
  * is found.( srv type, no regex and a supported protocol)
  * params:
  *         naptr_head - naptr rr list head
@@ -1376,7 +1412,7 @@ struct rdata* naptr_sip_iterate(struct rdata* naptr_head,
 		if (l->type!=T_NAPTR) continue; 
 		naptr=(struct naptr_rdata*) l->rdata;
 		if (naptr==0){
-			LM_CRIT("null rdata\n");
+				LOG(L_CRIT, "naptr_iterate: BUG: null rdata\n");
 			goto end;
 		}
 		/* check if valid and get proto */
@@ -1386,8 +1422,9 @@ struct rdata* naptr_sip_iterate(struct rdata* naptr_head,
 			continue; /* already tried */
 		}
 #ifdef NAPTR_DBG
-		LM_DBG("found a valid sip NAPTR rr %.*s, proto %d\n",
-					naptr->repl_len, naptr->repl, (int)naptr_proto);
+		DBG("naptr_iterate: found a valid sip NAPTR rr %.*s,"
+					" proto %d\n", naptr->repl_len, naptr->repl, 
+					(int)naptr_proto);
 #endif
 		if ((naptr_proto_supported(naptr_proto))){
 			if (naptr_choose(&naptr_saved, &saved_proto,
@@ -1400,8 +1437,8 @@ struct rdata* naptr_sip_iterate(struct rdata* naptr_head,
 	if (naptr_saved){
 		/* found something */
 #ifdef NAPTR_DBG
-		LM_DBG("choosed NAPTR rr %.*s, proto %d tried: 0x%x\n",
-					naptr_saved->repl_len, 
+		DBG("naptr_iterate: choosed NAPTR rr %.*s, proto %d"
+					" tried: 0x%x\n", naptr_saved->repl_len, 
 					naptr_saved->repl, (int)saved_proto, *tried);
 #endif
 		*tried|=1<<idx;
@@ -1414,7 +1451,7 @@ end:
 	return 0;
 }
 
-/** Prepend srv prefix according to the proto. */
+/* Prepend srv prefix according to the proto. */
 void create_srv_name(char proto, str *name, char *srv) {
 	switch (proto) {
 		case PROTO_UDP:
@@ -1438,7 +1475,7 @@ void create_srv_name(char proto, str *name, char *srv) {
 			srv[SRV_SCTP_PREFIX_LEN + name->len] = '\0';
 			break;
 		default:
-			LM_CRIT("%s: unknown proto %d\n", __func__, proto);
+			LOG(L_CRIT, "BUG: %s: unknown proto %d\n", __func__, proto);
 	}
 }
 
@@ -1497,12 +1534,13 @@ size_t create_srv_pref_list(char *proto, struct dns_srv_proto *list) {
 	return list_len;
 }
 
-/** Resolves SRV if no naptr found. 
+/* Resolves SRV if no naptr found. 
  * It reuse dns_pref values and according that resolves supported protocols. 
  * If dns_pref are equal then it use udp,tcp,tls,sctp order.
  * returns: hostent struct & *port filled with the port from the SRV record;
  *  0 on error
  */
+
 struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port, char* proto)
 {
 	struct dns_srv_proto srv_proto_list[PROTO_LAST];
@@ -1530,7 +1568,8 @@ struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port, ch
 	}
 
 	if ((name->len+SRV_MAX_PREFIX_LEN+1)>MAX_DNS_NAME){
-		LM_WARN("domain name too long (%d), unable to perform SRV lookup\n", name->len);
+		LOG(L_WARN, "WARNING: no_naptr_srv_sip_resolvehost: domain name too long"
+						" (%d), unable to perform SRV lookup\n", name->len);
 	} else {
 		/* looping on the ordered list until we found a protocol what has srv record */
 		list_len = create_srv_pref_list(proto, srv_proto_list);
@@ -1543,7 +1582,8 @@ struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port, ch
 					create_srv_name(srv_proto_list[i].proto, name, tmp_srv);
 					break;
 				default:
-					LM_CRIT("unknown proto %d\n", (int)srv_proto_list[i].proto);
+					LOG(L_CRIT, "BUG: no_naptr_srv_sip_resolvehost: unknown proto %d\n",
+							(int)srv_proto_list[i].proto);
 					return 0;
 			}
 			/* set default port */
@@ -1570,7 +1610,7 @@ struct hostent* no_naptr_srv_sip_resolvehost(str* name, unsigned short* port, ch
 
 } 
 
-/** internal sip naptr resolver function: resolves a host name trying:
+/* internal sip naptr resolver function: resolves a host name trying:
  * - NAPTR lookup if the address is not an ip and *proto==0 and *port==0.
  *   The result of the NAPTR query will be used for a SRV lookup
  * - SRV lookup if the address is not an ip *port==0. The result of the SRV
@@ -1600,7 +1640,7 @@ struct hostent* naptr_sip_resolvehost(str* name,  unsigned short* port,
 	naptr_head=0;
 	he=0;
 	if (name->len >= MAX_DNS_NAME) {
-		LM_ERR("domain name too long\n");
+		LOG(L_ERR, "naptr_sip_resolvehost: domain name too long\n");
 		goto end;
 	}
 	/* try NAPTR if no port or protocol is specified and NAPTR lookup is
@@ -1628,8 +1668,8 @@ struct hostent* naptr_sip_resolvehost(str* name,  unsigned short* port,
 		}
 		/*clean up on exit*/
 #ifdef RESOLVE_DBG
-		LM_DBG("no NAPTR record found for %.*s, trying SRV lookup...\n",
-					name->len, name->s);
+		DBG("naptr_sip_resolvehost: no NAPTR record found for %.*s," 
+				" trying SRV lookup...\n", name->len, name->s);
 #endif
 	}
 	/* fallback to srv lookup */
@@ -1648,7 +1688,7 @@ end:
 
 
 
-/** resolves a host name trying:
+/* resolves a host name trying:
  * - NAPTR lookup if enabled, the address is not an ip and *proto==0 and 
  *   *port==0. The result of the NAPTR query will be used for a SRV lookup
  * - SRV lookup if the address is not an ip *port==0. The result of the SRV
@@ -1678,7 +1718,7 @@ struct hostent* _sip_resolvehost(str* name, unsigned short* port, char* proto)
 }
 
 
-/** resolve host, port, proto using sip rules (e.g. use SRV if port=0 a.s.o)
+/* resolve host, port, proto using sip rules (e.g. use SRV if port=0 a.s.o)
  *  and write the result in the sockaddr_union to
  *  returns -1 on error (resolve failed), 0 on success */
 int sip_hostport2su(union sockaddr_union* su, str* name, unsigned short port,
@@ -1689,8 +1729,8 @@ int sip_hostport2su(union sockaddr_union* su, str* name, unsigned short port,
 	he=sip_resolvehost(name, &port, proto);
 	if (he==0){
 		ser_error=E_BAD_ADDRESS;
-		LM_ERR("could not resolve hostname: \"%.*s\"\n",
-					name->len, name->s);
+		LOG(L_ERR, "ERROR: sip_hostport2su: could not resolve hostname:"
+					" \"%.*s\"\n", name->len, name->s);
 		goto error;
 	}
 	/* port filled by sip_resolvehost if empty*/

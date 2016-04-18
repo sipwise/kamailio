@@ -36,7 +36,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -860,23 +860,7 @@ static ims_subscription* parse_ims_subscription(xmlDocPtr doc, xmlNodePtr root)
 					s->service_profiles_cnt++;
 			}				
 	s->lock = lock_alloc();
-	if (s->lock==0) {
-		LM_ERR("Failed to allocate Lock for IMS Subscription\n");
-		shm_free(s);
-		return 0;
-	}
-	if (lock_init(s->lock)==0){
-		LM_ERR("Failed to initialize Lock for IMS Subscription\n");
-		lock_dealloc(s->lock);
-		s->lock=0;
-		shm_free(s);
-		return 0;
-	}
-        
-        s->sl = -1; //this tells us the subscription is not linked to a list....
-#ifdef EXTRA_DEBUG
-    	LM_DBG("LOCK CREATED FOR SUBSCRIPTION [%.*s]: %p\n", s->private_identity.len, s->private_identity.s, s->lock);
-#endif
+	s->lock = lock_init(s->lock);
 	return s;
 }
 

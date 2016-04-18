@@ -1,4 +1,6 @@
 /* 
+ * $Id$
+ * 
  * Copyright (C) 2008 iptelorg GmbH
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -13,10 +15,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+/*
+ *  endianness compile and runtime  tests
+ * 
+ * History:
+ * --------
+ *  2008-06-13  created by andrei
+ */
 
 /*!
  * \file
- * \brief Kamailio core :: endianness compile and runtime  tests
+ * \brief SIP-router core :: 
  * \ingroup core
  * Module: \ref core
  */

@@ -17,14 +17,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 
 #include "../../lib/srdb1/db.h"
 #include "../../lib/srdb1/db_res.h"
 
-#include "../../parser/msg_parser.h"
 #include "rtpproxy.h"
 
 #define RTPP_TABLE_VERSION 1
@@ -34,7 +33,7 @@ static db1_con_t *rtpp_db_handle = NULL;
 
 str rtpp_db_url = {NULL, 0};
 str rtpp_table_name = str_init("rtpproxy");
-str rtpp_setid_col = str_init("setid");
+str rtpp_set_name_col = str_init("set_name");
 str rtpp_url_col = str_init("url");
 str rtpp_weight_col = str_init("weight");
 str rtpp_flags_col = str_init("flags");
@@ -67,7 +66,7 @@ static int rtpp_load_db(void)
 	db1_res_t *res = NULL;
 	db_val_t *values = NULL;
 	db_row_t *rows = NULL;
-	db_key_t query_cols[] = {&rtpp_setid_col, &rtpp_url_col, &rtpp_weight_col, &rtpp_flags_col};
+	db_key_t query_cols[] = {&rtpp_set_name_col, &rtpp_url_col, &rtpp_weight_col, &rtpp_flags_col};
 
 	str set, url;
 	int weight, flags;
@@ -130,6 +129,9 @@ int init_rtpproxy_db(void)
 	if (rtpp_db_url.s == NULL)
 		/* Database not configured */
 		return 0;
+
+	rtpp_db_url.len = strlen(rtpp_db_url.s);
+	rtpp_table_name.len = strlen(rtpp_table_name.s);
 
 	if (db_bind_mod(&rtpp_db_url, &rtpp_dbf) < 0)
 	{

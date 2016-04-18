@@ -1,4 +1,6 @@
 /*
+ * $Id$
+ *
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -15,15 +17,12 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- */
-
-/*!
- * \file
- * \brief Exec module:: Kill
- * \ingroup exec 
- * Module: \ref exec
+ * History:
+ * --------
+ *  2003-03-11  changed to the new locking scheme: locking.h (andrei)
+ *
  *
  * in this file, we implement the ability to send a kill signal to
  * a child after some time; its a quick ugly hack, for example kill
@@ -37,8 +36,7 @@
  * and last but not least -- we don't know the child pid (we use popen)
  * so we cannot close anyway
  *
- * From the README:
- *  (There is kill.c but it is not used along with the current mechanisms based on popen. Besides that kill.c is ugly).
+ *
  */
 
 

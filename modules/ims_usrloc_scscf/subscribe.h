@@ -39,34 +39,35 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
-#ifndef SUBSCRIBE_USRLOC_H
-#define SUBSCRIBE_USRLOC_H
-
 #include "usrloc.h"
 
-reg_subscriber* new_subscriber(subscriber_data_t* subscriber_data);
+reg_subscriber* new_subscriber(str* presentity_uri, str* watcher_uri,
+		str* watcher_contact, subscriber_data_t* subscriber_data);
 
 //API declarations
 int get_subscriber(impurecord_t* urec, str *watcher_uri,
 		str *watcher_contact, int event, reg_subscriber** r_subscriber);
 
-int add_subscriber(impurecord_t* urec, subscriber_data_t* subscriber_data, reg_subscriber** _reg_subscriber, int db_load);
+int add_subscriber(impurecord_t* urec, str *watcher_uri,
+		str *watcher_contact, subscriber_data_t* subscriber_data,
+		reg_subscriber** _reg_subscriber);
 
 
-int update_subscriber(impurecord_t* urec, reg_subscriber** _reg_subscriber, int *expires, int *local_cseq, int *version);
+int update_subscriber(impurecord_t* urec,
+        str *watcher_uri, str *watcher_contact,
+        int *expires, reg_subscriber** _reg_subscriber);
+
+
+
 
 void delete_subscriber(impurecord_t* urec, reg_subscriber *s);
 
-void external_delete_subscriber(reg_subscriber *s, udomain_t* _t, int lock_domain);
+void external_delete_subscriber(reg_subscriber *s, udomain_t* _t);
 
 void free_subscriber(reg_subscriber *s);
 
-int valid_subscriber(reg_subscriber *s, time_t act_time);
-
-str get_presentity_from_subscriber_dialog(str *callid, str *to_tag, str *from_tag);
-
-#endif /* SUBSCRIBE_USRLOC_H */
+int valid_subscriber(reg_subscriber *s);

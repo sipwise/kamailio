@@ -19,7 +19,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
 /*!
@@ -40,7 +40,7 @@
  */
 int build_path_vector(struct sip_msg *_m, str *path, str *received)
 {
-	static char buf[MAX_PATH_BUFFER];
+	static char buf[MAX_PATH_SIZE];
 	char *p;
 	struct hdr_field *hdr;
 	struct sip_uri puri;
@@ -59,11 +59,9 @@ int build_path_vector(struct sip_msg *_m, str *path, str *received)
 
 	for( hdr=_m->path,p=buf ; hdr ; hdr = next_sibling_hdr(hdr)) {
 		/* check for max. Path length */
-		if( p-buf+hdr->body.len+1 >= MAX_PATH_BUFFER) {
-			LM_ERR("Overall Path body exceeds max. length of %d - trying to add header [%.*s] and already have [%.*s]\n",
-					MAX_PATH_BUFFER,
-                                        hdr->body.len, hdr->body.s,
-                                        (int)(p-buf), buf);
+		if( p-buf+hdr->body.len+1 >= MAX_PATH_SIZE) {
+			LM_ERR("Overall Path body exceeds max. length of %d\n",
+					MAX_PATH_SIZE);
 			goto error;
 		}
 		if(p!=buf)

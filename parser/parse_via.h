@@ -1,21 +1,26 @@
 /*
  * Copyright (C) 2001-2003 FhG Fokus
  *
- * This file is part of Kamailio, a free SIP server.
+ * This file is part of ser, a free SIP server.
  *
- * Kamailio is free software; you can redistribute it and/or modify
+ * ser is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version
  *
- * Kamailio is distributed in the hope that it will be useful,
+ * For a license to use the ser software under conditions
+ * other than those described here, or to purchase support for this
+ * software, please contact iptel.org by e-mail at the following addresses:
+ *    info@iptel.org
+ *
+ * ser is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /** @file
@@ -23,6 +28,18 @@
  *
  * @ingroup parser
  */
+
+/* 
+ *  2003-01-21  added rport parsing code, contributed by
+ *               Maxim Sobolev  <sobomax@FreeBSD.org>
+ *  2003-01-21  added extra via param parsing code (i=...), used
+ *               by tcp to identify the sending socket, by andrei
+ *  2003-01-27  added a new member (start) to via_param, by andrei
+ *  2003-10-27  added alias to via && PARAM_ALIAS (andrei)
+ *  2006-02-24  added comp/PARAM_COMP support (andrei)
+ */
+
+
 
 #ifndef PARSE_VIA_H
 #define PARSE_VIA_H
@@ -47,7 +64,7 @@ enum {
 
 
 
-typedef struct via_param {
+struct via_param {
 	int type;               /* Type of the parameter */
 	str name;               /* Name of the parameter */
 	str value;              /* Value of the parameter */
@@ -56,12 +73,12 @@ typedef struct via_param {
 	int size;               /* total size, including preceding and trailing
 							 * white space */
 	struct via_param* next; /* Next parameter in the list */
-} via_param_t;
+};
 
 
 /* Format: name/version/transport host:port;params comment */
  /* WARNING: keep in sync with tm/sip_msg.c via_body_cloner */
-typedef struct via_body { 
+struct via_body { 
 	int error;
 	str hdr;   /* Contains "Via" or "v" */
 	str name;
@@ -92,7 +109,7 @@ typedef struct via_body {
 #endif
 	struct via_body* next; /* pointer to next via body string if
 				  compact via or null */
-} via_body_t;
+};
 
 
 /*

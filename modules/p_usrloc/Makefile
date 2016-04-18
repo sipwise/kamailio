@@ -1,5 +1,6 @@
+# $Id: Makefile,v 1.1.1.1 2005/06/13 16:47:47 bogdan_iancu Exp $
 #
-# p_userloc module Makefile
+# sp-ul_db module Makefile
 #
 # 
 # WARNING: do not run this directly, it should be run by the master Makefile

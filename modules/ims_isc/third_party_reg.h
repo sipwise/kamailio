@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -65,14 +65,13 @@ extern struct tm_binds isc_tmb; 	/**< Structure with pointers to tm funcs 		*/
 
 /** reg event notification structure */
 typedef struct _r_third_party_reg {
-	str req_uri;                    /* AS sip uri:  	*/
+	str req_uri; 		/* AS sip uri:  	*/
 	str from; 			/* SCSCF uri            */
 	str to; 			/* Public user id       */
 	str pvni; 			/* Visited network id 	*/
 	str pani; 			/* Access Network info 	*/
 	str cv; 			/* Charging vector 	*/
-	str service_info;               /* Service info body */
-    str path;                       /* Path header  */
+	str service_info; 	/* Service info body */
 } r_third_party_registration;
 
 int isc_third_party_reg(struct sip_msg *msg, isc_match *m, isc_mark *mark);

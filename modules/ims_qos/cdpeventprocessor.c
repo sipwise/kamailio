@@ -39,19 +39,18 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
 #include <time.h>
 #include "sem.h"
 #include "../ims_usrloc_pcscf/usrloc.h"
-#include "../ims_dialog/dlg_load.h"
+#include "../dialog_ng/dlg_load.h"
 #include "../cdp/session.h"
 #include "mod.h"
 #include "cdpeventprocessor.h"
 #include "rx_str.h"
-#include "ims_qos_stats.h"
 
 cdp_cb_event_list_t *cdp_event_list = 0;
 extern usrloc_api_t ul;
@@ -59,11 +58,6 @@ extern struct dlg_binds dlgb;
 extern int cdp_event_latency;
 extern int cdp_event_threshold;
 extern int cdp_event_latency_loglevel;
-extern int cdp_event_list_size_threshold;
-
-extern struct ims_qos_counters_h ims_qos_cnts_h;
-
-extern int terminate_dialog_on_rx_failure;
 
 int init_cdp_cb_event_list() {
     cdp_event_list = shm_malloc(sizeof (cdp_cb_event_list_t));
@@ -78,7 +72,6 @@ int init_cdp_cb_event_list() {
         return 0;
     }
     cdp_event_list->lock = lock_init(cdp_event_list->lock);
-    cdp_event_list->size = 0;
 
     sem_new(cdp_event_list->empty, 0); //pre-locked - as we assume list is empty at start
 
@@ -137,10 +130,6 @@ void push_cdp_cb_event(cdp_cb_event_t* event) {
         cdp_event_list->tail->next = event;
         cdp_event_list->tail = event;
     }
-    cdp_event_list->size++;
-    if(cdp_event_list_size_threshold > 0 && cdp_event_list->size > cdp_event_list_size_threshold) {
-	    LM_WARN("cdp_event_list is size [%d] and has exceed cdp_event_list_size_threshold of [%d]", cdp_event_list->size, cdp_event_list_size_threshold);
-    }
     sem_release(cdp_event_list->empty);
     lock_release(cdp_event_list->lock);
 }
@@ -164,7 +153,6 @@ cdp_cb_event_t* pop_cdp_cb_event() {
         cdp_event_list->tail = 0;
     }
     ev->next = 0; //make sure whoever gets this cant access our list
-    cdp_event_list->size--;
     lock_release(cdp_event_list->lock);
 
     return ev;
@@ -175,8 +163,7 @@ void cdp_cb_event_process() {
     cdp_cb_event_t *ev;
     udomain_t* domain;
     pcontact_t* pcontact;
-    pcontact_info_t contact_info;
-
+    str release_reason = {"QoS released", 12}; /* TODO: This could be a module parameter */
     struct pcontact_info ci;
     memset(&ci, 0, sizeof (struct pcontact_info));
 
@@ -228,10 +215,7 @@ void cdp_cb_event_process() {
                     LM_DBG("This is a media bearer session session");
                     //this is a media bearer session that was terminated from the transport plane - we need to terminate the associated dialog
                     //so we set p_session_data->must_terminate_dialog to 1 and when we receive AUTH_EV_SERVICE_TERMINATED event we will terminate the dialog
-                    //we only terminate the dialog if terminate_dialog_on_rx_failure is set
-                    if(terminate_dialog_on_rx_failure) {
-                        p_session_data->must_terminate_dialog = 1;
-                    }
+                    p_session_data->must_terminate_dialog = 1;
                 }
                 break;
 
@@ -246,45 +230,26 @@ void cdp_cb_event_process() {
                     LM_DBG("This is a subscription to signalling bearer session");
                     //instead of removing the contact from usrloc_pcscf we just change the state of the contact to TERMINATE_PENDING_NOTIFY
                     //pcscf_registrar sees this, sends a SIP PUBLISH and on SIP NOTIFY the contact is deleted
-		    //note we only send SIP PUBLISH if the session has been successfully opened
-		    
-		    if(p_session_data->session_has_been_opened) {
-			if (ul.register_udomain(p_session_data->domain.s, &domain)
-				< 0) {
-			    LM_DBG("Unable to register usrloc domain....aborting\n");
-			    return;
-			}
-			ul.lock_udomain(domain, &p_session_data->via_host, p_session_data->via_port, p_session_data->via_proto);
-                        
-                        contact_info.received_host = p_session_data->ip;
-                        contact_info.received_port = p_session_data->recv_port;
-                        contact_info.received_proto = p_session_data->recv_proto;
-                        contact_info.searchflag = (1 << SEARCH_RECEIVED);
-                        
-                        contact_info.via_host = p_session_data->via_host;
-                        contact_info.via_port = p_session_data->via_port;
-                        contact_info.via_prot = p_session_data->via_proto;
-                        contact_info.aor = p_session_data->registration_aor;
-						contact_info.reg_state = PCONTACT_ANY;
-                        
-			if (ul.get_pcontact(domain, &contact_info, &pcontact) != 0) {
-			    LM_DBG("no contact found for terminated Rx reg session..... ignoring\n");
-			} else {
-			    LM_DBG("Updating contact [%.*s] after Rx reg session terminated, setting state to PCONTACT_DEREG_PENDING_PUBLISH\n", pcontact->aor.len, pcontact->aor.s);
-			    ci.reg_state = PCONTACT_DEREG_PENDING_PUBLISH;
-			    ci.num_service_routes = 0;
-			    ul.update_pcontact(domain, &ci, pcontact);
-			}
-			ul.unlock_udomain(domain, &p_session_data->via_host, p_session_data->via_port, p_session_data->via_proto);
-			counter_add(ims_qos_cnts_h.active_registration_rx_sessions, -1);
-		    }
+
+                    if (ul.register_udomain(p_session_data->domain.s, &domain)
+                            < 0) {
+                        LM_DBG("Unable to register usrloc domain....aborting\n");
+                        return;
+                    }
+                    ul.lock_udomain(domain, &p_session_data->registration_aor);
+                    if (ul.get_pcontact(domain, &p_session_data->registration_aor,
+                            &pcontact) != 0) {
+                        LM_DBG("no contact found for terminated Rx reg session..... ignoring\n");
+                    } else {
+                        LM_DBG("Updating contact [%.*s] after Rx reg session terminated, setting state to PCONTACT_DEREG_PENDING_PUBLISH\n", pcontact->aor.len, pcontact->aor.s);
+                        ci.reg_state = PCONTACT_DEREG_PENDING_PUBLISH;
+                        ci.num_service_routes = 0;
+                        ul.update_pcontact(domain, &ci, pcontact);
+                    }
+                    ul.unlock_udomain(domain, &p_session_data->registration_aor);
                 } else {
                     LM_DBG("This is a media bearer session session");
-		    if(p_session_data->session_has_been_opened) {
-			LM_DBG("Session was opened so decrementing active_media_rx_sessions\n");
-			counter_add(ims_qos_cnts_h.active_media_rx_sessions, -1);
-		    }
-		    
+                    
                     //we only terminate the dialog if this was triggered from the transport plane or timeout - i.e. if must_terminate_dialog is set
                     //if this was triggered from the signalling plane (i.e. someone hanging up) then we don'y need to terminate the dialog
                     if (p_session_data->must_terminate_dialog) {
@@ -293,14 +258,15 @@ void cdp_cb_event_process() {
                                 p_session_data->ftag.len, p_session_data->ftag.s,
                                 p_session_data->ttag.len, p_session_data->ttag.s);
                         dlgb.terminate_dlg(&p_session_data->callid,
-                                &p_session_data->ftag, &p_session_data->ttag, &confirmed_qosrelease_headers,
-                                &early_qosrelease_reason);
+                                &p_session_data->ftag, &p_session_data->ttag, NULL,
+                                &release_reason);
                     }
                 }
 
                 //free callback data
                 if (p_session_data) {
-		    free_callsessiondata(p_session_data);
+                    shm_free(p_session_data);
+                    p_session_data = 0;
                 }
                 break;
             default:

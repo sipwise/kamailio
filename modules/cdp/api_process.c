@@ -39,7 +39,7 @@
  *
  * You should have received a copy of the GNU General Public License 
  * along with this program; if not, write to the Free Software 
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  * 
  */
 
@@ -47,10 +47,8 @@
 #include "transaction.h"
 #include "receiver.h"
 #include "peerstatemachine.h"
-#include "cdp_stats.h"
 
 extern unsigned int* latency_threshold_p;	/**<max delay for Diameter call */
-extern struct cdp_counters_h cdp_cnts_h;
 
 handler_list *handlers = 0; /**< list of handlers */
 gen_lock_t *handlers_lock;	/**< lock for list of handlers */
@@ -108,13 +106,10 @@ int api_callback(peer *p,AAAMessage *msg,void* ptr)
             long elapsed_usecs =  (stop.tv_sec - t->started.tv_sec)*1000000 + (stop.tv_usec - t->started.tv_usec);
             long elapsed_msecs = elapsed_usecs/1000;
             if (elapsed_msecs > *latency_threshold_p) {
-                if (msg->sessionId && msg->sessionId->data.len)
-                    LM_ERR("Received diameter response outside of threshold (%d) - %ld (session-id: [%.*s])\n", *latency_threshold_p, elapsed_msecs, msg->sessionId->data.len, msg->sessionId->data.s);
-                else 
-                    LM_ERR("Received diameter response outside of threshold (%d) - %ld (no session-id)\n", *latency_threshold_p, elapsed_msecs);
+            	LM_ERR("Received diameter response outside of threshold (%d) - %ld\n", *latency_threshold_p, elapsed_msecs);
             }
-	    counter_inc(cdp_cnts_h.replies_received);
-	    counter_add(cdp_cnts_h.replies_response_time, elapsed_msecs);
+            update_stat(replies_received, 1);
+            update_stat(replies_response_time, elapsed_msecs);
 			auto_drop = t->auto_drop;
 			if (t->cb){
 				(t->cb)(0,*(t->ptr),msg, elapsed_msecs);

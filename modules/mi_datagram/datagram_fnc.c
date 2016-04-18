@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  *
  * History:
@@ -331,9 +331,9 @@ static void datagram_close_async(struct mi_root *mi_rpl,struct mi_handler *hdl, 
 
 	LM_DBG("the socket domain is %i and af_local is %i\n", p->domain, AF_LOCAL);
 
-	memset(&dtgram, 0, sizeof(dtgram));
-
 	mi_create_dtgram_replysocket(reply_sock, p->domain, err);
+
+        memset(&dtgram, 0, sizeof(dtgram));
 
 	if (mi_rpl!=0) {
 		/*allocate the response datagram*/	
