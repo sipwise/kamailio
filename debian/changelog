@@ -1,3 +1,11 @@
+ngcp-kamailio (4.1.9-1+0~mr3.8.6.0) unstable; urgency=medium
+
+  * [089cad2] MT#18051 db_mysql: change log level from WARN to DBG for ping checks
+  * [f9a5244] Imported Upstream version 4.1.9
+  * [583ddcf] MT#19159 refresh upstream fixes from 4.1 since 4.1.9 release
+
+ -- Victor Seva <vseva@debian.org>  Mon, 18 Apr 2016 12:05:37 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.6.0) unstable; urgency=medium
 
   * New release.
