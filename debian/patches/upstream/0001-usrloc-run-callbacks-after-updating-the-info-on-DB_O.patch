@@ -8,11 +8,9 @@ Subject: [PATCH] usrloc: run callbacks after updating the info on DB_ONLY mode
  modules/usrloc/urecord.c  | 11 ++++++++++-
  2 files changed, 38 insertions(+), 15 deletions(-)
 
-diff --git a/modules/usrloc/ucontact.c b/modules/usrloc/ucontact.c
-index 8bd8c39..a645e42 100644
 --- a/modules/usrloc/ucontact.c
 +++ b/modules/usrloc/ucontact.c
-@@ -1639,6 +1639,28 @@ static inline void update_contact_pos(struct urecord* _r, ucontact_t* _c)
+@@ -1535,6 +1535,28 @@
  	}
  }
  
@@ -41,7 +39,7 @@ index 8bd8c39..a645e42 100644
  
  /*!
   * \brief Update ucontact with new values
-@@ -1649,8 +1671,6 @@ static inline void update_contact_pos(struct urecord* _r, ucontact_t* _c)
+@@ -1545,8 +1567,6 @@
   */
  int update_ucontact(struct urecord* _r, ucontact_t* _c, ucontact_info_t* _ci)
  {
@@ -50,7 +48,7 @@ index 8bd8c39..a645e42 100644
  	/* we have to update memory in any case, but database directly
  	 * only in db_mode 1 */
  	if (mem_update_ucontact( _c, _ci) < 0) {
-@@ -1658,6 +1678,10 @@ int update_ucontact(struct urecord* _r, ucontact_t* _c, ucontact_info_t* _ci)
+@@ -1554,6 +1574,10 @@
  		return -1;
  	}
  
@@ -61,7 +59,7 @@ index 8bd8c39..a645e42 100644
  	/* run callbacks for UPDATE event */
  	if (exists_ulcb_type(UL_CONTACT_UPDATE))
  	{
-@@ -1670,18 +1694,8 @@ int update_ucontact(struct urecord* _r, ucontact_t* _c, ucontact_info_t* _ci)
+@@ -1566,18 +1590,8 @@
  
  	st_update_ucontact(_c);
  
@@ -82,11 +80,9 @@ index 8bd8c39..a645e42 100644
  	}
  	return 0;
  }
-diff --git a/modules/usrloc/urecord.c b/modules/usrloc/urecord.c
-index 9e0bff3..36f747b 100644
 --- a/modules/usrloc/urecord.c
 +++ b/modules/usrloc/urecord.c
-@@ -571,11 +571,20 @@ int insert_ucontact(urecord_t* _r, str* _contact, ucontact_info_t* _ci,
+@@ -539,11 +539,20 @@
  		return -1;
  	}
  
@@ -108,6 +104,3 @@ index 9e0bff3..36f747b 100644
  		if (db_insert_ucontact(*_c) < 0) {
  			LM_ERR("failed to insert in database\n");
  			return -1;
--- 
-2.1.4
-

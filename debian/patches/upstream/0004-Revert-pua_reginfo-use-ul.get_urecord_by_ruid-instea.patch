@@ -1,0 +1,55 @@
+From 11660e5a4bf5853eda2d4ef4d40c36928d660a07 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 18 Apr 2016 11:41:30 +0200
+Subject: [PATCH] Revert "pua_reginfo: use ul.get_urecord_by_ruid instead of
+ ul.get_urecord"
+
+This reverts commit bb16ed70ed07b51f08a2abc2582ee61ea1cc4fb8.
+---
+ modules/pua_reginfo/usrloc_cb.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/modules/pua_reginfo/usrloc_cb.c b/modules/pua_reginfo/usrloc_cb.c
+index d4e9d5f..447142a 100644
+--- a/modules/pua_reginfo/usrloc_cb.c
++++ b/modules/pua_reginfo/usrloc_cb.c
+@@ -225,9 +225,9 @@ void reginfo_usrloc_cb(ucontact_t* c, int type, void* param) {
+ 	str content_type;
+ 	udomain_t * domain;
+ 	urecord_t * record;
+-	ucontact_t* _c = NULL;
+ 	int res;
+ 	str uri = {NULL, 0};
++	str user = {NULL, 0};
+ 
+ 	char* at = NULL;
+ 	char id_buf[512];
+@@ -252,6 +252,9 @@ void reginfo_usrloc_cb(ucontact_t* c, int type, void* param) {
+ 		LM_ERR("Unknown Type %i\n", type);
+ 		return;
+ 	}
++	/* make a local copy of the AOR */
++	user.len = c->aor->len;
++	user.s = c->aor->s;
+ 
+ 	/* Get the UDomain for this account */
+ 	res = ul.get_udomain(c->domain->s, &domain);
+@@ -260,11 +263,10 @@ void reginfo_usrloc_cb(ucontact_t* c, int type, void* param) {
+ 		return;
+ 	}
+ 
+-	/* Get the URecord for this ruid */
+-	res = ul.get_urecord_by_ruid(domain, ul.get_aorhash(c->aor), &(c->ruid),
+-		&record, &_c);
+-	if (res < 0) {
+-		LM_ERR("'%.*s (%.*s)' Not found in usrloc\n", c->aor->len, c->aor->s, c->domain->len, c->domain->s);
++	/* Get the URecord for this AOR */
++	res = ul.get_urecord(domain, &user, &record);
++	if (res > 0) {
++		LM_ERR("' %.*s (%.*s)' Not found in usrloc\n", c->aor->len, c->aor->s, c->domain->len, c->domain->s);
+ 		return;
+ 	}
+ 
+-- 
+2.8.0.rc3
+

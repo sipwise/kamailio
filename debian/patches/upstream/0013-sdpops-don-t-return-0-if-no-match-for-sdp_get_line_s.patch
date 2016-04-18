@@ -10,11 +10,9 @@ Subject: [PATCH] sdpops: don't return 0 if no match for
  modules/sdpops/sdpops_mod.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/modules/sdpops/sdpops_mod.c b/modules/sdpops/sdpops_mod.c
-index 2a4aa6b..f853996 100644
 --- a/modules/sdpops/sdpops_mod.c
 +++ b/modules/sdpops/sdpops_mod.c
-@@ -1657,7 +1657,7 @@ static int w_sdp_get_line_startswith(sip_msg_t *msg, char *avp, char *s_line)
+@@ -1422,7 +1422,7 @@
  		p = find_sdp_line(line.s + line.len, body.s + body.len, sline.s[0]);
  	}
  
@@ -23,6 +21,3 @@ index 2a4aa6b..f853996 100644
  }
  
  /**
--- 
-1.9.1
-

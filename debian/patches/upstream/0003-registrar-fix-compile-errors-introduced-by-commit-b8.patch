@@ -9,11 +9,9 @@ Subject: [PATCH] registrar: fix compile errors introduced by commit
  modules/registrar/reg_mod.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/modules/registrar/reg_mod.c b/modules/registrar/reg_mod.c
-index a9aceb1..d767834 100644
 --- a/modules/registrar/reg_mod.c
 +++ b/modules/registrar/reg_mod.c
-@@ -71,6 +71,8 @@ static int w_lookup_branches(struct sip_msg* _m, char* _d, char* _p2);
+@@ -95,6 +95,8 @@
  static int w_registered(struct sip_msg* _m, char* _d, char* _uri);
  static int w_unregister(struct sip_msg* _m, char* _d, char* _uri);
  static int w_unregister2(struct sip_msg* _m, char* _d, char* _uri, char *_ruid);
@@ -22,7 +20,7 @@ index a9aceb1..d767834 100644
  
  /*! \brief Fixup functions */
  static int domain_fixup(void** param, int param_no);
-@@ -78,6 +80,7 @@ static int domain_uri_fixup(void** param, int param_no);
+@@ -102,6 +104,7 @@
  static int save_fixup(void** param, int param_no);
  static int unreg_fixup(void** param, int param_no);
  static int fetchc_fixup(void** param, int param_no);
@@ -30,6 +28,3 @@ index a9aceb1..d767834 100644
  /*! \brief Functions */
  static int add_sock_hdr(struct sip_msg* msg, char *str, char *foo);
  
--- 
-2.5.1
-

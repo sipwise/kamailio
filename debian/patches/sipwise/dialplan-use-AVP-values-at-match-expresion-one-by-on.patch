@@ -200,7 +200,7 @@ Subject: [PATCH] dialplan: use AVP[*] values at match expresion one by one.
  		new_rule->orig = rule;
  	}
  	return new_rule;
-@@ -679,7 +735,7 @@
+@@ -681,7 +737,7 @@
  	return -1;
  }
  
@@ -209,7 +209,7 @@ Subject: [PATCH] dialplan: use AVP[*] values at match expresion one by one.
  {
  	dpl_pv_id_p crt_idp, last_idp;
  	dpl_pv_index_p indexp, last_indexp, new_indexp;
-@@ -884,17 +940,29 @@
+@@ -886,17 +942,29 @@
  }
  
  void destroy_pv_rule(dpl_pv_node_t * rule){
@@ -246,7 +246,7 @@ Subject: [PATCH] dialplan: use AVP[*] values at match expresion one by one.
  	}
  	if(rule->match_elem){
  		pv_elem_free_all(rule->match_elem);
-@@ -1029,20 +1097,40 @@
+@@ -1031,20 +1099,40 @@
  
  void list_pv_rule(dpl_pv_node_t * rule)
  {

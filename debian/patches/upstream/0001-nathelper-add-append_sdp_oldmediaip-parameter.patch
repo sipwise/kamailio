@@ -54,7 +54,7 @@ Subject: [PATCH] nathelper: add append_sdp_oldmediaip parameter
  	{"contact_only",          INT_PARAM, &contact_only          },
  	{"filter_socket",         INT_PARAM, &filter_socket         },
  
-@@ -1683,7 +1685,7 @@
+@@ -1697,7 +1699,7 @@
  		}
  		body2.s = oldip.s + oldip.len;
  		body2.len = bodylimit - body2.s;

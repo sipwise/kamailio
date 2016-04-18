@@ -68,7 +68,7 @@ Subject: [PATCH] modules/debugger: trace msg out
  	{"mod_hash_size",     INT_PARAM, &default_dbg_cfg.mod_hash_size},
  	{"mod_level_mode",    INT_PARAM, &default_dbg_cfg.mod_level_mode},
  	{"mod_level",         STR_PARAM|USE_FUNC_PARAM, (void*)dbg_mod_level_param},
-@@ -178,6 +180,7 @@
+@@ -184,6 +186,7 @@
  	if (rank==PROC_INIT) {
  		dbg_enable_mod_levels();
  		dbg_enable_log_assign();

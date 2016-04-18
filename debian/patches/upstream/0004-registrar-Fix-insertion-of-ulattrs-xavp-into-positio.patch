@@ -8,11 +8,9 @@ Subject: [PATCH] registrar: Fix insertion of ulattrs xavp into position 0
  modules/registrar/lookup.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/modules/registrar/lookup.c b/modules/registrar/lookup.c
-index 6193327..efbe39c 100644
 --- a/modules/registrar/lookup.c
 +++ b/modules/registrar/lookup.c
-@@ -345,7 +345,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
+@@ -298,7 +298,7 @@
  
  		if(ptr->xavp!=NULL) {
  			xavp = xavp_clone_level_nodata(ptr->xavp);
@@ -21,6 +19,3 @@ index 6193327..efbe39c 100644
  				ret = -3;
  				goto done;
  			}
--- 
-2.5.1
-

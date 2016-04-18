@@ -3,7 +3,6 @@ upstream/acc-allow-pseudo-variables-as-first-parameter-for-fu.patch
 upstream/acc-add-documentation-note-indicating-the-use-of-pse.patch
 upstream/presence_dialoginfo-optionally-send-dummy-dialog.patch
 upstream/presence_dialoginfo-rfc4235-in-dummy-dialog.patch
-upstream/lib-srdb1-use-6-digits-for-db_double2str.patch
 upstream/debug/0001-modules-debugger-trace-msg-out.patch
 upstream/0001-registrar-add-optional-params-to-registered-function.patch
 upstream/0002-registrar-fix-wrong-var-name.patch
@@ -22,11 +21,10 @@ upstream/0006-textops-fix-append_body_part.patch
 upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
 upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
 # 4.1 upstream fixes
-upstream/0001-sqlops-fix-column-index-for-sqlops_is_null.patch
-upstream/0002-sqlops-fix-use-after-free-by-deep-copying-result-nam.patch
-upstream/0003-modules-nathelper-don-t-include-enclosing-bracket-in.patch
-upstream/0004-siputils-new-function-is_tel_number-val.patch
-upstream/0005-siputils-is_tel_number-constraints-on-lenght-and-fir.patch
+upstream/0001-debugger-fix-issue-463.patch
+upstream/0002-carrierroute-fixed-possible-kamctl-fifo-segfault.patch
+upstream/0003-dtrie-sanity-checks.patch
+upstream/0004-Revert-pua_reginfo-use-ul.get_urecord_by_ruid-instea.patch
 # fixes from master that are not in 4.2
 upstream/0012-tm-handle-BRANCH_FAILURE_ROUTE-in-t_check_trans-test.patch
 upstream/acc-add-acc_prepare_always-parameter.patch
@@ -52,7 +50,6 @@ sipwise/db_mysql-change-log-level-from-WARN-to-DBG-for-ping-.patch
 # carrier support
 sipwise/usrloc_dbro.patch
 sipwise/nathelper_socket_filter.patch
-sipwise/pua_reginfo_fix.patch
 # backport from master
 upstream/0001-nathelper-add-append_sdp_oldmediaip-parameter.patch
 upstream/0001-usrloc-run-callbacks-after-updating-the-info-on-DB_O.patch

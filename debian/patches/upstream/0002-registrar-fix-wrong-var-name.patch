@@ -7,11 +7,9 @@ Subject: [PATCH] registrar: fix wrong var name
  modules/registrar/lookup.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/modules/registrar/lookup.c b/modules/registrar/lookup.c
-index 1a35eda..6193327 100644
 --- a/modules/registrar/lookup.c
 +++ b/modules/registrar/lookup.c
-@@ -661,7 +661,7 @@ int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag, in
+@@ -588,7 +588,7 @@
  	}
  
  	if (res == 0) {
@@ -20,6 +18,3 @@ index 1a35eda..6193327 100644
  		if(reg_xavp_cfg.s!=NULL) {
  
  			if((match_flag & 1)
--- 
-2.5.1
-

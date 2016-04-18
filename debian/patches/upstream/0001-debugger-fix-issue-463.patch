@@ -1,0 +1,39 @@
+From 9e57273df9b33a14f258e0c04b699d34655d7fec Mon Sep 17 00:00:00 2001
+From: Stefan Mititelu <stefan.mititelu@1and1.ro>
+Date: Thu, 7 Jan 2016 09:58:42 +0200
+Subject: [PATCH] debugger: fix issue #463
+
+Don't shm_malloc() while the lock is taken.
+
+(cherry picked from commit 3668618369a8a1db8cb3410c0a7f50ce74150cd2)
+---
+ modules/debugger/debugger_api.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+--- a/modules/debugger/debugger_api.c
++++ b/modules/debugger/debugger_api.c
+@@ -1161,15 +1161,14 @@
+ 		itp = it;
+ 		it = it->next;
+ 	}
++	lock_release(&_dbg_mod_table[idx].lock);
+ 	/* not found - add */
+ 	if(mlevel==NULL) {
+-		lock_release(&_dbg_mod_table[idx].lock);
+ 		return 0;
+ 	}
+ 	itn = (dbg_mod_level_t*)shm_malloc(sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
+ 	if(itn==NULL) {
+ 		LM_ERR("no more shm\n");
+-		lock_release(&_dbg_mod_table[idx].lock);
+ 		return -1;
+ 	}
+ 	memset(itn, 0, sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
+@@ -1180,6 +1179,7 @@
+ 	strncpy(itn->name.s, mname, mnlen);
+ 	itn->name.s[itn->name.len] = '\0';
+ 
++	lock_get(&_dbg_mod_table[idx].lock);
+ 	if(itp==NULL) {
+ 		itn->next = _dbg_mod_table[idx].first;
+ 		_dbg_mod_table[idx].first = itn;
