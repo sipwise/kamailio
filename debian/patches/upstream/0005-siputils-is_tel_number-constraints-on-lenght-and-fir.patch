@@ -1,0 +1,39 @@
+From 66b6f7e4520ade2a9cce91d8b229f08c94b83a1a Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 11 Dec 2014 10:47:09 +0100
+Subject: [PATCH] siputils: is_tel_number() constraints on lenght and first
+ digit after +
+
+- minimum one char and if first is +, then it must have another one,
+  which should not be 0
+---
+ modules/siputils/checks.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/modules/siputils/checks.c b/modules/siputils/checks.c
+index 6e04fcd..9c2420c 100644
+--- a/modules/siputils/checks.c
++++ b/modules/siputils/checks.c
+@@ -741,11 +741,17 @@ int is_tel_number(sip_msg_t *msg, char *_sp, char* _s2)
+ 		LM_ERR("cannot get parameter value\n");
+ 		return -1;
+ 	}
+-	if(tval.len<=0)
++	if(tval.len<1)
+ 		return -2;
+ 
+ 	i = 0;
+-	if(tval.s[i]=='+') i++;
++	if(tval.s[0]=='+') {
++		if(tval.len<2)
++			return -2;
++		if(tval.s[1]<'1' || tval.s[1]>'9')
++			return -2;
++		i = 2;
++	}
+ 
+ 	for(; i<tval.len; i++) {
+ 		if(tval.s[i]<'0' || tval.s[i]>'9')
+-- 
+1.9.1
+
