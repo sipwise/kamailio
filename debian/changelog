@@ -1,3 +1,15 @@
+ngcp-kamailio (4.3.4-1+0~mr4.2.2.1) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [6c71f95] MT#18057 create new isup_decode_number_hex()
+
+  [ Victor Seva ]
+  * [17e1c48] MT#18051 db_mysql: change log level from WARN to DBG for ping checks
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Apr 2016 09:19:48 +0200
+
 ngcp-kamailio (4.3.4-1+0~mr4.2.2.0) unstable; urgency=medium
 
   [ Victor Seva ]
