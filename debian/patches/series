@@ -15,6 +15,7 @@ sipwise/parallel_build.patch
 sipwise/tcap.patch
 # carrier support
 sipwise/usrloc_dbro.patch
+sipwise/0001-kex-add-extended-core-stats.patch
 ##
 # MT#14217
 sipwise/janssonrpc-c-fakerpc.patch
