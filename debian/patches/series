@@ -22,6 +22,7 @@ sipwise/parallel_build.patch
 sipwise/tcap.patch
 # carrier support
 sipwise/usrloc_dbro.patch
+sipwise/0001-kex-add-received-request-stats-by-method.patch
 ##
 # MT#14217
 sipwise/janssonrpc-c-fakerpc.patch

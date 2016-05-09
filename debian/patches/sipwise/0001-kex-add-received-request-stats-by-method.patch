@@ -1,0 +1,140 @@
+From 7bfb0208acb8a5ba48debfad717a7824ff489a8e Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 9 May 2016 11:31:10 +0200
+Subject: [PATCH] kex: add received request stats by method
+
+---
+ modules/kex/core_stats.c | 79 ++++++++++++++++++++++++++++++++++++++++++++++--
+ modules/kex/core_stats.h | 15 +++++++++
+ 2 files changed, 91 insertions(+), 3 deletions(-)
+
+diff --git a/modules/kex/core_stats.c b/modules/kex/core_stats.c
+index ff1ee92..fce9c59 100644
+--- a/modules/kex/core_stats.c
++++ b/modules/kex/core_stats.c
+@@ -54,11 +54,39 @@ stat_var* err_rpls;				/*!< error replies            */
+ stat_var* bad_URIs;				/*!< number of bad URIs       */
+ stat_var* unsupported_methods;			/*!< unsupported methods      */
+ stat_var* bad_msg_hdr;				/*!< messages with bad header */
+-
++ /*! received requests by method  */
++stat_var* rcv_reqs_invite;
++stat_var* rcv_reqs_cancel;
++stat_var* rcv_reqs_ack;
++stat_var* rcv_reqs_bye;
++stat_var* rcv_reqs_info;
++stat_var* rcv_reqs_register;
++stat_var* rcv_reqs_subscribe;
++stat_var* rcv_reqs_notify;
++stat_var* rcv_reqs_message;
++stat_var* rcv_reqs_options;
++stat_var* rcv_reqs_prack;
++stat_var* rcv_reqs_update;
++stat_var* rcv_reqs_refer;
++stat_var* rcv_reqs_publish;
+ 
+ /*! exported core statistics */
+ stat_export_t core_stats[] = {
+ 	{"rcv_requests" ,         0,  &rcv_reqs              },
++	{"rcv_reqs_invite" ,      0,  &rcv_reqs_invite       },
++	{"rcv_reqs_cancel" ,      0,  &rcv_reqs_cancel       },
++	{"rcv_reqs_ack" ,         0,  &rcv_reqs_ack          },
++	{"rcv_reqs_bye" ,         0,  &rcv_reqs_bye          },
++	{"rcv_reqs_info" ,        0,  &rcv_reqs_info         },
++	{"rcv_reqs_register" ,    0,  &rcv_reqs_register     },
++	{"rcv_reqs_subscribe" ,   0,  &rcv_reqs_subscribe    },
++	{"rcv_reqs_notify" ,      0,  &rcv_reqs_notify       },
++	{"rcv_reqs_message" ,     0,  &rcv_reqs_message      },
++	{"rcv_reqs_options" ,     0,  &rcv_reqs_options      },
++	{"rcv_reqs_prack" ,       0,  &rcv_reqs_prack        },
++	{"rcv_reqs_update" ,      0,  &rcv_reqs_update       },
++	{"rcv_reqs_refer" ,       0,  &rcv_reqs_refer        },
++	{"rcv_reqs_publish" ,     0,  &rcv_reqs_publish      },
+ 	{"rcv_replies" ,          0,  &rcv_rpls              },
+ 	{"fwd_requests" ,         0,  &fwd_reqs              },
+ 	{"fwd_replies" ,          0,  &fwd_rpls              },
+@@ -119,8 +147,53 @@ static int km_cb_req_stats(struct sip_msg *msg,
+ 	update_stat(rcv_reqs, 1);
+ 	if(!IS_SIP(msg))
+ 		return 1;
+-	if(msg->first_line.u.request.method_value==METHOD_OTHER)
+-		update_stat(unsupported_methods, 1);
++	switch(msg->first_line.u.request.method_value) {
++		case METHOD_INVITE:
++			update_stat(rcv_reqs_invite,1);
++		break;
++		case METHOD_CANCEL:
++			update_stat(rcv_reqs_cancel,1);
++		break;
++		case METHOD_ACK:
++			update_stat(rcv_reqs_ack,1);
++		break;
++		case METHOD_BYE:
++			update_stat(rcv_reqs_bye,1);
++		break;
++		case METHOD_INFO:
++			update_stat(rcv_reqs_info,1);
++		break;
++		case METHOD_REGISTER:
++			update_stat(rcv_reqs_register,1);
++		break;
++		case METHOD_SUBSCRIBE:
++			update_stat(rcv_reqs_subscribe,1);
++		break;
++		case METHOD_NOTIFY:
++			update_stat(rcv_reqs_notify,1);
++		break;
++		case METHOD_MESSAGE:
++			update_stat(rcv_reqs_message,1);
++		break;
++		case METHOD_OPTIONS:
++			update_stat(rcv_reqs_options,1);
++		break;
++		case METHOD_PRACK:
++			update_stat(rcv_reqs_prack,1);
++		break;
++		case METHOD_UPDATE:
++			update_stat(rcv_reqs_update,1);
++		break;
++		case METHOD_REFER:
++			update_stat(rcv_reqs_refer,1);
++		break;
++		case METHOD_PUBLISH:
++			update_stat(rcv_reqs_publish,1);
++		break;
++		case METHOD_OTHER:
++			update_stat(unsupported_methods, 1);
++		break;
++	}
+ 	return 1;
+ }
+ 
+diff --git a/modules/kex/core_stats.h b/modules/kex/core_stats.h
+index 9ba315e..f8afab3 100644
+--- a/modules/kex/core_stats.h
++++ b/modules/kex/core_stats.h
+@@ -38,6 +38,21 @@ extern stat_export_t core_stats[];
+ /*! \brief received requests */
+ extern stat_var* rcv_reqs;
+ 
++/* \brief extended received requests by method */
++extern stat_var* rcv_reqs_invite;
++extern stat_var* rcv_reqs_cancel;
++extern stat_var* rcv_reqs_ack;
++extern stat_var* rcv_reqs_bye;
++extern stat_var* rcv_reqs_info;
++extern stat_var* rcv_reqs_register;
++extern stat_var* rcv_reqs_notify;
++extern stat_var* rcv_reqs_message;
++extern stat_var* rcv_reqs_options;
++extern stat_var* rcv_reqs_prack;
++extern stat_var* rcv_reqs_update;
++extern stat_var* rcv_reqs_refer;
++extern stat_var* rcv_reqs_publish;
++
+ /*! \brief received replies */
+ extern stat_var* rcv_rpls;
+ 
+-- 
+2.8.1
+
