@@ -47,6 +47,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../../sr_module.h"
 #include "session.h"
 #include "diameter.h"
 #include "config.h"
@@ -73,6 +74,7 @@ unsigned int *session_id2;		/**< counter for second part of the session id */
  */
 inline void AAASessionsLock(unsigned int hash)
 {
+	if(destroy_modules_phase()) return;
 	if ( hash >=0 && hash < sessions_hash_size ){
 		lock_get(sessions[hash].lock);
 	}
@@ -86,6 +88,7 @@ inline void AAASessionsLock(unsigned int hash)
  */
 inline void AAASessionsUnlock(unsigned int hash)
 {
+	if(destroy_modules_phase()) return;
 
 	if ( hash >=0 && hash < sessions_hash_size ){
 		lock_release(sessions[hash].lock);
