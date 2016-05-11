@@ -1,3 +1,14 @@
+ngcp-kamailio (4.4.1-1+0~mr4.4.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [f699e68] MT#19073 add via-branch=next feature
+
+  [ Victor Seva ]
+  * [dea9d35] Imported Upstream version 4.4.1
+  * [e8c6649] MT#19673 remove already applied patches from 4.4 branch
+
+ -- Victor Seva <vseva@debian.org>  Wed, 11 May 2016 15:12:04 +0200
+
 ngcp-kamailio (4.4.0-1+0~mr4.4.0.0) unstable; urgency=medium
 
   * [e50bb3b] Imported Upstream version 4.4.0
