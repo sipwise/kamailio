@@ -235,7 +235,6 @@ int erl_init_ec(ei_cnode *ec, const str *alivename, const str *hostname, const s
 	char nodename[MAXNODELEN];
 
 	int result;
-	int port;
 
 	/* copy the nodename into something we can modify */
 	if (snprintf(nodename, MAXNODELEN, "%.*s@%.*s", STR_FMT(alivename), STR_FMT(hostname)) >= MAXNODELEN) {
@@ -255,8 +254,6 @@ int erl_init_ec(ei_cnode *ec, const str *alivename, const str *hostname, const s
 		LM_CRIT("failed to initialize self as cnode name %s\n", nodename);
 		return -1;
 	}
-
-	port = sockaddr_port(addr);
 
 	LM_DBG("initialized ec for cnode '%s' on %.*s[%s] creation %d.\n", nodename, STR_FMT(hostname), ip_addr2strz(&ip), creation);
 
@@ -307,9 +304,9 @@ int erl_init_node(ei_cnode *ec, const str *alivename, const str *hostname, const
 	sockaddr2ip_addr(&ip, addr);
 
 	/* publish */
-	if ((epmdfd = ei_publish_tmo(ec, port, timeout_ms)) == -1) {
+	if ((epmdfd = ei_publish_tmo(ec, port, timeout_ms)) < 0) {
 
-		LM_ERR("Failed to publish port %u to epmd, check is epmd started\n", port);
+		LM_DBG("Failed publish %s:%u[%u] as %s: %s (%d)\n",ip_addr2strz(&ip),port,listen_fd,nodename, strerror(erl_errno), epmdfd);
 
 		erl_close_socket(listen_fd);
 		return -1;
