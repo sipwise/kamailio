@@ -1,13 +1,6 @@
 ##
 # upstream fixes
 # 4.4
-upstream/0001-core-skip-address-family-AF_PACKET-on-l-iface_name.patch
-upstream/0002-core-test-if-AF_PACKET-is-defined-at-compile-time.patch
-upstream/0033-evapi-Fix-URL-to-library-home-page-in-README.patch
-upstream/0034-core-check-if-ifa_addr-field-is-set-while-trying-to-.patch
-upstream/0035-core-common-check-for-ifa-ifa_addr-in-add_intefaces.patch
-upstream/0036-Makefile.defs-re-enable-mem-join-define.patch
-upstream/0037-dialog-fix-dlg-from_bindaddr-name-parsing.patch
 #
 # upsream fixes from master
 #
