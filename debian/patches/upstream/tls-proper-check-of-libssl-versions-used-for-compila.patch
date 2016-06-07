@@ -11,11 +11,9 @@ Subject: [PATCH] tls: proper check of libssl versions used for compilation and
  modules/tls/tls_init.c | 6 ++++--
  1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/modules/tls/tls_init.c b/modules/tls/tls_init.c
-index d7f3cef..e0bbb0b 100644
 --- a/modules/tls/tls_init.c
 +++ b/modules/tls/tls_init.c
-@@ -545,8 +545,10 @@ int init_tls_h(void)
+@@ -528,8 +528,10 @@
  #endif
  	ssl_version=SSLeay();
  	/* check if version have the same major minor and fix level
@@ -26,8 +24,5 @@ index d7f3cef..e0bbb0b 100644
 +	 *   0x00090705f == 0.9.7e release */
 +	if ((ssl_version>>12)!=(OPENSSL_VERSION_NUMBER>>12)){
  		LOG(L_CRIT, "ERROR: tls: init_tls_h: installed openssl library "
- 				"version is too different from the library the Kamailio tls module "
+ 				"version is too different from the library the ser tls module "
  				"was compiled with: installed \"%s\" (0x%08lx), compiled "
--- 
-2.8.1
-
