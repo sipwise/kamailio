@@ -1,3 +1,12 @@
+ngcp-kamailio (4.3.4-1+0~mr4.3.1.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [ad35769] MT#20349 tls: fix openssl compatibility check
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 07 Jun 2016 17:10:02 +0200
+
 ngcp-kamailio (4.3.4-1+0~mr4.3.1.2) unstable; urgency=medium
 
   * New release.
