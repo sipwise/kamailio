@@ -16,6 +16,7 @@ upstream/pv-pv_var_to_xavp.patch
 upstream/pv-pv_xavp_to_var.patch
 upstream/core-add-fixup_pvar_pvar_pvar.patch
 upstream/acc-add-acc_prepare_always-parameter.patch
+upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 ##
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
