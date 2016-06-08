@@ -1,0 +1,69 @@
+From 8acf392d4c5fb5113dfaf7a9a229d75e1c2ced8b Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Wed, 8 Jun 2016 10:22:30 +0200
+Subject: [PATCH] usrloc: db_mode DB_FALLBACK
+
+---
+ modules/usrloc/doc/usrloc_admin.xml | 6 ++++++
+ modules/usrloc/udomain.c            | 6 ++++--
+ modules/usrloc/ul_mod.c             | 1 +
+ modules/usrloc/usrloc.h             | 1 +
+ 4 files changed, 12 insertions(+), 2 deletions(-)
+
+--- a/modules/usrloc/doc/usrloc_admin.xml
++++ b/modules/usrloc/doc/usrloc_admin.xml
+@@ -664,6 +664,12 @@
+ 			runtime.
+ 			</para>
+ 		</listitem>
++		<listitem>
++			<para>
++			5 - Write-Trhough scheme + fallback to DB if record is not found
++			in memory. That record will keep server_id value.
++			</para>
++		</listitem>
+ 		</itemizedlist>
+ 		<warning>
+ 		<para>
+--- a/modules/usrloc/udomain.c
++++ b/modules/usrloc/udomain.c
+@@ -1146,7 +1146,8 @@
+ 
+ 			r = r->next;
+ 		}
+-	} else {
++	}
++	if (db_mode==DB_ONLY || db_mode==DB_FALLBACK) {
+ 		/* search in DB */
+ 		r = db_load_urecord( ul_dbh, _d, _aor);
+ 		if (r) {
+@@ -1196,7 +1197,8 @@
+ 			}
+ 			r = r->next;
+ 		}
+-	} else {
++	}
++	if (db_mode==DB_ONLY || db_mode==DB_FALLBACK) {
+ 		/* search in DB */
+ 		r = db_load_urecord_by_ruid(ul_dbh, _d, _ruid);
+ 		if (r) {
+--- a/modules/usrloc/ul_mod.c
++++ b/modules/usrloc/ul_mod.c
+@@ -472,6 +472,7 @@
+ 			return 0;
+ 		case DB_ONLY:
+ 		case WRITE_THROUGH:
++		case DB_FALLBACK:
+ 			/* connect to db only from SIP workers, TIMER and MAIN processes */
+ 			if (_rank<=0 && _rank!=PROC_TIMER && _rank!=PROC_MAIN)
+ 				return 0;
+--- a/modules/usrloc/usrloc.h
++++ b/modules/usrloc/usrloc.h
+@@ -39,6 +39,7 @@
+ #define WRITE_BACK    2
+ #define DB_ONLY       3
+ #define DB_READONLY   4
++#define DB_FALLBACK   5
+ 
+ #define GAU_OPT_SERVER_ID  (1<<0)  /* filter query by server_id */
+ 
