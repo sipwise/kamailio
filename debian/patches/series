@@ -10,6 +10,7 @@ upstream/0002-registrar-fix-wrong-var-name.patch
 upstream/0003-registrar-fix-compile-errors-introduced-by-commit-b8.patch
 upstream/0004-registrar-Fix-insertion-of-ulattrs-xavp-into-positio.patch
 upstream/0013-sdpops-don-t-return-0-if-no-match-for-sdp_get_line_s.patch
+upstream/0014-rr-fix-detecting-next-strict-router.patch
 ## multipart bodies
 upstream/0001-parser-add-internal-flag-FL_BODY_MULTIPART.patch
 upstream/0001-core-add-str_append-helper-function.patch
