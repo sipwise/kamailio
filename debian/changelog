@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.5.2) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [a47b297] MT#20463: fix detecting strict router
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 10 Jun 2016 09:23:00 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.5.1) unstable; urgency=medium
 
   * New release.
