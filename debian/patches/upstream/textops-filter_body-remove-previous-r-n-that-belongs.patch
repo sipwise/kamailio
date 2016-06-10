@@ -1,0 +1,28 @@
+From 64ada7496a2f1ed91c5e79fd5f6827a65f65b06c Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 10 Jun 2016 16:47:02 +0200
+Subject: [PATCH] textops: filter_body() remove previous \r\n that belongs to
+ the boundary
+
+we were removing only '--boundary\r\n' but we must remove '\r\n--boundary\r\n'
+---
+ modules/textops/textops.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/modules/textops/textops.c b/modules/textops/textops.c
+index 400b836..54ab073 100644
+--- a/modules/textops/textops.c
++++ b/modules/textops/textops.c
+@@ -973,7 +973,8 @@ static int filter_body_f(struct sip_msg* msg, char* _content_type,
+ 				if (find_line_start(boundary.s, boundary.len, &start,
+ 					&len))
+ 				{
+-					if (del_lump(msg, start - msg->buf, len, 0) == 0)
++					# we need to remove \r\n too
++					if (del_lump(msg, (start-2) - msg->buf, len+2, 0) == 0)
+ 					{
+ 						LM_ERR("deleting lump <%.*s> failed\n", len, start);
+ 						goto err;
+-- 
+2.8.1
+
