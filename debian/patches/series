@@ -22,6 +22,7 @@ upstream/0006-textops-fix-append_body_part.patch
 #
 upstream/core-new-internal-msg-flag-added-FL_RR_ADDED.patch
 upstream/rr-use-internal-msg-flags-to-mark-a-request-with-rec.patch
+upstream/textops-filter_body-remove-previous-r-n-that-belongs.patch
 # 4.1 upstream fixes
 upstream/0001-sqlops-fix-column-index-for-sqlops_is_null.patch
 upstream/0002-sqlops-fix-use-after-free-by-deep-copying-result-nam.patch
