@@ -1,3 +1,12 @@
+ngcp-kamailio (4.1.8-1+0~mr3.8.5.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [3904868] MT#20493 textops: filter_body() remove extra '\r\n'
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 13 Jun 2016 13:54:48 +0200
+
 ngcp-kamailio (4.1.8-1+0~mr3.8.5.2) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
