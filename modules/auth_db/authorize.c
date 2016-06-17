@@ -15,8 +15,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
@@ -62,13 +62,16 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table, int fl
 		LM_ERR("no more pkg memory\n");
 		return -1;
 	}
-	col[0] = &user_column;
 
 	keys[0] = &user_column;
 	keys[1] = &domain_column;
 
-	for (n = 0, cred=credentials; cred ; n++, cred=cred->next) {
-		col[n] = &cred->text;
+	if(flags&AUTH_DB_SUBS_SKIP_CREDENTIALS) {
+		col[0] = &user_column;
+	} else {
+		for (n = 0, cred=credentials; cred ; n++, cred=cred->next) {
+			col[n] = &cred->text;
+		}
 	}
 
 	VAL_TYPE(vals) = VAL_TYPE(vals + 1) = DB1_STR;
@@ -126,7 +129,7 @@ done:
 }
 
 static inline int get_ha1(struct username* _username, str* _domain,
-			  const str* _table, char* _ha1, db1_res_t** res)
+		const str* _table, char* _ha1, db1_res_t** res)
 {
 	pv_elem_t *cred;
 	db_key_t keys[2];
@@ -496,10 +499,10 @@ int auth_check(struct sip_msg* _m, char* _realm, char* _table, char *_flags)
 
 	if(ret==AUTH_OK && hdr!=NULL && (iflags&AUTH_CHECK_ID_F)) {
 		srealm = ((auth_body_t*)(hdr->parsed))->digest.username.user;
-			
+
 		if((furi=parse_from_uri(_m))==NULL)
 			return AUTH_ERROR;
-		
+
 		if(_m->REQ_METHOD==METHOD_REGISTER || _m->REQ_METHOD==METHOD_PUBLISH) {
 			if((turi=parse_to_uri(_m))==NULL)
 				return AUTH_ERROR;
