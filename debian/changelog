@@ -1,3 +1,11 @@
+ngcp-kamailio (4.3.5-1+0~mr4.3.2.0) unstable; urgency=medium
+
+  * [a3d8910] MT#20349 tls: fix openssl compatibility check
+  * [fc0ef1e] MT#20493 textops: filter_body() remove extra '\r\n'
+  * [9ca6d0b] Imported Upstream version 4.3.5
+
+ -- Victor Seva <vseva@debian.org>  Fri, 17 Jun 2016 13:49:33 +0200
+
 ngcp-kamailio (4.3.4-1+0~mr4.3.2.0) unstable; urgency=medium
 
   * New release.
