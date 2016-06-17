@@ -35,7 +35,6 @@ int th_mask_contact(sip_msg_t *msg);
 int th_mask_record_route(sip_msg_t *msg);
 int th_unmask_via(sip_msg_t *msg, str *cookie);
 int th_unmask_callid(sip_msg_t *msg);
-int th_unmask_callid_str(str *icallid, str *ocallid);
 int th_flip_record_route(sip_msg_t *msg, int mode);
 int th_unmask_ruri(sip_msg_t *msg);
 int th_unmask_route(sip_msg_t *msg);

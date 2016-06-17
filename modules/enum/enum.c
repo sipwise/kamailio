@@ -34,7 +34,7 @@
  * based on the user part of the current Request-URI. These functions
  * assume that the Request URI user part consists of an international
  * phone number of the form +decimal-digits, where the number of digits is
- * at least 2 and at most 32. Out of this number enum_query forms a domain
+ * at least 2 and at most 15. Out of this number enum_query forms a domain
  * name, where the digits are in reverse order and separated by dots
  * followed by domain suffix that by default is "e164.arpa.". For example,
  * if the user part is +35831234567, the domain name will be
@@ -254,7 +254,7 @@ static inline int is_e164(str* _user)
 	int i;
 	char c;
 	
-	if ((_user->len > 1) && (_user->len < MAX_NUM_LEN) && ((_user->s)[0] == '+')) {
+	if ((_user->len > 2) && (_user->len < MAX_NUM_LEN) && ((_user->s)[0] == '+')) {
 		for (i = 1; i < _user->len; i++) {
 			c = (_user->s)[i];
 			if ((c < '0') || (c > '9')) return -1;
@@ -762,14 +762,13 @@ int enum_query(struct sip_msg* _msg, str* suffix, str* service)
 		return -1;
 	}
 
-	user_s = _msg->parsed_uri.user.s;
-	user_len = _msg->parsed_uri.user.len;
-
 	if (is_e164(&(_msg->parsed_uri.user)) == -1) {
-		LM_ERR("R-URI user '<%.*s>' is not an E164 number\n",
-		user_len, user_s);
+		LM_ERR("R-URI user is not an E164 number\n");
 		return -1;
 	}
+
+	user_s = _msg->parsed_uri.user.s;
+	user_len = _msg->parsed_uri.user.len;
 
 	memcpy(&(string[0]), user_s, user_len);
 	string[user_len] = (char)0;
@@ -1006,7 +1005,7 @@ int enum_pv_query_3(struct sip_msg* _msg, char* _sp, char* _suffix,
 	struct naptr_rdata* naptr;
 	str pattern, replacement, result, new_result;
 	str *suffix, *service;
-	char string[MAX_NUM_LEN];
+	char string[17];
 	pv_spec_t *sp;
 	pv_value_t pv_val;
 

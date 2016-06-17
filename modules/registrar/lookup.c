@@ -15,16 +15,16 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
+ * You should have received a copy of the GNU General Public License 
+ * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 /*!
  * \file
  * \brief SIP registrar module - lookup contacts in usrloc
- * \ingroup registrar
- */
+ * \ingroup registrar  
+ */  
 
 
 #include <string.h>
@@ -82,60 +82,14 @@ int reg_cmp_instances(str *i1, str *i2)
  * Lookup a contact in usrloc and rewrite R-URI if found
  */
 int lookup(struct sip_msg* _m, udomain_t* _d, str* _uri) {
-	return lookup_helper(_m, _d, _uri, 0);
+     return lookup_helper(_m, _d, _uri, 0);
 }
 
 /*! \brief
  * Lookup a contact in usrloc and add the records to the dset structure
  */
 int lookup_to_dset(struct sip_msg* _m, udomain_t* _d, str* _uri) {
-	return lookup_helper(_m, _d, _uri, 1);
-}
-
-/*! \brief
- * add xavp with details of the record (ruid, ...)
- */
-int xavp_rcd_helper(ucontact_t* ptr) {
-	sr_xavp_t *xavp=NULL;
-	sr_xavp_t *list=NULL;
-	str xname_ruid = {"ruid", 4};
-	str xname_received = { "received", 8};
-	str xname_contact = { "contact", 7};
-	sr_xval_t xval;
-
-	if(ptr==NULL) return -1;
-
-	if(reg_xavp_rcd.s!=NULL)
-	{
-		list = xavp_get(&reg_xavp_rcd, NULL);
-		xavp = list;
-		memset(&xval, 0, sizeof(sr_xval_t));
-		xval.type = SR_XTYPE_STR;
-		xval.v.s = ptr->ruid;
-		xavp_add_value(&xname_ruid, &xval, &xavp);
-
-		if(ptr->received.len > 0)
-		{
-			memset(&xval, 0, sizeof(sr_xval_t));
-			xval.type = SR_XTYPE_STR;
-			xval.v.s = ptr->received;
-			xavp_add_value(&xname_received, &xval, &xavp);
-		}
-
-		memset(&xval, 0, sizeof(sr_xval_t));
-		xval.type = SR_XTYPE_STR;
-		xval.v.s = ptr->c;
-		xavp_add_value(&xname_contact, &xval, &xavp);
-
-		if(list==NULL)
-		{
-			/* no reg_xavp_rcd xavp in root list - add it */
-			xval.type = SR_XTYPE_XAVP;
-			xval.v.xavp = xavp;
-			xavp_add_value(&reg_xavp_rcd, &xval, NULL);
-		}
-	}
-	return 0;
+     return lookup_helper(_m, _d, _uri, 1);
 }
 
 /*! \brief
@@ -161,6 +115,9 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 	str inst = {0};
 	unsigned int ahash = 0;
 	sr_xavp_t *xavp=NULL;
+	sr_xavp_t *list=NULL;
+	str xname = {"ruid", 4};
+	sr_xval_t xval;
 	sip_uri_t path_uri;
 	str path_str;
 
@@ -168,7 +125,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 
 	if (_m->new_uri.s) uri = _m->new_uri;
 	else uri = _m->first_line.u.request.uri;
-
+	
 	if (extract_aor((_uri)?_uri:&uri, &aor, &puri) < 0) {
 		LM_ERR("failed to extract address of record\n");
 		return -3;
@@ -281,7 +238,23 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 		/* reset next hop address */
 		reset_dst_uri(_m);
 
-		xavp_rcd_helper(ptr);
+		/* add xavp with details of the record (ruid, ...) */
+		if(reg_xavp_rcd.s!=NULL)
+		{
+			list = xavp_get(&reg_xavp_rcd, NULL);
+			xavp = list;
+			memset(&xval, 0, sizeof(sr_xval_t));
+			xval.type = SR_XTYPE_STR;
+			xval.v.s = ptr->ruid;
+			xavp_add_value(&xname, &xval, &xavp);
+			if(list==NULL)
+			{
+				/* no reg_xavp_rcd xavp in root list - add it */
+				xval.type = SR_XTYPE_XAVP;
+				xval.v.xavp = xavp;
+				xavp_add_value(&reg_xavp_rcd, &xval, NULL);
+			}
+		}
 
 		/* If a Path is present, use first path-uri in favour of
 		 * received-uri because in that case the last hop towards the uac
@@ -340,26 +313,26 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 		}
 
 		if (ptr->instance.len) {
-			if (set_instance(_m, &(ptr->instance)) < 0) {
+		    if (set_instance(_m, &(ptr->instance)) < 0) {
 				ret = -3;
 				goto done;
-			}
+		    }
 		}
-
+		
 		_m->reg_id = ptr->reg_id;
 
 		if (ptr->ruid.len) {
-			if (set_ruid(_m, &(ptr->ruid)) < 0) {
+		    if (set_ruid(_m, &(ptr->ruid)) < 0) {
 				ret = -3;
 				goto done;
-			}
+		    }
 		}
 
 		if (ptr->user_agent.len) {
-			if (set_ua(_m, &(ptr->user_agent)) < 0) {
+		    if (set_ua(_m, &(ptr->user_agent)) < 0) {
 				ret = -3;
 				goto done;
-			}
+		    }
 		}
 
 		set_ruri_q(ptr->q);
@@ -422,18 +395,18 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 				path_dst.len = 0;
 			}
 
-			/* The same as for the first contact applies for branches
+			/* The same as for the first contact applies for branches 
 			 * regarding path vs. received. */
 			LM_DBG("instance is %.*s\n",
-				ptr->instance.len, ptr->instance.s);
+			       ptr->instance.len, ptr->instance.s);
 			if (append_branch(_m, &ptr->c,
-					path_dst.len?&path_dst:&ptr->received,
-					path_dst.len?&path_str:0, ptr->q, ptr->cflags,
-					ptr->sock,
-					ptr->instance.len?&(ptr->instance):0,
-						ptr->instance.len?ptr->reg_id:0,
-						&ptr->ruid, &ptr->user_agent)
-					== -1) {
+					  path_dst.len?&path_dst:&ptr->received,
+					  path_dst.len?&path_str:0, ptr->q, ptr->cflags,
+					  ptr->sock,
+					  ptr->instance.len?&(ptr->instance):0,
+				          ptr->instance.len?ptr->reg_id:0,
+					  &ptr->ruid, &ptr->user_agent)
+			    == -1) {
 				LM_ERR("failed to append a branch\n");
 				/* Also give a chance to the next branches*/
 				continue;
@@ -484,19 +457,19 @@ int clear_ruri_branch(sip_msg_t *msg)
  */
 int reset_ruri_branch(sip_msg_t *msg)
 {
-	if(msg==NULL)
-		return -1;
+    if(msg==NULL)
+        return -1;
 
-	reset_dst_uri(msg);
-	reset_path_vector(msg);
-	set_ruri_q(Q_UNSPECIFIED);
-	reset_force_socket(msg);
-	setbflagsval(0, 0);
-	reset_instance(msg);
-	msg->reg_id = 0;
-	reset_ruid(msg);
-	reset_ua(msg);
-	return 0;
+    reset_dst_uri(msg);
+    reset_path_vector(msg);
+    set_ruri_q(Q_UNSPECIFIED);
+    reset_force_socket(msg);
+    setbflagsval(0, 0);
+    reset_instance(msg);
+    msg->reg_id = 0;
+    reset_ruid(msg);
+    reset_ua(msg);
+    return 0;
 }
 
 /*! \brief
@@ -681,12 +654,12 @@ int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag, in
 			else uri = _m->first_line.u.request.uri;
 		}
 	}
-
+	
 	if (extract_aor(&uri, &aor, NULL) < 0) {
 		LM_ERR("failed to extract address of record\n");
 		return -1;
 	}
-
+	
 	ul.lock_udomain(_d, &aor);
 	res = ul.get_urecord(_d, &aor, &r);
 
@@ -726,21 +699,19 @@ int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag, in
 			if(!VALID_CONTACT(ptr, act_time)) continue;
 			if (match_callid.s && /* optionally enforce tighter matching w/ Call-ID */
 				match_callid.len > 0 &&
-				(match_callid.len != ptr->callid.len ||
+				(match_callid.len != ptr->callid.len || 
 				memcmp(match_callid.s, ptr->callid.s, match_callid.len)))
 				continue;
 			if (match_received.s && /* optionally enforce tighter matching w/ ip:port */
 				match_received.len > 0 &&
-				(match_received.len != ptr->received.len ||
+				(match_received.len != ptr->received.len || 
 				memcmp(match_received.s, ptr->received.s, match_received.len)))
 				continue;
 			if (match_contact.s && /* optionally enforce tighter matching w/ Contact */
 				match_contact.len > 0 &&
-				(match_contact.len != ptr->c.len ||
+				(match_contact.len != ptr->c.len || 
 				memcmp(match_contact.s, ptr->c.s, match_contact.len)))
 				continue;
-
-			xavp_rcd_helper(ptr);
 
 			if(ptr->xavp!=NULL && match_action_flag == 1) {
 				sr_xavp_t *xavp = xavp_clone_level_nodata(ptr->xavp);

@@ -42,7 +42,6 @@ struct cfg_group_tls {
 	int force_run;
 	str method;
 	str server_name;
-	str server_id;
 	int verify_cert;
 	int verify_depth;
 	int require_cert;

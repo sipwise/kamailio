@@ -32,14 +32,9 @@
 #define _RADIUS_CORE_H
 
 #ifndef USE_FREERADIUS
-	#ifdef USE_RADCLI
-		#include <radcli/radcli.h>
-		#define DEFAULT_RADIUSCLIENT_CONF ""
-	#else
-		#include <radiusclient-ng.h>
-		#define DEFAULT_RADIUSCLIENT_CONF \
-			"/usr/local/etc/radiusclient-ng/radiusclient.conf"
-	#endif
+	#include <radiusclient-ng.h>
+	#define DEFAULT_RADIUSCLIENT_CONF \
+		"/usr/local/etc/radiusclient-ng/radiusclient.conf"
 #else
 	#include <freeradius-client.h>
 	#define DEFAULT_RADIUSCLIENT_CONF ""

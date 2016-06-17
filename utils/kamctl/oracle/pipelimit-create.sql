@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('pl_pipes','1');
 CREATE TABLE pl_pipes (
     id NUMBER(10) PRIMARY KEY,
     pipeid VARCHAR2(64) DEFAULT '',
@@ -13,5 +14,3 @@ END pl_pipes_tr;
 /
 BEGIN map2users('pl_pipes'); END;
 /
-INSERT INTO version (table_name, table_version) values ('pl_pipes','1');
-

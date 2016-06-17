@@ -550,9 +550,6 @@ int dlg_bye(struct dlg_cell *dlg, str *hdrs, int side)
 	}
 	ret = send_bye(dlg, side, &all_hdrs);
 	pkg_free(all_hdrs.s);
-
-	dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
-
 	return ret;
 }
 
@@ -574,9 +571,6 @@ int dlg_bye_all(struct dlg_cell *dlg, str *hdrs)
 	ret |= send_bye(dlg, DLG_CALLEE_LEG, &all_hdrs);
 	
 	pkg_free(all_hdrs.s);
-
-	dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
-
 	return ret;
 
 }

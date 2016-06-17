@@ -55,7 +55,7 @@
 #include "dlg_var.h"
 
 static str       rr_param;		/*!< record-route parameter for matching */
-static int       dlg_flag_mask=0;	/*!< flag for dialog tracking */
+static int       dlg_flag;		/*!< flag for dialog tracking */
 static pv_spec_t *timeout_avp;		/*!< AVP for timeout setting */
 static int       default_timeout;	/*!< default dialog timeout */
 static int       seq_match_mode;	/*!< dlg_match mode */ 
@@ -107,7 +107,7 @@ void init_dlg_handlers(char *rr_param_p, int dlg_flag_p,
 	rr_param.s = rr_param_p;
 	rr_param.len = strlen(rr_param.s);
 
-	if(dlg_flag_p>=0) dlg_flag_mask = 1<<dlg_flag_p;
+	dlg_flag = 1<<dlg_flag_p;
 
 	timeout_avp = timeout_avp_p;
 	default_timeout = default_timeout_p;
@@ -524,11 +524,6 @@ static void dlg_onreply(struct cell* t, int type, struct tmcb_params *param)
 		goto done;
 	}
 
-	if(new_state==DLG_STATE_DELETED && old_state!=DLG_STATE_DELETED) {
-		/* set end time */
-		dlg->end_ts = (unsigned int)(time(0));
-	}
-
 	if ( new_state==DLG_STATE_DELETED
 				&& (old_state==DLG_STATE_UNCONFIRMED
 					|| old_state==DLG_STATE_EARLY) ) {
@@ -716,7 +711,7 @@ void dlg_onreq(struct cell* t, int type, struct tmcb_params *param)
 		}
 	}
 	if (dlg==NULL) {
-		if((req->flags&dlg_flag_mask)!=dlg_flag_mask)
+		if((req->flags&dlg_flag)!=dlg_flag)
 			return;
 		LM_DBG("dialog creation on config flag\n");
 		dlg_new_dialog(req, t, 1);
@@ -1018,47 +1013,6 @@ static inline int parse_dlg_rr_param(char *p, char *end, int *h_entry, int *h_id
 
 
 /*!
- * \brief Update the saved Contact information in dialog from SIP message
- * \param dlg updated dialog
- * \param req SIP request
- * \param dir direction of request, must DLG_DIR_UPSTREAM or DLG_DIR_DOWNSTREAM
- * \return 0 on success, -1 on failure
- */
-static inline int dlg_refresh_contacts(struct dlg_cell *dlg, struct sip_msg *req,
-		unsigned int dir)
-{
-	str contact;
-
-	if(req->first_line.type == SIP_REPLY)
-		return 0;
-	if(req->first_line.u.request.method_value != METHOD_INVITE)
-		return 0;
-
-	/* extract the contact address */
-	if (!req->contact&&(parse_headers(req,HDR_CONTACT_F,0)<0||!req->contact)){
-		LM_ERR("bad sip message or missing Contact hdr\n");
-		return -1;
-	}
-	if ( parse_contact(req->contact)<0 ||
-	((contact_body_t *)req->contact->parsed)->contacts==NULL ||
-	((contact_body_t *)req->contact->parsed)->contacts->next!=NULL ) {
-		LM_ERR("bad Contact HDR\n");
-		return -1;
-	}
-	contact = ((contact_body_t *)req->contact->parsed)->contacts->uri;
-
-	if ( dir==DLG_DIR_UPSTREAM) {
-		return dlg_update_contact(dlg, DLG_CALLEE_LEG, &contact);
-	} else if ( dir==DLG_DIR_DOWNSTREAM) {
-		return dlg_update_contact(dlg, DLG_CALLER_LEG, &contact);
-	} else {
-		LM_CRIT("dir is not set!\n");
-		return -1;
-	}
-}
-
-
-/*!
  * \brief Update the saved CSEQ information in dialog from SIP message
  * \param dlg updated dialog
  * \param req SIP request
@@ -1285,7 +1239,7 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 			iuid = NULL;
 		}
 	}
-
+	
 	/* run state machine */
 	switch ( req->first_line.u.request.method_value ) {
 		case METHOD_PRACK:
@@ -1309,8 +1263,6 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 	/* delay deletion of dialog until transaction has died off in order
 	 * to absorb in-air messages */
 	if (new_state==DLG_STATE_DELETED && old_state!=DLG_STATE_DELETED) {
-		/* set end time */
-		dlg->end_ts = (unsigned int)(time(0));
 		iuid = dlg_get_iuid_shm_clone(dlg);
 		if(iuid!=NULL) {
 			if ( d_tmb.register_tmcb(req, NULL, TMCB_DESTROY,
@@ -1380,11 +1332,6 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 			}
 		}
 		if(event != DLG_EVENT_REQACK) {
-			if(dlg_refresh_contacts(dlg, req, dir)!=0) {
-				LM_ERR("contacts update failed\n");
-			} else {
-				dlg->dflags |= DLG_FLAG_CHANGED;
-			}
 			if(update_cseqs(dlg, req, dir)!=0) {
 				LM_ERR("cseqs update failed\n");
 			} else {
@@ -1485,7 +1432,10 @@ void dlg_ontimeout(struct dlg_tl *tl)
 			dlg_set_ctx_iuid(dlg);
 			if(dlg_bye_all(dlg, NULL)<0)
 				dlg_unref(dlg, 1);
-			dlg_reset_ctx_iuid();
+			dlg_reset_ctx_iuid();	
+
+			/* run event route for end of dlg */
+			dlg_run_event_route(dlg, NULL, dlg->state, DLG_STATE_DELETED);
 
 			dlg_unref(dlg, 1);
 			if_update_stat(dlg_enable_stats, expired_dlgs, 1);
@@ -1497,7 +1447,7 @@ void dlg_ontimeout(struct dlg_tl *tl)
     /* used for computing duration for timed out acknowledged dialog */
 	if (DLG_STATE_CONFIRMED == old_state) {
 		timeout_cb = (void *)CONFIRMED_DIALOG_STATE;
-	}
+	}	
 
 	dlg_run_event_route(dlg, NULL, old_state, new_state);
 
@@ -1506,9 +1456,6 @@ void dlg_ontimeout(struct dlg_tl *tl)
 			dlg->callid.len, dlg->callid.s,
 			dlg->tag[DLG_CALLER_LEG].len, dlg->tag[DLG_CALLER_LEG].s,
 			dlg->tag[DLG_CALLEE_LEG].len, dlg->tag[DLG_CALLEE_LEG].s);
-
-		/* set end time */
-		dlg->end_ts = (unsigned int)(time(0));
 
 		/* dialog timeout */
 		run_dlg_callbacks( DLGCB_EXPIRED, dlg, NULL, NULL, DLG_DIR_NONE, timeout_cb);

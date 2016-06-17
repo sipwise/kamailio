@@ -10,7 +10,7 @@ Daniel-Constantin Mierla
 
    <miconda@gmail.com>
 
-   Copyright Â© 2015 asipto.com
+   Copyright © 2015 asipto.com
      __________________________________________________________________
 
    Table of Contents
@@ -116,7 +116,7 @@ modparam("rtjson", "xavp_cfg", "myxavp")
    4.3. rtjson_next_route()
    4.4. rtjson_update_branch()
 
-4.1.  rtjson_init_routes(rtdoc)
+4.1. rtjson_init_routes(rtdoc)
 
    Initialize routing based on JSON document stored in rtdoc parameter.
 
@@ -131,7 +131,7 @@ modparam("rtjson", "xavp_cfg", "myxavp")
 rtjson_init_routes("$var(json)");
 ...
 
-4.2.  rtjson_push_routes()
+4.2. rtjson_push_routes()
 
    Push the routes given in JSON document to rtjson_init_routes(rtdoc) to
    the internal fields used by Kamailio for routing.
@@ -144,7 +144,7 @@ rtjson_init_routes("$var(json)");
 rtjson_push_routes();
 ...
 
-4.3.  rtjson_next_route()
+4.3. rtjson_next_route()
 
    To be used in failure_route for serial forking, to push the next route
    to the internal fields used by Kamailio for routing.
@@ -163,7 +163,7 @@ failure_route[REROUTE] {
 }
 ...
 
-4.4.  rtjson_update_branch()
+4.4. rtjson_update_branch()
 
    To be used in branch_route if the JSON document had attributes that
    needs to be set for each branch.

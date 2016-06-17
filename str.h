@@ -21,8 +21,6 @@
 #ifndef str_h
 #define str_h
 
-#include <string.h>
-
 /** @defgroup str_string Counted-Length Strings 
  * @{
  * 
@@ -126,8 +124,5 @@ typedef struct _str str;
  * remember to free the dest->s private memory
  */
 int str_append(str *orig, str *suffix, str *dest);
-
-char* _strnstr(const char *s, const char *find, size_t slen);
-char* _strnistr(const char *s, const char *find, size_t slen);
 
 #endif

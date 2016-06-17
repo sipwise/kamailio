@@ -22,7 +22,6 @@
  */
 
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 
 #include <ei.h>
@@ -44,7 +43,7 @@ int handle_req_ref_tuple(cnode_handler_t *phandler, erlang_msg * msg);
 int handle_rpc_response(cnode_handler_t *phandler, erlang_msg * msg, int arity);
 int handle_rex_call(cnode_handler_t *phandler,erlang_ref_ex_t *ref, erlang_pid *pid);
 int handle_net_kernel(cnode_handler_t *phandler, erlang_msg * msg);
-void encode_error_msg(ei_x_buff *response, erlang_ref_ex_t *ref, const char *type, const char *msg, ...);
+void encode_error_msg(ei_x_buff *response, erlang_ref_ex_t *ref, const char *type, const char *msg );
 
 int handle_reg_send(cnode_handler_t *phandler, erlang_msg * msg)
 {
@@ -415,36 +414,6 @@ int handle_net_kernel(cnode_handler_t *phandler, erlang_msg * msg)
 int erlang_whereis(cnode_handler_t *phandler,erlang_ref_ex_t *ref, erlang_pid *pid)
 {
 	ei_x_buff *response = &phandler->response;
-	ei_x_buff *request = &phandler->request;
-	char route[sizeof("erlang:")+MAXATOMLEN] = "erlang:";
-	int arity;
-	int type;
-	int rt;
-
-	ei_decode_list_header(request->buff,&request->index,&arity);
-
-	if (arity != 1) {
-		response->index = 1;
-		encode_error_msg(response, ref, "badarith", "undefined function erlang:whereis/%d",arity);
-		return 0;
-	}
-
-	ei_get_type(request->buff,&request->index,&type,&arity);
-
-	if (type != ERL_ATOM_EXT) {
-		response->index = 1;
-		encode_error_msg(response, ref, "badarg", "bad argument");
-		return 0;
-	}
-
-	ei_decode_atom(request->buff,&request->index,route+sizeof("erlang:")-1);
-
-	rt = route_get(&event_rt, route);
-	if (rt < 0 || event_rt.rlist[rt] == NULL) {
-		LM_WARN("can't find pseudo process %s\n", route);
-		ei_x_encode_atom(response,"undefined");
-		return 0;
-	}
 
 	ei_x_encode_pid(response,&phandler->ec.self);
 
@@ -460,7 +429,6 @@ static int handle_erlang_calls(cnode_handler_t *phandler,erlang_ref_ex_t *ref, e
 		return erlang_whereis(phandler,ref,pid);
 	}
 	else {
-		response->index = 1;
 		encode_error_msg(response, ref, "badrpc", "Method Not Found");
 	}
 
@@ -603,9 +571,7 @@ int handle_rex_call(cnode_handler_t *phandler,erlang_ref_ex_t *ref, erlang_pid *
 	ctx.size = arity;
 
 	/* call rpc */
-	rex_call_in_progress = 1;
 	exp->function(&erl_rpc_func_param,(void*)&ctx);
-	rex_call_in_progress = 0;
 
 	if (ctx.no_params)
 	{
@@ -847,27 +813,23 @@ int handle_erlang_msg(cnode_handler_t *phandler, erlang_msg * msg)
 			LM_ERR("ei_send failed on node=<%s> socket=<%d>, %s\n",
 					phandler->ec.thisnodename,phandler->sockfd, strerror(erl_errno));
 		}
+
+		/* reset pid */
+		cnode_reply_to_pid = NULL;
+		return ret;
 	}
 	else
 	{
 		LM_DBG("** no reply **\n");
-	}
 
-	/* reset pid */
-	cnode_reply_to_pid = NULL;
-	return 0;
+		/* reset pid */
+		cnode_reply_to_pid = NULL;
+		return 0;
+	}
 }
 
-void encode_error_msg(ei_x_buff *response, erlang_ref_ex_t *ref, const char *type, const char *msg, ... )
+void encode_error_msg(ei_x_buff *response, erlang_ref_ex_t *ref, const char *type, const char *msg )
 {
-	char buffer[256];
-	va_list args;
-	va_start (args, msg);
-
-	vsnprintf (buffer, 255, msg, args);
-
-	va_end (args);
-
 	ei_x_encode_tuple_header(response, 2);
 
 	if (ref->with_node)
@@ -882,5 +844,5 @@ void encode_error_msg(ei_x_buff *response, erlang_ref_ex_t *ref, const char *typ
 
 	ei_x_encode_tuple_header(response,2);
 	ei_x_encode_atom(response, type);
-	ei_x_encode_string(response, buffer);
+	ei_x_encode_string(response, msg);
 }

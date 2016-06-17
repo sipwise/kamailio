@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('dialplan','2');
 CREATE TABLE dialplan (
     id INTEGER PRIMARY KEY NOT NULL,
     dpid INTEGER NOT NULL,
@@ -9,6 +10,4 @@ CREATE TABLE dialplan (
     repl_exp VARCHAR(64) NOT NULL,
     attrs VARCHAR(64) NOT NULL
 );
-
-INSERT INTO version (table_name, table_version) values ('dialplan','2');
 

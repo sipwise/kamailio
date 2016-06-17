@@ -17,6 +17,7 @@ Build-Depends: bison,
                libev-dev,
                libevent-dev,
                libexpat1-dev,
+               libradiusclient-ng-dev,
                libgeoip-dev (>= 1.4.5),
                libhiredis-dev (>= 0.10.0),
                libjansson-dev,
@@ -31,7 +32,6 @@ Build-Depends: bison,
                libperl-dev,
                libpq-dev,
                libpurple-dev,
-               libradiusclient-ng-dev,
                libreadline-dev,
                libsasl2-dev,
                libsctp-dev,
@@ -236,7 +236,7 @@ Architecture: linux-any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: kamailio (= ${binary:Version}),
-         mysql-client | virtual-mysql-client,
+         mysql-client,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: MySQL database connectivity module for Kamailio
@@ -605,7 +605,7 @@ Description: extra modules for Kamailio
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides: gzcompress uuid ev jansson janssonrpc-c
+ This package provides: gzcompress uuid ev jansson
 
 Package: kamailio-nth
 Architecture: any

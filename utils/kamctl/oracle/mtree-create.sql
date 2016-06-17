@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('mtree','1');
 CREATE TABLE mtree (
     id NUMBER(10) PRIMARY KEY,
     tprefix VARCHAR2(32) DEFAULT '',
@@ -13,8 +14,7 @@ END mtree_tr;
 /
 BEGIN map2users('mtree'); END;
 /
-INSERT INTO version (table_name, table_version) values ('mtree','1');
-
+INSERT INTO version (table_name, table_version) values ('mtrees','2');
 CREATE TABLE mtrees (
     id NUMBER(10) PRIMARY KEY,
     tname VARCHAR2(128) DEFAULT '',
@@ -31,5 +31,3 @@ END mtrees_tr;
 /
 BEGIN map2users('mtrees'); END;
 /
-INSERT INTO version (table_name, table_version) values ('mtrees','2');
-

@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('aliases','8');
 CREATE TABLE aliases (
     id NUMBER(10) PRIMARY KEY,
     ruid VARCHAR2(64) DEFAULT '',
@@ -35,6 +36,4 @@ BEGIN map2users('aliases'); END;
 /
 CREATE INDEX aliases_account_contact_idx  ON aliases (username, domain, contact);
 CREATE INDEX aliases_expires_idx  ON aliases (expires);
-
-INSERT INTO version (table_name, table_version) values ('aliases','8');
 

@@ -46,7 +46,7 @@
 #include <time.h>
 #include "sem.h"
 #include "../ims_usrloc_pcscf/usrloc.h"
-#include "../ims_dialog/dlg_load.h"
+#include "../dialog_ng/dlg_load.h"
 #include "../cdp/session.h"
 #include "mod.h"
 #include "cdpeventprocessor.h"
@@ -62,8 +62,6 @@ extern int cdp_event_latency_loglevel;
 extern int cdp_event_list_size_threshold;
 
 extern struct ims_qos_counters_h ims_qos_cnts_h;
-
-extern int terminate_dialog_on_rx_failure;
 
 int init_cdp_cb_event_list() {
     cdp_event_list = shm_malloc(sizeof (cdp_cb_event_list_t));
@@ -175,8 +173,7 @@ void cdp_cb_event_process() {
     cdp_cb_event_t *ev;
     udomain_t* domain;
     pcontact_t* pcontact;
-    pcontact_info_t contact_info;
-
+    str release_reason = {"QoS released", 12}; /* TODO: This could be a module parameter */
     struct pcontact_info ci;
     memset(&ci, 0, sizeof (struct pcontact_info));
 
@@ -228,10 +225,7 @@ void cdp_cb_event_process() {
                     LM_DBG("This is a media bearer session session");
                     //this is a media bearer session that was terminated from the transport plane - we need to terminate the associated dialog
                     //so we set p_session_data->must_terminate_dialog to 1 and when we receive AUTH_EV_SERVICE_TERMINATED event we will terminate the dialog
-                    //we only terminate the dialog if terminate_dialog_on_rx_failure is set
-                    if(terminate_dialog_on_rx_failure) {
-                        p_session_data->must_terminate_dialog = 1;
-                    }
+                    p_session_data->must_terminate_dialog = 1;
                 }
                 break;
 
@@ -254,20 +248,8 @@ void cdp_cb_event_process() {
 			    LM_DBG("Unable to register usrloc domain....aborting\n");
 			    return;
 			}
-			ul.lock_udomain(domain, &p_session_data->via_host, p_session_data->via_port, p_session_data->via_proto);
-                        
-                        contact_info.received_host = p_session_data->ip;
-                        contact_info.received_port = p_session_data->recv_port;
-                        contact_info.received_proto = p_session_data->recv_proto;
-                        contact_info.searchflag = (1 << SEARCH_RECEIVED);
-                        
-                        contact_info.via_host = p_session_data->via_host;
-                        contact_info.via_port = p_session_data->via_port;
-                        contact_info.via_prot = p_session_data->via_proto;
-                        contact_info.aor = p_session_data->registration_aor;
-						contact_info.reg_state = PCONTACT_ANY;
-                        
-			if (ul.get_pcontact(domain, &contact_info, &pcontact) != 0) {
+			ul.lock_udomain(domain, &p_session_data->registration_aor, &p_session_data->ip, p_session_data->recv_port);
+			if (ul.get_pcontact(domain, &p_session_data->registration_aor, &p_session_data->ip, p_session_data->recv_port, &pcontact) != 0) {
 			    LM_DBG("no contact found for terminated Rx reg session..... ignoring\n");
 			} else {
 			    LM_DBG("Updating contact [%.*s] after Rx reg session terminated, setting state to PCONTACT_DEREG_PENDING_PUBLISH\n", pcontact->aor.len, pcontact->aor.s);
@@ -275,16 +257,13 @@ void cdp_cb_event_process() {
 			    ci.num_service_routes = 0;
 			    ul.update_pcontact(domain, &ci, pcontact);
 			}
-			ul.unlock_udomain(domain, &p_session_data->via_host, p_session_data->via_port, p_session_data->via_proto);
+			ul.unlock_udomain(domain, &p_session_data->registration_aor, &p_session_data->ip, p_session_data->recv_port);
 			counter_add(ims_qos_cnts_h.active_registration_rx_sessions, -1);
 		    }
                 } else {
                     LM_DBG("This is a media bearer session session");
-		    if(p_session_data->session_has_been_opened) {
-			LM_DBG("Session was opened so decrementing active_media_rx_sessions\n");
-			counter_add(ims_qos_cnts_h.active_media_rx_sessions, -1);
-		    }
 		    
+		    counter_add(ims_qos_cnts_h.active_media_rx_sessions, -1);
                     //we only terminate the dialog if this was triggered from the transport plane or timeout - i.e. if must_terminate_dialog is set
                     //if this was triggered from the signalling plane (i.e. someone hanging up) then we don'y need to terminate the dialog
                     if (p_session_data->must_terminate_dialog) {
@@ -293,8 +272,8 @@ void cdp_cb_event_process() {
                                 p_session_data->ftag.len, p_session_data->ftag.s,
                                 p_session_data->ttag.len, p_session_data->ttag.s);
                         dlgb.terminate_dlg(&p_session_data->callid,
-                                &p_session_data->ftag, &p_session_data->ttag, &confirmed_qosrelease_headers,
-                                &early_qosrelease_reason);
+                                &p_session_data->ftag, &p_session_data->ttag, NULL,
+                                &release_reason);
                     }
                 }
 

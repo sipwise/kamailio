@@ -3,7 +3,6 @@
  *   Postgress SQL Schema for Sipcapture
  *   Author: Ovind Kolbu
  *
- * UNSUPORTED FOR HOMER5. Please update
 */
 
 CREATE TABLE sip_capture (

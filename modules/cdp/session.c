@@ -47,7 +47,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../sr_module.h"
 #include "session.h"
 #include "diameter.h"
 #include "config.h"
@@ -74,7 +73,6 @@ unsigned int *session_id2;		/**< counter for second part of the session id */
  */
 inline void AAASessionsLock(unsigned int hash)
 {
-	if(destroy_modules_phase()) return;
 	if ( hash >=0 && hash < sessions_hash_size ){
 		lock_get(sessions[hash].lock);
 	}
@@ -88,7 +86,6 @@ inline void AAASessionsLock(unsigned int hash)
  */
 inline void AAASessionsUnlock(unsigned int hash)
 {
-	if(destroy_modules_phase()) return;
 
 	if ( hash >=0 && hash < sessions_hash_size ){
 		lock_release(sessions[hash].lock);
@@ -406,13 +403,12 @@ void cdp_sessions_log()
 			switch (x->type){
 				case AUTH_CLIENT_STATEFULL:
 				case AUTH_SERVER_STATEFULL:
-					LM_DBG(ANSI_GRAY"\tAuth State [%d] Timeout [%d] Lifetime [%d] Grace [%d] Generic [%p] Class [%d]\n",
+					LM_DBG(ANSI_GRAY"\tAuth State [%d] Timeout [%d] Lifetime [%d] Grace [%d] Generic [%p]\n",
 							x->u.auth.state,
 							(int)(x->u.auth.timeout-time(0)),
 							x->u.auth.lifetime?(int)(x->u.auth.lifetime-time(0)):-1,
 							(int)(x->u.auth.grace_period),
-							x->u.auth.generic_data, 
-                                                        x->u.auth.class);
+							x->u.auth.generic_data);
 					break;
 				case ACCT_CC_CLIENT:
 					LM_DBG(ANSI_GRAY"\tCCAcct State [%d] Charging Active [%c (%d)s] Reserved Units(valid=%ds) [%d] Generic [%p]\n",
@@ -589,8 +585,6 @@ AAASession* cdp_new_auth_session(str id,int is_client,int is_statefull)
 		s->u.auth.timeout=time(0)+config->default_auth_session_timeout;
 		s->u.auth.lifetime=0;
 		s->u.auth.grace_period=0;
-                s->u.auth.class = AUTH_CLASS_UNKNOWN;
-                s->u.auth.last_requested_grace = s->u.auth.last_requested_lifetime = s->u.auth.last_requested_timeout = 0;
 		cdp_add_session(s);
 	}
 	return s;

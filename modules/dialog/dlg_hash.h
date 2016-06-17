@@ -108,7 +108,6 @@ typedef struct dlg_cell
 	unsigned int         lifetime;		/*!< dialog lifetime */
 	unsigned int         init_ts;		/*!< init (creation) time (absolute UNIX ts)*/
 	unsigned int         start_ts;		/*!< start time  (absolute UNIX ts)*/
-	unsigned int         end_ts;		/*!< end time  (absolute UNIX ts)*/
 	unsigned int         dflags;		/*!< internal dialog memory flags */
 	unsigned int         iflags;		/*!< internal dialog persistent flags */
 	unsigned int         sflags;		/*!< script dialog persistent flags */
@@ -266,16 +265,6 @@ dlg_cell_t* build_new_dlg(str *callid, str *from_uri,
  */
 int dlg_set_leg_info(dlg_cell_t *dlg, str* tag, str *rr, str *contact,
 		str *cseq, unsigned int leg);
-
-
-/*!
- * \brief Update or set the Contact for an existing dialog
- * \param dlg dialog
- * \param leg must be either DLG_CALLER_LEG, or DLG_CALLEE_LEG
- * \param ct Contact of caller or callee
- * \return 0 on success, -1 on failure
- */
-int dlg_update_contact(struct dlg_cell * dlg, unsigned int leg, str *ct);
 
 
 /*!

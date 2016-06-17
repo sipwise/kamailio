@@ -317,7 +317,7 @@ $ kamcmd htable.dump htable
 	<section id="htable.p.htable">
 		<title><varname>htable</varname> (str)</title>
 		<para>
-		The definition of a hash table. The value of the parameter may have the
+		The definition of a hash table. The value of the parameter must have the
 		following format:
 		</para>
 		<itemizedlist>
@@ -360,22 +360,6 @@ $ kamcmd htable.dump htable
 			<emphasis>dbtable</emphasis> - name of database to be loaded at
 			startup in hash table. If empty or missing, no data will be loaded.
 		</para>
-		</listitem>
-		<listitem>
-		<para>
-			<emphasis>cols</emphasis> - the column names of the database table.
-			They must be enclosed in quotes in order to form a valid SIP
-			parameter value and be separated by comma. The first column
-			corresponds to key_name. When specified, there must be at least
-			two columns. If this attribute is not specified, then the global
-			module parameters for column names are used. If more than one
-			value columns are specified, the hash table will pack the column
-			values in a comma separated string, which will be associated
-			with the key (string transformation {s.select,...} can be
-			used in configuration file to extract a specific column value).
-			When cols attribute is present, writing back to database table
-			is disabled.
-			</para>
 		</listitem>
 		<listitem>
 		<para>
@@ -597,6 +581,27 @@ modparam("htable", "timer_interval", 10)
 </programlisting>
 		</example>
 	</section>
+	<section id="htable.p.timer_mode">
+		<title><varname>timer_mode</varname> (integer)</title>
+		<para>
+		If set to 1, the module will start a new timer process. If set to 0
+		will use the default timer process to check for expired htable
+		values.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>timer_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("htable", "timer_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	<section id="htable.p.db_expires">
 		<title><varname>db_expires</varname> (integer)</title>
 		<para>
@@ -646,28 +651,6 @@ modparam("htable", "db_expires", 1)
 		<programlisting format="linespecific">
 ...
 modparam("htable", "enable_dmq", 1)
-...
-</programlisting>
-		</example>
-	</section>
-	<section id="htable.p.timer_procs">
-		<title><varname>timer_procs</varname> (integer)</title>
-		<para>
-			If set to 1 or greater, the module will create its own timer
-			processes to scan for expired items in hash tables. If set to zero,
-			it will use the core timer for this task. Set it to 1 if you store
-			a lot of items with autoexpire property.
-		</para>
-		<para>
-		<emphasis>
-			Default value is 0.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>timer_procs</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("htable", "timer_procs", 4)
 ...
 </programlisting>
 		</example>
@@ -913,10 +896,7 @@ sht_iterator_end("i1");
 				<emphasis>$shtinc(htable=>key)</emphasis>
 			</para></listitem>
 			<listitem><para>
-				<emphasis>$shtitkey(iname)</emphasis>
-			</para></listitem>
-			<listitem><para>
-				<emphasis>$shtitval(iname)</emphasis>
+				<emphasis>$shtval(htable=>key)</emphasis>
 			</para></listitem>
 			<listitem><para>
 				<emphasis>$shtrecord(attribute)</emphasis>

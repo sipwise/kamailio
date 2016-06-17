@@ -40,7 +40,6 @@
 #include "mi_core.h"
 #include "core_stats.h"
 #include "pkg_stats.h"
-#include "mod_stats.h"
 
 
 MODULE_VERSION
@@ -71,39 +70,39 @@ static pv_export_t mod_pvs[] = {
 
 static cmd_export_t cmds[]={
 	{"setsflag", (cmd_function)w_setsflag,          1,fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"resetsflag", (cmd_function)w_resetsflag,      1,fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"issflagset", (cmd_function)w_issflagset,      1,fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"setbflag", (cmd_function)w_setbflag,          1,fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"setbflag", (cmd_function)w_setbflag,          2,fixup_igp_igp,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"resetbflag", (cmd_function)w_resetbflag,      1,fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"resetbflag", (cmd_function)w_resetbflag,      2,fixup_igp_igp,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"isbflagset", (cmd_function)w_isbflagset,      1,fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"isbflagset", (cmd_function)w_isbflagset,      2,fixup_igp_igp,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"setdsturi", (cmd_function)w_setdsturi,     1, 0,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"resetdsturi", (cmd_function)w_resetdsturi, 0, 0,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"isdsturiset", (cmd_function)w_isdsturiset, 0, 0,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"pv_printf", (cmd_function)w_pv_printf,    2, pv_printf_fixup,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"avp_printf", (cmd_function)w_pv_printf,   2, pv_printf_fixup,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"is_myself", (cmd_function)w_is_myself,    1, fixup_spve_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"setdebug", (cmd_function)w_setdebug,      1, fixup_igp_null,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 	{"resetdebug", (cmd_function)w_resetdebug,  0, 0,
-		0, ANY_ROUTE },
+			0, ANY_ROUTE },
 
 	{0,0,0,0,0,0}
 };
@@ -146,10 +145,6 @@ static int mod_init(void)
 #endif
 	register_pkg_proc_stats();
 	pkg_proc_stats_init_rpc();
-
-	/* per module memmory debugging RPC command */
-	mod_stats_init_rpc();
-
 	return 0;
 }
 

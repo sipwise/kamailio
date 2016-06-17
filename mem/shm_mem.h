@@ -31,10 +31,6 @@
 #ifndef shm_mem_h
 #define shm_mem_h
 
-#include "shm.h"
-
-#if 0
-
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -211,41 +207,41 @@ void shm_mem_destroy(void);
 #include "src_loc.h"
 
 #define shm_malloc_unsafe(_size ) \
-	MY_MALLOC(shm_block, (_size), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+	MY_MALLOC(shm_block, (_size), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 
 inline static void* _shm_malloc(unsigned int size, 
-	const char *file, const char *function, int line, const char *mname)
+	const char *file, const char *function, int line )
 {
 	void *p;
 	
 	shm_lock();
-	p=MY_MALLOC(shm_block, size, file, function, line, mname);
+	p=MY_MALLOC(shm_block, size, file, function, line );
 	shm_unlock();
 	return p; 
 }
 
 
 inline static void* _shm_realloc(void *ptr, unsigned int size, 
-		const char* file, const char* function, int line, const char *mname)
+		const char* file, const char* function, int line )
 {
 	void *p;
 	shm_lock();
-	p=MY_REALLOC(shm_block, ptr, size, file, function, line, mname);
+	p=MY_REALLOC(shm_block, ptr, size, file, function, line);
 	shm_unlock();
 	return p;
 }
 
 #define shm_malloc( _size ) _shm_malloc((_size), \
-	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ , _SRC_MODULE_)
+	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 #define shm_realloc( _ptr, _size ) _shm_realloc( (_ptr), (_size), \
-	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+	_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 
 
 #define shm_free_unsafe( _p  ) \
-	MY_FREE( shm_block, (_p), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+	MY_FREE( shm_block, (_p), _SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 
 #define shm_free(_p) \
 do { \
@@ -257,9 +253,9 @@ do { \
 
 
 void* _shm_resize(void* ptr, unsigned int size, const char* f, const char* fn,
-					int line, const char *mname);
+					int line);
 #define shm_resize(_p, _s ) _shm_resize((_p), (_s), \
-		_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_, _SRC_MODULE_)
+		_SRC_LOC_, _SRC_FUNCTION_, _SRC_LINE_ )
 /*#define shm_resize(_p, _s ) shm_realloc( (_p), (_s))*/
 
 
@@ -341,7 +337,6 @@ do{\
  */
 unsigned long shm_available_safe();
 
-#endif
 
 #endif /* shm_mem_h */
 

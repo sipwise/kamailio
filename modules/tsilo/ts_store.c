@@ -37,7 +37,9 @@
 #include "ts_hash.h"
 #include "ts_store.h"
 
-int ts_store(struct sip_msg* msg, str *puri) {
+extern int use_domain;
+
+int ts_store(struct sip_msg* msg) {
 	struct cell		*t;
 	str aor;
 	struct sip_uri ruri;
@@ -46,30 +48,27 @@ int ts_store(struct sip_msg* msg, str *puri) {
 	ts_urecord_t* r;
 	int res;
 
-	if(puri && puri->s && puri->len>0) {
-		suri = *puri;
+	if (msg->new_uri.s!=NULL) {
+		/* incoming r-uri was chaged by cfg or other component */
+		suri = msg->new_uri;
 	} else {
-		if (msg->new_uri.s!=NULL) {
-			/* incoming r-uri was chaged by cfg or other component */
-			suri = msg->new_uri;
-		} else {
-			/* no changes to incoming r-uri */
-			suri = msg->first_line.u.request.uri;
-		}
+		/* no changes to incoming r-uri */
+		suri = msg->first_line.u.request.uri;
 	}
 
-	if (parse_uri(suri.s, suri.len, &ruri)!=0)
-	{
-		LM_ERR("bad uri [%.*s]\n",
-				suri.len,
-				suri.s);
-		return -1;
-	}
-
-	if (use_domain)
+	if (use_domain) {
 		aor = suri;
-	else
+	}
+	else {
+		if (parse_uri(suri.s, suri.len, &ruri)!=0)
+		{
+			LM_ERR("bad uri [%.*s]\n",
+					suri.len,
+					suri.s);
+			return -1;
+		}
 		aor = ruri.user;
+	}
 
 	t = _tmb.t_gett();
 	if (!t || t==T_UNDEFINED) {

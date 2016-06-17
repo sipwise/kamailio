@@ -19,6 +19,8 @@ include /usr/share/dpkg/buildflags.mk
 #export DH_VERBOSE=1
 
 export JAVA_HOME=/usr/lib/jvm/java-gcj
+
+# choose freeradius
 export FREERADIUS=1
 
 # modules not in the "main" kamailio package
@@ -173,9 +175,7 @@ binary-common:
 	dh_installdocs
 	dh_installexamples -Xobsoleted -Xsr
 	dh_installmenu
-	dh_systemd_enable -pkamailio
 	dh_installinit -pkamailio -- defaults 23
-	dh_systemd_start -pkamailio
 	dh_installcron
 	dh_installman
 	dh_installinfo

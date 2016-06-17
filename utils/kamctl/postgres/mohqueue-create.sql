@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('mohqcalls','1');
 CREATE TABLE mohqcalls (
     id SERIAL PRIMARY KEY NOT NULL,
     mohq_id INTEGER NOT NULL,
@@ -9,8 +10,7 @@ CREATE TABLE mohqcalls (
     CONSTRAINT mohqcalls_mohqcalls_idx UNIQUE (call_id)
 );
 
-INSERT INTO version (table_name, table_version) values ('mohqcalls','1');
-
+INSERT INTO version (table_name, table_version) values ('mohqueues','1');
 CREATE TABLE mohqueues (
     id SERIAL PRIMARY KEY NOT NULL,
     name VARCHAR(25) NOT NULL,
@@ -21,6 +21,4 @@ CREATE TABLE mohqueues (
     CONSTRAINT mohqueues_mohqueue_uri_idx UNIQUE (uri),
     CONSTRAINT mohqueues_mohqueue_name_idx UNIQUE (name)
 );
-
-INSERT INTO version (table_name, table_version) values ('mohqueues','1');
 

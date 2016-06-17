@@ -43,9 +43,7 @@ struct t_proc_stats {
 	/* number of transactions which completed with this status */
 	stat_counter completed_3xx, completed_4xx, completed_5xx, 
 		completed_6xx, completed_2xx;
-	stat_counter rpl_received;
-	stat_counter rpl_generated;
-	stat_counter rpl_sent;
+	stat_counter replied_locally;
 	stat_counter deleted;
 #ifdef TM_MORE_STATS
 	/* number of created transactions */
@@ -122,19 +120,10 @@ inline static void update_reply_stats( int code ) {
 	}
 }
 
-inline void static t_stats_rpl_received(void)
-{
-	tm_stats[process_no].s.rpl_received++;
-}
 
-inline void static t_stats_rpl_generated(void)
+inline void static t_stats_replied_locally(void)
 {
-	tm_stats[process_no].s.rpl_generated++;
-}
-
-inline void static t_stats_rpl_sent(void)
-{
-	tm_stats[process_no].s.rpl_sent++;
+	tm_stats[process_no].s.replied_locally++;
 }
 
 

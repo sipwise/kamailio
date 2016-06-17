@@ -22,16 +22,10 @@
  * \ingroup mem
  */
 
-#if defined(Q_MALLOC)
-
-#if !defined(q_malloc_h)
+#if !defined(q_malloc_h) && !defined(F_MALLOC) && !defined(TLSF_MALLOC)
 #define q_malloc_h
 
 #include "meminfo.h"
-
-#ifdef DBG_SR_MEMORY
-#define DBG_QM_MALLOC
-#endif
 
 /* defs*/
 #ifdef DBG_QM_MALLOC
@@ -77,7 +71,6 @@ struct qm_frag{
 #ifdef DBG_QM_MALLOC
 	const char* file;
 	const char* func;
-	const char* mname;
 	unsigned long line;
 	unsigned long check;
 #endif
@@ -128,47 +121,35 @@ struct qm_block{
 struct qm_block* qm_malloc_init(char* address, unsigned long size, int type);
 
 #ifdef DBG_QM_MALLOC
-void* qm_malloc(void*, unsigned long size, const char* file,
-					const char* func, unsigned int line, const char* mname);
+void* qm_malloc(struct qm_block*, unsigned long size, const char* file,
+					const char* func, unsigned int line);
 #else
-void* qm_malloc(void*, unsigned long size);
+void* qm_malloc(struct qm_block*, unsigned long size);
 #endif
 
 #ifdef DBG_QM_MALLOC
-void  qm_free(void*, void* p, const char* file, const char* func,
-				unsigned int line, const char* mname);
+void  qm_free(struct qm_block*, void* p, const char* file, const char* func, 
+				unsigned int line);
 #else
-void  qm_free(void*, void* p);
+void  qm_free(struct qm_block*, void* p);
 #endif
 #ifdef DBG_QM_MALLOC
-void* qm_realloc(void*, void* p, unsigned long size,
-					const char* file, const char* func, unsigned int line, const char *mname);
+void* qm_realloc(struct qm_block*, void* p, unsigned long size,
+					const char* file, const char* func, unsigned int line);
 #else
-void* qm_realloc(void*, void* p, unsigned long size);
+void* qm_realloc(struct qm_block*, void* p, unsigned long size);
 #endif
 
+void  qm_status(struct qm_block*);
 void  qm_check(struct qm_block*);
+void  qm_info(struct qm_block*, struct mem_info*);
 
-void  qm_status(void*);
-void  qm_info(void*, struct mem_info*);
+unsigned long qm_available(struct qm_block* qm);
 
-unsigned long qm_available(void* qm);
+#ifdef DBG_QM_MALLOC
+void qm_sums(struct qm_block* qm);
+#else
+#define qm_sums(v) do{}while(0)
+#endif /*DBQ_QM_MALLOC */
 
-void qm_sums(void* qm);
-void qm_mod_get_stats(void *qm, void **qm_root);
-void qm_mod_free_stats(void *root);
-
-typedef struct _mem_counter{
-	const char *file;
-	const char *func;
-	const char *mname;
-	unsigned long line;
-
-	unsigned long size;
-	int count;
-
-	struct _mem_counter *next;
-} mem_counter;
-
-#endif
 #endif

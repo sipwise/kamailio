@@ -55,7 +55,6 @@ struct parsed_maa;
 extern struct cdp_binds cdpb;
 extern str cxdx_forced_peer; /**< FQDN of the Diameter peer to send requests to */
 extern str cxdx_dest_realm;
-extern str cxdx_dest_host;
 extern struct tm_binds tmb;
 
 typedef struct saved_transaction {

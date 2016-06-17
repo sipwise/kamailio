@@ -6,5 +6,3 @@ CREATE TABLE version (
 
 BEGIN map2users('version'); END;
 /
-INSERT INTO version (table_name, table_version) values ('version','1');
-

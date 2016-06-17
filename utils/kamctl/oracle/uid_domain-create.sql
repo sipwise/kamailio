@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('uid_domain','2');
 CREATE TABLE uid_domain (
     id NUMBER(10) PRIMARY KEY,
     did VARCHAR2(64),
@@ -16,8 +17,7 @@ BEGIN map2users('uid_domain'); END;
 /
 CREATE INDEX uid_domain_did_idx  ON uid_domain (did);
 
-INSERT INTO version (table_name, table_version) values ('uid_domain','2');
-
+INSERT INTO version (table_name, table_version) values ('uid_domain_attrs','1');
 CREATE TABLE uid_domain_attrs (
     id NUMBER(10) PRIMARY KEY,
     did VARCHAR2(64),
@@ -37,6 +37,4 @@ END uid_domain_attrs_tr;
 BEGIN map2users('uid_domain_attrs'); END;
 /
 CREATE INDEX uid_domain_attrs_domain_did  ON uid_domain_attrs (did, flags);
-
-INSERT INTO version (table_name, table_version) values ('uid_domain_attrs','1');
 

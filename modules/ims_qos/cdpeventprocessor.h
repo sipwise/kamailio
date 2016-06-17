@@ -49,7 +49,6 @@
 #include "../../locking.h"
 #include "sem.h"
 #include "rx_authdata.h"
-#include "../../str.h"
 
 typedef struct _cdp_cb_event{
 	int event;							/* event id */
@@ -66,9 +65,6 @@ typedef struct {
 	gen_sem_t *empty;
 	int size;
 } cdp_cb_event_list_t;
-
-str early_qosrelease_reason;
-str confirmed_qosrelease_headers;
 
 int init_cdp_cb_event_list();
 void destroy_cdp_cb_event_list();

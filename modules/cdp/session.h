@@ -110,24 +110,13 @@ typedef enum {
 	AUTH_EV_SESSION_DROP				=25,
 } cdp_auth_event;
 
-/** Accounting states definition */
-typedef enum {
-        AUTH_CLASS_UNKNOWN              = 0,
-	AUTH_CLASS_RXREG                = 1,
-	AUTH_CLASS_RXMEDIA              = 2
-} cdp_auth_session_class_t;
-
 /** structure for auth session */
 typedef struct _cdp_auth_session_t {
-	cdp_auth_state state;           /**< current state */
-        cdp_auth_session_class_t class; /**< useful to know if this is Rx reg or Rx media for example */
+	cdp_auth_state state;	/**< current state */
+
 	time_t timeout;			/**< absolute time for session timeout  -1 means forever */
 	time_t lifetime;		/**< absolute time for auth lifetime -1 means forever */
-	time_t grace_period;            /**< grace_period in seconds 	*/
-        unsigned int last_requested_lifetime;   /**< the following 3 timers are used to store what we are */
-        unsigned int last_requested_timeout;    /**<requesitng in a request, if the answer does not have anything */
-        unsigned int last_requested_grace;      /**<different then we will use these values */ 
-
+	time_t grace_period;	/**< grace_period in seconds 	*/
 	void* generic_data;
 } cdp_auth_session_t;
 

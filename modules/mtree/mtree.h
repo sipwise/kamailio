@@ -21,7 +21,7 @@
  *
  */
 
-
+		       
 #ifndef _MTREE_H_
 #define _MTREE_H_
 
@@ -30,13 +30,13 @@
 #include "../../lib/kmi/mi.h"
 #include "../../rpc.h"
 
-#define MT_TREE_SVAL	0
+#define MT_TREE_SVAL	0	
 #define MT_TREE_DW	1
 #define MT_TREE_IVAL	2
 
 typedef union {
-	int n;
-	str s;
+    int n;
+    str s;
 } is_t;
 
 typedef struct _mt_dw
@@ -48,31 +48,27 @@ typedef struct _mt_dw
 
 typedef struct _mt_is
 {
-	is_t tvalue;
-	struct _mt_is *next;
+    is_t tvalue;
+    struct _mt_is *next;
 } mt_is_t;
 
 typedef struct _mt_node
 {
-	mt_is_t *tvalues;
-	void *data;
-	struct _mt_node *child;
+    mt_is_t *tvalues;
+    void *data;
+    struct _mt_node *child;
 } mt_node_t;
 
 #define MT_MAX_DEPTH	64
 
 #define MT_NODE_SIZE	mt_char_list.len
 
-#define MT_MAX_COLS	8
 typedef struct _m_tree
 {
 	str tname;
 	str dbtable;
 	int type;
 	int multi;
-	int ncols;
-	str scols[MT_MAX_COLS];
-	char pack[4];
 	unsigned int nrnodes;
 	unsigned int nritems;
 	unsigned int memsize;
@@ -91,10 +87,9 @@ m_tree_t* mt_get_first_tree();
 
 is_t* mt_get_tvalue(m_tree_t *pt, str *tomatch, int *len);
 int mt_match_prefix(struct sip_msg *msg, m_tree_t *pt,
-			str *tomatch, int mode);
+		    str *tomatch, int mode);
 
-m_tree_t* mt_init_tree(str* tname, str* dbtable, str *scols, int type,
-		int multi);
+m_tree_t* mt_init_tree(str* tname, str* dbtable, int type, int multi);
 void mt_free_tree(m_tree_t *pt);
 int mt_print_tree(m_tree_t *pt);
 void mt_free_node(mt_node_t *pn, int type);
@@ -110,11 +105,11 @@ int mt_defined_trees(void);
 m_tree_t *mt_swap_list_head(m_tree_t *ntree);
 int mt_init_list_head(void);
 m_tree_t *mt_add_tree(m_tree_t **dpt, str *tname, str *dbtable,
-			str *cols, int type, int multi);
+		      int type, int multi);
 
 int mt_mi_match_prefix(struct mi_node *rpl, m_tree_t *pt,
-			str *tomatch, int mode);
+		    str *tomatch, int mode);
 int mt_rpc_match_prefix(rpc_t* rpc, void* ctx, m_tree_t *pt,
-			str *tomatch, int mode);
+		    str *tomatch, int mode);
 #endif
 

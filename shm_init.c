@@ -22,19 +22,11 @@
  */
 
 #include "shm_init.h"
-#include "mem/shm.h"
+#include "mem/mem.h"
 #include "globals.h"
 
 static int shm_init = 0;
-static char *shm_mname = 0;
 
-/**
- *
- */
-void shm_set_mname(char *mname)
-{
-	shm_mname = mname;
-}
 
 /** check if shm is initialized.
  * @return 1 if initialized, 0 if not
@@ -70,7 +62,9 @@ int init_shm()
 			goto error;
 		}
 	}
-	if (shm_init_manager(shm_mname)<0)
+	if (shm_mem_size == 0)
+		shm_mem_size=SHM_MEM_SIZE * 1024 * 1024;
+	if (init_shm_mallocs(shm_force_alloc)==-1)
 		goto error;
 	shm_init=1;
 	return 0;

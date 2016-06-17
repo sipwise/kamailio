@@ -6,8 +6,8 @@ compiler:
 services:
   - docker
 before_install:
-  - docker pull linuxmaniac/pkg-kamailio-docker:stretch
-script: docker run -v $TRAVIS_BUILD_DIR:/code:rw linuxmaniac/pkg-kamailio-docker:stretch /bin/bash -c "export CC=$CC; cd /code; ./test/travis/build_travis.sh"
+  - docker pull linuxmaniac/pkg-kamailio-docker:jessie
+script: docker run -v $TRAVIS_BUILD_DIR:/code:rw linuxmaniac/pkg-kamailio-docker:jessie /bin/bash -c "export CC=$CC; cd /code; ./test/travis/build_travis.sh"
 branches:
   only:
     - 'master'
@@ -15,7 +15,7 @@ branches:
 notifications:
   irc:
     channels:
-      - "chat.freenode.net#kamailio-dev"
+      - "chat.freenode.net#Kamailio"
     on_success: never
     on_failure: always
   email:

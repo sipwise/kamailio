@@ -88,8 +88,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -120,8 +118,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -155,8 +151,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>

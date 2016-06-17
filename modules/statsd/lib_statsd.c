@@ -11,86 +11,92 @@
 #include "../../sr_module.h"
 #include "lib_statsd.h"
 
-static StatsConnection statsd_connection = {
-    "127.0.0.1",
-    "8125",
-    -1
+static StatsdSocket statsd_socket = {
+    "/var/run/statsd/statsd.sock",
+    -1,
+    500, // timeout 500ms if no answer
+    0,
+    ""
 };
 
-bool statsd_connect(void){
+static StatsConnection statsd_connection = {
+    "127.0.0.1",
+    "8125"
+};
+
+int statsd_connect(void){
 
     struct addrinfo *serverAddr;
-    int rc;
+    int rc, error;
 
-    if (statsd_connection.sock > 0){
-        return true;
+    if (statsd_socket.sock > 0){
+        return True;
     }
 
-    rc = getaddrinfo(
+    error = getaddrinfo(
         statsd_connection.ip, statsd_connection.port,
         NULL, &serverAddr);
-    if (rc != 0)
+    if (error != 0)
     {
         LM_ERR(
             "Statsd: could not initiate server information (%s)\n",
-            gai_strerror(rc));
-        return false;
+            gai_strerror(error));
+        return False;
     }
 
-    statsd_connection.sock = socket(serverAddr->ai_family, SOCK_DGRAM, IPPROTO_UDP);
-    if (statsd_connection.sock < 0 ){
-        LM_ERR("Statsd: could not create a socket for statsd connection\n");
-        return false;
+    statsd_socket.sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (statsd_socket.sock == 0 ){
+        LM_ERR("Statsd: could not initiate a connect to statsd\n");
+        return False;
     }
 
     rc = connect(
-        statsd_connection.sock, serverAddr->ai_addr, serverAddr->ai_addrlen);
-	freeaddrinfo(serverAddr);
+        statsd_socket.sock, serverAddr->ai_addr, serverAddr->ai_addrlen);
     if (rc < 0){
         LM_ERR("Statsd: could not initiate a connect to statsd\n");
-        return false;
+        return False;
     }
-    return true;
+    return True;
 }
 
-bool send_command(char *command){
+int send_command(char *command){
     int send_result;
 
     if (!statsd_connect()){
-        return false;
+        return False;
     }
 
-    send_result = send(statsd_connection.sock, command, strlen(command), 0);
+    send_result = send(statsd_socket.sock, command, strlen(command), 0);
     if ( send_result < 0){
         LM_ERR("could not send the correct info to statsd (%i| %s)\n",
             send_result, strerror(errno));
-        return true;
+        return True;
     }
     LM_DBG("Sent to statsd (%s)", command);
-    return true;
+    return True;
 }
 
-bool statsd_set(char *key, char *value){
+int statsd_set(char *key, char *value){
    char* end = 0;
    char command[254];
    int val;
    val = strtol(value, &end, 0);
    if (*end){
        LM_ERR("statsd_count could not  use the provide value(%s)\n", value);
-       return false;
+       return False;
    }
    snprintf(command, sizeof command, "%s:%i|s\n", key, val);
    return send_command(command);
 }
 
 
-bool statsd_gauge(char *key, char *value){
+int statsd_gauge(char *key, char *value){
    char command[254];
    snprintf(command, sizeof command, "%s:%s|g\n", key, value);
    return send_command(command);
 }
 
-bool statsd_count(char *key, char *value){
+int statsd_count(char *key, char *value){
    char* end = 0;
    char command[254];
    int val;
@@ -98,19 +104,19 @@ bool statsd_count(char *key, char *value){
    val = strtol(value, &end, 0);
    if (*end){
        LM_ERR("statsd_count could not  use the provide value(%s)\n", value);
-       return false;
+       return False;
    }
    snprintf(command, sizeof command, "%s:%i|c\n", key, val);
    return send_command(command);
 }
 
-bool statsd_timing(char *key, int value){
+int statsd_timing(char *key, int value){
    char command[254];
    snprintf(command, sizeof command, "%s:%i|ms\n", key, value);
    return send_command(command);
 }
 
-bool statsd_init(char *ip, char *port){
+int statsd_init(char *ip, char *port){
 
     if (ip != NULL){
         statsd_connection.ip = ip;
@@ -121,7 +127,7 @@ bool statsd_init(char *ip, char *port){
     return statsd_connect();
 }
 
-bool statsd_destroy(void){
-    statsd_connection.sock = 0;
-    return true;
+int statsd_destroy(void){
+    statsd_socket.sock = 0;
+    return True;
 }

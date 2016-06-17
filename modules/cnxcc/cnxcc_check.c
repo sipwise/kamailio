@@ -23,7 +23,6 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 
 #include "cnxcc_mod.h"
 #include "cnxcc.h"

@@ -270,13 +270,11 @@ clean_doxygen:
 
 
 .PHONY: TAGS
-.PHONY: tags
-TAGS tags:
+TAGS:
 	$(MKTAGS) --exclude="obsolete/*" -R .
 
 .PHONY: TAGS-ALL
-.PHONY: tags-all
-TAGS-ALL tags-all:
+TAGS-ALL:
 	$(MKTAGS) -R .
 
 

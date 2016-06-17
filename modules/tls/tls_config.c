@@ -164,7 +164,6 @@ static cfg_option_t options[] = {
 	{"ca_list",             .f = cfg_parse_str_opt, .flags = CFG_STR_SHMMEM},
 	{"crl",                 .f = cfg_parse_str_opt, .flags = CFG_STR_SHMMEM},
 	{"server_name",         .f = cfg_parse_str_opt, .flags = CFG_STR_SHMMEM},
-	{"server_id",           .f = cfg_parse_str_opt, .flags = CFG_STR_SHMMEM},
 	{0}
 };
 
@@ -189,7 +188,6 @@ static void update_opt_variables(void)
 	options[13].param = &domain->ca_file;
 	options[14].param = &domain->crl_file;
 	options[15].param = &domain->server_name;
-	options[16].param = &domain->server_id;
 }
 
 

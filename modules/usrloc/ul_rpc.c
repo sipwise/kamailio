@@ -203,7 +203,6 @@ static void ul_rpc_dump(rpc_t* rpc, void* ctx)
 	ucontact_t* c;
 	void* th;
 	void* ah;
-	void* bh;
 	void* ih;
 	void* sh;
 	int max, n, i;
@@ -220,7 +219,7 @@ static void ul_rpc_dump(rpc_t* rpc, void* ctx)
 			rpc->fault(ctx, 500, "Internal error creating top rpc");
 			return;
 		}
-		if(rpc->struct_add(th, "Sd[",
+		if(rpc->struct_add(th, "Sd{",
 					"Domain",  &dl->name,
 					"Size",    (int)dom->size,
 					"AoRs",    &ah)<0)
@@ -243,14 +242,7 @@ static void ul_rpc_dump(rpc_t* rpc, void* ctx)
 						return;
 					}
 				} else {
-					if(rpc->struct_add(ah, "{",
-							"Info", &bh)<0)
-					{
-						unlock_ulslot( dom, i);
-						rpc->fault(ctx, 500, "Internal error creating aor struct");
-						return;
-					}
-					if(rpc->struct_add(bh, "Sd[",
+					if(rpc->struct_add(ah, "Sd{",
 							"AoR", &r->aor,
 							"HashID", r->aorhash,
 							"Contacts", &ih)<0)
@@ -348,7 +340,6 @@ static void ul_rpc_lookup(rpc_t* rpc, void* ctx)
 	str table = {0, 0};
 	str aor = {0, 0};
 	void* th;
-	void* ih;
 	urecord_t *rec;
 	ucontact_t* con;
 	int ret;
@@ -390,16 +381,7 @@ static void ul_rpc_lookup(rpc_t* rpc, void* ctx)
 
 	if (rpc->add(ctx, "{", &th) < 0)
 	{
-		unlock_udomain(dom, &aor);
 		rpc->fault(ctx, 500, "Internal error creating outer rpc");
-		return;
-	}
-	if(rpc->struct_add(th, "S[",
-			"AoR", &aor,
-			"Contacts", &ih)<0)
-	{
-		unlock_udomain(dom, &aor);
-		rpc->fault(ctx, 500, "Internal error creating aor struct");
 		return;
 	}
 
@@ -407,7 +389,7 @@ static void ul_rpc_lookup(rpc_t* rpc, void* ctx)
 	for( con=rec->contacts ; con ; con=con->next) {
 		if (VALID_CONTACT( con, act_time)) {
 			rpl_tree++;
-			if (rpc_dump_contact(rpc, ctx, ih, con) == -1) {
+			if (rpc_dump_contact(rpc, ctx, th, con) == -1) {
 				unlock_udomain(dom, &aor);
 				return;
 			}

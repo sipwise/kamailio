@@ -28,7 +28,7 @@
 #include "../../mod_fix.h"
 #include "../../route.h"
 #include "../../data_lump.h"
-#include "../../lib/kcore/statistics.h"
+#include "../../lib/kcore/kstats_wrapper.h"
 #include "../../dset.h"
 #include "../../script_cb.h"
 #include "../../parser/msg_parser.h"
@@ -41,23 +41,11 @@ int ts_append(struct sip_msg* msg, str *ruri, char *table) {
 	ts_urecord_t* _r;
 	ts_transaction_t* ptr;
 
-	struct sip_uri p_uri;
-	str *t_uri;
-
 	int res;
-	int appended;
 
 	lock_entry_by_ruri(ruri);
 
-	if (use_domain) {
-		t_uri = ruri;
-	}
-	else {
-		parse_uri(ruri->s, ruri->len, &p_uri);
-		t_uri = &p_uri.user;
-	}
-
-	res = get_ts_urecord(t_uri, &_r);
+	res = get_ts_urecord(ruri, &_r);
 
 	if (res != 0) {
 		LM_ERR("failed to retrieve record for %.*s\n", ruri->len, ruri->s);
@@ -69,10 +57,7 @@ int ts_append(struct sip_msg* msg, str *ruri, char *table) {
 
 	while(ptr) {
 		LM_DBG("transaction %u:%u found for %.*s, going to append branches\n",ptr->tindex, ptr->tlabel, ruri->len, ruri->s);
-
-		appended = ts_append_to(msg, ptr->tindex, ptr->tlabel, table, ruri);
-		if (appended > 0)
-			update_stat(added_branches, appended);
+		ts_append_to(msg, ptr->tindex, ptr->tlabel, table);
 		ptr = ptr->next;
 	}
 
@@ -81,8 +66,8 @@ int ts_append(struct sip_msg* msg, str *ruri, char *table) {
 	return 1;
 }
 
-int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri) {
-	struct cell     *t=0;
+int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table) {
+	struct cell     *t;
 	struct cell     *orig_t;
 	struct sip_msg *orig_msg;
 	int ret;
@@ -113,12 +98,7 @@ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *
 
 	orig_msg = t->uas.request;
 
-	if(uri==NULL || uri->s==NULL || uri->len<=0) {
-		ret = _regapi.lookup_to_dset(orig_msg, table, NULL);
-	} else {
-		ret = _regapi.lookup_to_dset(orig_msg, table, uri);
-	}
-
+	ret = _regapi.lookup_to_dset(orig_msg, table, NULL);
 	if(ret != 1) {
 		LM_DBG("transaction %u:%u: error updating dset (%d)\n", tindex, tlabel, ret);
 		ret = -4;
@@ -130,7 +110,7 @@ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *
 done:
 	/* unref the transaction which had been referred by t_lookup_ident() call. 
 	 * Restore the original transaction (if any) */
-	if(t) _tmb.unref_cell(t);
+	_tmb.unref_cell(t);
 	_tmb.t_sett(orig_t, T_BR_UNDEFINED);
 	
 	return ret;

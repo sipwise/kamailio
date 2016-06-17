@@ -36,19 +36,6 @@
 #include <stdio.h>
 #include <strings.h>
 
-char *_km_log_engine_type = NULL;
-char *_km_log_engine_data = NULL;
-
-km_log_f _km_log_func = &syslog;
-
-/**
- *
- */
-void km_log_func_set(km_log_f f)
-{
-	_km_log_func = f;
-}
-
 #ifndef NO_SIG_DEBUG
 /* signal protection: !=0 when LOG/DBG/... are printing */
 volatile int dprint_crit = 0; 
@@ -90,25 +77,11 @@ int str2facility(char *s)
 {
 	int i;
 
-	for (i=0; str_fac[i]; i++) {
+	for( i=0; str_fac[i] ; i++) {
 		if (!strcasecmp(s,str_fac[i]))
 			return int_fac[i];
 	}
 	return -1;
-}
-
-char* facility2str(int fl, int *len)
-{
-	int i;
-
-	for (i=0; str_fac[i]; i++) {
-		if (fl == int_fac[i]) {
-			*len = strlen(str_fac[i]);
-			return str_fac[i];
-		}
-	}
-
-	return NULL;
 }
 
 /* fixup function for log_facility cfg parameter */
@@ -130,15 +103,12 @@ int log_facility_fixup(void *handle, str *gname, str *name, void **val)
  */
 
 /* value for unset local log level  */
-#define UNSET_LOCAL_DEBUG_LEVEL	    -255
-#define UNSET_LOCAL_DEBUG_FACILITY  -255
+#define UNSET_LOCAL_DEBUG_LEVEL	-255
 
 /* the local debug log level */
 static int _local_debug_level = UNSET_LOCAL_DEBUG_LEVEL;
-static int _local_debug_facility = UNSET_LOCAL_DEBUG_FACILITY;
 /* callback to get per module debug level */
 static get_module_debug_level_f _module_debug_level = NULL;
-static get_module_debug_facility_f _module_debug_facility = NULL;
 
 /**
  * @brief set callback function for per module debug level
@@ -148,17 +118,12 @@ void set_module_debug_level_cb(get_module_debug_level_f f)
 	_module_debug_level = f;
 }
 
-void set_module_debug_facility_cb(get_module_debug_facility_f f)
-{
-	_module_debug_facility = f;
-}
-
 /**
  * @brief return the log level - the local one if it set,
  *   otherwise the global value
  */
 int get_debug_level(char *mname, int mnlen) {
-	int mlevel;
+	int mlevel = L_DBG;
 	/*important -- no LOGs inside, because it will loop */
 	if(unlikely(_module_debug_level!=NULL && mnlen>0)) {
 		if(_module_debug_level(mname, mnlen, &mlevel)==0) {
@@ -168,23 +133,6 @@ int get_debug_level(char *mname, int mnlen) {
 	return (_local_debug_level != UNSET_LOCAL_DEBUG_LEVEL) ?
 				_local_debug_level : cfg_get(core, core_cfg, debug);
 }
-
-/**
- * @brief return the log facility - the local one if it set,
- *   otherwise the global value
- */
-int get_debug_facility(char *mname, int mnlen) {
-	int mfacility;
-	/*important -- no LOGs inside, because it will loop */
-	if(unlikely(_module_debug_facility!=NULL && mnlen>0)) {
-		if(_module_debug_facility(mname, mnlen, &mfacility)==0) {
-			return mfacility;
-		}
-	}
-	return (_local_debug_facility != UNSET_LOCAL_DEBUG_FACILITY) ?
-				_local_debug_facility : cfg_get(core, core_cfg, log_facility);
-}
-
 
 /**
  * @brief set the local debug log level
@@ -200,22 +148,6 @@ void set_local_debug_level(int level)
 void reset_local_debug_level(void)
 {
 	_local_debug_level = UNSET_LOCAL_DEBUG_LEVEL;
-}
-
-/**
- * @brief set the local debug log facility
- */
-void set_local_debug_facility(int facility)
-{
-	_local_debug_facility = facility;
-}
-
-/**
- * @brief reset the local debug log facility
- */
-void reset_local_debug_facility(void)
-{
-	_local_debug_facility = UNSET_LOCAL_DEBUG_FACILITY;
 }
 
 typedef struct log_level_color {

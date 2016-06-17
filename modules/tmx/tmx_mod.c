@@ -70,7 +70,6 @@ static int t_flush_flags(struct sip_msg* msg, char*, char* );
 static int t_is_failure_route(struct sip_msg* msg, char*, char* );
 static int t_is_branch_route(struct sip_msg* msg, char*, char* );
 static int t_is_reply_route(struct sip_msg* msg, char*, char*);
-static int t_is_request_route(struct sip_msg* msg, char*, char*);
 
 static int w_t_suspend(struct sip_msg* msg, char*, char*);
 static int w_t_continue(struct sip_msg* msg, char *idx, char *lbl, char *rtn);
@@ -109,27 +108,23 @@ unsigned long tmx_stats_trans_6xx(void);
 unsigned long tmx_stats_trans_inuse(void);
 unsigned long tmx_stats_trans_active(void);
 unsigned long tmx_stats_rcv_rpls(void);
-unsigned long tmx_stats_abs_rpls(void);
-unsigned long tmx_stats_rld_rcv_rpls(void);
-unsigned long tmx_stats_rld_loc_rpls(void);
-unsigned long tmx_stats_rld_tot_rpls(void);
+unsigned long tmx_stats_rld_rpls(void);
+unsigned long tmx_stats_loc_rpls(void);
 
 static stat_export_t mod_stats[] = {
-	{"UAS_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_uas_trans   },
-	{"UAC_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_uac_trans   },
-	{"2xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_2xx   },
-	{"3xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_3xx   },
-	{"4xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_4xx   },
-	{"5xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_5xx   },
-	{"6xx_transactions",    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_6xx   },
-	{"inuse_transactions",  STAT_IS_FUNC, (stat_var**)tmx_stats_trans_inuse },
-	{"active_transactions", STAT_IS_FUNC, (stat_var**)tmx_stats_trans_active},
-	{"rpl_received",        STAT_IS_FUNC, (stat_var**)tmx_stats_rcv_rpls    },
-	{"rpl_absorbed",        STAT_IS_FUNC, (stat_var**)tmx_stats_abs_rpls    },
-	{"rpl_generated",       STAT_IS_FUNC, (stat_var**)tmx_stats_rld_loc_rpls},
-	{"rpl_relayed",         STAT_IS_FUNC, (stat_var**)tmx_stats_rld_rcv_rpls},
-	{"rpl_sent",            STAT_IS_FUNC, (stat_var**)tmx_stats_rld_tot_rpls},
-	{0, 0, 0}
+	{"UAS_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_uas_trans   },
+	{"UAC_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_uac_trans   },
+	{"2xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_2xx   },
+	{"3xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_3xx   },
+	{"4xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_4xx   },
+	{"5xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_5xx   },
+	{"6xx_transactions" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_trans_6xx   },
+	{"inuse_transactions" ,  STAT_IS_FUNC, (stat_var**)tmx_stats_trans_inuse },
+	{"active_transactions" , STAT_IS_FUNC, (stat_var**)tmx_stats_trans_active},
+	{"received_replies" ,    STAT_IS_FUNC, (stat_var**)tmx_stats_rcv_rpls    },
+	{"relayed_replies" ,     STAT_IS_FUNC, (stat_var**)tmx_stats_rld_rpls    },
+	{"local_replies" ,       STAT_IS_FUNC, (stat_var**)tmx_stats_loc_rpls    },
+	{0,0,0}
 };
 #endif
 
@@ -191,8 +186,6 @@ static cmd_export_t cmds[]={
 	{"t_is_branch_route",    (cmd_function)t_is_branch_route,    0, 0,
 			0, ANY_ROUTE  },
 	{"t_is_reply_route",    (cmd_function)t_is_reply_route,    0, 0,
-			0, ANY_ROUTE  },
-	{"t_is_request_route",    (cmd_function)t_is_request_route,    0, 0,
 			0, ANY_ROUTE  },
 	{"t_suspend",    (cmd_function)w_t_suspend,    0, 0,
 			0, ANY_ROUTE  },
@@ -569,16 +562,6 @@ static int t_is_reply_route(struct sip_msg* msg, char *foo, char *bar)
 /**
  *
  */
-static int t_is_request_route(struct sip_msg* msg, char *foo, char *bar)
-{
-	if(route_type == REQUEST_ROUTE)
-		return 1;
-	return -1;
-}
-
-/**
- *
- */
 static int w_t_suspend(struct sip_msg* msg, char *p1, char *p2)
 {
 	unsigned int tindex;
@@ -827,31 +810,28 @@ unsigned long tmx_stats_trans_active(void)
 unsigned long tmx_stats_rcv_rpls(void)
 {
 	tmx_stats_update();
-	return _tmx_stats_all.rpl_received;
+	return _tmx_stats_all.completed_6xx
+		+ _tmx_stats_all.completed_5xx
+		+ _tmx_stats_all.completed_4xx
+		+ _tmx_stats_all.completed_3xx
+		+ _tmx_stats_all.completed_2xx;
 }
 
-unsigned long tmx_stats_abs_rpls(void)
+unsigned long tmx_stats_rld_rpls(void)
 {
 	tmx_stats_update();
-	return _tmx_stats_all.rpl_received - tmx_stats_rld_rcv_rpls();
+	return _tmx_stats_all.completed_6xx
+		+ _tmx_stats_all.completed_5xx
+		+ _tmx_stats_all.completed_4xx
+		+ _tmx_stats_all.completed_3xx
+		+ _tmx_stats_all.completed_2xx
+		- _tmx_stats_all.replied_locally;
 }
 
-unsigned long tmx_stats_rld_loc_rpls(void)
+unsigned long tmx_stats_loc_rpls(void)
 {
 	tmx_stats_update();
-	return _tmx_stats_all.rpl_generated;
-}
-
-unsigned long tmx_stats_rld_tot_rpls(void)
-{
-	tmx_stats_update();
-	return _tmx_stats_all.rpl_sent;
-}
-
-unsigned long tmx_stats_rld_rcv_rpls(void)
-{
-	tmx_stats_update();
-	return _tmx_stats_all.rpl_sent - _tmx_stats_all.rpl_generated;
+	return _tmx_stats_all.replied_locally;
 }
 
 #endif

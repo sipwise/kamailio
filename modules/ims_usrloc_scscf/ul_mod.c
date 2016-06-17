@@ -63,10 +63,8 @@
 #include "contact_hslot.h"
 #include "../presence/bind_presence.h"
 #include "../presence/hash.h"
-#include "../../modules/ims_dialog/dlg_load.h"
-#include "../../modules/ims_dialog/dlg_hash.h"
-#include "ul_scscf_stats.h"
-#include "../../timer_proc.h" /* register_sync_timer */
+#include "../../modules/dialog_ng/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_hash.h"
 
 MODULE_VERSION
 
@@ -78,10 +76,8 @@ static int mod_init(void);                          /*!< Module initialization f
 static void destroy(void);                          /*!< Module destroy function */
 static void timer(unsigned int ticks, void* param); /*!< Timer handler */
 static int child_init(int rank);                    /*!< Per-child init function */
-static void ul_local_timer(unsigned int ticks, void* param); /*!< Local timer handler */
 
 extern int bind_usrloc(usrloc_api_t* api);
-extern void contact_dlg_create_handler(struct dlg_cell* dlg, int cb_types, struct dlg_cb_params *dlg_params);/*V1.1*/
 extern int ul_locks_no;
 extern int subs_locks_no;
 extern int contacts_locks_no;
@@ -103,10 +99,8 @@ int ul_fetch_rows = 2000;				/*!< number of rows to fetch from result */
 int ul_hash_size = 9;
 int subs_hash_size = 9;					/*!<number of ims subscription slots*/
 int contacts_hash_size = 9;
-int ul_timer_procs = 0;
 
 struct contact_list* contact_list;
-struct ims_subscription_list* ims_subscription_list;
 
 int db_mode = 0;						/*!<database mode*/
 db1_con_t* ul_dbh = 0;
@@ -121,8 +115,6 @@ struct dlg_binds dlgb;
 
 int sub_dialog_hash_size = 9;
 shtable_t sub_dialog_table;
-
-int contact_delete_delay = 30;   //If contact is put into delay delete state this is how long we delay before deleting
 
 new_shtable_t pres_new_shtable;
 insert_shtable_t pres_insert_shtable;
@@ -152,9 +144,7 @@ static param_export_t params[] = {
 	{"fetch_rows",        	INT_PARAM, &ul_fetch_rows   },
 	{"hash_size",         	INT_PARAM, &ul_hash_size    },
 	{"subs_hash_size",    	INT_PARAM, &subs_hash_size  },
-        {"contacts_hash_size", 	INT_PARAM, &contacts_hash_size  },
 	{"nat_bflag",         	INT_PARAM, &nat_bflag       },
-        {"contact_delete_delay", INT_PARAM, &contact_delete_delay       },
 	{"usrloc_debug_file", 	PARAM_STR, &usrloc_debug_file},
 	{"enable_debug_file", 	INT_PARAM, &usrloc_debug},
     {"user_data_dtd",     	PARAM_STRING, &scscf_user_data_dtd},
@@ -166,17 +156,20 @@ static param_export_t params[] = {
     {"sub_dialog_hash_size",INT_PARAM, &sub_dialog_hash_size},
     {"db_mode",				INT_PARAM, &db_mode},
     {"db_url", 				PARAM_STR, &db_url},
-    {"timer_procs",             INT_PARAM, &ul_timer_procs},
 	{0, 0, 0}
 };
 
+
 stat_export_t mod_stats[] = {
+	{"registered_users" ,  STAT_IS_FUNC, (stat_var**)get_number_of_users  },
 	{0,0,0}
 };
+
 
 static mi_export_t mi_cmds[] = {
 	{ 0, 0, 0, 0, 0}
 };
+
 
 struct module_exports exports = {
 	"ims_usrloc_scscf",
@@ -206,6 +199,14 @@ static int mod_init(void) {
 		fprintf(debug_file, "starting\n");
 		fflush(debug_file);
 	}
+
+#ifdef STATISTICS
+	/* register statistics */
+	if (register_module_stats( exports.name, mod_stats)!=0 ) {
+		LM_ERR("failed to register core statistics\n");
+		return -1;
+	}
+#endif
 
 	if (rpc_register_array(ul_rpc) != 0) {
 		LM_ERR("failed to register RPC commands\n");
@@ -246,6 +247,11 @@ static int mod_init(void) {
 		return -1;
 	}
 
+	if (subs_init_locks() != 0) {
+		LM_ERR("IMS Subscription locks array initialization failed\n");
+		return -1;
+	}
+	
 	/* create hash table for storing registered contacts */
 	if (init_contacts_locks() !=0) {
 	    LM_ERR("failed to initialise locks array for contacts\n");
@@ -266,26 +272,7 @@ static int mod_init(void) {
 	} 
 	contact_list->size = contacts_hash_size;
 	
-	if (subs_init_locks() != 0) {
-		LM_ERR("IMS Subscription locks array initialization failed\n");
-		return -1;
-	}
-        ims_subscription_list = (struct ims_subscription_list*) shm_malloc(sizeof(struct ims_subscription_list));
-        if (!ims_subscription_list) {
-            LM_ERR("no more shm memory to create ims subscription list\n");
-            return -1;
-        }
-        ims_subscription_list->slot = (struct hslot_sp*) shm_malloc(sizeof(struct hslot_sp) * subs_hash_size);
-        if (!ims_subscription_list->slot) {
-	    LM_ERR("no more memory to create subscription list structure\n");
-	    return -1;
-	}
-        for (i=0; i<subs_hash_size;i++) {
-	    subs_init_slot(&ims_subscription_list->slot[i], i);
-	} 
-	ims_subscription_list->size = subs_hash_size;
-        
-        /* presence binding for subscribe processing*/
+	/* presence binding for subscribe processing*/
 	presence_api_t pres;
 	bind_presence_t bind_presence;
 
@@ -356,23 +343,9 @@ static int mod_init(void) {
 		LM_ERR("can't load Dialog API\n");
 		return -1;
 	}
-        
-        /* Register counters */
-        if (ul_scscf_init_counters() != 0) {
-	    LM_ERR("Failed to register counters\n");
-	    return -1;
-	}
-        
-        /* Register cache timer */
-	if(ul_timer_procs<=0)
-	{
-		if (timer_interval > 0)
-                    register_timer(timer, 0, timer_interval);
-	}
-	else
-		register_sync_timers(ul_timer_procs);
 	
-	
+	/* Register cache timer */
+	register_timer(timer, 0, timer_interval);
 
 	/* init the callbacks list */
 	if (init_ulcb_list() < 0) {
@@ -390,20 +363,7 @@ static int mod_init(void) {
 	}
 
 	init_flag = 1;
-        
-	/* From contact_dlg_handlers.c
-         * 
-         * V1.1*/
-         
-        if (dlgb.register_dlgcb(0x00, DLGCB_CREATED, contact_dlg_create_handler, 0x00, 0x00) )
-        {
-            LM_ERR("Unable to setup DLGCB_CREATED");
-            return -1;
-        }
-        else
-        {
-            LM_DBG(" DLGCB_CREATED created successfully");
-        }
+	
 	return 0;
 }
 
@@ -411,17 +371,6 @@ static int mod_init(void) {
 static int child_init(int rank)
 {
 	dlist_t* ptr;
-        int i;
-        
-        if (rank == PROC_MAIN && ul_timer_procs > 0) {
-            for (i = 0; i < ul_timer_procs; i++) {
-                if (fork_sync_timer(PROC_TIMER, "IMS S-CSCF USRLOC Timer", 1 /*socks flag*/,
-                        ul_local_timer, (void*) (long) i, timer_interval /*sec*/) < 0) {
-                    LM_ERR("failed to start timer routine as process\n");
-                    return -1; /* error */
-                }
-            }
-        }
 
 	/* connecting to DB ? */
 	switch (db_mode) {
@@ -467,7 +416,7 @@ static void destroy(void) {
 
 	if (ul_dbh) {
 		ul_unlock_locks();
-		if (synchronize_all_udomains(0, 1) != 0) {
+		if (synchronize_all_udomains() != 0) {
 			LM_ERR("flushing cache failed\n");
 		}
 		ul_dbf.close(ul_dbh);
@@ -477,6 +426,7 @@ static void destroy(void) {
 	ul_destroy_locks();
 	subs_destroy_locks();
 	destroy_contacts_locks();
+
 	/* free callbacks list */
 	destroy_ulcb_list();
 }
@@ -486,24 +436,13 @@ static void destroy(void) {
  * Timer handler
  */
 static void timer(unsigned int ticks, void* param) {
-    
-    if (usrloc_debug) {
-        print_all_udomains(debug_file);
-        fflush(debug_file);
-    }
-    
-    LM_DBG("Syncing cache\n");
-    if (synchronize_all_udomains(0, 1) != 0) {
-        LM_ERR("synchronizing cache failed\n");
-    }
-}
+	if (usrloc_debug) {
+		print_all_udomains(debug_file);
+		fflush(debug_file);
+	}
 
-/*! \brief
- * Local timer handler
- */
-static void ul_local_timer(unsigned int ticks, void* param)
-{
-	if (synchronize_all_udomains((int)(long)param, ul_timer_procs) != 0) {
+	LM_DBG("Syncing cache\n");
+	if (synchronize_all_udomains() != 0) {
 		LM_ERR("synchronizing cache failed\n");
 	}
 }

@@ -251,9 +251,6 @@ static inline int close_connection(int conid) {
 		msg[0] = (long)con;
 		msg[1] = CONN_EOF;
 
-		con->send_flags.f |= SND_F_CON_CLOSE;
-		con->flags |= F_CONN_FORCE_EOF;
-
 		n = send_all(unix_tcp_sock, msg, sizeof(msg));
 		if (unlikely(n <= 0)){
 			LM_ERR("failed to send close request: %s (%d)\n", strerror(errno), errno);
@@ -707,27 +704,6 @@ static inline struct ucontact* contact_path_match( ucontact_t* ptr, str* _c, str
 	return 0;
 }
 
-
-
-/*!
- * \brief Match a contact record to a Call-ID only
- * \param ptr contact record
- * \param _c contact string
- * \return ptr on successfull match, 0 when they not match
- */
-static inline struct ucontact* contact_match_callidonly( ucontact_t* ptr, str* _callid)
-{
-	while(ptr) {
-		if ((_callid->len == ptr->callid.len) && !memcmp(_callid->s, ptr->callid.s, _callid->len)) {
-			return ptr;
-		}
-		
-		ptr = ptr->next;
-	}
-	return 0;
-}
-
-
 /*!
  * \brief Get pointer to ucontact with given contact
  * \param _r record where to search the contacts
@@ -759,9 +735,6 @@ int get_ucontact(urecord_t* _r, str* _c, str* _callid, str* _path, int _cseq,
 			break;
 		case CONTACT_PATH:
 			ptr = contact_path_match( _r->contacts, _c, _path);
-			break;
-		case CONTACT_CALLID_ONLY:
-			ptr = contact_match_callidonly( _r->contacts, _callid);
 			break;
 		default:
 			LM_CRIT("unknown matching_mode %d\n", matching_mode);

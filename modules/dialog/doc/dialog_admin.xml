@@ -472,7 +472,7 @@ modparam("dialog", "db_update_period", 120)
 		<para>
 			The number of the rows to be fetched at once from database when loading the dialog records at startup from the database.
 			This value can be used to tune the load time at startup. For 1MB of private memory (default), it should be below 400.
-			The database driver must support the fetch_result() capability. A value of 0 means the database fetch is not limited.
+			The database driver must support the fetch_result() capability. A value of 0 means the functionality is disabled.
 		</para>
 		<para>
 		<emphasis>
@@ -488,28 +488,6 @@ modparam("dialog", "db_fetch_rows", 500)
 </programlisting>
 		</example>
 	</section>
-
-<section>
-		<title><varname>db_skip_load</varname> (integer)</title>
-		<para>
-			Set db_skip_load to 1, to skip the loading of dialogs from the database alltogether.
-		</para>
-		<para>
-		<emphasis>
-			Default value is <quote>0</quote> ( not skipped ).
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>db_skip_load</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("dialog", "db_skip_load", 1)
-...
-</programlisting>
-		</example>
-	</section>
-
-
 
 	<section>
 		<title><varname>table_name</varname> (string)</title>
@@ -1248,16 +1226,8 @@ modparam("dialog", "ka_timer", 10)
 			The value represents the number of seconds.
 		</para>
 		<para>
-			If the requests times out (generating a 408) or if the
-			UA responds with 481 the lifetime is set to 10 seconds.
-			When lifetime expires the dialog will be terminated.
-			Any other response (including error responses) will
-			reset the timers.
-		</para>
-		<para>
 		<emphasis>
-			Default value is <quote>0</quote> (no keep alive). The lowest
-			settable interval is 30 seconds.
+			Default value is <quote>0</quote> (no keep alive).
 		</emphasis>
 		</para>
 		<example>

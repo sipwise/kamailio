@@ -45,9 +45,6 @@ static inline int rpc_dump_transaction(rpc_t* rpc, void* ctx, void *ih, ts_trans
 {
 	void* vh;
 
-	if(t==NULL)
-		return -1;
-
 	if(rpc->struct_add(ih, "{", "Transaction", &vh)<0)
 	{
 		rpc->fault(ctx, 500, "Internal error creating transaction struct");
@@ -76,9 +73,9 @@ static inline int rpc_dump_transaction(rpc_t* rpc, void* ctx, void *ih, ts_trans
  */
 static void rpc_tsilo_dump(rpc_t *rpc, void *c)
 {
-	ts_transaction_t* trans = NULL;
-	struct ts_urecord* record = NULL;
-	struct ts_entry* entry = NULL;
+	ts_transaction_t* trans;
+	struct ts_urecord* record;
+	struct ts_entry* entry;
 
 	str brief = {0, 0};
 
@@ -118,8 +115,8 @@ static void rpc_tsilo_dump(rpc_t *rpc, void *c)
 
 	/* add the entries per hash */
 	for(i=0,n=0,max=0,ntrans=0; i<t_table->size; i++) {
-		lock_entry(&t_table->entries[i]);
 		entry = &t_table->entries[i];
+		lock_entry(entry);
 
 		n += entry->n;
 		if(max<entry->n)
@@ -133,7 +130,7 @@ static void rpc_tsilo_dump(rpc_t *rpc, void *c)
 					"Hash", record->rurihash,
 					"Transactions", &ih)<0)
 				{
-					unlock_entry(&t_table->entries[i]);
+					unlock_entry(entry);
 					rpc->fault(c, 500, "Internal error creating ruri struct");
 					return;
 				}
@@ -142,13 +139,13 @@ static void rpc_tsilo_dump(rpc_t *rpc, void *c)
 				ntrans += 1;
 				if (short_dump==0) {
 					if (rpc_dump_transaction(rpc, c, ih, trans) == -1) {
-						unlock_entry(&t_table->entries[i]);
+						unlock_entry(entry);
 						return;
 					}
 				}
 			}
 		}
-		unlock_entry(&t_table->entries[i]);
+		unlock_entry(entry);
 	}
 
 	/* extra attributes node */

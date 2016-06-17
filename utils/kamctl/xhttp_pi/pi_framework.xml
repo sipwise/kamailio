@@ -468,9 +468,7 @@
 		<column><field>src_ip</field><type>DB1_STR</type></column>
 		<column><field>proto</field><type>DB1_STR</type></column>
 		<column><field>from_pattern</field><type>DB1_STR</type></column>
-		<column><field>ruri_pattern</field><type>DB1_STR</type></column>
 		<column><field>tag</field><type>DB1_STR</type></column>
-		<column><field>priority</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of address table-->
 	<db_table id="address">
@@ -536,8 +534,6 @@
 		<column><field>from_domain</field><type>DB1_STR</type></column>
 		<column><field>updated</field><type>DB1_INT</type></column>
 		<column><field>updated_winfo</field><type>DB1_INT</type></column>
-		<column><field>flags</field><type>DB1_INT</type></column>
-		<column><field>user_agent</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of watchers table-->
 	<db_table id="watchers">
@@ -671,16 +667,6 @@
 		<column><field>from_domain</field><type>DB1_STR</type></column>
 		<column><field>updated</field><type>DB1_INT</type></column>
 	</db_table>
-	<!-- Declaration of rtpengine table-->
-	<db_table id="rtpengine">
-		<table_name>rtpengine</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>setid</field><type>DB1_INT</type></column>
-		<column><field>url</field><type>DB1_STR</type></column>
-		<column><field>weight</field><type>DB1_INT</type></column>
-		<column><field>disabled</field><type>DB1_INT</type></column>
-		<column><field>stamp</field><type>DB1_DATETIME</type></column>
-	</db_table>
 	<!-- Declaration of rtpproxy table-->
 	<db_table id="rtpproxy">
 		<table_name>rtpproxy</table_name>
@@ -749,65 +735,6 @@
 		<column><field>table_name</field><type>DB1_STR</type></column>
 		<column><field>table_version</field><type>DB1_INT</type></column>
 	</db_table>
-	<!-- Declaration of topos_d table-->
-	<db_table id="topos_d">
-		<table_name>topos_d</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>id</field><type>DB1_INT</type></column>
-		<column><field>rectime</field><type>DB1_DATETIME</type></column>
-		<column><field>s_method</field><type>DB1_STR</type></column>
-		<column><field>s_cseq</field><type>DB1_STR</type></column>
-		<column><field>a_callid</field><type>DB1_STR</type></column>
-		<column><field>a_uuid</field><type>DB1_STR</type></column>
-		<column><field>b_uuid</field><type>DB1_STR</type></column>
-		<column><field>a_contact</field><type>DB1_STR</type></column>
-		<column><field>b_contact</field><type>DB1_STR</type></column>
-		<column><field>as_contact</field><type>DB1_STR</type></column>
-		<column><field>bs_contact</field><type>DB1_STR</type></column>
-		<column><field>a_tag</field><type>DB1_STR</type></column>
-		<column><field>b_tag</field><type>DB1_STR</type></column>
-		<column><field>a_rr</field><type>DB1_BLOB</type></column>
-		<column><field>b_rr</field><type>DB1_BLOB</type></column>
-		<column><field>s_rr</field><type>DB1_BLOB</type></column>
-		<column><field>iflags</field><type>DB1_INT</type></column>
-		<column><field>a_uri</field><type>DB1_STR</type></column>
-		<column><field>b_uri</field><type>DB1_STR</type></column>
-		<column><field>r_uri</field><type>DB1_STR</type></column>
-		<column><field>a_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>b_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>a_socket</field><type>DB1_STR</type></column>
-		<column><field>b_socket</field><type>DB1_STR</type></column>
-	</db_table>
-	<!-- Declaration of topos_t table-->
-	<db_table id="topos_t">
-		<table_name>topos_t</table_name>
-		<db_url_id>mysql</db_url_id>
-		<column><field>id</field><type>DB1_INT</type></column>
-		<column><field>rectime</field><type>DB1_DATETIME</type></column>
-		<column><field>s_method</field><type>DB1_STR</type></column>
-		<column><field>s_cseq</field><type>DB1_STR</type></column>
-		<column><field>a_callid</field><type>DB1_STR</type></column>
-		<column><field>a_uuid</field><type>DB1_STR</type></column>
-		<column><field>b_uuid</field><type>DB1_STR</type></column>
-		<column><field>direction</field><type>DB1_INT</type></column>
-		<column><field>x_via</field><type>DB1_BLOB</type></column>
-		<column><field>x_vbranch</field><type>DB1_STR</type></column>
-		<column><field>x_rr</field><type>DB1_BLOB</type></column>
-		<column><field>y_rr</field><type>DB1_BLOB</type></column>
-		<column><field>s_rr</field><type>DB1_BLOB</type></column>
-		<column><field>x_uri</field><type>DB1_STR</type></column>
-		<column><field>a_contact</field><type>DB1_STR</type></column>
-		<column><field>b_contact</field><type>DB1_STR</type></column>
-		<column><field>as_contact</field><type>DB1_STR</type></column>
-		<column><field>bs_contact</field><type>DB1_STR</type></column>
-		<column><field>x_tag</field><type>DB1_STR</type></column>
-		<column><field>a_tag</field><type>DB1_STR</type></column>
-		<column><field>b_tag</field><type>DB1_STR</type></column>
-		<column><field>a_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>b_srcaddr</field><type>DB1_STR</type></column>
-		<column><field>a_socket</field><type>DB1_STR</type></column>
-		<column><field>b_socket</field><type>DB1_STR</type></column>
-	</db_table>
 	<!-- Declaration of uacreg table-->
 	<db_table id="uacreg">
 		<table_name>uacreg</table_name>
@@ -823,8 +750,6 @@
 		<column><field>auth_password</field><type>DB1_STR</type></column>
 		<column><field>auth_proxy</field><type>DB1_STR</type></column>
 		<column><field>expires</field><type>DB1_INT</type></column>
-		<column><field>flags</field><type>DB1_INT</type></column>
-		<column><field>reg_delay</field><type>DB1_INT</type></column>
 	</db_table>
 	<!-- Declaration of uid_credentials table-->
 	<db_table id="uid_credentials">
@@ -2819,9 +2744,7 @@
 				<col><field>src_ip</field></col>
 				<col><field>proto</field></col>
 				<col><field>from_pattern</field></col>
-				<col><field>ruri_pattern</field></col>
 				<col><field>tag</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -2831,9 +2754,7 @@
 				<col><field>src_ip</field></col>
 				<col><field>proto</field></col>
 				<col><field>from_pattern</field></col>
-				<col><field>ruri_pattern</field></col>
 				<col><field>tag</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -2846,9 +2767,7 @@
 				<col><field>src_ip</field></col>
 				<col><field>proto</field></col>
 				<col><field>from_pattern</field></col>
-				<col><field>ruri_pattern</field></col>
 				<col><field>tag</field></col>
-				<col><field>priority</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -3037,8 +2956,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -3069,8 +2986,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -3104,8 +3019,6 @@
 				<col><field>from_domain</field></col>
 				<col><field>updated</field></col>
 				<col><field>updated_winfo</field></col>
-				<col><field>flags</field></col>
-				<col><field>user_agent</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -3610,31 +3523,6 @@
 			</clause_cols>
 		</cmd>
 	</mod>
-	<!-- rtpengine provisionning -->
-	<mod><mod_name>rtpengine</mod_name>
-		<cmd><cmd_name>show</cmd_name>
-			<db_table_id>rtpengine</db_table_id>
-			<cmd_type>DB1_QUERY</cmd_type>
-			<query_cols>
-				<col><field>setid</field></col>
-				<col><field>url</field></col>
-				<col><field>weight</field></col>
-				<col><field>disabled</field></col>
-				<col><field>stamp</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>add</cmd_name>
-			<db_table_id>rtpengine</db_table_id>
-			<cmd_type>DB1_INSERT</cmd_type>
-			<query_cols>
-				<col><field>setid</field></col>
-				<col><field>url</field></col>
-				<col><field>weight</field></col>
-				<col><field>disabled</field></col>
-				<col><field>stamp</field></col>
-			</query_cols>
-		</cmd>
-	</mod>
 	<!-- rtpproxy provisionning -->
 	<mod><mod_name>rtpproxy</mod_name>
 		<cmd><cmd_name>show</cmd_name>
@@ -3893,211 +3781,6 @@
 			</query_cols>
 		</cmd>
 	</mod>
-	<!-- topos_d provisionning -->
-	<mod><mod_name>topos_d</mod_name>
-		<cmd><cmd_name>show</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_QUERY</cmd_type>
-			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_rr</field></col>
-				<col><field>b_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>iflags</field></col>
-				<col><field>a_uri</field></col>
-				<col><field>b_uri</field></col>
-				<col><field>r_uri</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>add</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_INSERT</cmd_type>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_rr</field></col>
-				<col><field>b_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>iflags</field></col>
-				<col><field>a_uri</field></col>
-				<col><field>b_uri</field></col>
-				<col><field>r_uri</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>update</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_UPDATE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_rr</field></col>
-				<col><field>b_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>iflags</field></col>
-				<col><field>a_uri</field></col>
-				<col><field>b_uri</field></col>
-				<col><field>r_uri</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>delete</cmd_name>
-			<db_table_id>topos_d</db_table_id>
-			<cmd_type>DB1_DELETE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-		</cmd>
-	</mod>
-	<!-- topos_t provisionning -->
-	<mod><mod_name>topos_t</mod_name>
-		<cmd><cmd_name>show</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_QUERY</cmd_type>
-			<query_cols>
-				<col><field>id</field><link_cmd>update</link_cmd></col>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>direction</field></col>
-				<col><field>x_via</field></col>
-				<col><field>x_vbranch</field></col>
-				<col><field>x_rr</field></col>
-				<col><field>y_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>x_uri</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>x_tag</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>add</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_INSERT</cmd_type>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>direction</field></col>
-				<col><field>x_via</field></col>
-				<col><field>x_vbranch</field></col>
-				<col><field>x_rr</field></col>
-				<col><field>y_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>x_uri</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>x_tag</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>update</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_UPDATE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-			<query_cols>
-				<col><field>rectime</field></col>
-				<col><field>s_method</field></col>
-				<col><field>s_cseq</field></col>
-				<col><field>a_callid</field></col>
-				<col><field>a_uuid</field></col>
-				<col><field>b_uuid</field></col>
-				<col><field>direction</field></col>
-				<col><field>x_via</field></col>
-				<col><field>x_vbranch</field></col>
-				<col><field>x_rr</field></col>
-				<col><field>y_rr</field></col>
-				<col><field>s_rr</field></col>
-				<col><field>x_uri</field></col>
-				<col><field>a_contact</field></col>
-				<col><field>b_contact</field></col>
-				<col><field>as_contact</field></col>
-				<col><field>bs_contact</field></col>
-				<col><field>x_tag</field></col>
-				<col><field>a_tag</field></col>
-				<col><field>b_tag</field></col>
-				<col><field>a_srcaddr</field></col>
-				<col><field>b_srcaddr</field></col>
-				<col><field>a_socket</field></col>
-				<col><field>b_socket</field></col>
-			</query_cols>
-		</cmd>
-		<cmd><cmd_name>delete</cmd_name>
-			<db_table_id>topos_t</db_table_id>
-			<cmd_type>DB1_DELETE</cmd_type>
-			<clause_cols>
-				<col><field>id</field><operator>=</operator></col>
-			</clause_cols>
-		</cmd>
-	</mod>
 	<!-- uacreg provisionning -->
 	<mod><mod_name>uacreg</mod_name>
 		<cmd><cmd_name>show</cmd_name>
@@ -4115,8 +3798,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -4133,8 +3814,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -4154,8 +3833,6 @@
 				<col><field>auth_password</field></col>
 				<col><field>auth_proxy</field></col>
 				<col><field>expires</field></col>
-				<col><field>flags</field></col>
-				<col><field>reg_delay</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>

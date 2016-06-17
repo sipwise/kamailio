@@ -46,7 +46,7 @@
 #include "stats.h"
 #include "../cdp/cdp_load.h"
 #include "../../modules/tm/tm_load.h"
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "api.h"
 #include "cxdx_avp.h"
 
@@ -102,10 +102,8 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *maa, long elaps
     struct cell *t = 0;
     int result = CSCF_RETURN_TRUE;
     int sip_number_auth_items;
-    int items_found = 0;
     struct auth_data_item_list *adi_list = 0;
     AAA_AVP *auth_data;
-	AAA_AVP* avp;
     auth_data = 0;
     int item_number;
     str authenticate = {0, 0}, authorization2 = {0, 0}, ck = {0, 0}, ik = {0, 0}, ip = {0, 0}, ha1 = {0, 0};
@@ -115,8 +113,7 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *maa, long elaps
     HASHHEX ha1_hex;
     HASHHEX result_hex;
     str etsi_nonce = {0, 0};
-    str private_identity = {0,0};
-	str public_identity = {0,0};
+    str private_identity, public_identity;
     str algorithm;
 
     if (is_timeout) {
@@ -137,144 +134,129 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *maa, long elaps
     if (tmb.t_lookup_ident(&t, data->tindex, data->tlabel) < 0) {
         LM_ERR("t_continue: transaction not found\n");
         result = CSCF_RETURN_ERROR;
-        goto error1;
+        goto error;
     }
 
     /* get the private_identity */
-	/* private_identity = cscf_get_private_identity(t->uas.request, data->realm);*/
-	private_identity = cxdx_get_user_name(maa);
-	if (!private_identity.len) {
+    private_identity = cscf_get_private_identity(t->uas.request, data->realm);
+    if (!private_identity.len) {
         LM_ERR("No private identity specified (Authorization: username)\n");
         stateful_request_reply_async(t, t->uas.request, 403, MSG_403_NO_PRIVATE);
         result = CSCF_RETURN_FALSE;
         goto error;
     }
-
-	    /* get the public_identity */
-	    /*public_identity = cscf_get_public_identity(t->uas.request);*/
-	
-	avp = cxdx_get_next_public_identity(maa, 0, AVP_IMS_Public_Identity,IMS_vendor_id_3GPP,__FUNCTION__);
-	if (avp) {
-		public_identity = avp->data;
-	}
-	if (!public_identity.len) {
+    /* get the public_identity */
+    public_identity = cscf_get_public_identity(t->uas.request);
+    if (!public_identity.len) {
         LM_ERR("No public identity specified (To:)\n");
         stateful_request_reply_async(t, t->uas.request, 403, MSG_403_NO_PUBLIC);
         result = CSCF_RETURN_FALSE;
         goto error;
     }
-	
 
     //get each individual element from the MAA
     cxdx_get_result_code(maa, &rc);
     cxdx_get_experimental_result_code(maa, &experimental_rc);
+    cxdx_get_sip_number_auth_items(maa, &sip_number_auth_items);
 
-    if (!cxdx_get_sip_number_auth_items(maa, &sip_number_auth_items)) {
-       sip_number_auth_items = 0;
+    //now assign the auth_data_item elements
+    //there can be many of these in the MAA
+    struct auth_data_item *adi;
+    int adi_len;
+    char *p;
+    while ((cxdx_get_auth_data_item_answer(maa, &auth_data, &item_number,
+            &algorithm, &authenticate, &authorization2,
+            &ck, &ik,
+            &ip,
+            &ha1, &response_auth, &digest_realm,
+            &line_identifier))) {
+
+        //create an auth_data_item for each entry in the MAA
+        adi_len = sizeof (struct auth_data_item) +authenticate.len + authorization2.len + ck.len + ik.len + ip.len + ha1.len + line_identifier.len + response_auth.len + digest_realm.len + algorithm.len;
+        adi = (struct auth_data_item*) shm_malloc(adi_len);
+        if (!adi) {
+            LM_CRIT("Out of memory!\n");
+            result = CSCF_RETURN_ERROR;
+            goto done;
+        }
+
+        memset(adi, 0, adi_len);
+
+        //put all elements in the auth_data_item entry
+        p = (char*) (adi + 1);
+
+        adi->authenticate.s = p;
+        adi->authenticate.len = authenticate.len;
+        memcpy(p, authenticate.s, authenticate.len);
+        p += authenticate.len;
+
+        adi->authorization.s = p;
+        adi->authorization.len = authorization2.len;
+        memcpy(p, authorization2.s, authorization2.len);
+        p += authorization2.len;
+
+        adi->auth_scheme.s = p;
+        adi->auth_scheme.len = algorithm.len;
+        memcpy(p, algorithm.s, algorithm.len);
+        p += algorithm.len;
+
+        adi->ck.s = p;
+        adi->ck.len = ck.len;
+        memcpy(p, ck.s, ck.len);
+        p += ck.len;
+
+        adi->ik.s = p;
+        adi->ik.len = ik.len;
+        memcpy(p, ik.s, ik.len);
+        p += ik.len;
+
+        adi->ip.s = p;
+        adi->ip.len = ip.len;
+        memcpy(p, ip.s, ip.len);
+        p += ip.len;
+
+        adi->ha1.s = p;
+        adi->ha1.len = ha1.len;
+        memcpy(p, ha1.s, ha1.len);
+        p += ha1.len;
+
+        adi->line_identifier.s = p;
+        adi->line_identifier.len = line_identifier.len;
+        memcpy(p, line_identifier.s, line_identifier.len);
+        p += line_identifier.len;
+
+        adi->response_auth.s = p;
+        adi->response_auth.len = response_auth.len;
+        memcpy(p, response_auth.s, response_auth.len);
+        p += response_auth.len;
+
+        adi->digest_realm.s = p;
+        adi->digest_realm.len = digest_realm.len;
+        memcpy(p, digest_realm.s, digest_realm.len);
+        p += digest_realm.len;
+
+        if (p != (((char*) adi) + adi_len)) {
+            LM_CRIT("buffer overflow\n");
+            shm_free(adi);
+            adi = 0;
+            result = CSCF_RETURN_ERROR;
+            goto done;
+        }
+        auth_data->code = -auth_data->code;
+        adi->item_number = item_number;
+
+        int len = sizeof (struct auth_data_item_list);
+        adi_list = (struct auth_data_item_list*) shm_malloc(len);
+        memset(adi_list, 0, len);
+
+        if (adi_list->first == 0) {
+            adi_list->first = adi_list->last = adi;
+        } else {
+            adi_list->last->next = adi;
+            adi->previous = adi_list->last;
+            adi_list->last = adi;
+        }
     }
-
-    if (sip_number_auth_items > 0) {
-	    //now assign the auth_data_item elements
-	    //there can be many of these in the MAA
-	    struct auth_data_item *adi;
-	    int adi_len;
-	    char *p;
-	    while ((cxdx_get_auth_data_item_answer(maa, &auth_data, &item_number,
-		    &algorithm, &authenticate, &authorization2,
-		    &ck, &ik,
-		    &ip,
-		    &ha1, &response_auth, &digest_realm,
-		    &line_identifier))) {
-
-		//create an auth_data_item for each entry in the MAA
-		adi_len = sizeof (struct auth_data_item) +authenticate.len + authorization2.len + ck.len + ik.len + ip.len + ha1.len + line_identifier.len + response_auth.len + digest_realm.len + algorithm.len;
-		adi = (struct auth_data_item*) shm_malloc(adi_len);
-		if (!adi) {
-		    LM_CRIT("Out of memory!\n");
-		    result = CSCF_RETURN_ERROR;
-		    goto done;
-		}
-
-		memset(adi, 0, adi_len);
-
-		//put all elements in the auth_data_item entry
-		p = (char*) (adi + 1);
-
-		adi->authenticate.s = p;
-		adi->authenticate.len = authenticate.len;
-		memcpy(p, authenticate.s, authenticate.len);
-		p += authenticate.len;
-
-		adi->authorization.s = p;
-		adi->authorization.len = authorization2.len;
-		memcpy(p, authorization2.s, authorization2.len);
-		p += authorization2.len;
-
-		adi->auth_scheme.s = p;
-		adi->auth_scheme.len = algorithm.len;
-		memcpy(p, algorithm.s, algorithm.len);
-		p += algorithm.len;
-
-		adi->ck.s = p;
-		adi->ck.len = ck.len;
-		memcpy(p, ck.s, ck.len);
-		p += ck.len;
-
-		adi->ik.s = p;
-		adi->ik.len = ik.len;
-		memcpy(p, ik.s, ik.len);
-		p += ik.len;
-
-		adi->ip.s = p;
-		adi->ip.len = ip.len;
-		memcpy(p, ip.s, ip.len);
-		p += ip.len;
-
-		adi->ha1.s = p;
-		adi->ha1.len = ha1.len;
-		memcpy(p, ha1.s, ha1.len);
-		p += ha1.len;
-
-		adi->line_identifier.s = p;
-		adi->line_identifier.len = line_identifier.len;
-		memcpy(p, line_identifier.s, line_identifier.len);
-		p += line_identifier.len;
-
-		adi->response_auth.s = p;
-		adi->response_auth.len = response_auth.len;
-		memcpy(p, response_auth.s, response_auth.len);
-		p += response_auth.len;
-
-		adi->digest_realm.s = p;
-		adi->digest_realm.len = digest_realm.len;
-		memcpy(p, digest_realm.s, digest_realm.len);
-		p += digest_realm.len;
-
-		if (p != (((char*) adi) + adi_len)) {
-		    LM_CRIT("buffer overflow\n");
-		    shm_free(adi);
-		    adi = 0;
-		    result = CSCF_RETURN_ERROR;
-		    goto done;
-		}
-		auth_data->code = -auth_data->code;
-		adi->item_number = item_number;
-
-		int len = sizeof (struct auth_data_item_list);
-		adi_list = (struct auth_data_item_list*) shm_malloc(len);
-		memset(adi_list, 0, len);
-
-		if (adi_list->first == 0) {
-		    adi_list->first = adi_list->last = adi;
-		} else {
-		    adi_list->last->next = adi;
-		    adi->previous = adi_list->last;
-		    adi_list->last = adi;
-		}
-	
-		items_found++;
-	    }
-    }   
 
     if (!(rc) && !(experimental_rc)) {
         stateful_request_reply_async(t, t->uas.request, 480, MSG_480_DIAMETER_MISSING_AVP);
@@ -322,7 +304,7 @@ void async_cdp_callback(int is_timeout, void *param, AAAMessage *maa, long elaps
 
 success:
 
-    if (!sip_number_auth_items || !items_found) {
+    if (!sip_number_auth_items) {
         stateful_request_reply_async(t, t->uas.request, 403, MSG_403_NO_AUTH_DATA);
         result = CSCF_RETURN_FALSE;
         goto done;
@@ -485,8 +467,6 @@ error:
         tmb.unref_cell(t);
     }
     tmb.t_continue(data->tindex, data->tlabel, data->act);
-    
-error1:    
     free_saved_transaction_data(data);
 }
 
@@ -515,10 +495,6 @@ int cxdx_send_mar(struct sip_msg *msg, str public_identity, str private_identity
         session = 0;
     }
     if (!mar) goto error1;
-
-    if (cxdx_dest_host.len > 0) {
-       if (!cxdx_add_destination_host(mar, cxdx_dest_host)) goto error1;
-    }
 
     if (!cxdx_add_destination_realm(mar, cxdx_dest_realm)) goto error1;
 

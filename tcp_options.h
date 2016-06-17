@@ -23,8 +23,6 @@
 
 #ifdef USE_TCP
 
-#include <netinet/in.h>
-#include <netinet/tcp.h>
 #ifndef NO_TCP_ASYNC
 #define TCP_ASYNC /* enabled async mode */
 #endif
@@ -76,24 +74,24 @@
 
 /* keepintvl */
 #ifndef NO_TCP_KEEPINTVL
-#ifdef TCP_KEEPINTVL
+#ifdef __OS_linux
 #define HAVE_TCP_KEEPINTVL
-#endif /* TCP_KEEPINTVL */
-#endif /* NO_TCP_KEEPINTVL */
+#endif /* __OS_ */
+#endif /* NO_TCP_KEEPIDLE */
 
 /* keepidle */
 #ifndef NO_TCP_KEEPIDLE
-#ifdef TCP_KEEPIDLE
+#ifdef __OS_linux
 #define HAVE_TCP_KEEPIDLE
-#endif /* TCP_KEEPIDLE*/
+#endif /* __OS_*/
 #endif /* NO_TCP_KEEPIDLE */
 
 
 /* keepcnt */
 #ifndef NO_TCP_KEEPCNT
-#ifdef TCP_KEEPCNT
+#ifdef __OS_linux
 #define HAVE_TCP_KEEPCNT
-#endif /* TCP_KEEPCNT */
+#endif /* __OS_ */
 #endif /* NO_TCP_KEEPCNT */
 
 

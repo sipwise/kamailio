@@ -76,13 +76,7 @@ typedef struct saved_transaction {
 
 typedef struct saved_transaction_local {
 	int is_rereg;
-        str contact;                /* contact AOR */
-	str via_host;                   /* host address of UE - first via for REQUEST, last via for REPLY */
-        unsigned short via_port;        /* port of UE based on VIA */
-        unsigned short via_proto;       /* via proto */
-        str recv_host;                   /* host address of UE - first via for REQUEST, last via for REPLY */
-        unsigned short recv_port;        /* port of UE based on VIA */
-        unsigned short recv_proto;       /* via proto */
+	str contact;
 	str auth_session_id;
 	saved_transaction_t* global_data;
 } saved_transaction_local_t;

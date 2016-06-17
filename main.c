@@ -132,7 +132,6 @@
 #include "sock_ut.h"
 #include "async_task.h"
 #include "dset.h"
-#include "timer_proc.h"
 
 #ifdef DEBUG_DMALLOC
 #include <dmalloc.h>
@@ -201,11 +200,7 @@ Options:\n\
     -O nr        Script optimization level (debugging option)\n\
     -a mode      Auto aliases mode: enable with yes or on,\n\
                   disable with no or off\n\
-    -A define    Add config pre-processor define (e.g., -A WITH_AUTH)\n\
-    -x name      Specify internal manager for shared memory (shm)\n\
-                  - can be: fm, qm or tlsf\n\
-    -X name      Specify internal manager for private memory (pkg)\n\
-                  - if omitted, the one for shm is used\n"
+    -A define    Add config pre-processor define (e.g., -A WITH_AUTH)\n"
 #ifdef STATS
 "    -s file     File to which statistics is dumped (disabled otherwise)\n"
 #endif
@@ -502,20 +497,14 @@ char* pid_file = 0; /* filename as asked by use */
 char* pgid_file = 0;
 
 
-/* memory manager */
-#define SR_MEMMNG_DEFAULT	"fm"
-
-char *sr_memmng_pkg = NULL;
-char *sr_memmng_shm = NULL;
-
 /* call it before exiting; if show_status==1, mem status is displayed */
-void cleanup(int show_status)
+void cleanup(show_status)
 {
 	int memlog;
-
+	
 	/*clean-up*/
 #ifndef SHM_SAFE_MALLOC
-	if (_shm_lock)
+	if (mem_lock)
 		shm_unlock(); /* hack: force-unlock the shared memory lock in case
 					 some process crashed and let it locked; this will
 					 allow an almost gracious shutdown */
@@ -582,12 +571,12 @@ void cleanup(int show_status)
 		}
 	}
 	/* zero all shmem alloc vars that we still use */
-	shm_destroy_manager();
+	shm_mem_destroy();
 #endif
 	destroy_lock_ops();
 	if (pid_file) unlink(pid_file);
 	if (pgid_file) unlink(pgid_file);
-	pkg_destroy_manager();
+	destroy_pkg_mallocs();
 }
 
 
@@ -1233,7 +1222,6 @@ int main_loop(void)
 	int r;
 #endif
 	int nrprocs;
-	int woneinit;
 
 	/* one "main" process and n children handling i/o */
 	if (dont_fork){
@@ -1303,7 +1291,6 @@ int main_loop(void)
 		cfg_register_child(
 				1   /* main = udp listener */
 				+ 1 /* timer */
-				+ 1 /* wtimer */
 #ifdef USE_SLOW_TIMER
 				+ 1 /* slow timer */
 #endif
@@ -1373,10 +1360,6 @@ int main_loop(void)
 				}else{
 				}
 
-		if(sr_wtimer_start()<0) {
-			LM_CRIT("Cannot start wtimer\n");
-			goto error;
-		}
 		/* main process, receive loop */
 		process_no=0; /*main process number*/
 		pt[process_no].pid=getpid();
@@ -1408,7 +1391,6 @@ int main_loop(void)
 		 * will be added later.) */
 		cfg_register_child(
 				1   /* timer */
-				+ 1   /* wtimer */
 #ifdef USE_SLOW_TIMER
 				+ 1 /* slow timer */
 #endif
@@ -1556,7 +1538,6 @@ int main_loop(void)
 		if (counters_prefork_init(get_max_procs()) == -1) goto error;
 
 
-		woneinit = 0;
 		/* udp processes */
 		for(si=udp_listen; si; si=si->next){
 			nrprocs = (si->workers>0)?si->workers:children_no;
@@ -1593,13 +1574,8 @@ int main_loop(void)
 #ifdef STATS
 					setstats( i+r*children_no );
 #endif
-					if(woneinit==0) {
-						if(run_child_one_init_route()<0)
-							goto error;
-					}
 					return udp_rcv_loop();
 				}
-				woneinit = 1;
 			}
 			/*parent*/
 			/*close(udp_sock)*/; /*if it's closed=>sendto invalid fd errors?*/
@@ -1671,10 +1647,6 @@ int main_loop(void)
 			if (arm_timer()<0) goto error;
 			timer_main();
 		}
-		if(sr_wtimer_start()<0) {
-			LM_CRIT("Cannot start wtimer\n");
-			goto error;
-		}
 
 	/* init childs with rank==MAIN before starting tcp main (in case they want
 	 * to fork  a tcp capable process, the corresponding tcp. comm. fds in
@@ -1703,7 +1675,7 @@ int main_loop(void)
 		}
 #endif
 		/* main */
-		strncpy(pt[0].desc, "main process - attendant", MAX_PT_DESC );
+		strncpy(pt[0].desc, "attendant", MAX_PT_DESC );
 #ifdef USE_TCP
 		close_extra_socks(PROC_ATTENDANT, get_proc_no());
 		if(!tcp_disable){
@@ -1799,7 +1771,6 @@ static int calc_proc_no(void)
 #ifdef USE_SLOW_TIMER
 		+ 1 /* slow timer process */
 #endif
-		+ 1 /* wtimer process */
 #ifdef USE_TCP
 		+((!tcp_disable)?( 1/* tcp main */ + tcp_listeners ):0)
 #endif
@@ -1841,7 +1812,7 @@ int main(int argc, char** argv)
 	dprint_init_colors();
 
 	/* command line options */
-	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:"
+	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:"
 #ifdef STATS
 		"s:"
 #endif
@@ -1875,12 +1846,6 @@ int main(int argc, char** argv)
 						goto error;
 					};
 					break;
-			case 'x':
-					sr_memmng_shm = optarg;
-					break;
-			case 'X':
-					sr_memmng_pkg = optarg;
-					break;
 			default:
 					if (c == 'h' || (optarg && strcmp(optarg, "-h") == 0)) {
 						printf("version: %s\n", full_version);
@@ -1890,26 +1855,11 @@ int main(int argc, char** argv)
 					break;
 		}
 	}
-
-	if(sr_memmng_pkg==NULL) {
-		if(sr_memmng_shm!=NULL) {
-			sr_memmng_pkg = sr_memmng_shm;
-		} else {
-			sr_memmng_pkg = SR_MEMMNG_DEFAULT;
-		}
-	}
-	if(sr_memmng_shm==NULL) {
-		sr_memmng_shm = SR_MEMMNG_DEFAULT;
-	}
-	shm_set_mname(sr_memmng_shm);
-	if (pkg_mem_size == 0) {
-		pkg_mem_size = PKG_MEM_POOL_SIZE;
-	}
-
+	
 	/*init pkg mallocs (before parsing cfg or the rest of the cmd line !)*/
 	if (pkg_mem_size)
 		LM_INFO("private (per process) memory: %ld bytes\n", pkg_mem_size );
-	if (pkg_init_manager(sr_memmng_pkg)<0)
+	if (init_pkg_mallocs()==-1)
 		goto error;
 
 #ifdef DBG_MSG_QA
@@ -1923,17 +1873,11 @@ int main(int argc, char** argv)
 #ifdef USE_TCP
 	init_tcp_options(); /* set the defaults before the config */
 #endif
-
 	/* process command line (cfg. file path etc) */
 	optind = 1;  /* reset getopt */
 	/* switches required before script processing */
 	while((c=getopt(argc,argv,options))!=-1) {
 		switch(c) {
-			case 'M':
-			case 'x':
-			case 'X':
-					/* ignore, they were parsed immediately after startup */
-					break;
 			case 'f':
 					cfg_file=optarg;
 					break;
@@ -1953,6 +1897,10 @@ int main(int argc, char** argv)
 						goto error;
 					};
 					LM_INFO("shared memory: %ld bytes\n", shm_mem_size );
+					break;
+			case 'M':
+					/* ignore it, it was parsed immediately after startup,
+					   the pkg mem. is already initialized at this point */
 					break;
 			case 'd':
 					/* ignore it, was parsed immediately after startup */
@@ -2053,9 +2001,6 @@ int main(int argc, char** argv)
 			default:
 					abort();
 		}
-	}
-	if (shm_mem_size == 0) {
-		shm_mem_size = SHM_MEM_POOL_SIZE;
 	}
 
 	if (endianness_sanity_check() != 0){
@@ -2432,8 +2377,6 @@ try_again:
 	if (!shm_initialized() && init_shm()<0)
 		goto error;
 #endif /* SHM_MEM */
-	pkg_print_manager();
-	shm_print_manager();
 	if (init_atomic_ops()==-1)
 		goto error;
 	if (init_basex() != 0){
@@ -2462,12 +2405,6 @@ try_again:
 		LM_CRIT("could not initialize timer, exiting...\n");
 		goto error;
 	}
-	/* init wtimer */
-	if(sr_wtimer_init()<0) {
-		LM_CRIT("could not initialize wtimer, exiting...\n");
-		goto error;
-	}
-
 #ifdef USE_DNS_CACHE
 	if (init_dns_cache()<0){
 		LM_CRIT("could not initialize the dns cache, exiting...\n");

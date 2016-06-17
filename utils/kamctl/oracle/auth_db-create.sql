@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('subscriber','6');
 CREATE TABLE subscriber (
     id NUMBER(10) PRIMARY KEY,
     username VARCHAR2(64) DEFAULT '',
@@ -19,6 +20,4 @@ END subscriber_tr;
 BEGIN map2users('subscriber'); END;
 /
 CREATE INDEX subscriber_username_idx  ON subscriber (username);
-
-INSERT INTO version (table_name, table_version) values ('subscriber','6');
 

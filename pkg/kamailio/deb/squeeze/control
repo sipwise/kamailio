@@ -15,6 +15,7 @@ Build-Depends: bison,
                libev-dev,
                libevent-dev,
                libexpat1-dev,
+               libradiusclient-ng-dev,
                libgeoip-dev (>= 1.4.5),
                libjson0-dev,
                libldap2-dev,
@@ -25,7 +26,6 @@ Build-Depends: bison,
                libpcre3-dev,
                libperl-dev,
                libpq-dev,
-               libradiusclient-ng-dev,
                libreadline-dev,
                libsasl2-dev,
                libsnmp-dev,
@@ -192,7 +192,7 @@ Package: kamailio-mysql-modules
 Architecture: linux-any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: kamailio (= ${binary:Version}),
-         mysql-client | virtual-mysql-client,
+         mysql-client,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: MySQL database connectivity module for Kamailio

@@ -46,7 +46,6 @@
 
 static int _async_task_workers = 0;
 static int _async_task_sockets[2];
-static int _async_task_usleep = 0;
 
 int async_task_run(int idx);
 
@@ -178,19 +177,6 @@ int async_task_set_workers(int n)
 /**
  *
  */
-int async_task_set_usleep(int n)
-{
-	int v;
-
-	v = _async_task_usleep;
-	_async_task_usleep = n;
-
-	return v;
-}
-
-/**
- *
- */
 int async_task_push(async_task_t *task)
 {
 	int len;
@@ -218,7 +204,6 @@ int async_task_run(int idx)
 	LM_DBG("async task worker %d ready\n", idx);
 
 	for( ; ; ) {
-		if(unlikely(_async_task_usleep)) sleep_us(_async_task_usleep);
 		if ((received = recvfrom(_async_task_sockets[0],
 							&ptask, sizeof(async_task_t*),
 							0, NULL, 0)) < 0) {

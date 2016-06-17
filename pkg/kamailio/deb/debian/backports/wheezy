@@ -8,11 +8,6 @@ DIST=wheezy
 rm -rf ${DIST}
 cp -r debian ${DIST}
 
-# No systemd
-sed -i -e '/dh-systemd/d' ${DIST}/control
-sed -i -e '/dh_systemd/d' ${DIST}/rules
-rm ${DIST}/kamailio.service
-
 # No purple module:
 sed -i -e '/libpurple-dev/d' -e '/^Package: kamailio-purple-modules/,/^$/d' \
 	${DIST}/control
@@ -32,8 +27,8 @@ sed -i -e 's/ dnssec[ ,$]*/ /' ${DIST}/rules
 sed -i -e '/^EXTRA_EXCLUDED_MODULES=/s/$/ dnssec/' ${DIST}/rules
 
 # use old radius-client-ng
-sed -i 's/libradcli-dev/libradiusclient-ng-dev/' ${DIST}/control
-sed -i -e '/RADCLI/d' ${DIST}/rules
+sed -i 's/libfreeradius-client-dev/libradiusclient-ng-dev/' ${DIST}/control
+sed -i -e '/FREERADIUS/d' ${DIST}/rules
 
 # use old json
 sed -i 's/libjson-c-dev/libjson0-dev/' ${DIST}/control

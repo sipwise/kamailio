@@ -10,7 +10,7 @@
 
 #include "ro_timer.h"
 #include "../../mem/shm_mem.h"
-#include "ims_charging_stats.h"
+#include "../ims_usrloc_scscf/usrloc.h"
 #include <stdlib.h>
 
 
@@ -22,28 +22,26 @@
 
 #define MAX_PANI_LEN 100
 
-extern struct ims_charging_counters_h ims_charging_cnts_h;
-
 enum ro_session_event_type {
     pending,
     answered,
     no_more_credit,
-    delayed_delete,
-    unknown_error,
+    unknown_error
 };
 
 struct diameter_avp_value {
-    str mac;
+	str mac;
 };
 
 //used to pass data into dialog callbacks
-
 struct impu_data {
     str identity;
     str contact;
 } impu_data_t;
 
+
 struct ro_session {
+    str cdp_session_id;
     volatile int ref;
     int direction;
     struct ro_session* next;
@@ -70,12 +68,9 @@ struct ro_session {
     int auth_session_type;
     int active;
     unsigned int flags;
-    str mac;
+    struct diameter_avp_value avp_value;
     int rating_group;
     int service_identifier;
-    unsigned int is_final_allocation;
-    long billed;
-    unsigned int ccr_sent;
 };
 
 /*! entries in the main ro_session table */
@@ -145,7 +140,7 @@ extern struct ro_session_table *ro_session_table;
 		if ((_ro_session)->ref<=0) { \
 			unlink_unsafe_ro_session( _ro_session_entry, _ro_session);\
 			LM_DBG("ref <=0 for ro_session %p\n",_ro_session);\
-                        put_ro_session_on_wait(_ro_session);\
+			destroy_ro_session(_ro_session);\
 		}\
 	}while(0)
 
@@ -166,8 +161,6 @@ static inline void unlink_unsafe_ro_session(struct ro_session_entry *ro_session_
         ro_session_entry->first = ro_session->next;
 
     ro_session->next = ro_session->prev = 0;
-    
-    counter_add(ims_charging_cnts_h.active_ro_sessions, -1);
 
     return;
 }
@@ -180,10 +173,15 @@ static inline void unlink_unsafe_ro_session(struct ro_session_entry *ro_session_
 int init_ro_session_table(unsigned int size);
 
 /*!
+ * \brief Destroy a ro_session and free memory
+ * \param ro_session destroyed Ro Session
+ */
+inline void destroy_ro_session(struct ro_session *ro_session);
+
+/*!
  * \brief Destroy the ro_session dialog table
  */
-void destroy_ro_session(struct ro_session *ro_session);
-
+void destroy_ro_session_table(void);
 
 /*!
  * \brief Link a ro_session structure
@@ -194,9 +192,9 @@ void link_ro_session(struct ro_session *ro_session, int n);
 
 void remove_aaa_session(str *session_id);
 
-struct ro_session* build_new_ro_session(int direction, int auth_appid, int auth_session_type, str *session_id, str *callid, str *asserted_identity, str* called_asserted_identity,
-        str* mac, unsigned int dlg_h_entry, unsigned int dlg_h_id, unsigned int requested_secs, unsigned int validity_timeout,
-        int active_rating_group, int active_service_identifier, str *incoming_trunk_id, str *outgoing_trunk_id, str *pani);
+struct ro_session* build_new_ro_session(int direction, int auth_appid, int auth_session_type, str *session_id, str *callid, str *asserted_identity, str* called_asserted_identity, 
+	str* mac, unsigned int dlg_h_entry, unsigned int dlg_h_id, unsigned int requested_secs, unsigned int validity_timeout,
+	int active_rating_group, int active_service_identifier, str *incoming_trunk_id, str *outgoing_trunk_id, str *pani);
 
 /*!
  * \brief Refefence a ro_session with locking
@@ -217,8 +215,6 @@ void unref_ro_session(struct ro_session *ro_session, unsigned int cnt);
 struct ro_session* lookup_ro_session(unsigned int h_entry, str *callid, int direction, unsigned int *del);
 
 void free_impu_data(struct impu_data *impu_data);
-
-int put_ro_session_on_wait(struct ro_session* session);
 
 
 #endif	/* RO_SESSION_HASH_H */

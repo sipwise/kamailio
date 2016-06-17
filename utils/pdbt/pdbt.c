@@ -39,10 +39,14 @@
 #include "log.h"
 
 
-/* incremented after request sent to the server */
-uint16_t id = 0;
 
-typedef int (*query_func_t)(char *number, char *comment, void *data);
+
+#define NETBUFSIZE 200
+
+
+
+
+typedef void (*query_func_t)(char *number, char *comment, void *data);
 
 
 
@@ -132,11 +136,13 @@ int file_query(char *filename, query_func_t query_func, void *data) {
 	else fp = fopen(filename, "r");
 	if (fp == NULL) {
 		LERR("cannot open file '%s'\n", filename);
-		return -PDB_USE_ERROR;
+		return -1;
 	}
 	while ((read = getline(&line, &len, fp)) != -1) {
 		p=line;
 		while ((*p >= '0') && (*p <= '9') && (p < line+len)) p++;
+		*p='\0';
+		p++;
 		comment=p;
 		while ((*p >= 32) && (p < line+len)) p++;
 		*p='\0';
@@ -144,7 +150,7 @@ int file_query(char *filename, query_func_t query_func, void *data) {
 	}
 	if (line) free(line);
 	fclose(fp);
-	return -PDB_OK;
+	return 0;
 }
 
 
@@ -178,11 +184,6 @@ int import_csv(struct dt_node_t *root, char *filename) {
 	while ((read = getline(&line, &len, fp)) != -1) {
 		carrier_str=line;
 		prefix=strsep(&carrier_str, ";");
-		if ( carrier_str == NULL ) {
-			LWARNING("line %ld: no delimiter `;' found, ignoring line.\n", n); 
-			n++;
-			continue;
-		}
 		ret=strtol(carrier_str, NULL, 10);
 		if (!IS_VALID_PDB_CARRIERID(ret)) {
 			LWARNING("invalid carrier '%s' in line %ld.\n", carrier_str, (long int)n);
@@ -450,16 +451,12 @@ int merge_carrier(struct dt_node_t *root, int keep_carriers_num, carrier_t keep_
  */
 int query_udp(char *number, int timeout, struct pollfd *pfds, struct sockaddr_in *dstaddr, socklen_t dstaddrlen)
 {
-    struct pdb_msg msg;
 	struct timeval tstart, tnow;
 	short int carrierid;
-	char buf[sizeof(struct pdb_msg)];
+	char buf[NETBUFSIZE+1+sizeof(carrierid)];
 	size_t reqlen;
 	int ret, nflush;
 	long int td;
-    ssize_t bytes_received;
-    short int * idptr;
-
 
 	if (gettimeofday(&tstart, NULL) != 0) {
 		LERR("gettimeofday() failed with errno=%d (%s)\n", errno, strerror(errno));
@@ -468,108 +465,54 @@ int query_udp(char *number, int timeout, struct pollfd *pfds, struct sockaddr_in
 
 	/* clear recv buffer */
 	nflush = 0;
-	while (recv(pfds->fd, buf, sizeof(struct pdb_msg), MSG_DONTWAIT) > 0) {
+	while (recv(pfds->fd, buf, NETBUFSIZE, MSG_DONTWAIT) > 0) {
 		nflush++;
 		if (gettimeofday(&tnow, NULL) != 0) {
 			LERR("gettimeofday() failed with errno=%d (%s)\n", errno, strerror(errno));
-			return -PDB_OTHER;
+			return -1;
 		}
 		td=(tnow.tv_usec-tstart.tv_usec+(tnow.tv_sec-tstart.tv_sec)*1000000) / 1000;
 		if (td > timeout) {
 			LWARNING("exceeded timeout while flushing recv buffer.\n");
-			return -PDB_TIMEOUT;
+			return -1;
 		}
 	}
 	
 	/* prepare request */
 	reqlen = strlen(number) + 1; /* include null termination */
-	if (reqlen > sizeof(struct pdb_bdy)) {
+	if (reqlen > NETBUFSIZE) {
 		LERR("number too long '%s'.\n", number);
-		return -PDB_USE_ERROR;
+		return -1;
 	}
 	strcpy(buf, number);
 
-    switch (PDB_VERSION) {
-        case PDB_VERSION_1:
-            pdb_msg_format_send(&msg, PDB_VERSION, PDB_TYPE_REQUEST_ID, PDB_CODE_DEFAULT, htons(id), buf, reqlen);
-//            pdb_msg_dbg(msg);
-
-            /* increment msg id for the next request */
-            id++;
-
-            /* send request to all servers */
-            ret=sendto(pfds->fd, (struct pdb_msg*)&msg, msg.hdr.length, MSG_DONTWAIT, (struct sockaddr *)dstaddr, dstaddrlen);
-            if (ret < 0) {
-                LERR("sendto() failed with errno=%d (%s)\n", errno, strerror(errno));
-                return -1;
-            }
-            break;
-        default:
-            /* send request to all servers */
-            ret=sendto(pfds->fd, buf, reqlen, MSG_DONTWAIT, (struct sockaddr *)dstaddr, dstaddrlen);
-            if (ret < 0) {
-                LERR("sendto() failed with errno=%d (%s)\n", errno, strerror(errno));
-                return -PDB_OTHER;
-            }
-            break;
-    }
-
+	/* send request to all servers */
+	ret=sendto(pfds->fd, buf, reqlen, MSG_DONTWAIT, (struct sockaddr *)dstaddr, dstaddrlen);
+	if (ret < 0) {
+		LERR("sendto() failed with errno=%d (%s)\n", errno, strerror(errno));
+		return -1;
+	}
+		
 	/* wait for response */
 	for (;;) {
 		if (gettimeofday(&tnow, NULL) != 0) {
 			LERR("gettimeofday() failed with errno=%d (%s)\n", errno, strerror(errno));
-			return -PDB_OTHER;
+			return -1;
 		}
 		td=(tnow.tv_usec-tstart.tv_usec+(tnow.tv_sec-tstart.tv_sec)*1000000) / 1000;
 		if (td > timeout) {
 			LWARNING("exceeded timeout while waiting for response.\n");
-			return -PDB_TIMEOUT;
+			return -1;
 		}
-
+		
 		ret=poll(pfds, 1, timeout-td);
 		if (pfds->revents & POLLIN) {
-			if ((bytes_received = recv(pfds->fd, buf, sizeof(struct pdb_msg), MSG_DONTWAIT)) > 0) { /* do not block - just in case select/poll was wrong */
-                switch (PDB_VERSION) {
-                    case PDB_VERSION_1:
-                        memcpy(&msg, buf, bytes_received);
-//                        pdb_msg_dbg(msg);
-                          idptr = (short int *)&(msg.hdr.id); /* make gcc happy */
-                          msg.hdr.id = ntohs(*idptr);
-
-
-                        switch (msg.hdr.code) {
-                            case PDB_CODE_OK:
-                                msg.bdy.payload[sizeof(struct pdb_bdy) - 1] = '\0';
-                                if (strcmp(msg.bdy.payload, number) == 0) {
-                                    idptr = (short int *)&(msg.bdy.payload[reqlen]); /* make gcc happy */
-                                    carrierid=ntohs(*idptr); /* convert to host byte order */
-                                    goto found;
-                                }
-                                break;
-                            case PDB_CODE_NOT_NUMBER:
-			                    LERR("Number %s has letters in it\n", number);
-                                carrierid = 0;
-                                goto found;
-                            case PDB_CODE_NOT_FOUND:
-			                    LERR("Number %s pdb_id not found\n", number);
-                                carrierid = 0;
-                                goto found;
-                            default:
-			                    LERR("Invalid code %d received\n", msg.hdr.code);
-                                carrierid = 0;
-                                goto found;
-                        }
-
-                        break;
-                    default:
-                        buf[sizeof(struct pdb_msg) - 1] = '\0';
-                        if (strcmp(buf, number) == 0) {
-                            idptr = (short int *)&(buf[reqlen]); /* make gcc happy */
-                            carrierid=ntohs(*idptr); /* convert to host byte order */
-                            goto found;
-                        }
-                        break;
-                }
+			if (recv(pfds->fd, buf, NETBUFSIZE, MSG_DONTWAIT) > 0) { /* do not block - just in case select/poll was wrong */
+				buf[NETBUFSIZE] = '\0';
+				if (strcmp(buf, number) == 0) {
+					carrierid=ntohs(*((short int *)&(buf[reqlen]))); /* convert to host byte order */
+					goto found;
+				}
 			}
 		}
 		pfds->revents = 0;
@@ -595,7 +538,7 @@ struct server_query_data_t {
 
 
 
-int query_mmap(char *number, char *comment, void *data) {
+void query_mmap(char *number, char *comment, void *data) {
 	int nmatch;
 	carrier_t carrierid;
 	struct dtm_node_t *mroot = (struct dtm_node_t *)data;
@@ -604,39 +547,31 @@ int query_mmap(char *number, char *comment, void *data) {
 
 	if (nmatch<=0) {
 		LINFO("%s:%s:%ld:%s\n", number, comment, (long int)carrierid, "not allocated, probably old");
-		return -PDB_NOT_IN_PDB;
 	}
 	else {
 		LINFO("%s:%s:%ld:%s\n", number, comment, (long int)carrierid, carrierid2name(carrierid));
 		/* LINFO("%s: found: carrier_id=%ld, carrier_name='%s', nmatch=%ld, comment='%s'\n", number, (long int)carrierid, carrierid2name(carrierid), (long int)nmatch, comment);
 		*/
-		return -PDB_OK;
 	}
 }
 
 
 
 
-int query_server(char *number, char *comment, void *data) {
+void query_server(char *number, char *comment, void *data) {
 	carrier_t carrierid;
 	struct server_query_data_t *sdata = (struct server_query_data_t *)data;
-	int result = 0;
 
 	carrierid = query_udp(number, sdata->timeout, &(sdata->pfds), &(sdata->dstaddr), sdata->dstaddrlen);
 
 	if (carrierid<=0) {
-		LINFO("%s: not_found: comment='%s', result=%d\n", number, comment, carrierid);
-		if (carrierid < 0) {
-			result = carrierid; 
-		} else {
-			result = PDB_NOT_IN_PDB; 
-		}
+		LINFO("%s: not_found: comment='%s'\n", number, comment);
 	}
 	else {
 		LINFO("%s:%ld:%s\n", number, (long int)carrierid, carrierid2name(carrierid));
-		result = PDB_OK;
+		/* LINFO("%s: found: carrier_id=%ld, carrier_name='%s', comment='%s'\n", number, (long int)carrierid, carrierid2name(carrierid), comment);
+		*/
 	}
-	return result; 
 }
 
 
@@ -669,7 +604,6 @@ int main(int argc, char *argv[]) {
 
 	char *id_str;
 	long int ret;
-	int exit_status = PDB_OK;
 
 	sdata.timeout=500;
 
@@ -848,7 +782,7 @@ int main(int argc, char *argv[]) {
 			if (hp == NULL) {
 				LERR("gethostbyname(%s) failed with h_errno=%d.\n", host_str, h_errno);
 				close(sockfd);
-				exit (PDB_USE_ERROR);
+				return -1;
 			}
 			memcpy(&sdata.dstaddr.sin_addr.s_addr, hp->h_addr, hp->h_length);
 			sdata.dstaddrlen=sizeof(sdata.dstaddr);
@@ -858,30 +792,19 @@ int main(int argc, char *argv[]) {
 
 			if (query_file==NULL) {
 				LINFO("\nprocessing command line parameters...\n");
-				if ( optind+1 >= argc) {
-					exit_status = PDB_USE_ERROR;
-				}
 				for (n=optind+1; n<argc; n++) {
-					int result; 
-					result = query_server(argv[n], "", &sdata); 
-					if ( result != 0) {
-						exit_status = -result; 
-					}
+					query_server(argv[n], "", &sdata);
 				}
 			}
 			else {
-				int result; 
-				result = file_query(query_file, query_server, &sdata);
-				if ( result != 0) {
-					exit_status = -result; 
-				}
+				file_query(query_file, query_server, &sdata);
 			}
 		}
 		else {
 			mroot=dtm_load(mmap_file);
 			if (mroot == NULL) {
 				LERR("cannot load '%s'.\n", mmap_file);
-				exit(PDB_USE_ERROR);
+				return -1;
 			}
 			
 			if (query_file==NULL) {
@@ -891,18 +814,14 @@ int main(int argc, char *argv[]) {
 				}
 			}
 			else {
-				int result; 
-				result = file_query(query_file, query_mmap, mroot);
-				if ( result != 0) {
-					exit_status = -result; 
-				}
+				file_query(query_file, query_mmap, mroot);
 			}
 		}
 	}
 	else {
 		LERR("invalid command '%s'.\n", argv[optind]);
-		exit(PDB_USE_ERROR);
+		return 1;
 	}
 
-	exit (exit_status);
+	return 0;
 }

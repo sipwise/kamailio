@@ -7,8 +7,8 @@
 
 #include "mod.h"
 #include "../../sr_module.h"
-#include "../../modules/ims_dialog/dlg_load.h"
-#include "../../modules/ims_dialog/dlg_hash.h"
+#include "../../modules/dialog_ng/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_hash.h"
 #include "../cdp/cdp_load.h"
 #include "../cdp_avp/mod_export.h"
 #include "../../parser/parse_to.h"
@@ -17,10 +17,9 @@
 #include "ims_ro.h"
 #include "config.h"
 #include "dialog.h"
+#include "../ims_usrloc_scscf/usrloc.h"
 #include "../../lib/ims/ims_getters.h"
 #include "ro_db_handler.h"
-#include "ims_charging_stats.h"
-#include "ro_session_hash.h"
 #include "ims_charging_stats.h"
 
 MODULE_VERSION
@@ -32,9 +31,6 @@ char* ro_service_context_id_ext_s = "ext";
 char* ro_service_context_id_mnc_s = "01";
 char* ro_service_context_id_mcc_s = "001";
 char* ro_service_context_id_release_s = "8";
-int	termination_code = 0;
-int vendor_specific_id = 10;
-int vendor_specific_chargeinfo = 0;
 static int ro_session_hash_size = 4096;
 int ro_timer_buffer = 5;
 int interim_request_credits = 30;
@@ -61,11 +57,12 @@ client_ro_cfg cfg = { str_init("scscf.ims.smilecoms.com"),
     0
 };
 
-extern struct ims_charging_counters_h ims_charging_cnts_h;
 struct cdp_binds cdpb;
 struct dlg_binds dlgb;
 cdp_avp_bind_t *cdp_avp;
 struct tm_binds tmb;
+
+usrloc_api_t ul; /*!< Structure containing pointers to usrloc functions*/
 
 char* rx_dest_realm_s = "ims.smilecoms.com";
 str rx_dest_realm;
@@ -84,20 +81,12 @@ static int mod_child_init(int);
 static void mod_destroy(void);
 
 static int w_ro_ccr(struct sip_msg *msg, char* route_name, char* direction, int reservation_units, char* incoming_trunk_id, char* outgoing_trunk_id);
-static int w_ro_ccr_stop(struct sip_msg *msg, char* direction, char* _code, char* _reason);
 //void ro_session_ontimeout(struct ro_tl *tl);
 
-
-int create_response_avp_string(char* name, str* val);
-static int w_ro_set_session_id_avp(struct sip_msg *msg, char *str1, char *str2);
-
 static int ro_fixup(void **param, int param_no);
-static int ro_fixup_stop(void **param, int param_no);
 
 static cmd_export_t cmds[] = {
 		{ "Ro_CCR", 	(cmd_function) w_ro_ccr, 5, ro_fixup, 0, REQUEST_ROUTE },
-		{ "Ro_CCR_Stop",(cmd_function) w_ro_ccr_stop, 3, ro_fixup_stop, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE},
-        { "Ro_set_session_id_avp", 	(cmd_function) w_ro_set_session_id_avp, 0, 0, 0, REQUEST_ROUTE | ONREPLY_ROUTE },
 		{ 0, 0, 0, 0, 0, 0 }
 };
 
@@ -130,8 +119,6 @@ static param_export_t params[] = {
 		{ "db_mode",			INT_PARAM,			&ro_db_mode_param		},
 		{ "db_url",			PARAM_STRING,			&db_url 			},
 		{ "db_update_period",		INT_PARAM,			&db_update_period		},
-		{ "vendor_specific_chargeinfo",		INT_PARAM,	&vendor_specific_chargeinfo		}, /* VSI for extra charing info in Ro */
-		{ "vendor_specific_id",		INT_PARAM,			&vendor_specific_id		}, /* VSI for extra charing info in Ro */
 		{ 0, 0, 0 }
 };
 
@@ -180,7 +167,9 @@ int fix_parameters() {
 
 static int mod_init(void) {
 	int n;
+	load_dlg_f load_dlg;
 	load_tm_f load_tm;
+	bind_usrloc_t bind_usrloc;
 
 	if (!fix_parameters()) {
 		LM_ERR("unable to set Ro configuration parameters correctly\n");
@@ -194,6 +183,13 @@ static int mod_init(void) {
 	}
 	if (load_tm(&tmb) == -1)
 		goto error;
+
+	if (!(load_dlg = (load_dlg_f) find_export("load_dlg", 0, 0))) { /* bind to dialog module */
+		LM_ERR("can not import load_dlg. This module requires Kamailio dialog module.\n");
+	}
+	if (load_dlg(&dlgb) == -1) {
+		goto error;
+	}
 
 	if (load_cdp_api(&cdpb) != 0) { /* load the CDP API */
 		LM_ERR("can't load CDP API\n");
@@ -210,7 +206,7 @@ static int mod_init(void) {
 		LM_ERR("can't load CDP_AVP API\n");
 		goto error;
 	}
-        
+
 	/* init timer lists*/
 	if (init_ro_timer(ro_session_ontimeout) != 0) {
 		LM_ERR("cannot init timer list\n");
@@ -236,6 +232,23 @@ static int mod_init(void) {
 	if (register_timer(ro_timer_routine, 0/*(void*)ro_session_list*/, 1) < 0) {
 		LM_ERR("failed to register timer \n");
 		return -1;
+	}
+
+	bind_usrloc = (bind_usrloc_t) find_export("ul_bind_usrloc", 1, 0);
+	if (!bind_usrloc) {
+	    LM_ERR("can't bind usrloc\n");
+	    return -1;
+	}
+	
+	if (bind_usrloc(&ul) < 0) {
+	    return -1;
+	}
+
+	/*Register for callback of URECORD being deleted - so we can send a SAR*/
+
+	if (ul.register_ulcb == NULL) {
+	    LM_ERR("Could not import ul_register_ulcb\n");
+	    return -1;
 	}
 	
 	if (ims_charging_init_counters() != 0) {
@@ -298,141 +311,6 @@ static void mod_destroy(void) {
 
 }
 
-int create_response_avp_string(char* name, str* val) {
-    int rc;
-    int_str avp_val, avp_name;
-    avp_name.s.s = name;
-    avp_name.s.len = strlen(name);
-
-    avp_val.s = *val;
-
-    rc = add_avp(AVP_NAME_STR|AVP_VAL_STR, avp_name, avp_val);
-
-    if (rc < 0)
-        LM_ERR("couldnt create AVP\n");
-    else
-        LM_INFO("created AVP successfully : [%.*s] - [%.*s]\n", avp_name.s.len, avp_name.s.s, val->len, val->s);
-
-    return 1;
-}
-
-//This function gets the dlg from the current msg, gets the ro_session from the dlg and sets a AVP for use in the cfg file: ro_session_id
-static int w_ro_set_session_id_avp(struct sip_msg *msg, char *str1, char *str2) {
-    struct ro_session *ro_session = 0;
-    struct dlg_cell* dlg;
-    int res = -1;
-    
-    //get dlg from msg
-    dlg = dlgb.get_dlg(msg);
-    if (!dlg) {
-            LM_ERR("Unable to find dialog and cannot do Ro charging without it\n");
-            return RO_RETURN_ERROR;
-    }
-    
-    //get ro session id from dialog
-    ro_session= lookup_ro_session(dlg->h_entry, &dlg->callid, 0, 0);
-    if(!ro_session) {
-        LM_ERR("Unable to find Ro charging data\n");
-        dlgb.release_dlg(dlg);
-            return RO_RETURN_ERROR;
-    }
-    
-    //set avp response with session id
-    res = create_response_avp_string("ro_session_id", &ro_session->ro_session_id);
-    dlgb.release_dlg(dlg);
-    unref_ro_session(ro_session, 1);
-    return res;
-}
-
-static int w_ro_ccr_stop(struct sip_msg *msg, char* c_direction, char* _code, char* _reason) {
-    struct ro_session* ro_session;
-    struct ro_session_entry *ro_session_entry;
-    unsigned int h_entry;
-    str s_code, s_reason;
-    unsigned int code;
-    int dir = 0; /*any side*/
-
-    LM_DBG("Inside Ro_CCR_Stop with direction [%s]\n", c_direction);
-    if (strlen(c_direction) == 4) {
-        if (c_direction[0] == 'O' || c_direction[0] == 'o') {
-            dir = RO_ORIG_DIRECTION;
-        } else {
-            dir = RO_TERM_DIRECTION;
-        }
-    } else {
-        LM_ERR("Unknown direction [%s] to terminate\n", c_direction);
-        return RO_RETURN_FALSE;
-    }
-    struct dlg_cell* dlg = dlgb.get_dlg(msg);
-    if (!dlg) {
-        LM_ERR("Unable to find dialog to send CCR STOP record\n");
-        return RO_RETURN_ERROR;
-    }
-
-    if (get_str_fparam(&s_code, msg, (fparam_t*) _code) < 0) {
-        LM_ERR("failed to get code\n");
-        dlgb.release_dlg(dlg);
-        return RO_RETURN_ERROR;
-    }
-    LM_DBG("Code is [%.*s]\n", s_code.len, s_code.s);
-    if (get_str_fparam(&s_reason, msg, (fparam_t*) _reason) < 0) {
-        LM_ERR("failed to get reason\n");
-        dlgb.release_dlg(dlg);
-        return RO_RETURN_ERROR;
-    }
-
-    if (str2int(&s_code, &code) != 0) {
-        LM_ERR("Bad response code: [%.*s]\n", s_code.len, s_code.s);
-        dlgb.release_dlg(dlg);
-        return RO_RETURN_FALSE;
-    }
-
-//    switch (code) {
-//        case 486:
-//            termcode = VS_TERMCODE_BUSYHERE;
-//            break;
-//        case 487:
-//            termcode = VS_TERMCODE_CANCELLED;
-//            break;
-//        case 480:
-//        case 408:
-//            /* subscriber not available */
-//            termcode = VS_TERMCODE_NOTFOUND;
-//            break;
-//    }
-
-    LM_DBG("Sending Stop record with code [%d] and reason [%.*s]\n", code, s_reason.len, s_reason.s);
-
-    LM_DBG("Found DLG [%d : %d]\n", dlg->h_id, dlg->h_entry);
-
-    ro_session = lookup_ro_session(dlg->h_entry, &dlg->callid, dir, 0);
-    if (ro_session == NULL) {
-        LM_DBG("no ro_session - ignoring\n");
-        dlgb.release_dlg(dlg);
-        return RO_RETURN_TRUE;
-    }
-    h_entry = ro_session->h_entry;
-    ro_session_entry = &(ro_session_table->entries[h_entry]);
-
-    ro_session_lock(ro_session_table, ro_session_entry);
-    
-    if (ro_session->ccr_sent == 1) {
-        LM_DBG("Ro CCR already sent for session [%.*s]\n", ro_session->ro_session_id.len, ro_session->ro_session_id.s);
-        goto done;
-    }
-    send_ccr_stop_with_param(ro_session, code, &s_reason);
-    //TODO = check the CCR was sent successfully.
-    LM_DBG("Setting Ro session [%.*s] ccr_sent to 1\n", ro_session->ro_session_id.len, ro_session->ro_session_id.s);
-    ro_session->ccr_sent = 1;
-    ro_session->active = -1;
-//    counter_add(ims_charging_cnts_h.active_ro_sessions, -1);
-done:
-    unref_ro_session_unsafe(ro_session, 1, ro_session_entry);
-    ro_session_unlock(ro_session_table, ro_session_entry);
-    dlgb.release_dlg(dlg);
-    return RO_RETURN_TRUE;
-}
-
 static int w_ro_ccr(struct sip_msg *msg, char* c_route_name, char* c_direction, int reservation_units, char* c_incoming_trunk_id, char* c_outgoing_trunk_id) {
 	/* PSEUDOCODE/NOTES
 	 * 1. What mode are we in - terminating or originating
@@ -455,7 +333,10 @@ static int w_ro_ccr(struct sip_msg *msg, char* c_route_name, char* c_direction, 
 	tm_cell_t *t;
 	unsigned int tindex = 0,
 				 tlabel = 0;
+	struct impu_data *impu_data;
+	char *p;
 	struct dlg_cell* dlg;
+	unsigned int len;
 	struct ro_session *ro_session = 0;
 	int free_contact = 0;
 	
@@ -531,7 +412,49 @@ static int w_ro_ccr(struct sip_msg *msg, char* c_route_name, char* c_direction, 
 	}
 	
 	LM_DBG("IMPU data to pass to usrloc:  contact <%.*s> identity <%.*s>\n", contact.len, contact.s, identity.len, identity.s);
+	
+	//create impu_data_parcel
+	len = identity.len + contact.len +  sizeof (struct impu_data);
+	impu_data = (struct impu_data*) shm_malloc(len);
+	if (!impu_data) {
+	    LM_ERR("Unable to allocate memory for impu_data, trying to send CCR\n");
+	    ret = RO_RETURN_ERROR;
+	    goto done;
+	}
+	memset(impu_data, 0, len);
+	
+	p = (char*) (impu_data + 1);
+	impu_data->identity.s = p;
+	impu_data->identity.len = identity.len;
+	memcpy(p, identity.s, identity.len);
+	p += identity.len;
 
+	impu_data->contact.s = p;
+	impu_data->contact.len = contact.len;
+	memcpy(p, contact.s, contact.len);
+	p += contact.len;
+	
+	if (p != (((char*) impu_data) + len)) {
+	    LM_ERR("buffer overflow creating impu data, trying to send CCR\n");
+	    shm_free(impu_data);
+	    ret = RO_RETURN_ERROR;
+	    goto done;
+	}
+	
+	
+	//reg for callbacks on confirmed and terminated
+	if (dlgb.register_dlgcb(dlg, /* DLGCB_RESPONSE_FWDED */ DLGCB_CONFIRMED, add_dlg_data_to_contact, (void*)impu_data ,NULL ) != 0) {
+	    LM_CRIT("cannot register callback for dialog confirmation\n");
+	    ret = RO_RETURN_ERROR;
+	    goto done;
+	}
+
+	if (dlgb.register_dlgcb(dlg, DLGCB_TERMINATED | DLGCB_FAILED | DLGCB_EXPIRED /*| DLGCB_DESTROY */, remove_dlg_data_from_contact, (void*)impu_data, NULL ) != 0) {
+	    LM_CRIT("cannot register callback for dialog termination\n");
+	    ret = RO_RETURN_ERROR;
+	    goto done;
+	}
+	
 send_ccr:
 
 	//check if we need to send_ccr - 
@@ -576,7 +499,7 @@ send_ccr:
 	}
 
 	LM_DBG("Suspending SIP TM transaction\n");
-	if (tmb.t_suspend(msg, &tindex, &tlabel) != 0) {
+	if (tmb.t_suspend(msg, &tindex, &tlabel) < 0) {
 		LM_ERR("failed to suspend the TM processing\n");
 		ret =  RO_RETURN_ERROR;
 		goto done;
@@ -591,7 +514,6 @@ send_ccr:
     
 done:
 	if(free_contact)  shm_free(contact.s);// shm_malloc in cscf_get_public_identity_from_requri	
-        dlgb.release_dlg(dlg);
 	return ret;
 }
 
@@ -614,12 +536,5 @@ static int ro_fixup(void **param, int param_no) {
 		return E_CFG;
 	}
 	
-	return 0;
-}
-
-static int ro_fixup_stop(void **param, int param_no) {
-	if (param_no == 2 || param_no == 3) {
-		return fixup_var_pve_12(param, param_no);
-	}
 	return 0;
 }

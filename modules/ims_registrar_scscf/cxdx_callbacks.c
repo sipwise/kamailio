@@ -25,7 +25,6 @@
 #include "../../dprint.h"
 #include "../ims_usrloc_scscf/usrloc.h"
 #include "cxdx_avp.h"
-#include "registrar_notify.h"
 
 
 extern struct cdp_binds cdpb;
@@ -87,15 +86,8 @@ AAAMessage* cxdx_process_rtr(AAAMessage *rtr) {
             }
 	    
 	    for(i = 0; i < r->num_contacts; i++) {
-                LM_DBG("Deleting contact with AOR [%.*s]\n", r->newcontacts[i]->aor.len, r->newcontacts[i]->aor.s);
-                ul.lock_contact_slot_i(r->newcontacts[i]->sl);
-                r->newcontacts[i]->state = CONTACT_DELETE_PENDING;
-                if (r->shead) {
-                    //send NOTIFY to all subscribers of this IMPU.
-                    notify_subscribers(r);
-                }
-               r->newcontacts[i]->state = CONTACT_DELETED;
-                ul.unlock_contact_slot_i(r->newcontacts[i]->sl);
+		LM_DBG("Expiring contact with AOR [%.*s]\n", r->newcontacts[i]->aor.len, r->newcontacts[i]->aor.s);
+		ul.expire_ucontact(r, r->newcontacts[i]);
 	    }
 	    
 	    ul.unlock_udomain(udomain, &public_id);
@@ -113,15 +105,8 @@ AAAMessage* cxdx_process_rtr(AAAMessage *rtr) {
 		    }
 
 		    for(i = 0; i < r->num_contacts; i++) {
-			LM_DBG("Deleting contact with AOR [%.*s]\n", r->newcontacts[i]->aor.len, r->newcontacts[i]->aor.s);
-                        ul.lock_contact_slot_i(r->newcontacts[i]->sl);
-                        r->newcontacts[i]->state = CONTACT_DELETE_PENDING;
-                        if (r->shead) {
-                            //send NOTIFY to all subscribers of this IMPU.
-                            notify_subscribers(r);
-                        }
-                        r->newcontacts[i]->state = CONTACT_DELETED;
-                        ul.unlock_contact_slot_i(r->newcontacts[i]->sl);
+			LM_DBG("Expiring contact with AOR [%.*s]\n", r->newcontacts[i]->aor.len, r->newcontacts[i]->aor.s);
+			ul.expire_ucontact(r, r->newcontacts[i]);
 		    }
 
 		    ul.unlock_udomain(udomain, &public_id);

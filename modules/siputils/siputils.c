@@ -31,27 +31,27 @@
  * \defgroup siputils SIPUTILS :: Various SIP message handling functions
  *
  *
- *  This module implement various functions and checks related to
- *  SIP message handling and URI handling.
- *
- *  It offers some functions related to handle ringing. In a
- *  parallel forking scenario you get several 183s with SDP. You
- *  don't want that your customers hear more than one ringtone or
- *  answer machine in parallel on the phone. So its necessary to
- *  drop the 183 in this cases and send a 180 instead.
- *
- *  This module provides a function to answer OPTIONS requests
- *  which are directed to the server itself. This means an OPTIONS
- *  request which has the address of the server in the request
- *  URI, and no username in the URI. The request will be answered
- *  with a 200 OK which the capabilities of the server.
- *
- *  To answer OPTIONS request directed to your server is the
- *  easiest way for is-alive-tests on the SIP (application) layer
- *  from remote (similar to ICMP echo requests, also known as
- *  "ping", on the network layer).
+   This module implement various functions and checks related to
+   SIP message handling and URI handling.
 
-*/
+   It offers some functions related to handle ringing. In a
+   parallel forking scenario you get several 183s with SDP. You
+   don't want that your customers hear more than one ringtone or
+   answer machine in parallel on the phone. So its necessary to
+   drop the 183 in this cases and send a 180 instead.
+
+   This module provides a function to answer OPTIONS requests
+   which are directed to the server itself. This means an OPTIONS
+   request which has the address of the server in the request
+   URI, and no username in the URI. The request will be answered
+   with a 200 OK which the capabilities of the server.
+
+   To answer OPTIONS request directed to your server is the
+   easiest way for is-alive-tests on the SIP (application) layer
+   from remote (similar to ICMP echo requests, also known as
+   "ping", on the network layer).
+
+ */
 
 #include <assert.h>
 
@@ -77,7 +77,6 @@
 #include "contact_ops.h"
 #include "sipops.h"
 #include "config.h"
-#include "chargingvector.h"
 
 MODULE_VERSION
 
@@ -132,10 +131,10 @@ static cmd_export_t cmds[]={
 		0, REQUEST_ROUTE|LOCAL_ROUTE},
 	{"add_uri_param",      (cmd_function)add_uri_param,     1, fixup_str_null,
 		0, REQUEST_ROUTE},
-	{"get_uri_param",      (cmd_function)get_uri_param,     2, fixup_get_uri_param,
+	{"get_uri_param",      (cmd_function)get_uri_param,     2, fixup_get_uri_param, 
 		free_fixup_get_uri_param, REQUEST_ROUTE|LOCAL_ROUTE},
 	{"tel2sip", (cmd_function)tel2sip, 3, fixup_tel2sip, 0,
-		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE},
+	 REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE},
 	{"is_e164",            (cmd_function)is_e164,           1, fixup_pvar_null,
 		fixup_free_pvar_null, REQUEST_ROUTE|FAILURE_ROUTE|LOCAL_ROUTE},
 	{"is_uri_user_e164",   (cmd_function)w_is_uri_user_e164,  1, fixup_pvar_null,
@@ -151,21 +150,21 @@ static cmd_export_t cmds[]={
 	{"cmp_aor",  (cmd_function)w_cmp_aor,                   2, fixup_spve_spve,
 		0, ANY_ROUTE},
 	{"is_rpid_user_e164",   (cmd_function)is_rpid_user_e164, 0, 0,
-		0, REQUEST_ROUTE},
+			0, REQUEST_ROUTE},
 	{"append_rpid_hf",      (cmd_function)append_rpid_hf,    0, 0,
-		0, REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
+			0, REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
 	{"append_rpid_hf",      (cmd_function)append_rpid_hf_p,  2, fixup_str_str,
-		0, REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
+			0, REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
 	{"set_uri_user", (cmd_function)set_uri_user,             2, fixup_set_uri,
-		fixup_free_set_uri,	ANY_ROUTE},
+		    fixup_free_set_uri,	ANY_ROUTE},
 	{"set_uri_host", (cmd_function)set_uri_host,             2, fixup_set_uri,
-		fixup_free_set_uri,	ANY_ROUTE},
+		    fixup_free_set_uri,	ANY_ROUTE},
 	{"bind_siputils",       (cmd_function)bind_siputils,           1, 0,
-		0, 0},
+			0, 0},
 	{"is_request",          (cmd_function)w_is_request,            0, 0,
-		0, ANY_ROUTE},
+			0, ANY_ROUTE},
 	{"is_reply",            (cmd_function)w_is_reply,              0, 0,
-		0, ANY_ROUTE},
+			0, ANY_ROUTE},
 	{"is_gruu",  (cmd_function)w_is_gruu,                    0, 0,
 		0, ANY_ROUTE},
 	{"is_gruu",  (cmd_function)w_is_gruu,                    1, fixup_spve_null,
@@ -178,8 +177,6 @@ static cmd_export_t cmds[]={
 		0, ANY_ROUTE},
 	{"is_numeric", (cmd_function)is_numeric,                 1, fixup_spve_null,
 		0, ANY_ROUTE},
-	{"sip_p_charging_vector", (cmd_function)sip_handle_pcv,  1, fixup_spve_null,
-		fixup_free_spve_null, ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
 
@@ -197,13 +194,6 @@ static param_export_t params[] = {
 };
 
 
-static pv_export_t mod_pvs[] =  {
-	{ {"pcv", (sizeof("pvc")-1)}, PVT_OTHER, pv_get_charging_vector,
-		0, pv_parse_charging_vector_name, 0, 0, 0},
-
-	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
-};
-
 struct module_exports exports= {
 	"siputils",
 	DEFAULT_DLFLAGS, /* dlopen flags */
@@ -211,7 +201,7 @@ struct module_exports exports= {
 	params,          /* param exports */
 	0,               /* exported statistics */
 	0,               /* exported MI functions */
-	mod_pvs,         /* exported pseudo-variables */
+	0,               /* exported pseudo-variables */
 	0,               /* extra processes */
 	mod_init,        /* initialization function */
 	0,               /* Response function */
@@ -242,7 +232,7 @@ static int mod_init(void)
 		LM_ERR("cannot bind to SL API\n");
 		return -1;
 	}
-
+	
 	if ( init_rpid_avp(rpid_avp_param)<0 ) {
 		LM_ERR("failed to init rpid AVP name\n");
 		return -1;
@@ -293,24 +283,24 @@ int bind_siputils(siputils_api_t* api)
  */
 static int fixup_set_uri(void** param, int param_no)
 {
-	if (param_no == 1) {
-		if (fixup_pvar_null(param, 1) != 0) {
-			LM_ERR("failed to fixup uri pvar\n");
-			return -1;
-		}
-		if (((pv_spec_t *)(*param))->setf == NULL) {
-			LM_ERR("uri pvar is not writeble\n");
-			return -1;
-		}
-		return 0;
+    if (param_no == 1) {
+	if (fixup_pvar_null(param, 1) != 0) {
+	    LM_ERR("failed to fixup uri pvar\n");
+	    return -1;
 	}
-
-	if (param_no == 2) {
-		return fixup_pvar_null(param, 1);
+	if (((pv_spec_t *)(*param))->setf == NULL) {
+	    LM_ERR("uri pvar is not writeble\n");
+	    return -1;
 	}
+	return 0;
+    }
 
-	LM_ERR("invalid parameter number <%d>\n", param_no);
-	return -1;
+    if (param_no == 2) {
+	return fixup_pvar_null(param, 1);
+    }
+
+    LM_ERR("invalid parameter number <%d>\n", param_no);
+    return -1;
 }
 
 /*
@@ -318,7 +308,7 @@ static int fixup_set_uri(void** param, int param_no)
  */
 static int fixup_free_set_uri(void** param, int param_no)
 {
-	return fixup_free_pvar_null(param, 1);
+    return fixup_free_pvar_null(param, 1);
 }
 
 
@@ -328,28 +318,28 @@ static int fixup_free_set_uri(void** param, int param_no)
  */
 static int fixup_tel2sip(void** param, int param_no)
 {
-	if ((param_no == 1) || (param_no == 2)) {
-		if (fixup_var_str_12(param, 1) < 0) {
-			LM_ERR("failed to fixup uri or hostpart pvar\n");
-			return -1;
-		}
-		return 0;
+    if ((param_no == 1) || (param_no == 2)) {
+	if (fixup_var_str_12(param, 1) < 0) {
+	    LM_ERR("failed to fixup uri or hostpart pvar\n");
+	    return -1;
 	}
+	return 0;
+    }
 
-	if (param_no == 3) {
-		if (fixup_pvar_null(param, 1) != 0) {
-			LM_ERR("failed to fixup result pvar\n");
-			return -1;
-		}
-		if (((pv_spec_t *)(*param))->setf == NULL) {
-			LM_ERR("result pvar is not writeble\n");
-			return -1;
-		}
-		return 0;
+    if (param_no == 3) {
+	if (fixup_pvar_null(param, 1) != 0) {
+	    LM_ERR("failed to fixup result pvar\n");
+	    return -1;
 	}
+	if (((pv_spec_t *)(*param))->setf == NULL) {
+	    LM_ERR("result pvar is not writeble\n");
+	    return -1;
+	}
+	return 0;
+    }
 
-	LM_ERR("invalid parameter number <%d>\n", param_no);
-	return -1;
+    LM_ERR("invalid parameter number <%d>\n", param_no);
+    return -1;
 }
 
 /* */
@@ -389,65 +379,65 @@ static int free_fixup_get_uri_param(void** param, int param_no) {
 /* */
 static int fixup_option(void** param, int param_no) {
 
-	char *option;
-	unsigned int option_len, res;
+    char *option;
+    unsigned int option_len, res;
 
-	option = (char *)*param;
-	option_len = strlen(option);
+    option = (char *)*param;
+    option_len = strlen(option);
 
-	if (param_no != 1) {
-		LM_ERR("invalid parameter number <%d>\n", param_no);
-		return -1;
+    if (param_no != 1) {
+	LM_ERR("invalid parameter number <%d>\n", param_no);
+	return -1;
+    }
+
+    switch (option_len) {
+    case 4:
+	if (strncasecmp(option, "path", 4) == 0)
+	    res = F_OPTION_TAG_PATH;
+	else if (strncasecmp(option, "gruu", 4) == 0)
+	    res = F_OPTION_TAG_GRUU;
+	else {
+	    LM_ERR("unknown option <%s>\n", option);
+	    return -1;
 	}
-
-	switch (option_len) {
-		case 4:
-			if (strncasecmp(option, "path", 4) == 0)
-				res = F_OPTION_TAG_PATH;
-			else if (strncasecmp(option, "gruu", 4) == 0)
-				res = F_OPTION_TAG_GRUU;
-			else {
-				LM_ERR("unknown option <%s>\n", option);
-				return -1;
-			}
-			break;
-		case 5:
-			if (strncasecmp(option, "timer", 5) == 0)
-				res = F_OPTION_TAG_TIMER;
-			else {
-				LM_ERR("unknown option <%s>\n", option);
-				return -1;
-			}
-			break;
-		case 6:
-			if (strncasecmp(option, "100rel", 6) == 0)
-				res = F_OPTION_TAG_100REL;
-			else {
-				LM_ERR("unknown option <%s>\n", option);
-				return -1;
-			}
-			break;
-		case 8:
-			if (strncasecmp(option, "outbound", 8) == 0)
-				res = F_OPTION_TAG_OUTBOUND;
-			else {
-				LM_ERR("unknown option <%s>\n", option);
-				return -1;
-			}
-			break;
-		case 9:
-			if (strncasecmp(option, "eventlist", 9) == 0)
-				res = F_OPTION_TAG_EVENTLIST;
-			else {
-				LM_ERR("unknown option <%s>\n", option);
-				return -1;
-			}
-			break;
-		default:
-			LM_ERR("unknown option <%s>\n", option);
-			return -1;
+	break;
+    case 5:
+	if (strncasecmp(option, "timer", 5) == 0)
+	    res = F_OPTION_TAG_TIMER;
+	else {
+	    LM_ERR("unknown option <%s>\n", option);
+	    return -1;
 	}
+	break;
+    case 6:
+	if (strncasecmp(option, "100rel", 6) == 0)
+	    res = F_OPTION_TAG_100REL;
+	else {
+	    LM_ERR("unknown option <%s>\n", option);
+	    return -1;
+	}
+	break;
+    case 8:
+	if (strncasecmp(option, "outbound", 8) == 0)
+	    res = F_OPTION_TAG_OUTBOUND;
+	else {
+	    LM_ERR("unknown option <%s>\n", option);
+	    return -1;
+	}
+	break;
+    case 9:
+	if (strncasecmp(option, "eventlist", 9) == 0)
+	    res = F_OPTION_TAG_EVENTLIST;
+	else {
+	    LM_ERR("unknown option <%s>\n", option);
+	    return -1;
+	}
+	break;
+    default:
+	LM_ERR("unknown option <%s>\n", option);
+	return -1;
+    }
 
-	*param = (void *)(long)res;
-	return 0;
+    *param = (void *)(long)res;
+    return 0;
 }

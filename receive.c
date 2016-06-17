@@ -1,4 +1,4 @@
-/*
+/* 
  * Copyright (C) 2001-2003 FhG Fokus
  *
  * This file is part of Kamailio, a free SIP server.
@@ -13,15 +13,15 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
+ * You should have received a copy of the GNU General Public License 
+ * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
 
 /*!
  * \file
- * \brief Kamailio core ::
+ * \brief Kamailio core :: 
  * \ingroup core
  * Module: \ref core
  */
@@ -74,67 +74,23 @@ unsigned int inc_msg_no(void)
 	return ++msg_no;
 }
 
-/**
- *
- */
-int sip_check_fline(char* buf, unsigned int len)
-{
-	char *p;
-	int m;
-
-	m = 0;
-	for(p=buf; p<buf+len; p++) {
-		/* first check if is a reply - starts with SIP/2.0 */
-		if(m==0) {
-			if(*p==' ' || *p=='\t' || *p=='\r' || *p=='\n') continue;
-			if(buf+len-p<10) return -1;
-			if(strncmp(p, "SIP/2.0 ", 8)==0) {
-				LM_DBG("first line indicates a SIP reply\n");
-				return 0;
-			}
-			m=1;
-		} else {
-			/* check if a request - before end of first line is SIP/2.0 */
-			if(*p!='\r' && *p!='\n') continue;
-			if(p-10>=buf) {
-				if(strncmp(p-8, " SIP/2.0", 8)==0) {
-					LM_DBG("first line indicates a SIP request\n");
-					return 0;
-				}
-			}
-			return -1;
-		}
-	}
-	return -1;
-}
 
 /** Receive message
- *  WARNING: buf must be 0 terminated (buf[len]=0) or some things might
+ *  WARNING: buf must be 0 terminated (buf[len]=0) or some things might 
  * break (e.g.: modules/textops)
  */
-int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
+int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info) 
 {
 	struct sip_msg* msg;
 	struct run_act_ctx ctx;
 	int ret;
 #ifdef STATS
 	int skipped = 1;
-	struct timeval tvb, tve;
+	struct timeval tvb, tve;	
 	struct timezone tz;
 	unsigned int diff;
 #endif
 	str inb;
-	sr_net_info_t netinfo;
-
-	if(sr_event_enabled(SREV_NET_DATA_RECV)) {
-		if(sip_check_fline(buf, len)==0) {
-			memset(&netinfo, 0, sizeof(sr_net_info_t));
-			netinfo.data.s = buf;
-			netinfo.data.len = len;
-			netinfo.rcv = rcv_info;
-			sr_event_exec(SREV_NET_DATA_RECV, (void*)&netinfo);
-		}
-	}
 
 	inb.s = buf;
 	inb.len = len;
@@ -155,14 +111,14 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 	msg->buf=buf;
 	msg->len=len;
 	/* zero termination (termination of orig message bellow not that
-	 * useful as most of the work is done with scratch-pad; -jiri  */
+	   useful as most of the work is done with scratch-pad; -jiri  */
 	/* buf[len]=0; */ /* WARNING: zero term removed! */
 	msg->rcv=*rcv_info;
 	msg->id=msg_no;
 	msg->pid=my_pid();
 	msg->set_global_address=default_global_address;
 	msg->set_global_port=default_global_port;
-
+	
 	if(likely(sr_msg_time==1)) msg_set_time(msg);
 
 	if (parse_msg(buf,len, msg)!=0){
@@ -202,7 +158,7 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		/* check if necessary to add receive?->moved to forward_req */
 		/* check for the alias stuff */
 #ifdef USE_TCP
-		if (msg->via1->alias && cfg_get(tcp, tcp_cfg, accept_aliases) &&
+		if (msg->via1->alias && cfg_get(tcp, tcp_cfg, accept_aliases) && 
 				(((rcv_info->proto==PROTO_TCP) && !tcp_disable)
 #ifdef USE_TLS
 					|| ((rcv_info->proto==PROTO_TLS) && !tls_disable)
@@ -224,10 +180,10 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 #endif
 		/* execute pre-script callbacks, if any; -jiri */
 		/* if some of the callbacks said not to continue with
-		 * script processing, don't do so
-		 * if we are here basic sanity checks are already done
-		 * (like presence of at least one via), so you can count
-		 * on via1 being parsed in a pre-script callback --andrei
+		   script processing, don't do so
+		   if we are here basic sanity checks are already done
+		   (like presence of at least one via), so you can count
+		   on via1 being parsed in a pre-script callback --andrei
 		*/
 		if (exec_pre_script_cb(msg, REQUEST_CB_TYPE)==0 )
 		{
@@ -266,13 +222,13 @@ int receive_msg(char* buf, unsigned int len, struct receive_info* rcv_info)
 		gettimeofday( & tvb, &tz );
 		STATS_RX_RESPONSE ( msg->first_line.u.reply.statuscode / 100 );
 #endif
-
+		
 		/* execute pre-script callbacks, if any; -jiri */
 		/* if some of the callbacks said not to continue with
-		 * script processing, don't do so
-		 * if we are here basic sanity checks are already done
-		 * (like presence of at least one via), so you can count
-		 * on via1 being parsed in a pre-script callback --andrei
+		   script processing, don't do so
+		   if we are here basic sanity checks are already done
+		   (like presence of at least one via), so you can count
+		   on via1 being parsed in a pre-script callback --andrei
 		*/
 		if (exec_pre_script_cb(msg, ONREPLY_CB_TYPE)==0 )
 		{

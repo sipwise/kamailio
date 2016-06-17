@@ -106,7 +106,6 @@ typedef struct tls_domain {
 	enum tls_method method;
 	str crl_file;
 	str server_name;
-	str server_id;
 	struct tls_domain* next;
 } tls_domain_t;
 
@@ -195,7 +194,7 @@ int tls_fix_domains_cfg(tls_domains_cfg_t* cfg, tls_domain_t* srv_defaults,
  * @return found configuration or default, if not found
  */
 tls_domain_t* tls_lookup_cfg(tls_domains_cfg_t* cfg, int type,
-			struct ip_addr* ip, unsigned short port, str *sname, str *srvid);
+				struct ip_addr* ip, unsigned short port, str *sname);
 
 
 /**

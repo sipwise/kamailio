@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('speed_dial','2');
 CREATE TABLE speed_dial (
     id SERIAL PRIMARY KEY NOT NULL,
     username VARCHAR(64) DEFAULT '' NOT NULL,
@@ -10,6 +11,4 @@ CREATE TABLE speed_dial (
     description VARCHAR(64) DEFAULT '' NOT NULL,
     CONSTRAINT speed_dial_speed_dial_idx UNIQUE (username, domain, sd_domain, sd_username)
 );
-
-INSERT INTO version (table_name, table_version) values ('speed_dial','2');
 

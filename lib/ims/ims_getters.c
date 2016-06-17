@@ -109,74 +109,6 @@ contact_body_t *cscf_parse_contacts(struct sip_msg *msg)
 	if (!msg->contact) return 0;
 	return msg->contact->parsed;
 }
-/**
- * Returns the Private Identity extracted from the Authorization header.
- * If none found there takes the SIP URI in To without the "sip:" prefix
- * \todo - remove the fallback case to the To header
- * @param msg - the SIP message
- * @param realm - the realm to match in an Authorization header
- * @returns the str containing the private id, no mem dup
- */
-str cscf_get_private_identity(struct sip_msg *msg, str realm) {
-	str pi = {0, 0};
-	struct hdr_field* h = 0;
-	int ret, i, res;
-
-	if ((parse_headers(msg, HDR_AUTHORIZATION_F, 0) != 0) && (parse_headers(msg, HDR_PROXYAUTH_F, 0) != 0)) {
-		return pi;
-	}
-
-	h = msg->authorization;
-	if (!msg->authorization) {
-		goto fallback;
-	}
-		
-	if (realm.len && realm.s) {
-		ret = find_credentials(msg, &realm, HDR_AUTHORIZATION_F, &h);
-		if (ret < 0) {
-			ret = find_credentials(msg, &realm, HDR_PROXYAUTH_F, &h);
-			if (ret < 0) {
-				goto fallback;
-			} else {
-				if (ret >0) {
-					goto fallback;
-				}
-				h = msg->proxy_auth;
-			}
-		} else {
-			if (ret > 0) {
-				goto fallback;
-			}
-		}
-	}
-	
-	if (!h)
-		goto fallback;
-
-	res = parse_credentials(h);
-	if (res != 0) {
-		LOG(L_ERR, "Error while parsing credentials\n");
-		return pi;
-	}
-
-	if (h) pi = ((auth_body_t*) h->parsed)->digest.username.whole;
-
-	goto done;
-
-fallback:
-	pi = cscf_get_public_identity(msg);
-	if (pi.len > 4 && strncasecmp(pi.s, "sip:", 4) == 0) {
-		pi.s += 4;
-		pi.len -= 4;
-	}
-	for (i = 0; i < pi.len; i++)
-		if (pi.s[i] == ';') {
-			pi.len = i;
-			break;
-		}
-done:
-	return pi;
-}
 
 /**
  * Returns the Private Identity extracted from the Authorization header.
@@ -186,7 +118,7 @@ done:
  * @param realm - the realm to match in an Authorization header
  * @returns the str containing the private id, no mem dup
  */
-str cscf_get_private_identity_from(struct sip_msg *msg, str realm)
+str cscf_get_private_identity(struct sip_msg *msg, str realm)
 {
 	str pi={0,0};
 	struct hdr_field* h=0;
@@ -222,7 +154,7 @@ str cscf_get_private_identity_from(struct sip_msg *msg, str realm)
 	goto done;
 
 	fallback:
-	pi = cscf_get_public_identity_from(msg);
+	pi = cscf_get_public_identity(msg);
 	if (pi.len>4&&strncasecmp(pi.s,"sip:",4)==0) {pi.s+=4;pi.len-=4;}
 	for(i=0;i<pi.len;i++)
 		if (pi.s[i]==';') {
@@ -295,39 +227,6 @@ str cscf_get_public_identity(struct sip_msg *msg)
 	else to=(struct to_body *) msg->to->parsed;
 
 	pu = to->uri;
-
-	/* truncate to sip:username@host or tel:number */
-	for(i=4;i<pu.len;i++)
-		if (pu.s[i]==';' || pu.s[i]=='?' ||pu.s[i]==':'){
-			pu.len = i;
-		}
-
-	return pu;
-}
-
-/**
- * Returns the Public Identity extracted from the From header
- * @param msg - the SIP message
- * @returns the str containing the public id, no mem dup
- */
-str cscf_get_public_identity_from(struct sip_msg *msg)
-{
-	str pu={0,0};
-	struct to_body *from;
-	int i;
-
-	if (parse_headers(msg,HDR_FROM_F,0)!=0) {
-		return pu;
-	}
-
-	if ( get_from(msg) == NULL ) {
-		from = (struct to_body*) pkg_malloc(sizeof(struct to_body));
-		parse_to( msg->from->body.s, msg->from->body.s + msg->from->body.len, from );
-		msg->from->parsed = from;
-	}
-	else from=(struct to_body *) msg->from->parsed;
-
-	pu = from->uri;
 
 	/* truncate to sip:username@host or tel:number */
 	for(i=4;i<pu.len;i++)

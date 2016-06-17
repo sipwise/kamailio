@@ -105,7 +105,7 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
     void *cp;
     int shortage;
     int needed;
-    int i,j=0;
+    int i,j;
     cp = buf;
     shortage = 0;
     /* Reserve space for terminating 0000 */
@@ -234,7 +234,7 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
  * \param part_max maximal part
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
-int get_all_scontacts(void *buf, int len, unsigned int flags,
+int get_all_ucontacts(void *buf, int len, unsigned int flags,
 								unsigned int part_idx, unsigned int part_max)
 {
 	return get_all_mem_ucontacts( buf, len, flags, part_idx, part_max);
@@ -385,10 +385,32 @@ void print_all_udomains(FILE* _f)
 
 
 /*!
+ * \brief Loops through all domains summing up the number of users
+ * \return the number of users, could be zero
+ */
+unsigned long get_number_of_users(void)
+{
+	long numberOfUsers = 0;
+
+	dlist_t* current_dlist;
+	
+	current_dlist = root;
+
+	while (current_dlist)
+	{
+		numberOfUsers += get_stat_val(current_dlist->d->users); 
+		current_dlist  = current_dlist->next;
+	}
+
+	return numberOfUsers;
+}
+
+
+/*!
  * \brief Run timer handler of all domains
  * \return 0 if all timer return 0, != 0 otherwise
  */
-int synchronize_all_udomains(int istart, int istep)
+int synchronize_all_udomains(void)
 {
 	int res = 0;
 	dlist_t* ptr;
@@ -396,7 +418,7 @@ int synchronize_all_udomains(int istart, int istep)
 	get_act_time(); /* Get and save actual time */
 
 	for( ptr=root ; ptr ; ptr=ptr->next)
-		mem_timer_udomain(ptr->d, istart, istep);
+		mem_timer_udomain(ptr->d);
 
 	return res;
 }

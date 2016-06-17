@@ -29,12 +29,9 @@ struct _sipcapture_object {
 	str reply_reason;
 	str ruri;
 	str ruri_user;
-	str ruri_domain;
 	str from_user;
-	str from_domain;
 	str from_tag;
 	str to_user;
-	str to_domain;
 	str to_tag;
 	str pid_user;
 	str contact_user;
@@ -61,8 +58,7 @@ struct _sipcapture_object {
 	int family;
 	str rtp_stat;
 	int type;
-	long long tmstamp;
-	long timestamp;
+        long long tmstamp;
 	str node;
 	str msg;
 #ifdef STATISTICS

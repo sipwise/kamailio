@@ -50,7 +50,7 @@
 
 #include <arpa/inet.h>
 #include "../cdp_avp/mod_export.h"
-#include "../../modules/ims_dialog/dlg_load.h"
+#include "../../modules/dialog_ng/dlg_load.h"
 #include "../ims_usrloc_pcscf/usrloc.h"
 #include "rx_authdata.h"
 #include "rx_avp.h"
@@ -185,13 +185,8 @@ int rx_add_framed_ip_avp(AAA_AVP_LIST * list, str ip, uint16_t version) {
         }
         ip_buflen = len;
     }
-	if(ip.s[0]=='[' && ip.s[ip.len-1]==']') {
-		memcpy(ip_buf, ip.s+1, ip.len-2);
-		ip_buf[ip.len-2] = '\0';
-	} else {
-		memcpy(ip_buf, ip.s, ip.len);
-		ip_buf[ip.len] = '\0';
-	}
+    memcpy(ip_buf, ip.s, ip.len);
+    ip_buf[ip.len] = '\0';
     
     ip_adr.addr.ai_family = version;
 
@@ -904,23 +899,4 @@ inline int rx_get_result_code(AAAMessage *msg, unsigned int *data) {
     return ret;
 }
 
-
-/**
- * Creates and adds an Acct-Application-Id AVP.
- * @param msg - the Diameter message to add to.
- * @param data - the value for the AVP payload
- * @return CSCF_RETURN_TRUE on success or 0 on error
- */
-inline int rx_add_specific_action_avp(AAAMessage *msg, unsigned int data) {
-    char x[4];
-    set_4bytes(x, data);
-
-    return
-    rx_add_avp(msg, x, 4,
-            AVP_IMS_Specific_Action,
-            AAA_AVP_FLAG_MANDATORY|AAA_AVP_FLAG_VENDOR_SPECIFIC,
-            IMS_vendor_id_3GPP,
-            AVP_DUPLICATE_DATA,
-            __FUNCTION__);
-}
 

@@ -4,7 +4,6 @@
 #include <amqp.h>
 #include <amqp_framing.h>
 #include <amqp_tcp_socket.h>
-#include <amqp_ssl_socket.h>
 #include <json.h>
 #include <uuid/uuid.h>
 #include "../../mem/mem.h"
@@ -13,17 +12,14 @@
 #include "../../pvar.h"
 #include "../../mod_fix.h"
 #include "../../lvalue.h"
-#include "../tm/tm_load.h"
 
 
 #include "kz_amqp.h"
 #include "kz_json.h"
-#include "kz_hash.h"
 
 #define RET_AMQP_ERROR 2
 
-struct tm_binds tmb;
-
+kz_amqp_connection_pool_ptr kz_pool = NULL;
 kz_amqp_bindings_ptr kz_bindings = NULL;
 int bindings_count = 0;
 
@@ -31,87 +27,39 @@ static unsigned long rpl_query_routing_key_count = 0;
 
 typedef struct json_object *json_obj_ptr;
 
-extern pv_spec_t kz_query_result_spec;
+kz_amqp_channel_ptr channels = NULL;
+int channel_index = 0;
+extern int *kz_pipe_fds;
 
-extern int *kz_worker_pipes;
-extern int kz_cmd_pipe;
-
+extern struct timeval kz_sock_tv;
 extern struct timeval kz_amqp_tv;
 extern struct timeval kz_qtimeout_tv;
+extern struct timeval kz_ack_tv;
 extern struct timeval kz_timer_tv;
 
-extern str kz_amqps_ca_cert;
-extern str kz_amqps_cert;
-extern str kz_amqps_key;
-extern int kz_amqps_verify_peer;
-extern int kz_amqps_verify_hostname;
+extern int dbk_internal_loop_count;
+extern int dbk_consumer_loop_count;
+extern int dbk_consumer_ack_loop_count;
+
+
+extern int dbk_single_consumer_on_reconnect;
+extern int dbk_consume_messages_on_reconnect;
 
 extern pv_spec_t kz_query_timeout_spec;
 
 const amqp_bytes_t kz_amqp_empty_bytes = { 0, NULL };
 const amqp_table_t kz_amqp_empty_table = { 0, NULL };
 
-kz_amqp_zones_ptr kz_zones = NULL;
-kz_amqp_zone_ptr kz_primary_zone = NULL;
 
-
-amqp_exchange_declare_ok_t * AMQP_CALL kz_amqp_exchange_declare(amqp_connection_state_t state, amqp_channel_t channel, 
-								amqp_bytes_t exchange, amqp_bytes_t type, 
-								amqp_boolean_t passive, amqp_boolean_t durable, amqp_table_t arguments) {
+amqp_exchange_declare_ok_t * AMQP_CALL kz_amqp_exchange_declare(amqp_connection_state_t state, amqp_channel_t channel,
+			amqp_bytes_t exchange, amqp_bytes_t type,
+			amqp_boolean_t passive, amqp_boolean_t durable, amqp_table_t arguments) {
 #if AMQP_VERSION_MAJOR == 0 && AMQP_VERSION_MINOR < 6
 	return amqp_exchange_declare(state, channel, exchange, type, passive, durable, arguments);
 #else
 	return amqp_exchange_declare(state, channel, exchange, type, passive, durable, 0, 0, arguments);
 #endif
 }
-
-int set_non_blocking(int fd)
-{
-	int flags;
-
-	flags = fcntl(fd, F_GETFL);
-	if (flags < 0)
-		return flags;
-	flags |= O_NONBLOCK;
-	if (fcntl(fd, F_SETFL, flags) < 0)
-		return -1;
-
-	return 0;
-}
-
-static inline str* kz_str_dup(str* src)
-{
-	char *dst_char = (char*)shm_malloc(sizeof(str)+src->len+1);
-	if (!dst_char) {
-		LM_ERR("error allocating shared memory for str");
-		return NULL;
-	}
-	str* dst = (str*)dst_char;
-	dst->s = dst_char+sizeof(str);
-
-	memcpy(dst->s, src->s, src->len);
-	dst->len = src->len;
-	dst->s[dst->len] = '\0';
-	return dst;
-}
-
-static inline str* kz_str_dup_from_char(char* src)
-{
-	int len = strlen(src);
-	char *dst_char = (char*)shm_malloc(sizeof(str)+len+1);
-	if (!dst_char) {
-		LM_ERR("error allocating shared memory for str");
-		return NULL;
-	}
-	str* dst = (str*)dst_char;
-	dst->s = dst_char+sizeof(str);
-
-	memcpy(dst->s, src, len);
-	dst->len = len;
-	dst->s[dst->len] = '\0';
-	return dst;
-}
-
 
 static char *kz_amqp_str_dup(str *src)
 {
@@ -141,36 +89,6 @@ static char *kz_amqp_string_dup(char *src)
 	return res;
 }
 
-static char *kz_local_amqp_str_dup(str *src)
-{
-	char *res;
-
-	if (!src || !src->s)
-		return NULL;
-	if (!(res = (char *) pkg_malloc(src->len + 1)))
-		return NULL;
-	strncpy(res, src->s, src->len);
-	res[src->len] = 0;
-	return res;
-}
-
-
-static inline str* kz_local_str_dup(str* src)
-{
-	char *dst_char = (char*)pkg_malloc(sizeof(str)+src->len+1);
-	if (!dst_char) {
-		LM_ERR("error allocating shared memory for str");
-		return NULL;
-	}
-	str* dst = (str*)dst_char;
-	dst->s = dst_char+sizeof(str);
-
-	memcpy(dst->s, src->s, src->len);
-	dst->len = src->len;
-	dst->s[dst->len] = '\0';
-	return dst;
-}
-
 char *kz_amqp_bytes_dup(amqp_bytes_t bytes)
 {
 	char *res;
@@ -186,25 +104,9 @@ char *kz_amqp_bytes_dup(amqp_bytes_t bytes)
 	return res;
 }
 
-char *kz_local_amqp_bytes_dup(amqp_bytes_t bytes)
-{
-	char *res;
-	int sz;
-	if (!bytes.bytes )
-		return NULL;
-
-	sz = bytes.len;
-	if (!(res = (char *) pkg_malloc(sz + 1)))
-		return NULL;
-	strncpy(res, bytes.bytes, sz);
-	res[sz] = 0;
-	return res;
-}
-
 void kz_amqp_bytes_free(amqp_bytes_t bytes)
 {
-	if(bytes.bytes)
-		shm_free(bytes.bytes);
+  shm_free(bytes.bytes);
 }
 
 amqp_bytes_t kz_amqp_bytes_malloc_dup(amqp_bytes_t src)
@@ -219,29 +121,6 @@ amqp_bytes_t kz_amqp_bytes_malloc_dup(amqp_bytes_t src)
   return result;
 }
 
-void kz_local_amqp_bytes_free(amqp_bytes_t bytes)
-{
-	if(bytes.bytes)
-		pkg_free(bytes.bytes);
-}
-
-amqp_bytes_t kz_local_amqp_bytes_malloc_dup(amqp_bytes_t src)
-{
-  amqp_bytes_t result = {0, 0};
-  result.len = src.len;
-  result.bytes = pkg_malloc(src.len+1);
-  if (result.bytes != NULL) {
-    memcpy(result.bytes, src.bytes, src.len);
-    ((char*)result.bytes)[result.len] = '\0';
-  }
-  return result;
-}
-
-amqp_bytes_t kz_local_amqp_bytes_dup_from_string(char *src)
-{
-	return kz_local_amqp_bytes_malloc_dup(amqp_cstring_bytes(src));
-}
-
 amqp_bytes_t kz_amqp_bytes_dup_from_string(char *src)
 {
 	return kz_amqp_bytes_malloc_dup(amqp_cstring_bytes(src));
@@ -252,34 +131,6 @@ amqp_bytes_t kz_amqp_bytes_dup_from_str(str *src)
 	return kz_amqp_bytes_malloc_dup(amqp_cstring_bytes(src->s));
 }
 
-void kz_amqp_free_pipe_cmd(kz_amqp_cmd_ptr cmd)
-{
-	if(cmd == NULL)
-		return;
-	if (cmd->exchange)
-		shm_free(cmd->exchange);
-	if (cmd->exchange_type)
-		shm_free(cmd->exchange_type);
-	if (cmd->queue)
-		shm_free(cmd->queue);
-	if (cmd->routing_key)
-		shm_free(cmd->routing_key);
-	if (cmd->reply_routing_key)
-		shm_free(cmd->reply_routing_key);
-	if (cmd->payload)
-		shm_free(cmd->payload);
-	if (cmd->return_payload)
-		shm_free(cmd->return_payload);
-	if (cmd->message_id)
-		shm_free(cmd->message_id);
-	if (cmd->cb_route)
-		shm_free(cmd->cb_route);
-	if (cmd->err_route)
-		shm_free(cmd->err_route);
-	lock_release(&cmd->lock);
-	lock_destroy(&cmd->lock);
-	shm_free(cmd);
-}
 
 void kz_amqp_free_consumer_delivery(kz_amqp_consumer_delivery_ptr ptr)
 {
@@ -291,10 +142,6 @@ void kz_amqp_free_consumer_delivery(kz_amqp_consumer_delivery_ptr ptr)
 		shm_free(ptr->event_key);
 	if(ptr->event_subkey)
 		shm_free(ptr->event_subkey);
-	if(ptr->message_id)
-		shm_free(ptr->message_id);
-	if(ptr->cmd)
-		kz_amqp_free_pipe_cmd(ptr->cmd);
 	shm_free(ptr);
 }
 
@@ -325,6 +172,30 @@ void kz_amqp_free_connection(kz_amqp_connection_ptr conn)
 	if(conn->url)
 		shm_free(conn->url);
 	shm_free(conn);
+}
+
+
+void kz_amqp_free_pipe_cmd(kz_amqp_cmd_ptr cmd)
+{
+	if(cmd == NULL)
+		return;
+	if (cmd->exchange)
+		shm_free(cmd->exchange);
+	if (cmd->exchange_type)
+		shm_free(cmd->exchange_type);
+	if (cmd->queue)
+		shm_free(cmd->queue);
+	if (cmd->routing_key)
+		shm_free(cmd->routing_key);
+	if (cmd->reply_routing_key)
+		shm_free(cmd->reply_routing_key);
+	if (cmd->payload)
+		shm_free(cmd->payload);
+	if (cmd->return_payload)
+		shm_free(cmd->return_payload);
+	lock_release(&cmd->lock);
+	lock_destroy(&cmd->lock);
+	shm_free(cmd);
 }
 
 kz_amqp_cmd_ptr kz_amqp_alloc_pipe_cmd()
@@ -416,47 +287,14 @@ kz_amqp_bind_ptr kz_amqp_bind_alloc(str* exchange, str* exchange_type, str* queu
 	return kz_amqp_bind_alloc_ex(exchange, exchange_type, queue, routing_key, NULL, NULL );
 }
 
-kz_amqp_zone_ptr kz_amqp_get_primary_zone() {
-	if(kz_primary_zone == NULL) {
-		kz_primary_zone = (kz_amqp_zone_ptr) shm_malloc(sizeof(kz_amqp_zone));
-		memset(kz_primary_zone, 0, sizeof(kz_amqp_zone));
-		kz_primary_zone->zone = shm_malloc(dbk_primary_zone_name.len+1);
-		strcpy(kz_primary_zone->zone, dbk_primary_zone_name.s);
-		kz_primary_zone->zone[dbk_primary_zone_name.len] = '\0';
-		kz_primary_zone->servers = (kz_amqp_servers_ptr) shm_malloc(sizeof(kz_amqp_servers));
+void kz_amqp_init_connection_pool() {
+	if(kz_pool == NULL) {
+		kz_pool = (kz_amqp_connection_pool_ptr) shm_malloc(sizeof(kz_amqp_connection_pool));
+		memset(kz_pool, 0, sizeof(kz_amqp_connection_pool));
 	}
-	return kz_primary_zone;
 }
 
-kz_amqp_zone_ptr kz_amqp_get_zones() {
-	if(kz_zones == NULL) {
-		kz_zones = (kz_amqp_zones_ptr) shm_malloc(sizeof(kz_amqp_zones));
-		kz_zones->head = kz_zones->tail = kz_amqp_get_primary_zone();
-	}
-	return kz_zones->head;
-}
-
-kz_amqp_zone_ptr kz_amqp_get_zone(char* zone) {
-	kz_amqp_zone_ptr ret = NULL;
-	for(ret = kz_amqp_get_zones(); ret != NULL; ret = ret->next)
-		if(!strcmp(ret->zone, zone))
-			return ret;
-	return NULL;
-}
-
-kz_amqp_zone_ptr kz_amqp_add_zone(char* zone) {
-	kz_amqp_zone_ptr zone_ptr = (kz_amqp_zone_ptr) shm_malloc(sizeof(kz_amqp_zone));
-	memset(zone_ptr, 0, sizeof(kz_amqp_zone));
-	zone_ptr->zone = shm_malloc(strlen(zone)+1);
-	strcpy(zone_ptr->zone, zone);
-	zone_ptr->zone[strlen(zone)] = '\0';
-	zone_ptr->servers = (kz_amqp_servers_ptr) shm_malloc(sizeof(kz_amqp_servers));
-	kz_zones->tail->next = zone_ptr;
-	kz_zones->tail = zone_ptr;
-	return zone_ptr;
-}
-
-int kz_amqp_bind_init_targeted_channel(kz_amqp_server_ptr server, int idx )
+int kz_amqp_bind_init_targeted_channel(int idx )
 {
     kz_amqp_bind_ptr bind = NULL;
     str rpl_exch = str_init("targeted");
@@ -474,10 +312,10 @@ int kz_amqp_bind_init_targeted_channel(kz_amqp_server_ptr server, int idx )
 	bind->exchange = kz_amqp_bytes_dup_from_str(&rpl_exch);
 	bind->exchange_type = kz_amqp_bytes_dup_from_str(&rpl_exch_type);
 
-    sprintf(serverid, "kamailio@%.*s-<%d-%d>", dbk_node_hostname.len, dbk_node_hostname.s, server->id, idx);
+    sprintf(serverid, "kamailio@%.*s-<%d-%d>", dbk_node_hostname.len, dbk_node_hostname.s, my_pid(), idx);
     bind->queue = kz_amqp_bytes_dup_from_string(serverid);
 
-    sprintf(serverid, "kamailio@%.*s-<%d>-targeted-%d", dbk_node_hostname.len, dbk_node_hostname.s, server->id, idx);
+    sprintf(serverid, "kamailio@%.*s-<%d>-targeted-%d", dbk_node_hostname.len, dbk_node_hostname.s, my_pid(), idx);
     bind->routing_key = kz_amqp_bytes_dup_from_string(serverid);
 
     if (bind->exchange.bytes == NULL || bind->routing_key.bytes == NULL || bind->queue.bytes == NULL) {
@@ -485,126 +323,50 @@ int kz_amqp_bind_init_targeted_channel(kz_amqp_server_ptr server, int idx )
 		goto error;
     }
 
-    server->channels[idx].targeted = bind;
+    channels[idx].targeted = bind;
     return 0;
  error:
 	kz_amqp_free_bind(bind);
     return ret;
 }
 
-int kz_tm_bind()
-{
-	load_tm_f  load_tm;
-
-	if ( !(load_tm=(load_tm_f)find_export("load_tm", NO_SCRIPT, 0)))
-	{
-		LOG(L_ERR, "cannot import load_tm\n");
-		return 0;
-	}
-	if (load_tm( &tmb )==-1)
-		return 0;
-	return 1;
-}
-
-
 int kz_amqp_init() {
 	int i;
-	kz_amqp_zone_ptr g;
-	kz_amqp_server_ptr s;
-
-	if(!kz_hash_init())
-		return 0;
-
-	if(!kz_tm_bind())
-		return 0;
-
+	kz_amqp_init_connection_pool();
 	if(kz_bindings == NULL) {
 		kz_bindings = (kz_amqp_bindings_ptr) shm_malloc(sizeof(kz_amqp_bindings));
 		memset(kz_bindings, 0, sizeof(kz_amqp_bindings));
 	}
-
-	for (g = kz_amqp_get_zones(); g != NULL; g = g->next) {
-		for (s = g->servers->head; s != NULL; s = s->next) {
-			if(s->channels == NULL) {
-				s->channels = shm_malloc(dbk_channels * sizeof(kz_amqp_channel));
-				memset(s->channels, 0, dbk_channels * sizeof(kz_amqp_channel));
-				for(i=0; i < dbk_channels; i++) {
-					s->channels[i].channel = i+1;
-					if(lock_init(&s->channels[i].lock)==NULL) {
-						LM_ERR("could not initialize locks for channels\n");
-						return 0;
-					}
-					if(kz_amqp_bind_init_targeted_channel(s, i)) {
-						LM_ERR("could not initialize targeted channels\n");
-						return 0;
-					}
-				}
+	if(channels == NULL) {
+		channels = shm_malloc(dbk_channels * sizeof(kz_amqp_channel));
+		memset(channels, 0, dbk_channels * sizeof(kz_amqp_channel));
+		for(i=0; i < dbk_channels; i++) {
+			channels[i].channel = i+1;
+			if(lock_init(&channels[i].lock)==NULL) {
+				LM_ERR("could not initialize locks for channels\n");
+				return 0;
+			}
+			if(kz_amqp_bind_init_targeted_channel(i)) {
+				LM_ERR("could not initialize targeted channels\n");
+				return 0;
 			}
 		}
 	}
 	return 1;
 }
 
-void kz_amqp_destroy_connection(kz_amqp_connection_ptr s)
-{
-	kz_amqp_free_connection(s);
-}
-
-void kz_amqp_destroy_connection_ptr(kz_amqp_conn_ptr s)
-{
-}
-
-void kz_amqp_destroy_channels(kz_amqp_server_ptr server_ptr)
-{
-    int i;
-	if(server_ptr->channels == NULL) {
-		return;
-	}
-	for(i=0; i < dbk_channels; i++) {
-		if(server_ptr->channels[i].targeted != NULL) {
-			kz_amqp_free_bind(server_ptr->channels[i].targeted);
-		}
-	}
-	shm_free(server_ptr->channels);
-	server_ptr->channels = NULL;
-}
-
-kz_amqp_server_ptr kz_amqp_destroy_server(kz_amqp_server_ptr server_ptr)
-{
-    kz_amqp_server_ptr next = server_ptr->next;
-	kz_amqp_destroy_connection(server_ptr->connection);
-	kz_amqp_destroy_channels(server_ptr);
-	shm_free(server_ptr->producer);
-	shm_free(server_ptr);
-	return next;
-}
-
-kz_amqp_zone_ptr kz_amqp_destroy_zone(kz_amqp_zone_ptr zone_ptr)
-{
-	kz_amqp_zone_ptr next = zone_ptr->next;
-	kz_amqp_server_ptr server_ptr = zone_ptr->servers->head;
-	while(server_ptr) {
-	    server_ptr = kz_amqp_destroy_server(server_ptr);
-	}
-	shm_free(zone_ptr->zone);
-	shm_free(zone_ptr->servers);
-	shm_free(zone_ptr);
-	return next;
-}
-
-void kz_amqp_destroy_zones()
-{
-	kz_amqp_zone_ptr g = kz_amqp_get_zones();
-	while(g) {
-		g = kz_amqp_destroy_zone(g);
-	}
-	shm_free(kz_zones);
-	kz_zones = NULL;
-	kz_primary_zone = NULL;
-}
-
 void kz_amqp_destroy() {
-	kz_amqp_destroy_zones();
+	int i;
+	if(channels != NULL) {
+		for(i=0; i < dbk_channels; i++) {
+			if(channels[i].targeted != NULL) {
+				kz_amqp_free_bind(channels[i].targeted);
+			}
+		}
+		shm_free(channels);
+	}
+
+
 	if(kz_bindings != NULL) {
 		kz_amqp_binding_ptr binding = kz_bindings->head;
 		while(binding != NULL) {
@@ -617,15 +379,26 @@ void kz_amqp_destroy() {
 		}
 		shm_free(kz_bindings);
 	}
-	kz_hash_destroy();
+
+	if(kz_pool != NULL) {
+		kz_amqp_connection_ptr conn = kz_pool->head;
+		while(conn != NULL) {
+			kz_amqp_connection_ptr tofree = conn;
+			conn = conn->next;
+			kz_amqp_free_connection(tofree);
+		}
+		shm_free(kz_pool);
+	}
+
+
 }
 
-#define KZ_URL_MAX_SIZE 100
+#define KZ_URL_MAX_SIZE 50
 static char* KZ_URL_ROOT = "/";
 
 int kz_amqp_add_connection(modparam_t type, void* val)
 {
-	kz_amqp_zone_ptr zone_ptr = NULL;
+	kz_amqp_init_connection_pool();
 
 	char* url = (char*) val;
 	int len = strlen(url);
@@ -634,40 +407,13 @@ int kz_amqp_add_connection(modparam_t type, void* val)
 		return -1;
 	}
 
-	if(!strncmp(url, "zone=", 5)) {
-		char* ptr = strchr(url, ';');
-		char* zone_str_ptr = url+(5*sizeof(char));
-		if(ptr == NULL) {
-			LM_ERR("missing ';' at the end of zone name '%s'\n", url);
-			return -1;
-		}
-		*ptr = '\0';
-		if(strlen(zone_str_ptr) == 0) {
-			LM_ERR("invalid zone name '%s'\n", url);
-			return -1;
-		}
-		zone_ptr = kz_amqp_get_zone(zone_str_ptr);
-		if(zone_ptr == NULL) {
-			zone_ptr = kz_amqp_add_zone(zone_str_ptr);
-			if(zone_ptr == NULL) {
-				LM_ERR("unable to add zone %s\n", zone_str_ptr);
-				return -1;
-			}
-		}
-		url = ++ptr;
-
-	} else {
-		zone_ptr = kz_amqp_get_primary_zone();
-	}
-
-
 	kz_amqp_connection_ptr newConn = shm_malloc(sizeof(kz_amqp_connection));
 	memset(newConn, 0, sizeof(kz_amqp_connection));
 
 	newConn->url = shm_malloc( (KZ_URL_MAX_SIZE + 1) * sizeof(char) );
 	memset(newConn->url, 0, (KZ_URL_MAX_SIZE + 1) * sizeof(char));
 	// maintain compatibility
-	if (!strncmp(url, "kazoo://", 8)) {
+	if (!strncmp((char*)val, "kazoo://", 8)) {
 		sprintf(newConn->url, "amqp://%s", (char*)(url+(8*sizeof(char))) );
 	} else {
 		strcpy(newConn->url, url);
@@ -686,17 +432,13 @@ int kz_amqp_add_connection(modparam_t type, void* val)
     	newConn->info.vhost++;
     }
 
-	kz_amqp_server_ptr server_ptr = (kz_amqp_server_ptr)shm_malloc(sizeof(kz_amqp_server));
-	server_ptr->connection = newConn;
-	server_ptr->id = ++kz_server_counter;
-	server_ptr->zone = zone_ptr;
-	if(zone_ptr->servers->tail) {
-		zone_ptr->servers->tail->next = server_ptr;
-		zone_ptr->servers->tail = server_ptr;
-	} else {
-		zone_ptr->servers->head = server_ptr;
-		zone_ptr->servers->tail = server_ptr;
-	}
+	if(kz_pool->head == NULL)
+		kz_pool->head = newConn;
+
+	if(kz_pool->tail != NULL)
+		kz_pool->tail->next = newConn;
+
+	kz_pool->tail = newConn;
 
 	return 0;
 
@@ -711,8 +453,6 @@ void kz_amqp_connection_close(kz_amqp_conn_ptr rmq) {
     if (!rmq)
     	return;
 
-    kz_amqp_fire_connection_event("closed", rmq->server->connection->info.host);
-
     if (rmq->conn) {
 		LM_DBG("close connection:  %d rmq(%p)->conn(%p)\n", getpid(), (void *)rmq, rmq->conn);
 		kz_amqp_error("closing connection", amqp_connection_close(rmq->conn, AMQP_REPLY_SUCCESS));
@@ -723,7 +463,6 @@ void kz_amqp_connection_close(kz_amqp_conn_ptr rmq) {
 		rmq->socket = NULL;
 		rmq->channel_count = 0;
     }
-    rmq->state = KZ_AMQP_CONNECTION_CLOSED;
 
 }
 
@@ -736,90 +475,8 @@ void kz_amqp_channel_close(kz_amqp_conn_ptr rmq, amqp_channel_t channel) {
 	kz_amqp_error("closing channel", amqp_channel_close(rmq->conn, channel, AMQP_REPLY_SUCCESS));
 }
 
-int kz_ssl_initialized = 0;
-
-int kz_amqp_connection_open_ssl(kz_amqp_conn_ptr rmq) {
-
-    if(!kz_ssl_initialized) {
-	    kz_ssl_initialized = 1;
-	    amqp_set_initialize_ssl_library(1);
-    }
-
-    if (!(rmq->conn = amqp_new_connection())) {
-	LM_ERR("Failed to create new AMQP connection\n");
-	goto error;
-    }
-
-    rmq->socket = amqp_ssl_socket_new(rmq->conn);
-    if (!rmq->socket) {
-	LM_ERR("Failed to create SSL socket to AMQP broker\n");
-	goto nosocket;
-    }
-
-    if (kz_amqps_ca_cert.s) {
-      if (amqp_ssl_socket_set_cacert(rmq->socket, kz_amqps_ca_cert.s)) {
-	LM_ERR("Failed to set CA certificate for amqps connection\n");
-	goto nosocket;
-      }
-    }
-
-    if (kz_amqps_cert.s && kz_amqps_key.s) {
-      if (amqp_ssl_socket_set_key(rmq->socket, kz_amqps_cert.s, kz_amqps_key.s)) {
-	LM_ERR("Failed to set client key/certificate for amqps connection\n");
-	goto nosocket;
-      }
-    }
-
-#if AMQP_VERSION_MAJOR == 0 && AMQP_VERSION_MINOR < 8
-    amqp_ssl_socket_set_verify(rmq->socket, kz_amqps_verify_peer | kz_amqps_verify_hostname);
-#else
-    amqp_ssl_socket_set_verify_peer(rmq->socket, kz_amqps_verify_peer);
-    amqp_ssl_socket_set_verify_hostname(rmq->socket, kz_amqps_verify_hostname);
-#endif
-
-    if (amqp_socket_open(rmq->socket, rmq->server->connection->info.host, rmq->server->connection->info.port)) {
-	LM_ERR("Failed to open SSL socket to AMQP broker : %s : %i\n",
-	rmq->server->connection->info.host, rmq->server->connection->info.port);
-	goto nosocket;
-    }
-
-    if (kz_amqp_error("Logging in", amqp_login(rmq->conn,
-					   rmq->server->connection->info.vhost,
-					   0,
-					   131072,
-					   dbk_use_hearbeats,
-					   AMQP_SASL_METHOD_PLAIN,
-					   rmq->server->connection->info.user,
-					   rmq->server->connection->info.password))) {
-
-	LM_ERR("Login to AMQP broker failed!\n");
-	goto error;
-    }
-
-	rmq->state = KZ_AMQP_CONNECTION_OPEN;
-	return 0;
-
-nosocket:
-    if (amqp_destroy_connection(rmq->conn) < 0) {
-	LM_ERR("cannot destroy connection\n");
-    }
-
-    rmq->conn = NULL;
-    return -1;
-
- error:
-    kz_amqp_connection_close(rmq);
-    return -1;
-}
-
 int kz_amqp_connection_open(kz_amqp_conn_ptr rmq) {
-	rmq->state = KZ_AMQP_CONNECTION_CLOSED;
 	rmq->channel_count = rmq->channel_counter = 0;
-
-	if(rmq->server->connection->info.ssl)
-		return kz_amqp_connection_open_ssl(rmq);
-
-    rmq->channel_count = rmq->channel_counter = 0;
     if (!(rmq->conn = amqp_new_connection())) {
     	LM_DBG("Failed to create new AMQP connection\n");
     	goto error;
@@ -828,38 +485,30 @@ int kz_amqp_connection_open(kz_amqp_conn_ptr rmq) {
     rmq->socket = amqp_tcp_socket_new(rmq->conn);
     if (!rmq->socket) {
     	LM_DBG("Failed to create TCP socket to AMQP broker\n");
-    	goto nosocket;
+    	goto error;
     }
 
-    if (amqp_socket_open(rmq->socket, rmq->server->connection->info.host, rmq->server->connection->info.port)) {
+    if (amqp_socket_open(rmq->socket, rmq->info->info.host, rmq->info->info.port)) {
     	LM_DBG("Failed to open TCP socket to AMQP broker\n");
-    	goto nosocket;
+    	goto error;
     }
 
     if (kz_amqp_error("Logging in", amqp_login(rmq->conn,
-					   rmq->server->connection->info.vhost,
+					   rmq->info->info.vhost,
 					   0,
 					   131072,
-					   dbk_use_hearbeats,
+					   0,
 					   AMQP_SASL_METHOD_PLAIN,
-					   rmq->server->connection->info.user,
-					   rmq->server->connection->info.password))) {
+					   rmq->info->info.user,
+					   rmq->info->info.password))) {
 
     	LM_ERR("Login to AMQP broker failed!\n");
     	goto error;
     }
 
-	rmq->state = KZ_AMQP_CONNECTION_OPEN;
-	return 0;
+    return 0;
 
-nosocket:
-	if (amqp_destroy_connection(rmq->conn) < 0) {
-		LM_ERR("cannot destroy connection\n");
-	}
-	rmq->conn = NULL;
-	return -1;
-
-error:
+ error:
     kz_amqp_connection_close(rmq);
     return -1;
 }
@@ -879,9 +528,107 @@ int kz_amqp_channel_open(kz_amqp_conn_ptr rmq, amqp_channel_t channel) {
     return 0;
 }
 
-int kz_amqp_consume_error(kz_amqp_conn_ptr ptr)
+kz_amqp_conn_ptr kz_amqp_get_connection() {
+	return NULL;
+
+	/*
+	kz_amqp_conn_ptr ptr = NULL;
+	if(kz_pool == NULL) {
+		return NULL;
+	}
+//	lock_get(&kz_pool->lock);
+
+	ptr = kz_pool->head;
+
+	if(kz_pool->current != NULL) {
+		ptr = kz_pool->current;
+	}
+
+	if(ptr->socket == NULL )
+	{
+	while(ptr != NULL) {
+		if(kz_amqp_connection_open(ptr) == 0) {
+			kz_pool->current = ptr;
+			break;
+		}
+		ptr = ptr->next;
+	}
+	}
+
+//	lock_release(&kz_pool->lock);
+
+   	return ptr;
+   	*/
+}
+
+kz_amqp_conn_ptr kz_amqp_get_next_connection() {
+	return NULL;
+	/*
+	kz_amqp_conn_ptr ptr = NULL;
+	if(kz_pool == NULL) {
+		return NULL;
+	}
+
+	if(kz_pool->current != NULL) {
+		ptr = kz_pool->current->next;
+	}
+
+	if(ptr == NULL) {
+		ptr = kz_pool->head;
+	}
+
+	while(ptr != NULL) {
+		if(kz_amqp_connection_open(ptr) == 0) {
+			kz_pool->current = ptr;
+			break;
+		}
+		ptr = ptr->next;
+	}
+
+
+   	return ptr;
+   	*/
+}
+
+int kz_amqp_open_next_connection(kz_amqp_conn_ptr ptr) {
+	if(ptr == NULL) {
+		LM_ERR("OPEN CONNECTION PTR == NULL\n");
+		return -1;
+	}
+
+	if(kz_pool == NULL) {
+		LM_ERR("OPEN CONNECTION POOL == NULL\n");
+		return -2;
+	}
+
+	if(ptr->info == NULL) {
+		ptr->info = kz_pool->head;
+	} else {
+		ptr->info = ptr->info->next;
+		if(ptr->info == NULL) {
+			ptr->info = kz_pool->head;
+		}
+	}
+
+	while(ptr->conn == NULL) {
+		if(kz_amqp_connection_open(ptr) == 0) {
+			break;
+		}
+		ptr->info = ptr->info->next;
+		if(ptr->info == NULL) {
+			LM_INFO("all connections tried, restarting from head\n");
+			sleep(3);
+			ptr->info = kz_pool->head;
+		}
+	}
+
+
+   	return 0;
+}
+
+
+int kz_amqp_consume_error(amqp_connection_state_t conn)
 {
-	amqp_connection_state_t conn = ptr->conn;
 	amqp_frame_t frame;
 	int ret = 0;
 	amqp_rpc_reply_t reply;
@@ -928,7 +675,7 @@ int kz_amqp_consume_error(kz_amqp_conn_ptr ptr)
 			 */
 			LM_ERR("AMQP_CHANNEL_CLOSE_METHOD\n");
 			if(frame.channel > 0)
-				ptr->server->channels[frame.channel-1].state = KZ_AMQP_CHANNEL_CLOSED;
+				channels[frame.channel-1].state = KZ_AMQP_CLOSED;
 			break;
 
 		case AMQP_CONNECTION_CLOSE_METHOD:
@@ -951,19 +698,16 @@ int kz_amqp_consume_error(kz_amqp_conn_ptr ptr)
 void kz_amqp_add_payload_common_properties(json_obj_ptr json_obj, char* server_id, str* unique) {
     char node_name[512];
 
-    if(kz_json_get_object(json_obj, BLF_JSON_APP_NAME) == NULL)
-    	json_object_object_add(json_obj, BLF_JSON_APP_NAME, json_object_new_string(kz_app_name.s));
 
-    if(kz_json_get_object(json_obj, BLF_JSON_APP_VERSION) == NULL)
-    	json_object_object_add(json_obj, BLF_JSON_APP_VERSION, json_object_new_string(VERSION));
-
-    if(kz_json_get_object(json_obj, BLF_JSON_NODE) == NULL) {
-        sprintf(node_name, "kamailio@%.*s", dbk_node_hostname.len, dbk_node_hostname.s);
-        json_object_object_add(json_obj, BLF_JSON_NODE, json_object_new_string(node_name));
-    }
-
-    if(kz_json_get_object(json_obj, BLF_JSON_MSG_ID) == NULL)
-    	json_object_object_add(json_obj, BLF_JSON_MSG_ID, json_object_new_string_len(unique->s, unique->len));
+    json_object_object_add(json_obj, BLF_JSON_APP_NAME,
+			   json_object_new_string(NAME));
+    json_object_object_add(json_obj, BLF_JSON_APP_VERSION,
+			   json_object_new_string(VERSION));
+    sprintf(node_name, "kamailio@%.*s", dbk_node_hostname.len, dbk_node_hostname.s);
+    json_object_object_add(json_obj, BLF_JSON_NODE,
+			   json_object_new_string(node_name));
+    json_object_object_add(json_obj, BLF_JSON_MSG_ID,
+			   json_object_new_string_len(unique->s, unique->len));
 
 }
 
@@ -972,8 +716,7 @@ int kz_amqp_pipe_send(str *str_exchange, str *str_routing_key, str *str_payload)
 	int ret = 1;
     json_obj_ptr json_obj = NULL;
     kz_amqp_cmd_ptr cmd = NULL;
-	char* s_routing_key = NULL;
-	char* s_local_routing_key = NULL;
+
     str unique_string = { 0, 0 };
     char serverid[512];
 
@@ -1003,31 +746,8 @@ int kz_amqp_pipe_send(str *str_exchange, str *str_routing_key, str *str_payload)
 		goto error;
 	}
 	memset(cmd, 0, sizeof(kz_amqp_cmd));
-
-
-	// check routing
-	s_local_routing_key  = kz_local_amqp_str_dup(str_routing_key);
-	s_routing_key = s_local_routing_key;
-	if(!strncmp(s_routing_key, "consumer://", 11)) {
-	    char* ptr_consumer = s_routing_key+11;
-		char* ptr = strchr(ptr_consumer, '/');
-		if(ptr == NULL) {
-			LM_ERR("failed to get consumer key in process %d\n", getpid());
-			goto error;
-		}
-		*ptr = '\0';
-		ptr++;
-		if(strlen(ptr_consumer) == 0) {
-			LM_ERR("invalid length. failed to get consumer key in process %d\n", getpid());
-			goto error;
-		}
-		cmd->server_id = atoi(ptr_consumer);
-		s_routing_key = ptr;
-	}
-
-
 	cmd->exchange = kz_amqp_str_dup(str_exchange);
-	cmd->routing_key = kz_amqp_string_dup(s_routing_key);
+	cmd->routing_key = kz_amqp_str_dup(str_routing_key);
 	cmd->payload = kz_amqp_string_dup(payload);
 	if(cmd->payload == NULL || cmd->routing_key == NULL || cmd->exchange == NULL) {
 		LM_ERR("failed to allocate kz_amqp_cmd parameters in process %d\n", getpid());
@@ -1036,16 +756,17 @@ int kz_amqp_pipe_send(str *str_exchange, str *str_routing_key, str *str_payload)
 	if(lock_init(&cmd->lock)==NULL)
 	{
 		LM_ERR("cannot init the lock for publishing in process %d\n", getpid());
+		lock_dealloc(&cmd->lock);
 		goto error;
 	}
 	lock_get(&cmd->lock);
-	cmd->type = KZ_AMQP_CMD_PUBLISH;
+	cmd->type = KZ_AMQP_PUBLISH;
 	cmd->consumer = getpid();
-	if (write(kz_cmd_pipe, &cmd, sizeof(cmd)) != sizeof(cmd)) {
+	if (write(kz_pipe_fds[1], &cmd, sizeof(cmd)) != sizeof(cmd)) {
 		LM_ERR("failed to publish message to amqp in process %d, write to command pipe: %s\n", getpid(), strerror(errno));
 	} else {
 		lock_get(&cmd->lock);
-		ret = cmd->return_code;
+		ret = 1;//cmd->return_code;
 	}
 
 	error:
@@ -1055,9 +776,6 @@ int kz_amqp_pipe_send(str *str_exchange, str *str_routing_key, str *str_payload)
 
     if(json_obj)
     	json_object_put(json_obj);
-
-    if(s_local_routing_key)
-    	pkg_free(s_local_routing_key);
 
 	return ret;
 }
@@ -1102,7 +820,6 @@ int kz_amqp_pipe_send_receive(str *str_exchange, str *str_routing_key, str *str_
 	cmd->routing_key = kz_amqp_str_dup(str_routing_key);
 	cmd->reply_routing_key = kz_amqp_string_dup(serverid);
 	cmd->payload = kz_amqp_string_dup(payload);
-	cmd->message_id = kz_str_dup(&unique_string);
 
 	cmd->timeout = *kz_timeout;
 
@@ -1117,9 +834,9 @@ int kz_amqp_pipe_send_receive(str *str_exchange, str *str_routing_key, str *str_
 		goto error;
 	}
 	lock_get(&cmd->lock);
-	cmd->type = KZ_AMQP_CMD_CALL;
+	cmd->type = KZ_AMQP_CALL;
 	cmd->consumer = getpid();
-	if (write(kz_cmd_pipe, &cmd, sizeof(cmd)) != sizeof(cmd)) {
+	if (write(kz_pipe_fds[1], &cmd, sizeof(cmd)) != sizeof(cmd)) {
 		LM_ERR("failed to publish message to amqp in process %d, write to command pipe: %s\n", getpid(), strerror(errno));
 	} else {
 		lock_get(&cmd->lock);
@@ -1191,162 +908,6 @@ int kz_pv_get_last_query_result(struct sip_msg *msg, pv_param_t *param,	pv_value
 	return last_payload_result == NULL ? pv_get_null(msg, param, res) : pv_get_strzval(msg, param, res, last_payload_result);
 }
 
-int kz_amqp_async_query(struct sip_msg* msg, char* _exchange, char* _routing_key, char* _payload, char* _cb_route, char* _err_route)
-{
-	  str json_s;
-	  str exchange_s;
-	  str routing_key_s;
-	  str cb_route_s;
-	  str err_route_s;
-	  struct timeval kz_timeout = kz_qtimeout_tv;
-      int ret = -1;
-      json_obj_ptr json_obj = NULL;
-	  kz_amqp_cmd_ptr cmd = NULL;
-	  unsigned int hash_index = 0;
-	  unsigned int label = 0;
-	  tm_cell_t *t = 0;
-
-	  str unique_string = { 0, 0 };
-	  char serverid[512];
-
-	  uuid_t id;
-	  char uuid_buffer[40];
-
-	  if (fixup_get_svalue(msg, (gparam_p)_exchange, &exchange_s) != 0) {
-		  LM_ERR("cannot get exchange string value\n");
-		  goto error;
-	  }
-
-	  if (fixup_get_svalue(msg, (gparam_p)_routing_key, &routing_key_s) != 0) {
-		  LM_ERR("cannot get routing_key string value\n");
-		  goto error;
-	  }
-
-	  if (fixup_get_svalue(msg, (gparam_p)_payload, &json_s) != 0) {
-		  LM_ERR("cannot get json string value : %s\n", _payload);
-		  goto error;
-	  }
-
-	  json_obj = json_tokener_parse(json_s.s);
-
-	  if (is_error(json_obj)) {
-		  LM_ERR("empty or invalid JSON payload : %*.s\n", json_s.len, json_s.s);
-		  goto error;
-	  }
-
-	  if (fixup_get_svalue(msg, (gparam_p)_cb_route, &cb_route_s) != 0) {
-		  LM_ERR("cannot get cb_route value\n");
-		  return -1;
-	  }
-
-	  if (fixup_get_svalue(msg, (gparam_p)_err_route, &err_route_s) != 0) {
-		  LM_ERR("cannot get err_route value\n");
-		  return -1;
-	  }
-
-	  if(kz_query_timeout_spec.type != PVT_NONE) {
-		  pv_value_t pv_val;
-		  if(pv_get_spec_value( msg, &kz_query_timeout_spec, &pv_val) == 0) {
-			  if((pv_val.flags & PV_VAL_INT) && pv_val.ri != 0 ) {
-				  kz_timeout.tv_usec = (pv_val.ri % 1000) * 1000;
-				  kz_timeout.tv_sec = pv_val.ri / 1000;
-				  LM_DBG("setting timeout to %i,%i\n", (int) kz_timeout.tv_sec, (int) kz_timeout.tv_usec);
-			  }
-		  }
-	  }
-
-	  t = tmb.t_gett();
-	  if (t==NULL || t==T_UNDEFINED) {
-		  if(tmb.t_newtran(msg)<0) {
-			  LM_ERR("cannot create the transaction\n");
-			  goto error;
-		  }
-		  t = tmb.t_gett();
-		  if (t==NULL || t==T_UNDEFINED) {
-			  LM_ERR("cannot look up the transaction\n");
-			  goto error;
-		  }
-	  }
-
-	  if (tmb.t_suspend(msg, &hash_index, &label) < 0) {
-		  LM_ERR("t_suspend() failed\n");
-		  goto error;
-	  }
-
-	  uuid_generate_random(id);
-	  uuid_unparse_lower(id, uuid_buffer);
-	  unique_string.s = uuid_buffer;
-	  unique_string.len = strlen(unique_string.s);
-	  sprintf(serverid, "kamailio@%.*s-<%d>-script-%lu", dbk_node_hostname.len, dbk_node_hostname.s, my_pid(), rpl_query_routing_key_count++);
-	  kz_amqp_add_payload_common_properties(json_obj, serverid, &unique_string);
-
-		cmd = (kz_amqp_cmd_ptr)shm_malloc(sizeof(kz_amqp_cmd));
-		if(cmd == NULL) {
-			LM_ERR("failed to allocate kz_amqp_cmd in process %d\n", getpid());
-			goto error;
-		}
-		memset(cmd, 0, sizeof(kz_amqp_cmd));
-		cmd->exchange = kz_amqp_str_dup(&exchange_s);
-		cmd->routing_key = kz_amqp_str_dup(&routing_key_s);
-		cmd->reply_routing_key = kz_amqp_string_dup(serverid);
-		cmd->payload = kz_amqp_string_dup((char *)json_object_to_json_string(json_obj));
-		cmd->message_id = kz_str_dup(&unique_string);
-		cmd->timeout = kz_timeout;
-		cmd->cb_route = kz_amqp_str_dup(&cb_route_s);
-		cmd->err_route = kz_amqp_str_dup(&err_route_s);
-		cmd->t_hash = hash_index;
-		cmd->t_label = label;
-
-		if(cmd->payload == NULL || cmd->routing_key == NULL || cmd->exchange == NULL) {
-			LM_ERR("failed to allocate kz_amqp_cmd parameters in process %d\n", getpid());
-			goto error;
-		}
-		if(lock_init(&cmd->lock)==NULL)
-		{
-			LM_ERR("cannot init the lock for publishing in process %d\n", getpid());
-			lock_dealloc(&cmd->lock);
-			goto error;
-		}
-		lock_get(&cmd->lock);
-		cmd->type = KZ_AMQP_CMD_ASYNC_CALL;
-		cmd->consumer = getpid();
-		if (write(kz_cmd_pipe, &cmd, sizeof(cmd)) != sizeof(cmd)) {
-			LM_ERR("failed to publish message to amqp in process %d, write to command pipe: %s\n", getpid(), strerror(errno));
-			goto error;
-		}
-		ret = 0;
-		goto exit;
-
-error:
-		if(cmd)
-			kz_amqp_free_pipe_cmd(cmd);
-
-		if(hash_index | label)
-			tmb.t_cancel_suspend(hash_index, label);
-
-exit:
-	    if(json_obj)
-	    	json_object_put(json_obj);
-
-	    return ret;
-};
-
-void kz_amqp_reset_last_result()
-{
-	if(last_payload_result)
-		pkg_free(last_payload_result);
-	last_payload_result = NULL;
-}
-
-void kz_amqp_set_last_result(char* json)
-{
-	kz_amqp_reset_last_result();
-	int len = strlen(json);
-	char* value = pkg_malloc(len+1);
-	memcpy(value, json, len);
-	value[len] = '\0';
-	last_payload_result = value;
-}
 
 int kz_amqp_query_ex(struct sip_msg* msg, char* exchange, char* routing_key, char* payload)
 {
@@ -1516,7 +1077,6 @@ int kz_amqp_subscribe(struct sip_msg* msg, char* payload)
 	int exclusive = 0;
 	int auto_delete = 1;
 	int no_ack = 1;
-	int federate = 0;
 	int wait_for_consumer_ack = 1;
 
     json_obj_ptr json_obj = NULL;
@@ -1569,10 +1129,6 @@ int kz_amqp_subscribe(struct sip_msg* msg, char* payload)
     	wait_for_consumer_ack = json_object_get_int(tmpObj);
     }
 
-    tmpObj = kz_json_get_object(json_obj, "federate");
-    if(tmpObj != NULL) {
-    	federate = json_object_get_int(tmpObj);
-    }
 
 	kz_amqp_bind_ptr bind = kz_amqp_bind_alloc(&exchange_s, &exchange_type_s, &queue_s, &routing_key_s);
 	if(bind == NULL) {
@@ -1586,7 +1142,6 @@ int kz_amqp_subscribe(struct sip_msg* msg, char* payload)
 	bind->auto_delete = auto_delete;
 	bind->no_ack = no_ack;
 	bind->wait_for_consumer_ack = wait_for_consumer_ack;
-	bind->federate = federate;
 
 
 	kz_amqp_binding_ptr binding = shm_malloc(sizeof(kz_amqp_binding));
@@ -1699,46 +1254,47 @@ int kz_amqp_encode(struct sip_msg* msg, char* unencoded, char* encoded)
 
 }
 
-int get_channel_index(kz_amqp_server_ptr server) {
+int get_channel_index() {
 	int n;
-	for(n=server->channel_index; n < dbk_channels; n++)
-		if(server->channels[n].state == KZ_AMQP_CHANNEL_FREE) {
-			server->channel_index = n+1;
+	for(n=channel_index; n < dbk_channels; n++)
+		if(channels[n].state == KZ_AMQP_FREE) {
+			channel_index = n+1;
 			return n;
 		}
-	if(server->channel_index == 0) {
+	if(channel_index == 0) {
 		LM_ERR("max channels (%d) reached. please exit kamailio and change kazoo amqp_max_channels param", dbk_channels);
 		return -1;
 	}
-	server->channel_index = 0;
-	return get_channel_index(server);
+	channel_index = 0;
+	return get_channel_index();
 }
 
 int kz_amqp_bind_targeted_channel(kz_amqp_conn_ptr kz_conn, int idx )
 {
-    kz_amqp_bind_ptr bind = kz_conn->server->channels[idx].targeted;
+    kz_amqp_bind_ptr bind = channels[idx].targeted;
+    amqp_queue_declare_ok_t *r = NULL;
     int ret = -1;
 
-	kz_amqp_exchange_declare(kz_conn->conn, kz_conn->server->channels[idx].channel, bind->exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
+    r = amqp_queue_declare(kz_conn->conn, channels[idx].channel, bind->queue, 0, 0, 1, 1, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		goto error;
+    }
+
+	kz_amqp_exchange_declare(kz_conn->conn, channels[idx].channel, bind->exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
     if (kz_amqp_error("Declaring exchange", amqp_get_rpc_reply(kz_conn->conn)))
     {
 		ret = -RET_AMQP_ERROR;
 		goto error;
     }
 
-    amqp_queue_declare(kz_conn->conn, kz_conn->server->channels[idx].channel, bind->queue, 0, 0, 0, 1, kz_amqp_empty_table);
-    if (kz_amqp_error("Declaring queue", amqp_get_rpc_reply(kz_conn->conn)))
-    {
-		goto error;
-    }
-
-    if (amqp_queue_bind(kz_conn->conn, kz_conn->server->channels[idx].channel, bind->queue, bind->exchange, bind->routing_key, kz_amqp_empty_table) < 0
+    if (amqp_queue_bind(kz_conn->conn, channels[idx].channel, bind->queue, bind->exchange, bind->routing_key, kz_amqp_empty_table) < 0
 	    || kz_amqp_error("Binding queue", amqp_get_rpc_reply(kz_conn->conn)))
     {
 		goto error;
     }
 
-    if (amqp_basic_consume(kz_conn->conn, kz_conn->server->channels[idx].channel, bind->queue, kz_amqp_empty_bytes, 0, 1, 0, kz_amqp_empty_table) < 0
+    if (amqp_basic_consume(kz_conn->conn, channels[idx].channel, bind->queue, kz_amqp_empty_bytes, 0, 1, 1, kz_amqp_empty_table) < 0
 	    || kz_amqp_error("Consuming", amqp_get_rpc_reply(kz_conn->conn)))
     {
 		goto error;
@@ -1749,70 +1305,107 @@ int kz_amqp_bind_targeted_channel(kz_amqp_conn_ptr kz_conn, int idx )
     return ret;
 }
 
-int kz_amqp_bind_consumer(kz_amqp_conn_ptr kz_conn, kz_amqp_bind_ptr bind, int idx, kz_amqp_channel_ptr chan)
+int kz_amqp_bind_targeted_channel_ex(kz_amqp_conn_ptr kz_conn, int loopcount, int idx )
 {
+    kz_amqp_bind_ptr bind = NULL;
+    amqp_queue_declare_ok_t *r = NULL;
+    str rpl_exch = str_init("targeted");
+    str rpl_exch_type = str_init("direct");
     int ret = -1;
-    amqp_bytes_t federated_exchange = {0, 0};
-    amqp_bytes_t federated_routing_key = {0, 0};
-	char _federated[100];
+    char serverid[512];
 
-    if(bind->federate == 0
-    		|| dbk_use_federated_exchange == 0
-    		|| kz_conn->server->zone == kz_amqp_get_primary_zone()) {
-		kz_amqp_exchange_declare(kz_conn->conn, chan[idx].channel, bind->exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
-		if (kz_amqp_error("Declaring exchange", amqp_get_rpc_reply(kz_conn->conn)))
-		{
-			ret = -RET_AMQP_ERROR;
-			goto error;
-		}
-    }
-
-    if(bind->federate == 1
-    		&& dbk_use_federated_exchange == 1
-			&& kz_conn->server->zone != kz_amqp_get_primary_zone()) {
-    	federated_exchange = kz_local_amqp_bytes_dup_from_string(dbk_federated_exchange.s);
-		kz_amqp_exchange_declare(kz_conn->conn, chan[idx].channel, federated_exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
-		if (kz_amqp_error("Declaring federated exchange", amqp_get_rpc_reply(kz_conn->conn)))
-		{
-			ret = -RET_AMQP_ERROR;
-			goto error;
-		}
-    }
-
-	amqp_queue_declare(kz_conn->conn, chan[idx].channel, bind->queue, bind->passive, bind->durable, bind->exclusive, bind->auto_delete, kz_amqp_empty_table);
-	if (kz_amqp_error("Declaring queue", amqp_get_rpc_reply(kz_conn->conn)))
-	{
-		ret = -RET_AMQP_ERROR;
+    bind = (kz_amqp_bind_ptr)shm_malloc(sizeof(kz_amqp_bind));
+	if(bind == NULL) {
+		LM_ERR("error allocation memory for reply\n");
 		goto error;
 	}
+	memset(bind, 0, sizeof(kz_amqp_bind));
 
-    if(bind->federate == 0
-    		|| dbk_use_federated_exchange == 0
-    		|| kz_conn->server->zone == kz_amqp_get_primary_zone()) {
-		if (amqp_queue_bind(kz_conn->conn, chan[idx].channel, bind->queue, bind->exchange, bind->routing_key, kz_amqp_empty_table) < 0
-			|| kz_amqp_error("Binding queue", amqp_get_rpc_reply(kz_conn->conn)))
-		{
-			ret = -RET_AMQP_ERROR;
-			goto error;
-		}
+	bind->exchange = kz_amqp_bytes_dup_from_str(&rpl_exch);
+	bind->exchange_type = kz_amqp_bytes_dup_from_str(&rpl_exch_type);
+
+    sprintf(serverid, "kamailio@%.*s-<%d-%d-%d>", dbk_node_hostname.len, dbk_node_hostname.s, my_pid(), loopcount, idx);
+    bind->queue = kz_amqp_bytes_dup_from_string(serverid);
+
+    sprintf(serverid, "kamailio@%.*s-<%d-%d>-targeted-%d", dbk_node_hostname.len, dbk_node_hostname.s, my_pid(), loopcount, idx);
+    bind->routing_key = kz_amqp_bytes_dup_from_string(serverid);
+
+
+    if (bind->exchange.bytes == NULL || bind->routing_key.bytes == NULL || bind->queue.bytes == NULL) {
+		LM_ERR("Out of memory allocating for exchange/routing_key\n");
+		goto error;
     }
 
-    if(bind->federate == 1
-    		&& dbk_use_federated_exchange == 1
-			&& kz_conn->server->zone != kz_amqp_get_primary_zone()) {
-    	sprintf(_federated, "%.*s%s%.*s", (int)bind->exchange.len, (char*)bind->exchange.bytes,
-    			(bind->routing_key.len == 0 ? "" : "."),
-				(int)bind->routing_key.len, (char*)bind->routing_key.bytes
-    			);
-    	federated_routing_key = kz_local_amqp_bytes_dup_from_string(_federated);
-		if (amqp_queue_bind(kz_conn->conn, chan[idx].channel, bind->queue, federated_exchange, federated_routing_key, kz_amqp_empty_table) < 0
-			|| kz_amqp_error("Binding queue to federated exchange", amqp_get_rpc_reply(kz_conn->conn)))
-		{
-			ret = -RET_AMQP_ERROR;
-			goto error;
-		}
+    r = amqp_queue_declare(kz_conn->conn, channels[idx].channel, bind->queue, 0, 0, 1, 1, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		goto error;
     }
 
+	kz_amqp_exchange_declare(kz_conn->conn, channels[idx].channel, bind->exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring exchange", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+    if (amqp_queue_bind(kz_conn->conn, channels[idx].channel, bind->queue, bind->exchange, bind->routing_key, kz_amqp_empty_table) < 0
+	    || kz_amqp_error("Binding queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		goto error;
+    }
+
+    if (amqp_basic_consume(kz_conn->conn, channels[idx].channel, bind->queue, kz_amqp_empty_bytes, 0, 1, 1, kz_amqp_empty_table) < 0
+	    || kz_amqp_error("Consuming", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		goto error;
+    }
+
+    channels[idx].targeted = bind;
+    return 0;
+ error:
+	kz_amqp_free_bind(bind);
+    return ret;
+}
+
+int kz_amqp_bind_targeted_channels(kz_amqp_conn_ptr kz_conn , int loopcount)
+{
+	int i, ret;
+	for(i = 0; i < dbk_channels; i++) {
+		ret = kz_amqp_bind_targeted_channel_ex(kz_conn, loopcount, i);
+		if(ret != 0)
+			return ret;
+	}
+	return 0;
+}
+
+int kz_amqp_bind_consumer_ex(kz_amqp_conn_ptr kz_conn, kz_amqp_bind_ptr bind, int idx, kz_amqp_channel_ptr chan)
+{
+    int ret = -1;
+
+    amqp_queue_declare(kz_conn->conn, chan[idx].channel, bind->queue, bind->passive, bind->durable, bind->exclusive, bind->auto_delete, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+	kz_amqp_exchange_declare(kz_conn->conn, chan[idx].channel, bind->exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring exchange", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+    LM_DBG("QUEUE BIND\n");
+    if (amqp_queue_bind(kz_conn->conn, chan[idx].channel, bind->queue, bind->exchange, bind->routing_key, kz_amqp_empty_table) < 0
+	    || kz_amqp_error("Binding queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+    LM_DBG("BASIC CONSUME\n");
     if (amqp_basic_consume(kz_conn->conn, chan[idx].channel, bind->queue, kz_amqp_empty_bytes, 0, bind->no_ack, 0, kz_amqp_empty_table) < 0
 	    || kz_amqp_error("Consuming", amqp_get_rpc_reply(kz_conn->conn)))
     {
@@ -1820,20 +1413,64 @@ int kz_amqp_bind_consumer(kz_amqp_conn_ptr kz_conn, kz_amqp_bind_ptr bind, int i
 		goto error;
     }
 
-    chan[idx].state = KZ_AMQP_CHANNEL_CONSUMING;
+    chan[idx].state = KZ_AMQP_CONSUMING;
 	chan[idx].consumer = bind;
     ret = idx;
  error:
- 	 kz_local_amqp_bytes_free(federated_exchange);
- 	 kz_local_amqp_bytes_free(federated_routing_key);
-     return ret;
+
+    return ret;
 }
 
-int kz_amqp_send_ex(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd, kz_amqp_channel_state state, int idx)
+
+int kz_amqp_bind_consumer(kz_amqp_conn_ptr kz_conn, kz_amqp_bind_ptr bind)
 {
-	amqp_bytes_t exchange = {0,0};
-	amqp_bytes_t routing_key = {0,0};
-	amqp_bytes_t payload = {0,0};
+    int ret = -1;
+
+    int	idx = get_channel_index();
+
+    amqp_queue_declare(kz_conn->conn, channels[idx].channel, bind->queue, bind->passive, bind->durable, bind->exclusive, bind->auto_delete, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+	kz_amqp_exchange_declare(kz_conn->conn, channels[idx].channel, bind->exchange, bind->exchange_type, 0, 0, kz_amqp_empty_table);
+    if (kz_amqp_error("Declaring exchange", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+    LM_DBG("QUEUE BIND\n");
+    if (amqp_queue_bind(kz_conn->conn, channels[idx].channel, bind->queue, bind->exchange, bind->routing_key, kz_amqp_empty_table) < 0
+	    || kz_amqp_error("Binding queue", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+    LM_DBG("BASIC CONSUME\n");
+    if (amqp_basic_consume(kz_conn->conn, channels[idx].channel, bind->queue, kz_amqp_empty_bytes, 0, bind->no_ack, 0, kz_amqp_empty_table) < 0
+	    || kz_amqp_error("Consuming", amqp_get_rpc_reply(kz_conn->conn)))
+    {
+		ret = -RET_AMQP_ERROR;
+		goto error;
+    }
+
+    channels[idx].state = KZ_AMQP_CONSUMING;
+	channels[idx].consumer = bind;
+    ret = idx;
+ error:
+
+    return ret;
+}
+
+int kz_amqp_send_ex(kz_amqp_conn_ptr kz_conn, kz_amqp_cmd_ptr cmd, kz_amqp_channel_state state, int idx)
+{
+	amqp_bytes_t exchange;
+	amqp_bytes_t routing_key;
+	amqp_bytes_t payload;
 	int ret = -1;
     json_obj_ptr json_obj = NULL;
 
@@ -1843,7 +1480,7 @@ int kz_amqp_send_ex(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd, kz_amqp_channel
 	props.content_type = amqp_cstring_bytes("application/json");
 
 	if(idx == -1) {
-		idx = get_channel_index(srv);
+		idx = get_channel_index();
 		if(idx == -1) {
 			LM_ERR("Failed to get channel index to publish\n");
 			goto error;
@@ -1855,36 +1492,34 @@ int kz_amqp_send_ex(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd, kz_amqp_channel
     payload = amqp_bytes_malloc_dup(amqp_cstring_bytes(cmd->payload));
 
     json_obj = kz_json_parse(cmd->payload);
-    if (json_obj == NULL) {
-	    LM_ERR("error parsing json when publishing %s\n", cmd->payload);
-	    goto error;
-    }
+    if (json_obj == NULL)
+    	goto error;
 
     if(kz_json_get_object(json_obj, BLF_JSON_SERVERID) == NULL) {
-        json_object_object_add(json_obj, BLF_JSON_SERVERID, json_object_new_string((char*)srv->channels[idx].targeted->routing_key.bytes));
+        json_object_object_add(json_obj, BLF_JSON_SERVERID, json_object_new_string((char*)channels[idx].targeted->routing_key.bytes));
     	amqp_bytes_free(payload);
         payload = amqp_bytes_malloc_dup(amqp_cstring_bytes((char*)json_object_to_json_string(json_obj)));
     }
 
-	int amqpres = amqp_basic_publish(srv->producer->conn, srv->channels[idx].channel, exchange, routing_key, 0, 0, &props, payload);
+	int amqpres = amqp_basic_publish(kz_conn->conn, channels[idx].channel, exchange, routing_key, 0, 0, &props, payload);
 	if ( amqpres != AMQP_STATUS_OK ) {
 		LM_ERR("Failed to publish\n");
 		ret = -1;
 		goto error;
 	}
 
-	if ( kz_amqp_error("Publishing",  amqp_get_rpc_reply(srv->producer->conn)) ) {
+	if ( kz_amqp_error("Publishing",  amqp_get_rpc_reply(kz_conn->conn)) ) {
 		LM_ERR("Failed to publish\n");
 		ret = -1;
 		goto error;
 	}
-	gettimeofday(&srv->channels[idx].timer, NULL);
-	srv->channels[idx].state = state;
-	srv->channels[idx].cmd = cmd;
+	gettimeofday(&channels[idx].timer, NULL);
+	channels[idx].state = state;
+	channels[idx].cmd = cmd;
 
 	ret = idx;
 
-error:
+	error:
 
 	if(json_obj)
     	json_object_put(json_obj);
@@ -1899,20 +1534,24 @@ error:
 	return ret;
 }
 
-int kz_amqp_send(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd)
+int kz_amqp_send(kz_amqp_conn_ptr kz_conn, kz_amqp_cmd_ptr cmd)
 {
-	return kz_amqp_send_ex(srv, cmd, KZ_AMQP_CHANNEL_PUBLISHING , -1);
+	return kz_amqp_send_ex(kz_conn, cmd, KZ_AMQP_PUBLISHING , -1);
 }
 
 
-int kz_amqp_send_receive_ex(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd, int idx )
+int kz_amqp_send_receive_ex(kz_amqp_conn_ptr kz_conn, kz_amqp_cmd_ptr cmd, int idx )
 {
-	return kz_amqp_send_ex(srv, cmd, KZ_AMQP_CHANNEL_CALLING, idx);
+//	int newidx = kz_amqp_bind_channel_ex(kz_conn, cmd, idx);
+//	if(newidx >= 0)
+//		return kz_amqp_send_ex(kz_conn, cmd, KZ_AMQP_CALLING, newidx);
+		return kz_amqp_send_ex(kz_conn, cmd, KZ_AMQP_CALLING, idx);
+//	return newidx;
 }
 
-int kz_amqp_send_receive(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd )
+int kz_amqp_send_receive(kz_amqp_conn_ptr kz_conn, kz_amqp_cmd_ptr cmd )
 {
-	return kz_amqp_send_receive_ex(srv, cmd, -1 );
+	return kz_amqp_send_receive_ex(kz_conn, cmd, -1 );
 }
 
 char* eventData = NULL;
@@ -1948,7 +1587,7 @@ int kz_amqp_consumer_fire_event(char *eventkey)
 
 }
 
-void kz_amqp_consumer_event(char *payload, char* event_key, char* event_subkey)
+void kz_amqp_consumer_event(int child_no, char *payload, char* event_key, char* event_subkey)
 {
     json_obj_ptr json_obj = NULL;
     str ev_name = {0, 0}, ev_category = {0, 0};
@@ -1997,6 +1636,51 @@ void kz_amqp_consumer_event(char *payload, char* event_key, char* event_subkey)
 	eventData = NULL;
 }
 
+void kz_amqp_consumer_loop(int child_no)
+{
+
+	LM_DBG("starting consumer %d\n", child_no);
+	close(kz_pipe_fds[child_no*2+1]);
+	int data_pipe = kz_pipe_fds[child_no*2];
+//	int back_idx = (dbk_consumer_processes+1)*2+1;
+
+	fd_set fdset;
+    int selret;
+
+    while(1) {
+    	FD_ZERO(&fdset);
+    	FD_SET(data_pipe, &fdset);
+
+    	selret = select(FD_SETSIZE, &fdset, NULL, NULL, NULL);
+
+    	if (selret < 0) {
+    		LM_ERR("select() failed: %s\n", strerror(errno));
+    	} else if (!selret) {
+    	} else {
+			if(FD_ISSET(data_pipe, &fdset)) {
+				kz_amqp_consumer_delivery_ptr ptr;
+				if(read(data_pipe, &ptr, sizeof(ptr)) == sizeof(ptr)) {
+					LM_DBG("consumer %d received payload %s\n", child_no, ptr->payload);
+					kz_amqp_consumer_event(child_no, ptr->payload, ptr->event_key, ptr->event_subkey);
+					/*
+					if(ptr->channel > 0 && ptr->delivery_tag > 0) {
+						kz_amqp_cmd_ptr cmd = kz_amqp_alloc_pipe_cmd();
+						cmd->type = KZ_AMQP_ACK;
+						cmd->channel = ptr->channel;
+						cmd->delivery_tag = ptr->delivery_tag;
+						if (write(kz_pipe_fds[back_idx], &cmd, sizeof(cmd)) != sizeof(cmd)) {
+							LM_ERR("failed to send ack to AMQP Manager in process %d, write to command pipe: %s\n", getpid(), strerror(errno));
+						}
+					}
+					*/
+					kz_amqp_free_consumer_delivery(ptr);
+				}
+			}
+    	}
+	}
+	LM_DBG("exiting consumer %d\n", child_no);
+}
+
 int check_timeout(struct timeval *now, struct timeval *start, struct timeval *timeout)
 {
 	struct timeval chk;
@@ -2008,7 +1692,7 @@ int check_timeout(struct timeval *now, struct timeval *start, struct timeval *ti
 	return 0;
 }
 
-int consumer = 0;
+int consumer = 1;
 
 void kz_amqp_send_consumer_event_ex(char* payload, char* event_key, char* event_subkey, amqp_channel_t channel, uint64_t delivery_tag, int nextConsumer)
 {
@@ -2023,14 +1707,14 @@ void kz_amqp_send_consumer_event_ex(char* payload, char* event_key, char* event_
 	ptr->payload = payload;
 	ptr->event_key = event_key;
 	ptr->event_subkey = event_subkey;
-	if (write(kz_worker_pipes[consumer], &ptr, sizeof(ptr)) != sizeof(ptr)) {
+	if (write(kz_pipe_fds[(consumer+2)*2+1], &ptr, sizeof(ptr)) != sizeof(ptr)) {
 		LM_ERR("failed to send payload to consumer %d : %s\nPayload %s\n", consumer, strerror(errno), payload);
 	}
 
 	if(nextConsumer) {
 		consumer++;
-		if(consumer >= dbk_consumer_workers) {
-			consumer = 0;
+		if(consumer > dbk_consumer_processes) {
+			consumer = 1;
 		}
 	}
 }
@@ -2051,667 +1735,476 @@ void kz_amqp_fire_connection_event(char *event, char* host)
 	kz_amqp_send_consumer_event(payload, 1);
 }
 
-void kz_amqp_cb_ok(kz_amqp_cmd_ptr cmd)
+void kz_amqp_manager_loop(int child_no)
 {
-	int n = route_get(&main_rt, cmd->cb_route);
-	struct action *a = main_rt.rlist[n];
-	tmb.t_continue(cmd->t_hash, cmd->t_label, a);
-}
-
-void kz_amqp_cb_error(kz_amqp_cmd_ptr cmd)
-{
-	int n = route_get(&main_rt, cmd->err_route);
-	struct action *a = main_rt.rlist[n];
-	tmb.t_continue(cmd->t_hash, cmd->t_label, a);
-}
-
-int kz_send_worker_error_event(kz_amqp_cmd_ptr cmd)
-{
-	cmd->return_code = -1;
-	kz_amqp_consumer_delivery_ptr ptr = (kz_amqp_consumer_delivery_ptr) shm_malloc(sizeof(kz_amqp_consumer_delivery));
-	if(ptr == NULL) {
-		LM_ERR("NO MORE SHARED MEMORY!");
-		return 0;
-	}
-	memset(ptr, 0, sizeof(kz_amqp_consumer_delivery));
-	ptr->cmd = cmd;
-
-	consumer++;
-	if(consumer >= dbk_consumer_workers) {
-		consumer = 0;
-	}
-
-	if (write(kz_worker_pipes[consumer], &ptr, sizeof(ptr)) != sizeof(ptr)) {
-		LM_ERR("failed to send payload to consumer %d : %s\nPayload %s\n", consumer, strerror(errno), cmd->payload);
-		kz_amqp_free_consumer_delivery(ptr);
-		return 0;
-	}
-
-	return 1;
-
-}
-
-void kz_amqp_cmd_timeout_cb(int fd, short event, void *arg)
-{
-	kz_amqp_cmd_timeout_ptr cmd = (kz_amqp_cmd_timeout_ptr) arg;
-	kz_amqp_cmd_ptr retrieved_cmd = kz_cmd_retrieve(cmd->message_id);
-	if(retrieved_cmd != NULL) {
-		LM_DBG("amqp message timeout for exchange '%s' with routing key '%s' and message id '%.*s'\n"
-				, retrieved_cmd ->exchange, retrieved_cmd ->routing_key
-				, retrieved_cmd ->message_id->len, retrieved_cmd ->message_id->s
-				);
-		if(retrieved_cmd->type == KZ_AMQP_CMD_ASYNC_CALL) {
-			kz_send_worker_error_event(retrieved_cmd);
-		} else {
-			retrieved_cmd->return_code = -1;
-			lock_release(&retrieved_cmd->lock);
-		}
-	}
-	close(cmd->timerfd);
-	event_del(cmd->timer_ev);
-	pkg_free(cmd->timer_ev);
-	pkg_free(cmd->message_id);
-	pkg_free(cmd);
-
-}
+	LM_DBG("starting manager %d\n", child_no);
+	close(kz_pipe_fds[child_no*2+1]);
+	close(kz_pipe_fds[(dbk_consumer_processes+1)*2+1]);
+	int data_pipe = kz_pipe_fds[child_no*2];
+	int back_pipe = kz_pipe_fds[(dbk_consumer_processes+1)*2];
+    fd_set fdset;
+    int i, idx;
+    int selret;
+	int INTERNAL_READ, CONSUME, ACK_READ,  OK;
+	int INTERNAL_READ_COUNT , INTERNAL_READ_MAX_LOOP;
+	int CONSUMER_READ_COUNT , CONSUMER_READ_MAX_LOOP;
+	int ACK_READ_COUNT , ACK_READ_MAX_LOOP;
+	char* payload;
+	int channel_res;
+    kz_amqp_conn_ptr kzconn;
+	kz_amqp_cmd_ptr cmd;
+    int loopcount = 0;
+    int firstLoop = dbk_consume_messages_on_reconnect;
 
 
-int kz_amqp_start_cmd_timer(kz_amqp_cmd_ptr cmd)
-{
-	kz_amqp_cmd_timeout_ptr timeout_cmd = pkg_malloc(sizeof(kz_amqp_cmd_timeout));
-	if(timeout_cmd == NULL) {
-		LM_ERR("Could not allocate memory for kz_amqp_cmd_timeout_ptr\n");
-		goto error;
-	}
+    while(1) {
 
-	timeout_cmd->message_id = kz_local_str_dup(cmd->message_id);
-	if(timeout_cmd->message_id == NULL) {
-		LM_ERR("Could not allocate memory for kz_amqp_cmd_timeout_ptr message_id\n");
-		goto error;
-	}
+        INTERNAL_READ_MAX_LOOP = dbk_internal_loop_count;
+        CONSUMER_READ_MAX_LOOP = dbk_consumer_loop_count;
+        ACK_READ_MAX_LOOP = dbk_consumer_ack_loop_count;
 
-	int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-	if (timerfd == -1) {
-		LM_ERR("Could not create timerfd\n");
-		goto error;
-	}
+    	OK = 1;
 
-	timeout_cmd->timerfd = timerfd;
-	struct itimerspec *itime = pkg_malloc(sizeof(struct itimerspec));
-	if(itime == NULL){
-		LM_ERR("Could not set timer\n");
-		goto error;
-	}
-	itime->it_interval.tv_sec = 0;
-	itime->it_interval.tv_nsec = 0;
+    	while(1) {
+    		kzconn = kz_amqp_get_next_connection();
+    		if(kzconn != NULL)
+    			break;
+    		LM_DBG("Connection failed : all servers down?");
+    		sleep(3);
+    	}
 
-	itime->it_value.tv_sec = cmd->timeout.tv_sec;
-	itime->it_value.tv_nsec = cmd->timeout.tv_usec * 1000;
-	if (timerfd_settime(timerfd, 0, itime, NULL) == -1) {
-		LM_ERR("Could not set timer\n");
-		goto error;
-	}
-	pkg_free(itime);
-	struct event *timer_ev = pkg_malloc(sizeof(struct event));
-	if(timer_ev == NULL) {
-		LM_ERR("Could not allocate timer_ev\n");
-		goto error;
-	}
-	event_set(timer_ev, timerfd, EV_READ, kz_amqp_cmd_timeout_cb, timeout_cmd);
-	if(event_add(timer_ev, NULL) == -1) {
-		LM_ERR("event_add failed while setting request timer (%s)\n", strerror(errno));
-		pkg_free(timer_ev);
-		goto error;
-	}
-	timeout_cmd->timer_ev = timer_ev;
-	return 1;
+    	kz_amqp_fire_connection_event("open", kzconn->info->info.host);
 
-error:
-	if(timeout_cmd) {
-		if(timeout_cmd->message_id)
-			pkg_free(timeout_cmd->message_id);
-		pkg_free(timeout_cmd);
-	}
-	return 0;
+    	loopcount++;
+    	for(i=0,channel_res=0; i < dbk_channels && channel_res == 0; i++) {
+    		/* start cleanup */
+    		channels[i].state = KZ_AMQP_CLOSED;
+    		channels[i].consumer = NULL;
+    		if(channels[i].targeted != NULL) {
+    			kz_amqp_free_bind(channels[i].targeted);
+    			channels[i].targeted = NULL;
+    		}
+    		cmd = channels[i].cmd;
+			if(cmd != NULL) {
+				channels[i].cmd = NULL;
+				cmd->return_code = -1;
+				lock_release(&cmd->lock);
+			}
+    		/* end cleanup */
+    		channel_res = kz_amqp_channel_open(kzconn, channels[i].channel);
+    		if(channel_res == 0) {
+    			kz_amqp_bind_targeted_channel_ex(kzconn, loopcount, i);
+				channels[i].state = KZ_AMQP_FREE;
+    		}
+    	}
+    	channel_index = 0;
+    	/* bind consumers */
+    	if(kz_bindings != NULL) {
+    		kz_amqp_binding_ptr binding = kz_bindings->head;
+    		while(binding != NULL) {
+    			kz_amqp_bind_consumer(kzconn, binding->bind);
+    			binding = binding->next;
+    		}
+    	}
+
+    	firstLoop = dbk_consume_messages_on_reconnect;
+    	while(OK) {
+        	INTERNAL_READ = 1;
+    		CONSUME = 1;
+    		ACK_READ = 1;
+
+
+    		ACK_READ_COUNT = 0;
+        	while(ACK_READ && ACK_READ_COUNT < ACK_READ_MAX_LOOP) {
+        		ACK_READ_COUNT++;
+				FD_ZERO(&fdset);
+				FD_SET(back_pipe, &fdset);
+				selret = select(FD_SETSIZE, &fdset, NULL, NULL, &kz_ack_tv);
+				if (selret < 0) {
+					LM_ERR("select() failed: %s\n", strerror(errno));
+					break;
+				} else if (!selret) {
+					ACK_READ=0;
+				} else {
+					if(FD_ISSET(back_pipe, &fdset)) {
+						if(read(back_pipe, &cmd, sizeof(cmd)) == sizeof(cmd)) {
+							switch (cmd->type) {
+								case KZ_AMQP_ACK:
+									if(amqp_basic_ack(kzconn->conn, cmd->channel, cmd->delivery_tag, 0 ) < 0) {
+										LM_ERR("AMQP ERROR TRYING TO ACK A MSG RETURNED FROM CONSUMER\n");
+										OK = CONSUME = 0;
+									}
+									kz_amqp_free_pipe_cmd(cmd);
+									break;
+								default:
+									LM_DBG("unknown pipe cmd %d\n", cmd->type);
+									break;
+							}
+						}
+					}
+				}
+        	}
+    		INTERNAL_READ_COUNT = 0;
+        	while(INTERNAL_READ && INTERNAL_READ_COUNT < INTERNAL_READ_MAX_LOOP) {
+        		INTERNAL_READ_COUNT++;
+				FD_ZERO(&fdset);
+				FD_SET(data_pipe, &fdset);
+				selret = select(FD_SETSIZE, &fdset, NULL, NULL, &kz_sock_tv);
+				if (selret < 0) {
+					LM_ERR("select() failed: %s\n", strerror(errno));
+					break;
+				} else if (!selret) {
+					INTERNAL_READ=0;
+				} else {
+					if(FD_ISSET(data_pipe, &fdset)) {
+						if(read(data_pipe, &cmd, sizeof(cmd)) == sizeof(cmd)) {
+							switch (cmd->type) {
+							case KZ_AMQP_PUBLISH:
+								idx = kz_amqp_send(kzconn, cmd);
+								if(idx >= 0) {
+									cmd->return_code = AMQP_RESPONSE_NORMAL;
+								} else {
+									cmd->return_code = -1;
+									OK = INTERNAL_READ = CONSUME = 0;
+									LM_ERR("ERROR SENDING PUBLISH");
+								}
+								channels[idx].state = KZ_AMQP_FREE;
+								channels[idx].cmd = NULL;
+								lock_release(&cmd->lock);
+								break;
+							case KZ_AMQP_CALL:
+								idx = kz_amqp_send_receive(kzconn, cmd);
+								if(idx < 0) {
+									channels[idx].state = KZ_AMQP_FREE;
+									channels[idx].cmd = NULL;
+									cmd->return_code = -1;
+									lock_release(&cmd->lock);
+									LM_ERR("ERROR SENDING QUERY");
+									OK = INTERNAL_READ = CONSUME = 0;
+								} else {
+									gettimeofday(&channels[idx].timer, NULL);
+								}
+								break;
+							default:
+								LM_DBG("unknown pipe cmd %d\n", cmd->type);
+								break;
+							}
+						}
+					}
+				}
+        	}
+
+    		CONSUMER_READ_COUNT = 0;
+    	    while(CONSUME && (CONSUMER_READ_COUNT < CONSUMER_READ_MAX_LOOP || firstLoop)) {
+        		payload = NULL;
+        		CONSUMER_READ_COUNT++;
+				amqp_envelope_t envelope;
+				amqp_maybe_release_buffers(kzconn->conn);
+				amqp_rpc_reply_t reply = amqp_consume_message(kzconn->conn, &envelope, &kz_amqp_tv, 0);
+				switch(reply.reply_type) {
+				case AMQP_RESPONSE_LIBRARY_EXCEPTION:
+					switch(reply.library_error) {
+					case AMQP_STATUS_HEARTBEAT_TIMEOUT:
+						LM_ERR("AMQP_STATUS_HEARTBEAT_TIMEOUT\n");
+						OK = CONSUME = 0;
+						break;
+					case AMQP_STATUS_TIMEOUT:
+						CONSUME = 0;
+						break;
+					case AMQP_STATUS_UNEXPECTED_STATE:
+						LM_DBG("AMQP_STATUS_UNEXPECTED_STATE\n");
+						OK = CONSUME = kz_amqp_consume_error(kzconn->conn);
+						break;
+					default:
+						OK = CONSUME = 0;
+						break;
+					};
+					break;
+
+				case AMQP_RESPONSE_NORMAL:
+					idx = envelope.channel-1;
+					switch(channels[idx].state) {
+					case KZ_AMQP_CALLING:
+						channels[idx].cmd->return_payload = kz_amqp_bytes_dup(envelope.message.body);
+						channels[idx].cmd->return_code = AMQP_RESPONSE_NORMAL;
+						lock_release(&channels[idx].cmd->lock);
+						channels[idx].state = KZ_AMQP_FREE;
+						channels[idx].cmd = NULL;
+						break;
+					case KZ_AMQP_CONSUMING:
+						kz_amqp_send_consumer_event_ex(kz_amqp_bytes_dup(envelope.message.body),
+								kz_amqp_bytes_dup(channels[idx].consumer->event_key),
+								kz_amqp_bytes_dup(channels[idx].consumer->event_subkey),
+								channels[idx].consumer->no_ack ? 0 : envelope.channel,
+								channels[idx].consumer->no_ack ? 0 : envelope.delivery_tag,
+								(firstLoop && dbk_single_consumer_on_reconnect) ? 0 : 1);
+						if(!channels[idx].consumer->no_ack ) {
+							if(channels[idx].consumer->wait_for_consumer_ack) {
+								LM_DBG("MSG ACK delayed until return from consumer\n");
+							} else {
+								if(amqp_basic_ack(kzconn->conn, envelope.channel, envelope.delivery_tag, 0 ) < 0) {
+									LM_ERR("AMQP ERROR TRYING TO ACK A MSG\n");
+									OK = CONSUME = 0;
+								}
+							}
+						}
+						break;
+					default:
+						break;
+					}
+					break;
+				case AMQP_RESPONSE_SERVER_EXCEPTION:
+					LM_ERR("AMQP_RESPONSE_SERVER_EXCEPTION in consume\n");
+					OK = CONSUME = 0;
+					break;
+
+				default:
+					LM_ERR("UNHANDLED AMQP_RESPONSE in consume\n");
+					OK = CONSUME = 0;
+					break;
+				};
+				amqp_destroy_envelope(&envelope);
+    	    }
+
+			/* check timeouts */
+			if(OK && (!firstLoop)) {
+				struct timeval now;
+				gettimeofday(&now, NULL);
+				for(i=0; i < dbk_channels; i++) {
+					if(channels[i].state == KZ_AMQP_CALLING
+							&& channels[i].cmd != NULL
+							&& check_timeout(&now, &channels[i].timer, &channels[i].cmd->timeout)) {
+						cmd = channels[i].cmd;
+						channels[i].state = KZ_AMQP_FREE;
+						channels[i].cmd = NULL;
+						cmd->return_code = -1;
+						lock_release(&cmd->lock);
+						// rebind ??
+						LM_ERR("QUERY TIMEOUT");
+					}
+				}
+			}
+			firstLoop = 0;
+    	}
+    	kz_amqp_connection_close(kzconn);
+    	kz_amqp_fire_connection_event("closed", kzconn->info->info.host);
+    }
 }
 
 
 /* check timeouts */
-int kz_amqp_timeout_proc()
+void kz_amqp_timeout_proc(int child_no)
 {
 	kz_amqp_cmd_ptr cmd;
-	kz_amqp_zone_ptr g = NULL;
-	kz_amqp_server_ptr s = NULL;
 	int i;
     while(1) {
 		struct timeval now;
 		usleep(kz_timer_tv.tv_usec);
-		for (g = kz_amqp_get_zones(); g != NULL; g = g->next) {
-			for (s = g->servers->head; s != NULL; s = s->next) {
-				for(i=0; i < dbk_channels; i++) {
-					gettimeofday(&now, NULL);
-					if(s->channels[i].state == KZ_AMQP_CHANNEL_CALLING
-							&& s->channels[i].cmd != NULL
-							&& check_timeout(&now, &s->channels[i].timer, &s->channels[i].cmd->timeout)) {
-						lock_get(&s->channels[i].lock);
-						if(s->channels[i].cmd != NULL)
-						{
-							cmd = s->channels[i].cmd;
-							LM_DBG("Kazoo Query timeout - %s\n", cmd->payload);
-							cmd->return_code = -1;
-							lock_release(&cmd->lock);
-							s->channels[i].cmd = NULL;
-							s->channels[i].state = KZ_AMQP_CHANNEL_FREE;
-						}
-						lock_release(&s->channels[i].lock);
-					}
+		for(i=0; i < dbk_channels; i++) {
+			gettimeofday(&now, NULL);
+			if(channels[i].state == KZ_AMQP_CALLING
+					&& channels[i].cmd != NULL
+					&& check_timeout(&now, &channels[i].timer, &channels[i].cmd->timeout)) {
+				lock_get(&channels[i].lock);
+				if(channels[i].cmd != NULL)
+				{
+					cmd = channels[i].cmd;
+					LM_DBG("Kazoo Query timeout - %s\n", cmd->payload);
+					cmd->return_code = -1;
+					lock_release(&cmd->lock);
+					channels[i].cmd = NULL;
+					channels[i].state = KZ_AMQP_FREE;
 				}
+				lock_release(&channels[i].lock);
 			}
 		}
 	}
-    return 0;
 }
 
-int kz_amqp_connect(kz_amqp_conn_ptr rmq)
+void kz_amqp_publisher_proc(int child_no)
 {
-	int i,channel_res;
+	LM_DBG("starting publisher %d\n", child_no);
+	close(kz_pipe_fds[child_no*2+1]);
+	int data_pipe = kz_pipe_fds[child_no*2];
+	LM_DBG("publisher started %d\n", child_no);
+    fd_set fdset;
+    int idx, i;
+    int selret;
+	int OK;
+    kz_amqp_conn_ptr kzconn;
 	kz_amqp_cmd_ptr cmd;
-	if(rmq->state != KZ_AMQP_CONNECTION_CLOSED) {
-		kz_amqp_connection_close(rmq);
-	}
+	int channel_res;
 
-	if(kz_amqp_connection_open(rmq) != 0)
-		goto error;
+    kzconn = (kz_amqp_conn_ptr)pkg_malloc(sizeof(kz_amqp_conn));
+    if(kzconn == NULL)
+    {
+    	LM_ERR("NO MORE PACKAGE MEMORY\n");
+    	return;
+    }
+    memset(kzconn, 0, sizeof(kz_amqp_conn));
 
-	kz_amqp_fire_connection_event("open", rmq->server->connection->info.host);
-	for(i=0,channel_res=0; i < dbk_channels && channel_res == 0; i++) {
+    while(1) {
+    	OK = 1;
+   		if(kz_amqp_open_next_connection(kzconn)) {
+   			LM_ERR("Error opening connection\n");
+   			sleep(3);
+   			continue;
+   		}
+    	kz_amqp_fire_connection_event("open", kzconn->info->info.host);
+
+    	for(i=0,channel_res=0; i < dbk_channels && channel_res == 0; i++) {
 			/* start cleanup */
-			rmq->server->channels[i].state = KZ_AMQP_CHANNEL_CLOSED;
-			cmd = rmq->server->channels[i].cmd;
+			channels[i].state = KZ_AMQP_CLOSED;
+			cmd = channels[i].cmd;
 			if(cmd != NULL) {
-				rmq->server->channels[i].cmd = NULL;
+				channels[i].cmd = NULL;
 				cmd->return_code = -1;
 				lock_release(&cmd->lock);
 			}
 			/* end cleanup */
 
 			/* bind targeted channels */
-			channel_res = kz_amqp_channel_open(rmq, rmq->server->channels[i].channel);
+			channel_res = kz_amqp_channel_open(kzconn, channels[i].channel);
 			if(channel_res == 0) {
-				rmq->server->channels[i].state = KZ_AMQP_CHANNEL_FREE;
+				channels[i].state = KZ_AMQP_FREE;
 			}
+
     	}
 
-    return 0;
-
-error:
-	kz_amqp_handle_server_failure(rmq);
-	return -1;
-
-}
-
-void kz_amqp_reconnect_cb(int fd, short event, void *arg)
-{
-	LM_DBG("attempting to reconnect now.\n");
-	kz_amqp_conn_ptr connection = (kz_amqp_conn_ptr)arg;
-
-	if (connection->state == KZ_AMQP_CONNECTION_OPEN) {
-		LM_WARN("trying to connect an already connected server.\n");
-		return;
-	}
-
-	if (connection->ev != NULL) {
-		event_del(connection->ev);
-		pkg_free(connection->ev);
-		connection->ev = NULL;
-	}
-
-	close(fd);
-	pkg_free(connection->timer);
-
-	kz_amqp_connect(connection);
-}
-
-int kz_amqp_handle_server_failure(kz_amqp_conn_ptr connection)
-{
-
-	if(connection->state != KZ_AMQP_CONNECTION_CLOSED)
-		connection->state = KZ_AMQP_CONNECTION_FAILURE;
-
-	int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-
-	if (timerfd == -1) {
-		LM_ERR("could not create timerfd to reschedule connection. No further attempts will be made to reconnect this server.\n");
-		return -1;
-	}
-
-	struct itimerspec *itime = pkg_malloc(sizeof(struct itimerspec));
-	itime->it_interval.tv_sec = 0;
-	itime->it_interval.tv_nsec = 0;
-
-	itime->it_value.tv_sec = 5;
-	itime->it_value.tv_nsec = 0;
-
-	if (timerfd_settime(timerfd, 0, itime, NULL) == -1)
-	{
-		LM_ERR("could not set timer to reschedule connection. No further attempts will be made to reconnect this server.\n");
-		return -1;
-	}
-	LM_DBG("timerfd value is %d\n", timerfd);
-	struct event *timer_ev = pkg_malloc(sizeof(struct event));
-	event_set(timer_ev, timerfd, EV_READ, kz_amqp_reconnect_cb, connection);
-	if(event_add(timer_ev, NULL) == -1) {
-		LM_ERR("event_add failed while rescheduling connection (%s). No further attempts will be made to reconnect this server.\n", strerror(errno));
-		return -1;
-	}
-	connection->ev = timer_ev;
-	connection->timer = itime;
-	return 0;
-}
-
-int kz_amqp_publisher_send(kz_amqp_cmd_ptr cmd)
-{
-    int idx;
-	int sent = 0;
-	kz_amqp_zone_ptr g;
-	kz_amqp_server_ptr s;
-	for (g = kz_amqp_get_zones(); g != NULL && sent == 0; g = g->next) {
-		for (s = g->servers->head; s != NULL && sent == 0; s = s->next) {
-			if(cmd->server_id == s->id || cmd->server_id == 0) {
-				if(s->producer->state == KZ_AMQP_CONNECTION_OPEN) {
-					if(cmd->type == KZ_AMQP_CMD_PUBLISH
-							|| cmd->type == KZ_AMQP_CMD_PUBLISH_BROADCAST
-							|| cmd->type == KZ_AMQP_CMD_ASYNC_CALL)
-					{
-						idx = kz_amqp_send(s, cmd);
-						if(idx >= 0) {
-							cmd->return_code = AMQP_RESPONSE_NORMAL;
-							s->channels[idx].state = KZ_AMQP_CHANNEL_FREE;
-							sent = 1;
-						} else {
-							cmd->return_code = -1;
-							s->channels[idx].state = KZ_AMQP_CHANNEL_CLOSED;
-							LM_ERR("error sending publish to zone : %s , connection id : %d, uri : %s", s->zone->zone, s->id, s->connection->url);
-							kz_amqp_handle_server_failure(s->producer);
-						}
-						s->channels[idx].cmd = NULL;
-					} else if(cmd->type == KZ_AMQP_CMD_CALL) {
-						idx = kz_amqp_send_receive(s, cmd);
-						if(idx < 0) {
-							s->channels[idx].cmd = NULL;
-							cmd->return_code = -1;
-							s->channels[idx].state = KZ_AMQP_CHANNEL_CLOSED;
-							LM_ERR("error sending query to zone : %s , connection id : %d, uri : %s", s->zone->zone, s->id, s->connection->url);
-							kz_amqp_handle_server_failure(s->producer);
-						} else {
-							s->channels[idx].state = KZ_AMQP_CHANNEL_FREE;
-							sent = 1;
-						}
+    	while(OK) {
+			FD_ZERO(&fdset);
+			FD_SET(data_pipe, &fdset);
+			selret = select(FD_SETSIZE, &fdset, NULL, NULL, NULL);
+			if (selret < 0) {
+				LM_ERR("select() failed: %s\n", strerror(errno));
+				continue;
+			} else if (!selret) {
+				continue;
+			} else {
+				if(FD_ISSET(data_pipe, &fdset) && read(data_pipe, &cmd, sizeof(cmd)) == sizeof(cmd)) {
+					switch (cmd->type) {
+						case KZ_AMQP_PUBLISH:
+							idx = kz_amqp_send(kzconn, cmd);
+							if(idx >= 0) {
+								cmd->return_code = AMQP_RESPONSE_NORMAL;
+							} else {
+								cmd->return_code = -1;
+								OK = 0;
+								LM_ERR("ERROR SENDING PUBLISH");
+							}
+							channels[idx].cmd = NULL;
+							lock_release(&cmd->lock);
+							channels[idx].state = KZ_AMQP_FREE;
+							break;
+						case KZ_AMQP_CALL:
+							idx = kz_amqp_send_receive(kzconn, cmd);
+							if(idx < 0) {
+								channels[idx].cmd = NULL;
+								cmd->return_code = -1;
+								lock_release(&cmd->lock);
+								channels[idx].state = KZ_AMQP_FREE;
+								LM_ERR("ERROR SENDING QUERY");
+								OK = 0;
+							}
+							break;
+						default:
+							LM_DBG("unknown pipe cmd %d\n", cmd->type);
+							break;
 					}
 				}
-			}
-		}
-		if(cmd->type == KZ_AMQP_CMD_PUBLISH_BROADCAST) {
-			sent = 0;
-		}
-	}
-	return sent;
-}
-
-
-void kz_amqp_publisher_connect()
-{
-	kz_amqp_zone_ptr g;
-	kz_amqp_server_ptr s;
-	for (g = kz_amqp_get_zones(); g != NULL; g = g->next) {
-		for (s = g->servers->head; s != NULL; s = s->next) {
-			if(s->producer == NULL) {
-				s->producer = (kz_amqp_conn_ptr) shm_malloc(sizeof(kz_amqp_conn));
-				memset(s->producer, 0, sizeof(kz_amqp_conn));
-				s->producer->server = s;
-			}
-			kz_amqp_connect(s->producer);
-		}
-	}
-}
-
-void kz_amqp_publisher_proc_cb(int fd, short event, void *arg)
-{
-	kz_amqp_cmd_ptr cmd;
-	kz_amqp_cmd_ptr retrieved_cmd;
-	if (read(fd, &cmd, sizeof(cmd)) != sizeof(cmd)) {
-		LM_ERR("failed to read from command pipe: %s\n", strerror(errno));
-		return;
-	}
-
-	switch(cmd->type) {
-	case KZ_AMQP_CMD_PUBLISH:
-		kz_amqp_publisher_send(cmd);
-		lock_release(&cmd->lock);
-		break;
-
-	case KZ_AMQP_CMD_CALL:
-		if(kz_amqp_publisher_send(cmd) < 0) {
-			lock_release(&cmd->lock);
-		} else {
-			if(!kz_cmd_store(cmd)) {
-				cmd->return_code = -1;
-				lock_release(&cmd->lock);
-			} else {
-				if(!kz_amqp_start_cmd_timer(cmd)) {
-					cmd->return_code = -1;
-					lock_release(&cmd->lock);
-				}
-			}
-		}
-		break;
-
-	case KZ_AMQP_CMD_TARGETED_CONSUMER:
-		retrieved_cmd = kz_cmd_retrieve(cmd->message_id);
-		if(retrieved_cmd == NULL) {
-			LM_DBG("amqp message id %.*s not found.\n", cmd->message_id->len, cmd->message_id->s);
-			kz_amqp_free_pipe_cmd(cmd);
-		} else {
-			retrieved_cmd->return_code = cmd->return_code;
-			retrieved_cmd->return_payload = cmd->return_payload;
-			cmd->return_payload = NULL;
-			lock_release(&retrieved_cmd->lock);
-			kz_amqp_free_pipe_cmd(cmd);
-		}
-		break;
-
-	case KZ_AMQP_CMD_PUBLISH_BROADCAST:
-		kz_amqp_publisher_send(cmd);
-		lock_release(&cmd->lock);
-		break;
-
-	case KZ_AMQP_CMD_ASYNC_CALL:
-		if(kz_amqp_publisher_send(cmd) < 0) {
-			kz_amqp_cb_error(cmd);
-		} else {
-			if(!kz_cmd_store(cmd)) {
-				kz_amqp_cb_error(cmd);
-			} else {
-				if(!kz_amqp_start_cmd_timer(cmd)) {
-					kz_amqp_cb_error(cmd);
-				}
-			}
-		}
-		break;
-
-	case KZ_AMQP_CMD_COLLECT:
-		break;
-
-	case KZ_AMQP_CMD_ASYNC_COLLECT:
-		break;
-
-	default:
-		break;
-
-	}
-}
-
-int kz_amqp_publisher_proc(int cmd_pipe)
-{
-	event_init();
-	struct event pipe_ev;
-	set_non_blocking(cmd_pipe);
-	event_set(&pipe_ev, cmd_pipe, EV_READ | EV_PERSIST, kz_amqp_publisher_proc_cb, &pipe_ev);
-	event_add(&pipe_ev, NULL);
-
-	kz_amqp_publisher_connect();
-
-	event_dispatch();
-	return 0;
-}
-
-char* maybe_add_consumer_key(int server_id, amqp_bytes_t body)
-{
-	char* payload = kz_amqp_bytes_dup(body);
-    json_obj_ptr json_obj = kz_json_parse(payload );
-    if (json_obj == NULL)
-    	return payload ;
-
-	json_object* server_id_obj = kz_json_get_object(json_obj, BLF_JSON_SERVERID);
-    if(server_id_obj == NULL) {
-    	return payload;
-    }
-    char buffer[100];
-    const char* server_id_str = json_object_get_string(server_id_obj);
-    sprintf(buffer, "consumer://%d/%s", server_id, server_id_str);
-    json_object_object_del(json_obj, BLF_JSON_SERVERID);
-    json_object_object_add(json_obj, BLF_JSON_SERVERID, json_object_new_string(buffer));
-    shm_free(payload);
-    payload = kz_amqp_bytes_dup(amqp_cstring_bytes((char*)json_object_to_json_string(json_obj)));
-   	json_object_put(json_obj);
-    return payload;
-}
-
-void kz_send_targeted_cmd(int server_id, amqp_bytes_t body)
-{
-    char buffer[100];
-    char* server_id_str = NULL;
-    kz_amqp_cmd_ptr cmd = NULL;
-    json_object* JObj = NULL;
-	char* payload = kz_local_amqp_bytes_dup(body);
-
-	if(payload == NULL) {
-		LM_ERR("error allocating message payload\n");
-		goto error;
-	}
-
-	json_obj_ptr json_obj = kz_json_parse(payload );
-    if (json_obj == NULL) {
-		LM_ERR("error parsing json payload\n");
-		goto error;
-    }
-
-	cmd = (kz_amqp_cmd_ptr)shm_malloc(sizeof(kz_amqp_cmd));
-	if(cmd == NULL) {
-		LM_ERR("failed to allocate kz_amqp_cmd in process %d\n", getpid());
-		goto error;
-	}
-	memset(cmd, 0, sizeof(kz_amqp_cmd));
-	if(lock_init(&cmd->lock)==NULL)
-	{
-		LM_ERR("cannot init the lock for targeted delivery in process %d\n", getpid());
-		goto error;
-	}
-
-	cmd->type = KZ_AMQP_CMD_TARGETED_CONSUMER;
-	cmd->return_code = AMQP_RESPONSE_NORMAL;
-
-    JObj = kz_json_get_object(json_obj, BLF_JSON_SERVERID);
-    if(JObj != NULL) {
-    	server_id_str = (char*) json_object_get_string(JObj);
-        sprintf(buffer, "consumer://%d/%s", server_id, server_id_str);
-        json_object_object_del(json_obj, BLF_JSON_SERVERID);
-        json_object_object_add(json_obj, BLF_JSON_SERVERID, json_object_new_string(buffer));
-    }
-
-    cmd->return_payload = kz_amqp_string_dup((char*)json_object_to_json_string(json_obj));
-
-    JObj = kz_json_get_object(json_obj, BLF_JSON_MSG_ID);
-    if(JObj != NULL) {
-    	cmd->message_id = kz_str_dup_from_char((char*)json_object_get_string(JObj));
-    }
-
-	if (write(kz_cmd_pipe, &cmd, sizeof(cmd)) != sizeof(cmd)) {
-		LM_ERR("failed to publish message to amqp in process %d, write to command pipe: %s\n", getpid(), strerror(errno));
-	} else {
-		cmd = NULL;
-	}
-
-error:
-	if(json_obj)
-		json_object_put(json_obj);
-
-    if(payload)
-    	pkg_free(payload);
-
-    if(cmd)
-    	kz_amqp_free_pipe_cmd(cmd);
-
-}
-
-void kz_amqp_send_worker_event(int _kz_server_id, amqp_envelope_t* envelope, kz_amqp_bind_ptr bind)
-{
-    char buffer[100];
-    kz_amqp_cmd_ptr cmd = NULL;
-    kz_amqp_consumer_delivery_ptr ptr = NULL;
-    str* message_id = NULL;
-    int idx = envelope->channel-1;
-
-    json_obj_ptr json_obj = kz_json_parse((char*)envelope->message.body.bytes);
-    if (json_obj == NULL) {
-    	LM_ERR("error parsing json body\n");
-    	return;
-    }
-
-    json_object* JObj = kz_json_get_object(json_obj, BLF_JSON_SERVERID);
-    if(JObj != NULL) {
-        const char* _kz_server_id_str = json_object_get_string(JObj);
-        sprintf(buffer, "consumer://%d/%s", _kz_server_id, _kz_server_id_str);
-        json_object_object_del(json_obj, BLF_JSON_SERVERID);
-        json_object_object_add(json_obj, BLF_JSON_SERVERID, json_object_new_string(buffer));
-    }
-
-    JObj = kz_json_get_object(json_obj, BLF_JSON_MSG_ID);
-    if(JObj != NULL) {
-    	message_id = kz_str_dup_from_char((char*)json_object_get_string(JObj));
-    	if(message_id == NULL) {
-    		LM_ERR("Error allocating memory for message_id copy\n");
-    		goto error;
+        	}
     	}
-		if(idx < dbk_channels) {
-			cmd = kz_cmd_retrieve(message_id);
-			if(cmd)
-				cmd->return_code = AMQP_RESPONSE_NORMAL;
-		}
+    	kz_amqp_connection_close(kzconn);
+    	kz_amqp_fire_connection_event("closed", kzconn->info->info.host);
     }
-
-	ptr = (kz_amqp_consumer_delivery_ptr) shm_malloc(sizeof(kz_amqp_consumer_delivery));
-	if(ptr == NULL) {
-		LM_ERR("NO MORE SHARED MEMORY!");
-		goto error;
-	}
-	memset(ptr, 0, sizeof(kz_amqp_consumer_delivery));
-	ptr->channel = envelope->channel;
-	ptr->delivery_tag = envelope->delivery_tag;
-	ptr->payload = kz_amqp_string_dup((char*)json_object_to_json_string(json_obj));
-	ptr->cmd = cmd;
-	ptr->message_id = message_id;
-
-	if(bind) {
-		ptr->event_key = kz_amqp_bytes_dup(bind->event_key);
-		ptr->event_subkey = kz_amqp_bytes_dup(bind->event_subkey);
-	}
-
-	consumer++;
-	if(consumer >= dbk_consumer_workers) {
-		consumer = 0;
-	}
-
-	if (write(kz_worker_pipes[consumer], &ptr, sizeof(ptr)) != sizeof(ptr)) {
-		LM_ERR("failed to send payload to consumer %d : %s\nPayload %s\n", consumer, strerror(errno), ptr->payload);
-		goto error;
-	}
-
-	json_object_put(json_obj);
-
-	return;
-
-error:
-	if(ptr)
-		kz_amqp_free_consumer_delivery(ptr);
-
-	if(json_obj)
-		json_object_put(json_obj);
-
 }
 
-
-int kz_amqp_consumer_proc(kz_amqp_server_ptr server_ptr)
+void kz_amqp_consumer_proc(int child_no)
 {
+	LM_DBG("starting consumer %d\n", child_no);
+	close(kz_pipe_fds[child_no*2+1]);
     int i, idx;
 	int OK;
-//	char* payload;
+	char* payload;
 	int channel_res;
-	kz_amqp_conn_ptr consumer = NULL;
-	kz_amqp_channel_ptr consumer_channels = NULL;
-	int channel_base = 0;
+    kz_amqp_conn_ptr kzconn;
+    kz_amqp_channel_ptr consumer_channels = NULL;
 
-	if(server_ptr->zone == kz_amqp_get_primary_zone())
-		channel_base = dbk_channels;
-
-	consumer = (kz_amqp_conn_ptr)pkg_malloc(sizeof(kz_amqp_conn));
-    if(consumer == NULL)
+    kzconn = (kz_amqp_conn_ptr)pkg_malloc(sizeof(kz_amqp_conn));
+    if(kzconn == NULL)
     {
     	LM_ERR("NO MORE PACKAGE MEMORY\n");
-    	return 1;
+    	return;
     }
-    memset(consumer, 0, sizeof(kz_amqp_conn));
-    consumer->server = server_ptr;
+    memset(kzconn, 0, sizeof(kz_amqp_conn));
 
     consumer_channels = (kz_amqp_channel_ptr)pkg_malloc(sizeof(kz_amqp_channel)*bindings_count);
     if(consumer_channels == NULL)
     {
     	LM_ERR("NO MORE PACKAGE MEMORY\n");
-    	return 1;
+    	return;
     }
 	for(i=0; i < bindings_count; i++)
-		consumer_channels[i].channel = channel_base + i + 1;
+		consumer_channels[i].channel = dbk_channels + i + 1;
 
     while(1) {
     	OK = 1;
-   		if(kz_amqp_connection_open(consumer)) {
+   		if(kz_amqp_open_next_connection(kzconn)) {
+   			LM_ERR("Error opening connection\n");
    			sleep(3);
    			continue;
    		}
-    	kz_amqp_fire_connection_event("open", server_ptr->connection->info.host);
+    	kz_amqp_fire_connection_event("open", kzconn->info->info.host);
 
     	/* reset channels */
 
-		/* bind targeted channels */
-    	for(i=0,channel_res=0; i < channel_base && channel_res == 0; i++) {
-			channel_res = kz_amqp_channel_open(consumer, server_ptr->channels[i].channel);
+    	for(i=0,channel_res=0; i < dbk_channels && channel_res == 0; i++) {
+			/* start cleanup */
+			channels[i].consumer = NULL;
+
+			/*
+			if(channels[i].targeted != NULL) {
+				kz_amqp_free_bind(channels[i].targeted);
+				channels[i].targeted = NULL;
+			}
+			*/
+
+			/* end cleanup */
+
+			/* bind targeted channels */
+			channel_res = kz_amqp_channel_open(kzconn, channels[i].channel);
 			if(channel_res == 0) {
-				kz_amqp_bind_targeted_channel(consumer, i);
+				kz_amqp_bind_targeted_channel(kzconn, i);
 			}
     	}
 
-		/*  cleanup consumer channels */
     	for(i=0,channel_res=0; i < bindings_count && channel_res == 0; i++) {
+			/* start cleanup */
     		consumer_channels[i].consumer = NULL;
+			/* end cleanup */
+
+			/* bind targeted channels */
+			channel_res = kz_amqp_channel_open(kzconn, consumer_channels[i].channel);
     	}
 
     	i = 0;
 		/* bind consumers */
 		if(kz_bindings != NULL) {
 			kz_amqp_binding_ptr binding = kz_bindings->head;
-			while(binding != NULL && OK) {
-				if(binding->bind->federate || server_ptr->zone == kz_amqp_get_primary_zone()) {
-					channel_res = kz_amqp_channel_open(consumer, consumer_channels[i].channel);
-					if(channel_res == 0) {
-						kz_amqp_bind_consumer(consumer, binding->bind, i, consumer_channels);
-						consumer_channels[i].state = KZ_AMQP_CHANNEL_BINDED;
-						i++;
-					} else {
-						LM_ERR("Error opening channel %d in server %s\n", i, server_ptr->connection->url);
-						OK = 0;
-					}
-				}
+			while(binding != NULL) {
+				kz_amqp_bind_consumer_ex(kzconn, binding->bind, i, consumer_channels);
 				binding = binding->next;
+				i++;
 			}
 		}
 
 		LM_DBG("CONSUMER INIT DONE\n");
 
 		while(OK) {
-//			payload = NULL;
+			payload = NULL;
 			amqp_envelope_t envelope;
-			amqp_maybe_release_buffers(consumer->conn);
-			amqp_rpc_reply_t reply = amqp_consume_message(consumer->conn, &envelope, NULL, 0);
+			amqp_maybe_release_buffers(kzconn->conn);
+			amqp_rpc_reply_t reply = amqp_consume_message(kzconn->conn, &envelope, NULL, 0);
 			switch(reply.reply_type) {
 			case AMQP_RESPONSE_LIBRARY_EXCEPTION:
 				switch(reply.library_error) {
@@ -2723,10 +2216,9 @@ int kz_amqp_consumer_proc(kz_amqp_server_ptr server_ptr)
 					break;
 				case AMQP_STATUS_UNEXPECTED_STATE:
 					LM_DBG("AMQP_STATUS_UNEXPECTED_STATE\n");
-					OK = kz_amqp_consume_error(consumer);
+					OK = kz_amqp_consume_error(kzconn->conn);
 					break;
 				default:
-					LM_ERR("AMQP_RESPONSE_LIBRARY_EXCEPTION %i\n", reply.library_error);
 					OK = 0;
 					break;
 				};
@@ -2734,18 +2226,35 @@ int kz_amqp_consumer_proc(kz_amqp_server_ptr server_ptr)
 
 			case AMQP_RESPONSE_NORMAL:
 				idx = envelope.channel-1;
-				if(idx < channel_base) {
-					kz_amqp_send_worker_event(server_ptr->id, &envelope, NULL);
+				if(idx < dbk_channels) {
+					switch(channels[idx].state) {
+						case KZ_AMQP_CALLING:
+							lock_get(&channels[idx].lock);
+							if(channels[idx].cmd != NULL) {
+								channels[idx].cmd->return_payload = kz_amqp_bytes_dup(envelope.message.body);
+								channels[idx].cmd->return_code = AMQP_RESPONSE_NORMAL;
+								lock_release(&channels[idx].cmd->lock);
+								channels[idx].cmd = NULL;
+								channels[idx].state = KZ_AMQP_FREE;
+							}
+							lock_release(&channels[idx].lock);
+							break;
+						default:
+							LM_DBG("ignoring received payload on consumer - %.*s\n", (int) envelope.message.body.len, (char*)envelope.message.body.bytes);
+							break;
+					}
 				} else {
-					idx = idx - channel_base;
+					idx = idx - dbk_channels;
+					kz_amqp_send_consumer_event_ex(kz_amqp_bytes_dup(envelope.message.body),
+						kz_amqp_bytes_dup(consumer_channels[idx].consumer->event_key),
+						kz_amqp_bytes_dup(consumer_channels[idx].consumer->event_subkey),
+						0, 0, 1);
 					if(!consumer_channels[idx].consumer->no_ack ) {
-						if(amqp_basic_ack(consumer->conn, envelope.channel, envelope.delivery_tag, 0 ) < 0) {
+						if(amqp_basic_ack(kzconn->conn, envelope.channel, envelope.delivery_tag, 0 ) < 0) {
 							LM_ERR("AMQP ERROR TRYING TO ACK A MSG\n");
 							OK = 0;
 						}
 					}
-					if(OK)
-						kz_amqp_send_worker_event(server_ptr->id, &envelope, consumer_channels[idx].consumer);
 				}
 				break;
 			case AMQP_RESPONSE_SERVER_EXCEPTION:
@@ -2761,56 +2270,8 @@ int kz_amqp_consumer_proc(kz_amqp_server_ptr server_ptr)
 			amqp_destroy_envelope(&envelope);
 		}
 
-    	kz_amqp_connection_close(consumer);
+    	kz_amqp_connection_close(kzconn);
+    	kz_amqp_fire_connection_event("closed", kzconn->info->info.host);
 
     }
-    return 0;
 }
-
-void kz_amqp_consumer_worker_cb(int fd, short event, void *arg)
-{
-	kz_amqp_cmd_ptr cmd = NULL;
-	kz_amqp_consumer_delivery_ptr Evt;
-	if (read(fd, &Evt, sizeof(Evt)) != sizeof(Evt)) {
-		LM_ERR("failed to read from command pipe: %s\n", strerror(errno));
-		return;
-	}
-
-	LM_DBG("consumer %d received payload %s\n", my_pid(), Evt->payload);
-
-	if(Evt->cmd) {
-		cmd =Evt->cmd;
-		if(cmd->type == KZ_AMQP_CMD_ASYNC_CALL ) {
-			if(cmd->return_code == AMQP_RESPONSE_NORMAL) {
-				kz_amqp_set_last_result(Evt->payload);
-				kz_amqp_cb_ok(cmd);
-			} else {
-				kz_amqp_reset_last_result();
-				kz_amqp_cb_error(cmd);
-				LM_DBG("run error exiting consumer %d\n", my_pid());
-			}
-		} else {
-			cmd->return_payload = Evt->payload;
-			Evt->payload = NULL;
-			Evt->cmd = NULL;
-			lock_release(&cmd->lock);
-		}
-	} else {
-		kz_amqp_consumer_event(Evt->payload, Evt->event_key, Evt->event_subkey);
-	}
-
-	kz_amqp_free_consumer_delivery(Evt);
-	LM_DBG("exiting consumer %d\n", my_pid());
-}
-
-int kz_amqp_consumer_worker_proc(int cmd_pipe)
-{
-	event_init();
-	struct event pipe_ev;
-	set_non_blocking(cmd_pipe);
-	event_set(&pipe_ev, cmd_pipe, EV_READ | EV_PERSIST, kz_amqp_consumer_worker_cb, &pipe_ev);
-	event_add(&pipe_ev, NULL);
-	event_dispatch();
-	return 0;
-}
-

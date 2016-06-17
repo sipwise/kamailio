@@ -4,5 +4,3 @@ CREATE TABLE version (
     CONSTRAINT version_table_name_idx UNIQUE (table_name)
 );
 
-INSERT INTO version (table_name, table_version) values ('version','1');
-

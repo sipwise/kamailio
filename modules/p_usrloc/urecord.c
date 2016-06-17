@@ -304,7 +304,7 @@ static inline void wb_timer(urecord_t* _r)
 {
 	ucontact_t* ptr, *t;
 	cstate_t old_state;
-	int op, res;
+	int op;
 
 	ptr = _r->contacts;
 
@@ -348,11 +348,7 @@ static inline void wb_timer(urecord_t* _r)
 				break;
 
 			case 2: /* update */
-				if (ul_db_update_as_insert)
-				    res = db_insert_ucontact(ptr);
-                else
-                    res = db_update_ucontact(ptr);
-                if (res < 0) {
+				if (db_update_ucontact(ptr) < 0) {
 					LM_ERR("updating contact in db failed\n");
 					ptr->state = old_state;
 				}
@@ -577,7 +573,6 @@ static inline struct ucontact* contact_path_match( ucontact_t* ptr, str* _c, str
  * \param _r record where to search the contacts
  * \param _c contact string
  * \param _callid callid
- * \param _path path
  * \param _cseq CSEQ number
  * \param _co found contact
  * \return 0 - found, 1 - not found, -1 - invalid found, 

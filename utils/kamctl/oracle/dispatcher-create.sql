@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('dispatcher','4');
 CREATE TABLE dispatcher (
     id NUMBER(10) PRIMARY KEY,
     setid NUMBER(10) DEFAULT 0 NOT NULL,
@@ -16,5 +17,3 @@ END dispatcher_tr;
 /
 BEGIN map2users('dispatcher'); END;
 /
-INSERT INTO version (table_name, table_version) values ('dispatcher','4');
-

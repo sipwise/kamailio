@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <json-c/json.h>
 #include "../../mem/mem.h"
 #include "../../timer_proc.h"
 #include "../../sr_module.h"
@@ -8,11 +9,15 @@
 #include "../presence/bind_presence.h"
 #include "../../pvar.h"
 
+#include "../pua/pua.h"
+#include "../pua/pua_bind.h"
+#include "../pua/send_publish.h"
+
+#include "kz_pua.h"
 #include "defs.h"
 #include "const.h"
 #include "kz_json.h"
 
-#include "kz_pua.h"
 
 extern int dbk_include_entity;
 extern int dbk_pua_mode;
@@ -24,9 +29,9 @@ extern str kz_presentity_table;
 
 int kz_pua_update_presentity(str* event, str* realm, str* user, str* etag, str* sender, str* body, int expires, int reset)
 {
-	db_key_t query_cols[13];
-	db_op_t  query_ops[13];
-	db_val_t query_vals[13];
+	db_key_t query_cols[12];
+	db_op_t  query_ops[12];
+	db_val_t query_vals[12];
 	int n_query_cols = 0;
 	int ret = -1;
 	int use_replace = 1;
@@ -81,12 +86,6 @@ int kz_pua_update_presentity(str* event, str* realm, str* user, str* etag, str* 
 	query_vals[n_query_cols].type = DB1_INT;
 	query_vals[n_query_cols].nul = 0;
 	query_vals[n_query_cols].val.int_val = expires;
-	n_query_cols++;
-
-	query_cols[n_query_cols] = &str_priority_col;
-	query_vals[n_query_cols].type = DB1_INT;
-	query_vals[n_query_cols].nul = 0;
-	query_vals[n_query_cols].val.int_val = 0;
 	n_query_cols++;
 
 	if (kz_pa_dbf.use_table(kz_pa_db, &kz_presentity_table) < 0)
@@ -170,7 +169,7 @@ int kz_pua_publish_presence_to_presentity(struct json_object *json_obj) {
     str event = str_init("presence");
     str presence_body = { 0, 0 };
     str activity = str_init("");
-    str note = str_init("Available");
+    str note = str_init("Idle");
     str status = str_presence_status_online;
     int expires = 0;
 
@@ -217,9 +216,9 @@ int kz_pua_publish_presence_to_presentity(struct json_object *json_obj) {
     	note = str_presence_note_offline;
     	status = str_presence_status_offline;
 
-    }; // else {
-    //	note = str_presence_note_idle;
-//    }
+    } else {
+    	note = str_presence_note_idle;
+    }
 
 
     sprintf(body, PRESENCE_BODY, from_user.s, callid.s, status.s, note.s, activity.s, note.s);

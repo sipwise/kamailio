@@ -6,15 +6,12 @@ auto_gen=
 NAME=uuid.so
 
 ifeq ($(CROSS_COMPILE),)
-BUILDER = $(shell \
-	if pkg-config --exists uuid; then \
-		echo 'pkg-config uuid'; \
-	fi)
+	BUILDER = $(shell which pkg-config)
 endif
 
 ifneq ($(BUILDER),)
-	DEFS += $(shell $(BUILDER) --cflags)
-	LIBS += $(shell $(BUILDER) --libs)
+	DEFS += $(shell $(BUILDER) --cflags uuid)
+	LIBS += $(shell $(BUILDER) --libs uuid)
 else
 	DEFS +=-I$(LOCALBASE)/include -I$(SYSBASE)/include
 	LIBS+=-L$(LOCALBASE)/lib -L$(SYSBASE)/lib -luuid

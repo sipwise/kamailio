@@ -15,8 +15,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
+ * You should have received a copy of the GNU General Public License 
+ * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
@@ -24,15 +24,15 @@
 /*!
  * \defgroup registrar Registrar :: SIP Registrar support
  * The module contains REGISTER processing logic.
- */
+ */  
 
 /*!
  * \file
  * \brief SIP registrar module - interface
- * \ingroup registrar
+ * \ingroup registrar   
  *
  * - Module: \ref registrar
- */
+ */  
 
 #include <stdio.h>
 #include "../../sr_module.h"
@@ -89,12 +89,12 @@ int tcp_persistent_flag = -1;			/*!< if the TCP connection should be kept open *
 int method_filtering = 0;			/*!< if the looked up contacts should be filtered based on supported methods */
 int path_enabled = 0;				/*!< if the Path HF should be handled */
 int path_mode = PATH_MODE_STRICT;		/*!< if the Path HF should be inserted in the reply.
-			*   - STRICT (2): always insert, error if no support indicated in request
-			*   - LAZY   (1): insert only if support indicated in request
-			*   - OFF    (0): never insert */
+ 			*   - STRICT (2): always insert, error if no support indicated in request
+ 			*   - LAZY   (1): insert only if support indicated in request
+ 			*   - OFF    (0): never insert */
 
 int path_use_params = 0;			/*!< if the received- and nat-parameters of last Path uri should be used
-						 * to determine if UAC is nat'ed */
+ 						 * to determine if UAC is nat'ed */
 int path_check_local = 0;
 
 /* sruid to get internal uid */
@@ -163,8 +163,6 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"lookup_to_dset",  (cmd_function)w_lookup_to_dset,  1,  domain_uri_fixup, 0,
 			REQUEST_ROUTE | FAILURE_ROUTE },
-	{"lookup_to_dset",  (cmd_function)w_lookup_to_dset,  2,  domain_uri_fixup, 0,
-			REQUEST_ROUTE | FAILURE_ROUTE },
 	{"registered",   (cmd_function)w_registered,  1,  domain_uri_fixup, 0,
 			ANY_ROUTE },
 	{"registered",   (cmd_function)w_registered,  2,  domain_uri_fixup, 0,
@@ -179,7 +177,7 @@ static cmd_export_t cmds[] = {
 			REQUEST_ROUTE| FAILURE_ROUTE },
 	{"unregister",   (cmd_function)w_unregister2, 3, unreg_fixup, 0,
 			REQUEST_ROUTE| FAILURE_ROUTE },
-	{"reg_fetch_contacts", (cmd_function)pv_fetch_contacts, 3,
+	{"reg_fetch_contacts", (cmd_function)pv_fetch_contacts, 3, 
 			fetchc_fixup, 0,
 			REQUEST_ROUTE| FAILURE_ROUTE },
 	{"reg_free_contacts", (cmd_function)pv_free_contacts,   1,
@@ -246,7 +244,7 @@ stat_export_t mod_stats[] = {
  * Module exports structure
  */
 struct module_exports exports = {
-	"registrar",
+	"registrar", 
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	cmds,        /* Exported functions */
 	params,      /* Exported parameters */
@@ -288,11 +286,13 @@ static int mod_init(void)
 		LM_ERR("cannot bind to SL API\n");
 		return -1;
 	}
-
+	
 	if(cfg_declare("registrar", registrar_cfg_def, &default_registrar_cfg, cfg_sizeof(registrar), &registrar_cfg)){
 		LM_ERR("Fail to declare the configuration\n");
-		return -1;
+	        return -1;
 	}
+	                                                
+	                                                
 
 	if (rcv_avp_param && *rcv_avp_param) {
 		s.s = rcv_avp_param; s.len = strlen(s.s);
@@ -360,13 +360,8 @@ static int mod_init(void)
 			sock_hdr_name.len = 0;
 			sock_flag = -1;
 		}
-	} else if (reg_xavp_cfg.s) {
-		if (reg_xavp_cfg.len == 0 || sock_flag == -1) {
-			LM_WARN("empty reg_xavp_cfg or sock_flag no set -> resetting\n");
-			sock_flag = -1;
-		}
 	} else if (sock_flag!=-1) {
-		LM_WARN("sock_flag defined but no sock_hdr_name or no reg_xavp_cfg -> resetting flag\n");
+		LM_WARN("sock_flag defined but no sock_hdr_name -> reseting flag\n");
 		sock_flag = -1;
 	}
 
@@ -537,11 +532,11 @@ static int w_unregister(struct sip_msg* _m, char* _d, char* _uri)
 
 static int w_unregister2(struct sip_msg* _m, char* _d, char* _uri, char *_ruid)
 {
-	str uri = {0, 0};
+        str uri = {0, 0};
 	str ruid = {0};
 	if(fixup_get_svalue(_m, (gparam_p)_uri, &uri)!=0)
 	{
-		LM_ERR("invalid uri parameter\n");
+	        LM_ERR("invalid uri parameter\n");
 		return -1;
 	}
 	if(fixup_get_svalue(_m, (gparam_p)_ruid, &ruid)!=0 || ruid.len<=0)

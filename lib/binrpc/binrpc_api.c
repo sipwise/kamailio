@@ -53,7 +53,7 @@
 #define binrpc_free internal_free
 
 #ifndef UNIX_PATH_MAX
-#define UNIX_PATH_MAX 104
+#define UNIX_PATH_MAX 108
 #endif
 
 #ifndef INT2STR_MAX_LEN

@@ -1,5 +1,5 @@
 %define name	kamailio
-%define ver	4.4.1
+%define ver	4.3.5
 %define rel	0.0%{dist}
 
 
@@ -53,17 +53,8 @@ Group:		System Environment/Daemons
 Requires:	openssl, kamailio = %ver
 BuildRequires:	openssl-devel
 
-%description 	auth-ephemeral
+%description auth-ephemeral
 Functions for authentication using ephemeral credentials.
-
-
-%package	auth-xkeys
-Summary:	Functions for authentication using shared keys.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
-
-%description 	auth-xkeys
-Functions for authentication using shared keys.
 
 
 %package	bdb
@@ -86,16 +77,6 @@ BuildRequires:	epel-release, libconfuse-devel
 The carrierroute module for Kamailio.
 
 
-%package	cnxcc
-Summary:	Module which provides a mechanism to limit call duration based on credit information parameters for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libevent, hiredis, kamailio = %ver
-BuildRequires:	libevent-devel, hiredis-devel
-
-%description	cnxcc
-Module which provides a mechanism to limit call duration based on credit information parameters for Kamailio.
-
-
 %package	cpl
 Summary:	CPL (Call Processing Language) interpreter for Kamailio.
 Group:		System Environment/Daemons
@@ -114,15 +95,6 @@ BuildRequires:	pcre-devel
 
 %description	dialplan
 String translations based on rules for Kamailio.
-
-
-%package	dmq_userloc
-Summary:	User location (usrloc) records replication between multiple servers via DMQ module for Kamailio.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
-
-%description	dmq_userloc
-User location (usrloc) records replication between multiple servers via DMQ module.
 
 
 %package	dnssec
@@ -327,15 +299,6 @@ BuildRequires:	pcre-devel
 PCRE mtaching operations for Kamailio.
 
 
-%package	rtjson
-Summary:	SIP routing based on JSON specifications.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
-
-%description	rtjson
-SIP routing based on JSON specifications.
-
-
 %package	sctp
 Summary:	SCTP transport for Kamailio.
 Group:		System Environment/Daemons
@@ -356,15 +319,6 @@ BuildRequires:	net-snmp-devel
 SNMP management interface (scalar statistics) for Kamailio.
 
 
-%package	statsd
-Summary:	Send commands to statsd server.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
-
-%description	statsd
-Send commands to statsd server.
-
-
 %package	sqlite
 Summary:	SQLite database connectivity for Kamailio.
 Group:		System Environment/Daemons
@@ -383,15 +337,6 @@ BuildRequires:	openssl-devel
 
 %description	tls
 TLS transport for Kamailio.
-
-
-%package	tcpops
-Summary:	On demand and per socket control to the TCP options.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
-
-%description	tcpops
-On demand and per socket control to the TCP options.
 
 
 %package	unixodbc
@@ -476,7 +421,7 @@ make cfg prefix=/usr cfg_prefix=$RPM_BUILD_ROOT basedir=$RPM_BUILD_ROOT \
 make
 make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 	jabber ndb_cassandra osp" \
-	group_include="kstandard kautheph kberkeley kcarrierroute kcnxcc kcpl \
+	group_include="kstandard kautheph kberkeley kcarrierroute kcpl \
 	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
 	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
 	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
@@ -494,7 +439,7 @@ make utils
 make install
 make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 	iptrtpproxy jabber osp" \
-	group_include="kstandard kautheph kberkeley kcarrierroute kcnxcc kcpl \
+	group_include="kstandard kautheph kberkeley kcarrierroute kcpl \
 	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
 	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
 	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
@@ -565,6 +510,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.cfg_db
 %doc %{_docdir}/kamailio/modules/README.cfg_rpc
 %doc %{_docdir}/kamailio/modules/README.cfgutils
+%doc %{_docdir}/kamailio/modules/README.cnxcc
 %doc %{_docdir}/kamailio/modules/README.corex
 %doc %{_docdir}/kamailio/modules/README.counters
 %doc %{_docdir}/kamailio/modules/README.ctl
@@ -708,6 +654,7 @@ fi
 %{_libdir}/kamailio/modules/cfg_db.so
 %{_libdir}/kamailio/modules/cfg_rpc.so
 %{_libdir}/kamailio/modules/cfgutils.so
+%{_libdir}/kamailio/modules/cnxcc.so
 %{_libdir}/kamailio/modules/corex.so
 %{_libdir}/kamailio/modules/counters.so
 %{_libdir}/kamailio/modules/ctl.so
@@ -842,12 +789,6 @@ fi
 %{_libdir}/kamailio/modules/auth_ephemeral.so
 
 
-%files		auth-xkeys
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.auth_xkeys
-%{_libdir}/kamailio/modules/auth_xkeys.so
-
-
 %files		bdb
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_berkeley
@@ -865,11 +806,6 @@ fi
 %{_libdir}/kamailio/modules/carrierroute.so
 
 
-%files		cnxcc
-%defattr(-,root,root)
-%{_docdir}/kamailio/modules/README.cnxcc
-%{_libdir}/kamailio/modules/cnxcc.so
-
 %files		cpl
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.cpl-c
@@ -880,12 +816,6 @@ fi
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.dialplan
 %{_libdir}/kamailio/modules/dialplan.so
-
-
-%files		dmq_userloc
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.dmq_usrloc
-%{_libdir}/kamailio/modules/dmq_usrloc.so
 
 
 %files		dnssec
@@ -920,7 +850,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.ims_isc
 %doc %{_docdir}/kamailio/modules/README.ims_qos
 #%doc %{_docdir}/kamailio/modules/README.ims_registrar_pcscf
-%doc %{_docdir}/kamailio/modules/README.ims_registrar_scscf
+#%doc %{_docdir}/kamailio/modules/README.ims_registrar_scscf
 %doc %{_docdir}/kamailio/modules/README.ims_usrloc_pcscf
 #%doc %{_docdir}/kamailio/modules/README.ims_usrloc_scscf
 %{_libdir}/kamailio/modules/cdp.so
@@ -1115,12 +1045,6 @@ fi
 %{_libdir}/kamailio/modules/regex.so
 
 
-%files		rtjson
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.rtjson
-%{_libdir}/kamailio/modules/rtjson.so
-
-
 %files		sctp
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.sctp
@@ -1136,12 +1060,6 @@ fi
 %{_datadir}/snmp/mibs/KAMAILIO-SIP-COMMON-MIB
 %{_datadir}/snmp/mibs/KAMAILIO-SIP-SERVER-MIB
 %{_datadir}/snmp/mibs/KAMAILIO-TC
-
-
-%files		statsd
-%defattr(-,root,root)
-%{_docdir}/kamailio/modules/README.statsd
-%{_libdir}/kamailio/modules/statsd.so
 
 
 %files		sqlite
@@ -1160,12 +1078,6 @@ fi
 %doc %{_docdir}/kamailio/modules/README.tls
 %{_libdir}/kamailio/modules/auth_identity.so
 %{_libdir}/kamailio/modules/tls.so
-
-
-%files		tcpops
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.tcpops
-%{_libdir}/kamailio/modules/tcpops.so
 
 
 %files		unixodbc

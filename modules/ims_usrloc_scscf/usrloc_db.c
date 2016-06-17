@@ -67,12 +67,12 @@ int query_buffer_len		= 0;
 
 char* impu_contact_insert_query = "INSERT INTO impu_contact (impu_id, contact_id) (SELECT I.id, C.id FROM impu I, contact C WHERE I.impu='%.*s' and C.contact='%.*s')";
 int impu_contact_insert_query_len;
-char* impu_contact_delete_query = "DELETE impu_contact FROM impu_contact INNER JOIN impu ON impu_contact.impu_id = impu.id INNER JOIN contact ON contact.id = impu_contact.contact_id where impu.impu = '%.*s' and contact.contact = '%.*s'";
+char* impu_contact_delete_query = "DELETE FROM impu_contact WHERE impu_id in (select impu.id from impu where impu.impu='%.*s') AND contact_id in (select contact.id from contact where contact.contact='%.*s')";
 int impu_contact_delete_query_len;
 
 char* impu_subscriber_insert_query = "INSERT INTO impu_subscriber (impu_id, subscriber_id) (SELECT I.id, S.id FROM impu I, subscriber S WHERE I.impu='%.*s' and S.event='%.*s' and S.watcher_contact='%.*s' and S.presentity_uri='%.*s')";
 int impu_subscriber_insert_query_len;
-char* impu_subscriber_delete_query = "DELETE impu_subscriber FROM impu_subscriber INNER JOIN impu on impu_subscriber.impu_id=impu.id INNER JOIN subscriber on impu_subscriber.subscriber_id=subscriber.id WHERE impu.impu='%.*s' AND subscriber.event='%.*s' and subscriber.watcher_contact='%.*s' and subscriber.presentity_uri='%.*s'";
+char* impu_subscriber_delete_query = "DELETE FROM impu_subscriber WHERE impu_id in (select impu.id from impu where impu.impu='%.*s') AND subscriber_id in (select subscriber.id from subscriber where subscriber.event='%.*s' and subscriber.watcher_contact='%.*s' and subscriber.presentity_uri='%.*s')";
 int impu_subscriber_delete_query_len;
 
 
@@ -784,14 +784,12 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d) {
 
 	    /* insert impu into memory */
 	    lock_udomain(_d, &impu);
-	    if (get_impurecord_unsafe(_d, &impu, &impurecord) != 0) {
-		if (mem_insert_impurecord(_d, &impu, &subscription->private_identity,reg_state, barring,
+	    if (get_impurecord(_d, &impu, &impurecord) != 0) {
+		if (mem_insert_impurecord(_d, &impu, reg_state, barring,
 			&subscription, &ccf1, &ccf2, &ecf1, &ecf2, &impurecord)
 			!= 0) {
 		    LM_ERR("Unable to insert IMPU into memory [%.*s]\n", impu.len, impu.s);
 		}
-                /* run the INSERTion callback so REGISTRAR can get into sync - ie subscribe for callbacks on the IMPU.... for NOTIFYs for example*/
-                run_ul_callbacks(NULL, UL_IMPU_INSERT, impurecord, NULL);
 	    }
 
 	    /* add contacts */
@@ -841,22 +839,14 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d) {
 				contact.s = (char*) VAL_STRING(contact_vals);
 				contact.len = strlen(contact.s);
 			    }
-                            
-                            if (contact.len <=0 || !contact.s){
-                                   LM_ERR("Unable to insert contact [%.*s] for IMPU [%.*s] into memory... continuing...\n",
-					    contact.len, contact.s,
-					    impu.len, impu.s); 
-                                   continue;
-                            }
-                            
 			    if (dbrow2contact(contact_vals, &contact_data) != 0) {
 				LM_ERR("unable to convert contact row from DB into valid data... moving on\n");
 				continue;
 			    }
 
-			    if (get_scontact(&contact, contact_data.callid, contact_data.path, contact_data.cseq, &c) != 0) {
+			    if (get_ucontact(impurecord, &contact, contact_data.callid, contact_data.path, contact_data.cseq, &c) != 0) {
 				LM_DBG("Contact doesn't exist yet, creating new one [%.*s]\n", contact.len, contact.s);
-				if ((c = mem_insert_scontact(impurecord, &contact, &contact_data)) == 0) {
+				if ((c = mem_insert_ucontact(impurecord, &contact, &contact_data)) == 0) {
 				    LM_ERR("Unable to insert contact [%.*s] for IMPU [%.*s] into memory... continuing...\n",
 					    contact.len, contact.s,
 					    impu.len, impu.s);
@@ -864,7 +854,7 @@ int preload_udomain(db1_con_t* _c, udomain_t* _d) {
 				}
 			    }
 			    link_contact_to_impu(impurecord, c, 0);
-			    release_scontact(c);
+			    release_ucontact(c);
 			}
 			if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
 			    if (ul_dbf.fetch_result(_c, &contact_rs, ul_fetch_rows) < 0) {

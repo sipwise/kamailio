@@ -84,8 +84,6 @@ static cmd_export_t cmds[] = {
 		change_reply_status_fixup, ONREPLY_ROUTE },
 	{"remove_body",          (cmd_function)w_remove_body_f,         0,
 		0, ANY_ROUTE },
-	{"keep_hf",              (cmd_function)w_keep_hf_f,             0,
-		fixup_regexp_null, ANY_ROUTE },
 	{"keep_hf",              (cmd_function)w_keep_hf_f,             1,
 		fixup_regexp_null, ANY_ROUTE },
 	{"fnmatch",              (cmd_function)w_fnmatch2_f,            2,
@@ -358,11 +356,7 @@ static int w_keep_hf_f(struct sip_msg* msg, char* key, char* foo)
 	char c;
 	struct lump* l;
 
-	if(key) {
-		re = (regex_t*)key;
-	} else {
-		re = NULL;
-	}
+	re = (regex_t*)key;
 
 	/* we need to be sure we have seen all HFs */
 	parse_headers(msg, HDR_EOH_F, 0);
@@ -386,32 +380,20 @@ static int w_keep_hf_f(struct sip_msg* msg, char* key, char* foo)
 				;
 		}
 
-		if(re==NULL) {
-			/* no regex to match => remove all */
+		c = hf->name.s[hf->name.len];
+		hf->name.s[hf->name.len] = '\0';
+		if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
+		{
+			/* no match => remove */
+			hf->name.s[hf->name.len] = c;
 			l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
 			if (l==0)
 			{
-				LM_ERR("cannot remove header [%.*s]\n",
-						hf->name.len, hf->name.s);
+				LM_ERR("cannot remove header\n");
 				return -1;
 			}
 		} else {
-			c = hf->name.s[hf->name.len];
-			hf->name.s[hf->name.len] = '\0';
-			if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
-			{
-				/* no match => remove */
-				hf->name.s[hf->name.len] = c;
-				l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
-				if (l==0)
-				{
-					LM_ERR("cannot remove header [%.*s]\n",
-							hf->name.len, hf->name.s);
-					return -1;
-				}
-			} else {
-				hf->name.s[hf->name.len] = c;
-			}
+			hf->name.s[hf->name.len] = c;
 		}
 	}
 

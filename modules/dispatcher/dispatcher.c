@@ -47,7 +47,6 @@
 #include "../../error.h"
 #include "../../ut.h"
 #include "../../route.h"
-#include "../../timer_proc.h"
 #include "../../mem/mem.h"
 #include "../../mod_fix.h"
 #include "../../rpc.h"
@@ -96,9 +95,9 @@ unsigned short sock_avp_type;
 pv_elem_t * hash_param_model = NULL;
 
 int probing_threshold = 1; /* number of failed requests, before a destination
-							* is taken into probing */
+							   is taken into probing */
 int inactive_threshold = 1; /* number of replied requests, before a destination
-							 * is taken into back in active state */
+							   is taken into back in active state */
 str ds_ping_method = str_init("OPTIONS");
 str ds_ping_from   = str_init("sip:dispatcher@localhost");
 static int ds_ping_interval = 0;
@@ -115,7 +114,6 @@ int ds_hash_size = 0;
 int ds_hash_expire = 7200;
 int ds_hash_initexpire = 7200;
 int ds_hash_check_interval = 30;
-int ds_timer_mode = 0;
 
 str ds_outbound_proxy = {0, 0};
 
@@ -243,7 +241,6 @@ static param_export_t params[]={
 	{"ds_hash_check_interval", INT_PARAM, &ds_hash_check_interval},
 	{"outbound_proxy",  PARAM_STR, &ds_outbound_proxy},
 	{"ds_default_socket",  PARAM_STR, &ds_default_socket},
-	{"ds_timer_mode",      PARAM_INT, &ds_timer_mode},
 	{0,0,0}
 };
 
@@ -286,10 +283,6 @@ static int mod_init(void)
 		LM_ERR("failed to register MI commands\n");
 		return -1;
 	}
-	if(ds_ping_active_init()<0) {
-		return -1;
-	}
-
 	if(ds_init_rpc()<0)
 	{
 		LM_ERR("failed to register RPC commands\n");
@@ -518,13 +511,7 @@ static int mod_init(void)
 			if(ds_hash_load_init(1<<ds_hash_size, ds_hash_expire,
 						ds_hash_initexpire)<0)
 				return -1;
-			if(ds_timer_mode==1) {
-				if(sr_wtimer_add(ds_ht_timer, NULL, ds_hash_check_interval)<0)
-					return -1;
-			} else {
-				if(register_timer(ds_ht_timer, NULL, ds_hash_check_interval)<0)
-					return -1;
-			}
+			register_timer(ds_ht_timer, NULL, ds_hash_check_interval);
 		} else {
 			LM_ERR("call load dispatching DSTID_AVP set but no size"
 					" for hash table (see ds_hash_size parameter)\n");
@@ -545,13 +532,7 @@ static int mod_init(void)
 		/*****************************************************
 		 * Register the PING-Timer
 		 *****************************************************/
-		if(ds_timer_mode==1) {
-			if(sr_wtimer_add(ds_check_timer, NULL, ds_ping_interval)<0)
-				return -1;
-		} else {
-			if(register_timer(ds_check_timer, NULL, ds_ping_interval)<0)
-				return -1;
-		}
+		register_timer(ds_check_timer, NULL, ds_ping_interval);
 	}
 
 	return 0;
@@ -1230,13 +1211,12 @@ static void dispatcher_rpc_list(rpc_t* rpc, void* ctx)
 					rpc->fault(ctx, 500, "Internal error creating dest struct");
 					return;
 				}
-				if(rpc->struct_add(wh, "SSdddS",
+				if(rpc->struct_add(wh, "SSddS",
 							"BODY", &(list->dlist[j].attrs.body),
 							"DUID", (list->dlist[j].attrs.duid.s)?
 							&(list->dlist[j].attrs.duid):&data,
 							"MAXLOAD", list->dlist[j].attrs.maxload,
 							"WEIGHT", list->dlist[j].attrs.weight,
-							"RWEIGHT", list->dlist[j].attrs.rweight,
 							"SOCKET", (list->dlist[j].attrs.socket.s)?
 							&(list->dlist[j].attrs.socket):&data)<0)
 				{
@@ -1322,54 +1302,6 @@ static void dispatcher_rpc_set_state(rpc_t* rpc, void* ctx)
 }
 
 
-static const char* dispatcher_rpc_ping_active_doc[2] = {
-	"Manage setting on/off the pinging (keepalive) of destinations",
-	0
-};
-
-
-/*
- * RPC command to set the state of a destination address
- */
-static void dispatcher_rpc_ping_active(rpc_t* rpc, void* ctx)
-{
-	int state;
-	int ostate;
-	void *th;
-
-	if(rpc->scan(ctx, "*d", &state)!=1) {
-		state = -1;
-	}
-	ostate = ds_ping_active_get();
-	/* add entry node */
-	if (rpc->add(ctx, "{", &th) < 0) {
-		rpc->fault(ctx, 500, "Internal error root reply");
-		return;
-	}
-	if(state==-1) {
-		if(rpc->struct_add(th, "d",
-				"OldPingState", ostate)<0)
-		{
-			rpc->fault(ctx, 500, "Internal error reply structure");
-			return;
-		}
-		return;
-	}
-
-	if(ds_ping_active_set(state)<0) {
-		rpc->fault(ctx, 500, "Ping State Update Failed");
-		return;
-	}
-	if(rpc->struct_add(th, "dd",
-				"NewPingState", state,
-				"OldPingState", ostate)<0)
-	{
-		rpc->fault(ctx, 500, "Internal error reply structure");
-		return;
-	}
-	return;
-}
-
 rpc_export_t dispatcher_rpc_cmds[] = {
 	{"dispatcher.reload", dispatcher_rpc_reload,
 		dispatcher_rpc_reload_doc, 0},
@@ -1377,8 +1309,6 @@ rpc_export_t dispatcher_rpc_cmds[] = {
 		dispatcher_rpc_list_doc,   0},
 	{"dispatcher.set_state",   dispatcher_rpc_set_state,
 		dispatcher_rpc_set_state_doc,   0},
-	{"dispatcher.ping_active",   dispatcher_rpc_ping_active,
-		dispatcher_rpc_ping_active_doc, 0},
 	{0, 0, 0, 0}
 };
 

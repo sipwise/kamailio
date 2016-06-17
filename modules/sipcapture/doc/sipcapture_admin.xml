@@ -108,7 +108,7 @@ modparam("sipcapture", "db_url", "mysql://user:passwd@host/dbname")
 		</para>
 		<para>
 		<emphasis>
-			Default value is "sip_capture". Only for Homer 3. For Homer 5, please use an argument for the sip_capture function.
+			Default value is "sip_capture".
 		</emphasis>
 		</para>
 		<example>
@@ -166,11 +166,6 @@ modparam("sipcapture", "hash_source", "to_user")
                 If set to 1, use INSERT DELAYED to store sip message into capture table
                 when the DB driver has support for it. If no INSERT DELAYED support
                 is offered by DB driver, then standard INSERT is used.
-                </para>
-                <para>
-                If set to 2, use ASYNC INSERT to store sip message into capture table
-                when the DB driver has support for it. If no ASYNC INSERT support is
-                offered by DB driver, then standard INSERT is used.
                 </para>
                 <para>
                 Default value is 0 (no INSERT DELAYED).
@@ -455,122 +450,7 @@ modparam("sipcapture", "insert_retry_timeout", 10)
 			</programlisting>
 		</example>
 	</section>
-	<section id="sipcapture.p.callid_aleg_header">
-		<title><varname>callid_aleg_header</varname> (str)</title>
-		<para>
-		Header name used to correlate A-leg with B-leg. It can take a list of headers,
-		separated by semicolon, e.g. "X-CID0;X-CID1". First match wins.
-		</para>
-		<para>
-		<emphasis>
-			Default value is "X-CID".
-		</emphasis>
-		</para>
-		<example>
-			<title>Set <varname>callid_aleg_header</varname> parameter</title>
-			<programlisting format="linespecific">
-...
-modparam("sipcapture", "callid_aleg_header", "X-CallIDALeg")
-...
-			</programlisting>
-		</example>
-	</section>
-	<section id="sipcapture.p.topoh_unmask">
-		<title><varname>topoh_unmask</varname> (int)</title>
-		<para>
-		If set to 1, call-id will be unmasked using topoh module api (topoh
-		module must be loaded in this case).
-		</para>
-		<para>
-			Default value is <emphasis>0</emphasis>.
-		</para>
-		<example>
-			<title>Set <varname>topoh_unmask</varname> parameter</title>
-			<programlisting format="linespecific">
-...
-modparam("sipcapture", "topoh_unmask", 1)
-...
-			</programlisting>
-		</example>
-	</section>
 </section>	
-<section>
-	<title>Functions</title>
-	<section id="sipcapture.f.sip_capture">
-		<title>
-		<function moreinfo="none">sip_capture([table])</function>
-		</title>
-		<para>
-		Store the current processed HEP/IPIP SIP message in database. It is stored in the
-		form prior applying changes made to it.
-		</para>
-		<para>Meaning of the parameters is as follows:</para>
-		<itemizedlist>
-		<listitem>
-		<para><emphasis>table</emphasis> - The table where HEP SIP message will be stored. Homer 5 use now tables with datestamp. 
-		To generate an automatic table's name please use strftime parameters. I.e. $var(table) = "sip_capture_call_%Y%m%d" and set the variable
-		as an argument of the sip_capture function.
-		</para>
-		</listitem>
-		</itemizedlist>
-		<para>
-		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
-		ONREPLY_ROUTE, BRANCH_ROUTE.
-		</para>
-		<emphasis>
-			Default value is "NULL".
-		</emphasis>
-		<example>
-		<title><function>sip_capture()</function> usage</title>
-		<programlisting format="linespecific">
-...
-sip_capture();
-...
-sip_capture("sip_capture_call_20160124");
-...
-</programlisting>
-		</example>
-	</section>
-	<section id="sipcapture.f.report_capture">
-		<title>
-		<function moreinfo="none">report_capture([table],[data])</function>
-		</title>
-		<para>
-		Store the current processed HEP REPORT message in database. 
-		</para>
-		<para>Meaning of the parameters is as follows:</para>
-		<itemizedlist>
-		<listitem>
-		<para><emphasis>table</emphasis> - The table where REPORT message will be stored.
-		</para>
-		<para><emphasis>data</emphasis> - The custom report data.
-		</para>
-		</listitem>
-		</itemizedlist>
-		<para>
-		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
-		ONREPLY_ROUTE, BRANCH_ROUTE.
-		</para>
-		<emphasis>
-			Default value is "NULL".
-		</emphasis>
-		<example>
-		<title><function>report_capture()</function> usage</title>
-		<programlisting format="linespecific">
-...
-report_capture();
-...
-report_capture("report_data");
-...
-report_capture("report_data", "{\"MOS\":4.1,\"PACKET_LOST\":100"});
-...
-</programlisting>
-		</example>
-	</section>
-	
-	</section>
-
-
     <section>
 	<title>MI Commands</title>
 	<section id="sipcapture.m.sip_capture">
@@ -643,7 +523,7 @@ report_capture("report_data", "{\"MOS\":4.1,\"PACKET_LOST\":100"});
 		Before running &kamailio; with the sipcapture module, you have to setup the database 
 		tables where the module will store the data. For that, if the table were not 
 		created by the installation script or you choose to install everything by 
-		yourself you can use the homer_databases.sql, <acronym>SQL</acronym> script 
+		yourself you can use the sipcapture_create.sql, <acronym>SQL</acronym> script 
 		in the sql folder of sipcapture module as template. You can also find the 
 		complete database documentation on the project webpage, &kamailiodbdocslink;.
 		</para>
@@ -653,10 +533,12 @@ report_capture("report_data", "{\"MOS\":4.1,\"PACKET_LOST\":100"});
 	<itemizedlist>
 		<listitem>
 		1. Only one capturing mode on RAW socket is supported: IPIP or monitoring/mirroring port. 
-		   Don't activate both at the same time. Obsolete. Please use HEP mirroring now.
-		</listitem>
-		<listitem>
-		2. Mirroring port capturing works only on Linux.
+		   Don't activate both at the same time.
+		</listitem><listitem>
+		2. By default MySQL doesn't support INSERT DELAYED for partitioning table. You can patch MySQL 
+		  (http://bugs.mysql.com/bug.php?id=50393)
+		</listitem><listitem>
+		3. Mirroring port capturing works only on Linux.
 		</listitem>
         </itemizedlist>
         </section>

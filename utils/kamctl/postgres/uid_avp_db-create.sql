@@ -1,3 +1,4 @@
+INSERT INTO version (table_name, table_version) values ('uid_user_attrs','3');
 CREATE TABLE uid_user_attrs (
     id SERIAL PRIMARY KEY NOT NULL,
     uid VARCHAR(64) NOT NULL,
@@ -7,6 +8,4 @@ CREATE TABLE uid_user_attrs (
     flags INTEGER DEFAULT 0 NOT NULL,
     CONSTRAINT uid_user_attrs_userattrs_idx UNIQUE (uid, name, value)
 );
-
-INSERT INTO version (table_name, table_version) values ('uid_user_attrs','3');
 

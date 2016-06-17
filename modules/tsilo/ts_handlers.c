@@ -27,7 +27,6 @@
 #include "ts_handlers.h"
 
 extern struct tm_binds _tmb;
-extern struct ts_table *t_table;
 
 /*!
  * \brief add transaction structure to tm callbacks

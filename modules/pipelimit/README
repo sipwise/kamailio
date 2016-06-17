@@ -12,11 +12,11 @@ Edited by
 
 Daniel-Constantin Mierla
 
-   Copyright Â© 2013 VoIPEmbedded Inc.
+   Copyright © 2013 VoIPEmbedded Inc.
 
-   Copyright Â© 2010 Asipto.com
+   Copyright © 2010 Asipto.com
 
-   Copyright Â© 2006 Freenet Cityline GmbH
+   Copyright © 2006 Freenet Cityline GmbH
      __________________________________________________________________
 
    Table of Contents
@@ -24,9 +24,9 @@ Daniel-Constantin Mierla
    1. Admin Guide
 
         1. Overview
-        
-              1.1 Algorithms
-   
+
+              1.1. Algorithms
+
         2. Dependencies
 
               2.1. Kamailio Modules
@@ -88,7 +88,7 @@ Chapter 1. Admin Guide
    Table of Contents
 
    1. Overview
-   
+
         1.1. Algorithms
 
    2. Dependencies
@@ -147,15 +147,15 @@ Chapter 1. Admin Guide
    of pipes limits in database and dynamic names. Complexity of keeping
    everything in a module and make it dual mode functional resulted in a
    new module which is focused on just traffic shaping policies.
-   
+
 1.1. Algorithms
 
    Algorithms are based from the ratelimit module, which describes the
    algorithms in more detail. The algorithms are used by the pipelimit
    module to determine if a message should be blocked.
-   
+
    Tail Drop Algorithm (TAILDROP)
-   
+
    This is a trivial algorithm that imposes some risks when used in
    conjunction with long timer intervals. At the start of each interval an
    internal counter is reset and incremented for each incoming message.
@@ -172,7 +172,7 @@ Chapter 1. Admin Guide
    interval. As a negative side effect Kamailio might drop messages
    although the limit might not be reached within the interval. Decrease
    the timer interval if you encounter this.
-   
+
    Network Algorithm (NETWORK)
 
    This algorithm relies on information provided by network interfaces.
@@ -415,11 +415,11 @@ with unexpected retcode=$var(check_result)\n");
 ...
         # perform pipe match for INVITE
         if (is_method("INVITE")) {
-            $var(invlimit) = 10;
-            if (!pl_check("$si", "TAILDROP", "$var(invlimit)")) {
-               pl_drop();
-               exit;
-            }
+                $var(invlimit) = 10;
+                if (!pl_check("$si", "TAILDROP", "$var(invlimit)")) {
+                        pl_drop();
+                        exit;
+                }
         }
 ...
 

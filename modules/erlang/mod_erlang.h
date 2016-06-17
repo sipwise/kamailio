@@ -39,8 +39,6 @@ extern int rpc_reply_with_struct;
 extern str erlang_nodename;
 extern str erlang_node_sname;
 
-extern int rex_call_in_progress;
-
 /* sockets kamailio <-> cnode */
 extern int *usocks[2];
 
@@ -65,7 +63,7 @@ typedef enum {
 typedef struct erl_param_s {
 	erl_param_type type;
 	union {
-		fparam_t *fp;
+		fparam_t fp;
 		pv_spec_t sp;
 	} value;
 } erl_param_t;

@@ -34,7 +34,9 @@
 #include "../../ip_addr.h"
 #include "dr_time.h"
 
-#define PTREE_CHILDREN 13  //decimal digits, '*', '#',  '+'
+#define PTREE_CHILDREN 10
+#define IS_DECIMAL_DIGIT(d) \
+	(((d)>='0') && ((d)<= '9'))
 
 extern int tree_size;
 
@@ -172,11 +174,6 @@ rt_info_t*
 check_rt(
 	ptree_node_t *ptn,
 	unsigned int rgid
-	);
-
-int
-get_node_index(
-	char ch
 	);
 
 #endif
