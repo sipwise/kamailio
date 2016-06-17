@@ -21,8 +21,4 @@ sipwise/tcap.patch
 sipwise/usrloc_dbro.patch
 sipwise/0001-kex-add-extended-core-stats.patch
 ##
-# MT#14217
-sipwise/janssonrpc-c-fakerpc.patch
-sipwise/janssonrpc-c-keepalive.patch
-##
 sipwise/rtpengine_next_branch_parm.patch
