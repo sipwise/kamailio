@@ -24,6 +24,7 @@
 #endif
 #define _XOPEN_SOURCE_EXTENDED 1  /* solaris */
 #define _SVID_SOURCE 1            /* timegm */
+#define _DEFAULT_SOURCE 1         /* _SVID_SOURCE is deprecated */
 
 #include <strings.h>
 #include <time.h>
@@ -144,13 +145,6 @@
  */
 
 MODULE_VERSION
-
-#if defined (__OS_darwin) || defined (__OS_freebsd)
-/* redeclaration of functions from stdio.h throws errors */
-#else
-int snprintf(char *str, size_t size, const char *format, ...);
-int vsnprintf(char *str, size_t size, const char *format, va_list ap);
-#endif
 
 static int process_xmlrpc(sip_msg_t* msg);
 static int dispatch_rpc(sip_msg_t* msg, char* s1, char* s2);
