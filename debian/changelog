@@ -1,3 +1,15 @@
+ngcp-kamailio (4.4.2-1+0~mr4.5.0.0) unstable; urgency=medium
+
+  * [0d7b36c] MT#20225 backport pv_evalx()
+  * [1de2872] MT#20349 tls: fix openssl compatibility check
+  * [2e505d2] MT#20493 textops: filter_body() remove extra '\r\n'
+  * [3835a76] MT#14217 remove janssonrpc-c patches for custom server
+  * [a285751] MT#20927 Imported Upstream version 4.4.2
+  * [1e0fadc] MT#20927 fix build template for group modules
+  * [c333758] MT#20927 remove upstream already applied fixes
+
+ -- Victor Seva <vseva@debian.org>  Wed, 29 Jun 2016 10:04:47 +0200
+
 ngcp-kamailio (4.4.1-1+0~mr4.5.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
