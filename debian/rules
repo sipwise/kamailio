@@ -60,11 +60,10 @@ mod_name=$(subst db_,,$(lastword $(subst /, ,$(1))))
 
 define PACKAGE_GRP_BUILD_template
 	# package all the modules in PACKAGE_GROUPS in separate packages
-	$(foreach grp,$(PACKAGE_GROUPS EXTRA_GROUPS),\
+	$(foreach grp,$(PACKAGE_GROUPS),\
 		$(MAKE) every-module group_include="k$(grp)"
 	)
 endef
-
 
 define PACKAGE_GRP_INSTALL_template
 	$(foreach grp,$(PACKAGE_GROUPS),\
@@ -81,6 +80,13 @@ define PACKAGE_GRP_INSTALL_template
 			done ; \
 		done
 		find $(CURDIR)/debian/$(PKG_NAME)-$(grp)-modules -depth -empty -type d -exec rmdir {} \;
+	)
+endef
+
+define PACKAGE_EXTRA_BUILD_template
+	# package all the modules in EXTRA_GROUPS in separate packages
+	$(foreach grp,$(EXTRA_GROUPS),\
+		$(MAKE) every-module group_include="k$(grp)" quiet=verbose
 	)
 endef
 
@@ -136,6 +142,7 @@ build-stamp: configure-stamp
 	$(MAKE) -j`nproc` all
 	# make groups
 	$(call PACKAGE_GRP_BUILD_template)
+	$(call PACKAGE_EXTRA_BUILD_template)
 	touch build-stamp
 
 clean:
