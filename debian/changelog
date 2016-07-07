@@ -1,3 +1,17 @@
+ngcp-kamailio (4.1.9-1+0~mr3.8.7.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [43868c9] MT#20349 tls: fix openssl compatibility check
+  * [f940ba5] MT#20349 tls: fix openssl compatibility check (fix backport)
+  * [6fca588] MT#20493 textops: filter_body() remove extra '\r\n'
+
+  [ Andrew Pogrebennyk ]
+  * [2ee8b67] MT#20463: fix detecting strict router
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 07 Jul 2016 14:04:51 +0200
+
 ngcp-kamailio (4.1.9-1+0~mr3.8.7.0) unstable; urgency=medium
 
   [ Victor Seva ]
