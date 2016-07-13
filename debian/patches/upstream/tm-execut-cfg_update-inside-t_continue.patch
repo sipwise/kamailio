@@ -9,8 +9,6 @@ Subject: [PATCH] tm: execut cfg_update() inside t_continue()
  modules/tm/t_suspend.c | 3 +++
  1 file changed, 3 insertions(+)
 
-diff --git a/modules/tm/t_suspend.c b/modules/tm/t_suspend.c
-index e8096bb..6bb2547 100644
 --- a/modules/tm/t_suspend.c
 +++ b/modules/tm/t_suspend.c
 @@ -22,6 +22,7 @@
@@ -21,15 +19,12 @@ index e8096bb..6bb2547 100644
  
  #include "config.h"
  #include "sip_msg.h"
-@@ -178,6 +179,8 @@ int t_continue(unsigned int hash_index, unsigned int label,
+@@ -177,6 +178,8 @@
+ 	int do_put_on_wait;
  	struct hdr_field *hdr, *prev = 0, *tmp = 0;
- 	int route_type_bk;
  
 +	cfg_update();
 +
  	if (t_lookup_ident(&t, hash_index, label) < 0) {
  		LM_ERR("transaction not found\n");
  		return -1;
--- 
-2.8.1
-
