@@ -5,6 +5,8 @@
 # upsream fixes from master
 upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 upstream/textops-filter_body-remove-previous-r-n-that-belongs.patch
+upstream/tm-execut-cfg_update-inside-t_continue.patch
+upstream/janssonrpc-c-init-cfg-framework-for-additional-proce.patch
 #
 ##
 no_lib64_on_64_bits.patch
