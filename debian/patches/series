@@ -4,6 +4,8 @@
 #
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
+upstream/tm-execut-cfg_update-inside-t_continue.patch
+upstream/janssonrpc-c-init-cfg-framework-for-additional-proce.patch
 #
 ##
 no_lib64_on_64_bits.patch
