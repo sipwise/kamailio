@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.2-1+0~mr4.5.1.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [b69cfb4] MT#21143 fix log level after t_continue() when setting debug level via fifo/rpc
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 01 Aug 2016 16:24:31 +0200
+
 ngcp-kamailio (4.4.2-1+0~mr4.5.0.0) unstable; urgency=medium
 
   * [0d7b36c] MT#20225 backport pv_evalx()
