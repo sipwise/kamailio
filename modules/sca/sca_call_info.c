@@ -1067,14 +1067,18 @@ sca_call_info_invite_reply_18x_handler( sip_msg_t *msg,
     int			slot_idx = -1;
     int			rc = -1;
     int			notify = 0;
+	
+    LM_ERR("sca_call_info_invite_reply_18x_handler check");
 
     switch ( msg->REPLY_STATUS ) {
     case 180:
     case 183:
 	state = SCA_APPEARANCE_STATE_PROGRESSING;
+    LM_ERR(">>>>>> state is SCA_APPEARANCE_STATE_PROGRESSING");
 	break;
 
     default:
+    LM_ERR(">>>>>> invalid reply status %d", msg->REPLY_STATUS);
 	goto done;
     }
 
@@ -1084,9 +1088,11 @@ sca_call_info_invite_reply_18x_handler( sip_msg_t *msg,
 	return( 1 );
     }
 
+    LM_ERR(">>>>>> checking for tags unsafe");
     app = sca_appearance_for_tags_unsafe( sca, from_aor, &msg->callid->body,
 			  &from->tag_value, &to->tag_value, slot_idx );
     if ( app == NULL ) {
+    LM_ERR(">>>>>> app is null, bail out");
 	goto done;
     }
 
@@ -1102,6 +1108,7 @@ sca_call_info_invite_reply_18x_handler( sip_msg_t *msg,
 
     notify = ( app->state != state );
     if ( notify ) {
+    LM_ERR(">>>>>> notify is on, update state unsafe");
 	sca_appearance_update_state_unsafe( app, state );
     }
     rc = 1;
