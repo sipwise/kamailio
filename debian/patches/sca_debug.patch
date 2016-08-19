@@ -1,0 +1,79 @@
+Index: kamailio/modules/sca/sca_call_info.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_call_info.c	2016-08-19 15:08:59.109027721 +0200
++++ kamailio/modules/sca/sca_call_info.c	2016-08-19 15:08:59.105027710 +0200
+@@ -1067,14 +1067,18 @@
+     int			slot_idx = -1;
+     int			rc = -1;
+     int			notify = 0;
++	
++    LM_ERR("sca_call_info_invite_reply_18x_handler check");
+ 
+     switch ( msg->REPLY_STATUS ) {
+     case 180:
+     case 183:
+ 	state = SCA_APPEARANCE_STATE_PROGRESSING;
++    LM_ERR(">>>>>> state is SCA_APPEARANCE_STATE_PROGRESSING");
+ 	break;
+ 
+     default:
++    LM_ERR(">>>>>> invalid reply status %d", msg->REPLY_STATUS);
+ 	goto done;
+     }
+ 
+@@ -1084,9 +1088,11 @@
+ 	return( 1 );
+     }
+ 
++    LM_ERR(">>>>>> checking for tags unsafe");
+     app = sca_appearance_for_tags_unsafe( sca, from_aor, &msg->callid->body,
+ 			  &from->tag_value, &to->tag_value, slot_idx );
+     if ( app == NULL ) {
++    LM_ERR(">>>>>> app is null, bail out");
+ 	goto done;
+     }
+ 
+@@ -1102,6 +1108,7 @@
+ 
+     notify = ( app->state != state );
+     if ( notify ) {
++    LM_ERR(">>>>>> notify is on, update state unsafe");
+ 	sca_appearance_update_state_unsafe( app, state );
+     }
+     rc = 1;
+Index: kamailio/modules/sca/sca_appearance.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_appearance.c	2016-08-19 15:08:59.109027721 +0200
++++ kamailio/modules/sca/sca_appearance.c	2016-08-19 16:11:02.921466514 +0200
+@@ -961,6 +961,7 @@
+     }
+ 
+     for ( app = app_list->appearances; app != NULL; app = app->next ) {
++	LM_ERR( ">>>> checking index %d", app->index);
+ 	if ( app->index == idx ) {
+ 	    break;
+ 	} else if ( idx == 0 ) {
+@@ -1213,6 +1214,23 @@
+     }
+ 
+     for ( app = app_list->appearances; app != NULL; app = app->next ) {
++
++    LM_ERR(">>>>> checking appearance call_id %.*s and from_tag %.*s", 
++        app->dialog.call_id.len, app->dialog.call_id.s,
++        app->dialog.from_tag.len, app->dialog.from_tag.s
++    );
++
++    if ( SCA_STR_EQ( &app->dialog.call_id, &dialog->call_id )) {
++        LM_ERR(">>>>> call_id %.*s matches", dialog->call_id.len, dialog->call_id.s);
++    } else {
++        LM_ERR(">>>>> call_id %.*s does not match", dialog->call_id.len, dialog->call_id.s);
++    }
++    if(SCA_STR_EQ( &app->dialog.from_tag, &dialog->from_tag )) {
++        LM_ERR(">>>>> from_tag %.*s matches", dialog->from_tag.len, dialog->from_tag.s);
++    } else {
++        LM_ERR(">>>>> from_tag %.*s does not match", dialog->from_tag.len, dialog->from_tag.s);
++    }
++
+ 	if ( SCA_STR_EQ( &app->dialog.call_id, &dialog->call_id ) &&
+ 		SCA_STR_EQ( &app->dialog.from_tag, &dialog->from_tag )) {
+ #ifdef notdef
