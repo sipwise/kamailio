@@ -1,0 +1,117 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 9 Sep 2016 13:32:45 +0200
+Subject: sca: add [to|from]_pvar module parameters to skip parsing msg
+
+* disabled as default
+* will fallback to parsing msg ( previous behaviour ) on error
+---
+ modules/sca/sca.c      | 10 ++++++++++
+ modules/sca/sca.h      |  2 ++
+ modules/sca/sca_util.c | 35 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 47 insertions(+)
+
+diff --git a/modules/sca/sca.c b/modules/sca/sca.c
+index 6b9f0e9..206be5b 100644
+--- a/modules/sca/sca.c
++++ b/modules/sca/sca.c
+@@ -100,6 +100,8 @@ int			call_info_max_expires = 3600;
+ int			line_seize_max_expires = 15;
+ int			purge_expired_interval = 120;
+ int onhold_bflag = -1;
++str to_pvar = STR_NULL;
++str from_pvar = STR_NULL;
+ 
+ static param_export_t	params[] = {
+     { "outbound_proxy",		PARAM_STR,	&outbound_proxy },
+@@ -112,6 +114,8 @@ static param_export_t	params[] = {
+     { "line_seize_max_expires", INT_PARAM,	&line_seize_max_expires },
+     { "purge_expired_interval",	INT_PARAM,	&purge_expired_interval },
+     {"onhold_bflag", INT_PARAM, &onhold_bflag},
++    {"to_pvar", PARAM_STR, &to_pvar},
++    {"from_pvar", PARAM_STR, &from_pvar},
+     { NULL,			0,		NULL },
+ };
+ 
+@@ -249,6 +253,12 @@ sca_set_config( sca_mod *scam )
+         return (-1);
+     }
+     scam->cfg->onhold_bflag = onhold_bflag;
++    if (to_pvar.s) {
++        scam->cfg->to_pvar = &to_pvar;
++    }
++    if (from_pvar.s) {
++        scam->cfg->from_pvar = &from_pvar;
++    }
+ 
+     return( 0 );
+ }
+diff --git a/modules/sca/sca.h b/modules/sca/sca.h
+index f5dd225..9e4597a 100644
+--- a/modules/sca/sca.h
++++ b/modules/sca/sca.h
+@@ -38,6 +38,8 @@ struct _sca_config {
+     int		line_seize_max_expires;
+     int		purge_expired_interval;
+     int onhold_bflag;
++    str *to_pvar;
++    str *from_pvar;
+ };
+ typedef struct _sca_config	sca_config;
+ 
+diff --git a/modules/sca/sca_util.c b/modules/sca/sca_util.c
+index ce422ba..c13f0d0 100644
+--- a/modules/sca/sca_util.c
++++ b/modules/sca/sca_util.c
+@@ -123,6 +123,10 @@ sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from )
+     assert( msg != NULL );
+     assert( from != NULL );
+ 
++    if (sca->cfg->from_pvar) {
++        LM_DBG("from_pvar. Not implemted yet\n");
++    }
++
+     if ( SCA_HEADER_EMPTY( msg->from )) {
+ 	LM_ERR( "Empty From header" );
+ 	return( -1 );
+@@ -153,10 +157,41 @@ sca_get_msg_to_header( sip_msg_t *msg, struct to_body **to )
+ {
+     struct to_body	parsed_to;
+     struct to_body	*t = NULL;
++    pv_spec_t sp;
++    pv_value_t pv_val;
+ 
+     assert( msg != NULL );
+     assert( to != NULL );
+ 
++    if (sca->cfg->to_pvar) {
++        if (pv_parse_spec(sca->cfg->to_pvar, &sp) == NULL) {
++            LM_ERR("parse error to_pvar %.*s var\n",
++                STR_FMT(sca->cfg->to_pvar));
++            goto fallback;
++        }
++        if (pv_get_spec_value(msg, &sp, &pv_val) < 0) {
++            LM_ERR("can't get value from to_pvar %.*s\n",
++                STR_FMT(sca->cfg->to_pvar));
++            fallback;
++        }
++        if (pv_val.flags & PV_VAL_STR) {
++            parse_to(pv_val.rs.s, pv_val.rs.s + pv_val.rs.len + 1, &parsed_to);
++            if (parsed_to.error != PARSE_OK) {
++                LM_ERR("Bad To value from to_pvar %.*s\n",
++                    STR_FMT(sca->cfg->to_pvar));
++                goto fallback;
++            }
++            *to = &parsed_to;
++            return (0);
++        }
++        else {
++            LM_ERR("value from to_pvar %.*s is not a string\n",
++                STR_FMT(sca->cfg->to_pvar));
++            goto fallback;
++        }
++    }
++
++fallback:
+     if ( SCA_HEADER_EMPTY( msg->to )) {
+ 	LM_ERR( "Empty To header" );
+ 	return( -1 );

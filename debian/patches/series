@@ -23,4 +23,5 @@ sipwise/0001-kex-add-extended-core-stats.patch
 sipwise/rtpengine_next_branch_parm.patch
 # sca improvements
 sipwise/sca_add_onhold_bflag.patch
+sipwise/sca-add-to-from-_pvar-module-parameters-to-skip-pars.patch
 ##
