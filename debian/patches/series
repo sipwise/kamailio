@@ -25,4 +25,5 @@ sipwise/rtpengine_next_branch_parm.patch
 sipwise/sca_add_onhold_bflag.patch
 sipwise/sca-use-kamailio-module-interface.patch
 sipwise/sca-sca_call_info_update-add-to-from-optional-parame.patch
+sipwise/sca-sca_handle_subscribe-honor-the-ru-value.patch
 ##
