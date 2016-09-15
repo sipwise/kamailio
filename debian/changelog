@@ -1,3 +1,14 @@
+ngcp-kamailio (4.4.3-1+0~mr5.0.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [4bca15e] TT#2388 sca: onhold_bflag
+  * [a30ac67] TT#2386 sca: sca_call_info_update() add [to|from] optional parameters
+  * [7e92049] TT#2387 sca: sca_handle_subscribe() get actual ruri
+  * [c742e1b] New upstream version 4.4.3
+  * [be034e3] TT#3010 remove upstream fixes merged into 4.4.3
+
+ -- Victor Seva <vseva@debian.org>  Thu, 15 Sep 2016 10:17:33 +0200
+
 ngcp-kamailio (4.4.2-1+0~mr5.0.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
