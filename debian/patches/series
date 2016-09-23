@@ -4,6 +4,7 @@
 #
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
+upstream/presence-fix-crash-when-no-dialog.id-on-dialog-info-.patch
 #
 ##
 no_lib64_on_64_bits.patch
