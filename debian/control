@@ -255,7 +255,7 @@ Package: ngcp-kamailio-mysql-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
-Depends: mysql-client,
+Depends: mysql-client | mariadb-client,
          ngcp-kamailio (= ${binary:Version}),
          ${misc:Depends},
          ${shlibs:Depends}
