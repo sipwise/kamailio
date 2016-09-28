@@ -10,6 +10,7 @@ sipwise/debug/mod_cfgt.patch
 ##
 # upstream fixes
 # 4.3
+upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 #
 # upsream fixes from master
 upstream/pv-pv_var_to_xavp.patch
