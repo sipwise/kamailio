@@ -1,3 +1,9 @@
+ngcp-kamailio (4.0.6-2) unstable; urgency=medium
+
+  * [34ec145] TT#3992 tls: fix openssl version detection
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 28 Sep 2016 18:13:18 +0200
+
 ngcp-kamailio (4.0.6-1) unstable; urgency=medium
 
   * [e709834] Imported Upstream version 4.0.6
