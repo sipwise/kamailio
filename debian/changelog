@@ -1,3 +1,9 @@
+ngcp-kamailio (4.0.3-6) unstable; urgency=medium
+
+  * [bb4d90f] TT#3992 tls: fix openssl version detection
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 28 Sep 2016 17:46:42 +0200
+
 ngcp-kamailio (4.0.3-5) unstable; urgency=low
 
   * [8478f88] MT#4637 add the patch merged upstream by Richard. (cherry picked from commit 6e3fdbef2d5e6b561bddaaf749faf48acd0ac0fe)
