@@ -15,6 +15,7 @@ upstream/0006-textops-fix-append_body_part.patch
 upstream/0001-core-fix-crash-related-to-core-sockets_list-command.patch
 upstream/0002-app_java-Use-generic-libgcj.patch
 upstream/0005-registrar-Add-check-for-contact-header-before-checki.patch
+upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
