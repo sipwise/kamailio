@@ -8,11 +8,9 @@ Don't change the msg->id when that message has been processed already
  modules/debugger/debugger_api.c | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/modules/debugger/debugger_api.c b/modules/debugger/debugger_api.c
-index 6f4cbb8..05f904e 100644
 --- a/modules/debugger/debugger_api.c
 +++ b/modules/debugger/debugger_api.c
-@@ -273,18 +273,18 @@ int dbg_msgid_filter(struct sip_msg *msg, unsigned int flags, void *bar)
+@@ -270,18 +270,18 @@ int dbg_msgid_filter(struct sip_msg *msg
  	}
  	msgid_base = _dbg_pid_list[indx].msgid_base;
  	lock_release(_dbg_pid_list[indx].lock);
@@ -36,7 +34,4 @@ index 6f4cbb8..05f904e 100644
 +	return 1;
  }
  
- char* get_current_route_type_name()
--- 
-2.1.0.rc1
-
+ /**
