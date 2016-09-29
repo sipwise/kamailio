@@ -23,6 +23,7 @@ upstream/0009-db_mysql-properly-free-db-result-structure-if-db_mys.patch
 upstream/0010-presence_dialoginfo-get-rid-of-unused-variables-warn.patch
 upstream/0011-siputils-allocate-enough-space-to-hold-ending-zero-f.patch
 upstream/0012-mtree-replace-tree-structure-even-there-are-no-recor.patch
+upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
