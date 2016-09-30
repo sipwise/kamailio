@@ -1,3 +1,16 @@
+ngcp-kamailio (4.4.1-1+0~mr4.4.3.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [aa50406] MT#20349 tls: fix openssl compatibility check
+  * [c0fc599] MT#20493 textops: filter_body() remove extra '\r\n'
+  * [f7b0c32] MT#21143 fix log level after t_continue() when setting debug level via fifo/rpc
+  * [01f0662] MT#14217 remove janssonrpc-c patches for custom server
+  * [5c397ad] MT#21143 refresh debian patches
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 30 Sep 2016 13:09:23 +0200
+
 ngcp-kamailio (4.4.1-1+0~mr4.4.2.0) unstable; urgency=medium
 
   * New release.
