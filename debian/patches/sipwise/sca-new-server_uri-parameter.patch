@@ -1,0 +1,107 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 3 Oct 2016 12:19:51 +0200
+Subject: sca: new "server_uri" parameter
+
+* forces the contact URI (host:port) reply
+
+Change-Id: Iac75da17c0ccfa087f3988187ad4e1c93f92b939
+---
+ modules/sca/sca.c        |  5 +++++
+ modules/sca/sca.h        |  1 +
+ modules/sca/sca_notify.c | 32 +++++++++++++++++++++++++++++---
+ 3 files changed, 35 insertions(+), 3 deletions(-)
+
+diff --git a/modules/sca/sca.c b/modules/sca/sca.c
+index f46fb1b..cc0c17d 100644
+--- a/modules/sca/sca.c
++++ b/modules/sca/sca.c
+@@ -111,6 +111,7 @@ int			call_info_max_expires = 3600;
+ int			line_seize_max_expires = 15;
+ int			purge_expired_interval = 120;
+ int onhold_bflag = -1;
++str server_uri = STR_NULL;
+ 
+ static param_export_t	params[] = {
+     { "outbound_proxy",		PARAM_STR,	&outbound_proxy },
+@@ -123,6 +124,7 @@ static param_export_t	params[] = {
+     { "line_seize_max_expires", INT_PARAM,	&line_seize_max_expires },
+     { "purge_expired_interval",	INT_PARAM,	&purge_expired_interval },
+     {"onhold_bflag", INT_PARAM, &onhold_bflag},
++    {"server_uri", STR_PARAM, &server_uri},
+     { NULL,			0,		NULL },
+ };
+ 
+@@ -264,6 +266,9 @@ sca_set_config( sca_mod *scam )
+     }
+     scam->cfg->onhold_bflag = onhold_bflag;
+ 
++    if (server_uri.s) {
++        scam->cfg->server_uri = &server_uri;
++    }
+     return( 0 );
+ }
+ 
+diff --git a/modules/sca/sca.h b/modules/sca/sca.h
+index f5dd225..096600b 100644
+--- a/modules/sca/sca.h
++++ b/modules/sca/sca.h
+@@ -38,6 +38,7 @@ struct _sca_config {
+     int		line_seize_max_expires;
+     int		purge_expired_interval;
+     int onhold_bflag;
++    str *server_uri;
+ };
+ typedef struct _sca_config	sca_config;
+ 
+diff --git a/modules/sca/sca_notify.c b/modules/sca/sca_notify.c
+index e8cbdba..8d73b86 100644
+--- a/modules/sca/sca_notify.c
++++ b/modules/sca/sca_notify.c
+@@ -188,6 +188,8 @@ error:
+ sca_notify_append_contact_header( sca_subscription *sub,
+ 	char *hdrbuf, int maxlen )
+ {
++    char *pos = NULL;
++    int size = 0;
+     int		len = strlen( "Contact: " );
+ 
+     if ( len + sub->target_aor.len + strlen( CRLF ) >= maxlen ) {
+@@ -196,11 +198,35 @@ sca_notify_append_contact_header( sca_subscription *sub,
+     }
+ 
+     memcpy( hdrbuf, "Contact: ", len );
+-    memcpy( hdrbuf + len, sub->target_aor.s, sub->target_aor.len );
+-    len += sub->target_aor.len;
++    LM_DBG("aor:[%.*s] server_uri[%.*s]\n",
++        STR_FMT(&sub->target_aor), STR_FMT(sca->cfg->server_uri));
++    if (sca->cfg->server_uri != NULL) {
++        pos = strchr(sub->target_aor.s, '@');
++        /* user + @ */
++        size = pos - sub->target_aor.s + 1;
++        memcpy(hdrbuf + len, sub->target_aor.s, size);
++        len += size;
++        LM_DBG("len[%d] hdrbuf[%.*s]\n", len, len, hdrbuf);
++        memcpy(hdrbuf + len, sca->cfg->server_uri->s,
++            sca->cfg->server_uri->len);
++        len += sca->cfg->server_uri->len;
++        LM_DBG("len[%d] hdrbuf[%.*s]\n", len, len, hdrbuf);
++        pos = strchr(sub->target_aor.s + size , ';');
++        if (pos != NULL) {
++            size = pos - sub->target_aor.s;
++            memcpy(hdrbuf + len, pos, size);
++            len += size;
++            LM_DBG("len[%d] hdrbuf[%.*s]\n", len, len, hdrbuf);
++        }
++        LM_DBG("fixed len[%d] hdrbuf[%.*s]\n", len, len, hdrbuf);
++    }
++    else {
++        memcpy(hdrbuf + len, sub->target_aor.s, sub->target_aor.len);
++        len += sub->target_aor.len;
++    }
+     memcpy( hdrbuf + len, CRLF, strlen( CRLF ));
+     len += strlen( CRLF );
+-
++    LM_DBG("end len[%d] hdrbuf[%.*s]\n", len, len, hdrbuf);
+     return( len );
+ }
+ 
