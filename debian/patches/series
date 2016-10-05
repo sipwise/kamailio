@@ -27,4 +27,5 @@ sipwise/sca-sca_call_info_update-add-to-from-optional-parame.patch
 sipwise/sca-sca_handle_subscribe-honor-the-ru-value.patch
 sipwise/sca-fix-core-when-HDR_CSEQ-not-parsed.patch
 sipwise/sca-sca_call_info_update-fix-param-calls.patch
+sipwise/sca-add-server_address-parameter.patch
 ##
