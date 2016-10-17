@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.3-1+0~mr4.5.2.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [06b4a71] TT#3010 remove upstream fixes merged into 4.4.3
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 17 Oct 2016 13:24:25 +0200
+
 ngcp-kamailio (4.4.3-1+0~mr4.5.2.1) unstable; urgency=medium
 
   * [c742e1b] New upstream version 4.4.3
