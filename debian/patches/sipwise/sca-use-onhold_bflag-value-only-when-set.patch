@@ -1,0 +1,41 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 24 Oct 2016 11:34:39 +0200
+Subject: sca: use onhold_bflag value only when set
+
+Change-Id: Icc6d7edd407299b6de2f85ad8ecc5fe8d9b89339
+---
+ modules/sca/doc/sca_admin.xml | 3 ++-
+ modules/sca/sca_util.c        | 6 ++++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/modules/sca/doc/sca_admin.xml b/modules/sca/doc/sca_admin.xml
+index 1108126..b376e41 100644
+--- a/modules/sca/doc/sca_admin.xml
++++ b/modules/sca/doc/sca_admin.xml
+@@ -268,7 +268,8 @@ modparam( "sca", "db_update_interval", 120 )
+ 		<para>
+ 		<para>
+ 		Which branch flag should be used by the module to identify if the call
+-		is on-hold instead of parsing the sdp.
++		is on-hold instead of parsing the sdp. If the bflag not is set the
++		sdp will be parsed.
+ 		</para>
+ 		<para>
+ 		<emphasis>
+diff --git a/modules/sca/sca_util.c b/modules/sca/sca_util.c
+index 60c178c..e728c63 100644
+--- a/modules/sca/sca_util.c
++++ b/modules/sca/sca_util.c
+@@ -454,8 +454,10 @@ sca_call_is_held( sip_msg_t *msg )
+     int			rc;
+ 
+     if(sca->cfg->onhold_bflag >= 0) {
+-        LM_DBG("sca_call_is_held: skip parse_sdp and use onhold_bflag\n");
+-        return isbflagset(0, (flag_t)sca->cfg->onhold_bflag);
++        if(isbflagset(0, (flag_t)sca->cfg->onhold_bflag)) {
++            LM_DBG("onhold_bflag, skip parse_sdp and set held\n");
++            return ( 1 );
++        }
+     }
+     rc = parse_sdp( msg );
+     if ( rc < 0 ) {
