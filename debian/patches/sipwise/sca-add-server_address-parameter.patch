@@ -12,8 +12,6 @@ Change-Id: I8f0a93f180cafc4f014f621a413fcb5f6e672f46
  modules/sca/sca_notify.c | 14 +++++++++++---
  3 files changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/modules/sca/sca.c b/modules/sca/sca.c
-index f46fb1b..9dd0143 100644
 --- a/modules/sca/sca.c
 +++ b/modules/sca/sca.c
 @@ -111,6 +111,7 @@ int			call_info_max_expires = 3600;
@@ -42,8 +40,6 @@ index f46fb1b..9dd0143 100644
  
      return( 0 );
  }
-diff --git a/modules/sca/sca.h b/modules/sca/sca.h
-index f5dd225..abcbe56 100644
 --- a/modules/sca/sca.h
 +++ b/modules/sca/sca.h
 @@ -38,6 +38,7 @@ struct _sca_config {
@@ -54,11 +50,9 @@ index f5dd225..abcbe56 100644
  };
  typedef struct _sca_config	sca_config;
  
-diff --git a/modules/sca/sca_notify.c b/modules/sca/sca_notify.c
-index e8cbdba..89d8bb4 100644
 --- a/modules/sca/sca_notify.c
 +++ b/modules/sca/sca_notify.c
-@@ -189,15 +189,23 @@ sca_notify_append_contact_header( sca_subscription *sub,
+@@ -189,15 +189,23 @@ sca_notify_append_contact_header( sca_su
  	char *hdrbuf, int maxlen )
  {
      int		len = strlen( "Contact: " );
@@ -85,3 +79,19 @@ index e8cbdba..89d8bb4 100644
      memcpy( hdrbuf + len, CRLF, strlen( CRLF ));
      len += strlen( CRLF );
  
+--- a/modules/sca/sca_subscribe.c
++++ b/modules/sca/sca_subscribe.c
+@@ -1407,7 +1407,12 @@ sca_subscription_reply( sca_mod *scam, i
+ 	extra_headers.len = len;
+ 
+ 	SCA_STR_APPEND_CSTR( &extra_headers, "Contact: " );
+-	SCA_STR_APPEND( &extra_headers, &REQ_LINE( msg ).uri );
++	if (sca->cfg->server_address != NULL) {
++		SCA_STR_APPEND( &extra_headers, sca->cfg->server_address);
++	}
++	else {
++		SCA_STR_APPEND( &extra_headers, &REQ_LINE( msg ).uri );
++	}
+ 	SCA_STR_APPEND_CSTR( &extra_headers, CRLF );
+ 
+ 	SCA_STR_COPY_CSTR( &extra_headers,
