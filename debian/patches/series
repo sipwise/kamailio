@@ -31,4 +31,7 @@ sipwise/sca-add-server_address-parameter.patch
 sipwise/lib-srdb1-sca-add-server_id.patch
 sipwise/sca-use-new-server_id-column.patch
 sipwise/utils-kamctl-refresh-dbschema.patch
+sipwise/sca-use-To-header-if-in-dialog-as-target.patch
+sipwise/sca-fix-sca_call_info_update-params.patch
+sipwise/sca-use-onhold_bflag-value-only-when-set.patch
 ##
