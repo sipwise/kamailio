@@ -1,0 +1,69 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 24 Oct 2016 11:34:39 +0200
+Subject: sca: use onhold_bflag value only when set
+
+Change-Id: Icc6d7edd407299b6de2f85ad8ecc5fe8d9b89339
+---
+ modules/sca/doc/sca_admin.xml | 3 ++-
+ modules/sca/sca_util.c        | 6 ++++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+Index: kamailio/modules/sca/doc/sca_admin.xml
+===================================================================
+--- kamailio.orig/modules/sca/doc/sca_admin.xml	2016-10-24 14:50:40.501502382 +0200
++++ kamailio/modules/sca/doc/sca_admin.xml	2016-10-24 14:50:40.497502371 +0200
+@@ -268,7 +268,8 @@
+ 		<para>
+ 		<para>
+ 		Which branch flag should be used by the module to identify if the call
+-		is on-hold instead of parsing the sdp.
++		is on-hold instead of parsing the sdp. If the bflag not is set the
++		sdp will be parsed.
+ 		</para>
+ 		<para>
+ 		<emphasis>
+Index: kamailio/modules/sca/sca_util.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_util.c	2016-10-24 14:50:40.501502382 +0200
++++ kamailio/modules/sca/sca_util.c	2016-10-24 14:50:40.497502371 +0200
+@@ -454,8 +454,10 @@
+     int			rc;
+ 
+     if(sca->cfg->onhold_bflag >= 0) {
+-        LM_DBG("sca_call_is_held: skip parse_sdp and use onhold_bflag\n");
+-        return isbflagset(0, (flag_t)sca->cfg->onhold_bflag);
++        if(isbflagset(0, (flag_t)sca->cfg->onhold_bflag) == 1) {
++            LM_DBG("onhold_bflag, skip parse_sdp and set held\n");
++            return ( 1 );
++        }
+     }
+     rc = parse_sdp( msg );
+     if ( rc < 0 ) {
+@@ -475,6 +477,7 @@
+ 		stream != NULL;
+ 		n_str++, stream = get_sdp_stream( msg, n_sess, n_str )) {
+ 	    if ( stream->is_on_hold ) {
++		LM_DBG( "sca_call_is_held: parse_sdp detected stream is on hold");
+ 		is_held = 1;
+ 		goto done;
+ 	    }
+Index: kamailio/parser/sdp/sdp.c
+===================================================================
+--- kamailio.orig/parser/sdp/sdp.c	2016-10-24 14:50:29.397472754 +0200
++++ kamailio/parser/sdp/sdp.c	2016-10-24 14:50:26.713465606 +0200
+@@ -541,6 +541,7 @@
+ 				a1p = stream->ptime.s + stream->ptime.len;
+ 			} else if (parse_payload_attr && extract_sendrecv_mode(&tmpstr1,
+ 					&stream->sendrecv_mode, &stream->is_on_hold) == 0) {
++		        LM_DBG("stream sendrecv attribute found");
+ 				a1p = stream->sendrecv_mode.s + stream->sendrecv_mode.len;
+ 			} else if (parse_payload_attr && extract_rtpmap(&tmpstr1, &rtp_payload, &rtp_enc, &rtp_clock, &rtp_params) == 0) {
+ 				if (rtp_params.len != 0 && rtp_params.s != NULL) {
+@@ -579,6 +580,7 @@
+ 		}
+ 		/* Let's detect if the media is on hold by checking
+ 		 * the good old "0.0.0.0" connection address */
++		LM_DBG("stream is_on_hold=%d", stream->is_on_hold);
+ 		if (!stream->is_on_hold) {
+ 			if (stream->ip_addr.s && stream->ip_addr.len) {
+ 				if (stream->ip_addr.len == HOLD_IP_LEN &&
