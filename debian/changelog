@@ -1,3 +1,19 @@
+ngcp-kamailio (4.4.4-1+0~mr5.0.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [1660258] TT#2387 sca: fix call_info_update() param calls
+  * [760e90b] TT#3855 presence: fix crash when no dialog.id at dialog-info xml PUBLISH
+  * [33ce5e0] TT#2387 sca: new "server_address" parameter
+  * [d36252d] TT#3010 sca: server_id
+  * [3d5a816] TT#2391 sca fixes
+  * [69d1087] New upstream version 4.4.4
+  * [fd1c3eb] TT#3150 refresh patches and remove already applied upstream
+
+  [ Kirill Solomko ]
+  * [042eb86] MT#22031 kamailio-mysql-modules now depend on mariadb-client
+
+ -- Victor Seva <vseva@debian.org>  Wed, 09 Nov 2016 17:50:37 +0100
+
 ngcp-kamailio (4.4.3-1+0~mr5.0.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
