@@ -11,7 +11,7 @@ Add ro connection per child
 
 --- a/modules/usrloc/ul_mod.c
 +++ b/modules/usrloc/ul_mod.c
-@@ -156,6 +156,7 @@
+@@ -156,6 +156,7 @@ str ulattrs_avalue_col = str_init(ULATTR
  str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
  
  str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
@@ -19,7 +19,7 @@ Add ro connection per child
  int timer_interval  = 60;				/*!< Timer interval in seconds */
  int db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
  int use_domain      = 0;				/*!< Whether usrloc should use domain part of aor */
-@@ -187,6 +188,8 @@
+@@ -187,6 +188,8 @@ static cmd_export_t cmds[] = {
  	{0, 0, 0, 0, 0, 0}
  };
  
@@ -28,7 +28,7 @@ Add ro connection per child
  
  /*! \brief
   * Exported parameters 
-@@ -203,6 +206,7 @@
+@@ -203,6 +206,7 @@ static param_export_t params[] = {
  	{"flags_column",        PARAM_STR, &flags_col     },
  	{"cflags_column",       PARAM_STR, &cflags_col    },
  	{"db_url",              PARAM_STR, &db_url        },
@@ -36,7 +36,7 @@ Add ro connection per child
  	{"timer_interval",      INT_PARAM, &timer_interval  },
  	{"db_mode",             INT_PARAM, &db_mode         },
  	{"use_domain",          INT_PARAM, &use_domain      },
-@@ -278,6 +282,38 @@
+@@ -278,6 +282,38 @@ struct module_exports exports = {
  	child_init  /*!< Child initialization function */
  };
  
@@ -75,7 +75,7 @@ Add ro connection per child
  
  /*! \brief
   * Module initialization function
-@@ -370,6 +406,21 @@
+@@ -373,6 +409,21 @@ static int mod_init(void)
  		}
  	}
  
@@ -97,7 +97,7 @@ Add ro connection per child
  	if (nat_bflag==(unsigned int)-1) {
  		nat_bflag = 0;
  	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
-@@ -443,6 +494,16 @@
+@@ -448,6 +499,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -114,7 +114,7 @@ Add ro connection per child
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
  	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY) {
  		/* if cache is used, populate domains from DB */
-@@ -498,6 +559,10 @@
+@@ -503,6 +564,10 @@ static void destroy(void)
  		ul_dbf.close(ul_dbh);
  	}
  
@@ -127,7 +127,7 @@ Add ro connection per child
  
 --- a/modules/usrloc/ul_mod.h
 +++ b/modules/usrloc/ul_mod.h
-@@ -88,6 +88,8 @@
+@@ -88,6 +88,8 @@ extern int handle_lost_tcp;
  extern int close_expired_tcp;
  extern int skip_remote_socket;
  

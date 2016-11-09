@@ -9,7 +9,7 @@ Subject: do not install default config
 
 --- a/Makefile
 +++ b/Makefile
-@@ -647,7 +647,7 @@
+@@ -647,7 +647,7 @@ sunpkg:
  
  .PHONY: install
  install: mk_params="compile_for_install=yes"
@@ -20,7 +20,7 @@ Subject: do not install default config
  .PHONY: dbinstall
 --- a/utils/kamctl/Makefile
 +++ b/utils/kamctl/Makefile
-@@ -14,7 +14,7 @@
+@@ -13,7 +13,7 @@ all:
  
  install-if-newer: install
  
