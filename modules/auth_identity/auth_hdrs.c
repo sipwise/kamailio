@@ -449,7 +449,7 @@ int digeststr_asm(dynstr *sout, struct sip_msg *msg, str *sdate, int iflags)
 
 		/* there was an error or the required header is missing */
 		if (iRes==AUTH_ERROR
-		    || (iRes==AUTH_NOTFOUND && (pactpart[i1].iflag & DS_REQUIRED)))
+				|| (iRes==AUTH_NOTFOUND && (pactpart[i1].iflag & DS_REQUIRED)))
 			return -1;
 
 		switch (pactpart[i1].itype) {
@@ -552,7 +552,7 @@ int append_date(str *sdate, int idatesize, time_t *tout, struct sip_msg *msg)
 	}
 
 	ilen=strftime(date_str, sizeof(date_str), AUTH_TIME_FORMAT, bd_time);
-	if (ilen > sizeof(date_hf) - strlen("Date: \r\n") || ilen==0) {
+	if (ilen >= sizeof(date_hf) - strlen("Date: \r\n.") || ilen==0) {
 		LOG(L_ERR, "AUTH_IDENTITY:append_date: unexpected time length\n");
 		return -3;
 	}
@@ -569,10 +569,12 @@ int append_date(str *sdate, int idatesize, time_t *tout, struct sip_msg *msg)
 	if (sdate && idatesize >= ilen) {
 		memcpy(sdate->s, date_str, ilen);
 		sdate->len=ilen;
-	} else
+	} else {
 		return -5;
-		if (tout)
-			*tout=tdate_now;
+	}
+
+	if (tout)
+		*tout=tdate_now;
 
 	return 0;
 }
@@ -667,24 +669,24 @@ dc_end:
 		goto other;
 	} else {
 		return (p + 1);
- 	}
+	}
 
 	/* Unknown header type */
 other:
 	p = q_memchr(p, ':', end - p);
- 	if (!p) {        /* No double colon found, error.. */
+	if (!p) {        /* No double colon found, error.. */
 		*type = HDR_ERROR_T;
 		return 0;
- 	} else {
+	} else {
 		*type = HDR_OTHER_T;
 		return (p + 1);
- 	}
+	}
 
 	return p;
 }
 
 /* parses buffer that contains a SIP message header, looks for "Contact"
-   header field and returns the value of that */
+ * header field and returns the value of that */
 static int get_contact_body(char *buf, unsigned int len, str *sout)
 {
 	char *end, *s, *tmp, *match;
