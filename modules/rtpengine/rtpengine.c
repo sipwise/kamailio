@@ -465,6 +465,7 @@ static int get_ip_type(char *str_addr)
 		LM_DBG("%s is an ipv6 addinfos\n", str_addr);
 	} else {
 		LM_DBG("%s is an unknown addinfos format AF=%d\n",str_addr, info->ai_family);
+		freeaddrinfo(info);
 		return -1;
 	}
 
@@ -592,8 +593,7 @@ static inline int str_eq(const str *p, const char *q) {
 }
 
 static inline str str_prefix(const str *p, const char *q) {
-	str ret;
-	ret.s = NULL;
+	str ret = STR_NULL;
 	int l = strlen(q);
 	if (p->len < l)
 		return ret;
