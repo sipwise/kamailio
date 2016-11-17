@@ -12,6 +12,7 @@ FILENAME := $(PKG_NAME)_$(UPVERSION).orig.tar.gz
 URL := http://www.kamailio.org/pub/kamailio/$(UPVERSION)/src/kamailio-$(UPVERSION)_src.tar.gz
 
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
+DEB_HOST_ARCH := $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
@@ -21,9 +22,12 @@ include /usr/share/dpkg/buildflags.mk
 #export DH_VERBOSE=1
 
 export JAVA_HOME=/usr/lib/jvm/java-gcj
-
-# choose radius lib
-export FREERADIUS=$(shell test -f /usr/include/freeradius-client.h && echo 1 || echo 0)
+# select radius lib
+ifeq($(shell [ -f /usr/include/radcli/radcli.h ] && echo 1 || echo 0),1)
+export RADCLI=1
+else
+export FREERADIUS=1
+endif
 
 # modules not in the "main" kamailio package
 EXCLUDED_MODULES=
@@ -31,7 +35,7 @@ EXCLUDED_MODULES=
 # extra modules to skip, because they are not compilable now
 # - regardless if they go to the main kamailio package or to some module package,
 # they will be excluded from compile and install of all
-EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy purple mi_xmlrpc dnssec kazoo cnxcc
+EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy mi_xmlrpc dnssec
 
 # module groups that are packaged in seperate packages
 # (with the name kamailio-$(group_name)-modules)
@@ -40,11 +44,32 @@ EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy purple mi_xmlrpc dnssec 
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils lua memcached \
 			   snmpstats carrierroute xmpp cpl redis python geoip\
-			   sqlite json mono ims outbound websocket tls \
-			   autheph sctp java lcrrate tcap
+			   sqlite ims sctp java \
+			   purple tls outbound websocket autheph cnxcc \
+			   erlang \
+			   lcrrate tcap
 
 # module groups to be packaged onto kamailio-extra-modules
 EXTRA_GROUPS=gzcompress uuid ev jansson
+
+# mono not on all arches
+ifneq ("$(wildcard /usr/share/mono/mono-archs.make)","")
+override PACKAGE_GROUPS+= mono
+else
+override EXCLUDED_MODULES += mono
+endif
+
+# FTBFS on kfreebsd
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+override PACKAGE_GROUPS+= json kazoo
+else
+override EXCLUDED_MODULES += json kazoo
+endif
+
+# FTBFS on powerpcspe because of AltiVec assumption #729635
+ifeq ($(DEB_HOST_ARCH),powerpcspe)
+	export NOALTIVEC=1
+endif
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
 LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)
@@ -68,7 +93,7 @@ endef
 define PACKAGE_GRP_INSTALL_template
 	$(foreach grp,$(PACKAGE_GROUPS),\
 		$(MAKE) install-modules-all LIBDIR=$(LIBDIR) group_include="k$(grp)" \
-		basedir=$(CURDIR)/debian/$(PKG_NAME)-$(grp)-modules \
+		BASEDIR=$(CURDIR)/debian/$(PKG_NAME)-$(grp)-modules \
 		cfg_prefix=$(CURDIR)/debian/$(PKG_NAME)-$(grp)-modules \
 		doc-dir=share/doc/$(PKG_NAME)-$(grp)-modules
 		# eliminate duplicate libs
@@ -107,6 +132,13 @@ define PACKAGE_EXTRA_INSTALL_template
 	done
 	find $(CURDIR)/debian/$(PKG_NAME)-extra-modules -depth -empty -type d -exec rmdir {} \;
 endef
+
+ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
+	CFLAGS += -g
+endif
+ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
+	INSTALL_PROGRAM += -s
+endif
 
 # CFLAGS + CPPFLAGS -> CC_EXTRA_OPTS
 CC_EXTRA_OPTS := $(shell dpkg-buildflags --get CPPFLAGS)
@@ -150,7 +182,9 @@ clean:
 	dh_testroot
 	rm -f build-stamp configure-stamp
 	# Add here commands to clean up after the build process.
+	if [ -r autover.h -a ! -r debian/autover.h ]; then cp -a autover.h debian/; fi
 	$(MAKE) maintainer-clean
+	if [ -r debian/autover.h -a ! -r autover.h ]; then mv debian/autover.h .; fi
 	dh_clean
 
 install: build
@@ -163,8 +197,10 @@ install: build
 	# make group packages
 	$(call PACKAGE_GRP_INSTALL_template)
 	$(call PACKAGE_EXTRA_INSTALL_template)
-	mv $(CURDIR)/debian/$(PKG_NAME)-berkeley-modules/usr/sbin/kambdb_recover \
-		$(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/sbin/kambdb_recover
+	# move binaries of kamailio-berkeley-modules to kamailio-berkeley-bin
+	mkdir -p $(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/
+	mv $(CURDIR)/debian/$(PKG_NAME)-berkeley-modules/usr/sbin \
+		$(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/
 
 
 # This single target is used to build all the packages, all at once, or
