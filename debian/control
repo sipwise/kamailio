@@ -2,84 +2,95 @@ Source: ngcp-kamailio
 Section: net
 Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
-Build-Depends: bison,
-               debhelper (>= 9~),
-               docbook-xml,
-               dpkg-dev (>= 1.16.1.1),
-               flex,
-               gcj-jdk,
-               libconfuse-dev,
-               libcurl4-gnutls-dev,
-               libdb-dev (>= 4.6.19),
-               libev-dev,
-               libevent-dev,
-               libexpat1-dev,
-               libgeoip-dev (>= 1.4.5),
-               libhiredis-dev (>= 0.10.0),
-               libjansson-dev,
-               libjson0-dev,
-               libldap2-dev,
-               liblua5.1-0-dev,
-               libmemcached-dev,
-               libmono-2.0-dev,
-               libmysqlclient-dev,
-               libncurses5-dev,
-               libpcre3-dev,
-               libperl-dev,
-               libpq-dev,
-               libradiusclient-ng-dev | libfreeradius-client-dev,
-               libreadline-dev,
-               libsasl2-dev,
-               libsctp-dev,
-               libsnmp-dev,
-               libsqlite3-dev,
-               libssl-dev,
-               libunistring-dev,
-               libxml2-dev,
-               libxmlrpc-core-c3-dev,
-               ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
-               ngcp-libtcap-dev,
-               openssl,
-               pkg-config,
-               python,
-               python-dev,
-               unixodbc-dev,
-               uuid-dev,
-               xsltproc,
-               zlib1g-dev
-Standards-Version: 3.9.7
+Build-Depends:
+ bison,
+ debhelper (>= 9),
+ default-libmysqlclient-dev,
+ dh-systemd (>= 1.5),
+ docbook-xml,
+ dpkg-dev (>= 1.16.1.1),
+ erlang-dev,
+ flex,
+ gcj-jdk,
+ libconfuse-dev,
+ libcurl4-openssl-dev,
+ libdb-dev (>= 4.6.19),
+ libev-dev,
+ libevent-dev,
+ libexpat1-dev,
+ libgeoip-dev (>= 1.4.5),
+ libhiredis-dev (>= 0.10.0),
+ libjansson-dev,
+ libjson-c-dev,
+ libldap2-dev,
+ liblua5.1-0-dev,
+ libmemcached-dev,
+ libmono-2.0-dev [amd64 armel armhf i386 mipsel kfreebsd-amd64 kfreebsd-i386 ppc64 ppc64el s390x],
+ libncurses5-dev,
+ libpcre3-dev,
+ libperl-dev,
+ libpq-dev,
+ libpurple-dev,
+ librabbitmq-dev,
+ libreadline-dev,
+ libsasl2-dev,
+ libsctp-dev [linux-any],
+ libsnmp-dev,
+ libsqlite3-dev,
+ libunistring-dev,
+ libxml2-dev,
+ ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
+ ngcp-libtcap-dev,
+ openssl,
+ pkg-config,
+ python,
+ python-dev,
+ unixodbc-dev,
+ uuid-dev,
+ xsltproc,
+ zlib1g-dev,
+Standards-Version: 3.9.8
 Homepage: http://www.kamailio.org/
-Vcs-Svn: svn://svn.debian.org/pkg-voip/kamailio/trunk/
-Vcs-Browser: http://svn.debian.org/wsvn/pkg-voip/kamailio/?op=log
+Vcs-git: https://anonscm.debian.org/git/pkg-voip/kamailio.git
+Vcs-Browser: https://anonscm.debian.org/gitweb/?p=pkg-voip/kamailio.git
 
 Package: ngcp-kamailio
 Architecture: any
 Multi-Arch: foreign
-Depends: adduser,
-         ngcp-system-tools-ce | ngcp-system-tools,
-         python,
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio
-Replaces: kamailio
-Suggests: ngcp-kamailio-berkeley-modules,
-          ngcp-kamailio-carrierroute-modules,
-          ngcp-kamailio-cpl-modules,
-          ngcp-kamailio-ldap-modules,
-          ngcp-kamailio-lua-modules,
-          ngcp-kamailio-mono-modules,
-          ngcp-kamailio-mysql-modules,
-          ngcp-kamailio-perl-modules,
-          ngcp-kamailio-postgres-modules,
-          ngcp-kamailio-presence-modules,
-          ngcp-kamailio-python-modules,
-          ngcp-kamailio-radius-modules,
-          ngcp-kamailio-redis-modules,
-          ngcp-kamailio-snmpstats-modules,
-          ngcp-kamailio-tls-modules,
-          ngcp-kamailio-unixodbc-modules,
-          ngcp-kamailio-xml-modules,
-          ngcp-kamailio-xmpp-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ adduser,
+ lsb-base,
+ python,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio,
+Replaces:
+ kamailio,
+Suggests:
+ ngcp-kamailio-berkeley-modules,
+ ngcp-kamailio-carrierroute-modules,
+ ngcp-kamailio-cpl-modules,
+ ngcp-kamailio-ldap-modules,
+ ngcp-kamailio-lua-modules,
+ ngcp-kamailio-mono-modules,
+ ngcp-kamailio-mysql-modules,
+ ngcp-kamailio-perl-modules,
+ ngcp-kamailio-postgres-modules,
+ ngcp-kamailio-presence-modules,
+ ngcp-kamailio-python-modules,
+ ngcp-kamailio-radius-modules,
+ ngcp-kamailio-redis-modules,
+ ngcp-kamailio-snmpstats-modules,
+ ngcp-kamailio-tls-modules,
+ ngcp-kamailio-unixodbc-modules,
+ ngcp-kamailio-xml-modules,
+ ngcp-kamailio-xmpp-modules,
+ stun-server | turn-server,
+Provides:
+ sip-router,
 Description: very fast and configurable SIP proxy
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -89,24 +100,24 @@ Description: very fast and configurable SIP proxy
  behaviour. Its modular architecture allows only required functionality to be
  loaded.
  .
- Among others, the following modules are available: digest authentication, CPL
- scripts, instant messaging, MySQL support, presence agent, RADIUS
- authentication, record routing, SMS gateway, Jabber/XMPP gateway, transaction
- module, registrar and user location, XML-RPC interface.
- .
- This package contains the main Kamailio binary along with the principal modules
- and support binaries.
+ This package contains the main Kamailio binary along with the principal
+ modules and support binaries.
 
 Package: ngcp-kamailio-dbg
 Priority: extra
 Section: debug
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends}
-Conflicts: kamailio-dbg
-Replaces: kamailio-dbg
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-dbg,
+Replaces:
+ kamailio-dbg,
 Description: very fast and configurable SIP proxy [debug symbols]
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -118,12 +129,16 @@ Description: very fast and configurable SIP proxy [debug symbols]
 Package: ngcp-kamailio-geoip-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-geoip-modules
-Replaces: kamailio-geoip-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-geoip-modules,
+Replaces:
+ kamailio-geoip-modules,
 Description: contains the geoip module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -135,13 +150,18 @@ Description: contains the geoip module
 Package: ngcp-kamailio-sqlite-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Recommends: sqlite3
-Conflicts: kamailio-sqlite-modules
-Replaces: kamailio-sqlite-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Recommends:
+ sqlite3,
+Conflicts:
+ kamailio-sqlite-modules,
+Replaces:
+ kamailio-sqlite-modules,
 Description: SQLite database connectivity module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -150,14 +170,18 @@ Description: SQLite database connectivity module for Kamailio
  This package provides the SQLite database driver for Kamailio.
 
 Package: ngcp-kamailio-json-modules
-Architecture: any
+Architecture: linux-any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-json-modules
-Replaces: kamailio-json-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-json-modules,
+Replaces:
+ kamailio-json-modules,
 Description: Json parser and jsonrpc modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -169,13 +193,17 @@ Description: Json parser and jsonrpc modules for Kamailio
 Package: ngcp-kamailio-memcached-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-memcached-modules
-Replaces: kamailio-memcached-modules
-Description: Provides the memcached module, an interface to the memcached server
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-memcached-modules,
+Replaces:
+ kamailio-memcached-modules,
+Description: interface to memcached server
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
@@ -186,12 +214,16 @@ Description: Provides the memcached module, an interface to the memcached server
 Package: ngcp-kamailio-lua-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-lua-modules
-Replaces: kamailio-lua-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-lua-modules,
+Replaces:
+ kamailio-lua-modules,
 Description: contains the app_lua module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -201,14 +233,18 @@ Description: contains the app_lua module
  execute embedded Lua applications within configuration file.
 
 Package: ngcp-kamailio-mono-modules
-Architecture: any
+Architecture: amd64 armel i386 mipsel powerpc powerpcspe ppc64 s390x
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-mono-modules
-Replaces: kamailio-mono-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-mono-modules,
+Replaces:
+ kamailio-mono-modules,
 Description: contains the app_mono module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -220,13 +256,17 @@ Description: contains the app_mono module
 Package: ngcp-kamailio-python-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         python-dev,
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-python-modules
-Replaces: kamailio-python-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ python-dev,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-python-modules,
+Replaces:
+ kamailio-python-modules,
 Description: contains the app_python module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -238,12 +278,16 @@ Description: contains the app_python module
 Package: ngcp-kamailio-redis-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-redis-modules
-Replaces: kamailio-redis-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-redis-modules,
+Replaces:
+ kamailio-redis-modules,
 Description: Redis database connectivity module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -254,13 +298,17 @@ Description: Redis database connectivity module for Kamailio
 Package: ngcp-kamailio-mysql-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: mariadb-client| virtual-mysql-client,
-         ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-mysql-modules
-Replaces: kamailio-mysql-module
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ mariadb-client | virtual-mysql-client,
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-mysql-modules,
+Replaces:
+ kamailio-mysql-module,
 Description: MySQL database connectivity module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -271,13 +319,17 @@ Description: MySQL database connectivity module for Kamailio
 Package: ngcp-kamailio-postgres-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         postgresql-client,
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-postgres-modules
-Replaces: kamailio-postgres-module
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ postgresql-client,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-postgres-modules,
+Replaces:
+ kamailio-postgres-module,
 Description: PostgreSQL database connectivity module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -288,12 +340,16 @@ Description: PostgreSQL database connectivity module for Kamailio
 Package: ngcp-kamailio-cpl-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-cpl-modules
-Replaces: kamailio-cpl-module
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-cpl-modules,
+Replaces:
+ kamailio-cpl-module,
 Description: CPL module (CPL interpreter engine) for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -305,30 +361,38 @@ Description: CPL module (CPL interpreter engine) for Kamailio
 Package: ngcp-kamailio-radius-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-radius-modules
-Replaces: kamailio-radius-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-radius-modules,
+Replaces:
+ kamailio-radius-modules,
 Description: RADIUS modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
  This package provides a set of RADIUS modules for Kamailio, for
- authentication, peering, group membership and messages URIs checking against a
- RADIUS server.
+ authentication, peering, group membership and messages URIs checking against
+ a RADIUS server.
 
 Package: ngcp-kamailio-unixodbc-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-unixodbc-modules
-Replaces: kamailio-unixodbc-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-unixodbc-modules,
+Replaces:
+ kamailio-unixodbc-modules,
 Description: unixODBC database connectivity module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -339,12 +403,16 @@ Description: unixODBC database connectivity module for Kamailio
 Package: ngcp-kamailio-presence-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-presence-modules
-Replaces: kamailio-presence-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-presence-modules,
+Replaces:
+ kamailio-presence-modules,
 Description: SIMPLE presence modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -357,12 +425,16 @@ Description: SIMPLE presence modules for Kamailio
 Package: ngcp-kamailio-perl-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Replaces: kamailio-perl-modules
-Conflicts: kamailio-perl-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Replaces:
+ kamailio-perl-modules,
+Conflicts:
+ kamailio-perl-modules,
 Description: Perl extensions and database driver for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -374,13 +446,17 @@ Description: Perl extensions and database driver for Kamailio
 Package: ngcp-kamailio-snmpstats-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         snmpd,
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-snmpstats-modules
-Replaces: kamailio-snmpstats-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ snmpd,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-snmpstats-modules,
+Replaces:
+ kamailio-snmpstats-modules,
 Description: SNMP AgentX subagent module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -389,15 +465,40 @@ Description: SNMP AgentX subagent module for Kamailio
  This package provides the snmpstats module for Kamailio. This module acts
  as an AgentX subagent which connects to a master agent.
 
+Package: ngcp-kamailio-purple-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-purple-modules,
+Replaces:
+ kamailio-purple-modules,
+Description: Provides the purple module, a multi-protocol IM gateway
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides the purple module, a multi-protocol instant
+ messaging gateway module.
+
 Package: ngcp-kamailio-xmpp-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-xmpp-modules
-Replaces: kamailio-xmpp-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-xmpp-modules,
+Replaces:
+ kamailio-xmpp-modules,
 Description: XMPP gateway module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -408,14 +509,19 @@ Description: XMPP gateway module for Kamailio
 Package: ngcp-kamailio-xml-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-xml-modules
-Replaces: kamailio-xml-module,
-          kamailio-xmlrpc-module
-Provides: ngcp-kamailio-xmlrpc-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-xml-modules,
+Replaces:
+ kamailio-xml-module,
+ kamailio-xmlrpc-module,
+Provides:
+ ngcp-kamailio-xmlrpc-modules,
 Description: XML based extensions for Kamailio's Management Interface
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -429,12 +535,16 @@ Description: XML based extensions for Kamailio's Management Interface
 Package: ngcp-kamailio-carrierroute-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-carrierroute-modules
-Replaces: kamailio-carrierroute-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-carrierroute-modules,
+Replaces:
+ kamailio-carrierroute-modules,
 Description: carrierroute module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -446,13 +556,17 @@ Description: carrierroute module for Kamailio
 Package: ngcp-kamailio-berkeley-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: db5.1-util,
-         ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-berkeley-modules
-Replaces: kamailio-berkeley-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ db-util (>= 4.6.19),
+ kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-berkeley-modules,
+Replaces:
+ kamailio-berkeley-modules,
 Description: Berkeley database module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -465,11 +579,16 @@ Description: Berkeley database module for Kamailio
 Package: ngcp-kamailio-berkeley-bin
 Architecture: any
 Multi-Arch: foreign
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-berkeley-bin
-Replaces: kamailio-berkeley-bin
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-berkeley-bin,
+Replaces:
+ kamailio-berkeley-bin,
 Description: Berkeley database module for Kamailio - helper program
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -477,17 +596,21 @@ Description: Berkeley database module for Kamailio - helper program
  .
  This package provides helper modules for the Berkeley database module for
  Kamailio, a high-performance embedded DB kernel. You should normally
- install ngcp-kamailio-berkeley-modules and not this package directly.
+ install kamailio-berkeley-modules and not this package directly.
 
 Package: ngcp-kamailio-ldap-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-ldap-modules
-Replaces: kamailio-ldap-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-ldap-modules,
+Replaces:
+ kamailio-ldap-modules,
 Description: LDAP modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -497,31 +620,19 @@ Description: LDAP modules for Kamailio
  queries from the Kamailio config and storage of SIP account data in an LDAP
  directory.
 
-Package: ngcp-kamailio-outbound-modules
-Architecture: any
-Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-outbound-modules
-Replaces: kamailio-outbound-modules
-Description: Outbound module for Kamailio
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package contains the module implementing SIP outbound extension.
-
 Package: ngcp-kamailio-ims-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-ims-modules
-Replaces: kamailio-ims-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-ims-modules,
+Replaces:
+ kamailio-ims-modules,
 Description: IMS module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -530,15 +641,121 @@ Description: IMS module for Kamailio
  This package contains various Diameter interfaces and modules for Kamailio
  to run as an IMS core.
 
+Package: ngcp-kamailio-utils-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-utils-modules,
+Replaces:
+ kamailio-utils-modules,
+Description: Provides a set utility functions for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ Provides a set of utility functions for Kamailio, which are not related
+ to the server configuration.
+ .
+ Includes http client (http_client) module too
+
+Package: ngcp-kamailio-sctp-modules
+Architecture: linux-any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-sctp-modules,
+Replaces:
+ kamailio-sctp-modules,
+Description: sctp module for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides the sctp module for Kamailio.
+
+Package: ngcp-kamailio-java-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ gcj-jre,
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-java-modules,
+Replaces:
+ kamailio-java-modules,
+Description: contains the app_java module
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides the app_java module, an extension allowing to
+ execute embedded Java applications within configuration file.
+
+Package: ngcp-kamailio-tls-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-tls-modules,
+Replaces:
+ kamailio-tls-modules,
+Description: contains the TLS kamailio transport module
+ This has been split out of the main kamailio package, so that kamailio will
+ not depend on openssl. This module will enable you to use the TLS transport.
+
+Package: ngcp-kamailio-outbound-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-outbound-modules,
+Replaces:
+ kamailio-outbound-modules,
+Description: Outbound module for Kamailio
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains the module implementing SIP outbound extension.
+
 Package: ngcp-kamailio-websocket-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-websocket-modules
-Replaces: kamailio-websocket-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-websocket-modules,
+Replaces:
+ kamailio-websocket-modules,
 Description: Websocket module for kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -549,12 +766,16 @@ Description: Websocket module for kamailio
 Package: ngcp-kamailio-autheph-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-autheph-modules
-Replaces: kamailio-autheph-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-autheph-modules,
+Replaces:
+ kamailio-autheph-modules,
 Description: authentication using ephemeral credentials module for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -562,97 +783,96 @@ Description: authentication using ephemeral credentials module for Kamailio
  .
  This package provides the ephemeral module for Kamailio.
 
-Package: ngcp-kamailio-sctp-modules
-Architecture: any
+Package: ngcp-kamailio-kazoo-modules
+Architecture: linux-any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-sctp-modules
-Replaces: kamailio-sctp-modules
-Description: authentication using ephemeral credentials module for Kamailio
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-kazoo-modules,
+Replaces:
+ kamailio-kazoo-modules,
+Description: kazoo modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides the sctp module for Kamailio.
+ This package provides the kazoo module for Kamailio.
 
-Package: ngcp-kamailio-java-modules
+Package: ngcp-kamailio-cnxcc-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: gcj-jre,
-         ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-java-modules
-Replaces: kamailio-java-modules
-Description: contains the app_java module
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-cnxcc-modules,
+Replaces:
+ kamailio-cnxcc-modules,
+Description: cnxcc modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides the app_java module, an extension allowing to
- execute embedded Java applications within configuration file.
+ This package provides the cnxcc module for Kamailio.
 
-Package: ngcp-kamailio-utils-modules
+Package: ngcp-kamailio-erlang-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-utils-modules
-Replaces: kamailio-utils-modules
-Description: Provides a set utility functions for Kamailio
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-erlang-modules,
+Replaces:
+ kamailio-erlang-modules,
+Description: erlang modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- Provides a set of utility functions for Kamailio, which are not related
- to the server configuration.
-
-Package: ngcp-kamailio-tls-modules
-Architecture: any
-Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: kamailio-tls-modules
-Replaces: kamailio-tls-modules
-Description: contains the TLS kamailio transport module
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This has been split out of the main kamailio package, so that kamailio will
- not depend on openssl. This module will enable you to use the TLS transport.
+ This module provides interact with Erlang node. The module allows sending,
+ receiving Erlang messages and RPC calls between each other.
 
 Package: ngcp-kamailio-extra-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: ngcp-kamailio-extra-modules
-Replaces: ngcp-kamailio-extra-modules
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ ngcp-kamailio-extra-modules,
+Replaces:
+ ngcp-kamailio-extra-modules,
 Description: extra modules for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides: gzcompress uuid ev jansson janssonrpc-c
+ This package provides: gzcompress uuid ev jansson
 
 Package: ngcp-kamailio-lcrrate-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ngcp-kamailio-mysql-modules (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio-mysql-modules (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
 Description: Provides a set utility functions for Kamailio
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -663,9 +883,11 @@ Description: Provides a set utility functions for Kamailio
 Package: ngcp-kamailio-tcap-modules
 Architecture: any
 Multi-Arch: same
-Pre-Depends: ${misc:Pre-Depends}
-Depends: ${misc:Depends},
-         ${shlibs:Depends}
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
 Description: contains the tcap module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
