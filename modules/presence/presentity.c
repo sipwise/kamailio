@@ -396,9 +396,11 @@ int delete_presentity_if_dialog_id_exists(presentity_t* presentity, char* dialog
 	if(result == NULL)
 		return -3;
 
-	// No results from query definitely means no dialog exists
-	if (result->n <= 0)
+	/* no results from query definitely means no dialog exists */
+	if (result->n <= 0) {
+		pa_dbf.free_result(pa_db, result);
 		return 0;
+	}
 
 	// Loop the rows returned from the DB
 	for (i=0; i < result->n; i++)
@@ -428,11 +430,13 @@ int delete_presentity_if_dialog_id_exists(presentity_t* presentity, char* dialog
 				pa_dbf.free_result(pa_db, result);
 				result = NULL;
 				free(db_dialog_id);
+				db_dialog_id = NULL;
 
 				return 1;
 			}
 
 			free(db_dialog_id);
+			db_dialog_id = NULL;
 		}
 	}
 
@@ -494,7 +498,7 @@ int get_dialog_state(presentity_t* presentity, char** state)
 	}
 
 	if (pa_dbf.query (pa_db, query_cols, query_ops, query_vals,
-	 result_cols, n_query_cols, n_result_cols, 0, &result) < 0)
+				result_cols, n_query_cols, n_result_cols, 0, &result) < 0)
 	{
 		LM_ERR("unsuccessful sql query\n");
 		return -2;
@@ -503,9 +507,11 @@ int get_dialog_state(presentity_t* presentity, char** state)
 	if(result == NULL)
 		return -3;
 
-	// No results from query definitely means no dialog exists
-	if (result->n <= 0)
+	/* no results from query definitely means no dialog exists */
+	if (result->n <= 0) {
+		pa_dbf.free_result(pa_db, result);
 		return 0;
+	}
 
 	// Loop the rows returned from the DB
 	for (i=0; i < result->n; i++)
@@ -515,7 +521,8 @@ int get_dialog_state(presentity_t* presentity, char** state)
 		tmp_db_body.s = (char*)row_vals[rez_body_col].val.string_val;
 		tmp_db_body.len = strlen(tmp_db_body.s);
 
-		parse_state_result = parse_dialog_state_from_body(tmp_db_body, &db_is_dialog, state);
+		parse_state_result = parse_dialog_state_from_body(tmp_db_body,
+				&db_is_dialog, state);
 
 		pa_dbf.free_result(pa_db, result);
 		result = NULL;
@@ -686,13 +693,16 @@ int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 			}
 
 			check_if_dialog(*body, &is_dialog, &dialog_id);
+			if ( dialog_id ) {
+				if (delete_presentity_if_dialog_id_exists(presentity, dialog_id) < 0) {
+					free(dialog_id);
+					dialog_id = NULL;
+					goto error;
+				}
 
-			if (delete_presentity_if_dialog_id_exists(presentity, dialog_id) < 0) {
-				goto error;
+				free(dialog_id);
+				dialog_id = NULL;
 			}
-
-			free(dialog_id);
-
 			LM_DBG("inserting %d cols into table\n",n_query_cols);
 
 			if (pa_dbf.insert(pa_db, query_cols, query_vals, n_query_cols) < 0)
@@ -790,6 +800,10 @@ int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 			if(check_if_dialog(*body, &is_dialog, &dialog_id)< 0)
 			{
 				LM_ERR("failed to check if dialog stored\n");
+				if(dialog_id) {
+					free(dialog_id);
+					dialog_id = NULL;
+				}
 				goto error;
 			}
 
@@ -803,13 +817,26 @@ int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 			if(check_if_dialog(old_body, &is_dialog, &old_dialog_id)< 0)
 			{
 				LM_ERR("failed to check if dialog stored\n");
+				if(old_dialog_id) {
+					free(old_dialog_id);
+					old_dialog_id = NULL;
+				}
 				goto error;
 			}
 
-			if(is_dialog==0 ) /* if the old body has no dialog - overwrite */
+			/* if the old body has no dialog - overwrite */
+			if(is_dialog==0 ) {
+				if(old_dialog_id) {
+					free(old_dialog_id);
+					old_dialog_id = NULL;
+				}
 				goto after_dialog_check;
+			}
 
-			free(old_dialog_id);
+			if(old_dialog_id) {
+				free(old_dialog_id);
+				old_dialog_id = NULL;
+			}
 
 			sender.s = (char*)row_vals[rez_sender_col].val.string_val;
 			sender.len= strlen(sender.s);
@@ -966,23 +993,25 @@ after_dialog_check:
 		else
 			cur_etag= presentity->etag;
 
-		if (is_dialog_terminated(presentity))
-		{
-			LM_WARN("Trying to update an already terminated state. Skipping update.\n");
-
-			/* send 200OK */
-			if (publ_send200ok(msg, presentity->expires, cur_etag)< 0)
+		if (presentity->event->evp->type==EVENT_DIALOG) {
+			if(is_dialog_terminated(presentity))
 			{
-				LM_ERR("sending 200OK reply\n");
-				goto error;
+				LM_WARN("Trying to update an already terminated state."
+						" Skipping update.\n");
+
+				/* send 200OK */
+				if (publ_send200ok(msg, presentity->expires, cur_etag)< 0) {
+					LM_ERR("sending 200OK reply\n");
+					goto error;
+				}
+				if (sent_reply) *sent_reply= 1;
+
+				if(etag.s)
+					pkg_free(etag.s);
+				etag.s= NULL;
+
+				goto done;
 			}
-			if (sent_reply) *sent_reply= 1;
-
-			if(etag.s)
-				pkg_free(etag.s);
-			etag.s= NULL;
-
-			goto done;
 		}
 
 		update_keys[n_update_cols] = &str_expires_col;
@@ -1223,9 +1252,6 @@ int pres_htable_restore(void)
 		{
 			row = &result->rows[i];
 			row_vals = ROW_VALUES(row);
-
-			if(row_vals[expires_col].val.int_val< (int)time(NULL))
-				continue;
 
 			sphere= NULL;
 			user.s= (char*)row_vals[user_col].val.string_val;

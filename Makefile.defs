@@ -89,6 +89,11 @@ endif
 WITHAS ?= 1
 # enable core hooks for SCTP
 SCTP ?= 1
+# enable raw sockets
+RAW_SOCKS ?= yes
+ifeq ($(RAW_SOCKS),1)
+	RAW_SOCKS = yes
+endif
 
 # what to install
 INSTALL_FLAVOUR=$(FLAVOUR)
@@ -96,7 +101,7 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 # version number
 VERSION = 4
 PATCHLEVEL = 4
-SUBLEVEL =  3
+SUBLEVEL = 4
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
@@ -1716,7 +1721,10 @@ ifeq ($(OS), linux)
 	use_futex= yes
 	C_DEFS+=-DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD \
 			-DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H \
-			-DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DUSE_RAW_SOCKS
+			-DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER
+	ifneq ($(RAW_SOCKS), yes)
+		C_DEFS+= -DUSE_RAW_SOCKS
+	endif
 	ifneq ($(found_lock_method), yes)
 		#C_DEFS+= -DUSE_POSIX_SEM
 		C_DEFS+=-DUSE_PTHREAD_MUTEX
@@ -1763,7 +1771,10 @@ ifeq ($(OS), gnu_kfreebsd)
 	use_futex= yes
 	C_DEFS+=-DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD \
 			-DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H \
-			-DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DUSE_RAW_SOCKS
+			-DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER
+	ifneq ($(RAW_SOCKS), yes)
+		C_DEFS+= -DUSE_RAW_SOCKS
+	endif
 	ifneq ($(found_lock_method), yes)
 		#C_DEFS+= -DUSE_POSIX_SEM
 		C_DEFS+=-DUSE_PTHREAD_MUTEX
@@ -1844,7 +1855,10 @@ ifeq ($(OS), freebsd)
 	C_DEFS+=-DHAVE_SOCKADDR_SA_LEN -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN \
 		-DHAVE_SCHED_YIELD -DHAVE_MSGHDR_MSG_CONTROL \
 		-DHAVE_CONNECT_ECONNRESET_BUG -DHAVE_TIMEGM \
-		-DHAVE_NETINET_IN_SYSTM -DUSE_RAW_SOCKS
+		-DHAVE_NETINET_IN_SYSTM
+	ifneq ($(RAW_SOCKS), yes)
+		C_DEFS+= -DUSE_RAW_SOCKS
+	endif
 	ifneq ($(found_lock_method), yes)
 		C_DEFS+= -DUSE_PTHREAD_MUTEX  # try pthread sems
 		found_lock_method=yes
