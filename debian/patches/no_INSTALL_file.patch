@@ -3,7 +3,7 @@ Author: Victor Seva <linuxmaniac@torreviejawireless.org>
 
 --- a/Makefile
 +++ b/Makefile
-@@ -839,8 +839,6 @@
+@@ -839,8 +839,6 @@ install-modules-all: install-every-modul
  
  
  install-doc: $(doc_prefix)/$(doc_dir) install-every-module-doc

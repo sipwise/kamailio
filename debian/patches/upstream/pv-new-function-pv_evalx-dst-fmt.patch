@@ -16,8 +16,6 @@ the valye of $var(z) is "test one"
  modules/pv/pv.c | 115 ++++++++++++++++++++++++++++++++++++++++++++++++++------
  1 file changed, 103 insertions(+), 12 deletions(-)
 
-diff --git a/modules/pv/pv.c b/modules/pv/pv.c
-index e8e717b..4862a7d 100644
 --- a/modules/pv/pv.c
 +++ b/modules/pv/pv.c
 @@ -13,8 +13,8 @@
@@ -73,7 +71,7 @@ index e8e717b..4862a7d 100644
  	{"shvset",              PARAM_STRING|USE_FUNC_PARAM, (void*)param_set_shvar },
  	{"varset",              PARAM_STRING|USE_FUNC_PARAM, (void*)param_set_var },
  	{"avp_aliases",         PARAM_STRING|USE_FUNC_PARAM, (void*)add_avp_aliases },
-@@ -502,16 +503,19 @@ static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2);
+@@ -502,16 +503,19 @@ static int w_sbranch_reset(sip_msg_t *ms
  static int w_var_to_xavp(sip_msg_t *msg, char *p1, char *p2);
  static int w_xavp_to_var(sip_msg_t *msg, char *p1);
  
@@ -105,16 +103,16 @@ index e8e717b..4862a7d 100644
  	/* API exports */
  	{"pv_register_api",   (cmd_function)pv_register_api,     NO_SCRIPT, 0, 0},
  	{0,0,0,0,0,0}
-@@ -610,7 +616,7 @@ static int pv_isset(struct sip_msg* msg, char* pvid, char *foo)
+@@ -610,7 +616,7 @@ static int pv_isset(struct sip_msg* msg,
  static int pv_unset(struct sip_msg* msg, char* pvid, char *foo)
  {
  	pv_spec_t *sp;
 -	
 +
  	sp = (pv_spec_t*)pvid;
- 	pv_set_spec_value(msg, sp, 0, NULL);
- 
-@@ -786,6 +792,91 @@ static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2)
+ 	if(pv_set_spec_value(msg, sp, 0, NULL)<0) {
+ 		LM_ERR("faile to unset variable\n");
+@@ -789,6 +795,91 @@ static int w_sbranch_reset(sip_msg_t *ms
  	return 1;
  }
  
@@ -206,6 +204,3 @@ index e8e717b..4862a7d 100644
  static const char* rpc_shv_set_doc[2] = {
  	"Set a shared variable (args: name type value)",
  	0
--- 
-2.8.1
-

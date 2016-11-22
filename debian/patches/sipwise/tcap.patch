@@ -344,7 +344,7 @@
 +}
 --- a/Makefile.groups
 +++ b/Makefile.groups
-@@ -193,6 +193,9 @@
+@@ -193,6 +193,9 @@ mod_list_erlang=erlang
  # - modules depending on systemd library
  mod_list_systemd=log_systemd
  
@@ -354,7 +354,7 @@
  # - all modules
  mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
  			   $(mod_list_db) $(mod_list_dbuid) \
-@@ -278,6 +281,9 @@
+@@ -278,6 +281,9 @@ module_group_ignore= $(sort $(filter-out
  # pkg lcrrate module
  module_group_klcrrate=$(mod_list_lcrrate)
  
