@@ -5,6 +5,7 @@
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 #
+sipwise/dialplan_avp_fix.patch
 ##
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
