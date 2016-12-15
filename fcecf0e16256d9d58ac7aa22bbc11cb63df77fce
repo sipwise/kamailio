@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "ba51214e_ac9670ee",
+        "filename": "debian/patches/sipwise/dialplan_avp_fix.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 36,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2016-12-15T07:58:56Z",
+      "side": 1,
+      "message": "pv_printf_s() uses an internal buffer so v has always a value, no allocation involve. And if the function returns error I do jump to clean \n\nI\u0027m going to remove the if to make this less confusing.",
+      "parentUuid": "ba51214e_2cdc20e4",
+      "revId": "fcecf0e16256d9d58ac7aa22bbc11cb63df77fce",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ba51214e_ccd5a4ba",
         "filename": "debian/patches/sipwise/dialplan_avp_fix.patch",
         "patchSetId": 1
@@ -30,6 +48,24 @@
       "writtenOn": "2016-12-14T18:44:55Z",
       "side": 1,
       "message": "Here you already know that the buffer is big enough, so it\u0027s overkill to use strncpy() instead of just plain strcpy(). Just a note, not a deal breaker of course.",
+      "revId": "fcecf0e16256d9d58ac7aa22bbc11cb63df77fce",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "ba51214e_eca06845",
+        "filename": "debian/patches/sipwise/dialplan_avp_fix.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 43,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2016-12-15T07:58:56Z",
+      "side": 1,
+      "message": "right, thanks!",
+      "parentUuid": "ba51214e_ccd5a4ba",
       "revId": "fcecf0e16256d9d58ac7aa22bbc11cb63df77fce",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
