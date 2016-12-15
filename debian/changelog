@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.4-1+0~mr5.0.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [2159625] TT#7034 dialplan: fix avp values when PV_IDX_ITR
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 15 Dec 2016 11:22:44 +0100
+
 ngcp-kamailio (4.4.4-1+0~mr5.0.1.1) unstable; urgency=medium
 
   * New release.
