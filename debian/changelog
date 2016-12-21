@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.3-1+0~mr4.5.2.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [a5abbea] TT#7034 dialplan: fix avp values when PV_IDX_ITR
+  * [e6a549a] TT#8007 dialog: RPC dlg.dlg_list[_ctx] make from_tag parameter optional
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 21 Dec 2016 11:26:30 +0100
+
 ngcp-kamailio (4.4.3-1+0~mr4.5.2.2) unstable; urgency=medium
 
   [ Victor Seva ]
