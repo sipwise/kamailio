@@ -17,6 +17,7 @@ sipwise/parallel_build.patch
 sipwise/tcap.patch
 # carrier support
 sipwise/usrloc_dbro.patch
+sipwise/usrloc_dbro_pinger.patch
 sipwise/0001-kex-add-extended-core-stats.patch
 ##
 sipwise/rtpengine_next_branch_parm.patch
