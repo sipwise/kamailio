@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ba51214e_dfab731b",
+        "filename": "debian/patches/sipwise/usrloc_dbro_pinger.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 34,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2016-12-21T13:16:47Z",
+      "side": 1,
+      "message": "Is this actually an error? Or is it an expected condition?",
+      "revId": "c46d07d6886ba920648bf1a8318bef4bb0362509",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
