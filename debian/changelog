@@ -1,3 +1,14 @@
+ngcp-kamailio (4.4.4-1+0~mr4.5.3.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [9d45c93] TT#7034 dialplan: fix avp values when PV_IDX_ITR
+  * [569a1d8] TT#8007 dialog: RPC dlg.dlg_list[_ctx] make from_tag parameter optional
+  * [b9797db] TT#8199 [CARRIER] usrloc: restore use db read-only functionality
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 27 Dec 2016 11:14:15 +0100
+
 ngcp-kamailio (4.4.4-1+0~mr4.5.3.0) unstable; urgency=medium
 
   * [2973e0b] TT#3010 remove upstream fixes merged into 4.4.3
