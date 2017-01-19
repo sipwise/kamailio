@@ -1,3 +1,15 @@
+ngcp-kamailio (4.4.5-1+0~mr5.1.0.0) unstable; urgency=medium
+
+  * [890b2ba] TT#5449 debian: support stretch build
+  * [a2cae5c] TT#7034 dialplan: fix avp values when PV_IDX_ITR
+  * [c0c3afd] TT#8007 dialog: RPC dlg.dlg_list[_ctx] make from_tag parameter optional
+  * [262ed00] TT#8199 [CARRIER] usrloc: restore use db read-only functionality
+  * [298ee6b] TT#8275 debian/patches/sipwise: remove unused patches
+  * [e0fd465] New upstream version 4.4.5
+  * [16a4f27] TT#9301 remove already applied upstream patches
+
+ -- Victor Seva <vseva@debian.org>  Thu, 19 Jan 2017 09:11:36 +0100
+
 ngcp-kamailio (4.4.4-1+0~mr5.1.0.0) unstable; urgency=medium
 
   * New release.
