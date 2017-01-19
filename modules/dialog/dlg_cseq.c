@@ -40,6 +40,7 @@
 #include "../../parser/parse_to.h"
 #include "../../parser/parse_from.h"
 #include "../../parser/parse_cseq.h"
+#include "../../srapi.h"
 #include "../../modules/tm/tm_load.h"
 
 #include "dlg_handlers.h"
@@ -77,25 +78,24 @@ static int dlg_cseq_prepare_msg(sip_msg_t *msg)
 		/* reply to local transaction -- nothing to do */
 		if (parse_headers(msg, HDR_VIA2_F, 0)==-1
 				|| (msg->via2==0) || (msg->via2->error!=PARSE_OK)) {
-			LM_DBG("no second via in this message \n");
-			return 3;
+			if(get_cseq(msg)->method_id != METHOD_CANCEL) {
+				LM_DBG("no second via in this message \n");
+				return 3;
+			}
 		}
 	}
 
-	if(parse_from_header(msg)<0)
-	{
+	if(parse_from_header(msg)<0) {
 		LM_ERR("cannot parse FROM header\n");
 		return 3;
 	}
 
-	if(parse_to_header(msg)<0 || msg->to==NULL)
-	{
+	if(parse_to_header(msg)<0 || msg->to==NULL) {
 		LM_ERR("cannot parse TO header\n");
 		return 3;
 	}
 
-	if(get_to(msg)==NULL)
-	{
+	if(get_to(msg)==NULL) {
 		LM_ERR("cannot get TO header\n");
 		return 3;
 	}
@@ -127,6 +127,7 @@ int dlg_cseq_update(sip_msg_t *msg)
 	unsigned int vinc = 0;
 	str nval;
 	str *pval;
+	sr_cfgenv_t *cenv = NULL;
 
 	if(dlg_cseq_prepare_msg(msg)!=0) {
 		goto error;
@@ -152,6 +153,7 @@ int dlg_cseq_update(sip_msg_t *msg)
 		goto done;
 	}
 
+	cenv = sr_cfgenv_get();
 	ninc = 1;
 
 	/* take the increment value from dialog */
@@ -185,7 +187,7 @@ int dlg_cseq_update(sip_msg_t *msg)
 
 	LM_DBG("adding auth cseq header value: %.*s\n", nval.len, nval.s);
 	parse_headers(msg, HDR_EOH_F, 0);
-	sr_hdr_add_zs(msg, "P-K-Auth-CSeq", &nval);
+	sr_hdr_add_zs(msg, cenv->uac_cseq_auth.s, &nval);
 
 done:
 	if(dlg!=NULL) dlg_release(dlg);
@@ -207,6 +209,7 @@ int dlg_cseq_refresh(sip_msg_t *msg, dlg_cell_t *dlg,
 	unsigned int vinc = 0;
 	str nval;
 	str *pval;
+	sr_cfgenv_t *cenv = NULL;
 
 	if(dlg_cseq_prepare_msg(msg)!=0) {
 		goto error;
@@ -254,7 +257,8 @@ int dlg_cseq_refresh(sip_msg_t *msg, dlg_cell_t *dlg,
 
 	LM_DBG("adding cseq refresh header value: %.*s\n", nval.len, nval.s);
 	parse_headers(msg, HDR_EOH_F, 0);
-	sr_hdr_add_zs(msg, "P-K-CSeq-Refresh", &nval);
+	cenv = sr_cfgenv_get();
+	sr_hdr_add_zs(msg, cenv->uac_cseq_refresh.s, &nval);
 
 done:
 	return 0;
@@ -354,11 +358,13 @@ int dlg_cseq_msg_sent(void *data)
 	int tbuf_len = 0;
 	struct via_body *via;
 	hdr_field_t *hfk = NULL;
+	sr_cfgenv_t *cenv = NULL;
 
 	obuf = (str*)data;
 	memset(&msg, 0, sizeof(sip_msg_t));
 	msg.buf = obuf->s;
 	msg.len = obuf->len;
+	cenv = sr_cfgenv_get();
 
 	if(dlg_cseq_prepare_new_msg(&msg)!=0) {
 		goto done;
@@ -394,23 +400,23 @@ int dlg_cseq_msg_sent(void *data)
 	parse_headers(&msg, HDR_EOH_F, 0);
 
 	/* check if transaction is marked for a new increment */
-	if(get_cseq(&msg)->method_id!=METHOD_ACK) {
-		hfk = sr_hdr_get_z(&msg, "P-K-Auth-CSeq");
-		if(hfk!=NULL) {
-			LM_DBG("new cseq inc requested\n");
-			nval = hfk->body;
-			trim(&nval);
-		} else {
-			LM_DBG("new cseq inc not requested\n");
-		}
+	hfk = sr_hdr_get_z(&msg, cenv->uac_cseq_auth.s);
+	if(hfk!=NULL) {
+		LM_DBG("new cseq inc requested\n");
+		nval = hfk->body;
+		trim(&nval);
+	} else {
+		LM_DBG("new cseq inc not requested\n");
 	}
 
 	if(nval.len<=0) {
-		hfk = sr_hdr_get_z(&msg, "P-K-CSeq-Refresh");
+		hfk = sr_hdr_get_z(&msg, cenv->uac_cseq_refresh.s);
 		if(hfk!=NULL) {
 			LM_DBG("cseq refresh requested\n");
 			nval = hfk->body;
 			trim(&nval);
+		} else {
+			LM_DBG("cseq refresh not requested\n");
 		}
 	}
 	if(nval.len<=0) {
