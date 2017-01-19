@@ -1,7 +1,6 @@
 ##
 # upstream fixes
 # 4.4
-upstream/dialplan-fix-avp-values-when-using-PV_IDX_ITR.patch
 #
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
