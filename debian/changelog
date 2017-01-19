@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.5-1+0~mr5.0.2.0) unstable; urgency=medium
+
+  * [14f124f] TT#7034 dialplan: fix avp values when PV_IDX_ITR
+  * [d088145] TT#8007 dialog: RPC dlg.dlg_list[_ctx] make from_tag parameter optional
+  * [9a2f9b0] TT#8199 [CARRIER] usrloc: restore use db read-only functionality
+  * [e0fd465] New upstream version 4.4.5
+  * [f33cc53] TT#9301 remove already applied upstream patches
+
+ -- Victor Seva <vseva@debian.org>  Thu, 19 Jan 2017 09:47:09 +0100
+
 ngcp-kamailio (4.4.4-1+0~mr5.0.2.0) unstable; urgency=medium
 
   * New release.
