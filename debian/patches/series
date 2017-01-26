@@ -1,6 +1,9 @@
 ##
 # upstream fixes
 # 4.4
+upstream/0001-tm-apply-new-updates-with-Via-with-updated-request.patch
+upstream/0002-presence-free-pointer-after-usage.patch
+upstream/0003-htable-use-custom-column-name-for-order-by-in-db-loa.patch
 #
 sipwise/presence-remove-transaction-creation-from-publ_notif.patch
 # upsream fixes from master
