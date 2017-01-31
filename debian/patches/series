@@ -3,6 +3,7 @@
 # 4.4
 upstream/dialplan-fix-avp-values-when-using-PV_IDX_ITR.patch
 #
+sipwise/presence-remove-transaction-creation-from-publ_notif.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 #
