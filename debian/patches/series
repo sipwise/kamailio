@@ -2,6 +2,7 @@
 # upstream fixes
 # 4.4
 #
+sipwise/presence-remove-transaction-creation-from-publ_notif.patch
 # upsream fixes from master
 upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 upstream/textops-filter_body-remove-previous-r-n-that-belongs.patch
@@ -23,3 +24,4 @@ sipwise/usrloc_dbro_pinger.patch
 sipwise/0001-kex-add-extended-core-stats.patch
 ##
 sipwise/rtpengine_next_branch_parm.patch
+sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
