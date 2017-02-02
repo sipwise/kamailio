@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.5-1+0~mr5.1.1.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [a997dce] TT#9301 4.4 upstream fixes
+  * [4c15b35] TT#9870 presence: fix transaction issues
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 03 Feb 2017 00:32:44 +0100
+
 ngcp-kamailio (4.4.5-1+0~mr5.1.0.0) unstable; urgency=medium
 
   * [890b2ba] TT#5449 debian: support stretch build
