@@ -150,6 +150,9 @@ LD_EXTRA_OPTS := $(shell dpkg-buildflags --get LDFLAGS)
 # https://wiki.debian.org/ReproducibleBuilds/
 CC_EXTRA_OPTS += -DVERSION_NODATE
 
+# DEBUG MEMORY REMOVE MEEEEE!!!
+CC_EXTRA_OPTS += -DMEMDBG
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
