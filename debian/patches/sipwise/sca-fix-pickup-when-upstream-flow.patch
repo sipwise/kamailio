@@ -1,0 +1,94 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 8 Jun 2017 16:13:03 +0200
+Subject: sca: fix pickup when upstream flow
+
+Change-Id: Ibed4c626573e3ac6d0fdc43a0f83954f17e60283
+---
+ modules/sca/sca_call_info.c | 39 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 30 insertions(+), 9 deletions(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index 0e08afc..e6a4e1d 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -979,6 +979,9 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+     str			state_str = STR_NULL;
+     int			state = SCA_APPEARANCE_STATE_UNKNOWN;
+     int			rc = -1;
++    str 		*target_aor;
++    str			*to_tag, *from_tag;
++    int			slot_idx;
+ 
+     /*
+      * if we get here, one of the legs is an SCA endpoint. we want to know
+@@ -991,12 +994,29 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+ 	goto done;
+     }
+ 
+-    if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
++    if(SCA_CALL_INFO_IS_SHARED_CALLEE( call_info ) &&
++	sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++	LM_DBG("callee is SCA and direction is 'upstream' switch tags\n");
++	target_aor = to_aor;
++	to_tag = &from->tag_value;
++	from_tag = &to->tag_value;
++	slot_idx = sca_uri_lock_shared_appearance(sca, target_aor);
++	if(slot_idx>=0) {
++		LM_DBG("appearance index for [%.*s] is %d\n",
++		STR_FMT(target_aor), slot_idx);
++		sca_hash_table_unlock_index(sca->appearances, slot_idx);
++	}
++    } else if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
+ 	/* caller isn't SCA, no more to do. update callee in reply handler. */
+ 	LM_DBG("caller isn't SCA, no more to do. update callee in reply handler\n");
+ 	rc = 1;
+ 	goto done;
+-    }
++    } else {
++       target_aor = from_aor;
++       to_tag = &to->tag_value;
++       from_tag = &from->tag_value;
++       slot_idx = call_info->index;
++     }
+ 
+     /*
+      * register callback to handle error responses sent from script using
+@@ -1006,7 +1026,7 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+     if ( sca->tm_api->register_tmcb( msg, NULL, TMCB_RESPONSE_READY,
+ 			sca_call_info_response_ready_cb, NULL, NULL ) < 0 ) {
+ 	LM_ERR( "sca_call_info_invite_request_handler: failed to register "
+-		"callback for INVITE %.*s ACK", STR_FMT( from_aor ));
++		"callback for INVITE %.*s ACK", STR_FMT( target_aor ));
+ 	goto done;
+     }
+     
+@@ -1037,22 +1057,23 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+ 
+     dialog.id.s = dlg_buf;
+     if ( sca_dialog_build_from_tags( &dialog, sizeof( dlg_buf ),
+-	    &msg->callid->body, &from->tag_value, &to->tag_value ) < 0 ) {
+-	LM_ERR( "Failed to build dialog from tags" );
++	&msg->callid->body, from_tag, to_tag ) < 0 ) {
++	LM_ERR( "Failed to build dialog from tags from_tag[%.*s] to_tag[%.*s]",
++		STR_FMT(from_tag), STR_FMT(to_tag));
+ 	return( -1 );
+     }
+ 
+-    if ( sca_appearance_update_index( sca, from_aor, call_info->index,
++    if ( sca_appearance_update_index( sca, target_aor, slot_idx,
+ 		state, NULL, NULL, &dialog ) != SCA_APPEARANCE_OK ) {
+ 	sca_appearance_state_to_str( state, &state_str );
+ 	LM_ERR( "Failed to update %.*s appearance-index %d to %.*s",
+-		STR_FMT( from_aor ), call_info->index,
++		STR_FMT( target_aor ), slot_idx,
+ 		STR_FMT( &state_str ));
+     }
+ 
+-    if ( sca_notify_call_info_subscribers( sca, from_aor ) < 0 ) {
++    if ( sca_notify_call_info_subscribers( sca, target_aor ) < 0 ) {
+ 	LM_ERR( "Failed to call-info NOTIFY %.*s subscribers on INVITE",
+-		STR_FMT( from_aor ));
++		STR_FMT( target_aor ));
+ 	goto done;
+     }
+ 
