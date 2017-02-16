@@ -1,0 +1,171 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 16 Mar 2017 15:45:42 +0100
+Subject: sca: [to|from]_avp module parameters
+
+Change-Id: Ie7b09e95dd975fc549b1bb26e34663370200be0a
+---
+ modules/sca/sca.c           | 40 ++++++++++++++++++++++++++++++++++++++++
+ modules/sca/sca.h           |  6 ++++++
+ modules/sca/sca_call_info.c |  8 ++++++++
+ modules/sca/sca_util.c      | 14 ++++++++++++++
+ 4 files changed, 68 insertions(+)
+
+diff --git a/modules/sca/sca.c b/modules/sca/sca.c
+index 9e03f6f..b93553c 100644
+--- a/modules/sca/sca.c
++++ b/modules/sca/sca.c
+@@ -47,6 +47,12 @@ db_func_t		dbf;	/* db api */
+ struct tm_binds		tmb;	/* tm functions for sending messages */
+ sl_api_t		slb;	/* sl callback, function for getting to-tag */
+ 
++/* avps */
++unsigned short from_uri_avp_type;
++int_str from_uri_avp;
++unsigned short to_uri_avp_type;
++int_str to_uri_avp;
++
+ /* PROTOTYPES */
+ static int		sca_mod_init( void );
+ static int		sca_child_init( int );
+@@ -112,6 +118,8 @@ int			line_seize_max_expires = 15;
+ int			purge_expired_interval = 120;
+ int onhold_bflag = -1;
+ str server_address = STR_NULL;
++str from_uri_avp_param = STR_NULL;
++str to_uri_avp_param = STR_NULL;
+ 
+ static param_export_t	params[] = {
+     { "outbound_proxy",		PARAM_STR,	&outbound_proxy },
+@@ -125,6 +133,8 @@ static param_export_t	params[] = {
+     { "purge_expired_interval",	INT_PARAM,	&purge_expired_interval },
+     {"onhold_bflag", INT_PARAM, &onhold_bflag},
+     {"server_address", PARAM_STR, &server_address},
++    {"from_uri_avp", PARAM_STR, &from_uri_avp_param},
++    {"to_uri_avp", PARAM_STR, &to_uri_avp_param},
+     { NULL,			0,		NULL },
+ };
+ 
+@@ -301,6 +311,31 @@ sca_child_init( int rank )
+     return( 0 );
+ }
+ 
++static int
++sca_process_avps(str *avp_param, int_str *avp, unsigned short *avp_type)
++{
++  pv_spec_t *avp_spec;
++  unsigned short avp_flags;
++
++  if (avp_param && avp_param->len > 0) {
++    avp_spec = pv_cache_get(avp_param);
++    if (avp_spec==NULL|| avp_spec->type!=PVT_AVP) {
++        LM_ERR("malformed or non AVP definition <%.*s>\n", STR_FMT(avp_param));
++        return -1;
++    }
++
++    if (pv_get_avp_name(0, &(avp_spec->pvp), avp, &avp_flags) != 0) {
++        LM_ERR("invalid AVP definition <%.*s>\n", STR_FMT(avp_param));
++        return -1;
++    }
++    *avp_type = avp_flags;
++  } else {
++    avp->s.s = NULL;
++    avp->s.len = 0;
++  }
++  return 0;
++}
++
+     static int
+ sca_mod_init( void )
+ {
+@@ -363,6 +398,11 @@ sca_mod_init( void )
+      */
+     register_dummy_timers( 1 );
+ 
++    if(sca_process_avps(&from_uri_avp_param, &from_uri_avp, &from_uri_avp_type)<0 ||
++       sca_process_avps(&to_uri_avp_param, &to_uri_avp, &to_uri_avp_type)<0) {
++      goto error;
++    }
++
+     LM_INFO( "initialized" );
+ 
+     return( 0 );
+diff --git a/modules/sca/sca.h b/modules/sca/sca.h
+index abcbe56..69fed94 100644
+--- a/modules/sca/sca.h
++++ b/modules/sca/sca.h
+@@ -55,4 +55,10 @@ typedef struct _sca_mod		sca_mod;
+ 
+ extern sca_mod		*sca;
+ 
++/* avps */
++extern unsigned short from_uri_avp_type;
++extern int_str from_uri_avp;
++extern unsigned short to_uri_avp_type;
++extern int_str to_uri_avp;
++
+ #endif /* SCA_H */
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index d46c65d..ad56ebc 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -1880,6 +1880,7 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+     int			method;
+     int			rc = -1;
+     int			update_mask = SCA_CALL_INFO_SHARED_BOTH;
++    int_str val;
+ 
+     method = sca_get_msg_method( msg );
+ 
+@@ -1931,6 +1932,9 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+ 	}
+     }
+ 
++    delete_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp);
++    delete_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp);
++
+     memset( &call_info, 0, sizeof( sca_call_info ));
+     call_info_hdr = sca_call_info_header_find( msg->headers );
+     if ( !SCA_HEADER_EMPTY( call_info_hdr )) {
+@@ -1954,6 +1958,8 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+                 STR_FMT( &from->uri ));
+             goto done;
+         }
++        val.s = *uri_from;
++        add_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp, val);
+     }
+     else if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
+ 	LM_ERR( "Bad From header" );
+@@ -1971,6 +1977,8 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+                 STR_FMT( &to->uri ));
+             goto done;
+         }
++        val.s = *uri_to;
++        add_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp, val);
+     }
+     else if ( sca_get_msg_to_header( msg, &to ) < 0 ) {
+ 	LM_ERR( "Bad To header" );
+diff --git a/modules/sca/sca_util.c b/modules/sca/sca_util.c
+index 32a20bc..63a9e6e 100644
+--- a/modules/sca/sca_util.c
++++ b/modules/sca/sca_util.c
+@@ -137,6 +137,20 @@ sca_build_to_body_from_uri(sip_msg_t *msg, struct to_body **body, str *uri)
+     return (0);
+ }
+ 
++int
++sca_get_avp_value(unsigned short avp_type, int_str avp, str *result) {
++    int_str val;
++    struct usr_avp *_avp;
++
++    if (avp.s.len > 0) {
++        _avp = search_first_avp(avp_type, avp, &val, 0);
++        if(_avp) {
++            *result = val.s;
++            return 0;
++        }
++    }
++    return -1;
++}
+     int
+ sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from )
+ {
