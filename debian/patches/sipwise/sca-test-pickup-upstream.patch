@@ -1,0 +1,149 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 24 Apr 2017 11:16:44 +0200
+Subject: sca: test pickup upstream
+
+Change-Id: I51f849a3fbdd096d08cdea009a393df4065bcedd
+---
+ modules/sca/sca_call_info.c | 51 ++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 37 insertions(+), 14 deletions(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index fdf4d63..8c50b98 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -979,6 +979,13 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+     str			state_str = STR_NULL;
+     int			state = SCA_APPEARANCE_STATE_UNKNOWN;
+     int			rc = -1;
++    str			*target_aor = from_aor;
++
++    if(SCA_CALL_INFO_IS_SHARED_CALLEE( call_info ) &&
++    		sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++    	LM_DBG("callee is SCA and direction is 'upstream'\n");
++    	target_aor = to_aor;
++    }
+ 
+     /*
+      * if we get here, one of the legs is an SCA endpoint. we want to know
+@@ -987,7 +994,7 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+     if ( sca->tm_api->register_tmcb( msg, NULL, TMCB_E2EACK_IN,
+ 				    sca_call_info_ack_cb, NULL, NULL ) < 0 ) {
+ 	LM_ERR( "sca_call_info_invite_request_handler: failed to register "
+-		"callback for INVITE %.*s ACK", STR_FMT( from_aor ));
++		"callback for INVITE %.*s ACK", STR_FMT( target_aor ));
+ 	goto done;
+     }
+ 
+@@ -1006,11 +1013,12 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+     if ( sca->tm_api->register_tmcb( msg, NULL, TMCB_RESPONSE_READY,
+ 			sca_call_info_response_ready_cb, NULL, NULL ) < 0 ) {
+ 	LM_ERR( "sca_call_info_invite_request_handler: failed to register "
+-		"callback for INVITE %.*s ACK", STR_FMT( from_aor ));
++		"callback for INVITE %.*s ACK", STR_FMT( target_aor ));
+ 	goto done;
+     }
+-    
++
+     if ( sca_call_is_held( msg )) {
++    	LM_DBG("call_is_held\n");
+ 	state = SCA_APPEARANCE_STATE_HELD;
+ 	if ( call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE ) {
+ 	    state = SCA_APPEARANCE_STATE_HELD_PRIVATE;
+@@ -1041,17 +1049,17 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+ 	return( -1 );
+     }
+ 
+-    if ( sca_appearance_update_index( sca, from_aor, call_info->index,
++    if ( sca_appearance_update_index( sca, target_aor, call_info->index,
+ 		state, NULL, NULL, &dialog ) != SCA_APPEARANCE_OK ) {
+ 	sca_appearance_state_to_str( state, &state_str );
+ 	LM_ERR( "Failed to update %.*s appearance-index %d to %.*s",
+-		STR_FMT( from_aor ), call_info->index,
++		STR_FMT( target_aor ), call_info->index,
+ 		STR_FMT( &state_str ));
+     }
+ 
+-    if ( sca_notify_call_info_subscribers( sca, from_aor ) < 0 ) {
++    if ( sca_notify_call_info_subscribers( sca, target_aor ) < 0 ) {
+ 	LM_ERR( "Failed to call-info NOTIFY %.*s subscribers on INVITE",
+-		STR_FMT( from_aor ));
++		STR_FMT( target_aor ));
+ 	goto done;
+     }
+ 
+@@ -1232,6 +1240,7 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
+     int			rc = -1;
+ 
+     if ( SCA_CALL_INFO_IS_SHARED_CALLEE( call_info )) {
++	LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE\n");
+ 	rc = sca_call_info_uri_update( to_aor, call_info, from, to,
+ 			contact_uri, &msg->callid->body );
+     }
+@@ -1265,6 +1274,8 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
+ 		&msg->callid->body, &from->tag_value, NULL, slot_idx );
+     if ( app == NULL ) {
+ 	/* no SCA line is involved with this call */
++	LM_DBG("no SCA line is involved with this call[%.*s]\n",
++		STR_FMT(from_aor));
+ 	rc = 1;
+ 	goto done;
+     }
+@@ -1378,6 +1389,7 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
+     str			*tag;
+     int			slot_idx = -1;
+     int			state = SCA_APPEARANCE_STATE_IDLE;
++    str			*target_aor;
+ 
+     if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
+ 	LM_ERR( "sca_call_info_ack_cb: failed to get From-header" );
+@@ -1388,13 +1400,18 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
+ 	return;
+     }
+ 
+-    if ( sca_uri_lock_if_shared_appearance( sca, from_aor, &slot_idx )) {
+-	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+-		LM_DBG("upstream direction detected\n");
+-		tag = &to->tag_value;
+-	} else {
+-		tag = &from->tag_value;
+-	}
++    if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++	LM_DBG("upstream direction detected\n");
++	target_aor = to_aor;
++	tag = &to->tag_value;
++    } else {
++	target_aor = from_aor;
++	tag = &from->tag_value;
++    }
++
++    LM_DBG("target_aor[%.*s]\n", STR_FMT(target_aor));
++
++    if ( sca_uri_lock_if_shared_appearance( sca, target_aor, &slot_idx )) {
+ 	app = sca_appearance_for_tags_unsafe( sca, from_aor,
+ 			&msg->callid->body, tag, NULL, slot_idx );
+ 	if ( app == NULL ) {
+@@ -1423,6 +1440,8 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
+ 
+ 	    /* can't send NOTIFYs until we unlock the slot below */
+ 	}
++    } else {
++	LM_DBG("target_aor not shared appearance\n");
+     }
+ 
+ done:
+@@ -2078,11 +2097,15 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+     if ( sca_uri_is_shared_appearance( sca, &from_aor )) {
+ 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLER )) {
+ 	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;
++	    LM_DBG("SCA_CALL_INFO_SHARED_CALLER[%.*s]\n",
++		STR_FMT(&from_aor));
+ 	}
+     }
+     if ( sca_uri_is_shared_appearance( sca, &to_aor )) {
+ 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLEE )) {
+ 	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLEE;
++	    LM_DBG("SCA_CALL_INFO_SHARED_CALLEE[%.*s]\n",
++		STR_FMT(&to_aor));
+ 	}
+     }
+ 
