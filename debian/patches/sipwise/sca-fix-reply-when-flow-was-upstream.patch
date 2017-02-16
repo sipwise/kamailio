@@ -1,0 +1,32 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 12 Jun 2017 15:47:43 +0200
+Subject: sca: fix reply when flow was upstream
+
+Change-Id: I9e293c749e4b1485992c1e0f00830209bbc21525
+---
+ modules/sca/sca_call_info.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index 0504ba6..9957f98 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -1244,13 +1244,15 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
+     if ( SCA_CALL_INFO_IS_SHARED_CALLEE( call_info )) {
+ 	LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE\n");
+ 	if(sca->rr_api->is_direction(msg, RR_FLOW_DOWNSTREAM)==0) {
+-		LM_DBG("downstream detected\n");
++		LM_DBG("downstream detected, switch to/from\n");
++		rc = sca_call_info_uri_update( to_aor, call_info, to, from,
++			contact_uri, &msg->callid->body );
+ 	}
+ 	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+ 		LM_DBG("upstream detected\n");
+-	}
+-	rc = sca_call_info_uri_update( to_aor, call_info, from, to,
++		rc = sca_call_info_uri_update( to_aor, call_info, from, to,
+ 			contact_uri, &msg->callid->body );
++	}
+     }
+ 
+     if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
