@@ -1,0 +1,38 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 30 Mar 2017 10:16:00 +0200
+Subject: sca: sca_call_info_update() fallback to from uri if no Contact
+ header is present
+
+Change-Id: I6a3f5b4c6786bf804bd10987863edf954e41f69b
+---
+ modules/sca/sca_call_info.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index 734fbe2..e00927b 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -1976,9 +1976,6 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+         rc = -1;
+ 	    goto done;
+ 	}
+-    } else if ( rc < 0 ) {
+-	LM_ERR( "Bad Contact" );
+-	goto done;
+     }
+     /* reset rc to -1 so we don't end up returning 0 to the script */
+     rc = -1;
+@@ -2025,6 +2022,13 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+     LM_DBG("to_aor[%.*s] from_aor[%.*s]\n",
+         STR_FMT(&to_aor), STR_FMT(&from_aor));
+ 
++    if(contact_uri.s==NULL) {
++        contact_uri.s = from_aor.s;
++        contact_uri.len = from_aor.len;
++        LM_DBG("No Contact header, using from_aor[%.*s]\n",
++            STR_FMT(&contact_uri));
++    }
++
+     /* early check to see if we're dealing with any SCA endpoints */
+     if ( sca_uri_is_shared_appearance( sca, &from_aor )) {
+ 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLER )) {
