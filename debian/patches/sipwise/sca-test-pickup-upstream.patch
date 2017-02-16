@@ -1,0 +1,37 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 24 Apr 2017 11:16:44 +0200
+Subject: sca: test pickup upstream
+
+Change-Id: I51f849a3fbdd096d08cdea009a393df4065bcedd
+---
+ modules/sca/sca_call_info.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index fdf4d63..9d8db7b 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -991,9 +991,12 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+ 	goto done;
+     }
+ 
+-    if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
++    if(SCA_CALL_INFO_IS_SHARED_CALLEE( call_info ) &&
++    		sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++    	LM_DBG("callee is SCA and direction is 'upstream'\n");
++    } else if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
+ 	/* caller isn't SCA, no more to do. update callee in reply handler. */
+-	LM_DBG("caller isn't SCA, no more to do. update callee in reply handler\n");
++    	LM_DBG("caller isn't SCA, no more to do. update callee in reply handler\n");
+ 	rc = 1;
+ 	goto done;
+     }
+@@ -1009,7 +1012,7 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+ 		"callback for INVITE %.*s ACK", STR_FMT( from_aor ));
+ 	goto done;
+     }
+-    
++
+     if ( sca_call_is_held( msg )) {
+ 	state = SCA_APPEARANCE_STATE_HELD;
+ 	if ( call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE ) {
