@@ -1,0 +1,629 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 16 Mar 2017 15:45:42 +0100
+Subject: sca: [to|from]_avp module parameters
+
+Change-Id: Ie7b09e95dd975fc549b1bb26e34663370200be0a
+---
+ modules/sca/sca.c           | 102 +++++++++++++++++++++++++++++-
+ modules/sca/sca.h           |   6 ++
+ modules/sca/sca_call_info.c |  77 ++++++++++-------------
+ modules/sca/sca_subscribe.c |  52 +++++++++-------
+ modules/sca/sca_subscribe.h |   2 +-
+ modules/sca/sca_util.c      | 148 +++++++++++++++++++++++++-------------------
+ 6 files changed, 255 insertions(+), 132 deletions(-)
+
+diff --git a/modules/sca/sca.c b/modules/sca/sca.c
+index 9e03f6f..99d2ac1 100644
+--- a/modules/sca/sca.c
++++ b/modules/sca/sca.c
+@@ -47,11 +47,22 @@ db_func_t		dbf;	/* db api */
+ struct tm_binds		tmb;	/* tm functions for sending messages */
+ sl_api_t		slb;	/* sl callback, function for getting to-tag */
+ 
++/* avps */
++unsigned short from_uri_avp_type;
++int_str from_uri_avp;
++unsigned short to_uri_avp_type;
++int_str to_uri_avp;
++
+ /* PROTOTYPES */
+ static int		sca_mod_init( void );
+ static int		sca_child_init( int );
+ static void		sca_mod_destroy( void );
+ static int		sca_set_config( sca_mod * );
++static int sca_handle_subscribe_0_f(sip_msg_t* msg);
++static int sca_handle_subscribe_1_f(sip_msg_t* msg, char*);
++static int sca_handle_subscribe_2_f(sip_msg_t* msg, char*, char *);
++int fixup_hs(void **, int);
++int fixup_free_hs(void **param, int param_no);
+ static int sca_call_info_update_0_f(sip_msg_t* msg);
+ static int sca_call_info_update_1_f(sip_msg_t* msg, char*);
+ static int sca_call_info_update_2_f(sip_msg_t* msg, char* , char*);
+@@ -61,7 +72,12 @@ int fixup_free_ciu(void **param, int param_no);
+ 
+ /* EXPORTED COMMANDS */
+ static cmd_export_t	cmds[] = {
+-    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe, 0, NULL, NULL, REQUEST_ROUTE },
++    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe_0_f, 0,
++      NULL, NULL, REQUEST_ROUTE },
++    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe_1_f, 1,
++      fixup_hs, fixup_free_hs, REQUEST_ROUTE },
++    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe_2_f, 2,
++      fixup_hs, fixup_free_hs, REQUEST_ROUTE },
+     { "sca_call_info_update", (cmd_function)sca_call_info_update_0_f, 0, NULL, NULL,
+ 	REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
+     {"sca_call_info_update", (cmd_function)sca_call_info_update_1_f, 1,
+@@ -112,6 +128,8 @@ int			line_seize_max_expires = 15;
+ int			purge_expired_interval = 120;
+ int onhold_bflag = -1;
+ str server_address = STR_NULL;
++str from_uri_avp_param = STR_NULL;
++str to_uri_avp_param = STR_NULL;
+ 
+ static param_export_t	params[] = {
+     { "outbound_proxy",		PARAM_STR,	&outbound_proxy },
+@@ -125,6 +143,8 @@ static param_export_t	params[] = {
+     { "purge_expired_interval",	INT_PARAM,	&purge_expired_interval },
+     {"onhold_bflag", INT_PARAM, &onhold_bflag},
+     {"server_address", PARAM_STR, &server_address},
++    {"from_uri_avp", PARAM_STR, &from_uri_avp_param},
++    {"to_uri_avp", PARAM_STR, &to_uri_avp_param},
+     { NULL,			0,		NULL },
+ };
+ 
+@@ -301,6 +321,31 @@ sca_child_init( int rank )
+     return( 0 );
+ }
+ 
++static int
++sca_process_avps(str *avp_param, int_str *avp, unsigned short *avp_type)
++{
++  pv_spec_t *avp_spec;
++  unsigned short avp_flags;
++
++  if (avp_param && avp_param->len > 0) {
++    avp_spec = pv_cache_get(avp_param);
++    if (avp_spec==NULL|| avp_spec->type!=PVT_AVP) {
++        LM_ERR("malformed or non AVP definition <%.*s>\n", STR_FMT(avp_param));
++        return -1;
++    }
++
++    if (pv_get_avp_name(0, &(avp_spec->pvp), avp, &avp_flags) != 0) {
++        LM_ERR("invalid AVP definition <%.*s>\n", STR_FMT(avp_param));
++        return -1;
++    }
++    *avp_type = avp_flags;
++  } else {
++    avp->s.s = NULL;
++    avp->s.len = 0;
++  }
++  return 0;
++}
++
+     static int
+ sca_mod_init( void )
+ {
+@@ -363,6 +408,11 @@ sca_mod_init( void )
+      */
+     register_dummy_timers( 1 );
+ 
++    if(sca_process_avps(&from_uri_avp_param, &from_uri_avp, &from_uri_avp_type)<0 ||
++       sca_process_avps(&to_uri_avp_param, &to_uri_avp, &to_uri_avp_type)<0) {
++      goto error;
++    }
++
+     LM_INFO( "initialized" );
+ 
+     return( 0 );
+@@ -402,6 +452,56 @@ sca_mod_destroy( void )
+     sca_db_disconnect();
+ }
+ 
++static int sca_handle_subscribe_0_f(sip_msg_t* msg) {
++  return sca_handle_subscribe(msg, NULL, NULL);
++}
++static int sca_handle_subscribe_1_f(sip_msg_t* msg, char* p1) {
++  str uri_to = STR_NULL;
++  if(get_str_fparam(&uri_to, msg, (gparam_p)p1)!=0)
++  {
++    LM_ERR("unable to get value from param pvar_to\n");
++    return -1;
++  }
++  return sca_handle_subscribe(msg, &uri_to, NULL);
++}
++static int sca_handle_subscribe_2_f(sip_msg_t* msg, char* p1, char* p2) {
++  str uri_to = STR_NULL;
++  str uri_from = STR_NULL;
++  if(get_str_fparam(&uri_to, msg, (gparam_p)p1)!=0)
++  {
++    LM_ERR("unable to get value from param pvar_to\n");
++    return -1;
++  }
++  if(get_str_fparam(&uri_from, msg, (gparam_p)p2)!=0)
++  {
++    LM_ERR("unable to get value from param pvar_from\n");
++    return -1;
++  }
++return sca_handle_subscribe(msg, &uri_to, &uri_from);
++}
++
++int fixup_hs(void **param, int param_no)
++{
++   switch (param_no) {
++       case 1:
++       case 2:
++           return fixup_spve_null(param, 1);
++       default:
++           return E_UNSPEC;
++   }
++}
++
++int fixup_free_hs(void **param, int param_no)
++{
++   switch (param_no) {
++       case 1:
++       case 2:
++           return fixup_free_spve_null(param, 1);
++       default:
++           return E_UNSPEC;
++   }
++}
++
+ static int sca_call_info_update_0_f(sip_msg_t* msg) {
+    return sca_call_info_update(msg, NULL, NULL, NULL);
+ }
+diff --git a/modules/sca/sca.h b/modules/sca/sca.h
+index abcbe56..69fed94 100644
+--- a/modules/sca/sca.h
++++ b/modules/sca/sca.h
+@@ -55,4 +55,10 @@ typedef struct _sca_mod		sca_mod;
+ 
+ extern sca_mod		*sca;
+ 
++/* avps */
++extern unsigned short from_uri_avp_type;
++extern int_str from_uri_avp;
++extern unsigned short to_uri_avp_type;
++extern int_str to_uri_avp;
++
+ #endif /* SCA_H */
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index d46c65d..734fbe2 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -1874,12 +1874,12 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+     str			to_aor = STR_NULL;
+     str			contact_uri = STR_NULL;
+     int			aor_flags = SCA_CALL_INFO_UPDATE_FLAG_DEFAULT;
+-    int         to_body_flags = SCA_CALL_INFO_UPDATE_FLAG_DEFAULT;
+     int			n_dispatch;
+     int			i;
+     int			method;
+     int			rc = -1;
+     int			update_mask = SCA_CALL_INFO_SHARED_BOTH;
++    int_str val;
+ 
+     method = sca_get_msg_method( msg );
+ 
+@@ -1931,6 +1931,9 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+ 	}
+     }
+ 
++    delete_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp);
++    delete_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp);
++
+     memset( &call_info, 0, sizeof( sca_call_info ));
+     call_info_hdr = sca_call_info_header_find( msg->headers );
+     if ( !SCA_HEADER_EMPTY( call_info_hdr )) {
+@@ -1943,36 +1946,22 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+     }
+ 
+     if (uri_from != NULL) {
+-        if(sca_build_to_body_from_uri(msg, &from, uri_from)<0){
+-            LM_ERR( "Bad From uri from param\n" );
+-            return( -1 );
+-        }
++        val.s.s   = uri_from->s;
++        val.s.len = uri_from->len;
++        add_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp, val);
+         LM_DBG("from[%.*s] param\n", STR_FMT(uri_from));
+-        to_body_flags |= SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC;
+-        if ( sca_uri_extract_aor( &from->uri, &from_aor ) < 0 ) {
+-            LM_ERR( "Failed to extract AoR from From URI %.*s",
+-                STR_FMT( &from->uri ));
+-            goto done;
+-        }
+     }
+-    else if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
+-	LM_ERR( "Bad From header" );
++    if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
++    LM_ERR( "Bad From header" );
+ 	return( -1 );
+     }
+     if (uri_to != NULL) {
+-        if(sca_build_to_body_from_uri(msg, &to, uri_to)<0){
+-            LM_ERR( "Bad From uri to param\n" );
+-            goto done;
+-        }
++        val.s.s   = uri_to->s;
++        val.s.len = uri_to->len;
++        add_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp, val);
+         LM_DBG("to[%.*s] param\n", STR_FMT(uri_to));
+-        to_body_flags |= SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC;
+-        if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
+-            LM_ERR( "Failed to extract AoR from To URI %.*s",
+-                STR_FMT( &to->uri ));
+-            goto done;
+-        }
+     }
+-    else if ( sca_get_msg_to_header( msg, &to ) < 0 ) {
++    if ( sca_get_msg_to_header( msg, &to ) < 0 ) {
+ 	LM_ERR( "Bad To header" );
+ 	goto done;
+     }
+@@ -2001,27 +1990,35 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+ 	           goto done;
+             }
+             aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC;
+-        }
+-        if(uri_to==NULL) {
+-            if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
+-                LM_ERR( "Failed to extract AoR from To URI %.*s",
+-                      STR_FMT( &to->uri ));
+-                goto done;
+-            }
+-        }
+-    } else {
+-        if(uri_from==NULL) {
++        } else {
+             if ( sca_uri_extract_aor( &from->uri, &from_aor ) < 0 ) {
+                 LM_ERR( "Failed to extract AoR from From URI %.*s",
+-                        STR_FMT( &from->uri ));
++                    STR_FMT( &from->uri ));
+                 goto done;
+             }
+         }
++        if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
++            LM_ERR( "Failed to extract AoR from To URI %.*s",
++                STR_FMT( &to->uri ));
++            goto done;
++        }
++    } else {
++        if ( sca_uri_extract_aor( &from->uri, &from_aor ) < 0 ) {
++            LM_ERR( "Failed to extract AoR from From URI %.*s",
++                    STR_FMT( &from->uri ));
++            goto done;
++        }
+ 	    if(uri_to==NULL) {
+             if ( sca_create_canonical_aor( msg, &to_aor ) < 0 ) {
+ 	            goto done;
+ 	        }
+ 	        aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC;
++        } else {
++            if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
++                LM_ERR( "Failed to extract AoR from To URI %.*s",
++                    STR_FMT( &to->uri ));
++                goto done;
++            }
+         }
+     }
+ 
+@@ -2088,15 +2085,5 @@ done:
+ 	    pkg_free( to_aor.s );
+ 	}
+     }
+-    if (( to_body_flags & SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC )) {
+-    if ( from != NULL ) {
+-        free_to( from );
+-    }
+-    }
+-    if (( to_body_flags & SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC )) {
+-    if ( to != NULL ) {
+-        free_to( to );
+-    }
+-    }
+     return( rc );
+ }
+diff --git a/modules/sca/sca_subscribe.c b/modules/sca/sca_subscribe.c
+index 25fac54..3b92162 100644
+--- a/modules/sca/sca_subscribe.c
++++ b/modules/sca/sca_subscribe.c
+@@ -1043,10 +1043,6 @@ sca_subscription_from_request( sca_mod *scam, sip_msg_t *msg, int event_type,
+ 	expires = max_expires;
+     }
+ 
+-    if ( SCA_HEADER_EMPTY( msg->to )) {
+-	LM_ERR( "Empty To header" );
+-	goto error;
+-    }
+     if ( SCA_HEADER_EMPTY( msg->callid )) {
+ 	LM_ERR( "Empty Call-ID header" );
+ 	goto error;
+@@ -1068,30 +1064,18 @@ sca_subscription_from_request( sca_mod *scam, sip_msg_t *msg, int event_type,
+ 	goto error;
+     }
+ 
+-    if ( SCA_HEADER_EMPTY( msg->from )) {
+-	LM_ERR( "Empty From header" );
+-	goto error;
+-    }
+-    if ( parse_from_header( msg ) < 0 ) {
++    if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
+ 	LM_ERR( "Bad From header" );
+ 	goto error;
+     }
+-    from = (struct to_body *)msg->from->parsed;
+     if ( SCA_STR_EMPTY( &from->tag_value )) {
+ 	LM_ERR( "No from-tag in From header" );
+ 	goto error;
+     }
+ 
+-    if (( to = (struct to_body *)msg->to->parsed ) == NULL ) {
+-	parse_to( msg->to->body.s,
+-		  msg->to->body.s + msg->to->body.len + 1, /* end of buffer */
+-		  &tmp_to );
+-
+-	if ( tmp_to.error != PARSE_OK ) {
+-	    LM_ERR( "Bad To header" );
+-	    goto error;
+-	}
+-	to = &tmp_to;
++    if ( sca_get_msg_to_header( msg, &to ) < 0 ) {
++	LM_ERR( "Bad To header" );
++	goto error;
+     }
+ 
+     if (parse_sip_msg_uri(msg) < 0) {
+@@ -1179,7 +1163,7 @@ error:
+ }
+ 
+     int
+-sca_handle_subscribe( sip_msg_t *msg, char *p1, char *p2 )
++sca_handle_subscribe( sip_msg_t *msg, str *uri_to, str *uri_from )
+ {
+     sca_subscription	req_sub;
+     sca_subscription	*sub = NULL;
+@@ -1194,6 +1178,8 @@ sca_handle_subscribe( sip_msg_t *msg, char *p1, char *p2 )
+     int			idx = -1;
+     int			rc = -1;
+     int			released = 0;
++    int_str		val;
++    struct to_body	*tmp_to;
+ 
+     if ( parse_headers( msg, HDR_EOH_F, 0 ) < 0 ) {
+ 	LM_ERR( "header parsing failed: bad request" );
+@@ -1218,6 +1204,20 @@ sca_handle_subscribe( sip_msg_t *msg, char *p1, char *p2 )
+ 	return( -1 );
+     }
+ 
++    delete_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp);
++    delete_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp);
++    if (uri_from != NULL) {
++        val.s.s   = uri_from->s;
++        val.s.len = uri_from->len;
++        add_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp, val);
++        LM_DBG("from[%.*s] param\n", STR_FMT(uri_from));
++    }
++    if (uri_to != NULL) {
++        val.s.s   = uri_to->s;
++        val.s.len = uri_to->len;
++        add_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp, val);
++        LM_DBG("to[%.*s] param\n", STR_FMT(uri_to));
++    }
+     if ( sca_subscription_from_request( sca, msg, event_type, &req_sub ) < 0 ) {
+ 	SCA_SUB_REPLY_ERROR( sca, 400,
+ 		"Bad Shared Call Appearance Request", msg );
+@@ -1231,7 +1231,15 @@ sca_handle_subscribe( sip_msg_t *msg, char *p1, char *p2 )
+     sca_subscription_print( &req_sub );
+ 
+     /* check to see if the message has a to-tag */
+-    to_tag = &(get_to( msg )->tag_value);
++    if(uri_to!=NULL) {
++	if ( sca_get_msg_to_header( msg, &tmp_to ) < 0 ) {
++		LM_ERR( "Bad To header" );
++		return( -1 );
++	}
++	to_tag = &(tmp_to->tag_value);
++    } else {
++	to_tag = &(get_to( msg )->tag_value);
++    }
+ 
+     /* XXX should lock starting here and use unsafe methods below? */
+ 
+diff --git a/modules/sca/sca_subscribe.h b/modules/sca/sca_subscribe.h
+index a3688de..6e4b381 100644
+--- a/modules/sca/sca_subscribe.h
++++ b/modules/sca/sca_subscribe.h
+@@ -75,7 +75,7 @@ extern const str 	SCA_METHOD_SUBSCRIBE;
+         sca_subscription_reply((mod), (scode), (smsg), \
+ 		SCA_EVENT_TYPE_CALL_INFO, -1, (sreply))
+ 
+-int	sca_handle_subscribe( sip_msg_t *, char *, char * );
++int	sca_handle_subscribe( sip_msg_t *, str *, str * );
+ int	sca_subscription_reply( sca_mod *, int, char *, int, int, sip_msg_t * );
+ 
+ int	sca_subscription_from_db_result( db1_res_t *, sca_subscription * );
+diff --git a/modules/sca/sca_util.c b/modules/sca/sca_util.c
+index 32a20bc..a3476d8 100644
+--- a/modules/sca/sca_util.c
++++ b/modules/sca/sca_util.c
+@@ -116,94 +116,116 @@ sca_get_msg_cseq_method( sip_msg_t *msg )
+ 
+ /* caller needs to call free_to for *body */
+ int
+-sca_build_to_body_from_uri(sip_msg_t *msg, struct to_body **body, str *uri)
++sca_parse_uri(struct to_body *body, str *uri)
+ {
+-    assert( msg != NULL );
+     assert( body != NULL );
+     assert( uri != NULL );
+ 
+-    *body = pkg_malloc(sizeof(struct to_body));
+-    if(*body == NULL) {
+-        LM_ERR("cannot allocate pkg memory\n");
+-        return(-1);
+-    }
+-
+-    parse_to(uri->s, uri->s + uri->len + 1, *body);
+-    if ((*body)->error != PARSE_OK) {
++    parse_to(uri->s, uri->s + uri->len + 1, body);
++    if (body->error != PARSE_OK) {
+         LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
+-        free_to(*body);
+         return(-1);
+     }
+     return (0);
+ }
+ 
+-    int
+-sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from )
+-{
+-    struct to_body	*f;
++int
++sca_get_avp_value(unsigned short avp_type, int_str avp, str *result) {
++    int_str val;
++    struct usr_avp *_avp;
++
++    assert(result != NULL);
++
++    if (avp.s.len > 0) {
++        _avp = search_first_avp(avp_type, avp, &val, 0);
++        if(_avp) {
++            result->s = val.s.s;
++            result->len = val.s.len;
++            return 0;
++        }
++    }
++    return -1;
++}
++
++int
++sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from ) {
++    struct to_body *f;
++    static struct to_body sf;
++    str uri = STR_NULL;
+ 
+-    assert( msg != NULL );
+     assert( from != NULL );
+ 
+-    if ( SCA_HEADER_EMPTY( msg->from )) {
+-	LM_ERR( "Empty From header" );
+-	return( -1 );
+-    }
+-    if ( parse_from_header( msg ) < 0 ) {
+-	LM_ERR( "Bad From header" );
+-	return( -1 );
+-    }
+-    f = get_from( msg );
+-    if ( SCA_STR_EMPTY( &f->tag_value )) {
+-	LM_ERR( "Bad From header: no tag parameter" );
+-	return( -1 );
+-    }
++    if(sca_get_avp_value(from_uri_avp_type, from_uri_avp, &uri)<0) {
++        assert( msg != NULL );
++        if ( SCA_HEADER_EMPTY( msg->from )) {
++            LM_ERR( "Empty From header" );
++            return( -1 );
++        }
++        if ( parse_from_header( msg ) < 0 ) {
++            LM_ERR( "Bad From header" );
++            return( -1 );
++        }
++        f = get_from( msg );
++        if ( SCA_STR_EMPTY( &f->tag_value )) {
++            LM_ERR( "Bad From header: no tag parameter" );
++            return( -1 );
++        }
+ 
+-    /* ensure the URI is parsed for future use */
+-    if ( parse_uri( f->uri.s, f->uri.len, GET_FROM_PURI( msg )) < 0 ) {
+-	LM_ERR( "Failed to parse From URI %.*s", STR_FMT( &f->uri ));
+-	return( -1 );
++        /* ensure the URI is parsed for future use */
++        if ( parse_uri( f->uri.s, f->uri.len, GET_FROM_PURI( msg )) < 0 ) {
++            LM_ERR( "Failed to parse From URI %.*s", STR_FMT( &f->uri ));
++            return( -1 );
++        }
++        *from = f;
++    } else {
++        LM_DBG("using $avp(%.*s)[%.*s] as from uri\n",
++            STR_FMT(&from_uri_avp.s), STR_FMT(&uri));
++        if(sca_parse_uri(&sf, &uri)<0) return -1;
++        *from = &sf;
+     }
+-
+-    *from = f;
+-
+-    return( 0 );
++    return ( 0 );
+ }
+ 
+-    int
++int
+ sca_get_msg_to_header( sip_msg_t *msg, struct to_body **to )
+ {
+-    struct to_body	parsed_to;
++    static struct to_body	parsed_to;
+     struct to_body	*t = NULL;
++    str uri = STR_NULL;
+ 
+-    assert( msg != NULL );
+     assert( to != NULL );
++    if(sca_get_avp_value(to_uri_avp_type, to_uri_avp, &uri)<0) {
++        assert( msg != NULL );
+ 
+-    if ( SCA_HEADER_EMPTY( msg->to )) {
+-	LM_ERR( "Empty To header" );
+-	return( -1 );
+-    }
+-    t = get_to( msg );
+-    if ( t == NULL ) {
+-	parse_to( msg->to->body.s,
+-		  msg->to->body.s + msg->to->body.len + 1, /* end of buffer */
+-		  &parsed_to );
+-	if ( parsed_to.error != PARSE_OK ) {
+-	    LM_ERR( "Bad To header" );
+-	    return( -1 );
+-	}
+-	t = &parsed_to;
+-    }
++        if ( SCA_HEADER_EMPTY( msg->to )) {
++            LM_ERR( "Empty To header" );
++            return( -1 );
++        }
++        t = get_to( msg );
++        if ( t == NULL ) {
++            parse_to( msg->to->body.s,
++                msg->to->body.s + msg->to->body.len + 1, /* end of buffer */
++                &parsed_to );
++            if ( parsed_to.error != PARSE_OK ) {
++                LM_ERR( "Bad To header" );
++                return( -1 );
++            }
++            t = &parsed_to;
++        }
+ 
+-    /* ensure the URI is parsed for future use */
+-    if ( parse_uri( t->uri.s, t->uri.len, GET_TO_PURI( msg )) < 0 ) {
+-	LM_ERR( "Failed to parse To URI %.*s", STR_FMT( &t->uri ));
+-	return( -1 );
++        /* ensure the URI is parsed for future use */
++        if ( parse_uri( t->uri.s, t->uri.len, GET_TO_PURI( msg )) < 0 ) {
++            LM_ERR( "Failed to parse To URI %.*s", STR_FMT( &t->uri ));
++            return( -1 );
++        }
++        *to = t;
++    } else {
++        LM_DBG("using $avp(%.*s)[%.*s] as to uri\n",
++            STR_FMT(&to_uri_avp.s), STR_FMT(&uri));
++        if(sca_parse_uri(&parsed_to, &uri)<0) return -1;
++        *to = &parsed_to;
+     }
+-
+-    *to = t;
+-
+-    return( 0 );
++    return ( 0 );
+ }
+ 
+ /* count characters requiring escape as defined by escape_common */
