@@ -50,6 +50,8 @@ sipwise/utils-kamctl-refresh-dbschema.patch
 sipwise/sca-use-To-header-if-in-dialog-as-target.patch
 sipwise/sca-fix-sca_call_info_update-params.patch
 sipwise/sca-use-onhold_bflag-value-only-when-set.patch
+sipwise/sca-line-seize.patch
+sipwise/sca-fallback-from-uri-if-no-contact.patch
 ##
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
 sipwise/pv_trans_eval_uri.patch
