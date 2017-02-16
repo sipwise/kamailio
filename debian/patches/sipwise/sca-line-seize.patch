@@ -1,0 +1,13 @@
+Index: kamailio/modules/sca/sca_subscribe.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_subscribe.c
++++ kamailio/modules/sca/sca_subscribe.c
+@@ -1101,7 +1101,7 @@ sca_subscription_from_request( sca_mod *
+     ruri = GET_RURI(msg);
+ 
+     to_tag = to->tag_value;
+-    if ( to_tag.s == NULL ) {
++    if ( event_type == SCA_EVENT_TYPE_CALL_INFO || event_type == SCA_EVENT_TYPE_LINE_SEIZE) {
+ 	/*
+ 	 * XXX need hook to detect when we have a subscription and the
+ 	 * subscriber sends an out-of-dialog SUBSCRIBE, which indicates the
