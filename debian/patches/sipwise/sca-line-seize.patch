@@ -1,0 +1,67 @@
+Index: kamailio/modules/sca/sca_call_info.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_call_info.c
++++ kamailio/modules/sca/sca_call_info.c
+@@ -980,6 +980,8 @@ sca_call_info_invite_request_handler( si
+     int			state = SCA_APPEARANCE_STATE_UNKNOWN;
+     int			rc = -1;
+ 
++    LM_ERR( "sca_call_info_invite_request_handler: entered");
++    
+     /*
+      * if we get here, one of the legs is an SCA endpoint. we want to know
+      * when the e2e ACK comes in so we can notify other members of the group.
+@@ -1010,6 +1012,7 @@ sca_call_info_invite_request_handler( si
+     }
+     
+     if ( sca_call_is_held( msg )) {
++	LM_ERR( "sca_call_info_invite_request_handler: call hold");
+ 	state = SCA_APPEARANCE_STATE_HELD;
+ 	if ( call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE ) {
+ 	    state = SCA_APPEARANCE_STATE_HELD_PRIVATE;
+@@ -1017,16 +1020,19 @@ sca_call_info_invite_request_handler( si
+ 	    state = SCA_APPEARANCE_STATE_HELD;
+ 	}
+     } else if ( !SCA_STR_EMPTY( &to->tag_value )) {
++	LM_ERR( "sca_call_info_invite_request_handler: call hold");
+ 	/* this is a reINVITE from an SCA line that put the call on hold */
+ 	state = SCA_APPEARANCE_STATE_ACTIVE;
+     } else if ( sca_call_info_is_line_seize_reinvite( msg, call_info,
+ 					    from, to, from_aor, to_aor )) {
++	LM_ERR( "sca_call_info_invite_request_handler: reInvite");
+ 	rc = sca_call_info_seize_held_call( msg, call_info, from, to,
+ 					   from_aor, to_aor, contact_uri );
+ 	if ( rc <= 0 ) {
+ 	    goto done;
+ 	}
+     }
++	LM_ERR( "sca_call_info_invite_request_handler: initial invite");
+     /* otherwise, this is an initial INVITE */
+ 
+     dialog.id.s = dlg_buf;
+Index: kamailio/modules/sca/sca_subscribe.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_subscribe.c
++++ kamailio/modules/sca/sca_subscribe.c
+@@ -1101,7 +1101,7 @@ sca_subscription_from_request( sca_mod *
+     ruri = GET_RURI(msg);
+ 
+     to_tag = to->tag_value;
+-    if ( to_tag.s == NULL ) {
++    if ( to_tag.s == NULL || event_type == SCA_EVENT_TYPE_CALL_INFO || event_type == SCA_EVENT_TYPE_LINE_SEIZE) {
+ 	/*
+ 	 * XXX need hook to detect when we have a subscription and the
+ 	 * subscriber sends an out-of-dialog SUBSCRIBE, which indicates the
+Index: kamailio/modules/sca/sca_util.c
+===================================================================
+--- kamailio.orig/modules/sca/sca_util.c
++++ kamailio/modules/sca/sca_util.c
+@@ -453,6 +453,8 @@ sca_call_is_held( sip_msg_t *msg )
+     int			is_held = 0;
+     int			rc;
+ 
++    LM_DBG( "sca_call_is_held: %d", sca->cfg->onhold_bflag );
++    
+     if(sca->cfg->onhold_bflag >= 0) {
+         if(isbflagset(0, (flag_t)sca->cfg->onhold_bflag) == 1) {
+             LM_DBG("onhold_bflag set, skip parse_sdp and set held\n");
