@@ -53,8 +53,17 @@ sipwise/utils-kamctl-refresh-dbschema.patch
 sipwise/sca-use-To-header-if-in-dialog-as-target.patch
 sipwise/sca-fix-sca_call_info_update-params.patch
 sipwise/sca-use-onhold_bflag-value-only-when-set.patch
+sipwise/sca-line-seize.patch
+sipwise/sca-fallback-if-no-contact.patch
+sipwise/sca-call-info-unsubscribe.patch
+sipwise/sca-rr-is-direction.patch
+sipwise/sca-fix-core-when-release_appearance-RPC-command-par.patch
 ##
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
 sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/rtpengine-mos-stats.patch
+## WIP
+sipwise/sca-debug.patch
+sipwise/sca-fix-pickup-when-upstream-flow.patch
+sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
