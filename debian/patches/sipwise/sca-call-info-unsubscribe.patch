@@ -1,0 +1,76 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 13 Apr 2017 13:04:27 +0200
+Subject: sca: implement subscribe deletion with expires=0 for call-info
+
+Change-Id: I8cb4bb0db057f5f5754c5148a291029aaf30082d
+---
+ modules/sca/sca_subscribe.c | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
+
+diff --git a/modules/sca/sca_subscribe.c b/modules/sca/sca_subscribe.c
+index 3b92162..0022420 100644
+--- a/modules/sca/sca_subscribe.c
++++ b/modules/sca/sca_subscribe.c
+@@ -1180,6 +1180,8 @@ sca_handle_subscribe( sip_msg_t *msg, str *uri_to, str *uri_from )
+     int			released = 0;
+     int_str		val;
+     struct to_body	*tmp_to;
++    sca_hash_slot	*slot = NULL;
++    sca_hash_entry	*ent = NULL;
+ 
+     if ( parse_headers( msg, HDR_EOH_F, 0 ) < 0 ) {
+ 	LM_ERR( "header parsing failed: bad request" );
+@@ -1265,13 +1267,17 @@ sca_handle_subscribe( sip_msg_t *msg, str *uri_to, str *uri_from )
+ 	    goto done;
+ 	}
+     }
+-
++    slot = sca_hash_table_slot_for_index( sca->subscriptions, idx );
+     sca_hash_table_lock_index( sca->subscriptions, idx );
+ 
+-    sub = sca_hash_table_index_kv_find_unsafe( sca->subscriptions, idx,
+-					&req_sub.subscriber ); 
++    ent = sca_hash_table_slot_kv_find_entry_unsafe( slot, &req_sub.subscriber );
++    if (ent!=NULL) {
++    	sub = (sca_subscription *)ent->value;
++    }
+ 
+     if ( sub != NULL ) {
++    	LM_DBG("sca_handle_subscribe: subscription[%.*s] found\n",
++    		STR_FMT(&req_sub.subscriber));
+ 	/* this will remove the subscription if expires == 0 */
+ 	if ( sca_subscription_update_unsafe( sca, sub, &req_sub, idx ) < 0 ) {
+ 	    SCA_SUB_REPLY_ERROR( sca, 500, "Internal Server Error - "
+@@ -1323,10 +1329,24 @@ sca_handle_subscribe( sip_msg_t *msg, str *uri_to, str *uri_from )
+ 		    LM_INFO( "sca_handle_subscribe: released %d appearances "
+ 				"for subscriber %.*s", released,
+ 				STR_FMT( &req_sub.subscriber ));
++		} else {
++			LM_DBG("sca_handle_subscribe: subscriber[%.*s] doesn't "
++				"own any active appearances using target[%.*s]\n",
++				STR_FMT(&req_sub.subscriber),
++				STR_FMT(&req_sub.target_aor));
+ 		}
+ 	    }
++	    if( req_sub.expires == 0 ) {
++	    	ent = sca_hash_table_slot_unlink_entry_unsafe( slot, ent );
++	    	sub->expires = 0;
++    		sub->dialog.notify_cseq += 1;
++    		sub->state = SCA_SUBSCRIPTION_STATE_TERMINATED;
++	    	if(ent) sca_hash_entry_free( ent );
++	    }
+ 	}
+     } else {
++    	LM_DBG("sca_handle_subscribe: subscription[%.*s] not found\n",
++    		STR_FMT(&req_sub.subscriber));
+ 	/* in-dialog request, but we didn't find it. */
+ 	if ( !SCA_STR_EMPTY( to_tag )) {
+ 	    SCA_SUB_REPLY_ERROR( sca, 481,
+@@ -1362,6 +1382,7 @@ sca_handle_subscribe( sip_msg_t *msg, str *uri_to, str *uri_from )
+ 	     * but the dialog wasn't in our table. just reply with the
+ 	     * subscription info we got, without saving or creating anything.
+ 	     */
++		LM_DBG("sca_handle_subscribe: expires=0 in-dialog but dialog not found\n");
+ 	    sub = &req_sub;
+ 	}
+     }
