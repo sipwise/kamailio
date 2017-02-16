@@ -49,3 +49,4 @@ sipwise/sca-fix-sca_call_info_update-params.patch
 sipwise/sca-use-onhold_bflag-value-only-when-set.patch
 ##
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
+sipwise/sca-line-seize.patch
