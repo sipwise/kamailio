@@ -42,3 +42,4 @@ sipwise/sca-use-onhold_bflag-value-only-when-set.patch
 ##
 sipwise/rtpengine-sockets-list-fix.patch
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
+sipwise/sca-line-seize.patch
