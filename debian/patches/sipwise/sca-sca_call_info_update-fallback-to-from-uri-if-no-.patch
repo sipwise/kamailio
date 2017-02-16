@@ -1,0 +1,57 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 29 Mar 2017 18:37:58 +0200
+Subject: sca: sca_call_info_update() fallback to from uri if no Contact
+ header is present
+
+Change-Id: I64fc81c8bd7c93c2b2333c0fa6ab2e16d22f5ffe
+---
+ modules/sca/sca_call_info.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index 734fbe2..ccf11f8 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -1976,9 +1976,6 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+         rc = -1;
+ 	    goto done;
+ 	}
+-    } else if ( rc < 0 ) {
+-	LM_ERR( "Bad Contact" );
+-	goto done;
+     }
+     /* reset rc to -1 so we don't end up returning 0 to the script */
+     rc = -1;
+@@ -2008,11 +2005,11 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+                     STR_FMT( &from->uri ));
+             goto done;
+         }
+-	    if(uri_to==NULL) {
++        if(uri_to==NULL) {
+             if ( sca_create_canonical_aor( msg, &to_aor ) < 0 ) {
+-	            goto done;
+-	        }
+-	        aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC;
++                goto done;
++            }
++            aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC;
+         } else {
+             if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
+                 LM_ERR( "Failed to extract AoR from To URI %.*s",
+@@ -2022,9 +2019,16 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+         }
+     }
+ 
++
+     LM_DBG("to_aor[%.*s] from_aor[%.*s]\n",
+         STR_FMT(&to_aor), STR_FMT(&from_aor));
+ 
++    if(contact_uri.s==NULL) {
++        contact_uri.s = from_aor.s;
++        contact_uri.len = from_aor.len;
++        LM_DBG("No Contact header using from_aor\n");
++    }
++
+     /* early check to see if we're dealing with any SCA endpoints */
+     if ( sca_uri_is_shared_appearance( sca, &from_aor )) {
+ 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLER )) {
