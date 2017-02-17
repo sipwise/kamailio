@@ -1,0 +1,104 @@
+--- a/modules/usrloc/ucontact.c
++++ b/modules/usrloc/ucontact.c
+@@ -1673,6 +1673,7 @@ static inline int update_contact_db(ucon
+  */
+ int update_ucontact(struct urecord* _r, ucontact_t* _c, ucontact_info_t* _ci)
+ {
++	static struct urecord _ur;
+ 	/* we have to update memory in any case, but database directly
+ 	 * only in db_mode 1 */
+ 	if (mem_update_ucontact( _c, _ci) < 0) {
+@@ -1681,6 +1682,8 @@ int update_ucontact(struct urecord* _r,
+ 	}
+ 
+ 	if (db_mode==DB_ONLY) {
++		/* urecord is static generate a copy for later */
++		if (_r) memcpy(&_ur, _r, sizeof(struct urecord));
+ 		if (update_contact_db(_c) < 0) return -1;
+ 	}
+ 
+@@ -1691,8 +1694,14 @@ int update_ucontact(struct urecord* _r,
+ 		run_ul_callbacks( UL_CONTACT_UPDATE, _c);
+ 	}
+ 
+-	if (_r && db_mode!=DB_ONLY)
+-		update_contact_pos( _r, _c);
++	if (_r) {
++		if (db_mode!=DB_ONLY) {
++			update_contact_pos( _r, _c);
++		} else {
++			/* urecord was static restore copy */
++			memcpy(_r, &_ur, sizeof(struct urecord));
++		}
++	}
+ 
+ 	st_update_ucontact(_c);
+ 
+--- a/modules/usrloc/urecord.c
++++ b/modules/usrloc/urecord.c
+@@ -569,12 +569,15 @@ void release_urecord(urecord_t* _r)
+ int insert_ucontact(urecord_t* _r, str* _contact, ucontact_info_t* _ci,
+ 															ucontact_t** _c)
+ {
++	static struct urecord _ur;
+ 	if ( ((*_c)=mem_insert_ucontact(_r, _contact, _ci)) == 0) {
+ 		LM_ERR("failed to insert contact\n");
+ 		return -1;
+ 	}
+ 
+ 	if (db_mode==DB_ONLY) {
++		/* urecord is static generate a copy for later */
++		memcpy(&_ur, _r, sizeof(struct urecord));
+ 		if (db_insert_ucontact(*_c) < 0) {
+ 			LM_ERR("failed to insert in database\n");
+ 			return -1;
+@@ -587,13 +590,19 @@ int insert_ucontact(urecord_t* _r, str*
+ 		run_ul_callbacks( UL_CONTACT_INSERT, *_c);
+ 	}
+ 
+-	if (db_mode == WRITE_THROUGH) {
+-		if (db_insert_ucontact(*_c) < 0) {
+-			LM_ERR("failed to insert in database\n");
+-			return -1;
+-		} else {
+-			(*_c)->state = CS_SYNC;
+-		}
++	switch (db_mode) {
++		case WRITE_THROUGH:
++			if (db_insert_ucontact(*_c) < 0) {
++				LM_ERR("failed to insert in database\n");
++				return -1;
++			} else {
++				(*_c)->state = CS_SYNC;
++			}
++		break;
++		case DB_ONLY:
++			/* urecord was static restore copy */
++			memcpy(_r, &_ur, sizeof(struct urecord));
++		break;
+ 	}
+ 
+ 	return 0;
+@@ -609,11 +618,22 @@ int insert_ucontact(urecord_t* _r, str*
+ int delete_ucontact(urecord_t* _r, struct ucontact* _c)
+ {
+ 	int ret = 0;
++	static struct urecord _ur;
++
++	if (db_mode==DB_ONLY) {
++		/* urecord is static generate a copy for later */
++		memcpy(&_ur, _r, sizeof(struct urecord));
++	}
+ 
+ 	if (exists_ulcb_type(UL_CONTACT_DELETE)) {
+ 		run_ul_callbacks( UL_CONTACT_DELETE, _c);
+ 	}
+ 
++	if (db_mode==DB_ONLY) {
++		/* urecord was static restore copy */
++		memcpy(_r, &_ur, sizeof(struct urecord));
++	}
++
+ 	if (st_delete_ucontact(_c) > 0) {
+ 		if (db_mode == WRITE_THROUGH || db_mode==DB_ONLY) {
+ 			if (db_delete_ucontact(_c) < 0) {
