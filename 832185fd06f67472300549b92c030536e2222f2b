@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da01753e_f99fa601",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 8
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-02-21T11:42:17Z",
+      "side": 1,
+      "message": "why remove to_tag.s?\n\nwhy not:\n\nif (to_tag.s \u003d\u003d NULL || event_type \u003d\u003d SCA_EVENT_TYPE_CALL_INFO || event_type \u003d\u003d SCA_EVENT_TYPE_LINE_SEIZE )",
+      "revId": "832185fd06f67472300549b92c030536e2222f2b",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
