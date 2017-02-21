@@ -16,6 +16,24 @@
       "revId": "832185fd06f67472300549b92c030536e2222f2b",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da01753e_39892ecb",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 8
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 1000017
+      },
+      "writtenOn": "2017-02-21T11:46:39Z",
+      "side": 1,
+      "message": "just for testing",
+      "parentUuid": "da01753e_f99fa601",
+      "revId": "832185fd06f67472300549b92c030536e2222f2b",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
