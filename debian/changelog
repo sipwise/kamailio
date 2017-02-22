@@ -1,3 +1,11 @@
+ngcp-kamailio (4.4.5-1+0~mr4.5.4.0) unstable; urgency=medium
+
+  * [e0fd465] New upstream version 4.4.5
+  * [ab9a4d5] TT#9870 presence: fix transaction issues
+  * [0fe2f5b] TT#9301 remove already applied upstream patches
+
+ -- Victor Seva <vseva@debian.org>  Wed, 22 Feb 2017 11:03:08 +0100
+
 ngcp-kamailio (4.4.4-1+0~mr4.5.4.0) unstable; urgency=medium
 
   [ Victor Seva ]
