@@ -1,12 +1,16 @@
-From eb980e6bc633a91751ceb9f3187587e52e383535 Mon Sep 17 00:00:00 2001
+From 4a41962b0389f37dbc4d905afd25e2cda5e7c39c Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
-Date: Tue, 31 Jan 2017 18:46:11 +0100
+Date: Tue, 31 Jan 2017 19:23:53 +0100
 Subject: [PATCH] presence: remove transaction creation from
  publ_notify_notifier() and mark_presentity_for_delete()
 
 * publ_notify_notifier() and mark_presentity_for_delete() are
   called inside a already created transaction
 * adding transaction handle for msg_presentity_clean()
+
+fix #960
+
+(cherry picked from commit 6d157a4af708108b90a338614869de0ceeb94b68)
 ---
  modules/presence/notify.c     | 24 ------------------------
  modules/presence/presentity.c | 24 ------------------------
