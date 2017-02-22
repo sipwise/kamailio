@@ -1,0 +1,59 @@
+From 36814fafb02980e6165351e7cbe1acac0d11248d Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 16 Feb 2017 12:19:41 +0100
+Subject: [PATCH] pua_reginfo: fix memory leak when usrloc is DB_ONLY
+
+As release_urecord() clearly says:
+
+/*!
+ * \brief Release urecord previously obtained through get_urecord
+ * \warning Failing to calls this function after get_urecord will
+ * result in a memory leak when the DB_ONLY mode is used. When
+ * the records is later deleted, e.g. with delete_urecord, then
+ * its not necessary, as this function already releases the record.
+ * \param _r released record
+ */
+
+(cherry picked from commit 1b0e1c3cbdd162fcd438a7d9bb412ddce73bc214)
+---
+ modules/pua_reginfo/notify.c    | 2 +-
+ modules/pua_reginfo/usrloc_cb.c | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/modules/pua_reginfo/notify.c b/modules/pua_reginfo/notify.c
+index 4bdd4caa8..51e27eb6e 100644
+--- a/modules/pua_reginfo/notify.c
++++ b/modules/pua_reginfo/notify.c
+@@ -458,7 +458,7 @@ next_contact:
+ 			}
+ 		}
+ next_registration:
+-		// if (ul_record) ul.release_urecord(ul_record);		
++		if (ul_record) ul.release_urecord(ul_record);
+ 		/* Unlock the domain for this AOR: */
+ 		if (aor_key.len > 0)
+ 			ul.unlock_udomain(domain, &aor_key);
+diff --git a/modules/pua_reginfo/usrloc_cb.c b/modules/pua_reginfo/usrloc_cb.c
+index 7f84788ac..3e00a0eae 100644
+--- a/modules/pua_reginfo/usrloc_cb.c
++++ b/modules/pua_reginfo/usrloc_cb.c
+@@ -223,7 +223,7 @@ void reginfo_usrloc_cb(ucontact_t* c, int type, void* param) {
+ 	publ_info_t publ;
+ 	str content_type;
+ 	udomain_t * domain;
+-	urecord_t * record;
++	urecord_t * record = NULL;
+ 	int res;
+ 	str uri = {NULL, 0};
+ 	str user = {NULL, 0};
+@@ -332,6 +332,7 @@ error:
+ 		if(body->s) xmlFree(body->s);
+ 		pkg_free(body);
+ 	}
++	if(record) ul.release_urecord(record);
+ 
+ 	return;
+ }	
+-- 
+2.11.0
+
