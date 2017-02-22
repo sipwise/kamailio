@@ -1,0 +1,56 @@
+From b81a228b5a680dff1dff911f1020c8494fbee935 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 15 Feb 2017 12:48:59 +0100
+Subject: [PATCH] core: free parsed Required header structure
+
+(cherry picked from commit d31558b31fd607f842caa04d85ce8870f6fc1740)
+(cherry picked from commit 8a02d964ffc6145b3ae2f349b8d25aff4dacde3a)
+---
+ parser/hf.c            | 2 +-
+ parser/parse_require.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/parser/hf.c b/parser/hf.c
+index 963dd1471..915a52d2c 100644
+--- a/parser/hf.c
++++ b/parser/hf.c
+@@ -150,6 +150,7 @@ void clean_hdr_field(struct hdr_field* const hf)
+ 			free_subscription_state((subscription_state_t**)h_parsed);
+ 			break;
+ 
++		case HDR_REQUIRE_T:
+ 		case HDR_SUPPORTED_T:
+ 			hdr_free_parsed(h_parsed);
+ 			break;
+@@ -168,7 +169,6 @@ void clean_hdr_field(struct hdr_field* const hf)
+ 		case HDR_CONTENTTYPE_T:
+ 		case HDR_CONTENTLENGTH_T:
+ 		case HDR_RETRY_AFTER_T:
+-		case HDR_REQUIRE_T:
+ 		case HDR_PROXYREQUIRE_T:
+ 		case HDR_UNSUPPORTED_T:
+ 		case HDR_ACCEPTLANGUAGE_T:
+diff --git a/parser/parse_require.c b/parser/parse_require.c
+index a520318e1..e343e7f17 100644
+--- a/parser/parse_require.c
++++ b/parser/parse_require.c
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) 2006 Andreas Granig <agranig@linguin.org>
+- * 
++ *
+  * This file is part of Kamailio, a free SIP server.
+  *
+  * Kamailio is free software; you can redistribute it and/or modify
+@@ -65,7 +65,7 @@ int parse_require( struct sip_msg *msg)
+ 		require |= rb->option_tags;
+ 	}
+ 
+-	((struct option_tag_body*)msg->require->parsed)->option_tags_all = 
++	((struct option_tag_body*)msg->require->parsed)->option_tags_all =
+ 		require;
+ 	return 0;
+ }
+-- 
+2.11.0
+
