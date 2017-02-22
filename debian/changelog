@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.5-1+0~mr5.1.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [e322128] TT#10159 refresh upstream fixes from 4.4
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 22 Feb 2017 11:18:41 +0100
+
 ngcp-kamailio (4.4.5-1+0~mr5.1.1.1) unstable; urgency=medium
 
   [ Richard Fuchs ]
