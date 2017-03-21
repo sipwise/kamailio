@@ -16,6 +16,7 @@ upstream/0018-usrloc-fix-ucontact-shared-leak.patch
 upstream/0019-presence-remove-transaction-creation-from-publ_notif.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
+upstream/pv_trans_cfg_line.patch
 #
 ##
 no_lib64_on_64_bits.patch
@@ -49,3 +50,4 @@ sipwise/sca-fix-sca_call_info_update-params.patch
 sipwise/sca-use-onhold_bflag-value-only-when-set.patch
 ##
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
+sipwise/pv_trans_eval_uri.patch

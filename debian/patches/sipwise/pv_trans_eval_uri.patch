@@ -1,0 +1,24 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 21 Mar 2017 17:28:04 +0100
+Subject: pv: tr_eval_uri() set error message to debug
+
+Change-Id: I26b29ae116a2aace78750c2559de8eb7121c6812
+---
+ modules/pv/pv_trans.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/modules/pv/pv_trans.c b/modules/pv/pv_trans.c
+index a10f698..c55c3be 100644
+--- a/modules/pv/pv_trans.c
++++ b/modules/pv/pv_trans.c
+@@ -1147,8 +1147,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
+ 		/* parse uri -- params only when requested */
+ 		if(parse_uri(_tr_uri.s, _tr_uri.len, &_tr_parsed_uri)!=0)
+ 		{
+-			LM_ERR("invalid uri [%.*s]\n", val->rs.len,
+-					val->rs.s);
++			LM_DBG("invalid uri [%.*s] (%s:%d)\n", val->rs.len,
++					val->rs.s, ZSW(get_cfg_crt_name()), get_cfg_crt_line());
+ 			if(_tr_uri_params != NULL)
+ 			{
+ 				free_params(_tr_uri_params);
