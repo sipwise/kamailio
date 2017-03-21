@@ -16,6 +16,7 @@ upstream/0018-usrloc-fix-ucontact-shared-leak.patch
 upstream/0019-presence-remove-transaction-creation-from-publ_notif.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
+sipwise/pv_trans_cfg_line.patch
 #
 ##
 no_lib64_on_64_bits.patch
