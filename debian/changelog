@@ -1,3 +1,18 @@
+ngcp-kamailio (4.4.5-1+0~mr5.2.1.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [37a79ea] TT#10350 fix kamailio rtpengine module segfault
+
+  [ Victor Seva ]
+  * [86e3621] TT#10122 tm: fix race condition
+  * [cd6c25c] TT#10159 refresh upstream fixes from 4.4
+  * [064a6f0] TT#12309 debian: add missing libssl-dev
+  * [cf5d9b7] TT#13003 pv: stop spamming with ERROR on uri transformations
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 22 Mar 2017 10:52:52 +0100
+
 ngcp-kamailio (4.4.5-1+0~mr5.2.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
