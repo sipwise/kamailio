@@ -18,6 +18,7 @@ upstream/0037-tls-do-kerberos-and-zlib-init-checks-only-for-libssl.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
+upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
 #
 ##
 no_lib64_on_64_bits.patch
