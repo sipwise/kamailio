@@ -1,0 +1,192 @@
+--- a/modules/rtpengine/rtpengine.c
++++ b/modules/rtpengine/rtpengine.c
+@@ -284,11 +284,23 @@
+ /* tm */
+ static struct tm_binds tmb;
+ 
+-/*0-> disabled, 1 ->enabled*/
+-unsigned int *natping_state=0;
+-
+ static pv_elem_t *extra_id_pv = NULL;
+ 
++
++static str mos_average_pv_param = {NULL, 0};
++static str mos_min_pv_param = {NULL, 0};
++static str mos_max_pv_param = {NULL, 0};
++
++static pv_elem_t *mos_average_pv = NULL;
++static pv_elem_t *mos_min_pv = NULL;
++static pv_elem_t *mos_max_pv = NULL;
++
++static void (*parse_call_stats)(bencode_item_t *, struct sip_msg *);
++
++static void do_parse_call_stats(bencode_item_t *, struct sip_msg *);
++static void dummy_parse_call_stats(bencode_item_t *, struct sip_msg *);
++
++
+ static cmd_export_t cmds[] = {
+ 	{"set_rtpengine_set",	(cmd_function)set_rtpengine_set_f,	1,
+ 		fixup_set_id, 0,
+@@ -355,6 +367,9 @@
+ 	{"hash_table_tout",       INT_PARAM, &hash_table_tout        },
+ 	{"hash_table_size",       INT_PARAM, &hash_table_size        },
+ 	{"setid_default",         INT_PARAM, &setid_default          },
++	{"mos_average_pv",        PARAM_STR, &mos_average_pv_param   },
++	{"mos_min_pv",            PARAM_STR, &mos_min_pv_param       },
++	{"mos_max_pv",            PARAM_STR, &mos_max_pv_param       },
+ 	{0, 0, 0}
+ };
+ 
+@@ -1615,6 +1630,22 @@
+ }
+ 
+ 
++static int pv_parse_var(str *inp, pv_elem_t **outp, int *got_any) {
++	if (inp->s && *inp->s) {
++		inp->len = strlen(inp->s);
++		if(pv_parse_format(inp, outp) < 0) {
++			LM_ERR("malformed PV string: %s\n", inp->s);
++			return -1;
++		}
++		if (got_any)
++			*got_any = 1;
++	} else {
++		*outp = NULL;
++	}
++	return 0;
++}
++
++
+ static int
+ mod_init(void)
+ {
+@@ -1622,6 +1653,7 @@
+ 	pv_spec_t *avp_spec;
+ 	unsigned short avp_flags;
+ 	str s;
++	int got_any_mos_pvs = 0;
+ 
+ 	if(register_mi_mod(exports.name, mi_cmds)!=0)
+ 	{
+@@ -1709,15 +1741,16 @@
+ 		}
+ 	}
+ 
+-	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
+-		extra_id_pv_param.len = strlen(extra_id_pv_param.s);
+-		if(pv_parse_format(&extra_id_pv_param, &extra_id_pv) < 0) {
+-			LM_ERR("malformed PV string: %s\n", extra_id_pv_param.s);
+-			return -1;
+-		}
+-	} else {
+-		extra_id_pv = NULL;
+-	}
++	if (pv_parse_var(&extra_id_pv_param, &extra_id_pv, NULL))
++		return -1;
++	if (pv_parse_var(&mos_average_pv_param, &mos_average_pv, &got_any_mos_pvs))
++		return -1;
++	if (pv_parse_var(&mos_min_pv_param, &mos_min_pv, &got_any_mos_pvs))
++		return -1;
++	if (pv_parse_var(&mos_max_pv_param, &mos_max_pv, &got_any_mos_pvs))
++		return -1;
++
++	parse_call_stats = got_any_mos_pvs ? do_parse_call_stats : dummy_parse_call_stats;
+ 
+ 	if (setid_avp_param) {
+ 		s.s = setid_avp_param; s.len = strlen(s.s);
+@@ -1950,9 +1983,6 @@
+ 	struct rtpp_node * crt_rtpp, *last_rtpp;
+ 
+ 	/*free the shared memory*/
+-	if (natping_state)
+-		shm_free(natping_state);
+-
+ 	if (rtpp_no) {
+ 		shm_free(rtpp_no);
+ 		rtpp_no = NULL;
+@@ -2960,8 +2990,84 @@
+ 	return 1;
+ }
+ 
++static void avp_print_decimal(pv_elem_t *pv, int num, struct sip_msg *msg) {
++	pv_value_t val;
++	char buf[8];
++	int len;
++
++	if (!pv)
++		return;
++
++	len = snprintf(buf, sizeof(buf), "%i.%i",
++			num / 10,
++			abs(num % 10));
++	memset(&val, 0, sizeof(val));
++	val.flags = PV_VAL_STR;
++	val.rs.s = buf;
++	val.rs.len = len;
++	pv->spec->setf(msg, &pv->spec->pvp, EQ_T, &val);
++}
++
++static void do_parse_call_stats(bencode_item_t *dict, struct sip_msg *msg) {
++	bencode_item_t *ssrc_list,
++		       *ssrc_key,
++		       *ssrc_dict;
++	int avg_mos,
++	    avg_mos_sum = 0,
++	    avg_mos_count = 0,
++	    high_mos,
++	    highest_mos = -1,
++	    low_mos,
++	    lowest_mos = 100;
++
++	ssrc_list = bencode_dictionary_get_expect(dict, "SSRC", BENCODE_DICTIONARY);
++
++	for (ssrc_key = ssrc_list->child; ssrc_key; ssrc_key = ssrc_key->sibling->sibling) {
++		ssrc_dict = ssrc_key->sibling;
++
++		avg_mos = bencode_dictionary_get_integer(ssrc_dict, "average MOS", -1);
++		if (avg_mos != -1) {
++			avg_mos_sum += avg_mos;
++			avg_mos_count++;
++		}
++
++		high_mos = bencode_dictionary_get_integer(
++				bencode_dictionary_get_expect(ssrc_dict, "highest MOS", BENCODE_DICTIONARY),
++				"MOS", -1);
++		if (high_mos != -1) {
++			if (high_mos > highest_mos)
++				highest_mos = high_mos;
++		}
++
++		low_mos = bencode_dictionary_get_integer(
++				bencode_dictionary_get_expect(ssrc_dict, "lowest MOS", BENCODE_DICTIONARY),
++				"MOS", -1);
++		if (low_mos != -1) {
++			if (low_mos < lowest_mos)
++				lowest_mos = low_mos;
++		}
++	}
++
++	if (avg_mos_count > 0)
++		avp_print_decimal(mos_average_pv, avg_mos_sum / avg_mos_count, msg);
++	if (highest_mos != -1)
++		avp_print_decimal(mos_max_pv, highest_mos, msg);
++	if (lowest_mos != 100)
++		avp_print_decimal(mos_min_pv, lowest_mos, msg);
++}
++
++static void dummy_parse_call_stats(bencode_item_t *dict, struct sip_msg *msg) {
++	return;
++}
++
+ static int rtpengine_delete(struct sip_msg *msg, const char *flags) {
+-	return rtpp_function_call_simple(msg, OP_DELETE, flags);
++	bencode_buffer_t bencbuf;
++	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_DELETE, flags, NULL);
++	if (!ret)
++		return -1;
++	parse_call_stats(ret, msg);
++	bencode_buffer_free(&bencbuf);
++	return 1;
+ }
+ 
+ static int rtpengine_rtpp_set_wrap(struct sip_msg *msg, int (*func)(struct sip_msg *msg, void *, int),
