@@ -1,0 +1,285 @@
+--- a/modules/rtpengine/rtpengine.c
++++ b/modules/rtpengine/rtpengine.c
+@@ -184,6 +184,7 @@
+ static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_manage1_f(struct sip_msg *, char *, char *);
++static int rtpengine_query1_f(struct sip_msg *, char *, char *);
+ 
+ static int parse_flags(struct ng_flags_parse *, struct sip_msg *, enum rtpe_operation *, const char *);
+ 
+@@ -284,11 +285,27 @@
+ /* tm */
+ static struct tm_binds tmb;
+ 
+-/*0-> disabled, 1 ->enabled*/
+-unsigned int *natping_state=0;
+-
+ static pv_elem_t *extra_id_pv = NULL;
+ 
++
++static str mos_average_pv_param = {NULL, 0};
++static str mos_min_pv_param = {NULL, 0};
++static str mos_max_pv_param = {NULL, 0};
++static str mos_min_at_pv_param = {NULL, 0};
++static str mos_max_at_pv_param = {NULL, 0};
++
++static pv_elem_t *mos_average_pv = NULL;
++static pv_elem_t *mos_min_pv = NULL;
++static pv_elem_t *mos_max_pv = NULL;
++static pv_elem_t *mos_min_at_pv = NULL;
++static pv_elem_t *mos_max_at_pv = NULL;
++
++static void (*parse_call_stats)(bencode_item_t *, struct sip_msg *);
++
++static void do_parse_call_stats(bencode_item_t *, struct sip_msg *);
++static void dummy_parse_call_stats(bencode_item_t *, struct sip_msg *);
++
++
+ static cmd_export_t cmds[] = {
+ 	{"set_rtpengine_set",	(cmd_function)set_rtpengine_set_f,	1,
+ 		fixup_set_id, 0,
+@@ -323,6 +340,12 @@
+ 	{"rtpengine_delete",	(cmd_function)rtpengine_delete1_f,	1,
+ 		fixup_spve_null, 0,
+ 		ANY_ROUTE},
++	{"rtpengine_query",	(cmd_function)rtpengine_query1_f,	0,
++		0, 0,
++		ANY_ROUTE},
++	{"rtpengine_query",	(cmd_function)rtpengine_query1_f,	1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
+ 	{0, 0, 0, 0, 0, 0}
+ };
+ 
+@@ -355,6 +378,11 @@
+ 	{"hash_table_tout",       INT_PARAM, &hash_table_tout        },
+ 	{"hash_table_size",       INT_PARAM, &hash_table_size        },
+ 	{"setid_default",         INT_PARAM, &setid_default          },
++	{"mos_average_pv",        PARAM_STR, &mos_average_pv_param   },
++	{"mos_min_pv",            PARAM_STR, &mos_min_pv_param       },
++	{"mos_max_pv",            PARAM_STR, &mos_max_pv_param       },
++	{"mos_min_at_pv",         PARAM_STR, &mos_min_at_pv_param    },
++	{"mos_max_at_pv",         PARAM_STR, &mos_max_at_pv_param    },
+ 	{0, 0, 0}
+ };
+ 
+@@ -1615,6 +1643,22 @@
+ }
+ 
+ 
++static int pv_parse_var(str *inp, pv_elem_t **outp, int *got_any) {
++	if (inp->s && *inp->s) {
++		inp->len = strlen(inp->s);
++		if(pv_parse_format(inp, outp) < 0) {
++			LM_ERR("malformed PV string: %s\n", inp->s);
++			return -1;
++		}
++		if (got_any)
++			*got_any = 1;
++	} else {
++		*outp = NULL;
++	}
++	return 0;
++}
++
++
+ static int
+ mod_init(void)
+ {
+@@ -1622,6 +1666,7 @@
+ 	pv_spec_t *avp_spec;
+ 	unsigned short avp_flags;
+ 	str s;
++	int got_any_mos_pvs = 0;
+ 
+ 	if(register_mi_mod(exports.name, mi_cmds)!=0)
+ 	{
+@@ -1709,15 +1754,20 @@
+ 		}
+ 	}
+ 
+-	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
+-		extra_id_pv_param.len = strlen(extra_id_pv_param.s);
+-		if(pv_parse_format(&extra_id_pv_param, &extra_id_pv) < 0) {
+-			LM_ERR("malformed PV string: %s\n", extra_id_pv_param.s);
+-			return -1;
+-		}
+-	} else {
+-		extra_id_pv = NULL;
+-	}
++	if (pv_parse_var(&extra_id_pv_param, &extra_id_pv, NULL))
++		return -1;
++	if (pv_parse_var(&mos_average_pv_param, &mos_average_pv, &got_any_mos_pvs))
++		return -1;
++	if (pv_parse_var(&mos_min_pv_param, &mos_min_pv, &got_any_mos_pvs))
++		return -1;
++	if (pv_parse_var(&mos_max_pv_param, &mos_max_pv, &got_any_mos_pvs))
++		return -1;
++	if (pv_parse_var(&mos_min_at_pv_param, &mos_min_at_pv, &got_any_mos_pvs))
++		return -1;
++	if (pv_parse_var(&mos_max_at_pv_param, &mos_max_at_pv, &got_any_mos_pvs))
++		return -1;
++
++	parse_call_stats = got_any_mos_pvs ? do_parse_call_stats : dummy_parse_call_stats;
+ 
+ 	if (setid_avp_param) {
+ 		s.s = setid_avp_param; s.len = strlen(s.s);
+@@ -1950,9 +2000,6 @@
+ 	struct rtpp_node * crt_rtpp, *last_rtpp;
+ 
+ 	/*free the shared memory*/
+-	if (natping_state)
+-		shm_free(natping_state);
+-
+ 	if (rtpp_no) {
+ 		shm_free(rtpp_no);
+ 		rtpp_no = NULL;
+@@ -2960,8 +3007,122 @@
+ 	return 1;
+ }
+ 
++static void avp_print_s(pv_elem_t *pv, char *str, int len, struct sip_msg *msg) {
++	pv_value_t val;
++
++	if (!pv)
++		return;
++
++	memset(&val, 0, sizeof(val));
++	val.flags = PV_VAL_STR;
++	val.rs.s = str;
++	val.rs.len = len;
++	pv->spec->setf(msg, &pv->spec->pvp, EQ_T, &val);
++}
++
++static void avp_print_decimal(pv_elem_t *pv, int num, struct sip_msg *msg) {
++	int len;
++	char buf[8];
++
++	len = snprintf(buf, sizeof(buf), "%i.%i",
++			num / 10,
++			abs(num % 10));
++	avp_print_s(pv, buf, len, msg);
++}
++
++static void avp_print_time(pv_elem_t *pv, int num, struct sip_msg *msg) {
++	int len;
++	char buf[8];
++
++	len = snprintf(buf, sizeof(buf), "%i:%02i",
++			num / 60,
++			abs(num % 60));
++	avp_print_s(pv, buf, len, msg);
++}
++
++static void do_parse_call_stats(bencode_item_t *dict, struct sip_msg *msg) {
++	bencode_item_t *ssrc_list,
++		       *ssrc_key,
++		       *ssrc_dict,
++		       *mos_ent;
++	int avg_mos,
++	    avg_mos_sum = 0,
++	    avg_mos_count = 0,
++	    high_mos,
++	    highest_mos = -1,
++	    highest_mos_at = 0,
++	    low_mos,
++	    lowest_mos = 100,
++	    lowest_mos_at = 0;
++	time_t created;
++
++	created = (time_t) bencode_dictionary_get_integer(dict, "created", 0);
++	ssrc_list = bencode_dictionary_get_expect(dict, "SSRC", BENCODE_DICTIONARY);
++
++	for (ssrc_key = ssrc_list->child; ssrc_key; ssrc_key = ssrc_key->sibling->sibling) {
++		ssrc_dict = ssrc_key->sibling;
++
++		avg_mos = bencode_dictionary_get_integer(ssrc_dict, "average MOS", -1);
++		if (avg_mos != -1) {
++			avg_mos_sum += avg_mos;
++			avg_mos_count++;
++		}
++
++		mos_ent = bencode_dictionary_get_expect(ssrc_dict, "highest MOS", BENCODE_DICTIONARY);
++		high_mos = bencode_dictionary_get_integer(mos_ent, "MOS", -1);
++		if (high_mos != -1) {
++			if (high_mos > highest_mos) {
++				highest_mos = high_mos;
++				highest_mos_at = bencode_dictionary_get_integer(mos_ent, "reported at", 0)
++					- created;
++			}
++		}
++
++		mos_ent = bencode_dictionary_get_expect(ssrc_dict, "lowest MOS", BENCODE_DICTIONARY);
++		low_mos = bencode_dictionary_get_integer(mos_ent, "MOS", -1);
++		if (low_mos != -1) {
++			if (low_mos < lowest_mos) {
++				lowest_mos = low_mos;
++				lowest_mos_at = bencode_dictionary_get_integer(mos_ent, "reported at", 0)
++					- created;
++			}
++		}
++	}
++
++	if (avg_mos_count > 0)
++		avp_print_decimal(mos_average_pv, avg_mos_sum / avg_mos_count, msg);
++	if (highest_mos != -1)
++		avp_print_decimal(mos_max_pv, highest_mos, msg);
++	if (lowest_mos != 100)
++		avp_print_decimal(mos_min_pv, lowest_mos, msg);
++	if (highest_mos_at > 0)
++		avp_print_time(mos_min_at_pv, highest_mos_at, msg);
++	if (lowest_mos_at > 0)
++		avp_print_time(mos_max_at_pv, lowest_mos_at, msg);
++}
++
++static void dummy_parse_call_stats(bencode_item_t *dict, struct sip_msg *msg) {
++	return;
++}
++
+ static int rtpengine_delete(struct sip_msg *msg, const char *flags) {
+-	return rtpp_function_call_simple(msg, OP_DELETE, flags);
++	bencode_buffer_t bencbuf;
++	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_DELETE, flags, NULL);
++	if (!ret)
++		return -1;
++	parse_call_stats(ret, msg);
++	bencode_buffer_free(&bencbuf);
++	return 1;
++}
++
++static int rtpengine_query(struct sip_msg *msg, const char *flags) {
++	bencode_buffer_t bencbuf;
++	bencode_item_t *ret = rtpp_function_call_ok(&bencbuf, msg, OP_QUERY, flags, NULL);
++	if (!ret)
++		return -1;
++	parse_call_stats(ret, msg);
++	bencode_buffer_free(&bencbuf);
++	return 1;
+ }
+ 
+ static int rtpengine_rtpp_set_wrap(struct sip_msg *msg, int (*func)(struct sip_msg *msg, void *, int),
+@@ -3010,6 +3171,23 @@
+ 	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, flags.s, 1);
+ }
+ 
++static int rtpengine_query_wrap(struct sip_msg *msg, void *d, int more) {
++	return rtpengine_query(msg, d);
++}
++
++static int
++rtpengine_query1_f(struct sip_msg* msg, char* str1, char* str2)
++{
++	str flags;
++
++	flags.s = NULL;
++	if (str1)
++		get_str_fparam(&flags, msg, (fparam_t *) str1);
++
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, flags.s, 1);
++}
++
++
+ /* This function assumes p points to a line of requested type. */
+ 
+ static int
