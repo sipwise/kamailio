@@ -1,0 +1,67 @@
+--- a/modules/rtpengine/rtpengine.c
++++ b/modules/rtpengine/rtpengine.c
+@@ -238,6 +238,7 @@
+ static int hash_table_tout = 3600;
+ static int hash_table_size = 256;
+ static int setid_default = DEFAULT_RTPP_SET_ID;
++static str mos_average_pv_param = {NULL, 0};
+ 
+ static char ** rtpp_strings=0;
+ static int rtpp_sets=0; /*used in rtpengine_set_store()*/
+@@ -288,6 +289,7 @@
+ unsigned int *natping_state=0;
+ 
+ static pv_elem_t *extra_id_pv = NULL;
++static pv_elem_t *mos_average_pv = NULL;
+ 
+ static cmd_export_t cmds[] = {
+ 	{"set_rtpengine_set",	(cmd_function)set_rtpengine_set_f,	1,
+@@ -355,6 +357,7 @@
+ 	{"hash_table_tout",       INT_PARAM, &hash_table_tout        },
+ 	{"hash_table_size",       INT_PARAM, &hash_table_size        },
+ 	{"setid_default",         INT_PARAM, &setid_default          },
++	{"mos_average_pv",        PARAM_STR, &mos_average_pv_param   },
+ 	{0, 0, 0}
+ };
+ 
+@@ -1615,6 +1618,20 @@
+ }
+ 
+ 
++static int pv_parse_var(str *inp, pv_elem_t **outp) {
++	if (inp->s && *inp->s) {
++		inp->len = strlen(inp->s);
++		if(pv_parse_format(inp, outp) < 0) {
++			LM_ERR("malformed PV string: %s\n", inp->s);
++			return -1;
++		}
++	} else {
++		*outp = NULL;
++	}
++	return 0;
++}
++
++
+ static int
+ mod_init(void)
+ {
+@@ -1709,15 +1726,10 @@
+ 		}
+ 	}
+ 
+-	if (extra_id_pv_param.s && *extra_id_pv_param.s) {
+-		extra_id_pv_param.len = strlen(extra_id_pv_param.s);
+-		if(pv_parse_format(&extra_id_pv_param, &extra_id_pv) < 0) {
+-			LM_ERR("malformed PV string: %s\n", extra_id_pv_param.s);
+-			return -1;
+-		}
+-	} else {
+-		extra_id_pv = NULL;
+-	}
++	if (pv_parse_var(&mos_average_pv_param, &mos_average_pv))
++		return -1;
++	if (pv_parse_var(&mos_average_pv_param, &mos_average_pv))
++		return -1;
+ 
+ 	if (setid_avp_param) {
+ 		s.s = setid_avp_param; s.len = strlen(s.s);
