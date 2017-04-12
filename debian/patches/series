@@ -53,3 +53,4 @@ sipwise/sca-use-onhold_bflag-value-only-when-set.patch
 ##
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
 sipwise/pv_trans_eval_uri.patch
+sipwise/rtpengine-mos-stats.patch
