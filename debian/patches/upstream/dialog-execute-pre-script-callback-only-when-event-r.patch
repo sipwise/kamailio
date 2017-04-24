@@ -1,0 +1,70 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Fri, 21 Apr 2017 19:59:38 +0200
+Subject: dialog: execute pre script callback only when event route is set
+
+---
+ modules/dialog/dlg_handlers.c | 13 +++++++------
+ script_cb.c                   | 14 ++++++--------
+ 2 files changed, 13 insertions(+), 14 deletions(-)
+
+diff --git a/modules/dialog/dlg_handlers.c b/modules/dialog/dlg_handlers.c
+index 0f9ee74..6b00d7d 100644
+--- a/modules/dialog/dlg_handlers.c
++++ b/modules/dialog/dlg_handlers.c
+@@ -1632,13 +1632,14 @@ void dlg_run_event_route(dlg_cell_t *dlg, sip_msg_t *msg, int ostate, int nstate
+ 	if(rt==-1 || event_rt.rlist[rt]==NULL)
+ 		return;
+ 
+-	if(msg==NULL)
+-		fmsg = faked_msg_next();
+-	else
+-		fmsg = msg;
++	if(rt>=0 || dlg_event_callback.len>0) {
++		if(msg==NULL)
++			fmsg = faked_msg_next();
++		else
++			fmsg = msg;
+ 
+-	if (exec_pre_script_cb(fmsg, LOCAL_CB_TYPE)>0)
+-	{
++		if (exec_pre_script_cb(fmsg, LOCAL_CB_TYPE)<=0)
++			return;
+ 		dlg_ref(dlg, 1);
+ 		dlg_set_ctx_iuid(dlg);
+ 		LM_DBG("executing event_route %d on state %d\n", rt, nstate);
+diff --git a/script_cb.c b/script_cb.c
+index 5e1547e..7c13c7c 100644
+--- a/script_cb.c
++++ b/script_cb.c
+@@ -151,12 +151,11 @@ int exec_pre_script_cb( struct sip_msg *msg, enum script_cb_type type)
+ 	struct script_cb	*cb;
+ 	unsigned int	flags;
+ 
+-#ifdef EXTRA_DEBUG
+ 	if (type > SCRIPT_CB_NUM) {
+-		LOG(L_BUG, "Uknown callback type\n");
+-		abort();
++		LOG(L_BUG, "Uknown callback type %d\n", type);
++		return 0;
+ 	}
+-#endif
++
+ 	flags = PRE_SCRIPT_CB | (1<<(type-1));
+ 	for (cb=pre_script_cb[type-1]; cb ; cb=cb->next ) {
+ 		/* stop on error */
+@@ -174,12 +173,11 @@ int exec_post_script_cb( struct sip_msg *msg, enum script_cb_type type)
+ 	struct script_cb	*cb;
+ 	unsigned int	flags;
+ 
+-#ifdef EXTRA_DEBUG
+ 	if (type > SCRIPT_CB_NUM) {
+-		LOG(L_BUG, "exec_pre_script_cb: Uknown callback type\n");
+-		abort();
++		LOG(L_BUG, "Uknown callback type %d\n", type);
++		return 1;
+ 	}
+-#endif
++
+ 	flags = POST_SCRIPT_CB | (1<<(type-1));
+ 	for (cb=post_script_cb[type-1]; cb ; cb=cb->next){
+ 		cb->cbf(msg, flags, cb->param);
