@@ -19,6 +19,7 @@ upstream/0037-tls-do-kerberos-and-zlib-init-checks-only-for-libssl.patch
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
 upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
+upstream/dialog-more-safety-checks-to-detect-if-dialog-is-gon.patch
 #
 ##
 no_lib64_on_64_bits.patch
