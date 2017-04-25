@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.5-1+0~mr5.1.2.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [fb3cdde] TT#10159 refresh upstream fixes from 4.4
+  * [026743a] TT#14208 prevent crash on BYE when dialog is gone
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 25 Apr 2017 14:18:27 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr5.1.2.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
