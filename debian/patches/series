@@ -14,6 +14,7 @@ upstream/0016-sanity-reset-proxy_require-hdr-parsed-field-after-fr.patch
 upstream/0017-pua_reginfo-fix-memory-leak-when-usrloc-is-DB_ONLY.patch
 upstream/0018-usrloc-fix-ucontact-shared-leak.patch
 upstream/0019-presence-remove-transaction-creation-from-publ_notif.patch
+upstream/0020-dialog-more-safety-checks-to-detect-if-dialog-is-gon.patch
 upstream/0037-tls-do-kerberos-and-zlib-init-checks-only-for-libssl.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
