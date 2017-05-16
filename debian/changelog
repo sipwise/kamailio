@@ -1,3 +1,17 @@
+ngcp-kamailio (4.4.5-1+0~mr5.4.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [c55fc18] TT#12676 tls: fix kerberos detection at runtime with openssl > 1.1.0
+  * [1e2115a] TT#14208 prevent crash on BYE when dialog is gone
+  * [e55372f] TT#14953 dialog: more safety checks
+
+  [ Richard Fuchs ]
+  * [07d2257] TT#12800 return rtpengine MOS values to pvars
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 16 May 2017 21:35:00 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr5.3.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
