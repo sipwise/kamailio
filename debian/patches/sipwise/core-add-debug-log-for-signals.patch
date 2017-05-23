@@ -1,0 +1,117 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 23 May 2017 16:34:59 +0200
+Subject: core: add debug log for signals
+
+Change-Id: I6a32ed87ff5b612c239317b0adfa5daa35305836
+---
+ main.c | 43 ++++++++++++++++++++++++++++---------------
+ 1 file changed, 28 insertions(+), 15 deletions(-)
+
+diff --git a/main.c b/main.c
+index 8b2e8e8..8e1596c 100644
+--- a/main.c
++++ b/main.c
+@@ -675,8 +675,8 @@ void handle_sigs(void)
+ {
+ 	pid_t	chld;
+ 	int	chld_status;
+-	int memlog;
+-
++	int memlog, debug, mem_summary;
++	LM_DBG("sig_flag:%d\n", sig_flag);
+ 	switch(sig_flag){
+ 		case 0: break; /* do nothing*/
+ 		case SIGPIPE:
+@@ -703,25 +703,29 @@ void handle_sigs(void)
+ 			dump_all_statistic();
+ #endif
+ 		memlog=cfg_get(core, core_cfg, memlog);
++		debug=cfg_get(core, core_cfg, debug);
++		mem_summary=cfg_get(core, core_cfg, mem_summary);
++		LM_DBG("memlog:%d debug:%d mem_summary:%d\n",
++			memlog, debug, mem_summary);
+ #ifdef PKG_MALLOC
+-		if (memlog <= cfg_get(core, core_cfg, debug)){
+-			if (cfg_get(core, core_cfg, mem_summary) & 1) {
++		if (memlog <= debug){
++			if (mem_summary & 1) {
+ 				LOG(memlog, "Memory status (pkg):\n");
+ 				pkg_status();
+ 			}
+-			if (cfg_get(core, core_cfg, mem_summary) & 2) {
++			if (mem_summary & 2) {
+ 				LOG(memlog, "Memory still-in-use summary (pkg):\n");
+ 				pkg_sums();
+ 			}
+ 		}
+ #endif
+ #ifdef SHM_MEM
+-		if (memlog <= cfg_get(core, core_cfg, debug)){
+-			if (cfg_get(core, core_cfg, mem_summary) & 1) {
++		if (memlog <= debug){
++			if (mem_summary & 1) {
+ 				LOG(memlog, "Memory status (shm):\n");
+ 				shm_status();
+ 			}
+-			if (cfg_get(core, core_cfg, mem_summary) & 2) {
++			if (mem_summary & 2) {
+ 				LOG(memlog, "Memory still-in-use summary (shm):\n");
+ 				shm_sums();
+ 			}
+@@ -785,7 +789,7 @@ void sig_usr(int signo)
+ {
+ 
+ #ifdef PKG_MALLOC
+-	int memlog;
++	int memlog, debug, mem_summary;
+ #endif
+ 
+ 	if (is_main){
+@@ -798,6 +802,7 @@ void sig_usr(int signo)
+ 			handle_sigs();
+ 	}else{
+ 		/* process the important signals */
++		LM_DBG("signal %d received\n", signo);
+ 		switch(signo){
+ 			case SIGPIPE:
+ #ifdef SIG_DEBUG /* signal unsafe stuff follows */
+@@ -816,12 +821,16 @@ void sig_usr(int signo)
+ 					  config support */
+ 					cfg_update_no_cbs();
+ 					memlog=cfg_get(core, core_cfg, memlog);
+-					if (memlog <= cfg_get(core, core_cfg, debug)){
+-						if (cfg_get(core, core_cfg, mem_summary) & 1) {
++					debug=cfg_get(core, core_cfg, debug);
++					mem_summary=cfg_get(core, core_cfg, mem_summary);
++					LM_DBG("memlog:%d debug:%d mem_summary:%d\n",
++						memlog, debug, mem_summary);
++					if (memlog <= debug){
++						if (mem_summary & 1) {
+ 							LOG(memlog, "Memory status (pkg):\n");
+ 							pkg_status();
+ 						}
+-						if (cfg_get(core, core_cfg, mem_summary) & 2) {
++						if (mem_summary & 2) {
+ 							LOG(memlog, "Memory still-in-use summary (pkg):"
+ 									"\n");
+ 							pkg_sums();
+@@ -835,12 +844,16 @@ void sig_usr(int signo)
+ #ifdef PKG_MALLOC
+ 					cfg_update_no_cbs();
+ 					memlog=cfg_get(core, core_cfg, memlog);
+-					if (memlog <= cfg_get(core, core_cfg, debug)){
+-						if (cfg_get(core, core_cfg, mem_summary) & 1) {
++					debug=cfg_get(core, core_cfg, debug);
++					mem_summary=cfg_get(core, core_cfg, mem_summary);
++					LM_DBG("memlog:%d debug:%d mem_summary:%d\n",
++						memlog, debug, mem_summary);
++					if (memlog <= debug){
++						if ( mem_summary & 1) {
+ 							LOG(memlog, "Memory status (pkg):\n");
+ 							pkg_status();
+ 						}
+-						if (cfg_get(core, core_cfg, mem_summary) & 2) {
++						if (mem_summary & 2) {
+ 							LOG(memlog, "Memory still-in-use summary (pkg):\n");
+ 							pkg_sums();
+ 						}
