@@ -1,0 +1,30 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 23 May 2017 16:34:59 +0200
+Subject: core: add debug log for signals
+
+Change-Id: I6a32ed87ff5b612c239317b0adfa5daa35305836
+---
+ main.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/main.c b/main.c
+index 8b2e8e8..fd0c4e9 100644
+--- a/main.c
++++ b/main.c
+@@ -676,7 +676,7 @@ void handle_sigs(void)
+ 	pid_t	chld;
+ 	int	chld_status;
+ 	int memlog;
+-
++	LM_DBG("sig_flag:%d\n", sig_flag);
+ 	switch(sig_flag){
+ 		case 0: break; /* do nothing*/
+ 		case SIGPIPE:
+@@ -798,6 +798,7 @@ void sig_usr(int signo)
+ 			handle_sigs();
+ 	}else{
+ 		/* process the important signals */
++		LM_DEBUG("signal %d received\n", signo);
+ 		switch(signo){
+ 			case SIGPIPE:
+ #ifdef SIG_DEBUG /* signal unsafe stuff follows */
