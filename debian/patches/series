@@ -18,6 +18,7 @@ upstream/0037-tls-do-kerberos-and-zlib-init-checks-only-for-libssl.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
+upstream/pv-pv_var_to_xavp-fix-check-for-VAR_VAL_INT.patch
 upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
 upstream/dialog-more-safety-checks-to-detect-if-dialog-is-gon.patch
 upstream/core-fix-mem_summary-comparation-when-SIGUSR1-is-rec.patch
