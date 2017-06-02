@@ -1,0 +1,32 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 2 Jun 2017 10:19:25 +0200
+Subject: core: parser reset_path_vector() remove check for msg->msg_flags
+
+* tm now uses shared memory for fake_req() so faked_req->path_vec
+was leaking
+---
+ parser/msg_parser.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/parser/msg_parser.c b/parser/msg_parser.c
+index 8b21178..c1df41b 100644
+--- a/parser/msg_parser.c
++++ b/parser/msg_parser.c
+@@ -790,13 +790,11 @@ int set_path_vector(struct sip_msg* msg, str* path)
+ 
+ void reset_path_vector(struct sip_msg* const msg)
+ {
+-	/* only free path vector from pkg IFF it is still in pkg... - ie. if msg is shm we don't free... */
+-	if (!(msg->msg_flags&FL_SHM_CLONE)) {
+-		if (msg->path_vec.s)
+-			pkg_free(msg->path_vec.s);
+-		msg->path_vec.s = 0;
+-		msg->path_vec.len = 0;
++	if (msg->path_vec.s) {
++		pkg_free(msg->path_vec.s);
+ 	}
++	msg->path_vec.s = 0;
++	msg->path_vec.len = 0;
+ }
+ 
+ 
