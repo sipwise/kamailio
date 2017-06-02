@@ -14,6 +14,7 @@ upstream/0016-sanity-reset-proxy_require-hdr-parsed-field-after-fr.patch
 upstream/0017-pua_reginfo-fix-memory-leak-when-usrloc-is-DB_ONLY.patch
 upstream/0018-usrloc-fix-ucontact-shared-leak.patch
 upstream/0019-presence-remove-transaction-creation-from-publ_notif.patch
+upstream/0054-pv-fix-pv_var_to_xavp-and-pv_xavp_to_var-functions.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
