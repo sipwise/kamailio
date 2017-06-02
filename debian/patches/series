@@ -37,3 +37,4 @@ sipwise/0001-kex-add-extended-core-stats.patch
 sipwise/rtpengine_next_branch_parm.patch
 sipwise/dialog-RPC-dlg.dlg_list-_ctx-make-from_tag-parameter.patch
 sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
+sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch
