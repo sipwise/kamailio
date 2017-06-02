@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.5-1+0~mr5.3.1.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [75d25f4] TT#16548 core: fix mem_summary comparation when SIGUSR1 is received
+  * [72d289d] TT#14580 core: fix memory leak
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 02 Jun 2017 15:08:32 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr5.3.1.0) unstable; urgency=medium
 
   [ Victor Seva ]
