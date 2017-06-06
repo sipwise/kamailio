@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.5-1+0~mr4.5.4.5) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [a6e92d8] TT#14580 core: fix memory leak
+  * [9b3d1e6] TT#10136 pv: pv_var_to_xavp() and pv_xavp_to_var() fix
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 06 Jun 2017 11:45:44 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr4.5.4.4) unstable; urgency=medium
 
   [ Victor Seva ]
