@@ -22,6 +22,30 @@
       "revId": "a6e92d8b1c69f8798f2f217443eac6a207915a88",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "dacfb570_84400858",
+        "filename": "debian/patches/sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 19,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2017-06-06T09:44:00Z",
+      "side": 1,
+      "message": "No. It\u0027s not, as described in the commit now that value can be in shared memory too when the environment is faked",
+      "parentUuid": "dacfb570_e4fb9445",
+      "range": {
+        "startLine": 19,
+        "startChar": 2,
+        "endLine": 19,
+        "endChar": 101
+      },
+      "revId": "a6e92d8b1c69f8798f2f217443eac6a207915a88",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
