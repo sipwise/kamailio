@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.4-1+0~mr4.5.3.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [ae7bb15] TT#10136 pv: pv_var_to_xavp() and pv_xavp_to_var() fix
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 09 Jun 2017 15:46:51 +0200
+
 ngcp-kamailio (4.4.4-1+0~mr4.5.3.1) unstable; urgency=medium
 
   [ Victor Seva ]
