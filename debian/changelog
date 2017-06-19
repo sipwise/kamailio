@@ -1,3 +1,16 @@
+ngcp-kamailio (4.4.5-1+0~mr5.2.3.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [508f51b] TT#14208 prevent crash on BYE when dialog is gone
+  * [a50ccb8] TT#14953 dialog: more safety checks
+  * [767e74c] TT#16548 core: fix mem_summary comparation when SIGUSR1 is received
+  * [2f1a3ff] TT#14580 core: fix memory leak
+  * [7da1ad1] TT#10136 pv: pv_var_to_xavp() and pv_xavp_to_var() fix
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Jun 2017 15:01:43 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr5.2.2.0) unstable; urgency=medium
 
   * New release.
