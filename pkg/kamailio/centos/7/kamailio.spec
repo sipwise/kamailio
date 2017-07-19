@@ -1,38 +1,41 @@
-%define name	kamailio
-%define ver	4.4.6
-%define rel	0.0%{dist}
+%define name    kamailio
+%define ver 4.4.6
+%define rel 1%{dist}
+%bcond_with dnssec
 
 
 
-Summary:	Kamailio (former OpenSER) - the Open Source SIP Server
-Name:		%name
-Version:	%ver
-Release:	%rel
-Packager:	Peter Dunkley <peter@dunkley.me.uk>
-License:	GPL
-Group:		System Environment/Daemons
-Source:		http://kamailio.org/pub/kamailio/%{ver}/src/%{name}-%{ver}_src.tar.gz
-URL:		http://kamailio.org/
-Vendor:		kamailio.org
-BuildRoot:	%{_tmppath}/%{name}-%{ver}-buildroot
-Conflicts:	kamailio-auth-ephemeral < %ver, kamailio-bdb < %ver
-Conflicts:	kamailio-carrierroute < %ver, kamailio-cpl < %ver
-Conflicts:	kamailio-dialplan < %ver, kamailio-dnssec < %ver
-Conflicts:	kamailio-geoip < %ver, kamailio-gzcompress < %ver
-Conflicts:	kamailio-ims < %ver, kamailio-java < %ver, kamailio-json < %ver
-Conflicts:	kamailio-lcr < %ver, kamailio-ldap < %ver, kamailio-lua < %ver
-Conflicts:	kamailio-memcached < %ver, kamailio-mysql < %ver
-Conflicts:	kamailio-outbound < %ver, kamailio-perl < %ver
-Conflicts:	kamailio-postgresql < %ver, kamailio-presence < %ver
-Conflicts:	kamailio-purple < %ver, kamailio-python < %ver
-Conflicts:	kamailio-radius < % ver, kamailio-redis < %ver
-Conflicts:	kamailio-regex < %ver, kamailio-sctp < %ver
-Conflicts:	kamailio-snmpstats < %ver, kamailio-sqlite < %ver
-Conflicts:	kamailio-tls < %ver, kamailio-unixodbc < %ver
-Conflicts:	kamailio-utils < %ver, kamailio-websocket < %ver
-Conflicts:	kamailio-xhttp-pi < %ver, kamailio-xmlops < %ver
-Conflicts:	kamailio-xmlrpc < %ver, kamailio-xmpp < %ver
-BuildRequires:	bison, flex, gcc, make, redhat-rpm-config
+Summary:    Kamailio (former OpenSER) - the Open Source SIP Server
+Name:       %name
+Version:    %ver
+Release:    %rel
+Packager:   Peter Dunkley <peter@dunkley.me.uk>
+License:    GPL
+Group:      System Environment/Daemons
+Source:     http://kamailio.org/pub/kamailio/%{ver}/src/%{name}-%{ver}_src.tar.gz
+URL:        http://kamailio.org/
+Vendor:     kamailio.org
+BuildRoot:  %{_tmppath}/%{name}-%{ver}-buildroot
+Conflicts:  kamailio-auth-ephemeral < %ver, kamailio-bdb < %ver
+Conflicts:  kamailio-carrierroute < %ver, kamailio-cpl < %ver
+Conflicts:  kamailio-dialplan < %ver, kamailio-dnssec < %ver
+Conflicts:  kamailio-geoip < %ver, kamailio-gzcompress < %ver
+Conflicts:  kamailio-ims < %ver, kamailio-java < %ver, kamailio-json < %ver
+Conflicts:  kamailio-lcr < %ver, kamailio-ldap < %ver, kamailio-lua < %ver
+Conflicts:  kamailio-kazoo < %ver
+Conflicts:  kamailio-memcached < %ver, kamailio-mysql < %ver
+Conflicts:  kamailio-outbound < %ver, kamailio-perl < %ver
+Conflicts:  kamailio-postgresql < %ver, kamailio-presence < %ver
+Conflicts:  kamailio-python < %ver
+Conflicts:  kamailio-radius < % ver, kamailio-redis < %ver
+Conflicts:  kamailio-regex < %ver, kamailio-sctp < %ver
+Conflicts:  kamailio-snmpstats < %ver, kamailio-sqlite < %ver
+Conflicts:  kamailio-tls < %ver, kamailio-unixodbc < %ver
+Conflicts:  kamailio-utils < %ver, kamailio-websocket < %ver
+Conflicts:  kamailio-xhttp-pi < %ver, kamailio-xmlops < %ver
+Conflicts:  kamailio-xmlrpc < %ver, kamailio-xmpp < %ver
+Conflicts:  kamailio-uuid < %ver
+BuildRequires:  bison, flex, gcc, make, redhat-rpm-config
 
 %description
 Kamailio (former OpenSER) is an Open Source SIP Server released under GPL, able
@@ -47,422 +50,485 @@ platforms or to scale up SIP-to-PSTN gateways, PBX systems or media servers
 like Asterisk™, FreeSWITCH™ or SEMS.
 
 
-%package	auth-ephemeral
-Summary:	Functions for authentication using ephemeral credentials.
-Group:		System Environment/Daemons
-Requires:	openssl, kamailio = %ver
-BuildRequires:	openssl-devel
+%package    auth-ephemeral
+Summary:    Functions for authentication using ephemeral credentials.
+Group:      System Environment/Daemons
+Requires:   openssl, kamailio = %ver
+BuildRequires:  openssl-devel
 
-%description 	auth-ephemeral
+%description    auth-ephemeral
 Functions for authentication using ephemeral credentials.
 
 
-%package	auth-xkeys
-Summary:	Functions for authentication using shared keys.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
+%package    auth-xkeys
+Summary:    Functions for authentication using shared keys.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description 	auth-xkeys
+%description    auth-xkeys
 Functions for authentication using shared keys.
 
 
-%package	bdb
-Summary:	Berkeley database connectivity for Kamailio.
-Group:		System Environment/Daemons
-Requires:	db4, kamailio = %ver
-BuildRequires:	db4-devel
+%package    bdb
+Summary:    Berkeley database connectivity for Kamailio.
+Group:      System Environment/Daemons
+Requires:   db4, kamailio = %ver
+BuildRequires:  db4-devel
 
-%description	bdb
+%description    bdb
 Berkeley database connectivity for Kamailio.
 
 
-%package	carrierroute
-Summary:	The carrierroute module for Kamailio.
-Group:		System Environment/Daemons
-Requires:	epel-release, libconfuse, kamailio = %ver
-BuildRequires:	epel-release, libconfuse-devel
+%package    carrierroute
+Summary:    The carrierroute module for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libconfuse, kamailio = %ver
+BuildRequires:  libconfuse-devel
 
-%description	carrierroute
+%description    carrierroute
 The carrierroute module for Kamailio.
 
 
-%package	cnxcc
-Summary:	Module which provides a mechanism to limit call duration based on credit information parameters for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libevent, hiredis, kamailio = %ver
-BuildRequires:	libevent-devel, hiredis-devel
+%package    cfgt
+Summary:    Unit test config file execution tracing module for Kamailio.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	cnxcc
+%description    cfgt
+The unit test config file execution tracing module for Kamailio. 
+
+
+%package    cnxcc
+Summary:    Module which provides a mechanism to limit call duration based on credit information parameters for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libevent, hiredis, kamailio = %ver
+BuildRequires:  libevent-devel, hiredis-devel
+
+%description    cnxcc
 Module which provides a mechanism to limit call duration based on credit information parameters for Kamailio.
 
 
-%package	cpl
-Summary:	CPL (Call Processing Language) interpreter for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libxml2, kamailio = %ver
-BuildRequires:	libxml2-devel
+%package    cpl
+Summary:    CPL (Call Processing Language) interpreter for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libxml2, kamailio = %ver
+BuildRequires:  libxml2-devel
 
-%description	cpl
+%description    cpl
 CPL (Call Processing Language) interpreter for Kamailio.
 
 
-%package	dialplan
-Summary:	String translations based on rules for Kamailio.
-Group:		System Environment/Daemons
-Requires:	pcre, kamailio = %ver
-BuildRequires:	pcre-devel
+%package    crypto
+Summary:    Module to support cryptographic extensions for use in the Kamailio configuration.
+Group:      System Environment/Daemons
+Requires:   libcrypto
 
-%description	dialplan
+%description    crypto
+This module provides various cryptography tools for use in Kamailio configuration file.  It relies on OpenSSL libraries for cryptographic operations (libssl, libcrypto). 
+
+
+%package    dialplan
+Summary:    String translations based on rules for Kamailio.
+Group:      System Environment/Daemons
+Requires:   pcre, kamailio = %ver
+BuildRequires:  pcre-devel
+
+%description    dialplan
 String translations based on rules for Kamailio.
 
 
-%package	dmq_userloc
-Summary:	User location (usrloc) records replication between multiple servers via DMQ module for Kamailio.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
+%package    dmq_userloc
+Summary:    User location (usrloc) records replication between multiple servers via DMQ module for Kamailio.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	dmq_userloc
+%description    dmq_userloc
 User location (usrloc) records replication between multiple servers via DMQ module.
 
 
-%package	dnssec
-Summary:	DNSSEC support for Kamailio.
-Group:		System Environment/Daemons
-Requires:	epel-release, dnssec-tools-libs, kamailio = %ver
-BuildRequires:	epel-release, dnssec-tools-libs-devel
+%if %{with dnssec}
+%package    dnssec
+Summary:    DNSSEC support for Kamailio.
+Group:      System Environment/Daemons
+Requires:   dnssec-tools-libs, kamailio = %ver
+BuildRequires:  dnssec-tools-libs-devel
 
-%description	dnssec
+%description    dnssec
 DNSSEC support for Kamailio.
+%endif
 
 
-%package	geoip
-Summary:	MaxMind GeoIP support for Kamailio.
-Group:		System Environment/Daemons
-Requires:	epel-release, GeoIP, kamailio = %ver
-BuildRequires:	epel-release, GeoIP-devel
+%package    geoip
+Summary:    MaxMind GeoIP support for Kamailio.
+Group:      System Environment/Daemons
+Requires:   GeoIP, kamailio = %ver
+BuildRequires:  GeoIP-devel
 
-%description	geoip
+%description    geoip
 MaxMind GeoIP support for Kamailio.
 
 
-%package	gzcompress
-Summary:	Compressed body (SIP and HTTP) handling for kamailio.
-Group:		System Environment/Daemons
-Requires:	zlib, kamailio = %ver
-BuildRequires:	zlib-devel
+%package    gzcompress
+Summary:    Compressed body (SIP and HTTP) handling for kamailio.
+Group:      System Environment/Daemons
+Requires:   zlib, kamailio = %ver
+BuildRequires:  zlib-devel
 
-%description	gzcompress
+%description    gzcompress
 Compressed body (SIP and HTTP) handling for kamailio.
 
 
-%package	ims
-Summary:	IMS modules and extensions module for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libxml2, kamailio = %ver
-BuildRequires:	libxml2-devel
+%package    http_client
+Summary:    HTTP client module for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libcrypto
 
-%description	ims
+%description    http_client
+This module implements protocol functions that use the libcurl to communicate with HTTP servers. 
+
+
+%package    ims
+Summary:    IMS modules and extensions module for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libxml2, kamailio = %ver
+BuildRequires:  libxml2-devel
+
+%description    ims
 IMS modules and extensions module for Kamailio.
 
 
-%package	java
-Summary:	Java extensions for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libgcj, java-1.6.0-openjdk, kamailio = %ver
-BuildRequires:	libgcj-devel, java-1.6.0-openjdk-devel, ant
+%package    json
+Summary:    json string handling and RPC modules for Kamailio.
+Group:      System Environment/Daemons
+Requires:   json-c, libevent, kamailio = %ver
+BuildRequires:  json-c-devel, libevent-devel
 
-%description	java
-Java extensions for Kamailio.
-
-
-%package	json
-Summary:	json string handling and RPC modules for Kamailio.
-Group:		System Environment/Daemons
-Requires:	epel-release, json-c, libevent, kamailio = %ver
-BuildRequires:	epel-release, json-c-devel, libevent-devel
-
-%description	json
+%description    json
 json string handling and RPC modules for Kamailio.
 
 
-%package	lcr
-Summary:	Least cost routing for Kamailio.
-Group:		System Environment/Daemons
-Requires:	pcre, kamailio = %ver
-BuildRequires:	pcre-devel
+%package    kazoo
+Summary:    Kazoo middle layer connector support for Kamailio
+Group:      System Environment/Daemons
+Requires:   libuuid, librabbitmq, json-c, libevent, kamailio = %ver
+BuildRequires:  libuuid-devel, librabbitmq-devel, json-c-devel, libevent-devel
 
-%description	lcr
+%description    kazoo
+Kazoo module for Kamailio.
+
+
+%package    lcr
+Summary:    Least cost routing for Kamailio.
+Group:      System Environment/Daemons
+Requires:   pcre, kamailio = %ver
+BuildRequires:  pcre-devel
+
+%description    lcr
 Least cost routing for Kamailio.
 
 
-%package	ldap
-Summary:	LDAP search interface for Kamailio.
-Group:		System Environment/Daemons
-Requires:	openldap, kamailio = %ver
-BuildRequires:	openldap-devel
+%package    ldap
+Summary:    LDAP search interface for Kamailio.
+Group:      System Environment/Daemons
+Requires:   openldap, kamailio = %ver
+BuildRequires:  openldap-devel
 
-%description	ldap
+%description    ldap
 LDAP search interface for Kamailio.
 
 
-%package	lua
-Summary:	Lua extensions for Kamailio.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
-BuildRequires:	lua-devel
+%package    log_custom
+Summary:    Logging to custom backends from Kamailio.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	lua
+%description    log_custom
+This module provides logging to custom systems, replacing the default core logging to syslog.
+
+
+%package    lua
+Summary:    Lua extensions for Kamailio.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
+BuildRequires:  lua-devel
+
+%description    lua
 Lua extensions for Kamailio.
 
 
-%package	memcached
-Summary:	memcached configuration file support for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libmemcached, kamailio = %ver
-BuildRequires:	libmemcached-devel
+%package    memcached
+Summary:    memcached configuration file support for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libmemcached, kamailio = %ver
+BuildRequires:  libmemcached-devel
 
-%description	memcached
+%description    memcached
 memcached configuration file support for Kamailio.
 
 
-%package	mysql
-Summary:	MySQL database connectivity for Kamailio.
-Group:		System Environment/Daemons
-Requires:	mysql-libs, kamailio = %ver
-BuildRequires:	mysql-devel zlib-devel
+%package    mysql
+Summary:    MySQL database connectivity for Kamailio.
+Group:      System Environment/Daemons
+Requires:   mysql-libs, kamailio = %ver
+BuildRequires:  mysql-devel zlib-devel
 
-%description	mysql
+%description    mysql
 MySQL database connectivity for Kamailio.
 
 
-%package	outbound
-Summary:	Outbound (RFC 5626) support for Kamailio.
-Group:		System Environment/Daemons
-Requires:	openssl, kamailio = %ver
-BuildRequires:	openssl-devel
+%package    outbound
+Summary:    Outbound (RFC 5626) support for Kamailio.
+Group:      System Environment/Daemons
+Requires:   openssl, kamailio = %ver
+BuildRequires:  openssl-devel
 
-%description	outbound
+%description    outbound
 RFC 5626, "Managing Client-Initiated Connections in the Session Initiation
 Protocol (SIP)" support for Kamailio.
 
 
-%package	perl
-Summary:	Perl extensions and database driver for Kamailio.
-Group:		System Environment/Daemons 
-Requires:	mod_perl, kamailio = %ver
-BuildRequires:	mod_perl-devel
+%package    perl
+Summary:    Perl extensions and database driver for Kamailio.
+Group:      System Environment/Daemons 
+Requires:   mod_perl, kamailio = %ver
+BuildRequires:  mod_perl-devel
 
-%description	perl
+%description    perl
 Perl extensions and database driver for Kamailio.
 
 
-%package	postgresql
-Summary:	PostgreSQL database connectivity for Kamailio.
-Group:		System Environment/Daemons
-Requires:	postgresql-libs, kamailio = %ver
-BuildRequires:	postgresql-devel
+%package    postgresql
+Summary:    PostgreSQL database connectivity for Kamailio.
+Group:      System Environment/Daemons
+Requires:   postgresql-libs, kamailio = %ver
+BuildRequires:  postgresql-devel
 
-%description	postgresql
+%description    postgresql
 PostgreSQL database connectivity for Kamailio.
 
 
-%package	presence
-Summary:	SIP Presence (and RLS, XCAP, etc) support for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libxml2, libcurl, kamailio = %ver, kamailio-xmpp = %ver
-BuildRequires:	libxml2-devel, libcurl-devel
+%package    presence
+Summary:    SIP Presence (and RLS, XCAP, etc) support for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libxml2, libcurl, kamailio = %ver, kamailio-xmpp = %ver
+BuildRequires:  libxml2-devel, libcurl-devel
 
-%description	presence
+%description    presence
 SIP Presence (and RLS, XCAP, etc) support for Kamailio.
 
 
-%package	purple
-Summary:	Multi-protocol IM and presence gateway module.
-Group:		System Environment/Daemons
-Requires:	glib2, libpurple, libxml2, kamailio = %ver
-Requires:	kamailio-presence = %ver
-BuildRequires:	glib2-devel, libpurple-devel, libxml2-devel
+%package    python
+Summary:    Python extensions for Kamailio.
+Group:      System Environment/Daemons
+Requires:   python, kamailio = %ver
+BuildRequires:  python-devel
 
-%description	purple
-Multi-protocol IM and presence gateway module.
-
-
-%package	python
-Summary:	Python extensions for Kamailio.
-Group:		System Environment/Daemons
-Requires:	python, kamailio = %ver
-BuildRequires:	python-devel
-
-%description	python
+%description    python
 Python extensions for Kamailio.
 
 
-%package	radius
-Summary:	RADIUS modules for Kamailio.
-Group:		System Environment/Daemons
-Requires:	epel-release, radiusclient-ng, kamailio = %ver
-BuildRequires:	epel-release, radiusclient-ng-devel
+%package    radius
+Summary:    RADIUS modules for Kamailio.
+Group:      System Environment/Daemons
+Requires:   radiusclient-ng, kamailio = %ver
+BuildRequires:  radiusclient-ng-devel
 
-%description	radius
+%description    radius
 RADIUS modules for Kamailio.
 
 
-%package	redis
-Summary:	Redis configuration file support for Kamailio.
-Group:		System Environment/Daemons
-Requires:	epel-release, hiredis, kamailio = %ver
-BuildRequires:	epel-release, hiredis-devel
+%package    redis
+Summary:    Redis configuration file support for Kamailio.
+Group:      System Environment/Daemons
+Requires:   hiredis, kamailio = %ver
+BuildRequires:  hiredis-devel
 
-%description	redis
+%description    redis
 Redis configuration file support for Kamailio.
 
 
-%package	regex
-Summary:	PCRE mtaching operations for Kamailio.
-Group:		System Environment/Daemons
-Requires:	pcre, kamailio = %ver
-BuildRequires:	pcre-devel
+%package    regex
+Summary:    PCRE mtaching operations for Kamailio.
+Group:      System Environment/Daemons
+Requires:   pcre, kamailio = %ver
+BuildRequires:  pcre-devel
 
-%description	regex
+%description    regex
 PCRE mtaching operations for Kamailio.
 
 
-%package	rtjson
-Summary:	SIP routing based on JSON specifications.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
+%package    rtjson
+Summary:    SIP routing based on JSON specifications.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	rtjson
+%description    rtjson
 SIP routing based on JSON specifications.
 
 
-%package	sctp
-Summary:	SCTP transport for Kamailio.
-Group:		System Environment/Daemons
-Requires:	lksctp-tools, kamailio = %ver
-BuildRequires:	lksctp-tools-devel
+%package    sctp
+Summary:    SCTP transport for Kamailio.
+Group:      System Environment/Daemons
+Requires:   lksctp-tools, kamailio = %ver
+BuildRequires:  lksctp-tools-devel
 
-%description	sctp
+%description    sctp
 SCTP transport for Kamailio.
 
 
-%package	snmpstats
-Summary:	SNMP management interface (scalar statistics) for Kamailio.
-Group:		System Environment/Daemons
-Requires:	net-snmp-libs, kamailio = %ver
-BuildRequires:	net-snmp-devel
+%package    smsops
+Summary:    Tools for handling SMS packets in SIP messages
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	snmpstats
+%description    smsops
+This module collects the Transformations for 3GPP-SMS. 
+
+
+%package    snmpstats
+Summary:    SNMP management interface (scalar statistics) for Kamailio.
+Group:      System Environment/Daemons
+Requires:   net-snmp-libs, kamailio = %ver
+BuildRequires:  net-snmp-devel
+
+%description    snmpstats
 SNMP management interface (scalar statistics) for Kamailio.
 
 
-%package	statsd
-Summary:	Send commands to statsd server.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
+%package    statsc
+Summary:    Statistics collecting module providing reports for Kamailio.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	statsd
+%description    statsc
+This module provides a statistics collector engine. 
+
+
+%package    statsd
+Summary:    Send commands to statsd server.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
+
+%description    statsd
 Send commands to statsd server.
 
 
-%package	sqlite
-Summary:	SQLite database connectivity for Kamailio.
-Group:		System Environment/Daemons
-Requires:	sqlite, kamailio = %ver
-BuildRequires:	sqlite-devel
+%package    sqlite
+Summary:    SQLite database connectivity for Kamailio.
+Group:      System Environment/Daemons
+Requires:   sqlite, kamailio = %ver
+BuildRequires:  sqlite-devel
 
-%description	sqlite
+%description    sqlite
 SQLite database connectivity for Kamailio.
 
 
-%package	tls
-Summary:	TLS transport for Kamailio.
-Group:		System Environment/Daemons
-Requires:	openssl, kamailio = %ver
-BuildRequires:	openssl-devel
+%package    tls
+Summary:    TLS transport for Kamailio.
+Group:      System Environment/Daemons
+Requires:   openssl, kamailio = %ver
+BuildRequires:  openssl-devel
 
-%description	tls
+%description    tls
 TLS transport for Kamailio.
 
 
-%package	tcpops
-Summary:	On demand and per socket control to the TCP options.
-Group:		System Environment/Daemons
-Requires:	kamailio = %ver
+%package    tcpops
+Summary:    On demand and per socket control to the TCP options.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	tcpops
+%description    tcpops
 On demand and per socket control to the TCP options.
 
 
-%package	unixodbc
-Summary:	unixODBC database connectivity for Kamailio.
-Group:		System Environment/Daemons
-Requires:	unixODBC, kamailio = %ver
-BuildRequires:	unixODBC-devel
+%package    topos
+Summary:    Topology stripping module for Kamailio.
+Group:      System Environment/Daemons
+Requires:   kamailio = %ver
 
-%description	unixodbc
+%description    topos
+This module offers topology hiding by stripping the routing headers that could show topology details.
+
+
+%package    unixodbc
+Summary:    unixODBC database connectivity for Kamailio.
+Group:      System Environment/Daemons
+Requires:   unixODBC, kamailio = %ver
+BuildRequires:  unixODBC-devel
+
+%description    unixodbc
 unixODBC database connectivity for Kamailio.
 
 
-%package	utils
-Summary:	Non-SIP utitility functions for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libcurl, libxml2, kamailio = %ver
-BuildRequires:	libcurl-devel, libxml2-devel
+%package    utils
+Summary:    Non-SIP utitility functions for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libcurl, libxml2, kamailio = %ver
+BuildRequires:  libcurl-devel, libxml2-devel
 
-%description	utils
+%description    utils
 Non-SIP utitility functions for Kamailio.
 
 
-%package	websocket
-Summary:	WebSocket transport for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libunistring, openssl, kamailio = %ver
-BuildRequires:	libunistring-devel, openssl-devel
+%package    websocket
+Summary:    WebSocket transport for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libunistring, openssl, kamailio = %ver
+BuildRequires:  libunistring-devel, openssl-devel
 
-%description	websocket
+%description    websocket
 WebSocket transport for Kamailio.
 
 
-%package	xhttp-pi
-Summary:	Web-provisioning interface for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libxml2, kamailio = %ver
-BuildRequires:	libxml2-devel
+%package    xhttp-pi
+Summary:    Web-provisioning interface for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libxml2, kamailio = %ver
+BuildRequires:  libxml2-devel
 
-%description	xhttp-pi
+%description    xhttp-pi
 Web-provisioning interface for Kamailio.
 
 
-%package	xmlops
-Summary:	XML operation functions for Kamailio.
-Group:		System Environment/Daemons
-Requires:	libxml2, kamailio = %ver
-BuildRequires:	libxml2-devel
+%package    xmlops
+Summary:    XML operation functions for Kamailio.
+Group:      System Environment/Daemons
+Requires:   libxml2, kamailio = %ver
+BuildRequires:  libxml2-devel
 
-%description	xmlops
+%description    xmlops
 XML operation functions for Kamailio.
 
 
-%package	xmlrpc
-Summary:	XMLRPC transport and encoding for Kamailio RPCs and MI commands.
-Group:		System Environment/Daemons
-Requires:	libxml2, xmlrpc-c, kamailio = %ver
-BuildRequires:	libxml2-devel, xmlrpc-c-devel
+%package    xmlrpc
+Summary:    XMLRPC transport and encoding for Kamailio RPCs and MI commands.
+Group:      System Environment/Daemons
+Requires:   libxml2, xmlrpc-c, kamailio = %ver
+BuildRequires:  libxml2-devel, xmlrpc-c-devel
 
-%description	xmlrpc
+%description    xmlrpc
 XMLRPC transport and encoding for Kamailio RPCs and MI commands.
 
 
-%package	xmpp
-Summary:	SIP/XMPP IM gateway for Kamailio.
-Group:		System Environment/Daemons
-Requires:	expat, kamailio = %ver
-BuildRequires:	expat-devel
+%package    xmpp
+Summary:    SIP/XMPP IM gateway for Kamailio.
+Group:      System Environment/Daemons
+Requires:   expat, kamailio = %ver
+BuildRequires:  expat-devel
 
-%description	xmpp
+%description    xmpp
 SIP/XMPP IM gateway for Kamailio.
 
+
+%package        uuid
+Summary:        uuid generator for Kamailio
+Group:          System Environment/Daemons
+Requires:       libuuid, kamailio = %version
+BuildRequires:  libuuid-devel
+
+%description    uuid
+UUID module for Kamailio.
 
 
 %prep
@@ -472,18 +538,20 @@ SIP/XMPP IM gateway for Kamailio.
 
 %build
 make cfg prefix=/usr cfg_prefix=$RPM_BUILD_ROOT basedir=$RPM_BUILD_ROOT \
-	cfg_target=/%{_sysconfdir}/kamailio/ modules_dirs="modules"
+    cfg_target=/%{_sysconfdir}/kamailio/ modules_dirs="modules"
 make
 make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
-	jabber ndb_cassandra osp" \
-	group_include="kstandard kautheph kberkeley kcarrierroute kcnxcc kcpl \
-	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
-	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
-	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
-	kwebsocket kxml kxmpp"
-cd modules/app_java/kamailio_java_folder/java
-ant
-cd ../../../..
+    jabber ndb_cassandra osp" \
+    group_include="kstandard kautheph kberkeley kcarrierroute kcnxcc kcpl \
+%if %{with dnssec}
+    kdnssec \
+%endif
+    kgeoip kgzcompress kims kjson kjsonrpcs \
+    kkazoo kldap klua kmemcached \
+    kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpython \
+    kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
+    kwebsocket kxml kxmpp kuuid"
+
 make utils
 
 
@@ -493,33 +561,40 @@ make utils
 
 make install
 make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
-	iptrtpproxy jabber osp" \
-	group_include="kstandard kautheph kberkeley kcarrierroute kcnxcc kcpl \
-	kdnssec kgeoip kgzcompress kims kjava kjson kldap klua kmemcached \
-	kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpurple kpython \
-	kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
-	kwebsocket kxml kxmpp"
+    iptrtpproxy jabber osp" \
+    group_include="kstandard kautheph kberkeley kcarrierroute kcnxcc kcpl \
+%if %{with dnssec}
+    kdnssec \
+%endif
+    kgeoip kgzcompress kims kjson kjsonrpcs \
+    kkazoo kldap klua kmemcached \
+    kmi_xmlrpc kmysql koutbound kperl kpostgres kpresence kpython \
+    kradius kredis ksctp ksnmpstats ksqlite ktls kunixodbc kutils \
+    kwebsocket kxml kxmpp kuuid"
 
-mkdir -p $RPM_BUILD_ROOT/%{_libdir}/kamailio/java
-install -m644 modules/app_java/kamailio_java_folder/java/Kamailio.class \
-	$RPM_BUILD_ROOT/%{_libdir}/kamailio/java
-install -m644 modules/app_java/kamailio_java_folder/java/kamailio.jar \
-	$RPM_BUILD_ROOT/%{_libdir}/kamailio/java
-
+%if "%{?_unitdir}" == ""
+# On RedHat 6 like
+install -d %{buildroot}%{_rundir}/kamailio
 mkdir -p $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d
 install -m755 pkg/kamailio/centos/%{?centos}/kamailio.init \
-		$RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/kamailio
+        $RPM_BUILD_ROOT/%{_sysconfdir}/rc.d/init.d/kamailio
+%else
+# systemd
+install -d %{buildroot}%{_unitdir}
+install -Dpm 0644 pkg/kamailio/centos/%{?centos}/kamailio.service %{buildroot}%{_unitdir}/kamailio.service
+install -Dpm 0644 pkg/kamailio/centos/%{?centos}/kamailio.tmpfiles %{buildroot}%{_tmpfilesdir}/kamailio.conf
+%endif
 
 mkdir -p $RPM_BUILD_ROOT/%{_sysconfdir}/sysconfig
 install -m644 pkg/kamailio/centos/%{?centos}/kamailio.sysconfig \
-		$RPM_BUILD_ROOT/%{_sysconfdir}/sysconfig/kamailio
+        $RPM_BUILD_ROOT/%{_sysconfdir}/sysconfig/kamailio
 
 
 
 %pre
 /usr/sbin/groupadd -r kamailio 2> /dev/null || :
 /usr/sbin/useradd -r -g kamailio -s /bin/false -c "Kamailio daemon" -d \
-		%{_libdir}/kamailio kamailio 2> /dev/null || :
+        %{_libdir}/kamailio kamailio 2> /dev/null || :
 
 
 
@@ -529,14 +604,19 @@ rm -rf "$RPM_BUILD_ROOT"
 
 
 %post
+%if "%{?_unitdir}" == ""
 /sbin/chkconfig --add kamailio
+%else
+%tmpfiles_create kamailio.conf
+/usr/bin/systemctl -q enable kamailio.service
+%endif
 
 
 
 %preun
 if [ $1 = 0 ]; then
-	/sbin/service kamailio stop > /dev/null 2>&1
-	/sbin/chkconfig --del kamailio
+    /sbin/service kamailio stop > /dev/null 2>&1
+    /sbin/chkconfig --del kamailio
 fi
 
 
@@ -574,7 +654,6 @@ fi
 %doc %{_docdir}/kamailio/modules/README.db2_ops
 %doc %{_docdir}/kamailio/modules/README.debugger
 %doc %{_docdir}/kamailio/modules/README.dialog
-%doc %{_docdir}/kamailio/modules/README.dialog_ng
 %doc %{_docdir}/kamailio/modules/README.dispatcher
 %doc %{_docdir}/kamailio/modules/README.diversion
 %doc %{_docdir}/kamailio/modules/README.dmq
@@ -664,8 +743,14 @@ fi
 
 %dir %attr(-,kamailio,kamailio) %{_sysconfdir}/kamailio
 %config(noreplace) %{_sysconfdir}/kamailio/*
-%config %{_sysconfdir}/rc.d/init.d/*
 %config %{_sysconfdir}/sysconfig/*
+%if "%{?_unitdir}" == ""
+%config %{_sysconfdir}/rc.d/init.d/*
+%dir %{_rundir}/kamailio
+%else
+%{_unitdir}/kamailio.service
+%{_tmpfilesdir}/kamailio.conf
+%endif
 
 %dir %{_libdir}/kamailio
 %{_libdir}/kamailio/libbinrpc.so
@@ -717,7 +802,6 @@ fi
 %{_libdir}/kamailio/modules/db2_ops.so
 %{_libdir}/kamailio/modules/debugger.so
 %{_libdir}/kamailio/modules/dialog.so
-%{_libdir}/kamailio/modules/dialog_ng.so
 %{_libdir}/kamailio/modules/dispatcher.so
 %{_libdir}/kamailio/modules/diversion.so
 %{_libdir}/kamailio/modules/dmq.so
@@ -836,19 +920,19 @@ fi
 %{_datadir}/kamailio/dbtext/kamailio/*
 
 
-%files		auth-ephemeral
+%files      auth-ephemeral
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.auth_ephemeral
 %{_libdir}/kamailio/modules/auth_ephemeral.so
 
 
-%files		auth-xkeys
+%files      auth-xkeys
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.auth_xkeys
 %{_libdir}/kamailio/modules/auth_xkeys.so
 
 
-%files		bdb
+%files      bdb
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_berkeley
 %{_sbindir}/kambdb_recover
@@ -859,54 +943,61 @@ fi
 %{_datadir}/kamailio/db_berkeley/*
 
 
-%files		carrierroute
+%files      carrierroute
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.carrierroute
 %{_libdir}/kamailio/modules/carrierroute.so
 
 
-%files		cnxcc
+%files      cnxcc
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.cnxcc
 %{_libdir}/kamailio/modules/cnxcc.so
 
-%files		cpl
+%files      cpl
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.cpl-c
 %{_libdir}/kamailio/modules/cpl-c.so
 
 
-%files		dialplan
+%files      dialplan
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.dialplan
 %{_libdir}/kamailio/modules/dialplan.so
 
 
-%files		dmq_userloc
+%files      dmq_userloc
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.dmq_usrloc
 %{_libdir}/kamailio/modules/dmq_usrloc.so
 
 
-%files		dnssec
+%if %{with dnssec}
+%files      dnssec
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.dnssec
 %{_libdir}/kamailio/modules/dnssec.so
+%endif
 
 
-%files		geoip
+%files      geoip
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.geoip
 %{_libdir}/kamailio/modules/geoip.so
 
 
-%files		gzcompress
+%files      gzcompress
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.gzcompress
 %{_libdir}/kamailio/modules/gzcompress.so
 
 
-%files		ims
+%files      http_client
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.http_client
+%{_libdir}/kamailio/modules/http_client.so
+
+%files      ims
 %defattr(-,root,root)
 %{_libdir}/kamailio/libkamailio_ims.so
 %{_libdir}/kamailio/libkamailio_ims.so.0
@@ -914,19 +1005,29 @@ fi
 
 %doc %{_docdir}/kamailio/modules/README.cdp
 %doc %{_docdir}/kamailio/modules/README.cdp_avp
+%doc %{_docdir}/kamailio/modules/README.cfgt
+%doc %{_docdir}/kamailio/modules/README.crypto
 %doc %{_docdir}/kamailio/modules/README.ims_auth
 %doc %{_docdir}/kamailio/modules/README.ims_charging
+%doc %{_docdir}/kamailio/modules/README.ims_dialog
 %doc %{_docdir}/kamailio/modules/README.ims_icscf
 %doc %{_docdir}/kamailio/modules/README.ims_isc
 %doc %{_docdir}/kamailio/modules/README.ims_qos
-#%doc %{_docdir}/kamailio/modules/README.ims_registrar_pcscf
+%doc %{_docdir}/kamailio/modules/README.ims_registrar_pcscf
 %doc %{_docdir}/kamailio/modules/README.ims_registrar_scscf
 %doc %{_docdir}/kamailio/modules/README.ims_usrloc_pcscf
+%doc %{_docdir}/kamailio/modules/README.log_custom
+%doc %{_docdir}/kamailio/modules/README.smsops
+%doc %{_docdir}/kamailio/modules/README.statsc
+%doc %{_docdir}/kamailio/modules/README.topos
 #%doc %{_docdir}/kamailio/modules/README.ims_usrloc_scscf
 %{_libdir}/kamailio/modules/cdp.so
 %{_libdir}/kamailio/modules/cdp_avp.so
+%{_libdir}/kamailio/modules/cfgt.so
+%{_libdir}/kamailio/modules/crypto.so
 %{_libdir}/kamailio/modules/ims_auth.so
 %{_libdir}/kamailio/modules/ims_charging.so
+%{_libdir}/kamailio/modules/ims_dialog.so
 %{_libdir}/kamailio/modules/ims_icscf.so
 %{_libdir}/kamailio/modules/ims_isc.so
 %{_libdir}/kamailio/modules/ims_qos.so
@@ -934,18 +1035,13 @@ fi
 %{_libdir}/kamailio/modules/ims_registrar_scscf.so
 %{_libdir}/kamailio/modules/ims_usrloc_pcscf.so
 %{_libdir}/kamailio/modules/ims_usrloc_scscf.so
+%{_libdir}/kamailio/modules/log_custom.so
+%{_libdir}/kamailio/modules/smsops.so
+%{_libdir}/kamailio/modules/statsc.so
+%{_libdir}/kamailio/modules/topos.so
 
 
-%files		java
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.app_java
-%{_libdir}/kamailio/modules/app_java.so
-%dir %{_libdir}/kamailio/java
-%{_libdir}/kamailio/java/Kamailio.class
-%{_libdir}/kamailio/java/kamailio.jar
-
-
-%files		json
+%files      json
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.json
 %doc %{_docdir}/kamailio/modules/README.jsonrpc-c
@@ -953,13 +1049,19 @@ fi
 %{_libdir}/kamailio/modules/jsonrpc-c.so
 
 
-%files		lcr
+%files      kazoo
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.kazoo
+%{_libdir}/kamailio/modules/kazoo.so
+
+
+%files      lcr
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.lcr
 %{_libdir}/kamailio/modules/lcr.so
 
 
-%files		ldap
+%files      ldap
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db2_ldap
 %doc %{_docdir}/kamailio/modules/README.h350
@@ -969,19 +1071,19 @@ fi
 %{_libdir}/kamailio/modules/ldap.so
 
 
-%files		lua
+%files      lua
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_lua
 %{_libdir}/kamailio/modules/app_lua.so
 
 
-%files		memcached
+%files      memcached
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.memcached
 %{_libdir}/kamailio/modules/memcached.so
 
 
-%files		mysql
+%files      mysql
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_mysql
 %{_libdir}/kamailio/modules/db_mysql.so
@@ -991,13 +1093,13 @@ fi
 %{_datadir}/kamailio/mysql/*
 
 
-%files		outbound
+%files      outbound
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.outbound
 %{_libdir}/kamailio/modules/outbound.so
 
 
-%files		perl
+%files      perl
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_perl
 %doc %{_docdir}/kamailio/modules/README.db_perlvdb
@@ -1031,7 +1133,7 @@ fi
 %{_libdir}/kamailio/perl/Kamailio/VDB/Adapter/TableVersions.pm
 
 
-%files		postgresql
+%files      postgresql
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_postgres
 %{_libdir}/kamailio/modules/db_postgres.so
@@ -1041,7 +1143,7 @@ fi
 %{_datadir}/kamailio/postgres/*
 
 
-%files		presence
+%files      presence
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.presence
 %doc %{_docdir}/kamailio/modules/README.presence_conference
@@ -1079,19 +1181,13 @@ fi
 %{_libdir}/kamailio/modules/xcap_server.so
 
 
-%files		purple
-%defattr(-,root,root)
-%doc %{_docdir}/kamailio/modules/README.purple
-%{_libdir}/kamailio/modules/purple.so
-
-
-%files		python
+%files      python
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_python
 %{_libdir}/kamailio/modules/app_python.so
 
 
-%files		radius
+%files      radius
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.acc_radius
 %doc %{_docdir}/kamailio/modules/README.auth_radius
@@ -1103,31 +1199,31 @@ fi
 %{_libdir}/kamailio/modules/peering.so
 
 
-%files		redis
+%files      redis
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.ndb_redis
 %{_libdir}/kamailio/modules/ndb_redis.so
 
 
-%files		regex
+%files      regex
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.regex
 %{_libdir}/kamailio/modules/regex.so
 
 
-%files		rtjson
+%files      rtjson
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.rtjson
 %{_libdir}/kamailio/modules/rtjson.so
 
 
-%files		sctp
+%files      sctp
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.sctp
 %{_libdir}/kamailio/modules/sctp.so
 
 
-%files		snmpstats
+%files      snmpstats
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.snmpstats
 %{_libdir}/kamailio/modules/snmpstats.so
@@ -1138,13 +1234,13 @@ fi
 %{_datadir}/snmp/mibs/KAMAILIO-TC
 
 
-%files		statsd
+%files      statsd
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.statsd
 %{_libdir}/kamailio/modules/statsd.so
 
 
-%files		sqlite
+%files      sqlite
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_sqlite
 %{_libdir}/kamailio/modules/db_sqlite.so
@@ -1154,7 +1250,7 @@ fi
 %{_datadir}/kamailio/db_sqlite/*
 
 
-%files		tls
+%files      tls
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.auth_identity
 %doc %{_docdir}/kamailio/modules/README.tls
@@ -1162,31 +1258,31 @@ fi
 %{_libdir}/kamailio/modules/tls.so
 
 
-%files		tcpops
+%files      tcpops
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.tcpops
 %{_libdir}/kamailio/modules/tcpops.so
 
 
-%files		unixodbc
+%files      unixodbc
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.db_unixodbc
 %{_libdir}/kamailio/modules/db_unixodbc.so
 
 
-%files		utils
+%files      utils
 %defattr(-,root,root)
 %{_docdir}/kamailio/modules/README.utils
 %{_libdir}/kamailio/modules/utils.so
 
 
-%files		websocket
+%files      websocket
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.websocket
 %{_libdir}/kamailio/modules/websocket.so
 
 
-%files		xhttp-pi
+%files      xhttp-pi
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.xhttp_pi
 %{_libdir}/kamailio/modules/xhttp_pi.so
@@ -1194,13 +1290,13 @@ fi
 %{_datadir}/kamailio/xhttp_pi/*
 
 
-%files		xmlops
+%files      xmlops
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.xmlops
 %{_libdir}/kamailio/modules/xmlops.so
 
 
-%files		xmlrpc
+%files      xmlrpc
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.xmlrpc
 %{_libdir}/kamailio/modules/xmlrpc.so
@@ -1208,14 +1304,34 @@ fi
 %{_libdir}/kamailio/modules/mi_xmlrpc.so
 
 
-%files		xmpp
+%files      xmpp
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.xmpp
 %{_libdir}/kamailio/modules/xmpp.so
 
 
+%files          uuid
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.uuid
+%{_libdir}/kamailio/modules/uuid.so
+
 
 %changelog
+* Fri Nov 04 2016 Marcel Weinberg <marcel@ng-voice.com>
+  - Updated to Kamailio version 5.0 and CentOS / RHEL 7.2
+  - added new modules available with Kamailio 5.x 
+    - cfgt
+    - crypto
+    - http_client
+    - log_custom
+    - smsops
+    - statsc
+    - topos
+  - removed dialog_ng references and added ims_dialog to replace dialog_ng
+  - removed java module which requires libgcj 
+    - libgcj is no longer supported by RHEL / CentOS (Version >= 7)
+    - it's recommended to replace libgcj as dependency
+  - added the ims_registrar_pcscf module 
 * Tue Dec 3 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
   - Updated version to 4.2.0
 * Mon Oct 7 2013 Peter Dunkley <peter.dunkley@crocodilertc.net>
@@ -1280,3 +1396,4 @@ fi
 * Mon Jun 18 2012 Peter Dunkley <peter.dunkley@crocodilertc.net>
   - Consolidating changelog for 3.3.0 into a single entry...
   - See revision control for details this far back
+

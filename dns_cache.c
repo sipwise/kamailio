@@ -347,6 +347,9 @@ int init_dns_cache()
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
+
+	*dns_cache_mem_used=0;
+
 #ifdef DNS_LU_LST
 	dns_last_used_lst=shm_malloc(sizeof(*dns_last_used_lst));
 	if (dns_last_used_lst==0){
@@ -594,8 +597,10 @@ again:
 			cname_chain++;
 			cname.s=((struct cname_rdata*)e->rr_lst->rdata)->name;
 			cname.len= ((struct cname_rdata*)e->rr_lst->rdata)->name_len;
-			name=&cname;
-			goto again;
+			if(cname.s!=NULL && cname.len>0) {
+				name=&cname;
+				goto again;
+			}
 		}
 	}
 	return ret;
@@ -2362,6 +2367,7 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
 	int af, len;
 	struct dns_rr* rr;
 	unsigned char rr_no;
+	unsigned char *ip;
 	ticks_t now;
 	int i;
 
@@ -2389,7 +2395,15 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
 	for(i=0; rr && (i<DNS_HE_MAX_ADDR); i++,
 							rr=dns_entry_get_rr(e, &rr_no, now)){
 				p_addr[i]=&address[i*len];
-				memcpy(p_addr[i], ((struct a_rdata*)rr->rdata)->ip, len);
+				switch(e->type){
+					case T_A:
+						ip = ((struct a_rdata*)rr->rdata)->ip;
+						break;
+					case T_AAAA:
+						ip = ((struct aaaa_rdata*)rr->rdata)->ip6;
+						break;
+				}
+				memcpy(p_addr[i], ip, len);
 	}
 	if (i==0){
 		LM_DBG("no good records found (%d) for %.*s (%d)\n",

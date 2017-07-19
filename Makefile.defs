@@ -101,7 +101,7 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 # version number
 VERSION = 4
 PATCHLEVEL = 4
-SUBLEVEL = 5
+SUBLEVEL = 6
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
@@ -304,6 +304,8 @@ sparc64_macros= __sparcv9 __sparc_v9__
 arm_macros= __arm__ __thumb__
 arm6_macros= __ARM_ARCH_6__
 
+aarch64_macros= __aarch64__
+
 ppc_macros= __powerpc __powerpc__ __POWERPC__ __ppc__ _ARCH_PPC
 ppc64_macros= __ppc64__ _ARCH_PPC64
 
@@ -368,6 +370,12 @@ ARCH:=$(CC_ARCH)
 else
 ARCH:=$(HOST_ARCH)
 endif
+
+# retarget amd64 to x86_64
+ifeq ($(ARCH), amd64)
+	override ARCH=x86_64
+endif
+
 $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
 
 LIBDIR ?=
@@ -800,6 +808,11 @@ endif
 ifeq ($(ARCH), arm6)
 	use_fast_lock=yes
 	C_DEFS+=-DNOSMP # very unlikely to have an smp arm
+endif
+
+ifeq ($(ARCH), aarch64)
+	use_fast_lock=yes
+	C_DEFS+=-DNOSMP
 endif
 
 ifeq ($(ARCH), ppc)
@@ -1835,7 +1848,7 @@ ifeq  ($(OS), solaris)
 		#LDFLAGS=-g $(PROFILE)
 		#MOD_LDFLAGS=-g -G
 	endif
-	YACC=yacc
+	#YACC=yacc
 
 ifeq ($(CC_NAME), suncc)
 	LIBS= -ldl -lresolv
