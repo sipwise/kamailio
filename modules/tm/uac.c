@@ -88,7 +88,7 @@ int uac_init(void)
 	}
 
 	/* calculate the initial From tag */
-	src[0].s = "Long live SER server";
+	src[0].s = "Long live " NAME " server";
 	src[0].len = strlen(src[0].s);
 	src[1].s = si->address_str.s;
 	src[1].len = strlen(src[1].s);
@@ -426,7 +426,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 
 					LM_DBG("apply new updates with Via to sip msg\n");
 					buf1 = build_req_buf_from_sip_req(&lreq,
-							(unsigned int*)&buf_len1, &dst, BUILD_IN_SHM);
+							(unsigned int*)&buf_len1, &request->dst, BUILD_IN_SHM);
 					if (likely(buf1)){
 						shm_free(buf);
 						buf = buf1;

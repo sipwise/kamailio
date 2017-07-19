@@ -2839,7 +2839,7 @@ static int rve_can_optimize_str(struct rval_expr* rve)
 		return 0;
 	if (rve->op == RVE_RVAL_OP)
 		return 0;
-	LM_DBG("left %d, right %d\n", 
+	LM_DBG("left %d, right %d\n",
 			rve->left.rve->op, rve->right.rve?rve->right.rve->op:0);
 	if (rve->left.rve->op != RVE_RVAL_OP)
 		return 0;
@@ -2848,7 +2848,7 @@ static int rve_can_optimize_str(struct rval_expr* rve)
 	if (rve->right.rve){
 		if  (rve->right.rve->op != RVE_RVAL_OP)
 			return 0;
-		if ((rve->right.rve->left.rval.type!=RV_STR) && 
+		if ((rve->right.rve->left.rval.type!=RV_STR) &&
 				(rve->right.rve->left.rval.type!=RV_INT))
 			return 0;
 	}
@@ -2858,7 +2858,7 @@ static int rve_can_optimize_str(struct rval_expr* rve)
 
 
 
-static int fix_rval(struct rvalue* rv)
+static int fix_rval(struct rvalue* rv, struct rval_expr* rve)
 {
 	LM_DBG("RV fixing type %d\n", rv->type);
 	switch(rv->type){
@@ -2876,8 +2876,13 @@ static int fix_rval(struct rvalue* rv)
 			return fix_actions(rv->v.action);
 		case RV_SEL:
 			if (resolve_select(&rv->v.sel)<0){
-				ERR("Unable to resolve select\n");
-				print_select(&rv->v.sel);
+				if(rve==NULL) {
+					ERR("Unable to resolve select\n");
+				} else {
+					ERR("Unable to resolve select in cfg at line: %d col: %d\n",
+							rve->fpos.s_line, rve->fpos.s_col);
+				}
+				err_select(&rv->v.sel);
 			}
 			return 0;
 		case RV_AVP:
@@ -3786,15 +3791,17 @@ int fix_rval_expr(void* p)
 {
 	struct rval_expr* rve;
 	int ret;
-	
+
 	rve=(struct rval_expr*)p;
-	
+
 	switch(rve->op){
 		case RVE_NONE_OP:
 			BUG("empty rval expr\n");
 			break;
 		case RVE_RVAL_OP:
-			return fix_rval(&rve->left.rval);
+			ret = fix_rval(&rve->left.rval, rve);
+			if (ret<0) goto error;
+			return ret;
 		case RVE_UMINUS_OP: /* unary operators */
 		case RVE_BOOL_OP:
 		case RVE_LNOT_OP:
@@ -3806,7 +3813,7 @@ int fix_rval_expr(void* p)
 		case RVE_INT_OP:
 		case RVE_STR_OP:
 			ret=fix_rval_expr((void*)rve->left.rve);
-			if (ret<0) return ret;
+			if (ret<0) goto error;
 			break;
 		case RVE_MUL_OP:
 		case RVE_DIV_OP:
@@ -3833,18 +3840,24 @@ int fix_rval_expr(void* p)
 		case RVE_STRDIFF_OP:
 		case RVE_CONCAT_OP:
 			ret=fix_rval_expr((void*)rve->left.rve);
-			if (ret<0) return ret;
+			if (ret<0) goto error;
 			ret=fix_rval_expr((void*)rve->right.rve);
-			if (ret<0) return ret;
+			if (ret<0) goto error;
 			break;
 		case RVE_MATCH_OP:
 			ret=fix_match_rve(rve);
-			if (ret<0) return ret;
+			if (ret<0) goto error;
 			break;
 		default:
-			BUG("unsupported op type %d\n", rve->op);
+			BUG("unsupported op type %d (cfg line: %d col: %d)\n", rve->op,
+					rve->fpos.s_line, rve->fpos.s_col);
 	}
 	/* try to optimize */
 	rve_optimize(rve);
 	return 0;
+
+error:
+	LM_ERR("failure in cfg at line: %d col: %d\n",
+			rve->fpos.s_line, rve->fpos.s_col);
+	return ret;
 }
