@@ -1,3 +1,10 @@
+ngcp-kamailio (4.4.6-1+0~mr5.5.0.0) unstable; urgency=medium
+
+  * [78c035c] New upstream version 4.4.6
+  * [8fb71b4] TT#18950 remove already applied patches from 4.4 branch
+
+ -- Victor Seva <vseva@sipwise.com>  Wed, 19 Jul 2017 09:25:54 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr5.5.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
