@@ -10,8 +10,6 @@ Subject: [PATCH] tm: deep cloning of the request for fake environment
  modules/tm/t_suspend.c         | 24 ++++++-----
  4 files changed, 86 insertions(+), 64 deletions(-)
 
-diff --git a/modules/tm/t_append_branches.c b/modules/tm/t_append_branches.c
-index f745e755d..96cd40f78 100644
 --- a/modules/tm/t_append_branches.c
 +++ b/modules/tm/t_append_branches.c
 @@ -49,8 +49,9 @@
@@ -99,8 +97,6 @@ index f745e755d..96cd40f78 100644
  	
  	if (likely(replies_locked)) {
  		replies_locked = 0;
-diff --git a/modules/tm/t_reply.c b/modules/tm/t_reply.c
-index cf56de701..c407ec9a7 100644
 --- a/modules/tm/t_reply.c
 +++ b/modules/tm/t_reply.c
 @@ -70,6 +70,7 @@
@@ -111,7 +107,7 @@ index cf56de701..c407ec9a7 100644
  #include "../../sr_compat.h"
  #include "../../receive.h"
  #include "../../onsend.h"
-@@ -843,17 +844,20 @@ int fake_req_clone_str_helper(str *src, str *dst, char *txt)
+@@ -843,17 +844,20 @@ int fake_req_clone_str_helper(str *src,
  }
  
  /**
@@ -168,7 +164,7 @@ index cf56de701..c407ec9a7 100644
  
  	reset_new_uri(faked_req);
  	reset_dst_uri(faked_req);
-@@ -916,9 +923,8 @@ void free_faked_req(struct sip_msg *faked_req, struct cell *t)
+@@ -916,9 +923,8 @@ void free_faked_req(struct sip_msg *fake
  	/* free header's parsed structures that were added by failure handlers */
  	for( hdr=faked_req->headers ; hdr ; hdr=hdr->next ) {
  		if ( hdr->parsed && hdr_allocs_parse(hdr) &&
@@ -180,7 +176,7 @@ index cf56de701..c407ec9a7 100644
  			 * chunck -> it was added by failure funcs.-> free it as pkg */
  			DBG("DBG:free_faked_req: removing hdr->parsed %d\n",
  					hdr->type);
-@@ -939,14 +945,17 @@ void free_faked_req(struct sip_msg *faked_req, struct cell *t)
+@@ -939,14 +945,17 @@ void free_faked_req(struct sip_msg *fake
  	reset_ruid(faked_req);
  	reset_ua(faked_req);
  	msg_ldata_reset(faked_req);
@@ -200,7 +196,7 @@ index cf56de701..c407ec9a7 100644
  	struct sip_msg *shmem_msg = t->uas.request;
  	int on_failure;
  
-@@ -967,16 +976,18 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
+@@ -967,16 +976,18 @@ int run_failure_handlers(struct cell *t,
  		return 1;
  	}
  
@@ -222,7 +218,7 @@ index cf56de701..c407ec9a7 100644
  	}
  	if (on_failure) {
  		/* avoid recursion -- if failure_route forwards, and does not
-@@ -985,22 +996,23 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
+@@ -985,22 +996,23 @@ int run_failure_handlers(struct cell *t,
  		t->on_failure=0;
  		/* if continuing on timeout of a suspended transaction, reset the flag */
  		t->flags &= ~T_ASYNC_SUSPENDED;
@@ -254,7 +250,7 @@ index cf56de701..c407ec9a7 100644
  	return 1;
  }
  
-@@ -1009,7 +1021,8 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
+@@ -1009,7 +1021,8 @@ int run_failure_handlers(struct cell *t,
  int run_branch_failure_handlers(struct cell *t, struct sip_msg *rpl,
  					int code, int extra_flags)
  {
@@ -264,7 +260,7 @@ index cf56de701..c407ec9a7 100644
  	struct sip_msg *shmem_msg = t->uas.request;
  	int on_branch_failure;
  
-@@ -1030,37 +1043,40 @@ int run_branch_failure_handlers(struct cell *t, struct sip_msg *rpl,
+@@ -1030,37 +1043,40 @@ int run_branch_failure_handlers(struct c
  		return 1;
  	}
  
@@ -316,8 +312,6 @@ index cf56de701..c407ec9a7 100644
  	return 1;
  }
  
-diff --git a/modules/tm/t_reply.h b/modules/tm/t_reply.h
-index 91b2ac839..af99187e7 100644
 --- a/modules/tm/t_reply.h
 +++ b/modules/tm/t_reply.h
 @@ -227,10 +227,10 @@ void t_drop_replies(int v);
@@ -334,11 +328,9 @@ index 91b2ac839..af99187e7 100644
  
  typedef int (*tget_picked_f)(void);
  int t_get_picked_branch(void);
-diff --git a/modules/tm/t_suspend.c b/modules/tm/t_suspend.c
-index 6bb25473b..27f54569a 100644
 --- a/modules/tm/t_suspend.c
 +++ b/modules/tm/t_suspend.c
-@@ -166,7 +166,8 @@ int t_continue(unsigned int hash_index, unsigned int label,
+@@ -167,7 +167,8 @@ int t_continue(unsigned int hash_index,
  		struct action *route)
  {
  	struct cell	*t;
@@ -348,7 +340,7 @@ index 6bb25473b..27f54569a 100644
  	struct cancel_info cancel_data;
  	int	branch;
  	struct ua_client *uac =NULL;
-@@ -267,31 +268,34 @@ int t_continue(unsigned int hash_index, unsigned int label,
+@@ -268,31 +269,34 @@ int t_continue(unsigned int hash_index,
  		 */
  
  		/* fake the request and the environment, like in failure_route */
@@ -392,6 +384,3 @@ index 6bb25473b..27f54569a 100644
  
  		if (t->uas.status < 200) {
  			/* No final reply has been sent yet.
--- 
-2.11.0
-

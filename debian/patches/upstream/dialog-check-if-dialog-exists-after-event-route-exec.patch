@@ -9,11 +9,9 @@ Subject: [PATCH] dialog: check if dialog exists after event route execution
  modules/dialog/dlg_handlers.c | 27 ++++++++++++++++++++-------
  1 file changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/modules/dialog/dlg_handlers.c b/modules/dialog/dlg_handlers.c
-index 539d248e0..2eb36f502 100644
 --- a/modules/dialog/dlg_handlers.c
 +++ b/modules/dialog/dlg_handlers.c
-@@ -1226,12 +1226,14 @@ dlg_cell_t *dlg_get_msg_dialog(sip_msg_t *msg)
+@@ -1179,12 +1179,14 @@ dlg_cell_t *dlg_get_msg_dialog(sip_msg_t
   */
  void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
  {
@@ -33,7 +31,7 @@ index 539d248e0..2eb36f502 100644
  
  	dlg = dlg_get_ctx_dialog();
  	if (dlg!=NULL) {
-@@ -1321,8 +1323,10 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
+@@ -1274,8 +1276,10 @@ void dlg_onroute(struct sip_msg* req, st
  
      /* set current dialog - re-use ref increment from dlg_get() above */
      set_current_dialog( req, dlg);
@@ -46,9 +44,9 @@ index 539d248e0..2eb36f502 100644
  
  	if(dlg->iflags & DLG_IFLAG_CSEQ_DIFF) {
  		if(dlg_cseq_refresh(req, dlg, dir)<0) {
-@@ -1364,6 +1368,15 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
- 
- 	dlg_run_event_route(dlg, req, old_state, new_state);
+@@ -1320,6 +1324,15 @@ void dlg_onroute(struct sip_msg* req, st
+ 		return;
+ 	}
  
 +	dlg0 = dlg_lookup(h_entry, h_id);
 +	if (dlg0==0) {
@@ -62,6 +60,3 @@ index 539d248e0..2eb36f502 100644
  	/* delay deletion of dialog until transaction has died off in order
  	 * to absorb in-air messages */
  	if (new_state==DLG_STATE_DELETED && old_state!=DLG_STATE_DELETED) {
--- 
-2.11.0
-

@@ -17,8 +17,6 @@ See #782
  utils/kamctl/xhttp_pi/sca-table                     | 1 +
  11 files changed, 25 insertions(+), 13 deletions(-)
 
-diff --git a/utils/kamctl/db_berkeley/kamailio/sca_subscriptions b/utils/kamctl/db_berkeley/kamailio/sca_subscriptions
-index e95bce3..ee7f41a 100644
 --- a/utils/kamctl/db_berkeley/kamailio/sca_subscriptions
 +++ b/utils/kamctl/db_berkeley/kamailio/sca_subscriptions
 @@ -1,5 +1,5 @@
@@ -34,8 +32,6 @@ index e95bce3..ee7f41a 100644
  METADATA_DEFAULTS
 -NIL|NIL|NIL|0|0|0|0|NIL|NIL|NIL|NIL|NIL|NIL
 +NIL|NIL|NIL|0|0|0|0|NIL|NIL|NIL|NIL|NIL|NIL|0
-diff --git a/utils/kamctl/db_berkeley/kamailio/version b/utils/kamctl/db_berkeley/kamailio/version
-index 65f1371..f76e5ed 100644
 --- a/utils/kamctl/db_berkeley/kamailio/version
 +++ b/utils/kamctl/db_berkeley/kamailio/version
 @@ -107,7 +107,7 @@ rtpengine|1
@@ -47,8 +43,6 @@ index 65f1371..f76e5ed 100644
  silo|
  silo|8
  sip_trace|
-diff --git a/utils/kamctl/db_sqlite/sca-create.sql b/utils/kamctl/db_sqlite/sca-create.sql
-index 67cefaa..09e98e6 100644
 --- a/utils/kamctl/db_sqlite/sca-create.sql
 +++ b/utils/kamctl/db_sqlite/sca-create.sql
 @@ -12,11 +12,12 @@ CREATE TABLE sca_subscriptions (
@@ -66,15 +60,11 @@ index 67cefaa..09e98e6 100644
 -INSERT INTO version (table_name, table_version) values ('sca_subscriptions','1');
 +INSERT INTO version (table_name, table_version) values ('sca_subscriptions','2');
  
-diff --git a/utils/kamctl/dbtext/kamailio/sca_subscriptions b/utils/kamctl/dbtext/kamailio/sca_subscriptions
-index b953d2a..d175560 100644
 --- a/utils/kamctl/dbtext/kamailio/sca_subscriptions
 +++ b/utils/kamctl/dbtext/kamailio/sca_subscriptions
 @@ -1 +1 @@
 -id(int,auto) subscriber(string) aor(string) event(int) expires(int) state(int) app_idx(int) call_id(string) from_tag(string) to_tag(string) record_route(string,null) notify_cseq(int) subscribe_cseq(int) 
 +id(int,auto) subscriber(string) aor(string) event(int) expires(int) state(int) app_idx(int) call_id(string) from_tag(string) to_tag(string) record_route(string,null) notify_cseq(int) subscribe_cseq(int) server_id(int) 
-diff --git a/utils/kamctl/dbtext/kamailio/version b/utils/kamctl/dbtext/kamailio/version
-index eb3f135..5a26e5b 100644
 --- a/utils/kamctl/dbtext/kamailio/version
 +++ b/utils/kamctl/dbtext/kamailio/version
 @@ -48,7 +48,7 @@ rls_presentity:1
@@ -86,8 +76,6 @@ index eb3f135..5a26e5b 100644
  silo:8
  sip_trace:4
  speed_dial:2
-diff --git a/utils/kamctl/mysql/sca-create.sql b/utils/kamctl/mysql/sca-create.sql
-index 0f46808..3960156 100644
 --- a/utils/kamctl/mysql/sca-create.sql
 +++ b/utils/kamctl/mysql/sca-create.sql
 @@ -12,11 +12,12 @@ CREATE TABLE `sca_subscriptions` (
@@ -105,8 +93,6 @@ index 0f46808..3960156 100644
 -INSERT INTO version (table_name, table_version) values ('sca_subscriptions','1');
 +INSERT INTO version (table_name, table_version) values ('sca_subscriptions','2');
  
-diff --git a/utils/kamctl/oracle/sca-create.sql b/utils/kamctl/oracle/sca-create.sql
-index a91df4f..a9250fc 100644
 --- a/utils/kamctl/oracle/sca-create.sql
 +++ b/utils/kamctl/oracle/sca-create.sql
 @@ -12,6 +12,7 @@ CREATE TABLE sca_subscriptions (
@@ -128,8 +114,6 @@ index a91df4f..a9250fc 100644
 -INSERT INTO version (table_name, table_version) values ('sca_subscriptions','1');
 +INSERT INTO version (table_name, table_version) values ('sca_subscriptions','2');
  
-diff --git a/utils/kamctl/postgres/sca-create.sql b/utils/kamctl/postgres/sca-create.sql
-index dde0283..5792a73 100644
 --- a/utils/kamctl/postgres/sca-create.sql
 +++ b/utils/kamctl/postgres/sca-create.sql
 @@ -12,11 +12,12 @@ CREATE TABLE sca_subscriptions (
@@ -147,11 +131,9 @@ index dde0283..5792a73 100644
 -INSERT INTO version (table_name, table_version) values ('sca_subscriptions','1');
 +INSERT INTO version (table_name, table_version) values ('sca_subscriptions','2');
  
-diff --git a/utils/kamctl/xhttp_pi/pi_framework.xml b/utils/kamctl/xhttp_pi/pi_framework.xml
-index ddf2b2e..6cad290 100644
 --- a/utils/kamctl/xhttp_pi/pi_framework.xml
 +++ b/utils/kamctl/xhttp_pi/pi_framework.xml
-@@ -709,6 +709,7 @@
+@@ -708,6 +708,7 @@
  		<column><field>record_route</field><type>DB1_BLOB</type></column>
  		<column><field>notify_cseq</field><type>DB1_INT</type></column>
  		<column><field>subscribe_cseq</field><type>DB1_INT</type></column>
@@ -159,7 +141,7 @@ index ddf2b2e..6cad290 100644
  	</db_table>
  	<!-- Declaration of sip_trace table-->
  	<db_table id="sip_trace">
-@@ -3701,6 +3702,7 @@
+@@ -3698,6 +3699,7 @@
  				<col><field>record_route</field></col>
  				<col><field>notify_cseq</field></col>
  				<col><field>subscribe_cseq</field></col>
@@ -167,7 +149,7 @@ index ddf2b2e..6cad290 100644
  			</query_cols>
  		</cmd>
  		<cmd><cmd_name>add</cmd_name>
-@@ -3719,6 +3721,7 @@
+@@ -3716,6 +3718,7 @@
  				<col><field>record_route</field></col>
  				<col><field>notify_cseq</field></col>
  				<col><field>subscribe_cseq</field></col>
@@ -175,7 +157,7 @@ index ddf2b2e..6cad290 100644
  			</query_cols>
  		</cmd>
  		<cmd><cmd_name>update</cmd_name>
-@@ -3740,6 +3743,7 @@
+@@ -3737,6 +3740,7 @@
  				<col><field>record_route</field></col>
  				<col><field>notify_cseq</field></col>
  				<col><field>subscribe_cseq</field></col>
@@ -183,8 +165,6 @@ index ddf2b2e..6cad290 100644
  			</query_cols>
  		</cmd>
  		<cmd><cmd_name>delete</cmd_name>
-diff --git a/utils/kamctl/xhttp_pi/sca-mod b/utils/kamctl/xhttp_pi/sca-mod
-index db0b3e2..d774b40 100644
 --- a/utils/kamctl/xhttp_pi/sca-mod
 +++ b/utils/kamctl/xhttp_pi/sca-mod
 @@ -17,6 +17,7 @@
@@ -211,8 +191,6 @@ index db0b3e2..d774b40 100644
  			</query_cols>
  		</cmd>
  		<cmd><cmd_name>delete</cmd_name>
-diff --git a/utils/kamctl/xhttp_pi/sca-table b/utils/kamctl/xhttp_pi/sca-table
-index 4b8ae67..811c309 100644
 --- a/utils/kamctl/xhttp_pi/sca-table
 +++ b/utils/kamctl/xhttp_pi/sca-table
 @@ -15,4 +15,5 @@

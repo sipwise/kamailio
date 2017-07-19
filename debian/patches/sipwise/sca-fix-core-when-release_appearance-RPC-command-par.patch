@@ -20,11 +20,9 @@ Change-Id: Ied94a9872fa41ee5d6432380c549076da2fd6239
  modules/sca/sca_rpc.c | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/modules/sca/sca_rpc.c b/modules/sca/sca_rpc.c
-index 5e6873b..cac8465 100644
 --- a/modules/sca/sca_rpc.c
 +++ b/modules/sca/sca_rpc.c
-@@ -482,6 +482,11 @@ sca_rpc_release_appearance( rpc_t *rpc, void *ctx )
+@@ -487,6 +487,11 @@ sca_rpc_release_appearance( rpc_t *rpc,
  	return;
      }
  
