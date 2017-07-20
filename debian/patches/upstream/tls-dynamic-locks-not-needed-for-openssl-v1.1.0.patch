@@ -1,0 +1,59 @@
+From e7c03ce6ce61119fbf5cb9f41b7abcd4c7138d58 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 28 Jun 2017 10:26:43 +0200
+Subject: [PATCH] tls: dynamic locks not needed for openssl v1.1.0+
+
+- openssl v1.1.0 is thread safe
+- fixes the compile warnings for libssl 1.1.0
+---
+ src/modules/tls/tls_locking.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/modules/tls/tls_locking.c b/modules/tls/tls_locking.c
+index 9d8e8acec..38c028fd2 100644
+--- a/modules/tls/tls_locking.c
++++ b/modules/tls/tls_locking.c
+@@ -32,6 +32,9 @@
+ static int n_static_locks=0;
+ static gen_lock_set_t* static_locks=0;
+ 
++/* OpenSSL is thread-safe since 1.1.0 */
++#if OPENSSL_VERSION_NUMBER < 0x10100000L
++
+ /* "dynamic" locks */
+ 
+ struct CRYPTO_dynlock_value{
+@@ -61,7 +64,6 @@ error:
+ }
+ 
+ 
+-
+ static void dyn_lock_f(int mode, struct CRYPTO_dynlock_value* l,
+ 						const char* file, int line)
+ {
+@@ -116,6 +118,7 @@ static void locking_f(int mode, int n, const char* file, int line)
+ 	}
+ }
+ 
++#endif /* openssl < 0x10100000L (1.1.0) */
+ 
+ 
+ void tls_destroy_locks()
+@@ -163,10 +166,14 @@ int tls_init_locks()
+ 		}
+ 		CRYPTO_set_locking_callback(locking_f);
+ 	}
++
++/* OpenSSL is thread-safe since 1.1.0 */
++#if OPENSSL_VERSION_NUMBER < 0x10100000L
+ 	/* set "dynamic" locks callbacks */
+ 	CRYPTO_set_dynlock_create_callback(dyn_create_f);
+ 	CRYPTO_set_dynlock_lock_callback(dyn_lock_f);
+ 	CRYPTO_set_dynlock_destroy_callback(dyn_destroy_f);
++#endif
+ 
+ 	/* starting with v1.0.0 openssl does not use anymore getpid(), but address
+ 	 * of errno which can point to same virtual address in a multi-process
+-- 
+2.11.0
+

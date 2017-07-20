@@ -5,6 +5,8 @@
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
 upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
+upstream/tls-dynamic-locks-not-needed-for-openssl-v1.1.0.patch
+upstream/tls-updated-tls-version-selection-for-libssl-1.1.0-a.patch
 #
 ##
 no_lib64_on_64_bits.patch
