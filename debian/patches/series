@@ -49,3 +49,4 @@ sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
 sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/rtpengine-mos-stats.patch
+sipwise/presence_dfks.patch
