@@ -1,0 +1,592 @@
+--- a/Makefile.groups
++++ b/Makefile.groups
+@@ -119,7 +119,7 @@ mod_list_presence=presence presence_conf
+ 					   presence_xml \
+ 					   pua pua_bla pua_dialoginfo pua_mi pua_reginfo \
+ 					   pua_usrloc pua_xmpp \
+-					   rls xcap_client xcap_server
++					   rls xcap_client xcap_server presence_dfks
+ 
+ 
+ # - modules depending on lua library
+--- a/modules/pua/add_events.c
++++ b/modules/pua/add_events.c
+@@ -103,6 +103,13 @@ int pua_add_events(void)
+ 		return -1;
+ 	}
+ 
++	if(add_pua_event(DFKS_EVENT, "as-feature-event",
++				"application/x-as-feature-event+xml", dfks_process_body)< 0)
++	{
++		LM_ERR("while adding event as-feature-event\n");
++		return -1;
++	}
++
+ 	return 0;
+ 
+ }	
+@@ -395,5 +402,11 @@ int dlg_process_body(publ_info_t* publ,
+ {
+ 	*fin_body= publ->body;
+ 	return 0;
++}
++
++int dfks_process_body(publ_info_t* publ, str** fin_body, int ver, str** tuple)
++{
++	*fin_body= publ->body;
++	return 0;
+ }
+ 
+--- a/modules/pua/add_events.h
++++ b/modules/pua/add_events.h
+@@ -37,5 +37,6 @@ int bla_process_body (struct publ_info*
+ int mwi_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
+ int dlg_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
+ int reginfo_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
++int dfks_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
+ 
+ #endif
+--- a/modules/pua/hash.h
++++ b/modules/pua/hash.h
+@@ -41,6 +41,7 @@
+ #define DIALOG_EVENT        1<<5
+ #define REGINFO_EVENT       1<<6
+ #define XCAPDIFF_EVENT      1<<7
++#define DFKS_EVENT          1<<8
+ 
+ #define UL_PUBLISH          1<<0
+ #define BLA_PUBLISH         1<<1
+@@ -58,6 +59,8 @@
+ #define REGINFO_SUBSCRIBE   1<<13
+ #define XCAPDIFF_PUBLISH    1<<14
+ #define XCAPDIFF_SUBSCRIBE  1<<15
++#define DFKS_PUBLISH        1<<16
++#define DFKS_SUBSCRIBE      1<<17
+ 
+ #define NO_UPDATEDB_FLAG    1<<0
+ #define UPDATEDB_FLAG       1<<1
+@@ -172,6 +175,10 @@ static inline int get_event_flag(str* ev
+         case 15:
+             if (strncmp(event->s, "message-summary", 15) == 0)
+                 return MSGSUM_EVENT;
++            break;
++        case 16:
++            if (strncmp(event->s, "as-feature-event", 16) == 0)
++                return DFKS_EVENT;
+     }
+ 
+     LM_ERR("Unknown event string\n");
+--- /dev/null
++++ b/modules/presence_dfks/Makefile
+@@ -0,0 +1,30 @@
++#
++# Presence_dfks Makefile
++# 
++# 
++# WARNING: do not run this directly, it should be run by the master Makefile
++
++include ../../Makefile.defs
++auto_gen=
++
++#ifeq ($(CROSS_COMPILE),)
++XML2CFG=$(shell which xml2-config)
++#endif
++
++ifneq ($(XML2CFG),)
++	DEFS += $(shell $(XML2CFG) --cflags )
++	LIBS += $(shell $(XML2CFG) --libs)
++else
++	DEFS+=-I$(LOCALBASE)/include/libxml2 \
++		-I$(LOCALBASE)/include
++	LIBS+=-L$(LOCALBASE)/lib -lxml2
++endif
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE
++
++#SERLIBPATH=../../lib
++#SER_LIBS+=$(SERLIBPATH)/kmi/kmi
++
++NAME=presence_dfks.so
++
++include ../../Makefile.modules
+--- /dev/null
++++ b/modules/presence_dfks/README.md
+@@ -0,0 +1,32 @@
++sip-router-presence_dfks-module
++===============================
++
++sip-router/kamailio module for handling as-feature-event presence messages
++
++This module provide support for 'Device FeatureKey Synchronization', as described in 
++http://community.polycom.com/polycom/attachments/polycom/VoIP/2233/1/DeviceFeatureKeySynchronizationFD.pdf
++This 'protocol' was developed at Broadsoft, and is used in Linksys/Cisco and Polycom phones and probably some other too.
++
++It allows to set up features like dnd (No Not Disturb) and call forwarding using phone interface and have that status
++updated on aplication server/ proxy or otherway, set those features on aplication server using some gui, and have this data
++provisioned on phone.
++For Shared Line Appreance application this let You share status on all phones.
++
++Overview
++------
++
++This module is work in progress, it does not provide much functionality yet.
++Module reuses as much as possible from existing sip-router/kamailio modules, expecially from presence and pua.
++Basicaly module translates body of incoming SUBSCRIBE messages and and sends them as PUBLISH to presence framework,
++which would then propagate NOTIFY messages to watchers. 
++Currently module uses pua module to send PUBLISH, but that dependency is about to be dropped.
++In order to have this working currently pua module needs to be patched.
++Side effect of this is that it is possible to set phone status using pua_mi interface.
++
++
++```sh
++kamctl fifo pua_publish sip:1000@10.10.99.254 3600 as-feature-event application/x-as-feature-event+xml . . . "<?xml version='1.0' encoding='ISO-8859-1'?><DoNotDisturbEvent><device>1000</device><doNotDisturbOn>true</doNotDisturbOn></DoNotDisturbEvent>"
++
++kamctl fifo pua_publish sip:1000@10.10.99.254 3600 as-feature-event application/x-as-feature-event+xml . . . "<?xml version='1.0' encoding='ISO-8859-1'?><ForwardingEvent><device><notKnown/></device><forwardingType>forwardImmediate</forwardingType><forwardStatus>true</forwardStatus><forwardTo>1234</forwardTo></ForwardingEvent>"
++```
++This will be dropped too, a set of internal mi functions is planned and a script function that could preload presence server with phone status using some avp's. Registration route would be a good place for this.
+--- /dev/null
++++ b/modules/presence_dfks/add_events.c
+@@ -0,0 +1,272 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <libxml/parser.h>
++#include "../../parser/parse_content.h"
++#include "../presence/event_list.h"
++#include "../pua/pua.h"
++#include "presence_dfks.h"
++#include "add_events.h"
++
++static str pu_415_rpl  = str_init("Unsupported media type");
++static str unk_dev = str_init("<notKnown/>");
++static str content_type =str_init("application/x-as-feature-event+xml");
++// -4
++static str dnd_xml = str_init("<?xml version='1.0' encoding='ISO-8859-1'?><DoNotDisturbEvent><device>%s</device><doNotDisturbOn>%s</doNotDisturbOn></DoNotDisturbEvent>");
++// -8
++static str fwd_xml = str_init("<?xml version='1.0' encoding='ISO-8859-1'?><ForwardingEvent><device>%s</device><forwardingType>%s</forwardingType><forwardStatus>%s</forwardStatus><forwardTo>%s</forwardTo></ForwardingEvent>");
++
++int dfks_add_events(void)
++{
++	pres_ev_t event;
++	
++	/* constructing message-summary event */
++	memset(&event, 0, sizeof(pres_ev_t));
++	event.name.s = "as-feature-event";
++	event.name.len = 16;
++
++	event.content_type.s = "application/x-as-feature-event+xml";
++	event.content_type.len = 34;
++	event.default_expires= 3600;
++	event.type = PUBL_TYPE;
++	event.req_auth = 0;
++	event.evs_publ_handl = dfks_publ_handler;
++	event.evs_subs_handl = dfks_subs_handler;
++//	event.etag_not_new;
++//	get_rules_doc_t* get_rules_doc;
++//	get_pidf_doc_t* get_pidf_doc;
++//	apply_auth_t*  apply_auth_nbody;
++//	is_allowed_t*  get_auth_status;
++//	agg_nbody_t* agg_nbody;
++//	free_body_t* free_body;
++//	aux_body_processing_t* aux_body_processing;
++//	free_body_t* aux_free_body;
++//	struct pres_ev* wipeer;
++//	struct pres_ev* next;
++
++	if (pres.add_event(&event) < 0) {
++		LM_ERR("failed to add event \"as-feature-event\"\n");
++		return -1;
++	}		
++	return 0;
++}
++
++int dfks_publ_handler(struct sip_msg* msg) {
++	str body= {0, 0};
++	xmlDocPtr doc= NULL;
++
++	LM_ERR("dfks_publ_handl start\n");
++	if ( get_content_length(msg) == 0 )
++		return 1;
++	
++	body.s=get_body(msg);
++	if (body.s== NULL) {
++		LM_ERR("cannot extract body from msg\n");
++		goto error;
++	}
++	/* content-length (if present) must be already parsed */
++
++	body.len = get_content_length( msg );
++	doc= xmlParseMemory( body.s, body.len );
++	if(doc== NULL)
++	{
++		LM_ERR("bad body format\n");
++		if(slb.freply(msg, 415, &pu_415_rpl) < 0)
++		{
++			LM_ERR("while sending '415 Unsupported media type' reply\n");
++		}
++		goto error;
++	}
++	xmlFreeDoc(doc);
++	xmlCleanupParser();
++	xmlMemoryDump();
++	return 1;
++
++error:
++	xmlFreeDoc(doc);
++	xmlCleanupParser();
++	xmlMemoryDump();
++	return -1;
++}
++int dfks_subs_handler(struct sip_msg* msg) {
++	str body= {0, 0};
++	xmlDocPtr doc= NULL;
++	xmlNodePtr top_elem= NULL;
++	xmlNodePtr param = NULL;
++	char *dndact=NULL,*fwdact=NULL,*fwdtype=NULL,*fwdDN=NULL,*device=NULL;
++	publ_info_t publ;
++	str pres_uri;
++	char id_buf[512];
++	int id_buf_len;
++
++
++
++
++	LM_ERR("dfks_subs_handl start\n");
++	pres_uri.s = msg->first_line.u.request.uri.s;
++	pres_uri.len = msg->first_line.u.request.uri.len;
++
++	if ( get_content_length(msg) == 0 ){
++		LM_ERR("no body. (ok for initial)\n");
++		return 1;
++	}
++	body.s=get_body(msg);
++	if (body.s== NULL)
++	{
++		LM_ERR("cannot extract body from msg\n");
++		goto error;
++	}
++	/* content-length (if present) must be already parsed */
++
++	body.len = get_content_length( msg );
++	doc=xmlParseMemory( body.s, body.len );
++	if(doc== NULL)
++	{
++		LM_ERR("bad body format\n");
++		if(slb.freply(msg, 415, &pu_415_rpl) < 0)
++		{
++			LM_ERR("while sending '415 Unsupported media type' reply\n");
++		}
++		goto error;
++	}
++	top_elem=libxml_api.xmlDocGetNodeByName(doc, "SetDoNotDisturb", NULL);
++	if(top_elem != NULL) {
++		LM_ERR(" got SetDoNotDisturb\n");
++		param = libxml_api.xmlNodeGetNodeByName(top_elem, "doNotDisturbOn", NULL);
++		if(param!= NULL) {
++			dndact= (char*)xmlNodeGetContent(param);
++			if(dndact== NULL)  {
++				LM_ERR("while extracting value from 'doNotDisturbOn' in 'SetDoNotDisturb'\n");
++				goto error;
++			}
++			LM_ERR("got 'doNotDisturbOn'=%s in 'SetDoNotDisturb'\n",dndact);
++		}
++		param = libxml_api.xmlNodeGetNodeByName(top_elem, "device", NULL);
++		if(param!= NULL) {
++			device= (char*)xmlNodeGetContent(param);
++			if(device== NULL)  {
++				LM_ERR("while extracting value from 'device' in 'SetDoNotDisturb'\n");
++				goto error;
++			}
++			if (strlen(device)==0)
++			    device=unk_dev.s;
++			LM_ERR("got 'device'=%s in 'SetDoNotDisturb'\n",device);
++		}
++		body.len=dnd_xml.len -4 +strlen(dndact)+strlen(device);
++		body.s=pkg_malloc(body.len+1);
++		if(body.s== NULL)  {
++			LM_ERR("while extracting allocating body for publish in 'SetDoNotDisturb'\n");
++			goto error;
++		}
++		sprintf(body.s,dnd_xml.s,device,dndact);
++		LM_ERR("body for dnd publish is %d, %s\n",body.len,body.s);
++		memset(&publ, 0, sizeof(publ_info_t));
++		publ.pres_uri = &pres_uri;
++		publ.body = &body;
++		id_buf_len = snprintf(id_buf, sizeof(id_buf), "dfks_PUBLISH.%.*s",
++			pres_uri.len, pres_uri.s);
++		LM_ERR("ID = %.*s\n",id_buf_len,id_buf);
++		publ.id.s = id_buf;
++		publ.id.len = id_buf_len;
++		publ.content_type = content_type;
++		publ.expires = 3600;
++		
++		/* make UPDATE_TYPE, as if this "publish dialog" is not found.
++		   by pua it will fallback to INSERT_TYPE anyway */
++		publ.flag|= INSERT_TYPE;
++		publ.source_flag |= DFKS_PUBLISH;
++		publ.event |= DFKS_EVENT;
++		publ.extra_headers= NULL;
++
++		if(pua.send_publish(&publ) < 0) {
++			LM_ERR("error while sending publish\n");
++			pkg_free(body.s);
++			goto error;
++		}
++		pkg_free(body.s);
++	}
++	top_elem=libxml_api.xmlDocGetNodeByName(doc, "SetForwarding", NULL);
++	if(top_elem != NULL) {
++		LM_ERR(" got SetForwarding\n");
++		param = libxml_api.xmlNodeGetNodeByName(top_elem, "forwardDN", NULL);
++		if(param!= NULL) {
++			fwdDN= (char*)xmlNodeGetContent(param);
++			if(fwdDN== NULL) {
++				LM_ERR("while extracting value from 'forwardDN' in 'SetForwarding'\n");
++				goto error;
++			}
++			LM_ERR("got 'forwardDN'=%s in 'SetForwarding'\n",fwdDN);
++		}
++		param = libxml_api.xmlNodeGetNodeByName(top_elem, "forwardingType", NULL);
++		if(param!= NULL) {
++			fwdtype= (char*)xmlNodeGetContent(param);
++			if(fwdtype== NULL) {
++				LM_ERR("while extracting value from 'forwardingType' in 'SetForwarding'\n");
++				goto error;
++			}
++			LM_ERR("got 'forwardingType'=%s in 'SetForwarding'\n",fwdtype);
++		}
++		param = libxml_api.xmlNodeGetNodeByName(top_elem, "activateForward", NULL);
++		if(param!= NULL) {
++			fwdact= (char*)xmlNodeGetContent(param);
++			if(fwdact== NULL) {
++				LM_ERR("while extracting value from 'activateForward' in 'SetForwarding'\n");
++				goto error;
++			}
++			LM_ERR("got 'activateForward'=%s in 'SetForwarding'\n",fwdact);
++		}
++		param = libxml_api.xmlNodeGetNodeByName(top_elem, "device", NULL);
++		if(param!= NULL) {
++			device= (char*)xmlNodeGetContent(param);
++			if(device== NULL)  {
++				LM_ERR("while extracting value from 'device' in 'SetForwarding'\n");
++				goto error;
++			}
++			LM_ERR("got 'device'=%s in 'SetDoNotDisturb'\n",device);
++		}
++		body.len=fwd_xml.len -8 + strlen(device) + strlen(device) +strlen(fwdtype) + strlen(fwdact) +strlen(fwdDN);
++		body.s=pkg_malloc(body.len+1);
++		if(body.s== NULL)  {
++			LM_ERR("while extracting allocating body for publish in 'SetForwarding'\n");
++			goto error;
++		}
++		sprintf(body.s,fwd_xml.s,device,fwdtype,fwdact,fwdDN);
++		LM_ERR("body for dnd publish is %d %s\n",body.len,body.s);
++		memset(&publ, 0, sizeof(publ_info_t));
++		publ.pres_uri = &pres_uri;
++		publ.body = &body;
++		id_buf_len = snprintf(id_buf, sizeof(id_buf), "DFKS_PUBLISH.%.*s",
++			pres_uri.len, pres_uri.s);
++		LM_ERR("ID = %.*s\n",id_buf_len,id_buf);
++		publ.id.s = id_buf;
++		publ.id.len = id_buf_len;
++		publ.content_type = content_type;
++		publ.expires = 3600;
++		
++		/* make UPDATE_TYPE, as if this "publish dialog" is not found.
++		   by pua it will fallback to INSERT_TYPE anyway */
++		publ.flag|= INSERT_TYPE;
++		publ.source_flag |= DFKS_PUBLISH;
++		publ.event |= DFKS_EVENT;
++		publ.extra_headers= NULL;
++
++		if(pua.send_publish(&publ) < 0) {
++			LM_ERR("error while sending publish\n");
++			pkg_free(body.s);
++			goto error;
++		}
++		pkg_free(body.s);
++	}
++
++	xmlFreeDoc(doc);
++	xmlCleanupParser();
++	xmlMemoryDump();
++	return 1;
++
++error:
++	xmlFreeDoc(doc);
++	xmlCleanupParser();
++	xmlMemoryDump();
++	return -1;
++
++}
+--- /dev/null
++++ b/modules/presence_dfks/add_events.h
+@@ -0,0 +1,7 @@
++#ifndef _DFKS_ADD_EV_H_
++#define _DFKS_ADD_EV_H_
++
++int dfks_add_events(void);
++int	dfks_publ_handler(struct sip_msg* msg);
++int	dfks_subs_handler(struct sip_msg* msg);
++#endif
+--- /dev/null
++++ b/modules/presence_dfks/presence_dfks.c
+@@ -0,0 +1,137 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#include "../../sr_module.h"
++#include "../../dprint.h"
++#include "../../str.h"
++#include "../../parser/msg_parser.h"
++#include "../../mem/mem.h"
++#include "../presence/bind_presence.h"
++#include "add_events.h"
++#include "presence_dfks.h"
++
++MODULE_VERSION
++
++/* module functions */
++static int mod_init(void);
++
++/** SL API structure */
++sl_api_t slb;
++/* TM functions */
++struct tm_binds tmb;
++
++/** Presence API structure */
++presence_api_t pres;
++
++pua_api_t pua;
++
++libxml_api_t libxml_api;
++
++str outbound_proxy = {0, 0};
++char* dnd_param = 0;
++
++static param_export_t params[]={
++	{"outbound_proxy",           STR_PARAM, &outbound_proxy.s},
++	{"dnd_param",		STR_PARAM, &dnd_param},
++	{0,                          0,         0}
++};
++static mi_export_t mi_cmds[] = {
++//	{ "set_feature",	mi_set,		0,  0,  mi_child_init},
++	{ 0,			0,			0,  0,  0}
++};
++
++
++/* module exports */
++struct module_exports exports= {
++    "presence_dfks",	/* module name */
++    DEFAULT_DLFLAGS,	/* dlopen flags */
++    0,			/* exported functions */
++    params,		/* exported parameters */
++    0,			/* exported statistics */
++    mi_cmds,			/* exported MI functions */
++    0,			/* exported pseudo-variables */
++    0,			/* extra processes */
++    mod_init,		/* module initialization function */
++    0,			/* response handling function */
++    0,			/* destroy function */
++    0			/* per-child init function */
++};
++
++/*
++ * init module function
++ */
++static int mod_init(void)
++{
++	bind_presence_t bind_presence;
++	load_tm_f  load_tm;
++	bind_pua_t bind_pua;
++	bind_libxml_t bind_libxml;
++
++	/* bind the SL API */
++	if (sl_load_api(&slb)!=0) {
++		LM_ERR("cannot bind to SL API\n");
++		return -1;
++	}
++	/* import the TM auto-loading function */
++	if((load_tm=(load_tm_f)find_export("load_tm", NO_SCRIPT, 0))==NULL) {
++		LM_ERR("can't import load_tm\n");
++		return -1;
++	}
++	/* load all TM stuff */
++	if(load_tm_api(&tmb)==-1) {
++		LM_ERR("can't load tm functions\n");
++		return -1;
++	}
++
++	bind_presence= (bind_presence_t)find_export("bind_presence", 1,0);
++	if (!bind_presence) {
++		LM_ERR("can't bind presence\n");
++		return -1;
++	}
++	if (bind_presence(&pres) < 0) {
++		LM_ERR("can't bind presence\n");
++		return -1;
++	}
++
++	if (pres.add_event == NULL) {
++		LM_ERR("could not import add_event\n");
++		return -1;
++	}
++	bind_pua= (bind_pua_t)find_export("bind_pua", 1,0);
++	if (!bind_pua) {
++		LM_ERR("Can't bind pua\n");
++		return -1;
++	}
++	if (bind_pua(&pua) < 0) {
++		LM_ERR("mod_init Can't bind pua\n");
++		return -1;
++	}
++
++	/* bind libxml wrapper functions */
++	if((bind_libxml= (bind_libxml_t)find_export("bind_libxml_api", 1, 0))== NULL) {
++		LM_ERR("can't import bind_libxml_api\n");
++		return -1;
++	}
++	if(bind_libxml(&libxml_api)< 0) {
++		LM_ERR("can not bind libxml api\n");
++		return -1;
++	}
++	if(libxml_api.xmlNodeGetNodeByName==NULL) {
++		LM_ERR("can not bind libxml api\n");
++		return -1;
++	}
++
++
++	if(dfks_add_events() < 0) {
++		LM_ERR("failed to add as-feature-event events\n");
++		return -1;
++	}
++
++	outbound_proxy.len = outbound_proxy.s ? strlen(outbound_proxy.s) : 0;
++
++	return 0;
++}
+--- /dev/null
++++ b/modules/presence_dfks/presence_dfks.h
+@@ -0,0 +1,18 @@
++#ifndef _PRES_DFKS_H_
++#define _PRES_DFKS_H_
++#include "../../modules/sl/sl.h"
++
++#include "../presence/bind_presence.h"
++#include "../pua/pua_bind.h"
++#include "../pua/pidf.h"
++
++extern add_event_t pres_add_event;
++extern sl_api_t slb;
++extern pua_api_t pua;
++extern struct tm_binds tmb;
++extern presence_api_t pres;
++extern pua_api_t pua;
++extern libxml_api_t libxml_api;
++extern str outbound_proxy;
++
++#endif
