@@ -1,0 +1,38 @@
+Description: Explicitly call OPENSSL_cleanup() on TLS module destruction
+ Kamailio is a threaded program, and it pulls OpenSSL via a dynamically
+ linked plugin loaded at run-time via dlopen().
+ .
+ Older OpenSSL releases do not perform automatic cleanup on exit, newer ones
+ do via an atexit() handler.
+ .
+ In addition the OpenSSL code leaks (on purpose) a DSO handler for itself so
+ that it can guarantee that the library is still present when the atexit()
+ handler is executed.
+ .
+ When the handler is called, a pthreads variable is still present but the
+ memory it points to is not allocated anymore, which indicates something else
+ released those pthreads pools. Most probably pthreads itself as part of its
+ deconstructors, pthread_exit() or atexit() handlers while unwinding or
+ being unloaded.
+ .
+ While that might be a bug that might need to be tracked independently,
+ explicitly calling the OpenSSL cleanup code fixes the issue for newer
+ OpenSSL releases. And the documentation for OPENSSL_cleanup() mentions
+ that explicit cleanup might be needed in these conditions anyway.
+Origin: other, Sipwise
+Author: Guillem Jover <gjover@sipwise.com>
+Bug-Debian: https://bugs.debian.org/870018
+
+---
+
+--- a/modules/tls/tls_init.c
++++ b/modules/tls/tls_init.c
+@@ -778,4 +778,8 @@ void destroy_tls_h(void)
+ 	tls_destroy_cfg();
+ 	tls_destroy_locks();
+ 	tls_ct_wq_destroy();
++
++#if OPENSSL_VERSION_NUMBER >= 0x010100000L
++	OPENSSL_cleanup();
++#endif
+ }
