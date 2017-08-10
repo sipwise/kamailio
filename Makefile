@@ -139,6 +139,8 @@ endif
 main_makefile=1
 include Makefile.defs
 
+$(MAIN_NAME): LDFLAGS += -Wl,--export-dynamic
+
 static_modules_path=$(addprefix modules/, $(static_modules))
 extra_sources=$(wildcard $(addsuffix /*.c, $(static_modules_path)))
 extra_objs=$(extra_sources:.c=.o)
@@ -645,7 +647,7 @@ sunpkg:
 
 .PHONY: install
 install: mk_params="compile_for_install=yes"
-install: install-bin install-every-module install-cfg \
+install: install-bin install-every-module  \
 	install-doc install-man install-utils install-share
 
 .PHONY: dbinstall
@@ -839,8 +841,6 @@ install-modules-all: install-every-module install-every-module-doc
 
 
 install-doc: $(doc_prefix)/$(doc_dir) install-every-module-doc
-	$(INSTALL_TOUCH) $(doc_prefix)/$(doc_dir)/INSTALL 
-	$(INSTALL_DOC) INSTALL $(doc_prefix)/$(doc_dir)
 	$(INSTALL_TOUCH) $(doc_prefix)/$(doc_dir)/README-MODULES 
 	$(INSTALL_DOC) README-MODULES $(doc_prefix)/$(doc_dir)
 	$(INSTALL_TOUCH) $(doc_prefix)/$(doc_dir)/AUTHORS 

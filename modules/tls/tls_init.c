@@ -778,4 +778,8 @@ void destroy_tls_h(void)
 	tls_destroy_cfg();
 	tls_destroy_locks();
 	tls_ct_wq_destroy();
+
+#if OPENSSL_VERSION_NUMBER >= 0x010100000L
+	OPENSSL_cleanup();
+#endif
 }

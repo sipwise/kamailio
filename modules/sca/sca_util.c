@@ -18,11 +18,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include "sca_common.h"
-
+#include "sca.h"
 #include <assert.h>
 
 #include "sca_util.h"
-
+#include "../../dset.h"
 #include "../../parser/sdp/sdp.h"
 
     int
@@ -114,74 +114,118 @@ sca_get_msg_cseq_method( sip_msg_t *msg )
     return( get_cseq( msg )->method_id );
 }
 
-
-    int
-sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from )
+/* caller needs to call free_to for *body */
+int
+sca_parse_uri(struct to_body *body, str *uri)
 {
-    struct to_body	*f;
+    assert( body != NULL );
+    assert( uri != NULL );
 
-    assert( msg != NULL );
-    assert( from != NULL );
-
-    if ( SCA_HEADER_EMPTY( msg->from )) {
-	LM_ERR( "Empty From header" );
-	return( -1 );
+    parse_to(uri->s, uri->s + uri->len + 1, body);
+    if (body->error != PARSE_OK) {
+        LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
+        return(-1);
     }
-    if ( parse_from_header( msg ) < 0 ) {
-	LM_ERR( "Bad From header" );
-	return( -1 );
-    }
-    f = get_from( msg );
-    if ( SCA_STR_EMPTY( &f->tag_value )) {
-	LM_ERR( "Bad From header: no tag parameter" );
-	return( -1 );
-    }
-
-    /* ensure the URI is parsed for future use */
-    if ( parse_uri( f->uri.s, f->uri.len, GET_FROM_PURI( msg )) < 0 ) {
-	LM_ERR( "Failed to parse From URI %.*s", STR_FMT( &f->uri ));
-	return( -1 );
-    }
-
-    *from = f;
-
-    return( 0 );
+    return (0);
 }
 
-    int
+int
+sca_get_avp_value(unsigned short avp_type, int_str avp, str *result) {
+    int_str val;
+    struct usr_avp *_avp;
+
+    assert(result != NULL);
+
+    if (avp.s.len > 0) {
+        _avp = search_first_avp(avp_type, avp, &val, 0);
+        if(_avp) {
+            result->s = val.s.s;
+            result->len = val.s.len;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int
+sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from ) {
+    struct to_body *f;
+    static struct to_body sf;
+    str uri = STR_NULL;
+
+    assert( from != NULL );
+
+    if(sca_get_avp_value(from_uri_avp_type, from_uri_avp, &uri)<0) {
+        assert( msg != NULL );
+        if ( SCA_HEADER_EMPTY( msg->from )) {
+            LM_ERR( "Empty From header" );
+            return( -1 );
+        }
+        if ( parse_from_header( msg ) < 0 ) {
+            LM_ERR( "Bad From header" );
+            return( -1 );
+        }
+        f = get_from( msg );
+        if ( SCA_STR_EMPTY( &f->tag_value )) {
+            LM_ERR( "Bad From header: no tag parameter" );
+            return( -1 );
+        }
+
+        /* ensure the URI is parsed for future use */
+        if ( parse_uri( f->uri.s, f->uri.len, GET_FROM_PURI( msg )) < 0 ) {
+            LM_ERR( "Failed to parse From URI %.*s", STR_FMT( &f->uri ));
+            return( -1 );
+        }
+        *from = f;
+    } else {
+        LM_DBG("using $avp(%.*s)[%.*s] as from uri\n",
+            STR_FMT(&from_uri_avp.s), STR_FMT(&uri));
+        if(sca_parse_uri(&sf, &uri)<0) return -1;
+        *from = &sf;
+    }
+    return ( 0 );
+}
+
+int
 sca_get_msg_to_header( sip_msg_t *msg, struct to_body **to )
 {
-    struct to_body	parsed_to;
+    static struct to_body	parsed_to;
     struct to_body	*t = NULL;
+    str uri = STR_NULL;
 
-    assert( msg != NULL );
     assert( to != NULL );
+    if(sca_get_avp_value(to_uri_avp_type, to_uri_avp, &uri)<0) {
+        assert( msg != NULL );
 
-    if ( SCA_HEADER_EMPTY( msg->to )) {
-	LM_ERR( "Empty To header" );
-	return( -1 );
+        if ( SCA_HEADER_EMPTY( msg->to )) {
+            LM_ERR( "Empty To header" );
+            return( -1 );
+        }
+        t = get_to( msg );
+        if ( t == NULL ) {
+            parse_to( msg->to->body.s,
+                msg->to->body.s + msg->to->body.len + 1, /* end of buffer */
+                &parsed_to );
+            if ( parsed_to.error != PARSE_OK ) {
+                LM_ERR( "Bad To header" );
+                return( -1 );
+            }
+            t = &parsed_to;
+        }
+
+        /* ensure the URI is parsed for future use */
+        if ( parse_uri( t->uri.s, t->uri.len, GET_TO_PURI( msg )) < 0 ) {
+            LM_ERR( "Failed to parse To URI %.*s", STR_FMT( &t->uri ));
+            return( -1 );
+        }
+        *to = t;
+    } else {
+        LM_DBG("using $avp(%.*s)[%.*s] as to uri\n",
+            STR_FMT(&to_uri_avp.s), STR_FMT(&uri));
+        if(sca_parse_uri(&parsed_to, &uri)<0) return -1;
+        *to = &parsed_to;
     }
-    t = get_to( msg );
-    if ( t == NULL ) {
-	parse_to( msg->to->body.s,
-		  msg->to->body.s + msg->to->body.len + 1, /* end of buffer */
-		  &parsed_to );
-	if ( parsed_to.error != PARSE_OK ) {
-	    LM_ERR( "Bad To header" );
-	    return( -1 );
-	}
-	t = &parsed_to;
-    }
-
-    /* ensure the URI is parsed for future use */
-    if ( parse_uri( t->uri.s, t->uri.len, GET_TO_PURI( msg )) < 0 ) {
-	LM_ERR( "Failed to parse To URI %.*s", STR_FMT( &t->uri ));
-	return( -1 );
-    }
-
-    *to = t;
-
-    return( 0 );
+    return ( 0 );
 }
 
 /* count characters requiring escape as defined by escape_common */
@@ -431,6 +475,12 @@ sca_call_is_held( sip_msg_t *msg )
     int			is_held = 0;
     int			rc;
 
+    if(sca->cfg->onhold_bflag >= 0) {
+        if(isbflagset(0, (flag_t)sca->cfg->onhold_bflag) == 1) {
+            LM_DBG("onhold_bflag set, skip parse_sdp and set held\n");
+            return ( 1 );
+        }
+    }
     rc = parse_sdp( msg );
     if ( rc < 0 ) {
 	LM_ERR( "sca_call_is_held: parse_sdp body failed" );
@@ -449,6 +499,7 @@ sca_call_is_held( sip_msg_t *msg )
 		stream != NULL;
 		n_str++, stream = get_sdp_stream( msg, n_sess, n_str )) {
 	    if ( stream->is_on_hold ) {
+            LM_DBG("sca_call_is_held: parse_sdp detected stream is on hold\n");
 		is_held = 1;
 		goto done;
 	    }

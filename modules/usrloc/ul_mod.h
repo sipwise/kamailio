@@ -88,6 +88,8 @@ extern int handle_lost_tcp;
 extern int close_expired_tcp;
 extern int skip_remote_socket;
 
+extern db1_con_t* ul_dbh_ro;   /* Read-Only Database connection handle */
+extern db_func_t ul_dbf_ro;
 
 /*! nat branch flag */
 extern unsigned int nat_bflag;

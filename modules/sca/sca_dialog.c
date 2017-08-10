@@ -43,6 +43,9 @@ sca_dialog_build_from_tags( sca_dialog *dialog, int maxlen, str *call_id,
 	return( -1 );
     }
 
+    LM_DBG("call-id:%.*s from_tag:%.*s to_tag:%.*s\n",
+        STR_FMT(call_id), STR_FMT(from_tag), STR_FMT(to_tag));
+
     memcpy( dialog->id.s, call_id->s, call_id->len );
     dialog->call_id.s = dialog->id.s;
     dialog->call_id.len = call_id->len;
@@ -56,8 +59,15 @@ sca_dialog_build_from_tags( sca_dialog *dialog, int maxlen, str *call_id,
 		to_tag->s, to_tag->len );
 	dialog->to_tag.s = dialog->id.s + call_id->len + from_tag->len;
 	dialog->to_tag.len = to_tag->len;
+    } else {
+        dialog->to_tag.s = NULL;
+        dialog->to_tag.len = 0;
     }
     dialog->id.len = len;
+
+    LM_DBG("id:%.*s call-id:%.*s from_tag:%.*s to_tag:%.*s\n",
+        STR_FMT(&dialog->id), STR_FMT(&dialog->call_id),
+        STR_FMT(&dialog->from_tag), STR_FMT(&dialog->to_tag));
 
     return( len );
 }

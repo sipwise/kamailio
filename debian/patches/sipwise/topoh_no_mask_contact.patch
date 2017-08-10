@@ -1,0 +1,20 @@
+--- a/modules/topoh/topoh_mod.c
++++ b/modules/topoh/topoh_mod.c
+@@ -435,7 +435,7 @@ int th_msg_sent(void *data)
+ 			}
+ 		}
+ 		th_mask_via(&msg);
+-		th_mask_contact(&msg);
++		#th_mask_contact(&msg);
+ 		th_mask_record_route(&msg);
+ 		if(dialog)
+ 		{
+@@ -466,7 +466,7 @@ int th_msg_sent(void *data)
+ 			}
+ 		} else {
+ 			th_flip_record_route(&msg, 1);
+-			th_mask_contact(&msg);
++			#th_mask_contact(&msg);
+ 			if(th_cookie_value.s[0]=='d')
+ 			{
+ 				th_mask_callid(&msg);

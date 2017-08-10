@@ -40,6 +40,8 @@ int	sca_get_msg_cseq_number( sip_msg_t * );
 /* convenient extraction of cseq method from Cseq header */
 int	sca_get_msg_cseq_method( sip_msg_t * );
 
+int sca_build_to_body_from_uri(sip_msg_t *, struct to_body **, str *);
+
 /* convenient From header parsing and extraction */
 int	sca_get_msg_from_header( sip_msg_t *, struct to_body ** );
 

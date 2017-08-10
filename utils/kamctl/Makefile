@@ -13,7 +13,7 @@ all:
 
 install-if-newer: install
 
-install: install-cfg install-bin install-man install-modules
+install: install-bin install-man install-modules
 
 install-cfg: $(cfg_prefix)/$(cfg_dir)
 		# kamctl config

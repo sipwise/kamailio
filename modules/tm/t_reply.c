@@ -70,6 +70,7 @@
 #include "t_lookup.h"
 #include "t_fwd.h"
 #include "../../fix_lumps.h"
+#include "../../sip_msg_clone.h"
 #include "../../sr_compat.h"
 #include "../../receive.h"
 #include "../../onsend.h"
@@ -843,17 +844,20 @@ int fake_req_clone_str_helper(str *src, str *dst, char *txt)
 }
 
 /**
- * fake a semi-private sip message using transaction's shared memory message
+ * fake a private sip message using transaction's shared memory message
  */
-int fake_req(struct sip_msg *faked_req,
-		struct sip_msg *shmem_msg, int extra_flags, struct ua_client *uac)
+struct sip_msg * fake_req(struct sip_msg *shmem_msg, int extra_flags,
+	struct ua_client *uac, int *len)
 {
-	/* on_failure_reply faked msg now copied from shmem msg (as opposed
-	 * to zero-ing) -- more "read-only" actions (exec in particular) will
-	 * work from reply_route as they will see msg->from, etc.; caution,
-	 * rw actions may append some pkg stuff to msg, which will possibly be
-	 * never released (shmem is released in a single block) */
-	memcpy( faked_req, shmem_msg, sizeof(struct sip_msg));
+	struct sip_msg *faked_req;
+	/* make a clone so eventual new parsed headers in pkg are not visible
+     * to other processes -- other attributes should be already parsed,
+     * available in the req structure and propagated by cloning */
+	faked_req = sip_msg_shm_clone(shmem_msg, len, 1);
+	if(faked_req==NULL) {
+		LM_ERR("failed to clone the request\n");
+		return NULL;
+	}
 
 	/* if we set msg_id to something different from current's message
 	 * id, the first t_fork will properly clean new branch URIs */
@@ -883,7 +887,7 @@ int fake_req(struct sip_msg *faked_req,
 	if(uac) setbflagsval(0, uac->branch_flags);
 	else setbflagsval(0, 0);
 
-	return 1;
+	return faked_req;
 
 error02:
 	if (faked_req->dst_uri.s) {
@@ -898,12 +902,15 @@ error01:
 		faked_req->path_vec.len = 0;
 	}
 error00:
-	return 0;
+	shm_free(faked_req);
+	return NULL;
 }
 
-void free_faked_req(struct sip_msg *faked_req, struct cell *t)
+void free_faked_req(struct sip_msg *faked_req, int len)
 {
 	struct hdr_field *hdr;
+	void *mstart = faked_req;
+	void *mend =((char *) faked_req) + len;
 
 	reset_new_uri(faked_req);
 	reset_dst_uri(faked_req);
@@ -916,9 +923,8 @@ void free_faked_req(struct sip_msg *faked_req, struct cell *t)
 	/* free header's parsed structures that were added by failure handlers */
 	for( hdr=faked_req->headers ; hdr ; hdr=hdr->next ) {
 		if ( hdr->parsed && hdr_allocs_parse(hdr) &&
-		(hdr->parsed<(void*)t->uas.request ||
-		hdr->parsed>=(void*)t->uas.end_request)) {
-			/* header parsed filed doesn't point inside uas.request memory
+		(hdr->parsed<mstart || hdr->parsed>=mend)) {
+			/* header parsed filed doesn't point inside fake memory
 			 * chunck -> it was added by failure funcs.-> free it as pkg */
 			DBG("DBG:free_faked_req: removing hdr->parsed %d\n",
 					hdr->type);
@@ -939,14 +945,17 @@ void free_faked_req(struct sip_msg *faked_req, struct cell *t)
 	reset_ruid(faked_req);
 	reset_ua(faked_req);
 	msg_ldata_reset(faked_req);
-}
 
+	/* free shared block */
+	shm_free(faked_req);
+}
 
 /* return 1 if a failure_route processes */
 int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 					int code, int extra_flags)
 {
-	static struct sip_msg faked_req;
+	struct sip_msg *faked_req;
+	int faked_req_len = 0;
 	struct sip_msg *shmem_msg = t->uas.request;
 	int on_failure;
 
@@ -967,16 +976,18 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 		return 1;
 	}
 
-	if (!fake_req(&faked_req, shmem_msg, extra_flags, &t->uac[picked_branch])) {
+	faked_req = fake_req(shmem_msg, extra_flags, &t->uac[picked_branch],
+		&faked_req_len);
+	if (faked_req==NULL) {
 		LOG(L_ERR, "ERROR: run_failure_handlers: fake_req failed\n");
 		return 0;
 	}
 	/* fake also the env. conforming to the fake msg */
-	faked_env( t, &faked_req, 0);
+	faked_env( t, faked_req, 0);
 	/* DONE with faking ;-) -> run the failure handlers */
 
 	if (unlikely(has_tran_tmcbs( t, TMCB_ON_FAILURE)) ) {
-		run_trans_callbacks( TMCB_ON_FAILURE, t, &faked_req, rpl, code);
+		run_trans_callbacks( TMCB_ON_FAILURE, t, faked_req, rpl, code);
 	}
 	if (on_failure) {
 		/* avoid recursion -- if failure_route forwards, and does not
@@ -985,22 +996,23 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 		t->on_failure=0;
 		/* if continuing on timeout of a suspended transaction, reset the flag */
 		t->flags &= ~T_ASYNC_SUSPENDED;
-		if (exec_pre_script_cb(&faked_req, FAILURE_CB_TYPE)>0) {
+		if (exec_pre_script_cb(faked_req, FAILURE_CB_TYPE)>0) {
 			/* run a failure_route action if some was marked */
-			if (run_top_route(failure_rt.rlist[on_failure], &faked_req, 0)<0)
+			if (run_top_route(failure_rt.rlist[on_failure], faked_req, 0)<0)
 				LOG(L_ERR, "ERROR: run_failure_handlers: Error in run_top_route\n");
-			exec_post_script_cb(&faked_req, FAILURE_CB_TYPE);
+			exec_post_script_cb(faked_req, FAILURE_CB_TYPE);
 		}
 		/* update message flags, if changed in failure route */
-		t->uas.request->flags = faked_req.flags;
+		t->uas.request->flags = faked_req->flags;
 	}
 
-	/* restore original environment and free the fake msg */
+	/* restore original environment */
 	faked_env( t, 0, 0);
-	free_faked_req(&faked_req,t);
-
 	/* if failure handler changed flag, update transaction context */
-	shmem_msg->flags = faked_req.flags;
+	shmem_msg->flags = faked_req->flags;
+	/* free the fake msg */
+	free_faked_req(faked_req, faked_req_len);
+
 	return 1;
 }
 
@@ -1009,7 +1021,8 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 int run_branch_failure_handlers(struct cell *t, struct sip_msg *rpl,
 					int code, int extra_flags)
 {
-	static struct sip_msg faked_req;
+	struct sip_msg *faked_req;
+	int faked_req_len = 0;
 	struct sip_msg *shmem_msg = t->uas.request;
 	int on_branch_failure;
 
@@ -1030,37 +1043,40 @@ int run_branch_failure_handlers(struct cell *t, struct sip_msg *rpl,
 		return 1;
 	}
 
-	if (!fake_req(&faked_req, shmem_msg, extra_flags, &t->uac[picked_branch])) {
+	faked_req = fake_req(shmem_msg, extra_flags, &t->uac[picked_branch],
+		&faked_req_len);
+	if (faked_req==NULL) {
 		LOG(L_ERR, "fake_req failed\n");
 		return 0;
 	}
 	/* fake also the env. conforming to the fake msg */
-	faked_env( t, &faked_req, 0);
+	faked_env( t, faked_req, 0);
 	set_route_type(BRANCH_FAILURE_ROUTE);
 	set_t(t, picked_branch);
 	/* DONE with faking ;-) -> run the branch_failure handlers */
 
 	if (unlikely(has_tran_tmcbs( t, TMCB_ON_BRANCH_FAILURE)) ) {
-		run_trans_callbacks( TMCB_ON_BRANCH_FAILURE, t, &faked_req, rpl, code);
+		run_trans_callbacks( TMCB_ON_BRANCH_FAILURE, t, faked_req, rpl, code);
 	}
 	if (on_branch_failure >= 0) {
 		t->on_branch_failure = 0;
-		if (exec_pre_script_cb(&faked_req, BRANCH_FAILURE_CB_TYPE)>0) {
+		if (exec_pre_script_cb(faked_req, BRANCH_FAILURE_CB_TYPE)>0) {
 			/* run a branch_failure_route action if some was marked */
-			if (run_top_route(event_rt.rlist[on_branch_failure], &faked_req, 0)<0)
+			if (run_top_route(event_rt.rlist[on_branch_failure], faked_req, 0)<0)
 				LOG(L_ERR, "error in run_top_route\n");
-			exec_post_script_cb(&faked_req, BRANCH_FAILURE_CB_TYPE);
+			exec_post_script_cb(faked_req, BRANCH_FAILURE_CB_TYPE);
 		}
 		/* update message flags, if changed in branch_failure route */
-		t->uas.request->flags = faked_req.flags;
+		t->uas.request->flags = faked_req->flags;
 	}
 
-	/* restore original environment and free the fake msg */
+	/* restore original environment */
 	faked_env( t, 0, 0);
-	free_faked_req(&faked_req,t);
-
 	/* if branch_failure handler changed flag, update transaction context */
-	shmem_msg->flags = faked_req.flags;
+	shmem_msg->flags = faked_req->flags;
+	/* free the fake msg */
+	free_faked_req(faked_req, faked_req_len);
+
 	return 1;
 }
 

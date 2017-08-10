@@ -49,6 +49,7 @@
 /* bound API headers */
 #include "../../modules/sl/sl.h"
 #include "../../modules/tm/tm_load.h"
+#include "../../modules/rr/api.h"
 
 
 /* convenience macros */

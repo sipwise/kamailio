@@ -48,6 +48,7 @@ struct _sca_subscription {
     str		rr;		/* Record-Route header values */
 
     int		db_cmd_flag;	/* track whether to INSERT or UPDATE */
+    int server_id; /* server */
 };
 typedef struct _sca_subscription	sca_subscription;
 
@@ -74,7 +75,7 @@ extern const str 	SCA_METHOD_SUBSCRIBE;
         sca_subscription_reply((mod), (scode), (smsg), \
 		SCA_EVENT_TYPE_CALL_INFO, -1, (sreply))
 
-int	sca_handle_subscribe( sip_msg_t *, char *, char * );
+int	sca_handle_subscribe( sip_msg_t *, str *, str * );
 int	sca_subscription_reply( sca_mod *, int, char *, int, int, sip_msg_t * );
 
 int	sca_subscription_from_db_result( db1_res_t *, sca_subscription * );

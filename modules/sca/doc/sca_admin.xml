@@ -262,6 +262,29 @@ modparam( "sca", "db_update_interval", 120 )
 		</programlisting>
 		</example>
 	</section>
+
+	<section id="sca.p.onhold_bflag">
+		<title><varname>onhold_bflag</varname> (integer)</title>
+		<para>
+		<para>
+		Which branch flag should be used by the module to identify if the call
+		is on-hold instead of parsing the sdp. If the bflag not is set the
+		sdp will be parsed.
+		</para>
+		<para>
+		<emphasis>
+			Default value is -1 (disabled).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>onhold_bflag</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("sca", "onhold_bflag", 15)
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 
 	<section>
@@ -333,6 +356,14 @@ if ( is_method( "SUBSCRIBE" )) {
 							<listitem><para>2 - SCA_CALL_INFO_SHARED_CALLEE</para></listitem>
 						</itemizedlist>
 					</listitem>
+					<listitem>
+						<para><emphasis>to</emphasis> - string (optional)</para>
+						<para>string to use as To and skip parsing From header from the message. The parameter allows pseudo-variables usage</para>
+					</listitem>
+					<listitem>
+						<para><emphasis>from</emphasis> - string (optional)</para>
+						<para>string to use as From and skip parsing From header from the message. The parameter allows pseudo-variables usage</para>
+					</listitem>
 				</itemizedlist>
 			</para>
 		<para>
@@ -378,7 +409,7 @@ if ( is_method( "SUBSCRIBE" )) {
 route
 {
 ...
-	sca_call_info_update();
+	sca_call_info_update(0, "$var(to)", "$var(from)@$var(domain)");
 ...
 }
 

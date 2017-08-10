@@ -115,6 +115,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 	db_op_t  ops1[4];
 	db_key_t keys2[6]; /* select */
 	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
+	db1_con_t* dbh = ul_dbh;
+	db_func_t* dbf = &ul_dbf;
 
 	cp = buf;
 	shortage = 0;
@@ -169,22 +171,26 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 		vals1[n[0]].nul = 0;
 		vals1[n[0]].val.int_val = server_id;
 		n[0]++;
+		if(ul_dbh_ro) {
+			dbh = ul_dbh_ro;
+			dbf = &ul_dbf_ro;
+		}
 	}
 
 	/* TODO: use part_idx and part_max on keys1 */
 
 	for (dom = root; dom!=NULL ; dom=dom->next) {
-		if (ul_dbf.use_table(ul_dbh, dom->d->name) < 0) {
+		if (dbf->use_table(dbh, dom->d->name) < 0) {
 			LM_ERR("sql use_table failed\n");
 			return -1;
 		}
-		if (ul_dbf.query(ul_dbh, keys1, ops1, vals1, keys2,
+		if (dbf->query(dbh, keys1, ops1, vals1, keys2,
 							n[0], n[1], NULL, &res) <0 ) {
 			LM_ERR("query error\n");
 			return -1;
 		}
 		if( RES_ROW_N(res)==0 ) {
-			ul_dbf.free_result(ul_dbh, res);
+			dbf->free_result(dbh, res);
 			continue;
 		}
 
@@ -307,7 +313,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
 			len -= needed;
 		} /* row cycle */
 
-		ul_dbf.free_result(ul_dbh, res);
+		dbf->free_result(dbh, res);
 	} /* domain cycle */
 
 	/* len < 0 is possible, if size of the buffer < sizeof(c->c.len) */

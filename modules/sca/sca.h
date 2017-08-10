@@ -37,6 +37,8 @@ struct _sca_config {
     int		call_info_max_expires;
     int		line_seize_max_expires;
     int		purge_expired_interval;
+    int onhold_bflag;
+    str *server_address;
 };
 typedef struct _sca_config	sca_config;
 
@@ -47,10 +49,17 @@ struct _sca_mod {
 
     db_func_t		*db_api;
     struct tm_binds	*tm_api;
+    struct rr_binds	*rr_api;
     sl_api_t		*sl_api;
 };
 typedef struct _sca_mod		sca_mod;
 
 extern sca_mod		*sca;
+
+/* avps */
+extern unsigned short from_uri_avp_type;
+extern int_str from_uri_avp;
+extern unsigned short to_uri_avp_type;
+extern int_str to_uri_avp;
 
 #endif /* SCA_H */

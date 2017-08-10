@@ -979,6 +979,15 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
     str			state_str = STR_NULL;
     int			state = SCA_APPEARANCE_STATE_UNKNOWN;
     int			rc = -1;
+    str			*target_aor = from_aor;
+    int			upstream = 0;
+
+    if(SCA_CALL_INFO_IS_SHARED_CALLEE( call_info ) &&
+    		sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+    	LM_DBG("callee is SCA and direction is 'upstream'\n");
+    	target_aor = to_aor;
+    	upstream = 1;
+    }
 
     /*
      * if we get here, one of the legs is an SCA endpoint. we want to know
@@ -987,12 +996,13 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
     if ( sca->tm_api->register_tmcb( msg, NULL, TMCB_E2EACK_IN,
 				    sca_call_info_ack_cb, NULL, NULL ) < 0 ) {
 	LM_ERR( "sca_call_info_invite_request_handler: failed to register "
-		"callback for INVITE %.*s ACK", STR_FMT( from_aor ));
+		"callback for INVITE %.*s ACK", STR_FMT( target_aor ));
 	goto done;
     }
 
-    if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
+    if ( !upstream && !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
 	/* caller isn't SCA, no more to do. update callee in reply handler. */
+	LM_DBG("caller isn't SCA, no more to do. update callee in reply handler\n");
 	rc = 1;
 	goto done;
     }
@@ -1005,11 +1015,12 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
     if ( sca->tm_api->register_tmcb( msg, NULL, TMCB_RESPONSE_READY,
 			sca_call_info_response_ready_cb, NULL, NULL ) < 0 ) {
 	LM_ERR( "sca_call_info_invite_request_handler: failed to register "
-		"callback for INVITE %.*s ACK", STR_FMT( from_aor ));
+		"callback for INVITE %.*s ACK", STR_FMT( target_aor ));
 	goto done;
     }
     
     if ( sca_call_is_held( msg )) {
+	LM_DBG("call_is_held\n");
 	state = SCA_APPEARANCE_STATE_HELD;
 	if ( call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE ) {
 	    state = SCA_APPEARANCE_STATE_HELD_PRIVATE;
@@ -1018,14 +1029,18 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
 	}
     } else if ( !SCA_STR_EMPTY( &to->tag_value )) {
 	/* this is a reINVITE from an SCA line that put the call on hold */
+	LM_DBG("reINVITE from an SCA line that put the call on hold\n");
 	state = SCA_APPEARANCE_STATE_ACTIVE;
     } else if ( sca_call_info_is_line_seize_reinvite( msg, call_info,
 					    from, to, from_aor, to_aor )) {
+    	LM_DBG("line_seize_reinvite\n");
 	rc = sca_call_info_seize_held_call( msg, call_info, from, to,
 					   from_aor, to_aor, contact_uri );
 	if ( rc <= 0 ) {
 	    goto done;
 	}
+    } else {
+    	LM_DBG("Initial INVITE\n");
     }
     /* otherwise, this is an initial INVITE */
 
@@ -1036,17 +1051,17 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
 	return( -1 );
     }
 
-    if ( sca_appearance_update_index( sca, from_aor, call_info->index,
+    if ( sca_appearance_update_index( sca, target_aor, call_info->index,
 		state, NULL, NULL, &dialog ) != SCA_APPEARANCE_OK ) {
 	sca_appearance_state_to_str( state, &state_str );
 	LM_ERR( "Failed to update %.*s appearance-index %d to %.*s",
-		STR_FMT( from_aor ), call_info->index,
+		STR_FMT( target_aor ), call_info->index,
 		STR_FMT( &state_str ));
     }
 
-    if ( sca_notify_call_info_subscribers( sca, from_aor ) < 0 ) {
+    if ( sca_notify_call_info_subscribers( sca, target_aor ) < 0 ) {
 	LM_ERR( "Failed to call-info NOTIFY %.*s subscribers on INVITE",
-		STR_FMT( from_aor ));
+		STR_FMT( target_aor ));
 	goto done;
     }
 
@@ -1227,11 +1242,19 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
     int			rc = -1;
 
     if ( SCA_CALL_INFO_IS_SHARED_CALLEE( call_info )) {
+	LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE\n");
+	if(sca->rr_api->is_direction(msg, RR_FLOW_DOWNSTREAM)==0) {
+		LM_DBG("downstream detected\n");
+	}
+	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+		LM_DBG("upstream detected\n");
+	}
 	rc = sca_call_info_uri_update( to_aor, call_info, from, to,
 			contact_uri, &msg->callid->body );
     }
 
     if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
+    	LM_DBG("NOT SCA_CALL_INFO_IS_SHARED_CALLER\n");
 	goto done;
     }
 
@@ -1260,6 +1283,8 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
 		&msg->callid->body, &from->tag_value, NULL, slot_idx );
     if ( app == NULL ) {
 	/* no SCA line is involved with this call */
+	LM_DBG("no SCA line is involved with this call[%.*s]\n",
+		STR_FMT(from_aor));
 	rc = 1;
 	goto done;
     }
@@ -1370,8 +1395,10 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
     sca_appearance	*app;
     struct to_body	*from;
     struct to_body	*to;
+    str			*tag;
     int			slot_idx = -1;
     int			state = SCA_APPEARANCE_STATE_IDLE;
+    str			*target_aor;
 
     if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
 	LM_ERR( "sca_call_info_ack_cb: failed to get From-header" );
@@ -1382,16 +1409,27 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
 	return;
     }
 
-    if ( sca_uri_lock_if_shared_appearance( sca, from_aor, &slot_idx )) {
-	app = sca_appearance_for_tags_unsafe( sca, from_aor,
-			&msg->callid->body, &from->tag_value, NULL, slot_idx );
+    if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+	LM_DBG("upstream direction detected\n");
+	target_aor = to_aor;
+	tag = &to->tag_value;
+    } else {
+	target_aor = from_aor;
+	tag = &from->tag_value;
+    }
+
+    LM_DBG("target_aor[%.*s]\n", STR_FMT(target_aor));
+
+    if ( sca_uri_lock_if_shared_appearance( sca, target_aor, &slot_idx )) {
+	app = sca_appearance_for_tags_unsafe( sca, target_aor,
+			&msg->callid->body, tag, NULL, slot_idx );
 	if ( app == NULL ) {
 	    LM_ERR( "sca_call_info_ack_cb: No appearance for %.*s matching "
-		    "call-id <%.*s> and from-tag <%.*s>", STR_FMT( from_aor ),
-		    STR_FMT( &msg->callid->body ), STR_FMT( &from->tag_value ));
+		    "call-id <%.*s> and from-tag <%.*s>", STR_FMT( target_aor ),
+		    STR_FMT( &msg->callid->body ), STR_FMT( tag ));
 	    goto done;
 	}
-	
+
 	/*
 	 * Polycom's music-on-hold implementation uses an INVITE with
 	 * an empty body to get the remote party's SDP info, then INVITEs
@@ -1411,6 +1449,8 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
 
 	    /* can't send NOTIFYs until we unlock the slot below */
 	}
+    } else {
+	LM_DBG("from_aor[%.*s] not shared appearance\n", STR_FMT(from_aor));
     }
 
 done:
@@ -1418,9 +1458,9 @@ done:
 	sca_hash_table_unlock_index( sca->appearances, slot_idx );
 
 	if ( state != SCA_APPEARANCE_STATE_IDLE ) {
-	    if ( sca_notify_call_info_subscribers( sca, from_aor ) < 0 ) {
+	    if ( sca_notify_call_info_subscribers( sca, target_aor ) < 0 ) {
 		LM_ERR( "Failed to call-info NOTIFY %.*s subscribers on INVITE",
-			STR_FMT( from_aor ));
+			STR_FMT( target_aor ));
 	    }
 	}
     }
@@ -1430,11 +1470,12 @@ done:
     void
 sca_call_info_ack_cb( struct cell *t, int type, struct tmcb_params *params )
 {
-    struct to_body	*to;
+    struct to_body	*to, *from;
     sca_appearance	*app = NULL;
     str			from_aor = STR_NULL;
     str			to_aor = STR_NULL;
     int			slot_idx = -1;
+    str			*tag;
 
     if ( !(type & TMCB_E2EACK_IN)) {
 	return;
@@ -1463,8 +1504,18 @@ sca_call_info_ack_cb( struct cell *t, int type, struct tmcb_params *params )
     }
 
     /* on ACK, ensure SCA callee state is promoted to ACTIVE. */
+    if(sca->rr_api->is_direction(params->req, RR_FLOW_UPSTREAM)==0) {
+	LM_DBG("upstream direction detected\n");
+	if ( sca_get_msg_from_header( params->req, &from ) < 0 ) {
+		LM_ERR( "failed to get From-header" );
+		goto done;
+    	}
+	tag = &from->tag_value;
+    } else {
+	tag = &to->tag_value;
+    }
     app = sca_appearance_for_tags_unsafe( sca, &to_aor,
-		&params->req->callid->body, &to->tag_value, NULL, slot_idx );
+		&params->req->callid->body, tag, NULL, slot_idx );
     if ( app && app->state == SCA_APPEARANCE_STATE_ACTIVE_PENDING ) {
 	LM_DBG( "promoting %.*s appearance-index %d to active",
 		STR_FMT( &to_aor ), app->index );
@@ -1550,9 +1601,14 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
     sca_appearance	*app = NULL;
     int			slot_idx = -1;
     int			rc = -1;
+    str                 *tag = NULL;
 
     if ( msg->first_line.type == SIP_REQUEST ) {
+        LM_DBG("SIP_REQUEST\n");
 	if ( SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
+            LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLER "
+                "from_aor[%.*s] to_aor[%.*s]\n",
+                STR_FMT(from_aor), STR_FMT(to_aor));
 	    slot_idx = sca_uri_lock_shared_appearance( sca, from_aor );
 	    if ( slot_idx < 0 ) {
 		LM_ERR( "sca_call_info_bye_handler: failed to acquire "
@@ -1567,15 +1623,21 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
 	    }
 	    if ( app == NULL ) {
 		/* try to find it by tags */
+		if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+			LM_DBG("upstream direction detected\n");
+			tag = &to->tag_value;
+		} else {
+			tag = &from->tag_value;
+		}
 		app = sca_appearance_for_tags_unsafe( sca, from_aor,
-			&msg->callid->body, &from->tag_value, NULL, slot_idx );
+			&msg->callid->body, tag, NULL, slot_idx );
 	    }
 	    if ( app == NULL ) {
 		LM_ERR( "sca_call_info_bye_handler: %.*s "
 			"dialog leg %.*s;%.*s is not active",
 			STR_FMT( from_aor ),
 			STR_FMT( &msg->callid->body ),
-			STR_FMT( &from->tag_value ));
+			STR_FMT( tag ));
 		goto done;
 	    }
 
@@ -1600,7 +1662,11 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
 		    goto done;
 		}
 	    }
-	}
+	} else {
+            LM_DBG("NOT SCA_CALL_INFO_IS_SHARED_CALLER "
+                "from_aor[%.*s] to_aor[%.*s]\n",
+                STR_FMT(from_aor), STR_FMT(to_aor));
+        }
 
 	if ( slot_idx >= 0 ) {
 	    sca_hash_table_unlock_index( sca->appearances, slot_idx );
@@ -1615,8 +1681,14 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
 		goto done;
 	    }
 
+	    if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+	        LM_DBG("upstream direction detected\n");
+	        tag = &from->tag_value;
+	    } else {
+	        tag = &to->tag_value;
+	    }
 	    app = sca_appearance_for_tags_unsafe( sca, to_aor,
-			&msg->callid->body, &to->tag_value,
+			&msg->callid->body, tag,
 			NULL, slot_idx );
 	    if ( app == NULL ) {
 		LM_INFO( "sca_call_info_bye_handler: no in-use callee "
@@ -1649,6 +1721,7 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
 	    }
 	}
     } else {
+        LM_DBG("SIP_REPLY\n");
 	/* this is just a backup to catch anything missed on the BYE request */
 	if ( SCA_CALL_INFO_IS_SHARED_CALLEE( call_info )) {
 	    slot_idx = sca_hash_table_index_for_key( sca->appearances, to_aor );
@@ -1863,7 +1936,7 @@ struct sca_call_info_dispatch	call_info_dispatch[] = {
 #define SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC	(1 << 0)
 #define SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC	(1 << 1)
     int
-sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
+sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
 {
     sca_call_info	call_info;
     hdr_field_t		*call_info_hdr;
@@ -1879,6 +1952,7 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
     int			method;
     int			rc = -1;
     int			update_mask = SCA_CALL_INFO_SHARED_BOTH;
+    int_str val;
 
     method = sca_get_msg_method( msg );
 
@@ -1888,19 +1962,27 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
 	    break;
 	}
     }
-    if ( i >= n_dispatch ) {
-	LM_DBG( "BUG: sca module does not support Call-Info headers "
-		"in %.*s requests", STR_FMT( &get_cseq( msg )->method ));
-	return( 1 );
-    }
 
     if ( parse_headers( msg, HDR_EOH_F, 0 ) < 0 ) {
 	LM_ERR( "header parsing failed: bad request" );
 	return( -1 );
     }
 
+    if ( i >= n_dispatch ) {
+    LM_DBG( "BUG: sca module does not support Call-Info headers "
+        "in %.*s requests", STR_FMT( &get_cseq( msg )->method ));
+    return( 1 );
+    }
+
+
     if ( p1 != NULL ) {
 	if ( get_int_fparam( &update_mask, msg, (fparam_t *)p1 ) < 0 ) {
+        if(msg->cseq==NULL && ((parse_headers(msg, HDR_CSEQ_F, 0)==-1) ||
+           (msg->cseq==NULL)))
+        {
+           LM_ERR("no CSEQ header\n");
+           return (1);
+        }
 	    LM_ERR( "sca_call_info_update: argument 1: bad value "
 		    "(integer expected)" );
 	    return( -1 );
@@ -1922,6 +2004,9 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
 	}
     }
 
+    delete_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp);
+    delete_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp);
+
     memset( &call_info, 0, sizeof( sca_call_info ));
     call_info_hdr = sca_call_info_header_find( msg->headers );
     if ( !SCA_HEADER_EMPTY( call_info_hdr )) {
@@ -1933,13 +2018,25 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
 	}
     }
 
+    if (uri_from != NULL) {
+        val.s.s   = uri_from->s;
+        val.s.len = uri_from->len;
+        add_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp, val);
+        LM_DBG("from[%.*s] param\n", STR_FMT(uri_from));
+    }
     if ( sca_get_msg_from_header( msg, &from ) < 0 ) {
-	LM_ERR( "Bad From header" );
+    LM_ERR( "Bad From header" );
 	return( -1 );
+    }
+    if (uri_to != NULL) {
+        val.s.s   = uri_to->s;
+        val.s.len = uri_to->len;
+        add_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp, val);
+        LM_DBG("to[%.*s] param\n", STR_FMT(uri_to));
     }
     if ( sca_get_msg_to_header( msg, &to ) < 0 ) {
 	LM_ERR( "Bad To header" );
-	return( -1 );
+	goto done;
     }
 
     memset( &c_uri, 0, sizeof( sip_uri_t ));
@@ -1949,72 +2046,109 @@ sca_call_info_update( sip_msg_t *msg, char *p1, char *p2 )
 	if ( parse_uri( contact_uri.s, contact_uri.len, &c_uri ) < 0 ) {
 	    LM_ERR( "Failed to parse Contact URI %.*s",
 		    STR_FMT( &contact_uri ));
-	    return( -1 );
+        rc = -1;
+	    goto done;
 	}
-    } else if ( rc < 0 ) {
-	LM_ERR( "Bad Contact" );
-	return( -1 );
     }
     /* reset rc to -1 so we don't end up returning 0 to the script */
     rc = -1;
 
     /* reconcile mismatched Contact users and To/From URIs */
     if ( msg->first_line.type == SIP_REQUEST ) {
-	if ( sca_create_canonical_aor( msg, &from_aor ) < 0 ) {
-	    return( -1 );
-	}
-	aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC;
-
-	if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
-	    LM_ERR( "Failed to extract AoR from To URI %.*s",
-		    STR_FMT( &to->uri ));
-	    goto done;
-	}
+        if(uri_from==NULL) {
+            if ( sca_create_canonical_aor( msg, &from_aor ) < 0 ) {
+	           goto done;
+            }
+            aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC;
+        } else {
+            if ( sca_uri_extract_aor( &from->uri, &from_aor ) < 0 ) {
+                LM_ERR( "Failed to extract AoR from From URI %.*s",
+                    STR_FMT( &from->uri ));
+                goto done;
+            }
+        }
+        if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
+            LM_ERR( "Failed to extract AoR from To URI %.*s",
+                STR_FMT( &to->uri ));
+            goto done;
+        }
     } else {
-	if ( sca_uri_extract_aor( &from->uri, &from_aor ) < 0 ) {
-	    LM_ERR( "Failed to extract AoR from From URI %.*s",
-		    STR_FMT( &from->uri ));
-	    goto done;
-	}
-	if ( sca_create_canonical_aor( msg, &to_aor ) < 0 ) {
-	    return( -1 );
-	}
-	aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC;
+        if ( sca_uri_extract_aor( &from->uri, &from_aor ) < 0 ) {
+            LM_ERR( "Failed to extract AoR from From URI %.*s",
+                    STR_FMT( &from->uri ));
+            goto done;
+        }
+	    if(uri_to==NULL) {
+            if ( sca_create_canonical_aor( msg, &to_aor ) < 0 ) {
+	            goto done;
+	        }
+	        aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_TO_ALLOC;
+        } else {
+            if ( sca_uri_extract_aor( &to->uri, &to_aor ) < 0 ) {
+                LM_ERR( "Failed to extract AoR from To URI %.*s",
+                    STR_FMT( &to->uri ));
+                goto done;
+            }
+        }
+    }
+
+    LM_DBG("to_aor[%.*s] from_aor[%.*s]\n",
+        STR_FMT(&to_aor), STR_FMT(&from_aor));
+
+    if(contact_uri.s==NULL) {
+        contact_uri.s = "sip:127.0.0.1:5085;transport=udp";
+        contact_uri.len = strlen(contact_uri.s);
+        LM_DBG("No Contact header, using default owner[%.*s]\n",
+            STR_FMT(&contact_uri));
     }
 
     /* early check to see if we're dealing with any SCA endpoints */
     if ( sca_uri_is_shared_appearance( sca, &from_aor )) {
 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLER )) {
 	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;
+	    LM_DBG("SCA_CALL_INFO_SHARED_CALLER[%.*s]\n",
+		STR_FMT(&from_aor));
 	}
     }
     if ( sca_uri_is_shared_appearance( sca, &to_aor )) {
 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLEE )) {
 	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLEE;
+	    LM_DBG("SCA_CALL_INFO_SHARED_CALLEE[%.*s]\n",
+		STR_FMT(&to_aor));
 	}
     }
 
     if ( call_info_hdr == NULL ) {
+        LM_DBG("call_info_hdr is NULL\n");
 	if ( SCA_CALL_INFO_IS_SHARED_CALLER( &call_info ) &&
 		msg->first_line.type == SIP_REQUEST ) {
+            LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLER && SIP_REQUEST\n");
 	    if ( !sca_subscription_aor_has_subscribers(
 				SCA_EVENT_TYPE_CALL_INFO, &from_aor )) {
 		call_info.ua_shared &= ~SCA_CALL_INFO_SHARED_CALLER;
 		sca_appearance_unregister( sca, &from_aor );
-	    }
+	    } else {
+                LM_DBG("from_aor[%.*s] has subscribers\n",
+                        STR_FMT(&from_aor));
+            }
 	} else if ( SCA_CALL_INFO_IS_SHARED_CALLEE( &call_info ) &&
 		msg->first_line.type == SIP_REPLY ) {
+            LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE && SIP_REPLY\n");
 	    if ( !sca_subscription_aor_has_subscribers(
 				SCA_EVENT_TYPE_CALL_INFO, &to_aor )) {
 		call_info.ua_shared &= ~SCA_CALL_INFO_SHARED_CALLEE;
 		sca_appearance_unregister( sca, &to_aor );
-	    }
+	    } else {
+                LM_DBG("to_aor[%.*s] has subscribers\n",
+                        STR_FMT(&from_aor));
+            }
 	}
     }
 
     if ( sca_call_info_header_remove( msg ) < 0 ) {
 	LM_ERR( "Failed to remove Call-Info header" );
-	return( -1 );
+    rc = -1;
+	goto done;
     }
 
     if ( call_info.ua_shared == SCA_CALL_INFO_SHARED_NONE ) {
@@ -2041,6 +2175,5 @@ done:
 	    pkg_free( to_aor.s );
 	}
     }
-
     return( rc );
 }

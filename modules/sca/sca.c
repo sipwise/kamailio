@@ -26,6 +26,7 @@
 
 #include "../../timer.h"
 #include "../../timer_proc.h"
+#include "../../mod_fix.h"
 
 #include "sca.h"
 #include "sca_appearance.h"
@@ -44,22 +45,50 @@ sca_mod			*sca = NULL;
 /* EXTERNAL API */
 db_func_t		dbf;	/* db api */
 struct tm_binds		tmb;	/* tm functions for sending messages */
-sl_api_t		slb;	/* sl callback, function for getting to-tag */
+struct rr_binds rrb; /* rr functions for detecting direction */
+sl_api_t    slb;  /* sl callback, function for getting to-tag */
+
+
+/* avps */
+unsigned short from_uri_avp_type;
+int_str from_uri_avp;
+unsigned short to_uri_avp_type;
+int_str to_uri_avp;
 
 /* PROTOTYPES */
 static int		sca_mod_init( void );
 static int		sca_child_init( int );
 static void		sca_mod_destroy( void );
 static int		sca_set_config( sca_mod * );
+static int sca_handle_subscribe_0_f(sip_msg_t* msg);
+static int sca_handle_subscribe_1_f(sip_msg_t* msg, char*);
+static int sca_handle_subscribe_2_f(sip_msg_t* msg, char*, char *);
+int fixup_hs(void **, int);
+int fixup_free_hs(void **param, int param_no);
+static int sca_call_info_update_0_f(sip_msg_t* msg);
+static int sca_call_info_update_1_f(sip_msg_t* msg, char*);
+static int sca_call_info_update_2_f(sip_msg_t* msg, char* , char*);
+static int sca_call_info_update_3_f(sip_msg_t* msg, char* , char*, char *);
+int fixup_ciu(void **, int);
+int fixup_free_ciu(void **param, int param_no);
 
 /* EXPORTED COMMANDS */
 static cmd_export_t	cmds[] = {
-    { "sca_handle_subscribe", sca_handle_subscribe, 0, NULL, REQUEST_ROUTE },
-    { "sca_call_info_update", sca_call_info_update, 0, NULL,
+    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe_0_f, 0,
+      NULL, NULL, REQUEST_ROUTE },
+    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe_1_f, 1,
+      fixup_hs, fixup_free_hs, REQUEST_ROUTE },
+    { "sca_handle_subscribe", (cmd_function)sca_handle_subscribe_2_f, 2,
+      fixup_hs, fixup_free_hs, REQUEST_ROUTE },
+    { "sca_call_info_update", (cmd_function)sca_call_info_update_0_f, 0, NULL, NULL,
 	REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
-    { "sca_call_info_update", sca_call_info_update, 1, fixup_var_int_1,
-	REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE },
-    { NULL, NULL, -1, 0, 0 },
+    {"sca_call_info_update", (cmd_function)sca_call_info_update_1_f, 1,
+        fixup_ciu, fixup_free_ciu, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+    {"sca_call_info_update", (cmd_function)sca_call_info_update_2_f, 2,
+        fixup_ciu, fixup_free_ciu, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+    {"sca_call_info_update", (cmd_function)sca_call_info_update_3_f, 3,
+        fixup_ciu, fixup_free_ciu, REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
+    {0, 0, 0, 0, 0, 0},
 };
 
 /* EXPORTED RPC INTERFACE */
@@ -99,6 +128,10 @@ int			hash_table_size = -1;
 int			call_info_max_expires = 3600;
 int			line_seize_max_expires = 15;
 int			purge_expired_interval = 120;
+int onhold_bflag = -1;
+str server_address = STR_NULL;
+str from_uri_avp_param = STR_NULL;
+str to_uri_avp_param = STR_NULL;
 
 static param_export_t	params[] = {
     { "outbound_proxy",		PARAM_STR,	&outbound_proxy },
@@ -110,20 +143,27 @@ static param_export_t	params[] = {
     { "call_info_max_expires",	INT_PARAM,	&call_info_max_expires },
     { "line_seize_max_expires", INT_PARAM,	&line_seize_max_expires },
     { "purge_expired_interval",	INT_PARAM,	&purge_expired_interval },
+    {"onhold_bflag", INT_PARAM, &onhold_bflag},
+    {"server_address", PARAM_STR, &server_address},
+    {"from_uri_avp", PARAM_STR, &from_uri_avp_param},
+    {"to_uri_avp", PARAM_STR, &to_uri_avp_param},
     { NULL,			0,		NULL },
 };
 
 /* MODULE EXPORTS */
-struct module_exports	exports = {
-    "sca",		/* module name */
-    cmds,		/* exported functions */
-    NULL,		/* RPC methods */
-    params,		/* exported parameters */
-    sca_mod_init,	/* module initialization function */
-    NULL,		/* response handling function */
-    sca_mod_destroy,	/* destructor function */
-    NULL,		/* oncancel function */
-    sca_child_init,	/* per-child initialization function */
+struct module_exports exports= {
+   "sca",
+   DEFAULT_DLFLAGS, /* dlopen flags */
+   cmds,
+   params,
+   0,          /* exported statistics */
+   0,          /* exported MI functions */
+   0,          /* exported pseudo-variables */
+   0,          /* extra processes */
+   sca_mod_init,
+   0,
+   sca_mod_destroy,
+   sca_child_init  /* per-child init function */
 };
 
 
@@ -242,6 +282,14 @@ sca_set_config( sca_mod *scam )
     scam->cfg->call_info_max_expires = call_info_max_expires;
     scam->cfg->line_seize_max_expires = line_seize_max_expires;
     scam->cfg->purge_expired_interval = purge_expired_interval;
+    if(onhold_bflag > 31) {
+        LM_ERR("sca_set_config: onhold_bflag value > 31\n");
+        return (-1);
+    }
+    scam->cfg->onhold_bflag = onhold_bflag;
+    if (server_address.s) {
+        scam->cfg->server_address = &server_address;
+    }
 
     return( 0 );
 }
@@ -275,6 +323,31 @@ sca_child_init( int rank )
     return( 0 );
 }
 
+static int
+sca_process_avps(str *avp_param, int_str *avp, unsigned short *avp_type)
+{
+  pv_spec_t *avp_spec;
+  unsigned short avp_flags;
+
+  if (avp_param && avp_param->len > 0) {
+    avp_spec = pv_cache_get(avp_param);
+    if (avp_spec==NULL|| avp_spec->type!=PVT_AVP) {
+        LM_ERR("malformed or non AVP definition <%.*s>\n", STR_FMT(avp_param));
+        return -1;
+    }
+
+    if (pv_get_avp_name(0, &(avp_spec->pvp), avp, &avp_flags) != 0) {
+        LM_ERR("invalid AVP definition <%.*s>\n", STR_FMT(avp_param));
+        return -1;
+    }
+    *avp_type = avp_flags;
+  } else {
+    avp->s.s = NULL;
+    avp->s.len = 0;
+  }
+  return 0;
+}
+
     static int
 sca_mod_init( void )
 {
@@ -306,6 +379,12 @@ sca_mod_init( void )
     }
     sca->tm_api = &tmb;
 
+    if ( load_rr_api( &rrb ) != 0 ) {
+  LM_ERR( "Failed to initialize required rr API" );
+  goto error;
+    }
+    sca->rr_api = &rrb;
+
     if ( sca_bind_sl( sca, &slb ) != 0 ) {
 	LM_ERR( "Failed to initialize required sl API" );
 	goto error;
@@ -336,6 +415,11 @@ sca_mod_init( void )
      * timer process forks in sca_child_init, above.
      */
     register_dummy_timers( 1 );
+
+    if(sca_process_avps(&from_uri_avp_param, &from_uri_avp, &from_uri_avp_type)<0 ||
+       sca_process_avps(&to_uri_avp_param, &to_uri_avp, &to_uri_avp_type)<0) {
+      goto error;
+    }
 
     LM_INFO( "initialized" );
 
@@ -374,4 +458,113 @@ sca_mod_destroy( void )
     }
 
     sca_db_disconnect();
+}
+
+static int sca_handle_subscribe_0_f(sip_msg_t* msg) {
+  return sca_handle_subscribe(msg, NULL, NULL);
+}
+static int sca_handle_subscribe_1_f(sip_msg_t* msg, char* p1) {
+  str uri_to = STR_NULL;
+  if(get_str_fparam(&uri_to, msg, (gparam_p)p1)!=0)
+  {
+    LM_ERR("unable to get value from param pvar_to\n");
+    return -1;
+  }
+  return sca_handle_subscribe(msg, &uri_to, NULL);
+}
+static int sca_handle_subscribe_2_f(sip_msg_t* msg, char* p1, char* p2) {
+  str uri_to = STR_NULL;
+  str uri_from = STR_NULL;
+  if(get_str_fparam(&uri_to, msg, (gparam_p)p1)!=0)
+  {
+    LM_ERR("unable to get value from param pvar_to\n");
+    return -1;
+  }
+  if(get_str_fparam(&uri_from, msg, (gparam_p)p2)!=0)
+  {
+    LM_ERR("unable to get value from param pvar_from\n");
+    return -1;
+  }
+return sca_handle_subscribe(msg, &uri_to, &uri_from);
+}
+
+int fixup_hs(void **param, int param_no)
+{
+   switch (param_no) {
+       case 1:
+       case 2:
+           return fixup_spve_null(param, 1);
+       default:
+           return E_UNSPEC;
+   }
+}
+
+int fixup_free_hs(void **param, int param_no)
+{
+   switch (param_no) {
+       case 1:
+       case 2:
+           return fixup_free_spve_null(param, 1);
+       default:
+           return E_UNSPEC;
+   }
+}
+
+static int sca_call_info_update_0_f(sip_msg_t* msg) {
+   return sca_call_info_update(msg, NULL, NULL, NULL);
+}
+static int sca_call_info_update_1_f(sip_msg_t* msg, char* p1) {
+   return sca_call_info_update(msg, p1, NULL, NULL);
+}
+static int sca_call_info_update_2_f(sip_msg_t* msg, char* p1, char* p2) {
+   str uri_to = STR_NULL;
+   if(get_str_fparam(&uri_to, msg, (gparam_p)p2)!=0)
+   {
+      LM_ERR("unable to get value from param pvar_to\n");
+      return -1;
+   }
+   return sca_call_info_update(msg, p1, &uri_to, NULL);
+}
+static int sca_call_info_update_3_f(sip_msg_t* msg,
+   char* p1, char* p2, char * p3)
+{
+   str uri_to = STR_NULL;
+   str uri_from = STR_NULL;
+   if(get_str_fparam(&uri_to, msg, (gparam_p)p2)!=0)
+   {
+      LM_ERR("unable to get value from param pvar_to\n");
+      return -1;
+   }
+   if(get_str_fparam(&uri_from, msg, (gparam_p)p3)!=0)
+   {
+      LM_ERR("unable to get value from param pvar_from\n");
+      return -1;
+   }
+   return sca_call_info_update(msg, p1, &uri_to, &uri_from);
+}
+
+int fixup_ciu(void **param, int param_no)
+{
+   switch (param_no) {
+       case 1:
+           return fixup_var_int_1(param, param_no);
+       case 2:
+       case 3:
+           return fixup_spve_null(param, 1);
+       default:
+           return E_UNSPEC;
+   }
+}
+
+int fixup_free_ciu(void **param, int param_no)
+{
+   switch (param_no) {
+       case 1:
+           return 0;
+       case 2:
+       case 3:
+           return fixup_free_spve_null(param, 1);
+       default:
+           return E_UNSPEC;
+   }
 }
