@@ -1,0 +1,11 @@
+--- a/modules/topoh/th_mask.c
++++ b/modules/topoh/th_mask.c
+@@ -36,7 +36,7 @@
+ 
+ char _th_EB64[65];
+ int _th_DB64[256];
+-char *_th_PD64 = "*";
++char *_th_PD64 = "/";
+ 
+ extern str _th_key;
+ 
