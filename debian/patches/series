@@ -51,3 +51,4 @@ sipwise/pv_trans_eval_uri.patch
 sipwise/rtpengine-mos-stats.patch
 sipwise/openssl-pthreads-cleanup.patch
 sipwise/presence_dfks.patch
+sipwise/presence_dfks_add_crlf_xml.patch
