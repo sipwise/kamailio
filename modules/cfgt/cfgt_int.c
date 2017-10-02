@@ -21,6 +21,8 @@
  */
 #include <stdio.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <errno.h>
 
 #include "../../events.h"
 #include "../../lib/kcore/cmpapi.h"
@@ -376,7 +378,7 @@ void cfgt_save_node(cfgt_node_p node)
            return;
         }
         if(fputs(dest.s, fp)<0){
-        	LM_ERR("failed writing to file\n");
+        	LM_ERR("failed writing to file: %s\n", strerror(errno));
         }
         fclose(fp);
         node->jdoc.free_fn(dest.s);
