@@ -1,3 +1,24 @@
+ngcp-kamailio (4.4.6-1+0~mr5.5.1.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [2c01279] TT#18950 refresh patches
+
+  [ Guillem Jover ]
+  * [a7391e5] TT#16684 Cleanup OpenSSL state properly on a threaded program
+
+  [ Andrew Pogrebennyk ]
+  * [3890714] TT#18851 Import github.com/majastanislawska/sip-router-presence_dfks-module
+
+  [ Irina Peshinskaya ]
+  * [cf4d136] TT#21101 add CRLF to as-feature-event NOTIFY to satisfy Polycom
+
+  [ Andreas Granig ]
+  * [7157ca3] TT#22659 Print errno when json writing fails
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 02 Oct 2017 23:39:10 +0200
+
 ngcp-kamailio (4.4.6-1+0~mr5.5.0.0) unstable; urgency=medium
 
   * [78c035c] New upstream version 4.4.6
