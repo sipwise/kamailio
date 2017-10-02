@@ -1,0 +1,22 @@
+Index: kamailio/modules/cfgt/cfgt_int.c
+===================================================================
+--- kamailio.orig/modules/cfgt/cfgt_int.c	2017-10-02 17:46:31.813613647 +0200
++++ kamailio/modules/cfgt/cfgt_int.c	2017-10-02 17:48:15.141879863 +0200
+@@ -21,6 +21,8 @@
+  */
+ #include <stdio.h>
+ #include <sys/stat.h>
++#include <string.h>
++#include <errno.h>
+ 
+ #include "../../events.h"
+ #include "../../lib/kcore/cmpapi.h"
+@@ -376,7 +378,7 @@
+            return;
+         }
+         if(fputs(dest.s, fp)<0){
+-        	LM_ERR("failed writing to file\n");
++        	LM_ERR("failed writing to file: %s\n", strerror(errno));
+         }
+         fclose(fp);
+         node->jdoc.free_fn(dest.s);
