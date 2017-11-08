@@ -1,0 +1,11 @@
+--- a/modules/acc/acc_logic.c
++++ b/modules/acc/acc_logic.c
+@@ -376,6 +376,8 @@ static inline int should_acc_reply(struc
+ 
+     if ( !is_acc_on(req) )
+ 	return 0;
++
++    LM_ERR("++++++++++ early_media set to %d and code set to %d\n", early_media, code);
+ 	
+     if ( code<200 && !(early_media &&
+ 		       parse_headers(rpl,HDR_CONTENTLENGTH_F, 0) == 0 &&
