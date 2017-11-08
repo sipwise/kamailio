@@ -1,0 +1,84 @@
+--- a/modules/acc/acc_logic.c
++++ b/modules/acc/acc_logic.c
+@@ -46,6 +46,7 @@
+ #include "../../modules/tm/tm_load.h"
+ #include "../rr/api.h"
+ #include "../../flags.h"
++#include "../../trim.h"
+ #include "acc.h"
+ #include "acc_api.h"
+ #include "acc_mod.h"
+@@ -355,6 +356,34 @@ void acc_onreq( struct cell* t, int type
+ 
+ 
+ 
++/*
++ * Extract Call-ID value
++ * assumes the callid header is already parsed
++ * (so make sure it is, before calling this function or
++ * it might fail even if the message _has_ a callid)
++ */
++int
++get_callid(struct sip_msg* _m, str* _cid)
++{
++
++        if ((parse_headers(_m, HDR_CALLID_F, 0) == -1)) {
++                LOG(L_ERR, "get_callid(): parse_headers() failed\n");
++                return -1;
++        }
++
++        if (_m->callid == NULL) {
++                LOG(L_ERR, "get_callid(): Call-ID not found\n");
++                return -1;
++        }
++
++        _cid->s = _m->callid->body.s;
++        _cid->len = _m->callid->body.len;
++        trim(_cid);
++        return 0;
++}
++
++
++
+ /* is this reply of interest for accounting ? */
+ static inline int should_acc_reply(struct sip_msg *req, struct sip_msg *rpl,
+ 				   int code)
+@@ -376,11 +405,21 @@ static inline int should_acc_reply(struc
+ 
+     if ( !is_acc_on(req) )
+ 	return 0;
+-	
++
++    str req_callid, rpl_callid;
++    get_callid(req, &req_callid);
++    get_callid(rpl, &rpl_callid);
++
++    LM_ERR("++++++++++ early_media set to %d and code set to %d - call_id req: %.*s - call_id rpl: %.*s\n", early_media, code, req_callid.len, req_callid.s, rpl_callid.len, rpl_callid.s);
++
+     if ( code<200 && !(early_media &&
+ 		       parse_headers(rpl,HDR_CONTENTLENGTH_F, 0) == 0 &&
+-		       rpl->content_length && get_content_length(rpl) > 0))
++		       rpl->content_length && get_content_length(rpl) > 0)) {
++        LM_ERR("++++++++++ We will NOT account this reply - call_id req: %.*s - call_id rpl: %.*s\n", req_callid.len, req_callid.s, rpl_callid.len, rpl_callid.s);
+ 	return 0;
++    }
++
++    LM_ERR("++++++++++ We will account this reply - call_id req: %.*s - call_id rpl: %.*s\n", req_callid.len, req_callid.s, rpl_callid.len, rpl_callid.s);
+ 
+     return 1; /* seed is through, we will account this reply */
+ }
+--- a/modules/tm/t_reply.c
++++ b/modules/tm/t_reply.c
+@@ -1965,8 +1965,10 @@ enum rps relay_reply( struct cell *t, st
+ 			if (SEND_PR_BUFFER( uas_rb, buf, res_len ) >= 0){
+ 				if (unlikely(!totag_retr && has_tran_tmcbs(t, TMCB_RESPONSE_OUT))){
+ 					LOCK_REPLIES( t );
+-					run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb, t->uas.request,
+-												  relayed_msg, relayed_code);
++					if(relayed_msg==FAKED_REPLY || relayed_msg->REPLY_STATUS==uas_rb->activ_type) {
++						run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb, t->uas.request,
++											  relayed_msg, relayed_code);
++					}
+ 					UNLOCK_REPLIES( t );
+ 				}
+ 				if (unlikely(has_tran_tmcbs(t, TMCB_RESPONSE_SENT))){
