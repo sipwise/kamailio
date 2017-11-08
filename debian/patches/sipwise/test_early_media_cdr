@@ -1,0 +1,25 @@
+--- a/modules/acc/acc_logic.c
++++ b/modules/acc/acc_logic.c
+@@ -376,12 +376,21 @@ static inline int should_acc_reply(struc
+ 
+     if ( !is_acc_on(req) )
+ 	return 0;
+-	
++
++    str req_callid, rpl_callid;
++    get_callid(req, &req_callid)
++    get_callid(rpl, &rpl_callid)
++
++    LM_ERR("++++++++++ early_media set to %d and code set to %d - call_id req: %.*s - call_id rpl: %.*s\n", early_media, code, req_callid.len, req_callid.s, rpl_callid.len, rpl_callid.s);
++
+     if ( code<200 && !(early_media &&
+ 		       parse_headers(rpl,HDR_CONTENTLENGTH_F, 0) == 0 &&
+ 		       rpl->content_length && get_content_length(rpl) > 0))
++        LM_ERR("++++++++++ We will NOT account this reply - call_id req: %.*s - call_id rpl: %.*s\n", req_callid.len, req_callid.s, rpl_callid.len, rpl_callid.s);
+ 	return 0;
+ 
++    LM_ERR("++++++++++ We will account this reply - call_id req: %.*s - call_id rpl: %.*s\n", req_callid.len, req_callid.s, rpl_callid.len, rpl_callid.s);
++
+     return 1; /* seed is through, we will account this reply */
+ }
+ 
