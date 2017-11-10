@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
 Build-Depends:
  bison,
- debhelper (>= 9),
+ debhelper (>= 10),
  default-libmysqlclient-dev | libmysqlclient-dev,
  dh-systemd (>= 1.5),
  docbook-xml,
@@ -52,7 +52,7 @@ Build-Depends:
  xsltproc,
  zlib1g-dev,
 Standards-Version: 3.9.8
-Homepage: http://www.kamailio.org/
+Homepage: https://www.kamailio.org/
 Vcs-git: https://anonscm.debian.org/git/pkg-voip/kamailio.git
 Vcs-Browser: https://anonscm.debian.org/gitweb/?p=pkg-voip/kamailio.git
 
@@ -106,7 +106,7 @@ Description: very fast and configurable SIP proxy
  modules and support binaries.
 
 Package: ngcp-kamailio-dbg
-Priority: extra
+Priority: optional
 Section: debug
 Architecture: any
 Multi-Arch: same
