@@ -105,29 +105,6 @@ Description: very fast and configurable SIP proxy
  This package contains the main Kamailio binary along with the principal
  modules and support binaries.
 
-Package: ngcp-kamailio-dbg
-Priority: optional
-Section: debug
-Architecture: any
-Multi-Arch: same
-Pre-Depends:
- ${misc:Pre-Depends},
-Depends:
- ngcp-kamailio (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Conflicts:
- kamailio-dbg,
-Replaces:
- kamailio-dbg,
-Description: very fast and configurable SIP proxy [debug symbols]
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package contains the debugging symbols for the Kamailio binaries and
- modules. You only need to install it if you need to debug Kamailio.
-
 Package: ngcp-kamailio-geoip-modules
 Architecture: any
 Multi-Arch: same

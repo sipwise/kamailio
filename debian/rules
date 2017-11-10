@@ -133,13 +133,6 @@ define PACKAGE_EXTRA_INSTALL_template
 	find $(CURDIR)/debian/$(PKG_NAME)-extra-modules -depth -empty -type d -exec rmdir {} \;
 endef
 
-ifneq (,$(findstring debug,$(DEB_BUILD_OPTIONS)))
-	CFLAGS += -g
-endif
-ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
-	INSTALL_PROGRAM += -s
-endif
-
 # CFLAGS + CPPFLAGS -> CC_EXTRA_OPTS
 CC_EXTRA_OPTS := $(shell dpkg-buildflags --get CPPFLAGS)
 CC_EXTRA_OPTS += $(shell dpkg-buildflags --get CFLAGS)
@@ -214,15 +207,15 @@ binary-common:
 	dh_installdocs
 	dh_installexamples -Xobsoleted -Xsr
 	dh_installmenu
-	dh_installinit --name=kamailio-lb -- defaults 23
-	dh_installinit --name=kamailio-proxy -- defaults 23
+	dh_installinit --name=kamailio-lb
+	dh_installinit --name=kamailio-proxy
 	dh_installcron
 	dh_installman
 	dh_installinfo
 	dh_installchangelogs ChangeLog
 	dh_lintian
 	dh_link
-	dh_strip --dbg-package=$(PKG_NAME)-dbg
+	dh_strip --dbgsym-migration='$(PKG_NAME)-dbg (<= 4.4.6-1+0~mr6.0.0.0)'
 	dh_compress
 	dh_fixperms
 	dh_makeshlibs
