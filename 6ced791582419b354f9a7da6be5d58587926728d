@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "dab895d6_03ee8988",
+        "filename": "debian/.gitignore",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2017-11-13T08:17:00Z",
+      "side": 1,
+      "message": "I do not like the fact of having such list into git ignore, developers will always forget to update it and got -1 from jenkins probably. Why do we need it here? JFMI only. Tnx!",
+      "revId": "6ced791582419b354f9a7da6be5d58587926728d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
