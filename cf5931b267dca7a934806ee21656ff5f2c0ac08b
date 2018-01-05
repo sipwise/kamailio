@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da9df570_cb9f694f",
+        "filename": "debian/backports/squeeze",
+        "patchSetId": 1
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-01-05T11:04:28Z",
+      "side": 1,
+      "message": "AFAIK you can avoid the mute here in a simple ways:\n  \n12:01:11 ✔ taurus:(master)~/sipwise/git/kamailio$ grep \"LIBDIR ?\u003d\" debian/rules\nLIBDIR ?\u003d lib/$(DEB_HOST_MULTIARCH)\n12:01:22 ✔ taurus:(master)~/sipwise/git/kamailio$ grep \"LIBDIR ?\u003d\" debian/rules | sed \u0027s#^LIBDIR ?\u003d lib/$(DEB_HOST_MULTIARCH)#LIBDIR ?\u003d lib#\u0027\nLIBDIR ?\u003d lib\n12:01:31 ✔ taurus:(master)~/sipwise/git/kamailio$ grep \"LIBDIR ?\u003d\" debian/rules | sed \"s#^LIBDIR ?\u003d lib/\\$(DEB_HOST_MULTIARCH)#LIBDIR ?\u003d lib#\"\nLIBDIR ?\u003d lib\n12:01:44 ✔ taurus:(master)~/sipwise/git/kamailio$ grep \"LIBDIR ?\u003d\" debian/rules | sed \u0027s#^LIBDIR ?\u003d lib/\\$(DEB_HOST_MULTIARCH)#LIBDIR ?\u003d lib#\u0027\nLIBDIR ?\u003d lib\n12:01:52 ✔ taurus:(master)~/sipwise/git/kamailio$",
+      "range": {
+        "startLine": 8,
+        "startChar": 0,
+        "endLine": 9,
+        "endChar": 110
+      },
+      "revId": "cf5931b267dca7a934806ee21656ff5f2c0ac08b",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9df570_ebac2d8f",
+        "filename": "debian/kamailio-lb.init",
+        "patchSetId": 1
+      },
+      "lineNbr": 116,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-01-05T11:04:28Z",
+      "side": 1,
+      "message": "you have style mix here\n\ntest -x ...  \u003d\u003e sh\n[ -z ... ] \u003d\u003e bash\n\nnice to use one style. Unrelated here, while it fits my eye.",
+      "range": {
+        "startLine": 107,
+        "startChar": 0,
+        "endLine": 116,
+        "endChar": 33
+      },
+      "revId": "cf5931b267dca7a934806ee21656ff5f2c0ac08b",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9df570_8b9e4155",
+        "filename": "debian/kamailio-proxy.init",
+        "patchSetId": 1
+      },
+      "lineNbr": 114,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-01-05T11:04:28Z",
+      "side": 1,
+      "message": "since you are using bash now, you can have it fixed:\n  \n\u003e SHM_MEMORY\u003dasdf64ka ; SHM_MEMORY\u003d${SHM_MEMORY//[^[:digit:]]/} ; echo $SHM_MEMORY\n\u003e 64",
+      "range": {
+        "startLine": 111,
+        "startChar": 0,
+        "endLine": 114,
+        "endChar": 53
+      },
+      "revId": "cf5931b267dca7a934806ee21656ff5f2c0ac08b",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
