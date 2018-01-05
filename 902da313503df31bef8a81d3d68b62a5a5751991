@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da9df570_6b5afd84",
+        "filename": "debian/kamailio-lb.init",
+        "patchSetId": 2
+      },
+      "lineNbr": 170,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-01-05T15:19:24Z",
+      "side": 1,
+      "message": "not related to commit message changes ;-)\nat least add note to commit message about the migration here.\nup to Andrew here... LGTM.",
+      "range": {
+        "startLine": 169,
+        "startChar": 0,
+        "endLine": 170,
+        "endChar": 36
+      },
+      "revId": "902da313503df31bef8a81d3d68b62a5a5751991",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
