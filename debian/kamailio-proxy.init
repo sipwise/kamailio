@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ### BEGIN INIT INFO
 # Provides:          kamailio-proxy
 # Required-Start:    $syslog $network $local_fs $time $remote_fs
@@ -37,7 +37,7 @@ check_fork ()
 check_kamailio_config ()
 {
 	# Check if kamailio configuration is valid before starting the server
-	out=$($DAEMON $OPTIONS -c 2>&1 > /dev/null)
+	out=$($DAEMON "${OPTIONS[@]}" -c > /dev/null 2>&1)
 	retcode=$?
 	if [ "$retcode" != '0' ]; then
 	    echo "Not executing command for $DESC: invalid configuration file!"
@@ -54,7 +54,7 @@ check_homedir ()
     fi
 
     # Set the appropiate owner and group
-    chown ${USER}:${GROUP} $HOMEDIR
+    chown "${USER}:${GROUP}" $HOMEDIR
 }
 
 
@@ -74,7 +74,7 @@ create_radius_seqfile ()
         touch $RADIUS_SEQ_FILE
     fi
 
-    chown ${USER}:${GROUP} $RADIUS_SEQ_FILE
+    chown "${USER}:${GROUP}" $RADIUS_SEQ_FILE
     chmod 660 $RADIUS_SEQ_FILE
 }
 
@@ -108,10 +108,12 @@ fi
 
 test -z "$SHM_MEMORY" && SHM_MEMORY=64
 test -z "$PKG_MEMORY" && PKG_MEMORY=4
-SHM_MEMORY=$((`echo $SHM_MEMORY | sed -e 's/[^0-9]//g'`))
-PKG_MEMORY=$((`echo $PKG_MEMORY | sed -e 's/[^0-9]//g'`))
-[ $SHM_MEMORY -le 0 ] && SHM_MEMORY=64
-[ $PKG_MEMORY -le 0 ] && PKG_MEMORY=4
+# shellcheck disable=SC2001
+SHM_MEMORY=$(echo $SHM_MEMORY | sed -e 's/[^0-9]//g')
+# shellcheck disable=SC2001
+PKG_MEMORY=$(echo $PKG_MEMORY | sed -e 's/[^0-9]//g')
+[ "$SHM_MEMORY" -le 0 ] && SHM_MEMORY=64
+[ "$PKG_MEMORY" -le 0 ] && PKG_MEMORY=4
 [ -z "$USER" ]  && USER=kamailio
 [ -z "$GROUP" ] && GROUP=kamailio
 
@@ -132,18 +134,18 @@ else
 fi
 
 if [ "$SSD_SUID" != "yes" ]; then
-  OPTIONS="-f $CFGFILE -P $PIDFILE -m $SHM_MEMORY -M $PKG_MEMORY -u $USER -g $GROUP"
-  SSDOPTS=""
+  OPTIONS=(-f "$CFGFILE" -P "$PIDFILE" -m "$SHM_MEMORY" -M "$PKG_MEMORY" -u "$USER" -g "$GROUP")
+  SSDOPTS=()
 else
-  OPTIONS="-f $CFGFILE -P $PIDFILE -m $SHM_MEMORY -M $PKG_MEMORY"
-  SSDOPTS="--chuid $USER:$GROUP"
+  OPTIONS=(-f "$CFGFILE" -P "$PIDFILE" -m "$SHM_MEMORY" -M "$PKG_MEMORY")
+  SSDOPTS=(--chuid "$USER:$GROUP")
 fi
 
 
 start_kamailio_daemon ()
 {
-  start-stop-daemon --start --quiet --pidfile $PIDFILE $SSDOPTS \
-    --exec $DAEMON -- $OPTIONS
+  start-stop-daemon --start --quiet --pidfile $PIDFILE "${SSDOPTS[@]}" \
+    --exec $DAEMON -- "${OPTIONS[@]}"
   res=$?
 
   echo -n "$NAME "

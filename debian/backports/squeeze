@@ -5,6 +5,7 @@
 # Target dist: Debian Squeeze
 
 # remove Multi-arch
+# shellcheck disable=SC2016
 sed -i -e 's#^DEB_HOST_MULTIARCH.*$##' -e 's#^LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)#LIBDIR ?= lib#' debian/rules
 sed -i -e 's#multiarch_support.patch#no_lib64_on_64_bits.patch#' debian/patches/series
 sed -i -e '/^Multi-Arch: .*/d' debian/control
