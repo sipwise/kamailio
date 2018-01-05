@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ### BEGIN INIT INFO
 # Provides:          kamailio-lb
 # Required-Start:    $syslog $network $local_fs $remote_fs $time
@@ -36,7 +36,7 @@ check_fork ()
 check_kamailio_config ()
 {
 	# Check if kamailio configuration is valid before starting the server
-	out=$($DAEMON $OPTIONS -c 2>&1 > /dev/null)
+	out=$($DAEMON "${OPTIONS[@]}" -c > /dev/null 2>&1)
 	retcode=$?
 	if [ "$retcode" != '0' ]; then
 	    echo "Not executing command for $DESC: invalid configuration file!"
@@ -53,7 +53,7 @@ check_homedir ()
     fi
 
     # Set the appropiate owner and group
-    chown ${USER}:${GROUP} $HOMEDIR
+    chown "${USER}:${GROUP}" "$HOMEDIR"
 }
 
 
@@ -73,7 +73,7 @@ create_radius_seqfile ()
         touch $RADIUS_SEQ_FILE
     fi
 
-    chown ${USER}:${GROUP} $RADIUS_SEQ_FILE
+    chown "${USER}:${GROUP}" "$RADIUS_SEQ_FILE"
     chmod 660 $RADIUS_SEQ_FILE
 }
 
@@ -105,21 +105,22 @@ if [ "$RUN_KAMAILIO" != "yes" ]; then
 fi
 
 
-test -z "$SHM_MEMORY" && SHM_MEMORY=64
-test -z "$PKG_MEMORY" && PKG_MEMORY=4
-SHM_MEMORY=$((`echo $SHM_MEMORY | sed -e 's/[^0-9]//g'`))
-PKG_MEMORY=$((`echo $PKG_MEMORY | sed -e 's/[^0-9]//g'`))
-[ $SHM_MEMORY -le 0 ] && SHM_MEMORY=64
-[ $PKG_MEMORY -le 0 ] && PKG_MEMORY=4
+[ -z "$SHM_MEMORY" ] && SHM_MEMORY=64
+[ -z "$PKG_MEMORY" ] && PKG_MEMORY=4
+SHM_MEMORY=${SHM_MEMORY//[^[:digit:]]/}
+PKG_MEMORY=${PKG_MEMORY//[^[:digit:]]/}
+[ "$SHM_MEMORY" -le 0 ] && SHM_MEMORY=64
+[ "$PKG_MEMORY" -le 0 ] && PKG_MEMORY=4
 [ -z "$USER" ]  && USER=kamailio
 [ -z "$GROUP" ] && GROUP=kamailio
+
 
 if /usr/sbin/ngcp-virt-identify --type container; then
   echo "container environment detected. Skip ulimit commands"
 else
-  if test "$DUMP_CORE" = "yes" ; then
-      # set proper ulimit
-      ulimit -c unlimited
+  if [ "$DUMP_CORE" = "yes" ] ; then
+    # set proper ulimit
+    ulimit -c unlimited
   fi
 
   # raise memlock limit, otherwise mysql client fails to initialize
@@ -130,18 +131,18 @@ else
 fi
 
 if [ "$SSD_SUID" != "yes" ]; then
-  OPTIONS="-f $CFGFILE -P $PIDFILE -m $SHM_MEMORY -M $PKG_MEMORY -u $USER -g $GROUP"
-  SSDOPTS=""
+  OPTIONS=(-f "$CFGFILE" -P "$PIDFILE" -m "$SHM_MEMORY" -M "$PKG_MEMORY" -u "$USER" -g "$GROUP")
+  SSDOPTS=()
 else
-  OPTIONS="-f $CFGFILE -P $PIDFILE -m $SHM_MEMORY -M $PKG_MEMORY"
-  SSDOPTS="--chuid $USER:$GROUP"
+  OPTIONS=(-f "$CFGFILE" -P "$PIDFILE" -m "$SHM_MEMORY" -M "$PKG_MEMORY")
+  SSDOPTS=(--chuid "$USER:$GROUP")
 fi
 
 
 start_kamailio_daemon ()
 {
-  start-stop-daemon --start --quiet --pidfile $PIDFILE $SSDOPTS \
-    --exec $DAEMON -- $OPTIONS
+  start-stop-daemon --start --quiet --pidfile $PIDFILE "${SSDOPTS[@]}" \
+    --exec $DAEMON -- "${OPTIONS[@]}"
   res=$?
 
   echo -n "$NAME "
@@ -149,7 +150,7 @@ start_kamailio_daemon ()
     echo "started."
     exit 0
   else
-    if [ ! -r "$PIDFILE" ]; then
+    if [ ! -r "$PIDFILE" ] ; then
       echo "error, failed to start."
       exit 1
     elif read pid < "$PIDFILE" && ps -p "$pid" > /dev/null 2>&1; then
@@ -165,8 +166,8 @@ start_kamailio_daemon ()
 
 case "$1" in
   start|debug)
-    if [ -x "/usr/sbin/ngcp-check_active" ]; then
-      /usr/sbin/ngcp-check_active -q
+    if [ -x "/usr/sbin/ngcp-check-active" ] ; then
+      /usr/sbin/ngcp-check-active -q
       status=$?
       case "${status}" in
         0|3)
@@ -182,7 +183,7 @@ case "$1" in
     create_radius_seqfile
 
     if [ "$1" != "debug" ]; then
-        check_fork
+      check_fork
     fi
 
     echo "Starting $DESC using $CFGFILE: "
@@ -218,7 +219,7 @@ case "$1" in
     fi
     ;;
 
-    restart|force-reload)
+  restart|force-reload)
     check_kamailio_config
     check_homedir
     create_radius_seqfile
@@ -231,8 +232,8 @@ case "$1" in
       exit 1
     fi
 
-    if [ -x "/usr/sbin/ngcp-check_active" ]; then
-      /usr/sbin/ngcp-check_active -q
+    if [ -x "/usr/sbin/ngcp-check-active" ] ; then
+      /usr/sbin/ngcp-check-active -q
       status=$?
       case "${status}" in
         0|3)
@@ -250,7 +251,7 @@ case "$1" in
 
   status)
     echo -n "Status of $DESC: $NAME "
-    if [ ! -r "$PIDFILE" ]; then
+    if [ ! -r "$PIDFILE" ] ; then
       echo "is not running."
       exit 3
     fi
