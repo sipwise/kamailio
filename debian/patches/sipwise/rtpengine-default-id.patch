@@ -1,0 +1,40 @@
+--- a/modules/rtpengine/rtpengine.c
++++ b/modules/rtpengine/rtpengine.c
+@@ -778,7 +778,7 @@
+ 	unsigned int my_current_id = 0;
+ 	int new_list;
+ 
+-	if (set_id < DEFAULT_RTPP_SET_ID )
++	if (set_id < 0 )
+ 	{
+ 		LM_ERR(" invalid rtpproxy set value [%d]\n", set_id);
+ 		return NULL;
+@@ -840,7 +840,7 @@
+ 		rtpp_set_list->rset_last = rtpp_list;
+ 		rtpp_set_count++;
+ 
+-		if(my_current_id == DEFAULT_RTPP_SET_ID){
++		if(my_current_id == setid_default){
+ 			default_rtpp_set = rtpp_list;
+ 		}
+ 	}
+@@ -1052,7 +1052,7 @@
+ 		rtp_proxies+=2;
+ 	}else{
+ 		rtp_proxies = p;
+-		my_current_id = DEFAULT_RTPP_SET_ID;
++		my_current_id = setid_default;
+ 	}
+ 
+ 	for(;*rtp_proxies && isspace(*rtp_proxies);rtp_proxies++);
+@@ -1844,10 +1844,6 @@
+ 		}
+ 	}
+ 
+-	/* any rtpproxy configured? */
+-	if (rtpp_set_list)
+-		default_rtpp_set = select_rtpp_set(DEFAULT_RTPP_SET_ID);
+-
+ 	if (rtp_inst_pv_param.s) {
+ 		rtp_inst_pv_param.len = strlen(rtp_inst_pv_param.s);
+ 		rtp_inst_pvar = pv_cache_get(&rtp_inst_pv_param);
