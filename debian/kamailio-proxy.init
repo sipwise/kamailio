@@ -194,7 +194,7 @@ case "$1" in
   safe-stop)
     check_kamailio_config
     echo "Stopping $DESC:"
-    start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE \
+    start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE --retry 5 \
       --exec $DAEMON
     echo -n "$NAME "
     if [ $? -eq 0 ] ; then
@@ -208,7 +208,7 @@ case "$1" in
 
   stop)
     echo "Stopping $DESC:"
-    start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE \
+    start-stop-daemon --oknodo --stop --quiet --pidfile $PIDFILE --retry 5 \
       --exec $DAEMON
     echo -n "$NAME "
     if [ $? -eq 0 ] ; then
