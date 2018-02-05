@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1a930d6b_979e6755",
+        "filename": "debian/kamailio-proxy.init",
+        "patchSetId": 2
+      },
+      "lineNbr": 211,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-02-05T17:00:54Z",
+      "side": 1,
+      "message": "Andrew, isn\u0027t the difference in kamailio init actions stop/safe-stop exactly waiting for service to stop?\n\n\nI have heard \"safe-stop\" should wait for process to stop which can take some time. While \"stop\" didn\u0027t wait explicitly to be fast. We were not affected here on \"restart\" from ngcpcfg as we are wailing there. So fat systemd doesn\u0027t use \u0027restart\u0027 ection and operates with stop/start. So we have a problem here.\n\n\nI see no difference in stop/safe-stop here anymore.",
+      "revId": "c5db8b0f9b4fb3825467aff4b59636f0a6ce9779",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
