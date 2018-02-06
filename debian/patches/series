@@ -10,7 +10,8 @@ sipwise/add_pcem_module.patch
 sipwise/add_lcr_rate_module.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
-upstream/add_db_redis_module.patch
+sipwise/add_db_redis_module.patch
+sipwise/add_pv_headers_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
