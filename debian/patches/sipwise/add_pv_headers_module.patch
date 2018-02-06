@@ -1,0 +1,1960 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -15,7 +15,7 @@
+ 				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
+ 				   rtpproxy sanity sdpops siputils sl statistics textops \
+ 				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
+-				   auth_xkeys smsops tsilo cfgt statsc topos sipdump
++				   auth_xkeys smsops tsilo cfgt statsc topos sipdump pv_headers
+ 
+ # - extra used modules, with no extra dependency
+ mod_list_extra=avp auth_diameter call_control call_obj dmq domainpolicy msrp \
+--- /dev/null
++++ b/src/modules/pv_headers/Makefile
+@@ -0,0 +1,14 @@
++#
++# pv_headers module makefile
++#
++#
++# WARNING: do not run this directly, it should be run by the master Makefile
++
++include ../../Makefile.defs
++auto_gen=
++NAME=pv_headers.so
++LIBS=
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE
++
++include ../../Makefile.modules
+--- /dev/null
++++ b/src/modules/pv_headers/README
+@@ -0,0 +1,310 @@
++The pv_headers Module
++
++Kirill Solomko
++
++   Sipwise GmbH
++
++   Copyright © 2018 Sipwise GmbH
++     __________________________________________________________________
++
++   Table of Contents
++
++    1. Admin Guide
++
++        1. Dependencies
++
++              1.1. Kamailio modules
++
++        2. Parameters
++
++              2.1. xavp_name (string)
++
++        3. Functions
++
++              3.1. pv_collect_headers()
++              3.2. pv_apply_headers()
++              3.3. pv_check_header(hname)
++              3.4. pv_append_header(hname, hvalue)
++              3.5. pv_modify_header(hname, hvalue)
++              3.6. pv_remove_header(hname)
++
++1. Design Goals
++
++    The main goal of the module is to offload the intermediate header processing
++    into the XAVP dynamic container as well as provide with high level methods
++    for collecting the headers, applying the headers and manipulating the XAVP.
++
++2. Overview of Operation
++
++    This module enables storing all headers in XAVP to freely modify
++    them in the kamailio logic and only apply them once when it's time
++    for the packet to be routed outside.
++
++Chapter 1. Admin Guide
++
++    Table of Contents
++
++    1. Dependencies
++
++        1.1. Kamailio modules
++
++    2. Parameters
++
++        2.1. xavp_name (string)
++        2.2. skip_headers (string)
++        2.3. split_headers (string)
++
++    3. Functions
++
++        3.1. pv_collect_headers()
++        3.2. pv_apply_headers()
++        3.3. pv_reset_headers()
++        3.4. pv_check_header(hname)
++        3.5. pv_append_header(hname, hvalue)
++        3.6. pv_modify_header(hname, hvalue)
++        3.7. pv_modify_header(hname, idx, hvalue)
++        3.8. pv_remove_header(hname)
++        3.9. pv_remove_header(hname, idx)
++
++1. Dependencies
++
++    1.1. Kamailio modules
++
++1.1. Kamailio modules
++
++    The following modules are optional to be loaded and enable additional
++    functionality:
++        * uac
++            From/To headers are applied using uac_replace_from/uac_replace_to
++
++2. Parameters
++
++    2.1. xavp_name (string)
++
++2.1. xavp_name (string)
++
++    Name of the XAVP there the collected headers are stored.
++
++    Default: headers
++
++    Example 2.1. Set xavp_name parameter
++modparam("pv_headers", "xavp_name", "headers")
++
++    Result:
++        $xavp(headers[0]=>From)
++        $xavp(headers[0]=>To)
++        $xavp(headers[0]=>Call-ID)
++        ....
++
++    2.2. skip_headers (string)
++
++2.2. skip_headers (string)
++
++    A comma separated headers list that must be excluded from processing
++    (they are skipped when pv_apply_headers() changes the sip message headers).
++    If the parameter is not set then the "Default" list is used.
++    If the parameter is set to an empty string then all the sip message headers are processed.
++
++    Default: Record-Route,Via,Route,Content-Length,Max-Forwards
++
++    2.3. split_headers (string)
++
++2.3. split_headers (string)
++
++    A comma separated headers list that must be split into multi headers if
++    their value is a comma separated list.
++    If the parameter is not set then the "Default" is used.
++    If the parameter is set to an empty string then no headers are split.
++
++    Default: None
++
++    Example 2.3. Set split_headers parameters
++modparam("pv_headers", "split_headers", "Diversion")
++
++    Result:
++        Received Diversion header:
++            Diversion: <user1@test.local>,<user2@test.local>,<user3@test.local>
++        After split:
++            Diversion: <user1@test.local>
++            Diversion: <user2@test.local>
++            Diversion: <user3@test.local>
++        Becomes handy if used together with pv_modify_header() or pv_remove_header()
++        to change or remove value 2 for instance.
++
++3. Functions
++
++    3.1. pv_collect_headers()
++    3.2. pv_apply_headers()
++    3.3. pv_reset_headers()
++    3.4. pv_check_header(hname)
++    3.5. pv_append_header(hname, hvalue)
++    3.6. pv_modify_header(hname, hvalue)
++    3.7. pv_modify_header(hname, idx, hvalue)
++    3.8. pv_remove_header(hname)
++    3.9. pv_remove_header(hname, idx)
++
++3.1.  pv_collect_headers()
++
++    This function collects all headers from the message into the XAVP.
++    It should be used preferably just when the sip message is reveived by kamailio.
++
++    Returns:
++     1 - on success
++    -1 - if there were errors
++
++3.2.  pv_apply_headers()
++
++    This function applies the current XAVP headers state to the real headers.
++    and should be called only once per branch when the message is about to leave kamailio.
++
++    The following rules apply:
++
++    - all headers in the XAVP except for ones provided in the "skip_headers"
++      parameter and From/To are recreated in the sip message.
++    - From/To headers are processed by the uac module if it is loaded.
++    - From/To headers are not changed in the reply messages.
++    - headers with NULL value are removed if exist in the sip message.
++    - the initial order of the sip headers is preserved.
++
++    Usage:
++
++        if (pv_apply_headers())
++        {
++            "success"
++        }
++        else
++        {
++            "errors"
++        }
++
++3.3.  pv_reset_headers()
++
++    This function resets the current XAVP headers list and enables
++    pv_collect_headers() and pv_apply_headers() to be called again in the same branch.
++
++    Usage:
++
++        if (pv_reset_headers())
++        {
++            "success"
++        }
++        else
++        {
++            "errors"
++        }
++
++
++3.4.  pv_check_header(hname)
++
++    This function checks if the header already exists in the XAVP.
++    It can be freely called from anywere, but only after pv_collect_headers().
++
++    Usage:
++
++        if (pv_check_header(hname))
++        {
++            "exists"
++        }
++        else
++        {
++            "does not exist"
++        }
++
++
++3.5.  pv_append_header(hname, hvalue)
++
++    This function appends a new header into the XAVP.
++    It can be freely called from anywere, but only after pv_collect_headers().
++
++    Please note that subsequent "pv_append_header" calls will result in multiple
++    headers.
++
++    If the provided "hvalue" is $null then the header is added into the XAVP
++    but it is not going to be added into the message.
++
++    Usage:
++
++        if (pv_append_header(hname, hvalue))
++        {
++            "appended"
++        }
++        else
++        {
++            "errors"
++        }
++
++3.6.  pv_modify_header(hname, hvalue)
++
++    This function modifies an existing header in the XAVP.
++    It can be freely called from anywere, but only after pv_collect_headers().
++
++    Please note that if the header does not exist it will be explicitly appended.
++    If there are multiple headers with the same name only the first one will be affected.
++
++    If the provided header value is $null then the header is modified in the XAVP
++    then it is removed from the sip message when pv_apply_headers() is called.
++
++    Usage:
++
++        if (pv_modify_header(hname, hvalue))
++        {
++            "modified"
++        }
++        else
++        {
++            "errors"
++        }
++
++3.7. pv_modify_header(hname, idx, hvalue)
++
++    This function works similar to pv_modify_header(hname, hvalue) but
++    should be used when there are multiple headers with the same name one of them
++    to be modified. Index order is top to bottom.
++
++    Usage:
++
++    if (pv_modify_header(hname, idx, hvalue))
++    {
++        "modified"
++    }
++    else
++    {
++        "errors"
++    }
++
++3.8.  pv_remove_header(hname)
++
++    This function removes an existing header from the XAVP.
++    It can be freely called from anywere, but only after pv_collect_headers().
++
++    If there are multiple headers with the same name all of them are removed.
++
++    It returns -1 if the header does not exist.
++
++    Usage:
++
++        if (pv_remove_header(hname, hvalue))
++        {
++            "removed"
++        }
++        else
++        {
++            "does not exist or errors"
++        }
++
++3.7. pv_remove_header(hname, idx, hvalue)
++
++    This function works similar to pv_remove_header(hname, hvalue) but
++    should be used when there are multiple headers with the same name one of them
++    to be removed. Index order is top to bottom.
++
++    Usage:
++
++        if (pv_remove_header(hname, idx, hvalue))
++        {
++            "removed"
++        }
++        else
++        {
++            "does not exist or errors"
++        }
+--- /dev/null
++++ b/src/modules/pv_headers/pv_headers.c
+@@ -0,0 +1,1583 @@
++/*
++ * pv_headers
++ *
++ * Copyright (C) 2018 Kirill Solomko
++ *
++ * This file is part of SIP Router, a free SIP server.
++ *
++ * SIP Router is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * SIP Router is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "../../core/sr_module.h"
++#include "../../core/mod_fix.h"
++#include "../../core/dprint.h"
++#include "../../core/dset.h"
++#include "../../core/flags.h"
++#include "../../core/xavp.h"
++#include "../../core/pvar.h"
++#include "../../core/str_hash.h"
++#include "../../core/data_lump.h"
++#include "../../core/mem/shm_mem.h"
++#include "../../core/parser/parse_from.h"
++#include "../../core/parser/parse_uri.h"
++#include "../../core/parser/msg_parser.h"
++#include "../../modules/uac/api.h"
++
++MODULE_VERSION
++
++#define MODULE_NAME "pv_headers"
++
++#define XAVP_NAME "headers"
++
++#define FL_NAME_PV_HDRS_COLLECTED "pv_headers_collected"
++#define FL_NAME_PV_HDRS_APPLIED "pv_headers_applied"
++
++static int FL_PV_HDRS_COLLECTED = -1;
++static int FL_PV_HDRS_APPLIED = -1;
++
++static uac_api_t uac;
++
++static str xavp_name = str_init(XAVP_NAME);
++
++static str xavp_helper_xname  = str_init("modparam_pv_headers");
++static str xavp_parsed_xname  = str_init("parsed_pv_headers");
++static str xavp_helper_name   = str_init("xavp_name");
++static str skip_headers_param = str_init("Record-Route,Via,Route,Content-Length,Max-Forwards,CSeq");
++static str split_headers_param = STR_NULL;
++
++static str single_headers_param = str_init("");
++
++static unsigned int header_name_size    = 255;
++static unsigned int header_value_size   = 1024;
++
++static struct str_hash_table skip_headers;
++static struct str_hash_table split_headers;
++static struct str_hash_table single_headers;
++
++typedef struct _xavp_c_data {
++    struct to_body to_b;
++    str value;
++} xavp_c_data_t;
++
++static void destroy(void);
++static int mod_init(void);
++
++static int pv_collect_headers(struct sip_msg *msg, char *_s1, char *_s2);
++static int pv_apply_headers(struct sip_msg *msg, char *_s1, char *_s2);
++static int pv_reset_headers(struct sip_msg *_m, char *_s1, char *_s2);
++
++static int pv_check_header(struct sip_msg *_m, char *hname, char *_s2);
++static int pv_append_header(struct sip_msg *_m, char *hname, char *hvalue);
++static int pv_modify_header(struct sip_msg *_m, char *hname, char *hvalue);
++static int pv_modify_header_idx(struct sip_msg *_m, char *hname, char *hidx, char *hvalue);
++static int pv_remove_header(struct sip_msg *_m, char *hname, char *_s2);
++static int pv_remove_header_idx(struct sip_msg *_m, char *hname, char *hidx);
++
++static int pv_set_xavp(str *xname, str *name, void *data, sr_xtype_t type, int idx, int append);
++static int pv_free_xavp(str *xname);
++
++static int pv_fixup_svalue(struct sip_msg *msg, char *src, str *dst);
++static int pv_real_hdr_append(struct sip_msg *msg, str *hname, str *hvalue);
++static int pv_real_hdr_replace(struct sip_msg *msg, str *hname, str *hvalue);
++static int pv_real_hdr_del_by_name(struct sip_msg *msg, str *hname);
++static int pv_real_hdr_remove_display(struct sip_msg *msg, str *hname);
++static int pv_create_hdr_str(str *hname, str *hvalue, str *dst);
++static int pv_str_new(str *s, int size);
++static int pv_str_free(str *s);
++static int pv_str_copy(str *dst, str *src, unsigned int max_size);
++static int pv_extract_display_uri(char *suri, str *display, str *duri);
++static int pv_split_values(str *s, char d[][header_value_size], int *d_size);
++
++static sr_xavp_t * pv_xavp_new_value(str *name, sr_xval_t *val);
++static int pv_xavp_append_value(str *name, sr_xval_t *val, sr_xavp_t **start);
++static int pv_xavp_set_value(str *name, sr_xval_t *val, int idx, sr_xavp_t **start);
++static sr_xval_t * pv_xavp_get_value(str *xname, str *name, int idx);
++static int pv_xavp_is_null(sr_xavp_t * xavp);
++static void pv_xavp_free_data(void *p, sr_xavp_sfree_f sfree);
++static void pv_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree);
++
++static int pv_skip_header(str *hname);
++static int pv_single_header(str *hname);
++
++static int pv_xavp_keys_count(sr_xavp_t **start);
++
++static int pv_str_hash_init(struct str_hash_table *ht, str *keys, char *desc);
++static int pv_str_hash_add_key(struct str_hash_table *ht, str *key);
++static int pv_str_hash_free(struct str_hash_table *ht);
++
++static int pv_parse_header_name(pv_spec_p sp, str *hname);
++static int pv_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
++static int pv_set_header(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
++static int pv_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
++static int pv_set_uri(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
++static int pv_merge_uri(struct sip_msg *msg, enum action_type type, str *cur, str *new, xavp_c_data_t *c_data);
++
++
++/*
++ * Exported functions
++ */
++static cmd_export_t cmds[] = {
++    {"pv_collect_headers", (cmd_function)pv_collect_headers, 0, 0, 0, ANY_ROUTE},
++    {"pv_apply_headers", (cmd_function)pv_apply_headers, 0, 0, 0, ANY_ROUTE},
++    {"pv_reset_headers", (cmd_function)pv_reset_headers, 0, 0, 0, ANY_ROUTE},
++    {"pv_check_header", (cmd_function)pv_check_header, 1, fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
++    {"pv_append_header", (cmd_function)pv_append_header, 2, fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++    {"pv_modify_header", (cmd_function)pv_modify_header, 2, fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++    {"pv_modify_header", (cmd_function)pv_modify_header_idx, 3, fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
++    {"pv_remove_header", (cmd_function)pv_remove_header, 1, fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
++    {"pv_remove_header", (cmd_function)pv_remove_header_idx, 2, fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++    {0, 0, 0, 0, 0, 0}
++};
++
++static pv_export_t pvs[] = {
++    {{"x_hdr", (sizeof("x_hdr")-1)}, PVT_OTHER, pv_get_header, pv_set_header, pv_parse_header_name, pv_parse_index, 0, 0},
++    {{"x_fu", (sizeof("x_fu")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 1},
++    {{"x_fU", (sizeof("x_fU")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 2},
++    {{"x_fd", (sizeof("x_fd")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 3},
++    {{"x_fn", (sizeof("x_fn")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 4},
++    {{"x_ft", (sizeof("x_ft")-1)}, PVT_OTHER, pv_get_uri, /* ro */ 0, 0, 0, pv_init_iname, 5},
++    {{"x_tu", (sizeof("x_tu")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 6},
++    {{"x_tU", (sizeof("x_tU")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 7},
++    {{"x_td", (sizeof("x_td")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 8},
++    {{"x_tn", (sizeof("x_tn")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 9},
++    {{"x_tt", (sizeof("x_tt")-1)}, PVT_OTHER, pv_get_uri, /* ro */ 0, 0, 0, pv_init_iname, 10},
++    { {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
++};
++
++static param_export_t params[] = {
++    {"xavp_name", PARAM_STR, &xavp_name},
++    {"header_value_size", PARAM_INT, &header_value_size},
++    {"skip_headers", PARAM_STR, &skip_headers_param},
++    {"split_headers", PARAM_STR, &split_headers_param},
++    {0, 0, 0}
++};
++
++struct module_exports exports = {
++    MODULE_NAME,
++    DEFAULT_DLFLAGS, /* dlopen flags */
++    cmds,      /* Exported functions */
++    params,    /* Exported parameters */
++    0,         /* exported statistics */
++    0,         /* exported MI functions */
++    pvs,       /* exported pseudo-variables */
++    0,         /* extra processes */
++    mod_init,  /* module initialization function */
++    0,         /* response function */
++    destroy,   /* destroy function */
++    0          /* child initialization function */
++};
++
++int mod_init(void)
++{
++    LM_INFO("%s module init...\n", MODULE_NAME);
++    if ((FL_PV_HDRS_COLLECTED = register_flag(FL_NAME_PV_HDRS_COLLECTED, -1)) < 0) {
++        LM_ERR("could not register a flag\n");
++        return -1;
++    }
++    if ((FL_PV_HDRS_APPLIED = register_flag(FL_NAME_PV_HDRS_APPLIED, -1)) < 0) {
++        LM_ERR("could not register a flag\n");
++        return -1;
++    }
++
++    if (load_uac_api(&uac) < 0) {
++        LM_NOTICE("could not bind to the 'uac' module, From/To headers will not be modifed\n");
++    }
++
++    if (header_value_size == 0) {
++        LM_ERR("header_value_size must be >=0\n");
++        return -1;
++    }
++
++    pv_str_hash_init(&skip_headers, &skip_headers_param, "skip_headers");
++    pv_str_hash_init(&split_headers, &split_headers_param, "split_headers");
++    pv_str_hash_init(&single_headers, &single_headers_param, "single_headers");
++
++    return 0;
++}
++
++void destroy(void)
++{
++    pv_str_hash_free(&skip_headers);
++    pv_str_hash_free(&split_headers);
++    pv_str_hash_free(&single_headers);
++    pv_free_xavp(&xavp_name);
++    pv_free_xavp(&xavp_parsed_xname);
++    LM_INFO("%s module unload...\n", MODULE_NAME);
++}
++
++int pv_collect_headers(struct sip_msg *msg, char *_s1, char *_s2)
++{
++    struct hdr_field *hf = NULL;
++    str name = STR_NULL;
++    str val  = STR_NULL;
++
++    char hvals[header_name_size][header_value_size];
++    int idx = 0, d_size = 0;
++    str val_part = STR_NULL;
++
++    if ((isbflagset(0, FL_PV_HDRS_COLLECTED) == 1) &&
++        (isflagset(msg, FL_PV_HDRS_COLLECTED) == 1)) {
++        LM_ERR("headers are already collected\n");
++        return -1;
++    }
++
++    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
++        LM_ERR("error parsing headers\n");
++        return -1;
++    }
++
++    if (pv_str_new(&name,  header_name_size) < 0) goto err;
++    if (pv_str_new(&val,   header_value_size) < 0) goto err;
++
++    if (name.s == NULL || val.s == NULL)
++        goto err;
++
++    for (hf=msg->headers; hf; hf=hf->next) {
++        LM_DBG("collect header[%.*s]: %.*s\n", hf->name.len, hf->name.s, hf->body.len, hf->body.s);
++
++        pv_str_copy(&val, &hf->body, header_value_size);
++        pv_str_copy(&name, &hf->name, header_name_size);
++
++        if (str_hash_get(&split_headers, name.s, name.len) &&
++            strchr(val.s, ',') != NULL) {
++
++            if (pv_split_values(&val, hvals, &d_size) < 0) {
++                LM_ERR("could not parse Diversion header comma separated value");
++                return -1;
++            }
++
++            for (idx=0;idx<d_size;idx++) {
++                val_part.s = hvals[idx];
++                val_part.len = strlen(hvals[idx]);
++                if (pv_set_xavp(&xavp_name, &name, &val_part, SR_XTYPE_STR, 0, 1) < 0)
++                    goto err;
++            }
++            continue;
++        }
++
++        if (pv_set_xavp(&xavp_name, &name, &val, SR_XTYPE_STR, 0, 1) < 0)
++            goto err;
++    }
++
++    if (pv_set_xavp(&xavp_helper_xname, &xavp_helper_name, &xavp_name, SR_XTYPE_STR, 0, 0) < 0)
++        goto err;
++
++    pv_str_free(&name);
++    pv_str_free(&val);
++
++    setbflag(0, FL_PV_HDRS_COLLECTED);
++    setflag(msg, FL_PV_HDRS_COLLECTED);
++
++    return 1;
++
++err:
++    pv_str_free(&name);
++    pv_str_free(&val);
++    return -1;
++}
++
++int pv_apply_headers(struct sip_msg *msg, char *_s1, char *_s2)
++{
++    sr_xavp_t *xavp = NULL;
++    sr_xavp_t *sub = NULL;
++    str display = STR_NULL;
++    str uri = STR_NULL;
++    struct str_hash_table rm_hdrs;
++    int from_cnt = 0, to_cnt = 0;
++
++    if ((isbflagset(0, FL_PV_HDRS_APPLIED) == 1) &&
++        (isflagset(msg, FL_PV_HDRS_APPLIED) == 1)) {
++        LM_ERR("headers are already applied\n");
++        return -1;
++    }
++
++    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
++        LM_ERR("error parsing headers\n");
++        return -1;
++    }
++
++    xavp = xavp_get(&xavp_name, NULL);
++    if (xavp == NULL) {
++        LM_ERR("missing xavp %s, run pv_collect_headers() first\n", xavp_name.s);
++        return -1;
++    }
++
++    if (xavp->val.type != SR_XTYPE_XAVP) {
++        LM_ERR("not xavp child type %s\n" , xavp_name.s);
++        return -1;
++    }
++
++    if (xavp && xavp->val.type == SR_XTYPE_XAVP)
++        sub = xavp->val.v.xavp;
++
++    if (sub == NULL) {
++        LM_ERR("invalid xavp structure: %s\n", xavp_name.s);
++        return -1;
++    }
++
++    if (str_hash_alloc(&rm_hdrs, pv_xavp_keys_count(&sub)) < 0) {
++        LM_ERR("memory allocation error\n");
++        return -1;
++    }
++    str_hash_init(&rm_hdrs);
++
++    if (pv_str_new(&display, header_value_size) < 0) goto err;
++    if (pv_str_new(&uri,     header_value_size) < 0) goto err;
++
++    do {
++        if (pv_skip_header(&sub->name) == 1)
++            continue;
++
++        if (strncasecmp(sub->name.s, "From", sub->name.len) == 0) {
++            if (msg->first_line.type == SIP_REPLY ||
++                msg->first_line.u.request.method_value == METHOD_ACK ||
++                msg->first_line.u.request.method_value == METHOD_PRACK ||
++                msg->first_line.u.request.method_value == METHOD_BYE) {
++                LM_DBG("skip From header change in reply messages\n");
++                continue;
++            }
++
++            if (from_cnt > 0)
++                continue;
++
++            memset(display.s, 0, header_value_size);
++            memset(uri.s, 0, header_value_size);
++
++            if (pv_extract_display_uri(sub->val.v.s.s, &display, &uri) < 0) {
++                LM_ERR("error parsing From header\n");
++                goto err;
++            }
++
++            if (uac.replace_from != NULL) {
++                LM_DBG("replace_from[%s]: %s %s\n", sub->name.s, display.s, uri.s);
++                if (display.len == 0)
++                    pv_real_hdr_remove_display(msg, &sub->name);
++                uac.replace_from(msg, &display, &uri);
++            }
++
++            from_cnt++;
++            continue;
++        }
++
++        if (strncasecmp(sub->name.s, "To", sub->name.len) == 0) {
++            if (msg->first_line.type == SIP_REPLY ||
++                msg->first_line.u.request.method_value == METHOD_ACK ||
++                msg->first_line.u.request.method_value == METHOD_PRACK ||
++                msg->first_line.u.request.method_value == METHOD_BYE) {
++                LM_DBG("skip To header change in reply messages\n");
++                continue;
++            }
++
++            if (to_cnt > 0)
++                continue;
++
++            memset(display.s, 0, header_value_size);
++            memset(uri.s, 0, header_value_size);
++
++            if (pv_extract_display_uri(sub->val.v.s.s, &display, &uri) < 0) {
++                LM_ERR("error parsing To header\n");
++                goto err;
++            }
++
++            if (uac.replace_to != NULL) {
++                LM_DBG("replace_to[%s]: %s %s\n", sub->name.s, display.s, uri.s);
++                if (display.len == 0)
++                    pv_real_hdr_remove_display(msg, &sub->name);
++                uac.replace_to(msg, &display, &uri);
++            }
++
++            to_cnt++;
++            continue;
++        }
++
++        if (!str_hash_get(&rm_hdrs, sub->name.s, sub->name.len)) {
++            if (!pv_xavp_is_null(sub) &&
++                (pv_single_header(&sub->name) || xavp_count(&sub->name, &sub) == 1)) {
++                    pv_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
++                    pv_str_hash_add_key(&rm_hdrs, &sub->name);
++                    continue;
++            }
++            pv_real_hdr_del_by_name(msg, &sub->name);
++            pv_str_hash_add_key(&rm_hdrs, &sub->name);
++        }
++
++        if (!pv_xavp_is_null(sub)) {
++            pv_real_hdr_append(msg, &sub->name, &sub->val.v.s);
++            LM_DBG("apply header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
++        }
++    } while ((sub = sub->next) != NULL);
++
++    pv_str_free(&display);
++    pv_str_free(&uri);
++    pv_str_hash_free(&rm_hdrs);
++
++    setbflag(0, FL_PV_HDRS_APPLIED);
++    setflag(msg, FL_PV_HDRS_APPLIED);
++
++    return 1;
++
++err:
++    pv_str_free(&display);
++    pv_str_free(&uri);
++    pv_str_hash_free(&rm_hdrs);
++    return -1;
++}
++
++int pv_reset_headers(struct sip_msg *msg, char *_s1, char *_s2)
++{
++    pv_free_xavp(&xavp_name);
++    pv_free_xavp(&xavp_parsed_xname);
++    resetbflag(0, FL_PV_HDRS_COLLECTED);
++    resetflag(msg, FL_PV_HDRS_APPLIED);
++
++    return 1;
++}
++
++int pv_check_header(struct sip_msg *msg, char *hname, char *_s2)
++{
++    str hname_s = STR_NULL;
++
++    if (hname == NULL || pv_fixup_svalue(msg, hname, &hname_s) < 0)
++        return -1;
++
++    if (xavp_get_child(&xavp_name, &hname_s) == NULL)
++        return -1;
++
++    return 1;
++}
++
++int pv_append_header(struct sip_msg *msg, char *hname, char *hvalue)
++{
++    str hname_s = STR_NULL, hvalue_s = STR_NULL;
++
++    if (hname == NULL || pv_fixup_svalue(msg, hname, &hname_s) < 0)
++        return -1;
++
++    if (hvalue != NULL)
++        if (pv_fixup_svalue(msg, hvalue, &hvalue_s) < 0)
++            return -1;
++
++    return pv_set_xavp(&xavp_name, &hname_s, &hvalue_s, SR_XTYPE_STR, 0, 1);
++}
++
++int pv_modify_header(struct sip_msg *msg, char *hname, char *hvalue)
++{
++    str hname_s = STR_NULL, hvalue_s = STR_NULL;
++
++    if (hname == NULL || pv_fixup_svalue(msg, hname, &hname_s) < 0)
++        return -1;
++
++    if (hvalue != NULL)
++        if (pv_fixup_svalue(msg, hvalue, &hvalue_s) < 0)
++            return -1;
++
++    return pv_set_xavp(&xavp_name, &hname_s, &hvalue_s, SR_XTYPE_STR, 0, 0);
++}
++
++int pv_modify_header_idx(struct sip_msg *msg, char *hname, char *hidx, char *hvalue)
++{
++    str hname_s = STR_NULL, hidx_s = STR_NULL, hvalue_s = STR_NULL;
++    int idx = 0;
++
++    if (hname == NULL || pv_fixup_svalue(msg, hname, &hname_s) < 0)
++        return -1;
++
++    if (hidx == NULL || pv_fixup_svalue(msg, hidx, &hidx_s) < 0)
++        return -1;
++    idx = atoi(hidx_s.s);
++
++    if (hvalue != NULL)
++        if (pv_fixup_svalue(msg, hvalue, &hvalue_s) < 0)
++            return -1;
++
++    return pv_set_xavp(&xavp_name, &hname_s, &hvalue_s, SR_XTYPE_STR, idx, 0);
++}
++
++int pv_remove_header(struct sip_msg *msg, char *hname, char *_s2)
++{
++    str hname_s = STR_NULL;
++    sr_xavp_t *avp = NULL;
++    int idx = 0;
++    int count = 0;
++
++    if (hname == NULL || pv_fixup_svalue(msg, hname, &hname_s) < 0)
++        return -1;
++
++    if ((avp = xavp_get_child(&xavp_name, &hname_s)) == NULL)
++        return 1;
++
++    count = xavp_count(&hname_s, &avp);
++
++    while (idx < count) {
++        if (pv_set_xavp(&xavp_name, &hname_s, NULL, SR_XTYPE_STR, idx++, 0) < 1)
++            return -1;
++    }
++
++    return 1;
++}
++
++int pv_remove_header_idx(struct sip_msg *msg, char *hname, char *hidx)
++{
++    str hname_s = STR_NULL;
++    str hidx_s = STR_NULL;
++    int idx = 0;
++
++    if (hname == NULL || pv_fixup_svalue(msg, hname, &hname_s) < 0)
++        return -1;
++
++    if (hidx == NULL || pv_fixup_svalue(msg, hidx, &hidx_s) < 0)
++        return -1;
++    idx = atoi(hidx_s.s);
++
++    return pv_set_xavp(&xavp_name, &hname_s, NULL, SR_XTYPE_STR, idx, 0);
++}
++
++int pv_set_xavp(str *xname, str *name, void *data, sr_xtype_t type, int idx, int append)
++{
++    sr_xavp_t **xavp = NULL;
++    sr_xavp_t *root = NULL;
++    sr_xval_t root_xval;
++    sr_xval_t xval;
++
++    if (xname == NULL || name == NULL) {
++        LM_ERR("missing xavp/pv name\n");
++        return -1;
++    }
++
++    memset(&xval, 0, sizeof(sr_xval_t));
++    if (data == NULL || SR_XTYPE_NULL) {
++        xval.type = SR_XTYPE_NULL;
++    } else if (type == SR_XTYPE_STR) {
++        xval.type = SR_XTYPE_STR;
++        xval.v.s = *(str*)data;
++    } else if (type == SR_XTYPE_DATA) {
++        xval.type = SR_XTYPE_DATA;
++        xval.v.data = (sr_data_t*)shm_malloc(sizeof(sr_data_t));
++        if (xval.v.data == NULL) {
++            LM_ERR("out of shared memory\n");
++            return -1;
++        }
++        memset(xval.v.data, 0, sizeof(sr_data_t));
++        xval.v.data->p = data;
++        xval.v.data->pfree = pv_xavp_free_data;
++    }
++
++    root = xavp_get(xname, NULL);
++    xavp = root ? &root->val.v.xavp : &root;
++
++    if (root == NULL) {
++        append = 1;
++        memset(&root_xval, 0, sizeof(sr_xval_t));
++        root_xval.type = SR_XTYPE_XAVP;
++        root_xval.v.xavp = NULL;
++
++        if ((*xavp = xavp_add_value(xname, &root_xval, NULL)) == NULL) {
++            LM_ERR("error create xavp %s\n", xname->s);
++            goto err;
++        }
++        xavp = &(*xavp)->val.v.xavp;
++    } else if (xavp_get_child(xname, name) == NULL) {
++        append = 1;
++    }
++
++    if (append) {
++        if (pv_xavp_append_value(name, &xval, xavp) < 0) {
++            LM_ERR("error append xavp=>name %s=>%.*s\n", xname->s, name->len, name->s);
++            return -1;
++        }
++    } else {
++        if (pv_xavp_set_value(name, &xval, idx, xavp) < 0) {
++            LM_ERR("error modify xavp=>name %s=>%.*s idx=%d\n", xname->s, name->len, name->s, idx);
++            return -1;
++        }
++    }
++
++    return 1;
++
++err:
++    return -1;
++}
++
++int pv_free_xavp(str *xname)
++{
++    xavp_rm_by_name(xname, 1, NULL);
++    return 1;
++}
++
++int pv_fixup_svalue(struct sip_msg *msg, char *src, str *dst)
++{
++    if (fixup_get_svalue(msg, (gparam_p)src, dst) < 0) {
++        LM_ERR("unable to parse param value\n");
++        return -1;
++    }
++    return 1;
++}
++
++int pv_real_hdr_append(struct sip_msg *msg, str *hname, str *hvalue)
++{
++    struct lump *anchor = NULL;
++    hdr_field_t *hf = NULL;
++    hdr_field_t *m_hf = NULL;
++    str new_h;
++
++    if (hname->s == NULL || hvalue->s == NULL) {
++        LM_ERR("header name/value cannot be empty");
++        return -1;
++    }
++
++	// find last header matching the name
++	for (hf=msg->headers; hf; hf=hf->next) {
++		if (hf->name.len == hname->len &&
++            strncasecmp(hf->name.s, hname->s, hname->len) == 0) {
++                m_hf = hf;
++        }
++        if (!hf->next)
++            break;
++	}
++
++    if (m_hf == NULL)
++        anchor = anchor_lump(msg, msg->unparsed - msg->buf, 0, 0);
++    else
++        anchor = anchor_lump(msg, m_hf->name.s + m_hf->len - msg->buf, 0, 0);
++
++    if (anchor == 0) {
++        LM_ERR("unable to find header lump\n");
++        return -1;
++    }
++
++    if (pv_create_hdr_str(hname, hvalue, &new_h) <= 0)
++        return -1;
++
++    if (insert_new_lump_after(anchor, new_h.s, new_h.len, 0) == 0) {
++        LM_ERR("cannot insert header lump\n");
++        pkg_free(new_h.s);
++        return -1;
++    }
++
++    LM_DBG("append header: %.*s\n", new_h.len, new_h.s);
++
++    return 1;
++}
++
++int pv_real_hdr_replace(struct sip_msg *msg, str *hname, str *hvalue)
++{
++    struct lump *anchor = NULL;
++    hdr_field_t *hf = NULL;
++    str new_h;
++    int new = 1;
++
++    if (hname->s == NULL || hvalue->s == NULL) {
++        LM_ERR("header name/value cannot be empty");
++        return -1;
++    }
++
++    for (hf=msg->headers; hf; hf=hf->next) {
++        if (hf->name.len == hname->len &&
++            strncasecmp(hf->name.s, hname->s, hname->len) == 0) {
++            if (hf->body.len == hvalue->len &&
++                strncasecmp(hf->body.s, hvalue->s, hvalue->len) == 0) {
++                    return 1;
++            }
++            new = 0;
++            break;
++        }
++        if (!hf->next)
++            break;
++    }
++
++    if (hf == NULL) {
++        LM_ERR("unable to find header lump\n");
++        return -1;
++    }
++
++    if (new == 0) {
++        if ((anchor = del_lump(msg, hf->name.s - msg->buf, hf->len, 0)) == 0) {
++            LM_ERR("unable to delete header lump\n");
++            return -1;
++        }
++    } else {
++        anchor = anchor_lump(msg, hf->name.s + hf->len - msg->buf, 0, 0);
++    }
++
++    if (anchor == 0) {
++        LM_ERR("unable to find header lump\n");
++        return -1;
++    }
++
++    if (pv_create_hdr_str(hname, hvalue, &new_h) <= 0)
++        return -1;
++
++    if (insert_new_lump_after(anchor, new_h.s, new_h.len, 0) == 0) {
++        LM_ERR("cannot insert header lump\n");
++        pkg_free(new_h.s);
++        return -1;
++    }
++
++    LM_DBG("%s header: %.*s\n", new ? "append" : "replace",
++            new_h.len, new_h.s);
++
++    return 1;
++}
++
++int pv_real_hdr_del_by_name(struct sip_msg *msg, str *hname)
++{
++    hdr_field_t *hf = NULL;
++
++    for (hf=msg->headers; hf; hf=hf->next) {
++        if (hf->name.len==hname->len
++                && strncasecmp(hf->name.s, hname->s, hname->len) == 0) {
++            LM_DBG("remove header[%.*s]: %.*s\n",
++                    hf->name.len, hf->name.s, hf->body.len, hf->body.s);
++            del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
++        }
++    }
++    return 1;
++}
++
++int pv_real_hdr_remove_display(struct sip_msg *msg, str *hname)
++{
++    hdr_field_t *hf = NULL;
++    struct to_body *d_hf = NULL;
++    int disp_len = 0;
++
++    for (hf=msg->headers; hf; hf=hf->next) {
++        if (hf->name.len==hname->len
++                && strncasecmp(hf->name.s, hname->s, hname->len) == 0) {
++            d_hf = (struct to_body*)hf->parsed;
++            if ((disp_len = d_hf->display.len) > 0) {
++                LM_DBG("remove display[%.*s]: %.*s\n",
++                        hf->name.len, hf->name.s, disp_len, d_hf->display.s);
++                if (strncmp(d_hf->display.s+disp_len, " ", 1) == 0)
++                    disp_len++;
++                del_lump(msg, d_hf->display.s-msg->buf, disp_len, 0);
++            }
++        }
++    }
++    return 1;
++}
++
++int pv_create_hdr_str(str *hname, str *hvalue, str *dst)
++{
++    int os;
++    if (hname->s == NULL || hvalue->s == NULL) {
++            LM_ERR("header name/value cannot be empty");
++            return -1;
++    }
++
++    if (dst == NULL) {
++        LM_ERR("new header str cannot be null");
++        return -1;
++    }
++
++    dst->len = hname->len + 2 + hvalue->len + CRLF_LEN;
++    dst->s = (char*)pkg_malloc(dst->len+1);
++    if (dst->s == NULL) {
++        LM_ERR("out of pkg memory\n");
++        return -1;
++    }
++    memset(dst->s, 0, dst->len+1);
++
++    os = 0;
++    memcpy(dst->s, hname->s, hname->len); os+=hname->len;
++    memcpy(dst->s+os, ": ", 2); os+=2;
++    memcpy(dst->s+os, hvalue->s, hvalue->len); os+=hvalue->len;
++    memcpy(dst->s+os, CRLF, CRLF_LEN); os+=CRLF_LEN;
++    dst->s[dst->len] = '\0';
++
++    return 1;
++}
++
++int pv_str_new(str *s, int size)
++{
++    s->s = (char*)pkg_malloc(size);
++    if(s->s == NULL) {
++        LM_ERR("out of pkg memory\n");
++        return -1;
++    }
++    memset(s->s, 0, size);
++    s->len = 0;
++
++    return 1;
++}
++
++int pv_str_free(str *s)
++{
++    if (s->s)
++        pkg_free(s->s);
++    s->s = NULL;
++    return 1;
++}
++
++int pv_str_copy(str *dst, str *src, unsigned int max_size)
++{
++    unsigned int src_len = src->len+1 >= max_size ? max_size-1 : src->len;
++
++    if (src == NULL || dst == NULL || src->len <= 0)
++        return -1;
++
++    memset(dst->s, 0, dst->len);
++    memcpy(dst->s, src->s, src_len);
++    dst->s[src_len] = '\0';
++    dst->len = src_len;
++
++    return 1;
++}
++
++int pv_extract_display_uri(char *suri, str *display, str *duri)
++{
++    char *ptr_a = NULL;
++    char *ptr_b = NULL;
++    int a_len = 0, b_len = 0;
++
++    if (suri == NULL || strlen(suri) == 0)
++        return -1;
++
++    ptr_a = strchr(suri, '<');
++    ptr_b = strchr(suri, '>');
++
++    if (ptr_a == NULL || ptr_b == NULL)
++        return -1;
++
++    a_len = ptr_a-suri;
++    b_len = ptr_b-ptr_a;
++
++    if (b_len <= 0)
++        return -1;
++
++    if (a_len > 0) {
++        memcpy(display->s, suri, a_len);
++        display->len = strlen(display->s);
++        display->s[display->len] = '\0';
++    } else {
++        display->len = 0;
++    }
++
++    memcpy(duri->s, ptr_a+1, b_len-1);
++    duri->len = strlen(duri->s);
++    duri->s[duri->len] = '\0';
++
++    return 1;
++}
++
++int pv_split_values(str *s, char d[][header_value_size], int *d_size)
++{
++    char p;
++    int idx = 0, c_idx = 0;
++
++    *d_size = -1;
++
++    if (s == NULL || s->len == 0 || d == NULL) {
++        *d_size = 0;
++        return 1;
++    }
++
++    while (idx < s->len) {
++        strncpy(&p, s->s+idx++,1);
++        if (strncmp(&p, " ", 1) == 0)
++            continue;
++        if (strncmp(&p, ",", 1) == 0) {
++            if (c_idx == 0)
++                continue;
++            if (c_idx+1 < header_value_size)
++                c_idx++;
++            d[*d_size][c_idx] = '\0';
++            c_idx = 0;
++            continue;
++        }
++        if (c_idx == 0)
++            (*d_size)++;
++        strncpy(&d[*d_size][c_idx++], &p, 1);
++    }
++
++    if (c_idx > 0) {
++        if (c_idx >= header_value_size)
++            c_idx--;
++        d[*d_size][c_idx] = '\0';
++    }
++
++    (*d_size)++;
++
++    return 1;
++}
++
++sr_xavp_t * pv_xavp_new_value(str *name, sr_xval_t *val)
++{
++    sr_xavp_t *avp = NULL;
++    int size;
++    unsigned int id;
++
++    if (name==NULL || name->s==NULL || val==NULL)
++        return NULL;
++    id = get_hash1_raw(name->s, name->len);
++
++    size = sizeof(sr_xavp_t) + name->len + 1;
++    if (val->type == SR_XTYPE_STR)
++        size += val->v.s.len + 1;
++    avp = (sr_xavp_t*)shm_malloc(size);
++    if (avp == NULL) {
++        LM_ERR("out of shared memory\n");
++        return NULL;
++    }
++    memset(avp, 0, size);
++    avp->id = id;
++    avp->name.s = (char*)avp + sizeof(sr_xavp_t);
++    memcpy(avp->name.s, name->s, name->len);
++    avp->name.s[name->len] = '\0';
++    avp->name.len = name->len;
++    memcpy(&avp->val, val, sizeof(sr_xval_t));
++    if (val->type == SR_XTYPE_STR) {
++        avp->val.v.s.s = avp->name.s + avp->name.len + 1;
++        memcpy(avp->val.v.s.s, val->v.s.s, val->v.s.len);
++        avp->val.v.s.s[val->v.s.len] = '\0';
++        avp->val.v.s.len = val->v.s.len;
++    }
++
++    return avp;
++}
++
++int pv_xavp_append_value(str *name, sr_xval_t *val, sr_xavp_t **start)
++{
++    sr_xavp_t *last = NULL;
++    sr_xavp_t *xavp = NULL;
++
++    if ((xavp = pv_xavp_new_value(name, val)) == NULL)
++        return -1;
++
++    if (*start == NULL) {
++        xavp->next = *start;
++        *start = xavp;
++        return 1;
++    }
++
++    last = *start;
++    while (last->next)
++        last = last->next;
++    last->next = xavp;
++
++    return 1;
++}
++
++int pv_xavp_set_value(str *name, sr_xval_t *val, int idx, sr_xavp_t **start)
++{
++    int cnt = 0;
++
++    if (idx < 0) {
++        cnt = xavp_count(name, start);
++        idx = idx + cnt;
++        if (idx < 0)
++            return -1;
++    }
++
++    if (xavp_set_value(name, idx, val, start) == NULL)
++        return -1;
++
++    return 1;
++}
++
++sr_xval_t * pv_xavp_get_value(str *xname, str *name, int idx)
++{
++    sr_xavp_t *xavp = NULL;
++    sr_xavp_t *sub = NULL;
++
++    if ((xavp = xavp_get(xname, NULL)) == NULL)
++        return NULL;
++
++    if (xavp->val.type != SR_XTYPE_XAVP) {
++        LM_ERR("not xavp child type %s\n" , xname->s);
++        return NULL;
++    }
++
++    if ((sub = xavp_get_by_index(name, idx, &xavp->val.v.xavp)) == NULL)
++        return NULL;
++
++    return &sub->val;
++}
++
++int pv_xavp_is_null(sr_xavp_t * avp)
++{
++    if (avp == NULL)
++        return 1;
++
++    if (avp->val.type == SR_XTYPE_NULL ||
++        (avp->val.type == SR_XTYPE_STR &&
++         (strncasecmp(avp->val.v.s.s, "NULL", 4) == 0))) {
++            return 1;
++    }
++
++    return 0;
++}
++
++void pv_xavp_free_data(void *p, sr_xavp_sfree_f sfree)
++{
++    xavp_c_data_t *c_data = NULL;
++
++    if ((c_data = (xavp_c_data_t*)p) != NULL) {
++        pv_free_to_params(c_data->to_b.param_lst, sfree);
++        if (c_data->value.s) {
++            sfree(c_data->value.s);
++            c_data->value.s = NULL;
++        }
++        sfree(c_data);
++        c_data = NULL;
++    }
++}
++
++int pv_skip_header(str *hname)
++{
++    if (hname == NULL)
++        return -1;
++
++    if (str_hash_get(&skip_headers, hname->s, hname->len))
++        return 1;
++
++    return -1;
++}
++
++int pv_single_header(str *hname)
++{
++    if (hname == NULL)
++        return -1;
++
++    if (str_hash_get(&single_headers, hname->s, hname->len))
++        return 1;
++
++    return -1;
++}
++
++int pv_xavp_keys_count(sr_xavp_t **start)
++{
++    sr_xavp_t *xavp = NULL;
++    int cnt = 0;
++
++    if (*start == NULL)
++        return 0;
++
++    xavp = *start;
++
++    while (xavp) {
++        cnt++;
++        xavp = xavp->next;
++    }
++
++    return cnt;
++}
++
++int pv_str_hash_init(struct str_hash_table *ht, str *keys, char *desc)
++{
++    char split[header_name_size][header_value_size];
++    int idx = 0, d_size = 0;
++    str val = STR_NULL;
++
++    if (pv_split_values(keys, split, &d_size) < 0) {
++        LM_ERR("could not parse %s param\n", desc);
++        return -1;
++    }
++
++    if (str_hash_alloc(ht, d_size+1) < 0) {
++        LM_ERR("memory allocation error\n");
++        return -1;
++    }
++    str_hash_init(ht);
++
++    for (idx=0;idx<d_size;idx++) {
++        val.s = split[idx];
++        val.len = strlen(split[idx]);
++        if (pv_str_hash_add_key(ht, &val) < 0) {
++            LM_ERR("cannot add a hash key=>%s", desc);
++            return -1;
++        }
++    }
++
++    return 1;
++}
++
++int pv_str_hash_add_key(struct str_hash_table *ht, str *key)
++{
++    struct str_hash_entry *e = NULL;
++    int e_size;
++
++    if (ht->table == NULL || key == NULL || key->len == 0)
++        return -1;
++
++    e_size = sizeof(struct str_hash_entry)+sizeof(char)*key->len;
++    e = pkg_malloc(e_size);
++    if (e == NULL) {
++        LM_ERR("out of pkg memory\n");
++        return -1;
++    }
++    memset(e, 0, e_size);
++
++    if (pv_str_new(&e->key, key->len+1) < 0) goto err;
++    pv_str_copy(&e->key, key, key->len+1);
++
++    str_hash_add(ht, e);
++    return 1;
++
++err:
++    pv_str_free(&e->key);
++    return -1;
++}
++
++int pv_str_hash_free(struct str_hash_table *ht)
++{
++    struct str_hash_entry *e = NULL;
++    struct str_hash_entry *bak = NULL;
++    int r;
++
++    if (ht == NULL)
++        return -1;
++
++    if (ht->table) {
++        for (r=0; r< ht->size; r++) {
++            clist_foreach_safe(&ht->table[r], e, bak, next) {
++                pv_str_free(&e->key);
++                pkg_free(e);
++            }
++        }
++        pkg_free(ht->table);
++    }
++
++    return 1;
++}
++
++static void pv_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree)
++{
++    struct to_param *n = NULL;
++
++    while (param) {
++        n = param->next;
++        sfree(param);
++        param = n;
++    }
++    param = NULL;
++}
++
++int pv_parse_header_name(pv_spec_p sp, str *hname)
++{
++    if (hname->s == NULL || hname->len == 0) {
++        LM_ERR("empty header name\n");
++        return -1;
++    }
++
++    if (hname->len >= header_name_size) {
++        LM_ERR("header name is too long\n");
++        return -1;
++    }
++
++    sp->pvp.pvn.type = PV_NAME_INTSTR;
++    sp->pvp.pvn.u.isname.type = AVP_NAME_STR;
++    sp->pvp.pvn.u.isname.name.s = *hname;
++
++    return 0;
++}
++
++int pv_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
++{
++    sr_xavp_t *xavp = NULL;
++    sr_xval_t *xval = NULL;
++    str hname = STR_NULL;
++    int idx = 0;
++    int cnt = 0;
++
++    hname = param->pvn.u.isname.name.s;
++    idx = param->pvi.u.ival;
++
++    if (idx < 0) {
++        if ((xavp = xavp_get_child(&xavp_name, &hname)) == NULL)
++            cnt = 0;
++        else
++            cnt = xavp_count(&hname, &xavp);
++        idx = idx + cnt;
++        if (idx < 0)
++            pv_get_null(msg, param, res);
++    }
++
++    xval = pv_xavp_get_value(&xavp_name, &hname, idx);
++
++    if (xval == NULL || !xval->v.s.s)
++        return pv_get_null(msg, param, res);
++
++    return pv_get_strval(msg, param, res, &xval->v.s);
++}
++
++int pv_set_header(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
++{
++    sr_xavp_t *xavp = NULL;
++    str hname = STR_NULL;
++    pv_elem_p p;
++    str fval;
++    int idx = 0;
++    int cnt = 0;
++    int itype;
++
++    hname = param->pvn.u.isname.name.s;
++    idx = param->pvi.u.ival;
++    itype = param->pvi.type;
++
++    if (pv_parse_format(&val->rs, &p) < 0) {
++        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++        goto err;
++    }
++
++    if (pv_printf_s(msg, p, &fval) < 0) {
++        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++        goto err;
++    }
++
++    if ((xavp = xavp_get_child(&xavp_name, &hname)) == NULL)
++        idx = 0;
++    else if (idx < 0)
++        idx = idx + xavp_count(&hname, &xavp);
++
++    if (val->flags & PV_VAL_NULL) {
++        if (itype == PV_IDX_ALL) {
++            for (idx=xavp_count(&hname, &xavp)-1;idx>=0;idx--) {
++                if (pv_set_xavp(&xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0) < 0)
++                    goto err;
++            }
++        } else {
++            if (pv_set_xavp(&xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0) < 0)
++                goto err;
++        }
++    } else if (val->flags & PV_VAL_STR) {
++        if (strchr(hname.s, ']') == NULL) {
++            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, 0, 1) < 0)
++                goto err;
++        } else if (itype == PV_IDX_ALL) {
++            idx = 0;
++            cnt = xavp_count(&hname, &xavp);
++            while (idx < cnt) {
++                if (pv_set_xavp(&xavp_name, &hname, NULL, SR_XTYPE_STR, idx++, 0) < 1)
++                    goto err;
++            }
++            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, 0, cnt ? 0 : 1) < 0)
++                goto err;
++        } else {
++            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, idx, 0) < 0)
++                goto err;
++        }
++    } else {
++        LM_ERR("header %.*s value can be either string or null\n", hname.len, hname.s);
++        goto err;
++    }
++
++    pv_elem_free_all(p);
++    return 1;
++
++err:
++    pv_elem_free_all(p);
++    return -1;
++}
++
++int pv_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
++{
++    sr_xval_t *xval = NULL;
++    sr_xval_t *xval_pd = NULL;
++    xavp_c_data_t *c_data = NULL;
++    int p_no = 0;
++    str sval = STR_NULL;
++    int ival = 0;
++    int is_strint = 0;
++    str hname = STR_NULL;
++
++    p_no = param->pvn.u.isname.name.n;
++    if (pv_str_new(&hname, header_name_size) < 0) goto err;
++
++    if (p_no >= 1 && p_no <= 5)
++        pv_str_copy(&hname, &(str){"From",4}, header_name_size);
++    else if (p_no >= 6 && p_no <= 10)
++        pv_str_copy(&hname, &(str){"To",2}, header_name_size);
++
++    xval = pv_xavp_get_value(&xavp_name, &hname, 0);
++    if (xval == NULL || !xval->v.s.s)
++        goto err;
++
++    xval_pd = pv_xavp_get_value(&xavp_parsed_xname, &hname, 0);
++
++    if (xval_pd &&
++        (c_data = (xavp_c_data_t*)xval_pd->v.data->p) != NULL &&
++        strncasecmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
++            xval_pd = NULL;
++    }
++
++    if (xval_pd == NULL || (c_data = (xavp_c_data_t*)xval_pd->v.data->p) == NULL) {
++        c_data = (xavp_c_data_t*)shm_malloc(sizeof(xavp_c_data_t));
++        if (c_data == NULL) {
++            LM_ERR("out of shared memory\n");
++            goto err;
++        }
++        memset(c_data, 0, sizeof(xavp_c_data_t));
++        if (pv_merge_uri(msg, SET_URI_T, &xval->v.s, &xval->v.s, c_data) < 0)
++                goto err;
++        if (pv_set_xavp(&xavp_parsed_xname, &hname, c_data, SR_XTYPE_DATA, 0, 0) < 0)
++                goto err;
++    }
++
++    switch (p_no) {
++        case 1: // full from
++        case 6: // full to
++            sval = c_data->to_b.uri;
++            break;
++        case 2: // username from
++        case 7: // username to
++            sval = c_data->to_b.parsed_uri.user;
++            break;
++        case 3: // domain from
++        case 8: // domain to
++            sval = c_data->to_b.parsed_uri.host;
++            break;
++        case 4: // displayname from
++        case 9: // displayname to
++            sval = c_data->to_b.display;
++            break;
++        case 5: // from tag
++        case 10: // to tag
++            sval = c_data->to_b.tag_value;
++            break;
++        default:
++            LM_ERR("unknown get uri op\n");
++    }
++
++    pv_str_free(&hname);
++    return sval.s ? is_strint ? pv_get_strintval(msg, param, res, &sval, ival)
++                              : pv_get_strval(msg, param, res, &sval)
++                  : pv_get_null(msg, param, res);
++
++err:
++    pv_str_free(&hname);
++    return pv_get_null(msg, param, res);
++}
++
++int pv_set_uri(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
++{
++    sr_xval_t *xval = NULL;
++    xavp_c_data_t *c_data = NULL;
++    int p_no = 0;
++    enum action_type a_type;
++    str hname;
++    pv_elem_p p;
++    str fval;
++
++    p_no = param->pvn.u.isname.name.n;
++    if (pv_str_new(&hname, header_name_size) < 0) goto err;
++    if (p_no >= 1 && p_no <= 5)
++        pv_str_copy(&hname, &(str){"From",4}, header_name_size);
++    else if (p_no >= 6 && p_no <= 10)
++        pv_str_copy(&hname, &(str){"To",2}, header_name_size);
++
++    switch (p_no) {
++        case 1: // uri from
++        case 6: // uri to
++            a_type = SET_URI_T;
++            break;
++        case 2: // username from
++        case 7: // username to
++            a_type = SET_USER_T;
++            break;
++        case 3: // domain from
++        case 8: // domain to
++            a_type = SET_HOST_T;
++            break;
++        case 4: // displayname from
++        case 9: // displayname to
++            a_type = SET_USERPHONE_T;
++            break;
++        default:
++            LM_ERR("unknown set uri op\n");
++            goto err;
++    }
++
++    if (pv_parse_format(&val->rs, &p) < 0) {
++        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++        goto err;
++    }
++
++    if (pv_printf_s(msg, p, &fval) < 0) {
++        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++        goto err;
++    }
++
++    xval = pv_xavp_get_value(&xavp_name, &hname, 0);
++    if (xval == NULL || !xval->v.s.s)
++        goto err;
++
++    c_data = (xavp_c_data_t*)shm_malloc(sizeof(xavp_c_data_t));
++    if (c_data == NULL) {
++        LM_ERR("out of shared memory\n");
++        goto err;
++    }
++    memset(c_data, 0, sizeof(xavp_c_data_t));
++    if (pv_merge_uri(msg, a_type, &xval->v.s, &fval, c_data) < 0)
++        goto err;
++
++    if (pv_set_xavp(&xavp_name, &hname, &c_data->value, SR_XTYPE_STR, 0, 0) < 0)
++        goto err;
++
++    if (pv_set_xavp(&xavp_parsed_xname, &hname, c_data, SR_XTYPE_DATA, 0, 0) < 0)
++        goto err;
++
++    pv_str_free(&hname);
++    pv_elem_free_all(p);
++    return 1;
++
++err:
++    pv_str_free(&hname);
++    pv_elem_free_all(p);
++    return -1;
++}
++
++int pv_merge_uri(struct sip_msg *msg, enum action_type type, str *cur, str *new, xavp_c_data_t *c_data)
++{
++    struct sip_uri puri;
++    struct to_body tb;
++    struct to_param *param = NULL;
++    struct to_param *sparam_start = NULL;
++    struct to_param **sparam = NULL;
++    str *merged = NULL;
++    char *c_ptr = NULL;
++    str uri_t;
++    int os = 0;
++    int t_len = 0;
++
++    parse_addr_spec(cur->s, cur->s+cur->len, &tb, 0);
++    if (!tb.uri.s) {
++        LM_ERR("cannot parse addr spec\n");
++        goto err;
++    }
++
++    if (parse_uri(tb.uri.s, tb.uri.len, &tb.parsed_uri) < 0) {
++        LM_ERR("cannot parse uri %.*s\n", tb.uri.len, tb.uri.s);
++        goto err;
++    }
++    puri = tb.parsed_uri;
++
++    c_data->value.s = (char*)shm_malloc(header_value_size);
++    if (c_data->value.s == NULL) {
++        LM_ERR("out of shared memory\n");
++        goto err;
++    }
++    merged = &c_data->value;
++
++    if (type == SET_URI_T && strchr(new->s, '<')) {
++        pv_str_copy(merged, new, header_value_size);
++        goto reparse;
++    }
++
++    os = 0;
++    if (type == SET_USERPHONE_T) {
++        memcpy(merged->s+os, new->s, new->len); os+=new->len;
++        memcpy(merged->s+os, " ", 1); os+=1;
++    } else if (tb.display.len > 0) {
++        memcpy(merged->s+os, tb.display.s, tb.display.len);
++                os+=tb.display.len;
++        memcpy(merged->s+os, " ", 1); os+=1;
++    }
++    memcpy(merged->s+os, "<", 1); os+=1;
++    if (!SET_URI_T) {
++        uri_type_to_str(puri.type, &uri_t);
++        t_len = uri_t.len+1;
++        memcpy(merged->s+os, uri_t.s, uri_t.len); os+=uri_t.len;
++        memcpy(merged->s+os, ":", 1); os+=1;
++    }
++    switch (type) {
++        case SET_USERPHONE_T:
++            memcpy(merged->s+os, tb.uri.s+t_len, tb.uri.len-t_len);
++                    os+=tb.uri.len-t_len;
++            break;
++        case SET_URI_T:
++                memcpy(merged->s+os, new->s, new->len); os+=new->len;
++            break;
++        case SET_USER_T:
++            memcpy(merged->s+os, new->s, new->len); os+=new->len;
++            memcpy(merged->s+os, tb.uri.s+t_len+puri.user.len,
++                    tb.uri.len-t_len-puri.user.len);
++                    os+=tb.uri.len-t_len-puri.user.len;
++            break;
++        case SET_HOST_T:
++            if ((c_ptr = strchr(tb.uri.s, '@')) == NULL) {
++                LM_ERR("invalid uri: %.*s\n", tb.uri.len, tb.uri.s);
++                goto err;
++            }
++            memcpy(merged->s+os, tb.uri.s+t_len, c_ptr-tb.uri.s-t_len+1);
++                    os+=c_ptr-tb.uri.s-t_len+1;
++            memcpy(merged->s+os, new->s, new->len); os+=new->len;
++            memcpy(merged->s+os, c_ptr+puri.host.len+1,
++                    tb.uri.s+tb.uri.len-c_ptr-puri.host.len-1);
++                    os+=tb.uri.s+tb.uri.len-c_ptr-puri.host.len-1;
++            break;
++        default:
++            LM_ERR("unknown set uri op\n");
++            goto err;
++    }
++    memcpy(merged->s+os, ">", 1); os+=1;
++    if ((param = tb.param_lst) != NULL) {
++        while (param) {
++            memcpy(merged->s+os, ";", 1); os+=1;
++            memcpy(merged->s+os, param->name.s, param->name.len);
++                    os+=param->name.len;
++            memcpy(merged->s+os, "=", 1); os+=1;
++            memcpy(merged->s+os, param->value.s, param->value.len);
++                os += param->value.len;
++            param = param->next;
++        }
++    }
++    merged->len = os;
++    merged->s[merged->len] = '\0';
++
++reparse:
++
++    parse_addr_spec(merged->s, merged->s+merged->len, &c_data->to_b, 0);
++    if (!c_data->to_b.uri.s) {
++        LM_ERR("cannot parse addr spec\n");
++        goto err;
++    }
++
++    if ((param = tb.param_lst) != NULL) {
++        while (param) {
++            if (sparam == NULL)
++                sparam = &sparam_start;
++            *sparam = (struct to_param*)shm_malloc(sizeof(struct to_param));
++            if (*sparam == NULL) {
++                LM_ERR("out of shared memory\n");
++                goto err;
++            }
++            memset(*sparam, 0, sizeof(struct to_param));
++            memcpy(*sparam, param, sizeof(struct to_param));
++            (*sparam)->next = NULL;
++            sparam = &(*sparam)->next;
++            param = param->next;
++        }
++        c_data->to_b.param_lst = sparam_start;
++    }
++
++    if (parse_uri(c_data->to_b.uri.s, c_data->to_b.uri.len,
++                    &c_data->to_b.parsed_uri) < 0) {
++        LM_ERR("cannot parse uri %.*s\n",
++                c_data->to_b.uri.len, c_data->to_b.uri.s);
++        goto err;
++    }
++
++    free_to_params(&tb);
++    return 1;
++
++err:
++    free_to_params(&tb);
++    return -1;
++}
+--- /dev/null
++++ b/src/modules/pv_headers/pv_headers.h
+@@ -0,0 +1,30 @@
++/*
++ * $Id$
++ *
++ * PV Headers
++ *
++ * Copyright (C) 2018 Kirill Solomko
++ *
++ * This file is part of SIP Router, a free SIP server.
++ *
++ * SIP Router is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * SIP Router is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#ifndef PV_HEADERS_H
++#define PV_HEADERS_H
++
++
++#endif /* PV_HEADERS_H */
