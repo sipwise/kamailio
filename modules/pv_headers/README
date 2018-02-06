@@ -1,0 +1,209 @@
+The pv_headers Module
+
+Kirill Solomko
+
+   Sipwise GmbH
+
+   Copyright © 2018 Sipwise GmbH
+     __________________________________________________________________
+
+   Table of Contents
+
+    1. Admin Guide
+
+        1. Dependencies
+
+              1.1. Kamailio modules
+
+        2. Parameters
+
+              2.1. xavp_name (string)
+
+        3. Functions
+
+              3.1. pv_collect_headers()
+              3.2. pv_apply_headers()
+              3.3. pv_check_header(hname)
+              3.3. pv_append_header(hname, hvalue)
+              3.3. pv_modify_header(hname, hvalue)
+              3.3. pv_remove_header(hname)
+
+1. Design Goals
+
+    The main goal of the module is to offload the intermediate header processing
+    into the XAVP dynamic container as well as providing with high level methods
+    for collecting the headers, applying the headers and manipulating the XAVP.
+
+2. Overview of Operation
+
+    This module enables storing all headers in XAVP to freely modify
+    them in the kamailio logic and only apply them once when it's time
+    for the packet to be routed outside.
+
+Chapter 1. Admin Guide
+
+    Table of Contents
+
+    1. Dependencies
+
+        1.1. Kamailio modules
+
+    2. Parameters
+
+        2.1. xavp_name (string)
+
+    3. Functions
+
+        3.1. pv_collect_headers()
+        3.2. pv_apply_headers()
+        3.3. pv_check_header(hname)
+        3.3. pv_append_header(hname, hvalue)
+        3.3. pv_modify_header(hname, hvalue)
+        3.3. pv_remove_header(hname)
+
+1. Dependencies
+
+    1.1. Kamailio modules
+
+1.1. Kamailio modules
+
+    The following modules must be loaded before this module:
+        * none
+
+2. Parameters
+
+    2.1. xavp_name (string)
+
+2.1. xavp_name (string)
+
+    Name of the XAVP there the collected headers are stored.
+
+    Default: headers
+
+    Example 1.1. Set xavp_name parameter
+modparam("pv_headers", "xavp_name", "headers")
+
+    Result:
+        $xavp(headers[0]=>From)
+        $xavp(headers[0]=>To)
+        $xavp(headers[0]=>Call-ID)
+        ....
+
+3. Functions
+
+    3.1. pv_collect_headers()
+    3.2. pv_apply_headers()
+    3.3. pv_check_header(hname)
+    3.3. pv_append_header(hname, hvalue)
+    3.3. pv_modify_header(hname, hvalue)
+    3.3. pv_remove_header(hname)
+
+3.1.  pv_collect_headers()
+
+    This function collects all headers from the message into the XAVP,
+    it should be used preferably just when the message is delievered.
+
+    Returns:
+     1 - on success
+    -1 - if there were errors
+
+3.2.  pv_apply_headers()
+
+    This function applies the current XAVP headers state to the real headers.
+    and should be called only once when the message is about to leave kamailio.
+
+    The following rules apply:
+
+    - all headers in the XAVP are recreated in the message.
+    - headers with NULL value are going to be removed if exist in the message.
+    - the initial order of the headers from how they were collected from the message is preserved.
+
+    Usage:
+
+        if (pv_apply_headers())
+        {
+            "success"
+        }
+        else
+        {
+            "errors"
+        }
+
+
+3.3.  pv_check_header(hname)
+
+    This function checks if the header already exists in the XAVP.
+    It can be freely called from anywere, but only after pv_collect_headers.
+
+    Usage:
+
+        if (pv_check_header(hname))
+        {
+            "exists"
+        }
+        else
+        {
+            "does not exist"
+        }
+
+
+3.4.  pv_append_header(hname, hvalue)
+
+    This function appends a new header into the XAVP.
+    It can be freely called from anywere, but only after pv_collect_headers.
+
+    Please note that subsequent "pv_append_header" calls will result in multiple
+    headers with the same.
+
+    If the provided "hvalue" is $null then the header is added into the XAVP
+    but it is not going to be added into the message.
+
+    Usage:
+
+        if (pv_append_header(hname, hvalue))
+        {
+            "appended"
+        }
+        else
+        {
+            "errors"
+        }
+
+3.5.  pv_modify_header(hname, hvalue)
+
+    This function modifies an existing header in the XAVP.
+    It can be freely called from anywere, but only after pv_collect_headers.
+
+    Please note that if a header does not exist it will be implicitly appended.
+
+    If the provided "hvalue" is $null then the header is modified in the XAVP
+    but it is not going to be added into the message.
+
+    Usage:
+
+        if (pv_modify_header(hname, hvalue))
+        {
+            "modified"
+        }
+        else
+        {
+            "errors"
+        }
+
+3.6.  pv_remove_header(hname)
+
+    This function removes an existing header from the XAVP.
+    It can be freely called from anywere, but only after pv_collect_headers.
+
+    It returns "false" if the header does not exist.
+
+    Usage:
+
+        if (pv_modify_header(hname, hvalue))
+        {
+            "removed"
+        }
+        else
+        {
+            "does not exist or errors"
+        }
