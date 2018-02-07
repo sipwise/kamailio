@@ -1,0 +1,285 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1a930d6b_632bfd82",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 867,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "There doesn\u0027t seem to be any reason to have this as `void *` and then typecast back to what it is. (also below)",
+      "range": {
+        "startLine": 867,
+        "startChar": 50,
+        "endLine": 867,
+        "endChar": 61
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_e8218ab5",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1118,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "Typecast is unnecessary and should be avoided if `s` is declared as `const char *`",
+      "range": {
+        "startLine": 1118,
+        "startChar": 17,
+        "endLine": 1118,
+        "endChar": 24
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_883ba6ea",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1124,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "Doing memset and strncpy is unnecessary after doing a strlen since you know you have enough memory and plain strcpy copies the null byte too",
+      "range": {
+        "startLine": 1123,
+        "startChar": 0,
+        "endLine": 1124,
+        "endChar": 42
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_082fb6a2",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1127,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "Typecast should be unnecessary.\n\nEither:\n\nstr *tmpstr;\ntmpstr \u003d \u0026VAL_STR(v);\n\nor\n\nstr tmpstr;\ntmpstr \u003d VAL_STR(v);",
+      "range": {
+        "startLine": 1127,
+        "startChar": 22,
+        "endLine": 1127,
+        "endChar": 36
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_4818de84",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1134,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "Probably better to do:\n\nmemcpy(str-\u003es, tmpstr-\u003es, str-\u003elen);\nstr-\u003es[str-\u003elen] \u003d \u0027\\0\u0027;",
+      "range": {
+        "startLine": 1133,
+        "startChar": 0,
+        "endLine": 1134,
+        "endChar": 50
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_434d2172",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1190,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "This could be avoided by storing the components of the entry key in a hash table. Order must be preserved. `table` should store a count of how many components there are in the entry key, and each component of the entry key should map to its position within the entry key.",
+      "range": {
+        "startLine": 1186,
+        "startChar": 1,
+        "endLine": 1190,
+        "endChar": 39
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_231ad56e",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1228,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "Nested loop could be avoided by keeping the key names in a hash table. (List must still exist though, as key order must be preserved. Or use hash table -\u003e order index mapping.)",
+      "range": {
+        "startLine": 1224,
+        "startChar": 0,
+        "endLine": 1228,
+        "endChar": 39
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_684f5a93",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1310,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "use REDIS_DIRECT_PREFIX ?",
+      "range": {
+        "startLine": 1310,
+        "startChar": 30,
+        "endLine": 1310,
+        "endChar": 37
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_88448675",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 1465,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "can use str_init and REDIS_DIRECT_PREFIX",
+      "range": {
+        "startLine": 1465,
+        "startChar": 18,
+        "endLine": 1465,
+        "endChar": 25
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_a30ec532",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 3231,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "This could be avoided by using a queue or a clist. In fact all the manual list keeping could be replaced by the included clist.h",
+      "range": {
+        "startLine": 3230,
+        "startChar": 0,
+        "endLine": 3231,
+        "endChar": 25
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_68367a05",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 3444,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "AFAICS clist_foreach already takes care of the break condition, so checking for it again shouldn\u0027t be necessary? (applies to all other instances as well)",
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_4831be0a",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 3468,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "yes :)",
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_a849428d",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 3692,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-07T16:14:31Z",
+      "side": 1,
+      "message": "This doesn\u0027t quite work (if type_name.len is just 1, then you only match against the \"e\"), should be something like\n\nif (type_name.len \u003d\u003d 5 \u0026\u0026 !strncmp(type_name.s, \"entry\", 5))\n\nor do a str_init using REDIS_DIRECT_PREFIX and then use str_strcmp()",
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
