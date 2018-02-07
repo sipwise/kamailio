@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "1a930d6b_a381654c",
+        "filename": "debian/patches/sipwise/pv_headers.patch",
+        "patchSetId": 8
+      },
+      "lineNbr": 439,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2018-02-07T19:37:32Z",
+      "side": 1,
+      "message": "going to improve this part by modifying only headers that are changed but I want to preserve their original order as well. gonna figure something out.",
+      "range": {
+        "startLine": 437,
+        "startChar": 0,
+        "endLine": 439,
+        "endChar": 60
+      },
+      "revId": "f1f99bcd84920fc0be52241da6e6249afb9cd6ed",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
