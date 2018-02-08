@@ -2,6 +2,109 @@
   "comments": [
     {
       "key": {
+        "uuid": "1a930d6b_c8f76e8b",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 28,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "This is not cross-compilation friendly, but it would require using either some kind of autoconf support, or calling it via the config.guess triplet computed or passed at build-time, such as x86_64-linux-gnu-pkg-config",
+      "range": {
+        "startLine": 28,
+        "startChar": 5,
+        "endLine": 28,
+        "endChar": 15
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_a8030272",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 41,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "Probably remove?",
+      "range": {
+        "startLine": 41,
+        "startChar": 55,
+        "endLine": 41,
+        "endChar": 72
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_e8f42a89",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 42,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "Remove?",
+      "range": {
+        "startLine": 42,
+        "startChar": 17,
+        "endLine": 42,
+        "endChar": 33
+      },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_482b7eeb",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 320,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "Spaces for indentation instead of tabs for the previous two lines.",
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_432c414b",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 766,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "The function already checks whether the pointer is NULL, so there is no need for this check, here or on any other redis freeing calls.",
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "1a930d6b_632bfd82",
         "filename": "debian/patches/sipwise/db_redis.patch",
         "patchSetId": 1
@@ -19,6 +122,40 @@
         "endLine": 867,
         "endChar": 61
       },
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_a88862e8",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 882,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "Is comparing the error string the supported way, it seems a bit icky? :)",
+      "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "1a930d6b_284b92b1",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 910,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-08T14:32:43Z",
+      "side": 1,
+      "message": "error comparison?",
       "revId": "8a808630939cc4d4256463889b5d89959954a5b8",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
