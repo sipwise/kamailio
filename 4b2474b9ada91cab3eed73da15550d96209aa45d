@@ -1,0 +1,84 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa81d914_7e2559aa",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 3917,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-13T14:38:34Z",
+      "side": 1,
+      "message": "I don\u0027t think this is strictly necessary - pretty sure kamailio stores config params null-terminated in its string vars, so redis_schema_path.s can be used directly. But doesn\u0027t hurt either way.",
+      "range": {
+        "startLine": 3914,
+        "startChar": 0,
+        "endLine": 3917,
+        "endChar": 32
+      },
+      "revId": "4b2474b9ada91cab3eed73da15550d96209aa45d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa81d914_de33a5f4",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 3940,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-13T14:38:34Z",
+      "side": 1,
+      "message": "Unnecessary as strcpy always null-terminates",
+      "revId": "4b2474b9ada91cab3eed73da15550d96209aa45d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa81d914_3e520114",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 3946,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-13T14:38:34Z",
+      "side": 1,
+      "message": "The slash can always be added, even if one is there already. In fact the whole thing could be replaced by a single sprintf.",
+      "range": {
+        "startLine": 3941,
+        "startChar": 0,
+        "endLine": 3946,
+        "endChar": 52
+      },
+      "revId": "4b2474b9ada91cab3eed73da15550d96209aa45d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa81d914_5e57b502",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 3972,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2018-02-13T14:38:34Z",
+      "side": 1,
+      "message": "missing fclose(fin)",
+      "revId": "4b2474b9ada91cab3eed73da15550d96209aa45d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
