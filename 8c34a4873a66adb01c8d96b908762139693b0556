@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa81d914_4430c256",
+        "filename": "debian/ngcp-kamailio.preinst",
+        "patchSetId": 3
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-02-14T15:55:08Z",
+      "side": 1,
+      "message": "IMHO you should do this in ngcp-kamailio.postinst OR into ngcp-templates. init scripts must not delete configs as etckeeper-\u003e\u0027ngccfg status\u0027 will be unhappy.",
+      "range": {
+        "startLine": 16,
+        "startChar": 12,
+        "endLine": 16,
+        "endChar": 41
+      },
+      "revId": "8c34a4873a66adb01c8d96b908762139693b0556",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
