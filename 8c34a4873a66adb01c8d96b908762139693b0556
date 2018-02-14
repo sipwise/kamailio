@@ -22,6 +22,30 @@
       "revId": "8c34a4873a66adb01c8d96b908762139693b0556",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa81d914_a425fe0b",
+        "filename": "debian/ngcp-kamailio.preinst",
+        "patchSetId": 3
+      },
+      "lineNbr": 16,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-02-14T16:27:18Z",
+      "side": 1,
+      "message": "Yeah postinst please.",
+      "parentUuid": "fa81d914_4430c256",
+      "range": {
+        "startLine": 16,
+        "startChar": 12,
+        "endLine": 16,
+        "endChar": 41
+      },
+      "revId": "8c34a4873a66adb01c8d96b908762139693b0556",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
