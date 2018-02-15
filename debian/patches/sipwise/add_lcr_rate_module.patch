@@ -1,0 +1,488 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -107,6 +107,9 @@ mod_list_sctp=sctp
+ # - modules depending on openssl library
+ mod_list_autheph=auth_ephemeral
+ 
++# - modules depending on swrate library
++mod_list_lcrrate=lcr_rate
++
+ # - modules related to SIMPLE presence extensions
+ mod_list_presence=presence presence_conference presence_dialoginfo \
+ 					   presence_mwi presence_profile presence_reginfo \
+@@ -233,7 +236,8 @@ mod_list_all=$(sort $(mod_list_basic) $(
+ 			   $(mod_list_erlang) $(mod_list_systemd) \
+ 			   $(mod_list_http_async) $(mod_list_nsq) \
+ 			   $(mod_list_rabbitmq) $(mod_list_jsdt)) \
+-			   $(mod_list_phonenum)
++			   $(mod_list_phonenum) \
++			   $(mod_list_lcrrate)
+ 
+ 
+ 
+@@ -287,6 +291,8 @@ module_group_cassandra=$(module_group_ca
+ module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
+ 
+ 
++# pkg lcrrate module
++module_group_klcrrate=$(mod_list_lcrrate)
+ 
+ ### --- Groups defined for pacKaging ###
+ 
+--- /dev/null
++++ b/src/modules/lcr_rate/Makefile
+@@ -0,0 +1,9 @@
++include ../../Makefile.defs
++auto_gen=
++NAME=lcr_rate.so
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE -D_GNU_SOURCE
++DEFS+=$(shell mysql_config --cflags)
++LIBS+=-lswrate
++
++include ../../Makefile.modules
+--- /dev/null
++++ b/src/modules/lcr_rate/lcr_rate_mod.c
+@@ -0,0 +1,442 @@
++/*
++ * $Id$
++ *
++ * call rating for least cost routing module
++ *
++ * Copyright (C) 2012 Sipwise GmbH
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
++#include <time.h>
++#include <swrate/swrate.h>
++#include "../../sr_module.h"
++#include "../../mod_fix.h"
++#include "../../pvar.h"
++#include "../../mem/mem.h"
++#include "../../mem/shm_mem.h"
++
++MODULE_VERSION
++
++struct peer {
++	int valid;
++	unsigned int id;
++	double cost;
++	unsigned int weight;
++	str s;
++};
++
++static void mod_destroy();
++static int mod_init();
++static int child_init(int rank);
++
++static int lcr_rate(sip_msg_t *msg, char *su, char *sq);
++static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid, char *avp);
++static int lcr_get_profile_id_from_uuid(sip_msg_t *msg, char *uuid, char *avp);
++
++static cmd_export_t cmds[] = {
++	{"lcr_rate", lcr_rate, 2, fixup_spve_spve, 0,
++	REQUEST_ROUTE | FAILURE_ROUTE},
++	{"lcr_get_prepaid_from_uuid", lcr_get_prepaid_from_uuid, 2, fixup_spve_str, 0,
++	REQUEST_ROUTE | FAILURE_ROUTE},
++	{"lcr_get_profile_id_from_uuid", lcr_get_profile_id_from_uuid, 2, fixup_spve_str, 0,
++	REQUEST_ROUTE | FAILURE_ROUTE},
++	{0,}
++};
++
++static char *gw_uri_avp_param;
++static int gw_uri_avp_type;
++static int_str gw_uri_avp;
++
++static char *db_host;
++static unsigned int db_port;
++static char *db_user;
++static char *db_pass;
++static char *db_db;
++
++static param_export_t params[] = {
++	{"gw_uri_avp",		STR_PARAM, &gw_uri_avp_param},
++	{"db_host",		STR_PARAM, &db_host},
++	{"db_port",		INT_PARAM, &db_port},
++	{"db_user",		STR_PARAM, &db_user},
++	{"db_pass",		STR_PARAM, &db_pass},
++	{"db_db",		STR_PARAM, &db_db},
++	{0,},
++};
++
++static int swrate_done;
++static SWRATE *swrate_ptr;
++
++struct module_exports exports = {
++	"lcr_rate",
++	DEFAULT_DLFLAGS,
++	cmds,
++	params,
++	0,
++	0,
++	0,
++	0,
++	mod_init,
++	0,
++	mod_destroy,
++	child_init
++};
++
++static int mod_init() {
++	pv_spec_t avp_spec;
++	str s;
++	unsigned short avp_flags;
++
++	if (!gw_uri_avp_param || !*gw_uri_avp_param) {
++		LM_ERR("gw_uri_avp not set\n");
++		return -1;
++	}
++
++	s.s = gw_uri_avp_param;
++	s.len = strlen(s.s);
++
++	if (!pv_parse_spec(&s, &avp_spec) || avp_spec.type != PVT_AVP) {
++		LM_ERR("malformed or non AVP definition <%s>\n", gw_uri_avp_param);
++		return -1;
++	}
++
++	if (pv_get_avp_name(0, &(avp_spec.pvp), &gw_uri_avp, &avp_flags)) {
++		LM_ERR("invalid AVP definition <%s>\n", gw_uri_avp_param);
++		return -1;
++	}
++	gw_uri_avp_type = avp_flags;
++
++	return 0;
++}
++
++static int child_init(int rank) {
++	return 0;
++}
++
++static void mod_destroy() {
++	;
++}
++
++static int check_swrate_init() {
++	if (swrate_done)
++		return 0;
++	swrate_ptr = swrate_new(db_host, db_port, db_db, db_user, db_pass, NULL, 0, 1, 0);
++	if (!swrate_ptr || !swrate_new_ok(swrate_ptr)) {
++		LM_ERR("failed to initialized libswrate\n");
++		if (swrate_ptr)
++			swrate_free(swrate_ptr);
++		return -1;
++	}
++	swrate_done = 1;
++	return 0;
++}
++
++static struct peer *load_peers(int *num, char *src_user, char *src_domain, char *dst_user, char *dst_domain) {
++	struct usr_avp *avp;
++	int_str val;
++	struct peer *ret, *j;
++	int len, i;
++	char *c;
++	str s;
++	swr_rate_t rate;
++	time_t now;
++
++	LM_DBG("loading peers for user <%s>@<%s> -> <%s>@<%s> from avp\n",
++		src_user, src_domain, dst_user, dst_domain);
++
++	len = 4;
++	ret = pkg_malloc(len * sizeof(*ret));
++	if (!ret) {
++		LM_ERR("out of pkg memory\n");
++		return NULL;
++	}
++	i = 0;
++	time(&now);
++
++	while (1) {
++		avp = search_first_avp(gw_uri_avp_type, gw_uri_avp, &val, 0);
++		if (!avp)
++			break;
++
++		if (i == len) {
++			len <<= 1;
++			j = pkg_realloc(ret, len * sizeof(*ret));
++			if (!j) {
++				pkg_free(ret);
++				LM_ERR("out of pkg memory\n");
++				return NULL;
++			}
++			ret = j;
++		}
++
++		j = &ret[i];
++		j->valid = 0;
++
++		j->s.len = val.s.len;
++		j->s.s = pkg_malloc(val.s.len);
++		if (!j->s.s) {
++			pkg_free(ret);
++			LM_ERR("out of pkg memory\n");
++			return NULL;
++		}
++		memcpy(j->s.s, val.s.s, val.s.len);
++		c = memrchr(j->s.s, '|', val.s.len);
++		if (!c) {
++			LM_ERR("separator not found in string <%.*s>\n", val.s.len, j->s.s);
++			goto next;
++		}
++
++		c++;
++		s.s = c;
++		s.len = val.s.len - (c - j->s.s);
++		if (str2int(&s, &j->id)) {
++			LM_ERR("could not convert string <%.*s> to int\n", s.len, s.s);
++			goto next;
++		}
++
++		LM_DBG("finding rate for peer %u\n", j->id);
++		j->weight = i;
++
++		if (swrate_get_peer_ab_rate(&rate, swrate_ptr, j->id, src_user,
++					src_domain, dst_user, dst_domain, now)) {
++			LM_ERR("failed to get rate for call, peer id %u, user <%s>@<%s> -> <%s>@<%s>\n",
++				j->id, src_user, src_domain, dst_user, dst_domain);
++			goto next;
++		}
++		j->cost = rate.init_rate;
++		j->valid = 1;
++		LM_DBG("cost is %f\n", j->cost);
++
++next:
++		destroy_avp(avp);
++		i++;
++	}
++
++	*num = i;
++	return ret;
++}
++
++static int peers_cmp(const void *aa, const void *bb) {
++	const struct peer *a = aa, *b = bb;
++
++	if (a->valid && !b->valid)
++		return 1;
++	if (!a->valid && b->valid)
++		return -1;
++	if (!a->valid && !b->valid)
++		return 0;
++
++	if (a->cost < b->cost)
++		return 1;
++	if (a->cost > b->cost)
++		return -1;
++
++	if (a->weight < b->weight)
++		return 1;
++	if (a->weight > b->weight)
++		return -1;
++
++	return 0;
++}
++
++static int save_peers(struct peer *peers, int num) {
++	int i;
++	int_str val;
++
++	for (i = 0; i < num; i++) {
++		LM_DBG("adding back peer %u\n", peers[i].id);
++		val.s = peers[i].s;
++		if (add_avp(gw_uri_avp_type|AVP_VAL_STR, gw_uri_avp, val))
++			LM_ERR("add_avp failed\n");
++		pkg_free(val.s.s);
++	}
++
++	pkg_free(peers);
++	return 0;
++}
++
++static void extract_ud(str *s, char **user, char **at, char **domain) {
++	*user = *at = *domain = NULL;
++	if (!s || !s->s || !*s->s)
++		return;
++	*user = s->s;
++	*at = strchr(*user, '@');
++	if (!*at)
++		return;
++	**at = '\0';
++	*domain = *at + 1;
++	if (!**domain)
++		*domain = NULL;
++}
++
++static int lcr_rate(sip_msg_t *msg, char *su, char *sq) {
++	struct peer *peers;
++	int num_peers, ret;
++	str src, dst;
++	char *src_user, *src_at, *src_domain;
++	char *dst_user, *dst_at, *dst_domain;
++
++	if (check_swrate_init())
++		return -1;
++
++	if (fixup_get_svalue(msg, (gparam_t *) su, &src)) {
++		LM_ERR("failed to get user parameter\n");
++		return -1;
++	}
++	if (fixup_get_svalue(msg, (gparam_t *) sq, &dst)) {
++		LM_ERR("failed to get domain parameter\n");
++		return -1;
++	}
++
++	extract_ud(&src, &src_user, &src_at, &src_domain);
++	extract_ud(&dst, &dst_user, &dst_at, &dst_domain);
++
++	peers = load_peers(&num_peers, src_user, src_domain, dst_user, dst_domain);
++
++	if (*src_at)
++		*src_at = '@';
++	if (*dst_at)
++		*dst_at = '@';
++
++	if (!peers)
++		return -1;
++	qsort(peers, num_peers, sizeof(*peers), peers_cmp);
++
++	ret = 1;
++	if (!num_peers || (!peers[0].valid && !peers[num_peers - 1].valid)) {
++		LM_ERR("no peers with valid ratings found\n");
++		ret = -1;
++	}
++	save_peers(peers, num_peers);
++
++	LM_DBG("lcr_rate() done\n");
++	return ret;
++}
++
++static int get_avp(unsigned short *avp_type, int_str *avp_name, char *avp_s) {
++	pv_spec_t *avp_spec = NULL;
++	str *avp;
++
++	avp = (str *) avp_s;
++
++	if (pv_locate_name(avp) != avp->len)
++	{
++		LM_ERR("invalid AVP parameter\n");
++		return -1;
++	}
++
++	if (((avp_spec = pv_cache_get(avp)) == NULL)
++			|| avp_spec->type!=PVT_AVP) {
++		LM_ERR("malformed or non AVP %s AVP definition\n", avp->s);
++		return -1;
++	}
++
++	if(pv_get_avp_name(0, &avp_spec->pvp, avp_name, avp_type)!=0)
++	{
++		LM_ERR("[%s]- invalid AVP definition\n", avp->s);
++		return -1;
++	}
++
++	return 0;
++}
++
++static int get_profile_from_uuid(swr_profile_t *prof, sip_msg_t *msg, char *uuid_s) {
++	char *pc, *ip;
++	str uuid;
++
++	if (check_swrate_init())
++		return -1;
++
++	// validate parameters
++
++	if (get_str_fparam(&uuid, msg, (fparam_t *) uuid_s)) {
++		LM_ERR("unable to extract uuid parameter\n");
++		return -1;
++	}
++
++	if (!uuid.s || !*uuid.s) {
++		LM_ERR("empty uuid parameter\n");
++		return -1;
++	}
++
++	// split up "uuid;ip"
++
++	pc = strchr(uuid.s, ';');
++	if (!pc)
++		ip = NULL;
++	else {
++		*pc = 0;
++		ip = pc+1;
++	}
++
++	if (swrate_get_subscriber_billing_profile(prof, swrate_ptr, time(NULL), uuid.s, ip)) {
++		LM_ERR("swrate call returned error\n");
++		return -1;
++	}
++
++	return 0;
++}
++
++static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s) {
++	swr_profile_t prof;
++	unsigned short avp_type = 0;
++	int_str avp_val;
++	int_str avp_name;
++
++	if (get_profile_from_uuid(&prof, msg, uuid_s))
++		return -1;
++	if (get_avp(&avp_type, &avp_name, avp_s))
++		return -1;
++
++	avp_val.s.s = prof.prepaid ? "1" : "0";
++	avp_val.s.len = 1;
++
++	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
++	{
++		LM_ERR("Failed to add result avp");
++		return -1;
++	}
++
++	return 1;
++}
++
++static int lcr_get_profile_id_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s) {
++	swr_profile_t prof;
++	unsigned short avp_type = 0;
++	int_str avp_val;
++	int_str avp_name;
++
++	if (get_profile_from_uuid(&prof, msg, uuid_s))
++		return -1;
++	if (get_avp(&avp_type, &avp_name, avp_s))
++		return -1;
++
++	avp_val.s.s = int2str(prof.profile_id, &avp_val.s.len);
++
++	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
++	{
++		LM_ERR("Failed to add result avp");
++		return -1;
++	}
++
++	return 1;
++}

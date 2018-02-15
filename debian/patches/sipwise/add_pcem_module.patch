@@ -1,6 +1,6 @@
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -28,7 +28,7 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -28,7 +28,7 @@ mod_list_db=acc alias_db auth_db avpops
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
@@ -10,7 +10,7 @@
  
  # - common modules depending on database, using UID db schema
 --- /dev/null
-+++ b/modules/pcem/Makefile
++++ b/src/modules/pcem/Makefile
 @@ -0,0 +1,18 @@
 +# $Id$
 +#
@@ -31,7 +31,7 @@
 +
 +include ../../Makefile.modules
 --- /dev/null
-+++ b/modules/pcem/pcem_logic.c
++++ b/src/modules/pcem/pcem_logic.c
 @@ -0,0 +1,130 @@
 +/*
 + * $Id$
@@ -164,7 +164,7 @@
 +}
 +
 --- /dev/null
-+++ b/modules/pcem/pcem_logic.h
++++ b/src/modules/pcem/pcem_logic.h
 @@ -0,0 +1,34 @@
 +/*
 + * $Id$
@@ -201,7 +201,7 @@
 +
 +#endif
 --- /dev/null
-+++ b/modules/pcem/pcem_mod.c
++++ b/src/modules/pcem/pcem_mod.c
 @@ -0,0 +1,153 @@
 +/*
 + * $Id$
@@ -357,7 +357,7 @@
 +}
 +
 --- /dev/null
-+++ b/modules/pcem/pcem_mod.h
++++ b/src/modules/pcem/pcem_mod.h
 @@ -0,0 +1,33 @@
 +/*
 + * $Id$

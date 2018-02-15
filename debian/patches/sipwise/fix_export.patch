@@ -1,0 +1,11 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -139,6 +139,8 @@ endif
+ main_makefile=1
+ include Makefile.defs
+ 
++$(MAIN_NAME): LDFLAGS += -Wl,--export-dynamic
++
+ static_modules_path=$(addprefix modules/, $(static_modules))
+ extra_sources=$(wildcard $(addsuffix /*.c, $(static_modules_path)))
+ extra_objs=$(extra_sources:.c=.o)

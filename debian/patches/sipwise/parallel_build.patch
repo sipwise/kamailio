@@ -1,6 +1,6 @@
---- a/Makefile.rules
-+++ b/Makefile.rules
-@@ -60,6 +60,18 @@
+--- a/src/Makefile.rules
++++ b/src/Makefile.rules
+@@ -60,6 +60,18 @@ cmd_CC+=$(CC_MKDEP_OPTS)
  cmd_MKDEP=
  endif # CC_MKDEP_OPTS
  
@@ -19,7 +19,7 @@
  # what will be displayed if quiet==silent
  silent_cmd_CC=CC ($(CC)) [$(strip $(crt_type) $(NAME))]		$@
  silent_cmd_LD=LD ($(LD)) [$(strip $(crt_type) $(NAME))]		$@
-@@ -90,7 +102,7 @@
+@@ -93,7 +105,7 @@ module_make=	if [ -n "$(1)" -a -r "$(1)/
  quote:= "
  escall= $(subst $$,\$$,$(subst $(quote),\$(quote),$1))
  exec_cmd= $(if $($(quiet)_cmd_$(1)),\

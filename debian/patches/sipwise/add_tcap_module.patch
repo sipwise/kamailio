@@ -1,0 +1,366 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -196,6 +196,9 @@ mod_list_erlang=erlang
+ # - modules depending on systemd library
+ mod_list_systemd=log_systemd
+ 
++# - modules depending on libtcap library
++mod_list_tcap=tcap
++
+ # - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
+ mod_list_nsq=nsq
+ 
+@@ -294,6 +297,9 @@ module_group_ignore= $(sort $(filter-out
+ # pkg lcrrate module
+ module_group_klcrrate=$(mod_list_lcrrate)
+ 
++# pkg tap module
++module_group_ktcap=$(mod_list_tcap)
++
+ ### --- Groups defined for pacKaging ###
+ 
+ # Standard modules in main pkg
+--- /dev/null
++++ b/src/modules/tcap/Makefile
+@@ -0,0 +1,9 @@
++include ../../Makefile.defs
++auto_gen=
++NAME=tcap.so
++
++DEFS+=-DKAMAILIO_MOD_INTERFACE -D_GNU_SOURCE
++DEFS+=-I/usr/include/tcap
++LIBS+=-ltcap
++
++include ../../Makefile.modules
+--- /dev/null
++++ b/src/modules/tcap/tcap_mod.c
+@@ -0,0 +1,329 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
++#include <tcap/libtcap.h>
++#include "../../sr_module.h"
++#include "../../mod_fix.h"
++#include "../../pvar.h"
++#include "../../parser/parse_content.h"
++#include "../../lvalue.h"
++
++MODULE_VERSION
++
++
++
++static str content_type;
++static int strip_trailing_crlf;
++
++
++
++static int mod_init(void);
++static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int inap_extract_f(sip_msg_t *msg, char *su, char *sq);
++static int inap_extract_var_f(sip_msg_t *msg, char *o, char *f, char *d);
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq);
++static int isup_decode_number_hex_f(sip_msg_t *msg, char *su, char *sq);
++
++
++
++static cmd_export_t cmds[] = {
++	{"tcap_extract", (cmd_function)tcap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"inap_extract", (cmd_function)inap_extract_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"inap_extract_var", (cmd_function)inap_extract_var_f, 3,
++		fixup_pvar_pvar_pvar, fixup_free_pvar_pvar_pvar, ANY_ROUTE},
++	{"isup_decode_number", (cmd_function)isup_decode_number_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{"isup_decode_number_hex", (cmd_function)isup_decode_number_hex_f, 2,
++		fixup_spve_str, 0, ANY_ROUTE},
++	{0,}
++};
++
++
++
++static param_export_t params[] = {
++	{ "content_type",		STR_PARAM,	&content_type.s		},
++	{ "strip_trailing_crlf",	INT_PARAM,	&strip_trailing_crlf	},
++	{ 0, }
++};
++
++
++
++struct module_exports exports = {
++	"tcap",
++	DEFAULT_DLFLAGS,
++	cmds,
++	params,
++	0,
++	0,
++	0,
++	0,
++	mod_init,
++	0,
++	0,
++	0
++};
++
++
++
++static int mod_init(void) {
++	if (!content_type.s)
++		content_type.s = "application/tcap";
++	content_type.len = strlen(content_type.s);
++
++	return 0;
++}
++
++
++
++static int prepare_extract(sip_msg_t *msg, char *su, str *body, str *spec) {
++	const char *err;
++
++	err = "Error fixing up first parameter";
++	if (fixup_get_svalue(msg, (gparam_p) su, spec))
++		goto error;
++
++	err = "No SIP body found";
++	body->s = get_body(msg);
++	if (!body->s)
++		goto error;
++	err = "No Content-Length found or zero length body";
++	body->len = get_content_length(msg);
++	if (!body->len)
++		goto error;
++
++	if (strip_trailing_crlf
++			&& body->len >= 2
++			&& body->s[body->len - 1] == '\n'
++			&& body->s[body->len - 2] == '\r')
++		body->len -= 2;
++
++	err = "No Content-Type found";
++	if (!msg->content_type)
++		goto error;
++	err = "Content-Type mismatch";
++	if (msg->content_type->body.len < content_type.len)
++		goto error;
++	if (strncasecmp(msg->content_type->body.s, content_type.s, content_type.len))
++		goto error;
++
++	return 0;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++static int copy_output(sip_msg_t *msg, char *sq, char *outbuf, int outlen) {
++	const char *err;
++	pv_spec_t *avp_spec = NULL;
++	str *s;
++	pv_value_t avp_val;
++
++	s = (str *) sq;
++	err = "Malformed AVP definition";
++	if (!(avp_spec = pv_cache_get(s)))
++		goto error;
++	switch (avp_spec->type) {
++		case PVT_AVP:
++		case PVT_XAVP:
++		case PVT_SCRIPTVAR:
++			break;
++		default:
++			goto error;
++	}
++
++	memset(&avp_val, 0, sizeof(avp_val));
++	avp_val.flags = PV_VAL_STR;
++	avp_val.rs.s = outbuf;
++	avp_val.rs.len = outlen;
++	err = "Failed to set return AVP";
++	if (avp_spec->setf(msg, &avp_spec->pvp, EQ_T, &avp_val) < 0)
++		goto error;
++
++	return 0;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++
++}
++
++static int tcap_extract_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	static char buf[1024];
++	struct output_buffer out;
++	str body, spec;
++
++	if (prepare_extract(msg, su, &body, &spec))
++		return -1;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
++	if (tcap_extract(body.s, body.len, spec.s, &out))
++		goto error;
++
++	if (copy_output(msg, sq, out.buf, out.used))
++		return -1;
++
++	return 1;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++static int inap_extract_f(sip_msg_t *msg, char *su, char *sq) {
++	const char *err;
++	static char buf[1024];
++	struct output_buffer out;
++	str body, spec;
++
++	if (prepare_extract(msg, su, &body, &spec))
++		return -1;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	err = "Error parsing TCAP body";
++	if (inap_extract(body.s, body.len, spec.s, &out))
++		goto error;
++
++	if (copy_output(msg, sq, out.buf, out.used))
++		return -1;
++
++	return 1;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++/**
++ * our own decode.hexa
++ * We had problems passing binary string through pvars after
++ * string transformation s.decode.hexa
++ */
++static int _tcap_decode_hexa(str *in, char **out)
++{
++	int i;
++	static char buf[1024];
++	if(in->len/2>1024){
++		LM_ERR("bin string greater than max buffer\n");
++		return -1;
++	}
++	if(!out) return -1;
++	*out = NULL;
++
++	for(i=0; i<in->len/2; i++)
++	{
++		if(in->s[2*i]>='0'&&in->s[2*i]<='9')
++			buf[i] = (in->s[2*i]-'0') << 4;
++		else if(in->s[2*i]>='a'&&in->s[2*i]<='f')
++			buf[i] = (in->s[2*i]-'a'+10) << 4;
++		else if(in->s[2*i]>='A'&&in->s[2*i]<='F')
++			buf[i] = (in->s[2*i]-'A'+10) << 4;
++		else return -1;
++
++		if(in->s[2*i+1]>='0'&&in->s[2*i+1]<='9')
++			buf[i] += in->s[2*i+1]-'0';
++		else if(in->s[2*i+1]>='a'&&in->s[2*i+1]<='f')
++			buf[i] += in->s[2*i+1]-'a'+10;
++		else if(in->s[2*i+1]>='A'&&in->s[2*i+1]<='F')
++			buf[i] += in->s[2*i+1]-'A'+10;
++		else return -1;
++	}
++	buf[i] = '\0';
++	*out = buf;
++	return i;
++}
++
++static int inap_extract_var_f(sip_msg_t *msg, char *pv_orig, char *pv_field,
++	char *pv_dest)
++{
++	const char *err;
++	char *bin;
++	int bin_len;
++	static char buf[1024];
++	static char cfield[512];
++	struct output_buffer out;
++	pv_spec_p orig_spec = (pv_spec_t *) pv_orig;
++	pv_spec_p field_spec = (pv_spec_t *) pv_field;
++	pv_spec_p dest_spec = (pv_spec_t *) pv_dest;
++	pv_value_t tcap, field, dest;
++
++	err = "Can't get tcap PV value";
++	if (pv_get_spec_value(msg, orig_spec, &tcap) != 0)
++		goto error;
++
++	err = "orig has to be a string";
++	if(!(tcap.flags&PV_VAL_STR))
++		goto error;
++
++	err = "Can't get field PV value";
++	if (pv_get_spec_value(msg, field_spec, &field) != 0)
++		goto error;
++
++	err = "field has to be a string";
++	if (!(field.flags&PV_VAL_STR))
++		goto error;
++
++	err = "field is too big for internal buffer";
++	if (field.rs.len > 512)
++		goto error;
++	strncpy(cfield, field.rs.s, field.rs.len);
++	cfield[field.rs.len] = '\0';
++
++	err = "Can't decode.hexa";
++	bin_len = _tcap_decode_hexa(&(tcap.rs), &bin);
++	if(bin<=0)
++		goto error;
++
++	OUTPUT_BUFFER_INIT(&out, buf);
++	LM_DBG("tcap:[%.*s][%d] bin:[%.*s] field:[%s]\n", tcap.rs.len, tcap.rs.s,
++		tcap.rs.len, bin_len, bin, cfield);
++
++	err = "Error parsing TCAP body";
++	if (inap_extract(bin, bin_len, cfield, &out)<0)
++		goto error;
++
++	memset(&dest, 0, sizeof(pv_value_t));
++	dest.flags = PV_VAL_STR;
++	dest.rs.s = out.buf;
++	dest.rs.len = out.used;
++	err = "Failed to set return value";
++	if(pv_set_spec_value(msg, dest_spec, 0, &dest)<0)
++		goto error;
++
++	return 1;
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++static int isup_decode_number_common_f(sip_msg_t *msg, char *su, char *sq,
++		int (*func)(const char *, int, char *))
++{
++	const char *err;
++	str inp;
++	char num[64];
++
++	err = "Error fixing up first parameter";
++	if (fixup_get_svalue(msg, (gparam_p) su, &inp))
++		goto error;
++	err = "Invalid encoded number";
++	if (func(inp.s, inp.len, num))
++		goto error;
++
++	if (copy_output(msg, sq, num, strlen(num)))
++		return -1;
++
++	return 1;
++
++error:
++	LM_ERR("%s\n", err);
++	return -1;
++}
++
++static int isup_decode_number_f(sip_msg_t *msg, char *su, char *sq) {
++	return isup_decode_number_common_f(msg, su, sq, isup_convert_number);
++}
++static int isup_decode_number_hex_f(sip_msg_t *msg, char *su, char *sq) {
++	return isup_decode_number_common_f(msg, su, sq, isup_convert_number_hex);
++}

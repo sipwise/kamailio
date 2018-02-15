@@ -1,6 +1,6 @@
 %define name	kamailio
-%define ver	4.4.6
-%define rel	0.0%{dist}
+%define ver	5.1.1
+%define rel	0%{dist}
 
 
 
@@ -671,9 +671,6 @@ fi
 %{_libdir}/kamailio/libbinrpc.so
 %{_libdir}/kamailio/libbinrpc.so.0
 %{_libdir}/kamailio/libbinrpc.so.0.1
-%{_libdir}/kamailio/libkcore.so
-%{_libdir}/kamailio/libkcore.so.1
-%{_libdir}/kamailio/libkcore.so.1.0
 %{_libdir}/kamailio/libkmi.so
 %{_libdir}/kamailio/libkmi.so.1
 %{_libdir}/kamailio/libkmi.so.1.0
