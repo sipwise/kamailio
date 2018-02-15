@@ -1,8 +1,8 @@
 Index: kamailio/Makefile.groups
 ===================================================================
---- kamailio.orig/Makefile.groups	2018-02-14 15:23:35.861985218 +0100
-+++ kamailio/Makefile.groups	2018-02-14 15:23:35.853985199 +0100
-@@ -150,7 +150,7 @@
+--- kamailio.orig/Makefile.groups
++++ kamailio/Makefile.groups
+@@ -150,7 +150,7 @@ mod_list_json=json jsonrpc-c
  mod_list_jansson=jansson janssonrpc-c
  
  # - modules depending on redis library
@@ -13,8 +13,8 @@ Index: kamailio/Makefile.groups
  mod_list_mono=app_mono
 Index: kamailio/modules/db_redis/Makefile
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/Makefile	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/Makefile
 @@ -0,0 +1,36 @@
 +#
 +# WARNING: do not run this directly, it should be run by the master Makefile
@@ -54,8 +54,8 @@ Index: kamailio/modules/db_redis/Makefile
 +install-scripts: install-redis-scripts
 Index: kamailio/modules/db_redis/README
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/README	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/README
 @@ -0,0 +1,189 @@
 +DB_REDIS Module
 +
@@ -248,8 +248,8 @@ Index: kamailio/modules/db_redis/README
 +...
 Index: kamailio/modules/db_redis/db_redis_mod.c
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/db_redis_mod.c	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/db_redis_mod.c
 @@ -0,0 +1,115 @@
 +/**
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -368,8 +368,8 @@ Index: kamailio/modules/db_redis/db_redis_mod.c
 +}
 Index: kamailio/modules/db_redis/db_redis_mod.h
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/db_redis_mod.h	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/db_redis_mod.h
 @@ -0,0 +1,53 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -426,8 +426,8 @@ Index: kamailio/modules/db_redis/db_redis_mod.h
 +#endif /* _DB_REDIS_MOD_H */
 Index: kamailio/modules/db_redis/doc/Makefile
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/doc/Makefile	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/doc/Makefile
 @@ -0,0 +1,4 @@
 +docs = db_redis.xml
 +
@@ -435,8 +435,8 @@ Index: kamailio/modules/db_redis/doc/Makefile
 +include $(docbook_dir)/Makefile.module
 Index: kamailio/modules/db_redis/doc/db_redis.xml
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/doc/db_redis.xml	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/doc/db_redis.xml
 @@ -0,0 +1,33 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
@@ -473,8 +473,8 @@ Index: kamailio/modules/db_redis/doc/db_redis.xml
 +</book>
 Index: kamailio/modules/db_redis/doc/db_redis_admin.xml
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/doc/db_redis_admin.xml	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/doc/db_redis_admin.xml
 @@ -0,0 +1,192 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
@@ -670,9 +670,9 @@ Index: kamailio/modules/db_redis/doc/db_redis_admin.xml
 +</chapter>
 Index: kamailio/modules/db_redis/redis_connection.c
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/redis_connection.c	2018-02-14 15:23:35.853985199 +0100
-@@ -0,0 +1,301 @@
+--- /dev/null
++++ kamailio/modules/db_redis/redis_connection.c
+@@ -0,0 +1,419 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
 + *
@@ -698,6 +698,100 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +#include "db_redis_mod.h"
 +#include "redis_connection.h"
 +#include "redis_table.h"
++
++static void print_query(redis_key_t *query) {
++    LM_DBG("Query dump:\n");
++    for (redis_key_t *k = query; k; k = k->next) {
++        LM_DBG("  %s\n", k->key.s);
++    }
++}
++
++static int db_redis_push_query(km_redis_con_t *con, redis_key_t *query) {
++
++    redis_command_t *cmd = NULL;
++    redis_command_t *tmp = NULL;
++    redis_key_t *new_query = NULL;
++
++    if (!query)
++        return 0;
++
++    cmd = (redis_command_t*)pkg_malloc(sizeof(redis_command_t));
++    if (!cmd) {
++        LM_ERR("Failed to allocate memory for redis command\n");
++        goto err;
++    }
++
++    // duplicate query, as original one might be free'd after being
++    // appended
++    while(query) {
++         if (db_redis_key_add_str(&new_query, &query->key) != 0) {
++            LM_ERR("Failed to duplicate query\n");
++            goto err;
++        }
++        query = query->next;
++    }
++
++    cmd->query = new_query;
++    cmd->next = NULL;
++
++    if (!con->command_queue) {
++        con->command_queue = cmd;
++    } else {
++        tmp = con->command_queue;
++        while (tmp->next)
++            tmp = tmp->next;
++        tmp->next = cmd;
++    }
++
++    return 0;
++
++err:
++    if (new_query) {
++        db_redis_key_free(&new_query);
++    }
++    if (cmd) {
++        pkg_free(cmd);
++    }
++    return -1;
++}
++
++static redis_key_t* db_redis_shift_query(km_redis_con_t *con) {
++    redis_command_t *cmd;
++    redis_key_t *query;
++
++    query = NULL;
++    cmd = con->command_queue;
++
++    if (cmd) {
++        query = cmd->query;
++        con->command_queue = cmd->next;
++        pkg_free(cmd);
++    }
++
++    return query;
++}
++
++static redis_key_t* db_redis_pop_query(km_redis_con_t *con) {
++    redis_command_t **current;
++    redis_command_t *prev;
++    redis_key_t *query;
++
++    current = &con->command_queue;
++    if (!*current)
++        return NULL;
++
++    do {
++        query = (*current)->query;
++        prev = *current;
++        *current = (*current)->next;
++    } while (*current);
++
++    prev->next = NULL;
++    pkg_free(*current);
++    *current = NULL;
++
++    return query;
++}
 +
 +int db_redis_connect(km_redis_con_t *con) {
 +    struct timeval tv;
@@ -864,14 +958,6 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +    pkg_free(_c);
 +}
 +
-+
-+static void print_query(redis_key_t *query) {
-+    LM_DBG("Query dump:\n");
-+    for (redis_key_t *k = query; k; k = k->next) {
-+        LM_DBG("  %s\n", k->key.s);
-+    }
-+}
-+
 +void *db_redis_command_argv(km_redis_con_t *con, redis_key_t *query) {
 +    char **argv = NULL;
 +    int argc;
@@ -902,11 +988,16 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +    return reply;
 +}
 +
-+int db_redis_append_command_argv(km_redis_con_t *con, redis_key_t *query) {
++int db_redis_append_command_argv(km_redis_con_t *con, redis_key_t *query, int queue) {
 +    char **argv = NULL;
 +    int ret, argc;
 +
 +    print_query(query);
++
++    if (queue > 0 && db_redis_push_query(con, query) != 0) {
++        LM_ERR("Failed to queue redis command\n");
++        return -1;
++    }
 +
 +    argc = db_redis_key_list2arr(query, &argv);
 +    if (argc < 0) {
@@ -916,6 +1007,10 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +    LM_DBG("query has %d args\n", argc);
 +
 +    ret = redisAppendCommandArgv(con->con, argc, (const char**)argv, NULL);
++
++    // this should actually never happen, because if all replies
++    // are properly consumed for the previous command, it won't send
++    // out a new query until redisGetReply is called
 +    if (con->con->err == REDIS_ERR_EOF) {
 +        if (db_redis_connect(con) != 0) {
 +            LM_ERR("Failed to reconnect to redis db\n");
@@ -937,22 +1032,40 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +
 +int db_redis_get_reply(km_redis_con_t *con, void **reply) {
 +    int ret;
++    redis_key_t *query;
 +
 +    *reply = NULL;
 +    ret = redisGetReply(con->con, reply);
 +    if (con->con->err == REDIS_ERR_EOF) {
++        LM_DBG("redis connection is gone, try reconnect\n");
++        con->append_counter = 0;
 +        if (db_redis_connect(con) != 0) {
 +            LM_ERR("Failed to reconnect to redis db\n");
 +            if (con->con) {
 +                redisFree(con->con);
 +                con->con = NULL;
 +            }
-+            return ret;
++        }
++        // take commands from oldest to newest and re-do again,
++        // but don't queue them once again in retry-mode
++        while ((query = db_redis_shift_query(con))) {
++            LM_DBG("re-queueing appended command\n");
++            if (db_redis_append_command_argv(con, query, 0) != 0) {
++                LM_ERR("Failed to re-queue redis command");
++                return -1;
++            }
++            db_redis_key_free(&query);
 +        }
 +        ret = redisGetReply(con->con, reply);
-+    }
-+    if (!con->con->err)
++        if (con->con->err != REDIS_ERR_EOF) {
++            con->append_counter--;
++        }
++    } else {
++        LM_DBG("get_reply successful, popping query\n");
++        query = db_redis_pop_query(con);
++        db_redis_key_free(&query);
 +        con->append_counter--;
++    }
 +    return ret;
 +}
 +
@@ -965,6 +1078,7 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +
 +void db_redis_consume_replies(km_redis_con_t *con) {
 +    redisReply *reply = NULL;
++    redis_key_t *query;
 +    while (con->append_counter > 0 && !con->con->err) {
 +        LM_DBG("consuming outstanding reply %u", con->append_counter);
 +        db_redis_get_reply(con, (void**)&reply);
@@ -973,12 +1087,16 @@ Index: kamailio/modules/db_redis/redis_connection.c
 +            reply = NULL;
 +        }
 +    }
++    while ((query = db_redis_shift_query(con))) {
++        LM_DBG("consuming queued command\n");
++        db_redis_key_free(&query);
++    }
 +}
 Index: kamailio/modules/db_redis/redis_connection.h
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/redis_connection.h	2018-02-14 15:23:35.853985199 +0100
-@@ -0,0 +1,73 @@
+--- /dev/null
++++ kamailio/modules/db_redis/redis_connection.h
+@@ -0,0 +1,79 @@
 +/**
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
 + *
@@ -1004,9 +1122,12 @@ Index: kamailio/modules/db_redis/redis_connection.h
 +#ifndef _REDIS_CONNECTION_H_
 +#define _REDIS_CONNECTION_H_
 +
-+#include <hiredis.h>
++#include <hiredis/hiredis.h>
 +
 +#include "db_redis_mod.h"
++
++struct redis_key;
++typedef struct redis_key redis_key_t;
 +
 +#define db_redis_check_reply(con, reply, err) do { \
 +    if (!(reply) && !(con)->con) { \
@@ -1025,19 +1146,22 @@ Index: kamailio/modules/db_redis/redis_connection.h
 +    } \
 +} while(0);
 +
++typedef struct redis_command {
++    redis_key_t *query;
++    struct redis_command *next;
++} redis_command_t;
++
 +typedef struct km_redis_con {
 +    struct db_id* id;
 +    unsigned int ref;
 +    struct pool_con* next;
 +
 +    redisContext *con;
++    redis_command_t *command_queue;
 +    unsigned int append_counter;
 +    struct str_hash_table tables;
 +} km_redis_con_t;
 +
-+
-+struct redis_key;
-+typedef struct redis_key redis_key_t;
 +
 +#define REDIS_CON(db_con)  ((km_redis_con_t*)((db_con)->tail))
 +
@@ -1046,7 +1170,7 @@ Index: kamailio/modules/db_redis/redis_connection.h
 +
 +int db_redis_connect(km_redis_con_t *con);
 +void *db_redis_command_argv(km_redis_con_t *con, redis_key_t *query);
-+int db_redis_append_command_argv(km_redis_con_t *con, redis_key_t *query);
++int db_redis_append_command_argv(km_redis_con_t *con, redis_key_t *query, int queue);
 +int db_redis_get_reply(km_redis_con_t *con, void **reply);
 +void db_redis_consume_replies(km_redis_con_t *con);
 +void db_redis_free_reply(redisReply **reply);
@@ -1054,8 +1178,8 @@ Index: kamailio/modules/db_redis/redis_connection.h
 +#endif /* _REDIS_CONNECTION_H_ */
 Index: kamailio/modules/db_redis/redis_dbase.c
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/redis_dbase.c	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/redis_dbase.c
 @@ -0,0 +1,2128 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -2135,7 +2259,7 @@ Index: kamailio/modules/db_redis/redis_dbase.c
 +            LM_ERR("Failed to add key name to list\n");
 +            goto error;
 +        }
-+        if (db_redis_append_command_argv(con, query_v) != REDIS_OK) {
++        if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
 +            LM_ERR("Failed to append redis command\n");
 +            goto error;
 +        }
@@ -2174,7 +2298,7 @@ Index: kamailio/modules/db_redis/redis_dbase.c
 +            }
 +        }
 +
-+        if (db_redis_append_command_argv(con, query_v) != REDIS_OK) {
++        if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
 +            LM_ERR("Failed to append redis command\n");
 +            goto error;
 +        }
@@ -2492,7 +2616,7 @@ Index: kamailio/modules/db_redis/redis_dbase.c
 +            LM_ERR("Failed to add key name to pre-update exists query\n");
 +            goto error;
 +        }
-+        if (db_redis_append_command_argv(con, query_v) != REDIS_OK) {
++        if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
 +            LM_ERR("Failed to append redis command\n");
 +            goto error;
 +        }
@@ -2527,7 +2651,7 @@ Index: kamailio/modules/db_redis/redis_dbase.c
 +            }
 +        }
 +
-+        if (db_redis_append_command_argv(con, query_v) != REDIS_OK) {
++        if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
 +            LM_ERR("Failed to append redis command\n");
 +            goto error;
 +        }
@@ -2642,7 +2766,7 @@ Index: kamailio/modules/db_redis/redis_dbase.c
 +            pkg_free(v.s);
 +        }
 +        update_queries++;
-+        if (db_redis_append_command_argv(con, query_v) != REDIS_OK) {
++        if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
 +            LM_ERR("Failed to append redis command\n");
 +            goto error;
 +        }
@@ -3187,8 +3311,8 @@ Index: kamailio/modules/db_redis/redis_dbase.c
 +}
 Index: kamailio/modules/db_redis/redis_dbase.h
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/redis_dbase.h	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/redis_dbase.h
 @@ -0,0 +1,88 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -3280,8 +3404,8 @@ Index: kamailio/modules/db_redis/redis_dbase.h
 +#endif  /* _REDIS_BASE_H_ */
 Index: kamailio/modules/db_redis/redis_table.c
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/redis_table.c	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/redis_table.c
 @@ -0,0 +1,838 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -4123,8 +4247,8 @@ Index: kamailio/modules/db_redis/redis_table.c
 +}
 Index: kamailio/modules/db_redis/redis_table.h
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/modules/db_redis/redis_table.h	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/modules/db_redis/redis_table.h
 @@ -0,0 +1,66 @@
 +/**
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -4194,8 +4318,8 @@ Index: kamailio/modules/db_redis/redis_table.h
 +#endif /* _REDIS_TABLE_H_ */
 Index: kamailio/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/doc/stylesheets/dbschema_k/xsl/db_redis.xsl	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
 @@ -0,0 +1,126 @@
 +<?xml version='1.0'?>
 +<!--
@@ -4325,9 +4449,9 @@ Index: kamailio/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
 +</xsl:stylesheet>
 Index: kamailio/lib/srdb1/schema/Makefile
 ===================================================================
---- kamailio.orig/lib/srdb1/schema/Makefile	2018-02-14 15:23:35.861985218 +0100
-+++ kamailio/lib/srdb1/schema/Makefile	2018-02-14 15:23:35.853985199 +0100
-@@ -36,6 +36,9 @@
+--- kamailio.orig/lib/srdb1/schema/Makefile
++++ kamailio/lib/srdb1/schema/Makefile
+@@ -36,6 +36,9 @@ ORACLE_XSL = $(STYLESHEETS)/oracle.xsl
  # Stylesheet used to generate mongodb database schema
  MONGODB_XSL = $(STYLESHEETS)/mongodb.xsl
  
@@ -4337,7 +4461,7 @@ Index: kamailio/lib/srdb1/schema/Makefile
  # Stylesheet used to generate docbook documentation
  DOCBOOK_XSL = $(STYLESHEETS)/docbook.xsl
  
-@@ -68,7 +71,7 @@
+@@ -68,7 +71,7 @@ ifeq ($(VERBOSE), 1)
  	override XSLTPROC := $(XSLTPROC) --verbose
  endif
  
@@ -4346,7 +4470,7 @@ Index: kamailio/lib/srdb1/schema/Makefile
  
  .PHONY: pi_framework pi_framework_clean
  pi_framework:
-@@ -226,6 +229,19 @@
+@@ -226,6 +229,19 @@ mongodb:
  mongodb_clean:
  	-@rm -f $(SCHEME)/mongodb/kamailio/*
  
@@ -4366,7 +4490,7 @@ Index: kamailio/lib/srdb1/schema/Makefile
  
  .PHONY: docbook-xml
  docbook-xml:
-@@ -342,4 +358,4 @@
+@@ -342,4 +358,4 @@ dbdoc_clean:
  	done
  
  .PHONY: clean
@@ -4374,499 +4498,499 @@ Index: kamailio/lib/srdb1/schema/Makefile
 +clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean mongodb_clean db_redis_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
 Index: kamailio/utils/kamctl/db_redis/kamailio/acc
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/acc	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/acc
 @@ -0,0 +1,2 @@
 +id/int,method/string,from_tag/string,to_tag/string,callid/string,sip_code/string,sip_reason/string,time/int,
 +5
 Index: kamailio/utils/kamctl/db_redis/kamailio/acc_cdrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/acc_cdrs	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/acc_cdrs
 @@ -0,0 +1,2 @@
 +id/int,start_time/int,end_time/int,duration/double,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/active_watchers
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/active_watchers	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/active_watchers
 @@ -0,0 +1,2 @@
 +id/int,presentity_uri/string,watcher_username/string,watcher_domain/string,to_user/string,to_domain/string,event/string,event_id/string,to_tag/string,from_tag/string,callid/string,local_cseq/int,remote_cseq/int,contact/string,record_route/string,expires/int,status/int,reason/string,version/int,socket_info/string,local_contact/string,from_user/string,from_domain/string,updated/int,updated_winfo/int,flags/int,user_agent/string,
 +12
 Index: kamailio/utils/kamctl/db_redis/kamailio/address
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/address	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/address
 @@ -0,0 +1,2 @@
 +id/int,grp/int,ip_addr/string,mask/int,port/int,tag/string,
 +6
 Index: kamailio/utils/kamctl/db_redis/kamailio/aliases
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/aliases	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/aliases
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/int,q/double,callid/string,cseq/int,last_modified/int,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
 +8
 Index: kamailio/utils/kamctl/db_redis/kamailio/carrier_name
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/carrier_name	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/carrier_name
 @@ -0,0 +1,2 @@
 +id/int,carrier/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/carrierfailureroute
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/carrierfailureroute	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/carrierfailureroute
 @@ -0,0 +1,2 @@
 +id/int,carrier/int,domain/int,scan_prefix/string,host_name/string,reply_code/string,flags/int,mask/int,next_domain/int,description/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/carrierroute
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/carrierroute	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/carrierroute
 @@ -0,0 +1,2 @@
 +id/int,carrier/int,domain/int,scan_prefix/string,flags/int,mask/int,prob/double,strip/int,rewrite_host/string,rewrite_prefix/string,rewrite_suffix/string,description/string,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/cpl
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/cpl	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/cpl
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,cpl_xml/string,cpl_bin/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/dbaliases
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dbaliases	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dbaliases
 @@ -0,0 +1,2 @@
 +id/int,alias_username/string,alias_domain/string,username/string,domain/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/dialog
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dialog	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dialog
 @@ -0,0 +1,2 @@
 +id/int,hash_entry/int,hash_id/int,callid/string,from_uri/string,from_tag/string,to_uri/string,to_tag/string,caller_cseq/string,callee_cseq/string,caller_route_set/string,callee_route_set/string,caller_contact/string,callee_contact/string,caller_sock/string,callee_sock/string,state/int,start_time/int,timeout/int,sflags/int,iflags/int,toroute_name/string,req_uri/string,xdata/string,
 +7
 Index: kamailio/utils/kamctl/db_redis/kamailio/dialog_vars
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dialog_vars	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dialog_vars
 @@ -0,0 +1,2 @@
 +id/int,hash_entry/int,hash_id/int,dialog_key/string,dialog_value/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/dialplan
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dialplan	2018-02-14 15:23:35.853985199 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dialplan
 @@ -0,0 +1,2 @@
 +id/int,dpid/int,pr/int,match_op/int,match_exp/string,match_len/int,subst_exp/string,repl_exp/string,attrs/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/dispatcher
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dispatcher	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dispatcher
 @@ -0,0 +1,2 @@
 +id/int,setid/int,destination/string,flags/int,priority/int,attrs/string,description/string,
 +4
 Index: kamailio/utils/kamctl/db_redis/kamailio/domain
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/domain	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/domain
 @@ -0,0 +1,2 @@
 +id/int,domain/string,did/string,last_modified/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/domain_attrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/domain_attrs	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/domain_attrs
 @@ -0,0 +1,2 @@
 +id/int,did/string,name/string,type/int,value/string,last_modified/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/domain_name
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/domain_name	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/domain_name
 @@ -0,0 +1,2 @@
 +id/int,domain/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/domainpolicy
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/domainpolicy	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/domainpolicy
 @@ -0,0 +1,2 @@
 +id/int,rule/string,type/string,att/string,val/string,description/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/dr_gateways
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dr_gateways	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dr_gateways
 @@ -0,0 +1,2 @@
 +gwid/int,type/int,address/string,strip/int,pri_prefix/string,attrs/string,description/string,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/dr_groups
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dr_groups	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dr_groups
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,groupid/int,description/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/dr_gw_lists
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dr_gw_lists	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dr_gw_lists
 @@ -0,0 +1,2 @@
 +id/int,gwlist/string,description/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/dr_rules
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/dr_rules	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/dr_rules
 @@ -0,0 +1,2 @@
 +ruleid/int,groupid/string,prefix/string,timerec/string,priority/int,routeid/string,gwlist/string,description/string,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/globalblacklist
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/globalblacklist	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/globalblacklist
 @@ -0,0 +1,2 @@
 +id/int,prefix/string,whitelist/int,description/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/grp
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/grp	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/grp
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,grp/string,last_modified/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/htable
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/htable	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/htable
 @@ -0,0 +1,2 @@
 +id/int,key_name/string,key_type/int,value_type/int,key_value/string,expires/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/imc_members
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/imc_members	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/imc_members
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,room/string,flag/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/imc_rooms
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/imc_rooms	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/imc_rooms
 @@ -0,0 +1,2 @@
 +id/int,name/string,domain/string,flag/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/lcr_gw
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/lcr_gw	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/lcr_gw
 @@ -0,0 +1,2 @@
 +id/int,lcr_id/int,gw_name/string,ip_addr/string,hostname/string,port/int,params/string,uri_scheme/int,transport/int,strip/int,prefix/string,tag/string,flags/int,defunct/int,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/lcr_rule
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/lcr_rule	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/lcr_rule
 @@ -0,0 +1,2 @@
 +id/int,lcr_id/int,prefix/string,from_uri/string,request_uri/string,stopper/int,enabled/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/lcr_rule_target
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/lcr_rule_target	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/lcr_rule_target
 @@ -0,0 +1,2 @@
 +id/int,lcr_id/int,rule_id/int,gw_id/int,priority/int,weight/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/location
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/location	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/location
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/int,q/double,callid/string,cseq/int,last_modified/int,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
 +8
 Index: kamailio/utils/kamctl/db_redis/kamailio/location_attrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/location_attrs	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/location_attrs
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,aname/string,atype/int,avalue/string,last_modified/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/matrix
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/matrix	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/matrix
 @@ -0,0 +1,2 @@
 +first/int,second/int,res/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/missed_calls
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/missed_calls	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/missed_calls
 @@ -0,0 +1,2 @@
 +id/int,method/string,from_tag/string,to_tag/string,callid/string,sip_code/string,sip_reason/string,time/int,
 +4
 Index: kamailio/utils/kamctl/db_redis/kamailio/mohqcalls
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/mohqcalls	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/mohqcalls
 @@ -0,0 +1,2 @@
 +id/int,mohq_id/int,call_id/string,call_status/int,call_from/string,call_contact/string,call_time/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/mohqueues
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/mohqueues	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/mohqueues
 @@ -0,0 +1,2 @@
 +id/int,name/string,uri/string,mohdir/string,mohfile/string,debug/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/mtree
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/mtree	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/mtree
 @@ -0,0 +1,2 @@
 +id/int,tprefix/string,tvalue/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/mtrees
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/mtrees	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/mtrees
 @@ -0,0 +1,2 @@
 +id/int,tname/string,tprefix/string,tvalue/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/pdt
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/pdt	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/pdt
 @@ -0,0 +1,2 @@
 +id/int,sdomain/string,prefix/string,domain/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/pl_pipes
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/pl_pipes	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/pl_pipes
 @@ -0,0 +1,2 @@
 +id/int,pipeid/string,algorithm/string,plimit/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/presentity
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/presentity	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/presentity
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,event/string,etag/string,expires/int,received_time/int,body/string,sender/string,priority/int,
 +4
 Index: kamailio/utils/kamctl/db_redis/kamailio/pua
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/pua	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/pua
 @@ -0,0 +1,2 @@
 +id/int,pres_uri/string,pres_id/string,event/int,expires/int,desired_expires/int,flag/int,etag/string,tuple_id/string,watcher_uri/string,call_id/string,to_tag/string,from_tag/string,cseq/int,record_route/string,contact/string,remote_contact/string,version/int,extra_headers/string,
 +7
 Index: kamailio/utils/kamctl/db_redis/kamailio/purplemap
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/purplemap	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/purplemap
 @@ -0,0 +1,2 @@
 +id/int,sip_user/string,ext_user/string,ext_prot/string,ext_pass/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/re_grp
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/re_grp	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/re_grp
 @@ -0,0 +1,2 @@
 +id/int,reg_exp/string,group_id/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/rls_presentity
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/rls_presentity	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/rls_presentity
 @@ -0,0 +1,2 @@
 +id/int,rlsubs_did/string,resource_uri/string,content_type/string,presence_state/string,expires/int,updated/int,auth_state/int,reason/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/rls_watchers
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/rls_watchers	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/rls_watchers
 @@ -0,0 +1,2 @@
 +id/int,presentity_uri/string,to_user/string,to_domain/string,watcher_username/string,watcher_domain/string,event/string,event_id/string,to_tag/string,from_tag/string,callid/string,local_cseq/int,remote_cseq/int,contact/string,record_route/string,expires/int,status/int,reason/string,version/int,socket_info/string,local_contact/string,from_user/string,from_domain/string,updated/int,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/rtpengine
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/rtpengine	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/rtpengine
 @@ -0,0 +1,2 @@
 +setid/int,url/string,weight/int,disabled/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/rtpproxy
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/rtpproxy	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/rtpproxy
 @@ -0,0 +1,2 @@
 +id/int,setid/string,url/string,flags/int,weight/int,description/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/sca_subscriptions
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/sca_subscriptions	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/sca_subscriptions
 @@ -0,0 +1,2 @@
 +id/int,subscriber/string,aor/string,event/int,expires/int,state/int,app_idx/int,call_id/string,from_tag/string,to_tag/string,record_route/string,notify_cseq/int,subscribe_cseq/int,server_id/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/silo
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/silo	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/silo
 @@ -0,0 +1,2 @@
 +id/int,src_addr/string,dst_addr/string,username/string,domain/string,inc_time/int,exp_time/int,snd_time/int,ctype/string,body/string,extra_hdrs/string,callid/string,status/int,
 +8
 Index: kamailio/utils/kamctl/db_redis/kamailio/sip_trace
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/sip_trace	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/sip_trace
 @@ -0,0 +1,2 @@
 +id/int,time_stamp/int,time_us/int,callid/string,traced_user/string,msg/string,method/string,status/string,fromip/string,toip/string,fromtag/string,totag/string,direction/string,
 +4
 Index: kamailio/utils/kamctl/db_redis/kamailio/speed_dial
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/speed_dial	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/speed_dial
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,sd_username/string,sd_domain/string,new_uri/string,fname/string,lname/string,description/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/subscriber
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/subscriber	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/subscriber
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,password/string,email_address/string,ha1/string,ha1b/string,rpid/string,
 +6
 Index: kamailio/utils/kamctl/db_redis/kamailio/topos_d
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/topos_d	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/topos_d
 @@ -0,0 +1,2 @@
 +id/int,rectime/int,s_method/string,s_cseq/string,a_callid/string,a_uuid/string,b_uuid/string,a_contact/string,b_contact/string,as_contact/string,bs_contact/string,a_tag/string,b_tag/string,a_rr/string,b_rr/string,s_rr/string,iflags/int,a_uri/string,b_uri/string,r_uri/string,a_srcaddr/string,b_srcaddr/string,a_socket/string,b_socket/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/topos_t
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/topos_t	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/topos_t
 @@ -0,0 +1,2 @@
 +id/int,rectime/int,s_method/string,s_cseq/string,a_callid/string,a_uuid/string,b_uuid/string,direction/int,x_via/string,x_vbranch/string,x_rr/string,y_rr/string,s_rr/string,x_uri/string,a_contact/string,b_contact/string,as_contact/string,bs_contact/string,x_tag/string,a_tag/string,b_tag/string,a_srcaddr/string,b_srcaddr/string,a_socket/string,b_socket/string,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/trusted
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/trusted	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/trusted
 @@ -0,0 +1,2 @@
 +id/int,src_ip/string,proto/string,from_pattern/string,ruri_pattern/string,tag/string,priority/int,
 +6
 Index: kamailio/utils/kamctl/db_redis/kamailio/uacreg
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uacreg	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uacreg
 @@ -0,0 +1,2 @@
 +id/int,l_uuid/string,l_username/string,l_domain/string,r_username/string,r_domain/string,realm/string,auth_username/string,auth_password/string,auth_proxy/string,expires/int,flags/int,reg_delay/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_credentials
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_credentials	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_credentials
 @@ -0,0 +1,2 @@
 +id/int,auth_username/string,did/string,realm/string,password/string,flags/int,ha1/string,ha1b/string,uid/string,
 +7
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_domain
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_domain	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_domain
 @@ -0,0 +1,2 @@
 +id/int,did/string,domain/string,flags/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_domain_attrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_domain_attrs	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_domain_attrs
 @@ -0,0 +1,2 @@
 +id/int,did/string,name/string,type/int,value/string,flags/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_global_attrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_global_attrs	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_global_attrs
 @@ -0,0 +1,2 @@
 +id/int,name/string,type/int,value/string,flags/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_uri
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_uri	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_uri
 @@ -0,0 +1,2 @@
 +id/int,uid/string,did/string,username/string,flags/int,scheme/string,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_uri_attrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_uri_attrs	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_uri_attrs
 @@ -0,0 +1,2 @@
 +id/int,username/string,did/string,name/string,value/string,type/int,flags/int,scheme/string,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/uid_user_attrs
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uid_user_attrs	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uid_user_attrs
 @@ -0,0 +1,2 @@
 +id/int,uid/string,name/string,value/string,type/int,flags/int,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/uri
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/uri	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/uri
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,uri_user/string,last_modified/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/userblacklist
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/userblacklist	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/userblacklist
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,prefix/string,whitelist/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/usr_preferences
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/usr_preferences	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/usr_preferences
 @@ -0,0 +1,2 @@
 +id/int,uuid/string,username/string,domain/string,attribute/string,type/int,value/string,last_modified/int,
 +2
 Index: kamailio/utils/kamctl/db_redis/kamailio/version
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/version	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/version
 @@ -0,0 +1,2 @@
 +table_name/string,table_version/int,
 +1
 Index: kamailio/utils/kamctl/db_redis/kamailio/watchers
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/watchers	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/watchers
 @@ -0,0 +1,2 @@
 +id/int,presentity_uri/string,watcher_username/string,watcher_domain/string,event/string,status/int,reason/string,inserted_time/int,
 +3
 Index: kamailio/utils/kamctl/db_redis/kamailio/xcap
 ===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kamailio/utils/kamctl/db_redis/kamailio/xcap	2018-02-14 15:23:35.857985209 +0100
+--- /dev/null
++++ kamailio/utils/kamctl/db_redis/kamailio/xcap
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,doc/string,doc_type/int,etag/string,source/int,doc_uri/string,port/int,
 +4
 Index: kamailio/utils/kamctl/Makefile
 ===================================================================
---- kamailio.orig/utils/kamctl/Makefile	2018-02-14 15:23:24.413959305 +0100
-+++ kamailio/utils/kamctl/Makefile	2018-02-14 15:26:51.394416711 +0100
-@@ -274,6 +274,18 @@
+--- kamailio.orig/utils/kamctl/Makefile
++++ kamailio/utils/kamctl/Makefile
+@@ -274,6 +274,18 @@ install-modules: $(bin_prefix)/$(bin_dir
  				fi ;\
  			done ; \
  		fi
