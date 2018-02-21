@@ -19,7 +19,7 @@ NAME=kamailio
 DESC=kamailio-$TYPE
 HOMEDIR=/var/run/kamailio
 PIDFILE=$HOMEDIR/$NAME.$TYPE.pid
-DEFAULTS=/etc/default/kamailio-$TYPE
+DEFAULTS=/etc/default/kamailio.$TYPE
 CFGFILE=/etc/kamailio/$TYPE/kamailio.cfg
 RUN_KAMAILIO=no
 
@@ -100,7 +100,7 @@ fi
 
 
 if [ "$RUN_KAMAILIO" != "yes" ]; then
-    echo "$DESC not yet configured. Edit /etc/default/kamailio-$TYPE first."
+    echo "$DESC not yet configured. Edit /etc/default/kamailio.$TYPE first."
     exit 0
 fi
 
