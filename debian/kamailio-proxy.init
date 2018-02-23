@@ -3,7 +3,7 @@
 # Provides:          kamailio-proxy
 # Required-Start:    $syslog $network $local_fs $time $remote_fs
 # Required-Stop:     $syslog $network $local_fs $remote_fs
-# Should-Start:      sshd mysql
+# Should-Start:      mysql
 # Should-Stop:       mysql
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6

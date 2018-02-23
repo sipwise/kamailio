@@ -3,7 +3,6 @@
 # Provides:          kamailio-lb
 # Required-Start:    $syslog $network $local_fs $remote_fs $time
 # Required-Stop:     $syslog $network $local_fs $remote_fs
-# Should-Start:      sshd
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: Start the Kamailio SIP proxy server
