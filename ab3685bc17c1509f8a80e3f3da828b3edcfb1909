@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "7a75e904_cc0223b4",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 791,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2018-02-27T16:52:18Z",
+      "side": 1,
+      "message": "\u003e This function is supposed to remove the last element from the list?\n \u003e Code should look like\n \u003e \n \u003e while ((*current)-\u003enext)\n \u003e current \u003d \u0026current-\u003enext;\n \u003e \n \u003e query \u003d (*current)-\u003equery;\n \u003e pkg_free(*current);\n \u003e *current \u003d NULL;\n\nThe pop is not needed anymore, thus whole function is removed in latest patchset.",
+      "parentUuid": "ba7be1f8_6e5dabe9",
+      "range": {
+        "startLine": 783,
+        "startChar": 0,
+        "endLine": 791,
+        "endChar": 21
+      },
+      "revId": "ab3685bc17c1509f8a80e3f3da828b3edcfb1909",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ba7be1f8_0e050fc2",
         "filename": "debian/patches/sipwise/db_redis.patch",
         "patchSetId": 4
@@ -36,6 +60,30 @@
       "writtenOn": "2018-02-20T17:03:06Z",
       "side": 1,
       "message": "This assumes that the commands or the connection won\u0027t fail again a second time. Is that a safe assumption?\n\nA possible alternative would be to steal con-\u003ecommand_queue to a local var, set con-\u003ecommand_queue to NULL, and replay the stolen queue list normally using db_redis_append_command_argv (which re-populates the command_queue), and then restart db_redis_get_reply",
+      "range": {
+        "startLine": 1051,
+        "startChar": 0,
+        "endLine": 1053,
+        "endChar": 68
+      },
+      "revId": "ab3685bc17c1509f8a80e3f3da828b3edcfb1909",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a75e904_0c2c3b4a",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1053,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2018-02-27T16:52:18Z",
+      "side": 1,
+      "message": "\u003e This assumes that the commands or the connection won\u0027t fail again a\n \u003e second time. Is that a safe assumption?\n \u003e \n \u003e A possible alternative would be to steal con-\u003ecommand_queue to a\n \u003e local var, set con-\u003ecommand_queue to NULL, and replay the stolen\n \u003e queue list normally using db_redis_append_command_argv (which\n \u003e re-populates the command_queue), and then restart db_redis_get_reply\n\nGood enough for now, I\u0027d say. Main problem I\u0027m solving here is redis closing the connection due to no traffic for a while, so the reconnect is supposed to work the second time.\n\nIf the connection still fails, the error is passed on to the SIP processing and a 5xx is returned to the client, which should be fine.",
+      "parentUuid": "ba7be1f8_0e050fc2",
       "range": {
         "startLine": 1051,
         "startChar": 0,
@@ -65,6 +113,24 @@
     },
     {
       "key": {
+        "uuid": "7a75e904_6c2bef30",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1065,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2018-02-27T16:52:18Z",
+      "side": 1,
+      "message": "\u003e Shouldn\u0027t this remove the first element from the list instead of\n \u003e the last one?\n\nCorrect, fixed in latest patchset.",
+      "parentUuid": "ba7be1f8_ae6ec394",
+      "revId": "ab3685bc17c1509f8a80e3f3da828b3edcfb1909",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "ba7be1f8_2e0ad3d2",
         "filename": "debian/patches/sipwise/db_redis.patch",
         "patchSetId": 4
@@ -76,6 +142,30 @@
       "writtenOn": "2018-02-20T17:03:06Z",
       "side": 1,
       "message": "db_redis_get_reply already removes ack-ed queries from the command queue. Is this duplicated here?",
+      "range": {
+        "startLine": 1090,
+        "startChar": 0,
+        "endLine": 1093,
+        "endChar": 6
+      },
+      "revId": "ab3685bc17c1509f8a80e3f3da828b3edcfb1909",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a75e904_8c1f4b09",
+        "filename": "debian/patches/sipwise/db_redis.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1093,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2018-02-27T16:52:18Z",
+      "side": 1,
+      "message": "\u003e db_redis_get_reply already removes ack-ed queries from the command\n \u003e queue. Is this duplicated here?\n\nThe idea here is that if get_reply fails at this point (checking con-\u003econ-\u003eerr), I still free the memory properly.",
+      "parentUuid": "ba7be1f8_2e0ad3d2",
       "range": {
         "startLine": 1090,
         "startChar": 0,
