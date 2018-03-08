@@ -57,3 +57,4 @@ sipwise/prov_responses_cdr.patch
 sipwise/rtpengine-default-id.patch
 sipwise/db_redis.patch
 sipwise/rtpengine-transcoding.patch
+sipwise/fix_db_redis_time_schema
