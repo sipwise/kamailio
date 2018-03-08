@@ -1,17 +1,213 @@
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -150,7 +150,7 @@
- mod_list_jansson=jansson janssonrpc-c
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -156,7 +156,7 @@ mod_list_jansson=jansson
+ mod_list_jansson_event=janssonrpcc
  
  # - modules depending on redis library
--mod_list_redis=ndb_redis
-+mod_list_redis=ndb_redis db_redis
+-mod_list_redis=ndb_redis topos_redis
++mod_list_redis=db_redis ndb_redis topos_redis
  
  # - modules depending on mono library
  mod_list_mono=app_mono
+--- a/src/lib/srdb1/schema/Makefile
++++ b/src/lib/srdb1/schema/Makefile
+@@ -37,6 +37,9 @@ ORACLE_XSL = $(STYLESHEETS)/oracle.xsl
+ # Stylesheet used to generate mongodb database schema
+ MONGODB_XSL = $(STYLESHEETS)/mongodb.xsl
+ 
++# Stylesheet used to generate Redis database schema
++DB_REDIS_XSL = $(STYLESHEETS)/db_redis.xsl
++
+ # Stylesheet used to generate docbook documentation
+ DOCBOOK_XSL = $(STYLESHEETS)/docbook.xsl
+ 
+@@ -69,7 +72,7 @@ ifeq ($(VERBOSE), 1)
+ 	override XSLTPROC := $(XSLTPROC) --verbose
+ endif
+ 
+-all: mysql postgres dbtext db_berkeley db_sqlite oracle mongodb pi_framework
++all: mysql postgres dbtext db_berkeley db_sqlite oracle mongodb db_redis pi_framework
+ 
+ .PHONY: pi_framework pi_framework_clean
+ pi_framework:
+@@ -227,6 +230,18 @@ mongodb:
+ mongodb_clean:
+ 	-@rm -f $(SCHEME)/mongodb/kamailio/*
+ 
++.PHONY: db_redis db_redis_clean
++db_redis:
++	for FILE in $(TABLES); do \
++		XML_CATALOG_FILES=$(CATALOG) $(XSLTPROC) $(XSLTPROC_FLAGS) \
++		--stringparam dir "$(SCHEME)/db_redis/kamailio" \
++		--stringparam prefix "" \
++		--stringparam db "db_redis" \
++		$(DB_REDIS_XSL) kamailio-"$$FILE".xml ; \
++	done
++
++db_redis_clean:
++	-@rm -f $(SCHEME)/db_redis/*
+ 
+ .PHONY: docbook-xml
+ docbook-xml:
+@@ -350,4 +365,4 @@ dbdoc_clean:
+ 	done
+ 
+ .PHONY: clean
+-clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
++clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean mongodb_clean db_redis_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
+--- a/utils/kamctl/Makefile
++++ b/utils/kamctl/Makefile
+@@ -264,6 +264,18 @@ install-modules: $(bin_prefix)/$(bin_dir
+ 				fi ;\
+ 			done ; \
+ 		fi
++		# install Redis stuff
++		if [ "$(REDISON)" = "yes" ]; then \
++			mkdir -p $(data_prefix)/$(data_dir)/db_redis/kamailio ; \
++			for FILE in $(wildcard db_redis/kamailio/*) ; do \
++				if [ -f $$FILE ] ; then \
++				$(INSTALL_TOUCH) $$FILE \
++					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
++				$(INSTALL_CFG) $$FILE \
++					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
++				fi ;\
++			done ; \
++		fi
+ 
+ 
+ $(cfg_prefix)/$(cfg_dir):
 --- /dev/null
-+++ b/modules/db_redis/Makefile
-@@ -0,0 +1,36 @@
++++ b/src/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
+@@ -0,0 +1,126 @@
++<?xml version='1.0'?>
++<!--
++ * $Id: $
++ *
++ * XSL converter script for db_redis
++ *
++ * Copyright (C) 2001-2007 FhG Fokus
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++-->
++
++
++<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
++                version='1.0'
++                xmlns:xi="http://www.w3.org/2001/XInclude">
++
++    <xsl:import href="common.xsl"/>
++    <xsl:output method="text" indent="no" omit-xml-declaration="yes"/>
++
++    <!-- Create the file for the table in dbtext subdirectory -->
++    <xsl:template match="table">
++	<xsl:variable name="name">
++	    <xsl:call-template name="get-name"/>
++	</xsl:variable>
++
++	<xsl:variable name="path" select="concat($dir, concat('/', concat($prefix, $name)))"/>
++	<xsl:document href="{$path}" method="text" indent="no" omit-xml-declaration="yes">
++		<xsl:apply-imports/>
++		<!-- Insert version data -->
++		 <xsl:apply-templates select="version"/>
++		<!-- this is not exactly what we want for dbtext, as the version data gets
++		     appended to the actual table file, and no to the 'version' table.
++		     But its not possible (at least with XSL 1.0, AFAIK) to append data to a
++		     file. So it's much more easier to do this in the Makefile -->
++	</xsl:document>
++    </xsl:template>
++
++    <!-- version data template -->
++    <xsl:template match="version">
++	<xsl:value-of select="text()"/>
++	<xsl:text>&#x0A;</xsl:text>
++    </xsl:template>
++
++    <!-- Create column definitions -->
++    <xsl:template match="column">
++	<xsl:variable name="type">
++	    <xsl:call-template name="get-type"/>
++	</xsl:variable>
++
++	<xsl:variable name="null">
++	    <xsl:call-template name="get-null"/>
++	</xsl:variable>
++
++	<xsl:call-template name="get-name"/>
++	<xsl:text>/</xsl:text>
++	<xsl:choose>
++	    <xsl:when test="type[@db=$db]">
++		<xsl:value-of select="normalize-space(type[@db=$db])"/>
++	    </xsl:when>
++	    <xsl:when test="$type='char' or
++						$type='short' or
++						$type='int' or
++						$type='long' or
++						$type='datetime'">
++		<xsl:text>int</xsl:text>
++	    </xsl:when>
++	    <xsl:when test="$type='float' or
++						$type='double'">
++		<xsl:text>double</xsl:text>
++	    </xsl:when>
++	    <xsl:when test="$type='string' or
++						$type='text' or
++						$type='binary' or
++                        $type='largetext' or
++						$type='largebinary'">
++		<xsl:text>string</xsl:text>
++	    </xsl:when>
++	    <xsl:otherwise>
++		<xsl:call-template name="type-error"/>
++	    </xsl:otherwise>
++	</xsl:choose>
++
++    <!--
++	<xsl:if test="$null=1">
++	    <xsl:text>&amp;null</xsl:text>
++    </xsl:if>
++    -->
++	<xsl:text>,</xsl:text>
++	<xsl:if test="position()=last()">
++	    <xsl:text>&#x0A;</xsl:text>
++	</xsl:if>
++    </xsl:template>
++
++    <!-- Escape all : occurrences -->
++    <xsl:template name="escape">
++	<xsl:param name="value"/>
++	<xsl:choose>
++	    <xsl:when test="contains($value, ':')">
++		<xsl:value-of select="concat(substring-before($value, ':'), '\:')"/>
++		<xsl:call-template name="escape">
++		    <xsl:with-param name="value" select="substring-after($value, ':')"/>
++		</xsl:call-template>
++	    </xsl:when>
++	    <xsl:otherwise>
++		<xsl:value-of select="$value"/>
++	    </xsl:otherwise>
++	</xsl:choose>
++    </xsl:template>
++
++</xsl:stylesheet>
+--- /dev/null
++++ b/src/modules/db_redis/Makefile
+@@ -0,0 +1,42 @@
 +#
 +# WARNING: do not run this directly, it should be run by the master Makefile
 +
@@ -32,6 +228,12 @@
 +else
 +	HIREDISDEFS = $(shell $(HIREDIS_BUILDER) --cflags)
 +	HIREDISLIBS = $(shell $(HIREDIS_BUILDER) --libs)
++
++ifeq ($(HIREDISLIBS),-L -lhiredis)
++		HIREDISDEFS = $(shell $(HIREDIS_BUILDER) --cflags) /opt/local/include
++		HIREDISLIBS = -L/opt/local/lib -lhiredis
++endif
++
 +endif
 +
 +DEFS+=$(HIREDISDEFS)
@@ -45,12 +247,13 @@
 +include ../../Makefile.modules
 +
 +install-redis-scripts: $(bin_prefix)/$(bin_dir)
-+		REDISON=yes $(MAKE) -C ../../utils/kamctl/ install-modules
++	REDISON=yes $(MAKE) -C ../../../utils/kamctl/ install-modules
 +
 +install-scripts: install-redis-scripts
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/README
-@@ -0,0 +1,189 @@
++++ b/src/modules/db_redis/README
+@@ -0,0 +1,198 @@
 +DB_REDIS Module
 +
 +Andreas Granig
@@ -62,6 +265,12 @@
 +Andreas Granig
 +
 +   <agranig@sipwise.com>
++
++Edited by
++
++Alex Balashov
++
++   <abalashov@evaristesys.com>
 +
 +   Copyright © 2018 sipwise.com
 +     __________________________________________________________________
@@ -110,56 +319,61 @@
 +
 +1. Overview
 +
-+   This module provides a DB APIv1 connector for Redis server.
++   This module provides a DB APIv1 connector for the Redis server
++   (https://www.redis.io).
 +
 +   It can be used as a replacement for other database modules such as
 +   db_mysql and db_postgres. Not all the specs of DB APIv1 are
 +   implemented, thus the usage of this module might be restricted to
-+   specific modules. Also, for proper performance, the module needs
-+   particular configuration tailored to the using modules.
++   specific modules. Also, for proper performance, this module needs
++   particular configuration tailored to the modules that make use of it.
 +
 +   Since Redis does not provide a schema by itself, db_redis ships with
-+   schema files, which path has to be defined as module parameter
-+   "schema_path". The schema definition is defined in one file per table
-+   with the file name being the table name, and each file is composed of a
-+   comma-separated list of column definitions in format
-+   <column-name>/<type>[,<column-name>/<type> ...] in one line, followed
-+   by a line holding the table version.
++   schema files. The path to these has to be defined using the module
++   parameter "schema_path". The schema definition is defined in one file
++   per table, such that the file name corresponds to the table name, and
++   each file is composed of a comma-separated list of column definitions
++   in the format <column-name>/<type>[,<column-name>/<type> ...] in one
++   line, followed by a line holding the table version.
 +
-+   Example for location definition:
++   Example definition for the "location" table (from the usrloc module):
 +username/string,domain/string,contact/string,received/string,path/string,expires
 +/timestamp,q/double,callid/string,cseq/int,last_modified/timestamp,flags/int,cfl
 +ags/int,user_agent/string,socket/string,methods/int,ruid/string,reg_id/int,insta
 +nce/string,server_id/int,connection_id/int,keepalive/int,partition/int
 +8
 +
-+   Also since Redis is a key-value store with keys having to be unique,
-+   tables and rows e.g. from MySQL can not be ported 1:1 to Redis. For
-+   instance, usrloc relies on a key "username@domain", but it must not be
-+   unique for being able to store multiple contacts per AoR. Thus,
-+   db_redis supports mapping sets in a way for example for usrloc to have
-+   a set with a key "username@domain", with its entries being unique keys
-+   per contact being the ruid of a contact. Thus, one contact in usrloc
-+   consists of a unique key "location:entry::example-ruid-1" being a hash
-+   with the columns like username, domain, contact, path etc. In addition,
-+   this unique key is stored in a set
++   Because Redis is a key-value store, it requires unique keys. This means
++   that tables and rows from a relational SQL database, e.g. from MySQL,
++   can not be ported one a 1:1 basis to Redis.
++
++   For instance, usrloc relies on a key of "username@domain", but in order
++   to store multiple contacts per AoR, it cannot be constrained to
++   uniqueness. To work around this, db_redis supports mapping sets in such
++   a way as to, in the case of the usrloc module, have a set with a key of
++   "username@domain" and its entries being unique keys per contact based
++   on the ruid of a contact. Thus, one contact in usrloc consists of a
++   unique key "location:entry::example-ruid-1" being a hash with the
++   columns like username, domain, contact, path etc. In addition, this
++   unique key is stored in a set
 +   "location:usrdom::exampleuser:exampledomain.org". When usrloc does a
 +   lookup based on "username@domain", db_redis figures out via the
-+   keys/values the query is constructed by usrloc to look for the final
-+   entry key in the mapping set first, then querying the actual entries
-+   from there, avoiding full table scans. For usrloc, the same holds true
-+   for expired contacts, requiring a different kind of mapping. There is a
++   keys/values the query constructed by usrloc to look for the final entry
++   key in the mapping set first. It then query the actual entries from
++   there, avoiding full table scans. For usrloc, the same holds true for
++   expired contacts, requiring a different kind of mapping. There is a
 +   certain balance of read performance vs. write performance to consider,
-+   because inserts and deletes also have to maintain the mappings, in
-+   favor of much faster selects. The mappings can be freely defined, so
++   because inserts and deletes also have to maintain the mappings, though
++   this yields much faster selects. The mappings can be freely defined, so
 +   even though other kamailio modules don't require a specific mapping to
 +   be in place for proper performance, mappings could be defined for
 +   external applications to read faster (for instance letting the acc
 +   module also write mappings besides the actual records for billing
 +   systems to correlate start and stop records faster).
 +
-+   The mappings can be freely defined in the "keys" module parameter. It
-+   is composed of a semi-colon separated list of definitions in format
++   The mappings can be freely defined in the "keys" module parameter,
++   which is composed of a semi-colon separated list of definitions in the
++   format
 +   <table-name>=<entry>:<column-name>[&<map-name>:<column-name>,<column-na
 +   me>...]. Each table must at least have an "entry" key for db_redis to
 +   be able to store data.
@@ -168,17 +382,16 @@
 +location=entry:ruid&usrdom:username,domain&timer:partition,keepalive;acc=entry:c
 +allid,time_hires&cid:callid
 +
-+   For readability purposes, keys per table can be defined line by line by
-+   providing multiple "keys" mod-params.
-+
-+   You can read more about Redis at: https://www.redis.io.
++   For readability purposes, definitions of keys per table can span
++   multiple Kamailio config lines by providing multiple "keys" modparams.
 +
 +2. Limitations
 +
-+     * This module has implemented the equivalent operations for INSERT,
-+       UPDATE, DELETE and SELECT. The ORDER BY for SELECT is not
-+       implemented. Raw query is not implemented inside this module, use
-+       ndb_redis for sending any kind of command to a Redis server.
++     * This module has implemented equivalent underlying Redis operations
++       for INSERT, UPDATE, DELETE and SELECT. The ORDER BY clause for
++       SELECT is not implemented. Raw querying is not implemented inside
++       this module; for sending literal commands to the Redis server, use
++       ndb_redis.
 +
 +3. Dependencies
 +
@@ -196,8 +409,7 @@
 +
 +4.1. schema_path (string)
 +
-+   The path to the schema of your tables (default
-+   /usr/share/kamailio/db_redis).
++   The path to the table schemas (default /usr/share/kamailio/db_redis).
 +
 +   Example 1.1. Setting schema_path module parameter
 +modparam("db_redis", "schema_path", "/usr/local/share/kamailio/db_redis/kamailio
@@ -205,7 +417,7 @@
 +
 +4.2. keys (string)
 +
-+   The entry and mapping keys of your tables.
++   The entry and mapping keys of tables.
 +
 +   Example 1.2. Setting keys module parameter
 +modparam("db_redis", "keys", "version=entry:table_name;location=entry:ruid&usrdo
@@ -219,9 +431,9 @@
 +
 +6. Usage
 +
-+   Load the module and set the the DB URL for specific modules to:
-+   redis://[username]@host:port/database. Username is optional. Database
-+   must be a valid redis database number.
++   Load the module and set the "db_url" modparam for specific modules to:
++   redis://[username]@host:port/database. Username is optional. The
++   database portion must be a valid Redis database number.
 +
 +   Example 1.3. Usage
 +...
@@ -240,8 +452,9 @@
 +modparam("acc_db", "db_url", DBURL_ACC)
 +modparam("auth_db", "db_url", DBURL_AUTH)
 +...
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/db_redis_mod.c
++++ b/src/modules/db_redis/db_redis_mod.c
 @@ -0,0 +1,115 @@
 +/**
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -338,10 +551,10 @@
 +
 +int keys_param(modparam_t type, void *val)
 +{
-+	if (val == NULL)
-+		return -1;
-+	else
-+		return db_redis_keys_spec((char*)val);
++    if (val == NULL)
++        return -1;
++    else
++        return db_redis_keys_spec((char*)val);
 +}
 +
 +int mod_register(char *path, int *dlflags, void *p1, void *p2) {
@@ -358,8 +571,9 @@
 +static void mod_destroy(void) {
 +    LM_DBG("module destroying\n");
 +}
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/db_redis_mod.h
++++ b/src/modules/db_redis/db_redis_mod.h
 @@ -0,0 +1,53 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -397,13 +611,13 @@
 +#include "../../lib/srdb1/db_op.h"
 +#include "../../lib/srdb1/db_val.h"
 +
-+#include "../../mem/mem.h"
++#include "../../core/mem/mem.h"
 +
-+#include "../../dprint.h"
-+#include "../../sr_module.h"
-+#include "../../str.h"
-+#include "../../str_hash.h"
-+#include "../../ut.h"
++#include "../../core/dprint.h"
++#include "../../core/sr_module.h"
++#include "../../core/str.h"
++#include "../../core/str_hash.h"
++#include "../../core/ut.h"
 +
 +#define REDIS_DIRECT_PREFIX "entry"
 +#define REDIS_DIRECT_PREFIX_LEN 5
@@ -414,22 +628,24 @@
 +extern str redis_schema_path;
 +
 +#endif /* _DB_REDIS_MOD_H */
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/doc/Makefile
++++ b/src/modules/db_redis/doc/Makefile
 @@ -0,0 +1,4 @@
 +docs = db_redis.xml
 +
-+docbook_dir = ../../../docbook
++docbook_dir = ../../../../doc/docbook
 +include $(docbook_dir)/Makefile.module
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/doc/db_redis.xml
-@@ -0,0 +1,33 @@
++++ b/src/modules/db_redis/doc/db_redis.xml
+@@ -0,0 +1,38 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 +"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
 +
 +<!-- Include general documentation entities -->
-+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++<!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
 +%docentities;
 +
 +]>
@@ -448,6 +664,11 @@
 +		<surname>Granig</surname>
 +		<email>agranig@sipwise.com</email>
 +	    </editor>
++	    <editor>
++		<firstname>Alex</firstname>
++		<surname>Balashov</surname>
++		<email>abalashov@evaristesys.com</email>
++	    </editor>
 +	</authorgroup>
 +	<copyright>
 +	    <year>2018</year>
@@ -457,15 +678,16 @@
 +    <toc></toc>
 +    <xi:include href="db_redis_admin.xml"/>
 +</book>
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/doc/db_redis_admin.xml
++++ b/src/modules/db_redis/doc/db_redis_admin.xml
 @@ -0,0 +1,192 @@
 +<?xml version="1.0" encoding='ISO-8859-1'?>
 +<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 +"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
 +
 +<!-- Include general documentation entities -->
-+<!ENTITY % docentities SYSTEM "../../../docbook/entities.xml">
++<!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
 +%docentities;
 +
 +]>
@@ -476,49 +698,53 @@
 +	<section>
 +		<title>Overview</title>
 +		<para>
-+			This module provides a DB APIv1 connector for Redis server.
++			This module provides a DB APIv1 connector for the Redis server (<ulink url="https://www.redis.io">https://www.redis.io</ulink>).
++
 +		</para>
 +		<para>
 +			It can be used as a replacement for other database modules such as
 +			db_mysql and db_postgres. Not all the specs of DB APIv1 are
 +			implemented, thus the usage of this module might be restricted to
-+			specific modules. Also, for proper performance, the module needs
-+			particular configuration tailored to the using modules.
++			specific modules. Also, for proper performance, this module needs
++			particular configuration tailored to the modules that make use of it.
 +		</para>
 +		<para>
 +			Since Redis does not provide a schema by itself, db_redis ships with
-+			schema files, which path has to be defined as module parameter "schema_path".
-+			The schema definition is defined in one file per table with the file name
-+			being the table name, and each file is composed of a
-+			comma-separated list of column definitions in format
++			schema files. The path to these has to be defined using the module parameter
++			"schema_path". The schema definition is defined in one file per table, such that
++			the file name corresponds to the table name, and each file is composed of a
++			comma-separated list of column definitions in the format
 +			&lt;column-name&gt;/&lt;type&gt;[,&lt;column-name&gt;/&lt;type&gt; ...]
 +			in one line, followed by a line holding the table version.
 +		</para>
 +		<para>
-+			Example for location definition:
++			Example definition for the "location" table (from the usrloc module):
 +			<programlisting format="linespecific">
 +username/string,domain/string,contact/string,received/string,path/string,expires/timestamp,q/double,callid/string,cseq/int,last_modified/timestamp,flags/int,cflags/int,user_agent/string,socket/string,methods/int,ruid/string,reg_id/int,instance/string,server_id/int,connection_id/int,keepalive/int,partition/int
 +8
 +			</programlisting>
 +		</para>
 +		<para>
-+			Also since Redis is a key-value store with keys having to be unique,
-+			tables and rows e.g. from MySQL can not be ported 1:1 to Redis. For
-+			instance, usrloc relies on a key "username@domain", but it must not be
-+			unique for being able to store multiple contacts per AoR. Thus, db_redis
-+			supports mapping sets in a way for example for usrloc to have a set with
-+			a key "username@domain", with its entries being unique keys per contact being
-+			the ruid of a contact. Thus, one contact in usrloc consists of a unique
-+			key "location:entry::example-ruid-1" being a hash with the columns like
++			Because Redis is a key-value store, it requires unique keys. This means
++			that tables and rows from a relational SQL database, e.g. from MySQL, can
++			not be ported one a 1:1 basis to Redis.
++		</para>
++		<para>
++			For instance, usrloc relies on a key of "username@domain", but in order to store
++			multiple contacts per AoR, it cannot be constrained to uniqueness. To
++			work around this, db_redis supports mapping sets in such a way as to, in the case of
++			the usrloc module, have a set with a key of "username@domain" and its entries being
++			unique keys per contact based on the ruid of a contact. Thus, one contact in usrloc
++			consists of a unique key "location:entry::example-ruid-1" being a hash with the columns like
 +			username, domain, contact, path etc. In addition, this unique key is stored
 +			in a set "location:usrdom::exampleuser:exampledomain.org". When usrloc does
 +			a lookup based on "username@domain", db_redis figures out via the keys/values
-+			the query is constructed by usrloc to look for the final entry key in the
-+			mapping set first, then querying the actual entries from there, avoiding full
++			the query constructed by usrloc to look for the final entry key in the
++			mapping set first. It then query the actual entries from there, avoiding full
 +			table scans. For usrloc, the same holds true for expired contacts, requiring
 +			a different kind of mapping. There is a certain balance of read performance
 +			vs. write performance to consider, because inserts and deletes also have to
-+			maintain the mappings, in favor of much faster selects. The mappings can be
++			maintain the mappings, though this yields much faster selects. The mappings can be
 +			freely defined, so even though other kamailio modules don't require a specific
 +			mapping to be in place for proper performance, mappings could be defined
 +			for external applications to read faster (for instance letting the acc module
@@ -526,8 +752,8 @@
 +			correlate start and stop records faster).
 +		</para>
 +		<para>
-+			The mappings can be freely defined in the "keys" module parameter. It is
-+			composed of a semi-colon separated list of definitions in format
++			The mappings can be freely defined in the "keys" module parameter, which is
++			composed of a semi-colon separated list of definitions in the format
 +			&lt;table-name&gt;=&lt;entry&gt;:&lt;column-name&gt;[&amp;&lt;map-name&gt;:&lt;column-name&gt;,&lt;column-name&gt;...].
 +			Each table must at least have an "entry" key for db_redis to be able to store data.
 +		</para>
@@ -538,12 +764,8 @@
 +			</programlisting>
 +		</para>
 +		<para>
-+			For readability purposes, keys per table can be defined line by line by
-+			providing multiple "keys" mod-params.
-+		</para>
-+		<para>
-+			You can read more about Redis at:
-+			<ulink url="https://www.redis.io">https://www.redis.io</ulink>.
++			For readability purposes, definitions of keys per table can span multiple Kamailio
++			config lines by providing multiple "keys" modparams.
 +		</para>
 +	</section>
 +
@@ -552,10 +774,10 @@
 +		<itemizedlist>
 +			<listitem>
 +				<para>
-+					This module has implemented the equivalent operations for INSERT,
-+					UPDATE, DELETE and SELECT. The ORDER BY for SELECT is not implemented.
-+					Raw query is not implemented inside this module, use ndb_redis for sending any
-+					kind of command to a Redis server.
++					This module has implemented equivalent underlying Redis operations for INSERT,
++					UPDATE, DELETE and SELECT. The ORDER BY clause for SELECT is not implemented.
++					Raw querying is not implemented inside this module; for sending literal commands
++					to the Redis server, use ndb_redis.
 +				</para>
 +			</listitem>
 +		</itemizedlist>
@@ -583,7 +805,7 @@
 +		<section>
 +			<title><varname>schema_path</varname> (string)</title>
 +			<para>
-+				The path to the schema of your tables (default /usr/share/kamailio/db_redis).
++				The path to the table schemas (default /usr/share/kamailio/db_redis).
 +			</para>
 +			<example>
 +				<title>Setting schema_path module parameter</title>
@@ -596,7 +818,7 @@
 +		<section>
 +			<title><varname>keys</varname> (string)</title>
 +			<para>
-+				The entry and mapping keys of your tables.
++				The entry and mapping keys of tables.
 +			</para>
 +			<example>
 +				<title>Setting keys module parameter</title>
@@ -626,9 +848,9 @@
 +	<section>
 +		<title>Usage</title>
 +		<para>
-+			Load the module and set the the DB URL for specific modules to:
++			Load the module and set the "db_url" modparam for specific modules to:
 +			redis://[username]@host:port/database. Username is optional.
-+			Database must be a valid redis database number.
++			The database portion must be a valid Redis database number.
 +		</para>
 +		<example>
 +			<title>Usage</title>
@@ -652,9 +874,10 @@
 +		</example>
 +	</section>
 +</chapter>
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/redis_connection.c
-@@ -0,0 +1,397 @@
++++ b/src/modules/db_redis/redis_connection.c
+@@ -0,0 +1,399 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
 + *
@@ -682,8 +905,10 @@
 +#include "redis_table.h"
 +
 +static void print_query(redis_key_t *query) {
++    redis_key_t *k;
++
 +    LM_DBG("Query dump:\n");
-+    for (redis_key_t *k = query; k; k = k->next) {
++    for (k = query; k; k = k->next) {
 +        LM_DBG("  %s\n", k->key.s);
 +    }
 +}
@@ -1052,8 +1277,9 @@
 +        db_redis_key_free(&query);
 +    }
 +}
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/redis_connection.h
++++ b/src/modules/db_redis/redis_connection.h
 @@ -0,0 +1,81 @@
 +/**
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -1136,8 +1362,9 @@
 +void db_redis_free_reply(redisReply **reply);
 +
 +#endif /* _REDIS_CONNECTION_H_ */
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
 @@ -0,0 +1,2151 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -1169,7 +1396,7 @@
 +#include "redis_table.h"
 +
 +static void db_redis_dump_reply(redisReply *reply) {
-+	int i;
++    int i;
 +    if (reply->type == REDIS_REPLY_STRING) {
 +        LM_DBG("%s\n", reply->str);
 +    } else if (reply->type == REDIS_REPLY_INTEGER) {
@@ -1359,7 +1586,7 @@
 +}
 +
 +static int db_redis_build_entry_manual_keys(redis_table_t *table, const db_key_t *_k,
-+		const db_val_t *_v, const int _n, int **manual_keys, int *manual_key_count) {
++        const db_val_t *_v, const int _n, int **manual_keys, int *manual_key_count) {
 +
 +    // TODO: we also put keys here which are already part of type mapping!
 +    // there must be removed for performance reasons
@@ -1405,8 +1632,8 @@
 +}
 +
 +static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
-+		str *type_name, const db_key_t *_k, const db_val_t *_v, const int _n,
-+		str *key_name, int *key_found) {
++        str *type_name, const db_key_t *_k, const db_val_t *_v, const int _n,
++        str *key_name, int *key_found) {
 +
 +    unsigned int len;
 +    str val = {NULL, 0};
@@ -1705,7 +1932,7 @@
 +                        db_redis_free_reply(&reply);
 +                        break;
 +                    } else {
-+                    	int i;
++                        int i;
 +                        LM_DBG("populating query keys list with result of type query\n");
 +                        *query_keys_count = reply->elements;
 +                        for (i = 0; i < reply->elements; ++i) {
@@ -3290,8 +3517,9 @@
 +    db_free_result(_r);
 +    return 0;
 +}
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/redis_dbase.h
++++ b/src/modules/db_redis/redis_dbase.h
 @@ -0,0 +1,88 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -3381,8 +3609,9 @@
 +int db_redis_use_table(db1_con_t* _h, const str* _t);
 +
 +#endif  /* _REDIS_BASE_H_ */
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/redis_table.c
++++ b/src/modules/db_redis/redis_table.c
 @@ -0,0 +1,841 @@
 +/*
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -4225,8 +4454,9 @@
 +    }
 +    return -1;
 +}
+\ No newline at end of file
 --- /dev/null
-+++ b/modules/db_redis/redis_table.h
++++ b/src/modules/db_redis/redis_table.h
 @@ -0,0 +1,66 @@
 +/**
 + * Copyright (C) 2018 Andreas Granig (sipwise.com)
@@ -4294,182 +4524,7 @@
 +int db_redis_keys_spec(char *spec);
 +
 +#endif /* _REDIS_TABLE_H_ */
---- /dev/null
-+++ b/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
-@@ -0,0 +1,126 @@
-+<?xml version='1.0'?>
-+<!--
-+ * $Id: $
-+ *
-+ * XSL converter script for db_redis
-+ *
-+ * Copyright (C) 2001-2007 FhG Fokus
-+ *
-+ * This file is part of Kamailio, a free SIP server.
-+ *
-+ * Kamailio is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version
-+ *
-+ * Kamailio is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-+ *
-+ */
-+-->
-+
-+
-+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-+                version='1.0'
-+                xmlns:xi="http://www.w3.org/2001/XInclude">
-+
-+    <xsl:import href="common.xsl"/>
-+    <xsl:output method="text" indent="no" omit-xml-declaration="yes"/>
-+
-+    <!-- Create the file for the table in dbtext subdirectory -->
-+    <xsl:template match="table">
-+	<xsl:variable name="name">
-+	    <xsl:call-template name="get-name"/>
-+	</xsl:variable>
-+
-+	<xsl:variable name="path" select="concat($dir, concat('/', concat($prefix, $name)))"/>
-+	<xsl:document href="{$path}" method="text" indent="no" omit-xml-declaration="yes">
-+		<xsl:apply-imports/>
-+		<!-- Insert version data -->
-+		 <xsl:apply-templates select="version"/>
-+		<!-- this is not exactly what we want for dbtext, as the version data gets
-+		     appended to the actual table file, and no to the 'version' table.
-+		     But its not possible (at least with XSL 1.0, AFAIK) to append data to a
-+		     file. So it's much more easier to do this in the Makefile -->
-+	</xsl:document>
-+    </xsl:template>
-+
-+    <!-- version data template -->
-+    <xsl:template match="version">
-+	<xsl:value-of select="text()"/>
-+	<xsl:text>&#x0A;</xsl:text>
-+    </xsl:template>
-+
-+    <!-- Create column definitions -->
-+    <xsl:template match="column">
-+	<xsl:variable name="type">
-+	    <xsl:call-template name="get-type"/>
-+	</xsl:variable>
-+
-+	<xsl:variable name="null">
-+	    <xsl:call-template name="get-null"/>
-+	</xsl:variable>
-+
-+	<xsl:call-template name="get-name"/>
-+	<xsl:text>/</xsl:text>
-+	<xsl:choose>
-+	    <xsl:when test="type[@db=$db]">
-+		<xsl:value-of select="normalize-space(type[@db=$db])"/>
-+	    </xsl:when>
-+	    <xsl:when test="$type='char' or
-+						$type='short' or
-+						$type='int' or
-+						$type='long' or
-+						$type='datetime'">
-+		<xsl:text>int</xsl:text>
-+	    </xsl:when>
-+	    <xsl:when test="$type='float' or
-+						$type='double'">
-+		<xsl:text>double</xsl:text>
-+	    </xsl:when>
-+	    <xsl:when test="$type='string' or
-+						$type='text' or
-+						$type='binary' or
-+                        $type='largetext' or
-+						$type='largebinary'">
-+		<xsl:text>string</xsl:text>
-+	    </xsl:when>
-+	    <xsl:otherwise>
-+		<xsl:call-template name="type-error"/>
-+	    </xsl:otherwise>
-+	</xsl:choose>
-+
-+    <!--
-+	<xsl:if test="$null=1">
-+	    <xsl:text>&amp;null</xsl:text>
-+    </xsl:if>
-+    -->
-+	<xsl:text>,</xsl:text>
-+	<xsl:if test="position()=last()">
-+	    <xsl:text>&#x0A;</xsl:text>
-+	</xsl:if>
-+    </xsl:template>
-+
-+    <!-- Escape all : occurrences -->
-+    <xsl:template name="escape">
-+	<xsl:param name="value"/>
-+	<xsl:choose>
-+	    <xsl:when test="contains($value, ':')">
-+		<xsl:value-of select="concat(substring-before($value, ':'), '\:')"/>
-+		<xsl:call-template name="escape">
-+		    <xsl:with-param name="value" select="substring-after($value, ':')"/>
-+		</xsl:call-template>
-+	    </xsl:when>
-+	    <xsl:otherwise>
-+		<xsl:value-of select="$value"/>
-+	    </xsl:otherwise>
-+	</xsl:choose>
-+    </xsl:template>
-+
-+</xsl:stylesheet>
---- a/lib/srdb1/schema/Makefile
-+++ b/lib/srdb1/schema/Makefile
-@@ -36,6 +36,9 @@
- # Stylesheet used to generate mongodb database schema
- MONGODB_XSL = $(STYLESHEETS)/mongodb.xsl
- 
-+# Stylesheet used to generate Redis database schema
-+DB_REDIS_XSL = $(STYLESHEETS)/db_redis.xsl
-+
- # Stylesheet used to generate docbook documentation
- DOCBOOK_XSL = $(STYLESHEETS)/docbook.xsl
- 
-@@ -68,7 +71,7 @@
- 	override XSLTPROC := $(XSLTPROC) --verbose
- endif
- 
--all: mysql postgres dbtext db_berkeley db_sqlite docbook oracle pi_framework #modules dbdoc
-+all: mysql postgres dbtext db_berkeley db_sqlite docbook oracle pi_framework db_redis #modules dbdoc
- 
- .PHONY: pi_framework pi_framework_clean
- pi_framework:
-@@ -226,6 +229,19 @@
- mongodb_clean:
- 	-@rm -f $(SCHEME)/mongodb/kamailio/*
- 
-+.PHONY: db_redis db_redis_clean
-+db_redis:
-+	for FILE in $(TABLES); do \
-+		XML_CATALOG_FILES=$(CATALOG) $(XSLTPROC) $(XSLTPROC_FLAGS) \
-+		--stringparam dir "$(SCHEME)/db_redis/kamailio" \
-+		--stringparam prefix "" \
-+		--stringparam db "db_redis" \
-+		$(DB_REDIS_XSL) kamailio-"$$FILE".xml ; \
-+	done
-+
-+db_redis_clean:
-+	-@rm -f $(SCHEME)/db_redis/*
-+
- 
- .PHONY: docbook-xml
- docbook-xml:
-@@ -342,4 +358,4 @@
- 	done
- 
- .PHONY: clean
--clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
-+clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean mongodb_clean db_redis_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
+\ No newline at end of file
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/acc
 @@ -0,0 +1,2 @@
@@ -4613,8 +4668,8 @@
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/lcr_rule
 @@ -0,0 +1,2 @@
-+id/int,lcr_id/int,prefix/string,from_uri/string,request_uri/string,stopper/int,enabled/int,
-+2
++id/int,lcr_id/int,prefix/string,from_uri/string,request_uri/string,mt_tvalue/string,stopper/int,enabled/int,
++3
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/lcr_rule_target
 @@ -0,0 +1,2 @@
@@ -4624,7 +4679,7 @@
 +++ b/utils/kamctl/db_redis/kamailio/location
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/int,q/double,callid/string,cseq/int,last_modified/int,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
-+8
++9
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/location_attrs
 @@ -0,0 +1,2 @@
@@ -4673,8 +4728,8 @@
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/presentity
 @@ -0,0 +1,2 @@
-+id/int,username/string,domain/string,event/string,etag/string,expires/int,received_time/int,body/string,sender/string,priority/int,
-+4
++id/int,username/string,domain/string,event/string,etag/string,expires/int,received_time/int,body/string,sender/string,priority/int,ruid/string,
++5
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/pua
 @@ -0,0 +1,2 @@
@@ -4703,7 +4758,7 @@
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/rtpengine
 @@ -0,0 +1,2 @@
-+setid/int,url/string,weight/int,disabled/int,
++id/int,setid/int,url/string,weight/int,disabled/int,stamp/int,
 +1
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/rtpproxy
@@ -4733,8 +4788,8 @@
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/subscriber
 @@ -0,0 +1,2 @@
-+id/int,username/string,domain/string,password/string,email_address/string,ha1/string,ha1b/string,rpid/string,
-+6
++id/int,username/string,domain/string,password/string,ha1/string,ha1b/string,email_address/string,rpid/string,
++7
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/topos_d
 @@ -0,0 +1,2 @@
@@ -4753,8 +4808,8 @@
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uacreg
 @@ -0,0 +1,2 @@
-+id/int,l_uuid/string,l_username/string,l_domain/string,r_username/string,r_domain/string,realm/string,auth_username/string,auth_password/string,auth_proxy/string,expires/int,flags/int,reg_delay/int,
-+2
++id/int,l_uuid/string,l_username/string,l_domain/string,r_username/string,r_domain/string,realm/string,auth_username/string,auth_password/string,auth_ha1/string,auth_proxy/string,expires/int,flags/int,reg_delay/int,
++3
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_credentials
 @@ -0,0 +1,2 @@
@@ -4820,24 +4875,3 @@
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,doc/string,doc_type/int,etag/string,source/int,doc_uri/string,port/int,
 +4
---- a/utils/kamctl/Makefile
-+++ b/utils/kamctl/Makefile
-@@ -274,6 +274,18 @@
- 				fi ;\
- 			done ; \
- 		fi
-+		# install Redis stuff
-+		if [ "$(REDISON)" = "yes" ]; then \
-+			mkdir -p $(data_prefix)/$(data_dir)/db_redis/kamailio ; \
-+			for FILE in $(wildcard db_redis/kamailio/*) ; do \
-+				if [ -f $$FILE ] ; then \
-+				$(INSTALL_TOUCH) $$FILE \
-+					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
-+				$(INSTALL_CFG) $$FILE \
-+					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
-+				fi ;\
-+			done ; \
-+		fi
- 
- 
- $(cfg_prefix)/$(cfg_dir):

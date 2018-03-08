@@ -1,9 +1,6 @@
-Description: make sure symbols are exported from main binary to allow loading modules
-Author: Tzafrir Cohen <tzafrir@debian.org>
-
---- a/Makefile
-+++ b/Makefile
-@@ -139,6 +139,8 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -139,6 +139,8 @@ endif
  main_makefile=1
  include Makefile.defs
  

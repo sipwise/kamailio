@@ -1,9 +1,6 @@
-Description: don't try to install to lib64
-Author: Victor Seva <linuxmaniac@torreviejawireless.org>
-
---- a/Makefile.defs
-+++ b/Makefile.defs
-@@ -378,15 +378,7 @@ endif
+--- a/src/Makefile.defs
++++ b/src/Makefile.defs
+@@ -386,15 +386,7 @@ endif
  
  $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
  

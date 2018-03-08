@@ -1,6 +1,6 @@
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -110,6 +110,9 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -107,6 +107,9 @@ mod_list_sctp=sctp
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -10,17 +10,17 @@
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -217,7 +220,8 @@
- 			   $(mod_list_mongodb) $(mod_list_cnxcc) \
- 			   $(mod_list_jansson) $(mod_list_geoip2) \
+@@ -233,7 +236,8 @@ mod_list_all=$(sort $(mod_list_basic) $(
  			   $(mod_list_erlang) $(mod_list_systemd) \
--			   $(mod_list_http_async))
-+			   $(mod_list_http_async)) \
+ 			   $(mod_list_http_async) $(mod_list_nsq) \
+ 			   $(mod_list_rabbitmq) $(mod_list_jsdt)) \
+-			   $(mod_list_phonenum)
++			   $(mod_list_phonenum) \
 +			   $(mod_list_lcrrate)
  
  
  
-@@ -271,6 +275,8 @@
+@@ -287,6 +291,8 @@ module_group_cassandra=$(module_group_ca
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
@@ -30,7 +30,7 @@
  ### --- Groups defined for pacKaging ###
  
 --- /dev/null
-+++ b/modules/lcr_rate/Makefile
++++ b/src/modules/lcr_rate/Makefile
 @@ -0,0 +1,9 @@
 +include ../../Makefile.defs
 +auto_gen=
@@ -42,7 +42,7 @@
 +
 +include ../../Makefile.modules
 --- /dev/null
-+++ b/modules/lcr_rate/lcr_rate_mod.c
++++ b/src/modules/lcr_rate/lcr_rate_mod.c
 @@ -0,0 +1,442 @@
 +/*
 + * $Id$
@@ -75,11 +75,11 @@
 +#include <string.h>
 +#include <time.h>
 +#include <swrate/swrate.h>
-+#include "../../sr_module.h"
-+#include "../../mod_fix.h"
-+#include "../../pvar.h"
-+#include "../../mem/mem.h"
-+#include "../../mem/shm_mem.h"
++#include "../../core/sr_module.h"
++#include "../../core/mod_fix.h"
++#include "../../core/pvar.h"
++#include "../../core/mem/mem.h"
++#include "../../core/mem/shm_mem.h"
 +
 +MODULE_VERSION
 +

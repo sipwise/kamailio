@@ -1,36 +1,27 @@
-From: Victor Seva <vseva@sipwise.com>
-Date: Fri, 9 Jun 2017 13:54:04 +0200
-Subject: sca: fix on-hold detection when upstream flow
-
-Change-Id: I0c7186c0e749b47254e4b34468b044286a413876
----
- modules/sca/sca_call_info.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
-index 370fcc2..9ed63fd 100644
---- a/modules/sca/sca_call_info.c
-+++ b/modules/sca/sca_call_info.c
-@@ -980,11 +980,13 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
-     int			state = SCA_APPEARANCE_STATE_UNKNOWN;
-     int			rc = -1;
-     str			*target_aor = from_aor;
-+    int			upstream = 0;
+--- a/src/modules/sca/sca_call_info.c
++++ b/src/modules/sca/sca_call_info.c
+@@ -914,12 +914,14 @@ int sca_call_info_invite_request_handler
+ 	str state_str = STR_NULL;
+ 	int state = SCA_APPEARANCE_STATE_UNKNOWN;
+ 	int rc = -1;
+-	str			*target_aor = from_aor;
++	str *target_aor = from_aor;
++	int upstream = 0;
  
-     if(SCA_CALL_INFO_IS_SHARED_CALLEE( call_info ) &&
-     		sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
-     	LM_DBG("callee is SCA and direction is 'upstream'\n");
-     	target_aor = to_aor;
-+    	upstream = 1;
-     }
+ 	if(SCA_CALL_INFO_IS_SHARED_CALLEE(call_info) &&
+ 			sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+ 		LM_DBG("callee is SCA and direction is 'upstream'\n");
+ 		target_aor = to_aor;
++		upstream = 1;
+ 	}
  
-     /*
-@@ -998,7 +1000,7 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
- 	goto done;
-     }
+ 	LM_DBG("For From-AOR %.*s To-AOR: %.*s: From: <%.*s> To: <%.*s> "
+@@ -936,7 +938,7 @@ int sca_call_info_invite_request_handler
+ 		goto done;
+ 	}
  
--    if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
-+    if ( !upstream && !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
- 	/* caller isn't SCA, no more to do. update callee in reply handler. */
- 	rc = 1;
- 	goto done;
+-	if (!SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
++	if (!upstream && !SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
+ 		// caller isn't SCA, no more to do. update callee in reply handler.
+ 		rc = 1;
+ 		goto done;

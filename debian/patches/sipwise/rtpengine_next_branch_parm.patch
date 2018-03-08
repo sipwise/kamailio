@@ -1,14 +1,14 @@
---- a/modules/rtpengine/rtpengine.c
-+++ b/modules/rtpengine/rtpengine.c
-@@ -75,6 +75,7 @@
- #include "../../mod_fix.h"
- #include "../../dset.h"
- #include "../../route.h"
-+#include "../../char_msg_val.h"
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -77,6 +77,7 @@
+ #include "../../core/rpc.h"
+ #include "../../core/rpc_lookup.h"
+ #include "../../core/kemi.h"
++#include "../../core/char_msg_val.h"
  #include "../../modules/tm/tm_load.h"
  #include "rtpengine.h"
  #include "rtpengine_funcs.h"
-@@ -186,7 +187,7 @@ static int rtpengine_manage1_f(struct si
+@@ -176,7 +177,7 @@ static int rtpengine_query1_f(struct sip
  
  static int parse_flags(struct ng_flags_parse *, struct sip_msg *, enum rtpe_operation *, const char *);
  
@@ -16,8 +16,8 @@
 +static int rtpengine_offer_answer(struct sip_msg *msg, const char *flags, enum rtpe_operation op, int more);
  static int fixup_set_id(void ** param, int param_no);
  static int set_rtpengine_set_f(struct sip_msg * msg, char * str1, char * str2);
- static struct rtpp_set * select_rtpp_set(int id_set);
-@@ -2166,6 +2167,8 @@ static int parse_flags(struct ng_flags_p
+ static struct rtpp_set * select_rtpp_set(unsigned int id_set);
+@@ -2018,6 +2019,8 @@ static int parse_flags(struct ng_flags_p
  						ng_flags->via = 3;
  					else if (str_eq(&val, "extra"))
  						ng_flags->via = -1;
@@ -26,7 +26,7 @@
  					else
  						goto error;
  					goto next;
-@@ -2235,6 +2238,8 @@ static bencode_item_t *rtpp_function_cal
+@@ -2104,6 +2107,8 @@ static bencode_item_t *rtpp_function_cal
  	struct rtpp_node *node;
  	char *cp;
  	pv_value_t pv_val;
@@ -35,8 +35,8 @@
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2307,12 +2312,30 @@ static bencode_item_t *rtpp_function_cal
- 	bencode_dictionary_add_str(ng_flags.dict, "call-id", &callid);
+@@ -2176,12 +2181,30 @@ static bencode_item_t *rtpp_function_cal
+ 	bencode_dictionary_add_str(ng_flags.dict, "call-id", &ng_flags.call_id);
  
  	if (ng_flags.via) {
 -		if (ng_flags.via == 1 || ng_flags.via == 2)
@@ -72,7 +72,7 @@
  		if (ret == -1 || viabranch.len == 0) {
  			LM_ERR("can't get Via branch/extra ID\n");
  			goto error;
-@@ -3178,7 +3201,7 @@ rtpengine_answer1_f(struct sip_msg *msg,
+@@ -3330,7 +3353,7 @@ rtpengine_answer1_f(struct sip_msg *msg,
  }
  
  static int

@@ -1,16 +1,16 @@
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -119,7 +119,7 @@ mod_list_presence=presence presence_conf
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -116,7 +116,7 @@ mod_list_presence=presence presence_conf
  					   presence_xml \
- 					   pua pua_bla pua_dialoginfo pua_mi pua_reginfo \
- 					   pua_usrloc pua_xmpp \
+ 					   pua pua_bla pua_dialoginfo pua_reginfo \
+ 					   pua_rpc pua_usrloc pua_xmpp \
 -					   rls xcap_client xcap_server
 +					   rls xcap_client xcap_server presence_dfks
  
  
  # - modules depending on lua library
---- a/modules/pua/add_events.c
-+++ b/modules/pua/add_events.c
+--- a/src/modules/pua/add_events.c
++++ b/src/modules/pua/add_events.c
 @@ -103,6 +103,13 @@ int pua_add_events(void)
  		return -1;
  	}
@@ -25,7 +25,7 @@
  	return 0;
  
  }	
-@@ -395,5 +402,11 @@ int dlg_process_body(publ_info_t* publ,
+@@ -397,5 +404,11 @@ int dlg_process_body(publ_info_t* publ,
  {
  	*fin_body= publ->body;
  	return 0;
@@ -37,8 +37,8 @@
 +	return 0;
  }
  
---- a/modules/pua/add_events.h
-+++ b/modules/pua/add_events.h
+--- a/src/modules/pua/add_events.h
++++ b/src/modules/pua/add_events.h
 @@ -37,5 +37,6 @@ int bla_process_body (struct publ_info*
  int mwi_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
  int dlg_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
@@ -46,8 +46,8 @@
 +int dfks_process_body (struct publ_info* publ, str** fin_body, int ver, str** tuple);
  
  #endif
---- a/modules/pua/hash.h
-+++ b/modules/pua/hash.h
+--- a/src/modules/pua/hash.h
++++ b/src/modules/pua/hash.h
 @@ -41,6 +41,7 @@
  #define DIALOG_EVENT        1<<5
  #define REGINFO_EVENT       1<<6
@@ -77,12 +77,12 @@
  
      LM_ERR("Unknown event string\n");
 --- /dev/null
-+++ b/modules/presence_dfks/Makefile
++++ b/src/modules/presence_dfks/Makefile
 @@ -0,0 +1,30 @@
 +#
 +# Presence_dfks Makefile
-+# 
-+# 
++#
++#
 +# WARNING: do not run this directly, it should be run by the master Makefile
 +
 +include ../../Makefile.defs
@@ -110,14 +110,14 @@
 +
 +include ../../Makefile.modules
 --- /dev/null
-+++ b/modules/presence_dfks/README.md
++++ b/src/modules/presence_dfks/README.md
 @@ -0,0 +1,32 @@
 +sip-router-presence_dfks-module
 +===============================
 +
 +sip-router/kamailio module for handling as-feature-event presence messages
 +
-+This module provide support for 'Device FeatureKey Synchronization', as described in 
++This module provide support for 'Device FeatureKey Synchronization', as described in
 +http://community.polycom.com/polycom/attachments/polycom/VoIP/2233/1/DeviceFeatureKeySynchronizationFD.pdf
 +This 'protocol' was developed at Broadsoft, and is used in Linksys/Cisco and Polycom phones and probably some other too.
 +
@@ -132,7 +132,7 @@
 +This module is work in progress, it does not provide much functionality yet.
 +Module reuses as much as possible from existing sip-router/kamailio modules, expecially from presence and pua.
 +Basicaly module translates body of incoming SUBSCRIBE messages and and sends them as PUBLISH to presence framework,
-+which would then propagate NOTIFY messages to watchers. 
++which would then propagate NOTIFY messages to watchers.
 +Currently module uses pua module to send PUBLISH, but that dependency is about to be dropped.
 +In order to have this working currently pua module needs to be patched.
 +Side effect of this is that it is possible to set phone status using pua_mi interface.
@@ -145,17 +145,17 @@
 +```
 +This will be dropped too, a set of internal mi functions is planned and a script function that could preload presence server with phone status using some avp's. Registration route would be a good place for this.
 --- /dev/null
-+++ b/modules/presence_dfks/add_events.c
++++ b/src/modules/presence_dfks/add_events.c
 @@ -0,0 +1,298 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
 +#include <libxml/parser.h>
-+#include "../../parser/parse_content.h"
-+#include "../../parser/parse_expires.h"
-+#include "../../parser/parse_event.h"
-+#include "../../parser/contact/parse_contact.h"
-+#include "../../parser/parse_to.h"
++#include "../../core/parser/parse_content.h"
++#include "../../core/parser/parse_expires.h"
++#include "../../core/parser/parse_event.h"
++#include "../../core/parser/contact/parse_contact.h"
++#include "../../core/parser/parse_to.h"
 +#include "../presence/event_list.h"
 +#include "../pua/pua.h"
 +#include "presence_dfks.h"
@@ -165,14 +165,14 @@
 +static str unk_dev = str_init("<notKnown/>");
 +static str content_type =str_init("application/x-as-feature-event+xml");
 +// -4
-+static str dnd_xml = str_init("<?xml version='1.0' encoding='ISO-8859-1'?><DoNotDisturbEvent><device>%s</device><doNotDisturbOn>%s</doNotDisturbOn></DoNotDisturbEvent>");
++static str dnd_xml = str_init("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<DoNotDisturbEvent xmlns=\"http://www.ecma-international.org/standards/ecma-323/csta/ed3\">\n<device>%s</device>\n<doNotDisturbOn>%s</doNotDisturbOn>\n</DoNotDisturbEvent>\n\r\n");
 +// -8
-+static str fwd_xml = str_init("<?xml version='1.0' encoding='ISO-8859-1'?><ForwardingEvent><device>%s</device><forwardingType>%s</forwardingType><forwardStatus>%s</forwardStatus><forwardTo>%s</forwardTo></ForwardingEvent>");
++static str fwd_xml = str_init("<?xml version='1.0' encoding='ISO-8859-1'?><ForwardingEvent xmlns=\"http://www.ecma-international.org/standards/ecma-323/csta/ed3\">\n<device>%s</device>\n<forwardingType>%s</forwardingType>\n<forwardStatus>%s</forwardStatus>\n<forwardTo>%s</forwardTo>\n</ForwardingEvent>\n\r\n");
 +
 +int dfks_add_events(void)
 +{
 +	pres_ev_t event;
-+	
++
 +	/* constructing message-summary event */
 +	memset(&event, 0, sizeof(pres_ev_t));
 +	event.name.s = "as-feature-event";
@@ -200,7 +200,7 @@
 +	if (pres.add_event(&event) < 0) {
 +		LM_ERR("failed to add event \"as-feature-event\"\n");
 +		return -1;
-+	}		
++	}
 +	return 0;
 +}
 +
@@ -211,7 +211,7 @@
 +	LM_DBG("dfks_publ_handl start\n");
 +	if ( get_content_length(msg) == 0 )
 +		return 1;
-+	
++
 +	body.s=get_body(msg);
 +	if (body.s== NULL) {
 +		LM_ERR("cannot extract body from msg\n");
@@ -345,7 +345,7 @@
 +		publ.id.len = id_buf_len;
 +		publ.content_type = content_type;
 +		publ.expires = 3600;
-+		
++
 +		/* make UPDATE_TYPE, as if this "publish dialog" is not found.
 +		   by pua it will fallback to INSERT_TYPE anyway */
 +		publ.flag|= INSERT_TYPE;
@@ -417,7 +417,7 @@
 +		publ.id.len = id_buf_len;
 +		publ.content_type = content_type;
 +		publ.expires = 3600;
-+		
++
 +		/* make UPDATE_TYPE, as if this "publish dialog" is not found.
 +		   by pua it will fallback to INSERT_TYPE anyway */
 +		publ.flag|= INSERT_TYPE;
@@ -446,7 +446,7 @@
 +
 +}
 --- /dev/null
-+++ b/modules/presence_dfks/add_events.h
++++ b/src/modules/presence_dfks/add_events.h
 @@ -0,0 +1,7 @@
 +#ifndef _DFKS_ADD_EV_H_
 +#define _DFKS_ADD_EV_H_
@@ -456,8 +456,8 @@
 +int	dfks_subs_handler(struct sip_msg* msg);
 +#endif
 --- /dev/null
-+++ b/modules/presence_dfks/presence_dfks.c
-@@ -0,0 +1,137 @@
++++ b/src/modules/presence_dfks/presence_dfks.c
+@@ -0,0 +1,140 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
@@ -465,11 +465,11 @@
 +#include <sys/types.h>
 +#include <unistd.h>
 +
-+#include "../../sr_module.h"
-+#include "../../dprint.h"
-+#include "../../str.h"
-+#include "../../parser/msg_parser.h"
-+#include "../../mem/mem.h"
++#include "../../core/sr_module.h"
++#include "../../core/dprint.h"
++#include "../../core/str.h"
++#include "../../core/parser/msg_parser.h"
++#include "../../core/mem/mem.h"
 +#include "../presence/bind_presence.h"
 +#include "add_events.h"
 +#include "presence_dfks.h"
@@ -499,26 +499,29 @@
 +	{"dnd_param",		STR_PARAM, &dnd_param},
 +	{0,                          0,         0}
 +};
++
++#ifdef MI_REMOVED
 +static mi_export_t mi_cmds[] = {
 +//	{ "set_feature",	mi_set,		0,  0,  mi_child_init},
 +	{ 0,			0,			0,  0,  0}
 +};
++#endif
 +
 +
 +/* module exports */
 +struct module_exports exports= {
 +    "presence_dfks",	/* module name */
 +    DEFAULT_DLFLAGS,	/* dlopen flags */
-+    0,			/* exported functions */
-+    params,		/* exported parameters */
-+    0,			/* exported statistics */
-+    mi_cmds,			/* exported MI functions */
-+    0,			/* exported pseudo-variables */
-+    0,			/* extra processes */
-+    mod_init,		/* module initialization function */
-+    0,			/* response handling function */
-+    0,			/* destroy function */
-+    0			/* per-child init function */
++    0,					/* exported functions */
++    params,				/* exported parameters */
++    0,					/* exported statistics */
++    0,					/* exported MI functions */
++    0,					/* exported pseudo-variables */
++    0,					/* extra processes */
++    mod_init,			/* module initialization function */
++    0,					/* response handling function */
++    0,					/* destroy function */
++    0					/* per-child init function */
 +};
 +
 +/*
@@ -596,7 +599,7 @@
 +	return 0;
 +}
 --- /dev/null
-+++ b/modules/presence_dfks/presence_dfks.h
++++ b/src/modules/presence_dfks/presence_dfks.h
 @@ -0,0 +1,18 @@
 +#ifndef _PRES_DFKS_H_
 +#define _PRES_DFKS_H_

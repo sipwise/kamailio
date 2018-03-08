@@ -1,5 +1,27 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -196,6 +196,9 @@ mod_list_erlang=erlang
+ # - modules depending on systemd library
+ mod_list_systemd=log_systemd
+ 
++# - modules depending on libtcap library
++mod_list_tcap=tcap
++
+ # - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
+ mod_list_nsq=nsq
+ 
+@@ -294,6 +297,9 @@ module_group_ignore= $(sort $(filter-out
+ # pkg lcrrate module
+ module_group_klcrrate=$(mod_list_lcrrate)
+ 
++# pkg tap module
++module_group_ktcap=$(mod_list_tcap)
++
+ ### --- Groups defined for pacKaging ###
+ 
+ # Standard modules in main pkg
 --- /dev/null
-+++ b/modules/tcap/Makefile
++++ b/src/modules/tcap/Makefile
 @@ -0,0 +1,9 @@
 +include ../../Makefile.defs
 +auto_gen=
@@ -11,18 +33,18 @@
 +
 +include ../../Makefile.modules
 --- /dev/null
-+++ b/modules/tcap/tcap_mod.c
++++ b/src/modules/tcap/tcap_mod.c
 @@ -0,0 +1,329 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
 +#include <string.h>
 +#include <tcap/libtcap.h>
-+#include "../../sr_module.h"
-+#include "../../mod_fix.h"
-+#include "../../pvar.h"
-+#include "../../parser/parse_content.h"
-+#include "../../lvalue.h"
++#include "../../core/sr_module.h"
++#include "../../core/mod_fix.h"
++#include "../../core/pvar.h"
++#include "../../core/parser/parse_content.h"
++#include "../../core/lvalue.h"
 +
 +MODULE_VERSION
 +
@@ -342,25 +364,3 @@
 +static int isup_decode_number_hex_f(sip_msg_t *msg, char *su, char *sq) {
 +	return isup_decode_number_common_f(msg, su, sq, isup_convert_number_hex);
 +}
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -193,6 +193,9 @@
- # - modules depending on systemd library
- mod_list_systemd=log_systemd
- 
-+# - modules depending on libtcap library
-+mod_list_tcap=tcap
-+
- # - all modules
- mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
- 			   $(mod_list_db) $(mod_list_dbuid) \
-@@ -278,6 +281,9 @@
- # pkg lcrrate module
- module_group_klcrrate=$(mod_list_lcrrate)
- 
-+# pkg tap module
-+module_group_ktcap=$(mod_list_tcap)
-+
- ### --- Groups defined for pacKaging ###
- 
- # Standard modules in main pkg

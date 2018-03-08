@@ -1,59 +1,27 @@
-##
-# upstream fixes
-# 4.4
-# upsream fixes from master
-upstream/pv-new-function-pv_evalx-dst-fmt.patch
-upstream/pv_trans_cfg_line.patch
-upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
-#
-##
-no_lib64_on_64_bits.patch
-no_INSTALL_file.patch
-fix_export.patch
+
+## Package related
+sipwise/no_lib64_on_64_bits.patch
+sipwise/no_INSTALL_file.patch
+sipwise/fix_export.patch
 sipwise/do-not-install-default-config.patch
-sipwise/add_pcem_module.patch
-sipwise/lcr_rate_module.patch
 sipwise/parallel_build.patch
-sipwise/tcap.patch
-# carrier support
+## New Modules
+sipwise/add_pcem_module.patch
+sipwise/add_lcr_rate_module.patch
+sipwise/add_tcap_module.patch
+sipwise/add_presence_dfks_module.patch
+sipwise/add_db_redis_module.patch
+## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
-sipwise/0001-kex-add-extended-core-stats.patch
-##
 sipwise/rtpengine_next_branch_parm.patch
-sipwise/dialog-RPC-dlg.dlg_list-_ctx-make-from_tag-parameter.patch
-# sca improvements
-sipwise/sca_add_onhold_bflag.patch
-sipwise/sca-use-kamailio-module-interface.patch
-sipwise/sca-sca_call_info_update-add-to-from-optional-parame.patch
-sipwise/sca-sca_handle_subscribe-honor-the-ru-value.patch
-sipwise/sca-fix-core-when-HDR_CSEQ-not-parsed.patch
-sipwise/sca-sca_call_info_update-fix-param-calls.patch
-sipwise/sca-add-server_address-parameter.patch
-sipwise/lib-srdb1-sca-add-server_id.patch
-sipwise/sca-use-new-server_id-column.patch
-sipwise/utils-kamctl-refresh-dbschema.patch
-sipwise/sca-use-To-header-if-in-dialog-as-target.patch
-sipwise/sca-fix-sca_call_info_update-params.patch
-sipwise/sca-use-onhold_bflag-value-only-when-set.patch
+sipwise/cfgt_debug.patch
+sipwise/cfgt_folder_fix.patch
+## SCA Patches
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
 sipwise/sca-call-info-unsubscribe.patch
 sipwise/sca-rr-is-direction.patch
-sipwise/sca-fix-core-when-release_appearance-RPC-command-par.patch
 sipwise/sca-fix-pickup-when-upstream-flow.patch
 sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
-##
-sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
-sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch
-sipwise/pv_trans_eval_uri.patch
-sipwise/rtpengine-mos-stats.patch
-sipwise/openssl-pthreads-cleanup.patch
-sipwise/presence_dfks.patch
-sipwise/presence_dfks_add_crlf_xml.patch
-sipwise/cfgt_debug.patch
-sipwise/prov_responses_cdr.patch
-sipwise/rtpengine-default-id.patch
-sipwise/db_redis.patch
-sipwise/rtpengine-transcoding.patch

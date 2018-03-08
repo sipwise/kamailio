@@ -1,25 +1,14 @@
-From d06e1643603a23f2a5bf7eabae1113c15feb61f6 Mon Sep 17 00:00:00 2001
-From: Victor Seva <linuxmaniac@torreviejawireless.org>
-Date: Mon, 5 Jan 2015 17:27:09 +0100
-Subject: [PATCH] MT#9205: usrloc: add db_url_ro parameter
-
-Add ro connection per child
----
- modules/usrloc/ul_mod.c | 65 +++++++++++++++++++++++++++++++++++++++++++++++++
- modules/usrloc/ul_mod.h |  2 ++
- 2 files changed, 67 insertions(+)
-
---- a/modules/usrloc/ul_mod.c
-+++ b/modules/usrloc/ul_mod.c
-@@ -156,6 +156,7 @@ str ulattrs_avalue_col = str_init(ULATTR
+--- a/src/modules/usrloc/usrloc_mod.c
++++ b/src/modules/usrloc/usrloc_mod.c
+@@ -153,6 +153,7 @@ str ulattrs_avalue_col = str_init(ULATTR
  str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
  
  str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
 +str db_url_ro       = STR_NULL;			/*!< Read-Only Database URL */
  int timer_interval  = 60;				/*!< Timer interval in seconds */
  int db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
- int use_domain      = 0;				/*!< Whether usrloc should use domain part of aor */
-@@ -187,6 +188,8 @@ static cmd_export_t cmds[] = {
+ int db_load         = 1;				/*!< Database load after restart: 1- true, 0- false (only the db_mode allows it) */
+@@ -186,6 +187,8 @@ static cmd_export_t cmds[] = {
  	{0, 0, 0, 0, 0, 0}
  };
  
@@ -27,16 +16,16 @@ Add ro connection per child
 +db_func_t ul_dbf_ro;
  
  /*! \brief
-  * Exported parameters 
-@@ -203,6 +206,7 @@ static param_export_t params[] = {
+  * Exported parameters
+@@ -202,6 +205,7 @@ static param_export_t params[] = {
  	{"flags_column",        PARAM_STR, &flags_col     },
  	{"cflags_column",       PARAM_STR, &cflags_col    },
  	{"db_url",              PARAM_STR, &db_url        },
 +	{"db_url_ro",           PARAM_STR, &db_url_ro.s     },
  	{"timer_interval",      INT_PARAM, &timer_interval  },
  	{"db_mode",             INT_PARAM, &db_mode         },
- 	{"use_domain",          INT_PARAM, &use_domain      },
-@@ -278,6 +282,38 @@ struct module_exports exports = {
+ 	{"db_load",             INT_PARAM, &db_load         },
+@@ -263,6 +267,38 @@ struct module_exports exports = {
  	child_init  /*!< Child initialization function */
  };
  
@@ -75,7 +64,7 @@ Add ro connection per child
  
  /*! \brief
   * Module initialization function
-@@ -373,6 +409,21 @@ static int mod_init(void)
+@@ -345,6 +381,21 @@ static int mod_init(void)
  		}
  	}
  
@@ -97,7 +86,7 @@ Add ro connection per child
  	if (nat_bflag==(unsigned int)-1) {
  		nat_bflag = 0;
  	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
-@@ -448,6 +499,16 @@ static int child_init(int _rank)
+@@ -421,6 +472,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -112,9 +101,9 @@ Add ro connection per child
 +		LM_DBG("read-only connection init\n");
 +	}
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
- 	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY) {
+ 	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY && db_load) {
  		/* if cache is used, populate domains from DB */
-@@ -503,6 +564,10 @@ static void destroy(void)
+@@ -451,6 +512,10 @@ static void destroy(void)
  		ul_dbf.close(ul_dbh);
  	}
  
@@ -123,11 +112,11 @@ Add ro connection per child
 +	}
 +
  	free_all_udomains();
- 	ul_destroy_locks();
  
---- a/modules/usrloc/ul_mod.h
-+++ b/modules/usrloc/ul_mod.h
-@@ -88,6 +88,8 @@ extern int handle_lost_tcp;
+ 	/* free callbacks list */
+--- a/src/modules/usrloc/usrloc_mod.h
++++ b/src/modules/usrloc/usrloc_mod.h
+@@ -89,6 +89,8 @@ extern int handle_lost_tcp;
  extern int close_expired_tcp;
  extern int skip_remote_socket;
  

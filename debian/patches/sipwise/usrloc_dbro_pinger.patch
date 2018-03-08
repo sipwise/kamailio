@@ -1,20 +1,6 @@
-From: Victor Seva <vseva@sipwise.com>
-Date: Wed, 21 Dec 2016 09:51:10 +0100
-Subject: usrloc: use db_url_ro for pinger from nathelper
-
-get_all_db_ucontacts using db_url_ro if GAU_OPT_SERVER_ID
-
-
-Change-Id: I9a37aee62c888e72f4d1244db2a22cd412fd800f
----
- modules/usrloc/dlist.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/modules/usrloc/dlist.c b/modules/usrloc/dlist.c
-index 08bc834a..8305328e 100644
---- a/modules/usrloc/dlist.c
-+++ b/modules/usrloc/dlist.c
-@@ -115,6 +115,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+--- a/src/modules/usrloc/dlist.c
++++ b/src/modules/usrloc/dlist.c
+@@ -115,6 +115,8 @@ static inline int get_all_db_ucontacts(v
  	db_op_t  ops1[4];
  	db_key_t keys2[6]; /* select */
  	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
@@ -23,7 +9,7 @@ index 08bc834a..8305328e 100644
  
  	cp = buf;
  	shortage = 0;
-@@ -169,22 +171,26 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -169,22 +171,26 @@ static inline int get_all_db_ucontacts(v
  		vals1[n[0]].nul = 0;
  		vals1[n[0]].val.int_val = server_id;
  		n[0]++;
@@ -53,7 +39,7 @@ index 08bc834a..8305328e 100644
  			continue;
  		}
  
-@@ -307,7 +313,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -307,7 +313,7 @@ static inline int get_all_db_ucontacts(v
  			len -= needed;
  		} /* row cycle */
  

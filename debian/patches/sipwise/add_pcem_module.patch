@@ -1,6 +1,6 @@
---- a/Makefile.groups
-+++ b/Makefile.groups
-@@ -28,7 +28,7 @@
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -28,7 +28,7 @@ mod_list_db=acc alias_db auth_db avpops
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
@@ -10,7 +10,7 @@
  
  # - common modules depending on database, using UID db schema
 --- /dev/null
-+++ b/modules/pcem/Makefile
++++ b/src/modules/pcem/Makefile
 @@ -0,0 +1,18 @@
 +# $Id$
 +#
@@ -27,11 +27,11 @@
 +DEFS+=-DOPENSER_MOD_INTERFACE
 +
 +SERLIBPATH=../../lib
-+SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1 $(SERLIBPATH)/kcore/kcore
++SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1
 +
 +include ../../Makefile.modules
 --- /dev/null
-+++ b/modules/pcem/pcem_logic.c
++++ b/src/modules/pcem/pcem_logic.c
 @@ -0,0 +1,130 @@
 +/*
 + * $Id$
@@ -61,12 +61,12 @@
 +#include <stdio.h>
 +#include <string.h>
 +
-+#include "../../dprint.h"
-+#include "../../parser/parse_from.h"
-+#include "../../parser/parse_content.h"
++#include "../../core/dprint.h"
++#include "../../core/parser/parse_from.h"
++#include "../../core/parser/parse_content.h"
 +#include "../../modules/tm/tm_load.h"
 +#include "../rr/api.h"
-+#include "../../flags.h"
++#include "../../core/flags.h"
 +#include "pcem_mod.h"
 +#include "pcem_logic.h"
 +
@@ -164,7 +164,7 @@
 +}
 +
 --- /dev/null
-+++ b/modules/pcem/pcem_logic.h
++++ b/src/modules/pcem/pcem_logic.h
 @@ -0,0 +1,34 @@
 +/*
 + * $Id$
@@ -194,14 +194,14 @@
 +#ifndef _PCEM_LOGIC_H
 +#define _PCEM_LOGIC_H
 +
-+#include "../../str.h"
++#include "../../core/str.h"
 +#include "../../modules/tm/t_hooks.h"
 +
 +void pcem_onreq( struct cell* t, int type, struct tmcb_params *ps );
 +
 +#endif
 --- /dev/null
-+++ b/modules/pcem/pcem_mod.c
++++ b/src/modules/pcem/pcem_mod.c
 @@ -0,0 +1,153 @@
 +/*
 + * $Id$
@@ -231,11 +231,11 @@
 +#include <stdio.h>
 +#include <string.h>
 +
-+#include "../../sr_module.h"
-+#include "../../dprint.h"
-+#include "../../mem/mem.h"
++#include "../../core/sr_module.h"
++#include "../../core/dprint.h"
++#include "../../core/mem/mem.h"
 +#include "../../modules/tm/tm_load.h"
-+#include "../../str.h"
++#include "../../core/str.h"
 +#include "../rr/api.h"
 +#include "pcem_mod.h"
 +#include "pcem_logic.h"
@@ -357,7 +357,7 @@
 +}
 +
 --- /dev/null
-+++ b/modules/pcem/pcem_mod.h
++++ b/src/modules/pcem/pcem_mod.h
 @@ -0,0 +1,33 @@
 +/*
 + * $Id$

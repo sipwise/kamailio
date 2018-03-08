@@ -1,222 +1,199 @@
-From: Victor Seva <vseva@sipwise.com>
-Date: Tue, 18 Apr 2017 08:52:38 +0200
-Subject: sca: debug output
-
-Change-Id: Ib51bb44728ad9705e4e0fcc90e5d0e1873cb30d3
----
- modules/sca/sca_appearance.c |  6 ++++++
- modules/sca/sca_call_info.c  | 46 +++++++++++++++++++++++++++++++++++++++++---
- modules/sca/sca_dialog.c     | 10 ++++++++++
- 3 files changed, 59 insertions(+), 3 deletions(-)
-
-diff --git a/modules/sca/sca_appearance.c b/modules/sca/sca_appearance.c
-index e0ba91e..a0585bc 100644
---- a/modules/sca/sca_appearance.c
-+++ b/modules/sca/sca_appearance.c
-@@ -1212,7 +1212,12 @@ sca_appearance_for_dialog_unsafe( sca_mod *scam, str *aor, sca_dialog *dialog,
- 	return( NULL );
-     }
+--- a/src/modules/sca/sca_appearance.c
++++ b/src/modules/sca/sca_appearance.c
+@@ -1144,7 +1144,12 @@ sca_appearance *sca_appearance_for_dialo
+ 		return (NULL);
+ 	}
  
-+    LM_DBG("search for call_id[%.*s] from_tag[%.*s]\n",
-+        STR_FMT(&dialog->call_id), STR_FMT(&dialog->from_tag));
-     for ( app = app_list->appearances; app != NULL; app = app->next ) {
-+        LM_DBG("app.call_id[%.*s] app.from_tag[%.*s] app.to_tag[%.*s]\n",
-+                STR_FMT(&app->dialog.call_id), STR_FMT(&app->dialog.from_tag),
-+                STR_FMT(&app->dialog.to_tag));
- 	if ( SCA_STR_EQ( &app->dialog.call_id, &dialog->call_id ) &&
- 		SCA_STR_EQ( &app->dialog.from_tag, &dialog->from_tag )) {
++	LM_DBG("search for call_id[%.*s] from_tag[%.*s]\n",
++		STR_FMT(&dialog->call_id), STR_FMT(&dialog->from_tag));
+ 	for (app = app_list->appearances; app != NULL; app = app->next) {
++		LM_DBG("app.call_id[%.*s] app.from_tag[%.*s] app.to_tag[%.*s]\n",
++			STR_FMT(&app->dialog.call_id), STR_FMT(&app->dialog.from_tag),
++			STR_FMT(&app->dialog.to_tag));
+ 		if (SCA_STR_EQ(&app->dialog.call_id, &dialog->call_id) &&
+ 		SCA_STR_EQ(&app->dialog.from_tag, &dialog->from_tag)) {
  #ifdef notdef
-@@ -1222,6 +1227,7 @@ sca_appearance_for_dialog_unsafe( sca_mod *scam, str *aor, sca_dialog *dialog,
- 		continue;
- 	    }
- #endif /* notdef */
-+        LM_DBG("%.*s appearance-index %d found\n", STR_FMT(aor), app->index);
- 	    break;
- 	}
-     }
-diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
-index 9ed63fd..0504ba6 100644
---- a/modules/sca/sca_call_info.c
-+++ b/modules/sca/sca_call_info.c
-@@ -1002,6 +1002,7 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
- 
-     if ( !upstream && !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
- 	/* caller isn't SCA, no more to do. update callee in reply handler. */
-+	LM_DBG("caller isn't SCA, no more to do. update callee in reply handler\n");
- 	rc = 1;
- 	goto done;
-     }
-@@ -1019,6 +1020,7 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
-     }
-     
-     if ( sca_call_is_held( msg )) {
-+	LM_DBG("call_is_held\n");
- 	state = SCA_APPEARANCE_STATE_HELD;
- 	if ( call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE ) {
- 	    state = SCA_APPEARANCE_STATE_HELD_PRIVATE;
-@@ -1027,14 +1029,18 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
- 	}
-     } else if ( !SCA_STR_EMPTY( &to->tag_value )) {
- 	/* this is a reINVITE from an SCA line that put the call on hold */
-+	LM_DBG("reINVITE from an SCA line that put the call on hold\n");
- 	state = SCA_APPEARANCE_STATE_ACTIVE;
-     } else if ( sca_call_info_is_line_seize_reinvite( msg, call_info,
- 					    from, to, from_aor, to_aor )) {
-+    	LM_DBG("line_seize_reinvite\n");
- 	rc = sca_call_info_seize_held_call( msg, call_info, from, to,
- 					   from_aor, to_aor, contact_uri );
- 	if ( rc <= 0 ) {
- 	    goto done;
- 	}
-+    } else {
-+    	LM_DBG("Initial INVITE\n");
-     }
-     /* otherwise, this is an initial INVITE */
- 
-@@ -1236,11 +1242,19 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
-     int			rc = -1;
- 
-     if ( SCA_CALL_INFO_IS_SHARED_CALLEE( call_info )) {
-+	LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE\n");
-+	if(sca->rr_api->is_direction(msg, RR_FLOW_DOWNSTREAM)==0) {
-+		LM_DBG("downstream detected\n");
-+	}
-+	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
-+		LM_DBG("upstream detected\n");
-+	}
- 	rc = sca_call_info_uri_update( to_aor, call_info, from, to,
- 			contact_uri, &msg->callid->body );
-     }
- 
-     if ( !SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
-+    	LM_DBG("NOT SCA_CALL_INFO_IS_SHARED_CALLER\n");
- 	goto done;
-     }
- 
-@@ -1269,6 +1283,8 @@ sca_call_info_invite_reply_200_handler( sip_msg_t *msg,
- 		&msg->callid->body, &from->tag_value, NULL, slot_idx );
-     if ( app == NULL ) {
- 	/* no SCA line is involved with this call */
-+	LM_DBG("no SCA line is involved with this call[%.*s]\n",
-+		STR_FMT(from_aor));
- 	rc = 1;
- 	goto done;
-     }
-@@ -1433,6 +1449,8 @@ sca_call_info_ack_from_handler( sip_msg_t *msg, str *from_aor, str *to_aor )
- 
- 	    /* can't send NOTIFYs until we unlock the slot below */
- 	}
-+    } else {
-+	LM_DBG("from_aor[%.*s] not shared appearance\n", STR_FMT(from_aor));
-     }
- 
- done:
-@@ -1586,7 +1604,11 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
-     str                 *tag = NULL;
- 
-     if ( msg->first_line.type == SIP_REQUEST ) {
-+        LM_DBG("SIP_REQUEST\n");
- 	if ( SCA_CALL_INFO_IS_SHARED_CALLER( call_info )) {
-+            LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLER "
-+                "from_aor[%.*s] to_aor[%.*s]\n",
-+                STR_FMT(from_aor), STR_FMT(to_aor));
- 	    slot_idx = sca_uri_lock_shared_appearance( sca, from_aor );
- 	    if ( slot_idx < 0 ) {
- 		LM_ERR( "sca_call_info_bye_handler: failed to acquire "
-@@ -1640,7 +1662,11 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
- 		    goto done;
+@@ -1154,6 +1159,7 @@ sca_appearance *sca_appearance_for_dialo
+ 				continue;
+ 			}
+ #endif // notdef
++			LM_DBG("%.*s appearance-index %d found\n", STR_FMT(aor), app->index);
+ 			break;
  		}
- 	    }
--	}
+ 	}
+--- a/src/modules/sca/sca_call_info.c
++++ b/src/modules/sca/sca_call_info.c
+@@ -940,6 +940,7 @@ int sca_call_info_invite_request_handler
+ 
+ 	if (!upstream && !SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
+ 		// caller isn't SCA, no more to do. update callee in reply handler.
++		LM_DBG("caller isn't SCA, no more to do. update callee in reply handler\n");
+ 		rc = 1;
+ 		goto done;
+ 	}
+@@ -955,6 +956,7 @@ int sca_call_info_invite_request_handler
+ 	}
+ 
+ 	if (sca_call_is_held(msg)) {
++		LM_DBG("call_is_held\n");
+ 		state = SCA_APPEARANCE_STATE_HELD;
+ 		if (call_info->state == SCA_APPEARANCE_STATE_HELD_PRIVATE) {
+ 			state = SCA_APPEARANCE_STATE_HELD_PRIVATE;
+@@ -963,13 +965,17 @@ int sca_call_info_invite_request_handler
+ 		}
+ 	} else if (!SCA_STR_EMPTY(&to->tag_value)) {
+ 		// this is a reINVITE from an SCA line that put the call on hold
++		LM_DBG("reINVITE from an SCA line that put the call on hold\n");
+ 		state = SCA_APPEARANCE_STATE_ACTIVE;
+ 	} else if (sca_call_info_is_line_seize_reinvite(msg, call_info, from, to,
+ 			from_aor, to_aor)) {
++		LM_DBG("line_seize_reinvite\n");
+ 		rc = sca_call_info_seize_held_call(msg, call_info, from, to, from_aor,
+ 				to_aor, contact_uri);
+ 		if (rc <= 0) {
+ 			goto done;
++		} else {
++			LM_DBG("Initial INVITE\n");
+ 		}
+ 	}
+ 
+@@ -1177,11 +1183,19 @@ static int sca_call_info_invite_reply_20
+ 
+ 	if (SCA_CALL_INFO_IS_SHARED_CALLEE(call_info) &&
+ 			(!SCA_STR_EQ(from_aor, to_aor))) {
++		LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE\n");
++		if(sca->rr_api->is_direction(msg, RR_FLOW_DOWNSTREAM)==0) {
++			LM_DBG("downstream detected\n");
++		}
++		if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++			LM_DBG("upstream detected\n");
++		}
+ 		rc = sca_call_info_uri_update(to_aor, call_info, from, to, contact_uri,
+ 				&msg->callid->body);
+ 	}
+ 
+ 	if (!SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
++		LM_DBG("NOT SCA_CALL_INFO_IS_SHARED_CALLER\n");
+ 		goto done;
+ 	}
+ 
+@@ -1208,6 +1222,8 @@ static int sca_call_info_invite_reply_20
+ 			&from->tag_value, NULL, slot_idx);
+ 	if (app == NULL) {
+ 		// no SCA line is involved with this call
++		LM_DBG("no SCA line is involved with this call[%.*s]\n",
++			STR_FMT(from_aor));
+ 		rc = 1;
+ 		goto done;
+ 	}
+@@ -1372,6 +1388,8 @@ void sca_call_info_ack_from_handler(sip_
+ 			sca_appearance_update_state_unsafe(app, state);
+ 			// can't send NOTIFYs until we unlock the slot below
+ 		}
 +	} else {
-+            LM_DBG("NOT SCA_CALL_INFO_IS_SHARED_CALLER "
-+                "from_aor[%.*s] to_aor[%.*s]\n",
-+                STR_FMT(from_aor), STR_FMT(to_aor));
-+        }
- 
- 	if ( slot_idx >= 0 ) {
- 	    sca_hash_table_unlock_index( sca->appearances, slot_idx );
-@@ -1695,6 +1721,7 @@ sca_call_info_bye_handler( sip_msg_t *msg, sca_call_info *call_info,
- 	    }
++		LM_DBG("from_aor[%.*s] not shared appearance\n", STR_FMT(from_aor));
  	}
-     } else {
-+        LM_DBG("SIP_REPLY\n");
- 	/* this is just a backup to catch anything missed on the BYE request */
- 	if ( SCA_CALL_INFO_IS_SHARED_CALLEE( call_info )) {
- 	    slot_idx = sca_hash_table_index_for_key( sca->appearances, to_aor );
-@@ -2079,29 +2106,42 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
-     if ( sca_uri_is_shared_appearance( sca, &from_aor )) {
- 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLER )) {
- 	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;
-+	    LM_DBG("SCA_CALL_INFO_SHARED_CALLER[%.*s]\n",
-+		STR_FMT(&from_aor));
- 	}
-     }
-     if ( sca_uri_is_shared_appearance( sca, &to_aor )) {
- 	if (( update_mask & SCA_CALL_INFO_SHARED_CALLEE )) {
- 	    call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLEE;
-+	    LM_DBG("SCA_CALL_INFO_SHARED_CALLEE[%.*s]\n",
-+		STR_FMT(&to_aor));
- 	}
-     }
  
-     if ( call_info_hdr == NULL ) {
-+        LM_DBG("call_info_hdr is NULL\n");
- 	if ( SCA_CALL_INFO_IS_SHARED_CALLER( &call_info ) &&
- 		msg->first_line.type == SIP_REQUEST ) {
-+            LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLER && SIP_REQUEST\n");
- 	    if ( !sca_subscription_aor_has_subscribers(
- 				SCA_EVENT_TYPE_CALL_INFO, &from_aor )) {
- 		call_info.ua_shared &= ~SCA_CALL_INFO_SHARED_CALLER;
- 		sca_appearance_unregister( sca, &from_aor );
--	    }
-+	    } else {
-+                LM_DBG("from_aor[%.*s] has subscribers\n",
-+                        STR_FMT(&from_aor));
-+            }
- 	} else if ( SCA_CALL_INFO_IS_SHARED_CALLEE( &call_info ) &&
- 		msg->first_line.type == SIP_REPLY ) {
-+            LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE && SIP_REPLY\n");
- 	    if ( !sca_subscription_aor_has_subscribers(
- 				SCA_EVENT_TYPE_CALL_INFO, &to_aor )) {
- 		call_info.ua_shared &= ~SCA_CALL_INFO_SHARED_CALLEE;
- 		sca_appearance_unregister( sca, &to_aor );
--	    }
-+	    } else {
-+                LM_DBG("to_aor[%.*s] has subscribers\n",
-+                        STR_FMT(&from_aor));
-+            }
+ 	done: if (slot_idx >= 0) {
+@@ -1518,7 +1536,11 @@ static int sca_call_info_bye_handler(sip
+ 	str *tag = NULL;
+ 
+ 	if (msg->first_line.type == SIP_REQUEST) {
++		LM_DBG("SIP_REQUEST\n");
+ 		if (SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
++			LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLER "
++				"from_aor[%.*s] to_aor[%.*s]\n",
++				STR_FMT(from_aor), STR_FMT(to_aor));
+ 			slot_idx = sca_uri_lock_shared_appearance(sca, from_aor);
+ 			if (slot_idx < 0) {
+ 				LM_ERR("sca_call_info_bye_handler: failed to acquire "
+@@ -1572,6 +1594,10 @@ static int sca_call_info_bye_handler(sip
+ 					goto done;
+ 				}
+ 			}
++		} else {
++			LM_DBG("NOT SCA_CALL_INFO_IS_SHARED_CALLER "
++				"from_aor[%.*s] to_aor[%.*s]\n",
++				STR_FMT(from_aor), STR_FMT(to_aor));
+ 		}
+ 
+ 		if (slot_idx >= 0) {
+@@ -1627,6 +1653,7 @@ static int sca_call_info_bye_handler(sip
+ 			}
+ 		}
+ 	} else {
++		LM_DBG("SIP_REPLY\n");
+ 		// this is just a backup to catch anything missed on the BYE request
+ 		if (SCA_CALL_INFO_IS_SHARED_CALLEE(call_info)) {
+ 			slot_idx = sca_hash_table_index_for_key(sca->appearances, to_aor);
+@@ -1994,28 +2021,41 @@ int sca_call_info_update(sip_msg_t *msg,
+ 	if (sca_uri_is_shared_appearance(sca, &from_aor)) {
+ 		if ((update_mask & SCA_CALL_INFO_SHARED_CALLER)) {
+ 			call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLER;
++			LM_DBG("SCA_CALL_INFO_SHARED_CALLER[%.*s]\n",
++			STR_FMT(&from_aor));
+ 		}
  	}
-     }
+ 	if (sca_uri_is_shared_appearance(sca, &to_aor)) {
+ 		if ((update_mask & SCA_CALL_INFO_SHARED_CALLEE)) {
+ 			call_info.ua_shared |= SCA_CALL_INFO_SHARED_CALLEE;
++			LM_DBG("SCA_CALL_INFO_SHARED_CALLEE[%.*s]\n",
++			STR_FMT(&to_aor));
+ 		}
+ 	}
  
-diff --git a/modules/sca/sca_dialog.c b/modules/sca/sca_dialog.c
-index 9faf9e7..f31ae67 100644
---- a/modules/sca/sca_dialog.c
-+++ b/modules/sca/sca_dialog.c
-@@ -43,6 +43,9 @@ sca_dialog_build_from_tags( sca_dialog *dialog, int maxlen, str *call_id,
- 	return( -1 );
-     }
+ 	if (call_info_hdr == NULL) {
++		LM_DBG("call_info_hdr is NULL\n");
+ 		if (SCA_CALL_INFO_IS_SHARED_CALLER(&call_info) &&
+ 		msg->first_line.type == SIP_REQUEST) {
++			LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLER && SIP_REQUEST\n");
+ 			if (!sca_subscription_aor_has_subscribers(SCA_EVENT_TYPE_CALL_INFO,
+ 					&from_aor)) {
+ 				call_info.ua_shared &= ~SCA_CALL_INFO_SHARED_CALLER;
+ 				sca_appearance_unregister(sca, &from_aor);
++			} else {
++				LM_DBG("from_aor[%.*s] has subscribers\n",
++					STR_FMT(&from_aor));
+ 			}
+ 		} else if (SCA_CALL_INFO_IS_SHARED_CALLEE(&call_info) &&
+ 		msg->first_line.type == SIP_REPLY) {
++			LM_DBG("SCA_CALL_INFO_IS_SHARED_CALLEE && SIP_REPLY\n");
+ 			if (!sca_subscription_aor_has_subscribers(SCA_EVENT_TYPE_CALL_INFO,
+ 					&to_aor)) {
+ 				call_info.ua_shared &= ~SCA_CALL_INFO_SHARED_CALLEE;
+ 				sca_appearance_unregister(sca, &to_aor);
++			} else {
++				LM_DBG("to_aor[%.*s] has subscribers\n",
++					STR_FMT(&from_aor));
+ 			}
+ 		}
+ 	}
+--- a/src/modules/sca/sca_dialog.c
++++ b/src/modules/sca/sca_dialog.c
+@@ -45,6 +45,9 @@ int sca_dialog_build_from_tags(sca_dialo
+ 		return (-1);
+ 	}
  
-+    LM_DBG("call-id:%.*s from_tag:%.*s to_tag:%.*s\n",
-+        STR_FMT(call_id), STR_FMT(from_tag), STR_FMT(to_tag));
++	LM_DBG("call-id:%.*s from_tag:%.*s to_tag:%.*s\n",
++		STR_FMT(call_id), STR_FMT(from_tag), STR_FMT(to_tag));
 +
-     memcpy( dialog->id.s, call_id->s, call_id->len );
-     dialog->call_id.s = dialog->id.s;
-     dialog->call_id.len = call_id->len;
-@@ -56,9 +59,16 @@ sca_dialog_build_from_tags( sca_dialog *dialog, int maxlen, str *call_id,
- 		to_tag->s, to_tag->len );
- 	dialog->to_tag.s = dialog->id.s + call_id->len + from_tag->len;
- 	dialog->to_tag.len = to_tag->len;
-+    } else {
-+        dialog->to_tag.s = NULL;
-+        dialog->to_tag.len = 0;
-     }
-     dialog->id.len = len;
+ 	memcpy(dialog->id.s, call_id->s, call_id->len);
+ 	dialog->call_id.s = dialog->id.s;
+ 	dialog->call_id.len = call_id->len;
+@@ -58,9 +61,16 @@ int sca_dialog_build_from_tags(sca_dialo
+ 				to_tag->len);
+ 		dialog->to_tag.s = dialog->id.s + call_id->len + from_tag->len;
+ 		dialog->to_tag.len = to_tag->len;
++	} else {
++		dialog->to_tag.s = NULL;
++		dialog->to_tag.len = 0;
+ 	}
+ 	dialog->id.len = len;
  
-+    LM_DBG("id:%.*s call-id:%.*s from_tag:%.*s to_tag:%.*s\n",
-+        STR_FMT(&dialog->id), STR_FMT(&dialog->call_id),
-+        STR_FMT(&dialog->from_tag), STR_FMT(&dialog->to_tag));
++	LM_DBG("id:%.*s call-id:%.*s from_tag:%.*s to_tag:%.*s\n",
++	STR_FMT(&dialog->id), STR_FMT(&dialog->call_id),
++	STR_FMT(&dialog->from_tag), STR_FMT(&dialog->to_tag));
 +
-     return( len );
+ 	return (len);
  }
  
