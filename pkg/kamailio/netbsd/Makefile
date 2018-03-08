@@ -8,9 +8,9 @@
 COMMENT= "Kamailio"
 
 PORTNAME= kamailio
-PORTVERSION= 4.2.4
+PORTVERSION= 1.2.0-notls
 CATEGORIES= net
-MASTER_SITES= http://kamailio.org/pub/kamailio/4.4.2/src/
+MASTER_SITES= http://kamailio.org/pub/kamailio/1.2.0/src/
 
 MAINTAINER= miconda@gmail.com
 

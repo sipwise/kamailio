@@ -1,0 +1,117 @@
+The http_client module - todo
+======================
+- clean up			
+  Clean up curl connections, pconn and conn objects at exit time. Just to be nice.
+
+- connection parameters
+	read=line/all		- Implemented in API, but not in parameter
+	tlsverify=on/off
+	failover=httpcon	Other httpcon that can be used for failover in case of 5xx response or timeout
+				not implemented
+
+
+- Add XAVP parameter setting before running curl_connect
+
+- save fingerprint of cert for trust-on-first-use procedure
+
+- connection and last status for httpcon-object, needs to be object in process memory
+	- done.
+	- test what happens if we allocate curlcon objects in shared memory and use locks
+		Code implemeneted in git master branch for testing
+	- if 5xx response or timeout set flag
+	- function in dialplan - httpcon_exists(object)
+	- pv $curlstatus(object) ??
+	- this is per process !!!
+
+- Figure out a way to communicate back the content-type of the response. Another pvar arg?
+	- This is per process!
+
+- Reload of configuration file from RPC interface
+	- Need to close connections (if we have open ones according to idea above)
+	- Need to rebuild core httpcon objects and "mirrors" in pkg memory
+		- Should we just abandon old pkg objects and let them rot away
+		  in space and time?
+	- Can we add a lock to the connection list while switching if we load a new
+          list, then switch active list and then free the old ones
+
+- rpc
+	curl.listcon	list all connection objects with properties
+			-- Done, but not documented
+	curl.modcon     modify connection object
+			url
+			username
+			password
+			scheme
+			timeout
+			read
+			tlsverify
+			failover
+	curl.addcon	add connection object
+	curl.rmcon	remove connection object
+
+	Maybe RPC commands to change default settings for proxys
+
+- Async - event_route when done
+	(with and without suspending transaction)
+	Need background task process to run curl request
+	event_route[curl:connectioncomplete]
+	$curlcon == connection
+	$curl == URL
+	$curlres == result
+
+
+- Option to try connections at module load with CURLOPT_CONNECT_ONLY
+  just to make sure URLs resolve correctly in DNS and ports are open
+
+- Make it possible to define modparams in any order. For now, httpcon definitions only use default
+  values from modparam's defined on lines above in the config file. (issue #541)
+
+- Option to configure DNS resolvers for CURL to use
+
+
+Development API
+---------------
+- xcap_client needs to add headers:
+  char* hdr_name= NULL;
+
+                memset(buf, 0, 128* sizeof(char));
+                match_header= buf;
+
+                hdr_name= (match_type==IF_MATCH)?"If-Match":"If-None-Match";
+
+                len=sprintf(match_header, "%s: %s\n", hdr_name, match_etag);
+
+                match_header[len]= '\0';
+  https://curl.haxx.se/libcurl/c/CURLOPT_HEADERFUNCTION.html
+
+- It also does get a headers from the reply, which needs a callback
+- auth_identify sets the CURLOPT_CAINFO option
+  https://curl.haxx.se/libcurl/c/CURLOPT_CAINFO.html
+  This can be set in the httpconf object
+
+- Document that some options like useragent doesn't work in the
+  old http_query function
+
+
+Issues in the bug tracker
+-------------------------
+
+- none
+
+
+Solved issues
+--------------
+- https://github.com/kamailio/kamailio/issues/541 - closed
+  Support setting proxy 
+  Comitted another patch, which included default and per-connection proxy
+  settings. 
+- https://github.com/kamailio/kamailio/issues/515 - closed
+  Support various auth methods - digest, basic etc
+  Comitted another patch, which included default and per-connection settings
+- https://github.com/kamailio/kamailio/pull/481 - closed
+  Support TLS client certificates
+- https://github.com/kamailio/kamailio/pull/435 - closed
+  Pull request that fixed a lot of issues.
+- https://github.com/kamailio/kamailio/issues/542  - closed
+  Support connection reuse. Needs private memory structures to track connections
+
