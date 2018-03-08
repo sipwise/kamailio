@@ -1,3 +1,28 @@
+ngcp-kamailio (5.1.2-1+0~mr6.2.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [51d9562] TT#26263 fix rtpengine default set ID selection
+  * [5221f67] TT#30572 add transcoding options to rtpengine module
+
+  [ Guillem Jover ]
+  * [6872898] TT#22072 Update packaging
+  * [c5db8b0] TT#32207 Wait until the kamailio processes have been terminated
+
+  [ Andreas Granig ]
+  * [b98ea96] TT#32450 Implement db_redis database driver.
+  * [d2fbb6b] TT#32450 Install db_redis schema files
+  * [3be33de] TT#32450 Queue appended redis commands for reconnect
+
+  [ Marco Capetta ]
+  * [abb4ab5] TT#31165 Fix inconsistency in kamailio service names
+  * [13dca21] Imported Upstream version 5.1.2
+  * [372d8fd] TT#33258 Remove already applied upstream patches and refresh old ones
+
+  [ Alexander Lutay ]
+  * [4b365e0] TT#33276 Remove sysv init script dependency on sshd
+
+ -- Marco Capetta <mcapetta@mcapetta.sipwise>  Thu, 08 Mar 2018 15:52:44 +0100
+
 ngcp-kamailio (4.4.6-1+0~mr6.2.0.0) unstable; urgency=medium
 
   [ Marco Capetta ]
