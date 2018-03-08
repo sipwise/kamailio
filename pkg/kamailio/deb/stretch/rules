@@ -35,13 +35,13 @@ EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy mi_xmlrpc dnssec
 # on which other depend first)
 PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 			   ldap xml perl utils lua memcached \
-			   snmpstats carrierroute xmpp cpl redis python geoip\
+			   snmpstats carrierroute xmpp cpl redis python geoip geoip2 \
 			   sqlite json mono ims sctp java \
-			   purple tls outbound websocket autheph kazoo cnxcc \
-			   erlang
+			   tls outbound websocket autheph kazoo cnxcc \
+			   erlang systemd phonenum mongodb rabbitmq
 
 # module groups to be packaged onto kamailio-extra-modules
-EXTRA_GROUPS=gzcompress uuid ev jansson
+EXTRA_GROUPS=gzcompress uuid ev jansson http_async
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
 export LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)
@@ -107,8 +107,8 @@ endef
 
 # CFLAGS + CPPFLAGS -> CC_EXTRA_OPTS
 CC_EXTRA_OPTS := $(shell dpkg-buildflags --get CPPFLAGS)
-CC_EXTRA_OPTS += $(shell dpkg-buildflags --get CFLAGS)
-CXXFLAGS := $(shell dpkg-buildflags --get CXXFLAGS)
+CC_EXTRA_OPTS += $(shell DEB_CFLAGS_MAINT_STRIP=-O2 dpkg-buildflags --get CFLAGS)
+CXXFLAGS := $(shell DEB_CXXFLAGS_MAINT_STRIP=-O2 dpkg-buildflags --get CXXFLAGS)
 # LDFLAGS -> LD_EXTRA_OPTS
 LD_EXTRA_OPTS := $(shell dpkg-buildflags --get LDFLAGS)
 
