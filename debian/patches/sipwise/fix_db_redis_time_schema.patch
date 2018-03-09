@@ -4,3 +4,20 @@
 -id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/int,q/double,callid/string,cseq/int,last_modified/int,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
 +id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/time,q/double,callid/string,cseq/int,last_modified/time,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
  9
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -1393,7 +1393,6 @@
+         //db_redis_key_free(&type_keys);
+         LM_DBG("+++ done with loop '%.*s'\n", k->key.len, k->key.s);
+     }
+-    pkg_free(query_v);
+     db_redis_key_free(&type_keys);
+     db_redis_key_free(&all_type_keys);
+ 
+@@ -2148,4 +2147,4 @@
+         return -1;
+     db_free_result(_r);
+     return 0;
+-}
+\ No newline at end of file
++}
