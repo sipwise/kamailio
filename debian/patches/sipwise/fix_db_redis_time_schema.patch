@@ -24,7 +24,17 @@
          }
          update_queries++;
          if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
-@@ -2148,4 +2148,4 @@
+@@ -1850,7 +1850,8 @@
+             LM_ERR("Failed to add column value to insert query\n");
+             goto error;
+         }
+-        pkg_free(v.s);
++        if (v.s)
++            pkg_free(v.s);
+     }
+ 
+     reply = db_redis_command_argv(con, query_v);
+@@ -2148,4 +2149,4 @@
          return -1;
      db_free_result(_r);
      return 0;
