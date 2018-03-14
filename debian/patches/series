@@ -33,6 +33,7 @@ upstream/0004-siputils-new-function-is_tel_number-val.patch
 upstream/0005-siputils-is_tel_number-constraints-on-lenght-and-fir.patch
 upstream/tls-proper-check-of-libssl-versions-used-for-compila.patch
 upstream/textops-filter_body-remove-previous-r-n-that-belongs.patch
+upstream/0001-lcr-fixed-checking-if-there-is-more-uris-available-f.patch
 #
 no_lib64_on_64_bits.patch
 no_INSTALL_file.patch
