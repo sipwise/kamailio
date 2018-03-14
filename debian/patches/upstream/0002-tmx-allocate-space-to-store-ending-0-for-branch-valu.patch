@@ -1,0 +1,28 @@
+From 5cd6530e68ef311a59acbec180588a498f2a32dc Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Sat, 10 Feb 2018 22:05:42 +0100
+Subject: [PATCH] tmx: allocate space to store ending 0 for branch value
+
+- reported by Alfred Farrugia and Sandro Gauci
+
+(cherry picked from commit e1d8008a09d9390ebaf698abe8909e10dfec4097)
+---
+ src/modules/tmx/tmx_pretran.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/modules/tmx/tmx_pretran.c b/modules/tmx/tmx_pretran.c
+index 494bdff..67c4f7f 100644
+--- a/modules/tmx/tmx_pretran.c
++++ b/modules/tmx/tmx_pretran.c
+@@ -260,7 +260,7 @@ int tmx_check_pretran(sip_msg_t *msg)
+ 	if(likely(vbr!=NULL)) {
+ 		svbranch = vbr->value;
+ 		trim(&svbranch);
+-		dsize += svbranch.len;
++		dsize += svbranch.len + 1;
+ 	}
+ 	if(dsize<256) dsize = 256;
+ 
+-- 
+2.7.4
+
