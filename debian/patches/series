@@ -2,6 +2,8 @@
 # upstream fixes
 # 4.4
 upstream/dialplan-fix-avp-values-when-using-PV_IDX_ITR.patch
+upstream/0001-lcr-fixed-checking-if-there-is-more-uris-available-f.patch
+upstream/0002-tmx-allocate-space-to-store-ending-0-for-branch-valu.patch
 #
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
