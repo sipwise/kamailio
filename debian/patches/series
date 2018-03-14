@@ -1,6 +1,8 @@
 ##
 # upstream fixes
 # 4.4
+upstream/0001-lcr-fixed-checking-if-there-is-more-uris-available-f.patch
+upstream/0002-tmx-allocate-space-to-store-ending-0-for-branch-valu.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
