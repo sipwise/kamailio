@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.2-1+0~mr4.5.1.2) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [5089875] TT#34152 cherry-pick 5cd6530 and 1b3e22d from upstream
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 16 Mar 2018 17:12:11 +0100
+
 ngcp-kamailio (4.4.2-1+0~mr4.5.1.1) unstable; urgency=medium
 
   * New release.
