@@ -1,0 +1,4 @@
+rm_conffile /etc/default/kamailio-lb 5.1.2-1+0~mr6.3~ ngcp-kamailio
+rm_conffile /etc/default/kamailio-proxy 5.1.2-1+0~mr6.3~ ngcp-kamailio
+rm_conffile /etc/init.d/kamailio-lb 5.1.2-1+0~mr6.3~ ngcp-kamailio
+rm_conffile /etc/init.d/kamailio-proxy 5.1.2-1+0~mr6.3~ ngcp-kamailio
