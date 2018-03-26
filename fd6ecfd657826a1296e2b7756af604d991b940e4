@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "da9b358b_8a25cfc3",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2018-03-26T15:37:57Z",
+      "side": 1,
+      "message": "This is not ready to commit, note the hack.  Submitting for early feedback, and to know if maybe we can get rid of this check -- maybe it\u0027s used by upstream but in Sipwise nobody needs that??",
+      "range": {
+        "startLine": 22,
+        "startChar": 0,
+        "endLine": 23,
+        "endChar": 200
+      },
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
