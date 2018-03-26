@@ -1,2 +1,4 @@
 ngcp-kamailio: postrm-contains-additional-updaterc.d-calls etc/init.d/kamailio-proxy
 ngcp-kamailio: postrm-contains-additional-updaterc.d-calls etc/init.d/kamailio-lb
+ngcp-kamailio: init.d-script-not-included-in-package etc/init.d/kamailio-proxy
+ngcp-kamailio: init.d-script-not-included-in-package etc/init.d/kamailio-lb
