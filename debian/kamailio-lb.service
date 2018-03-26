@@ -1,0 +1,30 @@
+[Unit]
+Description=Kamailio (OpenSER) - the Open Source SIP Server, LB
+After=network-online.target
+After=remote-fs.target
+After=time-sync.target
+Requires=network-online.target
+Requires=remote-fs.target
+Requires=time-sync.target
+
+[Service]
+Type=simple
+User=kamailio
+Group=kamailio
+PIDFile=/run/kamailio/kamailio.lb.pid
+Environment='CFGFILE=/etc/kamailio/lb/kamailio.cfg'
+# Values of SHM_MEMORY=64 and PKG_MEMORY=16 taken from old sysvinit file
+# Amount of shared memory to allocate for the running Kamailio server (in Mb)
+Environment='SHM_MEMORY=64'
+# Amount of private memory for each Kamailio process (in Mb)
+Environment='PKG_MEMORY=16'
+# Check if config OK before starting
+ExecStartPre=/usr/sbin/kamailio -f $CFGFILE -c
+# -DD means to not daemonise
+ExecStart=/usr/sbin/kamailio -P /run/kamailio/kamailio.lb.pid -f $CFGFILE -m $SHM_MEMORY -M $PKG_MEMORY -DD
+Restart=on-abort
+LimitMEMLOCK=infinity
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target
