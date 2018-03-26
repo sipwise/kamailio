@@ -1,0 +1,30 @@
+[Unit]
+Description=Kamailio (OpenSER) - the Open Source SIP Server, LB
+After=network-online.target
+After=remote-fs.target
+After=time-sync.target
+Requires=network-online.target
+Requires=remote-fs.target
+Requires=time-sync.target
+
+[Service]
+Type=forking
+Environment='USER=kamailio'
+Environment='GROUP=kamailio'
+Environment='CFGFILE=/etc/kamailio/lb/kamailio.cfg'
+# Amount of shared memory to allocate for the running Kamailio server (in Mb)
+Environment='SHM_MEMORY=64'
+# Amount of private memory for each Kamailio process (in Mb)
+Environment='PKG_MEMORY=16'
+PIDFile=/run/kamailio/kamailio.lb.pid
+# Check if config OK before starting
+ExecStartPre=/usr/sbin/kamailio -f $CFGFILE -u $USER -g $GROUP -c
+# Hack / POC to get feedback, syntax possibly doesn't even work, potentially ignore this
+ExecStartPre=/usr/bin/grep -q "^[[:space:]]*fork[[:space:]]*=[[:space:]]*no.*" $CFGFILE || (echo "Not starting $DESC: fork=no specified in config file; run /etc/init.d/kamailio debug instead"; exit 1)
+ExecStart=/usr/sbin/kamailio -P /run/kamailio/kamailio.lb.pid -f $CFGFILE -m $SHM_MEMORY -M $PKG_MEMORY -u $USER -g $GROUP
+Restart=on-abort
+LimitMEMLOCK=infinity
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target

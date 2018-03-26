@@ -1,0 +1,2 @@
+# /run/kamailio created as tmpfile in "ngcp-kamailio" package
+f /run/kamailio/kamailio_radius.seq 0660 kamailio kamailio
