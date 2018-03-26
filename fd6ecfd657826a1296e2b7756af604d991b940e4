@@ -2,6 +2,74 @@
   "comments": [
     {
       "key": {
+        "uuid": "da9b358b_551d2c65",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-03-26T16:06:29Z",
+      "side": 1,
+      "message": "Why are we not using template services here?",
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9b358b_f503200c",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 13,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-03-26T16:06:29Z",
+      "side": 1,
+      "message": "Why not use the builtin User/Group and stop passing -u/-g to kamailio instead?",
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9b358b_d5081c2b",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 14,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-03-26T16:06:29Z",
+      "side": 1,
+      "message": "Why not just hardcode the values in the kamailio calls?",
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9b358b_7510304f",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-03-26T16:06:29Z",
+      "side": 1,
+      "message": "Why the environment setting for the Exec lines, this seems unidiomatic for a unit file TBH, even if it might indeed seem more descriptive.",
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "da9b358b_8a25cfc3",
         "filename": "debian/kamailio-lb.service",
         "patchSetId": 1
@@ -43,6 +111,47 @@
         "endLine": 23,
         "endChar": 200
       },
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9b358b_b50d9839",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 23,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-03-26T16:06:29Z",
+      "side": 1,
+      "message": "If this is some kind of consistency check in the config vs the unit file, yeah I\u0027d completely ignore it. We were not doing this in the init script anyway were we, and that could have broken there too.",
+      "parentUuid": "da9b358b_0a189f83",
+      "range": {
+        "startLine": 22,
+        "startChar": 0,
+        "endLine": 23,
+        "endChar": 200
+      },
+      "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "da9b358b_9513b45c",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 1
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-03-26T16:06:29Z",
+      "side": 1,
+      "message": "I\u0027m actually not sure how we should be setting this, because this feels is going to fight (kind-of) against monit (although the fact that systemd ends up being the gateway to whether and when and how the services gets started makes it probably a non-issue).",
       "revId": "fd6ecfd657826a1296e2b7756af604d991b940e4",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
