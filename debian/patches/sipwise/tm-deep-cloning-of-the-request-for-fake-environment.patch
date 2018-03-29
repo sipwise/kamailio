@@ -338,7 +338,7 @@ diff --git a/modules/tm/t_suspend.c b/modules/tm/t_suspend.c
 index 6bb25473b..27f54569a 100644
 --- a/modules/tm/t_suspend.c
 +++ b/modules/tm/t_suspend.c
-@@ -166,7 +166,8 @@ int t_continue(unsigned int hash_index, unsigned int label,
+@@ -167,7 +167,8 @@ int t_continue(unsigned int hash_index, unsigned int label,
  		struct action *route)
  {
  	struct cell	*t;
@@ -348,7 +348,7 @@ index 6bb25473b..27f54569a 100644
  	struct cancel_info cancel_data;
  	int	branch;
  	struct ua_client *uac =NULL;
-@@ -267,31 +268,34 @@ int t_continue(unsigned int hash_index, unsigned int label,
+@@ -268,31 +269,34 @@ int t_continue(unsigned int hash_index, unsigned int label,
  		 */
  
  		/* fake the request and the environment, like in failure_route */

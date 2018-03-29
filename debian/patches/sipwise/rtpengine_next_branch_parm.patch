@@ -17,7 +17,7 @@
  static int fixup_set_id(void ** param, int param_no);
  static int set_rtpengine_set_f(struct sip_msg * msg, char * str1, char * str2);
  static struct rtpp_set * select_rtpp_set(int id_set);
-@@ -2170,6 +2171,8 @@ static int parse_flags(struct ng_flags_p
+@@ -2166,6 +2167,8 @@ static int parse_flags(struct ng_flags_p
  						ng_flags->via = 3;
  					else if (str_eq(&val, "extra"))
  						ng_flags->via = -1;
@@ -26,7 +26,7 @@
  					else
  						goto error;
  					goto next;
-@@ -2239,6 +2242,8 @@ static bencode_item_t *rtpp_function_cal
+@@ -2235,6 +2238,8 @@ static bencode_item_t *rtpp_function_cal
  	struct rtpp_node *node;
  	char *cp;
  	pv_value_t pv_val;
@@ -35,7 +35,7 @@
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2311,12 +2316,30 @@ static bencode_item_t *rtpp_function_cal
+@@ -2307,12 +2312,30 @@ static bencode_item_t *rtpp_function_cal
  	bencode_dictionary_add_str(ng_flags.dict, "call-id", &callid);
  
  	if (ng_flags.via) {
@@ -72,7 +72,7 @@
  		if (ret == -1 || viabranch.len == 0) {
  			LM_ERR("can't get Via branch/extra ID\n");
  			goto error;
-@@ -3189,7 +3212,7 @@ rtpengine_answer1_f(struct sip_msg *msg,
+@@ -3178,7 +3201,7 @@ rtpengine_answer1_f(struct sip_msg *msg,
  }
  
  static int

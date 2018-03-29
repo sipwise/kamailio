@@ -12,7 +12,7 @@ diff --git a/modules/dialog/dialog.c b/modules/dialog/dialog.c
 index 7d56cfc..b1715ad 100644
 --- a/modules/dialog/dialog.c
 +++ b/modules/dialog/dialog.c
-@@ -1593,18 +1593,24 @@ static void internal_rpc_print_dlgs(rpc_t *rpc, void *c, int with_context)
+@@ -1601,18 +1601,24 @@ static void internal_rpc_print_dlgs(rpc_t *rpc, void *c, int with_context)
   * \param with_context if 1 then the dialog context will be also printed
   */
  static void internal_rpc_print_single_dlg(rpc_t *rpc, void *c, int with_context) {
@@ -40,7 +40,7 @@ index 7d56cfc..b1715ad 100644
  			internal_rpc_print_dlg(rpc, c, dlg, with_context);
  		}
  	}
-@@ -1695,10 +1701,10 @@ static const char *rpc_print_dlgs_ctx_doc[2] = {
+@@ -1703,10 +1709,10 @@ static const char *rpc_print_dlgs_ctx_doc[2] = {
  	"Print all dialogs with associated context", 0
  };
  static const char *rpc_print_dlg_doc[2] = {
@@ -57,7 +57,7 @@ diff --git a/modules/dialog/doc/dialog_admin.xml b/modules/dialog/doc/dialog_adm
 index e5ff763..af06c38 100644
 --- a/modules/dialog/doc/dialog_admin.xml
 +++ b/modules/dialog/doc/dialog_admin.xml
-@@ -2358,7 +2358,7 @@ dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
+@@ -2357,7 +2357,7 @@ dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
  		<title><varname>dlg.dlg_list</varname></title>
  		<para>
  		Lists the description of one dialog.  The dialog identifiers are to be passed
@@ -66,7 +66,7 @@ index e5ff763..af06c38 100644
  		</para>
  		<para>Name: <emphasis>dlg.dlg_list</emphasis></para>
  		<para>Parameters:</para>
-@@ -2375,6 +2375,9 @@ dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
+@@ -2374,6 +2374,9 @@ dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
  		<programlisting  format="linespecific">
  		serctl dlg.list abcdrssfrs122444@192.168.1.1 AAdfeEFF33
  		</programlisting>
@@ -76,7 +76,7 @@ index e5ff763..af06c38 100644
  		</section>
  
  		<section>
-@@ -2391,6 +2394,9 @@ dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
+@@ -2390,6 +2393,9 @@ dlg_remote_profile("add", "caller", "test", "$sruid", "$var(exp)");
  		<programlisting  format="linespecific">
  		serctl dlg.list_ctx abcdrssfrs122444@192.168.1.1 AAdfeEFF33
  		</programlisting>
