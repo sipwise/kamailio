@@ -1,3 +1,14 @@
+ngcp-kamailio (4.4.7-1+0~mr4.5.9.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [78c035c] New upstream version 4.4.6
+
+  [ Marco Capetta ]
+  * [c7a74b3] Imported Upstream version 4.4.7
+  * [18d4efa] TT#34850 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Thu, 29 Mar 2018 16:17:10 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr4.5.9.0) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
