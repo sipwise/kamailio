@@ -1,3 +1,14 @@
+ngcp-kamailio (4.4.7-1+0~mr5.5.4.0) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [1b0d63b] TT#34152 cherry-pick 5cd6530 and 1b3e22d from upstream
+
+  [ Marco Capetta ]
+  * [488e36d] Imported Upstream version 4.4.7
+  * [6a1804c] TT#34850 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Thu, 29 Mar 2018 16:49:22 +0200
+
 ngcp-kamailio (4.4.6-1+0~mr5.5.4.0) unstable; urgency=medium
 
   * New release.
