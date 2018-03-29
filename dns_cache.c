@@ -347,6 +347,9 @@ int init_dns_cache()
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
+
+	*dns_cache_mem_used=0;
+
 #ifdef DNS_LU_LST
 	dns_last_used_lst=shm_malloc(sizeof(*dns_last_used_lst));
 	if (dns_last_used_lst==0){
@@ -453,8 +456,10 @@ int init_dns_cache_stats(int iproc_num)
 		LM_CRIT("%s: crt(%p, %p, %p)," \
 					" prev(%p, %p, %p), next(%p, %p, %p)\n", txt, \
 					(l), (l)->next, (l)->prev, \
-					(l)->prev, (l)->prev->next, (l)->prev->prev, \
-					(l)->next, (l)->next->next, (l)->next->prev \
+					(l)->prev, ((l)->prev)?(l)->prev->next:NULL, \
+					((l)->prev)?(l)->prev->prev:NULL, \
+					(l)->next, ((l)->next)?(l)->next->next:NULL, \
+					((l)->next)?(l)->next->prev:NULL \
 				)
 
 #define debug_lu_lst( txt, l) \
@@ -594,8 +599,10 @@ again:
 			cname_chain++;
 			cname.s=((struct cname_rdata*)e->rr_lst->rdata)->name;
 			cname.len= ((struct cname_rdata*)e->rr_lst->rdata)->name_len;
-			name=&cname;
-			goto again;
+			if(cname.s!=NULL && cname.len>0) {
+				name=&cname;
+				goto again;
+			}
 		}
 	}
 	return ret;
@@ -2362,6 +2369,7 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
 	int af, len;
 	struct dns_rr* rr;
 	unsigned char rr_no;
+	unsigned char *ip;
 	ticks_t now;
 	int i;
 
@@ -2389,7 +2397,15 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
 	for(i=0; rr && (i<DNS_HE_MAX_ADDR); i++,
 							rr=dns_entry_get_rr(e, &rr_no, now)){
 				p_addr[i]=&address[i*len];
-				memcpy(p_addr[i], ((struct a_rdata*)rr->rdata)->ip, len);
+				switch(e->type){
+					case T_A:
+						ip = ((struct a_rdata*)rr->rdata)->ip;
+						break;
+					case T_AAAA:
+						ip = ((struct aaaa_rdata*)rr->rdata)->ip6;
+						break;
+				}
+				memcpy(p_addr[i], ip, len);
 	}
 	if (i==0){
 		LM_DBG("no good records found (%d) for %.*s (%d)\n",
@@ -3207,12 +3223,16 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 		return -E_DNS_NO_SRV;
 	}
 	if ((h->srv==0) && (h->a==0)){ /* first call */
-		if (proto && *proto==0){ /* makes sure we have a protocol set*/
-			*proto=PROTO_UDP; /* default */
-		}
-		h->port=(*proto==PROTO_TLS)?SIPS_PORT:SIP_PORT; /* just in case we
+		if (proto) {
+			if(*proto==0) { /* makes sure we have a protocol set*/
+				*proto=PROTO_UDP; /* default */
+			}
+			h->port=(*proto==PROTO_TLS)?SIPS_PORT:SIP_PORT; /* just in case we
 														don't find another */
-		h->proto=*proto; /* store initial protocol */
+			h->proto=*proto; /* store initial protocol */
+		} else {
+			h->proto=PROTO_UDP; /* default */
+		}
 		if (port){
 			if (*port==0){
 				/* try SRV if initial call & no port specified
@@ -3254,7 +3274,8 @@ inline static int dns_srv_sip_resolve(struct dns_srv_handle* h,  str* name,
 						srv_name.len=strlen(tmp);
 						if ((ret=dns_srv_resolve_ip(h, &srv_name, ip, port, flags))>=0)
 						{
-							h->proto = *proto = srv_proto_list[i].proto;
+							h->proto = srv_proto_list[i].proto;
+							if(proto) *proto = h->proto;
 #ifdef DNS_CACHE_DEBUG
 							LM_DBG("(%.*s, %d, %d), srv0, ret=%d\n",
 								name->len, name->s, h->srv_no, h->ip_no, ret);

@@ -49,8 +49,8 @@
 #include "pv_trans.h"
 
 
-static char _empty_str[] = "";
-static str _tr_empty = { _empty_str, 0 };
+static char _tr_empty_buf[2] = {0};
+static str _tr_empty = { _tr_empty_buf, 0 };
 static str _tr_uri = {0, 0};
 static struct sip_uri _tr_parsed_uri;
 static param_t* _tr_uri_params = NULL;
@@ -1259,6 +1259,7 @@ int tr_eval_paramlist(struct sip_msg *msg, tr_param_t *tp, int subtype,
 		pv_value_t *val)
 {
 	pv_value_t v;
+	pv_value_t vs;
 	str sv;
 	int n, i;
 	char separator = ';';
@@ -1272,17 +1273,23 @@ int tr_eval_paramlist(struct sip_msg *msg, tr_param_t *tp, int subtype,
 	{
 		if (subtype == TR_PL_COUNT)
 		{
-			if(tp->type != TR_PARAM_STRING || tp->v.s.len != 1)
-				return -1;
-
-			separator = tp->v.s.s[0];
-		}
-		else if (tp->next != NULL)
-		{
+			if(tp->type != TR_PARAM_STRING) {
+				if(pv_get_spec_value(msg, (pv_spec_t*)tp->v.data, &vs)!=0
+						|| (!(vs.flags&PV_VAL_STR)) || vs.rs.len<=0)
+				{
+					LM_ERR("value cannot get p1\n");
+					return -1;
+				}
+				separator = vs.rs.s[0];
+			} else {
+				if(tp->v.s.len != 1)
+					return -1;
+				separator = tp->v.s.s[0];
+			}
+		} else if (tp->next != NULL) {
 			if(tp->next->type != TR_PARAM_STRING
 					|| tp->next->v.s.len != 1)
 				return -1;
-
 			separator = tp->next->v.s.s[0];
 		}
 	}
@@ -2624,13 +2631,13 @@ char* tr_parse_paramlist(str* in, trans_t *t)
 			start_pos = ++p;
 			_tr_parse_sparam(p, p0, tp, spec, ps, in, s);
 			t->params = tp;
-			tp = 0;
-			if (p - start_pos != 1)
+			if (tp->type != TR_PARAM_SPEC && p - start_pos != 1)
 			{
 				LM_ERR("invalid separator in transformation: "
 						"%.*s\n", in->len, in->s);
 				goto error;
 			}
+			tp = 0;
 
 			while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
 			if(*p!=TR_RBRACKET)

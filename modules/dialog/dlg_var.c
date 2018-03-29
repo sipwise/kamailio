@@ -47,6 +47,9 @@ int msg_id;
 int dlg_cfg_cb(sip_msg_t *msg, unsigned int flags, void *cbp)
 {
 	dlg_cell_t *dlg;
+	if(get_route_type()==LOCAL_ROUTE) {
+		return 1;
+	}
 	if(flags&POST_SCRIPT_CB) {
 		dlg = dlg_get_ctx_dialog();
 		if(dlg!=NULL) {
@@ -76,6 +79,9 @@ int dlg_cfg_cb(sip_msg_t *msg, unsigned int flags, void *cbp)
 
 int cb_dlg_cfg_reset(sip_msg_t *msg, unsigned int flags, void *cbp)
 {
+	if(get_route_type()==LOCAL_ROUTE) {
+		return 1;
+	}
 	memset(&_dlg_ctx, 0, sizeof(dlg_ctx_t));
 
 	return 1;
@@ -83,6 +89,9 @@ int cb_dlg_cfg_reset(sip_msg_t *msg, unsigned int flags, void *cbp)
 
 int cb_dlg_locals_reset(sip_msg_t *msg, unsigned int flags, void *cbp)
 {
+	if(get_route_type()==LOCAL_ROUTE) {
+		return 1;
+	}
 	LM_DBG("resetting the local dialog shortcuts on script callback: %u\n", flags);
 	cb_dlg_cfg_reset(msg, flags, cbp);
 	cb_profile_reset(msg, flags, cbp);
@@ -474,6 +483,7 @@ int pv_set_dlg_ctx(struct sip_msg* msg, pv_param_t *param,
 		int op, pv_value_t *val)
 {
 	int n;
+	int rlen;
 	char *rtp;
 
 	if(param==NULL)
@@ -500,13 +510,15 @@ int pv_set_dlg_ctx(struct sip_msg* msg, pv_param_t *param,
 						&& val->rs.len<DLG_TOROUTE_SIZE) {
 					_dlg_ctx.to_route = route_lookup(&main_rt, val->rs.s);
 					strcpy(_dlg_ctx.to_route_name, val->rs.s);
-				} else _dlg_ctx.to_route = 0;
+				} else { _dlg_ctx.to_route = 0; }
 			} else {
 				if(n!=0) {
-					rtp = int2str(n, NULL);
-					_dlg_ctx.to_route = route_lookup(&main_rt, rtp);
-					strcpy(_dlg_ctx.to_route_name, rtp);
-				} else _dlg_ctx.to_route = 0;
+					rtp = int2str(n, &rlen);
+					if(rlen<DLG_TOROUTE_SIZE) {
+						_dlg_ctx.to_route = route_lookup(&main_rt, rtp);
+						strcpy(_dlg_ctx.to_route_name, rtp);
+					} else { _dlg_ctx.to_route = 0; }
+				} else { _dlg_ctx.to_route = 0; }
 			}
 			if(_dlg_ctx.to_route <0) _dlg_ctx.to_route = 0;
 		break;
@@ -918,6 +930,9 @@ dlg_ctx_t* dlg_get_dlg_ctx(void)
 
 int spiral_detect_reset(struct sip_msg *foo, unsigned int flags, void *bar)
 {
+	if(get_route_type()==LOCAL_ROUTE) {
+		return 1;
+	}
 	spiral_detected = -1;
 
 	return 0;
