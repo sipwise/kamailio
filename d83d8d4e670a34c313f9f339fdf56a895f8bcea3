@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baa041b7_23b6f43d",
+        "filename": "debian/kamailio-lb.service",
+        "patchSetId": 5
+      },
+      "lineNbr": 17,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-04-03T15:22:15Z",
+      "side": 1,
+      "message": "Do you mean MiB? ;)",
+      "range": {
+        "startLine": 17,
+        "startChar": 74,
+        "endLine": 17,
+        "endChar": 76
+      },
+      "revId": "d83d8d4e670a34c313f9f339fdf56a895f8bcea3",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
