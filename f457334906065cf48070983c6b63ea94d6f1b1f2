@@ -46,6 +46,30 @@
       "revId": "f457334906065cf48070983c6b63ea94d6f1b1f2",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_e0c002e3",
+        "filename": "debian/kamailio-proxy.init",
+        "patchSetId": 3
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-04-03T13:43:43Z",
+      "side": 0,
+      "message": "Ah, right. LGTM , tnx!",
+      "parentUuid": "baa041b7_8095b641",
+      "range": {
+        "startLine": 61,
+        "startChar": 0,
+        "endLine": 61,
+        "endChar": 21
+      },
+      "revId": "f457334906065cf48070983c6b63ea94d6f1b1f2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
