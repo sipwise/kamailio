@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baa041b7_63c75c46",
+        "filename": "debian/rules",
+        "patchSetId": 2
+      },
+      "lineNbr": 202,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-04-03T23:01:13Z",
+      "side": 1,
+      "message": "Yes, that would be the case, an explicit name disables the automatic handling. So, yeah, just call dh_installinit w/o arguments so that it can pick up all those automatically.",
+      "revId": "35a9ec3404aed8f6c907087a63898ae6f6b550f2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
