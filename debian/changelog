@@ -1,3 +1,20 @@
+ngcp-kamailio (5.1.2-1+0~mr6.2.1.0) unstable; urgency=medium
+
+  [ Andreas Granig ]
+  * [9d17e1d] TT#32450 Use "time" for db_redis timestamps
+  * [6ce48bf] TT#32450 Fix null free in db_redis
+  * [f457334] TT#32450 Fix null free in db_redis on insert
+
+  [ Marco Capetta ]
+  * [f22abc1] TT#33952 Remove obsolete packages purple and iptrtpproxy
+
+  [ Manuel Montecelo ]
+  * [a1a0865] TT#26264 Add systemd unit service file, remove sysvinit support
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 03 Apr 2018 22:27:38 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.2.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
