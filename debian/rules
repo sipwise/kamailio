@@ -207,8 +207,14 @@ binary-common:
 	dh_installdocs
 	dh_installexamples -Xobsoleted -Xsr
 	dh_installmenu
+	# extra dh_installinit calls needed to create run dirs with tmpfiles.d
+	# and install service files (they are not copied automatically if having
+	# only calls of dh_installinit without specific "name" for the service
+	# files)
 	dh_installinit --name=kamailio-lb
 	dh_installinit --name=kamailio-proxy
+	dh_installinit --name=ngcp-kamailio
+	dh_installinit --name=ngcp-kamailio-radius-modules
 	dh_installcron
 	dh_installman
 	dh_installinfo
