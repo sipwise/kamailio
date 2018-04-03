@@ -209,6 +209,10 @@ binary-common:
 	dh_installmenu
 	dh_installinit --name=kamailio-lb
 	dh_installinit --name=kamailio-proxy
+	# extra dh_installinit needed to create run dirs with tmpfiles.d (they
+	# are is not copied automatically if having only calls of dh_installinit
+	# with specific "name" for the service files)
+	dh_installinit
 	dh_installcron
 	dh_installman
 	dh_installinfo
