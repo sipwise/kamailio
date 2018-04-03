@@ -194,6 +194,12 @@ install: build
 	mkdir -p $(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/
 	mv $(CURDIR)/debian/$(PKG_NAME)-berkeley-modules/usr/sbin \
 		$(CURDIR)/debian/$(PKG_NAME)-berkeley-bin/usr/
+	# needed to create cache and run dirs with tmpfiles.d (it is not copied
+	# automatically, maybe due to direct calls of dh_installinit with
+	# specific "name" for the service files)
+	mkdir -p $(CURDIR)/debian/$(PKG_NAME)/usr/lib/tmpfiles.d/
+	cp $(CURDIR)/debian/$(PKG_NAME).tmpfile $(CURDIR)/debian/$(PKG_NAME)/usr/lib/tmpfiles.d/$(PKG_NAME).conf
+	cp $(CURDIR)/debian/ngcp-kamailio-radius-modules.tmpfile $(CURDIR)/debian/$(PKG_NAME)/usr/lib/tmpfiles.d/ngcp-kamailio-radius-modules.conf
 
 
 # This single target is used to build all the packages, all at once, or
