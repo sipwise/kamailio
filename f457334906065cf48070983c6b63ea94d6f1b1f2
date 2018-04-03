@@ -22,6 +22,30 @@
       "revId": "f457334906065cf48070983c6b63ea94d6f1b1f2",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_8095b641",
+        "filename": "debian/kamailio-proxy.init",
+        "patchSetId": 3
+      },
+      "lineNbr": 61,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2018-04-03T11:29:53Z",
+      "side": 0,
+      "message": "\u003e I do no see those code in new unit file, is it just removed?\n\nThis code is just creating an empty file with the right permissions, so I used \"tmpfiles\" for this:\nhttps://gerrit.mgm.sipwise.com/#/c/20006/3/debian/ngcp-kamailio-radius-modules.tmpfile\n\nThis is present in the filesystem after installing the ppa:\nroot@sp1:~# ls -l /run/kamailio/kamailio_radius.seq\n-rw-rw---- 1 kamailio kamailio 0 Apr  3 12:51 /run/kamailio/kamailio_radius.seq",
+      "parentUuid": "baa041b7_c0405e0a",
+      "range": {
+        "startLine": 61,
+        "startChar": 0,
+        "endLine": 61,
+        "endChar": 21
+      },
+      "revId": "f457334906065cf48070983c6b63ea94d6f1b1f2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
