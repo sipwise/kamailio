@@ -34,6 +34,24 @@
       "revId": "d009241e983bda6e6dd91a2358624da86dc0396a",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_466c669c",
+        "filename": "debian/rules",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-04-04T12:32:49Z",
+      "side": 1,
+      "message": "I do not mind, up 2 Guillem here, I need this fixed to continue with mr6.2 vagrant building.",
+      "parentUuid": "baa041b7_065e5ee9",
+      "revId": "d009241e983bda6e6dd91a2358624da86dc0396a",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
