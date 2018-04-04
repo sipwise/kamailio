@@ -16,6 +16,24 @@
       "revId": "d009241e983bda6e6dd91a2358624da86dc0396a",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_065e5ee9",
+        "filename": "debian/rules",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2018-04-04T12:27:15Z",
+      "side": 1,
+      "message": "\u003e IMHO\n \u003e \n \u003e dh_installinit --name\u003dngcp-kamailio\n \u003e dh_installinit --name\u003dngcp-kamailio-radius-modules\n \u003e dh_installinit --name\u003dkamailio-lb\n \u003e dh_installinit --name\u003dkamailio-proxy\n \u003e \n \u003e is better readable and bullet proven.\n\nI\u0027m starting to think that actually the first \"cp\" commands were better and more bullet-proof :)\n\nI can change it in this way if you prefer, specially if you find it more readable.  (After 3 repetitions, I tend to use loops).\n\n\n \u003e P.S. in patchset 4 (which was tested by me) there was one more\n \u003e \"dh_installinit\" without anything... in PS6 you do not have it. Is\n \u003e it OK?\n\nWith the \"dh_installinit\" without parameters it installs the one for \"ngcp-kamailio\" but not the one for \"dh_installinit --name\u003dngcp-kamailio-radius-modules\", if I am not mistaken.",
+      "parentUuid": "baa041b7_86c4ae92",
+      "revId": "d009241e983bda6e6dd91a2358624da86dc0396a",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
