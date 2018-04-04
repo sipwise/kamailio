@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baa041b7_8695ce41",
+        "filename": "debian/rules",
+        "patchSetId": 8
+      },
+      "lineNbr": 213,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2018-04-04T13:26:52Z",
+      "side": 1,
+      "message": "I\u0027m not sure why this is needed, it seems redundant, as this is really the expected and documented behavior, but fine. :)",
+      "revId": "9d7068d2d079a0fdd719d0852626abf7bb9c5a3d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
