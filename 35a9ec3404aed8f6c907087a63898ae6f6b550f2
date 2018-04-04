@@ -16,6 +16,24 @@
       "revId": "35a9ec3404aed8f6c907087a63898ae6f6b550f2",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_c3fd0870",
+        "filename": "debian/rules",
+        "patchSetId": 2
+      },
+      "lineNbr": 202,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2018-04-04T07:23:43Z",
+      "side": 1,
+      "message": "\u003e Yes, that would be the case, an explicit name disables the\n \u003e automatic handling. So, yeah, just call dh_installinit w/o\n \u003e arguments so that it can pick up all those automatically.\n\nAdditionally to the two existing ones?  I am not sure if it will break something else, but we can try...",
+      "parentUuid": "baa041b7_63c75c46",
+      "revId": "35a9ec3404aed8f6c907087a63898ae6f6b550f2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
