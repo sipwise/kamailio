@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baa041b7_86c4ae92",
+        "filename": "debian/rules",
+        "patchSetId": 6
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2018-04-04T12:13:09Z",
+      "side": 1,
+      "message": "IMHO\n\n\tdh_installinit --name\u003dngcp-kamailio\n\tdh_installinit --name\u003dngcp-kamailio-radius-modules\n\tdh_installinit --name\u003dkamailio-lb\n\tdh_installinit --name\u003dkamailio-proxy\n\nis better readable and bullet proven.\nP.S. in patchset 4 (which was tested by me) there was one more \"dh_installinit\" without anything... in PS6 you do not have it. Is it OK?",
+      "revId": "d009241e983bda6e6dd91a2358624da86dc0396a",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
