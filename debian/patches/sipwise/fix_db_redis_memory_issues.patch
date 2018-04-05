@@ -1,6 +1,6 @@
 --- a/src/modules/db_redis/redis_connection.c
 +++ b/src/modules/db_redis/redis_connection.c
-@@ -339,6 +339,11 @@ int db_redis_get_reply(km_redis_con_t *c
+@@ -339,6 +339,11 @@
      int ret;
      redis_key_t *query;
  
@@ -14,7 +14,7 @@
      if (con->con->err == REDIS_ERR_EOF) {
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -378,8 +378,6 @@ static int db_redis_build_entry_keys(km_
+@@ -378,8 +378,6 @@
          goto err;
      }
      if (key_found) {
@@ -23,7 +23,7 @@
          if (db_redis_key_add_str(keys, &keyname) != 0) {
              LM_ERR("Failed to add key string\n");
              goto err;
-@@ -470,7 +468,10 @@ static int db_redis_build_type_keys(km_r
+@@ -470,7 +468,10 @@
              goto err;
          }
          if (key_found) {
@@ -35,7 +35,7 @@
              (*keys_count)++;
              LM_DBG("found key '%.*s' for type '%.*s'\n",
                      keyname.len, keyname.s,
-@@ -526,7 +527,10 @@ static int db_redis_build_query_keys(km_
+@@ -526,7 +527,10 @@
      if (key_found) {
          LM_DBG("found suitable entry key '%.*s' for query\n",
                  keyname.len, keyname.s);
@@ -47,7 +47,7 @@
          *query_keys_count = 1;
          pkg_free(keyname.s);
          keyname.s = NULL;
-@@ -544,10 +548,12 @@ static int db_redis_build_query_keys(km_
+@@ -544,10 +548,12 @@
  
                  if (db_redis_key_add_string(&query_v, prefix, strlen(prefix)) != 0) {
                      LM_ERR("Failed to add smembers command to query\n");
@@ -60,7 +60,7 @@
                      goto err;
                  }
  
-@@ -1062,7 +1068,7 @@ static int db_redis_perform_query(const
+@@ -1062,7 +1068,7 @@
      RES_NUM_ROWS(*_r) = RES_ROW_N(*_r) = 0;
      RES_COL_N(*_r) = _nc;
  
@@ -69,7 +69,7 @@
          LM_DBG("performing full table scan\n");
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
-@@ -1354,7 +1360,9 @@ static int db_redis_perform_delete(const
+@@ -1354,7 +1360,9 @@
              goto error;
          }
          pkg_free(db_keys);
@@ -79,7 +79,7 @@
          db_redis_free_reply(&reply);
  
          if (db_redis_key_add_string(&query_v, "DEL", 3) != 0) {
-@@ -1395,6 +1403,7 @@ static int db_redis_perform_delete(const
+@@ -1395,6 +1403,7 @@
      }
      db_redis_key_free(&type_keys);
      db_redis_key_free(&all_type_keys);
@@ -87,7 +87,7 @@
  
      return 0;
  
-@@ -1426,7 +1435,7 @@ static int db_redis_perform_update(const
+@@ -1426,7 +1435,7 @@
      int j;
      size_t col;
  
@@ -96,7 +96,7 @@
          LM_DBG("performing full table scan\n");
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
-@@ -1664,6 +1673,11 @@ int db_redis_query(const db1_con_t* _h,
+@@ -1664,6 +1673,11 @@
      // TODO: optimize mapping-based manual post-check (remove check for keys already
      // in type query key)
  
@@ -108,7 +108,7 @@
      con = REDIS_CON(_h);
      if (con && con->con == NULL) {
          if (db_redis_connect(con) != 0) {
-@@ -1683,7 +1697,7 @@ int db_redis_query(const db1_con_t* _h,
+@@ -1683,7 +1697,7 @@
                  CON_TABLE(_h)->len, CON_TABLE(_h)->s);
      }
  
@@ -117,9 +117,17 @@
  
      // check if we have a version query, and return version directly from
      // schema instead of loading it from redis
+@@ -1731,6 +1745,7 @@
+     } else {
+         LM_DBG("no columns given to build query keys, falling back to full table scan\n");
+         keys_count = 0;
++        do_table_scan = 1;
+     }
+ 
+     if (db_redis_perform_query(_h, con, _k, _v, query_ops, _c, _n, _nc, _r,
 --- a/src/modules/db_redis/redis_table.c
 +++ b/src/modules/db_redis/redis_table.c
-@@ -313,8 +313,12 @@ void db_redis_free_tables(km_redis_con_t
+@@ -313,8 +313,12 @@
                  col_last = (&col_ht->table[j])->prev;
                  clist_foreach(&col_ht->table[j], col_he, next) {
                      pkg_free(col_he->key.s);
@@ -134,7 +142,7 @@
                  }
              }
              pkg_free(col_ht->table);
-@@ -340,9 +344,13 @@ void db_redis_free_tables(km_redis_con_t
+@@ -340,9 +344,13 @@
              }
              pkg_free(table);
              pkg_free(he->key.s);
@@ -150,7 +158,7 @@
          }
      }
      pkg_free(ht->table);
-@@ -409,6 +417,7 @@ static struct str_hash_entry* db_redis_c
+@@ -409,6 +417,7 @@
          LM_ERR("Failed to allocate memory for table schema hashtable\n");
          pkg_free(e->key.s);
          pkg_free(e);
@@ -158,7 +166,7 @@
          return NULL;
      }
      str_hash_init(&t->columns);
-@@ -426,6 +435,7 @@ static struct str_hash_entry* db_redis_c
+@@ -426,6 +435,7 @@
      }
      if (pkg_str_dup(&e->key, col) != 0) {
          LM_ERR("Failed to allocate memory for column name\n");
@@ -166,7 +174,7 @@
          return NULL;
      }
      e->flags = 0;
-@@ -453,6 +463,7 @@ static struct str_hash_entry* db_redis_c
+@@ -453,6 +463,7 @@
          default:
              LM_ERR("Invalid schema column type '%.*s', expecting one of string, int, timestamp, double, blob\n",
                      type->len, type->s);
@@ -174,7 +182,7 @@
              pkg_free(e);
              return NULL;
      }
-@@ -539,6 +550,10 @@ int db_redis_parse_keys(km_redis_con_t *
+@@ -539,6 +550,10 @@
                      if (!table->types) {
                          table->types = type_target = type;
                      } else {
@@ -185,7 +193,7 @@
                          type_target->next = type;
                          type_target = type_target->next;
                      }
-@@ -571,6 +586,10 @@ int db_redis_parse_keys(km_redis_con_t *
+@@ -571,6 +586,10 @@
                  if (*key_target == NULL) {
                      *key_target = key_location = key;
                  } else {
@@ -196,7 +204,7 @@
                      key_location->next = key;
                      key_location = key_location->next;
                  }
-@@ -608,7 +627,7 @@ int db_redis_parse_schema(km_redis_con_t
+@@ -608,7 +627,7 @@
      char full_path[_POSIX_PATH_MAX + 1];
      int path_len;
      struct stat fstat;
