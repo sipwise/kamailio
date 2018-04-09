@@ -214,13 +214,13 @@ static int encode_and_send_ws_frame(ws_frame_t *frame, conn_close_t conn_close)
 
 	/* Allocate send buffer and build frame */
 	frame_length = frame->payload_len + extended_length + 2;
-	if ((send_buf = pkg_malloc(sizeof(unsigned char) * frame_length))
+	if ((send_buf = pkg_malloc(sizeof(char) * frame_length))
 			== NULL)
 	{
 		LM_ERR("allocating send buffer from pkg memory\n");
 		return -1;
 	}
-	memset(send_buf, 0, sizeof(unsigned char) * frame_length);
+	memset(send_buf, 0, sizeof(char) * frame_length);
 	send_buf[pos++] = 0x80 | (frame->opcode & 0xff);
 	if (extended_length == 0)
 		send_buf[pos++] = (frame->payload_len & 0xff);
@@ -411,7 +411,7 @@ static int decode_and_validate_ws_frame(ws_frame_t *frame,
                                         short *err_code, str *err_text)
 {
 	unsigned int i, len = tcpinfo->len;
-	int mask_start, j;
+	unsigned int mask_start, j;
 	char *buf = tcpinfo->buf;
 
 	LM_DBG("decoding WebSocket frame\n");
@@ -538,6 +538,13 @@ static int decode_and_validate_ws_frame(ws_frame_t *frame,
 			frame->payload_len + mask_start + 4, len);
 		*err_code = 1002;
 		*err_text = str_status_protocol_error;
+		return -1;
+	}
+	if(frame->payload_len >= BUF_SIZE) {
+		LM_WARN("message is too long for our buffer size (%d / %d)\n",
+				BUF_SIZE, frame->payload_len);
+		*err_code = 1009;
+		*err_text = str_status_message_too_big;
 		return -1;
 	}
 	frame->payload_data = &buf[mask_start + 4];
