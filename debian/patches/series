@@ -1,8 +1,4 @@
 ##
-# upstream fixes
-# 4.4
-upstream/0001-lcr-fixed-checking-if-there-is-more-uris-available-f.patch
-upstream/0002-tmx-allocate-space-to-store-ending-0-for-branch-valu.patch
 # upsream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
@@ -51,7 +47,6 @@ sipwise/tm-deep-cloning-of-the-request-for-fake-environment.patch
 sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/rtpengine-mos-stats.patch
-sipwise/openssl-pthreads-cleanup.patch
 sipwise/presence_dfks.patch
 sipwise/presence_dfks_add_crlf_xml.patch
 sipwise/cfgt_debug.patch
