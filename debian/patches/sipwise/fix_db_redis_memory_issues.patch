@@ -60,7 +60,23 @@
                      goto err;
                  }
  
-@@ -1062,7 +1068,7 @@
+@@ -691,6 +697,7 @@
+                     table_name->len, table_name->s);
+             goto err;
+         }
++        LM_ERR("cursor is %lu\n", cursor);
+ 
+         if (reply->element[1]->type != REDIS_REPLY_ARRAY) {
+             LM_ERR("Invalid content type for scan on table '%.*s', expected array\n",
+@@ -717,6 +724,7 @@
+                         j, table_name->len, table_name->s);
+                 goto err;
+             }
++            LM_ERR("adding key '%s'\n", key->str);
+             if (db_redis_key_add_string(query_keys, key->str, strlen(key->str)) != 0) {
+                 LM_ERR("Failed to add redis key\n");
+                 goto err;
+@@ -1062,7 +1070,7 @@
      RES_NUM_ROWS(*_r) = RES_ROW_N(*_r) = 0;
      RES_COL_N(*_r) = _nc;
  
@@ -69,7 +85,7 @@
          LM_DBG("performing full table scan\n");
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
-@@ -1354,7 +1360,9 @@
+@@ -1354,7 +1362,9 @@
              goto error;
          }
          pkg_free(db_keys);
@@ -79,7 +95,7 @@
          db_redis_free_reply(&reply);
  
          if (db_redis_key_add_string(&query_v, "DEL", 3) != 0) {
-@@ -1395,6 +1403,7 @@
+@@ -1395,6 +1405,7 @@
      }
      db_redis_key_free(&type_keys);
      db_redis_key_free(&all_type_keys);
@@ -87,7 +103,7 @@
  
      return 0;
  
-@@ -1426,7 +1435,7 @@
+@@ -1426,7 +1437,7 @@
      int j;
      size_t col;
  
@@ -96,7 +112,7 @@
          LM_DBG("performing full table scan\n");
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
-@@ -1664,6 +1673,11 @@
+@@ -1664,6 +1675,11 @@
      // TODO: optimize mapping-based manual post-check (remove check for keys already
      // in type query key)
  
@@ -108,7 +124,7 @@
      con = REDIS_CON(_h);
      if (con && con->con == NULL) {
          if (db_redis_connect(con) != 0) {
-@@ -1683,7 +1697,7 @@
+@@ -1683,7 +1699,7 @@
                  CON_TABLE(_h)->len, CON_TABLE(_h)->s);
      }
  
@@ -117,7 +133,7 @@
  
      // check if we have a version query, and return version directly from
      // schema instead of loading it from redis
-@@ -1731,6 +1745,7 @@
+@@ -1731,6 +1747,7 @@
      } else {
          LM_DBG("no columns given to build query keys, falling back to full table scan\n");
          keys_count = 0;
