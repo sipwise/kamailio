@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "baa041b7_e00eb7e4",
+        "filename": "debian/patches/sipwise/fix_db_redis_memory_issues.patch",
+        "patchSetId": 8
+      },
+      "lineNbr": 105,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2018-04-11T10:15:13Z",
+      "side": 1,
+      "message": "Prepend here to avoid traversing to end of list for appending, as this could very well be \u003e50k entries, and it gets slow after 10k.",
+      "revId": "bd009368cd3363bc2cdfb902ec354ca858a7058f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baa041b7_a0f9cfca",
+        "filename": "debian/patches/sipwise/fix_db_redis_memory_issues.patch",
+        "patchSetId": 8
+      },
+      "lineNbr": 190,
+      "author": {
+        "id": 1000007
+      },
+      "writtenOn": "2018-04-11T10:15:13Z",
+      "side": 1,
+      "message": "Batch creation of actual db rows every 1000 entries or if \u003c1000 entries are left to avoid unnecessary memory consumption (at the cost of more redis queries).",
+      "revId": "bd009368cd3363bc2cdfb902ec354ca858a7058f",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
