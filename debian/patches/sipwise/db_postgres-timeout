@@ -1,0 +1,290 @@
+From d03bed3fae3426b19b064129d4296a707bce1de8 Mon Sep 17 00:00:00 2001
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 20 May 2015 15:10:55 +0200
+Subject: [PATCH] db_postgres-timeout
+
+Gbp-Pq-Topic: sipwise
+---
+ modules/db_postgres/km_dbase.c  | 43 +++++++++++++++++++++++++++++++++++++++++
+ modules/db_postgres/km_pg_con.c | 36 ++++++++++++++++++++++++++++++++--
+ modules/db_postgres/pg_con.c    | 38 +++++++++++++++++++++++++++++++-----
+ modules/db_postgres/pg_mod.c    |  4 ++++
+ modules/db_postgres/pg_mod.h    |  2 ++
+ 5 files changed, 116 insertions(+), 7 deletions(-)
+
+diff --git a/modules/db_postgres/km_dbase.c b/modules/db_postgres/km_dbase.c
+index 21c9cea..633959d 100644
+--- a/modules/db_postgres/km_dbase.c
++++ b/modules/db_postgres/km_dbase.c
+@@ -167,6 +167,10 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
+ 	int i, retries;
+ 	ExecStatusType pqresult;
+ 	PGresult *res = NULL;
++	int sock, ret;
++	fd_set fds;
++	time_t max_time;
++	struct timeval wait_time;
+ 
+ 	if(! _con || !_s || !_s->s)
+ 	{
+@@ -217,6 +221,44 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
+ 		/* exec the query */
+ 
+ 		if (PQsendQuery(CON_CONNECTION(_con), s)) {
++			if (pg_timeout <= 0)
++				goto do_read;
++
++			max_time = time(NULL) + pg_timeout;
++
++			while (1) {
++				sock = PQsocket(CON_CONNECTION(_con));
++				FD_ZERO(&fds);
++				FD_SET(sock, &fds);
++
++				wait_time.tv_usec = 0;
++				wait_time.tv_sec = max_time - time(NULL);
++				if (wait_time.tv_sec <= 0 || wait_time.tv_sec > 0xffffff)
++					goto timeout;
++
++				ret = select(sock + 1, &fds, NULL, NULL, &wait_time);
++				if (ret < 0) {
++					if (errno == EINTR)
++						continue;
++					LM_WARN("select() error\n");
++					goto reset;
++				}
++				if (!ret) {
++timeout:
++					LM_WARN("timeout waiting for postgres reply\n");
++					goto reset;
++				}
++
++				if (!PQconsumeInput(CON_CONNECTION(_con))) {
++					LM_WARN("error reading data from postgres server: %s\n",
++							PQerrorMessage(CON_CONNECTION(_con)));
++					goto reset;
++				}
++				if (!PQisBusy(CON_CONNECTION(_con)))
++					break;
++			}
++
++do_read:
+ 			/* Get the result of the query */
+ 			while ((res = PQgetResult(CON_CONNECTION(_con))) != NULL) {
+ 				db_postgres_free_query(_con);
+@@ -239,6 +281,7 @@ static int db_postgres_submit_query(const db1_con_t* _con, const str* _s)
+ 				PQerrorMessage(CON_CONNECTION(_con)));
+ 		if(PQstatus(CON_CONNECTION(_con))!=CONNECTION_OK)
+ 		{
++reset:
+ 			LM_DBG("reseting the connection to postgress server\n");
+ 			PQreset(CON_CONNECTION(_con));
+ 		}
+diff --git a/modules/db_postgres/km_pg_con.c b/modules/db_postgres/km_pg_con.c
+index 92acc75..9cac456 100644
+--- a/modules/db_postgres/km_pg_con.c
++++ b/modules/db_postgres/km_pg_con.c
+@@ -26,12 +26,15 @@
+  */
+ 
+ #include "km_pg_con.h"
++#include "pg_mod.h"
+ #include "../../mem/mem.h"
+ #include "../../dprint.h"
+ #include "../../ut.h"
+ #include "../../tls_hooks_init.h" 
+ #include <string.h>
+ #include <time.h>
++#include <netinet/in.h>
++#include <netinet/tcp.h>
+ 
+ 
+ /*!
+@@ -46,6 +49,9 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
+ {
+ 	struct pg_con* ptr;
+ 	char *ports;
++	int i = 0;
++	const char *keywords[10], *values[10];
++	char to[16];
+ 
+ 	LM_DBG("db_id = %p\n", id);
+  
+@@ -67,6 +73,8 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
+ 
+ 	if (id->port) {
+ 		ports = int2str(id->port, 0);
++		keywords[i] = "port";
++		values[i++] = ports;
+ 		LM_DBG("opening connection: postgres://xxxx:xxxx@%s:%d/%s\n", ZSW(id->host),
+ 			id->port, ZSW(id->database));
+ 	} else {
+@@ -75,11 +83,27 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
+ 			ZSW(id->database));
+ 	}
+ 
++	keywords[i] = "host";
++	values[i++] = id->host;
++	keywords[i] = "dbname";
++	values[i++] = id->database;
++	keywords[i] = "user";
++	values[i++] = id->username;
++	keywords[i] = "password";
++	values[i++] = id->password;
++	if (pg_timeout > 0) {
++		snprintf(to, sizeof(to)-1, "%d", pg_timeout + 3);
++		keywords[i] = "connect_timeout";
++		values[i++] = to;
++	}
++
++	keywords[i] = values[i] = NULL;
++
+ 	/* don't attempt to re-init openssl if done already */
+ 	if(tls_loaded()) PQinitSSL(0);
+ 
+- 	ptr->con = PQsetdbLogin(id->host, ports, NULL, NULL, id->database, id->username, id->password);
+-	LM_DBG("PQsetdbLogin(%p)\n", ptr->con);
++	ptr->con = PQconnectdbParams(keywords, values, 1);
++	LM_DBG("PQconnectdbParams(%p)\n", ptr->con);
+ 
+ 	if( (ptr->con == 0) || (PQstatus(ptr->con) != CONNECTION_OK) )
+ 	{
+@@ -92,6 +116,14 @@ struct pg_con* db_postgres_new_connection(struct db_id* id)
+ 	ptr->timestamp = time(0);
+ 	ptr->id = id;
+ 
++#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
++	if (pg_keepalive) {
++		i = 1;
++		setsockopt(PQsocket(ptr->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
++		setsockopt(PQsocket(ptr->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
++	}
++#endif
++
+ 	return ptr;
+ 
+  err:
+diff --git a/modules/db_postgres/pg_con.c b/modules/db_postgres/pg_con.c
+index 32b9be7..86c68fa 100644
+--- a/modules/db_postgres/pg_con.c
++++ b/modules/db_postgres/pg_con.c
+@@ -39,6 +39,7 @@
+ #include "pg_con.h"
+ #include "pg_uri.h"
+ #include "pg_sql.h"
++#include "pg_mod.h"
+ 
+ #include "../../mem/mem.h"
+ #include "../../dprint.h"
+@@ -47,6 +48,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <netinet/in.h>
++#include <netinet/tcp.h>
+ #include <time.h>
+ 
+ 
+@@ -237,7 +239,9 @@ int pg_con_connect(db_con_t* con)
+ 	struct pg_con* pcon;
+ 	struct pg_uri* puri;
+ 	char* port_str;
+-	int ret;
++	int ret, i = 0;
++	const char *keywords[10], *values[10];
++	char to[16];
+ 	
+ 	pcon = DB_GET_PAYLOAD(con);
+ 	puri = DB_GET_PAYLOAD(con->uri);
+@@ -251,6 +255,8 @@ int pg_con_connect(db_con_t* con)
+ 
+ 	if (puri->port > 0) {
+ 		port_str = int2str(puri->port, 0);
++		keywords[i] = "port";
++		values[i++] = port_str;
+ 	} else {
+ 		port_str = NULL;
+ 	}
+@@ -260,12 +266,26 @@ int pg_con_connect(db_con_t* con)
+ 		pcon->con = NULL;
+ 	}
+ 
+-	pcon->con = PQsetdbLogin(puri->host, port_str,
+-							 NULL, NULL, puri->database,
+-							 puri->username, puri->password);
++	keywords[i] = "host";
++	values[i++] = puri->host;
++	keywords[i] = "dbname";
++	values[i++] = puri->database;
++	keywords[i] = "user";
++	values[i++] = puri->username;
++	keywords[i] = "password";
++	values[i++] = puri->password;
++	if (pg_timeout > 0) {
++		snprintf(to, sizeof(to)-1, "%d", pg_timeout + 3);
++		keywords[i] = "connect_timeout";
++		values[i++] = to;
++	}
++
++	keywords[i] = values[i] = NULL;
++
++	pcon->con = PQconnectdbParams(keywords, values, 1);
+ 	
+ 	if (pcon->con == NULL) {
+-		ERR("postgres: PQsetdbLogin ran out of memory\n");
++		ERR("postgres: PQconnectdbParams ran out of memory\n");
+ 		goto error;
+ 	}
+ 	
+@@ -285,6 +305,14 @@ int pg_con_connect(db_con_t* con)
+ 	    PQprotocolVersion(pcon->con), 0 );
+ #endif
+ 
++#if defined(SO_KEEPALIVE) && defined(TCP_KEEPIDLE)
++	if (pg_keepalive) {
++		i = 1;
++		setsockopt(PQsocket(pcon->con), SOL_SOCKET, SO_KEEPALIVE, &i, sizeof(i));
++		setsockopt(PQsocket(pcon->con), IPPROTO_TCP, TCP_KEEPIDLE, &pg_keepalive, sizeof(pg_keepalive));
++	}
++#endif
++
+ 	ret = timestamp_format(pcon->con);
+ 	if (ret == 1 || ret == -1) {
+ 		/* Assume INT8 representation if detection fails */
+diff --git a/modules/db_postgres/pg_mod.c b/modules/db_postgres/pg_mod.c
+index 1b2d9f7..14f50a3 100644
+--- a/modules/db_postgres/pg_mod.c
++++ b/modules/db_postgres/pg_mod.c
+@@ -61,6 +61,8 @@ int pg_retries = 2;  /* How many times should the module try re-execute failed c
+ 					  * 0 disables reconnecting */
+ 
+ int pg_lockset = 4;
++int pg_timeout = 0; /* default = no timeout */
++int pg_keepalive = 0;
+ 
+ /*
+  * Postgres module interface
+@@ -92,6 +94,8 @@ static cmd_export_t cmds[] = {
+ static param_export_t params[] = {
+ 	{"retries",         PARAM_INT, &pg_retries },
+ 	{"lockset",         PARAM_INT, &pg_lockset },
++	{"timeout",         PARAM_INT, &pg_timeout },
++	{"tcp_keepalive",   PARAM_INT, &pg_keepalive },
+ 	{0, 0, 0}
+ };
+ 
+diff --git a/modules/db_postgres/pg_mod.h b/modules/db_postgres/pg_mod.h
+index 10c0535..194c7df 100644
+--- a/modules/db_postgres/pg_mod.h
++++ b/modules/db_postgres/pg_mod.h
+@@ -41,6 +41,8 @@
+  */
+ 
+ extern int pg_retries;
++extern int pg_timeout;
++extern int pg_keepalive;
+ 
+ /** @} */
+ 
+-- 
+2.1.4
+

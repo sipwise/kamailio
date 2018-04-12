@@ -3,8 +3,8 @@ Author: Victor Seva <linuxmaniac@torreviejawireless.org>
 
 --- a/Makefile.defs
 +++ b/Makefile.defs
-@@ -378,15 +370,7 @@ ARCH:=$(HOST_ARCH)
-
+@@ -370,15 +370,7 @@ ARCH:=$(HOST_ARCH)
+ endif
  $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
  
 -LIBDIR ?=

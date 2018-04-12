@@ -1,0 +1,172 @@
+From 4a41962b0389f37dbc4d905afd25e2cda5e7c39c Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 31 Jan 2017 19:23:53 +0100
+Subject: [PATCH] presence: remove transaction creation from
+ publ_notify_notifier() and mark_presentity_for_delete()
+
+* publ_notify_notifier() and mark_presentity_for_delete() are
+  called inside a already created transaction
+* adding transaction handle for msg_presentity_clean()
+
+fix #960
+
+(cherry picked from commit 6d157a4af708108b90a338614869de0ceeb94b68)
+---
+ modules/presence/notify.c     | 24 ------------------------
+ modules/presence/presentity.c | 24 ------------------------
+ modules/presence/publish.c    | 26 ++++++++++++++++++++++++++
+ 3 files changed, 26 insertions(+), 48 deletions(-)
+
+diff --git a/modules/presence/notify.c b/modules/presence/notify.c
+index 9e5037517..354dc1dbb 100644
+--- a/modules/presence/notify.c
++++ b/modules/presence/notify.c
+@@ -1348,15 +1348,6 @@ int publ_notify_notifier(str pres_uri, pres_ev_t *event)
+ 	result_cols[r_to_tag_col=n_result_cols++] = &str_to_tag_col;
+ 	result_cols[r_from_tag_col=n_result_cols++] = &str_from_tag_col;
+ 
+-	if (pa_dbf.start_transaction)
+-	{
+-		if (pa_dbf.start_transaction(pa_db, db_table_lock) < 0)
+-		{
+-			LM_ERR("in start_transaction\n");
+-			goto error;
+-		}
+-	}
+-
+ 	if(query_fn(pa_db, query_cols, 0, query_vals, result_cols, 
+ 				n_query_cols, n_result_cols, 0, &result )< 0)
+ 	{
+@@ -1385,26 +1376,11 @@ int publ_notify_notifier(str pres_uri, pres_ev_t *event)
+ 		set_updated(&subs);
+ 	}
+ 
+-	if (pa_dbf.end_transaction)
+-	{
+-		if (pa_dbf.end_transaction(pa_db) < 0)
+-		{
+-			LM_ERR("in end_transaction\n");
+-			goto error;
+-		}
+-	}
+-
+ 	ret = RES_ROW_N(result);
+ 
+ error:
+ 	if (result) pa_dbf.free_result(pa_db, result);
+ 
+-	if (pa_dbf.abort_transaction)
+-	{
+-		if (pa_dbf.abort_transaction(pa_db) < 0)
+-			LM_ERR("in abort_transaction\n");
+-	}
+-
+ 	return ret;
+ }
+ 
+diff --git a/modules/presence/presentity.c b/modules/presence/presentity.c
+index 3f79cfa4e..b515149e3 100644
+--- a/modules/presence/presentity.c
++++ b/modules/presence/presentity.c
+@@ -1564,15 +1564,6 @@ int mark_presentity_for_delete(presentity_t *pres)
+ 
+ 	result_cols[0] = &str_body_col;
+ 
+-	if (pa_dbf.start_transaction)
+-	{
+-		if (pa_dbf.start_transaction(pa_db, db_table_lock) < 0)
+-		{
+-			LM_ERR("in start_transaction\n");
+-			goto error;
+-		}
+-	}
+-
+ 	if (query_fn(pa_db, query_cols, 0, query_vals, result_cols,
+ 				n_query_cols, 1, 0, &result) < 0)
+ 	{
+@@ -1653,15 +1644,6 @@ int mark_presentity_for_delete(presentity_t *pres)
+ 		goto error;
+ 	}
+ 
+-	if (pa_dbf.end_transaction)
+-	{
+-		if (pa_dbf.end_transaction(pa_db) < 0)
+-		{
+-			LM_ERR("in end_transaction\n");
+-			goto error;
+-		}
+-	}
+-
+ 	if (pa_dbf.affected_rows)
+ 		ret = pa_dbf.affected_rows(pa_db);
+ 	else
+@@ -1673,12 +1655,6 @@ error:
+ 	if (cur_body) pkg_free(cur_body);
+ 	if (result) pa_dbf.free_result(pa_db, result);
+ 
+-	if (pa_dbf.abort_transaction)
+-	{
+-		if (pa_dbf.abort_transaction(pa_db) < 0)
+-			LM_ERR("in abort_transaction\n");
+-	}
+-
+ 	return ret;
+ }
+ 
+diff --git a/modules/presence/publish.c b/modules/presence/publish.c
+index 73a64c6db..8249aa4b7 100644
+--- a/modules/presence/publish.c
++++ b/modules/presence/publish.c
+@@ -156,9 +156,22 @@ void msg_presentity_clean(unsigned int ticks,void *param)
+ 
+ 			if (pres_notifier_processes > 0)
+ 			{
++				if (pa_dbf.start_transaction)
++				{
++					if (pa_dbf.start_transaction(pa_db, db_table_lock) < 0)
++					{
++						LM_ERR("in start_transaction\n");
++						goto error;
++					}
++				}
+ 				if ((num_watchers = publ_notify_notifier(uri, pres.event)) < 0)
+ 				{
+ 					LM_ERR("Updating watcher records\n");
++					if (pa_dbf.abort_transaction)
++					{
++						if (pa_dbf.abort_transaction(pa_db) < 0)
++							LM_ERR("in abort_transaction\n");
++					}
+ 					goto error;
+ 				}
+ 
+@@ -167,6 +180,11 @@ void msg_presentity_clean(unsigned int ticks,void *param)
+ 					if (mark_presentity_for_delete(&pres) < 0)
+ 					{
+ 						LM_ERR("Marking presentity\n");
++						if (pa_dbf.abort_transaction)
++						{
++							if (pa_dbf.abort_transaction(pa_db) < 0)
++								LM_ERR("in abort_transaction\n");
++						}
+ 						goto error;
+ 					}
+ 				}
+@@ -178,6 +196,14 @@ void msg_presentity_clean(unsigned int ticks,void *param)
+ 						goto error;
+ 					}
+ 				}
++				if (pa_dbf.end_transaction)
++				{
++					if (pa_dbf.end_transaction(pa_db) < 0)
++					{
++						LM_ERR("in end_transaction\n");
++						goto error;
++					}
++				}
+ 			}
+ 			else
+ 			{
+-- 
+2.11.0
+
