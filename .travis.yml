@@ -6,10 +6,11 @@ compiler:
 services:
   - docker
 before_install:
-  - docker pull kamailio/pkg-kamailio-docker:4.4-jessie
-script: docker run -v $TRAVIS_BUILD_DIR:/code:rw kamailio/pkg-kamailio-docker:4.4-jessie /bin/bash -c "export DIST=jessie CC=$CC; cd /code; ./test/travis/build_travis.sh"
+  - docker pull linuxmaniac/pkg-kamailio-docker:stretch
+script: docker run -v $TRAVIS_BUILD_DIR:/code:rw linuxmaniac/pkg-kamailio-docker:stretch /bin/bash -c "export CC=$CC; cd /code; ./test/travis/build_travis.sh"
 branches:
   only:
+    - 'master'
     - '/^4\.[0-9]+$/'
 notifications:
   irc:
@@ -19,6 +20,6 @@ notifications:
     on_failure: always
   email:
     recipients:
-      - sr-dev@lists.kamailio.org
+      - sr-dev@lists.sip-router.org
     on_success: never
     on_failure: always

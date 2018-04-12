@@ -52,7 +52,7 @@
 
 #ifdef __CPU_ppc64
 #warning powerpc64 atomic code was not tested, please report problems to \
-		sr-dev@lists.kamailio.org
+		serdev@iptel.org or andrei@iptel.org
 #endif
 
 

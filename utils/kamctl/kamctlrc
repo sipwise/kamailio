@@ -44,10 +44,7 @@
 ## database super user (for ORACLE this is 'scheme-creator' user)
 # DBROOTUSER="root"
 
-## database character set (used by MySQL when creating database)
-#CHARSET="latin1"
-
-## user name column
+# user name column
 # USERCOL="username"
 
 

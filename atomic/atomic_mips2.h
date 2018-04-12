@@ -49,7 +49,7 @@
 
 #ifdef __CPU_mips64
 #warning mips64 atomic code was not tested, please report problems to \
-		sr-dev@lists.kamailio.org
+		serdev@iptel.org or andrei@iptel.org
 #endif
 
 #ifdef NOSMP

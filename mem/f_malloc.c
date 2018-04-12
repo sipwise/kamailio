@@ -122,8 +122,7 @@ inline static int fm_bmp_first_set(struct fm_block* qm, int start)
 				return (start-bit+r);
 		}
 #endif
-		if((bit+1) < 8*sizeof(v)) v=qm->free_bitmap[bmp_idx]>>(bit+1);
-		else v = 0;
+		v=qm->free_bitmap[bmp_idx]>>(bit+1);
 		return start+1+bit_scan_forward((unsigned long)v);
 	}
 	for (r=bmp_idx+1;r<FM_HASH_BMP_SIZE; r++){

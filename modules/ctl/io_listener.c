@@ -181,7 +181,7 @@ void io_listen_loop(int fd_no, struct ctrl_socket* cs_lst)
 	int type;
 	
 	clist_init(&stream_conn_lst, next, prev);
-	type=F_T_RESERVED;
+	type=UNKNOWN_SOCK;
 #if 0
 	/* estimate used fd numbers -- FIXME: broken, make it a function in pt.h */
 	max_fd_no=get_max_procs()*3 -1 /* timer */ +3; /* stdin/out/err*/;

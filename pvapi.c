@@ -1470,19 +1470,6 @@ error:
 	return NULL;
 }
 
-/**
- *
- */
-void free_pvname_list(pvname_list_t* head)
-{
-	pvname_list_t* al;
-
-	while(head) {
-		al = head;
-		head=head->next;
-		pkg_free(al);
-	}
-}
 
 
 /** destroy the content of pv_spec_t structure.
@@ -2034,8 +2021,7 @@ char* pv_get_buffer(void)
 	char *p;
 
 	p = _pv_print_buffer[_pv_print_buffer_index];
-	_pv_print_buffer_index = (_pv_print_buffer_index+1)
-			% _pv_print_buffer_slots_active;
+	_pv_print_buffer_index = (_pv_print_buffer_index+1)%_pv_print_buffer_slots;
 
 	return p;
 }
@@ -2045,7 +2031,7 @@ char* pv_get_buffer(void)
  */
 int pv_get_buffer_size(void)
 {
-	return _pv_print_buffer_size_active;
+	return _pv_print_buffer_size;
 }
 
 /**
@@ -2053,7 +2039,7 @@ int pv_get_buffer_size(void)
  */
 int pv_get_buffer_slots(void)
 {
-	return _pv_print_buffer_slots_active;
+	return _pv_print_buffer_slots;
 }
 
 /**

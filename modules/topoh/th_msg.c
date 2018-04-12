@@ -57,7 +57,6 @@ extern str th_vparam_prefix;
 
 extern int th_param_mask_callid;
 extern int th_mask_addr_myself;
-extern int th_uri_prefix_checks;
 
 int th_skip_rw(char *s, int len)
 {
@@ -391,14 +390,6 @@ int th_unmask_via(sip_msg_t *msg, str *cookie)
 			LM_DBG("body: %d: [%.*s]\n", vlen, vlen, via->name.s);
 			if(i!=1)
 			{
-				/* Skip if via is not encoded */
-				if (th_uri_prefix_checks && (via->host.len!=th_ip.len
-						|| strncasecmp(via->host.s, th_ip.s, th_ip.len)!=0))
-				{
-					LM_DBG("via %d is not encoded",i);
-					continue;
-				}
-
 				vp = th_get_via_param(via, &th_vparam_name);
 				if(vp==NULL)
 				{
@@ -413,7 +404,7 @@ int th_unmask_via(sip_msg_t *msg, str *cookie)
 							&th_vparam_prefix, 0, &out.len);
 				if(out.s==NULL)
 				{
-					LM_ERR("cannot decode via %d\n", i);
+					LM_ERR("cannot encode via %d\n", i);
 					return -1;
 				}
 					
@@ -483,14 +474,6 @@ int th_unmask_callid(sip_msg_t *msg)
 	{
 		LM_ERR("cannot get Call-Id header\n");
 		return -1;
-	}
-
-	/* Do nothing if call-id is not encoded */
-	if ((msg->callid->body.len<th_callid_prefix.len) ||
-			(strncasecmp(msg->callid->body.s,th_callid_prefix.s,th_callid_prefix.len)!=0))
-	{
-		LM_DBG("call-id [%.*s] not encoded",msg->callid->body.len,msg->callid->body.s);
-		return 0;
 	}
 				
 	out.s = th_mask_decode(msg->callid->body.s, msg->callid->body.len,
@@ -687,18 +670,6 @@ int th_unmask_route(sip_msg_t *msg)
 			i++;
 			if(i!=1)
 			{
-				/* Skip if route is not encoded */
-				if (th_uri_prefix_checks
-						&& ((rr->nameaddr.uri.len<th_uri_prefix.len) ||
-						(strncasecmp(rr->nameaddr.uri.s,th_uri_prefix.s,
-									 th_uri_prefix.len)!=0)))
-				{
-					LM_DBG("rr %d is not encoded: [%.*s]", i,
-							rr->nameaddr.uri.len, rr->nameaddr.uri.s);
-					rr = rr->next;
-					continue;
-				}
-
 				if(th_get_uri_param_value(&rr->nameaddr.uri, &th_uparam_name,
 							&eval)<0 || eval.len<=0)
 					return -1;
@@ -738,15 +709,6 @@ int th_unmask_ruri(sip_msg_t *msg)
 	str eval;
 	struct lump* l;
 	str out;
-
-	/* Do nothing if ruri is not encoded */
-	if (th_uri_prefix_checks && ((REQ_LINE(msg).uri.len<th_uri_prefix.len) ||
-			(strncasecmp(REQ_LINE(msg).uri.s, th_uri_prefix.s,
-						 th_uri_prefix.len)!=0)))
-	{
-		LM_DBG("ruri [%.*s] is not encoded",REQ_LINE(msg).uri.len,REQ_LINE(msg).uri.s);
-		return 0;
-	}
 
 	if(th_get_uri_param_value(&REQ_LINE(msg).uri, &th_uparam_name, &eval)<0
 			|| eval.len<=0)
@@ -801,15 +763,6 @@ int th_unmask_refer_to(sip_msg_t *msg)
 	}
 
 	uri = &(get_refer_to(msg)->uri);
-
-	/* Do nothing if refer_to is not encoded */
-	if (th_uri_prefix_checks && ((uri->len<th_uri_prefix.len)
-			|| (strncasecmp(uri->s, th_uri_prefix.s, th_uri_prefix.len)!=0)))
-	{
-		LM_DBG("refer-to [%.*s] is not encoded",uri->len,uri->s);
-		return 0;
-	}
-
 	if(th_get_uri_param_value(uri, &th_uparam_name, &eval)<0
 			|| eval.len<=0)
 		return -1;
@@ -1001,10 +954,6 @@ int th_add_hdr_cookie(sip_msg_t *msg)
 struct via_param *th_get_via_cookie(sip_msg_t *msg, struct via_body *via)
 {
 	struct via_param *p;
-
-	if (!via) {
-		return NULL;
-	}
 	for(p=via->param_lst; p; p=p->next)
 	{
 		if(p->name.len==th_cookie_name.len

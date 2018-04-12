@@ -1142,16 +1142,8 @@ static int w_dlg_set_timeout(struct sip_msg *msg, char *pto, char *phe, char *ph
 		LM_ERR("no timeout value\n");
 		return -1;
 	}
-	if(to<=0) {
-		LM_ERR("invalid timeout value: %d\n", to);
-		return -1;
-	}
 	if(phe!=NULL)
 	{
-		if(phi==NULL) {
-			LM_ERR("invalid number of parameters\n");
-			return -1;
-		}
 		if(fixup_get_ivalue(msg, (gparam_p)phe, (int*)&he)!=0)
 		{
 			LM_ERR("no hash entry value value\n");
@@ -1173,7 +1165,7 @@ static int w_dlg_set_timeout(struct sip_msg *msg, char *pto, char *phe, char *ph
 		return -1;
 	}
 
-	if(update_dlg_timeout(dlg, to) != 0)
+	if(update_dlg_timeout(dlg, to) != 0) 
 		return -1;
 
 	return 1;
@@ -1684,8 +1676,8 @@ static void internal_rpc_profile_print_dlgs(rpc_t *rpc, void *c, str *profile_na
 				ph=ph->next;
 			}while(ph!=profile->entries[i].first);
 		}
+		lock_release(&profile->lock);
 	}
-	lock_release(&profile->lock);
 }
 
 /*

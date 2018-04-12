@@ -26,7 +26,7 @@
  */
 
 
-#include <poll.h>
+#include <sys/poll.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #include "../../dprint.h"

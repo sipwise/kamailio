@@ -1148,12 +1148,9 @@ done:
 		if(rules_doc->s)
 			pkg_free(rules_doc->s);
 		pkg_free(rules_doc);
-		rules_doc = NULL;
 	}
-	if(pres_uri.s) {
+	if(pres_uri.s)
 		pkg_free(pres_uri.s);
-		pres_uri.s = NULL;
-	}
 
 	if (pa_dbf.end_transaction)
 	{
@@ -1192,6 +1189,7 @@ error:
 	}
 	if(pres_uri.s) {
 		pkg_free(pres_uri.s);
+		pres_uri.s = NULL;
 	}
 
 	if (pa_dbf.abort_transaction) {
@@ -1566,6 +1564,15 @@ int mark_presentity_for_delete(presentity_t *pres)
 
 	result_cols[0] = &str_body_col;
 
+	if (pa_dbf.start_transaction)
+	{
+		if (pa_dbf.start_transaction(pa_db, db_table_lock) < 0)
+		{
+			LM_ERR("in start_transaction\n");
+			goto error;
+		}
+	}
+
 	if (query_fn(pa_db, query_cols, 0, query_vals, result_cols,
 				n_query_cols, 1, 0, &result) < 0)
 	{
@@ -1646,6 +1653,15 @@ int mark_presentity_for_delete(presentity_t *pres)
 		goto error;
 	}
 
+	if (pa_dbf.end_transaction)
+	{
+		if (pa_dbf.end_transaction(pa_db) < 0)
+		{
+			LM_ERR("in end_transaction\n");
+			goto error;
+		}
+	}
+
 	if (pa_dbf.affected_rows)
 		ret = pa_dbf.affected_rows(pa_db);
 	else
@@ -1656,6 +1672,12 @@ error:
 	free_notify_body(new_body, pres->event);
 	if (cur_body) pkg_free(cur_body);
 	if (result) pa_dbf.free_result(pa_db, result);
+
+	if (pa_dbf.abort_transaction)
+	{
+		if (pa_dbf.abort_transaction(pa_db) < 0)
+			LM_ERR("in abort_transaction\n");
+	}
 
 	return ret;
 }

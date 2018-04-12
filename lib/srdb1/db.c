@@ -374,8 +374,7 @@ int db_table_version(const db_func_t* dbf, db1_con_t* connection, const str* tab
 	str *version = &version_table;
 	str tmp1 = str_init(TABLENAME_COLUMN);
 	str tmp2 = str_init(VERSION_COLUMN);
-	int ret = 0;
-	int val_type;
+	int ret;
 
 	if (!dbf||!connection || !table || !table->s) {
 		LM_CRIT("invalid parameter value\n");
@@ -413,9 +412,7 @@ int db_table_version(const db_func_t* dbf, db1_con_t* connection, const str* tab
 	}
 
 	ver = ROW_VALUES(RES_ROWS(res));
-	val_type = VAL_TYPE(ver);
-	if ( (val_type!=DB1_INT && val_type!=DB1_DOUBLE && val_type!=DB1_BIGINT)
-			|| VAL_NULL(ver) ) {
+	if ( VAL_TYPE(ver)!=DB1_INT || VAL_NULL(ver) ) {
 		LM_ERR("invalid type (%d) or nul (%d) version "
 			"columns for %.*s\n", VAL_TYPE(ver), VAL_NULL(ver),
 			table->len, ZSW(table->s));
@@ -423,16 +420,8 @@ int db_table_version(const db_func_t* dbf, db1_con_t* connection, const str* tab
 		return -1;
 	}
 
-	if (val_type == DB1_INT) {
-		ret = VAL_INT(ver);
-	} else if (val_type == DB1_BIGINT) {
-		ret = (int)VAL_BIGINT(ver);
-	} else if (val_type == DB1_DOUBLE) {
-		ret = (int)VAL_DOUBLE(ver);
-	}
-
+	ret = VAL_INT(ver);
 	dbf->free_result(connection, res);
-
 	return ret;
 }
 

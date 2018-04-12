@@ -39,7 +39,6 @@
 #include "ld_session.h"
 
 static LDAP* last_ldap_handle = NULL;
-static LDAPMessage* last_ldap_result_holder = NULL;
 static LDAPMessage* last_ldap_result = NULL;
 
 int get_connected_ldap_session(
@@ -112,10 +111,9 @@ int get_connected_ldap_session(char* _lds_name, struct ld_session** _lds)
 		}
 		else
 		{
-			if (last_ldap_result_holder != NULL)
+			if (last_ldap_result != NULL)
 			{
-				ldap_msgfree(last_ldap_result_holder);
-				last_ldap_result_holder = NULL;
+				ldap_msgfree(last_ldap_result);
 				last_ldap_result = NULL;
 			}
 			ldap_disconnect(_lds_name);
@@ -414,10 +412,9 @@ int lds_search(
 	/*
 	 * free last_ldap_result
 	 */
-        if (last_ldap_result_holder != NULL) {
-                ldap_msgfree(last_ldap_result_holder);
-                last_ldap_result_holder = NULL;
-		last_ldap_result = NULL;
+        if (last_ldap_result != NULL) {
+                ldap_msgfree(last_ldap_result);
+                last_ldap_result = NULL;
         }
 
 	
@@ -448,7 +445,7 @@ int lds_search(
 		NULL,
 		&lds->client_search_timeout,
 		0,
-		&last_ldap_result_holder);
+		&last_ldap_result);
 
 #ifdef LDAP_PERF
 	gettimeofday(&after_search, NULL);
@@ -461,10 +458,10 @@ int lds_search(
 
 	if (*_ld_error != LDAP_SUCCESS)
 	{
-		if (last_ldap_result_holder != NULL)
+		if (last_ldap_result != NULL)
 		{
-			ldap_msgfree(last_ldap_result_holder);
-			last_ldap_result_holder = NULL;
+			ldap_msgfree(last_ldap_result);
+			last_ldap_result = NULL;
 		}
 
 		if (LDAP_API_ERROR(*_ld_error))
@@ -479,14 +476,12 @@ int lds_search(
 	}
 
 	last_ldap_handle = lds->handle;
-	*_ld_result_count = ldap_count_entries(lds->handle, last_ldap_result_holder);
+	*_ld_result_count = ldap_count_entries(lds->handle, last_ldap_result);
 	if (*_ld_result_count < 0)
 	{
 		LM_DBG("[%s]: ldap_count_entries failed\n", _lds_name);
 		return -1;
 	}
-
-	last_ldap_result = last_ldap_result_holder;
 
 	return 0;
 }

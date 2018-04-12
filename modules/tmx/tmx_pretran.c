@@ -260,7 +260,7 @@ int tmx_check_pretran(sip_msg_t *msg)
 	if(likely(vbr!=NULL)) {
 		svbranch = vbr->value;
 		trim(&svbranch);
-		dsize += svbranch.len + 1;
+		dsize += svbranch.len;
 	}
 	if(dsize<256) dsize = 256;
 

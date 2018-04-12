@@ -622,7 +622,7 @@ int xavp_params_explode(str *params, str *xname)
 int pv_var_to_xavp(str *varname, str *xname)
 {
 	script_var_t *it;
-	sr_xavp_t *avp = NULL;
+	sr_xavp_t *xavp = NULL;
 	sr_xval_t xval;
 
 	LM_DBG("xname:%.*s varname:%.*s\n", xname->len, xname->s,
@@ -638,26 +638,15 @@ int pv_var_to_xavp(str *varname, str *xname)
 			{
 				xval.type = SR_XTYPE_INT;
 				xval.v.i = it->v.value.n;
-				LM_DBG("[%.*s]: %d\n", it->name.len, it->name.s, xval.v.i);
 			} else {
 				if(it->v.value.s.len==0) continue;
 				xval.type = SR_XTYPE_STR;
 				xval.v.s.s = it->v.value.s.s;
 				xval.v.s.len = it->v.value.s.len;
-				LM_DBG("[%.*s]: '%.*s'\n", it->name.len, it->name.s,
-					xval.v.s.len, xval.v.s.s);
 			}
-			if(xavp_add_value(&it->name, &xval, &avp)==NULL) {
+			xavp = xavp_add_xavp_value(xname, &it->name, &xval, NULL);
+			if(xavp==NULL) {
 				LM_ERR("can't copy [%.*s]\n", it->name.len, it->name.s);
-				goto error;
-			}
-		}
-		if(avp) {
-			memset(&xval, 0, sizeof(sr_xval_t));
-			xval.type = SR_XTYPE_XAVP;
-			xval.v.xavp = avp;
-			if(xavp_add_value(xname, &xval, NULL)==NULL) {
-				LM_ERR("Can't create xavp[%.*s]\n", xname->len, xname->s);
 				goto error;
 			}
 		}
@@ -673,23 +662,21 @@ int pv_var_to_xavp(str *varname, str *xname)
 		{
 			xval.type = SR_XTYPE_INT;
 			xval.v.i = it->v.value.n;
-			LM_DBG("[%.*s]: %d\n", it->name.len, it->name.s, xval.v.i);
 		} else {
 			xval.type = SR_XTYPE_STR;
 			xval.v.s.s = it->v.value.s.s;
 			xval.v.s.len = it->v.value.s.len;
-			LM_DBG("[%.*s]: '%.*s'\n", it->name.len, it->name.s,
-					xval.v.s.len, xval.v.s.s);
 		}
-		if(xavp_add_xavp_value(xname, &it->name, &xval, NULL)==NULL) {
+		xavp = xavp_add_xavp_value(xname, &it->name, &xval, NULL);
+		if(xavp==NULL) {
 			LM_ERR("can't copy [%.*s]\n", it->name.len, it->name.s);
-			return -1;
+			goto error;
 		}
 	}
 	return 1;
 
 error:
-	if(avp) xavp_destroy_list(&avp);
+	xavp_rm_by_name(xname, 1, NULL);
 	return -1;
 }
 
@@ -704,7 +691,7 @@ int pv_xavp_to_var_helper(sr_xavp_t *avp) {
 		flags |= VAR_VAL_STR;
 		value.s.len = avp->val.v.s.len;
 		value.s.s = avp->val.v.s.s;
-		LM_DBG("var:[%.*s] STR:[%.*s]\n", avp->name.len, avp->name.s,
+		LM_DBG("var:[%.*s]  STR:[%.*s]\n", avp->name.len, avp->name.s,
 			value.s.len, value.s.s);
 	}
 	else if(avp->val.type==SR_XTYPE_INT) {
@@ -736,21 +723,18 @@ int pv_xavp_to_var(str *xname) {
 		LM_ERR("%.*s not xavp type?\n", xname->len, xname->s);
 		return -1;
 	}
-	do {
-		avp = xavp->val.v.xavp;
-		if (avp)
-		{
-			if(pv_xavp_to_var_helper(avp)<0) return -1;
-			avp = avp->next;
-		}
+	avp = xavp->val.v.xavp;
+	if (avp)
+	{
+		if(pv_xavp_to_var_helper(avp)<0) return -1;
+		avp = avp->next;
+	}
 
-		while(avp)
-		{
-			if(pv_xavp_to_var_helper(avp)<0) return -1;
-			avp = avp->next;
-		}
-		xavp = xavp_get_next(xavp);
-	} while(xavp);
+	while(avp)
+	{
+		if(pv_xavp_to_var_helper(avp)<0) return -1;
+		avp = avp->next;
+	}
 	return 1;
 }
 #endif

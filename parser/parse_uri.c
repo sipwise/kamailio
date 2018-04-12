@@ -34,9 +34,6 @@
 #include "../error.h"
 #include "../core_stats.h"
 
-static char _sr_uri_empty_buf[2] = {0};
-static str _sr_uri_empty = { _sr_uri_empty_buf, 0 };
-
 /* buf= pointer to begining of uri (sip:x@foo.bar:5060;a=b?h=i)
  * len= len of uri
  * returns: fills uri & returns <0 on error or 0 if ok 
@@ -996,11 +993,9 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 			if (scheme==URN_SCH){
 				uri->host.s=s;
 				uri->host.len=p-s;
-				DBG("parsed urn scheme with host: %.*s\n",
-						uri->host.len, uri->host.s);
+				DBG("parsed urn scheme...\n");
 			/* this is the port, it can't be the passwd */
 			}else goto error_bad_port;
-			break;
 		case URI_HOST_P:
 		case URI_HOST6_END:
 			uri->host.s=s;
@@ -1196,7 +1191,8 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 		case TELS_URI_T:
 			/* fix tel uris, move the number in uri and empty the host */
 			uri->user=uri->host;
-			uri->host=_sr_uri_empty;
+			uri->host.s="";
+			uri->host.len=0;
 			break;
 		/* urn: do nothing */
 		case URN_URI_T:

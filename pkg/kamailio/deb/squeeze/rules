@@ -24,7 +24,7 @@ EXCLUDED_MODULES=
 # extra modules to skip, because they are not compilable now
 # - regardless if they go to the main kamailio package or to some module package,
 # they will be excluded from compile and install of all
-EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy java dnssec sctp purple redis mono kazoo cnxcc jansson http_async
+EXTRA_EXCLUDED_MODULES=bdb dbtext oracle pa iptrtpproxy java dnssec sctp purple redis mono kazoo cnxcc jansson
 
 # module groups that are packaged in seperate packages
 # (with the name kamailio-$(group_name)-modules)
@@ -41,7 +41,7 @@ PACKAGE_GROUPS=mysql postgres berkeley unixodbc radius presence \
 EXTRA_GROUPS=gzcompress uuid ev 
 
 # name of libdir in the path for libraries (e.g., lib for 32b, lib64 for 64b)
-export LIBDIR ?= lib/$(DEB_HOST_MULTIARCH)
+LIBDIR ?= lib
 
 # directories with possible duplicate libraries (that should be deleted
 # from current module* packages)
@@ -153,7 +153,7 @@ install: build
 	dh_prep
 	dh_installdirs
 	# Add here commands to install the package into debian/kamailio
-	$(MAKE) install group_include="kstandard"
+	$(MAKE) install LIBDIR=$(LIBDIR) group_include="kstandard"
 	# make group packages
 	$(call PACKAGE_GRP_INSTALL_template)
 	$(call PACKAGE_EXTRA_INSTALL_template)

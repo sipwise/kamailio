@@ -25,9 +25,6 @@
 #include "dprint.h"
 #include "route.h"
 
-static char _lval_empty_buf[2] = {0};
-static str _lval_empty = { _lval_empty_buf, 0 };
-
 /* callback to log assign actions */
 static log_assign_action_f _log_assign_action = NULL;
 
@@ -127,7 +124,8 @@ inline static int lval_avp_assign(struct run_act_ctx* h, struct sip_msg* msg,
 			flags=avp->type|AVP_VAL_STR;
 			v=run_select(&value.s, &rv->v.sel, msg);
 			if (unlikely(v!=0)){
-				value.s = _lval_empty;
+				value.s.s="";
+				value.s.len=0;
 				if (v<0){
 					ret=-1;
 					break;
@@ -304,7 +302,8 @@ inline static int lval_pvar_assign(struct run_act_ctx* h, struct sip_msg* msg,
 			v=run_select(&pval.rs, &rv->v.sel, msg);
 			if (unlikely(v!=0)){
 				pval.flags|=PV_VAL_EMPTY;
-				pval.rs = _lval_empty;
+				pval.rs.s="";
+				pval.rs.len=0;
 				if (v<0){
 					ret=-1;
 					break;

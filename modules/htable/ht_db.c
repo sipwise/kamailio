@@ -204,7 +204,6 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 		return -1;
 	}
 	if(ht->ncols>0) {
-		db_ord = &ht->scols[0];
 		for(c=0; c<ht->ncols; c++) {
 			db_cols[c] = &ht->scols[c];
 		}
@@ -239,7 +238,6 @@ int ht_db_load_table(ht_t *ht, str *dbtable, int mode)
 		} else {
 			if(RES_ROW_N(db_res)==0)
 			{
-				ht_dbf.free_result(ht_db_con, db_res);
 				LM_DBG("Nothing to be loaded in hash table\n");
 				return 0;
 			}

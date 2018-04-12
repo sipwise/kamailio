@@ -44,7 +44,7 @@
 #define HAVE_ASM_INLINE_MEMBAR
 
 #warning alpha atomic code was not tested, please report problems to \
-		sr-dev@lists.kamailio.org
+		serdev@iptel.org or andrei@iptel.org
 
 #ifdef NOSMP
 #define membar() asm volatile ("" : : : "memory") /* gcc do not cache barrier*/

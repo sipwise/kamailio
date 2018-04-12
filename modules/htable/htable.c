@@ -237,7 +237,7 @@ static int child_init(int rank)
 	LM_DBG("rank is (%d)\n", rank);
 
 	if(rank==PROC_MAIN) {
-		if(ht_has_autoexpire() && ht_timer_procs>0) {
+		if(ht_timer_procs>0) {
 			for(i=0; i<ht_timer_procs; i++) {
 				if(fork_sync_timer(PROC_TIMER, "HTable Timer", 1 /*socks flag*/,
 						ht_timer, (void*)(long)i, ht_timer_interval)<0) {
@@ -1168,14 +1168,12 @@ static void htable_rpc_reload(rpc_t* rpc, void* c)
 
 	if (rpc->scan(c, "S", &htname) < 1)
 	{
-		ht_db_close_con();
 		rpc->fault(c, 500, "No htable name given");
 		return;
 	}
 	ht = ht_get_table(&htname);
 	if(ht==NULL)
 	{
-		ht_db_close_con();
 		rpc->fault(c, 500, "No such htable");
 		return;
 	}

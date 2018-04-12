@@ -431,7 +431,9 @@ static int load_pcres(int action)
 		LM_ERR("no more memory for pcres\n");
 		goto err;
 	}
-	memset(pcres, 0, sizeof(pcre *) * num_pcres_tmp);
+	for (i=0; i<num_pcres_tmp; i++) {
+		pcres[i] = NULL;
+	}
 	for (i=0; i<num_pcres_tmp; i++) {
 		pcre_rc = pcre_fullinfo(pcres_tmp[i], NULL, PCRE_INFO_SIZE, &pcre_size);
 		if ((pcres[i] = shm_malloc(pcre_size)) == 0) {
@@ -448,10 +450,6 @@ static int load_pcres(int action)
 		pkg_free(pcres_tmp[i]);
 	}
 	pkg_free(pcres_tmp);
-	/* Free allocated slots for unused patterns */
-	for (i = num_pcres_tmp; i < max_groups; i++) {
-		pkg_free(patterns[i]);
-	}
 	pkg_free(patterns);
 	lock_release(reload_lock);
 	

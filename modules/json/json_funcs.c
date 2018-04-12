@@ -57,8 +57,9 @@ int json_get_field(struct sip_msg* msg, char* json, char* field, char* dst)
 
 	j = json_tokener_parse(json_s.s);
 
-	if (j==NULL) {
+	if (is_error(j)) {
 		LM_ERR("empty or invalid JSON\n");
+		if(j!=NULL) json_object_put(j);
 		return -1;
 	}
 
@@ -74,6 +75,6 @@ int json_get_field(struct sip_msg* msg, char* json, char* field, char* dst)
 		ret = -1;
 	}
 
-	json_object_put(j);
+	if(j!=NULL) json_object_put(j);
 	return ret;
 }

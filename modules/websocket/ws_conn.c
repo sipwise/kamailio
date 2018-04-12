@@ -201,13 +201,13 @@ int wsconn_add(struct receive_info rcv, unsigned int sub_protocol)
 	LM_DBG("wsconn_add id [%d]\n", id);
 
 	/* Allocate and fill in new WebSocket connection */
-	wsc = shm_malloc(sizeof(ws_connection_t) + BUF_SIZE + 1);
+	wsc = shm_malloc(sizeof(ws_connection_t) + BUF_SIZE);
 	if (wsc == NULL)
 	{
 		LM_ERR("allocating shared memory\n");
 		return -1;
 	}
-	memset(wsc, 0, sizeof(ws_connection_t) + BUF_SIZE + 1);
+	memset(wsc, 0, sizeof(ws_connection_t) + BUF_SIZE);
 	wsc->id = id;
 	wsc->id_hash = id_hash;
 	wsc->state = WS_S_OPEN;
