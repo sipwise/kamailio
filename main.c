@@ -160,7 +160,7 @@ Options:\n\
                   [proto:]addr_lst[:port], where proto=udp|tcp|tls|sctp, \n\
                   addr_lst= addr|(addr, addr_lst) and \n\
                   addr= host|ip_address|interface_name. \n\
-                  E.g: -l locahost, -l udp:127.0.0.1:5080, -l eth0:5062,\n\
+                  E.g: -l localhost, -l udp:127.0.0.1:5080, -l eth0:5062,\n\
                   -l \"sctp:(eth0)\", -l \"(eth0, eth1, 127.0.0.1):5065\".\n\
                   The default behaviour is to listen on all the interfaces.\n\
     -n processes Number of child processes to fork per interface\n\
@@ -675,6 +675,7 @@ void handle_sigs(void)
 {
 	pid_t	chld;
 	int	chld_status;
+	int	any_chld_stopped;
 	int memlog;
 
 	switch(sig_flag){
@@ -730,7 +731,9 @@ void handle_sigs(void)
 			break;
 
 		case SIGCHLD:
+			any_chld_stopped=0;
 			while ((chld=waitpid( -1, &chld_status, WNOHANG ))>0) {
+				any_chld_stopped=1;
 				if (WIFEXITED(chld_status))
 					LM_ALERT("child process %ld exited normally,"
 							" status=%d\n", (long)chld,
@@ -747,6 +750,16 @@ void handle_sigs(void)
 								" signal %d\n", (long)chld,
 								 WSTOPSIG(chld_status));
 			}
+
+			/* If it appears that no child process has stopped, then do not terminate on SIGCHLD.
+			   Certain modules like app_python can run external scripts which cause child processes to be started and
+			   stopped. That can result in SIGCHLD being received here even though there is no real problem. Therefore,
+			   we do not terminate Kamailio unless we can find the child process which has stopped. */
+			if (!any_chld_stopped) {
+				LM_INFO("SIGCHLD received, but no child has stopped, ignoring it\n");
+				break;
+			}
+
 #ifndef STOP_JIRIS_CHANGES
 			if (dont_fork) {
 				LM_INFO("dont_fork turned on, living on\n");
