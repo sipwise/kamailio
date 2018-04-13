@@ -701,8 +701,7 @@ static int mod_init(void)
 	    LM_ERR("no memory for gw table\n");
 	    goto err;
 	}
-	memset(gw_pt[i], 0, sizeof(struct gw_info *) *
-	       (lcr_gw_count_param + 1));
+	memset(gw_pt[i], 0, sizeof(struct gw_info) * (lcr_gw_count_param + 1));
     }
 
     /* Allocate and initialize locks */
@@ -2461,8 +2460,8 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
 	 * Take Request-URI user from ruri_user_avp and generate Request
          * and Destination URIs. */
 
-	if (!generate_uris(_m, r_uri, &(ruri_user_val.s), &r_uri_len, dst_uri,
-			   &dst_uri_len, &addr, &gw_index, &flags, &tag_str)) {
+	if (generate_uris(_m, r_uri, &(ruri_user_val.s), &r_uri_len, dst_uri,
+			   &dst_uri_len, &addr, &gw_index, &flags, &tag_str) <= 0) {
 	    return -1;
 	}
     }
@@ -2470,7 +2469,10 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
     /* Rewrite Request URI */
     uri_str.s = r_uri;
     uri_str.len = r_uri_len;
-    rewrite_uri(_m, &uri_str);
+    if(rewrite_uri(_m, &uri_str)<0) {
+		LM_ERR("failed to rewrite uri\n");
+		return -1;
+	}
     
     /* Set Destination URI if not empty */
     if (dst_uri_len > 0) {
@@ -2479,7 +2481,7 @@ static int next_gw(struct sip_msg* _m, char* _s1, char* _s2)
 	LM_DBG("setting du to <%.*s>\n", uri_str.len, uri_str.s);
 	rval = set_dst_uri(_m, &uri_str);
 	if (rval != 0) {
-	    LM_ERR("calling do_action failed with return value <%d>\n", rval);
+	    LM_ERR("calling set dst uri failed with return value <%d>\n", rval);
 	    return -1;
 	}
 	
