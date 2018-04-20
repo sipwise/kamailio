@@ -1,0 +1,16 @@
+# Revert of upstream commit 57c4ec824fdd6c6c797bd7d6bfb3d65159a8d7c6
+# sca: reversed the from_tag and to_tag variables in the function call
+
+--- a/src/modules/sca/sca_call_info.c
++++ b/src/modules/sca/sca_call_info.c
+@@ -704,8 +704,8 @@ static int sca_call_info_uri_update(str
+ 	}
+ 
+ 	dialog.id.s = dlg_buf;
+-	if (sca_dialog_build_from_tags(&dialog, sizeof(dlg_buf), call_id, from_tag,
+-			to_tag) < 0) {
++	if (sca_dialog_build_from_tags(&dialog, sizeof(dlg_buf), call_id, to_tag,
++			from_tag) < 0) {
+ 		LM_ERR("sca_call_info_uri_update: Failed to build dialog from tags\n");
+ 		return (-1);
+ 	}
