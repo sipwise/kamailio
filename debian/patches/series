@@ -25,6 +25,7 @@ sipwise/sca-rr-is-direction.patch
 sipwise/sca-fix-pickup-when-upstream-flow.patch
 sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
+sipwise/sca-fix-notify-after-bye.patch
 ## Ongoing Patches
 sipwise/fix_db_redis_time_schema.patch
 sipwise/fix_db_redis_free_memory.patch
