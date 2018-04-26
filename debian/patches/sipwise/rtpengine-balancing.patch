@@ -1,0 +1,25 @@
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -2132,6 +2132,9 @@
+ 	}
+ 	ng_flags.dict = bencode_dictionary(bencbuf);
+ 
++	item = bencode_dictionary_add_list(ng_flags.dict, "supports");
++	bencode_list_add_string(item, "load limit");
++
+ 	body.s = NULL;
+ 	if (op == OP_OFFER || op == OP_ANSWER) {
+ 		ng_flags.flags = bencode_list(bencbuf);
+@@ -2282,6 +2285,12 @@
+ 		goto error;
+ 	}
+ 
++	if (!bencode_dictionary_get_strcmp(resp, "result", "load limit")) {
++		LM_INFO("proxy %.*s has reached its load limit - trying next one",
++				node->rn_url.len, node->rn_url.s , error.len, error.s);
++		goto select_node;
++	}
++
+ 	if (!bencode_dictionary_get_strcmp(resp, "result", "error")) {
+ 		if (!bencode_dictionary_get_str(resp, "error-reason", &error)) {
+ 			LM_ERR("proxy return error but didn't give an error reason: %.*s\n", ret, cp);
