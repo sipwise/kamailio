@@ -1,6 +1,8 @@
---- a/src/modules/db_redis/redis_connection.c
-+++ b/src/modules/db_redis/redis_connection.c
-@@ -339,6 +339,11 @@
+Index: kamailio/src/modules/db_redis/redis_connection.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_connection.c
++++ kamailio/src/modules/db_redis/redis_connection.c
+@@ -339,6 +339,11 @@ int db_redis_get_reply(km_redis_con_t *c
      int ret;
      redis_key_t *query;
  
@@ -12,7 +14,7 @@
      *reply = NULL;
      ret = redisGetReply(con->con, reply);
      if (con->con->err == REDIS_ERR_EOF) {
-@@ -350,6 +355,7 @@
+@@ -350,6 +355,7 @@ int db_redis_get_reply(km_redis_con_t *c
                  redisFree(con->con);
                  con->con = NULL;
              }
@@ -20,16 +22,25 @@
          }
          // take commands from oldest to newest and re-do again,
          // but don't queue them once again in retry-mode
-@@ -396,4 +402,4 @@
+@@ -396,4 +402,12 @@ void db_redis_consume_replies(km_redis_c
          LM_DBG("consuming queued command\n");
          db_redis_key_free(&query);
      }
--}
-\ No newline at end of file
 +}
---- a/src/modules/db_redis/redis_dbase.c
-+++ b/src/modules/db_redis/redis_dbase.c
-@@ -378,8 +378,6 @@
++
++const char *db_redis_get_error(km_redis_con_t *con) {
++    if (con && con->con && con->con->errstr) {
++        return con->con->errstr;
++    } else {
++        return "<broken redis connection>";
++    }
+ }
+\ No newline at end of file
+Index: kamailio/src/modules/db_redis/redis_dbase.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_dbase.c
++++ kamailio/src/modules/db_redis/redis_dbase.c
+@@ -378,8 +378,6 @@ static int db_redis_build_entry_keys(km_
          goto err;
      }
      if (key_found) {
@@ -38,7 +49,7 @@
          if (db_redis_key_add_str(keys, &keyname) != 0) {
              LM_ERR("Failed to add key string\n");
              goto err;
-@@ -470,7 +468,10 @@
+@@ -470,7 +468,10 @@ static int db_redis_build_type_keys(km_r
              goto err;
          }
          if (key_found) {
@@ -50,7 +61,7 @@
              (*keys_count)++;
              LM_DBG("found key '%.*s' for type '%.*s'\n",
                      keyname.len, keyname.s,
-@@ -526,7 +527,10 @@
+@@ -526,7 +527,10 @@ static int db_redis_build_query_keys(km_
      if (key_found) {
          LM_DBG("found suitable entry key '%.*s' for query\n",
                  keyname.len, keyname.s);
@@ -62,7 +73,7 @@
          *query_keys_count = 1;
          pkg_free(keyname.s);
          keyname.s = NULL;
-@@ -544,10 +548,12 @@
+@@ -544,10 +548,12 @@ static int db_redis_build_query_keys(km_
  
                  if (db_redis_key_add_string(&query_v, prefix, strlen(prefix)) != 0) {
                      LM_ERR("Failed to add smembers command to query\n");
@@ -75,7 +86,7 @@
                      goto err;
                  }
  
-@@ -665,6 +671,14 @@
+@@ -665,6 +671,14 @@ static int db_redis_scan_query_keys(km_r
              LM_ERR("Failed to add match pattern to scan query\n");
              goto err;
          }
@@ -90,7 +101,7 @@
          pkg_free(match); match = NULL;
  
          reply = db_redis_command_argv(con, query_v);
-@@ -691,6 +705,7 @@
+@@ -691,6 +705,7 @@ static int db_redis_scan_query_keys(km_r
                      table_name->len, table_name->s);
              goto err;
          }
@@ -98,7 +109,7 @@
  
          if (reply->element[1]->type != REDIS_REPLY_ARRAY) {
              LM_ERR("Invalid content type for scan on table '%.*s', expected array\n",
-@@ -717,8 +732,8 @@
+@@ -717,8 +732,8 @@ static int db_redis_scan_query_keys(km_r
                          j, table_name->len, table_name->s);
                  goto err;
              }
@@ -109,7 +120,7 @@
                  goto err;
              }
          }
-@@ -740,6 +755,8 @@
+@@ -740,6 +755,8 @@ static int db_redis_scan_query_keys(km_r
      if (reply) {
          db_redis_free_reply(&reply);
      }
@@ -118,7 +129,7 @@
      return 0;
  
  err:
-@@ -1047,7 +1064,7 @@
+@@ -1047,7 +1064,7 @@ static int db_redis_perform_query(const 
      redis_key_t *query_v = NULL;
      int num_rows = 0;
      redis_key_t *key;
@@ -127,7 +138,7 @@
  
      *_r = db_redis_new_result();
      if (!*_r) {
-@@ -1062,7 +1079,7 @@
+@@ -1062,7 +1079,7 @@ static int db_redis_perform_query(const 
      RES_NUM_ROWS(*_r) = RES_ROW_N(*_r) = 0;
      RES_COL_N(*_r) = _nc;
  
@@ -136,7 +147,7 @@
          LM_DBG("performing full table scan\n");
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
-@@ -1072,6 +1089,16 @@
+@@ -1072,6 +1089,16 @@ static int db_redis_perform_query(const 
          }
      }
  
@@ -153,7 +164,7 @@
      for (key = *keys; key; key = key->next) {
          redis_key_t *tmp = NULL;
          str *keyname = &(key->key);
-@@ -1134,58 +1161,58 @@
+@@ -1134,58 +1161,62 @@ static int db_redis_perform_query(const 
  
          db_redis_key_free(&query_v);
          query_v = NULL;
@@ -199,7 +210,7 @@
 +                // get reply for EXISTS query
 +                if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
 +                    LM_ERR("Failed to get reply for query: %s\n",
-+                            con->con->errstr);
++                            db_redis_get_error(con));
 +                    goto error;
 +                }
 +                db_redis_check_reply(con, reply, error);
@@ -207,7 +218,11 @@
 +                    LM_DBG("key does not exist, returning no row for query\n");
 +                    db_redis_free_reply(&reply);
 +                    // also free next reply, as this is a null row for the HMGET
-+                    db_redis_get_reply(con, (void**)&reply);
++                    if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
++                        LM_ERR("Failed to get reply for query: %s\n",
++                                db_redis_get_error(con));
++                        goto error;
++                    }
 +                    db_redis_check_reply(con, reply, error);
 +                    db_redis_free_reply(&reply);
 +                    continue;
@@ -230,7 +245,7 @@
 +                // get reply for actual HMGET query
 +                if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
 +                    LM_ERR("Failed to get reply for query: %s\n",
-+                            con->con->errstr);
++                            db_redis_get_error(con));
 +                    goto error;
 +                }
 +                db_redis_check_reply(con, reply, error);
@@ -258,7 +273,7 @@
      return 0;
  
  error:
-@@ -1193,7 +1220,7 @@
+@@ -1193,7 +1224,7 @@ error:
      db_redis_key_free(&query_v);
      if(reply)
          db_redis_free_reply(&reply);
@@ -267,7 +282,7 @@
          db_redis_free_result((db1_con_t*)_h, *_r); *_r = NULL;
      }
      return -1;
-@@ -1238,13 +1265,13 @@
+@@ -1238,13 +1269,13 @@ static int db_redis_perform_delete(const
              goto error;
      }
  
@@ -283,7 +298,7 @@
  
          if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
              LM_ERR("Failed to add exists command to pre-delete query\n");
-@@ -1354,7 +1381,9 @@
+@@ -1354,7 +1385,9 @@ static int db_redis_perform_delete(const
              goto error;
          }
          pkg_free(db_keys);
@@ -293,7 +308,7 @@
          db_redis_free_reply(&reply);
  
          if (db_redis_key_add_string(&query_v, "DEL", 3) != 0) {
-@@ -1391,10 +1420,11 @@
+@@ -1391,10 +1424,11 @@ static int db_redis_perform_delete(const
          }
  
          //db_redis_key_free(&type_keys);
@@ -306,7 +321,7 @@
  
      return 0;
  
-@@ -1426,7 +1456,7 @@
+@@ -1426,7 +1460,7 @@ static int db_redis_perform_update(const
      int j;
      size_t col;
  
@@ -315,7 +330,47 @@
          LM_DBG("performing full table scan\n");
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
-@@ -1664,6 +1694,11 @@
+@@ -1517,7 +1551,7 @@ static int db_redis_perform_update(const
+         // get reply for EXISTS query
+         if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
+             LM_ERR("Failed to get reply for query: %s\n",
+-                    con->con->errstr);
++                    db_redis_get_error(con));
+             goto error;
+         }
+         db_redis_check_reply(con, reply, error);
+@@ -1526,7 +1560,11 @@ static int db_redis_perform_update(const
+             db_redis_free_reply(&reply);
+             // also free next reply, as this is a null row for the HMGET
+             LM_DBG("also fetch hmget reply after non-existent key\n");
+-            db_redis_get_reply(con, (void**)&reply);
++            if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
++                LM_ERR("Failed to get reply for query: %s\n",
++                        db_redis_get_error(con));
++                goto error;
++            }
+             db_redis_check_reply(con, reply, error);
+             db_redis_free_reply(&reply);
+             LM_DBG("continue fetch reply loop\n");
+@@ -1537,7 +1575,7 @@ static int db_redis_perform_update(const
+         // get reply for actual HMGET query
+         if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
+             LM_ERR("Failed to get reply for query: %s\n",
+-                    con->con->errstr);
++                    db_redis_get_error(con));
+             goto error;
+         }
+         db_redis_check_reply(con, reply, error);
+@@ -1614,7 +1652,7 @@ static int db_redis_perform_update(const
+     for (i = 0; i < update_queries; ++i) {
+         if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
+             LM_ERR("Failed to get reply for query: %s\n",
+-                    con->con->errstr);
++                    db_redis_get_error(con));
+             goto error;
+         }
+         db_redis_check_reply(con, reply, error);
+@@ -1664,6 +1702,11 @@ int db_redis_query(const db1_con_t* _h, 
      // TODO: optimize mapping-based manual post-check (remove check for keys already
      // in type query key)
  
@@ -327,7 +382,7 @@
      con = REDIS_CON(_h);
      if (con && con->con == NULL) {
          if (db_redis_connect(con) != 0) {
-@@ -1683,7 +1718,7 @@
+@@ -1683,7 +1726,7 @@ int db_redis_query(const db1_con_t* _h, 
                  CON_TABLE(_h)->len, CON_TABLE(_h)->s);
      }
  
@@ -336,7 +391,7 @@
  
      // check if we have a version query, and return version directly from
      // schema instead of loading it from redis
-@@ -1731,6 +1766,7 @@
+@@ -1731,6 +1774,7 @@ int db_redis_query(const db1_con_t* _h, 
      } else {
          LM_DBG("no columns given to build query keys, falling back to full table scan\n");
          keys_count = 0;
@@ -344,9 +399,11 @@
      }
  
      if (db_redis_perform_query(_h, con, _k, _v, query_ops, _c, _n, _nc, _r,
---- a/src/modules/db_redis/redis_table.c
-+++ b/src/modules/db_redis/redis_table.c
-@@ -313,8 +313,12 @@
+Index: kamailio/src/modules/db_redis/redis_table.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_table.c
++++ kamailio/src/modules/db_redis/redis_table.c
+@@ -313,8 +313,12 @@ void db_redis_free_tables(km_redis_con_t
                  col_last = (&col_ht->table[j])->prev;
                  clist_foreach(&col_ht->table[j], col_he, next) {
                      pkg_free(col_he->key.s);
@@ -361,7 +418,7 @@
                  }
              }
              pkg_free(col_ht->table);
-@@ -340,9 +344,13 @@
+@@ -340,9 +344,13 @@ void db_redis_free_tables(km_redis_con_t
              }
              pkg_free(table);
              pkg_free(he->key.s);
@@ -377,7 +434,7 @@
          }
      }
      pkg_free(ht->table);
-@@ -409,6 +417,7 @@
+@@ -409,6 +417,7 @@ static struct str_hash_entry* db_redis_c
          LM_ERR("Failed to allocate memory for table schema hashtable\n");
          pkg_free(e->key.s);
          pkg_free(e);
@@ -385,7 +442,7 @@
          return NULL;
      }
      str_hash_init(&t->columns);
-@@ -426,6 +435,7 @@
+@@ -426,6 +435,7 @@ static struct str_hash_entry* db_redis_c
      }
      if (pkg_str_dup(&e->key, col) != 0) {
          LM_ERR("Failed to allocate memory for column name\n");
@@ -393,7 +450,7 @@
          return NULL;
      }
      e->flags = 0;
-@@ -453,6 +463,7 @@
+@@ -453,6 +463,7 @@ static struct str_hash_entry* db_redis_c
          default:
              LM_ERR("Invalid schema column type '%.*s', expecting one of string, int, timestamp, double, blob\n",
                      type->len, type->s);
@@ -401,7 +458,7 @@
              pkg_free(e);
              return NULL;
      }
-@@ -494,6 +505,8 @@
+@@ -494,6 +505,8 @@ int db_redis_parse_keys(km_redis_con_t *
      p = start = redis_keys.s;
      state = DBREDIS_KEYS_TABLE_ST;
      do {
@@ -410,7 +467,7 @@
          switch(state) {
              case DBREDIS_KEYS_TABLE_ST:
                  while(p != end && *p != '=')
-@@ -539,6 +552,10 @@
+@@ -539,6 +552,10 @@ int db_redis_parse_keys(km_redis_con_t *
                      if (!table->types) {
                          table->types = type_target = type;
                      } else {
@@ -421,7 +478,7 @@
                          type_target->next = type;
                          type_target = type_target->next;
                      }
-@@ -571,6 +588,10 @@
+@@ -571,6 +588,10 @@ int db_redis_parse_keys(km_redis_con_t *
                  if (*key_target == NULL) {
                      *key_target = key_location = key;
                  } else {
@@ -432,7 +489,7 @@
                      key_location->next = key;
                      key_location = key_location->next;
                  }
-@@ -586,6 +607,10 @@
+@@ -586,6 +607,10 @@ int db_redis_parse_keys(km_redis_con_t *
      return 0;
  
  err:
@@ -443,7 +500,7 @@
      db_redis_free_tables(con);
      return -1;
  }
-@@ -608,7 +633,8 @@
+@@ -608,7 +633,8 @@ int db_redis_parse_schema(km_redis_con_t
      char full_path[_POSIX_PATH_MAX + 1];
      int path_len;
      struct stat fstat;
@@ -453,7 +510,7 @@
  
      enum {
          DBREDIS_SCHEMA_COLUMN_ST,
-@@ -632,6 +658,10 @@
+@@ -632,6 +658,10 @@ int db_redis_parse_schema(km_redis_con_t
      }
  
      dir_name = (char*)pkg_malloc((redis_schema_path.len + 1) * sizeof(char));
@@ -464,7 +521,7 @@
      strncpy(dir_name, redis_schema_path.s, redis_schema_path.len);
      dir_name[redis_schema_path.len] = '\0';
      srcdir = opendir(dir_name);
-@@ -699,14 +729,15 @@
+@@ -699,14 +729,15 @@ int db_redis_parse_schema(km_redis_con_t
                  goto err;
              }
  
@@ -482,7 +539,7 @@
                          LM_ERR("Unexpected end of file in schema column name of file %s\n", full_path);
                          goto err;
                      }
-@@ -732,7 +763,7 @@
+@@ -732,7 +763,7 @@ int db_redis_parse_schema(km_redis_con_t
                      LM_DBG("found column name '%.*s'\n", column_name.len, column_name.s);
                      break;
                  case DBREDIS_SCHEMA_TYPE_ST:
@@ -491,7 +548,7 @@
                          LM_ERR("Unexpected end of file in schema column type of file %s\n", full_path);
                          goto err;
                      }
-@@ -772,7 +803,7 @@
+@@ -772,7 +803,7 @@ int db_redis_parse_schema(km_redis_con_t
                      bufptr = buf;
                      break;
                  case DBREDIS_SCHEMA_VERSION_ST:
@@ -500,7 +557,7 @@
                          *bufptr = c;
                          bufptr++;
                          continue;
-@@ -785,7 +816,7 @@
+@@ -785,7 +816,7 @@ int db_redis_parse_schema(km_redis_con_t
                      goto fileend;
                      break;
              }
@@ -509,10 +566,22 @@
  
  fileend:
          fclose(fin);
-@@ -838,4 +869,4 @@
+@@ -838,4 +869,4 @@ err:
          pkg_free(redis_keys.s);
      }
      return -1;
 -}
 \ No newline at end of file
 +}
+Index: kamailio/src/modules/db_redis/redis_connection.h
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_connection.h
++++ kamailio/src/modules/db_redis/redis_connection.h
+@@ -77,5 +77,6 @@ int db_redis_append_command_argv(km_redi
+ int db_redis_get_reply(km_redis_con_t *con, void **reply);
+ void db_redis_consume_replies(km_redis_con_t *con);
+ void db_redis_free_reply(redisReply **reply);
++const char *db_redis_get_error(km_redis_con_t *con);
+ 
+ #endif /* _REDIS_CONNECTION_H_ */
+\ No newline at end of file
