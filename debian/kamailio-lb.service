@@ -4,8 +4,8 @@ After=network-online.target
 After=remote-fs.target
 After=time-sync.target
 Requires=network-online.target
-Requires=remote-fs.target
 Requires=time-sync.target
+Wants=remote-fs.target
 
 [Service]
 Type=simple

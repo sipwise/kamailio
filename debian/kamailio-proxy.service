@@ -4,7 +4,7 @@ After=mariadb.service
 After=network-online.target
 After=remote-fs.target
 Requires=network-online.target
-Requires=remote-fs.target
+Wants=remote-fs.target
 Wants=mariadb.service
 
 [Service]
