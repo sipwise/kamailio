@@ -1,1 +1,0 @@
-ngcp-kamailio: postrm-contains-additional-updaterc.d-calls etc/init.d/kamailio-lb

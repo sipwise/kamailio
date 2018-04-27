@@ -10,6 +10,10 @@ case "$1" in
         adduser --quiet --system --group --disabled-password \
                 --shell /bin/false --gecos "Kamailio" \
                 --home "$HOMEDIR" kamailio || true
+
+        # Remove obsolete rc.d links.
+        update-rc.d kamailio-lb remove
+        update-rc.d kamailio-proxy remove
         ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
