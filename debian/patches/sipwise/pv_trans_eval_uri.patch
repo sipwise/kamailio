@@ -1,0 +1,13 @@
+--- a/src/modules/pv/pv_trans.c
++++ b/src/modules/pv/pv_trans.c
+@@ -1217,8 +1217,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_
+ 		/* parse uri -- params only when requested */
+ 		if(parse_uri(_tr_uri.s, _tr_uri.len, &_tr_parsed_uri)!=0)
+ 		{
+-			LM_ERR("invalid uri [%.*s]\n", val->rs.len,
+-					val->rs.s);
++			LM_DBG("invalid uri [%.*s] (%s:%d)\n", val->rs.len,
++					val->rs.s, ZSW(get_cfg_crt_file_name()), get_cfg_crt_line());
+ 			if(_tr_uri_params != NULL)
+ 			{
+ 				free_params(_tr_uri_params);
