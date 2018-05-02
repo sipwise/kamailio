@@ -1,3 +1,30 @@
+ngcp-kamailio (5.1.2-1+0~mr6.2.1.1) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [cc33a96] TT#34650 db_redis: Fix various pointer and memory issues
+  * [211b39e] TT#34900 Fix notify after BYE in case of shared line
+
+  [ Manuel Montecelo ]
+  * [ad1fcfd] TT#26264 Fix to install the config files for tmpfiles.d
+
+  [ Andreas Granig ]
+  * [226490d] TT#34650 Fix db_redis table scan on 0 query args
+  * [4d6882a] TT#34650 Fix table scan with lots of rows
+  * [07a0bd5] TT#36255 Fix redis error handling
+
+  [ Alexander Lutay ]
+  * [69d461a] TT#35502 Replace Requires=mariadb.service with Wants=mariadb.service for kamailio-proxy.service
+
+  [ Mykola Malkov ]
+  * [b57a2be] TT#33384 Use weaker type of services' dependency on remote-fs
+
+  [ Guillem Jover ]
+  * [156d1a9] TT#26264 Remove obsolete rc.d symlinks
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 02 May 2018 12:55:26 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.2.1.0) unstable; urgency=medium
 
   [ Andreas Granig ]
