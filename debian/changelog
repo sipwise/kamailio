@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.2-1+0~mr6.2.1.2) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [55358aa] TT#36211 proxy annoying errors in logs during config-test
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 03 May 2018 16:57:30 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.2.1.1) unstable; urgency=medium
 
   [ Marco Capetta ]
