@@ -32,3 +32,4 @@ sipwise/fix_db_redis_time_schema.patch
 sipwise/fix_db_redis_free_memory.patch
 sipwise/fix_db_redis_memory_issues.patch
 sipwise/rtpengine-balancing.patch
+sipwise/0001-topos-reuse-uuid-for-requests-withing-dialog.patch
