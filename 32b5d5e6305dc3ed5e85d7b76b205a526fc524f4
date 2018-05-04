@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3ab451fb_e2780292",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 37
+      },
+      "lineNbr": 483,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2018-05-04T06:53:30Z",
+      "side": 1,
+      "message": "if it is not too complicated, I prefer have this as configurable parameter.\nIn this way it will be easier modify the behavior in case we discover other particularities.",
+      "range": {
+        "startLine": 483,
+        "startChar": 34,
+        "endLine": 483,
+        "endChar": 43
+      },
+      "revId": "32b5d5e6305dc3ed5e85d7b76b205a526fc524f4",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
