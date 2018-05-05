@@ -18,7 +18,7 @@ Build-Depends:
  libev-dev,
  libevent-dev,
  libexpat1-dev,
- libgeoip-dev (>= 1.4.5),
+ libmaxminddb-dev,
  libhiredis-dev (>= 0.10.0),
  libjansson-dev,
  libjson-c-dev,
@@ -103,7 +103,7 @@ Description: very fast and configurable SIP proxy
  This package contains the main Kamailio binary along with the principal
  modules and support binaries.
 
-Package: ngcp-kamailio-geoip-modules
+Package: ngcp-kamailio-geoip2-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -113,15 +113,15 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends},
 Conflicts:
- kamailio-geoip-modules,
+ kamailio-geoip2-modules,
 Replaces:
- kamailio-geoip-modules,
-Description: contains the geoip module
+ kamailio-geoip2-modules,
+Description: contains the geoip2 module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides the geoip module, an extension allowing to
+ This package provides the geoip2 module, an extension allowing to
  use GeoIP API within configuration file.
 
 Package: ngcp-kamailio-sqlite-modules
