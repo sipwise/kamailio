@@ -18,7 +18,7 @@ Build-Depends:
  libev-dev,
  libevent-dev,
  libexpat1-dev,
- libgeoip-dev (>= 1.4.5),
+ libmaxminddb-dev,
  libhiredis-dev (>= 0.10.0),
  libjansson-dev,
  libjson-c-dev,
