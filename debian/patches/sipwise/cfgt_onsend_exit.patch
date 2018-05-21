@@ -1,0 +1,58 @@
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -477,6 +477,9 @@ int _cfgt_add_routename(cfgt_node_p node
+ 	} else {
+ 		LM_DBG("actual routename:[%.*s][%d]\n", node->route->s.len,
+ 				node->route->s.s, node->route->type);
++		if(node->route->prevprev)
++			LM_DBG("prevprev routename:[%.*s][%d]\n", node->route->prevprev->s.len,
++					node->route->prevprev->s.s, node->route->prevprev->type);
+ 		if(node->route->prev)
+ 			LM_DBG("prev routename:[%.*s][%d]\n", node->route->prev->s.len,
+ 					node->route->prev->s.s, node->route->prev->type);
+@@ -489,10 +492,16 @@ int _cfgt_add_routename(cfgt_node_p node
+ 			return 2;
+ 		} else if(node->route->prev
+ 				  && STR_EQ(*routename, node->route->prev->s)) {
+-			LM_DBG("back to route[%.*s]\n", node->route->prev->s.len,
++			LM_DBG("back to prev route[%.*s]\n", node->route->prev->s.len,
+ 					node->route->prev->s.s);
+ 			_cfgt_set_type(node->route->prev, a);
+ 			return 3;
++		} else if(node->route->prevprev
++				  && STR_EQ(*routename, node->route->prevprev->s)) {
++			LM_DBG("back to prevprev route[%.*s]\n", node->route->prevprev->s.len,
++					node->route->prevprev->s.s);
++			_cfgt_set_type(node->route->prevprev, a);
++			return 3;
+ 		}
+ 		route = pkg_malloc(sizeof(cfgt_str_list_t));
+ 		if(!route) {
+@@ -500,6 +509,7 @@ int _cfgt_add_routename(cfgt_node_p node
+ 			return -1;
+ 		}
+ 		memset(route, 0, sizeof(cfgt_str_list_t));
++		route->prevprev = node->route->prev;
+ 		route->prev = node->route;
+ 		node->route->next = route;
+ 		node->route = route;
+--- a/src/modules/cfgt/cfgt_int.h
++++ b/src/modules/cfgt/cfgt_int.h
+@@ -48,7 +48,7 @@ typedef struct _cfgt_str_list
+ {
+ 	str s;
+ 	enum _cfgt_action_type type;
+-	struct _cfgt_str_list *next, *prev;
++	struct _cfgt_str_list *next, *prev, *prevprev;
+ } cfgt_str_list_t, *cfgt_str_list_p;
+ 
+ typedef struct _cfgt_node
+@@ -59,7 +59,7 @@ typedef struct _cfgt_node
+ 	cfgt_str_list_p flow_head;
+ 	cfgt_str_list_p route;
+ 	srjson_t *in, *out, *flow;
+-	struct _cfgt_node *next, *prev;
++	struct _cfgt_node *next, *prev, *prevprev;
+ } cfgt_node_t, *cfgt_node_p;
+ 
+ int cfgt_init(void);
