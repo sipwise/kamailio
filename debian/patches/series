@@ -31,3 +31,5 @@ sipwise/sca-fix-notify-after-bye.patch
 sipwise/fix_db_redis_time_schema.patch
 sipwise/fix_db_redis_free_memory.patch
 sipwise/fix_db_redis_memory_issues.patch
+# backported from 5.1 branch
+sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
