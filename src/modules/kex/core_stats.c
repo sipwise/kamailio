@@ -81,6 +81,8 @@ stat_var* rcv_rpls_480;
 stat_var* rcv_rpls_486;
 stat_var* rcv_rpls_5xx;
 stat_var* rcv_rpls_6xx;
+stat_var* rcv_rpls_2xx_invite;
+stat_var* rcv_rpls_4xx_invite;
 
 /*! exported core statistics */
 stat_export_t core_stats[] = {
@@ -121,6 +123,8 @@ stat_export_t core_stats[] = {
 	{"bad_URIs_rcvd",         0,  &bad_URIs              },
 	{"unsupported_methods",   0,  &unsupported_methods   },
 	{"bad_msg_hdr",           0,  &bad_msg_hdr           },
+	{"rcv_replies_2xx_invite" ,0,  &rcv_rpls_2xx_invite  },
+	{"rcv_replies_4xx_invite" ,0,  &rcv_rpls_4xx_invite  },
 	{0,0,0}
 };
 
@@ -197,6 +201,28 @@ static int km_cb_req_stats(struct sip_msg *msg,
 			update_stat(unsupported_methods, 1);
 		break;
 	}
+	return 1;
+}
+
+static int km_cb_rpl_stats_by_method(struct sip_msg *msg,
+		unsigned int flags, void *param)
+{
+	if(msg->first_line.u.reply.statuscode > 199 &&
+		msg->first_line.u.reply.statuscode <300)
+	{
+            switch(msg->first_line.u.request.method_value) {
+            case METHOD_INVITE:
+                  update_stat(rcv_rpls_2xx_invite, 1);
+                  break;
+	}
+	else if(msg->first_line.u.reply.statuscode > 399 &&
+		msg->first_line.u.reply.statuscode <500)
+	{
+            switch(msg->first_line.u.request.method_value) {
+            case METHOD_INVITE:
+                  update_stat(rcv_rpls_4xx_invite, 1);
+                  break;
+      }
 	return 1;
 }
 
@@ -318,6 +344,10 @@ int register_core_stats(void)
 		return -1;
 	}
 	if (register_script_cb(km_cb_rpl_stats, PRE_SCRIPT_CB|ONREPLY_CB, 0)<0 ) {
+		LM_ERR("failed to register PRE request callback\n");
+		return -1;
+	}
+	if (register_script_cb(km_cb_rpl_stats_by_method, PRE_SCRIPT_CB|ONREPLY_CB, 0)<0 ) {
 		LM_ERR("failed to register PRE request callback\n");
 		return -1;
 	}
