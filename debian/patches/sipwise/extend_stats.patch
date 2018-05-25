@@ -1,0 +1,85 @@
+commit 417c1395d6eb28d0adfc56c4e042ca555acf39b6
+Author: Roman Romanchenko <rromanchenko@sipwise.com>
+Date:   Fri May 25 12:15:14 2018 +0300
+
+    TT#36356 Extend kamailio rcv_replies statistics
+     - statistics for 2xx and 4xx replies on invite added
+    
+    Change-Id: Ia6d5c42eddae3a3831d88c89eb770f1620e75b8e
+
+--- a/src/modules/kex/core_stats.c
++++ b/src/modules/kex/core_stats.c
+@@ -81,6 +81,8 @@ stat_var* rcv_rpls_480;
+ stat_var* rcv_rpls_486;
+ stat_var* rcv_rpls_5xx;
+ stat_var* rcv_rpls_6xx;
++stat_var* rcv_rpls_2xx_invite;
++stat_var* rcv_rpls_4xx_invite;
+ 
+ /*! exported core statistics */
+ stat_export_t core_stats[] = {
+@@ -121,6 +123,8 @@ stat_export_t core_stats[] = {
+ 	{"bad_URIs_rcvd",         0,  &bad_URIs              },
+ 	{"unsupported_methods",   0,  &unsupported_methods   },
+ 	{"bad_msg_hdr",           0,  &bad_msg_hdr           },
++	{"rcv_replies_2xx_invite" ,0,  &rcv_rpls_2xx_invite  },
++	{"rcv_replies_4xx_invite" ,0,  &rcv_rpls_4xx_invite  },
+ 	{0,0,0}
+ };
+ 
+@@ -200,6 +204,33 @@ static int km_cb_req_stats(struct sip_ms
+ 	return 1;
+ }
+ 
++static int km_cb_rpl_stats_by_method(struct sip_msg *msg,
++		unsigned int flags, void *param)
++{
++      int method = msg->first_line.u.reply.method_id;
++//      int method = (get_cseq(msg))->method_id;
++
++	if(msg->first_line.u.reply.statuscode > 199 &&
++		msg->first_line.u.reply.statuscode <300)
++	{
++            switch(method) {
++            case METHOD_INVITE:
++                  update_stat(rcv_rpls_2xx_invite, 1);
++                  break;
++            }
++	}
++	else if(msg->first_line.u.reply.statuscode > 399 &&
++		msg->first_line.u.reply.statuscode <500)
++	{
++            switch(method) {
++            case METHOD_INVITE:
++                  update_stat(rcv_rpls_4xx_invite, 1);
++                  break;
++            }
++      }
++	return 1;
++}
++
+ static int km_cb_rpl_stats(struct sip_msg *msg,
+ 		unsigned int flags, void *param)
+ {
+@@ -321,6 +352,10 @@ int register_core_stats(void)
+ 		LM_ERR("failed to register PRE request callback\n");
+ 		return -1;
+ 	}
++	if (register_script_cb(km_cb_rpl_stats_by_method, PRE_SCRIPT_CB|ONREPLY_CB, 0)<0 ) {
++		LM_ERR("failed to register PRE request callback\n");
++		return -1;
++	}
+ 	if (stats_proc_stats_init_rpc()<0) return -1;
+ 	sr_event_register_cb(SREV_CORE_STATS, sts_update_core_stats);
+ 
+--- a/src/modules/kex/core_stats.h
++++ b/src/modules/kex/core_stats.h
+@@ -69,6 +69,8 @@ extern stat_var* rcv_rpls_480;
+ extern stat_var* rcv_rpls_486;
+ extern stat_var* rcv_rpls_5xx;
+ extern stat_var* rcv_rpls_6xx;
++extern stat_var* rcv_rpls_2xx_invite;
++extern stat_var* rcv_rpls_4xx_invite;
+ 
+ /*! \brief forwarded requests */
+ extern stat_var* fwd_reqs;
