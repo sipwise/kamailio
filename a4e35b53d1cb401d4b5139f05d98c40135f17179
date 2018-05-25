@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fabf19d9_b7711fe3",
+        "filename": "debian/control",
+        "patchSetId": 4
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2018-05-25T08:12:18Z",
+      "side": 1,
+      "message": "Should we put here also the original version of the package (kamailio-geoip-modules) so we are sure it will be removed?",
+      "range": {
+        "startLine": 118,
+        "startChar": 1,
+        "endLine": 118,
+        "endChar": 25
+      },
+      "revId": "a4e35b53d1cb401d4b5139f05d98c40135f17179",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
