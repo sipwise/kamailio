@@ -1,0 +1,117 @@
+commit 417c1395d6eb28d0adfc56c4e042ca555acf39b6
+Author: Roman Romanchenko <rromanchenko@sipwise.com>
+Date:   Fri May 25 12:15:14 2018 +0300
+
+    TT#36356 Extend kamailio rcv_replies statistics
+     - statistics for 2xx and 4xx replies on invite added
+    
+    Change-Id: Ia6d5c42eddae3a3831d88c89eb770f1620e75b8e
+
+--- a/src/modules/kex/core_stats.c
++++ b/src/modules/kex/core_stats.c
+@@ -82,6 +82,40 @@ stat_var* rcv_rpls_486;
+ stat_var* rcv_rpls_5xx;
+ stat_var* rcv_rpls_6xx;
+ 
++#define VAR_NAME(method, group) \
++      rcv_rpls_  ## group ## xx_ ## method
++
++#define STAT_NAME(method, group) \
++      "rcv_replies_" #group "xx_" #method
++
++#define DECLARE_STATS_VARS(method) \
++      stat_var* VAR_NAME(method, 1); \
++      stat_var* VAR_NAME(method, 2); \
++      stat_var* VAR_NAME(method, 3); \
++      stat_var* VAR_NAME(method, 4); \
++      stat_var* VAR_NAME(method, 5); \
++      stat_var* VAR_NAME(method, 6);
++
++#define _update_stat( method, group ) \
++      update_stat( VAR_NAME(method, group), 1);
++
++#define DECLARE_STATS(method) \
++      { STAT_NAME(method, 1), 0, &VAR_NAME(method, 1) }, \
++      { STAT_NAME(method, 2), 0, &VAR_NAME(method, 2) }, \
++      { STAT_NAME(method, 3), 0, &VAR_NAME(method, 3) }, \
++      { STAT_NAME(method, 4), 0, &VAR_NAME(method, 4) }, \
++      { STAT_NAME(method, 5), 0, &VAR_NAME(method, 5) }, \
++      { STAT_NAME(method, 6), 0, &VAR_NAME(method, 6) }
++
++DECLARE_STATS_VARS(invite);
++DECLARE_STATS_VARS(cancel);
++DECLARE_STATS_VARS(bye);
++DECLARE_STATS_VARS(register);
++DECLARE_STATS_VARS(message);
++DECLARE_STATS_VARS(prack);
++DECLARE_STATS_VARS(update);
++DECLARE_STATS_VARS(refer);
++
+ /*! exported core statistics */
+ stat_export_t core_stats[] = {
+ 	{"rcv_requests" ,         0,  &rcv_reqs              },
+@@ -121,6 +155,14 @@ stat_export_t core_stats[] = {
+ 	{"bad_URIs_rcvd",         0,  &bad_URIs              },
+ 	{"unsupported_methods",   0,  &unsupported_methods   },
+ 	{"bad_msg_hdr",           0,  &bad_msg_hdr           },
++      DECLARE_STATS(invite),
++      DECLARE_STATS(cancel),
++      DECLARE_STATS(bye),
++      DECLARE_STATS(register),
++      DECLARE_STATS(message),
++      DECLARE_STATS(prack),
++      DECLARE_STATS(update),
++      DECLARE_STATS(refer),
+ 	{0,0,0}
+ };
+ 
+@@ -200,6 +242,27 @@ static int km_cb_req_stats(struct sip_ms
+ 	return 1;
+ }
+ 
++static int km_cb_rpl_stats_by_method(struct sip_msg *msg,
++		unsigned int flags, void *param)
++{
++      int method = get_cseq(msg)->method_id;
++      int group = msg->first_line.u.reply.statuscode / 100;
++
++      if (group >=1 && group <=6) {
++            switch(method) {
++                  case METHOD_INVITE: update_stat( VAR_NAME(invite, group), 1); break;
++                  case METHOD_CANCEL: update_stat( VAR_NAME(cancel, group), 1); break;
++                  case METHOD_BYE: update_stat( VAR_NAME(bye, group), 1); break;
++                  case METHOD_REGISTER: update_stat( VAR_NAME(register, group), 1); break;
++                  case METHOD_MESSAGE: update_stat( VAR_NAME(message, group), 1); break;
++                  case METHOD_PRACK: update_stat( VAR_NAME(prack, 1), group) break;
++                  case METHOD_UPDATE: update_stat( VAR_NAME(update, 1), group); break;
++                  case METHOD_REFER: update_stat( VAR_NAME(refer, group), 1) break;
++      }
++
++      return 1;
++}
++
+ static int km_cb_rpl_stats(struct sip_msg *msg,
+ 		unsigned int flags, void *param)
+ {
+@@ -321,6 +384,10 @@ int register_core_stats(void)
+ 		LM_ERR("failed to register PRE request callback\n");
+ 		return -1;
+ 	}
++	if (register_script_cb(km_cb_rpl_stats_by_method, PRE_SCRIPT_CB|ONREPLY_CB, 0)<0 ) {
++		LM_ERR("failed to register PRE request callback\n");
++		return -1;
++	}
+ 	if (stats_proc_stats_init_rpc()<0) return -1;
+ 	sr_event_register_cb(SREV_CORE_STATS, sts_update_core_stats);
+ 
+--- a/src/modules/kex/core_stats.h
++++ b/src/modules/kex/core_stats.h
+@@ -69,6 +69,8 @@ extern stat_var* rcv_rpls_480;
+ extern stat_var* rcv_rpls_486;
+ extern stat_var* rcv_rpls_5xx;
+ extern stat_var* rcv_rpls_6xx;
++extern stat_var* rcv_rpls_2xx_invite;
++extern stat_var* rcv_rpls_4xx_invite;
+ 
+ /*! \brief forwarded requests */
+ extern stat_var* fwd_reqs;
