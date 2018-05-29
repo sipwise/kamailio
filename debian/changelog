@@ -1,3 +1,41 @@
+ngcp-kamailio (5.1.2-1+0~mr6.3.1.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [9548c16] TT#34650 db_redis: Fix various pointer and memory issues
+  * [5534178] TT#34900 Fix notify after BYE in case of shared line
+  * [47c08b9] TT#36211 proxy annoying errors in logs during config-test
+
+  [ Manuel Montecelo ]
+  * [9d7068d] TT#26264 Fix to install the config files for tmpfiles.d
+
+  [ Andreas Granig ]
+  * [243697c] TT#34650 Fix db_redis table scan on 0 query args
+  * [04cb118] TT#34650 Fix table scan with lots of rows
+  * [72d728b] TT#36255 Fix redis error handling
+  * [22d8aa0] TT#37389 Backport kamailio RLS buffer fix
+
+  [ Alexander Lutay ]
+  * [27c63cd] TT#35502 Replace Requires=mariadb.service with Wants=mariadb.service for kamailio-proxy.service
+
+  [ Mykola Malkov ]
+  * [e27e59a] TT#33384 Use weaker type of services' dependency on remote-fs
+
+  [ Guillem Jover ]
+  * [c0b5748] TT#26264 Remove obsolete rc.d symlinks
+  * [62f727d] TT#26264 Cleanup systemd support
+  * [0bf7660] TT#36284 Move back mariadb.service from Wants to Restores for proxy
+
+  [ Richard Fuchs ]
+  * [b7397fd] TT#35413 add support for rtpengine load balancing
+
+  [ Andrew Pogrebennyk ]
+  * [2bf44a4] TT#36071 modules/topos: import from upstream 5.1.3 commit f9e0bc3
+  * [c06e6ca] TT#37050 import commit 03dd592 from upstream/5.1
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 29 May 2018 10:03:57 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.3.0.0) unstable; urgency=medium
 
   [ Andreas Granig ]
