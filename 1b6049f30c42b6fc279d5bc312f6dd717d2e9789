@@ -16,6 +16,24 @@
       "revId": "1b6049f30c42b6fc279d5bc312f6dd717d2e9789",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fabf19d9_eb456b17",
+        "filename": "debian/patches/sipwise/cfgt_onsend_exit.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2018-06-01T12:37:48Z",
+      "side": 1,
+      "message": "Basically yes.\n prev is the father\n prevprev is the grandfather\n\nnode-\u003eroute-\u003eprev-\u003eprev was not working",
+      "parentUuid": "fabf19d9_eb80cb48",
+      "revId": "1b6049f30c42b6fc279d5bc312f6dd717d2e9789",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
