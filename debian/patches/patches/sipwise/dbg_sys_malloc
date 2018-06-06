@@ -1,0 +1,21 @@
+Index: kamailio/src/Makefile.defs
+===================================================================
+--- kamailio.orig/src/Makefile.defs
++++ kamailio/src/Makefile.defs
+@@ -653,7 +653,7 @@ ifneq ($(MEMPKG), sys)
+ C_DEFS+= -DPKG_MALLOC
+ endif
+ 
+-C_DEFS+= -DSHM_MEM  -DSHM_MMAP \
++C_DEFS+= -DSHM_MMAP \
+ 	 -DDNS_IP_HACK \
+ 	 -DUSE_MCAST \
+ 	 -DUSE_TCP \
+@@ -664,6 +664,7 @@ C_DEFS+= -DSHM_MEM  -DSHM_MMAP \
+ 	 -DUSE_DST_BLACKLIST \
+ 	 -DUSE_NAPTR \
+ 	 -DWITH_XAVP \
++	 -DDBG_SYS_MALLOC \
+ 	 #-DUSE_DNS_CACHE_STATS \
+ 	 #-DUSE_DST_BLACKLIST_STATS \
+ 	 #-DDNS_WATCHDOG_SUPPORT \
