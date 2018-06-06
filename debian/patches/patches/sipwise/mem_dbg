@@ -1,0 +1,79 @@
+Index: kamailio/src/modules/db_redis/redis_dbase.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_dbase.c
++++ kamailio/src/modules/db_redis/redis_dbase.c
+@@ -225,6 +225,7 @@ static int db_redis_build_entry_manual_k
+ 
+     redis_key_t *key = NULL;
+ 
++    LM_ERR("++++++ allocing manual key indices for %d entries\n", _n);
+     *manual_keys = (int*)pkg_malloc(_n * sizeof(int));
+     if (! *manual_keys) {
+         LM_ERR("Failed to allocate memory for manual key indices\n");
+@@ -236,6 +237,7 @@ static int db_redis_build_entry_manual_k
+     for (key = table->entry_keys; key; key = key->next) {
+         int subkey_found = 0;
+         int i;
++        *manual_key_count = 0;
+         LM_DBG("checking for existence of entry key '%.*s' in query to get manual key\n",
+                 key->key.len, key->key.s);
+         for (i = 0; i < _n; ++i) {
+@@ -245,6 +247,7 @@ static int db_redis_build_entry_manual_k
+                 subkey_found = 1;
+                 break;
+             } else {
++                LM_ERR("++++++ add key number %d to manual key index %d\n", i, *manual_key_count);
+                 (*manual_keys)[*manual_key_count] = i;
+                 (*manual_key_count)++;
+             }
+@@ -1080,7 +1083,12 @@ static int db_redis_perform_query(const 
+     RES_COL_N(*_r) = _nc;
+ 
+     if (!(*keys_count) && do_table_scan) {
+-        LM_DBG("performing full table scan\n");
++        LM_WARN("performing full table scan on table '%.*s' while performing query\n",
++                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
++        for(i = 0; i < _n; ++i) {
++            LM_WARN("  scan key %d is '%.*s'\n",
++                    i, _k[i]->len, _k[i]->s);
++        }
+         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
+                     keys, keys_count,
+                     manual_keys, manual_keys_count) != 0) {
+@@ -1235,7 +1243,7 @@ static int db_redis_perform_delete(const
+         redis_key_t *keys, int keys_count,
+         int *manual_keys, int manual_keys_count, int do_table_scan) {
+ 
+-    int j = 0;
++    int i = 0, j = 0;
+     redis_key_t *k = NULL;
+     int type_keys_count = 0;
+     int all_type_keys_count = 0;
+@@ -1250,7 +1258,12 @@ static int db_redis_perform_delete(const
+     redis_key_t *type_key;
+ 
+     if (!keys_count && do_table_scan) {
+-        LM_DBG("performing full table scan\n");
++        LM_WARN("performing full table scan on table '%.*s' while performing delete\n",
++                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
++        for(i = 0; i < _n; ++i) {
++            LM_WARN("  scan key %d is '%.*s'\n",
++                    i, _k[i]->len, _k[i]->s);
++        }
+         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
+                     &keys, &keys_count,
+                     &manual_keys, &manual_keys_count) != 0) {
+@@ -1461,7 +1474,12 @@ static int db_redis_perform_update(const
+     size_t col;
+ 
+     if (!(*keys_count) && do_table_scan) {
+-        LM_DBG("performing full table scan\n");
++        LM_WARN("performing full table scan on table '%.*s' while performing update\n",
++                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
++        for(i = 0; i < _n; ++i) {
++            LM_WARN("  scan key %d is '%.*s'\n",
++                    i, _k[i]->len, _k[i]->s);
++        }
+         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
+                     keys, keys_count,
+                     manual_keys, manual_keys_count) != 0) {
