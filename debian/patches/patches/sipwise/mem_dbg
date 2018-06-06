@@ -1,0 +1,34 @@
+Index: kamailio/src/modules/db_redis/redis_dbase.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_dbase.c
++++ kamailio/src/modules/db_redis/redis_dbase.c
+@@ -1080,7 +1080,8 @@ static int db_redis_perform_query(const 
+     RES_COL_N(*_r) = _nc;
+ 
+     if (!(*keys_count) && do_table_scan) {
+-        LM_DBG("performing full table scan\n");
++        LM_WARN("performing full table scan on table '%.*s' while performing query\n",
++                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
+                     keys, keys_count,
+                     manual_keys, manual_keys_count) != 0) {
+@@ -1250,7 +1251,8 @@ static int db_redis_perform_delete(const
+     redis_key_t *type_key;
+ 
+     if (!keys_count && do_table_scan) {
+-        LM_DBG("performing full table scan\n");
++        LM_WARN("performing full table scan on table '%.*s' while performing delete\n",
++                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
+                     &keys, &keys_count,
+                     &manual_keys, &manual_keys_count) != 0) {
+@@ -1461,7 +1463,8 @@ static int db_redis_perform_update(const
+     size_t col;
+ 
+     if (!(*keys_count) && do_table_scan) {
+-        LM_DBG("performing full table scan\n");
++        LM_WARN("performing full table scan on table '%.*s' while performing update\n",
++                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
+         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
+                     keys, keys_count,
+                     manual_keys, manual_keys_count) != 0) {
