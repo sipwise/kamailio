@@ -52,6 +52,24 @@
       "revId": "1b6049f30c42b6fc279d5bc312f6dd717d2e9789",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5ad0253b_0f5e79e9",
+        "filename": "debian/patches/sipwise/cfgt_onsend_exit.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2018-06-11T16:05:06Z",
+      "side": 1,
+      "message": "OK, I\u0027ll try.\n\nThanks",
+      "parentUuid": "5ad0253b_24527cde",
+      "revId": "1b6049f30c42b6fc279d5bc312f6dd717d2e9789",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
