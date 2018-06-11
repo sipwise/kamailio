@@ -34,6 +34,24 @@
       "revId": "1b6049f30c42b6fc279d5bc312f6dd717d2e9789",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5ad0253b_24527cde",
+        "filename": "debian/patches/sipwise/cfgt_onsend_exit.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1000039
+      },
+      "writtenOn": "2018-06-11T06:30:05Z",
+      "side": 1,
+      "message": "Then maybe it makes sence to check something like:\ngrandfather \u003d node-\u003ereoute-\u003eprev-\u003eprev\nif (grandfather !\u003d null)\n{\n  // do something with grandfather\n}\n\nand avoid introducing extra structure member prevprev.",
+      "parentUuid": "fabf19d9_eb456b17",
+      "revId": "1b6049f30c42b6fc279d5bc312f6dd717d2e9789",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
