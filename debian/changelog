@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.2-1+0~mr6.2.1.5) unstable; urgency=medium
+
+  [ Andreas Granig ]
+  * [4831a18] TT#37500 Reset manual key count on key switch
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 12 Jun 2018 12:02:18 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.2.1.4) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
