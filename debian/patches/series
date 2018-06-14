@@ -38,3 +38,4 @@ sipwise/0001-topos-reuse-uuid-for-requests-withing-dialog.patch
 sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
 sipwise/rls_fix_buffer.patch
 sipwise/fix_db_redis_manual_key_issue.patch
+sipwise/tcap_add_var_extract_f
