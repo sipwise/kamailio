@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5ad0253b_97dbbfed",
+        "filename": "debian/patches/sipwise/extend_stats.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 1000006
+      },
+      "writtenOn": "2018-06-15T10:02:55Z",
+      "side": 1,
+      "message": "shouldn\u0027t it be cseq method?\nI seem to get zero in the new statistics, e.g.:\n  \"core:rcv_replies_4xx \u003d 3\",\n  \"core:rcv_replies_4xx_invite \u003d 0\",\n\nthese 3 replies were to invite but the corresponding counter did not increase",
+      "range": {
+        "startLine": 40,
+        "startChar": 45,
+        "endLine": 40,
+        "endChar": 46
+      },
+      "revId": "028460afe3bb6e570ee72239bf244181550e414e",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
