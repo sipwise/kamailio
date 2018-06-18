@@ -1,0 +1,32 @@
+From: f94770840029c1c73ab129f4b71fcb0cf146d808
+Author: Daniel-Constantin Mierla <miconda@gmail.com>
+Date:   Wed Jun 6 10:24:18 2018 +0200
+Subject: tm: free new tm cell in case of error if it was not referenced
+    
+    - part of t_uac_prepare(), reported by GH #1554
+---
+--- a/src/modules/tm/uac.c
++++ b/src/modules/tm/uac.c
+@@ -583,11 +583,18 @@ static inline int t_uac_prepare(uac_req_
+ 
+ error2:
+ #ifdef TM_DEL_UNREF
+-	if (!is_ack) {
+-		UNREF_FREE(new_cell);
+-	}else
+-#endif
++	if (is_ack) {
+ 		free_cell(new_cell);
++	} else {
++		if(atomic_get_int(&new_cell->ref_count)==0) {
++			free_cell(new_cell);
++		} else {
++			UNREF_FREE(new_cell);
++		}
++	}	
++#else
++	free_cell(new_cell);
++#endif
+ error3:
+ 	return ret;
+ }

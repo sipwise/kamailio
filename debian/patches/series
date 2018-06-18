@@ -35,3 +35,7 @@ sipwise/fix_db_redis_memory_issues.patch
 sipwise/rtpengine-balancing.patch
 sipwise/fix_db_redis_manual_key_issue.patch
 sipwise/tcap_add_tcap_var_extract.patch
+## backport from kamailio upstream (5.2)
+upstream/0001-tm-free-new-cell-in-case-of-error.patch
+upstream/0002-tm-force-free-cell-if-transaction-is-unlinkled.patch
+upstream/0003-tm-backup-and-restore-T-and-T_branch-in-t_continue.patch
