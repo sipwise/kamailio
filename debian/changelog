@@ -1,3 +1,16 @@
+ngcp-kamailio (4.4.5-1+0~mr4.5.10.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [9413643] Revert "TT#34850 Remove already applied upstream patches and refresh old ones"
+  * [69c329c] Revert "Merge tag 'upstream/4.4.7' into mr4.5"
+
+  [ Andrew Pogrebennyk ]
+  * [dd449aa] TT#37050 import commit 03dd592 from upstream/5.1 to mr5.5
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 18 Jun 2018 10:39:24 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr4.5.9.0) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
