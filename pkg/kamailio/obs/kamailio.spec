@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.1.2
+%define ver 5.1.4
 %define rel 0%{dist}
 
 %if 0%{?fedora} == 25
@@ -1118,7 +1118,7 @@ rm -rf %{buildroot}
 %if "%{?_unitdir}" == ""
 /sbin/chkconfig --add kamailio
 %else
-%tmpfiles_create kamailio
+%tmpfiles_create kamailio.conf
 /usr/bin/systemctl -q enable kamailio.service
 %endif
 

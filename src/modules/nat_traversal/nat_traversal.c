@@ -258,6 +258,7 @@ static NetInfo rfc1918nets[] = {
 	{"172.16.0.0", 0xac100000UL, 0xfff00000UL},
 	{"192.168.0.0", 0xc0a80000UL, 0xffff0000UL},
 	{"100.64.0.0", 0x64400000UL, 0xffc00000UL}, // include rfc6598 shared address space as technically the same for our purpose
+	{"192.0.0.0", 0xc0000000UL, 0xfffffff8UL}, // include rfc7335 IPv4 Service Continuity Prefix
 	{NULL, 0UL, 0UL}
 };
 
@@ -1904,7 +1905,7 @@ static int mod_init(void)
 		LM_NOTICE("using 10 seconds for keepalive_interval\n");
 		keepalive_interval = 10;
 	}
-	register_dummy_timers(1);
+	register_basic_timers(1);
 
 	return 0;
 }
@@ -1912,7 +1913,7 @@ static int mod_init(void)
 static int child_init(int rank)
 {
 	if(rank == PROC_MAIN) {
-		if(fork_dummy_timer(PROC_TIMER, "TIMER NT", 1 /*socks flag*/,
+		if(fork_basic_timer(PROC_TIMER, "TIMER NT", 1 /*socks flag*/,
 				   keepalive_timer, NULL, 1 /*sec*/)
 				< 0) {
 			LM_ERR("failed to register keepalive timer process\n");
