@@ -1,3 +1,17 @@
+ngcp-kamailio (5.1.4-1+0~mr6.4.0.0) unstable; urgency=medium
+
+  [ Andreas Granig ]
+  * [a3b1703] TT#37500 Reset manual key count on key switch
+
+  [ Marco Capetta ]
+  * [5e852cb] TT#35352 Fix cfgt module in case of return from onsend_route
+  * [0948636] TT#38155 Add tcap_extract_var function to tcap module
+  * [2e7b6d1] Imported Upstream version 5.1.4
+  * [ee80af9] TT#38600 Remove already applied upstream patches and refresh old ones
+  * [b8a2810] TT#38600 Add new important upstream patches
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Mon, 18 Jun 2018 15:44:20 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.4.0.0) unstable; urgency=medium
 
   [ Marco Capetta ]
