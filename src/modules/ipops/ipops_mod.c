@@ -390,7 +390,7 @@ int _ip_is_in_subnet_v4(struct in_addr *ip, char *net, size_t netlen,
 	if (netmask == 32) ipv4_mask = 0xFFFFFFFF;
 	else ipv4_mask = htonl(~(0xFFFFFFFF >> netmask));
 
-	if ((ip->s_addr & ipv4_mask) == net_addr.s_addr)
+	if ((ip->s_addr & ipv4_mask) == (net_addr.s_addr & ipv4_mask))
 		return 1;
 	return 0;
 }
@@ -415,7 +415,8 @@ int _ip_is_in_subnet_v6(struct in6_addr *ip, char *net, size_t netlen,
 		else ipv6_mask[i] = 0x00;
 	}
 	for (i=0; i<16; i++)  ip->s6_addr[i] &= ipv6_mask[i];
-	if (memcmp(ip->s6_addr, ip->s6_addr, sizeof(net_addr.s6_addr)) == 0)
+	for (i=0; i<16; i++)  net_addr.s6_addr[i] &= ipv6_mask[i];
+	if (memcmp(ip->s6_addr, net_addr.s6_addr, sizeof(net_addr.s6_addr)) == 0)
 		return 1;
 	return 0;
 }
