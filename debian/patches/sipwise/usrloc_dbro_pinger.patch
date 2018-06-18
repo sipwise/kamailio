@@ -1,6 +1,6 @@
 --- a/src/modules/usrloc/dlist.c
 +++ b/src/modules/usrloc/dlist.c
-@@ -115,6 +115,8 @@ static inline int get_all_db_ucontacts(v
+@@ -113,6 +113,8 @@ static inline int get_all_db_ucontacts(v
  	db_op_t  ops1[4];
  	db_key_t keys2[6]; /* select */
  	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
@@ -9,7 +9,7 @@
  
  	cp = buf;
  	shortage = 0;
-@@ -169,22 +171,26 @@ static inline int get_all_db_ucontacts(v
+@@ -159,22 +161,26 @@ static inline int get_all_db_ucontacts(v
  		vals1[n[0]].nul = 0;
  		vals1[n[0]].val.int_val = server_id;
  		n[0]++;
@@ -39,7 +39,7 @@
  			continue;
  		}
  
-@@ -307,7 +313,7 @@ static inline int get_all_db_ucontacts(v
+@@ -297,7 +303,7 @@ static inline int get_all_db_ucontacts(v
  			len -= needed;
  		} /* row cycle */
  

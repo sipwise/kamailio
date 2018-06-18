@@ -17,7 +17,7 @@
  static int fixup_set_id(void ** param, int param_no);
  static int set_rtpengine_set_f(struct sip_msg * msg, char * str1, char * str2);
  static struct rtpp_set * select_rtpp_set(unsigned int id_set);
-@@ -2018,6 +2019,8 @@ static int parse_flags(struct ng_flags_p
+@@ -2016,6 +2017,8 @@ static int parse_flags(struct ng_flags_p
  						ng_flags->via = 3;
  					else if (str_eq(&val, "extra"))
  						ng_flags->via = -1;

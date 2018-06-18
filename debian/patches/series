@@ -33,9 +33,5 @@ sipwise/fix_db_redis_time_schema.patch
 sipwise/fix_db_redis_free_memory.patch
 sipwise/fix_db_redis_memory_issues.patch
 sipwise/rtpengine-balancing.patch
-sipwise/tcap_add_tcap_var_extract.patch
-# backport from kamailio 5.1.3
-sipwise/0001-topos-reuse-uuid-for-requests-withing-dialog.patch
-sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
-sipwise/rls_fix_buffer.patch
 sipwise/fix_db_redis_manual_key_issue.patch
+sipwise/tcap_add_tcap_var_extract.patch
