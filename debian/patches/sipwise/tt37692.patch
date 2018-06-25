@@ -1,0 +1,198 @@
+--- a/src/modules/permissions/trusted.c
++++ b/src/modules/permissions/trusted.c
+@@ -354,16 +354,15 @@ static inline int match_proto(const char
+ 
+ 	return 0;
+ }
+-
+ /*
+  * Matches from uri against patterns returned from database.  Returns number
+  * of matches or -1 if none of the patterns match.
+  */
+-static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
++static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r, char *uri)
+ {
+ 	int i, tag_avp_type;
+-	str uri, ruri;
+-	char uri_string[MAX_URI_SIZE+1];
++	str ruri;
++
+ 	char ruri_string[MAX_URI_SIZE+1];
+ 	db_row_t* row;
+ 	db_val_t* val;
+@@ -372,14 +371,6 @@ static int match_res(struct sip_msg* msg
+ 	int count = 0;
+ 
+ 	if (IS_SIP(msg)) {
+-		if (parse_from_header(msg) < 0) return -1;
+-		uri = get_from(msg)->uri;
+-		if (uri.len > MAX_URI_SIZE) {
+-			LM_ERR("message has From URI too large\n");
+-			return -1;
+-		}
+-		memcpy(uri_string, uri.s, uri.len);
+-		uri_string[uri.len] = (char)0;
+ 		ruri = msg->first_line.u.request.uri;
+ 		if (ruri.len > MAX_URI_SIZE) {
+ 			LM_ERR("message has Request URI too large\n");
+@@ -412,7 +403,7 @@ static int match_res(struct sip_msg* msg
+ 							continue;
+ 						}
+ 					}
+-					if (regexec(&preg, uri_string, 0, (regmatch_t *)0, 0)) {
++					if (regexec(&preg, uri, 0, (regmatch_t *)0, 0)) {
+ 						regfree(&preg);
+ 						continue;
+ 					}
+@@ -450,13 +441,13 @@ static int match_res(struct sip_msg* msg
+ 		return count;
+ }
+ 
+-
+ /*
+  * Checks based on given source IP address and protocol, and From URI
+  * of request if request can be trusted without authentication.
+  */
+-int allow_trusted(struct sip_msg* msg, char *src_ip, int proto)
++int allow_trusted(struct sip_msg* msg, char *src_ip, int proto, char *uri)
+ {
++      LM_DBG("XXX: allow_trusted %s.\n", uri);
+ 	int result;
+ 	db1_res_t* res = NULL;
+ 
+@@ -498,7 +489,7 @@ int allow_trusted(struct sip_msg* msg, c
+ 			return -1;
+ 		}
+ 
+-		result = match_res(msg, proto, res);
++		result = match_res(msg, proto, res, uri);
+ 		perm_dbf.free_result(db_handle, res);
+ 		return result;
+ 	} else {
+@@ -513,18 +504,35 @@ int allow_trusted(struct sip_msg* msg, c
+  */
+ int allow_trusted_0(struct sip_msg* _msg, char* str1, char* str2)
+ {
+-	return allow_trusted(_msg, ip_addr2a(&(_msg->rcv.src_ip)),
+-			_msg->rcv.proto);
+-}
++      LM_DBG("XXX: allow_trusted_0.\n");
++      char uri_string[MAX_URI_SIZE + 1];
++      str uri;
++
++      if (IS_SIP(_msg)) {
++            if (parse_from_header(_msg) < 0) return -1;
++            uri = get_from(_msg)->uri;
++            if (uri.len > MAX_URI_SIZE) {
++                  LM_ERR("message has From URI too large\n");
++                  return -1;
++            }
+ 
++		memcpy(uri_string, uri.s, uri.len);
++		uri_string[uri.len] = (char)0;
++      }
++
++      LM_DBG("XXX: allow_trusted_0 %s.\n", uri_string);
++
++	return allow_trusted(_msg, ip_addr2a(&(_msg->rcv.src_ip)), _msg->rcv.proto, uri_string);
++}
+ 
+ /*
+  * Checks based on source address and protocol given in pvar arguments and
+- * and requests's From URI, if request can be trusted without authentication.
++ * provided uri, if request can be trusted without authentication.
+  */
+-int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp)
++int allow_trusted_1(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp, char *_uri)
+ {
+-	str src_ip, proto;
++      LM_DBG("XXX: allow_trusted_1 src_ip: %s, proto: %s, uri: %s\n", _src_ip_sp, _proto_sp, _uri);
++	str src_ip, proto, uri;
+ 	int proto_int;
+ 
+ 	if (_src_ip_sp==NULL
+@@ -539,6 +547,11 @@ int allow_trusted_2(struct sip_msg* _msg
+ 		return -1;
+ 	}
+ 
++      if (_uri==NULL || (fixup_get_svalue(_msg, (gparam_p)_uri, &uri) != 0)) {
++            LM_ERR("uri param does not exist or has no value\n");
++            return -1;
++      }
++
+ 	if(proto.len<2 || proto.len>4)
+ 		goto error;
+ 
+@@ -576,12 +589,46 @@ int allow_trusted_2(struct sip_msg* _msg
+ 			goto error;
+ 	}
+ 
+-	return allow_trusted(_msg, src_ip.s, proto_int);
++	return allow_trusted(_msg, src_ip.s, proto_int, _uri);
+ error:
+ 	LM_ERR("unknown protocol %.*s\n", proto.len, proto.s);
+ 	return -1;
+ }
+ 
++/*
++ * Checks based on source address and protocol given in pvar arguments and
++ * and requests's From URI, if request can be trusted without authentication.
++ */
++int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp)
++{
++      char uri_string[MAX_URI_SIZE + 1];
++      str s_uri;
++
++      if (IS_SIP(_msg)) {
++            if (parse_from_header(_msg) < 0) return -1;
++            s_uri = get_from(_msg)->uri;
++            if (s_uri.len > MAX_URI_SIZE) {
++                  LM_ERR("message has From URI too large\n");
++                  return -1;
++            }
++
++            memcpy(uri_string, s_uri.s, s_uri.len);
++            uri_string[s_uri.len] = (char)0;
++      }
++
++      LM_DBG("XXX: allow_trusted_2 %s.\n", uri_string);
++      return allow_trusted_1(_msg, _src_ip_sp, _proto_sp, uri_string);
++}
++
++/*
++ * Checks based on source address and protocol given in pvar arguments and
++ * and requests's From URI, if request can be trusted without authentication.
++ */
++int allow_trusted_3(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp, char *_uri)
++{
++      LM_DBG("XXX: allow_trusted_3 %s.\n", _uri);
++      return allow_trusted_1(_msg, _src_ip_sp, _proto_sp, _uri);
++}
+ 
+ int reload_trusted_table_cmd(void)
+ {
+--- a/src/modules/permissions/permissions.c
++++ b/src/modules/permissions/permissions.c
+@@ -141,6 +141,8 @@ static cmd_export_t cmds[] = {
+ 		ANY_ROUTE},
+ 	{"allow_trusted",  (cmd_function)allow_trusted_2,  2, fixup_spve_spve,
+ 		fixup_free_spve_spve, ANY_ROUTE},
++	{"allow_trusted",  (cmd_function)allow_trusted_3,  3, fixup_spve_spve,
++            fixup_free_spve_spve, ANY_ROUTE},
+ 	{"allow_uri",      (cmd_function)allow_uri, 2, double_fixup, 0,
+ 		REQUEST_ROUTE | FAILURE_ROUTE},
+ 	{"allow_address",  (cmd_function)w_allow_address, 3, fixup_allow_address,
+--- a/src/modules/permissions/trusted.h
++++ b/src/modules/permissions/trusted.h
+@@ -75,6 +75,11 @@ int allow_trusted_0(struct sip_msg* _msg
+  */
+ int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp);
+ 
++/*
++ * Checks based on source address and protocol given in pvar arguments and
++ * provided URI, if request can be trusted without authentication.
++ */
++int allow_trusted_3(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp, char* uri);
+ 
+ int reload_trusted_table_cmd(void);
+ 
