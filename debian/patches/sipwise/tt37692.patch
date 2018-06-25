@@ -1,0 +1,46 @@
+--- a/src/modules/permissions/README
++++ b/src/modules/permissions/README
+@@ -79,6 +79,7 @@ Emmanuel Schmidbauer
+               4.9. allow_source_address_group()
+               4.10. allow_address_group(addr, port)
+               4.11. allow_trusted([src_ip_pvar, proto_pvar])
++              4.12. allow_trusted([src_ip_pvar, proto_pvar, uri_var])
+ 
+         5. RPC Commands
+ 
+@@ -184,6 +185,7 @@ Chapter 1. Admin Guide
+         4.9. allow_source_address_group()
+         4.10. allow_address_group(addr, port)
+         4.11. allow_trusted([src_ip_pvar, proto_pvar])
++        4.12. allow_trusted([src_ip_pvar, proto_pvar, uri_var])
+ 
+    5. RPC Commands
+ 
+@@ -342,7 +344,7 @@ Chapter 1. Admin Guide
+      * transport protocol is either "ANY" or equal to the transport
+        protocol of request or the transport protocol given in pvar, and
+      * regular expression is either empty (NULL in database) or matches
+-       the From URI of request.
++       the From URI of request (or provided in allow_trusted() call uri).
+ 
+    Otherwise the request is rejected.
+ 
+@@ -716,6 +718,7 @@ modparam("permissions", "load_backends",
+    4.9. allow_source_address_group()
+    4.10. allow_address_group(addr, port)
+    4.11. allow_trusted([src_ip_pvar, proto_pvar])
++   4.12. allow_trusted([src_ip_pvar, proto_pvar, uri_var])
+ 
+ 4.1.  allow_routing()
+ 
+@@ -975,6 +978,10 @@ if (allow_trusted("$si", "$proto")) {
+ };
+ ...
+ 
++4.12.  allow_trusted([src_ip_pvar, proto_pvar, uri_pvar])
++
++    This makes same checks as allow_trusted([src_ip_pvar, proto_pvar]) but it uses provided uri_pvar instead of From URI during matching.
++
+ 5. RPC Commands
+ 
+    5.1. permissions.addressReload
