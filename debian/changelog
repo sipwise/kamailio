@@ -1,3 +1,21 @@
+ngcp-kamailio (5.1.2-1+0~mr6.2.3.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [80ca955] TT#36211 proxy annoying errors in logs during config-test
+
+  [ Guillem Jover ]
+  * [315e57e] TT#36284 Move back mariadb.service from Wants to Restores for proxy
+
+  [ Andrew Pogrebennyk ]
+  * [a0d9259] TT#37050 import commit 03dd592 from upstream/5.1 to mr6.2
+
+  [ Andreas Granig ]
+  * [cbfc429] TT#37500 Reset manual key count on key switch
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 02 Jul 2018 12:22:16 +0200
+
 ngcp-kamailio (5.1.2-1+0~mr6.2.2.0) unstable; urgency=medium
 
   [ Marco Capetta ]
