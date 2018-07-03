@@ -10,7 +10,7 @@ sipwise/add_pcem_module.patch
 sipwise/add_lcr_rate_module.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
-sipwise/add_db_redis_module.patch
+upstream/add_db_redis_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
@@ -29,11 +29,11 @@ sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 ## Ongoing Patches
-sipwise/fix_db_redis_time_schema.patch
-sipwise/fix_db_redis_free_memory.patch
-sipwise/fix_db_redis_memory_issues.patch
+upstream/fix_db_redis_time_schema.patch
+upstream/fix_db_redis_free_memory.patch
+upstream/fix_db_redis_memory_issues.patch
+upstream/fix_db_redis_manual_key_issue.patch
 sipwise/rtpengine-balancing.patch
-sipwise/fix_db_redis_manual_key_issue.patch
 sipwise/tcap_add_tcap_var_extract.patch
 ## backport from kamailio upstream (5.2)
 upstream/0001-tm-free-new-cell-in-case-of-error.patch
