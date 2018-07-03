@@ -43,10 +43,8 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
-@@ -0,0 +1,442 @@
+@@ -0,0 +1,440 @@
 +/*
-+ * $Id$
-+ *
 + * call rating for least cost routing module
 + *
 + * Copyright (C) 2012 Sipwise GmbH

@@ -11,8 +11,7 @@
  # - common modules depending on database, using UID db schema
 --- /dev/null
 +++ b/src/modules/pcem/Makefile
-@@ -0,0 +1,18 @@
-+# $Id$
+@@ -0,0 +1,17 @@
 +#
 +# pcem module makefile
 +#
@@ -32,10 +31,8 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/src/modules/pcem/pcem_logic.c
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,128 @@
 +/*
-+ * $Id$
-+ *
 + * PacketCable Event Messages module
 + *
 + * Copyright (C) 2012 Sipwise GmbH
@@ -165,10 +162,8 @@
 +
 --- /dev/null
 +++ b/src/modules/pcem/pcem_logic.h
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,32 @@
 +/*
-+ * $Id$
-+ *
 + * PacketCable Event Messages module
 + *
 + * Copyright (C) 2012 Sipwise GmbH
@@ -202,10 +197,8 @@
 +#endif
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.c
-@@ -0,0 +1,153 @@
+@@ -0,0 +1,151 @@
 +/*
-+ * $Id$
-+ *
 + * PacketCable Event Messages module
 + *
 + * Copyright (C) 2012 Sipwise GmbH
@@ -358,10 +351,8 @@
 +
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.h
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,31 @@
 +/*
-+ * $Id$
-+ *
 + * PacketCable Event Messages module
 + *
 + * Copyright (C) 2012 Sipwise GmbH
