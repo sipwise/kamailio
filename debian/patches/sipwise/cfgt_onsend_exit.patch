@@ -1,6 +1,10 @@
+---
+ src/modules/cfgt/cfgt_int.c |   28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
+
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
-@@ -477,9 +477,13 @@ int _cfgt_add_routename(cfgt_node_p node
+@@ -474,9 +474,13 @@ int _cfgt_add_routename(cfgt_node_p node
  	} else {
  		LM_DBG("actual routename:[%.*s][%d]\n", node->route->s.len,
  				node->route->s.s, node->route->type);
@@ -15,7 +19,7 @@
  		if(node->route->next)
  			LM_DBG("next routename:[%.*s][%d]\n", node->route->next->s.len,
  					node->route->next->s.s, node->route->next->type);
-@@ -487,12 +491,19 @@ int _cfgt_add_routename(cfgt_node_p node
+@@ -484,12 +488,19 @@ int _cfgt_add_routename(cfgt_node_p node
  			LM_DBG("same route\n");
  			_cfgt_set_type(node->route, a);
  			return 2;
@@ -41,7 +45,7 @@
  		}
  		route = pkg_malloc(sizeof(cfgt_str_list_t));
  		if(!route) {
-@@ -500,6 +511,9 @@ int _cfgt_add_routename(cfgt_node_p node
+@@ -497,6 +508,9 @@ int _cfgt_add_routename(cfgt_node_p node
  			return -1;
  		}
  		memset(route, 0, sizeof(cfgt_str_list_t));
