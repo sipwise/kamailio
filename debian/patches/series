@@ -1,8 +1,8 @@
 
 ## Package related
-sipwise/no_lib64_on_64_bits.patch
-sipwise/no_INSTALL_file.patch
-sipwise/fix_export.patch
+debian/no_lib64_on_64_bits.patch
+debian/no_INSTALL_file.patch
+debian/fix_export.patch
 sipwise/do-not-install-default-config.patch
 sipwise/parallel_build.patch
 ## New Modules
