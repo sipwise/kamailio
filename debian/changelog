@@ -1,3 +1,24 @@
+ngcp-kamailio (5.1.4-1+0~mr6.5.0.0) unstable; urgency=medium
+
+  [ Roman Romanchenko ]
+  * [0cec8e9] TT#36356 Extend kamailio rcv_replies statistics
+  * [41f15a2] TT#37692 Improve From pattern matching in kamailio permissions module when From is anonymous
+
+  [ Kirill Solomko ]
+  * [3d847c6] TT#39171 avpops: add avp_subst() pvar as subst
+
+  [ Guillem Jover ]
+  * [4f6a770] TT#39700 Simplify fix by reducing changed lines
+  * [d908c1f] TT#39700 Move Debian patches into their own directory
+  * [4bb3d42] TT#39700 Move db_redis patches merged upstream to the upstream dir
+  * [9d62138] TT#39700 Fold tcap_add_tcap_var_extract.patch into add_tcap_module.patch
+  * [9b996f7] TT#39700 Remove unused RCS keywords
+  * [3424f5a] TT#39700 Refresh patch to get rid of fuzz
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 24 Jul 2018 13:34:49 +0200
+
 ngcp-kamailio (5.1.4-1+0~mr6.4.0.0) unstable; urgency=medium
 
   [ Andreas Granig ]
