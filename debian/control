@@ -19,6 +19,7 @@ Build-Depends:
  libexpat1-dev,
  libmaxminddb-dev,
  libhiredis-dev (>= 0.10.0),
+ libical-dev,
  libjansson-dev,
  libjson-c-dev,
  libldap2-dev,
