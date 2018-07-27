@@ -47,6 +47,7 @@
 // bound API headers
 #include "../../modules/sl/sl.h"
 #include "../../modules/tm/tm_load.h"
+#include "../../modules/rr/api.h"
 
 // convenience macros
 #define SCA_STRUCT_PTR_OFFSET(struct1, cast1, offset1) \

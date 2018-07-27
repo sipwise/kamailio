@@ -60,6 +60,18 @@ cmd_CC+=$(CC_MKDEP_OPTS)
 cmd_MKDEP=
 endif # CC_MKDEP_OPTS
 
+cmd_CC_lock=while true; do ( flock -n 9 || exit 95; \
+	$(cmd_CC); \
+	) 9> $@.lock; exitcode=$$?; test $$exitcode = 95 || break; sleep 1; \
+	test -e $@ && exit 0; done; \
+	rm -f $@.lock; exit $$exitcode
+cmd_LD_lock=while true; do ( flock -n 9 || exit 95; \
+	$(cmd_LD); \
+	) 9> $@.lock; exitcode=$$?; test $$exitcode = 95 || break; sleep 1; \
+	test -e $@ && exit 0; done; \
+	rm -f $@.lock; exit $$exitcode
+
+
 # what will be displayed if quiet==silent
 silent_cmd_CC=CC ($(CC)) [$(strip $(crt_type) $(NAME))]		$@
 silent_cmd_LD=LD ($(LD)) [$(strip $(crt_type) $(NAME))]		$@
@@ -93,7 +105,7 @@ module_make=	if [ -n "$(1)" -a -r "$(1)/Makefile" ]; then \
 quote:= "
 escall= $(subst $$,\$$,$(subst $(quote),\$(quote),$1))
 exec_cmd= $(if $($(quiet)_cmd_$(1)),\
-			@echo "$(call escall,$($(quiet)_cmd_$(1)))" ;) $(cmd_$(1))
+			@echo "$(call escall,$($(quiet)_cmd_$(1)))" ;) $(cmd_$(1)_lock)
 
 #implicit rules
 %.o:%.c  $(ALLDEP)

@@ -13,7 +13,7 @@ all:
 
 install-if-newer: install
 
-install: install-cfg install-bin install-man install-modules
+install: install-bin install-man install-modules
 
 install-cfg: $(cfg_prefix)/$(cfg_dir)
 		# kamctl config
@@ -261,6 +261,18 @@ install-modules: $(bin_prefix)/$(bin_dir)
 					$(data_prefix)/$(data_dir)/db_sqlite/`basename "$$FILE"` ; \
 				$(INSTALL_CFG) $$FILE \
 					$(data_prefix)/$(data_dir)/db_sqlite/`basename "$$FILE"` ; \
+				fi ;\
+			done ; \
+		fi
+		# install Redis stuff
+		if [ "$(REDISON)" = "yes" ]; then \
+			mkdir -p $(data_prefix)/$(data_dir)/db_redis/kamailio ; \
+			for FILE in $(wildcard db_redis/kamailio/*) ; do \
+				if [ -f $$FILE ] ; then \
+				$(INSTALL_TOUCH) $$FILE \
+					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
+				$(INSTALL_CFG) $$FILE \
+					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
 				fi ;\
 			done ; \
 		fi

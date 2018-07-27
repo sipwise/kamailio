@@ -28,7 +28,7 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
 			  db_cluster dialog dispatcher domain drouting group \
 			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
 			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
-			  sqlops uac uri_db userblacklist usrloc
+			  sqlops uac uri_db userblacklist usrloc pcem
 
 
 # - common modules depending on database, using UID db schema
@@ -107,13 +107,16 @@ mod_list_sctp=sctp
 # - modules depending on openssl library
 mod_list_autheph=auth_ephemeral
 
+# - modules depending on swrate library
+mod_list_lcrrate=lcr_rate
+
 # - modules related to SIMPLE presence extensions
 mod_list_presence=presence presence_conference presence_dialoginfo \
 					   presence_mwi presence_profile presence_reginfo \
 					   presence_xml \
 					   pua pua_bla pua_dialoginfo pua_reginfo \
 					   pua_rpc pua_usrloc pua_xmpp \
-					   rls xcap_client xcap_server
+					   rls xcap_client xcap_server presence_dfks
 
 
 # - modules depending on lua library
@@ -153,7 +156,7 @@ mod_list_jansson=jansson
 mod_list_jansson_event=janssonrpcc
 
 # - modules depending on redis library
-mod_list_redis=ndb_redis topos_redis
+mod_list_redis=db_redis ndb_redis topos_redis
 
 # - modules depending on mono library
 mod_list_mono=app_mono
@@ -192,6 +195,9 @@ mod_list_erlang=erlang
 
 # - modules depending on systemd library
 mod_list_systemd=log_systemd
+
+# - modules depending on libtcap library
+mod_list_tcap=tcap
 
 # - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
 mod_list_nsq=nsq
@@ -233,7 +239,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
 			   $(mod_list_erlang) $(mod_list_systemd) \
 			   $(mod_list_http_async) $(mod_list_nsq) \
 			   $(mod_list_rabbitmq) $(mod_list_jsdt)) \
-			   $(mod_list_phonenum)
+			   $(mod_list_phonenum) \
+			   $(mod_list_lcrrate)
 
 
 
@@ -287,6 +294,11 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
 module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
 
 
+# pkg lcrrate module
+module_group_klcrrate=$(mod_list_lcrrate)
+
+# pkg tap module
+module_group_ktcap=$(mod_list_tcap)
 
 ### --- Groups defined for pacKaging ###
 
