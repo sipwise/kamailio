@@ -1,0 +1,242 @@
+--- /dev/null
++++ b/src/modules/tmrec/ical.c
+@@ -0,0 +1,116 @@
++#include "ical.h"
++#include <libical/ical.h>
++#include <libical/icalss.h>
++#include <stdlib.h>
++#include <fcntl.h>
++#include <string.h>
++
++const char *short_to_string(short i)
++{
++      // not thread safe
++      static char num[2];
++      sprintf(num, "%d", i);
++      return num;
++}
++
++void append_cs_array_formatted(char *dst, short array[], size_t size, const char *(*format_func)(short))
++{
++      int added = 0;
++
++      for (size_t i = 0; array[i] != ICAL_RECURRENCE_ARRAY_MAX && i < size; i++)
++      {
++            strcat(dst, format_func(array[i]));
++            strcat(dst, ",");
++            added++;
++      }
++
++      // remove last comma
++      if (added)
++      {
++            dst[strlen(dst) - 1] = 0;
++      }
++}
++
++void append_cs_array(char *dst, short array[], size_t size)
++{
++      return append_cs_array_formatted(dst, array, size, (const char * (*)(short))short_to_string);
++}
++
++void append_divider(char *dst)
++{
++      static const char divider[] ="|";
++      strcat(dst, divider);
++}
++
++void format_tmrec(str *s, icalcomponent *event)
++{
++      char *buf = s->s;
++      // startdate
++      struct icaltimetype dtstart = icalcomponent_get_dtstart(event);
++      strcat(buf, icaltime_as_ical_string(dtstart));
++      append_divider(buf);
++
++      // duration
++      struct icaldurationtype duration = icalcomponent_get_duration(event);
++      strcat(buf, icaldurationtype_as_ical_string(duration));
++      append_divider(buf);
++
++      icalproperty *rrule;
++      rrule = icalcomponent_get_first_property(event,ICAL_RRULE_PROPERTY);
++
++      // rrule if present
++      if (rrule)
++      {
++            // startdate, duration, [frequency]|[until]|[interval]|[byday]|[bymonthday]|[byyearday]|[byweekno]|[bymonth]
++            struct icalrecurrencetype recur;
++            recur = icalproperty_get_rrule(rrule);
++
++            // frequency
++            strcat(buf, icalrecur_freq_to_string(recur.freq));
++            append_divider(buf);
++
++            // until
++            if (!icaltime_is_null_time(recur.until))
++            {
++                 strcat(buf, icaltime_as_ical_string_r(recur.until));
++            }
++
++            append_divider(buf);
++
++            // interval
++            strcat(buf, short_to_string(recur.interval));
++            append_divider(buf);
++
++            // by_day
++            append_cs_array_formatted(buf, recur.by_day, ICAL_BY_DAY_SIZE, (const char * (*)(short))icalrecur_weekday_to_string);
++            append_divider(buf);
++
++            // by_month_day
++            append_cs_array(buf, recur.by_month_day, ICAL_BY_MONTHDAY_SIZE);
++            append_divider(buf);
++
++            // by_year_day
++            append_cs_array(buf, recur.by_year_day, ICAL_BY_YEARDAY_SIZE);
++            append_divider(buf);
++
++            // by_week_no
++            append_cs_array(buf, recur.by_week_no, ICAL_BY_WEEKNO_SIZE);
++            append_divider(buf);
++
++            // by_month
++            append_cs_array(buf, recur.by_month, ICAL_BY_MONTH_SIZE);
++      }
++      else
++      {
++            strcat(buf, "||||||||");
++      }
++
++      s->len = strlen(buf);
++}
++
++icalcomponent *create_from_buf(const char *buf)
++{
++      icalcomponent *c = icalparser_parse_string(buf);
++      return c;
++}
++
+--- /dev/null
++++ b/src/modules/tmrec/ical.h
+@@ -0,0 +1,14 @@
++#ifndef _ICAL_H_
++#define _ICAL_H_
++
++#include "../../core/str.h"
++#include <libical/ical.h>
++
++const char *short_to_string(short i);
++void append_cs_array_formatted(char *dst, short array[], size_t size, const char *(*format_func)(short));
++void append_cs_array(char *dst, short array[], size_t size);
++void append_divider(char *dst);
++void format_tmrec(str *s, icalcomponent *event);
++icalcomponent *create_from_buf(const char *buf);
++
++#endif
+--- a/src/modules/tmrec/tmrec_mod.c
++++ b/src/modules/tmrec/tmrec_mod.c
+@@ -41,6 +41,7 @@
+ #include "../../core/kemi.h"
+ #include "../../lib/srutils/tmrec.h"
+ #include "period.h"
++#include "ical.h"
+ 
+ 
+ MODULE_VERSION
+@@ -50,7 +51,9 @@ static int  child_init(int);
+ static void mod_destroy(void);
+ 
+ static int w_tmrec_match(struct sip_msg* msg, char* rec, char* t);
++static int w_tmrec_match_ical(struct sip_msg* msg, char* rec, char* t);
+ static int fixup_tmrec_match(void** param, int param_no);
++static int fixup_ical(void** param, int param_no);
+ static int w_is_leap_year(struct sip_msg* msg, char* t, char* p2);
+ static int fixup_is_leap_year(void** param, int param_no);
+ static int fixup_time_period_match(void** param, int param_no);
+@@ -65,6 +68,10 @@ static cmd_export_t cmds[]={
+ 		0, ANY_ROUTE},
+ 	{"tmrec_match", (cmd_function)w_tmrec_match, 2, fixup_tmrec_match,
+ 		0, ANY_ROUTE},
++	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 1, fixup_ical,
++		0, ANY_ROUTE},
++	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 2, fixup_ical,
++		0, ANY_ROUTE},
+ 	{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year,
+ 		0, ANY_ROUTE},
+ 	{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year,
+@@ -256,6 +263,35 @@ static int w_tmrec_match(struct sip_msg*
+ 	return ki_tmrec_match_timestamp(msg, &rv, ti);
+ }
+ 
++static int w_tmrec_match_ical(struct sip_msg* msg, char* ical_rec, char* t)
++{
++      str rv;
++	int ti;
++
++      if(fixup_get_svalue(msg, (gparam_t*)ical_rec, &rv)!=0)
++      {
++            LM_ERR("w_tmrec_match_ical: invalie input");
++            return -1;
++      }
++
++      if(t != NULL)
++      {
++            if(fixup_get_ivalue(msg, (gparam_t*)t, &ti)!=0)
++            {
++                  LM_ERR("invalid time stamp parameter value\n");
++                  return -1;
++            }
++      }
++
++      icalcomponent *event = create_from_buf(rv.s);
++      str rec;
++      format_tmrec(rec, event);
++
++      LM_DBG("w_tmrec_match_ical: formatting ical: %s to tmrec: %s\n", rv.s, rec.s);
++
++      return ki_tmrec_match_timestamp(msg, &rec, ti);
++}
++
+ static int fixup_tmrec_match(void** param, int param_no)
+ {
+ 	if(param_no==1)
+@@ -270,6 +306,20 @@ static int fixup_tmrec_match(void** para
+ 	return 0;
+ }
+ 
++static int fixup_ical(void** param, int param_no)
++{
++	if(param_no==1)
++	{
++		if(fixup_spve_null(param, 1)<0)
++			return -1;
++		return 0;
++	} else if(param_no==2) {
++		if(fixup_igp_null(param, 1)<0)
++			return -1;
++	}
++	return 0;
++}
++
+ static int fixup_time_period_match(void** param, int param_no)
+ {
+ 	if(param_no==1)
+@@ -379,4 +429,4 @@ int mod_register(char *path, int *dlflag
+ {
+ 	sr_kemi_modules_add(sr_kemi_tmrec_exports);
+ 	return 0;
+-}
+\ No newline at end of file
++}
+--- a/src/modules/tmrec/Makefile
++++ b/src/modules/tmrec/Makefile
+@@ -6,7 +6,7 @@ include ../../Makefile.defs
+ auto_gen=
+ NAME=tmrec.so
+ DEFS +=
+-LIBS +=
++LIBS += -L$(LOCALBASE)/lib -lical -licalss
+ 
+ DEFS+=-DKAMAILIO_MOD_INTERFACE
+ 
