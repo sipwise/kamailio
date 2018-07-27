@@ -42,3 +42,4 @@ upstream/0004-topos-keep-original-contact-in-3xx-responses-sent-ou.patch
 sipwise/extend_stats.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
+sipwise/tt41650.patch
