@@ -52,3 +52,4 @@ sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
 sipwise/fix_db_redis_reconnect.patch
 sipwise/fix_error_in_cfgt_module.patch
+sipwise/tt41650.patch
