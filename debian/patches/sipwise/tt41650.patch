@@ -1,0 +1,68 @@
+--- /dev/null
++++ b/src/modules/tmrec/ical.c
+@@ -0,0 +1,45 @@
++#include "ical.h"
++#include <libical/ical.h>
++#include <libical/icalss.h>
++#include <stdlib.h>
++
++#define PERIOD 24*3600*7 // one week
++
++void check_time_frame(icalcomponent *comp, struct icaltime_span *span, void *data)
++{
++      callback_data_t *d = (callback_data_t *)data;
++      if (span->start <= d->time && d->time <= span->end)
++      {
++          *(d->rc) = 1;
++      }
++}
++
++int match_ical_event(icalcomponent *c, time_t time)
++{
++      int rc = -1;
++
++      for(icalcomponent *event = icalcomponent_get_first_component(c, ICAL_VEVENT_COMPONENT); event != 0; event = icalcomponent_get_next_component(c, ICAL_VEVENT_COMPONENT))
++      {
++            struct icaltimetype start;
++            struct icaltimetype end;
++
++            icaltimezone *utc = icaltimezone_get_utc_timezone();
++            start = icaltime_from_timet_with_zone(t, 0, utc);
++            end = icaltime_from_timet_with_zone(t + PERIOD, 0, utc);
++            icaltime_normalize(end);
++
++            callback_data_t data = {&rc, time};
++            icalcomponent_foreach_recurrence(event, start, end, check_time_frame, &data);
++      }
++
++      icalcomponent_free(c);
++
++      return rc;
++}
++
++icalcomponent *create_from_buf(const char *buf)
++{
++      icalcomponent *c = icalparser_parse_string(buf);
++      return c;
++}
++
+--- /dev/null
++++ b/src/modules/tmrec/ical.h
+@@ -0,0 +1,17 @@
++#ifndef _ICAL_H_
++#define _ICAL_H_
++
++#include <libical/ical.h>
++#include <time.h>
++
++void check_time_frame(icalcomponent *comp, struct icaltime_span *span, void *data);
++int match_ical_event(icalcomponent *c, time_t t);
++icalcomponent *create_from_buf(const char *buf);
++
++typedef struct callback_data
++{
++    int *rc;
++    time_t time;
++} callback_data_t;
++
++#endif
