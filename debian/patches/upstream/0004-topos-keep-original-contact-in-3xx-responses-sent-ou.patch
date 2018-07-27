@@ -1,0 +1,40 @@
+From fcf1d3d778a903852b6e21103a23bd7fd6e3bbc9 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Tue, 24 Jul 2018 16:10:16 +0200
+Subject: [PATCH] topos: keep original contact in 3xx responses sent out
+
+- reported by Andrew Pogrebennyk
+---
+ src/modules/topos/tps_msg.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/topos/tps_msg.c b/src/modules/topos/tps_msg.c
+index 41cb7ef41..b34986526 100644
+--- a/src/modules/topos/tps_msg.c
++++ b/src/modules/topos/tps_msg.c
+@@ -1074,12 +1074,17 @@ int tps_response_sent(sip_msg_t *msg)
+ 	mtsd.direction = direction;
+ 
+ 	tps_remove_headers(msg, HDR_RECORDROUTE_T);
+-	tps_remove_headers(msg, HDR_CONTACT_T);
+ 
+-	if(direction==TPS_DIR_DOWNSTREAM) {
+-		tps_reinsert_contact(msg, &stsd, &stsd.as_contact);
+-	} else {
+-		tps_reinsert_contact(msg, &stsd, &stsd.bs_contact);
++	/* keep contact without updates for redirect responses sent out */
++	if(msg->first_line.u.reply.statuscode<300
++			|| msg->first_line.u.reply.statuscode>=400) {
++		tps_remove_headers(msg, HDR_CONTACT_T);
++
++		if(direction==TPS_DIR_DOWNSTREAM) {
++			tps_reinsert_contact(msg, &stsd, &stsd.as_contact);
++		} else {
++			tps_reinsert_contact(msg, &stsd, &stsd.bs_contact);
++		}
+ 	}
+ 
+ 	tps_reappend_rr(msg, &btsd, &btsd.x_rr);
+-- 
+2.15.2 (Apple Git-101.1)
+
