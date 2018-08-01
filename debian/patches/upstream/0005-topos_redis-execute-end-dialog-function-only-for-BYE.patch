@@ -1,0 +1,28 @@
+From 3924afe2917e64066ea796597104b0e00358b180 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 1 Aug 2018 22:55:06 +0200
+Subject: [PATCH] topos_redis: execute end dialog function only for BYE request
+
+- reported by GH #1608
+---
+ src/modules/topos_redis/topos_redis_storage.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/modules/topos_redis/topos_redis_storage.c b/src/modules/topos_redis/topos_redis_storage.c
+index bc810e702..4ba31f404 100644
+--- a/src/modules/topos_redis/topos_redis_storage.c
++++ b/src/modules/topos_redis/topos_redis_storage.c
+@@ -1314,6 +1314,10 @@ int tps_redis_end_dialog(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd)
+ 	int32_t liflags;
+ 	unsigned long lval = 0;
+ 
++	if(md->s_method_id != METHOD_BYE) {
++		return 0;
++	}
++
+ 	if(sd->a_uuid.len<=0 && sd->b_uuid.len<=0) {
+ 		LM_INFO("no uuid for this message\n");
+ 		return -1;
+-- 
+2.17.1
+

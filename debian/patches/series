@@ -39,6 +39,7 @@ upstream/0001-tm-free-new-cell-in-case-of-error.patch
 upstream/0002-tm-force-free-cell-if-transaction-is-unlinkled.patch
 upstream/0003-tm-backup-and-restore-T-and-T_branch-in-t_continue.patch
 upstream/0004-topos-keep-original-contact-in-3xx-responses-sent-ou.patch
+upstream/0005-topos_redis-execute-end-dialog-function-only-for-BYE.patch
 sipwise/extend_stats.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
