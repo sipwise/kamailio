@@ -1,0 +1,11 @@
+--- a/src/modules/topos_redis/topos_redis_storage.c
++++ b/src/modules/topos_redis/topos_redis_storage.c
+@@ -376,7 +376,7 @@ int tps_redis_insert_invite_branch(tps_d
+ 	argvlen[argc] = rkey.len;
+ 	argc++;
+ 
+-	lval = (unsigned long)_tps_api.get_branch_expire();
++	lval = (unsigned long)_tps_api.get_dialog_expire();
+ 	if(lval==0) {
+ 		return 0;
+ 	}
