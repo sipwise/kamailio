@@ -1,3 +1,13 @@
+ngcp-kamailio (5.1.4-1+0~mr6.4.1.1) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [e01b73c] TT#40617  topos: keep original contact in 3xx responses sent out
+  * [901737a] TT#40617 topos_redis: fix branch timeout value being used for whole dialog
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 09 Aug 2018 12:20:13 +0200
+
 ngcp-kamailio (5.1.4-1+0~mr6.4.1.0) unstable; urgency=medium
 
   [ Roman Romanchenko ]
