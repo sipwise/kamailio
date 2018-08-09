@@ -1,6 +1,6 @@
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -107,6 +107,9 @@ mod_list_sctp=sctp
+@@ -107,6 +107,9 @@
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -10,7 +10,7 @@
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -233,7 +236,8 @@ mod_list_all=$(sort $(mod_list_basic) $(
+@@ -233,7 +236,8 @@
  			   $(mod_list_erlang) $(mod_list_systemd) \
  			   $(mod_list_http_async) $(mod_list_nsq) \
  			   $(mod_list_rabbitmq) $(mod_list_jsdt)) \
@@ -20,7 +20,7 @@
  
  
  
-@@ -287,6 +291,8 @@ module_group_cassandra=$(module_group_ca
+@@ -287,6 +291,8 @@
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
@@ -43,7 +43,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,470 @@
 +/*
 + * call rating for least cost routing module
 + *
@@ -94,13 +94,15 @@
 +static int child_init(int rank);
 +
 +static int lcr_rate(sip_msg_t *msg, char *su, char *sq);
-+static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid, char *avp);
++static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid, char *avp, char *avp2);
 +static int lcr_get_profile_id_from_uuid(sip_msg_t *msg, char *uuid, char *avp);
 +
 +static cmd_export_t cmds[] = {
 +	{"lcr_rate", lcr_rate, 2, fixup_spve_spve, 0,
 +	REQUEST_ROUTE | FAILURE_ROUTE},
-+	{"lcr_get_prepaid_from_uuid", lcr_get_prepaid_from_uuid, 2, fixup_spve_str, 0,
++	{"lcr_get_prepaid_from_uuid", (cmd_function) lcr_get_prepaid_from_uuid, 2, fixup_pvar_str, 0,
++	REQUEST_ROUTE | FAILURE_ROUTE},
++	{"lcr_get_prepaid_from_uuid", (cmd_function) lcr_get_prepaid_from_uuid, 3, fixup_pvar_str_str, 0,
 +	REQUEST_ROUTE | FAILURE_ROUTE},
 +	{"lcr_get_profile_id_from_uuid", lcr_get_profile_id_from_uuid, 2, fixup_spve_str, 0,
 +	REQUEST_ROUTE | FAILURE_ROUTE},
@@ -440,27 +442,55 @@
 +	return 0;
 +}
 +
-+static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s) {
-+	swr_profile_t prof;
++static int lcr_get_prepaid_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s, char *avp2_s) {
++	swr_profile_t *prof;
 +	unsigned short avp_type = 0;
 +	int_str avp_val;
 +	int_str avp_name;
++	unsigned short avp2_type = 0;
++	int_str avp2_val;
++	int_str avp2_name;
 +
-+	if (get_profile_from_uuid(&prof, msg, uuid_s))
++	prof = swrate_profile_new();
++	if (!prof)
 +		return -1;
++
++	if (get_profile_from_uuid(prof, msg, uuid_s))
++		goto err;
 +	if (get_avp(&avp_type, &avp_name, avp_s))
-+		return -1;
++		goto err;
++	if (avp2_s) {
++		if (get_avp(&avp_type, &avp_name, avp_s))
++			goto err;
++	}
 +
-+	avp_val.s.s = prof.prepaid ? "1" : "0";
++	avp_val.s.s = prof->prepaid ? "1" : "0";
 +	avp_val.s.len = 1;
 +
 +	if (add_avp(AVP_VAL_STR | avp_type, avp_name, avp_val) != 0)
 +	{
 +		LM_ERR("Failed to add result avp");
-+		return -1;
++		goto err;
 +	}
 +
++	if (avp2_s) {
++		avp2_val.s.s = prof->prepaid_library;
++		avp2_val.s.len = strlen(prof->prepaid_library);
++
++		if (add_avp(AVP_VAL_STR | avp2_type, avp2_name, avp2_val) != 0)
++		{
++			LM_ERR("Failed to add result avp");
++			goto err;
++		}
++	}
++
++	swr_profile_free(prof);
++
 +	return 1;
++
++err:
++	swr_profile_free(prof);
++	return -1;
 +}
 +
 +static int lcr_get_profile_id_from_uuid(sip_msg_t *msg, char *uuid_s, char *avp_s) {
