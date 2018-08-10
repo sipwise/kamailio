@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.5-1+0~mr4.5.7.3) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [c2dda17] TT#37050 import commit 03dd592 from upstream/5.1 to mr5.5
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 10 Aug 2018 15:18:56 +0200
+
 ngcp-kamailio (4.4.5-1+0~mr4.5.7.2) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
