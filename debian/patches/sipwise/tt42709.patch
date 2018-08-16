@@ -1,0 +1,10 @@
+--- a/src/modules/tm/t_reply.c
++++ b/src/modules/tm/t_reply.c
+@@ -299,6 +299,7 @@ inline static int update_totag_set(struc
+ 
+ 	for (i=t->fwded_totags; i; i=i->next) {
+ 		if (i->tag.len==tag->len
++                        && i->tag->s
+ 				&& memcmp(i->tag.s, tag->s, tag->len) ==0 ){
+ 			/* to tag already recorded */
+ 			LM_DBG("to-tag retransmission\n");
