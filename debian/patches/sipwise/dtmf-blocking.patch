@@ -47,13 +47,13 @@
 +static int
 +block_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
 +{
-+	return rtpengine_rtpp_set_wrap(msg, rtpengine_start_recording_wrap, NULL, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_block_dtmf_wrap, NULL, 1);
 +}
 +
 +static int
 +unblock_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
 +{
-+	return rtpengine_rtpp_set_wrap(msg, rtpengine_stop_recording_wrap, NULL, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_dtmf_wrap, NULL, 1);
 +}
 +
  static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
