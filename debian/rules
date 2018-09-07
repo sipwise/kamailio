@@ -21,7 +21,6 @@ include /usr/share/dpkg/buildflags.mk
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-export JAVA_HOME=/usr/lib/jvm/java-gcj
 # select radius lib
 ifeq ($(shell [ -f /usr/include/radcli/radcli.h ] && echo 1 || echo 0),1)
 export RADCLI=1
