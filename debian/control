@@ -11,7 +11,6 @@ Build-Depends:
  dpkg-dev (>= 1.16.1.1),
  erlang-dev,
  flex,
- gcj-jdk,
  libconfuse-dev,
  libcurl4-openssl-dev,
  libdb-dev (>= 4.6.19),
@@ -639,28 +638,6 @@ Description: sctp module for Kamailio
  per second even on low-budget hardware.
  .
  This package provides the sctp module for Kamailio.
-
-Package: ngcp-kamailio-java-modules
-Architecture: any
-Multi-Arch: same
-Pre-Depends:
- ${misc:Pre-Depends},
-Depends:
- gcj-jre,
- ngcp-kamailio (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Conflicts:
- kamailio-java-modules,
-Replaces:
- kamailio-java-modules,
-Description: contains the app_java module
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package provides the app_java module, an extension allowing to
- execute embedded Java applications within configuration file.
 
 Package: ngcp-kamailio-tls-modules
 Architecture: any
