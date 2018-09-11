@@ -1,5 +1,5 @@
 ##
-# upsream fixes from master
+# upstream fixes from master
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
 upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch
@@ -53,3 +53,8 @@ sipwise/cfgt_debug.patch
 sipwise/prov_responses_cdr.patch
 # backported from 5.1 branch
 sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
+# backported from 5.2 branch
+upstream/0006-acc-more-debug-message.patch
+upstream/0007-tm-update-uas-rb-activ_type.patch
+upstream/0008-tm-activ_type-field-renamed-to-rbtype.patch
+upstream/0009-tm-set-uas-rb-type-along-with-the-buffer.patch
