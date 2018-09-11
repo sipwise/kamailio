@@ -1,0 +1,206 @@
+From 1aad02edc6b9ffb104900cbc624f0853166ae926 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Mon, 10 Sep 2018 17:15:30 +0200
+Subject: [PATCH] tm: activ_type field renamed to rbtype in struct retr_buf
+
+- better matching the purpose and do not use a typo word
+- field t_active changed from char to short for better mem align
+---
+ src/modules/tm/h_table.h  |  9 +++++----
+ src/modules/tm/t_cancel.c |  2 +-
+ src/modules/tm/t_hooks.c  |  2 +-
+ src/modules/tm/t_reply.c  | 12 ++++++------
+ src/modules/tm/timer.c    |  8 ++++----
+ src/modules/tm/timer.h    |  8 ++++----
+ src/modules/tm/uac.c      |  2 +-
+ 7 files changed, 22 insertions(+), 21 deletions(-)
+
+diff --git a/src/modules/tm/h_table.h b/src/modules/tm/h_table.h
+index a60fb9c754..7aca7ed92c 100644
+--- a/src/modules/tm/h_table.h
++++ b/src/modules/tm/h_table.h
+@@ -147,11 +147,12 @@ enum kill_reason
+ 
+ typedef struct retr_buf
+ {
+-	short activ_type;
+-	/* set to status code if the buffer is a reply,
+-	 * 0 if request or -1 if local CANCEL */
++	/* rbtype is set to status code if the buffer is a reply,
++	 * 0 (TYPE_REQUEST) if request, -1 if local CANCEL (TYPE_LOCAL_CANCEL),
++	 * -2 if local ACK (TYPE_LOCAL_ACK) */
++	short rbtype;
+ 	volatile unsigned short flags;   /* DISABLED, T2 */
+-	volatile unsigned char t_active; /* timer active */
++	volatile unsigned short t_active; /* timer active */
+ 	unsigned short branch;			 /* no more than 64k branches */
+ 	int buffer_len;
+ 	char *buffer;
+diff --git a/src/modules/tm/t_cancel.c b/src/modules/tm/t_cancel.c
+index c0635844ef..49751c9958 100644
+--- a/src/modules/tm/t_cancel.c
++++ b/src/modules/tm/t_cancel.c
+@@ -316,7 +316,7 @@ int cancel_branch( struct cell *t, int branch,
+ 	crb->branch = branch;
+ 	/* label it as cancel so that FR timer can better know how to
+ 	   deal with it */
+-	crb->activ_type = TYPE_LOCAL_CANCEL;
++	crb->rbtype = TYPE_LOCAL_CANCEL;
+ 	/* be extra carefully and check for bugs (the below if could be replaced
+ 	 *  by an atomic_set((void*)&crb->buffer, cancel) */
+ 	if (unlikely(atomic_cmpxchg_long((void*)&crb->buffer, (long)BUSY_BUFFER,
+diff --git a/src/modules/tm/t_hooks.c b/src/modules/tm/t_hooks.c
+index 4543c31924..bc3a83b26e 100644
+--- a/src/modules/tm/t_hooks.c
++++ b/src/modules/tm/t_hooks.c
+@@ -300,7 +300,7 @@ void run_trans_callbacks_with_buf(int type, struct retr_buf* rbuf,
+ 			((trans->tmcb_hl.reg_types)&type)==0 )
+ 		return;
+ 	INIT_TMCB_ONSEND_PARAMS(params, req, repl, rbuf, &rbuf->dst, rbuf->buffer,
+-					rbuf->buffer_len, flags, rbuf->branch, rbuf->activ_type);
++					rbuf->buffer_len, flags, rbuf->branch, rbuf->rbtype);
+ 	/* req, rpl */
+ 	run_trans_callbacks_internal(&trans->tmcb_hl, type, trans, &params);
+ }
+diff --git a/src/modules/tm/t_reply.c b/src/modules/tm/t_reply.c
+index 14f244ef7d..62e844a55a 100644
+--- a/src/modules/tm/t_reply.c
++++ b/src/modules/tm/t_reply.c
+@@ -483,7 +483,7 @@ static int _reply_light( struct cell *trans, char* buf, unsigned int len,
+ 	}
+ 
+ 	rb = & trans->uas.response;
+-	rb->activ_type=code;
++	rb->rbtype=code;
+ 
+ 	trans->uas.status = code;
+ 	buf_len = rb->buffer ? len : len + REPLY_OVERBUFFER_LEN;
+@@ -1799,7 +1799,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 	uas_rb = & t->uas.response;
+ 	if (relay >= 0 ) {
+ 		/* initialize sockets for outbound reply */
+-		uas_rb->activ_type=msg_status;
++		uas_rb->rbtype=msg_status;
+ 		/* only messages known to be relayed immediately will be
+ 		 * be called on; we do not evoke this callback on messages
+ 		 * stored in shmem -- they are fixed and one cannot change them
+@@ -1816,7 +1816,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 			if(t->flags & T_CANCELED) {
+ 				/* transaction canceled - send 487 */
+ 				relayed_code = 487;
+-				uas_rb->activ_type = 487;
++				uas_rb->rbtype = 487;
+ 			} else {
+ 				relayed_code = (branch==relay)
+ 					? msg_status : t->uac[relay].last_received;
+@@ -1871,7 +1871,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 				buf=build_res_buf_from_sip_req(500, &reason,
+ 									to_tag, t->uas.request, &res_len, &bm);
+ 				relayed_code=500;
+-				uas_rb->activ_type = 500;
++				uas_rb->rbtype = 500;
+ 			}else if (cfg_get(tm, tm_cfg, tm_aggregate_auth) &&
+ 						(relayed_code==401 || relayed_code==407) &&
+ 						(auth_reply_count(t, p_msg)>1)){
+@@ -1984,13 +1984,13 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 				if (unlikely(!totag_retr
+ 							&& has_tran_tmcbs(t, TMCB_RESPONSE_OUT))){
+ 					LOCK_REPLIES( t );
+-					if(relayed_code==uas_rb->activ_type) {
++					if(relayed_code==uas_rb->rbtype) {
+ 						run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb,
+ 								t->uas.request, relayed_msg, TMCB_NONE_F);
+ 					} else {
+ 						LM_DBG("skip tm callback %d - relay code %d active %d\n",
+ 								TMCB_RESPONSE_OUT, relayed_code,
+-								uas_rb->activ_type);
++								uas_rb->rbtype);
+ 					}
+ 					UNLOCK_REPLIES( t );
+ 				}
+diff --git a/src/modules/tm/timer.c b/src/modules/tm/timer.c
+index b5e4325929..fcc38823d3 100644
+--- a/src/modules/tm/timer.c
++++ b/src/modules/tm/timer.c
+@@ -367,8 +367,8 @@ inline static ticks_t retransmission_handler(struct retr_buf *r_buf)
+ 		abort();
+ 	}
+ #endif
+-	if(r_buf->activ_type == TYPE_LOCAL_CANCEL
+-			|| r_buf->activ_type == TYPE_REQUEST) {
++	if(r_buf->rbtype == TYPE_LOCAL_CANCEL
++			|| r_buf->rbtype == TYPE_REQUEST) {
+ #ifdef EXTRA_DEBUG
+ 		LM_DBG("request resending (t=%p, %.9s ... )\n", r_buf->my_T,
+ 				r_buf->buffer);
+@@ -415,14 +415,14 @@ inline static void final_response_handler(
+ 	}
+ #endif
+ 	/* FR for local cancels.... */
+-	if(r_buf->activ_type == TYPE_LOCAL_CANCEL) {
++	if(r_buf->rbtype == TYPE_LOCAL_CANCEL) {
+ #ifdef TIMER_DEBUG
+ 		LM_DBG("stop retr for local cancel\n");
+ #endif
+ 		return;
+ 	}
+ 	/* FR for replies (negative INVITE replies) */
+-	if(r_buf->activ_type > 0) {
++	if(r_buf->rbtype > 0) {
+ #ifdef EXTRA_DEBUG
+ 		if(t->uas.request->REQ_METHOD != METHOD_INVITE || t->uas.status < 200) {
+ 			LM_CRIT("BUG - unknown type reply buffer\n");
+diff --git a/src/modules/tm/timer.h b/src/modules/tm/timer.h
+index 5cb6c736a6..5f20dd3683 100644
+--- a/src/modules/tm/timer.h
++++ b/src/modules/tm/timer.h
+@@ -200,7 +200,7 @@ inline static int _set_fr_retr(struct retr_buf *rb, unsigned retr_ms)
+ #endif
+ 	/* adjust timeout to MIN(fr, maximum lifetime) if rb is a request
+ 	 *  (for neg. replies we are force to wait for the ACK so use fr) */
+-	if(unlikely((rb->activ_type == TYPE_REQUEST)
++	if(unlikely((rb->rbtype == TYPE_REQUEST)
+ 				&& ((s_ticks_t)(eol - (ticks + timeout))
+ 						   < 0))) { /* fr after end of life */
+ 		timeout = (((s_ticks_t)(eol - ticks)) > 0) ? (eol - ticks)
+@@ -260,7 +260,7 @@ inline static void restart_rb_fr(struct retr_buf *rb, ticks_t new_val)
+ 
+ 	now = get_ticks_raw();
+ 	t = rb->my_T;
+-	if(unlikely((rb->activ_type == TYPE_REQUEST)
++	if(unlikely((rb->rbtype == TYPE_REQUEST)
+ 				&& (((s_ticks_t)(t->end_of_life - (now + new_val))) < 0)))
+ 		rb->fr_expire = t->end_of_life;
+ 	else
+@@ -291,7 +291,7 @@ inline static void change_fr(struct cell *t, ticks_t fr_inv, ticks_t fr)
+ 			if((t->uac[i].request.flags & F_RB_FR_INV) && fr_inv)
+ 				t->uac[i].request.fr_expire = fr_inv_expire;
+ 			else if(fr) {
+-				if(t->uac[i].request.activ_type == TYPE_REQUEST)
++				if(t->uac[i].request.rbtype == TYPE_REQUEST)
+ 					t->uac[i].request.fr_expire = req_fr_expire;
+ 				else
+ 					t->uac[i].request.fr_expire = fr_expire;
+@@ -347,7 +347,7 @@ inline static void change_end_of_life(struct cell *t, int adj, ticks_t eol)
+ 	if(adj) {
+ 		for(i = 0; i < t->nr_of_outgoings; i++) {
+ 			if(t->uac[i].request.t_active) {
+-				if((t->uac[i].request.activ_type == TYPE_REQUEST)
++				if((t->uac[i].request.rbtype == TYPE_REQUEST)
+ 						&& ((s_ticks_t)(t->end_of_life
+ 										- t->uac[i].request.fr_expire)
+ 								   < 0))
+diff --git a/src/modules/tm/uac.c b/src/modules/tm/uac.c
+index 42e25762d2..21e62c9fb7 100644
+--- a/src/modules/tm/uac.c
++++ b/src/modules/tm/uac.c
+@@ -765,7 +765,7 @@ struct retr_buf *local_ack_rb(sip_msg_t *rpl_2xx, struct cell *trans,
+ 	}
+ 
+ 	/* TODO: need next 2? */
+-	lack->activ_type = TYPE_LOCAL_ACK;
++	lack->rbtype = TYPE_LOCAL_ACK;
+ 	lack->my_T = trans;
+ 
+ 	return lack;
+
