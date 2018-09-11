@@ -40,6 +40,10 @@ upstream/0002-tm-force-free-cell-if-transaction-is-unlinkled.patch
 upstream/0003-tm-backup-and-restore-T-and-T_branch-in-t_continue.patch
 upstream/0004-topos-keep-original-contact-in-3xx-responses-sent-ou.patch
 upstream/0005-topos_redis-execute-end-dialog-function-only-for-BYE.patch
+upstream/0006-acc-more-debug-message.patch
+upstream/0007-tm-update-uas-rb-activ_type.patch
+upstream/0008-tm-activ_type-field-renamed-to-rbtype.patch
+upstream/0009-tm-set-uas-rb-type-along-with-the-buffer.patch
 sipwise/extend_stats.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
