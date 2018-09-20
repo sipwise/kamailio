@@ -1,0 +1,34 @@
+--- a/src/core/crc.c
++++ b/src/core/crc.c
+@@ -231,6 +231,8 @@ void crcitt_string_array( char *dst, str
+ 	ccitt = 0xFFFF;
+ 	str_len=CRC16_LEN;
+ 	for (i=0; i<size; i++ ) {
++		/* invalid str with positive length and null char pointer */
++		if( unlikely(src[i].s==NULL)) break;
+ 		c=src[i].s;
+ 		len=src[i].len;
+ 		while(len) {
+--- a/src/core/msg_translator.c
++++ b/src/core/msg_translator.c
+@@ -168,12 +168,17 @@ static int check_via_address(struct ip_a
+ 						(name->s[name->len-1]==']')&&
+ 						(strncasecmp(name->s+1, s, len)==0))
+ 				)
+-		   )
++		   ) {
+ 			return 0;
+-		else
+-
++		}
++		else {
++			if (unlikely(name->s==NULL)) {
++				LM_CRIT("invalid Via host name\n");
++				return -1;
++			}
+ 			if (strncmp(name->s, s, name->len)==0)
+ 				return 0;
++		}
+ 	}else{
+ 		LM_CRIT("could not convert ip address\n");
+ 		return -1;
