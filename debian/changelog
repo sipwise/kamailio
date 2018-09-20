@@ -1,3 +1,12 @@
+ngcp-kamailio (4.4.6-1+0~mr5.5.1.4) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [345ddc1] TT#44251 Fix CVE-2018-16657
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 20 Sep 2018 17:40:29 +0200
+
 ngcp-kamailio (4.4.6-1+0~mr5.5.1.3) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
