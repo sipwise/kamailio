@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+2: Andrii Pogrebennyk <apogrebennyk@sipwise.com>
+Code-Review+2: Alexander Lutay <alutay@sipwise.com>
+Submitted-by: Marco Capetta <mcapetta@sipwise.com>
+Submitted-at: Thu, 20 Sep 2018 14:58:07 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/23642
+Project: kamailio
+Branch: refs/heads/mr5.5.6
