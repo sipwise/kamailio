@@ -58,3 +58,4 @@ upstream/0006-acc-more-debug-message.patch
 upstream/0007-tm-update-uas-rb-activ_type.patch
 upstream/0008-tm-activ_type-field-renamed-to-rbtype.patch
 upstream/0009-tm-set-uas-rb-type-along-with-the-buffer.patch
+upstream/0010-core-improve-header-safe-guards-for-via-handling.patch
