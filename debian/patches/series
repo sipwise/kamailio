@@ -34,3 +34,4 @@ sipwise/fix_db_redis_memory_issues.patch
 # backported from 5.1 branch
 sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
 sipwise/fix_db_redis_manual_key_issue.patch
+upstream/0003-core-improve-header-safe-guards-for-via-handling.patch
