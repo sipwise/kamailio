@@ -44,3 +44,4 @@ sipwise/core-parser-reset_path_vector-remove-check-for-msg-m.patch
 sipwise/prov_responses_cdr.patch
 # backported from 5.1 branch
 sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
+upstream/0055-core-improve-header-safe-guards-for-via-handling.patch
