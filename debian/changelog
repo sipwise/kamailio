@@ -1,3 +1,29 @@
+ngcp-kamailio (5.1.4-1+0~mr7.0.0.0) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [403fab4] TT#40617  topos: keep original contact in 3xx responses sent out
+  * [ea758f8] TT#40617 topos_redis: fix branch timeout value being used for whole dialog
+  * [42c06a4] TT#43352 geoip is obsolete; enable geoip2
+
+  [ Richard Fuchs ]
+  * [47b4b39] TT#42258 extend lcr_get_prepaid_from_uuid to also return the library
+  * [b068c12] TT#43556 support rtpengine DTMF blocking commands
+  * [bc33993] TT#43556 fix typo from b068c12
+  * [43db619] TT#43557 support rtpengine media blocking functions
+
+  [ Roman Romanchenko ]
+  * [847fcd0] TT#42709 [Test carrier] Kamailio Crashed mr6.4.1
+
+  [ Michael Prokop ]
+  * [61127c5] TT#44158 Drop ngcp-kamailio-java-modules package
+
+  [ Marco Capetta ]
+  * [57d75b2] TT#43152 ACC not created for call-fork with reject scenario
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 24 Sep 2018 18:53:45 +0200
+
 ngcp-kamailio (5.1.4-1+0~mr6.5.0.0) unstable; urgency=medium
 
   [ Roman Romanchenko ]
