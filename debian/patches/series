@@ -47,3 +47,4 @@ upstream/0009-tm-set-uas-rb-type-along-with-the-buffer.patch
 sipwise/extend_stats.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
+sipwise/fix_db_redis_reconnect.patch
