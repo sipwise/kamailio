@@ -43,3 +43,4 @@ upstream/0005-topos_redis-execute-end-dialog-function-only-for-BYE.patch
 sipwise/extend_stats.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
+sipwise/fix_db_redis_reconnect.patch

@@ -1,0 +1,36 @@
+--- a/src/modules/db_redis/redis_connection.c
++++ b/src/modules/db_redis/redis_connection.c
+@@ -390,7 +390,7 @@
+ void db_redis_consume_replies(km_redis_con_t *con) {
+     redisReply *reply = NULL;
+     redis_key_t *query;
+-    while (con->append_counter > 0 && !con->con->err) {
++    while (con->append_counter > 0 && con->con && !con->con->err) {
+         LM_DBG("consuming outstanding reply %u", con->append_counter);
+         db_redis_get_reply(con, (void**)&reply);
+         if (reply) {
+@@ -410,4 +410,4 @@
+     } else {
+         return "<broken redis connection>";
+     }
+-}
+\ No newline at end of file
++}
+--- a/src/modules/db_redis/redis_connection.h
++++ b/src/modules/db_redis/redis_connection.h
+@@ -35,6 +35,8 @@
+     if (!(reply)) { \
+         LM_ERR("Failed to fetch type entry: %s\n", \
+                 (con)->con->errstr); \
++        redisFree((con)->con); \
++        (con)->con = NULL; \
+         goto err; \
+     } \
+     if ((reply)->type == REDIS_REPLY_ERROR) { \
+@@ -79,4 +81,4 @@
+ void db_redis_free_reply(redisReply **reply);
+ const char *db_redis_get_error(km_redis_con_t *con);
+ 
+-#endif /* _REDIS_CONNECTION_H_ */
+\ No newline at end of file
++#endif /* _REDIS_CONNECTION_H_ */
