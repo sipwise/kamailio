@@ -50,3 +50,4 @@ sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
+sipwise/fix_db_redis_reconnect.patch
