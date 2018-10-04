@@ -1,0 +1,11 @@
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -649,6 +649,8 @@ int cfgt_pre(struct sip_msg *msg, unsign
+ 	if(_cfgt_node) {
+ 		if(_cfgt_node->msgid == 0) {
+ 			LM_DBG("new node\n");
++			LM_DBG("_cfgt_node->uuid:[%.*s]\n", _cfgt_node->uuid.len,
++					_cfgt_node->uuid.s);
+ 			if(_cfgt_get_hdr(msg, &_cfgt_node->uuid) != 0
+ 					|| _cfgt_node->uuid.len == 0) {
+ 				LM_ERR("cannot get value of cfgtest uuid header."
