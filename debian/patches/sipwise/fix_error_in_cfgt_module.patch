@@ -1,0 +1,55 @@
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -187,7 +187,7 @@ int _cfgt_get_hdr_helper(struct sip_msg
+ 			return STR_EQ(tmp, *res);
+ 		}
+ 	}
+-	return 1; /* not found */
++	return 2; /* not found */
+ }
+ 
+ int _cfgt_get_hdr(struct sip_msg *msg, str *res)
+@@ -645,14 +645,20 @@ int cfgt_msgin(sr_event_param_t *evp)
+ int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
+ {
+ 	str unknown = {"unknown", 7};
++	int get_hdr_result = 0;
+ 
+ 	if(_cfgt_node) {
+ 		if(_cfgt_node->msgid == 0) {
+ 			LM_DBG("new node\n");
+-			if(_cfgt_get_hdr(msg, &_cfgt_node->uuid) != 0
+-					|| _cfgt_node->uuid.len == 0) {
+-				LM_ERR("cannot get value of cfgtest uuid header."
+-					   " Using unknown\n");
++			get_hdr_result = _cfgt_get_hdr(msg, &_cfgt_node->uuid);
++			if(get_hdr_result != 0 || _cfgt_node->uuid.len == 0) {
++				if(get_hdr_result == 2) {
++					LM_DBG("message not related to the cfgtest scenario."
++						   " Using 'unknown' uuid\n");
++				} else {
++					LM_ERR("cannot get value of cfgtest uuid header."
++						   " Using 'unknown' uuid\n");
++				}
+ 				pkg_str_dup(&_cfgt_node->uuid, &unknown);
+ 			}
+ 			return _cfgt_get_uuid_id(_cfgt_node);
+@@ -682,7 +688,17 @@ int cfgt_post(struct sip_msg *msg, unsig
+ 
+ 	if(_cfgt_node) {
+ 		LM_DBG("dump last flow\n");
+-		if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
++		LM_DBG("_cfgt_node->uuid:[%.*s]\n", _cfgt_node->uuid.len,
++			_cfgt_node->uuid.s);
++		if(_cfgt_node->route == NULL)
++			LM_DBG("route is NULL\n");
++		if(strcmp(_cfgt_node->uuid.s, "unknown") == 0)
++			LM_DBG("uuid is equal to unknown 1\n");
++		if(strcmp(_cfgt_node->uuid, "unknown") == 0)
++			LM_DBG("uuid is equal to unknown 2\n");
++		if(_cfgt_node->route == NULL && strcmp(_cfgt_node->uuid.s, "unknown"))
++			LM_DBG("route is NULL and message doesn't belong to cfgtest scenario\n");
++		else if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
+ 			LM_ERR("cannot create flowname\n");
+ 		else
+ 			_cfgt_set_dump(msg, _cfgt_node, &flowname);
