@@ -1,0 +1,151 @@
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -40,6 +40,7 @@ cfgt_hash_p _cfgt_uuid = NULL;
+ str cfgt_hdr_prefix = {"NGCP%", 5};
+ str cfgt_basedir = {"/tmp", 4};
+ int cfgt_mask = CFGT_DP_ALL;
++int not_sip = 0;
+ 
+ static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
+ {
+@@ -187,7 +188,7 @@ int _cfgt_get_hdr_helper(struct sip_msg
+ 			return STR_EQ(tmp, *res);
+ 		}
+ 	}
+-	return 1; /* not found */
++	return 2; /* not found */
+ }
+ 
+ int _cfgt_get_hdr(struct sip_msg *msg, str *res)
+@@ -401,22 +402,35 @@ int _cfgt_set_dump(struct sip_msg *msg,
+ 
+ 	if(node == NULL || flow == NULL)
+ 		return -1;
++
++	// Skip variable dump when 'dialog:failed' route because it generates errors
++	//if(strncmp(node->route->s.s, "dialog:failed", 13) == 0) {
++	//	LM_DBG("node route [%.*s] skipped as required\n", node->route->s.len, node->route->s.s);
++	//	return 0;
++	//}
+ 	vars = srjson_CreateObject(&node->jdoc);
+ 	if(vars == NULL) {
+ 		LM_ERR("cannot create json object\n");
+ 		return -1;
+ 	}
+-	if(cfgt_get_json(msg, 30, &node->jdoc, vars) < 0) {
++	LM_DBG("+++++ I am here 2\n");
++	if(strncmp(node->route->s.s, "dialog:failed", 13) == 0) {
++		LM_DBG("json dump [%.*s] skipped as required\n", node->route->s.len, node->route->s.s);
++	} else if(cfgt_get_json(msg, 30, &node->jdoc, vars) < 0) {
+ 		LM_ERR("cannot get var info\n");
+ 		return -1;
+ 	}
++	LM_DBG("+++++ I am here 3\n");
+ 	f = srjson_CreateObject(&node->jdoc);
++	LM_DBG("+++++ I am here 4\n");
+ 	if(f == NULL) {
+ 		LM_ERR("cannot create json object\n");
+ 		srjson_Delete(&node->jdoc, vars);
+ 		return -1;
+ 	}
++	LM_DBG("+++++ I am here 5\n");
+ 	srjson_AddStrItemToObject(&node->jdoc, f, flow->s, flow->len, vars);
++	LM_DBG("+++++ I am here 6\n");
+ 	srjson_AddItemToArray(&node->jdoc, node->flow, f);
+ 	LM_DBG("node[%.*s] flow created\n", flow->len, flow->s);
+ 	return 0;
+@@ -567,6 +581,10 @@ int cfgt_process_route(struct sip_msg *m
+ 		return 0;
+ 	}
+ 	LM_DBG("route from action:[%s]\n", a->rname);
++	if(not_sip) {
++		LM_DBG("not_sip flag set, not a SIP message, skip it\n");
++		return 0;
++	}
+ 	routename.s = a->rname;
+ 	routename.len = strlen(a->rname);
+ 	switch(_cfgt_add_routename(_cfgt_node, a, &routename)) {
+@@ -612,7 +630,6 @@ int cfgt_process_route(struct sip_msg *m
+ 
+ /*
+ TODO:
+-- parse first line, check if is SIP
+ - parse for header cfgtest
+ */
+ int cfgt_msgin(sr_event_param_t *evp)
+@@ -621,6 +638,12 @@ int cfgt_msgin(sr_event_param_t *evp)
+ 	str *buf = (str *)evp->data;
+ 	if(buf == NULL)
+ 		return 0;
++	// Check if it is a SIP message
++	if(!(buf->len>7 && strstr(buf->s, "SIP/2.0"))) {
++		LM_DBG("msg in:{%.*s}\n", buf->len, buf->s);
++		LM_DBG("not a SIP message, skip it and set not_sip flag\n");
++		not_sip = 1;
++	}
+ 	if(_cfgt_node) {
+ 		cfgt_save_node(_cfgt_node);
+ 		_cfgt_remove_node(_cfgt_node);
+@@ -645,14 +668,23 @@ int cfgt_msgin(sr_event_param_t *evp)
+ int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
+ {
+ 	str unknown = {"unknown", 7};
++	int get_hdr_result = 0;
+ 
+ 	if(_cfgt_node) {
+ 		if(_cfgt_node->msgid == 0) {
+ 			LM_DBG("new node\n");
+-			if(_cfgt_get_hdr(msg, &_cfgt_node->uuid) != 0
+-					|| _cfgt_node->uuid.len == 0) {
+-				LM_ERR("cannot get value of cfgtest uuid header."
+-					   " Using unknown\n");
++			get_hdr_result = _cfgt_get_hdr(msg, &_cfgt_node->uuid);
++			if(get_hdr_result != 0 || _cfgt_node->uuid.len == 0) {
++				if(not_sip) {
++					LM_DBG("not_sip flag set, not a SIP message."
++							" Using 'unknown' uuid\n");
++				} else if(get_hdr_result == 2) {
++					LM_DBG("message not related to the cfgtest scenario."
++						   " Using 'unknown' uuid\n");
++				} else {
++					LM_ERR("cannot get value of cfgtest uuid header."
++						   " Using 'unknown' uuid\n");
++				}
+ 				pkg_str_dup(&_cfgt_node->uuid, &unknown);
+ 			}
+ 			return _cfgt_get_uuid_id(_cfgt_node);
+@@ -682,7 +714,10 @@ int cfgt_post(struct sip_msg *msg, unsig
+ 
+ 	if(_cfgt_node) {
+ 		LM_DBG("dump last flow\n");
+-		if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
++		LM_DBG("+++++ _cfgt_node->uuid:[%.*s]\n", _cfgt_node->uuid.len, _cfgt_node->uuid.s);
++		if(_cfgt_node->route == NULL && strncmp(_cfgt_node->uuid.s, "unknown", 7) == 0)
++			LM_DBG("route is NULL and message doesn't belong to cfgtest scenario\n");
++		else if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
+ 			LM_ERR("cannot create flowname\n");
+ 		else
+ 			_cfgt_set_dump(msg, _cfgt_node, &flowname);
+@@ -701,6 +736,11 @@ int cfgt_msgout(sr_event_param_t *evp)
+ 		return 0;
+ 	LM_DBG("msg out:{%.*s}\n", buf->len, buf->s);
+ 
++	// Check if it is a SIP message
++	if(!(buf->len>7 && strstr(buf->s, "SIP/2.0"))) {
++		LM_DBG("not a SIP message, skip it\n");
++	}
++
+ 	if(_cfgt_node) {
+ 		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
+ 		if(jobj == NULL) {
+@@ -710,6 +750,10 @@ int cfgt_msgout(sr_event_param_t *evp)
+ 		srjson_AddItemToArray(&_cfgt_node->jdoc, _cfgt_node->out, jobj);
+ 		return 0;
+ 	}
++	if(buf->len>7 && strstr(buf->s, "OPTIONS")) {
++		LM_DBG("OPTION message internally generated, skip it\n");
++		return 0;
++	}
+ 	LM_ERR("node empty\n");
+ 	return -1;
+ }
