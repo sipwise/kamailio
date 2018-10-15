@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7ad8896b_98e75a12",
+        "filename": "debian/patches/sipwise/fix_error_in_cfgt_module.patch",
+        "patchSetId": 27
+      },
+      "lineNbr": 118,
+      "author": {
+        "id": 1000039
+      },
+      "writtenOn": "2018-10-15T13:32:06Z",
+      "side": 1,
+      "message": "1. please try to avoid magic numbers like 7\n2. Maybe there is some built-in function to check if buffer is SIP message?",
+      "revId": "27cba7333a0bca176a8e87d9058b8bdc3532ef05",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
