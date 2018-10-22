@@ -277,8 +277,11 @@ static int sqlang_gettype(HSQUIRRELVM J, int idx)
  */
 static SQInteger sqlang_sr_get_str_null(HSQUIRRELVM J, int rmode)
 {
-	if(rmode) {
+	if(rmode==1) {
 		sqlang_pushlstring(J, "<<null>>", 8);
+		return 1;
+	} else if(rmode==2) {
+		sqlang_pushlstring(J, "", 0);
 		return 1;
 	} else {
 		return 0;
@@ -345,6 +348,14 @@ static SQInteger sqlang_sr_pv_get(HSQUIRRELVM J)
 static SQInteger sqlang_sr_pv_getw(HSQUIRRELVM J)
 {
 	return sqlang_sr_pv_get_mode(J, 1);
+}
+
+/**
+ *
+ */
+static SQInteger sqlang_sr_pv_gete(HSQUIRRELVM J)
+{
+	return sqlang_sr_pv_get_mode(J, 2);
 }
 
 /**
@@ -538,6 +549,7 @@ static SQInteger sqlang_sr_pv_is_null (HSQUIRRELVM J)
 const SQRegFunction _sr_kemi_pv_J_Map[] = {
 	{ "get", sqlang_sr_pv_get, 2 /* 1 args */, NULL },
 	{ "getw", sqlang_sr_pv_getw, 2 /* 1 args */, NULL },
+	{ "gete", sqlang_sr_pv_gete, 2 /* 1 args */, NULL },
 	{ "seti", sqlang_sr_pv_seti, 3 /* 2 args */, NULL },
 	{ "sets", sqlang_sr_pv_sets, 4 /* 2 args */, NULL },
 	{ "unset", sqlang_sr_pv_unset, 2 /* 1 args */, NULL },
@@ -1350,12 +1362,40 @@ int sr_kemi_sqlang_exec_func_ex(HSQUIRRELVM J, sr_kemi_t *ket)
 				ret = ((sr_kemi_fmssnn_f)(ket->func))(env_J->msg,
 						&vps[0].s, &vps[1].s, vps[2].n, vps[3].n);
 				return sr_kemi_sqlang_return_int(J, ket, ret);
+			} else if(ket->ptypes[0]==SR_KEMIP_STR
+					&& ket->ptypes[1]==SR_KEMIP_INT
+					&& ket->ptypes[2]==SR_KEMIP_INT
+					&& ket->ptypes[3]==SR_KEMIP_INT) {
+				ret = ((sr_kemi_fmsnnn_f)(ket->func))(env_J->msg,
+						&vps[0].s, vps[1].n, vps[2].n, vps[3].n);
+				return sr_kemi_sqlang_return_int(J, ket, ret);
 			} else if(ket->ptypes[0]==SR_KEMIP_INT
 					&& ket->ptypes[1]==SR_KEMIP_STR
 					&& ket->ptypes[2]==SR_KEMIP_STR
 					&& ket->ptypes[3]==SR_KEMIP_STR) {
 				ret = ((sr_kemi_fmnsss_f)(ket->func))(env_J->msg,
 						vps[0].n, &vps[1].s, &vps[2].s, &vps[3].s);
+				return sr_kemi_sqlang_return_int(J, ket, ret);
+			} else if(ket->ptypes[0]==SR_KEMIP_INT
+					&& ket->ptypes[1]==SR_KEMIP_INT
+					&& ket->ptypes[2]==SR_KEMIP_STR
+					&& ket->ptypes[3]==SR_KEMIP_STR) {
+				ret = ((sr_kemi_fmnnss_f)(ket->func))(env_J->msg,
+						vps[0].n, vps[1].n, &vps[2].s, &vps[3].s);
+				return sr_kemi_sqlang_return_int(J, ket, ret);
+			} else if(ket->ptypes[0]==SR_KEMIP_INT
+					&& ket->ptypes[1]==SR_KEMIP_INT
+					&& ket->ptypes[2]==SR_KEMIP_INT
+					&& ket->ptypes[3]==SR_KEMIP_STR) {
+				ret = ((sr_kemi_fmnnns_f)(ket->func))(env_J->msg,
+						vps[0].n, vps[1].n, vps[2].n, &vps[3].s);
+				return sr_kemi_sqlang_return_int(J, ket, ret);
+			} else if(ket->ptypes[0]==SR_KEMIP_INT
+					&& ket->ptypes[1]==SR_KEMIP_INT
+					&& ket->ptypes[2]==SR_KEMIP_INT
+					&& ket->ptypes[3]==SR_KEMIP_INT) {
+				ret = ((sr_kemi_fmnnnn_f)(ket->func))(env_J->msg,
+						vps[0].n, vps[1].n, vps[2].n, vps[3].n);
 				return sr_kemi_sqlang_return_int(J, ket, ret);
 			} else {
 				LM_ERR("invalid parameters for: %.*s\n",
