@@ -1,6 +1,6 @@
 --- a/src/Makefile.defs
 +++ b/src/Makefile.defs
-@@ -386,15 +386,7 @@ endif
+@@ -388,15 +388,7 @@ endif
  
  $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
  

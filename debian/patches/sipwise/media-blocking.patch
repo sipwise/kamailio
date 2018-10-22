@@ -1,3 +1,14 @@
+From 76b1f3bfae32490547c5b1500ab7356bcf463e9e Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Mon, 24 Sep 2018 09:46:19 -0400
+Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
+
+---
+ src/modules/rtpengine/doc/rtpengine_admin.xml |  67 ++++++++++-
+ src/modules/rtpengine/rtpengine.c             | 104 +++++++++++++++++-
+ src/modules/rtpengine/rtpengine.h             |   2 +
+ 3 files changed, 167 insertions(+), 6 deletions(-)
+
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -115,7 +115,7 @@
@@ -52,7 +63,7 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -1999,6 +2021,7 @@
+@@ -2000,6 +2022,7 @@
  					if (!val.s)
  						goto error;
  					ng_flags->from_tag = val;
@@ -60,7 +71,7 @@
  				}
  				else
  					goto generic;
-@@ -2050,8 +2073,12 @@
+@@ -2051,8 +2074,12 @@
  					if (!ng_flags->packetize)
  						goto error;
  					bencode_dictionary_add_integer(ng_flags->dict, "repacketize", ng_flags->packetize);
@@ -74,7 +85,7 @@
  				break;
  
  			case 12:
-@@ -2171,6 +2198,11 @@
+@@ -2172,6 +2199,11 @@
  		else
  			bencode_dictionary_add_str(ng_flags.dict, "sdp", &body);
  	}
@@ -86,7 +97,7 @@
  
  	/*** parse flags & build dictionary ***/
  
-@@ -2234,7 +2266,13 @@
+@@ -2235,7 +2267,13 @@
  	) );
  	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
  
@@ -101,7 +112,7 @@
  		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
  		|| (msg->first_line.type == SIP_REPLY && op == OP_ANSWER))
  	{
-@@ -3506,13 +3544,69 @@
+@@ -3511,13 +3549,69 @@
  static int
  block_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
  {

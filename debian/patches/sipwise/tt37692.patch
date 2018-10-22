@@ -1,3 +1,21 @@
+From caaef0457e3c5e061ee961588394a1105e0c5850 Mon Sep 17 00:00:00 2001
+From: Roman Romanchenko <rromanchenko@sipwise.com>
+Date: Mon, 9 Jul 2018 13:58:00 +0300
+Subject: [PATCH] permissions: Improve From pattern matching in kamailio
+ permissions module
+
+- allow_trusted() now can take optional parameter of value to match.
+- provided parameter will be used instead of From header in match_res() and match_hash_table()
+- documentation extended with 3-arguments allow_trusted() function description
+---
+ .../permissions/doc/permissions_admin.xml     |  8 +-
+ src/modules/permissions/hash.c                | 22 ++---
+ src/modules/permissions/hash.h                |  4 +-
+ src/modules/permissions/permissions.c         |  2 +
+ src/modules/permissions/trusted.c             | 98 ++++++++++++++-----
+ src/modules/permissions/trusted.h             |  5 +
+ 6 files changed, 93 insertions(+), 46 deletions(-)
+
 --- a/src/modules/permissions/README
 +++ b/src/modules/permissions/README
 @@ -79,6 +79,7 @@ Emmanuel Schmidbauer
