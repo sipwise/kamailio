@@ -1,3 +1,15 @@
+ngcp-kamailio (5.1.6-1+0~mr7.0.0.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [da9a2fa] TT#39554 fix db_redis reconnect after error
+
+  [ Marco Capetta ]
+  * [90a7268] TT#44855 [WIP] Fix ERROR messages in cfgt module
+  * [2d00cf7] Imported Upstream version 5.1.6
+  * [269a7e3] TT#43352 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Mon, 22 Oct 2018 10:13:37 +0200
+
 ngcp-kamailio (5.1.4-1+0~mr7.0.0.0) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
