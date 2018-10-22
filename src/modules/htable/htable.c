@@ -354,45 +354,49 @@ static int fixup_ht_key(void** param, int param_no)
 	return 0;
 }
 
-static int ht_rm_name_re(struct sip_msg* msg, char* key, char* foo)
+/**
+ *
+ */
+static int ht_rm_re_helper(sip_msg_t *msg, ht_t *ht, str *rexp, int rmode)
 {
-	ht_pv_t *hpv;
-	str sre;
-	pv_spec_t *sp;
-	sp = (pv_spec_t*)key;
 	int_str isval;
 
-	hpv = (ht_pv_t*)sp->pvp.pvn.u.dname;
-
-	if(hpv->ht==NULL)
-	{
-		hpv->ht = ht_get_table(&hpv->htname);
-		if(hpv->ht==NULL)
-			return 1;
-	}
-	if(pv_printf_s(msg, hpv->pve, &sre)!=0)
-	{
-		LM_ERR("cannot get $sht expression\n");
-		return -1;
-	}
-	if (hpv->ht->dmqreplicate>0) {
-		isval.s = sre;
-		if (ht_dmq_replicate_action(HT_DMQ_RM_CELL_RE, &hpv->htname, NULL, AVP_VAL_STR, &isval, 0)!=0) {
-			LM_ERR("dmq relication failed\n");
+	if (ht->dmqreplicate>0) {
+		isval.s = *rexp;
+		if (ht_dmq_replicate_action(HT_DMQ_RM_CELL_RE, &ht->name, NULL,
+				AVP_VAL_STR, &isval, rmode)!=0) {
+			LM_ERR("dmq relication failed for [%.*s]\n", ht->name.len, ht->name.s);
 		}
 	}
-	if(ht_rm_cell_re(&sre, hpv->ht, 0)<0)
+	if(ht_rm_cell_re(rexp, ht, rmode)<0)
 		return -1;
 	return 1;
 }
 
-static int ht_rm_value_re(struct sip_msg* msg, char* key, char* foo)
+/**
+ *
+ */
+static int ki_ht_rm_name_re(sip_msg_t *msg, str *htname, str *rexp)
+{
+	ht_t *ht;
+
+	ht = ht_get_table(htname);
+	if(ht==NULL) {
+		return 1;
+	}
+
+	return ht_rm_re_helper(msg, ht, rexp, 0);
+}
+
+/**
+ *
+ */
+static int ht_rm_name_re(sip_msg_t* msg, char* key, char* foo)
 {
 	ht_pv_t *hpv;
 	str sre;
 	pv_spec_t *sp;
 	sp = (pv_spec_t*)key;
-	int_str isval;
 
 	hpv = (ht_pv_t*)sp->pvp.pvn.u.dname;
 
@@ -407,16 +411,48 @@ static int ht_rm_value_re(struct sip_msg* msg, char* key, char* foo)
 		LM_ERR("cannot get $sht expression\n");
 		return -1;
 	}
+	return ht_rm_re_helper(msg, hpv->ht, &sre, 0);
+}
 
-	if (hpv->ht->dmqreplicate>0) {
-		isval.s = sre;
-		if (ht_dmq_replicate_action(HT_DMQ_RM_CELL_RE, &hpv->htname, NULL, AVP_VAL_STR, &isval, 1)!=0) {
-			LM_ERR("dmq relication failed\n");
-		}
+/**
+ *
+ */
+static int ki_ht_rm_value_re(sip_msg_t *msg, str *htname, str *rexp)
+{
+	ht_t *ht;
+
+	ht = ht_get_table(htname);
+	if(ht==NULL) {
+		return 1;
 	}
-	if(ht_rm_cell_re(&sre, hpv->ht, 1)<0)
+
+	return ht_rm_re_helper(msg, ht, rexp, 1);
+}
+
+/**
+ *
+ */
+static int ht_rm_value_re(sip_msg_t* msg, char* key, char* foo)
+{
+	ht_pv_t *hpv;
+	str sre;
+	pv_spec_t *sp;
+	sp = (pv_spec_t*)key;
+
+	hpv = (ht_pv_t*)sp->pvp.pvn.u.dname;
+
+	if(hpv->ht==NULL)
+	{
+		hpv->ht = ht_get_table(&hpv->htname);
+		if(hpv->ht==NULL)
+			return 1;
+	}
+	if(pv_printf_s(msg, hpv->pve, &sre)!=0)
+	{
+		LM_ERR("cannot get $sht expression\n");
 		return -1;
-	return 1;
+	}
+	return ht_rm_re_helper(msg, hpv->ht, &sre, 1);
 }
 
 static int ht_rm_items(sip_msg_t* msg, str* hname, str* op, str *val,
@@ -447,6 +483,7 @@ static int ht_rm_items(sip_msg_t* msg, str* hname, str* op, str *val,
 				if(ht_rm_cell_op(val, ht, mkey, HT_RM_OP_SW)<0) {
 					return -1;
 				}
+				return 1;
 			}
 			LM_WARN("unsupported match operator: %.*s\n", op->len, op->s);
 			break;
@@ -487,6 +524,17 @@ static int w_ht_rm_name(sip_msg_t* msg, char* hname, char* op, char *val)
 static int w_ht_rm_value(sip_msg_t* msg, char* hname, char* op, char *val)
 {
 	return w_ht_rm_items(msg, hname, op, val, 1);
+}
+
+static int ki_ht_rm_name(sip_msg_t* msg, str* sname, str* sop, str *sval)
+{
+	return ht_rm_items(msg, sname, sop, sval, 0);
+
+}
+
+static int ki_ht_rm_value(sip_msg_t* msg, str* sname, str* sop, str *sval)
+{
+	return ht_rm_items(msg, sname, sop, sval, 1);
 }
 
 static int ht_reset_by_name(str *hname)
@@ -1156,7 +1204,12 @@ static void htable_rpc_reload(rpc_t* rpc, void* c)
 		rpc->fault(c, 500, "No such htable");
 		return;
 	}
-
+	if(ht->dbtable.s==NULL || ht->dbtable.len<=0)
+	{
+		ht_db_close_con();
+		rpc->fault(c, 500, "No database htable");
+		return;
+	}
 
 	memcpy(&nht, ht, sizeof(ht_t));
 	/* it's temporary operation - use system malloc */
@@ -1164,7 +1217,7 @@ static void htable_rpc_reload(rpc_t* rpc, void* c)
 	if(nht.entries == NULL)
 	{
 		ht_db_close_con();
-		rpc->fault(c, 500, "Mtree reload failed");
+		rpc->fault(c, 500, "No resources for htable reload");
 		return;
 	}
 	memset(nht.entries, 0, nht.htsize*sizeof(ht_entry_t));
@@ -1184,7 +1237,7 @@ static void htable_rpc_reload(rpc_t* rpc, void* c)
 		}
 		free(nht.entries);
 		ht_db_close_con();
-		rpc->fault(c, 500, "Mtree reload failed");
+		rpc->fault(c, 500, "Htable reload failed");
 		return;
 	}
 
@@ -1268,6 +1321,26 @@ static sr_kemi_t sr_kemi_htable_exports[] = {
 	{ str_init("htable"), str_init("sht_iterator_end"),
 		SR_KEMIP_INT, ki_ht_iterator_end,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_rm_name_re"),
+		SR_KEMIP_INT, ki_ht_rm_name_re,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_rm_value_re"),
+		SR_KEMIP_INT, ki_ht_rm_value_re,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_rm_name"),
+		SR_KEMIP_INT, ki_ht_rm_name,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_rm_value"),
+		SR_KEMIP_INT, ki_ht_rm_value,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

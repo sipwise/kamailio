@@ -450,7 +450,8 @@ static int is_queried_node(struct rtpp_node *node, struct rtpp_node **queried_no
 int rtpengine_delete_node(struct rtpp_node *rtpp_node)
 {
 	rtpp_node->rn_displayed = 0;
-	rtpp_node->rn_disabled = RTPENGINE_MAX_RECHECK_TICKS;
+	rtpp_node->rn_disabled = 1;
+	rtpp_node->rn_recheck_ticks = RTPENGINE_MAX_RECHECK_TICKS;
 
 	return 1;
 }
@@ -3212,6 +3213,7 @@ rtpengine_manage(struct sip_msg *msg, const char *flags)
 {
 	int method;
 	int nosdp;
+	tm_cell_t *t = NULL;
 
 	if (msg->cseq==NULL && ((parse_headers(msg, HDR_CSEQ_F, 0)==-1) ||
 	   (msg->cseq==NULL)))
@@ -3241,9 +3243,12 @@ rtpengine_manage(struct sip_msg *msg, const char *flags)
 			return rtpengine_offer_answer(msg, flags, OP_OFFER, 0);
 		if(method==METHOD_INVITE && nosdp==0) {
 			msg->msg_flags |= FL_SDP_BODY;
-			if(tmb.t_gett!=NULL && tmb.t_gett()!=NULL
-					&& tmb.t_gett()!=T_UNDEFINED)
-				tmb.t_gett()->uas.request->msg_flags |= FL_SDP_BODY;
+			if(tmb.t_gett!=NULL) {
+				t = tmb.t_gett();
+				if(t!=NULL && t!=T_UNDEFINED && t->uas.request!=NULL) {
+					t->uas.request->msg_flags |= FL_SDP_BODY;
+				}
+			}
 			if(route_type==FAILURE_ROUTE)
 				return rtpengine_delete(msg, flags);
 			return rtpengine_offer_answer(msg, flags, OP_OFFER, 0);
