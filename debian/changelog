@@ -1,3 +1,11 @@
+ngcp-kamailio (5.1.6-1+0~mr6.5.2.0) unstable; urgency=medium
+
+  * [019a101] TT#44855 Fix ERROR messages in cfgt module
+  * [3a1a724] Imported Upstream version 5.1.6
+  * [6a98d2c] TT#43352 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Mon, 29 Oct 2018 10:52:29 +0100
+
 ngcp-kamailio (5.1.4-1+0~mr6.5.2.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
