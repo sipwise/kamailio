@@ -1,6 +1,5 @@
 
 ## Package related
-sipwise/tt42709.patch
 debian/no_lib64_on_64_bits.patch
 debian/no_INSTALL_file.patch
 debian/fix_export.patch
@@ -19,7 +18,9 @@ sipwise/rtpengine_next_branch_parm.patch
 sipwise/cfgt_debug.patch
 sipwise/cfgt_folder_fix.patch
 sipwise/cfgt_onsend_exit.patch
+sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_trans_eval_uri.patch
+sipwise/avpops_avp_subst_pvar.patch
 ## SCA Patches
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
@@ -34,21 +35,11 @@ upstream/fix_db_redis_time_schema.patch
 upstream/fix_db_redis_free_memory.patch
 upstream/fix_db_redis_memory_issues.patch
 upstream/fix_db_redis_manual_key_issue.patch
+upstream/fix_db_redis_reconnect.patch
 sipwise/rtpengine-balancing.patch
 ## backport from kamailio upstream (5.2)
-upstream/0001-tm-free-new-cell-in-case-of-error.patch
-upstream/0002-tm-force-free-cell-if-transaction-is-unlinkled.patch
-upstream/0003-tm-backup-and-restore-T-and-T_branch-in-t_continue.patch
-upstream/0004-topos-keep-original-contact-in-3xx-responses-sent-ou.patch
-upstream/0005-topos_redis-execute-end-dialog-function-only-for-BYE.patch
-upstream/0006-acc-more-debug-message.patch
-upstream/0007-tm-update-uas-rb-activ_type.patch
-upstream/0008-tm-activ_type-field-renamed-to-rbtype.patch
-upstream/0009-tm-set-uas-rb-type-along-with-the-buffer.patch
 sipwise/extend_stats.patch
-sipwise/avpops_avp_subst_pvar.patch
 sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
-sipwise/fix_db_redis_reconnect.patch
-sipwise/fix_error_in_cfgt_module.patch
+upstream/core_cfg_reset_routename_properly.patch

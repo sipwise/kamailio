@@ -1,11 +1,14 @@
-commit 417c1395d6eb28d0adfc56c4e042ca555acf39b6
-Author: Roman Romanchenko <rromanchenko@sipwise.com>
-Date:   Fri May 25 12:15:14 2018 +0300
+From e7ff1a13a244eb4b034a53774a00eeec0895e1d9 Mon Sep 17 00:00:00 2001
+From: Roman Romanchenko <rromanchenko@sipwise.com>
+Date: Mon, 17 Sep 2018 16:43:01 +0300
+Subject: [PATCH] kex: Extend kamailio rcv_replies statistics
 
-    TT#36356 Extend kamailio rcv_replies statistics
-     - statistics for 2xx and 4xx replies on invite added
-    
-    Change-Id: Ia6d5c42eddae3a3831d88c89eb770f1620e75b8e
+  - ability to count reply groups for each SIP method added.
+  - statistics for 2xx and 4xx replies on invite added
+---
+ src/modules/kex/core_stats.c | 57 ++++++++++++++++++++++++++++++++++++
+ src/modules/kex/core_stats.h |  2 ++
+ 2 files changed, 59 insertions(+)
 
 --- a/src/modules/kex/core_stats.c
 +++ b/src/modules/kex/core_stats.c

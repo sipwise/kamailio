@@ -1,3 +1,15 @@
+From e528fce4b61112f78b0081fcb0d53ef440cafce7 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Thu, 6 Sep 2018 04:16:35 -0400
+Subject: [PATCH] rtpengine: add block_dtmf and unblock_dtmf
+
+---
+ src/modules/rtpengine/doc/rtpengine.xml       |  2 +-
+ src/modules/rtpengine/doc/rtpengine_admin.xml | 41 +++++++++++++++++++
+ src/modules/rtpengine/rtpengine.c             | 31 ++++++++++++++
+ src/modules/rtpengine/rtpengine.h             |  2 +
+ 4 files changed, 75 insertions(+), 1 deletion(-)
+
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -128,6 +128,8 @@
@@ -31,7 +43,7 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -3484,6 +3494,27 @@
+@@ -3489,6 +3499,27 @@
  	return rtpengine_rtpp_set_wrap(msg, rtpengine_stop_recording_wrap, flags.s, 1);
  }
  
