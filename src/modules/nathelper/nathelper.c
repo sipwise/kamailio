@@ -1548,24 +1548,14 @@ static inline int replace_sdp_ip(
 	return count;
 }
 
-static int fix_nated_sdp_f(struct sip_msg *msg, char *str1, char *str2)
+static int ki_fix_nated_sdp_ip(sip_msg_t *msg, int level, str *ip)
 {
 	str body;
-	str ip;
-	int level, rest_len;
+	int rest_len;
 	char *buf, *m_start, *m_end;
 	struct lump *anchor;
 	int ret;
 	int count = 0;
-
-	if(fixup_get_ivalue(msg, (gparam_t *)str1, &level) != 0) {
-		LM_ERR("failed to get value for first parameter\n");
-		return -1;
-	}
-	if(str2 && fixup_get_svalue(msg, (gparam_t *)str2, &ip) != 0) {
-		LM_ERR("failed to get value for second parameter\n");
-		return -1;
-	}
 
 	if(extract_body(msg, &body) == -1) {
 		LM_ERR("cannot extract body from msg!\n");
@@ -1631,7 +1621,7 @@ static int fix_nated_sdp_f(struct sip_msg *msg, char *str1, char *str2)
 
 	if(level & FIX_MEDIP) {
 		/* Iterate all c= and replace ips in them. */
-		ret = replace_sdp_ip(msg, &body, "c=", str2 ? &ip : 0);
+		ret = replace_sdp_ip(msg, &body, "c=", (ip && ip->len>0) ? ip : 0);
 		if(ret == -1)
 			return -1;
 		count += ret;
@@ -1639,13 +1629,35 @@ static int fix_nated_sdp_f(struct sip_msg *msg, char *str1, char *str2)
 
 	if(level & FIX_ORGIP) {
 		/* Iterate all o= and replace ips in them. */
-		ret = replace_sdp_ip(msg, &body, "o=", str2 ? &ip : 0);
+		ret = replace_sdp_ip(msg, &body, "o=",  (ip && ip->len>0) ? ip : 0);
 		if(ret == -1)
 			return -1;
 		count += ret;
 	}
 
 	return count > 0 ? 1 : 2;
+}
+
+static int ki_fix_nated_sdp(sip_msg_t *msg, int level)
+{
+	return ki_fix_nated_sdp_ip(msg, level, NULL);
+}
+
+static int fix_nated_sdp_f(struct sip_msg *msg, char *str1, char *str2)
+{
+	int level;
+	str ip = {0,0};
+
+	if(fixup_get_ivalue(msg, (gparam_t *)str1, &level) != 0) {
+		LM_ERR("failed to get value for first parameter\n");
+		return -1;
+	}
+	if(str2 && fixup_get_svalue(msg, (gparam_t *)str2, &ip) != 0) {
+		LM_ERR("failed to get value for second parameter\n");
+		return -1;
+	}
+
+	return ki_fix_nated_sdp_ip(msg, level, &ip);
 }
 
 static int extract_mediaip(str *body, str *mediaip, int *pf, char *line)
@@ -1921,7 +1933,7 @@ static void nh_timer(unsigned int ticks, void *timer_idx)
 	unsigned int path_ip = 0;
 	unsigned short path_port = 0;
 	int options = 0;
-	int should_send_ping = 0;
+	int send_sip_ping = 0;
 
 	if((*natping_state) == 0)
 		goto done;
@@ -2060,9 +2072,11 @@ static void nh_timer(unsigned int ticks, void *timer_idx)
 		dst.proto = PROTO_UDP;
 		dst.send_sock = send_sock;
 
-		should_send_ping = (flags & sipping_flag) != 0 || ping_nated_only == 0;
+		send_sip_ping = ((flags & sipping_flag) != 0)
+							|| (ping_nated_only == 0 && sipping_flag != 0);
 
-		if ( should_send_ping && (opt.s = build_sipping(&c, send_sock, &path, &ruid, aorhash, &opt.len)) != 0) {
+		if ( send_sip_ping && (opt.s = build_sipping(&c, send_sock, &path,
+						&ruid, aorhash, &opt.len)) != 0) {
 			if(udp_send(&dst, opt.s, opt.len) < 0) {
 				LM_ERR("sip udp_send failed\n");
 			}
@@ -2421,6 +2435,16 @@ static sr_kemi_t sr_kemi_nathelper_exports[] = {
 	{ str_init("nathelper"), str_init("add_rcv_param"),
 		SR_KEMIP_INT, ki_add_rcv_param,
 		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("nathelper"), str_init("fix_nated_sdp"),
+		SR_KEMIP_INT, ki_fix_nated_sdp,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("nathelper"), str_init("fix_nated_sdp_ip"),
+		SR_KEMIP_INT, ki_fix_nated_sdp_ip,
+		{ SR_KEMIP_INT, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

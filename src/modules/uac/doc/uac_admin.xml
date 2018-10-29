@@ -921,9 +921,11 @@ failure_route[REMOTE_AUTH] {
 				<function moreinfo="none">event_route[uac:reply]</function>
 			</title>
 		<para>
-			Event route executed for the final reply to the request set with
-			uac_req_send(). The associated $uac_req(evroute) has to be set to
-			1.
+			Event route executed for the final reply of the branch for the
+			request sent with uac_req_send(). The associated $uac_req(evroute)
+			has to be set to 1. If the request is challenged for authentication
+			with 401/407, then the event_route is executed twice, first for
+			401/407 and second for final reply of the transaction.
 		</para>
 		<example>
 		<title><function>event_route[uac:reply]</function> usage</title>
@@ -987,7 +989,7 @@ event_route[uac:reply] {
 			Return the details of a remote registration record based on
 			a filter. The command has two parameter: attribute and value.
 			The attribute can be: l_uuid, l_username, r_username or auth_username.
-			The value is what should be matcheg against the value of the attribute
+			The value is what should be matched against the value of the attribute
 			in the remote registration record.
 		</para>
 		<para>
@@ -1029,7 +1031,7 @@ event_route[uac:reply] {
 			Enable a remote registration record based on
 			a filter. The command has two parameter: attribute and value.
 			The attribute can be: l_uuid, l_username, r_username or auth_username.
-			The value is what should be matcheg against the value of the attribute
+			The value is what should be matched against the value of the attribute
 			in the remote registration record.
 		</para>
 		<example>
@@ -1050,7 +1052,7 @@ event_route[uac:reply] {
 			Disable a remote registration record based on
 			a filter. The command has two parameter: attribute and value.
 			The attribute can be: l_uuid, l_username, r_username or auth_username.
-			The value is what should be matcheg against the value of the attribute
+			The value is what should be matched against the value of the attribute
 			in the remote registration record.
 		</para>
 		<example>

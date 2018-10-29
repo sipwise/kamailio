@@ -126,8 +126,6 @@ str empty_str = STR_NULL;
 
 /* statistic variables */
 int dlg_enable_stats = 1;
-int active_dlgs_cnt = 0;
-int early_dlgs_cnt = 0;
 int detect_spirals = 1;
 int dlg_send_bye = 0;
 int dlg_timeout_noreset = 0;
@@ -690,7 +688,6 @@ static int mod_init(void)
 			LM_ERR("failed to initialize the DB support\n");
 			return -1;
 		}
-		run_load_callbacks();
 	}
 
 	destroy_dlg_callbacks( DLGCB_LOADED );
@@ -721,6 +718,13 @@ static int child_init(int rank)
 {
 	dlg_db_mode = dlg_db_mode_param;
 
+
+	if(rank==PROC_INIT) {
+		if (dlg_db_mode!=DB_MODE_NONE) {
+			run_load_callbacks();
+		}
+	}
+
 	if(rank==PROC_MAIN) {
 		if(dlg_timer_procs>0) {
 			if(fork_sync_timer(PROC_TIMER, "Dialog Main Timer", 1 /*socks flag*/,
@@ -743,11 +747,6 @@ static int child_init(int rank)
 			LM_ERR("failed to start clean timer routine as process\n");
 			return -1; /* error */
 		}
-	}
-
-	if (rank==1) {
-		if_update_stat(dlg_enable_stats, active_dlgs, active_dlgs_cnt);
-		if_update_stat(dlg_enable_stats, early_dlgs, early_dlgs_cnt);
 	}
 
 	if ( ((dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED) &&
@@ -2266,6 +2265,14 @@ static void rpc_dlg_bridge(rpc_t *rpc, void *c) {
 		if(rpc->scan(c, "*S", &bd)<1) {
 			bd.s = NULL;
 			bd.len = 0;
+		} else {
+			if(bd.len==1 && *bd.s=='.') {
+				bd.s = NULL;
+				bd.len = 0;
+			} else if(bd.len==1 && *bd.s=='_') {
+				bd.s = "";
+				bd.len = 0;
+			}
 		}
 	}
 

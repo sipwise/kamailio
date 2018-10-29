@@ -512,8 +512,9 @@ int sdp_remove_line_by_prefix(sip_msg_t* msg, str* prefix, str* media)
 
 					LM_DBG("range for media type %.*s: %ld - %ld\n",
 							sdp_stream->media.len, sdp_stream->media.s,
-							sdp_stream->raw_stream.s - body.s,
-							sdp_stream->raw_stream.s + sdp_stream->raw_stream.len - body.s
+							(long int)(sdp_stream->raw_stream.s - body.s),
+							(long int)(sdp_stream->raw_stream.s
+								+ sdp_stream->raw_stream.len - body.s)
 					);
 
 					found += sdp_remove_line_lump_by_prefix(msg,&(sdp_stream->raw_stream),prefix);
@@ -2005,6 +2006,16 @@ static sr_kemi_t sr_kemi_sdpops_exports[] = {
 	{ str_init("sdpops"), str_init("sdp_with_ice"),
 		SR_KEMIP_INT, sdp_with_ice,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("sdpops"), str_init("sdp_with_media"),
+		SR_KEMIP_INT, sdp_with_media,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("sdpops"), str_init("sdp_with_active_media"),
+		SR_KEMIP_INT, sdp_with_active_media,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("sdpops"), str_init("sdp_get"),
