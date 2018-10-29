@@ -299,6 +299,7 @@ inline static int update_totag_set(struct cell *t, struct sip_msg *ok)
 
 	for (i=t->fwded_totags; i; i=i->next) {
 		if (i->tag.len==tag->len
+				&& i->tag.s
 				&& memcmp(i->tag.s, tag->s, tag->len) ==0 ){
 			/* to tag already recorded */
 			LM_DBG("to-tag retransmission\n");
@@ -315,7 +316,7 @@ inline static int update_totag_set(struct cell *t, struct sip_msg *ok)
 		return 0;
 	}
 	memset(n, 0, sizeof(struct totag_elem));
-	memcpy(s, tag->s, tag->len );
+	memcpy(s, tag->s, tag->len);
 	n->tag.s=s;n->tag.len=tag->len;
 	n->next=t->fwded_totags;
 	membar_write(); /* make sure all the changes to n are visible on all cpus
@@ -328,7 +329,7 @@ inline static int update_totag_set(struct cell *t, struct sip_msg *ok)
 					 * the "readers" (unmatched_tags()) do not use locks and
 					 * can be called simultaneously on another cpu.*/
 	t->fwded_totags=n;
-	LM_DBG("new totag \n");
+	LM_DBG("new totag [%.*s]\n", tag->len, tag->s);
 	return 0;
 }
 
@@ -482,7 +483,7 @@ static int _reply_light( struct cell *trans, char* buf, unsigned int len,
 	}
 
 	rb = & trans->uas.response;
-	rb->activ_type=code;
+	rb->rbtype=code;
 
 	trans->uas.status = code;
 	buf_len = rb->buffer ? len : len + REPLY_OVERBUFFER_LEN;
@@ -1784,20 +1785,19 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 	/* *** store and relay message as needed *** */
 	reply_status = t_should_relay_response(t, msg_status, branch,
 		&save_clone, &relay, cancel_data, p_msg );
-	LM_DBG("branch=%d, save=%d, relay=%d icode=%d\n",
-		branch, save_clone, relay, t->uac[branch].icode);
+	LM_DBG("branch=%d, save=%d, relay=%d icode=%d msg status=%u\n",
+		branch, save_clone, relay, t->uac[branch].icode, msg_status);
 
 	/* store the message if needed */
-	if (save_clone) /* save for later use, typically branch picking */
-	{
+	if (save_clone) {
+		/* save for later use, typically branch picking */
 		if (!store_reply( t, branch, p_msg ))
 			goto error01;
 	}
 
-	uas_rb = & t->uas.response;
+	/* initialize for outbound reply */
+	uas_rb = &t->uas.response;
 	if (relay >= 0 ) {
-		/* initialize sockets for outbound reply */
-		uas_rb->activ_type=msg_status;
 		/* only messages known to be relayed immediately will be
 		 * be called on; we do not evoke this callback on messages
 		 * stored in shmem -- they are fixed and one cannot change them
@@ -1809,13 +1809,13 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		}
 		/* try building the outbound reply from either the current
 		 * or a stored message */
-		relayed_msg = branch==relay ? p_msg :  t->uac[relay].reply;
+		relayed_msg = (branch==relay) ? p_msg :  t->uac[relay].reply;
 		if (relayed_msg==FAKED_REPLY) {
 			if(t->flags & T_CANCELED) {
 				/* transaction canceled - send 487 */
 				relayed_code = 487;
 			} else {
-				relayed_code = branch==relay
+				relayed_code = (branch==relay)
 					? msg_status : t->uac[relay].last_received;
 			}
 			/* use to_tag from the original request, or if not present,
@@ -1922,6 +1922,7 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 			LM_ERR("cannot alloc reply shmem\n");
 			goto error03;
 		}
+		uas_rb->rbtype = relayed_code;
 		uas_rb->buffer_len = res_len;
 		memcpy( uas_rb->buffer, buf, res_len );
 		if (relayed_msg==FAKED_REPLY) { /* to-tags for local replies */
@@ -1934,13 +1935,13 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 		t->relayed_reply_branch = relay;
 
 		if ( unlikely(is_invite(t) && relayed_msg!=FAKED_REPLY
-		&& relayed_code>=200 && relayed_code < 300
-		&& has_tran_tmcbs( t,
-				TMCB_RESPONSE_OUT|TMCB_RESPONSE_READY
-				|TMCB_E2EACK_IN|TMCB_E2EACK_RETR_IN))) {
+				&& relayed_code>=200 && relayed_code < 300
+				&& has_tran_tmcbs( t,
+					TMCB_RESPONSE_OUT|TMCB_RESPONSE_READY
+					|TMCB_E2EACK_IN|TMCB_E2EACK_RETR_IN))) {
 			totag_retr=update_totag_set(t, relayed_msg);
 		}
-	}; /* if relay ... */
+	} /* if relay ... */
 
 	UNLOCK_REPLIES( t );
 
@@ -1977,12 +1978,17 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
 
 		if (likely(uas_rb->dst.send_sock)) {
 			if (SEND_PR_BUFFER( uas_rb, buf, res_len ) >= 0){
+				LM_DBG("reply buffer sent out\n");
 				if (unlikely(!totag_retr
 							&& has_tran_tmcbs(t, TMCB_RESPONSE_OUT))){
 					LOCK_REPLIES( t );
-					if(relayed_code==uas_rb->activ_type) {
+					if(relayed_code==uas_rb->rbtype) {
 						run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb,
 								t->uas.request, relayed_msg, TMCB_NONE_F);
+					} else {
+						LM_DBG("skip tm callback %d - relay code %d active %d\n",
+								TMCB_RESPONSE_OUT, relayed_code,
+								uas_rb->rbtype);
 					}
 					UNLOCK_REPLIES( t );
 				}
@@ -2041,6 +2047,7 @@ error01:
 	/* a serious error occurred -- attempt to send an error reply;
 	 * it will take care of clean-ups  */
 
+	LM_DBG("reply relay failure\n");
 	/* failure */
 	return RPS_ERROR;
 }

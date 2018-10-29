@@ -360,6 +360,11 @@ int tps_storage_link_msg(sip_msg_t *msg, tps_data_t *td, int dir)
 		}
 	}
 
+	LM_DBG("downstream: %s - acontact: [%.*s] - bcontact: [%.*s]\n",
+			(dir==TPS_DIR_DOWNSTREAM)?"yes":"no",
+			td->a_contact.len, (td->a_contact.len>0)?td->a_contact.s:"",
+			td->b_contact.len, (td->b_contact.len>0)?td->b_contact.s:"");
+
 	return 0;
 
 error:
@@ -369,9 +374,9 @@ error:
 /**
  *
  */
-int tps_storage_record(sip_msg_t *msg, tps_data_t *td, int dialog)
+int tps_storage_record(sip_msg_t *msg, tps_data_t *td, int dialog, int dir)
 {
-	int ret;
+	int ret = -1; /* error if dialog == 0 */
 	str suid;
 
 	if(dialog==0) {
@@ -394,12 +399,12 @@ int tps_storage_record(sip_msg_t *msg, tps_data_t *td, int dialog)
 	ret = tps_storage_fill_contact(msg, td, &suid, TPS_DIR_UPSTREAM);
 	if(ret<0) goto error;
 
-	ret = tps_storage_link_msg(msg, td, TPS_DIR_DOWNSTREAM);
+	ret = tps_storage_link_msg(msg, td, dir);
 	if(ret<0) goto error;
-	if(td->as_contact.len <= 0 && td->bs_contact.len <= 0) {
-		LM_WARN("no local address - do record routing for all initial requests\n");
-	}
 	if(dialog==0) {
+		if(td->as_contact.len <= 0 && td->bs_contact.len <= 0) {
+			LM_WARN("no local address - do record routing for all initial requests\n");
+		}
 		ret = _tps_storage_api.insert_dialog(td);
 		if(ret<0) goto error;
 	}
