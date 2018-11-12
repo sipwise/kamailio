@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.6-1+0~mr7.1.0.0) unstable; urgency=medium
+
+  [ Kirill Solomko ]
+  * [fb85e10] TT#30386 add new kamailio module pv_headers
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 12 Nov 2018 22:35:16 +0100
+
 ngcp-kamailio (5.1.6-1+0~mr7.0.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
