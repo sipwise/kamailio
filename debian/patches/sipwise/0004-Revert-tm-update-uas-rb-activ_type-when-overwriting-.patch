@@ -1,0 +1,67 @@
+From 767e9c9b6edbd5bc0619a985f70748e59e04da6c Mon Sep 17 00:00:00 2001
+From: Andrew Pogrebennyk <apogrebennyk@sipwise.com>
+Date: Mon, 12 Nov 2018 15:15:31 +0100
+Subject: [PATCH 4/4] Revert "tm: update uas rb activ_type when overwriting
+ realyed_code"
+
+This reverts commit 5b223a2e8a92f351b8eab756f5256fda7645ff21.
+---
+ src/modules/tm/t_reply.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
+
+diff --git a/src/modules/tm/t_reply.c b/src/modules/tm/t_reply.c
+index 6c9e33894..bb2452c87 100644
+--- a/src/modules/tm/t_reply.c
++++ b/src/modules/tm/t_reply.c
+@@ -1795,7 +1795,6 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 	buf=0;
+ 	relayed_msg=0;
+ 	relayed_code=0;
+-
+ 	totag_retr=0;
+ 
+ 	/* remember, what was sent upstream to know whether we are
+@@ -1804,8 +1803,8 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 	/* *** store and relay message as needed *** */
+ 	reply_status = t_should_relay_response(t, msg_status, branch,
+ 		&save_clone, &relay, cancel_data, p_msg );
+-	LM_DBG("branch=%d, save=%d, relay=%d icode=%d msg status=%u\n",
+-		branch, save_clone, relay, t->uac[branch].icode, msg_status);
++	LM_DBG("branch=%d, save=%d, relay=%d icode=%d\n",
++		branch, save_clone, relay, t->uac[branch].icode);
+ 
+ 	/* store the message if needed */
+ 	if (save_clone) /* save for later use, typically branch picking */
+@@ -1834,9 +1833,8 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 			if(t->flags & T_CANCELED) {
+ 				/* transaction canceled - send 487 */
+ 				relayed_code = 487;
+-				uas_rb->activ_type = 487;
+ 			} else {
+-				relayed_code = (branch==relay)
++				relayed_code = branch==relay
+ 					? msg_status : t->uac[relay].last_received;
+ 			}
+ 			/* use to_tag from the original request, or if not present,
+@@ -1889,7 +1887,6 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 				buf=build_res_buf_from_sip_req(500, &reason,
+ 									to_tag, t->uas.request, &res_len, &bm);
+ 				relayed_code=500;
+-				uas_rb->activ_type = 500;
+ 			}else if (cfg_get(tm, tm_cfg, tm_aggregate_auth) &&
+ 						(relayed_code==401 || relayed_code==407) &&
+ 						(auth_reply_count(t, p_msg)>1)){
+@@ -2006,10 +2003,6 @@ enum rps relay_reply( struct cell *t, struct sip_msg *p_msg, int branch,
+ 					if(relayed_code==uas_rb->activ_type) {
+ 						run_trans_callbacks_with_buf( TMCB_RESPONSE_OUT, uas_rb,
+ 								t->uas.request, relayed_msg, TMCB_NONE_F);
+-					} else {
+-						LM_DBG("skip tm callback %d - relay code %d active %d\n",
+-								TMCB_RESPONSE_OUT, relayed_code,
+-								uas_rb->activ_type);
+ 					}
+ 					UNLOCK_REPLIES( t );
+ 				}
+-- 
+2.17.1
+

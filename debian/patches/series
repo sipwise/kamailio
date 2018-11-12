@@ -43,3 +43,8 @@ sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
 upstream/core_cfg_reset_routename_properly.patch
+# apogrebennyk test if this is crashing kamailio (6.5.1)
+sipwise/0001-Revert-acc-more-debug-message-when-checking-if-acc-s.patch
+sipwise/0002-Revert-tm-set-uas-rb-type-along-with-the-buffer-when.patch
+sipwise/0003-Revert-tm-activ_type-field-renamed-to-rbtype-in-stru.patch
+sipwise/0004-Revert-tm-update-uas-rb-activ_type-when-overwriting-.patch
