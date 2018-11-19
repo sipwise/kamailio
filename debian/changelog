@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.7-1+0~mr5.5.7.1) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [94a0de5] TT#43152 ACC not created for call-fork with reject scenario
+  * [13a0860] TT#44251 Fix CVE-2018-16657
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Nov 2018 17:56:44 +0100
+
 ngcp-kamailio (4.4.7-1+0~mr5.5.7.0) unstable; urgency=medium
 
   * New release.
