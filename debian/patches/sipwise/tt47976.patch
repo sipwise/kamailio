@@ -1,0 +1,47 @@
+Index: kamailio/src/modules/presence/presentity.c
+===================================================================
+--- kamailio.orig/src/modules/presence/presentity.c
++++ kamailio/src/modules/presence/presentity.c
+@@ -379,6 +379,10 @@ int delete_presentity_if_dialog_id_exist
+ 	int i = 0;
+ 	presentity_t old_presentity;
+ 
++	if (presentity->event->evp->type != EVENT_DIALOG) {
++		return 0;
++	}
++
+ 	query_cols[n_query_cols] = &str_domain_col;
+ 	query_ops[n_query_cols] = OP_EQ;
+ 	query_vals[n_query_cols].type = DB1_STR;
+@@ -436,6 +440,7 @@ int delete_presentity_if_dialog_id_exist
+ 		tmp_db_etag.s = (char*)row_vals[rez_etag_col].val.string_val;
+ 		tmp_db_etag.len = strlen(tmp_db_etag.s);
+ 
++		LM_WARN("++++ agranig check if dialog 1\n");
+ 		if (check_if_dialog(tmp_db_body, &db_is_dialog, &db_dialog_id) == 0)
+ 		{
+ 			// If ID from DB matches the one we supplied
+@@ -707,6 +712,7 @@ int update_presentity(struct sip_msg* ms
+ 				}
+ 			}
+ 
++		    LM_WARN("++++ agranig check if dialog 2\n");
+ 			check_if_dialog(*body, &is_dialog, &dialog_id);
+ 			if ( dialog_id ) {
+ 				if (delete_presentity_if_dialog_id_exists(presentity, dialog_id) < 0) {
+@@ -812,6 +818,7 @@ int update_presentity(struct sip_msg* ms
+ 
+ 			old_body.s = (char*)row_vals[rez_body_col].val.string_val;
+ 			old_body.len = strlen(old_body.s);
++		    LM_WARN("++++ agranig check if dialog 3\n");
+ 			if(check_if_dialog(*body, &is_dialog, &dialog_id)< 0)
+ 			{
+ 				LM_ERR("failed to check if dialog stored\n");
+@@ -829,6 +836,7 @@ int update_presentity(struct sip_msg* ms
+ 				goto after_dialog_check;
+ 			}
+ 
++		    LM_WARN("++++ agranig check if dialog 4\n");
+ 			if(check_if_dialog(old_body, &is_dialog, &old_dialog_id)< 0)
+ 			{
+ 				LM_ERR("failed to check if dialog stored\n");
