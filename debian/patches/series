@@ -46,3 +46,4 @@ sipwise/media-blocking.patch
 upstream/core_cfg_reset_routename_properly.patch
 sipwise/tt41650.patch
 sipwise/tt47976.patch
+upstream/tm_reply_received_simplify_locking.patch
