@@ -1,0 +1,63 @@
+--- a/src/modules/rtpengine/rtpengine_funcs.c
++++ b/src/modules/rtpengine/rtpengine_funcs.c
+@@ -64,6 +64,7 @@
+  * -1: error
+  *  1: text or sdp
+  *  2: multipart
++ *  3: trickle ice sdp fragment
+  */
+ int check_content_type(struct sip_msg *msg)
+ {
+@@ -133,8 +134,11 @@
+ 
+ 	advance(p,3,str_type,error_1);
+ 	x = READ(p-3) & 0x00ffffff;
+-	if (!one_of_8(x,sdp_))
++	if (!one_of_8(x,sdp_)) {
++		if (strncasecmp(p-3, "trickle-ice-sdpfrag", 19) == 0)
++			return 3;
+ 		goto other;
++	}
+ 
+ 	if (*p==';'||*p==' '||*p=='\t'||*p=='\n'||*p=='\r'||*p==0) {
+ 		LM_DBG("type <%.*s> found valid\n", (int)(p-str_type.s), str_type.s);
+@@ -264,7 +268,7 @@
+ 
+ done:
+ 	/*LM_DBG("DEBUG:extract_body:=|%.*s|\n",body->len,body->s);*/
+-	return 1;
++	return ret; /* mirrors return type of check_content_type */
+ }
+ 
+ /*
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -2141,7 +2141,7 @@
+ 	bencode_item_t *item, *resp;
+ 	str viabranch = STR_NULL;
+ 	str body = STR_NULL, error = STR_NULL;
+-	int ret, queried_nodes = 0;
++	int ret, queried_nodes = 0, cont_type = 0;
+ 	struct rtpp_node *node;
+ 	char *cp;
+ 	pv_value_t pv_val;
+@@ -2190,7 +2190,7 @@
+ 				body = pv_val.rs;
+ 			}
+ 
+-		} else if (extract_body(msg, &body) == -1) {
++		} else if ((cont_type = extract_body(msg, &body)) == -1) {
+ 			LM_ERR("can't extract body from the message\n");
+ 			goto error;
+ 		}
+@@ -2212,6 +2212,10 @@
+ 	if (parse_flags(&ng_flags, msg, &op, flags_str))
+ 		goto error;
+ 
++	/* trickle ice sdp fragment? */
++	if (cont_type == 3)
++		bencode_list_add_string(ng_flags.flags, "fragment");
++
+ 	/* only add those if any flags were given at all */
+ 	if (ng_flags.direction && ng_flags.direction->child)
+ 		bencode_dictionary_add(ng_flags.dict, "direction", ng_flags.direction);
