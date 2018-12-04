@@ -1,0 +1,15 @@
+--- a/src/modules/rtpengine/rtpengine_funcs.c
++++ b/src/modules/rtpengine/rtpengine_funcs.c
+@@ -133,8 +133,11 @@
+ 
+ 	advance(p,3,str_type,error_1);
+ 	x = READ(p-3) & 0x00ffffff;
+-	if (!one_of_8(x,sdp_))
++	if (!one_of_8(x,sdp_)) {
++		if (strncasecmp(p-3, "trickle-ice-sdpfrag", 19) == 0)
++			return 1;
+ 		goto other;
++	}
+ 
+ 	if (*p==';'||*p==' '||*p=='\t'||*p=='\n'||*p=='\r'||*p==0) {
+ 		LM_DBG("type <%.*s> found valid\n", (int)(p-str_type.s), str_type.s);
