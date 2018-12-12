@@ -1,0 +1,30 @@
+--- a/msg_translator.c
++++ b/msg_translator.c
+@@ -1819,10 +1819,10 @@ int check_boundaries(struct sip_msg *msg
+ 			tmp.len = get_line(lb_t->s);
+ 			if(tmp.len!=b.len || strncmp(b.s, tmp.s, b.len)!=0)
+ 			{
+-				LM_DBG("malformed bondary in the middle\n");
++				LM_DBG("malformed boundary in the middle\n");
+ 				memcpy(pb, b.s, b.len); body.len = body.len + b.len;
+ 				pb = pb + b.len;
+-				t = lb_t->s.s - (lb_t->s.s + tmp.len);
++				t = lb_t->next->s.s - (lb_t->s.s + tmp.len);
+ 				memcpy(pb, lb_t->s.s+tmp.len, t); pb = pb + t;
+ 				/*LM_DBG("new chunk[%d][%.*s]\n", t, t, pb-t);*/
+ 			}
+--- a/modules/textops/textops.c
++++ b/modules/textops/textops.c
+@@ -1679,6 +1679,12 @@ int set_multibody_helper(struct sip_msg*
+ 		}
+ 	}
+ 
++	/* safety check to be sure there is a body to be set in the message */
++	if(nb.len == 0 && body.len==0) {
++		LM_WARN("no body to be set in the message\n");
++		goto error;
++	}
++
+ 	anchor = anchor_lump(msg, msg->unparsed-msg->buf, 0, 0);
+ 	if(anchor==0)
+ 	{
