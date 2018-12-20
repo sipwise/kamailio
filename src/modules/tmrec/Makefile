@@ -6,7 +6,7 @@ include ../../Makefile.defs
 auto_gen=
 NAME=tmrec.so
 DEFS +=
-LIBS +=
+LIBS += -L$(LOCALBASE)/lib -lical -licalss
 
 DEFS+=-DKAMAILIO_MOD_INTERFACE
 

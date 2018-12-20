@@ -561,6 +561,7 @@ int fixup_free_igp_spve(void** param, int param_no)
 FIXUP_F_SPVE_T(spve_spve, 1, 2, 2, 0)
 FIXUP_F_SPVE_T(spve_uint, 1, 2, 1, FPARAM_INT)
 FIXUP_F_SPVE_T(spve_str, 1, 2, 1, FPARAM_STR)
+FIXUP_F_SPVE_T(spve_str_str, 1, 3, 1, FPARAM_STR)
 FIXUP_F_SPVE_T(spve_null, 1, 1, 1, 0)
 
 /** get the corresp. fixup_free* function.
@@ -590,6 +591,7 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
 	   see above fixup_uint_null) */
 	if (f == fixup_spve_uint) return 0;
 	if (f == fixup_spve_str) return fixup_free_spve_str;
+	if (f == fixup_spve_str_str) return fixup_free_spve_str_str;
 	return 0;
 }
 

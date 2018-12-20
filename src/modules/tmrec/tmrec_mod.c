@@ -41,6 +41,7 @@
 #include "../../core/kemi.h"
 #include "../../lib/srutils/tmrec.h"
 #include "period.h"
+#include "ical.h"
 
 
 MODULE_VERSION
@@ -50,7 +51,9 @@ static int  child_init(int);
 static void mod_destroy(void);
 
 static int w_tmrec_match(struct sip_msg* msg, char* rec, char* t);
+static int w_tmrec_match_ical(struct sip_msg* msg, char* rec, char* t);
 static int fixup_tmrec_match(void** param, int param_no);
+static int fixup_ical(void** param, int param_no);
 static int w_is_leap_year(struct sip_msg* msg, char* t, char* p2);
 static int fixup_is_leap_year(void** param, int param_no);
 static int fixup_time_period_match(void** param, int param_no);
@@ -64,6 +67,10 @@ static cmd_export_t cmds[]={
 	{"tmrec_match", (cmd_function)w_tmrec_match, 1, fixup_tmrec_match,
 		0, ANY_ROUTE},
 	{"tmrec_match", (cmd_function)w_tmrec_match, 2, fixup_tmrec_match,
+		0, ANY_ROUTE},
+	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 1, fixup_ical,
+		0, ANY_ROUTE},
+	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 2, fixup_ical,
 		0, ANY_ROUTE},
 	{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year,
 		0, ANY_ROUTE},
@@ -256,7 +263,60 @@ static int w_tmrec_match(struct sip_msg* msg, char* rec, char* t)
 	return ki_tmrec_match_timestamp(msg, &rv, ti);
 }
 
+static int w_tmrec_match_ical(struct sip_msg* msg, char* ical_rec, char* t)
+{
+	str rv;
+	time_t tv;
+	int ti;
+
+	if(msg==NULL)
+		return -2;
+
+	if(fixup_get_svalue(msg, (gparam_t*)ical_rec, &rv)!=0)
+	{
+		LM_ERR("w_tmrec_match_ical: invalid input");
+		return -1;
+	}
+
+	if(t!=NULL)
+	{
+		if(fixup_get_ivalue(msg, (gparam_t*)t, &ti)!=0)
+		{
+			LM_ERR("invalid time stamp parameter value\n");
+			return -4;
+		}
+		tv = (time_t)ti;
+	} else {
+		tv = time(NULL);
+	}
+
+	char time_string[20];
+	strftime(time_string, 20, "%Y-%m-%d %H:%M:%S", localtime(&tv));
+
+	icalcomponent *event = create_from_buf(rv.s);
+	LM_DBG("w_tmrec_match_ical: checking ical: %s, %s\n", time_string, rv.s);
+
+	int rc = match_ical_event(event, tv);
+
+	LM_DBG("match_ical_event return %d\n", rc);
+	return rc;
+}
+
 static int fixup_tmrec_match(void** param, int param_no)
+{
+	if(param_no==1)
+	{
+		if(fixup_spve_null(param, 1)<0)
+			return -1;
+		return 0;
+	} else if(param_no==2) {
+		if(fixup_igp_null(param, 1)<0)
+			return -1;
+	}
+	return 0;
+}
+
+static int fixup_ical(void** param, int param_no)
 {
 	if(param_no==1)
 	{

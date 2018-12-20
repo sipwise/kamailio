@@ -21,12 +21,19 @@
  */
 #include <stdio.h>
 #include <sys/stat.h>
+#include <string.h>
+#include <errno.h>
 
 #include "../../core/events.h"
 #include "../../core/strutils.h"
 #include "../../core/pvar.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
+#include "../../core/parser/msg_parser.h"
+#include "../../core/parser/parse_uri.h"
+#include "../../core/parser/parse_to.h"
+#include "../../core/parser/parse_from.h"
+#include "../../core/parser/parse_cseq.h"
 
 #include "cfgt_int.h"
 #include "cfgt_json.h"
@@ -38,6 +45,7 @@ cfgt_hash_p _cfgt_uuid = NULL;
 str cfgt_hdr_prefix = {"NGCP%", 5};
 str cfgt_basedir = {"/tmp", 4};
 int cfgt_mask = CFGT_DP_ALL;
+int not_sip = 0;
 
 static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
 {
@@ -185,7 +193,7 @@ int _cfgt_get_hdr_helper(struct sip_msg *msg, str *res, int mode)
 			return STR_EQ(tmp, *res);
 		}
 	}
-	return 1; /* not found */
+	return 2; /* not found */
 }
 
 int _cfgt_get_hdr(struct sip_msg *msg, str *res)
@@ -328,12 +336,15 @@ void cfgt_save_node(cfgt_node_p node)
 	FILE *fp;
 	str dest = STR_NULL;
 	int dir = 0;
+	struct stat sb;
 	if(_cfgt_get_filename(node->msgid, node->uuid, &dest, &dir) < 0) {
 		LM_ERR("can't build filename\n");
 		return;
 	}
 	LM_DBG("dir [%s]\n", dest.s);
-	if(mkdir(dest.s, S_IRWXO | S_IXGRP | S_IRWXU) < 0) {
+	if (stat(dest.s, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+		LM_DBG("dir [%s] already existing\n", dest.s);
+	} else if(mkdir(dest.s, S_IRWXO | S_IXGRP | S_IRWXU) < 0) {
 		LM_ERR("failed to make directory (%d)\n", errno);
 		return;
 	}
@@ -349,7 +360,7 @@ void cfgt_save_node(cfgt_node_p node)
 			return;
 		}
 		if(fputs(dest.s, fp) < 0) {
-			LM_ERR("failed writing to file\n");
+			LM_ERR("failed writing to file: %s\n", strerror(errno));
 		}
 		fclose(fp);
 		node->jdoc.free_fn(dest.s);
@@ -396,15 +407,21 @@ int _cfgt_set_dump(struct sip_msg *msg, cfgt_node_p node, str *flow)
 
 	if(node == NULL || flow == NULL)
 		return -1;
+
 	vars = srjson_CreateObject(&node->jdoc);
 	if(vars == NULL) {
 		LM_ERR("cannot create json object\n");
 		return -1;
 	}
+
+	/* TODO: during cfgt_get_json some errors are generated due to missing
+	values in some routes. Skip the function when node->route->s.s equals
+	'dialog:failed' partially solve the issue */
 	if(cfgt_get_json(msg, 30, &node->jdoc, vars) < 0) {
 		LM_ERR("cannot get var info\n");
 		return -1;
 	}
+
 	f = srjson_CreateObject(&node->jdoc);
 	if(f == NULL) {
 		LM_ERR("cannot create json object\n");
@@ -469,9 +486,13 @@ int _cfgt_add_routename(cfgt_node_p node, struct action *a, str *routename)
 	} else {
 		LM_DBG("actual routename:[%.*s][%d]\n", node->route->s.len,
 				node->route->s.s, node->route->type);
-		if(node->route->prev)
+		if(node->route->prev) {
+			if(node->route->prev->prev)
+				LM_DBG("prev prev routename:[%.*s][%d]\n", node->route->prev->prev->s.len,
+						node->route->prev->prev->s.s, node->route->prev->prev->type);
 			LM_DBG("prev routename:[%.*s][%d]\n", node->route->prev->s.len,
 					node->route->prev->s.s, node->route->prev->type);
+		}
 		if(node->route->next)
 			LM_DBG("next routename:[%.*s][%d]\n", node->route->next->s.len,
 					node->route->next->s.s, node->route->next->type);
@@ -479,12 +500,19 @@ int _cfgt_add_routename(cfgt_node_p node, struct action *a, str *routename)
 			LM_DBG("same route\n");
 			_cfgt_set_type(node->route, a);
 			return 2;
-		} else if(node->route->prev
-				  && STR_EQ(*routename, node->route->prev->s)) {
-			LM_DBG("back to route[%.*s]\n", node->route->prev->s.len,
-					node->route->prev->s.s);
-			_cfgt_set_type(node->route->prev, a);
-			return 3;
+		} else if(node->route->prev) {
+			if STR_EQ(*routename, node->route->prev->s) {
+				LM_DBG("back to prev route[%.*s]\n", node->route->prev->s.len,
+						node->route->prev->s.s);
+				_cfgt_set_type(node->route->prev, a);
+				return 3;
+			} else if(node->route->prev->prev
+					  && STR_EQ(*routename, node->route->prev->prev->s)) {
+				LM_DBG("back to prev prev route[%.*s]\n", node->route->prev->prev->s.len,
+						node->route->prev->prev->s.s);
+				_cfgt_set_type(node->route->prev->prev, a);
+				return 3;
+			}
 		}
 		route = pkg_malloc(sizeof(cfgt_str_list_t));
 		if(!route) {
@@ -492,6 +520,9 @@ int _cfgt_add_routename(cfgt_node_p node, struct action *a, str *routename)
 			return -1;
 		}
 		memset(route, 0, sizeof(cfgt_str_list_t));
+		if(route->prev && node->route->prev) {
+			route->prev->prev = node->route->prev;
+		}
 		route->prev = node->route;
 		node->route->next = route;
 		node->route = route;
@@ -533,6 +564,31 @@ int _cfgt_node_get_flowname(cfgt_str_list_p route, int *indx, str *dest)
 	return 0;
 }
 
+int _cfgt_parse_msg(sip_msg_t *msg)
+{
+	if (parse_msg(msg->buf, msg->len, msg)!=0) {
+		LM_ERR("outbuf buffer parsing failed!");
+		return 1;
+	}
+
+	if(msg->first_line.type==SIP_REQUEST) {
+		if(!IS_SIP(msg)) {
+			LM_DBG("non sip request message\n");
+			return 1;
+		}
+	} else if(msg->first_line.type==SIP_REPLY) {
+		if(!IS_SIP_REPLY(msg)) {
+			LM_DBG("non sip reply message\n");
+			return 1;
+		}
+	} else {
+		LM_DBG("non sip message\n");
+		return 1;
+	}
+
+	return 0;
+}
+
 int cfgt_process_route(struct sip_msg *msg, struct action *a)
 {
 	str routename;
@@ -548,6 +604,10 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
 		return 0;
 	}
 	LM_DBG("route from action:[%s]\n", a->rname);
+	if(not_sip) {
+		LM_DBG("not_sip flag set, not a SIP message, skip it\n");
+		return 0;
+	}
 	routename.s = a->rname;
 	routename.len = strlen(a->rname);
 	switch(_cfgt_add_routename(_cfgt_node, a, &routename)) {
@@ -593,22 +653,33 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
 
 /*
 TODO:
-- parse first line, check if is SIP
 - parse for header cfgtest
 */
 int cfgt_msgin(sr_event_param_t *evp)
 {
 	srjson_t *jobj;
+	sip_msg_t msg;
 	str *buf = (str *)evp->data;
+
 	if(buf == NULL)
 		return 0;
+	LM_DBG("msg in:{%.*s}\n", buf->len, buf->s);
+
+	// Check if it is a SIP message
+	memset(&msg, 0, sizeof(sip_msg_t));
+	msg.buf = buf->s;
+	msg.len = buf->len;
+	if(_cfgt_parse_msg(&msg)!=0) {
+		LM_DBG("set 'not_sip' flag\n");
+		not_sip = 1;
+	}
+
 	if(_cfgt_node) {
 		cfgt_save_node(_cfgt_node);
 		_cfgt_remove_node(_cfgt_node);
 		LM_DBG("node removed\n");
 		_cfgt_node = NULL;
 	}
-	LM_DBG("msg in:{%.*s}\n", buf->len, buf->s);
 	_cfgt_node = cfgt_create_node(NULL);
 	if(_cfgt_node) {
 		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
@@ -626,14 +697,23 @@ int cfgt_msgin(sr_event_param_t *evp)
 int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
 {
 	str unknown = {"unknown", 7};
+	int get_hdr_result = 0;
 
 	if(_cfgt_node) {
 		if(_cfgt_node->msgid == 0) {
 			LM_DBG("new node\n");
-			if(_cfgt_get_hdr(msg, &_cfgt_node->uuid) != 0
-					|| _cfgt_node->uuid.len == 0) {
-				LM_ERR("cannot get value of cfgtest uuid header."
-					   " Using unknown\n");
+			get_hdr_result = _cfgt_get_hdr(msg, &_cfgt_node->uuid);
+			if(get_hdr_result != 0 || _cfgt_node->uuid.len == 0) {
+				if(not_sip) {
+					LM_DBG("not_sip flag set, not a SIP message."
+							" Using 'unknown' uuid\n");
+				} else if(get_hdr_result == 2) {
+					LM_DBG("message not related to the cfgtest scenario."
+						   " Using 'unknown' uuid\n");
+				} else {
+					LM_ERR("cannot get value of cfgtest uuid header."
+						   " Using 'unknown' uuid\n");
+				}
 				pkg_str_dup(&_cfgt_node->uuid, &unknown);
 			}
 			return _cfgt_get_uuid_id(_cfgt_node);
@@ -663,7 +743,9 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
 
 	if(_cfgt_node) {
 		LM_DBG("dump last flow\n");
-		if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
+		if(_cfgt_node->route == NULL && strncmp(_cfgt_node->uuid.s, "unknown", 7) == 0)
+			LM_DBG("route is NULL and message doesn't belong to cfgtest scenario\n");
+		else if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
 			LM_ERR("cannot create flowname\n");
 		else
 			_cfgt_set_dump(msg, _cfgt_node, &flowname);
@@ -677,10 +759,21 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
 int cfgt_msgout(sr_event_param_t *evp)
 {
 	srjson_t *jobj;
+	sip_msg_t msg;
 	str *buf = (str *)evp->data;
+
 	if(buf == NULL)
 		return 0;
 	LM_DBG("msg out:{%.*s}\n", buf->len, buf->s);
+
+	// Check if it is a SIP message
+	memset(&msg, 0, sizeof(sip_msg_t));
+	msg.buf = buf->s;
+	msg.len = buf->len;
+	if(_cfgt_parse_msg(&msg)!=0) {
+		LM_DBG("set 'not_sip' flag\n");
+		not_sip = 1;
+	}
 
 	if(_cfgt_node) {
 		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
@@ -691,6 +784,13 @@ int cfgt_msgout(sr_event_param_t *evp)
 		srjson_AddItemToArray(&_cfgt_node->jdoc, _cfgt_node->out, jobj);
 		return 0;
 	}
+
+	// Skip OPTION messages internally generated
+	if(buf->len>7 && strcasestr(buf->s, "OPTIONS")) {
+		LM_DBG("OPTIONS message internally generated, skip it\n");
+		return 0;
+	}
+	
 	LM_ERR("node empty\n");
 	return -1;
 }

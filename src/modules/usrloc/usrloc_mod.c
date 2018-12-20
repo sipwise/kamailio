@@ -153,6 +153,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta
 str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
 
 str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
+str db_url_ro       = STR_NULL;			/*!< Read-Only Database URL */
 int timer_interval  = 60;				/*!< Timer interval in seconds */
 int db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
 int db_load         = 1;				/*!< Database load after restart: 1- true, 0- false (only the db_mode allows it) */
@@ -186,6 +187,8 @@ static cmd_export_t cmds[] = {
 	{0, 0, 0, 0, 0, 0}
 };
 
+db1_con_t* ul_dbh_ro = 0; /* Read-Only Database connection handle */
+db_func_t ul_dbf_ro;
 
 /*! \brief
  * Exported parameters
@@ -202,6 +205,7 @@ static param_export_t params[] = {
 	{"flags_column",        PARAM_STR, &flags_col     },
 	{"cflags_column",       PARAM_STR, &cflags_col    },
 	{"db_url",              PARAM_STR, &db_url        },
+	{"db_url_ro",           PARAM_STR, &db_url_ro.s     },
 	{"timer_interval",      INT_PARAM, &timer_interval  },
 	{"db_mode",             INT_PARAM, &db_mode         },
 	{"db_load",             INT_PARAM, &db_load         },
@@ -263,6 +267,38 @@ struct module_exports exports = {
 	child_init  /*!< Child initialization function */
 };
 
+/*!
+ * \brief check ro db
+ *
+ * \return 0 on success, -1 on failure
+ */
+int check_dbro(void)
+{
+	db1_con_t* con;
+	str s = str_init("location"); /* TODO other table name?? */
+
+	/* Test tables from database if we are gonna
+	 * to use database
+	 */
+
+	con = ul_dbf_ro.init(&db_url_ro);
+	if (!con) {
+		LM_ERR("failed to open read-only database connection\n");
+		goto err;
+	}
+
+	if(db_check_table_version(&ul_dbf_ro, con, &s, UL_TABLE_VERSION) < 0) {
+		LM_ERR("error during read-only table version check.\n");
+		goto err;
+	}
+	ul_dbf_ro.close(con);
+
+	return 0;
+
+err:
+	if (con) ul_dbf_ro.close(con);
+	return -1;
+}
 
 /*! \brief
  * Module initialization function
@@ -345,6 +381,21 @@ static int mod_init(void)
 		}
 	}
 
+	/* Shall we use read-only db ? */
+	if (db_mode == DB_ONLY && db_url_ro.len > 0) {
+		if (db_bind_mod(&db_url_ro, &ul_dbf_ro) < 0) { /* Find database module */
+			LM_ERR("failed to bind database module\n");
+			return -1;
+		}
+		if (!DB_CAPABILITY(ul_dbf_ro, DB_CAP_ALL)) {
+			LM_ERR("database module does not implement all functions"
+					" needed by the module\n");
+			return -1;
+		}
+		if(check_dbro()<0) return -1;
+		LM_DBG("db_url_ro detected and checked\n");
+	}
+
 	if (nat_bflag==(unsigned int)-1) {
 		nat_bflag = 0;
 	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
@@ -421,6 +472,16 @@ static int child_init(int _rank)
 		LM_ERR("child(%d): failed to connect to database\n", _rank);
 		return -1;
 	}
+
+	if (db_mode == DB_ONLY && db_url_ro.len > 0) {
+		/* Get a database connection per child */
+		ul_dbh_ro = ul_dbf_ro.init(&db_url_ro);
+		if (!ul_dbh_ro) {
+			LM_ERR("child(%d): failed to connect to read-only database\n", _rank);
+			return -1;
+		}
+		LM_DBG("read-only connection init\n");
+	}
 	/* _rank==PROC_SIPINIT is used even when fork is disabled */
 	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY && db_load) {
 		/* if cache is used, populate domains from DB */
@@ -449,6 +510,10 @@ static void destroy(void)
 			LM_ERR("flushing cache failed\n");
 		}
 		ul_dbf.close(ul_dbh);
+	}
+
+	if (ul_dbh_ro) {
+		ul_dbf_ro.close(ul_dbh_ro);
 	}
 
 	free_all_udomains();

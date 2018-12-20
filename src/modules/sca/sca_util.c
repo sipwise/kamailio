@@ -112,93 +112,118 @@ int sca_get_msg_cseq_method(sip_msg_t *msg)
 	return (get_cseq(msg)->method_id);
 }
 
-int sca_get_msg_from_header(sip_msg_t *msg, struct to_body **from)
-{
-	struct to_body *f;
+int sca_get_avp_value(unsigned short avp_type, int_str avp, str *result) {
+	int_str val;
+	struct usr_avp *_avp;
 
-	assert(msg != NULL);
+	assert(result != NULL);
+
+	if (avp.s.len > 0) {
+		_avp = search_first_avp(avp_type, avp, &val, 0);
+		if(_avp) {
+			result->s = val.s.s;
+			result->len = val.s.len;
+			return 0;
+		}
+	}
+	return -1;
+}
+
+/*
+ * caller needs to call free_to for *body
+ */
+int sca_parse_uri(struct to_body *body, str *uri)
+{
+	assert(body != NULL);
+	assert(uri != NULL);
+
+	parse_to(uri->s, uri->s + uri->len + 1, body);
+	if (body->error != PARSE_OK) {
+		LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
+		return(-1);
+	}
+	return (0);
+}
+
+int sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from ) {
+	struct to_body *f;
+	static struct to_body sf;
+	str uri = STR_NULL;
+
 	assert(from != NULL);
 
-	if (SCA_HEADER_EMPTY(msg->from)) {
-		LM_ERR("Empty From header\n");
-		return (-1);
-	}
-	if (parse_from_header(msg) < 0) {
-		LM_ERR("Bad From header\n");
-		return (-1);
-	}
-	f = get_from(msg);
-	if (SCA_STR_EMPTY(&f->tag_value)) {
-		LM_ERR("Bad From header: no tag parameter\n");
-		return (-1);
-	}
+	if(sca_get_avp_value(from_uri_avp_type, from_uri_avp, &uri)<0) {
+		assert( msg != NULL );
+		if (SCA_HEADER_EMPTY(msg->from)) {
+			LM_ERR("Empty From header\n");
+			return (-1);
+		}
+		if (parse_from_header(msg) < 0) {
+			LM_ERR("Bad From header\n");
+			return (-1);
+		}
+		f = get_from(msg);
+		if (SCA_STR_EMPTY(&f->tag_value)) {
+			LM_ERR("Bad From header: no tag parameter\n");
+			return (-1);
+		}
 
-	// ensure the URI is parsed for future use
-	if (parse_uri(f->uri.s, f->uri.len, GET_FROM_PURI(msg)) < 0) {
-		LM_ERR("Failed to parse From URI %.*s\n", STR_FMT(&f->uri));
-		return (-1);
-	}
+		// ensure the URI is parsed for future use
+		if (parse_uri(f->uri.s, f->uri.len, GET_FROM_PURI(msg)) < 0) {
+			LM_ERR("Failed to parse From URI %.*s\n", STR_FMT(&f->uri));
+			return (-1);
+		}
 
-	*from = f;
+		*from = f;
+	} else {
+		LM_DBG("using $avp(%.*s)[%.*s] as from uri\n",
+			STR_FMT(&from_uri_avp.s), STR_FMT(&uri));
+		if(sca_parse_uri(&sf, &uri)<0) return -1;
+		*from = &sf;
+	}
 
 	return (0);
 }
 
 int sca_get_msg_to_header(sip_msg_t *msg, struct to_body **to)
 {
-	struct to_body parsed_to;
+	static struct to_body parsed_to;
 	struct to_body *t = NULL;
+	str uri = STR_NULL;
 
-	assert(msg != NULL);
 	assert(to != NULL);
+	if(sca_get_avp_value(to_uri_avp_type, to_uri_avp, &uri)<0) {
+		assert(msg != NULL);
 
-	if (SCA_HEADER_EMPTY(msg->to)) {
-		LM_ERR("Empty To header\n");
-		return (-1);
-	}
-	t = get_to(msg);
-	if (t == NULL) {
-		parse_to(msg->to->body.s, msg->to->body.s + msg->to->body.len + 1, // end of buffer
-		&parsed_to);
-		if (parsed_to.error != PARSE_OK) {
-			LM_ERR("Bad To header\n");
+		if (SCA_HEADER_EMPTY(msg->to)) {
+			LM_ERR("Empty To header\n");
 			return (-1);
 		}
-		t = &parsed_to;
+		t = get_to(msg);
+		if (t == NULL) {
+			parse_to(msg->to->body.s, msg->to->body.s + msg->to->body.len + 1, // end of buffer
+			&parsed_to);
+			if (parsed_to.error != PARSE_OK) {
+				LM_ERR("Bad To header\n");
+				return (-1);
+			}
+			t = &parsed_to;
+		}
+
+		// ensure the URI is parsed for future use
+		if (parse_uri(t->uri.s, t->uri.len, GET_TO_PURI(msg)) < 0) {
+			LM_ERR("Failed to parse To URI %.*s\n", STR_FMT(&t->uri));
+			return (-1);
+		}
+
+		*to = t;
+	} else {
+		LM_DBG("using $avp(%.*s)[%.*s] as to uri\n",
+			STR_FMT(&to_uri_avp.s), STR_FMT(&uri));
+		if(sca_parse_uri(&parsed_to, &uri)<0) return -1;
+		*to = &parsed_to;
 	}
 
-	// ensure the URI is parsed for future use
-	if (parse_uri(t->uri.s, t->uri.len, GET_TO_PURI(msg)) < 0) {
-		LM_ERR("Failed to parse To URI %.*s\n", STR_FMT(&t->uri));
-		return (-1);
-	}
-
-	*to = t;
-
-	return (0);
-}
-
-/*
- * caller needs to call free_to for *body
- */
-int sca_build_to_body_from_uri(sip_msg_t *msg, struct to_body **body, str *uri)
-{
-	assert(msg != NULL);
-	assert(body != NULL);
-	assert(uri != NULL);
-
-	*body = pkg_malloc(sizeof(struct to_body));
-	if(*body == NULL) {
-		LM_ERR("cannot allocate pkg memory\n");
-		return(-1);
-	}
-
-	parse_to(uri->s, uri->s + uri->len + 1, *body);
-	if ((*body)->error != PARSE_OK) {
-		LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
-		free_to(*body);
-		return(-1);
-	}
 	return (0);
 }
 
