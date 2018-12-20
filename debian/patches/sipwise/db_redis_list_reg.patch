@@ -1,0 +1,30 @@
+Index: kamailio/src/modules/db_redis/redis_dbase.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_dbase.c
++++ kamailio/src/modules/db_redis/redis_dbase.c
+@@ -1286,7 +1286,7 @@ static int db_redis_perform_delete(const
+         str *key = &k->key;
+         redis_key_t *tmp = NULL;
+         int row_match;
+-        LM_DBG("delete key '%.*s'\n", key->len, key->s);
++        LM_WARN("delete key '%.*s'\n", key->len, key->s);
+ 
+         if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
+             LM_ERR("Failed to add exists command to pre-delete query\n");
+@@ -1987,6 +1987,16 @@ int db_redis_delete(const db1_con_t* _h,
+     // TODO: optimize mapping-based manual post-check (remove check for keys already
+     // in type query key)
+ 
++    LM_WARN("do db_redis_delete with %d keys\n", _n);
++    for (i = 0; i < _n; ++i) {
++        str vs = {NULL, 0};
++        db_val_t v = _v[i];
++
++        db_redis_val2str(&v, &vs);
++        LM_WARN("  [%d]: k=%.*s, v=%.%s\n", i, _k[i]->len, _k[i]->s, vs.len, vs.s);
++        pkg_free(vs.s);
++    }
++
+     con = REDIS_CON(_h);
+     if (con && con->con == NULL) {
+         if (db_redis_connect(con) != 0) {
