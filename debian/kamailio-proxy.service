@@ -1,9 +1,11 @@
 [Unit]
 Description=Kamailio (OpenSER) - the Open Source SIP Server, Proxy
+After=redis-server.service
 After=mariadb.service
 After=network-online.target
 After=remote-fs.target
 Requires=network-online.target
+Requires=redis-server.service
 Wants=remote-fs.target
 Requires=mariadb.service
 

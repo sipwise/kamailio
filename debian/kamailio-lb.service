@@ -1,10 +1,12 @@
 [Unit]
 Description=Kamailio (OpenSER) - the Open Source SIP Server, LB
+After=redis-server.service
 After=network-online.target
 After=remote-fs.target
 After=time-sync.target
 Requires=network-online.target
 Requires=time-sync.target
+Requires=redis-server.service
 Wants=remote-fs.target
 
 [Service]
