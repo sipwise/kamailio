@@ -1,3 +1,25 @@
+ngcp-kamailio (5.1.6-1+0~mr7.1.1.0) unstable; urgency=medium
+
+  [ Roman Romanchenko ]
+  * [2e17788] TT#41650 Development of Kamailio module/function for parsing iCal structure
+
+  [ Andreas Granig ]
+  * [e3eda4a] TT#47976 presence: test if event is dialog when attempting to delete old records
+
+  [ Richard Fuchs ]
+  * [bac99b3] TT#45472 add support for application/trickle-ice-sdpfrag mime type
+
+  [ Alexander Lutay ]
+  * [e6d2101] TT#43810 Execute 'wrap-and-sort -sat' as suggested by check-packaging
+  * [d22e0be] TT#43810 Add /ngcp-kamailio-geoip2-modules/ to .gitignore as suggested by check-packaging
+
+  [ Andrew Pogrebennyk ]
+  * [9ffa56c] TT#40617 kamailio-lb/proxy: set dependency on redis-server
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 09 Jan 2019 21:57:05 +0100
+
 ngcp-kamailio (5.1.6-1+0~mr7.1.0.0) unstable; urgency=medium
 
   [ Kirill Solomko ]
