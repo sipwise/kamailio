@@ -1,0 +1,48 @@
+Index: kamailio/src/modules/db_redis/redis_dbase.c
+===================================================================
+--- kamailio.orig/src/modules/db_redis/redis_dbase.c	2019-02-11 17:27:25.157884924 +0100
++++ kamailio/src/modules/db_redis/redis_dbase.c	2019-02-11 17:30:21.994313303 +0100
+@@ -1286,7 +1286,7 @@
+         str *key = &k->key;
+         redis_key_t *tmp = NULL;
+         int row_match;
+-        LM_DBG("delete key '%.*s'\n", key->len, key->s);
++        //LM_WARN("maybe delete key '%.*s'\n", key->len, key->s);
+ 
+         if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
+             LM_ERR("Failed to add exists command to pre-delete query\n");
+@@ -1354,6 +1354,7 @@
+                     LM_DBG("column %lu does not match, ignore row\n", col);
+                     row_match = 0;
+                     break;
++                } else {
+                 }
+             }
+         }
+@@ -1362,6 +1363,7 @@
+             continue;
+         } else {
+             LM_DBG("row matches manual filtering, proceed with deletion\n");
++            LM_WARN("really delete key '%.*s'\n", key->len, key->s);
+         }
+ 
+         db_keys = (db_key_t*) pkg_malloc(all_type_keys_count * sizeof(db_key_t));
+@@ -2023,6 +2025,18 @@
+         query_ops = (db_op_t*)_op;
+     }
+ 
++    /*
++    LM_WARN("do db_redis_delete with %d keys\n", _n);
++    for (i = 0; i < _n; ++i) {
++        str vs = {NULL, 0};
++        db_val_t v = _v[i];
++
++        db_redis_val2str(&v, &vs);
++        LM_WARN("  [%d]: '%.*s' %s '%.*s'\n", i, _k[i]->len, _k[i]->s, query_ops[i], vs.len, vs.s);
++        pkg_free(vs.s);
++    }
++    */
++
+     if (_n > 0) {
+         if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
+                     &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan) != 0) {
