@@ -47,3 +47,5 @@ upstream/core_cfg_reset_routename_properly.patch
 sipwise/tt41650.patch
 sipwise/tt47976.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
+# agranig debug
+sipwise/db_redis_list_reg.patch
