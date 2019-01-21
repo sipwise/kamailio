@@ -1,0 +1,152 @@
+--- a/modules/nathelper/nathelper.c
++++ b/modules/nathelper/nathelper.c
+@@ -2058,7 +2058,7 @@ nh_timer(unsigned int ticks, void *timer
+ {
+ 	static unsigned int iteration = 0;
+ 	int rval;
+-	void *buf, *cp;
++	void *buf, *cp, *test;
+ 	str c;
+ 	str recv;
+ 	str *dst_uri;
+@@ -2081,6 +2081,10 @@ nh_timer(unsigned int ticks, void *timer
+ 		goto done;
+ 
+ 	buf = NULL;
++
++	/* mcapetta debug */
++	LM_DBG("nh_timer: initial length of the buffer is '%i'\n", cblen);
++
+ 	if (cblen > 0) {
+ 		buf = pkg_malloc(cblen);
+ 		if (buf == NULL) {
+@@ -2092,6 +2096,10 @@ nh_timer(unsigned int ticks, void *timer
+ 	rval = ul.get_all_ucontacts(buf, cblen, (ping_nated_only?ul.nat_flag:0),
+ 		((unsigned int)(unsigned long)timer_idx)*natping_interval+iteration,
+ 		natping_processes*natping_interval, options);
++
++	/* mcapetta debug */
++	LM_DBG("nh_timer: first returned rval '%i'\n", rval);
++
+ 	if (rval<0) {
+ 		LM_ERR("failed to fetch contacts\n");
+ 		goto done;
+@@ -2100,6 +2108,10 @@ nh_timer(unsigned int ticks, void *timer
+ 		if (buf != NULL)
+ 			pkg_free(buf);
+ 		cblen = rval * 2;
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: setting length of the buffer to '%i'\n", cblen);
++
+ 		buf = pkg_malloc(cblen);
+ 		if (buf == NULL) {
+ 			LM_ERR("out of pkg memory\n");
+@@ -2108,17 +2120,34 @@ nh_timer(unsigned int ticks, void *timer
+ 		rval = ul.get_all_ucontacts(buf,cblen,(ping_nated_only?ul.nat_flag:0),
+ 		   ((unsigned int)(unsigned long)timer_idx)*natping_interval+iteration,
+ 		   natping_processes*natping_interval, options);
+-		if (rval != 0) {
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: second returned rval '%i'\n", rval);
++		if (rval<0) {
++			LM_ERR("failed to fetch contacts\n");
++			goto done;
++		}
++		if (rval > 0) {
++			LM_ERR("nh_timer: buffer is still not bit enough\n");
+ 			pkg_free(buf);
+ 			goto done;
+ 		}
+ 	}
+ 
+ 	if (buf == NULL)
++		LM_ERR("nh_timer: not able to initialize the buffer\n");
+ 		goto done;
+ 
+ 	cp = buf;
++
++	/* mcapetta debug */
++	LM_DBG("nh_timer: full buffer: '%.*s'\n", cblen, buf);
++
+ 	while (1) {
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: Enter in while loop\n");
++
+ 		memcpy(&(c.len), cp, sizeof(c.len));
+ 		if (c.len == 0)
+ 			break;
+@@ -2140,8 +2169,14 @@ nh_timer(unsigned int ticks, void *timer
+ 		memcpy( &aorhash, cp, sizeof(aorhash));
+ 		cp = (char*)cp + sizeof(aorhash);
+ 
+-		if ((flags & natping_disable_flag)) /* always 0 if natping_disable_flag not set */
++		/* mcapetta debug */
++		LM_DBG("nh_timer: contact '%.*s' - recv '%.*s' - flags '%u' - ruid '%.*s'\n", c.len, c.s, recv.len, recv.s, flags, ruid.len, ruid.s);
++
++		if ((flags & natping_disable_flag)) { /* always 0 if natping_disable_flag not set */
++			/* mcapetta debug */
++			LM_DBG("nh_timer: skipping because flags & natping_disable_flag\n");
+ 			continue;
++		}
+ 
+ 		if(recv.len>0) dst_uri = &recv;
+ 		else dst_uri = &c;
+@@ -2158,6 +2193,10 @@ nh_timer(unsigned int ticks, void *timer
+ 				LM_ERR("can't parse contact dst_uri\n");
+ 				continue;
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: contact/received 1 '%.*s'\n", opt.len, opt.s);
++
+ 		} else if (path.len && udpping_from_path) {
+ 			path_ip_str = extract_last_path_ip(path);
+ 			if (path_ip_str == NULL) {
+@@ -2172,12 +2211,20 @@ nh_timer(unsigned int ticks, void *timer
+ 				LM_ERR("can't parse contact/received uri\n");
+ 				continue;
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: contact/received 2 '%.*s'\n", dst_uri->len, dst_uri->s);
++
+ 		} else {
+ 			/* send to the contact/received */
+ 			if (parse_uri(dst_uri->s, dst_uri->len, &curi) < 0) {
+ 				LM_ERR("can't parse contact/received uri\n");
+ 				continue;
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: contact/received 3 '%.*s'\n", dst_uri->len, dst_uri->s);
++
+ 		}
+ 		if (curi.proto != PROTO_UDP && curi.proto != PROTO_NONE)
+ 			continue;
+@@ -2226,6 +2273,10 @@ nh_timer(unsigned int ticks, void *timer
+ 			}
+ 		}
+ 	}
++
++	/* mcapetta debug */
++	LM_DBG("nh_timer: Exit from while\n");
++
+ 	pkg_free(buf);
+ done:
+ 	iteration++;
+--- a/modules/nathelper/sip_pinger.h
++++ b/modules/nathelper/sip_pinger.h
+@@ -157,6 +157,10 @@ static inline char* build_sipping(str *c
+ 	append_str( p, sipping_method.s, sipping_method.len);
+ 	*(p++) = ' ';
+ 	append_str( p, curi->s, curi->len);
++
++	/* mcapetta debug */
++	LM_DBG("build_sipping: creating sip ping message for uri: '%.*s'\n", curi->len, curi->s);
++
+ 	append_fix( p, " SIP/2.0"CRLF"Via: SIP/2.0/UDP ");
+ 	if (s->address.af == AF_INET6) {	/* Via header IP is a IPv6 reference */
+ 		append_fix( p, "[");
