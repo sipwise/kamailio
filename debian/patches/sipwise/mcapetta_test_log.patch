@@ -1,0 +1,210 @@
+--- a/src/modules/nathelper/nathelper.c
++++ b/src/modules/nathelper/nathelper.c
+@@ -1915,7 +1915,7 @@ static void nh_timer(unsigned int ticks,
+ {
+ 	static unsigned int iteration = 0;
+ 	int rval;
+-	void *buf, *cp;
++	void *buf, *cp, *test;
+ 	str c;
+ 	str recv;
+ 	str *dst_uri;
+@@ -1980,36 +1980,76 @@ static void nh_timer(unsigned int ticks,
+ 		goto done;
+ 
+ 	cp = buf;
++
++	/* mcapetta debug */
++	test = buf;
++	LM_DBG("nh_timer: full buffer: '%.*s'\n", cblen, test);
++
+ 	while(1) {
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 1\n");
++
+ 		memcpy(&(c.len), cp, sizeof(c.len));
+ 		if(c.len == 0)
+ 			break;
+ 		c.s = (char *)cp + sizeof(c.len);
+ 		cp = (char *)cp + sizeof(c.len) + c.len;
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: while loop c '%.*s'\n", c.len, c.s);
++
+ 		memcpy(&(recv.len), cp, sizeof(recv.len));
+ 		recv.s = (char *)cp + sizeof(recv.len);
+ 		cp = (char *)cp + sizeof(recv.len) + recv.len;
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: while loop recv '%.*s'\n", recv.len, recv.s);
++
+ 		memcpy(&send_sock, cp, sizeof(send_sock));
+ 		cp = (char *)cp + sizeof(send_sock);
+ 		memcpy(&flags, cp, sizeof(flags));
+ 		cp = (char *)cp + sizeof(flags);
+ 		memcpy(&(path.len), cp, sizeof(path.len));
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: while loop flags '%.*s'\n", recv.len, recv.s);
++
+ 		path.s = path.len ? ((char *)cp + sizeof(path.len)) : NULL;
+ 		cp = (char *)cp + sizeof(path.len) + path.len;
+ 		memcpy(&(ruid.len), cp, sizeof(ruid.len));
+ 		ruid.s = ruid.len ? ((char *)cp + sizeof(ruid.len)) : NULL;
+ 		cp = (char *)cp + sizeof(ruid.len) + ruid.len;
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: while loop ruid '%.*s'\n", ruid.len, ruid.s);
++
+ 		memcpy(&aorhash, cp, sizeof(aorhash));
+ 		cp = (char *)cp + sizeof(aorhash);
+ 
+-		if((flags & natping_disable_flag)) /* always 0 if natping_disable_flag not set */
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 2\n");
++		/*
++
++		if((flags & natping_disable_flag))
++
++			// mcapetta debug
++			LM_DBG("nh_timer: skipping because flags & natping_disable_flag\n");
++
+ 			continue;
+ 
++		*/
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 2.1\n");
++
+ 		if(recv.len > 0)
+ 			dst_uri = &recv;
+ 		else
+ 			dst_uri = &c;
+ 
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 2.2\n");
++
+ 		/* determin the destination */
+ 		if(path.len && (flags & sipping_flag) != 0) {
+ 			/* send to first URI in path */
+@@ -2022,6 +2062,10 @@ static void nh_timer(unsigned int ticks,
+ 				LM_ERR("can't parse contact dst_uri\n");
+ 				continue;
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: contact/received 1 '%.*s'\n", opt.len, opt.s);
++
+ 		} else if(path.len && udpping_from_path) {
+ 			path_ip_str = extract_last_path_ip(path);
+ 			if(path_ip_str == NULL) {
+@@ -2037,13 +2081,25 @@ static void nh_timer(unsigned int ticks,
+ 				LM_ERR("can't parse contact/received uri\n");
+ 				continue;
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: contact/received 2 '%.*s'\n", dst_uri->len, dst_uri->s);
++
+ 		} else {
+ 			/* send to the contact/received */
+ 			if(parse_uri(dst_uri->s, dst_uri->len, &curi) < 0) {
+ 				LM_ERR("can't parse contact/received uri\n");
+ 				continue;
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: contact/received 3 '%.*s'\n", dst_uri->len, dst_uri->s);
++
+ 		}
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 3\n");
++
+ 		if(curi.proto != PROTO_UDP && curi.proto != PROTO_NONE)
+ 			continue;
+ 		if(curi.port_no == 0)
+@@ -2059,6 +2115,9 @@ static void nh_timer(unsigned int ticks,
+ 		init_dest_info(&dst);
+ 		hostent2su(&dst.to, he, 0, curi.port_no);
+ 
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 4\n");
++
+ 		if(force_socket) {
+ 			send_sock = force_socket;
+ 		}
+@@ -2072,30 +2131,60 @@ static void nh_timer(unsigned int ticks,
+ 		dst.proto = PROTO_UDP;
+ 		dst.send_sock = send_sock;
+ 
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 5\n");
++
+ 		send_sip_ping = ((flags & sipping_flag) != 0)
+ 							|| (ping_nated_only == 0 && sipping_flag != 0);
+ 
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 6\n");
++
+ 		if ( send_sip_ping && (opt.s = build_sipping(&c, send_sock, &path,
+ 						&ruid, aorhash, &opt.len)) != 0) {
+ 			if(udp_send(&dst, opt.s, opt.len) < 0) {
+ 				LM_ERR("sip udp_send failed\n");
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: round in while loop 'send_sip_ping'\n");
++
+ 		} else if(raw_ip) {
+ 			if(send_raw((char *)sbuf, sizeof(sbuf), &dst.to, raw_ip, raw_port)
+ 					< 0) {
+ 				LM_ERR("send_raw failed\n");
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: round in while loop 'raw_ip'\n");
++
+ 		} else if(udpping_from_path) {
+ 			if(send_raw((char *)sbuf, sizeof(sbuf), &dst.to, path_ip, path_port)
+ 					< 0) {
+ 				LM_ERR("send_raw from path failed\n");
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: round in while loop 'udpping_from_path'\n");
++
+ 		} else {
+ 			if(udp_send(&dst, (char *)sbuf, sizeof(sbuf)) < 0) {
+ 				LM_ERR("udp_send failed\n");
+ 			}
++
++			/* mcapetta debug */
++			LM_DBG("nh_timer: round in while loop 'else'\n");
++
+ 		}
++
++		/* mcapetta debug */
++		LM_DBG("nh_timer: round in while loop 7\n");
++
+ 	}
++
++	/* mcapetta debug */
++		LM_DBG("nh_timer: out from while\n");
++
+ 	pkg_free(buf);
+ done:
+ 	iteration++;
+--- a/src/modules/nathelper/sip_pinger.h
++++ b/src/modules/nathelper/sip_pinger.h
+@@ -161,6 +161,10 @@ static inline char *build_sipping(str *c
+ 	append_str(p, sipping_method.s, sipping_method.len);
+ 	*(p++) = ' ';
+ 	append_str(p, curi->s, curi->len);
++
++	/* mcapetta debug */
++	LM_DBG("build_sipping: creating sip ping message for uri: '%.*s'\n", curi->len, curi->s);
++
+ 	append_fix(p, " SIP/2.0" CRLF "Via: SIP/2.0/UDP ");
+ 	if(s->address.af == AF_INET6) { /* Via header IP is a IPv6 reference */
+ 		append_fix(p, "[");
