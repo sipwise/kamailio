@@ -31,11 +31,13 @@
 
 #include "../../core/counters.h"
 #include "../../core/rpc.h"
+#include "../../core/timer.h"
 
 typedef enum {
 	WS_S_CONNECTING = 0, /* Never used - included for completeness */
 	WS_S_OPEN,
 	WS_S_CLOSING,
+	WS_S_REMOVING,
 	WS_S_CLOSED /* Never used - included for completeness */
 } ws_conn_state_t;
 
@@ -43,6 +45,7 @@ typedef struct ws_connection
 {
 	ws_conn_state_t state;
 	int awaiting_pong;
+	ticks_t rmticks;
 
 	int last_used;
 	struct ws_connection *used_prev;
@@ -63,18 +66,23 @@ typedef struct ws_connection
 	str frag_buf;
 } ws_connection_t;
 
+typedef struct ws_connection_id
+{
+	int id;
+} ws_connection_id_t;
+
 typedef struct
 {
 	ws_connection_t *head;
 	ws_connection_t *tail;
-} ws_connection_used_list_t;
+} ws_connection_list_t;
 
 typedef enum {
 	WSCONN_EVENTROUTE_NO = 0,
 	WSCONN_EVENTROUTE_YES
 } ws_conn_eventroute_t;
 
-extern ws_connection_used_list_t *wsconn_used_list;
+extern ws_connection_list_t *wsconn_used_list;
 
 extern char *wsconn_state_str[];
 
@@ -95,5 +103,9 @@ ws_connection_t *wsconn_get(int id);
 int wsconn_put(ws_connection_t *wsc);
 ws_connection_t **wsconn_get_list(void);
 int wsconn_put_list(ws_connection_t **list);
+ws_connection_id_t *wsconn_get_list_ids(int idx);
+int wsconn_put_list_ids(ws_connection_id_t *list);
+int wsconn_put_id(int id);
 void ws_rpc_dump(rpc_t *rpc, void *ctx);
+void ws_timer(unsigned int ticks, void *param);
 #endif /* _WS_CONN_H */
