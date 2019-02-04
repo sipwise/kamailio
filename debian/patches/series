@@ -51,3 +51,4 @@ sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
 sipwise/fix_db_redis_reconnect.patch
+upstream/topos_execute_event_route_topos_sending.patch
