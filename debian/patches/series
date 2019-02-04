@@ -47,3 +47,4 @@ upstream/core_cfg_reset_routename_properly.patch
 sipwise/tt41650.patch
 sipwise/tt47976.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
+upstream/topos_execute_event_route_topos_sending.patch
