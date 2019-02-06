@@ -39,6 +39,8 @@
 
 extern int ws_verbose_list;
 extern str ws_event_callback;
+extern int ws_keepalive_processes;
+extern int ws_rm_delay_interval;
 
 ws_connection_t **wsconn_id_hash = NULL;
 #define wsconn_listadd tcpconn_listadd
@@ -53,7 +55,7 @@ gen_lock_t *wsconn_lock = NULL;
 
 gen_lock_t *wsstat_lock = NULL;
 
-ws_connection_used_list_t *wsconn_used_list = NULL;
+ws_connection_list_t *wsconn_used_list = NULL;
 
 stat_var *ws_current_connections;
 stat_var *ws_max_concurrent_connections;
@@ -103,13 +105,13 @@ int wsconn_init(void)
 	memset((void *)wsconn_id_hash, 0,
 			TCP_ID_HASH_SIZE * sizeof(ws_connection_t *));
 
-	wsconn_used_list = (ws_connection_used_list_t *)shm_malloc(
-			sizeof(ws_connection_used_list_t));
+	wsconn_used_list = (ws_connection_list_t *)shm_malloc(
+			sizeof(ws_connection_list_t));
 	if(wsconn_used_list == NULL) {
 		LM_ERR("allocating WebSocket used list\n");
 		goto error;
 	}
-	memset((void *)wsconn_used_list, 0, sizeof(ws_connection_used_list_t));
+	memset((void *)wsconn_used_list, 0, sizeof(ws_connection_list_t));
 
 	return 0;
 
@@ -382,52 +384,64 @@ void wsconn_close_now(ws_connection_t *wsc)
 	con->timeout = get_ticks_raw();
 }
 
-/* must be called with unlocked WSCONN_LOCK */
-int wsconn_put(ws_connection_t *wsc)
+void wsconn_detach_connection(ws_connection_t *wsc)
 {
-	int destroy = 0;
+	/* Remove from the WebSocket used list */
+	if(wsconn_used_list->head == wsc)
+		wsconn_used_list->head = wsc->used_next;
+	if(wsconn_used_list->tail == wsc)
+		wsconn_used_list->tail = wsc->used_prev;
+	if(wsc->used_prev)
+		wsc->used_prev->used_next = wsc->used_next;
+	if(wsc->used_next)
+		wsc->used_next->used_prev = wsc->used_prev;
+
+	/* remove from wsconn_id_hash */
+	wsconn_listrm(wsconn_id_hash[wsc->id_hash], wsc, id_next, id_prev);
+
+	/* stat */
+	update_stat(ws_current_connections, -1);
+	if(wsc->sub_protocol == SUB_PROTOCOL_SIP)
+		update_stat(ws_sip_current_connections, -1);
+	else if(wsc->sub_protocol == SUB_PROTOCOL_MSRP)
+		update_stat(ws_msrp_current_connections, -1);
+}
+
+/* mode controls if lock needs to be aquired */
+int wsconn_put_mode(ws_connection_t *wsc, int mode)
+{
+	if(!wsc)
+		return -1;
 
 	LM_DBG("wsconn_put start for [%p] refcnt [%d]\n", wsc,
 			atomic_get(&wsc->refcnt));
 
-	if(!wsc)
-		return -1;
-
-	WSCONN_LOCK;
+	if(mode) {
+		WSCONN_LOCK;
+	}
+	if(wsc->state == WS_S_REMOVING) {
+		goto done;
+	}
 	/* refcnt == 0*/
 	if(wsconn_unref(wsc)) {
-		/* Remove from the WebSocket used list */
-		if(wsconn_used_list->head == wsc)
-			wsconn_used_list->head = wsc->used_next;
-		if(wsconn_used_list->tail == wsc)
-			wsconn_used_list->tail = wsc->used_prev;
-		if(wsc->used_prev)
-			wsc->used_prev->used_next = wsc->used_next;
-		if(wsc->used_next)
-			wsc->used_next->used_prev = wsc->used_prev;
-
-		/* remove from wsconn_id_hash */
-		wsconn_listrm(wsconn_id_hash[wsc->id_hash], wsc, id_next, id_prev);
-
-		/* stat */
-		update_stat(ws_current_connections, -1);
-		if(wsc->sub_protocol == SUB_PROTOCOL_SIP)
-			update_stat(ws_sip_current_connections, -1);
-		else if(wsc->sub_protocol == SUB_PROTOCOL_MSRP)
-			update_stat(ws_msrp_current_connections, -1);
-
-		destroy = 1;
+		wsc->state = WS_S_REMOVING;
+		wsc->rmticks = get_ticks();
 	}
-	WSCONN_UNLOCK;
-
 	LM_DBG("wsconn_put end for [%p] refcnt [%d]\n", wsc,
 			atomic_get(&wsc->refcnt));
 
-	/* wsc is removed from all lists and can be destroyed safely */
-	if(destroy)
-		wsconn_dtor(wsc);
+done:
+	if(mode) {
+		WSCONN_UNLOCK;
+	}
 
 	return 0;
+}
+
+/* must be called with unlocked WSCONN_LOCK */
+int wsconn_put(ws_connection_t *wsc)
+{
+	return wsconn_put_mode(wsc, 1);
 }
 
 ws_connection_t *wsconn_get(int id)
@@ -452,6 +466,30 @@ ws_connection_t *wsconn_get(int id)
 	WSCONN_UNLOCK;
 
 	return NULL;
+}
+
+int wsconn_put_id(int id)
+{
+	int id_hash = tcp_id_hash(id);
+	ws_connection_t *wsc;
+
+	LM_DBG("wsconn put id [%d]\n", id);
+
+	WSCONN_LOCK;
+	for(wsc = wsconn_id_hash[id_hash]; wsc; wsc = wsc->id_next) {
+		if(wsc->id == id) {
+			LM_DBG("wsc [%p] refcnt [%d]\n", wsc,
+					atomic_get(&wsc->refcnt));
+			wsconn_put_mode(wsc, 0);
+
+			WSCONN_UNLOCK;
+
+			return 1;
+		}
+	}
+	WSCONN_UNLOCK;
+
+	return 0;
 }
 
 ws_connection_t **wsconn_get_list(void)
@@ -538,6 +576,128 @@ int wsconn_put_list(ws_connection_t **list_head)
 	return 0;
 }
 
+
+ws_connection_id_t *wsconn_get_list_ids(int idx)
+{
+	ws_connection_id_t *list = NULL;
+	ws_connection_t *wsc = NULL;
+	size_t list_size = 0;
+	size_t list_len = 0;
+	size_t i = 0;
+
+	if(ws_verbose_list)
+		LM_DBG("wsconn get list ids - starting\n");
+
+	WSCONN_LOCK;
+
+	/* get the number of used connections */
+	wsc = wsconn_used_list->head;
+	while(wsc) {
+		if(wsc->id % ws_keepalive_processes == idx) {
+			if(ws_verbose_list) {
+				LM_DBG("counter wsc [%p] prev => [%p] next => [%p] (%d/%d)\n",
+						wsc, wsc->used_prev, wsc->used_next, wsc->id, idx);
+			}
+			list_len++;
+		}
+		wsc = wsc->used_next;
+	}
+
+	if(!list_len)
+		goto end;
+
+	/* allocate a NULL terminated list of wsconn pointers */
+	list_size = (list_len + 1) * sizeof(ws_connection_id_t);
+	list = pkg_malloc(list_size);
+	if(!list)
+		goto end;
+
+	memset(list, 0, list_size);
+
+	/* copy */
+	wsc = wsconn_used_list->head;
+	for(i = 0; i < list_len; i++) {
+		if(!wsc) {
+			LM_ERR("Wrong list length\n");
+			break;
+		}
+
+		if(wsc->id % ws_keepalive_processes == idx) {
+			list[i].id = wsc->id;
+			wsconn_ref(wsc);
+			if(ws_verbose_list) {
+				LM_DBG("wsc [%p] id [%d] (%d) - ref++\n", wsc, wsc->id, idx);
+			}
+		}
+		wsc = wsc->used_next;
+	}
+	list[i].id = -1; /* explicit -1 termination */
+
+end:
+	WSCONN_UNLOCK;
+
+	if(ws_verbose_list) {
+		LM_DBG("wsconn get list id returns list [%p]"
+			   " with [%d] members (%d)\n",
+				list, (int)list_len, idx);
+	}
+
+	return list;
+}
+
+int wsconn_put_list_ids(ws_connection_id_t *list_head)
+{
+	ws_connection_id_t *list = NULL;
+	int i;
+
+	LM_DBG("wsconn put list id [%p]\n", list_head);
+
+	if(!list_head)
+		return -1;
+
+	list = list_head;
+	for(i=0; list[i].id!=-1; i++) {
+		wsconn_put_id(list[i].id);
+	}
+
+	pkg_free(list_head);
+
+	return 0;
+}
+
+void ws_timer(unsigned int ticks, void *param)
+{
+	ws_connection_list_t rmlist;
+	ws_connection_t *wsc;
+	ws_connection_t *next;
+	ticks_t nticks;
+	int h;
+
+	rmlist.head = NULL;
+	nticks = get_ticks();
+
+	WSCONN_LOCK;
+	for(h = 0; h < TCP_ID_HASH_SIZE; h++) {
+		wsc = wsconn_id_hash[h];
+		while(wsc) {
+			next = wsc->id_next;
+			if(wsc->state == WS_S_REMOVING
+					&& wsc->rmticks <= nticks - ws_rm_delay_interval) {
+				wsconn_detach_connection(wsc);
+				wsc->id_next = rmlist.head;
+				rmlist.head = wsc;
+			}
+			wsc = next;
+		}
+	}
+	WSCONN_UNLOCK;
+
+	for(wsc = rmlist.head; wsc; ) {
+		next = wsc->id_next;
+		wsconn_dtor(wsc);
+		wsc = next;
+	}
+}
 
 static int ws_rpc_add_node(
 		rpc_t *rpc, void *ctx, void *ih, ws_connection_t *wsc)
