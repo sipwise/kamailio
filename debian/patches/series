@@ -43,7 +43,5 @@ sipwise/extend_stats.patch
 sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
-upstream/core_cfg_reset_routename_properly.patch
 sipwise/tt41650.patch
-sipwise/tt47976.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
