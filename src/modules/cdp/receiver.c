@@ -157,10 +157,14 @@ static int make_send_pipe(serviced_peer_t *sp)
  */
 static void close_send_pipe(serviced_peer_t *sp)
 {
+	int tmp;
 	if (sp->send_pipe_name.s) {
 		close(sp->send_pipe_fd);
 		close(sp->send_pipe_fd_out);
-		remove(sp->send_pipe_name.s);
+		tmp = remove(sp->send_pipe_name.s);
+		if (tmp == -1) {
+			LM_ERR("could not remove send pipe\n");
+		}
 		shm_free(sp->send_pipe_name.s);
 		sp->send_pipe_name.s=0;
 		sp->send_pipe_name.len=0;
@@ -269,6 +273,7 @@ static int send_fd(int pipe_fd,int fd, peer *p)
 	struct iovec iov[1];
 	int ret;
 	int *tmp = NULL;
+	memset(&msg, 0, sizeof(struct msghdr));
 
 #ifdef HAVE_MSGHDR_MSG_CONTROL
 	struct cmsghdr* cmsg;
@@ -839,6 +844,7 @@ drop_peer:
 int peer_connect(peer *p)
 {
 	int sock;
+	int tmp = 0;
 	unsigned int option = 1;
 
 	struct addrinfo *ainfo=0,*res=0,*sainfo=0,hints;
@@ -930,10 +936,21 @@ int peer_connect(peer *p)
 			}
 
 			x=fcntl(sock,F_GETFL,0);
-			fcntl(sock,F_SETFL,x & (~O_NONBLOCK));
+			if (x == -1) {
+				LM_ERR("error during first fcntl operation\n");
+				goto error;
+			}
+			tmp = fcntl(sock,F_SETFL,x & (~O_NONBLOCK));
+			if (tmp == -1) {
+				LM_ERR("error during second fcntl operation\n");
+				goto error;
+			}
 		}
-		setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&option,sizeof(option));
-
+		tmp = setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&option,sizeof(option));
+		if (tmp == -1) {
+			LM_ERR("could not set socket options\n");
+			goto error;
+		}
 		LM_INFO("peer_connect(): Peer %.*s:%d connected\n",p->fqdn.len,p->fqdn.s,p->port);
 
 		if (!send_fd(p->fd_exchange_pipe,sock,p)){
@@ -943,10 +960,12 @@ int peer_connect(peer *p)
 		}
 
 		if (res) freeaddrinfo(res);
+		if (sainfo) freeaddrinfo(sainfo);
 		return sock;
 	}
 error:
 	if (res) freeaddrinfo(res);
+	if (sainfo) freeaddrinfo(sainfo);
 	return -1;
 }
 
