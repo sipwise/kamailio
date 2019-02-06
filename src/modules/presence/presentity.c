@@ -379,6 +379,10 @@ int delete_presentity_if_dialog_id_exists(presentity_t* presentity,
 	int i = 0;
 	presentity_t old_presentity;
 
+	if (presentity->event->evp->type != EVENT_DIALOG) {
+		return 0;
+	}
+
 	query_cols[n_query_cols] = &str_domain_col;
 	query_ops[n_query_cols] = OP_EQ;
 	query_vals[n_query_cols].type = DB1_STR;
@@ -706,17 +710,18 @@ int update_presentity(struct sip_msg* msg, presentity_t* presentity, str* body,
 					goto error;
 				}
 			}
+			if (presentity->event->evp->type == EVENT_DIALOG) {
+				check_if_dialog(*body, &is_dialog, &dialog_id);
+				if (dialog_id) {
+					if (delete_presentity_if_dialog_id_exists(presentity, dialog_id) < 0) {
+						free(dialog_id);
+						dialog_id = NULL;
+						goto error;
+					}
 
-			check_if_dialog(*body, &is_dialog, &dialog_id);
-			if ( dialog_id ) {
-				if (delete_presentity_if_dialog_id_exists(presentity, dialog_id) < 0) {
 					free(dialog_id);
 					dialog_id = NULL;
-					goto error;
 				}
-
-				free(dialog_id);
-				dialog_id = NULL;
 			}
 			LM_DBG("inserting %d cols into table\n",n_query_cols);
 
