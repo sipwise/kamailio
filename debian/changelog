@@ -1,4 +1,4 @@
-ngcp-kamailio (5.1.7-1+0~mr7.0.1.0) unstable; urgency=medium
+ngcp-kamailio (5.1.7-1+0~mr7.0.2.0) unstable; urgency=medium
 
   * [fa12520] New upstream version 5.1.7
   * [b414b67] TT#51903 Remove already applied upstream patches and refresh old ones
