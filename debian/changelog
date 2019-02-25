@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.7-1+0~mr7.2.1.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [d5ebfe5] TT#51950 Backport topos execute event_route[topos:sending] from upstream
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Feb 2019 22:53:23 +0100
+
 ngcp-kamailio (5.1.7-1+0~mr7.2.0.0) unstable; urgency=medium
 
   * [87b30e2] New upstream version 5.1.7
