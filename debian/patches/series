@@ -19,7 +19,6 @@ sipwise/rtpengine_next_branch_parm.patch
 sipwise/cfgt_debug.patch
 sipwise/cfgt_folder_fix.patch
 sipwise/cfgt_onsend_exit.patch
-sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/avpops_avp_subst_pvar.patch
 ## SCA Patches
