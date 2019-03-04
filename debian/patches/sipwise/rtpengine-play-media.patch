@@ -1,0 +1,377 @@
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -132,6 +132,8 @@
+ 	[OP_UNBLOCK_DTMF]	= "unblock DTMF",
+ 	[OP_BLOCK_MEDIA]	= "block media",
+ 	[OP_UNBLOCK_MEDIA]	= "unblock media",
++	[OP_PLAY_MEDIA]		= "play media",
++	[OP_STOP_MEDIA]		= "stop media",
+ };
+ 
+ struct minmax_mos_stats {
+@@ -177,6 +179,8 @@
+ static int unblock_dtmf_f(struct sip_msg *, char *, char *);
+ static int block_media_f(struct sip_msg *, char *, char *);
+ static int unblock_media_f(struct sip_msg *, char *, char *);
++static int play_media_f(struct sip_msg *, char *, char *);
++static int stop_media_f(struct sip_msg *, char *, char *);
+ static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
+@@ -327,6 +331,15 @@
+ 	{"unblock_media",	(cmd_function)unblock_media_f, 		1,
+ 		fixup_spve_null, 0,
+ 		ANY_ROUTE},
++	{"play_media",		(cmd_function)play_media_f, 		1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
++	{"stop_media",		(cmd_function)stop_media_f, 		1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
++	{"stop_media",		(cmd_function)stop_media_f, 		0,
++		0, 0,
++		ANY_ROUTE},
+ 	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
+ 		0, 0,
+ 		ANY_ROUTE},
+@@ -2286,7 +2299,8 @@
+ 	}
+ 	else if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
+ 		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
+-		|| (msg->first_line.type == SIP_REPLY && op == OP_ANSWER))
++		|| (msg->first_line.type == SIP_REPLY && op == OP_ANSWER)
++		|| ng_flags.directional) /* set if from-tag was set manually */
+ 	{
+ 		bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.from_tag);
+ 		if (ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
+@@ -3162,8 +3176,9 @@
+ 	return 1;
+ }
+ 
+-static int rtpengine_rtpp_set_wrap(struct sip_msg *msg, int (*func)(struct sip_msg *msg, void *, int),
+-		void *data, int direction)
++static int rtpengine_rtpp_set_wrap(struct sip_msg *msg, int (*func)(struct sip_msg *msg, void *, int,
++			enum rtpe_operation),
++		void *data, int direction, enum rtpe_operation op)
+ {
+ 	int ret, more;
+ 
+@@ -3176,7 +3191,7 @@
+ 	if (!selected_rtpp_set_2 || selected_rtpp_set_2 == selected_rtpp_set_1)
+ 		more = 0;
+ 
+-	ret = func(msg, data, more);
++	ret = func(msg, data, more, op);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -3187,12 +3202,12 @@
+ 	if (set_rtpengine_set_from_avp(msg, direction) == -1)
+ 		return -1;
+ 
+-	ret = func(msg, data, 0);
++	ret = func(msg, data, 0, op);
+ 	body_intermediate.s = NULL;
+ 	return ret;
+ }
+ 
+-static int rtpengine_delete_wrap(struct sip_msg *msg, void *d, int more) {
++static int rtpengine_delete_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	return rtpengine_delete(msg, d);
+ }
+ 
+@@ -3209,10 +3224,10 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, flags.s, 1, OP_DELETE);
+ }
+ 
+-static int rtpengine_query_wrap(struct sip_msg *msg, void *d, int more) {
++static int rtpengine_query_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	return rtpengine_query(msg, d);
+ }
+ 
+@@ -3229,7 +3244,7 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, flags.s, 1, OP_QUERY);
+ }
+ 
+ 
+@@ -3375,7 +3390,7 @@
+ 	return -1;
+ }
+ 
+-static int rtpengine_manage_wrap(struct sip_msg *msg, void *d, int more) {
++static int rtpengine_manage_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	return rtpengine_manage(msg, d);
+ }
+ 
+@@ -3392,10 +3407,10 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, flags.s, 1, OP_ANY);
+ }
+ 
+-static int rtpengine_info_wrap(struct sip_msg *msg, void *d, int more) {
++static int rtpengine_info_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	return rtpp_function_call_simple(msg, OP_OFFER, d);
+ }
+ 
+@@ -3412,10 +3427,10 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_info_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_info_wrap, flags.s, 1, OP_OFFER);
+ }
+ 
+-static int rtpengine_offer_wrap(struct sip_msg *msg, void *d, int more) {
++static int rtpengine_offer_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	return rtpengine_offer_answer(msg, d, OP_OFFER, more);
+ }
+ 
+@@ -3432,10 +3447,10 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_offer_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_offer_wrap, flags.s, 1, OP_OFFER);
+ }
+ 
+-static int rtpengine_answer_wrap(struct sip_msg *msg, void *d, int more) {
++static int rtpengine_answer_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	return rtpengine_offer_answer(msg, d, OP_ANSWER, more);
+ }
+ 
+@@ -3456,7 +3471,7 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_answer_wrap, flags.s, 2);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_answer_wrap, flags.s, 2, OP_ANSWER);
+ }
+ 
+ static int
+@@ -3530,12 +3545,8 @@
+ }
+ 
+ 
+-static int rtpengine_start_recording_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_START_RECORDING, d);
+-}
+-
+-static int rtpengine_stop_recording_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_STOP_RECORDING, d);
++static int rtpengine_simple_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
++	return rtpp_function_call_simple(msg, op, d);
+ }
+ 
+ static int
+@@ -3550,7 +3561,7 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_start_recording_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_START_RECORDING);
+ }
+ 
+ static int
+@@ -3565,18 +3576,10 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_stop_recording_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_STOP_RECORDING);
+ }
+ 
+ 
+-static int rtpengine_block_dtmf_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_BLOCK_DTMF, d);
+-}
+-
+-static int rtpengine_unblock_dtmf_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_UNBLOCK_DTMF, d);
+-}
+-
+ static int
+ block_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
+ {
+@@ -3589,7 +3592,7 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_block_dtmf_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_BLOCK_DTMF);
+ }
+ 
+ static int
+@@ -3604,19 +3607,26 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_dtmf_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_UNBLOCK_DTMF);
+ }
+ 
+-static int rtpengine_block_media_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_BLOCK_MEDIA, d);
+-}
++static int
++block_media_f(struct sip_msg* msg, char *str1, char *str2)
++{
++	str flags;
++	flags.s = NULL;
++	if (str1) {
++		if (get_str_fparam(&flags, msg, (fparam_t *) str1)) {
++			LM_ERR("Error getting string parameter\n");
++			return -1;
++		}
++	}
+ 
+-static int rtpengine_unblock_media_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_UNBLOCK_MEDIA, d);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_BLOCK_MEDIA);
+ }
+ 
+ static int
+-block_media_f(struct sip_msg* msg, char *str1, char *str2)
++unblock_media_f(struct sip_msg* msg, char *str1, char *str2)
+ {
+ 	str flags;
+ 	flags.s = NULL;
+@@ -3627,11 +3637,24 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_block_media_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_UNBLOCK_MEDIA);
+ }
+ 
+ static int
+-unblock_media_f(struct sip_msg* msg, char *str1, char *str2)
++play_media_f(struct sip_msg* msg, char *str1, char *str2)
++{
++	str flags;
++	flags.s = NULL;
++	if (get_str_fparam(&flags, msg, (fparam_t *) str1)) {
++		LM_ERR("Error getting string parameter\n");
++		return -1;
++	}
++
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_PLAY_MEDIA);
++}
++
++static int
++stop_media_f(struct sip_msg* msg, char *str1, char *str2)
+ {
+ 	str flags;
+ 	flags.s = NULL;
+@@ -3642,10 +3665,11 @@
+ 		}
+ 	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_media_wrap, flags.s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags.s, 1, OP_STOP_MEDIA);
+ }
+ 
+-static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
++
++static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
+ 	void **parms;
+ 	pv_param_t *param;
+ 	pv_value_t *res;
+@@ -3699,7 +3723,7 @@
+ 	parms[0] = param;
+ 	parms[1] = res;
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_rtpstat_wrap, parms, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_rtpstat_wrap, parms, 1, OP_ANY);
+ }
+ 
+ static int
+@@ -3724,54 +3748,55 @@
+  *
+  */
+ static int ki_rtpengine_manage0(sip_msg_t *msg) {
+-    return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, NULL, 1);
++    return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, NULL, 1, OP_ANY);
+ }
+ 
+ /**
+  *
+  */
+ static int ki_rtpengine_manage(sip_msg_t *msg, str *flags) {
+-    return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, ((flags && flags->len > 0) ? flags->s : NULL), 1);
++    return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, ((flags && flags->len > 0) ? flags->s : NULL), 1,
++		    OP_ANY);
+ }
+ 
+ static int ki_rtpengine_offer0(sip_msg_t *msg)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_offer_wrap, 0, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_offer_wrap, 0, 1, OP_ANY);
+ }
+ 
+ static int ki_rtpengine_offer(sip_msg_t *msg, str *flags)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_offer_wrap, flags->s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_offer_wrap, flags->s, 1, OP_ANY);
+ }
+ 
+ static int ki_rtpengine_answer0(sip_msg_t *msg)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_answer_wrap, NULL, 2);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_answer_wrap, NULL, 2, OP_ANY);
+ }
+ 
+ static int ki_rtpengine_answer(sip_msg_t *msg, str *flags)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_answer_wrap, flags->s, 2);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_answer_wrap, flags->s, 2, OP_ANY);
+ }
+ 
+ static int ki_rtpengine_delete0(sip_msg_t *msg)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, NULL, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, NULL, 1, OP_ANY);
+ }
+ 
+ static int ki_rtpengine_delete(sip_msg_t *msg, str *flags)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, flags->s, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, flags->s, 1, OP_ANY);
+ }
+ 
+ static int ki_start_recording(sip_msg_t *msg)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_start_recording_wrap, NULL, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_START_RECORDING);
+ }
+ 
+ static int ki_stop_recording(sip_msg_t *msg)
+ {
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_stop_recording_wrap, NULL, 1);
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_STOP_RECORDING);
+ }
+ 
+ static int ki_set_rtpengine_set(sip_msg_t *msg, int r1)
+--- a/src/modules/rtpengine/rtpengine.h
++++ b/src/modules/rtpengine/rtpengine.h
+@@ -42,6 +42,10 @@
+         OP_UNBLOCK_DTMF,
+         OP_BLOCK_MEDIA,
+         OP_UNBLOCK_MEDIA,
++        OP_PLAY_MEDIA,
++        OP_STOP_MEDIA,
++
++        OP_ANY,
+ };
+ 
+ struct rtpp_node {
