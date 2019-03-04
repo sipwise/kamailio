@@ -485,7 +485,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1584 @@
+@@ -0,0 +1,1587 @@
 +/*
 + * pv_headers
 + *
@@ -1713,20 +1713,11 @@
 +    int idx = 0;
 +    int cnt = 0;
 +    int itype;
++    int pv_format_parsed = 0;
 +
 +    hname = param->pvn.u.isname.name.s;
 +    idx = param->pvi.u.ival;
 +    itype = param->pvi.type;
-+
-+    if (pv_parse_format(&val->rs, &p) < 0) {
-+        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
-+        goto err;
-+    }
-+
-+    if (pv_printf_s(msg, p, &fval) < 0) {
-+        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
-+        goto err;
-+    }
 +
 +    if ((xavp = xavp_get_child(&xavp_name, &hname)) == NULL)
 +        idx = 0;
@@ -1744,6 +1735,17 @@
 +                goto err;
 +        }
 +    } else if (val->flags & PV_VAL_STR) {
++        if (pv_parse_format(&val->rs, &p) < 0) {
++            LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++            goto err;
++        }
++        pv_format_parsed = 1;
++
++        if (pv_printf_s(msg, p, &fval) < 0) {
++            LM_ERR("cannot use pv string: %.*s\n", val->rs.len, val->rs.s);
++            goto err;
++        }
++
 +        if (strchr(hname.s, ']') == NULL) {
 +            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, 0, 1) < 0)
 +                goto err;
@@ -1760,16 +1762,17 @@
 +            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, idx, 0) < 0)
 +                goto err;
 +        }
++        if (pv_format_parsed)
++            pv_elem_free_all(p);
 +    } else {
 +        LM_ERR("header %.*s value can be either string or null\n", hname.len, hname.s);
 +        goto err;
 +    }
-+
-+    pv_elem_free_all(p);
 +    return 1;
 +
 +err:
-+    pv_elem_free_all(p);
++    if (pv_format_parsed)
++        pv_elem_free_all(p);
 +    return -1;
 +}
 +
