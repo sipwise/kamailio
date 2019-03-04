@@ -22,6 +22,7 @@ sipwise/cfgt_onsend_exit.patch
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/avpops_avp_subst_pvar.patch
+sipwise/fix_dialplan_errors.patch
 ## SCA Patches
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
