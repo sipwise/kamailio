@@ -1,0 +1,63 @@
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -132,6 +132,7 @@
+ 	[OP_UNBLOCK_DTMF]	= "unblock DTMF",
+ 	[OP_BLOCK_MEDIA]	= "block media",
+ 	[OP_UNBLOCK_MEDIA]	= "unblock media",
++	[OP_PLAY_MEDIA]		= "play media",
+ };
+ 
+ struct minmax_mos_stats {
+@@ -177,6 +178,7 @@
+ static int unblock_dtmf_f(struct sip_msg *, char *, char *);
+ static int block_media_f(struct sip_msg *, char *, char *);
+ static int unblock_media_f(struct sip_msg *, char *, char *);
++static int play_media_f(struct sip_msg *, char *, char *);
+ static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
+@@ -327,6 +329,9 @@
+ 	{"unblock_media",	(cmd_function)unblock_media_f, 		1,
+ 		fixup_spve_null, 0,
+ 		ANY_ROUTE},
++	{"play_media",		(cmd_function)play_media_f, 		1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
+ 	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
+ 		0, 0,
+ 		ANY_ROUTE},
+@@ -3645,6 +3650,24 @@
+ 	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_media_wrap, flags.s, 1);
+ }
+ 
++static int rtpengine_play_media_wrap(struct sip_msg *msg, void *d, int more) {
++	return rtpp_function_call_simple(msg, OP_PLAY_MEDIA, d);
++}
++
++static int
++play_media_f(struct sip_msg* msg, char *str1, char *str2)
++{
++	str flags;
++	flags.s = NULL;
++	if (get_str_fparam(&flags, msg, (fparam_t *) str1)) {
++		LM_ERR("Error getting string parameter\n");
++		return -1;
++	}
++
++	return rtpengine_rtpp_set_wrap(msg, rtpengine_play_media_wrap, flags.s, 1);
++}
++
++
+ static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
+ 	void **parms;
+ 	pv_param_t *param;
+--- a/src/modules/rtpengine/rtpengine.h
++++ b/src/modules/rtpengine/rtpengine.h
+@@ -42,6 +42,7 @@
+         OP_UNBLOCK_DTMF,
+         OP_BLOCK_MEDIA,
+         OP_UNBLOCK_MEDIA,
++        OP_PLAY_MEDIA,
+ };
+ 
+ struct rtpp_node {
