@@ -1,0 +1,172 @@
+From 814d5cc1f4f5b1e4b95737108dffc1e7d7bd566f Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 28 Feb 2019 20:15:36 +0100
+Subject: [PATCH] tm: put back t in wait timer if still referenced more than
+ once
+
+- have a safety upper limit for putting back in wait timer
+- special credits to Yufei Tao for testing and helping to troubleshoot
+---
+ src/modules/tm/h_table.c |  1 -
+ src/modules/tm/h_table.h |  5 ++++
+ src/modules/tm/t_funcs.c |  3 +++
+ src/modules/tm/t_funcs.h |  3 +++
+ src/modules/tm/timer.c   | 52 +++++++++++++++++++++++++++++++++-------
+ 5 files changed, 54 insertions(+), 10 deletions(-)
+
+diff --git a/src/modules/tm/h_table.c b/src/modules/tm/h_table.c
+index 4b1f0233f..baebd8291 100644
+--- a/src/modules/tm/h_table.c
++++ b/src/modules/tm/h_table.c
+@@ -619,7 +619,6 @@ void tm_log_transaction(tm_cell_t *tcell, int llev, char *ltext)
+ 	LOG(llev, "%s [end] transaction %p\n", ltext, tcell);
+ }
+ 
+-#define TM_LIFETIME_LIMIT 90
+ /* clean active but very old transactions */
+ void tm_clean_lifetime(void)
+ {
+diff --git a/src/modules/tm/h_table.h b/src/modules/tm/h_table.h
+index bfcd28f2c..2a1e76160 100644
+--- a/src/modules/tm/h_table.h
++++ b/src/modules/tm/h_table.h
+@@ -125,6 +125,8 @@ enum kill_reason
+ 	REQ_ERR_DELAYED = 16
+ };
+ 
++/* interval for safer force removal after t lifetime (in sec) */
++#define TM_LIFETIME_LIMIT 90
+ 
+ /* #define F_RB_T_ACTIVE		0x01  (obsolete) fr or retr active */
+ #define F_RB_T2 0x02
+@@ -411,6 +413,7 @@ typedef struct cell
+ 
+ 	/* bindings to wait and delete timer */
+ 	struct timer_ln wait_timer; /* used also for delete */
++	ticks_t wait_start; /* ticks when put on wait first time */
+ 
+ 	/* UA Server */
+ 	struct ua_server uas;
+@@ -595,6 +598,7 @@ inline static void insert_into_hash_table_unsafe(
+ inline static void remove_from_hash_table_unsafe(struct cell *p_cell)
+ {
+ 	clist_rm(p_cell, next_c, prev_c);
++
+ 	p_cell->next_c = 0;
+ 	p_cell->prev_c = 0;
+ #ifdef EXTRA_DEBUG
+@@ -608,6 +612,7 @@ inline static void remove_from_hash_table_unsafe(struct cell *p_cell)
+ #ifdef TM_HASH_STATS
+ 	_tm_table->entries[p_cell->hash_index].cur_entries--;
+ #endif
++
+ 	t_stats_deleted(is_local(p_cell));
+ }
+ 
+diff --git a/src/modules/tm/t_funcs.c b/src/modules/tm/t_funcs.c
+index 42469cb43..119ceb3f2 100644
+--- a/src/modules/tm/t_funcs.c
++++ b/src/modules/tm/t_funcs.c
+@@ -146,6 +146,9 @@ void put_on_wait(  struct cell  *Trans  )
+ 	}else{
+ 		LM_DBG("transaction %p already on wait\n", Trans);
+ 	}
++	if(Trans->wait_start==0) {
++		Trans->wait_start = get_ticks_raw();
++	}
+ }
+ 
+ 
+diff --git a/src/modules/tm/t_funcs.h b/src/modules/tm/t_funcs.h
+index 5c219ca02..68701c534 100644
+--- a/src/modules/tm/t_funcs.h
++++ b/src/modules/tm/t_funcs.h
+@@ -103,6 +103,9 @@ int send_pr_buffer( struct retr_buf *rb, void *buf, int len);
+ 			free_cell((_T_cell)); \
+ 		}else{ \
+ 			if(_T_unlinked){ \
++				if(t_linked_timers(_T_cell)) { \
++					unlink_timers((_T_cell)); \
++				} \
+ 				free_cell((_T_cell)); \
+ 			}else{ \
+ 				t_stats_delayed_free(); \
+diff --git a/src/modules/tm/timer.c b/src/modules/tm/timer.c
+index fcc38823d..9f8529ab7 100644
+--- a/src/modules/tm/timer.c
++++ b/src/modules/tm/timer.c
+@@ -631,28 +631,62 @@ disabled:
+ 
+ ticks_t wait_handler(ticks_t ti, struct timer_ln *wait_tl, void *data)
+ {
+-	struct cell *p_cell;
++	tm_cell_t *p_cell;
+ 	ticks_t ret;
++	int unlinked = 0;
++	int rcount = 0;
+ 
+-	p_cell = (struct cell *)data;
++	p_cell = (tm_cell_t*)data;
+ #ifdef TIMER_DEBUG
+ 	LM_DBG("WAIT timer hit @%d for %p (timer_lm %p)\n", ti, p_cell, wait_tl);
+ #endif
+ 
+ #ifdef TM_DEL_UNREF
+ 	/* stop cancel timers if any running */
+-	if(is_invite(p_cell))
++	if(is_invite(p_cell)) {
+ 		cleanup_localcancel_timers(p_cell);
++	}
++
+ 	/* remove the cell from the hash table */
+ 	LOCK_HASH(p_cell->hash_index);
+-	remove_from_hash_table_unsafe(p_cell);
+-	UNLOCK_HASH(p_cell->hash_index);
+-	p_cell->flags |= T_IN_AGONY;
+-	if(t_linked_timers(p_cell)) {
+-		UNREF_FREE(p_cell, 0);
++	rcount = atomic_get(&p_cell->ref_count);
++	if(rcount > 1) {
++		/* t still referenced */
++		LM_DBG("transaction: %p referenced with: %d\n", p_cell, rcount);
++		if(p_cell->wait_start==0) {
++			p_cell->wait_start = ti;
++		}
++		if(p_cell->wait_start + S_TO_TICKS(TM_LIFETIME_LIMIT) < ti) {
++			/* too long in the wait state */
++			if(p_cell->prev_c != NULL && p_cell->next_c != NULL) {
++				/* unlink and put back on timer for one last wait cycle */
++				LM_DBG("unlinking transaction: %p\n", p_cell);
++				remove_from_hash_table_unsafe(p_cell);
++				unlink_timers(p_cell);
++				UNLOCK_HASH(p_cell->hash_index);
++				return wait_tl->initial_timeout;
++			} else {
++				LM_DBG("unlinked transaction: %p\n", p_cell);
++				unlinked = 1;
++			}
++		} else {
++			/* add back to timer for one more wait cycle */
++			LM_DBG("re-cycled transaction: %p\n", p_cell);
++			UNLOCK_HASH(p_cell->hash_index);
++			return wait_tl->initial_timeout;
++		}
+ 	} else {
+-		UNREF_FREE(p_cell, 1);
++		/* t ready to destroy */
++		LM_DBG("finished transaction: %p (p:%p/n:%p)\n", p_cell, p_cell->prev_c,
++				p_cell->next_c);
++		if(p_cell->prev_c != NULL && p_cell->next_c != NULL) {
++			remove_from_hash_table_unsafe(p_cell);
++		}
+ 	}
++	UNLOCK_HASH(p_cell->hash_index);
++
++	p_cell->flags |= T_IN_AGONY;
++	UNREF_FREE(p_cell, unlinked);
+ 	ret = 0;
+ #else  /* TM_DEL_UNREF */
+ 	if(p_cell->flags & T_IN_AGONY) {
+-- 
+2.17.1
+
