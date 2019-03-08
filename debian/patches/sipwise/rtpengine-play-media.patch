@@ -1,24 +1,24 @@
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -132,6 +132,8 @@
- 	[OP_UNBLOCK_DTMF]	= "unblock DTMF",
- 	[OP_BLOCK_MEDIA]	= "block media",
+@@ -134,6 +134,8 @@
  	[OP_UNBLOCK_MEDIA]	= "unblock media",
+ 	[OP_START_FORWARDING]	= "start forwarding",
+ 	[OP_STOP_FORWARDING]	= "stop forwarding",
 +	[OP_PLAY_MEDIA]		= "play media",
 +	[OP_STOP_MEDIA]		= "stop media",
  };
  
  struct minmax_mos_stats {
-@@ -177,6 +179,8 @@
- static int unblock_dtmf_f(struct sip_msg *, char *, char *);
- static int block_media_f(struct sip_msg *, char *, char *);
+@@ -181,6 +183,8 @@
  static int unblock_media_f(struct sip_msg *, char *, char *);
+ static int start_forwarding_f(struct sip_msg *, char *, char *);
+ static int stop_forwarding_f(struct sip_msg *, char *, char *);
 +static int play_media_f(struct sip_msg *, char *, char *);
 +static int stop_media_f(struct sip_msg *, char *, char *);
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -260,6 +264,9 @@
+@@ -264,6 +268,9 @@
  static str read_sdp_pvar_str = {NULL, 0};
  static pv_spec_t *read_sdp_pvar = NULL;
  
@@ -28,8 +28,8 @@
  #define RTPENGINE_SESS_LIMIT_MSG "Parallel session limit reached"
  #define RTPENGINE_SESS_LIMIT_MSG_LEN (sizeof(RTPENGINE_SESS_LIMIT_MSG)-1)
  
-@@ -327,6 +334,15 @@
- 	{"unblock_media",	(cmd_function)unblock_media_f, 		1,
+@@ -343,6 +350,15 @@
+ 	{"stop_forwarding",	(cmd_function)stop_forwarding_f,	1,
  		fixup_spve_null, 0,
  		ANY_ROUTE},
 +	{"play_media",		(cmd_function)play_media_f, 		1,
@@ -44,7 +44,7 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -395,6 +411,7 @@
+@@ -411,6 +427,7 @@
  	{"hash_table_tout",       INT_PARAM, &hash_table_tout        },
  	{"hash_table_size",       INT_PARAM, &hash_table_size        },
  	{"setid_default",         INT_PARAM, &setid_default          },
@@ -52,7 +52,7 @@
  
  	/* MOS stats output */
  	/* global averages */
-@@ -1578,6 +1595,16 @@
+@@ -1594,6 +1611,16 @@
  		}
  	}
  
@@ -69,7 +69,7 @@
  	if (rtpp_strings)
  		pkg_free(rtpp_strings);
  
-@@ -2286,7 +2313,8 @@
+@@ -2302,7 +2329,8 @@
  	}
  	else if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
  		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
@@ -79,7 +79,7 @@
  	{
  		bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.from_tag);
  		if (ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
-@@ -2454,14 +2482,27 @@
+@@ -2470,14 +2498,27 @@
  static int rtpp_function_call_simple(struct sip_msg *msg, enum rtpe_operation op, const char *flags_str)
  {
  	bencode_buffer_t bencbuf;
@@ -88,14 +88,14 @@
 -	if (!rtpp_function_call(&bencbuf, msg, op, flags_str, NULL))
 +	ret = rtpp_function_call(&bencbuf, msg, op, flags_str, NULL);
 +	if (!ret)
-+		return -1;
-+
+ 		return -1;
+ 
 +	if (bencode_dictionary_get_strcmp(ret, "result", "ok")) {
 +		LM_ERR("proxy didn't return \"ok\" result\n");
 +		bencode_buffer_free(&bencbuf);
- 		return -1;
++		return -1;
 +	}
- 
++
  	bencode_buffer_free(&bencbuf);
  	return 1;
  }
@@ -108,7 +108,7 @@
  static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
  		enum rtpe_operation op, const char *flags_str, str *body)
  {
-@@ -3162,8 +3203,9 @@
+@@ -3178,8 +3219,9 @@
  	return 1;
  }
  
@@ -120,7 +120,7 @@
  {
  	int ret, more;
  
-@@ -3176,7 +3218,7 @@
+@@ -3192,7 +3234,7 @@
  	if (!selected_rtpp_set_2 || selected_rtpp_set_2 == selected_rtpp_set_1)
  		more = 0;
  
@@ -129,7 +129,7 @@
  	if (ret < 0)
  		return ret;
  
-@@ -3187,17 +3229,18 @@
+@@ -3203,17 +3245,18 @@
  	if (set_rtpengine_set_from_avp(msg, direction) == -1)
  		return -1;
  
@@ -152,7 +152,7 @@
  {
  	str flags;
  
-@@ -3209,27 +3252,23 @@
+@@ -3225,27 +3268,23 @@
  		}
  	}
  
@@ -189,7 +189,7 @@
  }
  
  
-@@ -3375,88 +3414,45 @@
+@@ -3391,88 +3430,45 @@
  	return -1;
  }
  
@@ -285,7 +285,7 @@
  }
  
  static int
-@@ -3530,122 +3526,91 @@
+@@ -3546,160 +3542,102 @@
  }
  
  
@@ -433,32 +433,67 @@
 +			LM_ERR("error setting pvar <%.*s>\n", media_duration_pvar_str.len, media_duration_pvar_str.s);
 +			retval = -1;
  		}
-+
  	}
+ 
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_media_wrap, flags.s, 1);
 +	bencode_buffer_free(&bencbuf);
 +	return retval;
-+}
-+
+ }
+ 
+-static int rtpengine_start_forwarding_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_START_FORWARDING, d);
 +static int
 +play_media_f(struct sip_msg* msg, char *str1, char *str2)
 +{
 +	return rtpengine_rtpp_set_wrap_fparam(msg, rtpengine_play_media, str1, 1, OP_PLAY_MEDIA);
-+}
+ }
  
--	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_media_wrap, flags.s, 1);
+-static int rtpengine_stop_forwarding_wrap(struct sip_msg *msg, void *d, int more) {
+-	return rtpp_function_call_simple(msg, OP_STOP_FORWARDING, d);
 +static int
 +stop_media_f(struct sip_msg* msg, char *str1, char *str2)
 +{
 +	return rtpengine_generic_f(msg, str1, OP_STOP_MEDIA);
  }
  
+ static int
+ start_forwarding_f(struct sip_msg* msg, char *str1, char *str2)
+ {
+-	str flags;
+-	flags.s = NULL;
+-	if (str1) {
+-		if (get_str_fparam(&flags, msg, (fparam_t *) str1)) {
+-			LM_ERR("Error getting string parameter\n");
+-			return -1;
+-		}
+-	}
+-
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_start_forwarding_wrap, flags.s, 1);
++	return rtpengine_generic_f(msg, str1, OP_START_FORWARDING);
+ }
+ 
+ static int
+ stop_forwarding_f(struct sip_msg* msg, char *str1, char *str2)
+ {
+-	str flags;
+-	flags.s = NULL;
+-	if (str1) {
+-		if (get_str_fparam(&flags, msg, (fparam_t *) str1)) {
+-			LM_ERR("Error getting string parameter\n");
+-			return -1;
+-		}
+-	}
+-
+-	return rtpengine_rtpp_set_wrap(msg, rtpengine_stop_forwarding_wrap, flags.s, 1);
++	return rtpengine_generic_f(msg, str1, OP_STOP_FORWARDING);
+ }
+ 
 -static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
-+
 +static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more, enum rtpe_operation op) {
  	void **parms;
  	pv_param_t *param;
  	pv_value_t *res;
-@@ -3699,7 +3664,7 @@
+@@ -3753,7 +3691,7 @@
  	parms[0] = param;
  	parms[1] = res;
  
@@ -467,7 +502,7 @@
  }
  
  static int
-@@ -3724,54 +3689,55 @@
+@@ -3778,54 +3716,55 @@
   *
   */
  static int ki_rtpengine_manage0(sip_msg_t *msg) {
@@ -535,10 +570,10 @@
  static int ki_set_rtpengine_set(sip_msg_t *msg, int r1)
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
-@@ -42,6 +42,10 @@
-         OP_UNBLOCK_DTMF,
-         OP_BLOCK_MEDIA,
+@@ -44,6 +44,10 @@
          OP_UNBLOCK_MEDIA,
+         OP_START_FORWARDING,
+         OP_STOP_FORWARDING,
 +        OP_PLAY_MEDIA,
 +        OP_STOP_MEDIA,
 +
