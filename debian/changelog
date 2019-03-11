@@ -1,3 +1,15 @@
+ngcp-kamailio (5.1.7-1+0~mr7.2.2.0) unstable; urgency=medium
+
+  [ Kirill Solomko ]
+  * [bdfd364] TT#54406 pv_headers: pv_set_header() fix pv_parse_format
+
+  [ Andrew Pogrebennyk ]
+  * [4b2c38e] TT#46775 backport fix for crashes in tm module from upstream
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 11 Mar 2019 15:46:01 +0100
+
 ngcp-kamailio (5.1.7-1+0~mr7.2.1.0) unstable; urgency=medium
 
   [ Marco Capetta ]
