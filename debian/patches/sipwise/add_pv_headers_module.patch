@@ -485,7 +485,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1587 @@
+@@ -0,0 +1,1638 @@
 +/*
 + * pv_headers
 + *
@@ -1644,7 +1644,7 @@
 +    return 1;
 +}
 +
-+static void pv_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree)
++void pv_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree)
 +{
 +    struct to_param *n = NULL;
 +
@@ -1658,6 +1658,8 @@
 +
 +int pv_parse_header_name(pv_spec_p sp, str *hname)
 +{
++    pv_spec_p psp = NULL;
++
 +    if (hname->s == NULL || hname->len == 0) {
 +        LM_ERR("empty header name\n");
 +        return -1;
@@ -1666,6 +1668,24 @@
 +    if (hname->len >= header_name_size) {
 +        LM_ERR("header name is too long\n");
 +        return -1;
++    }
++
++    if(*hname->s == PV_MARKER)
++    {
++        psp = (pv_spec_p)pkg_malloc(sizeof(pv_spec_t));
++        if (psp == NULL) {
++            LM_ERR("out of pkg memory\n");
++            return -1;
++        }
++        if (pv_parse_spec(hname, psp) == NULL) {
++            LM_ERR("invalid avp name [%.*s]\n", hname->len, hname->s);
++            pv_spec_free(psp);
++            return -1;
++        }
++        sp->pvp.pvn.type = PV_NAME_PVAR;
++        sp->pvp.pvn.u.dname = (void*)psp;
++        sp->pvp.pvn.u.isname.name.s = *hname;
++        return 0;
 +    }
 +
 +    sp->pvp.pvn.type = PV_NAME_INTSTR;
@@ -1679,12 +1699,26 @@
 +{
 +    sr_xavp_t *xavp = NULL;
 +    sr_xval_t *xval = NULL;
++    pv_value_t tv;
 +    str hname = STR_NULL;
 +    int idx = 0;
 +    int cnt = 0;
 +
-+    hname = param->pvn.u.isname.name.s;
 +    idx = param->pvi.u.ival;
++
++    if (param->pvn.type == PV_NAME_PVAR)
++    {
++        if (pv_get_spec_name(msg, param, &tv) != 0 || !(tv.flags & PV_VAL_STR)) {
++            LM_ERR("invalid avp name, must be a string\n");
++            return -1;
++        }
++        hname = tv.rs;
++    } else if (param->pvn.u.isname.type == AVP_NAME_STR) {
++        hname = param->pvn.u.isname.name.s;
++    } else {
++        LM_ERR("invalid avp name, must be a string\n");
++        return -1;
++    }
 +
 +    if (idx < 0) {
 +        if ((xavp = xavp_get_child(&xavp_name, &hname)) == NULL)
@@ -1707,7 +1741,9 @@
 +int pv_set_header(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
 +{
 +    sr_xavp_t *xavp = NULL;
++    pv_value_t tv;
 +    str hname = STR_NULL;
++    str orig_hname = STR_NULL;
 +    pv_elem_p p;
 +    str fval;
 +    int idx = 0;
@@ -1715,9 +1751,24 @@
 +    int itype;
 +    int pv_format_parsed = 0;
 +
-+    hname = param->pvn.u.isname.name.s;
 +    idx = param->pvi.u.ival;
 +    itype = param->pvi.type;
++
++    if (param->pvn.type == PV_NAME_PVAR)
++    {
++        if (pv_get_spec_name(msg, param, &tv) != 0 || !(tv.flags & PV_VAL_STR)) {
++            LM_ERR("invalid avp name, must be a string\n");
++            return -1;
++        }
++        hname = tv.rs;
++        orig_hname = param->pvn.u.isname.name.s;
++    } else if (param->pvn.u.isname.type == AVP_NAME_STR) {
++        hname = param->pvn.u.isname.name.s;
++        orig_hname = hname;
++    } else {
++        LM_ERR("invalid avp name, must be a string\n");
++        return -1;
++    }
 +
 +    if ((xavp = xavp_get_child(&xavp_name, &hname)) == NULL)
 +        idx = 0;
@@ -1745,10 +1796,10 @@
 +            LM_ERR("cannot use pv string: %.*s\n", val->rs.len, val->rs.s);
 +            goto err;
 +        }
-+
-+        if (strchr(hname.s, ']') == NULL) {
-+            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, 0, 1) < 0)
-+                goto err;
++        if (strlen(orig_hname.s) > 1 &&
++            strcmp(orig_hname.s+strlen(orig_hname.s)-2, "])") != 0) {
++                if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, 0, 1) < 0)
++                    goto err;
 +        } else if (itype == PV_IDX_ALL) {
 +            idx = 0;
 +            cnt = xavp_count(&hname, &xavp);
