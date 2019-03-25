@@ -485,7 +485,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1638 @@
+@@ -0,0 +1,1646 @@
 +/*
 + * pv_headers
 + *
@@ -1708,16 +1708,19 @@
 +
 +    if (param->pvn.type == PV_NAME_PVAR)
 +    {
-+        if (pv_get_spec_name(msg, param, &tv) != 0 || !(tv.flags & PV_VAL_STR)) {
-+            LM_ERR("invalid avp name, must be a string\n");
++        if(pv_get_spec_value(msg, (pv_spec_p)(param->pvn.u.dname), &tv) != 0)
++        {
++            LM_ERR("cannot get avp value\n");
 +            return -1;
++        }
++        if (!(tv.flags & PV_VAL_STR)) {
++            return pv_get_null(msg, param, res);
 +        }
 +        hname = tv.rs;
 +    } else if (param->pvn.u.isname.type == AVP_NAME_STR) {
 +        hname = param->pvn.u.isname.name.s;
 +    } else {
-+        LM_ERR("invalid avp name, must be a string\n");
-+        return -1;
++        return pv_get_null(msg, param, res);
 +    }
 +
 +    if (idx < 0) {
@@ -1741,23 +1744,27 @@
 +int pv_set_header(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
 +{
 +    sr_xavp_t *xavp = NULL;
++    pv_elem_p pv_format = NULL;
 +    pv_value_t tv;
 +    str hname = STR_NULL;
 +    str orig_hname = STR_NULL;
-+    pv_elem_p p;
 +    str fval;
 +    int idx = 0;
 +    int cnt = 0;
 +    int itype;
-+    int pv_format_parsed = 0;
 +
 +    idx = param->pvi.u.ival;
 +    itype = param->pvi.type;
 +
 +    if (param->pvn.type == PV_NAME_PVAR)
 +    {
-+        if (pv_get_spec_name(msg, param, &tv) != 0 || !(tv.flags & PV_VAL_STR)) {
-+            LM_ERR("invalid avp name, must be a string\n");
++        if(pv_get_spec_value(msg, (pv_spec_p)(param->pvn.u.dname), &tv) != 0)
++        {
++            LM_ERR("cannot get avp value\n");
++            return -1;
++        }
++        if (!(tv.flags & PV_VAL_STR)) {
++            LM_ERR("invalid avp value, must be a string\n");
 +            return -1;
 +        }
 +        hname = tv.rs;
@@ -1766,7 +1773,7 @@
 +        hname = param->pvn.u.isname.name.s;
 +        orig_hname = hname;
 +    } else {
-+        LM_ERR("invalid avp name, must be a string\n");
++        LM_ERR("invalid header name, must be a string\n");
 +        return -1;
 +    }
 +
@@ -1786,14 +1793,13 @@
 +                goto err;
 +        }
 +    } else if (val->flags & PV_VAL_STR) {
-+        if (pv_parse_format(&val->rs, &p) < 0) {
++        if (pv_parse_format(&val->rs, &pv_format) < 0) {
 +            LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +            goto err;
 +        }
-+        pv_format_parsed = 1;
 +
-+        if (pv_printf_s(msg, p, &fval) < 0) {
-+            LM_ERR("cannot use pv string: %.*s\n", val->rs.len, val->rs.s);
++        if (pv_printf_s(msg, pv_format, &fval) < 0) {
++            LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +            goto err;
 +        }
 +        if (strlen(orig_hname.s) > 1 &&
@@ -1813,8 +1819,8 @@
 +            if (pv_set_xavp(&xavp_name, &hname, &fval, SR_XTYPE_STR, idx, 0) < 0)
 +                goto err;
 +        }
-+        if (pv_format_parsed)
-+            pv_elem_free_all(p);
++        if (pv_format)
++            pv_elem_free_all(pv_format);
 +    } else {
 +        LM_ERR("header %.*s value can be either string or null\n", hname.len, hname.s);
 +        goto err;
@@ -1822,8 +1828,8 @@
 +    return 1;
 +
 +err:
-+    if (pv_format_parsed)
-+        pv_elem_free_all(p);
++    if (pv_format)
++        pv_elem_free_all(pv_format);
 +    return -1;
 +}
 +
@@ -1910,10 +1916,10 @@
 +{
 +    sr_xval_t *xval = NULL;
 +    xavp_c_data_t *c_data = NULL;
++    pv_elem_p pv_format = NULL;
 +    int p_no = 0;
 +    enum action_type a_type;
 +    str hname;
-+    pv_elem_p p;
 +    str fval;
 +
 +    p_no = param->pvn.u.isname.name.n;
@@ -1945,12 +1951,12 @@
 +            goto err;
 +    }
 +
-+    if (pv_parse_format(&val->rs, &p) < 0) {
++    if (pv_parse_format(&val->rs, &pv_format) < 0) {
 +        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +        goto err;
 +    }
 +
-+    if (pv_printf_s(msg, p, &fval) < 0) {
++    if (pv_printf_s(msg, pv_format, &fval) < 0) {
 +        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +        goto err;
 +    }
@@ -1975,12 +1981,14 @@
 +        goto err;
 +
 +    pv_str_free(&hname);
-+    pv_elem_free_all(p);
++    if (pv_format)
++        pv_elem_free_all(pv_format);
 +    return 1;
 +
 +err:
 +    pv_str_free(&hname);
-+    pv_elem_free_all(p);
++    if (pv_format)
++        pv_elem_free_all(pv_format);
 +    return -1;
 +}
 +
