@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+1: Flaviu Mates <fmates@sipwise.com>
+Code-Review+2: Marco Capetta <mcapetta@sipwise.com>
+Submitted-by: Kirill Solomko <ksolomko@sipwise.com>
+Submitted-at: Tue, 26 Mar 2019 10:34:05 +0100
+Reviewed-on: http://gerrit.mgm.sipwise.com/28345
+Project: kamailio
+Branch: refs/heads/master
