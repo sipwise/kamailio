@@ -1,0 +1,26 @@
+Index: kamailio/src/modules/registrar/lookup.c
+===================================================================
+--- kamailio.orig/src/modules/registrar/lookup.c	2018-03-08 17:05:51.000000000 +0100
++++ kamailio/src/modules/registrar/lookup.c	2019-03-26 14:14:41.194804894 +0100
+@@ -112,6 +112,7 @@
+ 	str xname_received = { "received", 8};
+ 	str xname_contact = { "contact", 7};
+ 	str xname_expires = {"expires", 7};
++	str xname_path = {"path", 4};
+ 	sr_xval_t xval;
+ 
+ 	if(ptr==NULL) return -1;
+@@ -142,6 +143,13 @@
+ 	xval.v.i = (int) (ptr->expires - time(0));
+ 	xavp_add_value(&xname_expires, &xval, xavp);
+ 
++	if(ptr->path.len > 0) {
++		memset(&xval, 0, sizeof(sr_xval_t));
++		xval.type = SR_XTYPE_STR;
++		xval.v.s = ptr->path;
++		xavp_add_value(&xname_path, &xval, xavp);
++	}
++
+ 	if(list==NULL) {
+ 		/* no reg_xavp_rcd xavp in root list - add it */
+ 		xval.type = SR_XTYPE_XAVP;
