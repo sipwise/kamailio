@@ -51,6 +51,7 @@ sipwise/presence_dfks.patch
 sipwise/presence_dfks_add_crlf_xml.patch
 sipwise/cfgt_debug.patch
 sipwise/prov_responses_cdr.patch
+sipwise/fix_dialplan_errors.patch
 # backported from 5.1 branch
 sipwise/0002-core-improve-to-header-check-guards-str-consists-of-.patch
 # backported from 5.2 branch
