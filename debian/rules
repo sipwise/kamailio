@@ -18,6 +18,13 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
 
+# Enable parallel builds.
+NUMJOBS = 1
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+  NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+  MAKEFLAGS += -j$(NUMJOBS)
+endif
+
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
@@ -171,7 +178,7 @@ build-indep: build-stamp
 build-stamp: configure-stamp
 	dh_testdir
 	# Add here commands to compile the package.
-	$(MAKE) -j`nproc` all
+	$(MAKE) all
 	# make groups
 	$(call PACKAGE_GRP_BUILD_template)
 	$(call PACKAGE_EXTRA_BUILD_template)
