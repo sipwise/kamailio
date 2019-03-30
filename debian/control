@@ -36,7 +36,7 @@ Build-Depends:
  libsctp-dev [linux-any],
  libsnmp-dev,
  libsqlite3-dev,
- libssl-dev,
+ libssl1.0-dev,
  libunistring-dev,
  libxml2-dev,
  ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
