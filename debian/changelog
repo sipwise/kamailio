@@ -1,3 +1,16 @@
+ngcp-kamailio (5.1.7-1+0~mr6.5.4.1) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [a39f80f] TT#51950 Backport topos execute event_route[topos:sending] from upstream
+  * [6b1794c] TT#54256 Fix dialplan errors if rwr contains avps
+
+  [ Andrew Pogrebennyk ]
+  * [30d1fb0] TT#46775 backport fix for crashes in tm module from upstream
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 02 Apr 2019 00:37:13 +0200
+
 ngcp-kamailio (5.1.7-1+0~mr6.5.4.0) unstable; urgency=medium
 
   * [2d00cf7] Imported Upstream version 5.1.6
