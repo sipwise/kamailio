@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1806 @@
+@@ -0,0 +1,1808 @@
 +/*
 + * pv_headers
 + *
@@ -2212,13 +2212,15 @@
 +{
 +    qvalue_t q;
 +    int br_len;
-+    str ruid;
++    str ruid = STR_NULL;
 +
 +    *br_idx = 0;
 +    while ((get_branch(*br_idx,&br_len,&q,0,0,0,0,&ruid,0,0))) {
-+        if (strcmp(msg->ruid.s, ruid.s) == 0)
-+            break;
 +        (*br_idx)++;
++        if (br_len == 0 || msg->ruid.s == NULL || ruid.s == NULL ||
++            strcmp(msg->ruid.s, ruid.s) == 0) {
++                break;
++        }
 +    }
 +
 +    return 1;
