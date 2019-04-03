@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1810 @@
+@@ -0,0 +1,1819 @@
 +/*
 + * pv_headers
 + *
@@ -1869,7 +1869,11 @@
 +            if (pv_set_xavp(msg, &xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0) < 0)
 +                goto err;
 +        }
-+    } else if (val->flags & PV_VAL_STR) {
++    } else if (val->flags & (PV_VAL_STR|PV_TYPE_INT|PV_VAL_INT)) {
++        if (val->flags & (PV_TYPE_INT|PV_VAL_INT)) {
++            if (pv_get_sintval(msg, param, val, val->ri) < 0)
++                goto err;
++        }
 +        if (pv_parse_format(&val->rs, &pv_format) < 0) {
 +            LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +            goto err;
@@ -1899,7 +1903,7 @@
 +        if (pv_format)
 +            pv_elem_free_all(pv_format);
 +    } else {
-+        LM_ERR("header %.*s value can be either string or null\n", hname.len, hname.s);
++        LM_ERR("x_hdr %.*s value can be either string, integer or null\n", hname.len, hname.s);
 +        goto err;
 +    }
 +    return 1;
@@ -2028,6 +2032,11 @@
 +            goto err;
 +    }
 +
++    if (val->flags & (PV_TYPE_INT|PV_VAL_INT)) {
++        if (pv_get_sintval(msg, param, val, val->ri) < 0)
++            goto err;
++    }
++
 +    if (pv_parse_format(&val->rs, &pv_format) < 0) {
 +        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +        goto err;
@@ -2116,7 +2125,7 @@
 +        memcpy(merged->s+os, " ", 1); os+=1;
 +    }
 +    memcpy(merged->s+os, "<", 1); os+=1;
-+    if (!SET_URI_T) {
++    if (type != SET_URI_T) {
 +        uri_type_to_str(puri.type, &uri_t);
 +        t_len = uri_t.len+1;
 +        memcpy(merged->s+os, uri_t.s, uri_t.len); os+=uri_t.len;
