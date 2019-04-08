@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1819 @@
+@@ -0,0 +1,1839 @@
 +/*
 + * pv_headers
 + *
@@ -717,9 +717,10 @@
 +
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if (isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1) {
-+        LM_ERR("headers are already collected\n");
-+        return -1;
++    if ((br_idx >= 0 && isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1) ||
++        (br_idx == -1 && isflagset(msg, FL_PV_HDRS_COLLECTED) == 1)) {
++            LM_ERR("headers are already collected\n");
++            return -1;
 +    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -766,7 +767,8 @@
 +    pv_str_free(&name);
 +    pv_str_free(&val);
 +
-+    setbflag(br_idx, FL_PV_HDRS_COLLECTED);
++    br_idx >= 0 ? setbflag(br_idx, FL_PV_HDRS_COLLECTED)
++                : setflag(msg, FL_PV_HDRS_COLLECTED);
 +
 +    return 1;
 +
@@ -789,9 +791,10 @@
 +
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if (isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) {
-+        LM_ERR("headers are already applied\n");
-+        return -1;
++    if ((br_idx >= 0 && isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) ||
++        (br_idx == -1 && isflagset(msg, FL_PV_HDRS_APPLIED) == 1)) {
++            LM_ERR("headers are already applied\n");
++            return -1;
 +    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -912,8 +915,8 @@
 +        }
 +    } while ((sub = sub->next) != NULL);
 +
-+    if (br_idx > 0)
-+        setbflag(br_idx, FL_PV_HDRS_APPLIED);
++    br_idx >=0 ? setbflag(br_idx, FL_PV_HDRS_APPLIED)
++               : setflag(msg, FL_PV_HDRS_APPLIED);
 +
 +    pv_str_free(&display);
 +    pv_str_free(&uri);
@@ -946,8 +949,13 @@
 +    pv_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
 +    pv_free_xavp(&br_xname);
 +
-+    resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
-+    resetbflag(br_idx, FL_PV_HDRS_APPLIED);
++    if (br_idx >= 0) {
++        resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
++        resetbflag(br_idx, FL_PV_HDRS_APPLIED);
++    } else {
++        resetflag(msg, FL_PV_HDRS_COLLECTED);
++        resetflag(msg, FL_PV_HDRS_APPLIED);
++    }
 +
 +    pv_str_free(&br_xname);
 +
@@ -1092,7 +1100,7 @@
 +
 +    root = xavp_get(&br_xname, NULL);
 +
-+    if (root == NULL && br_idx > 0) {
++    if (root == NULL && br_idx >= 0) {
 +        pv_clone_branch_xavp(msg, &br_xname);
 +        root = xavp_get(&br_xname, NULL);
 +    }
@@ -2221,18 +2229,26 @@
 +
 +int pv_get_branch_index(struct sip_msg *msg, int *br_idx)
 +{
-+    qvalue_t q;
-+    int br_len;
-+    str ruid = STR_NULL;
++    str branch = STR_NULL;
++    int os = 0;
++    int len = 0;
 +
-+    *br_idx = 0;
-+    while ((get_branch(*br_idx,&br_len,&q,0,0,0,0,&ruid,0,0))) {
-+        (*br_idx)++;
-+        if (br_len == 0 || msg->ruid.s == NULL || ruid.s == NULL ||
-+            strcmp(msg->ruid.s, ruid.s) == 0) {
-+                break;
-+        }
++    if (msg->add_to_branch_s == NULL) {
++        *br_idx = -1;
++        return 1;
 +    }
++
++    pv_str_new(&branch, header_value_size);
++    os = msg->add_to_branch_len;
++    while (os > 0 && memcmp(msg->add_to_branch_s+os-1, ".", 1)) os--;
++    len = msg->add_to_branch_len-os;
++    if (os > 0 && len > 0) {
++        memcpy(branch.s, msg->add_to_branch_s+os, len);
++        *br_idx = atoi(branch.s);
++    } else {
++        *br_idx = -1;
++    }
++    pv_str_free(&branch);
 +
 +    return 1;
 +}
@@ -2241,6 +2257,8 @@
 +{
 +    int br_idx;
 +    int os = 0;
++    char br_idx_s[32];
++    char br_idx_len = 0;
 +
 +    if (dst == NULL)
 +        return -1;
@@ -2249,9 +2267,11 @@
 +    memcpy(dst->s, xname->s, xname->len); os+=xname->len;
 +
 +    pv_get_branch_index(msg, &br_idx);
-+    if (br_idx > 0) {
++    if (br_idx >= 0) {
++        sprintf(br_idx_s, "%d", br_idx);
++        br_idx_len = strlen(br_idx_s);
 +        memcpy(dst->s+os, "#", 1); os+=1;
-+        memcpy(dst->s+os, msg->ruid.s, msg->ruid.len); os+=msg->ruid.len;
++        memcpy(dst->s+os, br_idx_s, br_idx_len); os+=br_idx_len;
 +    }
 +    dst->len = os;
 +    dst->s[dst->len] = '\0';
