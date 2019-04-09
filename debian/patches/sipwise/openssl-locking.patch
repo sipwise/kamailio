@@ -1,0 +1,89 @@
+--- /dev/null
++++ b/src/modules/tls/utils/openssl_mutex_shared/Makefile
+@@ -0,0 +1,26 @@
++COREPATH=../../../../../src
++include $(COREPATH)/Makefile.defs
++include $(COREPATH)/Makefile.targets
++
++
++.PHONY: all
++all: openssl_mutex_shared.so
++
++.PHONY: install-if-newer
++install-if-newer: install
++
++.PHONY: install
++install: install-modules
++
++.PHONY: install-modules
++install-modules: openssl_mutex_shared.so
++	mkdir -p $(modules_prefix)/$(lib_dir)/openssl_mutex_shared
++	$(INSTALL_TOUCH) $(modules_prefix)/$(lib_dir)/openssl_mutex_shared/openssl_mutex_shared.so
++	$(INSTALL_BIN) openssl_mutex_shared.so $(modules_prefix)/$(lib_dir)/openssl_mutex_shared
++
++openssl_mutex_shared.so: openssl_mutex_shared.c
++	$(CC) -g -D_GNU_SOURCE -std=c99 -fvisibility=hidden -pthread -o $@ -O3 -Wall -shared -fPIC -ldl $<
++
++.PHONY: clean
++clean:
++	rm -f openssl_mutex_shared.so
+--- /dev/null
++++ b/src/modules/tls/utils/openssl_mutex_shared/openssl_mutex_shared.c
+@@ -0,0 +1,46 @@
++#include <pthread.h>
++#include <dlfcn.h>
++
++#define SYMBOL_EXPORT __attribute__((visibility("default")))
++
++int SYMBOL_EXPORT pthread_mutex_init (pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr)
++{
++	static int (*real_pthread_mutex_init)(pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr);
++	if (!real_pthread_mutex_init)
++		real_pthread_mutex_init = dlsym(RTLD_NEXT, "pthread_mutex_init");
++
++	if (__mutexattr) {
++		pthread_mutexattr_t attr = *__mutexattr;
++		pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++		return real_pthread_mutex_init(__mutex, &attr);
++	}
++
++	pthread_mutexattr_t attr;
++	pthread_mutexattr_init(&attr);
++	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	int ret = real_pthread_mutex_init(__mutex, &attr);
++	pthread_mutexattr_destroy(&attr);
++	return ret;
++}
++
++int SYMBOL_EXPORT pthread_rwlock_init (pthread_rwlock_t *__restrict __rwlock,
++				const pthread_rwlockattr_t *__restrict __attr)
++{
++	static int (*real_pthread_rwlock_init)(pthread_rwlock_t *__restrict __rwlock,
++				const pthread_rwlockattr_t *__restrict __attr);
++	if (!real_pthread_rwlock_init)
++		real_pthread_mutex_init = dlsym(RTLD_NEXT, "pthread_rwlock_init");
++
++	if (__attr) {
++		pthread_rwlockattr_t attr = *__attr;
++		pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++		return real_pthread_rwlock_init(__rwlock, &attr);
++	}
++
++	pthread_rwlockattr_t attr;
++	pthread_rwlockattr_init(&attr);
++	pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	int ret = real_pthread_rwlock_init(__rwlock, &attr);
++	pthread_rwlockattr_destroy(&attr);
++	return ret;
++}
+--- a/src/modules/tls/Makefile
++++ b/src/modules/tls/Makefile
+@@ -33,6 +33,8 @@
+ # dcm: tls.cfg installed via local 'install-cfg' to update paths
+ #MOD_INSTALL_CFGS=tls.cfg
+ 
++MOD_INSTALL_UTILS=utils/openssl_mutex_shared
++
+ DEFS+=-DKAMAILIO_MOD_INTERFACE
+ include ../../Makefile.modules
+ 
