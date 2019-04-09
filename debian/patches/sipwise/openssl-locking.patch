@@ -1,0 +1,138 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -204,7 +204,7 @@
+ 
+ 
+ # list of utils directories that should be compiled by make utils
+-C_COMPILE_UTILS=	../utils/kamcmd
++C_COMPILE_UTILS=	../utils/kamcmd ../utils/openssl_mutex_shared
+ # list of binaries that should be installed alongside
+ # (they should be created after make utils, see C_COMPILE_UTILS)
+ C_INSTALL_BIN=	# kamcmd is now installed by ctl
+@@ -212,7 +212,7 @@
+ # which utils know to install themselves and should be installed
+ # along the core (list of utils directories)
+ ifeq ($(FLAVOUR),kamailio)
+-C_INSTALL_UTILS= ../utils/kamctl
++C_INSTALL_UTILS= ../utils/kamctl ../utils/openssl_mutex_shared
+ else
+ C_INSTALL_UTILS=
+ endif
+--- /dev/null
++++ b/utils/openssl_mutex_shared/Makefile
+@@ -0,0 +1,26 @@
++COREPATH=../../src/
++include $(COREPATH)/Makefile.defs
++include $(COREPATH)/Makefile.targets
++
++
++.PHONY: all
++all: openssl_mutex_shared.so
++
++.PHONY: install-if-newer
++install-if-newer: install
++
++.PHONY: install
++install: install-modules
++
++.PHONY: install-modules
++install-modules: openssl_mutex_shared.so
++	mkdir -p $(modules_prefix)/$(lib_dir)/openssl_mutex_shared
++	$(INSTALL_TOUCH) $(modules_prefix)/$(lib_dir)/openssl_mutex_shared/openssl_mutex_shared.so
++	$(INSTALL_BIN) openssl_mutex_shared.so $(modules_prefix)/$(lib_dir)/openssl_mutex_shared
++
++openssl_mutex_shared.so: openssl_mutex_shared.c
++	$(CC) -g -D_GNU_SOURCE -std=c99 -o $@ -O3 -Wall -shared -fPIC $<
++
++.PHONY: clean
++clean:
++	rm -f openssl_mutex_shared.so
+--- /dev/null
++++ b/utils/openssl_mutex_shared/openssl_mutex_shared.c
+@@ -0,0 +1,86 @@
++#include <pthread.h>
++#include <dlfcn.h>
++
++int pthread_mutex_init (pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr)
++{
++	int (*real_pthread_mutex_init)(pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr)
++		= dlsym(RTLD_NEXT, "pthread_mutex_init");
++
++	// dl.so seems to have trouble resolving these symbols at times, so we try to
++	// look them up manually ourselves
++	int (*real_pthread_mutexattr_setpshared)(pthread_mutexattr_t *__attr,
++					 int __pshared)
++		= dlsym(RTLD_NEXT, "pthread_mutexattr_setpshared");
++	if (!real_pthread_mutexattr_setpshared)
++		real_pthread_mutexattr_setpshared =
++			= dlsym(RTLD_DEFAULT, "pthread_mutexattr_setpshared");
++
++	if (__mutexattr) {
++		pthread_mutexattr_t attr = *__mutexattr;
++		real_pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++		return real_pthread_mutex_init(__mutex, &attr);
++	}
++
++	int (*real_pthread_mutexattr_init)(pthread_mutexattr_t *__attr)
++		= dlsym(RTLD_NEXT, "pthread_mutexattr_init");
++	if (!real_pthread_mutexattr_init)
++		real_pthread_mutexattr_init =
++			= dlsym(RTLD_DEFAULT, "pthread_mutexattr_init");
++
++	int (*real_pthread_mutexattr_destroy)(pthread_mutexattr_t *__attr)
++		= dlsym(RTLD_NEXT, "pthread_mutexattr_destroy");
++	if (!real_pthread_mutexattr_destroy)
++		real_pthread_mutexattr_destroy =
++			= dlsym(RTLD_DEFAULT, "pthread_mutexattr_destroy");
++
++	pthread_mutexattr_t attr;
++	real_pthread_mutexattr_init(&attr);
++	real_pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	int ret = real_pthread_mutex_init(__mutex, &attr);
++	real_pthread_mutexattr_destroy(&attr);
++	return ret;
++}
++
++int pthread_rwlock_init (pthread_rwlock_t *__restrict __rwlock,
++				const pthread_rwlockattr_t *__restrict
++				__attr)
++{
++	int (*real_pthread_rwlock_init)(pthread_rwlock_t *__restrict __rwlock,
++				const pthread_rwlockattr_t *__restrict
++				__attr)
++		= dlsym(RTLD_NEXT, "pthread_rwlock_init");
++
++	// dl.so seems to have trouble resolving these symbols at times, so we try to
++	// look them up manually ourselves
++	int (*real_pthread_rwlockattr_setpshared)(pthread_rwlockattr_t *__attr,
++					 int __pshared)
++		= dlsym(RTLD_NEXT, "pthread_rwlockattr_setpshared");
++	if (!real_pthread_rwlockattr_setpshared)
++		real_pthread_rwlockattr_setpshared =
++			= dlsym(RTLD_DEFAULT, "pthread_rwlockattr_setpshared");
++
++	if (__attr) {
++		pthread_rwlockattr_t attr = *__attr;
++		real_pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++		return real_pthread_rwlock_init(__rwlock, &attr);
++	}
++
++	int (*real_pthread_rwlockattr_init)(pthread_rwlockattr_t *__attr)
++		= dlsym(RTLD_NEXT, "pthread_rwlockattr_init");
++	if (!real_pthread_rwlockattr_init)
++		real_pthread_rwlockattr_init =
++			= dlsym(RTLD_DEFAULT, "pthread_rwlockattr_init");
++
++	int (*real_pthread_rwlockattr_destroy)(pthread_rwlockattr_t *__attr)
++		= dlsym(RTLD_NEXT, "pthread_rwlockattr_destroy");
++	if (!real_pthread_rwlockattr_destroy)
++		real_pthread_rwlockattr_destroy =
++			= dlsym(RTLD_DEFAULT, "pthread_rwlockattr_destroy");
++
++	pthread_rwlockattr_t attr;
++	real_pthread_rwlockattr_init(&attr);
++	real_pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	int ret = real_pthread_rwlock_init(__rwlock, &attr);
++	real_pthread_rwlockattr_destroy(&attr);
++	return ret;
++}
