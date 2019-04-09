@@ -38,6 +38,7 @@ upstream/fix_db_redis_memory_issues.patch
 upstream/fix_db_redis_manual_key_issue.patch
 upstream/fix_db_redis_reconnect.patch
 sipwise/rtpengine-balancing.patch
+sipwise/openssl-locking.patch
 ## backport from kamailio upstream (5.2)
 sipwise/extend_stats.patch
 sipwise/tt37692.patch
