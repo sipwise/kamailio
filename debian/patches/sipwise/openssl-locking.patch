@@ -1,0 +1,84 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -204,7 +204,7 @@
+ 
+ 
+ # list of utils directories that should be compiled by make utils
+-C_COMPILE_UTILS=	../utils/kamcmd
++C_COMPILE_UTILS=	../utils/kamcmd ../utils/openssl_mutex_shared
+ # list of binaries that should be installed alongside
+ # (they should be created after make utils, see C_COMPILE_UTILS)
+ C_INSTALL_BIN=	# kamcmd is now installed by ctl
+--- /dev/null
++++ b/utils/openssl_mutex_shared/Makefile
+@@ -0,0 +1,25 @@
++COREPATH=../../src/
++include $(COREPATH)/Makefile.defs
++include $(COREPATH)/Makefile.targets
++
++
++.PHONY: all
++all: openssl_mutex_shared.so
++
++.PHONY: install-if-newer
++install-if-newer: install
++
++.PHONY: install
++install: install-modules
++
++.PHONY: install-modules
++install-modules: openssl_mutex_shared.so
++	$(INSTALL_TOUCH) $(modules_prefix)/$(lib_dir)/openssl_mutex_shared/openssl_mutex_shared.so
++	$(INSTALL_BIN) openssl_mutex_shared.so $(modules_prefix)/$(lib_dir)/openssl_mutex_shared
++
++openssl_mutex_shared.so: openssl_mutex_shared.c
++	$(CC) -g -D_GNU_SOURCE -std=c99 -o $@ -O3 -Wall -shared -fPIC $<
++
++.PHONY: clean
++clean:
++	rm -f openssl_mutex_shared.so
+--- /dev/null
++++ b/utils/openssl_mutex_shared/openssl_mutex_shared.c
+@@ -0,0 +1,42 @@
++#include <pthread.h>
++#include <dlfcn.h>
++
++int pthread_mutex_init (pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr)
++{
++	int (*real_pthread_mutex_init)(pthread_mutex_t *__mutex, const pthread_mutexattr_t *__mutexattr)
++		= dlsym(RTLD_NEXT, "pthread_mutex_init");
++
++	if (__mutexattr) {
++		pthread_mutexattr_setpshared((pthread_mutexattr_t *) __mutexattr, PTHREAD_PROCESS_SHARED);
++		return real_pthread_mutex_init(__mutex, __mutexattr);
++	}
++
++	pthread_mutexattr_t attr;
++	pthread_mutexattr_init(&attr);
++	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	int ret = real_pthread_mutex_init(__mutex, &attr);
++	pthread_mutexattr_destroy(&attr);
++	return ret;
++}
++
++int pthread_rwlock_init (pthread_rwlock_t *__restrict __rwlock,
++				const pthread_rwlockattr_t *__restrict
++				__attr)
++{
++	int (*real_pthread_rwlock_init)(pthread_rwlock_t *__restrict __rwlock,
++				const pthread_rwlockattr_t *__restrict
++				__attr)
++		= dlsym(RTLD_NEXT, "pthread_rwlock_init");
++
++	if (__attr) {
++		pthread_rwlockattr_setpshared((pthread_rwlockattr_t *) __attr, PTHREAD_PROCESS_SHARED);
++		return real_pthread_rwlock_init(__rwlock, __attr);
++	}
++
++	pthread_rwlockattr_t attr;
++	pthread_rwlockattr_init(&attr);
++	pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
++	int ret = real_pthread_rwlock_init(__rwlock, &attr);
++	pthread_rwlockattr_destroy(&attr);
++	return ret;
++}
