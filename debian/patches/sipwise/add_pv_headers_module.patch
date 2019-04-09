@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1839 @@
+@@ -0,0 +1,1857 @@
 +/*
 + * pv_headers
 + *
@@ -1101,7 +1101,7 @@
 +    root = xavp_get(&br_xname, NULL);
 +
 +    if (root == NULL && br_idx >= 0) {
-+        pv_clone_branch_xavp(msg, &br_xname);
++        pv_clone_branch_xavp(msg, xname);
 +        root = xavp_get(&br_xname, NULL);
 +    }
 +
@@ -1113,11 +1113,11 @@
 +        root_xval.type = SR_XTYPE_XAVP;
 +        root_xval.v.xavp = NULL;
 +
-+        if ((*xavp = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
++        if ((root = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
 +            LM_ERR("error create xavp %s\n", br_xname.s);
 +            goto err;
 +        }
-+        xavp = &(*xavp)->val.v.xavp;
++        xavp = &root->val.v.xavp;
 +    } else if (xavp_get_child(&br_xname, name) == NULL) {
 +        append = 1;
 +    }
@@ -1947,13 +1947,15 @@
 +
 +    xval_pd = pv_xavp_get_value(msg, &xavp_parsed_xname, &hname, 0);
 +
-+    if (xval_pd &&
-+        (c_data = (xavp_c_data_t*)xval_pd->v.data->p) != NULL &&
++    if (xval_pd)
++        c_data = (xavp_c_data_t*)xval_pd->v.data->p;
++
++    if (c_data != NULL &&
 +        strncasecmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
-+            xval_pd = NULL;
++            c_data = NULL;
 +    }
 +
-+    if (xval_pd == NULL || (c_data = (xavp_c_data_t*)xval_pd->v.data->p) == NULL) {
++    if (c_data == NULL) {
 +        c_data = (xavp_c_data_t*)shm_malloc(sizeof(xavp_c_data_t));
 +        if (c_data == NULL) {
 +            LM_ERR("out of shared memory\n");
@@ -2229,26 +2231,25 @@
 +
 +int pv_get_branch_index(struct sip_msg *msg, int *br_idx)
 +{
-+    str branch = STR_NULL;
 +    int os = 0;
 +    int len = 0;
++    char parsed_br_idx[header_value_size];
 +
-+    if (msg->add_to_branch_s == NULL) {
-+        *br_idx = -1;
-+        return 1;
++    if (msg->add_to_branch_len > header_value_size) {
++        LM_ERR("branch name is too long\n");
++        return -1;
 +    }
 +
-+    pv_str_new(&branch, header_value_size);
 +    os = msg->add_to_branch_len;
 +    while (os > 0 && memcmp(msg->add_to_branch_s+os-1, ".", 1)) os--;
 +    len = msg->add_to_branch_len-os;
 +    if (os > 0 && len > 0) {
-+        memcpy(branch.s, msg->add_to_branch_s+os, len);
-+        *br_idx = atoi(branch.s);
++        memcpy(parsed_br_idx, msg->add_to_branch_s+os, len);
++        parsed_br_idx[len] = '\0';
++        *br_idx = atoi(parsed_br_idx);
 +    } else {
 +        *br_idx = -1;
 +    }
-+    pv_str_free(&branch);
 +
 +    return 1;
 +}
@@ -2279,15 +2280,16 @@
 +    return 1;
 +}
 +
-+static int pv_clone_branch_xavp(struct sip_msg *msg, str *br_xname)
++static int pv_clone_branch_xavp(struct sip_msg *msg, str *xname)
 +{
 +    sr_xavp_t *xavp = NULL;
 +    sr_xavp_t *br_xavp = NULL;
 +    sr_xavp_t *sub = NULL;
 +    sr_xval_t root_xval;
++    str br_xname = STR_NULL;
 +
-+    if ((xavp = xavp_get(&xavp_name, NULL)) == NULL) {
-+        LM_ERR("cannot clone xavp from non existing %s\n" , xavp_name.s);
++    if ((xavp = xavp_get(xname, NULL)) == NULL) {
++        LM_ERR("cannot clone xavp from non existing %s\n" , xname->s);
 +        return -1;
 +    }
 +
@@ -2301,25 +2303,41 @@
 +        return -1;
 +    }
 +
++    if (pv_str_new(&br_xname, header_name_size) < 0)
++        return -1;
++    pv_get_branch_xname(msg, xname, &br_xname);
++
 +    memset(&root_xval, 0, sizeof(sr_xval_t));
 +    root_xval.type = SR_XTYPE_XAVP;
 +    root_xval.v.xavp = NULL;
 +
-+    if ((br_xavp = xavp_add_value(br_xname, &root_xval, NULL)) == NULL) {
-+        LM_ERR("error create xavp %s\n", br_xname->s);
-+        return -1;
++    if ((br_xavp = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
++        LM_ERR("error create xavp %s\n", br_xname.s);
++        goto err;
++    }
++
++    if (strncmp(xname->s, xavp_parsed_xname.s, xname->len) == 0) {
++        pv_str_free(&br_xname);
++        return 1;
 +    }
 +
 +    do {
 +        if (pv_skip_header(&sub->name) == 1)
 +            continue;
++        if (sub->val.type == SR_XTYPE_DATA)
++            continue;
 +        if (pv_xavp_append_value(&sub->name, &sub->val, &br_xavp->val.v.xavp) < 0) {
 +            LM_ERR("cannot clone xavp xavp %s\n", sub->name.s);
-+            return -1;
++            goto err;
 +        }
 +    } while ((sub = sub->next) != NULL);
 +
++    pv_str_free(&br_xname);
 +    return 1;
++
++err:
++    pv_str_free(&br_xname);
++    return -1;
 +}
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.h
