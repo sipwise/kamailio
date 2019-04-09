@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1857 @@
+@@ -0,0 +1,1856 @@
 +/*
 + * pv_headers
 + *
@@ -831,7 +831,7 @@
 +    str_hash_init(&rm_hdrs);
 +
 +    do {
-+        if (pv_skip_header(&sub->name) == 1)
++        if (pv_skip_header(&sub->name))
 +            continue;
 +
 +        if (strncasecmp(sub->name.s, "From", sub->name.len) == 0) {
@@ -897,19 +897,18 @@
 +        }
 +
 +        if (!str_hash_get(&rm_hdrs, sub->name.s, sub->name.len)) {
-+            if (!pv_xavp_is_null(sub) &&
-+                (pv_single_header(&sub->name) || xavp_count(&sub->name, &sub) == 1)) {
-+                    LM_DBG("replace header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
-+                    pv_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
-+                    pv_str_hash_add_key(&rm_hdrs, &sub->name);
-+                    continue;
++            if (!pv_xavp_is_null(sub) && xavp_count(&sub->name, &sub) == 1) {
++                LM_DBG("replace header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
++                pv_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
++                pv_str_hash_add_key(&rm_hdrs, &sub->name);
++                continue;
 +            }
 +            LM_DBG("remove header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
 +            pv_real_hdr_del_by_name(msg, &sub->name);
 +            pv_str_hash_add_key(&rm_hdrs, &sub->name);
 +        }
 +
-+        if (!pv_xavp_is_null(sub)) {
++        if (!pv_xavp_is_null(sub) && !pv_single_header(&sub->name)) {
 +            pv_real_hdr_append(msg, &sub->name, &sub->val.v.s);
 +            LM_DBG("append header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
 +        }
@@ -1614,23 +1613,23 @@
 +int pv_skip_header(str *hname)
 +{
 +    if (hname == NULL)
-+        return -1;
++        return 0;
 +
 +    if (str_hash_get(&skip_headers, hname->s, hname->len))
 +        return 1;
 +
-+    return -1;
++    return 0;
 +}
 +
 +int pv_single_header(str *hname)
 +{
 +    if (hname == NULL)
-+        return -1;
++        return 0;
 +
 +    if (str_hash_get(&single_headers, hname->s, hname->len))
 +        return 1;
 +
-+    return -1;
++    return 0;
 +}
 +
 +int pv_xavp_keys_count(sr_xavp_t **start)
@@ -2322,7 +2321,7 @@
 +    }
 +
 +    do {
-+        if (pv_skip_header(&sub->name) == 1)
++        if (pv_skip_header(&sub->name))
 +            continue;
 +        if (sub->val.type == SR_XTYPE_DATA)
 +            continue;
