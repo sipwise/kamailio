@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.6-1+0~mr6.5.3.3) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [4190d83] TT#55859 debian/control: Build-Depends on libssl1.0
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 09 Apr 2019 16:11:25 +0200
+
 ngcp-kamailio (5.1.6-1+0~mr6.5.3.2) unstable; urgency=medium
 
   [ Marco Capetta ]
