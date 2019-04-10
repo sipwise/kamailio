@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1856 @@
+@@ -0,0 +1,1845 @@
 +/*
 + * pv_headers
 + *
@@ -756,7 +756,6 @@
 +            }
 +            continue;
 +        }
-+
 +        if (pv_set_xavp(msg, &xavp_name, &name, &val, SR_XTYPE_STR, 0, 1) < 0)
 +            goto err;
 +    }
@@ -1560,27 +1559,17 @@
 +{
 +    sr_xavp_t *xavp = NULL;
 +    str br_xname = STR_NULL;
-+    int is_branch = 0;
 +
 +    if (pv_str_new(&br_xname, header_name_size) < 0)
 +        return NULL;
 +
 +    pv_get_branch_xname(msg, xname, &br_xname);
-+    if ((xavp = xavp_get(&br_xname, NULL)) == NULL)
-+        is_branch = 1;
++    xavp = xavp_get_child(&br_xname, name);
++    if (xavp == NULL)
++        xavp = xavp_get_child(xname, name);
 +
-+    if (is_branch == 0 && (xavp = xavp_get(xname, NULL)) == NULL)
-+        goto err;
-+
-+    xavp = is_branch ? xavp_get_child(&br_xname, name)
-+                     : xavp_get_child(xname, name);
 +    pv_str_free(&br_xname);
-+
 +    return xavp;
-+
-+err:
-+    pv_str_free(&br_xname);
-+    return NULL;
 +}
 +
 +int pv_xavp_is_null(sr_xavp_t * avp)
