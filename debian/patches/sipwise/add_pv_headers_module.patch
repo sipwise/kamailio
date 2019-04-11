@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1836 @@
+@@ -0,0 +1,1842 @@
 +/*
 + * pv_headers
 + *
@@ -838,7 +838,10 @@
 +                LM_DBG("skip From header change in reply messages\n");
 +                continue;
 +            }
-+
++            if (strncmp(sub->val.v.s.s, msg->from->body.s, sub->val.v.s.len) == 0) {
++                LM_DBG("skip unchanged From header\n");
++                continue;
++            }
 +            if (from_cnt > 0)
 +                continue;
 +
@@ -869,7 +872,10 @@
 +                LM_DBG("skip To header change in reply messages\n");
 +                continue;
 +            }
-+
++            if (strncmp(sub->val.v.s.s, msg->to->body.s, sub->val.v.s.len) == 0) {
++                LM_DBG("skip unchanged To header\n");
++                continue;
++            }
 +            if (to_cnt > 0)
 +                continue;
 +
@@ -1930,7 +1936,7 @@
 +        c_data = (xavp_c_data_t*)xval_pd->v.data->p;
 +
 +    if (c_data != NULL &&
-+        strncasecmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
++        strncmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
 +            c_data = NULL;
 +    }
 +
