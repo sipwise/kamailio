@@ -481,7 +481,7 @@
 +
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1845 @@
+@@ -0,0 +1,1836 @@
 +/*
 + * pv_headers
 + *
@@ -717,10 +717,9 @@
 +
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if ((br_idx >= 0 && isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1) ||
-+        (br_idx == -1 && isflagset(msg, FL_PV_HDRS_COLLECTED) == 1)) {
-+            LM_ERR("headers are already collected\n");
-+            return -1;
++    if (isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1) {
++        LM_ERR("headers are already collected\n");
++        return -1;
 +    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -766,8 +765,7 @@
 +    pv_str_free(&name);
 +    pv_str_free(&val);
 +
-+    br_idx >= 0 ? setbflag(br_idx, FL_PV_HDRS_COLLECTED)
-+                : setflag(msg, FL_PV_HDRS_COLLECTED);
++    setbflag(br_idx, FL_PV_HDRS_COLLECTED);
 +
 +    return 1;
 +
@@ -790,10 +788,9 @@
 +
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if ((br_idx >= 0 && isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) ||
-+        (br_idx == -1 && isflagset(msg, FL_PV_HDRS_APPLIED) == 1)) {
-+            LM_ERR("headers are already applied\n");
-+            return -1;
++    if (isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) {
++        LM_ERR("headers are already applied\n");
++        return -1;
 +    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -913,8 +910,7 @@
 +        }
 +    } while ((sub = sub->next) != NULL);
 +
-+    br_idx >=0 ? setbflag(br_idx, FL_PV_HDRS_APPLIED)
-+               : setflag(msg, FL_PV_HDRS_APPLIED);
++    setbflag(br_idx, FL_PV_HDRS_APPLIED);
 +
 +    pv_str_free(&display);
 +    pv_str_free(&uri);
@@ -947,13 +943,8 @@
 +    pv_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
 +    pv_free_xavp(&br_xname);
 +
-+    if (br_idx >= 0) {
-+        resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
-+        resetbflag(br_idx, FL_PV_HDRS_APPLIED);
-+    } else {
-+        resetflag(msg, FL_PV_HDRS_COLLECTED);
-+        resetflag(msg, FL_PV_HDRS_APPLIED);
-+    }
++    resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
++    resetbflag(br_idx, FL_PV_HDRS_APPLIED);
 +
 +    pv_str_free(&br_xname);
 +
@@ -1098,7 +1089,7 @@
 +
 +    root = xavp_get(&br_xname, NULL);
 +
-+    if (root == NULL && br_idx >= 0) {
++    if (root == NULL && br_idx > 0) {
 +        pv_clone_branch_xavp(msg, xname);
 +        root = xavp_get(&br_xname, NULL);
 +    }
@@ -2234,9 +2225,9 @@
 +    if (os > 0 && len > 0) {
 +        memcpy(parsed_br_idx, msg->add_to_branch_s+os, len);
 +        parsed_br_idx[len] = '\0';
-+        *br_idx = atoi(parsed_br_idx);
++        *br_idx = atoi(parsed_br_idx)+1;
 +    } else {
-+        *br_idx = -1;
++        *br_idx = 0;
 +    }
 +
 +    return 1;
@@ -2256,7 +2247,7 @@
 +    memcpy(dst->s, xname->s, xname->len); os+=xname->len;
 +
 +    pv_get_branch_index(msg, &br_idx);
-+    if (br_idx >= 0) {
++    if (br_idx > 0) {
 +        sprintf(br_idx_s, "%d", br_idx);
 +        br_idx_len = strlen(br_idx_s);
 +        memcpy(dst->s+os, "#", 1); os+=1;
