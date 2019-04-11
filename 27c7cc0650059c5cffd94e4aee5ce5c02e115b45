@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a016987_7eeec0ed",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 12
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2019-04-11T14:46:34Z",
+      "side": 1,
+      "message": "It would be nice to have a longer explanation about the details, not sure if this will be recorded later somewhere, like in the ticket or somewhere else?  It will surely be useful if it needs to be revisited or removed in the future.",
+      "revId": "27c7cc0650059c5cffd94e4aee5ce5c02e115b45",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a016987_5ebae4e2",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 12
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 1000042
+      },
+      "writtenOn": "2019-04-11T14:46:34Z",
+      "side": 1,
+      "message": "I think that -pthread is guaranteed to add -lpthread, as well as anything else needed for pthreads to work, under normal circumstances (not sure if with this special hackery needs to be done in this way).",
+      "revId": "27c7cc0650059c5cffd94e4aee5ce5c02e115b45",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
