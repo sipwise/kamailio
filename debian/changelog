@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.7-1+0~mr7.0.2.2) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [be16c88] TT#56343 Fix crash calculating packet stats
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 12 Apr 2019 09:50:22 +0200
+
 ngcp-kamailio (5.1.7-1+0~mr7.0.2.1) unstable; urgency=medium
 
   [ Marco Capetta ]
