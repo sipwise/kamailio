@@ -1,0 +1,106 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "7a016987_b4ac57ee",
+        "filename": "/COMMIT_MSG",
+        "patchSetId": 17
+      },
+      "lineNbr": 7,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-12T14:47:09Z",
+      "side": 1,
+      "message": "I\u0027d appreciate more details about the (ideas/approach/... of the) implementation in the commit message before submitting this :)",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a016987_d4afd3e1",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-12T14:47:09Z",
+      "side": 1,
+      "message": "The -O3 seems to be available as CC_OPT from src/Makefile.defs, would it make sense to rely on it from there?",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a016987_14a56b03",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 38,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-12T14:47:09Z",
+      "side": 1,
+      "message": "Mr. nitpick here: use new line consistent with lines 58/59?",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a016987_f4a9afe0",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 40,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-12T14:47:09Z",
+      "side": 1,
+      "message": "Mr. nitpick here: use new line consistent with lines 61/62?",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a016987_745fff0e",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-12T14:47:09Z",
+      "side": 1,
+      "message": "Just wondering whether we should log this, at least when in debug mode (like `xlog(\"L_DBG\",\"Invoking pthread_mutex_init workaround\\n\");` or so)?",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a016987_34a067f4",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-12T14:47:09Z",
+      "side": 1,
+      "message": "same here (re xlog)?",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
