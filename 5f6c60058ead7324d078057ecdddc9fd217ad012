@@ -87,6 +87,24 @@
     },
     {
       "key": {
+        "uuid": "5afe65bd_e8d20b34",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-04-15T18:05:15Z",
+      "side": 1,
+      "message": "AFAICT xlog is a kamailio module, and it exposes xlog as part of the config stuff. Even if this was a proper function, that would mean we\u0027d need to link the LD_PRELOAD so with either -rdynamic so that it can access its symbols, which looks like a bad idea. We should just be interposing pthreads symbols notthing more IMO. Anything else risks weird behavior.",
+      "parentUuid": "7a016987_745fff0e",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7a016987_34a067f4",
         "filename": "debian/patches/sipwise/openssl-locking.patch",
         "patchSetId": 17
