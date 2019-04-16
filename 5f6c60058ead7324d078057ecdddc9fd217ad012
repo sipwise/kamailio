@@ -105,6 +105,24 @@
     },
     {
       "key": {
+        "uuid": "5afe65bd_2bb93d2f",
+        "filename": "debian/patches/sipwise/openssl-locking.patch",
+        "patchSetId": 17
+      },
+      "lineNbr": 53,
+      "author": {
+        "id": 1000000
+      },
+      "writtenOn": "2019-04-16T13:24:48Z",
+      "side": 1,
+      "message": "Ah good point, thanks for clarifying this!",
+      "parentUuid": "5afe65bd_e8d20b34",
+      "revId": "5f6c60058ead7324d078057ecdddc9fd217ad012",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "7a016987_34a067f4",
         "filename": "debian/patches/sipwise/openssl-locking.patch",
         "patchSetId": 17
