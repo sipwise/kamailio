@@ -28,7 +28,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/src/modules/pv_headers/README
-@@ -0,0 +1,450 @@
+@@ -0,0 +1,476 @@
 +The pv_headers Module
 +
 +Kirill Solomko
@@ -67,6 +67,7 @@
 +              4.4. $x_fd, $x_td
 +              4.5. $x_fn, $x_tn
 +              4.6. $x_ft, $x_tt
++              4.7. $x_rs, $x_rr
 +
 +1. Design Goals
 +
@@ -114,6 +115,7 @@
 +        4.4. $x_fd, $x_td
 +        4.5. $x_fn, $x_tn
 +        4.6. $x_ft, $x_tt
++        4.7. $x_rs, $x_rr
 +
 +1. Dependencies
 +
@@ -366,6 +368,7 @@
 +    4.4. $x_fd, $x_td
 +    4.5. $x_fn, $x_tn
 +    4.6. $x_ft, $x_tt
++    4.7. $x_rs, $x_rr
 +
 +4.1. $x_hdr
 +
@@ -479,9 +482,32 @@
 +
 +        * $x_tt usage is the same
 +
++4.7. $x_rs, $x_rr
++
++    These pseudovariables are used to modify/retreive or change "status" and "code" of the SIP reply
++
++    NOTE: Only messages with reply status > 300 can be changed as well as reply status 1xx and 2xx cannot be set
++
++    Usage:
++
++        * modify the reply status
++
++            $x_rs = 486
++
++        * retrieve the reply status
++
++            $var(test) = $x_rs;
++
++        * modify the reply reason
++
++            $x_rr = "Custom Reason"
++
++        * retrieve the reply reason
++
++            $var(test) = $x_rr;
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1842 @@
+@@ -0,0 +1,1991 @@
 +/*
 + * pv_headers
 + *
@@ -583,6 +609,7 @@
 +static int pv_real_hdr_replace(struct sip_msg *msg, str *hname, str *hvalue);
 +static int pv_real_hdr_del_by_name(struct sip_msg *msg, str *hname);
 +static int pv_real_hdr_remove_display(struct sip_msg *msg, str *hname);
++static int pv_real_replace_reply_reason(struct sip_msg *msg, str *value);
 +static int pv_create_hdr_str(str *hname, str *hvalue, str *dst);
 +static int pv_str_new(str *s, int size);
 +static int pv_str_free(str *s);
@@ -614,6 +641,8 @@
 +static int pv_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
 +static int pv_set_uri(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
 +static int pv_merge_uri(struct sip_msg *msg, enum action_type type, str *cur, str *new, xavp_c_data_t *c_data);
++static int pv_get_reply_sr(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
++static int pv_set_reply_sr(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
 +
 +static int pv_get_branch_index(struct sip_msg *msg, int *br_idx);
 +static int pv_get_branch_xname(struct sip_msg *msg, str *xname, str *dst);
@@ -647,6 +676,8 @@
 +    {{"x_td", (sizeof("x_td")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 8},
 +    {{"x_tn", (sizeof("x_tn")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 9},
 +    {{"x_tt", (sizeof("x_tt")-1)}, PVT_OTHER, pv_get_uri, /* ro */ 0, 0, 0, pv_init_iname, 10},
++    {{"x_rs", (sizeof("x_rs")-1)}, PVT_OTHER, pv_get_reply_sr, pv_set_reply_sr, 0, 0, pv_init_iname, 1},
++    {{"x_rr", (sizeof("x_rr")-1)}, PVT_OTHER, pv_get_reply_sr, pv_set_reply_sr, 0, 0, pv_init_iname, 2},
 +    { {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
 +};
 +
@@ -895,6 +926,14 @@
 +            }
 +
 +            to_cnt++;
++            continue;
++        }
++
++        if (strncasecmp(sub->name.s, "@Reply-Reason", sub->name.len) == 0) {
++            if (str_hash_get(&rm_hdrs, sub->name.s, sub->name.len))
++                continue;
++            pv_real_replace_reply_reason(msg, &sub->val.v.s);
++            pv_str_hash_add_key(&rm_hdrs, &sub->name);
 +            continue;
 +        }
 +
@@ -1296,6 +1335,38 @@
 +        }
 +    }
 +    return 1;
++}
++
++int pv_real_replace_reply_reason(struct sip_msg *msg, str *value)
++{
++    struct lump *anchor = NULL;
++    char *reason = NULL;
++
++    anchor = del_lump(msg, msg->first_line.u.reply.reason.s - msg->buf,
++                           msg->first_line.u.reply.reason.len, 0);
++    if (!anchor) {
++        LM_ERR("set reply: failed to del lump\n");
++        goto err;
++    }
++
++    reason = (char*)pkg_malloc(value->len);
++    if (reason == NULL) {
++        LM_ERR("set reply: out of pkg memory\n");
++        goto err;
++    }
++    memcpy(reason, value->s, value->len);
++
++    if (insert_new_lump_after(anchor, reason, value->len, 0) == 0) {
++        LM_ERR("set reply: failed to add lump: %.*s\n", value->len, value->s);
++        goto err;
++    }
++
++    return 1;
++
++err:
++    if (reason)
++        pkg_free(reason);
++    return -1;
 +}
 +
 +int pv_create_hdr_str(str *hname, str *hvalue, str *dst)
@@ -2211,6 +2282,110 @@
 +err:
 +    free_to_params(&tb);
 +    free_to_params(&c_data->to_b);
++    return -1;
++}
++
++int pv_get_reply_sr(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
++{
++    sr_xval_t *xval = NULL;
++    int p_no = 0;
++    str rhname = {"@Reply-Reason",13};
++
++    p_no = param->pvn.u.isname.name.n;
++
++    if (msg->first_line.type != SIP_REPLY)
++        return pv_get_null(msg, param, res);
++
++    switch (p_no) {
++        case 1: // status
++            return pv_get_intstrval(msg, param, res,
++                    (int)msg->first_line.u.reply.statuscode,
++                    &msg->first_line.u.reply.status);
++            break;
++        case 2: // reason
++            xval = pv_xavp_get_value(msg, &xavp_name, &rhname, 0);
++            return pv_get_strval(msg, param, res,
++                                 xval && xval->v.s.s
++                                    ? &xval->v.s
++                                    : &msg->first_line.u.reply.reason);
++            break;
++        default:
++            LM_ERR("unknown get reply op\n");
++    }
++
++    return pv_get_null(msg, param, res);
++}
++
++int pv_set_reply_sr(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
++{
++    pv_elem_p pv_format = NULL;
++    int p_no = 0;
++    unsigned int code = 0;
++    str rhname = {"@Reply-Reason",13};
++    str fval;
++
++    p_no = param->pvn.u.isname.name.n;
++
++    if (msg->first_line.type != SIP_REPLY) {
++        LM_ERR("set reply: not a reply message\n");
++        goto err;
++    }
++
++    if (val->flags & (PV_VAL_NULL)) {
++        LM_ERR("set reply: value cannot be null\n");
++        goto err;
++    }
++
++    if (val->flags & (PV_TYPE_INT|PV_VAL_INT)) {
++        if (pv_get_sintval(msg, param, val, val->ri) < 0)
++            goto err;
++    }
++
++    if (pv_parse_format(&val->rs, &pv_format) < 0) {
++        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++        goto err;
++    }
++
++    if (pv_printf_s(msg, pv_format, &fval) < 0) {
++        LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
++        goto err;
++    }
++
++    switch (p_no) {
++        case 1: // status
++            code = atoi(fval.s);
++            if(code < 100 || code > 699) {
++                LM_ERR("set reply: wrong status code: %d\n", code);
++                goto err;
++            }
++            if((code < 300 || msg->REPLY_STATUS < 300) &&
++               (code / 100 != msg->REPLY_STATUS / 100)) {
++                LM_ERR("set reply: 1xx or 2xx replies cannot be changed or set to\n");
++                goto err;
++            }
++            msg->first_line.u.reply.statuscode = code;
++            msg->first_line.u.reply.status.s[2] = code % 10 + '0'; code /= 10;
++            msg->first_line.u.reply.status.s[1] = code % 10 + '0'; code /= 10;
++            msg->first_line.u.reply.status.s[0] = code + '0';
++            break;
++        case 2: // reason
++            if (pv_set_xavp(msg, &xavp_name, &rhname, &fval, SR_XTYPE_STR, 0, 0) < 0) {
++                LM_ERR("set reply: cannot set reply reason\n");
++                goto err;
++            }
++            break;
++        default:
++            LM_ERR("unknown set reply op\n");
++            goto err;
++    }
++
++    if (pv_format)
++        pv_elem_free_all(pv_format);
++    return 1;
++
++err:
++    if (pv_format)
++        pv_elem_free_all(pv_format);
 +    return -1;
 +}
 +
