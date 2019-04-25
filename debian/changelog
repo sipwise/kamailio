@@ -1,3 +1,46 @@
+ngcp-kamailio (5.1.7-1+0~mr7.4.0.0) unstable; urgency=medium
+
+  [ Kirill Solomko ]
+  * [d467019] TT#54406 pv_headers: pv_set_header() fix pv_parse_format
+  * [f6cfcc1] TT#55003 pv_headers: fix $x_hdr pv_parse_header_name
+  * [6563791] TT#55601 pv_headers change pv spec parsing
+  * [c105266] TT#47971 pv_headers: add isolation for branches
+  * [d66fb96] TT#56515 pv_headers fix get_branch_index
+  * [bc1cb47] TT#56483 pv_headers add support for int rvalue
+  * [bfa731b] TT#57100 pv_headers adjust branches handling
+  * [70a5c3b] TT#57100 pv_headers fix parsed data clone
+  * [f2f6ade] TT#57100 pv_headers fix multi header duplication
+  * [29f1170] TT#57300 pv_headers: fix pv_xavp_get_child()
+  * [3409b21] TT#57300 pv_headers adjust branch index internal position
+  * [f21aa13] TT#57502 pv_headers: skip From/To change when value is unchanged
+  * [3085915] TT#57701 pv_headers add reply status/reason change support
+
+  [ Andrew Pogrebennyk ]
+  * [8b7dd46] TT#46775 backport fix for crashes in tm module from upstream
+  * [a6e0de3] TT#55859 debian/control: Build-Depends on libssl1.0
+
+  [ Richard Fuchs ]
+  * [9d34e93] TT#50652 add play_media() and stop_media() function
+  * [098f5a6] TT#50652 add start_forwarding patch from upstream
+
+  [ Andreas Granig ]
+  * [ed5480e] TT#53672 Also return path column in lookup
+
+  [ Marco Capetta ]
+  * [6120351] TT#54256 Fix dialplan errors if rwr contains avps
+  * [3dcee6f] TT#56343 Fix crash calculating packet stats
+
+  [ Guillem Jover ]
+  * [152f660] TT#23584 Honor parallel build support
+
+  [ Roman Romanchenko ]
+  * [5bdbed2] TT#56343 fix crash in method km_cb_rpl_stats_by_method  if CSeq method is not available
+  * [23c90ef] Revert "TT#56343 fix crash in method km_cb_rpl_stats_by_method  if CSeq method is not available"
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 25 Apr 2019 14:27:46 +0200
+
 ngcp-kamailio (5.1.7-1+0~mr7.3.0.0) unstable; urgency=medium
 
   [ Marco Capetta ]
