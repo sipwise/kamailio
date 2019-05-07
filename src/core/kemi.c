@@ -31,6 +31,7 @@
 #include "data_lump.h"
 #include "data_lump_rpl.h"
 #include "strutils.h"
+#include "select_buf.h"
 #include "mem/shm.h"
 #include "parser/parse_uri.h"
 #include "parser/parse_hname2.h"
@@ -1659,4 +1660,37 @@ done:
 	sret.s = pbuf;
 	sret.len = strlen(sret.s);
 	return &sret;
+}
+
+/**
+ *
+ */
+int sr_kemi_route(sr_kemi_eng_t *keng, sip_msg_t *msg, int rtype,
+		str *ename, str *edata)
+{
+	flag_t sfbk;
+	int ret;
+
+	sfbk = getsflags();
+	setsflagsval(0);
+	reset_static_buffer();
+	ret = keng->froute(msg, rtype, ename, edata);
+	setsflagsval(sfbk);
+	return ret;
+}
+
+/**
+ *
+ */
+int sr_kemi_ctx_route(sr_kemi_eng_t *keng, run_act_ctx_t *ctx, sip_msg_t *msg,
+		int rtype, str *ename, str *edata)
+{
+	run_act_ctx_t *bctx;
+	int ret;
+
+	bctx = sr_kemi_act_ctx_get();
+	sr_kemi_act_ctx_set(ctx);
+	ret = sr_kemi_route(keng, msg, rtype, ename, edata);
+	sr_kemi_act_ctx_set(bctx);
+	return ret;
 }

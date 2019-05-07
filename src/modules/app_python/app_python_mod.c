@@ -161,7 +161,7 @@ static int mod_init(void)
 	if(apy_load_script()<0) {
 		pkg_free(dname_src);
 		pkg_free(bname_src);
-		LM_ERR("failed to load python script\n");
+		LM_ERR("failed to load python script: %s\n", _sr_python_load_file.s);
 		return -1;
 	}
 
@@ -512,6 +512,11 @@ static int ki_app_python_exec_p1(sip_msg_t *msg, str *method, str *p1)
 /* clang-format off */
 static sr_kemi_t sr_kemi_app_python_exports[] = {
 	{ str_init("app_python"), str_init("exec"),
+		SR_KEMIP_INT, ki_app_python_exec,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("app_python"), str_init("execx"),
 		SR_KEMIP_INT, ki_app_python_exec,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
