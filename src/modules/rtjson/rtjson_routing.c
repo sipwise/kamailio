@@ -271,6 +271,8 @@ int rtjson_push_routes(sip_msg_t *msg)
 		return -1;
 	}
 
+	LM_DBG("routes index: %d\n", iavp->val.v.i);
+
 	srjson_InitDoc(&tdoc, NULL);
 
 	tdoc.root = srjson_Parse(&tdoc, javp->val.v.s.s);
@@ -359,6 +361,8 @@ int rtjson_init_serial(sip_msg_t *msg, srjson_doc_t *jdoc, sr_xavp_t *iavp)
 			goto error;
 		}
 	}
+	/* mark for new branching */
+	ruri_mark_new();
 
 	rj = srjson_GetObjectItem(jdoc, nj, "path");
 	if(rj!=NULL && rj->type==srjson_String && rj->valuestring!=NULL) {
@@ -516,11 +520,15 @@ int rtjson_append_branch(sip_msg_t *msg, srjson_doc_t *jdoc, srjson_t *nj)
 
 	rj = srjson_GetObjectItem(jdoc, nj, "uri");
 	if(rj==NULL || rj->type!=srjson_String || rj->valuestring==NULL) {
-		return -1;
+		if (msg->new_uri.s!=NULL) {
+			uri = msg->new_uri;
+		} else {
+			uri = msg->first_line.u.request.uri;
+		}
+	} else {
+		uri.s = rj->valuestring;
+		uri.len = strlen(uri.s);
 	}
-
-	uri.s = rj->valuestring;
-	uri.len = strlen(uri.s);
 
 	rj = srjson_GetObjectItem(jdoc, nj, "dst_uri");
 	if(rj!=NULL && rj->type==srjson_String && rj->valuestring!=NULL) {
@@ -617,6 +625,8 @@ int rtjson_next_route(sip_msg_t *msg)
 		return -1;
 	}
 
+	LM_DBG("routes index: %d\n", iavp->val.v.i);
+
 	srjson_InitDoc(&tdoc, NULL);
 
 	tdoc.root = srjson_Parse(&tdoc, javp->val.v.s.s);
@@ -651,12 +661,16 @@ int rtjson_next_route(sip_msg_t *msg)
 		nj = nj->next;
 		i++;
 	}
-	if(nj==NULL)
+	if(nj==NULL) {
+		LM_DBG("no route at index: %d\n", iavp->val.v.i);
 		goto error;
+	}
 
 	iavp->val.v.i++;
-	if(rtjson_append_branch(msg, &tdoc, nj)<0)
+	if(rtjson_append_branch(msg, &tdoc, nj)<0) {
+		LM_DBG("route index %d not appended\n", iavp->val.v.i);
 		goto error;
+	}
 
 	srjson_DestroyDoc(&tdoc);
 	return 0;

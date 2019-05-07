@@ -424,6 +424,8 @@ err:
 	if(dp != NULL) {
 		if(dp->uri.s != NULL)
 			shm_free(dp->uri.s);
+		if(dp->attrs.body.s != NULL)
+			shm_free(dp->attrs.body.s);
 		shm_free(dp);
 	}
 
@@ -480,6 +482,8 @@ err:
 	if(dp != NULL) {
 		if(dp->uri.s != NULL)
 			shm_free(dp->uri.s);
+		if(dp->attrs.body.s != NULL)
+			shm_free(dp->attrs.body.s);
 		shm_free(dp);
 	}
 
@@ -1878,7 +1882,7 @@ int ds_select_dst_limit(
 			}
 			break;
 		case DS_ALG_RANDOM: /* 6 - random selection */
-			hash = kam_rand() % idx->nr;
+			hash = kam_rand();
 			break;
 		case DS_ALG_HASHPV: /* 7 - hash on PV value */
 			if(ds_hash_pvar(msg, &hash) != 0) {
@@ -2362,7 +2366,6 @@ int ds_update_latency(int group, str *address, int code)
 int ds_get_state(int group, str *address)
 {
 	int i = 0;
-	int state = 0;
 	ds_set_t *idx = NULL;
 
 	if(_ds_list == NULL || _ds_list_nr <= 0) {
@@ -2381,11 +2384,11 @@ int ds_get_state(int group, str *address)
 				&& strncasecmp(idx->dlist[i].uri.s, address->s, address->len)
 						   == 0) {
 			/* destination address found */
-			state = idx->dlist[i].flags;
+			return idx->dlist[i].flags;
 		}
 		i++;
 	}
-	return state;
+	return 0;
 }
 
 /**
@@ -3031,6 +3034,10 @@ void ds_avl_destroy(ds_set_t **node_ptr)
 		if(dest->uri.s != NULL) {
 			shm_free(dest->uri.s);
 			dest->uri.s = NULL;
+		}
+		if (dest->attrs.body.s != NULL) {
+			shm_free(dest->attrs.body.s);
+			dest->attrs.body.s = NULL;
 		}
 	}
 	if(node->dlist != NULL)
