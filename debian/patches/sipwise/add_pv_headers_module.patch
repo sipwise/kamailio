@@ -1,6 +1,6 @@
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -15,7 +15,7 @@
+@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
  				   rtpproxy sanity sdpops siputils sl statistics textops \
  				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
@@ -28,7 +28,7 @@
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/src/modules/pv_headers/README
-@@ -0,0 +1,476 @@
+@@ -0,0 +1,488 @@
 +The pv_headers Module
 +
 +Kirill Solomko
@@ -94,6 +94,7 @@
 +        2.1. xavp_name (string)
 +        2.2. skip_headers (string)
 +        2.3. split_headers (string)
++        2.4. auto_msg (int)
 +
 +    3. Functions
 +
@@ -181,6 +182,17 @@
 +            Diversion: <user3@test.local>
 +        Becomes handy if used together with pv_modify_header() or pv_remove_header()
 +        to change or remove value 2 for instance.
++
++    2.4. auto_msg (int)
++
++2.4. auto_msg (int)
++
++    This parameter defines wether the headers are automatically collected for incoming
++    messages, as well as automatically applied for forwarded messages. It is enabled
++    by default and requires the 'tm' module to be loaded, otherwise the mode is disabled
++    and manual invocation of pv_collect_headers()/pv_apply_headers() is required.
++
++    Default: 1
 +
 +3. Functions
 +
@@ -507,7 +519,7 @@
 +            $var(test) = $x_rr;
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1991 @@
+@@ -0,0 +1,2075 @@
 +/*
 + * pv_headers
 + *
@@ -548,7 +560,9 @@
 +#include "../../core/parser/parse_from.h"
 +#include "../../core/parser/parse_uri.h"
 +#include "../../core/parser/msg_parser.h"
++#include "../../core/script_cb.h"
 +#include "../../modules/uac/api.h"
++#include "../../modules/tm/tm_load.h"
 +
 +MODULE_VERSION
 +
@@ -563,6 +577,7 @@
 +static int FL_PV_HDRS_APPLIED = 28;
 +
 +static uac_api_t uac;
++static tm_api_t tmb;
 +
 +static str xavp_name = str_init(XAVP_NAME);
 +
@@ -571,6 +586,7 @@
 +static str xavp_helper_name   = str_init("xavp_name");
 +static str skip_headers_param = str_init("Record-Route,Via,Route,Content-Length,Max-Forwards,CSeq");
 +static str split_headers_param = STR_NULL;
++static int auto_msg_param     = 1;
 +
 +static str single_headers_param = str_init("");
 +
@@ -590,8 +606,11 @@
 +static void destroy(void);
 +static int mod_init(void);
 +
-+static int pv_collect_headers(struct sip_msg *msg, char *_s1, char *_s2);
-+static int pv_apply_headers(struct sip_msg *msg, char *_s1, char *_s2);
++static void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params* params);
++static int  handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb);
++
++static int pv_collect_headers(struct sip_msg *msg, char *is_auto, char *_s2);
++static int pv_apply_headers(struct sip_msg *msg, char *is_auto, char *_s2);
 +static int pv_reset_headers(struct sip_msg *_m, char *_s1, char *_s2);
 +
 +static int pv_check_header(struct sip_msg *_m, char *hname, char *_s2);
@@ -688,6 +707,7 @@
 +    {"header_apply_flag", PARAM_INT, &FL_PV_HDRS_APPLIED},
 +    {"skip_headers", PARAM_STR, &skip_headers_param},
 +    {"split_headers", PARAM_STR, &split_headers_param},
++    {"auto_msg", PARAM_INT, &auto_msg_param},
 +    {0, 0, 0}
 +};
 +
@@ -714,6 +734,17 @@
 +        LM_NOTICE("could not bind to the 'uac' module, From/To headers will not be modifed\n");
 +    }
 +
++    if (load_tm_api(&tmb) < 0) {
++        LM_NOTICE("could not bind to the 'tm' module, automatic headers collect/apply is disabled\n");
++        auto_msg_param = 0;
++    } else {
++        if (auto_msg_param &&
++            register_script_cb(handle_msg_cb, PRE_SCRIPT_CB|REQUEST_CB, 0) < 0) {
++                LM_ERR("cannot register PRE_SCRIPT_CB callbacks\n");
++                return -1;
++        }
++    }
++
 +    if (header_value_size == 0) {
 +        LM_ERR("header_value_size must be >=0\n");
 +        return -1;
@@ -736,7 +767,55 @@
 +    LM_INFO("%s module unload...\n", MODULE_NAME);
 +}
 +
-+int pv_collect_headers(struct sip_msg *msg, char *_s1, char *_s2)
++void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params* params)
++{
++    struct sip_msg *msg = NULL;
++
++    switch (type) {
++        case TMCB_RESPONSE_IN:
++            msg = params->rpl;
++            if (msg) {
++                pv_reset_headers(msg, NULL, NULL);
++                pv_collect_headers(msg, "1", NULL);
++            }
++            return;
++        case TMCB_REQUEST_FWDED:
++            msg = params->req;
++            break;
++        case TMCB_RESPONSE_FWDED:
++            msg = params->rpl;
++            break;
++        default:
++            LM_ERR("unknown callback: %d\n", type);
++            return;
++    }
++
++    if (msg)
++        pv_apply_headers(msg, "1", NULL);
++
++    return;
++}
++
++int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
++{
++    int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN;
++
++    switch (flags) {
++        case PRE_SCRIPT_CB|REQUEST_CB:
++            if (tmb.register_tmcb( msg, 0, cbs, handle_tm_t, 0, 0) <=0) {
++                LM_ERR("cannot register TM callbacks\n");
++                return -1;
++            }
++            pv_collect_headers(msg, "1", NULL);
++            break;
++        default:
++            LM_ERR("unknown callback: %d\n", flags);
++    }
++
++    return 1;
++}
++
++int pv_collect_headers(struct sip_msg *msg, char *is_auto, char *_s2)
 +{
 +    struct hdr_field *hf = NULL;
 +    str name = STR_NULL;
@@ -748,9 +827,11 @@
 +
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if (isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1) {
-+        LM_ERR("headers are already collected\n");
-+        return -1;
++    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
++        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) ||
++         (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1))) {
++            LM_ERR("headers are already collected\n");
++            return -1;
 +    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -796,7 +877,8 @@
 +    pv_str_free(&name);
 +    pv_str_free(&val);
 +
-+    setbflag(br_idx, FL_PV_HDRS_COLLECTED);
++    msg->first_line.type == SIP_REPLY ? setflag(msg, FL_PV_HDRS_COLLECTED)
++                                      : setbflag(br_idx, FL_PV_HDRS_COLLECTED);
 +
 +    return 1;
 +
@@ -806,7 +888,7 @@
 +    return -1;
 +}
 +
-+int pv_apply_headers(struct sip_msg *msg, char *_s1, char *_s2)
++int pv_apply_headers(struct sip_msg *msg, char *is_auto, char *_s2)
 +{
 +    sr_xavp_t *xavp = NULL;
 +    sr_xavp_t *sub = NULL;
@@ -817,11 +899,15 @@
 +    str br_xname = STR_NULL;
 +    int br_idx;
 +
++    rm_hdrs.size = 0;
++
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if (isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) {
-+        LM_ERR("headers are already applied\n");
-+        return -1;
++    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
++        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_APPLIED) == 1) ||
++        (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1))) {
++            LM_ERR("headers are already applied\n");
++            return -1;
 +    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -853,7 +939,7 @@
 +
 +    if (str_hash_alloc(&rm_hdrs, pv_xavp_keys_count(&sub)) < 0) {
 +        LM_ERR("memory allocation error\n");
-+        return -1;
++        goto err;
 +    }
 +    str_hash_init(&rm_hdrs);
 +
@@ -955,13 +1041,14 @@
 +        }
 +    } while ((sub = sub->next) != NULL);
 +
-+    setbflag(br_idx, FL_PV_HDRS_APPLIED);
++    msg->first_line.type == SIP_REPLY ? setflag(msg, FL_PV_HDRS_APPLIED)
++                                      : setbflag(br_idx, FL_PV_HDRS_APPLIED);
 +
 +    pv_str_free(&display);
 +    pv_str_free(&uri);
 +    pv_str_free(&br_xname);
-+    pv_str_hash_free(&rm_hdrs);
-+
++    if (rm_hdrs.size)
++        pv_str_hash_free(&rm_hdrs);
 +
 +    return 1;
 +
@@ -969,7 +1056,8 @@
 +    pv_str_free(&display);
 +    pv_str_free(&uri);
 +    pv_str_free(&br_xname);
-+    pv_str_hash_free(&rm_hdrs);
++    if (rm_hdrs.size)
++        pv_str_hash_free(&rm_hdrs);
 +    return -1;
 +}
 +
@@ -988,8 +1076,13 @@
 +    pv_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
 +    pv_free_xavp(&br_xname);
 +
-+    resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
-+    resetbflag(br_idx, FL_PV_HDRS_APPLIED);
++    if (msg->first_line.type == SIP_REPLY) {
++        resetflag(msg, FL_PV_HDRS_COLLECTED);
++        resetflag(msg, FL_PV_HDRS_APPLIED);
++    } else {
++        resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
++        resetbflag(br_idx, FL_PV_HDRS_APPLIED);
++    }
 +
 +    pv_str_free(&br_xname);
 +
@@ -2433,6 +2526,9 @@
 +        br_idx_len = strlen(br_idx_s);
 +        memcpy(dst->s+os, ".", 1); os+=1;
 +        memcpy(dst->s+os, br_idx_s, br_idx_len); os+=br_idx_len;
++    }
++    if (msg->first_line.type == SIP_REPLY) {
++        memcpy(dst->s+os, ".r", 2); os+=2;
 +    }
 +    dst->len = os;
 +    dst->s[dst->len] = '\0';
