@@ -40,11 +40,14 @@ upstream/fix_db_redis_reconnect.patch
 sipwise/rtpengine-balancing.patch
 ## backport from kamailio upstream (5.2)
 upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
+upstream/topos_execute_event_route_topos_sending.patch
+## backport from kamailio upstream (5.3)
+upstream/limit_the_execution_of_dialplan_reload.patch
+#
 sipwise/extend_stats.patch
 sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
-upstream/topos_execute_event_route_topos_sending.patch
 sipwise/sca-fix-memleaks.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/db_redis_fix_scan_usage.patch
