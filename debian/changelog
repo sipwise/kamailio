@@ -1,3 +1,33 @@
+ngcp-kamailio (5.1.7-1+0~mr7.2.3.0) unstable; urgency=medium
+
+  [ Kirill Solomko ]
+  * [e735002] TT#55003 pv_headers: fix $x_hdr pv_parse_header_name
+  * [e68d94e] TT#55601 pv_headers change pv spec parsing
+  * [2f2f400] TT#47971 pv_headers: add isolation for branches
+  * [a937823] TT#56515 pv_headers fix get_branch_index
+  * [1080387] TT#56483 pv_headers add support for int rvalue
+  * [5a708a0] TT#57100 pv_headers adjust branches handling
+  * [edcb9aa] TT#57100 pv_headers fix parsed data clone
+  * [74577f1] TT#57100 pv_headers fix multi header duplication
+  * [d9123af] TT#57300 pv_headers: fix pv_xavp_get_child()
+  * [f71c675] TT#57300 pv_headers adjust branch index internal position
+  * [2de8b21] TT#57502 pv_headers: skip From/To change when value is unchanged
+  * [a90b17b] TT#57701 pv_headers add reply status/reason change support
+
+  [ Marco Capetta ]
+  * [3cd21cc] TT#54256 Fix dialplan errors if rwr contains avps
+  * [0054ead] TT#56343 Fix crash calculating packet stats
+
+  [ Guillem Jover ]
+  * [8009306] TT#23584 Honor parallel build support
+
+  [ Andrew Pogrebennyk ]
+  * [78f535d] TT#55859 debian/control: Build-Depends on libssl1.0
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 03 Jun 2019 15:03:58 +0200
+
 ngcp-kamailio (5.1.7-1+0~mr7.2.2.0) unstable; urgency=medium
 
   [ Kirill Solomko ]
