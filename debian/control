@@ -5,7 +5,7 @@ Maintainer: Sipwise Development Team <support@sipwise.com>
 Build-Depends:
  bison,
  debhelper (>= 10),
- default-libmysqlclient-dev | libmysqlclient-dev,
+ default-libmysqlclient-dev,
  dh-systemd (>= 1.5),
  docbook-xml,
  dpkg-dev (>= 1.16.1.1),
@@ -31,7 +31,7 @@ Build-Depends:
  libperl-dev,
  libpq-dev,
  librabbitmq-dev,
- libradcli-dev | libfreeradius-client-dev,
+ libradcli-dev,
  libreadline-dev,
  libsasl2-dev,
  libsctp-dev [linux-any],
