@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
 Build-Depends:
  bison,
- debhelper (>= 10),
+ debhelper-compat (= 12),
  default-libmysqlclient-dev,
  dh-systemd (>= 1.5),
  docbook-xml,
