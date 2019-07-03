@@ -13,7 +13,7 @@ License: GPL-2.0+
  License version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
 
 Files: debian/*
-Copyright: 2013-2014 Sipwise Development Team <support@sipwise.com>
+Copyright: 2013-2019 Sipwise Development Team <support@sipwise.com>
            2012, Victor Seva <linuxmaniac@torreviejawireless.org>
            2009, 2010, 2011, Daniel-Constantin Mierla <miconda@gmail.com>
            2010, Jon Bonilla <manwe@aholab.ehu.es>
