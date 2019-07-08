@@ -39,7 +39,8 @@
 
 #include "redis_client.h"
 
-#define redisCommandNR(a...) (int)({ void *__tmp; __tmp = redisCommand(a); if (__tmp) freeReplyObject(__tmp); __tmp ? 0 : -1;})
+#define redisCommandNR(a...) (int)({ void *__tmp; __tmp = redisCommand(a); \
+		if (__tmp) freeReplyObject(__tmp); __tmp ? 0 : -1;})
 
 static redisc_server_t * _redisc_srv_list=NULL;
 
@@ -52,6 +53,7 @@ extern int redis_cluster_param;
 extern int redis_disable_time_param;
 extern int redis_allowed_timeouts_param;
 extern int redis_flush_on_reconnect_param;
+extern int redis_allow_dynamic_nodes_param;
 
 /* backwards compatibility with hiredis < 0.12 */
 #if (HIREDIS_MAJOR == 0) && (HIREDIS_MINOR < 12)
@@ -67,9 +69,10 @@ int redis_append_formatted_command(redisContext *c, const char *cmd, size_t len)
  */
 int redisc_init(void)
 {
-	char addr[256], pass[256], unix_sock_path[256];
+	char addr[256], pass[256], unix_sock_path[256], sentinel_group[256];
 
-	unsigned int port, db, sock = 0, haspass = 0;
+	unsigned int port, db, sock = 0, haspass = 0, sentinel_master = 1;
+	int i, row;
 	redisc_server_t *rsrv=NULL;
 	param_t *pit = NULL;
 	struct timeval tv_conn;
@@ -89,6 +92,9 @@ int redisc_init(void)
 
 	for(rsrv=_redisc_srv_list; rsrv; rsrv=rsrv->next)
 	{
+		char sentinels[MAXIMUM_SENTINELS][256];
+		uint8_t sentinels_count = 0;
+
 		port = 6379;
 		db = 0;
 		haspass = 0;
@@ -101,10 +107,12 @@ int redisc_init(void)
 		for (pit = rsrv->attrs; pit; pit=pit->next)
 		{
 			if(pit->name.len==4 && strncmp(pit->name.s, "unix", 4)==0) {
-				snprintf(unix_sock_path, sizeof(unix_sock_path)-1, "%.*s", pit->body.len, pit->body.s);
+				snprintf(unix_sock_path, sizeof(unix_sock_path)-1, "%.*s",
+						pit->body.len, pit->body.s);
 				sock = 1;
 			} else if(pit->name.len==4 && strncmp(pit->name.s, "addr", 4)==0) {
-				snprintf(addr, sizeof(addr)-1, "%.*s", pit->body.len, pit->body.s);
+				snprintf(addr, sizeof(addr)-1, "%.*s",
+						pit->body.len, pit->body.s);
 			} else if(pit->name.len==4 && strncmp(pit->name.s, "port", 4)==0) {
 				if(str2int(&pit->body, &port) < 0)
 					port = 6379;
@@ -112,8 +120,87 @@ int redisc_init(void)
 				if(str2int(&pit->body, &db) < 0)
 					db = 0;
 			} else if(pit->name.len==4 && strncmp(pit->name.s, "pass", 4)==0) {
-				snprintf(pass, sizeof(pass)-1, "%.*s", pit->body.len, pit->body.s);
+				snprintf(pass, sizeof(pass)-1, "%.*s",
+						pit->body.len, pit->body.s);
 				haspass = 1;
+			} else if(pit->name.len==14 && strncmp(pit->name.s,
+						"sentinel_group", 14)==0) {
+				snprintf(sentinel_group, sizeof(sentinel_group)-1, "%.*s",
+						pit->body.len, pit->body.s);
+			} else if(pit->name.len==15 && strncmp(pit->name.s,
+						"sentinel_master", 15)==0) {
+				if(str2int(&pit->body, &sentinel_master) < 0)
+					sentinel_master = 1;
+			} else if(pit->name.len==8 && strncmp(pit->name.s,
+						"sentinel", 8)==0) {
+				if( sentinels_count < MAXIMUM_SENTINELS ){
+					snprintf(sentinels[sentinels_count],
+							sizeof(sentinels[sentinels_count])-1, "%.*s",
+							pit->body.len, pit->body.s);
+					sentinels_count++;
+				}
+				else {
+					LM_ERR("too many sentinels, maximum %d supported.\n",
+							MAXIMUM_SENTINELS);
+					return -1;
+				}
+			}
+		}
+
+		// if sentinels are provided, we need to connect to them and retrieve the redis server
+		// address / port
+		if(sentinels_count > 0) {
+			for(i= 0; i< sentinels_count; i++) {
+				char *sentinelAddr = sentinels[i];
+				char *pos;
+				redisContext *redis;
+				redisReply *res, *res2;
+
+				port = 6379;
+				if( (pos = strchr(sentinelAddr, ':')) != NULL ) {
+					port = atoi(pos+1);
+					pos[i] = '\0';
+				}
+
+				redis = redisConnectWithTimeout(sentinelAddr, port, tv_conn);
+				if( redis ) {
+					if(sentinel_master != 0) {
+						res = redisCommand(redis,
+								"SENTINEL get-master-addr-by-name %s",
+								sentinel_group);
+						if( res && (res->type == REDIS_REPLY_ARRAY)
+								&& (res->elements == 2) ) {
+							strncpy(addr, res->element[0]->str,
+									res->element[0]->len + 1);
+							port = atoi(res->element[1]->str);
+							LM_DBG("sentinel replied: %s:%d\n", addr, port);
+						}
+					}
+					else {
+						res = redisCommand(redis, "SENTINEL slaves %s",
+								sentinel_group);
+						if( res && (res->type == REDIS_REPLY_ARRAY) ) {
+							for(row = 0; row< res->elements; row++){
+								res2 = res->element[row];
+								for(i= 0; i< res2->elements; i+= 2) {
+									if( strncmp(res2->element[i]->str,
+												"ip", 2) == 0 ) {
+										strncpy(addr, res2->element[i+1]->str,
+												res2->element[i+1]->len);
+										addr[res2->element[i+1]->len] = '\0';
+									}
+									else if( strncmp(res2->element[i]->str,
+												"port", 4) == 0) {
+										port = atoi(res2->element[i+1]->str);
+										break;
+									}
+								}
+							}
+							LM_DBG("slave for %s: %s:%d\n", sentinel_group,
+									addr, port);
+						}
+					}
+				}
 			}
 		}
 
@@ -133,7 +220,8 @@ int redisc_init(void)
 			goto err;
 		}
 		if (rsrv->ctxRedis->err) {
-			LM_ERR("Failed to create REDIS returned an error: %s\n", rsrv->ctxRedis->errstr);
+			LM_ERR("Failed to create REDIS returned an error: %s\n",
+					rsrv->ctxRedis->errstr);
 			goto err2;
 		}
 		if ((haspass != 0) && redisc_check_auth(rsrv, pass)) {
@@ -145,11 +233,14 @@ int redisc_init(void)
 			goto err2;
 		}
 		if (redisCommandNR(rsrv->ctxRedis, "PING")) {
-			LM_ERR("Failed to send PING (REDIS returned %s).\n", rsrv->ctxRedis->errstr);
+			LM_ERR("Failed to send PING (REDIS returned %s).\n",
+					rsrv->ctxRedis->errstr);
 			goto err2;
 		}
-		if ((redis_cluster_param == 0) && redisCommandNR(rsrv->ctxRedis, "SELECT %i", db)) {
-			LM_ERR("Failed to send \"SELECT %i\" (REDIS returned \"%s\", and not in cluster mode).\n", db, rsrv->ctxRedis->errstr);
+		if ((redis_cluster_param == 0) && redisCommandNR(rsrv->ctxRedis,
+					"SELECT %i", db)) {
+			LM_ERR("Failed to send \"SELECT %i\" (REDIS returned \"%s\","
+					" and not in cluster mode).\n", db, rsrv->ctxRedis->errstr);
 			goto err2;
 		}
 	}
@@ -262,6 +353,7 @@ int redisc_add_server(char *spec)
 	}
 	memset(rsrv, 0, sizeof(redisc_server_t));
 	rsrv->attrs = pit;
+	rsrv->spec = spec;
 	for (pit = rsrv->attrs; pit; pit=pit->next)
 	{
 		if(pit->name.len==4 && strncmp(pit->name.s, "name", 4)==0) {
@@ -300,7 +392,8 @@ redisc_server_t *redisc_get_server(str *name)
 	rsrv=_redisc_srv_list;
 	while(rsrv!=NULL)
 	{
-		LM_DBG("Entry %u (%.*s)\n", rsrv->hname, rsrv->sname->len, rsrv->sname->s);
+		LM_DBG("Entry %u (%.*s)\n", rsrv->hname,
+				rsrv->sname->len, rsrv->sname->s);
 		if(rsrv->hname==hname && rsrv->sname->len==name->len
 				&& strncmp(rsrv->sname->s, name->s, name->len)==0)
 			return rsrv;
@@ -335,7 +428,8 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 	for (pit = rsrv->attrs; pit; pit=pit->next)
 	{
 		if(pit->name.len==4 && strncmp(pit->name.s, "unix", 4)==0) {
-			snprintf(unix_sock_path, sizeof(unix_sock_path)-1, "%.*s", pit->body.len, pit->body.s);
+			snprintf(unix_sock_path, sizeof(unix_sock_path)-1, "%.*s",
+					pit->body.len, pit->body.s);
 			sock = 1;
 		} else if(pit->name.len==4 && strncmp(pit->name.s, "addr", 4)==0) {
 			snprintf(addr, sizeof(addr)-1, "%.*s", pit->body.len, pit->body.s);
@@ -373,7 +467,8 @@ int redisc_reconnect_server(redisc_server_t *rsrv)
 		goto err2;
 	if (redisCommandNR(rsrv->ctxRedis, "PING"))
 		goto err2;
-	if ((redis_cluster_param == 0) && redisCommandNR(rsrv->ctxRedis, "SELECT %i", db))
+	if ((redis_cluster_param == 0) && redisCommandNR(rsrv->ctxRedis,
+				"SELECT %i", db))
 		goto err2;
 	if (redis_flush_on_reconnect_param)
 		if (redisCommandNR(rsrv->ctxRedis, "FLUSHALL"))
@@ -437,7 +532,8 @@ int redisc_append_cmd(str *srv, str *res, str *cmd, ...)
 	}
 	if (rsrv->piped.pending_commands >= MAXIMUM_PIPELINED_COMMANDS)
 	{
-		LM_ERR("Too many pipelined commands, maximum is %d\n",MAXIMUM_PIPELINED_COMMANDS);
+		LM_ERR("Too many pipelined commands, maximum is %d\n",
+				MAXIMUM_PIPELINED_COMMANDS);
 		goto error_cmd;
 	}
 	rpl = redisc_get_reply(res);
@@ -512,17 +608,21 @@ int redisc_create_pipelined_message(redisc_server_t *rsrv)
 
 	if (rsrv->ctxRedis->err)
 	{
-		LM_DBG("Reconnecting server because of error %d: \"%s\"",rsrv->ctxRedis->err,rsrv->ctxRedis->errstr);
+		LM_DBG("Reconnecting server because of error %d: \"%s\"",
+				rsrv->ctxRedis->err,rsrv->ctxRedis->errstr);
 		if (redisc_reconnect_server(rsrv))
 		{
-			LM_ERR("unable to reconnect to REDIS server: %.*s\n", rsrv->sname->len,rsrv->sname->s);
+			LM_ERR("unable to reconnect to REDIS server: %.*s\n",
+					rsrv->sname->len,rsrv->sname->s);
 			return -1;
 		}
 	}
 
 	for (i=0;i<rsrv->piped.pending_commands;i++)
 	{
-		if (redis_append_formatted_command(rsrv->ctxRedis,rsrv->piped.commands[i].s,rsrv->piped.commands[i].len) != REDIS_OK)
+		if (redis_append_formatted_command(rsrv->ctxRedis,
+					rsrv->piped.commands[i].s,rsrv->piped.commands[i].len)
+						!= REDIS_OK)
 		{
 			LM_ERR("Error while appending command %d",i);
 			return -1;
@@ -568,7 +668,8 @@ int redisc_exec_pipelined(redisc_server_t *rsrv)
 	}
 	if(rsrv->ctxRedis==NULL)
 	{
-		LM_ERR("no redis context for server: %.*s\n", rsrv->sname->len,rsrv->sname->s);
+		LM_ERR("no redis context for server: %.*s\n",
+				rsrv->sname->len,rsrv->sname->s);
 		goto error_exec;
 	}
 
@@ -620,7 +721,8 @@ int redisc_exec_pipelined(redisc_server_t *rsrv)
 			freeReplyObject(rpl->rplRedis);
 			rpl->rplRedis = NULL;
 		}
-		if (redisGetReplyFromReader(rsrv->ctxRedis, (void**) &rpl->rplRedis) != REDIS_OK)
+		if (redisGetReplyFromReader(rsrv->ctxRedis, (void**) &rpl->rplRedis)
+				!= REDIS_OK)
 		{
 			LM_ERR("Unable to read reply\n");
 			continue;
@@ -646,43 +748,106 @@ srv_disabled:
 	return -2;
 }
 
-int check_cluster_reply(redisReply *reply, redisc_server_t **rsrv) {
+int check_cluster_reply(redisReply *reply, redisc_server_t **rsrv)
+{
 	redisc_server_t *rsrv_new;
 	char buffername[100];
 	unsigned int port;
 	str addr = {0, 0}, tmpstr = {0, 0}, name = {0, 0};
-	if (redis_cluster_param) {
-		LM_DBG("Redis replied: \"%.*s\"\n", reply->len, reply->str);
-		if ((reply->len > 7) && (strncmp(reply->str, "MOVED", 5) == 0)) {
+	int server_len = 0;
+	char spec_new[100];
+
+	if(redis_cluster_param) {
+		LM_DBG("Redis replied: \"%.*s\"\n", (int)reply->len, reply->str);
+		if((reply->len > 7) && (strncmp(reply->str, "MOVED", 5) == 0)) {
 			port = 6379;
-			if (strchr(reply->str, ':') > 0) {
+			if(strchr(reply->str, ':') > 0) {
 				tmpstr.s = strchr(reply->str, ':') + 1;
 				tmpstr.len = reply->len - (tmpstr.s - reply->str);
 				if(str2int(&tmpstr, &port) < 0)
 					port = 6379;
-				LM_DBG("Port \"%.*s\" [%i] => %i\n", tmpstr.len, tmpstr.s, tmpstr.len, port);
+				LM_DBG("Port \"%.*s\" [%i] => %i\n", tmpstr.len, tmpstr.s,
+						tmpstr.len, port);
 			} else {
-				LM_ERR("No Port in REDIS MOVED Reply (%.*s)\n", reply->len, reply->str);
+				LM_ERR("No Port in REDIS MOVED Reply (%.*s)\n", (int)reply->len,
+						reply->str);
 				return 0;
 			}
-			if (strchr(reply->str+6, ' ') > 0) {
-				addr.len = tmpstr.s - strchr(reply->str+6, ' ') - 2;
-				addr.s = strchr(reply->str+6, ' ') + 1;
+			if(strchr(reply->str + 6, ' ') > 0) {
+				addr.len = tmpstr.s - strchr(reply->str + 6, ' ') - 2;
+				addr.s = strchr(reply->str + 6, ' ') + 1;
 				LM_DBG("Host \"%.*s\" [%i]\n", addr.len, addr.s, addr.len);
 			} else {
-				LM_ERR("No Host in REDIS MOVED Reply (%.*s)\n", reply->len, reply->str);
+				LM_ERR("No Host in REDIS MOVED Reply (%.*s)\n", (int)reply->len,
+						reply->str);
 				return 0;
 			}
 
 			memset(buffername, 0, sizeof(buffername));
-			name.len = snprintf(buffername, sizeof(buffername), "%.*s:%i", addr.len, addr.s, port);
+			name.len = snprintf(buffername, sizeof(buffername), "%.*s:%i",
+					addr.len, addr.s, port);
 			name.s = buffername;
 			LM_DBG("Name of new connection: %.*s\n", name.len, name.s);
 			rsrv_new = redisc_get_server(&name);
-			if (rsrv_new) {
+			if(rsrv_new) {
 				LM_DBG("Reusing Connection\n");
 				*rsrv = rsrv_new;
 				return 1;
+			} else if(redis_allow_dynamic_nodes_param) {
+				/* New param redis_allow_dynamic_nodes_param:
+				* if set, we allow ndb_redis to add nodes that were
+				* not defined explicitly in the module configuration */
+				char *server_new;
+
+				memset(spec_new, 0, sizeof(spec_new));
+				/* For now the only way this can work is if
+				 * the new node is accessible with default
+				 * parameters for sock and db */
+				server_len = snprintf(spec_new, sizeof(spec_new) - 1,
+						"name=%.*s;addr=%.*s;port=%i", name.len, name.s,
+						addr.len, addr.s, port);
+
+				if(server_len<0 || server_len>sizeof(spec_new) - 1) {
+					LM_ERR("failed to print server spec string\n");
+					return 0;
+				}
+				server_new = (char *)pkg_malloc(server_len + 1);
+				if(server_new == NULL) {
+					LM_ERR("Error allocating pkg mem\n");
+					return 0;
+				}
+
+				strncpy(server_new, spec_new, server_len);
+				server_new[server_len] = '\0';
+
+				if(redisc_add_server(server_new) == 0) {
+					rsrv_new = redisc_get_server(&name);
+
+					if(rsrv_new) {
+						*rsrv = rsrv_new;
+						/* Need to connect to the new server now */
+						if(redisc_reconnect_server(rsrv_new) == 0) {
+							LM_DBG("Connected to the new server with name: "
+								   "%.*s\n",
+									name.len, name.s);
+							return 1;
+						} else {
+							LM_ERR("ERROR connecting to the new server with "
+								   "name: %.*s\n",
+									name.len, name.s);
+							return 0;
+						}
+					} else {
+						/* Adding the new node failed
+						 * - cannot perform redirection */
+						LM_ERR("No new connection with name (%.*s) was "
+								"created\n", name.len, name.s);
+					}
+				} else {
+					LM_ERR("Could not add a new connection with name %.*s\n",
+							name.len, name.s);
+					pkg_free(server_new);
+				}
 			} else {
 				LM_ERR("No Connection with name (%.*s)\n", name.len, name.s);
 			}
@@ -1044,7 +1209,8 @@ int redis_check_server(redisc_server_t *rsrv)
 	{
 		if (get_ticks() > rsrv->disable.restore_tick)
 		{
-			LM_NOTICE("REDIS server %.*s re-enabled",rsrv->sname->len,rsrv->sname->s);
+			LM_NOTICE("REDIS server %.*s re-enabled",
+					rsrv->sname->len, rsrv->sname->s);
 			rsrv->disable.disabled = 0;
 			rsrv->disable.consecutive_errors = 0;
 		}
@@ -1068,7 +1234,8 @@ int redis_count_err_and_disable(redisc_server_t *rsrv)
 	{
 		rsrv->disable.disabled=1;
 		rsrv->disable.restore_tick=get_ticks() + redis_disable_time_param;
-		LM_WARN("REDIS server %.*s disabled for %d seconds",rsrv->sname->len,rsrv->sname->s,redis_disable_time_param);
+		LM_WARN("REDIS server %.*s disabled for %d seconds", rsrv->sname->len,
+				rsrv->sname->s, redis_disable_time_param);
 		return 1;
 	}
 	return 0;
@@ -1109,7 +1276,8 @@ void print_redis_reply(int log_level, redisReply *rpl,int offset)
 		LOG(log_level,"%sinteger reply: %lld", padding, rpl->integer);
 		break;
 	case REDIS_REPLY_ARRAY:
-		LOG(log_level,"%sarray reply with %d elements", padding, (int)rpl->elements);
+		LOG(log_level,"%sarray reply with %d elements", padding,
+				(int)rpl->elements);
 		for (i=0; i < rpl->elements; i++)
 		{
 			LOG(log_level,"%selement %d:",padding,i);

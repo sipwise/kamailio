@@ -119,6 +119,15 @@ int db_mongodb_bson_filter_add(bson_t *doc, const db_key_t* _k, const db_op_t* _
 			}
 			break;
 
+		case DB1_UINT:
+			if(!bson_append_int32(&mdoc, ocmp.s, ocmp.len,
+						(int)VAL_UINT(tval))) {
+				LM_ERR("failed to append uint to bson doc %.*s %s %u [%d]\n",
+						tkey->len, tkey->s, ocmp.s, VAL_UINT(tval), idx);
+				goto error;
+			}
+			break;
+
 		case DB1_BIGINT:
 			if(!bson_append_int64(&mdoc, ocmp.s, ocmp.len,
 						VAL_BIGINT(tval ))) {
@@ -126,7 +135,16 @@ int db_mongodb_bson_filter_add(bson_t *doc, const db_key_t* _k, const db_op_t* _
 						tkey->len, tkey->s, ocmp.s, VAL_BIGINT(tval), idx);
 				goto error;
 			}
-			return -1;
+			break;
+
+		case DB1_UBIGINT:
+			if(!bson_append_int64(&mdoc, ocmp.s, ocmp.len,
+						(long long int)VAL_UBIGINT(tval ))) {
+				LM_ERR("failed to append ubigint to bson doc %.*s %s %llu [%d]\n",
+						tkey->len, tkey->s, ocmp.s, VAL_UBIGINT(tval), idx);
+				goto error;
+			}
+			break;
 
 		case DB1_DOUBLE:
 			if(!bson_append_double(&mdoc, ocmp.s, ocmp.len,
@@ -226,6 +244,15 @@ int db_mongodb_bson_add(bson_t *doc, const db_key_t _k, const db_val_t *_v, int 
 			}
 			break;
 
+		case DB1_UINT:
+			if(!bson_append_int32(doc, _k->s, _k->len,
+						(int)VAL_INT(_v))) {
+				LM_ERR("failed to append uint to bson doc %.*s = %u [%d]\n",
+						_k->len, _k->s, VAL_INT(_v), idx);
+				goto error;
+			}
+			break;
+
 		case DB1_BIGINT:
 			if(!bson_append_int64(doc, _k->s, _k->len,
 						VAL_BIGINT(_v ))) {
@@ -233,7 +260,16 @@ int db_mongodb_bson_add(bson_t *doc, const db_key_t _k, const db_val_t *_v, int 
 						_k->len, _k->s, VAL_BIGINT(_v), idx);
 				goto error;
 			}
-			return -1;
+			break;
+
+		case DB1_UBIGINT:
+			if(!bson_append_int64(doc, _k->s, _k->len,
+						(long long int)VAL_BIGINT(_v ))) {
+				LM_ERR("failed to append ubigint to bson doc %.*s = %llu [%d]\n",
+						_k->len, _k->s, VAL_UBIGINT(_v), idx);
+				goto error;
+			}
+			break;
 
 		case DB1_DOUBLE:
 			if(!bson_append_double(doc, _k->s, _k->len,
@@ -468,13 +504,18 @@ int db_mongodb_get_columns(const db1_con_t* _h, db1_res_t* _r)
 				RES_TYPES(_r)[col] = DB1_STRING;
 				break;
 
+			case BSON_TYPE_NULL:
+				/* 'null' value - default to type DB1_STRING */
+				LM_DBG("BSON_TYPE_NULL - use DB1_STRING result type\n");
+				RES_TYPES(_r)[col] = DB1_STRING;
+				break;
+
 #if 0
 			case BSON_TYPE_EOD:
 			case BSON_TYPE_DOCUMENT:
 			case BSON_TYPE_ARRAY:
 			case BSON_TYPE_UNDEFINED:
 			case BSON_TYPE_OID:
-			case BSON_TYPE_NULL:
 			case BSON_TYPE_REGEX:
 			case BSON_TYPE_DBPOINTER:
 			case BSON_TYPE_CODE:
@@ -504,6 +545,8 @@ int db_mongodb_get_columns(const db1_con_t* _h, db1_res_t* _r)
  * \brief Convert rows from mongodb to db API representation
  * \param _h database connection
  * \param _r database result set
+ * \param _row number of rows
+ * \param _rdoc binary json structure
  * \return 0 on success, negative on failure
  */
 static int db_mongodb_convert_bson(const db1_con_t* _h, db1_res_t* _r,

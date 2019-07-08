@@ -90,14 +90,12 @@ struct module_exports exports= {
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	0,
 	params,
-	0,          /* exported statistics */
-	0,          /* exported MI functions */
-	0,          /* exported pseudo-variables */
-	0,          /* extra processes */
-	mod_init,   /* module initialization function */
+	0,           /* exported RPC methods */
+	0,           /* exported pseudo-variables */
 	0,
-	0,
-	child_init  /* per-child init function */
+	mod_init,    /* module initialization function */
+	child_init,  /* per-child init function */
+	0
 };
 
 
@@ -203,7 +201,7 @@ void stm_timer_exec(unsigned int ticks, void *param)
 		if(keng==NULL) {
 			run_top_route(main_rt.rlist[rt->route], fmsg, 0);
 		} else {
-			if(keng->froute(fmsg, EVENT_ROUTE, &rt->route_name, &evname)<0) {
+			if(sr_kemi_route(keng, fmsg, EVENT_ROUTE, &rt->route_name, &evname)<0) {
 				LM_ERR("error running event route kemi callback [%.*s]\n",
 						rt->route_name.len, rt->route_name.s);
 			}

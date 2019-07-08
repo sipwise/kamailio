@@ -92,14 +92,12 @@ struct module_exports exports= {
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	cmds,
 	params,
-	0,          /* exported statistics */
-	0,          /* exported MI functions */
+	0,          /* exported RPC methods */
 	0,          /* exported pseudo-variables */
-	0,          /* extra processes */
+	0,          /* response handling function */
 	mod_init,
-	0,
-	0,
-	0           /* per-child init function */
+	0,          /* per-child init function */
+	0
 };
 /* clang-format on */
 
@@ -176,16 +174,11 @@ static int w_process_maxfwd_header(struct sip_msg *msg, char *str1, char *str2)
 /**
  *
  */
-static int is_maxfwd_lt(struct sip_msg *msg, char *slimit, char *foo)
+static int ki_is_maxfwd_lt(sip_msg_t *msg, int limit)
 {
 	str mf_value;
-	int limit = 70;
 	int val;
 
-	if(get_int_fparam(&limit, msg, (fparam_t *)slimit) < 0) {
-		LM_ERR("could not get param value\n");
-		return -1;
-	}
 	if(limit < 0 || limit > 255) {
 		LM_ERR("invalid param value: %d\n", limit);
 		return -1;
@@ -202,6 +195,21 @@ static int is_maxfwd_lt(struct sip_msg *msg, char *slimit, char *foo)
 	}
 
 	return 1;
+}
+
+
+/**
+ *
+ */
+static int is_maxfwd_lt(struct sip_msg *msg, char *slimit, char *foo)
+{
+	int limit = 70;
+
+	if(get_int_fparam(&limit, msg, (fparam_t *)slimit) < 0) {
+		LM_ERR("could not get param value\n");
+		return -1;
+	}
+	return ki_is_maxfwd_lt(msg, limit);
 }
 
 /**
@@ -222,13 +230,19 @@ int bind_maxfwd(maxfwd_api_t *api)
  *
  */
 static sr_kemi_t sr_kemi_maxfwd_exports[] = {
-		{ str_init("maxfwd"), str_init("process_maxfwd"),
-		    SR_KEMIP_INT, process_maxfwd_header,
-			{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
-			    SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
-        },
+	{ str_init("maxfwd"), str_init("process_maxfwd"),
+		SR_KEMIP_INT, process_maxfwd_header,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("maxfwd"), str_init("is_maxfwd_lt"),
+		SR_KEMIP_INT, ki_is_maxfwd_lt,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 
-		{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}};
+	{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}
+};
 
 /**
  *

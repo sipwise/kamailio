@@ -135,6 +135,7 @@
 #include "core/dset.h"
 #include "core/timer_proc.h"
 #include "core/srapi.h"
+#include "core/receive.h"
 
 #ifdef DEBUG_DMALLOC
 #include <dmalloc.h>
@@ -504,6 +505,21 @@ char* pgid_file = 0;
 char *sr_memmng_pkg = NULL;
 char *sr_memmng_shm = NULL;
 
+static int *_sr_instance_started = NULL;
+
+/**
+ * return 1 if all child processes were forked
+ * - note: they might still be in init phase (i.e., child init)
+ * - note: see also sr_insance_ready()
+ */
+int sr_instance_started(void)
+{
+	if(_sr_instance_started!=NULL && *_sr_instance_started==1) {
+		return 1;
+	}
+	return 0;
+}
+
 /* call it before exiting; if show_status==1, mem status is displayed */
 void cleanup(int show_status)
 {
@@ -547,6 +563,7 @@ void cleanup(int show_status)
 #endif
 	destroy_timer();
 	pv_destroy_api();
+	ksr_route_locks_set_destroy();
 	destroy_script_cb();
 	destroy_nonsip_hooks();
 	destroy_routes();
@@ -1268,6 +1285,14 @@ int main_loop(void)
 	int nrprocs;
 	int woneinit;
 
+	if(_sr_instance_started == NULL) {
+		_sr_instance_started = shm_malloc(sizeof(int));
+		if(_sr_instance_started == NULL) {
+			LM_ERR("no shared memory\n");
+			goto error;
+		}
+		*_sr_instance_started = 0;
+	}
 	/* one "main" process and n children handling i/o */
 	if (dont_fork){
 #ifdef STATS
@@ -1430,6 +1455,7 @@ int main_loop(void)
 			LM_ERR("init_child failed\n");
 			goto error;
 		}
+		*_sr_instance_started = 1;
 		return udp_rcv_loop();
 	}else{ /* fork: */
 
@@ -1744,6 +1770,8 @@ int main_loop(void)
 		cfg_child_no_cb_init();
 		cfg_ok=1;
 
+		*_sr_instance_started = 1;
+
 #ifdef EXTRA_DEBUG
 		for (r=0; r<*process_count; r++){
 			fprintf(stderr, "% 3d   % 5d - %s\n", r, pt[r].pid, pt[r].desc);
@@ -1956,6 +1984,8 @@ int main(int argc, char** argv)
 #ifdef USE_TCP
 	init_tcp_options(); /* set the defaults before the config */
 #endif
+
+	pp_define_core();
 
 	/* process command line (cfg. file path etc) */
 	optind = 1;  /* reset getopt */
@@ -2340,6 +2370,9 @@ try_again:
 
 	/* reinit if pv buffer size has been set in config */
 	if (pv_reinit_buffer()<0)
+		goto error;
+
+	if (ksr_route_locks_set_init()<0)
 		goto error;
 
 	/* init lookup for core event routes */

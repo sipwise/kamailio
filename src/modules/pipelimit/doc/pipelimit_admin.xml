@@ -21,7 +21,7 @@
 	<para>
 		The module defines in an abstract mode the notion of 'pipe',
 		which can be a reference to an IP address, to a network or a trunk.
-		The associtiation of traffic to a pipe is done in the config file,
+		The association of traffic to a pipe is done in the config file,
 		therefore, a pipe could represent SIP traffic coming from a user or
 		the flow of specific SIP requests such as INVITE or REGISTER.
 	</para>
@@ -32,6 +32,7 @@
 		new module which is focused on just traffic shaping policies, the
 		implementation of queues was discarded.
 	</para>
+	</section>
 	<section>
 		<title>Algorithms</title>
 		<para>
@@ -90,7 +91,6 @@
 			going up/down instantly by thousands - it takes up to 20 seconds for
 			the controller to adapt to the new request rate.
 		</para>
-	</section>
 	</section>
 	<section>
 	<title>Dependencies</title>
@@ -258,7 +258,7 @@ modparam("pipelimit", "plp_algorithm_column", "name")
 		each timer_interval, therefore the amounts of messages have to be divided
 		by this timer_interval value to get the messages per second value. For
 		example, if you want to allow an average of 10 messages per second with
-		a timer inteval of 10 seconds, then the limit value has to be 100.
+		a timer interval of 10 seconds, then the limit value has to be 100.
 		</para>
 		<para>
 		Note: A too small value may lead to performance penalties due to
@@ -274,6 +274,47 @@ modparam("pipelimit", "plp_algorithm_column", "name")
 		<programlisting format="linespecific">
 ...
 modparam("pipelimit", "timer_interval", 5)
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="pipelimit.p.timer_mode">
+		<title><varname>timer_mode</varname> (integer)</title>
+		<para>
+		Control what timer process to be used: 0 - use main fast timer; 1 - use
+		secondary wheel timer.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>timer_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pipelimit", "timer_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="pipelimit.p.load_fetch">
+		<title><varname>load_fetch</varname> (integer)</title>
+		<para>
+		Control if the module should fetch the load for CPU and network traffic.
+		If set to 0, no load is fetched; if set to 1, the load is fetched every
+		timer interval.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 1.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>load_fetch</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pipelimit", "load_fetch", 0)
 ...
 </programlisting>
 		</example>
@@ -339,6 +380,36 @@ modparam("pipelimit", "reply_reason", "Limiting")
 		</programlisting>
 		</example>
 	</section>
+	<section id="pipelimit.p.clean_unused">
+		<title><varname>clean_unused</varname> (int)</title>
+		<para>
+		Clean unused pipes afetr this number of timer intervals.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0 (cleanup disabled).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>clean_unused</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("pipelimit", "clean_unused", 10)
+...
+</programlisting>
+		</example>
+		<para>
+		This value can be modified at runtime using &sercmd;
+		</para>
+		<example>
+		<title> Set <varname>clean_unused</varname> parameter at runtime </title>
+		<programlisting format="linespecific">
+
+&sercmd; cfg.set_now_int pipelimit clean_unused 10
+
+		</programlisting>
+		</example>
+	</section>
 	</section>
 	<section>
 	<title>Functions</title>
@@ -356,7 +427,7 @@ modparam("pipelimit", "reply_reason", "Limiting")
 		value, if this is greater than 0. Algorithm is case sensitive.
 		</para>
 		<para>	
-		The pipe name can be provided via a pseudo variabile.
+		The pipe name can be provided via a pseudo variable.
 		</para>
 		<para>The method will return:
 		<itemizedlist>
@@ -487,13 +558,35 @@ with unexpected retcode=$var(check_result)\n");
 
 	<section>
 	<title>RPC Commands</title>
+	<section id="pipelimit.r.pl.list">
+		<title>
+		<function moreinfo="none">pl.list</function>
+		</title>
+		<para>
+		Lists the details of one or all pipes, respectively the attributes
+		pipe name (id), algorithm, limit and counter.
+		</para>
+		<para>
+		Name: <emphasis>pl.list</emphasis>
+		</para>
+		<para>Parameters: <emphasis>name</emphasis> - (optional) pipe name</para>
+		<para>
+		RPC Command Format:
+		</para>
+		<programlisting  format="linespecific">
+...
+kamctl rpc pl.list
+kamctl rpc pl.list testid
+...
+		</programlisting>
+	</section>
 	<section id="pipelimit.r.pl.stats">
 		<title>
 		<function moreinfo="none">pl.stats</function>
 		</title>
 		<para>
-		Lists the parameters and variabiles in the pipelimit module:
-		pipe id, pipe load and pipe couter.
+		Lists the parameters and variables in the pipelimit module:
+		pipe id, pipe load and pipe counter.
 		</para>
 		<para>
 		Name: <emphasis>pl.stats</emphasis>
@@ -503,7 +596,9 @@ with unexpected retcode=$var(check_result)\n");
 		RPC Command Format:
 		</para>
 		<programlisting  format="linespecific">
-	kamcmd pl.stats
+...
+kamcmd pl.stats
+...
 		</programlisting>
 	</section>
 	<section id="pipelimit.r.pl.set_pipe">
@@ -534,7 +629,9 @@ with unexpected retcode=$var(check_result)\n");
 		RPC Command Format:
 		</para>
 		<programlisting  format="linespecific">
-	kamcmd pl.set_pipe 2 RED 10
+...
+kamcmd pl.set_pipe 2 RED 10
+...
 		</programlisting>
 	</section>
 	<section id="pipelimit.r.pl.get_pipes">
@@ -552,7 +649,9 @@ with unexpected retcode=$var(check_result)\n");
 		RPC Command Format:
 		</para>
 		<programlisting  format="linespecific">
-	kamcmd pl.get_pipes
+...
+kamcmd pl.get_pipes
+...
 		</programlisting>
 	</section>
 	<section id="pipelimit.r.pl.set_pid">
@@ -581,7 +680,9 @@ with unexpected retcode=$var(check_result)\n");
 		RPC Command Format:
 		</para>
 		<programlisting  format="linespecific">
-	kamcmd pl.set_pid 0.5 0.5 0.5
+...
+kamcmd pl.set_pid 0.5 0.5 0.5
+...
 		</programlisting>
 	</section>
 	<section id="pipelimit.r.pl.get_pid">
@@ -599,7 +700,9 @@ with unexpected retcode=$var(check_result)\n");
 		RPC Command Format:
 		</para>
 		<programlisting  format="linespecific">
-	kamcmd pl.get_pid
+...
+kamcmd pl.get_pid
+...
 		</programlisting>
 	</section>
 	<section id="pipelimit.r.pl.push_load">
@@ -624,7 +727,9 @@ with unexpected retcode=$var(check_result)\n");
 		RPC Command Format:
 		</para>
 		<programlisting  format="linespecific">
-	kamcmd pl.push_load 0.85
+...
+kamcmd pl.push_load 0.85
+...
 		</programlisting>
 	</section>
 	</section>

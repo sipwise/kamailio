@@ -42,9 +42,6 @@ endif
 
 endif
 
-#DEFS += -DPG_TEST
-DEFS += -DSER_MOD_INTERFACE
-
 SERLIBPATH=../../lib
 SER_LIBS=$(SERLIBPATH)/srdb2/srdb2 $(SERLIBPATH)/srdb1/srdb1
 

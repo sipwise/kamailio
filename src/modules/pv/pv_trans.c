@@ -614,6 +614,7 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 				}
 				val->rs.s += i;
 				val->rs.len = j;
+				tr_string_clone_result;
 				break;
 			}
 			i = -i;
@@ -1156,6 +1157,56 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			val->ri = 0;
 			break;
 
+		case TR_S_UNQUOTE:
+			if(!(val->flags&PV_VAL_STR)) {
+				val->rs.s = int2str(val->ri, &val->rs.len);
+				break;
+			}
+			if(val->rs.len<2) {
+				break;
+			}
+			if(val->rs.len>TR_BUFFER_SIZE-2) {
+				LM_ERR("value too large: %d\n", val->rs.len);
+				return -1;
+			}
+			if((val->rs.s[0] == val->rs.s[val->rs.len-1])
+					&& (val->rs.s[0] == '"' || val->rs.s[0] == '\'')) {
+				memcpy(_tr_buffer, val->rs.s+1, val->rs.len-2);
+				val->rs.len -= 2;
+			} else {
+				memcpy(_tr_buffer, val->rs.s, val->rs.len);
+			}
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.s[val->rs.len] = '\0';
+			break;
+
+		case TR_S_UNBRACKET:
+			if(!(val->flags&PV_VAL_STR)) {
+				val->rs.s = int2str(val->ri, &val->rs.len);
+				break;
+			}
+			if(val->rs.len<2) {
+				break;
+			}
+			if(val->rs.len>TR_BUFFER_SIZE-2) {
+				LM_ERR("value too large: %d\n", val->rs.len);
+				return -1;
+			}
+			if((val->rs.s[0] == '(' && val->rs.s[val->rs.len-1] == ')')
+					|| (val->rs.s[0] == '[' && val->rs.s[val->rs.len-1] == ']')
+					|| (val->rs.s[0] == '{' && val->rs.s[val->rs.len-1] == '}')
+					|| (val->rs.s[0] == '<' && val->rs.s[val->rs.len-1] == '>')) {
+				memcpy(_tr_buffer, val->rs.s+1, val->rs.len-2);
+				val->rs.len -= 2;
+			} else {
+				memcpy(_tr_buffer, val->rs.s, val->rs.len);
+			}
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.s[val->rs.len] = '\0';
+			break;
+
 		default:
 			LM_ERR("unknown subtype %d (cfg line: %d)\n",
 					subtype, get_cfg_crt_line());
@@ -1180,6 +1231,7 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
 	str sv;
 	param_hooks_t phooks;
 	param_t *pit=NULL;
+	str sproto;
 
 	if(val==NULL || (!(val->flags&PV_VAL_STR)) || val->rs.len<=0)
 		return -1;
@@ -1336,6 +1388,26 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
 				}
 				val->rs.len++;
 			}
+			break;
+		case TR_URI_TOSOCKET:
+			if(get_valid_proto_string(_tr_parsed_uri.proto, 1, 0, &sproto)<0) {
+				LM_WARN("unknown transport protocol\n");
+				val->rs = _tr_empty;
+				break;
+			}
+			tr_set_crt_buffer();
+			val->rs.len = snprintf(_tr_buffer, TR_BUFFER_SIZE,
+					"%.*s:%.*s:%d", sproto.len, sproto.s,
+					_tr_parsed_uri.host.len, _tr_parsed_uri.host.s,
+					(_tr_parsed_uri.port_no!=0)
+							?(int)_tr_parsed_uri.port_no:5060);
+			if(val->rs.len<=0 || val->rs.len>=TR_BUFFER_SIZE) {
+				LM_WARN("error converting uri to socket address [%.*s]\n",
+						_tr_uri.len, _tr_uri.s);
+				val->rs = _tr_empty;
+				break;
+			}
+			val->rs.s = _tr_buffer;
 			break;
 		default:
 			LM_ERR("unknown subtype %d\n",
@@ -2490,6 +2562,12 @@ char* tr_parse_string(str* in, trans_t *t)
 	} else if(name.len==15 && strncasecmp(name.s, "urldecode.param", 15)==0) {
 		t->subtype = TR_S_URLDECODEPARAM;
 		goto done;
+	} else if(name.len==7 && strncasecmp(name.s, "unquote", 7)==0) {
+		t->subtype = TR_S_UNQUOTE;
+		goto done;
+	} else if(name.len==9 && strncasecmp(name.s, "unbracket", 9)==0) {
+		t->subtype = TR_S_UNBRACKET;
+		goto done;
 	}
 
 	LM_ERR("unknown transformation: %.*s/%.*s/%d!\n", in->len, in->s,
@@ -2601,6 +2679,9 @@ char* tr_parse_uri(str* in, trans_t *t)
 		goto done;
 	} else if(name.len==6 && strncasecmp(name.s, "scheme", 6)==0) {
 		t->subtype = TR_URI_SCHEME;
+		goto done;
+	} else if(name.len==8 && strncasecmp(name.s, "tosocket", 8)==0) {
+		t->subtype = TR_URI_TOSOCKET;
 		goto done;
 	}
 

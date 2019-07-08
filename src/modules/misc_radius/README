@@ -47,7 +47,7 @@ Daniel-Constantin Mierla
 
    List of Examples
 
-   1.1. “SIP-AVP” RADIUS AVP exmaples
+   1.1. “SIP-AVP” RADIUS AVP examples
    1.2. radius_config parameter usage
    1.3. caller_service_type parameter usage
    1.4. callee_service_type parameter usage
@@ -113,7 +113,7 @@ Chapter 1. Admin Guide
      * SIP_AVP_NAME = STRING_NAME | '#'ID_NUMBER
      * SIP_AVP_VALUE = ':'STRING_VALUE | '#'NUMBER_VALUE
 
-   Example 1.1. “SIP-AVP” RADIUS AVP exmaples
+   Example 1.1. “SIP-AVP” RADIUS AVP examples
 ....
 "email:joe@yahoo.com"
     -> STRING NAME AVP (email) with STRING VALUE (joe@yahoo.com)
@@ -326,19 +326,19 @@ radius_load_caller_avps($fU);
     Sending Access-Accept of id 60 to 192.168.25.32 port 59736
     Session-Timeout = 4261674
     next-hop-ip = "SIP/00111222333444@cisco-out"
-    SIP-AVP = "email:sr-users@lists.sip-router.org session-timeout#161 next-hop-
-ip:h323/0001111@myvoip-gate.kamailio.org"
+    SIP-AVP = "email:sr-users@lists.kamailio.org session-timeout#161 next-hop-ip
+:h323/0001111@myvoip-gate.kamailio.org"
     session-protocol = "SIP"
 ...
 
 $avp(Session-Timeout) has integer value 4261674
 $avp(next-hop-ip) has string value "SIP/005555777888@cisco-out"
 $avp(session-protocol) has string value "SIP"
-$avp(SIP-AVP) has string value  "email:sr-users@lists.sip-router.org session-tim
-eout#161 next-hop-ip:h323/0001111@myvoip-gate.kamailio.org"
+$avp(SIP-AVP) has string value  "email:sr-users@lists.kamailio.org session-timeo
+ut#161 next-hop-ip:h323/0001111@myvoip-gate.kamailio.org"
 
 ...
-    When recieving negative response, check appropriate avp's:
+    When receiving negative response, check appropriate avp's:
     $avp(Reply-Message) = "Not enough money on deposit '-89.83'. Rejected"
     $avp(Filter-Id) = "neg_deposit"
 ...

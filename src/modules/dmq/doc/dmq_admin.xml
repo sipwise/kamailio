@@ -22,7 +22,7 @@
 	transparently deals with node discovery, consistency, retransmissions, etc.
 	</para>
 	<para>
-	Other entities ("peers") are then able to utlize the DMQ bus to pass messages between themselves.
+	Other entities ("peers") are then able to utilize the DMQ bus to pass messages between themselves.
 	Peers are grouped by name in order to ensure the correct messages are passed to the relevant peers.
 	This grouping of peers can be compared to a topic in a typical pub/sub system.
 	</para>
@@ -219,12 +219,22 @@ modparam("dmq", "ping_interval", 90)
         <title>Functions</title>
         <section id="dmq.f.dmq_handle_message">
                 <title>
-                <function moreinfo="none">dmq_handle_message()</function>
+                <function moreinfo="none">dmq_handle_message([continue])</function>
                 </title>
                 <para>
                 Handles a DMQ message by passing it to the appropriate local peer (module).
 		The peer is identified by the user part of the To header.
                 </para>
+                <para>Meaning of parameters:</para>
+                <itemizedlist>
+                        <listitem>
+                                <para>
+                                <emphasis>continue</emphasis> - by default, dmq_handle_message() will end
+                                execution of routing script. If this optional parameter is set to "1", dmq_handle_message()
+                                will continue executing the routing script after it's been called.
+                                </para>
+                        </listitem>
+                </itemizedlist>
                 <para>
                 This function can be used from REQUEST_ROUTE.
                 </para>

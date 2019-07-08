@@ -4,7 +4,7 @@
 # Maintainer: Nathan Angelacos <nangel@alpinelinux.org>
 
 pkgname=kamailio
-pkgver=5.1.8
+pkgver=5.2.3
 pkgrel=0
 
 # If building from a git snapshot, specify the gitcommit
@@ -29,7 +29,7 @@ makedepends="bison db-dev flex freeradius-client-dev expat-dev lksctp-tools-dev 
 	libxml2-dev curl-dev unixodbc-dev confuse-dev ncurses-dev sqlite-dev
 	lua-dev openldap-dev openssl-dev net-snmp-dev libuuid libev-dev
 	jansson-dev json-c-dev libevent-dev linux-headers libmemcached-dev
-	rabbitmq-c-dev hiredis-dev libmaxminddb-dev libunistring-dev"
+	rabbitmq-c-dev hiredis-dev libmaxminddb-dev libunistring-dev ruby-dev"
 install="$pkgname.pre-install $pkgname.pre-upgrade"
 
 # secfixes:
@@ -162,6 +162,9 @@ _mod_list_perl="app_perl db_perlvdb"
 # - modules depending on python library
 _mod_list_python="app_python"
 
+# - modules depending on ruby library
+_mod_list_ruby="app_ruby"
+
 # - modules depending on rabbitmq
 _mod_list_rabbitmq="rabbitmq"
 
@@ -175,17 +178,17 @@ _mod_list_sqlite="db_sqlite"
 _mod_list_oracle="db_oracle"
 
 # - modules depending on json library
-_mod_list_json="json jsonrpcc jsonrpcs"
+_mod_list_json="json jsonrpcc jsonrpcs pua_json"
 
 # - modules depending on redis library
-_mod_list_redis="ndb_redis topos_redis"
+_mod_list_redis="db_redis ndb_redis topos_redis"
 
 # - modules depending on mono library
 _mod_list_mono="app_mono"
 
 # - modules related to IMS extensions
 _mod_list_ims="cdp cdp_avp ims_dialog ims_diameter_server ims_auth ims_isc ims_icscf ims_qos \
-		ims_registrar_pcscf ims_registrar_scscf ims_usrloc_pcscf \
+		ims_ocs ims_registrar_pcscf ims_registrar_scscf ims_usrloc_pcscf \
 		ims_usrloc_scscf ims_charging"
 
 # - modules depending on osp toolkit library
@@ -213,7 +216,7 @@ _mod_list_kazoo="kazoo"
 _mod_list_mongodb="db_mongodb ndb_mongodb"
 
 # - modules depending on jansson library
-_mod_list_jansson="jansson janssonrpcc"
+_mod_list_jansson="acc_json jansson janssonrpcc"
 
 # - modules depending on libm
 _mod_list_jsdt="app_jsdt"
@@ -243,7 +246,7 @@ for _i in db postgres sqlite dbtext mysql \
 	ldap utils tls presence lua ims outbound debugger \
 	extras json websocket authephemeral \
 	uuid ev memcached redis geoip2 jansson sqlang sipdump \
-	jsdt http_async kazoo rabbitmq sctp radius perl python; do
+	jsdt http_async kazoo rabbitmq sctp radius perl python ruby; do
 
    subpackages="$subpackages $pkgname-$_i"
    eval "_modules=\"\$_modules \$_mod_list_$_i\""
@@ -530,6 +533,11 @@ perl() {
 python() {
 	_generic_pkg "Python extensions for Kamailio" \
 		"$_mod_list_python"
+}
+
+ruby() {
+	_generic_pkg "Ruby extensions for Kamailio" \
+		"$_mod_list_ruby"
 }
 
 sqlang() {

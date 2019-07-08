@@ -43,6 +43,8 @@
 #include "usrloc_mod.h"
 
 
+extern int ul_version_table;
+
 /*! \brief Global list of all registered domains */
 dlist_t* root = 0;
 
@@ -85,7 +87,7 @@ static inline int find_dlist(str* _n, dlist_t** _d)
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
+ * \param options options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
@@ -323,7 +325,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
+ * \param options options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
@@ -473,7 +475,7 @@ static inline int get_all_mem_ucontacts(void *buf, int len, unsigned int flags,
  * \param flags contact flags
  * \param part_idx part index
  * \param part_max maximal part
- * \param GAU options
+ * \param options options
  * \return 0 on success, positive if buffer size was not sufficient, negative on failure
  */
 int get_all_ucontacts(void *buf, int len, unsigned int flags,
@@ -645,7 +647,8 @@ int register_udomain(const char* _n, udomain_t** _d)
 			goto err;
 		}
 
-		if(db_check_table_version(&ul_dbf, con, &s, UL_TABLE_VERSION) < 0) {
+		if(ul_version_table != 0
+				&& db_check_table_version(&ul_dbf, con, &s, UL_TABLE_VERSION) < 0) {
 			LM_ERR("error during table version check.\n");
 			goto err;
 		}

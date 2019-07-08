@@ -215,7 +215,7 @@ static ticks_t timer_handler(ticks_t ticks, struct timer_ln* tl, void* data)
 		if(keng==NULL) {
 			run_actions(&ra_ctx, main_rt.rlist[a->route_no], msg);
 		} else {
-			if(keng->froute(msg, EVENT_ROUTE, &a->route_name, &evname)<0) {
+			if(sr_kemi_route(keng, msg, EVENT_ROUTE, &a->route_name, &evname)<0) {
 				LM_ERR("error running event route kemi callback\n");
 			}
 		}
@@ -484,9 +484,9 @@ static void destroy_mod(void)
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-	{MODULE_NAME"_enable", timer_enable_func, 2, timer_enable_fixup,
+	{MODULE_NAME"_enable", timer_enable_func, 2, timer_enable_fixup, 0,
 		ANY_ROUTE},
-	{0, 0, 0, 0, 0}
+	{0, 0, 0, 0, 0, 0}
 };
 
 /*
@@ -499,13 +499,14 @@ static param_export_t params[] = {
 
 
 struct module_exports exports = {
-	MODULE_NAME,
-	cmds,        /* Exported commands */
-	0,	         /* RPC */
-	params,      /* Exported parameters */
-	mod_init,    /* module initialization function */
-	0,           /* response function*/
-	destroy_mod, /* destroy function */
-	0,           /* oncancel function */
-	child_init   /* per-child init function */
+	MODULE_NAME,     /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* Exported commands */
+	params,          /* Exported parameters */
+	0,               /* Exported RPC functions */
+	0,               /* pseudo-variables exports */
+	0,               /* response function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per-child init function */
+	destroy_mod      /* destroy function */
 };

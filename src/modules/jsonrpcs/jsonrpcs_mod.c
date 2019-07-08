@@ -50,18 +50,18 @@
 
 #include "jsonrpcs_mod.h"
 
-/** @addtogroup jsonrpc-s
- * @ingroup modules
- * @{
- *
- * <h1>Overview of Operation</h1>
- * This module provides jsonrpc over http server implementation.
- */
-
 /** @file
  *
  * This is the main file of jsonrpc-s module which contains all the functions
  * related to http processing, as well as the module interface.
+ */
+
+/** @addtogroup jsonrpc-s
+ * @ingroup modules
+ *
+ * <h1>Overview of Operation</h1>
+ * This module provides jsonrpc over http server implementation.
+ * @{
  */
 
 MODULE_VERSION
@@ -76,7 +76,7 @@ static str JSONRPC_CONTENT_TYPE_HTML = str_init("application/json");
 /*!< 0 - all available; 1 - http; 2 - fifo; 4 - datagram */
 static int jsonrpc_transport = 6; /* fifo + datagram */
 
-static int jsonrpc_pretty_format = 0;
+static int jsonrpc_pretty_format = 1;
 
 static int jsonrpc_register_rpc(void);
 
@@ -175,19 +175,17 @@ static pv_export_t mod_pvs[] = {
 };
 
 /** module exports */
-struct module_exports exports= {
-	"jsonrpcs",
+struct module_exports exports = {
+	"jsonrpcs",      /* module name */
 	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,
-	params,
-	0,			/* exported statistics */
-	0,			/* exported MI functions */
-	mod_pvs,	/* exported pseudo-variables */
-	0,			/* extra processes */
-	mod_init,	/* module initialization function */
-	0,
-	mod_destroy,/* module destroy function */
-	child_init	/* per-child init function */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	mod_pvs,         /* pseudo-variables exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	mod_destroy      /* module destroy function */
 };
 
 
@@ -1545,3 +1543,5 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 	sr_kemi_modules_add(sr_kemi_jsonrpcs_exports);
 	return 0;
 }
+
+/** @} */

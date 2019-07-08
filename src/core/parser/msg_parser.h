@@ -74,7 +74,12 @@ typedef enum request_method {
 	METHOD_UPDATE=2048,       /*!< 2048 - 2^11 */
 	METHOD_REFER=4096,        /*!< 4096 - 2^12 */
 	METHOD_PUBLISH=8192,      /*!< 8192 - 2^13 */
-	METHOD_OTHER=16384        /*!< 16384 - 2^14 */
+	METHOD_KDMQ=16384,        /*!< 16384 - 2^14 */
+	METHOD_GET=32768,         /*!< 32768 - 2^15 */
+	METHOD_POST=65536,        /*!< 65536 - 2^16 */
+	METHOD_PUT=131072,        /*!< 131072 - 2^17 */
+	METHOD_DELETE=262144,     /*!< 262144 - 2^18 */
+	METHOD_OTHER=524288       /*!< 524288 - 2^19 */
 } request_method_t;
 
 #define FL_FORCE_RPORT  (1 << 0)  /*!< force rport */
@@ -100,6 +105,10 @@ typedef enum request_method {
 #define FL_BODY_MULTIPART    (1<<17)  /* body modified is multipart */
 #define FL_RR_ADDED          (1<<18)  /* Record-Route header was added */
 #define FL_UAC_AUTH          (1<<19)  /* Proxy UAC-like authentication */
+#define FL_ADD_SRVID         (1<<20) /*!< add 'srvid' to local via hdr */
+#define FL_ADD_XAVP_VIA_PARAMS (1<<21) /*!< add xavp fields to local via params */
+#define FL_USE_XAVP_VIA_FIELDS (1<<22) /*!< use xavp fields for local via attrs */
+#define FL_MSG_NOREPLY       (1<<23) /*!< do not send sip reply for request */
 
 /* WARNING: Value (1 << 28) is temporarily reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */
@@ -359,6 +368,7 @@ typedef struct sip_msg {
 								to avoid unnecessary calculations */
 	unsigned int msg_flags; /*!< internal flags used by core */
 	flag_t flags; /*!< config flags */
+	flag_t xflags[KSR_XFLAGS_SIZE]; /*!< config extended flags */
 	str set_global_address;
 	str set_global_port;
 	struct socket_info* force_send_socket; /*!< force sending on this socket */
@@ -497,6 +507,11 @@ void msg_ldata_reset(sip_msg_t*);
  * get source ip, port and protocol in SIP URI format
  */
 int get_src_uri(sip_msg_t *m, int tmode, str *uri);
+
+/**
+ * get source proto:ip:port (socket address format)
+ */
+int get_src_address_socket(sip_msg_t *m, str *ssock);
 
 /**
  * get received-on-socket ip, port and protocol in SIP URI format

@@ -138,7 +138,6 @@ static void yyerror(char* s, ...);
 static void yyerror_at(struct cfg_pos* pos, char* s, ...);
 static char* tmp;
 static int i_tmp;
-static unsigned u_tmp;
 static struct socket_id* lst_tmp;
 static struct name_lst*  nl_tmp;
 static int rt;  /* Type of route block for find_export */
@@ -324,6 +323,8 @@ extern char *default_routename;
 %token LOGPREFIXMODE
 %token LOGENGINETYPE
 %token LOGENGINEDATA
+%token XAVPVIAPARAMS
+%token XAVPVIAFIELDS
 %token LISTEN
 %token ADVERTISE
 %token ALIAS
@@ -376,6 +377,7 @@ extern char *default_routename;
 %token SOCKET_WORKERS
 %token ASYNC_WORKERS
 %token ASYNC_USLEEP
+%token ASYNC_NONBLOCK
 %token CHECK_VIA
 %token PHONE2TEL
 %token MEMLOG
@@ -480,8 +482,13 @@ extern char *default_routename;
 %token HTTP_REPLY_PARSE
 %token VERSION_TABLE_CFG
 %token VERBOSE_STARTUP
+%token ROUTE_LOCKS_SIZE
 %token CFG_DESCRIPTION
 %token SERVER_ID
+%token KEMI
+%token ONSEND_ROUTE_CALLBACK
+%token REPLY_ROUTE_CALLBACK
+%token EVENT_ROUTE_CALLBACK
 %token MAX_RECURSIVE_LEVEL
 %token MAX_BRANCHES_PARAM
 %token LATENCY_CFG_LOG
@@ -792,6 +799,14 @@ assign_stm:
 	| LOGENGINETYPE EQUAL error { yyerror("string value expected"); }
 	| LOGENGINEDATA EQUAL STRING { _km_log_engine_data=$3; }
 	| LOGENGINEDATA EQUAL error { yyerror("string value expected"); }
+	| XAVPVIAPARAMS EQUAL STRING { _ksr_xavp_via_params.s=$3;
+			_ksr_xavp_via_params.len=strlen($3);
+		}
+	| XAVPVIAPARAMS EQUAL error { yyerror("string value expected"); }
+	| XAVPVIAFIELDS EQUAL STRING { _ksr_xavp_via_params.s=$3;
+			_ksr_xavp_via_fields.len=strlen($3);
+		}
+	| XAVPVIAFIELDS EQUAL error { yyerror("string value expected"); }
 	| DNS EQUAL NUMBER   { received_dns|= ($3)?DO_DNS:0; }
 	| DNS EQUAL error { yyerror("boolean value expected"); }
 	| REV_DNS EQUAL NUMBER { received_dns|= ($3)?DO_REV_DNS:0; }
@@ -900,6 +915,8 @@ assign_stm:
 	| ASYNC_WORKERS EQUAL error { yyerror("number expected"); }
 	| ASYNC_USLEEP EQUAL NUMBER { async_task_set_usleep($3); }
 	| ASYNC_USLEEP EQUAL error { yyerror("number expected"); }
+	| ASYNC_NONBLOCK EQUAL NUMBER { async_task_set_nonblock($3); }
+	| ASYNC_NONBLOCK EQUAL error { yyerror("number expected"); }
 	| CHECK_VIA EQUAL NUMBER { check_via=$3; }
 	| CHECK_VIA EQUAL error { yyerror("boolean value expected"); }
 	| PHONE2TEL EQUAL NUMBER { phone2tel=$3; }
@@ -1566,8 +1583,40 @@ assign_stm:
 	| HTTP_REPLY_PARSE EQUAL error { yyerror("boolean value expected"); }
 	| VERBOSE_STARTUP EQUAL NUMBER { ksr_verbose_startup=$3; }
 	| VERBOSE_STARTUP EQUAL error { yyerror("boolean value expected"); }
+	| ROUTE_LOCKS_SIZE EQUAL NUMBER { ksr_route_locks_size=$3; }
+	| ROUTE_LOCKS_SIZE EQUAL error { yyerror("number expected"); }
     | SERVER_ID EQUAL NUMBER { server_id=$3; }
-	| SERVER_ID EQUAL error  { yyerror("number  expected"); }
+	| SERVER_ID EQUAL error  { yyerror("number expected"); }
+	| KEMI DOT ONSEND_ROUTE_CALLBACK EQUAL STRING {
+			kemi_onsend_route_callback.s = $5;
+			kemi_onsend_route_callback.len = strlen($5);
+			if(kemi_onsend_route_callback.len==4
+					&& strcasecmp(kemi_onsend_route_callback.s, "none")==0) {
+				kemi_onsend_route_callback.s = "";
+				kemi_onsend_route_callback.len = 0;
+			}
+		}
+	| KEMI DOT ONSEND_ROUTE_CALLBACK EQUAL error { yyerror("string expected"); }
+	| KEMI DOT REPLY_ROUTE_CALLBACK EQUAL STRING {
+			kemi_reply_route_callback.s = $5;
+			kemi_reply_route_callback.len = strlen($5);
+			if(kemi_reply_route_callback.len==4
+					&& strcasecmp(kemi_reply_route_callback.s, "none")==0) {
+				kemi_reply_route_callback.s = "";
+				kemi_reply_route_callback.len = 0;
+			}
+		}
+	| KEMI DOT REPLY_ROUTE_CALLBACK EQUAL error { yyerror("string expected"); }
+	| KEMI DOT EVENT_ROUTE_CALLBACK EQUAL STRING {
+			kemi_event_route_callback.s = $5;
+			kemi_event_route_callback.len = strlen($5);
+			if(kemi_event_route_callback.len==4
+					&& strcasecmp(kemi_event_route_callback.s, "none")==0) {
+				kemi_event_route_callback.s = "";
+				kemi_event_route_callback.len = 0;
+			}
+		}
+	| KEMI DOT EVENT_ROUTE_CALLBACK EQUAL error { yyerror("string expected"); }
     | MAX_RECURSIVE_LEVEL EQUAL NUMBER { set_max_recursive_level($3); }
     | MAX_BRANCHES_PARAM EQUAL NUMBER { sr_dst_max_branches = $3; }
     | LATENCY_LOG EQUAL intno { default_core_cfg.latency_log=$3; }
@@ -3312,11 +3361,9 @@ cmd:
 	| ID {mod_func_action = mk_action(MODULE0_T, 2, MODEXP_ST, NULL, NUMBER_ST,
 			0); } LPAREN func_params RPAREN	{
 		mod_func_action->val[0].u.data =
-			find_export_record($1, mod_func_action->val[1].u.number, rt,
-								&u_tmp);
+			find_export_record($1, mod_func_action->val[1].u.number, rt);
 		if (mod_func_action->val[0].u.data == 0) {
-			if (find_export_record($1, mod_func_action->val[1].u.number, 0,
-									&u_tmp) ) {
+			if (find_export_record($1, mod_func_action->val[1].u.number, 0) ) {
 					LM_ERR("misused command %s\n", $1);
 					yyerror("Command cannot be used in the block\n");
 			} else {
@@ -3813,7 +3860,7 @@ static int case_check_default(struct case_stms* stms)
  */
 static int mod_f_params_pre_fixup(struct action* a)
 {
-	sr31_cmd_export_t* cmd_exp;
+	ksr_cmd_export_t* cmd_exp;
 	action_u_t* params;
 	int param_no;
 	struct rval_expr* rve;

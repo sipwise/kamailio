@@ -81,7 +81,7 @@ pres_get_sphere_t pres_get_sphere;
 
 /* Module parameter variables */
 str xcap_table= str_init("xcap");
-str db_url = str_init(DEFAULT_DB_URL);
+static str presxml_db_url = str_init(DEFAULT_DB_URL);
 int force_active= 0;
 int force_dummy_presence = 0;
 int integrated_xcap_server= 0;
@@ -115,7 +115,7 @@ static cmd_export_t cmds[]={
 };
 
 static param_export_t params[]={
-	{ "db_url",		PARAM_STR, &db_url},
+	{ "db_url",		PARAM_STR, &presxml_db_url},
 	{ "xcap_table",		PARAM_STR, &xcap_table},
 	{ "force_active",	INT_PARAM, &force_active },
 	{ "integrated_xcap_server", INT_PARAM, &integrated_xcap_server},
@@ -134,17 +134,15 @@ static param_export_t params[]={
 /** module exports */
 struct module_exports exports= {
 	"presence_xml",		/* module name */
-	 DEFAULT_DLFLAGS,	/* dlopen flags */
-	 cmds,  		/* exported functions */
-	 params,		/* exported parameters */
-	 0,				/* exported statistics */
-	 0,				/* exported MI functions */
-	 0,				/* exported pseudo-variables */
-	 0,				/* extra processes */
-	 mod_init,		/* module initialization function */
-	 0,				/* response handling function */
- 	 destroy,		/* destroy function */
-	 child_init		/* per-child init function */
+	DEFAULT_DLFLAGS,	/* dlopen flags */
+	cmds,				/* exported functions */
+	params,				/* exported parameters */
+	0,					/* RPC method exports */
+	0,					/* exported pseudo-variables */
+	0,					/* response handling function */
+	mod_init,			/* module initialization function */
+	child_init,			/* per-child init function */
+	destroy				/* module destroy function */
 };
 
 /**
@@ -158,7 +156,8 @@ static int mod_init(void)
 	if(passive_mode==1)
 		return 0;
 
-	LM_DBG("db_url=%s/%d/%p\n",ZSW(db_url.s),db_url.len, db_url.s);
+	LM_DBG("db_url=%s (len=%d addr=%p)\n", ZSW(presxml_db_url.s),
+			presxml_db_url.len, presxml_db_url.s);
 
 	/* bind the SL API */
 	if (sl_load_api(&slb)!=0) {
@@ -198,7 +197,7 @@ static int mod_init(void)
 	if(force_active== 0)
 	{
 		/* binding to mysql module  */
-		if (db_bind_mod(&db_url, &pxml_dbf))
+		if (db_bind_mod(&presxml_db_url, &pxml_dbf))
 		{
 			LM_ERR("Database module not found\n");
 			return -1;
@@ -210,7 +209,7 @@ static int mod_init(void)
 			return -1;
 		}
 
-		pxml_db = pxml_dbf.init(&db_url);
+		pxml_db = pxml_dbf.init(&presxml_db_url);
 		if (!pxml_db)
 		{
 			LM_ERR("while connecting to database\n");
@@ -281,7 +280,7 @@ static int child_init(int rank)
 	{
 		if(pxml_db)
 			return 0;
-		pxml_db = pxml_dbf.init(&db_url);
+		pxml_db = pxml_dbf.init(&presxml_db_url);
 		if (pxml_db== NULL)
 		{
 			LM_ERR("while connecting database\n");

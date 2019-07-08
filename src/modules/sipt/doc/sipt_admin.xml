@@ -16,7 +16,7 @@
 
     <section>
 	<title>Overview</title>
-	<para>Module for updating ISUP encapuslated in SIP (SIP-T/SIP-I)</para>
+	<para>Module for updating ISUP encapsulated in SIP (SIP-T/SIP-I)</para>
 	<para>
 	The sipt module can be used to update various ss7 headers contained inside
 	a message. 
@@ -43,7 +43,7 @@
 			updates the IAM in the body if it exists, setting the called party number to <quote>destination</quote>
 			with the nature address specified in <quote>nai</quote> and decrementing the hop counter value if present.
 			If the hop counter header is missing it will be added with the value of <quote>hops</quote>.  If
-			<quote>terminator</quote> is set to 1, then F will be appened to digit string to indicate the number
+			<quote>terminator</quote> is set to 1, then F will be appended to digit string to indicate the number
 			is complete (default).
 		</para>
 		<example>
@@ -89,6 +89,22 @@ sipt_set_bci_1("2", "1", "1", "0");
 ...
 # update the calling party to the value in the from header
 sipt_set_calling($fU, 4, 0, 3);
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="sipt.f.sipt_forwarding">
+		<title><function moreinfo="none">sipt_forwarding(origin, nai)</function></title>
+		<para>
+			updates the IAM in the body if it exists, setting (or adding) the forwarding number to <quote>origin</quote>
+			with the nature address specified in <quote>nai</quote>.
+		</para>
+		<example>
+			<title><function moreinfo="none">sipt_set_calling(origin, nai)</function> usage</title>
+			<programlisting format="linespecific">
+...
+# update the forwarding number to the value in the from header
+sipt_forwarfing($avp(s:forwarding_number), 3);
 ...
 </programlisting>
 		</example>
@@ -313,7 +329,63 @@ if($sipt(called_party_number.nai) == 3)
 			</tgroup>
 		</table>
 	</section>
+	<section id="sipt.v.sipt_redirection_info">
+		<title><varname>$sipt(redirection_info) / $sipt_redirection_info</varname></title>
+		<para>
+			Returns redirection info header from ISUP
+			Returns "Redirecting reason" or -1 if no redirection info found.
+		</para>
+		<table>
+			<title>Redirecting reason Values</title>
+			<tgroup cols="2">
+				<tbody>
+					<row><entry>0</entry><entry>Unknown</entry></row>
+					<row><entry>1</entry><entry>User busy</entry></row>
+					<row><entry>2</entry><entry>PROGRESS</entry></row>
+					<row><entry>3</entry><entry>no reply</entry></row>
+					<row><entry>4</entry><entry>deflection during alerting</entry></row>
+					<row><entry>5</entry><entry>deflection immediate response</entry></row>
+					<row><entry>6</entry><entry>mobile subscriber not reachable</entry></row>
+				</tbody>
+			</tgroup>
+		</table>
+	</section>
+        	<section id="sipt.v.sipt_redirection_number">
+		<title><varname>$sipt(redirection_number) / $sipt_redirection_number</varname></title>
+		<para>
+			Returns number to which redirection will trigered
+			Returns -1 if there is a parsing error.
+		</para>
+		<example>
+			<title><function moreinfo="none">sipt_redirection_number</function> usage</title>
+			<programlisting format="linespecific">
+...
+# get the redirection number
+$avp(s:redir_num) = $sipt(redirection_number);
 
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="sipt.v.sipt_redirection_number_nai">
+		<title><varname>$sipt(redirection_number.nai) / $sipt_redirection_number_nai</varname></title>
+		<para>
+			Returns NAI for redirection number from ISUP
+			Returns NAI for redirection number or -1 if no info found.
+		</para>
+		<table>
+			<title>Redirecting number NAI Values</title>
+			<tgroup cols="2">
+				<tbody>
+					<row><entry>0</entry><entry>Spare</entry></row>
+					<row><entry>1</entry><entry>Subscriber Number (national use)</entry></row>
+					<row><entry>2</entry><entry>Unknown (national use)</entry></row>
+					<row><entry>3</entry><entry>National (significant) number (national use)</entry></row>
+					<row><entry>4</entry><entry>International use</entry></row>
+				</tbody>
+			</tgroup>
+		</table>
+	</section>
 </section>
 </chapter>
 

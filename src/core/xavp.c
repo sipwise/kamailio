@@ -162,6 +162,19 @@ int xavp_add_last(sr_xavp_t *xavp, sr_xavp_t **list)
 	return 0;
 }
 
+int xavp_add_after(sr_xavp_t *nxavp, sr_xavp_t *pxavp)
+{
+	if(pxavp==NULL) {
+		nxavp->next = *_xavp_list_crt;
+		*_xavp_list_crt = nxavp;
+	} else {
+		nxavp->next = pxavp->next;
+		pxavp->next = nxavp;
+	}
+
+	return 0;
+}
+
 sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 {
 	sr_xavp_t *avp=0;
@@ -174,6 +187,26 @@ sr_xavp_t *xavp_add_value(str *name, sr_xval_t *val, sr_xavp_t **list)
 	if(list) {
 		avp->next = *list;
 		*list = avp;
+	} else {
+		avp->next = *_xavp_list_crt;
+		*_xavp_list_crt = avp;
+	}
+
+	return avp;
+}
+
+sr_xavp_t *xavp_add_value_after(str *name, sr_xval_t *val, sr_xavp_t *pxavp)
+{
+	sr_xavp_t *avp=0;
+
+	avp = xavp_new_value(name, val);
+	if (avp==NULL)
+		return NULL;
+
+	/* link new xavp */
+	if(pxavp) {
+		avp->next = pxavp->next;
+		pxavp->next = avp;
 	} else {
 		avp->next = *_xavp_list_crt;
 		*_xavp_list_crt = avp;
@@ -305,6 +338,22 @@ sr_xavp_t *xavp_get_next(sr_xavp_t *start)
 	return NULL;
 }
 
+sr_xavp_t *xavp_get_last(str *xname, sr_xavp_t **list)
+{
+	sr_xavp_t *prev;
+	sr_xavp_t *crt;
+
+	crt = xavp_get_internal(xname, list, 0, 0);
+
+	prev = NULL;
+
+	while(crt) {
+		prev = crt;
+		crt = xavp_get_next(prev);
+	}
+
+	return prev;
+}
 
 int xavp_rm(sr_xavp_t *xa, sr_xavp_t **head)
 {
@@ -521,6 +570,9 @@ void xavp_print_list_content(sr_xavp_t **head, int level)
 			case SR_XTYPE_XAVP:
 				LM_INFO("     XAVP value: <xavp:%p>\n", avp->val.v.xavp);
 				xavp_print_list_content(&avp->val.v.xavp, level+1);
+			break;
+			case SR_XTYPE_VPTR:
+				LM_INFO("     XAVP value: <vptr:%p>\n", avp->val.v.vptr);
 			break;
 			case SR_XTYPE_DATA:
 				LM_INFO("     XAVP value: <data:%p>\n", avp->val.v.data);
@@ -840,5 +892,66 @@ sr_xavp_t* xavp_get_child_with_sval(str *rname, str *cname)
 		return NULL;
 
 	return vavp;
+}
+
+
+/**
+ * serialize the values in subfields of an xavp in name=value; format
+ * - rname - name of the root list xavp
+ * - obuf - buffer were to write the output
+ * - olen - the size of obuf
+ * return: 0 - not found; -1 - error; >0 - length of output
+ */
+
+int xavp_serialize_fields(str *rname, char *obuf, int olen)
+{
+	sr_xavp_t *ravp = NULL;
+	sr_xavp_t *avp = NULL;
+	str ostr;
+	int rlen;
+
+	ravp = xavp_get(rname, NULL);
+	if(ravp==NULL || ravp->val.type!=SR_XTYPE_XAVP) {
+		/* not found or not holding subfields */
+		return 0;
+	}
+
+	rlen = 0;
+	ostr.s = obuf;
+	avp = ravp->val.v.xavp;
+	while(avp) {
+		switch(avp->val.type) {
+			case SR_XTYPE_INT:
+				LM_DBG("     XAVP int value: %d\n", avp->val.v.i);
+				ostr.len = snprintf(ostr.s, olen-rlen, "%.*s=%u;",
+						avp->name.len, avp->name.s, (unsigned int)avp->val.v.i);
+				if(ostr.len<=0 || ostr.len>=olen-rlen) {
+					LM_ERR("failed to serialize int value (%d/%d\n",
+							ostr.len, olen-rlen);
+					return -1;
+				}
+			break;
+			case SR_XTYPE_STR:
+				LM_DBG("     XAVP str value: %s\n", avp->val.v.s.s);
+				ostr.len = snprintf(ostr.s, olen-rlen, "%.*s=%.*s;",
+						avp->name.len, avp->name.s,
+						avp->val.v.s.len, avp->val.v.s.s);
+				if(ostr.len<=0 || ostr.len>=olen-rlen) {
+					LM_ERR("failed to serialize int value (%d/%d\n",
+							ostr.len, olen-rlen);
+					return -1;
+				}
+			break;
+			default:
+				LM_DBG("skipping value type: %d\n", avp->val.type);
+				ostr.len = 0;
+		}
+		if(ostr.len>0) {
+			ostr.s += ostr.len;
+			rlen += ostr.len;
+		}
+		avp = avp->next;
+	}
+	return rlen;
 }
 #endif

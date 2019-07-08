@@ -43,6 +43,8 @@ static int mod_init(void);
 static void mod_destroy(void);
 
 static int w_phonenum_match(struct sip_msg *msg, char *str1, char *str2);
+static int w_phonenum_match_cn(struct sip_msg *msg, char *str1, char *str2,
+		char *str3);
 static int phonenum_match(sip_msg_t *msg, str *tomatch, str *pvclass);
 
 /* clang-format off */
@@ -55,6 +57,8 @@ static pv_export_t mod_pvs[] = {
 static cmd_export_t cmds[]={
 	{"phonenum_match", (cmd_function)w_phonenum_match, 2, fixup_spve_spve,
 		0, ANY_ROUTE},
+	{"phonenum_match_cn", (cmd_function)w_phonenum_match_cn, 3, fixup_spve_all,
+		0, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -64,18 +68,16 @@ static param_export_t params[]={
 };
 
 struct module_exports exports = {
-	"phonenum",
+	"phonenum",      /* module name */
 	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,            /* exported config functions */
-	params,          /* exported config parameters */
-	0,
-	0,              /* exported MI functions */
-	mod_pvs,        /* exported pseudo-variables */
-	0,              /* extra processes */
-	mod_init,       /* module initialization function */
-	0,              /* response function */
-	mod_destroy,    /* destroy function */
-	0               /* per child init function */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	mod_pvs,         /* pseudo-variables exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	0,               /* per-child init function */
+	mod_destroy      /* module destroy function */
 };
 /* clang-format on */
 
@@ -105,7 +107,7 @@ static int phonenum_match(sip_msg_t *msg, str *tomatch, str *pvclass)
 {
 	phonenum_pv_reset(pvclass);
 
-	return phonenum_update_pv(tomatch, pvclass);
+	return phonenum_update_pv(tomatch, NULL, pvclass);
 }
 
 static int w_phonenum_match(sip_msg_t *msg, char *target, char *pvname)
@@ -128,6 +130,41 @@ static int w_phonenum_match(sip_msg_t *msg, char *target, char *pvname)
 	}
 
 	return phonenum_match(msg, &tomatch, &pvclass);
+}
+
+static int phonenum_match_cn(sip_msg_t *msg, str *tomatch, str *cnc, str *pvclass)
+{
+	phonenum_pv_reset(pvclass);
+
+	return phonenum_update_pv(tomatch, cnc, pvclass);
+}
+
+static int w_phonenum_match_cn(sip_msg_t *msg, char *target, char *cncstr,
+		char *pvname)
+{
+	str tomatch = STR_NULL;
+	str pvclass = STR_NULL;
+	str cncval = STR_NULL;
+
+	if(msg == NULL) {
+		LM_ERR("received null msg\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t *)target, &tomatch) < 0) {
+		LM_ERR("cannot get the address\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)cncstr, &cncval) < 0) {
+		LM_ERR("cannot get the country code\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)pvname, &pvclass) < 0) {
+		LM_ERR("cannot get the pv class\n");
+		return -1;
+	}
+
+	return phonenum_match_cn(msg, &tomatch, &cncval, &pvclass);
 }
 
 /**

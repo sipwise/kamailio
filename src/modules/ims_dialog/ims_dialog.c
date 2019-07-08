@@ -175,18 +175,16 @@ static pv_export_t mod_items[] = {
 };
 
 struct module_exports exports = {
-    "ims_dialog", /* module's name */
-    DEFAULT_DLFLAGS, /* dlopen flags */
-    cmds, /* exported functions */
-    mod_params, /* param exports */
-    0, /* exported statistics */
-    0, /* exported MI functions */
-    mod_items, /* exported pseudo-variables */
-    0, /* extra processes */
-    mod_init, /* module initialization function */
-    0, /* reply processing function */
-    mod_destroy,
-    child_init /* per-child init function */
+    "ims_dialog", 	/* module's name */
+    DEFAULT_DLFLAGS, 	/* dlopen flags */
+    cmds, 		/* exported functions */
+    mod_params, 	/* param exports */
+    0, 			/* exported RPC methods */
+    mod_items, 		/* exported pseudo-variables */
+    0, 			/* reply processing function */
+    mod_init, 		/* module initialization function */
+    child_init, 	/* per-child init function */
+    mod_destroy
 };
 
 static int fixup_profile(void** param, int param_no) {
@@ -505,17 +503,17 @@ static int mod_init(void) {
     }
 
     if (register_script_cb(profile_cleanup, POST_SCRIPT_CB | REQUEST_CB, 0) < 0) {
-        LM_ERR("cannot regsiter script callback");
+        LM_ERR("cannot register script callback");
         return -1;
     }
     if (register_script_cb(dlg_cfg_cb,
             PRE_SCRIPT_CB | REQUEST_CB, 0) < 0) {
-        LM_ERR("cannot regsiter pre-script ctx callback\n");
+        LM_ERR("cannot register pre-script ctx callback\n");
         return -1;
     }
     if (register_script_cb(dlg_cfg_cb,
             POST_SCRIPT_CB | REQUEST_CB, 0) < 0) {
-        LM_ERR("cannot regsiter post-script ctx callback\n");
+        LM_ERR("cannot register post-script ctx callback\n");
         return -1;
     }
 

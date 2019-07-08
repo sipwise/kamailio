@@ -105,9 +105,9 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 
 # version number
 VERSION = 5
-PATCHLEVEL = 1
-SUBLEVEL = 8
-EXTRAVERSION =
+PATCHLEVEL = 2
+SUBLEVEL = 3
+EXTRAVERSION = 
 
 # memory manager switcher
 # 0 - f_malloc (fast malloc)
@@ -119,7 +119,7 @@ MEMMNG ?= 0
 # 1 - on (debug mode)
 MEMDBG ?= 1
 
-SER_VER = $(shell expr $(VERSION) \* 1000000 + $(PATCHLEVEL) \* 1000 + \
+VERSIONVAL = $(shell expr $(VERSION) \* 1000000 + $(PATCHLEVEL) \* 1000 + \
 			$(SUBLEVEL) )
 RELEASE:=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 OS := $(shell uname -s | sed -e s/SunOS/solaris/ -e s/CYGWIN.*/cygwin/ \
@@ -497,6 +497,7 @@ bin_target = $(prefix)/$(bin_dir)
 #modules_target = $(prefix)/$(modules_dir)
 lib_target = $(prefix)/$(lib_dir)
 run_target = $(run_prefix)/$(run_dir)
+share_target = $(prefix)/$(share_dir)
 doc_target = $(prefix)/$(doc_dir)
 data_target = $(prefix)/$(data_dir)
 
@@ -655,8 +656,9 @@ C_DEFS= $(extra_defs) \
 	 -DNAME='"$(MAIN_NAME)"' -DVERSION='"$(RELEASE)"' -DARCH='"$(ARCH)"' \
 	 -DOS='$(OS)_' -DOS_QUOTED='"$(OS)"' -DCOMPILER='"$(CC_VER)"'\
 	 -D__CPU_$(ARCH) $(os_defs) \
-	 -DSER_VER=$(SER_VER) \
+	 -DVERSIONVAL=$(VERSIONVAL) \
 	 -DCFG_DIR='"$(cfg_target)"'\
+	 -DSHARE_DIR='"$(share_target)"'\
 	 -DRUN_DIR='"$(run_target)"'
 
 ifneq ($(MEMPKG), sys)
@@ -696,8 +698,8 @@ C_DEFS+= -DSHM_MEM  -DSHM_MMAP \
 				# you may also want to set -DPROFILING
 
 # WARNING: do not add mode=debug or mode=release anymore in the Makefile,
-# use make mode=debug all instead. Anyway no by default ser is  compiled w/
-# debugging symbols in all cases (-g). --andrei
+# use make mode=debug all instead. By default Kamailio is compiled with
+# debugging symbols in all cases (-g) and without optimization (-O0).
 
 # memory managers and related debug mode
 C_DEFS+= -DMEM_JOIN_FREE
@@ -886,7 +888,7 @@ ifeq		($(CC_NAME), gcc)
 				CFLAGS=-g $(CC_OPT) -funroll-loops  -Wcast-align $(PROFILE)
 			#if gcc 8.0+, 7.0+, 6.0+, 5.0+, 4.5+ or 4.2+
 ifeq (,$(strip $(filter-out 4.2+ 4.5+ 5.0+ 6.0+ 7.0+ 8.0+,$(CC_SHORTVER))))
-$(call				set_if_empty,CPUTYPE,athlon64)
+$(call				set_if_empty,CPUTYPE,generic)
 					CFLAGS+=-m32 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
@@ -967,18 +969,8 @@ ifeq		($(CC_NAME), gcc)
 				#common stuff
 				CFLAGS=-g $(CC_OPT) -funroll-loops  -Wcast-align $(PROFILE)
 			#if gcc 4.5+
-			# don't add '-mtune=$(CPUTYPE)' - gcc failure
-ifeq			($(CC_SHORTVER),$(filter $(CC_SHORTVER),4.5+ 5.0+ 6.0+ 7.0+ 8.0+))
-$(call				set_if_empty,CPUTYPE,opteron)
-					CFLAGS+=-m64 -minline-all-stringops \
-							-falign-loops \
-							-ftree-vectorize \
-							-fno-strict-overflow
-					LDFLAGS+=-m64
-else
-			#if gcc 4.2+
-ifeq			($(CC_SHORTVER), 4.2+)
-$(call				set_if_empty,CPUTYPE,opteron)
+ifeq			($(CC_SHORTVER),$(filter $(CC_SHORTVER),4.2+ 4.5+ 5.0+ 6.0+ 7.0+ 8.0+))
+$(call				set_if_empty,CPUTYPE,generic)
 					CFLAGS+=-m64 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
@@ -988,7 +980,7 @@ $(call				set_if_empty,CPUTYPE,opteron)
 else
 			#if gcc 4.0+
 ifeq			($(CC_SHORTVER), 4.x)
-$(call				set_if_empty,CPUTYPE,opteron)
+$(call				set_if_empty,CPUTYPE,athlon64)
 					CFLAGS+=-m64 -minline-all-stringops \
 							-falign-loops \
 							-ftree-vectorize \
@@ -1026,7 +1018,6 @@ endif			# CC_SHORTVER, 2.9x
 endif			# CC_SHORTVER, 3.0
 endif			# CC_SHORTVER, 3.4
 endif			# CC_SHORTVER, 4.x
-endif			# CC_SHORTVER, 4.2+
 endif			# CC_SHORTVER, 8.0+, 7.0+, 6.0+, 5.0+, 4.5+
 
 else		# CC_NAME, gcc
@@ -2104,7 +2095,8 @@ saved_chg_vars:=\
 		cfg_prefix cfg_dir bin_prefix bin_dir modules_prefix modules_dir \
 		doc_prefix doc_dir man_prefix man_dir ut_prefix ut_dir \
 		share_prefix share_dir lib_prefix lib_dir data_prefix data_dir \
-		cfg_target lib_target data_target run_prefix run_dir run_target
+		cfg_target lib_target data_target run_prefix run_dir run_target \
+		share_target
 
 
 #export relevant variables to the sub-makes

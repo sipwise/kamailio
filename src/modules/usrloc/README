@@ -89,7 +89,9 @@ Carsten Bock
               3.43. db_insert_null (int)
               3.44. skip_remote_socket (int)
               3.45. db_timer_clean (int)
-              3.46. server_id_filter (int)
+              3.46. rm_expired_delay (int)
+              3.47. server_id_filter (int)
+              3.48. version_table (integer)
 
         4. RPC Commands
 
@@ -182,7 +184,9 @@ Carsten Bock
    1.43. Set db_insert_null parameter
    1.44. Set skip_remote_socket parameter
    1.45. Set db_timer_clean parameter
-   1.46. Set server_id_filter parameter
+   1.46. Set rm_expired_delay parameter
+   1.47. Set server_id_filter parameter
+   1.48. version_table parameter usage
 
 Chapter 1. Admin Guide
 
@@ -244,7 +248,9 @@ Chapter 1. Admin Guide
         3.43. db_insert_null (int)
         3.44. skip_remote_socket (int)
         3.45. db_timer_clean (int)
-        3.46. server_id_filter (int)
+        3.46. rm_expired_delay (int)
+        3.47. server_id_filter (int)
+        3.48. version_table (integer)
 
    4. RPC Commands
 
@@ -285,9 +291,8 @@ Chapter 1. Admin Guide
    The SIP RFC 3261 publishes a matching algorithm based only on the
    contact string with Call-id and Cseq extra checking (if the Call-ID is
    the same, it must have a higher Cseq number, otherwise it is invalid).
-   But as argumented above, this is not enough in NAT traversal context,
-   so the Kamailio implementation of contact matching offers more
-   algorithms:
+   But as argued above, this is not enough in NAT traversal context, so
+   the Kamailio implementation of contact matching offers more algorithms:
      * Contact based only - it is strict RFC 3261 compliancy - the Contact
        URI is matched as string and extra checked via Call-ID and cseq (if
        Call-ID is the same, it must have a higher cseq number, otherwise
@@ -303,9 +308,9 @@ Chapter 1. Admin Guide
      * Call-id only based - it is not according to RFC3261, as it will
        check the Call-ID only (independent of the Contact-Header or Path).
 
-   To find out how to control/select the contact maching algorithm, please
-   see the module parameter matching_mode - Section 3.29, “matching_mode
-   (integer)”.
+   To find out how to control/select the contact matching algorithm,
+   please see the module parameter matching_mode - Section 3.29,
+   “matching_mode (integer)”.
 
 2. Dependencies
 
@@ -370,7 +375,9 @@ Chapter 1. Admin Guide
    3.43. db_insert_null (int)
    3.44. skip_remote_socket (int)
    3.45. db_timer_clean (int)
-   3.46. server_id_filter (int)
+   3.46. rm_expired_delay (int)
+   3.47. server_id_filter (int)
+   3.48. version_table (integer)
 
 3.1. nat_bflag (integer)
 
@@ -612,7 +619,7 @@ modparam("usrloc", "partition_column", "part")
 3.22. use_domain (integer)
 
    If the domain part of the user should be also saved and used for
-   identifing the user (along with the username part). Useful in multi
+   identifying the user (along with the username part). Useful in multi
    domain scenarios. Non 0 value means true.
 
    Default value is “0 (false)”.
@@ -688,7 +695,7 @@ modparam("usrloc", "db_url", "dbdriver://username:password@dbhost/dbname")
        more servers sharing the same DB without any replication at SIP
        level. The mode may be slower due the high number of DB operation.
        For example NAT pinging is a killer since during each ping cycle
-       all nated contact are loaded from the DB; The lack of memory
+       all natted contact are loaded from the DB; The lack of memory
        caching also disable the statistics exports.
      * 4 - This uses database to load records at startup but uses only
        memory during the runtime. Records are not written back at all, not
@@ -847,7 +854,7 @@ modparam("usrloc", "db_check_update", 1)
 3.36. timer_procs (int)
 
    Number of timer processes to be started by module. Timer processes take
-   care of checking expired records and syncronization with database. If
+   care of checking expired records and synchronization with database. If
    set to 0, no dedicated timer is started, the one from core will be
    used.
 
@@ -947,7 +954,7 @@ modparam("usrloc", "db_raw_fetch_type", 1)
    not have table definitions that create automatically the null fields
    (e.g., db_mongodb) for each stored record.
 
-   When set to 0, the fiels that default to null are not added to the DB
+   When set to 0, the fields that default to null are not added to the DB
    insert statement if they don't have a different value, making the query
    smaller.
 
@@ -984,15 +991,44 @@ modparam("usrloc", "skip_remote_socket", 1)
 modparam("usrloc", "db_timer_clean", 1)
 ...
 
-3.46. server_id_filter (int)
+3.46. rm_expired_delay (int)
 
-   Enable (1) or disable (0) filter records by server_id on load.
+   Specify the number of seconds to delay the removal of expired records.
+   For now it works for DB_ONLY mode (db_mode=3).
 
    Default value is “0”.
 
-   Example 1.46. Set server_id_filter parameter
+   Example 1.46. Set rm_expired_delay parameter
+...
+modparam("usrloc", "rm_expired_delay", 30)
+...
+
+3.47. server_id_filter (int)
+
+   Enable (1) or disable (0) filter records by server_id on load and
+   during cleaning of expired db records. It could be usefull when you
+   want to use the same location table for several kamailio instances
+   which are configured to work in db_mode=1 or db_mode=2 (cache modes).
+   Otherwise one instance of proxy cleans records made by another proxy
+   and that breaks its cache.
+
+   Default value is “0”.
+
+   Example 1.47. Set server_id_filter parameter
 ...
 modparam("usrloc", "server_id_filter", 1)
+...
+
+3.48. version_table (integer)
+
+   If set to 0, the module will skip checking the version for location
+   table.
+
+   Default value is “1 (check for table version)”.
+
+   Example 1.48. version_table parameter usage
+...
+modparam("usrloc", "version_table", 0)
 ...
 
 4. RPC Commands
@@ -1109,24 +1145,24 @@ modparam("usrloc", "server_id_filter", 1)
 5.1. users
 
    Number of AOR existing in the USRLOC memory cache for that domain - can
-   not be resetted; this statistic will be register for each used domain
-   (Ex: location).
+   not be reset; this statistic will be register for each used domain (Ex:
+   location).
 
 5.2. contacts
 
    Number of contacts existing in the USRLOC memory cache for that domain
-   - can not be resetted; this statistic will be register for each used
+   - can not be reset; this statistic will be register for each used
    domain (Ex: location).
 
 5.3. expires
 
-   Total number of expired contacts for that domain - can be resetted;
-   this statistic will be register for each used domain (Ex: location).
+   Total number of expired contacts for that domain - can be reset; this
+   statistic will be register for each used domain (Ex: location).
 
 5.4. registered_users
 
    Total number of AOR existing in the USRLOC memory cache for all domains
-   - can not be resetted.
+   - can not be reset.
 
 Chapter 2. Developer Guide
 

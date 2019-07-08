@@ -37,6 +37,7 @@
 #define DMQ_NODE_ACTIVE 1 << 1
 #define DMQ_NODE_TIMEOUT 1 << 2
 #define DMQ_NODE_DISABLED 1 << 3
+#define DMQ_NODE_PENDING 1 << 4
 
 typedef struct dmq_node
 {
@@ -69,13 +70,14 @@ dmq_node_t *find_dmq_node_uri(dmq_node_list_t *list, str *uri);
 dmq_node_t *find_dmq_node_uri2(str *uri);
 int del_dmq_node(dmq_node_list_t *list, dmq_node_t *node);
 int cmp_dmq_node(dmq_node_t *node, dmq_node_t *cmpnode);
+int update_dmq_node_status(dmq_node_list_t *list, dmq_node_t *node, int status);
 dmq_node_t *shm_dup_node(dmq_node_t *node);
 void destroy_dmq_node(dmq_node_t *node, int shm);
 void shm_free_node(dmq_node_t *node);
 void pkg_free_node(dmq_node_t *node);
 int set_dmq_node_params(dmq_node_t *node, param_t *params);
 
-str *get_status_str(int status);
+str *dmq_get_status_str(int status);
 int build_node_str(dmq_node_t *node, char *buf, int buflen);
 
 extern dmq_node_t *self_node;

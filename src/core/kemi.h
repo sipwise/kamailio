@@ -37,6 +37,10 @@
 
 #define SR_KEMI_PARAMS_MAX	6
 
+extern str kemi_onsend_route_callback;
+extern str kemi_reply_route_callback;
+extern str kemi_event_route_callback;
+
 typedef struct sr_kemi {
 	str mname; /* sub-module name */
 	str fname; /* function name */
@@ -104,6 +108,37 @@ typedef int (*sr_kemi_fmssss_f)(sip_msg_t*, str*, str*, str*, str*);
 
 /* sip_msg_t and five int|str params */
 typedef int (*sr_kemi_fmsssss_f)(sip_msg_t*, str*, str*, str*, str*, str*);
+typedef int (*sr_kemi_fmssssn_f)(sip_msg_t*, str*, str*, str*, str*, int);
+typedef int (*sr_kemi_fmsssns_f)(sip_msg_t*, str*, str*, str*, int, str*);
+typedef int (*sr_kemi_fmsssnn_f)(sip_msg_t*, str*, str*, str*, int, int);
+typedef int (*sr_kemi_fmssnss_f)(sip_msg_t*, str*, str*, int, str*, str*);
+typedef int (*sr_kemi_fmssnsn_f)(sip_msg_t*, str*, str*, int, str*, int);
+typedef int (*sr_kemi_fmssnns_f)(sip_msg_t*, str*, str*, int, int, str*);
+typedef int (*sr_kemi_fmssnnn_f)(sip_msg_t*, str*, str*, int, int, int);
+typedef int (*sr_kemi_fmsnsss_f)(sip_msg_t*, str*, int, str*, str*, str*);
+typedef int (*sr_kemi_fmsnssn_f)(sip_msg_t*, str*, int, str*, str*, int);
+typedef int (*sr_kemi_fmsnsns_f)(sip_msg_t*, str*, int, str*, int, str*);
+typedef int (*sr_kemi_fmsnsnn_f)(sip_msg_t*, str*, int, str*, int, int);
+typedef int (*sr_kemi_fmsnnss_f)(sip_msg_t*, str*, int, int, str*, str*);
+typedef int (*sr_kemi_fmsnnsn_f)(sip_msg_t*, str*, int, int, str*, int);
+typedef int (*sr_kemi_fmsnnns_f)(sip_msg_t*, str*, int, int, int, str*);
+typedef int (*sr_kemi_fmsnnnn_f)(sip_msg_t*, str*, int, int, int, int);
+typedef int (*sr_kemi_fmnssss_f)(sip_msg_t*, int, str*, str*, str*, str*);
+typedef int (*sr_kemi_fmnsssn_f)(sip_msg_t*, int, str*, str*, str*, int);
+typedef int (*sr_kemi_fmnssns_f)(sip_msg_t*, int, str*, str*, int, str*);
+typedef int (*sr_kemi_fmnssnn_f)(sip_msg_t*, int, str*, str*, int, int);
+typedef int (*sr_kemi_fmnsnss_f)(sip_msg_t*, int, str*, int, str*, str*);
+typedef int (*sr_kemi_fmnsnsn_f)(sip_msg_t*, int, str*, int, str*, int);
+typedef int (*sr_kemi_fmnsnns_f)(sip_msg_t*, int, str*, int, int, str*);
+typedef int (*sr_kemi_fmnsnnn_f)(sip_msg_t*, int, str*, int, int, int);
+typedef int (*sr_kemi_fmnnsss_f)(sip_msg_t*, int, int, str*, str*, str*);
+typedef int (*sr_kemi_fmnnssn_f)(sip_msg_t*, int, int, str*, str*, int);
+typedef int (*sr_kemi_fmnnsns_f)(sip_msg_t*, int, int, str*, int, str*);
+typedef int (*sr_kemi_fmnnsnn_f)(sip_msg_t*, int, int, str*, int, int);
+typedef int (*sr_kemi_fmnnnss_f)(sip_msg_t*, int, int, int, str*, str*);
+typedef int (*sr_kemi_fmnnnsn_f)(sip_msg_t*, int, int, int, str*, int);
+typedef int (*sr_kemi_fmnnnns_f)(sip_msg_t*, int, int, int, int, str*);
+typedef int (*sr_kemi_fmnnnnn_f)(sip_msg_t*, int, int, int, int, int);
 
 /* sip_msg_t and six int|str params */
 typedef int (*sr_kemi_fmssssss_f)(sip_msg_t*, str*, str*, str*, str*, str*, str*);
@@ -138,7 +173,7 @@ run_act_ctx_t* sr_kemi_act_ctx_get(void);
 str *sr_kemi_param_map_get_name(int ptype);
 str *sr_kemi_param_map_get_params(int *ptypes);
 
-int sr_kemi_core_drop(sip_msg_t *msg);
+int sr_kemi_core_set_drop(sip_msg_t *msg);
 
 int sr_kemi_route(sr_kemi_eng_t *keng, sip_msg_t *msg, int rtype,
 		str *ename, str *edata);

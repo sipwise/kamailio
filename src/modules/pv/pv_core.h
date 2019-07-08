@@ -94,6 +94,9 @@ int pv_get_cseq_body(struct sip_msg *msg, pv_param_t *param,
 int pv_get_msg_buf(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
+int pv_get_msg_buf_updated(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
 int pv_get_msg_len(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
@@ -140,6 +143,9 @@ int pv_get_srcaddr_uri(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_get_srcaddr_uri_full(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
+int pv_get_srcaddr_socket(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_get_rcvip(struct sip_msg *msg, pv_param_t *param,
@@ -367,5 +373,11 @@ int pv_get_msg_attrs(sip_msg_t *msg, pv_param_t *param,
 int pv_parse_env_name(pv_spec_p sp, str *in);
 
 int pv_get_env(sip_msg_t *msg, pv_param_t *param, pv_value_t *res);
+
+int pv_parse_ksr_attrs_name(pv_spec_p sp, str *in);
+
+int pv_get_ksr_attrs(sip_msg_t *msg, pv_param_t *param,
+		pv_value_t *res);
+
 #endif
 

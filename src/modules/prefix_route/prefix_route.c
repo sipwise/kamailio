@@ -26,8 +26,10 @@
  * \ingroup prefix_route
  */
 
-/*! \defgroup prefix_route
+/*! \defgroup prefix_route Prefix routing module
+ * \ingroup modules
  * The prefix_route module does routing based on a set of prefixes from the database.
+ * @{
  */
 
 
@@ -325,11 +327,11 @@ static int prefix_route(struct sip_msg *msg, char *p1, char *p2)
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-	{"prefix_route", prefix_route, 0, 0,
+	{"prefix_route", prefix_route, 0, 0, 0,
 		REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
-	{"prefix_route", prefix_route, 1, fixup_spve_null,
+	{"prefix_route", prefix_route, 1, fixup_spve_null, 0,
 		ANY_ROUTE},
-	{0,              0,            0, 0, 0            }
+	{0,              0,            0, 0, 0, 0         }
 };
 
 /*
@@ -346,15 +348,16 @@ static param_export_t params[] = {
  * Module description
  */
 struct module_exports exports = {
-	"prefix_route",  /* Module name             */
-	cmds,            /* Exported functions      */
-	pr_rpc,          /* RPC methods             */
-	params,          /* Exported parameters     */
-	mod_init,        /* Initialization function */
-	0,               /* Response function       */
-	mod_destroy,     /* Destroy function        */
-	0,               /* OnCancel function       */
-	0                /* Child init function     */
+	"prefix_route",  /* Module name              */
+	DEFAULT_DLFLAGS, /* dlopen flags             */
+	cmds,            /* exported functions       */
+	params,          /* exported parameters      */
+	pr_rpc,          /* RPC methods              */
+	0,               /* pseudo-variables exports */
+	0,               /* response function        */
+	mod_init,        /* initialization function  */
+	0,               /* per-child init function  */
+	mod_destroy      /* module destroy function  */
 };
 
 /**
@@ -385,3 +388,5 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 	sr_kemi_modules_add(sr_kemi_prefix_route_exports);
 	return 0;
 }
+
+/** @} */

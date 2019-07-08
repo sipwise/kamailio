@@ -8,6 +8,12 @@ LIBS=
 
 ifeq ($(CROSS_COMPILE),)
 XML2CFG=$(shell which xml2-config)
+ifeq ($(OS), darwin)
+ICU_BUILDER = $(shell \
+	if pkg-config --exists icu-uc; then \
+		echo 'pkg-config icu-uc'; \
+	fi)
+endif
 endif
 
 ifneq ($(XML2CFG),)
@@ -19,7 +25,10 @@ else
 	LIBS+=-L$(LOCALBASE)/lib -lxml2
 endif
 
-DEFS+=-DKAMAILIO_MOD_INTERFACE
+ifneq ($(ICU_BUILDER),)
+	DEFS += $(shell $(ICU_BUILDER) --cflags )
+	LIBS += $(shell $(ICU_BUILDER) --libs)
+endif
 
 SERLIBPATH=../../lib
 SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1

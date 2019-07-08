@@ -404,7 +404,7 @@ modparam("http_client", "tlsversion", 6)
 				<programlisting format="linespecific">
 ...
 # Use the best of BASIC and Digest authentication.
-modparam("http_client", "authmetod", 3)
+modparam("http_client", "authmethod", 3)
 ...
 				</programlisting>
 			</example>
@@ -632,7 +632,7 @@ http_follow_redirect = no
 				<listitem>
 					<para>
 						<emphasis>connection</emphasis> - the name of an existing
-						HTTP connection, definied by a httpcon modparam.
+						HTTP connection, defined by a httpcon modparam.
 					</para>
 					<para>
 						<emphasis>url</emphasis> - the part of the URL to add to the
@@ -692,7 +692,7 @@ xlog("L_INFO", "API-server HTTP connection: $avp(route) Result code $var(res)\n"
 				<listitem>
 					<para>
 						<emphasis>connection</emphasis> - the name of an existing
-						HTTP connection, definied by a httpcon modparam.
+						HTTP connection, defined by a httpcon modparam.
 					</para>
 					<para>
 						<emphasis>result</emphasis> - The name of a pseudo variable that

@@ -186,7 +186,10 @@ int db_mysql_submit_query_async(const db1_con_t* _h, const str* _s)
 	p[1].len = _s->len;
 	strncpy(p[1].s, _s->s, _s->len);
 
-	async_task_push(atask);
+	if (async_task_push(atask)<0) {
+		shm_free(atask);
+		return -1;
+	}
 
 	return 0;
 }
@@ -541,6 +544,8 @@ int db_mysql_update(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _o,
  * \param _k key names
  * \param _v values of the keys that must match
  * \param _n number of key=value pairs
+ * \param _un unused for db_mysql
+ * \param _m unused for db_mysql
  * \return zero on success, negative value on failure
  */
 int db_mysql_replace(const db1_con_t* _h, const db_key_t* _k,
@@ -584,6 +589,7 @@ int db_mysql_affected_rows(const db1_con_t* _h)
 /**
  * Starts a single transaction that will consist of one or more queries (SQL BEGIN)
  * \param _h database handle
+ * \param _l database locking , supports no locking or full locking
  * \return 0 on success, negative on failure
  */
 int db_mysql_start_transaction(db1_con_t* _h, db_locking_t _l)
