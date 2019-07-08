@@ -119,8 +119,8 @@ modparam("app_python", "load", "/usr/local/etc/kamailio/myscript.py")
 
 3.3. mod_init_function (string)
 
-   The Python function to be executed by this module when it is initialied
-   by Kamailio.
+   The Python function to be executed by this module when it is
+   initialized by Kamailio.
 
    Default value is “mod_init”.
 
@@ -132,7 +132,7 @@ modparam("app_python", "mod_init_function", "my_mod_init")
 3.4. child_init_method (string)
 
    The Python function to be executed by this module when a new worker
-   process (child) is initialied by Kamailio.
+   process (child) is initialized by Kamailio.
 
    Default value is “child_init”.
 
@@ -167,11 +167,8 @@ python_exec("my_python_function", "$rU");
 
 5.1.  app_python.reload
 
-   IMPORTANT: not functional yet (can crash a running instance, use it
-   only for testing).
-
-   Marks the need to reload the js script. The actual reload is done by
-   every working process when the next call to KEMI config is executed.
+   Marks the need to reload the Python script. The actual reload is done
+   by each worker when the next Python method is invoked.
 
    Name: app_python.reload
 

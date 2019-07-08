@@ -52,6 +52,7 @@ MODULE_VERSION
 int  ht_timer_interval = 20;
 int  ht_db_expires_flag = 0;
 int  ht_enable_dmq = 0;
+int  ht_dmq_init_sync = 0;
 int  ht_timer_procs = 0;
 static int ht_event_callback_mode = 0;
 
@@ -66,10 +67,13 @@ static int child_init(int rank);
 static void destroy(void);
 
 static int fixup_ht_key(void** param, int param_no);
+static int w_ht_rm(sip_msg_t* msg, char* htname, char* itname);
 static int ht_rm_name_re(struct sip_msg* msg, char* key, char* foo);
 static int ht_rm_value_re(struct sip_msg* msg, char* key, char* foo);
 static int w_ht_rm_name(struct sip_msg* msg, char* hname, char* op, char *val);
 static int w_ht_rm_value(struct sip_msg* msg, char* hname, char* op, char *val);
+static int w_ht_has_name(struct sip_msg* msg, char* hname, char* op, char *val);
+static int w_ht_has_str_value(struct sip_msg* msg, char* hname, char* op, char *val);
 static int w_ht_slot_lock(struct sip_msg* msg, char* key, char* foo);
 static int w_ht_slot_unlock(struct sip_msg* msg, char* key, char* foo);
 static int ht_reset(struct sip_msg* msg, char* htname, char* foo);
@@ -104,7 +108,9 @@ static pv_export_t mod_pvs[] = {
 
 
 static cmd_export_t cmds[]={
-	{"sht_print",       (cmd_function)ht_print,        0, 0, 0,
+	{"sht_print",       (cmd_function)ht_print,       0, 0, 0,
+		ANY_ROUTE},
+	{"sht_rm",	(cmd_function)w_ht_rm,	2, fixup_spve_spve, 0,
 		ANY_ROUTE},
 	{"sht_rm_name_re",  (cmd_function)ht_rm_name_re,   1, fixup_ht_key, 0,
 		ANY_ROUTE},
@@ -113,6 +119,10 @@ static cmd_export_t cmds[]={
 	{"sht_rm_name",  (cmd_function)w_ht_rm_name,   3, fixup_spve_all, 0,
 		ANY_ROUTE},
 	{"sht_rm_value", (cmd_function)w_ht_rm_value,  3, fixup_spve_all, 0,
+		ANY_ROUTE},
+	{"sht_has_name",  (cmd_function)w_ht_has_name,   3, fixup_spve_all, 0,
+		ANY_ROUTE},
+	{"sht_has_str_value", (cmd_function)w_ht_has_str_value,  3, fixup_spve_all, 0,
 		ANY_ROUTE},
 	{"sht_lock",        (cmd_function)w_ht_slot_lock,    1, fixup_ht_key, 0,
 		ANY_ROUTE},
@@ -144,6 +154,7 @@ static param_export_t params[]={
 	{"timer_interval",      INT_PARAM, &ht_timer_interval},
 	{"db_expires",          INT_PARAM, &ht_db_expires_flag},
 	{"enable_dmq",          INT_PARAM, &ht_enable_dmq},
+	{"dmq_init_sync",       INT_PARAM, &ht_dmq_init_sync},
 	{"timer_procs",         PARAM_INT, &ht_timer_procs},
 	{"event_callback",      PARAM_STR, &ht_event_callback},
 	{"event_callback_mode", PARAM_INT, &ht_event_callback_mode},
@@ -153,18 +164,16 @@ static param_export_t params[]={
 
 /** module exports */
 struct module_exports exports= {
-	"htable",
-	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,
-	params,
-	0,          /* exported statistics */
-	0,          /* exported MI functions */
-	mod_pvs,    /* exported pseudo-variables */
-	0,          /* extra processes */
-	mod_init,   /* module initialization function */
-	0,
-	(destroy_function) destroy,
-	child_init  /* per-child init function */
+	"htable",			/* module name */
+	DEFAULT_DLFLAGS,	/* dlopen flags */
+	cmds,				/* exported functions */
+	params,				/* exported parameters */
+	0,					/* RPC method exports */
+	mod_pvs,					/* exported pseudo-variables */
+	0,					/* response handling function */
+	mod_init,			/* module initialization function */
+	child_init,			/* per-child init function */
+	destroy				/* module destroy function */
 };
 
 /**
@@ -211,7 +220,7 @@ static int mod_init(void)
 		}
 	}
 
-	if (ht_enable_dmq>0 && ht_dmq_initialize()!=0) {
+	if (ht_enable_dmq>0 && ht_dmq_initialize(ht_dmq_init_sync)!=0) {
 		LM_ERR("failed to initialize dmq integration\n");
 		return -1;
 	}
@@ -279,7 +288,7 @@ static int child_init(int rank)
 			run_top_route(event_rt.rlist[rt], fmsg, &ctx);
 		} else {
 			if(keng!=NULL) {
-				if(keng->froute(fmsg, EVENT_ROUTE,
+				if(sr_kemi_ctx_route(keng, &ctx, fmsg, EVENT_ROUTE,
 							&ht_event_callback, &evname)<0) {
 					LM_ERR("error running event route kemi callback\n");
 					return -1;
@@ -537,6 +546,123 @@ static int ki_ht_rm_value(sip_msg_t* msg, str* sname, str* sop, str *sval)
 	return ht_rm_items(msg, sname, sop, sval, 1);
 }
 
+static int ki_ht_rm(sip_msg_t* msg, str* hname, str* iname)
+{
+	ht_t *ht;
+
+	ht = ht_get_table(hname);
+	if(ht==NULL) {
+		LM_ERR("cannot get hash table [%.*s]\n", hname->len, hname->s);
+		return -1;
+	}
+
+	/* delete it */
+	if (ht->dmqreplicate>0
+			&& ht_dmq_replicate_action(HT_DMQ_DEL_CELL, hname,
+				iname, 0, NULL, 0)!=0) {
+		LM_ERR("dmq relication failed\n");
+	}
+	ht_del_cell(ht, iname);
+	return 1;
+}
+
+static int w_ht_rm(sip_msg_t* msg, char* htname, char* itname)
+{
+	str shtname;
+	str sitname;
+
+	if(fixup_get_svalue(msg, (gparam_t*)htname, &shtname)<0 || shtname.len<=0) {
+		LM_ERR("cannot get the hash table name\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)itname, &sitname)<0 || sitname.len<=0) {
+		LM_ERR("cannot get the item table name\n");
+		return -1;
+	}
+
+	return ki_ht_rm(msg, &shtname, &sitname);
+}
+
+static int ht_has_str_items(sip_msg_t* msg, str* hname, str* op, str *val,
+		int mkey)
+{
+	ht_t *ht;
+	int vop;
+
+	ht = ht_get_table(hname);
+	if(ht==NULL) {
+		LM_ERR("cannot get hash table [%.*s]\n", hname->len, hname->s);
+		return -1;
+	}
+
+	switch(op->len) {
+		case 2:
+			if(strncmp(op->s, "eq", 2)==0) {
+				vop = HT_RM_OP_EQ;
+			} else if(strncmp(op->s, "ne", 2)==0) {
+				vop = HT_RM_OP_NE;
+			} else if(strncmp(op->s, "re", 2)==0) {
+				vop = HT_RM_OP_RE;
+			} else if(strncmp(op->s, "sw", 2)==0) {
+				vop = HT_RM_OP_SW;
+			} else {
+				LM_WARN("unsupported match operator: %.*s\n", op->len, op->s);
+				return -1;
+			}
+			if(ht_has_cell_op_str(val, ht, mkey, vop)<0) {
+				return -1;
+			}
+			return 1;
+		default:
+			LM_WARN("unsupported match operator: %.*s\n", op->len, op->s);
+			return -1;
+	}
+}
+
+static int w_ht_has_str_items(sip_msg_t* msg, char* hname, char* op, char *val,
+		int mkey)
+{
+	str sname;
+	str sop;
+	str sval;
+
+	if(fixup_get_svalue(msg, (gparam_t*)hname, &sname)<0 || sname.len<=0) {
+		LM_ERR("cannot get the hash table name\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)op, &sop)<0 || sop.len<=0) {
+		LM_ERR("cannot get the match operation\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)val, &sval)<0 || sval.len<=0) {
+		LM_ERR("cannot the get match value\n");
+		return -1;
+	}
+
+	return ht_has_str_items(msg, &sname, &sop, &sval, mkey);
+}
+
+static int w_ht_has_name(sip_msg_t* msg, char* hname, char* op, char *val)
+{
+	return w_ht_has_str_items(msg, hname, op, val, 0);
+}
+
+static int w_ht_has_str_value(sip_msg_t* msg, char* hname, char* op, char *val)
+{
+	return w_ht_has_str_items(msg, hname, op, val, 1);
+}
+
+static int ki_ht_has_name(sip_msg_t* msg, str* sname, str* sop, str *sval)
+{
+	return ht_has_str_items(msg, sname, sop, sval, 0);
+
+}
+
+static int ki_ht_has_str_value(sip_msg_t* msg, str* sname, str* sop, str *sval)
+{
+	return ht_has_str_items(msg, sname, sop, sval, 1);
+}
+
 static int ht_reset_by_name(str *hname)
 {
 	ht_t *ht;
@@ -549,6 +675,11 @@ static int ht_reset_by_name(str *hname)
 		return -1;
 	return 0;
 
+}
+
+static int ki_ht_reset_by_name(sip_msg_t* msg, str *hname)
+{
+	return ht_reset_by_name(hname);
 }
 
 static int ht_reset(struct sip_msg* msg, char* htname, char* foo)
@@ -784,6 +915,187 @@ int ht_param(modparam_t type, void *val)
 error:
 	return -1;
 
+}
+
+/**
+ *
+ */
+static int ki_ht_sets(sip_msg_t *msg, str *htname, str *itname, str *itval)
+{
+	int_str isvalue;
+	ht_t *ht;
+
+	/* Find the htable */
+	ht = ht_get_table(htname);
+	if (!ht) {
+		LM_ERR("No such htable: %.*s\n", htname->len, htname->s);
+		return -1;
+	}
+
+	isvalue.s = *itval;
+
+	if (ht->dmqreplicate>0 && ht_dmq_replicate_action(HT_DMQ_SET_CELL,
+				&ht->name, itname, AVP_VAL_STR, &isvalue, 1)!=0) {
+		LM_ERR("dmq relication failed\n");
+	}
+
+	if(ht_set_cell(ht, itname, AVP_VAL_STR, &isvalue, 1)!=0) {
+		LM_ERR("cannot set sht: %.*s key: %.*s\n", htname->len, htname->s,
+				itname->len, itname->s);
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int ki_ht_seti(sip_msg_t *msg, str *htname, str *itname, int itval)
+{
+	int_str isvalue;
+	ht_t *ht;
+
+	/* Find the htable */
+	ht = ht_get_table(htname);
+	if (!ht) {
+		LM_ERR("No such htable: %.*s\n", htname->len, htname->s);
+		return -1;
+	}
+
+	isvalue.n = itval;
+
+	if (ht->dmqreplicate>0 && ht_dmq_replicate_action(HT_DMQ_SET_CELL,
+				&ht->name, itname, 0, &isvalue, 1)!=0) {
+		LM_ERR("dmq relication failed\n");
+	}
+
+	if(ht_set_cell(ht, itname, 0, &isvalue, 1)!=0) {
+		LM_ERR("cannot set sht: %.*s key: %.*s\n", htname->len, htname->s,
+				itname->len, itname->s);
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int ki_ht_setex(sip_msg_t *msg, str *htname, str *itname, int itval)
+{
+	int_str isval;
+	ht_t *ht;
+
+	/* Find the htable */
+	ht = ht_get_table(htname);
+	if (!ht) {
+		LM_ERR("No such htable: %.*s\n", htname->len, htname->s);
+		return -1;
+	}
+
+	LM_DBG("set expire value for sht: %.*s key: %.*s exp: %d\n", htname->len,
+			htname->s, itname->len, itname->s, itval);
+
+	isval.n = itval;
+	if (ht->dmqreplicate>0
+				&& ht_dmq_replicate_action(HT_DMQ_SET_CELL_EXPIRE, htname,
+				itname, 0, &isval, 0)!=0) {
+		LM_ERR("dmq relication failed\n");
+	}
+	if(ht_set_cell_expire(ht, itname, 0, &isval)!=0) {
+		LM_ERR("cannot set expire for sht: %.*s key: %.*s\n", htname->len,
+				htname->s, itname->len, itname->s);
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int ki_ht_setxs(sip_msg_t *msg, str *htname, str *itname, str *itval,
+	int exval)
+{
+	int_str isval;
+	ht_t *ht;
+
+	/* Find the htable */
+	ht = ht_get_table(htname);
+	if (!ht) {
+		LM_ERR("No such htable: %.*s\n", htname->len, htname->s);
+		return -1;
+	}
+
+	LM_DBG("set value and expire for sht: %.*s key: %.*s val: %.*s exp: %d\n",
+			htname->len, htname->s, itname->len, itname->s,
+			(itval->len>100)?100:itval->len, itval->s, exval);
+
+	if (ht->dmqreplicate>0) {
+		isval.s = *itval;
+		if (ht->dmqreplicate>0 && ht_dmq_replicate_action(HT_DMQ_SET_CELL,
+				&ht->name, itname, AVP_VAL_STR, &isval, 1)!=0) {
+			LM_ERR("dmq set value replication failed\n");
+		} else {
+			isval.n = exval;
+			if(ht_dmq_replicate_action(HT_DMQ_SET_CELL_EXPIRE, htname,
+					itname, 0, &isval, 0)!=0) {
+				LM_ERR("dmq set expire relication failed\n");
+			}
+		}
+	}
+	isval.s = *itval;
+	if(ht_set_cell_ex(ht, itname, AVP_VAL_STR, &isval, 1, exval)!=0) {
+		LM_ERR("cannot set hash table: %.*s key: %.*s\n", htname->len, htname->s,
+				itname->len, itname->s);
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int ki_ht_setxi(sip_msg_t *msg, str *htname, str *itname, int itval,
+	int exval)
+{
+	int_str isval;
+	ht_t *ht;
+
+	/* Find the htable */
+	ht = ht_get_table(htname);
+	if (!ht) {
+		LM_ERR("No such htable: %.*s\n", htname->len, htname->s);
+		return -1;
+	}
+
+	LM_DBG("set value and expire for sht: %.*s key: %.*s val: %d exp: %d\n",
+			htname->len, htname->s, itname->len, itname->s, itval, exval);
+
+	if (ht->dmqreplicate>0) {
+		isval.n = itval;
+		if(ht_dmq_replicate_action(HT_DMQ_SET_CELL,
+				&ht->name, itname, 0, &isval, 1)!=0) {
+			LM_ERR("dmq set value relication failed\n");
+		} else {
+			isval.n = exval;
+			if(ht_dmq_replicate_action(HT_DMQ_SET_CELL_EXPIRE, htname,
+					itname, 0, &isval, 0)!=0) {
+				LM_ERR("dmq set expire replication failed\n");
+			}
+		}
+	}
+	isval.n = itval;
+
+	if(ht_set_cell_ex(ht, itname, 0, &isval, 1, exval)!=0) {
+		LM_ERR("cannot set value and expire for sht: %.*s key: %.*s\n",
+				htname->len, htname->s, itname->len, itname->s);
+		return -1;
+	}
+
+	return 0;
 }
 
 #define RPC_DATE_BUF_LEN 21
@@ -1304,7 +1616,7 @@ static sr_kemi_t sr_kemi_htable_exports[] = {
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("htable"), str_init("sht_reset"),
-		SR_KEMIP_INT, ht_reset_by_name,
+		SR_KEMIP_INT, ki_ht_reset_by_name,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
@@ -1321,6 +1633,11 @@ static sr_kemi_t sr_kemi_htable_exports[] = {
 	{ str_init("htable"), str_init("sht_iterator_end"),
 		SR_KEMIP_INT, ki_ht_iterator_end,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_rm"),
+		SR_KEMIP_INT, ki_ht_rm,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("htable"), str_init("sht_rm_name_re"),
@@ -1342,6 +1659,41 @@ static sr_kemi_t sr_kemi_htable_exports[] = {
 		SR_KEMIP_INT, ki_ht_rm_value,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_has_name"),
+		SR_KEMIP_INT, ki_ht_has_name,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_has_str_value"),
+		SR_KEMIP_INT, ki_ht_has_str_value,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_sets"),
+		SR_KEMIP_INT, ki_ht_sets,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_seti"),
+		SR_KEMIP_INT, ki_ht_seti,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_setex"),
+		SR_KEMIP_INT, ki_ht_setex,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_setxi"),
+		SR_KEMIP_INT, ki_ht_setxi,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
+			SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_setxs"),
+		SR_KEMIP_INT, ki_ht_setxs,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }

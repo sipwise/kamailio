@@ -16,7 +16,6 @@ Build-Depends:
  flex,
  gcj-jdk,
  libbson-dev,
- libconfuse-dev,
  libcurl4-openssl-dev,
  libdb-dev (>= 4.6.19),
  libev-dev,
@@ -30,6 +29,7 @@ Build-Depends:
  liblua5.1-0-dev,
  libmaxminddb-dev,
  libmemcached-dev,
+ libmnl-dev,
  libmongoc-dev,
  libmono-2.0-dev,
  libncurses5-dev,
@@ -52,6 +52,9 @@ Build-Depends:
  pkg-config,
  python,
  python-dev,
+ python3,
+ python3-dev,
+ ruby-dev,
  unixodbc-dev,
  uuid-dev,
  xsltproc,
@@ -72,9 +75,10 @@ Depends:
  python,
  ${misc:Depends},
  ${shlibs:Depends},
+Replaces:
+ kamailio-carrierroute-modules,
 Suggests:
  kamailio-berkeley-modules,
- kamailio-carrierroute-modules,
  kamailio-cpl-modules,
  kamailio-dbg,
  kamailio-ldap-modules,
@@ -275,6 +279,41 @@ Description: The app_python module for the Kamailio SIP server
  This package provides the app_python module, an extension allowing to
  execute embedded Python applications within the Kamailio SIP routing script.
 
+Package: kamailio-python3-modules
+Architecture: linux-any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ kamailio (= ${binary:Version}),
+ python3-dev,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: The app_python3 module for the Kamailio SIP server
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides the app_python3 module, an extension allowing to
+ execute embedded Python applications within the Kamailio SIP routing script.
+
+Package: kamailio-ruby-modules
+Architecture: linux-any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: The app_ruby module for Kamailio Ruby support
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides the app_ruby module, an extension allowing to
+ execute embedded Ruby applications within the Kamailio SIP routing script.
+
 Package: kamailio-redis-modules
 Architecture: linux-any
 Multi-Arch: same
@@ -474,23 +513,6 @@ Description: XML based extensions for Kamailio's Management Interface
  - the XMLRPC transport implementations for Kamailio's
  Management and Control Interface.
  - xmlops module for XPath operations in configuration file
-
-Package: kamailio-carrierroute-modules
-Architecture: linux-any
-Multi-Arch: same
-Pre-Depends:
- ${misc:Pre-Depends},
-Depends:
- kamailio (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Description: The carrierroute module for the Kamailio SIP server
- Kamailio is a very fast and flexible SIP (RFC3261)
- server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package provides the "carrierroute" module for Kamailio, an integrated
- solution for routing, balancing and blacklisting.
 
 Package: kamailio-berkeley-modules
 Architecture: linux-any

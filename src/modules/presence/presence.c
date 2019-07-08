@@ -68,6 +68,7 @@
 #include "event_list.h"
 #include "bind_presence.h"
 #include "notify.h"
+#include "presence_dmq.h"
 #include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
 #include "../../core/timer_proc.h"
@@ -77,7 +78,7 @@
 MODULE_VERSION
 
 #define S_TABLE_VERSION  3
-#define P_TABLE_VERSION  4
+#define P_TABLE_VERSION  5
 #define ACTWATCH_TABLE_VERSION 12
 
 char *log_buf = NULL;
@@ -144,7 +145,7 @@ int counter =0;
 int pid = 0;
 char prefix='a';
 int startup_time=0;
-str db_url = {0, 0};
+str pres_db_url = {0, 0};
 int expires_offset = 0;
 int pres_cseq_offset = 0;
 uint32_t min_expires= 0;
@@ -165,6 +166,7 @@ int pres_startup_mode = 1;
 str pres_xavp_cfg = {0};
 int pres_retrieve_order = 0;
 str pres_retrieve_order_by = str_init("priority");
+int pres_enable_dmq = 0;
 
 int db_table_lock_type = 1;
 db_locking_t db_table_lock = DB_LOCKING_WRITE;
@@ -173,6 +175,8 @@ int *pres_notifier_id = NULL;
 
 int phtable_size= 9;
 phtable_t* pres_htable=NULL;
+
+sruid_t pres_sruid;
 
 static cmd_export_t cmds[]=
 {
@@ -200,7 +204,7 @@ static cmd_export_t cmds[]=
 };
 
 static param_export_t params[]={
-	{ "db_url",                 PARAM_STR, &db_url},
+	{ "db_url",                 PARAM_STR, &pres_db_url},
 	{ "presentity_table",       PARAM_STR, &presentity_table},
 	{ "active_watchers_table",  PARAM_STR, &active_watchers_table},
 	{ "watchers_table",         PARAM_STR, &watchers_table},
@@ -233,7 +237,8 @@ static param_export_t params[]={
 	{ "retrieve_order",         PARAM_INT, &pres_retrieve_order},
 	{ "retrieve_order_by",      PARAM_STR, &pres_retrieve_order_by},
 	{ "sip_uri_match",          PARAM_INT, &pres_uri_match},
-    { "cseq_offset",            PARAM_INT, &pres_cseq_offset},
+	{ "cseq_offset",            PARAM_INT, &pres_cseq_offset},
+	{ "enable_dmq",             PARAM_INT, &pres_enable_dmq},
 	{0,0,0}
 };
 
@@ -249,14 +254,12 @@ struct module_exports exports= {
 	DEFAULT_DLFLAGS,	/* dlopen flags */
 	cmds,				/* exported functions */
 	params,				/* exported parameters */
-	0,					/* exported statistics */
-	0,					/* exported MI functions */
+	0,					/* RPC method exports */
 	pres_mod_pvs,		/* exported pseudo-variables */
-	0,					/* extra processes */
+	0,					/* response handling function */
 	mod_init,			/* module initialization function */
-	0,   				/* response handling function */
-	(destroy_function) destroy, 	/* destroy function */
-	child_init                  	/* per-child init function */
+	child_init,			/* per-child init function */
+	destroy				/* module destroy function */
 };
 
 /**
@@ -276,9 +279,10 @@ static int mod_init(void)
 		return -1;
 	}
 
-	LM_DBG("db_url=%s/%d/%p\n", ZSW(db_url.s), db_url.len,db_url.s);
+	LM_DBG("db_url=%s (len=%d addr=%p)\n", ZSW(pres_db_url.s), pres_db_url.len,
+			pres_db_url.s);
 
-	if(db_url.s== NULL)
+	if(pres_db_url.s== NULL)
 		library_mode= 1;
 
 	EvList= init_evlist();
@@ -291,6 +295,10 @@ static int mod_init(void)
 	{
 		LM_DBG("Presence module used for API library purpose only\n");
 		return 0;
+	}
+
+	if(sruid_init(&pres_sruid, '-', "pres", SRUID_INC) < 0) {
+		return -1;
 	}
 
 	if(expires_offset<0)
@@ -326,14 +334,14 @@ static int mod_init(void)
 		return -1;
 	}
 
-	if(db_url.s== NULL)
+	if(pres_db_url.s== NULL)
 	{
 		LM_ERR("database url not set!\n");
 		return -1;
 	}
 
 	/* binding to database module  */
-	if (db_bind_mod(&db_url, &pa_dbf))
+	if (db_bind_mod(&pres_db_url, &pa_dbf))
 	{
 		LM_ERR("Database module not found\n");
 		return -1;
@@ -346,7 +354,7 @@ static int mod_init(void)
 		return -1;
 	}
 
-	pa_db = pa_dbf.init(&db_url);
+	pa_db = pa_dbf.init(&pres_db_url);
 	if (!pa_db)
 	{
 		LM_ERR("Connection to database failed\n");
@@ -463,6 +471,11 @@ static int mod_init(void)
 	if (goto_on_notify_reply>=0 && event_rt.rlist[goto_on_notify_reply]==0)
 		goto_on_notify_reply=-1; /* disable */
 
+	if (pres_enable_dmq>0 && pres_dmq_initialize()!=0) {
+		LM_ERR("failed to initialize dmq integration\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -478,6 +491,10 @@ static int child_init(int rank)
 
 	if(library_mode)
 		return 0;
+
+	if(sruid_init(&pres_sruid, '-', "pres", SRUID_INC) < 0) {
+		return -1;
+	}
 
 	if (rank == PROC_MAIN)
 	{
@@ -510,9 +527,9 @@ static int child_init(int rank)
 	/* Do not pool the connections where possible when running notifier
 	 * processes. */
 	if (pres_notifier_processes > 0 && pa_dbf.init2)
-		pa_db = pa_dbf.init2(&db_url, DB_POOLING_NONE);
+		pa_db = pa_dbf.init2(&pres_db_url, DB_POOLING_NONE);
 	else
-		pa_db = pa_dbf.init(&db_url);
+		pa_db = pa_dbf.init(&pres_db_url);
 	if (!pa_db)
 	{
 		LM_ERR("child %d: unsuccessful connecting to database\n", rank);
@@ -551,7 +568,7 @@ static void destroy(void)
 {
 	if(subs_htable && subs_dbmode == WRITE_BACK) {
 		/* open database connection */
-		pa_db = pa_dbf.init(&db_url);
+		pa_db = pa_dbf.init(&pres_db_url);
 		if (!pa_db) {
 			LM_ERR("mod_destroy: unsuccessful connecting to database\n");
 		} else
@@ -674,6 +691,11 @@ error:
 		pkg_free(rules_doc);
 	}
 	return -1;
+}
+
+int _api_pres_refresh_watchers(str *pres, str *event, int type)
+{
+	return pres_refresh_watchers(pres, event, type, NULL, NULL);
 }
 
 int ki_pres_refresh_watchers(sip_msg_t *msg, str *pres, str *event, int type)
@@ -1373,7 +1395,7 @@ static int update_pw_dialogs(subs_t* subs, unsigned int hash_code, subs_t** subs
 			cs= mem_copy_subs(s, PKG_MEM_TYPE);
 			if(cs== NULL)
 			{
-				LM_ERR( "copying subs_t stucture\n");
+				LM_ERR( "copying subs_t structure\n");
 				lock_release(&subs_htable[hash_code].lock);
 				return -1;
 			}

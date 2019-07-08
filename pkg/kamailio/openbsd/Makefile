@@ -12,7 +12,7 @@ COMMENT-carrierroute =	kamailio carrierroute module
 COMMENT-snmpstats =	kamailio snmpstats module
 COMMENT-perl =		kamailio perl modules
 
-VERSION =		5.1.7
+VERSION =		1.5.0
 DISTNAME =		kamailio-${VERSION}
 PKGNAME-main =		kamailio-${VERSION}
 PKGNAME-mysql =		kamailio-mysql-${VERSION}

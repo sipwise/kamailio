@@ -112,18 +112,16 @@ static pv_export_t mod_pvs[] = {
 
 
 struct module_exports exports = {
-	"evapi",
-	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,
-	params,
-	0,
-	0,              /* exported MI functions */
-	mod_pvs,        /* exported pseudo-variables */
-	0,              /* extra processes */
-	mod_init,       /* module initialization function */
-	0,              /* response function */
-	mod_destroy,    /* destroy function */
-	child_init      /* per child init function */
+	"evapi",			/* module name */
+	DEFAULT_DLFLAGS,	/* dlopen flags */
+	cmds,				/* exported functions */
+	params,				/* exported parameters */
+	0,					/* RPC method exports */
+	mod_pvs,			/* exported pseudo-variables */
+	0,					/* response handling function */
+	mod_init,			/* module initialization function */
+	child_init,			/* per-child init function */
+	mod_destroy			/* module destroy function */
 };
 
 
@@ -588,7 +586,62 @@ static int w_evapi_set_tag(sip_msg_t* msg, char* ptag, char* p2)
  */
 static int ki_evapi_relay(sip_msg_t *msg, str *sdata)
 {
-	return evapi_relay(sdata);
+	int ret;
+
+	ret = evapi_relay(sdata);
+
+	if(ret<0) return ret;
+
+	return (ret+1);
+}
+
+/**
+ *
+ */
+static int ki_evapi_async_relay(sip_msg_t *msg, str *sdata)
+{
+	unsigned int tindex;
+	unsigned int tlabel;
+	tm_cell_t *t = 0;
+
+	if(tmb.t_suspend==NULL) {
+		LM_ERR("evapi async relay is disabled - tm module not loaded\n");
+		return -1;
+	}
+
+	t = tmb.t_gett();
+	if (t==NULL || t==T_UNDEFINED)
+	{
+		if(tmb.t_newtran(msg)<0)
+		{
+			LM_ERR("cannot create the transaction\n");
+			return -1;
+		}
+		t = tmb.t_gett();
+		if (t==NULL || t==T_UNDEFINED)
+		{
+			LM_ERR("cannot lookup the transaction\n");
+			return -1;
+		}
+	}
+	if(tmb.t_suspend(msg, &tindex, &tlabel)<0)
+	{
+		LM_ERR("failed to suspend request processing\n");
+		return -1;
+	}
+
+	LM_DBG("transaction suspended [%u:%u]\n", tindex, tlabel);
+
+	if(sdata->s==NULL || sdata->len == 0) {
+		LM_ERR("invalid data parameter\n");
+		return -1;
+	}
+
+	if(evapi_relay(sdata)<0) {
+		LM_ERR("failed to relay event: %.*s\n", sdata->len, sdata->s);
+		return -2;
+	}
+	return 1;
 }
 
 /**
@@ -596,7 +649,13 @@ static int ki_evapi_relay(sip_msg_t *msg, str *sdata)
  */
 static int ki_evapi_relay_unicast(sip_msg_t *msg, str *sdata, str *stag)
 {
-	return evapi_relay_unicast(sdata, stag);
+	int ret;
+
+	ret = evapi_relay_unicast(sdata, stag);
+
+	if(ret<0) return ret;
+
+	return (ret+1);
 }
 
 /**
@@ -604,7 +663,13 @@ static int ki_evapi_relay_unicast(sip_msg_t *msg, str *sdata, str *stag)
  */
 static int ki_evapi_relay_multicast(sip_msg_t *msg, str *sdata, str *stag)
 {
-	return evapi_relay_multicast(sdata, stag);
+	int ret;
+
+	ret = evapi_relay_multicast(sdata, stag);
+
+	if(ret<0) return ret;
+
+	return (ret+1);
 }
 
 /**
@@ -637,7 +702,11 @@ static sr_kemi_t sr_kemi_evapi_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
-
+	{ str_init("evapi"), str_init("async_relay"),
+		SR_KEMIP_INT, ki_evapi_async_relay,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+                        SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
 /* clang-format on */

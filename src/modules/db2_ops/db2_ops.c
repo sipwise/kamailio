@@ -488,7 +488,7 @@ static int parse_xlstr(struct xlstr* s) {
 
 	if (!s->s) return 0;
 	if (!strchr(s->s, '%')) return 0;
-	/* probably xl_log formating */
+	/* probably xl_log formatting */
 
 	if (!xl_print) {
 		xl_print=(xl_print_log_f*)find_export("xprint", NO_SCRIPT, 0);
@@ -535,7 +535,7 @@ static int eval_xlstr(struct sip_msg* msg, struct xlstr* s) {
 	if (s->xlfmt) {
 		len = xlbuf_size - (xlbuf_tail-xlbuf);
 		if (xl_print(msg, s->xlfmt, xlbuf_tail, &len) < 0) {
-			ERR(MODULE_NAME": eval_xlstr: Error while formating result\n");
+			ERR(MODULE_NAME": eval_xlstr: Error while formatting result\n");
 			return E_UNSPEC;
 		}
 
@@ -1512,15 +1512,15 @@ static int dbops_proper_func(struct sip_msg* m, char* dummy1, char* dummy2) {
  * Exported functions
  */
 static cmd_export_t cmds[] = {
-	{MODULE_NAME2"_query", dbops_query_func, 1, dbops_query_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_query", dbops_query_func, 2, dbops_query_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_first", dbops_first_func, 1, dbops_close_query_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_next", dbops_next_func, 1, dbops_close_query_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_seek", dbops_seek_func, 2, dbops_seek_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_close", dbops_close_query_func, 1, dbops_close_query_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_foreach", dbops_foreach_func, 2, dbops_foreach_fixup, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
-	{MODULE_NAME2"_proper", dbops_proper_func, 0, 0, FAILURE_ROUTE},
-	{0, 0, 0, 0, 0}
+	{MODULE_NAME2"_query", dbops_query_func, 1, dbops_query_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_query", dbops_query_func, 2, dbops_query_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_first", dbops_first_func, 1, dbops_close_query_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_next", dbops_next_func, 1, dbops_close_query_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_seek", dbops_seek_func, 2, dbops_seek_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_close", dbops_close_query_func, 1, dbops_close_query_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_foreach", dbops_foreach_func, 2, dbops_foreach_fixup, 0, REQUEST_ROUTE | ONREPLY_ROUTE | FAILURE_ROUTE | BRANCH_ROUTE | ONSEND_ROUTE},
+	{MODULE_NAME2"_proper", dbops_proper_func, 0, 0, 0, FAILURE_ROUTE},
+	{0, 0, 0, 0, 0, 0}
 };
 
 
@@ -1537,13 +1537,14 @@ static param_export_t params[] = {
 
 
 struct module_exports exports = {
-	MODULE_NAME,
-	cmds,        /* Exported commands */
-	0,	     /* RPC */
-	params,      /* Exported parameters */
-	mod_init,           /* module initialization function */
-	0,           /* response function*/
-	0,           /* destroy function */
-	0,           /* oncancel function */
-	child_init   /* per-child init function */
+	MODULE_NAME,     /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	0,               /* pseudo-variables exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	0                /* module destroy function */
 };

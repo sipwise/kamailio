@@ -627,13 +627,12 @@ error:
  * returns 1 if everything was OK or -1 for error
  */
 static int _reply( struct cell *trans, struct sip_msg* p_msg,
-	unsigned int code, char * text, int lock )
+	unsigned int code, str *reason, int lock )
 {
 	unsigned int len;
 	char * buf, *dset;
 	struct bookmark bm;
 	int dset_len;
-	str reason;
 
 	if (code>=200) set_kr(REQ_RPLD);
 	/* compute the buffer in private memory prior to entering lock;
@@ -647,18 +646,16 @@ static int _reply( struct cell *trans, struct sip_msg* p_msg,
 		}
 	}
 
-	reason.s = text;
-	reason.len = strlen(text);
 	if (code>=180 && p_msg->to
 				&& (get_to(p_msg)->tag_value.s==0
 					|| get_to(p_msg)->tag_value.len==0)) {
 		calc_crc_suffix( p_msg, tm_tag_suffix );
-		buf = build_res_buf_from_sip_req(code, &reason, &tm_tag, p_msg,
+		buf = build_res_buf_from_sip_req(code, reason, &tm_tag, p_msg,
 				&len, &bm);
 		return _reply_light( trans, buf, len, code,
 			tm_tag.s, TOTAG_VALUE_LEN, lock, &bm);
 	} else {
-		buf = build_res_buf_from_sip_req(code, &reason, 0 /*no to-tag*/,
+		buf = build_res_buf_from_sip_req(code, reason, 0 /*no to-tag*/,
 			p_msg, &len, &bm);
 		return _reply_light(trans,buf,len,code,
 			0, 0, /* no to-tag */lock, &bm);
@@ -1000,7 +997,7 @@ int run_failure_handlers(struct cell *t, struct sip_msg *rpl,
 			/* run a failure_route action if some was marked */
 			keng = sr_kemi_eng_get();
 			if(unlikely(keng!=NULL)) {
-				if(keng->froute(faked_req, FAILURE_ROUTE,
+				if(sr_kemi_route(keng, faked_req, FAILURE_ROUTE,
 						sr_kemi_cbname_lookup_idx(on_failure), NULL)<0) {
 					LM_ERR("error running failure route kemi callback\n");
 				}
@@ -1074,7 +1071,7 @@ int run_branch_failure_handlers(struct cell *t, struct sip_msg *rpl,
 			/* run a branch_failure_route action if some was marked */
 			keng = sr_kemi_eng_get();
 			if(unlikely(keng!=NULL)) {
-				if(keng->froute(faked_req, BRANCH_FAILURE_ROUTE,
+				if(sr_kemi_route(keng, faked_req, BRANCH_FAILURE_ROUTE,
 						sr_kemi_cbname_lookup_idx(on_branch_failure), NULL)<0) {
 					LM_ERR("error running branch failure route kemi callback\n");
 				}
@@ -1426,7 +1423,7 @@ static enum rps t_should_relay_response( struct cell *Trans , int new_code,
 		/* look if the callback perhaps replied transaction; it also
 		 * covers the case in which a transaction is replied localy
 		 * on CANCEL -- then it would make no sense to proceed to
-		 * new branches bellow
+		 * new branches below
 		*/
 		if (Trans->uas.status >= 200) {
 			*should_store=0;
@@ -1509,9 +1506,10 @@ static enum rps t_should_relay_response( struct cell *Trans , int new_code,
 #else
 		*should_store=0;
 #endif
-		/* 1xx and 2xx except 100 will be relayed */
+		/* By default, 1xx and 2xx (except 100) will be relayed. 100 relaying can be
+		 * controlled via relay_100 parameter */
 		Trans->uac[branch].last_received=new_code;
-		*should_relay= new_code==100? -1 : branch;
+		*should_relay= (new_code==100 && !cfg_get(tm, tm_cfg, relay_100)) ? -1 : branch;
 		if (new_code>=200 ) {
 			prepare_to_cancel( Trans, &cancel_data->cancel_bitmap, 0);
 #ifdef CANCEL_REASON_SUPPORT
@@ -1620,16 +1618,36 @@ error:
 int t_reply( struct cell *t, struct sip_msg* p_msg, unsigned int code,
 	char * text )
 {
-	return _reply( t, p_msg, code, text, 1 /* lock replies */ );
+	str reason;
+
+	reason.s = text;
+	reason.len = strlen(text);
+
+	return _reply( t, p_msg, code, &reason, 1 /* lock replies */ );
+}
+
+int t_reply_str( struct cell *t, struct sip_msg* p_msg, unsigned int code,
+	str* reason)
+{
+	return _reply( t, p_msg, code, reason, 1 /* lock replies */ );
 }
 
 int t_reply_unsafe( struct cell *t, struct sip_msg* p_msg, unsigned int code,
 	char * text )
 {
-	return _reply( t, p_msg, code, text, 0 /* don't lock replies */ );
+	str reason;
+
+	reason.s = text;
+	reason.len = strlen(text);
+
+	return _reply( t, p_msg, code, &reason, 0 /* don't lock replies */ );
 }
 
-
+int t_reply_str_unsafe( struct cell *t, struct sip_msg* p_msg, unsigned int code,
+	str* reason)
+{
+	return _reply( t, p_msg, code, reason, 0 /* don't lock replies */ );
+}
 
 void set_final_timer( struct cell *t )
 {
@@ -2370,7 +2388,11 @@ int reply_received( struct sip_msg  *p_msg )
 	if (onreply_route) {
 		set_route_type(TM_ONREPLY_ROUTE);
 		/* transfer transaction flag to message context */
-		if (t->uas.request) p_msg->flags=t->uas.request->flags;
+		if (t->uas.request) {
+			p_msg->flags=t->uas.request->flags;
+			memcpy(p_msg->xflags, t->uas.request->xflags,
+				KSR_XFLAGS_SIZE * sizeof(flag_t));
+		}
 		/* set the as avp_list the one from transaction */
 
 		backup_uri_from = set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI,
@@ -2405,7 +2427,7 @@ int reply_received( struct sip_msg  *p_msg )
 			bctx = sr_kemi_act_ctx_get();
 			init_run_actions_ctx(&ctx);
 			sr_kemi_act_ctx_set(&ctx);
-			keng->froute(p_msg, TM_ONREPLY_ROUTE,
+			sr_kemi_route(keng, p_msg, TM_ONREPLY_ROUTE,
 					sr_kemi_cbname_lookup_idx(onreply_route), NULL);
 			sr_kemi_act_ctx_set(bctx);
 		} else {
@@ -2415,7 +2437,11 @@ int reply_received( struct sip_msg  *p_msg )
 		/* restore brach last_received as before executing onreply_route */
 		uac->last_received = last_uac_status;
 		/* transfer current message context back to t */
-		if (t->uas.request) t->uas.request->flags=p_msg->flags;
+		if (t->uas.request) {
+			t->uas.request->flags=p_msg->flags;
+			memcpy(t->uas.request->xflags, p_msg->xflags,
+				KSR_XFLAGS_SIZE * sizeof(flag_t));
+		}
 		getbflagsval(0, &uac->branch_flags);
 
 		/* restore original avp list */

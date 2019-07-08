@@ -35,11 +35,12 @@ str dmq_node_status_str = str_init("status");
 str dmq_node_active_str = str_init("active");
 str dmq_node_disabled_str = str_init("disabled");
 str dmq_node_timeout_str = str_init("timeout");
+str dmq_node_pending_str = str_init("pending");
 
 /**
  * @brief get the string status of the node
  */
-str *get_status_str(int status)
+str *dmq_get_status_str(int status)
 {
 	switch(status) {
 		case DMQ_NODE_ACTIVE: {
@@ -50,6 +51,9 @@ str *get_status_str(int status)
 		}
 		case DMQ_NODE_TIMEOUT: {
 			return &dmq_node_timeout_str;
+		}
+		case DMQ_NODE_PENDING: {
+			return &dmq_node_pending_str;
 		}
 		default: {
 			return 0;
@@ -119,6 +123,8 @@ int set_dmq_node_params(dmq_node_t *node, param_t *params)
 			node->status = DMQ_NODE_TIMEOUT;
 		} else if(STR_EQ(*status, dmq_node_disabled_str)) {
 			node->status = DMQ_NODE_DISABLED;
+		} else if(STR_EQ(*status, dmq_node_pending_str)) {
+			node->status = DMQ_NODE_PENDING;
 		} else {
 			LM_ERR("invalid status parameter: %.*s\n", STR_FMT(status));
 			goto error;
@@ -134,7 +140,7 @@ error:
  */
 int set_default_dmq_node_params(dmq_node_t *node)
 {
-	node->status = DMQ_NODE_ACTIVE;
+	node->status = DMQ_NODE_PENDING;
 	return 0;
 }
 
@@ -367,6 +373,26 @@ error:
 }
 
 /**
+ * @brief update status of existing dmq node
+ */
+int update_dmq_node_status(dmq_node_list_t *list, dmq_node_t *node, int status)
+{
+	dmq_node_t *cur;
+	lock_get(&list->lock);
+	cur = list->nodes;
+	while(cur) {
+		if(cmp_dmq_node(cur, node)) {
+			cur->status = status;
+			lock_release(&list->lock);
+			return 1;
+		}
+		cur = cur->next;
+	}
+	lock_release(&list->lock);
+	return 0;
+}
+
+/**
  * @brief build dmq node string
  */
 int build_node_str(dmq_node_t *node, char *buf, int buflen)
@@ -389,8 +415,8 @@ int build_node_str(dmq_node_t *node, char *buf, int buflen)
 	len += 1;
 	memcpy(buf + len, "status=", 7);
 	len += 7;
-	memcpy(buf + len, get_status_str(node->status)->s,
-			get_status_str(node->status)->len);
-	len += get_status_str(node->status)->len;
+	memcpy(buf + len, dmq_get_status_str(node->status)->s,
+			dmq_get_status_str(node->status)->len);
+	len += dmq_get_status_str(node->status)->len;
 	return len;
 }

@@ -103,6 +103,8 @@
 #include "parser/parse_param.h"
 #include "forward.h"
 #include "str_list.h"
+#include "pvapi.h"
+#include "xavp.h"
 #include "rand/kam_rand.h"
 
 #define append_str_trans(_dest,_src,_len,_msg) \
@@ -111,7 +113,8 @@
 extern char version[];
 extern int version_len;
 
-
+str _ksr_xavp_via_params = STR_NULL;
+str _ksr_xavp_via_fields = STR_NULL;
 
 /** per process fixup function for global_req_flags.
   * It should be called from the configuration framework.
@@ -2671,10 +2674,10 @@ int branch_builder( unsigned int hash_index,
 
 
 
-/* uses only the send_info->send_socket, send_info->proto and 
+/* uses only the send_info->send_socket, send_info->proto and
  * send_info->comp (so that a send_info used for sending can be passed
  * to this function w/o changes and the correct via will be built) */
-char* via_builder( unsigned int *len,
+char* via_builder(unsigned int *len, sip_msg_t *msg,
 	struct dest_info* send_info /* where to send the reply */,
 	str* branch, str* extra_params, struct hostport* hp)
 {
@@ -2682,8 +2685,8 @@ char* via_builder( unsigned int *len,
 	char               *line_buf;
 	int max_len;
 	int via_prefix_len;
-	str* address_str; /* address displayed in via */
-	str* port_str; /* port no displayed in via */
+	str* address_str = NULL; /* address displayed in via */
+	str* port_str = NULL; /* port no displayed in via */
 	struct socket_info* send_sock;
 	int comp_len, comp_name_len;
 #ifdef USE_COMP
@@ -2694,22 +2697,46 @@ char* via_builder( unsigned int *len,
 	union sockaddr_union *from = NULL;
 	union sockaddr_union local_addr;
 	struct tcp_connection *con = NULL;
+	sr_xavp_t *rxavp = NULL;
+	str xname;
 
 	send_sock=send_info->send_sock;
 	/* use pre-set address in via, the outbound socket alias or address one */
-	if (hp && hp->host->len)
-		address_str=hp->host;
-	else if(send_sock->useinfo.name.len>0)
-		address_str=&(send_sock->useinfo.name);
-	else
-		address_str=&(send_sock->address_str);
-	if (hp && hp->port->len)
-		port_str=hp->port;
-	else if(send_sock->useinfo.port_no>0)
-		port_str=&(send_sock->useinfo.port_no_str);
-	else
-		port_str=&(send_sock->port_no_str);
-	
+	if(msg && (msg->msg_flags&FL_USE_XAVP_VIA_FIELDS)
+			&& _ksr_xavp_via_fields.len>0) {
+		xname.s = "address";
+		xname.len = 7;
+		rxavp = xavp_get_child_with_sval(&_ksr_xavp_via_fields, &xname);
+		if(rxavp!=NULL) {
+			address_str = &rxavp->val.v.s;
+		}
+	}
+	if(address_str==NULL) {
+		if (hp && hp->host->len)
+			address_str=hp->host;
+		else if(send_sock->useinfo.name.len>0)
+			address_str=&(send_sock->useinfo.name);
+		else
+			address_str=&(send_sock->address_str);
+	}
+	if(msg && (msg->msg_flags&FL_USE_XAVP_VIA_FIELDS)
+			&& _ksr_xavp_via_fields.len>0) {
+		xname.s = "port";
+		xname.len = 4;
+		rxavp = xavp_get_child_with_sval(&_ksr_xavp_via_fields, &xname);
+		if(rxavp!=NULL) {
+			port_str = &rxavp->val.v.s;
+		}
+	}
+	if(port_str==NULL) {
+		if (hp && hp->port->len)
+			port_str=hp->port;
+		else if(send_sock->useinfo.port_no>0)
+			port_str=&(send_sock->useinfo.port_no_str);
+		else
+			port_str=&(send_sock->port_no_str);
+	}
+
 	comp_len=comp_name_len=0;
 #ifdef USE_COMP
 	comp_name=0;
@@ -2859,7 +2886,7 @@ char* via_builder( unsigned int *len,
 
 /* creates a via header honoring the protocol of the incoming socket
  * msg is an optional parameter */
-char* create_via_hf( unsigned int *len,
+char* create_via_hf(unsigned int *len,
 	struct sip_msg *msg,
 	struct dest_info* send_info /* where to send the reply */,
 	str* branch)
@@ -2867,6 +2894,9 @@ char* create_via_hf( unsigned int *len,
 	char* via;
 	str extra_params;
 	struct hostport hp;
+	char sbuf[24];
+	int slen;
+	str xparams;
 #if defined USE_TCP || defined USE_SCTP
 	char* id_buf;
 	unsigned int id_len;
@@ -2926,8 +2956,58 @@ char* create_via_hf( unsigned int *len,
 		extra_params.s[extra_params.len]='\0';
 	}
 
+	/* test and add srvid parameter to local via  */
+	if(msg && (msg->msg_flags&FL_ADD_SRVID) && server_id!=0) {
+		slen = snprintf(sbuf, 24, ";srvid=%u", (unsigned int)server_id);
+		if(slen<=0 || slen>=24) {
+			LM_WARN("failed to build srvid parameter");
+		} else {
+			via = (char*)pkg_malloc(extra_params.len+slen+1);
+			if(via==0) {
+				LM_ERR("building srvid param failed\n");
+				if (extra_params.s) pkg_free(extra_params.s);
+				return 0;
+			}
+			if(extra_params.len != 0) {
+				memcpy(via, extra_params.s, extra_params.len);
+				pkg_free(extra_params.s);
+			}
+			memcpy(via + extra_params.len, sbuf, slen);
+			extra_params.s = via;
+			extra_params.len += slen;
+			extra_params.s[extra_params.len] = '\0';
+		}
+	}
+
+	/* test and add xavp params */
+	if(msg && (msg->msg_flags&FL_ADD_XAVP_VIA_PARAMS)
+			&& _ksr_xavp_via_params.len>0) {
+		xparams.s = pv_get_buffer();
+		xparams.len = xavp_serialize_fields(&_ksr_xavp_via_params,
+							xparams.s, pv_get_buffer_size());
+		if(xparams.len>0) {
+			via = (char*)pkg_malloc(extra_params.len+xparams.len+2);
+			if(via==0) {
+				LM_ERR("building xavps params failed\n");
+				if (extra_params.s) pkg_free(extra_params.s);
+				return 0;
+			}
+			if(extra_params.len != 0) {
+				memcpy(via, extra_params.s, extra_params.len);
+				pkg_free(extra_params.s);
+			}
+			/* add ';' between via parameters */
+			via[extra_params.len] = ';';
+			/* skip last ';' from xavp serialized output */
+			memcpy(via + extra_params.len + 1, xparams.s, xparams.len - 1);
+			extra_params.s = via;
+			extra_params.len += xparams.len;
+			extra_params.s[extra_params.len] = '\0';
+		}
+	}
+
 	set_hostport(&hp, msg);
-	via = via_builder( len, send_info, branch,
+	via = via_builder(len, msg, send_info, branch,
 							extra_params.len?&extra_params:0, &hp);
 
 	/* we do not need extra_params any more, already in the new via header */
@@ -3123,3 +3203,106 @@ int build_sip_msg_from_buf(struct sip_msg *msg, char *buf, int len,
 	return 0;
 }
 
+/**
+ *
+ */
+int sip_msg_update_buffer(sip_msg_t *msg, str *obuf)
+{
+	sip_msg_t tmp;
+
+	if(obuf==NULL || obuf->s==NULL || obuf->len<=0) {
+		LM_ERR("invalid buffer parameter\n");
+		return -1;
+	}
+
+	if(obuf->len >= BUF_SIZE) {
+		LM_ERR("new buffer is too large (%d)\n", obuf->len);
+		return -1;
+	}
+	/* temporary copy */
+	memcpy(&tmp, msg, sizeof(sip_msg_t));
+
+	/* reset dst uri and path vector to avoid freeing - restored later */
+	if(msg->dst_uri.s != NULL) {
+		msg->dst_uri.s = NULL;
+		msg->dst_uri.len = 0;
+	}
+	if(msg->path_vec.s != NULL) {
+		msg->path_vec.s = NULL;
+		msg->path_vec.len = 0;
+	}
+
+	/* free old msg structure */
+	free_sip_msg(msg);
+	memset(msg, 0, sizeof(sip_msg_t));
+
+	/* restore msg fields */
+	msg->buf = tmp.buf;
+	msg->id = tmp.id;
+	msg->rcv = tmp.rcv;
+	msg->set_global_address = tmp.set_global_address;
+	msg->set_global_port = tmp.set_global_port;
+	msg->flags = tmp.flags;
+	msg->msg_flags = tmp.msg_flags;
+	msg->hash_index = tmp.hash_index;
+	msg->force_send_socket = tmp.force_send_socket;
+	msg->fwd_send_flags = tmp.fwd_send_flags;
+	msg->rpl_send_flags = tmp.rpl_send_flags;
+	msg->dst_uri = tmp.dst_uri;
+	msg->path_vec = tmp.path_vec;
+
+	memcpy(msg->buf, obuf->s, obuf->len);
+	msg->len = obuf->len;
+	msg->buf[msg->len] = '\0';
+
+	/* reparse the message */
+	LM_DBG("SIP message content updated - reparsing\n");
+	if(parse_msg(msg->buf, msg->len, msg) != 0) {
+		LM_ERR("parsing new sip message failed [[%.*s]]\n", msg->len, msg->buf);
+		/* exit config execution - sip_msg_t structure is no longer
+		 * valid/safe for config */
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+int sip_msg_apply_changes(sip_msg_t *msg)
+{
+	int ret;
+	dest_info_t dst;
+	str obuf;
+
+	if(msg->first_line.type != SIP_REPLY && get_route_type() != REQUEST_ROUTE) {
+		LM_ERR("invalid usage - not in request route or a reply\n");
+		return -1;
+	}
+
+	init_dest_info(&dst);
+	dst.proto = PROTO_UDP;
+	if(msg->first_line.type == SIP_REPLY) {
+		obuf.s = generate_res_buf_from_sip_res(
+				msg, (unsigned int *)&obuf.len, BUILD_NO_VIA1_UPDATE);
+	} else {
+		if(msg->msg_flags & FL_RR_ADDED) {
+			LM_ERR("cannot apply msg changes after adding record-route"
+				   " header - it breaks conditional 2nd header\n");
+			return -1;
+		}
+		obuf.s = build_req_buf_from_sip_req(msg, (unsigned int *)&obuf.len,
+				&dst,
+				BUILD_NO_PATH | BUILD_NO_LOCAL_VIA | BUILD_NO_VIA1_UPDATE);
+	}
+	if(obuf.s == NULL) {
+		LM_ERR("couldn't update msg buffer content\n");
+		return -1;
+	}
+	ret = sip_msg_update_buffer(msg, &obuf);
+	/* free new buffer - copied in the static buffer from old sip_msg_t */
+	pkg_free(obuf.s);
+
+	return ret;
+}

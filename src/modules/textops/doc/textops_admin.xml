@@ -301,6 +301,38 @@ replace_body("openser", "&kamailio; SIP Proxy");
 		</example>
 	</section>
 
+	<section id="textops.f.replace_hdrs">
+		<title>
+		<function moreinfo="none">replace_hdrs(re, txt)</function>
+		</title>
+		<para>
+		Replaces the first occurrence of re in the SIP headers of the message
+		with txt.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>re</emphasis> - Regular expression.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>txt</emphasis> - String.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>replace_hdrs</function> usage</title>
+		<programlisting format="linespecific">
+...
+replace_hdrs("&kamailio;", "&kamailio; SIP Proxy");
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="textops.f.replace_all">
 		<title>
 		<function moreinfo="none">replace_all(re, txt)</function>
@@ -395,7 +427,120 @@ replace_body_all("openser", "&kamailio; SIP Proxy");
 ...
 # strip the whole body from the message:
 if(has_body() &amp;&amp; replace_body_atonce("^.+$", ""))
-        remove_hf("Content-Type"); 
+        remove_hf("Content-Type");
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="textops.f.replace_str">
+		<title>
+		<function moreinfo="none">replace_str(match, repl, mode)</function>
+		</title>
+		<para>
+		Replaces the first or all occurrence of 'match' with 'repl' by doing
+		string comparison for matching. It is applied over headers and message
+		body (not over the first line).
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>match</emphasis> - string to be matched.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>repl</emphasis> - string to be used as replacement.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>mode</emphasis> - 'f' - replace only first match;
+				'a' - replace all matches.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>replace_str</function> usage</title>
+		<programlisting format="linespecific">
+...
+replace_str("&kamailio;", "&kamailio; SIP Proxy", "a");
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="textops.f.replace_body_str">
+		<title>
+		<function moreinfo="none">replace_body_str(match, repl, mode)</function>
+		</title>
+		<para>
+		Replaces the first or all occurrence of 'match' with 'repl' by doing
+		string comparison for matching. It is applied over the message body.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>match</emphasis> - string to be matched.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>repl</emphasis> - string to be used as replacement.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>mode</emphasis> - 'f' - replace only first match;
+				'a' - replace all matches.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>replace_body_str</function> usage</title>
+		<programlisting format="linespecific">
+...
+replace_body_str("&kamailio;", "&kamailio; SIP Proxy", "a");
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="textops.f.replace_hdrs_str">
+		<title>
+		<function moreinfo="none">replace_hdrs_str(match, repl, mode)</function>
+		</title>
+		<para>
+		Replaces the first or all occurrence of 'match' with 'repl' by doing
+		string comparison for matching. It is applied over the part with headers
+		of the SIP message.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>match</emphasis> - string to be matched.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>repl</emphasis> - string to be used as replacement.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>mode</emphasis> - 'f' - replace only first match;
+				'a' - replace all matches.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>replace_hdrs_str</function> usage</title>
+		<programlisting format="linespecific">
+...
+replace_hdrs_str("&kamailio;", "&kamailio; SIP Proxy", "a");
 ...
 </programlisting>
 		</example>
@@ -416,10 +561,10 @@ if(has_body() &amp;&amp; replace_body_atonce("^.+$", ""))
 				g (global) or s (match newline don't treat it as end of line).
 			</para>
 			<para>
-			're' - is regular expresion
+			're' - is regular expression
 			</para>
 			<para>
-			'repl' - is replacement string - may contain pseudo-varibales
+			'repl' - is replacement string - may contain pseudo-variables
 			</para>
 			<para>
 			'flags' - substitution flags (i - ignore case, g - global)
@@ -461,10 +606,10 @@ if ( subst('/^To:(.*)sip:[^@]*@[a-zA-Z0-9.]+(.*)$/t:\1$avp(sip_address)\2/ig') )
 				g (global) or s (match newline don't treat it as end of line).
 			</para>
 			<para>
-			're' - is regular expresion
+			're' - is regular expression
 			</para>
 			<para>
-			'repl' - is replacement string - may contain pseudo-varibales
+			'repl' - is replacement string - may contain pseudo-variables
 			</para>
 			<para>
 			'flags' - substitution flags (i - ignore case, g - global)
@@ -508,10 +653,10 @@ if (subst_uri('/^sip:([0-9]+)@(.*)$/sip:$avp(uri_prefix)\1@\2;orig_uri=\0/i')){$
 				g (global) or s (match newline don't treat it as end of line).
 			</para>
 			<para>
-			're' - is regular expresion
+			're' - is regular expression
 			</para>
 			<para>
-			'repl' - is replacement string - may contain pseudo-varibales
+			'repl' - is replacement string - may contain pseudo-variables
 			</para>
 			<para>
 			'flags' - substitution flags (i - ignore case, g - global)
@@ -553,10 +698,10 @@ if (subst_user('/(.*)3642$/$avp(user_prefix)\13642/')){$
 				g (global) or s (match newline don't treat it as end of line).
 			</para>
 			<para>
-			're' - is regular expresion
+			're' - is regular expression
 			</para>
 			<para>
-			'repl' - is replacement string - may contain pseudo-varibales
+			'repl' - is replacement string - may contain pseudo-variables
 			</para>
 			<para>
 			'flags' - substitution flags (i - ignore case, g - global)
@@ -969,7 +1114,7 @@ if (is_present_hf_re("^P-")) log(1, "There are headers starting with P-\n");
 		</itemizedlist>
 		</para>
 		<para>
-		Return true if a header was succesfully appended.
+		Return true if a header was successfully appended.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE, 
@@ -1024,7 +1169,7 @@ append_time();
 		</itemizedlist>
 		</para>
 		<para>
-		Return true if a header was succesfully appended.
+		Return true if a header was successfully appended.
 		</para>
 		<para>
 		This function can be used from REQUEST_ROUTE, ONREPLY_ROUTE,
@@ -1350,6 +1495,30 @@ if (in_list("$var(subject)", "$var(list)", ",")) {
 		</example>
 	</section>
 
+	<section id="textops.f.in_list_prefix">
+		<title>
+			<function moreinfo="none">in_list_prefix(subject, list, separator)</function>
+		</title>
+		<para>
+		Function checks if any element in list string is a prefix for subject string where list items are separated by separator string.  Subject and list strings may contain pseudo variables.  Separator string needs to be one character long.  Returns 1 if subject is found and -1 otherwise.
+    	        </para>
+		<para>
+		Function can be used from all kinds of routes.
+		</para>
+		<example>
+			<title><function>in_list()</function> usage</title>
+			<programlisting format="linespecific">
+...
+$var(subject) = "final";
+$var(list) = "dk,fi,no,se";
+if (in_list_prefix("$var(subject)", "$var(list)", ",")) {
+    xlog("L_INFO", "prefix for subject is found in list\n");
+}
+...
+			</programlisting>
+		</example>
+	</section>
+
 	<section id="textops.f.cmp_str">
 		<title>
 		<function moreinfo="none">cmp_str(str1, str2)</function>
@@ -1455,7 +1624,7 @@ if (starts_with("$rU", "+358"))
 		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE, BRANCH_ROUTE.
 		</para>
 		<para>
-		The core will take care of the last boundary ending "--". Detecting wich one is
+		The core will take care of the last boundary ending "--". Detecting which one is
 		the last and fixing the others if needed.
 		</para>
 		<para>
@@ -1469,6 +1638,7 @@ if (starts_with("$rU", "+358"))
 set_body_multipart("test", "text/plain", "delimiter");
 msg_apply_changes();
 append_body_part(...);
+msg_apply_changes();
 
 ...
 
@@ -1521,12 +1691,17 @@ text
 		The core will take care of the last boundary ending "--". Detecting wich one is
 		the last and fixing the others if needed.
 		</para>
+		<para>
+		Note: it may be required that msg_apply_changes() from textopsx module
+		has to be executed if there are other operations over the new body.
+		</para>
 		<example>
 		<title><function>append_body_part</function> usage</title>
 		<programlisting format="linespecific">
 ...
-$var(b) = "7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c"
+$var(b) = "7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c";
 append_body_part("$var(b)", "application/vnd.cirpack.isdn-ext", "signal;handling=required");
+msg_apply_changes();
 ...
 
 # Will append this to the body:
@@ -1541,6 +1716,98 @@ Content-Disposition: signal;handling=required
 ...
 </programlisting>
 		</example>
+		<para>
+		If other headers are wanted to be added for a body part, they can be
+		appended after the value of the content-type parameter, separated by
+		`\r\n` (at the very end do not add the '\r\n').
+		</para>
+		<example>
+		<title><function>append_body_part</function> with headers</title>
+		<programlisting format="linespecific">
+...
+$var(b) = "<info>active</info>";
+append_body_part("$var(b)", "application/xml\r\nX-Header: xyz");
+msg_apply_changes();
+...
+
+# Will append this to the body:
+
+...
+Content-Type: application/vnd.cirpack.isdn-ext
+Content-Disposition: signal;handling=required
+
+7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c
+
+--unique-boundary-1
+...
+</programlisting>
+		</example>
+	</section>
+
+		<section id="textops.f.append_body_part_hex">
+		<title>
+		<function moreinfo="none">append_body_part_hex(txt,content_type[, content_disposition])</function>
+		</title>
+		<para>
+		Append a part on multipart body SIP message, with the content provided
+		in hexa format. Will use "unique-boundary-1" as boundary.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>txt</emphasis> - content for the multipart body in
+				hexa format. Spaces can be used between the pairs of hexa digits
+				to make it easier to read in the config, they are ignored and
+				not added in the body part. The parameter can include
+				pseudo-variables.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>content_type</emphasis> - value of Content-Type header,
+				can include pseudo-variables.
+			</para>
+		</listitem>
+		<listitem>
+			<para><emphasis>content_disposition</emphasis> - value of Content-Disposition header,
+				can include pseudo-variables.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE, BRANCH_ROUTE.
+		</para>
+		<para>
+		The core will take care of the last boundary ending "--". Detecting wich one is
+		the last and fixing the others if needed.
+		</para>
+		<para>
+		Note: it may be required that msg_apply_changes() from textopsx module
+		has to be executed if there are other operations over the new body.
+		</para>
+		<example>
+		<title><function>append_body_part_hex</function> usage</title>
+		<programlisting format="linespecific">
+...
+$var(b) = "6b 61 6d 61 69 6c 69 6f";
+append_body_part_hex("$var(b)", "application/my-custom-ext");
+msg_apply_changes();
+...
+
+# Will append this to the body:
+
+...
+Content-Type: application/my-custom-ext
+
+kamailio
+
+--unique-boundary-1
+...
+</programlisting>
+		</example>
+		<para>
+		If other headers are wanted to be added for a body part, see the docs
+		for append_body_part(...) function.
+		</para>
 	</section>
 
 	<section id="textops.f.get_body_part">
@@ -1639,11 +1906,16 @@ get_body_part("application/vnd.cirpack.isdn-ext", "$var(hbody)");
 		The core will take care of the last boundary ending "--". Detecting wich one is
 		the last and fixing the others if needed.
 		</para>
+		<para>
+		Note: it may be required that msg_apply_changes() from textopsx module
+		has to be executed if there are other operations over the new body.
+		</para>
 		<example>
 		<title><function>remove_body_part</function> usage</title>
 		<programlisting format="linespecific">
 ...
 remove_body_part("application/vnd.cirpack.isdn-ext");
+msg_apply_changes();
 ...
 </programlisting>
 		</example>

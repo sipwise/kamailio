@@ -40,6 +40,10 @@
 #include "usrloc.h"
 #include "utime.h"
 #include "usrloc.h"
+#include "ul_callback.h"
+#include "urecord.h"
+
+extern int ul_rm_expired_delay;
 
 #ifdef STATISTICS
 static char *build_stat_name( str* domain, char *var_name)
@@ -761,7 +765,7 @@ done:
  * \brief Loads from DB all contacts for a RUID
  * \param _c database connection
  * \param _d domain
- * \param _aor address of record
+ * \param _ruid record unique id
  * \return pointer to the record on success, 0 on errors or if nothing is found
  */
 urecord_t* db_load_urecord_by_ruid(db1_con_t* _c, udomain_t* _d, str *_ruid)
@@ -883,6 +887,176 @@ done:
 	return r;
 }
 
+/*!
+ * \brief call contact expired call back for a domain with db_mode: DB_ONLY
+ *
+ * call contact expired call back for a domain with db_mode: DB_ONLY since
+ * database rows are removed by the timer function: db_timer_udomain
+ * \param _c database connection
+ * \param _d loaded domain
+ * \return 0 on success, -1 on failure
+ */
+int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
+{
+	ucontact_info_t *ci;
+	db_row_t *row;
+	db_key_t columns[21], query_cols[3];
+	db_op_t  query_ops[3];
+	db_val_t query_vals[3];
+	int key_num = 2;
+	db1_res_t* res = NULL;
+	str user, contact;
+	int i;
+	int n;
+	urecord_t* r;
+	ucontact_t* c;
+
+	if (db_mode!=DB_ONLY) {
+		return 0;
+	}
+
+	columns[0] = &user_col;
+	columns[1] = &contact_col;
+	columns[2] = &expires_col;
+	columns[3] = &q_col;
+	columns[4] = &callid_col;
+	columns[5] = &cseq_col;
+	columns[6] = &flags_col;
+	columns[7] = &cflags_col;
+	columns[8] = &user_agent_col;
+	columns[9] = &received_col;
+	columns[10] = &path_col;
+	columns[11] = &sock_col;
+	columns[12] = &methods_col;
+	columns[13] = &last_mod_col;
+	columns[14] = &ruid_col;
+	columns[15] = &instance_col;
+	columns[16] = &reg_id_col;
+	columns[17] = &srv_id_col;
+	columns[18] = &con_id_col;
+	columns[19] = &keepalive_col;
+	columns[20] = &domain_col;
+
+	query_cols[0] = &expires_col;
+	query_ops[0] = "<";
+	query_vals[0].nul = 0;
+	UL_DB_EXPIRES_SET(&query_vals[0], act_time + 1 - ul_rm_expired_delay);
+
+	query_cols[1] = &expires_col;
+	query_ops[1] = OP_NEQ;
+	query_vals[1].nul = 0;
+	UL_DB_EXPIRES_SET(&query_vals[1], 0);
+
+	if (ul_db_srvid != 0) {
+                query_cols[2] = &srv_id_col;
+                query_ops[2] = OP_EQ;
+                query_vals[2].type = DB1_INT;
+                query_vals[2].nul = 0;
+                query_vals[2].val.int_val = server_id;
+                key_num = 3;
+        }
+
+	if (ul_dbf.use_table(_c, _d->name) < 0) {
+		LM_ERR("sql use_table failed\n");
+		return -1;
+	}
+
+#ifdef EXTRA_DEBUG
+	LM_NOTICE("udomain contact-expired start time [%d]\n", (int)time(NULL));
+#endif
+
+	if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
+		if (ul_dbf.query(_c, query_cols, query_ops, query_vals, columns, key_num, (use_domain)?(21):(20), 0,
+		0) < 0) {
+			LM_ERR("db_query (1) failed\n");
+			return -1;
+		}
+		if(ul_dbf.fetch_result(_c, &res, ul_fetch_rows)<0) {
+			LM_ERR("fetching rows failed\n");
+			return -1;
+		}
+	} else {
+		if (ul_dbf.query(_c, query_cols, query_ops, query_vals, columns, key_num, (use_domain)?(21):(20), 0,
+		&res) < 0) {
+			LM_ERR("db_query failed\n");
+			return -1;
+		}
+	}
+
+	if (RES_ROW_N(res) == 0) {
+		LM_DBG("no rows to be contact expired\n");
+                ul_dbf.free_result(_c, res);
+                return 0;
+	}
+
+	n = 0;
+	do {
+		LM_DBG("calling contact expired records - cycle [%d]\n", ++n);
+		for(i = 0; i < RES_ROW_N(res); i++) {
+			row = RES_ROWS(res) + i;
+
+			user.s = (char*)VAL_STRING(ROW_VALUES(row));
+			if (VAL_NULL(ROW_VALUES(row)) || user.s==0 || user.s[0]==0) {
+				LM_CRIT("empty username record in table %s...skipping\n",
+					_d->name->s);
+				continue;
+			}
+			user.len = strlen(user.s);
+
+			ci = dbrow2info(ROW_VALUES(row)+1, &contact, 0);
+			if (ci==0) {
+				LM_CRIT("skipping record for %.*s in table %s\n",
+					user.len, user.s, _d->name->s);
+				continue;
+			}
+
+			lock_udomain(_d, &user);
+			if (get_urecord(_d, &user, &r) > 0) {
+				LM_ERR("failed to get a record\n");
+				unlock_udomain(_d, &user);
+				goto error;
+			}
+
+			if ( (c=mem_insert_ucontact(r, &contact, ci)) == 0) {
+				LM_ERR("inserting contact failed\n");
+				release_urecord(r);
+				unlock_udomain(_d, &user);
+				goto error;
+			}
+
+			/* Call the contact-expired call-back if it exists for the contact */
+			if (exists_ulcb_type(UL_CONTACT_EXPIRE)) {
+				run_ul_callbacks( UL_CONTACT_EXPIRE, c);
+			}
+			c->state = CS_SYNC;
+			release_urecord(r);
+			unlock_udomain(_d, &user);
+		}
+
+		if (DB_CAPABILITY(ul_dbf, DB_CAP_FETCH)) {
+			if(ul_dbf.fetch_result(_c, &res, ul_fetch_rows)<0) {
+				LM_ERR("fetching rows (1) failed\n");
+				ul_dbf.free_result(_c, res);
+				return -1;
+			}
+		} else {
+			break;
+		}
+	} while(RES_ROW_N(res)>0);
+
+	ul_dbf.free_result(_c, res);
+
+#ifdef EXTRA_DEBUG
+	LM_NOTICE("udomain contact-expired end time [%d]\n", (int)time(NULL));
+#endif
+
+	return 0;
+
+error:
+	ul_dbf.free_result(_c, res);
+	return -1;
+}
+
 
 /*!
  * \brief Timer function to cleanup expired contacts, db_mode: DB_ONLY 
@@ -892,26 +1066,39 @@ done:
  */
 int db_timer_udomain(udomain_t* _d)
 {
-	db_key_t keys[2];
-	db_op_t  ops[2];
-	db_val_t vals[2];
+	db_key_t keys[3];
+	db_op_t  ops[3];
+	db_val_t vals[3];
+	int key_num = 2;
+
+	/* call contact expired call back for a domain before deleting database rows */
+	udomain_contact_expired_cb(ul_dbh, _d);
 
 	keys[0] = &expires_col;
 	ops[0] = "<";
 	vals[0].nul = 0;
-	UL_DB_EXPIRES_SET(&vals[0], act_time + 1);
+	UL_DB_EXPIRES_SET(&vals[0], act_time + 1 - ul_rm_expired_delay);
 
 	keys[1] = &expires_col;
 	ops[1] = OP_NEQ;
 	vals[1].nul = 0;
 	UL_DB_EXPIRES_SET(&vals[1], 0);
 
+	if (ul_db_srvid != 0) {
+		keys[2] = &srv_id_col;
+		ops[2] = OP_EQ;
+		vals[2].type = DB1_INT;
+		vals[2].nul = 0;
+		vals[2].val.int_val = server_id;
+		key_num = 3;
+	}
+
 	if (ul_dbf.use_table(ul_dbh, _d->name) < 0) {
 		LM_ERR("use_table failed\n");
 		return -1;
 	}
-
-	if (ul_dbf.delete(ul_dbh, keys, ops, vals, 2) < 0) {
+	
+	if (ul_dbf.delete(ul_dbh, keys, ops, vals, key_num) < 0) {
 		LM_ERR("failed to delete from table %s\n",_d->name->s);
 		return -1;
 	}
@@ -997,8 +1184,10 @@ void mem_delete_urecord(udomain_t* _d, struct urecord* _r)
 
 
 /*!
- * \brief Run timer handler for given domain
+ * \brief Run timer handler for given domain, delete urecords
  * \param _d domain
+ * \param istart start of run
+ * \param istep loop steps
  */
 void mem_timer_udomain(udomain_t* _d, int istart, int istep)
 {
@@ -1116,6 +1305,7 @@ int get_urecord(udomain_t* _d, str* _aor, struct urecord** _r)
 {
 	unsigned int sl, i, aorhash;
 	urecord_t* r;
+	ucontact_t* ptr = NULL;
 
 	if (db_mode!=DB_ONLY) {
 		/* search in cache */
@@ -1125,7 +1315,18 @@ int get_urecord(udomain_t* _d, str* _aor, struct urecord** _r)
 
 		for(i = 0; r!=NULL && i < _d->table[sl].n; i++) {
 			if((r->aorhash==aorhash) && (r->aor.len==_aor->len)
-						&& !memcmp(r->aor.s,_aor->s,_aor->len)){
+						&& !memcmp(r->aor.s,_aor->s,_aor->len))
+			{
+				if (handle_lost_tcp)
+				{
+					for (ptr = r->contacts;ptr;ptr = ptr->next)
+					{
+						if (ptr->expires == UL_EXPIRED_TIME )
+							continue;
+						if (is_valid_tcpconn(ptr) && !is_tcp_alive(ptr))
+							ptr->expires = UL_EXPIRED_TIME;
+					}
+				}
 				*_r = r;
 				return 0;
 			}

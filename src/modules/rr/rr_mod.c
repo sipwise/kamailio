@@ -57,9 +57,11 @@ int append_fromtag = 1;		/*!< append from tag by default */
 int enable_double_rr = 1;	/*!< enable using of 2 RR by default */
 int enable_full_lr = 0;		/*!< compatibilty mode disabled by default */
 int add_username = 0;	 	/*!< do not add username by default */
+int rr_force_send_socket = 0; /*!< control if socket is forced by rr */
 int enable_socket_mismatch_warning = 1; /*!< enable socket mismatch warning */
 static str custom_user_spec = {NULL, 0};
 pv_spec_t custom_user_avp;
+int rr_ignore_sips = 0; /*!< ignore sips schema when building record-route */
 
 ob_api_t rr_obb;
 
@@ -120,15 +122,17 @@ static cmd_export_t cmds[] = {
  * \brief Exported parameters
  */
 static param_export_t params[] ={
-	{"append_fromtag",	INT_PARAM, &append_fromtag},
+	{"append_fromtag",	    INT_PARAM, &append_fromtag},
 	{"enable_double_rr",	INT_PARAM, &enable_double_rr},
 	{"enable_full_lr",		INT_PARAM, &enable_full_lr},
 #ifdef ENABLE_USER_CHECK
-	{"ignore_user",		PARAM_STR, &i_user},
+	{"ignore_user",		    PARAM_STR, &i_user},
 #endif
 	{"add_username",		INT_PARAM, &add_username},
 	{"enable_socket_mismatch_warning",INT_PARAM,&enable_socket_mismatch_warning},
-	{"custom_user_avp",           PARAM_STR, &custom_user_spec},
+	{"custom_user_avp",     PARAM_STR, &custom_user_spec},
+	{"force_send_socket",   PARAM_INT, &rr_force_send_socket},
+	{"ignore_sips",         PARAM_INT, &rr_ignore_sips},
 	{0, 0, 0 }
 };
 
@@ -151,18 +155,16 @@ static pv_export_t mod_pvs[] = {
 
 
 struct module_exports exports = {
-	"rr",
-	DEFAULT_DLFLAGS,	/*!< dlopen flags */
-	cmds,			/*!< Exported functions */
-	params,			/*!< Exported parameters */
-	0,				/*!< exported statistics */
-	0,				/*!< exported MI functions */
-	mod_pvs,			/*!< exported pseudo-variables */
-	0,				/*!< extra processes */
-	mod_init,			/*!< initialize module */
-	0,				/*!< response function*/
-	mod_destroy,		/*!< destroy function */
-	0				/*!< per-child init function */
+	"rr",            /* module name */
+	DEFAULT_DLFLAGS, /* dlopen flags */
+	cmds,            /* cmd (cfg function) exports */
+	params,          /* param exports */
+	0,               /* RPC method exports */
+	mod_pvs,         /* pseudo-variables exports */
+	0,               /* response handling function */
+	mod_init,        /* module init function */
+	0,               /* per-child init function */
+	mod_destroy      /* module destroy function */
 };
 
 

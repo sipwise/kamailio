@@ -65,10 +65,13 @@ int app_lua_load_param(modparam_t type, void *val);
 int app_lua_register_param(modparam_t type, void *val);
 int app_lua_reload_param(modparam_t type, void *val);
 
+int _ksr_app_lua_log_mode = 0;
+
 static param_export_t params[]={
 	{"load",     PARAM_STRING|USE_FUNC_PARAM, (void*)app_lua_load_param},
 	{"register", PARAM_STRING|USE_FUNC_PARAM, (void*)app_lua_register_param},
 	{"reload",   INT_PARAM|USE_FUNC_PARAM, (void*)app_lua_reload_param},
+	{"log_mode", PARAM_INT, &_ksr_app_lua_log_mode},
 	{0, 0, 0}
 };
 
@@ -93,16 +96,14 @@ static cmd_export_t cmds[]={
 struct module_exports exports = {
 	"app_lua",
 	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,
-	params,
-	0,
-	0,              /* exported MI functions */
-	0,              /* exported pseudo-variables */
-	0,              /* extra processes */
-	mod_init,       /* module initialization function */
-	0,              /* response function */
-	mod_destroy,    /* destroy function */
-	child_init      /* per child init function */
+	cmds,		 /*·exported·functions·*/
+	params,		 /*·exported·params·*/
+	0,		 /*·exported·RPC·methods·*/
+	0,		 /* exported pseudo-variables */
+	0,		 /*·response·function·*/
+	mod_init,	 /* initialization module*/
+	child_init,	 /* per child init function */
+	mod_destroy	 /* destroy function */
 };
 
 /**
@@ -122,7 +123,10 @@ int sr_kemi_config_engine_lua(sip_msg_t *msg, int rtype, str *rname,
 			ret = app_lua_run_ex(msg, "ksr_request_route", NULL, NULL, NULL, 1);
 		}
 	} else if(rtype==CORE_ONREPLY_ROUTE) {
-		ret = app_lua_run_ex(msg, "ksr_reply_route", NULL, NULL, NULL, 0);
+		if(kemi_reply_route_callback.len>0) {
+			ret = app_lua_run_ex(msg, kemi_reply_route_callback.s, NULL,
+						NULL, NULL, 0);
+		}
 	} else if(rtype==BRANCH_ROUTE) {
 		if(rname!=NULL && rname->s!=NULL) {
 			ret = app_lua_run_ex(msg, rname->s, NULL, NULL, NULL, 0);
@@ -140,7 +144,11 @@ int sr_kemi_config_engine_lua(sip_msg_t *msg, int rtype, str *rname,
 			ret = app_lua_run_ex(msg, rname->s, NULL, NULL, NULL, 0);
 		}
 	} else if(rtype==ONSEND_ROUTE) {
-		ret = app_lua_run_ex(msg, "ksr_onsend_route", NULL, NULL, NULL, 0);
+		if(kemi_onsend_route_callback.len>0) {
+			ret = app_lua_run_ex(msg, kemi_onsend_route_callback.s, NULL,
+					NULL, NULL, 0);
+		}
+		return 1;
 	} else if(rtype==EVENT_ROUTE) {
 		if(rname!=NULL && rname->s!=NULL) {
 			ret = app_lua_run_ex(msg, rname->s,

@@ -49,6 +49,7 @@
 #include "xavp.h"
 #endif
 #include "select_buf.h"
+#include "locking.h"
 
 #include "tcp_server.h"  /* for tcpconn_add_alias */
 #include "tcp_options.h" /* for access to tcp_accept_aliases*/
@@ -68,6 +69,36 @@ str default_global_address = {0, 0};
 str default_global_port = {0, 0};
 str default_via_address = {0, 0};
 str default_via_port = {0, 0};
+
+int ksr_route_locks_size = 0;
+static rec_lock_set_t* ksr_route_locks_set = NULL;
+
+int ksr_route_locks_set_init(void)
+{
+	if(ksr_route_locks_set!=NULL || ksr_route_locks_size<=0)
+		return 0;
+
+	ksr_route_locks_set = rec_lock_set_alloc(ksr_route_locks_size);
+	if(ksr_route_locks_set==NULL) {
+		LM_ERR("failed to allocate route locks set\n");
+		return -1;
+	}
+	if(rec_lock_set_init(ksr_route_locks_set)==NULL) {
+		LM_ERR("failed to init route locks set\n");
+		return -1;
+	}
+	return 0;
+}
+
+void ksr_route_locks_set_destroy(void)
+{
+	if(ksr_route_locks_set==NULL)
+		return;
+
+	rec_lock_set_destroy(ksr_route_locks_set);
+	rec_lock_set_dealloc(ksr_route_locks_set);
+	ksr_route_locks_set = NULL;
+}
 
 /**
  * increment msg_no and return the new value
@@ -137,6 +168,8 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 	sr_net_info_t netinfo;
 	sr_kemi_eng_t *keng = NULL;
 	sr_event_param_t evp = {0};
+	unsigned int cidlockidx = 0;
+	unsigned int cidlockset = 0;
 	int errsipmsg = 0;
 
 	if(sr_event_enabled(SREV_NET_DATA_RECV)) {
@@ -158,7 +191,7 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 	len = inb.len;
 
 	msg = pkg_malloc(sizeof(struct sip_msg));
-	if(msg == 0) {
+	if(unlikely(msg == 0)) {
 		LM_ERR("no mem for sip_msg\n");
 		goto error00;
 	}
@@ -170,7 +203,7 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 	/* fill in msg */
 	msg->buf = buf;
 	msg->len = len;
-	/* zero termination (termination of orig message bellow not that
+	/* zero termination (termination of orig message below not that
 	 * useful as most of the work is done with scratch-pad; -jiri  */
 	/* buf[len]=0; */ /* WARNING: zero term removed! */
 	msg->rcv = *rcv_info;
@@ -201,8 +234,8 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 		goto error02;
 	}
 
-	if(parse_headers(msg, HDR_FROM_F | HDR_TO_F | HDR_CALLID_F | HDR_CSEQ_F, 0)
-			< 0) {
+	if(unlikely(parse_headers(msg, HDR_FROM_F | HDR_TO_F | HDR_CALLID_F | HDR_CSEQ_F, 0)
+			< 0)) {
 		LM_WARN("parsing relevant headers failed\n");
 	}
 	LM_DBG("--- received sip message - %s - call-id: [%.*s] - cseq: [%.*s]\n",
@@ -218,6 +251,13 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 	/* ... clear branches from previous message */
 	clear_branches();
 
+	if(unlikely(ksr_route_locks_set!=NULL && msg->callid && msg->callid->body.s
+			&& msg->callid->body.len >0)) {
+		cidlockidx = get_hash1_raw(msg->callid->body.s, msg->callid->body.len);
+		cidlockidx = cidlockidx % ksr_route_locks_set->size;
+		cidlockset = 1;
+	}
+
 	if(msg->first_line.type == SIP_REQUEST) {
 		ruri_mark_new(); /* ruri is usable for forking (not consumed yet) */
 		if(!IS_SIP(msg)) {
@@ -228,7 +268,7 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 			}
 		}
 		/* sanity checks */
-		if((msg->via1 == 0) || (msg->via1->error != PARSE_OK)) {
+		if(unlikely((msg->via1 == 0) || (msg->via1->error != PARSE_OK))) {
 			/* no via, send back error ? */
 			LM_ERR("no via found in request\n");
 			STATS_BAD_MSG();
@@ -279,13 +319,29 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 						" engine registered\n");
 				goto error_req;
 			}
-			if(keng->froute(msg, REQUEST_ROUTE, NULL, NULL) < 0) {
-				LM_NOTICE("negative return code from engine function\n");
+			if(unlikely(cidlockset)) {
+				rec_lock_set_get(ksr_route_locks_set, cidlockidx);
+				if(sr_kemi_route(keng, msg, REQUEST_ROUTE, NULL, NULL) < 0)
+					LM_NOTICE("negative return code from engine function\n");
+				rec_lock_set_release(ksr_route_locks_set, cidlockidx);
+			} else {
+				if(sr_kemi_route(keng, msg, REQUEST_ROUTE, NULL, NULL) < 0)
+					LM_NOTICE("negative return code from engine function\n");
 			}
 		} else {
-			if(run_top_route(main_rt.rlist[DEFAULT_RT], msg, 0) < 0) {
-				LM_WARN("error while trying script\n");
-				goto error_req;
+			if(unlikely(cidlockset)) {
+				rec_lock_set_get(ksr_route_locks_set, cidlockidx);
+				if(run_top_route(main_rt.rlist[DEFAULT_RT], msg, 0) < 0) {
+					rec_lock_set_release(ksr_route_locks_set, cidlockidx);
+					LM_WARN("error while trying script\n");
+					goto error_req;
+				}
+				rec_lock_set_release(ksr_route_locks_set, cidlockidx);
+			} else {
+				if(run_top_route(main_rt.rlist[DEFAULT_RT], msg, 0) < 0) {
+					LM_WARN("error while trying script\n");
+					goto error_req;
+				}
 			}
 		}
 
@@ -335,7 +391,9 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 		}
 
 		/* exec the onreply routing script */
-		keng = sr_kemi_eng_get();
+		if(kemi_reply_route_callback.len>0) {
+			keng = sr_kemi_eng_get();
+		}
 		if(onreply_rt.rlist[DEFAULT_RT] != NULL || keng != NULL) {
 			set_route_type(CORE_ONREPLY_ROUTE);
 			ret = 1;
@@ -343,10 +401,22 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 				bctx = sr_kemi_act_ctx_get();
 				init_run_actions_ctx(&ctx);
 				sr_kemi_act_ctx_set(&ctx);
-				ret = keng->froute(msg, CORE_ONREPLY_ROUTE, NULL, NULL);
+				if(unlikely(cidlockset)) {
+					rec_lock_set_get(ksr_route_locks_set, cidlockidx);
+					ret = sr_kemi_route(keng, msg, CORE_ONREPLY_ROUTE, NULL, NULL);
+					rec_lock_set_release(ksr_route_locks_set, cidlockidx);
+				} else {
+					ret = sr_kemi_route(keng, msg, CORE_ONREPLY_ROUTE, NULL, NULL);
+				}
 				sr_kemi_act_ctx_set(bctx);
 			} else {
-				ret = run_top_route(onreply_rt.rlist[DEFAULT_RT], msg, &ctx);
+				if(unlikely(cidlockset)) {
+					rec_lock_set_get(ksr_route_locks_set, cidlockidx);
+					ret = run_top_route(onreply_rt.rlist[DEFAULT_RT], msg, &ctx);
+					rec_lock_set_release(ksr_route_locks_set, cidlockidx);
+				} else  {
+					ret = run_top_route(onreply_rt.rlist[DEFAULT_RT], msg, &ctx);
+				}
 			}
 #ifndef NO_ONREPLY_ROUTE_ERROR
 			if(unlikely(ret < 0)) {

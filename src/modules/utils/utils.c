@@ -28,8 +28,8 @@
  * \ingroup utils
  */
 
-/*! \defgroup Utils Kamailio :: Various utilities
- *
+/*! \defgroup utils Kamailio :: Various utilities
+ * @{
  */
 
 
@@ -116,18 +116,16 @@ static mi_export_t mi_cmds[] = {
 
 /* Module interface */
 struct module_exports exports = {
-	"utils",
+	"utils",         /* module name */
 	DEFAULT_DLFLAGS, /* dlopen flags */
-	cmds,      /* Exported functions */
-	params,    /* Exported parameters */
-	0,         /* exported statistics */
-	0,         /* exported MI functions */
-	0,         /* exported pseudo-variables */
-	0,         /* extra processes */
-	mod_init,  /* module initialization function */
-	0,         /* response function*/
-	destroy,   /* destroy function */
-	child_init /* per-child init function */
+	cmds,            /* exported functions */
+	params,          /* exported parameters */
+	0,               /* exported rpc functions */
+	0,               /* exported pseudo-variables */
+	0,               /* response handling function*/
+	mod_init,        /* module init function */
+	child_init,      /* per-child init function */
+	destroy          /* destroy function */
 };
 
 
@@ -471,3 +469,5 @@ static struct mi_root* forward_fifo_proxy(struct mi_root* cmd_tree, void* param)
 	return init_mi_tree(200, MI_OK_S, MI_OK_LEN);
 }
 #endif
+
+/** @} */

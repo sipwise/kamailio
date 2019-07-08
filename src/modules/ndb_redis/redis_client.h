@@ -28,7 +28,11 @@
 #ifndef _REDIS_CLIENT_H_
 #define _REDIS_CLIENT_H_
 
+#ifdef WITH_HIREDIS_PATH
 #include <hiredis/hiredis.h>
+#else
+#include <hiredis.h>
+#endif
 
 #include "../../core/str.h"
 #include "../../core/parser/parse_param.h"
@@ -36,6 +40,7 @@
 
 #define MAXIMUM_PIPELINED_COMMANDS 1000
 #define MAXIMUM_NESTED_KEYS 10
+#define MAXIMUM_SENTINELS 5
 #define LM_DBG_redis_reply(rpl) print_redis_reply(L_DBG,(rpl),0)
 
 int redisc_init(void);
@@ -65,6 +70,7 @@ typedef struct redisc_server {
 	str *sname;
 	unsigned int hname;
 	param_t *attrs;
+	char *spec;
 	redisContext *ctxRedis;
 	struct redisc_server *next;
 	redisc_piped_cmds_t piped;

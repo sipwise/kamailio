@@ -28,7 +28,7 @@
  */
 
 /**
- * @defgroup Textops Various text operatoins on messages
+ * @defgroup textops Various text operations on messages
  * @brief Kamailio textops module
  */
 
@@ -88,7 +88,11 @@ MODULE_VERSION
 static int search_body_f(struct sip_msg*, char*, char*);
 static int search_hf_f(struct sip_msg*, char*, char*, char*);
 static int replace_f(struct sip_msg*, char*, char*);
+static int replace_str_f(struct sip_msg*, char*, char*, char*);
 static int replace_body_f(struct sip_msg*, char*, char*);
+static int replace_body_str_f(struct sip_msg*, char*, char*, char*);
+static int replace_hdrs_f(struct sip_msg*, char*, char*);
+static int replace_hdrs_str_f(struct sip_msg*, char*, char*, char*);
 static int replace_all_f(struct sip_msg*, char*, char*);
 static int replace_body_all_f(struct sip_msg*, char*, char*);
 static int replace_body_atonce_f(struct sip_msg*, char*, char*);
@@ -116,6 +120,8 @@ static int set_multibody_2(struct sip_msg* msg, char*, char *, char *);
 static int set_multibody_3(struct sip_msg* msg, char*, char *, char *);
 static int append_multibody_2(struct sip_msg* msg, char*, char *);
 static int append_multibody_3(struct sip_msg* msg, char*, char *, char *);
+static int append_multibody_hex_2(struct sip_msg* msg, char*, char *);
+static int append_multibody_hex_3(struct sip_msg* msg, char*, char *, char *);
 static int fixup_multibody_f(void** param, int param_no);
 static int remove_multibody_f(struct sip_msg *msg, char *p1, char *p2);
 static int get_body_part_raw_f(sip_msg_t* msg, char* ctype, char* ovar);
@@ -124,6 +130,8 @@ static int fixup_get_body_part(void** param, int param_no);
 static int is_method_f(struct sip_msg* msg, char* , char *);
 static int has_body_f(struct sip_msg *msg, char *type, char *str2 );
 static int in_list_f(struct sip_msg* _msg, char* _subject, char* _list,
+		char* _sep);
+static int in_list_prefix_f(struct sip_msg* _msg, char* _subject, char* _list,
 		char* _sep);
 static int cmp_str_f(struct sip_msg *msg, char *str1, char *str2 );
 static int cmp_istr_f(struct sip_msg *msg, char *str1, char *str2 );
@@ -139,7 +147,9 @@ static int fixup_method(void** param, int param_no);
 static int add_header_fixup(void** param, int param_no);
 static int fixup_body_type(void** param, int param_no);
 static int fixup_in_list(void** param, int param_no);
+static int fixup_in_list_prefix(void** param, int param_no);
 static int fixup_free_in_list(void** param, int param_no);
+static int fixup_free_in_list_prefix(void** param, int param_no);
 int fixup_regexpNL_none(void** param, int param_no);
 static int fixup_search_hf(void** param, int param_no);
 static int fixup_subst_hf(void** param, int param_no);
@@ -172,8 +182,20 @@ static cmd_export_t cmds[]={
 	{"replace",          (cmd_function)replace_f,         2,
 		fixup_regexp_none, fixup_free_regexp_none,
 		ANY_ROUTE},
+	{"replace_str",      (cmd_function)replace_str_f,     3,
+		fixup_spve_all, fixup_free_spve_all,
+		ANY_ROUTE},
 	{"replace_body",     (cmd_function)replace_body_f,    2,
 		fixup_regexp_none, fixup_free_regexp_none,
+		ANY_ROUTE},
+	{"replace_body_str", (cmd_function)replace_body_str_f,3,
+		fixup_spve_all, fixup_free_spve_all,
+		ANY_ROUTE},
+	{"replace_hdrs",     (cmd_function)replace_hdrs_f,    2,
+		fixup_regexp_none, fixup_free_regexp_none,
+		ANY_ROUTE},
+	{"replace_hdrs_str", (cmd_function)replace_hdrs_str_f,3,
+		fixup_spve_all, fixup_free_spve_all,
 		ANY_ROUTE},
 	{"replace_all",      (cmd_function)replace_all_f,     2,
 		fixup_regexp_none, fixup_free_regexp_none,
@@ -259,6 +281,9 @@ static cmd_export_t cmds[]={
 	{"in_list", (cmd_function)in_list_f, 3, fixup_in_list,
 		fixup_free_in_list,
 		ANY_ROUTE},
+	{"in_list_prefix", (cmd_function)in_list_prefix_f, 3,
+		fixup_in_list_prefix, fixup_free_in_list_prefix,
+		ANY_ROUTE},
 	{"cmp_str",  (cmd_function)cmp_str_f, 2,
 		fixup_spve_spve, 0,
 		ANY_ROUTE},
@@ -293,6 +318,12 @@ static cmd_export_t cmds[]={
 	{"append_body_part",     (cmd_function)append_multibody_3,    3,
 		fixup_multibody_f, 0,
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
+	{"append_body_part_hex",     (cmd_function)append_multibody_hex_2,    2,
+		fixup_spve_spve, 0,
+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
+	{"append_body_part_hex",     (cmd_function)append_multibody_hex_3,    3,
+		fixup_multibody_f, 0,
+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 	{"remove_body_part",     (cmd_function)remove_multibody_f,    1,
 		fixup_spve_null, 0,
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
@@ -314,15 +345,13 @@ struct module_exports exports= {
 	"textops",  /* module name*/
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	cmds,       /* exported functions */
-	0,          /* module parameters */
-	0,          /* exported statistics */
-	0,          /* exported MI functions */
+	0,          /* exported parameters */
+	0,          /* exported rpc functions */
 	0,          /* exported pseudo-variables */
-	0,          /* extra processes */
-	mod_init,   /* module initialization function */
-	0,          /* response function */
-	0,          /* destroy function */
+	0,          /* response handling function */
+	mod_init,   /* module init function */
 	0,          /* per-child init function */
+	0           /* module destroy function */
 };
 
 
@@ -764,6 +793,113 @@ static int ki_replace(sip_msg_t* msg, str* sre, str* sval)
 	return ret;
 }
 
+static char *textops_strfind(str *mbuf, str *mkey)
+{
+	char *sp;
+
+	// Sanity check
+	if(!(mbuf && mkey && mbuf->len >= mkey->len))
+		return NULL;
+
+	for(sp = mbuf->s; sp <= mbuf->s + mbuf->len - mkey->len; sp++) {
+		if(*sp == mkey->s[0] && strncmp(sp, mkey->s, mkey->len) == 0) {
+			return sp;
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * search in lbuf for mkey and replace it with rval, only first occurrence or
+ * all of them based on rmode
+ */
+static int ki_replace_str_helper(sip_msg_t* msg, str* lbuf, str* mkey,
+			str* rval, str *rmode)
+{
+	sr_lump_t* l;
+	char* s;
+	str mbuf;
+	char *mp;
+	char rpos;
+
+	if(lbuf==NULL || mkey==NULL || rval==NULL) {
+		return -1;
+	}
+	if(lbuf->s==NULL || lbuf->len<=0 || mkey->s==NULL || mkey->len<=0) {
+		return 1;
+	}
+
+	if(rmode==NULL || rmode->s==NULL || rmode->s[0]=='f' || rmode->s[0]=='F') {
+		rpos = 'f';
+	} else {
+		rpos = 'a';
+	}
+
+	mbuf = *lbuf;
+
+	while((mp=textops_strfind(&mbuf, mkey))!=NULL) {
+
+		if ((l=del_lump(msg, mp - msg->buf, mkey->len, 0))==0) {
+			return -1;
+		}
+		s=pkg_malloc(rval->len+1);
+		if (s==0){
+			LM_ERR("memory allocation failure\n");
+			return -1;
+		}
+		memcpy(s, rval->s, rval->len);
+		if (insert_new_lump_after(l, s, rval->len, 0)==0){
+			LM_ERR("could not insert new lump\n");
+			pkg_free(s);
+			return -1;
+		}
+
+		if(rpos=='f') {
+			return 1;
+		}
+
+		mbuf.s = mp + mkey->len;
+		mbuf.len = msg->len - (mbuf.s - msg->buf);
+	}
+
+	return 1;
+}
+
+static int ki_replace_str(sip_msg_t* msg, str* mkey, str* rval, str *rmode)
+{
+	str lbuf;
+
+	lbuf.s = get_header(msg);
+	lbuf.len = msg->len - (lbuf.s - msg->buf);
+
+	return ki_replace_str_helper(msg, &lbuf, mkey, rval, rmode);
+}
+
+static int replace_str_f(sip_msg_t* msg, char* pmkey, char* prval, char* prmode)
+{
+	str mkey;
+	str rval;
+	str rmode;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pmkey, &mkey)<0) {
+		LM_ERR("failed to get the matching string parameter\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t*)prval, &rval)<0) {
+		LM_ERR("failed to get the replacement string parameter\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t*)prmode, &rmode)<0) {
+		LM_ERR("failed to get the replacement mode parameter\n");
+		return -1;
+	}
+
+	return ki_replace_str(msg, &mkey, &rval, &rmode);
+}
+
 static int replace_body_helper(sip_msg_t* msg, regex_t *re, str *val)
 {
 	struct lump* l;
@@ -836,6 +972,173 @@ static int ki_replace_body(sip_msg_t* msg, str* sre, str* sval)
 	regfree(&mre);
 
 	return ret;
+}
+
+static int ki_replace_body_str(sip_msg_t* msg, str* mkey, str* rval, str *rmode)
+{
+	str lbuf;
+
+	lbuf.s = get_body(msg);
+	if (lbuf.s==0) {
+		LM_ERR("failed to get the message body\n");
+		return -1;
+	}
+	lbuf.len = msg->len - (int)(lbuf.s-msg->buf);
+	if (lbuf.len==0) {
+		LM_DBG("message body has zero length\n");
+		return -1;
+	}
+
+	return ki_replace_str_helper(msg, &lbuf, mkey, rval, rmode);
+}
+
+static int replace_body_str_f(sip_msg_t* msg, char* pmkey, char* prval, char* prmode)
+{
+	str mkey;
+	str rval;
+	str rmode;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pmkey, &mkey)<0) {
+		LM_ERR("failed to get the matching string parameter\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t*)prval, &rval)<0) {
+		LM_ERR("failed to get the replacement string parameter\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t*)prmode, &rmode)<0) {
+		LM_ERR("failed to get the replacement mode parameter\n");
+		return -1;
+	}
+
+	return ki_replace_body_str(msg, &mkey, &rval, &rmode);
+}
+
+static int replace_hdrs_helper(sip_msg_t* msg, regex_t *re, str *val)
+{
+	struct lump* l;
+	regmatch_t pmatch;
+	char* s;
+	int off;
+	str lbuf;
+	char bk;
+
+	if ( parse_headers(msg, HDR_EOH_F, 0)==-1 ) {
+		LM_ERR("failed to parse to end of headers\n");
+		return -1;
+	}
+
+	lbuf.s = get_header(msg);
+	lbuf.len = (int)(msg->unparsed - lbuf.s);
+
+	if (lbuf.len==0) {
+		LM_DBG("message headers part has zero length\n");
+		return -1;
+	}
+
+	bk = lbuf.s[lbuf.len];
+	lbuf.s[lbuf.len] = '\0';
+	if (regexec(re, lbuf.s, 1, &pmatch, 0)!=0) {
+		lbuf.s[lbuf.len] = bk;
+		return -1;
+	}
+	lbuf.s[lbuf.len] = bk;
+
+	off=lbuf.s-msg->buf;
+
+	if (pmatch.rm_so!=-1){
+		if ((l=del_lump(msg, pmatch.rm_so+off,
+						pmatch.rm_eo-pmatch.rm_so, 0))==0)
+			return -1;
+		s=pkg_malloc(val->len+1);
+		if (s==0){
+			LM_ERR("memory allocation failure\n");
+			return -1;
+		}
+		memcpy(s, val->s, val->len);
+		if (insert_new_lump_after(l, s, val->len, 0)==0){
+			LM_ERR("could not insert new lump\n");
+			pkg_free(s);
+			return -1;
+		}
+
+		return 1;
+	}
+	return -1;
+}
+
+static int replace_hdrs_f(struct sip_msg* msg, char* key, char* str2)
+{
+	str val;
+
+	val.s = str2;
+	val.len = strlen(val.s);
+
+	return replace_hdrs_helper(msg, (regex_t*)key, &val);
+}
+
+static int ki_replace_hdrs(sip_msg_t* msg, str* sre, str* sval)
+{
+	regex_t mre;
+	int ret;
+
+	memset(&mre, 0, sizeof(regex_t));
+	if (regcomp(&mre, sre->s, REG_EXTENDED|REG_ICASE|REG_NEWLINE)!=0) {
+		LM_ERR("failed to compile regex: %.*s\n", sre->len, sre->s);
+		return -1;
+	}
+
+	ret = replace_hdrs_helper(msg, &mre, sval);
+
+	regfree(&mre);
+
+	return ret;
+}
+
+static int ki_replace_hdrs_str(sip_msg_t* msg, str* mkey, str* rval, str *rmode)
+{
+	str lbuf;
+
+	if ( parse_headers(msg, HDR_EOH_F, 0)==-1 ) {
+		LM_ERR("failed to parse to end of headers\n");
+		return -1;
+	}
+
+	lbuf.s = get_header(msg);
+	lbuf.len = (int)(msg->unparsed - lbuf.s);
+
+	if (lbuf.len==0) {
+		LM_DBG("message headers part has zero length\n");
+		return -1;
+	}
+
+	return ki_replace_str_helper(msg, &lbuf, mkey, rval, rmode);
+}
+
+static int replace_hdrs_str_f(sip_msg_t* msg, char* pmkey, char* prval, char* prmode)
+{
+	str mkey;
+	str rval;
+	str rmode;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pmkey, &mkey)<0) {
+		LM_ERR("failed to get the matching string parameter\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t*)prval, &rval)<0) {
+		LM_ERR("failed to get the replacement string parameter\n");
+		return -1;
+	}
+
+	if(fixup_get_svalue(msg, (gparam_t*)prmode, &rmode)<0) {
+		LM_ERR("failed to get the replacement mode parameter\n");
+		return -1;
+	}
+
+	return ki_replace_hdrs_str(msg, &mkey, &rval, &rmode);
 }
 
 /* sed-perl style re: s/regular expression/replacement/flags */
@@ -2259,7 +2562,86 @@ int ki_append_multibody(sip_msg_t* msg, str* txt, str* ct)
 	return ki_append_multibody_cd(msg, txt, ct, &cd);
 }
 
-static int append_multibody_helper(sip_msg_t *msg, char *p1, char *p2, char *p3)
+int ki_append_multibody_hex_cd(sip_msg_t* msg, str* htxt, str* ct, str* cd)
+{
+	str sraw;
+	int i;
+	int ret;
+	char v;
+
+	if(htxt==NULL || htxt->s==NULL || htxt->len==0) {
+		LM_ERR("invalid body parameter\n");
+		return -1;
+	}
+
+	sraw.len = htxt->len / 2 + 2;
+	sraw.s = pkg_malloc(sraw.len * sizeof(char));
+	if(sraw.s==NULL) {
+		LM_ERR("no more pkg memory\n");
+		return -1;
+	}
+	memset(sraw.s, 0, sraw.len * sizeof(char));
+
+	sraw.len = 0;
+	for(i=0; i<htxt->len; i++) {
+		if(htxt->s[i]==' ' || htxt->s[i]=='\t') {
+			continue;
+		}
+		if(i+1==htxt->len) {
+			LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len, htxt->s,
+					htxt->len, i);
+			pkg_free(sraw.s);
+			return -1;
+		}
+		v = 0;
+		if(htxt->s[i]>='0' && htxt->s[i]<='9') {
+			v = (htxt->s[i] - '0') << 4;
+		} else if(htxt->s[i]>='A' && htxt->s[i]<='F') {
+			v = (htxt->s[i] - 'A' + 10) << 4;
+		} else if(htxt->s[i]>='a' && htxt->s[i]<='f') {
+			v = (htxt->s[i] - 'a' + 10) << 4;
+		} else {
+			LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len, htxt->s,
+					htxt->len, i);
+			pkg_free(sraw.s);
+			return -1;
+		}
+		i++;
+		if(htxt->s[i]>='0' && htxt->s[i]<='9') {
+			v += (htxt->s[i] - '0');
+		} else if(htxt->s[i]>='A' && htxt->s[i]<='F') {
+			v += (htxt->s[i] - 'A' + 10);
+		} else if(htxt->s[i]>='a' && htxt->s[i]<='f') {
+			v += (htxt->s[i] - 'a' + 10);
+		} else {
+			LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len, htxt->s,
+					htxt->len, i);
+			pkg_free(sraw.s);
+			return -1;
+		}
+		sraw.s[sraw.len++] = v;
+	}
+	if(sraw.len==0) {
+		/* only white spaces */
+		LM_ERR("invalid input hex data [%.*s] (%d/%d)\n", htxt->len, htxt->s,
+				htxt->len, i);
+		pkg_free(sraw.s);
+		return -1;
+	}
+	ret  = ki_append_multibody_cd(msg, &sraw, ct, cd);
+	pkg_free(sraw.s);
+	return ret;
+}
+
+int ki_append_multibody_hex(sip_msg_t* msg, str* txt, str* ct)
+{
+	str cd = {0,0};
+
+	return ki_append_multibody_hex_cd(msg, txt, ct, &cd);
+}
+
+static int append_multibody_helper(sip_msg_t *msg, char *p1, char *p2, char *p3,
+		int hex)
 {
 	str txt = {0,0};
 	str ct = {0,0};
@@ -2290,17 +2672,31 @@ static int append_multibody_helper(sip_msg_t *msg, char *p1, char *p2, char *p3)
 		}
 	}
 
-	return ki_append_multibody_cd(msg, &txt, &ct, &cd);
+	if(hex) {
+		return ki_append_multibody_hex_cd(msg, &txt, &ct, &cd);
+	} else {
+		return ki_append_multibody_cd(msg, &txt, &ct, &cd);
+	}
 }
 
 static int append_multibody_2(struct sip_msg* msg, char* p1, char* p2)
 {
-	return append_multibody_helper(msg, p1, p2, NULL);
+	return append_multibody_helper(msg, p1, p2, NULL, 0);
 }
 
 static int append_multibody_3(struct sip_msg* msg, char* p1, char* p2, char *p3)
 {
-	return append_multibody_helper(msg, p1, p2, p3);
+	return append_multibody_helper(msg, p1, p2, p3, 0);
+}
+
+static int append_multibody_hex_2(struct sip_msg* msg, char* p1, char* p2)
+{
+	return append_multibody_helper(msg, p1, p2, NULL, 1);
+}
+
+static int append_multibody_hex_3(struct sip_msg* msg, char* p1, char* p2, char *p3)
+{
+	return append_multibody_helper(msg, p1, p2, p3, 1);
 }
 
 static int fixup_multibody_f(void** param, int param_no)
@@ -2365,7 +2761,7 @@ static int ki_remove_multibody(sip_msg_t* msg, str* content_type)
 	}
 
 	if(get_boundary(msg, &boundary)!=0) {
-		LM_ERR("Cannot get boundary. Is body multipart?\n");
+		LM_ERR("Cannot get boundary from Content type header. Is body multipart?\n");
 		return -1;
 	}
 
@@ -2455,18 +2851,23 @@ static int ki_get_body_part_helper(sip_msg_t* msg, str* ctype, pv_spec_t *dst,
 
 	body.s = get_body(msg);
 	if (body.s == 0) {
-		LM_ERR("failed to get the message body\n");
+		LM_ERR("failed to get the content message body\n");
 		return -1;
 	}
 	body.len = msg->len - (int)(body.s - msg->buf);
 	if (body.len == 0) {
-		LM_DBG("message body has zero length\n");
+		LM_DBG("Content body has zero length\n");
 		return -1;
 	}
 
 	if(get_boundary(msg, &boundary)!=0) {
-		LM_ERR("Cannot get boundary. Is body multipart?\n");
-		return -1;
+		LM_DBG("Content is not multipart so return all content body as string\n");
+		memset(&val, 0, sizeof(pv_value_t));
+		val.flags = PV_VAL_STR;
+		val.rs.s = body.s;
+		val.rs.len =body.len;
+		dst->setf(msg, &dst->pvp, (int)EQ_T, &val);
+		return 1;
 	}
 
 	start = body.s;
@@ -2572,7 +2973,7 @@ static int get_body_part_helper(sip_msg_t* msg, char* ctype, char* ovar, int mod
 	str content_type;
 
 	if(ctype==0) {
-		LM_ERR("invalid parameters\n");
+		LM_ERR("invalid Content-type parameters\n");
 		return -1;
 	}
 
@@ -3007,6 +3408,41 @@ static int fixup_free_in_list(void** param, int param_no)
 	return -1;
 }
 
+/*
+ * Fix in_list_prefix params: subject and list (strings that may contain pvars),
+ * separator (string)
+ */
+static int fixup_in_list_prefix(void** param, int param_no)
+{
+	if ((param_no == 1) || (param_no == 2)) return fixup_spve_null(param, 1);
+
+	if (param_no == 3) {
+		if ((strlen((char *)*param) != 1) || (*((char *)(*param)) == 0)) {
+			LM_ERR("invalid separator parameter\n");
+			return -1;
+		}
+		return 0;
+	}
+
+	LM_ERR("invalid parameter number <%d>\n", param_no);
+	return -1;
+}
+
+/*
+ * Free in_list_prefix params
+ */
+static int fixup_free_in_list_prefix(void** param, int param_no)
+{
+	if ((param_no == 1) || (param_no == 2)) {
+		return fixup_free_spve_null(param, 1);
+	}
+
+	if (param_no == 3) return 0;
+
+	LM_ERR("invalid parameter number <%d>\n", param_no);
+	return -1;
+}
+
 static int add_header_fixup(void** param, int param_no)
 {
 	if(param_no==1)
@@ -3240,6 +3676,112 @@ int in_list_f(struct sip_msg* _m, char* _subject, char* _list, char* _sep)
 	sep.len = 1;
 
 	return ki_in_list(_m, &subject, &list, &sep);
+}
+
+/*
+ * Checks if an element in list is a prefix for subject
+ */
+int ki_in_list_prefix(sip_msg_t* _m, str* subject, str* list, str* vsep)
+{
+	int sep;
+	char *at, *past, *next_sep, *s;
+
+	if(subject==NULL || subject->len<=0 || list==NULL || list->len<=0
+			|| vsep==NULL || vsep->len<=0)
+		return -1;
+
+	sep = vsep->s[0];
+
+	at = list->s;
+	past = list->s + list->len;
+
+	/* Eat leading white space */
+	while ((at < past) &&
+			((*at == ' ') || (*at == '\t') || (*at == '\r') || (*at == '\n') )) {
+		at++;
+	}
+
+	while (at < past) {
+		next_sep = index(at, sep);
+		s = next_sep;
+		int list_element_len;
+
+		if (s == NULL) {
+			/* Eat trailing white space */
+			while ((at < past) &&
+					((*(past-1) == ' ') || (*(past-1) == '\t')
+						|| (*(past-1) == '\r') || (*(past-1) == '\n') )) {
+				past--;
+			}
+			list_element_len = past - at;
+			if (list_element_len == 0) {
+				/* There is no list element */
+				return -1;
+			}
+			if (list_element_len > subject->len) {
+				/* Length of list element is greater than subject length */
+				return -1;
+			}
+			if (strncmp(at, subject->s, list_element_len) != 0) {
+				return -1;
+			}
+			/* Prefix match found */
+			return 1;
+
+		} else {
+			/* Eat trailing white space */
+			while ((at < s) &&
+					((*(s-1) == ' ') || (*(s-1) == '\t') || (*(s-1) == '\r')
+						|| (*(s-1) == '\n') )) {
+				s--;
+			}
+			list_element_len = s - at;
+			if (list_element_len == 0 || list_element_len > subject->len ||
+				strncmp(at, subject->s, list_element_len) != 0) {
+				/* Prefix match not found */
+				at = next_sep + 1;
+				/* Eat leading white space */
+				while ((at < past) &&
+						((*at == ' ') || (*at == '\t') || (*at == '\r')
+							|| (*at == '\n') )) {
+					at++;
+				}
+			} else {
+				/* Prefix match found */
+				return 1;
+			}
+		}
+	}
+
+	return -1;
+}
+
+/*
+ * Checks if an element in list is a prefix for subject
+ */
+int in_list_prefix_f(struct sip_msg* _m, char* _subject, char* _list, char* _sep)
+{
+	str subject, list, sep;
+	if (fixup_get_svalue(_m, (gparam_p)_subject, &subject) != 0) {
+		LM_ERR("cannot get subject value\n");
+		return -1;
+	} else {
+		if (subject.len == 0) {
+			LM_ERR("subject cannot be empty string\n");
+			return -1;
+		}
+	}
+
+	if (fixup_get_svalue(_m, (gparam_p)_list, &list) != 0) {
+		LM_ERR("cannot get list value\n");
+		return -1;
+	} else {
+		if (list.len == 0) return -1;
+	}
+	sep.s = _sep;
+	sep.len = 1;
+
+	return ki_in_list_prefix(_m, &subject, &list, &sep);
 }
 
 static int cmp_str_f(struct sip_msg *msg, char *str1, char *str2 )
@@ -3994,6 +4536,11 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("textops"), str_init("replace_str"),
+		SR_KEMIP_INT, ki_replace_str,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("textops"), str_init("replace_all"),
 		SR_KEMIP_INT, ki_replace_all,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
@@ -4002,6 +4549,21 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 	{ str_init("textops"), str_init("replace_body"),
 		SR_KEMIP_INT, ki_replace_body,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("replace_body_str"),
+		SR_KEMIP_INT, ki_replace_body_str,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("replace_hdrs"),
+		SR_KEMIP_INT, ki_replace_hdrs,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("replace_hdrs_str"),
+		SR_KEMIP_INT, ki_replace_hdrs_str,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("textops"), str_init("replace_body_all"),
@@ -4046,6 +4608,11 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 	},
 	{ str_init("textops"), str_init("in_list"),
 		SR_KEMIP_INT, ki_in_list,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("in_list_prefix"),
+		SR_KEMIP_INT, ki_in_list_prefix,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
@@ -4096,6 +4663,16 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 	},
 	{ str_init("textops"), str_init("append_body_part_cd"),
 		SR_KEMIP_INT, ki_append_multibody_cd,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("append_body_part_hex"),
+		SR_KEMIP_INT, ki_append_multibody_hex,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("append_body_part_hex_cd"),
+		SR_KEMIP_INT, ki_append_multibody_hex_cd,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

@@ -20,10 +20,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- *
- * History:
- * --------
- *  2005-12-01  initial commit (chgen)
  */
 
 
@@ -151,7 +147,7 @@ int db_unixodbc_val2str(const db1_con_t* _c, const db_val_t* _v, char* _s, int* 
 			break;
 
 		default:
-			LM_DBG("unknown data type\n");
+			LM_ERR("unknown data type\n");
 			return -10;
 	}
 }

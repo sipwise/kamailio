@@ -220,22 +220,16 @@ stat_export_t siptrace_stats[] = {
 
 /*! \brief module exports */
 struct module_exports exports = {
-	"siptrace",
+	"siptrace",     /*!< module name */
 	DEFAULT_DLFLAGS, /*!< dlopen flags */
-	cmds,						 /*!< Exported functions */
-	params,						 /*!< Exported parameters */
-#ifdef STATISTICS
-	siptrace_stats, /*!< exported statistics */
-#else
-	0, /*!< exported statistics */
-#endif
-	0,		   /*!< exported MI functions */
-	0,		   /*!< exported pseudo-variables */
-	0,		   /*!< extra processes */
-	mod_init,  /*!< module initialization function */
-	0,		   /*!< response function */
-	destroy,   /*!< destroy function */
-	child_init /*!< child initialization function */
+	cmds,			/*!< exported functions */
+	params,			/*!< exported parameters */
+	0,				/*!< exported rpc functions */
+	0,				/*!< exported pseudo-variables */
+	0,				/*!< response function */
+	mod_init,		/*!< module initialization function */
+	child_init,		/*!< child initialization function */
+	destroy			/*!< destroy function */
 };
 
 
@@ -715,6 +709,7 @@ static int ki_sip_trace_dst_cid(sip_msg_t *msg, str *duri, str *cid)
 	dest_info_t *dst = NULL;
 	sip_uri_t uri;
 	proxy_l_t *p = NULL;
+	int ret = 1;
 
 	// If the dest is empty, use the module parameter, if set
 	if(duri == NULL || duri->len <= 0) {
@@ -756,7 +751,11 @@ static int ki_sip_trace_dst_cid(sip_msg_t *msg, str *duri, str *cid)
 		pkg_free(p);
 	}
 
-	return sip_trace(msg, dst, ((cid!=NULL && cid->len>0)?cid:NULL), NULL);
+	ret = sip_trace(msg, dst, ((cid!=NULL && cid->len>0)?cid:NULL), NULL);
+
+	pkg_free(dst);
+
+	return ret;
 }
 
 /**
@@ -1142,7 +1141,7 @@ static void trace_onreply_in(struct cell *t, int type, struct tmcb_params *ps)
 	siptrace_data_t sto;
 	sip_msg_t *msg;
 	sip_msg_t *req;
-	char statusbuf[8];
+	char statusbuf[INT2STR_MAX_LEN];
 
 	if(t == NULL || t->uas.request == 0 || ps == NULL) {
 		LM_DBG("no uas request, local transaction\n");
@@ -1176,25 +1175,36 @@ static void trace_onreply_in(struct cell *t, int type, struct tmcb_params *ps)
 
 	sto.method = get_cseq(msg)->method;
 
-	strcpy(statusbuf, int2str(ps->code, &sto.status.len));
-	sto.status.s = statusbuf;
+	sto.status.s = int2strbuf(ps->code, statusbuf, INT2STR_MAX_LEN, &sto.status.len);
+	if(sto.status.s == 0) {
+		LM_ERR("failure to get the status string\n");
+		return;
+	}
 
-	siptrace_copy_proto(msg->rcv.proto, sto.fromip_buff);
-	strcat(sto.fromip_buff, ip_addr2a(&msg->rcv.src_ip));
-	strcat(sto.fromip_buff, ":");
-	strcat(sto.fromip_buff, int2str(msg->rcv.src_port, NULL));
-	sto.fromip.s = sto.fromip_buff;
-	sto.fromip.len = strlen(sto.fromip_buff);
+	sto.fromip.len = snprintf(sto.fromip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+			siptrace_proto_name(msg->rcv.proto),
+			ip_addr2a(&msg->rcv.src_ip), (int)msg->rcv.src_port);
+	if(sto.fromip.len<0 || sto.fromip.len>=SIPTRACE_ADDR_MAX) {
+		LM_ERR("failed to format fromip buffer (%d)\n", sto.fromip.len);
+		sto.fromip.s = SIPTRACE_ANYADDR;
+		sto.fromip.len = SIPTRACE_ANYADDR_LEN;
+	} else {
+		sto.fromip.s = sto.fromip_buff;
+	}
 
 	if(trace_local_ip.s && trace_local_ip.len > 0) {
 		sto.toip = trace_local_ip;
 	} else {
-		siptrace_copy_proto(msg->rcv.proto, sto.toip_buff);
-		strcat(sto.toip_buff, ip_addr2a(&msg->rcv.dst_ip));
-		strcat(sto.toip_buff, ":");
-		strcat(sto.toip_buff, int2str(msg->rcv.dst_port, NULL));
-		sto.toip.s = sto.toip_buff;
-		sto.toip.len = strlen(sto.toip_buff);
+		sto.toip.len = snprintf(sto.toip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+				siptrace_proto_name(msg->rcv.proto),
+				ip_addr2a(&msg->rcv.dst_ip), (int)msg->rcv.dst_port);
+		if(sto.toip.len<0 || sto.toip.len>=SIPTRACE_ADDR_MAX) {
+			LM_ERR("failed to format toip buffer (%d)\n", sto.toip.len);
+			sto.toip.s = SIPTRACE_ANYADDR;
+			sto.toip.len = SIPTRACE_ANYADDR_LEN;
+		} else {
+			sto.toip.s = sto.toip_buff;
+		}
 	}
 
 	sto.dir = "in";
@@ -1216,8 +1226,7 @@ static void trace_onreply_out(struct cell *t, int type, struct tmcb_params *ps)
 	struct sip_msg *msg;
 	struct sip_msg *req;
 	struct ip_addr to_ip;
-	int len;
-	char statusbuf[8];
+	char statusbuf[INT2STR_MAX_LEN];
 	dest_info_t *dst;
 
 	if(t == NULL || t->uas.request == 0 || ps == NULL) {
@@ -1280,16 +1289,23 @@ static void trace_onreply_out(struct cell *t, int type, struct tmcb_params *ps)
 	if(trace_local_ip.s && trace_local_ip.len > 0) {
 		sto.fromip = trace_local_ip;
 	} else {
-		siptrace_copy_proto(msg->rcv.proto, sto.fromip_buff);
-		strcat(sto.fromip_buff, ip_addr2a(&req->rcv.dst_ip));
-		strcat(sto.fromip_buff, ":");
-		strcat(sto.fromip_buff, int2str(req->rcv.dst_port, NULL));
-		sto.fromip.s = sto.fromip_buff;
-		sto.fromip.len = strlen(sto.fromip_buff);
+		sto.fromip.len = snprintf(sto.fromip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+				siptrace_proto_name(msg->rcv.proto),
+				ip_addr2a(&req->rcv.dst_ip), (int)req->rcv.dst_port);
+		if(sto.fromip.len<0 || sto.fromip.len>=SIPTRACE_ADDR_MAX) {
+			LM_ERR("failed to format fromip buffer (%d)\n", sto.fromip.len);
+			sto.fromip.s = SIPTRACE_ANYADDR;
+			sto.fromip.len = SIPTRACE_ANYADDR_LEN;
+		} else {
+			sto.fromip.s = sto.fromip_buff;
+		}
 	}
 
-	strcpy(statusbuf, int2str(ps->code, &sto.status.len));
-	sto.status.s = statusbuf;
+	sto.status.s = int2strbuf(ps->code, statusbuf, INT2STR_MAX_LEN, &sto.status.len);
+	if(sto.status.s == 0) {
+		LM_ERR("failure to get the status string\n");
+		return;
+	}
 
 	memset(&to_ip, 0, sizeof(struct ip_addr));
 	dst = ps->dst;
@@ -1298,13 +1314,16 @@ static void trace_onreply_out(struct cell *t, int type, struct tmcb_params *ps)
 		sto.toip.len = SIPTRACE_ANYADDR_LEN;
 	} else {
 		su2ip_addr(&to_ip, &dst->to);
-		siptrace_copy_proto(dst->proto, sto.toip_buff);
-		strcat(sto.toip_buff, ip_addr2a(&to_ip));
-		strcat(sto.toip_buff, ":");
-		strcat(sto.toip_buff,
-				int2str((unsigned long)su_getport(&dst->to), &len));
-		sto.toip.s = sto.toip_buff;
-		sto.toip.len = strlen(sto.toip_buff);
+		sto.toip.len = snprintf(sto.toip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+				siptrace_proto_name(dst->proto),
+				ip_addr2a(&to_ip), (int)su_getport(&dst->to));
+		if(sto.toip.len<0 || sto.toip.len>=SIPTRACE_ADDR_MAX) {
+			LM_ERR("failed to format toip buffer (%d)\n", sto.toip.len);
+			sto.toip.s = SIPTRACE_ANYADDR;
+			sto.toip.len = SIPTRACE_ANYADDR_LEN;
+		} else {
+			sto.toip.s = sto.toip_buff;
+		}
 	}
 
 	sto.dir = "out";
@@ -1333,7 +1352,7 @@ static void trace_sl_onreply_out(sl_cbp_t *slcbp)
 	siptrace_data_t sto;
 	sip_msg_t *msg;
 	ip_addr_t to_ip;
-	char statusbuf[5];
+	char statusbuf[INT2STR_MAX_LEN];
 
 	if(slcbp == NULL || slcbp->req == NULL) {
 		LM_ERR("bad parameters\n");
@@ -1377,8 +1396,11 @@ static void trace_sl_onreply_out(sl_cbp_t *slcbp)
 		}
 	}
 
-	strcpy(statusbuf, int2str(slcbp->code, &sto.status.len));
-	sto.status.s = statusbuf;
+	sto.status.s = int2strbuf(slcbp->code, statusbuf, INT2STR_MAX_LEN, &sto.status.len);
+	if(sto.status.s == 0) {
+		LM_ERR("failure to get the status string\n");
+		return;
+	}
 
 	memset(&to_ip, 0, sizeof(struct ip_addr));
 	if(slcbp->dst == 0) {
@@ -1410,44 +1432,6 @@ static void trace_sl_onreply_out(sl_cbp_t *slcbp)
 	return;
 }
 
-#define st_bufcopy_uint(_dbuf, _dsize, _dp, _sival) do { \
-		str _ls; \
-		_ls.s = int2str(_sival, &_ls.len); \
-		if(_ls.s == NULL || _dp + _ls.len >= _dbuf + _dsize) { \
-			LM_ERR("conversion error or out of bound (%p:%d/%p:%d\n", \
-					_dbuf, _dsize, _dp, _ls.len); \
-			goto error; \
-		} \
-		memcpy(_dp, _ls.s, _ls.len); \
-		_dp += _ls.len; \
-	} while(0)
-
-#define st_bufcopy_ipaddr(_dbuf, _dsize, _dp, _sipaddr) do { \
-		str _ls; \
-		_ls.s = ip_addr2a(_sipaddr); \
-		if(_ls.s == NULL) { \
-			LM_ERR("conversion error\n"); \
-			goto error; \
-		} \
-		_ls.len = strlen(_ls.s); \
-		if(_dp + _ls.len >= _dbuf + _dsize) { \
-			LM_ERR("out of bound (%p:%d/%p:%d\n", \
-					_dbuf, _dsize, _dp, _ls.len); \
-			goto error; \
-		} \
-		memcpy(_dp, _ls.s, _ls.len); \
-		_dp += _ls.len; \
-	} while(0)
-
-#define st_bufcopy_char(_dbuf, _dsize, _dp, _scval) do { \
-		if(_dp + 1 >= _dbuf + _dsize) { \
-			LM_ERR("out of bound (%p:%d/%p:1\n", _dbuf, _dsize, _dp); \
-			goto error; \
-		} \
-		*_dp = _scval; \
-		_dp += 1; \
-	} while(0)
-
 /**
  *
  */
@@ -1455,8 +1439,6 @@ int siptrace_net_data_recv(sr_event_param_t *evp)
 {
 	sr_net_info_t *nd;
 	siptrace_data_t sto;
-	char *cp;
-	int olen;
 
 	if(evp->data == 0)
 		return -1;
@@ -1470,34 +1452,32 @@ int siptrace_net_data_recv(sr_event_param_t *evp)
 	sto.body.s = nd->data.s;
 	sto.body.len = nd->data.len;
 
-	siptrace_copy_proto_olen(nd->rcv->proto, sto.fromip_buff, olen);
-	cp = sto.fromip_buff + olen;
-	st_bufcopy_ipaddr(sto.fromip_buff, SIPTRACE_ADDR_MAX, cp,
-			&nd->rcv->src_ip);
-	st_bufcopy_char(sto.fromip_buff, SIPTRACE_ADDR_MAX, cp, ':');
-	st_bufcopy_uint(sto.fromip_buff, SIPTRACE_ADDR_MAX, cp,
-			nd->rcv->src_port);
-	sto.fromip.s = sto.fromip_buff;
-	sto.fromip.len = strlen(sto.fromip_buff);
+	sto.fromip.len = snprintf(sto.fromip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+			siptrace_proto_name(nd->rcv->proto),
+			ip_addr2a(&nd->rcv->src_ip), (int)nd->rcv->src_port);
+	if(sto.fromip.len<0 || sto.fromip.len>=SIPTRACE_ADDR_MAX) {
+		LM_ERR("failed to format toip buffer (%d)\n", sto.fromip.len);
+		sto.fromip.s = SIPTRACE_ANYADDR;
+		sto.fromip.len = SIPTRACE_ANYADDR_LEN;
+	} else {
+		sto.fromip.s = sto.fromip_buff;
+	}
 
-	siptrace_copy_proto_olen(nd->rcv->proto, sto.toip_buff, olen);
-	cp = sto.toip_buff + olen;
-	st_bufcopy_ipaddr(sto.toip_buff, SIPTRACE_ADDR_MAX, cp,
-			&nd->rcv->dst_ip);
-	st_bufcopy_char(sto.toip_buff, SIPTRACE_ADDR_MAX, cp, ':');
-	st_bufcopy_uint(sto.toip_buff, SIPTRACE_ADDR_MAX, cp,
-			nd->rcv->dst_port);
-	sto.toip.s = sto.toip_buff;
-	/* zero terminated due to memset */
-	sto.toip.len = strlen(sto.toip_buff);
+	sto.toip.len = snprintf(sto.toip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+			siptrace_proto_name(nd->rcv->proto), ip_addr2a(&nd->rcv->dst_ip),
+			(int)nd->rcv->dst_port);
+	if(sto.toip.len<0 || sto.toip.len>=SIPTRACE_ADDR_MAX) {
+		LM_ERR("failed to format toip buffer (%d)\n", sto.toip.len);
+		sto.toip.s = SIPTRACE_ANYADDR;
+		sto.toip.len = SIPTRACE_ANYADDR_LEN;
+	} else {
+		sto.toip.s = sto.toip_buff;
+	}
 
 	sto.dir = "in";
 
 	trace_send_hep_duplicate(&sto.body, &sto.fromip, &sto.toip, NULL, NULL);
 	return 0;
-
-error:
-	return -1;
 }
 
 /**
@@ -1508,9 +1488,6 @@ int siptrace_net_data_send(sr_event_param_t *evp)
 	sr_net_info_t *nd;
 	dest_info_t new_dst;
 	siptrace_data_t sto;
-	char *cp;
-	char *p0;
-	int olen;
 
 	if(evp->data == 0)
 		return -1;
@@ -1546,22 +1523,17 @@ int siptrace_net_data_send(sr_event_param_t *evp)
 	}
 	sto.fromip.s = sto.fromip_buff;
 
-	siptrace_copy_proto_olen(new_dst.send_sock->proto, sto.toip_buff, olen);
-	cp = sto.toip_buff + olen;
-	p0 = suip2a(&new_dst.to, sizeof(new_dst.to));
-	olen = strlen(p0);
-	if(cp + olen >= sto.toip_buff + SIPTRACE_ADDR_MAX - 1) {
-		LM_ERR("out of bounds: %p %p %d\n", sto.toip_buff, cp, olen);
-		goto error;
-	}
-	memcpy(cp, p0, olen);
-	cp += olen;
-	st_bufcopy_char(sto.toip_buff, SIPTRACE_ADDR_MAX, cp, ':');
-	st_bufcopy_uint(sto.toip_buff, SIPTRACE_ADDR_MAX, cp,
+	sto.toip.len = snprintf(sto.toip_buff, SIPTRACE_ADDR_MAX, "%s:%s:%d",
+			siptrace_proto_name(new_dst.send_sock->proto),
+			suip2a(&new_dst.to, sizeof(new_dst.to)),
 			(int)su_getport(&new_dst.to));
-	sto.toip.s = sto.toip_buff;
-	/* zero terminated due to memset */
-	sto.toip.len = strlen(sto.toip_buff);
+	if(sto.toip.len<0 || sto.toip.len>=SIPTRACE_ADDR_MAX) {
+		LM_ERR("failed to format toip buffer (%d)\n", sto.toip.len);
+		sto.toip.s = SIPTRACE_ANYADDR;
+		sto.toip.len = SIPTRACE_ANYADDR_LEN;
+	} else {
+		sto.toip.s = sto.toip_buff;
+	}
 
 	sto.dir = "out";
 

@@ -40,6 +40,8 @@ struct process_table {
 	int unix_sock; 	/* unix socket on which tcp main listens	*/
 	int idx; 		/* tcp child index, -1 for other processes 	*/
 #endif
+	int status;     /* set to 1 when child init is done */
+	int rank;       /* rank of process */
 	char desc[MAX_PT_DESC];
 };
 
@@ -75,14 +77,16 @@ char* my_desc(void);
  */
 int fork_process(int child_id,char *desc,int make_sock);
 
+
+#ifdef USE_TCP
 /**
  * Forks a new TCP process.
+ * @param child_id child id of the new process
  * @param desc - text description for the process table
  * @param r - index in the tcp_children array
  * @param *reader_fd_1 - pointer to return the reader_fd[1]
  * @returns the pid of the new process
  */
-#ifdef USE_TCP
 int fork_tcp_process(int child_id,char *desc,int r,int *reader_fd_1);
 #endif
 
@@ -95,5 +99,9 @@ int mem_dump_shm_fixup(void *handle, str *gname, str *name, void **val);
 #endif
 
 unsigned int set_fork_delay(unsigned int v);
+
+int sr_instance_started(void);
+
+int sr_instance_ready(void);
 
 #endif

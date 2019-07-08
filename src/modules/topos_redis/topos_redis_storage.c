@@ -654,7 +654,7 @@ int tps_redis_load_invite_branch(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd)
 		sval.s = NULL;
 		switch(rrpl->element[i]->type) {
 			case REDIS_REPLY_STRING:
-				LM_DBG("r[%d]: s[%.*s]\n", i, rrpl->element[i]->len,
+				LM_DBG("r[%d]: s[%.*s]\n", i, (int)rrpl->element[i]->len,
 						rrpl->element[i]->str);
 				sval.s = rrpl->element[i]->str;
 				sval.len = rrpl->element[i]->len;
@@ -677,7 +677,7 @@ int tps_redis_load_invite_branch(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd)
 				&& strncmp(skey.s, tt_key_x_vbranch.s, skey.len)==0) {
 			TPS_REDIS_DATA_APPEND(sd, &skey, &sval, &sd->x_vbranch1);
 		} else {
-			LM_INFO("unuseful key[%.*s]\n", skey.len, skey.s);
+			LM_INFO("useless key[%.*s]\n", skey.len, skey.s);
 		}
 	}
 
@@ -807,7 +807,7 @@ int tps_redis_load_branch(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd,
 		sval.s = NULL;
 		switch(rrpl->element[i]->type) {
 			case REDIS_REPLY_STRING:
-				LM_DBG("r[%d]: s[%.*s]\n", i, rrpl->element[i]->len,
+				LM_DBG("r[%d]: s[%.*s]\n", i, (int)rrpl->element[i]->len,
 						rrpl->element[i]->str);
 				sval.s = rrpl->element[i]->str;
 				sval.len = rrpl->element[i]->len;
@@ -884,7 +884,7 @@ int tps_redis_load_branch(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd,
 				&& strncmp(skey.s, tt_key_b_tag.s, skey.len)==0) {
 			TPS_REDIS_DATA_APPEND(sd, &skey, &sval, &sd->b_tag);
 		} else {
-			LM_WARN("unknow key[%.*s]\n", skey.len, skey.s);
+			LM_WARN("unknown key[%.*s]\n", skey.len, skey.s);
 		}
 	}
 
@@ -1010,7 +1010,7 @@ int tps_redis_load_dialog(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd)
 		sval.s = NULL;
 		switch(rrpl->element[i]->type) {
 			case REDIS_REPLY_STRING:
-				LM_DBG("r[%d]: s[%.*s]\n", i, rrpl->element[i]->len,
+				LM_DBG("r[%d]: s[%.*s]\n", i, (int)rrpl->element[i]->len,
 						rrpl->element[i]->str);
 				sval.s = rrpl->element[i]->str;
 				sval.len = rrpl->element[i]->len;
@@ -1089,7 +1089,7 @@ int tps_redis_load_dialog(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd)
 				&& strncmp(skey.s, td_key_s_cseq.s, skey.len)==0) {
 			TPS_REDIS_DATA_APPEND(sd, &skey, &sval, &sd->s_cseq);
 		} else {
-			LM_WARN("unknow key[%.*s]\n", skey.len, skey.s);
+			LM_WARN("unknown key[%.*s]\n", skey.len, skey.s);
 		}
 	}
 

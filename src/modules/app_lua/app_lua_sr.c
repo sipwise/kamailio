@@ -44,6 +44,10 @@
 #include "app_lua_kemi_export.h"
 #include "app_lua_sr.h"
 
+#define KSR_APP_LUA_LOG_EXPORTS (1<<0)
+
+extern int _ksr_app_lua_log_mode;
+
 /**
  *
  */
@@ -122,9 +126,8 @@ static int lua_sr_modf (lua_State *L)
 	int i;
 	int mod_type;
 	struct run_act_ctx ra_ctx;
-	unsigned modver;
 	struct action *act;
-	sr31_cmd_export_t* expf;
+	ksr_cmd_export_t* expf;
 	sr_lua_env_t *env_L;
 
 	ret = 1;
@@ -175,7 +178,7 @@ static int lua_sr_modf (lua_State *L)
 		}
 	}
 
-	expf = find_export_record(luav[0], argc-1, 0, &modver);
+	expf = find_export_record(luav[0], argc-1, 0);
 	if (expf==NULL) {
 		LM_ERR("function '%s' is not available\n", luav[0]);
 		goto error;
@@ -1918,9 +1921,51 @@ int sr_kemi_exec_func(lua_State* L, str *mname, int midx, str *fname)
 int sr_kemi_lua_exec_func(lua_State* L, int eidx)
 {
 	sr_kemi_t *ket;
+	int ret;
+	struct timeval tvb, tve;
+	struct timezone tz;
+	unsigned int tdiff;
+	lua_Debug dinfo;
 
 	ket = sr_kemi_lua_export_get(eidx);
-	return sr_kemi_lua_exec_func_ex(L, ket, 0);
+	if(unlikely(cfg_get(core, core_cfg, latency_limit_action)>0)
+			&& is_printable(cfg_get(core, core_cfg, latency_log))) {
+		gettimeofday(&tvb, &tz);
+	}
+
+	ret = sr_kemi_lua_exec_func_ex(L, ket, 0);
+
+	if(unlikely(cfg_get(core, core_cfg, latency_limit_action)>0)
+			&& is_printable(cfg_get(core, core_cfg, latency_log))) {
+		gettimeofday(&tve, &tz);
+		tdiff = (tve.tv_sec - tvb.tv_sec) * 1000000
+				   + (tve.tv_usec - tvb.tv_usec);
+		if(tdiff >= cfg_get(core, core_cfg, latency_limit_action)) {
+			memset(&dinfo, 0, sizeof(lua_Debug));
+			if(lua_getstack(L, 1, &dinfo)>0
+						&& lua_getinfo(L, "nSl", &dinfo)>0) {
+				LOG(cfg_get(core, core_cfg, latency_log),
+						"alert - action KSR.%s%s%s(...)"
+						" took too long [%u us] (%s:%d - %s [%s])\n",
+						(ket->mname.len>0)?ket->mname.s:"",
+						(ket->mname.len>0)?".":"", ket->fname.s,
+						tdiff,
+						(dinfo.short_src[0])?dinfo.short_src:"<unknown>",
+						dinfo.currentline,
+						(dinfo.name)?dinfo.name:"<unknown>",
+						(dinfo.what)?dinfo.what:"<unknown>");
+			} else {
+				LOG(cfg_get(core, core_cfg, latency_log),
+						"alert - action KSR.%s%s%s(...)"
+						" took too long [%u us]\n",
+						(ket->mname.len>0)?ket->mname.s:"",
+						(ket->mname.len>0)?".":"", ket->fname.s,
+						tdiff);
+			}
+		}
+	}
+
+	return ret;
 }
 
 /**
@@ -1946,7 +1991,7 @@ static int sr_kemi_lua_drop (lua_State *L)
 	str *s;
 
 	LM_DBG("script drop call\n");
-	sr_kemi_core_drop(NULL);
+	sr_kemi_core_set_drop(NULL);
 	s = sr_kemi_lua_exit_string_get();
 	lua_getglobal(L, "error");
 	lua_pushstring(L, s->s);
@@ -2126,7 +2171,9 @@ void lua_sr_kemi_register_libs(lua_State *L)
 	}
 
 	for(i=0; emods[0].kexp[i].func!=NULL; i++) {
-		LM_DBG("exporting KSR.%s(...)\n", emods[0].kexp[i].fname.s);
+		if(_ksr_app_lua_log_mode & KSR_APP_LUA_LOG_EXPORTS) {
+			LM_DBG("exporting KSR.%s(...)\n", emods[0].kexp[i].fname.s);
+		}
 		_sr_crt_KSRMethods[i].name = emods[0].kexp[i].fname.s;
 		_sr_crt_KSRMethods[i].func =
 			sr_kemi_lua_export_associate(&emods[0].kexp[i]);
@@ -2152,8 +2199,10 @@ void lua_sr_kemi_register_libs(lua_State *L)
 			_sr_crt_KSRMethods = _sr_KSRMethods + n;
 			snprintf(mname, 128, "KSR.%s", emods[k].kexp[0].mname.s);
 			for(i=0; emods[k].kexp[i].func!=NULL; i++) {
-				LM_DBG("exporting %s.%s(...)\n", mname,
-						emods[k].kexp[i].fname.s);
+				if(_ksr_app_lua_log_mode & KSR_APP_LUA_LOG_EXPORTS) {
+					LM_DBG("exporting %s.%s(...)\n", mname,
+							emods[k].kexp[i].fname.s);
+				}
 				_sr_crt_KSRMethods[i].name = emods[k].kexp[i].fname.s;
 				_sr_crt_KSRMethods[i].func =
 					sr_kemi_lua_export_associate(&emods[k].kexp[i]);
@@ -2170,8 +2219,10 @@ void lua_sr_kemi_register_libs(lua_State *L)
 				exit(-1);
 			}
 			luaL_openlib(L, mname, _sr_crt_KSRMethods, 0);
-			LM_DBG("initializing kemi sub-module: %s (%s) (%d/%d/%d)\n", mname,
-					emods[k].kexp[0].mname.s, i, k, n);
+			if(_ksr_app_lua_log_mode & KSR_APP_LUA_LOG_EXPORTS) {
+				LM_DBG("initializing kemi sub-module: %s (%s) (%d/%d/%d)\n",
+						mname, emods[k].kexp[0].mname.s, i, k, n);
+			}
 		}
 	}
 	LM_DBG("module 'KSR' has been initialized (%d/%d)\n", emods_size, n);

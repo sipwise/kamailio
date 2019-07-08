@@ -33,6 +33,8 @@
 #include "../../core/globals.h"
 #include "../../core/sr_module.h"
 #include "../../core/tcp_options.h"
+#include "../../core/resolve.h"
+#include "../../core/lvalue.h"
 #include "../../core/dprint.h"
 #include "../../core/mod_fix.h"
 #include "../../core/events.h"
@@ -58,9 +60,10 @@ static int w_tcpops_enable_closed_event1(sip_msg_t* msg, char* con, char* p2);
 static int w_tcpops_enable_closed_event0(sip_msg_t* msg, char* p1, char* p2);
 static int w_tcp_conid_state(sip_msg_t* msg, char* con, char *p2);
 static int w_tcp_conid_alive(sip_msg_t* msg, char* con, char *p2);
-
+static int w_tcp_get_conid(sip_msg_t* msg, char *paddr, char *pvn);
 static int fixup_numpv(void** param, int param_no);
 
+str tcpops_event_callback = STR_NULL;
 
 static cmd_export_t cmds[]={
 	{"tcp_keepalive_enable", (cmd_function)w_tcp_keepalive_enable4, 4,
@@ -81,6 +84,8 @@ static cmd_export_t cmds[]={
 			0, 0, REQUEST_ROUTE|ONREPLY_ROUTE},
 	{"tcp_conid_state", (cmd_function)w_tcp_conid_state, 1,
 			fixup_numpv, 0, ANY_ROUTE},
+	{"tcp_get_conid", (cmd_function)w_tcp_get_conid, 2,
+			fixup_spve_pvar, fixup_free_spve_pvar, ANY_ROUTE},
 	{"tcp_conid_alive", (cmd_function)w_tcp_conid_alive, 1,
 			fixup_numpv, 0, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
@@ -88,24 +93,23 @@ static cmd_export_t cmds[]={
 
 static param_export_t params[] = {
 	{"closed_event",    PARAM_INT,    &tcp_closed_event},
+	{"event_callback",  PARAM_STR,    &tcpops_event_callback},
 	{0, 0, 0}
 };
 
 
 
 struct module_exports exports = {
-	"tcpops",
+	"tcpops",        /* module name */
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	cmds,            /* exported functions to config */
 	params,          /* exported parameters to config */
-	0,               /* exported statistics */
-	0,              /* exported MI functions */
-	0,        /* exported pseudo-variables */
-	0,              /* extra processes */
-	mod_init,       /* module initialization function */
-	0,              /* response function */
-	mod_destroy,    /* destroy function */
-	child_init      /* per child init function */
+	0,               /* RPC method exports */
+	0,               /* exported pseudo-variables */
+	0,               /* response function */
+	mod_init,        /* module initialization function */
+	child_init,      /* per child init function */
+	mod_destroy      /* destroy function */
 };
 
 
@@ -130,10 +134,7 @@ static int mod_init(void)
 			return -1;
 		}
 
-		/* get event routes */
-		tcp_closed_routes[TCP_CLOSED_EOF] = route_get(&event_rt, "tcp:closed");
-		tcp_closed_routes[TCP_CLOSED_TIMEOUT] = route_get(&event_rt, "tcp:timeout");
-		tcp_closed_routes[TCP_CLOSED_RESET] = route_get(&event_rt, "tcp:reset");
+		tcpops_init_evroutes();
 	}
 
 	return 0;
@@ -511,6 +512,94 @@ static int w_tcpops_enable_closed_event0(sip_msg_t* msg, char* p1, char* p2)
 static int fixup_numpv(void** param, int param_no)
 {
 	return fixup_igp_null(param, 1);
+}
+
+/**
+ *
+ */
+static int ki_tcp_get_conid_helper(sip_msg_t* msg, str *saddr, pv_spec_t *pvs)
+{
+	int conid = 0;
+	sip_uri_t uaddr, *u;
+	dest_info_t dst;
+	char *p;
+	int ret;
+	ticks_t clifetime;
+	tcp_connection_t *c;
+	ip_addr_t ip;
+	int port;
+	pv_value_t val;
+
+	if(pvs->setf==NULL) {
+		LM_ERR("output variable is read only\n");
+		return -1;
+	}
+
+	init_dest_info(&dst);
+
+	u = &uaddr;
+	u->port_no = 5060;
+	u->host = *saddr;
+	/* detect ipv6 */
+	p = memchr(saddr->s, ']', saddr->len);
+	if (p) {
+		p++;
+		p = memchr(p, ':', saddr->s + saddr->len - p);
+	} else {
+		p = memchr(saddr->s, ':', saddr->len);
+	}
+	if (p) {
+		u->host.len = p - saddr->s;
+		p++;
+		u->port_no = str2s(p, saddr->len - (p - saddr->s), NULL);
+	}
+
+	ret = sip_hostport2su(&dst.to, &u->host, u->port_no, &dst.proto);
+	if(ret!=0) {
+		LM_ERR("failed to resolve [%.*s]\n", u->host.len, ZSW(u->host.s));
+		return E_BUG;
+	}
+
+	dst.proto = PROTO_TCP;
+	dst.id = 0;
+	clifetime = cfg_get(tcp, tcp_cfg, con_lifetime);
+	su2ip_addr(&ip, &dst.to);
+	port = su_getport(&dst.to);
+	c = tcpconn_get(dst.id, &ip, port, NULL, clifetime);
+
+	if (unlikely(c==0)) {
+		goto setvalue;
+	}
+	conid = c->id;
+	tcpconn_put(c);
+
+setvalue:
+	memset(&val, 0, sizeof(pv_value_t));
+	val.ri = conid;
+	val.flags = PV_VAL_INT;
+	if(pvs->setf(msg, &pvs->pvp, (int)EQ_T, &val)<0) {
+		LM_ERR("failed to set the output var\n");
+		return -1;
+	}
+	if(conid==0) {
+		return -1;
+	}
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_tcp_get_conid(sip_msg_t* msg, char *paddr, char *pvn)
+{
+	str saddr;
+
+	if(fixup_get_svalue(msg, (gparam_t*)paddr, &saddr)<0) {
+		LM_ERR("failed to get address parameter\n");
+		return -1;
+	}
+
+	return ki_tcp_get_conid_helper(msg, &saddr, (pv_spec_t*)pvn);
 }
 
 /**

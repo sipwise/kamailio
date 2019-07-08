@@ -171,13 +171,14 @@ Chapter 1. Admin Guide
 
 4.1. pretty_format (int)
 
-   Pretty format for JSON-RPC response document.
+   Pretty format for JSON-RPC response document if set to 1. To disable,
+   set to 0.
 
-   Default value is '0'.
+   Default value is '1' (on).
 
    Example 1.1. Set pretty_format parameter
 ...
-modparam("jsonrpcs", "pretty_format", 1)
+modparam("jsonrpcs", "pretty_format", 0)
 ...
 
 4.2. transport (int)
@@ -329,7 +330,7 @@ modparam("jsonrpcs", "dgram_user", "root")
 4.13. dgram_timeout (int)
 
    The reply will expire after trying to sent it for socket_timeout
-   miliseconds.
+   milliseconds.
 
    Default value is 2000.
 
@@ -469,7 +470,7 @@ xlog("jsonrpc response code: $jsonrpl(code) - the body is: $jsonrpl(body)\n");
 
 7.2. JSONRPC Over FIFO
 
-   This module can retrive JSONRPC requests via a local FIFO file. To
+   This module can retrieve JSONRPC requests via a local FIFO file. To
    enable this feature, 'fifo_name' parameter must be set and 'transport'
    parameter has to be 0 or 2.
 
@@ -504,7 +505,7 @@ rm /tmp/kamailio_jsonrpc_reply_fifo
 
 7.3. JSONRPC Over DATAGRAM
 
-   This module can retrive JSONRPC requests via a UNIX socket file or UDP
+   This module can retrieve JSONRPC requests via a UNIX socket file or UDP
    IPv4/IPv6 socket. To enable this feature, 'dgram_socket' parameter must
    be set and 'transport' parameter has to be 0 or 4.
 

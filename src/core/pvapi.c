@@ -287,6 +287,7 @@ int pv_cache_drop(void)
 					pvi->spec.pvp.pvn.nfree((void*)(&pvi->spec.pvp.pvn));
 				}
 				pkg_free(pvi);
+				_pv_cache_counter--;
 				return 1;
 			}
 			pvp = pvi;
@@ -309,6 +310,7 @@ int pv_cache_drop(void)
 					pvi->spec.pvp.pvn.nfree((void*)(&pvi->spec.pvp.pvn));
 				}
 				pkg_free(pvi);
+				_pv_cache_counter--;
 				return 1;
 			}
 			pvp = pvi;
@@ -364,6 +366,7 @@ pv_spec_t* pv_cache_add(str *name)
 	pvn->pvid = pvid;
 	pvn->next = _pv_cache[pvid%PV_CACHE_SIZE];
 	_pv_cache[pvid%PV_CACHE_SIZE] = pvn;
+	_pv_cache_counter++;
 
 	LM_DBG("pvar [%.*s] added in cache\n", name->len, name->s);
 	return &pvn->spec;
@@ -671,7 +674,8 @@ static char pv_str_empty_buf[2];
 static char pv_str_null_buf[8];
 
 static str pv_str_empty  = { "", 0 };
-static str pv_str_null   = { "<null>", 6 };
+#define PV_STR_NULL_VAL	"<null>"
+static str pv_str_null   = { PV_STR_NULL_VAL, sizeof(PV_STR_NULL_VAL)-1 };
 int pv_get_null(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 {
 	if(res==NULL)
@@ -681,6 +685,14 @@ int pv_get_null(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 	res->ri = 0;
 	res->flags = PV_VAL_NULL;
 	return 0;
+}
+
+/**
+ *
+ */
+str *pv_get_null_str(void)
+{
+	return &pv_str_null;
 }
 
 /**
@@ -2000,7 +2012,7 @@ int pv_init_api(void)
 	pv_str_empty_buf[0] = '\0';
 	pv_str_empty_buf[1] = '\0';
 	pv_str_empty.s = pv_str_empty_buf;
-	strcpy(pv_str_null_buf, "<null>");
+	strcpy(pv_str_null_buf, PV_STR_NULL_VAL);
 	pv_str_null.s = pv_str_null_buf;
 
 	if(register_pvars_mod("core", _core_pvs)<0)

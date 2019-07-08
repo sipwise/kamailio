@@ -84,8 +84,6 @@
 		<column><field>password</field><type>DB1_STR</type></column>
 		<column><field>ha1</field><type>DB1_STR</type></column>
 		<column><field>ha1b</field><type>DB1_STR</type></column>
-		<column><field>email_address</field><type>DB1_STR</type></column>
-		<column><field>rpid</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of usr_preferences table-->
 	<db_table id="usr_preferences">
@@ -507,6 +505,7 @@
 		<column><field>body</field><type>DB1_BLOB</type></column>
 		<column><field>sender</field><type>DB1_STR</type></column>
 		<column><field>priority</field><type>DB1_INT</type></column>
+		<column><field>ruid</field><type>DB1_STR</type></column>
 	</db_table>
 	<!-- Declaration of active_watchers table-->
 	<db_table id="active_watchers">
@@ -1222,8 +1221,6 @@
 				<col><field>password</field></col>
 				<col><field>ha1</field></col>
 				<col><field>ha1b</field></col>
-				<col><field>email_address</field></col>
-				<col><field>rpid</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -1235,8 +1232,6 @@
 				<col><field>password</field></col>
 				<col><field>ha1</field></col>
 				<col><field>ha1b</field></col>
-				<col><field>email_address</field></col>
-				<col><field>rpid</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -1251,8 +1246,6 @@
 				<col><field>password</field></col>
 				<col><field>ha1</field></col>
 				<col><field>ha1b</field></col>
-				<col><field>email_address</field></col>
-				<col><field>rpid</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
@@ -2970,6 +2963,7 @@
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
 				<col><field>priority</field></col>
+				<col><field>ruid</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>add</cmd_name>
@@ -2985,6 +2979,7 @@
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
 				<col><field>priority</field></col>
+				<col><field>ruid</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>update</cmd_name>
@@ -3003,6 +2998,7 @@
 				<col><field>body</field></col>
 				<col><field>sender</field></col>
 				<col><field>priority</field></col>
+				<col><field>ruid</field></col>
 			</query_cols>
 		</cmd>
 		<cmd><cmd_name>delete</cmd_name>
