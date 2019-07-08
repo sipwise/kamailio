@@ -6,7 +6,7 @@
 
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -196,6 +196,9 @@ mod_list_erlang=erlang
+@@ -201,6 +201,9 @@ mod_list_erlang=erlang
  # - modules depending on systemd library
  mod_list_systemd=log_systemd
  
@@ -16,7 +16,7 @@
  # - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
  mod_list_nsq=nsq
  
-@@ -294,6 +297,9 @@ module_group_ignore= $(sort $(filter-out
+@@ -300,6 +303,9 @@ module_group_ignore= $(sort $(filter-out
  # pkg lcrrate module
  module_group_klcrrate=$(mod_list_lcrrate)
  
@@ -33,14 +33,14 @@
 +auto_gen=
 +NAME=tcap.so
 +
-+DEFS+=-DKAMAILIO_MOD_INTERFACE -D_GNU_SOURCE
++DEFS+=-D_GNU_SOURCE
 +DEFS+=-I/usr/include/tcap
 +LIBS+=-ltcap
 +
 +include ../../Makefile.modules
 --- /dev/null
 +++ b/src/modules/tcap/tcap_mod.c
-@@ -0,0 +1,395 @@
+@@ -0,0 +1,392 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -96,20 +96,17 @@
 +};
 +
 +
-+
 +struct module_exports exports = {
-+	"tcap",
-+	DEFAULT_DLFLAGS,
-+	cmds,
-+	params,
-+	0,
-+	0,
-+	0,
-+	0,
-+	mod_init,
-+	0,
-+	0,
-+	0
++    "tcap",          /* module name */
++    DEFAULT_DLFLAGS, /* dlopen flags */
++    cmds,            /* exported functions */
++    params,          /* exported parameters */
++    0,               /* RPC method exports */
++    0,               /* exported pseudo-variables */
++    0,               /* response handling function */
++    mod_init,        /* module initialization function */
++    0,               /* per-child init function */
++    0                /* module destroy function */
 +};
 +
 +

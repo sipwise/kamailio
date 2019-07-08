@@ -84,6 +84,6 @@
  
 +MOD_INSTALL_UTILS=utils/openssl_mutex_shared
 +
- DEFS+=-DKAMAILIO_MOD_INTERFACE
  include ../../Makefile.modules
  
+ install-tls-cert: $(cfg_prefix)/$(cfg_dir)

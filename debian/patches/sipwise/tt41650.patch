@@ -97,7 +97,7 @@
  	{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year,
  		0, ANY_ROUTE},
  	{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year,
-@@ -256,6 +263,45 @@ static int w_tmrec_match(struct sip_msg*
+@@ -254,6 +261,45 @@ static int w_tmrec_match(struct sip_msg*
  	return ki_tmrec_match_timestamp(msg, &rv, ti);
  }
  
@@ -143,7 +143,7 @@
  static int fixup_tmrec_match(void** param, int param_no)
  {
  	if(param_no==1)
-@@ -270,6 +316,20 @@ static int fixup_tmrec_match(void** para
+@@ -268,6 +314,20 @@ static int fixup_tmrec_match(void** para
  	return 0;
  }
  
@@ -164,21 +164,14 @@
  static int fixup_time_period_match(void** param, int param_no)
  {
  	if(param_no==1)
-@@ -379,4 +439,4 @@ int mod_register(char *path, int *dlflag
- {
- 	sr_kemi_modules_add(sr_kemi_tmrec_exports);
- 	return 0;
--}
-\ No newline at end of file
-+}
 --- a/src/modules/tmrec/Makefile
 +++ b/src/modules/tmrec/Makefile
-@@ -6,7 +6,7 @@ include ../../Makefile.defs
+@@ -5,7 +5,7 @@ include ../../Makefile.defs
  auto_gen=
  NAME=tmrec.so
  DEFS +=
 -LIBS +=
 +LIBS += -L$(LOCALBASE)/lib -lical -licalss
  
- DEFS+=-DKAMAILIO_MOD_INTERFACE
- 
+ SERLIBPATH=../../lib
+ SER_LIBS+=$(SERLIBPATH)/srutils/srutils

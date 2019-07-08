@@ -58,7 +58,7 @@
  		{NULL, 0, NULL},
  };
  
-@@ -324,6 +343,31 @@ static int sca_child_init(int rank)
+@@ -322,6 +341,31 @@ static int sca_child_init(int rank)
  	return (0);
  }
  
@@ -90,7 +90,7 @@
  static int sca_mod_init(void)
  {
  	sca = (sca_mod *) shm_malloc(sizeof(sca_mod));
-@@ -382,6 +426,11 @@ static int sca_mod_init(void)
+@@ -380,6 +424,11 @@ static int sca_mod_init(void)
  	// timer process forks in sca_child_init, above.
  	register_dummy_timers(1);
  
@@ -102,7 +102,7 @@
  	LM_INFO("SCA initialized \n");
  
  	return (0);
-@@ -419,6 +468,56 @@ void sca_mod_destroy(void)
+@@ -417,6 +466,56 @@ void sca_mod_destroy(void)
  	sca_db_disconnect();
  }
  

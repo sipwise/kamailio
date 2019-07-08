@@ -1,6 +1,6 @@
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -116,7 +116,7 @@ mod_list_presence=presence presence_conf
+@@ -114,7 +114,7 @@ mod_list_presence=presence presence_conf
  					   presence_xml \
  					   pua pua_bla pua_dialoginfo pua_reginfo \
  					   pua_rpc pua_usrloc pua_xmpp \
@@ -78,7 +78,7 @@
      LM_ERR("Unknown event string\n");
 --- /dev/null
 +++ b/src/modules/presence_dfks/Makefile
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,28 @@
 +#
 +# Presence_dfks Makefile
 +#
@@ -100,8 +100,6 @@
 +		-I$(LOCALBASE)/include
 +	LIBS+=-L$(LOCALBASE)/lib -lxml2
 +endif
-+
-+DEFS+=-DKAMAILIO_MOD_INTERFACE
 +
 +#SERLIBPATH=../../lib
 +#SER_LIBS+=$(SERLIBPATH)/kmi/kmi
@@ -457,7 +455,7 @@
 +#endif
 --- /dev/null
 +++ b/src/modules/presence_dfks/presence_dfks.c
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,138 @@
 +#include <stdio.h>
 +#include <stdlib.h>
 +#include <string.h>
@@ -509,19 +507,17 @@
 +
 +
 +/* module exports */
-+struct module_exports exports= {
-+    "presence_dfks",	/* module name */
-+    DEFAULT_DLFLAGS,	/* dlopen flags */
-+    0,					/* exported functions */
-+    params,				/* exported parameters */
-+    0,					/* exported statistics */
-+    0,					/* exported MI functions */
-+    0,					/* exported pseudo-variables */
-+    0,					/* extra processes */
-+    mod_init,			/* module initialization function */
-+    0,					/* response handling function */
-+    0,					/* destroy function */
-+    0					/* per-child init function */
++struct module_exports exports = {
++    "presence_dfks", /* module name */
++    DEFAULT_DLFLAGS, /* dlopen flags */
++    0,               /* exported functions */
++    params,          /* exported parameters */
++    0,               /* RPC method exports */
++    0,               /* exported pseudo-variables */
++    0,               /* response handling function */
++    mod_init,        /* module initialization function */
++    0,               /* per-child init function */
++    0                /* module destroy function */
 +};
 +
 +/*

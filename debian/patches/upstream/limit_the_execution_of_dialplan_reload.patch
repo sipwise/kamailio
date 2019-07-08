@@ -25,7 +25,7 @@ using the new 'reload_delta' paramenter.
  	{0,0,0}
  };
  
-@@ -184,6 +186,9 @@ static int mod_init(void)
+@@ -182,6 +184,9 @@ static int mod_init(void)
  	if(dp_fetch_rows<=0)
  		dp_fetch_rows = 1000;
  
@@ -35,7 +35,7 @@ using the new 'reload_delta' paramenter.
  	if(init_data() != 0) {
  		LM_ERR("could not initialize data\n");
  		return -1;
-@@ -621,7 +626,7 @@ static void dialplan_rpc_reload(rpc_t* r
+@@ -623,7 +628,7 @@ static void dialplan_rpc_reload(rpc_t* r
  		rpc->fault(ctx, 500, "Not ready for reload");
  		return;
  	}

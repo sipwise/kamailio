@@ -1,6 +1,6 @@
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -134,6 +134,8 @@
+@@ -135,6 +135,8 @@
  	[OP_UNBLOCK_MEDIA]	= "unblock media",
  	[OP_START_FORWARDING]	= "start forwarding",
  	[OP_STOP_FORWARDING]	= "stop forwarding",
@@ -9,7 +9,7 @@
  };
  
  struct minmax_mos_stats {
-@@ -181,6 +183,8 @@
+@@ -192,6 +194,8 @@
  static int unblock_media_f(struct sip_msg *, char *, char *);
  static int start_forwarding_f(struct sip_msg *, char *, char *);
  static int stop_forwarding_f(struct sip_msg *, char *, char *);
@@ -18,7 +18,7 @@
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -264,6 +268,9 @@
+@@ -276,6 +280,9 @@
  static str read_sdp_pvar_str = {NULL, 0};
  static pv_spec_t *read_sdp_pvar = NULL;
  
@@ -28,7 +28,7 @@
  #define RTPENGINE_SESS_LIMIT_MSG "Parallel session limit reached"
  #define RTPENGINE_SESS_LIMIT_MSG_LEN (sizeof(RTPENGINE_SESS_LIMIT_MSG)-1)
  
-@@ -343,6 +350,15 @@
+@@ -354,6 +361,15 @@
  	{"stop_forwarding",	(cmd_function)stop_forwarding_f,	1,
  		fixup_spve_null, 0,
  		ANY_ROUTE},
@@ -44,7 +44,7 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -411,6 +427,7 @@
+@@ -424,6 +440,7 @@
  	{"hash_table_tout",       INT_PARAM, &hash_table_tout        },
  	{"hash_table_size",       INT_PARAM, &hash_table_size        },
  	{"setid_default",         INT_PARAM, &setid_default          },
@@ -52,7 +52,7 @@
  
  	/* MOS stats output */
  	/* global averages */
-@@ -1594,6 +1611,16 @@
+@@ -1656,6 +1673,16 @@
  		}
  	}
  
@@ -69,7 +69,7 @@
  	if (rtpp_strings)
  		pkg_free(rtpp_strings);
  
-@@ -2302,7 +2329,8 @@
+@@ -2455,7 +2482,8 @@
  	}
  	else if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
  		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
@@ -79,7 +79,7 @@
  	{
  		bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.from_tag);
  		if (ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
-@@ -2470,14 +2498,27 @@
+@@ -2623,14 +2641,27 @@
  static int rtpp_function_call_simple(struct sip_msg *msg, enum rtpe_operation op, const char *flags_str)
  {
  	bencode_buffer_t bencbuf;
@@ -108,7 +108,7 @@
  static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
  		enum rtpe_operation op, const char *flags_str, str *body)
  {
-@@ -3178,8 +3219,9 @@
+@@ -3335,8 +3376,9 @@
  	return 1;
  }
  
@@ -120,7 +120,7 @@
  {
  	int ret, more;
  
-@@ -3192,7 +3234,7 @@
+@@ -3349,7 +3391,7 @@
  	if (!selected_rtpp_set_2 || selected_rtpp_set_2 == selected_rtpp_set_1)
  		more = 0;
  
@@ -129,7 +129,7 @@
  	if (ret < 0)
  		return ret;
  
-@@ -3203,17 +3245,18 @@
+@@ -3360,17 +3402,18 @@
  	if (set_rtpengine_set_from_avp(msg, direction) == -1)
  		return -1;
  
@@ -152,7 +152,7 @@
  {
  	str flags;
  
-@@ -3225,27 +3268,23 @@
+@@ -3382,27 +3425,23 @@
  		}
  	}
  
@@ -189,7 +189,7 @@
  }
  
  
-@@ -3391,88 +3430,45 @@
+@@ -3548,88 +3587,45 @@
  	return -1;
  }
  
@@ -285,7 +285,7 @@
  }
  
  static int
-@@ -3546,160 +3542,102 @@
+@@ -3703,160 +3699,102 @@
  }
  
  
@@ -493,7 +493,7 @@
  	void **parms;
  	pv_param_t *param;
  	pv_value_t *res;
-@@ -3753,7 +3691,7 @@
+@@ -3910,7 +3848,7 @@
  	parms[0] = param;
  	parms[1] = res;
  
@@ -502,7 +502,7 @@
  }
  
  static int
-@@ -3778,54 +3716,55 @@
+@@ -3935,54 +3873,55 @@
   *
   */
  static int ki_rtpengine_manage0(sip_msg_t *msg) {

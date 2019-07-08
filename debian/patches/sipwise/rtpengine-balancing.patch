@@ -1,6 +1,6 @@
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2110,6 +2110,7 @@
+@@ -2294,6 +2294,7 @@
  	pv_value_t pv_val;
  	char md5[MD5_LEN];
  	char branch_buf[MAX_BRANCH_PARAM_LEN];
@@ -8,7 +8,7 @@
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2133,6 +2134,9 @@
+@@ -2317,6 +2318,9 @@
  	}
  	ng_flags.dict = bencode_dictionary(bencbuf);
  
@@ -18,7 +18,7 @@
  	body.s = NULL;
  	if (op == OP_OFFER || op == OP_ANSWER) {
  		ng_flags.flags = bencode_list(bencbuf);
-@@ -2283,7 +2287,26 @@
+@@ -2484,7 +2488,26 @@
  		goto error;
  	}
  

@@ -10,13 +10,11 @@ sipwise/add_pcem_module.patch
 sipwise/add_lcr_rate_module.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
-upstream/add_db_redis_module.patch
 sipwise/add_pv_headers_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
 sipwise/rtpengine_next_branch_parm.patch
-sipwise/cfgt_debug.patch
 sipwise/cfgt_folder_fix.patch
 sipwise/cfgt_onsend_exit.patch
 sipwise/fix_error_in_cfgt_module.patch
@@ -33,21 +31,11 @@ sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 ## Ongoing Patches
-upstream/fix_db_redis_time_schema.patch
-upstream/fix_db_redis_free_memory.patch
-upstream/fix_db_redis_memory_issues.patch
-upstream/fix_db_redis_manual_key_issue.patch
-upstream/fix_db_redis_reconnect.patch
 sipwise/rtpengine-balancing.patch
 sipwise/openssl-locking.patch
 ## backport from kamailio upstream (5.2)
-sipwise/extend_stats.patch
-sipwise/tt37692.patch
-sipwise/dtmf-blocking.patch
-sipwise/media-blocking.patch
 sipwise/tt41650.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
-upstream/topos_execute_event_route_topos_sending.patch
 sipwise/rtpengine-tcp-forwarding.patch
 sipwise/rtpengine-play-media.patch
 sipwise/registrar_add_path.patch

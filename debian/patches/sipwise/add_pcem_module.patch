@@ -1,6 +1,6 @@
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -28,7 +28,7 @@ mod_list_db=acc alias_db auth_db avpops
+@@ -29,7 +29,7 @@ mod_list_db=acc alias_db auth_db avpops
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
@@ -11,7 +11,7 @@
  # - common modules depending on database, using UID db schema
 --- /dev/null
 +++ b/src/modules/pcem/Makefile
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,15 @@
 +#
 +# pcem module makefile
 +#
@@ -22,8 +22,6 @@
 +auto_gen=
 +NAME=pcem.so
 +LIBS=
-+
-+DEFS+=-DOPENSER_MOD_INTERFACE
 +
 +SERLIBPATH=../../lib
 +SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1
@@ -197,7 +195,7 @@
 +#endif
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.c
-@@ -0,0 +1,151 @@
+@@ -0,0 +1,149 @@
 +/*
 + * PacketCable Event Messages module
 + *
@@ -239,7 +237,7 @@
 +struct rr_binds rrb;
 +
 +static int mod_init(void);
-+static void destroy(void);
++static void mod_destroy(void);
 +static int child_init(int rank);
 +
 +int pcem_qos_flag = -1; /* don't send qos messages by default */
@@ -278,19 +276,17 @@
 +};
 +
 +
-+struct module_exports exports= {
-+	"pcem",
-+	DEFAULT_DLFLAGS, /* dlopen flags */
-+	cmds,       /* exported functions */
-+	params,     /* exported params */
-+	0,          /* exported statistics */
-+	0,          /* exported MI functions */
-+	0,          /* exported pseudo-variables */
-+	0,          /* extra processes */
-+	mod_init,   /* initialization module */
-+	0,          /* response function */
-+	destroy,    /* destroy function */
-+	child_init  /* per-child init function */
++struct module_exports exports = {
++    "pcem",          /* module name */
++    DEFAULT_DLFLAGS, /* dlopen flags */
++    cmds,            /* exported functions */
++    params,          /* exported parameters */
++    0,               /* RPC method exports */
++    0,               /* exported pseudo-variables */
++    0,               /* response handling function */
++    mod_init,        /* module initialization function */
++    child_init,      /* per-child init function */
++    mod_destroy      /* module destroy function */
 +};
 +
 +
@@ -345,7 +341,7 @@
 +}
 +
 +
-+static void destroy(void)
++static void mod_destroy(void)
 +{
 +}
 +

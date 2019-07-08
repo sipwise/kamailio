@@ -8,7 +8,7 @@
  sl_api_t slb; // sl callback, function for getting to-tag
  
  /* avps */
-@@ -398,6 +399,12 @@ static int sca_mod_init(void)
+@@ -396,6 +397,12 @@ static int sca_mod_init(void)
  	}
  	sca->tm_api = &tmb;
  

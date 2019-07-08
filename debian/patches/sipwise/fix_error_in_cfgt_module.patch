@@ -29,7 +29,7 @@
  }
  
  int _cfgt_get_hdr(struct sip_msg *msg, str *res)
-@@ -401,15 +407,21 @@ int _cfgt_set_dump(struct sip_msg *msg,
+@@ -394,15 +400,21 @@ int _cfgt_set_dump(struct sip_msg *msg,
  
  	if(node == NULL || flow == NULL)
  		return -1;
@@ -51,7 +51,7 @@
  	f = srjson_CreateObject(&node->jdoc);
  	if(f == NULL) {
  		LM_ERR("cannot create json object\n");
-@@ -552,6 +564,31 @@ int _cfgt_node_get_flowname(cfgt_str_lis
+@@ -545,6 +557,31 @@ int _cfgt_node_get_flowname(cfgt_str_lis
  	return 0;
  }
  
@@ -83,7 +83,7 @@
  int cfgt_process_route(struct sip_msg *msg, struct action *a)
  {
  	str routename;
-@@ -567,6 +604,10 @@ int cfgt_process_route(struct sip_msg *m
+@@ -560,6 +597,10 @@ int cfgt_process_route(struct sip_msg *m
  		return 0;
  	}
  	LM_DBG("route from action:[%s]\n", a->rname);
@@ -94,7 +94,7 @@
  	routename.s = a->rname;
  	routename.len = strlen(a->rname);
  	switch(_cfgt_add_routename(_cfgt_node, a, &routename)) {
-@@ -612,22 +653,33 @@ int cfgt_process_route(struct sip_msg *m
+@@ -605,22 +646,33 @@ int cfgt_process_route(struct sip_msg *m
  
  /*
  TODO:
@@ -130,7 +130,7 @@
  	_cfgt_node = cfgt_create_node(NULL);
  	if(_cfgt_node) {
  		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
-@@ -645,14 +697,23 @@ int cfgt_msgin(sr_event_param_t *evp)
+@@ -638,14 +690,23 @@ int cfgt_msgin(sr_event_param_t *evp)
  int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
  {
  	str unknown = {"unknown", 7};
@@ -158,7 +158,7 @@
  				pkg_str_dup(&_cfgt_node->uuid, &unknown);
  			}
  			return _cfgt_get_uuid_id(_cfgt_node);
-@@ -682,7 +743,9 @@ int cfgt_post(struct sip_msg *msg, unsig
+@@ -675,7 +736,9 @@ int cfgt_post(struct sip_msg *msg, unsig
  
  	if(_cfgt_node) {
  		LM_DBG("dump last flow\n");
@@ -169,7 +169,7 @@
  			LM_ERR("cannot create flowname\n");
  		else
  			_cfgt_set_dump(msg, _cfgt_node, &flowname);
-@@ -696,11 +759,22 @@ int cfgt_post(struct sip_msg *msg, unsig
+@@ -689,11 +752,22 @@ int cfgt_post(struct sip_msg *msg, unsig
  int cfgt_msgout(sr_event_param_t *evp)
  {
  	srjson_t *jobj;
@@ -192,7 +192,7 @@
  	if(_cfgt_node) {
  		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
  		if(jobj == NULL) {
-@@ -710,6 +784,13 @@ int cfgt_msgout(sr_event_param_t *evp)
+@@ -703,6 +777,13 @@ int cfgt_msgout(sr_event_param_t *evp)
  		srjson_AddItemToArray(&_cfgt_node->jdoc, _cfgt_node->out, jobj);
  		return 0;
  	}

@@ -1,6 +1,6 @@
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -15,7 +15,7 @@
+@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
  				   rtpproxy sanity sdpops siputils sl statistics textops \
  				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
@@ -11,7 +11,7 @@
  mod_list_extra=avp auth_diameter call_control call_obj dmq domainpolicy msrp \
 --- /dev/null
 +++ b/src/modules/pv_headers/Makefile
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,12 @@
 +#
 +# pv_headers module makefile
 +#
@@ -22,8 +22,6 @@
 +auto_gen=
 +NAME=pv_headers.so
 +LIBS=
-+
-+DEFS+=-DKAMAILIO_MOD_INTERFACE
 +
 +include ../../Makefile.modules
 --- /dev/null
@@ -507,7 +505,7 @@
 +            $var(test) = $x_rr;
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,1991 @@
+@@ -0,0 +1,1989 @@
 +/*
 + * pv_headers
 + *
@@ -587,7 +585,7 @@
 +    str value;
 +} xavp_c_data_t;
 +
-+static void destroy(void);
++static void mod_destroy(void);
 +static int mod_init(void);
 +
 +static int pv_collect_headers(struct sip_msg *msg, char *_s1, char *_s2);
@@ -664,7 +662,7 @@
 +    {0, 0, 0, 0, 0, 0}
 +};
 +
-+static pv_export_t pvs[] = {
++static pv_export_t mod_pvs[] = {
 +    {{"x_hdr", (sizeof("x_hdr")-1)}, PVT_OTHER, pv_get_header, pv_set_header, pv_parse_header_name, pv_parse_index, 0, 0},
 +    {{"x_fu", (sizeof("x_fu")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 1},
 +    {{"x_fU", (sizeof("x_fU")-1)}, PVT_OTHER, pv_get_uri, pv_set_uri, 0, 0, pv_init_iname, 2},
@@ -692,18 +690,16 @@
 +};
 +
 +struct module_exports exports = {
-+    MODULE_NAME,
++    MODULE_NAME,     /* module name */
 +    DEFAULT_DLFLAGS, /* dlopen flags */
-+    cmds,      /* Exported functions */
-+    params,    /* Exported parameters */
-+    0,         /* exported statistics */
-+    0,         /* exported MI functions */
-+    pvs,       /* exported pseudo-variables */
-+    0,         /* extra processes */
-+    mod_init,  /* module initialization function */
-+    0,         /* response function */
-+    destroy,   /* destroy function */
-+    0          /* child initialization function */
++    cmds,            /* exported functions */
++    params,          /* exported parameters */
++    0,               /* RPC method exports */
++    mod_pvs,         /* exported pseudo-variables */
++    0,               /* response handling function */
++    mod_init,        /* module initialization function */
++    0,               /* per-child init function */
++    mod_destroy      /* module destroy function */
 +};
 +
 +int mod_init(void)
@@ -726,7 +722,7 @@
 +    return 0;
 +}
 +
-+void destroy(void)
++void mod_destroy(void)
 +{
 +    pv_str_hash_free(&skip_headers);
 +    pv_str_hash_free(&split_headers);
