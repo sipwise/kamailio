@@ -1,0 +1,188 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -1469,6 +1469,15 @@
+     int i;
+     int j;
+     size_t col;
++    redis_key_t *all_type_keys = NULL;
++    int all_type_keys_count = 0;
++    db_val_t *db_vals = NULL;
++    db_key_t *db_keys = NULL;
++    redis_key_t *type_keys = NULL;
++    int type_keys_count = 0;
++    redis_key_t *new_type_keys = NULL;
++    int new_type_keys_count = 0;
++    redis_key_t *all_type_key;
+ 
+     if (!(*keys_count) && do_table_scan) {
+         LM_WARN("performing full table scan on table '%.*s' while performing update\n",
+@@ -1485,10 +1494,27 @@
+         }
+     }
+ 
++    // TODO: this should be moved to redis_connection structure
++    // and be parsed at startup:
++    //
++    // fetch list of keys in all types
++    if (db_redis_get_keys_for_all_types(con, CON_TABLE(_h),
++                &all_type_keys, &all_type_keys_count) != 0) {
++            LM_ERR("failed to get full list of type keys\n");
++            goto error;
++    }
++
++    if (db_redis_build_type_keys(con, CON_TABLE(_h), _k, _v, _n,
++                &new_type_keys, &new_type_keys_count) != 0) {
++        LM_ERR("failed to build type keys\n");
++        goto error;
++    }
++    LM_DBG("%i new type keys\n", new_type_keys_count);
++
+     for (key = *keys; key; key = key->next) {
+         str *keyname = &key->key;
+ 
+-        LM_DBG("fetching row for '%.*s' from redis\n", keyname->len, keyname->s);
++        LM_DBG("fetching row for '%.*s' from redis for update\n", keyname->len, keyname->s);
+ 
+ 
+         if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
+@@ -1506,19 +1532,9 @@
+         db_redis_key_free(&query_v);
+ 
+         // construct HMGET query
+-        if ((*manual_keys_count) == 0) {
+-            if (db_redis_key_add_string(&query_v, "HGETALL", 7) != 0) {
+-                LM_ERR("Failed to set hgetall command to pre-update hget query\n");
+-                goto error;
+-            }
+-            // TODO: actually we wouldn't have to fetch it at all, but then we'd
+-            // have to mark this key telling to not fetch reply of HMGET after
+-            // EXISTS returns false!
+-        } else {
+-            if (db_redis_key_add_string(&query_v, "HMGET", 5) != 0) {
+-                LM_ERR("Failed to set hgetall command to pre-update hget query\n");
+-                goto error;
+-            }
++        if (db_redis_key_add_string(&query_v, "HMGET", 5) != 0) {
++            LM_ERR("Failed to set hgetall command to pre-update hget query\n");
++            goto error;
+         }
+         if (db_redis_key_add_str(&query_v, keyname) != 0) {
+             LM_ERR("Failed to add key name to pre-update exists query\n");
+@@ -1533,6 +1549,13 @@
+                 goto error;
+             }
+         }
++        // add all type keys to query
++        for (all_type_key = all_type_keys; all_type_key; all_type_key = all_type_key->next) {
++            if (db_redis_key_add_str(&query_v, &all_type_key->key) != 0) {
++                LM_ERR("Failed to add type key to pre-update query\n");
++                goto error;
++            }
++        }
+ 
+         if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
+             LM_ERR("Failed to append redis command\n");
+@@ -1559,9 +1582,12 @@
+ 
+ 
+     for (key = *keys; key; key = key->next) {
++        redis_key_t *tmp = NULL;
++        redis_key_t *type_key;
++        redis_key_t *new_type_key;
+         int row_match;
+ 
+-        LM_DBG("fetching replies for '%.*s' from redis\n", key->key.len, key->key.s);
++        LM_DBG("fetching replies for '%.*s' from redis for update\n", key->key.len, key->key.s);
+ 
+         // get reply for EXISTS query
+         if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
+@@ -1618,13 +1644,50 @@
+                 }
+             }
+         }
+-        db_redis_free_reply(&reply);
+         if (!row_match) {
+             continue;
+         } else {
+             LM_DBG("row matches manual filtering, proceed with update\n");
+         }
+ 
++        db_keys = (db_key_t*) pkg_malloc(all_type_keys_count * sizeof(db_key_t));
++        if (!db_keys) {
++            LM_ERR("Failed to allocate memory for db type keys\n");
++            goto error;
++        }
++        for (j = 0, tmp = all_type_keys; tmp; ++j, tmp = tmp->next) {
++            db_keys[j] = &tmp->key;
++        }
++
++        db_vals = (db_val_t*) pkg_malloc(all_type_keys_count * sizeof(db_val_t));
++        if (!db_vals) {
++            LM_ERR("Failed to allocate memory for manual db vals\n");
++            goto error;
++        }
++
++        for (j = 0, all_type_key = all_type_keys; all_type_key; ++j, all_type_key = all_type_key->next) {
++            db_val_t *v = &(db_vals[j]);
++            str *key = &all_type_key->key;
++            char *value = reply->element[*manual_keys_count + j]->str;
++            int coltype = db_redis_schema_get_column_type(con, CON_TABLE(_h), key);
++            if (value == NULL) {
++                VAL_NULL(v) = 1;
++            } else if (db_str2val(coltype, v, value, strlen(value), 0) != 0) {
++                LM_ERR("Failed to convert redis reply column to db value\n");
++                goto error;
++            }
++        }
++        if (db_redis_build_type_keys(con, CON_TABLE(_h), db_keys, db_vals, all_type_keys_count,
++                    &type_keys, &type_keys_count) != 0) {
++            LM_ERR("failed to build type keys\n");
++            goto error;
++        }
++        pkg_free(db_keys);
++        db_keys = NULL;
++        pkg_free(db_vals);
++        db_vals = NULL;
++        db_redis_free_reply(&reply);
++
+         if (db_redis_key_add_string(&query_v, "HMSET", 5) != 0) {
+             LM_ERR("Failed to add hmset command to update query\n");
+             goto error;
+@@ -1660,6 +1723,18 @@
+         }
+ 
+         db_redis_key_free(&query_v);
++
++        for (type_key = type_keys, new_type_key = new_type_keys; type_key && new_type_key;
++                type_key = type_key->next, new_type_key = new_type_key->next)
++        {
++            LM_DBG("checking for update of type key '%.*s' vs '%.*s'\n",
++                    type_key->key.len, type_key->key.s,
++                    new_type_key->key.len, new_type_key->key.s);
++            if (!str_strcmp(&type_key->key, &new_type_key->key))
++                continue;
++        }
++
++        db_redis_key_free(&type_keys);
+     }
+ 
+     LM_DBG("getting replies for %d queries\n", update_queries);
+@@ -1676,6 +1751,8 @@
+ 
+     LM_DBG("done performing update\n");
+ 
++    db_redis_key_free(&all_type_keys);
++    db_redis_key_free(&new_type_keys);
+     return 0;
+ 
+ error:
+@@ -1683,6 +1760,9 @@
+     if (reply)
+         db_redis_free_reply(&reply);
+     db_redis_key_free(&query_v);
++    db_redis_key_free(&all_type_keys);
++    db_redis_key_free(&type_keys);
++    db_redis_key_free(&new_type_keys);
+     return -1;
+ }
+ 
