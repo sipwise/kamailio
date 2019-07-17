@@ -55,3 +55,4 @@ upstream/limit_the_execution_of_dialplan_reload.patch
 sipwise/db_redis_fix_scan_usage.patch
 sipwise/db_redis_skip_not_eq_type_keys.patch
 sipwise/db_redis_update_type_keys.patch
+sipwise/db_redis_range_compare_timestamps.patch
