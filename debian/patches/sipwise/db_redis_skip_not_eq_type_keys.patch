@@ -1,0 +1,64 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -265,7 +265,7 @@
+ }
+ 
+ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
+-        str *type_name, const db_key_t *_k, const db_val_t *_v, const int _n,
++        str *type_name, const db_key_t *_k, const db_val_t *_v, const db_op_t *_op, const int _n,
+         str *key_name, int *key_found) {
+ 
+     unsigned int len;
+@@ -283,11 +283,16 @@
+         for (i = 0; i < _n; ++i) {
+             const db_key_t k = _k[i];
+             const db_val_t v = _v[i];
++            const db_op_t op = _op ? _op[i] : NULL;
+ 
+             if (VAL_NULL(&v)) {
+                 LM_DBG("Skipping null value for given key '%.*s'\n",
+                         k->len, k->s);
+                 break;
++            } else if (op && strcmp(op, OP_EQ)) {
++                LM_DBG("Skipping non-EQ op (%s) for given key '%.*s'\n",
++                        op, k->len, k->s);
++                break;
+             } else if (!str_strcmp(&key->key, (str*)k)) {
+                 LM_DBG("found key in entry key\n");
+                 if (db_redis_val2str(&v, &val) != 0) goto err;
+@@ -375,7 +380,7 @@
+     }
+     table = (redis_table_t*)table_e->u.p;
+     key = table->entry_keys;
+-    if (db_redis_find_query_key(key, table_name, &type_name, _k, _v, _n, &keyname, &key_found) != 0) {
++    if (db_redis_find_query_key(key, table_name, &type_name, _k, _v, NULL, _n, &keyname, &key_found) != 0) {
+         goto err;
+     }
+     if (key_found) {
+@@ -465,7 +470,7 @@
+         str keyname = {NULL, 0};
+         key = type->keys;
+ 
+-        if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, _n, &keyname, &key_found) != 0) {
++        if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, NULL, _n, &keyname, &key_found) != 0) {
+             goto err;
+         }
+         if (key_found) {
+@@ -522,7 +527,7 @@
+     keyname.len = 0;
+     key = table->entry_keys;
+ 
+-    if (db_redis_find_query_key(key, table_name, &typename, _k, _v, _n, &keyname, &key_found) != 0) {
++    if (db_redis_find_query_key(key, table_name, &typename, _k, _v, _op, _n, &keyname, &key_found) != 0) {
+         goto err;
+     }
+     if (key_found) {
+@@ -540,7 +545,7 @@
+         for (type = table->types; type; type = type->next) {
+             key = type->keys;
+             LM_DBG("checking type '%.*s'\n", type->type.len, type->type.s);
+-            if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, _n, &keyname, &key_found) != 0) {
++            if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, _op, _n, &keyname, &key_found) != 0) {
+                 goto err;
+             }
+             if (key_found) {
