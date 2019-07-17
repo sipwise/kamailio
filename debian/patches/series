@@ -53,3 +53,4 @@ sipwise/rtpengine-play-media.patch
 sipwise/registrar_add_path.patch
 upstream/limit_the_execution_of_dialplan_reload.patch
 sipwise/db_redis_fix_scan_usage.patch
+sipwise/db_redis_skip_not_eq_type_keys.patch
