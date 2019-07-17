@@ -48,3 +48,4 @@ upstream/tm-put-back-t-in-wait-timer-if-still-referenced-more.patch
 sipwise/db_redis_fix_scan_usage.patch
 sipwise/db_redis_skip_not_eq_type_keys.patch
 sipwise/db_redis_update_type_keys.patch
+sipwise/db_redis_range_compare_timestamps.patch
