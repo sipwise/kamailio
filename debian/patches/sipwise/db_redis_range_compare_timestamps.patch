@@ -1,0 +1,528 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -27,6 +27,8 @@
+ #include "redis_dbase.h"
+ #include "redis_table.h"
+ 
++#define TIMESTAMP_STR_LENGTH 19
++
+ static void db_redis_dump_reply(redisReply *reply) {
+     int i;
+     if (reply->type == REDIS_REPLY_STRING) {
+@@ -280,7 +282,7 @@
+ 
+ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
+         str *type_name, const db_key_t *_k, const db_val_t *_v, const db_op_t *_op, const int _n,
+-        str *key_name, int *key_found) {
++        str *key_name, int *key_found, int *ts_scan_start) {
+ 
+     unsigned int len;
+     str val = {NULL, 0};
+@@ -303,7 +305,8 @@
+                 LM_DBG("Skipping null value for given key '%.*s'\n",
+                         k->len, k->s);
+                 break;
+-            } else if (op && strcmp(op, OP_EQ)) {
++            } else if (op && strcmp(op, OP_EQ)
++                    && !(VAL_TYPE(&v) == DB1_DATETIME && (!strcmp(op, OP_LT) || !strcmp(op, OP_GT)))) {
+                 LM_DBG("Skipping non-EQ op (%s) for given key '%.*s'\n",
+                         op, k->len, k->s);
+                 break;
+@@ -340,6 +343,24 @@
+                             val.len, val.s);
+                     key_name->len += (1 + val.len);
+                 }
++                if (op && VAL_TYPE(&v) == DB1_DATETIME && (!strcmp(op, OP_LT) || !strcmp(op, OP_GT))) {
++                    // Special case: we support matching < or > against timestamps using a special
++                    // key scanning method. We do this only for a single timestamp occurance, and we
++                    // still do a table scan, just not a full table scan.
++                    if (!ts_scan_start) {
++                        LM_DBG("key '%.*s' for type '%.*s' found as timestamp, but table scans "
++                                "not supported, unable to use this type\n",
++                                key->key.len, key->key.s, type_name->len, type_name->s);
++                        break;
++                    }
++                    if (*ts_scan_start == 0 && val.len == TIMESTAMP_STR_LENGTH) {
++                        *ts_scan_start = key_name->len - TIMESTAMP_STR_LENGTH;
++                        if (!strcmp(op, OP_LT))
++                            *ts_scan_start = -1 * *ts_scan_start; // negative is <, positive is >
++                        LM_DBG("preparing for timestamp range scan at key offset %i\n", *ts_scan_start);
++                        *key_found = 0; // this forces a table scan using the new match key
++                    }
++                }
+                 LM_DBG("entry key so far is '%.*s'\n", key_name->len, key_name->s);
+                 subkey_found = 1;
+                 pkg_free(val.s);
+@@ -394,7 +415,7 @@
+     }
+     table = (redis_table_t*)table_e->u.p;
+     key = table->entry_keys;
+-    if (db_redis_find_query_key(key, table_name, &type_name, _k, _v, NULL, _n, &keyname, &key_found) != 0) {
++    if (db_redis_find_query_key(key, table_name, &type_name, _k, _v, NULL, _n, &keyname, &key_found, NULL) != 0) {
+         goto err;
+     }
+     if (key_found) {
+@@ -484,7 +505,7 @@
+         str keyname = {NULL, 0};
+         key = type->keys;
+ 
+-        if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, NULL, _n, &keyname, &key_found) != 0) {
++        if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, NULL, _n, &keyname, &key_found, NULL) != 0) {
+             goto err;
+         }
+         if (key_found) {
+@@ -511,7 +532,7 @@
+ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
+         const db_key_t *_k, const db_val_t *_v, const db_op_t *_op, const int _n,
+         redis_key_t **query_keys, int *query_keys_count, int **manual_keys, int *manual_keys_count,
+-        int *do_table_scan) {
++        int *do_table_scan, int *ts_scan_start, str *ts_scan_key) {
+ 
+     struct str_hash_entry *table_e;
+     redis_table_t *table;
+@@ -541,7 +562,7 @@
+     keyname.len = 0;
+     key = table->entry_keys;
+ 
+-    if (db_redis_find_query_key(key, table_name, &typename, _k, _v, _op, _n, &keyname, &key_found) != 0) {
++    if (db_redis_find_query_key(key, table_name, &typename, _k, _v, _op, _n, &keyname, &key_found, NULL) != 0) {
+         goto err;
+     }
+     if (key_found) {
+@@ -559,7 +580,7 @@
+         for (type = table->types; type; type = type->next) {
+             key = type->keys;
+             LM_DBG("checking type '%.*s'\n", type->type.len, type->type.s);
+-            if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, _op, _n, &keyname, &key_found) != 0) {
++            if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, _op, _n, &keyname, &key_found, ts_scan_start) != 0) {
+                 goto err;
+             }
+             if (key_found) {
+@@ -615,6 +636,11 @@
+                 db_redis_free_reply(&reply);
+                 break;
+             }
++            else if (keyname.s && *ts_scan_start) {
++                LM_DBG("will use key '%.*s' at offset %i for timestamp range scan\n",
++                        keyname.len, keyname.s, *ts_scan_start);
++                *ts_scan_key = keyname;
++            }
+         }
+     }
+ 
+@@ -644,22 +670,19 @@
+     return -1;
+ }
+ 
+-static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
+-        const db_key_t *_k, const int _n,
++static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *match_pattern,
++        const int _n,
+         redis_key_t **query_keys, int *query_keys_count,
+-        int **manual_keys, int *manual_keys_count) {
++        int **manual_keys, int *manual_keys_count, int ts_scan_start, const str *ts_scan_key) {
+ 
+     size_t i = 0;
+     redis_key_t *query_v = NULL;
+     char cursor_str[32] = "";
+     redisReply *reply = NULL;
+     unsigned long cursor = 0;
+-    char *match = NULL;
+     size_t j;
+     int l;
+ 
+-    str match_pattern = {":entry::*", strlen(":entry::*")};
+-
+     *query_keys = NULL;
+     *query_keys_count = 0;
+     *manual_keys = NULL;
+@@ -667,13 +690,6 @@
+ 
+     do {
+         snprintf(cursor_str, sizeof(cursor_str), "%lu", cursor);
+-        match = (char*)pkg_malloc(table_name->len + match_pattern.len + 1);
+-        if (!match) {
+-            LM_ERR("Failed to allocate memory for match pattern\n");
+-            goto err;
+-        }
+-        snprintf(match, table_name->len + match_pattern.len + 1, "%s%s\n",
+-                table_name->s, match_pattern.s);
+ 
+         if (db_redis_key_add_string(&query_v, "SCAN", 4) != 0) {
+             LM_ERR("Failed to add scan command to scan query\n");
+@@ -687,7 +703,7 @@
+             LM_ERR("Failed to add match command to scan query\n");
+             goto err;
+         }
+-        if (db_redis_key_add_string(&query_v, match, strlen(match)) != 0) {
++        if (db_redis_key_add_string(&query_v, match_pattern->s, match_pattern->len) != 0) {
+             LM_ERR("Failed to add match pattern to scan query\n");
+             goto err;
+         }
+@@ -699,19 +715,18 @@
+             LM_ERR("Failed to add count value to scan query\n");
+             goto err;
+         }
+-        pkg_free(match); match = NULL;
+ 
+         reply = db_redis_command_argv(con, query_v);
+         db_redis_key_free(&query_v);
+         db_redis_check_reply(con, reply, err);
+         if (reply->type != REDIS_REPLY_ARRAY) {
+             LM_ERR("Invalid reply type for scan on table '%.*s', expected array\n",
+-                    table_name->len, table_name->s);
++                    match_pattern->len, match_pattern->s);
+             goto err;
+         }
+         if (reply->elements != 2) {
+             LM_ERR("Invalid number of reply elements for scan on table '%.*s', expected 2, got %lu\n",
+-                    table_name->len, table_name->s, reply->elements);
++                    match_pattern->len, match_pattern->s, reply->elements);
+             goto err;
+         }
+ 
+@@ -722,19 +737,19 @@
+             cursor = reply->element[0]->integer;
+         } else {
+             LM_ERR("Invalid cursor type for scan on table '%.*s', expected string or integer\n",
+-                    table_name->len, table_name->s);
++                    match_pattern->len, match_pattern->s);
+             goto err;
+         }
+         LM_DBG("cursor is %lu\n", cursor);
+ 
+         if (reply->element[1]->type != REDIS_REPLY_ARRAY) {
+             LM_ERR("Invalid content type for scan on table '%.*s', expected array\n",
+-                    table_name->len, table_name->s);
++                    match_pattern->len, match_pattern->s);
+             goto err;
+         }
+         if (reply->element[1]->elements == 0) {
+             LM_DBG("no matching entries found for scan on table '%.*s'\n",
+-                    table_name->len, table_name->s);
++                    match_pattern->len, match_pattern->s);
+             return 0;
+         }
+ 
+@@ -744,12 +759,12 @@
+             redisReply *key = reply->element[1]->element[j];
+             if (!key) {
+                 LM_ERR("Invalid null key at cursor result index %lu while scanning table '%.*s'\n",
+-                        j, table_name->len, table_name->s);
++                        j, match_pattern->len, match_pattern->s);
+                 goto err;
+             }
+             if (key->type != REDIS_REPLY_STRING) {
+                 LM_ERR("Invalid key type at cursor result index %lu while scanning table '%.*s', expected string\n",
+-                        j, table_name->len, table_name->s);
++                        j, match_pattern->len, match_pattern->s);
+                 goto err;
+             }
+             if (db_redis_key_prepend_string(query_keys, key->str, strlen(key->str)) != 0) {
+@@ -780,8 +795,6 @@
+     return 0;
+ 
+ err:
+-    if (match)
+-        pkg_free(match);
+     if (reply)
+         db_redis_free_reply(&reply);
+     db_redis_key_free(&query_v);
+@@ -794,6 +807,79 @@
+     return -1;
+ }
+ 
++static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
++        const int _n,
++        redis_key_t **query_keys, int *query_keys_count,
++        int **manual_keys, int *manual_keys_count, int ts_scan_start, const str *ts_scan_key) {
++
++    char *match = NULL;
++    int ret;
++
++    if (!ts_scan_start) {
++        // full table scan
++        match = (char*)pkg_malloc(table_name->len + 10); // length of ':entry::*' plus \0
++        if (!match) {
++            LM_ERR("Failed to allocate memory for match pattern\n");
++            return -1;
++        }
++        int len = sprintf(match, "%.*s:entry::*",
++                table_name->len, table_name->s);
++        str match_pattern = {match, len};
++        ret = db_redis_scan_query_keys_pattern(con, &match_pattern, _n, query_keys, query_keys_count,
++                manual_keys, manual_keys_count, 0, NULL);
++        pkg_free(match);
++        return ret;
++    }
++
++    // timestamp range scan
++    // ex: 2019-07-17 17:33:16
++    // if >, we match: [3-9]*, 2[1-9]*, 20[2-9]*, etc
++    // if <, we match: [0-1]*, 200*, 201[0-8]*, etc
++    // the maximum match string length is ts_scan_key->len with one character replaced by 5 ('[a-b]')
++
++    match = pkg_malloc(ts_scan_key->len + 6);
++    if (!match) {
++        LM_ERR("Failed to allocate memory for match pattern\n");
++        return -1;
++    }
++
++    int scan_offset = ts_scan_start;
++    if (scan_offset < 0)
++        scan_offset *= -1;
++
++    for (int i = 0; i < TIMESTAMP_STR_LENGTH; i++) {
++        int len = scan_offset + i;
++        char match_char = ts_scan_key->s[len];
++        // skip non-numbers
++        if (match_char < '0' || match_char > '9')
++            continue;
++        // skip numbers that are at the edge of their match range
++        if (match_char == '0' && ts_scan_start < 0)
++            continue;
++        if (match_char == '9' && ts_scan_start > 0)
++            continue;
++
++        // copy unchanged prefix
++        memcpy(match, ts_scan_key->s, len);
++        // append matching suffix
++        const char *asterisk = "*";
++        if (i == TIMESTAMP_STR_LENGTH - 1)
++            asterisk = "";
++
++        if (ts_scan_start < 0)
++            len += sprintf(match + scan_offset + i, "[0-%c]%s", match_char - 1, asterisk);
++        else
++            len += sprintf(match + scan_offset + i, "[%c-9]%s", match_char + 1, asterisk);
++
++        str match_pattern = {match, len};
++        LM_DBG("running timestamp range matching using pattern '%.*s'\n", len, match);
++    }
++
++    pkg_free(match);
++
++    return 0;
++}
++
+ static int db_redis_compare_column(db_key_t k, db_val_t *v, db_op_t op, redisReply *reply) {
+     int i_value;
+     long long ll_value;
+@@ -1078,7 +1164,8 @@
+         const db_val_t* _v, const db_op_t *_op, const db_key_t* _c,
+         const int _n, const int _nc, db1_res_t** _r,
+         redis_key_t **keys, int *keys_count,
+-        int **manual_keys, int *manual_keys_count, int do_table_scan) {
++        int **manual_keys, int *manual_keys_count, int do_table_scan, int ts_scan_start,
++        const str *ts_scan_key) {
+ 
+     redisReply *reply = NULL;
+     redis_key_t *query_v = NULL;
+@@ -1106,9 +1193,9 @@
+             LM_WARN("  scan key %d is '%.*s'\n",
+                     i, _k[i]->len, _k[i]->s);
+         }
+-        if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
++        if (db_redis_scan_query_keys(con, CON_TABLE(_h), _n,
+                     keys, keys_count,
+-                    manual_keys, manual_keys_count) != 0) {
++                    manual_keys, manual_keys_count, ts_scan_start, ts_scan_key) != 0) {
+             LM_ERR("failed to scan query keys\n");
+             goto error;
+         }
+@@ -1258,7 +1345,8 @@
+ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, const db_key_t* _k,
+         const db_val_t* _v, const db_op_t *_op, const int _n,
+         redis_key_t **keys, int *keys_count,
+-        int **manual_keys, int *manual_keys_count, int do_table_scan) {
++        int **manual_keys, int *manual_keys_count, int do_table_scan, int ts_scan_start,
++        const str *ts_scan_key) {
+ 
+     int i = 0, j = 0;
+     redis_key_t *k = NULL;
+@@ -1275,15 +1363,21 @@
+     redis_key_t *type_key;
+ 
+     if (!*keys_count && do_table_scan) {
+-        LM_WARN("performing full table scan on table '%.*s' while performing delete\n",
+-                CON_TABLE(_h)->len, CON_TABLE(_h)->s);
++        if (!ts_scan_start)
++            LM_WARN("performing full table scan on table '%.*s' while performing delete\n",
++                    CON_TABLE(_h)->len, CON_TABLE(_h)->s);
++        else
++            LM_WARN("performing table scan on table '%.*s' while performing delete using match key "
++                    "'%.*s' at offset %i\n",
++                    CON_TABLE(_h)->len, CON_TABLE(_h)->s,
++                    ts_scan_key->len, ts_scan_key->s, ts_scan_start);
+         for(i = 0; i < _n; ++i) {
+             LM_WARN("  scan key %d is '%.*s'\n",
+                     i, _k[i]->len, _k[i]->s);
+         }
+-        if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
++        if (db_redis_scan_query_keys(con, CON_TABLE(_h), _n,
+                     keys, keys_count,
+-                    manual_keys, manual_keys_count) != 0) {
++                    manual_keys, manual_keys_count, ts_scan_start, ts_scan_key) != 0) {
+             LM_ERR("failed to scan query keys\n");
+             goto error;
+         }
+@@ -1479,7 +1573,8 @@
+         const db_val_t* _v, const db_op_t *_op, const db_key_t* _uk, const db_val_t *_uv,
+         const int _n, const int _nu,
+         redis_key_t **keys, int *keys_count,
+-        int **manual_keys, int *manual_keys_count, int do_table_scan) {
++        int **manual_keys, int *manual_keys_count, int do_table_scan, int ts_scan_start,
++        const str *ts_scan_key) {
+ 
+     redisReply *reply = NULL;
+     redis_key_t *query_v = NULL;
+@@ -1505,9 +1600,9 @@
+             LM_WARN("  scan key %d is '%.*s'\n",
+                     i, _k[i]->len, _k[i]->s);
+         }
+-        if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
++        if (db_redis_scan_query_keys(con, CON_TABLE(_h), _n,
+                     keys, keys_count,
+-                    manual_keys, manual_keys_count) != 0) {
++                    manual_keys, manual_keys_count, ts_scan_start, ts_scan_key) != 0) {
+             LM_ERR("failed to scan query keys\n");
+             goto error;
+         }
+@@ -1858,6 +1953,8 @@
+     km_redis_con_t *con = NULL;
+     int free_op = 0;
+     int do_table_scan = 0;
++    int ts_scan_start = 0;
++    str ts_scan_key = {0,};
+ 
+     redis_key_t *keys = NULL;
+     int keys_count = 0;
+@@ -1928,7 +2025,8 @@
+ 
+     if (_n > 0) {
+         if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
+-                    &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan) != 0) {
++                    &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan, &ts_scan_start,
++                    &ts_scan_key) != 0) {
+             LM_ERR("failed to build query keys\n");
+             goto error;
+         }
+@@ -1946,7 +2044,7 @@
+     }
+ 
+     if (db_redis_perform_query(_h, con, _k, _v, query_ops, _c, _n, _nc, _r,
+-        &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan) != 0) {
++        &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan, ts_scan_start, &ts_scan_key) != 0) {
+         goto error;
+     }
+ 
+@@ -1960,6 +2058,8 @@
+     if (manual_keys) {
+         pkg_free(manual_keys);
+     }
++    if (ts_scan_key.s)
++        pkg_free(ts_scan_key.s);
+ 
+     db_redis_consume_replies(con);
+     return 0;
+@@ -1973,6 +2073,8 @@
+     if (manual_keys) {
+         pkg_free(manual_keys);
+     }
++    if (ts_scan_key.s)
++        pkg_free(ts_scan_key.s);
+     db_redis_consume_replies(con);
+ 
+ 
+@@ -2134,6 +2236,8 @@
+     int manual_keys_count = 0;
+     int free_op = 0;
+     int do_table_scan = 0;
++    int ts_scan_start = 0;
++    str ts_scan_key = {0,};
+     db_op_t *query_ops = NULL;
+     int i;
+ 
+@@ -2178,7 +2282,8 @@
+ 
+     if (_n > 0) {
+         if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
+-                    &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan) != 0) {
++                    &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan, &ts_scan_start,
++                    &ts_scan_key) != 0) {
+             LM_ERR("failed to build query keys\n");
+             goto error;
+         }
+@@ -2195,7 +2300,7 @@
+     }
+ 
+     if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,
+-        &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan) != 0) {
++        &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan, ts_scan_start, &ts_scan_key) != 0) {
+         goto error;
+     }
+ 
+@@ -2207,6 +2312,8 @@
+     db_redis_key_free(&keys);
+     if (manual_keys)
+         pkg_free(manual_keys);
++    if (ts_scan_key.s)
++        pkg_free(ts_scan_key.s);
+     db_redis_consume_replies(con);
+ 
+     return 0;
+@@ -2219,6 +2326,8 @@
+     db_redis_key_free(&keys);
+     if (manual_keys)
+         pkg_free(manual_keys);
++    if (ts_scan_key.s)
++        pkg_free(ts_scan_key.s);
+     db_redis_consume_replies(con);
+     return -1;
+ }
+@@ -2241,6 +2350,8 @@
+     km_redis_con_t *con = NULL;
+     int free_op = 0;
+     int do_table_scan = 0;
++    int ts_scan_start = 0;
++    str ts_scan_key = {0,};
+ 
+     redis_key_t *keys = NULL;
+     int keys_count = 0;
+@@ -2290,7 +2401,8 @@
+ 
+     if (_n > 0) {
+         if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
+-                    &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan) != 0) {
++                    &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan, &ts_scan_start,
++                    &ts_scan_key) != 0) {
+             LM_ERR("failed to build query keys\n");
+             goto error;
+         }
+@@ -2307,7 +2419,7 @@
+     }
+ 
+     if (db_redis_perform_update(_h, con, _k, _v, query_ops, _uk, _uv, _n, _nu,
+-        &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan) != 0) {
++        &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan, ts_scan_start, &ts_scan_key) != 0) {
+         goto error;
+     }
+ 
+@@ -2321,6 +2433,8 @@
+     if (manual_keys) {
+         pkg_free(manual_keys);
+     }
++    if (ts_scan_key.s)
++        pkg_free(ts_scan_key.s);
+     db_redis_consume_replies(con);
+     return 0;
+ 
+@@ -2333,6 +2447,8 @@
+     if (manual_keys) {
+         pkg_free(manual_keys);
+     }
++    if (ts_scan_key.s)
++        pkg_free(ts_scan_key.s);
+     db_redis_consume_replies(con);
+     return -1;
+ }
