@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.8-1+0~mr7.4.1.2) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [be3541d] TT#63103 enable TLS preload module on lb instead of proxy
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 18 Jul 2019 15:15:10 +0200
+
 ngcp-kamailio (5.1.8-1+0~mr7.4.1.1) unstable; urgency=medium
 
   * New release.
