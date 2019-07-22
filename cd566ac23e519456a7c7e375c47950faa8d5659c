@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "fa1b9901_d9a05693",
+        "filename": "debian/control",
+        "patchSetId": 1
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-07-22T13:50:24Z",
+      "side": 1,
+      "message": "You need to add the module here so that upgrades will work fine. Also into a new Breaks field too. And while at it, I guess to make this super-smooth, also into Provides.",
+      "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
