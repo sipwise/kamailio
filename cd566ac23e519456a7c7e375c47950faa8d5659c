@@ -16,6 +16,24 @@
       "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa1b9901_b926c214",
+        "filename": "debian/control",
+        "patchSetId": 1
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-07-22T14:16:13Z",
+      "side": 1,
+      "message": "AFAIK, the package ngcp-kamailio-carrierroute-modules was nevery installed on NGCP, this is just debian repo cleanup AFAIK.",
+      "parentUuid": "fa1b9901_d9a05693",
+      "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
