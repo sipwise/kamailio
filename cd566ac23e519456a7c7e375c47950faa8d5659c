@@ -52,6 +52,24 @@
       "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa1b9901_d95b7653",
+        "filename": "debian/control",
+        "patchSetId": 1
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-07-22T22:50:24Z",
+      "side": 1,
+      "message": "Well, in case a customer installed it, we should provide correct metadata.",
+      "parentUuid": "fa1b9901_b926c214",
+      "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
