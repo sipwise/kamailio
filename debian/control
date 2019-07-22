@@ -70,9 +70,9 @@ Conflicts:
  kamailio,
 Replaces:
  kamailio,
+ ngcp-kamailio-carrierroute-modules,
 Suggests:
  ngcp-kamailio-berkeley-modules,
- ngcp-kamailio-carrierroute-modules,
  ngcp-kamailio-cpl-modules,
  ngcp-kamailio-ldap-modules,
  ngcp-kamailio-lua-modules,
@@ -90,8 +90,11 @@ Suggests:
  ngcp-kamailio-xml-modules,
  ngcp-kamailio-xmpp-modules,
  stun-server | turn-server,
+Breaks:
+ ngcp-kamailio-carrierroute-modules,
 Provides:
  sip-router,
+ ngcp-kamailio-carrierroute-modules,
 Description: very fast and configurable SIP proxy
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -492,27 +495,6 @@ Description: XML based extensions for Kamailio's Management Interface
  - the XMLRPC transport implementations for Kamailio's
  Management and Control Interface.
  - xmlops module for XPath operations in configuration file
-
-Package: ngcp-kamailio-carrierroute-modules
-Architecture: any
-Multi-Arch: same
-Pre-Depends:
- ${misc:Pre-Depends},
-Depends:
- ngcp-kamailio (= ${binary:Version}),
- ${misc:Depends},
- ${shlibs:Depends},
-Conflicts:
- kamailio-carrierroute-modules,
-Replaces:
- kamailio-carrierroute-modules,
-Description: carrierroute module for Kamailio
- Kamailio is a very fast and flexible SIP (RFC3261)
- proxy server. Written entirely in C, Kamailio can handle thousands calls
- per second even on low-budget hardware.
- .
- This package provides the carrierroute module for Kamailio, an integrated
- solution for routing, balancing and blacklisting.
 
 Package: ngcp-kamailio-berkeley-modules
 Architecture: any
