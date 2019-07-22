@@ -34,6 +34,24 @@
       "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fa1b9901_991dfebf",
+        "filename": "debian/control",
+        "patchSetId": 1
+      },
+      "lineNbr": 72,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-07-22T14:17:28Z",
+      "side": 1,
+      "message": "To make doze check happy: https://jenkins.mgm.sipwise.com/job/check-dose-distcheck/103665/console\n\n\n+ dose-distcheck -f -e --fg deb:///tmp/tmp.2UwgbgAA1P/statedir/lists/deb.sipwise.com_autobuild_dists_release-trunk-buster_main_binary-amd64_Packages --bg deb:///tmp/tmp.2UwgbgAA1P/statedir/lists/debian.sipwise.com_debian_dists_buster_main_binary-amd64_Packages --bg deb:///tmp/tmp.2UwgbgAA1P/statedir/lists/debian.sipwise.com_debian-security_dists_buster-security_main_binary-amd64_Packages --bg deb:///tmp/tmp.2UwgbgAA1P/statedir/lists/debian.sipwise.com_debian_dists_buster_non-free_binary-amd64_Packages\noutput-version: 1.2\nreport:\n -\n  package: ngcp-kamailio-carrierroute-modules-dbgsym\n  version: 5.1.8-1+0~mr7.5.0.0+0~20190703193637.1665+buster~1.gbp34d357\n  architecture: amd64\n  status: broken\n  reasons:\n   -\n    missing:\n     pkg:\n      package: ngcp-kamailio-carrierroute-modules-dbgsym\n      version: 5.1.8-1+0~mr7.5.0.0+0~20190703193637.1665+buster~1.gbp34d357\n      architecture: amd64\n      unsat-dependency: ngcp-kamailio-carrierroute-modules (\u003d 5.1.8-1+0~mr7.5.0.0+0~20190703193637.1665+buster~1.gbp34d357)",
+      "parentUuid": "fa1b9901_b926c214",
+      "revId": "cd566ac23e519456a7c7e375c47950faa8d5659c",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
