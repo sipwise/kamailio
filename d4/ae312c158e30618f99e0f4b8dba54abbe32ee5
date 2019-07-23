@@ -1,0 +1,9 @@
+Verified+1: Jenkins Jenkins
+Code-Review+1: Alexander Lutay <alutay@sipwise.com>
+Code-Review+1: Andrii Pogrebennyk <apogrebennyk@sipwise.com>
+Code-Review+2: Guillem Jover <gjover@sipwise.com>
+Submitted-by: Marco Capetta <mcapetta@sipwise.com>
+Submitted-at: Tue, 23 Jul 2019 09:30:43 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/31862
+Project: kamailio
+Branch: refs/heads/master
