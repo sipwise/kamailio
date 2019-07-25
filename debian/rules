@@ -218,10 +218,8 @@ binary-common:
 	# and install service files (they are not copied automatically if having
 	# only calls of dh_installinit without specific "name" for the service
 	# files)
-	dh_installinit --name=kamailio-lb
-	dh_installinit --name=kamailio-proxy
-	dh_installinit --name=ngcp-kamailio
-	dh_installinit --name=ngcp-kamailio-radius-modules
+	dh_installsystemd --name=kamailio-lb
+	dh_installsystemd --name=kamailio-proxy
 	dh_installcron
 	dh_installman
 	dh_installinfo
