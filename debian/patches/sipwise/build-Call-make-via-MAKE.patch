@@ -1,0 +1,82 @@
+From bcdb5b391c1a7c04f31a6714b0a444fa1abe83c4 Mon Sep 17 00:00:00 2001
+From: Guillem Jover <gjover@sipwise.com>
+Date: Mon, 29 Jul 2019 20:15:47 +0200
+Subject: [PATCH] build: Call make via $(MAKE)
+
+When we need to call make from within a Makefile, we should do so by
+using the MAKE variable, which has special meaning for make itself.
+This makes sure, it will get marked as recursive command, and will
+make it possible to use the make jobserver.
+
+Change-Id: I6829f3ee0a830fc8273e1dffe696382fccc6a093
+---
+ doc/tutorials/rpc_list/Makefile  | 4 ++--
+ src/modules/db_berkeley/Makefile | 2 +-
+ src/modules/db_oracle/Makefile   | 2 +-
+ src/modules/db_sqlite/Makefile   | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/doc/tutorials/rpc_list/Makefile b/doc/tutorials/rpc_list/Makefile
+index c9ff6905..e1050643 100644
+--- a/doc/tutorials/rpc_list/Makefile
++++ b/doc/tutorials/rpc_list/Makefile
+@@ -148,7 +148,7 @@ c_defsX=-DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' \
+ 	   -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT \
+ 	   -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT
+ 
+-c_defs=$(subst ^^,='\",$(subst ",\"',$(subst =",^^,$(shell make -s -C ../../../src printcdefs))))
++c_defs=$(subst ^^,='\",$(subst ",\"',$(subst =",^^,$(shell $(MAKE) -s -C ../../../src printcdefs))))
+ 
+ c_defs+= -DMOD_NAME='\"rpcgen\"'
+ c_defs+= -I$(COREPATH)/modules/app_sqlang/squirrel/include
+@@ -176,7 +176,7 @@ get_listed_grp=$(word 2, $(subst :, ,$(1)))
+ # get module interface define
+ get_modiface=$(word 3, $(subst :, ,$(1)))
+ 
+-find_modiface=$(if $(findstring modules,$(1)),$(shell make -s -C $(dir $(1)) printmiface),-DNONE)
++find_modiface=$(if $(findstring modules,$(1)),$(shell $(MAKE) -s -C $(dir $(1)) printmiface),-DNONE)
+ 
+ # get base file name from file:grp: get_bname(file:grp)
+ # => basename(file) without extension (e.g. get_bname(foo/bar.c:x) => bar)
+diff --git a/src/modules/db_berkeley/Makefile b/src/modules/db_berkeley/Makefile
+index 23013003..a33bc58e 100644
+--- a/src/modules/db_berkeley/Makefile
++++ b/src/modules/db_berkeley/Makefile
+@@ -25,7 +25,7 @@ ifeq ($(INSTALL_FLAVOUR),kamailio)
+ # extra install for kamailio
+ 
+ install-berkeley-scripts: $(bin_prefix)/$(bin_dir)
+-		BERKELEYDBON=yes make -C ../../../utils/kamctl/ install-modules
++	BERKELEYDBON=yes $(MAKE) -C ../../../utils/kamctl/ install-modules
+ 
+ install-scripts: install-berkeley-scripts
+ 
+diff --git a/src/modules/db_oracle/Makefile b/src/modules/db_oracle/Makefile
+index d30c7515..77a52af0 100644
+--- a/src/modules/db_oracle/Makefile
++++ b/src/modules/db_oracle/Makefile
+@@ -17,7 +17,7 @@ ifeq ($(INSTALL_FLAVOUR),kamailio)
+ # extra install for kamailio
+ 
+ install-oracle-scripts: $(bin_prefix)/$(bin_dir)
+-		ORACLEON=yes make -C ../../../utils/kamctl/ install-modules
++	ORACLEON=yes $(MAKE) -C ../../../utils/kamctl/ install-modules
+ 
+ install-scripts: install-oracle-scripts
+ 
+diff --git a/src/modules/db_sqlite/Makefile b/src/modules/db_sqlite/Makefile
+index c5f164cc..92e4de58 100644
+--- a/src/modules/db_sqlite/Makefile
++++ b/src/modules/db_sqlite/Makefile
+@@ -20,7 +20,7 @@ ifeq ($(INSTALL_FLAVOUR),kamailio)
+ # extra install for kamailio
+ 
+ install-sqlite-scripts: $(bin_prefix)/$(bin_dir)
+-		SQLITEON=yes make -C ../../../utils/kamctl/ install-modules
++	SQLITEON=yes $(MAKE) -C ../../../utils/kamctl/ install-modules
+ 
+ install-scripts: install-sqlite-scripts
+ 
+-- 
+2.22.0.709.g102302147b
+
