@@ -16,6 +16,24 @@
       "revId": "6ced791582419b354f9a7da6be5d58587926728d",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "baada198_d8482dcf",
+        "filename": "debian/.gitignore",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-07-29T14:56:17Z",
+      "side": 1,
+      "message": "Nothing checks for the contents of this file. It\u0027s just mostly for human usage, when doing «git status» on a local build. If someone misses a file, we can always run check-packages and see what\u0027s missing. :) We could of course add that check to some jenkins job to make sure no one forgets. :)",
+      "parentUuid": "dab895d6_03ee8988",
+      "revId": "6ced791582419b354f9a7da6be5d58587926728d",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
