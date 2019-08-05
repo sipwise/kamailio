@@ -1,3 +1,26 @@
+ngcp-kamailio (5.2.3-1+0~mr8.0.0.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [d316eaf] TT#56950 Add libmnl-dev dependency for new ims_ipsec_pcscf module
+  * [d4ae312] TT#63464 Remove carrierroute module definition
+
+  [ Andrew Pogrebennyk ]
+  * [e4a2849] TT#63103 enable TLS preload module on lb instead of proxy
+
+  [ Kirill Solomko ]
+  * [16861f1] TT#58628 pv_headers add auto collect/apply support
+
+  [ Guillem Jover ]
+  * [bd93c75] TT#61954 Set debhelper compat level in Build-Depends instead of debian/compat
+  * [b355100] TT#61954 Fix systemd service files installation
+  * [c14de91] TT#61954 Add RuntimeDirectory directives for systemd service files
+  * [aa3b451] TT#63463 build: Call make via $(MAKE)
+  * [f6a5888] TT#63463 Rewrite debian/rules file to use the debhelper sequencer
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 05 Aug 2019 20:54:23 +0200
+
 ngcp-kamailio (5.2.3-1+0~mr7.5.0.0) unstable; urgency=medium
 
   [ Guillem Jover ]
