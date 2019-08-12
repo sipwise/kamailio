@@ -11,17 +11,6 @@ case "$1" in
                 --shell /bin/false --gecos "Kamailio" \
                 --home "$HOMEDIR" kamailio || true
 
-        # Move kamailio db_redis table descriptors onder /etc/kamailio/db_redis folder
-        # in order to easily modify it using ngcpcfg templates
-        if [ -d /usr/share/kamailio/db_redis ] && [ -d /etc/kamailio/ ]; then
-          
-          # Copy kamailio original content in the target folder
-          mv /usr/share/kamailio/db_redis /etc/kamailio/
-
-          # Create symlink 
-          ln -sf /etc/kamailio/db_redis /usr/share/kamailio/db_redis
-        fi
-
         # Remove obsolete rc.d links.
         update-rc.d kamailio-lb remove
         update-rc.d kamailio-proxy remove
