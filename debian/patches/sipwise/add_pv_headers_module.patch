@@ -770,7 +770,7 @@
 +    switch (type) {
 +        case TMCB_RESPONSE_IN:
 +            msg = params->rpl;
-+            if (msg) {
++            if (msg != NULL && msg != FAKED_REPLY) {
 +                pv_reset_headers(msg, NULL, NULL);
 +                pv_collect_headers(msg, "1", NULL);
 +            }
@@ -787,7 +787,7 @@
 +            return;
 +    }
 +
-+    if (msg)
++    if (msg != NULL && msg != FAKED_REPLY)
 +        pv_apply_headers(msg, "1", NULL);
 +
 +    return;
