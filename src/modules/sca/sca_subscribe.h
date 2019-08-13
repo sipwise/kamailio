@@ -75,7 +75,7 @@ extern const str SCA_METHOD_SUBSCRIBE;
 		sca_subscription_reply((mod), (scode), (smsg), \
 		SCA_EVENT_TYPE_CALL_INFO, -1, (sreply))
 
-int sca_handle_subscribe(sip_msg_t *, char *, char *);
+int sca_handle_subscribe(sip_msg_t *, str *, str *);
 int sca_subscription_reply(sca_mod *, int, char *, int, int, sip_msg_t *);
 
 int sca_subscription_from_db_result(db1_res_t *, sca_subscription *);
@@ -88,6 +88,6 @@ void sca_subscription_state_to_str(int, str *);
 int sca_subscription_aor_has_subscribers(int, str *);
 int sca_subscription_delete_subscriber_for_event(sca_mod *, str *, str *, str *);
 int sca_subscription_terminate(sca_mod *, str *, int, str *, int, int);
-int ki_sca_handle_subscribe(sip_msg_t *msg);
+int ki_sca_handle_subscribe(sip_msg_t *msg, str *, str *);
 
 #endif // SCA_SUBSCRIBE_H

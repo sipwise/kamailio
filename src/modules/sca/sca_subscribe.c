@@ -1005,10 +1005,6 @@ int sca_subscription_from_request(sca_mod *scam, sip_msg_t *msg, int event_type,
 		expires = max_expires;
 	}
 
-	if (SCA_HEADER_EMPTY(msg->to)) {
-		LM_ERR("Empty To header\n");
-		goto error;
-	}
 	if (SCA_HEADER_EMPTY(msg->callid)) {
 		LM_ERR("Empty Call-ID header\n");
 		goto error;
@@ -1030,29 +1026,18 @@ int sca_subscription_from_request(sca_mod *scam, sip_msg_t *msg, int event_type,
 		goto error;
 	}
 
-	if (SCA_HEADER_EMPTY(msg->from)) {
-		LM_ERR("Empty From header\n");
-		goto error;
-	}
-	if (parse_from_header(msg) < 0) {
+	if (sca_get_msg_from_header(msg, &from) < 0) {
 		LM_ERR("Bad From header\n");
 		goto error;
 	}
-	from = (struct to_body *) msg->from->parsed;
 	if (SCA_STR_EMPTY(&from->tag_value)) {
 		LM_ERR("No from-tag in From header\n");
 		goto error;
 	}
 
-	if ((to = (struct to_body *) msg->to->parsed) == NULL) {
-		parse_to(msg->to->body.s, msg->to->body.s + msg->to->body.len + 1, // end of buffer
-		&tmp_to);
-
-		if (tmp_to.error != PARSE_OK) {
-			LM_ERR("Bad To header\n");
-			goto error;
-		}
-		to = &tmp_to;
+	if ( sca_get_msg_to_header( msg, &to ) < 0 ) {
+		LM_ERR( "Bad To header" );
+		goto error;
 	}
 
 	if (parse_sip_msg_uri(msg) < 0) {
@@ -1135,7 +1120,7 @@ int sca_subscription_from_request(sca_mod *scam, sip_msg_t *msg, int event_type,
 	return (-1);
 }
 
-int ki_sca_handle_subscribe(sip_msg_t *msg)
+int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
 {
 	sca_subscription req_sub;
 	sca_subscription *sub = NULL;
@@ -1150,6 +1135,10 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 	int idx = -1;
 	int rc = -1;
 	int released = 0;
+	int_str val;
+	struct to_body *tmp_to;
+	sca_hash_slot	*slot = NULL;
+	sca_hash_entry	*ent = NULL;
 
 	if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
 		LM_ERR("header parsing failed: bad request\n");
@@ -1174,6 +1163,21 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 		return (-1);
 	}
 
+	delete_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp);
+	delete_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp);
+	if (uri_from != NULL) {
+		val.s.s   = uri_from->s;
+		val.s.len = uri_from->len;
+		add_avp(from_uri_avp_type|AVP_VAL_STR, from_uri_avp, val);
+		LM_DBG("from[%.*s] param\n", STR_FMT(uri_from));
+	}
+	if (uri_to != NULL) {
+		val.s.s   = uri_to->s;
+		val.s.len = uri_to->len;
+		add_avp(to_uri_avp_type|AVP_VAL_STR, to_uri_avp, val);
+		LM_DBG("to[%.*s] param\n", STR_FMT(uri_to));
+	}
+
 	if (sca_subscription_from_request(sca, msg, event_type, &req_sub) < 0) {
 		SCA_SUB_REPLY_ERROR(sca, 400, "Bad Shared Call Appearance Request",
 				msg);
@@ -1187,7 +1191,15 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 	sca_subscription_print(&req_sub);
 
 	// check to see if the message has a to-tag
-	to_tag = &(get_to(msg)->tag_value);
+	if(uri_to!=NULL) {
+		if (sca_get_msg_to_header(msg, &tmp_to) < 0) {
+			LM_ERR( "Bad To header" );
+			return(-1);
+		}
+		to_tag = &(tmp_to->tag_value);
+	} else {
+		to_tag = &(get_to(msg)->tag_value);
+	}
 
 	// XXX should lock starting here and use unsafe methods below?
 
@@ -1213,12 +1225,17 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 		}
 	}
 
+	slot = sca_hash_table_slot_for_index(sca->subscriptions, idx);
 	sca_hash_table_lock_index(sca->subscriptions, idx);
 
-	sub = sca_hash_table_index_kv_find_unsafe(sca->subscriptions, idx,
-			&req_sub.subscriber);
+	ent = sca_hash_table_slot_kv_find_entry_unsafe( slot, &req_sub.subscriber );
+	if (ent!=NULL) {
+		sub = (sca_subscription *)ent->value;
+	}
 
 	if (sub != NULL) {
+		LM_DBG("sca_handle_subscribe: subscription[%.*s] found\n",
+			STR_FMT(&req_sub.subscriber));
 		// this will remove the subscription if expires == 0
 		if (sca_subscription_update_unsafe(sca, sub, &req_sub, idx) < 0) {
 			SCA_SUB_REPLY_ERROR(sca, 500, "Internal Server Error - "
@@ -1268,10 +1285,24 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 					LM_INFO("sca_handle_subscribe: released %d appearances "
 							"for subscriber %.*s\n", released,
 							STR_FMT(&req_sub.subscriber));
+				} else {
+					LM_DBG("sca_handle_subscribe: subscriber[%.*s] doesn't "
+						"own any active appearances using target[%.*s]\n",
+						STR_FMT(&req_sub.subscriber),
+						STR_FMT(&req_sub.target_aor));
 				}
+			}
+			if( req_sub.expires == 0 ) {
+				ent = sca_hash_table_slot_unlink_entry_unsafe(slot, ent);
+				sub->expires = 0;
+				sub->dialog.notify_cseq += 1;
+				sub->state = SCA_SUBSCRIPTION_STATE_TERMINATED;
+				if(ent) sca_hash_entry_free(ent);
 			}
 		}
 	} else {
+		LM_DBG("sca_handle_subscribe: subscription[%.*s] not found\n",
+			STR_FMT(&req_sub.subscriber));
 		// in-dialog request, but we didn't find it.
 		if (!SCA_STR_EMPTY(to_tag)) {
 			SCA_SUB_REPLY_ERROR(sca, 481, "Call Leg/Transaction Does Not Exist",
@@ -1305,6 +1336,7 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 			// we got an in-dialog SUBSCRIBE with an "Expires: 0" header,
 			// but the dialog wasn't in our table. just reply with the
 			// subscription info we got, without saving or creating anything.
+			LM_DBG("sca_handle_subscribe: expires=0 in-dialog but dialog not found\n");
 			sub = &req_sub;
 		}
 	}
@@ -1354,9 +1386,9 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
 	return (rc);
 }
 
-int sca_handle_subscribe(sip_msg_t *msg, char *p1, char *p2)
+int sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
 {
-	return ki_sca_handle_subscribe(msg);
+	return ki_sca_handle_subscribe(msg, uri_to, uri_from);
 }
 
 int sca_subscription_reply(sca_mod *scam, int status_code, char *status_msg,

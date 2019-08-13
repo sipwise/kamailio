@@ -1144,7 +1144,12 @@ sca_appearance *sca_appearance_for_dialog_unsafe(sca_mod *scam, str *aor,
 		return (NULL);
 	}
 
+	LM_DBG("search for call_id[%.*s] from_tag[%.*s]\n",
+		STR_FMT(&dialog->call_id), STR_FMT(&dialog->from_tag));
 	for (app = app_list->appearances; app != NULL; app = app->next) {
+		LM_DBG("app.call_id[%.*s] app.from_tag[%.*s] app.to_tag[%.*s]\n",
+			STR_FMT(&app->dialog.call_id), STR_FMT(&app->dialog.from_tag),
+			STR_FMT(&app->dialog.to_tag));
 		if (SCA_STR_EQ(&app->dialog.call_id, &dialog->call_id) &&
 		SCA_STR_EQ(&app->dialog.from_tag, &dialog->from_tag)) {
 #ifdef notdef
@@ -1154,6 +1159,7 @@ sca_appearance *sca_appearance_for_dialog_unsafe(sca_mod *scam, str *aor,
 				continue;
 			}
 #endif // notdef
+			LM_DBG("%.*s appearance-index %d found\n", STR_FMT(aor), app->index);
 			break;
 		}
 	}

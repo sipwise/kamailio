@@ -49,10 +49,17 @@ struct _sca_mod {
 
 	db_func_t *db_api;
 	struct tm_binds *tm_api;
+	struct rr_binds	*rr_api;
 	sl_api_t *sl_api;
 };
 typedef struct _sca_mod sca_mod;
 
 extern sca_mod *sca;
+
+/* avps */
+extern unsigned short from_uri_avp_type;
+extern int_str from_uri_avp;
+extern unsigned short to_uri_avp_type;
+extern int_str to_uri_avp;
 
 #endif // SCA_H
