@@ -517,7 +517,7 @@
 +            $var(test) = $x_rr;
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2074 @@
+@@ -0,0 +1,2077 @@
 +/*
 + * pv_headers
 + *
@@ -847,6 +847,9 @@
 +
 +        pv_str_copy(&val, &hf->body, header_value_size);
 +        pv_str_copy(&name, &hf->name, header_name_size);
++
++        if (pv_skip_header(&name))
++            continue;
 +
 +        if (str_hash_get(&split_headers, name.s, name.len) &&
 +            strchr(val.s, ',') != NULL) {
