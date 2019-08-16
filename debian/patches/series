@@ -53,3 +53,4 @@ sipwise/db_redis_master_sets.patch
 sipwise/db_redis_fixes.patch
 sipwise/sca-fix-memleaks.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
+sipwise/rtpengine_play_dtmf.patch
