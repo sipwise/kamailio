@@ -1,0 +1,51 @@
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -137,6 +137,7 @@
+ 	[OP_STOP_FORWARDING]	= "stop forwarding",
+ 	[OP_PLAY_MEDIA]		= "play media",
+ 	[OP_STOP_MEDIA]		= "stop media",
++	[OP_PLAY_DTMF]		= "play DTMF",
+ };
+ 
+ struct minmax_mos_stats {
+@@ -196,6 +197,7 @@
+ static int stop_forwarding_f(struct sip_msg *, char *, char *);
+ static int play_media_f(struct sip_msg *, char *, char *);
+ static int stop_media_f(struct sip_msg *, char *, char *);
++static int play_dtmf_f(struct sip_msg *, char *, char *);
+ static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
+ static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
+@@ -370,6 +372,9 @@
+ 	{"stop_media",		(cmd_function)stop_media_f, 		0,
+ 		0, 0,
+ 		ANY_ROUTE},
++	{"play_dtmf",		(cmd_function)play_dtmf_f, 		1,
++		fixup_spve_null, 0,
++		ANY_ROUTE},
+ 	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
+ 		0, 0,
+ 		ANY_ROUTE},
+@@ -3783,6 +3788,12 @@
+ }
+ 
+ static int
++play_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
++{
++	return rtpengine_generic_f(msg, str1, OP_PLAY_DTMF);
++}
++
++static int
+ start_forwarding_f(struct sip_msg* msg, char *str1, char *str2)
+ {
+ 	return rtpengine_generic_f(msg, str1, OP_START_FORWARDING);
+--- a/src/modules/rtpengine/rtpengine.h
++++ b/src/modules/rtpengine/rtpengine.h
+@@ -46,6 +46,7 @@
+         OP_STOP_FORWARDING,
+         OP_PLAY_MEDIA,
+         OP_STOP_MEDIA,
++	OP_PLAY_DTMF,
+ 
+         OP_ANY,
+ };
