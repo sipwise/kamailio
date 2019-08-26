@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+2: Andreas Granig <agranig@sipwise.com>
+Code-Review+1: Andrii Pogrebennyk <apogrebennyk@sipwise.com>
+Submitted-by: Richard Fuchs <rfuchs@sipwise.com>
+Submitted-at: Mon, 26 Aug 2019 20:10:56 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/c/kamailio/+/31805
+Project: kamailio
+Branch: refs/heads/master
