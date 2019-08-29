@@ -1,0 +1,38 @@
+--- a/src/modules/db_redis/redis_table.c
++++ b/src/modules/db_redis/redis_table.c
+@@ -605,6 +605,10 @@
+                 column_name.s = start;
+                 column_name.len = p - start;
+                 start = ++p;
++
++                if (!column_name.len)
++                    break;
++
+                 /*
+                 LM_DBG("found column name '%.*s' in type '%.*s' for table '%.*s'\n",
+                         column_name.len, column_name.s,
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -400,6 +400,22 @@
+         }
+     }
+ 
++    // for value-less master keys
++    if (!key_name->len) {
++        // <version>:<table_name>:<type>
++        len = table->version_code.len + table_name->len + 1 + type_name->len + 1;
++        key_name->s = (char*)pkg_malloc(len);
++        if (!key_name->s) {
++            LM_ERR("Failed to allocate key memory\n");
++            goto err;
++        }
++        snprintf(key_name->s, len, "%.*s%.*s:%.*s",
++                table->version_code.len, table->version_code.s,
++                table_name->len, table_name->s,
++                type_name->len, type_name->s);
++        key_name->len = len-1;
++    }
++
+     return 0;
+ 
+ err:
