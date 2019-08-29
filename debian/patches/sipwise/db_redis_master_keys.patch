@@ -1,0 +1,13 @@
+--- a/src/modules/db_redis/redis_table.c
++++ b/src/modules/db_redis/redis_table.c
+@@ -605,6 +605,10 @@
+                 column_name.s = start;
+                 column_name.len = p - start;
+                 start = ++p;
++
++                if (!columns_name.len)
++                    break;
++
+                 /*
+                 LM_DBG("found column name '%.*s' in type '%.*s' for table '%.*s'\n",
+                         column_name.len, column_name.s,
