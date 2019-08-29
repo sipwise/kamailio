@@ -1,0 +1,45 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -28,6 +28,7 @@
+ #include "redis_table.h"
+ 
+ #define TIMESTAMP_STR_LENGTH 19
++#define REDIS_DB_VERSION 1
+ 
+ static void db_redis_dump_reply(redisReply *reply) {
+     int i;
+@@ -321,14 +322,15 @@
+                     break;
+                 }
+                 if (!key_name->len) {
+-                    // <table_name>:<type>::<val>
++                    // <version>:<table_name>:<type>::<val>
+                     len = table_name->len + 1 + type_name->len + 2 + val.len + 1; //snprintf writes term 0 char
+                     key_name->s = (char*)pkg_malloc(len);
+                     if (!key_name->s) {
+                         LM_ERR("Failed to allocate key memory\n");
+                         goto err;
+                     }
+-                    snprintf(key_name->s, len, "%.*s:%.*s::%.*s",
++                    snprintf(key_name->s, len, "%u:%.*s:%.*s::%.*s",
++                            REDIS_DB_VERSION,
+                             table_name->len, table_name->s,
+                             type_name->len, type_name->s,
+                             val.len, val.s);
+@@ -883,12 +885,14 @@
+ 
+     if (!ts_scan_start) {
+         // full table scan
+-        match = (char*)pkg_malloc(table_name->len + 10); // length of ':entry::*' plus \0
++        match = (char*)pkg_malloc(strlen(#REDIS_DB_VERSION) + 1
++                + table_name->len + 10); // length of ':entry::*' plus \0
+         if (!match) {
+             LM_ERR("Failed to allocate memory for match pattern\n");
+             return -1;
+         }
+-        int len = sprintf(match, "%.*s:entry::*",
++        int len = sprintf(match, "%u:%.*s:entry::*",
++                REDIS_DB_VERSION,
+                 table_name->len, table_name->s);
+         str match_pattern = {match, len};
+         ret = db_redis_scan_query_keys_pattern(con, &match_pattern, _n, query_keys, query_keys_count,
