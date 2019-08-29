@@ -45,8 +45,8 @@ Build-Depends:
  ngcp-libtcap-dev,
  openssl,
  pkg-config,
- python,
- python-dev,
+ python3,
+ python3-dev,
  unixodbc-dev,
  uuid-dev,
  xsltproc,
@@ -63,7 +63,7 @@ Pre-Depends:
  ${misc:Pre-Depends},
 Depends:
  adduser,
- python,
+ python3,
  ${misc:Depends},
  ${shlibs:Depends},
 Conflicts:
@@ -245,19 +245,19 @@ Pre-Depends:
  ${misc:Pre-Depends},
 Depends:
  ngcp-kamailio (= ${binary:Version}),
- python-dev,
+ python3-dev,
  ${misc:Depends},
  ${shlibs:Depends},
 Conflicts:
  kamailio-python-modules,
 Replaces:
  kamailio-python-modules,
-Description: contains the app_python module
+Description: contains the app_python3 module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package provides the app_python module, an extension allowing to
+ This package provides the app_python3 module, an extension allowing to
  execute embedded Python applications within configuration file.
 
 Package: ngcp-kamailio-redis-modules
