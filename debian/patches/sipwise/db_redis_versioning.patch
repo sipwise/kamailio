@@ -1,0 +1,153 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -281,6 +281,7 @@
+ }
+ 
+ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
++        redis_table_t *table,
+         str *type_name, const db_key_t *_k, const db_val_t *_v, const db_op_t *_op, const int _n,
+         str *key_name, int *key_found, uint64_t *ts_scan_start) {
+ 
+@@ -321,14 +322,15 @@
+                     break;
+                 }
+                 if (!key_name->len) {
+-                    // <table_name>:<type>::<val>
++                    // <version>:<table_name>:<type>::<val>
+                     len = table_name->len + 1 + type_name->len + 2 + val.len + 1; //snprintf writes term 0 char
+                     key_name->s = (char*)pkg_malloc(len);
+                     if (!key_name->s) {
+                         LM_ERR("Failed to allocate key memory\n");
+                         goto err;
+                     }
+-                    snprintf(key_name->s, len, "%.*s:%.*s::%.*s",
++                    snprintf(key_name->s, len, "%.*s%.*s:%.*s::%.*s",
++                            table->version_code.len, table->version_code.s,
+                             table_name->len, table_name->s,
+                             type_name->len, type_name->s,
+                             val.len, val.s);
+@@ -432,7 +434,7 @@
+     }
+     table = (redis_table_t*)table_e->u.p;
+     key = table->entry_keys;
+-    if (db_redis_find_query_key(key, table_name, &type_name, _k, _v, NULL, _n, &keyname, &key_found, NULL) != 0) {
++    if (db_redis_find_query_key(key, table_name, table, &type_name, _k, _v, NULL, _n, &keyname, &key_found, NULL) != 0) {
+         goto err;
+     }
+     if (key_found) {
+@@ -522,7 +524,7 @@
+         str keyname = {NULL, 0};
+         key = type->keys;
+ 
+-        if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, NULL, _n, &keyname, &key_found, NULL) != 0) {
++        if (db_redis_find_query_key(key, table_name, table, &type->type, _k, _v, NULL, _n, &keyname, &key_found, NULL) != 0) {
+             goto err;
+         }
+         if (key_found) {
+@@ -579,7 +581,7 @@
+     keyname.len = 0;
+     key = table->entry_keys;
+ 
+-    if (db_redis_find_query_key(key, table_name, &typename, _k, _v, _op, _n, &keyname, &key_found, NULL) != 0) {
++    if (db_redis_find_query_key(key, table_name, table, &typename, _k, _v, _op, _n, &keyname, &key_found, NULL) != 0) {
+         goto err;
+     }
+     if (key_found) {
+@@ -597,7 +599,7 @@
+         for (type = table->types; type; type = type->next) {
+             key = type->keys;
+             LM_DBG("checking type '%.*s'\n", type->type.len, type->type.s);
+-            if (db_redis_find_query_key(key, table_name, &type->type, _k, _v, _op, _n, &keyname,
++            if (db_redis_find_query_key(key, table_name, table, &type->type, _k, _v, _op, _n, &keyname,
+                         &key_found, ts_scan_start) != 0) {
+                 goto err;
+             }
+@@ -870,6 +872,8 @@
+         redis_key_t **query_keys, int *query_keys_count,
+         int **manual_keys, int *manual_keys_count, uint64_t ts_scan_start, const str *ts_scan_key) {
+ 
++    struct str_hash_entry *table_e;
++    redis_table_t *table;
+     char *match = NULL;
+     int ret;
+     redisReply *reply = NULL;
+@@ -881,14 +885,24 @@
+     redis_key_t *set_keys = NULL;
+     int set_keys_count = 0;
+ 
++    table_e = str_hash_get(&con->tables, table_name->s, table_name->len);
++    if (!table_e) {
++        LM_ERR("query to undefined table '%.*s', define it in schema file!\n",
++                table_name->len, table_name->s);
++        return -1;
++    }
++    table = (redis_table_t*)table_e->u.p;
++
+     if (!ts_scan_start) {
+         // full table scan
+-        match = (char*)pkg_malloc(table_name->len + 10); // length of ':entry::*' plus \0
++        match = (char*)pkg_malloc(table->version_code.len
++                + table_name->len + 10); // length of ':entry::*' plus \0
+         if (!match) {
+             LM_ERR("Failed to allocate memory for match pattern\n");
+             return -1;
+         }
+-        int len = sprintf(match, "%.*s:entry::*",
++        int len = sprintf(match, "%.*s%.*s:entry::*",
++                table->version_code.len, table->version_code.s,
+                 table_name->len, table_name->s);
+         str match_pattern = {match, len};
+         ret = db_redis_scan_query_keys_pattern(con, &match_pattern, _n, query_keys, query_keys_count,
+--- a/src/modules/db_redis/redis_table.c
++++ b/src/modules/db_redis/redis_table.c
+@@ -487,13 +487,14 @@
+ }
+ 
+ int db_redis_parse_keys(km_redis_con_t *con) {
+-    char *p;
++    char *p, *q;
+     char *start;
+     char *end;
+ 
+     str table_name;
+     str type_name;
+     str column_name;
++    str version_code;
+ 
+     struct str_hash_entry *table_entry;
+     redis_table_t *table;
+@@ -533,6 +534,16 @@
+                 }
+                 table_name.s = start;
+                 table_name.len = p - start;
++
++                version_code = (str){"",0};
++                q = memchr(table_name.s, ':', table_name.len);
++                if (q) {
++                    version_code = table_name;
++                    version_code.len = q - table_name.s + 1;
++                    table_name.s = q + 1;
++                    table_name.len -= version_code.len;
++                }
++
+                 state = DBREDIS_KEYS_TYPE_ST;
+                 start = ++p;
+                 LM_DBG("found table name '%.*s'\n", table_name.len, table_name.s);
+@@ -544,6 +555,7 @@
+                     goto err;
+                 }
+                 table = table_entry->u.p;
++                table->version_code = version_code;
+                 break;
+             case DBREDIS_KEYS_TYPE_ST:
+                 while(p != end && *p != ':')
+--- a/src/modules/db_redis/redis_table.h
++++ b/src/modules/db_redis/redis_table.h
+@@ -42,6 +42,7 @@
+ typedef struct redis_table redis_table_t;
+ struct redis_table {
+     int version;
++    str version_code;
+     redis_key_t *entry_keys;
+     redis_type_t *types;
+     struct str_hash_table columns;
