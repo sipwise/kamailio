@@ -25,6 +25,30 @@
     },
     {
       "key": {
+        "uuid": "29b1bc89_91b5458e",
+        "filename": "debian/control",
+        "patchSetId": 2
+      },
+      "lineNbr": 241,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2019-08-30T15:49:01Z",
+      "side": 1,
+      "message": "You are right, it is not necessary because we don\u0027t allow to install the two packages in parallel.",
+      "parentUuid": "2867c0cc_59ca5474",
+      "range": {
+        "startLine": 241,
+        "startChar": 29,
+        "endLine": 241,
+        "endChar": 30
+      },
+      "revId": "c967dee47642b55451cb4fd5b0249a5ee6e60c76",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
         "uuid": "149df332_90591792",
         "filename": "debian/patches/series",
         "patchSetId": 2
@@ -36,6 +60,24 @@
       "writtenOn": "2019-08-30T15:01:43Z",
       "side": 1,
       "message": "I see no real chenages here, is it correct?",
+      "revId": "c967dee47642b55451cb4fd5b0249a5ee6e60c76",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "9e902935_460208fd",
+        "filename": "debian/patches/series",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2019-08-30T15:49:01Z",
+      "side": 1,
+      "message": "the diff is here:\nsipwise/switch_from_python2_to_python3.patch\n\nI don\u0027t know why gerrit doesn\u0027t highlight it",
+      "parentUuid": "149df332_90591792",
       "revId": "c967dee47642b55451cb4fd5b0249a5ee6e60c76",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
