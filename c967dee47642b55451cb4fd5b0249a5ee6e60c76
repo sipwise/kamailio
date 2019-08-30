@@ -1,0 +1,44 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "2867c0cc_59ca5474",
+        "filename": "debian/control",
+        "patchSetId": 2
+      },
+      "lineNbr": 241,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-08-30T15:01:43Z",
+      "side": 1,
+      "message": "IMHO it was unnecessary here, but up 2 you.",
+      "range": {
+        "startLine": 241,
+        "startChar": 29,
+        "endLine": 241,
+        "endChar": 30
+      },
+      "revId": "c967dee47642b55451cb4fd5b0249a5ee6e60c76",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "149df332_90591792",
+        "filename": "debian/patches/series",
+        "patchSetId": 2
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-08-30T15:01:43Z",
+      "side": 1,
+      "message": "I see no real chenages here, is it correct?",
+      "revId": "c967dee47642b55451cb4fd5b0249a5ee6e60c76",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
