@@ -52,3 +52,4 @@ sipwise/db_redis_range_compare_timestamps.patch
 sipwise/db_redis_bigint_min_len.patch
 sipwise/db_redis_use_keys_instead_of_scan.patch
 sipwise/db_redis_master_keys.patch
+sipwise/db_redis_master_sets.patch
