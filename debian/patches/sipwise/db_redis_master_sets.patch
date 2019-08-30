@@ -1,0 +1,366 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -514,7 +514,7 @@
+ 
+ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
+         const db_key_t *_k, const db_val_t *_v, const int _n,
+-        redis_key_t **keys, int *keys_count) {
++        redis_key_t **keys, redis_key_t **set_keys, int *keys_count) {
+ 
+     struct str_hash_entry *table_e;
+     redis_table_t *table;
+@@ -553,6 +553,26 @@
+                     keyname.len, keyname.s,
+                     type_name->len, type_name->s);
+             pkg_free(keyname.s);
++
++            if (set_keys) {
++                // add key for parent set
++                // <version>:<table>::index::<type>
++                keyname.len = table->version_code.len + table_name->len + 9 + type->type.len;
++                keyname.s = pkg_malloc(keyname.len + 1);
++                if (!keyname.s) {
++                    LM_ERR("Failed to allocate memory for parent set key\n");
++                    goto err;
++                }
++                sprintf(keyname.s, "%.*s%.*s::index::%.*s",
++                        table->version_code.len, table->version_code.s,
++                        table_name->len, table_name->s,
++                        type->type.len, type->type.s);
++                if (db_redis_key_add_str(set_keys, &keyname) != 0) {
++                    LM_ERR("Failed to add query key to set key list\n");
++                    goto err;
++                }
++                pkg_free(keyname.s);
++            }
+         }
+     }
+ 
+@@ -1589,10 +1609,12 @@
+     redisReply *reply = NULL;
+     redis_key_t *query_v = NULL;
+     redis_key_t *type_keys = NULL;
++    redis_key_t *set_keys = NULL;
+     redis_key_t *all_type_keys = NULL;
+     db_val_t *db_vals = NULL;
+     db_key_t *db_keys = NULL;
+     redis_key_t *type_key;
++    redis_key_t *set_key;
+ 
+     if (!*keys_count && do_table_scan) {
+         if (!ts_scan_start)
+@@ -1737,7 +1759,7 @@
+             }
+         }
+         if (db_redis_build_type_keys(con, CON_TABLE(_h), db_keys, db_vals, all_type_keys_count,
+-                    &type_keys, &type_keys_count) != 0) {
++                    &type_keys, &set_keys, &type_keys_count) != 0) {
+             LM_ERR("failed to build type keys\n");
+             goto error;
+         }
+@@ -1761,8 +1783,18 @@
+         db_redis_check_reply(con, reply, error);
+         db_redis_free_reply(&reply);
+ 
+-        for (type_key = type_keys; type_key; type_key = type_key->next) {
+-            if (db_redis_key_add_string(&query_v, "SREM", 4) != 0) {
++        for (type_key = type_keys, set_key = set_keys; type_key;
++                type_key = type_key->next, set_key = set_key->next) {
++
++            if (db_redis_key_add_string(&query_v, "EVALSHA", 7) != 0) {
++                LM_ERR("Failed to add srem command to post-delete query\n");
++                goto error;
++            }
++            if (db_redis_key_add_string(&query_v, con->srem_key_lua, strlen(con->srem_key_lua)) != 0) {
++                LM_ERR("Failed to add srem command to post-delete query\n");
++                goto error;
++            }
++            if (db_redis_key_add_string(&query_v, "3", 1) != 0) {
+                 LM_ERR("Failed to add srem command to post-delete query\n");
+                 goto error;
+             }
+@@ -1770,6 +1802,10 @@
+                 LM_ERR("Failed to add key to delete query\n");
+                 goto error;
+             }
++            if (db_redis_key_add_str(&query_v, &set_key->key) != 0) {
++                LM_ERR("Failed to add key to delete query\n");
++                goto error;
++            }
+             if (db_redis_key_add_str(&query_v, key) != 0) {
+                 LM_ERR("Failed to add key to delete query\n");
+                 goto error;
+@@ -1781,6 +1817,7 @@
+         }
+         LM_DBG("done with loop '%.*s'\n", k->key.len, k->key.s);
+         db_redis_key_free(&type_keys);
++        db_redis_key_free(&set_keys);
+     }
+     db_redis_key_free(&all_type_keys);
+     db_redis_key_free(&query_v);
+@@ -1797,6 +1834,7 @@
+         pkg_free(db_vals);
+     db_redis_key_free(&query_v);
+     db_redis_key_free(&type_keys);
++    db_redis_key_free(&set_keys);
+     db_redis_key_free(&all_type_keys);
+     return -1;
+ }
+@@ -1820,6 +1858,7 @@
+     db_val_t *db_vals = NULL;
+     db_key_t *db_keys = NULL;
+     redis_key_t *type_keys = NULL;
++    redis_key_t *set_keys = NULL;
+     int type_keys_count = 0;
+     redis_key_t *new_type_keys = NULL;
+     int new_type_keys_count = 0;
+@@ -1851,7 +1890,7 @@
+     }
+ 
+     if (db_redis_build_type_keys(con, CON_TABLE(_h), _uk, _uv, _nu,
+-                &new_type_keys, &new_type_keys_count) != 0) {
++                &new_type_keys, NULL, &new_type_keys_count) != 0) {
+         LM_ERR("failed to build type keys\n");
+         goto error;
+     }
+@@ -1930,6 +1969,7 @@
+     for (key = *keys; key; key = key->next) {
+         redis_key_t *tmp = NULL;
+         redis_key_t *type_key;
++        redis_key_t *set_key;
+         redis_key_t *new_type_key;
+         int row_match;
+ 
+@@ -2024,7 +2064,7 @@
+             }
+         }
+         if (db_redis_build_type_keys(con, CON_TABLE(_h), db_keys, db_vals, all_type_keys_count,
+-                    &type_keys, &type_keys_count) != 0) {
++                    &type_keys, &set_keys, &type_keys_count) != 0) {
+             LM_ERR("failed to build type keys\n");
+             goto error;
+         }
+@@ -2070,7 +2110,9 @@
+ 
+         db_redis_key_free(&query_v);
+ 
+-        for (type_key = type_keys; type_key; type_key = type_key->next) {
++        for (type_key = type_keys, set_key = set_keys; type_key;
++                type_key = type_key->next, set_key = set_key->next) {
++
+             LM_DBG("checking for update of type key '%.*s'\n",
+                     type_key->key.len, type_key->key.s);
+             char *prefix = ser_memmem(type_key->key.s, "::", type_key->key.len, 2);
+@@ -2111,15 +2153,15 @@
+ 
+                 db_redis_key_free(&query_v);
+ 
+-                if (db_redis_key_add_string(&query_v, "SREM", 4) != 0) {
++                if (db_redis_key_add_string(&query_v, "SADD", 4) != 0) {
+                     LM_ERR("Failed to set sadd command to post-update query\n");
+                     goto error;
+                 }
+-                if (db_redis_key_add_str(&query_v, &type_key->key) != 0) {
++                if (db_redis_key_add_str(&query_v, &set_key->key) != 0) {
+                     LM_ERR("Failed to add map key to post-update query\n");
+                     goto error;
+                 }
+-                if (db_redis_key_add_str(&query_v, &key->key) != 0) {
++                if (db_redis_key_add_str(&query_v, &new_type_key->key) != 0) {
+                     LM_ERR("Failed to set entry key to post-update query\n");
+                     goto error;
+                 }
+@@ -2131,10 +2173,44 @@
+                 }
+ 
+                 db_redis_key_free(&query_v);
++
++                if (db_redis_key_add_string(&query_v, "EVAL", 4) != 0) {
++                    LM_ERR("Failed to add srem command to post-delete query\n");
++                    goto error;
++                }
++                if (db_redis_key_add_string(&query_v, SREM_KEY_LUA, strlen(SREM_KEY_LUA)) != 0) {
++                    LM_ERR("Failed to add srem command to post-delete query\n");
++                    goto error;
++                }
++                if (db_redis_key_add_string(&query_v, "3", 1) != 0) {
++                    LM_ERR("Failed to add srem command to post-delete query\n");
++                    goto error;
++                }
++                if (db_redis_key_add_str(&query_v, &type_key->key) != 0) {
++                    LM_ERR("Failed to add key to delete query\n");
++                    goto error;
++                }
++                if (db_redis_key_add_str(&query_v, &set_key->key) != 0) {
++                    LM_ERR("Failed to add key to delete query\n");
++                    goto error;
++                }
++                if (db_redis_key_add_str(&query_v, &key->key) != 0) {
++                    LM_ERR("Failed to add key to delete query\n");
++                    goto error;
++                }
++
++                update_queries++;
++                if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
++                    LM_ERR("Failed to append redis command\n");
++                    goto error;
++                }
++
++                db_redis_key_free(&query_v);
+             }
+         }
+ 
+         db_redis_key_free(&type_keys);
++        db_redis_key_free(&set_keys);
+     }
+ 
+     LM_DBG("getting replies for %d queries\n", update_queries);
+@@ -2162,6 +2238,7 @@
+     db_redis_key_free(&query_v);
+     db_redis_key_free(&all_type_keys);
+     db_redis_key_free(&type_keys);
++    db_redis_key_free(&set_keys);
+     db_redis_key_free(&new_type_keys);
+     return -1;
+ }
+@@ -2335,11 +2412,13 @@
+     redis_key_t *key = NULL;
+     int keys_count = 0;
+     redis_key_t *type_keys = NULL;
++    redis_key_t *set_keys = NULL;
+     int type_keys_count = 0;
+     redis_key_t *query_v = NULL;
+     redisReply *reply = NULL;
+     int i;
+     redis_key_t *k;
++    redis_key_t *set_key;
+ 
+     con = REDIS_CON(_h);
+     if (con && con->con == NULL) {
+@@ -2366,7 +2445,7 @@
+         goto error;
+     }
+     if (db_redis_build_type_keys(con, CON_TABLE(_h), _k, _v, _n,
+-                &type_keys, &type_keys_count) != 0) {
++                &type_keys, &set_keys, &type_keys_count) != 0) {
+         LM_ERR("failed to build type keys\n");
+         goto error;
+     }
+@@ -2405,7 +2484,7 @@
+     db_redis_check_reply(con, reply, error);
+     db_redis_free_reply(&reply);
+ 
+-    for (k = type_keys; k; k = k->next) {
++    for (k = type_keys, set_key = set_keys; k; k = k->next, set_key = set_key->next) {
+         str *type_key = &k->key;
+ 
+         LM_DBG("inserting entry key '%.*s' to type map '%.*s'\n",
+@@ -2428,10 +2507,29 @@
+         db_redis_key_free(&query_v);
+         db_redis_check_reply(con, reply, error);
+         db_redis_free_reply(&reply);
++
++        if (db_redis_key_add_string(&query_v, "SADD", 4) != 0) {
++            LM_ERR("Failed to set sadd command to post-insert query\n");
++            goto error;
++        }
++        if (db_redis_key_add_str(&query_v, &set_key->key) != 0) {
++            LM_ERR("Failed to add map key to post-insert query\n");
++            goto error;
++        }
++        if (db_redis_key_add_str(&query_v, type_key) != 0) {
++            LM_ERR("Failed to set entry key to post-insert query\n");
++            goto error;
++        }
++
++        reply = db_redis_command_argv(con, query_v);
++        db_redis_key_free(&query_v);
++        db_redis_check_reply(con, reply, error);
++        db_redis_free_reply(&reply);
+     }
+ 
+     db_redis_key_free(&key);
+     db_redis_key_free(&type_keys);
++    db_redis_key_free(&set_keys);
+     db_redis_consume_replies(con);
+ 
+     return 0;
+@@ -2439,6 +2537,7 @@
+ error:
+     db_redis_key_free(&key);
+     db_redis_key_free(&type_keys);
++    db_redis_key_free(&set_keys);
+     db_redis_key_free(&query_v);
+ 
+     if (reply)
+--- a/src/modules/db_redis/redis_connection.c
++++ b/src/modules/db_redis/redis_connection.c
+@@ -23,6 +23,7 @@
+ #include "db_redis_mod.h"
+ #include "redis_connection.h"
+ #include "redis_table.h"
++#include "redis_dbase.h"
+ 
+ extern int db_redis_verbosity;
+ 
+@@ -170,6 +171,31 @@
+     freeReplyObject(reply); reply = NULL;
+     LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
+ 
++    reply = redisCommand(con->con, "SCRIPT LOAD %s", SREM_KEY_LUA);
++    if (!reply) {
++        LM_ERR("failed to load LUA script to server %.*s: %s\n",
++                con->id->url.len, con->id->url.s, con->con->errstr);
++        goto err;
++    }
++    if (reply->type == REDIS_REPLY_ERROR) {
++        LM_ERR("failed to load LUA script to server %.*s: %s\n",
++                con->id->url.len, con->id->url.s, reply->str);
++        goto err;
++    }
++    if (reply->type != REDIS_REPLY_STRING) {
++        LM_ERR("failed to load LUA script to server %.*s: %i\n",
++                con->id->url.len, con->id->url.s, reply->type);
++        goto err;
++    }
++    if (reply->len >= sizeof(con->srem_key_lua)) {
++        LM_ERR("failed to load LUA script to server %.*s: %i >= %i\n",
++                con->id->url.len, con->id->url.s, (int) reply->len, (int) sizeof(con->srem_key_lua));
++        goto err;
++    }
++    strcpy(con->srem_key_lua, reply->str);
++    freeReplyObject(reply); reply = NULL;
++    LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
++
+     return 0;
+ 
+ err:
+--- a/src/modules/db_redis/redis_connection.h
++++ b/src/modules/db_redis/redis_connection.h
+@@ -66,6 +66,7 @@
+     redis_command_t *command_queue;
+     unsigned int append_counter;
+     struct str_hash_table tables;
++    char srem_key_lua[41]; // sha-1 hex string
+ } km_redis_con_t;
+ 
+ 
+--- a/src/modules/db_redis/redis_dbase.h
++++ b/src/modules/db_redis/redis_dbase.h
+@@ -25,6 +25,9 @@
+ 
+ #include "db_redis_mod.h"
+ 
++#define SREM_KEY_LUA "redis.call('SREM', KEYS[1], KEYS[3]); if redis.call('SCARD', KEYS[1]) == 0 then redis.call('SREM', KEYS[2], KEYS[1]) end"
++
++
+ /*
+  * Initialize database connection
+  */
+@@ -85,4 +88,4 @@
+  */
+ int db_redis_use_table(db1_con_t* _h, const str* _t);
+ 
+-#endif  /* _REDIS_BASE_H_ */
+\ No newline at end of file
++#endif  /* _REDIS_BASE_H_ */
