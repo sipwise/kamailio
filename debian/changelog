@@ -1,3 +1,27 @@
+ngcp-kamailio (5.2.3-1+0~mr7.5.2.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [50e3ea1] TT#23358 Move db_redis table descriptor in /etc/kamailio folder
+  * [1678d52] Revert "TT#23358 Move db_redis table descriptor in /etc/kamailio folder"
+
+  [ Kirill Solomko ]
+  * [8764b1e] TT#64652 pv_headers: ignore FAKED_REPLY msg
+
+  [ Richard Fuchs ]
+  * [c11065b] TT#63000 fix redis SCAN usage
+  * [558fec4] TT#63000 skip non-EQ DB query type keys
+  * [80ca946] TT#63000 db_redis: support update of type key columns
+  * [16b4b26] TT#63000 db_redis: support range scans on timestamp keys
+  * [45ed069] TT#63000 db_redis: support exponential increase and fallof for SCAN
+  * [7d59211] TT#63000 db_redis: support range matching on int columns
+  * [0fcb821] TT#63000 db_redis: use a min string length of 10 digits for bigints
+  * [fa52db1] TT#63000 db_redis: use KEYS instead of SCAN
+  * [bd00ea7] TT#66000 add versioning to db_redis
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sun, 01 Sep 2019 21:49:04 +0200
+
 ngcp-kamailio (5.2.3-1+0~mr7.5.1.0) unstable; urgency=medium
 
   [ Marco Capetta ]
