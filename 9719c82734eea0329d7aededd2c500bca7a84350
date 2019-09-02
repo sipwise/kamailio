@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "8131b199_e1f10725",
+        "filename": "debian/patches/sipwise/switch_from_python2_to_python3.patch",
+        "patchSetId": 5
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-09-02T09:17:58Z",
+      "side": 1,
+      "message": "LGTM, please consider to upload it to kamailio upstream.\nSo, we will be able to remove patch one day.",
+      "revId": "9719c82734eea0329d7aededd2c500bca7a84350",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
