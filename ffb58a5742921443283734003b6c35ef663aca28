@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d5a615b5_281a1ece",
+        "filename": "debian/patches/sipwise/db_redis_master_sets.patch",
+        "patchSetId": 3
+      },
+      "lineNbr": 178,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-09-03T16:16:02Z",
+      "side": 1,
+      "message": "Why EVAL here instead of EVALSHA?",
+      "revId": "ffb58a5742921443283734003b6c35ef663aca28",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
