@@ -1,0 +1,11 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -663,7 +663,7 @@
+                             redisReply *subreply = reply->element[i];
+                             if (subreply->type == REDIS_REPLY_STRING) {
+                                 LM_DBG("adding resulting entry key '%s' from type query\n", subreply->str);
+-                                if (db_redis_key_add_string(query_keys, subreply->str, strlen(subreply->str)) != 0) {
++                                if (db_redis_key_prepend_string(query_keys, subreply->str, strlen(subreply->str)) != 0) {
+                                     LM_ERR("Failed to add query key\n");
+                                     goto err;
+                                 }
