@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "683e734d_fc7fceb2",
+        "filename": "debian/patches/sipwise/sca-fix-memleaks.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-09-06T22:51:09Z",
+      "side": 1,
+      "message": "Does this really apply? The modules path is under src/.",
+      "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
