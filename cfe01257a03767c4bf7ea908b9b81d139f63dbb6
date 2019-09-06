@@ -16,6 +16,24 @@
       "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "202d2a84_a93f1e1e",
+        "filename": "debian/patches/sipwise/sca-fix-memleaks.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-09-06T22:53:52Z",
+      "side": 1,
+      "message": "Ah this is for mr5.5, right. Also why isn\u0027t this being fixed in master too and then cherry picked here? I see the same apparent problem there no?",
+      "parentUuid": "683e734d_fc7fceb2",
+      "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
