@@ -1,0 +1,20 @@
+--- a/src/modules/sca/sca_util.c
++++ b/src/modules/sca/sca_util.c
+@@ -178,6 +178,8 @@
+ 	} else {
+ 		LM_DBG("using $avp(%.*s)[%.*s] as from uri\n",
+ 			STR_FMT(&from_uri_avp.s), STR_FMT(&uri));
++		free_to_params(&sf);
++		memset(&sf, 0, sizeof(sf));
+ 		if(sca_parse_uri(&sf, &uri)<0) return -1;
+ 		*from = &sf;
+ 	}
+@@ -220,6 +222,8 @@
+ 	} else {
+ 		LM_DBG("using $avp(%.*s)[%.*s] as to uri\n",
+ 			STR_FMT(&to_uri_avp.s), STR_FMT(&uri));
++		free_to_params(&parsed_to);
++		memset(&parsed_to, 0, sizeof(parsed_to));
+ 		if(sca_parse_uri(&parsed_to, &uri)<0) return -1;
+ 		*to = &parsed_to;
+ 	}
