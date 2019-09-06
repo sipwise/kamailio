@@ -52,6 +52,24 @@
       "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "187d6839_f516eb3a",
+        "filename": "debian/patches/sipwise/sca-fix-memleaks.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-09-06T23:01:04Z",
+      "side": 1,
+      "message": "Ok, even though it seems backwards (also AFAIK according to our \"policy\" :). In any case just make sure to use the same Change-Id. :)",
+      "parentUuid": "fadb399c_e4a680d4",
+      "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
