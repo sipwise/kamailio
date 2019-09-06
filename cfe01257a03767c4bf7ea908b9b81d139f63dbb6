@@ -34,6 +34,24 @@
       "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "fadb399c_e4a680d4",
+        "filename": "debian/patches/sipwise/sca-fix-memleaks.patch",
+        "patchSetId": 2
+      },
+      "lineNbr": 2,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2019-09-06T22:56:36Z",
+      "side": 1,
+      "message": "Master might not be affected (different code base), but other branches probably are. I\u0027ll go through them and merge/hotfix as needed once this is through. It\u0027s been reported on VTR which is on 5.5.6.",
+      "parentUuid": "202d2a84_a93f1e1e",
+      "revId": "cfe01257a03767c4bf7ea908b9b81d139f63dbb6",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
