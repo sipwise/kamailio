@@ -1,3 +1,14 @@
+ngcp-kamailio (5.2.3-1+0~mr7.5.1.2) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [80d9e65] TT#63000 add support for value-less master keys
+  * [4936dab] TT#63000 db_redis: simulate non-unique indexes through parent sets
+  * [8824377] TT#63000 db_redis: fixes
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 09 Sep 2019 20:30:11 +0200
+
 ngcp-kamailio (5.2.3-1+0~mr7.5.1.1) unstable; urgency=medium
 
   [ Marco Capetta ]
