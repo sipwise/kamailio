@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.8-1+0~mr7.4.1.3) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [84c15fa] TT#63509 fix sca mem leak
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 10 Sep 2019 17:21:31 +0200
+
 ngcp-kamailio (5.1.8-1+0~mr7.4.1.2) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
