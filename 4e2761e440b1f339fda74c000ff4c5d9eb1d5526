@@ -46,6 +46,30 @@
       "revId": "4e2761e440b1f339fda74c000ff4c5d9eb1d5526",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3c263a0e_d986f44b",
+        "filename": "debian/patches/sipwise/presence_dfks_null_ptr_fixes.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2019-09-13T21:03:18Z",
+      "side": 1,
+      "message": "Yeah, I don\u0027t see either, and I checked the other functions getting the publ struct to check whether they were making assumptions about the size or something, but it does not look that way, so it seems like a copy\u0026paste issue or similar.",
+      "parentUuid": "b2474030_2ebcd387",
+      "range": {
+        "startLine": 77,
+        "startChar": 46,
+        "endLine": 77,
+        "endChar": 60
+      },
+      "revId": "4e2761e440b1f339fda74c000ff4c5d9eb1d5526",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
     }
   ]
 }
