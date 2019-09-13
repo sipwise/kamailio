@@ -22,6 +22,30 @@
       "revId": "4e2761e440b1f339fda74c000ff4c5d9eb1d5526",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b2474030_2ebcd387",
+        "filename": "debian/patches/sipwise/presence_dfks_null_ptr_fixes.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2019-09-13T19:37:15Z",
+      "side": 1,
+      "message": "The core dumps I looked at were definitely triggered by SetForwarding messages. I posted an example in the ticket.\n\nAnd I don\u0027t know why device is counted twice here. Looking at the code I think it should be there once only. I can add it to the patch.",
+      "parentUuid": "a0e20458_c81571a2",
+      "range": {
+        "startLine": 77,
+        "startChar": 46,
+        "endLine": 77,
+        "endChar": 60
+      },
+      "revId": "4e2761e440b1f339fda74c000ff4c5d9eb1d5526",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
     }
   ]
 }
