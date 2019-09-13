@@ -60,3 +60,4 @@ upstream/0008-tm-activ_type-field-renamed-to-rbtype.patch
 upstream/0009-tm-set-uas-rb-type-along-with-the-buffer.patch
 upstream/0010-core-improve-header-safe-guards-for-via-handling.patch
 sipwise/sca-fix-memleaks.patch
+sipwise/presence_dfks_null_ptr_fixes.patch
