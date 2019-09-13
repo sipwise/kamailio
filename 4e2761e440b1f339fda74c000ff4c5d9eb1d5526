@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a0e20458_c81571a2",
+        "filename": "debian/patches/sipwise/presence_dfks_null_ptr_fixes.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 77,
+      "author": {
+        "id": 1000006
+      },
+      "writtenOn": "2019-09-13T19:32:40Z",
+      "side": 1,
+      "message": "we have never used request SetForwarding,only SetDoNotDisturb, but it seems here is one strlen(device) too much? I don\u0027t get otherwise why it\u0027s counted twice.",
+      "range": {
+        "startLine": 77,
+        "startChar": 46,
+        "endLine": 77,
+        "endChar": 60
+      },
+      "revId": "4e2761e440b1f339fda74c000ff4c5d9eb1d5526",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
