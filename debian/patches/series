@@ -53,3 +53,4 @@ sipwise/rtpengine-play-media.patch
 sipwise/registrar_add_path.patch
 upstream/limit_the_execution_of_dialplan_reload.patch
 sipwise/sca-fix-memleaks.patch
+sipwise/presence_dfks_null_ptr_fixes.patch
