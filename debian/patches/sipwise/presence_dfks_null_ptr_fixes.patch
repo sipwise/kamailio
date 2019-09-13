@@ -1,0 +1,81 @@
+--- a/modules/presence_dfks/add_events.c
++++ b/modules/presence_dfks/add_events.c
+@@ -156,14 +156,13 @@
+ 	if(top_elem != NULL) {
+ 		LM_DBG(" got SetDoNotDisturb\n");
+ 		param = libxml_api.xmlNodeGetNodeByName(top_elem, "doNotDisturbOn", NULL);
+-		if(param!= NULL) {
++		if(param!= NULL)
+ 			dndact= (char*)xmlNodeGetContent(param);
+-			if(dndact== NULL)  {
+-				LM_ERR("while extracting value from 'doNotDisturbOn' in 'SetDoNotDisturb'\n");
+-				goto error;
+-			}
+-			LM_DBG("got 'doNotDisturbOn'=%s in 'SetDoNotDisturb'\n",dndact);
++		if(dndact== NULL)  {
++			LM_ERR("while extracting value from 'doNotDisturbOn' in 'SetDoNotDisturb'\n");
++			goto error;
+ 		}
++		LM_DBG("got 'doNotDisturbOn'=%s in 'SetDoNotDisturb'\n",dndact);
+ 		param = NULL;
+ 		param = libxml_api.xmlNodeGetNodeByName(top_elem, "device", NULL);
+ 		if(param!= NULL) {
+@@ -215,32 +214,29 @@
+ 	if(top_elem != NULL) {
+ 		LM_DBG(" got SetForwarding\n");
+ 		param = libxml_api.xmlNodeGetNodeByName(top_elem, "forwardDN", NULL);
+-		if(param!= NULL) {
++		if(param!= NULL)
+ 			fwdDN= (char*)xmlNodeGetContent(param);
+-			if(fwdDN== NULL) {
+-				LM_ERR("while extracting value from 'forwardDN' in 'SetForwarding'\n");
+-				goto error;
+-			}
+-			LM_DBG("got 'forwardDN'=%s in 'SetForwarding'\n",fwdDN);
++		if(fwdDN== NULL) {
++			LM_ERR("while extracting value from 'forwardDN' in 'SetForwarding'\n");
++			goto error;
+ 		}
++		LM_DBG("got 'forwardDN'=%s in 'SetForwarding'\n",fwdDN);
+ 		param = libxml_api.xmlNodeGetNodeByName(top_elem, "forwardingType", NULL);
+-		if(param!= NULL) {
++		if(param!= NULL)
+ 			fwdtype= (char*)xmlNodeGetContent(param);
+-			if(fwdtype== NULL) {
+-				LM_ERR("while extracting value from 'forwardingType' in 'SetForwarding'\n");
+-				goto error;
+-			}
+-			LM_DBG("got 'forwardingType'=%s in 'SetForwarding'\n",fwdtype);
++		if(fwdtype== NULL) {
++			LM_ERR("while extracting value from 'forwardingType' in 'SetForwarding'\n");
++			goto error;
+ 		}
++		LM_DBG("got 'forwardingType'=%s in 'SetForwarding'\n",fwdtype);
+ 		param = libxml_api.xmlNodeGetNodeByName(top_elem, "activateForward", NULL);
+-		if(param!= NULL) {
++		if(param!= NULL)
+ 			fwdact= (char*)xmlNodeGetContent(param);
+-			if(fwdact== NULL) {
+-				LM_ERR("while extracting value from 'activateForward' in 'SetForwarding'\n");
+-				goto error;
+-			}
+-			LM_DBG("got 'activateForward'=%s in 'SetForwarding'\n",fwdact);
++		if(fwdact== NULL) {
++			LM_ERR("while extracting value from 'activateForward' in 'SetForwarding'\n");
++			goto error;
+ 		}
++		LM_DBG("got 'activateForward'=%s in 'SetForwarding'\n",fwdact);
+ 		param = libxml_api.xmlNodeGetNodeByName(top_elem, "device", NULL);
+ 		if(param!= NULL) {
+ 			device= (char*)xmlNodeGetContent(param);
+@@ -250,7 +246,9 @@
+ 			}
+ 			LM_DBG("got 'device'=%s in 'SetDoNotDisturb'\n",device);
+ 		}
+-		body.len=fwd_xml.len -8 + strlen(device) + strlen(device) +strlen(fwdtype) + strlen(fwdact) +strlen(fwdDN);
++		else
++			device=unk_dev.s;
++		body.len=fwd_xml.len -8 + strlen(device) +strlen(fwdtype) + strlen(fwdact) +strlen(fwdDN);
+ 		body.s=pkg_malloc(body.len+1);
+ 		if(body.s== NULL)  {
+ 			LM_ERR("while extracting allocating body for publish in 'SetForwarding'\n");
