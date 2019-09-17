@@ -1,5 +1,6 @@
 ##
 # upstream fixes from master
+sipwise/malloc.patch
 upstream/pv-new-function-pv_evalx-dst-fmt.patch
 upstream/pv_trans_cfg_line.patch
 upstream/dialog-check-if-dialog-exists-after-event-route-exec.patch

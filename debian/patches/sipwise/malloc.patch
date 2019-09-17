@@ -1,0 +1,11 @@
+--- a/Makefile.defs
++++ b/Makefile.defs
+@@ -648,7 +648,7 @@
+ 	 -DSER_VER=$(SER_VER) \
+ 	 -DCFG_DIR='"$(cfg_target)"'\
+ 	 -DRUN_DIR='"$(run_target)"'\
+-	 -DPKG_MALLOC \
++	 -DDBG_SYS_MALLOC \
+ 	 -DSHM_MEM  -DSHM_MMAP \
+ 	 -DDNS_IP_HACK \
+ 	 -DUSE_MCAST \
