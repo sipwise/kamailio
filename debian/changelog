@@ -1,3 +1,16 @@
+ngcp-kamailio (5.1.8-1+0~mr7.4.3.0) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [3250613] TT#63103 enable TLS preload module on lb instead of proxy
+
+  [ Richard Fuchs ]
+  * [5c85055] TT#63509 fix sca mem leak
+  * [5dfaa41] TT#66752 avoid presence_dfks core dumps
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 18 Sep 2019 22:31:57 +0200
+
 ngcp-kamailio (5.1.8-1+0~mr7.4.2.0) unstable; urgency=medium
 
   * New release.
