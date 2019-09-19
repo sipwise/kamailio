@@ -81,7 +81,7 @@ Suggests:
  ngcp-kamailio-perl-modules,
  ngcp-kamailio-postgres-modules,
  ngcp-kamailio-presence-modules,
- ngcp-kamailio-python-modules,
+ ngcp-kamailio-python3-modules,
  ngcp-kamailio-radius-modules,
  ngcp-kamailio-redis-modules,
  ngcp-kamailio-snmpstats-modules,
@@ -238,7 +238,7 @@ Description: contains the app_mono module
  This package provides the app_mono module, an extension allowing to
  execute embedded Mono applications within configuration file.
 
-Package: ngcp-kamailio-python-modules
+Package: ngcp-kamailio-python3-modules
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -250,8 +250,10 @@ Depends:
  ${shlibs:Depends},
 Conflicts:
  kamailio-python-modules,
+ kamailio-python3-modules,
 Replaces:
  kamailio-python-modules,
+ kamailio-python3-modules,
 Description: contains the app_python3 module
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
