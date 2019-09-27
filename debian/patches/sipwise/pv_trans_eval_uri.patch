@@ -1,8 +1,8 @@
 --- a/src/modules/pv/pv_trans.c
 +++ b/src/modules/pv/pv_trans.c
-@@ -1269,8 +1269,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_
+@@ -1273,8 +1273,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_
  		/* parse uri -- params only when requested */
- 		if(parse_uri(_tr_uri.s, _tr_uri.len, &_tr_parsed_uri)!=0)
+ 		if(parse_uri(_tr_uri.s, _tr_uri.len - dlen, &_tr_parsed_uri)!=0)
  		{
 -			LM_ERR("invalid uri [%.*s]\n", val->rs.len,
 -					val->rs.s);
