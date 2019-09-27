@@ -1,5 +1,6 @@
 
 ## Package related
+upstream/latest_kamailio_5.2.patch
 debian/no_lib64_on_64_bits.patch
 debian/no_INSTALL_file.patch
 debian/fix_export.patch
@@ -32,7 +33,6 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 ## Ongoing Patches
 sipwise/rtpengine-balancing.patch
-sipwise/openssl-locking.patch
 ## backport from kamailio upstream (5.2)
 sipwise/tt41650.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
@@ -55,3 +55,4 @@ sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/switch_from_python2_to_python3.patch
 sipwise/rtpengine_play_dtmf.patch
 sipwise/db_redis_eval_fix.patch
+upstream/fix_tls_rand_engine.patch
