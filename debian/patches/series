@@ -57,3 +57,4 @@ sipwise/db_redis_versioning.patch
 sipwise/db_redis_master_keys.patch
 sipwise/db_redis_master_sets.patch
 sipwise/db_redis_fixes.patch
+sipwise/db_redis_eval_fix.patch
