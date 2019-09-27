@@ -1,0 +1,191 @@
+From fc542100d85a013272dde869e54173a7d5a062f4 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Tue, 1 Oct 2019 23:04:01 +0200
+Subject: [PATCH] tls: option to set custom random bytess generator
+
+- attempt to fix GH #2077 which exposes a crash in the libssl v1.1
+default random bytes generator
+---
+ src/modules/tls/tls_mod.c  | 23 +++++++++++
+ src/modules/tls/tls_rand.c | 78 ++++++++++++++++++++++++++++++++++++++
+ src/modules/tls/tls_rand.h | 31 +++++++++++++++
+ 3 files changed, 132 insertions(+)
+ create mode 100644 src/modules/tls/tls_rand.c
+ create mode 100644 src/modules/tls/tls_rand.h
+
+diff --git a/src/modules/tls/tls_mod.c b/src/modules/tls/tls_mod.c
+index a70fe11738..52a45353d6 100644
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -50,6 +50,7 @@
+ #include "tls_util.h"
+ #include "tls_mod.h"
+ #include "tls_cfg.h"
++#include "tls_rand.h"
+ 
+ #ifndef TLS_HOOKS
+ 	#error "TLS_HOOKS must be defined, or the tls module won't work"
+@@ -80,6 +81,8 @@ static void destroy(void);
+ 
+ static int w_is_peer_verified(struct sip_msg* msg, char* p1, char* p2);
+ 
++int ksr_rand_engine_param(modparam_t type, void* val);
++
+ MODULE_VERSION
+ 
+ 
+@@ -236,6 +239,8 @@ static param_export_t params[] = {
+ 	{"renegotiation",       PARAM_INT,    &sr_tls_renegotiation},
+ 	{"xavp_cfg",            PARAM_STR,    &sr_tls_xavp_cfg},
+ 	{"event_callback",      PARAM_STR,    &sr_tls_event_callback},
++	{"rand_engine",         PARAM_STR|USE_FUNC_PARAM, (void*)ksr_rand_engine_param},
++
+ 	{0, 0, 0}
+ };
+ 
+@@ -432,6 +437,24 @@ static void destroy(void)
+ }
+ 
+ 
++int ksr_rand_engine_param(modparam_t type, void* val)
++{
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++	str *reng;
++
++	if(val==NULL) {
++		return -1;
++	}
++	reng = (str*)val;
++	LM_DBG("random engine: %.*s\n", reng->len, reng->s);
++	if(reng->len == 5 && strncasecmp(reng->s, "krand", 5) == 0) {
++		LM_DBG("setting krand random engine\n");
++		RAND_set_rand_method(RAND_ksr_method());
++	}
++#endif
++	return 0;
++}
++
+ static int ki_is_peer_verified(sip_msg_t* msg)
+ {
+ 	struct tcp_connection *c;
+diff --git a/src/modules/tls/tls_rand.c b/src/modules/tls/tls_rand.c
+new file mode 100644
+index 0000000000..7be0d335f7
+--- /dev/null
++++ b/src/modules/tls/tls_rand.c
+@@ -0,0 +1,78 @@
++/*
++ * TLS module
++ *
++ * Copyright (C) 2019 Asipto GmbH
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ */
++
++
++
++#include <stdlib.h>
++#include <string.h>
++
++#include "tls_rand.h"
++
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++
++#include "../../core/dprint.h"
++#include "../../core/rand/kam_rand.h"
++
++static int ksr_rand_bytes(unsigned char *outdata, int size)
++{
++	int r;
++
++	if (size < 0) {
++		return 0;
++	} else if (size == 0) {
++		return 1;
++	}
++
++	while(size >= sizeof(int)) {
++		r = kam_rand();
++		memcpy(outdata, &r, sizeof(int));
++		size -= sizeof(int);
++		outdata += sizeof(int);
++	}
++	if(size>0) {
++		r = kam_rand();
++		memcpy(outdata, &r, size);
++	}
++	return 1;
++}
++
++static int ksr_rand_pseudorand(unsigned char *outdata, int size)
++{
++    return ksr_rand_bytes(outdata, size);
++}
++
++static int ksr_rand_status(void)
++{
++    return 1;
++}
++
++const RAND_METHOD _ksr_rand_method = {
++    NULL,
++    ksr_rand_bytes,
++    NULL,
++    NULL,
++    ksr_rand_pseudorand,
++    ksr_rand_status
++};
++
++const RAND_METHOD *RAND_ksr_method(void)
++{
++    return &_ksr_rand_method;
++}
++
++#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
+diff --git a/src/modules/tls/tls_rand.h b/src/modules/tls/tls_rand.h
+new file mode 100644
+index 0000000000..20b5a20e9c
+--- /dev/null
++++ b/src/modules/tls/tls_rand.h
+@@ -0,0 +1,31 @@
++/*
++ * TLS module
++ *
++ * Copyright (C) 2019 Asipto GmbH
++ *
++ * Permission to use, copy, modify, and distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ */
++
++
++#ifndef _TLS_RAND_H_
++#define _TLS_RAND_H_
++
++#include <openssl/ssl.h>
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++
++#include <openssl/rand.h>
++
++const RAND_METHOD *RAND_ksr_method(void);
++
++#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
++#endif

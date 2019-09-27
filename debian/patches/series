@@ -1,5 +1,6 @@
 
 ## Package related
+upstream/latest_kamailio_5.2.patch
 debian/no_lib64_on_64_bits.patch
 debian/no_INSTALL_file.patch
 debian/fix_export.patch
@@ -21,7 +22,6 @@ sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/fix_dialplan_errors.patch
-sipwise/build-Call-make-via-MAKE.patch
 ## SCA Patches
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
@@ -33,7 +33,6 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 ## Ongoing Patches
 sipwise/rtpengine-balancing.patch
-sipwise/openssl-locking.patch
 ## backport from kamailio upstream (5.2)
 sipwise/tt41650.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
@@ -55,3 +54,4 @@ sipwise/sca-fix-memleaks.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/switch_from_python2_to_python3.patch
 sipwise/rtpengine_play_dtmf.patch
+upstream/fix_tls_rand_engine.patch
