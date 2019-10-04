@@ -1,3 +1,35 @@
+ngcp-kamailio (5.2.4-1+0~mr8.0.0.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [1192c49] TT#23358 Move db_redis table descriptor in /etc/kamailio folder
+  * [5fea855] Revert "TT#23358 Move db_redis table descriptor in /etc/kamailio folder"
+  * [577484c] TT#64352 Switch from app-python to app-python3
+  * [b3d08a1] TT#64352 Fix missing creation of python dbg symbol package
+  * [fafb27f] New upstream version 5.2.4
+  * [e11e30e] TT#68201 Remove already applied upstream patches and refresh old ones
+
+  [ Kirill Solomko ]
+  * [67446d7] TT#64652 pv_headers: ignore FAKED_REPLY msg
+
+  [ Richard Fuchs ]
+  * [a298193] TT#63000 fix redis SCAN usage
+  * [6111fb0] TT#63000 skip non-EQ DB query type keys
+  * [51196c6] TT#63000 db_redis: support update of type key columns
+  * [6df6f87] TT#63000 db_redis: support range scans on timestamp keys
+  * [19794b1] TT#63000 db_redis: support exponential increase and fallof for SCAN
+  * [dda2e56] TT#63000 db_redis: support range matching on int columns
+  * [640695c] TT#63000 db_redis: use a min string length of 10 digits for bigints
+  * [053e45b] TT#63000 db_redis: use KEYS instead of SCAN
+  * [f3b8e57] TT#66000 add versioning to db_redis
+  * [390981e] TT#63000 add support for value-less master keys
+  * [ffb58a5] TT#63000 db_redis: simulate non-unique indexes through parent sets
+  * [a57c149] TT#63000 db_redis: fixes
+  * [073249e] TT#63509 fix sca mem leak
+  * [9d76dcb] TT#66752 avoid presence_dfks core dumps
+  * [5b695c7] TT#65053 add play_dtmf command
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Fri, 04 Oct 2019 15:09:02 +0200
+
 ngcp-kamailio (5.2.3-1+0~mr8.0.0.0) unstable; urgency=medium
 
   [ Marco Capetta ]
