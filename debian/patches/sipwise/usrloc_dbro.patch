@@ -86,7 +86,7 @@
  	if (nat_bflag==(unsigned int)-1) {
  		nat_bflag = 0;
  	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
-@@ -434,6 +485,16 @@ static int child_init(int _rank)
+@@ -437,6 +488,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -103,7 +103,7 @@
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
  	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY && db_load) {
  		/* if cache is used, populate domains from DB */
-@@ -464,6 +525,10 @@ static void destroy(void)
+@@ -467,6 +528,10 @@ static void destroy(void)
  		ul_dbf.close(ul_dbh);
  	}
  
