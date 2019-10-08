@@ -5,7 +5,7 @@
                  db_redis_key_free(&query_v);
  
 -                if (db_redis_key_add_string(&query_v, "EVAL", 4) != 0) {
-+                if (db_redis_key_add_string(&query_v, "EVALSHA", 4) != 0) {
++                if (db_redis_key_add_string(&query_v, "EVALSHA", 7) != 0) {
                      LM_ERR("Failed to add srem command to post-delete query\n");
                      goto error;
                  }
