@@ -1,3 +1,12 @@
+ngcp-kamailio (5.2.4-1+0~mr8.0.1.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [df7ad22] TT#63000 db_redis: use EVALSHA instead of EVAL
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 08 Oct 2019 09:07:27 +0200
+
 ngcp-kamailio (5.2.4-1+0~mr8.0.0.0) unstable; urgency=medium
 
   [ Marco Capetta ]
