@@ -41,13 +41,8 @@
 #include "../../core/data_lump_rpl.h"
 
 
-#ifdef ENABLE_ASYNC_MUTEX
-#define LOCK_ASYNC_CONTINUE(_t) lock(&(_t)->async_mutex )
-#define UNLOCK_ASYNC_CONTINUE(_t) unlock(&(_t)->async_mutex )
-#else
 #define LOCK_ASYNC_CONTINUE(_t) LOCK_REPLIES(_t)
 #define UNLOCK_ASYNC_CONTINUE(_t) UNLOCK_REPLIES(_t)
-#endif
 
 /* Suspends the transaction for later use.
  * Save the returned hash_index and label to get
@@ -192,9 +187,9 @@ int t_continue_helper(unsigned int hash_index, unsigned int label,
 	backup_T = get_t();
 	backup_T_branch = get_t_branch();
 
-	if (t_lookup_ident(&t, hash_index, label) < 0) {
+	if (t_lookup_ident_filter(&t, hash_index, label, 1) < 0) {
 		set_t(backup_T, backup_T_branch);
-		LM_ERR("transaction not found\n");
+		LM_ERR("active transaction not found\n");
 		return -1;
 	}
 
