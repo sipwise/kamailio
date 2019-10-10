@@ -1,3 +1,14 @@
+ngcp-kamailio (5.2.5-1+0~mr8.0.1.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [85de6f1] TT#63000 db_redis: fix EVALSHA usage
+
+  [ Marco Capetta ]
+  * [5226276] New upstream version 5.2.5
+  * [f07e876] TT#68350 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Thu, 10 Oct 2019 16:11:23 +0200
+
 ngcp-kamailio (5.2.4-1+0~mr8.0.1.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
