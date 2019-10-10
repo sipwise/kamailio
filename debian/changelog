@@ -1,3 +1,20 @@
+ngcp-kamailio (5.2.4-1+0~mr7.5.2.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [a692867] TT#63000 add support for value-less master keys
+  * [26fc75d] TT#63000 db_redis: simulate non-unique indexes through parent sets
+  * [b6fa96d] TT#63000 db_redis: fixes
+  * [fd11be0] TT#63509 fix sca mem leak
+  * [64955ae] TT#66752 avoid presence_dfks core dumps
+  * [e2a1c62] TT#63000 db_redis: use EVALSHA instead of EVAL
+  * [3cc7407] TT#63000 db_redis: fix EVALSHA usage
+
+  [ Marco Capetta ]
+  * [c0af61c] New upstream version 5.2.4
+  * [311ab47] TT#68201 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Thu, 10 Oct 2019 16:44:13 +0200
+
 ngcp-kamailio (5.2.3-1+0~mr7.5.2.0) unstable; urgency=medium
 
   [ Marco Capetta ]
