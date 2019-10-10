@@ -78,7 +78,7 @@
 +}
 --- a/src/modules/tls/Makefile
 +++ b/src/modules/tls/Makefile
-@@ -33,6 +33,8 @@
+@@ -34,6 +34,8 @@
  # dcm: tls.cfg installed via local 'install-cfg' to update paths
  #MOD_INSTALL_CFGS=tls.cfg
  
