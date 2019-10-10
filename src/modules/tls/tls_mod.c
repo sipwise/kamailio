@@ -50,6 +50,7 @@
 #include "tls_util.h"
 #include "tls_mod.h"
 #include "tls_cfg.h"
+#include "tls_rand.h"
 
 #ifndef TLS_HOOKS
 	#error "TLS_HOOKS must be defined, or the tls module won't work"
@@ -79,6 +80,8 @@ static int mod_child(int rank);
 static void destroy(void);
 
 static int w_is_peer_verified(struct sip_msg* msg, char* p1, char* p2);
+
+int ksr_rand_engine_param(modparam_t type, void* val);
 
 MODULE_VERSION
 
@@ -236,6 +239,8 @@ static param_export_t params[] = {
 	{"renegotiation",       PARAM_INT,    &sr_tls_renegotiation},
 	{"xavp_cfg",            PARAM_STR,    &sr_tls_xavp_cfg},
 	{"event_callback",      PARAM_STR,    &sr_tls_event_callback},
+	{"rand_engine",         PARAM_STR|USE_FUNC_PARAM, (void*)ksr_rand_engine_param},
+
 	{0, 0, 0}
 };
 
@@ -432,6 +437,33 @@ static void destroy(void)
 }
 
 
+int ksr_rand_engine_param(modparam_t type, void* val)
+{
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	str *reng;
+
+	if(val==NULL) {
+		return -1;
+	}
+	reng = (str*)val;
+	LM_DBG("random engine: %.*s\n", reng->len, reng->s);
+	if(reng->len == 5 && strncasecmp(reng->s, "krand", 5) == 0) {
+		LM_DBG("setting krand random engine\n");
+		RAND_set_rand_method(RAND_ksr_krand_method());
+	} else if(reng->len == 8 && strncasecmp(reng->s, "fastrand", 8) == 0) {
+		LM_DBG("setting fastrand random engine\n");
+		RAND_set_rand_method(RAND_ksr_fastrand_method());
+	} else if (reng->len == 10 && strncasecmp(reng->s, "cryptorand", 10) == 0) {
+		LM_DBG("setting cryptorand random engine\n");
+		RAND_set_rand_method(RAND_ksr_cryptorand_method());
+	} else if (reng->len == 8 && strncasecmp(reng->s, "kxlibssl", 8) == 0) {
+		LM_DBG("setting kxlibssl random engine\n");
+		RAND_set_rand_method(RAND_ksr_kxlibssl_method());
+	}
+#endif
+	return 0;
+}
+
 static int ki_is_peer_verified(sip_msg_t* msg)
 {
 	struct tcp_connection *c;
@@ -535,6 +567,13 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 		return -1;
 
 	register_tls_hooks(&tls_h);
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	LM_DBG("setting cryptorand random engine\n");
+	ksr_cryptorand_seed_init();
+	RAND_set_rand_method(RAND_ksr_cryptorand_method());
+#endif
+
 	sr_kemi_modules_add(sr_kemi_tls_exports);
 
 	return 0;

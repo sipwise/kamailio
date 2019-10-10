@@ -30,6 +30,12 @@
  * sip router core part.
  */
 
+#ifdef KSR_PTHREAD_MUTEX_SHARED
+#define _GNU_SOURCE
+#include <pthread.h>
+#include <dlfcn.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -1563,12 +1569,20 @@ int main_loop(void)
 				/* get first ipv4/ipv6 socket*/
 				if ((si->address.af==AF_INET)&&
 						((sendipv4_tls==0) ||
-							(sendipv4_tls->flags&(SI_IS_LO|SI_IS_MCAST))))
+						 (sendipv4_tls->flags&(SI_IS_LO|SI_IS_MCAST)))) {
 					sendipv4_tls=si;
+					if(sendipv4_tcp==0) {
+						sendipv4_tcp=si;
+					}
+				}
 				if( ((sendipv6_tls==0) ||
 							(sendipv6_tls->flags&(SI_IS_LO|SI_IS_MCAST))) &&
-						(si->address.af==AF_INET6))
+						(si->address.af==AF_INET6)) {
 					sendipv6_tls=si;
+					if(sendipv6_tcp==0) {
+						sendipv6_tcp=si;
+					}
+				}
 			}
 		}
 #endif /* USE_TLS */
@@ -2716,3 +2730,72 @@ error:
 	}
 	return -1;
 }
+
+
+#ifdef KSR_PTHREAD_MUTEX_SHARED
+
+/**
+ * code to set PTHREAD_PROCESS_SHARED attribute for phtread mutex to cope
+ * with libssl 1.1+ thread-only mutex initialization
+ */
+
+#define SYMBOL_EXPORT __attribute__((visibility("default")))
+
+int SYMBOL_EXPORT pthread_mutex_init (pthread_mutex_t *__mutex,
+		const pthread_mutexattr_t *__mutexattr)
+{
+	static int (*real_pthread_mutex_init)(pthread_mutex_t *__mutex,
+			const pthread_mutexattr_t *__mutexattr) = 0;
+	pthread_mutexattr_t attr;
+	int ret;
+
+	if (!real_pthread_mutex_init) {
+		real_pthread_mutex_init = dlsym(RTLD_NEXT, "pthread_mutex_init");
+		if (!real_pthread_mutex_init) {
+			return -1;
+		}
+	}
+
+	if (__mutexattr) {
+		pthread_mutexattr_t attr = *__mutexattr;
+		pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+		return real_pthread_mutex_init(__mutex, &attr);
+	}
+
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+	ret = real_pthread_mutex_init(__mutex, &attr);
+	pthread_mutexattr_destroy(&attr);
+
+	return ret;
+}
+
+int SYMBOL_EXPORT pthread_rwlock_init (pthread_rwlock_t *__restrict __rwlock,
+				const pthread_rwlockattr_t *__restrict __attr)
+{
+	static int (*real_pthread_rwlock_init)(pthread_rwlock_t *__restrict __rwlock,
+				const pthread_rwlockattr_t *__restrict __attr) = 0;
+	pthread_rwlockattr_t attr;
+	int ret;
+
+	if (!real_pthread_rwlock_init) {
+		real_pthread_rwlock_init = dlsym(RTLD_NEXT, "pthread_rwlock_init");
+		if (!real_pthread_rwlock_init) {
+			return -1;
+		}
+	}
+
+	if (__attr) {
+		pthread_rwlockattr_t attr = *__attr;
+		pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+		return real_pthread_rwlock_init(__rwlock, &attr);
+	}
+
+	pthread_rwlockattr_init(&attr);
+	pthread_rwlockattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+	ret = real_pthread_rwlock_init(__rwlock, &attr);
+	pthread_rwlockattr_destroy(&attr);
+
+	return ret;
+}
+#endif
