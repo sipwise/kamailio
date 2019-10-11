@@ -1,3 +1,10 @@
+ngcp-kamailio (5.2.5-1+0~mr7.5.1.4) unstable; urgency=medium
+
+  * [4187c6a] New upstream version 5.2.5
+  * [da68c95] TT#68350 Remove already applied upstream patches and refresh old ones
+
+ -- Marco Capetta <mcapetta@sipwise.com>  Fri, 11 Oct 2019 10:02:44 +0200
+
 ngcp-kamailio (5.2.4-1+0~mr7.5.1.4) unstable; urgency=medium
 
   [ Richard Fuchs ]
