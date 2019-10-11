@@ -1428,7 +1428,7 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 				dlg->tag[DLG_CALLER_LEG].len, dlg->tag[DLG_CALLER_LEG].s,
 				dlg->tag[DLG_CALLEE_LEG].len, dlg->tag[DLG_CALLEE_LEG].s);
 		} else if (ret > 0) {
-			LM_WARN("inconsitent dlg timer data on dlg %p [%u:%u] "
+			LM_WARN("inconsistent dlg timer data on dlg %p [%u:%u] "
 				"with clid '%.*s' and tags '%.*s' '%.*s'\n",
 				dlg, dlg->h_entry, dlg->h_id,
 				dlg->callid.len, dlg->callid.s,
@@ -1451,7 +1451,7 @@ void dlg_onroute(struct sip_msg* req, str *route_params, void *param)
 		goto done;
 	}
 
-	if ( (event==DLG_EVENT_REQ || event==DLG_EVENT_REQACK)
+	if ( (event==DLG_EVENT_REQ || event==DLG_EVENT_REQACK || event==DLG_EVENT_REQPRACK)
 	&& (new_state==DLG_STATE_CONFIRMED || new_state==DLG_STATE_EARLY)) {
 
 		timeout = get_dlg_timeout(req);
