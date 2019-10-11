@@ -121,6 +121,10 @@ LD_EXTRA_OPTS := $(shell dpkg-buildflags --get LDFLAGS)
 # https://wiki.debian.org/ReproducibleBuilds/
 CC_EXTRA_OPTS += -DVERSION_NODATE
 
+# Fix for UDP buffer issue when TLS is enabled
+CC_EXTRA_OPTS += -pthread -DKSR_PTHREAD_MUTEX_SHARED
+LD_EXTRA_OPTS += -pthread -rdynamic -ldl -Wl,-Bsymbolic-functions
+
 %:
 	dh $@
 

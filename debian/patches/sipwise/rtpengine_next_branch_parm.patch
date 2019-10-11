@@ -72,7 +72,7 @@
  		if (ret == -1 || viabranch.len == 0) {
  			LM_ERR("can't get Via branch/extra ID\n");
  			goto error;
-@@ -3545,7 +3568,7 @@ rtpengine_answer1_f(struct sip_msg *msg,
+@@ -3554,7 +3577,7 @@ rtpengine_answer1_f(struct sip_msg *msg,
  }
  
  static int

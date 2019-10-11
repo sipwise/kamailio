@@ -108,7 +108,7 @@
  static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
  		enum rtpe_operation op, const char *flags_str, str *body)
  {
-@@ -3340,8 +3381,9 @@
+@@ -3349,8 +3390,9 @@
  	return 1;
  }
  
@@ -120,7 +120,7 @@
  {
  	int ret, more;
  
-@@ -3354,7 +3396,7 @@
+@@ -3363,7 +3405,7 @@
  	if (!selected_rtpp_set_2 || selected_rtpp_set_2 == selected_rtpp_set_1)
  		more = 0;
  
@@ -129,7 +129,7 @@
  	if (ret < 0)
  		return ret;
  
-@@ -3365,17 +3407,18 @@
+@@ -3374,17 +3416,18 @@
  	if (set_rtpengine_set_from_avp(msg, direction) == -1)
  		return -1;
  
@@ -152,7 +152,7 @@
  {
  	str flags;
  
-@@ -3387,27 +3430,23 @@
+@@ -3396,27 +3439,23 @@
  		}
  	}
  
@@ -189,7 +189,7 @@
  }
  
  
-@@ -3553,88 +3592,45 @@
+@@ -3562,88 +3601,45 @@
  	return -1;
  }
  
@@ -285,7 +285,7 @@
  }
  
  static int
-@@ -3708,160 +3704,102 @@
+@@ -3717,160 +3713,102 @@
  }
  
  
@@ -493,7 +493,7 @@
  	void **parms;
  	pv_param_t *param;
  	pv_value_t *res;
-@@ -3915,7 +3853,7 @@
+@@ -3924,7 +3862,7 @@
  	parms[0] = param;
  	parms[1] = res;
  
@@ -502,7 +502,7 @@
  }
  
  static int
-@@ -3940,54 +3878,55 @@
+@@ -3949,54 +3887,55 @@
   *
   */
  static int ki_rtpengine_manage0(sip_msg_t *msg) {
