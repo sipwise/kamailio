@@ -1,0 +1,108 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -237,12 +237,12 @@
+         int subkey_found = 0;
+         int i;
+         *manual_key_count = 0;
+-        LM_DBG("checking for existence of entry key '%.*s' in query to get manual key\n",
++        LM_WARN("checking for existence of entry key '%.*s' in query to get manual key\n",
+                 key->key.len, key->key.s);
+         for (i = 0; i < _n; ++i) {
+             const db_key_t k = _k[i];
+             if (!str_strcmp(&key->key, (str*)k)) {
+-                LM_DBG("found key in entry key\n");
++                LM_WARN("found key in entry key\n");
+                 subkey_found = 1;
+                 break;
+             } else {
+@@ -913,7 +913,7 @@
+         case DB1_DATETIME:
+             // TODO: insert int value to db for faster comparison!
+             strftime(tmp, sizeof(tmp), "%Y-%m-%d %H:%M:%S", localtime(&(VAL_TIME(v))));
+-            LM_DBG("comparing DATETIME %s %s %s\n", reply->str, op, tmp);
++            LM_WARN("comparing DATETIME %s %s %s\n", reply->str, op, tmp);
+             if (!strcmp(op, OP_EQ)) {
+                 return (strcmp(reply->str, tmp) == 0) ? 0 : -1;
+             } else if (!strcmp(op, OP_LT)) {
+@@ -1286,7 +1286,7 @@
+         str *key = &k->key;
+         redis_key_t *tmp = NULL;
+         int row_match;
+-        LM_DBG("delete key '%.*s'\n", key->len, key->s);
++        LM_WARN("delete key '%.*s'\n", key->len, key->s);
+ 
+         if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
+             LM_ERR("Failed to add exists command to pre-delete query\n");
+@@ -1316,11 +1316,15 @@
+             goto error;
+         }
+ 
++	LM_WARN("manual keys count: %i\n", *manual_keys_count);
++
+         // add all manual keys to query
+         for (j = 0; j < *manual_keys_count; ++j) {
+             int idx = (*manual_keys)[j];
+             str *col = _k[idx];
+ 
++	    LM_WARN("adding manual key: %.*s\n", col->len, col->s);
++
+             if (db_redis_key_add_str(&query_v, col) != 0) {
+                 LM_ERR("Failed to add manual key to pre-delete query\n");
+                 goto error;
+@@ -1328,6 +1332,7 @@
+         }
+         // add all type keys to query
+         for (all_type_key = all_type_keys; all_type_key; all_type_key = all_type_key->next) {
++	    LM_WARN("adding type key: %.*s\n", all_type_key->key.len, all_type_key->key.s);
+             if (db_redis_key_add_str(&query_v, &all_type_key->key) != 0) {
+                 LM_ERR("Failed to add type key to pre-delete query\n");
+                 goto error;
+@@ -1342,16 +1347,18 @@
+ 
+         // manually filter non-matching replies
+         row_match = 1;
++	LM_WARN("reply has %i elements\n", reply->elements);
+         for (col = 0; col < reply->elements; ++col) {
+             if (col < *manual_keys_count) {
+                 int idx = (*manual_keys)[col];
+                 db_key_t k = _k[idx];
+                 db_val_t v = _v[idx];
+                 db_op_t o = _op[idx];
+-                LM_DBG("manually filtering key '%.*s'\n",
++                LM_WARN("manually filtering key '%.*s'\n",
+                         k->len, k->s);
+-                if (db_redis_compare_column(k, &v, o, reply->element[col]) != 0) {
+-                    LM_DBG("column %lu does not match, ignore row\n", col);
++                int result = db_redis_compare_column(k, &v, o, reply->element[col]);
++                if (result != 0) {
++                    LM_WARN("column %lu does not match (result %i), ignore row\n", col, result);
+                     row_match = 0;
+                     break;
+                 }
+@@ -1361,7 +1368,7 @@
+             db_redis_free_reply(&reply);
+             continue;
+         } else {
+-            LM_DBG("row matches manual filtering, proceed with deletion\n");
++            LM_WARN("row matches manual filtering, proceed with deletion\n");
+         }
+ 
+         db_keys = (db_key_t*) pkg_malloc(all_type_keys_count * sizeof(db_key_t));
+@@ -2023,6 +2030,17 @@
+         query_ops = (db_op_t*)_op;
+     }
+ 
++    LM_WARN("do db_redis_delete with %d keys\n", _n);
++    for (i = 0; i < _n; ++i) {
++        str vs = {NULL, 0};
++        db_val_t v = _v[i];
++
++        db_redis_val2str(&v, &vs);
++        LM_WARN("  [%d]: '%.*s' %s '%.*s'\n", i, _k[i]->len, _k[i]->s, query_ops[i], vs.len, vs.s);
++        pkg_free(vs.s);
++    }
++
++
+     if (_n > 0) {
+         if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
+                     &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan) != 0) {
