@@ -1,3 +1,12 @@
+ngcp-kamailio (5.2.5-1+0~mr8.0.2.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [87d6947] TT#68350 Re-apply fix for python switch from version 2 to 3
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 21 Oct 2019 12:32:23 +0200
+
 ngcp-kamailio (5.2.5-1+0~mr8.0.1.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
