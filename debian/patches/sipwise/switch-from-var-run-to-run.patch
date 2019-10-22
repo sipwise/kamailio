@@ -1,0 +1,873 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Guillem Jover <gjover@sipwise.com>
+Date: Tue, 22 Oct 2019 16:40:03 +0200
+Subject: [PATCH] Switch from the deprecated /var/run to /run
+
+
+---
+ doc/scripts/cdefs2doc/dump_cfg_defs.pl                |    2 -
+ doc/scripts/cdefs2doc/dump_counters.pl                |    2 -
+ doc/scripts/cdefs2doc/dump_rpcs.pl                    |    2 -
+ doc/scripts/cdefs2doc/dump_selects.pl                 |    2 -
+ doc/tutorials/cfg_list/Makefile                       |    2 -
+ doc/tutorials/counter_list/Makefile                   |    2 -
+ doc/tutorials/rpc_list/Makefile                       |    2 -
+ doc/tutorials/select_list/Makefile                    |    2 -
+ etc/kamailio.cfg                                      |    6 +--
+ misc/examples/ims/icscf/kamailio.cfg                  |    6 +--
+ misc/examples/ims/pcscf/kamailio.cfg                  |    6 +--
+ misc/examples/ims/scscf/kamailio.cfg                  |    6 +--
+ misc/examples/kemi/kamailio-basic-kemi.cfg            |    6 +--
+ misc/examples/mixed/kamailio-minimal-anycast.cfg      |    6 +--
+ misc/examples/mixed/kamailio-minimal-proxy.cfg        |    6 +--
+ misc/examples/pkg/kamailio-basic.cfg                  |    6 +--
+ misc/examples/pkg/kamailio-oob.cfg                    |    6 +--
+ misc/examples/scripts/sr                              |    2 -
+ misc/examples/webrtc/kamailio-default-websocket.cfg   |    6 +--
+ src/Makefile                                          |   34 +++++++++---------
+ src/modules/call_control/README                       |    4 +-
+ src/modules/call_control/call_control.c               |    2 -
+ src/modules/call_control/doc/call_control.8           |    4 +-
+ src/modules/call_control/doc/call_control_admin.xml   |    4 +-
+ src/modules/cfgt/README                               |    2 -
+ src/modules/cfgt/doc/cfgt_admin.xml                   |    2 -
+ src/modules/ctl/README                                |   12 +++---
+ src/modules/ctl/ctl.cfg                               |    2 -
+ src/modules/ctl/doc/ctl.xml                           |    4 +-
+ src/modules/ctl/doc/ctl_params.xml                    |    4 +-
+ src/modules/ctl/doc/ctl_rpc.xml                       |    4 +-
+ src/modules/db_mysql/README                           |    2 -
+ src/modules/db_mysql/doc/db_mysql_admin.xml           |    2 -
+ src/modules/dispatcher/README                         |    2 -
+ src/modules/dispatcher/doc/dispatcher_admin.xml       |    2 -
+ src/modules/ims_diameter_server/examples/kamailio.cfg |    2 -
+ src/modules/ims_ocs/examples/full/kamailio.cfg        |    4 +-
+ src/modules/ims_ocs/examples/simple/kamailio.cfg      |    4 +-
+ src/modules/mediaproxy/README                         |    4 +-
+ src/modules/mediaproxy/doc/mediaproxy_admin.xml       |    4 +-
+ src/modules/mediaproxy/mediaproxy.c                   |    2 -
+ src/modules/nat_traversal/README                      |    2 -
+ src/modules/nat_traversal/doc/nat_traversal_admin.xml |    2 -
+ src/modules/sipdump/README                            |    2 -
+ src/modules/sipdump/doc/sipdump_admin.xml             |    2 -
+ utils/kamctl/kamctl.base                              |    2 -
+ utils/kamctl/kamctl.rpcfifo                           |    2 -
+ utils/kamctl/kamctlrc                                 |    6 +--
+ 48 files changed, 101 insertions(+), 101 deletions(-)
+
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -982,7 +982,7 @@ install_initd_debian install-initd-debia
+ 	sed -e "s#DAEMON=/usr/sbin/kamailio#DAEMON=$(bin_prefix)/$(bin_dir)$(NAME)#g" \
+ 		-e "s#NAME=kamailio#NAME=$(NAME)#g" \
+ 		-e "s#DESC=Kamailio#DESC=$(NAME)#g" \
+-		-e "s#HOMEDIR=/var/run/kamailio#HOMEDIR=/var/run/$(NAME)#g" \
++		-e "s#HOMEDIR=/run/kamailio#HOMEDIR=/run/$(NAME)#g" \
+ 		-e "s#DEFAULTS=/etc/default/kamailio#DEFAULTS=/etc/default/$(NAME)#g" \
+ 		-e "s#CFGFILE=/etc/kamailio/kamailio.cfg#CFGFILE=$(cfg_prefix)/$(cfg_dir)$(NAME).cfg#g" \
+ 		< pkg/kamailio/deb/debian/kamailio.init \
+@@ -991,18 +991,18 @@ install_initd_debian install-initd-debia
+ 	sed -e "s#RUN_KAMAILIO=no#RUN_KAMAILIO=yes#g" \
+ 		< pkg/kamailio/deb/debian/kamailio.default \
+ 		> /etc/default/$(NAME)
+-	mkdir -p /var/run/$(NAME)
++	mkdir -p /run/$(NAME)
+ 	adduser --quiet --system --group --disabled-password \
+         --shell /bin/false --gecos "$(NAME)" \
+-        --home /var/run/$(NAME) $(NAME)
+-	chown $(NAME):$(NAME) /var/run/$(NAME)
++        --home /run/$(NAME) $(NAME)
++	chown $(NAME):$(NAME) /run/$(NAME)
+ 
+ .PHONY: install_initd_centos install-initd-centos
+ install_initd_centos install-initd-centos:
+ 	sed -e "s#KAM=/usr/sbin/kamailio#KAM=$(bin_prefix)/$(bin_dir)$(NAME)#g" \
+ 		-e "s#PROG=kamailio#PROG=$(NAME)#g" \
+ 		-e "s#DEFAULTS=/etc/default/kamailio#DEFAULTS=/etc/default/$(NAME)#g" \
+-		-e "s#PID_FILE=/var/run/kamailio.pid#PID_FILE=/var/run/$(NAME).pid#g" \
++		-e "s#PID_FILE=/run/kamailio.pid#PID_FILE=/run/$(NAME).pid#g" \
+ 		-e "s#LOCK_FILE=/var/lock/subsys/kamailio#LOCK_FILE=/var/lock/subsys/$(NAME)#g" \
+ 		-e "s#KAMCFG=/etc/kamailio/kamailio.cfg#KAMCFG=$(cfg_prefix)/$(cfg_dir)$(NAME).cfg#g" \
+ 		< pkg/kamailio/rpm/kamailio.init \
+@@ -1013,17 +1013,17 @@ install_initd_centos install-initd-cento
+ 		-e "s#GROUP=kamailio#GROUP=$(NAME)#g" \
+ 		< pkg/kamailio/rpm/kamailio.default \
+ 		> /etc/default/$(NAME)
+-	mkdir -p /var/run/$(NAME)
++	mkdir -p /run/$(NAME)
+ 	/usr/sbin/groupadd -r $(NAME)
+ 	/usr/sbin/useradd -r -g $(NAME) -s /bin/false -c "Kamailio Daemon" \
+-                  -d /var/run/$(NAME) $(NAME)
+-	chown $(NAME):$(NAME) /var/run/$(NAME)
++                  -d /run/$(NAME) $(NAME)
++	chown $(NAME):$(NAME) /run/$(NAME)
+ 
+ .PHONY: install_systemd_debian install-systemd-debian
+ install_systemd_debian install-systemd-debian:
+ 	sed -e "s#ExecStart=/usr/sbin/kamailio#ExecStart=$(bin_prefix)/$(bin_dir)$(NAME)#g" \
+ 		-e "s#Description=Kamailio#Description=$(NAME)#g" \
+-		-e "s#/var/run/kamailio/kamailio.pid#/var/run/$(NAME)/$(NAME).pid#g" \
++		-e "s#/run/kamailio/kamailio.pid#/run/$(NAME)/$(NAME).pid#g" \
+ 		-e "s#EnvironmentFile=-/etc/default/kamailio#EnvironmentFile=-/etc/default/$(NAME)#g" \
+ 		-e "s#CFGFILE=/etc/kamailio/kamailio.cfg#CFGFILE=$(cfg_prefix)/$(cfg_dir)$(NAME).cfg#g" \
+ 		< ../pkg/kamailio/deb/debian/kamailio.service \
+@@ -1031,11 +1031,11 @@ install_systemd_debian install-systemd-d
+ 	sed -e "s#RUN_KAMAILIO=no#RUN_KAMAILIO=yes#g" \
+ 		< ../pkg/kamailio/deb/debian/kamailio.default \
+ 		> /etc/default/$(NAME)
+-	mkdir -p /var/run/$(NAME)
++	mkdir -p /run/$(NAME)
+ 	adduser --quiet --system --group --disabled-password \
+         --shell /bin/false --gecos "$(NAME)" \
+-        --home /var/run/$(NAME) $(NAME)
+-	chown $(NAME):$(NAME) /var/run/$(NAME)
++        --home /run/$(NAME) $(NAME)
++	chown $(NAME):$(NAME) /run/$(NAME)
+ 	echo "D /run/$(NAME) 0700 $(NAME) $(NAME) -" > /etc/tmpfiles.d/$(NAME).conf
+ 	@echo
+ 	@echo "* to enable kamailio service run:"
+@@ -1045,18 +1045,18 @@ install_systemd_debian install-systemd-d
+ install_systemd_centos install-systemd-centos:
+ 	sed -e "s#ExecStart=/usr/sbin/kamailio#ExecStart=$(bin_prefix)/$(bin_dir)$(NAME)#g" \
+ 		-e "s#Description=Kamailio#Description=$(NAME)#g" \
+-		-e "s#/var/run/kamailio/kamailio.pid#/var/run/$(NAME)/$(NAME).pid#g" \
++		-e "s#/run/kamailio/kamailio.pid#/run/$(NAME)/$(NAME).pid#g" \
+ 		-e "s#EnvironmentFile=-/etc/sysconfig/kamailio#EnvironmentFile=-/etc/sysconfig/$(NAME)#g" \
+ 		-e "s#CFGFILE=/etc/kamailio/kamailio.cfg#CFGFILE=$(cfg_prefix)/$(cfg_dir)$(NAME).cfg#g" \
+ 		< ../pkg/kamailio/obs/kamailio.service \
+ 		> /etc/systemd/system/$(NAME).service
+ 	cp ../pkg/kamailio/obs/kamailio.sysconfig \
+ 		/etc/sysconfig/$(NAME)
+-	mkdir -p /var/run/$(NAME)
+-	chmod 0700 /var/run/$(NAME)
++	mkdir -p /run/$(NAME)
++	chmod 0700 /run/$(NAME)
+ 	groupadd --system $(NAME)
+-	useradd $(NAME) --system --shell /sbin/nologin -g $(NAME) --home /var/run/$(NAME)
+-	chown $(NAME):$(NAME) /var/run/$(NAME)
++	useradd $(NAME) --system --shell /sbin/nologin -g $(NAME) --home /run/$(NAME)
++	chown $(NAME):$(NAME) /run/$(NAME)
+ 	echo "D /run/$(NAME) 0700 $(NAME) $(NAME) -" > /etc/tmpfiles.d/$(NAME).conf
+ 	@echo
+ 	@echo "* to enable kamailio service run:"
+--- a/src/modules/call_control/README
++++ b/src/modules/call_control/README
+@@ -195,11 +195,11 @@ modparam("call_control", "disable", 1)
+    The path to the filesystem socket where the callcontrol application
+    listens for commands from the module.
+ 
+-   Default value is “/var/run/callcontrol/socket”.
++   Default value is “/run/callcontrol/socket”.
+ 
+    Example 1.2. Setting the socket_name parameter
+ ...
+-modparam("call_control", "socket_name", "/var/run/callcontrol/socket")
++modparam("call_control", "socket_name", "/run/callcontrol/socket")
+ ...
+ 
+ 5.3. socket_timeout (int)
+--- a/src/modules/call_control/call_control.c
++++ b/src/modules/call_control/call_control.c
+@@ -121,7 +121,7 @@ int parse_param_stop(unsigned int type,
+ 
+ /* Local global variables */
+ static CallControlSocket callcontrol_socket = {
+-    "/var/run/callcontrol/socket", // name
++    "/run/callcontrol/socket", // name
+     -1,                            // sock
+     500,                           // timeout in 500 miliseconds if there is no answer
+     0,                             // time of the last failure
+--- a/src/modules/call_control/doc/call_control.8
++++ b/src/modules/call_control/doc/call_control.8
+@@ -38,11 +38,11 @@ Default value is 0.
+ .TP
+ It is the path to the filesystem socket where the callcontrol application listens for commands from the module.
+ .TP
+-Default value is /var/run/callcontrol/socket.
++Default value is /run/callcontrol/socket.
+ .TP
+ .B Setting the socket_name parameter
+ .TP
+- modparam("call_control", "socket_name", "/var/run/callcontrol/socket") ...
++ modparam("call_control", "socket_name", "/run/callcontrol/socket") ...
+ .TP 16
+ .I socket_timeout (int)
+ .TP
+--- a/src/modules/call_control/doc/call_control_admin.xml
++++ b/src/modules/call_control/doc/call_control_admin.xml
+@@ -215,7 +215,7 @@ modparam("call_control", "disable", 1)
+       <para>
+         <emphasis>
+           Default value is 
+-            <quote>/var/run/callcontrol/socket</quote>.
++            <quote>/run/callcontrol/socket</quote>.
+         </emphasis>
+       </para>
+ 
+@@ -223,7 +223,7 @@ modparam("call_control", "disable", 1)
+       <title>Setting the <varname>socket_name</varname> parameter</title>
+         <programlisting format="linespecific">
+ ...
+-modparam("call_control", "socket_name", "/var/run/callcontrol/socket")
++modparam("call_control", "socket_name", "/run/callcontrol/socket")
+ ...
+         </programlisting>
+       </example>
+--- a/src/modules/cfgt/README
++++ b/src/modules/cfgt/README
+@@ -97,7 +97,7 @@ Chapter 1. Admin Guide
+ 
+    Example 1.1. Set cfgtrace parameter
+ ...
+-modparam("cfgt", "basedir", "/var/run/kamailio/cfgtest")
++modparam("cfgt", "basedir", "/run/kamailio/cfgtest")
+ ...
+ 
+ 3.2. mask (int)
+--- a/src/modules/cfgt/doc/cfgt_admin.xml
++++ b/src/modules/cfgt/doc/cfgt_admin.xml
+@@ -73,7 +73,7 @@
+ 		<title>Set <varname>cfgtrace</varname> parameter</title>
+ 		<programlisting format="linespecific">
+ ...
+-modparam("cfgt", "basedir", "/var/run/kamailio/cfgtest")
++modparam("cfgt", "basedir", "/run/kamailio/cfgtest")
+ ...
+ </programlisting>
+ 		</example>
+--- a/src/modules/ctl/README
++++ b/src/modules/ctl/README
+@@ -80,8 +80,8 @@ Chapter 1. Admin Guide
+    protocol).
+ 
+    By default (if no parameters are changed in the config file) it uses a
+-   Unix stream socket under /var/run/kamailio:
+-   /var/run/kamailio/kamailio_ctl. This socket is also the default for
++   Unix stream socket under /run/kamailio:
++   /run/kamailio/kamailio_ctl. This socket is also the default for
+    kamcmd.
+ 
+    In general it's used in conjunction with kamcmd. kamcmd is a Unix tool
+@@ -151,7 +151,7 @@ $ kamcmd ps
+    Multiple transports / listen addresses can be specified, just by
+    setting the parameter multiple times.
+ 
+-   Default: "unix:/var/run/kamailio/kamailio_ctl" (Unix stream socket).
++   Default: "unix:/run/kamailio/kamailio_ctl" (Unix stream socket).
+    The default value is used only if no binrpc parameter is found in the
+    config file.
+ 
+@@ -160,7 +160,7 @@ loadmodule "ctl"
+ # optional listen addresses, if no one is specified,
+ # ctl will listen on unixs:/tmp/ser_ctl
+ 
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl") # default
++modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl") # default
+ modparam("ctl", "binrpc", "udp:localhost:2046")
+ modparam("ctl", "binrpc", "tcp:localhost:2046")
+ modparam("ctl", "binrpc", "unixd:/tmp/unix_dgram")  # unix datagram
+@@ -289,7 +289,7 @@ modparam("ctl", "binrpc_struct_max_body_
+ 
+    Example 1.11. print usage
+  $ kamcmd -f"[%v] %v:%v %v\n" ctl.listen
+-[binrpc] unix_stream:/var/run/kamailio/kamailio_ctl
++[binrpc] unix_stream:/run/kamailio/kamailio_ctl
+ 
+ # note: the above command is equivalent with kamcmd listen
+ 
+@@ -307,6 +307,6 @@ modparam("ctl", "binrpc_struct_max_body_
+ 
+    Example 1.13. ctl.who usage
+  $ kamcmd -f"[%v] %v: %v %v -> %v %v\n" ctl.who
+-[binrpc] unix_stream: <anonymous unix socket>  -> /var/run/kamailio/kamailio_ctl
++[binrpc] unix_stream: <anonymous unix socket>  -> /run/kamailio/kamailio_ctl
+ 
+ # note the above command is equivalent to kamcmd who
+--- a/src/modules/ctl/ctl.cfg
++++ b/src/modules/ctl/ctl.cfg
+@@ -31,7 +31,7 @@ alias="foo.bar"
+ 
+ loadmodule "modules/ctl/ctl.so"
+ # optional listen addresses, if no one is specified, 
+-# ctl will by default listen on unixs:/var/run/kamailio/kamailio_ctl.
++# ctl will by default listen on unixs:/run/kamailio/kamailio_ctl.
+ modparam("ctl", "binrpc", "unix:/tmp/kamailio_ctl") # 
+ modparam("ctl", "binrpc", "udp:localhost:2046")
+ modparam("ctl", "binrpc", "tcp:localhost:2046")
+--- a/src/modules/ctl/doc/ctl.xml
++++ b/src/modules/ctl/doc/ctl.xml
+@@ -40,8 +40,8 @@
+ 	</para>
+ 	<para>
+ 		By default (if no parameters are changed in the config file) it uses
+-		a Unix stream socket under /var/run/&kamailiobinary;:
+-		/var/run/&kamailiobinary;/&ctlsocket;. This socket is also the
++		a Unix stream socket under /run/&kamailiobinary;:
++		/run/&kamailiobinary;/&ctlsocket;. This socket is also the
+ 		default for &sercmd;.
+ 	</para>
+ 	<para>
+--- a/src/modules/ctl/doc/ctl_params.xml
++++ b/src/modules/ctl/doc/ctl_params.xml
+@@ -64,7 +64,7 @@
+ 	</para>
+ 	<para>
+ 		<emphasis>Default:</emphasis>
+-		"unix:/var/run/&kamailiobinary;/&kamailiobinary;_ctl" (Unix stream socket).
++		"unix:/run/&kamailiobinary;/&kamailiobinary;_ctl" (Unix stream socket).
+ 		The default value is used <emphasis>only</emphasis> if no
+ 		<varname>binrpc</varname> parameter is found in the config file.
+ 	</para>
+@@ -75,7 +75,7 @@ loadmodule "ctl"
+ # optional listen addresses, if no one is specified,
+ # ctl will listen on unixs:/tmp/ser_ctl
+ 
+-modparam("ctl", "binrpc", "unix:/var/run/&kamailiobinary;/&kamailiobinary;_ctl") # default
++modparam("ctl", "binrpc", "unix:/run/&kamailiobinary;/&kamailiobinary;_ctl") # default
+ modparam("ctl", "binrpc", "udp:localhost:2046")
+ modparam("ctl", "binrpc", "tcp:localhost:2046")
+ modparam("ctl", "binrpc", "unixd:/tmp/unix_dgram")  # unix datagram
+--- a/src/modules/ctl/doc/ctl_rpc.xml
++++ b/src/modules/ctl/doc/ctl_rpc.xml
+@@ -23,7 +23,7 @@
+ 		<title><function>print</function> usage</title>
+ 		<programlisting>
+  $ &sercmd; -f"[%v] %v:%v %v\n" ctl.listen
+-[binrpc] unix_stream:/var/run/&kamailiobinary;/&kamailiobinary;_ctl
++[binrpc] unix_stream:/run/&kamailiobinary;/&kamailiobinary;_ctl
+  
+ # note: the above command is equivalent with &sercmd; listen
+ 		</programlisting>
+@@ -53,7 +53,7 @@
+ 		<title><function>ctl.who</function> usage</title>
+ 		<programlisting>
+  $ &sercmd; -f"[%v] %v: %v %v -> %v %v\n" ctl.who
+-[binrpc] unix_stream: &lt;anonymous unix socket&gt;  -> /var/run/&kamailiobinary;/&kamailiobinary;_ctl
++[binrpc] unix_stream: &lt;anonymous unix socket&gt;  -> /run/&kamailiobinary;/&kamailiobinary;_ctl
+ 
+ # note the above command is equivalent to &sercmd; who
+ 		</programlisting>
+--- a/src/modules/db_mysql/README
++++ b/src/modules/db_mysql/README
+@@ -229,7 +229,7 @@ default-character-set = utf8
+    Example 1.9. Using [client] and specific group
+ ...
+ [client]
+-socket = /var/run/mysql/mysqld.sock
++socket = /run/mysql/mysqld.sock
+ 
+ [kamailio]
+ socket = /path/to/mysqld.sock
+--- a/src/modules/db_mysql/doc/db_mysql_admin.xml
++++ b/src/modules/db_mysql/doc/db_mysql_admin.xml
+@@ -250,7 +250,7 @@ default-character-set = utf8
+ 		<programlisting format="linespecific">
+ ...
+ [client]
+-socket = /var/run/mysql/mysqld.sock
++socket = /run/mysql/mysqld.sock
+ 
+ [kamailio]
+ socket = /path/to/mysqld.sock
+--- a/src/modules/dispatcher/README
++++ b/src/modules/dispatcher/README
+@@ -352,7 +352,7 @@ Chapter 1. Admin Guide
+ 
+    Example 1.1. Set the “list_file” parameter
+ ...
+-modparam("dispatcher", "list_file", "/var/run/kamailio/dispatcher.list")
++modparam("dispatcher", "list_file", "/run/kamailio/dispatcher.list")
+ ...
+ 
+ 3.2. db_url (string)
+--- a/src/modules/dispatcher/doc/dispatcher_admin.xml
++++ b/src/modules/dispatcher/doc/dispatcher_admin.xml
+@@ -89,7 +89,7 @@
+ 		<title>Set the <quote>list_file</quote> parameter</title>
+ 		<programlisting format="linespecific">
+ ...
+-modparam("dispatcher", "list_file", "/var/run/kamailio/dispatcher.list")
++modparam("dispatcher", "list_file", "/run/kamailio/dispatcher.list")
+ ...
+ </programlisting>
+ 		</example>
+--- a/src/modules/ims_diameter_server/examples/kamailio.cfg
++++ b/src/modules/ims_diameter_server/examples/kamailio.cfg
+@@ -78,7 +78,7 @@ loadmodule "statistics"
+ modparam("cdp","config_file","/etc/kamailio_hss/hss.xml")
+ 
+ # ----- ctl params -----
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio_hss/kamailio_ctl")
++modparam("ctl", "binrpc", "unix:/run/kamailio_hss/kamailio_ctl")
+ 
+ # ----- http_client params -----
+ modparam("http_client", "httpcon", "hss=>https://hss:password@rest.ng-voice.com/hss")
+--- a/src/modules/ims_ocs/examples/full/kamailio.cfg
++++ b/src/modules/ims_ocs/examples/full/kamailio.cfg
+@@ -53,7 +53,7 @@ memlog=5
+ log_stderror=no
+ sip_warning=no
+ 
+-rundir="/var/run/kamailio_ocs"
++rundir="/run/kamailio_ocs"
+ 
+ user_agent_header="User-Agent: TelcoSuite OCS"
+ server_header="Server: TelcoSuite OCS"
+@@ -115,7 +115,7 @@ loadmodule "mi_rpc"
+ # ----- db_cluster params -----
+ 
+ # ----- ctl params -----
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio_ocs/kamailio_ctl")
++modparam("ctl", "binrpc", "unix:/run/kamailio_ocs/kamailio_ctl")
+ 
+ #!ifdef DB_URL2
+ loadmodule "db_cluster"
+--- a/src/modules/ims_ocs/examples/simple/kamailio.cfg
++++ b/src/modules/ims_ocs/examples/simple/kamailio.cfg
+@@ -39,7 +39,7 @@ memlog=5
+ log_stderror=no
+ sip_warning=no
+ 
+-rundir="/var/run/kamailio_ocs"
++rundir="/run/kamailio_ocs"
+ 
+ user_agent_header="User-Agent: TelcoSuite OCS"
+ server_header="Server: TelcoSuite OCS"
+@@ -87,7 +87,7 @@ loadmodule "kex"
+ loadmodule "corex"
+ 
+ # ----- ctl params -----
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio_ocs/kamailio_ctl")
++modparam("ctl", "binrpc", "unix:/run/kamailio_ocs/kamailio_ctl")
+ 
+ # ----- cdp params -----
+ modparam("cdp","config_file","/etc/kamailio_ocs/ocs.xml")
+--- a/src/modules/mediaproxy/README
++++ b/src/modules/mediaproxy/README
+@@ -190,11 +190,11 @@ modparam("mediaproxy", "disable", 1)
+    It is the path to the filesystem socket where the mediaproxy dispatcher
+    listens for commands from the module.
+ 
+-   Default value is “/var/run/mediaproxy/dispatcher.sock”.
++   Default value is “/run/mediaproxy/dispatcher.sock”.
+ 
+    Example 1.2. Setting the mediaproxy_socket parameter
+ ...
+-modparam("mediaproxy", "mediaproxy_socket", "/var/run/mediaproxy/dispatcher.sock
++modparam("mediaproxy", "mediaproxy_socket", "/run/mediaproxy/dispatcher.sock
+ ")
+ ...
+ 
+--- a/src/modules/mediaproxy/doc/mediaproxy_admin.xml
++++ b/src/modules/mediaproxy/doc/mediaproxy_admin.xml
+@@ -184,7 +184,7 @@ modparam("mediaproxy", "disable", 1)
+       <para>
+         <emphasis>
+           Default value is
+-            <quote>/var/run/mediaproxy/dispatcher.sock</quote>.
++            <quote>/run/mediaproxy/dispatcher.sock</quote>.
+         </emphasis>
+       </para>
+ 
+@@ -192,7 +192,7 @@ modparam("mediaproxy", "disable", 1)
+       <title>Setting the <varname>mediaproxy_socket</varname> parameter</title>
+         <programlisting format="linespecific">
+ ...
+-modparam("mediaproxy", "mediaproxy_socket", "/var/run/mediaproxy/dispatcher.sock")
++modparam("mediaproxy", "mediaproxy_socket", "/run/mediaproxy/dispatcher.sock")
+ ...
+         </programlisting>
+       </example>
+--- a/src/modules/mediaproxy/mediaproxy.c
++++ b/src/modules/mediaproxy/mediaproxy.c
+@@ -191,7 +191,7 @@ static int mediaproxy_disabled = False;
+ static str ice_candidate = str_init("none");
+ 
+ static MediaproxySocket mediaproxy_socket = {
+-		"/var/run/mediaproxy/dispatcher.sock", // name
++		"/run/mediaproxy/dispatcher.sock", // name
+ 		-1,									   // sock
+ 		500, // timeout in 500 miliseconds if there is no answer
+ 		0,   // time of the last failure
+--- a/src/modules/nat_traversal/README
++++ b/src/modules/nat_traversal/README
+@@ -493,7 +493,7 @@ MyHeader: some_value\r\n")
+ 
+    Example 1.5. Setting the keepalive_state_file parameter
+ ...
+-modparam("nat_traversal", "keepalive_state_file", "/var/run/kamailio/keepalive_s
++modparam("nat_traversal", "keepalive_state_file", "/run/kamailio/keepalive_s
+ tate")
+ ...
+ 
+--- a/src/modules/nat_traversal/doc/nat_traversal_admin.xml
++++ b/src/modules/nat_traversal/doc/nat_traversal_admin.xml
+@@ -492,7 +492,7 @@ modparam("nat_traversal", "keepalive_ext
+       <title>Setting the <varname>keepalive_state_file</varname> parameter</title>
+         <programlisting format="linespecific">
+ ...
+-modparam("nat_traversal", "keepalive_state_file", "/var/run/kamailio/keepalive_state")
++modparam("nat_traversal", "keepalive_state_file", "/run/kamailio/keepalive_state")
+ ...
+         </programlisting>
+       </example>
+--- a/src/modules/sipdump/README
++++ b/src/modules/sipdump/README
+@@ -161,7 +161,7 @@ modparam("sipdump", "rotate", 3600)
+ 
+    Example 1.4. Set folder parameter
+ ...
+-modparam("sipdump", "folder", "/var/run/kamailio")
++modparam("sipdump", "folder", "/run/kamailio")
+ ...
+ 
+ 3.5. fprefix (str)
+--- a/src/modules/sipdump/doc/sipdump_admin.xml
++++ b/src/modules/sipdump/doc/sipdump_admin.xml
+@@ -144,7 +144,7 @@ modparam("sipdump", "rotate", 3600)
+ 		<title>Set <varname>folder</varname> parameter</title>
+ 		<programlisting format="linespecific">
+ ...
+-modparam("sipdump", "folder", "/var/run/kamailio")
++modparam("sipdump", "folder", "/run/kamailio")
+ ...
+ </programlisting>
+ 		</example>
+--- a/doc/scripts/cdefs2doc/dump_cfg_defs.pl
++++ b/doc/scripts/cdefs2doc/dump_cfg_defs.pl
+@@ -49,7 +49,7 @@ my $patch_required="$0 requires a patche
+ # gcc name
+ my $gcc="gcc";
+ # default defines
+-my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
++my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
+ 
+ # file with gcc syntax tree
+ my $file; #"tcp_options.c.001t.tu" ;
+--- a/doc/scripts/cdefs2doc/dump_counters.pl
++++ b/doc/scripts/cdefs2doc/dump_counters.pl
+@@ -39,7 +39,7 @@ my $patch_required="$0 requires a patche
+ # gcc name
+ my $gcc="gcc";
+ # default defines
+-my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
++my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
+ 
+ # file with gcc syntax tree
+ my $file; #"tcp_options.c.001t.tu" ;
+--- a/doc/scripts/cdefs2doc/dump_rpcs.pl
++++ b/doc/scripts/cdefs2doc/dump_rpcs.pl
+@@ -43,7 +43,7 @@ my $patch_required="$0 requires a patche
+ # gcc name
+ my $gcc="gcc";
+ # default defines
+-my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
++my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
+ 
+ # file with gcc syntax tree
+ my $file;
+--- a/doc/scripts/cdefs2doc/dump_selects.pl
++++ b/doc/scripts/cdefs2doc/dump_selects.pl
+@@ -40,7 +40,7 @@ my $patch_required="$0 requires a patche
+ # gcc name
+ my $gcc="gcc";
+ # default defines
+-my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
++my $c_defs="DNAME='\"kamailio\"' -DVERSION='\"5.1.0-dev3\"' -DARCH='\"x86_64\"' -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 -DCFG_DIR='\"/usr/local/etc/kamailio/\"' -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC -DDBG_SR_MEMORY -DUSE_TLS -DTLS_HOOKS -DUSE_CORE_STATS -DSTATISTICS -DMALLOC_STATS -DWITH_AS_SUPPORT -DUSE_SCTP -DFAST_LOCK -DADAPTIVE_WAIT -DADAPTIVE_WAIT_LOOPS=1024 -DCC_GCC_LIKE_ASM -DHAVE_GETHOSTBYNAME2 -DHAVE_UNION_SEMUN -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN -DHAVE_EPOLL -DHAVE_SIGIO_RT -DSIGINFO64_WORKARROUND -DUSE_FUTEX -DHAVE_SELECT";
+ 
+ # file with gcc syntax tree
+ my $file;
+--- a/doc/tutorials/cfg_list/Makefile
++++ b/doc/tutorials/cfg_list/Makefile
+@@ -69,7 +69,7 @@ c_defs=-DNAME='\"kamailio\"' -DVERSION='
+ 	   -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' \
+ 	   -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 \
+ 	   -DCFG_DIR='\"/usr/local/etc/kamailio/\"' \
+-	   -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
++	   -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
+ 	   -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES \
+ 	   -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR \
+ 	   -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC \
+--- a/doc/tutorials/counter_list/Makefile
++++ b/doc/tutorials/counter_list/Makefile
+@@ -63,7 +63,7 @@ c_defs=-DNAME='\"kamailio\"' -DVERSION='
+ 	   -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' \
+ 	   -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 \
+ 	   -DCFG_DIR='\"/usr/local/etc/kamailio/\"' \
+-	   -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
++	   -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
+ 	   -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES \
+ 	   -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR \
+ 	   -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC \
+--- a/doc/tutorials/rpc_list/Makefile
++++ b/doc/tutorials/rpc_list/Makefile
+@@ -136,7 +136,7 @@ c_defsX=-DNAME='\"kamailio\"' -DVERSION=
+ 	   -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' \
+ 	   -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 \
+ 	   -DCFG_DIR='\"/usr/local/etc/kamailio/\"' \
+-	   -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
++	   -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
+ 	   -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES \
+ 	   -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR \
+ 	   -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC \
+--- a/doc/tutorials/select_list/Makefile
++++ b/doc/tutorials/select_list/Makefile
+@@ -65,7 +65,7 @@ c_defs=-DNAME='\"kamailio\"' -DVERSION='
+ 	   -DOS='linux_' -DOS_QUOTED='\"linux\"' -DCOMPILER='\"gcc 4.9.2\"' \
+ 	   -D__CPU_x86_64 -D__OS_linux -DSER_VER=5001000 \
+ 	   -DCFG_DIR='\"/usr/local/etc/kamailio/\"' \
+-	   -DRUN_DIR='\"/var/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
++	   -DRUN_DIR='\"/run/kamailio/\"' -DPKG_MALLOC -DSHM_MEM -DSHM_MMAP \
+ 	   -DDNS_IP_HACK -DUSE_MCAST -DUSE_TCP -DDISABLE_NAGLE -DHAVE_RESOLV_RES \
+ 	   -DUSE_DNS_CACHE -DUSE_DNS_FAILOVER -DUSE_DST_BLACKLIST -DUSE_NAPTR \
+ 	   -DWITH_XAVP -DMEM_JOIN_FREE -DF_MALLOC -DQ_MALLOC -DTLSF_MALLOC \
+--- a/etc/kamailio.cfg
++++ b/etc/kamailio.cfg
+@@ -302,13 +302,13 @@ loadmodule "debugger.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+ /* set the path to RPC unix socket control file */
+-# modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++# modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/misc/examples/ims/icscf/kamailio.cfg
++++ b/misc/examples/ims/icscf/kamailio.cfg
+@@ -146,9 +146,9 @@ loadmodule "jsonrpcs.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # -- rr params --
+ # add value to ;lr param to make some broken UAs happy
+@@ -192,7 +192,7 @@ modparam("xmlrpc", "url_match", "^/RPC")
+ #!endif
+ 
+ # ----- ctl params -----
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio_icscf/kamailio_ctl")
++modparam("ctl", "binrpc", "unix:/run/kamailio_icscf/kamailio_ctl")
+ 
+ #!ifdef WITH_DEBUG
+ # ----- debugger params -----
+--- a/misc/examples/ims/pcscf/kamailio.cfg
++++ b/misc/examples/ims/pcscf/kamailio.cfg
+@@ -242,9 +242,9 @@ loadmodule "jsonrpcs.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----------------- setting module-specific parameters ---------------
+ #!ifdef DB_URL2
+@@ -324,7 +324,7 @@ modparam("rtpengine", "extra_id_pv", "$a
+ modparam("path", "use_received", 1)
+ 
+ # ----- ctl params -----
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio_pcscf/kamailio_ctl")
++modparam("ctl", "binrpc", "unix:/run/kamailio_pcscf/kamailio_ctl")
+ 
+ # ----------------- Settings for Dispatcher ---------------
+ modparam("dispatcher", "list_file", "/etc/kamailio_pcscf/dispatcher.list")
+--- a/misc/examples/ims/scscf/kamailio.cfg
++++ b/misc/examples/ims/scscf/kamailio.cfg
+@@ -190,12 +190,12 @@ loadmodule "jsonrpcs.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+-modparam("ctl", "binrpc", "unix:/var/run/kamailio_scscf/kamailio_ctl")
++modparam("ctl", "binrpc", "unix:/run/kamailio_scscf/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/misc/examples/kemi/kamailio-basic-kemi.cfg
++++ b/misc/examples/kemi/kamailio-basic-kemi.cfg
+@@ -228,12 +228,12 @@ loadmodule "app_sqlang.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+-#modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++#modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/misc/examples/mixed/kamailio-minimal-anycast.cfg
++++ b/misc/examples/mixed/kamailio-minimal-anycast.cfg
+@@ -115,13 +115,13 @@ loadmodule "counters.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+ /* set the path to RPC unix socket control file */
+-# modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++# modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/misc/examples/mixed/kamailio-minimal-proxy.cfg
++++ b/misc/examples/mixed/kamailio-minimal-proxy.cfg
+@@ -89,13 +89,13 @@ loadmodule "counters.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+ /* set the path to RPC unix socket control file */
+-# modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++# modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/misc/examples/pkg/kamailio-basic.cfg
++++ b/misc/examples/pkg/kamailio-basic.cfg
+@@ -190,12 +190,12 @@ loadmodule "debugger.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+-#modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++#modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/misc/examples/pkg/kamailio-oob.cfg
++++ b/misc/examples/pkg/kamailio-oob.cfg
+@@ -318,13 +318,13 @@ loadmodule "xhttp_pi.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ 
+ # ----- ctl params -----
+-#modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++#modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ 
+ # ----- tm params -----
+--- a/misc/examples/scripts/sr
++++ b/misc/examples/scripts/sr
+@@ -23,7 +23,7 @@ BINNAME=sr
+ HM=/home/srouter
+ SERDIR=$HM/sip_router
+ ETC=/etc/sip-router/iptel.cfg
+-PIDFILE=/var/run/sr.pid
++PIDFILE=/run/sr.pid
+ NOTIFY=sr@iptel.org
+ USR=510
+ GRP=510
+--- a/misc/examples/webrtc/kamailio-default-websocket.cfg
++++ b/misc/examples/webrtc/kamailio-default-websocket.cfg
+@@ -312,13 +312,13 @@ loadmodule "websocket.so"
+ # ----- jsonrpcs params -----
+ modparam("jsonrpcs", "pretty_format", 1)
+ /* set the path to RPC fifo control file */
+-# modparam("jsonrpcs", "fifo_name", "/var/run/kamailio/kamailio_rpc.fifo")
++# modparam("jsonrpcs", "fifo_name", "/run/kamailio/kamailio_rpc.fifo")
+ /* set the path to RPC unix socket control file */
+-# modparam("jsonrpcs", "dgram_socket", "/var/run/kamailio/kamailio_rpc.sock")
++# modparam("jsonrpcs", "dgram_socket", "/run/kamailio/kamailio_rpc.sock")
+ 
+ # ----- ctl params -----
+ /* set the path to RPC unix socket control file */
+-# modparam("ctl", "binrpc", "unix:/var/run/kamailio/kamailio_ctl")
++# modparam("ctl", "binrpc", "unix:/run/kamailio/kamailio_ctl")
+ 
+ # ----- tm params -----
+ # auto-discard branches from previous serial forking leg
+--- a/utils/kamctl/kamctl.base
++++ b/utils/kamctl/kamctl.base
+@@ -101,7 +101,7 @@ fi
+ ##### ------------------------------------------------ #####
+ ### configuration for starting/stopping kamailio
+ if [ -z "$PID_FILE" ] ; then
+-	PID_FILE=/var/run/kamailio/kamailio.pid
++	PID_FILE=/run/kamailio/kamailio.pid
+ fi
+ if [ -z "$SYSLOG" ] ; then
+ 	SYSLOG=1 # 0=output to console, 1=output to syslog
+--- a/utils/kamctl/kamctl.rpcfifo
++++ b/utils/kamctl/kamctl.rpcfifo
+@@ -23,7 +23,7 @@ fi
+ ### parameters
+ #
+ if [ -z "$RPCFIFOPATH" ]; then
+-	RPCFIFOPATH=/var/run/kamailio/kamailio_rpc.fifo
++	RPCFIFOPATH=/run/kamailio/kamailio_rpc.fifo
+ fi
+ 
+ #
+--- a/utils/kamctl/kamctlrc
++++ b/utils/kamctl/kamctlrc
+@@ -133,7 +133,7 @@
+ # CTLENGINE="RPCFIFO"
+ 
+ ## path to FIFO file for engine RPCFIFO
+-# RPCFIFOPATH="/var/run/kamailio/kamailio_rpc_fifo"
++# RPCFIFOPATH="/run/kamailio/kamailio_rpc_fifo"
+ 
+ ## check ACL names; default on (1); off (0)
+ # VERIFY_ACL=1
+@@ -154,8 +154,8 @@
+ # STORE_PLAINTEXT_PW=0
+ 
+ ## Kamailio START Options
+-## PID file path - default is: /var/run/kamailio/kamailio.pid
+-# PID_FILE=/var/run/kamailio/kamailio.pid
++## PID file path - default is: /run/kamailio/kamailio.pid
++# PID_FILE=/run/kamailio/kamailio.pid
+ 
+ ## Extra start options - default is: not set
+ # example: start Kamailio with 64MB share memory: STARTOPTIONS="-m 64"
