@@ -3,7 +3,7 @@
 
 set -e
 
-HOMEDIR=/var/run/kamailio
+HOMEDIR=/run/kamailio
 
 case "$1" in
     configure)
