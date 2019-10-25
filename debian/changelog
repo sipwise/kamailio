@@ -1,3 +1,12 @@
+ngcp-kamailio (5.1.7-1+0~mr6.5.5.4) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [7931f37] TT#63000 fix redis SCAN usage
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 25 Oct 2019 16:11:51 +0200
+
 ngcp-kamailio (5.1.7-1+0~mr6.5.5.3) unstable; urgency=medium
 
   [ Richard Fuchs ]
