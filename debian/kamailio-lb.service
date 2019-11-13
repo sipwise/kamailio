@@ -20,8 +20,6 @@ Environment='CFGFILE=/etc/kamailio/lb/kamailio.cfg'
 Environment='SHM_MEMORY=64'
 # Amount of private memory for each Kamailio process (in MiB)
 Environment='PKG_MEMORY=16'
-# Check if config OK before starting
-ExecStartPre=/usr/sbin/kamailio -f $CFGFILE -m $SHM_MEMORY -M $PKG_MEMORY -c
 # -DD means to not daemonise
 ExecStart=/usr/sbin/kamailio -P /run/kamailio/kamailio.lb.pid -f $CFGFILE -m $SHM_MEMORY -M $PKG_MEMORY -DD
 Restart=on-abort
