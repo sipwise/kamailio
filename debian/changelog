@@ -1,3 +1,12 @@
+ngcp-kamailio (5.2.5-1+0~mr8.0.1.2) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [1f3a1ae] TT#70475 systemd: remove separate kamailio config check on start
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 14 Nov 2019 10:20:18 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.0.1.1) unstable; urgency=medium
 
   [ Marco Capetta ]
