@@ -1,0 +1,134 @@
+---
+ src/Makefile.defs   |    8 ++++----
+ src/core/dprint.c   |    2 +-
+ src/core/dprint.h   |    4 ++--
+ src/core/ver_defs.h |    8 ++++----
+ src/main.c          |   12 ++++++++----
+ 5 files changed, 19 insertions(+), 15 deletions(-)
+
+--- a/src/Makefile.defs
++++ b/src/Makefile.defs
+@@ -656,9 +656,9 @@ data_target = $(prefix)/$(data_dir)
+ # -DPROFILING
+ #		if enabled profiling will be enabled for child processes
+ #		Don't forget to set PROFILE (see below)
+-# -DNO_SIG_DEBUG
+-#        turns off debugging messages in signal handlers (which might be
+-#         unsafe)
++# -DUSE_UNSAFE_SIG_DEBUG
++#		turns on debugging messages in signal handlers (which are
++#		unsafe, but might be acceptable for occasional debugging)
+ # -DUSE_NAPTR
+ #		 turns on naptr support (but must be also enabled from the config)
+ # -DDNS_WATCHDOG_SUPPORT
+@@ -720,7 +720,7 @@ C_DEFS+= -DSHM_MEM  -DSHM_MMAP \
+ 	 #-DSTATS \
+ 	 #-DNO_LOG \
+ 	 #-DPROFILING \
+-	 #-DNO_SIG_DEBUG
++	 #-DUSE_UNSAFE_SIG_DEBUG
+ 
+ #PROFILE=  -pg	# set this if you want profiling
+ 				# you may also want to set -DPROFILING
+--- a/src/core/dprint.c
++++ b/src/core/dprint.c
+@@ -49,7 +49,7 @@ void km_log_func_set(km_log_f f)
+ 	_km_log_func = f;
+ }
+ 
+-#ifndef NO_SIG_DEBUG
++#ifndef USE_UNSAFE_SIG_DEBUG
+ /* signal protection: !=0 when LOG/DBG/... are printing */
+ volatile int dprint_crit = 0; 
+ #endif
+--- a/src/core/dprint.h
++++ b/src/core/dprint.h
+@@ -155,7 +155,7 @@ void set_module_debug_facility_cb(get_mo
+ extern struct log_level_info log_level_info[];
+ extern char *log_name;
+ 
+-#ifndef NO_SIG_DEBUG
++#ifndef USE_UNSAFE_SIG_DEBUG
+ /** @brief protection against "simultaneous" printing from signal handlers */
+ extern volatile int dprint_crit;
+ #endif
+@@ -200,7 +200,7 @@ void log_prefix_init(void);
+ 
+ #else
+ 
+-#	ifdef NO_SIG_DEBUG
++#	ifdef USE_UNSAFE_SIG_DEBUG
+ #		define DPRINT_NON_CRIT		(1)
+ #		define DPRINT_CRIT_ENTER
+ #		define DPRINT_CRIT_EXIT
+--- a/src/core/ver_defs.h
++++ b/src/core/ver_defs.h
+@@ -294,10 +294,10 @@
+ #define USE_DST_BLACKLIST_STR ""
+ #endif
+ 
+-#ifdef NO_SIG_DEBUG
+-#define NO_SIG_DEBUG_STR ", NO_SIG_DEBUG"
++#ifdef USE_UNSAFE_SIG_DEBUG
++#define USE_UNSAFE_SIG_DEBUG_STR ", USE_UNSAFE_SIG_DEBUG"
+ #else
+-#define NO_SIG_DEBUG_STR ""
++#define USE_UNSAFE_SIG_DEBUG_STR ""
+ #endif
+ 
+ #ifdef HAVE_RESOLV_RES 
+@@ -346,7 +346,7 @@
+ 	STATS_STR EXTRA_DEBUG_STR USE_TCP_STR USE_TLS_STR \
+ 	USE_SCTP_STR CORE_TLS_STR TLS_HOOKS_STR USE_RAW_SOCKS_STR \
+ 	DISABLE_NAGLE_STR USE_MCAST_STR NO_DEBUG_STR NO_LOG_STR \
+-	NO_SIG_DEBUG_STR DNS_IP_HACK_STR \
++	USE_UNSAFE_SIG_DEBUG_STR DNS_IP_HACK_STR \
+ 	USE_SHM_MEM_STR SHM_MEM_STR SHM_MMAP_STR PKG_MALLOC_STR \
+ 	Q_MALLOC_STR F_MALLOC_STR DL_MALLOC_STR SF_MALLOC_STR LL_MALLOC_STR TLSF_MALLOC_STR \
+ 	DBG_SR_MEMORY_STR DBG_QM_MALLOC_STR DBG_F_MALLOC_STR \
+--- a/src/main.c
++++ b/src/main.c
+@@ -148,11 +148,11 @@
+ #endif
+ #include "core/ver.h"
+ 
+-/* define SIG_DEBUG by default */
+-#ifdef NO_SIG_DEBUG
+-#undef SIG_DEBUG
+-#else
++/* Do not define SIG_DEBUG by default */
++#ifdef USE_UNSAFE_SIG_DEBUG
+ #define SIG_DEBUG
++#else
++#undef SIG_DEBUG
+ #endif
+ 
+ 
+@@ -816,9 +816,11 @@ void handle_sigs(void)
+ void sig_usr(int signo)
+ {
+ 
++#ifdef SIG_DEBUG /* signal unsafe stuff follows */
+ #ifdef PKG_MALLOC
+ 	int memlog;
+ #endif
++#endif
+ 
+ 	if (is_main){
+ 		if (sig_flag==0) sig_flag=signo;
+@@ -864,6 +866,7 @@ void sig_usr(int signo)
+ 					_exit(0);
+ 					break;
+ 			case SIGUSR1:
++#ifdef SIG_DEBUG /* signal unsafe stuff follows */
+ #ifdef PKG_MALLOC
+ 					cfg_update_no_cbs();
+ 					memlog=cfg_get(core, core_cfg, memlog);
+@@ -878,6 +881,7 @@ void sig_usr(int signo)
+ 						}
+ 					}
+ #endif
++#endif
+ 					break;
+ 				/* ignored*/
+ 			case SIGUSR2:
