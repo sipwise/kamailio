@@ -1,6 +1,24 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Mon, 18 Nov 2019 10:36:39 +0100
+Subject: add_pv_headers_module
+
+---
+ src/Makefile.groups                 |    2 +-
+ src/modules/pv_headers/Makefile     |   12 +
+ src/modules/pv_headers/README       |  488 +++++++++
+ src/modules/pv_headers/pv_headers.c | 2074 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.h |   30 +
+ 5 files changed, 2605 insertions(+), 1 deletion(-)
+ create mode 100644 src/modules/pv_headers/Makefile
+ create mode 100644 src/modules/pv_headers/README
+ create mode 100644 src/modules/pv_headers/pv_headers.c
+ create mode 100644 src/modules/pv_headers/pv_headers.h
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index dba8073..33cbf0a 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst
+@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
  				   rtpproxy sanity sdpops siputils sl statistics textops \
  				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
@@ -9,6 +27,9 @@
  
  # - extra used modules, with no extra dependency
  mod_list_extra=avp auth_diameter call_control call_obj dmq domainpolicy msrp \
+diff --git a/src/modules/pv_headers/Makefile b/src/modules/pv_headers/Makefile
+new file mode 100644
+index 0000000..42b80dd
 --- /dev/null
 +++ b/src/modules/pv_headers/Makefile
 @@ -0,0 +1,12 @@
@@ -24,6 +45,9 @@
 +LIBS=
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/pv_headers/README b/src/modules/pv_headers/README
+new file mode 100644
+index 0000000..30bd1da
 --- /dev/null
 +++ b/src/modules/pv_headers/README
 @@ -0,0 +1,488 @@
@@ -515,6 +539,9 @@
 +        * retrieve the reply reason
 +
 +            $var(test) = $x_rr;
+diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
+new file mode 100644
+index 0000000..49e32b3
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -0,0 +1,2074 @@
@@ -2013,7 +2040,7 @@
 +    else if (idx < 0)
 +        idx = idx + xavp_count(&hname, &xavp);
 +
-+    if (val->flags & PV_VAL_NULL) {
++    if (val==NULL || (val->flags & PV_VAL_NULL)) {
 +        if (itype == PV_IDX_ALL) {
 +            for (idx=xavp_count(&hname, &xavp)-1;idx>=0;idx--) {
 +                if (pv_set_xavp(msg, &xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0) < 0)
@@ -2592,6 +2619,9 @@
 +    pv_str_free(&br_xname);
 +    return -1;
 +}
+diff --git a/src/modules/pv_headers/pv_headers.h b/src/modules/pv_headers/pv_headers.h
+new file mode 100644
+index 0000000..3944f64
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.h
 @@ -0,0 +1,30 @@
