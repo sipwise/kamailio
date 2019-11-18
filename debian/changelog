@@ -1,3 +1,15 @@
+ngcp-kamailio (5.2.5-1+0~mr7.5.3.0) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [43e79a3] TT#70475 systemd: remove separate kamailio config check on start
+
+  [ Guillem Jover ]
+  * [46ff84d] TT#70472 Disable unsafe signal handlers
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 18 Nov 2019 14:43:23 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr7.5.2.0) unstable; urgency=medium
 
   * [201e7cf] New upstream version 5.2.5
