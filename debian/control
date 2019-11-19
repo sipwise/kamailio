@@ -39,6 +39,7 @@ Build-Depends:
  libsnmp-dev,
  libsqlite3-dev,
  libssl-dev,
+ libsystemd-dev,
  libunistring-dev,
  libxml2-dev,
  ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
@@ -93,8 +94,8 @@ Suggests:
 Breaks:
  ngcp-kamailio-carrierroute-modules,
 Provides:
- sip-router,
  ngcp-kamailio-carrierroute-modules,
+ sip-router,
 Description: very fast and configurable SIP proxy
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
