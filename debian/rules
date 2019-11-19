@@ -138,6 +138,7 @@ override_dh_auto_configure:
 	  cfg_target=/etc/kamailio/ \
 	  FLAVOUR=kamailio \
 	  BASEDIR=$(D) \
+	  USE_SYSTEMD=1 \
 	  CC_EXTRA_OPTS="$(CC_EXTRA_OPTS)" \
 	  LD_EXTRA_OPTS="$(LD_EXTRA_OPTS)" \
 	  skip_modules="$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)" \

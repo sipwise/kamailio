@@ -1,0 +1,102 @@
+From 97fe517a2c8dc334e976284f612f5e236700f565 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 19 Nov 2019 12:09:43 +0100
+Subject: [PATCH] [main] USE_SYSTEMD to support sd_notify()
+
+(cherry picked from commit 7cb608e95a0ec78d304c4440dbf742b3ab2f26b5)
+---
+ src/Makefile.defs | 10 ++++++++++
+ src/main.c        | 21 +++++++++++++++++++--
+ 2 files changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/src/Makefile.defs b/src/Makefile.defs
+index 483a11eb2..92f788297 100644
+--- a/src/Makefile.defs
++++ b/src/Makefile.defs
+@@ -676,6 +676,8 @@ data_target = $(prefix)/$(data_dir)
+ #		records are used from the cache. (requires external watchdog)
+ # -DWITH_AS_SUPPORT
+ #		adds support for Application Server interface
++# -DUSE_SYSTEMD
++#       enable sd_notify() support
+ # Sometimes is needes correct non-quoted $OS. HACK: gcc translates known OS to number ('linux'), so there is added underscore
+ 
+ ifeq ($(OS), dragonfly)
+@@ -780,6 +782,10 @@ ifeq ($(SCTP), 1)
+ 	C_DEFS+= -DUSE_SCTP
+ endif
+ 
++ifneq ($(USE_SYSTEMD),)
++	C_DEFS += -DUSE_SYSTEMD
++endif
++
+ ifeq ($(mode),)
+ 	mode = release
+ endif
+@@ -2086,6 +2092,10 @@ LIBS+= -L$(LOCALBASE)/lib -L$(LOCALBASE)/ssl/lib -lssl -lcrypto \
+ #       E.g.: make CORE_TLS=1 EXTRA_TLS_LIBS="-lz -lkrb5"
+ endif
+ 
++ifneq ($(USE_SYSTEMD),)
++	LIBS+= -lsystemd
++endif
++
+ ifneq ($(found_lock_method), yes)
+ $(warning	No locking method found so far, trying SYS V sems)
+ 		C_DEFS+= -DUSE_SYSV_SEM  # try sys v sems
+diff --git a/src/main.c b/src/main.c
+index 0b3bb3a80..9d5a1cdc7 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -67,6 +67,10 @@
+ #include <sys/sockio.h>
+ #endif
+ 
++#ifdef USE_SYSTEMD
++#include <systemd/sd-daemon.h>
++#endif
++
+ #include "core/config.h"
+ #include "core/dprint.h"
+ #include "core/daemonize.h"
+@@ -1785,6 +1789,9 @@ int main_loop(void)
+ 		cfg_ok=1;
+ 
+ 		*_sr_instance_started = 1;
++#ifdef USE_SYSTEMD
++    sd_notify(0, "READY=1\nMAINPID=%lu", (unsigned long)creator_pid);
++#endif
+ 
+ #ifdef EXTRA_DEBUG
+ 		for (r=0; r<*process_count; r++){
+@@ -2711,7 +2718,12 @@ try_again:
+ 	if (ret < 0)
+ 		goto error;
+ 	/*kill everything*/
+-	if (is_main) shutdown_children(SIGTERM, 0);
++	if (is_main) {
++#ifdef USE_SYSTEMD
++    sd_notify(0, "STOPPING=1");
++#endif
++    shutdown_children(SIGTERM, 0);
++  }
+ 	if (!dont_daemonize) {
+ 		if (daemon_status_send(0) < 0)
+ 			fprintf(stderr, "error sending exit status: %s [%d]\n",
+@@ -2722,7 +2734,12 @@ try_again:
+ 
+ error:
+ 	/*kill everything*/
+-	if (is_main) shutdown_children(SIGTERM, 0);
++	if (is_main) {
++#ifdef USE_SYSTEMD
++    sd_notify(0, "STOPPING=1");
++#endif
++    shutdown_children(SIGTERM, 0);
++  }
+ 	if (!dont_daemonize) {
+ 		if (daemon_status_send((char)-1) < 0)
+ 			fprintf(stderr, "error sending exit status: %s [%d]\n",
+-- 
+2.20.1
+
