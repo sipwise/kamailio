@@ -83,6 +83,7 @@ endif
 # FTBFS on kfreebsd
 LINUX_MODULES += json
 LINUX_MODULES += kazoo
+LINUX_MODULES += systemd
 ifeq ($(DEB_HOST_ARCH_OS),linux)
 PACKAGE_GROUPS += $(LINUX_MODULES)
 else
