@@ -10,7 +10,7 @@ Wants=remote-fs.target
 Requires=mariadb.service
 
 [Service]
-Type=simple
+Type=notify
 User=kamailio
 Group=kamailio
 RuntimeDirectory=kamailio

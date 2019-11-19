@@ -1,0 +1,60 @@
+From 99403c83f2163350eda3b76180947b1fddcdf500 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 21 Nov 2019 13:40:21 +0100
+Subject: [PATCH] core: events - support for basic void core callbacks
+
+- can be used to allow modules execute their code from core for specific needs
+---
+ src/core/events.c | 13 +++++++++++++
+ src/core/events.h | 16 ++++++++++++++++
+ 2 files changed, 29 insertions(+)
+
+diff --git a/src/core/events.c b/src/core/events.c
+index 5f71cd8f2..70d717969 100644
+--- a/src/core/events.c
++++ b/src/core/events.c
+@@ -362,3 +362,16 @@ int sr_event_enabled(int type)
+ 	return 0;
+ }
+ 
++
++/**
++ *
++ */
++static sr_corecb_t _ksr_corecb = {0};
++
++/**
++ *
++ */
++sr_corecb_t *sr_corecb_get(void)
++{
++	return &_ksr_corecb;
++}
+diff --git a/src/core/events.h b/src/core/events.h
+index 9c4c54a2e..6282e65a5 100644
+--- a/src/core/events.h
++++ b/src/core/events.h
+@@ -79,4 +79,20 @@ int sr_event_enabled(int type);
+ void sr_core_ert_init(void);
+ void sr_core_ert_run(sip_msg_t *msg, int e);
+ 
++typedef void (*sr_corecb_void_f)(void);
++typedef struct sr_corecb {
++	sr_corecb_void_f app_ready;
++	sr_corecb_void_f app_shutdown;
++} sr_corecb_t;
++
++sr_corecb_t *sr_corecb_get(void);
++
++#define sr_corecb_void_exec(fname) \
++	do { \
++		sr_corecb_t *__cbp = sr_corecb_get(); \
++		if(__cbp && __cbp->fname) { \
++			__cbp->fname(); \
++		} \
++	} while(0);
++
+ #endif
+-- 
+2.20.1
+
