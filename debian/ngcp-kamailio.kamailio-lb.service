@@ -10,7 +10,7 @@ Requires=redis-server.service
 Wants=remote-fs.target
 
 [Service]
-Type=simple
+Type=notify
 User=kamailio
 Group=kamailio
 PIDFile=/run/kamailio/kamailio.lb.pid

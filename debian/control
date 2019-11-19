@@ -39,6 +39,7 @@ Build-Depends:
  libsnmp-dev,
  libsqlite3-dev,
  libssl-dev,
+ libsystemd-dev,
  libunistring-dev,
  libxml2-dev,
  ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
@@ -93,8 +94,8 @@ Suggests:
 Breaks:
  ngcp-kamailio-carrierroute-modules,
 Provides:
- sip-router,
  ngcp-kamailio-carrierroute-modules,
+ sip-router,
 Description: very fast and configurable SIP proxy
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
@@ -766,6 +767,27 @@ Description: erlang modules for Kamailio
  .
  This module provides interact with Erlang node. The module allows sending,
  receiving Erlang messages and RPC calls between each other.
+
+Package: ngcp-kamailio-systemd-modules
+Architecture: linux-any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Conflicts:
+ kamailio-systemd-modules,
+Replaces:
+ kamailio-systemd-modules,
+Description: systemd logging modules for the Kamailio SIP server
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package provides logging to systemd journal directly from the
+ Kamailio configuration and routing scripts.
 
 Package: ngcp-kamailio-extra-modules
 Architecture: any
