@@ -1,0 +1,347 @@
+From 0c48e1621c88bf1d390e4cfb82e52b2d6339b837 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 21 Nov 2019 13:42:14 +0100
+Subject: [PATCH] systemdops: new module to facilitate integration with systemd
+
+---
+ src/modules/systemdops/Makefile               | 23 ++++++
+ src/modules/systemdops/README                 | 77 +++++++++++++++++++
+ src/modules/systemdops/doc/Makefile           |  4 +
+ src/modules/systemdops/doc/systemdops.xml     | 36 +++++++++
+ .../systemdops/doc/systemdops_admin.xml       | 76 ++++++++++++++++++
+ src/modules/systemdops/systemdops_mod.c       | 72 +++++++++++++++++
+ 6 files changed, 288 insertions(+)
+ create mode 100644 src/modules/systemdops/Makefile
+ create mode 100644 src/modules/systemdops/README
+ create mode 100644 src/modules/systemdops/doc/Makefile
+ create mode 100644 src/modules/systemdops/doc/systemdops.xml
+ create mode 100644 src/modules/systemdops/doc/systemdops_admin.xml
+ create mode 100644 src/modules/systemdops/systemdops_mod.c
+
+diff --git a/src/modules/systemdops/Makefile b/src/modules/systemdops/Makefile
+new file mode 100644
+index 000000000..26e15cd39
+--- /dev/null
++++ b/src/modules/systemdops/Makefile
+@@ -0,0 +1,23 @@
++#
++# WARNING: do not run this directly, it should be run by the master Makefile
++
++include ../../Makefile.defs
++auto_gen=
++NAME=systemdops.so
++
++ifeq ($(CROSS_COMPILE),)
++SYSTEMD_BUILDER=$(shell \
++	if pkg-config --exists libsystemd; then \
++		echo 'pkg-config libsystemd'; \
++	fi)
++endif
++
++ifneq ($(SYSTEMD_BUILDER),)
++	DEFS += $(shell $(SYSTEMD_BUILDER) --cflags)
++	LIBS += $(shell $(SYSTEMD_BUILDER) --libs)
++else
++	DEFS += -I$(LOCALBASE)/include
++	LIBS= -L$(LOCALBASE)/lib -lsystemd
++endif
++
++include ../../Makefile.modules
+diff --git a/src/modules/systemdops/README b/src/modules/systemdops/README
+new file mode 100644
+index 000000000..c93df6102
+--- /dev/null
++++ b/src/modules/systemdops/README
+@@ -0,0 +1,77 @@
++SYSTEMDOPS Module
++
++Daniel-Constantin Mierla
++
++   <miconda@gmail.com>
++
++Edited by
++
++Daniel-Constantin Mierla
++
++   <miconda@gmail.com>
++
++   Copyright © 2019 asipto.com
++     __________________________________________________________________
++
++   Table of Contents
++
++   1. Admin Guide
++
++        1. Overview
++        2. Dependencies
++
++              2.1. Kamailio Modules
++              2.2. External Libraries or Applications
++
++        3. Systemd Notifications
++
++   List of Examples
++
++   1.1. Systemd Notifications
++
++Chapter 1. Admin Guide
++
++   Table of Contents
++
++   1. Overview
++   2. Dependencies
++
++        2.1. Kamailio Modules
++        2.2. External Libraries or Applications
++
++   3. Systemd Notifications
++
++1. Overview
++
++   It provides a collection of features to make easier the integration
++   with systemd.
++
++2. Dependencies
++
++   2.1. Kamailio Modules
++   2.2. External Libraries or Applications
++
++2.1. Kamailio Modules
++
++   The following modules must be loaded before this module:
++     * none.
++
++2.2. External Libraries or Applications
++
++   The following libraries or applications must be installed before
++   running Kamailio with this module loaded:
++     * libsystemd
++
++3. Systemd Notifications
++
++   If loaded, the module will generated systemd notifications when
++   Kamailio starts and when Kamailio shuts down. The content of these
++   notifications (sent with sd_notify(...)) are shown in the next example
++   (_PID_ is replaced by the PID of the main process).
++
++   Example 1.1. Systemd Notifications
++...
++READY=1\nMAINPID=_PID_
++...
++STOPPING=1
++...
+diff --git a/src/modules/systemdops/doc/Makefile b/src/modules/systemdops/doc/Makefile
+new file mode 100644
+index 000000000..51a2fbb9d
+--- /dev/null
++++ b/src/modules/systemdops/doc/Makefile
+@@ -0,0 +1,4 @@
++docs = systemdops.xml
++
++docbook_dir = ../../../../doc/docbook
++include $(docbook_dir)/Makefile.module
+diff --git a/src/modules/systemdops/doc/systemdops.xml b/src/modules/systemdops/doc/systemdops.xml
+new file mode 100644
+index 000000000..bf15611d2
+--- /dev/null
++++ b/src/modules/systemdops/doc/systemdops.xml
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
++%docentities;
++
++]>
++
++<book xmlns:xi="http://www.w3.org/2001/XInclude">
++    <bookinfo>
++	<title>SYSTEMDOPS Module</title>
++	<productname class="trade">kamailio.org</productname>
++	<authorgroup>
++	    <author>
++		<firstname>Daniel-Constantin</firstname>
++		<surname>Mierla</surname>
++		<email>miconda@gmail.com</email>
++	    </author>
++	    <editor>
++		<firstname>Daniel-Constantin</firstname>
++		<surname>Mierla</surname>
++		<email>miconda@gmail.com</email>
++	    </editor>
++	</authorgroup>
++	<copyright>
++	    <year>2019</year>
++	    <holder>asipto.com</holder>
++	</copyright>
++    </bookinfo>
++    <toc></toc>
++
++    <xi:include href="systemdops_admin.xml"/>
++
++</book>
+diff --git a/src/modules/systemdops/doc/systemdops_admin.xml b/src/modules/systemdops/doc/systemdops_admin.xml
+new file mode 100644
+index 000000000..7af4cc3d9
+--- /dev/null
++++ b/src/modules/systemdops/doc/systemdops_admin.xml
+@@ -0,0 +1,76 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
++%docentities;
++
++]>
++<!-- Module User's Guide -->
++
++<chapter>
++
++	<title>&adminguide;</title>
++
++	<section>
++	<title>Overview</title>
++	<para>
++		It provides a collection of features to make easier the integration
++		with systemd.
++	</para>
++	</section>
++
++	<section>
++	<title>Dependencies</title>
++	<section>
++		<title>&kamailio; Modules</title>
++		<para>
++		The following modules must be loaded before this module:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>none</emphasis>.
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	</section>
++	<section>
++		<title>External Libraries or Applications</title>
++		<para>
++		The following libraries or applications must be installed before running
++		&kamailio; with this module loaded:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>libsystemd</emphasis>
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	</section>
++	</section>
++
++	<section>
++	<title>Systemd Notifications</title>
++		<para>
++		If loaded, the module will generated systemd notifications when &kamailio;
++		starts and when &kamailio; shuts down. The content of these notifications
++		(sent with sd_notify(...)) are shown in the next example (_PID_ is
++		replaced by the PID of the main process).
++		</para>
++		<example>
++		<title><function>Systemd Notifications</function></title>
++		<programlisting format="linespecific">
++...
++READY=1\nMAINPID=_PID_
++...
++STOPPING=1
++...
++</programlisting>
++	    </example>
++	</section>
++
++</chapter>
++
+diff --git a/src/modules/systemdops/systemdops_mod.c b/src/modules/systemdops/systemdops_mod.c
+new file mode 100644
+index 000000000..58d7a2b24
+--- /dev/null
++++ b/src/modules/systemdops/systemdops_mod.c
+@@ -0,0 +1,72 @@
++/**
++ * Copyright (C) 2019 Daniel-Constantin Mierla (asipto.com)
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * This file is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ *
++ * This file is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#include <stdio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++#include <systemd/sd-daemon.h>
++
++#include "../../core/sr_module.h"
++#include "../../core/dprint.h"
++#include "../../core/events.h"
++#include "../../core/globals.h"
++
++
++MODULE_VERSION
++
++struct module_exports exports = {
++	"systemdops",    /* module name */
++	DEFAULT_DLFLAGS, /* dlopen flags */
++	0,               /* cmd (cfg function) exports */
++	0,               /* param exports */
++	0,               /* RPC method exports */
++	0,               /* pseudo-variables exports */
++	0,               /* response handling function */
++	0,               /* module init function */
++	0,               /* per-child init function */
++	0                /* module destroy function */
++};
++
++/**
++ *
++ */
++void ksr_sd_app_ready(void)
++{
++	sd_notifyf(0, "READY=1\nMAINPID=%lu", (unsigned long)creator_pid);
++}
++
++/**
++ *
++ */
++void ksr_sd_app_shutdown(void)
++{
++	sd_notify(0, "STOPPING=1");
++}
++
++/**
++ * module registration function
++ */
++int mod_register(char *path, int *dlflags, void *p1, void *p2)
++{
++	return 0;
++}
+-- 
+2.20.1
+
