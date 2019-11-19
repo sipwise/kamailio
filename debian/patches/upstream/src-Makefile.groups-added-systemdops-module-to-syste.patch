@@ -1,0 +1,21 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 21 Nov 2019 13:44:35 +0100
+Subject: src/Makefile.groups: added systemdops module to systemd group
+
+---
+ src/Makefile.groups | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index 33cbf0a..53d8cc6 100644
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -199,7 +199,7 @@ mod_list_cnxcc=cnxcc
+ mod_list_erlang=erlang
+ 
+ # - modules depending on systemd library
+-mod_list_systemd=log_systemd
++mod_list_systemd=log_systemd systemdops
+ 
+ # - modules depending on libtcap library
+ mod_list_tcap=tcap
