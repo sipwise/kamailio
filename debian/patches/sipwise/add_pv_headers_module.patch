@@ -2,13 +2,14 @@ From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
 
+Change-Id: I9f7efd8872a815b86ced8a06f663a10c5f327dcf
 ---
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
  src/modules/pv_headers/README       |  488 +++++++++
- src/modules/pv_headers/pv_headers.c | 2074 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.c | 2069 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2605 insertions(+), 1 deletion(-)
+ 5 files changed, 2600 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -541,10 +542,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..49e32b3
+index 0000000..170c29b
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2074 @@
+@@ -0,0 +1,2069 @@
 +/*
 + * pv_headers
 + *
@@ -794,24 +795,19 @@ index 0000000..49e32b3
 +{
 +    struct sip_msg *msg = NULL;
 +
-+    switch (type) {
-+        case TMCB_RESPONSE_IN:
-+            msg = params->rpl;
-+            if (msg != NULL && msg != FAKED_REPLY) {
-+                pv_reset_headers(msg, NULL, NULL);
-+                pv_collect_headers(msg, "1", NULL);
-+            }
-+            return;
-+        case TMCB_REQUEST_FWDED:
-+            msg = params->req;
-+            break;
-+        case TMCB_ON_BRANCH_FAILURE:
-+        case TMCB_RESPONSE_FWDED:
-+            msg = params->rpl;
-+            break;
-+        default:
-+            LM_ERR("unknown callback: %d\n", type);
-+            return;
++    if (type & TMCB_RESPONSE_IN) {
++        msg = params->rpl;
++        if (msg != NULL && msg != FAKED_REPLY) {
++            pv_reset_headers(msg, NULL, NULL);
++            pv_collect_headers(msg, "1", NULL);
++        }
++    } else if (type & TMCB_REQUEST_FWDED) {
++       msg = params->req;
++    } else if (type &(TMCB_ON_BRANCH_FAILURE|TMCB_RESPONSE_FWDED)) {
++        msg = params->rpl;
++    } else {
++        LM_ERR("unknown callback: %d\n", type);
++        return;
 +    }
 +
 +    if (msg != NULL && msg != FAKED_REPLY)
@@ -824,16 +820,14 @@ index 0000000..49e32b3
 +{
 +    int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN | TMCB_ON_BRANCH_FAILURE;
 +
-+    switch (flags) {
-+        case PRE_SCRIPT_CB|REQUEST_CB:
-+            if (tmb.register_tmcb( msg, 0, cbs, handle_tm_t, 0, 0) <=0) {
-+                LM_ERR("cannot register TM callbacks\n");
-+                return -1;
-+            }
-+            pv_collect_headers(msg, "1", NULL);
-+            break;
-+        default:
-+            LM_ERR("unknown callback: %d\n", flags);
++    if (flags & (PRE_SCRIPT_CB|REQUEST_CB)) {
++        if (tmb.register_tmcb( msg, 0, cbs, handle_tm_t, 0, 0) <=0) {
++            LM_ERR("cannot register TM callbacks\n");
++            return -1;
++        }
++        pv_collect_headers(msg, "1", NULL);
++    } else {
++        LM_ERR("unknown callback: %d\n", flags);
 +    }
 +
 +    return 1;
@@ -850,7 +844,7 @@ index 0000000..49e32b3
 +    int br_idx;
 +
 +    pv_get_branch_index(msg, &br_idx);
-+
++    LM_DBG("br_idx: %d\n", br_idx);
 +    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
 +        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) ||
 +         (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1))) {
@@ -950,7 +944,8 @@ index 0000000..49e32b3
 +        LM_ERR("missing xavp %s, run pv_collect_headers() first\n", xavp_name.s);
 +        goto err;
 +    }
-+
++    LM_DBG("xavp->name:%.*s br_xname:%.*s\n",
++        xavp->name.len, xavp->name.s, br_xname.len, br_xname.s);
 +    if (xavp->val.type != SR_XTYPE_XAVP) {
 +        LM_ERR("not xavp child type %s\n" , xavp_name.s);
 +        goto err;
@@ -1230,7 +1225,8 @@ index 0000000..49e32b3
 +    if (pv_str_new(&br_xname, header_name_size) < 0)
 +        return -1;
 +    pv_get_branch_xname(msg, xname, &br_xname);
-+
++    LM_DBG("br_xname: %.*s name: %.*s\n",
++        br_xname.len, br_xname.s, name->len, name->s);
 +    memset(&xval, 0, sizeof(sr_xval_t));
 +    if (data == NULL || SR_XTYPE_NULL) {
 +        xval.type = SR_XTYPE_NULL;
@@ -1703,7 +1699,7 @@ index 0000000..49e32b3
 +        if (idx < 0)
 +            return -1;
 +    }
-+
++    LM_DBG("xavp name: %.s\n", name->len, name->s);
 +    if (xavp_set_value(name, idx, val, start) == NULL)
 +        return -1;
 +
