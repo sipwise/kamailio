@@ -1,3 +1,13 @@
+ngcp-kamailio (4.4.7-1+0~mr5.5.11.1) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [e269b3c] TT#63509 fix sca mem leak
+  * [7d5bad3] TT#66752 avoid presence_dfks core dumps
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 20 Nov 2019 15:03:40 +0100
+
 ngcp-kamailio (4.4.7-1+0~mr5.5.11.0) unstable; urgency=medium
 
   [ Andrew Pogrebennyk ]
