@@ -1,0 +1,44 @@
+From 7b10327189fc6c1cf1c53fc7c90bed84753ec54b Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 21 Nov 2019 08:15:03 +0100
+Subject: [PATCH] tm: execute TMCB_REQUEST_FWDED cb as BRANCH_ROUTE when
+ necessary
+
+(cherry picked from commit bc40eaa4fe446bffd9f41d5d6b21becd7b7fdc87)
+---
+ src/modules/tm/t_fwd.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/tm/t_fwd.c b/src/modules/tm/t_fwd.c
+index 2ad86a3f8..99f603403 100644
+--- a/src/modules/tm/t_fwd.c
++++ b/src/modules/tm/t_fwd.c
+@@ -376,15 +376,19 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
+ 					goto error03;
+ 				}
+ 			}
++			/* run the specific callbacks for this transaction */
++			if (unlikely(has_tran_tmcbs(t, TMCB_REQUEST_FWDED)))
++				run_trans_callbacks( TMCB_REQUEST_FWDED , t, i_req, 0,
++						-i_req->REQ_METHOD);
++
+ 			tm_ctx_set_branch_index(T_BR_UNDEFINED);
+ 			set_route_type(backup_route_type);
++		} else {
++			/* run the specific callbacks for this transaction */
++			if (unlikely(has_tran_tmcbs(t, TMCB_REQUEST_FWDED)))
++				run_trans_callbacks( TMCB_REQUEST_FWDED , t, i_req, 0,
++						-i_req->REQ_METHOD);
+ 		}
+-
+-		/* run the specific callbacks for this transaction */
+-		if (unlikely(has_tran_tmcbs(t, TMCB_REQUEST_FWDED)))
+-			run_trans_callbacks( TMCB_REQUEST_FWDED , t, i_req, 0,
+-					-i_req->REQ_METHOD);
+-
+ 		if (likely( !(flags & UAC_DNS_FAILOVER_F) && i_req->dst_uri.s &&
+ 					i_req->dst_uri.len)){
+ 			/* no dns failover and non-empty dst_uri => use it as dst
+-- 
+2.20.1
+
