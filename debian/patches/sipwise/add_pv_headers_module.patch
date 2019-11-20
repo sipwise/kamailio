@@ -2,13 +2,14 @@ From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
 
+Change-Id: Id63d7711483732b44780dfa3ccc783ea93b28cc4
 ---
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
  src/modules/pv_headers/README       |  488 +++++++++
- src/modules/pv_headers/pv_headers.c | 2074 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.c | 2070 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2605 insertions(+), 1 deletion(-)
+ 5 files changed, 2601 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -541,10 +542,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..49e32b3
+index 0000000..c4c5d35
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2074 @@
+@@ -0,0 +1,2070 @@
 +/*
 + * pv_headers
 + *
@@ -794,24 +795,20 @@ index 0000000..49e32b3
 +{
 +    struct sip_msg *msg = NULL;
 +
-+    switch (type) {
-+        case TMCB_RESPONSE_IN:
-+            msg = params->rpl;
-+            if (msg != NULL && msg != FAKED_REPLY) {
-+                pv_reset_headers(msg, NULL, NULL);
-+                pv_collect_headers(msg, "1", NULL);
-+            }
-+            return;
-+        case TMCB_REQUEST_FWDED:
-+            msg = params->req;
-+            break;
-+        case TMCB_ON_BRANCH_FAILURE:
-+        case TMCB_RESPONSE_FWDED:
-+            msg = params->rpl;
-+            break;
-+        default:
-+            LM_ERR("unknown callback: %d\n", type);
-+            return;
++    if (type & TMCB_RESPONSE_IN) {
++        msg = params->rpl;
++        if (msg != NULL && msg != FAKED_REPLY) {
++            pv_reset_headers(msg, NULL, NULL);
++            pv_collect_headers(msg, "1", NULL);
++        }
++        return;
++    } else if (type & TMCB_REQUEST_FWDED) {
++        msg = params->req;
++    } else if (type & (TMCB_ON_BRANCH_FAILURE|TMCB_RESPONSE_FWDED)) {
++        msg = params->rpl;
++    } else {
++        LM_ERR("unknown callback: %d\n", type);
++        return;
 +    }
 +
 +    if (msg != NULL && msg != FAKED_REPLY)
