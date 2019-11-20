@@ -2,13 +2,14 @@ From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
 
+Change-Id: I9f7efd8872a815b86ced8a06f663a10c5f327dcf
 ---
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
  src/modules/pv_headers/README       |  488 +++++++++
- src/modules/pv_headers/pv_headers.c | 2074 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.c | 2068 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2605 insertions(+), 1 deletion(-)
+ 5 files changed, 2599 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -541,10 +542,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..49e32b3
+index 0000000..c66d0f8
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2074 @@
+@@ -0,0 +1,2068 @@
 +/*
 + * pv_headers
 + *
@@ -762,7 +763,7 @@ index 0000000..49e32b3
 +        auto_msg_param = 0;
 +    } else {
 +        if (auto_msg_param &&
-+            register_script_cb(handle_msg_cb, PRE_SCRIPT_CB|REQUEST_CB, 0) < 0) {
++            register_script_cb(handle_msg_cb, PRE_SCRIPT_CB|REQUEST_CB|BRANCH_CB, 0) < 0) {
 +                LM_ERR("cannot register PRE_SCRIPT_CB callbacks\n");
 +                return -1;
 +        }
@@ -794,24 +795,19 @@ index 0000000..49e32b3
 +{
 +    struct sip_msg *msg = NULL;
 +
-+    switch (type) {
-+        case TMCB_RESPONSE_IN:
-+            msg = params->rpl;
-+            if (msg != NULL && msg != FAKED_REPLY) {
-+                pv_reset_headers(msg, NULL, NULL);
-+                pv_collect_headers(msg, "1", NULL);
-+            }
-+            return;
-+        case TMCB_REQUEST_FWDED:
-+            msg = params->req;
-+            break;
-+        case TMCB_ON_BRANCH_FAILURE:
-+        case TMCB_RESPONSE_FWDED:
-+            msg = params->rpl;
-+            break;
-+        default:
-+            LM_ERR("unknown callback: %d\n", type);
-+            return;
++    if (type & TMCB_RESPONSE_IN) {
++        msg = params->rpl;
++        if (msg != NULL && msg != FAKED_REPLY) {
++            pv_reset_headers(msg, NULL, NULL);
++            pv_collect_headers(msg, "1", NULL);
++        }
++    } else if (type & TMCB_REQUEST_FWDED) {
++       msg = params->req;
++    } else if (type &(TMCB_ON_BRANCH_FAILURE|TMCB_RESPONSE_FWDED)) {
++        msg = params->rpl;
++    } else {
++        LM_ERR("unknown callback: %d\n", type);
++        return;
 +    }
 +
 +    if (msg != NULL && msg != FAKED_REPLY)
@@ -824,16 +820,14 @@ index 0000000..49e32b3
 +{
 +    int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN | TMCB_ON_BRANCH_FAILURE;
 +
-+    switch (flags) {
-+        case PRE_SCRIPT_CB|REQUEST_CB:
-+            if (tmb.register_tmcb( msg, 0, cbs, handle_tm_t, 0, 0) <=0) {
-+                LM_ERR("cannot register TM callbacks\n");
-+                return -1;
-+            }
-+            pv_collect_headers(msg, "1", NULL);
-+            break;
-+        default:
-+            LM_ERR("unknown callback: %d\n", flags);
++    if (flags & (PRE_SCRIPT_CB|REQUEST_CB|BRANCH_CB)) {
++        if (tmb.register_tmcb( msg, 0, cbs, handle_tm_t, 0, 0) <=0) {
++            LM_ERR("cannot register TM callbacks\n");
++            return -1;
++        }
++        pv_collect_headers(msg, "1", NULL);
++    } else {
++        LM_ERR("unknown callback: %d\n", flags);
 +    }
 +
 +    return 1;
@@ -1230,7 +1224,7 @@ index 0000000..49e32b3
 +    if (pv_str_new(&br_xname, header_name_size) < 0)
 +        return -1;
 +    pv_get_branch_xname(msg, xname, &br_xname);
-+
++    LM_DBG("br_xname: %.s\n", br_xname.len, br_xname.s);
 +    memset(&xval, 0, sizeof(sr_xval_t));
 +    if (data == NULL || SR_XTYPE_NULL) {
 +        xval.type = SR_XTYPE_NULL;
@@ -1720,6 +1714,7 @@ index 0000000..49e32b3
 +        return NULL;
 +
 +    pv_get_branch_xname(msg, xname, &br_xname);
++    LM_DBG("br_xname: %.s\n", br_xname.len, br_xname.s);
 +    if ((xavp = xavp_get(&br_xname, NULL)) == NULL &&
 +        (xavp = xavp_get(xname, NULL)) == NULL) {
 +        goto err;
