@@ -1,0 +1,73 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "a3a23d43_70b67693",
+        "filename": "debian/ngcp-kamailio.kamailio-lb.service",
+        "patchSetId": 8
+      },
+      "lineNbr": 9,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-11-22T10:45:36Z",
+      "side": 0,
+      "message": "Wants? (see the ticket)",
+      "range": {
+        "startLine": 9,
+        "startChar": 0,
+        "endLine": 9,
+        "endChar": 8
+      },
+      "revId": "f80b4491c8b88e7bf8f525437c0094a71b418bc5",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "7a3e007e_f3a1ae7d",
+        "filename": "debian/ngcp-kamailio.kamailio-proxy.service",
+        "patchSetId": 8
+      },
+      "lineNbr": 8,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-11-22T10:45:36Z",
+      "side": 0,
+      "message": "Wants? (see the ticket)",
+      "range": {
+        "startLine": 8,
+        "startChar": 0,
+        "endLine": 8,
+        "endChar": 8
+      },
+      "revId": "f80b4491c8b88e7bf8f525437c0094a71b418bc5",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "76b6b489_b687943e",
+        "filename": "debian/ngcp-kamailio.kamailio-proxy.service",
+        "patchSetId": 8
+      },
+      "lineNbr": 10,
+      "author": {
+        "id": 1000001
+      },
+      "writtenOn": "2019-11-22T10:45:36Z",
+      "side": 0,
+      "message": "Wants? (see the ticket)",
+      "range": {
+        "startLine": 10,
+        "startChar": 0,
+        "endLine": 10,
+        "endChar": 8
+      },
+      "revId": "f80b4491c8b88e7bf8f525437c0094a71b418bc5",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
