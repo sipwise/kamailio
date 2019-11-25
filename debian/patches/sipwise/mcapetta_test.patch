@@ -1,0 +1,321 @@
+--- a/src/modules/tm/t_serial.c
++++ b/src/modules/tm/t_serial.c
+@@ -33,6 +33,7 @@
+ #include "../../core/parser/msg_parser.h"
+ #include "../../core/ut.h"
+ #include "../../core/xavp.h"
++#include "../../core/rand/kam_rand.h"
+ #include "config.h"
+ #include "t_funcs.h"
+ #include "t_reply.h"
+@@ -362,6 +363,248 @@ int t_load_contacts(struct sip_msg* msg,
+ 	return ki_t_load_contacts(msg);
+ }
+ 
++/*
++ * Loads contacts in destination set into contacts_avp in reverse
++ * priority order and associated each contact with Q_FLAG telling if
++ * contact is the last one in its priority class.  Finally, removes
++ * all branches from destination set.
++ */
++int ki_t_load_contacts_2(struct sip_msg* msg)
++{
++	branch_t *branch;
++	str *ruri, sock_str;
++	struct contact *contacts, *next, *prev, *curr;
++	int first_idx, idx, len;
++	char sock_buf[MAX_SOCKET_STR];
++	unsigned short q_total = 0;
++	int n_rand =0;
++	int n_elements = 0;
++	int q_remove = 0;
++
++	kam_srand(time(NULL));
++
++	/* Check if contacts_avp has been defined */
++	if (contacts_avp.len == 0) {
++		LM_ERR("feature has been disabled - "
++				"to enable define contacts_avp module parameter");
++		return -1;
++	}
++
++	/* Check if anything needs to be done */
++	LM_DBG("nr_branches is %d\n", nr_branches);
++
++	if ((nr_branches == 0) || ((nr_branches == 1) && !ruri_is_new)) {
++		LM_DBG("nothing to do - only one contact!\n");
++		return 1;
++	}
++
++	/* Allocate memory for first contact */
++	contacts = (struct contact *)pkg_malloc(sizeof(struct contact));
++	if (!contacts) {
++		LM_ERR("no memory for contact info\n");
++		return -1;
++	}
++	memset(contacts, 0, sizeof(struct contact));
++
++	if (ruri_is_new) {
++		ruri = GET_RURI(msg);
++		if (!ruri) {
++			free_contact_list(contacts);
++			LM_ERR("no Request-URI found\n");
++			return -1;
++		}
++		/* Insert Request-URI branch to first contact */
++		contacts->uri.s = ruri->s;
++		contacts->uri.len = ruri->len;
++		contacts->dst_uri = msg->dst_uri;
++		contacts->sock = msg->force_send_socket;
++		getbflagsval(0, &contacts->flags);
++		contacts->path = msg->path_vec;
++		contacts->q = get_ruri_q();
++		contacts->instance = msg->instance;
++		contacts->ruid = msg->ruid;
++		contacts->location_ua = msg->location_ua;
++		if (ulattrs_xavp_name.s != NULL)
++		{
++			contacts->ulattrs = xavp_get_by_index(&ulattrs_xavp_name, 0, NULL);
++		}
++		first_idx = 0;
++	} else {
++		/* Insert first branch to first contact */
++		branch = get_sip_branch(0);
++		contacts->uri.s = branch->uri;
++		contacts->uri.len = branch->len;
++		contacts->dst_uri.s = branch->dst_uri;
++		contacts->dst_uri.len = branch->dst_uri_len;
++		contacts->sock = branch->force_send_socket;
++		contacts->flags = branch->flags;
++		contacts->path.s = branch->path;
++		contacts->path.len = branch->path_len;
++		contacts->q = branch->q;
++		contacts->instance.s = branch->instance;
++		contacts->instance.len = branch->instance_len;
++		contacts->ruid.s = branch->ruid;
++		contacts->ruid.len = branch->ruid_len;
++		contacts->location_ua.s = branch->location_ua;
++		contacts->location_ua.len = branch->location_ua_len;
++		if (ulattrs_xavp_name.s != NULL)
++		{
++			contacts->ulattrs = xavp_get_by_index(&ulattrs_xavp_name, 1, NULL);
++		}
++		first_idx = 1;
++	}
++
++	// Save in q_flag the index to check for the probability order
++	// Don't consider elements with Q value 0 or negative
++	if (contacts->q > 0) {
++		q_total += contacts->q;
++		n_elements += 1;
++	}
++	contacts->q_flag = q_total;
++	LM_DBG("contact's q_value: %d / q_flag: %d / q_total: %d\n", contacts->q, contacts->q_flag, q_total);
++
++	contacts->next = (struct contact *)0;
++
++	/* Insert (remaining) branches to contact list in increasing q_flag order */
++	for (idx = first_idx; (branch = get_sip_branch(idx)) != 0; idx++) {
++
++		next = (struct contact *)pkg_malloc(sizeof(struct contact));
++		if (!next) {
++			LM_ERR("no memory for contact info\n");
++			free_contact_list(contacts);
++			return -1;
++		}
++
++		memset(next, 0, sizeof(struct contact));
++		next->uri.s = branch->uri;
++		next->uri.len = branch->len;
++		next->dst_uri.s = branch->dst_uri;
++		next->dst_uri.len = branch->dst_uri_len;
++		next->sock = branch->force_send_socket;
++		next->flags = branch->flags;
++		next->path.s = branch->path;
++		next->path.len = branch->path_len;
++		next->q = branch->q;
++		next->instance.s = branch->instance;
++		next->instance.len = branch->instance_len;
++		next->ruid.s = branch->ruid;
++		next->ruid.len = branch->ruid_len;
++		next->location_ua.s = branch->location_ua;
++		next->location_ua.len = branch->location_ua_len;
++		if (ulattrs_xavp_name.s != NULL)
++		{
++			next->ulattrs = xavp_get_by_index(&ulattrs_xavp_name, idx + 1, NULL);
++		}
++
++		// Save in q_flag the index to check for the probability order
++		// Don't consider elements with Q value 0 or negative
++		if (next->q > 0) {
++			q_total += next->q;
++			n_elements += 1;
++		}
++		next->q_flag = q_total;
++		LM_DBG("contact's q_value: %d / q_flag: %d / q_total: %d\n", next->q, next->q_flag, q_total);
++
++		next->next = (struct contact *)0;
++
++		prev = (struct contact *)0;
++		curr = contacts;
++		while (curr &&
++				((curr->q_flag < next->q_flag) ||
++				 ((curr->q_flag == next->q_flag) && (next->path.len == 0)))) {
++			prev = curr;
++			curr = curr->next;
++		}
++		if (!curr) {
++			next->next = (struct contact *)0;
++			prev->next = next;
++		} else {
++			next->next = curr;
++			if (prev) {
++				prev->next = next;
++			} else {
++				contacts = next;
++			}
++		}
++	}
++
++	/* Add contacts to contacts_avp */
++	for (idx = 0; idx < n_elements; idx++) {
++		LM_DBG("Loop number: %d\n", idx);
++
++		q_remove = 0;
++		n_rand = kam_rand() % q_total;	// Generate a random number from 0 to (q_total -1)
++		LM_DBG("Random number is: %d\n", n_rand);
++
++		curr = contacts;
++		while (curr) {
++			if (curr->q <= 0) {
++				curr = curr->next;
++				continue;
++			}
++			if (q_remove != 0) {
++				LM_DBG("ALREADY FOUND\n");
++				LM_DBG(" - OLD - q_remove: %d / q_flag: %d / q: %d / q_total: %d\n", q_remove, curr->q_flag, curr->q, q_total);
++				curr->q_flag -= q_remove;
++				LM_DBG(" - NEW - q_remove: %d / q_flag: %d / q: %d / q_total: %d\n", q_remove, curr->q_flag, curr->q, q_total);
++			}
++			else if (curr->q_flag > n_rand) {
++				LM_DBG("FOUND\n");
++				LM_DBG(" - OLD - q_remove: %d / q_flag: %d / q: %d / q_total: %d\n", q_remove, curr->q_flag, curr->q, q_total);
++				q_remove = curr->q;
++				q_total -= q_remove;
++				curr->q_flag -= q_remove;
++				LM_DBG(" - NEW - q_remove: %d / q_flag: %d / q: %d / q_total: %d\n", q_remove, curr->q_flag, curr->q, q_total);
++
++				if (curr->sock) {
++					len = MAX_SOCKET_STR - 1;
++					if (socket2str(sock_buf, &len, curr->sock) < 0) {
++						LM_ERR("failed to convert socket to str\n");
++						free_contact_list(contacts);
++						return -1;
++					}
++					sock_buf[len] = 0;
++					sock_str.s = sock_buf;
++					sock_str.len = len + 1;
++				} else {
++					sock_str.s = 0;
++					sock_str.len = 0;
++				}
++
++				// Always set Q_FLAG because only serial forking is needed
++				add_contacts_avp(&(curr->uri), &(curr->dst_uri), &(curr->path),
++						&sock_str, curr->flags, Q_FLAG,
++						&(curr->instance), &(curr->ruid), &(curr->location_ua),
++						curr->ulattrs);
++			}
++			else {
++				LM_DBG("NOT FOUND\n");
++				LM_DBG(" - OLD - q_remove: %d / q_flag: %d / q: %d / q_total: %d\n", q_remove, curr->q_flag, curr->q, q_total);
++			}
++
++			curr = curr->next;
++		}
++	}
++
++	/// TODO: missing the part where we add the contacts with q-value equals to 0 or less.
++
++	/* Clear all branches */
++	clear_branches();
++	if (ulattrs_xavp_name.s != NULL){
++		xavp_rm_by_name(&ulattrs_xavp_name, 1, NULL);
++	}
++
++	/* Free contact list */
++	free_contact_list(contacts);
++
++	return 1;
++}
++
++int t_load_contacts_2(struct sip_msg* msg, char* key, char* value)
++{
++	return ki_t_load_contacts_2(msg);
++}
++
+ void add_contact_flows_avp(str *uri, str *dst_uri, str *path, str *sock_str,
+ 		unsigned int flags, str *instance, str *ruid,
+ 		str *location_ua, sr_xavp_t *ulattrs_xavp)
+--- a/src/modules/tm/t_serial.h
++++ b/src/modules/tm/t_serial.h
+@@ -32,12 +32,16 @@ extern int fr_inv_timer_next;
+ 
+ int t_load_contacts(struct sip_msg* msg, char* key, char* value);
+ 
++int t_load_contacts_2(struct sip_msg* msg, char* key, char* value);
++
+ int t_next_contacts(struct sip_msg* msg, char* key, char* value);
+ 
+ int t_next_contact_flow(struct sip_msg* msg, char* key, char* value);
+ 
+ int ki_t_load_contacts(struct sip_msg* msg);
+ 
++int ki_t_load_contacts_2(struct sip_msg* msg);
++
+ int ki_t_next_contacts(struct sip_msg* msg);
+ 
+ int ki_t_next_contact_flow(struct sip_msg* msg);
+--- a/src/modules/tm/tm.c
++++ b/src/modules/tm/tm.c
+@@ -407,6 +407,8 @@ static cmd_export_t cmds[]={
+ 
+ 	{"t_load_contacts", t_load_contacts,            0, 0, 0,
+ 		REQUEST_ROUTE | FAILURE_ROUTE},
++	{"t_load_contacts_2", t_load_contacts_2,        0, 0, 0,
++		REQUEST_ROUTE | FAILURE_ROUTE},
+ 	{"t_next_contacts", t_next_contacts,            0, 0, 0,
+ 		REQUEST_ROUTE | FAILURE_ROUTE},
+ 	{"t_next_contact_flow", t_next_contact_flow,            0, 0, 0,
+@@ -2922,6 +2924,11 @@ static sr_kemi_t tm_kemi_exports[] = {
+ 		SR_KEMIP_INT, ki_t_load_contacts,
+ 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+ 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
++	},
++	{ str_init("tm"), str_init("t_load_contacts_2"),
++		SR_KEMIP_INT, ki_t_load_contacts,
++		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+ 	},
+ 	{ str_init("tm"), str_init("t_next_contacts"),
+ 		SR_KEMIP_INT, ki_t_next_contacts,
+--- a/src/modules/tm/tm_load.c
++++ b/src/modules/tm/tm_load.c
+@@ -139,6 +139,7 @@ int load_tm( struct tm_binds *tmb)
+ #endif
+ 	tmb->t_append_branches = t_append_branches;
+ 	tmb->t_load_contacts = t_load_contacts;
++	tmb->t_load_contacts_2 = t_load_contacts_2;
+ 	tmb->t_next_contacts = t_next_contacts;
+ 	tmb->set_fr = t_set_fr;
+ 	return 1;
+--- a/src/modules/tm/tm_load.h
++++ b/src/modules/tm/tm_load.h
+@@ -126,6 +126,7 @@ struct tm_binds {
+ #endif
+ 	t_append_branches_f	t_append_branches;
+ 	cmd_function	t_load_contacts;
++	cmd_function	t_load_contacts_2;
+ 	cmd_function	t_next_contacts;
+ 	tset_fr_f set_fr;
+ };
