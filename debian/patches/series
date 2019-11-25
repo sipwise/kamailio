@@ -55,3 +55,4 @@ sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/rtpengine_play_dtmf.patch
 sipwise/db_redis_eval_fix.patch
 sipwise/switch_from_python2_to_python3.patch
+sipwise/fix_lcr_rate_wrong_id.patch
