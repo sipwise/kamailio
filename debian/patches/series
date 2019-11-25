@@ -64,3 +64,4 @@ upstream/cfgt-don-t-try-to-create-dir-if-it-already-exists.patch
 upstream/cfgt-fix-detection-of-jump-to-previous-previous-rout.patch
 ### 
 sipwise/fix_error_in_cfgt_module.patch
+sipwise/mcapetta_test.patch
