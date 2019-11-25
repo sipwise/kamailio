@@ -1,3 +1,23 @@
+ngcp-kamailio (5.2.5-1+0~mr8.2.0.0) unstable; urgency=medium
+
+  [ Marco Capetta ]
+  * [478fca5] TT#68350 Re-apply fix for python switch from version 2 to 3
+
+  [ Guillem Jover ]
+  * [bafd63c] TT#51701 Switch from deprecated /var/run to /run
+  * [3cd4b89] TT#70472 Disable unsafe signal handlers
+
+  [ Alexander Lutay ]
+  * [3811fc2] TT#70475 systemd: remove separate kamailio config check on start
+
+  [ Victor Seva ]
+  * [7cc1d58] TT#64607 pv_headers: fix Segmentation fault calling pv_unset
+  * [f80b449] TT#70962 [pv_headers]: fix fork scenario
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Nov 2019 14:54:08 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.1.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
