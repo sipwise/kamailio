@@ -67,6 +67,7 @@ upstream/cfgt-doc-add-missing-section.patch
 upstream/cfgt-remove-dbg-from-RPC-commands.patch
 upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
 upstream/cfgt-use-snprintf-instead-of-sprintf.patch
+upstream/tm_add_proportional_load_contacts_by_q_value.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 #
