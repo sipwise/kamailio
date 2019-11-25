@@ -1,0 +1,401 @@
+--- a/src/modules/tm/t_serial.c
++++ b/src/modules/tm/t_serial.c
+@@ -33,10 +33,13 @@
+ #include "../../core/parser/msg_parser.h"
+ #include "../../core/ut.h"
+ #include "../../core/xavp.h"
++#include "../../core/sr_module.h"
++#include "../../core/rand/kam_rand.h"
+ #include "config.h"
+ #include "t_funcs.h"
+ #include "t_reply.h"
+ #include "t_lookup.h"
++#include "t_serial.h"
+ 
+ /* usr_avp flag for sequential forking */
+ #define Q_FLAG      (1<<2)
+@@ -57,6 +60,7 @@ struct contact {
+ 	unsigned short q_flag;
+ 	struct contact *next;
+ 	sr_xavp_t *ulattrs;
++	unsigned short q_index;
+ };
+ 
+ struct instance_list {
+@@ -101,7 +105,8 @@ static str ua_name = {"ua", 2};
+ 
+ void add_contacts_avp(str *uri, str *dst_uri, str *path, str *sock_str,
+ 		unsigned int flags, unsigned int q_flag, str *instance,
+-		str *ruid, str *location_ua, sr_xavp_t *ulattrs_xavp)
++		str *ruid, str *location_ua, sr_xavp_t *ulattrs_xavp,
++		int last, sr_xavp_t **pxavp)
+ {
+ 	sr_xavp_t *record;
+ 	sr_xval_t val;
+@@ -159,10 +164,19 @@ void add_contacts_avp(str *uri, str *dst
+ 
+ 	val.type = SR_XTYPE_XAVP;
+ 	val.v.xavp = record;
+-	if(xavp_add_value(&contacts_avp, &val, NULL)==NULL) {
+-		/* failed to add xavps to root list */
+-		LM_ERR("failed to add xavps to root list\n");
+-		xavp_destroy_list(&record);
++	if(last == 1) {
++		if((*pxavp = xavp_add_value_after(&contacts_avp, &val, *pxavp))==NULL) {
++			/* failed to add xavps to root list */
++			LM_ERR("failed to add xavps to root list\n");
++			xavp_destroy_list(&record);
++		}
++	}
++	else {
++		if(xavp_add_value(&contacts_avp, &val, NULL)==NULL) {
++			/* failed to add xavps to root list */
++			LM_ERR("failed to add xavps to root list\n");
++			xavp_destroy_list(&record);
++		}
+ 	}
+ }
+ 
+@@ -172,13 +186,23 @@ void add_contacts_avp(str *uri, str *dst
+  * contact is the last one in its priority class.  Finally, removes
+  * all branches from destination set.
+  */
+-int ki_t_load_contacts(struct sip_msg* msg)
++int ki_t_load_contacts(struct sip_msg* msg, int mode)
+ {
+ 	branch_t *branch;
+ 	str *ruri, sock_str;
+ 	struct contact *contacts, *next, *prev, *curr;
+ 	int first_idx, idx, len;
+ 	char sock_buf[MAX_SOCKET_STR];
++	unsigned short q_total = 0;
++	int n_rand =0;
++	int n_elements = 0;
++	int q_remove = 0;
++	sr_xavp_t *lxavp = NULL;
++
++	if (mode == PROPORTIONAL) {
++		/* Initialize the random generator */
++		kam_srand(time(NULL));
++	}
+ 
+ 	/* Check if contacts_avp has been defined */
+ 	if (contacts_avp.len == 0) {
+@@ -251,6 +275,18 @@ int ki_t_load_contacts(struct sip_msg* m
+ 		first_idx = 1;
+ 	}
+ 
++	contacts->q_index = contacts->q;
++	if (mode == PROPORTIONAL) {
++		/* Save in q_index the index to check for the proportional order
++		   Don't consider elements with Q value 0 or negative */
++		if (contacts->q > 0) {
++			q_total += contacts->q;
++			n_elements += 1;
++		}
++		contacts->q_index = q_total;
++		LM_DBG("contact's q_value: %d / q_index: %d / q_total: %d / uri: %s\n", contacts->q, contacts->q_index, q_total, contacts->uri.s);
++	}
++
+ 	contacts->next = (struct contact *)0;
+ 
+ 	/* Insert (remaining) branches to contact list in increasing q order */
+@@ -283,13 +319,26 @@ int ki_t_load_contacts(struct sip_msg* m
+ 		{
+ 			next->ulattrs = xavp_get_by_index(&ulattrs_xavp_name, idx + 1, NULL);
+ 		}
++
++		next->q_index = next->q;
++		if (mode == PROPORTIONAL) {
++			/* Save in q_index the index to check for the proportional order
++			   Don't consider elements with Q value 0 or negative */
++			if (next->q > 0) {
++				q_total += next->q;
++				n_elements += 1;
++			}
++			next->q_index = q_total;
++			LM_DBG("contact's q_value: %d / q_index: %d / q_total: %d / uri: %s\n", next->q, next->q_index, q_total, next->uri.s);
++		}
++
+ 		next->next = (struct contact *)0;
+ 
+ 		prev = (struct contact *)0;
+ 		curr = contacts;
+ 		while (curr &&
+-				((curr->q < next->q) ||
+-				 ((curr->q == next->q) && (next->path.len == 0)))) {
++				((curr->q_index < next->q_index) ||
++				 ((curr->q_index == next->q_index) && (next->path.len == 0)))) {
+ 			prev = curr;
+ 			curr = curr->next;
+ 		}
+@@ -306,43 +355,142 @@ int ki_t_load_contacts(struct sip_msg* m
+ 		}
+ 	}
+ 
+-	/* Assign values for q_flags */
+-	curr = contacts;
+-	curr->q_flag = 0;
+-	while (curr->next) {
+-		if (curr->q < curr->next->q) {
+-			curr->next->q_flag = Q_FLAG;
+-		} else {
+-			curr->next->q_flag = 0;
++	/* TODO: DESCRIBE */
++	if (mode == PROPORTIONAL) {
++		/* Add contacts with q-value NOT equals to 0 and NOT negative to contacts_avp */
++		for (idx = 0; idx < n_elements; idx++) {
++			LM_DBG("Loop number: %d\n", idx);
++
++			q_remove = 0;
++			n_rand = kam_rand() % q_total;	// Generate a random number from 0 to (q_total -1)
++			LM_DBG("Random number is: %d\n", n_rand);
++
++			curr = contacts;
++			while (curr) {
++				if (curr->q <= 0) {
++					curr = curr->next;
++					continue;
++				}
++
++				if (q_remove != 0) {
++					LM_DBG("ALREADY FOUND\n");
++					LM_DBG(" - OLD - q_remove: %d / q_index: %d / q: %d / q_total: %d / uri: %s\n", q_remove, curr->q_index, curr->q, q_total, curr->uri.s);
++					curr->q_index -= q_remove;
++					LM_DBG(" - NEW - q_remove: %d / q_index: %d / q: %d / q_total: %d / uri: %s\n", q_remove, curr->q_index, curr->q, q_total, curr->uri.s);
++				}
++				else if (curr->q_index > n_rand) {
++					LM_DBG("FOUND\n");
++					LM_DBG(" - OLD - q_remove: %d / q_index: %d / q: %d / q_total: %d / uri: %s\n", q_remove, curr->q_index, curr->q, q_total, curr->uri.s);
++					q_remove = curr->q;
++					q_total -= q_remove;
++					curr->q_index -= q_remove;
++					LM_DBG(" - NEW - q_remove: %d / q_index: %d / q: %d / q_total: %d / uri: %s\n", q_remove, curr->q_index, curr->q, q_total, curr->uri.s);
++
++					if (curr->sock) {
++						len = MAX_SOCKET_STR - 1;
++						if (socket2str(sock_buf, &len, curr->sock) < 0) {
++							LM_ERR("failed to convert socket to str\n");
++							free_contact_list(contacts);
++							return -1;
++						}
++						sock_buf[len] = 0;
++						sock_str.s = sock_buf;
++						sock_str.len = len + 1;
++					} else {
++						sock_str.s = 0;
++						sock_str.len = 0;
++					}
++
++					// Always set Q_FLAG because only serial forking is needed
++					curr->q_flag = Q_FLAG;
++					add_contacts_avp(&(curr->uri), &(curr->dst_uri), &(curr->path),
++							&sock_str, curr->flags, curr->q_flag,
++							&(curr->instance), &(curr->ruid), &(curr->location_ua),
++							curr->ulattrs, 1, &lxavp);
++				}
++				else {
++					LM_DBG("NOT FOUND\n");
++					LM_DBG(" - OLD - q_remove: %d / q_index: %d / q: %d / q_total: %d / uri: %s\n", q_remove, curr->q_index, curr->q, q_total, curr->uri.s);
++				}
++
++				curr = curr->next;
++			}
+ 		}
+-		curr = curr->next;
+-	}
+ 
+-	/* Add contacts to contacts_avp */
+-	curr = contacts;
+-	while (curr) {
++		/* Add contacts with q-value equals to 0 or negative to contacts_avp */
++		curr = contacts;
++		while (curr) {
++			if (curr->q > 0) {
++				curr = curr->next;
++				continue;
++			}
++
++			LM_DBG(" BACKUP CONTACTS - q_remove: %d / q_index: %d / q: %d / q_total: %d / uri: %s\n", q_remove, curr->q_index, curr->q, q_total, curr->uri.s);
+ 
+-		if (curr->sock) {
+-			len = MAX_SOCKET_STR - 1;
+-			if (socket2str(sock_buf, &len, curr->sock) < 0) {
+-				LM_ERR("failed to convert socket to str\n");
+-				free_contact_list(contacts);
+-				return -1;
++			if (curr->sock) {
++				len = MAX_SOCKET_STR - 1;
++				if (socket2str(sock_buf, &len, curr->sock) < 0) {
++					LM_ERR("failed to convert socket to str\n");
++					free_contact_list(contacts);
++					return -1;
++				}
++				sock_buf[len] = 0;
++				sock_str.s = sock_buf;
++				sock_str.len = len + 1;
++			} else {
++				sock_str.s = 0;
++				sock_str.len = 0;
+ 			}
+-			sock_buf[len] = 0;
+-			sock_str.s = sock_buf;
+-			sock_str.len = len + 1;
+-		} else {
+-			sock_str.s = 0;
+-			sock_str.len = 0;
++
++			curr->q_flag = Q_FLAG;
++			add_contacts_avp(&(curr->uri), &(curr->dst_uri), &(curr->path),
++					&sock_str, curr->flags, curr->q_flag,
++					&(curr->instance), &(curr->ruid), &(curr->location_ua),
++					curr->ulattrs, 1, &lxavp);
++
++			curr = curr->next;
++		}
++	}
++	/* TODO: DESCRIBE */
++	else {
++		/* Assign values for q_flags */
++		curr = contacts;
++		curr->q_flag = 0;
++		while (curr->next) {
++			if (curr->q < curr->next->q) {
++				curr->next->q_flag = Q_FLAG;
++			} else {
++				curr->next->q_flag = 0;
++			}
++			curr = curr->next;
+ 		}
+ 
+-		add_contacts_avp(&(curr->uri), &(curr->dst_uri), &(curr->path),
+-				&sock_str, curr->flags, curr->q_flag,
+-				&(curr->instance), &(curr->ruid), &(curr->location_ua),
+-				curr->ulattrs);
++		/* Add contacts to contacts_avp */
++		curr = contacts;
++		while (curr) {
+ 
+-		curr = curr->next;
++			if (curr->sock) {
++				len = MAX_SOCKET_STR - 1;
++				if (socket2str(sock_buf, &len, curr->sock) < 0) {
++					LM_ERR("failed to convert socket to str\n");
++					free_contact_list(contacts);
++					return -1;
++				}
++				sock_buf[len] = 0;
++				sock_str.s = sock_buf;
++				sock_str.len = len + 1;
++			} else {
++				sock_str.s = 0;
++				sock_str.len = 0;
++			}
++
++			add_contacts_avp(&(curr->uri), &(curr->dst_uri), &(curr->path),
++					&sock_str, curr->flags, curr->q_flag,
++					&(curr->instance), &(curr->ruid), &(curr->location_ua),
++					curr->ulattrs, 0, &lxavp);
++
++			curr = curr->next;
++		}
+ 	}
+ 
+ 	/* Clear all branches */
+@@ -357,11 +505,45 @@ int ki_t_load_contacts(struct sip_msg* m
+ 	return 1;
+ }
+ 
+-int t_load_contacts(struct sip_msg* msg, char* key, char* value)
++int t_load_contacts(struct sip_msg* msg, char* mode, char* value)
+ {
+-	return ki_t_load_contacts(msg);
++	int i = STANDARD;
++
++	if(mode) {
++		if(get_int_fparam(&i, msg, (fparam_t*)mode)<0) return -1;
++
++		if ((i != STANDARD) && (i != PROPORTIONAL)) {
++			LM_ERR("invalid load_contact mode: %d, please use 0 (standard) or 1 (proportional)\n", i);
++			return -1;
++		}
++		LM_DBG("load_contact mode selected: %d\n", i);
++	}
++	else
++	{
++		LM_DBG("load_contact mode not selected, using: %d\n", STANDARD);
++	}
++
++	return ki_t_load_contacts(msg, i);
+ }
+ 
++/*
++int t_load_contacts_0(struct sip_msg* msg, char* key, char* value)
++{
++	LM_DBG("load_contact mode not selected, using: %d\n", STANDARD);
++	return t_load_contacts(msg, key, value, STANDARD);
++}
++
++int t_load_contacts_1(struct sip_msg* msg, char* key, char* value, int mode)
++{
++	if ((mode != STANDARD) && (mode != PROPORTIONAL)) {
++		LM_ERR("invalid load_contact mode: %d, please use 0 (standard) or 1 (proportional)\n", mode);
++		return -1;
++	}
++
++	LM_DBG("load_contact mode selected: %d\n", mode);
++	return t_load_contacts(msg, key, value, mode);
++}
++*/
+ void add_contact_flows_avp(str *uri, str *dst_uri, str *path, str *sock_str,
+ 		unsigned int flags, str *instance, str *ruid,
+ 		str *location_ua, sr_xavp_t *ulattrs_xavp)
+--- a/src/modules/tm/t_serial.h
++++ b/src/modules/tm/t_serial.h
+@@ -28,15 +28,22 @@
+ #ifndef _T_SERIAL_H_
+ #define _T_SERIAL_H_
+ 
++#define STANDARD 0
++#define PROPORTIONAL 1
++
+ extern int fr_inv_timer_next;
+ 
+-int t_load_contacts(struct sip_msg* msg, char* key, char* value);
++int t_load_contacts(struct sip_msg* msg, char* mode, char* value);
++/*
++int t_load_contacts_0(struct sip_msg* msg, char* key, char* value);
+ 
++int t_load_contacts_1(struct sip_msg* msg, char* key, char* value, int mode);
++*/
+ int t_next_contacts(struct sip_msg* msg, char* key, char* value);
+ 
+ int t_next_contact_flow(struct sip_msg* msg, char* key, char* value);
+ 
+-int ki_t_load_contacts(struct sip_msg* msg);
++int ki_t_load_contacts(struct sip_msg* msg, int mode);
+ 
+ int ki_t_next_contacts(struct sip_msg* msg);
+ 
+--- a/src/modules/tm/tm.c
++++ b/src/modules/tm/tm.c
+@@ -405,7 +405,9 @@ static cmd_export_t cmds[]={
+ 	{"t_uac_send", (cmd_function)w_t_uac_send, 6, fixup_spve_all, 0,
+ 		ANY_ROUTE },
+ 
+-	{"t_load_contacts", t_load_contacts,            0, 0, 0,
++	{"t_load_contacts", t_load_contacts,          0, 0, 0,
++		REQUEST_ROUTE | FAILURE_ROUTE},
++	{"t_load_contacts", t_load_contacts,          1, fixup_var_int_1, 0,
+ 		REQUEST_ROUTE | FAILURE_ROUTE},
+ 	{"t_next_contacts", t_next_contacts,            0, 0, 0,
+ 		REQUEST_ROUTE | FAILURE_ROUTE},
+@@ -2920,7 +2922,7 @@ static sr_kemi_t tm_kemi_exports[] = {
+ 	},
+ 	{ str_init("tm"), str_init("t_load_contacts"),
+ 		SR_KEMIP_INT, ki_t_load_contacts,
+-		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+ 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+ 	},
+ 	{ str_init("tm"), str_init("t_next_contacts"),
