@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "14bf4ba2_0b3973a0",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 607,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2019-11-26T09:37:54Z",
+      "side": 1,
+      "message": "This parameter defines an internal maximum SIP header value size. Header values longer than this setting will be stripped down when collected or applied.",
+      "parentUuid": "05a25f71_9bdb39bd",
+      "revId": "25f87b0b9a6690f8462d0ceb859d86c86a298309",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "90ebe4a2_886c3299",
         "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
         "patchSetId": 4
