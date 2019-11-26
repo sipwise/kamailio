@@ -19,6 +19,24 @@
     },
     {
       "key": {
+        "uuid": "21cbffb6_f473a51d",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 626,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2019-11-26T09:25:55Z",
+      "side": 1,
+      "message": "This parameter is used to mark that headers are collected for the SIP message, leading to subsequent headers collection on this message to be declined with an error. Should be used only in branches and replies.",
+      "parentUuid": "90ebe4a2_886c3299",
+      "revId": "25f87b0b9a6690f8462d0ceb859d86c86a298309",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "384aa335_d900faf0",
         "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
         "patchSetId": 4
@@ -30,6 +48,24 @@
       "writtenOn": "2019-11-25T17:10:38Z",
       "side": 1,
       "message": "@kirill can you please add some small description of what this parameter is?",
+      "revId": "25f87b0b9a6690f8462d0ceb859d86c86a298309",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "156e3e3c_a719d95a",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 645,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2019-11-26T09:25:55Z",
+      "side": 1,
+      "message": "This parameter is used to mark that headers are applied for the SIP message, leading to subsequent headers applies on this message to be declined with an error. Should be used only in branches and replies.",
+      "parentUuid": "384aa335_d900faf0",
       "revId": "25f87b0b9a6690f8462d0ceb859d86c86a298309",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": true
