@@ -2,6 +2,7 @@ From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
 
+Change-Id: I2e0dd0bd8ff2eaafeaf2114886f1b7ea0cf08470
 ---
  src/Makefile.groups                             |    2 +-
  src/modules/pv_headers/Makefile                 |   12 +
@@ -11,8 +12,10 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/doc/params.xml           |  186 ++++
  src/modules/pv_headers/doc/pv_headers.xml       |   39 +
  src/modules/pv_headers/doc/pv_headers_admin.xml |  116 +++
- src/modules/pv_headers/pv_headers.c             |  654 ++++++++++++++
- src/modules/pv_headers/pv_headers.h             |   42 +
+ src/modules/pv_headers/pv_headers.c             |  348 ++++++++
+ src/modules/pv_headers/pv_headers.h             |   48 ++
+ src/modules/pv_headers/pvh_func.c               |  377 ++++++++
+ src/modules/pv_headers/pvh_func.h               |   38 +
  src/modules/pv_headers/pvh_hash.c               |  132 +++
  src/modules/pv_headers/pvh_hash.h               |   39 +
  src/modules/pv_headers/pvh_hdr.c                |  235 +++++
@@ -21,7 +24,7 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/pvh_str.h                |   38 +
  src/modules/pv_headers/pvh_xavp.c               | 1050 +++++++++++++++++++++++
  src/modules/pv_headers/pvh_xavp.h               |   64 ++
- 18 files changed, 3258 insertions(+), 1 deletion(-)
+ 20 files changed, 3373 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -31,6 +34,8 @@ Subject: add_pv_headers_module
  create mode 100644 src/modules/pv_headers/doc/pv_headers_admin.xml
  create mode 100644 src/modules/pv_headers/pv_headers.c
  create mode 100644 src/modules/pv_headers/pv_headers.h
+ create mode 100644 src/modules/pv_headers/pvh_func.c
+ create mode 100644 src/modules/pv_headers/pvh_func.h
  create mode 100644 src/modules/pv_headers/pvh_hash.c
  create mode 100644 src/modules/pv_headers/pvh_hash.h
  create mode 100644 src/modules/pv_headers/pvh_hdr.c
@@ -421,7 +426,7 @@ index 0000000..b143109
 +include $(docbook_dir)/Makefile.module
 diff --git a/src/modules/pv_headers/doc/functions.xml b/src/modules/pv_headers/doc/functions.xml
 new file mode 100644
-index 0000000..d390061
+index 0000000..ef7f133
 --- /dev/null
 +++ b/src/modules/pv_headers/doc/functions.xml
 @@ -0,0 +1,131 @@
@@ -522,7 +527,7 @@ index 0000000..d390061
 +	</section>
 +	<section id="pv_headers.f.pvh_modify_header">
 +		<title>
-+		<function moreinfo="none">pvh_modify_header(hname, [idx], hvalue)</function>
++		<function moreinfo="none">pvh_modify_header(hname, hvalue, [idx])</function>
 +		</title>
 +		<para>
 +		Modifies an existing header in the XAVP <quote>hname</quote> with the value <quote>hvalue</quote> into the XAVP.
@@ -918,10 +923,10 @@ index 0000000..9c5c009
 +</chapter>
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..7d7863f
+index 0000000..722f9d9
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,654 @@
+@@ -0,0 +1,348 @@
 +/*
 + * pv_headers
 + *
@@ -947,16 +952,14 @@ index 0000000..7d7863f
 +
 +#include "../../core/sr_module.h"
 +#include "../../core/mod_fix.h"
-+#include "../../core/dset.h"
 +#include "../../core/script_cb.h"
-+#include "../../modules/uac/api.h"
 +#include "../../modules/tm/tm_load.h"
++#include "../../core/kemi.h"
 +
 +#include "pv_headers.h"
-+#include "pvh_hash.h"
-+#include "pvh_str.h"
++#include "pvh_func.h"
 +#include "pvh_xavp.h"
-+#include "pvh_hdr.h"
++#include "pvh_hash.h"
 +
 +MODULE_VERSION
 +
@@ -967,17 +970,15 @@ index 0000000..7d7863f
 +#define FL_NAME_PV_HDRS_COLLECTED "pv_headers_collected"
 +#define FL_NAME_PV_HDRS_APPLIED "pv_headers_applied"
 +
-+static int FL_PV_HDRS_COLLECTED = 27;
-+static int FL_PV_HDRS_APPLIED = 28;
++int FL_PV_HDRS_COLLECTED = 27;
++int FL_PV_HDRS_APPLIED = 28;
 +
-+static uac_api_t uac;
++uac_api_t uac;
 +static tm_api_t tmb;
 +
 +str xavp_name = str_init(XAVP_NAME);
 +
-+static str xavp_helper_xname = str_init("modparam_pv_headers");
 +str xavp_parsed_xname = str_init("parsed_pv_headers");
-+static str xavp_helper_name = str_init("xavp_name");
 +static str skip_headers_param =
 +		str_init("Record-Route,Via,Route,Content-Length,Max-Forwards,CSeq");
 +static str split_headers_param = STR_NULL;
@@ -992,44 +993,111 @@ index 0000000..7d7863f
 +static void mod_destroy(void);
 +static int mod_init(void);
 +
-+static int pvh_fixup_svalue(struct sip_msg *msg, char *src, str *dst);
-+
 +static void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params);
 +static int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb);
 +
-+static int pvh_collect_headers(struct sip_msg *msg, char *is_auto, char *_s2);
-+static int pvh_apply_headers(struct sip_msg *msg, char *is_auto, char *_s2);
-+static int pvh_reset_headers(struct sip_msg *_m, char *_s1, char *_s2);
++static int w_pvh_collect_headers(struct sip_msg *msg, char *p1, char *p2)
++{
++	return pvh_collect_headers(msg, 0);
++}
 +
-+static int pvh_check_header(struct sip_msg *_m, char *hname, char *_s2);
-+static int pvh_append_header(struct sip_msg *_m, char *hname, char *hvalue);
-+static int pvh_modify_header(struct sip_msg *_m, char *hname, char *hvalue);
-+static int pvh_modify_header_idx(
-+		struct sip_msg *_m, char *hname, char *hidx, char *hvalue);
-+static int pvh_remove_header(struct sip_msg *_m, char *hname, char *_s2);
-+static int pvh_remove_header_idx(struct sip_msg *_m, char *hname, char *hidx);
++static int ki_pvh_collect_headers(struct sip_msg *msg)
++{
++	return pvh_collect_headers(msg, 0);
++}
++
++static int w_pvh_apply_headers(struct sip_msg *msg, char *p1, char *p2)
++{
++	return pvh_apply_headers(msg, 0);
++}
++
++static int ki_pvh_apply_headers(struct sip_msg *msg)
++{
++	return pvh_apply_headers(msg, 0);
++}
++
++static int w_pvh_reset_headers(struct sip_msg *msg, char *p1, char *p2)
++{
++	return pvh_reset_headers(msg);
++}
++
++static int w_pvh_check_header(struct sip_msg *msg, char *p1, char *p2)
++{
++	str hname = STR_NULL;
++
++	if(fixup_get_svalue(msg, (gparam_p)p1, &hname) < 0)
++		return -1;
++
++	return pvh_check_header(msg, &hname);
++}
++
++static int w_pvh_append_header(struct sip_msg *msg, char *p1, char *p2)
++{
++	str hname = STR_NULL, hvalue = STR_NULL;
++
++	if(fixup_get_svalue(msg, (gparam_p)p1, &hname) < 0)
++		return -1;
++
++	if(p2 && fixup_get_svalue(msg, (gparam_p)p2, &hvalue) < 0)
++		return -1;
++
++	return pvh_append_header(msg, &hname, &hvalue);
++}
++
++static int w_pvh_modify_header(
++		struct sip_msg *msg, char *p1, char *p2, char *p3)
++{
++	int indx = 0;
++	str hname = STR_NULL, hvalue = STR_NULL;
++
++	if(fixup_get_svalue(msg, (gparam_p)p1, &hname) < 0)
++		return -1;
++
++	if(p2 && fixup_get_svalue(msg, (gparam_p)p2, &hvalue) < 0)
++		return -1;
++
++	if(p3 && fixup_get_ivalue(msg, (gparam_p)p3, &indx) < 0)
++		return -1;
++
++	return pvh_modify_header(msg, &hname, &hvalue, indx);
++}
++
++static int w_pvh_remove_header(
++		struct sip_msg *msg, char *p1, char *p2, char *p3)
++{
++	int indx = -1;
++	str hname = STR_NULL;
++
++	if(fixup_get_svalue(msg, (gparam_p)p1, &hname) < 0)
++		return -1;
++
++	if(p2 && fixup_get_ivalue(msg, (gparam_p)p2, &indx) < 0)
++		return -1;
++
++	return pvh_remove_header(msg, &hname, indx);
++}
 +
 +/*
 + * Exported functions
 + */
 +static cmd_export_t cmds[] = {
-+		{"pvh_collect_headers", (cmd_function)pvh_collect_headers, 0, 0, 0,
++		{"pvh_collect_headers", (cmd_function)w_pvh_collect_headers, 0, 0, 0,
 +				ANY_ROUTE},
-+		{"pvh_apply_headers", (cmd_function)pvh_apply_headers, 0, 0, 0,
++		{"pvh_apply_headers", (cmd_function)w_pvh_apply_headers, 0, 0, 0,
 +				ANY_ROUTE},
-+		{"pvh_reset_headers", (cmd_function)pvh_reset_headers, 0, 0, 0,
++		{"pvh_reset_headers", (cmd_function)w_pvh_reset_headers, 0, 0, 0,
 +				ANY_ROUTE},
-+		{"pvh_check_header", (cmd_function)pvh_check_header, 1, fixup_spve_null,
-+				fixup_free_spve_null, ANY_ROUTE},
-+		{"pvh_append_header", (cmd_function)pvh_append_header, 2,
-+				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
-+		{"pvh_modify_header", (cmd_function)pvh_modify_header, 2,
-+				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
-+		{"pvh_modify_header", (cmd_function)pvh_modify_header_idx, 3,
-+				fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
-+		{"pvh_remove_header", (cmd_function)pvh_remove_header, 1,
++		{"pvh_check_header", (cmd_function)w_pvh_check_header, 1,
 +				fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
-+		{"pvh_remove_header", (cmd_function)pvh_remove_header_idx, 2,
++		{"pvh_append_header", (cmd_function)w_pvh_append_header, 2,
++				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++		{"pvh_modify_header", (cmd_function)w_pvh_modify_header, 2,
++				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++		{"pvh_modify_header", (cmd_function)w_pvh_modify_header, 3,
++				fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
++		{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 1,
++				fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
++		{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 2,
 +				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
 +		{0, 0, 0, 0, 0, 0}};
 +
@@ -1135,8 +1203,8 @@ index 0000000..7d7863f
 +	if(type & TMCB_RESPONSE_IN) {
 +		msg = params->rpl;
 +		if(msg != NULL && msg != FAKED_REPLY) {
-+			pvh_reset_headers(msg, NULL, NULL);
-+			pvh_collect_headers(msg, "1", NULL);
++			pvh_reset_headers(msg);
++			pvh_collect_headers(msg, 1);
 +		}
 +	} else if(type & TMCB_REQUEST_FWDED) {
 +		msg = params->req;
@@ -1148,7 +1216,7 @@ index 0000000..7d7863f
 +	}
 +
 +	if(msg != NULL && msg != FAKED_REPLY)
-+		pvh_apply_headers(msg, "1", NULL);
++		pvh_apply_headers(msg, 1);
 +
 +	return;
 +}
@@ -1163,7 +1231,7 @@ index 0000000..7d7863f
 +			LM_ERR("cannot register TM callbacks\n");
 +			return -1;
 +		}
-+		pvh_collect_headers(msg, "1", NULL);
++		pvh_collect_headers(msg, 1);
 +	} else {
 +		LM_ERR("unknown callback: %d\n", flags);
 +	}
@@ -1171,7 +1239,137 @@ index 0000000..7d7863f
 +	return 1;
 +}
 +
-+int pvh_collect_headers(struct sip_msg *msg, char *is_auto, char *_s2)
++static sr_kemi_t pvh_kemi_exports[] = {
++		{str_init("pv_headers"), str_init("pvh_collect_headers"), SR_KEMIP_INT,
++				ki_pvh_collect_headers,
++				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{str_init("pv_headers"), str_init("pvh_apply_headers"), SR_KEMIP_INT,
++				ki_pvh_apply_headers,
++				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{str_init("pv_headers"), str_init("pvh_reset_headers"), SR_KEMIP_INT,
++				pvh_reset_headers,
++				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{str_init("pv_headers"), str_init("pvh_check_header"), SR_KEMIP_INT,
++				pvh_check_header,
++				{SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{str_init("pv_headers"), str_init("pvh_append_header"), SR_KEMIP_INT,
++				pvh_check_header,
++				{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{str_init("pv_headers"), str_init("pvh_modify_header"), SR_KEMIP_INT,
++				pvh_modify_header,
++				{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{str_init("pv_headers"), str_init("pvh_remove_header"), SR_KEMIP_INT,
++				pvh_remove_header,
++				{SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
++						SR_KEMIP_NONE, SR_KEMIP_NONE}},
++		{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}};
++
++int mod_register(char *path, int *dlflags, void *p1, void *p2)
++{
++	sr_kemi_modules_add(pvh_kemi_exports);
++	return 0;
++}
+diff --git a/src/modules/pv_headers/pv_headers.h b/src/modules/pv_headers/pv_headers.h
+new file mode 100644
+index 0000000..a7937c4
+--- /dev/null
++++ b/src/modules/pv_headers/pv_headers.h
+@@ -0,0 +1,48 @@
++/*
++ * PV Headers
++ *
++ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ *
++ * This file is part of SIP Router, a free SIP server.
++ *
++ * SIP Router is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * SIP Router is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#ifndef PV_HEADERS_H
++#define PV_HEADERS_H
++
++#include "../../core/parser/parse_addr_spec.h"
++#include "../../modules/uac/api.h"
++
++typedef struct _xavp_c_data
++{
++	struct to_body to_b;
++	struct to_param *to_params;
++	str value;
++} xavp_c_data_t;
++
++extern uac_api_t uac;
++
++extern str xavp_name;
++extern str xavp_parsed_xname;
++
++extern unsigned int header_name_size;
++extern unsigned int header_value_size;
++
++extern int FL_PV_HDRS_COLLECTED;
++extern int FL_PV_HDRS_APPLIED;
++
++#endif /* PV_HEADERS_H */
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+new file mode 100644
+index 0000000..effed13
+--- /dev/null
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -0,0 +1,377 @@
++/*
++ * pv_headers
++ *
++ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ *
++ * This file is part of SIP Router, a free SIP server.
++ *
++ * SIP Router is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * SIP Router is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#include "../../core/dset.h"
++
++#include "pv_headers.h"
++#include "pvh_str.h"
++#include "pvh_hdr.h"
++#include "pvh_hash.h"
++#include "pvh_xavp.h"
++
++static str xavp_helper_xname = str_init("modparam_pv_headers");
++static str xavp_helper_name = str_init("xavp_name");
++
++int pvh_collect_headers(struct sip_msg *msg, int is_auto)
 +{
 +	struct hdr_field *hf = NULL;
 +	str name = STR_NULL;
@@ -1183,14 +1381,18 @@ index 0000000..7d7863f
 +
 +	pvh_get_branch_index(msg, &br_idx);
 +	LM_DBG("br_idx: %d\n", br_idx);
-+	if(!(is_auto && strcmp(is_auto, "1") == 0)
-+			&& ((msg->first_line.type == SIP_REPLY
-+						&& isflagset(msg, FL_PV_HDRS_COLLECTED) == 1)
-+					   || (msg->first_line.type != SIP_REPLY
-+								  && isbflagset(br_idx, FL_PV_HDRS_COLLECTED)
-+											 == 1))) {
-+		LM_ERR("headers are already collected\n");
-+		return -1;
++	if(!is_auto) {
++		if(msg->first_line.type == SIP_REPLY) {
++			if(isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) {
++				LM_ERR("headers are already collected\n");
++				return -1;
++			}
++		} else {
++			if(isbflagset(br_idx, FL_PV_HDRS_COLLECTED)) {
++				LM_ERR("headers are already collected\n");
++				return -1;
++			}
++		}
 +	}
 +
 +	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -1255,7 +1457,7 @@ index 0000000..7d7863f
 +	return -1;
 +}
 +
-+int pvh_apply_headers(struct sip_msg *msg, char *is_auto, char *_s2)
++int pvh_apply_headers(struct sip_msg *msg, int is_auto)
 +{
 +	sr_xavp_t *xavp = NULL;
 +	sr_xavp_t *sub = NULL;
@@ -1271,14 +1473,18 @@ index 0000000..7d7863f
 +
 +	pvh_get_branch_index(msg, &br_idx);
 +
-+	if(!(is_auto && strcmp(is_auto, "1") == 0)
-+			&& ((msg->first_line.type == SIP_REPLY
-+						&& isflagset(msg, FL_PV_HDRS_APPLIED) == 1)
-+					   || (msg->first_line.type != SIP_REPLY
-+								  && isbflagset(br_idx, FL_PV_HDRS_APPLIED)
-+											 == 1))) {
-+		LM_ERR("headers are already applied\n");
-+		return -1;
++	if(!is_auto) {
++		if(msg->first_line.type == SIP_REPLY) {
++			if(isflagset(msg, FL_PV_HDRS_APPLIED) == 1) {
++				LM_ERR("headers are already applied\n");
++				return -1;
++			}
++		} else {
++			if(isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) {
++				LM_ERR("headers are already applied\n");
++				return -1;
++			}
++		}
 +	}
 +
 +	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -1435,7 +1641,7 @@ index 0000000..7d7863f
 +	return res;
 +}
 +
-+int pvh_reset_headers(struct sip_msg *msg, char *_s1, char *_s2)
++int pvh_reset_headers(struct sip_msg *msg)
 +{
 +	str br_xname = STR_NULL;
 +	int br_idx;
@@ -1463,125 +1669,55 @@ index 0000000..7d7863f
 +	return 1;
 +}
 +
-+int pvh_check_header(struct sip_msg *msg, char *hname, char *_s2)
++int pvh_check_header(struct sip_msg *msg, str *hname)
 +{
-+	str hname_s = STR_NULL;
 +
-+	if(hname == NULL || pvh_fixup_svalue(msg, hname, &hname_s) < 0)
-+		return -1;
-+
-+	if(pvh_xavp_get_child(msg, &xavp_name, &hname_s) == NULL)
++	if(pvh_xavp_get_child(msg, &xavp_name, hname) == NULL)
 +		return -1;
 +
 +	return 1;
 +}
 +
-+int pvh_append_header(struct sip_msg *msg, char *hname, char *hvalue)
++int pvh_append_header(struct sip_msg *msg, str *hname, str *hvalue)
 +{
-+	str hname_s = STR_NULL, hvalue_s = STR_NULL;
-+
-+	if(hname == NULL || pvh_fixup_svalue(msg, hname, &hname_s) < 0)
-+		return -1;
-+
-+	if(hvalue != NULL)
-+		if(pvh_fixup_svalue(msg, hvalue, &hvalue_s) < 0)
-+			return -1;
-+
-+	return pvh_set_xavp(
-+			msg, &xavp_name, &hname_s, &hvalue_s, SR_XTYPE_STR, 0, 1);
++	return pvh_set_xavp(msg, &xavp_name, hname, hvalue, SR_XTYPE_STR, 0, 1);
 +}
 +
-+int pvh_modify_header(struct sip_msg *msg, char *hname, char *hvalue)
++int pvh_modify_header(struct sip_msg *msg, str *hname, str *hvalue, int indx)
 +{
-+	str hname_s = STR_NULL, hvalue_s = STR_NULL;
-+
-+	if(hname == NULL || pvh_fixup_svalue(msg, hname, &hname_s) < 0)
-+		return -1;
-+
-+	if(hvalue != NULL)
-+		if(pvh_fixup_svalue(msg, hvalue, &hvalue_s) < 0)
-+			return -1;
-+
-+	return pvh_set_xavp(
-+			msg, &xavp_name, &hname_s, &hvalue_s, SR_XTYPE_STR, 0, 0);
++	return pvh_set_xavp(msg, &xavp_name, hname, hvalue, SR_XTYPE_STR, indx, 0);
 +}
 +
-+int pvh_modify_header_idx(
-+		struct sip_msg *msg, char *hname, char *hidx, char *hvalue)
++int pvh_remove_header(struct sip_msg *msg, str *hname, int indx)
 +{
-+	str hname_s = STR_NULL, hidx_s = STR_NULL, hvalue_s = STR_NULL;
-+	int idx = 0;
-+
-+	if(hname == NULL || pvh_fixup_svalue(msg, hname, &hname_s) < 0)
-+		return -1;
-+
-+	if(hidx == NULL || pvh_fixup_svalue(msg, hidx, &hidx_s) < 0)
-+		return -1;
-+	idx = atoi(hidx_s.s);
-+
-+	if(hvalue != NULL)
-+		if(pvh_fixup_svalue(msg, hvalue, &hvalue_s) < 0)
-+			return -1;
-+
-+	return pvh_set_xavp(
-+			msg, &xavp_name, &hname_s, &hvalue_s, SR_XTYPE_STR, idx, 0);
-+}
-+
-+int pvh_remove_header(struct sip_msg *msg, char *hname, char *_s2)
-+{
-+	str hname_s = STR_NULL;
 +	sr_xavp_t *avp = NULL;
-+	int idx = 0;
 +	int count = 0;
 +
-+	if(hname == NULL || pvh_fixup_svalue(msg, hname, &hname_s) < 0)
-+		return -1;
-+
-+	if((avp = pvh_xavp_get_child(msg, &xavp_name, &hname_s)) == NULL)
++	if((avp = pvh_xavp_get_child(msg, &xavp_name, hname)) == NULL)
 +		return 1;
 +
-+	count = xavp_count(&hname_s, &avp);
-+
-+	while(idx < count) {
-+		if(pvh_set_xavp(msg, &xavp_name, &hname_s, NULL, SR_XTYPE_STR, idx++, 0)
++	if(indx < 0) {
++		count = xavp_count(hname, &avp);
++		do {
++			if(pvh_set_xavp(
++					   msg, &xavp_name, hname, NULL, SR_XTYPE_STR, indx++, 0)
++					< 1)
++				return -1;
++		} while(indx < count);
++	} else {
++		if(pvh_set_xavp(msg, &xavp_name, hname, NULL, SR_XTYPE_STR, indx, 0)
 +				< 1)
 +			return -1;
 +	}
 +
 +	return 1;
 +}
-+
-+int pvh_remove_header_idx(struct sip_msg *msg, char *hname, char *hidx)
-+{
-+	str hname_s = STR_NULL;
-+	str hidx_s = STR_NULL;
-+	int idx = 0;
-+
-+	if(hname == NULL || pvh_fixup_svalue(msg, hname, &hname_s) < 0)
-+		return -1;
-+
-+	if(hidx == NULL || pvh_fixup_svalue(msg, hidx, &hidx_s) < 0)
-+		return -1;
-+	idx = atoi(hidx_s.s);
-+
-+	return pvh_set_xavp(msg, &xavp_name, &hname_s, NULL, SR_XTYPE_STR, idx, 0);
-+}
-+
-+
-+int pvh_fixup_svalue(struct sip_msg *msg, char *src, str *dst)
-+{
-+	if(fixup_get_svalue(msg, (gparam_p)src, dst) < 0) {
-+		LM_ERR("unable to parse param value\n");
-+		return -1;
-+	}
-+	return 1;
-+}
-diff --git a/src/modules/pv_headers/pv_headers.h b/src/modules/pv_headers/pv_headers.h
+diff --git a/src/modules/pv_headers/pvh_func.h b/src/modules/pv_headers/pvh_func.h
 new file mode 100644
-index 0000000..e694f36
+index 0000000..0fe5524
 --- /dev/null
-+++ b/src/modules/pv_headers/pv_headers.h
-@@ -0,0 +1,42 @@
++++ b/src/modules/pv_headers/pvh_func.h
+@@ -0,0 +1,38 @@
 +/*
 + * PV Headers
 + *
@@ -1605,25 +1741,21 @@ index 0000000..e694f36
 + *
 + */
 +
-+#ifndef PV_HEADERS_H
-+#define PV_HEADERS_H
++#ifndef PV_FUNC_H
++#define PV_FUNC_H
 +
-+#include "../../core/parser/parse_addr_spec.h"
++#include "../../core/parser/msg_parser.h"
 +
-+typedef struct _xavp_c_data
-+{
-+	struct to_body to_b;
-+	struct to_param *to_params;
-+	str value;
-+} xavp_c_data_t;
++int pvh_collect_headers(struct sip_msg *msg, int is_auto);
++int pvh_apply_headers(struct sip_msg *msg, int is_auto);
++int pvh_reset_headers(struct sip_msg *msg);
 +
-+extern str xavp_name;
-+extern str xavp_parsed_xname;
++int pvh_check_header(struct sip_msg *msg, str *hname);
++int pvh_append_header(struct sip_msg *msg, str *hname, str *hvalue);
++int pvh_modify_header(struct sip_msg *msg, str *hname, str *hvalue, int indx);
++int pvh_remove_header(struct sip_msg *msg, str *hname, int indx);
 +
-+extern unsigned int header_name_size;
-+extern unsigned int header_value_size;
-+
-+#endif /* PV_HEADERS_H */
++#endif /* PV_FUNC_H */
 diff --git a/src/modules/pv_headers/pvh_hash.c b/src/modules/pv_headers/pvh_hash.c
 new file mode 100644
 index 0000000..f269868
