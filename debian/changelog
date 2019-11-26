@@ -1,3 +1,12 @@
+ngcp-kamailio (5.2.5-1+0~mr7.5.1.7) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [b562bab] TT#71450 fix lcr_rate using the wrong peer ID
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 26 Nov 2019 15:08:37 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr7.5.1.6) unstable; urgency=medium
 
   [ Alexander Lutay ]
