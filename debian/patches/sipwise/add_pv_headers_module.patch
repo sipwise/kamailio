@@ -1,15 +1,13 @@
 From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
-
-Change-Id: I9f7efd8872a815b86ced8a06f663a10c5f327dcf
 ---
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
- src/modules/pv_headers/README       |  488 +++++++++
- src/modules/pv_headers/pv_headers.c | 2069 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/README       |  488 ++++++++
+ src/modules/pv_headers/pv_headers.c | 2083 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2600 insertions(+), 1 deletion(-)
+ 5 files changed, 2614 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -542,10 +540,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..79e91e6
+index 0000000..f3b90e4
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2069 @@
+@@ -0,0 +1,2083 @@
 +/*
 + * pv_headers
 + *
@@ -615,6 +613,9 @@ index 0000000..79e91e6
 +static int auto_msg_param     = 1;
 +
 +static str single_headers_param = str_init("");
++
++static str _hdr_from = {"From", 4};
++static str _hdr_to = {"To", 2};
 +
 +static unsigned int header_name_size    = 255;
 +static unsigned int header_value_size   = 1024;
@@ -866,8 +867,19 @@ index 0000000..79e91e6
 +    for (hf=msg->headers; hf; hf=hf->next) {
 +        LM_DBG("collect header[%.*s]: %.*s\n", hf->name.len, hf->name.s, hf->body.len, hf->body.s);
 +
++    	switch(hf->type) {
++			case HDR_FROM_T:
++				pv_str_copy(&name, &_hdr_from, header_name_size);
++				LM_DBG("force [From] as key\n");
++				break;
++			case HDR_TO_T:
++				pv_str_copy(&name, &_hdr_to, header_name_size);
++				LM_DBG("force [To] as key\n");
++				break;
++			default:
++				pv_str_copy(&name, &hf->name, header_name_size);
++		}
 +        pv_str_copy(&val, &hf->body, header_value_size);
-+        pv_str_copy(&name, &hf->name, header_name_size);
 +
 +        if (str_hash_get(&split_headers, name.s, name.len) &&
 +            strchr(val.s, ',') != NULL) {
@@ -966,7 +978,7 @@ index 0000000..79e91e6
 +        if (pv_skip_header(&sub->name))
 +            continue;
 +
-+        if (strncasecmp(sub->name.s, "From", sub->name.len) == 0) {
++        if (strncasecmp(sub->name.s, _hdr_from.s, sub->name.len) == 0) {
 +            if (msg->first_line.type == SIP_REPLY ||
 +                msg->first_line.u.request.method_value == METHOD_ACK ||
 +                msg->first_line.u.request.method_value == METHOD_PRACK ||
@@ -1000,7 +1012,7 @@ index 0000000..79e91e6
 +            continue;
 +        }
 +
-+        if (strncasecmp(sub->name.s, "To", sub->name.len) == 0) {
++        if (strncasecmp(sub->name.s, _hdr_to.s, sub->name.len) == 0) {
 +            if (msg->first_line.type == SIP_REPLY ||
 +                msg->first_line.u.request.method_value == METHOD_ACK ||
 +                msg->first_line.u.request.method_value == METHOD_PRACK ||
@@ -2106,9 +2118,9 @@ index 0000000..79e91e6
 +    if (pv_str_new(&hname, header_name_size) < 0) goto err;
 +
 +    if (p_no >= 1 && p_no <= 5)
-+        pv_str_copy(&hname, &(str){"From",4}, header_name_size);
++        pv_str_copy(&hname, &_hdr_from, header_name_size);
 +    else if (p_no >= 6 && p_no <= 10)
-+        pv_str_copy(&hname, &(str){"To",2}, header_name_size);
++        pv_str_copy(&hname, &_hdr_to, header_name_size);
 +
 +    xval = pv_xavp_get_value(msg, &xavp_name, &hname, 0);
 +    if (xval == NULL || !xval->v.s.s)
@@ -2185,9 +2197,9 @@ index 0000000..79e91e6
 +    p_no = param->pvn.u.isname.name.n;
 +    if (pv_str_new(&hname, header_name_size) < 0) goto err;
 +    if (p_no >= 1 && p_no <= 5)
-+        pv_str_copy(&hname, &(str){"From",4}, header_name_size);
++        pv_str_copy(&hname, &_hdr_from, header_name_size);
 +    else if (p_no >= 6 && p_no <= 10)
-+        pv_str_copy(&hname, &(str){"To",2}, header_name_size);
++        pv_str_copy(&hname, &_hdr_to, header_name_size);
 +
 +    switch (p_no) {
 +        case 1: // uri from
