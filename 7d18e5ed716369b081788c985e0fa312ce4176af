@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "d4cf46d2_1e896ff1",
+        "filename": "debian/patches/series",
+        "patchSetId": 1
+      },
+      "lineNbr": 58,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2019-11-27T13:22:44Z",
+      "side": 0,
+      "message": "that\u0027s wrong",
+      "revId": "7d18e5ed716369b081788c985e0fa312ce4176af",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
