@@ -2,6 +2,7 @@ From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
 
+Change-Id: I2dd3b640f94f4188501bae91c950654174b6782c
 ---
  src/Makefile.groups                             |    2 +-
  src/modules/pv_headers/Makefile                 |   12 +
@@ -11,8 +12,8 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/doc/params.xml           |  186 ++++
  src/modules/pv_headers/doc/pv_headers.xml       |   39 +
  src/modules/pv_headers/doc/pv_headers_admin.xml |  116 +++
- src/modules/pv_headers/pv_headers.c             |  654 ++++++++++++++
- src/modules/pv_headers/pv_headers.h             |   42 +
+ src/modules/pv_headers/pv_headers.c             |  666 ++++++++++++++
+ src/modules/pv_headers/pv_headers.h             |   45 +
  src/modules/pv_headers/pvh_hash.c               |  132 +++
  src/modules/pv_headers/pvh_hash.h               |   39 +
  src/modules/pv_headers/pvh_hdr.c                |  235 +++++
@@ -21,7 +22,7 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/pvh_str.h                |   38 +
  src/modules/pv_headers/pvh_xavp.c               | 1050 +++++++++++++++++++++++
  src/modules/pv_headers/pvh_xavp.h               |   64 ++
- 18 files changed, 3258 insertions(+), 1 deletion(-)
+ 18 files changed, 3273 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -918,10 +919,10 @@ index 0000000..9c5c009
 +</chapter>
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..7d7863f
+index 0000000..e49f1f2
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,654 @@
+@@ -0,0 +1,666 @@
 +/*
 + * pv_headers
 + *
@@ -984,6 +985,9 @@ index 0000000..7d7863f
 +static int auto_msg_param = 1;
 +
 +static str single_headers_param = str_init("");
++
++str _hdr_from = {"From", 4};
++str _hdr_to = {"To", 2};
 +
 +unsigned int header_name_size = 255;
 +unsigned int header_value_size = 1024;
@@ -1210,8 +1214,17 @@ index 0000000..7d7863f
 +		LM_DBG("collect header[%.*s]: %.*s\n", hf->name.len, hf->name.s,
 +				hf->body.len, hf->body.s);
 +
++		switch(hf->type) {
++			case HDR_FROM_T:
++				pvh_str_copy(&name, &_hdr_from, header_name_size);
++				break;
++			case HDR_TO_T:
++				pvh_str_copy(&name, &_hdr_to, header_name_size);
++				break;
++			default:
++				pvh_str_copy(&name, &hf->name, header_name_size);
++		}
 +		pvh_str_copy(&val, &hf->body, header_value_size);
-+		pvh_str_copy(&name, &hf->name, header_name_size);
 +
 +		if(str_hash_get(&split_headers, name.s, name.len)
 +				&& strchr(val.s, ',') != NULL) {
@@ -1323,7 +1336,7 @@ index 0000000..7d7863f
 +		if(pvh_skip_header(&sub->name))
 +			continue;
 +
-+		if(strncasecmp(sub->name.s, "From", sub->name.len) == 0) {
++		if(strncasecmp(sub->name.s, _hdr_from.s, sub->name.len) == 0) {
 +			if(msg->first_line.type == SIP_REPLY
 +					|| msg->first_line.u.request.method_value == METHOD_ACK
 +					|| msg->first_line.u.request.method_value == METHOD_PRACK
@@ -1359,7 +1372,7 @@ index 0000000..7d7863f
 +			continue;
 +		}
 +
-+		if(strncasecmp(sub->name.s, "To", sub->name.len) == 0) {
++		if(strncasecmp(sub->name.s, _hdr_to.s, sub->name.len) == 0) {
 +			if(msg->first_line.type == SIP_REPLY
 +					|| msg->first_line.u.request.method_value == METHOD_ACK
 +					|| msg->first_line.u.request.method_value == METHOD_PRACK
@@ -1578,10 +1591,10 @@ index 0000000..7d7863f
 +}
 diff --git a/src/modules/pv_headers/pv_headers.h b/src/modules/pv_headers/pv_headers.h
 new file mode 100644
-index 0000000..e694f36
+index 0000000..83cc845
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.h
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,45 @@
 +/*
 + * PV Headers
 + *
@@ -1622,6 +1635,9 @@ index 0000000..e694f36
 +
 +extern unsigned int header_name_size;
 +extern unsigned int header_value_size;
++
++extern str _hdr_from;
++extern str _hdr_to;
 +
 +#endif /* PV_HEADERS_H */
 diff --git a/src/modules/pv_headers/pvh_hash.c b/src/modules/pv_headers/pvh_hash.c
@@ -2292,7 +2308,7 @@ index 0000000..95aa0b9
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
 new file mode 100644
-index 0000000..67c44fd
+index 0000000..de296b4
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
 @@ -0,0 +1,1050 @@
@@ -2926,9 +2942,9 @@ index 0000000..67c44fd
 +		goto err;
 +
 +	if(p_no >= 1 && p_no <= 5)
-+		pvh_str_copy(&hname, &(str){"From", 4}, header_name_size);
++		pvh_str_copy(&hname, &_hdr_from, header_name_size);
 +	else if(p_no >= 6 && p_no <= 10)
-+		pvh_str_copy(&hname, &(str){"To", 2}, header_name_size);
++		pvh_str_copy(&hname, &_hdr_to, header_name_size);
 +
 +	xval = pvh_xavp_get_value(msg, &xavp_name, &hname, 0);
 +	if(xval == NULL || !xval->v.s.s)
@@ -3008,9 +3024,9 @@ index 0000000..67c44fd
 +	if(pvh_str_new(&hname, header_name_size) < 0)
 +		goto err;
 +	if(p_no >= 1 && p_no <= 5)
-+		pvh_str_copy(&hname, &(str){"From", 4}, header_name_size);
++		pvh_str_copy(&hname, &_hdr_from, header_name_size);
 +	else if(p_no >= 6 && p_no <= 10)
-+		pvh_str_copy(&hname, &(str){"To", 2}, header_name_size);
++		pvh_str_copy(&hname, &_hdr_to, header_name_size);
 +
 +	switch(p_no) {
 +		case 1: // uri from
