@@ -1,3 +1,14 @@
+ngcp-kamailio (5.2.5-1+0~mr8.0.1.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [7f6c367] TT#64607 pv_headers: fix Segmentation fault calling pv_unset
+  * [184c5a6] TT#70962 [pv_headers]: fix fork scenario
+  * [6b78665] TT#71323 [pv_headers] force "From"/"To" keys when collecting headers
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 28 Nov 2019 12:12:34 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.0.1.3) unstable; urgency=medium
 
   [ Richard Fuchs ]
