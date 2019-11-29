@@ -1,4 +1,3 @@
-
 ## Package related
 debian/no_lib64_on_64_bits.patch
 debian/no_INSTALL_file.patch
@@ -8,16 +7,15 @@ sipwise/parallel_build.patch
 ## New Modules
 sipwise/add_pcem_module.patch
 sipwise/add_lcr_rate_module.patch
+sipwise/fix_lcr_rate_wrong_id.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
+sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/add_pv_headers_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
 sipwise/rtpengine_next_branch_parm.patch
-sipwise/cfgt_folder_fix.patch
-sipwise/cfgt_onsend_exit.patch
-sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/fix_dialplan_errors.patch
@@ -30,6 +28,7 @@ sipwise/sca-fix-pickup-when-upstream-flow.patch
 sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
+sipwise/sca-fix-memleaks.patch
 ## Ongoing Patches
 sipwise/rtpengine-balancing.patch
 sipwise/openssl-locking.patch
@@ -57,10 +56,11 @@ sipwise/db_redis_versioning.patch
 sipwise/db_redis_master_keys.patch
 sipwise/db_redis_master_sets.patch
 sipwise/db_redis_fixes.patch
-sipwise/sca-fix-memleaks.patch
-sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/rtpengine_play_dtmf.patch
 sipwise/db_redis_eval_fix.patch
 sipwise/switch_from_python2_to_python3.patch
 upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
-sipwise/fix_lcr_rate_wrong_id.patch
+upstream/cfgt-don-t-try-to-create-dir-if-it-already-exists.patch
+upstream/cfgt-fix-detection-of-jump-to-previous-previous-rout.patch
+### 
+sipwise/fix_error_in_cfgt_module.patch
