@@ -1,7 +1,14 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 28 Nov 2019 14:28:14 +0100
+Subject: [PATCH] cfgt: don't try to create dir if it already exists
+
+(cherry picked from commit 6918a96cc61fa0b15e09db01bb02e9b9f8c78abf)
 ---
- src/modules/cfgt/cfgt_int.c |    5 ++++-
+ src/modules/cfgt/cfgt_int.c | 5 ++++-
  1 file changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
+index 1c5b938..0e3bfec 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -322,13 +322,16 @@ void cfgt_save_node(cfgt_node_p node)
