@@ -1,6 +1,17 @@
+From 9178da02494d3fbb689db331535a31b75b28b614 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Mon, 4 Mar 2019 12:07:30 -0500
+Subject: [PATCH] rtpengine: add support for explicit load balancing options
+
+---
+ src/modules/rtpengine/rtpengine.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index f27503c6c..23e06a88a 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2294,6 +2294,7 @@
+@@ -2309,6 +2309,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	pv_value_t pv_val;
  	char md5[MD5_LEN];
  	char branch_buf[MAX_BRANCH_PARAM_LEN];
@@ -8,7 +19,7 @@
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2317,6 +2318,9 @@
+@@ -2332,6 +2333,9 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	}
  	ng_flags.dict = bencode_dictionary(bencbuf);
  
@@ -18,7 +29,7 @@
  	body.s = NULL;
  	if (op == OP_OFFER || op == OP_ANSWER) {
  		ng_flags.flags = bencode_list(bencbuf);
-@@ -2484,7 +2488,26 @@
+@@ -2499,7 +2503,26 @@ select_node:
  		goto error;
  	}
  
@@ -46,3 +57,6 @@
  		if (!bencode_dictionary_get_str(resp, "error-reason", &error)) {
  			LM_ERR("proxy return error but didn't give an error reason: %.*s\n", ret, cp);
  		} else {
+-- 
+2.20.1
+
