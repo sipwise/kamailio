@@ -1,6 +1,20 @@
+From 639c29f224309ae960eb78f35e00a658d6f57a47 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Fri, 8 Mar 2019 16:05:44 -0500
+Subject: [PATCH] rtpengine: add play_media() and stop_media()
+
+Also includes addition of the media_duration pvar, as well as several
+code cleanups and simplifications.
+---
+ src/modules/rtpengine/rtpengine.c | 319 ++++++++++++------------------
+ src/modules/rtpengine/rtpengine.h |   4 +
+ 2 files changed, 133 insertions(+), 190 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 08dcfd949..21f03775d 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -135,6 +135,8 @@
+@@ -135,6 +135,8 @@ static const char *command_strings[] = {
  	[OP_UNBLOCK_MEDIA]	= "unblock media",
  	[OP_START_FORWARDING]	= "start forwarding",
  	[OP_STOP_FORWARDING]	= "stop forwarding",
@@ -9,7 +23,7 @@
  };
  
  struct minmax_mos_stats {
-@@ -192,6 +194,8 @@
+@@ -192,6 +194,8 @@ static int block_media_f(struct sip_msg *, char *, char *);
  static int unblock_media_f(struct sip_msg *, char *, char *);
  static int start_forwarding_f(struct sip_msg *, char *, char *);
  static int stop_forwarding_f(struct sip_msg *, char *, char *);
@@ -18,7 +32,7 @@
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -276,6 +280,9 @@
+@@ -276,6 +280,9 @@ static pv_spec_t *write_sdp_pvar = NULL;
  static str read_sdp_pvar_str = {NULL, 0};
  static pv_spec_t *read_sdp_pvar = NULL;
  
@@ -28,7 +42,7 @@
  #define RTPENGINE_SESS_LIMIT_MSG "Parallel session limit reached"
  #define RTPENGINE_SESS_LIMIT_MSG_LEN (sizeof(RTPENGINE_SESS_LIMIT_MSG)-1)
  
-@@ -354,6 +361,15 @@
+@@ -354,6 +361,15 @@ static cmd_export_t cmds[] = {
  	{"stop_forwarding",	(cmd_function)stop_forwarding_f,	1,
  		fixup_spve_null, 0,
  		ANY_ROUTE},
@@ -44,7 +58,7 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -424,6 +440,7 @@
+@@ -424,6 +440,7 @@ static param_export_t params[] = {
  	{"hash_table_tout",       INT_PARAM, &hash_table_tout        },
  	{"hash_table_size",       INT_PARAM, &hash_table_size        },
  	{"setid_default",         INT_PARAM, &setid_default          },
@@ -52,7 +66,7 @@
  
  	/* MOS stats output */
  	/* global averages */
-@@ -1656,6 +1673,16 @@
+@@ -1656,6 +1673,16 @@ mod_init(void)
  		}
  	}
  
@@ -69,7 +83,7 @@
  	if (rtpp_strings)
  		pkg_free(rtpp_strings);
  
-@@ -2455,7 +2482,8 @@
+@@ -2454,7 +2481,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	}
  	else if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
  		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
@@ -79,7 +93,7 @@
  	{
  		bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.from_tag);
  		if (ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
-@@ -2623,14 +2641,27 @@
+@@ -2622,14 +2650,27 @@ error:
  static int rtpp_function_call_simple(struct sip_msg *msg, enum rtpe_operation op, const char *flags_str)
  {
  	bencode_buffer_t bencbuf;
@@ -108,7 +122,7 @@
  static bencode_item_t *rtpp_function_call_ok(bencode_buffer_t *bencbuf, struct sip_msg *msg,
  		enum rtpe_operation op, const char *flags_str, str *body)
  {
-@@ -3349,8 +3390,9 @@
+@@ -3334,8 +3375,9 @@ static int rtpengine_query(struct sip_msg *msg, const char *flags) {
  	return 1;
  }
  
@@ -120,7 +134,7 @@
  {
  	int ret, more;
  
-@@ -3363,7 +3405,7 @@
+@@ -3348,7 +3390,7 @@ static int rtpengine_rtpp_set_wrap(struct sip_msg *msg, int (*func)(struct sip_m
  	if (!selected_rtpp_set_2 || selected_rtpp_set_2 == selected_rtpp_set_1)
  		more = 0;
  
@@ -129,7 +143,7 @@
  	if (ret < 0)
  		return ret;
  
-@@ -3374,17 +3416,18 @@
+@@ -3359,17 +3401,18 @@ static int rtpengine_rtpp_set_wrap(struct sip_msg *msg, int (*func)(struct sip_m
  	if (set_rtpengine_set_from_avp(msg, direction) == -1)
  		return -1;
  
@@ -152,7 +166,7 @@
  {
  	str flags;
  
-@@ -3396,27 +3439,23 @@
+@@ -3381,27 +3424,23 @@ rtpengine_delete1_f(struct sip_msg* msg, char* str1, char* str2)
  		}
  	}
  
@@ -189,7 +203,7 @@
  }
  
  
-@@ -3562,88 +3601,45 @@
+@@ -3547,88 +3586,45 @@ rtpengine_manage(struct sip_msg *msg, const char *flags)
  	return -1;
  }
  
@@ -285,7 +299,7 @@
  }
  
  static int
-@@ -3717,160 +3713,102 @@
+@@ -3702,160 +3698,102 @@ error:
  }
  
  
@@ -493,7 +507,7 @@
  	void **parms;
  	pv_param_t *param;
  	pv_value_t *res;
-@@ -3924,7 +3862,7 @@
+@@ -3909,7 +3847,7 @@ pv_get_rtpstat_f(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
  	parms[0] = param;
  	parms[1] = res;
  
@@ -502,7 +516,7 @@
  }
  
  static int
-@@ -3949,54 +3887,55 @@
+@@ -3934,64 +3872,65 @@ set_rtp_inst_pvar(struct sip_msg *msg, const str * const uri) {
   *
   */
  static int ki_rtpengine_manage0(sip_msg_t *msg) {
@@ -555,6 +569,18 @@
 +	return rtpengine_rtpp_set_wrap(msg, rtpengine_delete_wrap, flags->s, 1, OP_ANY);
  }
  
+ static int ki_rtpengine_query0(sip_msg_t *msg)
+ {       
+-        return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, NULL, 1);
++        return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, NULL, 1, OP_ANY);
+ }
+ 
+ static int ki_rtpengine_query(sip_msg_t *msg, str *flags)
+ {       
+-        return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, flags->s, 1);
++        return rtpengine_rtpp_set_wrap(msg, rtpengine_query_wrap, flags->s, 1, OP_ANY);
+ }
+ 
  static int ki_start_recording(sip_msg_t *msg)
  {
 -	return rtpengine_rtpp_set_wrap(msg, rtpengine_start_recording_wrap, NULL, 1);
@@ -568,9 +594,11 @@
  }
  
  static int ki_set_rtpengine_set(sip_msg_t *msg, int r1)
+diff --git a/src/modules/rtpengine/rtpengine.h b/src/modules/rtpengine/rtpengine.h
+index 904b9a81e..8ec033fc1 100644
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
-@@ -44,6 +44,10 @@
+@@ -44,6 +44,10 @@ enum rtpe_operation {
          OP_UNBLOCK_MEDIA,
          OP_START_FORWARDING,
          OP_STOP_FORWARDING,
@@ -581,3 +609,6 @@
  };
  
  struct rtpp_node {
+-- 
+2.20.1
+

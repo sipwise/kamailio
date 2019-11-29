@@ -1,6 +1,18 @@
+From 120a71bec0ee7a07f5f39262a038977f27bc7073 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Fri, 22 Nov 2019 09:37:02 -0500
+Subject: [PATCH] rtpengine: add play_dtmf() command
+
+---
+ src/modules/rtpengine/rtpengine.c | 11 +++++++++++
+ src/modules/rtpengine/rtpengine.h |  1 +
+ 2 files changed, 12 insertions(+)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 6e436083e..9ccf8c4a7 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -137,6 +137,7 @@
+@@ -138,6 +138,7 @@ static const char *command_strings[] = {
  	[OP_STOP_FORWARDING]	= "stop forwarding",
  	[OP_PLAY_MEDIA]		= "play media",
  	[OP_STOP_MEDIA]		= "stop media",
@@ -8,7 +20,7 @@
  };
  
  struct minmax_mos_stats {
-@@ -196,6 +197,7 @@
+@@ -197,6 +198,7 @@ static int start_forwarding_f(struct sip_msg *, char *, char *);
  static int stop_forwarding_f(struct sip_msg *, char *, char *);
  static int play_media_f(struct sip_msg *, char *, char *);
  static int stop_media_f(struct sip_msg *, char *, char *);
@@ -16,7 +28,7 @@
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -370,6 +372,9 @@
+@@ -376,6 +378,9 @@ static cmd_export_t cmds[] = {
  	{"stop_media",		(cmd_function)stop_media_f, 		0,
  		0, 0,
  		ANY_ROUTE},
@@ -26,26 +38,31 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -3797,6 +3802,12 @@
+@@ -3839,6 +3844,12 @@ stop_media_f(struct sip_msg* msg, char *str1, char *str2)
+ 	return rtpengine_generic_f(msg, str1, OP_STOP_MEDIA);
  }
  
- static int
++static int
 +play_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
 +{
 +	return rtpengine_generic_f(msg, str1, OP_PLAY_DTMF);
 +}
 +
-+static int
+ static int
  start_forwarding_f(struct sip_msg* msg, char *str1, char *str2)
  {
- 	return rtpengine_generic_f(msg, str1, OP_START_FORWARDING);
+diff --git a/src/modules/rtpengine/rtpengine.h b/src/modules/rtpengine/rtpengine.h
+index b5314c2c3..1e55cf244 100644
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
-@@ -46,6 +46,7 @@
+@@ -46,6 +46,7 @@ enum rtpe_operation {
          OP_STOP_FORWARDING,
          OP_PLAY_MEDIA,
          OP_STOP_MEDIA,
-+	OP_PLAY_DTMF,
++        OP_PLAY_DTMF,
  
          OP_ANY,
  };
+-- 
+2.20.1
+

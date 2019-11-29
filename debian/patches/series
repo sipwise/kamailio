@@ -15,7 +15,6 @@ sipwise/add_pv_headers_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
-sipwise/rtpengine_next_branch_parm.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/avpops_avp_subst_pvar.patch
 sipwise/fix_dialplan_errors.patch
@@ -30,20 +29,24 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-fix-memleaks.patch
 ## Ongoing Patches
-sipwise/rtpengine-balancing.patch
 sipwise/openssl-locking.patch
 ## backport from kamailio trunk (5.4)
+upstream/rtpengine-add-support-for-via-branch-extra-option.patch
+upstream/rtpengine-add-support-for-explicit-load-balancing-op.patch
 upstream/core-events-support-for-basic-void-core-callbacks.patch
 upstream/core-main-executes-callbacks-on-app-ready-and-shutdo.patch
 upstream/systemdops-new-module-to-facilitate-integration-with.patch
 upstream/src-Makefile.groups-added-systemdops-module-to-syste.patch
 upstream/systemdops-set-core-callbacks-in-mod_register.patch
 upstream/systemdops-proper-check-for-null-value.patch
+## backport from kamailio upstream (5.3)
+upstream/rtpengine-add-support-for-trickle-ICE-SDP-fragments.patch
+upstream/rtpengine-add-support-for-start_forwarding-and-stop_.patch
+upstream/rtpengine-exported-rtpengine_query-variants-to-KEMI-.patch
+upstream/rtpengine-add-play_media-and-stop_media.patch
+upstream/rtpengine-add-play_dtmf-command.patch # (trunk)
 ## backport from kamailio upstream (5.2)
 sipwise/tt41650.patch
-sipwise/rtpengine-trickle-ice-sdp.patch
-sipwise/rtpengine-tcp-forwarding.patch
-sipwise/rtpengine-play-media.patch
 sipwise/registrar_add_path.patch
 upstream/limit_the_execution_of_dialplan_reload.patch
 sipwise/db_redis_fix_scan_usage.patch
@@ -56,7 +59,6 @@ sipwise/db_redis_versioning.patch
 sipwise/db_redis_master_keys.patch
 sipwise/db_redis_master_sets.patch
 sipwise/db_redis_fixes.patch
-sipwise/rtpengine_play_dtmf.patch
 sipwise/db_redis_eval_fix.patch
 sipwise/switch_from_python2_to_python3.patch
 upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
