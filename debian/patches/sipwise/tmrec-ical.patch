@@ -1,3 +1,10 @@
+From: Roman Romanchenko <rromanchenko@sipwise.com>
+Subject: TT#41650 Development of Kamailio module/function for parsing iCal structure
+
+ - parsing ical from buffer and converting to tmrec using libical implementation.
+
+Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
+---
 --- /dev/null
 +++ b/src/modules/tmrec/ical.c
 @@ -0,0 +1,45 @@
