@@ -4,14 +4,14 @@ Subject: fix_error_in_cfgt_module
 
 Change-Id: I5deab153a0c17117be1d2f4de8ca84f9134a5d00
 ---
- src/modules/cfgt/cfgt_int.c | 101 ++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 93 insertions(+), 8 deletions(-)
+ src/modules/cfgt/cfgt_int.c | 103 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 95 insertions(+), 8 deletions(-)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 0e3bfec..971222f 100644
+index ec7107e..aa4f0dc 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
-@@ -29,6 +29,11 @@
+@@ -30,6 +30,11 @@
  #include "../../core/pvar.h"
  #include "../../core/rpc.h"
  #include "../../core/rpc_lookup.h"
@@ -23,15 +23,15 @@ index 0e3bfec..971222f 100644
  
  #include "cfgt_int.h"
  #include "cfgt_json.h"
-@@ -40,6 +45,7 @@ cfgt_hash_p _cfgt_uuid = NULL;
+@@ -41,6 +46,7 @@ cfgt_hash_p _cfgt_uuid = NULL;
  str cfgt_hdr_prefix = {"NGCP%", 5};
  str cfgt_basedir = {"/tmp", 4};
  int cfgt_mask = CFGT_DP_ALL;
 +int not_sip = 0;
  
- static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
- {
-@@ -187,7 +193,7 @@ int _cfgt_get_hdr_helper(struct sip_msg *msg, str *res, int mode)
+ int _cfgt_get_filename(int msgid, str uuid, str *dest, int *dir);
+ 
+@@ -259,7 +265,7 @@ int _cfgt_get_hdr_helper(struct sip_msg *msg, str *res, int mode)
  			return STR_EQ(tmp, *res);
  		}
  	}
@@ -40,7 +40,7 @@ index 0e3bfec..971222f 100644
  }
  
  int _cfgt_get_hdr(struct sip_msg *msg, str *res)
-@@ -394,15 +400,21 @@ int _cfgt_set_dump(struct sip_msg *msg, cfgt_node_p node, str *flow)
+@@ -466,15 +472,21 @@ int _cfgt_set_dump(struct sip_msg *msg, cfgt_node_p node, str *flow)
  
  	if(node == NULL || flow == NULL)
  		return -1;
@@ -62,13 +62,13 @@ index 0e3bfec..971222f 100644
  	f = srjson_CreateObject(&node->jdoc);
  	if(f == NULL) {
  		LM_ERR("cannot create json object\n");
-@@ -531,6 +543,31 @@ int _cfgt_node_get_flowname(cfgt_str_list_p route, int *indx, str *dest)
+@@ -620,6 +632,31 @@ int _cfgt_node_get_flowname(cfgt_str_list_p route, int *indx, str *dest)
  	return 0;
  }
  
 +int _cfgt_parse_msg(sip_msg_t *msg)
 +{
-+	if (parse_msg(msg->buf, msg->len, msg) != 0) {
++	if(parse_msg(msg->buf, msg->len, msg) != 0) {
 +		LM_ERR("outbuf buffer parsing failed!");
 +		return 1;
 +	}
@@ -94,7 +94,7 @@ index 0e3bfec..971222f 100644
  int cfgt_process_route(struct sip_msg *msg, struct action *a)
  {
  	str routename;
-@@ -546,6 +583,10 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
+@@ -635,6 +672,10 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
  		return 0;
  	}
  	LM_DBG("route from action:[%s]\n", a->rname);
@@ -105,7 +105,7 @@ index 0e3bfec..971222f 100644
  	routename.s = a->rname;
  	routename.len = strlen(a->rname);
  	switch(_cfgt_add_routename(_cfgt_node, a, &routename)) {
-@@ -591,22 +632,35 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
+@@ -680,22 +721,35 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
  
  /*
  TODO:
@@ -143,7 +143,7 @@ index 0e3bfec..971222f 100644
  	_cfgt_node = cfgt_create_node(NULL);
  	if(_cfgt_node) {
  		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
-@@ -624,14 +678,23 @@ int cfgt_msgin(sr_event_param_t *evp)
+@@ -713,14 +767,23 @@ int cfgt_msgin(sr_event_param_t *evp)
  int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
  {
  	str unknown = {"unknown", 7};
@@ -160,7 +160,7 @@ index 0e3bfec..971222f 100644
 +			if(get_hdr_result != 0 || _cfgt_node->uuid.len == 0) {
 +				if(not_sip) {
 +					LM_DBG("not_sip flag set, not a SIP message."
-+							" Using 'unknown' uuid\n");
++						   " Using 'unknown' uuid\n");
 +				} else if(get_hdr_result == 2) {
 +					LM_DBG("message not related to the cfgtest scenario."
 +						   " Using 'unknown' uuid\n");
@@ -171,18 +171,20 @@ index 0e3bfec..971222f 100644
  				pkg_str_dup(&_cfgt_node->uuid, &unknown);
  			}
  			return _cfgt_get_uuid_id(_cfgt_node);
-@@ -661,7 +724,9 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
+@@ -750,7 +813,11 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
  
  	if(_cfgt_node) {
  		LM_DBG("dump last flow\n");
 -		if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
-+		if(_cfgt_node->route == NULL && strncmp(_cfgt_node->uuid.s, "unknown", 7) == 0)
-+			LM_DBG("route is NULL and message doesn't belong to cfgtest scenario\n");
++		if(_cfgt_node->route == NULL
++				&& strncmp(_cfgt_node->uuid.s, "unknown", 7) == 0)
++			LM_DBG("route is NULL and message doesn't belong to cfgtest "
++				   "scenario\n");
 +		else if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
  			LM_ERR("cannot create flowname\n");
  		else
  			_cfgt_set_dump(msg, _cfgt_node, &flowname);
-@@ -675,11 +740,24 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
+@@ -764,11 +831,24 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
  int cfgt_msgout(sr_event_param_t *evp)
  {
  	srjson_t *jobj;
@@ -207,7 +209,7 @@ index 0e3bfec..971222f 100644
  	if(_cfgt_node) {
  		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
  		if(jobj == NULL) {
-@@ -689,6 +767,13 @@ int cfgt_msgout(sr_event_param_t *evp)
+@@ -778,6 +858,13 @@ int cfgt_msgout(sr_event_param_t *evp)
  		srjson_AddItemToArray(&_cfgt_node->jdoc, _cfgt_node->out, jobj);
  		return 0;
  	}
@@ -217,7 +219,7 @@ index 0e3bfec..971222f 100644
 +		LM_DBG("OPTIONS message internally generated, skip it\n");
 +		return 0;
 +	}
-+	
++
  	LM_ERR("node empty\n");
  	return -1;
  }

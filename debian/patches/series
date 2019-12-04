@@ -59,6 +59,12 @@ upstream/limit_the_execution_of_dialplan_reload.patch
 upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
 upstream/cfgt-don-t-try-to-create-dir-if-it-already-exists.patch
 upstream/cfgt-fix-detection-of-jump-to-previous-previous-rout.patch
+## backport from kamailio trunk (5.4)
+upstream/cfgt-group-RPC-commands-using-module-name.patch
+upstream/cfgt-add-docs-for-missing-RPC-commands.patch
+upstream/cfgt-doc-add-missing-section.patch
+upstream/cfgt-remove-dbg-from-RPC-commands.patch
+upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 #

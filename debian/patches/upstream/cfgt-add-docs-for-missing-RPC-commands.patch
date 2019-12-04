@@ -1,0 +1,50 @@
+From 3b2225ba762291b825dd7dead92a4aaee676b637 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 3 Dec 2019 12:07:04 +0100
+Subject: [PATCH] cfgt: add docs for missing RPC commands
+
+---
+ src/modules/cfgt/doc/cfgt_admin.xml | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/src/modules/cfgt/doc/cfgt_admin.xml b/src/modules/cfgt/doc/cfgt_admin.xml
+index 76fb76750..186055dbe 100644
+--- a/src/modules/cfgt/doc/cfgt_admin.xml
++++ b/src/modules/cfgt/doc/cfgt_admin.xml
+@@ -147,6 +147,33 @@ modparam("cfgt", "callid_prefix", "TEST-ID%")
+ 		</example>
+ 	</section>
+ 
++	<section>
++	<title>RPC Commands</title>
++	<section id="cfgt.r.mask">
++		<title>
++		<function moreinfo="none">dbg.cfgt.mask</function>
++		</title>
++		<para>
++		Sets <link linked="cfgt.p.mask">mask</link> module parameter.
++		</para>
++		<para>
++		Name: <emphasis>dbg.cfgt.mask</emphasis>
++		</para>
++		<para>Parameters:</para>
++		<itemizedlist>
++			<listitem><para>mask : int value</para>
++			</listitem>
++		</itemizedlist>
++		<para>
++		Example:
++		</para>
++<programlisting  format="linespecific">
++...
++# prototype: &sercmd; dbg.cfgt.mask 32
++...
++</programlisting>
++    </section>
++
+ 	</section>
+ 	<section>
+ 		<title>Usage</title>
+-- 
+2.20.1
+
