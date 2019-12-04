@@ -1,0 +1,39 @@
+From 2cb4ca9c436f1e6e21a21b100f7a79a25e023865 Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 3 Dec 2019 10:38:54 +0100
+Subject: [PATCH] cfgt: group RPC commands using module name
+
+---
+ src/modules/cfgt/cfgt_int.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
+index b8a6456fc..5d29fdb87 100644
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -328,7 +328,7 @@ void cfgt_save_node(cfgt_node_p node)
+ 	dest.s[dir] = '\0';
+ 	LM_DBG("dir [%s]\n", dest.s);
+ 	if(stat(dest.s, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+-		LM_DBG("dir [%s] already existing\n", dest.s);
++		LM_DBG("dir [%s] already exists\n", dest.s);
+ 	} else if(mkdir(dest.s, S_IRWXO | S_IXGRP | S_IRWXU) < 0) {
+ 		LM_ERR("failed to make directory: %s\n", strerror(errno));
+ 		return;
+@@ -725,8 +725,12 @@ static void cfgt_rpc_mask(rpc_t *rpc, void *ctx)
+ 	rpc->add(ctx, "s", "200 ok");
+ }
+ 
++/* clang-format off */
+ rpc_export_t cfgt_rpc[] = {
+-		{"dbg.mask", cfgt_rpc_mask, cfgt_rpc_mask_doc, 0}, {0, 0, 0, 0}};
++		{"dbg.cfgt.mask", cfgt_rpc_mask, cfgt_rpc_mask_doc, 0},
++		{0, 0, 0, 0}
++};
++/* clang-format on */
+ 
+ int cfgt_init(void)
+ {
+-- 
+2.20.1
+
