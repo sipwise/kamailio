@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "ee018770_5a71858f",
+        "filename": "debian/patches/sipwise/tm_add_proportional_load_contacts_by_q_value.patch",
+        "patchSetId": 5
+      },
+      "lineNbr": 1,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2019-12-09T08:55:25Z",
+      "side": 1,
+      "message": "first, please keep info the commit here. Description of what this is, who did it etc...",
+      "revId": "b88422ce062564388162b29583b52f5edd852c9e",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}

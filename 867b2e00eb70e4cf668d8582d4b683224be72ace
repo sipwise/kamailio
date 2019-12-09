@@ -1,0 +1,72 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "5404d688_3fbfbbd8",
+        "filename": "debian/patches/sipwise/tm_add_proportional_load_contacts_by_q_value.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 31,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2019-12-09T08:55:25Z",
+      "side": 1,
+      "message": "you can just use pxavp and remove last parameter, just check if pxavp is NULL",
+      "revId": "867b2e00eb70e4cf668d8582d4b683224be72ace",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "6f8aaa1e_193c45e5",
+        "filename": "debian/patches/sipwise/tm_add_proportional_load_contacts_by_q_value.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 45,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2019-12-09T08:55:25Z",
+      "side": 1,
+      "message": "the comment and error are wrong, you are not adding to the root list here",
+      "revId": "867b2e00eb70e4cf668d8582d4b683224be72ace",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "b2aa612c_360b6762",
+        "filename": "debian/patches/sipwise/tm_add_proportional_load_contacts_by_q_value.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 64,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2019-12-09T08:55:25Z",
+      "side": 1,
+      "message": "I think \"last\" parameter is not needed, you pass pxavp as NULL indicating the same as last as 0",
+      "revId": "867b2e00eb70e4cf668d8582d4b683224be72ace",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "e0032a71_a9cde6e7",
+        "filename": "debian/patches/sipwise/tm_add_proportional_load_contacts_by_q_value.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 75,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2019-12-09T08:55:25Z",
+      "side": 1,
+      "message": "You mean sock_buf[len] \u003d \u0027\\0\u0027;? But in str there\u0027s no need to do that. Actually I will do just:\nsock_str.s \u003d sock_buf;\nsock_str.len \u003d len;",
+      "revId": "867b2e00eb70e4cf668d8582d4b683224be72ace",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
