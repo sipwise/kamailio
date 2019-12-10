@@ -1,3 +1,15 @@
+ngcp-kamailio (5.2.5-1+0~mr8.1.2.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [ec7fd38] TT#71450 fix lcr_rate using the wrong peer ID
+
+  [ Victor Seva ]
+  * [167693d] TT#71323 [pv_headers] force "From"/"To" keys when collecting headers
+
+  [ Sipwise Jenkins Builder ]
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 10 Dec 2019 17:43:03 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.1.1.0) unstable; urgency=medium
 
   [ Marco Capetta ]
