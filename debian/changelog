@@ -1,3 +1,26 @@
+ngcp-kamailio (5.1.7-1+0~mr6.5.8.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [f78feb7] TT#63000 fix redis SCAN usage
+  * [5aee72d] TT#63000 skip non-EQ DB query type keys
+  * [a1a6fcc] TT#63000 db_redis: support update of type key columns
+  * [017e331] TT#63000 db_redis: support range scans on timestamp keys
+  * [5c332e4] TT#63000 db_redis: support exponential increase and fallof for SCAN
+  * [cb78dd1] TT#63000 db_redis: support range matching on int columns
+  * [d240e27] TT#63000 db_redis: use a min string length of 10 digits for bigints
+  * [ca3578e] TT#63000 db_redis: use KEYS instead of SCAN
+  * [f74e29b] TT#66000 add versioning to db_redis
+  * [522d0be] TT#63000 add support for value-less master keys
+  * [81e3553] TT#63000 db_redis: simulate non-unique indexes through parent sets
+  * [e4d546f] TT#63000 db_redis: fixes
+  * [f64cff2] TT#63000 db_redis: use EVALSHA instead of EVAL
+  * [0bcaa10] TT#63000 db_redis: fix EVALSHA usage
+
+  [ Alexander Lutay ]
+  * [23ce2e1] TT#70475 systemd: remove separate kamailio config check on start
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 12 Dec 2019 12:00:17 +0100
+
 ngcp-kamailio (5.1.7-1+0~mr6.5.7.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
