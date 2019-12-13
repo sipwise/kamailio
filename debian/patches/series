@@ -65,8 +65,10 @@ upstream/cfgt-add-docs-for-missing-RPC-commands.patch
 upstream/cfgt-doc-add-missing-section.patch
 upstream/cfgt-remove-dbg-from-RPC-commands.patch
 upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
+upstream/cfgt-use-snprintf-instead-of-sprintf.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
+sipwise/cfgt-fix-coredump.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches

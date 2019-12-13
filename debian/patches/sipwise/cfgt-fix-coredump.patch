@@ -1,0 +1,21 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 13 Dec 2019 11:08:21 +0100
+Subject: cfgt: fix coredump
+
+Change-Id: I0df49598377897ca94fad25e845b88115fd473de
+---
+ src/modules/cfgt/cfgt_int.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
+index 419d1f1..38e79b9 100644
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -144,6 +144,7 @@ end:
+ 		pkg_free(filepath.s);
+ 	if(dest.s)
+ 		pkg_free(dest.s);
++	return;
+ }
+ 
+ int _cfgt_remove_uuid(const str *uuid, int remove_report)
