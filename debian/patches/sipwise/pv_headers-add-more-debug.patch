@@ -1,0 +1,56 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 17 Dec 2019 15:27:35 +0100
+Subject: pv_headers: add more debug
+
+Change-Id: Ie8be77dc76f6a6cd275606af470f273951ce62a6
+---
+ src/modules/pv_headers/pvh_xavp.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index de296b4..f70a5f9 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -633,20 +633,32 @@ int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 		pvh_str_copy(&hname, &_hdr_to, header_name_size);
+ 
+ 	xval = pvh_xavp_get_value(msg, &xavp_name, &hname, 0);
+-	if(xval == NULL || !xval->v.s.s)
++	if(xval == NULL || !xval->v.s.s) {
++		LM_DBG("xavp %.*s hname:%.*s is null\n",
++			xavp_name.len, xavp_name.s,
++			hname.len, hname.s);
+ 		goto err;
++	}
+ 
+ 	xval_pd = pvh_xavp_get_value(msg, &xavp_parsed_xname, &hname, 0);
+ 
+-	if(xval_pd)
++	if(xval_pd) {
++		LM_DBG("c_data from xavp %.*s hname:%.*s\n",
++			xavp_parsed_xname.len, xavp_parsed_xname.s,
++			hname.len, hname.s);
+ 		c_data = (xavp_c_data_t *)xval_pd->v.data->p;
++	}
+ 
+ 	if(c_data != NULL
+ 			&& strncmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
++		LM_DBG("xval:%.*s != c_data->value:%.*s\n",
++			xval->v.s.len, xval->v.s.s,
++			c_data->value.len, c_data->value.s);
+ 		c_data = NULL;
+ 	}
+ 
+ 	if(c_data == NULL) {
++		// I think this is never freed, pvh_set_xavp already allocates the memory
+ 		c_data = (xavp_c_data_t *)shm_malloc(sizeof(xavp_c_data_t));
+ 		if(c_data == NULL) {
+ 			SHM_MEM_ERROR;
+@@ -659,6 +671,7 @@ int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 				   msg, &xavp_parsed_xname, &hname, c_data, SR_XTYPE_DATA, 0, 0)
+ 				< 0)
+ 			goto err;
++		LM_DBG("c_data from pvh_merge_uri\n");
+ 	}
+ 
+ 	switch(p_no) {
