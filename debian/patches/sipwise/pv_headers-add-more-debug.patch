@@ -1,0 +1,294 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 17 Dec 2019 15:27:35 +0100
+Subject: pv_headers: add more debug
+
+Change-Id: Ic31adbd3f761c146ccc3e45f26dc22985de21629
+---
+ src/modules/pv_headers/pvh_func.c | 39 ++++++++++++---------
+ src/modules/pv_headers/pvh_xavp.c | 73 +++++++++++++++++++++++++--------------
+ src/modules/pv_headers/pvh_xavp.h |  2 +-
+ 3 files changed, 71 insertions(+), 43 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 1340500..81e10d0 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -139,6 +139,7 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)
+ 	str uri = STR_NULL;
+ 	struct str_hash_table rm_hdrs;
+ 	int from_cnt = 0, to_cnt = 0;
++	int skip_from_to = 0;
+ 	str br_xname = STR_NULL;
+ 	int br_idx, keys_count;
+ 	int res = -1;
+@@ -175,11 +176,15 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)
+ 
+ 	pvh_get_branch_xname(msg, &xavp_name, &br_xname);
+ 
+-	if((xavp = xavp_get(&br_xname, NULL)) == NULL
+-			&& (xavp = xavp_get(&xavp_name, NULL)) == NULL) {
+-		LM_ERR("missing xavp %s, run pv_collect_headers() first\n",
+-				xavp_name.s);
+-		goto err;
++	if((xavp = xavp_get(&br_xname, NULL)) == NULL) {
++		LM_DBG("br_xname:%.*s is not there, using xavp_name:%.*s\n",
++			br_xname.len, br_xname.s,
++			xavp_name.len, xavp_name.s);
++		if((xavp = xavp_get(&xavp_name, NULL)) == NULL) {
++			LM_ERR("missing xavp %s, run pv_collect_headers() first\n",
++					xavp_name.s);
++			goto err;
++		}
+ 	}
+ 	if(xavp->val.type != SR_XTYPE_XAVP) {
+ 		LM_ERR("not xavp child type %s\n", xavp_name.s);
+@@ -195,19 +200,23 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)
+ 		PKG_MEM_ERROR;
+ 		goto err;
+ 	}
+-	LM_DBG("xavp->name:%.*s br_xname:%.*s keys_count: %d\n", xavp->name.len,
+-			xavp->name.s, br_xname.len, br_xname.s, keys_count);
++	LM_DBG("xavp->name:%.*s keys_count: %d\n",
++		xavp->name.len, xavp->name.s, keys_count);
+ 	str_hash_init(&rm_hdrs);
+ 
++	if(msg->first_line.type == SIP_REPLY
++					|| msg->first_line.u.request.method_value == METHOD_ACK
++					|| msg->first_line.u.request.method_value == METHOD_PRACK
++					|| msg->first_line.u.request.method_value == METHOD_BYE) {
++		skip_from_to = 1;
++	}
++
+ 	do {
+ 		if(pvh_skip_header(&sub->name))
+ 			continue;
+ 
+ 		if(strncasecmp(sub->name.s, _hdr_from.s, sub->name.len) == 0) {
+-			if(msg->first_line.type == SIP_REPLY
+-					|| msg->first_line.u.request.method_value == METHOD_ACK
+-					|| msg->first_line.u.request.method_value == METHOD_PRACK
+-					|| msg->first_line.u.request.method_value == METHOD_BYE) {
++			if(skip_from_to) {
+ 				LM_DBG("skip From header change in reply messages\n");
+ 				continue;
+ 			}
+@@ -240,10 +249,7 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)
+ 		}
+ 
+ 		if(strncasecmp(sub->name.s, _hdr_to.s, sub->name.len) == 0) {
+-			if(msg->first_line.type == SIP_REPLY
+-					|| msg->first_line.u.request.method_value == METHOD_ACK
+-					|| msg->first_line.u.request.method_value == METHOD_PRACK
+-					|| msg->first_line.u.request.method_value == METHOD_BYE) {
++			if(skip_from_to) {
+ 				LM_DBG("skip To header change in reply messages\n");
+ 				continue;
+ 			}
+@@ -325,9 +331,10 @@ int pvh_reset_headers(struct sip_msg *msg)
+ 
+ 	pvh_get_branch_index(msg, &br_idx);
+ 	pvh_get_branch_xname(msg, &xavp_name, &br_xname);
+-
++	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s);
+ 	pvh_free_xavp(&br_xname);
+ 	pvh_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
++	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s);
+ 	pvh_free_xavp(&br_xname);
+ 
+ 	if(msg->first_line.type == SIP_REPLY) {
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index de296b4..bd8e06e 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -116,16 +116,23 @@ sr_xval_t *pvh_xavp_get_value(
+ 		return NULL;
+ 
+ 	pvh_get_branch_xname(msg, xname, &br_xname);
+-	if((xavp = xavp_get(&br_xname, NULL)) == NULL
+-			&& (xavp = xavp_get(xname, NULL)) == NULL) {
+-		goto err;
++	if((xavp = xavp_get(&br_xname, NULL)) == NULL) {
++		if((xavp = xavp_get(xname, NULL)) == NULL) {
++			goto err;
++		}
++		LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
++			br_xname.len, br_xname.s,
++			xname->len, xname->s);
+ 	}
+ 
+ 	if(xavp->val.type != SR_XTYPE_XAVP) {
+ 		LM_ERR("not xavp child type %s\n", br_xname.s);
+ 		goto err;
+ 	}
+-
++	LM_DBG("xavp:%.*s name:%.*s idx:%d\n",
++		xavp->name.len, xavp->name.s,
++		name->len, name->s, idx
++	);
+ 	sub = xavp_get_by_index(name, idx, &xavp->val.v.xavp);
+ 
+ 	pvh_str_free(&br_xname);
+@@ -146,8 +153,12 @@ sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name)
+ 
+ 	pvh_get_branch_xname(msg, xname, &br_xname);
+ 	xavp = xavp_get_child(&br_xname, name);
+-	if(xavp == NULL)
++	if(xavp == NULL) {
++		LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
++			br_xname.len, br_xname.s,
++			xname->len, xname->s);
+ 		xavp = xavp_get_child(xname, name);
++	}
+ 
+ 	pvh_str_free(&br_xname);
+ 	return xavp;
+@@ -290,7 +301,10 @@ int pvh_set_xavp(struct sip_msg *msg, str *xname, str *name, void *data,
+ 	root = xavp_get(&br_xname, NULL);
+ 
+ 	if(root == NULL && br_idx > 0) {
+-		pvh_clone_branch_xavp(msg, xname);
++		LM_DBG("clone xavp:%.*s br_xname:%.*s\n",
++			xname->len, xname->s,
++			br_xname.len, br_xname.s);
++		pvh_clone_branch_xavp(msg, xname, &br_xname);
+ 		root = xavp_get(&br_xname, NULL);
+ 	}
+ 
+@@ -401,13 +415,12 @@ int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst)
+ 	return 1;
+ }
+ 
+-int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname)
++int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname, str *br_xname)
+ {
+ 	sr_xavp_t *xavp = NULL;
+ 	sr_xavp_t *br_xavp = NULL;
+ 	sr_xavp_t *sub = NULL;
+ 	sr_xval_t root_xval;
+-	str br_xname = STR_NULL;
+ 
+ 	if((xavp = xavp_get(xname, NULL)) == NULL) {
+ 		LM_ERR("cannot clone xavp from non existing %s\n", xname->s);
+@@ -424,21 +437,17 @@ int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname)
+ 		return -1;
+ 	}
+ 
+-	if(pvh_str_new(&br_xname, header_name_size) < 0)
+-		return -1;
+-	pvh_get_branch_xname(msg, xname, &br_xname);
+-
+ 	memset(&root_xval, 0, sizeof(sr_xval_t));
+ 	root_xval.type = SR_XTYPE_XAVP;
+ 	root_xval.v.xavp = NULL;
+ 
+-	if((br_xavp = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
+-		LM_ERR("error create xavp %s\n", br_xname.s);
+-		goto err;
++	if((br_xavp = xavp_add_value(br_xname, &root_xval, NULL)) == NULL) {
++		LM_ERR("error create xavp %s\n", br_xname->s);
++		return -1;
+ 	}
+ 
+ 	if(strncmp(xname->s, xavp_parsed_xname.s, xname->len) == 0) {
+-		pvh_str_free(&br_xname);
++		LM_DBG("skip clone\n");
+ 		return 1;
+ 	}
+ 
+@@ -450,16 +459,11 @@ int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname)
+ 		if(pvh_xavp_append_value(&sub->name, &sub->val, &br_xavp->val.v.xavp)
+ 				< 0) {
+ 			LM_ERR("cannot clone xavp %s\n", sub->name.s);
+-			goto err;
++			return -1;
+ 		}
+ 	} while((sub = sub->next) != NULL);
+ 
+-	pvh_str_free(&br_xname);
+ 	return 1;
+-
+-err:
+-	pvh_str_free(&br_xname);
+-	return -1;
+ }
+ 
+ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+@@ -633,16 +637,27 @@ int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 		pvh_str_copy(&hname, &_hdr_to, header_name_size);
+ 
+ 	xval = pvh_xavp_get_value(msg, &xavp_name, &hname, 0);
+-	if(xval == NULL || !xval->v.s.s)
++	if(xval == NULL || !xval->v.s.s) {
++		LM_DBG("xavp:%.*s hname:%.*s is null\n",
++			xavp_name.len, xavp_name.s,
++			hname.len, hname.s);
+ 		goto err;
++	}
+ 
+ 	xval_pd = pvh_xavp_get_value(msg, &xavp_parsed_xname, &hname, 0);
+ 
+-	if(xval_pd)
++	if(xval_pd) {
++		LM_DBG("p_no:%d c_data from xavp:%.*s hname:%.*s\n", p_no,
++			xavp_parsed_xname.len, xavp_parsed_xname.s,
++			hname.len, hname.s);
+ 		c_data = (xavp_c_data_t *)xval_pd->v.data->p;
++	}
+ 
+ 	if(c_data != NULL
+ 			&& strncmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
++		LM_DBG("xval:%.*s != c_data->value:%.*s\n",
++			xval->v.s.len, xval->v.s.s,
++			c_data->value.len, c_data->value.s);
+ 		c_data = NULL;
+ 	}
+ 
+@@ -659,6 +674,8 @@ int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 				   msg, &xavp_parsed_xname, &hname, c_data, SR_XTYPE_DATA, 0, 0)
+ 				< 0)
+ 			goto err;
++		LM_DBG("p_no:%d c_data from pvh_merge_uri hname:%.*s\n",
++			p_no, hname.len, hname.s);
+ 	}
+ 
+ 	switch(p_no) {
+@@ -685,13 +702,14 @@ int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 		default:
+ 			LM_ERR("unknown get uri op\n");
+ 	}
+-
++	LM_DBG("sval:%.*s\n", sval.len, sval.s);
+ 	pvh_str_free(&hname);
+ 	return sval.s ? is_strint ? pv_get_strintval(msg, param, res, &sval, ival)
+ 							  : pv_get_strval(msg, param, res, &sval)
+ 				  : pv_get_null(msg, param, res);
+ 
+ err:
++	LM_DBG("err, return null\n");
+ 	pvh_str_free(&hname);
+ 	return pv_get_null(msg, param, res);
+ }
+@@ -763,7 +781,10 @@ int pvh_set_uri(struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
+ 	memset(c_data, 0, sizeof(xavp_c_data_t));
+ 	if(pvh_merge_uri(msg, a_type, &xval->v.s, &fval, c_data) < 0)
+ 		goto err;
+-
++	LM_DBG("xavp:%.*s hname:%.*s value:%.*s\n",
++		xavp_name.len, xavp_name.s,
++		hname.len, hname.s,
++		c_data->value.len, c_data->value.s);
+ 	if(pvh_set_xavp(msg, &xavp_name, &hname, &c_data->value, SR_XTYPE_STR, 0, 0)
+ 			< 0)
+ 		goto err;
+diff --git a/src/modules/pv_headers/pvh_xavp.h b/src/modules/pv_headers/pvh_xavp.h
+index 1245a1a..a74a971 100644
+--- a/src/modules/pv_headers/pvh_xavp.h
++++ b/src/modules/pv_headers/pvh_xavp.h
+@@ -59,6 +59,6 @@ int pvh_set_reply_sr(
+ 
+ int pvh_get_branch_index(struct sip_msg *msg, int *br_idx);
+ int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst);
+-int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname);
++int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname, str *br_xname);
+ 
+ #endif /* PV_XAVP_H */
