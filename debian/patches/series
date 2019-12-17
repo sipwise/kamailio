@@ -69,6 +69,7 @@ upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
 upstream/cfgt-use-snprintf-instead-of-sprintf.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
+sipwise/pv_headers-add-more-debug.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
