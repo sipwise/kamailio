@@ -1,3 +1,10 @@
+ngcp-kamailio (5.2.5-1+0~mr7.5.2.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [73c9c36] TT#71821 pv_headers: fix missing $x_tt on replies
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 19 Dec 2019 15:58:16 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr7.5.2.3) unstable; urgency=medium
 
   [ Victor Seva ]
