@@ -48,3 +48,4 @@ upstream/tm-put-back-t-in-wait-timer-if-still-referenced-more.patch
 sipwise/sca-fix-memleaks.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/db_redis_fix_scan_usage.patch
+upstream/topos_redis_fix_prack_method_check_the_branch_values.patch
