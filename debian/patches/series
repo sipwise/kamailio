@@ -21,8 +21,6 @@ sipwise/add_pv_headers_module.patch
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
 sipwise/pv_trans_eval_uri.patch
-# ** https://github.com/kamailio/kamailio/pull/2158
-sipwise/avpops_avp_subst_pvar.patch
 sipwise/fix_dialplan_errors.patch
 sipwise/tmrec-ical.patch
 # ** https://github.com/kamailio/kamailio/pull/2162
@@ -68,6 +66,8 @@ upstream/cfgt-remove-dbg-from-RPC-commands.patch
 upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
 upstream/cfgt-use-snprintf-instead-of-sprintf.patch
 upstream/tm_add_proportional_load_contacts_by_q_value.patch
+upstream/avpops-add-avp_subst_pv-documentation.patch
+upstream/avpops-add-avp_subst_pv.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
