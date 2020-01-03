@@ -1,0 +1,33 @@
+From ed10d7692b99b1cd6d3975c06d8b0d9d3270779d Mon Sep 17 00:00:00 2001
+From: Henning Westerholt <hw@skalatan.de>
+Date: Fri, 6 Sep 2019 11:37:44 +0200
+Subject: [PATCH] core: improve error message related to a mismatch of
+ #!ifdef/#!define statement
+
+---
+ src/core/ppcfg.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/core/ppcfg.c b/src/core/ppcfg.c
+index 3b026f997..49065938a 100644
+--- a/src/core/ppcfg.c
++++ b/src/core/ppcfg.c
+@@ -219,8 +219,13 @@ void pp_ifdef_level_update(int val)
+ void pp_ifdef_level_check(void)
+ {
+ 	if(_pp_ifdef_level!=0) {
+-		LM_WARN("different number of preprocessor directives:"
+-				" N(#!IF[N]DEF) - N(#!ENDIF) = %d\n", _pp_ifdef_level);
++		if (_pp_ifdef_level > 0) {
++	                LM_WARN("different number of preprocessor directives:"
++				" %d more #!if[n]def as #!endif\n", _pp_ifdef_level);
++		} else {
++			LM_WARN("different number of preprocessor directives:"
++				" %d more #!endif as #!if[n]def\n", (_pp_ifdef_level)*-1);
++		}
+ 	} else {
+ 		LM_DBG("same number of pairing preprocessor directives"
+ 			" #!IF[N]DEF - #!ENDIF\n");
+-- 
+2.20.1
+

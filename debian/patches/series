@@ -43,6 +43,10 @@ upstream/rtpengine-add-support-for-via-branch-extra-option.patch
 upstream/rtpengine-add-support-for-explicit-load-balancing-op.patch
 upstream/core-events-support-for-basic-void-core-callbacks.patch
 upstream/core-main-executes-callbacks-on-app-ready-and-shutdo.patch
+upstream/core-allow-pp_define_get-to-be-used-by-modules.patch
+upstream/core-export-pp_define_get-via-ppcfg.h.patch
+upstream/core-improve-error-message-related-to-a-mismatch-of-.patch
+upstream/core-stop-start-if-ifdef-check-fails.patch
 upstream/systemdops-new-module-to-facilitate-integration-with.patch
 upstream/src-Makefile.groups-added-systemdops-module-to-syste.patch
 upstream/systemdops-set-core-callbacks-in-mod_register.patch
