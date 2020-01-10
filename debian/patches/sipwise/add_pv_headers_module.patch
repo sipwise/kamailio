@@ -12,7 +12,7 @@ Change-Id: I2e0dd0bd8ff2eaafeaf2114886f1b7ea0cf08470
  src/modules/pv_headers/doc/params.xml           |  186 ++++
  src/modules/pv_headers/doc/pv_headers.xml       |   39 +
  src/modules/pv_headers/doc/pv_headers_admin.xml |  116 +++
- src/modules/pv_headers/pv_headers.c             |  351 ++++++++
+ src/modules/pv_headers/pv_headers.c             |  357 ++++++++
  src/modules/pv_headers/pv_headers.h             |   51 ++
  src/modules/pv_headers/pvh_func.c               |  388 +++++++++
  src/modules/pv_headers/pvh_func.h               |   38 +
@@ -24,7 +24,7 @@ Change-Id: I2e0dd0bd8ff2eaafeaf2114886f1b7ea0cf08470
  src/modules/pv_headers/pvh_str.h                |   38 +
  src/modules/pv_headers/pvh_xavp.c               | 1050 +++++++++++++++++++++++
  src/modules/pv_headers/pvh_xavp.h               |   64 ++
- 20 files changed, 3390 insertions(+), 1 deletion(-)
+ 20 files changed, 3396 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -923,10 +923,10 @@ index 0000000..9c5c009
 +</chapter>
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..9730847
+index 0000000..56047e3
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,357 @@
 +/*
 + * pv_headers
 + *
@@ -1202,6 +1202,12 @@ index 0000000..9730847
 +void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params)
 +{
 +	struct sip_msg *msg = NULL;
++
++	LM_DBG("params->branch: %d\n", params->branch);
++	if(params->t_rbuf) {
++		LM_DBG("T=(%p) T_branch:%d\n",
++			params->t_rbuf->my_T, params->t_rbuf->branch);
++	}
 +
 +	if(type & TMCB_RESPONSE_IN) {
 +		msg = params->rpl;
