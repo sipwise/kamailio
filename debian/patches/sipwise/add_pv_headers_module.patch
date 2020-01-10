@@ -1,13 +1,15 @@
 From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
+
+Change-Id: I07be0eca51ad6f870477e2a49cf1f7d307212afc
 ---
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
  src/modules/pv_headers/README       |  488 ++++++++
- src/modules/pv_headers/pv_headers.c | 2126 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.c | 2132 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2657 insertions(+), 1 deletion(-)
+ 5 files changed, 2663 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -540,10 +542,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..f3c8a83
+index 0000000..627133b
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2126 @@
+@@ -0,0 +1,2132 @@
 +/*
 + * pv_headers
 + *
@@ -798,6 +800,12 @@ index 0000000..f3c8a83
 +void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params* params)
 +{
 +    struct sip_msg *msg = NULL;
++
++	LM_DBG("params->branch: %d\n", params->branch);
++	if(params->t_rbuf) {
++		LM_DBG("T=(%p) T_branch:%d\n",
++			params->t_rbuf->my_T, params->t_rbuf->branch);
++	}
 +
 +    if (type & TMCB_RESPONSE_IN) {
 +        msg = params->rpl;
