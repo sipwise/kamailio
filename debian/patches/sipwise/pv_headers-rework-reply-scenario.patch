@@ -1,0 +1,290 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 14 Jan 2020 14:16:42 +0100
+Subject: pv_headers: rework reply scenario
+---
+ src/modules/pv_headers/pv_headers.c | 65 +++++++++++++++++++++---
+ src/modules/pv_headers/pvh_func.c   |  6 +--
+ src/modules/pv_headers/pvh_xavp.c   | 98 +++++++++++++++++++++++++++++++++++--
+ src/modules/pv_headers/pvh_xavp.h   |  2 +
+ 4 files changed, 158 insertions(+), 13 deletions(-)
+
+diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
+index 9730847..66925e9 100644
+--- a/src/modules/pv_headers/pv_headers.c
++++ b/src/modules/pv_headers/pv_headers.c
+@@ -69,6 +69,8 @@ static int mod_init(void);
+ 
+ static void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params);
+ static int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb);
++static int handle_msg_reply_cb(
++		struct sip_msg *msg, unsigned int flags, void *cb);
+ 
+ static int w_pvh_collect_headers(struct sip_msg *msg, char *p1, char *p2)
+ {
+@@ -239,12 +241,18 @@ int mod_init(void)
+ 				  "collect/apply is disabled\n");
+ 		auto_msg_param = 0;
+ 	} else {
+-		if(auto_msg_param
+-				&& register_script_cb(
+-						   handle_msg_cb, PRE_SCRIPT_CB | REQUEST_CB, 0)
+-						   < 0) {
+-			LM_ERR("cannot register PRE_SCRIPT_CB callbacks\n");
+-			return -1;
++		if(auto_msg_param) {
++			if(register_script_cb(handle_msg_cb, PRE_SCRIPT_CB | REQUEST_CB, 0)
++					< 0) {
++				LM_ERR("cannot register PRE_SCRIPT_CB|REQUEST_CB callbacks\n");
++				return -1;
++			}
++			if(register_script_cb(
++					   handle_msg_reply_cb, PRE_SCRIPT_CB | ONREPLY_CB, 0)
++					< 0) {
++				LM_ERR("cannot register PRE_SCRIPT_CB|ONREPLY_CB callbacks\n");
++				return -1;
++			}
+ 		}
+ 	}
+ 
+@@ -274,6 +282,7 @@ void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params)
+ {
+ 	struct sip_msg *msg = NULL;
+ 
++	LM_DBG("T:%p params->branch: %d\n", t, params->branch);
+ 	if(type & TMCB_RESPONSE_IN) {
+ 		msg = params->rpl;
+ 		if(msg != NULL && msg != FAKED_REPLY) {
+@@ -305,6 +314,7 @@ int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+ 			LM_ERR("cannot register TM callbacks\n");
+ 			return -1;
+ 		}
++		pvh_reply_init(0);
+ 		pvh_collect_headers(msg, 1);
+ 	} else {
+ 		LM_ERR("unknown callback: %d\n", flags);
+@@ -313,6 +323,49 @@ int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+ 	return 1;
+ }
+ 
++int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
++{
++	tm_cell_t *t = NULL;
++	int branch;
++	sr_xavp_t **backup_xavps = NULL;
++	int backup_m_flags = msg->msg_flags;
++	int reply_count;
++
++	if(likely(!(msg->msg_flags & FL_TM_RPL_MATCHED))) {
++		msg->msg_flags |= FL_TM_RPL_MATCHED;
++		LM_DBG("fake FL_TM_RPL_MATCHED, to skip tm_cb TMCB_RESPONSE_IN\n");
++	}
++
++	if(tmb.t_check(msg, &branch) == -1) {
++		LM_ERR("failed find UAC branch\n");
++	} else {
++		t = tmb.t_gett();
++		if(t == NULL || t == T_UNDEFINED) {
++			LM_DBG("cannot lookup the transaction\n");
++		} else {
++			LM_DBG("T:%p branch:%d\n", t, branch);
++			backup_xavps = xavp_set_list(&t->xavps_list);
++		}
++	}
++
++	if(msg->msg_flags != backup_m_flags) {
++		msg->msg_flags = backup_m_flags;
++		LM_DBG("restored msg_flags\n");
++	}
++	if((reply_count = pvh_reply_append()) < 0) {
++		return -1;
++	}
++	if(backup_xavps) {
++		xavp_set_list(backup_xavps);
++		LM_DBG("restored backup_xavps\n");
++		if(pvh_reply_init(reply_count) < 0) {
++			return -1;
++		}
++	}
++
++	return 1;
++}
++
+ static sr_kemi_t pvh_kemi_exports[] = {
+ 		{str_init("pv_headers"), str_init("pvh_collect_headers"), SR_KEMIP_INT,
+ 				ki_pvh_collect_headers,
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 7fafa40..0ebbec7 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -146,7 +146,7 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)
+ 	rm_hdrs.size = 0;
+ 
+ 	pvh_get_branch_index(msg, &br_idx);
+-
++	LM_DBG("br_idx: %d\n", br_idx);
+ 	if(!is_auto) {
+ 		if(msg->first_line.type == SIP_REPLY) {
+ 			if(isflagset(msg, FL_PV_HDRS_APPLIED) == 1) {
+@@ -322,10 +322,10 @@ int pvh_reset_headers(struct sip_msg *msg)
+ 
+ 	pvh_get_branch_index(msg, &br_idx);
+ 	pvh_get_branch_xname(msg, &xavp_name, &br_xname);
+-	/*	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s); */
++	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s);
+ 	pvh_free_xavp(&br_xname);
+ 	pvh_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
+-	/*	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s); */
++	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s);
+ 	pvh_free_xavp(&br_xname);
+ 
+ 	if(msg->first_line.type == SIP_REPLY) {
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index db2192c..7f72193 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -32,6 +32,83 @@
+ #include "pvh_str.h"
+ #include "pvh_hash.h"
+ 
++static str reply_counter = str_init("reply_counter");
++
++/**
++ * We keep a $xavp(xavp_name=>reply_counter) with the number of replies
++ * so we will use $xavp(xavp_name.r.<id>) on reply_route
++ */
++int pvh_reply_init(int value)
++{
++	sr_xavp_t *xavp = NULL;
++	sr_xval_t xval;
++
++	xavp = xavp_get_child_with_ival(&xavp_name, &reply_counter);
++	if(xavp) {
++		LM_DBG("%.*s=>%.*s found: %d\n", xavp_name.len, xavp_name.s,
++				reply_counter.len, reply_counter.s, xavp->val.v.i);
++		return 1;
++	}
++
++	memset(&xval, 0, sizeof(sr_xval_t));
++	xval.type = SR_XTYPE_INT;
++	xval.v.i = value;
++
++	xavp = xavp_get(&xavp_name, NULL);
++	if(xavp == NULL) {
++		if(xavp_add_xavp_value(&xavp_name, &reply_counter, &xval, NULL)
++				== NULL) {
++			LM_ERR("can't create xavp:%.*s\n", xavp_name.len, xavp_name.s);
++			return -1;
++		}
++		LM_DBG("xavp_name:%.*s created\n", xavp_name.len, xavp_name.s);
++	} else {
++		if(xavp_set_value(&reply_counter, 0, &xval, &xavp->val.v.xavp)
++				== NULL) {
++			LM_ERR("can't set reply_counter value\n");
++			return -1;
++		}
++		LM_DBG("added value\n");
++	}
++	LM_DBG("reply message: %d\n", xval.v.i);
++	return xval.v.i;
++}
++
++int pvh_reply_append(void)
++{
++	sr_xavp_t *xavp = NULL;
++	sr_xval_t xval;
++
++	xavp = xavp_get_child_with_ival(&xavp_name, &reply_counter);
++	if(xavp) {
++		xavp->val.v.i++;
++		LM_DBG("reply message: %d\n", xavp->val.v.i);
++		return xavp->val.v.i;
++	}
++
++	memset(&xval, 0, sizeof(sr_xval_t));
++	xval.type = SR_XTYPE_INT;
++	xval.v.i = 0;
++
++	xavp = xavp_get(&xavp_name, NULL);
++	if(xavp == NULL) {
++		if(xavp_add_xavp_value(&xavp_name, &reply_counter, &xval, NULL)
++				== NULL) {
++			LM_ERR("can't create xavp:%.*s\n", xavp_name.len, xavp_name.s);
++			return -1;
++		}
++		LM_DBG("xavp_name:%.*s created\n", xavp_name.len, xavp_name.s);
++	} else {
++		if(xavp_add_value(&reply_counter, &xval, &xavp->val.v.xavp) == NULL) {
++			LM_ERR("can't add reply_counter value\n");
++			return -1;
++		}
++		LM_DBG("added value\n");
++	}
++	LM_DBG("reply message: %d\n", xval.v.i);
++	return xval.v.i;
++}
++
+ sr_xavp_t *pvh_xavp_new_value(str *name, sr_xval_t *val)
+ {
+ 	sr_xavp_t *avp = NULL;
+@@ -182,7 +259,7 @@ int pvh_xavp_is_null(sr_xavp_t *avp)
+ 
+ 	if(avp->val.type == SR_XTYPE_NULL
+ 			|| (avp->val.type == SR_XTYPE_STR
+-					   && (strncasecmp(avp->val.v.s.s, "NULL", 4) == 0))) {
++					&& (strncasecmp(avp->val.v.s.s, "NULL", 4) == 0))) {
+ 		return 1;
+ 	}
+ 
+@@ -398,6 +475,8 @@ int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst)
+ 	int os = 0;
+ 	char br_idx_s[32];
+ 	char br_idx_len = 0;
++	sr_xavp_t *xavp;
++	int reply = 0;
+ 
+ 	if(dst == NULL)
+ 		return -1;
+@@ -408,7 +487,7 @@ int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst)
+ 
+ 	pvh_get_branch_index(msg, &br_idx);
+ 	if(br_idx > 0) {
+-		sprintf(br_idx_s, "%d", br_idx - 1);
++		snprintf(br_idx_s, 32, "%d", br_idx - 1);
+ 		br_idx_len = strlen(br_idx_s);
+ 		memcpy(dst->s + os, ".", 1);
+ 		os += 1;
+@@ -416,8 +495,19 @@ int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst)
+ 		os += br_idx_len;
+ 	}
+ 	if(msg->first_line.type == SIP_REPLY) {
+-		memcpy(dst->s + os, ".r", 2);
+-		os += 2;
++		xavp = xavp_get_child_with_ival(&xavp_name, &reply_counter);
++		if(!xavp) {
++			LM_DBG("no %.*s=>%.*s found\n", xavp_name.len, xavp_name.s,
++					reply_counter.len, reply_counter.s);
++			pvh_reply_append();
++			reply = 0;
++		} else {
++			reply = xavp->val.v.i;
++		}
++		snprintf(br_idx_s, 32, ".r.%d", reply);
++		br_idx_len = strlen(br_idx_s);
++		memcpy(dst->s + os, br_idx_s, br_idx_len);
++		os += br_idx_len;
+ 	}
+ 	dst->len = os;
+ 	dst->s[dst->len] = '\0';
+diff --git a/src/modules/pv_headers/pvh_xavp.h b/src/modules/pv_headers/pvh_xavp.h
+index d9e9299..3e38f7d 100644
+--- a/src/modules/pv_headers/pvh_xavp.h
++++ b/src/modules/pv_headers/pvh_xavp.h
+@@ -45,6 +45,8 @@ int pvh_set_xavp(struct sip_msg *msg, str *xname, str *name, void *data,
+ 		sr_xtype_t type, int idx, int append);
+ int pvh_free_xavp(str *xname);
+ int pvh_parse_header_name(pv_spec_p sp, str *hname);
++int pvh_reply_init(int value);
++int pvh_reply_append(void);
+ 
+ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
+ int pvh_set_header(
