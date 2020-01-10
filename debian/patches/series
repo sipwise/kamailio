@@ -75,6 +75,7 @@ upstream/avpops-add-avp_subst_pv.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
+sipwise/pv_headers-rework-reply-scenario.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
