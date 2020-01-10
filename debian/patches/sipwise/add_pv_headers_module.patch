@@ -5,9 +5,9 @@ Subject: add_pv_headers_module
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
  src/modules/pv_headers/README       |  488 ++++++++
- src/modules/pv_headers/pv_headers.c | 2126 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.c | 2149 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2657 insertions(+), 1 deletion(-)
+ 5 files changed, 2680 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -540,10 +540,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..f3c8a83
+index 0000000..fab44f7
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2126 @@
+@@ -0,0 +1,2149 @@
 +/*
 + * pv_headers
 + *
@@ -600,6 +600,7 @@ index 0000000..f3c8a83
 +
 +static int FL_PV_HDRS_COLLECTED = 27;
 +static int FL_PV_HDRS_APPLIED = 28;
++static int FL_PV_HDRS_RESET = 29;
 +
 +static uac_api_t uac;
 +static tm_api_t tmb;
@@ -799,6 +800,12 @@ index 0000000..f3c8a83
 +{
 +    struct sip_msg *msg = NULL;
 +
++	LM_DBG("T:%p params->branch: %d\n", t, params->branch);
++	if(params->t_rbuf) {
++		LM_DBG("T=(%p) T_branch:%d\n",
++			params->t_rbuf->my_T, params->t_rbuf->branch);
++	}
++
 +    if (type & TMCB_RESPONSE_IN) {
 +        msg = params->rpl;
 +        if (msg != NULL && msg != FAKED_REPLY) {
@@ -956,7 +963,7 @@ index 0000000..f3c8a83
 +                xavp_name.len, xavp_name.s);
 +        goto err;
 +    }
-+
++    LM_DBG("xavp:%.*s[%p]\n", xavp_name.len, xavp_name.s, xavp);
 +    if ((sub = xavp->val.v.xavp) == NULL) {
 +        LM_ERR("invalid xavp structure: %s\n", xavp_name.s);
 +        goto err;
@@ -1103,19 +1110,28 @@ index 0000000..f3c8a83
 +
 +    pv_get_branch_index(msg, &br_idx);
 +    pv_get_branch_xname(msg, &xavp_name, &br_xname);
++    if ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_RESET) == 1) ||
++         (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_RESET) == 1)) {
++            LM_ERR("headers are already reset\n");
++            return -1;
++    }
 +
++    LM_DBG("free xavp:%.*s\n", br_xname.len, br_xname.s);
 +    pv_free_xavp(&br_xname);
 +    pv_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
++    LM_DBG("free xavp:%.*s\n", br_xname.len, br_xname.s);
 +    pv_free_xavp(&br_xname);
 +
 +    if (msg->first_line.type == SIP_REPLY) {
 +        resetflag(msg, FL_PV_HDRS_COLLECTED);
 +        resetflag(msg, FL_PV_HDRS_APPLIED);
++        setflag(msg, FL_PV_HDRS_RESET);
 +    } else {
 +        resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
 +        resetbflag(br_idx, FL_PV_HDRS_APPLIED);
++        setbflag(br_idx, FL_PV_HDRS_RESET);
 +    }
-+
++    LM_DBG("done\n");
 +    pv_str_free(&br_xname);
 +
 +    return 1;
@@ -1306,10 +1322,17 @@ index 0000000..f3c8a83
 +
 +int pv_free_xavp(str *xname)
 +{
++	int num;
++
 +    sr_xavp_t *xavp = NULL;
-+    xavp_rm_by_name(xname, 1, NULL);
-+    if ((xavp = xavp_get(xname, NULL)) != NULL)
++    xavp = xavp_get(xname, NULL);
++    LM_DBG("xavp:%.*s[%p] will be removed\n", xname->len, xname->s, xavp);
++    num = xavp_rm_by_name(xname, 1, NULL);
++    LM_DBG("deleted %d values\n", num);
++    if ((xavp = xavp_get(xname, NULL)) != NULL) {
++    	LM_DBG("xavp:%.*s[%p] still here\n", xname->len, xname->s, xavp);
 +        xavp_rm(xavp, NULL);
++    }
 +    return 1;
 +}
 +
