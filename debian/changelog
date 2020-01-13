@@ -1,3 +1,22 @@
+ngcp-kamailio (5.2.5-1+0~mr8.0.3.0) unstable; urgency=medium
+
+  [ Alexander Lutay ]
+  * [5073a71] TT#70475 systemd: remove separate kamailio config check on start
+
+  [ Guillem Jover ]
+  * [4f66a62] TT#70472 Disable unsafe signal handlers
+
+  [ Richard Fuchs ]
+  * [3eeabb2] TT#71450 fix lcr_rate using the wrong peer ID
+
+  [ Victor Seva ]
+  * [7d18e5e] TT#64607 pv_headers: fix Segmentation fault calling pv_unset
+  * [00b00b3] TT#70962 [pv_headers]: fix fork scenario
+  * [f206c2e] TT#71323 [pv_headers] force "From"/"To" keys when collecting headers
+  * [0515fb8] TT#71821 pv_headers: fix missing $x_tt on replies
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 13 Jan 2020 15:17:31 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.0.2.0) unstable; urgency=medium
 
   [ Marco Capetta ]
