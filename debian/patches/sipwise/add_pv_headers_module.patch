@@ -5,9 +5,9 @@ Subject: add_pv_headers_module
  src/Makefile.groups                 |    2 +-
  src/modules/pv_headers/Makefile     |   12 +
  src/modules/pv_headers/README       |  488 ++++++++
- src/modules/pv_headers/pv_headers.c | 2126 +++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pv_headers.c | 2143 +++++++++++++++++++++++++++++++++++
  src/modules/pv_headers/pv_headers.h |   30 +
- 5 files changed, 2657 insertions(+), 1 deletion(-)
+ 5 files changed, 2674 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/pv_headers.c
@@ -540,10 +540,10 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..f3c8a83
+index 0000000..d9d6ad1
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2126 @@
+@@ -0,0 +1,2143 @@
 +/*
 + * pv_headers
 + *
@@ -799,6 +799,7 @@ index 0000000..f3c8a83
 +{
 +    struct sip_msg *msg = NULL;
 +
++    LM_DBG("T:%p params->branch: %d\n", t, params->branch);
 +    if (type & TMCB_RESPONSE_IN) {
 +        msg = params->rpl;
 +        if (msg != NULL && msg != FAKED_REPLY) {
@@ -1104,8 +1105,10 @@ index 0000000..f3c8a83
 +    pv_get_branch_index(msg, &br_idx);
 +    pv_get_branch_xname(msg, &xavp_name, &br_xname);
 +
++    LM_DBG("free xavp:%.*s\n", br_xname.len, br_xname.s);
 +    pv_free_xavp(&br_xname);
 +    pv_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
++    LM_DBG("free xavp:%.*s\n", br_xname.len, br_xname.s);
 +    pv_free_xavp(&br_xname);
 +
 +    if (msg->first_line.type == SIP_REPLY) {
@@ -1306,10 +1309,21 @@ index 0000000..f3c8a83
 +
 +int pv_free_xavp(str *xname)
 +{
++    int num;
++
 +    sr_xavp_t *xavp = NULL;
-+    xavp_rm_by_name(xname, 1, NULL);
-+    if ((xavp = xavp_get(xname, NULL)) != NULL)
-+        xavp_rm(xavp, NULL);
++    xavp = xavp_get(xname, NULL);
++    if (xavp) {
++        LM_DBG("xavp:%.*s[%p] will be removed\n", xname->len, xname->s, xavp);
++        num = xavp_rm_by_name(xname, 1, NULL);
++        LM_DBG("deleted %d values\n", num);
++        if ((xavp = xavp_get(xname, NULL)) != NULL) {
++            LM_DBG("xavp:%.*s[%p] still here\n", xname->len, xname->s, xavp);
++            xavp_rm(xavp, NULL);
++        }
++    } else {
++        LM_DBG("no xavp:%.*s found\n", xname->len, xname->s);
++    }
 +    return 1;
 +}
 +
@@ -2607,13 +2621,16 @@ index 0000000..f3c8a83
 +
 +    pv_get_branch_index(msg, &br_idx);
 +    if (br_idx > 0) {
-+        sprintf(br_idx_s, "%d", br_idx-1);
++        snprintf(br_idx_s, 32, "%d", br_idx-1);
 +        br_idx_len = strlen(br_idx_s);
 +        memcpy(dst->s+os, ".", 1); os+=1;
 +        memcpy(dst->s+os, br_idx_s, br_idx_len); os+=br_idx_len;
 +    }
 +    if (msg->first_line.type == SIP_REPLY) {
-+        memcpy(dst->s+os, ".r", 2); os+=2;
++        memcpy(dst->s+os, ".r.", 3); os+=3;
++        snprintf(br_idx_s, 32, "%d", msg->id);
++        br_idx_len = strlen(br_idx_s);
++        memcpy(dst->s+os, br_idx_s, br_idx_len); os+=br_idx_len;
 +    }
 +    dst->len = os;
 +    dst->s[dst->len] = '\0';
