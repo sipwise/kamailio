@@ -57,3 +57,4 @@ sipwise/db_redis_eval_fix.patch
 sipwise/switch_from_python2_to_python3.patch
 upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
 sipwise/fix_lcr_rate_wrong_id.patch
+sipwise/pv_headers-rework-reply-scenario.patch
