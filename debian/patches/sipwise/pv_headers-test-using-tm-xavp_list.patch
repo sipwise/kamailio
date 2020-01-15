@@ -1,0 +1,110 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 17 Jan 2020 10:30:24 +0100
+Subject: pv_headers: test using tm xavp_list
+
+Change-Id: I35d645a2933d9d185fa9291d1ccb6d16f74a9c21
+---
+ src/modules/pv_headers/pv_headers.c | 51 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 49 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
+index 4d41b55..1820cc9 100644
+--- a/src/modules/pv_headers/pv_headers.c
++++ b/src/modules/pv_headers/pv_headers.c
+@@ -272,13 +272,42 @@ void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params* params)
+ int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+ {
+     int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN | TMCB_ON_BRANCH_FAILURE;
++    int branch;
++    tm_cell_t *t = NULL;
++    sr_xavp_t **backup_xavps = NULL;
+ 
+-    if (flags & (PRE_SCRIPT_CB|REQUEST_CB|ONREPLY_CB)) {
++    if(flags&ONREPLY_CB_TYPE) {
++        LM_DBG("ONREPLY_CB\n");
++    }
++    if(flags&REQUEST_CB_TYPE) {
++        LM_DBG("REQUEST_CB\n");
++    }
++
++    if (flags & PRE_SCRIPT_CB) {
++        LM_DBG("REQUEST_CB\n");
++        if (tmb.t_check(msg, &branch) == -1) {
++            LM_ERR("failed find UAC branch\n");
++        } else {
++           t = tmb.t_gett();
++           if(t == NULL || t == T_UNDEFINED) {
++               LM_DBG("cannot lookup the transaction\n");
++           } else {
++               LM_DBG("T:%p branch:%d\n", t, branch);
++               backup_xavps = xavp_set_list(&t->xavps_list);
++           }
++        }
++    }
++
++    if (flags & (PRE_SCRIPT_CB|REQUEST_CB|ONREPLY_CB_TYPE)) {
+         if (tmb.register_tmcb( msg, 0, cbs, handle_tm_t, 0, 0) <=0) {
+             LM_ERR("cannot register TM callbacks\n");
+             return -1;
+         }
+         pv_collect_headers(msg, "1", NULL);
++        if(backup_xavps) {
++            xavp_set_list(backup_xavps);
++            LM_DBG("restored backup_xavps\n");
++       }
+     } else {
+         LM_ERR("unknown callback: %d\n", flags);
+     }
+@@ -286,6 +315,19 @@ int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+     return 1;
+ }
+ 
++void pvh_check_reply_counter() {
++    sr_xavp_t *xavp = NULL;
++
++    xavp = xavp_get_child_with_ival(&xavp_name, &reply_counter);
++    if(xavp==NULL) {
++        LM_DBG("no %.*s=>%.*s found, this should not happend\n",
++                xavp_name.len, xavp_name.s,
++                reply_counter.len, reply_counter.s);
++    } else {
++        LM_DBG("OK\n");
++    }
++}
++
+ /**
+  * We keep a $xavp(xavp_name=>reply_counter) with the number of replies
+  * so we will use $xavp(xavp_name.r.<id>) on reply_route
+@@ -321,6 +363,7 @@ int pvh_reply_append(void)
+ 		LM_DBG("added value\n");
+ 	}
+ 	LM_DBG("reply message: %d\n", xval.v.i);
++    pvh_check_reply_counter();
+ 	return 1;
+ }
+ 
+@@ -333,6 +376,7 @@ int pv_collect_headers(struct sip_msg *msg, char *is_auto, char *_s2)
+     int idx = 0, d_size = 0;
+     str val_part = STR_NULL;
+     int br_idx;
++    sr_xavp_t *xavp = NULL;
+ 
+     pv_get_branch_index(msg, &br_idx);
+     LM_DBG("br_idx: %d\n", br_idx);
+@@ -391,12 +435,15 @@ int pv_collect_headers(struct sip_msg *msg, char *is_auto, char *_s2)
+             }
+             continue;
+         }
++        pvh_check_reply_counter();
+         if (pv_set_xavp(msg, &xavp_name, &name, &val, SR_XTYPE_STR, 0, 1) < 0)
+             goto err;
++        pvh_check_reply_counter();
+     }
+-
++    pvh_check_reply_counter();
+     if (pv_set_xavp(msg, &xavp_helper_xname, &xavp_helper_name, &xavp_name, SR_XTYPE_STR, 0, 0) < 0)
+         goto err;
++    pvh_check_reply_counter();
+ 
+     pv_str_free(&name);
+     pv_str_free(&val);
