@@ -33,6 +33,7 @@ sipwise/sca-fix-notify-after-bye.patch
 ## Ongoing Patches
 sipwise/rtpengine-balancing.patch
 sipwise/openssl-locking.patch
+sipwise/pv_headers-rework-reply-scenario.patch
 ## backport from kamailio upstream (5.2)
 sipwise/tt41650.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
