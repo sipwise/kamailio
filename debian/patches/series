@@ -56,4 +56,41 @@ sipwise/rtpengine_play_dtmf.patch
 sipwise/db_redis_eval_fix.patch
 sipwise/switch_from_python2_to_python3.patch
 upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
+<<<<<<< HEAD   (2097e0 TT#71821 pv_headers: fix missing $x_tt on replies)
 sipwise/fix_lcr_rate_wrong_id.patch
+=======
+upstream/cfgt-don-t-try-to-create-dir-if-it-already-exists.patch
+upstream/cfgt-fix-detection-of-jump-to-previous-previous-rout.patch
+upstream/Makefile.defs-use-dedicated-vars-for-pthread-mutex-f.patch
+## backport from kamailio trunk (5.4)
+upstream/cfgt-group-RPC-commands-using-module-name.patch
+upstream/cfgt-add-docs-for-missing-RPC-commands.patch
+upstream/cfgt-doc-add-missing-section.patch
+upstream/cfgt-remove-dbg-from-RPC-commands.patch
+upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
+upstream/cfgt-use-snprintf-instead-of-sprintf.patch
+upstream/tm_add_proportional_load_contacts_by_q_value.patch
+upstream/avpops-add-avp_subst_pv-documentation.patch
+upstream/avpops-add-avp_subst_pv.patch
+### relevant for upstream
+sipwise/fix_error_in_cfgt_module.patch
+sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
+#
+### Don't just put stuff in any order
+### use gbp pq import/export tooling to help maintain patches
+###
+## apt install git-buildpackage
+## git checkout -b vseva/xxxx --track origin/master
+### rework on a patch
+### edit debian/patches/series to keep that patch as last entry
+### for instance sipwise/add_pv_headers_module.patch
+## gbp pq import --force
+### edit files and ammend that commit
+## gbp pq export
+## git add debian/patches/sipwise/add_pv_headers_module.patch
+### don't commit any other change to debian/
+## git checkout -- debian/
+### git commit + git-review as usual
+###
+sipwise/fix_incorrect_branch_id_via_branch_next.patch
+>>>>>>> CHANGE (50da1b TT#74951 fix incorrect branch index used in via-branch=next)
