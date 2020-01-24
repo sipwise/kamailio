@@ -13,11 +13,9 @@ Subject: add_pv_headers_module
  create mode 100644 src/modules/pv_headers/pv_headers.c
  create mode 100644 src/modules/pv_headers/pv_headers.h
 
-diff --git a/src/Makefile.groups b/src/Makefile.groups
-index dba8073..33cbf0a 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
+@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
  				   rtpproxy sanity sdpops siputils sl statistics textops \
  				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
@@ -26,9 +24,6 @@ index dba8073..33cbf0a 100644
  
  # - extra used modules, with no extra dependency
  mod_list_extra=avp auth_diameter call_control call_obj dmq domainpolicy msrp \
-diff --git a/src/modules/pv_headers/Makefile b/src/modules/pv_headers/Makefile
-new file mode 100644
-index 0000000..42b80dd
 --- /dev/null
 +++ b/src/modules/pv_headers/Makefile
 @@ -0,0 +1,12 @@
@@ -44,9 +39,6 @@ index 0000000..42b80dd
 +LIBS=
 +
 +include ../../Makefile.modules
-diff --git a/src/modules/pv_headers/README b/src/modules/pv_headers/README
-new file mode 100644
-index 0000000..30bd1da
 --- /dev/null
 +++ b/src/modules/pv_headers/README
 @@ -0,0 +1,488 @@
@@ -538,12 +530,9 @@ index 0000000..30bd1da
 +        * retrieve the reply reason
 +
 +            $var(test) = $x_rr;
-diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-new file mode 100644
-index 0000000..f3c8a83
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,2126 @@
+@@ -0,0 +1,2128 @@
 +/*
 + * pv_headers
 + *
@@ -849,12 +838,12 @@ index 0000000..f3c8a83
 +
 +    pv_get_branch_index(msg, &br_idx);
 +    LM_DBG("br_idx: %d\n", br_idx);
-+    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
-+        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) ||
-+         (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1))) {
-+            LM_ERR("headers are already collected\n");
-+            return -1;
-+    }
++//    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
++//        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) ||
++//         (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1))) {
++//            LM_ERR("headers are already collected\n");
++//            return -1;
++//    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
 +        LM_ERR("error parsing headers\n");
@@ -936,12 +925,12 @@ index 0000000..f3c8a83
 +
 +    pv_get_branch_index(msg, &br_idx);
 +
-+    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
-+        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_APPLIED) == 1) ||
-+        (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1))) {
-+            LM_ERR("headers are already applied\n");
-+            return -1;
-+    }
++//    if (!(is_auto && strcmp(is_auto, "1") == 0) &&
++//        ((msg->first_line.type == SIP_REPLY && isflagset(msg, FL_PV_HDRS_APPLIED) == 1) ||
++//        (msg->first_line.type != SIP_REPLY && isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1))) {
++//            LM_ERR("headers are already applied\n");
++//            return -1;
++//    }
 +
 +    if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
 +        LM_ERR("error parsing headers\n");
@@ -1100,6 +1089,8 @@ index 0000000..f3c8a83
 +
 +    if (pv_str_new(&br_xname, header_name_size) < 0)
 +        return -1;
++
++    LM_DBG("Reset all the collected headers\n");
 +
 +    pv_get_branch_index(msg, &br_idx);
 +    pv_get_branch_xname(msg, &xavp_name, &br_xname);
@@ -2670,9 +2661,6 @@ index 0000000..f3c8a83
 +
 +    return 1;
 +}
-diff --git a/src/modules/pv_headers/pv_headers.h b/src/modules/pv_headers/pv_headers.h
-new file mode 100644
-index 0000000..3944f64
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.h
 @@ -0,0 +1,30 @@
