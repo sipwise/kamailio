@@ -92,3 +92,4 @@ sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/fix_incorrect_branch_id_via_branch_next.patch
