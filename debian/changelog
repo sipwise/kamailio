@@ -1,3 +1,30 @@
+ngcp-kamailio (5.2.5-1+0~mr8.2.1.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [c896cdd] TT#71450 fix lcr_rate using the wrong peer ID
+
+  [ Victor Seva ]
+  * [6b91a6a] TT#36285 support sd_notify()
+  * [6aff9a1] TT#64607 rework pv_headers module
+  * [493a842] TT#71323 [pv_headers] force "From"/"To" keys when collecting headers
+  * [184ec37] TT#64607 [pv_headers] export module functions to KEMI interface
+  * [fbf34ab] TT#71552 [cfgt] refresh already merged patches
+  * [4426d19] TT#71552 [rtpengine] reorder and update patches from upstream
+  * [5aa1fa4] TT#71552 [db_redis] reorder and update patches from upstream
+  * [fb5978a] TT#71552 remove obsolete openssl fix
+  * [b3872eb] TT#71552 [cfgt] backport from trunk new RPC commands
+  * [2c3ea64] TT#72700 cfgt: add upstream fix for printf
+  * [582ada3] TT#71552 tls: upstream fix for pthread mutex flags
+  * [1ba66d5] TT#71821 pv_headers: fix missing $x_tt on replies
+  * [79520e8] TT#71552 avpops change from upstream merge
+  * [6b1b0af] TT#71207 don't start if if[n]def check fails
+  * [9f33a71] TT#73652 pv_headers: fix detection of branch flag
+
+  [ Marco Capetta ]
+  * [11fd4e4] TT#70329 Call-termination distribution probability based on Q value
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 27 Jan 2020 12:20:43 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.2.0.0) unstable; urgency=medium
 
   [ Marco Capetta ]
