@@ -1,0 +1,338 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 29 Jan 2020 17:05:47 +0100
+Subject: pv_headers: full rework
+
+Change-Id: I647deb51e01f22498a4f5702103297a5c93781b8
+---
+ src/Makefile.groups                     |   2 +-
+ src/modules/pv_headers_new/Makefile     |  12 ++
+ src/modules/pv_headers_new/pv_headers.c | 229 ++++++++++++++++++++++++++++++++
+ src/modules/pv_headers_new/pv_headers.h |  50 +++++++
+ 4 files changed, 292 insertions(+), 1 deletion(-)
+ create mode 100644 src/modules/pv_headers_new/Makefile
+ create mode 100644 src/modules/pv_headers_new/pv_headers.c
+ create mode 100644 src/modules/pv_headers_new/pv_headers.h
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index 53d8cc6..745a127 100644
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -11,7 +11,7 @@
+ # - basic used modules, with no extra dependency (widespread usage)
+ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
+ 				   ctl debugger diversion enum exec ipops kex mangler maxfwd \
+-				   mediaproxy mqueue \
++				   mediaproxy mqueue pv_headers_new \
+ 				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
+ 				   rtpproxy sanity sdpops siputils sl statistics textops \
+ 				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
+diff --git a/src/modules/pv_headers_new/Makefile b/src/modules/pv_headers_new/Makefile
+new file mode 100644
+index 0000000..eb00413
+--- /dev/null
++++ b/src/modules/pv_headers_new/Makefile
+@@ -0,0 +1,12 @@
++#
++# pv_headers module makefile
++#
++#
++# WARNING: do not run this directly, it should be run by the master Makefile
++
++include ../../Makefile.defs
++auto_gen=
++NAME=pv_headers_new.so
++LIBS=
++
++include ../../Makefile.modules
+diff --git a/src/modules/pv_headers_new/pv_headers.c b/src/modules/pv_headers_new/pv_headers.c
+new file mode 100644
+index 0000000..21cd8ae
+--- /dev/null
++++ b/src/modules/pv_headers_new/pv_headers.c
+@@ -0,0 +1,229 @@
++/*
++ * pv_headers
++ *
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#include "../../core/sr_module.h"
++#include "../../core/script_cb.h"
++#include "../../modules/tm/tm_load.h"
++
++#include "pv_headers.h"
++
++MODULE_VERSION
++
++#define MODULE_NAME "pv_headers_new"
++#define XAVP_NAME "headers_new"
++
++uac_api_t uac;
++static tm_api_t tmb;
++
++str xavp_name = str_init(XAVP_NAME);
++int FL_PV_HDRS_COLLECTED = 27;
++int FL_PV_HDRS_APPLIED = 28;
++static int auto_msg_param = 1;
++
++str _hdr_from = {"From", 4};
++str _hdr_to = {"To", 2};
++
++static void mod_destroy(void);
++static int mod_init(void);
++
++static void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params);
++static int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb);
++
++/*
++ * Exported functions
++ */
++static cmd_export_t cmds[] = {
++		{0, 0, 0, 0, 0, 0}
++};
++
++static pv_export_t mod_pvs[] = {
++		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
++};
++
++static param_export_t params[] = {
++	{"xavp_name", PARAM_STR, &xavp_name},
++	{"header_collect_flag", PARAM_INT, &FL_PV_HDRS_COLLECTED},
++	{"header_apply_flag", PARAM_INT, &FL_PV_HDRS_APPLIED},
++	{"auto_msg", PARAM_INT, &auto_msg_param},
++	{0, 0, 0}
++};
++
++struct module_exports exports = {
++	MODULE_NAME,	 /* module name */
++	DEFAULT_DLFLAGS, /* dlopen flags */
++	cmds,			 /* exported functions */
++	params,			 /* exported parameters */
++	0,				 /* RPC method exports */
++	mod_pvs,		 /* exported pseudo-variables */
++	0,				 /* response handling function */
++	mod_init,		 /* module initialization function */
++	0,				 /* per-child init function */
++	mod_destroy		 /* module destroy function */
++};
++
++int mod_init(void)
++{
++	LM_INFO("%s module init...\n", MODULE_NAME);
++
++	if(load_uac_api(&uac) < 0) {
++		LM_NOTICE("could not bind to the 'uac' module, From/To headers will "
++				  "not be modifed\n");
++	}
++
++	if(load_tm_api(&tmb) < 0) {
++		LM_NOTICE("could not bind to the 'tm' module, automatic headers "
++				  "collect/apply is disabled\n");
++		auto_msg_param = 0;
++	} else {
++		if(auto_msg_param
++				&& register_script_cb(
++						   handle_msg_cb, PRE_SCRIPT_CB | REQUEST_CB, 0)
++						   < 0) {
++			LM_ERR("cannot register PRE_SCRIPT_CB callbacks\n");
++			return -1;
++		}
++	}
++
++	return 0;
++}
++
++void mod_destroy(void)
++{
++	LM_INFO("%s module unload...\n", MODULE_NAME);
++}
++
++/* just for debug */
++static inline char* tm_type_to_string(int type) {
++    switch (type) {
++        case TMCB_REQUEST_IN:
++            return "TMCB_REQUEST_IN";
++        case TMCB_RESPONSE_IN:
++            return "TMCB_RESPONSE_IN";
++        case TMCB_E2EACK_IN:
++            return "TMCB_E2EACK_IN";
++        case TMCB_REQUEST_PENDING:
++            return "TMCB_REQUEST_PENDING";
++        case TMCB_REQUEST_FWDED:
++            return "TMCB_REQUEST_FWDED";
++        case TMCB_RESPONSE_FWDED:
++            return "TMCB_RESPONSE_FWDED";
++        case TMCB_ON_FAILURE_RO:
++            return "TMCB_ON_FAILURE_RO";
++        case TMCB_ON_FAILURE:
++            return "TMCB_ON_FAILURE";
++        case TMCB_REQUEST_OUT:
++            return "TMCB_REQUEST_OUT";
++        case TMCB_RESPONSE_OUT:
++            return "TMCB_RESPONSE_OUT";
++        case TMCB_LOCAL_COMPLETED:
++            return "TMCB_LOCAL_COMPLETED";
++        case TMCB_LOCAL_RESPONSE_OUT:
++            return "TMCB_LOCAL_RESPONSE_OUT";
++        case TMCB_ACK_NEG_IN:
++            return "TMCB_ACK_NEG_IN";
++        case TMCB_REQ_RETR_IN:
++            return "TMCB_REQ_RETR_IN";
++        case TMCB_LOCAL_RESPONSE_IN:
++            return "TMCB_LOCAL_RESPONSE_IN";
++        case TMCB_LOCAL_REQUEST_IN:
++            return "TMCB_LOCAL_REQUEST_IN";
++        case TMCB_DLG:
++            return "TMCB_DLG";
++        case TMCB_DESTROY:
++            return "TMCB_DESTROY";
++        case TMCB_E2ECANCEL_IN:
++            return "TMCB_E2ECANCEL_IN";
++        case TMCB_E2EACK_RETR_IN:
++            return "TMCB_E2EACK_RETR_IN";
++        case TMCB_RESPONSE_READY:
++            return "TMCB_RESPONSE_READY";
++        case TMCB_DONT_ACK:
++            return "TMCB_DONT_ACK";
++        case TMCB_REQUEST_SENT:
++            return "TMCB_REQUEST_SENT";
++        case TMCB_RESPONSE_SENT:
++            return "TMCB_RESPONSE_SENT";
++        case TMCB_ON_BRANCH_FAILURE:
++            return "TMCB_ON_BRANCH_FAILURE";
++        case TMCB_ON_BRANCH_FAILURE_RO:
++            return "TMCB_ON_BRANCH_FAILURE_RO";
++        case TMCB_MAX:
++            return "TMCB_MAX";
++    }
++
++    return "UNKNOWN";
++}
++
++void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params)
++{
++	struct sip_msg *msg = NULL;
++
++	LM_DBG("T:%p type:%s\n\n", t, tm_type_to_string(type));
++
++	if(type & TMCB_REQUEST_FWDED) {
++		msg = params->req;
++	} else if(type & (TMCB_ON_BRANCH_FAILURE | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN)) {
++		msg = params->rpl;
++	} else {
++		LM_ERR("unknown callback: %d\n", type);
++		return;
++	}
++
++	LM_DBG("msg:%p apply changes??\n", msg);
++	return;
++}
++
++int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
++{
++	int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN
++			  | TMCB_ON_BRANCH_FAILURE;
++
++	LM_DBG("msg:%p flags:%d\n", msg, flags);
++
++	if(flags & (PRE_SCRIPT_CB | REQUEST_CB)) {
++		if(tmb.register_tmcb(msg, 0, cbs, handle_tm_t, 0, 0) <= 0) {
++			LM_ERR("cannot register TM callbacks\n");
++			return -1;
++		}
++		LM_DBG("msg:%p collect??\n", msg);
++	} else {
++		LM_ERR("unknown callback: %d\n", flags);
++	}
++
++	return 1;
++}
++
++int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
++{
++	LM_DBG("msg:%p flags:%d\n", msg, flags);
++
++	if(flags & (PRE_SCRIPT_CB | ONREPLY_CB)) {
++		LM_DBG("msg:%p collect??\n", msg);
++	} else {
++		LM_ERR("unknown callback: %d\n", flags);
++	}
++
++	return 1;
++}
+\ No newline at end of file
+diff --git a/src/modules/pv_headers_new/pv_headers.h b/src/modules/pv_headers_new/pv_headers.h
+new file mode 100644
+index 0000000..fd1213e
+--- /dev/null
++++ b/src/modules/pv_headers_new/pv_headers.h
+@@ -0,0 +1,50 @@
++/*
++ * pv_headers
++ *
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ *
++ */
++
++#ifndef PV_HEADERS_H
++#define PV_HEADERS_H
++
++#include "../../core/parser/parse_addr_spec.h"
++#include "../../modules/uac/api.h"
++
++typedef struct _xavp_c_data
++{
++	struct to_body to_b;
++	struct to_param *to_params;
++	str value;
++} xavp_c_data_t;
++
++extern uac_api_t uac;
++
++extern str xavp_name;
++extern str xavp_parsed_xname;
++
++extern str _hdr_from;
++extern str _hdr_to;
++
++extern int FL_PV_HDRS_COLLECTED;
++extern int FL_PV_HDRS_APPLIED;
++
++#endif /* PV_HEADERS_H */
