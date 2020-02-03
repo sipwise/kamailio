@@ -1,0 +1,37 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 3 Feb 2020 11:05:58 +0100
+Subject: TT#75200 pv_headers: enable more debug
+
+Change-Id: Ie32b00b192725248cf80637d1d5e9decd0fe760a
+---
+ src/modules/pv_headers/pvh_xavp.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index db2192c..e925369 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -120,8 +120,8 @@ sr_xavp_t *pvh_xavp_get(struct sip_msg *msg, str *xname)
+ 			goto end;
+ 		if((xavp = xavp_get(xname, NULL)) == NULL)
+ 			goto end;
+-		/*	LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n", br_xname.len,
+-			br_xname.s, xname->len, xname->s); */
++		LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n", br_xname.len,
++			br_xname.s, xname->len, xname->s);
+ 	}
+ 
+ 	if(xavp->val.type != SR_XTYPE_XAVP) {
+@@ -163,11 +163,10 @@ sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name)
+ 	if(xavp == NULL) {
+ 		if(cmp_str(xname, &br_xname) != 0) {
+ 			xavp = xavp_get_child(xname, name);
+-			/*
+ 			if(xavp) {
+ 				LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
+ 					br_xname.len, br_xname.s, xname->len, xname->s);
+-			} */
++			}
+ 		}
+ 	}
+ 
