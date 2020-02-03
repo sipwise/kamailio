@@ -1,0 +1,139 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 3 Feb 2020 11:05:58 +0100
+Subject: pv_headers: enable more debug
+---
+ src/modules/pv_headers/pv_headers.c | 67 +++++++++++++++++++++++++++++++++++++
+ src/modules/pv_headers/pvh_func.c   |  2 +-
+ src/modules/pv_headers/pvh_xavp.c   |  7 ++--
+ 3 files changed, 71 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
+index 9730847..40060bc 100644
+--- a/src/modules/pv_headers/pv_headers.c
++++ b/src/modules/pv_headers/pv_headers.c
+@@ -270,10 +270,75 @@ void mod_destroy(void)
+ 	LM_INFO("%s module unload...\n", MODULE_NAME);
+ }
+ 
++/* just for debug */
++static inline char *tm_type_to_string(int type)
++{
++	switch(type) {
++		case TMCB_REQUEST_IN:
++			return "TMCB_REQUEST_IN";
++		case TMCB_RESPONSE_IN:
++			return "TMCB_RESPONSE_IN";
++		case TMCB_E2EACK_IN:
++			return "TMCB_E2EACK_IN";
++		case TMCB_REQUEST_PENDING:
++			return "TMCB_REQUEST_PENDING";
++		case TMCB_REQUEST_FWDED:
++			return "TMCB_REQUEST_FWDED";
++		case TMCB_RESPONSE_FWDED:
++			return "TMCB_RESPONSE_FWDED";
++		case TMCB_ON_FAILURE_RO:
++			return "TMCB_ON_FAILURE_RO";
++		case TMCB_ON_FAILURE:
++			return "TMCB_ON_FAILURE";
++		case TMCB_REQUEST_OUT:
++			return "TMCB_REQUEST_OUT";
++		case TMCB_RESPONSE_OUT:
++			return "TMCB_RESPONSE_OUT";
++		case TMCB_LOCAL_COMPLETED:
++			return "TMCB_LOCAL_COMPLETED";
++		case TMCB_LOCAL_RESPONSE_OUT:
++			return "TMCB_LOCAL_RESPONSE_OUT";
++		case TMCB_ACK_NEG_IN:
++			return "TMCB_ACK_NEG_IN";
++		case TMCB_REQ_RETR_IN:
++			return "TMCB_REQ_RETR_IN";
++		case TMCB_LOCAL_RESPONSE_IN:
++			return "TMCB_LOCAL_RESPONSE_IN";
++		case TMCB_LOCAL_REQUEST_IN:
++			return "TMCB_LOCAL_REQUEST_IN";
++		case TMCB_DLG:
++			return "TMCB_DLG";
++		case TMCB_DESTROY:
++			return "TMCB_DESTROY";
++		case TMCB_E2ECANCEL_IN:
++			return "TMCB_E2ECANCEL_IN";
++		case TMCB_E2EACK_RETR_IN:
++			return "TMCB_E2EACK_RETR_IN";
++		case TMCB_RESPONSE_READY:
++			return "TMCB_RESPONSE_READY";
++		case TMCB_DONT_ACK:
++			return "TMCB_DONT_ACK";
++		case TMCB_REQUEST_SENT:
++			return "TMCB_REQUEST_SENT";
++		case TMCB_RESPONSE_SENT:
++			return "TMCB_RESPONSE_SENT";
++		case TMCB_ON_BRANCH_FAILURE:
++			return "TMCB_ON_BRANCH_FAILURE";
++		case TMCB_ON_BRANCH_FAILURE_RO:
++			return "TMCB_ON_BRANCH_FAILURE_RO";
++		case TMCB_MAX:
++			return "TMCB_MAX";
++	}
++
++	return "UNKNOWN";
++}
++
+ void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params)
+ {
+ 	struct sip_msg *msg = NULL;
+ 
++	LM_DBG("T:%p params->branch: %d type:%s\n", t, params->branch,
++			tm_type_to_string(type));
+ 	if(type & TMCB_RESPONSE_IN) {
+ 		msg = params->rpl;
+ 		if(msg != NULL && msg != FAKED_REPLY) {
+@@ -300,6 +365,8 @@ int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+ 	int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN
+ 			  | TMCB_ON_BRANCH_FAILURE;
+ 
++	LM_DBG("msg:%p flags:%d\n", msg, flags);
++
+ 	if(flags & (PRE_SCRIPT_CB | REQUEST_CB)) {
+ 		if(tmb.register_tmcb(msg, 0, cbs, handle_tm_t, 0, 0) <= 0) {
+ 			LM_ERR("cannot register TM callbacks\n");
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 88a6497..f4320a2 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -146,7 +146,7 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)
+ 	rm_hdrs.size = 0;
+ 
+ 	pvh_get_branch_index(msg, &br_idx);
+-
++	LM_DBG("br_idx: %d\n", br_idx);
+ 	if(!is_auto) {
+ 		if(msg->first_line.type == SIP_REPLY) {
+ 			if(isflagset(msg, FL_PV_HDRS_APPLIED) == 1) {
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index db2192c..e925369 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -120,8 +120,8 @@ sr_xavp_t *pvh_xavp_get(struct sip_msg *msg, str *xname)
+ 			goto end;
+ 		if((xavp = xavp_get(xname, NULL)) == NULL)
+ 			goto end;
+-		/*	LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n", br_xname.len,
+-			br_xname.s, xname->len, xname->s); */
++		LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n", br_xname.len,
++			br_xname.s, xname->len, xname->s);
+ 	}
+ 
+ 	if(xavp->val.type != SR_XTYPE_XAVP) {
+@@ -163,11 +163,10 @@ sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name)
+ 	if(xavp == NULL) {
+ 		if(cmp_str(xname, &br_xname) != 0) {
+ 			xavp = xavp_get_child(xname, name);
+-			/*
+ 			if(xavp) {
+ 				LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
+ 					br_xname.len, br_xname.s, xname->len, xname->s);
+-			} */
++			}
+ 		}
+ 	}
+ 
