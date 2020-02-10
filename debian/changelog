@@ -1,3 +1,16 @@
+ngcp-kamailio (5.2.5-1+0~mr7.5.3.1) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [d4e9adf] TT#71450 fix lcr_rate using the wrong peer ID
+
+  [ Victor Seva ]
+  * [48d6163] TT#64607 pv_headers: fix Segmentation fault calling pv_unset
+  * [b0d3599] TT#70962 [pv_headers]: fix fork scenario
+  * [2bce392] TT#71323 [pv_headers] force "From"/"To" keys when collecting headers
+  * [95e0773] TT#71821 pv_headers: fix missing $x_tt on replies
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 10 Feb 2020 16:33:22 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr7.5.3.0) unstable; urgency=medium
 
   [ Alexander Lutay ]
