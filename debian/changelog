@@ -1,3 +1,10 @@
+ngcp-kamailio (5.2.5-1+0~mr8.2.2.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [fad6925] TT#74951 fix incorrect branch index used in via-branch=next
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 10 Feb 2020 08:45:31 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.2.1.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
