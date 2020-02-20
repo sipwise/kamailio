@@ -1,0 +1,128 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 28 Feb 2020 11:39:24 +0100
+Subject: pua_dialoginfo: local_identity_avp
+---
+ .../pua_dialoginfo/doc/pua_dialoginfo_admin.xml    | 20 ++++++++++++
+ src/modules/pua_dialoginfo/pua_dialoginfo.c        | 36 ++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+
+diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
+index 3054a77..bcc2feb 100644
+--- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
++++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
+@@ -535,6 +535,26 @@ modparam("pua_dialoginfo", "callee_trying", 1)
+ </programlisting>
+ 		</example>
+ 		</section>
++
++		<section>
++		<title><varname>local_identity_avp</varname> (int)</title>
++		<para>
++			PUBLISH-requests reporting dialog-information will use the value of
++			the AVP if exists
++		</para>
++		<para>
++			<emphasis>Default value is <quote>NULL</quote>.</emphasis>
++		</para>
++		<example>
++			<title>Set <varname>local_identity_avp</varname> parameter</title>
++			<programlisting format="linespecific">
++...
++modparam("pua_dialoginfo", "local_identity_avp", "$avp(s:local_identity)")
++...
++</programlisting>
++		</example>
++		</section>
++
+ 	</section>
+ 
+ 	<section>
+diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
+index 2e25386..9ebc61e 100644
+--- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
++++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
+@@ -62,6 +62,7 @@ MODULE_VERSION
+ #define DEF_REFRESH_PUBRURI_AVPS_FLAG -1
+ #define DEF_PUBRURI_CALLER_AVP 0
+ #define DEF_PUBRURI_CALLEE_AVP 0
++#define DEF_LOCAL_IDENTITY_AVP 0
+ #define DEF_CALLEE_TRYING 0
+ #define DEF_DISABLE_CALLER_PUBLISH_FLAG -1
+ #define DEF_DISABLE_CALLEE_PUBLISH_FLAG -1
+@@ -80,6 +81,9 @@ int_str pubruri_caller_avp_name;
+ unsigned short pubruri_callee_avp_type;
+ int_str pubruri_callee_avp_name;
+ 
++unsigned short local_identity_avp_type;
++int_str local_identity_avp_name;
++
+ static str caller_dlg_var = {0, 0}; /* pubruri_caller */
+ static str callee_dlg_var = {0, 0}; /* pubruri_callee */
+ 
+@@ -98,6 +102,7 @@ int disable_caller_publish_flag = DEF_DISABLE_CALLER_PUBLISH_FLAG;
+ int disable_callee_publish_flag = DEF_DISABLE_CALLEE_PUBLISH_FLAG;
+ char * pubruri_caller_avp  = DEF_PUBRURI_CALLER_AVP;
+ char * pubruri_callee_avp  = DEF_PUBRURI_CALLEE_AVP;
++char * local_identity_avp = DEF_LOCAL_IDENTITY_AVP;
+ 
+ 
+ send_publish_t pua_send_publish;
+@@ -127,6 +132,7 @@ static param_export_t params[]={
+ 	{"callee_trying",       INT_PARAM, &callee_trying },
+ 	{"disable_caller_publish_flag",   INT_PARAM, &disable_caller_publish_flag },
+ 	{"disable_callee_publish_flag",   INT_PARAM, &disable_callee_publish_flag },
++	{"local_identity_avp",  PARAM_STRING, &local_identity_avp },
+ 	{0, 0, 0 }
+ };
+ 
+@@ -300,6 +306,19 @@ void refresh_pubruri_avps(struct dlginfo_cell *dlginfo, str *uri)
+ 	}
+ }
+ 
++void refresh_local_identity(struct dlginfo_cell *dlginfo, str *uri) {
++	int_str avp_value;
++	struct search_state st;
++
++	if(search_first_avp(local_identity_avp_type, local_identity_avp_name,
++		&avp_value, &st))
++	{
++		LM_DBG("AVP found '%.*s'\n", avp_value.s.len, avp_value.s.s);
++		uri->s = avp_value.s.s;
++		uri->len = avp_value.s.len;
++	}
++}
++
+ static void
+ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
+ {
+@@ -328,6 +347,10 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
+ 		refresh_pubruri_avps(dlginfo, &uri);
+ 	}
+ 
++	if(local_identity_avp) {
++		refresh_local_identity(dlginfo, &uri);
++	}
++
+ 	switch (type) {
+ 		case DLGCB_FAILED:
+ 		case DLGCB_TERMINATED:
+@@ -825,6 +848,19 @@ static int mod_init(void)
+ 		LM_DBG("configured to use headers for uri values\n");
+ 	}
+ 
++	if(local_identity_avp) {
++		s.s = local_identity_avp; s.len = strlen(s.s);
++		if (pv_parse_spec(&s, &avp_spec)==0	|| avp_spec.type!=PVT_AVP) {
++			LM_ERR("malformed or non AVP %s AVP definition\n", local_identity_avp);
++			return -1;
++		}
++		if(pv_get_avp_name(0, &avp_spec.pvp, &local_identity_avp_name,
++					&local_identity_avp_type)!=0) {
++			LM_ERR("[%s]- invalid AVP definition\n", local_identity_avp);
++			return -1;
++		}
++	}
++
+ 	return 0;
+ }
+ 
