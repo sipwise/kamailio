@@ -1,3 +1,13 @@
+ngcp-kamailio (5.2.5-1+0~mr8.1.3.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [2097e0f] TT#71821 pv_headers: fix missing $x_tt on replies
+
+  [ Richard Fuchs ]
+  * [8a34278] TT#74951 fix incorrect branch index used in via-branch=next
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 09 Mar 2020 11:03:28 +0100
+
 ngcp-kamailio (5.2.5-1+0~mr8.1.2.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
