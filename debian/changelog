@@ -1,3 +1,10 @@
+ngcp-kamailio (5.1.7-1+0~mr6.5.8.1) unstable; urgency=medium
+
+  [ Andrew Pogrebennyk ]
+  * [ecbbdfa] TT#55004 topos_redis: fix regression in PRACK routing
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 11 Mar 2020 09:13:22 +0100
+
 ngcp-kamailio (5.1.7-1+0~mr6.5.8.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
