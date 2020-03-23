@@ -97,3 +97,4 @@ sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/rtpengine-t38-options.patch
