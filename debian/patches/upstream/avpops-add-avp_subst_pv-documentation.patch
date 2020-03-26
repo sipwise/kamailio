@@ -1,14 +1,13 @@
-From 5c8ddbc64f556e4fec1f0e1215a42abb0b010cd3 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Fri, 13 Dec 2019 08:58:05 +0100
 Subject: [PATCH] avpops: add avp_subst_pv() documentation
 
 ---
- src/modules/avpops/doc/avpops_admin.xml | 30 +++++++++++++++++++++++++
+ src/modules/avpops/doc/avpops_admin.xml | 30 ++++++++++++++++++++++++++++++
  1 file changed, 30 insertions(+)
 
 diff --git a/src/modules/avpops/doc/avpops_admin.xml b/src/modules/avpops/doc/avpops_admin.xml
-index beb578762..8c87de058 100644
+index beb5787..8c87de0 100644
 --- a/src/modules/avpops/doc/avpops_admin.xml
 +++ b/src/modules/avpops/doc/avpops_admin.xml
 @@ -971,6 +971,36 @@ avp_subst("$avp(i:678)/$avp(i:679)/g", "/(.*)@(.*)/\1@$rd/");
@@ -48,6 +47,3 @@ index beb578762..8c87de058 100644
  		<section id="avpops.f.avp_op">
  			<title>
  				<function moreinfo="none">avp_op(name,op_value)
--- 
-2.20.1
-

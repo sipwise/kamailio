@@ -17,7 +17,7 @@ Change-Id: I961d176204ddb5d4f726061c413be765187b27ac
  3 files changed, 115 insertions(+), 73 deletions(-)
 
 diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
-index 1340500..7fafa40 100644
+index 22ee74e..88a6497 100644
 --- a/src/modules/pv_headers/pvh_func.c
 +++ b/src/modules/pv_headers/pvh_func.c
 @@ -139,7 +139,7 @@ int pvh_apply_headers(struct sip_msg *msg, int is_auto)

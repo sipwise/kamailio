@@ -1,4 +1,3 @@
-From fffd892b7d18734c8f60d2eebec5d4a15a0fdc26 Mon Sep 17 00:00:00 2001
 From: Daniel-Constantin Mierla <miconda@gmail.com>
 Date: Fri, 22 Nov 2019 09:42:08 +0100
 Subject: [PATCH] systemdops: proper check for null value
@@ -8,7 +7,7 @@ Subject: [PATCH] systemdops: proper check for null value
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/systemdops/systemdops_mod.c b/src/modules/systemdops/systemdops_mod.c
-index 0ac15426d..8c24ac186 100644
+index 0ac1542..8c24ac1 100644
 --- a/src/modules/systemdops/systemdops_mod.c
 +++ b/src/modules/systemdops/systemdops_mod.c
 @@ -69,7 +69,7 @@ void ksr_sd_app_shutdown(void)
@@ -20,6 +19,3 @@ index 0ac15426d..8c24ac186 100644
  		return -1;
  	}
  	cbp->app_ready = ksr_sd_app_ready;
--- 
-2.20.1
-

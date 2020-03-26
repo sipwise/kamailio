@@ -1,6 +1,17 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 26 Mar 2020 10:06:46 +0100
+Subject: usrloc_dbro
+
+---
+ src/modules/usrloc/usrloc_mod.c | 65 +++++++++++++++++++++++++++++++++++++++++
+ src/modules/usrloc/usrloc_mod.h |  2 ++
+ 2 files changed, 67 insertions(+)
+
+diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
+index a834fe0..898f286 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
-@@ -155,6 +155,7 @@ str ulattrs_avalue_col = str_init(ULATTR
+@@ -155,6 +155,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta
  str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
  
  str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
@@ -114,6 +125,8 @@
  	free_all_udomains();
  
  	/* free callbacks list */
+diff --git a/src/modules/usrloc/usrloc_mod.h b/src/modules/usrloc/usrloc_mod.h
+index 12735f1..d1ab60e 100644
 --- a/src/modules/usrloc/usrloc_mod.h
 +++ b/src/modules/usrloc/usrloc_mod.h
 @@ -89,6 +89,8 @@ extern int handle_lost_tcp;

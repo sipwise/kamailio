@@ -1,4 +1,3 @@
-From 992dcdabbb42394ad694354cf283a3beb7b66878 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Mon, 23 Dec 2019 13:53:39 +0100
 Subject: [PATCH] core: stop start if ifdef check fails
@@ -11,7 +10,7 @@ Related #2057
  3 files changed, 18 insertions(+), 10 deletions(-)
 
 diff --git a/src/core/ppcfg.c b/src/core/ppcfg.c
-index 584a491ba..115707aa0 100644
+index 584a491..115707a 100644
 --- a/src/core/ppcfg.c
 +++ b/src/core/ppcfg.c
 @@ -216,19 +216,27 @@ void pp_ifdef_level_update(int val)
@@ -49,7 +48,7 @@ index 584a491ba..115707aa0 100644
  }
  
 diff --git a/src/core/ppcfg.h b/src/core/ppcfg.h
-index 848505991..6fbd8a352 100644
+index 8485059..6fbd8a3 100644
 --- a/src/core/ppcfg.h
 +++ b/src/core/ppcfg.h
 @@ -44,7 +44,8 @@ int  pp_define_set_type(int type);
@@ -63,10 +62,10 @@ index 848505991..6fbd8a352 100644
  void pp_define_core(void);
  
 diff --git a/src/main.c b/src/main.c
-index 0bc2e650d..1c62c6d13 100644
+index b1414a9..c12b9e4 100644
 --- a/src/main.c
 +++ b/src/main.c
-@@ -2299,10 +2299,10 @@ try_again:
+@@ -2265,10 +2265,10 @@ try_again:
  
  	yyin=cfg_stream;
  	debug_save = default_core_cfg.debug;
@@ -79,7 +78,7 @@ index 0bc2e650d..1c62c6d13 100644
  
  		goto error;
  	}
-@@ -2310,7 +2310,6 @@ try_again:
+@@ -2276,7 +2276,6 @@ try_again:
  		fprintf(stderr, "%d config warnings\n", cfg_warnings);
  	}
  	if (debug_flag) default_core_cfg.debug = debug_save;
@@ -87,6 +86,3 @@ index 0bc2e650d..1c62c6d13 100644
  	print_rls();
  
  	if(init_dst_set()<0) {
--- 
-2.20.1
-
