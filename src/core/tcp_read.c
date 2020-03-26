@@ -39,7 +39,6 @@
 #include <unistd.h>
 #include <stdlib.h> /* for abort() */
 
-
 #include "dprint.h"
 #include "tcp_conn.h"
 #include "tcp_read.h"
@@ -93,6 +92,7 @@ static ticks_t tcp_reader_prev_ticks;
 int is_msg_complete(struct tcp_req* r);
 
 int ksr_tcp_accept_hep3=0;
+int ksr_tcp_accept_haproxy=0;
 /**
  * control cloning of TCP receive buffer
  * - needed for operations working directly inside the buffer
@@ -1407,7 +1407,7 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 #ifdef DYN_BUF
 	buf=pkg_malloc(blen+1);
 	if (buf==0) {
-		LM_ERR("could not allocate receive buffer\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 #else
@@ -1426,7 +1426,7 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 			free(buf);
 		buf=malloc(blen+1);
 		if (buf==0) {
-			LM_ERR("could not allocate receive buffer\n");
+			SYS_MEM_ERROR;
 			return -1;
 		}
 		bsize = blen;

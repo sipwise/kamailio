@@ -16,11 +16,20 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/**
+ * \file
+ * \brief Main definitions for memory manager
+ * 
+ * Main definitions for PKG memory manager, like malloc, free and realloc
+ * \ingroup mem
+ */
 
 #ifndef _sr_pkg_h_
 #define _sr_pkg_h_
 
 #include "memapi.h"
+
+#include "../dprint.h"
 
 extern sr_pkg_api_t _pkg_root;
 
@@ -104,4 +113,47 @@ void pkg_print_manager(void);
 #	define pkg_mod_free_stats(x)    do{}while(0)
 #endif /*PKG_MALLOC*/
 
+
+/* generic logging helper for allocation errors in private system memory */
+#ifdef SYS_MALLOC
+#define PKG_MEM_ERROR LM_ERR("could not allocate private memory from sys pool\n")
+#define PKG_MEM_CRITICAL LM_CRIT("could not allocate private memory from sys pool\n")
+
+#ifdef __SUNPRO_C
+#define PKG_MEM_ERROR_FMT(...) LM_ERR("could not allocate private memory from sys pool" __VA_ARGS__)
+#define PKG_MEM_CRITICAL_FMT(...) LM_CRIT("could not allocate private memory from sys pool" __VA_ARGS__)
+#else
+#define PKG_MEM_ERROR_FMT(fmt, args...) LM_ERR("could not allocate private memory from sys pool - " fmt , ## args)
+#define PKG_MEM_CRITICAL_FMT(fmt, args...) LM_CRIT("could not allocate private memory from sys pool - " fmt , ## args)
 #endif
+
+/* generic logging helper for allocation errors in private memory pool */
+#else
+
+#define PKG_MEM_ERROR LM_ERR("could not allocate private memory from pkg pool\n")
+#define PKG_MEM_CRITICAL LM_CRIT("could not allocate private memory from pkg pool\n")
+
+#ifdef __SUNPRO_C
+#define PKG_MEM_ERROR_FMT(...) LM_ERR("could not allocate private memory from pkg pool" __VA_ARGS__)
+#define PKG_MEM_CRITICAL_FMT(...) LM_CRIT("could not allocate private memory from pkg pool" __VA_ARGS__)
+#else
+#define PKG_MEM_ERROR_FMT(fmt, args...) LM_ERR("could not allocate private memory from pkg pool - " fmt , ## args)
+#define PKG_MEM_CRITICAL_FMT(fmt, args...) LM_CRIT("could not allocate private memory from pkg pool - " fmt , ## args)
+#endif
+
+#endif /* SYS_MALLOC */
+
+
+/* generic logging helper for allocation errors in system memory */
+#define SYS_MEM_ERROR LM_ERR("could not allocate memory from system\n")
+#define SYS_MEM_CRITICAL LM_CRIT("could not allocate memory from system\n")
+
+#ifdef __SUNPRO_C
+#define SYS_MEM_ERROR_FMT(...) LM_ERR("could not allocate memory from system" __VA_ARGS__)
+#define SYS_MEM_CRITICAL_FMT(...) LM_CRIT("could not allocate memory from system" __VA_ARGS__)
+#else
+#define SYS_MEM_ERROR_FMT(fmt, args...) LM_ERR("could not allocate memory from system - " fmt , ## args)
+#define SYS_MEM_CRITICAL_FMT(fmt, args...) LM_CRIT("could not allocate memory from system - " fmt , ## args)
+#endif
+
+#endif /* _sr_pkg_h_ */

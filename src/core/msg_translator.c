@@ -332,7 +332,7 @@ char* received_builder(struct sip_msg *msg, unsigned int *received_len)
 	buf=pkg_malloc(sizeof(char)*MAX_RECEIVED_SIZE);
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 	memcpy(buf, RECEIVED, RECEIVED_LEN);
@@ -365,7 +365,7 @@ char* rport_builder(struct sip_msg *msg, unsigned int *rport_len)
 	buf=pkg_malloc(sizeof(char)*(len+1));/* space for null term */
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 	memcpy(buf, RPORT, RPORT_LEN);
@@ -397,7 +397,7 @@ char* id_builder(struct sip_msg* msg, unsigned int *id_len)
 	buf=pkg_malloc(sizeof(char)*(len+1));/* place for ending \0 */
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 	memcpy(buf, ID_PARAM, ID_PARAM_LEN);
@@ -440,7 +440,7 @@ char* clen_builder(	struct sip_msg* msg, int *clen_len, int diff,
 	buf=pkg_malloc(sizeof(char)*(len+1));
 	if (buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 	if (body_only) {
@@ -1711,16 +1711,14 @@ int get_boundary(struct sip_msg* msg, str* boundary)
 
 	params.s = memchr(msg->content_type->body.s, ';',
 		msg->content_type->body.len);
-	if (params.s == NULL)
-	{
+	if (params.s == NULL) {
 		LM_INFO("Content-Type hdr has no boundary params <%.*s>\n",
 				msg->content_type->body.len, msg->content_type->body.s);
-		return -1;
+		return -2;
 	}
 	params.len = msg->content_type->body.len -
 		(params.s - msg->content_type->body.s);
-	if (parse_params(&params, CLASS_ANY, &hooks, &list) < 0)
-	{
+	if (parse_params(&params, CLASS_ANY, &hooks, &list) < 0) {
 		LM_ERR("while parsing Content-Type params\n");
 		return -1;
 	}
@@ -1728,13 +1726,11 @@ int get_boundary(struct sip_msg* msg, str* boundary)
 	boundary->len = 0;
 	for (p = list; p; p = p->next) {
 		if ((p->name.len == 8)
-			&& (strncasecmp(p->name.s, "boundary", 8) == 0))
-		{
+			&& (strncasecmp(p->name.s, "boundary", 8) == 0)) {
 			boundary->s = pkg_malloc(p->body.len + 2);
-			if (boundary->s == NULL)
-			{
+			if (boundary->s == NULL) {
 				free_params(list);
-				LM_ERR("no memory for boundary string\n");
+				PKG_MEM_ERROR;
 				return -1;
 			}
 			*(boundary->s) = '-';
@@ -1765,9 +1761,17 @@ int check_boundaries(struct sip_msg *msg, struct dest_info *send_info)
 	int t, ret, lb_size;
 	char *pb;
 
-	if(!(msg->msg_flags&FL_BODY_MULTIPART)) return 0;
-	else
-	{
+	if(!(msg->msg_flags&FL_BODY_MULTIPART)) {
+		LM_DBG("no multi-part body\n");
+		return 0;
+	} else {
+		if((t = get_boundary(msg, &ob)) != 0) {
+			if(t==-2) {
+				LM_INFO("no boundary - maybe just turning into multipart body\n");
+				return -2;
+			}
+			return -1;
+		}
 		buf.s = build_body(msg, (unsigned int *)&buf.len, &ret, send_info);
 		if(ret) {
 			LM_ERR("Can't get body\n");
@@ -1775,10 +1779,6 @@ int check_boundaries(struct sip_msg *msg, struct dest_info *send_info)
 		}
 		tmp.s = buf.s;
 		t = tmp.len = buf.len;
-		if(get_boundary(msg, &ob)!=0) {
-			if(tmp.s) pkg_free(tmp.s);
-			return -1;
-		}
 		if(str_append(&ob, &bsuffix, &b)!=0) {
 			LM_ERR("Can't append suffix to boundary\n");
 			goto error;
@@ -1962,6 +1962,7 @@ char * build_req_buf_from_sip_req( struct sip_msg* msg,
 	unsigned int flags;
 	unsigned int udp_mtu;
 	struct dest_info di;
+	int ret;
 
 	via_insert_param=0;
 	uri_len=0;
@@ -1979,9 +1980,10 @@ char * build_req_buf_from_sip_req( struct sip_msg* msg,
 	path_buf.len=0;
 
 	flags=msg->msg_flags|global_req_flags;
-	if(check_boundaries(msg, send_info)<0){
-		LM_WARN("check_boundaries error\n");
+	if((ret = check_boundaries(msg, send_info)) < 0){
+		LM_INFO("check boundaries negative (%d)\n", ret);
 	}
+
 	/* Calculate message body difference and adjust Content-Length */
 	body_delta = lumps_len(msg, msg->body_lumps, send_info);
 	if (adjust_clen(msg, body_delta, send_info->proto) < 0) {
@@ -2087,7 +2089,7 @@ after_update_via1:
 		path_buf.len=ROUTE_PREFIX_LEN+msg->path_vec.len+CRLF_LEN;
 		path_buf.s=pkg_malloc(path_buf.len+1);
 		if (unlikely(path_buf.s==0)){
-			LM_ERR("out of memory\n");
+		        PKG_MEM_ERROR;
 			ser_error=E_OUT_OF_MEM;
 			goto error00;
 		}
@@ -2187,7 +2189,11 @@ after_update_via1:
 		new_buf=(char*)pkg_malloc(new_len+1);
 	if (new_buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LM_ERR("out of memory\n");
+		if(unlikely(mode&BUILD_IN_SHM)) {
+			SHM_MEM_ERROR;
+		} else {
+			PKG_MEM_ERROR;
+		}
 		goto error00;
 	}
 
@@ -2289,7 +2295,7 @@ char * generate_res_buf_from_sip_res( struct sip_msg* msg,
 	new_buf=(char*)pkg_malloc(new_len+1); /* +1 is for debugging
 											 (\0 to print it )*/
 	if (new_buf==0){
-		LM_ERR("out of mem\n");
+	        PKG_MEM_ERROR;
 		goto error;
 	}
 	new_buf[new_len]=0; /* debug: print the message */
@@ -2446,7 +2452,7 @@ char * build_res_buf_from_sip_req( unsigned int code, str *text ,str *new_tag,
 	buf = (char*) pkg_malloc( len+1 );
 	if (!buf)
 	{
-		LM_ERR("out of memory; needs %d\n",len);
+	        PKG_MEM_ERROR;
 		goto error01;
 	}
 
@@ -2770,7 +2776,7 @@ char* via_builder(unsigned int *len, sip_msg_t *msg,
 	line_buf=pkg_malloc( max_len );
 	if (line_buf==0){
 		ser_error=E_OUT_OF_MEM;
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 
@@ -2942,7 +2948,7 @@ char* create_via_hf(unsigned int *len,
 		/* params so far + ';rport' + '\0' */
 		via = (char*)pkg_malloc(extra_params.len+RPORT_LEN);
 		if(via==0) {
-			LM_ERR("building local rport via param failed\n");
+		        PKG_MEM_ERROR;
 			if (extra_params.s) pkg_free(extra_params.s);
 			return 0;
 		}
@@ -2964,7 +2970,7 @@ char* create_via_hf(unsigned int *len,
 		} else {
 			via = (char*)pkg_malloc(extra_params.len+slen+1);
 			if(via==0) {
-				LM_ERR("building srvid param failed\n");
+			        PKG_MEM_ERROR;
 				if (extra_params.s) pkg_free(extra_params.s);
 				return 0;
 			}
@@ -2988,7 +2994,7 @@ char* create_via_hf(unsigned int *len,
 		if(xparams.len>0) {
 			via = (char*)pkg_malloc(extra_params.len+xparams.len+2);
 			if(via==0) {
-				LM_ERR("building xavps params failed\n");
+			        PKG_MEM_ERROR;
 				if (extra_params.s) pkg_free(extra_params.s);
 				return 0;
 			}
@@ -3048,7 +3054,7 @@ char * build_only_headers( struct sip_msg* msg, int skip_first_line,
 
 	new_buf = (char *)pkg_malloc(new_len+1);
 	if (!new_buf) {
-		LM_ERR("Not enough memory\n");
+	        PKG_MEM_ERROR;
 		*error = -1;
 		return 0;
 	}
@@ -3098,7 +3104,7 @@ char * build_body( struct sip_msg* msg,
 
 	new_buf = (char *)pkg_malloc(new_len+1);
 	if (!new_buf) {
-		LM_ERR("Not enough memory\n");
+	        PKG_MEM_ERROR;
 		*error = -1;
 		return 0;
 	}
@@ -3158,7 +3164,7 @@ char * build_all( struct sip_msg* msg, int touch_clen,
 
 	new_buf = (char *)pkg_malloc(new_len+1);
 	if (!new_buf) {
-		LM_ERR("Not enough memory\n");
+	        PKG_MEM_ERROR;
 		*error = -1;
 		return 0;
 	}
@@ -3244,6 +3250,7 @@ int sip_msg_update_buffer(sip_msg_t *msg, str *obuf)
 	msg->set_global_port = tmp.set_global_port;
 	msg->flags = tmp.flags;
 	msg->msg_flags = tmp.msg_flags;
+	memcpy(msg->xflags, tmp.xflags, KSR_XFLAGS_SIZE * sizeof(flag_t));
 	msg->hash_index = tmp.hash_index;
 	msg->force_send_socket = tmp.force_send_socket;
 	msg->fwd_send_flags = tmp.fwd_send_flags;

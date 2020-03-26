@@ -43,12 +43,6 @@
 
 #include "mem/mem.h"
 
-#ifndef local_malloc
-#define local_malloc pkg_malloc
-#endif
-#ifndef local_free
-#define local_free pkg_free
-#endif
 
 char* poll_support="poll"
 #ifdef HAVE_EPOLL
@@ -472,10 +466,9 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 	h->poll_method=poll_method;
 	
 	/* common stuff, everybody has fd_hash */
-	h->fd_hash=local_malloc(sizeof(*(h->fd_hash))*h->max_fd_no);
+	h->fd_hash=pkg_malloc(sizeof(*(h->fd_hash))*h->max_fd_no);
 	if (h->fd_hash==0){
-		LM_CRIT("could not alloc fd hashtable (%ld bytes)\n",
-					(long)sizeof(*(h->fd_hash))*h->max_fd_no );
+		PKG_MEM_CRITICAL;
 		goto error;
 	}
 	memset((void*)h->fd_hash, 0, sizeof(*(h->fd_hash))*h->max_fd_no);
@@ -491,10 +484,9 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 #ifdef HAVE_DEVPOLL
 		case POLL_DEVPOLL:
 #endif
-			h->fd_array=local_malloc(sizeof(*(h->fd_array))*h->max_fd_no);
+			h->fd_array=pkg_malloc(sizeof(*(h->fd_array))*h->max_fd_no);
 			if (h->fd_array==0){
-				LM_CRIT("could not alloc fd array (%ld bytes)\n",
-						(long)sizeof(*(h->fd_hash))*h->max_fd_no);
+				PKG_MEM_CRITICAL;
 				goto error;
 			}
 			memset((void*)h->fd_array, 0, sizeof(*(h->fd_array))*h->max_fd_no);
@@ -521,9 +513,9 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 #ifdef HAVE_EPOLL
 		case POLL_EPOLL_LT:
 		case POLL_EPOLL_ET:
-			h->ep_array=local_malloc(sizeof(*(h->ep_array))*h->max_fd_no);
+			h->ep_array=pkg_malloc(sizeof(*(h->ep_array))*h->max_fd_no);
 			if (h->ep_array==0){
-				LM_CRIT("could not alloc epoll array\n");
+				PKG_MEM_CRITICAL;
 				goto error;
 			}
 			memset((void*)h->ep_array, 0, sizeof(*(h->ep_array))*h->max_fd_no);
@@ -544,15 +536,15 @@ int init_io_wait(io_wait_h* h, int max_fd, enum poll_types poll_method)
 			   decrease the array size.
 			 */
 			h->kq_array_size=2 * h->max_fd_no + h->kq_changes_size;
-			h->kq_array=local_malloc(sizeof(*(h->kq_array))*h->kq_array_size);
+			h->kq_array=pkg_malloc(sizeof(*(h->kq_array))*h->kq_array_size);
 			if (h->kq_array==0){
-				LM_CRIT("could not alloc kqueue event array\n");
+				PKG_MEM_CRITICAL;
 				goto error;
 			}
-			h->kq_changes=local_malloc(sizeof(*(h->kq_changes))*
+			h->kq_changes=pkg_malloc(sizeof(*(h->kq_changes))*
 										h->kq_changes_size);
 			if (h->kq_changes==0){
-				LM_CRIT("could not alloc kqueue changes array\n");
+				PKG_MEM_CRITICAL;
 				goto error;
 			}
 			h->kq_nchanges=0;
@@ -587,7 +579,7 @@ void destroy_io_wait(io_wait_h* h)
 		case POLL_EPOLL_ET:
 			destroy_epoll(h);
 			if (h->ep_array){
-				local_free(h->ep_array);
+				pkg_free(h->ep_array);
 				h->ep_array=0;
 			}
 		break;
@@ -596,11 +588,11 @@ void destroy_io_wait(io_wait_h* h)
 		case POLL_KQUEUE:
 			destroy_kqueue(h);
 			if (h->kq_array){
-				local_free(h->kq_array);
+				pkg_free(h->kq_array);
 				h->kq_array=0;
 			}
 			if (h->kq_changes){
-				local_free(h->kq_changes);
+				pkg_free(h->kq_changes);
 				h->kq_changes=0;
 			}
 			break;
@@ -619,11 +611,11 @@ void destroy_io_wait(io_wait_h* h)
 			;
 	}
 		if (h->fd_array){
-			local_free(h->fd_array);
+			pkg_free(h->fd_array);
 			h->fd_array=0;
 		}
 		if (h->fd_hash){
-			local_free(h->fd_hash);
+			pkg_free(h->fd_hash);
 			h->fd_hash=0;
 		}
 }

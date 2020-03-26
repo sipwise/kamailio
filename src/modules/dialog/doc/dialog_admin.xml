@@ -1602,8 +1602,45 @@ modparam("dialog", "h_id_step", 10)
 		</example>
 	</section>
 
+	<section id="dialog.p.keep_proxy_rr">
+		<title><varname>keep_proxy_rr</varname> (string)</title>
+		<para>
+			Whether to keep the record-route header added by the proxy.
+			When enabled, it will keep this proxy&apos;s record-route
+			header from the reply. The result is that generated requests
+			like the BYE from the dlg_end_dlg mi function will pass
+			through the proxy (looped).
+		</para>
+		<para>
+			Valid values are:
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>0</emphasis> - Don&apos;t keep any proxy Record-Route headers
+			</para></listitem>
+			<listitem><para>
+				<emphasis>1</emphasis> - Keep Record-route headers for the callee leg
+			</para></listitem>
+			<listitem><para>
+				<emphasis>2</emphasis> - Keep Record-route headers for the caller leg
+			</para></listitem>
+			<listitem><para>
+				<emphasis>3</emphasis> - Keep Record-route headers for both legs
+			</para></listitem>
+		</itemizedlist>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		<example>
+		<title>Set <varname>dlg_keep_proxy_rr</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "keep_proxy_rr", 1)
+...
+</programlisting>
+		</example>
 	</section>
-
+	</section>
 
 	<section>
 	<title>Functions</title>
@@ -2408,6 +2445,56 @@ if(has_totag()) {
 		</programlisting>
 		</section>
 
+		<section id="dlg.r.list_match">
+		<title>dlg.list_match</title>
+		<para>
+		Lists the details of matching dialogs. The paramters specify the matching
+		key, operator, value and optionally a limit of matched dialogs.
+		</para>
+		<para>Name: <emphasis>dlg.list_match</emphasis></para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>mkey</emphasis> - matching key. It can be: 'ruri' -
+				match against R-URI of the dialog; 'furi' - match against From
+				header URI of the dialog; 'turi' - match against the To header
+				URI of the dialog; 'callid' - match against Call-Id value.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>mop</emphasis> - matching operator. It can be: 'eq' -
+				match using string comparison; 're' - match using regular
+				expression; 'sw' - match using starts-with (prefix) comparison.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>mval</emphasis> - matching value.
+			</para></listitem>
+		</itemizedlist>
+		<para>RPC Command Format:</para>
+		<programlisting  format="linespecific">
+...
+&kamcmd; dlg.list_match furi eq sip:alice@test.com 2
+...
+&kamcmd; dlg.list_match furi sw sip:alice@
+...
+		</programlisting>
+		</section>
+
+		<section id="dlg.r.list_match_ctx">
+		<title>dlg.list_match_ctx</title>
+		<para>
+		Similar to <quote>dlg.list_match</quote>, but including in the
+		attributes associated with the dialog context from modules sitting on
+		top of the dialog module.
+		</para>
+		<para>Name: <emphasis>dlg.list_match_ctx</emphasis></para>
+		<para>RPC Command Format:</para>
+		<programlisting  format="linespecific">
+...
+&kamcmd; dlg.list_match_ctx furi sw sip:alice@
+...
+		</programlisting>
+		</section>
+
 		<section id="dlg.r.dlg_list">
 		<title>dlg.dlg_list</title>
 		<para>
@@ -2437,7 +2524,7 @@ if(has_totag()) {
 		<section id="dlg.r.dlg_list_ctx">
 		<title>dlg.dlg_list_ctx</title>
 		<para>
-		The same as the <quote>dlg.list_ctx</quote> but including in the dialog
+		The same as the <quote>dlg.list_list</quote> but including in the dialog
 		description the associated context from modules sitting on top of
 		the dialog module.
 		</para>
@@ -2646,6 +2733,36 @@ if(has_totag()) {
 &kamcmd; dlg.stats_active
 ...
 		</programlisting>
+		</section>
+		<section id="dlg.r.is_alive">
+			<title>dlg.is_alive</title>
+			<para>
+				Check whether a dialog matching the parameter is in confirmed
+				state (answered and alive).
+			</para>
+			<para>Name: <emphasis>dlg.is_alive</emphasis></para>
+			<para>Parameters:</para>
+			<itemizedlist>
+				<listitem><para>
+					<emphasis>callid</emphasis> - callid of dialog
+				</para></listitem>
+				<listitem><para>
+					<emphasis>from_tag</emphasis> - from tag of the dialog
+				</para></listitem>
+				<listitem><para>
+					<emphasis>to_tag</emphasis> - to tag of the dialog
+				</para></listitem>
+			</itemizedlist>
+			<para>
+				This command will return error if dialog is not found or not
+				confirmed state (answered).
+			</para>
+			<para>RPC Command Format:</para>
+			<programlisting format="linespecific">
+...
+&kamcmd; dlg.is_alive callid123 fromtag123 totag123
+...
+			</programlisting>
 		</section>
 	</section>
 

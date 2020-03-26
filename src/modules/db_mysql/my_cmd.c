@@ -160,7 +160,7 @@ static int build_delete_cmd(str* sql_cmd, db_cmd_t* cmd)
 				case DB_LEQ: sql_cmd->len += strings[STR_OP_LEQ].len; break;
 				case DB_GEQ: sql_cmd->len += strings[STR_OP_GEQ].len; break;
 				default:
-					ERR("mysql: Unsupported db_fld operator %d\n", fld[i].op);
+					ERR("Unsupported db_fld operator %d\n", fld[i].op);
 					return -1;
 			}
 
@@ -172,7 +172,7 @@ static int build_delete_cmd(str* sql_cmd, db_cmd_t* cmd)
 
 	sql_cmd->s = pkg_malloc(sql_cmd->len + 1);
 	if (sql_cmd->s == NULL) {
-		ERR("mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	p = sql_cmd->s;
@@ -244,7 +244,7 @@ static int build_select_cmd(str* sql_cmd, db_cmd_t* cmd)
 				case DB_LEQ: sql_cmd->len += strings[STR_OP_LEQ].len; break;
 				case DB_GEQ: sql_cmd->len += strings[STR_OP_GEQ].len; break;
 				default:
-					ERR("mysql: Unsupported db_fld operator %d\n", fld[i].op);
+					ERR("Unsupported db_fld operator %d\n", fld[i].op);
 					return -1;
 			}
 
@@ -256,7 +256,7 @@ static int build_select_cmd(str* sql_cmd, db_cmd_t* cmd)
 
 	sql_cmd->s = pkg_malloc(sql_cmd->len + 1);
 	if (sql_cmd->s == NULL) {
-		ERR("mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	p = sql_cmd->s;
@@ -323,7 +323,7 @@ static int build_replace_cmd(str* sql_cmd, db_cmd_t* cmd)
 
 	sql_cmd->s = pkg_malloc(sql_cmd->len + 1);
 	if (sql_cmd->s == NULL) {
-		ERR("mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	p = sql_cmd->s;
@@ -380,7 +380,7 @@ static inline int sb_add(struct string_buffer *sb, str *nstr)
 		new_size = sb->size + (asize / sb->increment  + (asize % sb->increment > 0)) * sb->increment;
 		newp = pkg_malloc(new_size);
 		if (!newp) {
-			ERR("mysql: No memory left\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		if (sb->s) {
@@ -691,7 +691,7 @@ static int exec_cmd_safe(db_cmd_t* cmd)
 		if ((mcon->flags & MY_CONNECTED) == 0) {
 			/* The connection is disconnected, try to reconnect */
 			if (my_con_connect(con)) {
-				INFO("mysql: exec_cmd_safe failed to re-connect\n");
+				INFO("exec_cmd_safe failed to re-connect\n");
 				continue;
 			}
 		}
@@ -703,10 +703,10 @@ static int exec_cmd_safe(db_cmd_t* cmd)
 		 * the server recycles all server side information upon disconnect.
 		 */
 		if (mcon->resets > mcmd->last_reset) {
-			INFO("mysql: Connection reset detected, uploading command to server\n");
+			INFO("Connection reset detected, uploading command to server\n");
 			err = upload_cmd(cmd);
 			if (err < 0) {
-				INFO("mysql: Error while uploading command\n");
+				INFO("Error while uploading command\n");
 				continue;
 			} else if (err > 0) {
 				/* DB API error, this is a serious problem such as memory
@@ -724,7 +724,7 @@ static int exec_cmd_safe(db_cmd_t* cmd)
 			if (mcmd->flags & MY_FETCH_ALL) {
 				err = mysql_stmt_store_result(mcmd->st);
 				if (err) {
-					INFO("mysql: Error while fetching data to client.\n");
+					INFO("Error while fetching data to client.\n");
 					goto error;
 				}
 			}
@@ -733,19 +733,19 @@ static int exec_cmd_safe(db_cmd_t* cmd)
 
 error:
 		/* Command execution failed, log a message and try to reconnect */
-		INFO("mysql: libmysql: %d, %s\n", mysql_stmt_errno(mcmd->st),
+		INFO("libmysql error: %d, %s\n", mysql_stmt_errno(mcmd->st),
 				mysql_stmt_error(mcmd->st));
-		INFO("mysql: Error while executing command on server, trying to reconnect\n");
+		INFO("Error while executing command on server, trying to reconnect\n");
 
 		my_con_disconnect(con);
 		if (my_con_connect(con)) {
-			INFO("mysql: Failed to reconnect server\n");
+			INFO("Failed to reconnect server\n");
 		} else {
-			INFO("mysql: Successfully reconnected server\n");
+			INFO("Successfully reconnected server\n");
 		}
 	}
 
-	INFO("mysql: Failed to execute command, giving up\n");
+	INFO("Failed to execute command, giving up\n");
 	return -1;
 }
 
@@ -840,13 +840,13 @@ static int bind_mysql_params(MYSQL_STMT* st, db_fld_t* params1, db_fld_t* params
 	for(count1 = 0; !DB_FLD_EMPTY(params1) && !DB_FLD_LAST(params1[count1]); count1++);
 	for(count2 = 0; !DB_FLD_EMPTY(params2) && !DB_FLD_LAST(params2[count2]); count2++);
 	if (st->param_count != count1 + count2) {
-		BUG("mysql: Number of parameters in SQL command does not match number of DB API parameters\n");
+		BUG("Number of parameters in SQL command does not match number of DB API parameters\n");
 		return 1;
 	}
 
 	my_params = (MYSQL_BIND*)pkg_malloc(sizeof(MYSQL_BIND) * (count1 + count2));
 	if (my_params == NULL) {
-		ERR("mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memset(my_params, '\0', sizeof(MYSQL_BIND) * (count1 + count2));
@@ -863,7 +863,7 @@ static int bind_mysql_params(MYSQL_STMT* st, db_fld_t* params1, db_fld_t* params
 
 	err = mysql_stmt_bind_param(st, my_params);
 	if (err) {
-		ERR("mysql: libmysqlclient: %d, %s\n",
+		ERR("libmysqlclient: %d, %s\n",
 				mysql_stmt_errno(st), mysql_stmt_error(st));
 		goto error;
 	}
@@ -895,7 +895,7 @@ static int check_result(db_cmd_t* cmd, struct my_cmd* payload)
 	if (meta == NULL) {
 		/* No error means no result set to be checked */
 		if (mysql_stmt_errno(payload->st) == 0) return 0;
-		ERR("mysql: Error while getting metadata of SQL command: %d, %s\n",
+		ERR("Error while getting metadata of SQL command: %d, %s\n",
 				mysql_stmt_errno(payload->st), mysql_stmt_error(payload->st));
 		return -1;
 	}
@@ -914,7 +914,7 @@ static int check_result(db_cmd_t* cmd, struct my_cmd* payload)
 			fld = mysql_fetch_field_direct(meta, i);
 			f->name = pkg_malloc(strlen(fld->name)+1);
 			if (f->name == NULL) {
-				ERR("mysql: Out of private memory\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 			strcpy(f->name, fld->name);
@@ -922,7 +922,7 @@ static int check_result(db_cmd_t* cmd, struct my_cmd* payload)
 		}
 	} else {
 		if (cmd->result_count != n) {
-			BUG("mysql: Number of fields in MySQL result does not match number of parameters in DB API\n");
+			BUG("Number of fields in MySQL result does not match number of parameters in DB API\n");
 			goto error;
 		}
 	}
@@ -962,7 +962,7 @@ static int check_result(db_cmd_t* cmd, struct my_cmd* payload)
 				break;
 
 			default:
-				ERR("mysql: Unsupported MySQL column type: %d, table: %s, column: %s\n",
+				ERR("Unsupported MySQL column type: %d, table: %s, column: %s\n",
 						fld->type, cmd->table.s, fld->name);
 				goto error;
 		}
@@ -994,7 +994,7 @@ static int bind_result(MYSQL_STMT* st, db_fld_t* fld)
 
 	result = (MYSQL_BIND*)pkg_malloc(sizeof(MYSQL_BIND) * n);
 	if (result == NULL) {
-		ERR("mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		return 1;
 	}
 	memset(result, '\0', sizeof(MYSQL_BIND) * n);
@@ -1032,7 +1032,7 @@ static int bind_result(MYSQL_STMT* st, db_fld_t* fld)
 				result[i].buffer_type = MYSQL_TYPE_VAR_STRING;
 				if (!f->buf.s) f->buf.s = pkg_malloc(STR_BUF_SIZE);
 				if (f->buf.s == NULL) {
-					ERR("mysql: No memory left\n");
+					PKG_MEM_ERROR;
 					err = 1;
 					goto error;
 				}
@@ -1045,7 +1045,7 @@ static int bind_result(MYSQL_STMT* st, db_fld_t* fld)
 				result[i].buffer_type = MYSQL_TYPE_VAR_STRING;
 				if (!f->buf.s) f->buf.s = pkg_malloc(STR_BUF_SIZE);
 				if (f->buf.s == NULL) {
-					ERR("mysql: No memory left\n");
+					PKG_MEM_ERROR;
 					err = 1;
 					goto error;
 				}
@@ -1058,7 +1058,7 @@ static int bind_result(MYSQL_STMT* st, db_fld_t* fld)
 				result[i].buffer_type = MYSQL_TYPE_BLOB;
 				if (!f->buf.s) f->buf.s = pkg_malloc(STR_BUF_SIZE);
 				if (f->buf.s == NULL) {
-					ERR("mysql: No memory left\n");
+					PKG_MEM_ERROR;
 					err = 1;
 					goto error;
 				}
@@ -1076,7 +1076,7 @@ static int bind_result(MYSQL_STMT* st, db_fld_t* fld)
 
 	err = mysql_stmt_bind_result(st, result);
 	if (err) {
-		ERR("mysql: Error while binding result: %s\n", mysql_stmt_error(st));
+		ERR("Error while binding result: %s\n", mysql_stmt_error(st));
 		goto error;
 	}
 
@@ -1120,7 +1120,7 @@ static int upload_cmd(db_cmd_t* cmd)
 	/* Create a new pre-compiled statement data structure */
 	res->st = mysql_stmt_init(mcon->con);
 	if (res->st == NULL) {
-		ERR("mysql: Error while creating new MySQL_STMT data structure (no memory left)\n");
+		ERR("Error while creating new MySQL_STMT data structure (no memory left)\n");
 		err = 1;
 		goto error;
 	}
@@ -1128,8 +1128,8 @@ static int upload_cmd(db_cmd_t* cmd)
 	/* Try to upload the command to the server */
 	if (mysql_stmt_prepare(res->st, res->sql_cmd.s, res->sql_cmd.len)) {
 		err = mysql_stmt_errno(res->st);
-		ERR("mysql: libmysql: %d, %s\n", err, mysql_stmt_error(res->st));
-		ERR("mysql: An error occurred while uploading command to server\n");
+		ERR("libmysql error: %d, %s\n", err, mysql_stmt_error(res->st));
+		ERR("An error occurred while uploading command to server\n");
 	}
 	if (err == CR_SERVER_LOST ||
 			err == CR_SERVER_GONE_ERROR) {
@@ -1175,7 +1175,7 @@ int my_cmd(db_cmd_t* cmd)
 
 	res = (struct my_cmd*)pkg_malloc(sizeof(struct my_cmd));
 	if (res == NULL) {
-		ERR("mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset(res, '\0', sizeof(struct my_cmd));
@@ -1186,7 +1186,7 @@ int my_cmd(db_cmd_t* cmd)
 	switch(cmd->type) {
 		case DB_PUT:
 			if (DB_FLD_EMPTY(cmd->vals)) {
-				BUG("mysql: No parameters provided for DB_PUT in context '%.*s'\n",
+				BUG("No parameters provided for DB_PUT in context '%.*s'\n",
 						cmd->ctx->id.len, ZSW(cmd->ctx->id.s));
 				goto error;
 			}
@@ -1208,7 +1208,7 @@ int my_cmd(db_cmd_t* cmd)
 		case DB_SQL:
 			res->sql_cmd.s = (char*)pkg_malloc(cmd->table.len);
 			if (res->sql_cmd.s == NULL) {
-				ERR("mysql: Out of private memory\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 			memcpy(res->sql_cmd.s,cmd->table.s, cmd->table.len);
@@ -1250,7 +1250,7 @@ int my_cmd_first(db_res_t* res) {
 			return 0;
 		case 1:  /* next row */
 		case 2:  /* EOF */
-			ERR("mysql: Unbuffered queries do not support cursor reset.\n");
+			ERR("Unbuffered queries do not support cursor reset.\n");
 			return -1;
 		default:
 			return my_cmd_next(res);
@@ -1267,7 +1267,7 @@ int my_cmd_next(db_res_t* res)
 	if (mcmd->next_flag == 2 || mcmd->next_flag == -2) return 1;
 
 	if (mcmd->st == NULL) {
-		ERR("mysql: Prepared statement not found\n");
+		ERR("Prepared statement not found\n");
 		return -1;
 	}
 
@@ -1281,10 +1281,10 @@ int my_cmd_next(db_res_t* res)
 #if defined MYSQL_DATA_TRUNCATED
 	if (ret == MYSQL_DATA_TRUNCATED) {
 		int i;
-		ERR("mysql: mysql_stmt_fetch, data truncated, fields: %d\n", res->cmd->result_count);
+		ERR("mysql_stmt_fetch, data truncated, fields: %d\n", res->cmd->result_count);
 		for (i = 0; i < res->cmd->result_count; i++) {
 			if (mcmd->st->bind[i].error /*&& mcmd->st->bind[i].buffer_length*/) {
-				ERR("mysql: truncation, bind %d, length: %lu, buffer_length: %lu\n",
+				ERR("truncation, bind %d, length: %lu, buffer_length: %lu\n",
 						i, *(mcmd->st->bind[i].length), mcmd->st->bind[i].buffer_length);
 			}
 		}
@@ -1295,7 +1295,7 @@ int my_cmd_next(db_res_t* res)
 		mcmd->next_flag++;
 	}
 	if (ret != 0) {
-		ERR("mysql: Error in mysql_stmt_fetch (ret=%d): %s\n", ret, mysql_stmt_error(mcmd->st));
+		ERR("Error in mysql_stmt_fetch (ret=%d): %s\n", ret, mysql_stmt_error(mcmd->st));
 		return -1;
 	}
 
@@ -1320,26 +1320,26 @@ int my_getopt(db_cmd_t* cmd, char* optname, va_list ap)
 	if (!strcasecmp("last_id", optname)) {
 		id = va_arg(ap, long long*);
 		if (id == NULL) {
-			BUG("mysql: NULL pointer passed to 'last_id' option\n");
+			BUG("NULL pointer passed to 'last_id' option\n");
 			goto error;
 		}
 
 		if (mcmd->st->last_errno != 0) {
-			BUG("mysql: Option 'last_id' called but previous command failed, "
+			BUG("Option 'last_id' called but previous command failed, "
 					"check your code\n");
 			return -1;
 		}
 
 		*id = mysql_stmt_insert_id(mcmd->st);
 		if ((*id) == 0) {
-			BUG("mysql: Option 'last_id' called but there is no auto-increment"
+			BUG("Option 'last_id' called but there is no auto-increment"
 					" column in table, SQL command: %.*s\n", STR_FMT(&mcmd->sql_cmd));
 			return -1;
 		}
 	} else if (!strcasecmp("fetch_all", optname)) {
 		val = va_arg(ap, int*);
 		if (val == NULL) {
-			BUG("mysql: NULL pointer passed to 'fetch_all' DB option\n");
+			BUG("NULL pointer passed to 'fetch_all' DB option\n");
 			goto error;
 		}
 		*val = mcmd->flags;

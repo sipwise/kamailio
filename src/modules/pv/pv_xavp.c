@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com) 
+ * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com)
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,8 +13,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#ifdef WITH_XAVP
 
 #include <stdio.h>
 
@@ -58,6 +56,14 @@ int pv_xavp_get_value(struct sip_msg *msg, pv_param_t *param,
 		break;
 		case SR_XTYPE_XAVP:
 			if(snprintf(_pv_xavp_buf, 128, "<<xavp:%p>>", avp->val.v.xavp)<0)
+				return pv_get_null(msg, param, res);
+		break;
+		case SR_XTYPE_VPTR:
+			if(snprintf(_pv_xavp_buf, 128, "<<vptr:%p>>", avp->val.v.vptr)<0)
+				return pv_get_null(msg, param, res);
+		break;
+		case SR_XTYPE_SPTR:
+			if(snprintf(_pv_xavp_buf, 128, "<<sptr:%p>>", avp->val.v.vptr)<0)
 				return pv_get_null(msg, param, res);
 		break;
 		case SR_XTYPE_DATA:
@@ -753,4 +759,3 @@ int pv_xavp_to_var(str *xname) {
 	} while(xavp);
 	return 1;
 }
-#endif

@@ -12,19 +12,11 @@ Edited by
 
 Maxim Sobolev
 
-Edited by
-
 Bogdan-Andrei Iancu
-
-Edited by
 
 Juha Heinanen
 
-Edited by
-
 Sas Ovidiu
-
-Edited by
 
 Carsten Bock
 
@@ -644,7 +636,9 @@ rtpproxy_destroy();
        resuming a suspended transaction (e.g., after t_continue()),
        because the context of executed route is FAILURE ROUTE (in other
        words, rtpproxy_manage() in the route block of t_continue() does
-       the same as in failure_route).
+       the same as in failure_route; use a branch route to engage
+       rtpengine for a forwarded branch after resuming the transaction).
+     * It does nothing if used inside event_route[tm:branch-failure:...]
      * If reply to INVITE with code >= 300 do unforce_rtpproxy()
      * If reply with SDP to INVITE having code 1xx and 2xx, then do
        rtpproxy_answer() if the request had SDP or tm is not loaded,
@@ -802,35 +796,35 @@ Chapter 2. Frequently Asked Questions
 
    2.1.
 
-       What happened with “rtpproxy_disable” parameter?
+   What happened with “rtpproxy_disable” parameter?
 
-       It was removed as it became obsolete - now “rtpproxy_sock” can take
-       empty value to disable the rtpproxy functionality.
+   It was removed as it became obsolete - now “rtpproxy_sock” can take
+   empty value to disable the rtpproxy functionality.
 
    2.2.
 
-       Where can I find more about Kamailio?
+   Where can I find more about Kamailio?
 
-       Take a look at https://www.kamailio.org/.
+   Take a look at https://www.kamailio.org/.
 
    2.3.
 
-       Where can I post a question about this module?
+   Where can I post a question about this module?
 
-       First at all check if your question was already answered on one of our
-       mailing lists:
-         * User Mailing List -
-           https://lists.kamailio.org/cgi-bin/mailman/listinfo/sr-users
-         * Developer Mailing List -
-           https://lists.kamailio.org/cgi-bin/mailman/listinfo/sr-dev
+   First at all check if your question was already answered on one of our
+   mailing lists:
+     * User Mailing List -
+       https://lists.kamailio.org/cgi-bin/mailman/listinfo/sr-users
+     * Developer Mailing List -
+       https://lists.kamailio.org/cgi-bin/mailman/listinfo/sr-dev
 
-       E-mails regarding any stable Kamailio release should be sent to
-       <sr-users@lists.kamailio.org> and e-mails regarding development
-       versions should be sent to <sr-dev@lists.kamailio.org>.
+   E-mails regarding any stable Kamailio release should be sent to
+   <sr-users@lists.kamailio.org> and e-mails regarding development
+   versions should be sent to <sr-dev@lists.kamailio.org>.
 
    2.4.
 
-       How can I report a bug?
+   How can I report a bug?
 
-       Please follow the guidelines provided at:
-       https://github.com/kamailio/kamailio/issues.
+   Please follow the guidelines provided at:
+   https://github.com/kamailio/kamailio/issues.

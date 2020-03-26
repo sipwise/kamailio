@@ -17,9 +17,6 @@
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2007-04-18  initial version (anca)
  */
 
 /*! \file
@@ -40,9 +37,9 @@
 
 typedef struct xcap_serv
 {
-	char* addr;
+	char *addr;
 	unsigned int port;
-	struct xcap_serv* next;
+	struct xcap_serv *next;
 } xcap_serv_t;
 
 extern sl_api_t slb;
@@ -54,7 +51,7 @@ extern db_func_t pxml_dbf;
 extern int force_active;
 extern int pidf_manipulation;
 extern int integrated_xcap_server;
-extern xcap_serv_t* xs_list;
+extern xcap_serv_t *xs_list;
 extern xcapGetNewDoc_t xcap_GetNewDoc;
 extern pres_get_sphere_t pres_get_sphere;
 

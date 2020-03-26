@@ -25,7 +25,6 @@
  * - Module: \ref sqlops
  */
 
-		       
 #ifndef _SQL_API_H_
 #define _SQL_API_H_
 
@@ -68,14 +67,13 @@ typedef struct _sql_con
 
 int sql_parse_param(char *val);
 void sql_destroy(void);
-int sql_connect(void);
+int sql_connect(int mode);
+int sql_reconnect(sql_con_t *sc);
 
 int sql_do_query(sql_con_t *con, str *query, sql_result_t *res);
 int sql_do_query_async(sql_con_t *con, str *query);
-#ifdef WITH_XAVP
 int sql_do_xquery(sip_msg_t *msg, sql_con_t *con, pv_elem_t *query,
 		pv_elem_t *res);
-#endif
 int sql_do_pvquery(sip_msg_t *msg, sql_con_t *con, pv_elem_t *query,
 		pvname_list_t *res);
 int pv_get_sqlrows(sip_msg_t *msg,  pv_param_t *param,

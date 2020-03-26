@@ -29,6 +29,7 @@
 #include "db_id.h"
 #include "../../core/dprint.h"
 #include "../../core/mem/mem.h"
+#include "../../core/resolve.h"
 #include "../../core/pt.h"
 #include "../../core/ut.h"
 #include <stdlib.h>
@@ -47,6 +48,7 @@ static int dupl_string(char** dst, const char* begin, const char* end)
 
 	*dst = pkg_malloc(end - begin + 1);
 	if ((*dst) == NULL) {
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -71,6 +73,7 @@ static int dupl_string_name(char** dst, const char* begin, const char* end)
 	}
 	*dst = pkg_malloc(p - begin + 1);
 	if ((*dst) == NULL) {
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -109,6 +112,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 	unsigned int len, i, j, a, foundanother, ipv6_flag=0;
 	const char* begin;
 	char* prev_token;
+	str sval = STR_NULL;
 
 	foundanother = 0;
 	prev_token = 0;
@@ -251,7 +255,14 @@ static int parse_db_url(struct db_id* id, const str* url)
 		case ST_HOST6:
 			switch(url->s[i]) {
 			case ']':
-				ipv6_flag = 1;
+				sval.s = (char*)begin;
+				sval.len = url->s + i - begin;
+				if(str2ip6(&sval)==NULL) {
+					ipv6_flag = 0;
+					begin -= 1;
+				} else {
+					ipv6_flag = 1;
+				}
 				st = ST_HOST;
 				break;
 			}
@@ -306,7 +317,7 @@ struct db_id* new_db_id(const str* url, db_pooling_t pooling)
 
 	ptr = (struct db_id*)pkg_malloc(sizeof(struct db_id) + url->len + 1);
 	if (!ptr) {
-		LM_ERR("no private memory left\n");
+		PKG_MEM_ERROR;
 		goto err;
 	}
 	memset(ptr, 0, sizeof(struct db_id)+url->len+1);

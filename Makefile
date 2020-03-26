@@ -10,6 +10,9 @@ KSR_DIR ?= src/
 # default target for makefile
 .DEFAULT_GOAL := default
 
+ifneq ($(wildcard modules),)
+$(warning "old Kamailio modules directory found, you should clean that")
+endif
 
 # strip the src/ from the path to modules
 SMODPARAM=
@@ -21,6 +24,10 @@ endif
 endif
 
 MKTAGS?=ctags
+EMACS_COMPAT=
+ifneq ($(INSIDE_EMACS),)
+EMACS_COMPAT=-e
+endif
 
 # forward all named targets
 %:
@@ -38,7 +45,7 @@ install:
 .PHONY: TAGS
 .PHONY: tags
 TAGS tags:
-	$(MKTAGS) --exclude="misc/*" --exclude="test/*" -R .
+	$(MKTAGS) $(EMACS_COMPAT) --exclude="misc/*" --exclude="test/*" -R .
 
 # clean everything generated - shortcut on maintainer-clean
 .PHONY: pure

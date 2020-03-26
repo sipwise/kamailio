@@ -48,7 +48,7 @@ MODULE_VERSION
 
 static rule_file_t allow[MAX_RULE_FILES]; /* Parsed allow files */
 static rule_file_t deny[MAX_RULE_FILES];  /* Parsed deny files */
-static int rules_num;  /* Number of parsed allow/deny files */
+static int rules_num = 0;  /* Number of parsed allow/deny files */
 
 
 /* Module parameter variables */
@@ -662,11 +662,11 @@ static void mod_exit(void)
 	int i;
 
 	for(i = 0; i < rules_num; i++) {
-		free_rule(allow[i].rules);
-		pkg_free(allow[i].filename);
+		if(allow[i].rules) free_rule(allow[i].rules);
+		if(allow[i].filename) pkg_free(allow[i].filename);
 
-		free_rule(deny[i].rules);
-		pkg_free(deny[i].filename);
+		if(deny[i].rules) free_rule(deny[i].rules);
+		if(deny[i].filename) pkg_free(deny[i].filename);
 	}
 
 	clean_trusted();
@@ -1023,6 +1023,7 @@ static int permissions_init_rpc(void)
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_permissions_exports[] = {
 	{ str_init("permissions"), str_init("allow_source_address"),
 		SR_KEMIP_INT, allow_source_address,
@@ -1047,6 +1048,7 @@ static sr_kemi_t sr_kemi_permissions_exports[] = {
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

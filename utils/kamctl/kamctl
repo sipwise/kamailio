@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 #
 # control tool for maintaining Kamailio
 #
 #===================================================================
 
 ### version for this script
-VERSION='5.2.0'
+VERSION='5.3.0'
 
 PATH=$PATH:/usr/local/sbin/
 
@@ -1795,6 +1795,11 @@ ksr_srv() {
 			mecho "list server rpc commands"
 			ctl_cmd_run system.listMethods
 			;;
+		version)
+			require_ctlengine
+			mecho "list server version"
+			ctl_cmd_run core.version
+			;;
 		*)
 			usage_ksr_srv
 			exit 1
@@ -1986,16 +1991,16 @@ kamailio_start() {
 		exit 1
 	fi
 
-	if [ ! -x "$OSERBIN" ] ; then
+	if [ ! -x "$KAMBIN" ] ; then
 		echo
-		merr "Kamailio binaries not found at $OSERBIN"
-		merr "set OSERBIN to the path of kamailio in $0 or ~/.kamctlrc"
+		merr "Kamailio binaries not found at $KAMBIN"
+		merr "set KAMBIN to the path of kamailio in $0 or ~/.kamctlrc"
 		exit 1
 	fi
 	if [ $SYSLOG = 1 ] ; then
-		$OSERBIN -P $PID_FILE  -f $ETCDIR/kamailio.cfg $STARTOPTIONS 1>/dev/null 2>/dev/null
+		$KAMBIN -P $PID_FILE  -f $ETCDIR/kamailio.cfg $STARTOPTIONS 1>/dev/null 2>/dev/null
 	else
-		$OSERBIN -P $PID_FILE -E  -f $ETCDIR/kamailio.cfg $STARTOPTIONS
+		$KAMBIN -P $PID_FILE -E  -f $ETCDIR/kamailio.cfg $STARTOPTIONS
 	fi
 	sleep 3
 	if [ ! -s $PID_FILE ] ; then
@@ -2337,6 +2342,70 @@ $SD_SD_DOMAIN_COLUMN='$OSERDOMAIN'"
 } # end speed_dial()
 
 #
+##### ------------------------------------------------ #####
+### acc management
+#
+acc() {
+	if [ "$#" -lt 2 ] ; then
+		merr "acc - too few parameters"
+		usage_acc
+		exit 1
+	fi
+	shift;
+	require_dbengine
+	case $1 in
+		initdb)
+			QUERY=$(cat <<-END
+ALTER TABLE acc ADD COLUMN src_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN src_domain VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN src_ip varchar(64) NOT NULL default '';
+ALTER TABLE acc ADD COLUMN dst_ouser VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN dst_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN dst_domain VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN src_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN src_domain VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN src_ip varchar(64) NOT NULL default '';
+ALTER TABLE missed_calls ADD COLUMN dst_ouser VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN dst_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN dst_domain VARCHAR(128) NOT NULL DEFAULT '';
+END
+)
+			$DBCMD "$QUERY"
+			if [ $? -ne 0 ] ; then
+				merr "error - acc db init"
+				exit 1
+			fi
+
+			mecho "ok - acc db init"
+
+			;;
+
+		showdb)
+			QUERY="select * FROM $ACC_TABLE ;"
+			$DBROCMD "$QUERY"
+			;;
+
+		recent)
+			TIMENOW=`date +"%s"`
+			if [ $# -eq 2 ] ; then
+				CLAUSE=" WHERE time>=$TIMENOW - $2 "
+			else
+				CLAUSE=" WHERE time>=$TIMENOW - 300 "
+			fi
+			QUERY="select * FROM $ACC_TABLE $CLAUSE ; "
+			$DBROCMD "$QUERY"
+			;;
+
+
+		*)
+			usage_acc
+			exit 1
+			;;
+	esac
+} # end acc()
+
+
+#
 ##### ================================================ #####
 ### subscriber management
 #
@@ -2655,6 +2724,18 @@ usrloc() {
 				usage_usrloc
 				exit 1
 			fi
+			;;
+
+		dbclean)
+			require_dbengine
+			KSR_CLEAN_VAL=3600
+			if [ $# -eq 2 ] ; then
+				KSR_CLEAN_VAL=$2
+			fi
+			QUERY="delete from $USRLOC_TABLE where expires < SUBDATE(NOW(), INTERVAL $KSR_CLEAN_VAL SECOND);"
+			$DBCMD "$QUERY"
+
+			exit $?
 			;;
 
 		*)
@@ -3014,6 +3095,11 @@ case $1 in
 		ctl_cmd_run core.psx
 		;;
 
+	psa)
+		require_ctlengine
+		ctl_cmd_run core.psa
+		;;
+
 	uptime)
 		require_ctlengine
 		ctl_cmd_run core.uptime
@@ -3045,6 +3131,10 @@ case $1 in
 
 	speeddial|speed_dial)
 		speeddial "$@"
+		;;
+
+	acc)
+		acc "$@"
 		;;
 
 	tls)

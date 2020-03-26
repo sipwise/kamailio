@@ -303,12 +303,13 @@ static int auth_fixup(void** param, int param_no)
 		if(version_table_check!=0
 				&& db_check_table_version(&auth_dbf, dbh, &name,
 					TABLE_VERSION) < 0) {
-			LM_ERR("error during version check for db table: %.*s.\n",
-					name.len, name.s);
+			DB_TABLE_VERSION_ERROR(name);
 			auth_dbf.close(dbh);
+			dbh = 0;
 			return -1;
 		}
 		auth_dbf.close(dbh);
+		dbh = 0;
 	}
 	return 0;
 }
@@ -437,6 +438,7 @@ error:
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_auth_db_exports[] = {
 	{ str_init("auth_db"), str_init("auth_check"),
 		SR_KEMIP_INT, auth_check,
@@ -451,6 +453,7 @@ static sr_kemi_t sr_kemi_auth_db_exports[] = {
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

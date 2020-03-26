@@ -39,6 +39,7 @@
 #include "dset.h"
 #include "mem/mem.h"
 #include "ip_addr.h"
+#include "strutils.h"
 
 #define CONTACT "Contact: "
 #define CONTACT_LEN (sizeof(CONTACT) - 1)
@@ -46,9 +47,14 @@
 #define CONTACT_DELIM ", "
 #define CONTACT_DELIM_LEN (sizeof(CONTACT_DELIM) - 1)
 
-#define Q_PARAM ">;q="
+#define Q_PARAM ";q="
 #define Q_PARAM_LEN (sizeof(Q_PARAM) - 1)
 
+#define ROUTE_PARAM "?Route="
+#define ROUTE_PARAM_LEN (sizeof(ROUTE_PARAM) - 1)
+
+#define FLAGS_PARAM ";flags="
+#define FLAGS_PARAM_LEN (sizeof(FLAGS_PARAM) - 1)
 
 /* 
  * Where we store URIs of additional transaction branches
@@ -82,7 +88,7 @@ int init_dst_set(void)
 	/* sr_dst_max_branches - 1 : because of the default branch for r-uri, #0 in tm */
 	branches = (branch_t*)pkg_malloc((sr_dst_max_branches-1)*sizeof(branch_t));
 	if(branches==NULL) {
-		LM_ERR("not enough memory to initialize destination branches\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memset(branches, 0, (sr_dst_max_branches-1)*sizeof(branch_t));
@@ -226,9 +232,9 @@ void set_branch_iterator(int n)
  * more branches
  */
 char* get_branch(unsigned int i, int* len, qvalue_t* q, str* dst_uri,
-		 str* path, unsigned int *flags,
-		 struct socket_info** force_socket,
-		 str *ruid, str *instance, str *location_ua)
+		str* path, unsigned int *flags,
+		struct socket_info** force_socket,
+		str *ruid, str *instance, str *location_ua)
 {
 	if (i < nr_branches) {
 		*len = branches[i].len;
@@ -296,18 +302,78 @@ char* get_branch(unsigned int i, int* len, qvalue_t* q, str* dst_uri,
  * 0 is returned if there are no more branches
  */
 char* next_branch(int* len, qvalue_t* q, str* dst_uri, str* path,
-		  unsigned int* flags, struct socket_info** force_socket,
-		  str* ruid, str *instance, str *location_ua)
+		unsigned int* flags, struct socket_info** force_socket,
+		str* ruid, str *instance, str *location_ua)
 {
 	char* ret;
-	
+
 	ret=get_branch(branch_iterator, len, q, dst_uri, path, flags,
-		       force_socket, ruid, instance, location_ua);
+			force_socket, ruid, instance, location_ua);
 	if (likely(ret))
 		branch_iterator++;
 	return ret;
 }
 
+/**
+ * Link branch attributes in the data structure
+ * - return: -1 (<0) on error; 0 - on no valid branch; 1 - on a valid branch
+ */
+int get_branch_data(unsigned int i, branch_data_t *vbranch)
+{
+	if(vbranch==NULL) {
+		return -1;
+	}
+	memset(vbranch, 0, sizeof(branch_data_t));
+
+	if (i < nr_branches) {
+		vbranch->uri.s = branches[i].uri;
+		vbranch->uri.len = branches[i].len;
+		vbranch->q = branches[i].q;
+		if (branches[i].dst_uri_len > 0) {
+			vbranch->dst_uri.len = branches[i].dst_uri_len;
+			vbranch->dst_uri.s = branches[i].dst_uri;
+		}
+		if (branches[i].path_len > 0) {
+			vbranch->path.len = branches[i].path_len;
+			vbranch->path.s = branches[i].path;
+		}
+		vbranch->force_socket = branches[i].force_send_socket;
+		vbranch->flags = branches[i].flags;
+		if (branches[i].ruid_len > 0) {
+			vbranch->ruid.len = branches[i].ruid_len;
+			vbranch->ruid.s = branches[i].ruid;
+		}
+		if (branches[i].instance_len > 0) {
+			vbranch->instance.len = branches[i].instance_len;
+			vbranch->instance.s =branches[i].instance;
+		}
+		if (branches[i].location_ua_len > 0) {
+			vbranch->location_ua.len = branches[i].location_ua_len;
+			vbranch->location_ua.s = branches[i].location_ua;
+		}
+		vbranch->otcpid = branches[i].otcpid;
+		return 1;
+	} else {
+		vbranch->q = Q_UNSPECIFIED;
+		return 0;
+	}
+}
+
+/**
+ * Link branch attributes in the data structure and advance the iterator on
+ * return of a valid branch
+ * - return: -1 (<0) on error; 0 - on no valid branch; 1 - on a valid branch
+ */
+int next_branch_data(branch_data_t *vbranch)
+{
+	int ret;
+	ret= get_branch_data(branch_iterator, vbranch);
+	if (ret <= 0) {
+		return ret;
+	}
+	branch_iterator++;
+	return ret;
+}
 
 /*
  * Empty the dset array
@@ -322,7 +388,7 @@ void clear_branches(void)
 
 
 
-/**  Add a new branch to the current transaction.
+/**  Add a new branch to the current destination set.
  * @param msg sip message, used for getting the uri if not specified (0).
  * @param uri uri, can be 0 (in which case the uri is taken from msg)
  * @param dst_uri destination uri, can be 0.
@@ -346,7 +412,7 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 	str luri;
 
 	/* if we have already set up the maximum number
-	 * of branches, don't try new ones 
+	 * of branches, don't try new ones
 	 */
 	if (unlikely(nr_branches == sr_dst_max_branches - 1)) {
 		LM_ERR("max nr of branches exceeded\n");
@@ -460,9 +526,107 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 		branches[nr_branches].location_ua[0] = '\0';
 		branches[nr_branches].location_ua_len = 0;
 	}
-	
+
 	nr_branches++;
 	return 1;
+}
+
+
+/**  Push a new branch to the current destination set.
+ * @param msg sip message, used for getting the uri if not specified (0).
+ * @param uri uri, can be 0 (in which case the uri is taken from msg)
+ * @param dst_uri destination uri, can be 0.
+ * @param path path vector (passed in a string), can be 0.
+ * @param q  q value.
+ * @param flags per branch flags.
+ * @param force_socket socket that should be used when sending.
+ * @param instance sip instance contact header param value
+ * @param reg_id reg-id contact header param value
+ * @param ruid ruid value from usrloc
+ * @param location_ua location user agent
+ *
+ * @return NULL on failure, new branch pointer on success.
+ */
+branch_t* ksr_push_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
+		  qvalue_t q, unsigned int flags,
+		  struct socket_info* force_socket,
+		  str* instance, unsigned int reg_id,
+		  str* ruid, str* location_ua)
+{
+	if(append_branch(msg, uri, dst_uri, path, q, flags, force_socket,
+				instance, reg_id, ruid, location_ua)<0) {
+		return NULL;
+	}
+	return &branches[nr_branches-1];
+}
+
+/*! \brief
+ * Combines the given elements into a Contact header field
+ * dest = target buffer, will be updated to new position after the printed contact
+ * uri, q = contact elements
+ * end = end of target buffer
+ * Returns 0 on success or -1 on error (buffer is too short)
+ */
+static int print_contact_str(char **dest, str *uri, qvalue_t q, str *path, unsigned int flags, char *end, int options)
+{
+	char *p = *dest;
+	str buf;
+
+	/* uri */
+	if (p + uri->len + 2 > end) {
+		return -1;
+	}
+	*p++ = '<';
+	memcpy(p, uri->s, uri->len);
+	p += uri->len;
+
+	/* uri parameters */
+	/* path vector as route header parameter */
+	if ((options & DS_PATH) && path->len > 0) {
+		if (p + ROUTE_PARAM_LEN + path->len > end) {
+			return -1;
+		}
+		memcpy(p, ROUTE_PARAM, ROUTE_PARAM_LEN);
+		p += ROUTE_PARAM_LEN;
+		/* copy escaped path into dest */
+		buf.s = p;
+		buf.len = end - p;
+		if (escape_param(path, &buf) < 0) {
+			return -1;
+		}
+		p += buf.len;
+	}
+
+	/* end of uri parameters */
+	*p++ = '>';
+
+	/* header parameters */
+	/* q value */
+	if (q != Q_UNSPECIFIED) {
+		buf.s = q2str(q, (unsigned int*)&buf.len);
+		if (p + Q_PARAM_LEN + buf.len > end) {
+			return -1;
+		}
+		memcpy(p, Q_PARAM, Q_PARAM_LEN);
+		p += Q_PARAM_LEN;
+		memcpy(p, buf.s, buf.len);
+		p += buf.len;
+	}
+
+	/* branch flags (not SIP standard conformant) */
+	if (options & DS_FLAGS) {
+		buf.s = int2str(flags, &buf.len);
+		if (p + FLAGS_PARAM_LEN + buf.len > end) {
+			return -1;
+		}
+		memcpy(p, FLAGS_PARAM, FLAGS_PARAM_LEN);
+		p += FLAGS_PARAM_LEN;
+		memcpy(p, buf.s, buf.len);
+		p += buf.len;
+	}
+
+	*dest = p;
+	return 0;
 }
 
 
@@ -470,104 +634,70 @@ int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
  * Create a Contact header field from the dset
  * array
  */
-char* print_dset(struct sip_msg* msg, int* len) 
+char* print_dset(struct sip_msg* msg, int* len, int options)
 {
-	int cnt, i;
-	unsigned int qlen;
+	int cnt = 0;
 	qvalue_t q;
-	str uri;
-	char* p, *qbuf;
+	str uri, path;
+	unsigned int flags;
+	char *p;
 	int crt_branch;
 	static char dset[MAX_REDIRECTION_LEN];
-
-	if (msg->new_uri.s) {
-		cnt = 1;
-		*len = msg->new_uri.len + 1 /*'<'*/;
-		if (ruri_q != Q_UNSPECIFIED) {
-			*len += Q_PARAM_LEN + len_q(ruri_q);
-		} else {
-			*len += 1 /*'>'*/;
-		}
-	} else {
-		cnt = 0;
-		*len = 0;
-	}
+	char *end = dset + MAX_REDIRECTION_LEN;
 
 	/* backup current branch index to restore it later */
 	crt_branch = get_branch_iterator();
 
-	init_branch_iterator();
-	while ((uri.s = next_branch(&uri.len, &q, 0, 0, 0, 0, 0, 0, 0))) {
-		cnt++;
-		*len += uri.len + 1 /*'<'*/;
-		if (q != Q_UNSPECIFIED) {
-			*len += Q_PARAM_LEN + len_q(q);
-		} else {
-			*len += 1 /*'>'*/;
-		}
+	/* contact header name */
+	if (CONTACT_LEN + CRLF_LEN + 1 > MAX_REDIRECTION_LEN) {
+		goto memfail;
 	}
-
-	if (cnt == 0) return 0;	
-
-	*len += CONTACT_LEN + CRLF_LEN + (cnt - 1) * CONTACT_DELIM_LEN;
-
-	if (*len + 1 > MAX_REDIRECTION_LEN) {
-		LM_ERR("redirection buffer length exceed\n");
-		goto error;
-	}
-
 	memcpy(dset, CONTACT, CONTACT_LEN);
 	p = dset + CONTACT_LEN;
+
+	/* current uri */
 	if (msg->new_uri.s) {
-		*p++ = '<';
-
-		memcpy(p, msg->new_uri.s, msg->new_uri.len);
-		p += msg->new_uri.len;
-
-		if (ruri_q != Q_UNSPECIFIED) {
-			memcpy(p, Q_PARAM, Q_PARAM_LEN);
-			p += Q_PARAM_LEN;
-
-			qbuf = q2str(ruri_q, &qlen);
-			memcpy(p, qbuf, qlen);
-			p += qlen;
-		} else {
-			*p++ = '>';
+		if (print_contact_str(&p, &msg->new_uri, ruri_q, &msg->path_vec, ruri_bflags, end, options) < 0) {
+			goto memfail;
 		}
-		i = 1;
-	} else {
-		i = 0;
+		cnt++;
 	}
 
+	/* branches */
 	init_branch_iterator();
-	while ((uri.s = next_branch(&uri.len, &q, 0, 0, 0, 0, 0, 0, 0))) {
-		if (i) {
+	while ((uri.s = next_branch(&uri.len, &q, 0, &path, &flags, 0, 0, 0, 0))) {
+		if (cnt > 0) {
+			if (p + CONTACT_DELIM_LEN > end) {
+				goto memfail;
+			}
 			memcpy(p, CONTACT_DELIM, CONTACT_DELIM_LEN);
 			p += CONTACT_DELIM_LEN;
 		}
 
-		*p++ = '<';
-
-		memcpy(p, uri.s, uri.len);
-		p += uri.len;
-		if (q != Q_UNSPECIFIED) {
-			memcpy(p, Q_PARAM, Q_PARAM_LEN);
-			p += Q_PARAM_LEN;
-
-			qbuf = q2str(q, &qlen);
-			memcpy(p, qbuf, qlen);
-			p += qlen;
-		} else {
-			*p++ = '>';
+		if (print_contact_str(&p, &uri, q, &path, flags, end, options) < 0) {
+			goto memfail;
 		}
-		i++;
+
+		cnt++;
 	}
 
+	if (cnt == 0) {
+		LM_WARN("no r-uri or branches\n");
+		goto error;
+	}
+
+	if (p + CRLF_LEN + 1 > end) {
+		goto memfail;
+	}
 	memcpy(p, CRLF " ", CRLF_LEN + 1);
+	*len = p - dset + CRLF_LEN;
 	set_branch_iterator(crt_branch);
 	return dset;
 
+memfail:
+	LM_ERR("redirection buffer length exceed\n");
 error:
+	*len = 0;
 	set_branch_iterator(crt_branch);
 	return 0;
 }
@@ -602,7 +732,7 @@ int rewrite_uri(struct sip_msg* _m, str* _s)
 	if(_m->new_uri.s==NULL || _m->new_uri.len<_s->len) {
 		buf = (char*)pkg_malloc(_s->len + 1);
 		if (!buf) {
-			LM_ERR("No memory left to rewrite r-uri\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 	}

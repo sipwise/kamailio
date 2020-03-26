@@ -34,7 +34,6 @@
 
 #include "../../core/events.h"
 #include "../../core/receive.h"
-#include "../../core/stats.h"
 #include "../../core/str.h"
 #include "../../core/tcp_conn.h"
 #include "../../core/tcp_read.h"
@@ -244,7 +243,6 @@ static int encode_and_send_ws_frame(ws_frame_t *frame, conn_close_t conn_close)
 
 	if(dst.proto == PROTO_WS) {
 		if(unlikely(tcp_disable)) {
-			STATS_TX_DROPS;
 			LM_WARN("TCP disabled\n");
 			pkg_free(send_buf);
 			tcpconn_put(con);
@@ -254,7 +252,6 @@ static int encode_and_send_ws_frame(ws_frame_t *frame, conn_close_t conn_close)
 #ifdef USE_TLS
 	else if(dst.proto == PROTO_WSS) {
 		if(unlikely(tls_disable)) {
-			STATS_TX_DROPS;
 			LM_WARN("TLS disabled\n");
 			pkg_free(send_buf);
 			tcpconn_put(con);
@@ -275,7 +272,6 @@ static int encode_and_send_ws_frame(ws_frame_t *frame, conn_close_t conn_close)
 	dst.send_flags.f |= SND_F_FORCE_CON_REUSE;
 
 	if(tcp_send(&dst, from, send_buf, frame_length) < 0) {
-		STATS_TX_DROPS;
 		LM_ERR("sending WebSocket frame\n");
 		pkg_free(send_buf);
 		update_stat(ws_failed_connections, 1);
@@ -812,6 +808,14 @@ void ws_keepalive(unsigned int ticks, void *param)
 			if(wsc->state == WS_S_CLOSING || wsc->awaiting_pong) {
 				LM_WARN("forcibly closing connection\n");
 				wsconn_close_now(wsc);
+			} else if (ws_keepalive_mechanism == KEEPALIVE_MECHANISM_CONCHECK) {
+				tcp_connection_t *con = tcpconn_get(wsc->id, 0, 0, 0, 0);
+				if(con==NULL) {
+					LM_INFO("tcp connection has been lost\n");
+					wsc->state = WS_S_CLOSING;
+				} else {
+					tcpconn_put(con);
+				}
 			} else {
 				int opcode = (ws_keepalive_mechanism == KEEPALIVE_MECHANISM_PING)
 								 ? OPCODE_PING

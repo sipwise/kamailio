@@ -247,8 +247,6 @@ static inline int generate_random_secret(void)
 		return -1;
 	}
 
-	/* srandom(time(0));  -- seeded by core */
-
 	for(i = 0; i < RAND_SECRET_LEN; i++) {
 		sec_rand1[i] = 32 + (int)(95.0 * kam_rand() / (KAM_RAND_MAX + 1.0));
 	}
@@ -746,6 +744,13 @@ static int pv_auth_check(sip_msg_t *msg, str *srealm, str *spasswd, int vflags,
 
 	if(ret==AUTH_OK && (vchecks&AUTH_CHECK_ID_F)) {
 		hdr = (msg->proxy_auth==0)?msg->authorization:msg->proxy_auth;
+		if(hdr==NULL) {
+			if (msg->REQ_METHOD & (METHOD_ACK|METHOD_CANCEL|METHOD_PRACK)) {
+				return AUTH_OK;
+			} else {
+				return AUTH_ERROR;
+			}
+		}
 		suser = ((auth_body_t*)(hdr->parsed))->digest.username.user;
 
 		if((furi=parse_from_uri(msg))==NULL)
@@ -1213,6 +1218,7 @@ static int fixup_auth_get_www_authenticate(void **param, int param_no)
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_auth_exports[] = {
 	{ str_init("auth"), str_init("consume_credentials"),
 		SR_KEMIP_INT, consume_credentials,
@@ -1237,6 +1243,7 @@ static sr_kemi_t sr_kemi_auth_exports[] = {
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

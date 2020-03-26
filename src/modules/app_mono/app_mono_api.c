@@ -83,7 +83,7 @@ int sr_mono_load_script(char *script)
 	mi = (sr_mono_load_t*)pkg_malloc(sizeof(sr_mono_load_t));
 	if(mi==NULL)
 	{
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memset(mi, 0, sizeof(sr_mono_load_t));
@@ -771,14 +771,14 @@ static int sr_mono_hdr_append (MonoString *hv)
 	hdr = (char*)pkg_malloc(txt.len+1);
 	if(hdr==NULL)
 	{
-		LM_ERR("no pkg memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memcpy(hdr, txt.s, txt.len);
 	hdr[txt.len] = '\0';
 	anchor = anchor_lump(env_M->msg,
 				hf->name.s + hf->len - env_M->msg->buf, 0, 0);
-	if(insert_new_lump_before(anchor, hdr, txt.len, 0) == 0)
+	if((anchor==NULL) || (insert_new_lump_before(anchor, hdr, txt.len, 0) == 0))
 	{
 		LM_ERR("can't insert lump\n");
 		pkg_free(hdr);
@@ -866,14 +866,14 @@ static int sr_mono_hdr_insert (MonoString *hv)
 	hdr = (char*)pkg_malloc(txt.len+1);
 	if(hdr==NULL)
 	{
-		LM_ERR("no pkg memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memcpy(hdr, txt.s, txt.len);
 	hdr[txt.len] = '\0';
 	anchor = anchor_lump(env_M->msg,
 				hf->name.s + hf->len - env_M->msg->buf, 0, 0);
-	if(insert_new_lump_before(anchor, hdr, txt.len, 0) == 0)
+	if((anchor==NULL) || (insert_new_lump_before(anchor, hdr, txt.len, 0) == 0))
 	{
 		LM_ERR("can't insert lump\n");
 		pkg_free(hdr);

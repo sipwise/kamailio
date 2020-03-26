@@ -60,7 +60,7 @@
 #include "t_fwd.h"
 #endif
 
-#define FROM_TAG_LEN (MD5_LEN + 1 /* - */ + CRC16_LEN) /* length of FROM tags */
+#define FROM_TAG_LEN (MD5_LEN + 1 /* - */ + CRC32_LEN) /* length of FROM tags */
 
 #ifdef WITH_EVENT_LOCAL_REQUEST
 /* where to go for the local request route ("tm:local-request") */
@@ -106,10 +106,16 @@ int uac_init(void)
 /*
  * Generate a From tag
  */
-void generate_fromtag(str* tag, str* callid)
+void generate_fromtag(str* tag, str* callid, str* ruri)
 {
-	     /* calculate from tag from callid */
+	/* calculate from tag from callid and request uri */
 	crcitt_string_array(&from_tag[MD5_LEN + 1], callid, 1);
+	if(ruri) {
+		crcitt_string_array(&from_tag[MD5_LEN + 5], ruri, 1);
+	} else {
+		/* prevent shorter tag in this case, to be changed */
+		crcitt_string_array(&from_tag[MD5_LEN + 5], callid, 1);
+	}
 	tag->s = from_tag;
 	tag->len = FROM_TAG_LEN;
 }
@@ -240,7 +246,7 @@ static inline int t_run_local_req(
 		return -1;
 	}
 	if (unlikely(set_dst_uri(&lreq, uac_r->dialog->hooks.next_hop))) {
-		LM_ERR("failed to set dst_uri");
+		LM_ERR("failed to set dst_uri\n");
 		free_sip_msg(&lreq);
 		return -1;
 	}
@@ -457,10 +463,8 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 		new_cell->flags |= T_IS_INVITE_FLAG;
 		new_cell->flags|=T_AUTO_INV_100 &
 				(!cfg_get(tm, tm_cfg, tm_auto_inv_100) -1);
-#ifdef WITH_AS_SUPPORT
 		if (uac_r->cb_flags & TMCB_DONT_ACK)
 			new_cell->flags |= T_NO_AUTO_ACK;
-#endif
 		lifetime=cfg_get(tm, tm_cfg, tm_max_inv_lifetime);
 	}else
 		lifetime=cfg_get(tm, tm_cfg, tm_max_noninv_lifetime);
@@ -473,11 +477,9 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	new_cell->fr_timeout=cfg_get(tm, tm_cfg, fr_timeout);
 	new_cell->fr_inv_timeout=cfg_get(tm, tm_cfg, fr_inv_timeout);
 	new_cell->end_of_life=get_ticks_raw()+lifetime;
-#ifdef TM_DIFF_RT_TIMEOUT
 	/* same as above for retransmission intervals */
 	new_cell->rt_t1_timeout_ms = cfg_get(tm, tm_cfg, rt_t1_timeout_ms);
 	new_cell->rt_t2_timeout_ms = cfg_get(tm, tm_cfg, rt_t2_timeout_ms);
-#endif
 
 	set_kr(REQ_FWDED);
 
@@ -494,9 +496,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 #endif
 
 	if (!is_ack) {
-#ifdef TM_DEL_UNREF
 		INIT_REF(new_cell, 1); /* ref'ed only from the hash */
-#endif
 		hi=dlg2hash(uac_r->dialog);
 		LOCK_HASH(hi);
 		insert_into_hash_table_unsafe(new_cell, hi);
@@ -585,7 +585,6 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	}
 
 error2:
-#ifdef TM_DEL_UNREF
 	if (is_ack) {
 		free_cell(new_cell);
 	} else {
@@ -596,9 +595,6 @@ error2:
 			UNREF_FREE(new_cell, 0);
 		}
 	}
-#else
-	free_cell(new_cell);
-#endif
 error3:
 	return ret;
 }
@@ -744,7 +740,6 @@ int t_uac_with_ids(uac_req_t *uac_r,
 	return ret;
 }
 
-#ifdef WITH_AS_SUPPORT
 struct retr_buf *local_ack_rb(sip_msg_t *rpl_2xx, struct cell *trans,
 					unsigned int branch, str *hdrs, str *body)
 {
@@ -836,7 +831,7 @@ int ack_local_uac(struct cell *trans, str *hdrs, str *body)
 
 	if (! (local_ack = local_ack_rb(trans->uac[0].reply, trans, /*branch*/0,
 			hdrs, body))) {
-		LM_ERR("failed to build ACK retransmission buffer");
+		LM_ERR("failed to build ACK retransmission buffer\n");
 		RET_INVALID;
 	} else {
 		/* set the new buffer, but only if not already set (conc. invok.) */
@@ -876,7 +871,6 @@ fin:
 
 #undef RET_INVALID
 }
-#endif /* WITH_AS_SUPPORT */
 
 
 /*
@@ -961,7 +955,7 @@ int req_outside(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 	if (check_params(uac_r, to, from) < 0) goto err;
 
 	generate_callid(&callid);
-	generate_fromtag(&fromtag, &callid);
+	generate_fromtag(&fromtag, &callid, ruri);
 
 	if (new_dlg_uac(&callid, &fromtag, DEFAULT_CSEQ, from, to, &uac_r->dialog) < 0) {
 		LM_ERR("Error while creating new dialog\n");
@@ -1008,7 +1002,7 @@ int request(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 	    generate_callid(&callid);
 	else
 	    callid = *uac_r->callid;
-	generate_fromtag(&fromtag, &callid);
+	generate_fromtag(&fromtag, &callid, ruri);
 
 	if (new_dlg_uac(&callid, &fromtag, DEFAULT_CSEQ, from, to, &dialog) < 0) {
 		LM_ERR("Error while creating temporary dialog\n");

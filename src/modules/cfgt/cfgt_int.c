@@ -44,9 +44,10 @@ int cfgt_mask = CFGT_DP_ALL;
 static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
 {
 	ht->table = shm_malloc(sizeof(struct str_hash_head) * size);
-
-	if(!ht->table)
+	if(!ht->table) {
+		SHM_MEM_ERROR;
 		return -1;
+	}
 
 	ht->size = size;
 	return 0;
@@ -54,10 +55,8 @@ static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
 
 static int _cfgt_init_hashtable(struct str_hash_table *ht)
 {
-	if(shm_str_hash_alloc(ht, CFGT_HASH_SIZE) != 0) {
-		LM_ERR("Error allocating shared memory hashtable\n");
+	if(shm_str_hash_alloc(ht, CFGT_HASH_SIZE) != 0)
 		return -1;
-	}
 
 	str_hash_init(ht);
 
@@ -128,13 +127,12 @@ int _cfgt_get_uuid_id(cfgt_node_p node)
 		entry = shm_malloc(sizeof(struct str_hash_entry));
 		if(entry == NULL) {
 			lock_release(&_cfgt_uuid->lock);
-			LM_ERR("No shared memory left\n");
+			SHM_MEM_ERROR;
 			return -1;
 		}
 		if(shm_str_dup(&entry->key, &node->uuid) != 0) {
 			lock_release(&_cfgt_uuid->lock);
 			shm_free(entry);
-			LM_ERR("No shared memory left\n");
 			return -1;
 		}
 		entry->u.n = 1;
@@ -206,7 +204,7 @@ cfgt_node_p cfgt_create_node(struct sip_msg *msg)
 
 	node = (cfgt_node_p)pkg_malloc(sizeof(cfgt_node_t));
 	if(node == NULL) {
-		LM_ERR("cannot allocate cfgtest msgnode\n");
+		PKG_MEM_ERROR;
 		return node;
 	}
 	memset(node, 0, sizeof(cfgt_node_t));
@@ -287,7 +285,7 @@ int _cfgt_get_filename(int msgid, str uuid, str *dest, int *dir)
 	dest->len += lid + 6;
 	dest->s = (char *)pkg_malloc((dest->len * sizeof(char) + 1));
 	if(dest->s == NULL) {
-		LM_ERR("no more memory.\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	snprintf(dest->s, dest->len + 1, format, cfgt_basedir.len, cfgt_basedir.s,
@@ -322,13 +320,16 @@ void cfgt_save_node(cfgt_node_p node)
 	FILE *fp;
 	str dest = STR_NULL;
 	int dir = 0;
+	struct stat sb;
 	if(_cfgt_get_filename(node->msgid, node->uuid, &dest, &dir) < 0) {
 		LM_ERR("can't build filename\n");
 		return;
 	}
 	dest.s[dir] = '\0';
 	LM_DBG("dir [%s]\n", dest.s);
-	if(mkdir(dest.s, S_IRWXO | S_IXGRP | S_IRWXU) < 0) {
+	if(stat(dest.s, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+		LM_DBG("dir [%s] already existing\n", dest.s);
+	} else if(mkdir(dest.s, S_IRWXO | S_IXGRP | S_IRWXU) < 0) {
 		LM_ERR("failed to make directory: %s\n", strerror(errno));
 		return;
 	}
@@ -454,7 +455,7 @@ int _cfgt_add_routename(cfgt_node_p node, struct action *a, str *routename)
 	{
 		node->route = pkg_malloc(sizeof(cfgt_str_list_t));
 		if(!node->route) {
-			LM_ERR("No more pkg mem\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		memset(node->route, 0, sizeof(cfgt_str_list_t));
@@ -464,9 +465,15 @@ int _cfgt_add_routename(cfgt_node_p node, struct action *a, str *routename)
 	} else {
 		LM_DBG("actual routename:[%.*s][%d]\n", node->route->s.len,
 				node->route->s.s, node->route->type);
-		if(node->route->prev)
+		if(node->route->prev) {
+			if(node->route->prev->prev)
+				LM_DBG("prev prev routename:[%.*s][%d]\n",
+						node->route->prev->prev->s.len,
+						node->route->prev->prev->s.s,
+						node->route->prev->prev->type);
 			LM_DBG("prev routename:[%.*s][%d]\n", node->route->prev->s.len,
 					node->route->prev->s.s, node->route->prev->type);
+		}
 		if(node->route->next)
 			LM_DBG("next routename:[%.*s][%d]\n", node->route->next->s.len,
 					node->route->next->s.s, node->route->next->type);
@@ -474,19 +481,30 @@ int _cfgt_add_routename(cfgt_node_p node, struct action *a, str *routename)
 			LM_DBG("same route\n");
 			_cfgt_set_type(node->route, a);
 			return 2;
-		} else if(node->route->prev
-				  && STR_EQ(*routename, node->route->prev->s)) {
-			LM_DBG("back to route[%.*s]\n", node->route->prev->s.len,
-					node->route->prev->s.s);
-			_cfgt_set_type(node->route->prev, a);
-			return 3;
+		} else if(node->route->prev) {
+			if(STR_EQ(*routename, node->route->prev->s)) {
+				LM_DBG("back to prev route[%.*s]\n", node->route->prev->s.len,
+						node->route->prev->s.s);
+				_cfgt_set_type(node->route->prev, a);
+				return 3;
+			} else if(node->route->prev->prev
+					  && STR_EQ(*routename, node->route->prev->prev->s)) {
+				LM_DBG("back to prev prev route[%.*s]\n",
+						node->route->prev->prev->s.len,
+						node->route->prev->prev->s.s);
+				_cfgt_set_type(node->route->prev->prev, a);
+				return 3;
+			}
 		}
 		route = pkg_malloc(sizeof(cfgt_str_list_t));
 		if(!route) {
-			LM_ERR("No more pkg mem\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		memset(route, 0, sizeof(cfgt_str_list_t));
+		if(route->prev && node->route->prev) {
+			route->prev->prev = node->route->prev;
+		}
 		route->prev = node->route;
 		node->route->next = route;
 		node->route = route;
@@ -718,7 +736,7 @@ int cfgt_init(void)
 	}
 	_cfgt_uuid = shm_malloc(sizeof(cfgt_hash_t));
 	if(_cfgt_uuid == NULL) {
-		LM_ERR("Cannot allocate shared memory\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	if(!lock_init(&_cfgt_uuid->lock)) {

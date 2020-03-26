@@ -109,6 +109,7 @@ typedef enum request_method {
 #define FL_ADD_XAVP_VIA_PARAMS (1<<21) /*!< add xavp fields to local via params */
 #define FL_USE_XAVP_VIA_FIELDS (1<<22) /*!< use xavp fields for local via attrs */
 #define FL_MSG_NOREPLY       (1<<23) /*!< do not send sip reply for request */
+#define FL_SIPTRACE          (1<<24) /*!< message to be traced in stateless replies */
 
 /* WARNING: Value (1 << 28) is temporarily reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */
@@ -146,9 +147,12 @@ if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 		SIP_VERSION, SIP_VERSION_LEN))
 
 #define IS_HTTP_REPLY(rpl)                                                \
-	((rpl)->first_line.u.reply.version.len >= HTTP_VERSION_LEN && \
+	(((rpl)->first_line.u.reply.version.len >= HTTP_VERSION_LEN && \
 	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
-		HTTP_VERSION, HTTP_VERSION_LEN))
+		HTTP_VERSION, HTTP_VERSION_LEN)) ||                         \
+	((rpl)->first_line.u.reply.version.len >= HTTP2_VERSION_LEN && \
+	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
+		HTTP2_VERSION, HTTP2_VERSION_LEN)))
 
 #define IS_SIP_REPLY(rpl)                                                \
 	((rpl)->first_line.u.reply.version.len >= SIP_VERSION_LEN && \
@@ -377,6 +381,7 @@ typedef struct sip_msg {
 	unsigned int reg_id;
 	str ruid;
 	str location_ua;
+	int otcpid; /*!< outbound tcp connection id, if known */
 
 	/* structure with fields that are needed for local processing
 	 * - not cloned to shm, reset to 0 in the clone */
@@ -474,11 +479,11 @@ void reset_ua(struct sip_msg* const msg);
 
 /**
  * struct to identify a msg context
- * - the pair of pid and message-id
+ * - the pair of message-id and pid (fields in sip_msg_t)
  */
 typedef struct msg_ctx_id {
+	unsigned int msgid;
 	int pid;
-	int msgid;
 } msg_ctx_id_t;
 
 /**

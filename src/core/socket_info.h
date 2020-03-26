@@ -41,6 +41,9 @@
 #define MAX_SOCKET_STR (sizeof("unknown") - 1 + IP_ADDR_MAX_STR_SIZE + \
 	INT2STR_MAX_LEN + 2 + 2)
 
+/* Maximum length for advertise string of listen socket */
+#define MAX_SOCKET_ADVERTISE_STR	511
+
 int socket2str(char* s, int* len, struct socket_info* si);
 int socketinfo2str(char* s, int* len, struct socket_info* si, int mode);
 
@@ -147,5 +150,7 @@ typedef struct _sr_phostp {
 
 struct socket_info* lookup_local_socket(str *phostp);
 int parse_protohostport(str* ins, sr_phostp_t *r);
+
+unsigned int ipv6_get_netif_scope(char *ipval);
 
 #endif

@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <string.h>
+#include <getopt.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -74,10 +75,8 @@
 #include "core/udp_server.h"
 #include "core/globals.h"
 #include "core/mem/mem.h"
-#ifdef SHM_MEM
 #include "core/mem/shm_mem.h"
 #include "core/shm_init.h"
-#endif /* SHM_MEM */
 #include "core/sr_module.h"
 #include "core/timer.h"
 #include "core/parser/msg_parser.h"
@@ -126,7 +125,6 @@
 #include "core/rand/fastrand.h" /* seed */
 #include "core/rand/kam_rand.h"
 
-#include "core/stats.h"
 #include "core/counters.h"
 #include "core/cfg/cfg.h"
 #include "core/cfg/cfg_struct.h"
@@ -160,65 +158,81 @@
 static char help_msg[]= "\
 Usage: " NAME " [options]\n\
 Options:\n\
-    -f file      Configuration file (default: " CFG_FILE ")\n\
-    -L path      Modules search path (default: " MODS_DIR ")\n\
-    -c           Check configuration file for errors\n\
-    -l address   Listen on the specified address/interface (multiple -l\n\
-                  mean listening on more addresses).  The address format is\n\
-                  [proto:]addr_lst[:port], where proto=udp|tcp|tls|sctp, \n\
-                  addr_lst= addr|(addr, addr_lst) and \n\
-                  addr= host|ip_address|interface_name. \n\
-                  E.g: -l localhost, -l udp:127.0.0.1:5080, -l eth0:5062,\n\
-                  -l \"sctp:(eth0)\", -l \"(eth0, eth1, 127.0.0.1):5065\".\n\
-                  The default behaviour is to listen on all the interfaces.\n\
-    -n processes Number of child processes to fork per interface\n\
-                  (default: 8)\n\
-    -r           Use dns to check if is necessary to add a \"received=\"\n\
-                  field to a via\n\
-    -R           Same as `-r` but use reverse dns;\n\
-                  (to use both use `-rR`)\n\
-    -K           Turn on \"via:\" host checking when forwarding replies\n\
+    -a mode      Auto aliases mode: enable with yes or on,\n\
+                  disable with no or off\n\
+    --alias=val  Add an alias, the value has to be '[proto:]hostname[:port]'\n\
+                  (like for 'alias' global parameter)\n\
+    -A define    Add config pre-processor define (e.g., -A WITH_AUTH,\n\
+                  -A 'FLT_ACC=1', -A 'DEFVAL=\"str-val\"')\n\
+    -b nr        Maximum receive buffer size which will not be exceeded by\n\
+                  auto-probing procedure even if  OS allows\n\
+    -c           Check configuration file for syntax errors\n\
     -d           Debugging mode (multiple -d increase the level)\n\
     -D           Control how daemonize is done:\n\
                   -D..do not fork (almost) anyway;\n\
                   -DD..do not daemonize creator;\n\
                   -DDD..daemonize (default)\n\
+    -e           Log messages printed in terminal colors (requires -E)\n\
     -E           Log to stderr\n\
-    -e           Log messages printed in terminal colors (requires -E)\n"
-#ifdef USE_TCP
-"    -T           Disable tcp\n\
-    -N           Number of tcp child processes (default: equal to `-n')\n\
-    -W type      poll method (depending on support in OS, it can be: poll,\n\
-                  epoll_lt, epoll_et, sigio_rt, select, kqueue, /dev/poll)\n"
-#endif
-#ifdef USE_SCTP
-"    -S           disable sctp\n\
-    -Q            Number of sctp child processes (default: equal to `-n')\n"
-#endif /* USE_SCTP */
-"    -v (-V)      Version number\n\
+    -f file      Configuration file (default: " CFG_FILE ")\n\
+    -g gid       Change gid (group id)\n\
+    -G file      Create a pgid file\n\
     -h           This help message\n\
+    --help       Long option for `-h`\n\
     -I           Print more internal compile flags and options\n\
-    -b nr        Maximum receive buffer size which will not be exceeded by\n\
-                  auto-probing procedure even if  OS allows\n\
+    -K           Turn on \"via:\" host checking when forwarding replies\n\
+    -l address   Listen on the specified address/interface (multiple -l\n\
+                  mean listening on more addresses). The address format is\n\
+                  [proto:]addr_lst[:port][/advaddr], \n\
+                  where proto=udp|tcp|tls|sctp, \n\
+                  addr_lst= addr|(addr, addr_lst), \n\
+                  addr=host|ip_address|interface_name and \n\
+                  advaddr=addr[:port] (advertised address). \n\
+                  E.g: -l localhost, -l udp:127.0.0.1:5080, -l eth0:5062,\n\
+                  -l udp:127.0.0.1:5080/1.2.3.4:5060,\n\
+                  -l \"sctp:(eth0)\", -l \"(eth0, eth1, 127.0.0.1):5065\".\n\
+                  The default behaviour is to listen on all the interfaces.\n\
+    -L path      Modules search path (default: " MODS_DIR ")\n\
     -m nr        Size of shared memory allocated in Megabytes\n\
     -M nr        Size of private memory allocated, in Megabytes\n\
-    -w dir       Change the working directory to \"dir\" (default: \"/\")\n\
-    -t dir       Chroot to \"dir\"\n\
-    -u uid       Change uid (user id)\n\
-    -g gid       Change gid (group id)\n\
-    -P file      Create a pid file\n\
-    -G file      Create a pgid file\n\
-    -Y dir       Runtime dir path\n\
-    -O nr        Script optimization level (debugging option)\n\
-    -a mode      Auto aliases mode: enable with yes or on,\n\
-                  disable with no or off\n\
-    -A define    Add config pre-processor define (e.g., -A WITH_AUTH)\n\
+    -n processes Number of child processes to fork per interface\n\
+                  (default: 8)\n"
+#ifdef USE_TCP
+"    -N           Number of tcp child processes (default: equal to `-n')\n"
+#endif
+"    -O nr        Script optimization level (debugging option)\n\
+    -P file      Create a pid file\n"
+#ifdef USE_SCTP
+"    -Q           Number of sctp child processes (default: equal to `-n')\n"
+#endif /* USE_SCTP */
+"    -r           Use dns to check if is necessary to add a \"received=\"\n\
+                  field to a via\n\
+    -R           Same as `-r` but use reverse dns;\n\
+                  (to use both use `-rR`)\n"
+"    --server-id=num set the value for server_id\n\
+    --subst=exp set a subst preprocessor directive\n\
+    --substdef=exp set a substdef preprocessor directive\n\
+    --substdefs=exp set a substdefs preprocessor directive\n"
+#ifdef USE_SCTP
+"    -S           disable sctp\n"
+#endif
+"    -t dir       Chroot to \"dir\"\n"
+#ifdef USE_TCP
+"    -T           Disable tcp\n"
+#endif
+"    -u uid       Change uid (user id)\n\
+    -v           Version number\n\
+    --version    Long option for `-v`\n\
+    -V           Alternative for `-v`\n\
     -x name      Specify internal manager for shared memory (shm)\n\
                   - can be: fm, qm or tlsf\n\
     -X name      Specify internal manager for private memory (pkg)\n\
-                  - if omitted, the one for shm is used\n"
-#ifdef STATS
-"    -s file     File where to write internal statistics on SIGUSR1\n"
+                  - if omitted, the one for shm is used\n\
+    -Y dir       Runtime dir path\n\
+    -w dir       Change the working directory to \"dir\" (default: \"/\")\n"
+#ifdef USE_TCP
+"    -W type      poll method (depending on support in OS, it can be: poll,\n\
+                  epoll_lt, epoll_et, sigio_rt, select, kqueue, /dev/poll)\n"
 #endif
 ;
 
@@ -227,14 +241,12 @@ Options:\n\
 void print_ct_constants(void)
 {
 #ifdef ADAPTIVE_WAIT
-	printf("ADAPTIVE_WAIT_LOOPS=%d, ", ADAPTIVE_WAIT_LOOPS);
+	printf("ADAPTIVE_WAIT_LOOPS %d, ", ADAPTIVE_WAIT_LOOPS);
 #endif
 /*
-#ifdef SHM_MEM
-	printf("SHM_MEM_SIZE=%d, ", SHM_MEM_SIZE);
-#endif
+	printf("SHM_MEM_SIZE %dMB, ", SHM_MEM_SIZE);
 */
-	printf("MAX_RECV_BUFFER_SIZE %d"
+	printf("MAX_RECV_BUFFER_SIZE %d,"
 			" MAX_URI_SIZE %d, BUF_SIZE %d, DEFAULT PKG_SIZE %uMB\n",
 		MAX_RECV_BUFFER_SIZE, MAX_URI_SIZE,
 		BUF_SIZE, PKG_MEM_SIZE);
@@ -255,9 +267,7 @@ void print_internals(void)
 	printf("  MAX_URI_SIZE=%d\n", MAX_URI_SIZE);
 	printf("  BUF_SIZE=%d\n", BUF_SIZE);
 	printf("  DEFAULT PKG_SIZE=%uMB\n", PKG_MEM_SIZE);
-#ifdef SHM_MEM
 	printf("  DEFAULT SHM_SIZE=%uMB\n", SHM_MEM_SIZE);
-#endif
 #ifdef ADAPTIVE_WAIT
 	printf("  ADAPTIVE_WAIT_LOOPS=%d\n", ADAPTIVE_WAIT_LOOPS);
 #endif
@@ -266,6 +276,7 @@ void print_internals(void)
 #endif
 	printf("  Source code revision ID: %s\n", ver_id);
 	printf("  Compiled with: %s\n", ver_compiler);
+	printf("  Compiled architecture: %s\n", ARCH);
 	printf("  Compiled on: %s\n", ver_compiled_time);
 	printf("Thank you for flying %s!\n", NAME);
 }
@@ -426,6 +437,7 @@ int tos = IPTOS_LOWDELAY;
 int pmtu_discovery = 0;
 
 int auto_bind_ipv6 = 0;
+int sr_bind_ipv6_link_local = 0;
 
 struct socket_info* udp_listen=0;
 #ifdef USE_TCP
@@ -588,7 +600,6 @@ void cleanup(int show_status)
 		}
 	}
 #endif
-#ifdef SHM_MEM
 	if (pt) shm_free(pt);
 	pt=0;
 	if (show_status && memlog <= cfg_get(core, core_cfg, debug)){
@@ -603,7 +614,6 @@ void cleanup(int show_status)
 	}
 	/* zero all shmem alloc vars that we still use */
 	shm_destroy_manager();
-#endif
 	destroy_lock_ops();
 	if (pid_file) unlink(pid_file);
 	if (pgid_file) unlink(pgid_file);
@@ -719,9 +729,6 @@ void handle_sigs(void)
 			break;
 
 		case SIGUSR1:
-#ifdef STATS
-			dump_all_statistic();
-#endif
 		memlog=cfg_get(core, core_cfg, memlog);
 #ifdef PKG_MALLOC
 		if (memlog <= cfg_get(core, core_cfg, debug)){
@@ -735,7 +742,6 @@ void handle_sigs(void)
 			}
 		}
 #endif
-#ifdef SHM_MEM
 		if (memlog <= cfg_get(core, core_cfg, debug)){
 			if (cfg_get(core, core_cfg, mem_summary) & 2) {
 				LOG(memlog, "Memory status (shm):\n");
@@ -746,7 +752,6 @@ void handle_sigs(void)
 				shm_sums();
 			}
 		}
-#endif
 			break;
 
 		case SIGCHLD:
@@ -1009,8 +1014,11 @@ static struct name_lst* mk_name_lst_elem(char* name, int name_len, int flags)
 		l->name[name_len]=0;
 		l->flags=flags;
 		l->next=0;
+		return l;
+	} else {
+		PKG_MEM_ERROR;
+		return 0;
 	}
-	return l;
 }
 
 
@@ -1294,16 +1302,13 @@ int main_loop(void)
 	if(_sr_instance_started == NULL) {
 		_sr_instance_started = shm_malloc(sizeof(int));
 		if(_sr_instance_started == NULL) {
-			LM_ERR("no shared memory\n");
+			SHM_MEM_ERROR;
 			goto error;
 		}
 		*_sr_instance_started = 0;
 	}
 	/* one "main" process and n children handling i/o */
 	if (dont_fork){
-#ifdef STATS
-		setstats( 0 );
-#endif
 		if (udp_listen==0){
 			LM_ERR("no fork mode requires at least one"
 					" udp listen address, exiting...\n");
@@ -1432,6 +1437,7 @@ int main_loop(void)
 					if (arm_timer()<0) goto error;
 					timer_main();
 				}else{
+					/* do nothing for main timer */
 				}
 
 		if(sr_wtimer_start()<0) {
@@ -1659,9 +1665,7 @@ int main_loop(void)
 				}else if (pid==0){
 					/* child */
 					bind_address=si; /* shortcut */
-#ifdef STATS
-					setstats( i+r*children_no );
-#endif
+
 					if(woneinit==0) {
 						if(run_child_one_init_route()<0)
 							goto error;
@@ -1696,9 +1700,7 @@ int main_loop(void)
 					}else if (pid==0){
 						/* child */
 						bind_address=si; /* shortcut */
-#ifdef STATS
-						setstats( i+r*children_no );
-#endif
+
 						return sctp_core_rcv_loop();
 					}
 				}
@@ -1888,6 +1890,8 @@ int main(int argc, char** argv)
 	int tmp_len;
 	int port;
 	int proto;
+	char *ahost = NULL;
+	int aport = 0;
 	char *options;
 	int ret;
 	unsigned int seed;
@@ -1897,6 +1901,25 @@ int main(int argc, char** argv)
 	struct name_lst* n_lst;
 	char *p;
 	struct stat st = {0};
+
+#define KSR_TBUF_SIZE 512
+	char tbuf[KSR_TBUF_SIZE];
+
+	int option_index = 0;
+
+#define KARGOPTVAL	1024
+	static struct option long_options[] = {
+		/* long options with short variant */
+		{"help",  no_argument, 0, 'h'},
+		{"version",  no_argument, 0, 'v'},
+		/* long options without short variant */
+		{"alias",       required_argument, 0, KARGOPTVAL},
+		{"subst",       required_argument, 0, KARGOPTVAL + 1},
+		{"substdef",    required_argument, 0, KARGOPTVAL + 2},
+		{"substdefs",   required_argument, 0, KARGOPTVAL + 3},
+		{"server-id",   required_argument, 0, KARGOPTVAL + 4},
+		{0, 0, 0, 0 }
+	};
 
 	/*init*/
 	time(&up_since);
@@ -1912,11 +1935,7 @@ int main(int argc, char** argv)
 	dprint_init_colors();
 
 	/* command line options */
-	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:"
-#ifdef STATS
-		"s:"
-#endif
-	;
+	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:";
 	/* Handle special command line arguments, that must be treated before
 	 * intializing the various subsystem or before parsing other arguments:
 	 *  - get the startup debug and log_stderr values
@@ -1926,7 +1945,8 @@ int main(int argc, char** argv)
 	 *    later
 	 */
 	opterr = 0;
-	while((c=getopt(argc,argv,options))!=-1) {
+	option_index = 0;
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case 'd':
 					debug_flag = 1;
@@ -2002,9 +2022,10 @@ int main(int argc, char** argv)
 	pp_define_core();
 
 	/* process command line (cfg. file path etc) */
-	optind = 1;  /* reset getopt */
+	optind = 1;  /* reset getopt index */
+	option_index = 0;
 	/* switches required before script processing */
-	while((c=getopt(argc,argv,options))!=-1) {
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case 'M':
 			case 'x':
@@ -2113,23 +2134,71 @@ int main(int argc, char** argv)
 			case 's':
 			case 'Y':
 					break;
+
+			/* long options */
+			case KARGOPTVAL:
+					if(parse_phostport(optarg, &tmp, &tmp_len,
+											&port, &proto)!=0) {
+						fprintf(stderr, "Invalid alias value '%s'\n", optarg);
+						goto error;
+					}
+					if(add_alias(tmp, tmp_len, port, proto)<0) {
+						fprintf(stderr, "Failed to add alias value '%s'\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+1:
+					if(pp_subst_add(optarg)<0) {
+						LM_ERR("failed to add subst expression: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+2:
+					if(pp_substdef_add(optarg, 0)<0) {
+						LM_ERR("failed to add substdef expression: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+3:
+					if(pp_substdef_add(optarg, 1)<0) {
+						LM_ERR("failed to add substdefs expression: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+4:
+					server_id=(int)strtol(optarg, &tmp, 10);
+					if ((tmp==0) || (*tmp)){
+						LM_ERR("bad server_id value: %s\n", optarg);
+						goto error;
+					}
+					break;
+
+			/* special cases */
 			case '?':
 					if (isprint(optopt)) {
-						fprintf(stderr, "Unknown option `-%c'."
+						fprintf(stderr, "Unknown option '-%c'."
 										" Use -h for help.\n", optopt);
 					} else {
-						fprintf(stderr, "Unknown option character `\\x%x'."
+						fprintf(stderr, "Unknown option code '0x%x' (%d)."
 										" Use -h for help.\n",
-							optopt);
+							optopt, option_index);
 					}
 					goto error;
 			case ':':
-					fprintf(stderr, "Option `-%c' requires an argument."
+					if (isprint(optopt)) {
+						fprintf(stderr, "Option '-%c' requires an argument."
 									" Use -h for help.\n",
-						optopt);
+							optopt);
+					} else {
+						fprintf(stderr, "Option code '0x%x' (%d) requires an argument."
+										" Use -h for help.\n",
+							optopt, option_index);
+					}
 					goto error;
+
 			default:
-					abort();
+					fprintf(stderr, "Invalid option code '0x%x'", c);
+					return -1;
 		}
 	}
 	if (shm_mem_size == 0) {
@@ -2158,7 +2227,8 @@ int main(int argc, char** argv)
 		cfg_stream=fopen (cfg_file, "r");
 	}
 	if (cfg_stream==0){
-		fprintf(stderr, "ERROR: loading config file(%s): %s\n", cfg_file,
+		fprintf(stderr, "ERROR: loading config file(%s): %s,"
+				" check file and directory permissions\n", cfg_file,
 				strerror(errno));
 		goto error;
 	}
@@ -2179,9 +2249,9 @@ try_again:
 	}
 	seed+=getpid()+time(0);
 	LM_DBG("seeding PRNG with %u\n", seed);
-	kam_srand(seed);
-	fastrand_seed(kam_rand());
-	srandom(kam_rand()+time(0));
+	fastrand_seed(seed);
+	kam_srand(fastrand());
+	srandom(fastrand()+time(0));
 	LM_DBG("test random numbers %u %lu %u\n", kam_rand(), random(), fastrand());
 
 	/*register builtin  modules*/
@@ -2211,8 +2281,9 @@ try_again:
 		goto error;
 	}
 	/* options with higher priority than cfg file */
-	optind = 1;  /* reset getopt */
-	while((c=getopt(argc,argv,options))!=-1) {
+	optind = 1;  /* reset getopt index */
+	option_index = 0;
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case 'f':
 			case 'c':
@@ -2257,7 +2328,38 @@ try_again:
 				#endif
 					break;
 			case 'l':
-					if ((n_lst=parse_phostport_mh(optarg, &tmp, &tmp_len,
+					p = strrchr(optarg, '/');
+					if(p==NULL) {
+						p = optarg;
+					} else {
+						if(strlen(optarg)>=KSR_TBUF_SIZE-1) {
+							fprintf(stderr, "listen value too long: %s\n",
+									optarg);
+							goto error;
+						}
+						strcpy(tbuf, optarg);
+						p = strrchr(tbuf, '/');
+						if(p==NULL) {
+							fprintf(stderr, "unexpected bug for listen: %s\n",
+									optarg);
+							goto error;
+						}
+						*p = '\0';
+						p++;
+						tmp_len = 0;
+						if(parse_phostport(p, &ahost, &tmp_len, &aport,
+									&proto)<0)
+						{
+							fprintf(stderr, "listen value with invalid advertise: %s\n",
+									optarg);
+							goto error;
+						}
+						if(ahost) {
+							ahost[tmp_len] = '\0';
+						}
+						p = tbuf;
+					}
+					if ((n_lst=parse_phostport_mh(p, &tmp, &tmp_len,
 											&port, &proto))==0){
 						fprintf(stderr, "bad -l address specifier: %s\n"
 											"Check disabled protocols\n",
@@ -2265,9 +2367,10 @@ try_again:
 						goto error;
 					}
 					/* add a new addr. to our address list */
-					if (add_listen_iface(n_lst->name, n_lst->next,  port,
-											proto, n_lst->flags)!=0){
-						fprintf(stderr, "failed to add new listen address\n");
+					if (add_listen_advertise_iface(n_lst->name, n_lst->next,  port,
+											proto, ahost, aport, n_lst->flags)!=0){
+						fprintf(stderr, "failed to add new listen address: %s\n",
+								optarg);
 						free_name_lst(n_lst);
 						goto error;
 					}
@@ -2372,11 +2475,6 @@ try_again:
 						goto error;
 					}
 					break;
-			case 's':
-				#ifdef STATS
-					stat_file=optarg;
-				#endif
-					break;
 			default:
 					break;
 		}
@@ -2470,8 +2568,8 @@ try_again:
 	/* create runtime dir if doesn't exist */
 	if (stat(runtime_dir, &st) == -1) {
 		if(mkdir(runtime_dir, 0700) == -1) {
-			LM_ERR("failed to create runtime dir %s\n", runtime_dir);
-			fprintf(stderr,  "failed to create runtime dir %s\n", runtime_dir);
+			LM_ERR("failed to create runtime dir %s, check directory permissions\n", runtime_dir);
+			fprintf(stderr, "failed to create runtime dir %s, check directory permissions\n", runtime_dir);
 			goto error;
 		}
 		if(sock_uid!=-1 || sock_gid!=-1) {
@@ -2523,10 +2621,8 @@ try_again:
 	 *  Note: shm can now be initialized when parsing the config script, that's
 	 *  why checking for a prior initialization is needed.
 	 * --andrei */
-#ifdef SHM_MEM
 	if (!shm_initialized() && init_shm()<0)
 		goto error;
-#endif /* SHM_MEM */
 	pkg_print_manager();
 	shm_print_manager();
 	if (init_atomic_ops()==-1)
@@ -2702,10 +2798,6 @@ try_again:
 		goto error;
 	};
 	fixup_complete=1;
-
-#ifdef STATS
-	if (init_stats(  dont_fork ? 1 : children_no  )==-1) goto error;
-#endif
 
 	ret=main_loop();
 	if (ret < 0)

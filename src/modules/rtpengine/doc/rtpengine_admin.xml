@@ -480,7 +480,7 @@ modparam("rtpengine", "rtp_inst_pvar", "$avp(RTP_INSTANCE)")
 		<title>Set <varname>hash_table_size</varname> parameter</title>
 <programlisting format="linespecific">
 ...
-modparam("rtpengine", "hash_table_size", "123")
+modparam("rtpengine", "hash_table_size", 123)
 ...
 </programlisting>
 		</example>
@@ -507,7 +507,7 @@ modparam("rtpengine", "hash_table_size", "123")
 		<title>Set <varname>hash_table_tout</varname> parameter</title>
 <programlisting format="linespecific">
 ...
-modparam("rtpengine", "hash_table_tout", "300")
+modparam("rtpengine", "hash_table_tout", 300)
 ...
 </programlisting>
                 </example>
@@ -693,6 +693,28 @@ modparam("rtpengine", "disabled_col", "disabled_column_name")
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "setid_default", 11)
+...
+</programlisting>
+		</example>
+	</section>
+
+
+	<section id="rtpengine.p.media_duration">
+		<title><varname>media_duration</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to be filled in with the length of the
+			media being played back after a call to <quote>play_media</quote>,
+			expressed in milliseconds. It's set to -1 if the length of the media
+			could not be determined.
+		</para>
+		<para>
+			By default, this parameter is not set.
+		</para>
+		<example>
+		<title>Set <varname>media_duration</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "media_duration", "$avp(MEDIA_DURATION)")
 ...
 </programlisting>
 		</example>
@@ -1980,11 +2002,36 @@ modparam("rtpengine", "mos_average_samples_B_pv", "$avp(mos_average_samples_B)")
 		<title>Set <varname>control_cmd_tos</varname> parameter</title>
 <programlisting format="linespecific">
 ...
-modparam("rtpengine", "control_cmd_tos", "144")
+modparam("rtpengine", "control_cmd_tos", 144)
 ...
 </programlisting>
 		</example>
 	</section>
+
+	<section id="rtpengine.p.hash_algo">
+		<title><varname>hash_algo</varname> (integer)</title>
+		<para>
+			Hashing algorithm to be used in node selection algorithm. Now there are 2 possibilities: legacy
+			alogrithm - 0(very basic hash over callid) or SHA1 - 1(apply sha1 over the callid and calculate hash).
+		</para>
+		<para>
+			Default value is 0, legacy algorithm.
+		</para>
+		<para>
+			The values not falling into the range <quote>0-1</quote> .
+		</para>
+		<example>
+		<title>Set <varname>control_cmd_tos</varname> parameter</title>
+<programlisting format="linespecific">
+...
+### use SHA1 instead of legacy algorithm
+modparam("rtpengine", "hash_algo", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+
 
 	</section>
 
@@ -2063,7 +2110,9 @@ rtpengine_offer();
 				<quote>auto</quote> - use the first <quote>Via</quote> header if this is
 				a request, or the second one if this is a reply;
 				<quote>extra</quote> - don't take the value from a header, but instead use
-				the value of the <quote>extra_id_pv</quote> variable.
+				the value of the <quote>extra_id_pv</quote> variable;
+				<quote>next</quote> - use the value of the <quote>Via/branch</quote>
+				tag that Kamailio will generate for the next branch.
 				This can be used to create one media session per branch
 				on the &rtp; proxy. When sending a subsequent <quote>delete</quote> command to
 				the &rtp; proxy, you can then stop just the session for a specific branch when
@@ -2429,6 +2478,34 @@ if (has_body("application/sdp")) {
 		</para>
 		</example>
         </section>
+	<section id="rtpengine.f.rtpengine_info">
+		<title>
+		<function moreinfo="none">rtpengine_info([flags])</function>
+		</title>
+		<para>
+		Send an updated offer to rtpengine. This is meant to be used when processing
+		Tricke ICE &sdp; Fragments that are carried in &sip; INFO messages
+		and are proxied to endpoints that do not support ICE. With a matching
+		content type, the &sdp; fragment is used to update rtpengine's list of ICE
+		candidates. No new &sdp; is returned and so the &sip; INFO message should
+		be consumed after calling this function.
+		</para>
+		<para>
+		While this function supports the same flags as <quote>rtpengine_offer</quote>
+		et al, it is not normally necessary to provide any.
+		</para>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>rtpengine_info</function> usage</title>
+		<programlisting format="linespecific">
+...
+rtpengine_info();
+...
+</programlisting>
+		</example>
+	</section>
 	<section id="rtpengine.f.rtpengine_delete">
 		<title>
 		<function moreinfo="none">rtpengine_delete([flags])</function>
@@ -2483,7 +2560,7 @@ rtpengine_query();
         <function moreinfo="none">rtpengine_manage([flags])</function>
         </title>
 		<para>
-		Manage the RTPProxy session - it combines the functionality of
+		Manage the RTPEngine session - it combines the functionality of
 		rtpengine_offer(), rtpengine_answer() and rtpengine_delete(), detecting
 		internally based on message type and method which one to execute.
 		</para>
@@ -2520,7 +2597,14 @@ rtpengine_query();
 			this function after resuming a suspended transaction (e.g., after
 			t_continue()), because the context of executed route is FAILURE
 			ROUTE (in other words, rtpengine_manage() in the route block of
-			t_continue() does the same as in failure_route).
+			t_continue() does the same as in failure_route; use a branch route
+			to engage rtpengine for a forwarded branch after resuming the
+			transaction).
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			It does nothing if used inside event_route[tm:branch-failure:...]
 			</para>
 		</listitem>
 		<listitem>
@@ -2711,6 +2795,101 @@ block_media("address=192.168.42.42");
 ...
 unblock_media();
 unblock_media("all");
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.f.start_forwarding">
+		<title>
+		<function moreinfo="none">start_forwarding([flags])</function>
+		</title>
+		<para>
+		Controls the PCM forwarding feature of the recording daemon. Unlike the
+		recording feature, PCM forwarding can be done directionally for individual
+		call participants only, therefore this command takes the same flags as
+		the media/DTMF blocking commands above.
+		</para>
+		<para>
+		See <quote>block_dtmf</quote> for a description of the flags that can be used.
+		</para>
+		<example>
+		<title><function>start_forwarding</function> usage</title>
+		<programlisting format="linespecific">
+...
+start_forwarding();
+start_forwarding("directional");
+start_forwarding("address=192.168.42.42");
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.f.stop_forwarding">
+		<title>
+		<function moreinfo="none">stop_forwarding([flags])</function>
+		</title>
+		<para>
+		Analogous to <quote>unblock_dtmf</quote>, but controls the PCM forwarding feature
+		instead of DTMF blocking.
+		</para>
+		<para>
+		See <quote>unblock_dtmf</quote> for a description of the flags that can be used.
+		</para>
+		<example>
+		<title><function>stop_forwarding</function> usage</title>
+		<programlisting format="linespecific">
+...
+stop_forwarding();
+stop_forwarding("all");
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.f.play_media">
+		<title>
+		<function moreinfo="none">play_media([flags])</function>
+		</title>
+		<para>
+		Instructs rtpengine to play a prerecorded announcement to the selected
+		call participant, either from a local file or from a file stored in a
+		database. The participant must be selected using the same flags as are
+		described under the <quote>block_dtmf</quote> function. If none of these
+		flags are given, then the <quote>From</quote> tag from the current &sip;
+		message context is used.
+		</para>
+		<para>
+		If successful, the <quote>media_duration</quote> pseudovariable is filled
+		in with the duration of the media being played, expressed in milliseconds.
+		If the length of the media could not be determined, it's set to -1.
+		</para>
+		<example>
+		<title><function>play_media</function> usage</title>
+		<programlisting format="linespecific">
+...
+play_media("file=/use/share/media/hello.wav");
+play_media("from-tag=tfugklbildfydrtuykgfv db-id=12345");
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.f.stop_media">
+		<title>
+		<function moreinfo="none">stop_media([flags])</function>
+		</title>
+		<para>
+		Stops the playback of media previously started by <quote>play_media</quote>.
+		Media playback is automatically stopped when the end of the media file is reached,
+		so this function is only useful to prematurely stop playback.
+		</para>
+		<example>
+		<title><function>stop_media</function> usage</title>
+		<programlisting format="linespecific">
+...
+stop_media();
+stop_media("from-tag=5yqaeriguhxcikxj");
 ...
 		</programlisting>
 		</example>

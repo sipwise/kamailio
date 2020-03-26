@@ -165,7 +165,7 @@ static int _acc_module_initialized = 0;
 static int acc_fixup(void** param, int param_no);
 static int free_acc_fixup(void** param, int param_no);
 
-
+/* clang-format off */
 static cmd_export_t cmds[] = {
 	{"acc_log_request", (cmd_function)w_acc_log_request, 1,
 		acc_fixup, free_acc_fixup,
@@ -242,14 +242,14 @@ struct module_exports exports= {
 	DEFAULT_DLFLAGS, /* dlopen flags */
 	cmds,            /* exported functions */
 	params,     	 /* exported params */
-        0,          	 /* RPC method exports */
+	0,          	 /* RPC method exports */
 	0,          	 /* exported pseudo-variables */
 	0,          	 /* response function */
 	mod_init,   	 /* initialization module */
 	child_init,  	 /* per-child init function */
 	destroy    	 /* destroy function */
 };
-
+/* clang-format on */
 
 
 /************************** FIXUP functions ****************************/
@@ -268,7 +268,7 @@ static int acc_fixup(void** param, int param_no)
 	if (param_no == 1) {
 		accp = (struct acc_param*)pkg_malloc(sizeof(struct acc_param));
 		if (!accp) {
-			LM_ERR("no more pkg mem\n");
+			PKG_MEM_ERROR;
 			return E_OUT_OF_MEM;
 		}
 		memset( accp, 0, sizeof(struct acc_param));
@@ -374,6 +374,8 @@ static int mod_init( void )
 			LM_ERR("unable to parse acc table name [%.*s]\n",
 					db_table_acc.len, db_table_acc.s);
 			return -1;
+		} else {
+			LM_DBG("acc db table initialized to: %s\n", db_table_acc.s);
 		}
 	}
 	if(db_table_mc.len!=12 || strncmp(db_table_mc.s, "missed_calls", 12)!=0)
@@ -384,6 +386,8 @@ static int mod_init( void )
 			LM_ERR("unable to parse mc table name [%.*s]\n",
 					db_table_mc.len, db_table_mc.s);
 			return -1;
+		} else {
+			LM_DBG("missed calls db table initialized to: %s\n", db_table_mc.s);
 		}
 	}
 
@@ -664,7 +668,7 @@ static int acc_register_engine(acc_engine_t *eng)
 	e = (acc_engine_t*)pkg_malloc(sizeof(acc_engine_t));
 	if(e ==NULL)
 	{
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memcpy(e, eng, sizeof(acc_engine_t));

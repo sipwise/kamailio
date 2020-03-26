@@ -59,9 +59,7 @@
 	<section>
 	<title>Parameters</title>
 	<section id="tmx.p.precheck_trans">
-		<title>
-		<function moreinfo="none">precheck_trans</function>
-		</title>
+		<title><varname>precheck_trans</varname> (int)</title>
 		<para>
 		Enable/disable transaction pre-check via t_precheck_trans()
 		function. If set to 0, the internal structures are not created
@@ -71,7 +69,7 @@
 		Default value is <emphasis>1</emphasis> (enabled).
 		</para>
 		<example>
-		<title><function>precheck_trans</function> usage</title>
+		<title><varname>precheck_trans</varname> (int)</title>
 		<programlisting format="linespecific">
 ...
 modparam("tmx", "precheck_trans", 0)
@@ -432,6 +430,60 @@ route[MYROUTE] {
 </programlisting>
 		</example>
 	</section>
+    <section id="tmx.f.t_drop">
+        <title>
+            <function moreinfo="none">t_drop([rcode])
+            </function>
+        </title>
+        <para>
+        Drops the transaction with response code (500 default).
+        </para>
+        <para>
+        Parameters:.
+        </para>
+        <itemizedlist>
+            <listitem><para>
+                <emphasis>rcode</emphasis> - response code to set in uas status.
+            </para></listitem>
+        </itemizedlist>
+        <para>
+        This function can be used in ANY_ROUTE.
+        </para>
+        <example>
+        <title><function>t_drop</function> usage</title>
+        <programlisting format="linespecific">
+...
+route[MYREQ]
+{
+...
+    if (!t_newtran()) {
+        xlog("L_ERROR", "$ci|log|failed to create transaction\n");
+        drop;
+    }
+
+    t_on_failure("TR_ERROR");
+    t_on_reply("TR_OK");
+    t_relay();
+}
+
+failure_route[TR_ERROR]
+{
+    xlog("L_INFO", "$ci|log|failed $T_reply_code $T_reply_reason\n");
+    t_drop();
+}
+
+onreply_route[TR_OK]
+{
+   xlog("L_INFO", "$ci|log|checking transaction result\n");
+   if(status=~"60[0-9]") {
+      t_drop();
+   }
+...
+}
+...
+</programlisting>
+        </example>
+    </section>
 
 	<section id="tmx.f.t_reuse_branch">
 		<title>

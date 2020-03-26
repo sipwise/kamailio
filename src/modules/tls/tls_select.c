@@ -68,6 +68,7 @@ enum {
 	COMP_URI,         /* URI from subject/alternative */
 	COMP_E,           /* Email address */
 	COMP_IP,          /* IP from subject/alternative */
+	COMP_UID,         /* UserID*/
 	TLSEXT_SN         /* Server name of the peer */
 };
 
@@ -96,8 +97,9 @@ enum {
 	PV_COMP_URI  = 1<<17,        /* URI from subject/alternative */
 	PV_COMP_E    = 1<<18,        /* Email address */
 	PV_COMP_IP   = 1<<19,        /* IP from subject/alternative */
+	PV_COMP_UID  = 1<<20,        /* UserID*/
 
-	PV_TLSEXT_SNI = 1<<20,       /* Peer's server name (TLS extension) */
+	PV_TLSEXT_SNI = 1<<21,       /* Peer's server name (TLS extension) */
 };
 
 
@@ -712,6 +714,7 @@ static int get_comp(str* res, int local, int issuer, int nid, sip_msg_t* msg)
 		case NID_countryName:            elem = "CountryName";             break;
 		case NID_stateOrProvinceName:    elem = "StateOrProvinceName";     break;
 		case NID_localityName:           elem = "LocalityName";            break;
+		case NID_userId:                 elem = "UserID";                  break;
 		default:                         elem = "Unknown";                 break;
 		}
 		DBG("Element %s not found in certificate subject/issuer\n", elem);
@@ -759,6 +762,7 @@ static int sel_comp(str* res, select_t* s, sip_msg_t* msg)
 		case COMP_C:       nid = NID_countryName;            break;
 		case COMP_ST:      nid = NID_stateOrProvinceName;    break;
 		case COMP_L:       nid = NID_localityName;           break;
+		case COMP_UID:     nid = NID_userId;                 break;
 		default:
 			BUG("Bug in sel_comp: %d\n", s->params[s->n - 1].v.i);
 			return -1;
@@ -800,13 +804,14 @@ static int pv_comp(sip_msg_t* msg, pv_param_t* param, pv_value_t* res)
 	}
 
 	switch(ind_local) {
-		case PV_COMP_CN: nid = NID_commonName;             break;
-		case PV_COMP_O:  nid = NID_organizationName;       break;
-		case PV_COMP_OU: nid = NID_organizationalUnitName; break;
-		case PV_COMP_C:  nid = NID_countryName;            break;
-		case PV_COMP_ST: nid = NID_stateOrProvinceName;    break;
-		case PV_COMP_L:  nid = NID_localityName;           break;
-		default:      nid = NID_undef;
+		case PV_COMP_CN:  nid = NID_commonName;             break;
+		case PV_COMP_O:   nid = NID_organizationName;       break;
+		case PV_COMP_OU:  nid = NID_organizationalUnitName; break;
+		case PV_COMP_C:   nid = NID_countryName;            break;
+		case PV_COMP_ST:  nid = NID_stateOrProvinceName;    break;
+		case PV_COMP_L:   nid = NID_localityName;           break;
+		case PV_COMP_UID: nid = NID_userId;                 break;
+		default:          nid = NID_undef;
 	}
 
 	if (get_comp(&res->rs, local, issuer, nid, msg) < 0) {
@@ -1132,6 +1137,10 @@ select_row_t tls_sel[] = {
 	{ sel_name, SEL_PARAM_STR, STR_STATIC_INIT("organizational_unit_name"), sel_comp, DIVERSION | COMP_OU},
 	{ sel_name, SEL_PARAM_STR, STR_STATIC_INIT("unit"),                     sel_comp, DIVERSION | COMP_OU},
 
+	{ sel_name, SEL_PARAM_STR, STR_STATIC_INIT("uid"),               sel_comp, DIVERSION | COMP_UID},
+	{ sel_name, SEL_PARAM_STR, STR_STATIC_INIT("uniqueIdentifier"),  sel_comp, DIVERSION | COMP_UID},
+	{ sel_name, SEL_PARAM_STR, STR_STATIC_INIT("unique_identifier"), sel_comp, DIVERSION | COMP_UID},
+
 	{ NULL, SEL_PARAM_INT, STR_NULL, NULL, 0}
 };
 
@@ -1251,6 +1260,13 @@ pv_export_t tls_pv[] = {
 	{{"tls_my_issuer_unit", sizeof("tls_my_issuer_unit")-1},
 		PVT_OTHER, pv_comp, 0,
 		0, 0, pv_init_iname, PV_CERT_LOCAL | PV_CERT_ISSUER  | PV_COMP_OU },
+	/* unique identifier for peer and local */
+	{{"tls_peer_subject_uid", sizeof("tls_peer_subject_uid")-1},
+		PVT_OTHER, pv_comp, 0,
+		0, 0, pv_init_iname, PV_CERT_PEER | PV_CERT_SUBJECT | PV_COMP_UID },
+	{{"tls_my_subject_uid", sizeof("tls_my_subject_uid")-1},
+		PVT_OTHER, pv_comp, 0,
+		0, 0, pv_init_iname, PV_CERT_LOCAL | PV_CERT_SUBJECT | PV_COMP_UID },
 	/* subject alternative name parameters for peer and local */	
 	{{"tls_peer_san_email", sizeof("tls_peer_san_email")-1},
 		PVT_OTHER, pv_alt, 0,
