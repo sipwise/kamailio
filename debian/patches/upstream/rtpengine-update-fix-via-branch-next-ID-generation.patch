@@ -1,6 +1,18 @@
+From ad3ae0133f321e357cf09f65f2067ed10d9c64a2 Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Tue, 28 Jan 2020 09:13:11 -0500
+Subject: [PATCH] rtpengine: update/fix via-branch=next ID generation
+
+- via-branch=next should not use a hard-coded branch index of zero, but
+instead use the actual branch index from the tm module
+- also adds via-branch=auto-next and via-branch=auto-extra for easier
+processing in scripts
+---
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 9399f94e00..4db1461f0d 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2255,6 +2255,10 @@
+@@ -2268,6 +2268,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
  						ng_flags->via = -1;
  					else if (str_eq(&val, "next"))
  						ng_flags->via = -2;
@@ -11,7 +23,7 @@
  					else
  						goto error;
  					goto next;
-@@ -2350,6 +2354,8 @@
+@@ -2363,6 +2367,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	char md5[MD5_LEN];
  	char branch_buf[MAX_BRANCH_PARAM_LEN];
  	bencode_item_t *result;
@@ -20,7 +32,7 @@
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2440,11 +2446,21 @@
+@@ -2453,11 +2459,21 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	bencode_dictionary_add_str(ng_flags.dict, "call-id", &ng_flags.call_id);
  
  	if (ng_flags.via) {
@@ -44,7 +56,7 @@
  			case 1:
  			case 2:
  				ret = get_via_branch(msg, ng_flags.via, &viabranch);
-@@ -2456,10 +2472,16 @@
+@@ -2469,10 +2485,16 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  			case -2:
  				if (!char_msg_val(msg, md5))
  					break;
@@ -79,3 +91,6 @@
  				This can be used to create one media session per branch
  				on the &rtp; proxy. When sending a subsequent <quote>delete</quote> command to
  				the &rtp; proxy, you can then stop just the session for a specific branch when
+-- 
+2.20.1
+
