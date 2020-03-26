@@ -164,12 +164,12 @@ static int init_blst_callback_lst(struct blst_callbacks_lst*  cb_lst, int max)
 	cb_lst->max_hooks=MAX_BLST_HOOKS;
 	cb_lst->last_idx=0;
 	cb_lst->hooks=pkg_malloc(cb_lst->max_hooks*sizeof(struct blacklist_hook));
-	if (cb_lst->hooks==0)
-		goto error;
+	if (cb_lst->hooks==0) {
+		PKG_MEM_ERROR;
+		return -1;
+	}
 	memset(cb_lst->hooks, 0, cb_lst->max_hooks*sizeof(struct blacklist_hook));
 	return 0;
-error:
-	return -1;
 }
 
 
@@ -429,6 +429,7 @@ int init_dst_blacklist()
 #endif
 	blst_mem_used=shm_malloc(sizeof(*blst_mem_used));
 	if (blst_mem_used==0){
+	        SHM_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -436,6 +437,7 @@ int init_dst_blacklist()
 	dst_blst_hash=shm_malloc(sizeof(struct dst_blst_lst_head) *
 											DST_BLST_HASH_SIZE);
 	if (dst_blst_hash==0){
+	        SHM_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -511,6 +513,7 @@ int init_dst_blacklist_stats(int iproc_num)
 
 	dst_blacklist_stats=shm_malloc(sizeof(*dst_blacklist_stats) * iproc_num);
 	if (dst_blacklist_stats==0){
+	        SHM_MEM_ERROR;
 		return E_OUT_OF_MEM;
 	}
 	memset(dst_blacklist_stats, 0, sizeof(*dst_blacklist_stats) * iproc_num);
@@ -744,6 +747,7 @@ inline static int dst_blacklist_add_ip(unsigned char err_flags,
 			}
 			e=shm_malloc(size);
 			if (e==0){
+			        SHM_MEM_ERROR;
 				UNLOCK_BLST(hash);
 				ret=E_OUT_OF_MEM;
 				goto error;

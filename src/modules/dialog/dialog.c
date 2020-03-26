@@ -103,6 +103,7 @@ static char* profiles_nv_s = NULL;
 str dlg_extra_hdrs = {NULL,0};
 static int db_fetch_rows = 200;
 static int db_skip_load = 0;
+static int dlg_keep_proxy_rr = 0;
 int initial_cbs_inscript = 1;
 int dlg_wait_ack = 1;
 static int dlg_timer_procs = 0;
@@ -322,6 +323,7 @@ static param_export_t mod_params[]={
 	{ "end_timeout",           PARAM_INT, &dlg_end_timeout          },
 	{ "h_id_start",            PARAM_INT, &dlg_h_id_start           },
 	{ "h_id_step",             PARAM_INT, &dlg_h_id_step            },
+	{ "keep_proxy_rr",         INT_PARAM, &dlg_keep_proxy_rr        },
 	{ 0,0,0 }
 };
 
@@ -528,6 +530,11 @@ static int mod_init(void)
 		return -1;
 	}
 
+	if (dlg_keep_proxy_rr < 0 || dlg_keep_proxy_rr > 3) {
+		LM_ERR("invalid value for keep_proxy_rr\n");
+		return -1;
+	}
+
 	if (timeout_spec.s) {
 		if ( pv_parse_spec(&timeout_spec, &timeout_avp)==0
 				&& (timeout_avp.type!=PVT_AVP)){
@@ -655,7 +662,7 @@ static int mod_init(void)
 
 	/* init handlers */
 	init_dlg_handlers( rr_param, dlg_flag,
-		timeout_spec.s?&timeout_avp:0, default_timeout, seq_match_mode);
+		timeout_spec.s?&timeout_avp:0, default_timeout, seq_match_mode, dlg_keep_proxy_rr);
 
 	/* init timer */
 	if (init_dlg_timer(dlg_ontimeout)!=0) {
@@ -1201,6 +1208,14 @@ static int w_dlg_bridge(struct sip_msg *msg, char *from, char *to, char *op)
 	if(dlg_bridge(&sf, &st, &so, NULL)!=0)
 		return -1;
 	return 1;
+}
+
+static int ki_dlg_bridge(sip_msg_t *msg, str *sfrom, str *sto, str *soproxy)
+{
+	if(dlg_bridge(sfrom, sto, soproxy, NULL)!=0)
+		return -1;
+	return 1;
+
 }
 
 /**
@@ -1856,6 +1871,111 @@ static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2)
 /**
  *
  */
+static int ki_dlg_var_sets(sip_msg_t *msg, str *name, str *val)
+{
+	dlg_cell_t *dlg;
+	int ret;
+
+	dlg = dlg_get_msg_dialog(msg);
+	ret = set_dlg_variable_unsafe(dlg, name, val);
+	if(dlg) {
+		dlg_release(dlg);
+	}
+
+	return (ret==0)?1:ret;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t _sr_kemi_dialog_xval = {0};
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_dlg_var_get_mode(sip_msg_t *msg, str *name, int rmode)
+{
+	dlg_cell_t *dlg;
+	str *pval;
+
+	memset(&_sr_kemi_dialog_xval, 0, sizeof(sr_kemi_xval_t));
+
+	dlg = dlg_get_msg_dialog(msg);
+	if(dlg==NULL) {
+		sr_kemi_xval_null(&_sr_kemi_dialog_xval, rmode);
+		return &_sr_kemi_dialog_xval;
+	}
+	pval = get_dlg_variable(dlg, name);
+	if(pval==NULL || pval->s==NULL) {
+		sr_kemi_xval_null(&_sr_kemi_dialog_xval, rmode);
+		goto done;
+	}
+
+	_sr_kemi_dialog_xval.vtype = SR_KEMIP_STR;
+	_sr_kemi_dialog_xval.v.s = *pval;
+
+done:
+	dlg_release(dlg);
+	return &_sr_kemi_dialog_xval;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_dlg_var_get(sip_msg_t *msg, str *name)
+{
+	return ki_dlg_var_get_mode(msg, name, SR_KEMI_XVAL_NULL_NONE);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_dlg_var_gete(sip_msg_t *msg, str *name)
+{
+	return ki_dlg_var_get_mode(msg, name, SR_KEMI_XVAL_NULL_EMPTY);
+}
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_dlg_var_getw(sip_msg_t *msg, str *name)
+{
+	return ki_dlg_var_get_mode(msg, name, SR_KEMI_XVAL_NULL_PRINT);
+}
+
+/**
+ *
+ */
+static int ki_dlg_var_rm(sip_msg_t *msg, str *name)
+{
+	dlg_cell_t *dlg;
+
+	dlg = dlg_get_msg_dialog(msg);
+	set_dlg_variable_unsafe(dlg, name, NULL);
+	return 1;
+}
+
+/**
+ *
+ */
+static int ki_dlg_var_is_null(sip_msg_t *msg, str *name)
+{
+	dlg_cell_t *dlg;
+	str *pval;
+
+	dlg = dlg_get_msg_dialog(msg);
+	if(dlg==NULL) {
+		return 1;
+	}
+	pval = get_dlg_variable(dlg, name);
+	if(pval==NULL || pval->s==NULL) {
+		return 1;
+	}
+	return -1;
+}
+
+/**
+ *
+ */
 /* clang-format off */
 static sr_kemi_t sr_kemi_dialog_exports[] = {
 	{ str_init("dialog"), str_init("dlg_manage"),
@@ -1956,6 +2076,41 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
 	{ str_init("dialog"), str_init("dlg_db_load_extra"),
 		SR_KEMIP_INT, ki_dlg_db_load_extra,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("var_sets"),
+		SR_KEMIP_INT, ki_dlg_var_sets,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("var_get"),
+		SR_KEMIP_XVAL, ki_dlg_var_get,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("var_gete"),
+		SR_KEMIP_XVAL, ki_dlg_var_gete,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("var_getw"),
+		SR_KEMIP_XVAL, ki_dlg_var_getw,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("var_rm"),
+		SR_KEMIP_INT, ki_dlg_var_rm,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("var_is_null"),
+		SR_KEMIP_INT, ki_dlg_var_is_null,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("dialog"), str_init("dlg_bridge"),
+		SR_KEMIP_INT, ki_dlg_bridge,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 
@@ -2195,6 +2350,12 @@ static const char *rpc_print_dlgs_doc[2] = {
 static const char *rpc_print_dlgs_ctx_doc[2] = {
 	"Print all dialogs with associated context", 0
 };
+static const char *rpc_dlg_list_match_doc[2] = {
+	"Print matching dialogs", 0
+};
+static const char *rpc_dlg_list_match_ctx_doc[2] = {
+	"Print matching dialogs with associated context", 0
+};
 static const char *rpc_print_dlg_doc[2] = {
 	"Print dialog based on callid and optionally fromtag", 0
 };
@@ -2214,8 +2375,11 @@ static const char *rpc_profile_print_dlgs_doc[2] = {
 	"Lists all the dialogs belonging to a profile", 0
 };
 static const char *rpc_dlg_bridge_doc[2] = {
-	"Bridge two SIP addresses in a call using INVITE(hold)-REFER-BYE mechanism:\
- to, from, [outbound SIP proxy]", 0
+	"Bridge two SIP addresses in a call using INVITE(hold)-REFER-BYE mechanism:"
+		" to, from, [outbound SIP proxy]", 0
+};
+static const char *rpc_dlg_is_alive_doc[2] = {
+	"Check whether dialog is alive or not", 0
 };
 
 
@@ -2271,6 +2435,40 @@ static void rpc_dlg_terminate_dlg(rpc_t *rpc,void *c){
     }
 }
 
+static void rpc_dlg_is_alive(rpc_t *rpc, void *c)
+{
+	str callid = {NULL, 0};
+	str ftag = {NULL, 0};
+	str ttag = {NULL, 0};
+
+	dlg_cell_t *dlg = NULL;
+	unsigned int dir = 0;
+	unsigned int state = 0;
+
+	if (rpc->scan(c, ".S.S.S", &callid, &ftag, &ttag) < 3) {
+		LM_DBG("Unable to read expected parameters\n");
+		rpc->fault(c, 400, "Too few parameters (required callid, from-tag, to-tag)");
+		return;
+	}
+
+	dlg = get_dlg(&callid, &ftag, &ttag, &dir);
+
+	if (dlg == NULL) {
+		LM_DBG("Couldnt find dialog with callid: '%.*s'\n", callid.len, callid.s);
+		rpc->fault(c, 404, "Dialog not found");
+		return;
+	}
+	state = dlg->state;
+    dlg_release(dlg);
+	if (state != DLG_STATE_CONFIRMED) {
+		LM_DBG("Dialog with Call-ID '%.*s' is in state: %d (confirmed: %d)\n",
+				callid.len, callid.s, state, DLG_STATE_CONFIRMED);
+		rpc->fault(c, 500, "Dialog not in confirmed state");
+		return;
+	} else {
+		rpc->add(c, "s", "Alive");
+	}
+}
 
 static void rpc_end_dlg_entry_id(rpc_t *rpc, void *c) {
 	unsigned int h_entry, h_id;
@@ -2416,9 +2614,165 @@ static void rpc_dlg_stats_active(rpc_t *rpc, void *c)
 		"all", dlg_starting + dlg_connecting + dlg_answering + dlg_ongoing);
 }
 
+/*!
+ * \brief Helper function that outputs matching dialogs via the RPC interface
+ *
+ * \param rpc RPC node that should be filled
+ * \param c RPC void pointer
+ * \param with_context if 1 then the dialog context will be also printed
+ */
+static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
+{
+	dlg_cell_t *dlg = NULL;
+	int i = 0;
+	str mkey = {NULL, 0};
+	str mop = {NULL, 0};
+	str mval = {NULL, 0};
+	str sval = {NULL, 0};
+	int n = 0;
+	int m = 0;
+	int vkey = 0;
+	int vop = 0;
+	int matched = 0;
+	regex_t mre;
+	regmatch_t pmatch;
+
+	i = rpc->scan(c, "SSS", &mkey, &mop, &mval);
+	if (i < 3) {
+		LM_ERR("unable to read required parameters (%d)\n", i);
+		rpc->fault(c, 500, "Invalid parameters");
+		return;
+	}
+	if(mkey.s==NULL || mkey.len<=0 || mop.s==NULL || mop.len<=0
+			|| mval.s==NULL || mval.len<=0) {
+		LM_ERR("invalid parameters (%d)\n", i);
+		rpc->fault(c, 500, "Invalid parameters");
+		return;
+	}
+	if(mkey.len==4 && strncmp(mkey.s, "ruri", mkey.len)==0) {
+		vkey = 0;
+	} else if(mkey.len==4 && strncmp(mkey.s, "furi", mkey.len)==0) {
+		vkey = 1;
+	} else if(mkey.len==4 && strncmp(mkey.s, "turi", mkey.len)==0) {
+		vkey = 2;
+	} else if(mkey.len==5 && strncmp(mkey.s, "callid", mkey.len)==0) {
+		vkey = 3;
+	} else {
+		LM_ERR("invalid key %.*s\n", mkey.len, mkey.s);
+		rpc->fault(c, 500, "Invalid matching key parameter");
+		return;
+	}
+	if(mop.len!=2) {
+		LM_ERR("invalid matching operator %.*s\n", mop.len, mop.s);
+		rpc->fault(c, 500, "Invalid matching operator parameter");
+		return;
+
+	}
+	if(strncmp(mop.s, "eq", 2)==0) {
+		vop = 0;
+	} else if(strncmp(mop.s, "re", 2)==0) {
+		vop = 1;
+		memset(&mre, 0, sizeof(regex_t));
+		if (regcomp(&mre, mval.s, REG_EXTENDED|REG_ICASE|REG_NEWLINE)!=0) {
+			LM_ERR("failed to compile regex: %.*s\n", mval.len, mval.s);
+			rpc->fault(c, 500, "Invalid matching value parameter");
+			return;
+		}
+	} else if(strncmp(mop.s, "sw", 2)==0) {
+		vop = 2;
+	} else {
+		LM_ERR("invalid matching operator %.*s\n", mop.len, mop.s);
+		rpc->fault(c, 500, "Invalid matching operator parameter");
+		return;
+	}
+	if(rpc->scan(c, "*d", &n)<1) {
+		n = 0;
+	}
+
+	for(i=0; i<d_table->size; i++) {
+		dlg_lock(d_table, &(d_table->entries[i]));
+		for(dlg=d_table->entries[i].first; dlg!=NULL; dlg=dlg->next) {
+			matched = 0;
+			switch(vkey) {
+				case 0:
+					sval = dlg->req_uri;
+				break;
+				case 1:
+					sval = dlg->from_uri;
+				break;
+				case 2:
+					sval = dlg->to_uri;
+				break;
+				case 3:
+					sval = dlg->callid;
+				break;
+			}
+			switch(vop) {
+				case 0:
+					/* string comparison */
+					if(mval.len==sval.len
+							&& strncmp(mval.s, sval.s, mval.len)==0) {
+						matched = 1;
+					}
+				break;
+				case 1:
+					/* regexp matching */
+					if(regexec(&mre, sval.s, 1, &pmatch, 0)==0) {
+						matched = 1;
+					}
+				break;
+				case 2:
+					/* starts with */
+					if(mval.len<=sval.len
+							&& strncmp(mval.s, sval.s, mval.len)==0) {
+						matched = 1;
+					}
+				break;
+			}
+			if (matched==1) {
+				m++;
+				internal_rpc_print_dlg(rpc, c, dlg, with_context);
+				if(n>0 && m==n) {
+					break;
+				}
+			}
+		}
+		dlg_unlock(d_table, &(d_table->entries[i]));
+		if(n>0 && m==n) {
+			break;
+		}
+	}
+	if(vop == 1) {
+		regfree(&mre);
+	}
+
+	if(m==0) {
+		rpc->fault(c, 404, "Not found");
+		return;
+	}
+}
+
+/*!
+ * \brief Print matching dialogs
+ */
+static void rpc_dlg_list_match(rpc_t *rpc, void *c)
+{
+	rpc_dlg_list_match_ex(rpc, c, 0);
+}
+
+/*!
+ * \brief Print matching dialogs wih context
+ */
+static void rpc_dlg_list_match_ctx(rpc_t *rpc, void *c)
+{
+	rpc_dlg_list_match_ex(rpc, c, 1);
+}
+
 static rpc_export_t rpc_methods[] = {
 	{"dlg.list", rpc_print_dlgs, rpc_print_dlgs_doc, RET_ARRAY},
 	{"dlg.list_ctx", rpc_print_dlgs_ctx, rpc_print_dlgs_ctx_doc, RET_ARRAY},
+	{"dlg.list_match", rpc_dlg_list_match, rpc_dlg_list_match_doc, RET_ARRAY},
+	{"dlg.list_match_ctx", rpc_dlg_list_match_ctx, rpc_dlg_list_match_ctx_doc, RET_ARRAY},
 	{"dlg.dlg_list", rpc_print_dlg, rpc_print_dlg_doc, 0},
 	{"dlg.dlg_list_ctx", rpc_print_dlg_ctx, rpc_print_dlg_ctx_doc, 0},
 	{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
@@ -2427,5 +2781,6 @@ static rpc_export_t rpc_methods[] = {
 	{"dlg.bridge_dlg", rpc_dlg_bridge, rpc_dlg_bridge_doc, 0},
 	{"dlg.terminate_dlg", rpc_dlg_terminate_dlg, rpc_dlg_terminate_dlg_doc, 0},
 	{"dlg.stats_active", rpc_dlg_stats_active, rpc_dlg_stats_active_doc, 0},
+	{"dlg.is_alive",  rpc_dlg_is_alive, rpc_dlg_is_alive_doc, 0},
 	{0, 0, 0, 0}
 };

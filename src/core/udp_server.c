@@ -49,6 +49,7 @@
 #include "receive.h"
 #include "mem/mem.h"
 #include "ip_addr.h"
+#include "socket_info.h"
 #include "cfg/cfg_struct.h"
 #include "events.h"
 #include "stun.h"
@@ -283,7 +284,7 @@ int udp_init(struct socket_info* sock_info)
 /*
 	addr=(union sockaddr_union*)pkg_malloc(sizeof(union sockaddr_union));
 	if (addr==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 */
@@ -318,6 +319,11 @@ int udp_init(struct socket_info* sock_info)
 					(void*)&optval, sizeof(optval)) ==-1) {
 			LM_WARN("setsockopt v6 tos: %s\n", strerror(errno));
 			/* continue since this is not critical */
+		}
+		if(sr_bind_ipv6_link_local!=0) {
+			LM_INFO("setting scope of %s\n", sock_info->address_str.s);
+			addr->sin6.sin6_scope_id =
+					ipv6_get_netif_scope(sock_info->address_str.s);
 		}
 	}
 
@@ -397,8 +403,9 @@ int udp_init(struct socket_info* sock_info)
 				(unsigned)sockaddru_len(*addr),
 				sock_info->address_str.s,
 				strerror(errno));
-		if (addr->s.sa_family==AF_INET6)
-			LM_ERR("might be caused by using a link local address, try site local or global\n");
+		if (addr->s.sa_family==AF_INET6) {
+			LM_ERR("might be caused by using a link local address, is 'bind_ipv6_link_local' set?\n");
+		}
 		goto error;
 	}
 
@@ -435,7 +442,7 @@ int udp_rcv_loop()
 
 	from=(union sockaddr_union*) pkg_malloc(sizeof(union sockaddr_union));
 	if (from==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset(from, 0 , sizeof(union sockaddr_union));
@@ -452,7 +459,7 @@ int udp_rcv_loop()
 #ifdef DYN_BUF
 		buf=pkg_malloc(BUF_SIZE+1);
 		if (buf==0){
-			LM_ERR("could not allocate receive buffer\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 #endif

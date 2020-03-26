@@ -239,6 +239,7 @@ static void tcpops_tcp_closed_run_route(tcp_closed_event_info_t *tev)
 	str *evname;
 
 	if(tcpops_event_callback.len > 0) {
+		rt = -1;
 		keng = sr_kemi_eng_get();
 		if(keng == NULL) {
 			LM_DBG("even callback set, but no kemi engine\n");
@@ -261,7 +262,11 @@ static void tcpops_tcp_closed_run_route(tcp_closed_event_info_t *tev)
 	set_route_type(EVENT_ROUTE);
 	init_run_actions_ctx(&ctx);
 	if(keng == NULL) {
-		run_top_route(event_rt.rlist[rt], fmsg, 0);
+		if(rt>=0) {
+			run_top_route(event_rt.rlist[rt], fmsg, 0);
+		} else {
+			LM_DBG("no event route block to execute\n");
+		}
 	} else {
 		if(tev->reason==TCP_CLOSED_TIMEOUT) {
 			evname = &tcpops_evrt_timeout;
@@ -270,7 +275,12 @@ static void tcpops_tcp_closed_run_route(tcp_closed_event_info_t *tev)
 		} else {
 			evname = &tcpops_evrt_closed;
 		}
-		sr_kemi_route(keng, fmsg, EVENT_ROUTE, &tcpops_event_callback, evname);
+		if(sr_kemi_route(keng, fmsg, EVENT_ROUTE, &tcpops_event_callback,
+					evname)<0) {
+			LM_ERR("error running event route kemi callback [%.*s - %.*s]\n",
+						tcpops_event_callback.len, tcpops_event_callback.s,
+						evname->len, evname->s);
+		}
 	}
 	set_route_type(backup_rt);
 }

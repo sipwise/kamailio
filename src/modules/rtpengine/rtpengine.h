@@ -42,6 +42,12 @@ enum rtpe_operation {
         OP_UNBLOCK_DTMF,
         OP_BLOCK_MEDIA,
         OP_UNBLOCK_MEDIA,
+        OP_START_FORWARDING,
+        OP_STOP_FORWARDING,
+        OP_PLAY_MEDIA,
+        OP_STOP_MEDIA,
+
+        OP_ANY,
 };
 
 struct rtpp_node {
@@ -53,8 +59,6 @@ struct rtpp_node {
 	unsigned int		rn_weight;		/* for load balancing */
 	unsigned int		rn_displayed;		/* for delete at db reload */
 	unsigned int		rn_recheck_ticks;
-	int			rn_rep_supported;
-	int			rn_ptl_supported;
 	struct rtpp_node	*rn_next;
 };
 
@@ -97,5 +101,6 @@ extern str rtpp_url_col;
 extern str rtpp_weight_col;
 extern str rtpp_disabled_col;
 
+enum hash_algo_t { RTP_HASH_CALLID, RTP_HASH_SHA1_CALLID};
 
 #endif

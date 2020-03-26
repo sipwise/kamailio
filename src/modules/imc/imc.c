@@ -56,7 +56,7 @@
 MODULE_VERSION
 
 /** header variables */
-str imc_hdr_ctype = str_init("Content-Type: text/plain\r\n");
+str imc_hdrs = str_init("Content-Type: text/plain\r\nSupported: kamailio/imc\r\n");
 char hdr_buf[1024];
 str all_hdrs;
 
@@ -81,6 +81,8 @@ int imc_hash_size = 4;
 str imc_cmd_start_str = str_init(IMC_CMD_START_STR);
 char imc_cmd_start_char;
 str extra_hdrs = {NULL, 0};
+int imc_create_on_join = 1;
+int imc_check_on_create = 0;
 
 /** module functions */
 static int mod_init(void);
@@ -112,6 +114,8 @@ static param_export_t params[]={
 	{"members_table",		PARAM_STR, &members_table},
 	{"outbound_proxy",		PARAM_STR, &outbound_proxy},
 	{"extra_hdrs",        PARAM_STR, &extra_hdrs},
+	{"create_on_join", INT_PARAM, &imc_create_on_join},
+	{"check_on_create", INT_PARAM, &imc_check_on_create},
 	{0,0,0}
 };
 
@@ -250,8 +254,8 @@ int add_from_db(void)
 			flag = m_row_vals[2].val.int_val;
 
 			LM_DBG("adding memeber: [name]=%.*s [domain]=%.*s"
-					" in [room]= %.*s\n",name.len, name.s, domain.len,domain.s,
-					room->uri.len, room->uri.s);
+					" in [room]= %.*s\n", STR_FMT(&name), STR_FMT(&domain),
+					STR_FMT(&room->uri));
 
 			member = imc_add_member(room, &name, &domain, flag);
 			if(member == NULL)
@@ -350,17 +354,17 @@ static int mod_init(void)
 	}
 
 	if (extra_hdrs.s) {
-		if (extra_hdrs.len + imc_hdr_ctype.len > 1024) {
+		if (extra_hdrs.len + imc_hdrs.len > 1024) {
 			LM_ERR("extra_hdrs too long\n");
 			return -1;
 		}
 		all_hdrs.s = &(hdr_buf[0]);
-		memcpy(all_hdrs.s, imc_hdr_ctype.s, imc_hdr_ctype.len);
-		memcpy(all_hdrs.s + imc_hdr_ctype.len, extra_hdrs.s,
+		memcpy(all_hdrs.s, imc_hdrs.s, imc_hdrs.len);
+		memcpy(all_hdrs.s + imc_hdrs.len, extra_hdrs.s,
 				extra_hdrs.len);
-		all_hdrs.len = extra_hdrs.len + imc_hdr_ctype.len;
+		all_hdrs.len = extra_hdrs.len + imc_hdrs.len;
 	} else {
-		all_hdrs = imc_hdr_ctype;
+		all_hdrs = imc_hdrs;
 	}
 
 	/*  binding to mysql module */
@@ -423,12 +427,12 @@ static int child_init(int rank)
 	{
 		if (imc_dbf.use_table(imc_db, &rooms_table) < 0)
 		{
-			LM_ERR("child %d: Error in use_table '%.*s'\n", rank, rooms_table.len, rooms_table.s);
+			LM_ERR("child %d: Error in use_table '%.*s'\n", rank, STR_FMT(&rooms_table));
 			return -1;
 		}
 		if (imc_dbf.use_table(imc_db, &members_table) < 0)
 		{
-			LM_ERR("child %d: Error in use_table '%.*s'\n", rank, members_table.len, members_table.s);
+			LM_ERR("child %d: Error in use_table '%.*s'\n", rank, STR_FMT(&members_table));
 			return -1;
 		}
 
@@ -443,8 +447,7 @@ static int ki_imc_manager(struct sip_msg* msg)
 {
 	imc_cmd_t cmd;
 	str body;
-	struct sip_uri from_uri, *pto_uri=NULL, *pfrom_uri=NULL;
-	struct to_body *pfrom;
+	struct imc_uri src, dst;
 	int ret = -1;
 
 	body.s = get_body( msg );
@@ -468,25 +471,24 @@ static int ki_imc_manager(struct sip_msg* msg)
 		goto error;
 	}
 
+	dst.uri = *GET_RURI(msg);
 	if(parse_sip_msg_uri(msg)<0)
 	{
 		LM_ERR("failed to parse r-uri\n");
 		goto error;
 	}
-
-	pto_uri=&msg->parsed_uri;
+	dst.parsed = msg->parsed_uri;
 
 	if(parse_from_header(msg)<0)
 	{
-		LM_ERR("failed to parse  From header\n");
+		LM_ERR("failed to parse From header\n");
 		goto error;
 	}
-	pfrom = (struct to_body*)msg->from->parsed;
-	if(parse_uri(pfrom->uri.s, pfrom->uri.len, &from_uri)<0){
+	src.uri = ((struct to_body*)msg->from->parsed)->uri;
+	if (parse_uri(src.uri.s, src.uri.len, &src.parsed)<0){
 		LM_ERR("failed to parse From URI\n");
 		goto error;
 	}
-	pfrom_uri=&from_uri;
 
 	if(body.s[0]== imc_cmd_start_char)
 	{
@@ -501,7 +503,7 @@ static int ki_imc_manager(struct sip_msg* msg)
 		switch(cmd.type)
 		{
 		case IMC_CMDID_CREATE:
-			if(imc_handle_create(msg, &cmd, pfrom_uri, pto_uri)<0)
+			if(imc_handle_create(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'create'\n");
 				ret = -30;
@@ -509,7 +511,7 @@ static int ki_imc_manager(struct sip_msg* msg)
 			}
 		break;
 		case IMC_CMDID_JOIN:
-			if(imc_handle_join(msg, &cmd, pfrom_uri, pto_uri)<0)
+			if(imc_handle_join(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'join'\n");
 				ret = -40;
@@ -517,55 +519,71 @@ static int ki_imc_manager(struct sip_msg* msg)
 			}
 		break;
 		case IMC_CMDID_INVITE:
-			if(imc_handle_invite(msg, &cmd, pfrom_uri, pto_uri)<0)
+			if(imc_handle_invite(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'invite'\n");
 				ret = -50;
 				goto error;
 			}
 		break;
+		case IMC_CMDID_ADD:
+			if(imc_handle_add(msg, &cmd, &src, &dst)<0)
+			{
+				LM_ERR("failed to handle 'add'\n");
+				ret = -50;
+				goto error;
+			}
+		break;
 		case IMC_CMDID_ACCEPT:
-			if(imc_handle_accept(msg, &cmd, pfrom_uri, pto_uri)<0)
+			if(imc_handle_accept(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'accept'\n");
 				ret = -60;
 				goto error;
 			}
 		break;
-		case IMC_CMDID_DENY:
-			if(imc_handle_deny(msg, &cmd, pfrom_uri, pto_uri)<0)
+		case IMC_CMDID_REJECT:
+			if(imc_handle_reject(msg, &cmd, &src, &dst)<0)
 			{
-				LM_ERR("failed to handle 'deny'\n");
+				LM_ERR("failed to handle 'reject'\n");
 				ret = -70;
 				goto error;
 			}
 		break;
 		case IMC_CMDID_REMOVE:
-			if(imc_handle_remove(msg, &cmd, pfrom_uri, pto_uri)<0)
+			if(imc_handle_remove(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'remove'\n");
 				ret = -80;
 				goto error;
 			}
 		break;
-		case IMC_CMDID_EXIT:
-			if(imc_handle_exit(msg, &cmd, pfrom_uri, pto_uri)<0)
+		case IMC_CMDID_LEAVE:
+			if(imc_handle_leave(msg, &cmd, &src, &dst)<0)
 			{
-				LM_ERR("failed to handle 'exit'\n");
+				LM_ERR("failed to handle 'leave'\n");
 				ret = -90;
 				goto error;
 			}
 		break;
-		case IMC_CMDID_LIST:
-			if(imc_handle_list(msg, &cmd, pfrom_uri, pto_uri)<0)
+		case IMC_CMDID_MEMBERS:
+			if(imc_handle_members(msg, &cmd, &src, &dst)<0)
 			{
-				LM_ERR("failed to handle 'list'\n");
+				LM_ERR("failed to handle 'members'\n");
+				ret = -100;
+				goto error;
+			}
+		break;
+		case IMC_CMDID_ROOMS:
+			if(imc_handle_rooms(msg, &cmd, &src, &dst)<0)
+			{
+				LM_ERR("failed to handle 'rooms'\n");
 				ret = -100;
 				goto error;
 			}
 		break;
 		case IMC_CMDID_DESTROY:
-			if(imc_handle_destroy(msg, &cmd, pfrom_uri, pto_uri)<0)
+			if(imc_handle_destroy(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'destroy'\n");
 				ret = -110;
@@ -573,8 +591,7 @@ static int ki_imc_manager(struct sip_msg* msg)
 			}
 		break;
 		case IMC_CMDID_HELP:
-			if(imc_handle_help(msg, &cmd, &pfrom->uri,
-			(msg->new_uri.s)?&msg->new_uri:&msg->first_line.u.request.uri)<0)
+			if(imc_handle_help(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'help'\n");
 				ret = -120;
@@ -582,8 +599,7 @@ static int ki_imc_manager(struct sip_msg* msg)
 			}
 		break;
 		default:
-			if(imc_handle_unknown(msg, &cmd, &pfrom->uri,
-			(msg->new_uri.s)?&msg->new_uri:&msg->first_line.u.request.uri)<0)
+			if(imc_handle_unknown(msg, &cmd, &src, &dst)<0)
 			{
 				LM_ERR("failed to handle 'unknown'\n");
 				ret = -130;
@@ -594,7 +610,7 @@ static int ki_imc_manager(struct sip_msg* msg)
 		goto done;
 	}
 
-	if(imc_handle_message(msg, &body, pfrom_uri, pto_uri)<0)
+	if(imc_handle_message(msg, &body, &src, &dst)<0)
 	{
 		LM_ERR("failed to handle 'message'\n");
 		ret = -200;

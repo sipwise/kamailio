@@ -33,7 +33,7 @@ Julien Chavanton
 
               3.1. acc_flag (integer)
               3.2. acc_missed_flag (integer)
-              3.3. acc_extra (integer)
+              3.3. acc_extra (string)
               3.4. acc_time_mode (integer)
               3.5. acc_time_format (str)
               3.6. output_mqueue (integer)
@@ -67,7 +67,7 @@ Chapter 1. Admin Guide
 
         3.1. acc_flag (integer)
         3.2. acc_missed_flag (integer)
-        3.3. acc_extra (integer)
+        3.3. acc_extra (string)
         3.4. acc_time_mode (integer)
         3.5. acc_time_format (str)
         3.6. output_mqueue (integer)
@@ -108,7 +108,7 @@ Chapter 1. Admin Guide
 
    3.1. acc_flag (integer)
    3.2. acc_missed_flag (integer)
-   3.3. acc_extra (integer)
+   3.3. acc_extra (string)
    3.4. acc_time_mode (integer)
    3.5. acc_time_format (str)
    3.6. output_mqueue (integer)
@@ -140,7 +140,7 @@ modparam("acc_json", "acc_flag", 2)
 modparam("acc_json", "acc_missed_flag", 3)
 ...
 
-3.3. acc_extra (integer)
+3.3. acc_extra (string)
 
    Extra values to be added to the json dictionary.
 
@@ -187,7 +187,9 @@ modparam("acc_json", "acc_time_format", "%Y/%m/%d %H:%M:%S")
    in the specified mqueue. Using a rtimer module exec you can access the
    queue and process them.
 
-   Default value is not-set mqueue will not be required
+   You can also fetch the acc events using mqueue.fetch over JSON-RPC.
+
+   Default value is not-set mqueue will not be required.
 
    Example 1.6. output_mqueue usage example
 ...
@@ -202,17 +204,22 @@ modparam("rtimer", "exec", "timer=nsqt;route=RUN_CDR_PUBLISH")
 modparam("http_client", "keep_connections", 1)
 modparam("http_client", "httpcon", "nsqd=>http://localhost:4151/pub?topic=acc")
 
-route[RUN_CDR_PUBLISH] {
+route[RUN_ACC_PUBLISH] {
    $var(count) = 0;
    while (mq_fetch("acc_events")) {
       $var(q_size) = mq_size("acc_events");
       $var(count) = $var(count) + 1;
-      xinfo("[RUN_CDR_PUBLISH][$var(q_size)][$var(count)][$mqk(acc_events)][$mqv
+      xinfo("[RUN_ACC_PUBLISH][$var(q_size)][$var(count)][$mqk(acc_events)][$mqv
 (acc_events)]\n");
-      $var(res) = http_connect("nsqd", "", "application/json", $mqv(acc_events),
- "$var(nsq_res)");
-      if ($var(res) != "200") {
+      $var(res) = http_connect_raw("nsqd", "", "application/json", $mqv(acc_even
+ts), "$var(nsq_res)");
+      if ($var(res) < 0) {
+         xerr("[RUN_ACC_PUBLISH][$var(res)] http_connect_raw: timeout or error !
+\n");
          mq_add("acc_events", "acc_key", "$mqv(acc_events)");
+      } else if ($var(res) < 200 || $var(res) > 299) {
+         xerr("[RUN_ACC_PUBLISH][$var(res)] http unexpected response code !\n");
+         mq_add("acc_dead_letter_queue", "acc_key", "$mqv(acc_events)");
          return;
       }
    }

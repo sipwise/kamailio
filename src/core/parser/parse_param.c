@@ -173,6 +173,14 @@ static inline void parse_contact_class(param_hooks_t *_h, param_t *_p)
 				_h->contact.ob = _p;
 			}
 			break;
+		case 'f':
+		case 'F':
+			if ((_p->name.len == 5) &&
+				(!strncasecmp(_p->name.s + 1, "lags", 4))) {
+				_p->type = P_FLAGS;
+				_h->contact.flags = _p;
+			}
+			break;
 	}
 }
 
@@ -584,7 +592,7 @@ int parse_params2(
 	while(1) {
 		t = (param_t *)pkg_malloc(sizeof(param_t));
 		if(t == 0) {
-			LM_ERR("No memory left\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 
@@ -672,6 +680,9 @@ static inline void print_param(FILE *_o, param_t *_p)
 			break;
 		case P_METHODS:
 			type = "P_METHODS";
+			break;
+		case P_FLAGS:
+			type = "P_FLAGS";
 			break;
 		case P_TRANSPORT:
 			type = "P_TRANSPORT";
@@ -768,7 +779,11 @@ static inline int do_duplicate_params(param_t **_n, param_t *_p, int _shm)
 			t = (param_t *)pkg_malloc(sizeof(param_t));
 		}
 		if(!t) {
-			LM_ERR("No more memory (%d)\n", _shm);
+			if (_shm) {
+				SHM_MEM_ERROR;
+			} else {
+				PKG_MEM_ERROR;
+			}
 			goto err;
 		}
 		memcpy(t, ptr, sizeof(param_t));

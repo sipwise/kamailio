@@ -854,6 +854,11 @@ modparam("usrloc", "db_check_update", 1)
    set to 0, no dedicated timer is started, the one from core will be
    used.
 
+   If the number of timer processes is greater than 1, the workload of
+   synchronization and record expiration is split up among the multiple
+   processes. (Each process is assigned a range of slots from the internal
+   hash table, and is responsible for cleanup and storage on those slots.)
+
    Default value is “0”.
 
    Example 1.36. Set timer_procs parameter
@@ -1002,11 +1007,11 @@ modparam("usrloc", "rm_expired_delay", 30)
 3.47. server_id_filter (int)
 
    Enable (1) or disable (0) filter records by server_id on load and
-   during cleaning of expired db records. It could be usefull when you
-   want to use the same location table for several kamailio instances
-   which are configured to work in db_mode=1 or db_mode=2 (cache modes).
-   Otherwise one instance of proxy cleans records made by another proxy
-   and that breaks its cache.
+   during cleaning of expired db records. It could be useful when you want
+   to use the same location table for several kamailio instances which are
+   configured to work in db_mode=1 or db_mode=2 (cache modes). Otherwise
+   one instance of proxy cleans records made by another proxy and that
+   breaks its cache.
 
    Default value is “0”.
 

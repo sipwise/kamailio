@@ -37,7 +37,6 @@
 #include "../../core/error.h"
 #include "../../core/char_msg_val.h"
 #include "../../core/rand/kam_rand.h"
-#include "defs.h"
 #include "t_reply.h"
 #include "t_cancel.h"
 #include "t_stats.h"
@@ -171,10 +170,8 @@ void free_cell_helper(
 		sip_msg_free_unsafe(dead_cell->uas.request);
 	if(dead_cell->uas.response.buffer)
 		shm_free_unsafe(dead_cell->uas.response.buffer);
-#ifdef CANCEL_REASON_SUPPORT
 	if(unlikely(dead_cell->uas.cancel_reas))
 		shm_free_unsafe(dead_cell->uas.cancel_reas);
-#endif /* CANCEL_REASON_SUPPORT */
 
 	/* callbacks */
 	for(cbs = (struct tm_callback *)dead_cell->tmcb_hl.first; cbs;) {
@@ -237,10 +234,8 @@ void free_cell_helper(
 		}
 	}
 
-#ifdef WITH_AS_SUPPORT
 	if(dead_cell->uac[0].local_ack)
 		free_local_ack_unsafe(dead_cell->uac[0].local_ack);
-#endif
 
 	/* collected to tags */
 	tt = dead_cell->fwded_totags;
@@ -260,10 +255,8 @@ void free_cell_helper(
 		destroy_avp_list_unsafe(&dead_cell->uri_avps_from);
 	if(dead_cell->uri_avps_to)
 		destroy_avp_list_unsafe(&dead_cell->uri_avps_to);
-#ifdef WITH_XAVP
 	if(dead_cell->xavps_list)
 		xavp_destroy_list_unsafe(&dead_cell->xavps_list);
-#endif
 
 	memset(dead_cell, 0, sizeof(tm_cell_t));
 	/* the cell's body */
@@ -325,9 +318,7 @@ struct cell *build_cell(struct sip_msg *p_msg)
 	int sip_msg_len;
 	avp_list_t *old;
 	struct tm_callback *cbs, *cbs_tmp;
-#ifdef WITH_XAVP
 	sr_xavp_t **xold;
-#endif
 	unsigned int cell_size;
 
 	/* allocs a new cell, add space for:
@@ -371,11 +362,9 @@ struct cell *build_cell(struct sip_msg *p_msg)
 	new_cell->user_avps_to = *old;
 	*old = 0;
 
-#ifdef WITH_XAVP
 	xold = xavp_set_list(&new_cell->xavps_list);
 	new_cell->xavps_list = *xold;
 	*xold = 0;
-#endif
 
 	/* We can just store pointer to domain avps in the transaction context,
 	 * because they are read-only */
@@ -433,15 +422,11 @@ error:
 	destroy_avp_list(&new_cell->user_avps_to);
 	destroy_avp_list(&new_cell->uri_avps_from);
 	destroy_avp_list(&new_cell->uri_avps_to);
-#ifdef WITH_XAVP
 	xavp_destroy_list(&new_cell->xavps_list);
-#endif
 	shm_free(new_cell);
 	/* unlink transaction AVP list and link back the global AVP list (bogdan)*/
 	reset_avps();
-#ifdef WITH_XAVP
 	xavp_reset_list();
-#endif
 	return NULL;
 }
 
@@ -536,9 +521,7 @@ void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
 		x->domain_avps_to = set_avp_list(
 				AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
-#ifdef WITH_XAVP
 		x->xavps_list = xavp_set_list(&t->xavps_list);
-#endif
 	} else if(mode == 1) {
 		/* restore original avp list */
 		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, x->uri_avps_from);
@@ -547,9 +530,7 @@ void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, x->user_avps_to);
 		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, x->domain_avps_from);
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, x->domain_avps_to);
-#ifdef WITH_XAVP
 		xavp_set_list(x->xavps_list);
-#endif
 	}
 }
 
@@ -566,9 +547,7 @@ void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
 		set_avp_list(
 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, bakxd->domain_avps_from);
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, bakxd->domain_avps_to);
-#ifdef WITH_XAVP
 		xavp_set_list(bakxd->xavps_list);
-#endif
 		return;
 	}
 
@@ -585,9 +564,7 @@ void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &newxd->domain_avps_from);
 		bakxd->domain_avps_to = set_avp_list(
 				AVP_TRACK_TO | AVP_CLASS_DOMAIN, &newxd->domain_avps_to);
-#ifdef WITH_XAVP
 		bakxd->xavps_list = xavp_set_list(&newxd->xavps_list);
-#endif
 		return;
 	}
 }
@@ -607,11 +584,7 @@ void tm_log_transaction(tm_cell_t *tcell, int llev, char *ltext)
 			(tcell->uas.request)?"yes":"no",
 			(unsigned)tcell->flags,
 			(unsigned)tcell->nr_of_outgoings,
-#ifdef TM_DEL_UNREF
 			(unsigned)atomic_get(&tcell->ref_count),
-#else
-			tcell->ref_count,
-#endif
 			(unsigned)TICKS_TO_S(tcell->end_of_life)
 		);
 
@@ -623,6 +596,7 @@ void tm_clean_lifetime(void)
 {
 	int r;
 	tm_cell_t *tcell;
+	tm_cell_t *bcell;
 	ticks_t texp;
 
 	texp = get_ticks_raw() - S_TO_TICKS(TM_LIFETIME_LIMIT);
@@ -639,7 +613,7 @@ void tm_clean_lifetime(void)
 			continue;
 		}
 
-		clist_foreach(&_tm_table->entries[r], tcell, next_c)
+		clist_foreach_safe(&_tm_table->entries[r], tcell, bcell, next_c)
 		{
 			if(TICKS_GT(texp, tcell->end_of_life)) {
 				tm_log_transaction(tcell, L_WARN, "[hard cleanup]");

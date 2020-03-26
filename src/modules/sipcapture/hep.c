@@ -37,7 +37,7 @@
 
 static int count = 0;
 
-struct hep_timeinfo *heptime;
+extern struct hep_timeinfo *heptime;
 
 /* HEPv2 HEPv3 */
 int hepv2_received(char *buf, unsigned int len, struct receive_info *ri);
@@ -493,7 +493,7 @@ int parsing_hepv3_message(char *buf, unsigned int len)
 	ri.bind_address = si;
 
 	if(payload != NULL) {
-		/* and now recieve message */
+		/* and now receive message */
 		if(hg->proto_t->data == 5)
 			receive_logging_json_msg(payload, payload_len, hg, "rtcp_capture");
 		else if(hg->proto_t->data == 32)
@@ -739,7 +739,11 @@ int hepv3_message_parse(char *buf, unsigned int len, sip_msg_t *msg)
 		msg->rcv.proto = PROTO_UDP;
 
 	if(payload != NULL)
+	{
 		ret = len - payload_len;
+		msg->buf = payload;
+                msg->len = payload_len;
+	}
 
 
 done:

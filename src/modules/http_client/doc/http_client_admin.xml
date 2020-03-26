@@ -36,10 +36,10 @@
 	<para>
 	Like in SIP, the HTTP URL may need encoding to be transported safely
 	over the network. Check the string encoding functions in the Transformation
-	Cookbook (as used in the http_client_query example below).
+	Cookbook (as used in the http_client_query() example below).
 	</para>
 	<para>
-	The function http_client_query allows &kamailio; to issue an HTTP GET
+	The function http_client_query() allows &kamailio; to issue an HTTP GET
 	request and get access to parts of the reply. This function has
 	been ported from the utils module and now use the same libcurl
 	functions. We recommend using the new functionality provided by
@@ -437,6 +437,49 @@ modparam("http_client", "keep_connections", 1)
 				</programlisting>
 			</example>
 		</section>
+		<section id="http_client.p.query_result">
+			<title><varname>query_result</varname> (int)</title>
+			<para>
+			Control what is returned by the http_client_query(...) in the result
+			variable.
+			</para>
+			<para>
+			Valid values are:
+				<itemizedlist>
+				<listitem><para>0 - Return the entire HTTP result body</para></listitem>
+				<listitem><para>1 - Return the first oine from HTTP result body</para></listitem>
+				</itemizedlist>
+			</para>
+			<para>
+			Default value: 1 (return first line).
+			</para>
+			<example>
+			<title>Set <varname>query_result</varname> parameter</title>
+				<programlisting format="linespecific">
+...
+modparam("http_client", "query_result", 0)
+...
+				</programlisting>
+			</example>
+		</section>
+		<section id="http_client.p.query_maxdatasize">
+			<title><varname>query_maxdatasize</varname> (int)</title>
+			<para>
+			Control the size in bytes of the data to be returned by the
+			http_client_query(...) in the result variable.
+			</para>
+			<para>
+			Default value: 0 (disabled, unlimited size).
+			</para>
+			<example>
+			<title>Set <varname>query_maxdatasize</varname> parameter</title>
+				<programlisting format="linespecific">
+...
+modparam("http_client", "query_maxdatasize", 2048)
+...
+				</programlisting>
+			</example>
+		</section>
 		<section id="http_client.p.httpcon">
 			<title><varname>httpcon</varname> (string)</title>
 			<para>
@@ -646,7 +689,7 @@ http_follow_redirect = no
 					</para>
 					<para>
 						<emphasis>data</emphasis> - Data or a pseudo variable holding
-						data to be posted.
+						data to be posted. (may contain pseudo variable)
 					</para>
 					<para>
 						<emphasis>result</emphasis> - The name of a pseudo variable that
@@ -674,6 +717,67 @@ $var(res) = http_connect("apiserver", "/mailbox", "application/json", "{ ok, {20
 xlog("L_INFO", "API-server HTTP connection: $avp(gurka) Result code $var(res)\n");
 
 $var(res) = http_connect("apiserver", "/callroute", "application/json", "$var(jsondata)", "$avp(route)");
+xlog("L_INFO", "API-server HTTP connection: $avp(route) Result code $var(res)\n");
+...
+				</programlisting>
+			</example>
+		</section>
+		<section id="http_client.f.http_connect_raw">
+			<title>
+				<function moreinfo="none">http_connect_raw(connection, url, content_type, data, result)</function>
+			</title>
+			<para>
+				Sends HTTP POST request to a given connection.
+				Similar to http_connect.
+				The only difference is that the data parameter will not be parsed for pseudo variables,
+				therefore it can safely be used for content that may contain "$" character like JSON.
+			</para>
+			<itemizedlist>
+				<listitem>
+					<para>
+						<emphasis>connection</emphasis> - the name of an existing
+						HTTP connection, defined by a httpcon modparam.
+					</para>
+					<para>
+						<emphasis>url</emphasis> - the part of the URL to add to the
+						predefined URL in the connection definition.
+					</para>
+					<para>
+						<emphasis>content_type</emphasis> - Used only when posting
+						data with HTTP POST. An Internet Media type, like
+						"application/json" or "text/plain". Will be added to the
+						HTTP request as a header.
+					</para>
+					<para>
+						<emphasis>data</emphasis> - Data or a pseudo variable holding
+						data to be posted. (will not be parsed for pseudo variable)
+					</para>
+					<para>
+						<emphasis>result</emphasis> - The name of a pseudo variable that
+						will have the data of the response from the HTTP server.
+					</para>
+				</listitem>
+			</itemizedlist>
+			<para>
+			The return value is the HTTP return code (if >=100) or the
+			CURL error code if below 100. See the $curlerror pseudovariable
+			below for more information about CURL error codes.
+	    	        </para>
+			<para>
+			This function can be used from REQUEST_ROUTE,
+			ONREPLY_ROUTE, FAILURE_ROUTE, and BRANCH_ROUTE.
+			</para>
+			<example>
+				<title><function>http_connect_raw()</function> usage</title>
+				<programlisting format="linespecific">
+...
+modparam("http_client", "httpcon", "apiserver=>http://kamailio.org/api/");
+...
+# POST Request
+$var(res) = http_connect_raw("apiserver", "/mailbox", "application/json", "{ ok, {200, ok}}", "$avp(gurka)");
+xlog("L_INFO", "API-server HTTP connection: $avp(gurka) Result code $var(res)\n");
+
+$var(res) = http_connect_war("apiserver", "/callroute", "application/json", "$var(jsondata)", "$avp(route)");
 xlog("L_INFO", "API-server HTTP connection: $avp(route) Result code $var(res)\n");
 ...
 				</programlisting>
@@ -735,17 +839,18 @@ http_get_redirect("apiserver", "$var(targeturl)");
 			</para>
 			<para>
 			If HTTP server returns a class 2xx, 3xx or 4xx reply,
-			the first line of the reply's body (if any) is
+			the first line or the entire reply body (if any) is
 			stored in <quote>result</quote> parameter,
-			which must be a	writable pseudo	variable.
+			which must be a	writable pseudo	variable. See the query_result
+			parameter for controling what value to be stored in the result
+			variable.
 			</para>
 			<para>
 			Function returns reply code of HTTP reply or -1
 			if something went wrong.
 			</para>
 			<para>
-			This function can be used from REQUEST_ROUTE,
-			ONREPLY_ROUTE, FAILURE_ROUTE, and BRANCH_ROUTE.
+			This function can be used from ANY_ROUTE.
 			</para>
 			<para>
 			Note that this function is based on the http_query function in the utils module.

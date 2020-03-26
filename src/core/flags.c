@@ -66,10 +66,6 @@ int flag_in_range( flag_t flag ) {
 		LM_ERR("message flag %d too high; MAX=%d\n", flag, MAX_FLAG );
 		return 0;
 	}
-	if ((int)flag<0) {
-		LM_ERR("message flag (%d) must be in range 0..%d\n", flag, MAX_FLAG );
-		return 0;
-	}
 	return 1;
 }
 
@@ -242,7 +238,7 @@ int register_flag(char* name, int pos)
 	
 	e=pkg_malloc(sizeof(struct flag_entry));
 	if (e==0){
-		LM_ERR("memory allocation failure\n");
+		PKG_MEM_ERROR;
 		return -3;
 	}
 	e->name.s=name;

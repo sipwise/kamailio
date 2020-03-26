@@ -11,19 +11,13 @@ Andrei Pelinescu-Onciul
 
    <pelinescu-onciul@fokus.fraunhofer.de>
 
-Edited by
-
 Daniel-Constantin Mierla
 
    <miconda@gmail.com>
 
-Edited by
-
 Juha Heinanen
 
    <jh@tutpro.com>
-
-Edited by
 
 Ovidiu Sas
 
@@ -97,6 +91,7 @@ Ovidiu Sas
               4.46. get_body_part(content_type, opv)
               4.47. get_body_part_raw(content_type, opv)
               4.48. remove_body_part(content_type)
+              4.49. regex_substring(itext, regexp, mindex, mcount, dpv)
 
    2. Developer Guide
 
@@ -155,6 +150,7 @@ Ovidiu Sas
    1.47. get_body_part usage
    1.48. get_body_part_raw usage
    1.49. remove_body_part usage
+   1.50. _regex_substring usage
 
 Chapter 1. Admin Guide
 
@@ -219,6 +215,7 @@ Chapter 1. Admin Guide
         4.46. get_body_part(content_type, opv)
         4.47. get_body_part_raw(content_type, opv)
         4.48. remove_body_part(content_type)
+        4.49. regex_substring(itext, regexp, mindex, mcount, dpv)
 
 1. Overview
 
@@ -305,6 +302,7 @@ From: medabeda
    4.46. get_body_part(content_type, opv)
    4.47. get_body_part_raw(content_type, opv)
    4.48. remove_body_part(content_type)
+   4.49. regex_substring(itext, regexp, mindex, mcount, dpv)
 
 4.1.  search(re)
 
@@ -1224,8 +1222,9 @@ Content-Disposition: signal;handling=required
 
    Example 1.45. append_body_part with headers
 ...
-$var(b) = "";
-append_body_part("$var(b)", "application/xml\r\nX-Header: xyz");
+$var(b) = "7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c";
+append_body_part("$var(b)", "application/vnd.cirpack.isdn-ext\r\nX-Header: xyz",
+ "signal;handling=required");
 msg_apply_changes();
 ...
 
@@ -1233,6 +1232,7 @@ msg_apply_changes();
 
 ...
 Content-Type: application/vnd.cirpack.isdn-ext
+X-Header: xyz
 Content-Disposition: signal;handling=required
 
 7e Od 04 55 75 69 20 4d 61 6b 65 43 61 6c 6c
@@ -1344,6 +1344,38 @@ get_body_part("application/vnd.cirpack.isdn-ext", "$var(hbody)");
 remove_body_part("application/vnd.cirpack.isdn-ext");
 msg_apply_changes();
 ...
+
+4.49.  regex_substring(itext, regexp, mindex, mcount, dpv)
+
+   Search in text with given regular expression then sets dpv
+   pseudo-variable with the matched token at provided index.
+
+   Meaning of the parameters is as follows:
+     * itext - text to be searched (dynamic string)
+     * regexp - regular expression (dynamic string)
+     * mindex - index of the matched token (int or variable holding int)
+     * mcount - the number of maximum expected matches (int or variable
+       holding int)
+     * dpv - variable to be set with matched token (static string with a
+       name of a variable)
+
+   This function can be used from REQUEST_ROUTE, FAILURE_ROUTE,
+   BRANCH_ROUTE.
+
+   Note that the regular expression extended is used. More info at:
+   https://www.regular-expressions.info/posix.html.
+
+   Example 1.50. _regex_substring usage
+        ...
+        regex_substring("___ abc123def ___ ghi456 ___", "([a-z]*)([0-9]+)([a-z]*
+)",
+                        1, 3, "$var(asd)");
+        xlog("L_WARN","RESULT: $var(asd)\r\n");
+        ------
+        result:
+        abc
+        ----
+        ...
 
 Chapter 2. Developer Guide
 

@@ -85,6 +85,7 @@ str ds_xavp_dst_grp = str_init("grp");
 str ds_xavp_dst_dstid = str_init("dstid");
 str ds_xavp_dst_attrs = str_init("attrs");
 str ds_xavp_dst_sock = str_init("sock");
+str ds_xavp_dst_socket = str_init("socket");
 
 str ds_xavp_ctx_cnt = str_init("cnt");
 
@@ -116,6 +117,7 @@ int ds_hash_initexpire = 7200;
 int ds_hash_check_interval = 30;
 int ds_timer_mode = 0;
 int ds_attrs_none = 0;
+int ds_load_mode = 0;
 
 str ds_outbound_proxy = STR_NULL;
 
@@ -139,6 +141,9 @@ pv_spec_t ds_attrs_pv;
 str ds_event_callback = STR_NULL;
 str ds_db_extra_attrs = STR_NULL;
 param_t *ds_db_extra_attrs_list = NULL;
+
+static int ds_reload_delta = 5;
+static time_t *ds_rpc_reload_time = NULL;
 
 /** module functions */
 static int mod_init(void);
@@ -269,6 +274,8 @@ static param_export_t params[]={
 	{"event_callback",     PARAM_STR, &ds_event_callback},
 	{"ds_attrs_none",      PARAM_INT, &ds_attrs_none},
 	{"ds_db_extra_attrs",  PARAM_STR, &ds_db_extra_attrs},
+	{"ds_load_mode",       PARAM_INT, &ds_load_mode},
+	{"reload_delta",       PARAM_INT, &ds_reload_delta },
 	{0,0,0}
 };
 
@@ -341,7 +348,7 @@ static int mod_init(void)
 		ds_default_sockinfo =
 				grep_sock_info(&host, (unsigned short)port, proto);
 		if(ds_default_sockinfo == 0) {
-			LM_WARN("non-local socket <%.*s>\n", ds_default_socket.len,
+			LM_ERR("non-local socket <%.*s>\n", ds_default_socket.len,
 					ds_default_socket.s);
 			return -1;
 		}
@@ -449,6 +456,14 @@ static int mod_init(void)
 		LM_ERR("invalid ds_latency_estimator_alpha must be between 0 and 1000,"
 				" using default[%.3f]\n", ds_latency_estimator_alpha);
 	}
+
+	ds_rpc_reload_time = shm_malloc(sizeof(time_t));
+	if(ds_rpc_reload_time == NULL) {
+		SHM_MEM_ERROR;
+		return -1;
+	}
+	*ds_rpc_reload_time = 0;
+
 	return 0;
 }
 
@@ -457,8 +472,6 @@ static int mod_init(void)
  */
 static int child_init(int rank)
 {
-	kam_srand((11 + rank) * getpid() * 7);
-
 	return 0;
 }
 
@@ -475,6 +488,10 @@ static void destroy(void)
 		shm_free(ds_ping_reply_codes);
 	if(ds_ping_reply_codes_cnt)
 		shm_free(ds_ping_reply_codes_cnt);
+	if(ds_rpc_reload_time!=NULL) {
+		shm_free(ds_rpc_reload_time);
+		ds_rpc_reload_time = 0;
+	}
 }
 
 #define GET_VALUE(param_name, param, i_value, s_value, value_flags)        \
@@ -1009,9 +1026,8 @@ static int w_ds_list_exist(struct sip_msg *msg, char *param, char *p2)
 
 	if(fixup_get_ivalue(msg, (gparam_p)param, &set) != 0) {
 		LM_ERR("cannot get set id param value\n");
-		return -1;
+		return -2;
 	}
-	LM_DBG("--- Looking for dispatcher set %d\n", set);
 	return ds_list_exist(set);
 }
 
@@ -1371,6 +1387,19 @@ static const char *dispatcher_rpc_reload_doc[2] = {
  */
 static void dispatcher_rpc_reload(rpc_t *rpc, void *ctx)
 {
+
+	if(ds_rpc_reload_time==NULL) {
+		LM_ERR("not ready for reload\n");
+		rpc->fault(ctx, 500, "Not ready for reload");
+		return;
+	}
+	if(*ds_rpc_reload_time!=0 && *ds_rpc_reload_time > time(NULL) - ds_reload_delta) {
+		LM_ERR("ongoing reload\n");
+		rpc->fault(ctx, 500, "Ongoing reload");
+		return;
+	}
+	*ds_rpc_reload_time = time(NULL);
+
 	if(!ds_db_url.s) {
 		if(ds_load_list(dslistfile) != 0) {
 			rpc->fault(ctx, 500, "Reload Failed");
@@ -1639,6 +1668,58 @@ static void dispatcher_rpc_ping_active(rpc_t *rpc, void *ctx)
 	return;
 }
 
+static const char *dispatcher_rpc_add_doc[2] = {
+		"Add a destination address in memory", 0};
+
+
+/*
+ * RPC command to add a destination address to memory
+ */
+static void dispatcher_rpc_add(rpc_t *rpc, void *ctx)
+{
+	int group, flags;
+	str dest;
+
+	flags = 0;
+
+	if(rpc->scan(ctx, "dS*d", &group, &dest, &flags) < 2) {
+		rpc->fault(ctx, 500, "Invalid Parameters");
+		return;
+	}
+
+	if(ds_add_dst(group, &dest, flags) != 0) {
+		rpc->fault(ctx, 500, "Adding dispatcher dst failed");
+		return;
+	}
+
+	return;
+}
+
+static const char *dispatcher_rpc_remove_doc[2] = {
+		"Remove a destination address from memory", 0};
+
+
+/*
+ * RPC command to remove a destination address from memory
+ */
+static void dispatcher_rpc_remove(rpc_t *rpc, void *ctx)
+{
+	int group;
+	str dest;
+
+	if(rpc->scan(ctx, "dS", &group, &dest) < 2) {
+		rpc->fault(ctx, 500, "Invalid Parameters");
+		return;
+	}
+
+	if(ds_remove_dst(group, &dest) != 0) {
+		rpc->fault(ctx, 500, "Removing dispatcher dst failed");
+		return;
+	}
+
+	return;
+}
+
 /* clang-format off */
 rpc_export_t dispatcher_rpc_cmds[] = {
 	{"dispatcher.reload", dispatcher_rpc_reload,
@@ -1649,6 +1730,10 @@ rpc_export_t dispatcher_rpc_cmds[] = {
 		dispatcher_rpc_set_state_doc,   0},
 	{"dispatcher.ping_active",   dispatcher_rpc_ping_active,
 		dispatcher_rpc_ping_active_doc, 0},
+	{"dispatcher.add",   dispatcher_rpc_add,
+		dispatcher_rpc_add_doc, 0},
+	{"dispatcher.remove",   dispatcher_rpc_remove,
+		dispatcher_rpc_remove_doc, 0},
 	{0, 0, 0, 0}
 };
 /* clang-format on */

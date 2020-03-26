@@ -809,7 +809,7 @@ static void cdr_on_create( struct dlg_cell* dialog,
 	}
 }
 
-/* callback for loading a dialog frm database */
+/* callback for loading a dialog from database */
 static void cdr_on_load( struct dlg_cell* dialog,
 		int type,
 		struct dlg_cb_params* params)
@@ -863,7 +863,7 @@ static void cdr_on_load( struct dlg_cell* dialog,
 		return;
 	}
 
-	LM_DBG("dialog '%p' loaded!", dialog);
+	LM_DBG("dialog '%p' loaded and callbacks registered\n", dialog);
 
 }
 

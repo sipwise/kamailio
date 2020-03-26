@@ -172,7 +172,6 @@ int cdp_sessions_init(int hash_size)
 		LOG_NO_MEM("shm",sizeof(unsigned int));
 		goto error;
 	}
-	kam_srand((unsigned int)time(0));
 	*session_id1 = kam_rand();
 	*session_id1 <<= 16;
 	*session_id1 += time(0)&0xFFFF;
@@ -607,8 +606,8 @@ AAASession* cdp_new_cc_acc_session(str id, int is_statefull)
 	AAASession *s;
 	cdp_session_type_t type;
 
-	if (is_statefull) type = ACCT_CC_CLIENT;
-	else type = ACCT_CC_CLIENT; //for now everything will be supported through this SM (until we add IEC)
+	//for now everything will be supported through this SM (until we add IEC)
+	type = ACCT_CC_CLIENT;
 
 	s = cdp_new_session(id,type);
 	if (s) {

@@ -67,6 +67,7 @@ struct cfg_group_core {
 	int dns_tls_pref;
 	int dns_sctp_pref;
 	int dns_retr_time;
+	int dns_slow_query_ms;
 	int dns_retr_no;
 	int dns_servers_no;
 	int dns_search_list;
@@ -89,9 +90,7 @@ struct cfg_group_core {
 #ifdef PKG_MALLOC
 	int mem_dump_pkg;
 #endif
-#ifdef SHM_MEM
 	int mem_dump_shm;
-#endif
 	int max_while_loops;
 	int udp_mtu; /*!< maximum send size for udp, if > try another protocol*/
 	int udp_mtu_try_proto; /*!< if packet> udp_mtu, try proto (e.g. TCP) */
@@ -109,6 +108,7 @@ struct cfg_group_core {
 	int latency_log; /*!< log level for latency limits messages */
 	int latency_limit_db; /*!< alert limit of running db commands */
 	int latency_limit_action; /*!< alert limit of running cfg actions */
+	int latency_limit_cfg; /*!< alert limit of running cfg routing script */
 	int pv_cache_limit; /*!< alert limit of having too many vars in pv cache */
 	int pv_cache_action; /*!< action to be taken on pv cache limit */
 };

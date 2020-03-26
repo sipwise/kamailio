@@ -62,12 +62,11 @@ struct dns_counters_h dns_cnts_h;
 counter_def_t dns_cnt_defs[] =  {
 	{&dns_cnts_h.failed_dns_req, "failed_dns_request", 0, 0, 0,
 		"incremented each time a DNS request has failed."},
+	{&dns_cnts_h.slow_dns_req, "slow_dns_request", 0, 0, 0,
+		"incremented each time a DNS request took longer than dns_slow_query_ms."},
 	{0, 0, 0, 0, 0, 0 }
 };
 
-/* mallocs for local stuff */
-#define local_malloc pkg_malloc
-#define local_free   pkg_free
 
 #ifdef USE_NAPTR
 static int naptr_proto_pref[PROTO_LAST+1];
@@ -316,9 +315,9 @@ struct srv_rdata* dns_srv_parser( unsigned char* msg, unsigned char* end,
 	if (len>255)
 		goto error;
 	/* alloc enought space for the struct + null terminated name */
-	srv=local_malloc(sizeof(struct srv_rdata)-1+len+1);
+	srv=pkg_malloc(sizeof(struct srv_rdata)-1+len+1);
 	if (srv==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	srv->priority=ntohs(priority);
@@ -330,7 +329,7 @@ struct srv_rdata* dns_srv_parser( unsigned char* msg, unsigned char* end,
 	
 	return srv;
 error:
-	if (srv) local_free(srv);
+	if (srv) pkg_free(srv);
 	return 0;
 }
 
@@ -402,10 +401,10 @@ struct naptr_rdata* dns_naptr_parser( unsigned char* msg, unsigned char* end,
 	len=strlen(repl);
 	if (len>255)
 		goto error;
-	naptr=local_malloc(sizeof(struct naptr_rdata)+flags_len+services_len+
+	naptr=pkg_malloc(sizeof(struct naptr_rdata)+flags_len+services_len+
 						regexp_len+len+1-1);
 	if (naptr == 0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	naptr->order=ntohs(order);
@@ -427,7 +426,7 @@ struct naptr_rdata* dns_naptr_parser( unsigned char* msg, unsigned char* end,
 	
 	return naptr;
 error:
-	if (naptr) local_free(naptr);
+	if (naptr) pkg_free(naptr);
 	return 0;
 }
 
@@ -448,9 +447,9 @@ struct cname_rdata* dns_cname_parser( unsigned char* msg, unsigned char* end,
 	if (len>255)
 		goto error;
 	/* alloc sizeof struct + space for the null terminated name */
-	cname=local_malloc(sizeof(struct cname_rdata)-1+len+1);
+	cname=pkg_malloc(sizeof(struct cname_rdata)-1+len+1);
 	if(cname==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	cname->name_len=len;
@@ -458,7 +457,7 @@ struct cname_rdata* dns_cname_parser( unsigned char* msg, unsigned char* end,
 	cname->name[cname->name_len]=0;
 	return cname;
 error:
-	if (cname) local_free(cname);
+	if (cname) pkg_free(cname);
 	return 0;
 }
 
@@ -472,9 +471,9 @@ struct a_rdata* dns_a_parser(unsigned char* rdata, unsigned char* eor)
 	struct a_rdata* a;
 	
 	if (rdata+4>eor) goto error;
-	a=(struct a_rdata*)local_malloc(sizeof(struct a_rdata));
+	a=(struct a_rdata*)pkg_malloc(sizeof(struct a_rdata));
 	if (a==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memcpy(a->ip, rdata, 4);
@@ -492,9 +491,9 @@ struct aaaa_rdata* dns_aaaa_parser(unsigned char* rdata, unsigned char* eor)
 	struct aaaa_rdata* aaaa;
 	
 	if (rdata+16>eor) goto error;
-	aaaa=(struct aaaa_rdata*)local_malloc(sizeof(struct aaaa_rdata));
+	aaaa=(struct aaaa_rdata*)pkg_malloc(sizeof(struct aaaa_rdata));
 	if (aaaa==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memcpy(aaaa->ip6, rdata, 16);
@@ -542,10 +541,10 @@ static struct txt_rdata* dns_txt_parser(unsigned char* msg, unsigned char* end,
 	}while(p<end);
 	/* alloc sizeof struct + space for the dns_cstr array + space for
 	   the strings */
-	txt=local_malloc(sizeof(struct txt_rdata) +(n-1)*sizeof(struct dns_cstr)+
+	txt=pkg_malloc(sizeof(struct txt_rdata) +(n-1)*sizeof(struct dns_cstr)+
 						str_size);
 	if(unlikely(txt==0)){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	/* string table */
@@ -566,7 +565,7 @@ static struct txt_rdata* dns_txt_parser(unsigned char* msg, unsigned char* end,
 	}
 	return txt;
 error:
-	if (txt) local_free(txt);
+	if (txt) pkg_free(txt);
 	return 0;
 }
 
@@ -613,9 +612,9 @@ static struct ebl_rdata* dns_ebl_parser(unsigned char* msg, unsigned char* end,
 		goto error;
 	apex_len=strlen(apex);
 	/* alloc sizeof struct + space for the 2 null-terminated strings */
-	ebl=local_malloc(sizeof(struct ebl_rdata)-1+sep_len+1+apex_len+1);
+	ebl=pkg_malloc(sizeof(struct ebl_rdata)-1+sep_len+1+apex_len+1);
 	if (ebl==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	ebl->position=rdata[0];
@@ -630,7 +629,7 @@ static struct ebl_rdata* dns_ebl_parser(unsigned char* msg, unsigned char* end,
 	
 	return ebl;
 error:
-	if (ebl) local_free(ebl);
+	if (ebl) pkg_free(ebl);
 	return 0;
 }
 
@@ -651,9 +650,9 @@ struct ptr_rdata* dns_ptr_parser( unsigned char* msg, unsigned char* end,
 	if (len>255)
 		goto error;
 	/* alloc sizeof struct + space for the null terminated name */
-	pname=local_malloc(sizeof(struct ptr_rdata)-1+len+1);
+	pname=pkg_malloc(sizeof(struct ptr_rdata)-1+len+1);
 	if(pname==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	pname->ptrdname_len=len;
@@ -661,7 +660,7 @@ struct ptr_rdata* dns_ptr_parser( unsigned char* msg, unsigned char* end,
 	pname->ptrdname[pname->ptrdname_len]=0;
 	return pname;
 error:
-	if (pname) local_free(pname);
+	if (pname) pkg_free(pname);
 	return 0;
 }
 
@@ -676,8 +675,8 @@ void free_rdata_list(struct rdata* head)
 	while (l != 0) {
 		next_l = l->next;
 		/* free the parsed rdata*/
-		if (l->rdata) local_free(l->rdata);
-		local_free(l);
+		if (l->rdata) pkg_free(l->rdata);
+		pkg_free(l);
 		l = next_l;
 	}
 }
@@ -728,6 +727,8 @@ struct rdata* get_record(char* name, int type, int flags)
 	int name_len;
 	struct rdata* fullname_rd;
 	char c;
+	struct timeval start, stop;
+	int slow_query_ms = cfg_get(core, core_cfg, dns_slow_query_ms);
 
 	name_len=strlen(name);
 
@@ -749,7 +750,20 @@ struct rdata* get_record(char* name, int type, int flags)
 	}
 	fullname_rd=0;
 
+	if (slow_query_ms > 0)
+		gettimeofday(&start, NULL);
+
 	size=dns_func.sr_res_search(name, C_IN, type, buff.buff, sizeof(buff));
+
+	if (slow_query_ms > 0) {
+		gettimeofday(&stop, NULL);
+		int latency_ms = (stop.tv_sec - start.tv_sec)*1000
+                + (stop.tv_usec - start.tv_usec)/1000;
+		if (slow_query_ms < latency_ms) {
+			LOG(cfg_get(core, core_cfg, latency_log), "res_search[%d][%s]elapsed[%dms]\n", type, name, latency_ms);
+			counter_inc(dns_cnts_h.slow_dns_req);
+		}
+	}
 
 	if (unlikely(size<0)) {
 		LM_DBG("lookup(%s, %d) failed\n", name, type);
@@ -844,10 +858,10 @@ again:
 		}
 		/* expand the "type" record  (rdata)*/
 
-		rd=(struct rdata*) local_malloc(sizeof(struct rdata)+rec_name_len+
+		rd=(struct rdata*) pkg_malloc(sizeof(struct rdata)+rec_name_len+
 										1-1);
 		if (rd==0){
-			LM_ERR("out of memory\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		rd->type=rtype;
@@ -989,9 +1003,9 @@ again:
 	 * (queried) to long name (answered)
 	 */
 	if ((search_list_used==1)&&(fullname_rd!=0)) {
-		rd=(struct rdata*) local_malloc(sizeof(struct rdata)+name_len+1-1);
+		rd=(struct rdata*) pkg_malloc(sizeof(struct rdata)+name_len+1-1);
 		if (unlikely(rd==0)){
-			LM_ERR("out of memory\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		rd->type=T_CNAME;
@@ -1002,10 +1016,10 @@ again:
 		rd->name[name_len]=0;
 		rd->name_len=name_len;
 		/* alloc sizeof struct + space for the null terminated name */
-		rd->rdata=(void*)local_malloc(sizeof(struct cname_rdata)-1+
+		rd->rdata=(void*)pkg_malloc(sizeof(struct cname_rdata)-1+
 										head->name_len+1);
 		if(unlikely(rd->rdata==0)){
-			LM_ERR("out of memory\n");
+			PKG_MEM_ERROR;
 			goto error_rd;
 		}
 		((struct cname_rdata*)(rd->rdata))->name_len=fullname_rd->name_len;
@@ -1026,7 +1040,7 @@ error_parse:
 				name, type,
 				p, end, rtype, class, ttl, rdlength);
 error_rd:
-		if (rd) local_free(rd); /* rd->rdata=0 & rd is not linked yet into
+		if (rd) pkg_free(rd); /* rd->rdata=0 & rd is not linked yet into
 								   the list */
 error:
 		LM_ERR("get_record\n");
@@ -1257,7 +1271,7 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 														  don't find another */
 		/* check if it's an ip address */
 		if (((ip=str2ip(name))!=0)
-			  || ((ip=str2ip6(name))!=0) 
+			  || ((ip=str2ip6(name))!=0)
 			 ){
 			/* we are lucky, this is an ip address */
 			he=ip_addr2he(name, ip);
@@ -1267,7 +1281,7 @@ struct hostent* srv_sip_resolvehost(str* name, int zt, unsigned short* port,
 			LM_WARN("domain name too long (%d), unable to perform SRV lookup\n",
 						name->len);
 		}else{
-			
+
 			switch(srv_proto){
 				case PROTO_UDP:
 				case PROTO_TCP:
@@ -1694,7 +1708,7 @@ int sip_hostport2su(union sockaddr_union* su, str* name, unsigned short port,
 						char* proto)
 {
 	struct hostent* he;
-	
+
 	he=sip_resolvehost(name, &port, proto);
 	if (he==0){
 		ser_error=E_BAD_ADDRESS;
@@ -1710,4 +1724,210 @@ int sip_hostport2su(union sockaddr_union* su, str* name, unsigned short port,
 	return 0;
 error:
 	return -1;
+}
+
+/* converts a str to an ipv4 address struct stored in ipb
+ * - ipb must be already allocated
+ * - return 0 on success; <0 on failure */
+int str2ipbuf(str* st, ip_addr_t* ipb)
+{
+	int i;
+	unsigned char *limit;
+	unsigned char* s;
+
+	/* just in case that e.g. the VIA parser get confused */
+	if(unlikely(!st->s || st->len <= 0)) {
+		LM_ERR("invalid name, no conversion to IP address possible\n");
+		return -1;
+	}
+	s=(unsigned char*)st->s;
+
+	/*init*/
+	ipb->u.addr32[0]=0;
+	i=0;
+	limit=(unsigned char*)(st->s + st->len);
+
+	for(;s<limit ;s++){
+		if (*s=='.'){
+				i++;
+				if (i>3) goto error_dots;
+		}else if ( (*s <= '9' ) && (*s >= '0') ){
+				ipb->u.addr[i]=ipb->u.addr[i]*10+*s-'0';
+		}else{
+				//error unknown char
+				goto error_char;
+		}
+	}
+	if (i<3) goto error_dots;
+	ipb->af=AF_INET;
+	ipb->len=4;
+
+	return 0;
+
+error_dots:
+	DBG("error - too %s dots in [%.*s]\n", (i>3)?"many":"few",
+			st->len, st->s);
+	return -1;
+ error_char:
+	/*
+	DBG("warning - unexpected char %c in [%.*s]\n", *s, st->len, st->s);
+	*/
+	return -2;
+}
+
+/* converts a str to an ipv4 address, returns the address or 0 on error
+   Warning: the result is a pointer to a statically allocated structure */
+ip_addr_t* str2ip(str* st)
+{
+	static ip_addr_t ip;
+
+	if(str2ipbuf(st, &ip)<0) {
+		return NULL;
+	}
+
+	return &ip;
+}
+
+/* converts a str to an ipv6 address struct stored in ipb
+ * - ipb must be already allocated
+ * - return 0 on success; <0 on failure */
+int str2ip6buf(str* st, ip_addr_t* ipb)
+{
+	int i, idx1, rest;
+	int no_colons;
+	int double_colon;
+	int hex;
+	unsigned short* addr_start;
+	unsigned short addr_end[8];
+	unsigned short* addr;
+	unsigned char* limit;
+	unsigned char* s;
+
+	/* just in case that e.g. the VIA parser get confused */
+	if(unlikely(!st->s || st->len <= 0)) {
+		LM_ERR("invalid name, no conversion to IP address possible\n");
+		return -1;
+	}
+	/* init */
+	if ((st->len) && (st->s[0]=='[')){
+		/* skip over [ ] */
+		if (st->s[st->len-1]!=']') goto error_char;
+		s=(unsigned char*)(st->s+1);
+		limit=(unsigned char*)(st->s+st->len-1);
+	}else{
+		s=(unsigned char*)st->s;
+		limit=(unsigned char*)(st->s+st->len);
+	}
+	i=idx1=rest=0;
+	double_colon=0;
+	no_colons=0;
+	ipb->af=AF_INET6;
+	ipb->len=16;
+	addr_start=ipb->u.addr16;
+	addr=addr_start;
+	memset(addr_start, 0 , 8*sizeof(unsigned short));
+	memset(addr_end, 0 , 8*sizeof(unsigned short));
+	for (; s<limit; s++){
+		if (*s==':'){
+			no_colons++;
+			if (no_colons>7) goto error_too_many_colons;
+			if (double_colon){
+				idx1=i;
+				i=0;
+				if (addr==addr_end) goto error_colons;
+				addr=addr_end;
+			}else{
+				double_colon=1;
+				addr[i]=htons(addr[i]);
+				i++;
+			}
+		}else if ((hex=HEX2I(*s))>=0){
+				addr[i]=addr[i]*16+hex;
+				double_colon=0;
+		}else{
+			/* error, unknown char */
+			goto error_char;
+		}
+	}
+	if (!double_colon){ /* not ending in ':' */
+		addr[i]=htons(addr[i]);
+		i++;
+	}
+	/* if address contained '::' fix it */
+	if (addr==addr_end){
+		rest=8-i-idx1;
+		memcpy(addr_start+idx1+rest, addr_end, i*sizeof(unsigned short));
+	}else{
+		/* no double colons inside */
+		if (no_colons<7) goto error_too_few_colons;
+	}
+/*
+	DBG("idx1=%d, rest=%d, no_colons=%d, hex=%x\n",
+			idx1, rest, no_colons, hex);
+	DBG("address %x:%x:%x:%x:%x:%x:%x:%x\n",
+			addr_start[0], addr_start[1], addr_start[2],
+			addr_start[3], addr_start[4], addr_start[5],
+			addr_start[6], addr_start[7] );
+*/
+	return 0;
+
+error_too_many_colons:
+	DBG("error - too many colons in [%.*s]\n", st->len, st->s);
+	return -1;
+
+error_too_few_colons:
+	DBG("error - too few colons in [%.*s]\n", st->len, st->s);
+	return -2;
+
+error_colons:
+	DBG("error - too many double colons in [%.*s]\n", st->len, st->s);
+	return -3;
+
+error_char:
+	/*
+	DBG("warning - unexpected char %c in  [%.*s]\n", *s, st->len,
+			st->s);*/
+	return -4;
+}
+
+/* returns an ip_addr struct.; on error returns 0
+ * the ip_addr struct is static, so subsequent calls will destroy its content*/
+ip_addr_t* str2ip6(str* st)
+{
+	static ip_addr_t ip;
+
+	if(str2ip6buf(st, &ip)<0) {
+		return NULL;
+	}
+
+	return &ip;
+}
+
+/* converts a str to an ipvv/6 address struct stored in ipb
+ * - ipb must be already allocated
+ * - return 0 on success; <0 on failure */
+int str2ipxbuf(str* st, ip_addr_t* ipb)
+{
+	if (str2ipbuf(st, ipb)<0) {
+		if(str2ip6buf(st, ipb) < 0) {
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/* returns an ip_addr struct converted from ipv4/6 str; on error returns 0
+ * the ip_addr struct is static, so subsequent calls will destroy its content*/
+struct ip_addr* str2ipx(str* st)
+{
+	static ip_addr_t ip;
+
+	if(str2ipbuf(st, &ip)<0) {
+		if(str2ip6buf(st, &ip)<0) {
+			return NULL;
+		}
+	}
+
+	return &ip;
 }

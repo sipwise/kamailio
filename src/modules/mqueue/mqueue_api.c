@@ -35,39 +35,6 @@
 
 #include "mqueue_api.h"
 
-/**
- *
- */
-typedef struct _mq_item
-{
-	str key;
-	str val;
-	struct _mq_item *next;
-} mq_item_t;
-
-/**
- *
- */
-typedef struct _mq_head
-{
-	str name;
-	int msize;
-	int csize;
-	gen_lock_t lock;
-	mq_item_t *ifirst;
-	mq_item_t *ilast;
-	struct _mq_head *next;
-} mq_head_t;
-
-/**
- *
- */
-typedef struct _mq_pv
-{
-	str *name;
-	mq_item_t *item;
-	struct _mq_pv *next;
-} mq_pv_t;
 
 /**
  *
@@ -420,6 +387,44 @@ int pv_get_mqk(struct sip_msg *msg, pv_param_t *param,
 	if(mp==NULL || mp->item==NULL || mp->item->key.len<=0)
 		return pv_get_null(msg, param, res);
 	return pv_get_strval(msg, param, res, &mp->item->key);
+}
+
+/**
+ *
+ */
+str* get_mqk(str *in)
+{
+	mq_pv_t *mp = NULL;
+
+	if (mq_head_get(in) == NULL)
+	{
+		LM_ERR("mqueue not found: %.*s\n", in->len, in->s);
+		return NULL;
+	}
+
+	mp = mq_pv_get(in);
+	if(mp==NULL || mp->item==NULL || mp->item->key.len<=0)
+		return NULL;
+	return &mp->item->key;
+}
+
+/**
+ *
+ */
+str* get_mqv(str *in)
+{
+	mq_pv_t *mp = NULL;
+
+	if (mq_head_get(in) == NULL)
+	{
+		LM_ERR("mqueue not found: %.*s\n", in->len, in->s);
+		return NULL;
+	}
+
+	mp = mq_pv_get(in);
+	if(mp==NULL || mp->item==NULL || mp->item->val.len<=0)
+		return NULL;
+	return &mp->item->val;
 }
 
 /**

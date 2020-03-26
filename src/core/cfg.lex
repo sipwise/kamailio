@@ -113,7 +113,7 @@
 		struct sr_yy_fname *next;
 	} *sr_yy_fname_list = 0;
 
-	static str  *pp_define_get(int len, const char * text);
+	str  *pp_define_get(int len, const char * text);
 	static int  pp_ifdef_type(int pos);
 	static void pp_ifdef_var(int len, const char * text);
 	static void pp_ifdef();
@@ -309,6 +309,7 @@ DNS_TCP_PREF	dns_tcp_pref|dns_tcp_preference
 DNS_TLS_PREF	dns_tls_pref|dns_tls_preference
 DNS_SCTP_PREF	dns_sctp_pref|dns_sctp_preference
 DNS_RETR_TIME	dns_retr_time
+DNS_SLOW_QUERY_MS	dns_slow_query_ms
 DNS_RETR_NO		dns_retr_no
 DNS_SERVERS_NO	dns_servers_no
 DNS_USE_SEARCH	dns_use_search_list
@@ -328,6 +329,7 @@ DNS_CACHE_DEL_NONEXP	dns_cache_del_nonexp|dns_cache_delete_nonexpired
 DNS_CACHE_REC_PREF	dns_cache_rec_pref
 /* ipv6 auto bind */
 AUTO_BIND_IPV6		auto_bind_ipv6
+BIND_IPV6_LINK_LOCAL	bind_ipv6_link_local
 /* blacklist */
 DST_BLST_INIT	dst_blacklist_init
 USE_DST_BLST		use_dst_blacklist
@@ -373,9 +375,11 @@ MHOMED		mhomed
 DISABLE_TCP		"disable_tcp"
 TCP_CHILDREN	"tcp_children"
 TCP_ACCEPT_ALIASES	"tcp_accept_aliases"
+TCP_ACCEPT_UNIQUE	"tcp_accept_unique"
 TCP_SEND_TIMEOUT	"tcp_send_timeout"
 TCP_CONNECT_TIMEOUT	"tcp_connect_timeout"
 TCP_CON_LIFETIME	"tcp_connection_lifetime"
+TCP_CONNECTION_MATCH	"tcp_connection_match"
 TCP_POLL_METHOD		"tcp_poll_method"
 TCP_MAX_CONNECTIONS	"tcp_max_connections"
 TLS_MAX_CONNECTIONS	"tls_max_connections"
@@ -399,6 +403,7 @@ TCP_OPT_KEEPCNT		"tcp_keepcnt"
 TCP_OPT_CRLF_PING	"tcp_crlf_ping"
 TCP_OPT_ACCEPT_NO_CL	"tcp_accept_no_cl"
 TCP_OPT_ACCEPT_HEP3	"tcp_accept_hep3"
+TCP_OPT_ACCEPT_HAPROXY	"tcp_accept_haproxy"
 TCP_CLONE_RCVBUF	"tcp_clone_rcvbuf"
 TCP_REUSE_PORT		"tcp_reuse_port"
 DISABLE_TLS		"disable_tls"|"tls_disable"
@@ -453,6 +458,8 @@ KEMI     "kemi"
 ONSEND_ROUTE_CALLBACK	"onsend_route_callback"
 REPLY_ROUTE_CALLBACK	"reply_route_callback"
 EVENT_ROUTE_CALLBACK	"event_route_callback"
+RECEIVED_ROUTE_CALLBACK	"received_route_callback"
+RECEIVED_ROUTE_MODE		"received_route_mode"
 
 MAX_RECURSIVE_LEVEL		"max_recursive_level"
 MAX_BRANCHES_PARAM		"max_branches"
@@ -461,6 +468,7 @@ LATENCY_CFG_LOG			latency_cfg_log
 LATENCY_LOG				latency_log
 LATENCY_LIMIT_DB		latency_limit_db
 LATENCY_LIMIT_ACTION	latency_limit_action
+LATENCY_LIMIT_CFG		latency_limit_cfg
 
 MSG_TIME	msg_time
 ONSEND_RT_REPLY		"onsend_route_reply"
@@ -722,6 +730,8 @@ IMPORTFILE      "import_file"
 								return DNS_SCTP_PREF; }
 <INITIAL>{DNS_RETR_TIME}	{ count(); yylval.strval=yytext;
 								return DNS_RETR_TIME; }
+<INITIAL>{DNS_SLOW_QUERY_MS}	{ count(); yylval.strval=yytext;
+								return DNS_SLOW_QUERY_MS; }
 <INITIAL>{DNS_RETR_NO}	{ count(); yylval.strval=yytext;
 								return DNS_RETR_NO; }
 <INITIAL>{DNS_SERVERS_NO}	{ count(); yylval.strval=yytext;
@@ -756,6 +766,8 @@ IMPORTFILE      "import_file"
 								return DNS_CACHE_REC_PREF; }
 <INITIAL>{AUTO_BIND_IPV6}	{ count(); yylval.strval=yytext;
 								return AUTO_BIND_IPV6; }
+<INITIAL>{BIND_IPV6_LINK_LOCAL}	{ count(); yylval.strval=yytext;
+								return BIND_IPV6_LINK_LOCAL; }
 <INITIAL>{DST_BLST_INIT}	{ count(); yylval.strval=yytext;
 								return DST_BLST_INIT; }
 <INITIAL>{USE_DST_BLST}	{ count(); yylval.strval=yytext;
@@ -804,6 +816,10 @@ IMPORTFILE      "import_file"
 <INITIAL>{TCP_CHILDREN}	{ count(); yylval.strval=yytext; return TCP_CHILDREN; }
 <INITIAL>{TCP_ACCEPT_ALIASES}	{ count(); yylval.strval=yytext;
 									return TCP_ACCEPT_ALIASES; }
+<INITIAL>{TCP_ACCEPT_UNIQUE}	{ count(); yylval.strval=yytext;
+									return TCP_ACCEPT_UNIQUE; }
+<INITIAL>{TCP_CONNECTION_MATCH}	{ count(); yylval.strval=yytext;
+									return TCP_CONNECTION_MATCH; }
 <INITIAL>{TCP_SEND_TIMEOUT}		{ count(); yylval.strval=yytext;
 									return TCP_SEND_TIMEOUT; }
 <INITIAL>{TCP_CONNECT_TIMEOUT}		{ count(); yylval.strval=yytext;
@@ -856,6 +872,8 @@ IMPORTFILE      "import_file"
 									return TCP_OPT_ACCEPT_NO_CL; }
 <INITIAL>{TCP_OPT_ACCEPT_HEP3}	{ count(); yylval.strval=yytext;
 									return TCP_OPT_ACCEPT_HEP3; }
+<INITIAL>{TCP_OPT_ACCEPT_HAPROXY}	{ count(); yylval.strval=yytext;
+									return TCP_OPT_ACCEPT_HAPROXY; }
 <INITIAL>{TCP_CLONE_RCVBUF}		{ count(); yylval.strval=yytext;
 									return TCP_CLONE_RCVBUF; }
 <INITIAL>{TCP_REUSE_PORT}	{ count(); yylval.strval=yytext; return TCP_REUSE_PORT; }
@@ -946,6 +964,8 @@ IMPORTFILE      "import_file"
 <INITIAL>{REPLY_ROUTE_CALLBACK}  { count(); yylval.strval=yytext; return REPLY_ROUTE_CALLBACK;}
 <INITIAL>{ONSEND_ROUTE_CALLBACK}  { count(); yylval.strval=yytext; return ONSEND_ROUTE_CALLBACK;}
 <INITIAL>{EVENT_ROUTE_CALLBACK}  { count(); yylval.strval=yytext; return EVENT_ROUTE_CALLBACK;}
+<INITIAL>{RECEIVED_ROUTE_CALLBACK}  { count(); yylval.strval=yytext; return RECEIVED_ROUTE_CALLBACK;}
+<INITIAL>{RECEIVED_ROUTE_MODE}  { count(); yylval.strval=yytext; return RECEIVED_ROUTE_MODE;}
 <INITIAL>{MAX_RECURSIVE_LEVEL}  { count(); yylval.strval=yytext; return MAX_RECURSIVE_LEVEL;}
 <INITIAL>{MAX_BRANCHES_PARAM}  { count(); yylval.strval=yytext; return MAX_BRANCHES_PARAM;}
 <INITIAL>{LATENCY_LOG}  { count(); yylval.strval=yytext; return LATENCY_LOG;}
@@ -954,6 +974,7 @@ IMPORTFILE      "import_file"
 <INITIAL>{ONSEND_RT_REPLY}	{ count(); yylval.strval=yytext; return ONSEND_RT_REPLY; }
 <INITIAL>{LATENCY_LIMIT_DB}  { count(); yylval.strval=yytext; return LATENCY_LIMIT_DB;}
 <INITIAL>{LATENCY_LIMIT_ACTION}  { count(); yylval.strval=yytext; return LATENCY_LIMIT_ACTION;}
+<INITIAL>{LATENCY_LIMIT_CFG}  { count(); yylval.strval=yytext; return LATENCY_LIMIT_CFG;}
 <INITIAL>{CFG_DESCRIPTION}	{ count(); yylval.strval=yytext; return CFG_DESCRIPTION; }
 <INITIAL>{LOADMODULE}	{ count(); yylval.strval=yytext; return LOADMODULE; }
 <INITIAL>{LOADPATH}		{ count(); yylval.strval=yytext; return LOADPATH; }
@@ -1430,8 +1451,7 @@ static char* addstr(struct str_buf* dst_b, char* src, int len)
 
 	return dst_b->s;
 error:
-	LM_CRIT("lex: memory allocation error\n");
-	LM_CRIT("lex: try to increase pkg size with -M parameter\n");
+	PKG_MEM_CRITICAL;
 	exit(-1);
 }
 
@@ -1599,7 +1619,7 @@ static int sr_push_yy_state(char *fin, int mode)
 		newf = (char*)pkg_malloc(x-tmpfiname+strlen(fbuf)+2);
 		if(newf==0)
 		{
-			LM_CRIT("no more pkg\n");
+			PKG_MEM_CRITICAL;
 			return -1;
 		}
 		newf[0] = '\0';
@@ -1661,7 +1681,7 @@ static int sr_push_yy_state(char *fin, int mode)
 		{
 			if(newf!=fbuf)
 				pkg_free(newf);
-			LM_CRIT("no more pkg\n");
+			PKG_MEM_CRITICAL;
 			return -1;
 		}
 		if(newf==fbuf)
@@ -1670,7 +1690,7 @@ static int sr_push_yy_state(char *fin, int mode)
 			if(fn->fname==0)
 			{
 				pkg_free(fn);
-				LM_CRIT("no more pkg!\n");
+				PKG_MEM_CRITICAL;
 				return -1;
 			}
 			strcpy(fn->fname, fbuf);
@@ -1790,7 +1810,7 @@ int pp_define(int len, const char * text)
 	pp_defines[pp_num_defines].name.len = len;
 	pp_defines[pp_num_defines].name.s = (char*)pkg_malloc(len+1);
 	if(pp_defines[pp_num_defines].name.s==NULL) {
-		LM_CRIT("no more memory to define: %.*s\n", len, text);
+		PKG_MEM_CRITICAL;
 		return -1;
 	}
 	memcpy(pp_defines[pp_num_defines].name.s, text, len);
@@ -1854,7 +1874,7 @@ int pp_define_set(int len, char *text)
 	return 0;
 }
 
-static str *pp_define_get(int len, const char * text)
+str *pp_define_get(int len, const char * text)
 {
 	str var = {(char *)text, len};
 	int i;
@@ -1935,7 +1955,7 @@ static void pp_endif()
 {
 	pp_ifdef_level_update(-1);
 	if(pp_sptr==0) {
-		LM_WARN("invalid position for preprocessor directive 'else'"
+		LM_WARN("invalid position for preprocessor directive 'endif'"
 				" - at %s line %d\n", (finame)?finame:"cfg", line);
 		return;
 	}

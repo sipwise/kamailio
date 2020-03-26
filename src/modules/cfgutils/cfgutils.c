@@ -623,6 +623,12 @@ static int m_sleep(struct sip_msg *msg, char *time, char *str2)
 	return 1;
 }
 
+static int ki_sleep(sip_msg_t* msg, int v)
+{
+	sleep((unsigned int)v);
+	return 1;
+}
+
 static int m_usleep(struct sip_msg *msg, char *time, char *str2)
 {
 	int s;
@@ -632,6 +638,12 @@ static int m_usleep(struct sip_msg *msg, char *time, char *str2)
 		return -1;
 	}
 	sleep_us((unsigned int)s);
+	return 1;
+}
+
+static int ki_usleep(sip_msg_t* msg, int v)
+{
+	sleep_us((unsigned int)v);
 	return 1;
 }
 
@@ -989,6 +1001,7 @@ int bind_cfgutils(cfgutils_api_t *api)
 /**
  * KEMI exports
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_cfgutils_exports[] = {
 	{ str_init("cfgutils"), str_init("lock"),
 		SR_KEMIP_INT, cfg_lock,
@@ -1055,9 +1068,20 @@ static sr_kemi_t sr_kemi_cfgutils_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("cfgutils"), str_init("sleep"),
+		SR_KEMIP_INT, ki_sleep,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("cfgutils"), str_init("usleep"),
+		SR_KEMIP_INT, ki_usleep,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

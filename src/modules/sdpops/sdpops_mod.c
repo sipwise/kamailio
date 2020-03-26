@@ -65,6 +65,7 @@ static int w_sdp_get_line_startswith(sip_msg_t* msg, char *foo, char *bar);
 
 static int sdp_get_sess_version(sip_msg_t* msg, str* sess_version, int* sess_version_num);
 static int sdp_set_sess_version(sip_msg_t* msg, str* sess_version, int* sess_version_num);
+static int w_sdp_get_address_family(sip_msg_t* msg);
 
 static int pv_get_sdp(sip_msg_t *msg, pv_param_t *param,
 		pv_value_t *res);
@@ -125,6 +126,8 @@ static cmd_export_t cmds[] = {
 		0, 0,  0, ANY_ROUTE},
 	{"sdp_get_line_startswith", (cmd_function)w_sdp_get_line_startswith,
 		2, fixup_none_spve,  0, ANY_ROUTE},
+	{"sdp_get_address_family", (cmd_function)w_sdp_get_address_family,
+			0, 0,  0, ANY_ROUTE},
 	{"bind_sdpops",                (cmd_function)bind_sdpops,
 		1, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}
@@ -529,28 +532,6 @@ int sdp_remove_line_by_prefix(sip_msg_t* msg, str* prefix, str* media)
 	}
 	return found;
 }
-
-
-/*
-
-int sdp_remove_str_codec_id_attrs(sip_msg_t* msg, sdp_stream_cell_t* sdp_stream, str *rm_codec)
-
-	str aline = {0, 0};
-	sdp_payload_attr_t *payload;
-	struct lump *anchor;
-
-	payload = sdp_stream->payload_attr;
-	while (payload) {
-		LM_DBG("a= ... for codec %.*s/%.*s\n",
-				payload->rtp_payload.len, payload->rtp_payload.s,
-				payload->rtp_enc.len, payload->rtp_enc.s);
-		if(rm_codec->len==payload->rtp_payload.len
-				&& strncmp(payload->rtp_payload.s, rm_codec->s,
-					rm_codec->len)==0) {
-			if(payload->rtp_enc.s!=NULL) {
-				if(sdp_locate_line(msg, payload->rtp_enc.s, &aline)==0)
-*/
-
 
 /**
  * removes all SDP lines that begin with script provided prefix
@@ -1013,6 +994,47 @@ static int w_sdp_with_active_media(sip_msg_t* msg, char* media, char *bar)
 }
 
 /**
+	AF_INET 2
+	AF_INET6 10
+
+it helps to extract IP adress family at c line  from sdp
+	@param msg
+	@return -1 for error,
+			4 for  IP4,
+			6 for  IP6
+
+*/
+static int w_sdp_get_address_family(sip_msg_t *msg){
+
+	sdp_session_cell_t* session;
+	int sdp_session_num;
+	int result= -1;
+	if(parse_sdp(msg) < 0) {
+		LM_ERR("Unable to parse sdp body \n");
+		return -1;
+	}
+
+	sdp_session_num = 0;
+
+	for(;;){
+
+		session = get_sdp_session(msg, sdp_session_num);
+		if(!session)
+			break;
+
+		if(session->pf==AF_INET){
+			result = 4;
+		}else if(session->pf==AF_INET6){
+			result = 6;
+		}else{
+			result = -1;
+		}
+		sdp_session_num++;
+	}
+
+	return result;
+}
+/**
  * @brief remove streams matching the m='media'
  * @return -1 - error; 0 - not found; >=1 - found
  */
@@ -1058,7 +1080,7 @@ static int sdp_remove_media(sip_msg_t *msg, str *media)
 						media->len)==0)
 			{
 				/* found - remove */
-				LM_DBG("removing media stream: %.*s", media->len, media->s);
+				LM_DBG("removing media stream: %.*s\n", media->len, media->s);
 				nxt_stream = get_sdp_stream(msg, sdp_session_num,
 						sdp_stream_num+1);
 				/* skip back 'm=' */
@@ -2131,6 +2153,7 @@ error:
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_sdpops_exports[] = {
 	{ str_init("sdpops"), str_init("remove_codecs_by_name"),
 		SR_KEMIP_INT, sdp_remove_codecs_by_name,
@@ -2220,6 +2243,7 @@ static sr_kemi_t sr_kemi_sdpops_exports[] = {
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

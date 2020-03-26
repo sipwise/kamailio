@@ -21,6 +21,12 @@
 	<itemizedlist>
 			<listitem>
 				<para>
+				<emphasis>TLSv1.2+</emphasis> - TLSv1.2 or newer (TLSv1.3, ...)
+				connections are accepted (available starting with openssl/libssl v1.1.1)
+				</para>
+			</listitem>
+			<listitem>
+				<para>
 				<emphasis>TLSv1.2</emphasis> - only TLSv1.2 connections are accepted
 				(available starting with openssl/libssl v1.0.1e)
 				</para>
@@ -1202,7 +1208,7 @@ modparam("tls", "config", "/usr/local/etc/kamailio/tls.cfg")
   modparam("tls", "xavp_cfg", "tls")
  ...
   $xavp(tls=>server_name) = "kamailio.org";
-  $xavp(tls=>server_id) = "kamailio.org";
+  $xavp(tls[0]=>server_id) = "kamailio.org";
   $du = "sip:kamailio.org:5061;transport=tls";
   route(RELAY);
 ...

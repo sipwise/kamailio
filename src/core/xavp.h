@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com) 
+ * Copyright (C) 2009 Daniel-Constantin Mierla (asipto.com)
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,8 +18,6 @@
 #ifndef _SR_XAVP_H_
 #define _SR_XAVP_H_
 
-#ifdef WITH_XAVP
-
 #include <time.h>
 #include "str.h"
 #include "str_list.h"
@@ -35,7 +33,8 @@ typedef enum {
 	SR_XTYPE_LONG,    /* long value */
 	SR_XTYPE_LLONG,   /* long long value */
 	SR_XTYPE_XAVP,    /* xavp value */
-	SR_XTYPE_VPTR,    /* void pointer value */
+	SR_XTYPE_VPTR,    /* void pointer value (no free on destroy) */
+	SR_XTYPE_SPTR,    /* void pointer value (shm free on destroy) */
 	SR_XTYPE_DATA     /* custom data value */
 } sr_xtype_t;
 
@@ -58,7 +57,7 @@ typedef struct _sr_xval {
 		long l;
 		long long ll;
 		struct _sr_xavp *xavp; /* must be given in shm (not cloned) */
-		void *vptr;            /* void pointer - address copied, not freed */
+		void *vptr;            /* void pointer - see SR_XTYPE_VPTR, SR_XTYPE_SPTR */
 		sr_data_t *data;       /* must be given in shm (not cloned) */
 	} v;
 } sr_xval_t;
@@ -88,6 +87,7 @@ sr_xavp_t *xavp_get_last(str *xname, sr_xavp_t **list);
 int xavp_rm_by_name(str *name, int all, sr_xavp_t **head);
 int xavp_rm_by_index(str *name, int idx, sr_xavp_t **head);
 int xavp_rm(sr_xavp_t *xa, sr_xavp_t **head);
+int xavp_rm_child_by_index(str *rname, str *cname, int idx);
 int xavp_count(str *name, sr_xavp_t **start);
 void xavp_destroy_list_unsafe(sr_xavp_t **head);
 void xavp_destroy_list(sr_xavp_t **head);
@@ -108,6 +108,7 @@ sr_xavp_t* xavp_get_child_with_ival(str *rname, str *cname);
 sr_xavp_t* xavp_get_child_with_sval(str *rname, str *cname);
 int xavp_serialize_fields(str *rname, char *obuf, int olen);
 
-#endif
+int xavp_set_child_ival(str *rname, str *cname, int ival);
+int xavp_set_child_sval(str *rname, str *cname, str *sval);
 
 #endif

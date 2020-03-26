@@ -1,6 +1,4 @@
 /*
- * $Id: pidf.h 1401 2006-12-14 11:12:42Z anca_vamanu $
- *
  * presence module - presence server implementation
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -21,9 +19,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2006-08-15  initial version (anca)
  */
 
 /*! \file
@@ -39,15 +34,15 @@
 #include "../../core/str.h"
 #include <libxml/parser.h>
 
-xmlNodePtr xmlNodeGetNodeByName(xmlNodePtr node, const char *name,
-															const char *ns);
+xmlNodePtr xmlNodeGetNodeByName(
+		xmlNodePtr node, const char *name, const char *ns);
 xmlNodePtr xmlDocGetNodeByName(xmlDocPtr doc, const char *name, const char *ns);
 xmlNodePtr xmlNodeGetChildByName(xmlNodePtr node, const char *name);
 
-char *xmlNodeGetNodeContentByName(xmlNodePtr root, const char *name,
-		const char *ns);
+char *xmlNodeGetNodeContentByName(
+		xmlNodePtr root, const char *name, const char *ns);
 char *xmlNodeGetAttrContentByName(xmlNodePtr node, const char *name);
 
-time_t xml_parse_dateTime(char* xml_time_str);
+time_t xml_parse_dateTime(char *xml_time_str);
 
-#endif 
+#endif

@@ -42,6 +42,7 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <ifaddrs.h>
+#include <netdb.h>
 #ifdef HAVE_SYS_SOCKIO_H
 #include <sys/sockio.h>
 #endif
@@ -100,6 +101,73 @@
 #define addr_info_listins sock_listins
 #define addr_info_listrm sock_listrm
 
+/**
+ * return the scope for IPv6 interface matching the ipval parameter
+ * - needed for binding to link local IPv6 addresses
+ */
+unsigned int ipv6_get_netif_scope(char *ipval)
+{
+	struct ifaddrs *netiflist = NULL;
+	struct ifaddrs *netif = NULL;
+	char ipaddr[NI_MAXHOST];
+	unsigned int iscope = 0;
+	int i = 0;
+	int r = 0;
+	ip_addr_t *ipa = NULL;
+	ip_addr_t vaddr;
+	str ips;
+
+	ips.s = ipval;
+	ips.len = strlen(ipval);
+
+	ipa = str2ip6(&ips);
+	if(ipa==NULL) {
+		LM_ERR("could not parse ipv6 address: %s\n", ipval);
+		return 0;
+	}
+	memcpy(&vaddr, ipa, sizeof(ip_addr_t));
+	ipa = NULL;
+
+	/* walk over the list of all network interface addresses */
+	if(getifaddrs(&netiflist)!=0) {
+		LM_ERR("failed to get network interfaces - errno: %d\n", errno);
+		return 0;
+	}
+	for(netif = netiflist; netif; netif = netif->ifa_next) {
+		/* only active and ipv6 */
+		if (netif->ifa_addr && (netif->ifa_flags & IFF_UP)
+					&& netif->ifa_addr->sa_family==AF_INET6) {
+			r = getnameinfo(netif->ifa_addr, sizeof(struct sockaddr_in6),
+					ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST);
+			if(r!=0) {
+				LM_ERR("failed to get the name info - ret: %d\n", r);
+				goto done;
+			}
+			/* strip the interface name after */
+			for(i=0; ipaddr[i]; i++) {
+				if(ipaddr[i]=='%') {
+					ipaddr[i]='\0';
+					break;
+				}
+			}
+			ips.s = ipaddr;
+			ips.len = strlen(ipaddr);
+			ipa = str2ip6(&ips);
+			if(ipa!=NULL) {
+				/* if the ips match, get scope index from interface name */
+				if(ip_addr_cmp(&vaddr, ipa)) {
+					iscope=if_nametoindex(netif->ifa_name);
+					goto done;
+				}
+			}
+		}
+	}
+
+done:
+	freeifaddrs(netiflist);
+	return iscope;
+}
+
 inline static void addr_info_list_ins_lst(struct addr_info* lst,
 										struct addr_info* after)
 {
@@ -141,7 +209,7 @@ static int init_addr_info(struct addr_info* a,
 	a->flags=flags;
 	return 0;
 error:
-	LM_ERR("memory allocation error\n");
+	PKG_MEM_ERROR;
 	return -1;
 }
 
@@ -160,7 +228,7 @@ static inline struct addr_info* new_addr_info(char* name,
 	if (init_addr_info(al, name, gf)!=0) goto error;
 	return al;
 error:
-	LM_ERR("memory allocation error\n");
+	PKG_MEM_ERROR;
 	if (al){
 		if (al->name.s) pkg_free(al->name.s);
 		pkg_free(al);
@@ -215,7 +283,8 @@ error:
 
 
 
-/* another helper function, it just creates a socket_info struct */
+/* another helper function, it just creates a socket_info struct
+ * allocates a si and a si->name in new pkg memory */
 static inline struct socket_info* new_sock_info(	char* name,
 								struct name_lst* addr_l,
 								unsigned short port, unsigned short proto,
@@ -285,7 +354,7 @@ static inline struct socket_info* new_sock_info(	char* name,
 	}
 	return si;
 error:
-	LM_ERR("memory allocation error\n");
+	PKG_MEM_ERROR;
 	if (si) {
 		if(si->name.s)
 			pkg_free(si->name.s);
@@ -419,7 +488,7 @@ static int fix_sock_str(struct socket_info* si)
 	
 	si->sock_str.s = pkg_malloc(len + 1);
 	if (si->sock_str.s == NULL) {
-		LM_ERR("No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	if (socketinfo2str(si->sock_str.s, &len, si, 0) < 0) {
@@ -430,13 +499,13 @@ static int fix_sock_str(struct socket_info* si)
 	si->sock_str.len = len;
 	if(si->useinfo.name.s!=NULL)
 	{
-		len = MAX_SOCKET_STR;
+		len = MAX_SOCKET_ADVERTISE_STR;
 
 		if (si->useinfo.sock_str.s) pkg_free(si->useinfo.sock_str.s);
 
 		si->useinfo.sock_str.s = pkg_malloc(len + 1);
 		if (si->useinfo.sock_str.s == NULL) {
-			LM_ERR("No memory left\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		if (socketinfo2str(si->useinfo.sock_str.s, &len, si, 1) < 0) {
@@ -702,7 +771,7 @@ static struct socket_info* new_sock2list(char* name, struct name_lst* addr_l,
 									struct socket_info** list)
 {
 	struct socket_info* si;
-	
+	/* allocates si and si->name in new pkg memory */
 	si=new_sock_info(name, addr_l, port, proto, usename, useport, flags);
 	if (si==0){
 		LM_ERR("new_sock_info failed\n");
@@ -716,6 +785,12 @@ static struct socket_info* new_sock2list(char* name, struct name_lst* addr_l,
 	if (mcast!=0) {
 		si->mcast.len=strlen(mcast);
 		si->mcast.s=(char*)pkg_malloc(si->mcast.len+1);
+		if (si->mcast.s==0) {
+			PKG_MEM_ERROR;
+			pkg_free(si->name.s);
+			pkg_free(si);
+			return 0;
+		}
 		strcpy(si->mcast.s, mcast);
 		mcast = 0;
 	}
@@ -1011,7 +1086,7 @@ static int build_iface_list(void)
 	if(ifaces == NULL){
 		if((ifaces = (struct idxlist*)pkg_malloc(MAX_IFACE_NO
 						*sizeof(struct idxlist))) == NULL){
-			LM_ERR("No more pkg memory\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		memset(ifaces, 0, sizeof(struct idxlist)*MAX_IFACE_NO);
@@ -1070,7 +1145,7 @@ static int build_iface_list(void)
 			entry = (struct idx*)pkg_malloc(sizeof(struct idx));
 			if(entry == 0)
 			{
-				LM_ERR("could not allocate memory\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 
@@ -1079,6 +1154,7 @@ static int build_iface_list(void)
 			entry->ifa_flags = ifi->ifa_flags;
             is_link_local = 0;
 
+			name[0] = '\0';
 			for(;RTA_OK(rtap, rtl);rtap=RTA_NEXT(rtap,rtl)){
 				switch(rtap->rta_type){
 					case IFA_ADDRESS:
@@ -1111,12 +1187,16 @@ static int build_iface_list(void)
 				}
 			}
 			if(is_link_local) {
-				pkg_free(entry);
-				continue;    /* link local addresses are not bindable */
+				if(sr_bind_ipv6_link_local==0) {
+					/* skip - link local addresses are not bindable without scope */
+					pkg_free(entry);
+					continue;
+				}
 			}
 
-			if(strlen(ifaces[index].name)==0)
+			if(strlen(ifaces[index].name)==0 && strlen(name)>0) {
 				strncpy(ifaces[index].name, name, MAX_IF_LEN-1);
+			}
 
 			ifaces[index].index = index;
 
@@ -1281,7 +1361,7 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 		pkg_free(name->s);
 		name->s=(char*)pkg_malloc(strlen(he->h_name)+1);
 		if (name->s==0){
-			LM_ERR("out of memory.\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		name->len=strlen(he->h_name);
@@ -1299,7 +1379,7 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 	if ((tmp=ip_addr2a(address))==0) goto error;
 	address_str->s=pkg_malloc(strlen(tmp)+1);
 	if (address_str->s==0){
-		LM_ERR("out of memory.\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	strncpy(address_str->s, tmp, strlen(tmp)+1);
@@ -1507,7 +1587,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 		}
 		si->port_no_str.s=(char*)pkg_malloc(len+1);
 		if (si->port_no_str.s==0){
-			LM_ERR("out of memory.\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		strncpy(si->port_no_str.s, tmp, len+1);

@@ -211,7 +211,7 @@ int fixup_regexp_null(void** param, int param_no)
 	if (param_no != 1)
 		return E_UNSPEC;
 	if ((re=pkg_malloc(sizeof(*re))) ==0) {
-		ERR("No memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	if (regcomp(&re->regex, *param,
@@ -277,7 +277,7 @@ int fixup_pvar_all(void** param, int param_no)
 		/* not a pvs id */
 		goto error;
 	if ((pvs_f=pkg_malloc(sizeof(*pvs_f))) == 0) {
-		ERR("No memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	if (pv_parse_spec2(&name, &pvs_f->pvs, 1) == 0)
@@ -620,6 +620,14 @@ int fixup_igp_all(void** param, int param_no)
 /**
  *
  */
+int fixup_free_igp_all(void** param, int param_no)
+{
+	return fixup_free_igp_null(param, 1);
+}
+
+/**
+ *
+ */
 int fixup_spve_igp(void** param, int param_no)
 {
 	if(param_no==1)
@@ -707,4 +715,43 @@ int fixup_free_none_spve(void** param, int param_no)
 	if(param_no==2)
 		return fixup_free_spve_null(param, 1);
 	return 0;
+}
+
+
+/**
+ *
+ */
+int fixup_vstr_all(void** param, int param_no)
+{
+	str s;
+	pv_elem_t *xm;
+
+	s.s = (char*)(*param);
+	s.len = strlen(s.s);
+	if(pv_parse_format(&s, &xm)<0) {
+		LM_ERR("invalid parameter format [%s]\n", (char*)(*param));
+		return E_UNSPEC;
+	}
+	*param = (void*)xm;
+	return 0;
+}
+
+/**
+ *
+ */
+int fixup_free_vstr_all(void** param, int param_no)
+{
+	pv_elem_free_all((pv_elem_t*)(*param));
+	return 0;
+}
+/**
+ *
+ */
+int fixup_get_vstr_buf(sip_msg_t *msg, pv_elem_t *p, char *buf, int blen)
+{
+	if(pv_printf(msg, p, buf, &blen)<0) {
+		LM_ERR("unable to get the value\n");
+		return -1;
+	}
+	return -1;
 }

@@ -32,6 +32,7 @@
 #include "../../core/strutils.h"
 #include "../../core/tcp_conn.h"
 #include "../../core/pvapi.h"
+#include "../../core/ppcfg.h"
 #include "../../core/trim.h"
 #include "../../core/msg_translator.h"
 
@@ -1334,7 +1335,7 @@ int pv_get_dset(struct sip_msg *msg, pv_param_t *param,
 	if(msg==NULL)
 		return -1;
 
-	s.s = print_dset(msg, &s.len);
+	s.s = print_dset(msg, &s.len, 0);
 	if (s.s == NULL)
 		return pv_get_null(msg, param, res);
 	s.len -= CRLF_LEN;
@@ -1570,6 +1571,37 @@ static inline str *cred_realm(struct sip_msg *rq)
 	}
 	return realm;
 }
+
+
+int pv_get_acc_user(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	str* user;
+	struct sip_uri puri;
+	struct to_body* from;
+
+	/* try to take it from credentials */
+	user = cred_user(msg);
+	if (user) {
+		return pv_get_strval(msg, param, res, user);
+	}
+
+	/* from from uri */
+	if(parse_from_header(msg)<0)
+	{
+		LM_ERR("cannot parse FROM header\n");
+		return pv_get_null(msg, param, res);
+	}
+	if (msg->from && (from=get_from(msg)) && from->uri.len) {
+		if (parse_uri(from->uri.s, from->uri.len, &puri) < 0 ) {
+			LM_ERR("bad From URI\n");
+			return pv_get_null(msg, param, res);
+		}
+		return pv_get_strval(msg, param, res, &(puri.user));
+	}
+	return pv_get_null(msg, param, res);
+}
+
 
 int pv_get_acc_username(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res)
@@ -3655,6 +3687,29 @@ int pv_get_env(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		if (val) {
 			return pv_get_strzval(msg, param, res, val);
 		}
+	}
+	return pv_get_null(msg, param, res);
+}
+
+int pv_parse_def_name(pv_spec_p sp, str *in)
+{
+	if (in == NULL || in->s == NULL || sp == NULL) {
+		LM_ERR("INVALID DEF NAME\n");
+		return -1;
+	}
+	sp->pvp.pvn.type = PV_NAME_INTSTR;
+	sp->pvp.pvn.u.isname.type = AVP_NAME_STR;
+	sp->pvp.pvn.u.isname.name.s = *in;
+	return 0;
+
+}
+
+int pv_get_def(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
+{
+	str *val = pp_define_get(param->pvn.u.isname.name.s.len, param->pvn.u.isname.name.s.s);
+
+	if (val) {
+		return pv_get_strval(msg, param, res, val);
 	}
 	return pv_get_null(msg, param, res);
 }

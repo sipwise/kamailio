@@ -84,6 +84,27 @@ int fork_basic_timer(int child_id, char* desc, int make_sock,
 	return pid;
 }
 
+int fork_basic_timer_w(int child_id, char* desc, int make_sock,
+						timer_function_w* f, int worker, void* param, int interval)
+{
+	int pid;
+
+	pid=fork_process(child_id, desc, make_sock);
+	if (pid<0) return -1;
+	if (pid==0){
+		/* child */
+		if (cfg_child_init()) return -1;
+		for(;;){
+			sleep(interval);
+			cfg_update();
+			f(get_ticks(), worker, param); /* ticks in s for compatibility with old
+									* timers */
+		}
+	}
+	/* parent */
+	return pid;
+}
+
 /**
  * \brief Forks a separate simple microsecond-sleep() periodic timer
  *
@@ -117,6 +138,28 @@ int fork_basic_utimer(int child_id, char* desc, int make_sock,
 			cfg_update();
 			ts = get_ticks_raw();
 			f(TICKS_TO_MS(ts), param); /* ticks in mili-seconds */
+		}
+	}
+	/* parent */
+	return pid;
+}
+
+int fork_basic_utimer_w(int child_id, char* desc, int make_sock,
+						utimer_function_w* f, int worker, void* param, int uinterval)
+{
+	int pid;
+	ticks_t ts;
+
+	pid=fork_process(child_id, desc, make_sock);
+	if (pid<0) return -1;
+	if (pid==0){
+		/* child */
+		if (cfg_child_init()) return -1;
+		for(;;){
+			sleep_us(uinterval);
+			cfg_update();
+			ts = get_ticks_raw();
+			f(TICKS_TO_MS(ts), worker, param); /* ticks in mili-seconds */
 		}
 	}
 	/* parent */
@@ -307,7 +350,7 @@ int sr_wtimer_init(void)
 		return 0;
 	_sr_wtimer = (sr_wtimer_t *)pkg_malloc(sizeof(sr_wtimer_t));
 	if(_sr_wtimer==NULL) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -329,7 +372,7 @@ int sr_wtimer_add(timer_function* f, void* param, int interval)
 
 	wt = (sr_wtimer_node_t*)pkg_malloc(sizeof(sr_wtimer_node_t));
 	if(wt==NULL) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memset(wt, 0, sizeof(sr_wtimer_node_t));

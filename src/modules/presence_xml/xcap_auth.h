@@ -1,6 +1,4 @@
 /*
- * $Id: xcap_auth.h 1337 2006-12-07 18:05:05Z anca_vamanu $
- *
  * presence_xml module - 
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
@@ -21,9 +19,6 @@
  * along with this program; if not, write to the Free Software 
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- * History:
- * --------
- *  2007-04-12  initial version (anca)
  */
 
 /*! \file
@@ -40,11 +35,12 @@
 #include "../presence/subscribe.h"
 #include "../xcap_client/xcap_callbacks.h"
 
-int pres_watcher_allowed(subs_t* subs);
+int pres_watcher_allowed(subs_t *subs);
 
-xmlNodePtr get_rule_node(subs_t* subs, xmlDocPtr xcap_tree );
-int get_rules_doc(str* user, str* domain, str *file_uri, int type, str** rules_doc);
-int pres_get_rules_doc(str* user, str* domain, str** rules_doc);
+xmlNodePtr get_rule_node(subs_t *subs, xmlDocPtr xcap_tree);
+int get_rules_doc(
+		str *user, str *domain, str *file_uri, int type, str **rules_doc);
+int pres_get_rules_doc(str *user, str *domain, str **rules_doc);
 int pres_get_pidf_doc(str *user, str *domain, str *file_uri, str **rules_doc);
 
 #endif

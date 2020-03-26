@@ -28,10 +28,6 @@
 #ifdef USE_TCP
 
 
-#ifndef SHM_MEM
-#error "shared memory support needed (add -DSHM_MEM to Makefile.defs)"
-#endif
-
 #define HANDLE_IO_INLINE
 #include "io_wait.h" /* include first to make sure the needed features are
 						turned on (e.g. _GNU_SOURCE for POLLRDHUP) */
@@ -46,6 +42,7 @@
 #define BSD_COMP  /* needed on older solaris for FIONREAD */
 #endif /* HAVE_FILIO_H / __OS_solaris */
 #include <sys/ioctl.h>  /* ioctl() used on write error */
+#include <arpa/inet.h>  /* for inet_pton() */
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -53,6 +50,7 @@
 #include <sys/uio.h>  /* writev*/
 #include <netdb.h>
 #include <stdlib.h> /*exit() */
+#include <stdint.h> /* UINT32_MAX */
 
 #include <unistd.h>
 
@@ -98,9 +96,6 @@
 #include "tcp_options.h"
 #include "ut.h"
 #include "cfg/cfg_struct.h"
-
-#define local_malloc pkg_malloc
-#define local_free   pkg_free
 
 #include <fcntl.h> /* must be included after io_wait.h if SIGIO_RT is used */
 
@@ -163,6 +158,9 @@ enum poll_types tcp_poll_method=0; /* by default choose the best method */
 int tcp_main_max_fd_no=0;
 int tcp_max_connections=DEFAULT_TCP_MAX_CONNECTIONS;
 int tls_max_connections=DEFAULT_TLS_MAX_CONNECTIONS;
+int tcp_accept_unique=0;
+
+int tcp_connection_match=TCPCONN_MATCH_DEFAULT;
 
 static union sockaddr_union tcp_source_ipv4_addr; /* saved bind/srv v4 addr. */
 static union sockaddr_union* tcp_source_ipv4=0;
@@ -648,8 +646,10 @@ inline static int _wbufq_add(struct  tcp_connection* c, const char* data,
 	if (unlikely(q->last==0)){
 		wb_size=MAX_unsigned(cfg_get(tcp, tcp_cfg, wq_blk_size), size);
 		wb=shm_malloc(sizeof(*wb)+wb_size-1);
-		if (unlikely(wb==0))
+		if (unlikely(wb==0)) {
+			SHM_MEM_ERROR;
 			goto error;
+		}
 		wb->b_size=wb_size;
 		wb->next=0;
 		q->last=wb;
@@ -669,8 +669,10 @@ inline static int _wbufq_add(struct  tcp_connection* c, const char* data,
 		if (last_free==0){
 			wb_size=MAX_unsigned(cfg_get(tcp, tcp_cfg, wq_blk_size), size);
 			wb=shm_malloc(sizeof(*wb)+wb_size-1);
-			if (unlikely(wb==0))
+			if (unlikely(wb==0)) {
+				SHM_MEM_ERROR;
 				goto error;
+			}
 			wb->b_size=wb_size;
 			wb->next=0;
 			q->last->next=wb;
@@ -728,8 +730,10 @@ inline static int _wbufq_insert(struct  tcp_connection* c, const char* data,
 	}else{
 		/* create a size bytes block directly */
 		wb=shm_malloc(sizeof(*wb)+size-1);
-		if (unlikely(wb==0))
+		if (unlikely(wb==0)) {
+			SHM_MEM_ERROR;
 			goto error;
+		}
 		wb->b_size=size;
 		/* insert it */
 		wb->next=q->first;
@@ -957,7 +961,227 @@ end:
 }
 #endif
 
+/* Attempt to extract real connection information from an upstream load
+ * balancer or reverse proxy. This should be called right after accept()ing the
+ * connection, and before TLS negotiation.
+ *
+ * Returns:
+ *    -1 on parsing error (connection should be closed)
+ *    0 on parser success, and connection information was extracted
+ *    1 on parser success, but no connection information was provided by the
+ *      upstream load balancer or reverse proxy.
+ */
+int tcpconn_read_haproxy(struct tcp_connection *c) {
+	int bytes, retval = 0;
+	uint32_t size, port;
+	char *p, *end;
+	struct ip_addr *src_ip, *dst_ip;
 
+	const char v2sig[12] = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A";
+
+	// proxy header union
+	union {
+		// v1 struct
+		struct {
+			char line[108];
+		} v1;
+
+		// v2 struct
+		struct {
+			uint8_t sig[12];
+			uint8_t ver_cmd;
+			uint8_t fam;
+			uint16_t len;
+
+			union {
+				struct { /* for TCP/UDP over IPv4, len = 12 */
+					uint32_t src_addr;
+					uint32_t dst_addr;
+					uint16_t src_port;
+					uint16_t dst_port;
+				} ip4;
+
+				struct { /* for TCP/UDP over IPv6, len = 36 */
+					 uint8_t  src_addr[16];
+					 uint8_t  dst_addr[16];
+					 uint16_t src_port;
+					 uint16_t dst_port;
+				} ip6;
+
+				struct { /* for AF_UNIX sockets, len = 216 */
+					 uint8_t src_addr[108];
+					 uint8_t dst_addr[108];
+				} unx;
+			} addr;
+		} v2;
+
+	} hdr;
+
+	do {
+		bytes = recv(c->s, &hdr, sizeof(hdr), MSG_PEEK);
+	} while (bytes == -1 && (errno == EINTR || errno == EAGAIN));
+
+	src_ip = &c->rcv.src_ip;
+	dst_ip = &c->rcv.dst_ip;
+
+	if (bytes >= 16 && memcmp(&hdr.v2, v2sig, 12) == 0 &&
+		(hdr.v2.ver_cmd & 0xF0) == 0x20) {
+		LM_DBG("received PROXY protocol v2 header\n");
+		size = 16 + ntohs(hdr.v2.len);
+
+		if (bytes < size) {
+			return -1; /* truncated or too large header */
+		}
+
+		switch (hdr.v2.ver_cmd & 0xF) {
+			case 0x01: /* PROXY command */
+				switch (hdr.v2.fam) {
+					case 0x11: /* TCPv4 */
+						src_ip->af = AF_INET;
+						src_ip->len = 4;
+						src_ip->u.addr32[0] =
+							hdr.v2.addr.ip4.src_addr;
+						c->rcv.src_port =
+							hdr.v2.addr.ip4.src_port;
+
+						dst_ip->af = AF_INET;
+						dst_ip->len = 4;
+						dst_ip->u.addr32[0] =
+							hdr.v2.addr.ip4.dst_addr;
+						c->rcv.dst_port =
+							hdr.v2.addr.ip4.dst_port;
+
+						goto done;
+
+					case 0x21: /* TCPv6 */
+						src_ip->af = AF_INET6;
+						src_ip->len = 16;
+						memcpy(src_ip->u.addr,
+							hdr.v2.addr.ip6.src_addr, 16);
+						c->rcv.src_port =
+							hdr.v2.addr.ip6.src_port;
+
+						dst_ip->af = AF_INET6;
+						dst_ip->len = 16;
+						memcpy(dst_ip->u.addr,
+							hdr.v2.addr.ip6.src_addr, 16);
+						c->rcv.dst_port =
+							hdr.v2.addr.ip6.dst_port;
+
+						goto done;
+
+					default: /* unsupported protocol */
+						return -1;
+				}
+
+			case 0x00: /* LOCAL command */
+				retval = 1; /* keep local connection address for LOCAL */
+				goto done;
+
+			default:
+				return -1; /* not a supported command */
+		}
+	}
+	else if (bytes >= 8 && memcmp(hdr.v1.line, "PROXY", 5) == 0) {
+		LM_DBG("received PROXY protocol v1 header\n");
+		end = memchr(hdr.v1.line, '\r', bytes - 1);
+		if (!end || end[1] != '\n') {
+			return -1; /* partial or invalid header */
+		}
+		*end = '\0'; /* terminate the string to ease parsing */
+		size = end + 2 - hdr.v1.line;
+		p = hdr.v1.line + 5;
+
+		if (strncmp(p, " TCP", 4) == 0) {
+			switch (p[4]) {
+				case '4':
+					src_ip->af  = dst_ip->af  = AF_INET;
+					src_ip->len = dst_ip->len = 4;
+					break;
+				case '6':
+					src_ip->af  = dst_ip->af  = AF_INET6;
+					src_ip->len = dst_ip->len = 16;
+					break;
+				default:
+					return -1; /* unknown TCP version */
+			}
+
+			if (p[5] != ' ') {
+				return -1; /* misformatted header */
+			}
+			p += 6; /* skip over the already-parsed bytes */
+
+			/* Parse the source IP address */
+			end = strchr(p, ' ');
+			if (!end) {
+				return -1; /* truncated header */
+			}
+			*end = '\0'; /* mark the end of the IP address */
+			if (inet_pton(src_ip->af, p, src_ip->u.addr) != 1) {
+				return -1; /* missing IP address */
+			}
+			p = end + 1;
+
+			/* Parse the destination IP address */
+			end = strchr(p, ' ');
+			if (!end) {
+				return -1;
+			}
+			*end = '\0'; /* mark the end of the IP address */
+			if (inet_pton(dst_ip->af, p, dst_ip->u.addr) != 1) {
+				return -1;
+			}
+			p = end + 1;
+
+			/* Parse the source port */
+			port = strtoul(p, &end, 10);
+			if (port == UINT32_MAX || port == 0 || port >= (1 << 16)) {
+				return -1; /* invalid port number */
+			}
+			c->rcv.src_port = port;
+
+			if (*end != ' ') {
+				return -1; /* invalid header */
+			}
+			p = end + 1;
+
+			/* Parse the destination port */
+			port = strtoul(p, NULL, 10);
+			if (port == UINT32_MAX || port == 0 || port >= (1 << 16)) {
+				return -1; /* invalid port number */
+			}
+			c->rcv.dst_port = port;
+
+			goto done;
+		}
+		else if (strncmp(p, " UNKNOWN", 8) == 0) {
+			/* We know that the sender speaks the correct PROXY protocol with the
+			 * appropriate version, and we SHOULD accept the connection and use the
+			 * real connection's parameters as if there were no PROXY protocol header
+			 * on the wire.
+			 */
+			retval = 1; /* PROXY protocol parsed, but no IP override */
+			goto done;
+		}
+		else {
+			return -1; /* invalid header */
+		}
+	} else if (bytes == 0) {
+		return 1; /* EOF? Return "no IP change" in any case */
+	}
+	else {
+		/* Wrong protocol */
+		return -1;
+	}
+
+done:
+	/* we need to consume the appropriate amount of data from the socket */
+	do {
+		bytes = recv(c->s, &hdr, size, 0);
+	} while (bytes == -1 && errno == EINTR);
+
+	return (bytes >= 0) ? retval : -1;
+}
 
 struct tcp_connection* tcpconn_new(int sock, union sockaddr_union* su,
 									union sockaddr_union* local_addr,
@@ -965,12 +1189,12 @@ struct tcp_connection* tcpconn_new(int sock, union sockaddr_union* su,
 									int state)
 {
 	struct tcp_connection *c;
-	int rd_b_size;
+	int rd_b_size, ret;
 
 	rd_b_size=cfg_get(tcp, tcp_cfg, rd_buf_size);
 	c=shm_malloc(sizeof(struct tcp_connection) + rd_b_size);
 	if (c==0){
-		LM_ERR("mem. allocation failure\n");
+		SHM_MEM_ERROR;
 		goto error;
 	}
 	memset(c, 0, sizeof(struct tcp_connection)); /* zero init (skip rd buf)*/
@@ -985,16 +1209,29 @@ struct tcp_connection* tcpconn_new(int sock, union sockaddr_union* su,
 
 	atomic_set(&c->refcnt, 0);
 	local_timer_init(&c->timer, tcpconn_main_timeout, c, 0);
-	su2ip_addr(&c->rcv.src_ip, su);
-	c->rcv.src_port=su_getport(su);
-	c->rcv.bind_address=ba;
-	if (likely(local_addr)){
-		su2ip_addr(&c->rcv.dst_ip, local_addr);
-		c->rcv.dst_port=su_getport(local_addr);
-	}else if (ba){
-		c->rcv.dst_ip=ba->address;
-		c->rcv.dst_port=ba->port_no;
+	if (unlikely(ksr_tcp_accept_haproxy && state == S_CONN_ACCEPT)) {
+		ret = tcpconn_read_haproxy(c);
+
+		if (ret == -1) {
+			LM_ERR("invalid PROXY protocol header\n");
+			goto error;
+		} else if (ret == 1) {
+			LM_DBG("PROXY protocol did not override IP addresses\n");
+			goto read_ip_info;
+		}
+	} else {
+read_ip_info:
+		su2ip_addr(&c->rcv.src_ip, su);
+		c->rcv.src_port=su_getport(su);
+		if (likely(local_addr)){
+			su2ip_addr(&c->rcv.dst_ip, local_addr);
+			c->rcv.dst_port=su_getport(local_addr);
+		}else if (ba){
+			c->rcv.dst_ip=ba->address;
+			c->rcv.dst_port=ba->port_no;
+		}
 	}
+	c->rcv.bind_address=ba;
 	print_ip("tcpconn_new: new tcp connection: ", &c->rcv.src_ip, "\n");
 	LM_DBG("on port %d, type %d\n", c->rcv.src_port, type);
 	init_tcp_req(&c->req, (char*)c+sizeof(struct tcp_connection), rd_b_size);
@@ -1400,7 +1637,7 @@ struct tcp_connection* _tcpconn_find(int id, struct ip_addr* ip, int port,
 	int is_local_ip_any;
 	
 #ifdef EXTRA_DEBUG
-	LM_DBG("%d  port %d\n",id, port);
+	LM_DBG("%d  port %d\n", id, port);
 	if (ip) print_ip("tcpconn_find: ip ", ip, "\n");
 #endif
 	if (likely(id)){
@@ -1410,7 +1647,10 @@ struct tcp_connection* _tcpconn_find(int id, struct ip_addr* ip, int port,
 			LM_DBG("c=%p, c->id=%d, port=%d\n", c, c->id, c->rcv.src_port);
 			print_ip("ip=", &c->rcv.src_ip, "\n");
 #endif
-			if ((id==c->id)&&(c->state!=S_CONN_BAD)) return c;
+			if ((id==c->id)&&(c->state!=S_CONN_BAD)) {
+				LM_DBG("found connection by id: %d\n", id);
+				return c;
+			}
 		}
 	}else if (likely(ip)){
 		hash=tcp_addr_hash(ip, port, l_ip, l_port);
@@ -1426,30 +1666,52 @@ struct tcp_connection* _tcpconn_find(int id, struct ip_addr* ip, int port,
 					(ip_addr_cmp(ip, &a->parent->rcv.src_ip)) &&
 					(is_local_ip_any ||
 						ip_addr_cmp(l_ip, &a->parent->rcv.dst_ip))
-				)
+			   ) {
+				LM_DBG("found connection by peer address (id: %d)\n",
+						a->parent->id);
 				return a->parent;
+			}
 		}
 	}
 	return 0;
 }
 
 
+/**
+ * find if a tcp connection exits by id or remote+local address/port
+ * - return: 1 if found; 0 if not found
+ */
+int tcpconn_exists(int conn_id, ip_addr_t* peer_ip, int peer_port,
+						ip_addr_t* local_ip, int local_port)
+{
+	tcp_connection_t* c;
 
-/* _tcpconn_find with locks and timeout
- * local_addr contains the desired local ip:port. If null any local address 
- * will be used.  IN*ADDR_ANY or 0 port are wild cards.
+	TCPCONN_LOCK;
+	c=_tcpconn_find(conn_id, peer_ip, peer_port, local_ip, local_port);
+	TCPCONN_UNLOCK;
+	if (c) {
+		return 1;
+	}
+	return 0;
+
+}
+
+/* TCP connection find with locks and timeout
+ * - local_addr contains the desired local ip:port. If null any local address
+ * will be used. IN*ADDR_ANY or 0 port are wild cards.
+ * - try_local_port makes the search use it first, instead of port from local_addr
  * If found, the connection's reference counter will be incremented, you might
  * want to decrement it after use.
  */
-struct tcp_connection* tcpconn_get(int id, struct ip_addr* ip, int port,
-									union sockaddr_union* local_addr,
-									ticks_t timeout)
+struct tcp_connection* tcpconn_lookup(int id, struct ip_addr* ip, int port,
+		union sockaddr_union* local_addr, int try_local_port, ticks_t timeout)
 {
 	struct tcp_connection* c;
 	struct ip_addr local_ip;
 	int local_port;
-	
+
 	local_port=0;
+	c = NULL;
 	if (likely(ip)){
 		if (unlikely(local_addr)){
 			su2ip_addr(&local_ip, local_addr);
@@ -1460,8 +1722,13 @@ struct tcp_connection* tcpconn_get(int id, struct ip_addr* ip, int port,
 		}
 	}
 	TCPCONN_LOCK;
-	c=_tcpconn_find(id, ip, port, &local_ip, local_port);
-	if (likely(c)){ 
+	if(likely(try_local_port!=0) && likely(local_port==0)) {
+		c=_tcpconn_find(id, ip, port, &local_ip, try_local_port);
+	}
+	if(unlikely(c==NULL)) {
+		c=_tcpconn_find(id, ip, port, &local_ip, local_port);
+	}
+	if (likely(c)) {
 			atomic_inc(&c->refcnt);
 			/* update the timeout only if the connection is not handled
 			 * by a tcp reader _and_the timeout is non-zero  (the tcp
@@ -1475,6 +1742,18 @@ struct tcp_connection* tcpconn_get(int id, struct ip_addr* ip, int port,
 	return c;
 }
 
+/* TCP connection find with locks and timeout
+ * - local_addr contains the desired local ip:port. If null any local address
+ * will be used.  IN*ADDR_ANY or 0 port are wild cards.
+ * If found, the connection's reference counter will be incremented, you might
+ * want to decrement it after use.
+ */
+struct tcp_connection* tcpconn_get(int id, struct ip_addr* ip, int port,
+									union sockaddr_union* local_addr,
+									ticks_t timeout)
+{
+	return tcpconn_lookup(id, ip, port, local_addr, 0, timeout);
+}
 
 
 /* add c->dst:port, local_addr as an alias for the "id" connection, 
@@ -1714,6 +1993,7 @@ int tcp_send(struct dest_info* dst, union sockaddr_union* from,
 	long response[2];
 	int n;
 	ticks_t con_lifetime;
+	int try_local_port;
 #ifdef USE_TLS
 	const char* rest_buf;
 	const char* t_buf;
@@ -1722,11 +2002,21 @@ int tcp_send(struct dest_info* dst, union sockaddr_union* from,
 	snd_flags_t t_send_flags;
 #endif /* USE_TLS */
 
+	if(unlikely(dst==NULL)) {
+		LM_ERR("no destination address provided\n");
+		return -1;
+	}
+
 	port=su_getport(&dst->to);
+	try_local_port = (dst->send_sock)?dst->send_sock->port_no:0;
 	con_lifetime=cfg_get(tcp, tcp_cfg, con_lifetime);
 	if (likely(port)){
 		su2ip_addr(&ip, &dst->to);
-		c=tcpconn_get(dst->id, &ip, port, from, con_lifetime);
+		if(tcp_connection_match==TCPCONN_MATCH_STRICT) {
+			c=tcpconn_lookup(dst->id, &ip, port, from, try_local_port, con_lifetime);
+		} else {
+			c=tcpconn_get(dst->id, &ip, port, from, con_lifetime);
+		}
 	}else if (likely(dst->id)){
 		c=tcpconn_get(dst->id, 0, 0, 0, con_lifetime);
 	}else{
@@ -1738,7 +2028,11 @@ int tcp_send(struct dest_info* dst, union sockaddr_union* from,
 		if (unlikely(c==0)) {
 			if (likely(port)){
 				/* try again w/o id */
-				c=tcpconn_get(0, &ip, port, from, con_lifetime);
+				if(tcp_connection_match==TCPCONN_MATCH_STRICT) {
+					c=tcpconn_lookup(dst->id, &ip, port, from, try_local_port, con_lifetime);
+				} else {
+					c=tcpconn_get(0, &ip, port, from, con_lifetime);
+				}
 			}else{
 				LM_ERR("id %d not found, dropping\n", dst->id);
 				return -1;
@@ -2820,6 +3114,11 @@ int tcp_init(struct socket_info* sock_info)
 			LM_WARN("setsockopt v6 tos: %s (%d)\n", strerror(errno), tos);
 			/* continue since this is not critical */
 		}
+		if(sr_bind_ipv6_link_local!=0) {
+			LM_INFO("setting scope of %s\n", sock_info->address_str.s);
+			addr->sin6.sin6_scope_id =
+				ipv6_get_netif_scope(sock_info->address_str.s);
+		}
 	}
 
 #if defined(IP_FREEBIND)
@@ -3102,7 +3401,7 @@ static int send_fd_queue_init(struct tcp_send_fd_q *q, unsigned int size)
 {
 	q->data=pkg_malloc(size*sizeof(struct send_fd_info));
 	if (q->data==0){
-		LM_ERR("out of memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	q->crt=q->data;
@@ -3259,7 +3558,7 @@ again:
 /* handles io from a tcp child process
  * params: tcp_c - pointer in the tcp_children array, to the entry for
  *                 which an io event was detected 
- *         fd_i  - fd index in the fd_array (usefull for optimizing
+ *         fd_i  - fd index in the fd_array (useful for optimizing
  *                 io_watch_deletes)
  * returns:  handle_* return convention: -1 on error, 0 on EAGAIN (no more
  *           io events queued), >0 on success. success/error refer only to
@@ -3482,7 +3781,7 @@ error:
  * 
  * params: p     - pointer in the ser processes array (pt[]), to the entry for
  *                 which an io event was detected
- *         fd_i  - fd index in the fd_array (usefull for optimizing
+ *         fd_i  - fd index in the fd_array (useful for optimizing
  *                 io_watch_deletes)
  * returns:  handle_* return convention:
  *          -1 on error reading from the fd,
@@ -4019,6 +4318,15 @@ static inline int handle_new_connect(struct socket_info* si)
 	/* add socket to list */
 	tcpconn=tcpconn_new(new_sock, &su, dst_su, si, si->proto, S_CONN_ACCEPT);
 	if (likely(tcpconn)){
+		if(tcp_accept_unique) {
+			if(tcpconn_exists(0, &tcpconn->rcv.dst_ip, tcpconn->rcv.dst_port,
+						&tcpconn->rcv.src_ip, tcpconn->rcv.src_port)) {
+				LM_ERR("duplicated connection by local and remote addresses\n");
+				_tcpconn_free(tcpconn);
+				tcp_safe_close(new_sock);
+				return 1; /* success, because the accept was succesfull */
+			}
+		}
 		tcpconn->flags|=F_CONN_PASSIVE;
 #ifdef TCP_PASS_NEW_CONNECTION_ON_DATA
 		atomic_set(&tcpconn->refcnt, 1); /* safe, not yet available to the
@@ -4678,27 +4986,27 @@ int init_tcp()
 	/* init globals */
 	tcp_connections_no=shm_malloc(sizeof(int));
 	if (tcp_connections_no==0){
-		LM_CRIT("could not alloc globals\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 	*tcp_connections_no=0;
 	tls_connections_no=shm_malloc(sizeof(int));
 	if (tls_connections_no==0){
-		LM_CRIT("could not alloc globals\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 	*tls_connections_no=0;
 	if (INIT_TCP_STATS()!=0) goto error;
 	connection_id=shm_malloc(sizeof(int));
 	if (connection_id==0){
-		LM_CRIT("could not alloc globals\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 	*connection_id=1;
 #ifdef TCP_ASYNC
 	tcp_total_wq=shm_malloc(sizeof(*tcp_total_wq));
 	if (tcp_total_wq==0){
-		LM_CRIT("could not alloc globals\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 #endif /* TCP_ASYNC */
@@ -4706,13 +5014,13 @@ int init_tcp()
 	tcpconn_aliases_hash=(struct tcp_conn_alias**)
 			shm_malloc(TCP_ALIAS_HASH_SIZE* sizeof(struct tcp_conn_alias*));
 	if (tcpconn_aliases_hash==0){
-		LM_CRIT("could not alloc address hashtable\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 	tcpconn_id_hash=(struct tcp_connection**)shm_malloc(TCP_ID_HASH_SIZE*
 								sizeof(struct tcp_connection*));
 	if (tcpconn_id_hash==0){
-		LM_CRIT("could not alloc id hashtable\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 	/* init hashtables*/
@@ -4814,7 +5122,7 @@ int tcp_init_children()
 	/* alloc the children array */
 	tcp_children=pkg_malloc(sizeof(struct tcp_child)*tcp_children_no);
 	if (tcp_children==0){
-			LM_ERR("out of memory\n");
+			PKG_MEM_ERROR;
 			goto error;
 	}
 	memset(tcp_children, 0, sizeof(struct tcp_child)*tcp_children_no);

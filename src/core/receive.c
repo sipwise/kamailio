@@ -39,15 +39,13 @@
 #include "forward.h"
 #include "action.h"
 #include "mem/mem.h"
-#include "stats.h"
 #include "ip_addr.h"
 #include "script_cb.h"
 #include "nonsip_hooks.h"
 #include "dset.h"
+#include "fmsg.h"
 #include "usr_avp.h"
-#ifdef WITH_XAVP
 #include "xavp.h"
-#endif
 #include "select_buf.h"
 #include "locking.h"
 
@@ -145,22 +143,90 @@ int sip_check_fline(char *buf, unsigned int len)
 	return -1;
 }
 
+/**
+ *
+ */
+static sr_net_info_t *ksr_evrt_rcvnetinfo = NULL;
+int ksr_evrt_received_mode = 0;
+str kemi_received_route_callback = STR_NULL;
+
+/**
+ *
+ */
+sr_net_info_t *ksr_evrt_rcvnetinfo_get(void)
+{
+	return ksr_evrt_rcvnetinfo;
+}
+
+/**
+ *
+ */
+int ksr_evrt_received(char *buf, unsigned int len, receive_info_t *rcv_info)
+{
+	sr_kemi_eng_t *keng = NULL;
+	sr_net_info_t netinfo;
+	int ret = 0;
+	int rt = -1;
+	run_act_ctx_t ra_ctx;
+	run_act_ctx_t *bctx = NULL;
+	sip_msg_t *fmsg = NULL;
+	str evname = str_init("core:msg-received");
+
+	if(len==0 || rcv_info==NULL || buf==NULL) {
+		LM_ERR("required parameters are not available\n");
+		return -1;
+	}
+
+	if(kemi_received_route_callback.len>0) {
+		keng = sr_kemi_eng_get();
+		if(keng == NULL) {
+			LM_DBG("kemi enabled with no core:msg-receive event route callback\n");
+			return 0;
+		}
+	} else {
+		rt = route_lookup(&event_rt, evname.s);
+		if (rt < 0 || event_rt.rlist[rt] == NULL) {
+			LM_DBG("event route core:msg-received not defined\n");
+			return 0;
+		}
+	}
+	memset(&netinfo, 0, sizeof(sr_net_info_t));
+	netinfo.data.s = buf;
+	netinfo.data.len = len;
+	netinfo.rcv = rcv_info;
+
+	ksr_evrt_rcvnetinfo = &netinfo;
+	set_route_type(REQUEST_ROUTE);
+	fmsg = faked_msg_get_next();
+	init_run_actions_ctx(&ra_ctx);
+	if(keng) {
+		bctx = sr_kemi_act_ctx_get();
+		sr_kemi_act_ctx_set(&ra_ctx);
+		ret=sr_kemi_route(keng, fmsg, REQUEST_ROUTE,
+				&kemi_received_route_callback, NULL);
+		sr_kemi_act_ctx_set(bctx);
+	} else {
+		ret=run_actions(&ra_ctx, event_rt.rlist[rt], fmsg);
+	}
+	if(ra_ctx.run_flags&DROP_R_F) {
+		LM_DBG("dropping received message\n");
+		ret = -1;
+	}
+	ksr_evrt_rcvnetinfo = NULL;
+
+	return ret;
+}
+
 /** Receive message
  *  WARNING: buf must be 0 terminated (buf[len]=0) or some things might
  * break (e.g.: modules/textops)
  */
-int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
+int receive_msg(char *buf, unsigned int len, receive_info_t *rcv_info)
 {
 	struct sip_msg *msg;
 	struct run_act_ctx ctx;
 	struct run_act_ctx *bctx;
 	int ret;
-#ifdef STATS
-	int skipped = 1;
-	int stats_on = 1;
-#else
-	int stats_on = 0;
-#endif
 	struct timeval tvb, tve;
 	struct timezone tz;
 	unsigned int diff = 0;
@@ -171,7 +237,20 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 	unsigned int cidlockidx = 0;
 	unsigned int cidlockset = 0;
 	int errsipmsg = 0;
+	int exectime = 0;
 
+	if(rcv_info->bind_address==NULL) {
+		LM_ERR("critical - incoming message without local socket [%.*s ...]\n",
+				(len>128)?128:len, buf);
+		return -1;
+	}
+
+	if(ksr_evrt_received_mode!=0) {
+		if(ksr_evrt_received(buf, len, rcv_info)<0) {
+			LM_DBG("dropping the received message\n");
+			goto error00;
+		}
+	}
 	if(sr_event_enabled(SREV_NET_DATA_RECV)) {
 		if(sip_check_fline(buf, len) == 0) {
 			memset(&netinfo, 0, sizeof(sr_net_info_t));
@@ -192,7 +271,7 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 
 	msg = pkg_malloc(sizeof(struct sip_msg));
 	if(unlikely(msg == 0)) {
-		LM_ERR("no mem for sip_msg\n");
+		PKG_MEM_ERROR;
 		goto error00;
 	}
 	msg_no++;
@@ -258,6 +337,11 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 		cidlockset = 1;
 	}
 
+
+	if(is_printable(cfg_get(core, core_cfg, latency_cfg_log))) {
+		exectime = 1;
+	}
+
 	if(msg->first_line.type == SIP_REQUEST) {
 		ruri_mark_new(); /* ruri is usable for forking (not consumed yet) */
 		if(!IS_SIP(msg)) {
@@ -294,8 +378,7 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 
 		/*	skip: */
 		LM_DBG("preparing to run routing scripts...\n");
-		if(is_printable(cfg_get(core, core_cfg, latency_cfg_log))
-				|| stats_on == 1) {
+		if(exectime) {
 			gettimeofday(&tvb, &tz);
 		}
 		/* execute pre-script callbacks, if any; -jiri */
@@ -345,18 +428,15 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 			}
 		}
 
-		if(is_printable(cfg_get(core, core_cfg, latency_cfg_log))
-				|| stats_on == 1) {
+		if(exectime) {
 			gettimeofday(&tve, &tz);
 			diff = (tve.tv_sec - tvb.tv_sec) * 1000000
 				   + (tve.tv_usec - tvb.tv_usec);
-			LOG(cfg_get(core, core_cfg, latency_cfg_log),
-					"request-route executed in: %d usec\n", diff);
-#ifdef STATS
-			stats->processed_requests++;
-			stats->acc_req_time += diff;
-			STATS_RX_REQUEST(msg->first_line.u.request.method_value);
-#endif
+			if (cfg_get(core, core_cfg, latency_limit_cfg) == 0
+					|| cfg_get(core, core_cfg, latency_limit_cfg) <= diff) {
+				LOG(cfg_get(core, core_cfg, latency_cfg_log),
+						"request-route executed in: %d usec\n", diff);
+			}
 		}
 
 		/* execute post request-script callbacks */
@@ -370,13 +450,9 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 			goto error02;
 		}
 
-		if(is_printable(cfg_get(core, core_cfg, latency_cfg_log))
-				|| stats_on == 1) {
+		if(exectime) {
 			gettimeofday(&tvb, &tz);
 		}
-#ifdef STATS
-		STATS_RX_RESPONSE(msg->first_line.u.reply.statuscode / 100);
-#endif
 
 		/* execute pre-script callbacks, if any; -jiri */
 		/* if some of the callbacks said not to continue with
@@ -433,17 +509,15 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 		/* send the msg */
 		forward_reply(msg);
 	skip_send_reply:
-		if(is_printable(cfg_get(core, core_cfg, latency_cfg_log))
-				|| stats_on == 1) {
+		if(exectime) {
 			gettimeofday(&tve, &tz);
 			diff = (tve.tv_sec - tvb.tv_sec) * 1000000
 				   + (tve.tv_usec - tvb.tv_usec);
-			LOG(cfg_get(core, core_cfg, latency_cfg_log),
-					"reply-route executed in: %d usec\n", diff);
-#ifdef STATS
-			stats->processed_responses++;
-			stats->acc_res_time += diff;
-#endif
+			if (cfg_get(core, core_cfg, latency_limit_cfg) == 0
+					|| cfg_get(core, core_cfg, latency_limit_cfg) <= diff) {
+				LOG(cfg_get(core, core_cfg, latency_cfg_log),
+						"reply-route executed in: %d usec\n", diff);
+			}
 		}
 
 		/* execute post reply-script callbacks */
@@ -451,17 +525,10 @@ int receive_msg(char *buf, unsigned int len, struct receive_info *rcv_info)
 	}
 
 end:
-#ifdef STATS
-	skipped = 0;
-#endif
 	ksr_msg_env_reset();
 	LM_DBG("cleaning up\n");
 	free_sip_msg(msg);
 	pkg_free(msg);
-#ifdef STATS
-	if(skipped)
-		STATS_RX_DROPS;
-#endif
 	/* reset log prefix */
 	log_prefix_set(NULL);
 	return 0;
@@ -482,7 +549,6 @@ error02:
 	pkg_free(msg);
 error00:
 	ksr_msg_env_reset();
-	STATS_RX_DROPS;
 	/* reset log prefix */
 	log_prefix_set(NULL);
 	return -1;
@@ -494,7 +560,5 @@ error00:
 void ksr_msg_env_reset(void)
 {
 	reset_avps();
-#ifdef WITH_XAVP
 	xavp_reset_list();
-#endif
 }

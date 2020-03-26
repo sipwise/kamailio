@@ -30,6 +30,7 @@
 #include "../../core/parser/parse_uri.h"
 #include "../../core/str.h"
 #include "imc_mng.h"
+#include "imc.h"
 
 #define IMC_CMD_START		'#'
 #define IMC_CMD_START_STR	"#"
@@ -37,24 +38,29 @@
 #define IMC_CMDID_CREATE	1
 #define IMC_CMDID_INVITE	2
 #define IMC_CMDID_JOIN		3
-#define IMC_CMDID_EXIT		4
+#define IMC_CMDID_LEAVE		4
 #define IMC_CMDID_ACCEPT	5
-#define IMC_CMDID_DENY		6
+#define IMC_CMDID_REJECT	6
 #define IMC_CMDID_REMOVE	7
 #define IMC_CMDID_DESTROY	8
 #define IMC_CMDID_HELP		9
-#define IMC_CMDID_LIST		10
+#define IMC_CMDID_MEMBERS	10
 #define IMC_CMDID_UNKNOWN	11
+#define IMC_CMDID_ADD		12
+#define IMC_CMDID_ROOMS		13
+
 
 #define IMC_CMD_CREATE	"create"
 #define IMC_CMD_INVITE	"invite"
 #define IMC_CMD_JOIN	"join"
-#define IMC_CMD_EXIT	"exit"
+#define IMC_CMD_LEAVE	"leave"
 #define IMC_CMD_ACCEPT	"accept"
-#define IMC_CMD_DENY	"deny"
+#define IMC_CMD_REJECT	"reject"
 #define IMC_CMD_REMOVE	"remove"
 #define IMC_CMD_DESTROY	"destroy"
-#define IMC_CMD_LIST	"list"
+#define IMC_CMD_MEMBERS	"members"
+#define IMC_CMD_ADD	    "add"
+#define IMC_CMD_ROOMS	"rooms"
 
 #define IMC_ROOM_PRIVATE		"private"
 #define IMC_ROOM_PRIVATE_LEN	(sizeof(IMC_ROOM_PRIVATE)-1)
@@ -65,16 +71,20 @@ create new conference room\r\n\
 join the conference room\r\n\
 "IMC_CMD_START_STR IMC_CMD_INVITE" <user_name> [<room_name>] - \
 invite a user to join a conference room\r\n\
+"IMC_CMD_START_STR IMC_CMD_ADD" <user_name> [<room_name>] - \
+add a user to a conference room\r\n\
 "IMC_CMD_START_STR IMC_CMD_ACCEPT" - \
 accept invitation to join a conference room\r\n\
-"IMC_CMD_START_STR IMC_CMD_DENY" - \
-deny invitation to join a conference room\r\n\
+"IMC_CMD_START_STR IMC_CMD_REJECT" - \
+reject invitation to join a conference room\r\n\
 "IMC_CMD_START_STR IMC_CMD_REMOVE" <user_name> [<room_name>] - \
 remove an user from the conference room\r\n\
-"IMC_CMD_START_STR IMC_CMD_LIST" - \
+"IMC_CMD_START_STR IMC_CMD_MEMBERS" - \
 list members is a conference room\r\n\
-"IMC_CMD_START_STR IMC_CMD_EXIT" [<room_name>] - \
-exit from a conference room\r\n\
+"IMC_CMD_START_STR IMC_CMD_ROOMS" - \
+list existing conference rooms\r\n\
+"IMC_CMD_START_STR IMC_CMD_LEAVE" [<room_name>] - \
+leave from a conference room\r\n\
 "IMC_CMD_START_STR IMC_CMD_DESTROY" [<room_name>] - \
 destroy conference room\r\n"
 
@@ -92,28 +102,32 @@ typedef struct _imc_cmd
 int imc_parse_cmd(char *buf, int len, imc_cmd_p cmd);
 
 int imc_handle_create(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_join(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_invite(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
+int imc_handle_add(struct sip_msg* msg, imc_cmd_t *cmd,
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_accept(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
-int imc_handle_deny(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
+int imc_handle_reject(struct sip_msg* msg, imc_cmd_t *cmd,
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_remove(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
-int imc_handle_list(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
-int imc_handle_exit(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
+int imc_handle_members(struct sip_msg* msg, imc_cmd_t *cmd,
+		struct imc_uri *src, struct imc_uri *dst);
+int imc_handle_rooms(struct sip_msg* msg, imc_cmd_t *cmd,
+		struct imc_uri *src, struct imc_uri *dst);
+int imc_handle_leave(struct sip_msg* msg, imc_cmd_t *cmd,
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_destroy(struct sip_msg* msg, imc_cmd_t *cmd,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_unknown(struct sip_msg* msg, imc_cmd_t *cmd,
-		str *src, str *dst);
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_help(struct sip_msg* msg, imc_cmd_t *cmd,
-		str *src, str *dst);
+		struct imc_uri *src, struct imc_uri *dst);
 int imc_handle_message(struct sip_msg* msg, str *msgbody,
-		struct sip_uri *src, struct sip_uri *dst);
+		struct imc_uri *src, struct imc_uri *dst);
 
 #endif

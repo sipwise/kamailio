@@ -21,13 +21,16 @@ Daniel-Constantin Mierla
               2.1. default_code (int)
               2.2. default_reason (str)
               2.3. bind_tm (int)
+              2.4. rich_redirect (int)
+              2.5. event_callback_fl_ack (str)
+              2.6. event_callback_lres_sent (str)
 
         3. Functions
 
               3.1. sl_send_reply(code, reason)
               3.2. send_reply(code, reason)
               3.3. sl_reply_error()
-              3.4. sl_forward _reply([ code, [ reason ] ])
+              3.4. sl_forward_reply([ code, [ reason ] ])
 
         4. Statistics
 
@@ -66,10 +69,13 @@ Daniel-Constantin Mierla
    1.1. default_code example
    1.2. default_reason example
    1.3. bind_tm example
-   1.4. sl_send_reply usage
-   1.5. send_reply usage
-   1.6. sl_reply_error usage
-   1.7. send_reply usage
+   1.4. rich_redirect example
+   1.5. event_callback_fl_ack example
+   1.6. event_callback_lres_sent example
+   1.7. sl_send_reply usage
+   1.8. send_reply usage
+   1.9. sl_reply_error usage
+   1.10. send_reply usage
 
 Chapter 1. Admin Guide
 
@@ -81,13 +87,16 @@ Chapter 1. Admin Guide
         2.1. default_code (int)
         2.2. default_reason (str)
         2.3. bind_tm (int)
+        2.4. rich_redirect (int)
+        2.5. event_callback_fl_ack (str)
+        2.6. event_callback_lres_sent (str)
 
    3. Functions
 
         3.1. sl_send_reply(code, reason)
         3.2. send_reply(code, reason)
         3.3. sl_reply_error()
-        3.4. sl_forward _reply([ code, [ reason ] ])
+        3.4. sl_forward_reply([ code, [ reason ] ])
 
    4. Statistics
 
@@ -154,6 +163,9 @@ Chapter 1. Admin Guide
    2.1. default_code (int)
    2.2. default_reason (str)
    2.3. bind_tm (int)
+   2.4. rich_redirect (int)
+   2.5. event_callback_fl_ack (str)
+   2.6. event_callback_lres_sent (str)
 
 2.1. default_code (int)
 
@@ -189,12 +201,53 @@ modparam("sl", "default_reason", "Server Error")
 modparam("sl", "bind_tm", 0)  # feature disabled
 ...
 
+2.4. rich_redirect (int)
+
+   When sending a 3xx class reply, include additional branch info to the
+   contacts such as path vector and branch flags.
+     * 0 - no extra info is added (default)
+     * 1 - include branch flags as contact header parameter
+     * 2 - include path as contact uri Route header
+
+   Values may be combined (added).
+
+   Example 1.4. rich_redirect example
+...
+modparam("sl", "rich_redirect", 3)
+...
+
+2.5. event_callback_fl_ack (str)
+
+   The name of the KEMI callback function to be executed instead of
+   event_route[sl:filtered-ack]. This function receives a string
+   parameter.
+
+   Default value: not set.
+
+   Example 1.5. event_callback_fl_ack example
+...
+modparam("sl", "event_callback_fl_ack", "ksr_event_sl_filtered_ack")
+...
+
+2.6. event_callback_lres_sent (str)
+
+   The name of the KEMI callback function to be executed instead of
+   event_route[sl:local-response]. This function receives a string
+   parameter.
+
+   Default value: not set.
+
+   Example 1.6. event_callback_lres_sent example
+...
+modparam("sl", "event_callback_lres_sent", "ksr_event_sl_local_response")
+...
+
 3. Functions
 
    3.1. sl_send_reply(code, reason)
    3.2. send_reply(code, reason)
    3.3. sl_reply_error()
-   3.4. sl_forward _reply([ code, [ reason ] ])
+   3.4. sl_forward_reply([ code, [ reason ] ])
 
 3.1.  sl_send_reply(code, reason)
 
@@ -217,7 +270,7 @@ modparam("sl", "bind_tm", 0)  # feature disabled
      * code - Return code.
      * reason - Reason phrase.
 
-   Example 1.4. sl_send_reply usage
+   Example 1.7. sl_send_reply usage
 ...
 sl_send_reply("404", "Not found");
 ...
@@ -237,7 +290,7 @@ sl_send_reply("404", "Not found");
    be used on ONREPLY_ROUTE executed by tm module (upon a t_on_reply()
    callback).
 
-   Example 1.5. send_reply usage
+   Example 1.8. send_reply usage
 ...
 send_reply("404", "Not found");
 ...
@@ -250,12 +303,12 @@ send_reply("403", "Invalid user - $fU");
    error. Usually this function should be used after a script function
    that returned an error code.
 
-   Example 1.6. sl_reply_error usage
+   Example 1.9. sl_reply_error usage
 ...
 sl_reply_error();
 ...
 
-3.4.  sl_forward _reply([ code, [ reason ] ])
+3.4.  sl_forward_reply([ code, [ reason ] ])
 
    Forward statelessly the current received SIP reply, with the option to
    change the status code and reason text. The new code has to be in the
@@ -268,7 +321,7 @@ sl_reply_error();
 
    This function can be used from ONREPLY_ROUTE.
 
-   Example 1.7. send_reply usage
+   Example 1.10. send_reply usage
 ...
 if(status=="408")
     sl_forward_reply("404", "Not found");

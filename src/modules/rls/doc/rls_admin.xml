@@ -566,6 +566,25 @@ modparam("rls", "max_notify_body_length", 32000)
 		</programlisting>
 		</example>
 	</section>
+	<section id="rls.p.reload_db_subs">
+	    <title><varname>reload_db_subs</varname> (integer)</title>
+	    <para>
+		    Reload subscriptions on module initialization (requires db_mode 0 (memory only mode)).
+	    </para>
+	    <para>
+		<emphasis>
+		    Default value is 0 (do not load rows from db).
+		</emphasis>
+	    </para>
+	    <example>
+		<title>Set <varname>reload_db_subs</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("rls", "reload_db_subs", 1)
+...
+</programlisting>
+	    </example>
+	</section>
 	<section id="rls.p.fetch_rows">
 	    <title><varname>fetch_rows</varname> (integer)</title>
 	    <para>
@@ -775,6 +794,36 @@ Within event_route[xhttp:request]:
 	  <programlisting  format="linespecific">
 ...
 &kamcmd; rls.cleanup
+...
+	  </programlisting>
+	</section>
+	<section id="rls.rpc.update_subs">
+	  <title>rls.update_subs</title>
+	  <para>
+		Manually triggers updates to resource list subscriptions (for example,
+		after the contents of a resource list has changes).
+	  </para>
+	  <para>
+		Name: <emphasis>rls.cleanup</emphasis>
+	  </para>
+	  <para>Parameters:</para>
+		<itemizedlist>
+			<listitem>
+				<para>uri - the uri of the user who made the change
+				and whose resource list subscriptions should be
+				updated</para>
+			</listitem>
+			<listitem>
+				<para>event - the event package (e.g. presence).
+				</para>
+			</listitem>
+		</itemizedlist>
+	  <para>
+		RPC Command Format:
+	  </para>
+	  <programlisting  format="linespecific">
+...
+&kamcmd; rls.update_subs sip:alice@domain.com presence
 ...
 	  </programlisting>
 	</section>

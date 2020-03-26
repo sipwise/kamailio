@@ -74,6 +74,8 @@ static int w_t_is_branch_route(sip_msg_t* msg, char*, char* );
 static int w_t_is_reply_route(sip_msg_t* msg, char*, char*);
 static int w_t_is_request_route(sip_msg_t* msg, char*, char*);
 
+static int w_t_drop0(sip_msg_t* msg, char*, char*);
+static int w_t_drop1(sip_msg_t* msg, char*, char*);
 static int w_t_suspend(sip_msg_t* msg, char*, char*);
 static int w_t_continue(sip_msg_t* msg, char *idx, char *lbl, char *rtn);
 static int w_t_reuse_branch(sip_msg_t* msg, char*, char*);
@@ -198,6 +200,8 @@ static cmd_export_t cmds[]={
 		REQUEST_ROUTE },
 	{"bind_tmx", (cmd_function)bind_tmx, 1,
 		0, 0, ANY_ROUTE },
+	{"t_drop",   (cmd_function)w_t_drop0, 0, 0, 0, ANY_ROUTE},
+	{"t_drop",   (cmd_function)w_t_drop1, 1, fixup_igp_null, 0, ANY_ROUTE},
 	{0,0,0,0,0,0}
 };
 
@@ -700,6 +704,56 @@ static int t_is_request_route(sip_msg_t* msg)
 /**
  *
  */
+static int ki_t_drop_rcode(sip_msg_t* msg, int rcode)
+{
+	tm_cell_t *t = 0;
+
+	t=_tmx_tmb.t_gett();
+	if (t==NULL || t==T_UNDEFINED) {
+		LM_ERR("no transaction\n");
+		return -1;
+	}
+
+	t->uas.status = (unsigned int)rcode;
+	_tmx_tmb.t_release_transaction(t);
+	return 0;
+}
+
+/**
+ *
+ */
+static int ki_t_drop(sip_msg_t* msg)
+{
+	return ki_t_drop_rcode(msg, 500);
+}
+
+/**
+ *
+ */
+static int w_t_drop1(sip_msg_t* msg, char *p1, char *p2)
+{
+	int uas_status = 500;
+
+	if(p1) {
+		if(fixup_get_ivalue(msg, (gparam_t*)p1, &uas_status)<0) {
+			uas_status = 500;
+		}
+	}
+	return ki_t_drop_rcode(msg, uas_status);
+}
+
+/**
+ *
+ */
+static int w_t_drop0(sip_msg_t* msg, char *p1, char *p2)
+{
+	return ki_t_drop_rcode(msg, 500);
+}
+
+
+/**
+ *
+ */
 static int ki_t_suspend(sip_msg_t* msg)
 {
 	unsigned int tindex;
@@ -1028,6 +1082,7 @@ unsigned long tmx_stats_rld_rcv_rpls(void)
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_tmx_exports[] = {
 	{ str_init("tmx"), str_init("t_precheck_trans"),
 		SR_KEMIP_INT, t_precheck_trans,
@@ -1099,9 +1154,20 @@ static sr_kemi_t sr_kemi_tmx_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
 			SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("tmx"), str_init("t_drop"),
+		SR_KEMIP_INT, ki_t_drop,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tmx"), str_init("t_drop_rcode"),
+		SR_KEMIP_INT, ki_t_drop_rcode,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

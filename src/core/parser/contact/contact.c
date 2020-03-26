@@ -190,7 +190,7 @@ int parse_contacts(str* _s, contact_t** _c)
 		/* Allocate and clear contact structure */
 		c = (contact_t*)pkg_malloc(sizeof(contact_t));
 		if (c == 0) {
-			LM_ERR("no memory left\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		memset(c, 0, sizeof(contact_t));
@@ -251,6 +251,7 @@ int parse_contacts(str* _s, contact_t** _c)
 			c->methods = hooks.contact.methods;
 			c->instance = hooks.contact.instance;
 			c->reg_id = hooks.contact.reg_id;
+			c->flags = hooks.contact.flags;
 
 			if (_s->len == 0) goto ok;
 		}
@@ -323,6 +324,7 @@ void print_contacts(FILE* _o, contact_t* _c)
 		fprintf(_o, "methods : %p\n", ptr->methods);
 		fprintf(_o, "instance: %p\n", ptr->instance);
 		fprintf(_o, "reg-id  : %p\n", ptr->reg_id);
+		fprintf(_o, "flags   : %p\n", ptr->flags);
 		fprintf(_o, "len     : %d\n", ptr->len);
 		if (ptr->params) {
 			print_params(_o, ptr->params);

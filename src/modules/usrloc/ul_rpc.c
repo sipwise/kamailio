@@ -739,8 +739,8 @@ static void ul_rpc_db_users(rpc_t* rpc, void* ctx)
 	str table = {0, 0};
 	char query[QUERY_LEN];
 	str query_str;
-	db1_res_t* res;
-	int count;
+	db1_res_t* res = NULL;
+	int count = 0;
 
 	if (db_mode == NO_DB) {
 		rpc->fault(ctx, 500, "Command is not supported in db_mode=0");
@@ -773,12 +773,13 @@ static void ul_rpc_db_users(rpc_t* rpc, void* ctx)
 			domain_col.len, domain_col.s,
 			table.len, table.s);
 	query_str.s = query;
-	if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0) {
+	if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0 || res==NULL) {
 		rpc->fault(ctx, 500, "Failed to query AoR count");
 		return;
 	}
-
-	count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+	if (RES_ROW_N(res) > 0) {
+		count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+	}
 	ul_dbf.free_result(ul_dbh, res);
 
 	rpc->add(ctx, "d", count);
@@ -794,8 +795,8 @@ static void ul_rpc_db_contacts(rpc_t* rpc, void* ctx)
 	str table = {0, 0};
 	char query[QUERY_LEN];
 	str query_str;
-	db1_res_t* res;
-	int count;
+	db1_res_t* res = NULL;
+	int count = 0;
 
 	if (db_mode == NO_DB) {
 		rpc->fault(ctx, 500, "Command is not supported in db_mode=0");
@@ -825,12 +826,14 @@ static void ul_rpc_db_contacts(rpc_t* rpc, void* ctx)
 	query_str.len = snprintf(query, QUERY_LEN, "SELECT COUNT(*) FROM %.*s WHERE (UNIX_TIMESTAMP(expires) = 0) OR (expires > NOW())",
 			table.len, table.s);
 	query_str.s = query;
-	if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0) {
+	if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0 || res==NULL) {
 		rpc->fault(ctx, 500, "Failed to query contact count");
 		return;
 	}
 
-	count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+	if (RES_ROW_N(res) > 0) {
+		count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+	}
 	ul_dbf.free_result(ul_dbh, res);
 
 	rpc->add(ctx, "d", count);
@@ -846,8 +849,8 @@ static void ul_rpc_db_expired_contacts(rpc_t* rpc, void* ctx)
 	str table = {0, 0};
 	char query[QUERY_LEN];
 	str query_str;
-	db1_res_t* res;
-	int count;
+	db1_res_t* res = NULL;
+	int count = 0;
 
 	if (db_mode == NO_DB) {
 		rpc->fault(ctx, 500, "Command is not supported in db_mode=0");
@@ -877,12 +880,14 @@ static void ul_rpc_db_expired_contacts(rpc_t* rpc, void* ctx)
 	query_str.len = snprintf(query, QUERY_LEN, "SELECT COUNT(*) FROM %.*s WHERE (UNIX_TIMESTAMP(expires) > 0) AND (expires <= NOW())",
 			table.len, table.s);
 	query_str.s = query;
-	if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0) {
+	if (ul_dbf.raw_query(ul_dbh, &query_str, &res) < 0 || res==NULL) {
 		rpc->fault(ctx, 500, "Failed to query contact count");
 		return;
 	}
 
-	count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+	if (RES_ROW_N(res) > 0) {
+		count = (int)VAL_INT(ROW_VALUES(RES_ROWS(res)));
+	}
 	ul_dbf.free_result(ul_dbh, res);
 
 	rpc->add(ctx, "d", count);
