@@ -1,16 +1,15 @@
-From 9c478f04481ddab001eda8c7723ee12564b2f778 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Wed, 4 Dec 2019 11:46:00 +0100
 Subject: [PATCH] cfgt: add RPC commands 'cfgt.list' and 'cfgt.clean'
 
 fixes #574
 ---
- src/modules/cfgt/cfgt_int.c         | 148 +++++++++++++++++++++++++++-
- src/modules/cfgt/doc/cfgt_admin.xml |  57 +++++++++++
+ src/modules/cfgt/cfgt_int.c         | 148 ++++++++++++++++++++++++++++++++++--
+ src/modules/cfgt/doc/cfgt_admin.xml |  57 ++++++++++++++
  2 files changed, 200 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 4e92938ae..7582bec61 100644
+index 4e92938..7582bec 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -21,6 +21,7 @@
@@ -234,7 +233,7 @@ index 4e92938ae..7582bec61 100644
  };
  /* clang-format on */
 diff --git a/src/modules/cfgt/doc/cfgt_admin.xml b/src/modules/cfgt/doc/cfgt_admin.xml
-index d96515d3d..2a2b158e5 100644
+index 23ab092..5ca9722 100644
 --- a/src/modules/cfgt/doc/cfgt_admin.xml
 +++ b/src/modules/cfgt/doc/cfgt_admin.xml
 @@ -172,6 +172,63 @@ modparam("cfgt", "callid_prefix", "TEST-ID%")
@@ -301,6 +300,3 @@ index d96515d3d..2a2b158e5 100644
  </programlisting>
      </section>
  
--- 
-2.20.1
-

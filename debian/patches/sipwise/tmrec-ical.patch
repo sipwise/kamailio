@@ -1,10 +1,36 @@
 From: Roman Romanchenko <rromanchenko@sipwise.com>
-Subject: TT#41650 Development of Kamailio module/function for parsing iCal structure
+Date: Thu, 26 Mar 2020 10:06:46 +0100
+Subject: TT#41650 Development of Kamailio module/function for parsing iCal
+ structure
 
  - parsing ical from buffer and converting to tmrec using libical implementation.
 
 Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
 ---
+ src/modules/tmrec/Makefile    |  2 +-
+ src/modules/tmrec/ical.c      | 45 ++++++++++++++++++++++++++++++++
+ src/modules/tmrec/ical.h      | 17 ++++++++++++
+ src/modules/tmrec/tmrec_mod.c | 60 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 123 insertions(+), 1 deletion(-)
+ create mode 100644 src/modules/tmrec/ical.c
+ create mode 100644 src/modules/tmrec/ical.h
+
+diff --git a/src/modules/tmrec/Makefile b/src/modules/tmrec/Makefile
+index a29758a..e2a4622 100644
+--- a/src/modules/tmrec/Makefile
++++ b/src/modules/tmrec/Makefile
+@@ -5,7 +5,7 @@ include ../../Makefile.defs
+ auto_gen=
+ NAME=tmrec.so
+ DEFS +=
+-LIBS +=
++LIBS += -L$(LOCALBASE)/lib -lical -licalss
+ 
+ SERLIBPATH=../../lib
+ SER_LIBS+=$(SERLIBPATH)/srutils/srutils
+diff --git a/src/modules/tmrec/ical.c b/src/modules/tmrec/ical.c
+new file mode 100644
+index 0000000..91d9b60
 --- /dev/null
 +++ b/src/modules/tmrec/ical.c
 @@ -0,0 +1,45 @@
@@ -53,6 +79,9 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
 +      return c;
 +}
 +
+diff --git a/src/modules/tmrec/ical.h b/src/modules/tmrec/ical.h
+new file mode 100644
+index 0000000..5e44ba1
 --- /dev/null
 +++ b/src/modules/tmrec/ical.h
 @@ -0,0 +1,17 @@
@@ -73,6 +102,8 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
 +} callback_data_t;
 +
 +#endif
+diff --git a/src/modules/tmrec/tmrec_mod.c b/src/modules/tmrec/tmrec_mod.c
+index 2334e16..55c046e 100644
 --- a/src/modules/tmrec/tmrec_mod.c
 +++ b/src/modules/tmrec/tmrec_mod.c
 @@ -41,6 +41,7 @@
@@ -104,7 +135,7 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
  	{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year,
  		0, ANY_ROUTE},
  	{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year,
-@@ -254,6 +261,45 @@ static int w_tmrec_match(struct sip_msg*
+@@ -254,6 +261,45 @@ static int w_tmrec_match(struct sip_msg* msg, char* rec, char* t)
  	return ki_tmrec_match_timestamp(msg, &rv, ti);
  }
  
@@ -150,7 +181,7 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
  static int fixup_tmrec_match(void** param, int param_no)
  {
  	if(param_no==1)
-@@ -268,6 +314,20 @@ static int fixup_tmrec_match(void** para
+@@ -268,6 +314,20 @@ static int fixup_tmrec_match(void** param, int param_no)
  	return 0;
  }
  
@@ -171,14 +202,3 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
  static int fixup_time_period_match(void** param, int param_no)
  {
  	if(param_no==1)
---- a/src/modules/tmrec/Makefile
-+++ b/src/modules/tmrec/Makefile
-@@ -5,7 +5,7 @@ include ../../Makefile.defs
- auto_gen=
- NAME=tmrec.so
- DEFS +=
--LIBS +=
-+LIBS += -L$(LOCALBASE)/lib -lical -licalss
- 
- SERLIBPATH=../../lib
- SER_LIBS+=$(SERLIBPATH)/srutils/srutils

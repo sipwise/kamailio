@@ -1,4 +1,3 @@
-From 9da53baeadb0403de86d14fa7be826780382e315 Mon Sep 17 00:00:00 2001
 From: Richard Fuchs <rfuchs@sipwise.com>
 Date: Fri, 22 Nov 2019 08:35:49 -0500
 Subject: [PATCH] db_redis: performance improvements and fixes
@@ -13,16 +12,16 @@ Subject: [PATCH] db_redis: performance improvements and fixes
 - Simulate non-unique indexes through parent sets for O(1) counting of
   entries
 ---
- src/modules/db_redis/redis_connection.c |  26 +
+ src/modules/db_redis/redis_connection.c |  26 ++
  src/modules/db_redis/redis_connection.h |   1 +
- src/modules/db_redis/redis_dbase.c      | 798 +++++++++++++++++++++---
+ src/modules/db_redis/redis_dbase.c      | 798 ++++++++++++++++++++++++++++----
  src/modules/db_redis/redis_dbase.h      |   5 +-
  src/modules/db_redis/redis_table.c      |  18 +-
  src/modules/db_redis/redis_table.h      |   1 +
  6 files changed, 746 insertions(+), 103 deletions(-)
 
 diff --git a/src/modules/db_redis/redis_connection.c b/src/modules/db_redis/redis_connection.c
-index 6743a97cf..ad2921f1d 100644
+index 6743a97..ad2921f 100644
 --- a/src/modules/db_redis/redis_connection.c
 +++ b/src/modules/db_redis/redis_connection.c
 @@ -23,6 +23,7 @@
@@ -66,7 +65,7 @@ index 6743a97cf..ad2921f1d 100644
  
  err:
 diff --git a/src/modules/db_redis/redis_connection.h b/src/modules/db_redis/redis_connection.h
-index b137d80e6..22392838c 100644
+index b137d80..2239283 100644
 --- a/src/modules/db_redis/redis_connection.h
 +++ b/src/modules/db_redis/redis_connection.h
 @@ -66,6 +66,7 @@ typedef struct km_redis_con {
@@ -78,7 +77,7 @@ index b137d80e6..22392838c 100644
  
  
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index 97fd19ee0..919cde71c 100644
+index 97fd19e..919cde7 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -27,6 +27,8 @@
@@ -1428,7 +1427,7 @@ index 97fd19ee0..919cde71c 100644
      return -1;
  }
 diff --git a/src/modules/db_redis/redis_dbase.h b/src/modules/db_redis/redis_dbase.h
-index f41be1a27..ae40db696 100644
+index f41be1a..ae40db6 100644
 --- a/src/modules/db_redis/redis_dbase.h
 +++ b/src/modules/db_redis/redis_dbase.h
 @@ -25,6 +25,9 @@
@@ -1449,7 +1448,7 @@ index f41be1a27..ae40db696 100644
 \ No newline at end of file
 +#endif  /* _REDIS_BASE_H_ */
 diff --git a/src/modules/db_redis/redis_table.c b/src/modules/db_redis/redis_table.c
-index fe6349017..4bed4e1c6 100644
+index fe63490..4bed4e1 100644
 --- a/src/modules/db_redis/redis_table.c
 +++ b/src/modules/db_redis/redis_table.c
 @@ -487,13 +487,14 @@ static struct str_hash_entry* db_redis_create_column(str *col, str *type) {
@@ -1505,7 +1504,7 @@ index fe6349017..4bed4e1c6 100644
                  LM_DBG("found column name '%.*s' in type '%.*s' for table '%.*s'\n",
                          column_name.len, column_name.s,
 diff --git a/src/modules/db_redis/redis_table.h b/src/modules/db_redis/redis_table.h
-index 9e71d2a2b..a866b166d 100644
+index 9e71d2a..a866b16 100644
 --- a/src/modules/db_redis/redis_table.h
 +++ b/src/modules/db_redis/redis_table.h
 @@ -42,6 +42,7 @@ struct redis_type {
@@ -1516,6 +1515,3 @@ index 9e71d2a2b..a866b166d 100644
      redis_key_t *entry_keys;
      redis_type_t *types;
      struct str_hash_table columns;
--- 
-2.20.1
-

@@ -1,4 +1,3 @@
-From d4fc8b0168ba3de78e29deb7c7d7ed9b3fd29a36 Mon Sep 17 00:00:00 2001
 From: Daniel-Constantin Mierla <miconda@gmail.com>
 Date: Fri, 22 Nov 2019 09:14:06 +0100
 Subject: [PATCH] systemdops: set core callbacks in mod_register()
@@ -8,7 +7,7 @@ Subject: [PATCH] systemdops: set core callbacks in mod_register()
  1 file changed, 6 insertions(+)
 
 diff --git a/src/modules/systemdops/systemdops_mod.c b/src/modules/systemdops/systemdops_mod.c
-index 58d7a2b24..0ac15426d 100644
+index 58d7a2b..0ac1542 100644
 --- a/src/modules/systemdops/systemdops_mod.c
 +++ b/src/modules/systemdops/systemdops_mod.c
 @@ -68,5 +68,11 @@ void ksr_sd_app_shutdown(void)
@@ -23,6 +22,3 @@ index 58d7a2b24..0ac15426d 100644
 +	cbp->app_shutdown = ksr_sd_app_shutdown;
  	return 0;
  }
--- 
-2.20.1
-

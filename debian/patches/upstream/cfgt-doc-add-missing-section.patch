@@ -1,4 +1,3 @@
-From 14729d390ea42cbadeda707d9207e9fdfe4512d7 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Tue, 3 Dec 2019 12:46:44 +0100
 Subject: [PATCH] cfgt: [doc] add missing </section>
@@ -8,7 +7,7 @@ Subject: [PATCH] cfgt: [doc] add missing </section>
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/cfgt/doc/cfgt_admin.xml b/src/modules/cfgt/doc/cfgt_admin.xml
-index 186055dbe..13c878c54 100644
+index ec6967d..42e19c3 100644
 --- a/src/modules/cfgt/doc/cfgt_admin.xml
 +++ b/src/modules/cfgt/doc/cfgt_admin.xml
 @@ -147,6 +147,7 @@ modparam("cfgt", "callid_prefix", "TEST-ID%")
@@ -28,6 +27,3 @@ index 186055dbe..13c878c54 100644
  ...
  </programlisting>
      </section>
--- 
-2.20.1
-

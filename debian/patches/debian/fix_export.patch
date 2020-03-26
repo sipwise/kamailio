@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 26 Mar 2020 10:06:45 +0100
+Subject: fix_export
+
+---
+ src/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/Makefile b/src/Makefile
+index 771ea31..d9f7a57 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -139,6 +139,8 @@ endif
