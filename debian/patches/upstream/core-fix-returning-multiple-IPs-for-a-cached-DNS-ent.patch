@@ -1,0 +1,21 @@
+From: Nathan Bruning <nathan@iperity.com>
+Date: Tue, 24 Mar 2020 11:24:28 +0100
+Subject: [PATCH] core: fix returning multiple IPs for a cached DNS entry
+
+(cherry picked from commit 29a35ec3cec8b9c3ee4b45c8d84308701bda097c)
+---
+ src/core/dns_cache.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/core/dns_cache.c b/src/core/dns_cache.c
+index 8f3f4ae..81fc6a9 100644
+--- a/src/core/dns_cache.c
++++ b/src/core/dns_cache.c
+@@ -2304,6 +2304,7 @@ inline static struct hostent* dns_entry2he(struct dns_hash_entry* e)
+ 						return 0;
+ 				}
+ 				memcpy(p_addr[i], ip, len);
++				rr_no++;
+ 	}
+ 	if (i==0){
+ 		LM_DBG("no good records found (%d) for %.*s (%d)\n",

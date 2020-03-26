@@ -1,4 +1,3 @@
-From 6ab1431464f97e856812e0f69d77bc96e3dd8f57 Mon Sep 17 00:00:00 2001
 From: Richard Fuchs <rfuchs@sipwise.com>
 Date: Wed, 25 Mar 2020 09:00:40 -0400
 Subject: [PATCH] rtpengine: add support for new T.38 options
@@ -8,7 +7,7 @@ Subject: [PATCH] rtpengine: add support for new T.38 options
  1 file changed, 8 insertions(+)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 6d821aee7a..7be7968660 100644
+index c040c36..135e34b 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -118,6 +118,7 @@ enum {

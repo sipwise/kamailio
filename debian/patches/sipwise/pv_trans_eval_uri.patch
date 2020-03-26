@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 26 Mar 2020 10:06:46 +0100
+Subject: pv_trans_eval_uri
+
+---
+ src/modules/pv/pv_trans.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/pv/pv_trans.c b/src/modules/pv/pv_trans.c
+index ea693bf..e24983a 100644
 --- a/src/modules/pv/pv_trans.c
 +++ b/src/modules/pv/pv_trans.c
-@@ -1273,8 +1273,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_
+@@ -1309,8 +1309,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
  		/* parse uri -- params only when requested */
  		if(parse_uri(_tr_uri.s, _tr_uri.len - dlen, &_tr_parsed_uri)!=0)
  		{
