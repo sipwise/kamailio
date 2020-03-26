@@ -72,7 +72,8 @@ upstream/cfgt-use-snprintf-instead-of-sprintf.patch
 upstream/tm_add_proportional_load_contacts_by_q_value.patch
 upstream/avpops-add-avp_subst_pv-documentation.patch
 upstream/avpops-add-avp_subst_pv.patch
-sipwise/fix_incorrect_branch_id_via_branch_next.patch
+upstream/rtpengine-update-fix-via-branch-next-ID-generation.patch
+upstream/rtpengine-t38-options.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
@@ -97,4 +98,3 @@ sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
-sipwise/rtpengine-t38-options.patch
