@@ -21,7 +21,6 @@ sipwise/add_pv_headers_module.patch
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
 sipwise/pv_trans_eval_uri.patch
-sipwise/fix_dialplan_errors.patch
 sipwise/tmrec-ical.patch
 # ** https://github.com/kamailio/kamailio/pull/2162
 sipwise/registrar_add_path.patch
@@ -37,13 +36,8 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-fix-memleaks.patch
 ## backport from kamailio trunk (5.4)
-upstream/rtpengine-add-support-for-via-branch-extra-option.patch
-upstream/rtpengine-add-support-for-explicit-load-balancing-op.patch
 upstream/core-events-support-for-basic-void-core-callbacks.patch
 upstream/core-main-executes-callbacks-on-app-ready-and-shutdo.patch
-upstream/core-allow-pp_define_get-to-be-used-by-modules.patch
-upstream/core-export-pp_define_get-via-ppcfg.h.patch
-upstream/core-improve-error-message-related-to-a-mismatch-of-.patch
 upstream/core-stop-start-if-ifdef-check-fails.patch
 upstream/systemdops-new-module-to-facilitate-integration-with.patch
 upstream/src-Makefile.groups-added-systemdops-module-to-syste.patch
@@ -51,18 +45,9 @@ upstream/systemdops-set-core-callbacks-in-mod_register.patch
 upstream/systemdops-proper-check-for-null-value.patch
 upstream/db_redis-performance-improvements-and-fixes.patch
 ## backport from kamailio upstream (5.3)
-upstream/rtpengine-add-support-for-trickle-ICE-SDP-fragments.patch
-upstream/rtpengine-add-support-for-start_forwarding-and-stop_.patch
 upstream/rtpengine-exported-rtpengine_query-variants-to-KEMI-.patch
-upstream/rtpengine-add-play_media-and-stop_media.patch
-upstream/rtpengine-add-play_dtmf-command.patch # (trunk)
-## backport from kamailio upstream (5.2)
-upstream/limit_the_execution_of_dialplan_reload.patch
-upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
-upstream/cfgt-don-t-try-to-create-dir-if-it-already-exists.patch
-upstream/cfgt-fix-detection-of-jump-to-previous-previous-rout.patch
-upstream/Makefile.defs-use-dedicated-vars-for-pthread-mutex-f.patch
 ## backport from kamailio trunk (5.4)
+upstream/rtpengine-add-play_dtmf-command.patch
 upstream/cfgt-group-RPC-commands-using-module-name.patch
 upstream/cfgt-add-docs-for-missing-RPC-commands.patch
 upstream/cfgt-doc-add-missing-section.patch

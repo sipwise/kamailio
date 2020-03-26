@@ -1,16 +1,17 @@
 From: Victor Seva <vseva@sipwise.com>
 Date: Fri, 28 Feb 2020 11:39:24 +0100
 Subject: pua_dialoginfo: local_identity_dlg_var
+
 ---
  .../pua_dialoginfo/doc/pua_dialoginfo_admin.xml      | 20 ++++++++++++++++++++
  src/modules/pua_dialoginfo/pua_dialoginfo.c          | 17 +++++++++++++++++
  2 files changed, 37 insertions(+)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 3054a77..fc0efd6 100644
+index bd48956..0dee5f9 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-@@ -535,6 +535,26 @@ modparam("pua_dialoginfo", "callee_trying", 1)
+@@ -554,6 +554,26 @@ modparam("pua_dialoginfo", "callee_trying", 1)
  </programlisting>
  		</example>
  		</section>

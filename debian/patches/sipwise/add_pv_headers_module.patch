@@ -1,8 +1,9 @@
 From: Sipwise Development Team <support@sipwise.com>
 Date: Mon, 18 Nov 2019 10:36:39 +0100
 Subject: add_pv_headers_module
+
 ---
- src/Makefile.groups                             |    2 +-
+ src/Makefile.groups                             |    3 +-
  src/modules/pv_headers/Makefile                 |   12 +
  src/modules/pv_headers/README                   |  332 +++++++
  src/modules/pv_headers/doc/Makefile             |    4 +
@@ -22,7 +23,7 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/pvh_str.h                |   38 +
  src/modules/pv_headers/pvh_xavp.c               | 1050 +++++++++++++++++++++++
  src/modules/pv_headers/pvh_xavp.h               |   64 ++
- 20 files changed, 3390 insertions(+), 1 deletion(-)
+ 20 files changed, 3391 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -44,15 +45,16 @@ Subject: add_pv_headers_module
  create mode 100644 src/modules/pv_headers/pvh_xavp.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index dba8073..33cbf0a 100644
+index 001307f..e426b78 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -15,7 +15,7 @@ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
+@@ -15,7 +15,8 @@ mod_list_basic=async auth benchmark blst cfg_rpc cfgutils corex counters \
  				   nat_traversal nathelper path pike pv ratelimit rr rtimer \
  				   rtpproxy sanity sdpops siputils sl statistics textops \
  				   textopsx tm tmx topoh xlog rtpengine stun sipt tcpops \
--				   auth_xkeys smsops tsilo cfgt statsc topos sipdump
-+				   auth_xkeys smsops tsilo cfgt statsc topos sipdump pv_headers
+-				   auth_xkeys smsops tsilo cfgt statsc topos sipdump kemix
++				   auth_xkeys smsops tsilo cfgt statsc topos sipdump kemix \
++				   pv_headers
  
  # - extra used modules, with no extra dependency
  mod_list_extra=avp auth_diameter call_control call_obj dmq domainpolicy msrp \

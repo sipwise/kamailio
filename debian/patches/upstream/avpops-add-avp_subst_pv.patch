@@ -1,4 +1,3 @@
-From 3693ab0bbb5254e4286e1894884380295e99ad52 Mon Sep 17 00:00:00 2001
 From: Kirill Solomko <ksolomko@sipwise.com>
 Date: Thu, 28 Nov 2019 16:11:15 +0100
 Subject: [PATCH] avpops: add avp_subst_pv()
@@ -6,11 +5,11 @@ Subject: [PATCH] avpops: add avp_subst_pv()
 * same functionality as avp_subst() but second parameter
   will be evaluated before calling subst.
 ---
- src/modules/avpops/avpops.c | 58 +++++++++++++++++++++++++++++++++++++
+ src/modules/avpops/avpops.c | 58 +++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 58 insertions(+)
 
 diff --git a/src/modules/avpops/avpops.c b/src/modules/avpops/avpops.c
-index 0805407cf..3d8f949b3 100644
+index 0805407..3d8f949 100644
 --- a/src/modules/avpops/avpops.c
 +++ b/src/modules/avpops/avpops.c
 @@ -67,6 +67,8 @@ static int fixup_pushto_avp(void** param, int param_no);
@@ -113,6 +112,3 @@ index 0805407cf..3d8f949b3 100644
  static int w_is_avp_set(struct sip_msg* msg, char* param, char *op)
  {
  	return ops_is_avp_set(msg, (struct fis_param*)param);
--- 
-2.20.1
-

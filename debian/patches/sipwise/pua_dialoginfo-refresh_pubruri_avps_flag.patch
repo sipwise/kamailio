@@ -1,16 +1,17 @@
 From: Victor Seva <vseva@sipwise.com>
 Date: Thu, 20 Feb 2020 18:50:14 +0100
 Subject: pua_dialoginfo: refresh_pubruri_avps_flag
+
 ---
  .../pua_dialoginfo/doc/pua_dialoginfo_admin.xml    | 20 +++++-
  src/modules/pua_dialoginfo/pua_dialoginfo.c        | 75 ++++++++++++++++++++++
  2 files changed, 94 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index eda5562..3054a77 100644
+index c869344..bd48956 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-@@ -414,7 +414,25 @@ modparam("pua_dialoginfo", "use_pubruri_avps", 1)
+@@ -433,7 +433,25 @@ modparam("pua_dialoginfo", "use_pubruri_avps", 1)
  </programlisting>
  		</example>
  		</section>
@@ -35,7 +36,7 @@ index eda5562..3054a77 100644
 +		</section>
 +
  		<section>
- 		<title><varname>pubruri_caller_avp</varname> (int)</title>
+ 		<title><varname>pubruri_caller_avp</varname> (str)</title>
  		<para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 index f393249..2e25386 100644

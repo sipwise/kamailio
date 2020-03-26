@@ -1,14 +1,39 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 26 Mar 2020 10:06:45 +0100
+Subject: add_pcem_module
+
+---
+ src/Makefile.groups           |   4 +-
+ src/modules/pcem/Makefile     |  15 +++++
+ src/modules/pcem/pcem_logic.c | 128 ++++++++++++++++++++++++++++++++++++
+ src/modules/pcem/pcem_logic.h |  32 +++++++++
+ src/modules/pcem/pcem_mod.c   | 149 ++++++++++++++++++++++++++++++++++++++++++
+ src/modules/pcem/pcem_mod.h   |  31 +++++++++
+ 6 files changed, 357 insertions(+), 2 deletions(-)
+ create mode 100644 src/modules/pcem/Makefile
+ create mode 100644 src/modules/pcem/pcem_logic.c
+ create mode 100644 src/modules/pcem/pcem_logic.h
+ create mode 100644 src/modules/pcem/pcem_mod.c
+ create mode 100644 src/modules/pcem/pcem_mod.h
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index fe65f55..e2de25b 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -29,7 +29,7 @@ mod_list_db=acc alias_db auth_db avpops
+@@ -29,8 +29,8 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
--			  sqlops uac uri_db userblacklist usrloc
-+			  sqlops uac uri_db userblacklist usrloc pcem
- 
+-			  sqlops uac uri_db userblacklist usrloc secfilter
+-
++			  sqlops uac uri_db userblacklist usrloc secfilter \
++			  pcem
  
  # - common modules depending on database, using UID db schema
+ mod_list_dbuid=db2_ops uid_auth_db uid_avp_db uid_domain uid_gflags \
+diff --git a/src/modules/pcem/Makefile b/src/modules/pcem/Makefile
+new file mode 100644
+index 0000000..3672a07
 --- /dev/null
 +++ b/src/modules/pcem/Makefile
 @@ -0,0 +1,15 @@
@@ -27,6 +52,9 @@
 +SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/pcem/pcem_logic.c b/src/modules/pcem/pcem_logic.c
+new file mode 100644
+index 0000000..350480a
 --- /dev/null
 +++ b/src/modules/pcem/pcem_logic.c
 @@ -0,0 +1,128 @@
@@ -158,6 +186,9 @@
 +	}
 +}
 +
+diff --git a/src/modules/pcem/pcem_logic.h b/src/modules/pcem/pcem_logic.h
+new file mode 100644
+index 0000000..b93b181
 --- /dev/null
 +++ b/src/modules/pcem/pcem_logic.h
 @@ -0,0 +1,32 @@
@@ -193,6 +224,9 @@
 +void pcem_onreq( struct cell* t, int type, struct tmcb_params *ps );
 +
 +#endif
+diff --git a/src/modules/pcem/pcem_mod.c b/src/modules/pcem/pcem_mod.c
+new file mode 100644
+index 0000000..2710b60
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.c
 @@ -0,0 +1,149 @@
@@ -345,6 +379,9 @@
 +{
 +}
 +
+diff --git a/src/modules/pcem/pcem_mod.h b/src/modules/pcem/pcem_mod.h
+new file mode 100644
+index 0000000..65c4f74
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.h
 @@ -0,0 +1,31 @@

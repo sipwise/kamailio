@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Thu, 26 Mar 2020 10:06:45 +0100
+Subject: no_lib64_on_64_bits
+
+---
+ src/Makefile.defs | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/src/Makefile.defs b/src/Makefile.defs
+index a4ecc20..47cf68e 100644
 --- a/src/Makefile.defs
 +++ b/src/Makefile.defs
-@@ -424,15 +424,7 @@ endif
+@@ -443,15 +443,7 @@ endif
  
  $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
  

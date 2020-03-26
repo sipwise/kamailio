@@ -1,15 +1,15 @@
-From 0c48e1621c88bf1d390e4cfb82e52b2d6339b837 Mon Sep 17 00:00:00 2001
 From: Daniel-Constantin Mierla <miconda@gmail.com>
 Date: Thu, 21 Nov 2019 13:42:14 +0100
-Subject: [PATCH] systemdops: new module to facilitate integration with systemd
+Subject: [PATCH] systemdops: new module to facilitate integration with
+ systemd
 
 ---
- src/modules/systemdops/Makefile               | 23 ++++++
- src/modules/systemdops/README                 | 77 +++++++++++++++++++
- src/modules/systemdops/doc/Makefile           |  4 +
- src/modules/systemdops/doc/systemdops.xml     | 36 +++++++++
- .../systemdops/doc/systemdops_admin.xml       | 76 ++++++++++++++++++
- src/modules/systemdops/systemdops_mod.c       | 72 +++++++++++++++++
+ src/modules/systemdops/Makefile                 | 23 ++++++++
+ src/modules/systemdops/README                   | 77 +++++++++++++++++++++++++
+ src/modules/systemdops/doc/Makefile             |  4 ++
+ src/modules/systemdops/doc/systemdops.xml       | 36 ++++++++++++
+ src/modules/systemdops/doc/systemdops_admin.xml | 76 ++++++++++++++++++++++++
+ src/modules/systemdops/systemdops_mod.c         | 72 +++++++++++++++++++++++
  6 files changed, 288 insertions(+)
  create mode 100644 src/modules/systemdops/Makefile
  create mode 100644 src/modules/systemdops/README
@@ -20,7 +20,7 @@ Subject: [PATCH] systemdops: new module to facilitate integration with systemd
 
 diff --git a/src/modules/systemdops/Makefile b/src/modules/systemdops/Makefile
 new file mode 100644
-index 000000000..26e15cd39
+index 0000000..26e15cd
 --- /dev/null
 +++ b/src/modules/systemdops/Makefile
 @@ -0,0 +1,23 @@
@@ -49,7 +49,7 @@ index 000000000..26e15cd39
 +include ../../Makefile.modules
 diff --git a/src/modules/systemdops/README b/src/modules/systemdops/README
 new file mode 100644
-index 000000000..c93df6102
+index 0000000..c93df61
 --- /dev/null
 +++ b/src/modules/systemdops/README
 @@ -0,0 +1,77 @@
@@ -132,7 +132,7 @@ index 000000000..c93df6102
 +...
 diff --git a/src/modules/systemdops/doc/Makefile b/src/modules/systemdops/doc/Makefile
 new file mode 100644
-index 000000000..51a2fbb9d
+index 0000000..51a2fbb
 --- /dev/null
 +++ b/src/modules/systemdops/doc/Makefile
 @@ -0,0 +1,4 @@
@@ -142,7 +142,7 @@ index 000000000..51a2fbb9d
 +include $(docbook_dir)/Makefile.module
 diff --git a/src/modules/systemdops/doc/systemdops.xml b/src/modules/systemdops/doc/systemdops.xml
 new file mode 100644
-index 000000000..bf15611d2
+index 0000000..bf15611
 --- /dev/null
 +++ b/src/modules/systemdops/doc/systemdops.xml
 @@ -0,0 +1,36 @@
@@ -184,7 +184,7 @@ index 000000000..bf15611d2
 +</book>
 diff --git a/src/modules/systemdops/doc/systemdops_admin.xml b/src/modules/systemdops/doc/systemdops_admin.xml
 new file mode 100644
-index 000000000..7af4cc3d9
+index 0000000..7af4cc3
 --- /dev/null
 +++ b/src/modules/systemdops/doc/systemdops_admin.xml
 @@ -0,0 +1,76 @@
@@ -266,7 +266,7 @@ index 000000000..7af4cc3d9
 +
 diff --git a/src/modules/systemdops/systemdops_mod.c b/src/modules/systemdops/systemdops_mod.c
 new file mode 100644
-index 000000000..58d7a2b24
+index 0000000..58d7a2b
 --- /dev/null
 +++ b/src/modules/systemdops/systemdops_mod.c
 @@ -0,0 +1,72 @@
@@ -342,6 +342,3 @@ index 000000000..58d7a2b24
 +{
 +	return 0;
 +}
--- 
-2.20.1
-
