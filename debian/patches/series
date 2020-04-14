@@ -72,6 +72,11 @@ sipwise/rtpengine-flags-for-everything.patch
 sipwise/pv_headers-full-rework.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+# ** https://github.com/kamailio/kamailio/pull/2284
+sipwise/app_lua-add-support-for-ARRAY-and-DICT-types.patch
+sipwise/core-KEMI-suport-for-ARRAY-and-DICT.patch
+# ** https://github.com/kamailio/kamailio/pull/2285
+sipwise/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
