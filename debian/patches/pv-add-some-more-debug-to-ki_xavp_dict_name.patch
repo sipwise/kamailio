@@ -1,0 +1,47 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 21 Apr 2020 10:54:20 +0200
+Subject: pv: add some more debug to ki_xavp_dict_name
+
+Change-Id: Idd9d5e0bc171522fb3e747d4cb40fb4cc290732e
+---
+ src/modules/pv/pv.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/pv/pv.c b/src/modules/pv/pv.c
+index 54bf38d..7cb01d1 100644
+--- a/src/modules/pv/pv.c
++++ b/src/modules/pv/pv.c
+@@ -1247,7 +1247,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+ 	{
+ 		avp = avp->next;
+ 	}
+-
++	LM_DBG("name:%.*s\n", name->len, name->s);
+ 	while(avp!=NULL){
+ 		switch(avp->val.type) {
+ 			case SR_XTYPE_XAVP:
+@@ -1263,13 +1263,16 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+ 		}
+ 		switch(avp->val.type) {
+ 			case SR_XTYPE_NULL:
++				LM_DBG("name:%.*s SR_XTYPE_NULL\n", name->len, name->s);
+ 				val->vtype = SR_KEMIP_NULL;
+ 			break;
+ 			case SR_XTYPE_INT:
++				LM_DBG("name:%.*s SR_XTYPE_INT\n", name->len, name->s);
+ 				val->vtype = SR_KEMIP_INT;
+ 				val->v.n = avp->val.v.i;
+ 			break;
+ 			case SR_XTYPE_STR:
++				LM_DBG("name:%.*s SR_XTYPE_STR\n", name->len, name->s);
+ 				val->vtype = SR_KEMIP_STR;
+ 				val->v.s.s = avp->val.v.s.s;
+ 				val->v.s.len = avp->val.v.s.len;
+@@ -1282,6 +1285,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+ 				LM_WARN("XAVP type:%d value not supported\n", avp->val.type);
+ 			break;
+ 			case SR_XTYPE_XAVP:
++				LM_DBG("name:%.*s SR_XTYPE_XAVP\n", name->len, name->s);
+ 				val = ki_xavp_dict(avp->val.v.xavp);
+ 			break;
+ 			default:
