@@ -1,0 +1,130 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 21 Apr 2020 10:54:20 +0200
+Subject: pv: add some more debug to ki_xavp_dict_name
+
+---
+ src/modules/app_lua/app_lua_api.c |  9 +++++++++
+ src/modules/pv/pv.c               | 12 ++++++++----
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/app_lua/app_lua_api.c b/src/modules/app_lua/app_lua_api.c
+index da3b4ee..2106a95 100644
+--- a/src/modules/app_lua/app_lua_api.c
++++ b/src/modules/app_lua/app_lua_api.c
+@@ -820,6 +820,7 @@ void sr_kemi_lua_push_array(lua_State *L, sr_kemi_dict_item_t *item) {
+ 		return;
+ 	}
+ 	if (item->vtype == SR_KEMIP_ARRAY) {
++		LM_DBG("item is SR_KEMIP_ARRAY\n");
+ 		k = item->v.dict;
+ 	} else {
+ 		k = item;
+@@ -828,6 +829,7 @@ void sr_kemi_lua_push_array(lua_State *L, sr_kemi_dict_item_t *item) {
+ 		lua_newtable(L);
+ 	}
+ 	while(k){
++		LM_DBG("[%d]\n", i);
+ 		lua_pushnumber(L, i++);
+ 		sr_kemi_lua_push_dict_item(L, k);
+ 		lua_settable(L, -3);
+@@ -845,6 +847,7 @@ void sr_kemi_lua_push_dict(lua_State *L, sr_kemi_dict_item_t *item) {
+ 	while(k){
+ 		sr_kemi_lua_push_dict_item(L, k->v.dict);
+ 		lua_setfield(L, -2, k->name.s);
++		LM_DBG("name:%.*s\n", k->name.len, k->name.s);
+ 		k = k->next;
+ 	}
+ }
+@@ -858,12 +861,15 @@ sr_kemi_lua_push_dict_item(lua_State *L, sr_kemi_dict_item_t *item)
+ 			lua_pushnil(L);
+ 		break;
+ 		case SR_KEMIP_INT:
++			LM_DBG("SR_KEMIP_INT\n");
+ 			lua_pushinteger(L, item->v.n);
+ 		break;
+ 		case SR_KEMIP_STR:
++			LM_DBG("SR_KEMIP_STR\n");
+ 			lua_pushlstring(L, item->v.s.s, item->v.s.len);
+ 		break;
+ 		case SR_KEMIP_BOOL:
++			LM_DBG("SR_KEMIP_BOOL\n");
+ 			if(item->v.n!=SR_KEMI_FALSE) {
+ 				lua_pushboolean(L, SRLUA_TRUE);
+ 			} else {
+@@ -871,12 +877,15 @@ sr_kemi_lua_push_dict_item(lua_State *L, sr_kemi_dict_item_t *item)
+ 			}
+ 		break;
+ 		case SR_KEMIP_NULL:
++			LM_DBG("SR_KEMIP_NULL\n");
+ 			lua_pushnil(L);
+ 		break;
+ 		case SR_KEMIP_ARRAY:
++			LM_DBG("SR_KEMIP_ARRAY\n");
+ 			sr_kemi_lua_push_array(L, item);
+ 		break;
+ 		case SR_KEMIP_DICT:
++			LM_DBG("SR_KEMIP_DICT\n");
+ 			sr_kemi_lua_push_dict(L, item);
+ 		break;
+ 		default:
+diff --git a/src/modules/pv/pv.c b/src/modules/pv/pv.c
+index 54bf38d..58942f1 100644
+--- a/src/modules/pv/pv.c
++++ b/src/modules/pv/pv.c
+@@ -1229,7 +1229,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp);
+ /**
+  * SR_KEMIP_ARRAY with values of xavp=>name
+  */
+-sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
++sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
+ {
+ 	sr_kemi_dict_item_t *ini = NULL;
+ 	sr_kemi_dict_item_t *val;
+@@ -1243,11 +1243,11 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+ 	}
+ 	memset(ini, 0, sizeof(sr_kemi_xval_t));
+ 	ini->vtype = SR_KEMIP_ARRAY;
+-	while(avp!=NULL&&!STR_EQ(avp->name,name))
++	while(avp!=NULL&&!STR_EQ(avp->name,*name))
+ 	{
+ 		avp = avp->next;
+ 	}
+-
++	LM_DBG("name:%.*s\n", name->len, name->s);
+ 	while(avp!=NULL){
+ 		switch(avp->val.type) {
+ 			case SR_XTYPE_XAVP:
+@@ -1263,13 +1263,16 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+ 		}
+ 		switch(avp->val.type) {
+ 			case SR_XTYPE_NULL:
++				LM_DBG("name:%.*s SR_XTYPE_NULL\n", name->len, name->s);
+ 				val->vtype = SR_KEMIP_NULL;
+ 			break;
+ 			case SR_XTYPE_INT:
++				LM_DBG("name:%.*s SR_XTYPE_INT\n", name->len, name->s);
+ 				val->vtype = SR_KEMIP_INT;
+ 				val->v.n = avp->val.v.i;
+ 			break;
+ 			case SR_XTYPE_STR:
++				LM_DBG("name:%.*s SR_XTYPE_STR\n", name->len, name->s);
+ 				val->vtype = SR_KEMIP_STR;
+ 				val->v.s.s = avp->val.v.s.s;
+ 				val->v.s.len = avp->val.v.s.len;
+@@ -1282,6 +1285,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+ 				LM_WARN("XAVP type:%d value not supported\n", avp->val.type);
+ 			break;
+ 			case SR_XTYPE_XAVP:
++				LM_DBG("name:%.*s SR_XTYPE_XAVP\n", name->len, name->s);
+ 				val = ki_xavp_dict(avp->val.v.xavp);
+ 			break;
+ 			default:
+@@ -1335,7 +1339,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
+ 			val->vtype = SR_KEMIP_DICT;
+ 			val->name.s = keys->s.s;
+ 			val->name.len = keys->s.len;
+-			val->v.dict = ki_xavp_dict_name(avp, keys->s);
++			val->v.dict = ki_xavp_dict_name(avp, &keys->s);
+ 			if(last) {
+ 				last->next = val;
+ 			} else {
