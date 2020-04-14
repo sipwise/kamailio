@@ -1,0 +1,93 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 13 Apr 2020 17:08:50 +0200
+Subject: [PATCH] core: KEMI suport for ARRAY and DICT
+
+---
+ src/core/kemi.c | 28 ++++++++++++++++++++++++++++
+ src/core/kemi.h | 17 ++++++++++++++++-
+ 2 files changed, 44 insertions(+), 1 deletion(-)
+
+diff --git a/src/core/kemi.c b/src/core/kemi.c
+index 7a96254..1f22969 100644
+--- a/src/core/kemi.c
++++ b/src/core/kemi.c
+@@ -2373,6 +2373,34 @@ static void sr_kemi_pv_push_valx (sr_kemi_xval_t *xval, int rmode, int vi, str *
+ 	}
+ }
+ 
++/**
++ *
++ */
++void sr_kemi_dict_item_free(sr_kemi_dict_item_t *item)
++{
++	sr_kemi_dict_item_t *v;
++
++	while(item) {
++		if (item->vtype == SR_KEMIP_ARRAY || item->vtype == SR_KEMIP_DICT) {
++			sr_kemi_dict_item_free(item->v.dict);
++		}
++		v = item;
++		item = item->next;
++		pkg_free(v);
++	}
++}
++
++/**
++ *
++ */
++void sr_kemi_xval_free(sr_kemi_xval_t *xval)
++{
++	if(xval && (xval->vtype == SR_KEMIP_ARRAY || xval->vtype == SR_KEMIP_DICT))
++	{
++		sr_kemi_dict_item_free(xval->v.dict);
++	}
++}
++
+ /**
+  *
+  */
+diff --git a/src/core/kemi.h b/src/core/kemi.h
+index 7824ce2..85cd521 100644
+--- a/src/core/kemi.h
++++ b/src/core/kemi.h
+@@ -32,6 +32,8 @@
+ #define SR_KEMIP_BOOL	(1<<2)	/* type boolean (0/1) */
+ #define SR_KEMIP_XVAL	(1<<3)	/* type extended value (integer, str*, ...) */
+ #define SR_KEMIP_NULL	(1<<4)	/* type NULL */
++#define SR_KEMIP_DICT	(1<<5)	/* type dictionary */
++#define SR_KEMIP_ARRAY	(1<<6)	/* type array */
+ 
+ #define SR_KEMI_FALSE	0
+ #define SR_KEMI_TRUE	1
+@@ -66,11 +68,24 @@ typedef union {
+ 	str s;
+ } sr_kemi_val_t;
+ 
++typedef struct sr_kemi_dict_item
++{
++	struct sr_kemi_dict_item *next;
++	str name;
++	int vtype;
++	union {
++		int n;
++		str s;
++		struct sr_kemi_dict_item *dict;
++	} v;
++} sr_kemi_dict_item_t;
++
+ typedef struct sr_kemi_xval {
+ 	int vtype;
+ 	union {
+ 		int n;
+ 		str s;
++		sr_kemi_dict_item_t *dict;
+ 	} v;
+ } sr_kemi_xval_t;
+ 
+@@ -208,5 +223,5 @@ sr_kemi_t* sr_kemi_exports_get_pv(void);
+ #define SR_KEMI_XVAL_NULL_PRINT 1
+ #define SR_KEMI_XVAL_NULL_EMPTY 2
+ void sr_kemi_xval_null(sr_kemi_xval_t *xval, int rmode);
+-
++void sr_kemi_xval_free(sr_kemi_xval_t *xval);
+ #endif
