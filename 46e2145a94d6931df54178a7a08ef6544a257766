@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b1d84f60_eeaa6d7a",
+        "filename": "debian/patches/series",
+        "patchSetId": 1
+      },
+      "lineNbr": 91,
+      "author": {
+        "id": 1000021
+      },
+      "writtenOn": "2020-04-14T13:56:11Z",
+      "side": 1,
+      "message": "I think it is better move the line under \n   \"### relevant for upstream\"\nsection",
+      "range": {
+        "startLine": 91,
+        "startChar": 0,
+        "endLine": 91,
+        "endChar": 44
+      },
+      "revId": "46e2145a94d6931df54178a7a08ef6544a257766",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
