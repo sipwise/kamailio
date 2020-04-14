@@ -75,6 +75,7 @@ upstream/avpops-add-avp_subst_pv.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
+sipwise/rtpengine-flags-for-everything.patch
 ##
 sipwise/pv_headers-full-rework.patch
 #
