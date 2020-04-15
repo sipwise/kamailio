@@ -1,0 +1,8 @@
+Verified+1: Jenkins Jenkins
+Code-Review+1: Richard Fuchs <rfuchs@sipwise.com>
+Code-Review+2: Marco Capetta <mcapetta@sipwise.com>
+Submitted-by: Marco Capetta <mcapetta@sipwise.com>
+Submitted-at: Wed, 15 Apr 2020 15:23:20 +0200
+Reviewed-on: http://gerrit.mgm.sipwise.com/c/kamailio/+/39350
+Project: kamailio
+Branch: refs/heads/mr8.3
