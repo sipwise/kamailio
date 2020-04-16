@@ -1,3 +1,10 @@
+ngcp-kamailio (5.2.5-1+0~mr8.3.1.2) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [297005f] TT#79601 add rtpengine flags for all commands
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 16 Apr 2020 14:03:08 +0200
+
 ngcp-kamailio (5.2.5-1+0~mr8.3.1.1) unstable; urgency=medium
 
   * New release.
