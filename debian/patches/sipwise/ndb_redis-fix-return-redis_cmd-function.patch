@@ -1,0 +1,42 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 22 Apr 2020 14:12:54 +0200
+Subject: ndb_redis: fix return redis_cmd function
+
+return error if command execution fails
+---
+ src/modules/ndb_redis/redis_client.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/src/modules/ndb_redis/redis_client.c b/src/modules/ndb_redis/redis_client.c
+index a453180..acdc978 100644
+--- a/src/modules/ndb_redis/redis_client.c
++++ b/src/modules/ndb_redis/redis_client.c
+@@ -953,6 +953,14 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
+ 			goto error_exec;
+ 		}
+ 	}
++
++	LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
++	if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
++		LM_ERR("Redis error:%.*s\n",
++			(int)rpl->rplRedis->len, rpl->rplRedis->str);
++		goto error_exec;
++	}
++
+ 	if (check_cluster_reply(rpl->rplRedis, &rsrv)) {
+ 		LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
+ 		if(rsrv->ctxRedis==NULL)
+@@ -987,6 +995,13 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
+ 				goto error_exec;
+ 			}
+ 		}
++
++		LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
++		if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
++			LM_ERR("Redis error:%.*s\n",
++				(int)rpl->rplRedis->len, rpl->rplRedis->str);
++			goto error_exec;
++		}
+ 	}
+ 	cmd->s[cmd->len] = c;
+ 	rsrv->disable.consecutive_errors = 0;
