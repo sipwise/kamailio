@@ -1,0 +1,26 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 22 Apr 2020 14:12:54 +0200
+Subject: ndb_redis: fix return redis_cmd function
+
+return error if command execution fails
+---
+ src/modules/ndb_redis/redis_client.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/ndb_redis/redis_client.c b/src/modules/ndb_redis/redis_client.c
+index a453180..ef121fe 100644
+--- a/src/modules/ndb_redis/redis_client.c
++++ b/src/modules/ndb_redis/redis_client.c
+@@ -996,8 +996,10 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
+ 	va_end(ap4);
+ 
+ 	LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
+-
+-	return 0;
++	if(!rsrv->ctxRedis->err) {
++		ret = 0;
++	}
++	return ret;
+ 
+ error_exec:
+ 	cmd->s[cmd->len] = c;
