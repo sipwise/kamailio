@@ -1,0 +1,57 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 22 Apr 2020 14:12:54 +0200
+Subject: ndb_redis: fix return redis_cmd function
+
+return error if command execution fails
+---
+ src/modules/ndb_redis/redis_client.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/ndb_redis/redis_client.c b/src/modules/ndb_redis/redis_client.c
+index a453180..f1312e0 100644
+--- a/src/modules/ndb_redis/redis_client.c
++++ b/src/modules/ndb_redis/redis_client.c
+@@ -893,14 +893,16 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
+ 		goto error_exec;
+ 	}
+ 
+-	LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
++	LM_DBG("rsrv->ctxRedis = %p rsrv->ctxRedis->err = %d\n",
++		rsrv->ctxRedis, rsrv->ctxRedis->err);
+ 
+ 	if(rsrv->ctxRedis==NULL)
+ 	{
+ 		LM_ERR("no redis context for server: %.*s\n", srv->len, srv->s);
+ 		goto error_exec;
+ 	}
+-	LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
++	LM_DBG("rsrv->ctxRedis = %p rsrv->ctxRedis->err = %d\n",
++		rsrv->ctxRedis, rsrv->ctxRedis->err);
+ 
+ 	if (rsrv->piped.pending_commands != 0)
+ 	{
+@@ -928,6 +930,8 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
+ 	}
+ 
+ 	rpl->rplRedis = redisvCommand(rsrv->ctxRedis, cmd->s, ap );
++	LM_DBG("rsrv->ctxRedis = %p rsrv->ctxRedis->err = %d\n",
++		rsrv->ctxRedis, rsrv->ctxRedis->err);
+ 	if(rpl->rplRedis == NULL)
+ 	{
+ 		/* null reply, reconnect and try again */
+@@ -995,9 +999,12 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
+ 	va_end(ap3);
+ 	va_end(ap4);
+ 
+-	LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
+-
+-	return 0;
++	LM_DBG("rsrv->ctxRedis = %p rsrv->ctxRedis->err = %d\n",
++		rsrv->ctxRedis, rsrv->ctxRedis->err);
++	if(!rsrv->ctxRedis->err) {
++		ret = 0;
++	}
++	return ret;
+ 
+ error_exec:
+ 	cmd->s[cmd->len] = c;
