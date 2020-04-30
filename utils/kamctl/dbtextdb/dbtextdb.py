@@ -993,12 +993,12 @@ class DBText(object):
             try:
                 if val:
                     val = eval(val)
-            except (NameError, e):
+            except NameError as e:
                 raise ExecuteError('Failed to parse %s in %s '
                                    '(unable to convert to type %s): %s' %
                                    (col, self.table, self.header[col]['type'],
                                     e))
-            except (SyntaxError, e):
+            except SyntaxError as e:
                 raise ExecuteError('Failed to parse %s in %s '
                                    '(unable to convert to type %s): %s' %
                                    (col, self.table, self.header[col]['type'],
@@ -1083,7 +1083,7 @@ class DBText(object):
             # save a copy of the data before modifying
             self.orig_data = self.data[:]
 
-        except (IOError, e):
+        except IOError as e:
             raise ExecuteError('Unable to open table %s: %s' % (self.table, e))
 
         Debug('Header is: %s' % self.header)
@@ -1230,7 +1230,7 @@ def main(argv):
                     print('Updated %s, rows affected: %d' % (conn.table, row))
                 else:
                     print(row)
-    except (Error, e):
+    except Error as e:
         print(e)
         sys.exit(1)
 
