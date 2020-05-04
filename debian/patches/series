@@ -68,6 +68,10 @@ upstream/rtpengine-fix-zero-length-log-placeholder.patch
 upstream/core-fix-returning-multiple-IPs-for-a-cached-DNS-ent.patch
 upstream/core-do-not-set-msg-tcp-connection-id-in-the-dst-inf.patch
 upstream/tm-do-not-set-msg-tcp-connection-id-in-the-dst-info.patch
+upstream/utils-kamctl-fix-handling-of-Exceptions.patch
+upstream/utils-kamctl-fix-dbtestdb.patch
+upstream/utils-kamctl-dbtextdb-remove-DeprecationWarning-on-t.patch
+upstream/utils-kamctl-dbtextdb.py-close-previous-opened-file-.patch
 ### relevant for upstream
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
@@ -76,7 +80,6 @@ sipwise/rtpengine-flags-for-everything.patch
 sipwise/pv_headers-full-rework.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
-sipwise/dbtextdb_fix_exception_handling
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
