@@ -1,6 +1,17 @@
+From 498d7649339edfc07f40fe3e37e66376b2817d6c Mon Sep 17 00:00:00 2001
+From: Richard Fuchs <rfuchs@sipwise.com>
+Date: Tue, 14 Apr 2020 13:15:21 -0400
+Subject: [PATCH] rtpengine: add `flags` field for every command
+
+---
+ src/modules/rtpengine/rtpengine.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 7be7968660..d56e88e003 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2401,8 +2401,9 @@
+@@ -2401,8 +2401,9 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	bencode_list_add_string(item, "load limit");
  
  	body.s = NULL;
@@ -11,7 +22,7 @@
  		ng_flags.direction = bencode_list(bencbuf);
  		ng_flags.replace = bencode_list(bencbuf);
  		ng_flags.rtcp_mux = bencode_list(bencbuf);
-@@ -2428,11 +2429,6 @@
+@@ -2428,11 +2429,6 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  		else
  			bencode_dictionary_add_str(ng_flags.dict, "sdp", &body);
  	}
@@ -23,3 +34,6 @@
  
  	/*** parse flags & build dictionary ***/
  
+-- 
+2.20.1
+
