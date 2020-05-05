@@ -5,25 +5,25 @@ Subject: add_pv_headers_module
 ---
  src/Makefile.groups                             |    3 +-
  src/modules/pv_headers/Makefile                 |   12 +
- src/modules/pv_headers/README                   |  332 +++++++
+ src/modules/pv_headers/README                   |  337 +++++++
  src/modules/pv_headers/doc/Makefile             |    4 +
  src/modules/pv_headers/doc/functions.xml        |  131 +++
  src/modules/pv_headers/doc/params.xml           |  186 ++++
  src/modules/pv_headers/doc/pv_headers.xml       |   39 +
  src/modules/pv_headers/doc/pv_headers_admin.xml |  116 +++
- src/modules/pv_headers/pv_headers.c             |  351 ++++++++
- src/modules/pv_headers/pv_headers.h             |   51 ++
- src/modules/pv_headers/pvh_func.c               |  388 +++++++++
- src/modules/pv_headers/pvh_func.h               |   38 +
- src/modules/pv_headers/pvh_hash.c               |  132 +++
- src/modules/pv_headers/pvh_hash.h               |   39 +
- src/modules/pv_headers/pvh_hdr.c                |  235 +++++
- src/modules/pv_headers/pvh_hdr.h                |   39 +
- src/modules/pv_headers/pvh_str.c                |  144 ++++
- src/modules/pv_headers/pvh_str.h                |   38 +
- src/modules/pv_headers/pvh_xavp.c               | 1050 +++++++++++++++++++++++
- src/modules/pv_headers/pvh_xavp.h               |   64 ++
- 20 files changed, 3391 insertions(+), 1 deletion(-)
+ src/modules/pv_headers/pv_headers.c             |  519 +++++++++++
+ src/modules/pv_headers/pv_headers.h             |   57 ++
+ src/modules/pv_headers/pvh_func.c               |  360 +++++++
+ src/modules/pv_headers/pvh_func.h               |   42 +
+ src/modules/pv_headers/pvh_hash.c               |  134 +++
+ src/modules/pv_headers/pvh_hash.h               |   41 +
+ src/modules/pv_headers/pvh_hdr.c                |  295 ++++++
+ src/modules/pv_headers/pvh_hdr.h                |   47 +
+ src/modules/pv_headers/pvh_str.c                |  146 +++
+ src/modules/pv_headers/pvh_str.h                |   40 +
+ src/modules/pv_headers/pvh_xavp.c               | 1133 +++++++++++++++++++++++
+ src/modules/pv_headers/pvh_xavp.h               |   66 ++
+ 20 files changed, 3707 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -78,10 +78,10 @@ index 0000000..42b80dd
 +include ../../Makefile.modules
 diff --git a/src/modules/pv_headers/README b/src/modules/pv_headers/README
 new file mode 100644
-index 0000000..b99cc42
+index 0000000..1967529
 --- /dev/null
 +++ b/src/modules/pv_headers/README
-@@ -0,0 +1,332 @@
+@@ -0,0 +1,337 @@
 +pv_headers Module
 +
 +Kirill Solomko
@@ -126,7 +126,7 @@ index 0000000..b99cc42
 +              4.3. pvh_reset_headers()
 +              4.4. pvh_check_header(hname)
 +              4.5. pvh_append_header(hname, hvalue)
-+              4.6. pvh_modify_header(hname, [idx], hvalue)
++              4.6. pvh_modify_header(hname, hvalue, [idx])
 +              4.7. pvh_remove_header(hname, [idx])
 +
 +        5. Exported Variables
@@ -168,7 +168,7 @@ index 0000000..b99cc42
 +        4.3. pvh_reset_headers()
 +        4.4. pvh_check_header(hname)
 +        4.5. pvh_append_header(hname, hvalue)
-+        4.6. pvh_modify_header(hname, [idx], hvalue)
++        4.6. pvh_modify_header(hname, hvalue, [idx])
 +        4.7. pvh_remove_header(hname, [idx])
 +
 +   5. Exported Variables
@@ -224,7 +224,8 @@ index 0000000..b99cc42
 +
 +3.2. header_value_size (int)
 +
-+   ??????.
++   Defines an internal maximum SIP header value size. Header values longer
++   than this setting will be stripped down when collected or applied.
 +
 +   Default value is 1024.
 +
@@ -235,7 +236,9 @@ index 0000000..b99cc42
 +
 +3.3. header_collect_flag (int)
 +
-+   ??????.
++   Used to mark that headers are collected for the SIP message, leading to
++   subsequent headers collection on this message to be declined with an
++   error. Should be used only in branches and replies.
 +
 +   Default value is 27.
 +
@@ -246,7 +249,9 @@ index 0000000..b99cc42
 +
 +3.4. header_apply_flag (int)
 +
-+   ??????.
++   Used to mark that headers are applied for the SIP message, leading to
++   subsequent headers applies on this message to be declined with an
++   error. Should be used only in branches and replies.
 +
 +   Default value is 28.
 +
@@ -317,7 +322,7 @@ index 0000000..b99cc42
 +   4.3. pvh_reset_headers()
 +   4.4. pvh_check_header(hname)
 +   4.5. pvh_append_header(hname, hvalue)
-+   4.6. pvh_modify_header(hname, [idx], hvalue)
++   4.6. pvh_modify_header(hname, hvalue, [idx])
 +   4.7. pvh_remove_header(hname, [idx])
 +
 +   \
@@ -372,7 +377,7 @@ index 0000000..b99cc42
 +   This function can be used from ANY_ROUTE but only after
 +   pvh_collect_headers() or with "auto_msg" parameter enabled.
 +
-+4.6.  pvh_modify_header(hname, [idx], hvalue)
++4.6.  pvh_modify_header(hname, hvalue, [idx])
 +
 +   Modifies an existing header in the XAVP "hname" with the value "hvalue"
 +   into the XAVP. Index order is top to bottom. Please note that
@@ -801,7 +806,7 @@ index 0000000..a5211b9
 +</book>
 diff --git a/src/modules/pv_headers/doc/pv_headers_admin.xml b/src/modules/pv_headers/doc/pv_headers_admin.xml
 new file mode 100644
-index 0000000..9c5c009
+index 0000000..44e84f2
 --- /dev/null
 +++ b/src/modules/pv_headers/doc/pv_headers_admin.xml
 @@ -0,0 +1,116 @@
@@ -871,7 +876,7 @@ index 0000000..9c5c009
 +
 +	<xi:include href="params.xml"/>
 +	<xi:include href="functions.xml"/>
-+	
++
 +	<section>
 +		<title>Exported Variables</title>
 +		<itemizedlist>
@@ -923,23 +928,25 @@ index 0000000..9c5c009
 +</chapter>
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..9730847
+index 0000000..6faaf64
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,519 @@
 +/*
 + * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -951,76 +958,99 @@ index 0000000..9730847
 + */
 +
 +#include "../../core/sr_module.h"
-+#include "../../core/mod_fix.h"
 +#include "../../core/script_cb.h"
++#include "../../core/mod_fix.h"
 +#include "../../modules/tm/tm_load.h"
 +#include "../../core/kemi.h"
 +
 +#include "pv_headers.h"
 +#include "pvh_func.h"
-+#include "pvh_xavp.h"
 +#include "pvh_hash.h"
++#include "pvh_xavp.h"
 +
 +MODULE_VERSION
 +
 +#define MODULE_NAME "pv_headers"
-+
 +#define XAVP_NAME "headers"
-+
-+#define FL_NAME_PV_HDRS_COLLECTED "pv_headers_collected"
-+#define FL_NAME_PV_HDRS_APPLIED "pv_headers_applied"
-+
-+int FL_PV_HDRS_COLLECTED = 27;
-+int FL_PV_HDRS_APPLIED = 28;
 +
 +uac_api_t uac;
 +static tm_api_t tmb;
 +
 +str xavp_name = str_init(XAVP_NAME);
-+
++str xavp_helper_xname = str_init("modparam_pv_headers");
 +str xavp_parsed_xname = str_init("parsed_pv_headers");
++unsigned int header_name_size = 255;
++unsigned int header_value_size = 1024;
++int FL_PV_HDRS_COLLECTED = 27;
++int FL_PV_HDRS_APPLIED = 28;
 +static str skip_headers_param =
 +		str_init("Record-Route,Via,Route,Content-Length,Max-Forwards,CSeq");
 +static str split_headers_param = STR_NULL;
-+static int auto_msg_param = 1;
-+
 +static str single_headers_param = str_init("");
++static int auto_msg_param = 1;
 +
 +str _hdr_from = {"From", 4};
 +str _hdr_to = {"To", 2};
-+
-+unsigned int header_name_size = 255;
-+unsigned int header_value_size = 1024;
-+
++str _hdr_reply_reason = {"@Reply-Reason", 13};
++int _branch = T_BR_UNDEFINED;
++int _reply_counter = -1;
 +
 +static void mod_destroy(void);
 +static int mod_init(void);
 +
 +static void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params);
 +static int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb);
++static int handle_msg_branch_cb(
++		struct sip_msg *msg, unsigned int flags, void *cb);
++static int handle_msg_reply_cb(
++		struct sip_msg *msg, unsigned int flags, void *cb);
 +
 +static int w_pvh_collect_headers(struct sip_msg *msg, char *p1, char *p2)
 +{
-+	return pvh_collect_headers(msg, 0);
++	sr_xavp_t **backup_xavps = NULL;
++
++	if(pvh_get_branch_index(msg, &_branch) < 0)
++		return -1;
++	if(msg->first_line.type == SIP_REPLY) {
++		if((_reply_counter = pvh_reply_append(backup_xavps)) < 0) {
++			return -1;
++		}
++	}
++	return pvh_collect_headers(msg);
 +}
 +
 +static int ki_pvh_collect_headers(struct sip_msg *msg)
 +{
-+	return pvh_collect_headers(msg, 0);
++	sr_xavp_t **backup_xavps = NULL;
++
++	if(pvh_get_branch_index(msg, &_branch) < 0)
++		return -1;
++	if(msg->first_line.type == SIP_REPLY) {
++		if((_reply_counter = pvh_reply_append(backup_xavps)) < 0) {
++			return -1;
++		}
++	}
++	return pvh_collect_headers(msg);
 +}
 +
 +static int w_pvh_apply_headers(struct sip_msg *msg, char *p1, char *p2)
 +{
-+	return pvh_apply_headers(msg, 0);
++	if(pvh_get_branch_index(msg, &_branch) < 0)
++		return -1;
++	return pvh_apply_headers(msg);
 +}
 +
 +static int ki_pvh_apply_headers(struct sip_msg *msg)
 +{
-+	return pvh_apply_headers(msg, 0);
++	if(pvh_get_branch_index(msg, &_branch) < 0)
++		return -1;
++	return pvh_apply_headers(msg);
 +}
 +
 +static int w_pvh_reset_headers(struct sip_msg *msg, char *p1, char *p2)
 +{
++	if(pvh_get_branch_index(msg, &_branch) < 0)
++		return -1;
 +	return pvh_reset_headers(msg);
 +}
 +
@@ -1080,79 +1110,83 @@ index 0000000..9730847
 +	return pvh_remove_header(msg, &hname, indx);
 +}
 +
-+/*
-+ * Exported functions
-+ */
++/* clang-format off */
 +static cmd_export_t cmds[] = {
-+		{"pvh_collect_headers", (cmd_function)w_pvh_collect_headers, 0, 0, 0,
-+				ANY_ROUTE},
-+		{"pvh_apply_headers", (cmd_function)w_pvh_apply_headers, 0, 0, 0,
-+				ANY_ROUTE},
-+		{"pvh_reset_headers", (cmd_function)w_pvh_reset_headers, 0, 0, 0,
-+				ANY_ROUTE},
-+		{"pvh_check_header", (cmd_function)w_pvh_check_header, 1,
-+				fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
-+		{"pvh_append_header", (cmd_function)w_pvh_append_header, 2,
-+				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
-+		{"pvh_modify_header", (cmd_function)w_pvh_modify_header, 2,
-+				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
-+		{"pvh_modify_header", (cmd_function)w_pvh_modify_header, 3,
-+				fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
-+		{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 1,
-+				fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
-+		{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 2,
-+				fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
-+		{0, 0, 0, 0, 0, 0}};
++	{"pvh_collect_headers", (cmd_function)w_pvh_collect_headers, 0, 0, 0,
++			ANY_ROUTE},
++	{"pvh_apply_headers", (cmd_function)w_pvh_apply_headers, 0, 0, 0,
++			ANY_ROUTE},
++	{"pvh_reset_headers", (cmd_function)w_pvh_reset_headers, 0, 0, 0,
++			ANY_ROUTE},
++	{"pvh_check_header", (cmd_function)w_pvh_check_header, 1,
++			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
++	{"pvh_append_header", (cmd_function)w_pvh_append_header, 2,
++			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++	{"pvh_modify_header", (cmd_function)w_pvh_modify_header, 2,
++			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++	{"pvh_modify_header", (cmd_function)w_pvh_modify_header, 3,
++			fixup_spve_all, fixup_free_spve_all, ANY_ROUTE},
++	{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 1,
++			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
++	{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 2,
++			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
++	{0, 0, 0, 0, 0, 0}
++};
 +
 +static pv_export_t mod_pvs[] = {
-+		{{"x_hdr", (sizeof("x_hdr") - 1)}, PVT_OTHER, pvh_get_header,
-+				pvh_set_header, pvh_parse_header_name, pv_parse_index, 0, 0},
-+		{{"x_fu", (sizeof("x_fu") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 1},
-+		{{"x_fU", (sizeof("x_fU") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 2},
-+		{{"x_fd", (sizeof("x_fd") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 3},
-+		{{"x_fn", (sizeof("x_fn") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 4},
-+		{{"x_ft", (sizeof("x_ft") - 1)}, PVT_OTHER, pvh_get_uri, /* ro */ 0, 0,
-+				0, pv_init_iname, 5},
-+		{{"x_tu", (sizeof("x_tu") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 6},
-+		{{"x_tU", (sizeof("x_tU") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 7},
-+		{{"x_td", (sizeof("x_td") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 8},
-+		{{"x_tn", (sizeof("x_tn") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
-+				0, pv_init_iname, 9},
-+		{{"x_tt", (sizeof("x_tt") - 1)}, PVT_OTHER, pvh_get_uri, /* ro */ 0, 0,
-+				0, pv_init_iname, 10},
-+		{{"x_rs", (sizeof("x_rs") - 1)}, PVT_OTHER, pvh_get_reply_sr,
-+				pvh_set_reply_sr, 0, 0, pv_init_iname, 1},
-+		{{"x_rr", (sizeof("x_rr") - 1)}, PVT_OTHER, pvh_get_reply_sr,
-+				pvh_set_reply_sr, 0, 0, pv_init_iname, 2},
-+		{{0, 0}, 0, 0, 0, 0, 0, 0, 0}};
++	{{"x_hdr", (sizeof("x_hdr") - 1)}, PVT_OTHER, pvh_get_header,
++			pvh_set_header, pvh_parse_header_name, pv_parse_index, 0, 0},
++	{{"x_fu", (sizeof("x_fu") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 1},
++	{{"x_fU", (sizeof("x_fU") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 2},
++	{{"x_fd", (sizeof("x_fd") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 3},
++	{{"x_fn", (sizeof("x_fn") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 4},
++	{{"x_ft", (sizeof("x_ft") - 1)}, PVT_OTHER, pvh_get_uri, /* ro */ 0, 0,
++			0, pv_init_iname, 5},
++	{{"x_tu", (sizeof("x_tu") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 6},
++	{{"x_tU", (sizeof("x_tU") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 7},
++	{{"x_td", (sizeof("x_td") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 8},
++	{{"x_tn", (sizeof("x_tn") - 1)}, PVT_OTHER, pvh_get_uri, pvh_set_uri, 0,
++			0, pv_init_iname, 9},
++	{{"x_tt", (sizeof("x_tt") - 1)}, PVT_OTHER, pvh_get_uri, /* ro */ 0, 0,
++			0, pv_init_iname, 10},
++	{{"x_rs", (sizeof("x_rs") - 1)}, PVT_OTHER, pvh_get_reply_sr,
++			pvh_set_reply_sr, 0, 0, pv_init_iname, 1},
++	{{"x_rr", (sizeof("x_rr") - 1)}, PVT_OTHER, pvh_get_reply_sr,
++			pvh_set_reply_sr, 0, 0, pv_init_iname, 2},
++	{{0, 0}, 0, 0, 0, 0, 0, 0, 0}
++};
 +
-+static param_export_t params[] = {{"xavp_name", PARAM_STR, &xavp_name},
-+		{"header_value_size", PARAM_INT, &header_value_size},
-+		{"header_collect_flag", PARAM_INT, &FL_PV_HDRS_COLLECTED},
-+		{"header_apply_flag", PARAM_INT, &FL_PV_HDRS_APPLIED},
-+		{"skip_headers", PARAM_STR, &skip_headers_param},
-+		{"split_headers", PARAM_STR, &split_headers_param},
-+		{"auto_msg", PARAM_INT, &auto_msg_param}, {0, 0, 0}};
++static param_export_t params[] = {
++	{"xavp_name", PARAM_STR, &xavp_name},
++	{"header_value_size", PARAM_INT, &header_value_size},
++	{"header_collect_flag", PARAM_INT, &FL_PV_HDRS_COLLECTED},
++	{"header_apply_flag", PARAM_INT, &FL_PV_HDRS_APPLIED},
++	{"skip_headers", PARAM_STR, &skip_headers_param},
++	{"split_headers", PARAM_STR, &split_headers_param},
++	{"auto_msg", PARAM_INT, &auto_msg_param},
++	{0, 0, 0}
++};
 +
 +struct module_exports exports = {
-+		MODULE_NAME,	 /* module name */
-+		DEFAULT_DLFLAGS, /* dlopen flags */
-+		cmds,			 /* exported functions */
-+		params,			 /* exported parameters */
-+		0,				 /* RPC method exports */
-+		mod_pvs,		 /* exported pseudo-variables */
-+		0,				 /* response handling function */
-+		mod_init,		 /* module initialization function */
-+		0,				 /* per-child init function */
-+		mod_destroy		 /* module destroy function */
++	MODULE_NAME,	 /* module name */
++	DEFAULT_DLFLAGS, /* dlopen flags */
++	cmds,			 /* exported functions */
++	params,			 /* exported parameters */
++	0,				 /* RPC method exports */
++	mod_pvs,		 /* exported pseudo-variables */
++	0,				 /* response handling function */
++	mod_init,		 /* module initialization function */
++	0,				 /* per-child init function */
++	mod_destroy		 /* module destroy function */
 +};
++/* clang-format on */
 +
 +int mod_init(void)
 +{
@@ -1167,19 +1201,25 @@ index 0000000..9730847
 +		LM_NOTICE("could not bind to the 'tm' module, automatic headers "
 +				  "collect/apply is disabled\n");
 +		auto_msg_param = 0;
-+	} else {
-+		if(auto_msg_param
-+				&& register_script_cb(
-+						   handle_msg_cb, PRE_SCRIPT_CB | REQUEST_CB, 0)
-+						   < 0) {
-+			LM_ERR("cannot register PRE_SCRIPT_CB callbacks\n");
++	}
++	if(auto_msg_param) {
++		if(register_script_cb(handle_msg_cb, PRE_SCRIPT_CB | REQUEST_CB, 0)
++				< 0) {
++			LM_ERR("cannot register PRE_SCRIPT_CB REQUEST_CB callbacks\n");
 +			return -1;
 +		}
-+	}
-+
-+	if(header_value_size == 0) {
-+		LM_ERR("header_value_size must be >=0\n");
-+		return -1;
++		if(register_script_cb(
++				   handle_msg_branch_cb, PRE_SCRIPT_CB | BRANCH_CB, 0)
++				< 0) {
++			LM_ERR("cannot register PRE_SCRIPT_CB BRANCH_CB callbacks\n");
++			return -1;
++		}
++		if(register_script_cb(
++				   handle_msg_reply_cb, PRE_SCRIPT_CB | ONREPLY_CB, 0)
++				< 0) {
++			LM_ERR("cannot register PRE_SCRIPT_CB ONREPLY_CB callbacks\n");
++			return -1;
++		}
 +	}
 +
 +	pvh_str_hash_init(&skip_headers, &skip_headers_param, "skip_headers");
@@ -1191,25 +1231,81 @@ index 0000000..9730847
 +
 +void mod_destroy(void)
 +{
-+	pvh_str_hash_free(&skip_headers);
-+	pvh_str_hash_free(&split_headers);
-+	pvh_str_hash_free(&single_headers);
-+	pvh_free_xavp(&xavp_name);
-+	pvh_free_xavp(&xavp_parsed_xname);
 +	LM_INFO("%s module unload...\n", MODULE_NAME);
++}
++
++/* just for debug */
++static inline char *tm_type_to_string(int type)
++{
++	switch(type) {
++		case TMCB_REQUEST_IN:
++			return "TMCB_REQUEST_IN";
++		case TMCB_RESPONSE_IN:
++			return "TMCB_RESPONSE_IN";
++		case TMCB_E2EACK_IN:
++			return "TMCB_E2EACK_IN";
++		case TMCB_REQUEST_PENDING:
++			return "TMCB_REQUEST_PENDING";
++		case TMCB_REQUEST_FWDED:
++			return "TMCB_REQUEST_FWDED";
++		case TMCB_RESPONSE_FWDED:
++			return "TMCB_RESPONSE_FWDED";
++		case TMCB_ON_FAILURE_RO:
++			return "TMCB_ON_FAILURE_RO";
++		case TMCB_ON_FAILURE:
++			return "TMCB_ON_FAILURE";
++		case TMCB_REQUEST_OUT:
++			return "TMCB_REQUEST_OUT";
++		case TMCB_RESPONSE_OUT:
++			return "TMCB_RESPONSE_OUT";
++		case TMCB_LOCAL_COMPLETED:
++			return "TMCB_LOCAL_COMPLETED";
++		case TMCB_LOCAL_RESPONSE_OUT:
++			return "TMCB_LOCAL_RESPONSE_OUT";
++		case TMCB_ACK_NEG_IN:
++			return "TMCB_ACK_NEG_IN";
++		case TMCB_REQ_RETR_IN:
++			return "TMCB_REQ_RETR_IN";
++		case TMCB_LOCAL_RESPONSE_IN:
++			return "TMCB_LOCAL_RESPONSE_IN";
++		case TMCB_LOCAL_REQUEST_IN:
++			return "TMCB_LOCAL_REQUEST_IN";
++		case TMCB_DLG:
++			return "TMCB_DLG";
++		case TMCB_DESTROY:
++			return "TMCB_DESTROY";
++		case TMCB_E2ECANCEL_IN:
++			return "TMCB_E2ECANCEL_IN";
++		case TMCB_E2EACK_RETR_IN:
++			return "TMCB_E2EACK_RETR_IN";
++		case TMCB_RESPONSE_READY:
++			return "TMCB_RESPONSE_READY";
++		case TMCB_DONT_ACK:
++			return "TMCB_DONT_ACK";
++		case TMCB_REQUEST_SENT:
++			return "TMCB_REQUEST_SENT";
++		case TMCB_RESPONSE_SENT:
++			return "TMCB_RESPONSE_SENT";
++		case TMCB_ON_BRANCH_FAILURE:
++			return "TMCB_ON_BRANCH_FAILURE";
++		case TMCB_ON_BRANCH_FAILURE_RO:
++			return "TMCB_ON_BRANCH_FAILURE_RO";
++		case TMCB_MAX:
++			return "TMCB_MAX";
++	}
++
++	return "UNKNOWN";
 +}
 +
 +void handle_tm_t(tm_cell_t *t, int type, struct tmcb_params *params)
 +{
 +	struct sip_msg *msg = NULL;
 +
-+	if(type & TMCB_RESPONSE_IN) {
-+		msg = params->rpl;
-+		if(msg != NULL && msg != FAKED_REPLY) {
-+			pvh_reset_headers(msg);
-+			pvh_collect_headers(msg, 1);
-+		}
-+	} else if(type & TMCB_REQUEST_FWDED) {
++	LM_DBG("T:%p params->branch:%d type:%s\n", t, params->branch,
++			tm_type_to_string(type));
++
++
++	if(type & TMCB_REQUEST_FWDED) {
 +		msg = params->req;
 +	} else if(type & (TMCB_ON_BRANCH_FAILURE | TMCB_RESPONSE_FWDED)) {
 +		msg = params->rpl;
@@ -1218,60 +1314,137 @@ index 0000000..9730847
 +		return;
 +	}
 +
-+	if(msg != NULL && msg != FAKED_REPLY)
-+		pvh_apply_headers(msg, 1);
 +
++	LM_DBG("T:%p picked_branch:%d label:%d branches:%d\n", t,
++			tmb.t_get_picked_branch(), t->label, t->nr_of_outgoings);
++
++	if(msg != NULL && msg != FAKED_REPLY) {
++		pvh_get_branch_index(msg, &_branch);
++		LM_DBG("T:%p set branch:%d\n", t, _branch);
++		pvh_apply_headers(msg);
++	}
 +	return;
 +}
 +
++static int msg_cbs =
++		TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_ON_BRANCH_FAILURE;
++
 +int handle_msg_cb(struct sip_msg *msg, unsigned int flags, void *cb)
 +{
-+	int cbs = TMCB_REQUEST_FWDED | TMCB_RESPONSE_FWDED | TMCB_RESPONSE_IN
-+			  | TMCB_ON_BRANCH_FAILURE;
++	if(pvh_parse_msg(msg) != 0)
++		return 1;
 +
-+	if(flags & (PRE_SCRIPT_CB | REQUEST_CB)) {
-+		if(tmb.register_tmcb(msg, 0, cbs, handle_tm_t, 0, 0) <= 0) {
-+			LM_ERR("cannot register TM callbacks\n");
-+			return -1;
-+		}
-+		pvh_collect_headers(msg, 1);
-+	} else {
-+		LM_ERR("unknown callback: %d\n", flags);
++	if(tmb.register_tmcb(msg, 0, msg_cbs, handle_tm_t, 0, 0) <= 0) {
++		LM_ERR("cannot register TM callbacks\n");
++		return -1;
++	}
++
++	_branch = 0;
++	LM_DBG("msg:%p set branch:%d\n", msg, _branch);
++	pvh_collect_headers(msg);
++	return 1;
++}
++
++int handle_msg_branch_cb(struct sip_msg *msg, unsigned int flags, void *cb)
++{
++
++	LM_DBG("msg:%p previous branch:%d\n", msg, _branch);
++
++	if(flags & PRE_SCRIPT_CB) {
++		pvh_get_branch_index(msg, &_branch);
++		LM_DBG("msg:%p set branch:%d\n", msg, _branch);
++		pvh_clone_branch_xavp(msg, &xavp_name);
 +	}
 +
 +	return 1;
 +}
 +
++int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
++{
++	tm_cell_t *t = NULL;
++	sr_xavp_t **backup_xavps = NULL;
++	sr_xavp_t **list = NULL;
++
++	if(pvh_parse_msg(msg) != 0)
++		return 1;
++	LM_DBG("msg:%p previous branch:%d\n", msg, _branch);
++
++	if(tmb.t_check(msg, &_branch) == -1) {
++		LM_ERR("failed find UAC branch\n");
++	} else {
++		t = tmb.t_gett();
++		if(t == NULL || t == T_UNDEFINED) {
++			LM_DBG("cannot lookup the transaction\n");
++		} else {
++			LM_DBG("T:%p t_check-branch:%d xavp_list:%p branches:%d\n", t,
++					_branch, &t->xavps_list, t->nr_of_outgoings);
++			list = &t->xavps_list;
++			backup_xavps = xavp_set_list(&t->xavps_list);
++		}
++	}
++
++	pvh_get_branch_index(msg, &_branch);
++	LM_DBG("T:%p set branch:%d picked_branch:%d\n", t, _branch,
++			tmb.t_get_picked_branch());
++
++	if((_reply_counter = pvh_reply_append(list)) < 0) {
++		return -1;
++	}
++	pvh_collect_headers(msg);
++	if(backup_xavps) {
++		xavp_set_list(backup_xavps);
++		LM_DBG("restored backup_xavps:%p\n", *backup_xavps);
++	}
++	if(t) {
++		tmb.unref_cell(t);
++		LM_DBG("T:%p unref\n", t);
++	}
++	tmb.t_sett(T_UNDEFINED, T_BR_UNDEFINED);
++	LM_DBG("reset tm\n");
++
++	return 1;
++}
++
++/* clang-format off */
 +static sr_kemi_t pvh_kemi_exports[] = {
-+		{str_init("pv_headers"), str_init("pvh_collect_headers"), SR_KEMIP_INT,
-+				ki_pvh_collect_headers,
-+				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{str_init("pv_headers"), str_init("pvh_apply_headers"), SR_KEMIP_INT,
-+				ki_pvh_apply_headers,
-+				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{str_init("pv_headers"), str_init("pvh_reset_headers"), SR_KEMIP_INT,
-+				pvh_reset_headers,
-+				{SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{str_init("pv_headers"), str_init("pvh_check_header"), SR_KEMIP_INT,
-+				pvh_check_header,
-+				{SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{str_init("pv_headers"), str_init("pvh_append_header"), SR_KEMIP_INT,
-+				pvh_check_header,
-+				{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{str_init("pv_headers"), str_init("pvh_modify_header"), SR_KEMIP_INT,
-+				pvh_modify_header,
-+				{SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{str_init("pv_headers"), str_init("pvh_remove_header"), SR_KEMIP_INT,
-+				pvh_remove_header,
-+				{SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
-+						SR_KEMIP_NONE, SR_KEMIP_NONE}},
-+		{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}};
++	{ str_init("pv_headers"), str_init("pvh_collect_headers"),
++		SR_KEMIP_INT, ki_pvh_collect_headers,
++			{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{ str_init("pv_headers"), str_init("pvh_apply_headers"),
++		SR_KEMIP_INT, ki_pvh_apply_headers,
++			{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{ str_init("pv_headers"), str_init("pvh_reset_headers"),
++		SR_KEMIP_INT, pvh_reset_headers,
++			{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{ str_init("pv_headers"), str_init("pvh_check_header"),
++		SR_KEMIP_INT, pvh_check_header,
++			{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{ str_init("pv_headers"), str_init("pvh_append_header"),
++		SR_KEMIP_INT, pvh_append_header,
++			{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{ str_init("pv_headers"), str_init("pvh_modify_header"),
++		SR_KEMIP_INT, pvh_modify_header,
++			{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
++			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{ str_init("pv_headers"), str_init("pvh_remove_header"),
++		SR_KEMIP_INT, pvh_remove_header,
++			{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
++	},
++	{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}
++};
++/* clang-format on */
 +
 +int mod_register(char *path, int *dlflags, void *p1, void *p2)
 +{
@@ -1280,23 +1453,25 @@ index 0000000..9730847
 +}
 diff --git a/src/modules/pv_headers/pv_headers.h b/src/modules/pv_headers/pv_headers.h
 new file mode 100644
-index 0000000..556b7bf
+index 0000000..4d53318
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,57 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -1324,12 +1499,16 @@ index 0000000..556b7bf
 +
 +extern str xavp_name;
 +extern str xavp_parsed_xname;
++extern str xavp_helper_xname;
 +
 +extern unsigned int header_name_size;
 +extern unsigned int header_value_size;
 +
 +extern str _hdr_from;
 +extern str _hdr_to;
++extern str _hdr_reply_reason;
++extern int _branch;
++extern int _reply_counter;
 +
 +extern int FL_PV_HDRS_COLLECTED;
 +extern int FL_PV_HDRS_APPLIED;
@@ -1337,23 +1516,25 @@ index 0000000..556b7bf
 +#endif /* PV_HEADERS_H */
 diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
 new file mode 100644
-index 0000000..22ee74e
+index 0000000..b3749a6
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_func.c
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,360 @@
 +/*
 + * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -1364,18 +1545,38 @@ index 0000000..22ee74e
 + *
 + */
 +
-+#include "../../core/dset.h"
++#include "../../core/strutils.h"
 +
 +#include "pv_headers.h"
-+#include "pvh_str.h"
-+#include "pvh_hdr.h"
-+#include "pvh_hash.h"
++#include "pvh_func.h"
 +#include "pvh_xavp.h"
++#include "pvh_str.h"
++#include "pvh_hash.h"
++#include "pvh_hdr.h"
 +
-+static str xavp_helper_xname = str_init("modparam_pv_headers");
 +static str xavp_helper_name = str_init("xavp_name");
 +
-+int pvh_collect_headers(struct sip_msg *msg, int is_auto)
++int pvh_parse_msg(sip_msg_t *msg)
++{
++	if(msg->first_line.type == SIP_REQUEST) {
++		if(!IS_SIP(msg)) {
++			LM_DBG("non SIP request message\n");
++			return 1;
++		}
++	} else if(msg->first_line.type == SIP_REPLY) {
++		if(!IS_SIP_REPLY(msg)) {
++			LM_DBG("non SIP reply message\n");
++			return 1;
++		}
++	} else {
++		LM_DBG("non SIP message\n");
++		return 1;
++	}
++
++	return 0;
++}
++
++int pvh_collect_headers(struct sip_msg *msg)
 +{
 +	struct hdr_field *hf = NULL;
 +	str name = STR_NULL;
@@ -1383,22 +1584,10 @@ index 0000000..22ee74e
 +	char hvals[header_name_size][header_value_size];
 +	int idx = 0, d_size = 0;
 +	str val_part = STR_NULL;
-+	int br_idx;
 +
-+	pvh_get_branch_index(msg, &br_idx);
-+	LM_DBG("br_idx: %d\n", br_idx);
-+	if(!is_auto) {
-+		if(msg->first_line.type == SIP_REPLY) {
-+			if(isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) {
-+				LM_ERR("headers are already collected\n");
-+				return -1;
-+			}
-+		} else {
-+			if(isbflagset(br_idx, FL_PV_HDRS_COLLECTED) == 1) {
-+				LM_ERR("headers are already collected\n");
-+				return -1;
-+			}
-+		}
++	if(pvh_hdrs_collected(msg)) {
++		LM_ERR("headers are already collected\n");
++		return -1;
 +	}
 +
 +	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -1406,38 +1595,35 @@ index 0000000..22ee74e
 +		return -1;
 +	}
 +
-+	if(pvh_str_new(&name, header_name_size) < 0)
-+		goto err;
-+	if(pvh_str_new(&val, header_value_size) < 0)
-+		goto err;
-+
-+	if(name.s == NULL || val.s == NULL)
-+		goto err;
-+
 +	for(hf = msg->headers; hf; hf = hf->next) {
 +		LM_DBG("collect header[%.*s]: %.*s\n", hf->name.len, hf->name.s,
 +				hf->body.len, hf->body.s);
 +
 +		switch(hf->type) {
 +			case HDR_FROM_T:
-+				pvh_str_copy(&name, &_hdr_from, header_name_size);
++				name.len = _hdr_from.len;
++				name.s = _hdr_from.s;
 +				LM_DBG("force [From] as key\n");
 +				break;
 +			case HDR_TO_T:
-+				pvh_str_copy(&name, &_hdr_to, header_name_size);
++				name.len = _hdr_to.len;
++				name.s = _hdr_to.s;
 +				LM_DBG("force [To] as key\n");
 +				break;
 +			default:
-+				pvh_str_copy(&name, &hf->name, header_name_size);
++				name.len = hf->name.len;
++				name.s = hf->name.s;
 +		}
-+		pvh_str_copy(&val, &hf->body, header_value_size);
++		val.len = hf->body.len;
++		val.s = hf->body.s;
 +
-+		if(str_hash_get(&split_headers, name.s, name.len)
-+				&& strchr(val.s, ',') != NULL) {
++		if(strchr(val.s, ',') != NULL
++				&& str_hash_get(&split_headers, name.s, name.len)) {
 +
 +			if(pvh_split_values(&val, hvals, &d_size, 1) < 0) {
-+				LM_ERR("could not parse Diversion header comma separated "
-+					   "value");
++				LM_ERR("could not parse %.*s header comma separated "
++					   "value",
++						name.len, name.s);
 +				return -1;
 +			}
 +
@@ -1447,61 +1633,43 @@ index 0000000..22ee74e
 +				if(pvh_set_xavp(msg, &xavp_name, &name, &val_part, SR_XTYPE_STR,
 +						   0, 1)
 +						< 0)
-+					goto err;
++					return -1;
 +			}
 +			continue;
 +		}
 +		if(pvh_set_xavp(msg, &xavp_name, &name, &val, SR_XTYPE_STR, 0, 1) < 0)
-+			goto err;
++			return -1;
 +	}
 +
 +	if(pvh_set_xavp(msg, &xavp_helper_xname, &xavp_helper_name, &xavp_name,
 +			   SR_XTYPE_STR, 0, 0)
 +			< 0)
-+		goto err;
++		return -1;
 +
-+	pvh_str_free(&name);
-+	pvh_str_free(&val);
-+
-+	msg->first_line.type == SIP_REPLY ? setflag(msg, FL_PV_HDRS_COLLECTED)
-+									  : setbflag(br_idx, FL_PV_HDRS_COLLECTED);
++	pvh_hdrs_set_collected(msg);
 +
 +	return 1;
-+
-+err:
-+	pvh_str_free(&name);
-+	pvh_str_free(&val);
-+	return -1;
 +}
 +
-+int pvh_apply_headers(struct sip_msg *msg, int is_auto)
++int pvh_apply_headers(struct sip_msg *msg)
 +{
 +	sr_xavp_t *xavp = NULL;
 +	sr_xavp_t *sub = NULL;
-+	str display = STR_NULL;
-+	str uri = STR_NULL;
 +	struct str_hash_table rm_hdrs;
 +	int from_cnt = 0, to_cnt = 0;
-+	str br_xname = STR_NULL;
-+	int br_idx, keys_count;
++	char t[header_name_size];
++	char tv[2][header_value_size];
++	str display = {tv[0], header_value_size};
++	str uri = {tv[1], header_value_size};
++	str br_xname = {t, header_name_size};
++	int skip_from_to = 0, keys_count = 0;
 +	int res = -1;
 +
-+	rm_hdrs.size = 0;
++	memset(&rm_hdrs, 0, sizeof(struct str_hash_table));
 +
-+	pvh_get_branch_index(msg, &br_idx);
-+
-+	if(!is_auto) {
-+		if(msg->first_line.type == SIP_REPLY) {
-+			if(isflagset(msg, FL_PV_HDRS_APPLIED) == 1) {
-+				LM_ERR("headers are already applied\n");
-+				return -1;
-+			}
-+		} else {
-+			if(isbflagset(br_idx, FL_PV_HDRS_APPLIED) == 1) {
-+				LM_ERR("headers are already applied\n");
-+				return -1;
-+			}
-+		}
++	if(pvh_hdrs_applied(msg)) {
++		LM_ERR("headers are already applied\n");
++		return -1;
 +	}
 +
 +	if(parse_headers(msg, HDR_EOH_F, 0) < 0) {
@@ -1509,53 +1677,55 @@ index 0000000..22ee74e
 +		return -1;
 +	}
 +
-+	if(pvh_str_new(&display, header_value_size) < 0)
-+		goto err;
-+	if(pvh_str_new(&uri, header_value_size) < 0)
-+		goto err;
-+	if(pvh_str_new(&br_xname, header_value_size) < 0)
-+		goto err;
-+
 +	pvh_get_branch_xname(msg, &xavp_name, &br_xname);
 +
 +	if((xavp = xavp_get(&br_xname, NULL)) == NULL
 +			&& (xavp = xavp_get(&xavp_name, NULL)) == NULL) {
 +		LM_ERR("missing xavp %s, run pv_collect_headers() first\n",
 +				xavp_name.s);
-+		goto err;
++		return -1;
 +	}
 +	if(xavp->val.type != SR_XTYPE_XAVP) {
 +		LM_ERR("not xavp child type %s\n", xavp_name.s);
-+		goto err;
++		return -1;
 +	}
 +
 +	if((sub = xavp->val.v.xavp) == NULL) {
 +		LM_ERR("invalid xavp structure: %s\n", xavp_name.s);
-+		goto err;
++		return -1;
 +	}
 +	keys_count = pvh_xavp_keys_count(&sub);
 +	if(str_hash_alloc(&rm_hdrs, keys_count) < 0) {
 +		PKG_MEM_ERROR;
-+		goto err;
++		return -1;
 +	}
 +	LM_DBG("xavp->name:%.*s br_xname:%.*s keys_count: %d\n", xavp->name.len,
 +			xavp->name.s, br_xname.len, br_xname.s, keys_count);
 +	str_hash_init(&rm_hdrs);
 +
++	if(msg->first_line.type == SIP_REPLY
++			|| msg->first_line.u.request.method_value == METHOD_ACK
++			|| msg->first_line.u.request.method_value == METHOD_PRACK
++			|| msg->first_line.u.request.method_value == METHOD_BYE) {
++		skip_from_to = 1;
++		if(msg->to == NULL) {
++			LM_DBG("no To header, can't store To info in parsed\n");
++		} else {
++			if(pvh_set_parsed(msg, &_hdr_to, &msg->to->body, NULL) == NULL)
++				LM_ERR("can't store To info in parsed\n");
++		}
++	}
++
 +	do {
 +		if(pvh_skip_header(&sub->name))
 +			continue;
 +
-+		if(strncasecmp(sub->name.s, _hdr_from.s, sub->name.len) == 0) {
-+			if(msg->first_line.type == SIP_REPLY
-+					|| msg->first_line.u.request.method_value == METHOD_ACK
-+					|| msg->first_line.u.request.method_value == METHOD_PRACK
-+					|| msg->first_line.u.request.method_value == METHOD_BYE) {
++		if(cmpi_str(&sub->name, &_hdr_from) == 0) {
++			if(skip_from_to) {
 +				LM_DBG("skip From header change in reply messages\n");
 +				continue;
 +			}
-+			if(strncmp(sub->val.v.s.s, msg->from->body.s, sub->val.v.s.len)
-+					== 0) {
++			if(cmp_str(&sub->val.v.s, &msg->from->body) == 0) {
 +				LM_DBG("skip unchanged From header\n");
 +				continue;
 +			}
@@ -1582,16 +1752,12 @@ index 0000000..22ee74e
 +			continue;
 +		}
 +
-+		if(strncasecmp(sub->name.s, _hdr_to.s, sub->name.len) == 0) {
-+			if(msg->first_line.type == SIP_REPLY
-+					|| msg->first_line.u.request.method_value == METHOD_ACK
-+					|| msg->first_line.u.request.method_value == METHOD_PRACK
-+					|| msg->first_line.u.request.method_value == METHOD_BYE) {
++		if(cmpi_str(&sub->name, &_hdr_to) == 0) {
++			if(skip_from_to) {
 +				LM_DBG("skip To header change in reply messages\n");
 +				continue;
 +			}
-+			if(strncmp(sub->val.v.s.s, msg->to->body.s, sub->val.v.s.len)
-+					== 0) {
++			if(cmp_str(&sub->val.v.s, &msg->to->body) == 0) {
 +				LM_DBG("skip unchanged To header\n");
 +				continue;
 +			}
@@ -1618,7 +1784,7 @@ index 0000000..22ee74e
 +			continue;
 +		}
 +
-+		if(strncasecmp(sub->name.s, "@Reply-Reason", sub->name.len) == 0) {
++		if(cmpi_str(&sub->name, &_hdr_reply_reason) == 0) {
 +			if(str_hash_get(&rm_hdrs, sub->name.s, sub->name.len))
 +				continue;
 +			pvh_real_replace_reply_reason(msg, &sub->val.v.s);
@@ -1644,15 +1810,11 @@ index 0000000..22ee74e
 +		}
 +	} while((sub = sub->next) != NULL);
 +
-+	msg->first_line.type == SIP_REPLY ? setflag(msg, FL_PV_HDRS_APPLIED)
-+									  : setbflag(br_idx, FL_PV_HDRS_APPLIED);
++	pvh_hdrs_set_applied(msg);
 +
 +	res = 1;
 +
 +err:
-+	pvh_str_free(&display);
-+	pvh_str_free(&uri);
-+	pvh_str_free(&br_xname);
 +	if(rm_hdrs.size)
 +		pvh_str_hash_free(&rm_hdrs);
 +	return res;
@@ -1660,28 +1822,17 @@ index 0000000..22ee74e
 +
 +int pvh_reset_headers(struct sip_msg *msg)
 +{
-+	str br_xname = STR_NULL;
-+	int br_idx;
++	char t[header_name_size];
++	str br_xname = {t, header_name_size};
 +
-+	if(pvh_str_new(&br_xname, header_name_size) < 0)
-+		return -1;
-+
-+	pvh_get_branch_index(msg, &br_idx);
 +	pvh_get_branch_xname(msg, &xavp_name, &br_xname);
-+
++	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s);
 +	pvh_free_xavp(&br_xname);
 +	pvh_get_branch_xname(msg, &xavp_parsed_xname, &br_xname);
++	LM_DBG("clean xavp:%.*s\n", br_xname.len, br_xname.s);
 +	pvh_free_xavp(&br_xname);
 +
-+	if(msg->first_line.type == SIP_REPLY) {
-+		resetflag(msg, FL_PV_HDRS_COLLECTED);
-+		resetflag(msg, FL_PV_HDRS_APPLIED);
-+	} else {
-+		resetbflag(br_idx, FL_PV_HDRS_COLLECTED);
-+		resetbflag(br_idx, FL_PV_HDRS_APPLIED);
-+	}
-+
-+	pvh_str_free(&br_xname);
++	pvh_hdrs_reset_flags(msg);
 +
 +	return 1;
 +}
@@ -1731,23 +1882,25 @@ index 0000000..22ee74e
 +}
 diff --git a/src/modules/pv_headers/pvh_func.h b/src/modules/pv_headers/pvh_func.h
 new file mode 100644
-index 0000000..0fe5524
+index 0000000..6aaf5aa
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_func.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,42 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -1763,8 +1916,10 @@ index 0000000..0fe5524
 +
 +#include "../../core/parser/msg_parser.h"
 +
-+int pvh_collect_headers(struct sip_msg *msg, int is_auto);
-+int pvh_apply_headers(struct sip_msg *msg, int is_auto);
++int pvh_parse_msg(sip_msg_t *msg);
++
++int pvh_collect_headers(struct sip_msg *msg);
++int pvh_apply_headers(struct sip_msg *msg);
 +int pvh_reset_headers(struct sip_msg *msg);
 +
 +int pvh_check_header(struct sip_msg *msg, str *hname);
@@ -1775,23 +1930,25 @@ index 0000000..0fe5524
 +#endif /* PV_FUNC_H */
 diff --git a/src/modules/pv_headers/pvh_hash.c b/src/modules/pv_headers/pvh_hash.c
 new file mode 100644
-index 0000000..f269868
+index 0000000..6c99c43
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_hash.c
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,134 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -1913,23 +2070,25 @@ index 0000000..f269868
 +}
 diff --git a/src/modules/pv_headers/pvh_hash.h b/src/modules/pv_headers/pvh_hash.h
 new file mode 100644
-index 0000000..8828cc6
+index 0000000..d7e25f8
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_hash.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,41 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -1958,23 +2117,25 @@ index 0000000..8828cc6
 +#endif /* PVH_HASH_H */
 diff --git a/src/modules/pv_headers/pvh_hdr.c b/src/modules/pv_headers/pvh_hdr.c
 new file mode 100644
-index 0000000..70be9ac
+index 0000000..d83a646
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_hdr.c
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,295 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -1986,15 +2147,73 @@ index 0000000..70be9ac
 + */
 +
 +#include "../../core/data_lump.h"
++#include "../../core/dset.h"
 +
 +#include "pvh_hdr.h"
++
++int pvh_hdrs_collected(struct sip_msg *msg)
++{
++	if(msg->first_line.type == SIP_REPLY) {
++		if(isflagset(msg, FL_PV_HDRS_COLLECTED) == 1) {
++			return 1;
++		}
++	} else {
++		if(isbflagset(_branch, FL_PV_HDRS_COLLECTED) == 1) {
++			return 1;
++		}
++	}
++	return 0;
++}
++
++int pvh_hdrs_applied(struct sip_msg *msg)
++{
++	if(msg->first_line.type == SIP_REPLY) {
++		if(isflagset(msg, FL_PV_HDRS_APPLIED) == 1) {
++			return 1;
++		}
++	} else {
++		if(isbflagset(_branch, FL_PV_HDRS_APPLIED) == 1) {
++			return 1;
++		}
++	}
++	return 0;
++}
++
++void pvh_hdrs_set_applied(struct sip_msg *msg)
++{
++	if(msg->first_line.type == SIP_REPLY) {
++		setflag(msg, FL_PV_HDRS_APPLIED);
++	} else {
++		setbflag(_branch, FL_PV_HDRS_APPLIED);
++	}
++}
++
++void pvh_hdrs_set_collected(struct sip_msg *msg)
++{
++	if(msg->first_line.type == SIP_REPLY) {
++		setflag(msg, FL_PV_HDRS_COLLECTED);
++	} else {
++		setbflag(_branch, FL_PV_HDRS_COLLECTED);
++	}
++}
++
++void pvh_hdrs_reset_flags(struct sip_msg *msg)
++{
++	if(msg->first_line.type == SIP_REPLY) {
++		resetflag(msg, FL_PV_HDRS_COLLECTED);
++		resetflag(msg, FL_PV_HDRS_APPLIED);
++	} else {
++		resetbflag(_branch, FL_PV_HDRS_COLLECTED);
++		resetbflag(_branch, FL_PV_HDRS_APPLIED);
++	}
++}
 +
 +int pvh_real_hdr_append(struct sip_msg *msg, str *hname, str *hvalue)
 +{
 +	struct lump *anchor = NULL;
 +	hdr_field_t *hf = NULL;
 +	hdr_field_t *m_hf = NULL;
-+	str new_h;
++	str new_h = STR_NULL;
 +
 +	if(hname->s == NULL || hvalue->s == NULL) {
 +		LM_ERR("header name/value cannot be empty");
@@ -2039,7 +2258,7 @@ index 0000000..70be9ac
 +{
 +	struct lump *anchor = NULL;
 +	hdr_field_t *hf = NULL;
-+	str new_h;
++	str new_h = STR_NULL;
 +	int new = 1;
 +
 +	if(hname->s == NULL || hvalue->s == NULL) {
@@ -2199,23 +2418,25 @@ index 0000000..70be9ac
 +}
 diff --git a/src/modules/pv_headers/pvh_hdr.h b/src/modules/pv_headers/pvh_hdr.h
 new file mode 100644
-index 0000000..f05d7e4
+index 0000000..4f86953
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_hdr.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,47 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -2234,6 +2455,12 @@ index 0000000..f05d7e4
 +
 +#include "pv_headers.h"
 +
++int pvh_hdrs_collected(struct sip_msg *msg);
++int pvh_hdrs_applied(struct sip_msg *msg);
++void pvh_hdrs_set_collected(struct sip_msg *msg);
++void pvh_hdrs_set_applied(struct sip_msg *msg);
++void pvh_hdrs_reset_flags(struct sip_msg *msg);
++
 +int pvh_real_hdr_append(struct sip_msg *msg, str *hname, str *hvalue);
 +int pvh_real_hdr_replace(struct sip_msg *msg, str *hname, str *hvalue);
 +int pvh_real_hdr_del_by_name(struct sip_msg *msg, str *hname);
@@ -2245,23 +2472,25 @@ index 0000000..f05d7e4
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_str.c b/src/modules/pv_headers/pvh_str.c
 new file mode 100644
-index 0000000..53e2c9c
+index 0000000..6ede032
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_str.c
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,146 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -2396,23 +2625,25 @@ index 0000000..53e2c9c
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_str.h b/src/modules/pv_headers/pvh_str.h
 new file mode 100644
-index 0000000..95aa0b9
+index 0000000..10aa216
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_str.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,40 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -2441,24 +2672,25 @@ index 0000000..95aa0b9
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
 new file mode 100644
-index 0000000..de296b4
+index 0000000..0cfd969
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
-@@ -0,0 +1,1050 @@
+@@ -0,0 +1,1133 @@
 +/*
++ * pv_headers
 + *
-+ * PV Headers
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * This file is part of SIP Router, a free SIP server.
-+ *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -2469,14 +2701,75 @@ index 0000000..de296b4
 + *
 + */
 +
-+#include <stdlib.h>
-+
-+#include "../../core/hashes.h"
-+#include "../../core/route_struct.h"
++#include "../../core/parser/parse_uri.h"
++#include "../../core/strutils.h"
 +
 +#include "pvh_xavp.h"
 +#include "pvh_str.h"
 +#include "pvh_hash.h"
++#include "pvh_hdr.h"
++
++static str reply_counter = str_init("reply_counter");
++
++sr_xavp_t *pvh_xavp_get_child_with_ival(
++		str *rname, str *cname, sr_xavp_t *start)
++{
++	sr_xavp_t *ravp = NULL;
++	sr_xavp_t *vavp = NULL;
++
++	ravp = xavp_get(rname, start);
++	if(ravp == NULL || ravp->val.type != SR_XTYPE_XAVP)
++		return NULL;
++
++	vavp = xavp_get(cname, ravp->val.v.xavp);
++	if(vavp == NULL || vavp->val.type != SR_XTYPE_INT)
++		return NULL;
++
++	return vavp;
++}
++
++/**
++ * We keep a $xavp(xavp_helper_xname=>reply_counter) with the number of replies
++ * so we will use $xavp(xavp_name.r.<id>) on reply_route
++ */
++int pvh_reply_append(sr_xavp_t **start)
++{
++	sr_xavp_t *xavp = NULL;
++	sr_xval_t xval;
++
++	xavp = pvh_xavp_get_child_with_ival(
++			&xavp_helper_xname, &reply_counter, start ? *start : NULL);
++	if(xavp) {
++		xavp->val.v.i++;
++		LM_DBG("reply message: %d\n", xavp->val.v.i);
++		return xavp->val.v.i;
++	}
++
++	memset(&xval, 0, sizeof(sr_xval_t));
++	xval.type = SR_XTYPE_INT;
++	xval.v.i = 0;
++
++	xavp = xavp_get(&xavp_helper_xname, start ? *start : NULL);
++	if(xavp == NULL) {
++		if(xavp_add_xavp_value(&xavp_helper_xname, &reply_counter, &xval,
++				   start ? start : NULL)
++				== NULL) {
++			LM_ERR("can't create xavp:%.*s\n", xavp_helper_xname.len,
++					xavp_helper_xname.s);
++			return -1;
++		}
++		LM_DBG("xavp_name:%.*s created\n", xavp_helper_xname.len,
++				xavp_helper_xname.s);
++	} else {
++		if(xavp_add_value(&reply_counter, &xval, &xavp->val.v.xavp) == NULL) {
++			LM_ERR("can't add reply_counter value\n");
++			return -1;
++		}
++		LM_DBG("added value\n");
++	}
++	LM_DBG("reply message: %d\n", xval.v.i);
++	return xval.v.i;
++}
 +
 +sr_xavp_t *pvh_xavp_new_value(str *name, sr_xval_t *val)
 +{
@@ -2552,97 +2845,41 @@ index 0000000..de296b4
 +	return 1;
 +}
 +
-+sr_xval_t *pvh_xavp_get_value(
-+		struct sip_msg *msg, str *xname, str *name, int idx)
++sr_xavp_t *pvh_xavp_get(struct sip_msg *msg, str *xname)
 +{
 +	sr_xavp_t *xavp = NULL;
-+	sr_xavp_t *sub = NULL;
-+	str br_xname = STR_NULL;
-+
-+	if(pvh_str_new(&br_xname, header_name_size) < 0)
-+		return NULL;
++	char t[header_name_size];
++	str br_xname = {t, header_name_size};
 +
 +	pvh_get_branch_xname(msg, xname, &br_xname);
-+	if((xavp = xavp_get(&br_xname, NULL)) == NULL
-+			&& (xavp = xavp_get(xname, NULL)) == NULL) {
-+		goto err;
++	if((xavp = xavp_get(&br_xname, NULL)) == NULL) {
++		if(cmp_str(xname, &br_xname) == 0)
++			goto end;
++		if((xavp = xavp_get(xname, NULL)) == NULL)
++			goto end;
++		if(xname != &xavp_parsed_xname) {
++			LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
++					br_xname.len, br_xname.s, xname->len, xname->s);
++		}
 +	}
 +
 +	if(xavp->val.type != SR_XTYPE_XAVP) {
 +		LM_ERR("not xavp child type %s\n", br_xname.s);
-+		goto err;
++		xavp = NULL;
++		goto end;
 +	}
 +
-+	sub = xavp_get_by_index(name, idx, &xavp->val.v.xavp);
-+
-+	pvh_str_free(&br_xname);
-+	return sub ? &sub->val : NULL;
-+
-+err:
-+	pvh_str_free(&br_xname);
-+	return NULL;
-+}
-+
-+sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name)
-+{
-+	sr_xavp_t *xavp = NULL;
-+	str br_xname = STR_NULL;
-+
-+	if(pvh_str_new(&br_xname, header_name_size) < 0)
-+		return NULL;
-+
-+	pvh_get_branch_xname(msg, xname, &br_xname);
-+	xavp = xavp_get_child(&br_xname, name);
-+	if(xavp == NULL)
-+		xavp = xavp_get_child(xname, name);
-+
-+	pvh_str_free(&br_xname);
++end:
 +	return xavp;
 +}
 +
-+int pvh_xavp_is_null(sr_xavp_t *avp)
-+{
-+	if(avp == NULL)
-+		return 1;
-+
-+	if(avp->val.type == SR_XTYPE_NULL
-+			|| (avp->val.type == SR_XTYPE_STR
-+					   && (strncasecmp(avp->val.v.s.s, "NULL", 4) == 0))) {
-+		return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+void pvh_xavp_free_data(void *p, sr_xavp_sfree_f sfree)
-+{
-+	xavp_c_data_t *c_data = NULL;
-+
-+	if((c_data = (xavp_c_data_t *)p) != NULL) {
-+		pvh_free_to_params(c_data->to_params, sfree);
-+		sfree(c_data->value.s);
-+		c_data->value.s = NULL;
-+		sfree(c_data);
-+		c_data = NULL;
-+	}
-+}
-+
-+int pvh_xavp_keys_count(sr_xavp_t **start)
++int pvh_free_xavp(str *xname)
 +{
 +	sr_xavp_t *xavp = NULL;
-+	int cnt = 0;
-+
-+	if(*start == NULL)
-+		return 0;
-+
-+	xavp = *start;
-+
-+	while(xavp) {
-+		cnt++;
-+		xavp = xavp->next;
-+	}
-+
-+	return cnt;
++	xavp_rm_by_name(xname, 1, NULL);
++	if((xavp = xavp_get(xname, NULL)) != NULL)
++		xavp_rm(xavp, NULL);
++	return 1;
 +}
 +
 +void pvh_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree)
@@ -2695,6 +2932,86 @@ index 0000000..de296b4
 +	return 0;
 +}
 +
++sr_xval_t *pvh_xavp_get_value(
++		struct sip_msg *msg, str *xname, str *name, int idx)
++{
++	sr_xavp_t *xavp = NULL;
++	sr_xavp_t *sub = NULL;
++
++	if((xavp = pvh_xavp_get(msg, xname)) != NULL) {
++		/*	LM_DBG("xavp:%.*s name:%.*s idx:%d\n", xavp->name.len, xavp->name.s,
++				name->len, name->s, idx); */
++		sub = xavp_get_by_index(name, idx, &xavp->val.v.xavp);
++	}
++
++	return sub ? &sub->val : NULL;
++}
++
++sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name)
++{
++	sr_xavp_t *xavp = NULL;
++	char t[header_name_size];
++	str br_xname = {t, header_name_size};
++
++	pvh_get_branch_xname(msg, xname, &br_xname);
++	xavp = xavp_get_child(&br_xname, name);
++	if(xavp == NULL) {
++		if(cmp_str(xname, &br_xname) != 0) {
++			xavp = xavp_get_child(xname, name);
++			if(xavp) {
++				LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
++						br_xname.len, br_xname.s, xname->len, xname->s);
++			}
++		}
++	}
++	return xavp;
++}
++
++int pvh_xavp_is_null(sr_xavp_t *avp)
++{
++	if(avp == NULL)
++		return 1;
++
++	if(avp->val.type == SR_XTYPE_NULL
++			|| (avp->val.type == SR_XTYPE_STR
++					   && (strncasecmp(avp->val.v.s.s, "NULL", 4) == 0))) {
++		return 1;
++	}
++
++	return 0;
++}
++
++void pvh_xavp_free_data(void *p, sr_xavp_sfree_f sfree)
++{
++	xavp_c_data_t *c_data = NULL;
++
++	if((c_data = (xavp_c_data_t *)p) != NULL) {
++		pvh_free_to_params(c_data->to_params, sfree);
++		sfree(c_data->value.s);
++		c_data->value.s = NULL;
++		sfree(c_data);
++		c_data = NULL;
++	}
++}
++
++int pvh_xavp_keys_count(sr_xavp_t **start)
++{
++	sr_xavp_t *xavp = NULL;
++	int cnt = 0;
++
++	if(*start == NULL)
++		return 0;
++
++	xavp = *start;
++
++	while(xavp) {
++		cnt++;
++		xavp = xavp->next;
++	}
++
++	return cnt;
++}
++
 +int pvh_set_xavp(struct sip_msg *msg, str *xname, str *name, void *data,
 +		sr_xtype_t type, int idx, int append)
 +{
@@ -2702,17 +3019,14 @@ index 0000000..de296b4
 +	sr_xavp_t *root = NULL;
 +	sr_xval_t root_xval;
 +	sr_xval_t xval;
-+	str br_xname = STR_NULL;
-+	int br_idx;
++	char t[header_name_size];
++	str br_xname = {t, header_name_size};
 +
 +	if(xname == NULL || name == NULL) {
 +		LM_ERR("missing xavp/pv name\n");
 +		return -1;
 +	}
 +
-+	pvh_get_branch_index(msg, &br_idx);
-+	if(pvh_str_new(&br_xname, header_name_size) < 0)
-+		return -1;
 +	pvh_get_branch_xname(msg, xname, &br_xname);
 +	LM_DBG("br_xname: %.*s name: %.*s\n", br_xname.len, br_xname.s, name->len,
 +			name->s);
@@ -2727,7 +3041,7 @@ index 0000000..de296b4
 +		xval.v.data = (sr_data_t *)shm_malloc(sizeof(sr_data_t));
 +		if(xval.v.data == NULL) {
 +			SHM_MEM_ERROR;
-+			goto err;
++			return -1;
 +		}
 +		memset(xval.v.data, 0, sizeof(sr_data_t));
 +		xval.v.data->p = data;
@@ -2736,7 +3050,7 @@ index 0000000..de296b4
 +
 +	root = xavp_get(&br_xname, NULL);
 +
-+	if(root == NULL && br_idx > 0) {
++	if(root == NULL && _branch > 0) {
 +		pvh_clone_branch_xavp(msg, xname);
 +		root = xavp_get(&br_xname, NULL);
 +	}
@@ -2751,7 +3065,7 @@ index 0000000..de296b4
 +
 +		if((root = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
 +			LM_ERR("error create xavp %s\n", br_xname.s);
-+			goto err;
++			return -1;
 +		}
 +		xavp = &root->val.v.xavp;
 +	} else if(xavp_get_child(&br_xname, name) == NULL) {
@@ -2762,30 +3076,16 @@ index 0000000..de296b4
 +		if(pvh_xavp_append_value(name, &xval, xavp) < 0) {
 +			LM_ERR("error append xavp=>name %s=>%.*s\n", br_xname.s, name->len,
 +					name->s);
-+			goto err;
++			return -1;
 +		}
 +	} else {
 +		if(pvh_xavp_set_value(name, &xval, idx, xavp) < 0) {
 +			LM_ERR("error modify xavp=>name %s=>%.*s idx=%d\n", br_xname.s,
 +					name->len, name->s, idx);
-+			goto err;
++			return -1;
 +		}
 +	}
 +
-+	pvh_str_free(&br_xname);
-+	return 1;
-+
-+err:
-+	pvh_str_free(&br_xname);
-+	return -1;
-+}
-+
-+int pvh_free_xavp(str *xname)
-+{
-+	sr_xavp_t *xavp = NULL;
-+	xavp_rm_by_name(xname, 1, NULL);
-+	if((xavp = xavp_get(xname, NULL)) != NULL)
-+		xavp_rm(xavp, NULL);
 +	return 1;
 +}
 +
@@ -2817,7 +3117,6 @@ index 0000000..de296b4
 +
 +int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst)
 +{
-+	int br_idx;
 +	int os = 0;
 +	char br_idx_s[32];
 +	char br_idx_len = 0;
@@ -2829,9 +3128,8 @@ index 0000000..de296b4
 +	memcpy(dst->s, xname->s, xname->len);
 +	os += xname->len;
 +
-+	pvh_get_branch_index(msg, &br_idx);
-+	if(br_idx > 0) {
-+		sprintf(br_idx_s, "%d", br_idx - 1);
++	if(_branch > 0) {
++		snprintf(br_idx_s, 32, "%d", _branch - 1);
 +		br_idx_len = strlen(br_idx_s);
 +		memcpy(dst->s + os, ".", 1);
 +		os += 1;
@@ -2839,8 +3137,10 @@ index 0000000..de296b4
 +		os += br_idx_len;
 +	}
 +	if(msg->first_line.type == SIP_REPLY) {
-+		memcpy(dst->s + os, ".r", 2);
-+		os += 2;
++		snprintf(br_idx_s, 32, ".r.%d", _reply_counter);
++		br_idx_len = strlen(br_idx_s);
++		memcpy(dst->s + os, br_idx_s, br_idx_len);
++		os += br_idx_len;
 +	}
 +	dst->len = os;
 +	dst->s[dst->len] = '\0';
@@ -2854,7 +3154,9 @@ index 0000000..de296b4
 +	sr_xavp_t *br_xavp = NULL;
 +	sr_xavp_t *sub = NULL;
 +	sr_xval_t root_xval;
-+	str br_xname = STR_NULL;
++	char t[header_name_size];
++	str br_xname = {t, header_name_size};
++	int i = 0;
 +
 +	if((xavp = xavp_get(xname, NULL)) == NULL) {
 +		LM_ERR("cannot clone xavp from non existing %s\n", xname->s);
@@ -2871,8 +3173,6 @@ index 0000000..de296b4
 +		return -1;
 +	}
 +
-+	if(pvh_str_new(&br_xname, header_name_size) < 0)
-+		return -1;
 +	pvh_get_branch_xname(msg, xname, &br_xname);
 +
 +	memset(&root_xval, 0, sizeof(sr_xval_t));
@@ -2881,11 +3181,10 @@ index 0000000..de296b4
 +
 +	if((br_xavp = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
 +		LM_ERR("error create xavp %s\n", br_xname.s);
-+		goto err;
++		return -1;
 +	}
 +
-+	if(strncmp(xname->s, xavp_parsed_xname.s, xname->len) == 0) {
-+		pvh_str_free(&br_xname);
++	if(cmp_str(xname, &xavp_parsed_xname) == 0) {
 +		return 1;
 +	}
 +
@@ -2897,16 +3196,13 @@ index 0000000..de296b4
 +		if(pvh_xavp_append_value(&sub->name, &sub->val, &br_xavp->val.v.xavp)
 +				< 0) {
 +			LM_ERR("cannot clone xavp %s\n", sub->name.s);
-+			goto err;
++			return -1;
 +		}
++		++i;
 +	} while((sub = sub->next) != NULL);
-+
-+	pvh_str_free(&br_xname);
++	LM_DBG("cloned %.*s[%d] => %.*s\n", xname->len, xname->s, i, br_xname.len,
++			br_xname.s);
 +	return 1;
-+
-+err:
-+	pvh_str_free(&br_xname);
-+	return -1;
 +}
 +
 +int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
@@ -3059,6 +3355,34 @@ index 0000000..de296b4
 +	return -1;
 +}
 +
++xavp_c_data_t *pvh_set_parsed(
++		struct sip_msg *msg, str *hname, str *cur, str *new)
++{
++	xavp_c_data_t *c_data = NULL;
++	str *val = new;
++
++	c_data = (xavp_c_data_t *)shm_malloc(sizeof(xavp_c_data_t));
++	if(c_data == NULL) {
++		SHM_MEM_ERROR;
++		return NULL;
++	}
++	memset(c_data, 0, sizeof(xavp_c_data_t));
++	if(val == NULL)
++		val = cur;
++	if(pvh_merge_uri(msg, SET_URI_T, cur, val, c_data) < 0)
++		goto err;
++	if(pvh_set_xavp(msg, &xavp_parsed_xname, hname, c_data, SR_XTYPE_DATA, 0, 0)
++			< 0)
++		goto err;
++	LM_DBG("c_data from pvh_merge_uri hname:%.*s\n", hname->len, hname->s);
++
++	return c_data;
++
++err:
++	// how can I call?? pvh_xavp_free_data(c_data, shm_free);
++	return NULL;
++}
++
 +int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 +{
 +	sr_xval_t *xval = NULL;
@@ -3068,43 +3392,38 @@ index 0000000..de296b4
 +	str sval = STR_NULL;
 +	int ival = 0;
 +	int is_strint = 0;
-+	str hname = STR_NULL;
++	char t[header_name_size];
++	str hname = {t, header_name_size - 1};
 +
 +	p_no = param->pvn.u.isname.name.n;
-+	if(pvh_str_new(&hname, header_name_size) < 0)
-+		goto err;
-+
 +	if(p_no >= 1 && p_no <= 5)
 +		pvh_str_copy(&hname, &_hdr_from, header_name_size);
 +	else if(p_no >= 6 && p_no <= 10)
 +		pvh_str_copy(&hname, &_hdr_to, header_name_size);
 +
 +	xval = pvh_xavp_get_value(msg, &xavp_name, &hname, 0);
-+	if(xval == NULL || !xval->v.s.s)
++	if(xval == NULL || !xval->v.s.s) {
++		/*	LM_DBG("xavp:%.*s hname:%.*s is null\n", xavp_name.len, xavp_name.s,
++				hname.len, hname.s); */
 +		goto err;
++	}
 +
 +	xval_pd = pvh_xavp_get_value(msg, &xavp_parsed_xname, &hname, 0);
 +
-+	if(xval_pd)
++	if(xval_pd) {
++		/*	LM_DBG("p_no:%d c_data from xavp_parsed_xname hname:%.*s\n", p_no,
++				hname.len, hname.s); */
 +		c_data = (xavp_c_data_t *)xval_pd->v.data->p;
++	}
 +
-+	if(c_data != NULL
-+			&& strncmp(xval->v.s.s, c_data->value.s, c_data->value.len) != 0) {
++	if(c_data != NULL && cmp_str(&xval->v.s, &c_data->value) != 0) {
++		/*	LM_DBG("xval:%.*s != c_data->value:%.*s\n", xval->v.s.len, xval->v.s.s,
++				c_data->value.len, c_data->value.s); */
 +		c_data = NULL;
 +	}
 +
 +	if(c_data == NULL) {
-+		c_data = (xavp_c_data_t *)shm_malloc(sizeof(xavp_c_data_t));
-+		if(c_data == NULL) {
-+			SHM_MEM_ERROR;
-+			goto err;
-+		}
-+		memset(c_data, 0, sizeof(xavp_c_data_t));
-+		if(pvh_merge_uri(msg, SET_URI_T, &xval->v.s, &xval->v.s, c_data) < 0)
-+			goto err;
-+		if(pvh_set_xavp(
-+				   msg, &xavp_parsed_xname, &hname, c_data, SR_XTYPE_DATA, 0, 0)
-+				< 0)
++		if((c_data = pvh_set_parsed(msg, &hname, &xval->v.s, NULL)) == NULL)
 +			goto err;
 +	}
 +
@@ -3132,14 +3451,12 @@ index 0000000..de296b4
 +		default:
 +			LM_ERR("unknown get uri op\n");
 +	}
-+
-+	pvh_str_free(&hname);
++	/*	LM_DBG("p_no:%d sval:%.*s\n", p_no, sval.len, sval.s); */
 +	return sval.s ? is_strint ? pv_get_strintval(msg, param, res, &sval, ival)
 +							  : pv_get_strval(msg, param, res, &sval)
 +				  : pv_get_null(msg, param, res);
 +
 +err:
-+	pvh_str_free(&hname);
 +	return pv_get_null(msg, param, res);
 +}
 +
@@ -3150,12 +3467,11 @@ index 0000000..de296b4
 +	pv_elem_p pv_format = NULL;
 +	int p_no = 0;
 +	enum action_type a_type;
-+	str hname;
++	char t[header_name_size];
++	str hname = {t, header_name_size - 1};
 +	str fval;
 +
 +	p_no = param->pvn.u.isname.name.n;
-+	if(pvh_str_new(&hname, header_name_size) < 0)
-+		goto err;
 +	if(p_no >= 1 && p_no <= 5)
 +		pvh_str_copy(&hname, &_hdr_from, header_name_size);
 +	else if(p_no >= 6 && p_no <= 10)
@@ -3210,7 +3526,8 @@ index 0000000..de296b4
 +	memset(c_data, 0, sizeof(xavp_c_data_t));
 +	if(pvh_merge_uri(msg, a_type, &xval->v.s, &fval, c_data) < 0)
 +		goto err;
-+
++	/*	LM_DBG("xavp:%.*s hname:%.*s value:%.*s\n", xavp_name.len, xavp_name.s,
++			hname.len, hname.s, c_data->value.len, c_data->value.s); */
 +	if(pvh_set_xavp(msg, &xavp_name, &hname, &c_data->value, SR_XTYPE_STR, 0, 0)
 +			< 0)
 +		goto err;
@@ -3220,13 +3537,11 @@ index 0000000..de296b4
 +			< 0)
 +		goto err;
 +
-+	pvh_str_free(&hname);
 +	if(pv_format)
 +		pv_elem_free_all(pv_format);
 +	return 1;
 +
 +err:
-+	pvh_str_free(&hname);
 +	if(pv_format)
 +		pv_elem_free_all(pv_format);
 +	return -1;
@@ -3392,7 +3707,6 @@ index 0000000..de296b4
 +{
 +	sr_xval_t *xval = NULL;
 +	int p_no = 0;
-+	str rhname = {"@Reply-Reason", 13};
 +
 +	p_no = param->pvn.u.isname.name.n;
 +
@@ -3406,7 +3720,7 @@ index 0000000..de296b4
 +					&msg->first_line.u.reply.status);
 +			break;
 +		case 2: // reason
-+			xval = pvh_xavp_get_value(msg, &xavp_name, &rhname, 0);
++			xval = pvh_xavp_get_value(msg, &xavp_name, &_hdr_reply_reason, 0);
 +			return pv_get_strval(msg, param, res,
 +					xval && xval->v.s.s ? &xval->v.s
 +										: &msg->first_line.u.reply.reason);
@@ -3424,7 +3738,6 @@ index 0000000..de296b4
 +	pv_elem_p pv_format = NULL;
 +	int p_no = 0;
 +	unsigned int code = 0;
-+	str rhname = {"@Reply-Reason", 13};
 +	str fval;
 +
 +	p_no = param->pvn.u.isname.name.n;
@@ -3475,7 +3788,8 @@ index 0000000..de296b4
 +			msg->first_line.u.reply.status.s[0] = code + '0';
 +			break;
 +		case 2: // reason
-+			if(pvh_set_xavp(msg, &xavp_name, &rhname, &fval, SR_XTYPE_STR, 0, 0)
++			if(pvh_set_xavp(msg, &xavp_name, &_hdr_reply_reason, &fval,
++					   SR_XTYPE_STR, 0, 0)
 +					< 0) {
 +				LM_ERR("set reply: cannot set reply reason\n");
 +				goto err;
@@ -3497,23 +3811,25 @@ index 0000000..de296b4
 +}
 diff --git a/src/modules/pv_headers/pvh_xavp.h b/src/modules/pv_headers/pvh_xavp.h
 new file mode 100644
-index 0000000..1245a1a
+index 0000000..7d4aa30
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.h
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,66 @@
 +/*
-+ * PV Headers
++ * pv_headers
 + *
-+ * Copyright (C) 2018 Kirill Solomko <ksolomko@sipwise.com>
++ * Copyright (C)
++ * 2020 Victor Seva <vseva@sipwise.com>
++ * 2018 Kirill Solomko <ksolomko@sipwise.com>
 + *
-+ * This file is part of SIP Router, a free SIP server.
++ * This file is part of Kamailio, a free SIP server.
 + *
-+ * SIP Router is free software; you can redistribute it and/or modify
++ * Kamailio is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version
 + *
-+ * SIP Router is distributed in the hope that it will be useful,
++ * Kamailio is distributed in the hope that it will be useful,
 + * but WITHOUT ANY WARRANTY; without even the implied warranty of
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
@@ -3527,41 +3843,41 @@ index 0000000..1245a1a
 +#ifndef PV_XAVP_H
 +#define PV_XAVP_H
 +
-+#include "../../core/parser/parse_uri.h"
++#include "../../core/str.h"
 +#include "../../core/xavp.h"
-+#include "../../core/pvar.h"
 +
 +#include "pv_headers.h"
 +
-+sr_xavp_t *pvh_xavp_new_value(str *name, sr_xval_t *val);
-+int pvh_xavp_append_value(str *name, sr_xval_t *val, sr_xavp_t **start);
-+int pvh_xavp_set_value(str *name, sr_xval_t *val, int idx, sr_xavp_t **start);
-+sr_xval_t *pvh_xavp_get_value(
-+		struct sip_msg *msg, str *xname, str *name, int idx);
-+sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name);
-+int pvh_xavp_is_null(sr_xavp_t *xavp);
-+void pvh_xavp_free_data(void *p, sr_xavp_sfree_f sfree);
-+int pvh_xavp_keys_count(sr_xavp_t **start);
-+void pvh_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree);
++int pvh_reply_append(sr_xavp_t **start);
++
 +int pvh_set_xavp(struct sip_msg *msg, str *xname, str *name, void *data,
 +		sr_xtype_t type, int idx, int append);
 +int pvh_free_xavp(str *xname);
-+int pvh_parse_header_name(pv_spec_p sp, str *hname);
-+
-+int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
-+int pvh_set_header(
-+		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
-+int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
-+int pvh_set_uri(
-+		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
-+int pvh_merge_uri(struct sip_msg *msg, enum action_type type, str *cur,
-+		str *new, xavp_c_data_t *c_data);
-+int pvh_get_reply_sr(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
-+int pvh_set_reply_sr(
-+		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
++int pvh_xavp_is_null(sr_xavp_t *avp);
++int pvh_xavp_keys_count(sr_xavp_t **start);
++sr_xval_t *pvh_xavp_get_value(
++		struct sip_msg *msg, str *xname, str *name, int idx);
++sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name);
 +
 +int pvh_get_branch_index(struct sip_msg *msg, int *br_idx);
 +int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst);
 +int pvh_clone_branch_xavp(struct sip_msg *msg, str *xname);
++
++int pvh_parse_header_name(pv_spec_p sp, str *hname);
++int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
++int pvh_set_header(
++		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
++xavp_c_data_t *pvh_set_parsed(
++		struct sip_msg *msg, str *hname, str *cur, str *new);
++
++int pvh_set_uri(
++		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
++int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
++int pvh_merge_uri(struct sip_msg *msg, enum action_type type, str *cur,
++		str *new, xavp_c_data_t *c_data);
++
++int pvh_get_reply_sr(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
++int pvh_set_reply_sr(
++		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val);
 +
 +#endif /* PV_XAVP_H */

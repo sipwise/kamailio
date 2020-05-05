@@ -56,10 +56,12 @@ upstream/avpops-add-avp_subst_pv-documentation.patch
 upstream/avpops-add-avp_subst_pv.patch
 upstream/rtpengine-update-fix-via-branch-next-ID-generation.patch
 upstream/rtpengine-t38-options.patch
+upstream/rtpengine-add-flags-field-for-every-command.patch
 upstream/app_lua-add-support-for-ARRAY-and-DICT-types.patch
 upstream/core-KEMI-suport-for-ARRAY-and-DICT.patch
 upstream/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
 upstream/pv-fixes-for-KEMI-pvx.xavp_getd.patch
+upstream/cfgt-don-t-process-non-sip-messages.patch
 ## backport from kamailio trunk (5.3)
 upstream/pv-do-not-set-ending-0-for-port-value-in-pv_set_ruri.patch
 upstream/uac-also-set-socket-for-in-dialog-REGISTER-GH-2262.patch
@@ -73,13 +75,9 @@ upstream/utils-kamctl-fix-dbtestdb.patch
 upstream/utils-kamctl-dbtextdb-remove-DeprecationWarning-on-t.patch
 upstream/utils-kamctl-dbtextdb.py-close-previous-opened-file-.patch
 ### relevant for upstream
-sipwise/fix_error_in_cfgt_module.patch
-sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
-sipwise/rtpengine-flags-for-everything.patch
-##
-sipwise/pv_headers-full-rework.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+## active development
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
