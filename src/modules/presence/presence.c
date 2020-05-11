@@ -81,7 +81,6 @@ MODULE_VERSION
 #define P_TABLE_VERSION 5
 #define ACTWATCH_TABLE_VERSION 12
 
-char *log_buf = NULL;
 static int clean_period = 100;
 static int db_update_period = 100;
 int pres_local_log_level = L_INFO;
@@ -1726,7 +1725,9 @@ void rpc_presence_refresh_watchers(rpc_t *rpc, void *ctx)
 }
 
 static const char *rpc_presence_refresh_watchers_doc[2] = {
-		"Trigger refresh of watchers", 0};
+	"Trigger refresh of watchers",
+	0
+};
 
 /*! \brief
  *  rpc cmd: presence.updateWatchers
@@ -1768,7 +1769,9 @@ void rpc_presence_update_watchers(rpc_t *rpc, void *ctx)
 }
 
 static const char *rpc_presence_update_watchers_doc[2] = {
-		"Trigger update of watchers", 0};
+	"Trigger update of watchers",
+	0
+};
 
 
 void rpc_presence_cleanup(rpc_t *rpc, void *c)
@@ -1783,18 +1786,21 @@ void rpc_presence_cleanup(rpc_t *rpc, void *c)
 	return;
 }
 
-static const char *rpc_presence_cleanup_doc[2] = {
-		"Manually triggers the cleanup functions for the active_watchers, "
-		"presentity, and watchers tables.",
-		0};
+static const char *rpc_presence_cleanup_doc[3] = {
+	"Manually triggers the cleanup functions for the active_watchers, "
+	"presentity, and watchers tables.",
+	0
+};
+
 
 rpc_export_t presence_rpc[] = {
-		{"presence.cleanup", rpc_presence_cleanup, rpc_presence_cleanup_doc, 0},
-		{"presence.refreshWatchers", rpc_presence_refresh_watchers,
-				rpc_presence_refresh_watchers_doc, 0},
-		{"presence.updateWatchers", rpc_presence_update_watchers,
-				rpc_presence_update_watchers_doc, 0},
-		{0, 0, 0, 0}};
+	{"presence.cleanup", rpc_presence_cleanup, rpc_presence_cleanup_doc, 0},
+	{"presence.refreshWatchers", rpc_presence_refresh_watchers,
+			rpc_presence_refresh_watchers_doc, 0},
+	{"presence.updateWatchers", rpc_presence_update_watchers,
+			rpc_presence_update_watchers_doc, 0},
+	{0, 0, 0, 0}
+};
 
 static int presence_init_rpc(void)
 {
