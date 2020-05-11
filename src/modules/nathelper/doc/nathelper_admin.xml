@@ -173,13 +173,13 @@ modparam("nathelper", "natping_interval", 10)
 		<title><varname>ping_nated_only</varname> (integer)</title>
 		<para>
 		If this parameter is set to 1 then only contacts that have
-		<quote>behind_NAT</quote> flag in user location database set will
-		get ping.
+		the behind NAT <quote>nat_bflag</quote> flag in user location
+		database set will get ping.
 		</para>
 		<para>
-		If it is 0 and sipping_flag is not set, then the 4-bytes UDP ping is
-		sent to all contacts. If it is 0 and sipping_flag parameter is set, then
-		SIP-request-based pinging is sent to all contacts.
+		If it is 0 and sipping_bflag is not set, then the 4-bytes UDP ping
+		is sent to all contacts. If it is 0 and sipping_bflag parameter
+		is set, then SIP-request-based pinging is sent to all contacts.
 		</para>
 		<para>
 		<emphasis>
@@ -461,6 +461,52 @@ modparam("nathelper", "append_sdp_oldmediaip", 1)
 		<programlisting format="linespecific">
 ...
 modparam("nathelper", "filter_server_id", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="nathelper.p.nat_addr_mode">
+		<title><varname>nat_addr_mode</varname> (int)</title>
+		<para>
+			If set to 0, only default private net addresses are checked by
+			nat_uac_test(). If set to 1, other reserved net addresses are
+			checked by nat_uac_test() as well.
+		</para>
+		<para>Default private net addresses are:</para>
+		<itemizedlist>
+			<listitem>
+				<para>10.0.0.0/8</para>
+			</listitem>
+			<listitem>
+				<para>172.16.0.0/12</para>
+			</listitem>
+			<listitem>
+				<para>192.168.0.0/16</para>
+			</listitem>
+			<listitem>
+				<para>100.64.0.0/10 - RFC6598 - Carrier Grade NAT</para>
+			</listitem>
+			<listitem>
+				<para>192.0.0.0/29 - RFC7335 - IPv4 Service Continuity Prefix</para>
+			</listitem>
+		</itemizedlist>
+		<para>Reserved net addresses are:</para>
+		<itemizedlist>
+			<listitem>
+				<para>192.0.0.0/24 - RFC7335 - IETF Protocol Assignments</para>
+			</listitem>
+		</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is <quote>1</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>nat_addr_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("nathelper", "nat_addr_mode", 0)
 ...
 </programlisting>
 		</example>
