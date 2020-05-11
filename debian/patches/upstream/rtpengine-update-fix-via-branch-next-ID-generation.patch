@@ -12,7 +12,7 @@ processing in scripts
  2 files changed, 29 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/rtpengine/doc/rtpengine_admin.xml b/src/modules/rtpengine/doc/rtpengine_admin.xml
-index d4cd2e4..1beaeeb 100644
+index cafd6b6..9e31a7d 100644
 --- a/src/modules/rtpengine/doc/rtpengine_admin.xml
 +++ b/src/modules/rtpengine/doc/rtpengine_admin.xml
 @@ -2113,6 +2113,10 @@ rtpengine_offer();
@@ -27,7 +27,7 @@ index d4cd2e4..1beaeeb 100644
  				on the &rtp; proxy. When sending a subsequent <quote>delete</quote> command to
  				the &rtp; proxy, you can then stop just the session for a specific branch when
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 2d6b7c1..c040c36 100644
+index 2e09c15..6d821ae 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -2268,6 +2268,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu

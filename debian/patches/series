@@ -63,17 +63,7 @@ upstream/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
 upstream/pv-fixes-for-KEMI-pvx.xavp_getd.patch
 upstream/cfgt-don-t-process-non-sip-messages.patch
 ## backport from kamailio trunk (5.3)
-upstream/pv-do-not-set-ending-0-for-port-value-in-pv_set_ruri.patch
-upstream/uac-also-set-socket-for-in-dialog-REGISTER-GH-2262.patch
-upstream/rtpengine-replaced-rtpproxy-with-rtpengine.patch
-upstream/rtpengine-fix-zero-length-log-placeholder.patch
-upstream/core-fix-returning-multiple-IPs-for-a-cached-DNS-ent.patch
-upstream/core-do-not-set-msg-tcp-connection-id-in-the-dst-inf.patch
-upstream/tm-do-not-set-msg-tcp-connection-id-in-the-dst-info.patch
-upstream/utils-kamctl-fix-handling-of-Exceptions.patch
-upstream/utils-kamctl-fix-dbtestdb.patch
-upstream/utils-kamctl-dbtextdb-remove-DeprecationWarning-on-t.patch
-upstream/utils-kamctl-dbtextdb.py-close-previous-opened-file-.patch
+#
 ### relevant for upstream
 #
 ### active development

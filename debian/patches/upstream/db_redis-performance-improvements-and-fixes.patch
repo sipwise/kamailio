@@ -1448,7 +1448,7 @@ index f41be1a..ae40db6 100644
 \ No newline at end of file
 +#endif  /* _REDIS_BASE_H_ */
 diff --git a/src/modules/db_redis/redis_table.c b/src/modules/db_redis/redis_table.c
-index fe63490..4bed4e1 100644
+index 721d31d..e59bd5b 100644
 --- a/src/modules/db_redis/redis_table.c
 +++ b/src/modules/db_redis/redis_table.c
 @@ -487,13 +487,14 @@ static struct str_hash_entry* db_redis_create_column(str *col, str *type) {
@@ -1460,13 +1460,13 @@ index fe63490..4bed4e1 100644
      char *start;
      char *end;
  
-     str table_name;
+     str table_name = str_init("");
      str type_name;
      str column_name;
 +    str version_code;
  
-     struct str_hash_entry *table_entry;
-     redis_table_t *table;
+     struct str_hash_entry *table_entry = NULL;
+     redis_table_t *table = NULL;
 @@ -533,6 +534,16 @@ int db_redis_parse_keys(km_redis_con_t *con) {
                  }
                  table_name.s = start;
@@ -1484,15 +1484,15 @@ index fe63490..4bed4e1 100644
                  state = DBREDIS_KEYS_TYPE_ST;
                  start = ++p;
                  LM_DBG("found table name '%.*s'\n", table_name.len, table_name.s);
-@@ -544,6 +555,7 @@ int db_redis_parse_keys(km_redis_con_t *con) {
+@@ -545,6 +556,7 @@ int db_redis_parse_keys(km_redis_con_t *con) {
                      goto err;
                  }
                  table = table_entry->u.p;
 +                table->version_code = version_code;
                  break;
              case DBREDIS_KEYS_TYPE_ST:
-                 while(p != end && *p != ':')
-@@ -593,6 +605,10 @@ int db_redis_parse_keys(km_redis_con_t *con) {
+             	if(!table) {
+@@ -598,6 +610,10 @@ int db_redis_parse_keys(km_redis_con_t *con) {
                  column_name.s = start;
                  column_name.len = p - start;
                  start = ++p;

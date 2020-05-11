@@ -8,7 +8,7 @@ Subject: [PATCH] rtpengine: add play_dtmf() command
  2 files changed, 12 insertions(+)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 20df725..2d6b7c1 100644
+index 8f3c28a..2e09c15 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -138,6 +138,7 @@ static const char *command_strings[] = {
@@ -51,7 +51,7 @@ index 20df725..2d6b7c1 100644
  start_forwarding_f(struct sip_msg* msg, char *str1, char *str2)
  {
 diff --git a/src/modules/rtpengine/rtpengine.h b/src/modules/rtpengine/rtpengine.h
-index 4edf52f..354eceb 100644
+index 8a29210..03999bf 100644
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
 @@ -46,6 +46,7 @@ enum rtpe_operation {

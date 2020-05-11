@@ -1,4 +1,3 @@
-From 916c775f8ccb079af11f370aa498b5932f3734d5 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Tue, 21 Apr 2020 13:03:16 +0200
 Subject: [PATCH] pv: fixes for KEMI pvx.xavp_getd
@@ -8,10 +7,10 @@ Subject: [PATCH] pv: fixes for KEMI pvx.xavp_getd
  1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/pv/pv.c b/src/modules/pv/pv.c
-index 2574148c04..511a0e3b29 100644
+index 54bf38d..2bbc77b 100644
 --- a/src/modules/pv/pv.c
 +++ b/src/modules/pv/pv.c
-@@ -1402,7 +1402,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp);
+@@ -1229,7 +1229,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp);
  /**
   * SR_KEMIP_ARRAY with values of xavp=>name
   */
@@ -20,7 +19,7 @@ index 2574148c04..511a0e3b29 100644
  {
  	sr_kemi_dict_item_t *ini = NULL;
  	sr_kemi_dict_item_t *val;
-@@ -1416,7 +1416,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+@@ -1243,7 +1243,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
  	}
  	memset(ini, 0, sizeof(sr_kemi_xval_t));
  	ini->vtype = SR_KEMIP_ARRAY;
@@ -29,7 +28,7 @@ index 2574148c04..511a0e3b29 100644
  	{
  		avp = avp->next;
  	}
-@@ -1467,8 +1467,8 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+@@ -1294,8 +1294,8 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
  			last->next = val;
  		} else {
  			ini->v.dict = val;
@@ -39,7 +38,7 @@ index 2574148c04..511a0e3b29 100644
  		avp = xavp_get_next(avp);
  	}
  	return ini;
-@@ -1509,13 +1509,13 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp)
+@@ -1335,13 +1335,13 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
  			val->vtype = SR_KEMIP_DICT;
  			val->name.s = keys->s.s;
  			val->name.len = keys->s.len;
@@ -55,6 +54,3 @@ index 2574148c04..511a0e3b29 100644
  			k = keys;
  			keys = keys->next;
  			pkg_free(k);
--- 
-2.20.1
-

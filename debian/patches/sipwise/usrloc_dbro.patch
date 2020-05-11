@@ -126,7 +126,7 @@ index a834fe0..898f286 100644
  
  	/* free callbacks list */
 diff --git a/src/modules/usrloc/usrloc_mod.h b/src/modules/usrloc/usrloc_mod.h
-index 12735f1..d1ab60e 100644
+index f04b61c..cfe4c96 100644
 --- a/src/modules/usrloc/usrloc_mod.h
 +++ b/src/modules/usrloc/usrloc_mod.h
 @@ -89,6 +89,8 @@ extern int handle_lost_tcp;

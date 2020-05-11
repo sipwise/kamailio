@@ -1,17 +1,25 @@
-ngcp-kamailio (5.3.3-1+0~mr8.4.0.0) unstable; urgency=medium
+ngcp-kamailio (5.3.4-1+0~mr8.4.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
-  * [ca23604] TT#75200 pv_headers: rework
+  * TT#75200 pv_headers: rework
   * TT#76405 pua_dialoginfo
   * TT#78500 update patches merged upstream
-  * New upstream version 5.3.3
-  * TT#78500 update patches
+  * TT#78651 KEMI changes needed to remove app_lua_sr
+  * TT#80825 upstream fixes for kamctl dbtextdb
+  * TT#78500 update patches from upstream
+  * TT#79800 ndb_redis: fix redis_cmd return value on error
+  * New upstream version 5.3.4
+  * TT#81263 refresh patches and remove already applied
 
   [ Richard Fuchs ]
   * TT#78302 support rtpengine T.38 options
-  * [7ebf36b] TT#74951 fix incorrect branch index used in via-branch=next
+  * TT#74951 fix incorrect branch index used in via-branch=next
+  * TT#79601 add rtpengine flags for all commands
 
- -- Victor Seva <vseva@sipwise.com>  Thu, 26 Mar 2020 10:44:27 +0100
+  [ Michael Prokop ]
+  * TT#80825 utils/kamctl/dbtextdb/dbtextdb.py: fix exception usage with python3
+
+ -- Victor Seva <vseva@debian.org>  Mon, 11 May 2020 11:29:01 +0200
 
 ngcp-kamailio (5.2.5-1+0~mr8.3.0.0) unstable; urgency=medium
 

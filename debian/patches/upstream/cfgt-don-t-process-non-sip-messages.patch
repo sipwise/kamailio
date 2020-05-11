@@ -1,15 +1,14 @@
-From 57dbfba97f03370db3ad36e1d52f85f725f12972 Mon Sep 17 00:00:00 2001
 From: Sipwise Development Team <support@sipwise.com>
 Date: Fri, 29 Nov 2019 11:23:36 +0100
 Subject: [PATCH] cfgt: don't process non-sip messages
 
 * Skip OPTION messages internally generated
 ---
- src/modules/cfgt/cfgt_int.c | 103 +++++++++++++++++++++++++++++++++---
+ src/modules/cfgt/cfgt_int.c | 103 ++++++++++++++++++++++++++++++++++++++++----
  1 file changed, 95 insertions(+), 8 deletions(-)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 5f73a05bc8..382d696f53 100644
+index 5f73a05..382d696 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -30,6 +30,11 @@
@@ -224,6 +223,3 @@ index 5f73a05bc8..382d696f53 100644
  	LM_ERR("node empty\n");
  	return -1;
  }
--- 
-2.20.1
-
