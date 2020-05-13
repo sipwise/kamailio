@@ -63,6 +63,9 @@ upstream/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
 upstream/pv-fixes-for-KEMI-pvx.xavp_getd.patch
 upstream/cfgt-don-t-process-non-sip-messages.patch
 upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
+upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
+upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
+upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream

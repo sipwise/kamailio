@@ -1,0 +1,22 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Mon, 27 Apr 2020 15:24:23 +0200
+Subject: [PATCH] core: str - fixed wrong (undo'ed) version of STR_ZTOV()
+ macro
+
+---
+ src/core/str.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/str.h b/src/core/str.h
+index 83334b8..01b12ec 100644
+--- a/src/core/str.h
++++ b/src/core/str.h
+@@ -137,7 +137,7 @@ typedef struct _str str;
+ 		if (v != '\0') { \
+ 			c = v; \
+ 		} \
+-	}
++	} while(0)
+ 
+ /** @} */
+ 
