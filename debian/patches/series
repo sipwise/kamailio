@@ -63,6 +63,8 @@ upstream/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
 upstream/pv-fixes-for-KEMI-pvx.xavp_getd.patch
 upstream/cfgt-don-t-process-non-sip-messages.patch
 upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
+upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
+upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
@@ -70,6 +72,7 @@ upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
 ### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+sipwise/jansson-add-debug-for-janssonmod_set.patch
 #
 sipwise/ndb_redis-fix-return-redis_cmd-function.patch
 ### Don't just put stuff in any order
