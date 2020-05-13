@@ -1,0 +1,32 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 13 May 2020 14:37:54 +0200
+Subject: jansson: add debug for janssonmod_set()
+
+---
+ src/modules/jansson/jansson_funcs.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/jansson/jansson_funcs.c b/src/modules/jansson/jansson_funcs.c
+index 7eceae4..1d38355 100644
+--- a/src/modules/jansson/jansson_funcs.c
++++ b/src/modules/jansson/jansson_funcs.c
+@@ -126,12 +126,13 @@ int janssonmod_set(unsigned int append, struct sip_msg* msg, char* type_in,
+ 		result_val.rs.len = strlen("{}");
+ 	}
+ 
+-/*
+-	ALERT("type is: %.*s\n", type_s.len, type_s.s);
+-	ALERT("path is: %.*s\n", path_s.len, path_s.s);
+-	ALERT("value is: %.*s\n", value_s.len, value_s.s);
+-	ALERT("result is: %.*s\n", result_val.rs.len, result_val.rs.s);
+-*/
++
++	LM_DBG("type is: %.*s with len: %d\n", type_s.len, type_s.s, type_s.len);
++	LM_DBG("path is: %.*s with len: %d\n", path_s.len, path_s.s, path_s.len);
++	LM_DBG("value is: %.*s with len: %d\n", value_s.len, value_s.s, value_s.len);
++	LM_DBG("result is: %.*s with len: %d\n",
++		result_val.rs.len, result_val.rs.s, result_val.rs.len);
++
+ 
+ 	char* result = result_val.rs.s;
+ 
