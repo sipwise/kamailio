@@ -1,0 +1,43 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 18 May 2020 13:05:51 +0200
+Subject: core: add case functions for str_hash get and set
+
+---
+ src/core/str_hash.h | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/src/core/str_hash.h b/src/core/str_hash.h
+index 8755a62..a338283 100644
+--- a/src/core/str_hash.h
++++ b/src/core/str_hash.h
+@@ -101,6 +101,30 @@ inline static struct str_hash_entry* str_hash_get(struct str_hash_table* ht,
+ 	return 0;
+ }
+ 
++inline static void str_hash_case_add(struct str_hash_table* ht,
++								struct str_hash_entry* e)
++{
++	int h;
++
++	h=get_hash1_case_raw(e->key.s, e->key.len) % ht->size;
++	clist_insert(&ht->table[h], e, next, prev);
++}
++
++
++
++inline static struct str_hash_entry* str_hash_case_get(struct str_hash_table* ht,
++									const char* key, int len)
++{
++	int h;
++	struct str_hash_entry* e;
++
++	h=get_hash1_case_raw(key, len) % ht->size;
++	clist_foreach(&ht->table[h], e, next){
++		if ((e->key.len==len) && (strncasecmp(e->key.s, key, len)==0))
++			return e;
++	}
++	return 0;
++}
+ 
+ #define str_hash_del(e) clist_rm(e, next, prev)
+ 

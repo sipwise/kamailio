@@ -69,6 +69,8 @@ upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
+## https://github.com/kamailio/kamailio/pull/2332
+sipwise/core-add-case-functions-for-str_hash-get-and-set.patch
 #
 ### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
