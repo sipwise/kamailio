@@ -1679,8 +1679,8 @@ index 0000000..b3749a6
 +
 +	pvh_get_branch_xname(msg, &xavp_name, &br_xname);
 +
-+	if((xavp = xavp_get(&br_xname, NULL)) == NULL
-+			&& (xavp = xavp_get(&xavp_name, NULL)) == NULL) {
++	if((xavp = pvh_xavp_get(&br_xname, NULL)) == NULL
++			&& (xavp = pvh_xavp_get(&xavp_name, NULL)) == NULL) {
 +		LM_ERR("missing xavp %s, run pv_collect_headers() first\n",
 +				xavp_name.s);
 +		return -1;
@@ -1793,7 +1793,7 @@ index 0000000..b3749a6
 +		}
 +
 +		if(!str_hash_get(&rm_hdrs, sub->name.s, sub->name.len)) {
-+			if(!pvh_xavp_is_null(sub) && xavp_count(&sub->name, &sub) == 1) {
++			if(!pvh_xavp_is_null(sub) && pvh_xavp_count(&sub->name, &sub) == 1) {
 +				LM_DBG("replace header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
 +				pvh_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
 +				pvh_str_hash_add_key(&rm_hdrs, &sub->name);
@@ -1865,7 +1865,7 @@ index 0000000..b3749a6
 +		return 1;
 +
 +	if(indx < 0) {
-+		count = xavp_count(hname, &avp);
++		count = pvh_xavp_count(hname, &avp);
 +		do {
 +			if(pvh_set_xavp(
 +					   msg, &xavp_name, hname, NULL, SR_XTYPE_STR, indx++, 0)
@@ -2675,7 +2675,7 @@ new file mode 100644
 index 0000000..0cfd969
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
-@@ -0,0 +1,1133 @@
+@@ -0,0 +1,1355 @@
 +/*
 + * pv_headers
 + *
@@ -2711,17 +2711,26 @@ index 0000000..0cfd969
 +
 +static str reply_counter = str_init("reply_counter");
 +
++// internal forward declarations
++sr_xavp_t *pvh_xavp_add_value_casei(str *name, sr_xval_t *val, sr_xavp_t **list);
++sr_xavp_t *pvh_xavp_add_xavp_value_casei(str *rname, str *name, sr_xval_t *val, sr_xavp_t **list);
++sr_xavp_t *pvh_xavp_set_value_casei(str *name, int idx, sr_xval_t *val, sr_xavp_t **list);
++sr_xavp_t *pvh_xavp_get_internal_casei(str *name, sr_xavp_t **list, int idx, sr_xavp_t **prv);
++sr_xavp_t* pvh_xavp_get_child_casei(str *rname, str *cname);
++int pvh_xavp_rm_internal_casei(str *name, sr_xavp_t **head, int idx);
++int pvh_xavp_rm_by_name_casei(str *name, int all, sr_xavp_t **head);
++
 +sr_xavp_t *pvh_xavp_get_child_with_ival(
 +		str *rname, str *cname, sr_xavp_t *start)
 +{
 +	sr_xavp_t *ravp = NULL;
 +	sr_xavp_t *vavp = NULL;
 +
-+	ravp = xavp_get(rname, start);
++	ravp = pvh_xavp_get(rname, start);
 +	if(ravp == NULL || ravp->val.type != SR_XTYPE_XAVP)
 +		return NULL;
 +
-+	vavp = xavp_get(cname, ravp->val.v.xavp);
++	vavp = pvh_xavp_get(cname, ravp->val.v.xavp);
 +	if(vavp == NULL || vavp->val.type != SR_XTYPE_INT)
 +		return NULL;
 +
@@ -2749,9 +2758,9 @@ index 0000000..0cfd969
 +	xval.type = SR_XTYPE_INT;
 +	xval.v.i = 0;
 +
-+	xavp = xavp_get(&xavp_helper_xname, start ? *start : NULL);
++	xavp = pvh_xavp_get(&xavp_helper_xname, start ? *start : NULL);
 +	if(xavp == NULL) {
-+		if(xavp_add_xavp_value(&xavp_helper_xname, &reply_counter, &xval,
++		if(pvh_xavp_add_xavp_value_casei(&xavp_helper_xname, &reply_counter, &xval,
 +				   start ? start : NULL)
 +				== NULL) {
 +			LM_ERR("can't create xavp:%.*s\n", xavp_helper_xname.len,
@@ -2761,7 +2770,7 @@ index 0000000..0cfd969
 +		LM_DBG("xavp_name:%.*s created\n", xavp_helper_xname.len,
 +				xavp_helper_xname.s);
 +	} else {
-+		if(xavp_add_value(&reply_counter, &xval, &xavp->val.v.xavp) == NULL) {
++		if(pvh_xavp_add_value_casei(&reply_counter, &xval, &xavp->val.v.xavp) == NULL) {
 +			LM_ERR("can't add reply_counter value\n");
 +			return -1;
 +		}
@@ -2779,7 +2788,7 @@ index 0000000..0cfd969
 +
 +	if(name == NULL || name->s == NULL || val == NULL)
 +		return NULL;
-+	id = get_hash1_raw(name->s, name->len);
++	id = get_hash1_case_raw(name->s, name->len);
 +
 +	size = sizeof(sr_xavp_t) + name->len + 1;
 +	if(val->type == SR_XTYPE_STR)
@@ -2833,29 +2842,29 @@ index 0000000..0cfd969
 +	int cnt = 0;
 +
 +	if(idx < 0) {
-+		cnt = xavp_count(name, start);
++		cnt = pvh_xavp_count(name, start);
 +		idx = idx + cnt;
 +		if(idx < 0)
 +			return -1;
 +	}
 +	LM_DBG("xavp name: %.*s\n", name->len, name->s);
-+	if(xavp_set_value(name, idx, val, start) == NULL)
++	if(pvh_xavp_set_value_casei(name, idx, val, start) == NULL)
 +		return -1;
 +
 +	return 1;
 +}
 +
-+sr_xavp_t *pvh_xavp_get(struct sip_msg *msg, str *xname)
++sr_xavp_t *pvh_get_xavp(struct sip_msg *msg, str *xname)
 +{
 +	sr_xavp_t *xavp = NULL;
 +	char t[header_name_size];
 +	str br_xname = {t, header_name_size};
 +
 +	pvh_get_branch_xname(msg, xname, &br_xname);
-+	if((xavp = xavp_get(&br_xname, NULL)) == NULL) {
++	if((xavp = pvh_xavp_get(&br_xname, NULL)) == NULL) {
 +		if(cmp_str(xname, &br_xname) == 0)
 +			goto end;
-+		if((xavp = xavp_get(xname, NULL)) == NULL)
++		if((xavp = pvh_xavp_get(xname, NULL)) == NULL)
 +			goto end;
 +		if(xname != &xavp_parsed_xname) {
 +			LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
@@ -2876,8 +2885,8 @@ index 0000000..0cfd969
 +int pvh_free_xavp(str *xname)
 +{
 +	sr_xavp_t *xavp = NULL;
-+	xavp_rm_by_name(xname, 1, NULL);
-+	if((xavp = xavp_get(xname, NULL)) != NULL)
++	pvh_xavp_rm_by_name_casei(xname, 1, NULL);
++	if((xavp = pvh_xavp_get(xname, NULL)) != NULL)
 +		xavp_rm(xavp, NULL);
 +	return 1;
 +}
@@ -2938,10 +2947,10 @@ index 0000000..0cfd969
 +	sr_xavp_t *xavp = NULL;
 +	sr_xavp_t *sub = NULL;
 +
-+	if((xavp = pvh_xavp_get(msg, xname)) != NULL) {
++	if((xavp = pvh_get_xavp(msg, xname)) != NULL) {
 +		/*	LM_DBG("xavp:%.*s name:%.*s idx:%d\n", xavp->name.len, xavp->name.s,
 +				name->len, name->s, idx); */
-+		sub = xavp_get_by_index(name, idx, &xavp->val.v.xavp);
++		sub = pvh_xavp_get_by_index(name, idx, &xavp->val.v.xavp);
 +	}
 +
 +	return sub ? &sub->val : NULL;
@@ -2954,10 +2963,10 @@ index 0000000..0cfd969
 +	str br_xname = {t, header_name_size};
 +
 +	pvh_get_branch_xname(msg, xname, &br_xname);
-+	xavp = xavp_get_child(&br_xname, name);
++	xavp = pvh_xavp_get_child_casei(&br_xname, name);
 +	if(xavp == NULL) {
 +		if(cmp_str(xname, &br_xname) != 0) {
-+			xavp = xavp_get_child(xname, name);
++			xavp = pvh_xavp_get_child_casei(xname, name);
 +			if(xavp) {
 +				LM_DBG("br_xname:%.*s is not there, using xname:%.*s\n",
 +						br_xname.len, br_xname.s, xname->len, xname->s);
@@ -2965,6 +2974,43 @@ index 0000000..0cfd969
 +		}
 +	}
 +	return xavp;
++}
++
++sr_xavp_t *pvh_xavp_get(str *name, sr_xavp_t *start)
++{
++    return pvh_xavp_get_internal_casei(name, (start)?&start:NULL, 0, NULL);
++}
++
++sr_xavp_t *pvh_xavp_get_by_index(str *name, int idx, sr_xavp_t **start)
++{
++    return pvh_xavp_get_internal_casei(name, start, idx, NULL);
++}
++
++int pvh_xavp_count(str *name, sr_xavp_t **start)
++{
++    sr_xavp_t *avp;
++    unsigned int id;
++    int n = 0;
++
++    if(name==NULL || name->s==NULL)
++        return -1;
++    id = get_hash1_case_raw(name->s, name->len);
++
++    if(start)
++        avp = *start;
++    else
++        avp=*xavp_get_crt_list();
++    while(avp)
++    {
++        if(avp->id==id && avp->name.len==name->len
++                && strncasecmp(avp->name.s, name->s, name->len)==0)
++        {
++            n++;
++        }
++        avp=avp->next;
++    }
++
++    return n;
 +}
 +
 +int pvh_xavp_is_null(sr_xavp_t *avp)
@@ -3048,11 +3094,11 @@ index 0000000..0cfd969
 +		xval.v.data->pfree = pvh_xavp_free_data;
 +	}
 +
-+	root = xavp_get(&br_xname, NULL);
++	root = pvh_xavp_get(&br_xname, NULL);
 +
 +	if(root == NULL && _branch > 0) {
 +		pvh_clone_branch_xavp(msg, xname);
-+		root = xavp_get(&br_xname, NULL);
++		root = pvh_xavp_get(&br_xname, NULL);
 +	}
 +
 +	xavp = root ? &root->val.v.xavp : &root;
@@ -3063,12 +3109,12 @@ index 0000000..0cfd969
 +		root_xval.type = SR_XTYPE_XAVP;
 +		root_xval.v.xavp = NULL;
 +
-+		if((root = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
++		if((root = pvh_xavp_add_value_casei(&br_xname, &root_xval, NULL)) == NULL) {
 +			LM_ERR("error create xavp %s\n", br_xname.s);
 +			return -1;
 +		}
 +		xavp = &root->val.v.xavp;
-+	} else if(xavp_get_child(&br_xname, name) == NULL) {
++	} else if(pvh_xavp_get_child_casei(&br_xname, name) == NULL) {
 +		append = 1;
 +	}
 +
@@ -3158,7 +3204,7 @@ index 0000000..0cfd969
 +	str br_xname = {t, header_name_size};
 +	int i = 0;
 +
-+	if((xavp = xavp_get(xname, NULL)) == NULL) {
++	if((xavp = pvh_xavp_get(xname, NULL)) == NULL) {
 +		LM_ERR("cannot clone xavp from non existing %s\n", xname->s);
 +		return -1;
 +	}
@@ -3179,7 +3225,7 @@ index 0000000..0cfd969
 +	root_xval.type = SR_XTYPE_XAVP;
 +	root_xval.v.xavp = NULL;
 +
-+	if((br_xavp = xavp_add_value(&br_xname, &root_xval, NULL)) == NULL) {
++	if((br_xavp = pvh_xavp_add_value_casei(&br_xname, &root_xval, NULL)) == NULL) {
 +		LM_ERR("error create xavp %s\n", br_xname.s);
 +		return -1;
 +	}
@@ -3235,7 +3281,7 @@ index 0000000..0cfd969
 +		if((xavp = pvh_xavp_get_child(msg, &xavp_name, &hname)) == NULL)
 +			cnt = 0;
 +		else
-+			cnt = xavp_count(&hname, &xavp);
++			cnt = pvh_xavp_count(&hname, &xavp);
 +		idx = idx + cnt;
 +		if(idx < 0)
 +			pv_get_null(msg, param, res);
@@ -3287,11 +3333,11 @@ index 0000000..0cfd969
 +	if((xavp = pvh_xavp_get_child(msg, &xavp_name, &hname)) == NULL)
 +		idx = 0;
 +	else if(idx < 0)
-+		idx = idx + xavp_count(&hname, &xavp);
++		idx = idx + pvh_xavp_count(&hname, &xavp);
 +
 +	if(val == NULL || (val->flags & PV_VAL_NULL)) {
 +		if(itype == PV_IDX_ALL) {
-+			for(idx = xavp_count(&hname, &xavp) - 1; idx >= 0; idx--) {
++			for(idx = pvh_xavp_count(&hname, &xavp) - 1; idx >= 0; idx--) {
 +				if(pvh_set_xavp(
 +						   msg, &xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
 +						< 0)
@@ -3323,7 +3369,7 @@ index 0000000..0cfd969
 +				goto err;
 +		} else if(itype == PV_IDX_ALL) {
 +			idx = 0;
-+			cnt = xavp_count(&hname, &xavp);
++			cnt = pvh_xavp_count(&hname, &xavp);
 +			while(idx < cnt) {
 +				if(pvh_set_xavp(msg, &xavp_name, &hname, NULL, SR_XTYPE_STR,
 +						   idx++, 0)
@@ -3809,12 +3855,188 @@ index 0000000..0cfd969
 +		pv_elem_free_all(pv_format);
 +	return -1;
 +}
++
++sr_xavp_t *pvh_xavp_add_value_casei(str *name, sr_xval_t *val, sr_xavp_t **list)
++{
++    sr_xavp_t *avp=0;
++
++    avp = pvh_xavp_new_value(name, val);
++    if (avp==NULL)
++        return NULL;
++
++    /* Prepend new value to the list */
++    if(list) {
++        avp->next = *list;
++        *list = avp;
++    } else {
++        avp->next = *xavp_get_crt_list();
++        *xavp_get_crt_list() = avp;
++    }
++
++    return avp;
++}
++
++sr_xavp_t *pvh_xavp_add_xavp_value_casei(str *rname, str *name, sr_xval_t *val, sr_xavp_t **list)
++{
++    sr_xavp_t *ravp=0;
++    sr_xavp_t *cavp=0;
++    sr_xval_t rval;
++
++    cavp = pvh_xavp_new_value(name, val);
++    if (cavp==NULL)
++        return NULL;
++
++    memset(&rval, 0, sizeof(sr_xval_t));
++    rval.type = SR_XTYPE_XAVP;
++    rval.v.xavp = cavp;
++
++    ravp = pvh_xavp_new_value(rname, &rval);
++    if (ravp==NULL) {
++        xavp_destroy_list(&cavp);
++        return NULL;
++    }
++
++    /* Prepend new value to the list */
++    if(list) {
++        ravp->next = *list;
++        *list = ravp;
++    } else {
++        ravp->next = *xavp_get_crt_list();
++        *xavp_get_crt_list() = ravp;
++    }
++
++    return ravp;
++}
++
++sr_xavp_t *pvh_xavp_set_value_casei(str *name, int idx, sr_xval_t *val, sr_xavp_t **list)
++{
++    sr_xavp_t *avp;
++    sr_xavp_t *cur;
++    sr_xavp_t *prv=0;
++
++    if(val==NULL)
++        return NULL;
++
++    /* Find the current value */
++    cur = pvh_xavp_get_internal_casei(name, list, idx, &prv);
++    if(cur==NULL)
++        return NULL;
++
++    avp = pvh_xavp_new_value(name, val);
++    if (avp==NULL)
++        return NULL;
++
++    /* Replace the current value with the new */
++    avp->next = cur->next;
++    if(prv)
++        prv->next = avp;
++    else if(list)
++        *list = avp;
++    else
++        *xavp_get_crt_list() = avp;
++
++    xavp_free(cur);
++
++    return avp;
++}
++
++sr_xavp_t *pvh_xavp_get_internal_casei(str *name, sr_xavp_t **list, int idx, sr_xavp_t **prv)
++{
++    sr_xavp_t *avp;
++    unsigned int id;
++    int n = 0;
++
++    if(name==NULL || name->s==NULL)
++        return NULL;
++    id = get_hash1_case_raw(name->s, name->len);
++
++    if(list && *list)
++        avp = *list;
++    else
++        avp = *xavp_get_crt_list();
++    while(avp)
++    {
++        if(avp->id==id && avp->name.len==name->len
++                && strncasecmp(avp->name.s, name->s, name->len)==0)
++        {
++            if(idx==n)
++                return avp;
++            n++;
++        }
++        if(prv)
++            *prv = avp;
++        avp = avp->next;
++    }
++    return NULL;
++}
++
++sr_xavp_t* pvh_xavp_get_child_casei(str *rname, str *cname)
++{
++    sr_xavp_t *ravp=NULL;
++
++    ravp = pvh_xavp_get(rname, NULL);
++    if(ravp==NULL || ravp->val.type!=SR_XTYPE_XAVP)
++        return NULL;
++
++    return pvh_xavp_get(cname, ravp->val.v.xavp);
++}
++
++int pvh_xavp_rm_internal_casei(str *name, sr_xavp_t **head, int idx)
++{
++    sr_xavp_t *avp;
++    sr_xavp_t *foo;
++    sr_xavp_t *prv=0;
++    unsigned int id;
++    int n=0;
++    int count=0;
++
++    if(name==NULL || name->s==NULL)
++        return 0;
++
++    id = get_hash1_case_raw(name->s, name->len);
++    if(head!=NULL)
++        avp = *head;
++    else
++        avp = *xavp_get_crt_list();
++    while(avp)
++    {
++        foo = avp;
++        avp=avp->next;
++        if(foo->id==id && foo->name.len==name->len
++                && strncasecmp(foo->name.s, name->s, name->len)==0)
++        {
++            if(idx<0 || idx==n)
++            {
++                if(prv!=NULL)
++                    prv->next=foo->next;
++                else if(head!=NULL)
++                    *head = foo->next;
++                else
++                    *xavp_get_crt_list() = foo->next;
++                xavp_free(foo);
++                if(idx>=0)
++                    return 1;
++                count++;
++            }
++            n++;
++        } else {
++            prv = foo;
++        }
++    }
++    return count;
++}
++
++int pvh_xavp_rm_by_name_casei(str *name, int all, sr_xavp_t **head)
++{
++    return pvh_xavp_rm_internal_casei(name, head, -1*all);
++}
++
 diff --git a/src/modules/pv_headers/pvh_xavp.h b/src/modules/pv_headers/pvh_xavp.h
 new file mode 100644
 index 0000000..7d4aa30
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.h
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,69 @@
 +/*
 + * pv_headers
 + *
@@ -3858,6 +4080,9 @@ index 0000000..7d4aa30
 +sr_xval_t *pvh_xavp_get_value(
 +		struct sip_msg *msg, str *xname, str *name, int idx);
 +sr_xavp_t *pvh_xavp_get_child(struct sip_msg *msg, str *xname, str *name);
++sr_xavp_t *pvh_xavp_get(str *name, sr_xavp_t *start);
++sr_xavp_t *pvh_xavp_get_by_index(str *name, int idx, sr_xavp_t **start);
++int pvh_xavp_count(str *name, sr_xavp_t **start);
 +
 +int pvh_get_branch_index(struct sip_msg *msg, int *br_idx);
 +int pvh_get_branch_xname(struct sip_msg *msg, str *xname, str *dst);
