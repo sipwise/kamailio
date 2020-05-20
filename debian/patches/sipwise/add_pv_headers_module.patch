@@ -1618,7 +1618,7 @@ index 0000000..97f89aa
 +		val.s = hf->body.s;
 +
 +		if(strchr(val.s, ',') != NULL
-+				&& str_hash_get(&split_headers, name.s, name.len)) {
++				&& str_hash_case_get(&split_headers, name.s, name.len)) {
 +
 +			if(pvh_split_values(&val, hvals, &d_size, 1) < 0) {
 +				LM_ERR("could not parse %.*s header comma separated "
@@ -1785,14 +1785,14 @@ index 0000000..97f89aa
 +		}
 +
 +		if(cmpi_str(&sub->name, &_hdr_reply_reason) == 0) {
-+			if(str_hash_get(&rm_hdrs, sub->name.s, sub->name.len))
++			if(str_hash_case_get(&rm_hdrs, sub->name.s, sub->name.len))
 +				continue;
 +			pvh_real_replace_reply_reason(msg, &sub->val.v.s);
 +			pvh_str_hash_add_key(&rm_hdrs, &sub->name);
 +			continue;
 +		}
 +
-+		if(!str_hash_get(&rm_hdrs, sub->name.s, sub->name.len)) {
++		if(!str_hash_case_get(&rm_hdrs, sub->name.s, sub->name.len)) {
 +			if(!pvh_xavp_is_null(sub) && pvh_xavp_count(&sub->name, &sub) == 1) {
 +				LM_DBG("replace header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
 +				pvh_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
