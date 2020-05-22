@@ -1,0 +1,284 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 22 May 2020 13:42:57 +0200
+Subject: pv_headers: add some more debug
+
+---
+ src/modules/pv_headers/pvh_xavp.c | 115 ++++++++++++++++++++++----------------
+ 1 file changed, 67 insertions(+), 48 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index 72235b1..78e8703 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -270,8 +270,8 @@ sr_xval_t *pvh_xavp_get_value(
+ 	sr_xavp_t *sub = NULL;
+ 
+ 	if((xavp = pvh_get_xavp(msg, xname)) != NULL) {
+-		/*	LM_DBG("xavp:%.*s name:%.*s idx:%d\n", xavp->name.len, xavp->name.s,
+-				name->len, name->s, idx); */
++		LM_DBG("xavp:%.*s name:%.*s idx:%d\n", xavp->name.len, xavp->name.s,
++				name->len, name->s, idx);
+ 		sub = pvh_xavp_get_by_index(name, idx, &xavp->val.v.xavp);
+ 	}
+ 
+@@ -578,7 +578,7 @@ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 	sr_xavp_t *xavp = NULL;
+ 	sr_xval_t *xval = NULL;
+ 	pv_value_t tv;
+-	str hname = STR_NULL;
++	str *hname = NULL;
+ 	int idx = 0;
+ 	int cnt = 0;
+ 
+@@ -592,28 +592,35 @@ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 		if(!(tv.flags & PV_VAL_STR)) {
+ 			return pv_get_null(msg, param, res);
+ 		}
+-		hname = tv.rs;
++		hname = &tv.rs;
+ 	} else if(param->pvn.u.isname.type == AVP_NAME_STR) {
+-		hname = param->pvn.u.isname.name.s;
++		hname = &param->pvn.u.isname.name.s;
+ 	} else {
++		LM_DBG("wrong param type\n");
+ 		return pv_get_null(msg, param, res);
+ 	}
+-
++	LM_DBG("xavp:%.*s hname:%.*s idx:%d\n",
++			xavp_name.len, xavp_name.s, hname->len, hname->s, idx);
+ 	if(idx < 0) {
+-		if((xavp = pvh_xavp_get_child(msg, &xavp_name, &hname)) == NULL)
++		if((xavp = pvh_xavp_get_child(msg, &xavp_name, hname)) == NULL)
+ 			cnt = 0;
+ 		else
+-			cnt = pvh_xavp_count(&hname, &xavp);
++			cnt = pvh_xavp_count(hname, &xavp);
+ 		idx = idx + cnt;
+-		if(idx < 0)
+-			pv_get_null(msg, param, res);
++		if(idx < 0) {
++			LM_DBG("wrong calculated idx:%d cnt:%d\n", idx, cnt);
++			return pv_get_null(msg, param, res);
++		}
+ 	}
+ 
+-	xval = pvh_xavp_get_value(msg, &xavp_name, &hname, idx);
++	xval = pvh_xavp_get_value(msg, &xavp_name, hname, idx);
+ 
+-	if(xval == NULL || !xval->v.s.s)
++	if(xval == NULL || !xval->v.s.s) {
++		LM_DBG("xval not found xavp:%.*s hname:%.*s idx:%d\n",
++			xavp_name.len, xavp_name.s, hname->len, hname->s, idx);
+ 		return pv_get_null(msg, param, res);
+-
++	}
++	LM_DBG("xval:%.*s\n", xval->v.s.len, xval->v.s.s);
+ 	return pv_get_strval(msg, param, res, &xval->v.s);
+ }
+ 
+@@ -623,8 +630,8 @@ int pvh_set_header(
+ 	sr_xavp_t *xavp = NULL;
+ 	pv_elem_p pv_format = NULL;
+ 	pv_value_t tv;
+-	str hname = STR_NULL;
+-	str orig_hname = STR_NULL;
++	str *hname = NULL;
++	str *orig_hname = NULL;
+ 	str fval;
+ 	int idx = 0;
+ 	int cnt = 0;
+@@ -642,31 +649,37 @@ int pvh_set_header(
+ 			LM_ERR("invalid avp value, must be a string\n");
+ 			return -1;
+ 		}
+-		hname = tv.rs;
+-		orig_hname = param->pvn.u.isname.name.s;
++		hname = &tv.rs;
++		orig_hname = &param->pvn.u.isname.name.s;
+ 	} else if(param->pvn.u.isname.type == AVP_NAME_STR) {
+-		hname = param->pvn.u.isname.name.s;
++		hname = &param->pvn.u.isname.name.s;
+ 		orig_hname = hname;
+ 	} else {
+ 		LM_ERR("invalid header name, must be a string\n");
+ 		return -1;
+ 	}
+ 
+-	if((xavp = pvh_xavp_get_child(msg, &xavp_name, &hname)) == NULL)
++	if((xavp = pvh_xavp_get_child(msg, &xavp_name, hname)) == NULL) {
+ 		idx = 0;
+-	else if(idx < 0)
+-		idx = idx + pvh_xavp_count(&hname, &xavp);
+-
++		cnt = pvh_xavp_count(hname, &xavp);
++	} else if(idx < 0) {
++		cnt = pvh_xavp_count(hname, &xavp);
++		idx = idx + cnt;
++		if(idx < 0) {
++			LM_ERR("wrong calculated idx:%d\n", idx);
++			return -1;
++		}
++	}
+ 	if(val == NULL || (val->flags & PV_VAL_NULL)) {
+ 		if(itype == PV_IDX_ALL) {
+-			for(idx = pvh_xavp_count(&hname, &xavp) - 1; idx >= 0; idx--) {
++			for(idx = cnt - 1; idx >= 0; idx--) {
+ 				if(pvh_set_xavp(
+-						   msg, &xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
++						   msg, &xavp_name, hname, NULL, SR_XTYPE_STR, idx, 0)
+ 						< 0)
+ 					goto err;
+ 			}
+ 		} else {
+-			if(pvh_set_xavp(msg, &xavp_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
++			if(pvh_set_xavp(msg, &xavp_name, hname, NULL, SR_XTYPE_STR, idx, 0)
+ 					< 0)
+ 				goto err;
+ 		}
+@@ -684,27 +697,26 @@ int pvh_set_header(
+ 			LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
+ 			goto err;
+ 		}
+-		if(strlen(orig_hname.s) > 1
+-				&& strcmp(orig_hname.s + strlen(orig_hname.s) - 2, "])") != 0) {
+-			if(pvh_set_xavp(msg, &xavp_name, &hname, &fval, SR_XTYPE_STR, 0, 1)
++		if(orig_hname->len > 1
++				&& strcmp(orig_hname->s + orig_hname->len - 2, "])") != 0) {
++			if(pvh_set_xavp(msg, &xavp_name, hname, &fval, SR_XTYPE_STR, 0, 1)
+ 					< 0)
+ 				goto err;
+ 		} else if(itype == PV_IDX_ALL) {
+ 			idx = 0;
+-			cnt = pvh_xavp_count(&hname, &xavp);
+ 			while(idx < cnt) {
+-				if(pvh_set_xavp(msg, &xavp_name, &hname, NULL, SR_XTYPE_STR,
++				if(pvh_set_xavp(msg, &xavp_name, hname, NULL, SR_XTYPE_STR,
+ 						   idx++, 0)
+ 						< 1)
+ 					goto err;
+ 			}
+-			if(pvh_set_xavp(msg, &xavp_name, &hname, &fval, SR_XTYPE_STR, 0,
++			if(pvh_set_xavp(msg, &xavp_name, hname, &fval, SR_XTYPE_STR, 0,
+ 					   cnt ? 0 : 1)
+ 					< 0)
+ 				goto err;
+ 		} else {
+ 			if(pvh_set_xavp(
+-					   msg, &xavp_name, &hname, &fval, SR_XTYPE_STR, idx, 0)
++					   msg, &xavp_name, hname, &fval, SR_XTYPE_STR, idx, 0)
+ 					< 0)
+ 				goto err;
+ 		}
+@@ -712,7 +724,7 @@ int pvh_set_header(
+ 			pv_elem_free_all(pv_format);
+ 	} else {
+ 		LM_ERR("x_hdr %.*s value can be either string, integer or null\n",
+-				hname.len, hname.s);
++				hname->len, hname->s);
+ 		goto err;
+ 	}
+ 	return 1;
+@@ -771,22 +783,22 @@ int pvh_get_uri(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 
+ 	xval = pvh_xavp_get_value(msg, &xavp_name, &hname, 0);
+ 	if(xval == NULL || !xval->v.s.s) {
+-		/*	LM_DBG("xavp:%.*s hname:%.*s is null\n", xavp_name.len, xavp_name.s,
+-				hname.len, hname.s); */
++		LM_DBG("xavp:%.*s hname:%.*s is null\n", xavp_name.len, xavp_name.s,
++				hname.len, hname.s);
+ 		goto err;
+ 	}
+ 
+ 	xval_pd = pvh_xavp_get_value(msg, &xavp_parsed_xname, &hname, 0);
+ 
+ 	if(xval_pd) {
+-		/*	LM_DBG("p_no:%d c_data from xavp_parsed_xname hname:%.*s\n", p_no,
+-				hname.len, hname.s); */
++		LM_DBG("p_no:%d c_data from xavp_parsed_xname hname:%.*s\n", p_no,
++				hname.len, hname.s);
+ 		c_data = (xavp_c_data_t *)xval_pd->v.data->p;
+ 	}
+ 
+ 	if(c_data != NULL && cmp_str(&xval->v.s, &c_data->value) != 0) {
+-		/*	LM_DBG("xval:%.*s != c_data->value:%.*s\n", xval->v.s.len, xval->v.s.s,
+-				c_data->value.len, c_data->value.s); */
++		LM_DBG("xval:%.*s != c_data->value:%.*s\n", xval->v.s.len, xval->v.s.s,
++				c_data->value.len, c_data->value.s);
+ 		c_data = NULL;
+ 	}
+ 
+@@ -1180,7 +1192,8 @@ err:
+ 
+ sr_xavp_t *pvh_xavp_add_value_casei(str *name, sr_xval_t *val, sr_xavp_t **list)
+ {
+-	sr_xavp_t *avp=0;
++	sr_xavp_t *avp = NULL;
++	sr_xavp_t **crt_list = NULL;
+ 
+ 	avp = pvh_xavp_new_value(name, val);
+ 	if (avp==NULL)
+@@ -1191,8 +1204,9 @@ sr_xavp_t *pvh_xavp_add_value_casei(str *name, sr_xval_t *val, sr_xavp_t **list)
+ 		avp->next = *list;
+ 		*list = avp;
+ 	} else {
+-		avp->next = *xavp_get_crt_list();
+-		*xavp_get_crt_list() = avp;
++		crt_list = xavp_get_crt_list();
++		avp->next = *crt_list;
++		*crt_list = avp;
+ 	}
+ 
+ 	return avp;
+@@ -1203,6 +1217,7 @@ sr_xavp_t *pvh_xavp_add_xavp_value_casei(str *rname, str *name, sr_xval_t *val,
+ 	sr_xavp_t *ravp=0;
+ 	sr_xavp_t *cavp=0;
+ 	sr_xval_t rval;
++	sr_xavp_t **crt_list = NULL;
+ 
+ 	cavp = pvh_xavp_new_value(name, val);
+ 	if (cavp==NULL)
+@@ -1223,8 +1238,9 @@ sr_xavp_t *pvh_xavp_add_xavp_value_casei(str *rname, str *name, sr_xval_t *val,
+ 		ravp->next = *list;
+ 		*list = ravp;
+ 	} else {
+-		ravp->next = *xavp_get_crt_list();
+-		*xavp_get_crt_list() = ravp;
++		crt_list = xavp_get_crt_list();
++		ravp->next = *crt_list;
++		*crt_list = ravp;
+ 	}
+ 
+ 	return ravp;
+@@ -1308,6 +1324,7 @@ int pvh_xavp_rm_internal_casei(str *name, sr_xavp_t **head, int idx)
+ 	sr_xavp_t *avp;
+ 	sr_xavp_t *foo;
+ 	sr_xavp_t *prv=0;
++	sr_xavp_t **crt_list = NULL;
+ 	unsigned int id;
+ 	int n=0;
+ 	int count=0;
+@@ -1316,10 +1333,12 @@ int pvh_xavp_rm_internal_casei(str *name, sr_xavp_t **head, int idx)
+ 		return 0;
+ 
+ 	id = get_hash1_case_raw(name->s, name->len);
+-	if(head!=NULL)
++	if(head!=NULL) {
+ 		avp = *head;
+-	else
+-		avp = *xavp_get_crt_list();
++	} else {
++		crt_list = xavp_get_crt_list();
++		avp = *crt_list;
++	}
+ 	while(avp)
+ 	{
+ 		foo = avp;
+@@ -1334,7 +1353,7 @@ int pvh_xavp_rm_internal_casei(str *name, sr_xavp_t **head, int idx)
+ 				else if(head!=NULL)
+ 					*head = foo->next;
+ 				else
+-					*xavp_get_crt_list() = foo->next;
++					*crt_list = foo->next;
+ 				xavp_free(foo);
+ 				if(idx>=0)
+ 					return 1;
