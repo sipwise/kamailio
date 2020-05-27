@@ -1,0 +1,205 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 27 May 2020 09:05:09 +0200
+Subject: tm: process xavi list in transaction contexts
+
+---
+ src/modules/tm/h_table.c | 11 +++++++++++
+ src/modules/tm/h_table.h |  3 +++
+ src/modules/tm/t_hooks.c |  6 ++++++
+ src/modules/tm/t_reply.c |  7 +++++++
+ 4 files changed, 27 insertions(+)
+
+diff --git a/src/modules/tm/h_table.c b/src/modules/tm/h_table.c
+index cf5201c..2d73b9a 100644
+--- a/src/modules/tm/h_table.c
++++ b/src/modules/tm/h_table.c
+@@ -257,6 +257,8 @@ void free_cell_helper(
+ 		destroy_avp_list_unsafe(&dead_cell->uri_avps_to);
+ 	if(dead_cell->xavps_list)
+ 		xavp_destroy_list_unsafe(&dead_cell->xavps_list);
++	if(dead_cell->xavis_list)
++		xavi_destroy_list_unsafe(&dead_cell->xavis_list);
+ 
+ 	memset(dead_cell, 0, sizeof(tm_cell_t));
+ 	/* the cell's body */
+@@ -366,6 +368,10 @@ struct cell *build_cell(struct sip_msg *p_msg)
+ 	new_cell->xavps_list = *xold;
+ 	*xold = 0;
+ 
++	xold = xavi_set_list(&new_cell->xavis_list);
++	new_cell->xavis_list = *xold;
++	*xold = 0;
++
+ 	/* We can just store pointer to domain avps in the transaction context,
+ 	 * because they are read-only */
+ 	new_cell->domain_avps_from =
+@@ -423,10 +429,12 @@ error:
+ 	destroy_avp_list(&new_cell->uri_avps_from);
+ 	destroy_avp_list(&new_cell->uri_avps_to);
+ 	xavp_destroy_list(&new_cell->xavps_list);
++	xavi_destroy_list(&new_cell->xavis_list);
+ 	shm_free(new_cell);
+ 	/* unlink transaction AVP list and link back the global AVP list (bogdan)*/
+ 	reset_avps();
+ 	xavp_reset_list();
++	xavi_reset_list();
+ 	return NULL;
+ }
+ 
+@@ -531,6 +539,7 @@ void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
+ 		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, x->domain_avps_from);
+ 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, x->domain_avps_to);
+ 		xavp_set_list(x->xavps_list);
++		xavi_set_list(x->xavis_list);
+ 	}
+ }
+ 
+@@ -548,6 +557,7 @@ void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
+ 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, bakxd->domain_avps_from);
+ 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, bakxd->domain_avps_to);
+ 		xavp_set_list(bakxd->xavps_list);
++		xavi_set_list(bakxd->xavis_list);
+ 		return;
+ 	}
+ 
+@@ -565,6 +575,7 @@ void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
+ 		bakxd->domain_avps_to = set_avp_list(
+ 				AVP_TRACK_TO | AVP_CLASS_DOMAIN, &newxd->domain_avps_to);
+ 		bakxd->xavps_list = xavp_set_list(&newxd->xavps_list);
++		bakxd->xavis_list = xavi_set_list(&newxd->xavis_list);
+ 		return;
+ 	}
+ }
+diff --git a/src/modules/tm/h_table.h b/src/modules/tm/h_table.h
+index ef666e5..5c8b916 100644
+--- a/src/modules/tm/h_table.h
++++ b/src/modules/tm/h_table.h
+@@ -309,6 +309,7 @@ typedef struct tm_xdata
+ 	struct usr_avp *domain_avps_from;
+ 	struct usr_avp *domain_avps_to;
+ 	sr_xavp_t *xavps_list;
++	sr_xavp_t *xavis_list;
+ } tm_xdata_t;
+ 
+ 
+@@ -325,6 +326,7 @@ typedef struct tm_xlinks
+ 	struct usr_avp **domain_avps_from;
+ 	struct usr_avp **domain_avps_to;
+ 	sr_xavp_t **xavps_list;
++	sr_xavp_t **xavis_list;
+ } tm_xlinks_t;
+ 
+ 
+@@ -398,6 +400,7 @@ typedef struct cell
+ 	struct usr_avp *domain_avps_from;
+ 	struct usr_avp *domain_avps_to;
+ 	sr_xavp_t *xavps_list;
++	sr_xavp_t *xavis_list;
+ 
+ 	/* protection against concurrent reply processing */
+ 	ser_lock_t reply_mutex;
+diff --git a/src/modules/tm/t_hooks.c b/src/modules/tm/t_hooks.c
+index e0d4423..2decc79 100644
+--- a/src/modules/tm/t_hooks.c
++++ b/src/modules/tm/t_hooks.c
+@@ -229,6 +229,7 @@ void run_trans_callbacks_internal(struct tmcb_head_list* cb_lst, int type,
+ 	struct tm_callback    *cbp;
+ 	avp_list_t* backup_from, *backup_to, *backup_dom_from, *backup_dom_to, *backup_uri_from, *backup_uri_to;
+ 	sr_xavp_t **backup_xavps;
++	sr_xavp_t **backup_xavis;
+ 
+ 	backup_uri_from = set_avp_list(AVP_CLASS_URI | AVP_TRACK_FROM,
+ 			&trans->uri_avps_from );
+@@ -243,6 +244,7 @@ void run_trans_callbacks_internal(struct tmcb_head_list* cb_lst, int type,
+ 	backup_dom_to = set_avp_list(AVP_CLASS_DOMAIN | AVP_TRACK_TO,
+ 			&trans->domain_avps_to);
+ 	backup_xavps = xavp_set_list(&trans->xavps_list);
++	backup_xavis = xavi_set_list(&trans->xavis_list);
+ 
+ 	cbp=(struct tm_callback*)cb_lst->first;
+ 	while(cbp){
+@@ -262,6 +264,7 @@ void run_trans_callbacks_internal(struct tmcb_head_list* cb_lst, int type,
+ 	set_avp_list(AVP_CLASS_URI | AVP_TRACK_TO, backup_uri_to );
+ 	set_avp_list(AVP_CLASS_URI | AVP_TRACK_FROM, backup_uri_from );
+ 	xavp_set_list(backup_xavps);
++	xavi_set_list(backup_xavis);
+ }
+ 
+ 
+@@ -317,6 +320,7 @@ static void run_reqin_callbacks_internal(struct tmcb_head_list* hl,
+ 	avp_list_t* backup_from, *backup_to, *backup_dom_from, *backup_dom_to,
+ 				*backup_uri_from, *backup_uri_to;
+ 	sr_xavp_t **backup_xavps;
++	sr_xavp_t **backup_xavis;
+ 
+ 	if (hl==0 || hl->first==0) return;
+ 	backup_uri_from = set_avp_list(AVP_CLASS_URI | AVP_TRACK_FROM,
+@@ -332,6 +336,7 @@ static void run_reqin_callbacks_internal(struct tmcb_head_list* hl,
+ 	backup_dom_to = set_avp_list(AVP_CLASS_DOMAIN | AVP_TRACK_TO,
+ 			&trans->domain_avps_to);
+ 	backup_xavps = xavp_set_list(&trans->xavps_list);
++	backup_xavis = xavi_set_list(&trans->xavis_list);
+ 	for (cbp=(struct tm_callback*)hl->first; cbp; cbp=cbp->next)  {
+ 		LM_DBG("trans=%p, callback type %d, id %d entered\n",
+ 			trans, cbp->types, cbp->id );
+@@ -345,6 +350,7 @@ static void run_reqin_callbacks_internal(struct tmcb_head_list* hl,
+ 	set_avp_list(AVP_CLASS_USER | AVP_TRACK_TO, backup_to );
+ 	set_avp_list(AVP_CLASS_USER | AVP_TRACK_FROM, backup_from );
+ 	xavp_set_list(backup_xavps);
++	xavi_set_list(backup_xavis);
+ }
+ 
+ 
+diff --git a/src/modules/tm/t_reply.c b/src/modules/tm/t_reply.c
+index 77747d3..f26d42b 100644
+--- a/src/modules/tm/t_reply.c
++++ b/src/modules/tm/t_reply.c
+@@ -691,6 +691,7 @@ typedef struct tm_faked_env {
+ 	avp_list_t* backup_uri_from;
+ 	avp_list_t* backup_uri_to;
+ 	sr_xavp_t **backup_xavps;
++	sr_xavp_t **backup_xavis;
+ 	struct socket_info* backup_si;
+ 	struct lump *backup_add_rm;
+ 	struct lump *backup_body_lumps;
+@@ -780,6 +781,8 @@ int faked_env(struct cell *t, struct sip_msg *msg, int is_async_env)
+ 					&t->domain_avps_to);
+ 		_tm_faked_env[_tm_faked_env_idx].backup_xavps
+ 				= xavp_set_list(&t->xavps_list);
++		_tm_faked_env[_tm_faked_env_idx].backup_xavis
++				= xavi_set_list(&t->xavis_list);
+ 		/* set default send address to the saved value */
+ 		_tm_faked_env[_tm_faked_env_idx].backup_si = bind_address;
+ 		bind_address = t->uac[0].request.dst.send_sock;
+@@ -815,6 +818,7 @@ int faked_env(struct cell *t, struct sip_msg *msg, int is_async_env)
+ 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_URI,
+ 				_tm_faked_env[_tm_faked_env_idx].backup_uri_to);
+ 		xavp_set_list(_tm_faked_env[_tm_faked_env_idx].backup_xavps);
++		xavi_set_list(_tm_faked_env[_tm_faked_env_idx].backup_xavis);
+ 		bind_address = _tm_faked_env[_tm_faked_env_idx].backup_si;
+ 		/* restore lump lists */
+ 		t->uas.request->add_rm
+@@ -2203,6 +2207,7 @@ int reply_received( struct sip_msg  *p_msg )
+ 	avp_list_t* backup_domain_from, *backup_domain_to;
+ 	avp_list_t* backup_uri_from, *backup_uri_to;
+ 	sr_xavp_t **backup_xavps;
++	sr_xavp_t **backup_xavis;
+ 	int replies_locked = 0;
+ #ifdef USE_DNS_FAILOVER
+ 	int branch_ret;
+@@ -2392,6 +2397,7 @@ int reply_received( struct sip_msg  *p_msg )
+ 		backup_domain_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN,
+ 				&t->domain_avps_to );
+ 		backup_xavps = xavp_set_list(&t->xavps_list);
++		backup_xavis = xavi_set_list(&t->xavis_list);
+ 		setbflagsval(0, uac->branch_flags);
+ 		if(msg_status>last_uac_status) {
+ 			/* current response (msg) status is higher that the last received
+@@ -2436,6 +2442,7 @@ int reply_received( struct sip_msg  *p_msg )
+ 		set_avp_list( AVP_TRACK_FROM | AVP_CLASS_DOMAIN, backup_domain_from );
+ 		set_avp_list( AVP_TRACK_TO | AVP_CLASS_DOMAIN, backup_domain_to );
+ 		xavp_set_list(backup_xavps);
++		xavi_set_list(backup_xavis);
+ 		/* handle a possible DROP in the script, but only if this
+ 		 * is not a final reply (final replies already stop the timers
+ 		 * and droping them might leave a transaction living forever) */
