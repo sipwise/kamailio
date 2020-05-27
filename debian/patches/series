@@ -15,7 +15,6 @@ sipwise/fix_lcr_rate_wrong_id.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
-# ** https://github.com/kamailio/kamailio/pull/2156
 sipwise/add_pv_headers_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
@@ -66,6 +65,11 @@ upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
 upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
 upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
 upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
+upstream/core-xavi-api-like-xavp-but-with-insensitive-case-na.patch
+upstream/pv-define-xavi-types.patch
+upstream/core-receive-reset-xavi-list-after-message-processin.patch
+upstream/tm-process-xavi-list-in-transaction-contexts.patch
+upstream/pv-xavi-.-config-variables-implementation.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
