@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "b506ff2e_9f9134a8",
+        "filename": "debian/patches/upstream/core-xavi-api-like-xavp-but-with-insensitive-case-na.patch",
+        "patchSetId": 14
+      },
+      "lineNbr": 11,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2020-05-28T13:58:09Z",
+      "side": 1,
+      "message": "I think it\u0027s better having the new code in separate xavi.c/xavi.h\neasier to maintain",
+      "range": {
+        "startLine": 11,
+        "startChar": 22,
+        "endLine": 11,
+        "endChar": 46
+      },
+      "revId": "7a5b54fc6a8576f3d79831afd0dde5d2ed93a1c6",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
