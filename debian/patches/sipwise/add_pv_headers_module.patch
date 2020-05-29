@@ -21,9 +21,9 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/pvh_hdr.h                |   47 +
  src/modules/pv_headers/pvh_str.c                |  146 +++
  src/modules/pv_headers/pvh_str.h                |   40 +
- src/modules/pv_headers/pvh_xavp.c               | 1173 +++++++++++++++++++++++
- src/modules/pv_headers/pvh_xavp.h               |   63 ++
- 20 files changed, 3773 insertions(+), 1 deletion(-)
+ src/modules/pv_headers/pvh_xavp.c               | 1155 +++++++++++++++++++++++
+ src/modules/pv_headers/pvh_xavp.h               |   62 ++
+ 20 files changed, 3754 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -1545,7 +1545,7 @@ index 0000000..5ee4efc
 +#endif /* PV_HEADERS_H */
 diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
 new file mode 100644
-index 0000000..1e1a9cc
+index 0000000..749275e
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_func.c
 @@ -0,0 +1,360 @@
@@ -1856,10 +1856,10 @@ index 0000000..1e1a9cc
 +
 +	pvh_get_branch_xname(msg, &xavi_name, &br_xname);
 +	LM_DBG("clean xavi:%.*s\n", br_xname.len, br_xname.s);
-+	pvh_free_xavi(&br_xname);
++	xavi_rm_by_name(&br_xname, 1, NULL);
 +	pvh_get_branch_xname(msg, &xavi_parsed_xname, &br_xname);
 +	LM_DBG("clean xavi:%.*s\n", br_xname.len, br_xname.s);
-+	pvh_free_xavi(&br_xname);
++	xavi_rm_by_name(&br_xname, 1, NULL);
 +
 +	pvh_hdrs_reset_flags(msg);
 +
@@ -2701,10 +2701,10 @@ index 0000000..10aa216
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
 new file mode 100644
-index 0000000..3c0950a
+index 0000000..03bcaf1
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
-@@ -0,0 +1,1173 @@
+@@ -0,0 +1,1155 @@
 +/*
 + * pv_headers
 + *
@@ -2912,18 +2912,6 @@ index 0000000..3c0950a
 +/**
 + *
 + */
-+int pvh_free_xavi(str *xname)
-+{
-+	sr_xavp_t *xavi = NULL;
-+	xavi_rm_by_name(xname, 1, NULL);
-+	if((xavi = xavi_get(xname, NULL)) != NULL)
-+		xavi_rm(xavi, NULL);
-+	return 1;
-+}
-+
-+/**
-+ *
-+ */
 +static void pvh_free_to_params(struct to_param *param, sr_xavp_sfree_f sfree)
 +{
 +	struct to_param *n = NULL;
@@ -2960,13 +2948,12 @@ index 0000000..3c0950a
 +			return -1;
 +		}
 +		if(pv_parse_spec(hname, psp) == NULL) {
-+			LM_ERR("invalid avp name [%.*s]\n", hname->len, hname->s);
++			LM_ERR("invalid name [%.*s]\n", hname->len, hname->s);
 +			pv_spec_free(psp);
 +			return -1;
 +		}
 +		sp->pvp.pvn.type = PV_NAME_PVAR;
 +		sp->pvp.pvn.u.dname = (void *)psp;
-+		sp->pvp.pvn.u.isname.name.s = *hname;
 +		return 0;
 +	}
 +
@@ -3091,8 +3078,8 @@ index 0000000..3c0950a
 +	}
 +
 +	pvh_get_branch_xname(msg, xname, &br_xname);
-+	LM_DBG("br_xname: %.*s name: %.*s\n", br_xname.len, br_xname.s, name->len,
-+			name->s);
++	LM_DBG("br_xname: %.*s name: %.*s append:%d\n",
++		br_xname.len, br_xname.s, name->len, name->s, append);
 +	memset(&xval, 0, sizeof(sr_xval_t));
 +	if(data == NULL || SR_XTYPE_NULL) {
 +		xval.type = SR_XTYPE_NULL;
@@ -3303,53 +3290,52 @@ index 0000000..3c0950a
 +int pvh_set_header(
 +		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
 +{
-+	sr_xavp_t *xavi = NULL;
++	sr_xavp_t *xavi = NULL, *avi = NULL;
 +	pv_elem_p pv_format = NULL;
 +	pv_value_t tv;
-+	str hname = STR_NULL;
-+	str orig_hname = STR_NULL;
-+	str fval;
-+	int idx = 0;
-+	int cnt = 0;
-+	int itype;
++	str *hname = NULL;
++	str fval = STR_NULL;
++	int idxf, idx, hname_cnt, cnt;
 +
-+	idx = param->pvi.u.ival;
-+	itype = param->pvi.type;
-+
-+	if(param->pvn.type == PV_NAME_PVAR) {
-+		if(pv_get_spec_value(msg, (pv_spec_p)(param->pvn.u.dname), &tv) != 0) {
-+			LM_ERR("cannot get avp value\n");
-+			return -1;
-+		}
-+		if(!(tv.flags & PV_VAL_STR)) {
-+			LM_ERR("invalid avp value, must be a string\n");
-+			return -1;
-+		}
-+		hname = tv.rs;
-+		orig_hname = param->pvn.u.isname.name.s;
-+	} else if(param->pvn.u.isname.type == AVP_NAME_STR) {
-+		hname = param->pvn.u.isname.name.s;
-+		orig_hname = hname;
-+	} else {
++	if(pv_get_spec_name(msg, param, &tv) != 0 || (!(tv.flags & PV_VAL_STR))) {
 +		LM_ERR("invalid header name, must be a string\n");
 +		return -1;
 +	}
++	hname = &tv.rs;
 +
-+	if((xavi = pvh_xavi_get_child(msg, &xavi_name, &hname)) == NULL)
++	/* get the index */
++	if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
++	{
++		LM_ERR("invalid index\n");
++		return -1;
++	}
++
++	xavi = pvh_get_xavi(msg, &xavi_name);
++	avi = xavi->val.v.xavp;
++	hname_cnt = xavi_count(hname, &avi);
++	if(hname_cnt == 0) {
 +		idx = 0;
-+	else if(idx < 0)
-+		idx = idx + xavi_count(&hname, &xavi);
++	} else if(idx < 0) {
++		idx = idx + hname_cnt;
++	}
++	if(idx < 0) {
++		LM_ERR("invalid index\n");
++		return -1;
++	}
++	LM_DBG("xavi:%.*s hname:%.*s hname_cnt:%d idx:%d idxf:%d\n",
++		xavi->name.len, xavi->name.s, hname->len, hname->s,
++		hname_cnt, idx, idxf);
 +
 +	if(val == NULL || (val->flags & PV_VAL_NULL)) {
-+		if(itype == PV_IDX_ALL) {
-+			for(idx = xavi_count(&hname, &xavi) - 1; idx >= 0; idx--) {
-+				if(pvh_set_xavi(
-+						   msg, &xavi_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
-+						< 0)
-+					goto err;
-+			}
++		if(idxf == PV_IDX_ALL) {
++			cnt = xavi_rm_by_name(hname, 1, &xavi);
++			LM_DBG("removed %d values of %.*s=>%.*s, set $null\n",
++				cnt, xavi->name.len, xavi->name.s, hname->len, hname->s);
++			if(pvh_set_xavi(msg, &xavi_name, hname, NULL, SR_XTYPE_NULL, 0, 0)
++					< 0)
++				goto err;
 +		} else {
-+			if(pvh_set_xavi(msg, &xavi_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
++			if(pvh_set_xavi(msg, &xavi_name, hname, NULL, SR_XTYPE_NULL, idx, 0)
 +					< 0)
 +				goto err;
 +		}
@@ -3367,27 +3353,23 @@ index 0000000..3c0950a
 +			LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
 +			goto err;
 +		}
-+		if(strlen(orig_hname.s) > 1
-+				&& strcmp(orig_hname.s + strlen(orig_hname.s) - 2, "])") != 0) {
-+			if(pvh_set_xavi(msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, 0, 1)
++		if( idx == 0 && idxf == PV_IDX_NONE) {
++			if(pvh_set_xavi(msg, &xavi_name, hname, &fval, SR_XTYPE_STR, 0, 1)
 +					< 0)
 +				goto err;
-+		} else if(itype == PV_IDX_ALL) {
-+			idx = 0;
-+			cnt = xavi_count(&hname, &xavi);
-+			while(idx < cnt) {
-+				if(pvh_set_xavi(msg, &xavi_name, &hname, NULL, SR_XTYPE_STR,
-+						   idx++, 0)
-+						< 1)
-+					goto err;
++		} else if(idxf == PV_IDX_ALL) {
++			if(hname_cnt > 1) {
++				cnt = xavi_rm_by_name(hname, 1, &xavi);
++				LM_DBG("removed %d values of %.*s=>%.*s\n",
++					cnt, xavi->name.len, xavi->name.s, hname->len, hname->s);
 +			}
-+			if(pvh_set_xavi(msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, 0,
-+					   cnt ? 0 : 1)
++			if(pvh_set_xavi(msg, &xavi_name, hname, &fval, SR_XTYPE_STR, 0,
++					   hname_cnt ? 0 : 1)
 +					< 0)
 +				goto err;
 +		} else {
 +			if(pvh_set_xavi(
-+					   msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, idx, 0)
++					   msg, &xavi_name, hname, &fval, SR_XTYPE_STR, idx, 0)
 +					< 0)
 +				goto err;
 +		}
@@ -3395,7 +3377,7 @@ index 0000000..3c0950a
 +			pv_elem_free_all(pv_format);
 +	} else {
 +		LM_ERR("x_hdr %.*s value can be either string, integer or null\n",
-+				hname.len, hname.s);
++				hname->len, hname->s);
 +		goto err;
 +	}
 +	return 1;
@@ -3880,10 +3862,10 @@ index 0000000..3c0950a
 +}
 diff --git a/src/modules/pv_headers/pvh_xavp.h b/src/modules/pv_headers/pvh_xavp.h
 new file mode 100644
-index 0000000..c3bc978
+index 0000000..646ebd7
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.h
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,62 @@
 +/*
 + * pv_headers
 + *
@@ -3921,7 +3903,6 @@ index 0000000..c3bc978
 +
 +int pvh_set_xavi(struct sip_msg *msg, str *xname, str *name, void *data,
 +		sr_xtype_t type, int idx, int append);
-+int pvh_free_xavi(str *xname);
 +int pvh_xavi_keys_count(sr_xavp_t **start);
 +sr_xavp_t *pvh_xavi_get_child(struct sip_msg *msg, str *xname, str *name);
 +int pvh_avp_is_null(sr_xavp_t *avp);

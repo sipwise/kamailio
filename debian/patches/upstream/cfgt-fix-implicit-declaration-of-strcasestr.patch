@@ -1,4 +1,3 @@
-From 361542a953ceaab1894f790e21eecf74008b749a Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Mon, 11 May 2020 15:06:26 +0200
 Subject: [PATCH] cfgt: fix implicit declaration of 'strcasestr'
@@ -13,7 +12,7 @@ Subject: [PATCH] cfgt: fix implicit declaration of 'strcasestr'
  1 file changed, 1 insertion(+)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 382d696f53..c47a1cecc0 100644
+index 382d696..c47a1ce 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -19,6 +19,7 @@
@@ -24,6 +23,3 @@ index 382d696f53..c47a1cecc0 100644
  #include <stdio.h>
  #include <sys/stat.h>
  #include <dirent.h>
--- 
-2.20.1
-
