@@ -75,12 +75,16 @@ upstream/pv-xavi-.-config-variables-implementation.patch
 ### relevant for upstream
 ## https://github.com/kamailio/kamailio/pull/2332
 sipwise/core-add-case-functions-for-str_hash-get-and-set.patch
+sipwise/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
+sipwise/pv-fix-for-new-PV_IDX_NONE-value.patch
 #
 ### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 #
 sipwise/ndb_redis-fix-return-redis_cmd-function.patch
+#
+sipwise/pv_headers-rework.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
