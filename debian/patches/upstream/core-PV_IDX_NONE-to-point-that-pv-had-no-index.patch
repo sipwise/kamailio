@@ -1,0 +1,53 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 29 May 2020 15:31:28 +0200
+Subject: [PATCH] core: PV_IDX_NONE to point that pv had no index
+
+if index is 0 there were no way to know if the index was there
+
+$x_hdr(A) = "value" needs to append a value
+$(x_hdr(A)[0]) = "value" needs to set the value
+
+pv_parse_spec(str *s, pv_spec_p p) was always setting p->pvp.pvi.type
+to 0 == PV_IDX_INT
+---
+ src/core/pvapi.c | 7 +++++++
+ src/core/pvar.h  | 1 +
+ 2 files changed, 8 insertions(+)
+
+diff --git a/src/core/pvapi.c b/src/core/pvapi.c
+index 0148578..30b2a7c 100644
+--- a/src/core/pvapi.c
++++ b/src/core/pvapi.c
+@@ -857,6 +857,7 @@ char* pv_parse_spec2(str *in, pv_spec_p e, int silent)
+ 	tr = 0;
+ 	pvstate = 0;
+ 	memset(e, 0, sizeof(pv_spec_t));
++	e->pvp.pvi.type = PV_IDX_NONE;
+ 	p = in->s;
+ 	p++;
+ 	if(*p==PV_LNBRACKET)
+@@ -1369,6 +1370,12 @@ int pv_get_spec_index(struct sip_msg* msg, pv_param_p ip, int *idx, int *flags)
+ 		*idx = ip->pvi.u.ival;
+ 		return 0;
+ 	}
++	if(ip->pvi.type == PV_IDX_NONE)
++	{
++		*flags = PV_IDX_NONE;
++		*idx = ip->pvi.u.ival;
++		return 0;
++	}
+ 
+ 	/* pvar */
+ 	if(pv_get_spec_value(msg, (pv_spec_p)ip->pvi.u.dval, &tv)!=0)
+diff --git a/src/core/pvar.h b/src/core/pvar.h
+index c1dd9f3..ff18e45 100644
+--- a/src/core/pvar.h
++++ b/src/core/pvar.h
+@@ -61,6 +61,7 @@
+ #define PV_IDX_PVAR	1
+ #define PV_IDX_ALL	2
+ #define PV_IDX_ITR	3
++#define PV_IDX_NONE 4
+ 
+ /*! if PV name is dynamic, integer, or str */
+ #define pv_has_dname(pv) ((pv)->pvp.pvn.type==PV_NAME_PVAR)

@@ -65,22 +65,23 @@ upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
 upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
 upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
 upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
+upstream/ndb_redis-fix-return-redis_cmd-function.patch
+upstream/core-add-case-functions-for-str_hash-get-and-set.patch
 upstream/core-xavi-api-like-xavp-but-with-insensitive-case-na.patch
 upstream/pv-define-xavi-types.patch
 upstream/core-receive-reset-xavi-list-after-message-processin.patch
 upstream/tm-process-xavi-list-in-transaction-contexts.patch
 upstream/pv-xavi-.-config-variables-implementation.patch
+upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
+upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
-## https://github.com/kamailio/kamailio/pull/2332
-sipwise/core-add-case-functions-for-str_hash-get-and-set.patch
 #
-### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+### active development
 #
-sipwise/ndb_redis-fix-return-redis_cmd-function.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
