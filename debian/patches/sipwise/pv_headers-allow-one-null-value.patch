@@ -1,0 +1,283 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 4 Jun 2020 12:51:23 +0200
+Subject: pv_headers: allow one null value
+
+* needed to indicate that header must be removed
+---
+ src/modules/pv_headers/pvh_func.c | 129 ++++++++++++++++++++++----------------
+ src/modules/pv_headers/pvh_xavp.c |  19 ++++--
+ 2 files changed, 87 insertions(+), 61 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 749275e..a1ceda8 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -24,6 +24,7 @@
+  */
+ 
+ #include "../../core/strutils.h"
++#include "../../core/str_list.h"
+ 
+ #include "pv_headers.h"
+ #include "pvh_func.h"
+@@ -133,17 +134,14 @@ int pvh_apply_headers(struct sip_msg *msg)
+ {
+ 	sr_xavp_t *xavi = NULL;
+ 	sr_xavp_t *sub = NULL;
+-	struct str_hash_table rm_hdrs;
+-	int from_cnt = 0, to_cnt = 0;
++	struct str_list *xavi_keys = NULL, *back_keys = NULL;
+ 	char t[header_name_size];
+ 	char tv[2][header_value_size];
+ 	str display = {tv[0], header_value_size};
+ 	str uri = {tv[1], header_value_size};
+ 	str br_xname = {t, header_name_size};
+ 	int skip_from_to = 0, keys_count = 0;
+-	int res = -1;
+-
+-	memset(&rm_hdrs, 0, sizeof(struct str_hash_table));
++	int res = -1, hdr_values = 0, idx = 0;
+ 
+ 	if(pvh_hdrs_applied(msg)) {
+ 		LM_ERR("headers are already applied\n");
+@@ -163,24 +161,20 @@ int pvh_apply_headers(struct sip_msg *msg)
+ 				xavi_name.len, xavi_name.s);
+ 		return -1;
+ 	}
+-	if(xavi->val.type != SR_XTYPE_XAVP) {
+-		LM_ERR("not xavp child type %.*s\n", xavi_name.len, xavi_name.s);
+-		return -1;
+-	}
+-
+-	if((sub = xavi->val.v.xavp) == NULL) {
+-		LM_ERR("invalid xavp structure: %.*s\n", xavi_name.len, xavi_name.s);
++	xavi_keys = xavi_get_list_key_names(xavi);
++	if(xavi_keys==NULL) {
++		LM_ERR("No headers in xavi %.*s\n", xavi->name.len, xavi->name.s);
+ 		return -1;
+ 	}
+-	keys_count = pvh_xavi_keys_count(&sub);
+-	if(str_hash_alloc(&rm_hdrs, keys_count) < 0) {
+-		PKG_MEM_ERROR;
+-		return -1;
++	back_keys = xavi_keys;
++	while(back_keys!=NULL) {
++		keys_count += 1;
++		back_keys = back_keys->next;
+ 	}
++	back_keys = xavi_keys;
++
+ 	LM_DBG("xavi->name:%.*s br_xname:%.*s keys_count: %d\n", xavi->name.len,
+ 			xavi->name.s, br_xname.len, br_xname.s, keys_count);
+-	str_hash_init(&rm_hdrs);
+-
+ 	if(msg->first_line.type == SIP_REPLY
+ 			|| msg->first_line.u.request.method_value == METHOD_ACK
+ 			|| msg->first_line.u.request.method_value == METHOD_PRACK
+@@ -194,22 +188,28 @@ int pvh_apply_headers(struct sip_msg *msg)
+ 		}
+ 	}
+ 
+-	do {
+-		if(pvh_skip_header(&sub->name))
++	while(xavi_keys) {
++		if(pvh_skip_header(&xavi_keys->s)) {
++			xavi_keys = xavi_keys->next;
+ 			continue;
++		}
+ 
+-		if(cmpi_str(&sub->name, &_hdr_from) == 0) {
++		if(cmpi_str(&xavi_keys->s, &_hdr_from) == 0) {
+ 			if(skip_from_to) {
+ 				LM_DBG("skip From header change in reply messages\n");
++				xavi_keys = xavi_keys->next;
+ 				continue;
+ 			}
++			if((sub = xavi_get_by_index(&xavi_keys->s, 0, &xavi)) == NULL) {
++				LM_ERR("missing xavi header[%.*s]\n",
++					xavi_keys->s.len, xavi_keys->s.s);
++				goto err;
++			}
+ 			if(cmp_str(&sub->val.v.s, &msg->from->body) == 0) {
+ 				LM_DBG("skip unchanged From header\n");
++				xavi_keys = xavi_keys->next;
+ 				continue;
+ 			}
+-			if(from_cnt > 0)
+-				continue;
+-
+ 			memset(display.s, 0, header_value_size);
+ 			memset(uri.s, 0, header_value_size);
+ 
+@@ -225,23 +225,26 @@ int pvh_apply_headers(struct sip_msg *msg)
+ 					pvh_real_hdr_remove_display(msg, &sub->name);
+ 				uac.replace_from(msg, &display, &uri);
+ 			}
+-
+-			from_cnt++;
++			xavi_keys = xavi_keys->next;
+ 			continue;
+ 		}
+ 
+-		if(cmpi_str(&sub->name, &_hdr_to) == 0) {
++		if(cmpi_str(&xavi_keys->s, &_hdr_to) == 0) {
+ 			if(skip_from_to) {
+ 				LM_DBG("skip To header change in reply messages\n");
++				xavi_keys = xavi_keys->next;
+ 				continue;
+ 			}
++			if((sub = xavi_get_by_index(&xavi_keys->s, 0, &xavi)) == NULL) {
++				LM_ERR("missing xavi header[%.*s]\n",
++					xavi_keys->s.len, xavi_keys->s.s);
++				goto err;
++			}
+ 			if(cmp_str(&sub->val.v.s, &msg->to->body) == 0) {
+ 				LM_DBG("skip unchanged To header\n");
++				xavi_keys = xavi_keys->next;
+ 				continue;
+ 			}
+-			if(to_cnt > 0)
+-				continue;
+-
+ 			memset(display.s, 0, header_value_size);
+ 			memset(uri.s, 0, header_value_size);
+ 
+@@ -251,50 +254,66 @@ int pvh_apply_headers(struct sip_msg *msg)
+ 			}
+ 
+ 			if(uac.replace_to != NULL) {
+-				LM_DBG("replace_to[%s]: %s %s\n", sub->name.s, display.s,
+-						uri.s);
++				LM_DBG("replace_to[%.*s]: %.*s %.*s\n",
++					sub->name.len, sub->name.s,
++					display.len, display.s,
++					uri.len, uri.s);
+ 				if(display.len == 0)
+ 					pvh_real_hdr_remove_display(msg, &sub->name);
+ 				uac.replace_to(msg, &display, &uri);
+ 			}
+-
+-			to_cnt++;
++			xavi_keys = xavi_keys->next;
+ 			continue;
+ 		}
+ 
+-		if(cmpi_str(&sub->name, &_hdr_reply_reason) == 0) {
+-			if(str_hash_case_get(&rm_hdrs, sub->name.s, sub->name.len))
+-				continue;
++		if(cmpi_str(&xavi_keys->s, &_hdr_reply_reason) == 0) {
++			if((sub = xavi_get_by_index(&xavi_keys->s, 0, &xavi)) == NULL) {
++				LM_ERR("missing xavi header[%.*s]\n",
++					xavi_keys->s.len, xavi_keys->s.s);
++				goto err;
++			}
+ 			pvh_real_replace_reply_reason(msg, &sub->val.v.s);
+-			pvh_str_hash_add_key(&rm_hdrs, &sub->name);
++			xavi_keys = xavi_keys->next;
+ 			continue;
+ 		}
+ 
+-		if(!str_hash_case_get(&rm_hdrs, sub->name.s, sub->name.len)) {
+-			if(!pvh_avp_is_null(sub) && xavi_count(&sub->name, &sub) == 1) {
+-				LM_DBG("replace header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
+-				pvh_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
+-				pvh_str_hash_add_key(&rm_hdrs, &sub->name);
+-				continue;
+-			}
+-			LM_DBG("remove header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
+-			pvh_real_hdr_del_by_name(msg, &sub->name);
+-			pvh_str_hash_add_key(&rm_hdrs, &sub->name);
++		if((sub = xavi_get_by_index(&xavi_keys->s, 0, &xavi)) == NULL) {
++			LM_ERR("missing xavi header[%.*s]\n",
++				xavi_keys->s.len, xavi_keys->s.s);
++			goto err;
+ 		}
+-
+-		if(!pvh_avp_is_null(sub) && !pvh_single_header(&sub->name)) {
+-			pvh_real_hdr_append(msg, &sub->name, &sub->val.v.s);
+-			LM_DBG("append header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
++		hdr_values = xavi_count(&sub->name, &sub);
++		LM_DBG("remove all headers of [%.*s]\n",
++				sub->name.len, sub->name.s);
++		pvh_real_hdr_del_by_name(msg, &sub->name);
++		if(hdr_values == 1 && pvh_avp_is_null(sub)) {
++			xavi_keys = xavi_keys->next;
++			continue;
+ 		}
+-	} while((sub = sub->next) != NULL);
++		idx = 0;
++		do {
++			if(!pvh_avp_is_null(sub)) {
++				pvh_real_hdr_append(msg, &sub->name, &sub->val.v.s);
++				LM_DBG("append header[%.*s][%d]: %.*s\n",
++					sub->name.len, sub->name.s, idx,
++					sub->val.v.s.len, sub->val.v.s.s);
++			}
++			idx++;
++		} while((sub = xavi_get_by_index(&xavi_keys->s, idx, &xavi)));
++
++		xavi_keys = xavi_keys->next;
++	}
+ 
+ 	pvh_hdrs_set_applied(msg);
+ 
+ 	res = 1;
+ 
+ err:
+-	if(rm_hdrs.size)
+-		pvh_str_hash_free(&rm_hdrs);
++	while(back_keys!=NULL) {
++		xavi_keys = back_keys;
++		back_keys = back_keys->next;
++		pkg_free(xavi_keys);
++	}
+ 	return res;
+ }
+ 
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index 4b25759..06938ba 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -619,15 +619,23 @@ int pvh_set_header(
+ 	if(val == NULL || (val->flags & PV_VAL_NULL)) {
+ 		if(idxf == PV_IDX_ALL) {
+ 			cnt = xavi_rm_by_name(hname, 1, &xavi);
+-			LM_DBG("removed %d values of %.*s=>%.*s\n",
++			LM_DBG("removed %d values of %.*s=>%.*s, insert NULL value\n",
+ 				cnt, xavi->name.len, xavi->name.s, hname->len, hname->s);
++			if(pvh_set_xavi(msg, &xavi_name, hname, NULL, SR_XTYPE_NULL, 0, 0) < 0)
++				return -1;
+ 		} else {
+-			xavi_rm_child_by_index(&xavi->name, hname, idx);
++			cnt = xavi_rm_child_by_index(&xavi->name, hname, idx);
++			if(xavi_count(hname, &xavi) == 0) {
++				LM_DBG("removed %d values of %.*s=>%.*s, insert NULL value\n",
++					cnt, xavi->name.len, xavi->name.s, hname->len, hname->s);
++				if(pvh_set_xavi(msg, &xavi_name, hname, NULL, SR_XTYPE_NULL, 0, 0) < 0)
++					return -1;
++			}
+ 		}
+ 	} else if(val->flags & (PV_VAL_STR | PV_TYPE_INT | PV_VAL_INT)) {
+ 		if(val->flags & (PV_TYPE_INT | PV_VAL_INT)) {
+ 			if(pv_get_sintval(msg, param, val, val->ri) < 0)
+-				goto err;
++				return -1;
+ 		}
+ 		if(pv_parse_format(&val->rs, &pv_format) < 0) {
+ 			LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
+@@ -648,13 +656,12 @@ int pvh_set_header(
+ 		}
+ 		if(pvh_set_xavi(msg, &xavi_name, hname, &fval, SR_XTYPE_STR, idx, append) < 0)
+ 			goto err;
++		if(pv_format) pv_elem_free_all(pv_format);
+ 	} else {
+ 		LM_ERR("x_hdr %.*s value can be either string, integer or null\n",
+ 				hname->len, hname->s);
+-		goto err;
++		return -1;
+ 	}
+-	if(pv_format)
+-		pv_elem_free_all(pv_format);
+ 	return 1;
+ 
+ err:
