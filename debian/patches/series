@@ -81,6 +81,8 @@ sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 #
 sipwise/ndb_redis-fix-return-redis_cmd-function.patch
+#
+sipwise/pv_headers-rework.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###

@@ -1,0 +1,206 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 29 May 2020 10:50:36 +0200
+Subject: pv_headers: rework
+
+* WIP
+---
+ src/modules/pv_headers/pvh_func.c |  4 +-
+ src/modules/pv_headers/pvh_xavp.c | 98 +++++++++++++--------------------------
+ src/modules/pv_headers/pvh_xavp.h |  1 -
+ 3 files changed, 35 insertions(+), 68 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 1e1a9cc..749275e 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -305,10 +305,10 @@ int pvh_reset_headers(struct sip_msg *msg)
+ 
+ 	pvh_get_branch_xname(msg, &xavi_name, &br_xname);
+ 	LM_DBG("clean xavi:%.*s\n", br_xname.len, br_xname.s);
+-	pvh_free_xavi(&br_xname);
++	xavi_rm_by_name(&br_xname, 1, NULL);
+ 	pvh_get_branch_xname(msg, &xavi_parsed_xname, &br_xname);
+ 	LM_DBG("clean xavi:%.*s\n", br_xname.len, br_xname.s);
+-	pvh_free_xavi(&br_xname);
++	xavi_rm_by_name(&br_xname, 1, NULL);
+ 
+ 	pvh_hdrs_reset_flags(msg);
+ 
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index 3c0950a..3a8e3a7 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -202,18 +202,6 @@ end:
+ 	return xavi;
+ }
+ 
+-/**
+- *
+- */
+-int pvh_free_xavi(str *xname)
+-{
+-	sr_xavp_t *xavi = NULL;
+-	xavi_rm_by_name(xname, 1, NULL);
+-	if((xavi = xavi_get(xname, NULL)) != NULL)
+-		xavi_rm(xavi, NULL);
+-	return 1;
+-}
+-
+ /**
+  *
+  */
+@@ -253,19 +241,17 @@ int pvh_parse_header_name(pv_spec_p sp, str *hname)
+ 			return -1;
+ 		}
+ 		if(pv_parse_spec(hname, psp) == NULL) {
+-			LM_ERR("invalid avp name [%.*s]\n", hname->len, hname->s);
++			LM_ERR("invalid name [%.*s]\n", hname->len, hname->s);
+ 			pv_spec_free(psp);
+ 			return -1;
+ 		}
+ 		sp->pvp.pvn.type = PV_NAME_PVAR;
+ 		sp->pvp.pvn.u.dname = (void *)psp;
+-		sp->pvp.pvn.u.isname.name.s = *hname;
+ 		return 0;
+ 	}
+ 
+ 	sp->pvp.pvn.type = PV_NAME_INTSTR;
+ 	sp->pvp.pvn.u.isname.type = AVP_NAME_STR;
+-	sp->pvp.pvn.u.isname.name.s = *hname;
+ 
+ 	return 0;
+ }
+@@ -597,17 +583,14 @@ int pvh_set_header(
+ 		struct sip_msg *msg, pv_param_t *param, int op, pv_value_t *val)
+ {
+ 	sr_xavp_t *xavi = NULL;
++	sr_xavp_t *sub = NULL;
+ 	pv_elem_p pv_format = NULL;
+ 	pv_value_t tv;
+-	str hname = STR_NULL;
+-	str orig_hname = STR_NULL;
++	str *hname = NULL;
+ 	str fval;
+-	int idx = 0;
++	int idxf;
++	int idx;
+ 	int cnt = 0;
+-	int itype;
+-
+-	idx = param->pvi.u.ival;
+-	itype = param->pvi.type;
+ 
+ 	if(param->pvn.type == PV_NAME_PVAR) {
+ 		if(pv_get_spec_value(msg, (pv_spec_p)(param->pvn.u.dname), &tv) != 0) {
+@@ -618,33 +601,35 @@ int pvh_set_header(
+ 			LM_ERR("invalid avp value, must be a string\n");
+ 			return -1;
+ 		}
+-		hname = tv.rs;
+-		orig_hname = param->pvn.u.isname.name.s;
++		hname = &tv.rs;
+ 	} else if(param->pvn.u.isname.type == AVP_NAME_STR) {
+-		hname = param->pvn.u.isname.name.s;
+-		orig_hname = hname;
++		hname = &param->pvn.u.isname.name.s;
+ 	} else {
+ 		LM_ERR("invalid header name, must be a string\n");
+ 		return -1;
+ 	}
+ 
+-	if((xavi = pvh_xavi_get_child(msg, &xavi_name, &hname)) == NULL)
+-		idx = 0;
+-	else if(idx < 0)
+-		idx = idx + xavi_count(&hname, &xavi);
++	/* get the index */
++	if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
++	{
++		LM_ERR("invalid index\n");
++		return -1;
++	}
++
++	xavi = pvh_get_xavi(&xavi_name, NULL);
++	if(idx < 0)
++		idx = idx + xavi_count(hname, &xavi);
++	if(idx < 0) {
++		LM_ERR("invalid index\n");
++		return -1;
++	}
+ 
+ 	if(val == NULL || (val->flags & PV_VAL_NULL)) {
+-		if(itype == PV_IDX_ALL) {
+-			for(idx = xavi_count(&hname, &xavi) - 1; idx >= 0; idx--) {
+-				if(pvh_set_xavi(
+-						   msg, &xavi_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
+-						< 0)
+-					goto err;
+-			}
++		if(idxf == PV_IDX_ALL) {
++			cnt = xavi_rm_by_name(hname, 1, xavi);
++			LM_DBG("removed %d values of %.*s\n", hname->len, hname->s);
+ 		} else {
+-			if(pvh_set_xavi(msg, &xavi_name, &hname, NULL, SR_XTYPE_STR, idx, 0)
+-					< 0)
+-				goto err;
++			xavi_rm_child_by_index(&xavi->name, hname, idx);
+ 		}
+ 	} else if(val->flags & (PV_VAL_STR | PV_TYPE_INT | PV_VAL_INT)) {
+ 		if(val->flags & (PV_TYPE_INT | PV_VAL_INT)) {
+@@ -660,37 +645,20 @@ int pvh_set_header(
+ 			LM_ERR("cannot parse format: %.*s\n", val->rs.len, val->rs.s);
+ 			goto err;
+ 		}
+-		if(strlen(orig_hname.s) > 1
+-				&& strcmp(orig_hname.s + strlen(orig_hname.s) - 2, "])") != 0) {
+-			if(pvh_set_xavi(msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, 0, 1)
+-					< 0)
+-				goto err;
+-		} else if(itype == PV_IDX_ALL) {
+-			idx = 0;
+-			cnt = xavi_count(&hname, &xavi);
+-			while(idx < cnt) {
+-				if(pvh_set_xavi(msg, &xavi_name, &hname, NULL, SR_XTYPE_STR,
+-						   idx++, 0)
+-						< 1)
+-					goto err;
+-			}
+-			if(pvh_set_xavi(msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, 0,
+-					   cnt ? 0 : 1)
+-					< 0)
+-				goto err;
+-		} else {
+-			if(pvh_set_xavi(
+-					   msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, idx, 0)
+-					< 0)
+-				goto err;
++		if(idxf == PV_IDX_ALL) {
++			cnt = xavi_rm_by_name(hname, 1, xavi);
++			LM_DBG("removed %d values of %.*s=>%.*s\n",
++				xavi->name.len, xavi->name.s, hname->len, hname->s);
+ 		}
+-		if(pv_format)
+-			pv_elem_free_all(pv_format);
++		if(pvh_set_xavi(msg, &xavi_name, &hname, &fval, SR_XTYPE_STR, idx, 0) < 0)
++			goto err;
+ 	} else {
+ 		LM_ERR("x_hdr %.*s value can be either string, integer or null\n",
+ 				hname.len, hname.s);
+ 		goto err;
+ 	}
++	if(pv_format)
++		pv_elem_free_all(pv_format);
+ 	return 1;
+ 
+ err:
+diff --git a/src/modules/pv_headers/pvh_xavp.h b/src/modules/pv_headers/pvh_xavp.h
+index c3bc978..646ebd7 100644
+--- a/src/modules/pv_headers/pvh_xavp.h
++++ b/src/modules/pv_headers/pvh_xavp.h
+@@ -35,7 +35,6 @@ int pvh_reply_append(sr_xavp_t **start);
+ 
+ int pvh_set_xavi(struct sip_msg *msg, str *xname, str *name, void *data,
+ 		sr_xtype_t type, int idx, int append);
+-int pvh_free_xavi(str *xname);
+ int pvh_xavi_keys_count(sr_xavp_t **start);
+ sr_xavp_t *pvh_xavi_get_child(struct sip_msg *msg, str *xname, str *name);
+ int pvh_avp_is_null(sr_xavp_t *avp);
