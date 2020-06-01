@@ -1,0 +1,25 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 1 Jun 2020 19:06:32 +0200
+Subject: sca: add some debug for P-Asserted-Identity
+
+Change-Id: Ieca137e1640cf43c773827d1146af6f5e28743a7
+---
+ modules/sca/sca_call_info.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index 0504ba6..88592b1 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -1206,7 +1206,10 @@ sca_call_info_insert_asserted_identity( sip_msg_t *msg, str *display,
+ 
+     memcpy( hdr.s + hdr.len, CRLF, CRLF_LEN );
+     hdr.len += CRLF_LEN;
+-
++    LM_DBG("hdr[%.*s](%d) display[%.*s](%d) aor[%.*s](%d)\n",
++        STR_FMT(&hdr), hdr.len,
++        STR_FMT(display), display->len,
++        STR_FMT(&aor), aor.len);
+     /* append the PAI header before the sdp body */
+     if ( insert_new_lump_before( anchor, hdr.s, hdr.len, HDR_PAI_T ) == NULL ) {
+ 	LM_ERR( "Failed to add PAI header %.*s", STR_FMT( &hdr ));
