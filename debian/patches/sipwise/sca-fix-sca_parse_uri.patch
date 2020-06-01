@@ -1,0 +1,24 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 31 Jul 2020 12:24:05 +0200
+Subject: sca: fix sca_parse_uri()
+
+---
+ modules/sca/sca_util.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/modules/sca/sca_util.c b/modules/sca/sca_util.c
+index 4620869..8803221 100644
+--- a/modules/sca/sca_util.c
++++ b/modules/sca/sca_util.c
+@@ -126,6 +126,11 @@ sca_parse_uri(struct to_body *body, str *uri)
+         LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
+         return(-1);
+     }
++    /* ensure the URI is parsed for future use */
++    if(parse_uri(body->uri.s, body->uri.len, &body->parsed_uri) < 0) {
++        LM_ERR("Failed to parse URI %.*s", STR_FMT(&body->uri));
++        return (-1);
++    }
+     return (0);
+ }
+ 

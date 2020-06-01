@@ -1,0 +1,65 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 1 Jun 2020 19:06:32 +0200
+Subject: sca: add some debug for P-Asserted-Identity
+
+---
+ modules/sca/sca_appearance.c |  4 +++-
+ modules/sca/sca_call_info.c  | 15 ++++++++++++++-
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+
+diff --git a/modules/sca/sca_appearance.c b/modules/sca/sca_appearance.c
+index a0585bc..9bd2bd8 100644
+--- a/modules/sca/sca_appearance.c
++++ b/modules/sca/sca_appearance.c
+@@ -959,8 +959,10 @@ sca_appearance_update_index( sca_mod *scam, str *aor, int idx,
+ 	rc = SCA_APPEARANCE_ERR_NOT_IN_USE;
+ 	goto done;
+     }
+-
++    LM_DBG("search for index[%d] dialog.id[%.*s]\n", idx, STR_FMT(&dialog->id));
+     for ( app = app_list->appearances; app != NULL; app = app->next ) {
++        LM_DBG("app.index[%d] app.dialog.id[%.*s]\n", app->index,
++                STR_FMT(&app->dialog.id));
+ 	if ( app->index == idx ) {
+ 	    break;
+ 	} else if ( idx == 0 ) {
+diff --git a/modules/sca/sca_call_info.c b/modules/sca/sca_call_info.c
+index 0504ba6..c9ba5bb 100644
+--- a/modules/sca/sca_call_info.c
++++ b/modules/sca/sca_call_info.c
+@@ -989,6 +989,11 @@ sca_call_info_invite_request_handler( sip_msg_t *msg, sca_call_info *call_info,
+     	upstream = 1;
+     }
+ 
++    LM_DBG("For From-AOR %.*s To-AOR: %.*s: From: <%.*s> To: <%.*s> "
++           "Contact: <%.*s> Call-Info: appearance-index=%d\n",
++            STR_FMT(from_aor), STR_FMT(to_aor), STR_FMT(&from->uri),
++            STR_FMT(&to->uri), STR_FMT(contact_uri), call_info->index);
++
+     /*
+      * if we get here, one of the legs is an SCA endpoint. we want to know
+      * when the e2e ACK comes in so we can notify other members of the group.
+@@ -1206,7 +1211,10 @@ sca_call_info_insert_asserted_identity( sip_msg_t *msg, str *display,
+ 
+     memcpy( hdr.s + hdr.len, CRLF, CRLF_LEN );
+     hdr.len += CRLF_LEN;
+-
++    LM_DBG("hdr[%.*s](%d) display[%.*s](%d) aor[%.*s](%d)\n",
++        STR_FMT(&hdr), hdr.len,
++        STR_FMT(display), display->len,
++        STR_FMT(&aor), aor.len);
+     /* append the PAI header before the sdp body */
+     if ( insert_new_lump_before( anchor, hdr.s, hdr.len, HDR_PAI_T ) == NULL ) {
+ 	LM_ERR( "Failed to add PAI header %.*s", STR_FMT( &hdr ));
+@@ -2157,6 +2165,11 @@ sca_call_info_update( sip_msg_t *msg, char *p1, str *uri_to, str *uri_from )
+ 	goto done;
+     }
+ 
++    LM_DBG("Calling Dispatch Id: %d handler with From-AOR: %.*s To-AOR: %.*s "
++           "From-URI: <%.*s> To-URI: <%.*s> Contact-URI: <%.*s>\n",
++            i, STR_FMT(&from_aor), STR_FMT(&to_aor), STR_FMT(&from->uri),
++            STR_FMT(&to->uri), STR_FMT(&contact_uri));
++
+     rc = call_info_dispatch[ i ].handler( msg, &call_info, from, to,
+ 					&from_aor, &to_aor, &contact_uri );
+     if ( rc < 0 ) {
