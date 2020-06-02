@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "461f457e_169dba3c",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 11
+      },
+      "lineNbr": 1834,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2020-06-02T18:03:36Z",
+      "side": 1,
+      "message": "this needs to be also reflected.\n\n- in pv_collect_headers() we need to store into a hash wether a header was single or multi when it was collected\n- here we check if the initially collected header was single and now its also single (99% of cases) - replace the lump, otherwise remove all lumps + add new ones\n\notherwise if we have initially:\n \nHistory-Info\nHistory-Info\n\nand end up here with a single \n\nHistory-Info\n\nit will be replaced instead of remove all+create",
+      "range": {
+        "startLine": 1823,
+        "startChar": 1,
+        "endLine": 1834,
+        "endChar": 4
+      },
+      "revId": "48a4637a7dc88ca8cb79d349cf258715f85b16b2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
