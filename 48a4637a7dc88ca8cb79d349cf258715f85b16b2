@@ -22,6 +22,30 @@
       "revId": "48a4637a7dc88ca8cb79d349cf258715f85b16b2",
       "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
       "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "2520932d_6532e87b",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 11
+      },
+      "lineNbr": 1834,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2020-06-04T08:13:40Z",
+      "side": 1,
+      "message": "but why don\u0027t remove all lumps of HEADER and add the values we have in $x_hdr(HEADER)? If the HEADER was multi... we will have more than one. If it was single... we will have just one.\n\nSeems easier to remove all lumps of HEADER always",
+      "parentUuid": "461f457e_169dba3c",
+      "range": {
+        "startLine": 1823,
+        "startChar": 1,
+        "endLine": 1834,
+        "endChar": 4
+      },
+      "revId": "48a4637a7dc88ca8cb79d349cf258715f85b16b2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
     }
   ]
 }
