@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e68866ff_b13d3fcd",
+        "filename": "debian/patches/sipwise/add_pv_headers_module.patch",
+        "patchSetId": 15
+      },
+      "lineNbr": 3336,
+      "author": {
+        "id": 1000004
+      },
+      "writtenOn": "2020-06-05T15:16:43Z",
+      "side": 1,
+      "message": "if we have hname_cnt \u003e 0 and someone sets [*] \u003d $null\nwe should xavi_rm_by_index() everything with Idx \u003e 0 and set xavi with idx\u003d0 to NULL, so we prevent the user to reuse idx \u003e 0, as only idx\u003d0 remains existing, so then $x_hdr(T[1]) \u003d .. should correctly fail\n\nso to prevent the following:\n\nT: 1\nT: 2\nT: 3\n\n$x_hdr(T[*]) \u003d $null;\n$x_hdr[T[2]) \u003d 4; \u003c --- creates a gap as idx 1 is NULL\n\nalso creates a discrepancy as it is still not possible to set a value to an index that never existed, like\n\n$x_hdr(T[20]) \u003d 5; it will fail as the index does not exist",
+      "range": {
+        "startLine": 3330,
+        "startChar": 3,
+        "endLine": 3336,
+        "endChar": 5
+      },
+      "revId": "5132fe14c5191e5ea4f332d58dbcaf48f44ac353",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
