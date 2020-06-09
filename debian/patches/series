@@ -74,6 +74,9 @@ upstream/tm-process-xavi-list-in-transaction-contexts.patch
 upstream/pv-xavi-.-config-variables-implementation.patch
 upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
 upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
+# https://github.com/kamailio/kamailio/pull/2354
+upstream/sqlops-export-sql_pvquery-to-KEMI.patch
+upstream/avpops-export-avp_check-to-KEMI.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
