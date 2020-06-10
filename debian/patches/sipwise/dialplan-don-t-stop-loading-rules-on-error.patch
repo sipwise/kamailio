@@ -1,0 +1,25 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 24 Apr 2020 12:02:48 +0200
+Subject: dialplan: don't stop loading rules on error
+
+---
+ src/modules/dialplan/dp_db.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/dialplan/dp_db.c b/src/modules/dialplan/dp_db.c
+index f50c0d0..fb24f35 100644
+--- a/src/modules/dialplan/dp_db.c
++++ b/src/modules/dialplan/dp_db.c
+@@ -299,8 +299,10 @@ int dp_load_db(void)
+ 
+ 			values = ROW_VALUES(rows+i);
+ 
+-			if((rule = build_rule(values)) ==0 )
+-				goto err2;
++			if((rule = build_rule(values)) ==0 ) {
++				LM_ERR("skip rule id:%d", VAL_INT(values));
++				continue;
++			}
+ 
+ 			if(add_rule2hash(rule , *next_idx) != 0)
+ 				goto err2;
