@@ -74,6 +74,7 @@ upstream/tm-process-xavi-list-in-transaction-contexts.patch
 upstream/pv-xavi-.-config-variables-implementation.patch
 upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
 upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
+upstream/dialog-add-parameter-to-configure-synchronisation-of.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
