@@ -1,0 +1,26 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Sat, 13 Jun 2020 08:42:29 +0200
+Subject: dialog: follow up changes
+
+Change-Id: I441f294df13d5343ddada6e492d92cdf141e8022
+---
+ src/modules/dialog/dlg_handlers.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/modules/dialog/dlg_handlers.c b/src/modules/dialog/dlg_handlers.c
+index 43e01ee..a645820 100644
+--- a/src/modules/dialog/dlg_handlers.c
++++ b/src/modules/dialog/dlg_handlers.c
+@@ -988,6 +988,12 @@ int dlg_new_dialog(sip_msg_t *req, struct cell *t, const int run_initial_cbs)
+     _dlg_ctx.iuid.h_id = dlg->h_id;
+     set_current_dialog(req, dlg);
+ 
++	if(dlg_update_all_states == 1) {
++		LM_DBG("dlg_update_all_states, force DLG_FLAG_NEW\n");
++		dlg->dflags |= DLG_FLAG_NEW;
++		if ( dlg_db_mode==DB_MODE_REALTIME )
++			update_dialog_dbinfo(dlg);
++	}
+ 	return 0;
+ 
+ error:
