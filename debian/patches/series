@@ -74,6 +74,7 @@ upstream/tm-process-xavi-list-in-transaction-contexts.patch
 upstream/pv-xavi-.-config-variables-implementation.patch
 upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
 upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
+upstream/dialog-add-parameter-to-configure-synchronisation-of.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream
@@ -82,6 +83,7 @@ sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 ### active development
+sipwise/dialog-more-debug.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
