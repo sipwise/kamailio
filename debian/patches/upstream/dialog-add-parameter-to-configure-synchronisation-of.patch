@@ -1,0 +1,110 @@
+From: Henning Westerholt <hw@skalatan.de>
+Date: Fri, 12 Jun 2020 08:21:20 +0000
+Subject: [PATCH] dialog: add parameter to configure synchronisation of all
+ dialog states to DB
+
+- add parameter to configure synchronisation of all dialog states to DB
+- new parameter update_all_states added to module interface
+- activated by default to provide correct failover behaviour for users
+- really large installation should test it and consider the load trade-off
+---
+ src/modules/dialog/dialog.c             |  2 ++
+ src/modules/dialog/dlg_db_handler.c     |  3 ++-
+ src/modules/dialog/doc/dialog_admin.xml | 36 ++++++++++++++++++++++++++++++++-
+ 3 files changed, 39 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index b849cfb..6247612 100644
+--- a/src/modules/dialog/dialog.c
++++ b/src/modules/dialog/dialog.c
+@@ -114,6 +114,7 @@ int dlg_noack_timeout = 60;
+ int dlg_end_timeout = 300;
+ 
+ int dlg_enable_dmq = 0;
++int dlg_update_all_states = 1;
+ 
+ int dlg_event_rt[DLG_EVENTRT_MAX];
+ str dlg_event_callback = STR_NULL;
+@@ -324,6 +325,7 @@ static param_export_t mod_params[]={
+ 	{ "h_id_start",            PARAM_INT, &dlg_h_id_start           },
+ 	{ "h_id_step",             PARAM_INT, &dlg_h_id_step            },
+ 	{ "keep_proxy_rr",         INT_PARAM, &dlg_keep_proxy_rr        },
++	{ "update_all_states",     INT_PARAM, &dlg_update_all_states    },
+ 	{ 0,0,0 }
+ };
+ 
+diff --git a/src/modules/dialog/dlg_db_handler.c b/src/modules/dialog/dlg_db_handler.c
+index 1325469..df43c7e 100644
+--- a/src/modules/dialog/dlg_db_handler.c
++++ b/src/modules/dialog/dlg_db_handler.c
+@@ -81,6 +81,7 @@ static db1_con_t* dialog_db_handle    = 0; /* database connection handle */
+ static db_func_t dialog_dbf;
+ 
+ extern int dlg_enable_stats;
++extern int dlg_update_all_states;
+ extern int dlg_h_id_start;
+ extern int dlg_h_id_step;
+ 
+@@ -815,7 +816,7 @@ int update_dialog_dbinfo_unsafe(struct dlg_cell * cell)
+ 			&sflags_column, /*18*/     &toroute_name_column, /*19*/ &req_uri_column, /*20*/
+ 			&xdata_column, /*21*/      &iflags_column  /*22*/ };
+ 
+-	if(cell->state<DLG_STATE_EARLY || cell->state==DLG_STATE_DELETED) {
++	if((dlg_update_all_states == 0) && (cell->state<DLG_STATE_EARLY || cell->state==DLG_STATE_DELETED)) {
+ 		LM_DBG("not storing dlg in db during initial or deleted states\n");
+ 		return 0;
+ 	}
+diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
+index 033ffdd..7b37f58 100644
+--- a/src/modules/dialog/doc/dialog_admin.xml
++++ b/src/modules/dialog/doc/dialog_admin.xml
+@@ -82,7 +82,8 @@
+ 			<para><emphasis>5</emphasis> : Deleted dialog</para>
+ 		</listitem>
+ 	</itemizedlist>
+-	<para>The early and deleted dialog states are not updated in database storage.
++	<para>The early and deleted dialog states are updated in database storage,
++	unless deactivated with the <emphasis>update_all_states</emphasis> parameter.
+ 	</para>
+ 	</section>
+ 
+@@ -1640,6 +1641,39 @@ modparam("dialog", "keep_proxy_rr", 1)
+ </programlisting>
+ 		</example>
+ 	</section>
++
++	<section id="dialog.p.update_all_states">
++		<title><varname>update_all_states</varname> (string)</title>
++		<para>
++			When enabled the dialog modules will also synchronize the
++			early and deleted dialog states to the database. This is
++			useful in failover situations, but of course will generate
++			more load to the database from this module.
++		</para>
++		<para>
++			Valid values are:
++		</para>
++		<itemizedlist>
++			<listitem><para>
++				<emphasis>0</emphasis> - Don't synchronize early and deleted dialogs
++			</para></listitem>
++			<listitem><para>
++				<emphasis>1</emphasis> - Synchronize early and deleted dialogs
++			</para></listitem>
++		</itemizedlist>
++		<emphasis>
++			Default value is <quote>1</quote>.
++		</emphasis>
++		<example>
++		<title>Set <varname>update_all_states</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("dialog", "update_all_states", 1)
++...
++</programlisting>
++		</example>
++	</section>
++
+ 	</section>
+ 
+ 	<section>

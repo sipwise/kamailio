@@ -1,0 +1,59 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Sat, 13 Jun 2020 08:42:29 +0200
+Subject: dialog: follow up changes
+
+---
+ src/modules/dialog/dlg_db_handler.c | 10 +++++++---
+ src/modules/dialog/dlg_handlers.c   |  8 +++++++-
+ 2 files changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/dialog/dlg_db_handler.c b/src/modules/dialog/dlg_db_handler.c
+index 90e526c..023682f 100644
+--- a/src/modules/dialog/dlg_db_handler.c
++++ b/src/modules/dialog/dlg_db_handler.c
+@@ -872,12 +872,16 @@ int update_dialog_dbinfo_unsafe(struct dlg_cell * cell)
+ 		SET_STR_VALUE(values+6, cell->tag[DLG_CALLEE_LEG]);
+ 		SET_PROPER_NULL_FLAG(cell->tag[DLG_CALLEE_LEG], values, 6);
+ 
+-		LM_DBG("sock_info is %.*s\n", 
++		LM_DBG("sock_info is %.*s\n",
+ 			cell->bind_addr[DLG_CALLER_LEG]->sock_str.len,
+-			cell->bind_addr[DLG_CALLEE_LEG]->sock_str.s);
++			cell->bind_addr[DLG_CALLER_LEG]->sock_str.s);
+ 
+ 		SET_STR_VALUE(values+7, cell->bind_addr[DLG_CALLER_LEG]->sock_str);
+-		SET_STR_VALUE(values+8, cell->bind_addr[DLG_CALLEE_LEG]->sock_str);
++		if(cell->bind_addr[DLG_CALLEE_LEG]) {
++			SET_STR_VALUE(values+8, cell->bind_addr[DLG_CALLEE_LEG]->sock_str);
++		} else {
++			VAL_NULL(values+8) = 1;
++		}
+ 
+ 		SET_STR_VALUE(values+12, cell->cseq[DLG_CALLER_LEG]);
+ 		SET_STR_VALUE(values+13, cell->cseq[DLG_CALLEE_LEG]);
+diff --git a/src/modules/dialog/dlg_handlers.c b/src/modules/dialog/dlg_handlers.c
+index 43e01ee..17bf019 100644
+--- a/src/modules/dialog/dlg_handlers.c
++++ b/src/modules/dialog/dlg_handlers.c
+@@ -77,7 +77,7 @@ extern struct rr_binds d_rrb;		/*!< binding to record-routing module */
+ 
+ 
+ extern pv_elem_t *ruri_param_model;	/*!< pv-string to get r-uri */
+-
++extern int dlg_update_all_states;
+ extern str dlg_event_callback;
+ 
+ static unsigned int CURR_DLG_LIFETIME = 0;	/*!< current dialog lifetime */
+@@ -988,6 +988,12 @@ int dlg_new_dialog(sip_msg_t *req, struct cell *t, const int run_initial_cbs)
+     _dlg_ctx.iuid.h_id = dlg->h_id;
+     set_current_dialog(req, dlg);
+ 
++	if(dlg_update_all_states == 1) {
++		LM_DBG("dlg_update_all_states, force DLG_FLAG_NEW\n");
++		dlg->dflags |= DLG_FLAG_NEW;
++		if ( dlg_db_mode==DB_MODE_REALTIME )
++			update_dialog_dbinfo(dlg);
++	}
+ 	return 0;
+ 
+ error:

@@ -1,0 +1,48 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 12 Jun 2020 16:32:41 +0200
+Subject: dialog: more debug
+
+---
+ src/modules/dialog/dlg_db_handler.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/modules/dialog/dlg_db_handler.c b/src/modules/dialog/dlg_db_handler.c
+index df43c7e..90e526c 100644
+--- a/src/modules/dialog/dlg_db_handler.c
++++ b/src/modules/dialog/dlg_db_handler.c
+@@ -837,7 +837,8 @@ int update_dialog_dbinfo_unsafe(struct dlg_cell * cell)
+ 
+ 	if(use_dialog_table()!=0)
+ 		return -1;
+-	
++	LM_DBG("state:%d dflags:%d dlg [%d:%d]\n", cell->state, cell->dflags, cell->h_entry, cell->h_id);
++
+ 	srjson_InitDoc(&jdoc, NULL);
+ 
+ 	if((cell->dflags & DLG_FLAG_NEW) != 0){
+@@ -909,7 +910,7 @@ int update_dialog_dbinfo_unsafe(struct dlg_cell * cell)
+ 
+ 		VAL_NULL(values+22) = 0;
+ 		VAL_INT(values+22)  = cell->iflags;
+-
++		LM_DBG("insert dlg [%d:%d]\n", cell->h_entry, cell->h_id);
+ 		if((dialog_dbf.insert(dialog_db_handle, insert_keys, values, 
+ 								DIALOG_TABLE_COL_NO)) !=0){
+ 			LM_ERR("could not add another dialog to db\n");
+@@ -941,7 +942,7 @@ int update_dialog_dbinfo_unsafe(struct dlg_cell * cell)
+ 		VAL_NULL(values+10) = VAL_NULL(values+11) = 
+ 		VAL_NULL(values+12) = VAL_NULL(values+13) = 
+ 		VAL_NULL(values+14) = VAL_NULL(values+15) = 0;
+-
++		LM_DBG("update dlg [%d:%d]\n", cell->h_entry, cell->h_id);
+ 		if((dialog_dbf.update(dialog_db_handle, (insert_keys), 0, 
+ 						(values), (insert_keys+10), (values+10), 2, 6)) !=0){
+ 			LM_ERR("could not update database info\n");
+@@ -949,6 +950,7 @@ int update_dialog_dbinfo_unsafe(struct dlg_cell * cell)
+ 		}
+ 		cell->dflags &= ~(DLG_FLAG_CHANGED);
+ 	} else {
++		LM_DBG("skip dlg [%d:%d]\n", cell->h_entry, cell->h_id);
+ 		return 0;
+ 	}
+ 
