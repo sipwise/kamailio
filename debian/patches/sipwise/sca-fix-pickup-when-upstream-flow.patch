@@ -7,84 +7,82 @@ Subject: sca-fix-pickup-when-upstream-flow
  1 file changed, 30 insertions(+), 17 deletions(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 0fc0cd4..65c21ac 100644
+index 00a4c0e..0a72427 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -914,6 +914,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -937,6 +937,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	str state_str = STR_NULL;
  	int state = SCA_APPEARANCE_STATE_UNKNOWN;
  	int rc = -1;
-+	str			*target_aor = from_aor;
++	str *target_aor = from_aor;
 +
-+	if(SCA_CALL_INFO_IS_SHARED_CALLEE(call_info) &&
-+			sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++	if(SCA_CALL_INFO_IS_SHARED_CALLEE(call_info)
++			&& sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM) == 0) {
 +		LM_DBG("callee is SCA and direction is 'upstream'\n");
 +		target_aor = to_aor;
 +	}
  
  	LM_DBG("For From-AOR %.*s To-AOR: %.*s: From: <%.*s> To: <%.*s> "
- 			"Contact: <%.*s> Call-Info: appearance-index=%d\n",
-@@ -925,7 +932,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
- 	if (sca->tm_api->register_tmcb(msg, NULL, TMCB_E2EACK_IN,
- 			sca_call_info_ack_cb, NULL, NULL) < 0) {
+ 		   "Contact: <%.*s> Call-Info: appearance-index=%d\n",
+@@ -950,7 +957,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+ 			< 0) {
  		LM_ERR("sca_call_info_invite_request_handler: failed to register "
--				"callback for INVITE %.*s ACK\n", STR_FMT(from_aor));
-+				"callback for INVITE %.*s ACK\n", STR_FMT(target_aor));
+ 			   "callback for INVITE %.*s ACK\n",
+-				STR_FMT(from_aor));
++				STR_FMT(target_aor));
  		goto done;
  	}
  
-@@ -941,7 +948,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
- 	if (sca->tm_api->register_tmcb(msg, NULL, TMCB_RESPONSE_READY,
- 			sca_call_info_response_ready_cb, NULL, NULL) < 0) {
+@@ -968,7 +975,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+ 			< 0) {
  		LM_ERR("sca_call_info_invite_request_handler: failed to register "
--				"callback for INVITE %.*s ACK\n", STR_FMT(from_aor));
-+				"callback for INVITE %.*s ACK\n", STR_FMT(target_aor));
+ 			   "callback for INVITE %.*s ACK\n",
+-				STR_FMT(from_aor));
++				STR_FMT(target_aor));
  		goto done;
  	}
  
-@@ -972,17 +979,17 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
- 		return (-1);
+@@ -1001,16 +1008,16 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	}
  
--	if (sca_appearance_update_index(sca, from_aor, call_info->index, state,
-+	if (sca_appearance_update_index(sca, target_aor, call_info->index, state,
- 			NULL, NULL, &dialog) != SCA_APPEARANCE_OK) {
+ 	if(sca_appearance_update_index(
+-			   sca, from_aor, call_info->index, state, NULL, NULL, &dialog)
++			   sca, target_aor, call_info->index, state, NULL, NULL, &dialog)
+ 			!= SCA_APPEARANCE_OK) {
  		sca_appearance_state_to_str(state, &state_str);
  		LM_ERR("Failed to update %.*s appearance-index %d to %.*s\n",
--				STR_FMT(from_aor), call_info->index,
-+				STR_FMT(target_aor), call_info->index,
- 				STR_FMT(&state_str));
+-				STR_FMT(from_aor), call_info->index, STR_FMT(&state_str));
++				STR_FMT(target_aor), call_info->index, STR_FMT(&state_str));
  	}
  
--	if (sca_notify_call_info_subscribers(sca, from_aor) < 0) {
-+	if (sca_notify_call_info_subscribers(sca, target_aor) < 0) {
+-	if(sca_notify_call_info_subscribers(sca, from_aor) < 0) {
++	if(sca_notify_call_info_subscribers(sca, target_aor) < 0) {
  		LM_ERR("Failed to call-info NOTIFY %.*s subscribers on INVITE\n",
 -				STR_FMT(from_aor));
 +				STR_FMT(target_aor));
  		goto done;
  	}
  
-@@ -1315,6 +1322,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1356,6 +1363,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  	str *tag;
  	int slot_idx = -1;
  	int state = SCA_APPEARANCE_STATE_IDLE;
 +	str *target_aor;
  
- 	if (sca_get_msg_from_header(msg, &from) < 0) {
+ 	if(sca_get_msg_from_header(msg, &from) < 0) {
  		LM_ERR("sca_call_info_ack_cb: failed to get From-header\n");
-@@ -1325,18 +1333,23 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1366,19 +1374,24 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  		return;
  	}
  
--	if (sca_uri_lock_if_shared_appearance(sca, from_aor, &slot_idx)) {
--		if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
+-	if(sca_uri_lock_if_shared_appearance(sca, from_aor, &slot_idx)) {
+-		if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM) == 0) {
 -			LM_DBG("upstream direction detected\n");
 -			tag = &to->tag_value;
 -		} else {
 -			tag = &from->tag_value;
 -		}
--		app = sca_appearance_for_tags_unsafe(sca, from_aor, &msg->callid->body,
-+	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM)==0) {
++	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM) == 0) {
 +		LM_DBG("upstream direction detected\n");
 +		target_aor = to_aor;
 +		tag = &to->tag_value;
@@ -95,23 +93,26 @@ index 0fc0cd4..65c21ac 100644
 +
 +	LM_DBG("target_aor[%.*s]\n", STR_FMT(target_aor));
 +
-+	if (sca_uri_lock_if_shared_appearance(sca, target_aor, &slot_idx)) {
-+		app = sca_appearance_for_tags_unsafe(sca, target_aor, &msg->callid->body,
- 				tag, NULL, slot_idx);
- 		if (app == NULL) {
++	if(sca_uri_lock_if_shared_appearance(sca, target_aor, &slot_idx)) {
+ 		app = sca_appearance_for_tags_unsafe(
+-				sca, from_aor, &msg->callid->body, tag, NULL, slot_idx);
++				sca, target_aor, &msg->callid->body, tag, NULL, slot_idx);
+ 		if(app == NULL) {
  			LM_ERR("sca_call_info_ack_cb: No appearance for %.*s matching "
--					"call-id <%.*s> and from-tag <%.*s>\n", STR_FMT(from_aor),
-+					"call-id <%.*s> and from-tag <%.*s>\n", STR_FMT(target_aor),
- 					STR_FMT(&msg->callid->body), STR_FMT(tag));
+ 				   "call-id <%.*s> and from-tag <%.*s>\n",
+-					STR_FMT(from_aor), STR_FMT(&msg->callid->body),
++					STR_FMT(target_aor), STR_FMT(&msg->callid->body),
+ 					STR_FMT(tag));
  			goto done;
  		}
-@@ -1363,9 +1376,9 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1406,10 +1419,10 @@ done:
  		sca_hash_table_unlock_index(sca->appearances, slot_idx);
  
- 		if (state != SCA_APPEARANCE_STATE_IDLE) {
--			if (sca_notify_call_info_subscribers(sca, from_aor) < 0) {
-+			if (sca_notify_call_info_subscribers(sca, target_aor) < 0) {
- 				LM_ERR("Failed to call-info NOTIFY %.*s subscribers on INVITE\n",
+ 		if(state != SCA_APPEARANCE_STATE_IDLE) {
+-			if(sca_notify_call_info_subscribers(sca, from_aor) < 0) {
++			if(sca_notify_call_info_subscribers(sca, target_aor) < 0) {
+ 				LM_ERR("Failed to call-info NOTIFY %.*s subscribers on "
+ 					   "INVITE\n",
 -						STR_FMT(from_aor));
 +						STR_FMT(target_aor));
  			}
