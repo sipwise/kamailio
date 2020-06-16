@@ -7,30 +7,30 @@ Subject: sca-fallback-if-no-contact
  1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 4ae93f9..8b940c3 100644
+index 867421b..a173294 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1891,9 +1891,6 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
+@@ -1944,9 +1944,6 @@ int sca_call_info_update(
  			rc = -1;
  			goto done;
  		}
--	} else if (rc < 0) {
+-	} else if(rc < 0) {
 -		LM_ERR("Bad Contact\n");
 -		goto done;
  	}
  	// reset rc to -1 so we don't end up returning 0 to the script
  	rc = -1;
-@@ -1940,6 +1937,13 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
- 	LM_DBG("to_aor[%.*s] from_aor[%.*s]\n",
- 		STR_FMT(&to_aor), STR_FMT(&from_aor));
+@@ -1992,6 +1989,13 @@ int sca_call_info_update(
+ 	LM_DBG("to_aor[%.*s] from_aor[%.*s]\n", STR_FMT(&to_aor),
+ 			STR_FMT(&from_aor));
  
-+	if(contact_uri.s==NULL) {
++	if(contact_uri.s == NULL) {
 +		contact_uri.s = "sip:127.0.0.1:5085;transport=udp";
 +		contact_uri.len = strlen(contact_uri.s);
 +		LM_DBG("No Contact header, using default owner[%.*s]\n",
-+			STR_FMT(&contact_uri));
++				STR_FMT(&contact_uri));
 +	}
 +
  	// early check to see if we're dealing with any SCA endpoints
- 	if (sca_uri_is_shared_appearance(sca, &from_aor)) {
- 		if ((update_mask & SCA_CALL_INFO_SHARED_CALLER)) {
+ 	if(sca_uri_is_shared_appearance(sca, &from_aor)) {
+ 		if((update_mask & SCA_CALL_INFO_SHARED_CALLER)) {

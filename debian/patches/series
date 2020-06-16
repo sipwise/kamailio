@@ -25,6 +25,7 @@ sipwise/tmrec-ical.patch
 sipwise/registrar_add_path.patch
 sipwise/switch_from_python2_to_python3.patch
 ## SCA Patches
+upstream/sca-clang-format-code.patch
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
 sipwise/sca-call-info-unsubscribe.patch

@@ -7,24 +7,24 @@ Subject: sca-fix-memleaks
  1 file changed, 4 insertions(+)
 
 diff --git a/src/modules/sca/sca_util.c b/src/modules/sca/sca_util.c
-index 46d04c5..65a5a26 100644
+index e1ef561..9fa64ca 100644
 --- a/src/modules/sca/sca_util.c
 +++ b/src/modules/sca/sca_util.c
-@@ -178,6 +178,8 @@ int sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from ) {
+@@ -180,6 +180,8 @@ int sca_get_msg_from_header(sip_msg_t *msg, struct to_body **from)
  	} else {
- 		LM_DBG("using $avp(%.*s)[%.*s] as from uri\n",
- 			STR_FMT(&from_uri_avp.s), STR_FMT(&uri));
+ 		LM_DBG("using $avp(%.*s)[%.*s] as from uri\n", STR_FMT(&from_uri_avp.s),
+ 				STR_FMT(&uri));
 +		free_to_params(&sf);
 +		memset(&sf, 0, sizeof(sf));
- 		if(sca_parse_uri(&sf, &uri)<0) return -1;
+ 		if(sca_parse_uri(&sf, &uri) < 0)
+ 			return -1;
  		*from = &sf;
- 	}
-@@ -220,6 +222,8 @@ int sca_get_msg_to_header(sip_msg_t *msg, struct to_body **to)
+@@ -224,6 +226,8 @@ int sca_get_msg_to_header(sip_msg_t *msg, struct to_body **to)
  	} else {
- 		LM_DBG("using $avp(%.*s)[%.*s] as to uri\n",
- 			STR_FMT(&to_uri_avp.s), STR_FMT(&uri));
+ 		LM_DBG("using $avp(%.*s)[%.*s] as to uri\n", STR_FMT(&to_uri_avp.s),
+ 				STR_FMT(&uri));
 +		free_to_params(&parsed_to);
 +		memset(&parsed_to, 0, sizeof(parsed_to));
- 		if(sca_parse_uri(&parsed_to, &uri)<0) return -1;
+ 		if(sca_parse_uri(&parsed_to, &uri) < 0)
+ 			return -1;
  		*to = &parsed_to;
- 	}
