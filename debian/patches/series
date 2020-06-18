@@ -84,6 +84,7 @@ sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 ### active development
 #
+sipwise/topos-add-debug.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
