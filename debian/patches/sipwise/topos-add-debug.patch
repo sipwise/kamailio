@@ -1,0 +1,28 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 18 Jun 2020 13:19:36 +0200
+Subject: topos: add debug
+
+---
+ src/modules/topos/tps_msg.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/topos/tps_msg.c b/src/modules/topos/tps_msg.c
+index 3bb5f12..a54b6ce 100644
+--- a/src/modules/topos/tps_msg.c
++++ b/src/modules/topos/tps_msg.c
+@@ -1094,7 +1094,7 @@ int tps_response_sent(sip_msg_t *msg)
+ 			tps_reinsert_contact(msg, &stsd, &stsd.bs_contact);
+ 		}
+ 	}
+-
++	LM_DBG("x_rr [%.*s]\n", btsd.x_rr.len, ZSW(btsd.x_rr.s));
+ 	tps_reappend_rr(msg, &btsd, &btsd.x_rr);
+ 	if(tps_storage_update_branch(msg, &mtsd, &btsd, TPS_DBU_CONTACT)<0) {
+ 		goto error;
+@@ -1107,5 +1107,6 @@ int tps_response_sent(sip_msg_t *msg)
+ error:
+ 	tps_storage_lock_release(&lkey);
+ error1:
++	LM_DBG("error\n");
+ 	return -1;
+ }
