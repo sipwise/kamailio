@@ -1,0 +1,60 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 18 Jun 2020 13:19:36 +0200
+Subject: topos: add debug
+
+possible fix??
+---
+ src/modules/topos/tps_msg.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/topos/tps_msg.c b/src/modules/topos/tps_msg.c
+index 3bb5f12..9f36bce 100644
+--- a/src/modules/topos/tps_msg.c
++++ b/src/modules/topos/tps_msg.c
+@@ -907,6 +907,10 @@ int tps_response_received(sip_msg_t *msg)
+ 	tps_storage_lock_release(&lkey);
+ 
+ 	tps_reappend_via(msg, &btsd, &btsd.x_via);
++	LM_DBG("x_rr[%.*s] y_rr[%.*s] s_rr[%.*s]\n",
++		btsd.x_rr.len, ZSW(btsd.x_rr.s),
++		btsd.y_rr.len, ZSW(btsd.y_rr.s),
++		btsd.s_rr.len, ZSW(btsd.s_rr.s));
+ 	tps_reappend_rr(msg, &btsd, &btsd.s_rr);
+ 	tps_reappend_rr(msg, &btsd, &btsd.x_rr);
+ 	tps_append_xbranch(msg, &mtsd.x_vbranch1);
+@@ -1074,7 +1078,11 @@ int tps_response_sent(sip_msg_t *msg)
+ 	}
+ 	mtsd.direction = direction;
+ 
+-	tps_remove_headers(msg, HDR_RECORDROUTE_T);
++	if(msg->first_line.u.reply.statuscode>100
++				&& msg->first_line.u.reply.statuscode<200) {
++		LM_DBG("removing Record-Route headers\n");
++		tps_remove_headers(msg, HDR_RECORDROUTE_T);
++	}
+ 
+ 	/* keep contact without updates for redirect responses sent out */
+ 	if(msg->first_line.u.reply.statuscode>=300
+@@ -1095,7 +1103,14 @@ int tps_response_sent(sip_msg_t *msg)
+ 		}
+ 	}
+ 
+-	tps_reappend_rr(msg, &btsd, &btsd.x_rr);
++	LM_DBG("x_rr[%.*s] y_rr[%.*s] s_rr[%.*s]\n",
++		btsd.x_rr.len, ZSW(btsd.x_rr.s),
++		btsd.y_rr.len, ZSW(btsd.y_rr.s),
++		btsd.s_rr.len, ZSW(btsd.s_rr.s));
++	if(btsd.x_rr.len > 0) {
++		tps_remove_headers(msg, HDR_RECORDROUTE_T);
++		tps_reappend_rr(msg, &btsd, &btsd.x_rr);
++	}
+ 	if(tps_storage_update_branch(msg, &mtsd, &btsd, TPS_DBU_CONTACT)<0) {
+ 		goto error;
+ 	}
+@@ -1107,5 +1122,6 @@ int tps_response_sent(sip_msg_t *msg)
+ error:
+ 	tps_storage_lock_release(&lkey);
+ error1:
++	LM_DBG("error\n");
+ 	return -1;
+ }
