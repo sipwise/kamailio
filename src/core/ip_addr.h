@@ -71,6 +71,7 @@ union sockaddr_union{
 	struct sockaddr     s;
 	struct sockaddr_in  sin;
 	struct sockaddr_in6 sin6;
+	struct sockaddr_storage sas;
 };
 
 
@@ -790,11 +791,14 @@ static inline struct hostent* ip_addr2he(str* name, struct ip_addr* ip)
 	static char* p_aliases[1];
 	static char* p_addr[2];
 	static char address[16];
+	int len;
 
 	p_aliases[0]=0; /* no aliases*/
 	p_addr[1]=0; /* only one address*/
 	p_addr[0]=address;
-	strncpy(hostname, name->s, (name->len<256)?(name->len)+1:256);
+	len = (name->len<255)?name->len:255;
+	memcpy(hostname, name->s, len);
+	hostname[len] = '\0';
 	if (ip->len>16) return 0;
 	memcpy(address, ip->u.addr, ip->len);
 
