@@ -79,6 +79,22 @@
 #define DS_ALG_RELWEIGHT 11
 #define DS_ALG_PARALLEL 12
 
+/* increment call load */
+#define DS_LOAD_INC(dgrp, didx) do { \
+		lock_get(&(dgrp)->lock); \
+		(dgrp)->dlist[didx].dload++; \
+		lock_release(&(dgrp)->lock); \
+	} while(0)
+
+/* decrement call load */
+#define DS_LOAD_DEC(dgrp, didx) do { \
+		lock_get(&(dgrp)->lock); \
+		if(likely((dgrp)->dlist[didx].dload > 0)) { \
+			(dgrp)->dlist[didx].dload--; \
+		} \
+		lock_release(&(dgrp)->lock); \
+	} while(0)
+
 static int _ds_table_version = DS_TABLE_VERSION;
 
 static ds_ht_t *_dsht_load = NULL;
@@ -854,7 +870,7 @@ next_line:
 	/* Update list - should it be sync'ed? */
 	_ds_list_nr = setn;
 	*crt_idx = *next_idx;
-	ds_ht_clear_slots(_dsht_load);
+	
 	ds_log_sets();
 	return 0;
 
@@ -1102,7 +1118,6 @@ int ds_load_db(void)
 	/* update data - should it be sync'ed? */
 	_ds_list_nr = setn;
 	*crt_idx = *next_idx;
-	ds_ht_clear_slots(_dsht_load);
 
 	ds_log_sets();
 
@@ -1506,6 +1521,7 @@ int ds_get_leastloaded(ds_set_t *dset)
 
 	k = -1;
 	t = 0x7fffffff; /* high load */
+	lock_get(&dset->lock); \
 	for(j = 0; j < dset->nr; j++) {
 		if(!ds_skip_dst(dset->dlist[j].flags)
 				&& (dset->dlist[j].attrs.maxload == 0
@@ -1517,6 +1533,7 @@ int ds_get_leastloaded(ds_set_t *dset)
 			}
 		}
 	}
+	lock_release(&dset->lock); \
 	return k;
 }
 
@@ -1538,7 +1555,7 @@ int ds_load_add(struct sip_msg *msg, ds_set_t *dset, int setid, int dst)
 				msg->callid->body.s);
 		return -1;
 	}
-	dset->dlist[dst].dload++;
+	DS_LOAD_INC(dset, dst);
 	return 0;
 }
 
@@ -1591,23 +1608,24 @@ int ds_load_replace(struct sip_msg *msg, str *duid)
 				break;
 		}
 	}
+	/* old destination has not been found: has been removed meanwhile? */
 	if(olddst == -1) {
-		ds_unlock_cell(_dsht_load, &msg->callid->body);
-		LM_ERR("old destination address not found for [%d, %.*s]\n", set,
+		LM_WARN("old destination address not found for [%d, %.*s]\n", set,
 				it->duid.len, it->duid.s);
-		return -1;
-	}
+	} 
 	if(newdst == -1) {
+		/* new destination has not been found: has been removed meanwhile? */
 		ds_unlock_cell(_dsht_load, &msg->callid->body);
 		LM_ERR("new destination address not found for [%d, %.*s]\n", set,
 				duid->len, duid->s);
-		return -1;
+		return -2;
 	}
 
 	ds_unlock_cell(_dsht_load, &msg->callid->body);
 	ds_del_cell(_dsht_load, &msg->callid->body);
-	if(idx->dlist[olddst].dload > 0)
-		idx->dlist[olddst].dload--;
+	
+	if(olddst != -1)
+		DS_LOAD_DEC(idx, olddst);
 
 	if(ds_load_add(msg, idx, set, newdst) < 0) {
 		LM_ERR("unable to replace destination load [%.*s / %.*s]\n", duid->len,
@@ -1646,8 +1664,7 @@ int ds_load_remove_byid(int set, str *duid)
 		return -1;
 	}
 
-	if(idx->dlist[olddst].dload > 0)
-		idx->dlist[olddst].dload--;
+	DS_LOAD_DEC(idx, olddst);
 
 	return 0;
 }
@@ -2301,6 +2318,7 @@ int ds_manage_routes(sip_msg_t *msg, ds_select_state_t *rstate)
 int ds_update_dst(struct sip_msg *msg, int upos, int mode)
 {
 
+	int ret;
 	socket_info_t *sock = NULL;
 	sr_xavp_t *rxavp = NULL;
 	sr_xavp_t *lxavp = NULL;
@@ -2313,6 +2331,7 @@ int ds_update_dst(struct sip_msg *msg, int upos, int mode)
 		}
 	}
 
+next_dst:
 	rxavp = xavp_get(&ds_xavp_dst, NULL);
 	if(rxavp == NULL || rxavp->val.type != SR_XTYPE_XAVP) {
 		LM_DBG("no xavp with previous destination record\n");
@@ -2360,12 +2379,18 @@ int ds_update_dst(struct sip_msg *msg, int upos, int mode)
 		return 1;
 	}
 	if(upos == DS_USE_NEXT) {
-		if(ds_load_replace(msg, &lxavp->val.v.s) < 0) {
-			LM_ERR("cannot update load distribution\n");
-			return -1;
+		ret = ds_load_replace(msg, &lxavp->val.v.s);
+		switch(ret) {
+			case 0:
+				break;
+			case -2:
+				LM_ERR("cannot update load with %.*s, skipping dst.\n", lxavp->val.v.s.len, lxavp->val.v.s.s);
+				goto next_dst;
+			default:
+				LM_ERR("cannot update load distribution\n");
+				return -1;
 		}
 	}
-
 	return 1;
 }
 
@@ -2416,7 +2441,7 @@ int ds_add_dst(int group, str *address, int flags)
 
 	_ds_list_nr = setn;
 	*crt_idx = *next_idx;
-	ds_ht_clear_slots(_dsht_load);
+	
 	ds_log_sets();
 	return 0;
 
@@ -2471,7 +2496,7 @@ int ds_remove_dst(int group, str *address)
 
 	_ds_list_nr = setn;
 	*crt_idx = *next_idx;
-	ds_ht_clear_slots(_dsht_load);
+	
 	ds_log_sets();
 	return 0;
 
