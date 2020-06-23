@@ -30,7 +30,7 @@ index 5f71cd8..70d7179 100644
 +	return &_ksr_corecb;
 +}
 diff --git a/src/core/events.h b/src/core/events.h
-index 9c4c54a..6282e65 100644
+index 239c26b..df8a313 100644
 --- a/src/core/events.h
 +++ b/src/core/events.h
 @@ -79,4 +79,20 @@ int sr_event_enabled(int type);

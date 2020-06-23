@@ -7,10 +7,10 @@ Subject: [PATCH] pv: add KEMI functions pvx.xavp_get_keys and pvx.xavp_getd
  1 file changed, 281 insertions(+)
 
 diff --git a/src/modules/pv/pv.c b/src/modules/pv/pv.c
-index 310acf5..54bf38d 100644
+index d6a11b6..c53ea16 100644
 --- a/src/modules/pv/pv.c
 +++ b/src/modules/pv/pv.c
-@@ -1225,6 +1225,272 @@ static sr_kemi_xval_t* ki_xavp_getw(sip_msg_t *msg, str *rname)
+@@ -1219,6 +1219,272 @@ static sr_kemi_xval_t* ki_xavp_getw(sip_msg_t *msg, str *rname)
  	return ki_xavp_get_mode(msg, rname, SR_KEMI_XVAL_NULL_PRINT);
  }
  
@@ -283,7 +283,7 @@ index 310acf5..54bf38d 100644
  /**
   *
   */
-@@ -1696,6 +1962,21 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
+@@ -1690,6 +1956,21 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},

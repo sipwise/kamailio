@@ -7,7 +7,7 @@ Subject: [PATCH] rtpengine: add `flags` field for every command
  1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 7be7968..d56e88e 100644
+index 60d505c..2d28895 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -2401,8 +2401,9 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_

@@ -7,7 +7,7 @@ Subject: [PATCH] rtpengine: add support for new T.38 options
  1 file changed, 8 insertions(+)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 6d821ae..7be7968 100644
+index edd5899..60d505c 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -118,6 +118,7 @@ enum {

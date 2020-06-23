@@ -631,7 +631,7 @@ index 5dbf5e0..1f0d0f4 100644
  
  #endif
 diff --git a/src/modules/pua/hash.h b/src/modules/pua/hash.h
-index cc73d3e..b046e6a 100644
+index 454e4bb..9be6f81 100644
 --- a/src/modules/pua/hash.h
 +++ b/src/modules/pua/hash.h
 @@ -41,6 +41,7 @@

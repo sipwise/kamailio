@@ -7,7 +7,7 @@ Subject: [PATCH] pv: fix for new PV_IDX_NONE value
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/pv/pv_core.c b/src/modules/pv/pv_core.c
-index 9087fe0..1e2eb91 100644
+index d4ae29b..ca863b4 100644
 --- a/src/modules/pv/pv_core.c
 +++ b/src/modules/pv/pv_core.c
 @@ -1791,7 +1791,7 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)

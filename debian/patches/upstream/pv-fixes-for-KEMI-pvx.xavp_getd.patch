@@ -7,10 +7,10 @@ Subject: [PATCH] pv: fixes for KEMI pvx.xavp_getd
  1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/pv/pv.c b/src/modules/pv/pv.c
-index 54bf38d..2bbc77b 100644
+index c53ea16..b427667 100644
 --- a/src/modules/pv/pv.c
 +++ b/src/modules/pv/pv.c
-@@ -1229,7 +1229,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp);
+@@ -1223,7 +1223,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp);
  /**
   * SR_KEMIP_ARRAY with values of xavp=>name
   */
@@ -19,7 +19,7 @@ index 54bf38d..2bbc77b 100644
  {
  	sr_kemi_dict_item_t *ini = NULL;
  	sr_kemi_dict_item_t *val;
-@@ -1243,7 +1243,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+@@ -1237,7 +1237,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
  	}
  	memset(ini, 0, sizeof(sr_kemi_xval_t));
  	ini->vtype = SR_KEMIP_ARRAY;
@@ -28,7 +28,7 @@ index 54bf38d..2bbc77b 100644
  	{
  		avp = avp->next;
  	}
-@@ -1294,8 +1294,8 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
+@@ -1288,8 +1288,8 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str name)
  			last->next = val;
  		} else {
  			ini->v.dict = val;
@@ -38,7 +38,7 @@ index 54bf38d..2bbc77b 100644
  		avp = xavp_get_next(avp);
  	}
  	return ini;
-@@ -1335,13 +1335,13 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
+@@ -1329,13 +1329,13 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
  			val->vtype = SR_KEMIP_DICT;
  			val->name.s = keys->s.s;
  			val->name.len = keys->s.len;

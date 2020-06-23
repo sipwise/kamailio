@@ -10,7 +10,7 @@ same as $xavp but case insensitive for keys
  3 files changed, 891 insertions(+), 71 deletions(-)
 
 diff --git a/src/modules/pv/pv.c b/src/modules/pv/pv.c
-index 2bbc77b..a92ea5a 100644
+index b427667..be79f61 100644
 --- a/src/modules/pv/pv.c
 +++ b/src/modules/pv/pv.c
 @@ -31,6 +31,7 @@
@@ -31,7 +31,7 @@ index 2bbc77b..a92ea5a 100644
  	{{"avp", (sizeof("avp")-1)}, PVT_AVP, pv_get_avp, pv_set_avp,
  		pv_parse_avp_name, pv_parse_index, 0, 0},
  	{{"hdr", (sizeof("hdr")-1)}, PVT_HDR, pv_get_hdr, 0, pv_parse_hdr_name,
-@@ -549,6 +553,13 @@ static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2);
+@@ -543,6 +547,13 @@ static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2);
  static int w_var_to_xavp(sip_msg_t *msg, char *p1, char *p2);
  static int w_xavp_to_var(sip_msg_t *msg, char *p1);
  
@@ -45,7 +45,7 @@ index 2bbc77b..a92ea5a 100644
  int pv_evalx_fixup(void** param, int param_no);
  int w_pv_evalx(struct sip_msg *msg, char *dst, str *fmt);
  
-@@ -565,6 +576,8 @@ static cmd_export_t cmds[]={
+@@ -559,6 +570,8 @@ static cmd_export_t cmds[]={
  		ANY_ROUTE },
  	{"pv_xavp_print",  (cmd_function)pv_xavp_print,  0, 0, 0,
  		ANY_ROUTE },
@@ -54,7 +54,7 @@ index 2bbc77b..a92ea5a 100644
  	{"pv_var_to_xavp",  (cmd_function)w_var_to_xavp, 2, fixup_spve_spve,
  		fixup_free_spve_spve, ANY_ROUTE },
  	{"pv_xavp_to_var",  (cmd_function)w_xavp_to_var, 1, fixup_spve_null,
-@@ -595,6 +608,18 @@ static cmd_export_t cmds[]={
+@@ -589,6 +602,18 @@ static cmd_export_t cmds[]={
  	{"xavp_child_rm", (cmd_function)w_xavp_child_rm,
  		2, fixup_spve_spve, fixup_free_spve_spve,
  		ANY_ROUTE},
@@ -73,7 +73,7 @@ index 2bbc77b..a92ea5a 100644
  	{"sbranch_set_ruri",  (cmd_function)w_sbranch_set_ruri,  0, 0, 0,
  		ANY_ROUTE },
  	{"sbranch_append",    (cmd_function)w_sbranch_append,    0, 0, 0,
-@@ -811,6 +836,12 @@ static int ki_xavp_print(sip_msg_t* msg)
+@@ -805,6 +830,12 @@ static int ki_xavp_print(sip_msg_t* msg)
  	return 1;
  }
  
@@ -86,7 +86,7 @@ index 2bbc77b..a92ea5a 100644
  /**
   *
   */
-@@ -905,7 +936,7 @@ static int w_xavp_params_implode(sip_msg_t *msg, char *pxname, char *pvname)
+@@ -899,7 +930,7 @@ static int w_xavp_params_implode(sip_msg_t *msg, char *pxname, char *pvname)
  /**
   *
   */
@@ -95,7 +95,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	sr_xavp_t *xavp = NULL;
  	sr_xval_t xval;
-@@ -914,15 +945,28 @@ static int ki_xavp_seti(sip_msg_t *msg, str *rname, int ival)
+@@ -908,15 +939,28 @@ static int ki_xavp_seti(sip_msg_t *msg, str *rname, int ival)
  	xval.type = SR_XTYPE_INT;
  	xval.v.i = ival;
  
@@ -127,7 +127,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	sr_xavp_t *xavp = NULL;
  	sr_xval_t xval;
-@@ -931,29 +975,56 @@ static int ki_xavp_sets(sip_msg_t *msg, str *rname, str *sval)
+@@ -925,29 +969,56 @@ static int ki_xavp_sets(sip_msg_t *msg, str *rname, str *sval)
  	xval.type = SR_XTYPE_STR;
  	xval.v.s = *sval;
  
@@ -192,7 +192,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	str rname = STR_NULL;
  	str cname = STR_NULL;
-@@ -972,27 +1043,53 @@ static int w_xavp_child_seti(sip_msg_t *msg, char *prname, char *pcname,
+@@ -966,27 +1037,53 @@ static int w_xavp_child_seti(sip_msg_t *msg, char *prname, char *pcname,
  		return -1;
  	}
  
@@ -253,7 +253,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	str rname;
  	str cname;
-@@ -1011,7 +1108,17 @@ static int w_xavp_child_sets(sip_msg_t *msg, char *prname, char *pcname,
+@@ -1005,7 +1102,17 @@ static int w_xavp_child_sets(sip_msg_t *msg, char *prname, char *pcname,
  		return -1;
  	}
  
@@ -272,7 +272,7 @@ index 2bbc77b..a92ea5a 100644
  }
  
  /**
-@@ -1042,19 +1149,32 @@ static int fixup_free_xavp_child_seti(void** param, int param_no)
+@@ -1036,19 +1143,32 @@ static int fixup_free_xavp_child_seti(void** param, int param_no)
  /**
   *
   */
@@ -309,7 +309,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	str rname;
  
-@@ -1063,25 +1183,45 @@ static int w_xavp_rm(sip_msg_t *msg, char *prname, char *p2)
+@@ -1057,25 +1177,45 @@ static int w_xavp_rm(sip_msg_t *msg, char *prname, char *p2)
  		return -1;
  	}
  
@@ -360,7 +360,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	str rname;
  	str cname;
-@@ -1095,17 +1235,28 @@ static int w_xavp_child_rm(sip_msg_t *msg, char *prname, char *pcname)
+@@ -1089,17 +1229,28 @@ static int w_xavp_child_rm(sip_msg_t *msg, char *prname, char *pcname)
  		return -1;
  	}
  
@@ -393,7 +393,7 @@ index 2bbc77b..a92ea5a 100644
  	if(xavp==NULL) {
  		return 1;
  	}
-@@ -1115,6 +1266,13 @@ static int ki_xavp_is_null(sip_msg_t *msg, str *rname)
+@@ -1109,6 +1260,13 @@ static int ki_xavp_is_null(sip_msg_t *msg, str *rname)
  	return -1;
  }
  
@@ -407,7 +407,7 @@ index 2bbc77b..a92ea5a 100644
  /**
   *
   */
-@@ -1186,13 +1344,17 @@ static sr_kemi_xval_t* ki_xavp_get_xval(sr_xavp_t *xavp, int rmode)
+@@ -1180,13 +1338,17 @@ static sr_kemi_xval_t* ki_xavp_get_xval(sr_xavp_t *xavp, int rmode)
  /**
   *
   */
@@ -428,7 +428,7 @@ index 2bbc77b..a92ea5a 100644
  	if(xavp==NULL) {
  		sr_kemi_xval_null(&_sr_kemi_pv_xval, rmode);
  		return &_sr_kemi_pv_xval;
-@@ -1206,7 +1368,15 @@ static sr_kemi_xval_t* ki_xavp_get_mode(sip_msg_t *msg, str *rname, int rmode)
+@@ -1200,7 +1362,15 @@ static sr_kemi_xval_t* ki_xavp_get_mode(sip_msg_t *msg, str *rname, int rmode)
   */
  static sr_kemi_xval_t* ki_xavp_get(sip_msg_t *msg, str *rname)
  {
@@ -445,7 +445,7 @@ index 2bbc77b..a92ea5a 100644
  }
  
  /**
-@@ -1214,7 +1384,15 @@ static sr_kemi_xval_t* ki_xavp_get(sip_msg_t *msg, str *rname)
+@@ -1208,7 +1378,15 @@ static sr_kemi_xval_t* ki_xavp_get(sip_msg_t *msg, str *rname)
   */
  static sr_kemi_xval_t* ki_xavp_gete(sip_msg_t *msg, str *rname)
  {
@@ -462,7 +462,7 @@ index 2bbc77b..a92ea5a 100644
  }
  
  /**
-@@ -1222,14 +1400,22 @@ static sr_kemi_xval_t* ki_xavp_gete(sip_msg_t *msg, str *rname)
+@@ -1216,14 +1394,22 @@ static sr_kemi_xval_t* ki_xavp_gete(sip_msg_t *msg, str *rname)
   */
  static sr_kemi_xval_t* ki_xavp_getw(sip_msg_t *msg, str *rname)
  {
@@ -488,7 +488,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	sr_kemi_dict_item_t *ini = NULL;
  	sr_kemi_dict_item_t *val;
-@@ -1243,11 +1429,17 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
+@@ -1237,11 +1423,17 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
  	}
  	memset(ini, 0, sizeof(sr_kemi_xval_t));
  	ini->vtype = SR_KEMIP_ARRAY;
@@ -510,7 +510,7 @@ index 2bbc77b..a92ea5a 100644
  	while(avp!=NULL){
  		switch(avp->val.type) {
  			case SR_XTYPE_XAVP:
-@@ -1282,7 +1474,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
+@@ -1276,7 +1468,7 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
  				LM_WARN("XAVP type:%d value not supported\n", avp->val.type);
  			break;
  			case SR_XTYPE_XAVP:
@@ -519,7 +519,7 @@ index 2bbc77b..a92ea5a 100644
  			break;
  			default:
  				val->vtype = SR_KEMIP_NULL;
-@@ -1296,7 +1488,11 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
+@@ -1290,7 +1482,11 @@ sr_kemi_dict_item_t* ki_xavp_dict_name(sr_xavp_t *xavp, str *name)
  			ini->v.dict = val;
  		}
  		last = val;
@@ -532,7 +532,7 @@ index 2bbc77b..a92ea5a 100644
  	}
  	return ini;
  error:
-@@ -1311,7 +1507,7 @@ error:
+@@ -1305,7 +1501,7 @@ error:
  /**
   * SR_KEMIP_DICT of xavp
   */
@@ -541,7 +541,7 @@ index 2bbc77b..a92ea5a 100644
  	sr_xavp_t *avp = NULL;
  	struct str_list *keys;
  	struct str_list *k;
-@@ -1324,7 +1520,12 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
+@@ -1318,7 +1514,12 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
  		return NULL;
  	}
  	avp = xavp->val.v.xavp;
@@ -555,7 +555,7 @@ index 2bbc77b..a92ea5a 100644
  		do {
  			val = (sr_kemi_dict_item_t*)pkg_malloc(sizeof(sr_kemi_dict_item_t));
  			if(val==NULL) {
-@@ -1335,7 +1536,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
+@@ -1329,7 +1530,7 @@ sr_kemi_dict_item_t* ki_xavp_dict(sr_xavp_t *xavp) {
  			val->vtype = SR_KEMIP_DICT;
  			val->name.s = keys->s.s;
  			val->name.len = keys->s.len;
@@ -564,7 +564,7 @@ index 2bbc77b..a92ea5a 100644
  			if(last) {
  				last->next = val;
  			} else {
-@@ -1366,7 +1567,7 @@ error:
+@@ -1360,7 +1561,7 @@ error:
   *
   */
  static sr_kemi_xval_t*
@@ -573,7 +573,7 @@ index 2bbc77b..a92ea5a 100644
  {
  	sr_xavp_t *xavp=NULL;
  	int xavp_size = 0;
-@@ -1383,7 +1584,11 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
+@@ -1377,7 +1578,11 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
  		/* we're going to retrive all */
  		_sr_kemi_pv_xval.vtype = SR_KEMIP_ARRAY;
  	}
@@ -586,7 +586,7 @@ index 2bbc77b..a92ea5a 100644
  	if(indx<0)
  	{
  		if((indx*-1)>xavp_size)
-@@ -1394,13 +1599,17 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
+@@ -1388,13 +1593,17 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
  		indx = xavp_size + indx;
  	}
  
@@ -606,7 +606,7 @@ index 2bbc77b..a92ea5a 100644
  		if(last) {
  			last->next = val;
  		} else {
-@@ -1411,7 +1620,11 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
+@@ -1405,7 +1614,11 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
  			xavp = NULL;
  		} else {
  			indx = indx + 1;
@@ -619,7 +619,7 @@ index 2bbc77b..a92ea5a 100644
  		}
  	} while(xavp!=NULL);
  	return &_sr_kemi_pv_xval;
-@@ -1423,7 +1636,15 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
+@@ -1417,7 +1630,15 @@ ki_xavp_getd_helper(sip_msg_t *msg, str *rname, int *_indx)
  static sr_kemi_xval_t*
  ki_xavp_getd(sip_msg_t *msg, str *rname)
  {
@@ -636,7 +636,7 @@ index 2bbc77b..a92ea5a 100644
  }
  
  /**
-@@ -1432,14 +1653,23 @@ ki_xavp_getd(sip_msg_t *msg, str *rname)
+@@ -1426,14 +1647,23 @@ ki_xavp_getd(sip_msg_t *msg, str *rname)
  static sr_kemi_xval_t*
  ki_xavp_getd_p1(sip_msg_t *msg, str *rname, int indx)
  {
@@ -662,7 +662,7 @@ index 2bbc77b..a92ea5a 100644
  	sr_xavp_t *xavp=NULL;
  	struct str_list *keys, *k;
  	sr_kemi_dict_item_t *val;
-@@ -1447,12 +1677,20 @@ ki_xavp_get_keys(sip_msg_t *msg, str *rname, int indx) {
+@@ -1441,12 +1671,20 @@ ki_xavp_get_keys(sip_msg_t *msg, str *rname, int indx) {
  
  	memset(&_sr_kemi_pv_xval, 0, sizeof(sr_kemi_xval_t));
  
@@ -685,7 +685,7 @@ index 2bbc77b..a92ea5a 100644
  	_sr_kemi_pv_xval.vtype = SR_KEMIP_ARRAY;
  	while(keys!=NULL){
  		k = keys;
-@@ -1494,18 +1732,41 @@ error:
+@@ -1488,18 +1726,41 @@ error:
  /**
   *
   */
@@ -731,7 +731,7 @@ index 2bbc77b..a92ea5a 100644
  	if(xavp==NULL) {
  		return 1;
  	}
-@@ -1518,14 +1779,34 @@ static int ki_xavp_child_is_null(sip_msg_t *msg, str *rname, str *cname)
+@@ -1512,14 +1773,34 @@ static int ki_xavp_child_is_null(sip_msg_t *msg, str *rname, str *cname)
  /**
   *
   */
@@ -769,7 +769,7 @@ index 2bbc77b..a92ea5a 100644
  	if(xavp==NULL) {
  		sr_kemi_xval_null(&_sr_kemi_pv_xval, rmode);
  		return &_sr_kemi_pv_xval;
-@@ -1536,7 +1817,11 @@ static sr_kemi_xval_t* ki_xavp_child_get_mode(sip_msg_t *msg, str *rname,
+@@ -1530,7 +1811,11 @@ static sr_kemi_xval_t* ki_xavp_child_get_mode(sip_msg_t *msg, str *rname,
  		return &_sr_kemi_pv_xval;
  	}
  
@@ -782,7 +782,7 @@ index 2bbc77b..a92ea5a 100644
  	if(xavp==NULL) {
  		sr_kemi_xval_null(&_sr_kemi_pv_xval, rmode);
  		return &_sr_kemi_pv_xval;
-@@ -1550,25 +1835,47 @@ static sr_kemi_xval_t* ki_xavp_child_get_mode(sip_msg_t *msg, str *rname,
+@@ -1544,25 +1829,47 @@ static sr_kemi_xval_t* ki_xavp_child_get_mode(sip_msg_t *msg, str *rname,
   */
  static sr_kemi_xval_t* ki_xavp_child_get(sip_msg_t *msg, str *rname, str *cname)
  {
@@ -833,7 +833,7 @@ index 2bbc77b..a92ea5a 100644
  }
  
  /**
-@@ -1927,6 +2234,11 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
+@@ -1921,6 +2228,11 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
  		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
@@ -845,7 +845,7 @@ index 2bbc77b..a92ea5a 100644
  	{ str_init("pvx"), str_init("xavp_params_explode"),
  		SR_KEMIP_INT, ki_xavp_params_explode,
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
-@@ -2022,6 +2334,91 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
+@@ -2016,6 +2328,91 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},

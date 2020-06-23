@@ -27,7 +27,7 @@ index cafd6b6..9e31a7d 100644
  				on the &rtp; proxy. When sending a subsequent <quote>delete</quote> command to
  				the &rtp; proxy, you can then stop just the session for a specific branch when
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 2e09c15..6d821ae 100644
+index dba5e62..edd5899 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -2268,6 +2268,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu

@@ -1,10 +1,21 @@
-ngcp-kamailio (5.3.4-1+0~mr8.5.0.0) unstable; urgency=medium
+ngcp-kamailio (5.3.5-1+0~mr8.5.0.0) unstable; urgency=medium
+
+  [ Kirill Solomko ]
+  * TT#81803 add pv_headers case insensitive support
+  * TT#81803 pv_headers use str_hash_case_get
 
   [ Victor Seva ]
   * [c2c59c7] TT#81263 cfgt fix from upstream
   * [18503c0] TT#81182 jansson fix
+  * TT#81803 pv_headers use $xavi instead of $xavp
+  * TT#81803 pv_headers rework
+  * TT#79400 dialplan: don't stop loading rules on error
+  * TT#71906 sca: clang-format
+  * TT#81208 export missing KEMI functions
+  * TT#84508 New upstream version 5.3.5
+  * TT#84508 refresh patches
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 19 May 2020 11:07:51 +0200
+ -- Victor Seva <vseva@debian.org>  Tue, 23 Jun 2020 11:15:02 +0200
 
 ngcp-kamailio (5.3.4-1+0~mr8.4.0.0) unstable; urgency=medium
 

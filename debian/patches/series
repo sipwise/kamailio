@@ -25,7 +25,6 @@ sipwise/tmrec-ical.patch
 sipwise/registrar_add_path.patch
 sipwise/switch_from_python2_to_python3.patch
 ## SCA Patches
-upstream/sca-clang-format-code.patch
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
 sipwise/sca-call-info-unsubscribe.patch
@@ -66,7 +65,6 @@ upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
 upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
 upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
 upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
-upstream/ndb_redis-fix-return-redis_cmd-function.patch
 upstream/core-add-case-functions-for-str_hash-get-and-set.patch
 upstream/core-xavi-api-like-xavp-but-with-insensitive-case-na.patch
 upstream/pv-define-xavi-types.patch
@@ -75,8 +73,6 @@ upstream/tm-process-xavi-list-in-transaction-contexts.patch
 upstream/pv-xavi-.-config-variables-implementation.patch
 upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
 upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
-upstream/sqlops-export-sql_pvquery-to-KEMI.patch
-upstream/avpops-export-functions-to-KEMI.patch
 ## backport from kamailio trunk (5.3)
 #
 ### relevant for upstream

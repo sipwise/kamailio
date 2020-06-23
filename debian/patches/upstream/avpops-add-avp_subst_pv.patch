@@ -9,10 +9,10 @@ Subject: [PATCH] avpops: add avp_subst_pv()
  1 file changed, 58 insertions(+)
 
 diff --git a/src/modules/avpops/avpops.c b/src/modules/avpops/avpops.c
-index 0805407..3d8f949 100644
+index 6e49933..06f5f1f 100644
 --- a/src/modules/avpops/avpops.c
 +++ b/src/modules/avpops/avpops.c
-@@ -67,6 +67,8 @@ static int fixup_pushto_avp(void** param, int param_no);
+@@ -68,6 +68,8 @@ static int fixup_pushto_avp(void** param, int param_no);
  static int fixup_check_avp(void** param, int param_no);
  static int fixup_op_avp(void** param, int param_no);
  static int fixup_subst(void** param, int param_no);
@@ -21,7 +21,7 @@ index 0805407..3d8f949 100644
  static int fixup_is_avp_set(void** param, int param_no);
  
  static int w_print_avps(struct sip_msg* msg, char* foo, char *bar);
-@@ -81,6 +83,7 @@ static int w_pushto_avps(struct sip_msg* msg, char* destination, char *param);
+@@ -82,6 +84,7 @@ static int w_pushto_avps(struct sip_msg* msg, char* destination, char *param);
  static int w_check_avps(struct sip_msg* msg, char* param, char *check);
  static int w_op_avps(struct sip_msg* msg, char* param, char *op);
  static int w_subst(struct sip_msg* msg, char* src, char *subst);
@@ -29,7 +29,7 @@ index 0805407..3d8f949 100644
  static int w_is_avp_set(struct sip_msg* msg, char* param, char *foo);
  
  /*! \brief
-@@ -111,6 +114,9 @@ static cmd_export_t cmds[] = {
+@@ -112,6 +115,9 @@ static cmd_export_t cmds[] = {
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
  	{"avp_subst",  (cmd_function)w_subst,   2, fixup_subst, 0,
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
@@ -39,7 +39,7 @@ index 0805407..3d8f949 100644
  	{"is_avp_set", (cmd_function)w_is_avp_set, 1, fixup_is_avp_set, 0,
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
  	{0, 0, 0, 0, 0, 0}
-@@ -708,6 +714,16 @@ static int fixup_check_avp(void** param, int param_no)
+@@ -709,6 +715,16 @@ static int fixup_check_avp(void** param, int param_no)
  	return 0;
  }
  
@@ -56,7 +56,7 @@ index 0805407..3d8f949 100644
  static int fixup_subst(void** param, int param_no)
  {
  	struct subst_expr* se;
-@@ -841,6 +857,14 @@ static int fixup_subst(void** param, int param_no)
+@@ -842,6 +858,14 @@ static int fixup_subst(void** param, int param_no)
  	return 0;
  }
  
@@ -71,7 +71,7 @@ index 0805407..3d8f949 100644
  static int fixup_op_avp(void** param, int param_no)
  {
  	struct fis_param *ap;
-@@ -1054,6 +1078,40 @@ static int w_subst(struct sip_msg* msg, char* src, char *subst)
+@@ -1055,6 +1079,40 @@ static int w_subst(struct sip_msg* msg, char* src, char *subst)
  	return ops_subst(msg, (struct fis_param**)src, (struct subst_expr*)subst);
  }
  
