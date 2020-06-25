@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.3.4
+%define ver 5.3.5
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -1109,6 +1109,10 @@ UUID module for Kamailio.
 
 %prep
 %setup -n %{name}-%{ver}
+# python3 does not exist in RHEL 6 and similar dist.
+%if 0%{?rhel} == 6
+sed -i -e 's/python3/python2/' utils/kamctl/dbtextdb/dbtextdb.py
+%endif
 
 %build
 ln -s ../obs pkg/kamailio/%{dist_name}/%{dist_version}
@@ -1145,6 +1149,7 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with http_async_client}
     khttp_async \
 %endif
+    kxhttp_prom \
 %if %{with ims}
     kims \
 %endif
@@ -1232,6 +1237,7 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with http_async_client}
     khttp_async \
 %endif
+    kxhttp_prom \
 %if %{with ims}
     kims \
 %endif

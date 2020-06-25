@@ -90,7 +90,7 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start* fl)
 	tmp=buffer;
   	/* is it perhaps a reply, ie does it start with "SIP...." ? */
 	if ( 	(*tmp=='S' || *tmp=='s') && 
-		strncasecmp( tmp+1, SIP_VERSION+1, SIP_VERSION_LEN-1)==0 &&
+		strncasecmp( tmp+1, &SIP_VERSION[1], SIP_VERSION_LEN-1)==0 &&
 		(*(tmp+SIP_VERSION_LEN)==' ')) {
 			fl->type=SIP_REPLY;
 			fl->flags|=FLINE_FLAG_PROTO_SIP;
@@ -98,7 +98,7 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start* fl)
 			tmp=buffer+SIP_VERSION_LEN;
 	} else if (http_reply_parse != 0 && (*tmp=='H' || *tmp=='h')) {
 			/* 'HTTP/1.' */
-			if (strncasecmp( tmp+1, HTTP_VERSION+1, HTTP_VERSION_LEN-1)==0 &&
+			if (strncasecmp( tmp+1, &HTTP_VERSION[1], HTTP_VERSION_LEN-1)==0 &&
 			  /* [0|1] */
 			  ((*(tmp+HTTP_VERSION_LEN)=='0') || (*(tmp+HTTP_VERSION_LEN)=='1')) &&
 			  (*(tmp+HTTP_VERSION_LEN+1)==' ')  ){ 
@@ -111,7 +111,7 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start* fl)
 				  fl->u.reply.version.len=HTTP_VERSION_LEN+1 /*include last digit*/;
           tmp=buffer+HTTP_VERSION_LEN+1 /* last digit */;
 			/* 'HTTP/2' */
-			} else if (strncasecmp( tmp+1, HTTP2_VERSION+1, HTTP2_VERSION_LEN-1)==0 &&
+			} else if (strncasecmp( tmp+1, &HTTP2_VERSION[1], HTTP2_VERSION_LEN-1)==0 &&
 						(*(tmp+HTTP2_VERSION_LEN)==' ')) {
 					fl->type=SIP_REPLY;
 					fl->flags|=FLINE_FLAG_PROTO_HTTP;
@@ -238,13 +238,13 @@ char* parse_first_line(char* buffer, unsigned int len, struct msg_start* fl)
 				&& (fl->u.request.version.s[0]=='S'
 					|| fl->u.request.version.s[0]=='s')
 				&& !strncasecmp(fl->u.request.version.s+1,
-					SIP_VERSION+1, SIP_VERSION_LEN-1)) {
+					&SIP_VERSION[1], SIP_VERSION_LEN-1)) {
 			fl->flags|=FLINE_FLAG_PROTO_SIP;
 		} else if(fl->u.request.version.len >= HTTP_VERSION_LEN
 				&& (fl->u.request.version.s[0]=='H'
 					|| fl->u.request.version.s[0]=='h')
 				&& !strncasecmp(fl->u.request.version.s+1,
-					HTTP_VERSION+1, HTTP_VERSION_LEN-1)) {
+					&HTTP_VERSION[1], HTTP_VERSION_LEN-1)) {
 			fl->flags|=FLINE_FLAG_PROTO_HTTP;
 		}
 	}
