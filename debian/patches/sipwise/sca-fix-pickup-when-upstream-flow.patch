@@ -7,10 +7,10 @@ Subject: sca-fix-pickup-when-upstream-flow
  1 file changed, 30 insertions(+), 17 deletions(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index 00a4c0e..0a72427 100644
+index 88553b6..d82b569 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -937,6 +937,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -945,6 +945,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	str state_str = STR_NULL;
  	int state = SCA_APPEARANCE_STATE_UNKNOWN;
  	int rc = -1;
@@ -24,7 +24,7 @@ index 00a4c0e..0a72427 100644
  
  	LM_DBG("For From-AOR %.*s To-AOR: %.*s: From: <%.*s> To: <%.*s> "
  		   "Contact: <%.*s> Call-Info: appearance-index=%d\n",
-@@ -950,7 +957,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -958,7 +965,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  			< 0) {
  		LM_ERR("sca_call_info_invite_request_handler: failed to register "
  			   "callback for INVITE %.*s ACK\n",
@@ -33,7 +33,7 @@ index 00a4c0e..0a72427 100644
  		goto done;
  	}
  
-@@ -968,7 +975,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -976,7 +983,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  			< 0) {
  		LM_ERR("sca_call_info_invite_request_handler: failed to register "
  			   "callback for INVITE %.*s ACK\n",
@@ -42,7 +42,7 @@ index 00a4c0e..0a72427 100644
  		goto done;
  	}
  
-@@ -1001,16 +1008,16 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
+@@ -1009,16 +1016,16 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	}
  
  	if(sca_appearance_update_index(
@@ -63,7 +63,7 @@ index 00a4c0e..0a72427 100644
  		goto done;
  	}
  
-@@ -1356,6 +1363,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+@@ -1363,6 +1370,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  	str *tag;
  	int slot_idx = -1;
  	int state = SCA_APPEARANCE_STATE_IDLE;
@@ -71,24 +71,24 @@ index 00a4c0e..0a72427 100644
  
  	if(sca_get_msg_from_header(msg, &from) < 0) {
  		LM_ERR("sca_call_info_ack_cb: failed to get From-header\n");
-@@ -1366,19 +1374,24 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
- 		return;
+@@ -1373,19 +1381,24 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
+ 		goto done;
  	}
  
 -	if(sca_uri_lock_if_shared_appearance(sca, from_aor, &slot_idx)) {
 -		if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM) == 0) {
 -			LM_DBG("upstream direction detected\n");
--			tag = &to->tag_value;
+-			tag = &to.hdr->tag_value;
 -		} else {
--			tag = &from->tag_value;
+-			tag = &from.hdr->tag_value;
 -		}
 +	if(sca->rr_api->is_direction(msg, RR_FLOW_UPSTREAM) == 0) {
 +		LM_DBG("upstream direction detected\n");
 +		target_aor = to_aor;
-+		tag = &to->tag_value;
++		tag = &to.hdr->tag_value;
 +	} else {
 +		target_aor = from_aor;
-+		tag = &from->tag_value;
++		tag = &from.hdr->tag_value;
 +	}
 +
 +	LM_DBG("target_aor[%.*s]\n", STR_FMT(target_aor));
@@ -105,7 +105,7 @@ index 00a4c0e..0a72427 100644
  					STR_FMT(tag));
  			goto done;
  		}
-@@ -1406,10 +1419,10 @@ done:
+@@ -1413,10 +1426,10 @@ done:
  		sca_hash_table_unlock_index(sca->appearances, slot_idx);
  
  		if(state != SCA_APPEARANCE_STATE_IDLE) {
