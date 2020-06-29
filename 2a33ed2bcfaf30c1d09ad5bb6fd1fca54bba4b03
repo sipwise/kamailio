@@ -2,6 +2,108 @@
   "comments": [
     {
       "key": {
+        "uuid": "4f0ee6c4_d16cb9c4",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 224,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-29T17:11:24Z",
+      "side": 1,
+      "message": "This also lacks initialisation",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "66dbdc40_0a27a851",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 299,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-29T17:11:24Z",
+      "side": 1,
+      "message": "And here. For sure here, because if sca_get_msg_from_header fails, then sca_get_msg_to_header is never called and that leaves `to` uninitialised.",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "3ff21940_f68f11b8",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 343,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-29T17:11:24Z",
+      "side": 1,
+      "message": "Also here",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "f1f20121_0fe0b928",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 384,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-29T17:11:24Z",
+      "side": 1,
+      "message": "Also here",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "1c896eca_6fbb23f9",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 449,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-29T17:11:24Z",
+      "side": 1,
+      "message": "Same comment about initialising here",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "7a50eff9_3bc5dc2b",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1099,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-29T17:11:24Z",
+      "side": 1,
+      "message": "Doesn\u0027t this need to be initialised? Or is it only used via the new sca_get_msg_*_header before the code has a chance to \"goto done\" ?",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
         "uuid": "3bef5d98_a52d4f06",
         "filename": "debian/patches/sipwise/sca-line-seize.patch",
         "patchSetId": 4
