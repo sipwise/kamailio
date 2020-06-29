@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "3bef5d98_a52d4f06",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1152,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2020-06-29T16:47:45Z",
+      "side": 1,
+      "message": "@richard the change is here. Define a new struct that has a flag to indicate if the memory has to be freed.",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "925cf698_6f60952e",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1177,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2020-06-29T16:47:45Z",
+      "side": 1,
+      "message": "this function was removed in this patch, forgot to remove it from here.",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "c840de39_960246c4",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 4
+      },
+      "lineNbr": 1178,
+      "author": {
+        "id": 1000002
+      },
+      "writtenOn": "2020-06-29T16:47:45Z",
+      "side": 1,
+      "message": "and the change itself is to use that new struct in the sca_get_msg_from_header and sca_get_msg_to_header functions.",
+      "revId": "2a33ed2bcfaf30c1d09ad5bb6fd1fca54bba4b03",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
