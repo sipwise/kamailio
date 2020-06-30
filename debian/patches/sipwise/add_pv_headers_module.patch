@@ -21,9 +21,15 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/pvh_hdr.h                |   47 +
  src/modules/pv_headers/pvh_str.c                |  146 +++
  src/modules/pv_headers/pvh_str.h                |   40 +
+<<<<<<< HEAD   (366b63 TT#84599 pua_dialoginfo use lock when necessary)
  src/modules/pv_headers/pvh_xavp.c               | 1133 +++++++++++++++++++++++
  src/modules/pv_headers/pvh_xavp.h               |   66 ++
  20 files changed, 3707 insertions(+), 1 deletion(-)
+=======
+ src/modules/pv_headers/pvh_xavp.c               | 1158 +++++++++++++++++++++++
+ src/modules/pv_headers/pvh_xavp.h               |   62 ++
+ 20 files changed, 3757 insertions(+), 1 deletion(-)
+>>>>>>> CHANGE (bf598c TT#84599 pv_headers: fix coredump when no more shm is left)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -2672,10 +2678,18 @@ index 0000000..10aa216
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
 new file mode 100644
+<<<<<<< HEAD   (366b63 TT#84599 pua_dialoginfo use lock when necessary)
 index 0000000..0cfd969
+=======
+index 0000000..4cc5a7e
+>>>>>>> CHANGE (bf598c TT#84599 pv_headers: fix coredump when no more shm is left)
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
+<<<<<<< HEAD   (366b63 TT#84599 pua_dialoginfo use lock when necessary)
 @@ -0,0 +1,1133 @@
+=======
+@@ -0,0 +1,1158 @@
+>>>>>>> CHANGE (bf598c TT#84599 pv_headers: fix coredump when no more shm is left)
 +/*
 + * pv_headers
 + *
@@ -3284,7 +3298,24 @@ index 0000000..0cfd969
 +		return -1;
 +	}
 +
+<<<<<<< HEAD   (366b63 TT#84599 pua_dialoginfo use lock when necessary)
 +	if((xavp = pvh_xavp_get_child(msg, &xavp_name, &hname)) == NULL)
+=======
++	/* get the index */
++	if(pv_get_spec_index(msg, param, &idx, &idxf)!=0)
++	{
++		LM_ERR("invalid index\n");
++		return -1;
++	}
++
++	if((xavi = pvh_get_xavi(msg, &xavi_name) == NULL)) {
++		LM_ERR("xavi %.*s not found\n", xavi_name.len, xavi_name.s);
++		return -1;
++	}
++	avi = xavi->val.v.xavp;
++	hname_cnt = xavi_count(hname, &avi);
++	if(hname_cnt == 0) {
+>>>>>>> CHANGE (bf598c TT#84599 pv_headers: fix coredump when no more shm is left)
 +		idx = 0;
 +	else if(idx < 0)
 +		idx = idx + xavp_count(&hname, &xavp);
