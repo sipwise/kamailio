@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9fd1a01e_d9eab7e7",
+        "filename": "debian/patches/sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch",
+        "patchSetId": 1
+      },
+      "lineNbr": 18,
+      "author": {
+        "id": 1000008
+      },
+      "writtenOn": "2020-06-30T13:10:55Z",
+      "side": 1,
+      "message": "Don\u0027t think this is enough. You need to obtain the lock even if just accessing/reading the list, not just when modifying it. One thread could be modifying the list with the lock held while another one was reading it without a lock held.",
+      "revId": "e4052ee75bbb6a3b1739e3c8dd458d04d429bdb2",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": true
+    }
+  ]
+}
