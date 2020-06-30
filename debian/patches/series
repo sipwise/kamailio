@@ -73,6 +73,12 @@ upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
 ### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+<<<<<<< HEAD   (3ee6c3 Release new version 5.3.4-1+0~mr8.4.2.0)
+=======
+sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
+### active development
+sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
+>>>>>>> CHANGE (63132f TT#84599 pua_dialoginfo use lock when necessary)
 #
 sipwise/ndb_redis-fix-return-redis_cmd-function.patch
 ### Don't just put stuff in any order
