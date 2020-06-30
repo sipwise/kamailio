@@ -21,9 +21,9 @@ Subject: add_pv_headers_module
  src/modules/pv_headers/pvh_hdr.h                |   47 +
  src/modules/pv_headers/pvh_str.c                |  146 +++
  src/modules/pv_headers/pvh_str.h                |   40 +
- src/modules/pv_headers/pvh_xavp.c               | 1155 +++++++++++++++++++++++
+ src/modules/pv_headers/pvh_xavp.c               | 1158 +++++++++++++++++++++++
  src/modules/pv_headers/pvh_xavp.h               |   62 ++
- 20 files changed, 3754 insertions(+), 1 deletion(-)
+ 20 files changed, 3757 insertions(+), 1 deletion(-)
  create mode 100644 src/modules/pv_headers/Makefile
  create mode 100644 src/modules/pv_headers/README
  create mode 100644 src/modules/pv_headers/doc/Makefile
@@ -2701,10 +2701,10 @@ index 0000000..10aa216
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
 new file mode 100644
-index 0000000..03bcaf1
+index 0000000..4cc5a7e
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
-@@ -0,0 +1,1155 @@
+@@ -0,0 +1,1158 @@
 +/*
 + * pv_headers
 + *
@@ -3310,7 +3310,10 @@ index 0000000..03bcaf1
 +		return -1;
 +	}
 +
-+	xavi = pvh_get_xavi(msg, &xavi_name);
++	if((xavi = pvh_get_xavi(msg, &xavi_name) == NULL)) {
++		LM_ERR("xavi %.*s not found\n", xavi_name.len, xavi_name.s);
++		return -1;
++	}
 +	avi = xavi->val.v.xavp;
 +	hname_cnt = xavi_count(hname, &avi);
 +	if(hname_cnt == 0) {
