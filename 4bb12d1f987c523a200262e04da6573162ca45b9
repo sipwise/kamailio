@@ -1,0 +1,101 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e553fd96_a3a62530",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 229,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2020-06-30T17:06:04Z",
+      "side": 1,
+      "message": "nit: I\u0027m not sure what\u0027s the coding style in kamailio for this, but in general I tend to prefer to use the variable instead of repeating its type, because than there\u0027s never the possibility of getting that out-of-sync in case the type changes, so something like «memset(\u0026from, 0, sizeof(from));». Of course there are always ways to mess that up by our future-selves but... :)",
+      "range": {
+        "startLine": 229,
+        "startChar": 19,
+        "endLine": 229,
+        "endChar": 40
+      },
+      "revId": "4bb12d1f987c523a200262e04da6573162ca45b9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "0fc09ce0_b47660f5",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 290,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2020-06-30T17:06:04Z",
+      "side": 1,
+      "message": "Is there no function to do this? Or perhaps would be nice to refactor this into one?",
+      "range": {
+        "startLine": 288,
+        "startChar": 1,
+        "endLine": 290,
+        "endChar": 3
+      },
+      "revId": "4bb12d1f987c523a200262e04da6573162ca45b9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "22aaca7c_07c95ce1",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 563,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2020-06-30T17:06:04Z",
+      "side": 1,
+      "message": "nit: The nesting level could be reduced here by folding the if with the preceding else: } else if(...) {",
+      "revId": "4bb12d1f987c523a200262e04da6573162ca45b9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "5afcd0d8_dfb4de8b",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 704,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2020-06-30T17:06:04Z",
+      "side": 1,
+      "message": "nit: Move the int rc before the blank line split?",
+      "revId": "4bb12d1f987c523a200262e04da6573162ca45b9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "488efada_1380cb53",
+        "filename": "debian/patches/sipwise/sca-line-seize.patch",
+        "patchSetId": 6
+      },
+      "lineNbr": 796,
+      "author": {
+        "id": 1000016
+      },
+      "writtenOn": "2020-06-30T17:06:04Z",
+      "side": 1,
+      "message": "Maybe swap the logic here, otherwise we\u0027d need to always recall to set rc \u003d 1 whenever doing a goto done (if any is added in the future. So perhaps set default rc \u003d 1, and then after the error: label, set rc \u003d -1 ?",
+      "revId": "4bb12d1f987c523a200262e04da6573162ca45b9",
+      "serverId": "85315e57-5f03-49c3-83f8-201ae2313a75",
+      "unresolved": false
+    }
+  ]
+}
