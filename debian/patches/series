@@ -73,6 +73,7 @@ upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
 ### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 #
 sipwise/ndb_redis-fix-return-redis_cmd-function.patch
 ### Don't just put stuff in any order
