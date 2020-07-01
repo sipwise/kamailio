@@ -2701,7 +2701,7 @@ index 0000000..10aa216
 \ No newline at end of file
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
 new file mode 100644
-index 0000000..4cc5a7e
+index 0000000..6aaa8ca
 --- /dev/null
 +++ b/src/modules/pv_headers/pvh_xavp.c
 @@ -0,0 +1,1158 @@
@@ -3310,7 +3310,7 @@ index 0000000..4cc5a7e
 +		return -1;
 +	}
 +
-+	if((xavi = pvh_get_xavi(msg, &xavi_name) == NULL)) {
++	if((xavi = pvh_get_xavi(msg, &xavi_name)) == NULL) {
 +		LM_ERR("xavi %.*s not found\n", xavi_name.len, xavi_name.s);
 +		return -1;
 +	}
