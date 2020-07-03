@@ -73,11 +73,7 @@ upstream/tm_add_proportional_load_contacts_by_q_value.patch
 upstream/avpops-add-avp_subst_pv-documentation.patch
 upstream/avpops-add-avp_subst_pv.patch
 ### relevant for upstream
-sipwise/fix_error_in_cfgt_module.patch
-sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
-sipwise/rtpengine-flags-for-everything.patch
-##
-sipwise/pv_headers-full-rework.patch
+sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
