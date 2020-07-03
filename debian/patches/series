@@ -73,6 +73,11 @@ upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
 ### active development
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+<<<<<<< HEAD   (d265d1 Release new version 5.3.4-1+0~mr8.4.1.1)
+=======
+sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
+sipwise/fix-db-redis-key-expiry.patch
+>>>>>>> CHANGE (8dfe76 TT#84862 fix Redis key expiry)
 #
 sipwise/ndb_redis-fix-return-redis_cmd-function.patch
 ### Don't just put stuff in any order
