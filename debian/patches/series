@@ -98,3 +98,4 @@ sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/fix-db-redis-key-expiry.patch
