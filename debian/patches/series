@@ -78,6 +78,7 @@ sipwise/pv_headers-store-To-info-in-xavp_parsed_name.r-on-re.patch
 sipwise/rtpengine-flags-for-everything.patch
 ##
 sipwise/pv_headers-full-rework.patch
+sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
