@@ -1,0 +1,18 @@
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -1747,6 +1747,7 @@
+             LM_DBG("row matches manual filtering, proceed with deletion\n");
+         }
+ 
++      skipkeys:
+         db_keys = (db_key_t*) pkg_malloc(all_type_keys_count * sizeof(db_key_t));
+         if (!db_keys) {
+             LM_ERR("Failed to allocate memory for db type keys\n");
+@@ -1785,7 +1786,6 @@
+         db_vals = NULL;
+         db_redis_free_reply(&reply);
+ 
+-      skipkeys:
+         if (db_redis_key_add_string(&query_v, "DEL", 3) != 0) {
+             LM_ERR("Failed to add del command to delete query\n");
+             goto error;
