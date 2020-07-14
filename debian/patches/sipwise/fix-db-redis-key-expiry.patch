@@ -21,3 +21,11 @@
          if (db_redis_key_add_string(&query_v, "DEL", 3) != 0) {
              LM_ERR("Failed to add del command to delete query\n");
              goto error;
+@@ -2645,6 +2638,7 @@
+     } else {
+         LM_DBG("no columns given to build query keys, falling back to full table scan\n");
+         keys_count = 0;
++        do_table_scan = 1;
+     }
+ 
+     if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,
