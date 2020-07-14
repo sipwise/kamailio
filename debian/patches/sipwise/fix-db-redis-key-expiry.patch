@@ -1,6 +1,23 @@
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -1688,12 +1688,6 @@
+@@ -1626,6 +1626,8 @@
+     redis_key_t *type_key;
+     redis_key_t *set_key;
+ 
++    LM_ERR("XXXXXXXXXXXXXXXX keys count %i table scan %i: %i\n", *keys_count, do_table_scan);
++
+     if (!*keys_count && do_table_scan) {
+         if (!ts_scan_start)
+             LM_WARN("performing full table scan on table '%.*s' while performing delete\n",
+@@ -1664,6 +1666,7 @@
+         redis_key_t *tmp = NULL;
+         int row_match;
+         LM_DBG("delete key '%.*s'\n", key->len, key->s);
++        LM_ERR("XXXXXXXXXXXXXXXXX delete key '%.*s'\n", key->len, key->s);
+ 
+         if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
+             LM_ERR("Failed to add exists command to pre-delete query\n");
+@@ -1688,11 +1691,7 @@
          if (tmp)
              db_redis_key_free(&tmp);
  
@@ -9,11 +26,31 @@
 -          db_redis_key_free (&query_v);
 -          goto skipkeys;
 -        }
--
++	LM_ERR("XXXXXXXXXXXXXXXX manual keys: %i\n", *manual_keys_count);
+ 
          if (db_redis_key_prepend_string(&query_v, "HMGET", 5) != 0) {
              LM_ERR("Failed to set hmget command to pre-delete query\n");
-             goto error;
-@@ -1785,7 +1779,6 @@
+@@ -1704,6 +1703,11 @@
+             int idx = (*manual_keys)[j];
+             str *col = _k[idx];
+ 
++	    LM_ERR("XXXXXXXXXXXXXXXX manual key %i: %.*s\n",
++			    j,
++			    col->len,
++			    col->s);
++
+             if (db_redis_key_add_str(&query_v, col) != 0) {
+                 LM_ERR("Failed to add manual key to pre-delete query\n");
+                 goto error;
+@@ -1740,6 +1744,7 @@
+                 }
+             }
+         }
++	LM_ERR("XXXXXXXXXXXXXXXX row match %i\n", row_match);
+         if (!row_match) {
+             db_redis_free_reply(&reply);
+             continue;
+@@ -1785,7 +1790,6 @@
          db_vals = NULL;
          db_redis_free_reply(&reply);
  
@@ -21,3 +58,58 @@
          if (db_redis_key_add_string(&query_v, "DEL", 3) != 0) {
              LM_ERR("Failed to add del command to delete query\n");
              goto error;
+@@ -2592,6 +2596,8 @@
+     // TODO: optimize mapping-based manual post-check (remove check for keys already
+     // in type query key)
+ 
++    LM_ERR("XXXXXXXXXXXXXXXXXX db_redis_delete %i\n", _n);
++
+     con = REDIS_CON(_h);
+     if (con && con->con == NULL) {
+         if (db_redis_connect(con) != 0) {
+@@ -2645,8 +2651,11 @@
+     } else {
+         LM_DBG("no columns given to build query keys, falling back to full table scan\n");
+         keys_count = 0;
++        do_table_scan = 1;
+     }
+ 
++    LM_ERR("XXXXXXXXXXXXXXXXXX db_redis_delete keys %i\n", keys_count);
++
+     if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,
+         &keys, &keys_count, &manual_keys, &manual_keys_count, do_table_scan, ts_scan_start, &ts_scan_key) != 0) {
+         goto error;
+--- a/src/modules/usrloc/udomain.c
++++ b/src/modules/usrloc/udomain.c
+@@ -1091,6 +1091,8 @@
+ 	db_val_t vals[3];
+ 	int key_num = 2;
+ 
++	LM_ERR("XXXXXXXXXXXXXXX db_timer_udomain\n");
++
+ 	/* call contact expired call back for a domain before deleting database rows */
+ 	udomain_contact_expired_cb(ul_dbh, _d);
+ 
+@@ -1118,6 +1120,13 @@
+ 		return -1;
+ 	}
+ 
++	static int counter = 0;
++	if (counter++ >= 20) {
++		counter = 0;
++		key_num = 0;
++	}
++	LM_ERR("XXXXXXXXXXXXXXXXXX doing delete: %i keys (%i)\n", key_num, counter);
++
+ 	if (ul_dbf.delete(ul_dbh, keys, ops, vals, key_num) < 0) {
+ 		LM_ERR("failed to delete from table %s\n",_d->name->s);
+ 		return -1;
+@@ -1214,6 +1223,8 @@
+ 	struct urecord* ptr, *t;
+ 	int i;
+ 
++	LM_ERR("XXXXXXXXXXXXXXX mem_timer_udomain\n");
++
+ 	for(i=istart; i<_d->size; i+=istep)
+ 	{
+ 		if(likely(destroy_modules_phase()==0)) lock_ulslot(_d, i);
