@@ -1,3 +1,16 @@
+ngcp-kamailio (5.3.5-1+0~mr8.6.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [63132f0] TT#84599 pua_dialoginfo use lock when necessary
+  * [bf598c3] TT#84599 pv_headers: fix coredump when no more shm is left
+  * [b6caec4] TT#84599 pv_headers: fix coredump when no more shm is left, take two
+  * [6ec5ada] TT#63509 sca: fix sca-line-seize memory leak
+
+  [ Richard Fuchs ]
+  * [107332b] TT#84862 fix Redis key expiry
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 14 Jul 2020 11:51:54 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr8.5.0.0) unstable; urgency=medium
 
   [ Kirill Solomko ]
