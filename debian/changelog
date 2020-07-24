@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.5-1+0~mr8.5.2.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [6588309] TT#84862 further fix Redis key expiry
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 24 Jul 2020 13:48:25 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr8.5.1.0) unstable; urgency=medium
 
   [ Victor Seva ]
