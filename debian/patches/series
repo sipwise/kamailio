@@ -81,6 +81,7 @@ sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 ### active development
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
+sipwise/pua-revert-6822ff45e931ad3e93b22ebf7d1beb350bf27e70.patch
 sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order

@@ -1,0 +1,67 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 30 Jul 2020 09:29:07 +0200
+Subject: pua: revert 6822ff45e931ad3e93b22ebf7d1beb350bf27e70
+
+* pua_dialoginfo or pua_bla don't set etag when calling
+  send_publish()
+* behavior was different depending on db_mode
+---
+ src/modules/pua/send_publish.c | 36 ++++++++++++++++--------------------
+ 1 file changed, 16 insertions(+), 20 deletions(-)
+
+diff --git a/src/modules/pua/send_publish.c b/src/modules/pua/send_publish.c
+index 1c9d8ed..275cd8a 100644
+--- a/src/modules/pua/send_publish.c
++++ b/src/modules/pua/send_publish.c
+@@ -339,20 +339,18 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
+ 		goto done;
+ 	}
+ 
+-	if (hentity->etag.s) {
+-		if (pua_dbf.affected_rows != NULL || dbmode != PUA_DB_ONLY) {
+-			if (find_and_update_record(hentity, hash_code,
+-						   lexpire, &etag) > 0)
+-				goto done;
+-		}
+-		else if ((db_presentity =
+-			  get_record_puadb(hentity->id, &hentity->etag,
+-					   &dbpres, &res)) != NULL)
+-		{
+-			update_record_puadb(hentity, lexpire, &etag);
++
++	if(pua_dbf.affected_rows != NULL || dbmode != PUA_DB_ONLY) {
++		if (find_and_update_record(hentity, hash_code, lexpire, &etag) > 0)
+ 			goto done;
+-		}
+ 	}
++	else if((db_presentity = get_record_puadb(hentity->id, &hentity->etag,
++				   &dbpres, &res)) != NULL)
++	{
++		update_record_puadb(hentity, lexpire, &etag);
++		goto done;
++	}
++
+ 
+ 	size= sizeof(ua_pres_t)+ sizeof(str)+ 
+ 		(hentity->pres_uri->len+ hentity->tuple_id.len + 
+@@ -516,14 +514,12 @@ int send_publish( publ_info_t* publ )
+ 
+ 	if (dbmode==PUA_DB_ONLY)
+ 	{
+-		if (publ->etag) {
+-			memset(&dbpres, 0, sizeof(dbpres));
+-			dbpres.pres_uri = &pres_uri;
+-			dbpres.watcher_uri = &watcher_uri;
+-			dbpres.extra_headers = &extra_headers;
+-			presentity = get_record_puadb(publ->id, publ->etag,
+-						      &dbpres, &res);
+-		}
++		memset(&dbpres, 0, sizeof(dbpres));
++		dbpres.pres_uri = &pres_uri;
++		dbpres.watcher_uri = &watcher_uri;
++		dbpres.extra_headers = &extra_headers;
++		presentity = get_record_puadb(publ->id, publ->etag, &dbpres, &res);
++
+ 	}
+ 	else
+ 	{
