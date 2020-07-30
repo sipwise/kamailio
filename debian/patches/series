@@ -78,9 +78,10 @@ upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
 #
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 ### active development
-sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
+sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
 sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order
