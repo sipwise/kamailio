@@ -1,0 +1,54 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 31 Jul 2020 15:11:11 +0200
+Subject: pua: update_version_puadb() use pres_id to select record
+
+* call_id/from_tag/to_tag can be "" and then **ALL** records
+  get changed
+---
+ src/modules/pua/pua_db.c | 22 +++++-----------------
+ 1 file changed, 5 insertions(+), 17 deletions(-)
+
+diff --git a/src/modules/pua/pua_db.c b/src/modules/pua/pua_db.c
+index fda1a6c..8b8fb51 100644
+--- a/src/modules/pua/pua_db.c
++++ b/src/modules/pua/pua_db.c
+@@ -1482,11 +1482,11 @@ int update_contact_puadb(ua_pres_t *pres, str *contact)
+ 
+ /******************************************************************************/
+ 
+-int update_version_puadb(ua_pres_t *pres) 
++int update_version_puadb(ua_pres_t *pres)
+ 
+ {
+-	db_key_t q_cols[3], db_cols[1];
+-	db_val_t q_vals[3], db_vals[1];
++	db_key_t q_cols[1], db_cols[1];
++	db_val_t q_vals[1], db_vals[1];
+ 	int n_query_cols= 0, n_update_cols=0;
+ 
+ 	if (pres==NULL)
+@@ -1496,22 +1496,10 @@ int update_version_puadb(ua_pres_t *pres)
+ 	}
+ 
+ 	/* cols and values used for search query */
+-	q_cols[n_query_cols] = &str_call_id_col;	
+-	q_vals[n_query_cols].type = DB1_STR;
+-	q_vals[n_query_cols].nul = 0;
+-	q_vals[n_query_cols].val.str_val = pres->call_id;
+-	n_query_cols++;
+-
+-	q_cols[n_query_cols] = &str_to_tag_col;	
+-	q_vals[n_query_cols].type = DB1_STR;
+-	q_vals[n_query_cols].nul = 0;
+-	q_vals[n_query_cols].val.str_val = pres->to_tag;
+-	n_query_cols++;
+-
+-	q_cols[n_query_cols] = &str_from_tag_col;	
++	q_cols[n_query_cols] = &str_pres_id_col;
+ 	q_vals[n_query_cols].type = DB1_STR;
+ 	q_vals[n_query_cols].nul = 0;
+-	q_vals[n_query_cols].val.str_val = pres->from_tag;
++	q_vals[n_query_cols].val.str_val = pres->id;
+ 	n_query_cols++;
+ 
+ 	/* we overwrite contact even if not changed */
