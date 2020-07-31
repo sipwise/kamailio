@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.5-1+0~mr8.5.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [7f739c1] TT#85550 pua: fix creation of records for every dialog state
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 31 Jul 2020 10:50:03 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr8.5.1.1) unstable; urgency=medium
 
   [ Richard Fuchs ]
