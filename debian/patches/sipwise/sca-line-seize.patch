@@ -11,9 +11,9 @@ Subject: sca-line-seize
  src/modules/sca/sca_dialog.h     |   2 +-
  src/modules/sca/sca_subscribe.c  |  96 ++++++++++++--------
  src/modules/sca/sca_subscribe.h  |   6 +-
- src/modules/sca/sca_util.c       | 177 ++++++++++++++++++++++--------------
+ src/modules/sca/sca_util.c       | 180 +++++++++++++++++++++++--------------
  src/modules/sca/sca_util.h       |  18 +++-
- 10 files changed, 406 insertions(+), 202 deletions(-)
+ 10 files changed, 410 insertions(+), 201 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
 index 07dac39..c2347bb 100644
@@ -917,10 +917,10 @@ index e27883e..44f93b7 100644
  
  #endif // SCA_SUBSCRIBE_H
 diff --git a/src/modules/sca/sca_util.c b/src/modules/sca/sca_util.c
-index 4ab4c6f..a102af4 100644
+index 4ab4c6f..685cf8d 100644
 --- a/src/modules/sca/sca_util.c
 +++ b/src/modules/sca/sca_util.c
-@@ -112,94 +112,129 @@ int sca_get_msg_cseq_method(sip_msg_t *msg)
+@@ -112,94 +112,134 @@ int sca_get_msg_cseq_method(sip_msg_t *msg)
  	return (get_cseq(msg)->method_id);
  }
  
@@ -942,11 +942,6 @@ index 4ab4c6f..a102af4 100644
 -	if(parse_from_header(msg) < 0) {
 -		LM_ERR("Bad From header\n");
 -		return (-1);
--	}
--	f = get_from(msg);
--	if(SCA_STR_EMPTY(&f->tag_value)) {
--		LM_ERR("Bad From header: no tag parameter\n");
--		return (-1);
 +	if(avp.s.len > 0) {
 +		_avp = search_first_avp(avp_type, avp, &val, 0);
 +		if(_avp) {
@@ -955,6 +950,9 @@ index 4ab4c6f..a102af4 100644
 +			return 0;
 +		}
  	}
+-	f = get_from(msg);
+-	if(SCA_STR_EMPTY(&f->tag_value)) {
+-		LM_ERR("Bad From header: no tag parameter\n");
 +	return -1;
 +}
 +
@@ -965,13 +963,19 @@ index 4ab4c6f..a102af4 100644
 +{
 +	assert(body != NULL);
 +	assert(uri != NULL);
- 
--	// ensure the URI is parsed for future use
--	if(parse_uri(f->uri.s, f->uri.len, GET_FROM_PURI(msg)) < 0) {
--		LM_ERR("Failed to parse From URI %.*s\n", STR_FMT(&f->uri));
++
 +	parse_to(uri->s, uri->s + uri->len + 1, body);
 +	if(body->error != PARSE_OK) {
 +		LM_ERR("Bad uri value[%.*s]\n", STR_FMT(uri));
+ 		return (-1);
+ 	}
+-
+-	// ensure the URI is parsed for future use
+-	if(parse_uri(f->uri.s, f->uri.len, GET_FROM_PURI(msg)) < 0) {
+-		LM_ERR("Failed to parse From URI %.*s\n", STR_FMT(&f->uri));
++	/* ensure the URI is parsed for future use */
++	if(parse_uri(body->uri.s, body->uri.len, &body->parsed_uri) < 0) {
++		LM_ERR("Failed to parse URI %.*s", STR_FMT(&body->uri));
  		return (-1);
  	}
 -
@@ -1114,7 +1118,7 @@ index 4ab4c6f..a102af4 100644
  	return (0);
  }
  
-@@ -354,7 +389,7 @@ int sca_aor_create_from_info(
+@@ -354,7 +394,7 @@ int sca_aor_create_from_info(
  
  int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
  {
@@ -1123,7 +1127,7 @@ index 4ab4c6f..a102af4 100644
  	sip_uri_t c_uri;
  	str tf_aor = STR_NULL;
  	str contact_uri = STR_NULL;
-@@ -364,6 +399,7 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
+@@ -364,6 +404,7 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
  	assert(c_aor != NULL);
  
  	memset(c_aor, 0, sizeof(str));
@@ -1131,7 +1135,7 @@ index 4ab4c6f..a102af4 100644
  
  	if((ua_opts & SCA_AOR_TYPE_AUTO)) {
  		if(msg->first_line.type == SIP_REQUEST) {
-@@ -385,10 +421,10 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
+@@ -385,10 +426,10 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
  		}
  	}
  
@@ -1144,7 +1148,7 @@ index 4ab4c6f..a102af4 100644
  		goto done;
  	}
  
-@@ -410,7 +446,7 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
+@@ -410,7 +451,7 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
  	}
  
  	if(SCA_STR_EMPTY(&c_uri.user)
@@ -1153,7 +1157,7 @@ index 4ab4c6f..a102af4 100644
  		// empty contact header or Contact user matches To/From AoR
  		c_aor->s = (char *)pkg_malloc(tf_aor.len);
  		c_aor->len = tf_aor.len;
-@@ -418,7 +454,7 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
+@@ -418,7 +459,7 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
  	} else {
  		// Contact user and To/From user mismatch
  		if(sca_aor_create_from_info(c_aor, c_uri.type, &c_uri.user,
@@ -1162,7 +1166,7 @@ index 4ab4c6f..a102af4 100644
  				< 0) {
  			LM_ERR("sca_create_canonical_aor: failed to create AoR from "
  				   "Contact <%.*s> and URI <%.*s>\n",
-@@ -430,6 +466,9 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
+@@ -430,6 +471,9 @@ int sca_create_canonical_aor_for_ua(sip_msg_t *msg, str *c_aor, int ua_opts)
  	rc = 1;
  
  done:
