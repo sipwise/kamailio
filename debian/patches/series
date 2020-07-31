@@ -82,6 +82,7 @@ sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 ### active development
 sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
+sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
 sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order
