@@ -1,3 +1,13 @@
+ngcp-kamailio (5.3.4-1+0~mr8.4.2.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [366b639] TT#84599 pua_dialoginfo use lock when necessary
+
+  [ Richard Fuchs ]
+  * [7a760a7] TT#84862 fix Redis key expiry
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 25 Aug 2020 16:48:43 +0200
+
 ngcp-kamailio (5.3.4-1+0~mr8.4.2.0) unstable; urgency=medium
 
   * New release.
