@@ -1,3 +1,12 @@
+ngcp-kamailio (5.3.5-1+0~mr9.1.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [bd1cdb6] TT#85550 pua: fix creation of records for every dialog state
+  * [ca0de3a] TT#85550 pua: update_version_puadb() use pres_id to select record
+  * [e695a22] TT#71906 sca: fix sca_parse_uri()
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 31 Aug 2020 21:53:35 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr9.0.0.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
