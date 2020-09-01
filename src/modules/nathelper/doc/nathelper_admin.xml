@@ -842,7 +842,7 @@ if(is_rfc1918("$rd")) {
 
 	<section id="nathelper.set_contact_alias">
 		<title>
-		<function moreinfo="none">set_contact_alias()</function>
+		<function moreinfo="none">set_contact_alias([trim])</function>
 		</title>
 		<para>
 		Adds an <quote>;alias=ip~port~transport</quote> parameter to the
@@ -850,6 +850,16 @@ if(is_rfc1918("$rd")) {
 		The new contact URI is immediately visible to other modules in the
 		way the <function>fix_nated_contact()</function> does it.
 		</para>
+		<para>Meaning of parameters:</para>
+		<itemizedlist>
+			<listitem>
+				<para>
+					<emphasis>trim</emphasis> - by default, set_contact_alias() will not detect and trim an
+					already existing alias parameter. If this optional parameter is set to "1", set_contact_alias()
+					will trim the existing alias before adding a new one.
+				</para>
+			</listitem>
+		</itemizedlist>
 		<para>
 		This function can be used from
 		REQUEST_ROUTE, ONREPLY_ROUTE, BRANCH_ROUTE, and FAILURE_ROUTE.
@@ -865,6 +875,27 @@ if(is_rfc1918("$rd")) {
             exit;
         };
     };
+...
+		</programlisting>
+		</example>
+	</section>
+		<section id="nathelper.set_alias_to_pv">
+		<title>
+		<function moreinfo="none">set_alias_to_pv(target_avp)</function>
+		</title>
+		<para>
+		Reads <quote>;alias=ip~port~transport</quote> from Contact header then
+		writes to target pseudo-variable as a sip uri.
+		</para>
+		<para>
+		This function can be used from
+		REQUEST_ROUTE, ONREPLY_ROUTE, BRANCH_ROUTE, and FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>set_alias_to_pv</function> usage</title>
+		<programlisting format="linespecific">
+...
+		set_alias_to_pv("$avp(aliasuri)");
 ...
 		</programlisting>
 		</example>

@@ -28,7 +28,6 @@ MODULE_VERSION
 struct dlg_binds* dlgb_p;
 
 /* parameters */
-char* ro_destination_host_s = "hss.ims.smilecoms.com";
 char* ro_service_context_id_root_s = "32260@3gpp.org";
 char* ro_service_context_id_ext_s = "ext";
 char* ro_service_context_id_mnc_s = "01";
@@ -62,11 +61,14 @@ char *domain = "location";
 client_ro_cfg cfg = { str_init(""),
     str_init(""),
     str_init(""),
+    str_init(""),
     0
 };
 
 static str custom_user_spec = {NULL, 0};
+static str app_provided_party_spec = {NULL, 0};
 pv_spec_t custom_user_avp;
+pv_spec_t app_provided_party_avp;
 
 extern struct ims_charging_counters_h ims_charging_cnts_h;
 struct cdp_binds cdpb;
@@ -122,7 +124,7 @@ static param_export_t params[] = {
 		{ "origin_host", 			PARAM_STR, 			&cfg.origin_host 			},
 		{ "origin_realm", 			PARAM_STR,			&cfg.origin_realm 			},
 		{ "destination_realm", 		PARAM_STR,			&cfg.destination_realm 	},
-		{ "destination_host", 		PARAM_STRING,			&ro_destination_host_s 		}, /* Unused parameter? */
+		{ "destination_host", 		PARAM_STR,			&cfg.destination_host 		},
 		{ "service_context_id_root",PARAM_STRING,			&ro_service_context_id_root_s 	},
 		{ "service_context_id_ext", PARAM_STRING,			&ro_service_context_id_ext_s 	},
 		{ "service_context_id_mnc", PARAM_STRING,			&ro_service_context_id_mnc_s 	},
@@ -133,11 +135,12 @@ static param_export_t params[] = {
 		{ "video_service_identifier", 	INT_PARAM, 			&video_service_identifier },/*service id for voice*/
 		{ "video_rating_group", 	INT_PARAM, 			&video_rating_group },/*rating group for voice*/
 		{ "db_mode",			INT_PARAM,			&ro_db_mode_param		},
-		{ "db_url",			PARAM_STRING,			&db_url 			},
+		{ "db_url",			PARAM_STR,			&db_url 			},
 		{ "db_update_period",		INT_PARAM,			&db_update_period		},
 		{ "vendor_specific_chargeinfo",		INT_PARAM,	&vendor_specific_chargeinfo		}, /* VSI for extra charing info in Ro */
 		{ "vendor_specific_id",		INT_PARAM,			&vendor_specific_id		}, /* VSI for extra charing info in Ro */
 		{ "custom_user_avp",		PARAM_STR,			&custom_user_spec},
+		{ "app_provided_party_avp",	PARAM_STR,			&app_provided_party_spec},
 		{ 0, 0, 0 }
 };
 
@@ -188,7 +191,19 @@ int fix_parameters() {
 		}
 	}
 
+	if (app_provided_party_spec.s) {
+		if (pv_parse_spec(&app_provided_party_spec, &app_provided_party_avp) == 0
+				&& (app_provided_party_avp.type != PVT_AVP)) {
+			LM_ERR("malformed or non AVP app_provided_party "
+					"AVP definition in '%.*s'\n",
+					app_provided_party_spec.len,
+					app_provided_party_spec.s);
+			return -1;
+		}
+	}
+
 	init_custom_user(custom_user_spec.s ? &custom_user_avp : 0);
+	init_app_provided_party(app_provided_party_spec.s ? &app_provided_party_avp : 0);
 
 	return 1;
 }

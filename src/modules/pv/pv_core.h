@@ -49,6 +49,9 @@ int pv_get_methodid(struct sip_msg *msg, pv_param_t *param,
 int pv_get_msgtype(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
+int pv_get_msgtypes(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
 int pv_get_status(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
@@ -175,6 +178,9 @@ int pv_get_rcvadv_uri_full(struct sip_msg *msg, pv_param_t *param,
 int pv_get_force_sock(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
+int pv_get_force_sock_name(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
 int pv_get_useragent(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
@@ -293,6 +299,9 @@ int pv_set_branch(struct sip_msg* msg, pv_param_t *param,
 		int op, pv_value_t *val);
 
 int pv_set_force_sock(struct sip_msg* msg, pv_param_t *param,
+		int op, pv_value_t *val);
+
+int pv_set_force_sock_name(struct sip_msg* msg, pv_param_t *param,
 		int op, pv_value_t *val);
 
 int pv_set_mflags(struct sip_msg* msg, pv_param_t *param,

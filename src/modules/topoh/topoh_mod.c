@@ -186,7 +186,7 @@ static int mod_init(void)
 	th_via_prefix.s = (char*)pkg_malloc(th_via_prefix.len+1);
 	if(th_via_prefix.s==NULL)
 	{
-		LM_ERR("via prefix parameter is invalid\n");
+		PKG_MEM_ERROR_FMT("via prefix parameter\n");
 		goto error;
 	}
 	/* 'sip:' + ip + ';' + param + '=' + prefix (+ '\0') */
@@ -195,7 +195,7 @@ static int mod_init(void)
 	th_uri_prefix.s = (char*)pkg_malloc(th_uri_prefix.len+1);
 	if(th_uri_prefix.s==NULL)
 	{
-		LM_ERR("uri prefix parameter is invalid\n");
+		PKG_MEM_ERROR_FMT("uri prefix parameter\n");
 		goto error;
 	}
 	/* build via prefix */
@@ -421,10 +421,6 @@ int th_msg_sent(sr_event_param_t *evp)
 
 	obuf = (str*)evp->data;
 
-	if(th_execute_event_route(NULL, evp)==1) {
-		return 0;
-	}
-
 	memset(&msg, 0, sizeof(sip_msg_t));
 	msg.buf = obuf->s;
 	msg.len = obuf->len;
@@ -442,6 +438,11 @@ int th_msg_sent(sr_event_param_t *evp)
 	if(th_cookie_value.s[0]!='x') {
 		th_del_cookie(&msg);
 	}
+
+	if(th_execute_event_route(&msg, evp)==1) {
+		goto done;
+	}
+
 	if(msg.first_line.type==SIP_REQUEST) {
 		direction = (th_cookie_value.s[0]=='u')?1:0; /* upstream/downstram */
 		dialog = (get_to(&msg)->tag_value.len>0)?1:0;

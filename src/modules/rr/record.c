@@ -13,8 +13,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
@@ -70,9 +70,10 @@
 #define RR_PARAM_BUF_SIZE 512 /*!< buffer for RR parameter */
 
 extern int rr_ignore_sips;
+extern int rr_sockname_mode;
 
 /*!
- * \brief RR param buffer 
+ * \brief RR param buffer
  * \note used for storing RR param which are added before RR insertion
  */
 static char rr_param_buf_ptr[RR_PARAM_BUF_SIZE];
@@ -140,7 +141,7 @@ static inline int get_username(struct sip_msg* _m, str* _user)
 	/* no username in original uri -- hmm; maybe it is a uri
 	 * with just host address and username is in a preloaded route,
 	 * which is now no rewritten r-uri (assumed rewriteFromRoute
-	 * was called somewhere in script's beginning) 
+	 * was called somewhere in script's beginning)
 	 */
 	if (!puri.user.len && _m->new_uri.s) {
 		if (parse_uri(_m->new_uri.s, _m->new_uri.len, &puri) < 0) {
@@ -207,6 +208,7 @@ static inline int build_rr(struct lump* _l, struct lump* _l2, str* user,
 	char *p;
 	char *rr_prefix;
 	int rr_prefix_len;
+	int rr_lump_type;
 
 	if(_sips==0) {
 		rr_prefix = RR_PREFIX_SIP;
@@ -238,13 +240,13 @@ static inline int build_rr(struct lump* _l, struct lump* _l2, str* user,
 		if (r2) pkg_free(r2);
 		return -3;
 	}
-	
+
 	memcpy(prefix, rr_prefix, rr_prefix_len);
 	if (user->len) {
 		memcpy(prefix + rr_prefix_len, user->s, user->len);
 #ifdef ENABLE_USER_CHECK
 		/* don't add the ignored user into a RR */
-		if(i_user.len && i_user.len == user->len && 
+		if(i_user.len && i_user.len == user->len &&
 				!strncmp(i_user.s, user->s, i_user.len))
 		{
 			if(prefix[rr_prefix_len]=='x')
@@ -274,14 +276,17 @@ static inline int build_rr(struct lump* _l, struct lump* _l2, str* user,
 		memcpy(p, params->s, params->len);
 		p += params->len;
 	}
-	
+
 	memcpy(term, RR_TERM, RR_TERM_LEN);
 	memcpy(r2, RR_R2, RR_R2_LEN);
 
-	if (!(_l = insert_new_lump_after(_l, prefix, prefix_len, 0))) 
+	if (!(_l = insert_new_lump_after(_l, prefix, prefix_len, 0)))
 		goto lump_err;
 	prefix = 0;
-	_l = insert_subst_lump_after(_l, _inbound?SUBST_RCV_ALL:SUBST_SND_ALL, 0);
+	rr_lump_type = (_inbound)?
+					(rr_sockname_mode?SUBST_RCV_ALL_EX:SUBST_RCV_ALL)
+					:(rr_sockname_mode?SUBST_SND_ALL_EX:SUBST_SND_ALL);
+	_l = insert_subst_lump_after(_l, rr_lump_type, 0);
 	if (_l ==0 )
 		goto lump_err;
 	if (enable_double_rr) {
@@ -308,7 +313,7 @@ static inline int build_rr(struct lump* _l, struct lump* _l2, str* user,
 		goto lump_err;
 	term = 0;
 	return 0;
-	
+
 lump_err:
 	LM_ERR("failed to insert lumps\n");
 	if (prefix) pkg_free(prefix);
@@ -471,6 +476,8 @@ int record_route(struct sip_msg* _m, str *params)
 		goto error;
 	}
 
+	LM_DBG("inserted record route (r2: %d - plen: %d)\n", enable_double_rr,
+			(params)?params->len:0);
 	/* reset the rr_param buffer */
 	rr_param_buf.len = 0;
 	ret = 0;
@@ -541,7 +548,7 @@ int record_route_preset(struct sip_msg* _m, str* _data)
 		}
 		from = get_from(_m);
 	}
-	
+
 	l = anchor_lump(_m, _m->headers->name.s - _m->buf, 0, HDR_RECORDROUTE_T);
 	if (!l) {
 		LM_ERR("failed to create lump anchor\n");
@@ -557,7 +564,7 @@ int record_route_preset(struct sip_msg* _m, str* _data)
 	if (append_fromtag && from->tag_value.len) {
 		hdr_len += RR_FROMTAG_LEN + from->tag_value.len;
 	}
-	
+
 	if (enable_full_lr) {
 		hdr_len += RR_LR_FULL_LEN;
 	} else {
@@ -586,7 +593,7 @@ int record_route_preset(struct sip_msg* _m, str* _data)
 
 	memcpy(p, _data->s, _data->len);
 	p += _data->len;
-	
+
 	if (append_fromtag && from->tag_value.len) {
 		memcpy(p, RR_FROMTAG, RR_FROMTAG_LEN);
 		p += RR_FROMTAG_LEN;
@@ -610,6 +617,7 @@ int record_route_preset(struct sip_msg* _m, str* _data)
 		ret = -5;
 		goto error;
 	}
+	LM_DBG("inserted preset record route\n");
 	ret = 1;
 error:
 	if ((use_ob == 1) || (use_ob == 2))
@@ -657,7 +665,7 @@ static inline int build_advertised_rr(struct lump* _l, struct lump* _l2, str *_d
 	if (tag && tag->len) {
 		suffix_len += RR_FROMTAG_LEN + tag->len;
 	}
-	
+
 	if (enable_full_lr) {
 		suffix_len += RR_LR_FULL_LEN;
 	} else {
@@ -691,7 +699,7 @@ static inline int build_advertised_rr(struct lump* _l, struct lump* _l2, str *_d
 	}
 
 	memcpy(p, _data->s, _data->len);
-	
+
 	p = suffix;
 	if (tag && tag->len) {
 		memcpy(p, RR_FROMTAG, RR_FROMTAG_LEN);
@@ -846,6 +854,7 @@ int record_route_advertised_address(struct sip_msg* _m, str* _data)
 		ret = -7;
 		goto error;
 	}
+	LM_DBG("inserted advertised address record route\n");
 	ret = 1;
 error:
 	if ((use_ob == 1) || (use_ob == 2))
@@ -869,7 +878,7 @@ static struct lump *get_rr_param_lump( struct lump** root)
 	for( crt=*root ; crt && !last ; crt=crt->next,(*root)=crt ) {
 		/* check on before list */
 		for( r=crt->before ; r ; r=r->before ) {
-			/* we are looking for the lump that adds the 
+			/* we are looking for the lump that adds the
 			 * suffix of the RR header */
 			if ( r->type==HDR_RECORDROUTE_T && r->op==LUMP_ADD)
 				last = r;

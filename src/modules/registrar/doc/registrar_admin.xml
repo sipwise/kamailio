@@ -201,9 +201,10 @@ modparam("registrar", "expires_range", 30) # expires within [0.7*expires .. expi
 	<section id="registrar.p.min_expires">
 		<title><varname>min_expires</varname> (integer)</title>
 		<para>
-		The minimum expires value of a <quote>Contact</quote>. Values lower than this 
-		minimum will be automatically set to the minimum. Value 0 disables 
-		the checking. This parameter can be modified via the &kamailio; config framework.
+		The minimum expires value of a <quote>Contact</quote>. Values lower than this
+		minimum will be either set to the minimum or 423 response is sent back.
+		Value 0 disables the checking. This parameter can be modified via the
+		&kamailio; config framework.
 		</para>
 		<para>
 		<emphasis>
@@ -219,6 +220,29 @@ modparam("registrar", "min_expires", 60)
 </programlisting>
 		</example>
 	</section>
+
+	<section id="registrar.p.min_expires_mode">
+		<title><varname>min_expires_mode</varname> (integer)</title>
+		<para>
+		Control what to do when expires value in REGISTER request is lower than
+		min_expires parameter. If set to 0, expires is set to min_expires. If
+		set to 1, then 423 Interval Too Brief is sent back.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>min_expires_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "min_expires_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="registrar.p.max_expires">
 		<title><varname>max_expires</varname> (integer)</title>
 		<para>
@@ -771,6 +795,11 @@ request_route {
 				<emphasis>received</emphasis> - the record's received value.
 			</para>
 		</listitem>
+		<listitem>
+			<para>
+				<emphasis>path</emphasis> - the record's path value.
+			</para>
+		</listitem>
 		</itemizedlist>
 		<para>
 			For example. if this parameter is set to 'ulrcd', then values are set in:
@@ -785,6 +814,9 @@ request_route {
 		<listitem>
 			<para><emphasis>$xavp(ulrcd[0]=&gt;received)</emphasis></para>
 		</listitem>
+		<listitem>
+			<para><emphasis>$xavp(ulrcd[0]=&gt;path)</emphasis></para>
+		</listitem>
 		</itemizedlist>
 		<para>
 		<emphasis>
@@ -796,6 +828,37 @@ request_route {
 		<programlisting format="linespecific">
 ...
 modparam("registrar", "xavp_rcd", "ulrcd")
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section id="registrar.p.xavp_rcd_mask">
+		<title><varname>xavp_rcd_mask</varname> (int)</title>
+		<para>
+			Defines what values to skip when xavp_rcd is stored.
+		</para>
+		<itemizedlist>
+		<listitem><para>1 - <emphasis>ruid</emphasis></para></listitem>
+		<listitem><para>2 - <emphasis>contact</emphasis></para></listitem>
+		<listitem><para>4 - <emphasis>expires</emphasis></para></listitem>
+		<listitem><para>8 - <emphasis>received</emphasis></para></listitem>
+		<listitem><para>16 - <emphasis>path</emphasis></para></listitem>
+		</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is 0 (none).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xavp_rcd_mask</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+# skip path value
+modparam("registrar", "xavp_rcd_mask", 16)
+...
+# skip path and expires values
+modparam("registrar", "xavp_rcd_mask", 20)
 ...
 		</programlisting>
 		</example>
@@ -1034,6 +1097,46 @@ request_route {
     ...
 }
 ...
+		</programlisting>
+		</example>
+	</section>
+
+
+	<section id="registrar.p.use_expired_contacts">
+		<title><varname>use_expired_contacts</varname> (int)</title>
+
+		<para>
+			Allow/Disallow the usage of the expired contacts.
+		</para>
+
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>0</emphasis> Disallow the usage of the expired contacts.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>1</emphasis> Allow the usage of the expired contacts.
+			</para>
+		</listitem>
+		</itemizedlist>
+
+		<para>
+		<emphasis>
+			Default value is 0 (Disallow).
+		</emphasis>
+		</para>
+
+		<example>
+		<title>Set <varname>use_expired_contacts</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "use_expired_contacts", 1)
+...
+
+kamcmd cfg.set_now_int registrar use_expired_contacts 1
+kamcmd cfg.set_now_int registrar use_expired_contacts 0
 		</programlisting>
 		</example>
 	</section>

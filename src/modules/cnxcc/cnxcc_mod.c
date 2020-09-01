@@ -1430,10 +1430,6 @@ static int __add_call_by_cid(str *cid, call_t *call, credit_type_t type)
 			return -1;
 		}
 
-		LM_WARN("value cid: len=%d | value [%.*s]", value->sip_data.callid.len,
-				value->sip_data.callid.len, value->sip_data.callid.s);
-		LM_WARN("added cid: len=%d | value [%.*s]", cid->len, cid->len, cid->s);
-
 		if(value->sip_data.callid.len != cid->len
 				|| strncasecmp(value->sip_data.callid.s, cid->s, cid->len)
 						   != 0) {
@@ -1444,7 +1440,7 @@ static int __add_call_by_cid(str *cid, call_t *call, credit_type_t type)
 			return -1;
 		}
 
-		LM_DBG("CID already present\n");
+		LM_DBG("CID[%.*s] already present\n", cid->len, cid->s);
 		return 0;
 	}
 
@@ -1492,6 +1488,7 @@ static int ki_set_max_credit(sip_msg_t *msg, str *sclient, str *scredit,
 {
 	credit_data_t *credit_data = NULL;
 	call_t *call = NULL;
+	hash_tables_t *hts = NULL;
 
 	double credit = 0, connect_cost = 0, cost_per_second = 0;
 
@@ -1531,6 +1528,12 @@ static int ki_set_max_credit(sip_msg_t *msg, str *sclient, str *scredit,
 	if(cost_per_second <= 0) {
 		LM_ERR("cost_per_second value must be > 0: %f\n", cost_per_second);
 		return -1;
+	}
+
+	if(try_get_call_entry(&msg->callid->body, &call, &hts) == 0) {
+		LM_ERR("call-id[%.*s] already present\n",
+		msg->callid->body.len, msg->callid->body.s);
+		return -4;
 	}
 
 	LM_DBG("Setting up new call for client [%.*s], max-credit[%f], "
@@ -1710,6 +1713,7 @@ static int ki_set_max_channels(sip_msg_t *msg, str *sclient, int max_chan)
 {
 	credit_data_t *credit_data = NULL;
 	call_t *call = NULL;
+	hash_tables_t *hts = NULL;
 
 	if(parse_headers(msg, HDR_CALLID_F, 0) != 0) {
 		LM_ERR("Error parsing Call-ID");
@@ -1738,6 +1742,12 @@ static int ki_set_max_channels(sip_msg_t *msg, str *sclient, int max_chan)
 		LM_ERR("[%.*s]: client ID cannot be null\n", msg->callid->body.len,
 				msg->callid->body.s);
 		return -1;
+	}
+
+	if(try_get_call_entry(&msg->callid->body, &call, &hts) == 0) {
+		LM_ERR("call-id[%.*s] already present\n",
+		msg->callid->body.len, msg->callid->body.s);
+		return -4;
 	}
 
 	LM_DBG("Setting up new call for client [%.*s], max-chan[%d], "
@@ -1796,6 +1806,7 @@ static int ki_set_max_time(sip_msg_t *msg, str *sclient, int max_secs)
 {
 	credit_data_t *credit_data = NULL;
 	call_t *call = NULL;
+	hash_tables_t *hts = NULL;
 
 	if(parse_headers(msg, HDR_CALLID_F, 0) != 0) {
 		LM_ERR("Error parsing Call-ID");
@@ -1825,6 +1836,12 @@ static int ki_set_max_time(sip_msg_t *msg, str *sclient, int max_secs)
 		LM_ERR("[%.*s]: client ID cannot be null\n", msg->callid->body.len,
 				msg->callid->body.s);
 		return -1;
+	}
+
+	if(try_get_call_entry(&msg->callid->body, &call, &hts) == 0) {
+		LM_ERR("call-id[%.*s] already present\n",
+		msg->callid->body.len, msg->callid->body.s);
+		return -4;
 	}
 
 	LM_DBG("Setting up new call for client [%.*s], max-secs[%d], "

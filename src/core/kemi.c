@@ -225,6 +225,38 @@ static int sr_kemi_core_is_myself_ruri(sip_msg_t *msg)
 /**
  *
  */
+static int sr_kemi_core_is_myself_duri(sip_msg_t *msg)
+{
+	if(msg==NULL) {
+		LM_WARN("invalid msg parameter\n");
+		return SR_KEMI_FALSE;
+	}
+
+	if (msg->dst_uri.s!=NULL)
+		return sr_kemi_core_is_myself(msg, &msg->dst_uri);
+
+	return SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_is_myself_nhuri(sip_msg_t *msg)
+{
+	if(msg==NULL) {
+		LM_WARN("invalid msg parameter\n");
+		return SR_KEMI_FALSE;
+	}
+
+	if (msg->dst_uri.s!=NULL)
+		return sr_kemi_core_is_myself(msg, &msg->dst_uri);
+
+	return sr_kemi_core_is_myself_ruri(msg);
+}
+
+/**
+ *
+ */
 static int sr_kemi_core_is_myself_furi(sip_msg_t *msg)
 {
 	to_body_t *xfrom;
@@ -1127,6 +1159,59 @@ static int sr_kemi_core_is_proto_sctp(sip_msg_t *msg)
 /**
  *
  */
+static int sr_kemi_core_is_proto(sip_msg_t *msg, str *sproto)
+{
+	int i;
+	if (msg==NULL || sproto==NULL || sproto->s==NULL || sproto->len<=0) {
+		return SR_KEMI_FALSE;
+	}
+	for(i=0; i<sproto->len; i++) {
+		switch(sproto->s[i]) {
+			case 'e':
+			case 'E':
+				if (msg->rcv.proto == PROTO_TLS) {
+					return SR_KEMI_TRUE;
+				}
+			break;
+			case 's':
+			case 'S':
+				if (msg->rcv.proto == PROTO_SCTP) {
+					return SR_KEMI_TRUE;
+				}
+			break;
+			case 't':
+			case 'T':
+				if (msg->rcv.proto == PROTO_TCP) {
+					return SR_KEMI_TRUE;
+				}
+			break;
+			case 'u':
+			case 'U':
+				if (msg->rcv.proto == PROTO_UDP) {
+					return SR_KEMI_TRUE;
+				}
+			break;
+			case 'v':
+			case 'V':
+				if (msg->rcv.proto == PROTO_WS) {
+					return SR_KEMI_TRUE;
+				}
+			break;
+
+			case 'w':
+			case 'W':
+				if (msg->rcv.proto == PROTO_WSS) {
+					return SR_KEMI_TRUE;
+				}
+			break;
+		}
+	}
+	return SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
 static int sr_kemi_core_is_af_ipv4(sip_msg_t *msg)
 {
 	if(msg==NULL || msg->rcv.bind_address==NULL) {
@@ -1400,6 +1485,41 @@ static int sr_kemi_core_get_debug(sip_msg_t *msg)
 /**
  *
  */
+static int sr_kemi_core_route(sip_msg_t *msg, str *route)
+{
+	run_act_ctx_t tctx;
+	run_act_ctx_t *pctx = NULL;
+	int rtid = -1;
+	int ret = 0;
+
+	if(route == NULL || route->s == NULL) {
+		return -1;
+	}
+
+	rtid = route_lookup(&main_rt, route->s);
+	if (rtid < 0) {
+		return -1;
+	}
+
+	if(_sr_kemi_act_ctx != NULL) {
+		pctx = _sr_kemi_act_ctx;
+	} else {
+		init_run_actions_ctx(&tctx);
+		pctx = &tctx;
+	}
+
+	ret=run_actions(pctx, main_rt.rlist[rtid], msg);
+
+	if (pctx->run_flags & EXIT_R_F) {
+		return 0;
+	}
+
+	return ret;
+}
+
+/**
+ *
+ */
 static sr_kemi_t _sr_kemi_core[] = {
 	{ str_init(""), str_init("dbg"),
 		SR_KEMIP_NONE, sr_kemi_core_dbg,
@@ -1448,6 +1568,16 @@ static sr_kemi_t _sr_kemi_core[] = {
 	},
 	{ str_init(""), str_init("is_myself_ruri"),
 		SR_KEMIP_BOOL, sr_kemi_core_is_myself_ruri,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("is_myself_duri"),
+		SR_KEMIP_BOOL, sr_kemi_core_is_myself_duri,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("is_myself_nhuri"),
+		SR_KEMIP_BOOL, sr_kemi_core_is_myself_nhuri,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
@@ -1756,6 +1886,11 @@ static sr_kemi_t _sr_kemi_core[] = {
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init(""), str_init("is_proto"),
+		SR_KEMIP_BOOL, sr_kemi_core_is_proto,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init(""), str_init("is_IPv4"),
 		SR_KEMIP_BOOL, sr_kemi_core_is_af_ipv4,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
@@ -1779,6 +1914,11 @@ static sr_kemi_t _sr_kemi_core[] = {
 	{ str_init(""), str_init("get_debug"),
 		SR_KEMIP_INT, sr_kemi_core_get_debug,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("route"),
+		SR_KEMIP_INT, sr_kemi_core_route,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 
@@ -1891,7 +2031,7 @@ static int sr_kemi_hdr_append_after(sip_msg_t *msg, str *txt, str *hname)
 /**
  *
  */
-static int sr_kemi_hdr_remove(sip_msg_t *msg, str *hname)
+int sr_kemi_hdr_remove(sip_msg_t *msg, str *hname)
 {
 	struct lump* anchor;
 	hdr_field_t *hf;
@@ -2358,16 +2498,52 @@ static sr_kemi_t _sr_kemi_hdr[] = {
  */
 void sr_kemi_xval_null(sr_kemi_xval_t *xval, int rmode)
 {
-	if(rmode==SR_KEMI_XVAL_NULL_PRINT) {
-		xval->vtype = SR_KEMIP_STR;
-		xval->v.s = *pv_get_null_str();
-	} else if(rmode==SR_KEMI_XVAL_NULL_EMPTY) {
-		xval->vtype = SR_KEMIP_STR;
-		xval->v.s = *pv_get_empty_str();
-	} else {
-		xval->vtype = SR_KEMIP_NULL;
-		xval->v.s.s = NULL;
-		xval->v.s.len = 0;
+	switch(rmode) {
+		case SR_KEMI_XVAL_NULL_PRINT:
+			xval->vtype = SR_KEMIP_STR;
+			xval->v.s = *pv_get_null_str();
+			return;
+		case SR_KEMI_XVAL_NULL_EMPTY:
+			xval->vtype = SR_KEMIP_STR;
+			xval->v.s = *pv_get_empty_str();
+			return;
+		case SR_KEMI_XVAL_NULL_ZERO:
+			xval->vtype = SR_KEMIP_INT;
+			xval->v.n = 0;
+			return;
+		default:
+			xval->vtype = SR_KEMIP_NULL;
+			xval->v.s.s = NULL;
+			xval->v.s.len = 0;
+			return;
+	}
+}
+
+/**
+ *
+ */
+void sr_kemi_dict_item_free(sr_kemi_dict_item_t *item)
+{
+	sr_kemi_dict_item_t *v;
+
+	while(item) {
+		if (item->vtype == SR_KEMIP_ARRAY || item->vtype == SR_KEMIP_DICT) {
+			sr_kemi_dict_item_free(item->v.dict);
+		}
+		v = item;
+		item = item->next;
+		pkg_free(v);
+	}
+}
+
+/**
+ *
+ */
+void sr_kemi_xval_free(sr_kemi_xval_t *xval)
+{
+	if(xval && (xval->vtype == SR_KEMIP_ARRAY || xval->vtype == SR_KEMIP_DICT))
+	{
+		sr_kemi_dict_item_free(xval->v.dict);
 	}
 }
 

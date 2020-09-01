@@ -1440,7 +1440,7 @@ end
 	</section>
 
 	<section id="tm.p.event_callback_lres_sent">
-		<title><varname>event_callback_lres</varname> (str)</title>
+		<title><varname>event_callback_lres_sent</varname> (str)</title>
 		<para>
 			The name of the function in the kemi configuration file (embedded
 			scripting language such as Lua, Python, ...) to be executed instead
@@ -1523,6 +1523,31 @@ modparam("tm", "relay_100", 1)
 modparam("tm", "rich_redirect", 3)
 ....
 			</programlisting>
+		</example>
+	</section>
+
+	<section id="tm.p.exec_time_check">
+		<title><varname>exec_time_check</varname> (int)</title>
+		<para>
+			Duration in milliseconds for executing transaction failure callbacks
+			and failure_route block after which to do a safety check if
+			transaction is still active.
+		</para>
+		<para>
+			Set it to 0 in order to disable this check.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 5000 (5 seconds).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>exec_time_check</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("tm", "exec_time_check", 0)
+...
+</programlisting>
 		</example>
 	</section>
 

@@ -28,6 +28,7 @@
 
 #include "dprint.h"
 #include "ut.h"
+#include "trim.h"
 #include "strutils.h"
 
 /*! \brief
@@ -453,16 +454,24 @@ int cmpi_str(str *s1, str *s2)
 
 int cmp_hdrname_str(str *s1, str *s2)
 {
+	str n1, n2;
+	n1 = *s1;
+	n2 = *s2;
+	trim_trailing(&n1);
+	trim_trailing(&n2);
 	/* todo: parse hdr name and compare with short/long alternative */
-	return cmpi_str(s1, s2);
+	return cmpi_str(&n1, &n2);
 }
 
-int cmp_hdrname_strzn(str *s1, char *s2, size_t n)
+int cmp_hdrname_strzn(str *s1, char *s2, size_t len)
 {
-	str s;
-	s.s = s2;
-	s.len = n;
-	return cmpi_str(s1, &s);
+	str n1, n2;
+	n1 = *s1;
+	n2.s = s2;
+	n2.len = len;
+	trim_trailing(&n1);
+	trim_trailing(&n2);
+	return cmpi_str(&n1, &n2);
 }
 
 int cmp_str_params(str *s1, str *s2)
@@ -750,4 +759,77 @@ int reg_replace(char *pattern, char *replacement, char *string, str *result)
 
 	return replace(&pmatch[0], string, replacement, result);
 
+}
+
+/* Converts a hex character to its integer value */
+char hex_to_char(char hex_code)
+{
+	return isdigit(hex_code) ? hex_code - '0' : tolower(hex_code) - 'a' + 10;
+}
+
+/* Converts an integer value to its hex character */
+char char_to_hex(char char_code)
+{
+	static char hex[] = "0123456789abcdef";
+	return hex[char_code & 15];
+}
+
+/*! \brief
+ *  URL Encodes a string
+ */
+int urlencode(str *sin, str *sout)
+{
+	char *at, *p;
+
+	if (sin==NULL || sout==NULL || sin->s==NULL || sout->s==NULL ||
+			sin->len<0 || sout->len < 3*sin->len+1)
+		return -1;
+
+	at = sout->s;
+	p = sin->s;
+
+	while (p < sin->s+sin->len) {
+		if (isalnum(*p) || *p == '-' || *p == '_' || *p == '.' || *p == '~')
+			*at++ = *p;
+		else
+			*at++ = '%', *at++ = char_to_hex(*p >> 4), *at++ = char_to_hex(*p & 15);
+		p++;
+	}
+
+	*at = 0;
+	sout->len = at - sout->s;
+	LM_DBG("urlencoded string is <%s>\n", sout->s);
+
+	return 0;
+}
+
+/*! \brief
+ *  URL Decodes a string
+ */
+int urldecode(str *sin, str *sout)
+{
+	char *at, *p;
+
+	at = sout->s;
+	p = sin->s;
+
+	while (p < sin->s+sin->len) {
+		if (*p == '%') {
+			if (p[1] && p[2]) {
+				*at++ = hex_to_char(p[1]) << 4 | hex_to_char(p[2]);
+				p += 2;
+			}
+		} else if (*p == '+') {
+			*at++ = ' ';
+		} else {
+			*at++ = *p;
+		}
+		p++;
+	}
+
+	*at = 0;
+	sout->len = at - sout->s;
+
+	LM_DBG("urldecoded string is <%s>\n", sout->s);
+	return 0;
 }

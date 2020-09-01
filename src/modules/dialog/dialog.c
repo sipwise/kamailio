@@ -176,6 +176,7 @@ static int w_dlg_isflagset(struct sip_msg *msg, char *flag, str *s2);
 static int w_dlg_resetflag(struct sip_msg *msg, char *flag, str *s2);
 static int w_dlg_setflag(struct sip_msg *msg, char *flag, char *s2);
 static int w_dlg_set_property(struct sip_msg *msg, char *prop, char *s2);
+static int w_dlg_reset_property(struct sip_msg *msg, char *prop, char *s2);
 static int w_dlg_manage(struct sip_msg*, char*, char*);
 static int w_dlg_bye(struct sip_msg*, char*, char*);
 static int w_dlg_refer(struct sip_msg*, char*, char*);
@@ -244,6 +245,8 @@ static cmd_export_t cmds[]={
 			0, ANY_ROUTE },
 	{"dlg_set_property", (cmd_function)w_dlg_set_property,1,fixup_spve_null,
 			0, ANY_ROUTE },
+	{"dlg_reset_property", (cmd_function)w_dlg_reset_property,1,fixup_spve_null,
+            0, ANY_ROUTE },
 	{"dlg_remote_profile", (cmd_function)w_dlg_remote_profile, 5, fixup_dlg_remote_profile,
 			0, ANY_ROUTE },
 	{"dlg_set_ruri",       (cmd_function)w_dlg_set_ruri,  0, NULL,
@@ -1330,6 +1333,66 @@ static int w_dlg_set_property(struct sip_msg *msg, char *prop, char *s2)
 	return ki_dlg_set_property(msg, &val);
 }
 
+/**
+ *
+ */
+static int ki_dlg_reset_property(sip_msg_t *msg, str *pval)
+{
+	dlg_ctx_t *dctx;
+	dlg_cell_t *d;
+
+	if(pval->len<=0) {
+		LM_ERR("empty property value\n");
+		return -1;
+	}
+	if ( (dctx=dlg_get_dlg_ctx())==NULL )
+		return -1;
+
+	if(pval->len==6 && strncmp(pval->s, "ka-src", 6)==0) {
+		dctx->iflags &= ~(DLG_IFLAG_KA_SRC);
+		d = dlg_get_by_iuid(&dctx->iuid);
+		if(d!=NULL) {
+			d->iflags &= ~(DLG_IFLAG_KA_SRC);
+			dlg_release(d);
+		}
+	} else if(pval->len==6 && strncmp(pval->s, "ka-dst", 6)==0) {
+		dctx->iflags &= ~(DLG_IFLAG_KA_DST);
+		d = dlg_get_by_iuid(&dctx->iuid);
+		if(d!=NULL) {
+			d->iflags &= ~(DLG_IFLAG_KA_DST);
+			dlg_release(d);
+		}
+	} else if(pval->len==15 && strncmp(pval->s, "timeout-noreset", 15)==0) {
+		dctx->iflags &= ~(DLG_IFLAG_TIMER_NORESET);
+		d = dlg_get_by_iuid(&dctx->iuid);
+		if(d!=NULL) {
+			d->iflags &= ~(DLG_IFLAG_TIMER_NORESET);
+			dlg_release(d);
+		}
+	} else {
+		LM_ERR("unknown property value [%.*s]\n", pval->len, pval->s);
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_dlg_reset_property(struct sip_msg *msg, char *prop, char *s2)
+{
+	str val;
+
+	if(fixup_get_svalue(msg, (gparam_t*)prop, &val)!=0)
+	{
+		LM_ERR("no property value\n");
+		return -1;
+	}
+
+	return ki_dlg_reset_property(msg, &val);
+}
+
 static int w_dlg_set_timeout_by_profile3(struct sip_msg *msg, char *profile,
 					char *value, char *timeout_str) 
 {
@@ -2008,6 +2071,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("dialog"), str_init("dlg_reset_property"),
+		SR_KEMIP_INT, ki_dlg_reset_property,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("dialog"), str_init("dlg_get"),
 		SR_KEMIP_INT, ki_dlg_get,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
@@ -2129,6 +2197,118 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 
 /**************************** RPC functions ******************************/
 /*!
+ * \brief Helper method that outputs a dialog in a file
+ * \see rpc_dump_file_dlg
+ * \param dlg printed dialog
+ * \param output file descriptor
+ * \return 0 on success, -1 on failure
+ */
+static inline void internal_rpc_dump_file_dlg(dlg_cell_t *dlg, FILE* dialogf)
+{
+	dlg_profile_link_t *pl;
+	dlg_var_t *var;
+	srjson_doc_t jdoc;
+	srjson_t * jdoc_caller = NULL;
+	srjson_t * jdoc_callee = NULL;
+	srjson_t * jdoc_profiles = NULL;
+	srjson_t * jdoc_variables = NULL;
+
+	srjson_InitDoc(&jdoc, NULL);
+	jdoc.root = srjson_CreateObject(&jdoc);
+	if (!jdoc.root) {
+		LM_ERR("cannot create json\n");
+		goto clear;
+	}
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "h_entry", dlg->h_entry);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "h_id", dlg->h_id);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "ref", dlg->ref);
+	srjson_AddStrToObject(&jdoc, jdoc.root, "call_id", dlg->callid.s, dlg->callid.len);
+	srjson_AddStrToObject(&jdoc, jdoc.root, "from_uri", dlg->from_uri.s, dlg->from_uri.len);
+	srjson_AddStrToObject(&jdoc, jdoc.root, "to_uri", dlg->to_uri.s, dlg->to_uri.len);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "state", dlg->state);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "start_ts", dlg->start_ts);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "init_ts", dlg->init_ts);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "end_ts", dlg->end_ts);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "timeout", dlg->tl.timeout ? time(0) + dlg->tl.timeout - get_ticks() : 0);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "lifetime", dlg->lifetime);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "dflags", dlg->dflags);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "sflags", dlg->sflags);
+	srjson_AddNumberToObject(&jdoc, jdoc.root, "iflags", dlg->iflags);
+
+	jdoc_caller = srjson_CreateObject(&jdoc);
+	if (!jdoc_caller) {
+		LM_ERR("cannot create json caller\n");
+		goto clear;
+	}
+	srjson_AddStrToObject(&jdoc, jdoc_caller, "tag", dlg->tag[DLG_CALLER_LEG].s, dlg->tag[DLG_CALLER_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_caller, "contact", dlg->contact[DLG_CALLER_LEG].s, dlg->contact[DLG_CALLER_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_caller, "cseq", dlg->cseq[DLG_CALLER_LEG].s, dlg->cseq[DLG_CALLER_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_caller, "route_set", dlg->route_set[DLG_CALLER_LEG].s, dlg->route_set[DLG_CALLER_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_caller, "socket",
+			dlg->bind_addr[DLG_CALLER_LEG] ? dlg->bind_addr[DLG_CALLER_LEG]->sock_str.s : empty_str.s,
+			dlg->bind_addr[DLG_CALLER_LEG] ? dlg->bind_addr[DLG_CALLER_LEG]->sock_str.len : empty_str.len);
+	srjson_AddItemToObject(&jdoc, jdoc.root, "caller", jdoc_caller);
+
+	jdoc_callee = srjson_CreateObject(&jdoc);
+	if (!jdoc_callee) {
+		LM_ERR("cannot create json callee\n");
+		goto clear;
+	}
+	srjson_AddStrToObject(&jdoc, jdoc_callee, "tag", dlg->tag[DLG_CALLEE_LEG].s, dlg->tag[DLG_CALLEE_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_callee, "contact", dlg->contact[DLG_CALLEE_LEG].s, dlg->contact[DLG_CALLEE_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_callee, "cseq", dlg->cseq[DLG_CALLEE_LEG].s, dlg->cseq[DLG_CALLEE_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_callee, "route_set", dlg->route_set[DLG_CALLEE_LEG].s, dlg->route_set[DLG_CALLEE_LEG].len);
+	srjson_AddStrToObject(&jdoc, jdoc_callee, "socket",
+			dlg->bind_addr[DLG_CALLEE_LEG] ? dlg->bind_addr[DLG_CALLEE_LEG]->sock_str.s : empty_str.s,
+			dlg->bind_addr[DLG_CALLEE_LEG] ? dlg->bind_addr[DLG_CALLEE_LEG]->sock_str.len : empty_str.len);
+	srjson_AddItemToObject(&jdoc, jdoc.root, "callee", jdoc_callee);
+
+	// profiles section
+	jdoc_profiles = srjson_CreateObject(&jdoc);
+	if (!jdoc_profiles) {
+		LM_ERR("cannot create json profiles\n");
+		goto clear;
+	}
+	for (pl = dlg->profile_links ; pl && (dlg->state<DLG_STATE_DELETED) ; pl=pl->next) {
+		if (pl->profile->has_value) {
+			srjson_AddStrToObject(&jdoc, jdoc_profiles, pl->profile->name.s, pl->hash_linker.value.s, pl->hash_linker.value.len);
+		} else {
+			srjson_AddStrToObject(&jdoc, jdoc_profiles, pl->profile->name.s, empty_str.s, empty_str.len);
+		}
+	}
+	srjson_AddItemToObject(&jdoc, jdoc.root, "profiles", jdoc_profiles);
+
+	// variables section
+	jdoc_variables = srjson_CreateObject(&jdoc);
+	if (!jdoc_variables) {
+		LM_ERR("cannot create json variables\n");
+		goto clear;
+	}
+	for (var=dlg->vars ; var && (dlg->state<DLG_STATE_DELETED) ; var=var->next) {
+		srjson_AddStrToObject(&jdoc, jdoc_variables, var->key.s, var->value.s, var->value.len);
+	}
+	srjson_AddItemToObject(&jdoc, jdoc.root, "variables", jdoc_variables);
+
+	// serialize and print to file
+	jdoc.buf.s = srjson_PrintUnformatted(&jdoc, jdoc.root);
+	if (!jdoc.buf.s) {
+		LM_ERR("unable to serialize data\n");
+		goto clear;
+	}
+	jdoc.buf.len = strlen(jdoc.buf.s);
+	LM_DBG("sending serialized data %.*s\n", jdoc.buf.len, jdoc.buf.s);
+	fprintf(dialogf,"%s\n", jdoc.buf.s);
+
+clear:
+	if (jdoc.buf.s) {
+		jdoc.free_fn(jdoc.buf.s);
+		jdoc.buf.s = NULL;
+	}
+	srjson_DestroyDoc(&jdoc);
+	return;
+}
+
+/*!
  * \brief Helper method that outputs a dialog via the RPC interface
  * \see rpc_print_dlg
  * \param rpc RPC node that should be filled
@@ -2206,6 +2386,38 @@ static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, dlg_cell_t *dlg,
 error:
 	LM_ERR("Failed to add item to RPC response\n");
 	return;
+}
+
+/*!
+ * \brief Helper function that outputs all dialogs via the RPC interface
+ * \see rpc_dump_file_dlgs
+ * \param rpc RPC node that should be filled
+ * \param c RPC void pointer
+ * \param with_context if 1 then the dialog context will be also printed
+ */
+static void internal_rpc_dump_file_dlgs(rpc_t *rpc, void *c, int with_context)
+{
+	dlg_cell_t *dlg;
+	str output_file_name;
+	FILE* dialogf;
+	unsigned int i;
+	if (rpc->scan(c, ".S", &output_file_name) < 1) return;
+
+	dialogf = fopen(output_file_name.s, "a+");
+	if (!dialogf) {
+		LM_ERR("failed to open output file: %s\n", output_file_name.s);
+		return;
+	}
+
+	for( i=0 ; i<d_table->size ; i++ ) {
+		dlg_lock( d_table, &(d_table->entries[i]) );
+
+		for( dlg=d_table->entries[i].first ; dlg ; dlg=dlg->next ) {
+			internal_rpc_dump_file_dlg(dlg, dialogf);
+		}
+		dlg_unlock( d_table, &(d_table->entries[i]) );
+	}
+	fclose(dialogf);
 }
 
 /*!
@@ -2347,6 +2559,9 @@ static int w_dlg_set_ruri(sip_msg_t *msg, char *p1, char *p2)
 static const char *rpc_print_dlgs_doc[2] = {
 	"Print all dialogs", 0
 };
+static const char *rpc_dump_file_dlgs_doc[2] = {
+	"Print all dialogs to json file", 0
+};
 static const char *rpc_print_dlgs_ctx_doc[2] = {
 	"Print all dialogs with associated context", 0
 };
@@ -2368,6 +2583,11 @@ static const char *rpc_end_dlg_entry_id_doc[2] = {
 static const char *rpc_dlg_terminate_dlg_doc[2] = {
         "End a given dialog based on callid", 0
 };
+static const char *rpc_dlg_set_state_doc[3] = {
+        "Set state for a dialog based on callid and tags",
+        "It is targeting the need to update from state 4 (confirmed) to 5 (terminated)",
+        0
+};
 static const char *rpc_profile_get_size_doc[2] = {
 	"Returns the number of dialogs belonging to a profile", 0
 };
@@ -2385,6 +2605,9 @@ static const char *rpc_dlg_is_alive_doc[2] = {
 
 static void rpc_print_dlgs(rpc_t *rpc, void *c) {
 	internal_rpc_print_dlgs(rpc, c, 0);
+}
+static void rpc_dump_file_dlgs(rpc_t *rpc, void *c) {
+	internal_rpc_dump_file_dlgs(rpc, c, 0);
 }
 static void rpc_print_dlgs_ctx(rpc_t *rpc, void *c) {
 	internal_rpc_print_dlgs(rpc, c, 1);
@@ -2433,6 +2656,70 @@ static void rpc_dlg_terminate_dlg(rpc_t *rpc,void *c){
         		callid.len, callid.s);
         dlg_release(dlg);
     }
+}
+
+static void rpc_dlg_set_state(rpc_t *rpc,void *c){
+	str callid = {NULL,0};
+	str ftag = {NULL,0};
+	str ttag = {NULL,0};
+	int sval = DLG_STATE_DELETED;
+	int ostate = 0;
+
+	dlg_cell_t * dlg = NULL;
+	unsigned int dir;
+	int unref=1;
+	dir = 0;
+
+	if(rpc->scan(c, ".S.S.Sd", &callid, &ftag, &ttag, &sval)<3) {
+		LM_ERR("unable to read the parameters\n" );
+		rpc->fault(c, 400, "Need the callid, from tag,to tag and state");
+		return;
+	}
+	if(sval < DLG_STATE_UNCONFIRMED || sval > DLG_STATE_DELETED) {
+		LM_ERR("invalid new state value: %d\n", sval);
+		rpc->fault(c, 500, "Invalid state value");
+		return;
+	}
+
+	dlg=get_dlg(&callid, &ftag, &ttag, &dir);
+
+	if(dlg==NULL) {
+		LM_ERR("dialog not found - callid '%.*s' \n", callid.len, callid.s);
+		rpc->fault(c, 500, "Dialog not found");
+		return;
+	}
+
+	LM_DBG("dialog found - callid '%.*s'\n", callid.len, callid.s);
+
+	if(dlg->state != DLG_STATE_CONFIRMED || sval!=DLG_STATE_DELETED) {
+		LM_WARN("updating states for not confirmed dialogs not properly supported yet,"
+				" use at own risk: '%.*s'\n", callid.len, callid.s);
+	}
+
+	/* setting new state for this dialog */
+	ostate = dlg->state;
+	dlg->state = sval;
+
+	/* updates for terminated dialogs */
+	if(ostate==DLG_STATE_CONFIRMED && sval==DLG_STATE_DELETED) {
+		/* updating timestamps, flags, dialog stats */
+		dlg->init_ts = (unsigned int)(time(0));
+		dlg->end_ts = (unsigned int)(time(0));
+	}
+	dlg->dflags |= DLG_FLAG_NEW;
+
+	dlg_unref(dlg, unref);
+
+	if(ostate==DLG_STATE_CONFIRMED && sval==DLG_STATE_DELETED) {
+		if_update_stat(dlg_enable_stats, active_dlgs, -1);
+	}
+
+	/* dlg_clean_run called by timer execution will handle timers deletion and all that stuff */
+	LM_NOTICE("dialog callid '%.*s' - state change forced - old: %d - new: %d\n",
+			callid.len, callid.s, ostate, sval);
+
+	rpc->add(c, "s", "Done");
+
 }
 
 static void rpc_dlg_is_alive(rpc_t *rpc, void *c)
@@ -2768,8 +3055,118 @@ static void rpc_dlg_list_match_ctx(rpc_t *rpc, void *c)
 	rpc_dlg_list_match_ex(rpc, c, 1);
 }
 
+static const char *rpc_dlg_briefing_doc[2] = {
+	"List the summary of dialog records in memory", 0
+};
+
+/*!
+ * \brief List summary of active calls
+ */
+static void rpc_dlg_briefing(rpc_t *rpc, void *c)
+{
+	dlg_cell_t *dlg = NULL;
+	unsigned int i = 0;
+	int n = 0;
+	str fmt = STR_NULL;
+	void *h = NULL;
+
+	n = rpc->scan(c, "S", &fmt);
+	if (n < 1) {
+		fmt.s = "ftcFT";
+		fmt.len = 5;
+	}
+
+	for( i=0 ; i<d_table->size ; i++ ) {
+		dlg_lock( d_table, &(d_table->entries[i]) );
+		for( dlg=d_table->entries[i].first ; dlg ; dlg=dlg->next ) {
+			if (rpc->add(c, "{", &h) < 0) {
+				rpc->fault(c, 500, "Failed to create the structure");
+				return;
+			}
+			if(rpc->struct_add(h, "dd",
+					"h_entry", dlg->h_entry,
+					"h_id", dlg->h_id) < 0) {
+				rpc->fault(c, 500, "Failed to add fields");
+				return;
+
+			}
+			for(n=0; n<fmt.len; n++) {
+				switch(fmt.s[n]) {
+					case 'f':
+						if(rpc->struct_add(h, "S",
+									"from_uri", &dlg->from_uri) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 't':
+						if(rpc->struct_add(h, "S",
+									"to_uri", &dlg->to_uri) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 'c':
+						if(rpc->struct_add(h, "S",
+									"call-id", &dlg->callid) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 'F':
+						if(rpc->struct_add(h, "S",
+									"from_tag", &dlg->tag[DLG_CALLER_LEG]) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 'T':
+						if(rpc->struct_add(h, "S",
+									"to_tag", &dlg->tag[DLG_CALLER_LEG]) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 'I':
+						if(rpc->struct_add(h, "d",
+									"init_ts", dlg->init_ts) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 'S':
+						if(rpc->struct_add(h, "d",
+									"start_ts", dlg->start_ts) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 'E':
+						if(rpc->struct_add(h, "d",
+									"end_ts", dlg->end_ts) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+					case 's':
+						if(rpc->struct_add(h, "d",
+									"state", dlg->state) < 0) {
+							rpc->fault(c, 500, "Failed to add fields");
+							return;
+						}
+					break;
+				}
+			}
+
+		}
+		dlg_unlock( d_table, &(d_table->entries[i]) );
+	}
+}
+
 static rpc_export_t rpc_methods[] = {
+	{"dlg.briefing", rpc_dlg_briefing, rpc_dlg_briefing_doc, RET_ARRAY},
 	{"dlg.list", rpc_print_dlgs, rpc_print_dlgs_doc, RET_ARRAY},
+	{"dlg.dump_file", rpc_dump_file_dlgs, rpc_dump_file_dlgs_doc, 0},
 	{"dlg.list_ctx", rpc_print_dlgs_ctx, rpc_print_dlgs_ctx_doc, RET_ARRAY},
 	{"dlg.list_match", rpc_dlg_list_match, rpc_dlg_list_match_doc, RET_ARRAY},
 	{"dlg.list_match_ctx", rpc_dlg_list_match_ctx, rpc_dlg_list_match_ctx_doc, RET_ARRAY},
@@ -2780,6 +3177,7 @@ static rpc_export_t rpc_methods[] = {
 	{"dlg.profile_list", rpc_profile_print_dlgs, rpc_profile_print_dlgs_doc, RET_ARRAY},
 	{"dlg.bridge_dlg", rpc_dlg_bridge, rpc_dlg_bridge_doc, 0},
 	{"dlg.terminate_dlg", rpc_dlg_terminate_dlg, rpc_dlg_terminate_dlg_doc, 0},
+	{"dlg.set_state", rpc_dlg_set_state, rpc_dlg_set_state_doc, 0},
 	{"dlg.stats_active", rpc_dlg_stats_active, rpc_dlg_stats_active_doc, 0},
 	{"dlg.is_alive",  rpc_dlg_is_alive, rpc_dlg_is_alive_doc, 0},
 	{0, 0, 0, 0}

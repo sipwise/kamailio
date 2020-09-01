@@ -217,7 +217,7 @@ static inline struct lump* get_display_anchor(struct sip_msg *msg,
 	}
 	p1 = (char*)pkg_malloc(1);
 	if (p1==0) {
-		LM_ERR("no more pkg mem \n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 	*p1 = '>';
@@ -333,7 +333,7 @@ int replace_uri( struct sip_msg *msg, str *display, str *uri,
 			buf.s = pkg_malloc( display->len + 2 );
 			if (buf.s==0)
 			{
-				LM_ERR("no more pkg mem\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 			memcpy( buf.s, display->s, display->len);
@@ -370,7 +370,7 @@ int replace_uri( struct sip_msg *msg, str *display, str *uri,
 	p = pkg_malloc( uri->len);
 	if (p==0)
 	{
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memcpy( p, uri->s, uri->len);
@@ -510,7 +510,7 @@ int replace_uri( struct sip_msg *msg, str *display, str *uri,
 		param.s = (char*)pkg_malloc(param.len);
 		if (param.s==0)
 		{
-			LM_ERR("no more pkg mem\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		p = param.s;
@@ -568,6 +568,7 @@ int restore_uri( struct sip_msg *msg, str *rr_param, str* restore_avp,
 	int i;
 	int_str avp_value;
 	int flag;
+	int bsize;
 
 	/* we should process only sequential request, but since we are looking
 	 * for Route param, the test is not really required -bogdan */
@@ -589,15 +590,20 @@ int restore_uri( struct sip_msg *msg, str *rr_param, str* restore_avp,
 		goto failed;
 	}
 
-	add_to_rr.s = pkg_malloc(3+rr_param->len+param_val.len);
+	bsize = 3+rr_param->len+param_val.len;
+	add_to_rr.s = pkg_malloc(bsize);
 	if ( add_to_rr.s==0 ) {
 		add_to_rr.len = 0;
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		goto failed;
 	}
-	add_to_rr.len = sprintf(add_to_rr.s, ";%.*s=%.*s",
+	add_to_rr.len = snprintf(add_to_rr.s, bsize, ";%.*s=%.*s",
 			rr_param->len, rr_param->s, param_val.len, param_val.s);
 
+	if(add_to_rr.len<0 || add_to_rr.len>=bsize) {
+		LM_ERR("printing rr param failed\n");
+		goto failed;
+	}
 	if ( uac_rrb.add_rr_param(msg, &add_to_rr)!=0 ) {
 		LM_ERR("add rr param failed\n");
 		goto failed;
@@ -690,7 +696,7 @@ int restore_uri( struct sip_msg *msg, str *rr_param, str* restore_avp,
 	/* duplicate the decoded value */
 	p = pkg_malloc( new_uri.len);
 	if (p==0) {
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		goto failed;
 	}
 	memcpy( p, new_uri.s, new_uri.len);
@@ -770,7 +776,7 @@ static inline int restore_uri_reply(struct sip_msg *rpl,
 
 	new_val.s = pkg_malloc( len );
 	if (new_val.s==0) {
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memcpy( new_val.s, p, len);
@@ -939,7 +945,7 @@ static void replace_callback(struct dlg_cell *dlg, int type,
 	/* duplicate the decoded value */
 	p = pkg_malloc( new_uri->len);
 	if (!p) {
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		return;
 	}
 	memcpy( p, new_uri->s, new_uri->len);
@@ -975,7 +981,7 @@ static void replace_callback(struct dlg_cell *dlg, int type,
 		/* add the new display exactly over the deleted one */
 		buf.s = pkg_malloc(new_display->len + 2);
 		if (buf.s==0) {
-			LM_ERR("no more pkg mem\n");
+			PKG_MEM_ERROR;
 			goto free;
 		}
 		memcpy( buf.s, new_display->s, new_display->len);

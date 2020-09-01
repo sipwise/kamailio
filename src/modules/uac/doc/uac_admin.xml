@@ -593,6 +593,38 @@ modparam("uac", "reg_gc_interval", 60)
 		</example>
 	</section>
 
+	<section id="uac.p.event_callback">
+		<title><varname>event_callback</varname> (str)</title>
+		<para>
+			The name of the function in the kemi configuration file (embedded
+			scripting language such as Lua, Python, ...) to be executed instead
+			of event_route[uac:reply] block.
+		</para>
+		<para>
+			The function receives a string parameter with the name of the event,
+			the value can be: 'uac:reply'.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 'empty' (no function is executed for events).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>event_callback</varname> parameter</title>
+ <programlisting format="linespecific">
+ ...
+modparam("uac", "event_callback", "ksr_uac_event")
+
+function ksr_uac_event(evname)
+	KSR.info("===== uac module triggered event: " .. evname .. "\n");
+	return 1;
+end
+ ...
+ </programlisting>
+		</example>
+	</section>
+  
+  
 	</section>
 
 	<section>
@@ -802,12 +834,16 @@ uac_restore_to();
 		</section>
 		<section id="uac.f.uac_auth">
 			<title>
-				<function moreinfo="none">uac_auth()</function>
+				<function moreinfo="none">uac_auth([mode])</function>
 			</title>
 			<para>
-			This function can be called only from failure route and will 
+			This function can be called only from failure route and will
 			build the authentication response header and insert it into the
 			request without sending anything.
+			</para>
+			<para>
+			If mode is set to 1, then the password has to be provided in HA1 format.
+			The parameter can be a static integer or a variable holding an integer value.
 			</para>
 			<para>
 			This function can be used from FAILURE_ROUTE.
@@ -836,7 +872,9 @@ failure_route[TRUNKAUTH] {
     if(t_check_status("401|407")) {
         $avp(auser) = "test";
         $avp(apass) = "test";
+        # $avp(apass) = "36d0a02793542b4961e8348347236dbf";
         uac_auth();
+        # uac_auth("1");
         t_relay();
         exit;
     }
@@ -951,12 +989,27 @@ $var(status) = uac_reg_status("$rU");
 				<function moreinfo="none">uac_reg_request_to(user, mode)</function>
 			</title>
 			<para>
-			This function can be used to send an authenticated request to a remote user in 
+			This function can be used to send an authenticated request to a remote user in
 			the uac registrations table. It sets the request-uri, dst-uri and auth_*_avp
-			pv's to the values that correspond to the supplied user.
+			variables to the values that correspond to the supplied user.
 			</para>
 			<para>
-			The mode indicates whether the user should match the local uuid (mode=0), or the username (mode=1).
+			The mode is a bitwise set of flags controlling how the matching of
+			the record is done and what field is used to set auth_password_avp:
+			<itemizedlist>
+			<listitem>
+				<para>
+				indicates whether the user should match the local uuid (bit value=0),
+				or the username (bit value=1, int value=1).
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				indicates whether the auth_password value is used to set auth_password_avp
+				(bit value=0), or the auth_ha1 value (bit value=1, int value=2).
+				</para>
+			</listitem>
+			</itemizedlist>
 			</para>
 			<para>
 			The auth_*_avp module parameters must be set to valid pv&apos;s.

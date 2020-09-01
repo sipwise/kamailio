@@ -19,8 +19,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <string.h>
 #include <errno.h>
 
@@ -29,6 +31,11 @@
 #include "../../core/pvar.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
+#include "../../core/parser/msg_parser.h"
+#include "../../core/parser/parse_uri.h"
+#include "../../core/parser/parse_to.h"
+#include "../../core/parser/parse_from.h"
+#include "../../core/parser/parse_cseq.h"
 
 #include "cfgt_int.h"
 #include "cfgt_json.h"
@@ -40,6 +47,9 @@ cfgt_hash_p _cfgt_uuid = NULL;
 str cfgt_hdr_prefix = {"NGCP%", 5};
 str cfgt_basedir = {"/tmp", 4};
 int cfgt_mask = CFGT_DP_ALL;
+int not_sip = 0;
+
+int _cfgt_get_filename(int msgid, str uuid, str *dest, int *dir);
 
 static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
 {
@@ -75,24 +85,90 @@ int _cfgt_pv_parse(str *param, pv_elem_p *elem)
 	return 0;
 }
 
-void _cfgt_remove_uuid(const str *uuid)
+void _cfgt_remove_report(const str *scen)
+{
+	str dest = STR_NULL;
+	str filepath = STR_NULL;
+	int dir = 0;
+	int len;
+	struct stat sb;
+	DIR *folder = NULL;
+	struct dirent *next_file = NULL;
+
+	if(_cfgt_get_filename(0, *scen, &dest, &dir) < 0) {
+		LM_ERR("can't build filename for uuid: %.*s\n", scen->len, scen->s);
+		return;
+	}
+	dest.s[dir] = '\0';
+
+	if(stat(dest.s, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+		filepath.s = (char *)pkg_malloc(sizeof(char) * dest.len + 1);
+		if(filepath.s == NULL) {
+			PKG_MEM_ERROR;
+			goto end;
+		}
+		if((folder = opendir(dest.s)) == NULL) {
+			LM_ERR("can't open dir: %s", strerror(errno));
+			goto end;
+		}
+		while((next_file = readdir(folder)) != NULL) {
+			len = strlen(next_file->d_name);
+			if(len <= 2) {
+				if(strncmp(next_file->d_name, "..", 2) == 0
+						|| strncmp(next_file->d_name, ".", 1) == 0) {
+					continue;
+				}
+			}
+			snprintf(filepath.s, dest.len + 1, "%s/%s", dest.s,
+				next_file->d_name);
+			if(remove(filepath.s) < 0) {
+				LM_ERR("failed removing file: %s\n", strerror(errno));
+			} else {
+				LM_DBG("removed report file: %s\n", filepath.s);
+			}
+		}
+		if(closedir(folder) < 0) {
+			LM_ERR("can't close dir: %s", strerror(errno));
+		}
+		if(remove(dest.s) < 0) {
+			LM_ERR("failed removing dir: %s\n", strerror(errno));
+		} else {
+			LM_DBG("removed report dir: %s\n", dest.s);
+		}
+	} else {
+		LM_DBG("dir %s not found\n", dest.s);
+	}
+
+end:
+	if(filepath.s)
+		pkg_free(filepath.s);
+	if(dest.s)
+		pkg_free(dest.s);
+}
+
+int _cfgt_remove_uuid(const str *uuid, int remove_report)
 {
 	struct str_hash_head *head;
 	struct str_hash_entry *entry, *back;
 	int i;
+	int res = -1;
 
 	if(_cfgt_uuid == NULL)
-		return;
+		return res;
 	if(uuid) {
 		lock_get(&_cfgt_uuid->lock);
 		entry = str_hash_get(&_cfgt_uuid->hash, uuid->s, uuid->len);
 		if(entry) {
 			str_hash_del(entry);
+			if(remove_report)
+				_cfgt_remove_report(&entry->key);
 			shm_free(entry->key.s);
 			shm_free(entry);
 			LM_DBG("uuid[%.*s] removed from hash\n", uuid->len, uuid->s);
-		} else
+			res = 0;
+		} else {
 			LM_DBG("uuid[%.*s] not found in hash\n", uuid->len, uuid->s);
+		}
 		lock_release(&_cfgt_uuid->lock);
 	} else {
 		lock_get(&_cfgt_uuid->lock);
@@ -100,16 +176,20 @@ void _cfgt_remove_uuid(const str *uuid)
 			head = _cfgt_uuid->hash.table + i;
 			clist_foreach_safe(head, entry, back, next)
 			{
+				str_hash_del(entry);
+				if(remove_report)
+					_cfgt_remove_report(&entry->key);
 				LM_DBG("uuid[%.*s] removed from hash\n", entry->key.len,
 						entry->key.s);
-				str_hash_del(entry);
 				shm_free(entry->key.s);
 				shm_free(entry);
 			}
-			lock_release(&_cfgt_uuid->lock);
 		}
+		lock_release(&_cfgt_uuid->lock);
+		res = 0;
 		LM_DBG("remove all uuids. done\n");
 	}
+	return res;
 }
 
 int _cfgt_get_uuid_id(cfgt_node_p node)
@@ -185,7 +265,7 @@ int _cfgt_get_hdr_helper(struct sip_msg *msg, str *res, int mode)
 			return STR_EQ(tmp, *res);
 		}
 	}
-	return 1; /* not found */
+	return 2; /* not found */
 }
 
 int _cfgt_get_hdr(struct sip_msg *msg, str *res)
@@ -328,7 +408,7 @@ void cfgt_save_node(cfgt_node_p node)
 	dest.s[dir] = '\0';
 	LM_DBG("dir [%s]\n", dest.s);
 	if(stat(dest.s, &sb) == 0 && S_ISDIR(sb.st_mode)) {
-		LM_DBG("dir [%s] already existing\n", dest.s);
+		LM_DBG("dir [%s] already exists\n", dest.s);
 	} else if(mkdir(dest.s, S_IRWXO | S_IXGRP | S_IRWXU) < 0) {
 		LM_ERR("failed to make directory: %s\n", strerror(errno));
 		return;
@@ -392,15 +472,21 @@ int _cfgt_set_dump(struct sip_msg *msg, cfgt_node_p node, str *flow)
 
 	if(node == NULL || flow == NULL)
 		return -1;
+
 	vars = srjson_CreateObject(&node->jdoc);
 	if(vars == NULL) {
 		LM_ERR("cannot create json object\n");
 		return -1;
 	}
+
+	/* TODO: during cfgt_get_json some errors are generated due to missing
+	values in some routes. Skip the function when node->route->s.s equals
+	'dialog:failed' partially solve the issue */
 	if(cfgt_get_json(msg, 30, &node->jdoc, vars) < 0) {
 		LM_ERR("cannot get var info\n");
 		return -1;
 	}
+
 	f = srjson_CreateObject(&node->jdoc);
 	if(f == NULL) {
 		LM_ERR("cannot create json object\n");
@@ -546,6 +632,31 @@ int _cfgt_node_get_flowname(cfgt_str_list_p route, int *indx, str *dest)
 	return 0;
 }
 
+int _cfgt_parse_msg(sip_msg_t *msg)
+{
+	if(parse_msg(msg->buf, msg->len, msg) != 0) {
+		LM_ERR("outbuf buffer parsing failed!");
+		return 1;
+	}
+
+	if(msg->first_line.type == SIP_REQUEST) {
+		if(!IS_SIP(msg)) {
+			LM_DBG("non sip request message\n");
+			return 1;
+		}
+	} else if(msg->first_line.type == SIP_REPLY) {
+		if(!IS_SIP_REPLY(msg)) {
+			LM_DBG("non sip reply message\n");
+			return 1;
+		}
+	} else {
+		LM_DBG("non sip message\n");
+		return 1;
+	}
+
+	return 0;
+}
+
 int cfgt_process_route(struct sip_msg *msg, struct action *a)
 {
 	str routename;
@@ -561,6 +672,10 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
 		return 0;
 	}
 	LM_DBG("route from action:[%s]\n", a->rname);
+	if(not_sip) {
+		LM_DBG("not_sip flag set, not a SIP message, skip it\n");
+		return 0;
+	}
 	routename.s = a->rname;
 	routename.len = strlen(a->rname);
 	switch(_cfgt_add_routename(_cfgt_node, a, &routename)) {
@@ -606,22 +721,35 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
 
 /*
 TODO:
-- parse first line, check if is SIP
 - parse for header cfgtest
 */
 int cfgt_msgin(sr_event_param_t *evp)
 {
 	srjson_t *jobj;
+	sip_msg_t msg;
 	str *buf = (str *)evp->data;
+
 	if(buf == NULL)
 		return 0;
+	LM_DBG("msg in:{%.*s}\n", buf->len, buf->s);
+
+	// Check if it is a SIP message
+	memset(&msg, 0, sizeof(sip_msg_t));
+	msg.buf = buf->s;
+	msg.len = buf->len;
+	if(_cfgt_parse_msg(&msg) != 0) {
+		LM_DBG("set 'not_sip' flag\n");
+		not_sip = 1;
+	} else {
+		not_sip = 0;
+	}
+
 	if(_cfgt_node) {
 		cfgt_save_node(_cfgt_node);
 		_cfgt_remove_node(_cfgt_node);
 		LM_DBG("node removed\n");
 		_cfgt_node = NULL;
 	}
-	LM_DBG("msg in:{%.*s}\n", buf->len, buf->s);
 	_cfgt_node = cfgt_create_node(NULL);
 	if(_cfgt_node) {
 		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
@@ -639,14 +767,23 @@ int cfgt_msgin(sr_event_param_t *evp)
 int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
 {
 	str unknown = {"unknown", 7};
+	int get_hdr_result = 0;
 
 	if(_cfgt_node) {
 		if(_cfgt_node->msgid == 0) {
 			LM_DBG("new node\n");
-			if(_cfgt_get_hdr(msg, &_cfgt_node->uuid) != 0
-					|| _cfgt_node->uuid.len == 0) {
-				LM_ERR("cannot get value of cfgtest uuid header."
-					   " Using unknown\n");
+			get_hdr_result = _cfgt_get_hdr(msg, &_cfgt_node->uuid);
+			if(get_hdr_result != 0 || _cfgt_node->uuid.len == 0) {
+				if(not_sip) {
+					LM_DBG("not_sip flag set, not a SIP message."
+						   " Using 'unknown' uuid\n");
+				} else if(get_hdr_result == 2) {
+					LM_DBG("message not related to the cfgtest scenario."
+						   " Using 'unknown' uuid\n");
+				} else {
+					LM_ERR("cannot get value of cfgtest uuid header."
+						   " Using 'unknown' uuid\n");
+				}
 				pkg_str_dup(&_cfgt_node->uuid, &unknown);
 			}
 			return _cfgt_get_uuid_id(_cfgt_node);
@@ -676,7 +813,11 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
 
 	if(_cfgt_node) {
 		LM_DBG("dump last flow\n");
-		if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
+		if(_cfgt_node->route == NULL
+				&& strncmp(_cfgt_node->uuid.s, "unknown", 7) == 0)
+			LM_DBG("route is NULL and message doesn't belong to cfgtest "
+				   "scenario\n");
+		else if(_cfgt_node_get_flowname(_cfgt_node->route, 0, &flowname) < 0)
 			LM_ERR("cannot create flowname\n");
 		else
 			_cfgt_set_dump(msg, _cfgt_node, &flowname);
@@ -690,10 +831,23 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
 int cfgt_msgout(sr_event_param_t *evp)
 {
 	srjson_t *jobj;
+	sip_msg_t msg;
 	str *buf = (str *)evp->data;
+
 	if(buf == NULL)
 		return 0;
 	LM_DBG("msg out:{%.*s}\n", buf->len, buf->s);
+
+	// Check if it is a SIP message
+	memset(&msg, 0, sizeof(sip_msg_t));
+	msg.buf = buf->s;
+	msg.len = buf->len;
+	if(_cfgt_parse_msg(&msg) != 0) {
+		LM_DBG("set 'not_sip' flag\n");
+		not_sip = 1;
+	} else {
+		not_sip = 0;
+	}
 
 	if(_cfgt_node) {
 		jobj = srjson_CreateStr(&_cfgt_node->jdoc, buf->s, buf->len);
@@ -704,14 +858,64 @@ int cfgt_msgout(sr_event_param_t *evp)
 		srjson_AddItemToArray(&_cfgt_node->jdoc, _cfgt_node->out, jobj);
 		return 0;
 	}
+
+	// Skip OPTION messages internally generated
+	if(buf->len > 7 && strcasestr(buf->s, "OPTIONS")) {
+		LM_DBG("OPTIONS message internally generated, skip it\n");
+		return 0;
+	}
+
 	LM_ERR("node empty\n");
 	return -1;
+}
+
+int _cfgt_clean(str *scen)
+{
+	if(strncmp(scen->s, "all", 3) == 0) {
+		return _cfgt_remove_uuid(NULL, 1);
+	}
+	return _cfgt_remove_uuid(scen, 1);
+}
+
+int _cfgt_list_uuids(rpc_t *rpc, void *ctx)
+{
+	void *vh;
+	struct str_hash_head *head;
+	struct str_hash_entry *entry, *back;
+	int i;
+
+	if(_cfgt_uuid == NULL) {
+		LM_DBG("no _cfgt_uuid\n");
+		rpc->fault(ctx, 500, "Server error");
+		return -1;
+	}
+
+
+	lock_get(&_cfgt_uuid->lock);
+	for(i = 0; i < CFGT_HASH_SIZE; i++) {
+		head = _cfgt_uuid->hash.table + i;
+		clist_foreach_safe(head, entry, back, next)
+		{
+			if(rpc->add(ctx, "{", &vh) < 0) {
+				rpc->fault(ctx, 500, "Server error");
+				return -1;
+			}
+			rpc->struct_add(vh, "Sd", "uuid", &entry->key, "msgid", entry->u.n);
+		}
+	}
+	lock_release(&_cfgt_uuid->lock);
+	return 0;
 }
 
 /**
  *
  */
 static const char *cfgt_rpc_mask_doc[2] = {"Specify module mask", 0};
+static const char *cfgt_rpc_list_doc[2] = {
+		"List scenarios currently in memory", 0};
+static const char *cfgt_rpc_clean_doc[2] = {
+		"Clean scenario, 'all' to clean all scenarios in memory", 0};
+
 
 static void cfgt_rpc_mask(rpc_t *rpc, void *ctx)
 {
@@ -725,8 +929,35 @@ static void cfgt_rpc_mask(rpc_t *rpc, void *ctx)
 	rpc->add(ctx, "s", "200 ok");
 }
 
+static void cfgt_rpc_list(rpc_t *rpc, void *ctx)
+{
+	if(_cfgt_list_uuids(rpc, ctx) >= 0)
+		rpc->add(ctx, "s", "200 ok");
+}
+
+static void cfgt_rpc_clean(rpc_t *rpc, void *ctx)
+{
+	str scen = STR_NULL;
+
+	if(rpc->scan(ctx, "S", &scen) != 1) {
+		rpc->fault(ctx, 500, "invalid parameters");
+		return;
+	}
+	if(_cfgt_clean(&scen) != 0) {
+		rpc->fault(ctx, 500, "error in clean");
+		return;
+	}
+	rpc->add(ctx, "s", "200 ok");
+}
+
+/* clang-format off */
 rpc_export_t cfgt_rpc[] = {
-		{"dbg.mask", cfgt_rpc_mask, cfgt_rpc_mask_doc, 0}, {0, 0, 0, 0}};
+		{"cfgt.mask", cfgt_rpc_mask, cfgt_rpc_mask_doc, 0},
+		{"cfgt.list", cfgt_rpc_list, cfgt_rpc_list_doc, 0},
+		{"cfgt.clean", cfgt_rpc_clean, cfgt_rpc_clean_doc, 0},
+		{0, 0, 0, 0}
+};
+/* clang-format on */
 
 int cfgt_init(void)
 {

@@ -29,7 +29,7 @@
 #include "../../core/mem/shm_mem.h"
 #include "../../core/dprint.h"
 #include "../../core/globals.h"
-#include "../../core/md5.h"
+#include "../../core/crypto/md5utils.h"
 #include "../../core/crc.h"
 #include "../../core/ip_addr.h"
 #include "../../core/dset.h"
@@ -187,12 +187,12 @@ int uac_refresh_hdr_shortcuts(tm_cell_t *tcell, char *buf, int buf_len)
 	tcell->cseq_n.len = (int)(cs->number.s + cs->number.len - lreq.cseq->name.s);
 
 	LM_DBG("cseq: [%.*s]\n", tcell->cseq_n.len, tcell->cseq_n.s);
-	lreq.buf=0; /* covers the obsolete DYN_BUF */
+	lreq.buf=0;
 	free_sip_msg(&lreq);
 	return 0;
 
 error:
-	lreq.buf=0; /* covers the obsolete DYN_BUF */
+	lreq.buf=0;
 	free_sip_msg(&lreq);
 	return -1;
 }
@@ -239,6 +239,8 @@ static inline int t_run_local_req(
 	msg_ctx_id_t backup_ctxid;
 	int refresh_shortcuts = 0;
 	sr_kemi_eng_t *keng = NULL;
+	run_act_ctx_t ra_ctx;
+	run_act_ctx_t *bctx;
 	str evname = str_init("tm:local-request");
 
 	LM_DBG("executing event_route[tm:local-request]\n");
@@ -271,18 +273,24 @@ static inline int t_run_local_req(
 	tm_global_ctx_id.msgid=lreq.id;
 	tm_global_ctx_id.pid=lreq.pid;
 	set_t(new_cell, T_BR_UNDEFINED);
+  
+	init_run_actions_ctx(&ra_ctx);
+	
 	if(goto_on_local_req>=0) {
-		run_top_route(event_rt.rlist[goto_on_local_req], &lreq, 0);
+		run_top_route(event_rt.rlist[goto_on_local_req], &lreq, &ra_ctx);
 	} else {
 		keng = sr_kemi_eng_get();
 		if(keng==NULL) {
 			LM_WARN("event callback (%s) set, but no cfg engine\n",
 					tm_event_callback.s);
 		} else {
+			bctx = sr_kemi_act_ctx_get();
+			sr_kemi_act_ctx_set(&ra_ctx);
 			if(sr_kemi_route(keng, &lreq, EVENT_ROUTE,
 						&tm_event_callback, &evname)<0) {
 				LM_ERR("error running event route kemi callback\n");
 			}
+			sr_kemi_act_ctx_set(bctx);
 		}
 	}
 	/* restore original environment */
@@ -296,6 +304,12 @@ static inline int t_run_local_req(
 	tm_xdata_swap(new_cell, &backup_xd, 1);
 	setsflagsval(sflag_bk);
 
+	if (unlikely(ra_ctx.run_flags&DROP_R_F)) {
+		LM_DBG("tm:local-request dropped msg. to %.*s\n", 
+				lreq.dst_uri.len, lreq.dst_uri.s);
+		refresh_shortcuts = E_DROP;
+		goto clean;
+	}
 	/* rebuild the new message content */
 	if(lreq.force_send_socket != uac_r->dialog->send_sock) {
 		LM_DBG("Send socket updated to: %.*s",
@@ -350,6 +364,7 @@ normal_update:
 		}
 	}
 
+clean:
 	/* clean local msg structure */
 	if (unlikely(lreq.new_uri.s))
 	{
@@ -363,7 +378,7 @@ normal_update:
 		lreq.dst_uri.s=0;
 		lreq.dst_uri.len=0;
 	}
-	lreq.buf=0; /* covers the obsolete DYN_BUF */
+	lreq.buf=0;
 	free_sip_msg(&lreq);
 	return refresh_shortcuts;
 }
@@ -488,10 +503,12 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 	request->flags |= nhtype;
 
 #ifdef SO_REUSEPORT
-	if (cfg_get(tcp, tcp_cfg, reuse_port) && 
-			uac_r->ssock!=NULL && uac_r->ssock->len>0 &&
-			request->dst.send_sock->proto == PROTO_TCP) {
-		request->dst.send_flags.f |= SND_F_FORCE_SOCKET;
+	if (cfg_get(tcp, tcp_cfg, reuse_port)
+			&& request->dst.send_sock->proto == PROTO_TCP) { 
+		if((uac_r->ssockname!=NULL && uac_r->ssockname->len>0)
+				|| (uac_r->ssock!=NULL && uac_r->ssock->len>0)) {
+			request->dst.send_flags.f |= SND_F_FORCE_SOCKET;
+		}
 	}
 #endif
 
@@ -514,6 +531,10 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 #ifdef WITH_EVENT_LOCAL_REQUEST
 	if (unlikely(goto_on_local_req>=0 || tm_event_callback.len>0)) {
 		refresh_shortcuts = t_run_local_req(&buf, &buf_len, uac_r, new_cell, request);
+		if (unlikely(refresh_shortcuts==E_DROP)) {
+			ret=E_DROP;
+			goto error1;
+		}			
 	}
 #endif
 
@@ -525,7 +546,7 @@ static inline int t_uac_prepare(uac_req_t *uac_r,
 				LM_ERR("failed to parse headers on uas for failover\n");
 			} else {
 				new_cell->uas.request = sip_msg_cloner(&lreq, &sip_msg_len);
-				lreq.buf=0; /* covers the obsolete DYN_BUF */
+				lreq.buf=0;
 				free_sip_msg(&lreq);
 				if (!new_cell->uas.request) {
 					LM_ERR("no more shmem\n");
@@ -605,6 +626,7 @@ error3:
 int prepare_req_within(uac_req_t *uac_r,
 		struct retr_buf **dst_req)
 {
+	int ret = -1;
 	if (!uac_r || !uac_r->method || !uac_r->dialog) {
 		LM_ERR("Invalid parameter value\n");
 		goto err;
@@ -619,13 +641,17 @@ int prepare_req_within(uac_req_t *uac_r,
 	if ((uac_r->method->len == 6) && (!memcmp("CANCEL", uac_r->method->s, 6))) goto send;
 	uac_r->dialog->loc_seq.value++; /* Increment CSeq */
  send:
-	return t_uac_prepare(uac_r, dst_req, 0);
+	ret = t_uac_prepare(uac_r, dst_req, 0);
+	
+	if (unlikely(ret < 0 && ret == E_DROP)) {
+		ret = 0;
+	}
 
  err:
 	/* if (cbp) shm_free(cbp); */
 	/* !! never free cbp here because if t_uac_prepare fails, cbp is not freed
 	 * and thus caller has no chance to discover if it is freed or not !! */
-	return -1;
+	return ret;
 }
 
 static inline int send_prepared_request_impl(struct retr_buf *request, int retransmit, int branch)
@@ -711,7 +737,14 @@ int t_uac_with_ids(uac_req_t *uac_r,
 	branch_bm_t added_branches = 1;
 
 	ret = t_uac_prepare(uac_r, &request, &cell);
-	if (ret < 0) return ret;
+	
+	if (ret < 0) {
+		if (unlikely(ret == E_DROP)) {
+			ret = 0;
+		}
+		return ret;
+	}
+
 	is_ack = (uac_r->method->len == 3) && (memcmp("ACK", uac_r->method->s, 3)==0) ? 1 : 0;
 
 	/* equivalent loop to the one in t_forward_nonack */
@@ -895,10 +928,14 @@ int req_within(uac_req_t *uac_r)
 		goto err;
 	}
 
-	if(uac_r->ssock!=NULL && uac_r->ssock->len>0
-			&& uac_r->dialog->send_sock==NULL) {
-		/* set local send socket */
-		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+	if(uac_r->dialog->send_sock==NULL) {
+		if(uac_r->ssockname!=NULL && uac_r->ssockname->len>0) {
+			/* set local send socket by name */
+			uac_r->dialog->send_sock = ksr_get_socket_by_name(uac_r->ssockname);
+		} else if(uac_r->ssock!=NULL && uac_r->ssock->len>0) {
+			/* set local send socket by address */
+			uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+		}
 	}
 
 	/* handle alias parameter in uri
@@ -975,10 +1012,14 @@ int req_outside(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 	if (next_hop) uac_r->dialog->dst_uri = *next_hop;
 	w_calculate_hooks(uac_r->dialog);
 
-	if(uac_r->ssock!=NULL && uac_r->ssock->len>0
-			&& uac_r->dialog->send_sock==NULL) {
-		/* set local send socket */
-		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+	if(uac_r->dialog->send_sock==NULL) {
+		if(uac_r->ssockname!=NULL && uac_r->ssockname->len>0) {
+			/* set local send socket by name */
+			uac_r->dialog->send_sock = ksr_get_socket_by_name(uac_r->ssockname);
+		} else if(uac_r->ssock!=NULL && uac_r->ssock->len>0) {
+			/* set local send socket by address */
+			uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+		}
 	}
 
 	return t_uac(uac_r);
@@ -1035,10 +1076,14 @@ int request(uac_req_t *uac_r, str* ruri, str* to, str* from, str *next_hop)
 	 */
 	uac_r->dialog = dialog;
 
-	if(uac_r->ssock!=NULL && uac_r->ssock->len>0
-			&& uac_r->dialog->send_sock==NULL) {
-		/* set local send socket */
-		uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+	if(uac_r->dialog->send_sock==NULL) {
+		if(uac_r->ssockname!=NULL && uac_r->ssockname->len>0) {
+			/* set local send socket by name */
+			uac_r->dialog->send_sock = ksr_get_socket_by_name(uac_r->ssockname);
+		} else if(uac_r->ssock!=NULL && uac_r->ssock->len>0) {
+			/* set local send socket by address */
+			uac_r->dialog->send_sock = lookup_local_socket(uac_r->ssock);
+		}
 	}
 
 	res = t_uac(uac_r);

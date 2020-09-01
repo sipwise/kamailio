@@ -16,7 +16,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-
+/*
+ * OpenSSL docs:
+ * https://www.openssl.org/docs/man1.1.1/man7/RAND.html
+ * https://www.openssl.org/docs/man1.1.1/man3/RAND_set_rand_method.html
+ */
 
 #include <stdlib.h>
 #include <string.h>
@@ -32,8 +36,12 @@
 #include "../../core/mem/shm.h"
 #include "../../core/rand/kam_rand.h"
 #include "../../core/rand/fastrand.h"
-#include "fortuna/random.h"
+#include "../../core/rand/fortuna/random.h"
 
+/*
+ * Implementation for tests with system library PNRG,
+ * do not use this in production.
+ */
 static int ksr_krand_bytes(unsigned char *outdata, int size)
 {
 	int r;
@@ -43,11 +51,6 @@ static int ksr_krand_bytes(unsigned char *outdata, int size)
 	} else if (size == 0) {
 		return 1;
 	}
-
-/* TODO
-	sr_get_pseudo_random_bytes(outdata, size);
-	return 1;
-*/
 
 	while(size >= sizeof(int)) {
 		r = kam_rand();
@@ -86,6 +89,11 @@ const RAND_METHOD *RAND_ksr_krand_method(void)
     return &_ksr_krand_method;
 }
 
+/*
+ * Implementation for tests with fastrand implementation,
+ * better as system library but still not secure enough.
+ * Do not use this in production.y
+ */
 static int ksr_fastrand_bytes(unsigned char *outdata, int size)
 {
 	int r;
@@ -133,7 +141,6 @@ const RAND_METHOD *RAND_ksr_fastrand_method(void)
     return &_ksr_fastrand_method;
 }
 
-
 /*
  * Implementation with Fortuna cryptographic PRNG.
  * We are not strictly implementing the OpenSSL API here - we will
@@ -173,21 +180,6 @@ const RAND_METHOD _ksr_cryptorand_method = {
 const RAND_METHOD *RAND_ksr_cryptorand_method(void)
 {
     return &_ksr_cryptorand_method;
-}
-
-/* seed the generator during startup, internally it will also use system entropy */
-void ksr_cryptorand_seed_init() {
-        u_int8_t bytes[4];
-        unsigned int seed;
-
-        seed = fastrand();
-        bytes[0] = (seed >> 24) & 0xFF;
-        bytes[1] = (seed >> 16) & 0xFF;
-        bytes[2] = (seed >> 8)  & 0xFF;
-        bytes[3] = seed & 0xFF;
-
-        LM_DBG("seeding cryptorand generator with %u\n", seed);
-        sr_add_entropy(bytes, 4);
 }
 
 /**
