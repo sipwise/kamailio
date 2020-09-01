@@ -27,6 +27,7 @@ Build-Depends:
  libmemcached-dev,
  libmnl-dev,
  libmono-2.0-dev [amd64 armel armhf i386 mipsel kfreebsd-amd64 kfreebsd-i386 ppc64 ppc64el s390x],
+ libmosquitto-dev,
  libncurses5-dev,
  libpcre3-dev,
  libperl-dev,
@@ -788,6 +789,26 @@ Description: systemd logging modules for the Kamailio SIP server
  .
  This package provides logging to systemd journal directly from the
  Kamailio configuration and routing scripts.
+
+Package: ngcp-kamailio-mqtt-modules
+Architecture: linux-any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: MQTT modules for the Kamailio SIP Server
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ MQTT module allows bidirectional publish/subscribe communication by
+ connecting Kamailio to a MQTT Broker.
+ .
+ Messages can be published from any point in the routing script. Also
+ the subscriptions can be fully controlled by scripting commands.
 
 Package: ngcp-kamailio-extra-modules
 Architecture: any
