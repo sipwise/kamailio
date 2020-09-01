@@ -17,10 +17,10 @@ Subject: add_pcem_module
  create mode 100644 src/modules/pcem/pcem_mod.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index fe65f55..e2de25b 100644
+index fe74c7e..7b879ec 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -29,8 +29,8 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
+@@ -30,8 +30,8 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \

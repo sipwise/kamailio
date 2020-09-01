@@ -39,7 +39,7 @@ index bd48956..0dee5f9 100644
  
  	<section>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index 2e25386..c70ea02 100644
+index cc2fd20..a1cd837 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -82,6 +82,7 @@ int_str pubruri_callee_avp_name;

@@ -13,10 +13,10 @@ Subject: add_lcr_rate_module
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index e2de25b..eaf1649 100644
+index 7b879ec..6f7bf91 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -105,6 +105,9 @@ mod_list_sctp=sctp
+@@ -106,6 +106,9 @@ mod_list_sctp=sctp
  # - modules depending on openssl library
  mod_list_autheph=auth_ephemeral
  
@@ -26,10 +26,10 @@ index e2de25b..eaf1649 100644
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -243,8 +246,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
- 			   $(mod_list_http_async) $(mod_list_nsq) \
- 			   $(mod_list_rabbitmq) $(mod_list_jsdt)) \
- 			   $(mod_list_phonenum) \
+@@ -256,8 +259,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
+ 			   $(mod_list_kafka) \
+ 			   $(mod_list_mqtt) \
+ 			   $(mod_list_secsipid) \
 -			   $(mod_list_rtp_media_server)
 -
 +			   $(mod_list_rtp_media_server) \
@@ -37,7 +37,7 @@ index e2de25b..eaf1649 100644
  
  
  ### --- Groups defined for source code compilation ###
-@@ -297,6 +300,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
+@@ -310,6 +313,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  

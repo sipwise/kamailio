@@ -16,18 +16,17 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
  create mode 100644 src/modules/tmrec/ical.h
 
 diff --git a/src/modules/tmrec/Makefile b/src/modules/tmrec/Makefile
-index a29758a..e2a4622 100644
+index 61cbca6..374ccc4 100644
 --- a/src/modules/tmrec/Makefile
 +++ b/src/modules/tmrec/Makefile
-@@ -5,7 +5,7 @@ include ../../Makefile.defs
+@@ -5,6 +5,6 @@ include ../../Makefile.defs
  auto_gen=
  NAME=tmrec.so
  DEFS +=
 -LIBS +=
 +LIBS += -L$(LOCALBASE)/lib -lical -licalss
  
- SERLIBPATH=../../lib
- SER_LIBS+=$(SERLIBPATH)/srutils/srutils
+ include ../../Makefile.modules
 diff --git a/src/modules/tmrec/ical.c b/src/modules/tmrec/ical.c
 new file mode 100644
 index 0000000..91d9b60
@@ -103,12 +102,12 @@ index 0000000..5e44ba1
 +
 +#endif
 diff --git a/src/modules/tmrec/tmrec_mod.c b/src/modules/tmrec/tmrec_mod.c
-index 2334e16..55c046e 100644
+index cc97cc9..e574af1 100644
 --- a/src/modules/tmrec/tmrec_mod.c
 +++ b/src/modules/tmrec/tmrec_mod.c
 @@ -41,6 +41,7 @@
  #include "../../core/kemi.h"
- #include "../../lib/srutils/tmrec.h"
+ #include "../../core/utils/tmrec.h"
  #include "period.h"
 +#include "ical.h"
  

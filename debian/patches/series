@@ -15,14 +15,11 @@ sipwise/fix_lcr_rate_wrong_id.patch
 sipwise/add_tcap_module.patch
 sipwise/add_presence_dfks_module.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
-sipwise/add_pv_headers_module.patch
 ## General Patches
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/tmrec-ical.patch
-# ** https://github.com/kamailio/kamailio/pull/2162
-sipwise/registrar_add_path.patch
 sipwise/switch_from_python2_to_python3.patch
 ## SCA Patches
 sipwise/sca-line-seize.patch
@@ -33,57 +30,12 @@ sipwise/sca-fix-pickup-when-upstream-flow.patch
 sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
-## backport from kamailio trunk (5.4)
-upstream/core-events-support-for-basic-void-core-callbacks.patch
-upstream/core-main-executes-callbacks-on-app-ready-and-shutdo.patch
-upstream/core-stop-start-if-ifdef-check-fails.patch
-upstream/systemdops-new-module-to-facilitate-integration-with.patch
-upstream/src-Makefile.groups-added-systemdops-module-to-syste.patch
-upstream/systemdops-set-core-callbacks-in-mod_register.patch
-upstream/systemdops-proper-check-for-null-value.patch
-upstream/db_redis-performance-improvements-and-fixes.patch
-upstream/rtpengine-add-play_dtmf-command.patch
-upstream/cfgt-group-RPC-commands-using-module-name.patch
-upstream/cfgt-add-docs-for-missing-RPC-commands.patch
-upstream/cfgt-doc-add-missing-section.patch
-upstream/cfgt-remove-dbg-from-RPC-commands.patch
-upstream/cfgt-add-RPC-commands-cfgt.list-and-cfgt.clean.patch
-upstream/cfgt-use-snprintf-instead-of-sprintf.patch
-upstream/tm_add_proportional_load_contacts_by_q_value.patch
-upstream/avpops-add-avp_subst_pv-documentation.patch
-upstream/avpops-add-avp_subst_pv.patch
-upstream/rtpengine-update-fix-via-branch-next-ID-generation.patch
-upstream/rtpengine-t38-options.patch
-upstream/rtpengine-add-flags-field-for-every-command.patch
-upstream/app_lua-add-support-for-ARRAY-and-DICT-types.patch
-upstream/core-KEMI-suport-for-ARRAY-and-DICT.patch
-upstream/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
-upstream/pv-fixes-for-KEMI-pvx.xavp_getd.patch
-upstream/cfgt-don-t-process-non-sip-messages.patch
-upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
-upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
-upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
-upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
-upstream/core-add-case-functions-for-str_hash-get-and-set.patch
-upstream/core-xavi-api-like-xavp-but-with-insensitive-case-na.patch
-upstream/pv-define-xavi-types.patch
-upstream/core-receive-reset-xavi-list-after-message-processin.patch
-upstream/tm-process-xavi-list-in-transaction-contexts.patch
-upstream/pv-xavi-.-config-variables-implementation.patch
-upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
-upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
-## backport from kamailio trunk (5.3)
-#
 ### relevant for upstream
-#
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 ### active development
-sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
-sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
-sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches

@@ -39,7 +39,7 @@ index c869344..bd48956 100644
  		<title><varname>pubruri_caller_avp</varname> (str)</title>
  		<para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index f393249..2e25386 100644
+index eb37c61..cc2fd20 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -41,6 +41,7 @@
