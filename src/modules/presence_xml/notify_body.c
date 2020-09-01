@@ -1,5 +1,5 @@
 /*
- * presence_xml module -  
+ * presence_xml module
  *
  * Copyright (C) 2006 Voice Sistem S.R.L.
  *
@@ -15,8 +15,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
@@ -38,10 +38,14 @@
 #include "notify_body.h"
 #include "presence_xml.h"
 
-extern int force_dummy_presence;
+extern int pxml_force_dummy_presence;
+extern int pxml_force_single_body;
+extern str pxml_single_body_priorities;
+extern str pxml_single_body_lookup_element;
 
 str *offline_nbody(str *body);
 str *agregate_xmls(str *pres_user, str *pres_domain, str **body_array, int n);
+str *agregate_xmls_priority(str *pres_user, str *pres_domain, str **body_array, int n);
 str *get_final_notify_body(
 		subs_t *subs, str *notify_body, xmlNodePtr rule_node);
 
@@ -58,14 +62,18 @@ void free_xml_body(char *body)
 
 #define PRESENCE_EMPTY_BODY \
 	"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
-<presence xmlns=\"urn:ietf:params:xml:ns:pidf\" xmlns:dm=\"urn:ietf:params:xml:ns:pidf:data-model\" xmlns:rpid=\"urn:ietf:params:xml:ns:pidf:rpid\" xmlns:c=\"urn:ietf:params:xml:ns:pidf:cipid\" entity=\"%.*s\"> \
+<presence xmlns=\"urn:ietf:params:xml:ns:pidf\"\
+ xmlns:dm=\"urn:ietf:params:xml:ns:pidf:data-model\"\
+ xmlns:rpid=\"urn:ietf:params:xml:ns:pidf:rpid\"\
+ xmlns:c=\"urn:ietf:params:xml:ns:pidf:cipid\" entity=\"%.*s\">\
 <tuple xmlns=\"urn:ietf:params:xml:ns:pidf\" id=\"615293b33c62dec073e05d9421e9f48b\">\
 <status>\
 <basic>open</basic>\
 </status>\
 </tuple>\
 <note xmlns=\"urn:ietf:params:xml:ns:pidf\">Available</note>\
-<dm:person xmlns:dm=\"urn:ietf:params:xml:ns:pidf:data-model\" xmlns:rpid=\"urn:ietf:params:xml:ns:pidf:rpid\" id=\"1\">\
+<dm:person xmlns:dm=\"urn:ietf:params:xml:ns:pidf:data-model\"\
+ xmlns:rpid=\"urn:ietf:params:xml:ns:pidf:rpid\" id=\"1\">\
 <rpid:activities/>\
 <dm:note>Available</dm:note>\
 </dm:person>\
@@ -131,7 +139,7 @@ str *pres_agg_nbody(str *pres_user, str *pres_domain, str **body_array, int n,
 	str *n_body = NULL;
 	str *body = NULL;
 
-	if(body_array == NULL && (!force_dummy_presence))
+	if(body_array == NULL && (!pxml_force_dummy_presence))
 		return NULL;
 
 	if(body_array == NULL)
@@ -148,7 +156,11 @@ str *pres_agg_nbody(str *pres_user, str *pres_domain, str **body_array, int n,
 	}
 	LM_DBG("[user]=%.*s  [domain]= %.*s\n", pres_user->len, pres_user->s,
 			pres_domain->len, pres_domain->s);
-	n_body = agregate_xmls(pres_user, pres_domain, body_array, n);
+	if(pxml_force_single_body == 0) {
+		n_body = agregate_xmls(pres_user, pres_domain, body_array, n);
+	} else {
+		n_body = agregate_xmls_priority(pres_user, pres_domain, body_array, n);
+	}
 	if(n_body == NULL && n != 0) {
 		LM_ERR("while aggregating body\n");
 	}
@@ -172,8 +184,9 @@ int pres_apply_auth(str *notify_body, subs_t *subs, str **final_nbody)
 	str *n_body = NULL;
 
 	*final_nbody = NULL;
-	if(force_active)
+	if(pxml_force_active) {
 		return 0;
+	}
 
 	if(subs->auth_rules_doc == NULL) {
 		LM_ERR("NULL rules doc\n");
@@ -626,6 +639,109 @@ error:
 	}
 	if(tuple_id)
 		xmlFree(tuple_id);
+	if(body)
+		pkg_free(body);
+
+	return NULL;
+}
+
+str *agregate_xmls_priority(str *pres_user, str *pres_domain, str **body_array, int n)
+{
+	int i, j = 0, idx = 0;
+	xmlNodePtr p_root = NULL, new_p_root = NULL;
+	xmlDocPtr *xml_array;
+	str *body = NULL;
+	char *cur = NULL, *cmp = NULL, *priority = NULL;
+
+	xml_array = (xmlDocPtr *)pkg_malloc((n + 2) * sizeof(xmlDocPtr));
+	if(xml_array == NULL) {
+
+		LM_ERR("while allocating memory");
+		return NULL;
+	}
+	memset(xml_array, 0, (n + 2) * sizeof(xmlDocPtr));
+
+	for(i = 0; i < n; i++) {
+		if(body_array[i] == NULL)
+			continue;
+
+		xml_array[j] = NULL;
+		xml_array[j] = xmlParseMemory(body_array[i]->s, body_array[i]->len);
+
+		if(xml_array[j] == NULL) {
+			LM_ERR("while parsing xml body message\n");
+			goto error;
+		}
+		j++;
+	}
+
+	if(j == 0) /* no body */
+	{
+		if(xml_array)
+			pkg_free(xml_array);
+		return NULL;
+	}
+
+	idx = --j;
+	if(strlen(pxml_single_body_priorities.s) > 0
+				&& strlen(pxml_single_body_lookup_element.s) > 0) {
+		p_root = xmlDocGetNodeByName(xml_array[j], "presence", NULL);
+		if(p_root == NULL) {
+			LM_ERR("while getting the xml_tree root\n");
+			goto error;
+		}
+		cur = xmlNodeGetNodeContentByName(p_root, pxml_single_body_lookup_element.s, NULL);
+		if(cur) {
+			priority = strstr(pxml_single_body_priorities.s, cur);
+		}
+
+		for(i = j - 1; i >= 0; i--) {
+			new_p_root = xmlDocGetNodeByName(xml_array[i], "presence", NULL);
+			if(new_p_root == NULL) {
+				LM_ERR("while getting the xml_tree root\n");
+				goto error;
+			}
+
+			cmp = xmlNodeGetNodeContentByName(new_p_root, pxml_single_body_lookup_element.s, NULL);
+			if(cur != NULL && cmp != NULL && strcasecmp(cur,cmp)) {
+				char *x1 = strstr(pxml_single_body_priorities.s, cmp);
+				if(x1 > priority) {
+					idx = i;
+					cur = cmp;
+					priority = x1;
+				}
+			}
+		}
+	}
+
+	body = (str *)pkg_malloc(sizeof(str));
+	if(body == NULL) {
+		ERR_MEM(PKG_MEM_STR);
+	}
+
+	xmlDocDumpFormatMemory(
+			xml_array[idx], (xmlChar **)(void *)&body->s, &body->len, 1);
+
+	for(i = 0; i <= j; i++) {
+		if(xml_array[i] != NULL)
+			xmlFreeDoc(xml_array[i]);
+	}
+	if(xml_array != NULL)
+		pkg_free(xml_array);
+
+	xmlCleanupParser();
+	xmlMemoryDump();
+
+	return body;
+
+error:
+	if(xml_array != NULL) {
+		for(i = 0; i <= j; i++) {
+			if(xml_array[i] != NULL)
+				xmlFreeDoc(xml_array[i]);
+		}
+		pkg_free(xml_array);
+	}
 	if(body)
 		pkg_free(body);
 

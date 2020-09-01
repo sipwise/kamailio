@@ -46,43 +46,43 @@ static void ka_run_route(sip_msg_t *msg, str *uri, char *route);
 static void ka_options_callback(struct cell *t, int type,
 		struct tmcb_params *ps);
 
-
+extern str ka_ping_from;
 /*! \brief
- * Timer for checking probing destinations
+ * Callback run from timer,  for probing a destination
  *
  * This timer is regularly fired.
  */
-void ka_check_timer(unsigned int ticks, void *param)
+ticks_t ka_check_timer(ticks_t ticks, struct timer_ln* tl, void* param)
 {
 	ka_dest_t *ka_dest;
 	str ka_ping_method = str_init("OPTIONS");
-	str ka_ping_from = str_init("sip:dispatcher@localhost");
 	str ka_outbound_proxy = {0, 0};
 	uac_req_t uac_r;
 
-	LM_DBG("ka check timer\n");
+	ka_dest = (ka_dest_t *)param;
 
-	for(ka_dest = ka_destinations_list->first; ka_dest != NULL;
-			ka_dest = ka_dest->next) {
-		LM_DBG("ka_check_timer dest:%.*s\n", ka_dest->uri.len, ka_dest->uri.s);
+    LM_DBG("dest: %.*s\n", ka_dest->uri.len, ka_dest->uri.s);
 
-		/* Send ping using TM-Module.
-		 * int request(str* m, str* ruri, str* to, str* from, str* h,
-		 *		str* b, str *oburi,
-		 *		transaction_cb cb, void* cbp); */
-		set_uac_req(&uac_r, &ka_ping_method, 0, 0, 0, TMCB_LOCAL_COMPLETED,
-				ka_options_callback, (void *)ka_dest);
+    if(ka_counter_del > 0 && ka_dest->counter > ka_counter_del) {
+        return (ticks_t)(0); /* stops the timer */
+    }
 
-		if(tmb.t_request(&uac_r, &ka_dest->uri, &ka_dest->uri, &ka_ping_from,
-				   &ka_outbound_proxy)
-				< 0) {
-			LM_ERR("unable to ping [%.*s]\n", ka_dest->uri.len, ka_dest->uri.s);
-		}
+    /* Send ping using TM-Module.
+     * int request(str* m, str* ruri, str* to, str* from, str* h,
+     *		str* b, str *oburi,
+     *		transaction_cb cb, void* cbp); */
+    set_uac_req(&uac_r, &ka_ping_method, 0, 0, 0, TMCB_LOCAL_COMPLETED,
+            ka_options_callback, (void *)ka_dest);
 
-		ka_dest->last_checked = time(NULL);
-	}
+    if(tmb.t_request(&uac_r, &ka_dest->uri, &ka_dest->uri, &ka_ping_from,
+               &ka_outbound_proxy)
+            < 0) {
+        LM_ERR("unable to ping [%.*s]\n", ka_dest->uri.len, ka_dest->uri.s);
+    }
 
-	return;
+    ka_dest->last_checked = time(NULL);
+
+	return ka_dest->ping_interval; /* periodical, but based on dest->ping_interval, not on initial_timeout */
 }
 
 /*! \brief
@@ -104,7 +104,7 @@ static void ka_options_callback(
 
 	uri.s = t->to.s + 5;
 	uri.len = t->to.len - 8;
-	LM_DBG("OPTIONS-Request was finished with code %d (to %.*s)\n", ps->code,
+	LM_DBG("OPTIONS request was finished with code %d (to %.*s)\n", ps->code,
 			ka_dest->uri.len, ka_dest->uri.s); //uri.len, uri.s);
 
 
@@ -112,12 +112,13 @@ static void ka_options_callback(
 	if(ps->code >= 200 && ps->code <= 299) {
 		state = KA_STATE_UP;
 		ka_dest->last_down = time(NULL);
+		ka_dest->counter=0;
 	} else {
 		state = KA_STATE_DOWN;
 		ka_dest->last_up = time(NULL);
+		ka_dest->counter++;
 	}
 
-	LM_DBG("new state is: %d\n", state);
 	if(state != ka_dest->state) {
 		ka_run_route(msg, &uri, state_routes[state]);
 
@@ -125,7 +126,11 @@ static void ka_options_callback(
 			ka_dest->statechanged_clb(&ka_dest->uri, state, ka_dest->user_attr);
 		}
 
+		LM_DBG("new state is: %d\n", state);
 		ka_dest->state = state;
+	}
+	if(ka_dest->response_clb != NULL) {
+		ka_dest->response_clb(&ka_dest->uri, ps, ka_dest->user_attr);
 	}
 }
 
@@ -144,7 +149,7 @@ static void ka_run_route(sip_msg_t *msg, str *uri, char *route)
 		return;
 	}
 
-	LM_DBG("ka_run_route event_route[%s]\n", route);
+	LM_DBG("run event_route[%s]\n", route);
 
 	rt = route_get(&event_rt, route);
 	if(rt < 0 || event_rt.rlist[rt] == NULL) {

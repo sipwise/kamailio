@@ -35,6 +35,8 @@
 #ifndef config_h
 #define config_h
 
+#include "crypto/md5utils.h"
+
 #define SIP_PORT  5060 /*!< default SIP port if none specified */
 #define SIPS_PORT 5061 /*!< default SIP port for TLS if none specified */
 
@@ -108,6 +110,9 @@
 
 #define COMP_PARAM ";comp="
 #define COMP_PARAM_LEN (sizeof(COMP_PARAM)-1)
+
+#define SOCKNAME_PARAM ";sn="
+#define SOCKNAME_PARAM_LEN (sizeof(SOCKNAME_PARAM)-1)
 
 #define SIGCOMP_NAME "sigcomp"
 #define SIGCOMP_NAME_LEN (sizeof(SIGCOMP_NAME)-1)

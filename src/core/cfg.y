@@ -325,6 +325,7 @@ extern char *default_routename;
 %token XAVPVIAFIELDS
 %token LISTEN
 %token ADVERTISE
+%token STRNAME
 %token ALIAS
 %token SR_AUTO_ALIASES
 %token DNS
@@ -373,6 +374,7 @@ extern char *default_routename;
 
 %token PORT
 %token STAT
+%token STATS_NAMESEP
 %token CHILDREN
 %token SOCKET_WORKERS
 %token ASYNC_WORKERS
@@ -503,6 +505,7 @@ extern char *default_routename;
 %token LATENCY_LIMIT_CFG
 %token MSG_TIME
 %token ONSEND_RT_REPLY
+%token URI_HOST_EXTRA_CHARS
 
 %token FLAGS_DECL
 %token AVPFLAGS_DECL
@@ -914,6 +917,8 @@ assign_stm:
 	| PORT EQUAL error    { yyerror("number expected"); }
 	| CHILDREN EQUAL NUMBER { children_no=$3; }
 	| CHILDREN EQUAL error { yyerror("number expected"); }
+	| STATS_NAMESEP EQUAL STRING { ksr_stats_namesep=$3; }
+	| STATS_NAMESEP EQUAL error { yyerror("string value expected"); }
 	| SOCKET_WORKERS EQUAL NUMBER { socket_workers=$3; }
 	| SOCKET_WORKERS EQUAL error { yyerror("number expected"); }
 	| ASYNC_WORKERS EQUAL NUMBER { async_task_set_workers($3); }
@@ -1437,6 +1442,8 @@ assign_stm:
 			user_agent_hdr.len=strlen(user_agent_hdr.s);
 	}
 	| USER_AGENT_HEADER EQUAL error { yyerror("string value expected"); }
+	| URI_HOST_EXTRA_CHARS EQUAL STRING { _sr_uri_host_extra_chars=$3; }
+	| URI_HOST_EXTRA_CHARS EQUAL error { yyerror("string value expected"); }
 	| REPLY_TO_VIA EQUAL NUMBER { reply_to_via=$3; }
 	| REPLY_TO_VIA EQUAL error { yyerror("boolean value expected"); }
 	| LISTEN EQUAL id_lst {
@@ -1444,6 +1451,18 @@ assign_stm:
 			if (add_listen_iface(	lst_tmp->addr_lst->name,
 									lst_tmp->addr_lst->next,
 									lst_tmp->port, lst_tmp->proto,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
+	| LISTEN EQUAL id_lst STRNAME STRING {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_iface_name(lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto, $5,
 									lst_tmp->flags)!=0) {
 				LM_CRIT("cfg. parser: failed to add listen address\n");
 				break;
@@ -1464,12 +1483,38 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+	| LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER STRNAME STRING {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto,
+									$5, $7, $9,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
 	| LISTEN EQUAL id_lst ADVERTISE listen_id {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_advertise_iface(	lst_tmp->addr_lst->name,
 									lst_tmp->addr_lst->next,
 									lst_tmp->port, lst_tmp->proto,
 									$5, 0,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
+	| LISTEN EQUAL id_lst ADVERTISE listen_id STRNAME STRING {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto,
+									$5, 0, $7,
 									lst_tmp->flags)!=0) {
 				LM_CRIT("cfg. parser: failed to add listen address\n");
 				break;
@@ -2670,7 +2715,7 @@ attr_mark:
 	ATTR_MARK {
 		s_attr = (struct avp_spec*)pkg_malloc(sizeof(struct avp_spec));
 		if (!s_attr) { yyerror("No memory left"); YYABORT; }
-		else s_attr->type = 0;
+		else { memset(s_attr, 0, (sizeof(struct avp_spec))); }
 	}
 	;
 attr_id:
@@ -3709,6 +3754,7 @@ static struct name_lst* mk_name_lst(char* host, int flags)
 	if (l==0) {
 		PKG_MEM_CRITICAL;
 	} else {
+		memset(l, 0, sizeof(struct name_lst));
 		l->name=host;
 		l->flags=flags;
 		l->next=0;
@@ -3725,6 +3771,7 @@ static struct socket_id* mk_listen_id(char* host, int proto, int port)
 	if (l==0) {
 		PKG_MEM_CRITICAL;
 	} else {
+		memset(l, 0, sizeof(struct socket_id));
 		l->addr_lst=mk_name_lst(host, 0);
 		if (l->addr_lst==0){
 			pkg_free(l);
@@ -3760,6 +3807,7 @@ static struct socket_id* mk_listen_id2(struct name_lst* addr_l, int proto,
 	if (l==0) {
 		PKG_MEM_CRITICAL;
 	} else {
+		memset(l, 0, sizeof(struct socket_id));
 		l->flags=addr_l->flags;
 		l->port=port;
 		l->proto=proto;

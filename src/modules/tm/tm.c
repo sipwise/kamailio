@@ -63,6 +63,7 @@
 #include "../../core/cfg/cfg.h"
 #include "../../core/globals.h"
 #include "../../core/timer_ticks.h"
+#include "../../core/dset.h"
 #include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
 
@@ -207,6 +208,7 @@ static int w_t_uac_send(sip_msg_t* msg, char* pmethod, char* pruri,
 		char* pnexthop, char* psock, char *phdrs, char* pbody);
 static int w_t_get_status_code(sip_msg_t* msg, char *p1, char *p2);
 
+static int t_clean(struct sip_msg* msg, char* key, char* value);
 
 /* by default the fr timers avps are not set, so that the avps won't be
  * searched for nothing each time a new transaction is created */
@@ -219,6 +221,9 @@ str ulattrs_xavp_name = {NULL, 0};
 str on_sl_reply_name = {NULL, 0};
 int tm_remap_503_500 = 1;
 str _tm_event_callback_lres_sent = {NULL, 0};
+
+unsigned long tm_exec_time_check = 0; /* microseconds */
+int tm_exec_time_check_param = 5000; /* milliseconds */
 
 int tm_failure_exec_mode = 0;
 
@@ -402,12 +407,15 @@ static cmd_export_t cmds[]={
 	{"t_get_status_code", w_t_get_status_code,      0, 0, 0,
 		REQUEST_ROUTE|ONREPLY_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE },
 
-	{"t_load_contacts", t_load_contacts,            0, 0, 0,
+	{"t_load_contacts", t_load_contacts,          0, 0, 0,
+		REQUEST_ROUTE | FAILURE_ROUTE},
+	{"t_load_contacts", t_load_contacts,          1, fixup_var_int_1, 0,
 		REQUEST_ROUTE | FAILURE_ROUTE},
 	{"t_next_contacts", t_next_contacts,            0, 0, 0,
 		REQUEST_ROUTE | FAILURE_ROUTE},
 	{"t_next_contact_flow", t_next_contact_flow,            0, 0, 0,
 		REQUEST_ROUTE },
+	{"t_clean", t_clean, 0, 0, 0, ANY_ROUTE },
 
 	/* not applicable from the script */
 	{"load_tm",            (cmd_function)load_tm,           NO_SCRIPT,   0, 0, 0},
@@ -471,6 +479,7 @@ static param_export_t params[]={
 	{"relay_100",           PARAM_INT, &default_tm_cfg.relay_100             },
 	{"rich_redirect" ,      PARAM_INT, &tm_rich_redirect                     },
 	{"event_callback_lres_sent", PARAM_STR, &_tm_event_callback_lres_sent    },
+	{"exec_time_check" ,    PARAM_INT, &tm_exec_time_check_param             },
 	{0,0,0}
 };
 
@@ -538,21 +547,27 @@ static int fixup_on_failure(void** param, int param_no)
 static int fixup_on_branch_failure(void** param, int param_no)
 {
 	char *full_route_name = NULL;
-	int len;
+	int blen =0;
+	int bsize = 0;
 	int ret = 0;
-	if (param_no==1){
-		if((len = strlen((char*)*param))<=1
-				&& (*(char*)(*param)==0 || *(char*)(*param)=='0')) {
+	if (param_no==1) {
+		bsize = strlen((char*)*param);
+		if((bsize <=1) && (*(char*)(*param)==0 || *(char*)(*param)=='0')) {
 			*param = (void*)0;
 			return 0;
 		}
-		len += strlen(BRANCH_FAILURE_ROUTE_PREFIX) + 1;
-		if ((full_route_name = pkg_malloc(len+1)) == NULL)
-		{
+		bsize += strlen(BRANCH_FAILURE_ROUTE_PREFIX) + 2;
+		if ((full_route_name = pkg_malloc(bsize)) == NULL) {
 			LM_ERR("No memory left in branch_failure fixup\n");
 			return -1;
 		}
-		sprintf(full_route_name, "%s:%s", BRANCH_FAILURE_ROUTE_PREFIX, (char*)*param);
+		blen = snprintf(full_route_name, bsize, "%s:%s",
+					BRANCH_FAILURE_ROUTE_PREFIX, (char*)*param);
+		if(blen<0 || blen>=bsize) {
+			LM_ERR("Failure to construct route block name\n");
+			pkg_free(full_route_name);
+			return -1;
+		}
 		*param=(void*)full_route_name;
 		ret = fixup_routes("t_on_branch_failure", &event_rt, param);
 		pkg_free(full_route_name);
@@ -695,6 +710,10 @@ static int mod_init(void)
 
 	DBG( "TM - (sizeof cell=%ld, sip_msg=%ld) initializing...\n",
 			(long)sizeof(struct cell), (long)sizeof(struct sip_msg));
+
+	if(tm_exec_time_check_param > 0) {
+		tm_exec_time_check = (unsigned long)tm_exec_time_check_param * 1000;
+	}
 
 	/* checking if we have sufficient bitmap capacity for given
 	 * maximum number of  branches */
@@ -912,6 +931,50 @@ error:
 static int w_t_get_status_code(sip_msg_t* msg, char *p1, char *p2)
 {
 	return ki_t_get_status_code(msg);
+}
+
+static int ki_t_get_branch_index(sip_msg_t* msg)
+{
+	tm_cell_t *t = 0;
+	tm_ctx_t *tcx = 0;
+	int idx = T_BR_UNDEFINED;
+
+	if(msg==NULL) {
+		return -1;
+	}
+
+	/* statefull replies have the branch_index set */
+	if(msg->first_line.type == SIP_REPLY) {
+		tcx = tm_ctx_get();
+		if(tcx != NULL) {
+			idx = tcx->branch_index;
+		}
+	} else switch(route_type) {
+		case BRANCH_ROUTE:
+		case BRANCH_FAILURE_ROUTE:
+			/* branch and branch_failure routes have their index set */
+			tcx = tm_ctx_get();
+			if(tcx != NULL) {
+				idx = tcx->branch_index;
+			}
+			break;
+		case REQUEST_ROUTE:
+			/* take the branch number from the number of added branches */
+			idx = nr_branches;
+			break;
+		case FAILURE_ROUTE:
+			/* first get the transaction */
+			t = get_t();
+			if ( t == NULL || t == T_UNDEFINED ) {
+				return -1;
+			}
+			/* add the currently added branches to the number of
+			 * completed branches in the transaction
+			 */
+			idx = t->nr_of_outgoings + nr_branches;
+			break;
+	}
+	return idx;
 }
 
 static int t_check_status(struct sip_msg* msg, char *p1, char *foo)
@@ -2899,6 +2962,20 @@ static int ki_t_relay_to_flags(sip_msg_t *msg, int rflags)
 	return ki_t_relay_to_proxy_flags(msg, NULL, rflags);
 }
 
+/* script function to clean active but very old transactions */
+static int t_clean(struct sip_msg* msg, char* key, char* value)
+{
+	tm_clean_lifetime();
+	return 1;
+}
+
+/* kemi function to clean active but very old transactions */
+static int ki_t_clean(sip_msg_t* msg)
+{
+	tm_clean_lifetime();
+	return 1;
+}
+
 /**
  *
  */
@@ -3034,6 +3111,11 @@ static sr_kemi_t tm_kemi_exports[] = {
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("tm"), str_init("ki_t_load_contacts_mode"),
+		SR_KEMIP_INT, ki_t_load_contacts_mode,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("tm"), str_init("t_next_contacts"),
 		SR_KEMIP_INT, ki_t_next_contacts,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
@@ -3149,6 +3231,17 @@ static sr_kemi_t tm_kemi_exports[] = {
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("tm"), str_init("t_get_branch_index"),
+		SR_KEMIP_INT, ki_t_get_branch_index,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tm"), str_init("t_clean"),
+		SR_KEMIP_INT, ki_t_clean,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };

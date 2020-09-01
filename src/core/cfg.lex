@@ -297,6 +297,7 @@ XAVPVIAPARAMS	xavp_via_params
 XAVPVIAFIELDS	xavp_via_fields
 LISTEN		listen
 ADVERTISE	advertise|ADVERTISE
+STRNAME		name|NAME
 ALIAS		alias
 SR_AUTO_ALIASES	auto_aliases
 DNS		 dns
@@ -345,6 +346,7 @@ IP_FREE_BIND		ip_free_bind|ipfreebind|ip_nonlocal_bind
 
 PORT	port
 STAT	statistics
+STATS_NAMESEP	stats_name_separator
 MAXBUFFER maxbuffer
 SQL_BUFFER_SIZE sql_buffer_size
 CHILDREN children
@@ -469,6 +471,8 @@ LATENCY_LOG				latency_log
 LATENCY_LIMIT_DB		latency_limit_db
 LATENCY_LIMIT_ACTION	latency_limit_action
 LATENCY_LIMIT_CFG		latency_limit_cfg
+
+URI_HOST_EXTRA_CHARS	"uri_host_extra_chars"
 
 MSG_TIME	msg_time
 ONSEND_RT_REPLY		"onsend_route_reply"
@@ -709,6 +713,7 @@ IMPORTFILE      "import_file"
 <INITIAL>{XAVPVIAFIELDS}	{ yylval.strval=yytext; return XAVPVIAFIELDS; }
 <INITIAL>{LISTEN}	{ count(); yylval.strval=yytext; return LISTEN; }
 <INITIAL>{ADVERTISE}	{ count(); yylval.strval=yytext; return ADVERTISE; }
+<INITIAL>{STRNAME}	{ count(); yylval.strval=yytext; return STRNAME; }
 <INITIAL>{ALIAS}	{ count(); yylval.strval=yytext; return ALIAS; }
 <INITIAL>{SR_AUTO_ALIASES}	{ count(); yylval.strval=yytext;
 									return SR_AUTO_ALIASES; }
@@ -789,6 +794,7 @@ IMPORTFILE      "import_file"
 <INITIAL>{IP_FREE_BIND}	{ count(); yylval.strval=yytext; return IP_FREE_BIND; }
 <INITIAL>{PORT}	{ count(); yylval.strval=yytext; return PORT; }
 <INITIAL>{STAT}	{ count(); yylval.strval=yytext; return STAT; }
+<INITIAL>{STATS_NAMESEP}	{ count(); yylval.strval=yytext; return STATS_NAMESEP; }
 <INITIAL>{MAXBUFFER}	{ count(); yylval.strval=yytext; return MAXBUFFER; }
 <INITIAL>{SQL_BUFFER_SIZE}	{ count(); yylval.strval=yytext; return SQL_BUFFER_SIZE; }
 <INITIAL>{CHILDREN}	{ count(); yylval.strval=yytext; return CHILDREN; }
@@ -980,6 +986,7 @@ IMPORTFILE      "import_file"
 <INITIAL>{LOADPATH}		{ count(); yylval.strval=yytext; return LOADPATH; }
 <INITIAL>{MODPARAM}     { count(); yylval.strval=yytext; return MODPARAM; }
 <INITIAL>{CFGENGINE}	{ count(); yylval.strval=yytext; return CFGENGINE; }
+<INITIAL>{URI_HOST_EXTRA_CHARS}	{ yylval.strval=yytext; return URI_HOST_EXTRA_CHARS; }
 
 <INITIAL>{EQUAL}	{ count(); return EQUAL; }
 <INITIAL>{ADDEQ}          { count(); return ADDEQ; }

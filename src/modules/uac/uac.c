@@ -93,11 +93,14 @@ pv_spec_t auth_password_spec;
 str uac_default_socket = STR_NULL;
 struct socket_info * uac_default_sockinfo = NULL;
 
+str uac_event_callback = STR_NULL;
+
 static int w_replace_from(struct sip_msg* msg, char* p1, char* p2);
 static int w_restore_from(struct sip_msg* msg, char* p1, char* p2);
 static int w_replace_to(struct sip_msg* msg, char* p1, char* p2);
 static int w_restore_to(struct sip_msg* msg, char* p1, char* p2);
 static int w_uac_auth(struct sip_msg* msg, char* str, char* str2);
+static int w_uac_auth_mode(struct sip_msg* msg, char* pmode, char* str2);
 static int w_uac_reg_lookup(struct sip_msg* msg, char* src, char* dst);
 static int w_uac_reg_status(struct sip_msg* msg, char* src, char* dst);
 static int w_uac_reg_request_to(struct sip_msg* msg, char* src, char* mode_s);
@@ -132,6 +135,8 @@ static cmd_export_t cmds[]={
 		REQUEST_ROUTE | BRANCH_ROUTE },
 	{"uac_restore_to",  (cmd_function)w_restore_to,  0, 0, 0, REQUEST_ROUTE },
 	{"uac_auth",	  (cmd_function)w_uac_auth,       0, 0, 0, FAILURE_ROUTE },
+	{"uac_auth_mode", (cmd_function)w_uac_auth_mode,  1,
+			fixup_igp_null, fixup_free_igp_null, FAILURE_ROUTE },
 	{"uac_req_send",  (cmd_function)w_uac_req_send,   0, 0, 0, ANY_ROUTE},
 	{"uac_reg_lookup",  (cmd_function)w_uac_reg_lookup,  2, fixup_spve_pvar,
 		fixup_free_spve_pvar, ANY_ROUTE },
@@ -175,6 +180,7 @@ static param_export_t params[] = {
 	{"reg_active",	INT_PARAM,			&reg_active_param      },
 	{"reg_gc_interval",		INT_PARAM,	&_uac_reg_gc_interval	},
 	{"default_socket",	PARAM_STR, &uac_default_socket},
+	{"event_callback",	PARAM_STR,	&uac_event_callback},
 	{0, 0, 0}
 };
 
@@ -615,6 +621,22 @@ static int ki_uac_auth(struct sip_msg* msg)
 	return (uac_auth(msg)==0)?1:-1;
 }
 
+static int w_uac_auth_mode(struct sip_msg* msg, char* pmode, char* str2)
+{
+	int imode = 0;
+
+	if(fixup_get_ivalue(msg, (gparam_t*)pmode, &imode)<0) {
+		LM_ERR("failed to get the mode parameter\n");
+		return -1;
+	}
+	return (uac_auth_mode(msg, imode)==0)?1:-1;
+}
+
+static int ki_uac_auth_mode(sip_msg_t* msg, int mode)
+{
+	return (uac_auth_mode(msg, mode)==0)?1:-1;
+}
+
 static int w_uac_reg_lookup(struct sip_msg* msg, char* src, char* dst)
 {
 	pv_spec_t *dpv;
@@ -715,7 +737,7 @@ static int w_uac_reg_request_to(struct sip_msg* msg, char* src, char* pmode)
 		return -1;
 	}
 
-	if (imode > 1) {
+	if (imode > (UACREG_REQTO_MASK_USER|UACREG_REQTO_MASK_AUTH)) {
 		LM_ERR("invalid mode\n");
 		return -1;
 	}
@@ -755,6 +777,11 @@ static sr_kemi_t sr_kemi_uac_exports[] = {
 	{ str_init("uac"), str_init("uac_auth"),
 		SR_KEMIP_INT, ki_uac_auth,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("uac"), str_init("uac_auth_mode"),
+		SR_KEMIP_INT, ki_uac_auth_mode,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("uac"), str_init("uac_req_send"),

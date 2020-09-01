@@ -35,7 +35,6 @@
 #include "../lump_struct.h"
 #include "../flags.h"
 #include "../ip_addr.h"
-#include "../md5utils.h"
 #include "../config.h"
 #include "parse_def.h"
 #include "parse_cseq.h"
@@ -110,6 +109,8 @@ typedef enum request_method {
 #define FL_USE_XAVP_VIA_FIELDS (1<<22) /*!< use xavp fields for local via attrs */
 #define FL_MSG_NOREPLY       (1<<23) /*!< do not send sip reply for request */
 #define FL_SIPTRACE          (1<<24) /*!< message to be traced in stateless replies */
+#define FL_ROUTE_ADDR        (1<<25) /*!< request has Route address for next hop */
+#define FL_USE_OTCPID        (1<<26) /*!< request to be routed using outboud tcp con id */
 
 /* WARNING: Value (1 << 28) is reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */
@@ -267,6 +268,7 @@ typedef struct ocd_flow {
  * - add to msg_ldata_reset() if a field uses dynamic memory */
 typedef struct msg_ldata {
 	ocd_flow_t flow;
+	void *vdata;
 } msg_ldata_t;
 
 /*! \brief The SIP message */

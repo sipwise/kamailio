@@ -78,6 +78,7 @@
 #include "core/mem/shm_mem.h"
 #include "core/shm_init.h"
 #include "core/sr_module.h"
+#include "core/modparam.h"
 #include "core/timer.h"
 #include "core/parser/msg_parser.h"
 #include "core/ip_addr.h"
@@ -124,6 +125,7 @@
 #endif
 #include "core/rand/fastrand.h" /* seed */
 #include "core/rand/kam_rand.h"
+#include "core/rand/cryptorand.h"
 
 #include "core/counters.h"
 #include "core/cfg/cfg.h"
@@ -167,7 +169,8 @@ Options:\n\
     -b nr        Maximum receive buffer size which will not be exceeded by\n\
                   auto-probing procedure even if  OS allows\n\
     -c           Check configuration file for syntax errors\n\
-    -d           Debugging mode (multiple -d increase the level)\n\
+    -d           Debugging level control (multiple -d to increase the level from 0)\n\
+    --debug=val  Debugging level value\n\
     -D           Control how daemonize is done:\n\
                   -D..do not fork (almost) anyway;\n\
                   -DD..do not daemonize creator;\n\
@@ -192,8 +195,13 @@ Options:\n\
                   -l udp:127.0.0.1:5080/1.2.3.4:5060,\n\
                   -l \"sctp:(eth0)\", -l \"(eth0, eth1, 127.0.0.1):5065\".\n\
                   The default behaviour is to listen on all the interfaces.\n\
+    --loadmodule=name load the module specified by name\n\
+    --log-engine=log engine name and data\n\
     -L path      Modules search path (default: " MODS_DIR ")\n\
     -m nr        Size of shared memory allocated in Megabytes\n\
+    --modparam=modname:paramname:type:value set the module parameter\n\
+                  type has to be 's' for string value and 'i' for int value, \n\
+                  example: --modparam=corex:alias_subdomains:s:" NAME ".org\n\
     -M nr        Size of private memory allocated, in Megabytes\n\
     -n processes Number of child processes to fork per interface\n\
                   (default: 8)\n"
@@ -683,6 +691,8 @@ static void sig_alarm_abort(int signo)
 
 static void shutdown_children(int sig, int show_status)
 {
+	sr_corecb_void_exec(app_shutdown);
+
 	kill_all_children(sig);
 	if (set_sig_h(SIGALRM, sig_alarm_kill) == SIG_ERR ) {
 		LM_ERR("could not install SIGALARM handler\n");
@@ -1787,6 +1797,7 @@ int main_loop(void)
 		cfg_ok=1;
 
 		*_sr_instance_started = 1;
+		sr_corecb_void_exec(app_ready);
 
 #ifdef EXTRA_DEBUG
 		for (r=0; r<*process_count; r++){
@@ -1918,6 +1929,10 @@ int main(int argc, char** argv)
 		{"substdef",    required_argument, 0, KARGOPTVAL + 2},
 		{"substdefs",   required_argument, 0, KARGOPTVAL + 3},
 		{"server-id",   required_argument, 0, KARGOPTVAL + 4},
+		{"loadmodule",  required_argument, 0, KARGOPTVAL + 5},
+		{"modparam",    required_argument, 0, KARGOPTVAL + 6},
+		{"log-engine",  required_argument, 0, KARGOPTVAL + 7},
+		{"debug",       required_argument, 0, KARGOPTVAL + 8},
 		{0, 0, 0, 0 }
 	};
 
@@ -1976,6 +1991,18 @@ int main(int argc, char** argv)
 			case 'X':
 					sr_memmng_pkg = optarg;
 					break;
+			case KARGOPTVAL+7:
+					ksr_slog_init(optarg);
+					break;
+			case KARGOPTVAL+8:
+					debug_flag = 1;
+					default_core_cfg.debug=(int)strtol(optarg, &tmp, 10);
+					if ((tmp==0) || (*tmp)){
+						LM_ERR("bad debug level value: %s\n", optarg);
+						goto error;
+					}
+					break;
+
 			default:
 					if (c == 'h' || (optarg && strcmp(optarg, "-h") == 0)) {
 						printf("version: %s\n", full_version);
@@ -2133,6 +2160,10 @@ int main(int argc, char** argv)
 			case 'a':
 			case 's':
 			case 'Y':
+			case KARGOPTVAL+5:
+			case KARGOPTVAL+6:
+			case KARGOPTVAL+7:
+			case KARGOPTVAL+8:
 					break;
 
 			/* long options */
@@ -2220,6 +2251,29 @@ int main(int argc, char** argv)
 	/* Fix the value of cfg_file variable.*/
 	if (fix_cfg_file() < 0) goto error;
 
+	/* process command line parameters that require initialized basic environment */
+	optind = 1;  /* reset getopt index */
+	option_index = 0;
+	/* switches required before config parsing and processing */
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
+		switch(c) {
+			case KARGOPTVAL+5:
+					if (load_module(optarg)!=0) {
+						LM_ERR("failed to load the module: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+6:
+					if(set_mod_param_serialized(optarg) < 0) {
+						LM_ERR("failed to set modparam: %s\n", optarg);
+						goto error;
+					}
+					break;
+			default:
+					break;
+		}
+	}
+
 	/* load config file or die */
 	if (cfg_file[0] == '-' && strlen(cfg_file)==1) {
 		cfg_stream=stdin;
@@ -2249,10 +2303,11 @@ try_again:
 	}
 	seed+=getpid()+time(0);
 	LM_DBG("seeding PRNG with %u\n", seed);
-	fastrand_seed(seed);
-	kam_srand(fastrand());
-	srandom(fastrand()+time(0));
-	LM_DBG("test random numbers %u %lu %u\n", kam_rand(), random(), fastrand());
+	cryptorand_seed(seed);
+	fastrand_seed(cryptorand());
+	kam_srand(cryptorand());
+	srandom(cryptorand());
+	LM_DBG("test random numbers %u %lu %u %u\n", kam_rand(), random(), fastrand(), cryptorand());
 
 	/*register builtin  modules*/
 	register_builtin_modules();
@@ -2262,10 +2317,10 @@ try_again:
 
 	yyin=cfg_stream;
 	debug_save = default_core_cfg.debug;
-	if ((yyparse()!=0)||(cfg_errors)){
+	if ((yyparse()!=0)||(cfg_errors)||(pp_ifdef_level_check()<0)){
 		fprintf(stderr, "ERROR: bad config file (%d errors)\n", cfg_errors);
 		if (debug_flag) default_core_cfg.debug = debug_save;
-		pp_ifdef_level_check();
+		pp_ifdef_level_error();
 
 		goto error;
 	}
@@ -2273,7 +2328,6 @@ try_again:
 		fprintf(stderr, "%d config warnings\n", cfg_warnings);
 	}
 	if (debug_flag) default_core_cfg.debug = debug_save;
-	pp_ifdef_level_check();
 	print_rls();
 
 	if(init_dst_set()<0) {

@@ -118,6 +118,7 @@ enum {
 struct ng_flags_parse {
 	int via, to, packetize, transport, directional;
 	bencode_item_t *dict, *flags, *direction, *replace, *rtcp_mux, *sdes,
+		       *t38,
 		       *codec, *codec_strip, *codec_offer, *codec_transcode, *codec_mask;
 	str call_id, from_tag, to_tag;
 };
@@ -138,6 +139,7 @@ static const char *command_strings[] = {
 	[OP_STOP_FORWARDING]	= "stop forwarding",
 	[OP_PLAY_MEDIA]		= "play media",
 	[OP_STOP_MEDIA]		= "stop media",
+	[OP_PLAY_DTMF]		= "play DTMF",
 };
 
 struct minmax_mos_stats {
@@ -197,6 +199,7 @@ static int start_forwarding_f(struct sip_msg *, char *, char *);
 static int stop_forwarding_f(struct sip_msg *, char *, char *);
 static int play_media_f(struct sip_msg *, char *, char *);
 static int stop_media_f(struct sip_msg *, char *, char *);
+static int play_dtmf_f(struct sip_msg *, char *, char *);
 static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
 static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
 static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
@@ -375,6 +378,9 @@ static cmd_export_t cmds[] = {
 		ANY_ROUTE},
 	{"stop_media",		(cmd_function)stop_media_f, 		0,
 		0, 0,
+		ANY_ROUTE},
+	{"play_dtmf",		(cmd_function)play_dtmf_f, 		1,
+		fixup_spve_null, 0,
 		ANY_ROUTE},
 	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
 		0, 0,
@@ -2120,6 +2126,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
 			bencode_list_add_str(ng_flags->sdes, &s);
 			goto next;
 		}
+		if (str_key_val_prefix(&key, "T38", &val, &s) || str_key_val_prefix(&key, "T.38", &val, &s)) {
+			bencode_list_add_str(ng_flags->t38, &s);
+			goto next;
+		}
 		if (str_key_val_prefix(&key, "rtcp-mux", &val, &s)) {
 			bencode_list_add_str(ng_flags->rtcp_mux, &s);
 			goto next;
@@ -2263,6 +2273,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
 						ng_flags->via = -1;
 					else if (str_eq(&val, "next"))
 						ng_flags->via = -2;
+					else if (str_eq(&val, "auto-next") || str_eq(&val, "next-auto"))
+						ng_flags->via = -3;
+					else if (str_eq(&val, "auto-extra") || str_eq(&val, "extra-auto"))
+						ng_flags->via = -4;
 					else
 						goto error;
 					goto next;
@@ -2358,6 +2372,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 	char md5[MD5_LEN];
 	char branch_buf[MAX_BRANCH_PARAM_LEN];
 	bencode_item_t *result;
+	tm_cell_t *t;
+	unsigned int branch_idx;
 
 	/*** get & init basic stuff needed ***/
 
@@ -2385,12 +2401,14 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 	bencode_list_add_string(item, "load limit");
 
 	body.s = NULL;
+	ng_flags.flags = bencode_list(bencbuf);
+
 	if (op == OP_OFFER || op == OP_ANSWER) {
-		ng_flags.flags = bencode_list(bencbuf);
 		ng_flags.direction = bencode_list(bencbuf);
 		ng_flags.replace = bencode_list(bencbuf);
 		ng_flags.rtcp_mux = bencode_list(bencbuf);
 		ng_flags.sdes = bencode_list(bencbuf);
+		ng_flags.t38 = bencode_list(bencbuf);
 		ng_flags.codec = bencode_dictionary(bencbuf);
 
 		if (read_sdp_pvar!= NULL) {
@@ -2410,11 +2428,6 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 			bencode_dictionary_add_str(ng_flags.dict, "sdp", &body_intermediate);
 		else
 			bencode_dictionary_add_str(ng_flags.dict, "sdp", &body);
-	}
-	else if (op == OP_BLOCK_DTMF || op == OP_BLOCK_MEDIA || op == OP_UNBLOCK_DTMF
-			|| op == OP_UNBLOCK_MEDIA || op == OP_START_FORWARDING || op == OP_STOP_FORWARDING)
-	{
-		ng_flags.flags = bencode_list(bencbuf);
 	}
 
 	/*** parse flags & build dictionary ***/
@@ -2444,15 +2457,27 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 		bencode_dictionary_add(ng_flags.dict, "rtcp-mux", ng_flags.rtcp_mux);
 	if (ng_flags.sdes && ng_flags.sdes->child)
 		bencode_dictionary_add(ng_flags.dict, "SDES", ng_flags.sdes);
+	if (ng_flags.t38 && ng_flags.t38->child)
+		bencode_dictionary_add(ng_flags.dict, "T.38", ng_flags.t38);
 
 	bencode_dictionary_add_str(ng_flags.dict, "call-id", &ng_flags.call_id);
 
 	if (ng_flags.via) {
-		ret = -1;
+		/* pre-process */
 		switch (ng_flags.via) {
 			case 3:
 				ng_flags.via = (msg->first_line.type == SIP_REPLY) ? 2 : 1;
-				/* fall thru */
+				break;
+			case -3:
+				ng_flags.via = (msg->first_line.type == SIP_REPLY) ? 1 : -2;
+				break;
+			case -4:
+				ng_flags.via = (msg->first_line.type == SIP_REPLY) ? 1 : -1;
+				break;
+		}
+
+		ret = -1;
+		switch (ng_flags.via) {
 			case 1:
 			case 2:
 				ret = get_via_branch(msg, ng_flags.via, &viabranch);
@@ -2464,10 +2489,16 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 			case -2:
 				if (!char_msg_val(msg, md5))
 					break;
+				branch_idx = 0;
+				if (tmb.t_gett) {
+					t = tmb.t_gett();
+					if (t && t != T_UNDEFINED)
+						branch_idx = t->nr_of_outgoings;
+				}
 				msg->hash_index = hash(msg->callid->body, get_cseq(msg)->number);
 
 				viabranch.s = branch_buf;
-				if (branch_builder(msg->hash_index, 0, md5, 0, branch_buf, &viabranch.len))
+				if (branch_builder(msg->hash_index, 0, md5, branch_idx, branch_buf, &viabranch.len))
 					ret = 0;
 				break;
 		}
@@ -3846,6 +3877,12 @@ stop_media_f(struct sip_msg* msg, char *str1, char *str2)
 }
 
 static int
+play_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
+{
+	return rtpengine_generic_f(msg, str1, OP_PLAY_DTMF);
+}
+
+static int
 start_forwarding_f(struct sip_msg* msg, char *str1, char *str2)
 {
 	return rtpengine_generic_f(msg, str1, OP_START_FORWARDING);
@@ -3997,6 +4034,55 @@ static int ki_stop_recording(sip_msg_t *msg)
 	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_STOP_RECORDING);
 }
 
+
+static int ki_block_media0(sip_msg_t *msg)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_BLOCK_MEDIA);
+}
+static int ki_block_media(sip_msg_t *msg, str *flags)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags->s, 1, OP_BLOCK_MEDIA);
+}
+static int ki_unblock_media0(sip_msg_t *msg)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_UNBLOCK_MEDIA);
+}
+static int ki_unblock_media(sip_msg_t *msg , str *flags)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags->s, 1, OP_UNBLOCK_MEDIA);
+}
+
+static int ki_block_dtmf0(sip_msg_t *msg)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_BLOCK_DTMF);
+}
+static int ki_block_dtmf(sip_msg_t *msg, str *flags)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags->s, 1, OP_BLOCK_DTMF);
+}
+static int ki_unblock_dtmf0(sip_msg_t *msg)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_UNBLOCK_DTMF);
+}
+static int ki_unblock_dtmf(sip_msg_t *msg, str *flags)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags->s, 1, OP_UNBLOCK_DTMF);
+}
+
+static int ki_play_media(sip_msg_t *msg, str *flags)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags->s, 1, OP_PLAY_MEDIA);
+}
+static int ki_stop_media0(sip_msg_t *msg)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, NULL, 1, OP_STOP_MEDIA);
+}
+static int ki_stop_media(sip_msg_t *msg, str *flags)
+{
+	return rtpengine_rtpp_set_wrap(msg, rtpengine_simple_wrap, flags->s, 1, OP_STOP_MEDIA);
+}
+
+
 static int ki_set_rtpengine_set(sip_msg_t *msg, int r1)
 {
 	rtpp_set_link_t rtpl1;
@@ -4112,6 +4198,65 @@ static sr_kemi_t sr_kemi_rtpengine_exports[] = {
         { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
             SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
     },
+
+	{ str_init("rtpengine"), str_init("block_media0"),
+        SR_KEMIP_INT, ki_block_media0,
+        { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+    { str_init("rtpengine"), str_init("block_media"),
+        SR_KEMIP_INT, ki_block_media,
+        { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+	{ str_init("rtpengine"), str_init("unblock_media0"),
+        SR_KEMIP_INT, ki_unblock_media0,
+        { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+    { str_init("rtpengine"), str_init("unblock_media"),
+        SR_KEMIP_INT, ki_unblock_media,
+        { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+
+	{ str_init("rtpengine"), str_init("block_dtmf0"),
+        SR_KEMIP_INT, ki_block_dtmf0,
+        { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+    { str_init("rtpengine"), str_init("block_dtmf"),
+        SR_KEMIP_INT, ki_block_dtmf,
+        { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+	{ str_init("rtpengine"), str_init("unblock_dtmf0"),
+        SR_KEMIP_INT, ki_unblock_dtmf0,
+        { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+    { str_init("rtpengine"), str_init("unblock_dtmf"),
+        SR_KEMIP_INT, ki_unblock_dtmf,
+        { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+
+    { str_init("rtpengine"), str_init("play_media"),
+        SR_KEMIP_INT, ki_play_media,
+        { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+		{ str_init("rtpengine"), str_init("stop_media0"),
+        SR_KEMIP_INT, ki_stop_media0,
+        { SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+    { str_init("rtpengine"), str_init("stop_media"),
+        SR_KEMIP_INT, ki_stop_media,
+        { SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+            SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+    },
+
     { str_init("rtpengine"), str_init("set_rtpengine_set"),
         SR_KEMIP_INT, ki_set_rtpengine_set,
         { SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,

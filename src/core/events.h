@@ -37,13 +37,19 @@
 #define SREV_TCP_CLOSED			13
 #define SREV_NET_DATA_RECV		14
 #define SREV_NET_DATA_SEND		15
+#define SREV_SIP_REPLY_OUT		16
 
 #define SREV_CB_LIST_SIZE	8
 
 typedef struct sr_event_param {
 	void *data;
+	str obuf;
 	receive_info_t* rcv;
 	dest_info_t *dst;
+	sip_msg_t *req;
+	sip_msg_t *rpl;
+	int rplcode;
+	int mode;
 } sr_event_param_t;
 
 typedef int (*sr_event_cb_f)(sr_event_param_t *evp);
@@ -64,6 +70,7 @@ typedef struct sr_event_cb {
 	sr_event_cb_f tcp_closed;
 	sr_event_cb_f net_data_recv;
 	sr_event_cb_f net_data_send;
+	sr_event_cb_f sip_reply_out[SREV_CB_LIST_SIZE];
 } sr_event_cb_t;
 
 void sr_event_cb_init(void);
@@ -78,5 +85,21 @@ int sr_event_enabled(int type);
 
 void sr_core_ert_init(void);
 void sr_core_ert_run(sip_msg_t *msg, int e);
+
+typedef void (*sr_corecb_void_f)(void);
+typedef struct sr_corecb {
+	sr_corecb_void_f app_ready;
+	sr_corecb_void_f app_shutdown;
+} sr_corecb_t;
+
+sr_corecb_t *sr_corecb_get(void);
+
+#define sr_corecb_void_exec(fname) \
+	do { \
+		sr_corecb_t *__cbp = sr_corecb_get(); \
+		if(__cbp && __cbp->fname) { \
+			__cbp->fname(); \
+		} \
+	} while(0);
 
 #endif

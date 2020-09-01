@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.3.5
+%define ver 5.4.1
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -238,11 +238,11 @@
 %endif
 
 
-Summary:    Kamailio (former OpenSER) - the Open Source SIP Server
+Summary:    Kamailio - the Open Source SIP Server
 Name:       %name
 Version:    %ver
 Release:    %rel
-Packager:   Peter Dunkley <peter@dunkley.me.uk>
+Packager:   Sergey Safarov <s.safarov@gmail.com>
 License:    GPL-2.0
 Group:      %{PKGGROUP}
 Source:     http://kamailio.org/pub/kamailio/%{ver}/src/%{name}-%{ver}_src.tar.gz
@@ -271,15 +271,20 @@ Conflicts:  kamailio-utils < %ver, kamailio-websocket < %ver
 Conflicts:  kamailio-xhttp-pi < %ver, kamailio-xmlops < %ver
 Conflicts:  kamailio-xmlrpc < %ver, kamailio-xmpp < %ver
 Conflicts:  kamailio-uuid < %ver
-BuildRequires:  bison, flex
+BuildRequires:  bison, flex, which, make, gcc, gcc-c++, pkgconfig
+%if 0%{?rhel} != 6
+Requires:  systemd
+BuildRequires:  systemd-devel
+%endif
+
 %if 0%{?suse_version} == 1315 || 0%{?suse_version} == 1330
 Requires:  filesystem
-BuildRequires:  systemd, shadow
+BuildRequires:  shadow
 %endif
 
 
 %description
-Kamailio (former OpenSER) is an Open Source SIP Server released under GPL, able
+Kamailio is an Open Source SIP Server released under GPL, able
 to handle thousands of call setups per second. Among features: asynchronous TCP,
 UDP and SCTP, secure communication via TLS for VoIP (voice, video); IPv4 and
 IPv6; SIMPLE instant messaging and presence with embedded XCAP server and MSRP
@@ -1200,7 +1205,11 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with sctp}
     ksctp \
 %endif
-    ksnmpstats ksqlite ktls kunixodbc kutils \
+    ksnmpstats ksqlite \
+%if "%{?_unitdir}" != ""
+    ksystemd \
+%endif
+    ktls kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
 %endif
@@ -1288,7 +1297,11 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with sctp}
     ksctp \
 %endif
-    ksnmpstats ksqlite ktls kunixodbc kutils \
+    ksnmpstats ksqlite \
+%if "%{?_unitdir}" != ""
+    ksystemd \
+%endif
+    ktls kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
 %endif
@@ -1416,6 +1429,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.dialog
 %doc %{_docdir}/kamailio/modules/README.dispatcher
 %doc %{_docdir}/kamailio/modules/README.diversion
+%doc %{_docdir}/kamailio/modules/README.dlgs
 %doc %{_docdir}/kamailio/modules/README.dmq
 %doc %{_docdir}/kamailio/modules/README.domain
 %doc %{_docdir}/kamailio/modules/README.domainpolicy
@@ -1451,6 +1465,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.print
 %doc %{_docdir}/kamailio/modules/README.print_lib
 %doc %{_docdir}/kamailio/modules/README.pv
+%doc %{_docdir}/kamailio/modules/README.pv_headers
 %doc %{_docdir}/kamailio/modules/README.pua_rpc
 %doc %{_docdir}/kamailio/modules/README.qos
 %doc %{_docdir}/kamailio/modules/README.ratelimit
@@ -1508,6 +1523,10 @@ fi
 %doc %{_docdir}/kamailio/modules/README.statsc
 %doc %{_docdir}/kamailio/modules/README.topos
 %doc %{_docdir}/kamailio/modules/README.cfgt
+%if "%{?_unitdir}" != ""
+%doc %{_docdir}/kamailio/modules/README.log_systemd
+%doc %{_docdir}/kamailio/modules/README.systemdops
+%endif
 
 %dir %attr(-,kamailio,kamailio) %{_sysconfdir}/kamailio
 %config(noreplace) %{_sysconfdir}/kamailio/dictionary.kamailio
@@ -1536,8 +1555,6 @@ fi
 %{_libdir}/kamailio/libsrdb1.so.1.0
 %{_libdir}/kamailio/libsrdb2.so.1
 %{_libdir}/kamailio/libsrdb2.so.1.0
-%{_libdir}/kamailio/libsrutils.so.1
-%{_libdir}/kamailio/libsrutils.so.1.0
 %{_libdir}/kamailio/libtrie.so.1
 %{_libdir}/kamailio/libtrie.so.1.0
 
@@ -1569,6 +1586,7 @@ fi
 %{_libdir}/kamailio/modules/dialog.so
 %{_libdir}/kamailio/modules/dispatcher.so
 %{_libdir}/kamailio/modules/diversion.so
+%{_libdir}/kamailio/modules/dlgs.so
 %{_libdir}/kamailio/modules/dmq.so
 %{_libdir}/kamailio/modules/domain.so
 %{_libdir}/kamailio/modules/domainpolicy.so
@@ -1605,6 +1623,7 @@ fi
 %{_libdir}/kamailio/modules/print_lib.so
 %{_libdir}/kamailio/modules/pua_rpc.so
 %{_libdir}/kamailio/modules/pv.so
+%{_libdir}/kamailio/modules/pv_headers.so
 %{_libdir}/kamailio/modules/qos.so
 %{_libdir}/kamailio/modules/ratelimit.so
 %{_libdir}/kamailio/modules/registrar.so
@@ -1661,6 +1680,10 @@ fi
 %{_libdir}/kamailio/modules/statsc.so
 %{_libdir}/kamailio/modules/topos.so
 %{_libdir}/kamailio/modules/cfgt.so
+%if "%{?_unitdir}" != ""
+%{_libdir}/kamailio/modules/log_systemd.so
+%{_libdir}/kamailio/modules/systemdops.so
+%endif
 
 %{_sbindir}/kamailio
 %{_sbindir}/kamctl
@@ -2168,11 +2191,11 @@ fi
 
 %files      tls
 %defattr(-,root,root)
+%dir %{_libdir}/kamailio/openssl_mutex_shared
 %doc %{_docdir}/kamailio/modules/README.auth_identity
 %doc %{_docdir}/kamailio/modules/README.tls
 %{_libdir}/kamailio/modules/auth_identity.so
 %{_libdir}/kamailio/modules/tls.so
-%dir %{_libdir}/kamailio/openssl_mutex_shared
 %{_libdir}/kamailio/openssl_mutex_shared/openssl_mutex_shared.so
 
 

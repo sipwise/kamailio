@@ -31,6 +31,7 @@
 #include "../../lib/srdb1/db.h"
 #include "../../core/dprint.h"
 #include "../../core/cfg/cfg_struct.h"
+#include "../../core/kemi.h"
 
 #include "kz_amqp.h"
 #include "kz_json.h"
@@ -46,6 +47,8 @@
 static int mod_init(void);
 static int  mod_child_init(int rank);
 static int fire_init_event(int rank);
+static int fire_init_event_cfg(void);
+static int fire_init_event_kemi(void);
 static void mod_destroy(void);
 
 str dbk_node_hostname = { 0, 0 };
@@ -88,6 +91,7 @@ int dbk_internal_loop_count = 5;
 int dbk_consumer_loop_count = 10;
 int dbk_consumer_ack_loop_count = 20;
 int dbk_include_entity = 1;
+int dbk_use_full_entity = 0;
 int dbk_pua_mode = 1;
 db_locking_t kz_pua_lock_type = DB_LOCKING_WRITE;
 int dbk_use_hearbeats = 0;
@@ -121,6 +125,9 @@ pv_spec_t kz_query_result_spec;
 
 str kz_app_name = str_init(NAME);
 
+str kazoo_event_callback = STR_NULL;
+int kazoo_kemi_enabled=0;
+
 MODULE_VERSION
 
 static tr_export_t mod_trans[] = {
@@ -140,6 +147,7 @@ static pv_export_t kz_mod_pvs[] = {
  */
 static cmd_export_t cmds[] = {
     {"kazoo_publish", (cmd_function) kz_amqp_publish, 3, fixup_kz_amqp, fixup_kz_amqp_free, ANY_ROUTE},
+    {"kazoo_publish", (cmd_function) kz_amqp_publish_ex, 4, fixup_kz_amqp, fixup_kz_amqp_free, ANY_ROUTE},
     {"kazoo_query", (cmd_function) kz_amqp_query, 4, fixup_kz_amqp, fixup_kz_amqp_free, ANY_ROUTE},
     {"kazoo_query", (cmd_function) kz_amqp_query_ex, 3, fixup_kz_amqp, fixup_kz_amqp_free, ANY_ROUTE},
     {"kazoo_pua_publish", (cmd_function) kz_pua_publish, 1, 0, 0, ANY_ROUTE},
@@ -156,6 +164,9 @@ static cmd_export_t cmds[] = {
     {"kazoo_encode", (cmd_function) kz_amqp_encode, 2, fixup_kz_amqp_encode, fixup_kz_amqp_encode_free, ANY_ROUTE},
 
     {"kazoo_async_query", (cmd_function) kz_amqp_async_query, 5, fixup_kz_async_amqp, fixup_kz_async_amqp_free, ANY_ROUTE},
+    {"kazoo_async_query", (cmd_function) kz_amqp_async_query_ex, 6, fixup_kz_async_amqp, fixup_kz_async_amqp_free, ANY_ROUTE},
+    {"kazoo_query_async", (cmd_function) kz_amqp_async_query, 5, fixup_kz_async_amqp, fixup_kz_async_amqp_free, ANY_ROUTE},
+    {"kazoo_query_async", (cmd_function) kz_amqp_async_query_ex, 6, fixup_kz_async_amqp, fixup_kz_async_amqp_free, ANY_ROUTE},
 
 	{0, 0, 0, 0, 0, 0}
 };
@@ -181,6 +192,7 @@ static param_export_t params[] = {
     {"amqp_consumer_loop_count", INT_PARAM, &dbk_consumer_loop_count},
     {"amqp_consumer_ack_loop_count", INT_PARAM, &dbk_consumer_ack_loop_count},
     {"pua_include_entity", INT_PARAM, &dbk_include_entity},
+	{"presence_use_full_entity", INT_PARAM, &dbk_use_full_entity},
     {"presentity_table", PARAM_STR, &kz_presentity_table},
 	{"db_url", PARAM_STR, &kz_db_url},
     {"pua_mode", INT_PARAM, &dbk_pua_mode},
@@ -203,6 +215,7 @@ static param_export_t params[] = {
 	{"pua_lock_type", INT_PARAM, &kz_pua_lock_type},
     {"amqp_connect_timeout_micro", INT_PARAM, &kz_amqp_connect_timeout_tv.tv_usec},
     {"amqp_connect_timeout_sec", INT_PARAM, &kz_amqp_connect_timeout_tv.tv_sec},
+    {"event_callback",  PARAM_STR,    &kazoo_event_callback},
     {0, 0, 0}
 };
 
@@ -267,6 +280,7 @@ static int mod_init(void) {
    		return -1;
     }
 
+
     if(kz_timer_ms > 0) {
     	kz_timer_tv.tv_usec = (kz_timer_ms % 1000) * 1000;
     	kz_timer_tv.tv_sec = kz_timer_ms / 1000;
@@ -306,6 +320,16 @@ static int mod_init(void) {
 		}
     }
 
+	sr_kemi_eng_t *keng = NULL;
+	if(kazoo_event_callback.s!=NULL && kazoo_event_callback.len>0) {
+		keng = sr_kemi_eng_get();
+		if(keng==NULL) {
+			LM_ERR("failed to find kemi engine\n");
+			return -1;
+		}
+		kazoo_kemi_enabled=1;
+	}
+
 
     int total_workers = dbk_consumer_workers + (dbk_consumer_processes * kz_server_counter) + 2;
 
@@ -335,6 +359,20 @@ static int mod_init(void) {
     return 0;
 }
 
+static sr_kemi_t kazoo_kemi_exports[] = {
+	{ str_init("kazoo"), str_init("kazoo_publish"),
+		SR_KEMIP_INT, ki_kz_amqp_publish,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("kazoo"), str_init("kazoo_subscribe"),
+		SR_KEMIP_INT, ki_kz_amqp_subscribe,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
+};
+
 int mod_register(char *path, int *dlflags, void *p1, void *p2)
 {
 	if(kz_tr_init_buffers()<0)
@@ -342,6 +380,9 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 		LM_ERR("failed to initialize transformations buffers\n");
 		return -1;
 	}
+
+	sr_kemi_modules_add(kazoo_kemi_exports);
+
 	return register_trans_mod(path, mod_trans);
 }
 
@@ -424,15 +465,11 @@ static int mod_child_init(int rank)
 	return 0;
 }
 
-static int fire_init_event(int rank)
+static int fire_init_event_cfg(void)
 {
 	struct sip_msg *fmsg;
 	struct run_act_ctx ctx;
 	int rtb, rt;
-
-	LM_DBG("rank is (%d)\n", rank);
-	if (rank!=PROC_INIT)
-		return 0;
 
 	rt = route_get(&event_rt, "kazoo:mod-init");
 	if(rt>=0 && event_rt.rlist[rt]!=NULL) {
@@ -455,11 +492,50 @@ static int fire_init_event(int rank)
 	return 0;
 }
 
+static int fire_init_event_kemi(void)
+{
+	struct sip_msg *fmsg;
+	int rtb;
+	sr_kemi_eng_t *keng = NULL;
+
+	keng = sr_kemi_eng_get();
+	if(keng!=NULL) {
+		str evrtname = str_init("kazoo:mod-init");
+		rtb = get_route_type();
+		if(faked_msg_init()<0)
+			return -1;
+		fmsg = faked_msg_next();
+		if(sr_kemi_route(keng, fmsg, EVENT_ROUTE, &kazoo_event_callback, &evrtname)<0) {
+			LM_ERR("error running event route kemi callback\n");
+		}
+		set_route_type(rtb);
+	} 
+	else {
+		LM_ERR("no event route or kemi callback found for execution\n");
+	}
+
+	return 0;
+}
+
+static int fire_init_event(int rank)
+{
+	LM_DBG("rank is (%d)\n", rank);
+	if (rank!=PROC_INIT)
+		return 0;
+
+	if (kazoo_kemi_enabled) {
+		return fire_init_event_kemi();
+	}
+	else {
+		return fire_init_event_cfg();
+	}
+
+	return 0;
+}
+
 
 static void mod_destroy(void) {
 	kz_amqp_destroy();
     if (kz_worker_pipes_fds) { shm_free(kz_worker_pipes_fds); }
     if (kz_worker_pipes) { shm_free(kz_worker_pipes); }
 }
-
-

@@ -530,7 +530,7 @@ modparam("ims_charging", "origin_realm", "kamailio-ims.org")
       <para>Destination host to be used in Diameter messages to
       charging-server.</para>
 
-      <para><emphasis>Default value is "hss.ims.smilecoms.com".</emphasis></para>
+      <para><emphasis>Default value is "".</emphasis></para>
 
       <example>
         <title><varname>destination_host</varname>parameter usage</title>
@@ -549,7 +549,7 @@ modparam("ims_charging", "destination_host", "ocs.kamailio-ims.org")
       <para>Destination realm to be used in Diameter messages to
       charging-server.</para>
 
-      <para><emphasis>Default value is "ims.smilecoms.com".</emphasis></para>
+      <para><emphasis>Default value is "".</emphasis></para>
 
       <example>
         <title><varname>destination_realm</varname>parameter usage</title>
@@ -789,6 +789,29 @@ modparam("ims_charging", "service_context_id_release", "262")
         <programlisting format="linespecific">
 ...
 modparam("ims_charging", "custom_user_avp", "$avp(from_user)")
+...
+        </programlisting>
+      </example>
+    </section>
+
+    <section>
+      <title><varname>app_provided_party_avp</varname> (avp string)</title>
+
+      <para>When this parameter is set and the contents of the AVP is not
+      empty, an Application-Provided-Called Party-Address AVP will be
+      addedd to charging related requests. This is required for special
+      cases e.g. related to roaming for some diameter server.</para>
+
+      <para><emphasis> Default value: if not set, the
+      Application-Provided-Called-Party-Address AVP will be not set.</emphasis></para>
+
+      <example>
+        <title><varname>app_provided_party_avp</varname>parameter
+        usage</title>
+
+        <programlisting format="linespecific">
+...
+modparam("ims_charging", "app_provided_party_avp", "$avp(app_user)")
 ...
         </programlisting>
       </example>
