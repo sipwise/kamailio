@@ -1,0 +1,65 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Wed, 2 Sep 2020 13:12:06 +0200
+Subject: [PATCH 2/3] Revert "tls: added define condition on version
+ functions"
+
+This reverts commit 67979e07b63b574687b1924c38fabd724d0ad876.
+---
+ src/modules/tls/tls_domain.c |  4 +---
+ src/modules/tls/tls_init.c   | 11 +----------
+ 2 files changed, 2 insertions(+), 13 deletions(-)
+
+diff --git a/src/modules/tls/tls_domain.c b/src/modules/tls/tls_domain.c
+index 2930bde..fc84033 100644
+--- a/src/modules/tls/tls_domain.c
++++ b/src/modules/tls/tls_domain.c
+@@ -63,11 +63,9 @@ static void setup_ecdh(SSL_CTX *ctx)
+ {
+    EC_KEY *ecdh;
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x010100000L
+-   if (SSLeay() < 0x1000005fL) {
++   if (OpenSSL_version_num() < 0x1000005fL) {
+       return;
+    }
+-#endif
+ 
+    ecdh = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
+    SSL_CTX_set_options(ctx, SSL_OP_SINGLE_ECDH_USE);
+diff --git a/src/modules/tls/tls_init.c b/src/modules/tls/tls_init.c
+index f10d0c0..351ed41 100644
+--- a/src/modules/tls/tls_init.c
++++ b/src/modules/tls/tls_init.c
+@@ -645,7 +645,6 @@ int tls_h_mod_init_f(void)
+ {
+ 	/*struct socket_info* si;*/
+ 	long ssl_version;
+-	const char *ssl_version_txt;
+ #if OPENSSL_VERSION_NUMBER < 0x010100000L && !defined(LIBRESSL_VERSION_NUMBER)
+ 	int lib_kerberos;
+ 	int lib_zlib;
+@@ -668,15 +667,7 @@ int tls_h_mod_init_f(void)
+ #if OPENSSL_VERSION_NUMBER < 0x00907000L
+ 	LM_WARN("You are using an old version of OpenSSL (< 0.9.7). Upgrade!\n");
+ #endif
+-
+-#if OPENSSL_VERSION_NUMBER < 0x010100000L
+-	ssl_version=SSLeay();
+-	ssl_version_txt=SSLeay_version(SSLEAY_VERSION);
+-#else
+ 	ssl_version=OpenSSL_version_num();
+-	ssl_version_txt=OpenSSL_version(OPENSSL_VERSION);
+-#endif
+-
+ 	/* check if version have the same major minor and fix level
+ 	 * (e.g. 0.9.8a & 0.9.8c are ok, but 0.9.8 and 0.9.9x are not)
+ 	 * - values is represented as 0xMMNNFFPPS: major minor fix patch status
+@@ -688,7 +679,7 @@ int tls_h_mod_init_f(void)
+ 				" compiled \"%s\" (0x%08lx).\n"
+ 				" Please make sure a compatible version is used"
+ 				" (tls_force_run in kamailio.cfg will override this check)\n",
+-				ssl_version_txt, ssl_version,
++				OpenSSL_version(OPENSSL_VERSION), ssl_version,
+ 				OPENSSL_VERSION_TEXT, (long)OPENSSL_VERSION_NUMBER);
+ 		if (cfg_get(tls, tls_cfg, force_run))
+ 			LM_WARN("tls_force_run turned on, ignoring "
