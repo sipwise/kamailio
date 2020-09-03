@@ -30,6 +30,7 @@ sipwise/sca-fix-pickup-when-upstream-flow.patch
 sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
+sipwise/sca-add-pai_avp-parameter.patch
 ## backports from upstream (5.4)
 upstream/0001-Revert-tls-proper-ifdef-on-libssl-version-for-tls_in.patch
 upstream/0002-Revert-tls-added-define-condition-on-version-functio.patch
