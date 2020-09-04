@@ -34,6 +34,7 @@ sipwise/sca-fix-notify-after-bye.patch
 upstream/0001-Revert-tls-proper-ifdef-on-libssl-version-for-tls_in.patch
 upstream/0002-Revert-tls-added-define-condition-on-version-functio.patch
 upstream/0003-Revert-tls-support-compilation-without-deprecated-Op.patch
+upstream/pv_headers-fix-x_hdr-index-on-get.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
