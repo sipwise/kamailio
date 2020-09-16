@@ -1,0 +1,24 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 16 Sep 2020 14:26:25 +0200
+Subject: cfgt: skip tm vars $T_*
+
+---
+ src/modules/cfgt/cfgt_json.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/modules/cfgt/cfgt_json.c b/src/modules/cfgt/cfgt_json.c
+index b3dea63..8089c02 100644
+--- a/src/modules/cfgt/cfgt_json.c
++++ b/src/modules/cfgt/cfgt_json.c
+@@ -314,6 +314,11 @@ int cfgt_get_json(struct sip_msg *msg, unsigned int mask, srjson_doc_t *jdoc,
+ 				}
+ 				snprintf(iname, 128, "$xavp(%.*s)", item_name.len, item_name.s);
+ 			} else {
++				if(el->pvname.len > 3 && strncmp("$T_", el->pvname.s, 3) == 0) {
++					LM_DBG("skip tm var[%.*s]\n", el->pvname.len, el->pvname.s);
++					el = el->next;
++					continue;
++				}
+ 				if(pv_get_spec_value(msg, &el->spec, &value) != 0) {
+ 					LM_WARN("can't get value[%.*s]\n", el->pvname.len,
+ 							el->pvname.s);
