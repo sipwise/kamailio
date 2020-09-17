@@ -44,6 +44,7 @@ sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 ### active development
+sipwise/lcr-stopper_mode-parameter.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
