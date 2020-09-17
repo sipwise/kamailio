@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.5-1+0~mr9.0.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [4c29ccb] TT#93800 cfgt: skip $T_* vars
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 17 Sep 2020 11:59:58 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr9.0.1.1) unstable; urgency=medium
 
   [ Victor Seva ]
