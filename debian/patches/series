@@ -55,3 +55,5 @@ sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/db_redis_eval_fix.patch
 sipwise/fix_lcr_rate_wrong_id.patch
 upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
+## backport from kamailio upstream (5.4)
+upstream/ndb_redis-set-message-level-to-debug-on-exec.patch
