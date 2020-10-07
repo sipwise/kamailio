@@ -1,0 +1,25 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 7 Oct 2020 15:35:50 +0200
+Subject: topos: don't insert contact header for 4xx replies
+
+unless original msg has contact
+---
+ src/modules/topos/tps_msg.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/modules/topos/tps_msg.c b/src/modules/topos/tps_msg.c
+index e40a510..37aeac4 100644
+--- a/src/modules/topos/tps_msg.c
++++ b/src/modules/topos/tps_msg.c
+@@ -1085,6 +1085,11 @@ int tps_response_sent(sip_msg_t *msg)
+ 				&& msg->contact==NULL) {
+ 		contact_keep = 1;
+ 	}
++	if(contact_keep==0 && msg->first_line.u.reply.statuscode>=400
++				&& msg->first_line.u.reply.statuscode<500
++				&& msg->contact==NULL) {
++		contact_keep = 1;
++	}
+ 	if(contact_keep==0) {
+ 		tps_remove_headers(msg, HDR_CONTACT_T);
+ 		if(direction==TPS_DIR_DOWNSTREAM) {

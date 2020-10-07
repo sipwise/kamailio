@@ -44,6 +44,7 @@ sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/rtpengine-codec-set-except.patch
+sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 #
