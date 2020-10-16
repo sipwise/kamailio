@@ -1,3 +1,11 @@
+ngcp-kamailio (5.2.5-1+0~mr7.5.7.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [e25d51c] TT#91452 pv_headers: fix $x_hdr index
+  * [f2c9e5b] TT#87201 ndb_redis remove useless error message
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 16 Oct 2020 16:17:20 +0200
+
 ngcp-kamailio (5.2.5-1+0~mr7.5.6.0) unstable; urgency=medium
 
   * New release.
