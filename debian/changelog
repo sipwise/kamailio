@@ -1,3 +1,16 @@
+ngcp-kamailio (5.3.5-1+0~mr8.5.3.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [bc8d4fe] TT#85550 pua: fix creation of records for every dialog state
+  * [aac88d9] TT#85550 pua: update_version_puadb() use pres_id to select record
+  * [ef9e687] TT#71906 sca: fix sca_parse_uri()
+  * [1d7918f] TT#91452 pv_headers: fix $x_hdr index on get
+  * [c83b347] TT#91452 pv_headers: get_header(), remove annoying errors
+  * [16af682] TT#93800 cfgt: skip $T_* vars
+  * [5c9be2e] TT#87201 ndb_redis remove useless error message
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Oct 2020 14:27:50 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr8.5.2.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
