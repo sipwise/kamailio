@@ -1,0 +1,73 @@
+From 01fa7503433f4e23dea156e1034a87bbb49a4a1d Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 5 Nov 2020 12:12:38 +0100
+Subject: [PATCH] permissions: add reload_delta parameter
+
+- make the rate limit of maximum allowed RPC reload configurable
+using the new 'reload_delta' paramenter.
+---
+ src/modules/permissions/permissions.c | 4 ++++
+ src/modules/permissions/permissions.h | 1 +
+ src/modules/permissions/rpc.c         | 8 +++++---
+ 3 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/src/modules/permissions/permissions.c b/src/modules/permissions/permissions.c
+index 7e447d14d2..7dd6d981c6 100644
+--- a/src/modules/permissions/permissions.c
++++ b/src/modules/permissions/permissions.c
+@@ -60,6 +60,7 @@ static char* perm_deny_suffix = ".deny";
+ 
+ /* for allow_trusted and allow_address function */
+ str perm_db_url = {NULL, 0};                    /* Don't connect to the database by default */
++int perm_reload_delta = 5;
+ 
+ /* for allow_trusted function */
+ int perm_db_mode = DISABLE_CACHE;               /* Database usage mode: 0=no cache, 1=cache */
+@@ -594,6 +595,9 @@ static int mod_init(void)
+ 	}
+ 	*perm_rpc_reload_time = 0;
+ 
++	if(perm_reload_delta < 0)
++		perm_reload_delta = 5;
++
+ 	if(permissions_init_rpc()!=0) {
+ 		LM_ERR("failed to register RPC commands\n");
+ 		return -1;
+diff --git a/src/modules/permissions/permissions.h b/src/modules/permissions/permissions.h
+index c094185626..2a417ffd58 100644
+--- a/src/modules/permissions/permissions.h
++++ b/src/modules/permissions/permissions.h
+@@ -59,6 +59,7 @@ extern str perm_ip_addr_col;   /* Name of ip address column */
+ extern str perm_mask_col;      /* Name of mask column */
+ extern str perm_port_col;      /* Name of port column */
+ extern int perm_peer_tag_mode; /* Matching mode */
++extern int perm_reload_delta;  /* seconds between RPC reloads */
+ 
+ /* backends to be loaded */
+ #define PERM_LOAD_ADDRESSDB	(1<<0)
+diff --git a/src/modules/permissions/rpc.c b/src/modules/permissions/rpc.c
+index b6a6f9a420..cff9523406 100644
+--- a/src/modules/permissions/rpc.c
++++ b/src/modules/permissions/rpc.c
+@@ -30,13 +30,15 @@
+ #include "permissions.h"
+ 
+ 
+-int rpc_check_reload(rpc_t* rpc, void* ctx) {
+-	if(perm_rpc_reload_time==NULL) {
++int rpc_check_reload(rpc_t *rpc, void *ctx)
++{
++	if(perm_rpc_reload_time == NULL) {
+ 		LM_ERR("not ready for reload\n");
+ 		rpc->fault(ctx, 500, "Not ready for reload");
+ 		return -1;
+ 	}
+-	if(*perm_rpc_reload_time!=0 && *perm_rpc_reload_time > time(NULL) - 5) {
++	if(*perm_rpc_reload_time != 0
++			&& *perm_rpc_reload_time > time(NULL) - perm_reload_delta) {
+ 		LM_ERR("ongoing reload\n");
+ 		rpc->fault(ctx, 500, "ongoing reload");
+ 		return -1;
+-- 
+2.20.1
+
