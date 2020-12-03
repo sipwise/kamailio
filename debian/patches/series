@@ -41,6 +41,7 @@ upstream/ndb_redis-set-message-level-to-debug-on-exec.patch
 upstream/permissions-basic-safety-for-concurent-rpc-reload.patch
 upstream/permissions-add-reload_delta-parameter.patch
 upstream/ndb_redis-set-message-level-to-debug-on-reconnect.patch
+upstream/cfgt-log-info-when-node-is-created-and-saved.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
