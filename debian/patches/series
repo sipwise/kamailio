@@ -59,3 +59,4 @@ sipwise/db_redis_master_sets.patch
 sipwise/db_redis_fixes.patch
 sipwise/db_redis_eval_fix.patch
 upstream/topos_redis_fix_prack_method_check_the_branch_values.patch
+sipwise/db_redis_skip_empty_keys.patch
