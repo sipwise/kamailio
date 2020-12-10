@@ -55,6 +55,7 @@ sipwise/cfgt-skip.patch
 sipwise/rtpengine-codec-set-except.patch
 sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
 sipwise/0001-sl-Fix-3xx-stats-RPC-marshalling.patch
+sipwise/db_redis_skip_empty_keys.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 #
