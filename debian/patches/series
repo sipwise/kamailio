@@ -58,3 +58,4 @@ upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
 ## backport from kamailio upstream (5.4)
 upstream/ndb_redis-set-message-level-to-debug-on-exec.patch
 sipwise/db_redis_skip_empty_keys.patch
+sipwise/db_redis_graceful_scan.patch
