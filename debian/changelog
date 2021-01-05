@@ -1,3 +1,13 @@
+ngcp-kamailio (5.4.1-1+0~mr9.2.1.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [6e835bd] TT#87201 ndb_redis remove useless error message, take two
+  * [6a80d80] TT#81700 cfgt: add log info on creation and save
+  * [1c87813] TT#105150 remove dh-systemd dependence
+  * [be3d9ad] TT#81500 cfgt: skip $_s and avp id 0
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 05 Jan 2021 15:30:55 +0100
+
 ngcp-kamailio (5.4.1-1+0~mr9.2.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
