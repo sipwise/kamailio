@@ -64,6 +64,7 @@ PACKAGE_GROUPS += websocket
 PACKAGE_GROUPS += autheph
 PACKAGE_GROUPS += cnxcc
 PACKAGE_GROUPS += erlang
+PACKAGE_GROUPS += secsipid
 PACKAGE_GROUPS += lcrrate
 PACKAGE_GROUPS += tcap
 

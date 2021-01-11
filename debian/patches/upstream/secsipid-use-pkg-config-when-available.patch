@@ -1,0 +1,34 @@
+From b0a629ef9b366f4946dd1e73ce4aed2e028c119b Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Thu, 7 Jan 2021 11:14:53 +0100
+Subject: [PATCH] secsipid: use pkg-config when available
+
+(cherry picked from commit 231a6eceeb67318cf4708a765b47df6c336350da)
+---
+ src/modules/secsipid/Makefile | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/secsipid/Makefile b/src/modules/secsipid/Makefile
+index ec8ad07980..13012cd248 100644
+--- a/src/modules/secsipid/Makefile
++++ b/src/modules/secsipid/Makefile
+@@ -7,8 +7,14 @@ include ../../Makefile.defs
+ auto_gen=
+ NAME=secsipid.so
+ 
+-DEFS+= -I.
+-LIBS+= -L. -lsecsipid
++BUILDER = $(shell which pkg-config)
++ifeq ($(BUILDER),)
++	DEFS+= -I.
++	LIBS = -L. -lsecsipid
++else
++	DEFS+= $(shell pkg-config --cflags secsipid-1)
++	LIBS = $(shell pkg-config --libs secsipid-1)
++endif
+ 
+ ifeq ($(OS), darwin)
+ LIBS+= -framework CoreFoundation -framework Security -lpthread
+-- 
+2.20.1
+

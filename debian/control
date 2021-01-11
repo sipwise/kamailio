@@ -36,6 +36,7 @@ Build-Depends:
  libreadline-dev,
  libsasl2-dev,
  libsctp-dev [linux-any],
+ libsecsipid-dev,
  libsnmp-dev,
  libsqlite3-dev,
  libssl-dev,
@@ -828,6 +829,21 @@ Description: extra modules for Kamailio
  per second even on low-budget hardware.
  .
  This package provides: gzcompress uuid ev jansson
+
+Package: ngcp-kamailio-secsipid-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: contains the secsipid module
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ proxy server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains the secsipid Module.
 
 Package: ngcp-kamailio-lcrrate-modules
 Architecture: any
