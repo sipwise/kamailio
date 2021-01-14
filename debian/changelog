@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.5-1+0~mr8.5.3.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [fdd0295] TT#87201 ndb_redis remove useless error message, take two
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 14 Jan 2021 16:47:44 +0100
+
 ngcp-kamailio (5.3.5-1+0~mr8.5.3.0) unstable; urgency=medium
 
   [ Victor Seva ]
