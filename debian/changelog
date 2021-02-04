@@ -1,3 +1,12 @@
+ngcp-kamailio (5.4.1-1+0~mr9.2.1.2) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [b2044f0] TT#63000 skip empty keys when looking for key
+  * [7dd18bd] TT#63000 improve Redis SCAN increase and falloff
+  * [adb79b0] TT#63000 use SSCAN instead of SCAN if possible
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 04 Feb 2021 16:10:07 +0100
+
 ngcp-kamailio (5.4.1-1+0~mr9.2.1.1) unstable; urgency=medium
 
   * New release.
