@@ -1,9 +1,16 @@
-ngcp-kamailio (5.3.5-1+0~mr8.5.4.0) unstable; urgency=medium
+ngcp-kamailio (5.3.8-1+0~mr8.5.4.0) unstable; urgency=medium
+
+  [ Richard Fuchs ]
+  * [d44329b] TT#63000 skip empty keys when looking for key
+  * [6a67a89] TT#63000 improve Redis SCAN increase and falloff
+  * [986d726] TT#63000 use SSCAN instead of SCAN if possible
 
   [ Victor Seva ]
   * [fdd0295] TT#87201 ndb_redis remove useless error message, take two
+  * [ed1235d] TT#110300 New upstream version 5.3.8
+  * [6c64867] TT#110300 remove already applied patches
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 14 Jan 2021 16:47:45 +0100
+ -- Victor Seva <vseva@debian.org>  Wed, 10 Feb 2021 14:42:12 +0100
 
 ngcp-kamailio (5.3.5-1+0~mr8.5.3.0) unstable; urgency=medium
 
