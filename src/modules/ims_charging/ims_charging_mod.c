@@ -28,7 +28,6 @@ MODULE_VERSION
 struct dlg_binds* dlgb_p;
 
 /* parameters */
-char* ro_destination_host_s = "hss.ims.smilecoms.com";
 char* ro_service_context_id_root_s = "32260@3gpp.org";
 char* ro_service_context_id_ext_s = "ext";
 char* ro_service_context_id_mnc_s = "01";
@@ -60,6 +59,7 @@ int ro_db_mode = DB_MODE_NONE;
 char *domain = "location";
 
 client_ro_cfg cfg = { str_init(""),
+    str_init(""),
     str_init(""),
     str_init(""),
     0
@@ -122,7 +122,7 @@ static param_export_t params[] = {
 		{ "origin_host", 			PARAM_STR, 			&cfg.origin_host 			},
 		{ "origin_realm", 			PARAM_STR,			&cfg.origin_realm 			},
 		{ "destination_realm", 		PARAM_STR,			&cfg.destination_realm 	},
-		{ "destination_host", 		PARAM_STRING,			&ro_destination_host_s 		}, /* Unused parameter? */
+		{ "destination_host", 		PARAM_STR,			&cfg.destination_host 		},
 		{ "service_context_id_root",PARAM_STRING,			&ro_service_context_id_root_s 	},
 		{ "service_context_id_ext", PARAM_STRING,			&ro_service_context_id_ext_s 	},
 		{ "service_context_id_mnc", PARAM_STRING,			&ro_service_context_id_mnc_s 	},
@@ -133,7 +133,7 @@ static param_export_t params[] = {
 		{ "video_service_identifier", 	INT_PARAM, 			&video_service_identifier },/*service id for voice*/
 		{ "video_rating_group", 	INT_PARAM, 			&video_rating_group },/*rating group for voice*/
 		{ "db_mode",			INT_PARAM,			&ro_db_mode_param		},
-		{ "db_url",			PARAM_STRING,			&db_url 			},
+		{ "db_url",			PARAM_STR,			&db_url 			},
 		{ "db_update_period",		INT_PARAM,			&db_update_period		},
 		{ "vendor_specific_chargeinfo",		INT_PARAM,	&vendor_specific_chargeinfo		}, /* VSI for extra charing info in Ro */
 		{ "vendor_specific_id",		INT_PARAM,			&vendor_specific_id		}, /* VSI for extra charing info in Ro */

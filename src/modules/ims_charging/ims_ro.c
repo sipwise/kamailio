@@ -865,6 +865,8 @@ void send_ccr_stop_with_param(struct ro_session *ro_session, unsigned int code, 
     //getting subscription id type
     if (strncasecmp(subscr.id.s, "tel:", 4) == 0) {
         subscr.type = Subscription_Type_MSISDN;
+        subscr.id.s += 4;
+        subscr.id.len -= 4;
     } else {
         subscr.type = Subscription_Type_IMPU; //default is END_USER_SIP_URI
     }
@@ -1562,9 +1564,8 @@ static int get_mac_avp_value(struct sip_msg *msg, str *value) {
 
     pv_parse_spec2(&mac_avp_name_str, &avp_spec, 1);
     if (pv_get_spec_value(msg, &avp_spec, &val) != 0 || val.rs.len == 0) {
-
-        value->s = "00:00:00:00:00:00";
-        value->len = sizeof ("00:00:00:00:00:00") - 1;
+        value->s = "00-00-00-00-00-00";
+        value->len = strlen(value->s);
         return -1;
     }
 

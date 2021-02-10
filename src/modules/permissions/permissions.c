@@ -648,8 +648,10 @@ static int mod_init(void)
 
 static int child_init(int rank)
 {
-	if (init_child_trusted(rank) == -1)
-		return -1;
+	if(_perm_load_backends&PERM_LOAD_TRUSTEDDB) {
+		if(init_child_trusted(rank) == -1)
+			return -1;
+	}
 	return 0;
 }
 
@@ -1043,6 +1045,11 @@ static sr_kemi_t sr_kemi_permissions_exports[] = {
 	{ str_init("permissions"), str_init("allow_address_group"),
 		SR_KEMIP_INT, ki_allow_address_group,
 		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("permissions"), str_init("allow_trusted"),
+		SR_KEMIP_INT, ki_allow_trusted,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

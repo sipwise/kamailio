@@ -836,8 +836,9 @@ failure_route[TRUNKAUTH] {
     if(t_check_status("401|407")) {
         $avp(auser) = "test";
         $avp(apass) = "test";
-        uac_auth();
-        t_relay();
+        if (uac_auth()) {
+            t_relay();
+        }
         exit;
     }
 }
@@ -1317,7 +1318,25 @@ event_route[uac:reply] {
 ...
 			</programlisting>
 		</example>
-	</section>
+		</section>
+
+		<section id="uac.r.uac.reg_remove">
+			<title>
+				<function moreinfo="none">uac.reg_remove</function>
+			</title>
+		<para>
+		Remove a UAC remote registration record by l_uuid.
+		</para>
+
+		<example>
+		<title><function>uac.reg_remove</function> usage</title>
+			<programlisting format="linespecific">
+...
+   kamcmd uac.reg_remove my_l_uuid
+...
+			</programlisting>
+		</example>
+		</section>
 	</section>
 
 	<section>

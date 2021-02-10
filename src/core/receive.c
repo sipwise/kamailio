@@ -227,7 +227,7 @@ int receive_msg(char *buf, unsigned int len, receive_info_t *rcv_info)
 	struct run_act_ctx ctx;
 	struct run_act_ctx *bctx = NULL;
 	int ret = -1;
-	struct timeval tvb, tve;
+	struct timeval tvb = {0}, tve = {0};
 	unsigned int diff = 0;
 	str inb = STR_NULL;
 	sr_net_info_t netinfo = {0};
@@ -300,7 +300,7 @@ int receive_msg(char *buf, unsigned int len, receive_info_t *rcv_info)
 			LM_DBG("attempt of nonsip message processing failed\n");
 		} else if(ret == NONSIP_MSG_DROP) {
 			LM_DBG("nonsip message processing completed\n");
-			goto error02;
+			goto end;
 		}
 	}
 	if(errsipmsg==1) {
