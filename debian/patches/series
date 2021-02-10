@@ -61,9 +61,6 @@ upstream/pv-add-KEMI-functions-pvx.xavp_get_keys-and-pvx.xavp.patch
 upstream/pv-fixes-for-KEMI-pvx.xavp_getd.patch
 upstream/cfgt-don-t-process-non-sip-messages.patch
 upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
-upstream/core-str-helper-macro-to-set-ending-zero-with-backup.patch
-upstream/core-str-fixed-wrong-undo-ed-version-of-STR_ZTOV-mac.patch
-upstream/jansson-use-the-core-macros-for-ending-string-value-.patch
 upstream/core-add-case-functions-for-str_hash-get-and-set.patch
 upstream/core-xavi-api-like-xavp-but-with-insensitive-case-na.patch
 upstream/pv-define-xavi-types.patch
@@ -73,11 +70,10 @@ upstream/pv-xavi-.-config-variables-implementation.patch
 upstream/core-PV_IDX_NONE-to-point-that-pv-had-no-index.patch
 upstream/pv-fix-for-new-PV_IDX_NONE-value.patch
 upstream/pv_headers-fix-x_hdr-index-on-get.patch
-upstream/ndb_redis-set-message-level-to-debug-on-exec.patch
 ## backport from kamailio trunk (5.3)
 #
 # upstream master (5.5)
-upstream/ndb_redis-set-message-level-to-debug-on-reconnect.patch
+#
 ### relevant for upstream
 #
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
@@ -91,7 +87,6 @@ sipwise/db_redis_sscan.patch
 ### active development
 sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
 sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
-sipwise/fix-db-redis-key-expiry.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches

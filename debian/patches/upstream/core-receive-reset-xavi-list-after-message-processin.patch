@@ -7,7 +7,7 @@ Subject: core: receive - reset xavi list after message processing
  1 file changed, 1 insertion(+)
 
 diff --git a/src/core/receive.c b/src/core/receive.c
-index 550ec59..e23de0f 100644
+index ba488a5..3d193d1 100644
 --- a/src/core/receive.c
 +++ b/src/core/receive.c
 @@ -560,4 +560,5 @@ void ksr_msg_env_reset(void)

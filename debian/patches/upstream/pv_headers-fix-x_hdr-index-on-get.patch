@@ -8,10 +8,10 @@ Subject: pv_headers: fix $x_hdr index on get
  1 file changed, 17 insertions(+), 11 deletions(-)
 
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
-index ad5ba9d..3e0fcc0 100644
+index 6aaa8ca..226be47 100644
 --- a/src/modules/pv_headers/pvh_xavp.c
 +++ b/src/modules/pv_headers/pvh_xavp.c
-@@ -539,12 +539,12 @@ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+@@ -538,12 +538,12 @@ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
  	sr_xavp_t *xavi = NULL;
  	sr_xval_t *xval = NULL;
  	pv_value_t tv;
@@ -28,7 +28,7 @@ index ad5ba9d..3e0fcc0 100644
  	if(param->pvn.type == PV_NAME_PVAR) {
  		if(pv_get_spec_value(msg, (pv_spec_p)(param->pvn.u.dname), &tv) != 0) {
  			LM_ERR("cannot get avp value\n");
-@@ -553,24 +553,30 @@ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+@@ -552,24 +552,30 @@ int pvh_get_header(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
  		if(!(tv.flags & PV_VAL_STR)) {
  			return pv_get_null(msg, param, res);
  		}

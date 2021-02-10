@@ -9,7 +9,7 @@ Subject: [PATCH] avpops: add avp_subst_pv()
  1 file changed, 58 insertions(+)
 
 diff --git a/src/modules/avpops/avpops.c b/src/modules/avpops/avpops.c
-index 6e49933..06f5f1f 100644
+index d981675..f2c0b93 100644
 --- a/src/modules/avpops/avpops.c
 +++ b/src/modules/avpops/avpops.c
 @@ -68,6 +68,8 @@ static int fixup_pushto_avp(void** param, int param_no);

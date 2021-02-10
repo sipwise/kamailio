@@ -23,7 +23,7 @@ Change-Id: Ic39a70e43004422e2b6e5db4788df68d9e223129
  4 files changed, 252 insertions(+), 59 deletions(-)
 
 diff --git a/src/modules/tm/doc/functions.xml b/src/modules/tm/doc/functions.xml
-index 489147a..1935fe3 100644
+index 5ba8526..ee9fd0b 100644
 --- a/src/modules/tm/doc/functions.xml
 +++ b/src/modules/tm/doc/functions.xml
 @@ -1154,7 +1154,7 @@ failure_route[1] {
@@ -87,7 +87,7 @@ index 489147a..1935fe3 100644
  		<para>
  		  Function returns 1 if loading of contacts succeeded or
 diff --git a/src/modules/tm/t_serial.c b/src/modules/tm/t_serial.c
-index 68b8afc..8592a9c 100644
+index 8f7c492..7487c7c 100644
 --- a/src/modules/tm/t_serial.c
 +++ b/src/modules/tm/t_serial.c
 @@ -33,6 +33,8 @@

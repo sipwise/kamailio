@@ -151,7 +151,7 @@ index e0d4423..2decc79 100644
  
  
 diff --git a/src/modules/tm/t_reply.c b/src/modules/tm/t_reply.c
-index c868e70..c09e168 100644
+index 99361a5..7703e9c 100644
 --- a/src/modules/tm/t_reply.c
 +++ b/src/modules/tm/t_reply.c
 @@ -695,6 +695,7 @@ typedef struct tm_faked_env {
@@ -179,7 +179,7 @@ index c868e70..c09e168 100644
  		bind_address = _tm_faked_env[_tm_faked_env_idx].backup_si;
  		/* restore lump lists */
  		t->uas.request->add_rm
-@@ -2211,6 +2215,7 @@ int reply_received( struct sip_msg  *p_msg )
+@@ -2214,6 +2218,7 @@ int reply_received( struct sip_msg  *p_msg )
  	avp_list_t* backup_domain_from, *backup_domain_to;
  	avp_list_t* backup_uri_from, *backup_uri_to;
  	sr_xavp_t **backup_xavps;
@@ -187,7 +187,7 @@ index c868e70..c09e168 100644
  	int replies_locked = 0;
  #ifdef USE_DNS_FAILOVER
  	int branch_ret;
-@@ -2400,6 +2405,7 @@ int reply_received( struct sip_msg  *p_msg )
+@@ -2403,6 +2408,7 @@ int reply_received( struct sip_msg  *p_msg )
  		backup_domain_to = set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN,
  				&t->domain_avps_to );
  		backup_xavps = xavp_set_list(&t->xavps_list);
@@ -195,7 +195,7 @@ index c868e70..c09e168 100644
  		setbflagsval(0, uac->branch_flags);
  		if(msg_status>last_uac_status) {
  			/* current response (msg) status is higher that the last received
-@@ -2444,6 +2450,7 @@ int reply_received( struct sip_msg  *p_msg )
+@@ -2447,6 +2453,7 @@ int reply_received( struct sip_msg  *p_msg )
  		set_avp_list( AVP_TRACK_FROM | AVP_CLASS_DOMAIN, backup_domain_from );
  		set_avp_list( AVP_TRACK_TO | AVP_CLASS_DOMAIN, backup_domain_to );
  		xavp_set_list(backup_xavps);

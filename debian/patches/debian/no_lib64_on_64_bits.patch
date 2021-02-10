@@ -7,10 +7,10 @@ Subject: no_lib64_on_64_bits
  1 file changed, 1 insertion(+), 9 deletions(-)
 
 diff --git a/src/Makefile.defs b/src/Makefile.defs
-index 460a589..607350d 100644
+index 83e48e6..4ca496b 100644
 --- a/src/Makefile.defs
 +++ b/src/Makefile.defs
-@@ -452,15 +452,7 @@ endif
+@@ -454,15 +454,7 @@ endif
  
  $(info target architecture <$(ARCH)>, host architecture <$(HOST_ARCH)>)
  

@@ -77,7 +77,7 @@ index b137d80..2239283 100644
  
  
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index 97fd19e..919cde7 100644
+index c0dc5f6..863968a 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -27,6 +27,8 @@
@@ -796,7 +796,7 @@ index 97fd19e..919cde7 100644
  static int db_redis_compare_column(db_key_t k, db_val_t *v, db_op_t op, redisReply *reply) {
      int i_value;
      long long ll_value;
-@@ -1073,7 +1426,8 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
+@@ -1075,7 +1428,8 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
          const db_val_t* _v, const db_op_t *_op, const db_key_t* _c,
          const int _n, const int _nc, db1_res_t** _r,
          redis_key_t **keys, int *keys_count,
@@ -806,7 +806,7 @@ index 97fd19e..919cde7 100644
  
      redisReply *reply = NULL;
      redis_key_t *query_v = NULL;
-@@ -1101,9 +1455,9 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
+@@ -1103,9 +1457,9 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
              LM_WARN("  scan key %d is '%.*s'\n",
                      i, _k[i]->len, _k[i]->s);
          }
@@ -818,7 +818,7 @@ index 97fd19e..919cde7 100644
              LM_ERR("failed to scan query keys\n");
              goto error;
          }
-@@ -1253,7 +1607,8 @@ error:
+@@ -1255,7 +1609,8 @@ error:
  static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, const db_key_t* _k,
          const db_val_t* _v, const db_op_t *_op, const int _n,
          redis_key_t **keys, int *keys_count,
@@ -828,7 +828,7 @@ index 97fd19e..919cde7 100644
  
      int i = 0, j = 0;
      redis_key_t *k = NULL;
-@@ -1264,21 +1619,29 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1266,21 +1621,29 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
      redisReply *reply = NULL;
      redis_key_t *query_v = NULL;
      redis_key_t *type_keys = NULL;
@@ -862,7 +862,7 @@ index 97fd19e..919cde7 100644
              LM_ERR("failed to scan query keys\n");
              goto error;
          }
-@@ -1412,7 +1775,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1408,7 +1771,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
              }
          }
          if (db_redis_build_type_keys(con, CON_TABLE(_h), db_keys, db_vals, all_type_keys_count,
@@ -871,7 +871,7 @@ index 97fd19e..919cde7 100644
              LM_ERR("failed to build type keys\n");
              goto error;
          }
-@@ -1437,8 +1800,18 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1432,8 +1795,18 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          db_redis_check_reply(con, reply, error);
          db_redis_free_reply(&reply);
  
@@ -892,7 +892,7 @@ index 97fd19e..919cde7 100644
                  LM_ERR("Failed to add srem command to post-delete query\n");
                  goto error;
              }
-@@ -1446,6 +1819,10 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1441,6 +1814,10 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
                  LM_ERR("Failed to add key to delete query\n");
                  goto error;
              }
@@ -903,7 +903,7 @@ index 97fd19e..919cde7 100644
              if (db_redis_key_add_str(&query_v, key) != 0) {
                  LM_ERR("Failed to add key to delete query\n");
                  goto error;
-@@ -1457,6 +1834,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1452,6 +1829,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          }
          LM_DBG("done with loop '%.*s'\n", k->key.len, k->key.s);
          db_redis_key_free(&type_keys);
@@ -911,7 +911,7 @@ index 97fd19e..919cde7 100644
      }
      db_redis_key_free(&all_type_keys);
      db_redis_key_free(&query_v);
-@@ -1473,6 +1851,7 @@ error:
+@@ -1468,6 +1846,7 @@ error:
          pkg_free(db_vals);
      db_redis_key_free(&query_v);
      db_redis_key_free(&type_keys);
@@ -919,7 +919,7 @@ index 97fd19e..919cde7 100644
      db_redis_key_free(&all_type_keys);
      return -1;
  }
-@@ -1481,7 +1860,8 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1476,7 +1855,8 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
          const db_val_t* _v, const db_op_t *_op, const db_key_t* _uk, const db_val_t *_uv,
          const int _n, const int _nu,
          redis_key_t **keys, int *keys_count,
@@ -929,7 +929,7 @@ index 97fd19e..919cde7 100644
  
      redisReply *reply = NULL;
      redis_key_t *query_v = NULL;
-@@ -1490,6 +1870,16 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1485,6 +1865,16 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
      int i;
      int j;
      size_t col;
@@ -946,7 +946,7 @@ index 97fd19e..919cde7 100644
  
      if (!(*keys_count) && do_table_scan) {
          LM_WARN("performing full table scan on table '%.*s' while performing update\n",
-@@ -1498,18 +1888,35 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1493,18 +1883,35 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
              LM_WARN("  scan key %d is '%.*s'\n",
                      i, _k[i]->len, _k[i]->s);
          }
@@ -985,7 +985,7 @@ index 97fd19e..919cde7 100644
  
  
          if (db_redis_key_add_string(&query_v, "EXISTS", 6) != 0) {
-@@ -1527,19 +1934,9 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1522,19 +1929,9 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
          db_redis_key_free(&query_v);
  
          // construct HMGET query
@@ -1008,7 +1008,7 @@ index 97fd19e..919cde7 100644
          }
          if (db_redis_key_add_str(&query_v, keyname) != 0) {
              LM_ERR("Failed to add key name to pre-update exists query\n");
-@@ -1554,6 +1951,13 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1549,6 +1946,13 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
                  goto error;
              }
          }
@@ -1022,7 +1022,7 @@ index 97fd19e..919cde7 100644
  
          if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
              LM_ERR("Failed to append redis command\n");
-@@ -1580,9 +1984,13 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1575,9 +1979,13 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
  
  
      for (key = *keys; key; key = key->next) {
@@ -1037,7 +1037,7 @@ index 97fd19e..919cde7 100644
  
          // get reply for EXISTS query
          if (db_redis_get_reply(con, (void**)&reply) != REDIS_OK) {
-@@ -1639,13 +2047,50 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1634,13 +2042,50 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
                  }
              }
          }
@@ -1089,7 +1089,7 @@ index 97fd19e..919cde7 100644
          if (db_redis_key_add_string(&query_v, "HMSET", 5) != 0) {
              LM_ERR("Failed to add hmset command to update query\n");
              goto error;
-@@ -1681,6 +2126,108 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1676,6 +2121,108 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
          }
  
          db_redis_key_free(&query_v);
@@ -1198,7 +1198,7 @@ index 97fd19e..919cde7 100644
      }
  
      LM_DBG("getting replies for %d queries\n", update_queries);
-@@ -1697,6 +2244,8 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1692,6 +2239,8 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
  
      LM_DBG("done performing update\n");
  
@@ -1207,7 +1207,7 @@ index 97fd19e..919cde7 100644
      return 0;
  
  error:
-@@ -1704,6 +2253,10 @@ error:
+@@ -1699,6 +2248,10 @@ error:
      if (reply)
          db_redis_free_reply(&reply);
      db_redis_key_free(&query_v);
@@ -1218,7 +1218,7 @@ index 97fd19e..919cde7 100644
      return -1;
  }
  
-@@ -1726,6 +2279,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -1721,6 +2274,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      km_redis_con_t *con = NULL;
      int free_op = 0;
      int do_table_scan = 0;
@@ -1227,7 +1227,7 @@ index 97fd19e..919cde7 100644
  
      redis_key_t *keys = NULL;
      int keys_count = 0;
-@@ -1796,7 +2351,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -1791,7 +2346,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
  
      if (_n > 0) {
          if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
@@ -1237,7 +1237,7 @@ index 97fd19e..919cde7 100644
              LM_ERR("failed to build query keys\n");
              goto error;
          }
-@@ -1814,7 +2370,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -1809,7 +2365,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      }
  
      if (db_redis_perform_query(_h, con, _k, _v, query_ops, _c, _n, _nc, _r,
@@ -1246,7 +1246,7 @@ index 97fd19e..919cde7 100644
          goto error;
      }
  
-@@ -1828,6 +2384,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -1823,6 +2379,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      if (manual_keys) {
          pkg_free(manual_keys);
      }
@@ -1255,7 +1255,7 @@ index 97fd19e..919cde7 100644
  
      db_redis_consume_replies(con);
      return 0;
-@@ -1841,6 +2399,8 @@ error:
+@@ -1836,6 +2394,8 @@ error:
      if (manual_keys) {
          pkg_free(manual_keys);
      }
@@ -1264,7 +1264,7 @@ index 97fd19e..919cde7 100644
      db_redis_consume_replies(con);
  
  
-@@ -1869,11 +2429,13 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+@@ -1864,11 +2424,13 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
      redis_key_t *key = NULL;
      int keys_count = 0;
      redis_key_t *type_keys = NULL;
@@ -1278,7 +1278,7 @@ index 97fd19e..919cde7 100644
  
      con = REDIS_CON(_h);
      if (con && con->con == NULL) {
-@@ -1900,7 +2462,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+@@ -1895,7 +2457,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
          goto error;
      }
      if (db_redis_build_type_keys(con, CON_TABLE(_h), _k, _v, _n,
@@ -1287,7 +1287,7 @@ index 97fd19e..919cde7 100644
          LM_ERR("failed to build type keys\n");
          goto error;
      }
-@@ -1939,7 +2501,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+@@ -1934,7 +2496,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
      db_redis_check_reply(con, reply, error);
      db_redis_free_reply(&reply);
  
@@ -1296,7 +1296,7 @@ index 97fd19e..919cde7 100644
          str *type_key = &k->key;
  
          LM_DBG("inserting entry key '%.*s' to type map '%.*s'\n",
-@@ -1962,10 +2524,29 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+@@ -1957,10 +2519,29 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
          db_redis_key_free(&query_v);
          db_redis_check_reply(con, reply, error);
          db_redis_free_reply(&reply);
@@ -1326,7 +1326,7 @@ index 97fd19e..919cde7 100644
      db_redis_consume_replies(con);
  
      return 0;
-@@ -1973,6 +2554,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
+@@ -1968,6 +2549,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
  error:
      db_redis_key_free(&key);
      db_redis_key_free(&type_keys);
@@ -1334,7 +1334,7 @@ index 97fd19e..919cde7 100644
      db_redis_key_free(&query_v);
  
      if (reply)
-@@ -2002,6 +2584,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -1997,6 +2579,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      int manual_keys_count = 0;
      int free_op = 0;
      int do_table_scan = 0;
@@ -1343,7 +1343,7 @@ index 97fd19e..919cde7 100644
      db_op_t *query_ops = NULL;
      int i;
  
-@@ -2046,7 +2630,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2041,7 +2625,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
  
      if (_n > 0) {
          if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
@@ -1353,7 +1353,7 @@ index 97fd19e..919cde7 100644
              LM_ERR("failed to build query keys\n");
              goto error;
          }
-@@ -2063,7 +2648,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2059,7 +2644,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      }
  
      if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,
@@ -1362,7 +1362,7 @@ index 97fd19e..919cde7 100644
          goto error;
      }
  
-@@ -2075,6 +2660,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2071,6 +2656,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      db_redis_key_free(&keys);
      if (manual_keys)
          pkg_free(manual_keys);
@@ -1371,7 +1371,7 @@ index 97fd19e..919cde7 100644
      db_redis_consume_replies(con);
  
      return 0;
-@@ -2087,6 +2674,8 @@ error:
+@@ -2083,6 +2670,8 @@ error:
      db_redis_key_free(&keys);
      if (manual_keys)
          pkg_free(manual_keys);
@@ -1380,7 +1380,7 @@ index 97fd19e..919cde7 100644
      db_redis_consume_replies(con);
      return -1;
  }
-@@ -2109,6 +2698,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2105,6 +2694,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      km_redis_con_t *con = NULL;
      int free_op = 0;
      int do_table_scan = 0;
@@ -1389,7 +1389,7 @@ index 97fd19e..919cde7 100644
  
      redis_key_t *keys = NULL;
      int keys_count = 0;
-@@ -2158,7 +2749,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2154,7 +2745,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
  
      if (_n > 0) {
          if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
@@ -1399,7 +1399,7 @@ index 97fd19e..919cde7 100644
              LM_ERR("failed to build query keys\n");
              goto error;
          }
-@@ -2175,7 +2767,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2171,7 +2763,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      }
  
      if (db_redis_perform_update(_h, con, _k, _v, query_ops, _uk, _uv, _n, _nu,
@@ -1408,7 +1408,7 @@ index 97fd19e..919cde7 100644
          goto error;
      }
  
-@@ -2189,6 +2781,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2185,6 +2777,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      if (manual_keys) {
          pkg_free(manual_keys);
      }
@@ -1417,7 +1417,7 @@ index 97fd19e..919cde7 100644
      db_redis_consume_replies(con);
      return 0;
  
-@@ -2201,6 +2795,8 @@ error:
+@@ -2197,6 +2791,8 @@ error:
      if (manual_keys) {
          pkg_free(manual_keys);
      }
