@@ -62,3 +62,4 @@ upstream/topos_redis_fix_prack_method_check_the_branch_values.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
+sipwise/db_redis_sscan_fix_empty_key.patch
