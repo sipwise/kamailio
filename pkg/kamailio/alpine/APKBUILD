@@ -4,7 +4,7 @@
 # Maintainer: Nathan Angelacos <nangel@alpinelinux.org>
 
 pkgname=kamailio
-pkgver=5.3.5
+pkgver=5.3.8
 pkgrel=0
 
 # If building from a git snapshot, specify the gitcommit
@@ -157,7 +157,7 @@ _mod_list_presence="presence presence_conference presence_dialoginfo \
 			rls xcap_client xcap_server"
 
 # - modules depending on lua library
-_mod_list_lua="app_lua"
+_mod_list_lua="app_lua app_lua_sr"
 
 # - modules depending on perl library
 _mod_list_perl="app_perl db_perlvdb"

@@ -109,6 +109,11 @@ int tcp_set_clone_rcvbuf(int v)
 	return r;
 }
 
+int tcp_get_clone_rcvbuf(void)
+{
+	return tcp_clone_rcvbuf;
+}
+
 #ifdef READ_HTTP11
 static inline char *strfindcasestrz(str *haystack, char *needlez)
 {
@@ -311,12 +316,14 @@ again:
 			}
 		}else if (unlikely((bytes_read==0) ||
 					(*flags & RD_CONN_FORCE_EOF))){
+			LM_DBG("EOF on connection %p (state: %u, flags: %x) - FD %d,"
+					" bytes %d, rd-flags %x ([%s]:%u -> [%s]:%u)",
+					c, c->state, c->flags, fd, bytes_read, *flags,
+					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port,
+					ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
 			c->state=S_CONN_EOF;
 			*flags|=RD_CONN_EOF;
 			tcp_emit_closed_event(c, TCP_CLOSED_EOF);
-			LM_DBG("EOF on %p, FD %d ([%s]:%u ->", c, fd,
-					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port);
-			LM_DBG("-> [%s]:%u)\n", ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
 		}else{
 			if (unlikely(c->state==S_CONN_CONNECT || c->state==S_CONN_ACCEPT)){
 				TCP_STATS_ESTABLISHED(c->state);
@@ -1701,10 +1708,10 @@ void release_tcpconn(struct tcp_connection* c, long state, int unix_sock)
 static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
 {
 	struct tcp_connection *c;
-	
-	c=(struct tcp_connection*)data; 
+
+	c=(struct tcp_connection*)data;
 	/* or (struct tcp...*)(tl-offset(c->timer)) */
-	
+
 	if (likely(!(c->state<0) && TICKS_LT(t, c->timeout))){
 		/* timeout extended, exit */
 		return (ticks_t)(c->timeout - t);
@@ -1718,9 +1725,10 @@ static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
 					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port,
 					ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
 	}
-	tcpconn_listrm(tcp_conn_lst, c, c_next, c_prev);
-	release_tcpconn(c, (c->state<0)?CONN_ERROR:CONN_RELEASE, tcpmain_sock);
-	
+	if(tcp_conn_lst!=NULL) {
+		tcpconn_listrm(tcp_conn_lst, c, c_next, c_prev);
+		release_tcpconn(c, (c->state<0)?CONN_ERROR:CONN_RELEASE, tcpmain_sock);
+	}
 	return 0;
 }
 
@@ -1848,8 +1856,10 @@ repeat_1st_read:
 							ip_addr2a(&ec->rcv.dst_ip), ec->rcv.dst_port);
 
 				}
-				tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
-				local_timer_del(&tcp_reader_ltimer, &con->timer);
+				if(tcp_conn_lst!=NULL) {
+					tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
+					local_timer_del(&tcp_reader_ltimer, &con->timer);
+				}
 				goto con_error;
 			}
 			break;
@@ -1858,8 +1868,11 @@ repeat_1st_read:
 			if (unlikely(con->state==S_CONN_BAD)){
 				resp=CONN_ERROR;
 				if (!(con->send_flags.f & SND_F_CON_CLOSE))
-					LM_WARN("F_TCPCONN connection marked as bad: %p id %d refcnt %d\n",
-							con, con->id, atomic_get(&con->refcnt));
+					LM_WARN("F_TCPCONN connection marked as bad: %p id %d fd %d"
+							" refcnt %d ([%s]:%u -> [%s]:%u)\n",
+							con, con->id, con->fd, atomic_get(&con->refcnt),
+							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
+							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
 				goto read_error;
 			}
 			read_flags=((
@@ -1886,11 +1899,20 @@ read_error:
 							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
 							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
 				}
-				tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
-				local_timer_del(&tcp_reader_ltimer, &con->timer);
-				if (unlikely(resp!=CONN_EOF))
-					con->state=S_CONN_BAD;
-				release_tcpconn(con, resp, tcpmain_sock);
+				if(tcp_conn_lst!=NULL) {
+					LM_DBG("removing from list %p id %d fd %d,"
+							" state %d, flags %x, main fd %d, refcnt %d"
+							" ([%s]:%u -> [%s]:%u)\n",
+							con, con->id, con->fd, con->state,
+							con->flags, con->s, atomic_get(&con->refcnt),
+							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
+							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
+					tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
+					local_timer_del(&tcp_reader_ltimer, &con->timer);
+					if (unlikely(resp!=CONN_EOF))
+						con->state=S_CONN_BAD;
+					release_tcpconn(con, resp, tcpmain_sock);
+				}
 			}else{
 #ifdef USE_TLS
 				if (unlikely(read_flags & RD_CONN_REPEAT_READ))
@@ -1898,8 +1920,8 @@ read_error:
 #endif /* USE_TLS */
 				/* update timeout */
 				con->timeout=get_ticks_raw()+S_TO_TICKS(TCP_CHILD_TIMEOUT);
-				/* ret= 0 (read the whole socket buffer) if short read & 
-				 *  !POLLPRI,  bytes read otherwise */
+				/* ret= 0 (read the whole socket buffer) if short read
+				 * & !POLLPRI,  bytes read otherwise */
 				ret&=(((read_flags & RD_CONN_SHORT_READ) &&
 						!(events & POLLPRI)) - 1);
 			}
@@ -1913,7 +1935,7 @@ read_error:
 			LM_CRIT("unknown fd type %d\n", fm->type);
 			goto error;
 	}
-	
+
 	return ret;
 con_error:
 	con->state=S_CONN_BAD;
