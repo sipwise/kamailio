@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.1.8
+%define ver 5.1.9
 %define rel 0%{dist}
 
 %if 0%{?fedora} == 27
@@ -74,12 +74,12 @@
 %bcond_with cnxcc
 %bcond_without dnssec
 %bcond_without geoip
-%bcond_with http_async_client
+%bcond_without http_async_client
 %bcond_without ims
-%bcond_with jansson
-%bcond_with json
+%bcond_without jansson
+%bcond_without json
 %bcond_without lua
-%bcond_with kazoo
+%bcond_without kazoo
 %bcond_without memcached
 %bcond_with mongodb
 %bcond_without perl
@@ -179,6 +179,11 @@
 %bcond_without xmlrpc
 %endif
 
+# Defining missing macros on RHEL/CentOS 6
+%if 0%{?rhel} == 6
+%define _rundir %{_localstatedir}/run
+%endif
+
 # redefine buggy openSUSE Leap _sharedstatedir macro. More info at https://bugzilla.redhat.com/show_bug.cgi?id=183370
 %if 0%{?suse_version} == 1315
 %define _sharedstatedir /var/lib
@@ -226,6 +231,10 @@ BuildRequires:  python3-devel
 %if 0%{?fedora} == 28
 BuildRequires:  python3-devel
 %endif
+%if 0%{?fedora} == 30
+BuildRequires:  python3-devel
+%endif
+
 
 %description
 Kamailio (former OpenSER) is an Open Source SIP Server released under GPL, able
@@ -320,7 +329,7 @@ Module which provides a mechanism to limit call duration based on credit informa
 %package    cpl
 Summary:    CPL (Call Processing Language) interpreter for Kamailio
 Group:      System Environment/Daemons
-Requires:   libxml2, kamailio = %ver
+Requires:   which, libxml2, kamailio = %ver
 BuildRequires:  libxml2-devel
 
 %description    cpl
@@ -409,8 +418,14 @@ Compressed body (SIP and HTTP) handling for kamailio.
 %package    http_async_client
 Summary:    Async HTTP client module for Kamailio
 Group:      System Environment/Daemons
-Requires:   libevent, kamailio = %ver
-BuildRequires: libevent-devel
+Requires:   kamailio = %ver
+%if 0%{?rhel} == 6
+Requires:   libevent2
+BuildRequires:  libevent2-devel
+%else
+Requires:   libevent
+BuildRequires:  libevent-devel
+%endif
 %if 0%{?suse_version}
 Requires:   libcurl4
 BuildRequires:  libcurl-devel
@@ -455,7 +470,14 @@ IMS modules and extensions module for Kamailio.
 %package    jansson
 Summary:    JSON string handling and RPC modules for Kamailio using JANSSON library
 Group:      System Environment/Daemons
-Requires:   libevent, kamailio = %ver
+Requires:   kamailio = %ver
+%if 0%{?rhel} == 6
+Requires:   libevent2
+BuildRequires:  libevent2-devel
+%else
+Requires:   libevent
+BuildRequires:  libevent-devel
+%endif
 %if 0%{?suse_version}
 Requires:   libjson-c2
 BuildRequires:  libjansson-devel
@@ -473,8 +495,14 @@ JSON string handling and RPC modules for Kamailio using JANSSON library.
 %package    json
 Summary:    JSON string handling and RPC modules for Kamailio
 Group:      System Environment/Daemons
-Requires:   libevent, kamailio = %ver
+Requires:   kamailio = %ver
+%if 0%{?rhel} == 6
+Requires:   libevent2
+BuildRequires:  libevent2-devel
+%else
+Requires:   libevent
 BuildRequires:  libevent-devel
+%endif
 %if 0%{?suse_version}
 Requires:   libjson-c2
 BuildRequires:  libjson-c-devel
@@ -492,8 +520,15 @@ JSON string handling and RPC modules for Kamailio.
 %package    kazoo
 Summary:    Kazoo middle layer connector support for Kamailio
 Group:      System Environment/Daemons
-Requires:   libuuid, librabbitmq, json-c, libevent, kamailio = %ver
-BuildRequires:  libuuid-devel, librabbitmq-devel, json-c-devel, libevent-devel
+Requires:   libuuid, librabbitmq, json-c, kamailio = %ver
+BuildRequires:  libuuid-devel, librabbitmq-devel, json-c-devel
+%if 0%{?rhel} == 6
+Requires:   libevent2
+BuildRequires:  libevent2-devel
+%else
+Requires:   libevent
+BuildRequires:  libevent-devel
+%endif
 
 %description    kazoo
 Kazoo module for Kamailio.
@@ -937,9 +972,14 @@ UUID module for Kamailio.
 %prep
 %setup -n %{name}-%{ver}
 
+%if "%{__python2}" != ""
+    sed -i -e 's:#!/usr/bin/python:#!%{__python2}:' utils/kamctl/dbtextdb/dbtextdb.py
+%endif
+
 ln -s ../obs pkg/kamailio/fedora/27
 ln -s ../obs pkg/kamailio/fedora/28
 ln -s ../obs pkg/kamailio/fedora/29
+ln -s ../obs pkg/kamailio/fedora/30
 ln -s ../obs pkg/kamailio/rhel/6
 ln -s ../obs pkg/kamailio/rhel/7
 ln -s ../obs pkg/kamailio/opensuse/1315
@@ -1607,6 +1647,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.ims_registrar_pcscf
 %doc %{_docdir}/kamailio/modules/README.ims_registrar_scscf
 %doc %{_docdir}/kamailio/modules/README.ims_usrloc_pcscf
+%doc %{_docdir}/kamailio/modules/README.ims_usrloc_scscf
 %{_libdir}/kamailio/modules/cdp.so
 %{_libdir}/kamailio/modules/cdp_avp.so
 %{_libdir}/kamailio/modules/ims_auth.so

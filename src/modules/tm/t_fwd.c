@@ -199,7 +199,7 @@ static int prepare_new_uac( struct cell *t, struct sip_msg *i_req,
 		i_req->add_rm = dup_lump_list(i_req->add_rm);
 		if (unlikely(i_req->add_rm==0)){
 			ret=E_OUT_OF_MEM;
-			goto error04;
+			goto error05;
 		}
 	}
 	if (unlikely(i_req->body_lumps)){
@@ -593,12 +593,15 @@ error03:
 	/* Delete the duplicated lump lists, this will also delete
 	 * all lumps created here, such as lumps created in per-branch
 	 * routing sections, Via, and Content-Length headers created in
-	 * build_req_buf_from_sip_req
+	 * build_req_buf_from_sip_req().
 	 */
+	free_duped_lump_list(i_req->body_lumps);
+
 error04:
 	free_duped_lump_list(i_req->add_rm);
-	free_duped_lump_list(i_req->body_lumps);
-	/* Restore the lists from backups */
+
+error05:
+	/* Restore the lists from backups. */
 	i_req->add_rm = add_rm_backup;
 	i_req->body_lumps = body_lumps_backup;
 
