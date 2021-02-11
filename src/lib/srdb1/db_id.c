@@ -100,26 +100,28 @@ static int parse_db_url(struct db_id* id, const str* url)
 		ST_USER_HOST,  /* Username or hostname */
 		ST_PASS_PORT,  /* Password or port part */
 		ST_HOST,       /* Hostname part */
+		ST_HOST6,      /* Hostname part IPv6 */
 		ST_PORT,       /* Port part */
 		ST_DB          /* Database part */
 	};
 
 	enum state st;
-	unsigned int len, i, j, a;
+	unsigned int len, i, j, a, foundanother, ipv6_flag=0;
 	const char* begin;
 	char* prev_token;
 
+	foundanother = 0;
 	prev_token = 0;
 
 	if (!id || !url || !url->s) {
 		goto err;
 	}
-	
+
 	len = url->len;
 	if (len < SHORTEST_DB_URL_LEN) {
 		goto err;
 	}
-	
+
 	/* Initialize all attributes to 0 */
 	memset(id, 0, sizeof(struct db_id));
 	st = ST_SCHEME;
@@ -153,7 +155,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 				st = ST_USER_HOST;
 				begin = url->s + i + 1;
 				break;
-				
+
 			default:
 				goto err;
 			}
@@ -162,6 +164,20 @@ static int parse_db_url(struct db_id* id, const str* url)
 		case ST_USER_HOST:
 			switch(url->s[i]) {
 			case '@':
+				/* look for another @ to cope with username@domain user id */
+				if (foundanother == 0) {
+					for (j = i + 1; j < url->len; j++) {
+						if (url->s[j] == '@') {
+							foundanother = 1;
+							break;
+						}
+					}
+					if (foundanother == 1) {
+						/* keep the current @ in the username */
+						st = ST_USER_HOST;
+						break;
+					}
+				}
 				st = ST_HOST;
 				if (dupl_string(&id->username, begin, url->s + i) < 0) goto err;
 				begin = url->s + i + 1;
@@ -170,6 +186,11 @@ static int parse_db_url(struct db_id* id, const str* url)
 			case ':':
 				st = ST_PASS_PORT;
 				if (dupl_string(&prev_token, begin, url->s + i) < 0) goto err;
+				begin = url->s + i + 1;
+				break;
+
+			case '[':
+				st = ST_HOST6;
 				begin = url->s + i + 1;
 				break;
 
@@ -209,16 +230,30 @@ static int parse_db_url(struct db_id* id, const str* url)
 
 		case ST_HOST:
 			switch(url->s[i]) {
+			case '[':
+				st = ST_HOST6;
+				begin = url->s + i + 1;
+				break;
+
 			case ':':
 				st = ST_PORT;
-				if (dupl_string(&id->host, begin, url->s + i) < 0) goto err;
+				if (dupl_string(&id->host, begin, url->s + i - ipv6_flag) < 0) goto err;
 				begin = url->s + i + 1;
 				break;
 
 			case '/':
-				if (dupl_string(&id->host, begin, url->s + i) < 0) goto err;
+				if (dupl_string(&id->host, begin, url->s + i - ipv6_flag) < 0) goto err;
 				if (dupl_string_name(&id->database, url->s + i + 1, url->s + len) < 0) goto err;
 				return 0;
+			}
+			break;
+
+		case ST_HOST6:
+			switch(url->s[i]) {
+			case ']':
+				ipv6_flag = 1;
+				st = ST_HOST;
+				break;
 			}
 			break;
 
@@ -230,7 +265,7 @@ static int parse_db_url(struct db_id* id, const str* url)
 				return 0;
 			}
 			break;
-			
+
 		case ST_DB:
 			break;
 		}

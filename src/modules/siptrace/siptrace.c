@@ -503,13 +503,13 @@ static int sip_trace_store(siptrace_data_t *sto, dest_info_t *dst,
 
 static int sip_trace_store_db(siptrace_data_t *sto)
 {
+	if(trace_to_database_flag == NULL || *trace_to_database_flag == 0)
+		goto done;
+
 	if(db_con == NULL) {
 		LM_DBG("database connection not initialized\n");
 		return -1;
 	}
-
-	if(trace_to_database_flag == NULL || *trace_to_database_flag == 0)
-		goto done;
 
 	db_key_t db_keys[NR_KEYS];
 	db_val_t db_vals[NR_KEYS];
@@ -715,6 +715,7 @@ static int ki_sip_trace_dst_cid(sip_msg_t *msg, str *duri, str *cid)
 	dest_info_t *dst = NULL;
 	sip_uri_t uri;
 	proxy_l_t *p = NULL;
+	int ret = 1;
 
 	// If the dest is empty, use the module parameter, if set
 	if(duri == NULL || duri->len <= 0) {
@@ -756,7 +757,11 @@ static int ki_sip_trace_dst_cid(sip_msg_t *msg, str *duri, str *cid)
 		pkg_free(p);
 	}
 
-	return sip_trace(msg, dst, ((cid!=NULL && cid->len>0)?cid:NULL), NULL);
+	ret = sip_trace(msg, dst, ((cid!=NULL && cid->len>0)?cid:NULL), NULL);
+
+	pkg_free(dst);
+
+	return ret;
 }
 
 /**
