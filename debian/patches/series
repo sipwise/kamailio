@@ -44,7 +44,6 @@ sipwise/tt37692.patch
 sipwise/dtmf-blocking.patch
 sipwise/media-blocking.patch
 upstream/topos_execute_event_route_topos_sending.patch
-upstream/tm-put-back-t-in-wait-timer-if-still-referenced-more.patch
 sipwise/sca-fix-memleaks.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/db_redis_fix_scan_usage.patch
@@ -58,7 +57,6 @@ sipwise/db_redis_master_keys.patch
 sipwise/db_redis_master_sets.patch
 sipwise/db_redis_fixes.patch
 sipwise/db_redis_eval_fix.patch
-upstream/topos_redis_fix_prack_method_check_the_branch_values.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch

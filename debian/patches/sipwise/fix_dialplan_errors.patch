@@ -1,6 +1,16 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 12 Feb 2021 11:36:01 +0100
+Subject: fix_dialplan_errors
+
+---
+ src/modules/dialplan/dp_repl.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/dialplan/dp_repl.c b/src/modules/dialplan/dp_repl.c
+index 093e48f..1bdc6e8 100644
 --- a/src/modules/dialplan/dp_repl.c
 +++ b/src/modules/dialplan/dp_repl.c
-@@ -432,7 +432,7 @@ int rule_translate(sip_msg_t *msg, str *
+@@ -432,7 +432,7 @@ int rule_translate(sip_msg_t *msg, str *instr, dpl_node_t *rule,
  		/*search for the pattern from the compiled subst_exp*/
  		if (pcre_exec(subst_comp, NULL, instr->s, instr->len,
  					0, 0, ovector, 3 * (MAX_REPLACE_WITH + 1)) <= 0) {
@@ -9,8 +19,8 @@
  					"the match_exp %.*s but not the subst_exp %.*s!\n",
  					instr->len, instr->s,
  					rule->match_exp.len, rule->match_exp.s,
-@@ -700,7 +700,7 @@ repl:
- 		}
+@@ -703,7 +703,7 @@ repl:
+ 		return 0;
  	}
  	if(rulep->tflags&DP_TFLAGS_PV_SUBST) {
 -		re_list = dpl_dynamic_pcre_list(msg, &rulep->match_exp);
@@ -18,7 +28,7 @@
  		if(re_list==NULL) {
  			/* failed to compile dynamic pcre -- ignore */
  			LM_DBG("failed to compile dynamic pcre[%.*s]\n",
-@@ -721,6 +721,14 @@ repl:
+@@ -724,6 +724,14 @@ repl:
  			pkg_free(re_list);
  			re_list = rt;
  		} while(re_list);
