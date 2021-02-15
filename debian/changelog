@@ -1,3 +1,16 @@
+ngcp-kamailio (5.4.1-1+0~mr9.3.1.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [7f49eef] TT#105600 secsipid package
+
+  [ Richard Fuchs ]
+  * [5542caa] TT#63000 skip empty keys when looking for key
+  * [2a23b94] TT#63000 improve Redis SCAN increase and falloff
+  * [d53e856] TT#63000 use SSCAN instead of SCAN if possible
+  * [c182f41] TT#63000 fix SSCAN using empty key name
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 15 Feb 2021 17:52:04 +0100
+
 ngcp-kamailio (5.4.1-1+0~mr9.3.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
