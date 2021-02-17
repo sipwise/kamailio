@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: db_redis_graceful_scan
+
+---
+ src/modules/db_redis/redis_dbase.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 8370fa4..b68708e 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -735,7 +735,7 @@
+@@ -735,7 +735,7 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
      int l;
  
  
@@ -9,7 +19,7 @@
  
  #ifdef USE_SCAN
  
-@@ -743,6 +743,8 @@
+@@ -743,6 +743,8 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
      unsigned long cursor = 0;
      unsigned int match_count = match_count_start_val;
      char match_count_str[16];
@@ -18,7 +28,7 @@
  
      do {
          snprintf(cursor_str, sizeof(cursor_str), "%lu", cursor);
-@@ -777,7 +779,12 @@
+@@ -777,7 +779,12 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
              goto err;
          }
  
@@ -31,7 +41,7 @@
          db_redis_key_free(&query_v);
          db_redis_check_reply(con, reply, err);
          if (reply->type != REDIS_REPLY_ARRAY) {
-@@ -851,11 +858,15 @@
+@@ -851,11 +858,15 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
          }
  
  #ifdef USE_SCAN

@@ -1,6 +1,17 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: usrloc_dbro
+
+---
+ src/modules/usrloc/usrloc_mod.c | 65 +++++++++++++++++++++++++++++++++++++++++
+ src/modules/usrloc/usrloc_mod.h |  2 ++
+ 2 files changed, 67 insertions(+)
+
+diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
+index 254e896..d09c038 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
-@@ -153,6 +153,7 @@ str ulattrs_avalue_col = str_init(ULATTR
+@@ -153,6 +153,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta
  str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
  
  str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
@@ -86,7 +97,7 @@
  	if (nat_bflag==(unsigned int)-1) {
  		nat_bflag = 0;
  	} else if ( nat_bflag>=8*sizeof(nat_bflag) ) {
-@@ -421,6 +472,16 @@ static int child_init(int _rank)
+@@ -424,6 +475,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -103,7 +114,7 @@
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
  	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY && db_load) {
  		/* if cache is used, populate domains from DB */
-@@ -451,6 +512,10 @@ static void destroy(void)
+@@ -454,6 +515,10 @@ static void destroy(void)
  		ul_dbf.close(ul_dbh);
  	}
  
@@ -114,6 +125,8 @@
  	free_all_udomains();
  
  	/* free callbacks list */
+diff --git a/src/modules/usrloc/usrloc_mod.h b/src/modules/usrloc/usrloc_mod.h
+index 5ac67d6..6bc2f1c 100644
 --- a/src/modules/usrloc/usrloc_mod.h
 +++ b/src/modules/usrloc/usrloc_mod.h
 @@ -89,6 +89,8 @@ extern int handle_lost_tcp;

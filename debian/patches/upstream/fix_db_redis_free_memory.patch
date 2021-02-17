@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: fix_db_redis_free_memory
+
+---
+ src/modules/db_redis/redis_dbase.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index ff210ec..273ee59 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -1393,7 +1393,6 @@
+@@ -1393,7 +1393,6 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          //db_redis_key_free(&type_keys);
          LM_DBG("+++ done with loop '%.*s'\n", k->key.len, k->key.s);
      }
@@ -8,7 +18,7 @@
      db_redis_key_free(&type_keys);
      db_redis_key_free(&all_type_keys);
  
-@@ -1598,7 +1597,8 @@
+@@ -1598,7 +1597,8 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
                  LM_ERR("Failed to add key to update query\n");
                  goto error;
              }
@@ -18,7 +28,7 @@
          }
          update_queries++;
          if (db_redis_append_command_argv(con, query_v, 1) != REDIS_OK) {
-@@ -1850,7 +1850,8 @@
+@@ -1850,7 +1850,8 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
              LM_ERR("Failed to add column value to insert query\n");
              goto error;
          }
@@ -28,7 +38,7 @@
      }
  
      reply = db_redis_command_argv(con, query_v);
-@@ -2148,4 +2149,4 @@
+@@ -2148,4 +2149,4 @@ int db_redis_free_result(db1_con_t* _h, db1_res_t* _r) {
          return -1;
      db_free_result(_r);
      return 0;

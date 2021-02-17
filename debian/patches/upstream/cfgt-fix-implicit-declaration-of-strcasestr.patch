@@ -1,0 +1,27 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 11 May 2020 15:06:26 +0200
+Subject: [PATCH] cfgt: fix implicit declaration of 'strcasestr'
+
+> cfgt_int.c: In function 'cfgt_msgout':
+> cfgt_int.c:863:21: warning: implicit declaration of function 'strcasestr'; did you mean 'strcasecmp'? [-Wimplicit-function-declaration]
+>  863 |  if(buf->len > 7 && strcasestr(buf->s, "OPTIONS")) {
+>      |                     ^~~~~~~~~~
+>      |                     strcasecmp
+
+(cherry picked from commit 361542a953ceaab1894f790e21eecf74008b749a)
+---
+ src/modules/cfgt/cfgt_int.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
+index 4247743..2a837d4 100644
+--- a/src/modules/cfgt/cfgt_int.c
++++ b/src/modules/cfgt/cfgt_int.c
+@@ -19,6 +19,7 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+  */
++#define _GNU_SOURCE
+ #include <stdio.h>
+ #include <sys/stat.h>
+ #include <string.h>

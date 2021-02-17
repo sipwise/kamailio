@@ -1,3 +1,183 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: add_db_redis_module
+
+---
+ src/Makefile.groups                                |    2 +-
+ src/doc/stylesheets/dbschema_k/xsl/db_redis.xsl    |  126 ++
+ src/lib/srdb1/schema/Makefile                      |   19 +-
+ src/modules/db_redis/Makefile                      |   42 +
+ src/modules/db_redis/README                        |  198 ++
+ src/modules/db_redis/db_redis_mod.c                |  115 ++
+ src/modules/db_redis/db_redis_mod.h                |   53 +
+ src/modules/db_redis/doc/Makefile                  |    4 +
+ src/modules/db_redis/doc/db_redis.xml              |   38 +
+ src/modules/db_redis/doc/db_redis_admin.xml        |  192 ++
+ src/modules/db_redis/redis_connection.c            |  399 ++++
+ src/modules/db_redis/redis_connection.h            |   81 +
+ src/modules/db_redis/redis_dbase.c                 | 2151 ++++++++++++++++++++
+ src/modules/db_redis/redis_dbase.h                 |   88 +
+ src/modules/db_redis/redis_table.c                 |  841 ++++++++
+ src/modules/db_redis/redis_table.h                 |   66 +
+ utils/kamctl/Makefile                              |   12 +
+ utils/kamctl/db_redis/kamailio/acc                 |    2 +
+ utils/kamctl/db_redis/kamailio/acc_cdrs            |    2 +
+ utils/kamctl/db_redis/kamailio/active_watchers     |    2 +
+ utils/kamctl/db_redis/kamailio/address             |    2 +
+ utils/kamctl/db_redis/kamailio/aliases             |    2 +
+ utils/kamctl/db_redis/kamailio/carrier_name        |    2 +
+ utils/kamctl/db_redis/kamailio/carrierfailureroute |    2 +
+ utils/kamctl/db_redis/kamailio/carrierroute        |    2 +
+ utils/kamctl/db_redis/kamailio/cpl                 |    2 +
+ utils/kamctl/db_redis/kamailio/dbaliases           |    2 +
+ utils/kamctl/db_redis/kamailio/dialog              |    2 +
+ utils/kamctl/db_redis/kamailio/dialog_vars         |    2 +
+ utils/kamctl/db_redis/kamailio/dialplan            |    2 +
+ utils/kamctl/db_redis/kamailio/dispatcher          |    2 +
+ utils/kamctl/db_redis/kamailio/domain              |    2 +
+ utils/kamctl/db_redis/kamailio/domain_attrs        |    2 +
+ utils/kamctl/db_redis/kamailio/domain_name         |    2 +
+ utils/kamctl/db_redis/kamailio/domainpolicy        |    2 +
+ utils/kamctl/db_redis/kamailio/dr_gateways         |    2 +
+ utils/kamctl/db_redis/kamailio/dr_groups           |    2 +
+ utils/kamctl/db_redis/kamailio/dr_gw_lists         |    2 +
+ utils/kamctl/db_redis/kamailio/dr_rules            |    2 +
+ utils/kamctl/db_redis/kamailio/globalblacklist     |    2 +
+ utils/kamctl/db_redis/kamailio/grp                 |    2 +
+ utils/kamctl/db_redis/kamailio/htable              |    2 +
+ utils/kamctl/db_redis/kamailio/imc_members         |    2 +
+ utils/kamctl/db_redis/kamailio/imc_rooms           |    2 +
+ utils/kamctl/db_redis/kamailio/lcr_gw              |    2 +
+ utils/kamctl/db_redis/kamailio/lcr_rule            |    2 +
+ utils/kamctl/db_redis/kamailio/lcr_rule_target     |    2 +
+ utils/kamctl/db_redis/kamailio/location            |    2 +
+ utils/kamctl/db_redis/kamailio/location_attrs      |    2 +
+ utils/kamctl/db_redis/kamailio/matrix              |    2 +
+ utils/kamctl/db_redis/kamailio/missed_calls        |    2 +
+ utils/kamctl/db_redis/kamailio/mohqcalls           |    2 +
+ utils/kamctl/db_redis/kamailio/mohqueues           |    2 +
+ utils/kamctl/db_redis/kamailio/mtree               |    2 +
+ utils/kamctl/db_redis/kamailio/mtrees              |    2 +
+ utils/kamctl/db_redis/kamailio/pdt                 |    2 +
+ utils/kamctl/db_redis/kamailio/pl_pipes            |    2 +
+ utils/kamctl/db_redis/kamailio/presentity          |    2 +
+ utils/kamctl/db_redis/kamailio/pua                 |    2 +
+ utils/kamctl/db_redis/kamailio/purplemap           |    2 +
+ utils/kamctl/db_redis/kamailio/re_grp              |    2 +
+ utils/kamctl/db_redis/kamailio/rls_presentity      |    2 +
+ utils/kamctl/db_redis/kamailio/rls_watchers        |    2 +
+ utils/kamctl/db_redis/kamailio/rtpengine           |    2 +
+ utils/kamctl/db_redis/kamailio/rtpproxy            |    2 +
+ utils/kamctl/db_redis/kamailio/sca_subscriptions   |    2 +
+ utils/kamctl/db_redis/kamailio/silo                |    2 +
+ utils/kamctl/db_redis/kamailio/sip_trace           |    2 +
+ utils/kamctl/db_redis/kamailio/speed_dial          |    2 +
+ utils/kamctl/db_redis/kamailio/subscriber          |    2 +
+ utils/kamctl/db_redis/kamailio/topos_d             |    2 +
+ utils/kamctl/db_redis/kamailio/topos_t             |    2 +
+ utils/kamctl/db_redis/kamailio/trusted             |    2 +
+ utils/kamctl/db_redis/kamailio/uacreg              |    2 +
+ utils/kamctl/db_redis/kamailio/uid_credentials     |    2 +
+ utils/kamctl/db_redis/kamailio/uid_domain          |    2 +
+ utils/kamctl/db_redis/kamailio/uid_domain_attrs    |    2 +
+ utils/kamctl/db_redis/kamailio/uid_global_attrs    |    2 +
+ utils/kamctl/db_redis/kamailio/uid_uri             |    2 +
+ utils/kamctl/db_redis/kamailio/uid_uri_attrs       |    2 +
+ utils/kamctl/db_redis/kamailio/uid_user_attrs      |    2 +
+ utils/kamctl/db_redis/kamailio/uri                 |    2 +
+ utils/kamctl/db_redis/kamailio/userblacklist       |    2 +
+ utils/kamctl/db_redis/kamailio/usr_preferences     |    2 +
+ utils/kamctl/db_redis/kamailio/version             |    2 +
+ utils/kamctl/db_redis/kamailio/watchers            |    2 +
+ utils/kamctl/db_redis/kamailio/xcap                |    2 +
+ 87 files changed, 4564 insertions(+), 3 deletions(-)
+ create mode 100644 src/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
+ create mode 100644 src/modules/db_redis/Makefile
+ create mode 100644 src/modules/db_redis/README
+ create mode 100644 src/modules/db_redis/db_redis_mod.c
+ create mode 100644 src/modules/db_redis/db_redis_mod.h
+ create mode 100644 src/modules/db_redis/doc/Makefile
+ create mode 100644 src/modules/db_redis/doc/db_redis.xml
+ create mode 100644 src/modules/db_redis/doc/db_redis_admin.xml
+ create mode 100644 src/modules/db_redis/redis_connection.c
+ create mode 100644 src/modules/db_redis/redis_connection.h
+ create mode 100644 src/modules/db_redis/redis_dbase.c
+ create mode 100644 src/modules/db_redis/redis_dbase.h
+ create mode 100644 src/modules/db_redis/redis_table.c
+ create mode 100644 src/modules/db_redis/redis_table.h
+ create mode 100644 utils/kamctl/db_redis/kamailio/acc
+ create mode 100644 utils/kamctl/db_redis/kamailio/acc_cdrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/active_watchers
+ create mode 100644 utils/kamctl/db_redis/kamailio/address
+ create mode 100644 utils/kamctl/db_redis/kamailio/aliases
+ create mode 100644 utils/kamctl/db_redis/kamailio/carrier_name
+ create mode 100644 utils/kamctl/db_redis/kamailio/carrierfailureroute
+ create mode 100644 utils/kamctl/db_redis/kamailio/carrierroute
+ create mode 100644 utils/kamctl/db_redis/kamailio/cpl
+ create mode 100644 utils/kamctl/db_redis/kamailio/dbaliases
+ create mode 100644 utils/kamctl/db_redis/kamailio/dialog
+ create mode 100644 utils/kamctl/db_redis/kamailio/dialog_vars
+ create mode 100644 utils/kamctl/db_redis/kamailio/dialplan
+ create mode 100644 utils/kamctl/db_redis/kamailio/dispatcher
+ create mode 100644 utils/kamctl/db_redis/kamailio/domain
+ create mode 100644 utils/kamctl/db_redis/kamailio/domain_attrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/domain_name
+ create mode 100644 utils/kamctl/db_redis/kamailio/domainpolicy
+ create mode 100644 utils/kamctl/db_redis/kamailio/dr_gateways
+ create mode 100644 utils/kamctl/db_redis/kamailio/dr_groups
+ create mode 100644 utils/kamctl/db_redis/kamailio/dr_gw_lists
+ create mode 100644 utils/kamctl/db_redis/kamailio/dr_rules
+ create mode 100644 utils/kamctl/db_redis/kamailio/globalblacklist
+ create mode 100644 utils/kamctl/db_redis/kamailio/grp
+ create mode 100644 utils/kamctl/db_redis/kamailio/htable
+ create mode 100644 utils/kamctl/db_redis/kamailio/imc_members
+ create mode 100644 utils/kamctl/db_redis/kamailio/imc_rooms
+ create mode 100644 utils/kamctl/db_redis/kamailio/lcr_gw
+ create mode 100644 utils/kamctl/db_redis/kamailio/lcr_rule
+ create mode 100644 utils/kamctl/db_redis/kamailio/lcr_rule_target
+ create mode 100644 utils/kamctl/db_redis/kamailio/location
+ create mode 100644 utils/kamctl/db_redis/kamailio/location_attrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/matrix
+ create mode 100644 utils/kamctl/db_redis/kamailio/missed_calls
+ create mode 100644 utils/kamctl/db_redis/kamailio/mohqcalls
+ create mode 100644 utils/kamctl/db_redis/kamailio/mohqueues
+ create mode 100644 utils/kamctl/db_redis/kamailio/mtree
+ create mode 100644 utils/kamctl/db_redis/kamailio/mtrees
+ create mode 100644 utils/kamctl/db_redis/kamailio/pdt
+ create mode 100644 utils/kamctl/db_redis/kamailio/pl_pipes
+ create mode 100644 utils/kamctl/db_redis/kamailio/presentity
+ create mode 100644 utils/kamctl/db_redis/kamailio/pua
+ create mode 100644 utils/kamctl/db_redis/kamailio/purplemap
+ create mode 100644 utils/kamctl/db_redis/kamailio/re_grp
+ create mode 100644 utils/kamctl/db_redis/kamailio/rls_presentity
+ create mode 100644 utils/kamctl/db_redis/kamailio/rls_watchers
+ create mode 100644 utils/kamctl/db_redis/kamailio/rtpengine
+ create mode 100644 utils/kamctl/db_redis/kamailio/rtpproxy
+ create mode 100644 utils/kamctl/db_redis/kamailio/sca_subscriptions
+ create mode 100644 utils/kamctl/db_redis/kamailio/silo
+ create mode 100644 utils/kamctl/db_redis/kamailio/sip_trace
+ create mode 100644 utils/kamctl/db_redis/kamailio/speed_dial
+ create mode 100644 utils/kamctl/db_redis/kamailio/subscriber
+ create mode 100644 utils/kamctl/db_redis/kamailio/topos_d
+ create mode 100644 utils/kamctl/db_redis/kamailio/topos_t
+ create mode 100644 utils/kamctl/db_redis/kamailio/trusted
+ create mode 100644 utils/kamctl/db_redis/kamailio/uacreg
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_credentials
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_domain
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_domain_attrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_global_attrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_uri
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_uri_attrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/uid_user_attrs
+ create mode 100644 utils/kamctl/db_redis/kamailio/uri
+ create mode 100644 utils/kamctl/db_redis/kamailio/userblacklist
+ create mode 100644 utils/kamctl/db_redis/kamailio/usr_preferences
+ create mode 100644 utils/kamctl/db_redis/kamailio/version
+ create mode 100644 utils/kamctl/db_redis/kamailio/watchers
+ create mode 100644 utils/kamctl/db_redis/kamailio/xcap
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index 127a274..77a6e5b 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -156,7 +156,7 @@ mod_list_jansson=jansson
@@ -9,73 +189,9 @@
  
  # - modules depending on mono library
  mod_list_mono=app_mono
---- a/src/lib/srdb1/schema/Makefile
-+++ b/src/lib/srdb1/schema/Makefile
-@@ -37,6 +37,9 @@ ORACLE_XSL = $(STYLESHEETS)/oracle.xsl
- # Stylesheet used to generate mongodb database schema
- MONGODB_XSL = $(STYLESHEETS)/mongodb.xsl
- 
-+# Stylesheet used to generate Redis database schema
-+DB_REDIS_XSL = $(STYLESHEETS)/db_redis.xsl
-+
- # Stylesheet used to generate docbook documentation
- DOCBOOK_XSL = $(STYLESHEETS)/docbook.xsl
- 
-@@ -69,7 +72,7 @@ ifeq ($(VERBOSE), 1)
- 	override XSLTPROC := $(XSLTPROC) --verbose
- endif
- 
--all: mysql postgres dbtext db_berkeley db_sqlite oracle mongodb pi_framework
-+all: mysql postgres dbtext db_berkeley db_sqlite oracle mongodb db_redis pi_framework
- 
- .PHONY: pi_framework pi_framework_clean
- pi_framework:
-@@ -227,6 +230,18 @@ mongodb:
- mongodb_clean:
- 	-@rm -f $(SCHEME)/mongodb/kamailio/*
- 
-+.PHONY: db_redis db_redis_clean
-+db_redis:
-+	for FILE in $(TABLES); do \
-+		XML_CATALOG_FILES=$(CATALOG) $(XSLTPROC) $(XSLTPROC_FLAGS) \
-+		--stringparam dir "$(SCHEME)/db_redis/kamailio" \
-+		--stringparam prefix "" \
-+		--stringparam db "db_redis" \
-+		$(DB_REDIS_XSL) kamailio-"$$FILE".xml ; \
-+	done
-+
-+db_redis_clean:
-+	-@rm -f $(SCHEME)/db_redis/*
- 
- .PHONY: docbook-xml
- docbook-xml:
-@@ -350,4 +365,4 @@ dbdoc_clean:
- 	done
- 
- .PHONY: clean
--clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
-+clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean mongodb_clean db_redis_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
---- a/utils/kamctl/Makefile
-+++ b/utils/kamctl/Makefile
-@@ -264,6 +264,18 @@ install-modules: $(bin_prefix)/$(bin_dir
- 				fi ;\
- 			done ; \
- 		fi
-+		# install Redis stuff
-+		if [ "$(REDISON)" = "yes" ]; then \
-+			mkdir -p $(data_prefix)/$(data_dir)/db_redis/kamailio ; \
-+			for FILE in $(wildcard db_redis/kamailio/*) ; do \
-+				if [ -f $$FILE ] ; then \
-+				$(INSTALL_TOUCH) $$FILE \
-+					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
-+				$(INSTALL_CFG) $$FILE \
-+					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
-+				fi ;\
-+			done ; \
-+		fi
- 
- 
- $(cfg_prefix)/$(cfg_dir):
+diff --git a/src/doc/stylesheets/dbschema_k/xsl/db_redis.xsl b/src/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
+new file mode 100644
+index 0000000..0c202b0
 --- /dev/null
 +++ b/src/doc/stylesheets/dbschema_k/xsl/db_redis.xsl
 @@ -0,0 +1,126 @@
@@ -205,6 +321,57 @@
 +    </xsl:template>
 +
 +</xsl:stylesheet>
+diff --git a/src/lib/srdb1/schema/Makefile b/src/lib/srdb1/schema/Makefile
+index 4d3be74..b057387 100644
+--- a/src/lib/srdb1/schema/Makefile
++++ b/src/lib/srdb1/schema/Makefile
+@@ -37,6 +37,9 @@ ORACLE_XSL = $(STYLESHEETS)/oracle.xsl
+ # Stylesheet used to generate mongodb database schema
+ MONGODB_XSL = $(STYLESHEETS)/mongodb.xsl
+ 
++# Stylesheet used to generate Redis database schema
++DB_REDIS_XSL = $(STYLESHEETS)/db_redis.xsl
++
+ # Stylesheet used to generate docbook documentation
+ DOCBOOK_XSL = $(STYLESHEETS)/docbook.xsl
+ 
+@@ -69,7 +72,7 @@ ifeq ($(VERBOSE), 1)
+ 	override XSLTPROC := $(XSLTPROC) --verbose
+ endif
+ 
+-all: mysql postgres dbtext db_berkeley db_sqlite oracle mongodb pi_framework
++all: mysql postgres dbtext db_berkeley db_sqlite oracle mongodb db_redis pi_framework
+ 
+ .PHONY: pi_framework pi_framework_clean
+ pi_framework:
+@@ -227,6 +230,18 @@ mongodb:
+ mongodb_clean:
+ 	-@rm -f $(SCHEME)/mongodb/kamailio/*
+ 
++.PHONY: db_redis db_redis_clean
++db_redis:
++	for FILE in $(TABLES); do \
++		XML_CATALOG_FILES=$(CATALOG) $(XSLTPROC) $(XSLTPROC_FLAGS) \
++		--stringparam dir "$(SCHEME)/db_redis/kamailio" \
++		--stringparam prefix "" \
++		--stringparam db "db_redis" \
++		$(DB_REDIS_XSL) kamailio-"$$FILE".xml ; \
++	done
++
++db_redis_clean:
++	-@rm -f $(SCHEME)/db_redis/*
+ 
+ .PHONY: docbook-xml
+ docbook-xml:
+@@ -350,4 +365,4 @@ dbdoc_clean:
+ 	done
+ 
+ .PHONY: clean
+-clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
++clean: mysql_clean postgres_clean oracle_clean dbtext_clean db_berkeley_clean db_sqlite_clean mongodb_clean db_redis_clean pi_framework_clean docbook_clean # modules_clean dbdoc_clean
+diff --git a/src/modules/db_redis/Makefile b/src/modules/db_redis/Makefile
+new file mode 100644
+index 0000000..680e3e0
 --- /dev/null
 +++ b/src/modules/db_redis/Makefile
 @@ -0,0 +1,42 @@
@@ -251,6 +418,9 @@
 +
 +install-scripts: install-redis-scripts
 \ No newline at end of file
+diff --git a/src/modules/db_redis/README b/src/modules/db_redis/README
+new file mode 100644
+index 0000000..765bfc7
 --- /dev/null
 +++ b/src/modules/db_redis/README
 @@ -0,0 +1,198 @@
@@ -453,6 +623,9 @@
 +modparam("auth_db", "db_url", DBURL_AUTH)
 +...
 \ No newline at end of file
+diff --git a/src/modules/db_redis/db_redis_mod.c b/src/modules/db_redis/db_redis_mod.c
+new file mode 100644
+index 0000000..ad21bb1
 --- /dev/null
 +++ b/src/modules/db_redis/db_redis_mod.c
 @@ -0,0 +1,115 @@
@@ -572,6 +745,9 @@
 +    LM_DBG("module destroying\n");
 +}
 \ No newline at end of file
+diff --git a/src/modules/db_redis/db_redis_mod.h b/src/modules/db_redis/db_redis_mod.h
+new file mode 100644
+index 0000000..dac420b
 --- /dev/null
 +++ b/src/modules/db_redis/db_redis_mod.h
 @@ -0,0 +1,53 @@
@@ -629,6 +805,9 @@
 +
 +#endif /* _DB_REDIS_MOD_H */
 \ No newline at end of file
+diff --git a/src/modules/db_redis/doc/Makefile b/src/modules/db_redis/doc/Makefile
+new file mode 100644
+index 0000000..ddcdd5e
 --- /dev/null
 +++ b/src/modules/db_redis/doc/Makefile
 @@ -0,0 +1,4 @@
@@ -637,6 +816,9 @@
 +docbook_dir = ../../../../doc/docbook
 +include $(docbook_dir)/Makefile.module
 \ No newline at end of file
+diff --git a/src/modules/db_redis/doc/db_redis.xml b/src/modules/db_redis/doc/db_redis.xml
+new file mode 100644
+index 0000000..7b57580
 --- /dev/null
 +++ b/src/modules/db_redis/doc/db_redis.xml
 @@ -0,0 +1,38 @@
@@ -679,6 +861,9 @@
 +    <xi:include href="db_redis_admin.xml"/>
 +</book>
 \ No newline at end of file
+diff --git a/src/modules/db_redis/doc/db_redis_admin.xml b/src/modules/db_redis/doc/db_redis_admin.xml
+new file mode 100644
+index 0000000..37f5b7e
 --- /dev/null
 +++ b/src/modules/db_redis/doc/db_redis_admin.xml
 @@ -0,0 +1,192 @@
@@ -875,6 +1060,9 @@
 +	</section>
 +</chapter>
 \ No newline at end of file
+diff --git a/src/modules/db_redis/redis_connection.c b/src/modules/db_redis/redis_connection.c
+new file mode 100644
+index 0000000..1f33e79
 --- /dev/null
 +++ b/src/modules/db_redis/redis_connection.c
 @@ -0,0 +1,399 @@
@@ -1278,6 +1466,9 @@
 +    }
 +}
 \ No newline at end of file
+diff --git a/src/modules/db_redis/redis_connection.h b/src/modules/db_redis/redis_connection.h
+new file mode 100644
+index 0000000..18a9f35
 --- /dev/null
 +++ b/src/modules/db_redis/redis_connection.h
 @@ -0,0 +1,81 @@
@@ -1363,6 +1554,9 @@
 +
 +#endif /* _REDIS_CONNECTION_H_ */
 \ No newline at end of file
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+new file mode 100644
+index 0000000..ff210ec
 --- /dev/null
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -0,0 +1,2151 @@
@@ -3518,6 +3712,9 @@
 +    return 0;
 +}
 \ No newline at end of file
+diff --git a/src/modules/db_redis/redis_dbase.h b/src/modules/db_redis/redis_dbase.h
+new file mode 100644
+index 0000000..f41be1a
 --- /dev/null
 +++ b/src/modules/db_redis/redis_dbase.h
 @@ -0,0 +1,88 @@
@@ -3610,6 +3807,9 @@
 +
 +#endif  /* _REDIS_BASE_H_ */
 \ No newline at end of file
+diff --git a/src/modules/db_redis/redis_table.c b/src/modules/db_redis/redis_table.c
+new file mode 100644
+index 0000000..846b9ff
 --- /dev/null
 +++ b/src/modules/db_redis/redis_table.c
 @@ -0,0 +1,841 @@
@@ -4455,6 +4655,9 @@
 +    return -1;
 +}
 \ No newline at end of file
+diff --git a/src/modules/db_redis/redis_table.h b/src/modules/db_redis/redis_table.h
+new file mode 100644
+index 0000000..5ea1349
 --- /dev/null
 +++ b/src/modules/db_redis/redis_table.h
 @@ -0,0 +1,66 @@
@@ -4525,351 +4728,584 @@
 +
 +#endif /* _REDIS_TABLE_H_ */
 \ No newline at end of file
+diff --git a/utils/kamctl/Makefile b/utils/kamctl/Makefile
+index 1a8aab5..0faaf6b 100644
+--- a/utils/kamctl/Makefile
++++ b/utils/kamctl/Makefile
+@@ -264,6 +264,18 @@ install-modules: $(bin_prefix)/$(bin_dir)
+ 				fi ;\
+ 			done ; \
+ 		fi
++		# install Redis stuff
++		if [ "$(REDISON)" = "yes" ]; then \
++			mkdir -p $(data_prefix)/$(data_dir)/db_redis/kamailio ; \
++			for FILE in $(wildcard db_redis/kamailio/*) ; do \
++				if [ -f $$FILE ] ; then \
++				$(INSTALL_TOUCH) $$FILE \
++					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
++				$(INSTALL_CFG) $$FILE \
++					$(data_prefix)/$(data_dir)/db_redis/kamailio/`basename "$$FILE"` ; \
++				fi ;\
++			done ; \
++		fi
+ 
+ 
+ $(cfg_prefix)/$(cfg_dir):
+diff --git a/utils/kamctl/db_redis/kamailio/acc b/utils/kamctl/db_redis/kamailio/acc
+new file mode 100644
+index 0000000..d2be703
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/acc
 @@ -0,0 +1,2 @@
 +id/int,method/string,from_tag/string,to_tag/string,callid/string,sip_code/string,sip_reason/string,time/int,
 +5
+diff --git a/utils/kamctl/db_redis/kamailio/acc_cdrs b/utils/kamctl/db_redis/kamailio/acc_cdrs
+new file mode 100644
+index 0000000..a8a5ff5
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/acc_cdrs
 @@ -0,0 +1,2 @@
 +id/int,start_time/int,end_time/int,duration/double,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/active_watchers b/utils/kamctl/db_redis/kamailio/active_watchers
+new file mode 100644
+index 0000000..d8f74fb
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/active_watchers
 @@ -0,0 +1,2 @@
 +id/int,presentity_uri/string,watcher_username/string,watcher_domain/string,to_user/string,to_domain/string,event/string,event_id/string,to_tag/string,from_tag/string,callid/string,local_cseq/int,remote_cseq/int,contact/string,record_route/string,expires/int,status/int,reason/string,version/int,socket_info/string,local_contact/string,from_user/string,from_domain/string,updated/int,updated_winfo/int,flags/int,user_agent/string,
 +12
+diff --git a/utils/kamctl/db_redis/kamailio/address b/utils/kamctl/db_redis/kamailio/address
+new file mode 100644
+index 0000000..4de2765
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/address
 @@ -0,0 +1,2 @@
 +id/int,grp/int,ip_addr/string,mask/int,port/int,tag/string,
 +6
+diff --git a/utils/kamctl/db_redis/kamailio/aliases b/utils/kamctl/db_redis/kamailio/aliases
+new file mode 100644
+index 0000000..cacabc7
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/aliases
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/int,q/double,callid/string,cseq/int,last_modified/int,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
 +8
+diff --git a/utils/kamctl/db_redis/kamailio/carrier_name b/utils/kamctl/db_redis/kamailio/carrier_name
+new file mode 100644
+index 0000000..e41d5d9
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/carrier_name
 @@ -0,0 +1,2 @@
 +id/int,carrier/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/carrierfailureroute b/utils/kamctl/db_redis/kamailio/carrierfailureroute
+new file mode 100644
+index 0000000..331af92
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/carrierfailureroute
 @@ -0,0 +1,2 @@
 +id/int,carrier/int,domain/int,scan_prefix/string,host_name/string,reply_code/string,flags/int,mask/int,next_domain/int,description/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/carrierroute b/utils/kamctl/db_redis/kamailio/carrierroute
+new file mode 100644
+index 0000000..f4b5f6b
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/carrierroute
 @@ -0,0 +1,2 @@
 +id/int,carrier/int,domain/int,scan_prefix/string,flags/int,mask/int,prob/double,strip/int,rewrite_host/string,rewrite_prefix/string,rewrite_suffix/string,description/string,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/cpl b/utils/kamctl/db_redis/kamailio/cpl
+new file mode 100644
+index 0000000..85067a7
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/cpl
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,cpl_xml/string,cpl_bin/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/dbaliases b/utils/kamctl/db_redis/kamailio/dbaliases
+new file mode 100644
+index 0000000..86f4d33
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dbaliases
 @@ -0,0 +1,2 @@
 +id/int,alias_username/string,alias_domain/string,username/string,domain/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/dialog b/utils/kamctl/db_redis/kamailio/dialog
+new file mode 100644
+index 0000000..38c6586
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dialog
 @@ -0,0 +1,2 @@
 +id/int,hash_entry/int,hash_id/int,callid/string,from_uri/string,from_tag/string,to_uri/string,to_tag/string,caller_cseq/string,callee_cseq/string,caller_route_set/string,callee_route_set/string,caller_contact/string,callee_contact/string,caller_sock/string,callee_sock/string,state/int,start_time/int,timeout/int,sflags/int,iflags/int,toroute_name/string,req_uri/string,xdata/string,
 +7
+diff --git a/utils/kamctl/db_redis/kamailio/dialog_vars b/utils/kamctl/db_redis/kamailio/dialog_vars
+new file mode 100644
+index 0000000..0e9f27d
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dialog_vars
 @@ -0,0 +1,2 @@
 +id/int,hash_entry/int,hash_id/int,dialog_key/string,dialog_value/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/dialplan b/utils/kamctl/db_redis/kamailio/dialplan
+new file mode 100644
+index 0000000..3c7b28c
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dialplan
 @@ -0,0 +1,2 @@
 +id/int,dpid/int,pr/int,match_op/int,match_exp/string,match_len/int,subst_exp/string,repl_exp/string,attrs/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/dispatcher b/utils/kamctl/db_redis/kamailio/dispatcher
+new file mode 100644
+index 0000000..c16745b
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dispatcher
 @@ -0,0 +1,2 @@
 +id/int,setid/int,destination/string,flags/int,priority/int,attrs/string,description/string,
 +4
+diff --git a/utils/kamctl/db_redis/kamailio/domain b/utils/kamctl/db_redis/kamailio/domain
+new file mode 100644
+index 0000000..ac77d71
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/domain
 @@ -0,0 +1,2 @@
 +id/int,domain/string,did/string,last_modified/int,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/domain_attrs b/utils/kamctl/db_redis/kamailio/domain_attrs
+new file mode 100644
+index 0000000..5968bc1
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/domain_attrs
 @@ -0,0 +1,2 @@
 +id/int,did/string,name/string,type/int,value/string,last_modified/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/domain_name b/utils/kamctl/db_redis/kamailio/domain_name
+new file mode 100644
+index 0000000..dafbc3d
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/domain_name
 @@ -0,0 +1,2 @@
 +id/int,domain/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/domainpolicy b/utils/kamctl/db_redis/kamailio/domainpolicy
+new file mode 100644
+index 0000000..d51a82f
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/domainpolicy
 @@ -0,0 +1,2 @@
 +id/int,rule/string,type/string,att/string,val/string,description/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/dr_gateways b/utils/kamctl/db_redis/kamailio/dr_gateways
+new file mode 100644
+index 0000000..85e073f
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dr_gateways
 @@ -0,0 +1,2 @@
 +gwid/int,type/int,address/string,strip/int,pri_prefix/string,attrs/string,description/string,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/dr_groups b/utils/kamctl/db_redis/kamailio/dr_groups
+new file mode 100644
+index 0000000..dca09ae
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dr_groups
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,groupid/int,description/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/dr_gw_lists b/utils/kamctl/db_redis/kamailio/dr_gw_lists
+new file mode 100644
+index 0000000..4694b81
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dr_gw_lists
 @@ -0,0 +1,2 @@
 +id/int,gwlist/string,description/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/dr_rules b/utils/kamctl/db_redis/kamailio/dr_rules
+new file mode 100644
+index 0000000..99774e0
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/dr_rules
 @@ -0,0 +1,2 @@
 +ruleid/int,groupid/string,prefix/string,timerec/string,priority/int,routeid/string,gwlist/string,description/string,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/globalblacklist b/utils/kamctl/db_redis/kamailio/globalblacklist
+new file mode 100644
+index 0000000..07084c7
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/globalblacklist
 @@ -0,0 +1,2 @@
 +id/int,prefix/string,whitelist/int,description/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/grp b/utils/kamctl/db_redis/kamailio/grp
+new file mode 100644
+index 0000000..c8e808d
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/grp
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,grp/string,last_modified/int,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/htable b/utils/kamctl/db_redis/kamailio/htable
+new file mode 100644
+index 0000000..c01ec16
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/htable
 @@ -0,0 +1,2 @@
 +id/int,key_name/string,key_type/int,value_type/int,key_value/string,expires/int,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/imc_members b/utils/kamctl/db_redis/kamailio/imc_members
+new file mode 100644
+index 0000000..b2675a7
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/imc_members
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,room/string,flag/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/imc_rooms b/utils/kamctl/db_redis/kamailio/imc_rooms
+new file mode 100644
+index 0000000..eefb6b5
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/imc_rooms
 @@ -0,0 +1,2 @@
 +id/int,name/string,domain/string,flag/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/lcr_gw b/utils/kamctl/db_redis/kamailio/lcr_gw
+new file mode 100644
+index 0000000..2a4c84c
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/lcr_gw
 @@ -0,0 +1,2 @@
 +id/int,lcr_id/int,gw_name/string,ip_addr/string,hostname/string,port/int,params/string,uri_scheme/int,transport/int,strip/int,prefix/string,tag/string,flags/int,defunct/int,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/lcr_rule b/utils/kamctl/db_redis/kamailio/lcr_rule
+new file mode 100644
+index 0000000..b34558c
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/lcr_rule
 @@ -0,0 +1,2 @@
 +id/int,lcr_id/int,prefix/string,from_uri/string,request_uri/string,mt_tvalue/string,stopper/int,enabled/int,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/lcr_rule_target b/utils/kamctl/db_redis/kamailio/lcr_rule_target
+new file mode 100644
+index 0000000..a8efdaf
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/lcr_rule_target
 @@ -0,0 +1,2 @@
 +id/int,lcr_id/int,rule_id/int,gw_id/int,priority/int,weight/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/location b/utils/kamctl/db_redis/kamailio/location
+new file mode 100644
+index 0000000..9ca18f2
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/location
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,contact/string,received/string,path/string,expires/int,q/double,callid/string,cseq/int,last_modified/int,flags/int,cflags/int,user_agent/string,socket/string,methods/int,instance/string,reg_id/int,server_id/int,connection_id/int,keepalive/int,partition/int,
 +9
+diff --git a/utils/kamctl/db_redis/kamailio/location_attrs b/utils/kamctl/db_redis/kamailio/location_attrs
+new file mode 100644
+index 0000000..baef28a
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/location_attrs
 @@ -0,0 +1,2 @@
 +id/int,ruid/string,username/string,domain/string,aname/string,atype/int,avalue/string,last_modified/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/matrix b/utils/kamctl/db_redis/kamailio/matrix
+new file mode 100644
+index 0000000..ddf335d
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/matrix
 @@ -0,0 +1,2 @@
 +first/int,second/int,res/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/missed_calls b/utils/kamctl/db_redis/kamailio/missed_calls
+new file mode 100644
+index 0000000..a0b64d0
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/missed_calls
 @@ -0,0 +1,2 @@
 +id/int,method/string,from_tag/string,to_tag/string,callid/string,sip_code/string,sip_reason/string,time/int,
 +4
+diff --git a/utils/kamctl/db_redis/kamailio/mohqcalls b/utils/kamctl/db_redis/kamailio/mohqcalls
+new file mode 100644
+index 0000000..bb0035a
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/mohqcalls
 @@ -0,0 +1,2 @@
 +id/int,mohq_id/int,call_id/string,call_status/int,call_from/string,call_contact/string,call_time/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/mohqueues b/utils/kamctl/db_redis/kamailio/mohqueues
+new file mode 100644
+index 0000000..a61d641
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/mohqueues
 @@ -0,0 +1,2 @@
 +id/int,name/string,uri/string,mohdir/string,mohfile/string,debug/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/mtree b/utils/kamctl/db_redis/kamailio/mtree
+new file mode 100644
+index 0000000..2eb6d5c
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/mtree
 @@ -0,0 +1,2 @@
 +id/int,tprefix/string,tvalue/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/mtrees b/utils/kamctl/db_redis/kamailio/mtrees
+new file mode 100644
+index 0000000..14b945e
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/mtrees
 @@ -0,0 +1,2 @@
 +id/int,tname/string,tprefix/string,tvalue/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/pdt b/utils/kamctl/db_redis/kamailio/pdt
+new file mode 100644
+index 0000000..03b06d5
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/pdt
 @@ -0,0 +1,2 @@
 +id/int,sdomain/string,prefix/string,domain/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/pl_pipes b/utils/kamctl/db_redis/kamailio/pl_pipes
+new file mode 100644
+index 0000000..344bf09
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/pl_pipes
 @@ -0,0 +1,2 @@
 +id/int,pipeid/string,algorithm/string,plimit/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/presentity b/utils/kamctl/db_redis/kamailio/presentity
+new file mode 100644
+index 0000000..2145394
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/presentity
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,event/string,etag/string,expires/int,received_time/int,body/string,sender/string,priority/int,ruid/string,
 +5
+diff --git a/utils/kamctl/db_redis/kamailio/pua b/utils/kamctl/db_redis/kamailio/pua
+new file mode 100644
+index 0000000..21e710b
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/pua
 @@ -0,0 +1,2 @@
 +id/int,pres_uri/string,pres_id/string,event/int,expires/int,desired_expires/int,flag/int,etag/string,tuple_id/string,watcher_uri/string,call_id/string,to_tag/string,from_tag/string,cseq/int,record_route/string,contact/string,remote_contact/string,version/int,extra_headers/string,
 +7
+diff --git a/utils/kamctl/db_redis/kamailio/purplemap b/utils/kamctl/db_redis/kamailio/purplemap
+new file mode 100644
+index 0000000..77b4efa
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/purplemap
 @@ -0,0 +1,2 @@
 +id/int,sip_user/string,ext_user/string,ext_prot/string,ext_pass/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/re_grp b/utils/kamctl/db_redis/kamailio/re_grp
+new file mode 100644
+index 0000000..ecd19d5
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/re_grp
 @@ -0,0 +1,2 @@
 +id/int,reg_exp/string,group_id/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/rls_presentity b/utils/kamctl/db_redis/kamailio/rls_presentity
+new file mode 100644
+index 0000000..d70ac30
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/rls_presentity
 @@ -0,0 +1,2 @@
 +id/int,rlsubs_did/string,resource_uri/string,content_type/string,presence_state/string,expires/int,updated/int,auth_state/int,reason/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/rls_watchers b/utils/kamctl/db_redis/kamailio/rls_watchers
+new file mode 100644
+index 0000000..38e1357
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/rls_watchers
 @@ -0,0 +1,2 @@
 +id/int,presentity_uri/string,to_user/string,to_domain/string,watcher_username/string,watcher_domain/string,event/string,event_id/string,to_tag/string,from_tag/string,callid/string,local_cseq/int,remote_cseq/int,contact/string,record_route/string,expires/int,status/int,reason/string,version/int,socket_info/string,local_contact/string,from_user/string,from_domain/string,updated/int,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/rtpengine b/utils/kamctl/db_redis/kamailio/rtpengine
+new file mode 100644
+index 0000000..b3ebac8
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/rtpengine
 @@ -0,0 +1,2 @@
 +id/int,setid/int,url/string,weight/int,disabled/int,stamp/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/rtpproxy b/utils/kamctl/db_redis/kamailio/rtpproxy
+new file mode 100644
+index 0000000..a0e5f7d
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/rtpproxy
 @@ -0,0 +1,2 @@
 +id/int,setid/string,url/string,flags/int,weight/int,description/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/sca_subscriptions b/utils/kamctl/db_redis/kamailio/sca_subscriptions
+new file mode 100644
+index 0000000..827693d
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/sca_subscriptions
 @@ -0,0 +1,2 @@
 +id/int,subscriber/string,aor/string,event/int,expires/int,state/int,app_idx/int,call_id/string,from_tag/string,to_tag/string,record_route/string,notify_cseq/int,subscribe_cseq/int,server_id/int,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/silo b/utils/kamctl/db_redis/kamailio/silo
+new file mode 100644
+index 0000000..e5253cf
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/silo
 @@ -0,0 +1,2 @@
 +id/int,src_addr/string,dst_addr/string,username/string,domain/string,inc_time/int,exp_time/int,snd_time/int,ctype/string,body/string,extra_hdrs/string,callid/string,status/int,
 +8
+diff --git a/utils/kamctl/db_redis/kamailio/sip_trace b/utils/kamctl/db_redis/kamailio/sip_trace
+new file mode 100644
+index 0000000..34bc7db
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/sip_trace
 @@ -0,0 +1,2 @@
 +id/int,time_stamp/int,time_us/int,callid/string,traced_user/string,msg/string,method/string,status/string,fromip/string,toip/string,fromtag/string,totag/string,direction/string,
 +4
+diff --git a/utils/kamctl/db_redis/kamailio/speed_dial b/utils/kamctl/db_redis/kamailio/speed_dial
+new file mode 100644
+index 0000000..b4be4bb
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/speed_dial
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,sd_username/string,sd_domain/string,new_uri/string,fname/string,lname/string,description/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/subscriber b/utils/kamctl/db_redis/kamailio/subscriber
+new file mode 100644
+index 0000000..912a111
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/subscriber
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,password/string,ha1/string,ha1b/string,email_address/string,rpid/string,
 +7
+diff --git a/utils/kamctl/db_redis/kamailio/topos_d b/utils/kamctl/db_redis/kamailio/topos_d
+new file mode 100644
+index 0000000..e646373
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/topos_d
 @@ -0,0 +1,2 @@
 +id/int,rectime/int,s_method/string,s_cseq/string,a_callid/string,a_uuid/string,b_uuid/string,a_contact/string,b_contact/string,as_contact/string,bs_contact/string,a_tag/string,b_tag/string,a_rr/string,b_rr/string,s_rr/string,iflags/int,a_uri/string,b_uri/string,r_uri/string,a_srcaddr/string,b_srcaddr/string,a_socket/string,b_socket/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/topos_t b/utils/kamctl/db_redis/kamailio/topos_t
+new file mode 100644
+index 0000000..849faec
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/topos_t
 @@ -0,0 +1,2 @@
 +id/int,rectime/int,s_method/string,s_cseq/string,a_callid/string,a_uuid/string,b_uuid/string,direction/int,x_via/string,x_vbranch/string,x_rr/string,y_rr/string,s_rr/string,x_uri/string,a_contact/string,b_contact/string,as_contact/string,bs_contact/string,x_tag/string,a_tag/string,b_tag/string,a_srcaddr/string,b_srcaddr/string,a_socket/string,b_socket/string,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/trusted b/utils/kamctl/db_redis/kamailio/trusted
+new file mode 100644
+index 0000000..cc92027
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/trusted
 @@ -0,0 +1,2 @@
 +id/int,src_ip/string,proto/string,from_pattern/string,ruri_pattern/string,tag/string,priority/int,
 +6
+diff --git a/utils/kamctl/db_redis/kamailio/uacreg b/utils/kamctl/db_redis/kamailio/uacreg
+new file mode 100644
+index 0000000..383fa88
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uacreg
 @@ -0,0 +1,2 @@
 +id/int,l_uuid/string,l_username/string,l_domain/string,r_username/string,r_domain/string,realm/string,auth_username/string,auth_password/string,auth_ha1/string,auth_proxy/string,expires/int,flags/int,reg_delay/int,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/uid_credentials b/utils/kamctl/db_redis/kamailio/uid_credentials
+new file mode 100644
+index 0000000..3411b84
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_credentials
 @@ -0,0 +1,2 @@
 +id/int,auth_username/string,did/string,realm/string,password/string,flags/int,ha1/string,ha1b/string,uid/string,
 +7
+diff --git a/utils/kamctl/db_redis/kamailio/uid_domain b/utils/kamctl/db_redis/kamailio/uid_domain
+new file mode 100644
+index 0000000..2178839
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_domain
 @@ -0,0 +1,2 @@
 +id/int,did/string,domain/string,flags/int,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/uid_domain_attrs b/utils/kamctl/db_redis/kamailio/uid_domain_attrs
+new file mode 100644
+index 0000000..b412956
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_domain_attrs
 @@ -0,0 +1,2 @@
 +id/int,did/string,name/string,type/int,value/string,flags/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/uid_global_attrs b/utils/kamctl/db_redis/kamailio/uid_global_attrs
+new file mode 100644
+index 0000000..14c8b77
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_global_attrs
 @@ -0,0 +1,2 @@
 +id/int,name/string,type/int,value/string,flags/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/uid_uri b/utils/kamctl/db_redis/kamailio/uid_uri
+new file mode 100644
+index 0000000..4d0a858
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_uri
 @@ -0,0 +1,2 @@
 +id/int,uid/string,did/string,username/string,flags/int,scheme/string,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/uid_uri_attrs b/utils/kamctl/db_redis/kamailio/uid_uri_attrs
+new file mode 100644
+index 0000000..135cca0
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_uri_attrs
 @@ -0,0 +1,2 @@
 +id/int,username/string,did/string,name/string,value/string,type/int,flags/int,scheme/string,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/uid_user_attrs b/utils/kamctl/db_redis/kamailio/uid_user_attrs
+new file mode 100644
+index 0000000..1e0851a
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uid_user_attrs
 @@ -0,0 +1,2 @@
 +id/int,uid/string,name/string,value/string,type/int,flags/int,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/uri b/utils/kamctl/db_redis/kamailio/uri
+new file mode 100644
+index 0000000..130308b
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/uri
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,uri_user/string,last_modified/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/userblacklist b/utils/kamctl/db_redis/kamailio/userblacklist
+new file mode 100644
+index 0000000..b3986d5
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/userblacklist
 @@ -0,0 +1,2 @@
 +id/int,username/string,domain/string,prefix/string,whitelist/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/usr_preferences b/utils/kamctl/db_redis/kamailio/usr_preferences
+new file mode 100644
+index 0000000..a6f1f94
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/usr_preferences
 @@ -0,0 +1,2 @@
 +id/int,uuid/string,username/string,domain/string,attribute/string,type/int,value/string,last_modified/int,
 +2
+diff --git a/utils/kamctl/db_redis/kamailio/version b/utils/kamctl/db_redis/kamailio/version
+new file mode 100644
+index 0000000..b9353c0
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/version
 @@ -0,0 +1,2 @@
 +table_name/string,table_version/int,
 +1
+diff --git a/utils/kamctl/db_redis/kamailio/watchers b/utils/kamctl/db_redis/kamailio/watchers
+new file mode 100644
+index 0000000..707ee05
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/watchers
 @@ -0,0 +1,2 @@
 +id/int,presentity_uri/string,watcher_username/string,watcher_domain/string,event/string,status/int,reason/string,inserted_time/int,
 +3
+diff --git a/utils/kamctl/db_redis/kamailio/xcap b/utils/kamctl/db_redis/kamailio/xcap
+new file mode 100644
+index 0000000..7f7cd32
 --- /dev/null
 +++ b/utils/kamctl/db_redis/kamailio/xcap
 @@ -0,0 +1,2 @@

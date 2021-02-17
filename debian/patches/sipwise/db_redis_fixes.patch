@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: db_redis_fixes
+
+---
+ src/modules/db_redis/redis_dbase.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index de3a4b1..73d23b5 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -461,11 +461,12 @@
+@@ -444,11 +444,12 @@ static int db_redis_build_entry_keys(km_redis_con_t *con, const str *table_name,
          LM_DBG("found suitable entry key '%.*s' for query\n",
                  (*keys)->key.len, (*keys)->key.s);
          *keys_count = 1;
@@ -14,7 +24,7 @@
  
      return 0;
  
-@@ -552,11 +553,11 @@
+@@ -535,11 +536,11 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
              LM_DBG("found key '%.*s' for type '%.*s'\n",
                      keyname.len, keyname.s,
                      type_name->len, type_name->s);
@@ -27,7 +37,7 @@
                  keyname.len = table->version_code.len + table_name->len + 9 + type->type.len;
                  keyname.s = pkg_malloc(keyname.len + 1);
                  if (!keyname.s) {
-@@ -571,9 +572,10 @@
+@@ -554,9 +555,10 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
                      LM_ERR("Failed to add query key to set key list\n");
                      goto err;
                  }
@@ -39,7 +49,7 @@
      }
  
      return 0;
-@@ -631,6 +633,9 @@
+@@ -614,6 +616,9 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
          pkg_free(keyname.s);
          keyname.s = NULL;
      } else {
@@ -49,7 +59,7 @@
          LM_DBG("no direct entry key found, checking type keys\n");
          for (type = table->types; type; type = type->next) {
              key = type->keys;
-@@ -674,7 +679,7 @@
+@@ -657,7 +662,7 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
                              redisReply *subreply = reply->element[i];
                              if (subreply->type == REDIS_REPLY_STRING) {
                                  LM_DBG("adding resulting entry key '%s' from type query\n", subreply->str);
@@ -58,7 +68,7 @@
                                      LM_ERR("Failed to add query key\n");
                                      goto err;
                                  }
-@@ -696,6 +701,11 @@
+@@ -679,6 +684,11 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
                  LM_DBG("will use key '%.*s' at offset %llx for timestamp/int range scan\n",
                          keyname.len, keyname.s, (unsigned long long) *ts_scan_start);
                  *ts_scan_key = keyname;
@@ -70,7 +80,7 @@
              }
          }
      }
-@@ -2119,7 +2129,7 @@
+@@ -2102,7 +2112,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
              if (!prefix || prefix == type_key->key.s) {
                  LM_DBG("Invalid key without :: '%.*s'\n",
                          type_key->key.len, type_key->key.s);

@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: sca-call-info-unsubscribe
+
+---
+ src/modules/sca/sca_subscribe.c | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/sca/sca_subscribe.c b/src/modules/sca/sca_subscribe.c
+index d568729..6fd6e52 100644
 --- a/src/modules/sca/sca_subscribe.c
 +++ b/src/modules/sca/sca_subscribe.c
-@@ -1137,6 +1137,8 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1137,6 +1137,8 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
  	int released = 0;
  	int_str val;
  	struct to_body *tmp_to;
@@ -9,7 +19,7 @@
  
  	if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
  		LM_ERR("header parsing failed: bad request\n");
-@@ -1223,12 +1225,17 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1223,12 +1225,17 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
  		}
  	}
  
@@ -29,7 +39,7 @@
  		// this will remove the subscription if expires == 0
  		if (sca_subscription_update_unsafe(sca, sub, &req_sub, idx) < 0) {
  			SCA_SUB_REPLY_ERROR(sca, 500, "Internal Server Error - "
-@@ -1278,10 +1285,24 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1278,10 +1285,24 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
  					LM_INFO("sca_handle_subscribe: released %d appearances "
  							"for subscriber %.*s\n", released,
  							STR_FMT(&req_sub.subscriber));
@@ -54,7 +64,7 @@
  		// in-dialog request, but we didn't find it.
  		if (!SCA_STR_EMPTY(to_tag)) {
  			SCA_SUB_REPLY_ERROR(sca, 481, "Call Leg/Transaction Does Not Exist",
-@@ -1315,6 +1336,7 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1315,6 +1336,7 @@ int ki_sca_handle_subscribe(sip_msg_t *msg, str *uri_to, str *uri_from)
  			// we got an in-dialog SUBSCRIBE with an "Expires: 0" header,
  			// but the dialog wasn't in our table. just reply with the
  			// subscription info we got, without saving or creating anything.

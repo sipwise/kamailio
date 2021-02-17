@@ -1,6 +1,18 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: db_redis_versioning
+
+---
+ src/modules/db_redis/redis_dbase.c | 32 +++++++++++++++++++++++---------
+ src/modules/db_redis/redis_table.c | 14 +++++++++++++-
+ src/modules/db_redis/redis_table.h |  1 +
+ 3 files changed, 37 insertions(+), 10 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index dee8fc1..5be2285 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -281,6 +281,7 @@
+@@ -267,6 +267,7 @@ err:
  }
  
  static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
@@ -8,7 +20,7 @@
          str *type_name, const db_key_t *_k, const db_val_t *_v, const db_op_t *_op, const int _n,
          str *key_name, int *key_found, uint64_t *ts_scan_start) {
  
-@@ -321,14 +322,15 @@
+@@ -306,14 +307,15 @@ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
                      break;
                  }
                  if (!key_name->len) {
@@ -27,7 +39,7 @@
                              table_name->len, table_name->s,
                              type_name->len, type_name->s,
                              val.len, val.s);
-@@ -432,7 +434,7 @@
+@@ -415,7 +417,7 @@ static int db_redis_build_entry_keys(km_redis_con_t *con, const str *table_name,
      }
      table = (redis_table_t*)table_e->u.p;
      key = table->entry_keys;
@@ -36,7 +48,7 @@
          goto err;
      }
      if (key_found) {
-@@ -522,7 +524,7 @@
+@@ -505,7 +507,7 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
          str keyname = {NULL, 0};
          key = type->keys;
  
@@ -45,7 +57,7 @@
              goto err;
          }
          if (key_found) {
-@@ -579,7 +581,7 @@
+@@ -562,7 +564,7 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
      keyname.len = 0;
      key = table->entry_keys;
  
@@ -54,7 +66,7 @@
          goto err;
      }
      if (key_found) {
-@@ -597,7 +599,7 @@
+@@ -580,7 +582,7 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
          for (type = table->types; type; type = type->next) {
              key = type->keys;
              LM_DBG("checking type '%.*s'\n", type->type.len, type->type.s);
@@ -63,7 +75,7 @@
                          &key_found, ts_scan_start) != 0) {
                  goto err;
              }
-@@ -870,6 +872,8 @@
+@@ -853,6 +855,8 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
          redis_key_t **query_keys, int *query_keys_count,
          int **manual_keys, int *manual_keys_count, uint64_t ts_scan_start, const str *ts_scan_key) {
  
@@ -72,7 +84,7 @@
      char *match = NULL;
      int ret;
      redisReply *reply = NULL;
-@@ -881,14 +885,24 @@
+@@ -864,14 +868,24 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
      redis_key_t *set_keys = NULL;
      int set_keys_count = 0;
  
@@ -99,9 +111,11 @@
                  table_name->len, table_name->s);
          str match_pattern = {match, len};
          ret = db_redis_scan_query_keys_pattern(con, &match_pattern, _n, query_keys, query_keys_count,
+diff --git a/src/modules/db_redis/redis_table.c b/src/modules/db_redis/redis_table.c
+index fb7c06c..956aad9 100644
 --- a/src/modules/db_redis/redis_table.c
 +++ b/src/modules/db_redis/redis_table.c
-@@ -487,13 +487,14 @@
+@@ -471,13 +471,14 @@ static struct str_hash_entry* db_redis_create_column(str *col, str *type) {
  }
  
  int db_redis_parse_keys(km_redis_con_t *con) {
@@ -117,7 +131,7 @@
  
      struct str_hash_entry *table_entry;
      redis_table_t *table;
-@@ -533,6 +534,16 @@
+@@ -517,6 +518,16 @@ int db_redis_parse_keys(km_redis_con_t *con) {
                  }
                  table_name.s = start;
                  table_name.len = p - start;
@@ -134,7 +148,7 @@
                  state = DBREDIS_KEYS_TYPE_ST;
                  start = ++p;
                  LM_DBG("found table name '%.*s'\n", table_name.len, table_name.s);
-@@ -544,6 +555,7 @@
+@@ -528,6 +539,7 @@ int db_redis_parse_keys(km_redis_con_t *con) {
                      goto err;
                  }
                  table = table_entry->u.p;
@@ -142,9 +156,11 @@
                  break;
              case DBREDIS_KEYS_TYPE_ST:
                  while(p != end && *p != ':')
+diff --git a/src/modules/db_redis/redis_table.h b/src/modules/db_redis/redis_table.h
+index 9e71d2a..a866b16 100644
 --- a/src/modules/db_redis/redis_table.h
 +++ b/src/modules/db_redis/redis_table.h
-@@ -42,6 +42,7 @@
+@@ -42,6 +42,7 @@ struct redis_type {
  typedef struct redis_table redis_table_t;
  struct redis_table {
      int version;

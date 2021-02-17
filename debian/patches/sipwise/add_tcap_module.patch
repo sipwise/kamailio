@@ -1,9 +1,17 @@
----
- src/Makefile.groups         |    6 
- src/modules/tcap/Makefile   |    9 +
- src/modules/tcap/tcap_mod.c |  395 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 410 insertions(+)
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: add_tcap_module
 
+---
+ src/Makefile.groups         |   6 +
+ src/modules/tcap/Makefile   |   9 +
+ src/modules/tcap/tcap_mod.c | 395 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 410 insertions(+)
+ create mode 100644 src/modules/tcap/Makefile
+ create mode 100644 src/modules/tcap/tcap_mod.c
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index 2466010..527229b 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -196,6 +196,9 @@ mod_list_erlang=erlang
@@ -16,7 +24,7 @@
  # - modules depending on libnsq (+libev libevbuffsock liblcurl libjson-c) library
  mod_list_nsq=nsq
  
-@@ -294,6 +297,9 @@ module_group_ignore= $(sort $(filter-out
+@@ -294,6 +297,9 @@ module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all
  # pkg lcrrate module
  module_group_klcrrate=$(mod_list_lcrrate)
  
@@ -26,6 +34,9 @@
  ### --- Groups defined for pacKaging ###
  
  # Standard modules in main pkg
+diff --git a/src/modules/tcap/Makefile b/src/modules/tcap/Makefile
+new file mode 100644
+index 0000000..4b2105c
 --- /dev/null
 +++ b/src/modules/tcap/Makefile
 @@ -0,0 +1,9 @@
@@ -38,6 +49,9 @@
 +LIBS+=-ltcap
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/tcap/tcap_mod.c b/src/modules/tcap/tcap_mod.c
+new file mode 100644
+index 0000000..d456416
 --- /dev/null
 +++ b/src/modules/tcap/tcap_mod.c
 @@ -0,0 +1,395 @@

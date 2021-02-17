@@ -1,17 +1,17 @@
-From 76b1f3bfae32490547c5b1500ab7356bcf463e9e Mon Sep 17 00:00:00 2001
 From: Richard Fuchs <rfuchs@sipwise.com>
 Date: Mon, 24 Sep 2018 09:46:19 -0400
 Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
 
 ---
- src/modules/rtpengine/doc/rtpengine_admin.xml |  67 ++++++++++-
- src/modules/rtpengine/rtpengine.c             | 104 +++++++++++++++++-
- src/modules/rtpengine/rtpengine.h             |   2 +
- 3 files changed, 167 insertions(+), 6 deletions(-)
+ src/modules/rtpengine/rtpengine.c | 104 ++++++++++++++++++++++++++++++++++++--
+ src/modules/rtpengine/rtpengine.h |   2 +
+ 2 files changed, 101 insertions(+), 5 deletions(-)
 
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 8f4f7f5..5b5cf84 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -115,7 +115,7 @@
+@@ -115,7 +115,7 @@ enum {
  #define	CPORT					"22222"
  
  struct ng_flags_parse {
@@ -20,7 +20,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  	bencode_item_t *dict, *flags, *direction, *replace, *rtcp_mux;
  	str call_id, from_tag, to_tag;
  };
-@@ -130,6 +130,8 @@
+@@ -130,6 +130,8 @@ static const char *command_strings[] = {
  	[OP_STOP_RECORDING]	= "stop recording",
  	[OP_BLOCK_DTMF]		= "block DTMF",
  	[OP_UNBLOCK_DTMF]	= "unblock DTMF",
@@ -29,7 +29,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  };
  
  struct minmax_mos_stats {
-@@ -173,6 +175,8 @@
+@@ -173,6 +175,8 @@ static int start_recording_f(struct sip_msg *, char *, char *);
  static int stop_recording_f(struct sip_msg *, char *, char *);
  static int block_dtmf_f(struct sip_msg *, char *, char *);
  static int unblock_dtmf_f(struct sip_msg *, char *, char *);
@@ -38,7 +38,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -304,6 +308,24 @@
+@@ -304,6 +308,24 @@ static cmd_export_t cmds[] = {
  	{"unblock_dtmf",	(cmd_function)unblock_dtmf_f, 		0,
  		0, 0,
  		ANY_ROUTE},
@@ -63,7 +63,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -2000,6 +2022,7 @@
+@@ -2000,6 +2022,7 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
  					if (!val.s)
  						goto error;
  					ng_flags->from_tag = val;
@@ -71,7 +71,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  				}
  				else
  					goto generic;
-@@ -2051,8 +2074,12 @@
+@@ -2051,8 +2074,12 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
  					if (!ng_flags->packetize)
  						goto error;
  					bencode_dictionary_add_integer(ng_flags->dict, "repacketize", ng_flags->packetize);
@@ -85,7 +85,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  				break;
  
  			case 12:
-@@ -2172,6 +2199,11 @@
+@@ -2172,6 +2199,11 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  		else
  			bencode_dictionary_add_str(ng_flags.dict, "sdp", &body);
  	}
@@ -97,7 +97,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  
  	/*** parse flags & build dictionary ***/
  
-@@ -2235,7 +2267,13 @@
+@@ -2235,7 +2267,13 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	) );
  	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
  
@@ -112,7 +112,7 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
  		|| (msg->first_line.type == SIP_REPLY && op == OP_ANSWER))
  	{
-@@ -3511,13 +3549,69 @@
+@@ -3516,13 +3554,69 @@ static int rtpengine_unblock_dtmf_wrap(struct sip_msg *msg, void *d, int more) {
  static int
  block_dtmf_f(struct sip_msg* msg, char *str1, char *str2)
  {
@@ -184,9 +184,11 @@ Subject: [PATCH] rtpengine: add block_media and unblock_media function calls
  }
  
  static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
+diff --git a/src/modules/rtpengine/rtpengine.h b/src/modules/rtpengine/rtpengine.h
+index abebc4c..ddc146f 100644
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
-@@ -40,6 +40,8 @@
+@@ -40,6 +40,8 @@ enum rtpe_operation {
          OP_PING,
          OP_BLOCK_DTMF,
          OP_UNBLOCK_DTMF,

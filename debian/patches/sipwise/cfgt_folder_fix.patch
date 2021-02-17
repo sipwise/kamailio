@@ -1,7 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: cfgt_folder_fix
+
 ---
- src/modules/cfgt/cfgt_int.c |    5 ++++-
+ src/modules/cfgt/cfgt_int.c | 5 ++++-
  1 file changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
+index d60cc61..4987434 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -330,12 +330,15 @@ void cfgt_save_node(cfgt_node_p node)

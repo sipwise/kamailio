@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: fix_error_in_cfgt_module
+
+---
+ src/modules/cfgt/cfgt_int.c | 97 +++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 89 insertions(+), 8 deletions(-)
+
+diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
+index 6f7eb19..4247743 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -29,6 +29,11 @@
@@ -20,7 +30,7 @@
  
  static int shm_str_hash_alloc(struct str_hash_table *ht, int size)
  {
-@@ -187,7 +193,7 @@ int _cfgt_get_hdr_helper(struct sip_msg
+@@ -187,7 +193,7 @@ int _cfgt_get_hdr_helper(struct sip_msg *msg, str *res, int mode)
  			return STR_EQ(tmp, *res);
  		}
  	}
@@ -29,7 +39,7 @@
  }
  
  int _cfgt_get_hdr(struct sip_msg *msg, str *res)
-@@ -401,15 +407,21 @@ int _cfgt_set_dump(struct sip_msg *msg,
+@@ -401,15 +407,21 @@ int _cfgt_set_dump(struct sip_msg *msg, cfgt_node_p node, str *flow)
  
  	if(node == NULL || flow == NULL)
  		return -1;
@@ -51,7 +61,7 @@
  	f = srjson_CreateObject(&node->jdoc);
  	if(f == NULL) {
  		LM_ERR("cannot create json object\n");
-@@ -552,6 +564,31 @@ int _cfgt_node_get_flowname(cfgt_str_lis
+@@ -552,6 +564,31 @@ int _cfgt_node_get_flowname(cfgt_str_list_p route, int *indx, str *dest)
  	return 0;
  }
  
@@ -83,7 +93,7 @@
  int cfgt_process_route(struct sip_msg *msg, struct action *a)
  {
  	str routename;
-@@ -567,6 +604,10 @@ int cfgt_process_route(struct sip_msg *m
+@@ -567,6 +604,10 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
  		return 0;
  	}
  	LM_DBG("route from action:[%s]\n", a->rname);
@@ -94,7 +104,7 @@
  	routename.s = a->rname;
  	routename.len = strlen(a->rname);
  	switch(_cfgt_add_routename(_cfgt_node, a, &routename)) {
-@@ -612,22 +653,33 @@ int cfgt_process_route(struct sip_msg *m
+@@ -612,22 +653,33 @@ int cfgt_process_route(struct sip_msg *msg, struct action *a)
  
  /*
  TODO:
@@ -158,7 +168,7 @@
  				pkg_str_dup(&_cfgt_node->uuid, &unknown);
  			}
  			return _cfgt_get_uuid_id(_cfgt_node);
-@@ -682,7 +743,9 @@ int cfgt_post(struct sip_msg *msg, unsig
+@@ -682,7 +743,9 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
  
  	if(_cfgt_node) {
  		LM_DBG("dump last flow\n");
@@ -169,7 +179,7 @@
  			LM_ERR("cannot create flowname\n");
  		else
  			_cfgt_set_dump(msg, _cfgt_node, &flowname);
-@@ -696,11 +759,22 @@ int cfgt_post(struct sip_msg *msg, unsig
+@@ -696,11 +759,22 @@ int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
  int cfgt_msgout(sr_event_param_t *evp)
  {
  	srjson_t *jobj;

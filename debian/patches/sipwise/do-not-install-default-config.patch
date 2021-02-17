@@ -1,3 +1,14 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: do-not-install-default-config
+
+---
+ src/Makefile          | 2 +-
+ utils/kamctl/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/Makefile b/src/Makefile
+index d9f7a57..2c316ab 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -652,7 +652,7 @@ sunpkg:
@@ -9,6 +20,8 @@
  	install-doc install-man install-utils install-share
  
  .PHONY: dbinstall
+diff --git a/utils/kamctl/Makefile b/utils/kamctl/Makefile
+index 3804d70..1a8aab5 100644
 --- a/utils/kamctl/Makefile
 +++ b/utils/kamctl/Makefile
 @@ -13,7 +13,7 @@ all:

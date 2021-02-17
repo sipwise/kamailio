@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: db_redis_fix_scan_usage
+
+---
+ src/modules/db_redis/redis_dbase.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 46bf38b..195a595 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -727,11 +727,6 @@
+@@ -713,11 +713,6 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
                      table_name->len, table_name->s);
              goto err;
          }

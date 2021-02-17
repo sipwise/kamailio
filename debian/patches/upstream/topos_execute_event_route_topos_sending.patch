@@ -8,9 +8,9 @@ Subject: [PATCH] topos: execute event_route[topos:sending] with current sip
 - new parameter event_mode to control what event_route blocks are
 executed
 ---
- src/modules/topos/doc/topos_admin.xml | 45 +++++++++++++++++++++++++++++++++
- src/modules/topos/topos_mod.c         | 47 +++++++++++++++++++++++++++--------
- 2 files changed, 81 insertions(+), 11 deletions(-)
+ src/modules/topos/doc/topos_admin.xml | 45 ++++++++++++++++++++++++++++++++
+ src/modules/topos/topos_mod.c         | 49 ++++++++++++++++++++++++++---------
+ 2 files changed, 82 insertions(+), 12 deletions(-)
 
 diff --git a/src/modules/topos/doc/topos_admin.xml b/src/modules/topos/doc/topos_admin.xml
 index 049d11e..4df76b6 100644
@@ -76,7 +76,7 @@ index 049d11e..4df76b6 100644
  		</example>
  	</section>
 diff --git a/src/modules/topos/topos_mod.c b/src/modules/topos/topos_mod.c
-index d38bb50..9a9450c 100644
+index d38bb50..94fd80e 100644
 --- a/src/modules/topos/topos_mod.c
 +++ b/src/modules/topos/topos_mod.c
 @@ -84,16 +84,22 @@ extern int _tps_dialog_expire;
@@ -194,7 +194,7 @@ index d38bb50..9a9450c 100644
  	fmsg = faked_msg_next();
  
  	onsnd_info.to = &evp->dst->to;
-@@ -503,8 +528,8 @@ static int tps_execute_event_route(sip_msg_t *msg, sr_event_param_t *evp)
+@@ -503,12 +528,12 @@ static int tps_execute_event_route(sip_msg_t *msg, sr_event_param_t *evp)
  	rtb = get_route_type();
  	set_route_type(REQUEST_ROUTE);
  	init_run_actions_ctx(&ctx);
@@ -205,3 +205,8 @@ index d38bb50..9a9450c 100644
  	} else {
  		if(keng!=NULL) {
  			if(sr_kemi_ctx_route(keng, &ctx, (msg)?msg:fmsg, EVENT_ROUTE,
+-						&_tps_eventrt_callback, &_tps_eventrt_name)<0) {
++						&_tps_eventrt_callback, evname)<0) {
+ 				LM_ERR("error running event route kemi callback\n");
+ 				p_onsend=NULL;
+ 				return -1;

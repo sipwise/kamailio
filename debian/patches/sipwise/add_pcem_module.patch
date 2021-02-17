@@ -1,6 +1,26 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: add_pcem_module
+
+---
+ src/Makefile.groups           |   2 +-
+ src/modules/pcem/Makefile     |  17 +++++
+ src/modules/pcem/pcem_logic.c | 128 +++++++++++++++++++++++++++++++++++
+ src/modules/pcem/pcem_logic.h |  32 +++++++++
+ src/modules/pcem/pcem_mod.c   | 151 ++++++++++++++++++++++++++++++++++++++++++
+ src/modules/pcem/pcem_mod.h   |  31 +++++++++
+ 6 files changed, 360 insertions(+), 1 deletion(-)
+ create mode 100644 src/modules/pcem/Makefile
+ create mode 100644 src/modules/pcem/pcem_logic.c
+ create mode 100644 src/modules/pcem/pcem_logic.h
+ create mode 100644 src/modules/pcem/pcem_mod.c
+ create mode 100644 src/modules/pcem/pcem_mod.h
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index 52bad0b..b837537 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -28,7 +28,7 @@ mod_list_db=acc alias_db auth_db avpops
+@@ -28,7 +28,7 @@ mod_list_db=acc alias_db auth_db avpops cfg_db db_text db_flatstore \
  			  db_cluster dialog dispatcher domain drouting group \
  			  htable imc matrix mohqueue msilo mtree p_usrloc pdt permissions \
  			  pipelimit prefix_route registrar sipcapture siptrace speeddial \
@@ -9,6 +29,9 @@
  
  
  # - common modules depending on database, using UID db schema
+diff --git a/src/modules/pcem/Makefile b/src/modules/pcem/Makefile
+new file mode 100644
+index 0000000..e574136
 --- /dev/null
 +++ b/src/modules/pcem/Makefile
 @@ -0,0 +1,17 @@
@@ -29,6 +52,9 @@
 +SER_LIBS+=$(SERLIBPATH)/srdb1/srdb1
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/pcem/pcem_logic.c b/src/modules/pcem/pcem_logic.c
+new file mode 100644
+index 0000000..350480a
 --- /dev/null
 +++ b/src/modules/pcem/pcem_logic.c
 @@ -0,0 +1,128 @@
@@ -160,6 +186,9 @@
 +	}
 +}
 +
+diff --git a/src/modules/pcem/pcem_logic.h b/src/modules/pcem/pcem_logic.h
+new file mode 100644
+index 0000000..b93b181
 --- /dev/null
 +++ b/src/modules/pcem/pcem_logic.h
 @@ -0,0 +1,32 @@
@@ -195,6 +224,9 @@
 +void pcem_onreq( struct cell* t, int type, struct tmcb_params *ps );
 +
 +#endif
+diff --git a/src/modules/pcem/pcem_mod.c b/src/modules/pcem/pcem_mod.c
+new file mode 100644
+index 0000000..e5bafb1
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.c
 @@ -0,0 +1,151 @@
@@ -349,6 +381,9 @@
 +{
 +}
 +
+diff --git a/src/modules/pcem/pcem_mod.h b/src/modules/pcem/pcem_mod.h
+new file mode 100644
+index 0000000..65c4f74
 --- /dev/null
 +++ b/src/modules/pcem/pcem_mod.h
 @@ -0,0 +1,31 @@

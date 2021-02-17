@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: db_redis_skip_not_eq_type_keys
+
+---
+ src/modules/db_redis/redis_dbase.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 195a595..1b58c1b 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -279,7 +279,7 @@
+@@ -265,7 +265,7 @@ err:
  }
  
  static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
@@ -9,7 +19,7 @@
          str *key_name, int *key_found) {
  
      unsigned int len;
-@@ -297,11 +297,16 @@
+@@ -283,11 +283,16 @@ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
          for (i = 0; i < _n; ++i) {
              const db_key_t k = _k[i];
              const db_val_t v = _v[i];
@@ -26,7 +36,7 @@
              } else if (!str_strcmp(&key->key, (str*)k)) {
                  LM_DBG("found key in entry key\n");
                  if (db_redis_val2str(&v, &val) != 0) goto err;
-@@ -389,7 +394,7 @@
+@@ -375,7 +380,7 @@ static int db_redis_build_entry_keys(km_redis_con_t *con, const str *table_name,
      }
      table = (redis_table_t*)table_e->u.p;
      key = table->entry_keys;
@@ -35,7 +45,7 @@
          goto err;
      }
      if (key_found) {
-@@ -479,7 +484,7 @@
+@@ -465,7 +470,7 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
          str keyname = {NULL, 0};
          key = type->keys;
  
@@ -44,7 +54,7 @@
              goto err;
          }
          if (key_found) {
-@@ -536,7 +541,7 @@
+@@ -522,7 +527,7 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
      keyname.len = 0;
      key = table->entry_keys;
  
@@ -53,7 +63,7 @@
          goto err;
      }
      if (key_found) {
-@@ -554,7 +559,7 @@
+@@ -540,7 +545,7 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
          for (type = table->types; type; type = type->next) {
              key = type->keys;
              LM_DBG("checking type '%.*s'\n", type->type.len, type->type.s);

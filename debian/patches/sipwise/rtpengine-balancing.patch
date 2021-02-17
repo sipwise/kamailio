@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: rtpengine-balancing
+
+---
+ src/modules/rtpengine/rtpengine.c | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 77cfce5..ed5aa40 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2110,6 +2110,7 @@
+@@ -2110,6 +2110,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	pv_value_t pv_val;
  	char md5[MD5_LEN];
  	char branch_buf[MAX_BRANCH_PARAM_LEN];
@@ -8,7 +18,7 @@
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2133,6 +2134,9 @@
+@@ -2133,6 +2134,9 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	}
  	ng_flags.dict = bencode_dictionary(bencbuf);
  
@@ -18,7 +28,7 @@
  	body.s = NULL;
  	if (op == OP_OFFER || op == OP_ANSWER) {
  		ng_flags.flags = bencode_list(bencbuf);
-@@ -2283,7 +2287,26 @@
+@@ -2283,7 +2287,26 @@ select_node:
  		goto error;
  	}
  

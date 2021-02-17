@@ -1,8 +1,19 @@
-Index: kamailio/src/modules/db_redis/redis_dbase.c
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: fix_db_redis_manual_key_issue
+
 ===================================================================
---- kamailio.orig/src/modules/db_redis/redis_dbase.c
-+++ kamailio/src/modules/db_redis/redis_dbase.c
-@@ -236,6 +236,7 @@ static int db_redis_build_entry_manual_k
+---
+ src/modules/db_redis/redis_dbase.c | 57 ++++++++++++++++++++++++--------------
+ src/modules/db_redis/redis_table.c |  2 +-
+ src/modules/db_redis/redis_table.h |  4 +--
+ 3 files changed, 39 insertions(+), 24 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 7bdef74..46bf38b 100644
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -236,6 +236,7 @@ static int db_redis_build_entry_manual_keys(redis_table_t *table, const db_key_t
      for (key = table->entry_keys; key; key = key->next) {
          int subkey_found = 0;
          int i;
@@ -10,7 +21,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
          LM_DBG("checking for existence of entry key '%.*s' in query to get manual key\n",
                  key->key.len, key->key.s);
          for (i = 0; i < _n; ++i) {
-@@ -1080,7 +1081,12 @@ static int db_redis_perform_query(const 
+@@ -1080,7 +1081,12 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
      RES_COL_N(*_r) = _nc;
  
      if (!(*keys_count) && do_table_scan) {
@@ -24,7 +35,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
                      manual_keys, manual_keys_count) != 0) {
-@@ -1119,7 +1125,7 @@ static int db_redis_perform_query(const 
+@@ -1119,7 +1125,7 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
              LM_ERR("Failed to append redis command\n");
              goto error;
          }
@@ -47,7 +58,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
      redis_key_t *k = NULL;
      int type_keys_count = 0;
      int all_type_keys_count = 0;
-@@ -1249,11 +1255,16 @@ static int db_redis_perform_delete(const
+@@ -1249,11 +1255,16 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
      db_key_t *db_keys = NULL;
      redis_key_t *type_key;
  
@@ -68,7 +79,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
              LM_ERR("failed to scan query keys\n");
              goto error;
          }
-@@ -1270,7 +1281,7 @@ static int db_redis_perform_delete(const
+@@ -1270,7 +1281,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
      }
  
      LM_DBG("delete all keys\n");
@@ -77,7 +88,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
          redis_key_t *all_type_key;
          str *key = &k->key;
          redis_key_t *tmp = NULL;
-@@ -1292,10 +1303,11 @@ static int db_redis_perform_delete(const
+@@ -1292,10 +1303,11 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          if (reply->integer == 0) {
              LM_DBG("key does not exist in redis, skip deleting\n");
              db_redis_free_reply(&reply);
@@ -90,7 +101,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
          if (tmp)
              db_redis_key_free(&tmp);
  
-@@ -1305,8 +1317,8 @@ static int db_redis_perform_delete(const
+@@ -1305,8 +1317,8 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          }
  
          // add all manual keys to query
@@ -101,7 +112,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
              str *col = _k[idx];
  
              if (db_redis_key_add_str(&query_v, col) != 0) {
-@@ -1331,8 +1343,8 @@ static int db_redis_perform_delete(const
+@@ -1331,8 +1343,8 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          // manually filter non-matching replies
          row_match = 1;
          for (col = 0; col < reply->elements; ++col) {
@@ -112,7 +123,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
                  db_key_t k = _k[idx];
                  db_val_t v = _v[idx];
                  db_op_t o = _op[idx];
-@@ -1370,7 +1382,7 @@ static int db_redis_perform_delete(const
+@@ -1370,7 +1382,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          for (j = 0, all_type_key = all_type_keys; all_type_key; ++j, all_type_key = all_type_key->next) {
              db_val_t *v = &(db_vals[j]);
              str *key = &all_type_key->key;
@@ -121,7 +132,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
              int coltype = db_redis_schema_get_column_type(con, CON_TABLE(_h), key);
              if (value == NULL) {
                  VAL_NULL(v) = 1;
-@@ -1422,11 +1434,9 @@ static int db_redis_perform_delete(const
+@@ -1422,11 +1434,9 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
              db_redis_check_reply(con, reply, error);
              db_redis_free_reply(&reply);
          }
@@ -134,7 +145,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
      db_redis_key_free(&all_type_keys);
      db_redis_key_free(&query_v);
  
-@@ -1461,7 +1471,12 @@ static int db_redis_perform_update(const
+@@ -1461,7 +1471,12 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
      size_t col;
  
      if (!(*keys_count) && do_table_scan) {
@@ -148,7 +159,7 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                      keys, keys_count,
                      manual_keys, manual_keys_count) != 0) {
-@@ -2027,7 +2042,7 @@ int db_redis_delete(const db1_con_t* _h,
+@@ -2027,7 +2042,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      }
  
      if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,
@@ -157,10 +168,10 @@ Index: kamailio/src/modules/db_redis/redis_dbase.c
          goto error;
      }
  
-Index: kamailio/src/modules/db_redis/redis_table.c
-===================================================================
---- kamailio.orig/src/modules/db_redis/redis_table.c
-+++ kamailio/src/modules/db_redis/redis_table.c
+diff --git a/src/modules/db_redis/redis_table.c b/src/modules/db_redis/redis_table.c
+index 2b4bcfb..fb7c06c 100644
+--- a/src/modules/db_redis/redis_table.c
++++ b/src/modules/db_redis/redis_table.c
 @@ -103,7 +103,7 @@ err:
      return -1;
  }
@@ -170,11 +181,11 @@ Index: kamailio/src/modules/db_redis/redis_table.c
      redis_key_t *k;
  
      k = *list;
-Index: kamailio/src/modules/db_redis/redis_table.h
-===================================================================
---- kamailio.orig/src/modules/db_redis/redis_table.h
-+++ kamailio/src/modules/db_redis/redis_table.h
-@@ -58,9 +58,9 @@ int db_redis_key_add_string(redis_key_t*
+diff --git a/src/modules/db_redis/redis_table.h b/src/modules/db_redis/redis_table.h
+index 5ea1349..9e71d2a 100644
+--- a/src/modules/db_redis/redis_table.h
++++ b/src/modules/db_redis/redis_table.h
+@@ -58,9 +58,9 @@ int db_redis_key_add_string(redis_key_t* *list, const char* entry, int len);
  int db_redis_key_add_str(redis_key_t **list, const str* entry);
  int db_redis_key_prepend_string(redis_key_t **list, const char* entry, int len);
  int db_redis_key_list2arr(redis_key_t *list, char ***arr);

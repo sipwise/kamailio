@@ -1,0 +1,21 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 17 Feb 2021 12:18:32 +0100
+Subject: rtpengine: fix build warning
+
+---
+ src/modules/rtpengine/rtpengine.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 5b5cf84..bbf348b 100644
+--- a/src/modules/rtpengine/rtpengine.c
++++ b/src/modules/rtpengine/rtpengine.c
+@@ -2350,7 +2350,7 @@ select_node:
+ 		else
+ 			LM_INFO("proxy %.*s has reached its load limit (%.*s) - trying next one",
+ 					node->rn_url.len, node->rn_url.s,
+-					item->iov[1].iov_len, item->iov[1].iov_base);
++					(int) item->iov[1].iov_len, (char *) item->iov[1].iov_base);
+ 		goto select_node;
+ 	}
+ 

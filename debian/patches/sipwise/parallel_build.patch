@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: parallel_build
+
+---
+ src/Makefile.rules | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/src/Makefile.rules b/src/Makefile.rules
+index 10d04a1..9e1b031 100644
 --- a/src/Makefile.rules
 +++ b/src/Makefile.rules
 @@ -60,6 +60,18 @@ cmd_CC+=$(CC_MKDEP_OPTS)
@@ -19,7 +29,7 @@
  # what will be displayed if quiet==silent
  silent_cmd_CC=CC ($(CC)) [$(strip $(crt_type) $(NAME))]		$@
  silent_cmd_LD=LD ($(LD)) [$(strip $(crt_type) $(NAME))]		$@
-@@ -93,7 +105,7 @@ module_make=	if [ -n "$(1)" -a -r "$(1)/
+@@ -93,7 +105,7 @@ module_make=	if [ -n "$(1)" -a -r "$(1)/Makefile" ]; then \
  quote:= "
  escall= $(subst $$,\$$,$(subst $(quote),\$(quote),$1))
  exec_cmd= $(if $($(quiet)_cmd_$(1)),\

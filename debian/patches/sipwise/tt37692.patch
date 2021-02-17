@@ -1,4 +1,3 @@
-From caaef0457e3c5e061ee961588394a1105e0c5850 Mon Sep 17 00:00:00 2001
 From: Roman Romanchenko <rromanchenko@sipwise.com>
 Date: Mon, 9 Jul 2018 13:58:00 +0300
 Subject: [PATCH] permissions: Improve From pattern matching in kamailio
@@ -8,14 +7,16 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
 - provided parameter will be used instead of From header in match_res() and match_hash_table()
 - documentation extended with 3-arguments allow_trusted() function description
 ---
- .../permissions/doc/permissions_admin.xml     |  8 +-
- src/modules/permissions/hash.c                | 22 ++---
- src/modules/permissions/hash.h                |  4 +-
- src/modules/permissions/permissions.c         |  2 +
- src/modules/permissions/trusted.c             | 98 ++++++++++++++-----
- src/modules/permissions/trusted.h             |  5 +
- 6 files changed, 93 insertions(+), 46 deletions(-)
+ src/modules/permissions/README        |  9 +++-
+ src/modules/permissions/hash.c        | 22 ++++----
+ src/modules/permissions/hash.h        |  4 +-
+ src/modules/permissions/permissions.c |  2 +
+ src/modules/permissions/trusted.c     | 98 +++++++++++++++++++++++++----------
+ src/modules/permissions/trusted.h     |  5 ++
+ 6 files changed, 97 insertions(+), 43 deletions(-)
 
+diff --git a/src/modules/permissions/README b/src/modules/permissions/README
+index 631fdea..4102520 100644
 --- a/src/modules/permissions/README
 +++ b/src/modules/permissions/README
 @@ -79,6 +79,7 @@ Emmanuel Schmidbauer
@@ -43,7 +44,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  
     Otherwise the request is rejected.
  
-@@ -716,6 +718,7 @@ modparam("permissions", "load_backends",
+@@ -716,6 +718,7 @@ modparam("permissions", "load_backends", 1)
     4.9. allow_source_address_group()
     4.10. allow_address_group(addr, port)
     4.11. allow_trusted([src_ip_pvar, proto_pvar])
@@ -62,9 +63,11 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  5. RPC Commands
  
     5.1. permissions.addressReload
+diff --git a/src/modules/permissions/hash.c b/src/modules/permissions/hash.c
+index 14121b6..19098b6 100644
 --- a/src/modules/permissions/hash.c
 +++ b/src/modules/permissions/hash.c
-@@ -250,10 +250,10 @@ int hash_table_insert(struct trusted_lis
+@@ -250,10 +250,10 @@ int hash_table_insert(struct trusted_list** table, char* src_ip,
   * Returns number of matches or -1 if none matched.
   */
  int match_hash_table(struct trusted_list** table, struct sip_msg* msg,
@@ -78,7 +81,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	char ruri_string[MAX_URI_SIZE + 1];
  	regex_t preg;
  	struct trusted_list *np;
-@@ -266,14 +266,6 @@ int match_hash_table(struct trusted_list
+@@ -266,14 +266,6 @@ int match_hash_table(struct trusted_list** table, struct sip_msg* msg,
  
  	if (IS_SIP(msg))
  	{
@@ -93,7 +96,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  		ruri = msg->first_line.u.request.uri;
  		if (ruri.len > MAX_URI_SIZE) {
  			LM_ERR("message has Request URI too large\n");
-@@ -288,15 +280,18 @@ int match_hash_table(struct trusted_list
+@@ -288,15 +280,18 @@ int match_hash_table(struct trusted_list** table, struct sip_msg* msg,
  				(strncmp(np->src_ip.s, src_ip.s, src_ip.len) == 0) &&
  				((np->proto == PROTO_NONE) || (proto == PROTO_NONE) ||
  				(np->proto == proto))) {
@@ -114,7 +117,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  						regfree(&preg);
  						continue;
  					}
-@@ -327,6 +322,7 @@ int match_hash_table(struct trusted_list
+@@ -327,6 +322,7 @@ int match_hash_table(struct trusted_list** table, struct sip_msg* msg,
  			count++;
  		}
  	}
@@ -122,9 +125,11 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	if (!count)
  		return -1;
  	else
+diff --git a/src/modules/permissions/hash.h b/src/modules/permissions/hash.h
+index 047c3f6..b170d2e 100644
 --- a/src/modules/permissions/hash.h
 +++ b/src/modules/permissions/hash.h
-@@ -85,10 +85,10 @@ int hash_table_insert(struct trusted_lis
+@@ -85,10 +85,10 @@ int hash_table_insert(struct trusted_list** hash_table, char* src_ip,
  
  /*
   * Check if an entry exists in hash table that has given src_ip and protocol
@@ -137,6 +142,8 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  
  
  /*
+diff --git a/src/modules/permissions/permissions.c b/src/modules/permissions/permissions.c
+index 8e7bdb9..aa00e3a 100644
 --- a/src/modules/permissions/permissions.c
 +++ b/src/modules/permissions/permissions.c
 @@ -141,6 +141,8 @@ static cmd_export_t cmds[] = {
@@ -148,9 +155,11 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	{"allow_uri",      (cmd_function)allow_uri, 2, double_fixup, 0,
  		REQUEST_ROUTE | FAILURE_ROUTE},
  	{"allow_address",  (cmd_function)w_allow_address, 3, fixup_allow_address,
+diff --git a/src/modules/permissions/trusted.c b/src/modules/permissions/trusted.c
+index c357293..2471ac4 100644
 --- a/src/modules/permissions/trusted.c
 +++ b/src/modules/permissions/trusted.c
-@@ -354,16 +354,15 @@ static inline int match_proto(const char
+@@ -354,16 +354,15 @@ static inline int match_proto(const char *proto_string, int proto_int)
  
  	return 0;
  }
@@ -170,7 +179,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	char ruri_string[MAX_URI_SIZE+1];
  	db_row_t* row;
  	db_val_t* val;
-@@ -372,14 +371,6 @@ static int match_res(struct sip_msg* msg
+@@ -372,14 +371,6 @@ static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
  	int count = 0;
  
  	if (IS_SIP(msg)) {
@@ -185,7 +194,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  		ruri = msg->first_line.u.request.uri;
  		if (ruri.len > MAX_URI_SIZE) {
  			LM_ERR("message has Request URI too large\n");
-@@ -392,6 +383,8 @@ static int match_res(struct sip_msg* msg
+@@ -392,6 +383,8 @@ static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
  
  	row = RES_ROWS(_r);
  
@@ -194,7 +203,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	for(i = 0; i < RES_ROW_N(_r); i++) {
  		val = ROW_VALUES(row + i);
  		if ((ROW_N(row + i) == 4) &&
-@@ -404,6 +397,8 @@ static int match_res(struct sip_msg* msg
+@@ -404,6 +397,8 @@ static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
  				(VAL_NULL(val + 3) ||
  				((VAL_TYPE(val + 3) == DB1_STRING) && !VAL_NULL(val + 3))))
  		{
@@ -203,7 +212,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  			if (IS_SIP(msg)) {
  				if (!VAL_NULL(val + 1)) {
  					if (regcomp(&preg, (char *)VAL_STRING(val + 1), REG_NOSUB)) {
-@@ -412,7 +407,7 @@ static int match_res(struct sip_msg* msg
+@@ -412,7 +407,7 @@ static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
  							continue;
  						}
  					}
@@ -212,7 +221,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  						regfree(&preg);
  						continue;
  					}
-@@ -444,19 +439,17 @@ static int match_res(struct sip_msg* msg
+@@ -444,19 +439,17 @@ static int match_res(struct sip_msg* msg, int proto, db1_res_t* _r)
  			count++;
  		}
  	}
@@ -236,7 +245,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	int result;
  	db1_res_t* res = NULL;
  
-@@ -498,11 +491,11 @@ int allow_trusted(struct sip_msg* msg, c
+@@ -498,11 +491,11 @@ int allow_trusted(struct sip_msg* msg, char *src_ip, int proto)
  			return -1;
  		}
  
@@ -250,16 +259,15 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  	}
  }
  
-@@ -513,16 +506,29 @@ int allow_trusted(struct sip_msg* msg, c
+@@ -513,16 +506,29 @@ int allow_trusted(struct sip_msg* msg, char *src_ip, int proto)
   */
  int allow_trusted_0(struct sip_msg* _msg, char* str1, char* str2)
  {
 -	return allow_trusted(_msg, ip_addr2a(&(_msg->rcv.src_ip)),
 -			_msg->rcv.proto);
--}
 +      str uri;
 +      char uri_string[MAX_URI_SIZE+1];
- 
++
 +      if (IS_SIP(_msg)) {
 +            if (parse_from_header(_msg) < 0) return -1;
 +            uri = get_from(_msg)->uri;
@@ -273,8 +281,9 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
 +      }
 +
 +	return allow_trusted(_msg, ip_addr2a(&(_msg->rcv.src_ip)), _msg->rcv.proto, uri_string);
-+}
+ }
  
+-
  /*
   * Checks based on source address and protocol given in pvar arguments and
 - * and requests's From URI, if request can be trusted without authentication.
@@ -285,7 +294,7 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  {
  	str src_ip, proto;
  	int proto_int;
-@@ -576,12 +582,50 @@ int allow_trusted_2(struct sip_msg* _msg
+@@ -576,12 +582,50 @@ int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp)
  			goto error;
  	}
  
@@ -337,9 +346,11 @@ Subject: [PATCH] permissions: Improve From pattern matching in kamailio
  
  int reload_trusted_table_cmd(void)
  {
+diff --git a/src/modules/permissions/trusted.h b/src/modules/permissions/trusted.h
+index 485165b..a37a162 100644
 --- a/src/modules/permissions/trusted.h
 +++ b/src/modules/permissions/trusted.h
-@@ -75,6 +75,11 @@ int allow_trusted_0(struct sip_msg* _msg
+@@ -75,6 +75,11 @@ int allow_trusted_0(struct sip_msg* _msg, char* str1, char* str2);
   */
  int allow_trusted_2(struct sip_msg* _msg, char* _src_ip_sp, char* _proto_sp);
  

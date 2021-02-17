@@ -1,3 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: sca-rr-is-direction
+
+---
+ src/modules/sca/sca.c           |  7 +++++++
+ src/modules/sca/sca.h           |  1 +
+ src/modules/sca/sca_call_info.c | 45 ++++++++++++++++++++++++++++++++++-------
+ src/modules/sca/sca_common.h    |  1 +
+ 4 files changed, 47 insertions(+), 7 deletions(-)
+
+diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
+index a576f40..6304027 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -62,6 +62,7 @@ sca_mod *sca = NULL;
@@ -21,6 +34,8 @@
  	if (sca_bind_sl(sca, &slb) != 0) {
  		LM_ERR("Failed to initialize required sl API. Check that the \"sl\" module is loaded before this module.\n");
  		goto error;
+diff --git a/src/modules/sca/sca.h b/src/modules/sca/sca.h
+index 2425bc3..8a7008d 100644
 --- a/src/modules/sca/sca.h
 +++ b/src/modules/sca/sca.h
 @@ -49,6 +49,7 @@ struct _sca_mod {
@@ -31,9 +46,11 @@
  	sl_api_t *sl_api;
  };
  typedef struct _sca_mod sca_mod;
+diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
+index 8b940c3..0fc0cd4 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1312,6 +1312,7 @@ void sca_call_info_ack_from_handler(sip_
+@@ -1312,6 +1312,7 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  	sca_appearance *app;
  	struct to_body *from;
  	struct to_body *to;
@@ -41,7 +58,7 @@
  	int slot_idx = -1;
  	int state = SCA_APPEARANCE_STATE_IDLE;
  
-@@ -1325,12 +1326,18 @@ void sca_call_info_ack_from_handler(sip_
+@@ -1325,12 +1326,18 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  	}
  
  	if (sca_uri_lock_if_shared_appearance(sca, from_aor, &slot_idx)) {
@@ -62,7 +79,7 @@
  			goto done;
  		}
  
-@@ -1367,11 +1374,12 @@ void sca_call_info_ack_from_handler(sip_
+@@ -1367,11 +1374,12 @@ void sca_call_info_ack_from_handler(sip_msg_t *msg, str *from_aor, str *to_aor)
  /* XXX needs extract routines */
  void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
  {
@@ -76,7 +93,7 @@
  
  	if (!(type & TMCB_E2EACK_IN)) {
  		return;
-@@ -1400,8 +1408,18 @@ void sca_call_info_ack_cb(struct cell *t
+@@ -1400,8 +1408,18 @@ void sca_call_info_ack_cb(struct cell *t, int type, struct tmcb_params *params)
  	}
  
  	// on ACK, ensure SCA callee state is promoted to ACTIVE.
@@ -96,7 +113,7 @@
  	if (app && app->state == SCA_APPEARANCE_STATE_ACTIVE_PENDING) {
  		LM_DBG("promoting %.*s appearance-index %d to active\n",
  				STR_FMT(&to_aor), app->index);
-@@ -1482,6 +1500,7 @@ static int sca_call_info_bye_handler(sip
+@@ -1482,6 +1500,7 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  	sca_appearance *app = NULL;
  	int slot_idx = -1;
  	int rc = -1;
@@ -104,7 +121,7 @@
  
  	if (msg->first_line.type == SIP_REQUEST) {
  		if (SCA_CALL_INFO_IS_SHARED_CALLER(call_info)) {
-@@ -1499,15 +1518,21 @@ static int sca_call_info_bye_handler(sip
+@@ -1499,15 +1518,21 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  			}
  			if (app == NULL) {
  				// try to find it by tags
@@ -128,7 +145,7 @@
  				goto done;
  			}
  
-@@ -1547,8 +1572,14 @@ static int sca_call_info_bye_handler(sip
+@@ -1547,8 +1572,14 @@ static int sca_call_info_bye_handler(sip_msg_t *msg, sca_call_info *call_info,
  				goto done;
  			}
  
@@ -144,6 +161,8 @@
  					NULL, slot_idx);
  			if (app == NULL) {
  				LM_INFO("sca_call_info_bye_handler: no in-use callee "
+diff --git a/src/modules/sca/sca_common.h b/src/modules/sca/sca_common.h
+index acf967b..316a802 100644
 --- a/src/modules/sca/sca_common.h
 +++ b/src/modules/sca/sca_common.h
 @@ -47,6 +47,7 @@

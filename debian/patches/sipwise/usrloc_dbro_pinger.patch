@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:21 +0100
+Subject: usrloc_dbro_pinger
+
+---
+ src/modules/usrloc/dlist.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/usrloc/dlist.c b/src/modules/usrloc/dlist.c
+index a71d59a..71aac2d 100644
 --- a/src/modules/usrloc/dlist.c
 +++ b/src/modules/usrloc/dlist.c
-@@ -113,6 +113,8 @@ static inline int get_all_db_ucontacts(v
+@@ -113,6 +113,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  	db_op_t  ops1[4];
  	db_key_t keys2[6]; /* select */
  	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
@@ -9,7 +19,7 @@
  
  	cp = buf;
  	shortage = 0;
-@@ -159,22 +161,26 @@ static inline int get_all_db_ucontacts(v
+@@ -159,22 +161,26 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  		vals1[n[0]].nul = 0;
  		vals1[n[0]].val.int_val = server_id;
  		n[0]++;
@@ -39,7 +49,7 @@
  			continue;
  		}
  
-@@ -297,7 +303,7 @@ static inline int get_all_db_ucontacts(v
+@@ -297,7 +303,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  			len -= needed;
  		} /* row cycle */
  

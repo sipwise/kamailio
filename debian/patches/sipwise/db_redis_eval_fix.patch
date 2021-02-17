@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: db_redis_eval_fix
+
+---
+ src/modules/db_redis/redis_dbase.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 73d23b5..9c1bf70 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -2184,11 +2184,11 @@
+@@ -2167,11 +2167,11 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
  
                  db_redis_key_free(&query_v);
  

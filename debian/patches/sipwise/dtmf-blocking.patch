@@ -1,18 +1,17 @@
-From e528fce4b61112f78b0081fcb0d53ef440cafce7 Mon Sep 17 00:00:00 2001
 From: Richard Fuchs <rfuchs@sipwise.com>
 Date: Thu, 6 Sep 2018 04:16:35 -0400
 Subject: [PATCH] rtpengine: add block_dtmf and unblock_dtmf
 
 ---
- src/modules/rtpengine/doc/rtpengine.xml       |  2 +-
- src/modules/rtpengine/doc/rtpengine_admin.xml | 41 +++++++++++++++++++
- src/modules/rtpengine/rtpengine.c             | 31 ++++++++++++++
- src/modules/rtpengine/rtpengine.h             |  2 +
- 4 files changed, 75 insertions(+), 1 deletion(-)
+ src/modules/rtpengine/rtpengine.c | 31 +++++++++++++++++++++++++++++++
+ src/modules/rtpengine/rtpengine.h |  2 ++
+ 2 files changed, 33 insertions(+)
 
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index ed5aa40..8f4f7f5 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -128,6 +128,8 @@
+@@ -128,6 +128,8 @@ static const char *command_strings[] = {
  	[OP_QUERY]		= "query",
  	[OP_PING]		= "ping",
  	[OP_STOP_RECORDING]	= "stop recording",
@@ -21,7 +20,7 @@ Subject: [PATCH] rtpengine: add block_dtmf and unblock_dtmf
  };
  
  struct minmax_mos_stats {
-@@ -169,6 +171,8 @@
+@@ -169,6 +171,8 @@ static char *gencookie();
  static int rtpp_test(struct rtpp_node*, int, int);
  static int start_recording_f(struct sip_msg *, char *, char *);
  static int stop_recording_f(struct sip_msg *, char *, char *);
@@ -30,7 +29,7 @@ Subject: [PATCH] rtpengine: add block_dtmf and unblock_dtmf
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -294,6 +298,12 @@
+@@ -294,6 +298,12 @@ static cmd_export_t cmds[] = {
  	{"stop_recording",	(cmd_function)stop_recording_f, 	1,
  		fixup_spve_null, 0,
  		ANY_ROUTE},
@@ -43,7 +42,7 @@ Subject: [PATCH] rtpengine: add block_dtmf and unblock_dtmf
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -3489,6 +3499,27 @@
+@@ -3494,6 +3504,27 @@ stop_recording_f(struct sip_msg* msg, char *str1, char *str2)
  	return rtpengine_rtpp_set_wrap(msg, rtpengine_stop_recording_wrap, flags.s, 1);
  }
  
@@ -71,9 +70,11 @@ Subject: [PATCH] rtpengine: add block_dtmf and unblock_dtmf
  static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
  	void **parms;
  	pv_param_t *param;
+diff --git a/src/modules/rtpengine/rtpengine.h b/src/modules/rtpengine/rtpengine.h
+index d7b6050..abebc4c 100644
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
-@@ -38,6 +38,8 @@
+@@ -38,6 +38,8 @@ enum rtpe_operation {
          OP_STOP_RECORDING,
          OP_QUERY,
          OP_PING,

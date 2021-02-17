@@ -1,3 +1,13 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 17 Feb 2021 11:46:22 +0100
+Subject: fix_db_redis_time_schema
+
+---
+ utils/kamctl/db_redis/kamailio/location | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/utils/kamctl/db_redis/kamailio/location b/utils/kamctl/db_redis/kamailio/location
+index 9ca18f2..7c0ea2a 100644
 --- a/utils/kamctl/db_redis/kamailio/location
 +++ b/utils/kamctl/db_redis/kamailio/location
 @@ -1,2 +1,2 @@
