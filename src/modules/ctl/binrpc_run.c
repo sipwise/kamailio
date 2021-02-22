@@ -627,10 +627,17 @@ int process_rpc_req(unsigned char* buf, int size, int* bytes_needed,
 	rpc_export_t* rpc_e;
 	struct binrpc_ctx f_ctx;
 	struct binrpc_parse_ctx* ctx;
-	
+
+	if(ksr_shutdown_phase()) {
+		/* during shutdown - no more RPC command handling */
+		LM_DBG("shutdown phase - skipping rpc command\n");
+		return -1;
+	}
+
 	if (size<BINRPC_MIN_PKT_SIZE){
 		*bytes_needed=BINRPC_MIN_PKT_SIZE-size;
-		return 0; /* more data , nothing processed */
+		LM_DBG("more data needed - at least: %d bytes\n", *bytes_needed);
+		return 0; /* more data, nothing processed */
 	}
 	err=init_binrpc_ctx(&f_ctx, buf, size, sh);
 	ctx=&f_ctx.in.ctx;

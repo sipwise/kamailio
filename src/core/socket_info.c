@@ -1070,6 +1070,7 @@ error:
 	req.g.rtgen_family = family;\
 	} while(0);
 
+#define NETLINK_BUFFER_SIZE 32768
 	
 static int get_flags(int family){
 	struct {
@@ -1079,12 +1080,12 @@ static int get_flags(int family){
 	int rtn = 0;
 	struct nlmsghdr*  nlp;
 	struct ifinfomsg *ifi;
-	char buf[8192];
+	char buf[NETLINK_BUFFER_SIZE];
 	char *p = buf;
 	int nll = 0;
     int nl_sock = -1;
 
-	fill_nl_req(req, RTM_GETLINK, AF_INET);
+	fill_nl_req(req, RTM_GETLINK, family);
 
 	if((nl_sock = nl_bound_sock()) < 0) return -1;
 
@@ -1095,6 +1096,10 @@ static int get_flags(int family){
 	}
 
 	while(1) {
+		if ((sizeof(buf) - nll) == 0) {
+			LM_ERR("netlink buffer overflow in get_flags");
+			goto error;
+		}
 		rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
 		nlp = (struct nlmsghdr *) p;
 		if(nlp->nlmsg_type == NLMSG_DONE){
@@ -1148,7 +1153,7 @@ static int build_iface_list(void)
 	struct nlmsghdr*  nlp;
 	struct ifaddrmsg *ifi;
 	int rtl;
-	char buf[8192];
+	char buf[NETLINK_BUFFER_SIZE];
 	char *p = buf;
 	int nll = 0;
 	struct rtattr * rtap;
@@ -1184,6 +1189,10 @@ static int build_iface_list(void)
 		nll = 0;
 		p = buf;
 		while(1) {
+			if ((sizeof(buf) - nll) == 0) {
+				LM_ERR("netlink buffer overflow in build_iface_list");
+				goto error;
+			}
 			rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
 			LM_DBG("received %d byles \n", rtn);
 			nlp = (struct nlmsghdr *) p;
@@ -2142,7 +2151,7 @@ void init_proto_order()
 
 
 /**
- * parse '[port:]host[:port]' string to a broken down structure
+ * parse '[proto:]host[:port]' string to a broken down structure
  */
 int parse_protohostport(str* ins, sr_phostp_t *r)
 {
@@ -2230,7 +2239,7 @@ error_port:
 }
 
 /**
- * lookup a local socket by '[port:]host[:port]' string
+ * lookup a local socket by '[proto:]host[:port]' string
  */
 struct socket_info* lookup_local_socket(str *phostp)
 {

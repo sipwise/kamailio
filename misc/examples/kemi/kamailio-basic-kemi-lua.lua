@@ -1,7 +1,7 @@
 -- Kamailio - equivalent of routing blocks in Lua
 --
--- KSR - the new dynamic object exporting Kamailio functions (kemi)
--- sr - the old static object exporting Kamailio functions
+-- KSR - the object exporting Kamailio KEMI functions (app_lua module)
+-- sr - the old object exporting Kamailio functions (app_lua_sr module)
 --
 
 -- Relevant remarks:
@@ -10,6 +10,9 @@
 --  * use KSR.x.exit() to trigger the stop of executing the script
 --  * KSR.drop() is only marking the SIP message for drop, but doesn't stop
 --  the execution of the script. Use KSR.x.exit() after it or KSR.x.drop()
+--
+-- Hints:
+--  * Lua syntax check: luac -p /path/to/script.lua
 --
 
 -- debug callback function to print details of execution trace
@@ -160,21 +163,21 @@ function ksr_route_reqinit()
 		if KSR.htable.sht_match_name("ipban", "eq", srcip) > 0 then
 			-- ip is already blocked
 			KSR.dbg("request from blocked IP - " .. KSR.kx.get_method()
-					.. " from " .. KSR.kx.gete_furi() .. " (IP:"
+					.. " from " .. KSR.kx.get_furi() .. " (IP:"
 					.. srcip .. ":" .. KSR.kx.get_srcport() .. ")\n");
 			KSR.x.exit();
 		end
 		if KSR.pike.pike_check_req() < 0 then
 			KSR.err("ALERT: pike blocking " .. KSR.kx.get_method()
-					.. " from " .. KSR.kx.gete_furi() .. " (IP:"
+					.. " from " .. KSR.kx.get_furi() .. " (IP:"
 					.. srcip .. ":" .. KSR.kx.get_srcport() .. ")\n");
 			KSR.htable.sht_seti("ipban", srcip, 1);
 			KSR.x.exit();
 		end
 	end
 	local ua = KSR.kx.gete_ua();
-	if string.find(ua, "friendly-scanner")
-				or string.find(ua, "sipcli") then
+	if string.find(ua, "friendly") or string.find(ua, "scanner")
+			or string.find(ua, "sipcli") or string.find(ua, "sipvicious") then
 		KSR.sl.sl_send_reply(200, "OK");
 		KSR.x.exit();
 	end

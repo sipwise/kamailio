@@ -164,6 +164,10 @@ Options:\n\
                   disable with no or off\n\
     --alias=val  Add an alias, the value has to be '[proto:]hostname[:port]'\n\
                   (like for 'alias' global parameter)\n\
+    --atexit=val Control atexit callbacks execution from external libraries\n\
+                  which may access destroyed shm memory causing crash on shutdown.\n\
+                  Can be y[es] or 1 to enable atexit callbacks, n[o] or 0 to disable,\n\
+                  default is yes.\n\
     -A define    Add config pre-processor define (e.g., -A WITH_AUTH,\n\
                   -A 'FLT_ACC=1', -A 'DEFVAL=\"str-val\"')\n\
     -b nr        Maximum receive buffer size which will not be exceeded by\n\
@@ -533,6 +537,8 @@ char *sr_memmng_shm = NULL;
 
 static int *_sr_instance_started = NULL;
 
+int ksr_atexit_mode = 1;
+
 /**
  * return 1 if all child processes were forked
  * - note: they might still be in init phase (i.e., child init)
@@ -735,7 +741,7 @@ void handle_sigs(void)
 			LM_NOTICE("Thank you for flying " NAME "!!!\n");
 			/* shutdown/kill all the children */
 			shutdown_children(SIGTERM, 1);
-			exit(0);
+			ksr_exit(0);
 			break;
 
 		case SIGUSR1:
@@ -805,9 +811,9 @@ void handle_sigs(void)
 			/* exit */
 			shutdown_children(SIGTERM, 1);
 			if (WIFSIGNALED(chld_status)) {
-				exit(1);
+				ksr_exit(1);
 			} else {
-				exit(0);
+				ksr_exit(0);
 			}
 			break;
 
@@ -1933,6 +1939,7 @@ int main(int argc, char** argv)
 		{"modparam",    required_argument, 0, KARGOPTVAL + 6},
 		{"log-engine",  required_argument, 0, KARGOPTVAL + 7},
 		{"debug",       required_argument, 0, KARGOPTVAL + 8},
+		{"atexit",      required_argument, 0, KARGOPTVAL + 10},
 		{0, 0, 0, 0 }
 	};
 
@@ -1999,6 +2006,16 @@ int main(int argc, char** argv)
 					default_core_cfg.debug=(int)strtol(optarg, &tmp, 10);
 					if ((tmp==0) || (*tmp)){
 						LM_ERR("bad debug level value: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+10:
+					if(optarg[0]=='y' || optarg[0]=='1') {
+						ksr_atexit_mode = 1;
+					} else if(optarg[0]=='n' || optarg[0]=='0') {
+						ksr_atexit_mode = 0;
+					} else {
+						LM_ERR("bad atexit value: %s\n", optarg);
 						goto error;
 					}
 					break;
@@ -2164,6 +2181,7 @@ int main(int argc, char** argv)
 			case KARGOPTVAL+6:
 			case KARGOPTVAL+7:
 			case KARGOPTVAL+8:
+			case KARGOPTVAL+10:
 					break;
 
 			/* long options */
@@ -2541,6 +2559,8 @@ try_again:
 	if (ksr_route_locks_set_init()<0)
 		goto error;
 
+	ksr_shutdown_phase_init();
+
 	/* init lookup for core event routes */
 	sr_core_ert_init();
 
@@ -2864,7 +2884,7 @@ try_again:
 					strerror(errno), errno);
 	}
 	/* else terminate process */
-	return ret;
+	ksr_exit(ret);
 
 error:
 	/*kill everything*/
@@ -2874,7 +2894,7 @@ error:
 			fprintf(stderr, "error sending exit status: %s [%d]\n",
 					strerror(errno), errno);
 	}
-	return -1;
+	ksr_exit(-1);
 }
 
 
