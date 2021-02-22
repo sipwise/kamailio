@@ -32,19 +32,11 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## backports from upstream (5.4)
-upstream/0001-Revert-tls-proper-ifdef-on-libssl-version-for-tls_in.patch
-upstream/0002-Revert-tls-added-define-condition-on-version-functio.patch
-upstream/0003-Revert-tls-support-compilation-without-deprecated-Op.patch
-upstream/pv_headers-fix-x_hdr-index-on-get.patch
-upstream/ndb_redis-set-message-level-to-debug-on-exec.patch
-upstream/secsipid-use-pkg-config-when-available.patch
-upstream/secsipid-Makefile-detect-of-pkg-config-knows-about-l.patch
-upstream/secsipid-include-secsipid.h-from-standard-path.patch
+#
 # upstream master (5.5)
 upstream/permissions-basic-safety-for-concurent-rpc-reload.patch
 upstream/permissions-add-reload_delta-parameter.patch
 upstream/ndb_redis-set-message-level-to-debug-on-reconnect.patch
-upstream/cfgt-log-info-when-node-is-created-and-saved.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
@@ -54,7 +46,6 @@ sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
 sipwise/rtpengine-codec-set-except.patch
 sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
-sipwise/0001-sl-Fix-3xx-stats-RPC-marshalling.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
