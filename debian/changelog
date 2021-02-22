@@ -1,7 +1,9 @@
-ngcp-kamailio (5.4.1-1+0~mr9.4.0.0) unstable; urgency=medium
+ngcp-kamailio (5.4.4-1+0~mr9.4.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
   * [7f49eef] TT#105600 secsipid package
+  * New upstream version 5.4.4
+  * TT#111601 remove already applied patches
 
   [ Richard Fuchs ]
   * [5542caa] TT#63000 skip empty keys when looking for key
@@ -9,7 +11,7 @@ ngcp-kamailio (5.4.1-1+0~mr9.4.0.0) unstable; urgency=medium
   * [d53e856] TT#63000 use SSCAN instead of SCAN if possible
   * [c182f41] TT#63000 fix SSCAN using empty key name
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 15 Feb 2021 17:52:05 +0100
+ -- Victor Seva <vseva@debian.org>  Mon, 22 Feb 2021 11:58:03 +0100
 
 ngcp-kamailio (5.4.1-1+0~mr9.3.0.0) unstable; urgency=medium
 
