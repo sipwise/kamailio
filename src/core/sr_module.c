@@ -43,6 +43,8 @@
 #include "sr_compat.h"
 #include "ppcfg.h"
 #include "async_task.h"
+#include "shm_init.h"
+#include "daemonize.h"
 
 #include <sys/stat.h>
 #include <regex.h>
@@ -107,6 +109,24 @@ unsigned int set_modinit_delay(unsigned int v)
 	r =  modinit_delay;
 	modinit_delay = v;
 	return r;
+}
+
+/* shut down phase for instance - kept in shared memory */
+static int *_ksr_shutdown_phase = NULL;
+
+int ksr_shutdown_phase_init(void)
+{
+	if((_ksr_shutdown_phase == NULL) && (shm_initialized())) {
+		_ksr_shutdown_phase = (int*)shm_mallocxz(sizeof(int));
+	}
+	return 0;
+}
+/**
+ * return destroy modules phase state
+ */
+int ksr_shutdown_phase(void)
+{
+	return (_ksr_shutdown_phase)?(*_ksr_shutdown_phase):0;
 }
 
 /* keep state if server is in destroy modules phase */
@@ -521,7 +541,7 @@ reload:
 	}
 	/* version control */
 	if (!version_control(handle, path)) {
-		exit(-1);
+		ksr_exit(-1);
 	}
 	/* launch register */
 	mr = (mod_register_function)dlsym(handle, "mod_register");
@@ -738,6 +758,12 @@ void destroy_modules()
 	struct sr_module* t, *foo;
 
 	_sr_destroy_modules_phase = 1;
+	if(_ksr_shutdown_phase!=NULL) {
+		*_ksr_shutdown_phase = 1;
+	}
+
+	LM_DBG("starting modules destroy phase\n");
+
 	/* call first destroy function from each module */
 	t=modules;
 	while(t) {

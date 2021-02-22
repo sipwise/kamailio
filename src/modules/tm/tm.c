@@ -222,6 +222,10 @@ str on_sl_reply_name = {NULL, 0};
 int tm_remap_503_500 = 1;
 str _tm_event_callback_lres_sent = {NULL, 0};
 
+/* control if reply should be relayed
+ * when transaction reply status is RPS_PUSHED_AFTER_COMPLETION */
+int tm_reply_relay_mode = 1;
+
 unsigned long tm_exec_time_check = 0; /* microseconds */
 int tm_exec_time_check_param = 5000; /* milliseconds */
 
@@ -480,6 +484,7 @@ static param_export_t params[]={
 	{"rich_redirect" ,      PARAM_INT, &tm_rich_redirect                     },
 	{"event_callback_lres_sent", PARAM_STR, &_tm_event_callback_lres_sent    },
 	{"exec_time_check" ,    PARAM_INT, &tm_exec_time_check_param             },
+	{"reply_relay_mode",    PARAM_INT, &tm_reply_relay_mode                  },
 	{0,0,0}
 };
 
@@ -720,6 +725,11 @@ static int mod_init(void)
 	if (sr_dst_max_branches+1>31) {
 		LM_CRIT("Too many max UACs for UAC branch_bm_t bitmap: %d\n",
 				sr_dst_max_branches );
+		return -1;
+	}
+
+	if(tm_rpc_response_list_init()<0) {
+		LM_ERR("failed to init rpc\n");
 		return -1;
 	}
 
@@ -2767,6 +2777,13 @@ static const char* rpc_t_uac_wait_doc[2] = {
 	0
 };
 
+static const char* rpc_t_uac_wait_block_doc[2] = {
+	"starts a tm uac and waits for the final reply in blocking mode, using a"
+		" list of string parameters: method, ruri, dst_uri send_sock, headers"
+		" (CRLF separated) and body (optional)",
+	0
+};
+
 static const char* tm_rpc_list_doc[2] = {
 	"List transactions.",
 	0
@@ -2787,6 +2804,7 @@ static rpc_export_t tm_rpc[] = {
 	{"tm.hash_stats",  tm_rpc_hash_stats, tm_rpc_hash_stats_doc, 0},
 	{"tm.t_uac_start", rpc_t_uac_start, rpc_t_uac_start_doc, 0 },
 	{"tm.t_uac_wait",  rpc_t_uac_wait,  rpc_t_uac_wait_doc, RET_ARRAY},
+	{"tm.t_uac_wait_block",  rpc_t_uac_wait_block,  rpc_t_uac_wait_block_doc, 0},
 	{"tm.list",  tm_rpc_list,  tm_rpc_list_doc, RET_ARRAY},
 	{"tm.clean", tm_rpc_clean,  tm_rpc_clean_doc, 0},
 	{0, 0, 0, 0}

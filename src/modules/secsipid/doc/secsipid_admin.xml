@@ -16,11 +16,13 @@
 	<section>
 	<title>Overview</title>
 	<para>
-		The module implements secure SIP identity specifications - STIR and SHAKEN
-		IETF extensions for SIP (RFC8224, RFC 8588).
+		The module implements secure SIP identity specifications - STIR
+		(Secure Telephony Identity Revisited) and SHAKEN
+		(Signature-based Handling of Asserted information using toKENs)
+		IETF extensions for SIP (RFC8224, RFC8588).
 	</para>
 	<para>
-		It exports the functions to check and generate Identity header.
+		It exports the functions to check and generate SIP Identity header.
 	</para>
 	</section>
 	<section>
@@ -110,7 +112,7 @@ modparam("secsipid", "timeout", 2)
 			the function is downloading the key using the URL from "info"
 			parameter of the Identity header, using the value od "timeout"
 			parameter to limit the download time. The validity of the JWT
-			body in the Identity header is also checjed against the "expire"
+			body in the Identity header is also checked against the "expire"
 			parameter.
 		</para>
 		<para>
@@ -164,7 +166,7 @@ request_route {
 request_route {
     ...
     secsipid_add_identity("$fU", "$rU", "A", "",
-        "http://kamailio.org/stir/$rd/cert.pem", "/secsipid/$rd/key.pem");
+        "https://kamailio.org/stir/$rd/cert.pem", "/secsipid/$rd/key.pem");
     ...
 }
 ...

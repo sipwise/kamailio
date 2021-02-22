@@ -39,7 +39,11 @@
 	#include "select.h"
 	#include "cfg.tab.h"
 	#include "sr_compat.h"
+	#include "daemonize.h"
 	#include "ppcfg.h"
+
+	static void ksr_yy_fatal_error(const char* msg);
+	#define YY_FATAL_ERROR(msg) ksr_yy_fatal_error(msg);
 
 	/* states */
 	#define INITIAL_S		0
@@ -1271,7 +1275,7 @@ IMPORTFILE      "import_file"
 									LM_CRIT(
 										"error at %s line %d: '-' not allowed\n",
 										(finame)?finame:"cfg", line);
-									exit(-1);
+									ksr_exit(-1);
 								}
 <DEFINE_ID>{ID}                 {	count();
 									if (pp_define(yyleng, yytext)) return 1;
@@ -1304,7 +1308,7 @@ IMPORTFILE      "import_file"
 									LM_CRIT(
 										"error at %s line %d: '-' not allowed\n",
 										(finame)?finame:"cfg", line);
-									exit(-1);
+									ksr_exit(-1);
 								}
 <IFDEF_ID>{ID}                { count();
 								pp_ifdef_var(yyleng, yytext);
@@ -1351,7 +1355,7 @@ IMPORTFILE      "import_file"
 				if(sr_push_yy_state(s_buf.s, 0)<0)
 				{
 					LOG(L_CRIT, "error at %s line %d\n", (finame)?finame:"cfg", line);
-					exit(-1);
+					ksr_exit(-1);
 				}
 				memset(&s_buf, 0, sizeof(s_buf));
 				BEGIN(INITIAL);
@@ -1365,7 +1369,7 @@ IMPORTFILE      "import_file"
 				if(sr_push_yy_state(s_buf.s, 1)<0)
 				{
 					LM_CRIT("error at %s line %d\n", (finame)?finame:"cfg", line);
-					exit(-1);
+					ksr_exit(-1);
 				}
 				memset(&s_buf, 0, sizeof(s_buf));
 				BEGIN(INITIAL);
@@ -1459,7 +1463,7 @@ static char* addstr(struct str_buf* dst_b, char* src, int len)
 	return dst_b->s;
 error:
 	PKG_MEM_CRITICAL;
-	exit(-1);
+	ksr_exit(-1);
 }
 
 
@@ -1970,3 +1974,12 @@ static void pp_endif()
 	pp_update_state();
 }
 
+static void ksr_yy_fatal_error(const char* msg)
+{
+	if(ksr_atexit_mode==1) {
+		yy_fatal_error(msg);
+	}
+
+	fprintf( stderr, "%s\n", msg );
+	_exit( YY_EXIT_FAILURE );
+}

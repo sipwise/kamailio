@@ -40,6 +40,8 @@
 
 #include "ul_keepalive.h"
 
+extern int ul_keepalive_timeout;
+
 static int ul_ka_send(str *kamsg, dest_info_t *kadst);
 
 /**
@@ -102,11 +104,13 @@ int ul_ka_urecord(urecord_t *ur)
 	int aortype = 0;
 	int i;
 	struct timeval tv;
+	time_t tnow = 0;
 
 	if (ul_ka_mode == ULKA_NONE) {
 		return 0;
 	}
 	LM_DBG("keepalive for aor: %.*s\n", ur->aor.len, ur->aor.s);
+	tnow = time(NULL);
 
 	for(i=0; i<ur->aor.len; i++) {
 		if(ur->aor.s[i] == '@') {
@@ -129,6 +133,20 @@ int ul_ka_urecord(urecord_t *ur)
 			}
 			if ((uc->cflags & ul_nat_bflag) != ul_nat_bflag) {
 				continue;
+			}
+		}
+
+		if(ul_keepalive_timeout>0 && uc->last_keepalive>0) {
+			if(uc->last_keepalive+ul_keepalive_timeout < tnow) {
+				/* set contact as expired in 10s */
+				LM_DBG("set expired contact on keepalive (%u + %u < %u)"
+						" - aor: %.*s c: %.*s\n", (unsigned int)uc->last_keepalive,
+						(unsigned int)ul_keepalive_timeout, (unsigned int)tnow,
+						ur->aor.len, ur->aor.s, uc->c.len, uc->c.s);
+				if(uc->expires > tnow + 10) {
+					uc->expires = tnow + 10;
+					continue;
+				}
 			}
 		}
 		if(uc->received.len > 0) {
@@ -235,6 +253,11 @@ static int ul_ka_send(str *kamsg, dest_info_t *kadst)
 	}
 
 #ifdef USE_TCP
+	else if(kadst->proto == PROTO_WS || kadst->proto == PROTO_WSS) {
+		/*ws-wss*/
+		kadst->id=0;
+		return wss_send(kadst, kamsg->s, kamsg->len);
+	}
 	else if(kadst->proto == PROTO_TCP) {
 		/*tcp*/
 		kadst->id=0;
