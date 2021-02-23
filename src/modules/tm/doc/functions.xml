@@ -302,14 +302,23 @@ branch_route[1] {
 	    is the only way a script can add a new transaction in an atomic
 	    way. Typically, it is used to deploy a UAS.
 	</para>
+	<para>
+		Note: once the t_newtran() is executed, the new message flag operations
+		(i.e., setflag() and resetflag()) are not syncronized to the transaction,
+		being stored only in the private memory SIP message structure. Use the
+		tmx module function t_flush_flags() to synchronize the modified message
+		flags to the already created transaction.
+	</para>
 	<example>
 	    <title><function>t_newtran</function> usage</title>
 	    <programlisting>
 ...
-if (t_newtran()) { 
-    log("UAS logic"); 
-    t_reply("999","hello"); 
-} else sl_reply_error();
+if (t_newtran()) {
+    xlog("the transaction has been created\n");
+    t_reply("999","hello");
+} else {
+    sl_reply_error();
+}
 ...
 	    </programlisting>
 	</example>
@@ -659,7 +668,7 @@ route {
 	    <function>t_reset_max_lifetime()</function>
 	</title>
 	<para>
-		Resets the the maximum lifetime for the current INVITE or non-INVITE 
+		Resets the maximum lifetime for the current INVITE or non-INVITE 
 		transaction to the default value (set using the tm module parameter
 		<varname>max_inv_lifetime</varname> or 
 		<varname>max_noninv_lifetime</varname>).

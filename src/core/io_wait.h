@@ -112,12 +112,12 @@ typedef int fd_type;
 
 /* maps a fd to some other structure; used in almost all cases
  * except epoll and maybe kqueue or /dev/poll */
-struct fd_map{
+typedef struct fd_map {
 	int fd;               /* fd no */
 	fd_type type;         /* "data" type */
 	void* data;           /* pointer to the corresponding structure */
 	short events;         /* events we are interested int */
-};
+} fd_map_t;
 
 
 #ifdef HAVE_KQUEUE
@@ -135,7 +135,7 @@ struct fd_map{
 
 
 /* handler structure */
-struct io_wait_handler{
+typedef struct io_wait_handler {
 	enum poll_types poll_method;
 	int flags;
 	struct fd_map* fd_hash;
@@ -175,13 +175,12 @@ struct io_wait_handler{
 	fd_set master_wset; /* write set */
 	int max_fd_select; /* maximum select used fd */
 #endif
-};
-
-typedef struct io_wait_handler io_wait_h;
+} io_wait_h;
 
 
 /* get the corresponding fd_map structure pointer */
 #define get_fd_map(h, fd)		(&(h)->fd_hash[(fd)])
+
 /* remove a fd_map structure from the hash; the pointer must be returned
  * by get_fd_map or hash_fd_map*/
 #define unhash_fd_map(pfm)	\
@@ -324,7 +323,7 @@ inline static int io_watch_add(	io_wait_h* h,
 		h->fd_array[h->fd_no].events=(ev); /* useless for select */ \
 		h->fd_array[h->fd_no].revents=0;     /* useless for select */ \
 	}while(0)
-	
+
 #define set_fd_flags(f) \
 	do{ \
 			flags=fcntl(fd, F_GETFL); \
@@ -339,8 +338,7 @@ inline static int io_watch_add(	io_wait_h* h,
 				goto error; \
 			} \
 	}while(0)
-	
-	
+
 	struct fd_map* e;
 	int flags;
 #ifdef HAVE_EPOLL
@@ -356,7 +354,7 @@ inline static int io_watch_add(	io_wait_h* h,
 	int idx;
 	int check_io;
 	struct pollfd pf;
-	
+
 	check_io=0; /* set to 1 if we need to check for pre-existing queued
 				   io/data on the fd */
 	idx=-1;
@@ -381,13 +379,13 @@ inline static int io_watch_add(	io_wait_h* h,
 	/*  hash sanity check */
 	e=get_fd_map(h, fd);
 	if (unlikely(e && (e->type!=0 /*F_NONE*/))){
-		LM_ERR("trying to overwrite entry %d"
-			" watched for %x in the hash(%d, %d, %p) with (%d, %d, %p)\n",
-			fd, events, e->fd, e->type, e->data, fd, type, data);
+		LM_ERR("trying to overwrite entry %d watched for %x"
+			" in the hash %p (fd:%d, type:%d, data:%p) with (%d, %d, %p)\n",
+			fd, events, h, e->fd, e->type, e->data, fd, type, data);
 		e=0;
 		goto error;
 	}
-	
+
 	if (unlikely((e=hash_fd_map(h, fd, events, type, data))==0)){
 		LM_ERR("failed to hash the fd %d\n", fd);
 		goto error;
@@ -420,13 +418,13 @@ inline static int io_watch_add(	io_wait_h* h,
 			 */
 			/* set async & signal */
 			if (fcntl(fd, F_SETOWN, my_pid())==-1){
-				LM_ERR("fnctl: SETOWN failed: %s [%d]\n",
-					strerror(errno), errno);
+				LM_ERR("fnctl: SETOWN on fd %d failed: %s [%d]\n",
+					fd, strerror(errno), errno);
 				goto error;
 			}
 			if (fcntl(fd, F_SETSIG, h->signo)==-1){
-				LM_ERR("fnctl: SETSIG failed: %s [%d]\n",
-					strerror(errno), errno);
+				LM_ERR("fnctl: SETSIG on fd %d failed: %s [%d]\n",
+					fd, strerror(errno), errno);
 				goto error;
 			}
 			/* set both non-blocking and async */
@@ -460,7 +458,8 @@ again1:
 			n=epoll_ctl(h->epfd, EPOLL_CTL_ADD, fd, &ep_event);
 			if (unlikely(n==-1)){
 				if (errno==EAGAIN) goto again1;
-				LM_ERR("epoll_ctl failed: %s [%d]\n", strerror(errno), errno);
+				LM_ERR("epoll_ctl on fd %d failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 				goto error;
 			}
 			break;
@@ -480,7 +479,8 @@ again2:
 			n=epoll_ctl(h->epfd, EPOLL_CTL_ADD, fd, &ep_event);
 			if (unlikely(n==-1)){
 				if (errno==EAGAIN) goto again2;
-				LM_ERR("epoll_ctl failed: %s [%d]\n", strerror(errno), errno);
+				LM_ERR("epoll_ctl on fd %d failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 				goto error;
 			}
 			break;
@@ -510,8 +510,8 @@ again2:
 again_devpoll:
 			if (write(h->dpoll_fd, &pfd, sizeof(pfd))==-1){
 				if (errno==EAGAIN) goto again_devpoll;
-				LM_ERR("/dev/poll write failed: %s [%d]\n",
-					strerror(errno), errno);
+				LM_ERR("/dev/poll write of fd %d failed: %s [%d]\n",
+					fd, strerror(errno), errno);
 				goto error;
 			}
 			break;
@@ -537,7 +537,8 @@ check_io_again:
 				(pf.revents & (e->events|POLLERR|POLLHUP)));
 		if (unlikely(e->type && (n==-1))){
 			if (errno==EINTR) goto check_io_again;
-			LM_ERR("check_io poll: %s [%d]\n", strerror(errno), errno);
+			LM_ERR("check_io poll on fd %d failed: %s [%d]\n",
+					fd, strerror(errno), errno);
 		}
 	}
 #endif
@@ -642,13 +643,13 @@ inline static int io_watch_del(io_wait_h* h, int fd, int idx, int flags)
 				/* reset ASYNC */
 				fd_flags=fcntl(fd, F_GETFL);
 				if (unlikely(fd_flags==-1)){
-					LM_ERR("fnctl: GETFL failed: %s [%d]\n",
-						strerror(errno), errno);
+					LM_ERR("fnctl: GETFL on fd %d failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 					goto error;
 				}
 				if (unlikely(fcntl(fd, F_SETFL, fd_flags&(~O_ASYNC))==-1)){
-					LM_ERR("fnctl: SETFL failed: %s [%d]\n",
-						strerror(errno), errno);
+					LM_ERR("fnctl: SETFL on fd %d failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 					goto error;
 				}
 			fix_fd_array; /* only on success */
@@ -669,8 +670,15 @@ again_epoll:
 				n=epoll_ctl(h->epfd, EPOLL_CTL_DEL, fd, &ep_event);
 				if (unlikely(n==-1)){
 					if (errno==EAGAIN) goto again_epoll;
-					LM_ERR("removing fd from epoll list failed: %s [%d]\n",
-						strerror(errno), errno);
+					LM_ERR("removing fd %d from epoll list failed: %s [%d]\n",
+						fd, strerror(errno), errno);
+					if (unlikely(errno==EBADF)) {
+						LM_ERR("unhashing of invalid fd - %d (epfd %d)\n", fd,
+								h->epfd);
+						unhash_fd_map(e);
+						h->fd_no--;
+					}
+
 					goto error;
 				}
 #ifdef EPOLL_NO_CLOSE_BUG
@@ -709,8 +717,8 @@ again_epoll:
 again_devpoll:
 				if (write(h->dpoll_fd, &pfd, sizeof(pfd))==-1){
 					if (errno==EINTR) goto again_devpoll;
-					LM_ERR("removing fd from /dev/poll failed: %s [%d]\n",
-						strerror(errno), errno);
+					LM_ERR("removing fd %d from /dev/poll failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 					goto error;
 				}
 				break;
@@ -836,8 +844,8 @@ again_epoll_lt:
 				n=epoll_ctl(h->epfd, EPOLL_CTL_MOD, fd, &ep_event);
 				if (unlikely(n==-1)){
 					if (errno==EAGAIN) goto again_epoll_lt;
-					LM_ERR("modifying epoll events failed: %s [%d]\n",
-						strerror(errno), errno);
+					LM_ERR("modifying epoll events of fd %d failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 					goto error;
 				}
 			break;
@@ -856,8 +864,8 @@ again_epoll_et:
 				n=epoll_ctl(h->epfd, EPOLL_CTL_MOD, fd, &ep_event);
 				if (unlikely(n==-1)){
 					if (errno==EAGAIN) goto again_epoll_et;
-					LM_ERR("modifying epoll events failed: %s [%d]\n",
-						strerror(errno), errno);
+					LM_ERR("modifying epoll events of fd %d failed: %s [%d]\n",
+						fd, strerror(errno), errno);
 					goto error;
 				}
 			break;
@@ -892,8 +900,8 @@ again_epoll_et:
 again_devpoll1:
 				if (unlikely(write(h->dpoll_fd, &pfd, sizeof(pfd))==-1)){
 					if (errno==EINTR) goto again_devpoll1;
-					LM_ERR("removing fd from /dev/poll failed: %s [%d]\n",
-								strerror(errno), errno);
+					LM_ERR("removing fd %d from /dev/poll failed: %s [%d]\n",
+								fd, strerror(errno), errno);
 					goto error;
 				}
 again_devpoll2:
@@ -901,8 +909,8 @@ again_devpoll2:
 				pfd.revents=0;
 				if (unlikely(write(h->dpoll_fd, &pfd, sizeof(pfd))==-1)){
 					if (errno==EINTR) goto again_devpoll2;
-					LM_ERR("re-adding fd to /dev/poll failed: %s [%d]\n",
-								strerror(errno), errno);
+					LM_ERR("re-adding fd %d to /dev/poll failed: %s [%d]\n",
+								fd, strerror(errno), errno);
 					/* error re-adding the fd => mark it as removed/unhash */
 					unhash_fd_map(e);
 					goto error;

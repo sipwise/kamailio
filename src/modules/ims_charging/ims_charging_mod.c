@@ -25,8 +25,9 @@
 
 MODULE_VERSION
 
+struct dlg_binds* dlgb_p;
+
 /* parameters */
-char* ro_destination_host_s = "hss.ims.smilecoms.com";
 char* ro_service_context_id_root_s = "32260@3gpp.org";
 char* ro_service_context_id_ext_s = "ext";
 char* ro_service_context_id_mnc_s = "01";
@@ -46,6 +47,8 @@ int video_service_identifier = 1001;
 int video_rating_group = 200;
 
 
+struct impu_data impu_data_t;
+
 /* DB params */
 static str db_url = str_init(DEFAULT_DB_URL);
 static unsigned int db_update_period = DB_DEFAULT_UPDATE_PERIOD;
@@ -56,6 +59,7 @@ int ro_db_mode = DB_MODE_NONE;
 char *domain = "location";
 
 client_ro_cfg cfg = { str_init(""),
+    str_init(""),
     str_init(""),
     str_init(""),
     0
@@ -72,7 +76,7 @@ struct tm_binds tmb;
 
 /* Only used if we want to force the Ro peer usually this is configured at a stack level and the first request uses realm routing */
 //char* rx_forced_peer_s = "";
-str ro_forced_peer;
+str ro_forced_peer = str_init("");
 int ro_auth_expiry = 7200;
 int cdp_event_latency = 1; /*flag: report slow processing of CDP callback events or not - default enabled */
 int cdp_event_threshold = 500; /*time in ms above which we should report slow processing of CDP callback event - default 500ms*/
@@ -118,7 +122,7 @@ static param_export_t params[] = {
 		{ "origin_host", 			PARAM_STR, 			&cfg.origin_host 			},
 		{ "origin_realm", 			PARAM_STR,			&cfg.origin_realm 			},
 		{ "destination_realm", 		PARAM_STR,			&cfg.destination_realm 	},
-		{ "destination_host", 		PARAM_STRING,			&ro_destination_host_s 		}, /* Unused parameter? */
+		{ "destination_host", 		PARAM_STR,			&cfg.destination_host 		},
 		{ "service_context_id_root",PARAM_STRING,			&ro_service_context_id_root_s 	},
 		{ "service_context_id_ext", PARAM_STRING,			&ro_service_context_id_ext_s 	},
 		{ "service_context_id_mnc", PARAM_STRING,			&ro_service_context_id_mnc_s 	},
@@ -129,7 +133,7 @@ static param_export_t params[] = {
 		{ "video_service_identifier", 	INT_PARAM, 			&video_service_identifier },/*service id for voice*/
 		{ "video_rating_group", 	INT_PARAM, 			&video_rating_group },/*rating group for voice*/
 		{ "db_mode",			INT_PARAM,			&ro_db_mode_param		},
-		{ "db_url",			PARAM_STRING,			&db_url 			},
+		{ "db_url",			PARAM_STR,			&db_url 			},
 		{ "db_update_period",		INT_PARAM,			&db_update_period		},
 		{ "vendor_specific_chargeinfo",		INT_PARAM,	&vendor_specific_chargeinfo		}, /* VSI for extra charing info in Ro */
 		{ "vendor_specific_id",		INT_PARAM,			&vendor_specific_id		}, /* VSI for extra charing info in Ro */
@@ -498,7 +502,7 @@ static int w_ro_ccr(struct sip_msg *msg, char* c_route_name, char* c_direction, 
 	
 
 	if (msg->first_line.type != SIP_REQUEST) {
-	    LM_ERR("Ro_CCR() called from SIP reply.");
+	    LM_ERR("Ro_CCR() called from SIP reply.\n");
 	    return RO_RETURN_ERROR;;
 	}
 	
@@ -515,12 +519,12 @@ static int w_ro_ccr(struct sip_msg *msg, char* c_route_name, char* c_direction, 
 	if (dir == RO_ORIG_DIRECTION) {
 		//get caller IMPU from asserted identity
 		if ((identity = cscf_get_asserted_identity(msg, 0)).len == 0) {
-			LM_DBG("No P-Asserted-Identity hdr found. Using From hdr for asserted_identity");
+			LM_DBG("No P-Asserted-Identity hdr found. Using From hdr for asserted_identity\n");
 			identity = dlg->from_uri;
 		}
 		//get caller contact from contact header - if not present then skip this
 		if ((contact = cscf_get_contact(msg)).len == 0) {
-		    LM_WARN("Can not get contact from message - will not get callbacks if this IMPU is removed to terminate call");
+		    LM_WARN("Can not get contact from message - will not get callbacks if this IMPU is removed to terminate call\n");
 			goto send_ccr;
 		}
 		
@@ -528,7 +532,7 @@ static int w_ro_ccr(struct sip_msg *msg, char* c_route_name, char* c_direction, 
 	} else if (dir == RO_TERM_DIRECTION){
 		//get callee IMPU from called part id - if not present then skip this
 		if ((identity = cscf_get_public_identity_from_called_party_id(msg, &h)).len == 0) {
-			LM_DBG("No P-Called-Identity hdr found - will not get callbacks if this IMPU is removed to terminate call");
+			LM_DBG("No P-Called-Identity hdr found - will not get callbacks if this IMPU is removed to terminate call\n");
 			goto send_ccr;
 		}
 		//get callee contact from request URI

@@ -221,6 +221,27 @@ modparam("dispatcher", "priority_col", "dstpriority")
 		</example>
 	</section>
 
+	<section id="dispatcher.p.attrs_col">
+		<title><varname>attrs_col</varname> (string)</title>
+		<para>
+			The column's name in the database storing the attributes for
+			destination URI.
+		</para>
+		<para>
+		<emphasis>
+			Default value is <quote>attrs</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <quote>attrs_col</quote> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dispatcher", "attrs_col", "dstattrs")
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="dispatcher.p.force_dst">
 		<title><varname>force_dst</varname> (int)</title>
 		<para>
@@ -644,8 +665,8 @@ modparam("dispatcher", "force_dst", 1)
 			but you can skip some servers with flag 4 in destination list file, for example.</para>
 		</listitem>
 		<listitem>
-			<para>Value 2: if set to 2, only gateways in inactive state with
-			probing mode set are tested.</para>
+			<para>Value 2: if set to 2, only gateways in INACTIVE state with
+			PROBING mode set are tested.</para>
 		</listitem>
 		<listitem>
 			<para>Value 3: If set to 3, any gateway with state PROBING is continually probed
@@ -1076,8 +1097,9 @@ modparam("dispatcher", "ds_db_extra_attrs", "socket=socket;pref=prefix")
 			<listitem>
 				<para>
 				<quote>9</quote> - use weight based load distribution. You
-				have to set the attribute 'weight' per each address in
-				destination set.
+				have to set the attribute 'weight' for each address (gateway) in
+				destination set. For more see the description of the 'weight'
+				attribute in the 'Special Attributes' section.
 				</para>
 			</listitem>
 			<listitem>

@@ -2,6 +2,6 @@
  * DO NOT EDIT IT
  */
 
-#define REPO_VER "62d35f"
-#define REPO_HASH "62d35f"
+#define REPO_VER "5a7f5b"
+#define REPO_HASH "5a7f5b"
 #define REPO_STATE ""

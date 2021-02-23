@@ -136,21 +136,21 @@ extern char* yy_number_str;
 
 static void yyerror(char* s, ...);
 static void yyerror_at(struct cfg_pos* pos, char* s, ...);
-static char* tmp;
-static int i_tmp;
-static struct socket_id* lst_tmp;
-static struct name_lst*  nl_tmp;
-static int rt;  /* Type of route block for find_export */
-static str* str_tmp;
-static str s_tmp;
-static struct ip_addr* ip_tmp;
-static struct avp_spec* s_attr;
+static char* tmp = NULL;
+static int i_tmp = 0;
+static struct socket_id* lst_tmp = NULL;
+static struct name_lst* nl_tmp = NULL;
+static int rt = 0;  /* Type of route block for find_export */
+static str* str_tmp = NULL;
+static str s_tmp = STR_NULL;
+static struct ip_addr* ip_tmp = NULL;
+static struct avp_spec* s_attr = NULL;
 static select_t sel;
-static select_t* sel_ptr;
-static pv_spec_t* pv_spec;
-static struct action *mod_func_action;
-static struct lvalue* lval_tmp;
-static struct rvalue* rval_tmp;
+static select_t* sel_ptr = NULL;
+static pv_spec_t* pv_spec = NULL;
+static struct action *mod_func_action = NULL;
+static struct lvalue* lval_tmp = NULL;
+static struct rvalue* rval_tmp = NULL;
 
 static void warn(char* s, ...);
 static void warn_at(struct cfg_pos* pos, char* s, ...);
@@ -167,7 +167,7 @@ static struct socket_id* mk_listen_id2(struct name_lst*, int, int);
 static void free_name_lst(struct name_lst* lst);
 static void free_socket_id_lst(struct socket_id* i);
 
-static struct case_stms* mk_case_stm(struct rval_expr* ct, int is_re, 
+static struct case_stms* mk_case_stm(struct rval_expr* ct, int is_re,
 									struct action* a, int* err);
 static int case_check_type(struct case_stms* stms);
 static int case_check_default(struct case_stms* stms);
@@ -2641,7 +2641,7 @@ attr_mark:
 	ATTR_MARK {
 		s_attr = (struct avp_spec*)pkg_malloc(sizeof(struct avp_spec));
 		if (!s_attr) { yyerror("No memory left"); YYABORT; }
-		else s_attr->type = 0;
+		else { memset(s_attr, 0, (sizeof(struct avp_spec))); }
 	}
 	;
 attr_id:
@@ -2861,7 +2861,7 @@ rval_expr: rval						{ $$=$1;
 		| rval_expr rve_cmpop rval_expr %prec GT { $$=mk_rve2( $2, $1, $3);}
 		| rval_expr rve_equalop rval_expr %prec EQUAL_T {
 			/* comparing with $null => treat as defined or !defined */
-			if($3->op==RVE_RVAL_OP && $3->left.rval.type==RV_PVAR
+			if($3 != NULL && $3->op==RVE_RVAL_OP && $3->left.rval.type==RV_PVAR
 					&& $3->left.rval.v.pvs.type==PVT_NULL) {
 				if($2==RVE_DIFF_OP || $2==RVE_IDIFF_OP
 						|| $2==RVE_STRDIFF_OP) {
@@ -3358,8 +3358,14 @@ cmd:
 	}
 	| CFG_RESET error { $$=0; yyerror("missing '(' or ')' ?"); }
 	| CFG_RESET LPAREN error RPAREN { $$=0; yyerror("bad arguments, string expected"); }
-	| ID {mod_func_action = mk_action(MODULE0_T, 2, MODEXP_ST, NULL, NUMBER_ST,
-			0); } LPAREN func_params RPAREN	{
+	| ID {
+		if (mod_func_action != NULL) {
+			LM_ERR("function used inside params of another function: %s\n", $1);
+			yyerror("use of function execution inside params not allowed\n");
+			exit(-1);
+		}
+		mod_func_action = mk_action(MODULE0_T, 2, MODEXP_ST, NULL, NUMBER_ST, 0);
+		} LPAREN func_params RPAREN	{
 		mod_func_action->val[0].u.data =
 			find_export_record($1, mod_func_action->val[1].u.number, rt);
 		if (mod_func_action->val[0].u.data == 0) {
@@ -3383,6 +3389,7 @@ cmd:
 		}
 		$$ = mod_func_action;
 		set_cfg_pos($$);
+		mod_func_action = NULL;
 	}
 	| ID error					{ yyerror("'('')' expected (function call)");}
 	;
@@ -3673,6 +3680,7 @@ static struct name_lst* mk_name_lst(char* host, int flags)
 	if (l==0) {
 		LM_CRIT("cfg. parser: out of memory.\n");
 	} else {
+		memset(l, 0, sizeof(struct name_lst));
 		l->name=host;
 		l->flags=flags;
 		l->next=0;
@@ -3689,6 +3697,7 @@ static struct socket_id* mk_listen_id(char* host, int proto, int port)
 	if (l==0) {
 		LM_CRIT("cfg. parser: out of memory.\n");
 	} else {
+		memset(l, 0, sizeof(struct socket_id));
 		l->addr_lst=mk_name_lst(host, 0);
 		if (l->addr_lst==0){
 			pkg_free(l);
@@ -3724,6 +3733,7 @@ static struct socket_id* mk_listen_id2(struct name_lst* addr_l, int proto,
 	if (l==0) {
 		LM_CRIT("cfg. parser: out of memory.\n");
 	} else {
+		memset(l, 0, sizeof(struct socket_id));
 		l->flags=addr_l->flags;
 		l->port=port;
 		l->proto=proto;

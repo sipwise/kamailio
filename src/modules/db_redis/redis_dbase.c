@@ -795,6 +795,7 @@ static int db_redis_compare_column(db_key_t k, db_val_t *v, db_op_t op, redisRep
     double d_value;
     str *tmpstr;
     char tmp[32] = "";
+    struct tm _time;
 
     int vtype = VAL_TYPE(v);
 
@@ -926,7 +927,8 @@ static int db_redis_compare_column(db_key_t k, db_val_t *v, db_op_t op, redisRep
             return -1;
         case DB1_DATETIME:
             // TODO: insert int value to db for faster comparison!
-            strftime(tmp, sizeof(tmp), "%Y-%m-%d %H:%M:%S", localtime(&(VAL_TIME(v))));
+            localtime_r(&(VAL_TIME(v)), &_time);
+            strftime(tmp, sizeof(tmp), "%Y-%m-%d %H:%M:%S", &_time);
             LM_DBG("comparing DATETIME %s %s %s\n", reply->str, op, tmp);
             if (!strcmp(op, OP_EQ)) {
                 return (strcmp(reply->str, tmp) == 0) ? 0 : -1;
@@ -1095,11 +1097,15 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
     RES_COL_N(*_r) = _nc;
 
     if (!(*keys_count) && do_table_scan) {
-        LM_WARN("performing full table scan on table '%.*s' while performing query\n",
+        if(_n > 0) {
+            LM_WARN("performing full table scan on table '%.*s' while doing the query\n",
                 CON_TABLE(_h)->len, CON_TABLE(_h)->s);
-        for(i = 0; i < _n; ++i) {
-            LM_WARN("  scan key %d is '%.*s'\n",
-                    i, _k[i]->len, _k[i]->s);
+            for(i = 0; i < _n; ++i) {
+                LM_WARN("  scan key %d is '%.*s'\n",
+                        i, _k[i]->len, _k[i]->s);
+            }
+        } else {
+            LM_DBG("loading full table: '%.*s\n", CON_TABLE(_h)->len, CON_TABLE(_h)->s);
         }
         if (db_redis_scan_query_keys(con, CON_TABLE(_h), _k, _n,
                     keys, keys_count,
@@ -2053,6 +2059,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
     } else {
         LM_DBG("no columns given to build query keys, falling back to full table scan\n");
         keys_count = 0;
+        do_table_scan = 1;
     }
 
     if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,

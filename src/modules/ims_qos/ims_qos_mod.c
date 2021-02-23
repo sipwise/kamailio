@@ -75,7 +75,11 @@
 
 MODULE_VERSION
 
-		extern gen_lock_t* process_lock; /* lock on the process table */
+extern gen_lock_t* process_lock; /* lock on the process table */
+
+stat_var* stat_aar_timeouts;
+stat_var* aar_replies_received;
+stat_var* aar_replies_response_time;
 
 str orig_session_key = str_init("originating");
 str term_session_key = str_init("terminating");
@@ -1084,6 +1088,13 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* dir, char *c_id, int
 				}
 				saved_t_data->aar_update = 1; //this is an update aar - we set this so on async_aar we know this is an update and act accordingly
 		}
+
+                dlg = dlgb.get_dlg(msg);
+                if (!dlg) {
+                    LM_ERR("Unable to find dialog and cannot do Rx without it\n");
+                    goto error;
+                }
+                saved_t_data->dlg = dlg;
 
 		LM_DBG("Suspending SIP TM transaction\n");
 		if (tmb.t_suspend(msg, &saved_t_data->tindex, &saved_t_data->tlabel) != 0) {

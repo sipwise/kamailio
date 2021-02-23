@@ -1701,10 +1701,10 @@ void release_tcpconn(struct tcp_connection* c, long state, int unix_sock)
 static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
 {
 	struct tcp_connection *c;
-	
-	c=(struct tcp_connection*)data; 
+
+	c=(struct tcp_connection*)data;
 	/* or (struct tcp...*)(tl-offset(c->timer)) */
-	
+
 	if (likely(!(c->state<0) && TICKS_LT(t, c->timeout))){
 		/* timeout extended, exit */
 		return (ticks_t)(c->timeout - t);
@@ -1718,9 +1718,10 @@ static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
 					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port,
 					ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
 	}
-	tcpconn_listrm(tcp_conn_lst, c, c_next, c_prev);
-	release_tcpconn(c, (c->state<0)?CONN_ERROR:CONN_RELEASE, tcpmain_sock);
-	
+	if(tcp_conn_lst!=NULL) {
+		tcpconn_listrm(tcp_conn_lst, c, c_next, c_prev);
+		release_tcpconn(c, (c->state<0)?CONN_ERROR:CONN_RELEASE, tcpmain_sock);
+	}
 	return 0;
 }
 
@@ -1732,7 +1733,7 @@ static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
  *          idx - index in the fd_array (or -1 if not known)
  * return: -1 on error, or when we are not interested any more on reads
  *            from this fd (e.g.: we are closing it )
- *          0 on EAGAIN or when by some other way it is known that no more 
+ *          0 on EAGAIN or when by some other way it is known that no more
  *            io events are queued on the fd (the receive buffer is empty).
  *            Usefull to detect when there are no more io events queued for
  *            sigio_rt, epoll_et, kqueue.
@@ -1740,7 +1741,7 @@ static ticks_t tcpconn_read_timeout(ticks_t t, struct timer_ln* tl, void* data)
  *            queued -- the receive buffer might still be non-empty)
  */
 inline static int handle_io(struct fd_map* fm, short events, int idx)
-{	
+{
 	int ret;
 	int n;
 	int read_flags;
@@ -1748,10 +1749,11 @@ inline static int handle_io(struct fd_map* fm, short events, int idx)
 	int s;
 	long resp;
 	ticks_t t;
-	
+	fd_map_t *ee = NULL;
+
 	/* update the local config */
 	cfg_update();
-	
+
 	switch(fm->type){
 		case F_TCPMAIN:
 again:
@@ -1815,7 +1817,7 @@ repeat_1st_read:
 			if (unlikely(read_flags & RD_CONN_REPEAT_READ))
 				goto repeat_1st_read;
 #endif /* USE_TLS */
-			
+
 			/* must be before io_watch_add, io_watch_add might catch some
 			 * already existing events => might call handle_io and
 			 * handle_io might decide to del. the new connection =>
@@ -1828,15 +1830,29 @@ repeat_1st_read:
 			local_timer_reinit(&con->timer);
 			local_timer_add(&tcp_reader_ltimer, &con->timer,
 								S_TO_TICKS(TCP_CHILD_TIMEOUT), t);
-			if (unlikely(io_watch_add(&io_w, s, POLLIN, F_TCPCONN, con)<0)){
+			if (unlikely(io_watch_add(&io_w, s, POLLIN, F_TCPCONN, con)<0)) {
 				LM_CRIT("io_watch_add failed for %p id %d fd %d, state %d, flags %x,"
 							" main fd %d, refcnt %d ([%s]:%u -> [%s]:%u)\n",
 							con, con->id, con->fd, con->state, con->flags,
 							con->s, atomic_get(&con->refcnt),
 							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
 							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
-				tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
-				local_timer_del(&tcp_reader_ltimer, &con->timer);
+				ee = get_fd_map(&io_w, s);
+				if(ee!=0 && ee->type==F_TCPCONN) {
+					tcp_connection_t *ec;
+					ec = (tcp_connection_t*)ee->data;
+					LM_CRIT("existing tcp con %p id %d fd %d, state %d, flags %x,"
+							" main fd %d, refcnt %d ([%s]:%u -> [%s]:%u)\n",
+							ec, ec->id, ec->fd, ec->state, ec->flags,
+							ec->s, atomic_get(&ec->refcnt),
+							ip_addr2a(&ec->rcv.src_ip), ec->rcv.src_port,
+							ip_addr2a(&ec->rcv.dst_ip), ec->rcv.dst_port);
+
+				}
+				if(tcp_conn_lst!=NULL) {
+					tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
+					local_timer_del(&tcp_reader_ltimer, &con->timer);
+				}
 				goto con_error;
 			}
 			break;
@@ -1845,8 +1861,11 @@ repeat_1st_read:
 			if (unlikely(con->state==S_CONN_BAD)){
 				resp=CONN_ERROR;
 				if (!(con->send_flags.f & SND_F_CON_CLOSE))
-					LM_WARN("F_TCPCONN connection marked as bad: %p id %d refcnt %d\n",
-							con, con->id, atomic_get(&con->refcnt));
+					LM_WARN("F_TCPCONN connection marked as bad: %p id %d fd %d"
+							" refcnt %d ([%s]:%u -> [%s]:%u)\n",
+							con, con->id, con->fd, atomic_get(&con->refcnt),
+							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
+							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
 				goto read_error;
 			}
 			read_flags=((
@@ -1873,11 +1892,20 @@ read_error:
 							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
 							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
 				}
-				tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
-				local_timer_del(&tcp_reader_ltimer, &con->timer);
-				if (unlikely(resp!=CONN_EOF))
-					con->state=S_CONN_BAD;
-				release_tcpconn(con, resp, tcpmain_sock);
+				if(tcp_conn_lst!=NULL) {
+					LM_DBG("removing from list %p id %d fd %d,"
+							" state %d, flags %x, main fd %d, refcnt %d"
+							" ([%s]:%u -> [%s]:%u)\n",
+							con, con->id, con->fd, con->state,
+							con->flags, con->s, atomic_get(&con->refcnt),
+							ip_addr2a(&con->rcv.src_ip), con->rcv.src_port,
+							ip_addr2a(&con->rcv.dst_ip), con->rcv.dst_port);
+					tcpconn_listrm(tcp_conn_lst, con, c_next, c_prev);
+					local_timer_del(&tcp_reader_ltimer, &con->timer);
+					if (unlikely(resp!=CONN_EOF))
+						con->state=S_CONN_BAD;
+					release_tcpconn(con, resp, tcpmain_sock);
+				}
 			}else{
 #ifdef USE_TLS
 				if (unlikely(read_flags & RD_CONN_REPEAT_READ))
@@ -1885,8 +1913,8 @@ read_error:
 #endif /* USE_TLS */
 				/* update timeout */
 				con->timeout=get_ticks_raw()+S_TO_TICKS(TCP_CHILD_TIMEOUT);
-				/* ret= 0 (read the whole socket buffer) if short read & 
-				 *  !POLLPRI,  bytes read otherwise */
+				/* ret= 0 (read the whole socket buffer) if short read
+				 * & !POLLPRI,  bytes read otherwise */
 				ret&=(((read_flags & RD_CONN_SHORT_READ) &&
 						!(events & POLLPRI)) - 1);
 			}
@@ -1900,7 +1928,7 @@ read_error:
 			LM_CRIT("unknown fd type %d\n", fm->type);
 			goto error;
 	}
-	
+
 	return ret;
 con_error:
 	con->state=S_CONN_BAD;

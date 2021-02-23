@@ -294,7 +294,7 @@ enum hash_source source = hs_error;
 
 //unsigned int rr_idx = 0;
 
-struct hep_timeinfo *heptime;
+struct hep_timeinfo *heptime = NULL;
 
 /*! \brief
  * Exported functions
@@ -388,7 +388,7 @@ static param_export_t params[] = {
 	{"raw_moni_capture_on", INT_PARAM, &moni_capture_on},
 	{"db_insert_mode", INT_PARAM, &db_insert_mode},
 	{"raw_interface", PARAM_STR, &raw_interface},
-	{"promiscious_on", INT_PARAM, &promisc_on},
+	{"promiscuous_on", INT_PARAM, &promisc_on},
 	{"raw_moni_bpf_on", INT_PARAM, &bpf_on},
 	{"callid_aleg_header", PARAM_STR, &callid_aleg_header},
 	{"custom_field1_header", PARAM_STR, &custom_field1_header},
@@ -824,7 +824,7 @@ static int mod_init(void)
 	c = capture_modes_root;
 
 	while(c) {
-		/*for the default capture_mode, don't add it's name to the stat name*/
+		/*for the default capture_mode, don't add its name to the stat name*/
 		def = (capture_def && c == capture_def) ? 1 : 0;
 		stat_name = (char *)shm_malloc(
 				sizeof(char)
@@ -2424,7 +2424,7 @@ int raw_capture_rcv_loop(int rsock, int port1, int port2, int ipip)
 			ri.bind_address = si;
 
 
-			/* and now recieve message */
+			/* and now receive message */
 			receive_msg(buf + offset, len, &ri);
 			if(si)
 				pkg_free(si);
@@ -3049,14 +3049,6 @@ static int pv_parse_hep_name(pv_spec_p sp, str *in)
 					else
 						goto error;
 				} break;
-		case 6: {
-					if(!strncmp(in->s, "src_ip", 6))
-						sp->pvp.pvn.u.isname.name.n = 2;
-					else if(!strncmp(in->s, "dst_ip", 6))
-						sp->pvp.pvn.u.isname.name.n = 3;
-					else
-						goto error;
-				} break;
 		case 7: {
 					if(!strncmp(in->s, "version", 7))
 						sp->pvp.pvn.u.isname.name.n = 0;
@@ -3079,27 +3071,12 @@ error:
 
 static int pv_get_hep(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
 {
-	static char sc_buf_ip[IP_ADDR_MAX_STR_SIZE + 12];
-	int sc_buf_ip_len;
-
 	if(param == NULL)
 		return -1;
 
 	switch(param->pvn.u.isname.name.n) {
 		case 0:
 			return pv_get_uintval(msg, param, res, hep_version(msg));
-		case 1:
-			return pv_get_uintval(msg, param, res, hep_version(msg));
-		case 2:
-			sc_buf_ip_len = ip_addr2sbuf(
-					&msg->rcv.src_ip, sc_buf_ip, sizeof(sc_buf_ip) - 1);
-			sc_buf_ip[sc_buf_ip_len] = 0;
-			return pv_get_strlval(msg, param, res, sc_buf_ip, sc_buf_ip_len);
-		case 3:
-			sc_buf_ip_len = ip_addr2sbuf(
-					&msg->rcv.dst_ip, sc_buf_ip, sizeof(sc_buf_ip) - 1);
-			sc_buf_ip[sc_buf_ip_len] = 0;
-			return pv_get_strlval(msg, param, res, sc_buf_ip, sc_buf_ip_len);
 		default:
 			return hepv3_get_chunk(msg, msg->buf, msg->len,
 					param->pvn.u.isname.name.n, param, res);
