@@ -73,8 +73,8 @@
 
 extern int unreg_validity;
 extern int db_mode;
-struct contact_list* contact_list;
-struct ims_subscription_list* ims_subscription_list;
+extern struct contact_list* contact_list;
+extern struct ims_subscription_list* ims_subscription_list;
 extern int subs_hash_size;
 
 extern int contact_delete_delay;
@@ -306,7 +306,7 @@ void mem_timer_udomain(udomain_t* _d, int istart, int istep) {
                 if ((contact_ptr->expires-now) <= 0) {
                     if (contact_ptr->state == CONTACT_DELAYED_DELETE) {
                         if (contact_ptr->ref_count <= 0) {
-                            LM_DBG("contact in state CONTACT_DELATED_DELETE is about to be deleted");
+                            LM_DBG("contact in state CONTACT_DELATED_DELETE is about to be deleted\n");
                             expired_contacts[num_expired_contacts] = contact_ptr;
                             num_expired_contacts++;
                         } else {
@@ -320,19 +320,20 @@ void mem_timer_udomain(udomain_t* _d, int istart, int istep) {
 								if (ref_count_db < 0) {
 									LM_ERR("Unable to check if contact is unlinked\n");
 								} else if (ref_count_db == 0) {
-									LM_DBG("Contact has ref count [%d] but there's no link on the DB. Deleting contact", contact_ptr->ref_count);
+									LM_DBG("Contact has ref count [%d] but there's no link on the DB. Deleting contact\n", contact_ptr->ref_count);
 									contact_ptr->ref_count = 0;
 									expired_contacts[num_expired_contacts] = contact_ptr;
 									num_expired_contacts++;
 								} else {
-									LM_DBG("Contact in state CONTACT_DELAYED_DELETE has ref count [%d] on DB", ref_count_db);
+									LM_DBG("Contact in state CONTACT_DELAYED_DELETE has ref count [%d] on DB\n", ref_count_db);
 								}
 							} else {
 								LM_DBG("contact in state CONTACT_DELAYED_DELETE still has a ref count of [%d] in memory. Not doing anything for now \n", contact_ptr->ref_count);
 							}
                         }
                     } else if (contact_ptr->state != CONTACT_DELETED) {
-                        LM_DBG("expiring contact [%.*s].... setting to CONTACT_EXPIRE_PENDING_NOTIFY\n", contact_ptr->aor.len, contact_ptr->aor.s);
+                        LM_DBG("expiring contact [%.*s](%.*s).... setting to CONTACT_EXPIRE_PENDING_NOTIFY\n",
+								contact_ptr->aor.len, contact_ptr->aor.s, contact_ptr->c.len, contact_ptr->c.s);
                         contact_ptr->state = CONTACT_EXPIRE_PENDING_NOTIFY;
                         ref_contact_unsafe(contact_ptr);
                         expired_contacts[num_expired_contacts] = contact_ptr;
@@ -399,11 +400,13 @@ void mem_timer_udomain(udomain_t* _d, int istart, int istep) {
             slot = expired_contacts[i]->sl;
             lock_contact_slot_i(slot);
             if (expired_contacts[i]->state != CONTACT_DELAYED_DELETE) {
-                LM_DBG("Setting contact state to CONTACT_DELETED for contact [%.*s]\n", expired_contacts[i]->aor.len, expired_contacts[i]->aor.s);
+                LM_DBG("Setting contact state to CONTACT_DELETED for contact [%.*s](%.*s)\n",
+						expired_contacts[i]->aor.len, expired_contacts[i]->aor.s, expired_contacts[i]->c.len, expired_contacts[i]->c.s);
                 expired_contacts[i]->state = CONTACT_DELETED;
                 unref_contact_unsafe(expired_contacts[i]);
             } else {
-                LM_DBG("deleting contact [%.*s]\n", expired_contacts[i]->aor.len, expired_contacts[i]->aor.s);
+                LM_DBG("deleting contact [%.*s](%.*s)\n",
+						expired_contacts[i]->aor.len, expired_contacts[i]->aor.s, expired_contacts[i]->c.len, expired_contacts[i]->c.s);
                 delete_scontact(expired_contacts[i]);
             }
             unlock_contact_slot_i(slot);
@@ -577,7 +580,7 @@ int insert_impurecord(struct udomain* _d, str* public_identity, str* private_ide
 
     /*DB?*/
     if (db_mode == WRITE_THROUGH && db_insert_impurecord(_d, public_identity, reg_state, barring, s, ccf1, ccf2, ecf1, ecf2, _r) != 0) {
-        LM_ERR("error inserting contact into db");
+        LM_ERR("error inserting contact into db\n");
         goto error;
     }
 

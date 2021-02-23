@@ -749,7 +749,7 @@ int set_dst_uri(struct sip_msg* const msg, const str* const uri)
 		memcpy(msg->dst_uri.s, uri->s, uri->len);
 		msg->dst_uri.len = uri->len;
 	} else {
-		ptr = (char*)pkg_malloc(uri->len);
+		ptr = (char*)pkg_malloc(uri->len + 1);
 		if (!ptr) {
 			ERR("Not enough memory\n");
 			return -1;
@@ -759,6 +759,7 @@ int set_dst_uri(struct sip_msg* const msg, const str* const uri)
 		if (msg->dst_uri.s) pkg_free(msg->dst_uri.s);
 		msg->dst_uri.s = ptr;
 		msg->dst_uri.len = uri->len;
+		msg->dst_uri.s[msg->dst_uri.len] = '\0';
 	}
 	return 0;
 }
@@ -805,11 +806,14 @@ int set_path_vector(struct sip_msg* msg, str* path)
 
 void reset_path_vector(struct sip_msg* const msg)
 {
-	if (msg->path_vec.s) {
-		pkg_free(msg->path_vec.s);
+	if (!shm_address_in(msg->path_vec.s)) {
+		if (msg->path_vec.s)
+			pkg_free(msg->path_vec.s);
+		msg->path_vec.s = 0;
+		msg->path_vec.len = 0;
+	} else {
+		LM_WARN("Found path_vec that is not in pkg mem!\n");
 	}
-	msg->path_vec.s = 0;
-	msg->path_vec.len = 0;
 }
 
 

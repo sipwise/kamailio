@@ -691,7 +691,7 @@ int redisc_exec_pipelined(redisc_server_t *rsrv)
 		/* null reply, reconnect and try again */
 		if (rsrv->ctxRedis->err)
 		{
-			LM_ERR("Redis error: %s\n", rsrv->ctxRedis->errstr);
+			LM_DBG("Redis error: %s\n", rsrv->ctxRedis->errstr);
 		}
 		if (redisc_create_pipelined_message(rsrv) == 0)
 		{
@@ -953,6 +953,14 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
 			goto error_exec;
 		}
 	}
+
+	LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
+	if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
+		LM_ERR("Redis error:%.*s\n",
+			(int)rpl->rplRedis->len, rpl->rplRedis->str);
+		goto error_exec;
+	}
+
 	if (check_cluster_reply(rpl->rplRedis, &rsrv)) {
 		LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
 		if(rsrv->ctxRedis==NULL)
@@ -986,6 +994,13 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
 				cmd->s[cmd->len] = c;
 				goto error_exec;
 			}
+		}
+
+		LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
+		if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
+			LM_ERR("Redis error:%.*s\n",
+				(int)rpl->rplRedis->len, rpl->rplRedis->str);
+			goto error_exec;
 		}
 	}
 	cmd->s[cmd->len] = c;

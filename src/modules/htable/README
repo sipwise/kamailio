@@ -91,7 +91,7 @@ Ovidiu Sas
    1.1. Accessing $sht(htname=>key)
    1.2. Dictionary attack limitation
    1.3. Storing array values
-   1.4. Set hash_size parameter
+   1.4. Set htable parameter
    1.5. Set db_url parameter
    1.6. Set key_name_column parameter
    1.7. Set key_type_column parameter
@@ -436,11 +436,17 @@ $ kamcmd htable.dump htable
    configuration file.
      * htname - string specifying the name of the hash table. This string
        is used by $sht(...) to refer to the hash table.
-     * size - number specifying the size of hash table. Larger value means
-       less collisions. The number of entries (aka slots or buckets) in
-       the table is 2^size. The possible range for this value is from 2 to
-       31, smaller or larger values will be increased to 3 (8 slots) or
-       decreased to 14 (16384 slots).
+     * size - number to control how many slots (buckets) to create for the
+       hash table. Larger value means more slots with higher probability
+       for less collisions. The actual number slots (or buckets) created
+       for the table is 2^size. The possible range for this value is from
+       2 to 31, smaller or larger values will be increased to 3 (8 slots)
+       or decreased to 14 (16384 slots). Note that each slot can store
+       more than one item, when there are collisions of hash ids computed
+       for keys. The items in the same slot are stored in a linked list.
+       In other words, the size is not setting a limit of how many items
+       can be stored in a hash table, as long as there is enough free
+       shared memory, new items can be added.
      * autoexpire -time in seconds to delete an item from a hash table if
        no update was done to it. If is missing or set to 0, the items
        won't expire.
@@ -475,7 +481,7 @@ $ kamcmd htable.dump htable
 
    Default value is NULL.
 
-   Example 1.4. Set hash_size parameter
+   Example 1.4. Set htable parameter
 ...
 modparam("htable", "htable", "a=>size=4;autoexpire=7200;dbtable=htable_a;")
 modparam("htable", "htable", "b=>size=5;")

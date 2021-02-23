@@ -215,7 +215,11 @@ AAAMessage * Ro_write_CCR_avps(AAAMessage * ccr, Ro_CCR_t* x) {
     if (x->origin_realm.s && x->origin_realm.len > 0) {
         if (!cdp_avp->base.add_Origin_Realm(&(ccr->avpList), x->origin_realm, 0)) goto error;
     }
-    
+
+    if (x->destination_host.s && x->destination_host.len > 0) {
+        if (!cdp_avp->base.add_Destination_Host(&(ccr->avpList), x->destination_host, 0)) goto error;
+    }
+
     if (x->destination_realm.s && x->destination_realm.len > 0) {
         if (!ro_add_destination_realm_avp(ccr, x->destination_realm)) goto error;
     }
@@ -300,7 +304,7 @@ Ro_CCA_t *Ro_parse_CCA_avps(AAAMessage *cca) {
                 mscc_avp_list_ptr = &mscc_avp_list;
                 AAA_AVP *mscc_avp = mscc_avp_list_ptr->head;
                 while (mscc_avp != NULL) {
-                    LM_DBG("MSCC AVP code is [%i] and data length is [%i]", mscc_avp->code, mscc_avp->data.len);
+                    LM_DBG("MSCC AVP code is [%i] and data length is [%i]\n", mscc_avp->code, mscc_avp->data.len);
                     switch (mscc_avp->code) {
                             AAA_AVP_LIST y;
                             AAA_AVP *z;

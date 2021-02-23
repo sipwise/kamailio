@@ -110,16 +110,16 @@ typedef enum request_method {
 #define FL_USE_XAVP_VIA_FIELDS (1<<22) /*!< use xavp fields for local via attrs */
 #define FL_MSG_NOREPLY       (1<<23) /*!< do not send sip reply for request */
 
-/* WARNING: Value (1 << 28) is temporarily reserved for use in kamailio call_control
+/* WARNING: Value (1 << 28) is reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */
 
-/* WARNING: Value (1 << 29) is temporarily reserved for use in kamailio acc
+/* WARNING: Value (1 << 29) is reserved for use in kamailio acc
  * module (flag FL_REQ_UPSTREAM)! */
 
-/* WARNING: Value (1 << 30) is temporarily reserved for use in kamailio
+/* WARNING: Value (1 << 30) is reserved for use in kamailio
  * media proxy module (flag FL_USE_MEDIA_PROXY)! */
 
-/* WARNING: Value (1 << 31) is temporarily reserved for use in kamailio
+/* WARNING: Value (1 << 31) is reserved for use in kamailio
  * nat_traversal module (flag FL_DO_KEEPALIVE)! */
 
 #define FL_MTU_FB_MASK  (FL_MTU_TCP_FB|FL_MTU_TLS_FB|FL_MTU_SCTP_FB)
@@ -127,7 +127,7 @@ typedef enum request_method {
 
 #define IFISMETHOD(methodname,firstchar)                                  \
 if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
-		strncasecmp( tmp+1, #methodname +1, methodname##_LEN-1)==0 &&     \
+		strncasecmp( tmp+1, &#methodname[1], methodname##_LEN-1)==0 &&     \
 		*(tmp+methodname##_LEN)==' ') {                                   \
 				fl->type=SIP_REQUEST;                                     \
 				fl->u.request.method.len=methodname##_LEN;                \
@@ -146,9 +146,12 @@ if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 		SIP_VERSION, SIP_VERSION_LEN))
 
 #define IS_HTTP_REPLY(rpl)                                                \
-	((rpl)->first_line.u.reply.version.len >= HTTP_VERSION_LEN && \
+	(((rpl)->first_line.u.reply.version.len >= HTTP_VERSION_LEN && \
 	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
-		HTTP_VERSION, HTTP_VERSION_LEN))
+		HTTP_VERSION, HTTP_VERSION_LEN)) ||                         \
+	((rpl)->first_line.u.reply.version.len >= HTTP2_VERSION_LEN && \
+	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
+		HTTP2_VERSION, HTTP2_VERSION_LEN)))
 
 #define IS_SIP_REPLY(rpl)                                                \
 	((rpl)->first_line.u.reply.version.len >= SIP_VERSION_LEN && \
