@@ -1,3 +1,19 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: add_lcr_rate_module
+
+---
+ src/Makefile.groups                 |   8 +-
+ src/core/mod_fix.c                  |   2 +
+ src/core/mod_fix.h                  |   2 +
+ src/modules/lcr_rate/Makefile       |   9 +
+ src/modules/lcr_rate/lcr_rate_mod.c | 473 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 493 insertions(+), 1 deletion(-)
+ create mode 100644 src/modules/lcr_rate/Makefile
+ create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index 68ea38c..dd98413 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -105,6 +105,9 @@ mod_list_sctp=sctp
@@ -10,7 +26,7 @@
  # - modules related to SIMPLE presence extensions
  mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_mwi presence_profile presence_reginfo \
-@@ -239,7 +242,8 @@ mod_list_all=$(sort $(mod_list_basic) $(
+@@ -239,7 +242,8 @@ mod_list_all=$(sort $(mod_list_basic) $(mod_list_extra) \
  			   $(mod_list_erlang) $(mod_list_systemd) \
  			   $(mod_list_http_async) $(mod_list_nsq) \
  			   $(mod_list_rabbitmq) $(mod_list_jsdt)) \
@@ -20,7 +36,7 @@
  
  
  
-@@ -293,6 +297,8 @@ module_group_cassandra=$(module_group_ca
+@@ -293,6 +297,8 @@ module_group_cassandra=$(module_group_cassandra_driver) $(module_group_db)
  module_group_ignore= $(sort $(filter-out $(module_group_default), $(mod_list_all)))
  
  
@@ -29,6 +45,42 @@
  
  ### --- Groups defined for pacKaging ###
  
+diff --git a/src/core/mod_fix.c b/src/core/mod_fix.c
+index 9c8a953..303449d 100644
+--- a/src/core/mod_fix.c
++++ b/src/core/mod_fix.c
+@@ -561,6 +561,7 @@ int fixup_free_igp_spve(void** param, int param_no)
+ FIXUP_F_SPVE_T(spve_spve, 1, 2, 2, 0)
+ FIXUP_F_SPVE_T(spve_uint, 1, 2, 1, FPARAM_INT)
+ FIXUP_F_SPVE_T(spve_str, 1, 2, 1, FPARAM_STR)
++FIXUP_F_SPVE_T(spve_str_str, 1, 3, 1, FPARAM_STR)
+ FIXUP_F_SPVE_T(spve_null, 1, 1, 1, 0)
+ 
+ /** get the corresp. fixup_free* function.
+@@ -590,6 +591,7 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
+ 	   see above fixup_uint_null) */
+ 	if (f == fixup_spve_uint) return 0;
+ 	if (f == fixup_spve_str) return fixup_free_spve_str;
++	if (f == fixup_spve_str_str) return fixup_free_spve_str_str;
+ 	return 0;
+ }
+ 
+diff --git a/src/core/mod_fix.h b/src/core/mod_fix.h
+index b3ab9b9..cd301b6 100644
+--- a/src/core/mod_fix.h
++++ b/src/core/mod_fix.h
+@@ -136,6 +136,8 @@ int fixup_spve_uint(void** param, int param_no);
+ int fixup_free_spve_uint(void** param, int param_no);
+ int fixup_spve_str(void** param, int param_no);
+ int fixup_free_spve_str(void** param, int param_no);
++int fixup_spve_str_str(void** param, int param_no);
++int fixup_free_spve_str_str(void** param, int param_no);
+ 
+ int fixup_spve_all(void** param, int param_no);
+ int fixup_free_spve_all(void** param, int param_no);
+diff --git a/src/modules/lcr_rate/Makefile b/src/modules/lcr_rate/Makefile
+new file mode 100644
+index 0000000..9a3cee1
 --- /dev/null
 +++ b/src/modules/lcr_rate/Makefile
 @@ -0,0 +1,9 @@
@@ -41,6 +93,9 @@
 +LIBS+=-lswrate
 +
 +include ../../Makefile.modules
+diff --git a/src/modules/lcr_rate/lcr_rate_mod.c b/src/modules/lcr_rate/lcr_rate_mod.c
+new file mode 100644
+index 0000000..f3a9ab2
 --- /dev/null
 +++ b/src/modules/lcr_rate/lcr_rate_mod.c
 @@ -0,0 +1,473 @@
@@ -517,32 +572,3 @@
 +
 +	return 1;
 +}
---- a/src/core/mod_fix.c
-+++ b/src/core/mod_fix.c
-@@ -561,6 +561,7 @@ int fixup_free_igp_spve(void** param, in
- FIXUP_F_SPVE_T(spve_spve, 1, 2, 2, 0)
- FIXUP_F_SPVE_T(spve_uint, 1, 2, 1, FPARAM_INT)
- FIXUP_F_SPVE_T(spve_str, 1, 2, 1, FPARAM_STR)
-+FIXUP_F_SPVE_T(spve_str_str, 1, 3, 1, FPARAM_STR)
- FIXUP_F_SPVE_T(spve_null, 1, 1, 1, 0)
- 
- /** get the corresp. fixup_free* function.
-@@ -590,6 +591,7 @@ free_fixup_function mod_fix_get_fixup_fr
- 	   see above fixup_uint_null) */
- 	if (f == fixup_spve_uint) return 0;
- 	if (f == fixup_spve_str) return fixup_free_spve_str;
-+	if (f == fixup_spve_str_str) return fixup_free_spve_str_str;
- 	return 0;
- }
- 
---- a/src/core/mod_fix.h
-+++ b/src/core/mod_fix.h
-@@ -136,6 +136,8 @@ int fixup_spve_uint(void** param, int pa
- int fixup_free_spve_uint(void** param, int param_no);
- int fixup_spve_str(void** param, int param_no);
- int fixup_free_spve_str(void** param, int param_no);
-+int fixup_spve_str_str(void** param, int param_no);
-+int fixup_free_spve_str_str(void** param, int param_no);
- 
- int fixup_spve_all(void** param, int param_no);
- int fixup_free_spve_all(void** param, int param_no);

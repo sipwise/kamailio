@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: sca-fix-on-hold-detection-when-upstream-flow
+
+---
+ src/modules/sca/sca_call_info.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
+index 65c21ac..da8e6d3 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -914,12 +914,14 @@ int sca_call_info_invite_request_handler
+@@ -914,12 +914,14 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  	str state_str = STR_NULL;
  	int state = SCA_APPEARANCE_STATE_UNKNOWN;
  	int rc = -1;
@@ -16,7 +26,7 @@
  	}
  
  	LM_DBG("For From-AOR %.*s To-AOR: %.*s: From: <%.*s> To: <%.*s> "
-@@ -936,7 +938,7 @@ int sca_call_info_invite_request_handler
+@@ -936,7 +938,7 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
  		goto done;
  	}
  

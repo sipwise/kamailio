@@ -15,12 +15,9 @@ sipwise/add_pv_headers_module.patch
 sipwise/usrloc_dbro.patch
 sipwise/usrloc_dbro_pinger.patch
 sipwise/rtpengine_next_branch_parm.patch
-sipwise/cfgt_folder_fix.patch
-sipwise/cfgt_onsend_exit.patch
 sipwise/fix_error_in_cfgt_module.patch
 sipwise/pv_trans_eval_uri.patch
 sipwise/avpops_avp_subst_pvar.patch
-sipwise/fix_dialplan_errors.patch
 ## SCA Patches
 sipwise/sca-line-seize.patch
 sipwise/sca-fallback-if-no-contact.patch
@@ -34,12 +31,15 @@ sipwise/sca-fix-notify-after-bye.patch
 sipwise/rtpengine-balancing.patch
 sipwise/openssl-locking.patch
 ## backport from kamailio upstream (5.2)
+#
+## backport from kamailio upstream (5.4)
+upstream/limit_the_execution_of_dialplan_reload.patch
+#
 sipwise/tt41650.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
 sipwise/rtpengine-tcp-forwarding.patch
 sipwise/rtpengine-play-media.patch
 sipwise/registrar_add_path.patch
-upstream/limit_the_execution_of_dialplan_reload.patch
 sipwise/db_redis_fix_scan_usage.patch
 sipwise/db_redis_skip_not_eq_type_keys.patch
 sipwise/db_redis_update_type_keys.patch
@@ -54,9 +54,6 @@ sipwise/sca-fix-memleaks.patch
 sipwise/presence_dfks_null_ptr_fixes.patch
 sipwise/db_redis_eval_fix.patch
 sipwise/fix_lcr_rate_wrong_id.patch
-upstream/tm-execute-TMCB_REQUEST_FWDED-cb-as-BRANCH_ROUTE-whe.patch
-## backport from kamailio upstream (5.4)
-upstream/ndb_redis-set-message-level-to-debug-on-exec.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch

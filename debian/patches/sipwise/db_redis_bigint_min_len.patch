@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: db_redis_bigint_min_len
+
+---
+ src/modules/db_redis/redis_dbase.c | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index a04dc8d..d97e115 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -109,14 +109,14 @@
+@@ -109,14 +109,14 @@ static int db_redis_val2str(const db_val_t *v, str *_str) {
              LM_DBG("converting bigint value %lld to str\n", VAL_BIGINT(v));
              _str->s = (char*)pkg_malloc(_str->len);
              if (!_str->s) goto memerr;
@@ -17,7 +27,7 @@
              _str->len = strlen(_str->s);
              break;
          case DB1_STRING:
-@@ -306,7 +306,8 @@
+@@ -306,7 +306,8 @@ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
                          k->len, k->s);
                  break;
              } else if (op && strcmp(op, OP_EQ)
@@ -27,7 +37,7 @@
                          && (!strcmp(op, OP_LT) || !strcmp(op, OP_GT)))) {
                  LM_DBG("Skipping non-EQ op (%s) for given key '%.*s'\n",
                          op, k->len, k->s);
-@@ -344,7 +345,8 @@
+@@ -344,7 +345,8 @@ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
                              val.len, val.s);
                      key_name->len += (1 + val.len);
                  }
@@ -37,7 +47,7 @@
                          && (!strcmp(op, OP_LT) || !strcmp(op, OP_GT))) {
                      // Special case: we support matching < or > against timestamps and ints using a special
                      // key scanning method. We do this only for a single timestamp/int occurance, and we
-@@ -365,7 +367,8 @@
+@@ -365,7 +367,8 @@ static int db_redis_find_query_key(redis_key_t *key, const str *table_name,
                                      (unsigned long long) *ts_scan_start);
                          *key_found = 0; // this forces a table scan using the new match key
                      }
@@ -47,7 +57,7 @@
                          *ts_scan_start = key_name->len | ((uint64_t) val.len << 31);
                          *ts_scan_start |= 0x4000000000000000ULL; // length is variable
                          if (!strcmp(op, OP_LT))
-@@ -872,6 +875,7 @@
+@@ -872,6 +875,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
      // ex: 12345
      // if >, we match: 2????, 1[3-9]???, ..., plus ?????*
      // if <. we match: ?, ??, ???, ????, 1[0-1]???, 12[0-2]??, etc
@@ -55,7 +65,7 @@
  
      match = pkg_malloc(ts_scan_key->len + 6);
      if (!match) {
-@@ -895,7 +899,7 @@
+@@ -895,7 +899,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
          // copy unchanged prefix
          memcpy(match, ts_scan_key->s, scan_offset);
  
@@ -64,7 +74,7 @@
          for (int i = 0; i < scan_length - 1; i++) {
              int len = scan_offset + i;
              char match_char = ts_scan_key->s[len];
-@@ -910,6 +914,10 @@
+@@ -910,6 +914,10 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
              strcpy(match + len + 1, suffix);
              len = strlen(match);
  
@@ -75,7 +85,7 @@
              str match_pattern = {match, len};
              LM_DBG("running timestamp/int range matching using pattern '%.*s'\n", len, match);
  
-@@ -929,6 +937,8 @@
+@@ -929,6 +937,8 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
          // skip numbers that are at the edge of their match range
          if (match_char == '0' && scan_lt)
              continue;

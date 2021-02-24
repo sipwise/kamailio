@@ -1,8 +1,17 @@
-Index: kamailio/src/modules/registrar/lookup.c
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: registrar_add_path
+
 ===================================================================
---- kamailio.orig/src/modules/registrar/lookup.c	2018-03-08 17:05:51.000000000 +0100
-+++ kamailio/src/modules/registrar/lookup.c	2019-03-26 14:14:41.194804894 +0100
-@@ -112,6 +112,7 @@
+---
+ src/modules/registrar/lookup.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/modules/registrar/lookup.c b/src/modules/registrar/lookup.c
+index f012d69..aa91f43 100644
+--- a/src/modules/registrar/lookup.c
++++ b/src/modules/registrar/lookup.c
+@@ -112,6 +112,7 @@ int xavp_rcd_helper(ucontact_t* ptr)
  	str xname_received = { "received", 8};
  	str xname_contact = { "contact", 7};
  	str xname_expires = {"expires", 7};
@@ -10,7 +19,7 @@ Index: kamailio/src/modules/registrar/lookup.c
  	sr_xval_t xval;
  
  	if(ptr==NULL) return -1;
-@@ -142,6 +143,13 @@
+@@ -142,6 +143,13 @@ int xavp_rcd_helper(ucontact_t* ptr)
  	xval.v.i = (int) (ptr->expires - time(0));
  	xavp_add_value(&xname_expires, &xval, xavp);
  

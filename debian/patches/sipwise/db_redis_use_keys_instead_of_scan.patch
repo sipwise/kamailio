@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: db_redis_use_keys_instead_of_scan
+
+---
+ src/modules/db_redis/redis_dbase.c | 50 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 41 insertions(+), 9 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index d97e115..ab0074d 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -695,15 +695,21 @@
+@@ -695,15 +695,21 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
  
      size_t i = 0;
      redis_key_t *query_v = NULL;
@@ -25,7 +35,7 @@
      do {
          snprintf(cursor_str, sizeof(cursor_str), "%lu", cursor);
  
-@@ -763,16 +769,37 @@
+@@ -763,16 +769,37 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
          }
          LM_DBG("cursor is %lu\n", cursor);
  
@@ -67,7 +77,7 @@
              if (!key) {
                  LM_ERR("Invalid null key at cursor result index %lu while scanning table '%.*s'\n",
                          j, match_pattern->len, match_pattern->s);
-@@ -789,14 +816,19 @@
+@@ -789,14 +816,19 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
              }
          }
  

@@ -1,6 +1,75 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: db_redis_master_sets
+
+---
+ src/modules/db_redis/redis_connection.c |  26 +++++++
+ src/modules/db_redis/redis_connection.h |   1 +
+ src/modules/db_redis/redis_dbase.c      | 123 ++++++++++++++++++++++++++++----
+ src/modules/db_redis/redis_dbase.h      |   5 +-
+ 4 files changed, 142 insertions(+), 13 deletions(-)
+
+diff --git a/src/modules/db_redis/redis_connection.c b/src/modules/db_redis/redis_connection.c
+index 6743a97..ad2921f 100644
+--- a/src/modules/db_redis/redis_connection.c
++++ b/src/modules/db_redis/redis_connection.c
+@@ -23,6 +23,7 @@
+ #include "db_redis_mod.h"
+ #include "redis_connection.h"
+ #include "redis_table.h"
++#include "redis_dbase.h"
+ 
+ extern int db_redis_verbosity;
+ 
+@@ -170,6 +171,31 @@ int db_redis_connect(km_redis_con_t *con) {
+     freeReplyObject(reply); reply = NULL;
+     LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
+ 
++    reply = redisCommand(con->con, "SCRIPT LOAD %s", SREM_KEY_LUA);
++    if (!reply) {
++        LM_ERR("failed to load LUA script to server %.*s: %s\n",
++                con->id->url.len, con->id->url.s, con->con->errstr);
++        goto err;
++    }
++    if (reply->type == REDIS_REPLY_ERROR) {
++        LM_ERR("failed to load LUA script to server %.*s: %s\n",
++                con->id->url.len, con->id->url.s, reply->str);
++        goto err;
++    }
++    if (reply->type != REDIS_REPLY_STRING) {
++        LM_ERR("failed to load LUA script to server %.*s: %i\n",
++                con->id->url.len, con->id->url.s, reply->type);
++        goto err;
++    }
++    if (reply->len >= sizeof(con->srem_key_lua)) {
++        LM_ERR("failed to load LUA script to server %.*s: %i >= %i\n",
++                con->id->url.len, con->id->url.s, (int) reply->len, (int) sizeof(con->srem_key_lua));
++        goto err;
++    }
++    strcpy(con->srem_key_lua, reply->str);
++    freeReplyObject(reply); reply = NULL;
++    LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
++
+     return 0;
+ 
+ err:
+diff --git a/src/modules/db_redis/redis_connection.h b/src/modules/db_redis/redis_connection.h
+index b137d80..2239283 100644
+--- a/src/modules/db_redis/redis_connection.h
++++ b/src/modules/db_redis/redis_connection.h
+@@ -66,6 +66,7 @@ typedef struct km_redis_con {
+     redis_command_t *command_queue;
+     unsigned int append_counter;
+     struct str_hash_table tables;
++    char srem_key_lua[41]; // sha-1 hex string
+ } km_redis_con_t;
+ 
+ 
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index e774e22..16bcba2 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -514,7 +514,7 @@
+@@ -514,7 +514,7 @@ err:
  
  static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
          const db_key_t *_k, const db_val_t *_v, const int _n,
@@ -9,7 +78,7 @@
  
      struct str_hash_entry *table_e;
      redis_table_t *table;
-@@ -553,6 +553,26 @@
+@@ -553,6 +553,26 @@ static int db_redis_build_type_keys(km_redis_con_t *con, const str *table_name,
                      keyname.len, keyname.s,
                      type_name->len, type_name->s);
              pkg_free(keyname.s);
@@ -36,7 +105,7 @@
          }
      }
  
-@@ -1589,10 +1609,12 @@
+@@ -1595,10 +1615,12 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
      redisReply *reply = NULL;
      redis_key_t *query_v = NULL;
      redis_key_t *type_keys = NULL;
@@ -49,7 +118,7 @@
  
      if (!*keys_count && do_table_scan) {
          if (!ts_scan_start)
-@@ -1737,7 +1759,7 @@
+@@ -1743,7 +1765,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
              }
          }
          if (db_redis_build_type_keys(con, CON_TABLE(_h), db_keys, db_vals, all_type_keys_count,
@@ -58,7 +127,7 @@
              LM_ERR("failed to build type keys\n");
              goto error;
          }
-@@ -1761,8 +1783,18 @@
+@@ -1767,8 +1789,18 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          db_redis_check_reply(con, reply, error);
          db_redis_free_reply(&reply);
  
@@ -79,7 +148,7 @@
                  LM_ERR("Failed to add srem command to post-delete query\n");
                  goto error;
              }
-@@ -1770,6 +1802,10 @@
+@@ -1776,6 +1808,10 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
                  LM_ERR("Failed to add key to delete query\n");
                  goto error;
              }
@@ -90,7 +159,7 @@
              if (db_redis_key_add_str(&query_v, key) != 0) {
                  LM_ERR("Failed to add key to delete query\n");
                  goto error;
-@@ -1781,6 +1817,7 @@
+@@ -1787,6 +1823,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          }
          LM_DBG("done with loop '%.*s'\n", k->key.len, k->key.s);
          db_redis_key_free(&type_keys);
@@ -98,7 +167,7 @@
      }
      db_redis_key_free(&all_type_keys);
      db_redis_key_free(&query_v);
-@@ -1797,6 +1834,7 @@
+@@ -1803,6 +1840,7 @@ error:
          pkg_free(db_vals);
      db_redis_key_free(&query_v);
      db_redis_key_free(&type_keys);
@@ -106,7 +175,7 @@
      db_redis_key_free(&all_type_keys);
      return -1;
  }
-@@ -1820,6 +1858,7 @@
+@@ -1826,6 +1864,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
      db_val_t *db_vals = NULL;
      db_key_t *db_keys = NULL;
      redis_key_t *type_keys = NULL;
@@ -114,7 +183,7 @@
      int type_keys_count = 0;
      redis_key_t *new_type_keys = NULL;
      int new_type_keys_count = 0;
-@@ -1851,7 +1890,7 @@
+@@ -1857,7 +1896,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
      }
  
      if (db_redis_build_type_keys(con, CON_TABLE(_h), _uk, _uv, _nu,
@@ -123,7 +192,7 @@
          LM_ERR("failed to build type keys\n");
          goto error;
      }
-@@ -1930,6 +1969,7 @@
+@@ -1936,6 +1975,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
      for (key = *keys; key; key = key->next) {
          redis_key_t *tmp = NULL;
          redis_key_t *type_key;
@@ -131,7 +200,7 @@
          redis_key_t *new_type_key;
          int row_match;
  
-@@ -2024,7 +2064,7 @@
+@@ -2030,7 +2070,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
              }
          }
          if (db_redis_build_type_keys(con, CON_TABLE(_h), db_keys, db_vals, all_type_keys_count,
@@ -140,7 +209,7 @@
              LM_ERR("failed to build type keys\n");
              goto error;
          }
-@@ -2070,7 +2110,9 @@
+@@ -2076,7 +2116,9 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
  
          db_redis_key_free(&query_v);
  
@@ -151,7 +220,7 @@
              LM_DBG("checking for update of type key '%.*s'\n",
                      type_key->key.len, type_key->key.s);
              char *prefix = ser_memmem(type_key->key.s, "::", type_key->key.len, 2);
-@@ -2111,15 +2153,15 @@
+@@ -2117,15 +2159,15 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
  
                  db_redis_key_free(&query_v);
  
@@ -170,7 +239,7 @@
                      LM_ERR("Failed to set entry key to post-update query\n");
                      goto error;
                  }
-@@ -2131,10 +2173,44 @@
+@@ -2137,10 +2179,44 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
                  }
  
                  db_redis_key_free(&query_v);
@@ -215,7 +284,7 @@
      }
  
      LM_DBG("getting replies for %d queries\n", update_queries);
-@@ -2162,6 +2238,7 @@
+@@ -2168,6 +2244,7 @@ error:
      db_redis_key_free(&query_v);
      db_redis_key_free(&all_type_keys);
      db_redis_key_free(&type_keys);
@@ -223,7 +292,7 @@
      db_redis_key_free(&new_type_keys);
      return -1;
  }
-@@ -2335,11 +2412,13 @@
+@@ -2341,11 +2418,13 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
      redis_key_t *key = NULL;
      int keys_count = 0;
      redis_key_t *type_keys = NULL;
@@ -237,7 +306,7 @@
  
      con = REDIS_CON(_h);
      if (con && con->con == NULL) {
-@@ -2366,7 +2445,7 @@
+@@ -2372,7 +2451,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
          goto error;
      }
      if (db_redis_build_type_keys(con, CON_TABLE(_h), _k, _v, _n,
@@ -246,7 +315,7 @@
          LM_ERR("failed to build type keys\n");
          goto error;
      }
-@@ -2405,7 +2484,7 @@
+@@ -2411,7 +2490,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
      db_redis_check_reply(con, reply, error);
      db_redis_free_reply(&reply);
  
@@ -255,7 +324,7 @@
          str *type_key = &k->key;
  
          LM_DBG("inserting entry key '%.*s' to type map '%.*s'\n",
-@@ -2428,10 +2507,29 @@
+@@ -2434,10 +2513,29 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
          db_redis_key_free(&query_v);
          db_redis_check_reply(con, reply, error);
          db_redis_free_reply(&reply);
@@ -285,7 +354,7 @@
      db_redis_consume_replies(con);
  
      return 0;
-@@ -2439,6 +2537,7 @@
+@@ -2445,6 +2543,7 @@ int db_redis_insert(const db1_con_t* _h, const db_key_t* _k, const db_val_t* _v,
  error:
      db_redis_key_free(&key);
      db_redis_key_free(&type_keys);
@@ -293,58 +362,8 @@
      db_redis_key_free(&query_v);
  
      if (reply)
---- a/src/modules/db_redis/redis_connection.c
-+++ b/src/modules/db_redis/redis_connection.c
-@@ -23,6 +23,7 @@
- #include "db_redis_mod.h"
- #include "redis_connection.h"
- #include "redis_table.h"
-+#include "redis_dbase.h"
- 
- extern int db_redis_verbosity;
- 
-@@ -170,6 +171,31 @@
-     freeReplyObject(reply); reply = NULL;
-     LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
- 
-+    reply = redisCommand(con->con, "SCRIPT LOAD %s", SREM_KEY_LUA);
-+    if (!reply) {
-+        LM_ERR("failed to load LUA script to server %.*s: %s\n",
-+                con->id->url.len, con->id->url.s, con->con->errstr);
-+        goto err;
-+    }
-+    if (reply->type == REDIS_REPLY_ERROR) {
-+        LM_ERR("failed to load LUA script to server %.*s: %s\n",
-+                con->id->url.len, con->id->url.s, reply->str);
-+        goto err;
-+    }
-+    if (reply->type != REDIS_REPLY_STRING) {
-+        LM_ERR("failed to load LUA script to server %.*s: %i\n",
-+                con->id->url.len, con->id->url.s, reply->type);
-+        goto err;
-+    }
-+    if (reply->len >= sizeof(con->srem_key_lua)) {
-+        LM_ERR("failed to load LUA script to server %.*s: %i >= %i\n",
-+                con->id->url.len, con->id->url.s, (int) reply->len, (int) sizeof(con->srem_key_lua));
-+        goto err;
-+    }
-+    strcpy(con->srem_key_lua, reply->str);
-+    freeReplyObject(reply); reply = NULL;
-+    LM_DBG("connection opened to %.*s\n", con->id->url.len, con->id->url.s);
-+
-     return 0;
- 
- err:
---- a/src/modules/db_redis/redis_connection.h
-+++ b/src/modules/db_redis/redis_connection.h
-@@ -66,6 +66,7 @@
-     redis_command_t *command_queue;
-     unsigned int append_counter;
-     struct str_hash_table tables;
-+    char srem_key_lua[41]; // sha-1 hex string
- } km_redis_con_t;
- 
- 
+diff --git a/src/modules/db_redis/redis_dbase.h b/src/modules/db_redis/redis_dbase.h
+index f41be1a..ae40db6 100644
 --- a/src/modules/db_redis/redis_dbase.h
 +++ b/src/modules/db_redis/redis_dbase.h
 @@ -25,6 +25,9 @@
@@ -357,7 +376,7 @@
  /*
   * Initialize database connection
   */
-@@ -85,4 +88,4 @@
+@@ -85,4 +88,4 @@ int db_redis_replace(const db1_con_t* handle, const db_key_t* keys, const db_val
   */
  int db_redis_use_table(db1_con_t* _h, const str* _t);
  

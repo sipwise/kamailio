@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: avpops_avp_subst_pvar
+
+---
+ src/modules/avpops/avpops.c | 63 +++++++++++++++++++++++++++++++++------------
+ 1 file changed, 46 insertions(+), 17 deletions(-)
+
+diff --git a/src/modules/avpops/avpops.c b/src/modules/avpops/avpops.c
+index 0805407..2be98f3 100644
 --- a/src/modules/avpops/avpops.c
 +++ b/src/modules/avpops/avpops.c
-@@ -67,6 +67,7 @@
+@@ -67,6 +67,7 @@ static int fixup_pushto_avp(void** param, int param_no);
  static int fixup_check_avp(void** param, int param_no);
  static int fixup_op_avp(void** param, int param_no);
  static int fixup_subst(void** param, int param_no);
@@ -8,7 +18,7 @@
  static int fixup_is_avp_set(void** param, int param_no);
  
  static int w_print_avps(struct sip_msg* msg, char* foo, char *bar);
-@@ -80,7 +81,7 @@
+@@ -80,7 +81,7 @@ static int w_copy_avps(struct sip_msg* msg, char* param, char *check);
  static int w_pushto_avps(struct sip_msg* msg, char* destination, char *param);
  static int w_check_avps(struct sip_msg* msg, char* param, char *check);
  static int w_op_avps(struct sip_msg* msg, char* param, char *op);
@@ -17,7 +27,7 @@
  static int w_is_avp_set(struct sip_msg* msg, char* param, char *foo);
  
  /*! \brief
-@@ -109,7 +110,7 @@
+@@ -109,7 +110,7 @@ static cmd_export_t cmds[] = {
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
  	{"avp_op",     (cmd_function)w_op_avps, 2, fixup_op_avp, 0,
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
@@ -26,7 +36,7 @@
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
  	{"is_avp_set", (cmd_function)w_is_avp_set, 1, fixup_is_avp_set, 0,
  		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE|LOCAL_ROUTE},
-@@ -710,8 +711,6 @@
+@@ -710,8 +711,6 @@ static int fixup_check_avp(void** param, int param_no)
  
  static int fixup_subst(void** param, int param_no)
  {
@@ -35,7 +45,7 @@
  	struct fis_param *ap;
  	struct fis_param **av;
  	char *s;
-@@ -824,23 +823,26 @@
+@@ -824,23 +823,26 @@ static int fixup_subst(void** param, int param_no)
  		}
  		*param=(void*)av;
  	} else if (param_no==2) {
@@ -46,16 +56,15 @@
 -		if (se==0){
 -			LM_ERR("%s: bad subst re %s\n",exports.name, (char*)*param);
 -			return E_BAD_RE;
--		}
--		/* don't free string -- needed for specifiers */
--		/* pkg_free(*param); */
--		/* replace it with the compiled subst. re */
--		*param=se;
 +		if (strncmp((char*)*param, "/", 1) == 0) // static subst string
 +		{
 +			LM_DBG("%s static subst string: %s\n", exports.name, (char*)*param);
 +			return fix_param(FPARAM_SUBST, param);
-+		}
+ 		}
+-		/* don't free string -- needed for specifiers */
+-		/* pkg_free(*param); */
+-		/* replace it with the compiled subst. re */
+-		*param=se;
 +		LM_DBG("%s dynamic avp subst: %s\n", exports.name, (char*)*param);
 +		return fixup_var_str_2(param, param_no);
  	}
@@ -74,7 +83,7 @@
  static int fixup_op_avp(void** param, int param_no)
  {
  	struct fis_param *ap;
-@@ -1049,9 +1051,36 @@
+@@ -1049,9 +1051,36 @@ static int w_op_avps(struct sip_msg* msg, char* param, char *op)
  								(struct fis_param*)op);
  }
  

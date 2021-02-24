@@ -1,6 +1,17 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: rtpengine-tcp-forwarding
+
+---
+ src/modules/rtpengine/rtpengine.c | 58 +++++++++++++++++++++++++++++++++++++--
+ src/modules/rtpengine/rtpengine.h |  2 ++
+ 2 files changed, 58 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 487fb58..24ddf5e 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -133,6 +133,8 @@
+@@ -133,6 +133,8 @@ static const char *command_strings[] = {
  	[OP_UNBLOCK_DTMF]	= "unblock DTMF",
  	[OP_BLOCK_MEDIA]	= "block media",
  	[OP_UNBLOCK_MEDIA]	= "unblock media",
@@ -9,7 +20,7 @@
  };
  
  struct minmax_mos_stats {
-@@ -188,6 +190,8 @@
+@@ -188,6 +190,8 @@ static int block_dtmf_f(struct sip_msg *, char *, char *);
  static int unblock_dtmf_f(struct sip_msg *, char *, char *);
  static int block_media_f(struct sip_msg *, char *, char *);
  static int unblock_media_f(struct sip_msg *, char *, char *);
@@ -18,7 +29,7 @@
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -338,6 +342,18 @@
+@@ -338,6 +342,18 @@ static cmd_export_t cmds[] = {
  	{"unblock_media",	(cmd_function)unblock_media_f, 		1,
  		fixup_spve_null, 0,
  		ANY_ROUTE},
@@ -37,7 +48,7 @@
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -2356,7 +2372,7 @@
+@@ -2356,7 +2372,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  			bencode_dictionary_add_str(ng_flags.dict, "sdp", &body);
  	}
  	else if (op == OP_BLOCK_DTMF || op == OP_BLOCK_MEDIA || op == OP_UNBLOCK_DTMF
@@ -46,7 +57,7 @@
  	{
  		ng_flags.flags = bencode_list(bencbuf);
  	}
-@@ -2432,7 +2448,7 @@
+@@ -2432,7 +2448,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
  
  	if (op == OP_BLOCK_DTMF || op == OP_BLOCK_MEDIA || op == OP_UNBLOCK_DTMF
@@ -55,7 +66,7 @@
  	{
  		if (ng_flags.directional)
  			bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.from_tag);
-@@ -3816,6 +3832,44 @@
+@@ -3816,6 +3832,44 @@ unblock_media_f(struct sip_msg* msg, char *str1, char *str2)
  	return rtpengine_rtpp_set_wrap(msg, rtpengine_unblock_media_wrap, flags.s, 1);
  }
  
@@ -100,9 +111,11 @@
  static int rtpengine_rtpstat_wrap(struct sip_msg *msg, void *d, int more) {
  	void **parms;
  	pv_param_t *param;
+diff --git a/src/modules/rtpengine/rtpengine.h b/src/modules/rtpengine/rtpengine.h
+index 0ddd9c8..05f5bba 100644
 --- a/src/modules/rtpengine/rtpengine.h
 +++ b/src/modules/rtpengine/rtpengine.h
-@@ -42,6 +42,8 @@
+@@ -42,6 +42,8 @@ enum rtpe_operation {
          OP_UNBLOCK_DTMF,
          OP_BLOCK_MEDIA,
          OP_UNBLOCK_MEDIA,

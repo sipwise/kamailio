@@ -1,3 +1,31 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: openssl-locking
+
+---
+ src/modules/tls/Makefile                           |  2 +
+ .../tls/utils/openssl_mutex_shared/Makefile        | 26 ++++++++++++
+ .../openssl_mutex_shared/openssl_mutex_shared.c    | 46 ++++++++++++++++++++++
+ 3 files changed, 74 insertions(+)
+ create mode 100644 src/modules/tls/utils/openssl_mutex_shared/Makefile
+ create mode 100644 src/modules/tls/utils/openssl_mutex_shared/openssl_mutex_shared.c
+
+diff --git a/src/modules/tls/Makefile b/src/modules/tls/Makefile
+index c26b6c4..58c758c 100644
+--- a/src/modules/tls/Makefile
++++ b/src/modules/tls/Makefile
+@@ -54,6 +54,8 @@ LIBS+= $(TLS_EXTRA_LIBS)
+ # dcm: tls.cfg installed via local 'install-cfg' to update paths
+ #MOD_INSTALL_CFGS=tls.cfg
+ 
++MOD_INSTALL_UTILS=utils/openssl_mutex_shared
++
+ include ../../Makefile.modules
+ 
+ install-tls-cert: $(cfg_prefix)/$(cfg_dir)
+diff --git a/src/modules/tls/utils/openssl_mutex_shared/Makefile b/src/modules/tls/utils/openssl_mutex_shared/Makefile
+new file mode 100644
+index 0000000..8edfe13
 --- /dev/null
 +++ b/src/modules/tls/utils/openssl_mutex_shared/Makefile
 @@ -0,0 +1,26 @@
@@ -27,6 +55,9 @@
 +.PHONY: clean
 +clean:
 +	rm -f openssl_mutex_shared.so
+diff --git a/src/modules/tls/utils/openssl_mutex_shared/openssl_mutex_shared.c b/src/modules/tls/utils/openssl_mutex_shared/openssl_mutex_shared.c
+new file mode 100644
+index 0000000..00c9c80
 --- /dev/null
 +++ b/src/modules/tls/utils/openssl_mutex_shared/openssl_mutex_shared.c
 @@ -0,0 +1,46 @@
@@ -76,14 +107,3 @@
 +	pthread_rwlockattr_destroy(&attr);
 +	return ret;
 +}
---- a/src/modules/tls/Makefile
-+++ b/src/modules/tls/Makefile
-@@ -34,6 +34,8 @@
- # dcm: tls.cfg installed via local 'install-cfg' to update paths
- #MOD_INSTALL_CFGS=tls.cfg
- 
-+MOD_INSTALL_UTILS=utils/openssl_mutex_shared
-+
- include ../../Makefile.modules
- 
- install-tls-cert: $(cfg_prefix)/$(cfg_dir)

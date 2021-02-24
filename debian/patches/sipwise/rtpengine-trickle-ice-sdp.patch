@@ -1,38 +1,17 @@
---- a/src/modules/rtpengine/rtpengine_funcs.c
-+++ b/src/modules/rtpengine/rtpengine_funcs.c
-@@ -64,6 +64,7 @@
-  * -1: error
-  *  1: text or sdp
-  *  2: multipart
-+ *  3: trickle ice sdp fragment
-  */
- int check_content_type(struct sip_msg *msg)
- {
-@@ -133,8 +134,11 @@
- 
- 	advance(p,3,str_type,error_1);
- 	x = READ(p-3) & 0x00ffffff;
--	if (!one_of_8(x,sdp_))
-+	if (!one_of_8(x,sdp_)) {
-+		if (strncasecmp(p-3, "trickle-ice-sdpfrag", 19) == 0)
-+			return 3;
- 		goto other;
-+	}
- 
- 	if (*p==';'||*p==' '||*p=='\t'||*p=='\n'||*p=='\r'||*p==0) {
- 		LM_DBG("type <%.*s> found valid\n", (int)(p-str_type.s), str_type.s);
-@@ -264,7 +268,7 @@
- 
- done:
- 	/*LM_DBG("DEBUG:extract_body:=|%.*s|\n",body->len,body->s);*/
--	return 1;
-+	return ret; /* mirrors return type of check_content_type */
- }
- 
- /*
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: rtpengine-trickle-ice-sdp
+
+---
+ src/modules/rtpengine/rtpengine.c       | 37 ++++++++++++++++++++++++++++++---
+ src/modules/rtpengine/rtpengine_funcs.c |  8 +++++--
+ 2 files changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
+index 66c87a9..487fb58 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -193,6 +193,7 @@
+@@ -193,6 +193,7 @@ static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
  static int rtpengine_manage1_f(struct sip_msg *, char *, char *);
  static int rtpengine_query1_f(struct sip_msg *, char *, char *);
@@ -40,7 +19,7 @@
  
  static int parse_flags(struct ng_flags_parse *, struct sip_msg *, enum rtpe_operation *, const char *);
  
-@@ -349,6 +350,12 @@
+@@ -349,6 +350,12 @@ static cmd_export_t cmds[] = {
  	{"rtpengine_answer",	(cmd_function)rtpengine_answer1_f,	1,
  		fixup_spve_null, 0,
  		ANY_ROUTE},
@@ -53,7 +32,7 @@
  	{"rtpengine_manage",	(cmd_function)rtpengine_manage1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -2288,7 +2295,7 @@
+@@ -2288,7 +2295,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	bencode_item_t *item, *resp;
  	str viabranch = STR_NULL;
  	str body = STR_NULL, error = STR_NULL;
@@ -62,7 +41,7 @@
  	struct rtpp_node *node;
  	char *cp;
  	pv_value_t pv_val;
-@@ -2339,7 +2346,7 @@
+@@ -2339,7 +2346,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  				body = pv_val.rs;
  			}
  
@@ -71,7 +50,7 @@
  			LM_ERR("can't extract body from the message\n");
  			goto error;
  		}
-@@ -2361,6 +2368,10 @@
+@@ -2361,6 +2368,10 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	if (parse_flags(&ng_flags, msg, &op, flags_str))
  		goto error;
  
@@ -82,7 +61,7 @@
  	/* only add those if any flags were given at all */
  	if (ng_flags.direction && ng_flags.direction->child)
  		bencode_dictionary_add(ng_flags.dict, "direction", ng_flags.direction);
-@@ -2503,7 +2514,7 @@
+@@ -2503,7 +2514,7 @@ select_node:
  		else
  			LM_INFO("proxy %.*s has reached its load limit (%.*s) - trying next one",
  					node->rn_url.len, node->rn_url.s,
@@ -91,7 +70,7 @@
  		goto select_node;
  	}
  
-@@ -3555,6 +3566,26 @@
+@@ -3555,6 +3566,26 @@ rtpengine_manage1_f(struct sip_msg *msg, char *str1, char *str2)
  	return rtpengine_rtpp_set_wrap(msg, rtpengine_manage_wrap, flags.s, 1);
  }
  
@@ -118,3 +97,37 @@
  static int rtpengine_offer_wrap(struct sip_msg *msg, void *d, int more) {
  	return rtpengine_offer_answer(msg, d, OP_OFFER, more);
  }
+diff --git a/src/modules/rtpengine/rtpengine_funcs.c b/src/modules/rtpengine/rtpengine_funcs.c
+index 028dec6..598af63 100644
+--- a/src/modules/rtpengine/rtpengine_funcs.c
++++ b/src/modules/rtpengine/rtpengine_funcs.c
+@@ -64,6 +64,7 @@
+  * -1: error
+  *  1: text or sdp
+  *  2: multipart
++ *  3: trickle ice sdp fragment
+  */
+ int check_content_type(struct sip_msg *msg)
+ {
+@@ -133,8 +134,11 @@ int check_content_type(struct sip_msg *msg)
+ 
+ 	advance(p,3,str_type,error_1);
+ 	x = READ(p-3) & 0x00ffffff;
+-	if (!one_of_8(x,sdp_))
++	if (!one_of_8(x,sdp_)) {
++		if (strncasecmp(p-3, "trickle-ice-sdpfrag", 19) == 0)
++			return 3;
+ 		goto other;
++	}
+ 
+ 	if (*p==';'||*p==' '||*p=='\t'||*p=='\n'||*p=='\r'||*p==0) {
+ 		LM_DBG("type <%.*s> found valid\n", (int)(p-str_type.s), str_type.s);
+@@ -264,7 +268,7 @@ error:
+ 
+ done:
+ 	/*LM_DBG("DEBUG:extract_body:=|%.*s|\n",body->len,body->s);*/
+-	return 1;
++	return ret; /* mirrors return type of check_content_type */
+ }
+ 
+ /*

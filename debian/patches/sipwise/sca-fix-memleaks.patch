@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: sca-fix-memleaks
+
+---
+ src/modules/sca/sca_util.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/modules/sca/sca_util.c b/src/modules/sca/sca_util.c
+index bc344d5..a6040bc 100644
 --- a/src/modules/sca/sca_util.c
 +++ b/src/modules/sca/sca_util.c
-@@ -178,6 +178,8 @@
+@@ -178,6 +178,8 @@ int sca_get_msg_from_header( sip_msg_t *msg, struct to_body **from ) {
  	} else {
  		LM_DBG("using $avp(%.*s)[%.*s] as from uri\n",
  			STR_FMT(&from_uri_avp.s), STR_FMT(&uri));
@@ -9,7 +19,7 @@
  		if(sca_parse_uri(&sf, &uri)<0) return -1;
  		*from = &sf;
  	}
-@@ -220,6 +222,8 @@
+@@ -220,6 +222,8 @@ int sca_get_msg_to_header(sip_msg_t *msg, struct to_body **to)
  	} else {
  		LM_DBG("using $avp(%.*s)[%.*s] as to uri\n",
  			STR_FMT(&to_uri_avp.s), STR_FMT(&uri));

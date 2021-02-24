@@ -1,3 +1,18 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 24 Feb 2021 11:20:05 +0100
+Subject: sca-line-seize
+
+---
+ src/modules/sca/sca.c           | 103 ++++++++++++++++++++++++++-
+ src/modules/sca/sca.h           |   6 ++
+ src/modules/sca/sca_call_info.c |  77 +++++++++-----------
+ src/modules/sca/sca_subscribe.c |  56 +++++++++------
+ src/modules/sca/sca_subscribe.h |   4 +-
+ src/modules/sca/sca_util.c      | 153 +++++++++++++++++++++++-----------------
+ 6 files changed, 263 insertions(+), 136 deletions(-)
+
+diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
+index 44a9a9e..862f56e 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -64,6 +64,12 @@ db_func_t dbf;	// db api
@@ -25,7 +40,7 @@
  static int sca_call_info_update_0_f(sip_msg_t* msg, char*, char*);
  static int sca_call_info_update_1_f(sip_msg_t* msg, char*, char*);
  static int sca_call_info_update_2_f(sip_msg_t* msg, char*, char*);
-@@ -82,8 +93,12 @@ int fixup_free_ciu(void **param, int par
+@@ -82,8 +93,12 @@ int fixup_free_ciu(void **param, int param_no);
   * EXPORTED COMMANDS
   */
  static cmd_export_t cmds[] = {
@@ -159,6 +174,8 @@
  static int sca_call_info_update_0_f(sip_msg_t* msg, char* p1, char* p2)
  {
  	return sca_call_info_update(msg, SCA_CALL_INFO_SHARED_BOTH, NULL, NULL);
+diff --git a/src/modules/sca/sca.h b/src/modules/sca/sca.h
+index 04d3c1e..2425bc3 100644
 --- a/src/modules/sca/sca.h
 +++ b/src/modules/sca/sca.h
 @@ -55,4 +55,10 @@ typedef struct _sca_mod sca_mod;
@@ -172,9 +189,11 @@
 +extern int_str to_uri_avp;
 +
  #endif // SCA_H
+diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
+index 5592efd..4ae93f9 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
-@@ -1798,11 +1798,11 @@ int sca_call_info_update(sip_msg_t *msg,
+@@ -1798,11 +1798,11 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
  	str to_aor = STR_NULL;
  	str contact_uri = STR_NULL;
  	int aor_flags = SCA_CALL_INFO_UPDATE_FLAG_DEFAULT;
@@ -187,7 +206,7 @@
  
  	method = sca_get_msg_method(msg);
  
-@@ -1846,6 +1846,9 @@ int sca_call_info_update(sip_msg_t *msg,
+@@ -1846,6 +1846,9 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
  		}
  	}
  
@@ -197,7 +216,7 @@
  	memset(&call_info, 0, sizeof(sca_call_info));
  	call_info_hdr = get_hdr(msg, HDR_CALLINFO_T);
  	if (!SCA_HEADER_EMPTY(call_info_hdr)) {
-@@ -1858,36 +1861,22 @@ int sca_call_info_update(sip_msg_t *msg,
+@@ -1858,36 +1861,22 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
  	}
  
  	if (uri_from != NULL) {
@@ -243,7 +262,7 @@
  		LM_ERR("Bad To header\n");
  		goto done;
  	}
-@@ -1916,27 +1905,35 @@ int sca_call_info_update(sip_msg_t *msg,
+@@ -1916,27 +1905,35 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
  				goto done;
  			}
  			aor_flags |= SCA_CALL_INFO_UPDATE_FLAG_FROM_ALLOC;
@@ -290,7 +309,7 @@
  		}
  	}
  
-@@ -2006,16 +2003,6 @@ int sca_call_info_update(sip_msg_t *msg,
+@@ -2006,16 +2003,6 @@ int sca_call_info_update(sip_msg_t *msg, int update_mask, str *uri_to,
  			pkg_free(to_aor.s);
  		}
  	}
@@ -307,9 +326,11 @@
  
  	return (rc);
  }
+diff --git a/src/modules/sca/sca_subscribe.c b/src/modules/sca/sca_subscribe.c
+index 8040d49..d568729 100644
 --- a/src/modules/sca/sca_subscribe.c
 +++ b/src/modules/sca/sca_subscribe.c
-@@ -1005,10 +1005,6 @@ int sca_subscription_from_request(sca_mo
+@@ -1005,10 +1005,6 @@ int sca_subscription_from_request(sca_mod *scam, sip_msg_t *msg, int event_type,
  		expires = max_expires;
  	}
  
@@ -320,7 +341,7 @@
  	if (SCA_HEADER_EMPTY(msg->callid)) {
  		LM_ERR("Empty Call-ID header\n");
  		goto error;
-@@ -1030,29 +1026,18 @@ int sca_subscription_from_request(sca_mo
+@@ -1030,29 +1026,18 @@ int sca_subscription_from_request(sca_mod *scam, sip_msg_t *msg, int event_type,
  		goto error;
  	}
  
@@ -354,7 +375,7 @@
  	}
  
  	if (parse_sip_msg_uri(msg) < 0) {
-@@ -1135,7 +1120,7 @@ int sca_subscription_from_request(sca_mo
+@@ -1135,7 +1120,7 @@ int sca_subscription_from_request(sca_mod *scam, sip_msg_t *msg, int event_type,
  	return (-1);
  }
  
@@ -363,7 +384,7 @@
  {
  	sca_subscription req_sub;
  	sca_subscription *sub = NULL;
-@@ -1150,6 +1135,8 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1150,6 +1135,8 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
  	int idx = -1;
  	int rc = -1;
  	int released = 0;
@@ -372,7 +393,7 @@
  
  	if (parse_headers(msg, HDR_EOH_F, 0) < 0) {
  		LM_ERR("header parsing failed: bad request\n");
-@@ -1174,6 +1161,21 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1174,6 +1161,21 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
  		return (-1);
  	}
  
@@ -394,7 +415,7 @@
  	if (sca_subscription_from_request(sca, msg, event_type, &req_sub) < 0) {
  		SCA_SUB_REPLY_ERROR(sca, 400, "Bad Shared Call Appearance Request",
  				msg);
-@@ -1187,7 +1189,15 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1187,7 +1189,15 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
  	sca_subscription_print(&req_sub);
  
  	// check to see if the message has a to-tag
@@ -411,7 +432,7 @@
  
  	// XXX should lock starting here and use unsafe methods below?
  
-@@ -1354,9 +1364,9 @@ int ki_sca_handle_subscribe(sip_msg_t *m
+@@ -1354,9 +1364,9 @@ int ki_sca_handle_subscribe(sip_msg_t *msg)
  	return (rc);
  }
  
@@ -423,6 +444,8 @@
  }
  
  int sca_subscription_reply(sca_mod *scam, int status_code, char *status_msg,
+diff --git a/src/modules/sca/sca_subscribe.h b/src/modules/sca/sca_subscribe.h
+index e919717..5ee2cbc 100644
 --- a/src/modules/sca/sca_subscribe.h
 +++ b/src/modules/sca/sca_subscribe.h
 @@ -75,7 +75,7 @@ extern const str SCA_METHOD_SUBSCRIBE;
@@ -434,7 +457,7 @@
  int sca_subscription_reply(sca_mod *, int, char *, int, int, sip_msg_t *);
  
  int sca_subscription_from_db_result(db1_res_t *, sca_subscription *);
-@@ -88,6 +88,6 @@ void sca_subscription_state_to_str(int,
+@@ -88,6 +88,6 @@ void sca_subscription_state_to_str(int, str *);
  int sca_subscription_aor_has_subscribers(int, str *);
  int sca_subscription_delete_subscriber_for_event(sca_mod *, str *, str *, str *);
  int sca_subscription_terminate(sca_mod *, str *, int, str *, int, int);
@@ -442,9 +465,11 @@
 +int ki_sca_handle_subscribe(sip_msg_t *msg, str *, str *);
  
  #endif // SCA_SUBSCRIBE_H
+diff --git a/src/modules/sca/sca_util.c b/src/modules/sca/sca_util.c
+index 434d1df..bc344d5 100644
 --- a/src/modules/sca/sca_util.c
 +++ b/src/modules/sca/sca_util.c
-@@ -112,93 +112,118 @@ int sca_get_msg_cseq_method(sip_msg_t *m
+@@ -112,93 +112,118 @@ int sca_get_msg_cseq_method(sip_msg_t *msg)
  	return (get_cseq(msg)->method_id);
  }
  
