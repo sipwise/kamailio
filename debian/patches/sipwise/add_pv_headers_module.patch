@@ -541,7 +541,7 @@ index 0000000..30bd1da
 +            $var(test) = $x_rr;
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
 new file mode 100644
-index 0000000..7683293
+index 0000000..30d944c
 --- /dev/null
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -0,0 +1,2170 @@
@@ -1652,7 +1652,7 @@ index 0000000..7683293
 +    if(!marker)
 +        marker = pv_detect_split_char(s->s);
 +    while (idx < s->len) {
-+        strncpy(p, s->s+idx++,1);
++        p = s->s + idx++;
 +        if (keep_spaces == 0 && strncmp(p, " ", 1) == 0)
 +            continue;
 +        if (p == marker) {
