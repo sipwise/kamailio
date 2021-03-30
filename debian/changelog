@@ -1,3 +1,13 @@
+ngcp-kamailio (5.1.10-1+0~mr6.5.13.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [512a3f1] TT#110950 fix upstream/topos_execute_event_route_topos_sending.patch
+
+  [ Marco Capetta ]
+  * [0414dc3] TT#110950 TT#58562 dialplan: add reload_delta parameter
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 30 Mar 2021 19:21:29 +0200
+
 ngcp-kamailio (5.1.10-1+0~mr6.5.12.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
