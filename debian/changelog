@@ -1,3 +1,11 @@
+ngcp-kamailio (5.2.8-1+0~mr7.5.9.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [69cd7f7] TT#114315 pv_headers: fix split detection marker
+  * [70abee9] TT#114315 pv_headers: fix split detection marker, take two
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 31 Mar 2021 09:47:38 +0200
+
 ngcp-kamailio (5.2.8-1+0~mr7.5.8.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
