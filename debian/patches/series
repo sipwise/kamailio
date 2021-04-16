@@ -32,8 +32,8 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## backports from upstream (5.4)
-upstream/ctl-info-log-messages-made-debug.patch
-# upstream master (5.5)
+#
+## upstream master (5.5)
 upstream/permissions-basic-safety-for-concurent-rpc-reload.patch
 upstream/permissions-add-reload_delta-parameter.patch
 upstream/ndb_redis-set-message-level-to-debug-on-reconnect.patch
@@ -50,7 +50,6 @@ sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
-sipwise/pv_headers-fix-detection-of-split-marker.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 #
