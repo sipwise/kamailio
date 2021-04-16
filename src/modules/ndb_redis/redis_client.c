@@ -1032,13 +1032,6 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
 		}
 	}
 
-	LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
-	if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
-		LM_ERR("Redis error:%.*s\n",
-			(int)rpl->rplRedis->len, rpl->rplRedis->str);
-		goto error_exec;
-	}
-
 	if (check_cluster_reply(rpl->rplRedis, &rsrv)) {
 		LM_DBG("rsrv->ctxRedis = %p\n", rsrv->ctxRedis);
 		if(rsrv->ctxRedis==NULL)
@@ -1066,6 +1059,11 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
 			if(redisc_reconnect_server(rsrv)==0)
 			{
 				rpl->rplRedis = redisvCommand(rsrv->ctxRedis, cmd->s, ap4);
+				if(rpl->rplRedis == NULL)
+				{
+					redis_count_err_and_disable(rsrv);
+					goto error_exec;
+				}
 			} else {
 				LM_ERR("unable to reconnect to redis server: %.*s\n",
 						srv->len, srv->s);
@@ -1073,14 +1071,15 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
 				goto error_exec;
 			}
 		}
-
-		LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
-		if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
-			LM_ERR("Redis error:%.*s\n",
-				(int)rpl->rplRedis->len, rpl->rplRedis->str);
-			goto error_exec;
-		}
 	}
+
+	LM_DBG("rpl->rplRedis->type:%d\n", rpl->rplRedis->type);
+	if(rpl->rplRedis->type == REDIS_REPLY_ERROR) {
+		LM_ERR("Redis error:%.*s\n",
+			(int)rpl->rplRedis->len, rpl->rplRedis->str);
+		goto error_exec;
+	}
+
 	STR_ZTOV(cmd->s[cmd->len], c);
 	rsrv->disable.consecutive_errors = 0;
 	va_end(ap);
