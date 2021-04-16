@@ -1,3 +1,11 @@
+ngcp-kamailio (5.4.5-1+0~mr9.4.0.0) unstable; urgency=medium
+
+  * TT#114315 pv_headers: fix split detection marker
+  * TT#91551 ctl: remove debug message
+  * TT#119500 update to 5.4.5
+
+ -- Victor Seva <vseva@debian.org>  Fri, 16 Apr 2021 10:55:24 +0200
+
 ngcp-kamailio (5.4.4-1+0~mr9.4.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
