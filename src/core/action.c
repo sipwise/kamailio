@@ -75,7 +75,6 @@
 #endif
 
 int _last_returned_code  = 0;
-struct onsend_info* p_onsend=0; /* onsend route send info */
 
 /* current action executed from config file */
 static cfg_action_t *_cfg_crt_action = 0;
@@ -383,10 +382,20 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 			init_dest_info(&dst);
 			if (a->type==FORWARD_UDP_T) dst.proto=PROTO_UDP;
 #ifdef USE_TCP
-			else if (a->type==FORWARD_TCP_T) dst.proto= PROTO_TCP;
+			else if (a->type==FORWARD_TCP_T) {
+				dst.proto= PROTO_TCP;
+				if(msg->msg_flags & FL_USE_OTCPID) {
+					dst.id = msg->otcpid;
+				}
+			}
 #endif
 #ifdef USE_TLS
-			else if (a->type==FORWARD_TLS_T) dst.proto= PROTO_TLS;
+			else if (a->type==FORWARD_TLS_T) {
+				dst.proto= PROTO_TLS;
+				if(msg->msg_flags & FL_USE_OTCPID) {
+					dst.id = msg->otcpid;
+				}
+			}
 #endif
 #ifdef USE_SCTP
 			else if (a->type==FORWARD_SCTP_T) dst.proto=PROTO_SCTP;
@@ -500,7 +509,7 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 				ret=E_BUG;
 				goto error;
 			}
-			LOG_(DEFAULT_FACILITY, a->val[0].u.number, "<script>: ", "%s", 
+			LOG_FN(DEFAULT_FACILITY, a->val[0].u.number, "<script>: ", "%s",
 				 a->val[1].u.string);
 			ret=1;
 			break;
@@ -752,7 +761,7 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 					len=strlen(a->val[0].u.string);
 					msg->new_uri.s=pkg_malloc(len+1);
 					if (msg->new_uri.s==0){
-						LM_ERR("memory allocation failure\n");
+						PKG_MEM_ERROR;
 						ret=E_OUT_OF_MEM;
 						goto error;
 					}
@@ -802,7 +811,7 @@ int do_action(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 
 				new_uri=pkg_malloc(MAX_URI_SIZE);
 				if (new_uri==0){
-					LM_ERR("memory allocation failure\n");
+					PKG_MEM_ERROR;
 					ret=E_OUT_OF_MEM;
 					goto error;
 				}
@@ -1530,7 +1539,7 @@ int run_actions(struct run_act_ctx* h, struct action* a, struct sip_msg* msg)
 {
 	struct action* t;
 	int ret;
-	struct timeval tvb, tve;
+	struct timeval tvb = {0}, tve = {0};
 	struct timezone tz;
 	unsigned int tdiff;
 

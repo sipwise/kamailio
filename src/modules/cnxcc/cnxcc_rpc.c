@@ -22,18 +22,16 @@
 
 #include <stdio.h>
 
-#include "../../core/rpc.h"
-#include "../../core/rpc_lookup.h"
-
+#include "cnxcc_rpc.h"
 #include "cnxcc_mod.h"
 
 extern data_t _data;
 
 void rpc_kill_call(rpc_t *rpc, void *ctx)
 {
-	call_t *call;
-	hash_tables_t *hts;
-	str callid;
+	call_t *call = NULL;
+	hash_tables_t *hts = NULL;
+	str callid = STR_NULL;
 
 	if(!rpc->scan(ctx, "S", &callid)) {
 		LM_ERR("%s: error reading RPC param\n", __FUNCTION__);
@@ -65,11 +63,12 @@ void rpc_kill_call(rpc_t *rpc, void *ctx)
 
 void rpc_check_client_stats(rpc_t *rpc, void *ctx)
 {
-	call_t *call, *tmp;
+	call_t *call = NULL, *tmp = NULL;
 	int index = 0;
-	str client_id, rows;
+	str client_id = STR_NULL;
+	str rows = STR_NULL;
 	char row_buffer[512];
-	credit_data_t *credit_data;
+	credit_data_t *credit_data = NULL;
 
 	if(!rpc->scan(ctx, "S", &client_id)) {
 		LM_ERR("%s: error reading RPC param\n", __FUNCTION__);
@@ -98,9 +97,7 @@ void rpc_check_client_stats(rpc_t *rpc, void *ctx)
 		return;
 	}
 
-	rows.len = 0;
 	rows.s = pkg_malloc(10);
-
 	if(rows.s == NULL)
 		goto nomem;
 
@@ -115,13 +112,14 @@ void rpc_check_client_stats(rpc_t *rpc, void *ctx)
 					"id:%d,confirmed:%s,local_consumed_amount:%f,global_"
 					"consumed_amount:%f,local_max_amount:%f,global_max_amount:%"
 					"f,call_id:%.*s,start_timestamp:%d"
-					",inip:%d,finp:%d,cps:%f;",
+					",inip:%d,finp:%d,connect:%f,cps:%f;",
 					index, call->confirmed ? "yes" : "no",
 					call->consumed_amount, credit_data->consumed_amount,
 					call->max_amount, credit_data->max_amount,
 					call->sip_data.callid.len, call->sip_data.callid.s,
 					call->start_timestamp, call->money_based.initial_pulse,
 					call->money_based.final_pulse,
+					call->money_based.connect_cost,
 					call->money_based.cost_per_second);
 		else
 			snprintf(row_buffer, sizeof(row_buffer),
@@ -136,7 +134,6 @@ void rpc_check_client_stats(rpc_t *rpc, void *ctx)
 
 		row_len = strlen(row_buffer);
 		rows.s = pkg_reallocxf(rows.s, rows.len + row_len);
-
 		if(rows.s == NULL) {
 			cnxcc_unlock(credit_data->lock);
 			goto nomem;
@@ -160,14 +157,14 @@ void rpc_check_client_stats(rpc_t *rpc, void *ctx)
 	return;
 
 nomem:
-	LM_ERR("No more pkg memory\n");
+	PKG_MEM_ERROR;
 	rpc->fault(ctx, 500, "No more memory\n");
 }
 
 static int iterate_over_table(
 		hash_tables_t *hts, str *result, credit_type_t type)
 {
-	struct str_hash_entry *h_entry, *tmp;
+	struct str_hash_entry *h_entry = NULL, *tmp = NULL;
 	char row_buffer[512];
 	int index = 0;
 
@@ -222,7 +219,6 @@ static int iterate_over_table(
 
 				row_len = strlen(row_buffer);
 				result->s = pkg_reallocxf(result->s, result->len + row_len);
-
 				if(result->s == NULL) {
 					cnxcc_unlock(hts->lock);
 					goto nomem;
@@ -237,20 +233,17 @@ static int iterate_over_table(
 	return 0;
 
 nomem:
-	LM_ERR("No more pkg memory\n");
+	PKG_MEM_ERROR;
 	return -1;
 }
 
 void rpc_active_clients(rpc_t *rpc, void *ctx)
 {
-	str rows;
+	str rows = STR_NULL;
 
 	rows.s = pkg_malloc(10);
-
 	if(rows.s == NULL)
 		goto nomem;
-
-	rows.len = 0;
 
 	iterate_over_table(&_data.time, &rows, CREDIT_TIME);
 	iterate_over_table(&_data.money, &rows, CREDIT_MONEY);
@@ -265,6 +258,6 @@ void rpc_active_clients(rpc_t *rpc, void *ctx)
 	return;
 
 nomem:
-	LM_ERR("No more pkg memory\n");
+	PKG_MEM_ERROR;
 	rpc->fault(ctx, 500, "No more memory\n");
 }

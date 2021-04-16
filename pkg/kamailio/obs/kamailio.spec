@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.2.8
+%define ver 5.4.5
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -238,11 +238,11 @@
 %endif
 
 
-Summary:    Kamailio (former OpenSER) - the Open Source SIP Server
+Summary:    Kamailio - the Open Source SIP Server
 Name:       %name
 Version:    %ver
 Release:    %rel
-Packager:   Peter Dunkley <peter@dunkley.me.uk>
+Packager:   Sergey Safarov <s.safarov@gmail.com>
 License:    GPL-2.0
 Group:      %{PKGGROUP}
 Source:     http://kamailio.org/pub/kamailio/%{ver}/src/%{name}-%{ver}_src.tar.gz
@@ -255,7 +255,7 @@ Conflicts:  kamailio-carrierroute < %ver, kamailio-cpl < %ver
 Conflicts:  kamailio-dialplan < %ver, kamailio-dnssec < %ver
 Conflicts:  kamailio-geoip < %ver, kamailio-gzcompress < %ver
 Conflicts:  kamailio-ims < %ver, kamailio-java < %ver, kamailio-json < %ver
-Conflicts:  kamailio-lcr < %ver, kamailio-ldap < %ver, kamailio-lua < %ver
+Conflicts:  kamailio-lcr < %ver, kamailio-ldap < %ver, kamailio-lost < %ver, kamailio-lua < %ver
 Conflicts:  kamailio-kazoo < %ver
 Conflicts:  kamailio-rabbitmq < %ver
 Conflicts:  kamailio-memcached < %ver, kamailio-mongodb < %ver, kamailio-mysql < %ver
@@ -263,23 +263,28 @@ Conflicts:  kamailio-outbound < %ver, kamailio-perl < %ver
 Conflicts:  kamailio-postgresql < %ver, kamailio-presence < %ver
 Conflicts:  kamailio-python < %ver
 Conflicts:  kamailio-radius < %ver, kamailio-redis < %ver
-Conflicts:  kamailio-regex < %ver, kamailio-ruby < %ver, kamailio-sctp < %ver
-Conflicts:  kamailio-sipdump < %ver
+Conflicts:  kamailio-regex < %ver, kamailio-ruby < %ver
+Conflicts:  kamailio-sctp < %ver, kamailio-secfilter < %ver, kamailio-sipdump < %ver
 Conflicts:  kamailio-snmpstats < %ver, kamailio-sqlang < %ver, kamailio-sqlite < %ver
 Conflicts:  kamailio-tls < %ver, kamailio-unixodbc < %ver
 Conflicts:  kamailio-utils < %ver, kamailio-websocket < %ver
 Conflicts:  kamailio-xhttp-pi < %ver, kamailio-xmlops < %ver
 Conflicts:  kamailio-xmlrpc < %ver, kamailio-xmpp < %ver
 Conflicts:  kamailio-uuid < %ver
-BuildRequires:  bison, flex
+BuildRequires:  bison, flex, which, make, gcc, gcc-c++, pkgconfig
+%if 0%{?rhel} != 6
+Requires:  systemd
+BuildRequires:  systemd-devel
+%endif
+
 %if 0%{?suse_version} == 1315 || 0%{?suse_version} == 1330
 Requires:  filesystem
-BuildRequires:  systemd, shadow
+BuildRequires:  shadow
 %endif
 
 
 %description
-Kamailio (former OpenSER) is an Open Source SIP Server released under GPL, able
+Kamailio is an Open Source SIP Server released under GPL, able
 to handle thousands of call setups per second. Among features: asynchronous TCP,
 UDP and SCTP, secure communication via TLS for VoIP (voice, video); IPv4 and
 IPv6; SIMPLE instant messaging and presence with embedded XCAP server and MSRP
@@ -635,6 +640,14 @@ BuildRequires:  openldap-devel
 %description    ldap
 LDAP search interface for Kamailio.
 
+%package    lost
+Summary:    HELD (RFC6155) and LOST (RFC5222) location-based routing
+Group:      %{PKGGROUP}
+Requires:   libxml2, kamailio = %ver
+BuildRequires:  libxml2-devel
+
+%description    lost
+HELD (RFC6155) and LOST (RFC5222) location-based routing support for Kamailio.
 
 %if %{with lua}
 %package    lua
@@ -867,10 +880,19 @@ SCTP transport for Kamailio.
 %endif
 
 
+%package    secfilter
+Summary:    Additional layer of security over our communications
+Group:      %{PKGGROUP}
+Requires:   kamailio = %ver
+
+%description    secfilter
+Additional layer of security over our communications.
+
+
 %package    sipcapture-daemon-config
 Summary:    Reference config for sipcapture daemon
 Group:      %{PKGGROUP}
-Requires:   kamailio-sipcapture = %ver
+Requires:   kamailio = %ver
 %if 0%{?suse_version}
 Requires:  filesystem
 %endif
@@ -1097,6 +1119,12 @@ UUID module for Kamailio.
 sed -i -e 's/python3/python2/' utils/kamctl/dbtextdb/dbtextdb.py
 %endif
 
+# on latest dist need to add --atexit=no for Kamailio options. More details GH #2616
+%if 0%{?fedora} || 0%{?suse_version} || 0%{?rhel} == 8
+sed -i -e 's|/usr/sbin/kamailio|/usr/sbin/kamailio --atexit=no|' pkg/kamailio/obs/kamailio.service
+%endif
+
+
 %build
 ln -s ../obs pkg/kamailio/%{dist_name}/%{dist_version}
 %if 0%{?fedora} || 0%{?suse_version} || 0%{?rhel} == 8
@@ -1146,7 +1174,10 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with kazoo}
     kkazoo \
 %endif
-    kldap \
+%if %{with rabbitmq}
+    krabbitmq \
+%endif
+    kldap 
 %if %{with lua}
     klua \
 %endif
@@ -1170,9 +1201,6 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with python3}
     kpython3 \
 %endif
-%if %{with rabbitmq}
-    krabbitmq \
-%endif
     kradius \
 %if %{with redis}
     kredis \
@@ -1183,7 +1211,11 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with sctp}
     ksctp \
 %endif
-    ksnmpstats ksqlite ktls kunixodbc kutils \
+    ksnmpstats ksqlite \
+%if "%{?_unitdir}" != ""
+    ksystemd \
+%endif
+    ktls kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
 %endif
@@ -1234,6 +1266,9 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with kazoo}
     kkazoo \
 %endif
+%if %{with rabbitmq}
+    krabbitmq \
+%endif
     kldap \
 %if %{with lua}
     klua \
@@ -1258,9 +1293,6 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with python3}
     kpython3 \
 %endif
-%if %{with rabbitmq}
-    krabbitmq \
-%endif
     kradius \
 %if %{with redis}
     kredis \
@@ -1271,7 +1303,11 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with sctp}
     ksctp \
 %endif
-    ksnmpstats ksqlite ktls kunixodbc kutils \
+    ksnmpstats ksqlite \
+%if "%{?_unitdir}" != ""
+    ksystemd \
+%endif
+    ktls kunixodbc kutils \
 %if %{with websocket}
     kwebsocket \
 %endif
@@ -1399,6 +1435,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.dialog
 %doc %{_docdir}/kamailio/modules/README.dispatcher
 %doc %{_docdir}/kamailio/modules/README.diversion
+%doc %{_docdir}/kamailio/modules/README.dlgs
 %doc %{_docdir}/kamailio/modules/README.dmq
 %doc %{_docdir}/kamailio/modules/README.domain
 %doc %{_docdir}/kamailio/modules/README.domainpolicy
@@ -1409,6 +1446,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.htable
 %doc %{_docdir}/kamailio/modules/README.imc
 %doc %{_docdir}/kamailio/modules/README.ipops
+%doc %{_docdir}/kamailio/modules/README.kemix
 %doc %{_docdir}/kamailio/modules/README.kex
 %doc %{_docdir}/kamailio/modules/README.malloc_test
 %doc %{_docdir}/kamailio/modules/README.mangler
@@ -1433,6 +1471,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.print
 %doc %{_docdir}/kamailio/modules/README.print_lib
 %doc %{_docdir}/kamailio/modules/README.pv
+%doc %{_docdir}/kamailio/modules/README.pv_headers
 %doc %{_docdir}/kamailio/modules/README.pua_rpc
 %doc %{_docdir}/kamailio/modules/README.qos
 %doc %{_docdir}/kamailio/modules/README.ratelimit
@@ -1476,6 +1515,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.userblacklist
 %doc %{_docdir}/kamailio/modules/README.usrloc
 %doc %{_docdir}/kamailio/modules/README.xhttp
+%doc %{_docdir}/kamailio/modules/README.xhttp_prom
 %doc %{_docdir}/kamailio/modules/README.xhttp_rpc
 %doc %{_docdir}/kamailio/modules/README.xlog
 %doc %{_docdir}/kamailio/modules/README.xprint
@@ -1489,6 +1529,10 @@ fi
 %doc %{_docdir}/kamailio/modules/README.statsc
 %doc %{_docdir}/kamailio/modules/README.topos
 %doc %{_docdir}/kamailio/modules/README.cfgt
+%if "%{?_unitdir}" != ""
+%doc %{_docdir}/kamailio/modules/README.log_systemd
+%doc %{_docdir}/kamailio/modules/README.systemdops
+%endif
 
 %dir %attr(-,kamailio,kamailio) %{_sysconfdir}/kamailio
 %config(noreplace) %{_sysconfdir}/kamailio/dictionary.kamailio
@@ -1517,8 +1561,6 @@ fi
 %{_libdir}/kamailio/libsrdb1.so.1.0
 %{_libdir}/kamailio/libsrdb2.so.1
 %{_libdir}/kamailio/libsrdb2.so.1.0
-%{_libdir}/kamailio/libsrutils.so.1
-%{_libdir}/kamailio/libsrutils.so.1.0
 %{_libdir}/kamailio/libtrie.so.1
 %{_libdir}/kamailio/libtrie.so.1.0
 
@@ -1550,6 +1592,7 @@ fi
 %{_libdir}/kamailio/modules/dialog.so
 %{_libdir}/kamailio/modules/dispatcher.so
 %{_libdir}/kamailio/modules/diversion.so
+%{_libdir}/kamailio/modules/dlgs.so
 %{_libdir}/kamailio/modules/dmq.so
 %{_libdir}/kamailio/modules/domain.so
 %{_libdir}/kamailio/modules/domainpolicy.so
@@ -1560,6 +1603,7 @@ fi
 %{_libdir}/kamailio/modules/htable.so
 %{_libdir}/kamailio/modules/imc.so
 %{_libdir}/kamailio/modules/ipops.so
+%{_libdir}/kamailio/modules/kemix.so
 %{_libdir}/kamailio/modules/kex.so
 %{_libdir}/kamailio/modules/malloc_test.so
 %{_libdir}/kamailio/modules/mangler.so
@@ -1585,6 +1629,7 @@ fi
 %{_libdir}/kamailio/modules/print_lib.so
 %{_libdir}/kamailio/modules/pua_rpc.so
 %{_libdir}/kamailio/modules/pv.so
+%{_libdir}/kamailio/modules/pv_headers.so
 %{_libdir}/kamailio/modules/qos.so
 %{_libdir}/kamailio/modules/ratelimit.so
 %{_libdir}/kamailio/modules/registrar.so
@@ -1627,6 +1672,7 @@ fi
 %{_libdir}/kamailio/modules/userblacklist.so
 %{_libdir}/kamailio/modules/usrloc.so
 %{_libdir}/kamailio/modules/xhttp.so
+%{_libdir}/kamailio/modules/xhttp_prom.so
 %{_libdir}/kamailio/modules/xhttp_rpc.so
 %{_libdir}/kamailio/modules/xlog.so
 %{_libdir}/kamailio/modules/xprint.so
@@ -1640,6 +1686,10 @@ fi
 %{_libdir}/kamailio/modules/statsc.so
 %{_libdir}/kamailio/modules/topos.so
 %{_libdir}/kamailio/modules/cfgt.so
+%if "%{?_unitdir}" != ""
+%{_libdir}/kamailio/modules/log_systemd.so
+%{_libdir}/kamailio/modules/systemdops.so
+%endif
 
 %{_sbindir}/kamailio
 %{_sbindir}/kamctl
@@ -1862,12 +1912,19 @@ fi
 %{_libdir}/kamailio/modules/h350.so
 %{_libdir}/kamailio/modules/ldap.so
 
+%files      lost
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.lost
+%{_libdir}/kamailio/modules/lost.so
+
 
 %if %{with lua}
 %files      lua
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.app_lua
+%doc %{_docdir}/kamailio/modules/README.app_lua_sr
 %{_libdir}/kamailio/modules/app_lua.so
+%{_libdir}/kamailio/modules/app_lua_sr.so
 %endif
 
 
@@ -2087,6 +2144,12 @@ fi
 %endif
 
 
+%files      secfilter
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.secfilter
+%{_libdir}/kamailio/modules/secfilter.so
+
+
 %files      sipdump
 %defattr(-,root,root)
 %doc %{_docdir}/kamailio/modules/README.sipdump
@@ -2134,10 +2197,12 @@ fi
 
 %files      tls
 %defattr(-,root,root)
+%dir %{_libdir}/kamailio/openssl_mutex_shared
 %doc %{_docdir}/kamailio/modules/README.auth_identity
 %doc %{_docdir}/kamailio/modules/README.tls
 %{_libdir}/kamailio/modules/auth_identity.so
 %{_libdir}/kamailio/modules/tls.so
+%{_libdir}/kamailio/openssl_mutex_shared/openssl_mutex_shared.so
 
 
 %files      tcpops
@@ -2201,8 +2266,12 @@ fi
 
 
 %changelog
+* Sat Aug 31 2019 Sergey Safarov <s.safarov@gmail.com> 5.3.0-dev7
+  - Packaged kemix, lost and xhttp_prom modules
 * Sat Mar 30 2019 Sergey Safarov <s.safarov@gmail.com> 5.3.0-0
   - Added support of openSUSE:Leap:15.0, openSUSE:Leap:15.1 and Fedora 30 dists
+* Thu Feb 21 2019 Sergey Safarov <s.safarov@gmail.com> 5.3.0-0
+  - Added secfilter package
 * Tue Dec 11 2018 Sergey Safarov <s.safarov@gmail.com> 5.2.0-1
   - Added Ruby package
 * Sun Nov 04 2018 Sergey Safarov <s.safarov@gmail.com> 5.2.0-0

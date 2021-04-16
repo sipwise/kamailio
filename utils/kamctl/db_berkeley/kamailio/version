@@ -1,13 +1,13 @@
 METADATA_COLUMNS
-table_name(str) table_version(int)
+id(int) table_name(str) table_version(int)
 METADATA_KEY
-0 
+1 
 METADATA_READONLY
 0
 METADATA_LOGFLAGS
 0
 METADATA_DEFAULTS
-NIL|0
+NIL|NIL|0
 version|
 version|1
 acc|
@@ -108,6 +108,8 @@ rtpproxy|
 rtpproxy|1
 sca_subscriptions|
 sca_subscriptions|2
+secfilter|
+secfilter|1
 silo|
 silo|8
 sip_trace|
@@ -123,7 +125,7 @@ topos_t|1
 trusted|
 trusted|6
 uacreg|
-uacreg|3
+uacreg|4
 uid_credentials|
 uid_credentials|7
 uid_domain|

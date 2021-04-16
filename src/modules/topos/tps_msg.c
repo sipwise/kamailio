@@ -163,8 +163,7 @@ int tps_add_headers(sip_msg_t *msg, str *hname, str *hbody, int hpos)
 	hs.len = hname->len + 2 + hbody->len;
 	hs.s  = (char*)pkg_malloc(hs.len + 3);
 	if (hs.s==NULL) {
-		LM_ERR("no pkg memory left (%.*s - %d)\n",
-				hname->len, hname->s, hs.len);
+		PKG_MEM_ERROR_FMT("(%.*s - %d)\n", hname->len, hname->s, hs.len);
 		return -1;
 	}
 	memcpy(hs.s, hname->s, hname->len);
@@ -866,11 +865,6 @@ int tps_response_received(sip_msg_t *msg)
 	uint32_t direction = TPS_DIR_DOWNSTREAM;
 
 	LM_DBG("handling incoming response\n");
-
-	if(msg->first_line.u.reply.statuscode==100) {
-		/* nothing to do - it should be absorbed */
-		return 0;
-	}
 
 	memset(&mtsd, 0, sizeof(tps_data_t));
 	memset(&stsd, 0, sizeof(tps_data_t));

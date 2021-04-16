@@ -21,7 +21,7 @@
 #include "../../core/globals.h"
 #include "../../core/forward.h"
 #include "../../core/dprint.h"
-#include "../../core/md5utils.h"
+#include "../../core/crypto/md5utils.h"
 #include "../../core/msg_translator.h"
 #include "../../core/udp_server.h"
 #include "../../core/timer.h"
@@ -37,6 +37,7 @@
 #include "../../core/route.h"
 #include "../../core/receive.h"
 #include "../../core/onsend.h"
+#include "../../core/kemi.h"
 #include "sl_stats.h"
 #include "sl_funcs.h"
 #include "sl.h"
@@ -54,6 +55,12 @@ static unsigned int  *sl_timeout;
 static int _sl_filtered_ack_route = -1; /* default disabled */
 
 static int _sl_evrt_local_response = -1; /* default disabled */
+
+/* send path and flags in 3xx class reply */
+int sl_rich_redirect = 0;
+
+extern str _sl_event_callback_fl_ack;
+extern str _sl_event_callback_lres_sent;
 
 /*!
  * lookup sl event routes
@@ -128,6 +135,9 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 
 	int backup_rt;
 	struct run_act_ctx ctx;
+	run_act_ctx_t *bctx;
+	sr_kemi_eng_t *keng = NULL;
+	str evname = str_init("sl:local-response");
 	struct sip_msg pmsg;
 
 	if (msg->first_line.u.request.method_value==METHOD_ACK)
@@ -150,7 +160,7 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 
 	/* if that is a redirection message, dump current message set to it */
 	if (code>=300 && code<400) {
-		dset.s=print_dset(msg, &dset.len);
+		dset.s=print_dset(msg, &dset.len, sl_rich_redirect);
 		if (dset.s) {
 			add_lump_rpl(msg, dset.s, dset.len, LUMP_RPL_HDR);
 		}
@@ -203,7 +213,9 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 	ret = msg_send(&dst, buf.s, buf.len);
 	mhomed=backup_mhomed;
 
-	if (unlikely(_sl_evrt_local_response >= 0))
+	keng = sr_kemi_eng_get();
+	if (_sl_evrt_local_response >= 0 || keng!=NULL
+			|| sr_event_enabled(SREV_SIP_REPLY_OUT))
 	{
 		if (likely(build_sip_msg_from_buf(&pmsg, buf.s, buf.len,
 				inc_msg_no()) == 0))
@@ -215,10 +227,8 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 			onsnd_info.send_sock=dst.send_sock;
 			onsnd_info.buf=buf.s;
 			onsnd_info.len=buf.len;
-			p_onsend=&onsnd_info;
 
-			if (unlikely(!IS_SIP(msg)))
-			{
+			if (unlikely(!IS_SIP(msg))) {
 				/* This is an HTTP reply...  So fudge in a CSeq into
 				 * the parsed message message structure so that $rm will
 				 * work in the route */
@@ -226,6 +236,7 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 				struct cseq_body *cseqb;
 				char *tmp2;
 				int len;
+				int tsize;
 
 				if ((hf = (hdr_field_t*) pkg_malloc(sizeof(struct hdr_field))) == NULL)
 				{
@@ -240,8 +251,9 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 					goto event_route_error;
 				}
 
-				if ((tmp = (char *) pkg_malloc(sizeof(char)
-						* (msg->first_line.u.request.method.len + 5))) == NULL)
+				tsize = sizeof(char)
+						* (msg->first_line.u.request.method.len + 5);
+				if ((tmp = (char *) pkg_malloc(tsize)) == NULL)
 				{
 					LM_ERR("out of package memory\n");
 					pkg_free(cseqb);
@@ -252,9 +264,16 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 				memset(hf, 0, sizeof(struct hdr_field));
 				memset(cseqb, 0, sizeof(struct cseq_body));
 
-				len = sprintf(tmp, "0 %.*s\r\n",
+				len = snprintf(tmp, tsize, "0 %.*s\r\n",
 						msg->first_line.u.request.method.len,
 						msg->first_line.u.request.method.s);
+				if(len<0 || len>=tsize) {
+					LM_ERR("failed to print the tmp cseq\n");
+					pkg_free(tmp);
+					pkg_free(cseqb);
+					pkg_free(hf);
+					goto event_route_error;
+				}
 				tmp2 = parse_cseq(tmp, &tmp[len], cseqb);
 
 				hf->type = HDR_CSEQ_T;
@@ -273,10 +292,33 @@ int sl_reply_helper(struct sip_msg *msg, int code, char *reason, str *tag)
 				}
 			}
 
+			if(IS_SIP(msg) && sr_event_enabled(SREV_SIP_REPLY_OUT)) {
+				sr_event_param_t evp;
+				memset(&evp, 0, sizeof(sr_event_param_t));
+				evp.obuf = buf;
+				evp.rcv = &msg->rcv;
+				evp.dst = &dst;
+				evp.req = msg;
+				evp.rpl = &pmsg;
+				evp.rplcode = code;
+				evp.mode = 1;
+				sr_event_exec(SREV_SIP_REPLY_OUT, &evp);
+			}
+
+			p_onsend=&onsnd_info;
 			backup_rt = get_route_type();
 			set_route_type(LOCAL_ROUTE);
 			init_run_actions_ctx(&ctx);
-			run_top_route(event_rt.rlist[_sl_evrt_local_response], &pmsg, 0);
+
+			if(_sl_evrt_local_response>=0) {
+				run_top_route(event_rt.rlist[_sl_evrt_local_response], &pmsg, 0);
+			} else if (keng!=NULL) {
+				bctx = sr_kemi_act_ctx_get();
+				sr_kemi_act_ctx_set(&ctx);
+				(void)sr_kemi_route(keng, msg, EVENT_ROUTE,
+							&_sl_event_callback_lres_sent, &evname);
+				sr_kemi_act_ctx_set(bctx);
+			}
 			set_route_type(backup_rt);
 			p_onsend=0;
 
@@ -387,6 +429,10 @@ int sl_reply_error(struct sip_msg *msg )
 int sl_filter_ACK(struct sip_msg *msg, unsigned int flags, void *bar )
 {
 	str *tag_str;
+	run_act_ctx_t ctx;
+	run_act_ctx_t *bctx;
+	sr_kemi_eng_t *keng = NULL;
+	str evname = str_init("sl:filtered-ack");
 
 	if (msg->first_line.u.request.method_value!=METHOD_ACK)
 		goto pass_it;
@@ -416,9 +462,17 @@ int sl_filter_ACK(struct sip_msg *msg, unsigned int flags, void *bar )
 				LM_DBG("SL local ACK found -> dropping it!\n" );
 				update_sl_filtered_acks();
 				sl_run_callbacks(SLCB_ACK_FILTERED, msg, 0, 0, 0, 0);
+				keng = sr_kemi_eng_get();
 				if(unlikely(_sl_filtered_ack_route>=0)) {
 					run_top_route(event_rt.rlist[_sl_filtered_ack_route],
 							msg, 0);
+				} else if(keng!=NULL) {
+					init_run_actions_ctx(&ctx);
+					bctx = sr_kemi_act_ctx_get();
+					sr_kemi_act_ctx_set(&ctx);
+					(void)sr_kemi_route(keng, msg, EVENT_ROUTE,
+							&_sl_event_callback_fl_ack, &evname);
+					sr_kemi_act_ctx_set(bctx);
 				}
 				return 0;
 			}

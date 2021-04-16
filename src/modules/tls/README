@@ -69,6 +69,7 @@ Olle E. Johansson
               10.35. engine (string)
               10.36. engine_config (string)
               10.37. engine_algorithms (string)
+              10.38. verify_client (string)
 
         11. Functions
 
@@ -139,8 +140,10 @@ Olle E. Johansson
    1.43. Set xavp_cfg parameter
    1.44. Set event_callback parameter
    1.45. Set rand_engine parameter
-   1.46. is_peer_verified usage
-   1.47. Use of event_route[tls:connection-out]
+   1.46. Set verify_client modparam parameter
+   1.47. Set verify_client tls.cfg parameter
+   1.48. is_peer_verified usage
+   1.49. Use of event_route[tls:connection-out]
 
 Chapter 1. Admin Guide
 
@@ -194,6 +197,7 @@ Chapter 1. Admin Guide
         10.35. engine (string)
         10.36. engine_config (string)
         10.37. engine_algorithms (string)
+        10.38. verify_client (string)
 
    11. Functions
 
@@ -275,6 +279,10 @@ request_route {
    To quickly check if your Kamailio version was compiled with these
    options, run kamailio -V and look for USE_TLS and TLS_HOOKS among the
    flags.
+
+   For OpenSSL (libssl) v1.1.x, it is required to preload
+   'openssl_mutex_shared' library shipped by Kamailio. For more details
+   see 'src/modules/tls/openssl_mutex_shared/README.md'.
 
    This module includes several workarounds for various Openssl bugs (like
    compression and Kerberos using the wrong memory allocations functions,
@@ -383,10 +391,9 @@ make -C modules/tls extra_defs="-DTLS_WR_DEBUG -DTLS_RD_DEBUG"
    it, especially under heavy traffic.
 
    This documentation is incomplete. The provided selects are not
-   documented. A list with all the ones implemented by the TLS module can
-   be seen under doc/select_list/select_tls.txt or or
-   http://sip-router.org/docbook/sip-router/branch/master/select_list/sele
-   ct_list.html#select_list.tls.
+   documented in this file. A list with all the ones implemented by the
+   TLS module can be found in the Cookbook https://www.kamailio.org/wiki/
+   in the section Selects for the respective version of Kamailio.
 
 8. Quick Certificate Howto
 
@@ -610,6 +617,7 @@ Place holder
    10.35. engine (string)
    10.36. engine_config (string)
    10.37. engine_algorithms (string)
+   10.38. verify_client (string)
 
 10.1. tls_method (string)
 
@@ -1258,6 +1266,7 @@ modparam("tls", "renegotiation", 1)
      * tls_method - (str) - TLS methods
      * verify_certificate - (bool) - see modparam
      * require_certificate - (bool) - see modparam
+     * verify_client - (str) - see modparam
      * private_key - (str) - see modparam
      * certificate - (str) - see modparam
      * verify_depth - (int) - see modparam
@@ -1491,6 +1500,55 @@ modparam("tls", "engine_algorithms", "ALL")
    The default is not to set any methods as default. This global param is
    not supported in the tls config file.
 
+10.38. verify_client (string)
+
+   Provides an alternative to verify_certificate and require_certificate
+   modparam and tls.cfg parameters, and creates an additional
+   opportunistic connection establishment option for connections with with
+   unverifiable certificates (optional_no_ca).
+
+   This is useful for allowing connections from SIP phones with
+   self-signed certificates, signed by unrecognized root CAs, expired
+   certificates, etc.
+
+   The following values have respective behaviors:
+     * off - no client certificate request performed.
+     * on - require a verified certificate from the client.
+     * optional - ask client for certificate. If one is provided, it must
+       be verified. Allowing missing certificate.
+     * optional_no_ca - ask client for certificate. Opportunistically try
+       to verify certificate. Allow connection regardless of whether there
+       is no certificate or whether certificate is present (verified or
+       not). Note that verification status can be retrieved via
+       $tls_peer_verified.
+
+   Default value is 'off' (no client certificate request performed).
+
+   Recommendation: when using this parameter, do not use
+   verify_certificate or require_certificate parameters. Conversion table
+   is as follows:
+     * verify_certificate=0, require_certificate=0 => verify_client="off"
+     * verify_certificate=1, require_certificate=0 =>
+       verify_client="optional"
+     * verify_certificate=1, require_certificate=1 => verify_client="on"
+
+   Example 1.46. Set verify_client modparam parameter
+...
+modparam("tls", "verify_client", "on")
+...
+
+   Example 1.47. Set verify_client tls.cfg parameter
+...
+[server:1.2.3.4:5061]
+method = TLSv1
+verify_client = on
+...
+
+[server:5.6.7.8:5061]
+method = TLSv1.2
+verify_client = optional_no_ca
+...
+
 11. Functions
 
    11.1. is_peer_verified()
@@ -1503,7 +1561,7 @@ modparam("tls", "engine_algorithms", "ALL")
 
    It can be used only in a request route.
 
-   Example 1.46. is_peer_verified usage
+   Example 1.48. is_peer_verified usage
         if (proto==TLS && !is_peer_verified()) {
                 sl_send_reply("400", "No certificate or verification failed");
                 exit;
@@ -1580,7 +1638,7 @@ modparam("tls", "engine_algorithms", "ALL")
    If drop() is executed in the event route, then the data is no longer
    sent over the connection.
 
-   Example 1.47. Use of event_route[tls:connection-out]
+   Example 1.49. Use of event_route[tls:connection-out]
 ...
 event_route[tls:connection-out] {
   if($sndto(ip)=="1.2.3.4") {

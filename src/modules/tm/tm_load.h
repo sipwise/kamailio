@@ -24,8 +24,6 @@
 #ifndef _TM_BIND_H
 #define _TM_BIND_H
 
-#include "defs.h"
-
 
 #include "../../core/sr_module.h"
 #include "t_hooks.h"
@@ -85,7 +83,6 @@ struct tm_binds {
 	cancel_all_uacs_f  cancel_all_uacs;
 	prepare_request_within_f  prepare_request_within;
 	send_prepared_request_f   send_prepared_request;
-	enum route_mode*   route_mode;
 #ifdef DIALOG_CALLBACKS
 	register_new_dlg_cb_f register_new_dlg_cb;
 	register_dlg_tmcb_f   register_dlg_tmcb;
@@ -94,13 +91,8 @@ struct tm_binds {
 	                    if no dlg callbacks are used/defined*/
 	void* reserved2;
 #endif
-#ifdef WITH_AS_SUPPORT
 	ack_local_uac_f           ack_local_uac;
 	t_get_canceled_ident_f    t_get_canceled_ident;
-#else
-	void* reserved3;
-	void* reserved4;
-#endif
 	t_suspend_f	t_suspend;
 	t_continue_f	t_continue;
 	t_continue_cb_f	t_continue_cb;
@@ -128,6 +120,7 @@ struct tm_binds {
 	cmd_function	t_load_contacts;
 	cmd_function	t_next_contacts;
 	tset_fr_f set_fr;
+	trelease_t      t_release_transaction;
 };
 
 typedef struct tm_binds tm_api_t;

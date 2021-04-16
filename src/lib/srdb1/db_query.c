@@ -69,6 +69,7 @@ static inline int db_do_submit_query(const db1_con_t* _h, const str *_query,
 		}
 	}
 
+	LM_DBG("submitted query: %.*s, result %d\n", _query->len, _query->s, ret);
 	return ret;
 }
 
@@ -412,7 +413,7 @@ int db_query_init(void)
     sql_buf = (char*)malloc(sql_buffer_size);
     if (sql_buf == NULL)
     {
-        LM_ERR("failed to allocate sql_buf\n");
+		PKG_MEM_ERROR;
         return -1;
     }
     return 0;

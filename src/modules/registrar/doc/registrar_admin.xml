@@ -10,9 +10,9 @@
 <!-- Module User's Guide -->
 
 <chapter>
-	
+
 	<title>&adminguide;</title>
-	
+
 	<section id="rergistrar.overview">
 	<title>Overview</title>
 	<para>The module contains REGISTER processing logic. The actual location
@@ -201,9 +201,10 @@ modparam("registrar", "expires_range", 30) # expires within [0.7*expires .. expi
 	<section id="registrar.p.min_expires">
 		<title><varname>min_expires</varname> (integer)</title>
 		<para>
-		The minimum expires value of a <quote>Contact</quote>. Values lower than this 
-		minimum will be automatically set to the minimum. Value 0 disables 
-		the checking. This parameter can be modified via the &kamailio; config framework.
+		The minimum expires value of a <quote>Contact</quote>. Values lower than this
+		minimum will be either set to the minimum or 423 response is sent back.
+		Value 0 disables the checking. This parameter can be modified via the
+		&kamailio; config framework.
 		</para>
 		<para>
 		<emphasis>
@@ -219,6 +220,29 @@ modparam("registrar", "min_expires", 60)
 </programlisting>
 		</example>
 	</section>
+
+	<section id="registrar.p.min_expires_mode">
+		<title><varname>min_expires_mode</varname> (integer)</title>
+		<para>
+		Control what to do when expires value in REGISTER request is lower than
+		min_expires parameter. If set to 0, expires is set to min_expires. If
+		set to 1, then 423 Interval Too Brief is sent back.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>min_expires_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "min_expires_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="registrar.p.max_expires">
 		<title><varname>max_expires</varname> (integer)</title>
 		<para>
@@ -731,6 +755,13 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 ...
 modparam("registrar", "xavp_cfg", "reg")
 ...
+request_route {
+    ...
+    $xavp(reg=&gt;max_contacts) = 4;
+    save("location");
+    ...
+}
+...
 		</programlisting>
 		</example>
 	</section>
@@ -764,6 +795,11 @@ modparam("registrar", "xavp_cfg", "reg")
 				<emphasis>received</emphasis> - the record's received value.
 			</para>
 		</listitem>
+		<listitem>
+			<para>
+				<emphasis>path</emphasis> - the record's path value.
+			</para>
+		</listitem>
 		</itemizedlist>
 		<para>
 			For example. if this parameter is set to 'ulrcd', then values are set in:
@@ -778,6 +814,9 @@ modparam("registrar", "xavp_cfg", "reg")
 		<listitem>
 			<para><emphasis>$xavp(ulrcd[0]=&gt;received)</emphasis></para>
 		</listitem>
+		<listitem>
+			<para><emphasis>$xavp(ulrcd[0]=&gt;path)</emphasis></para>
+		</listitem>
 		</itemizedlist>
 		<para>
 		<emphasis>
@@ -789,6 +828,37 @@ modparam("registrar", "xavp_cfg", "reg")
 		<programlisting format="linespecific">
 ...
 modparam("registrar", "xavp_rcd", "ulrcd")
+...
+		</programlisting>
+		</example>
+	</section>
+
+	<section id="registrar.p.xavp_rcd_mask">
+		<title><varname>xavp_rcd_mask</varname> (int)</title>
+		<para>
+			Defines what values to skip when xavp_rcd is stored.
+		</para>
+		<itemizedlist>
+		<listitem><para>1 - <emphasis>ruid</emphasis></para></listitem>
+		<listitem><para>2 - <emphasis>contact</emphasis></para></listitem>
+		<listitem><para>4 - <emphasis>expires</emphasis></para></listitem>
+		<listitem><para>8 - <emphasis>received</emphasis></para></listitem>
+		<listitem><para>16 - <emphasis>path</emphasis></para></listitem>
+		</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is 0 (none).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xavp_rcd_mask</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+# skip path value
+modparam("registrar", "xavp_rcd_mask", 16)
+...
+# skip path and expires values
+modparam("registrar", "xavp_rcd_mask", 20)
 ...
 		</programlisting>
 		</example>
@@ -992,6 +1062,84 @@ end
         </programlisting>
 		</example>
 	</section>
+	<section id="registrar.p.lookup_filter_mode">
+		<title><varname>lookup_filter_mode</varname> (int)</title>
+		<para>
+			Control what filters should be applied to lookup(...) operations.
+			It can be a combination (sum) of the next values:
+		</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>1</emphasis> - apply the branch flags filter - return
+				only contact records with branch flags matching at least one set
+				inside xavp specified by xavp_cfg parameter with inner name
+				rlf_bflags - e.g., $xavp(reg=&gt;rlf_bflags).
+			</para>
+		</listitem>
+	</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is NULL (disabled).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>xavp_cfg</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "xavp_cfg", "reg")
+modparam("registrar", "lookup_filter_mode", 1)
+...
+request_route {
+    ...
+    $xavp(reg=&gt;rlf_bflags) = 8;
+    if(lookup("location")) { ... }
+    ...
+}
+...
+		</programlisting>
+		</example>
+	</section>
+
+
+	<section id="registrar.p.use_expired_contacts">
+		<title><varname>use_expired_contacts</varname> (int)</title>
+
+		<para>
+			Allow/Disallow the usage of the expired contacts.
+		</para>
+
+		<itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>0</emphasis> Disallow the usage of the expired contacts.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>1</emphasis> Allow the usage of the expired contacts.
+			</para>
+		</listitem>
+		</itemizedlist>
+
+		<para>
+		<emphasis>
+			Default value is 0 (Disallow).
+		</emphasis>
+		</para>
+
+		<example>
+		<title>Set <varname>use_expired_contacts</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("registrar", "use_expired_contacts", 1)
+...
+
+kamcmd cfg.set_now_int registrar use_expired_contacts 1
+kamcmd cfg.set_now_int registrar use_expired_contacts 0
+		</programlisting>
+		</example>
+	</section>
 	</section>
 
 	
@@ -1006,7 +1154,8 @@ end
 		modify location records (in usrloc) depending on Contact and Expires header fields in the 
 		REGISTER message. On success and when called from the REQUEST_ROUTE, 
 		<quote>200 OK</quote> will be returned listing all contacts that are currently in 
-		the location database. On an error, an error message will be sent with a short
+		the location database. As a side effect, also branch flags are
+        stored in usrloc. On an error, an error message will be sent with a short
 		description in reason phrase.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
@@ -1107,6 +1256,7 @@ save("location", "0x00", "sip:test@kamailio.org");
 		Request-URI will be overwritten with the contact that has
 		the highest q value and optionally the rest will be appended to 
 		the message (depending on append_branches parameter value).
+        As a side effect, also branch flags are restored from usrloc.
 		</para>
 		<para>
 		If the <varname>method_filtering</varname> option is enabled and
@@ -1156,7 +1306,8 @@ save("location", "0x00", "sip:test@kamailio.org");
 		<programlisting format="linespecific">
 ...
 lookup("location");
-switch ($retcode) {
+			switch ($retcode) {:1
+
     case -1:
     case -3:
         sl_send_reply("404", "Not Found");
@@ -1165,6 +1316,29 @@ switch ($retcode) {
         sl_send_reply("405", "Not Found");
         exit;
 };
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="registrar.f.lookup_to_dset">
+		<title>
+		<function moreinfo="none">lookup_to_dset(domain [, uri])</function>
+		</title>
+		<para>
+			Similar to lookup(...), but push the location contacts to destination
+			set, without changing the R-URI (first branch not changed, it creates
+			additional branches). For the meaning of the parameters and the return
+			codes, see the documentation for lookup(...) function.
+		</para>
+		<para>
+		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>lookup_to_dset</function> usage</title>
+		<programlisting format="linespecific">
+...
+lookup_to_dset("location");
 ...
 </programlisting>
 		</example>
@@ -1355,7 +1529,7 @@ add_sock_hdr("Sock-Info");
 		</listitem>
 		</itemizedlist>
 		<para>
-		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
+		This function can be used from ANY_ROUTE.
 		</para>
 		<para>
 		Return values:
@@ -1464,6 +1638,30 @@ reg_fetch_contacts("location", "sip:user@kamailio.org", "caller");
 		<programlisting format="linespecific">
 ...
 reg_free_contacts("callee");
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="registrar.f.reg_send_reply">
+		<title>
+		<function moreinfo="none">reg_send_reply()</function>
+		</title>
+		<para>
+			The function sends the SIP reply that is normally sent by
+			save(...), but that was skipped due to flag 0x2. It must be used
+			after save(..., "0x2"). Practically it allows saving registration
+			to location table, do other operations and then send the reply.
+		</para>
+		<para>
+		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
+		</para>
+		<example>
+		<title><function>reg_send_reply</function> usage</title>
+		<programlisting format="linespecific">
+...
+save("location", "0x2");
+...
+reg_send_reply();
 ...
 </programlisting>
 		</example>

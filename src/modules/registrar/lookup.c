@@ -45,6 +45,54 @@
 #include "lookup.h"
 #include "config.h"
 
+
+extern int reg_lookup_filter_mode;
+
+typedef struct reg_lookup_filter {
+	uint32_t factive;
+	uint32_t bflags;
+} reg_lookup_filter_t;
+
+static reg_lookup_filter_t _reg_lookup_filter;
+
+static void reg_lookup_filter_init(void)
+{
+	str filter_bflags = str_init("rlf_bflags");
+	sr_xavp_t *vavp = NULL;
+
+	if(reg_lookup_filter_mode==0 || reg_xavp_cfg.s==NULL) {
+		return;
+	}
+	memset(&_reg_lookup_filter, 0, sizeof(reg_lookup_filter_t));
+
+	if((reg_lookup_filter_mode & 1)
+			&& (vavp = xavp_get_child_with_ival(&reg_xavp_cfg,
+					&filter_bflags)) != NULL) {
+		if(vavp->val.v.i != 0) {
+			_reg_lookup_filter.bflags = (uint32_t)vavp->val.v.i;
+			_reg_lookup_filter.factive = 1;
+		}
+	}
+	return;
+}
+
+static int reg_lookup_filter_match(ucontact_t* ptr)
+{
+	if(reg_lookup_filter_mode==0 || reg_xavp_cfg.s==NULL) {
+		return 1;
+	}
+	if(_reg_lookup_filter.factive==0) {
+		return 1;
+	}
+	if(_reg_lookup_filter.bflags!=0) {
+		if((_reg_lookup_filter.bflags & ptr->cflags)==0) {
+			return 0;
+		}
+	}
+	return 1;
+
+}
+
 static int has_to_tag(struct sip_msg* msg)
 {
 	if (parse_to_header(msg) < 0) return 0;
@@ -112,6 +160,7 @@ int xavp_rcd_helper(ucontact_t* ptr)
 	str xname_received = { "received", 8};
 	str xname_contact = { "contact", 7};
 	str xname_expires = {"expires", 7};
+	str xname_path = {"path", 4};
 	sr_xval_t xval;
 
 	if(ptr==NULL) return -1;
@@ -120,27 +169,41 @@ int xavp_rcd_helper(ucontact_t* ptr)
 
 	list = xavp_get(&reg_xavp_rcd, NULL);
 	xavp = list ? &list->val.v.xavp : &new_xavp;
-	memset(&xval, 0, sizeof(sr_xval_t));
-	xval.type = SR_XTYPE_STR;
-	xval.v.s = ptr->ruid;
-	xavp_add_value(&xname_ruid, &xval, xavp);
 
-	if(ptr->received.len > 0) {
+	if(!(reg_xavp_rcd_mask & AVP_RCD_RUID)) {
+		memset(&xval, 0, sizeof(sr_xval_t));
+		xval.type = SR_XTYPE_STR;
+		xval.v.s = ptr->ruid;
+		xavp_add_value(&xname_ruid, &xval, xavp);
+	}
+
+	if(!(reg_xavp_rcd_mask & AVP_RCD_RCV) && (ptr->received.len > 0)) {
 		memset(&xval, 0, sizeof(sr_xval_t));
 		xval.type = SR_XTYPE_STR;
 		xval.v.s = ptr->received;
 		xavp_add_value(&xname_received, &xval, xavp);
 	}
 
-	memset(&xval, 0, sizeof(sr_xval_t));
-	xval.type = SR_XTYPE_STR;
-	xval.v.s = ptr->c;
-	xavp_add_value(&xname_contact, &xval, xavp);
+	if(!(reg_xavp_rcd_mask & AVP_RCD_CNT)) {
+		memset(&xval, 0, sizeof(sr_xval_t));
+		xval.type = SR_XTYPE_STR;
+		xval.v.s = ptr->c;
+		xavp_add_value(&xname_contact, &xval, xavp);
+	}
 
-	memset(&xval, 0, sizeof(sr_xval_t));
-	xval.type = SR_XTYPE_INT;
-	xval.v.i = (int) (ptr->expires - time(0));
-	xavp_add_value(&xname_expires, &xval, xavp);
+	if(!(reg_xavp_rcd_mask & AVP_RCD_EXP)) {
+		memset(&xval, 0, sizeof(sr_xval_t));
+		xval.type = SR_XTYPE_INT;
+		xval.v.i = (int) (ptr->expires - time(0));
+		xavp_add_value(&xname_expires, &xval, xavp);
+	}
+
+	if(!(reg_xavp_rcd_mask & AVP_RCD_PATH) && (ptr->path.len > 0)) {
+		memset(&xval, 0, sizeof(sr_xval_t));
+		xval.type = SR_XTYPE_STR;
+		xval.v.s = ptr->path;
+		xavp_add_value(&xname_path, &xval, xavp);
+	}
 
 	if(list==NULL) {
 		/* no reg_xavp_rcd xavp in root list - add it */
@@ -179,6 +242,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 	sr_xavp_t *xavp=NULL;
 	sip_uri_t path_uri;
 	str path_str;
+	branch_t *nbranch;
 
 	ret = -1;
 
@@ -223,6 +287,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 	}
 
 	get_act_time();
+	reg_lookup_filter_init();
 
 	if(puri.gr.s==NULL || puri.gr_val.len>0)
 	{
@@ -239,7 +304,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 		ret = -1;
 		/* look first for an un-expired and suported contact */
 		while (ptr) {
-			if(VALID_CONTACT(ptr,act_time)) {
+			if(VALID_CONTACT(ptr,act_time) || cfg_get(registrar,registrar_cfg,use_expired_contacts)) {
 				if(allowed_method(_m,ptr)) {
 					/* match on instance, if pub-gruu */
 					if(inst.len>0) {
@@ -251,10 +316,12 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 							break;
 						}
 					} else {
-						/* no-gruu - found by address */
-						LM_DBG("contact for [%.*s] found by address\n",
-								aor.len, ZSW(aor.s));
-						break;
+						if(reg_lookup_filter_match(ptr)) {
+							/* no-gruu - found by address */
+							LM_DBG("contact for [%.*s] found by address\n",
+									aor.len, ZSW(aor.s));
+							break;
+						}
 					}
 				} else {
 					LM_DBG("contact for [%.*s] cannot handle the SIP method\n",
@@ -279,7 +346,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 		aor = *ptr->aor;
 		/* test if not expired and contact with suported method */
 		if(ptr) {
-			if(!(VALID_CONTACT(ptr,act_time))) {
+			if(!(VALID_CONTACT(ptr,act_time) || cfg_get(registrar,registrar_cfg,use_expired_contacts))) {
 				goto done;
 			} else if(!allowed_method(_m,ptr)) {
 				ret=-2;
@@ -368,6 +435,7 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 		}
 
 		_m->reg_id = ptr->reg_id;
+		_m->otcpid = ptr->tcpconn_id;
 
 		if (ptr->ruid.len) {
 			if (set_ruid(_m, &(ptr->ruid)) < 0) {
@@ -417,7 +485,8 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 	if (!cfg_get(registrar, registrar_cfg, append_branches)) goto done;
 
 	for( ; ptr ; ptr = ptr->next ) {
-		if (VALID_CONTACT(ptr, act_time) && allowed_method(_m, ptr)) {
+		if ((VALID_CONTACT(ptr, act_time) || cfg_get(registrar,registrar_cfg,use_expired_contacts)) && allowed_method(_m, ptr)
+				&& reg_lookup_filter_match(ptr)) {
 			path_dst.len = 0;
 			if(ptr->path.s && ptr->path.len) {
 				path_str = ptr->path;
@@ -455,18 +524,19 @@ int lookup_helper(struct sip_msg* _m, udomain_t* _d, str* _uri, int _mode)
 			 * regarding path vs. received. */
 			LM_DBG("instance is %.*s\n",
 				ptr->instance.len, ptr->instance.s);
-			if (append_branch(_m, &ptr->c,
+			nbranch = ksr_push_branch(_m, &ptr->c,
 					path_dst.len?&path_dst:&ptr->received,
 					path_dst.len?&path_str:0, ptr->q, ptr->cflags,
 					ptr->sock,
 					ptr->instance.len?&(ptr->instance):0,
 						ptr->instance.len?ptr->reg_id:0,
-						&ptr->ruid, &ptr->user_agent)
-					== -1) {
+						&ptr->ruid, &ptr->user_agent);
+			if (nbranch==NULL) {
 				LM_ERR("failed to append a branch\n");
 				/* Also give a chance to the next branches*/
 				continue;
 			}
+			nbranch->otcpid = ptr->tcpconn_id;
 			if(ptr->xavp!=NULL) {
 				xavp = xavp_clone_level_nodata(ptr->xavp);
 				if(xavp != NULL) {
@@ -777,7 +847,7 @@ int registered4(struct sip_msg* _m, udomain_t* _d, str* _uri, int match_flag,
 
 		get_act_time();
 		for (ptr = r->contacts; ptr; ptr = ptr->next) {
-			if(!VALID_CONTACT(ptr, act_time)) continue;
+			if(!(VALID_CONTACT(ptr, act_time) || cfg_get(registrar,registrar_cfg,use_expired_contacts))) continue;
 			if (match_callid.s && /* optionally enforce tighter matching w/ Call-ID */
 				match_callid.len > 0 &&
 				(match_callid.len != ptr->callid.len ||

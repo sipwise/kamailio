@@ -3,23 +3,23 @@
  *
  * Copyright (C) 2012 Smile Communications, jason.penton@smilecoms.com
  * Copyright (C) 2012 Smile Communications, richard.good@smilecoms.com
- * 
+ *
  * The initial version of this code was written by Dragos Vingarzan
  * (dragos(dot)vingarzan(at)fokus(dot)fraunhofer(dot)de and the
  * Fruanhofer Institute. It was and still is maintained in a separate
  * branch of the original SER. We are therefore migrating it to
  * Kamailio/SR and look forward to maintaining it from here on out.
  * 2011/2012 Smile Communications, Pty. Ltd.
- * ported/maintained/improved by 
+ * ported/maintained/improved by
  * Jason Penton (jason(dot)penton(at)smilecoms.com and
- * Richard Good (richard(dot)good(at)smilecoms.com) as part of an 
+ * Richard Good (richard(dot)good(at)smilecoms.com) as part of an
  * effort to add full IMS support to Kamailio/SR using a new and
  * improved architecture
- * 
+ *
  * NB: Alot of this code was originally part of OpenIMSCore,
- * FhG Fokus. 
+ * FhG Fokus.
  * Copyright (C) 2004-2006 FhG Fokus
- * Thanks for great work! This is an effort to 
+ * Thanks for great work! This is an effort to
  * break apart the various CSCF functions into logically separate
  * components. We hope this will drive wider use. We also feel
  * that in this way the architecture is more complete and thereby easier
@@ -37,13 +37,14 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- * 
+ *
  */
 
 #include "third_party_reg.h"
+#include "../../core/msg_translator.h"
 
 extern usrloc_api_t isc_ulb;/*!< Structure containing pointers to usrloc functions*/
 
@@ -135,7 +136,7 @@ static inline unsigned int calc_associateduri_buf_len(ims_subscription* s) {
 
 int build_p_associated_uri(ims_subscription* s) {
     char *p;
-    int i, j, cnt = 0;
+    int i, j, cnt = 0,cnttel = 0;;
     ims_public_identity* id;
 
     LM_DBG("Building P-Associated-URI\n");
@@ -169,16 +170,28 @@ int build_p_associated_uri(ims_subscription* s) {
     for (i = 0; i < s->service_profiles_cnt; i++)
         for (j = 0; j < s->service_profiles[i].public_identities_cnt; j++) {
             id = &(s->service_profiles[i].public_identities[j]);
-            if (!id->barring && (strncmp(id->public_identity.s,"tel",3) == 0) ) {
-                if (cnt == 0)
+            if (!id->barring && !(strncmp(id->public_identity.s,"tel",3) == 0) ) {
+                if (cnt == 0 && cnttel == 0){
                     *p++ = '<';
-                else {
+                } else if(cnttel != 0 && cnt == 0){
+                    memcpy(p, ", <", 3);
+                    p += 3;
+                } else {
                     memcpy(p, ">, <", 4);
                     p += 4;
                 }
                 memcpy(p, id->public_identity.s, id->public_identity.len);
                 p += id->public_identity.len;
                 cnt++;
+            }else if(!id->barring && strncmp(id->public_identity.s,"tel",3) == 0){
+
+                if(cnttel != 0  || cnt != 0){
+                    memcpy(p, ", ", 2);
+                    p += 2;
+                }
+                memcpy(p, id->public_identity.s, id->public_identity.len);
+                p += id->public_identity.len;
+                cnttel++;
             }
         }
     if (cnt)
@@ -192,12 +205,12 @@ int build_p_associated_uri(ims_subscription* s) {
     return 0;
 }
 
-
+static str reg_resp_200OK = {"OK", 2};
 
 /**
  * Handle third party registration
  * @param msg - the SIP REGISTER message
- * @param m  - the isc_match that matched with info about where to forward it 
+ * @param m  - the isc_match that matched with info about where to forward it
  * @param mark  - the isc_mark that should be used to mark the message
  * @returns #ISC_RETURN_TRUE if allowed, #ISC_RETURN_FALSE if not
  */
@@ -211,7 +224,7 @@ int isc_third_party_reg(struct sip_msg *msg, isc_match *m, isc_mark *mark, udoma
     str pani = {0, 0};
     str cv = {0, 0};
 	str s = {0, 0};
-	
+
 	impurecord_t *p;
 
     struct hdr_field *hdr;
@@ -224,9 +237,9 @@ int isc_third_party_reg(struct sip_msg *msg, isc_match *m, isc_mark *mark, udoma
 
     /* Get To header*/
     to = cscf_get_public_identity(msg);
-	
+
 	if (cscf_get_originating_user(msg, &s)) {
-		
+
 		isc_ulb.lock_udomain(d, &s);
 		if ( isc_ulb.get_impurecord(d,&s,&p) != 0) {
 			isc_ulb.unlock_udomain(d, &s);
@@ -274,7 +287,24 @@ no_pai:
 	r.pvni = pvni;
 	r.pani = pani;
 	r.cv = cv;
-	r.service_info = m->service_info;
+	if (m->service_info.s && m->service_info.len) {
+		r.body.content_type = CT_SERVICE_INFO;
+		r.body.content = m->service_info;
+	} else if (m->include_register_request) {
+		r.body.content_type = CT_REGISTER_REQ;
+                r.body.content.s = msg->first_line.u.request.method.s;
+		r.body.content.len = msg->len;
+	} else if (m->include_register_response) {
+		struct bookmark dummy_bm;
+		r.body.content_type = CT_REGISTER_RESP;
+                r.body.content.s = build_res_buf_from_sip_req(200, &reg_resp_200OK, 0, msg, (unsigned int*)&r.body.content.len, &dummy_bm);
+		if (!r.body.content.s) {
+			LM_DBG("response building failed for body of third party register request");
+			r.body.content_type = CT_NONE;
+		}
+	} else {
+		r.body.content_type = CT_NONE;
+	}
 	r.path = path;
 
 	if (expires <= 0)
@@ -311,6 +341,13 @@ static str comma = {",", 1};
 
 static str path_mine_s = {"<", 1};
 static str path_mine_e = {";lr>", 4};
+
+static str content_type_s = {"Content-Type: ", 14};
+static str content_type_e = {"\r\n", 2};
+
+static str ct_service_info = {"application/3gpp-ims+xml", 24};
+static str ct_register_req = {"message/sip", 11};
+static str ct_register_resp = {"message/sip", 11};
 
 static str body_s = {"<ims-3gpp version=\"1\"><service-info>", 36};
 static str body_e = {"</service-info></ims-3gpp>", 26};
@@ -351,13 +388,27 @@ int r_send_third_party_reg(r_third_party_registration *r, int expires) {
             + r->from.len /*adding our own address to path*/;
     }
 	str pauri = {0,0};
-	
+
 	if (p_associated_uri.data_len > 0)
 	{
 		pauri.s = p_associated_uri.buf;
 		pauri.len = p_associated_uri.data_len;
 		h.len += pauri.len;
 	}
+
+    if (r->body.content_type == CT_SERVICE_INFO) {
+        h.len += content_type_s.len;
+        h.len += ct_service_info.len;
+        h.len += content_type_e.len;
+    } else if (r->body.content_type == CT_REGISTER_REQ) {
+        h.len += content_type_s.len;
+        h.len += ct_register_req.len;
+        h.len += content_type_e.len;
+    } else if (r->body.content_type == CT_REGISTER_RESP) {
+        h.len += content_type_s.len;
+        h.len += ct_register_resp.len;
+        h.len += content_type_e.len;
+    }
 
     h.s = pkg_malloc(h.len);
     if (!h.s) {
@@ -403,28 +454,61 @@ int r_send_third_party_reg(r_third_party_registration *r, int expires) {
     }
 
     if (r->cv.len) {
-		STR_APPEND(h, p_charging_vector_s);
-		STR_APPEND(h, r->cv);
-		STR_APPEND(h, p_charging_vector_e);
+	STR_APPEND(h, p_charging_vector_s);
+	STR_APPEND(h, r->cv);
+	STR_APPEND(h, p_charging_vector_e);
     }
-    
+
     if (p_associated_uri.data_len > 0) {
 		STR_APPEND(h, pauri);
 	}
-    LM_DBG("SRV INFO:<%.*s>\n", r->service_info.len, r->service_info.s);
-    if (r->service_info.len) {
-	b.len = body_s.len + r->service_info.len + body_e.len;
-	b.s = pkg_malloc(b.len);
-	if (!b.s) {
-	    LM_ERR("r_send_third_party_reg: Error allocating %d bytes\n", b.len);
-	    b.len = 0;
-	    return 0;
+    LM_DBG("BODY TYPE(3rd PARTY REGISTER):<%d>\n", r->body.content_type);
+    if (r->body.content_type != CT_NONE) {
+	if (r->body.content_type == CT_SERVICE_INFO) {
+		LM_ERR("BODY (3rd PARTY REGISTER) \"SI\": <%.*s>\n", r->body.content.len, r->body.content.s);
+		b.len = body_s.len + r->body.content.len + body_e.len;
+		b.s = pkg_malloc(b.len);
+		if (!b.s) {
+		    LM_ERR("r_send_third_party_reg: Error allocating %d bytes\n", b.len);
+		    b.len = 0;
+		    goto error;
+		}
+		b.len = 0;
+		STR_APPEND(b, body_s);
+		STR_APPEND(b, r->body.content);
+		STR_APPEND(b, body_e);
+		STR_APPEND(h, content_type_s);
+		STR_APPEND(h, ct_service_info);
+		STR_APPEND(h, content_type_e);
+	} else if (r->body.content_type == CT_REGISTER_REQ) {
+		LM_ERR("BODY (3rd PARTY REGISTER) \"REQ\": <%.*s>\n", r->body.content.len, r->body.content.s);
+		b.len = r->body.content.len;
+		b.s = pkg_malloc(b.len);
+		if (!b.s) {
+                    LM_ERR("r_send_third_party_reg: Error allocating %d bytes\n", b.len);
+                    b.len = 0;
+                    goto error;
+                }
+		b.len = 0;
+		STR_APPEND(b, r->body.content);
+		STR_APPEND(h, content_type_s);
+                STR_APPEND(h, ct_register_req);
+                STR_APPEND(h, content_type_e);
+	} else if (r->body.content_type == CT_REGISTER_RESP) {
+		LM_ERR("BODY (3rd PARTY REGISTER) \"RESP\": <%.*s>\n", r->body.content.len, r->body.content.s);
+		b.len = r->body.content.len;
+                b.s = pkg_malloc(b.len);
+                if (!b.s) {
+                    LM_ERR("r_send_third_party_reg: Error allocating %d bytes\n", b.len);
+                    b.len = 0;
+                    goto error;
+                }
+                b.len = 0;
+                STR_APPEND(b, r->body.content);
+                STR_APPEND(h, content_type_s);
+                STR_APPEND(h, ct_register_resp);
+                STR_APPEND(h, content_type_e);
 	}
-
-	b.len = 0;
-	STR_APPEND(b, body_s);
-	STR_APPEND(b, r->service_info);
-	STR_APPEND(b, body_e);
     }
 
     set_uac_req(&req, &method, &h, &b, 0,
@@ -436,11 +520,19 @@ int r_send_third_party_reg(r_third_party_registration *r, int expires) {
     }
     if (h.s)
 	pkg_free(h.s);
+    if (b.s)
+	pkg_free(b.s);
+    if (r->body.content_type == CT_REGISTER_RESP)
+	pkg_free(r->body.content.s);
     return 1;
 
 error:
     if (h.s)
 	pkg_free(h.s);
+    if (b.s)
+	pkg_free(b.s);
+    if (r->body.content_type == CT_REGISTER_RESP)
+        pkg_free(r->body.content.s);
     return 0;
 }
 
@@ -464,4 +556,3 @@ void r_third_party_reg_response(struct cell *t, int type, struct tmcb_params *ps
 	LM_DBG("r_third_party_reg_response: code %d\n", ps->code);
     }
 }
-

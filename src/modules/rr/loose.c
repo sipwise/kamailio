@@ -36,19 +36,13 @@
 #include "../../core/parser/parse_rr.h"
 #include "../../core/parser/parse_uri.h"
 #include "../../core/parser/parse_from.h"
+#include "../../core/parser/parse_param.h"
 #include "../../core/mem/mem.h"
 #include "../../core/dset.h"
 #include "loose.h"
 #include "rr_cb.h"
 #include "rr_mod.h"
 
-
-#define RR_ERROR -1		/*!< An error occurred while processing route set */
-#define RR_DRIVEN 1		/*!< The next hop is determined from the route set */
-#define RR_OB_DRIVEN 2		/*!< The next hop is determined from the route set based on flow-token */
-#define NOT_RR_DRIVEN -1	/*!< The next hop is not determined from the route set */
-#define FLOW_TOKEN_BROKEN -2	/*!< Outbound flow-token shows evidence of tampering */
-#define RR_PRELOADED -3		/*!< The next hop is determined from a preloaded route set */
 
 #define RR_ROUTE_PREFIX ROUTE_PREFIX "<"
 #define RR_ROUTE_PREFIX_LEN (sizeof(RR_ROUTE_PREFIX)-1)
@@ -57,11 +51,11 @@
 #define ROUTE_SUFFIX_LEN (sizeof(ROUTE_SUFFIX)-1)
 
 /*! variables used to hook the param part of the local route */
-static unsigned int routed_msg_id = 0;
-static int routed_msg_pid = 0;
+static msg_ctx_id_t routed_msg_id = {0};
 static str routed_params = {0,0};
 
 extern int rr_force_send_socket;
+extern int rr_sockname_mode;
 
 /*!
  * \brief Test whether we are processing pre-loaded route set by looking at the To tag
@@ -127,6 +121,11 @@ static inline int find_first_route(struct sip_msg* _m)
 static inline int is_myself(sip_uri_t *_puri)
 {
 	int ret;
+
+	if(_puri->host.len==0) {
+		/* catch uri without host (e.g., tel uri) */
+		return 0;
+	}
 
 	ret = check_self(&_puri->host,
 			_puri->port_no?_puri->port_no:SIP_PORT, 0);/* match all protos*/
@@ -585,8 +584,8 @@ static inline int after_strict(struct sip_msg* _m)
 	uri = rt->nameaddr.uri;
 
 	/* reset rr handling static vars for safety in error case */
-	routed_msg_id = 0;
-	routed_msg_pid = 0;
+	routed_msg_id.msgid = 0;
+	routed_msg_id.pid = 0;
 	routed_params.s = NULL;
 	routed_params.len = 0;
 
@@ -621,7 +620,7 @@ static inline int after_strict(struct sip_msg* _m)
 			}
 			if (res > 0) { /* No next route found */
 				LM_DBG("after_strict: No next URI found\n");
-				return NOT_RR_DRIVEN;
+				return RR_NOT_DRIVEN;
 			}
 			rt = (rr_t*)hdr->parsed;
 		} else rt = rt->next;
@@ -637,8 +636,8 @@ static inline int after_strict(struct sip_msg* _m)
 	/* set the hooks for the param
 	 * important note: RURI is already parsed by the above function, so 
 	 * we just used it without any checking */
-	routed_msg_id = _m->id;
-	routed_msg_pid = _m->pid;
+	routed_msg_id.msgid = _m->id;
+	routed_msg_id.pid = _m->pid;
 	routed_params = _m->parsed_uri.params;
 
 	if (is_strict(&puri.params)) {
@@ -750,14 +749,55 @@ static inline int after_strict(struct sip_msg* _m)
 static inline void rr_do_force_send_socket(sip_msg_t *_m, sip_uri_t *puri,
 		rr_t* rt, int rr2on)
 {
-	socket_info_t *si;
+	socket_info_t *si = NULL;
+	param_hooks_t phooks;
+	param_t* plist = NULL;
+	param_t *pit=NULL;
+	str s;
+
+
+	if(rr_sockname_mode!=0 && puri->params.len>0) {
+		s = puri->params;
+		if(s.s[s.len-1]==';') {
+			s.len--;
+		}
+		if (parse_params(&s, CLASS_ANY, &phooks, &plist)<0) {
+			LM_ERR("bad sip uri parameters: %.*s\n", s.len, s.s);
+			return;
+		}
+		for (pit = plist; pit; pit=pit->next) {
+			if (pit->name.len==SOCKNAME_ATTR_LEN
+					&& strncasecmp(pit->name.s, SOCKNAME_ATTR,
+							SOCKNAME_ATTR_LEN)==0) {
+				if(pit->body.len>0) {
+					si = ksr_get_socket_by_name(&pit->body);
+					if(si != NULL) {
+						LM_DBG("found socket with name: %.*s\n",
+								pit->body.len, pit->body.s);
+						set_force_socket(_m, si);
+						free_params(plist);
+						return;
+					} else {
+						LM_DBG("failed to find socket with name: %.*s\n",
+								pit->body.len, pit->body.s);
+					}
+				}
+			}
+		}
+		LM_DBG("use of sockname parameter enabled, but failed to find it\n");
+		free_params(plist);
+	}
 
 	if ((si = grep_sock_info(&puri->host,
 				puri->port_no?puri->port_no:proto_default_port(puri->proto),
 				puri->proto)) != 0) {
+		LM_DBG("set send socket %p for local route uri: %.*s\n", si,
+				rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
 		set_force_socket(_m, si);
 	} else if ((si = grep_sock_info(&puri->host, puri->port_no,
 					puri->proto)) != 0) {
+		LM_DBG("set send socket %p for local route uri: %.*s\n", si,
+				rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
 		set_force_socket(_m, si);
 	} else {
 		if (enable_socket_mismatch_warning && rr2on) {
@@ -767,6 +807,9 @@ static inline void rr_do_force_send_socket(sip_msg_t *_m, sip_uri_t *puri,
 				LM_WARN("second RR uri is not myself (%.*s)\n",
 						rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
 			}
+		} else {
+			LM_DBG("no socket found to match second RR (%.*s)\n",
+					rt->nameaddr.uri.len, ZSW(rt->nameaddr.uri.s));
 		}
 	}
 }
@@ -794,8 +837,8 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 	uri = rt->nameaddr.uri;
 
 	/* reset rr handling static vars for safety in error case */
-	routed_msg_id = 0;
-	routed_msg_pid = 0;
+	routed_msg_id.msgid = 0;
+	routed_msg_id.pid = 0;
 
 	if (parse_uri(uri.s, uri.len, &puri) < 0) {
 		LM_ERR("failed to parse the first route URI (%.*s)\n",
@@ -812,12 +855,12 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 		LM_DBG("Topmost route URI: '%.*s' is me\n",
 			uri.len, ZSW(uri.s));
 		/* set the hooks for the params */
-		routed_msg_id = _m->id;
-		routed_msg_pid = _m->pid;
+		routed_msg_id.msgid = _m->id;
+		routed_msg_id.pid = _m->pid;
 
 		if ((use_ob = process_outbound(_m, puri.user)) < 0) {
 			LM_INFO("failed to process outbound flow-token\n");
-			return FLOW_TOKEN_BROKEN;
+			return RR_FLOW_TOKEN_BROKEN;
 		}
 
 		if (rr_force_send_socket && !use_ob) {
@@ -887,11 +930,12 @@ static inline int after_loose(struct sip_msg* _m, int preloaded)
 					uri.len, ZSW(uri.s));
 			return RR_ERROR;
 		}
+		_m->msg_flags |= FL_ROUTE_ADDR;
 	} else {
 #ifdef ENABLE_USER_CHECK
 		/* check if it the ignored user */
 		if(uri_is_myself < 0)
-			return NOT_RR_DRIVEN;
+			return RR_NOT_DRIVEN;
 #endif
 		LM_DBG("Topmost URI is NOT myself\n");
 		routed_params.s = NULL;
@@ -951,7 +995,7 @@ done:
 /*!
  * \brief Do loose routing as per RFC3261
  * \param _m SIP message
- * \return -1 on failure, 1 on success
+ * \return negative on failure or preloaded, 1 on success
  */
 int loose_route(struct sip_msg* _m)
 {
@@ -998,12 +1042,24 @@ int redo_route_params(sip_msg_t *msg)
 		return -1;
 	}
 
-	if(msg->route==NULL || msg->route->parsed==NULL) {
+	if(msg->route==NULL) {
+		return -1;
+	}
+
+	if(msg->route->parsed==NULL) {
+		if (parse_rr(msg->route) < 0) {
+			LM_ERR("failed to parse Route HF\n");
+			return -1;
+		}
+	}
+
+	if(msg->route->parsed==NULL) {
+		LM_ERR("NULL parsed Route header\n");
 		return -1;
 	}
 
 	/* check if the hooked params belong to the same message */
-	if (routed_msg_id != msg->id || routed_msg_pid != msg->pid) {
+	if (routed_msg_id.msgid != msg->id || routed_msg_id.pid != msg->pid) {
 		redo = 1;
 	}
 	if((redo==0) && (routed_params.s==NULL || routed_params.len<=0)) {
@@ -1019,8 +1075,8 @@ int redo_route_params(sip_msg_t *msg)
 		uri = rt->nameaddr.uri;
 
 		/* reset rr handling static vars for safety in error case */
-		routed_msg_id = 0;
-		routed_msg_pid = 0;
+		routed_msg_id.msgid = 0;
+		routed_msg_id.pid = 0;
 
 		if (parse_uri(uri.s, uri.len, &puri) < 0) {
 			LM_ERR("failed to parse the first route URI (%.*s)\n",
@@ -1035,8 +1091,8 @@ int redo_route_params(sip_msg_t *msg)
 			LM_DBG("Topmost route URI: '%.*s' is me\n",
 				uri.len, ZSW(uri.s));
 			/* set the hooks for the params */
-			routed_msg_id = msg->id;
-			routed_msg_pid = msg->pid;
+			routed_msg_id.msgid = msg->id;
+			routed_msg_id.pid = msg->pid;
 			routed_params = puri.params;
 			return 0;
 		} else {
@@ -1207,12 +1263,12 @@ found:
 int is_direction(struct sip_msg * msg, int dir)
 {
 	static str ftag_param = {"ftag",4};
-	static unsigned int last_id = (unsigned int)-1;
+	static msg_ctx_id_t last_id = {0};
 	static unsigned int last_dir = 0;
 	str ftag_val;
 	str tag;
 
-	if ( last_id==msg->id && last_dir!=0) {
+	if ( last_id.msgid==msg->id && last_id.pid==msg->pid && last_dir!=0) {
 		if (last_dir==RR_FLOW_UPSTREAM)
 			goto upstream;
 		else
@@ -1245,11 +1301,13 @@ int is_direction(struct sip_msg * msg, int dir)
 		goto upstream;
 
 downstream:
-	last_id = msg->id;
+	last_id.msgid = msg->id;
+	last_id.pid = msg->pid;
 	last_dir = RR_FLOW_DOWNSTREAM;
 	return (dir==RR_FLOW_DOWNSTREAM)?0:-1;
 upstream:
-	last_id = msg->id;
+	last_id.msgid = msg->id;
+	last_id.pid = msg->pid;
 	last_dir = RR_FLOW_UPSTREAM;
 	return (dir==RR_FLOW_UPSTREAM)?0:-1;
 }

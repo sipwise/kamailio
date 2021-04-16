@@ -18,8 +18,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "defs.h"
-
 
 #include "stdlib.h"
 #include "../../core/dprint.h"
@@ -73,7 +71,7 @@ int init_tmcb_lists()
 	local_req_in_tmcb_hl = (struct tmcb_head_list*)shm_malloc
 		( sizeof(struct tmcb_head_list) );
 	if ((req_in_tmcb_hl==0) || (local_req_in_tmcb_hl==0)) {
-		LM_CRIT("no more shared mem\n");
+		SHM_MEM_CRITICAL;
 		goto error;
 	}
 	req_in_tmcb_hl->first = 0;
@@ -135,7 +133,7 @@ int insert_tmcb(struct tmcb_head_list *cb_list, int types,
 
 	/* build a new callback structure */
 	if (!(cbp=shm_malloc( sizeof( struct tm_callback)))) {
-		LM_ERR("out of shm. mem\n");
+		SHM_MEM_ERROR;
 		return E_OUT_OF_MEM;
 	}
 
@@ -230,9 +228,9 @@ void run_trans_callbacks_internal(struct tmcb_head_list* cb_lst, int type,
 {
 	struct tm_callback    *cbp;
 	avp_list_t* backup_from, *backup_to, *backup_dom_from, *backup_dom_to, *backup_uri_from, *backup_uri_to;
-#ifdef WITH_XAVP
 	sr_xavp_t **backup_xavps;
-#endif
+	sr_xavp_t **backup_xavus;
+	sr_xavp_t **backup_xavis;
 
 	backup_uri_from = set_avp_list(AVP_CLASS_URI | AVP_TRACK_FROM,
 			&trans->uri_avps_from );
@@ -246,9 +244,9 @@ void run_trans_callbacks_internal(struct tmcb_head_list* cb_lst, int type,
 			&trans->domain_avps_from);
 	backup_dom_to = set_avp_list(AVP_CLASS_DOMAIN | AVP_TRACK_TO,
 			&trans->domain_avps_to);
-#ifdef WITH_XAVP
 	backup_xavps = xavp_set_list(&trans->xavps_list);
-#endif
+	backup_xavus = xavu_set_list(&trans->xavus_list);
+	backup_xavis = xavi_set_list(&trans->xavis_list);
 
 	cbp=(struct tm_callback*)cb_lst->first;
 	while(cbp){
@@ -267,9 +265,9 @@ void run_trans_callbacks_internal(struct tmcb_head_list* cb_lst, int type,
 	set_avp_list(AVP_CLASS_USER | AVP_TRACK_FROM, backup_from );
 	set_avp_list(AVP_CLASS_URI | AVP_TRACK_TO, backup_uri_to );
 	set_avp_list(AVP_CLASS_URI | AVP_TRACK_FROM, backup_uri_from );
-#ifdef WITH_XAVP
 	xavp_set_list(backup_xavps);
-#endif
+	xavu_set_list(backup_xavus);
+	xavi_set_list(backup_xavis);
 }
 
 
@@ -324,9 +322,9 @@ static void run_reqin_callbacks_internal(struct tmcb_head_list* hl,
 	struct tm_callback    *cbp;
 	avp_list_t* backup_from, *backup_to, *backup_dom_from, *backup_dom_to,
 				*backup_uri_from, *backup_uri_to;
-#ifdef WITH_XAVP
 	sr_xavp_t **backup_xavps;
-#endif
+	sr_xavp_t **backup_xavus;
+	sr_xavp_t **backup_xavis;
 
 	if (hl==0 || hl->first==0) return;
 	backup_uri_from = set_avp_list(AVP_CLASS_URI | AVP_TRACK_FROM,
@@ -341,9 +339,9 @@ static void run_reqin_callbacks_internal(struct tmcb_head_list* hl,
 			&trans->domain_avps_from);
 	backup_dom_to = set_avp_list(AVP_CLASS_DOMAIN | AVP_TRACK_TO,
 			&trans->domain_avps_to);
-#ifdef WITH_XAVP
 	backup_xavps = xavp_set_list(&trans->xavps_list);
-#endif
+	backup_xavus = xavu_set_list(&trans->xavus_list);
+	backup_xavis = xavi_set_list(&trans->xavis_list);
 	for (cbp=(struct tm_callback*)hl->first; cbp; cbp=cbp->next)  {
 		LM_DBG("trans=%p, callback type %d, id %d entered\n",
 			trans, cbp->types, cbp->id );
@@ -356,9 +354,9 @@ static void run_reqin_callbacks_internal(struct tmcb_head_list* hl,
 	set_avp_list(AVP_CLASS_DOMAIN | AVP_TRACK_FROM, backup_dom_from );
 	set_avp_list(AVP_CLASS_USER | AVP_TRACK_TO, backup_to );
 	set_avp_list(AVP_CLASS_USER | AVP_TRACK_FROM, backup_from );
-#ifdef WITH_XAVP
 	xavp_set_list(backup_xavps);
-#endif
+	xavu_set_list(backup_xavus);
+	xavi_set_list(backup_xavis);
 }
 
 

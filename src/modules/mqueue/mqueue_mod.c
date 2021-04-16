@@ -37,6 +37,7 @@
 #include "../../core/kemi.h"
 
 #include "mqueue_api.h"
+#include "mqueue_db.h"
 #include "api.h"
 
 MODULE_VERSION
@@ -53,6 +54,7 @@ static int fixup_mq_add(void** param, int param_no);
 static int bind_mq(mq_api_t* api);
 
 static int mqueue_rpc_init(void);
+
 
 static pv_export_t mod_pvs[] = {
 	{ {"mqk", sizeof("mqk")-1}, PVT_OTHER, pv_get_mqk, 0,
@@ -80,6 +82,7 @@ static cmd_export_t cmds[]={
 };
 
 static param_export_t params[]={
+	{"db_url",          PARAM_STR, &mqueue_db_url},
 	{"mqueue",          PARAM_STRING|USE_FUNC_PARAM, (void*)mq_param},
 	{0, 0, 0}
 };
@@ -205,6 +208,7 @@ int mq_param(modparam_t type, void *val)
 	param_t *pit=NULL;
 	str qname = {0, 0};
 	int msize = 0;
+	int dbmode = 0;
 
 	if(val==NULL)
 		return -1;
@@ -229,6 +233,9 @@ int mq_param(modparam_t type, void *val)
 		} else if(pit->name.len==4
 				&& strncasecmp(pit->name.s, "size", 4)==0) {
 			str2sint(&pit->body, &msize);
+		} else if(pit->name.len==6
+				&& strncasecmp(pit->name.s, "dbmode", 6)==0) {
+			str2sint(&pit->body, &dbmode);
 		}  else {
 			LM_ERR("unknown param: %.*s\n", pit->name.len, pit->name.s);
 			free_params(params_list);
@@ -247,6 +254,16 @@ int mq_param(modparam_t type, void *val)
 		free_params(params_list);
 		return -1;
 	}
+	LM_INFO("mqueue param: [%.*s|%d]\n", qname.len, qname.s, dbmode);
+	if(dbmode == 1 || dbmode == 2) {
+		if(mqueue_db_load_queue(&qname)<0)
+		{
+			LM_ERR("error loading mqueue: %.*s from DB\n", qname.len, qname.s);
+			free_params(params_list);
+			return -1;
+		}
+	}
+	mq_set_dbmode(&qname, dbmode);
 	free_params(params_list);
 	return 0;
 }
@@ -310,8 +327,72 @@ static const char* mqueue_rpc_get_size_doc[2] = {
 	0
 };
 
+static void  mqueue_rpc_fetch(rpc_t* rpc, void* ctx)
+{
+	str mqueue_name;
+	int mqueue_sz = 0;
+	int ret = 0;
+	void *th;
+	str *key = NULL;
+	str *val = NULL;
+
+	if (rpc->scan(ctx, "S", &mqueue_name) < 1) {
+		rpc->fault(ctx, 500, "No queue name");
+		return;
+	}
+
+	if(mqueue_name.len <= 0 || mqueue_name.s == NULL) {
+		LM_ERR("bad mqueue name\n");
+		rpc->fault(ctx, 500, "Invalid queue name");
+		return;
+	}
+
+	mqueue_sz = _mq_get_csize(&mqueue_name);
+
+	if(mqueue_sz < 0) {
+		LM_ERR("no such mqueue\n");
+		rpc->fault(ctx, 500, "No such queue");
+		return;
+	}
+
+	ret = mq_head_fetch(&mqueue_name);
+	if(ret == -2) {
+		rpc->fault(ctx, 404, "Empty queue");
+		return;
+	} else if(ret <0) {
+		LM_ERR("mqueue fetch\n");
+		rpc->fault(ctx, 500, "Unexpected error (fetch)");
+		return;
+	}
+
+	key = get_mqk(&mqueue_name);
+	val = get_mqv(&mqueue_name);
+
+	if(!val || !key) {
+		rpc->fault(ctx, 500, "Unexpected error (result)");
+		return;
+	}
+
+	/* add entry node */
+	if(rpc->add(ctx, "{", &th) < 0) {
+		rpc->fault(ctx, 500, "Internal error root reply");
+		return;
+	}
+
+	if (rpc->struct_add(th, "SS", "key", key, "val", val) < 0) {
+		rpc->fault(ctx, 500, "Server error appending (key/val)");
+		return;
+	}
+}
+
+static const char* mqueue_rpc_fetch_doc[2] = {
+	"Fetch an element from the queue.",
+	0
+};
+
 rpc_export_t mqueue_rpc[] = {
 	{"mqueue.get_size", mqueue_rpc_get_size, mqueue_rpc_get_size_doc, 0},
+	{"mqueue.fetch", mqueue_rpc_fetch, mqueue_rpc_fetch_doc, 0},
 	{0, 0, 0, 0}
 };
 
@@ -374,6 +455,82 @@ static int ki_mq_pv_free(sip_msg_t* msg, str *mq)
 /**
  *
  */
+static sr_kemi_xval_t _sr_kemi_mqueue_xval = {0};
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqx_get_mode(sip_msg_t *msg, str *qname, int qtype,
+			int rmode)
+{
+	mq_pv_t *mp = NULL;
+
+	memset(&_sr_kemi_mqueue_xval, 0, sizeof(sr_kemi_xval_t));
+	mp = mq_pv_get(qname);
+	if(mp == NULL || mp->item==NULL) {
+		sr_kemi_xval_null(&_sr_kemi_mqueue_xval, 0);
+		return &_sr_kemi_mqueue_xval;
+	}
+	_sr_kemi_mqueue_xval.vtype = SR_KEMIP_STR;
+	if(qtype==0) {
+		_sr_kemi_mqueue_xval.v.s = mp->item->key;
+	} else {
+		_sr_kemi_mqueue_xval.v.s = mp->item->val;
+	}
+	return &_sr_kemi_mqueue_xval;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqk_get(sip_msg_t *msg, str *qname)
+{
+	return ki_mqx_get_mode(msg, qname, 0, SR_KEMI_XVAL_NULL_NONE);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqk_gete(sip_msg_t *msg, str *qname)
+{
+	return ki_mqx_get_mode(msg, qname, 0, SR_KEMI_XVAL_NULL_EMPTY);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqk_getw(sip_msg_t *msg, str *qname)
+{
+	return ki_mqx_get_mode(msg, qname, 0, SR_KEMI_XVAL_NULL_PRINT);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqv_get(sip_msg_t *msg, str *qname)
+{
+	return ki_mqx_get_mode(msg, qname, 1, SR_KEMI_XVAL_NULL_NONE);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqv_gete(sip_msg_t *msg, str *qname)
+{
+	return ki_mqx_get_mode(msg, qname, 1, SR_KEMI_XVAL_NULL_EMPTY);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_mqv_getw(sip_msg_t *msg, str *qname)
+{
+	return ki_mqx_get_mode(msg, qname, 1, SR_KEMI_XVAL_NULL_PRINT);
+}
+
+/**
+ *
+ */
 /* clang-format off */
 static sr_kemi_t sr_kemi_mqueue_exports[] = {
 	{ str_init("mqueue"), str_init("mq_add"),
@@ -393,6 +550,36 @@ static sr_kemi_t sr_kemi_mqueue_exports[] = {
 	},
 	{ str_init("mqueue"), str_init("mq_pv_free"),
 		SR_KEMIP_INT, ki_mq_pv_free,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("mqueue"), str_init("mqk_get"),
+		SR_KEMIP_XVAL, ki_mqk_get,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("mqueue"), str_init("mqk_gete"),
+		SR_KEMIP_XVAL, ki_mqk_gete,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("mqueue"), str_init("mqk_getw"),
+		SR_KEMIP_XVAL, ki_mqk_getw,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("mqueue"), str_init("mqv_get"),
+		SR_KEMIP_XVAL, ki_mqv_get,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("mqueue"), str_init("mqv_gete"),
+		SR_KEMIP_XVAL, ki_mqv_gete,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("mqueue"), str_init("mqv_getw"),
+		SR_KEMIP_XVAL, ki_mqv_getw,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

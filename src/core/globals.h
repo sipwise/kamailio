@@ -93,6 +93,8 @@ extern int socket_workers;
 #ifdef USE_TCP
 extern int tcp_main_pid;
 extern int tcp_cfg_children_no;
+extern int tcp_accept_unique;
+extern int tcp_connection_match;
 extern int tcp_children_no;
 extern int tcp_disable;
 extern enum poll_types tcp_poll_method;
@@ -100,6 +102,7 @@ extern int tcp_max_connections; /* maximum tcp connections, hard limit */
 extern int tls_max_connections; /* maximum tls connections, hard limit */
 #endif
 extern int ksr_tcp_accept_hep3;
+extern int ksr_tcp_accept_haproxy;
 #ifdef USE_TLS
 extern int tls_disable;
 extern unsigned short tls_port_no;
@@ -139,6 +142,7 @@ extern char* mcast;
 #endif /* USE_MCAST */
 
 extern int auto_bind_ipv6;
+extern int sr_bind_ipv6_link_local;
 
 extern int tos;
 extern int pmtu_discovery;
@@ -192,6 +196,9 @@ extern int mlock_pages;
 /* execute onsend_route for replies */
 extern int onsend_route_reply;
 
+extern int ksr_evrt_received_mode;
+extern str kemi_received_route_callback;
+
 /* real time stuff */
 extern int real_time;
 extern int rt_prio;
@@ -207,6 +214,10 @@ extern int ksr_verbose_startup;
 extern int ksr_route_locks_size;
 extern str _ksr_xavp_via_params;
 extern str _ksr_xavp_via_fields;
+
+extern char *_sr_uri_host_extra_chars;
+
+extern char *ksr_stats_namesep;
 
 #ifdef USE_DNS_CACHE
 extern int dns_cache_init; /* if 0, the DNS cache is not initialized at startup */

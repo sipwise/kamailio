@@ -56,7 +56,7 @@
 #include "../../core/kemi.h"
 
 #include "../../lib/srdb1/db.h"
-#include "../../lib/srutils/sruid.h"
+#include "../../core/utils/sruid.h"
 
 #include "../../modules/sanity/api.h"
 
@@ -357,10 +357,6 @@ int tps_msg_received(sr_event_param_t *evp)
 		}
 	} else {
 		/* reply */
-		if(msg.first_line.u.reply.statuscode==100) {
-			/* nothing to do - it should be absorbed */
-			goto done;
-		}
 		tps_response_received(&msg);
 	}
 

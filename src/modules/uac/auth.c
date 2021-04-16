@@ -59,7 +59,7 @@ static struct uac_credential *crd_list = 0;
 		_strd.s = (char*)pkg_malloc(_strs.len); \
 		if (_strd.s==0) \
 		{ \
-			LM_ERR("no more pkg memory\n");\
+			PKG_MEM_ERROR;\
 			goto _error; \
 		} \
 		memcpy( _strd.s, _strs.s, _strs.len); \
@@ -112,7 +112,7 @@ int add_credential( unsigned int type, void *val)
 	crd = (struct uac_credential*)pkg_malloc(sizeof(struct uac_credential));
 	if (crd==0)
 	{
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset( crd, 0, sizeof(struct uac_credential));
@@ -341,7 +341,7 @@ static inline int apply_urihdr_changes( struct sip_msg *req,
 	req->new_uri.s = (char*)pkg_malloc(uri->len+1);
 	if (req->new_uri.s==0)
 	{
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memcpy( req->new_uri.s, uri->s, uri->len);
@@ -375,9 +375,10 @@ error:
 	return -1;
 }
 
-
-
-int uac_auth(sip_msg_t *msg)
+/**
+ *
+ */
+int uac_auth_mode(sip_msg_t *msg, int mode)
 {
 	static struct authenticate_body auth;
 	struct uac_credential *crd;
@@ -446,9 +447,13 @@ int uac_auth(sip_msg_t *msg)
 	/* found? */
 	if (crd==0)
 	{
-		LM_DBG("no credential for realm \"%.*s\"\n",
+		LM_INFO("no credential for realm \"%.*s\"\n",
 			auth.realm.len, auth.realm.s);
 		goto error;
+	}
+
+	if(mode & UACAUTH_MODE_HA1) {
+		crd->aflags |= UAC_FLCRED_HA1;
 	}
 
 	/* do authentication */
@@ -489,5 +494,10 @@ error:
 	return -1;
 }
 
-
-
+/**
+ *
+ */
+int uac_auth(sip_msg_t *msg)
+{
+	return uac_auth_mode(msg, 0);
+}

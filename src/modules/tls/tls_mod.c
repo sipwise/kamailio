@@ -108,6 +108,7 @@ static tls_domain_t mod_params = {
 	{0, 0},           /* Server name (SNI) */
 	0,                /* Server name (SNI) mode */
 	{0, 0},           /* Server id */
+	TLS_VERIFY_CLIENT_OFF,             /* Verify client */
 	0                 /* next */
 };
 
@@ -132,6 +133,7 @@ tls_domain_t srv_defaults = {
 	{0, 0},           /* Server name (SNI) */
 	0,                /* Server name (SNI) mode */
 	{0, 0},           /* Server id */
+	TLS_VERIFY_CLIENT_OFF,             /* Verify client */
 	0                 /* next */
 };
 
@@ -173,6 +175,7 @@ tls_domain_t cli_defaults = {
 	{0, 0},           /* Server name (SNI) */
 	0,                /* Server name (SNI) mode */
 	{0, 0},           /* Server id */
+	TLS_VERIFY_CLIENT_OFF,             /* Verify client */
 	0                 /* next */
 };
 
@@ -206,6 +209,7 @@ static param_export_t params[] = {
 	{"verify_certificate",  PARAM_INT,    &default_tls_cfg.verify_cert  },
 	{"verify_depth",        PARAM_INT,    &default_tls_cfg.verify_depth },
 	{"require_certificate", PARAM_INT,    &default_tls_cfg.require_cert },
+	{"verify_client",       PARAM_STR,    &default_tls_cfg.verify_client},
 	{"private_key",         PARAM_STR,    &default_tls_cfg.private_key  },
 	{"ca_list",             PARAM_STR,    &default_tls_cfg.ca_list      },
 	{"certificate",         PARAM_STR,    &default_tls_cfg.certificate  },
@@ -264,15 +268,15 @@ struct module_exports exports = {
 
 
 static struct tls_hooks tls_h = {
-	tls_read_f,
-	tls_encode_f,
-	tls_h_tcpconn_init,
-	tls_h_tcpconn_clean,
-	tls_h_close,
-	tls_h_init_si,
-	init_tls_h,
-	destroy_tls_h,
-	tls_mod_pre_init_h,
+	tls_h_read_f,
+	tls_h_encode_f,
+	tls_h_tcpconn_init_f,
+	tls_h_tcpconn_clean_f,
+	tls_h_tcpconn_close_f,
+	tls_h_init_si_f,
+	tls_h_mod_init_f,
+	tls_h_mod_destroy_f,
+	tls_h_mod_pre_init_f,
 };
 
 
@@ -296,6 +300,7 @@ static tls_domains_cfg_t* tls_use_modparams(void)
 static int mod_init(void)
 {
 	int method;
+	int verify_client;
 
 	if (tls_disable){
 		LM_WARN("tls support is disabled "
@@ -329,6 +334,13 @@ static int mod_init(void)
 	mod_params.cert_file = cfg_get(tls, tls_cfg, certificate);
 	mod_params.cipher_list = cfg_get(tls, tls_cfg, cipher_list);
 	mod_params.server_name = cfg_get(tls, tls_cfg, server_name);
+	/* Convert verify_client parameter to integer */
+	verify_client = tls_parse_verify_client(&cfg_get(tls, tls_cfg, verify_client));
+	if (verify_client < 0) {
+		LM_ERR("Invalid tls_method parameter value\n");
+		return -1;
+	}
+	mod_params.verify_client = verify_client;
 
 	tls_domains_cfg =
 			(tls_domains_cfg_t**)shm_malloc(sizeof(tls_domains_cfg_t*));
@@ -373,6 +385,7 @@ static int mod_init(void)
 	if (tls_check_sockets(*tls_domains_cfg) < 0)
 		goto error;
 
+	LM_INFO("use OpenSSL version: %08x\n", (uint32_t)(OPENSSL_VERSION_NUMBER));
 #ifndef OPENSSL_NO_ECDH
 	LM_INFO("With ECDH-Support!\n");
 #endif
@@ -384,7 +397,7 @@ static int mod_init(void)
 	}
 	return 0;
 error:
-	destroy_tls_h();
+	tls_h_mod_destroy_f();
 	return -1;
 }
 
@@ -482,7 +495,7 @@ static int ki_is_peer_verified(sip_msg_t* msg)
 	c = tcpconn_get(msg->rcv.proto_reserved1, 0, 0, 0,
 					cfg_get(tls, tls_cfg, con_lifetime));
 	if (!c) {
-		LM_ERR("connection no longer exits\n");
+		LM_ERR("connection no longer exists\n");
 		return -1;
 	}
 
@@ -570,7 +583,6 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
 	LM_DBG("setting cryptorand random engine\n");
-	ksr_cryptorand_seed_init();
 	RAND_set_rand_method(RAND_ksr_cryptorand_method());
 #endif
 

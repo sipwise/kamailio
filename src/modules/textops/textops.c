@@ -139,7 +139,14 @@ static int starts_with_f(struct sip_msg *msg, char *str1, char *str2 );
 static int remove_hf_re_f(struct sip_msg* msg, char* key, char* foo);
 static int remove_hf_exp_f(sip_msg_t* msg, char* ematch, char* eskip);
 static int is_present_hf_re_f(struct sip_msg* msg, char* key, char* foo);
+static int remove_hf_pv_f(sip_msg_t* msg, char* phf, char* foo);
+static int remove_hf_re_pv_f(sip_msg_t* msg, char* key, char* foo);
+static int remove_hf_exp_pv_f(sip_msg_t* msg, char* ematch, char* eskip);
+static int is_present_hf_pv_f(sip_msg_t* msg, char* key, char* foo);
+static int is_present_hf_re_pv_f(sip_msg_t* msg, char* key, char* foo);
 static int is_audio_on_hold_f(struct sip_msg *msg, char *str1, char *str2 );
+static int regex_substring_f(struct sip_msg *msg,  char *input, char *regex,
+		char *matched_index, char *match_count, char *dst);
 static int fixup_substre(void**, int);
 static int hname_fixup(void** param, int param_no);
 static int free_hname_fixup(void** param, int param_no);
@@ -153,6 +160,7 @@ static int fixup_free_in_list_prefix(void** param, int param_no);
 int fixup_regexpNL_none(void** param, int param_no);
 static int fixup_search_hf(void** param, int param_no);
 static int fixup_subst_hf(void** param, int param_no);
+static int fixup_regex_substring(void** param, int param_no);
 
 static int mod_init(void);
 
@@ -238,6 +246,21 @@ static cmd_export_t cmds[]={
 		ANY_ROUTE},
 	{"is_present_hf_re", (cmd_function)is_present_hf_re_f,1,
 		fixup_regexp_null, fixup_free_regexp_null,
+		ANY_ROUTE},
+	{"remove_hf_pv",     (cmd_function)remove_hf_pv_f,    1,
+		fixup_spve_null, fixup_free_spve_null,
+		ANY_ROUTE},
+	{"remove_hf_re_pv",  (cmd_function)remove_hf_re_pv_f, 1,
+		fixup_spve_null, fixup_free_spve_null,
+		ANY_ROUTE},
+	{"remove_hf_exp_pv", (cmd_function)remove_hf_exp_pv_f,2,
+		fixup_spve_spve, fixup_free_spve_spve,
+		ANY_ROUTE},
+	{"is_present_hf_pv", (cmd_function)is_present_hf_pv_f,1,
+		fixup_spve_null, fixup_free_spve_null,
+		ANY_ROUTE},
+	{"is_present_hf_re_pv", (cmd_function)is_present_hf_re_pv_f,1,
+		fixup_spve_null, fixup_free_spve_null,
 		ANY_ROUTE},
 	{"subst",            (cmd_function)subst_f,           1,
 		fixup_substre, 0,
@@ -332,6 +355,9 @@ static cmd_export_t cmds[]={
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
 	{"get_body_part",        (cmd_function)get_body_part_f,       2,
 		fixup_get_body_part, 0,
+		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
+	{"regex_substring",        (cmd_function)regex_substring_f,   5,
+		fixup_regex_substring, 0,
 		REQUEST_ROUTE|FAILURE_ROUTE|BRANCH_ROUTE|ONREPLY_ROUTE },
 
 	{"bind_textops",      (cmd_function)bind_textops,       0, 0, 0,
@@ -766,6 +792,170 @@ static int replace_helper(sip_msg_t *msg, regex_t *re, str *val)
 	return -1;
 }
 
+/**
+ * it helps to get substring from a string with regular expression ,regexec()
+ * after findingf substring, function sets destination pseudo-variable as given
+ * @param input - given strings
+ * @param regex - reguler expression as REG_EXTENDED
+ * @param mindex - index number for finding array, when nmatch is non-zero,
+ *   points to an array with at least nmatch elements.
+ * @param nmatch - is the number of matches allowed
+ * @param dst - given pseudo-variable, result will be setted
+ * @return : 1 is success, -1 or less is failed
+*/
+static int ki_regex_substring(sip_msg_t* msg, str *input, str *regex,
+		int mindex, int nmatch, str *dst)
+{
+	regex_t preg;
+	regmatch_t* pmatch;
+	pv_spec_t *pvresult = NULL;
+	pv_value_t valx;
+	str tempstr = {0,0};
+	int rc;
+
+	if(dst == NULL || dst->s == NULL || dst->len<=0) {
+		LM_ERR("Destination pseudo-variable is empty \n");
+		return -1;
+	}
+
+	if(mindex > (nmatch-1)) {
+		LM_ERR("matched_index cannot be bigger than match_count\n");
+		return -1;
+	}
+
+	pvresult = pv_cache_get(dst);
+
+	if(pvresult == NULL) {
+		LM_ERR("Failed to malloc destination pseudo-variable \n");
+		return -1;
+	}
+
+	if(pvresult->setf==NULL) {
+		LM_ERR("destination pseudo-variable is not writable: %.*s \n",
+				dst->len, dst->s);
+		return -1;
+	}
+
+	memset(&valx, 0, sizeof(pv_value_t));
+	memset(&preg, 0, sizeof(regex_t));
+
+	pmatch=pkg_malloc(nmatch*sizeof(regmatch_t));
+
+	LM_DBG("mindex: %d\n", mindex);
+	LM_DBG("nmatch: %d\n", nmatch );
+
+	if (pmatch==0){
+		LM_ERR("couldnt malloc memory for pmatch\n");
+		return -1;
+	}
+
+	rc = regcomp(&preg, regex->s, REG_EXTENDED);
+
+	if (0 != rc) {
+		LM_ERR("regular expression coudnt be compiled, Error code: (%d)\n", rc);
+		pkg_free(pmatch);
+		regfree(&preg);
+		return -1;
+	}
+
+	rc = regexec(&preg, input->s, nmatch, pmatch, REG_EXTENDED);
+	regfree(&preg);
+	if(rc!=0) {
+		LM_DBG("no matches\n");
+		pkg_free(pmatch);
+		return -2;
+	}
+
+	/* matched */
+	if (pmatch[mindex].rm_so==-1) {
+		LM_WARN("invalid offset for regular expression result\n");
+		pkg_free(pmatch);
+		return -1;
+	}
+
+	LM_DBG("start offset %d end offset %d\n",
+			(int)pmatch[0].rm_so, (int)pmatch[0].rm_eo);
+
+	if (pmatch[mindex].rm_so==pmatch[mindex].rm_eo) {
+		LM_WARN("Matched string is empty\n");
+		pkg_free(pmatch);
+		return -1;
+	}
+
+	tempstr.len=(int)(pmatch[mindex].rm_eo - pmatch[mindex].rm_so);
+	tempstr.s=&input->s[pmatch[mindex].rm_so];
+
+	if(tempstr.s== NULL || tempstr.len<=0) {
+		LM_WARN("matched token is null\n");
+		pkg_free(pmatch);
+		return -1;
+	}
+
+	valx.flags = PV_VAL_STR;
+	valx.rs.s=tempstr.s;
+	valx.rs.len=tempstr.len;
+	LM_DBG("result: %.*s\n", valx.rs.len, valx.rs.s);
+	pvresult->setf(msg, &pvresult->pvp, (int)EQ_T, &valx);
+	pkg_free(pmatch);
+
+	return 1;
+}
+
+/**
+ * it helps to get substring from a string with regular expression ,regexec()
+ * after findingf substring, function sets destination pseudo-variable as given
+ * @param input, given strings
+ * @param regex, reguler expression as REG_EXTENDED
+ * @param matched_index, index number for finding array, when nmatch is non-zero,
+ *   points to an array with at least nmatch elements.
+ * @param match_count, is the number of matches allowed
+ * @param dst, given pseudo-variable, result will be setted
+ * @return : 1 is success, -1 or less is failed
+*/
+static int regex_substring_f(sip_msg_t *msg, char *input, char *iregex,
+		char *matched_index, char *match_count, char* dst)
+{
+	str sinput;
+	str sregex;
+	str sdst;
+	int nmatch;
+	int index;
+
+	if(fixup_get_svalue(msg, (gparam_t*)input, &sinput)!=0) {
+		LM_ERR("unable to get input string\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)iregex, &sregex)!=0) {
+		LM_ERR("unable to get input regex\n");
+		return -1;
+	}
+	if(fixup_get_ivalue(msg, (gparam_t*)matched_index, &index)!=0) {
+		LM_ERR("unable to get index\n");
+		return -1;
+	}
+	if(fixup_get_ivalue(msg, (gparam_t*)match_count, &nmatch)!=0) {
+		LM_ERR("unable to get index\n");
+		return -1;
+	}
+	sdst.s = dst;
+	sdst.len = strlen(sdst.s);
+
+	return ki_regex_substring(msg, &sinput, &sregex, index, nmatch, &sdst);
+}
+
+static int fixup_regex_substring(void** param, int param_no)
+{
+	if (param_no == 1 || param_no == 2) {
+		return fixup_spve_all(param, param_no);
+	}
+
+	if (param_no == 3 || param_no == 4) {
+		return fixup_igp_all(param, param_no);
+	}
+
+	return 0;
+}
+
 static int replace_f(sip_msg_t* msg, char* key, char* str2)
 {
 	str val;
@@ -1038,13 +1228,12 @@ static int replace_hdrs_helper(sip_msg_t* msg, regex_t *re, str *val)
 		return -1;
 	}
 
-	bk = lbuf.s[lbuf.len];
-	lbuf.s[lbuf.len] = '\0';
+	STR_VTOZ(lbuf.s[lbuf.len], bk);
 	if (regexec(re, lbuf.s, 1, &pmatch, 0)!=0) {
-		lbuf.s[lbuf.len] = bk;
+		STR_ZTOV(lbuf.s[lbuf.len], bk);
 		return -1;
 	}
-	lbuf.s[lbuf.len] = bk;
+	STR_ZTOV(lbuf.s[lbuf.len], bk);
 
 	off=lbuf.s-msg->buf;
 
@@ -1158,10 +1347,9 @@ static int subst_helper_f(sip_msg_t* msg, struct subst_expr* se)
 	off=begin-msg->buf;
 	ret=-1;
 
-	c = msg->buf[msg->len];
-	msg->buf[msg->len] = '\0';
+	STR_VTOZ(msg->buf[msg->len], c);
 	lst=subst_run(se, begin, msg, &nmatches);
-	msg->buf[msg->len] = c;
+	STR_ZTOV(msg->buf[msg->len], c);
 
 	if (lst==0)
 		goto error; /* not found */
@@ -1320,10 +1508,9 @@ static int subst_body_helper_f(struct sip_msg* msg, struct subst_expr* se)
 	off=begin-msg->buf;
 	ret=-1;
 
-	c = body.s[body.len];
-	body.s[body.len] = '\0';
+	STR_VTOZ(body.s[body.len], c);
 	lst=subst_run(se, begin, msg, &nmatches);
-	body.s[body.len] = c;
+	STR_ZTOV(body.s[body.len], c);
 
 	if (lst==0)
 		goto error; /* not found */
@@ -1561,14 +1748,13 @@ static int remove_hf_re(sip_msg_t* msg, regex_t *re)
 	}
 	for (hf=msg->headers; hf; hf=hf->next)
 	{
-		c = hf->name.s[hf->name.len];
-		hf->name.s[hf->name.len] = '\0';
+		STR_VTOZ(hf->name.s[hf->name.len], c);
 		if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
 		{
-			hf->name.s[hf->name.len] = c;
+			STR_ZTOV(hf->name.s[hf->name.len], c);
 			continue;
 		}
-		hf->name.s[hf->name.len] = c;
+		STR_ZTOV(hf->name.s[hf->name.len], c);
 		l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
 		if (l==0)
 		{
@@ -1622,19 +1808,18 @@ static int remove_hf_exp(sip_msg_t* msg, regex_t *mre, regex_t *sre)
 
 	for (hf=msg->headers; hf; hf=hf->next)
 	{
-		c = hf->name.s[hf->name.len];
-		hf->name.s[hf->name.len] = '\0';
+		STR_VTOZ(hf->name.s[hf->name.len], c);
 		if (regexec(sre, hf->name.s, 1, &pmatch, 0)==0)
 		{
-			hf->name.s[hf->name.len] = c;
+			STR_ZTOV(hf->name.s[hf->name.len], c);
 			continue;
 		}
 		if (regexec(mre, hf->name.s, 1, &pmatch, 0)!=0)
 		{
-			hf->name.s[hf->name.len] = c;
+			STR_ZTOV(hf->name.s[hf->name.len], c);
 			continue;
 		}
-		hf->name.s[hf->name.len] = c;
+		STR_ZTOV(hf->name.s[hf->name.len], c);
 		l=del_lump(msg, hf->name.s-msg->buf, hf->len, 0);
 		if (l==0)
 		{
@@ -1721,14 +1906,13 @@ static int is_present_hf_re_helper(sip_msg_t* msg, regex_t *re)
 	}
 	for (hf=msg->headers; hf; hf=hf->next)
 	{
-		c = hf->name.s[hf->name.len];
-		hf->name.s[hf->name.len] = '\0';
+		STR_VTOZ(hf->name.s[hf->name.len], c);
 		if (regexec(re, hf->name.s, 1, &pmatch, 0)!=0)
 		{
-			hf->name.s[hf->name.len] = c;
+			STR_ZTOV(hf->name.s[hf->name.len], c);
 			continue;
 		}
-		hf->name.s[hf->name.len] = c;
+		STR_ZTOV(hf->name.s[hf->name.len], c);
 		return 1;
 	}
 
@@ -1738,6 +1922,74 @@ static int is_present_hf_re_helper(sip_msg_t* msg, regex_t *re)
 static int is_present_hf_re_f(struct sip_msg* msg, char* key, char* foo)
 {
 	return is_present_hf_re_helper(msg, (regex_t*)key);
+}
+
+/*
+ * Convert char* header_name to str* parameter
+ */
+static int ki_hname_gparam(str *hname, gparam_t *gp)
+{
+	char hbuf[256];
+	struct hdr_field hdr;
+
+	if(hname->len<=0) {
+		LM_ERR("invalid header name\n");
+		return -1;
+	}
+
+	if(hname->len>252) {
+		LM_ERR("header name too long: %d (%.*s...)\n",
+			hname->len, 32, hname->s);
+		return -1;
+	}
+	strncpy(hbuf, hname->s, hname->len);
+	hbuf[hname->len] = ':';
+	hbuf[hname->len+1] = '\0';
+
+	memset(gp, 0, sizeof(gparam_t));
+
+	gp->v.str = *hname;
+
+	if (parse_hname2_short(hbuf, hbuf + gp->v.str.len + 1, &hdr)==0) {
+		LM_ERR("error parsing header name: %.*s\n", hname->len, hname->s);
+		return -1;
+	}
+
+	if (hdr.type!=HDR_OTHER_T && hdr.type!=HDR_ERROR_T) {
+		LM_DBG("using hdr type (%d) instead of <%.*s>\n",
+				hdr.type, gp->v.str.len, gp->v.str.s);
+		gp->v.str.s = NULL;
+		gp->v.i = hdr.type;
+		gp->type = GPARAM_TYPE_INT;
+	} else {
+		gp->type = GPARAM_TYPE_STR;
+		LM_DBG("using hdr type name <%.*s>\n", gp->v.str.len, gp->v.str.s);
+	}
+
+	return 0;
+}
+
+static int ki_is_present_hf(sip_msg_t *msg, str *hname)
+{
+	gparam_t ghp;
+
+	if(hname==NULL || hname->len<=0)
+		return -1;
+	if(ki_hname_gparam(hname, &ghp)<0)
+		return -1;
+
+	return is_present_hf_helper_f(msg, &ghp);
+}
+
+static int is_present_hf_pv_f(sip_msg_t* msg, char* key, char* foo)
+{
+	str hname = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)key, &hname)!=0) {
+		LM_ERR("unable to get parameter\n");
+		return -1;
+	}
+	return ki_is_present_hf(msg, &hname);
 }
 
 static int ki_is_present_hf_re(sip_msg_t* msg, str *ematch)
@@ -1754,6 +2006,60 @@ static int ki_is_present_hf_re(sip_msg_t* msg, str *ematch)
 	regfree(&mre);
 
 	return ret;
+}
+
+static int is_present_hf_re_pv_f(sip_msg_t* msg, char* key, char* foo)
+{
+	str ematch = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)key, &ematch)!=0) {
+		LM_ERR("unable to get parameter\n");
+		return -1;
+	}
+	return ki_is_present_hf_re(msg, &ematch) ;
+}
+
+static int ki_remove_hf(sip_msg_t* msg, str *hname)
+{
+	return sr_kemi_hdr_remove(msg, hname);
+}
+
+static int remove_hf_pv_f(sip_msg_t* msg, char* phf, char* foo)
+{
+	str hname = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)phf, &hname)!=0) {
+		LM_ERR("unable to get parameter\n");
+		return -1;
+	}
+	return ki_remove_hf(msg, &hname);
+}
+
+static int remove_hf_re_pv_f(sip_msg_t* msg, char* key, char* foo)
+{
+	str ematch = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)key, &ematch)!=0) {
+		LM_ERR("unable to get parameter\n");
+		return -1;
+	}
+	return ki_remove_hf_re(msg, &ematch);
+}
+
+static int remove_hf_exp_pv_f(sip_msg_t* msg, char* pematch, char* peskip)
+{
+	str ematch = STR_NULL;
+	str eskip = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pematch, &ematch)!=0) {
+		LM_ERR("unable to get parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)peskip, &eskip)!=0) {
+		LM_ERR("unable to get parameter\n");
+		return -1;
+	}
+	return ki_remove_hf_exp(msg, &ematch, &eskip);
 }
 
 static int fixup_substre(void** param, int param_no)
@@ -1786,17 +2092,15 @@ static int append_time_f(struct sip_msg* msg, char* p1, char *p2)
 	size_t len;
 	char time_str[MAX_TIME];
 	time_t now;
-	struct tm *bd_time;
+	struct tm bd_time;
 
 	now=time(0);
-
-	bd_time=gmtime(&now);
-	if (bd_time==NULL) {
+	if (gmtime_r(&now, &bd_time)==NULL) {
 		LM_ERR("gmtime failed\n");
 		return -1;
 	}
 
-	len=strftime(time_str, MAX_TIME, TIME_FORMAT, bd_time);
+	len=strftime(time_str, MAX_TIME, TIME_FORMAT, &bd_time);
 	if (len>MAX_TIME-2 || len==0) {
 		LM_ERR("unexpected time length\n");
 		return -1;
@@ -1819,14 +2123,12 @@ static int append_time_request_f(struct sip_msg* msg, char* p1, char *p2)
 {
 	str time_str = {0, 0};
 	time_t now;
-	struct tm *bd_time;
+	struct tm bd_time;
 	struct hdr_field *hf = msg->headers;
 	struct lump *anchor = anchor_lump(msg, hf->name.s + hf->len - msg->buf, 0, 0);
 
 	now=time(0);
-
-	bd_time=gmtime(&now);
-	if (bd_time==NULL) {
+	if (gmtime_r(&now, &bd_time)==NULL) {
 		LM_ERR("gmtime failed\n");
 		goto error;
 	}
@@ -1836,7 +2138,7 @@ static int append_time_request_f(struct sip_msg* msg, char* p1, char *p2)
 		LM_ERR("no more pkg memory\n");
 		goto error;
 	}
-	time_str.len=strftime(time_str.s, MAX_TIME, TIME_FORMAT, bd_time);
+	time_str.len=strftime(time_str.s, MAX_TIME, TIME_FORMAT, &bd_time);
 	if (time_str.len>MAX_TIME-2 || time_str.len==0) {
 		LM_ERR("unexpected time length\n");
 		goto error;
@@ -3059,7 +3361,7 @@ int add_hf_helper(struct sip_msg* msg, str *str1, str *str2,
 		gparam_p hfval, int mode, gparam_p hfanc)
 {
 	struct lump* anchor;
-	struct hdr_field *hf;
+	struct hdr_field *hf, *append_hf;
 	char *s;
 	int len;
 	str s0;
@@ -3070,6 +3372,7 @@ int add_hf_helper(struct sip_msg* msg, str *str1, str *str2,
 	}
 
 	hf = 0;
+	append_hf = 0;
 	if(hfanc!=NULL) {
 		for (hf=msg->headers; hf; hf=hf->next) {
 			if(hfanc->type==GPARAM_TYPE_INT)
@@ -3082,20 +3385,25 @@ int add_hf_helper(struct sip_msg* msg, str *str1, str *str2,
 				if (cmp_hdrname_str(&hf->name,&hfanc->v.str)!=0)
 					continue;
 			}
-			break;
+			if (mode == 0) { /* append */
+				append_hf = hf;
+				continue;
+			} else { /* insert */
+				break;
+			}
 		}
 	}
 
 	if(mode == 0) { /* append */
-		if(hf==0) { /* after last header */
+		if(append_hf==0) { /* after last header */
 			anchor = anchor_lump(msg, msg->unparsed - msg->buf, 0, 0);
-		} else { /* after hf */
-			anchor = anchor_lump(msg, hf->name.s + hf->len - msg->buf, 0, 0);
+		} else { /* after last hf */
+			anchor = anchor_lump(msg, append_hf->name.s + append_hf->len - msg->buf, 0, 0);
 		}
 	} else { /* insert */
 		if(hf==0) { /* before first header */
 			anchor = anchor_lump(msg, msg->headers->name.s - msg->buf, 0, 0);
-		} else { /* before hf */
+		} else { /* before first hf */
 			anchor = anchor_lump(msg, hf->name.s - msg->buf, 0, 0);
 		}
 	}
@@ -4019,10 +4327,9 @@ static int search_hf_helper_f(sip_msg_t* msg, gparam_t *ghp, regex_t* re, char* 
 		if(flags==NULL || *flags!='l')
 		{
 			body = hf->body;
-			c = body.s[body.len];
-			body.s[body.len] = '\0';
+			STR_VTOZ(body.s[body.len], c);
 			ret = regexec((regex_t*) re, body.s, 1, &pmatch, 0);
-			body.s[body.len] = c;
+			STR_ZTOV(body.s[body.len], c);
 			if(ret==0)
 			{
 				/* match */
@@ -4040,10 +4347,9 @@ static int search_hf_helper_f(sip_msg_t* msg, gparam_t *ghp, regex_t* re, char* 
 	{
 		hf = hfl;
 		body = hf->body;
-		c = body.s[body.len];
-		body.s[body.len] = '\0';
+		STR_VTOZ(body.s[body.len], c);
 		ret = regexec((regex_t*) re, body.s, 1, &pmatch, 0);
-		body.s[body.len] = c;
+		STR_ZTOV(body.s[body.len], c);
 		if(ret==0)
 			return 1;
 	}
@@ -4108,15 +4414,14 @@ static int subst_hf_helper_f(sip_msg_t *msg, gparam_t *gp,
 		if(flags==NULL || *flags!='l')
 		{
 			body = hf->body;
-			c = body.s[body.len];
-			body.s[body.len] = '\0';
+			STR_VTOZ(body.s[body.len], c);
 
 			begin=body.s;
 
 			off=begin-msg->buf;
 			if (lst) replace_lst_free(lst);
 			lst=subst_run(se, begin, msg, &nmatches);
-			body.s[body.len] = c;
+			STR_ZTOV(body.s[body.len], c);
 			if(lst==0 && flags!=NULL && *flags=='f')
 				goto error; /* not found */
 			if(lst!=0)
@@ -4157,15 +4462,14 @@ static int subst_hf_helper_f(sip_msg_t *msg, gparam_t *gp,
 	{
 		hf= hfl;
 		body = hf->body;
-		c = body.s[body.len];
-		body.s[body.len] = '\0';
+		STR_VTOZ(body.s[body.len], c);
 
 		begin=body.s;
 
 		off=begin-msg->buf;
 		if (lst) replace_lst_free(lst);
 		lst=subst_run(se, begin, msg, &nmatches);
-		body.s[body.len] = c;
+		STR_ZTOV(body.s[body.len], c);
 		if(lst==0)
 			goto error; /* not found */
 		ret=1;
@@ -4265,50 +4569,6 @@ static int ki_search_body(sip_msg_t *msg, str *sre)
 	return ret;
 }
 
-/*
- * Convert char* header_name to str* parameter
- */
-static int ki_hname_gparam(str *hname, gparam_t *gp)
-{
-	char hbuf[256];
-	struct hdr_field hdr;
-
-	if(hname->len<=0) {
-		LM_ERR("invalid header name\n");
-		return -1;
-	}
-
-	if(hname->len>252) {
-		LM_ERR("header name too long: %d (%.*s...)\n",
-			hname->len, 32, hname->s);
-		return -1;
-	}
-	strncpy(hbuf, hname->s, hname->len);
-	hbuf[hname->len] = ':';
-	hbuf[hname->len+1] = '\0';
-
-	memset(gp, 0, sizeof(gparam_t));
-
-	gp->v.str = *hname;
-
-	if (parse_hname2_short(hbuf, hbuf + gp->v.str.len + 1, &hdr)==0) {
-		LM_ERR("error parsing header name: %.*s\n", hname->len, hname->s);
-		return -1;
-	}
-
-	if (hdr.type!=HDR_OTHER_T && hdr.type!=HDR_ERROR_T) {
-		LM_DBG("using hdr type (%d) instead of <%.*s>\n",
-				hdr.type, gp->v.str.len, gp->v.str.s);
-		gp->v.str.s = NULL;
-		gp->v.i = hdr.type;
-		gp->type = GPARAM_TYPE_INT;
-	} else {
-		gp->type = GPARAM_TYPE_STR;
-		LM_DBG("using hdr type name <%.*s>\n", gp->v.str.len, gp->v.str.s);
-	}
-
-	return 0;
-}
 
 /**
  *
@@ -4336,18 +4596,6 @@ static int ki_search_hf(sip_msg_t *msg, str *hname, str *sre, str *flags)
 	ret = search_hf_helper_f(msg, &ghp, &re, (flags)?flags->s:NULL);
 	regfree(&re);
 	return ret;
-}
-
-static int ki_is_present_hf(sip_msg_t *msg, str *hname)
-{
-	gparam_t ghp;
-
-	if(hname==NULL || hname->len<=0)
-		return -1;
-	if(ki_hname_gparam(hname, &ghp)<0)
-		return -1;
-
-	return is_present_hf_helper_f(msg, &ghp);
 }
 
 static int ki_subst(sip_msg_t *msg, str *subst)
@@ -4521,6 +4769,11 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("textops"), str_init("remove_hf"),
+		SR_KEMIP_INT, ki_remove_hf,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("textops"), str_init("remove_hf_re"),
 		SR_KEMIP_INT, ki_remove_hf_re,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
@@ -4690,6 +4943,11 @@ static sr_kemi_t sr_kemi_textops_exports[] = {
 		SR_KEMIP_INT, ki_get_body_part_raw,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("textops"), str_init("regex_substring"),
+		SR_KEMIP_INT, ki_regex_substring,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
+			SR_KEMIP_INT, SR_KEMIP_STR, SR_KEMIP_NONE }
 	},
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }

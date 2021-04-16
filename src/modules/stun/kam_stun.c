@@ -227,7 +227,7 @@ static int stun_parse_body(
 	buf = &req->msg.buf.s[sizeof(struct stun_hdr)];
 	
 	/* 
-	 * Mark the body lenght as unparsed.
+	 * Mark the body length as unparsed.
 	 */
 	not_parsed = req->msg.buf.len - sizeof(struct stun_hdr);
 	
@@ -928,10 +928,6 @@ static int reallock_buffer(struct stun_buffer* buffer, UINT_T len)
 static void clean_memory(struct stun_msg* req,
 				struct stun_msg* res,	struct stun_unknown_att* unknown)
 {
-#ifdef DYN_BUF
-	pkg_free(req->msg.buf.s);
-#endif
-
 	if (res->msg.buf.s != NULL) {
 		pkg_free(res->msg.buf.s);
 	}

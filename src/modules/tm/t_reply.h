@@ -23,7 +23,6 @@
 #ifndef _T_REPLY_H
 #define _T_REPLY_H
 
-#include "defs.h"
 #include "../../core/rpc.h"
 #include "../../core/tags.h"
 
@@ -43,7 +42,9 @@ enum rps {
 	/* transaction completed */
 	RPS_COMPLETED,
 	/* provisional reply not affecting transaction state */
-	RPS_PROVISIONAL
+	RPS_PROVISIONAL,
+	/* too long execution - transaction is gone */
+	RPS_TGONE
 };
 
 extern char tm_tags[TOTAG_VALUE_LEN];
@@ -62,8 +63,6 @@ int unmatched_totag(struct cell *t, struct sip_msg *ack);
 
 /* branch bitmap type */
 typedef unsigned int branch_bm_t;
-
-#ifdef CANCEL_REASON_SUPPORT
 
 /* reason building blocks (see rfc3326) */
 #define REASON_PREFIX "Reason: SIP;cause="
@@ -105,19 +104,6 @@ struct cancel_info {
 		(ci)->cancel_bitmap=0; \
 		init_cancel_reason(&(ci)->reason); \
 	}while (0);
-
-#else /* ! CANCEL_REASON_SUPPORT */
-
-struct cancel_info {
-	branch_bm_t cancel_bitmap; /**< cancel branch bitmap */
-};
-
-#define init_cancel_info(ci) \
-	do {\
-		(ci)->cancel_bitmap=0; \
-	}while (0);
-
-#endif /* CANCEL_REASON_SUPPORT */
 
 
 /* reply export types */

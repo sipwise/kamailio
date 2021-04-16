@@ -177,11 +177,6 @@ static int ki_msg_set_buffer(sip_msg_t *msg, str *obuf)
  */
 static int ki_msg_apply_changes(sip_msg_t *msg)
 {
-	if(msg->first_line.type != SIP_REPLY && get_route_type() != REQUEST_ROUTE) {
-		LM_ERR("invalid usage - not in request route or a reply\n");
-		return -1;
-	}
-
 	return sip_msg_apply_changes(msg);
 }
 
@@ -190,7 +185,7 @@ static int ki_msg_apply_changes(sip_msg_t *msg)
  */
 static int msg_apply_changes_f(sip_msg_t *msg, char *str1, char *str2)
 {
-	return ki_msg_apply_changes(msg);
+	return sip_msg_apply_changes(msg);
 }
 
 /**
@@ -357,11 +352,10 @@ static int keep_hf_helper(sip_msg_t *msg, regex_t *re)
 				return -1;
 			}
 		} else {
-			c = hf->name.s[hf->name.len];
-			hf->name.s[hf->name.len] = '\0';
+			STR_VTOZ(hf->name.s[hf->name.len], c);
 			if(regexec(re, hf->name.s, 1, &pmatch, 0) != 0) {
 				/* no match => remove */
-				hf->name.s[hf->name.len] = c;
+				STR_ZTOV(hf->name.s[hf->name.len], c);
 				l = del_lump(msg, hf->name.s - msg->buf, hf->len, 0);
 				if(l == 0) {
 					LM_ERR("cannot remove header [%.*s]\n", hf->name.len,
@@ -369,7 +363,7 @@ static int keep_hf_helper(sip_msg_t *msg, regex_t *re)
 					return -1;
 				}
 			} else {
-				hf->name.s[hf->name.len] = c;
+				STR_ZTOV(hf->name.s[hf->name.len], c);
 			}
 		}
 	}

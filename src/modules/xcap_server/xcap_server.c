@@ -197,7 +197,9 @@ static int mod_init(void)
 
 	if(db_check_table_version(&xcaps_dbf, xcaps_db, &xcaps_db_table,
 				XCAP_TABLE_VERSION) < 0) {
-		LM_ERR("error during table version check.\n");
+		DB_TABLE_VERSION_ERROR(xcaps_db_table);
+		xcaps_dbf.close(xcaps_db);
+		xcaps_db = NULL;
 		return -1;
 	}
 	xcaps_dbf.close(xcaps_db);
@@ -319,14 +321,12 @@ int xcaps_xpath_hack(str *buf, int type)
 	}
 
 	start = buf->s;
-	c = buf->s[buf->len-1];
-	buf->s[buf->len-1] = '\0';
-	while((p = strstr(start, match))!=NULL)
-	{
+	STR_VTOZ(buf->s[buf->len-1], c);
+	while((start < buf->s + buf->len - 10) && (p = strstr(start, match))!=NULL) {
 		memcpy(p, repl, 7);
 		start = p + 7;
 	}
-	buf->s[buf->len-1] = c;
+	STR_ZTOV(buf->s[buf->len-1], c);
 	return 0;
 }
 

@@ -26,6 +26,8 @@
  */
 
 
+#include <stdint.h>
+
 #include "../globals.h"
 #include "parse_uri.h"
 #include <string.h>
@@ -36,6 +38,25 @@
 
 static char _sr_uri_empty_buf[2] = {0};
 static str _sr_uri_empty = { _sr_uri_empty_buf, 0 };
+
+/* extra chars that should be allowed in URI host */
+char *_sr_uri_host_extra_chars = "";
+
+int uri_host_char_allowed(char c)
+{
+	int i = 0;
+
+	if(_sr_uri_host_extra_chars==NULL || _sr_uri_host_extra_chars[0]=='\0') {
+		return 0;
+	}
+	while(_sr_uri_host_extra_chars[i]!='\0') {
+		if(_sr_uri_host_extra_chars[i]==c) {
+			return 1;
+		}
+		i++;
+	}
+	return 0;
+}
 
 /* buf= pointer to begining of uri (sip:x@foo.bar:5060;a=b?h=i)
  * len= len of uri
@@ -105,7 +126,7 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 	char* pass;
 	int found_user;
 	int error_headers;
-	unsigned int scheme;
+	uint32_t scheme;
 	uri_type backup_urit;
 	uri_flags backup_urif;
 
@@ -122,6 +143,9 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 #define case_port( ch, var) \
 	case ch: \
 			(var)=(var)*10+ch-'0'; \
+			if((var) > MAX_PORT_VAL) { \
+				goto error_bad_port; \
+			}\
 			break
 
 #define still_at_user  \
@@ -367,9 +391,10 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 	port_no=0;
 	state=URI_INIT;
 	memset(uri, 0, sizeof(struct sip_uri)); /* zero it all, just to be sure*/
-	/*look for sip:, sips: ,tel: or urn:*/
+	/*look for sip:, sips:, tel: or urn:*/
 	if (len<5) goto error_too_short;
-	scheme=buf[0]+(buf[1]<<8)+(buf[2]<<16)+(buf[3]<<24);
+	scheme=((uint32_t)buf[0]) + (((uint32_t)buf[1])<<8)
+				+ (((uint32_t)buf[2])<<16) + (((uint32_t)buf[3])<<24);
 	scheme|=0x20202020;
 	if (scheme==SIP_SCH){
 		uri->type=SIP_URI_T;
@@ -542,7 +567,8 @@ int parse_uri(char* buf, int len, struct sip_uri* uri)
 				switch(*p) {
 					check_host_end;
 					default:
-						if(!isalnum(*p) && (*p != '.') && (*p != '-')) {
+						if(!isalnum(*p) && (*p != '.') && (*p != '-')
+								&& !uri_host_char_allowed(*p)) {
 							goto error_bad_host;
 						}
 				}

@@ -1602,8 +1602,45 @@ modparam("dialog", "h_id_step", 10)
 		</example>
 	</section>
 
+	<section id="dialog.p.keep_proxy_rr">
+		<title><varname>keep_proxy_rr</varname> (string)</title>
+		<para>
+			Whether to keep the record-route header added by the proxy.
+			When enabled, it will keep this proxy&apos;s record-route
+			header from the reply. The result is that generated requests
+			like the BYE from the dlg_end_dlg mi function will pass
+			through the proxy (looped).
+		</para>
+		<para>
+			Valid values are:
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>0</emphasis> - Don&apos;t keep any proxy Record-Route headers
+			</para></listitem>
+			<listitem><para>
+				<emphasis>1</emphasis> - Keep Record-route headers for the callee leg
+			</para></listitem>
+			<listitem><para>
+				<emphasis>2</emphasis> - Keep Record-route headers for the caller leg
+			</para></listitem>
+			<listitem><para>
+				<emphasis>3</emphasis> - Keep Record-route headers for both legs
+			</para></listitem>
+		</itemizedlist>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		<example>
+		<title>Set <varname>dlg_keep_proxy_rr</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "keep_proxy_rr", 1)
+...
+</programlisting>
+		</example>
 	</section>
-
+	</section>
 
 	<section>
 	<title>Functions</title>
@@ -2339,6 +2376,48 @@ if(has_totag()) {
 </programlisting>
 		</example>
 	</section>
+
+	<section id="dialog.f.dlg_reset_property">
+		<title>
+		<function moreinfo="none">dlg_reset_property(attr)</function>
+		</title>
+		<para>
+			Reset a dialog property - an attribute that enable/disable
+			various behaviours (e.g., sending keep alive requests).
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para><emphasis>attr</emphasis> - name of property. It can be:
+				<itemizedlist>
+					<listitem>
+						'ka-src' - send keep alive OPTION requests to caller
+					</listitem>
+					<listitem>
+						'ka-dst' - send keep alive OPTION requests to callee
+					</listitem>
+					<listitem>
+						'timeout-noreset' - don't reset timeout on in-dialog messages reception
+					</listitem>
+				</itemizedlist>
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+			This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>dlg_reset_property</function> usage</title>
+		<programlisting format="linespecific">
+...
+dlg_reset_property("ka-src");
+dlg_reset_property("ka-dst");
+dlg_reset_property("timeout-noreset");
+...
+
+</programlisting>
+		</example>
+	</section>
 	</section>
 
 
@@ -2408,6 +2487,74 @@ if(has_totag()) {
 		</programlisting>
 		</section>
 
+		<section id="dlg.r.list_match">
+		<title>dlg.list_match</title>
+		<para>
+		Lists the details of matching dialogs. The paramters specify the matching
+		key, operator, value and optionally a limit of matched dialogs.
+		</para>
+		<para>Name: <emphasis>dlg.list_match</emphasis></para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>mkey</emphasis> - matching key. It can be: 'ruri' -
+				match against R-URI of the dialog; 'furi' - match against From
+				header URI of the dialog; 'turi' - match against the To header
+				URI of the dialog; 'callid' - match against Call-Id value.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>mop</emphasis> - matching operator. It can be: 'eq' -
+				match using string comparison; 're' - match using regular
+				expression; 'sw' - match using starts-with (prefix) comparison.
+			</para></listitem>
+			<listitem><para>
+				<emphasis>mval</emphasis> - matching value.
+			</para></listitem>
+		</itemizedlist>
+		<para>RPC Command Format:</para>
+		<programlisting  format="linespecific">
+...
+&kamcmd; dlg.list_match furi eq sip:alice@test.com 2
+...
+&kamcmd; dlg.list_match furi sw sip:alice@
+...
+		</programlisting>
+		</section>
+
+		<section id="dlg.r.list_match_ctx">
+		<title>dlg.list_match_ctx</title>
+		<para>
+		Similar to <quote>dlg.list_match</quote>, but including in the
+		attributes associated with the dialog context from modules sitting on
+		top of the dialog module.
+		</para>
+		<para>Name: <emphasis>dlg.list_match_ctx</emphasis></para>
+		<para>RPC Command Format:</para>
+		<programlisting  format="linespecific">
+...
+&kamcmd; dlg.list_match_ctx furi sw sip:alice@
+...
+		</programlisting>
+		</section>
+
+		<section id="dlg.r.dump_file">
+		<title>dlg.dump_file</title>
+		<para>Dump all dialogs in a json file. (much faster than dlg.list)</para>
+		<para>Name: <emphasis>dlg.dump_file</emphasis></para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>file name</emphasis> output file name
+			</para></listitem>
+		</itemizedlist>
+		<para>RPC Command Format:</para>
+		<programlisting  format="linespecific">
+...
+&kamcmd; dlg.dump_file "/tmp/dlg.json"
+...
+		</programlisting>
+		</section>
+
 		<section id="dlg.r.dlg_list">
 		<title>dlg.dlg_list</title>
 		<para>
@@ -2437,7 +2584,7 @@ if(has_totag()) {
 		<section id="dlg.r.dlg_list_ctx">
 		<title>dlg.dlg_list_ctx</title>
 		<para>
-		The same as the <quote>dlg.list_ctx</quote> but including in the dialog
+		The same as the <quote>dlg.list_list</quote> but including in the dialog
 		description the associated context from modules sitting on top of
 		the dialog module.
 		</para>
@@ -2509,6 +2656,44 @@ if(has_totag()) {
 		<programlisting  format="linespecific">
 ...
 &kamcmd; dlg.end_dlg 342 56
+...
+		</programlisting>
+		</section>
+		<section>
+			<title>dlg.set_state</title>
+			<para>
+			Set state for the dialog matching the dialog on Call-ID, From-Tag and To-Tag.
+			</para>
+		<para>Name: <emphasis>dlg.kill_active_dlg</emphasis></para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>callid</emphasis> - Call-ID of active dialog to kill
+			</para></listitem>
+			<listitem><para>
+				<emphasis>from_tag</emphasis> - From-Tag of active dialog to kill
+			</para></listitem>
+			<listitem><para>
+				<emphasis>to_tag</emphasis> - To-tag of active dialog to kill
+			</para></listitem>
+			<listitem><para>
+				<emphasis>state</emphasis> - The value for new state
+			</para></listitem>
+		</itemizedlist>
+		<para>
+		At this moment, the command targets the need to change from active dialogs
+		(state 4) to terminated state (5), although it allows setting other state
+		value. Be careful using with it, it can cause side effects and the
+		terminated dialog is wiped out silently. Dialog ending functions are not
+		executed, such as accounting end-of-call events, dialog-end
+		events, module-generated BYE requests, etc. After executing the	command, dialog
+		remains in memory until execution of the recurring function in charge of removing
+		old dialogs (a "dialog in delete state is too old" will then be logged).
+		</para>
+		<para>RPC Command Format:</para>
+		<programlisting  format="linespecific">
+...
+&kamcmd; dlg.set_state callid12345 fromtag123 totag123 5
 ...
 		</programlisting>
 		</section>
@@ -2647,6 +2832,95 @@ if(has_totag()) {
 ...
 		</programlisting>
 		</section>
+		<section id="dlg.r.is_alive">
+			<title>dlg.is_alive</title>
+			<para>
+				Check whether a dialog matching the parameter is in confirmed
+				state (answered and alive).
+			</para>
+			<para>Name: <emphasis>dlg.is_alive</emphasis></para>
+			<para>Parameters:</para>
+			<itemizedlist>
+				<listitem><para>
+					<emphasis>callid</emphasis> - callid of dialog
+				</para></listitem>
+				<listitem><para>
+					<emphasis>from_tag</emphasis> - from tag of the dialog
+				</para></listitem>
+				<listitem><para>
+					<emphasis>to_tag</emphasis> - to tag of the dialog
+				</para></listitem>
+			</itemizedlist>
+			<para>
+				This command will return error if dialog is not found or not
+				confirmed state (answered).
+			</para>
+			<para>RPC Command Format:</para>
+			<programlisting format="linespecific">
+...
+&kamcmd; dlg.is_alive callid123 fromtag123 totag123
+...
+			</programlisting>
+		</section>
+		<section id="dlg.r.briefing">
+		<title>dlg.briefing</title>
+		<para>
+		Lists fewer attributes for dialog records in memory. The dialog hash
+		entry and id are added always, the rest of them are a matter of 'attrs'
+		parameter.
+		</para>
+		<para>Name: <emphasis>dlg.briefing</emphasis></para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>
+			<emphasis>attrs</emphasis> - (optional) a list of characters (flags)
+			representing the fields to be added to the response. If is missing,
+			its default value is 'ftcFT' (note the characters are case sensitive).
+			</para>
+			<para>
+				The characters can be:
+				<itemizedlist>
+				<listitem><para>
+					<emphasis>f</emphasis> - From URI
+				</para></listitem>
+				<listitem><para>
+					<emphasis>t</emphasis> - To URI
+				</para></listitem>
+				<listitem><para>
+					<emphasis>c</emphasis> - Call-ID
+				</para></listitem>
+				<listitem><para>
+					<emphasis>F</emphasis> - From tag
+				</para></listitem>
+				<listitem><para>
+					<emphasis>T</emphasis> - To tag
+				</para></listitem>
+				<listitem><para>
+					<emphasis>I</emphasis> - Init time
+				</para></listitem>
+				<listitem><para>
+					<emphasis>S</emphasis> - Start time
+				</para></listitem>
+				<listitem><para>
+					<emphasis>E</emphasis> - End time
+				</para></listitem>
+				<listitem><para>
+					<emphasis>s</emphasis> - State
+				</para></listitem>
+				</itemizedlist>
+			</para>
+			</listitem>
+		</itemizedlist>
+		<para>RPC Command Example:</para>
+		<programlisting  format="linespecific">
+...
+kamctl rpc dlg.briefing
+...
+kamctl rpc dlg.briefing "ft"
+...
+		</programlisting>
+		</section>
+
 	</section>
 
 	<section>

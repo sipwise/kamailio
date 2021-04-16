@@ -37,15 +37,18 @@
 extern unsigned int nr_branches;
 extern int ruri_is_new;
 
+#define DS_FLAGS    1
+#define DS_PATH     2
+
 /*! \brief
  * Structure for storing branch attributes
  */
-struct branch
+typedef struct branch
 {
     char uri[MAX_URI_SIZE];
     unsigned int len;
 
-         /* Real destination of the request */
+    /* Real destination of the request */
     char dst_uri[MAX_URI_SIZE];
     unsigned int dst_uri_len;
 
@@ -71,11 +74,25 @@ struct branch
     char location_ua[MAX_UA_SIZE + 1];
     unsigned int location_ua_len;
 
+	/* tcp connection id */
+	int otcpid;
+
     /* Branch flags */
     flag_t flags;
-};
+} branch_t;
 
-typedef struct branch branch_t;
+typedef struct branch_data {
+	str uri;
+	str dst_uri;
+	qvalue_t q;
+	str path;
+	unsigned int flags;
+	socket_info_t* force_socket;
+	str ruid;
+	str instance;
+	str location_ua;
+	int otcpid;
+} branch_data_t;
 
 /*! \brief
  * Return pointer to branch[idx] structure
@@ -88,7 +105,16 @@ branch_t *get_sip_branch(int idx);
 int drop_sip_branch(int idx);
 
 /*! \brief
- * Add a new branch to current transaction 
+ * Push a new branch to current destination set
+ */
+branch_t *ksr_push_branch(sip_msg_t* msg, str* uri, str* dst_uri, str* path,
+		  qvalue_t q, unsigned int flags,
+		  struct socket_info* force_socket,
+		  str* instance, unsigned int reg_id,
+		  str* ruid, str* location_ua);
+
+/*! \brief
+ * Add a new branch to current destination set
  */
 int append_branch(struct sip_msg* msg, str* uri, str* dst_uri, str* path,
 		  qvalue_t q, unsigned int flags,
@@ -148,6 +174,9 @@ char* get_branch( unsigned int i, int* len, qvalue_t* q, str* dst_uri,
 		  struct socket_info** force_socket,
 		  str* ruid, str *instance, str *location_ua);
 
+int get_branch_data(unsigned int i, branch_data_t *vbranch);
+int next_branch_data(branch_data_t *vbranch);
+
 /*! \brief
  * Empty the array of branches
  */
@@ -158,7 +187,7 @@ void clear_branches(void);
  * Create a Contact header field from the
  * list of current branches
  */
-char* print_dset(struct sip_msg* msg, int* len);
+char* print_dset(struct sip_msg* msg, int* len, int options);
 
 
 /*! \brief
@@ -194,7 +223,7 @@ inline static int get_request_uri(struct sip_msg* _m, str* _u)
 #define ruri_mark_consumed()  (ruri_is_new = 0)
 
 /** returns whether or not ruri should be used when forking.
-  * (usefull for serial forking)
+  * (useful for serial forking)
   * @return 0 if already marked as consumed, 1 if not.
  */
 #define ruri_get_forking_state() (ruri_is_new)
@@ -255,6 +284,7 @@ int setbflagsval(unsigned int branch, flag_t val);
 
 int uri_add_rcv_alias(sip_msg_t *msg, str *uri, str *nuri);
 int uri_restore_rcv_alias(str *uri, str *nuri, str *suri);
+int uri_trim_rcv_alias(str *uri, str *nuri);
 
 int init_dst_set(void);
 

@@ -72,7 +72,7 @@
 	</section>
 	<section>
 	<title>Parameters</title>
-	<section>
+	<section id="imc.p.db_url">
 		<title><varname>db_url</varname> (str)</title>
 		<para>
 		The database url.
@@ -91,7 +91,7 @@ modparam("imc", "db_url", "&exampledb;")
 </programlisting>
 		</example>
 	</section>
-	<section>
+	<section id="imc.p.rooms_table">
 		<title><varname>rooms_table</varname> (str)</title>
 		<para>
 		The name of the table storing IMC rooms.
@@ -110,7 +110,7 @@ modparam("imc", "rooms_table", "rooms")
 </programlisting>
 		</example>
 	</section>
-	<section>
+	<section id="imc.p.members_table">
 		<title><varname>members_table</varname> (str)</title>
 		<para>
 		The name of the table storing IMC members.
@@ -129,7 +129,7 @@ modparam("imc", "members_table", "members")
 </programlisting>
 		</example>
 	</section>
-	<section>
+	<section id="imc.p.hash_size">
 		<title><varname>hash_size</varname> (integer)</title>
 		<para>
 		The power of 2 to get the size of the hash table used for storing
@@ -149,7 +149,7 @@ modparam("imc", "hash_size", 8)
 </programlisting>
 		</example>
 	</section>
-	<section>
+	<section id="imc.p.imc_cmd_start_char">
 		<title><varname>imc_cmd_start_char</varname> (str)</title>
 		<para>
 		The character which indicates that the body of the message is
@@ -169,7 +169,7 @@ modparam("imc", "imc_cmd_start_char", "#")
 </programlisting>
 		</example>
 	</section>
-	<section>
+	<section id="imc.p.outbound_proxy">
 		<title><varname>outbound_proxy</varname> (str)</title>
 		<para>
 			The SIP address used as next hop when sending the message. Very
@@ -193,7 +193,7 @@ modparam("imc", "outbound_proxy", "sip:kamailio.org;transport=tcp")
 		</example>
 	</section>
 
-	<section>
+	<section id="imc.p.extra_hdrs">
 		<title><varname>extra_hdrs</varname> (str)</title>
 		<para>
 		Extra headers (each ending with \r\n) to be added in
@@ -213,12 +213,53 @@ modparam("imc", "extra_hdrs", "P-Flags: 3\r\n")
 </programlisting>
 		</example>
 	</section>
-
+	<section id="imc.p.create_on_join">
+		<title><varname>create_on_join</varname> (integer)</title>
+		<para>
+		If set to 1 and user requests to join a non-existing
+		room, the room will be automatically created. If set
+		to 0, joinin a non-existing room returns an error.
+		</para>
+		<para>
+		<emphasis>
+		The default value is 1.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>create_on_join</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("imc", "create_on_join", 0)
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="imc.p.check_on_create">
+		<title><varname>check_on_create</varname> (integer)</title>
+		<para>
+		  If set to 1, the chat server will report an error if
+		  the user attempts to create a room that already
+		  exists.
+		</para>
+		<para>
+		<emphasis>
+		The default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>check_on_create</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("imc", "check_on_create", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	</section>
 	<section>
 	<title>Functions</title>
 	<section>
-		<title>
+		<title id="imc.p.imc_manager">
 		<function moreinfo="none">imc_manager()</function>
 		</title>
 		<para>
@@ -368,7 +409,7 @@ if(is_method("MESSAGE)
   -eg: #accept sip:john@kamailio.org
   -error case: return codes: -60 -- -69
 
-5.deny
+5.reject
   -rejects an invitation
   -the parameter is the same as for accept
   -error case: return codes: -70 -- -79
@@ -383,7 +424,7 @@ if(is_method("MESSAGE)
   -eg: #remove sip:john@kamailio.org, sent to sip:chat-000@kamailio.org
   -error case: return codes: -80 -- -89
 
-7.exit
+7.leave
   -leaving a room
   -takes one optional parameter - the address of the room - if not
     present it will be considered to be the address in the To header
@@ -393,14 +434,25 @@ if(is_method("MESSAGE)
 
 8.destroy
   -removing a room
-  -the parameter is the same as for exit
+  -the parameter is the same as for leave
   -only the owner of a room has the right to destroy it
   -error case: return codes: -110 -- -119
 
-9.list
+9.members
   -list members in a room
   -error case: return codes: -100 -- -109
 
+10.add
+  -adds a user to a room
+  -takes 2 parameters:
+     1)the complete address of the user
+     2)the address of the room -if not present it will be considered
+	   to be the address in the To header of the message
+  -only certain users have the right to add other users: the owner
+    and the administrators
+  -eg: #add sip:john@kamailio.org sip:chat-000@kamailio.org
+    or  #add john@kamailio.org sent to sip:chat-000@kamailio.org
+  -error case: return codes: -50 -- -59
 ...
 </programlisting>
 		</example>

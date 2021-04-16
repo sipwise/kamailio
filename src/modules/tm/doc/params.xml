@@ -194,29 +194,6 @@ modparam("tm", "wt_timer", 1000)
 	</example>
     </section>
 
-    <section id="tm.p.delete_timer">
-	<title><varname>delete_timer</varname> (integer)</title>
-	<para>
-	    Time after which a to-be-deleted transaction currently ref-ed by a
-	    process will be tried to be deleted again (in milliseconds).
-	</para>
-	<para>
-	    Note: this parameter is obsolete for SER 2.1 (in 2.1 the transaction
-		 is deleted the moment it's not referenced anymore).
-	</para>
-	<para>
-	    Default value is 200 milliseconds.
-	</para>
-	<example>
-	    <title>Set <varname>delete_timer</varname> parameter</title>
-	    <programlisting>
-...
-modparam("tm", "delete_timer", 100)
-...
-	    </programlisting>
-	</example>
-    </section>
-    
     <section id="tm.p.retr_timer1">
 	<title><varname>retr_timer1</varname> (integer)</title>
 	<para>
@@ -734,7 +711,11 @@ modparam("tm", "reparse_on_dns_failover", 0)
 		Sets reply route block, to which control is passed when a
 		reply is received that has no associated transaction.
 		The reply is passed to the core for stateless forwarding after
-		the route block execution unless it returns 0.
+		the route block execution unless drop is executed (or it returns 0).
+	</para>
+	<para>
+		If KEMI is used, the parameter has to be the KEMI function name, which
+		receives a string parameter with the event name.
 	</para>
 	<example>
 	    <title>Set <varname>on_sl_reply</varname> parameter</title>
@@ -750,7 +731,7 @@ onreply_route["stateless_replies"] {
 	    </programlisting>
 	</example>
     </section>
-	
+
 	<section id ="tm.p.contacts_avp">
 		<title><varname>contacts_avp</varname> (string)</title>
 		<para>
@@ -1450,7 +1431,37 @@ modparam("tm", "event_callback", "ksr_tm_event")
 ...
 -- event callback function implemented in Lua
 function ksr_tm_event(evname)
-	KSR.info("===== htable module triggered event: " .. evname .. "\n");
+	KSR.info("===== tm module triggered event: " .. evname .. "\n");
+	return 1;
+end
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="tm.p.event_callback_lres_sent">
+		<title><varname>event_callback_lres_sent</varname> (str)</title>
+		<para>
+			The name of the function in the kemi configuration file (embedded
+			scripting language such as Lua, Python, ...) to be executed instead
+			of event_route[tm:local-response] block. The function receives
+			a string parameter with the name of the event, respectively
+			"tm:local-response".
+		</para>
+		<para>
+		<emphasis>
+			Default value is 'empty' (no function is executed for events).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>event_callback_lres_sent</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("tm", "event_callback_lres_sent", "ksr_tm_event_response_sent")
+...
+-- event callback function implemented in Lua
+function ksr_tm_event_response_sent(evname)
+	KSR.info("===== tm module triggered event: " .. evname .. "\n");
 	return 1;
 end
 ...
@@ -1480,6 +1491,90 @@ end
 		<programlisting format="linespecific">
 ...
 modparam("tm", "relay_100", 1)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="tm.p.rich_redirect">
+		<title><varname>rich_redirect</varname> (int)</title>
+		<para>
+			When sending a 3xx class reply, include additional branch info
+			to the contacts such as path vector and branch flags.
+		</para>
+		<itemizedlist>
+			<listitem><para>
+			<emphasis>0</emphasis> - no extra info is added (default)
+			</para></listitem>
+			<listitem><para>
+			<emphasis>1</emphasis> - include branch flags as contact header parameter
+			</para></listitem>
+			<listitem><para>
+			<emphasis>2</emphasis> - include path as contact uri Route header
+			</para></listitem>
+		</itemizedlist>
+		<para>
+		Values may be combined (added).
+		</para>
+		<example>
+			<title>rich_redirect example</title>
+			<programlisting>
+...
+modparam("tm", "rich_redirect", 3)
+....
+			</programlisting>
+		</example>
+	</section>
+
+	<section id="tm.p.exec_time_check">
+		<title><varname>exec_time_check</varname> (int)</title>
+		<para>
+			Duration in milliseconds for executing transaction failure callbacks
+			and failure_route block after which to do a safety check if
+			transaction is still active.
+		</para>
+		<para>
+			Set it to 0 in order to disable this check.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 5000 (5 seconds).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>exec_time_check</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("tm", "exec_time_check", 0)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="tm.p.reply_relay_mode">
+		<title><varname>reply_relay_mode</varname> (int)</title>
+		<para>
+			If set to 1, a received 200ok response that was suspeneded is no
+			longer forwarded in the transactional context if another final
+			response was forward while 200ok was suspended. Forwarding the 200ok,
+			even it was received first, results in overwritting the transaction
+			response buffer that can impact matching of incoming ACKs.
+		</para>
+		<para>
+			Set it to 0 in order to disable this behaviour and attempt to forward
+			suspended 200ok in the transaction context. This was the behaviour
+			before the commit 18410da0.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 1.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>reply_relay_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("tm", "reply_relay_mode", 0)
 ...
 </programlisting>
 		</example>

@@ -39,7 +39,6 @@
 #include <unistd.h>
 #include <stdlib.h> /* for abort() */
 
-
 #include "dprint.h"
 #include "tcp_conn.h"
 #include "tcp_read.h"
@@ -53,6 +52,7 @@
 #include "ut.h"
 #include "trim.h"
 #include "pt.h"
+#include "daemonize.h"
 #include "cfg/cfg_struct.h"
 #ifdef CORE_TLS
 #include "tls/tls_server.h"
@@ -93,6 +93,7 @@ static ticks_t tcp_reader_prev_ticks;
 int is_msg_complete(struct tcp_req* r);
 
 int ksr_tcp_accept_hep3=0;
+int ksr_tcp_accept_haproxy=0;
 /**
  * control cloning of TCP receive buffer
  * - needed for operations working directly inside the buffer
@@ -107,6 +108,11 @@ int tcp_set_clone_rcvbuf(int v)
 	r = tcp_clone_rcvbuf;
 	tcp_clone_rcvbuf = v;
 	return r;
+}
+
+int tcp_get_clone_rcvbuf(void)
+{
+	return tcp_clone_rcvbuf;
 }
 
 #ifdef READ_HTTP11
@@ -311,12 +317,14 @@ again:
 			}
 		}else if (unlikely((bytes_read==0) ||
 					(*flags & RD_CONN_FORCE_EOF))){
+			LM_DBG("EOF on connection %p (state: %u, flags: %x) - FD %d,"
+					" bytes %d, rd-flags %x ([%s]:%u -> [%s]:%u)",
+					c, c->state, c->flags, fd, bytes_read, *flags,
+					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port,
+					ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
 			c->state=S_CONN_EOF;
 			*flags|=RD_CONN_EOF;
 			tcp_emit_closed_event(c, TCP_CLOSED_EOF);
-			LM_DBG("EOF on %p, FD %d ([%s]:%u ->", c, fd,
-					ip_addr2a(&c->rcv.src_ip), c->rcv.src_port);
-			LM_DBG("-> [%s]:%u)\n", ip_addr2a(&c->rcv.dst_ip), c->rcv.dst_port);
 		}else{
 			if (unlikely(c->state==S_CONN_CONNECT || c->state==S_CONN_ACCEPT)){
 				TCP_STATS_ESTABLISHED(c->state);
@@ -1375,12 +1383,8 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 		struct receive_info* rcv_info, struct tcp_connection* con)
 {
 #ifdef TCP_CLONE_RCVBUF
-#ifdef DYN_BUF
-	char *buf = NULL;
-#else
 	static char *buf = NULL;
 	static unsigned int bsize = 0;
-#endif
 	int blen;
 
 	/* cloning is disabled via parameter */
@@ -1404,13 +1408,6 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 	if(blen < BUF_SIZE)
 		blen = BUF_SIZE;
 
-#ifdef DYN_BUF
-	buf=pkg_malloc(blen+1);
-	if (buf==0) {
-		LM_ERR("could not allocate receive buffer\n");
-		return -1;
-	}
-#else
 	/* allocate buffer when needed
 	 * - no buffer yet
 	 * - existing buffer too small (min size is BUF_SIZE - to accomodate most
@@ -1426,12 +1423,11 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 			free(buf);
 		buf=malloc(blen+1);
 		if (buf==0) {
-			LM_ERR("could not allocate receive buffer\n");
+			SYS_MEM_ERROR;
 			return -1;
 		}
 		bsize = blen;
 	}
-#endif
 
 	memcpy(buf, tcpbuf, len);
 	buf[len] = '\0';
@@ -2034,7 +2030,7 @@ void tcp_receive_loop(int unix_sock)
 error:
 	destroy_io_wait(&io_w);
 	LM_CRIT("exiting...");
-	exit(-1);
+	ksr_exit(-1);
 }
 
 

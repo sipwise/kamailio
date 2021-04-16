@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-17 Robert Boisvert
+ * Copyright (C) 2013-19 Robert Boisvert
  *
  * This file is part of the mohqueue module for Kamailio, a free SIP server.
  *
@@ -32,7 +32,7 @@
 #define ALLOWHDR "Allow: INVITE, ACK, BYE, CANCEL, NOTIFY, PRACK"
 #define CLENHDR "Content-Length"
 #define SIPEOL  "\r\n"
-#define USRAGNT "Kamailio MOH Queue v1.4"
+#define USRAGNT "Kamailio MOH Queue v1.6"
 
 /**********
 * local constants
@@ -185,6 +185,7 @@ void ack_msg (sip_msg_t *pmsg, call_lst *pcall)
 char *pfncname = "ack_msg: ";
 struct cell *ptrans;
 tm_api_t *ptm = pmod_data->ptm;
+tm_cell_t *t = 0;
 if (pcall->call_state != CLSTA_INVITED)
   {
   /**********
@@ -215,7 +216,22 @@ if (ptm->t_lookup_ident (&ptrans, pcall->call_hash, pcall->call_label) < 0)
   }
 else
   {
-  if (ptm->t_release (pcall->call_pmsg) < 0)
+  t = ptm->t_gett();
+  if (t==NULL || t==T_UNDEFINED)
+    {
+      if (ptm->t_newtran(pmsg)<0)
+        {
+          LM_ERR("cannot create the transaction\n");
+          return;
+        }
+      t = ptm->t_gett();
+      if (t==NULL || t==T_UNDEFINED)
+        {
+          LM_ERR("cannot lookup the transaction\n");
+          return;
+        }
+    }
+  if (ptm->t_release_transaction(t) < 0)
     {
     LM_ERR ("%sRelease transaction failed for call (%s)!\n",
       pfncname, pcall->call_from);
@@ -1405,9 +1421,12 @@ static void
 
 {
 call_lst *pcall = (call_lst *)*pcbp->param;
+if (pcall->call_state >= CLSTA_INQUEUE)
+  { return; }
+LM_ERR ("invite_cb: INVITE failed for call (%s), code=%x, callstate=%x!\n",
+  pcall->call_from, ntype, pcall->call_state);
 if (ntype == TMCB_DESTROY)
   { pcall->call_hash = pcall->call_label = 0; }
-LM_ERR ("invite_cb: INVITE failed for call (%s)!\n", pcall->call_from);
 delete_call (pcall);
 return;
 }
@@ -1904,7 +1923,7 @@ for (npos1 = 0; npos1 < pstr->len; npos1++)
   {
   /**********
   * o find non-space
-  * o search to end, space or comma
+  * o search to end, space, semicolon or comma
   * o same size?
   * o same name?
   **********/
@@ -1913,7 +1932,8 @@ for (npos1 = 0; npos1 < pstr->len; npos1++)
     { continue; }
   for (npos2 = npos1++; npos1 < pstr->len; npos1++)
     {
-    if (pstr->s [npos1] == ' ' || pstr->s [npos1] == ',')
+    if (pstr->s [npos1] == ' ' || pstr->s [npos1] == ';'
+      || pstr->s [npos1] == ',')
       { break; }
     }
   if (npos1 - npos2 != pext->len)
@@ -2238,10 +2258,11 @@ strcpy (&pfile [npos], pcall->pmohq->mohq_mohfile);
 npos += strlen (&pfile [npos]);
 str pMOH [1] = {{pfile, npos}};
 pv_elem_t *pmodel;
-if(pv_parse_format (pMOH, &pmodel)<0) {
+if (pv_parse_format (pMOH, &pmodel) < 0)
+  {
   LM_ERR("failed to parse pv format string\n");
   return 0;
-}
+  }
 cmd_function fn_stream = bserver ? pmod_data->fn_rtp_stream_s
   : pmod_data->fn_rtp_stream_c;
 mohq_debug (pcall->pmohq, "%sStarting RTP link for call (%s)",

@@ -35,6 +35,8 @@
 #ifndef config_h
 #define config_h
 
+#include "crypto/md5utils.h"
+
 #define SIP_PORT  5060 /*!< default SIP port if none specified */
 #define SIPS_PORT 5061 /*!< default SIP port for TLS if none specified */
 
@@ -93,6 +95,7 @@
 #define MY_BRANCH ";branch="
 #define MY_BRANCH_LEN (sizeof(MY_BRANCH) - 1)
 
+#define MAX_PORT_VAL 65535
 #define MAX_PORT_LEN 7 /* ':' + max 5 letters + \0 */
 
 #define CRLF "\r\n"
@@ -108,6 +111,12 @@
 
 #define COMP_PARAM ";comp="
 #define COMP_PARAM_LEN (sizeof(COMP_PARAM)-1)
+
+#define SOCKNAME_ATTR "sn"
+#define SOCKNAME_ATTR_LEN (sizeof(SOCKNAME_ATTR)-1)
+
+#define SOCKNAME_PARAM ";" SOCKNAME_ATTR "="
+#define SOCKNAME_PARAM_LEN (sizeof(SOCKNAME_PARAM)-1)
 
 #define SIGCOMP_NAME "sigcomp"
 #define SIGCOMP_NAME_LEN (sizeof(SIGCOMP_NAME)-1)
@@ -169,7 +178,7 @@
 
 #define MAX_PRINT_TEXT 		256	/*!< max length of the text of fifo 'print' command */
 
-#define MAX_REDIRECTION_LEN	512	/*!< maximum length of Contact header field in redirection replies */
+#define MAX_REDIRECTION_LEN	4096	/*!< maximum length of Contact header field in redirection replies */
 
 /*! \brief used by FIFO statistics in module to terminate line;
    extra whitespaces are used to overwrite remainders of

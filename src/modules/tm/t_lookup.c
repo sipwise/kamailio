@@ -37,8 +37,6 @@
  *
  */
 
-#include "defs.h"
-
 
 #include "../../core/comp_defs.h"
 #include "../../core/compiler_opt.h"
@@ -620,11 +618,6 @@ int t_lookup_request( struct sip_msg* p_msg , int leave_new_locked,
 				if (! STR_EQ(get_from(t_msg)->tag_value,
 							get_from(p_msg)->tag_value))
 					continue;
-#ifdef TM_E2E_ACK_CHECK_FROM_URI
-				if (! STR_EQ(get_from(t_msg)->uri,
-							get_from(p_msg)->uri))
-					continue;
-#endif
 
 				/* all criteria for proxied ACK are ok */
 				if (likely(p_cell->relayed_reply_branch!=-2)) {
@@ -1216,10 +1209,8 @@ static inline void init_new_t(struct cell *new_cell, struct sip_msg *p_msg)
 			(!cfg_get(tm, tm_cfg, tm_auto_inv_100) -1);
 		new_cell->flags|=T_DISABLE_6xx &
 			(!cfg_get(tm, tm_cfg, disable_6xx) -1);
-#ifdef CANCEL_REASON_SUPPORT
 		new_cell->flags|=T_NO_E2E_CANCEL_REASON &
 			(!!cfg_get(tm, tm_cfg, e2e_cancel_reason) -1);
-#endif /* CANCEL_REASON_SUPPORT */
 		/* reset flags */
 		new_cell->flags &=
 			(~ get_msgid_val(user_cell_reset_flags, p_msg->id, int));
@@ -1259,7 +1250,6 @@ static inline void init_new_t(struct cell *new_cell, struct sip_msg *p_msg)
 			new_cell->fr_inv_timeout=cfg_get(tm, tm_cfg, fr_inv_timeout);
 		}
 	}
-#ifdef TM_DIFF_RT_TIMEOUT
 	new_cell->rt_t1_timeout_ms = (retr_timeout_t) get_msgid_val(
 			user_rt_t1_timeout_ms,
 			p_msg->id, int);
@@ -1270,7 +1260,6 @@ static inline void init_new_t(struct cell *new_cell, struct sip_msg *p_msg)
 			p_msg->id, int);
 	if (likely(new_cell->rt_t2_timeout_ms == 0))
 		new_cell->rt_t2_timeout_ms = cfg_get(tm, tm_cfg, rt_t2_timeout_ms);
-#endif
 	new_cell->on_branch=get_on_branch();
 }
 
@@ -1305,15 +1294,10 @@ static inline int new_t(struct sip_msg *p_msg)
 		return E_OUT_OF_MEM;
 	}
 
-#ifdef TM_DEL_UNREF
 	INIT_REF(new_cell, 2); /* 1 because it will be ref'ed from the
 							* hash and +1 because we set T to it */
-#endif
 	insert_into_hash_table_unsafe( new_cell, p_msg->hash_index );
 	set_t(new_cell, T_BR_UNDEFINED);
-#ifndef TM_DEL_UNREF
-	INIT_REF_UNSAFE(T);
-#endif
 	/* init pointers to headers needed to construct local
 	 * requests such as CANCEL/ACK
 	 */
@@ -1554,7 +1538,6 @@ int t_get_trans_ident(struct sip_msg* p_msg, unsigned int* hash_index, unsigned 
 	return 1;
 }
 
-#ifdef WITH_AS_SUPPORT
 /**
  * Returns the hash coordinates of the transaction current CANCEL is targeting.
  */
@@ -1577,7 +1560,6 @@ int t_get_canceled_ident(struct sip_msg* msg, unsigned int* hash_index,
 	UNREF(orig);
 	return 1;
 }
-#endif /* WITH_AS_SUPPORT */
 
 
 
@@ -1654,6 +1636,55 @@ int t_lookup_ident(struct cell ** trans, unsigned int hash_index,
 		unsigned int label)
 {
 	return t_lookup_ident_filter(trans, hash_index, label, 0);
+}
+
+/** find a transaction based on its identifier (hash_index:label).
+ * @param trans - double pointer to cell structure, that will be filled
+ *                with the result (a pointer to an existing transaction or
+ *                0).
+ * @param hash_index - searched transaction hash_index (part of the ident).
+ * @param label - searched transaction label (part of the ident).
+ * @param filter - if 1, skip transaction put on-wait (terminated state).
+ * @return transaction cell pointer
+ * Note: it does not sets T and T_branch, nor reference the transaction,
+ *   useful to quickly check if a transaction still exists
+ */
+tm_cell_t *t_find_ident_filter(unsigned int hash_index, unsigned int label,
+		int filter)
+{
+	tm_cell_t *p_cell;
+	tm_entry_t *hash_bucket;
+
+	if(unlikely(hash_index >= TABLE_ENTRIES)){
+		LM_ERR("invalid hash_index=%u\n", hash_index);
+		return NULL;
+	}
+
+	LOCK_HASH(hash_index);
+
+	hash_bucket=&(get_tm_table()->entries[hash_index]);
+	/* all the transactions from the entry are compared */
+	clist_foreach(hash_bucket, p_cell, next_c) {
+		prefetch_loc_r(p_cell->next_c, 1);
+		if(p_cell->label == label) {
+			if(filter==1) {
+				if(t_on_wait(p_cell)) {
+					/* transaction in terminated state */
+					UNLOCK_HASH(hash_index);
+					LM_DBG("transaction in terminated phase - skipping\n");
+					return NULL;
+				}
+			}
+			UNLOCK_HASH(hash_index);
+			LM_DBG("transaction found\n");
+			return p_cell;
+		}
+	}
+
+	UNLOCK_HASH(hash_index);
+	LM_DBG("transaction not found\n");
+
+	return NULL;
 }
 
 /** check if a transaction is local or not.
@@ -1813,7 +1844,6 @@ int t_reset_fr()
 	return 1;
 }
 
-#ifdef TM_DIFF_RT_TIMEOUT
 
 /* params: retr. t1 & retr. t2 value in ms, 0 means "do not touch"
  * ret: 1 on success, -1 on error (script safe)*/
@@ -1877,7 +1907,6 @@ int t_reset_retr()
 	}
 	return 1;
 }
-#endif
 
 
 /* params: maximum transaction lifetime for inv and non-inv

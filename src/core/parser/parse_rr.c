@@ -67,7 +67,7 @@ static inline int do_parse_rr_body(char *buf, int len, rr_t **head)
 		/* Allocate and clear rr structure */
 		r = (rr_t*)pkg_malloc(sizeof(rr_t));
 		if (!r) {
-			LM_ERR("No memory left\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		memset(r, 0, sizeof(rr_t));
@@ -291,8 +291,13 @@ static inline int do_duplicate_rr(rr_t** _new, rr_t* _r, int _shm)
 		if (_shm) res = shm_malloc(sizeof(rr_t) + len);
 		else res = pkg_malloc(sizeof(rr_t) + len);
 		if (!res) {
-			LM_ERR("No memory left\n");
-			return -2;
+			if (_shm) {
+				SHM_MEM_ERROR;
+			} else {
+				PKG_MEM_ERROR;
+			}
+			ret = -2;
+			goto error;
 		}
 		memcpy(res, it, sizeof(rr_t));
 
@@ -309,7 +314,8 @@ static inline int do_duplicate_rr(rr_t** _new, rr_t* _r, int _shm)
 			LM_ERR("Error while duplicating parameters\n");
 			if (_shm) shm_free(res);
 			else pkg_free(res);
-			return -3;
+			ret = -3;
+			goto error;
 		}
 
 		xlate_pointers(it, res);
@@ -323,6 +329,18 @@ static inline int do_duplicate_rr(rr_t** _new, rr_t* _r, int _shm)
 		it = it->next;
 	}
 	return 0;
+
+error:
+	if(*_new != NULL) {
+		if (_shm) {
+			shm_free_rr(_new);
+		} else {
+			free_rr(_new);
+		}
+		*_new = NULL;
+	}
+
+	return ret;
 }
 
 
@@ -409,10 +427,9 @@ int print_rr_body(struct hdr_field *iroute, str *oroute, int order,
 
 	oroute->s=(char*)pkg_malloc(route_len);
 
-
 	if(oroute->s==0)
 	{
-		LM_ERR("no more pkg mem\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	cp = start = oroute->s;

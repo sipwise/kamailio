@@ -41,6 +41,9 @@
 #define MAX_SOCKET_STR (sizeof("unknown") - 1 + IP_ADDR_MAX_STR_SIZE + \
 	INT2STR_MAX_LEN + 2 + 2)
 
+/* Maximum length for advertise string of listen socket */
+#define MAX_SOCKET_ADVERTISE_STR	511
+
 int socket2str(char* s, int* len, struct socket_info* si);
 int socketinfo2str(char* s, int* len, struct socket_info* si, int mode);
 
@@ -79,9 +82,16 @@ void init_proto_order(void);
 int add_listen_iface(char* name, struct name_lst* nlst,
 						unsigned short port, unsigned short proto,
 						enum si_flags flags);
+int add_listen_iface_name(char* name, struct name_lst* addr_l,
+						unsigned short port, unsigned short proto, char *sockname,
+						enum si_flags flags);
 int add_listen_advertise_iface(char* name, struct name_lst* nlst,
 						unsigned short port, unsigned short proto,
 						char *useaddr, unsigned short useport,
+						enum si_flags flags);
+int add_listen_advertise_iface_name(char* name, struct name_lst* nlst,
+						unsigned short port, unsigned short proto,
+						char *useaddr, unsigned short useport, char *sockname,
 						enum si_flags flags);
 int fix_all_socket_lists(void);
 void print_all_socket_lists(void);
@@ -93,6 +103,7 @@ struct socket_info* grep_sock_info_by_port(unsigned short port,
 											unsigned short proto);
 struct socket_info* find_si(struct ip_addr* ip, unsigned short port,
 												unsigned short proto);
+socket_info_t* ksr_get_socket_by_name(str *sockname);
 
 struct socket_info** get_sock_info_list(unsigned short proto);
 
@@ -147,5 +158,7 @@ typedef struct _sr_phostp {
 
 struct socket_info* lookup_local_socket(str *phostp);
 int parse_protohostport(str* ins, sr_phostp_t *r);
+
+unsigned int ipv6_get_netif_scope(char *ipval);
 
 #endif

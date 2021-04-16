@@ -37,7 +37,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include <sys/poll.h>
+#include <poll.h>
 #include <curl/curl.h>
 #include <event2/event.h>
 #include <fcntl.h>
@@ -47,6 +47,10 @@
 #include "../../core/counters.h"
 #include "hm_hash.h"
 
+
+#ifndef CURLPIPE_NOTHING
+#define CURLPIPE_NOTHING   0L
+#endif
 
 extern stat_var *requests;
 extern stat_var *replies;

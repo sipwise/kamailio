@@ -41,9 +41,11 @@ int pp_subst_run(char **data);
 int  pp_define(int len, const char *text);
 int  pp_define_set(int len, char *text);
 int  pp_define_set_type(int type);
+str *pp_define_get(int len, const char * text);
 
 void pp_ifdef_level_update(int val);
-void pp_ifdef_level_check(void);
+int pp_ifdef_level_check(void);
+void pp_ifdef_level_error(void);
 
 void pp_define_core(void);
 

@@ -102,11 +102,15 @@ static int pres_dmq_init_proc()
 		}
 	}
 
+	if(publ_cache_mode==PS_PCACHE_RECORD && pres_subs_dbmode==NO_DB) {
+		goto finish;
+	}
+
 	if(!pa_db) {
 		LM_DBG("Initializing presence DB connection for pid (%d)\n", my_pid());
 
 		if(pa_dbf.init == 0) {
-			LM_ERR("dmq_worker_init: database not bound\n");
+			LM_ERR("database not bound\n");
 			return -1;
 		}
 
@@ -123,6 +127,7 @@ static int pres_dmq_init_proc()
 		}
 	}
 
+finish:
 	*pres_dmq_proc_init = 1;
 
 	LM_DBG("process initialization complete\n");
@@ -306,9 +311,10 @@ int pres_dmq_handle_msg(
 
 	switch(action) {
 		case PRES_DMQ_UPDATE_PRESENTITY:
-			if(presentity==NULL
+			if(presentity == NULL
 					|| update_presentity(NULL, presentity, &p_body, t_new,
-							&sent_reply, sphere, &cur_etag, &ruid, 0) < 0) {
+							   &sent_reply, sphere, &cur_etag, &ruid, 0)
+							   < 0) {
 				goto error;
 			}
 			break;

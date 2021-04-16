@@ -13,8 +13,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License 
- * along with this program; if not, write to the Free Software 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
@@ -93,6 +93,12 @@ int pv_get_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 			if(br->location_ua_len==0)
 				return pv_get_null(msg, param, res);
 			return pv_get_strlval(msg, param, res, br->location_ua, br->location_ua_len);
+		case 9: /* otcpid */
+			return pv_get_uintval(msg, param, res, br->otcpid);
+		case 10: /* instance */
+			if(br->instance_len==0)
+				return pv_get_null(msg, param, res);
+			return pv_get_strlval(msg, param, res, br->instance, br->instance_len);
 		default:
 			/* 0 - uri */
 			return pv_get_strlval(msg, param, res, br->uri, br->len);
@@ -241,16 +247,15 @@ int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 				br->force_send_socket = NULL;
 				break;
 			}
-			backup = val->rs.s[val->rs.len];
-			val->rs.s[val->rs.len] = '\0';
+			STR_VTOZ(val->rs.s[val->rs.len], backup);
 			if (parse_phostport(val->rs.s, &host.s, &host.len, &port,
 						&proto) < 0)
 			{
 				LM_ERR("invalid socket specification\n");
-				val->rs.s[val->rs.len] = backup;
+				STR_ZTOV(val->rs.s[val->rs.len], backup);
 				return -1;
 			}
-			val->rs.s[val->rs.len] = backup;
+			STR_ZTOV(val->rs.s[val->rs.len], backup);
 			si = grep_sock_info(&host, (unsigned short)port,
 					(unsigned short)proto);
 			if (si!=NULL)
@@ -283,6 +288,22 @@ int pv_set_branchx_helper(sip_msg_t *msg, pv_param_t *param,
 		break;
 		case 8: /* location_ua */
 			/* do nothing - cannot set the location_ua */
+		break;
+		case 9: /* otcpid */
+			if(val==NULL || (val->flags&PV_VAL_NULL))
+			{
+				br->otcpid = 0;
+				break;
+			}
+			if(!(val->flags&PV_VAL_INT))
+			{
+				LM_ERR("int value required to set branch flags\n");
+				return -1;
+			}
+			br->otcpid = val->ri;
+		break;
+		case 10: /* instance */
+			/* do nothing - cannot set the instance */
 		break;
 		default:
 			/* 0 - uri */
@@ -336,42 +357,53 @@ int pv_parse_branchx_name(pv_spec_p sp, str *in)
 
 	switch(in->len)
 	{
-		case 3: 
+		case 1:
+			if(*in->s=='q' || *in->s=='Q')
+				sp->pvp.pvn.u.isname.name.n = 3;
+			else goto error;
+		break;
+		case 3:
 			if(strncmp(in->s, "uri", 3)==0)
 				sp->pvp.pvn.u.isname.name.n = 0;
 			else goto error;
 		break;
-		case 7: 
-			if(strncmp(in->s, "dst_uri", 7)==0)
-				sp->pvp.pvn.u.isname.name.n = 1;
-			else goto error;
-		break;
-		case 4: 
+		case 4:
 			if(strncmp(in->s, "path", 4)==0)
 				sp->pvp.pvn.u.isname.name.n = 2;
 			else if (strncmp(in->s, "ruid", 4)==0)
 				sp->pvp.pvn.u.isname.name.n = 7;
 			else goto error;
 		break;
-		case 1: 
-			if(*in->s=='q' || *in->s=='Q')
-				sp->pvp.pvn.u.isname.name.n = 3;
-			else goto error;
-		break;
-		case 11: 
-			if(strncmp(in->s, "send_socket", 11)==0)
-				sp->pvp.pvn.u.isname.name.n = 4;
-			else if(strncmp(in->s, "location_ua", 11)==0)
-				sp->pvp.pvn.u.isname.name.n = 8;
-			else goto error;
-		break;
-		case 5: 
+		case 5:
 			if(strncmp(in->s, "count", 5)==0)
 				sp->pvp.pvn.u.isname.name.n = 5;
 			else if(strncmp(in->s, "flags", 5)==0)
 				sp->pvp.pvn.u.isname.name.n = 6;
 			else goto error;
 		break;
+		case 6:
+			if(strncmp(in->s, "otcpid", 6)==0)
+				sp->pvp.pvn.u.isname.name.n = 9;
+			else goto error;
+		break;
+		case 7:
+			if(strncmp(in->s, "dst_uri", 7)==0)
+				sp->pvp.pvn.u.isname.name.n = 1;
+			else goto error;
+		break;
+		case 8:
+			if(strncmp(in->s, "instance", 8)==0)
+				sp->pvp.pvn.u.isname.name.n = 10;
+			else goto error;
+		break;
+		case 11:
+			if(strncmp(in->s, "send_socket", 11)==0)
+				sp->pvp.pvn.u.isname.name.n = 4;
+			else if(strncmp(in->s, "location_ua", 11)==0)
+				sp->pvp.pvn.u.isname.name.n = 8;
+			else goto error;
+		break;
+
 		default:
 			goto error;
 	}
@@ -530,6 +562,110 @@ int pv_parse_snd_name(pv_spec_p sp, str *in)
 
 error:
 	LM_ERR("unknown PV snd name %.*s\n", in->len, in->s);
+	return -1;
+}
+
+int pv_get_rcv(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	sr_net_info_t *neti = NULL;
+	str s;
+
+	neti = ksr_evrt_rcvnetinfo_get();
+
+	if (neti==NULL || neti->rcv==NULL || neti->rcv->bind_address==NULL)
+		return pv_get_null(msg, param, res);
+
+	switch(param->pvn.u.isname.name.n)
+	{
+		case 1: /* buf */
+			s.s   = neti->data.s;
+			s.len = neti->data.len;
+			return pv_get_strval(msg, param, res, &s);
+		case 2: /* len */
+			return pv_get_uintval(msg, param, res,
+					(int)neti->data.len);
+		case 3: /* proto */
+			return pv_get_uintval(msg, param, res, (int)neti->rcv->proto);
+		case 4: /* srcip */
+			s.s = ip_addr2a(&neti->rcv->src_ip);
+			s.len = strlen(s.s);
+			return pv_get_strval(msg, param, res, &s);
+		case 5: /* rcvip */
+			s.s = ip_addr2a(&neti->rcv->dst_ip);
+			s.len = strlen(s.s);
+			return pv_get_strval(msg, param, res, &s);
+		case 6: /* sproto */
+			if(get_valid_proto_string((int)neti->rcv->proto,
+						0, 0, &s)<0) {
+				return pv_get_null(msg, param, res);
+			}
+			return pv_get_strval(msg, param, res, &s);
+		case 7: /* srcport */
+			return pv_get_uintval(msg, param, res,
+					(int)neti->rcv->src_port);
+		case 8: /* rcvport */
+			return pv_get_uintval(msg, param, res,
+					(int)neti->rcv->dst_port);
+		default:
+			/* 0 - af */
+			return pv_get_uintval(msg, param, res,
+					(int)neti->rcv->bind_address->address.af);
+	}
+
+	return 0;
+}
+
+int pv_parse_rcv_name(pv_spec_p sp, str *in)
+{
+	if(sp==NULL || in==NULL || in->len<=0)
+		return -1;
+
+	switch(in->len)
+	{
+		case 2:
+			if(strncmp(in->s, "af", 2)==0)
+				sp->pvp.pvn.u.isname.name.n = 0;
+			else goto error;
+		break;
+		case 3:
+			if(strncmp(in->s, "buf", 3)==0)
+				sp->pvp.pvn.u.isname.name.n = 1;
+			else if(strncmp(in->s, "len", 3)==0)
+				sp->pvp.pvn.u.isname.name.n = 2;
+			else goto error;
+		break;
+		case 5:
+			if(strncmp(in->s, "proto", 5)==0)
+				sp->pvp.pvn.u.isname.name.n = 3;
+			else if(strncmp(in->s, "srcip", 5)==0)
+				sp->pvp.pvn.u.isname.name.n = 4;
+			else if(strncmp(in->s, "rcvip", 5)==0)
+				sp->pvp.pvn.u.isname.name.n = 5;
+			else goto error;
+		break;
+		case 6:
+			if(strncmp(in->s, "sproto", 6)==0)
+				sp->pvp.pvn.u.isname.name.n = 6;
+			else goto error;
+		break;
+		case 7:
+			if(strncmp(in->s, "srcport", 7)==0)
+				sp->pvp.pvn.u.isname.name.n = 7;
+			else if(strncmp(in->s, "rcvport", 7)==0)
+				sp->pvp.pvn.u.isname.name.n = 8;
+			else goto error;
+		break;
+		default:
+			goto error;
+	}
+	sp->pvp.pvn.type = PV_NAME_INTSTR;
+	sp->pvp.pvn.u.isname.type = 0;
+
+	return 0;
+
+error:
+	LM_ERR("unknown PV rcv name %.*s\n", in->len, in->s);
 	return -1;
 }
 
@@ -701,6 +837,7 @@ int sbranch_set_ruri(sip_msg_t *msg)
 		set_force_socket(msg, br->force_send_socket);
 
 	msg->reg_id = br->reg_id;
+	msg->otcpid = br->otcpid;
 	set_ruri_q(br->q);
 	old_bflags = 0;
 	getbflagsval(0, &old_bflags);
@@ -721,7 +858,9 @@ int sbranch_append(sip_msg_t *msg)
 	str path = {0};
 	str ruid = {0};
 	str location_ua = {0};
+	str instance = {0};
 	branch_t *br;
+	branch_t *newbr;
 
 	br = &_pv_sbranch;
 	if(br->len==0)
@@ -746,14 +885,19 @@ int sbranch_append(sip_msg_t *msg)
 		location_ua.s = br->location_ua;
 		location_ua.len = br->location_ua_len;
 	}
+	if(br->instance_len) {
+		instance.s = br->instance;
+		instance.len = br->instance_len;
+	}
 
-	if (append_branch(msg, &uri, &duri, &path, br->q, br->flags,
-					  br->force_send_socket, 0 /*instance*/, br->reg_id,
-					  &ruid, &location_ua)
-			    == -1) {
+	newbr = ksr_push_branch(msg, &uri, &duri, &path, br->q, br->flags,
+					  br->force_send_socket, &instance, br->reg_id,
+					  &ruid, &location_ua);
+	if(newbr==NULL) {
 		LM_ERR("failed to append static branch\n");
 		return -1;
 	}
+	newbr->otcpid = br->otcpid;
 	return 0;
 }
 

@@ -72,8 +72,8 @@ static int ht_rm_name_re(struct sip_msg* msg, char* key, char* foo);
 static int ht_rm_value_re(struct sip_msg* msg, char* key, char* foo);
 static int w_ht_rm_name(struct sip_msg* msg, char* hname, char* op, char *val);
 static int w_ht_rm_value(struct sip_msg* msg, char* hname, char* op, char *val);
-static int w_ht_has_name(struct sip_msg* msg, char* hname, char* op, char *val);
-static int w_ht_has_str_value(struct sip_msg* msg, char* hname, char* op, char *val);
+static int w_ht_match_name(struct sip_msg* msg, char* hname, char* op, char *val);
+static int w_ht_match_str_value(struct sip_msg* msg, char* hname, char* op, char *val);
 static int w_ht_slot_lock(struct sip_msg* msg, char* key, char* foo);
 static int w_ht_slot_unlock(struct sip_msg* msg, char* key, char* foo);
 static int ht_reset(struct sip_msg* msg, char* htname, char* foo);
@@ -120,9 +120,13 @@ static cmd_export_t cmds[]={
 		ANY_ROUTE},
 	{"sht_rm_value", (cmd_function)w_ht_rm_value,  3, fixup_spve_all, 0,
 		ANY_ROUTE},
-	{"sht_has_name",  (cmd_function)w_ht_has_name,   3, fixup_spve_all, 0,
+	{"sht_match_name",  (cmd_function)w_ht_match_name,   3, fixup_spve_all, 0,
 		ANY_ROUTE},
-	{"sht_has_str_value", (cmd_function)w_ht_has_str_value,  3, fixup_spve_all, 0,
+	{"sht_has_name",  (cmd_function)w_ht_match_name,   3, fixup_spve_all, 0,
+		ANY_ROUTE},
+	{"sht_match_str_value", (cmd_function)w_ht_match_str_value,  3, fixup_spve_all, 0,
+		ANY_ROUTE},
+	{"sht_has_str_value", (cmd_function)w_ht_match_str_value,  3, fixup_spve_all, 0,
 		ANY_ROUTE},
 	{"sht_lock",        (cmd_function)w_ht_slot_lock,    1, fixup_ht_key, 0,
 		ANY_ROUTE},
@@ -583,7 +587,7 @@ static int w_ht_rm(sip_msg_t* msg, char* htname, char* itname)
 	return ki_ht_rm(msg, &shtname, &sitname);
 }
 
-static int ht_has_str_items(sip_msg_t* msg, str* hname, str* op, str *val,
+static int ht_match_str_items(sip_msg_t* msg, str* hname, str* op, str *val,
 		int mkey)
 {
 	ht_t *ht;
@@ -609,7 +613,7 @@ static int ht_has_str_items(sip_msg_t* msg, str* hname, str* op, str *val,
 				LM_WARN("unsupported match operator: %.*s\n", op->len, op->s);
 				return -1;
 			}
-			if(ht_has_cell_op_str(val, ht, mkey, vop)<0) {
+			if(ht_match_cell_op_str(val, ht, mkey, vop)<0) {
 				return -1;
 			}
 			return 1;
@@ -619,7 +623,7 @@ static int ht_has_str_items(sip_msg_t* msg, str* hname, str* op, str *val,
 	}
 }
 
-static int w_ht_has_str_items(sip_msg_t* msg, char* hname, char* op, char *val,
+static int w_ht_match_str_items(sip_msg_t* msg, char* hname, char* op, char *val,
 		int mkey)
 {
 	str sname;
@@ -639,28 +643,28 @@ static int w_ht_has_str_items(sip_msg_t* msg, char* hname, char* op, char *val,
 		return -1;
 	}
 
-	return ht_has_str_items(msg, &sname, &sop, &sval, mkey);
+	return ht_match_str_items(msg, &sname, &sop, &sval, mkey);
 }
 
-static int w_ht_has_name(sip_msg_t* msg, char* hname, char* op, char *val)
+static int w_ht_match_name(sip_msg_t* msg, char* hname, char* op, char *val)
 {
-	return w_ht_has_str_items(msg, hname, op, val, 0);
+	return w_ht_match_str_items(msg, hname, op, val, 0);
 }
 
-static int w_ht_has_str_value(sip_msg_t* msg, char* hname, char* op, char *val)
+static int w_ht_match_str_value(sip_msg_t* msg, char* hname, char* op, char *val)
 {
-	return w_ht_has_str_items(msg, hname, op, val, 1);
+	return w_ht_match_str_items(msg, hname, op, val, 1);
 }
 
-static int ki_ht_has_name(sip_msg_t* msg, str* sname, str* sop, str *sval)
+static int ki_ht_match_name(sip_msg_t* msg, str* sname, str* sop, str *sval)
 {
-	return ht_has_str_items(msg, sname, sop, sval, 0);
+	return ht_match_str_items(msg, sname, sop, sval, 0);
 
 }
 
-static int ki_ht_has_str_value(sip_msg_t* msg, str* sname, str* sop, str *sval)
+static int ki_ht_match_str_value(sip_msg_t* msg, str* sname, str* sop, str *sval)
 {
-	return ht_has_str_items(msg, sname, sop, sval, 1);
+	return ht_match_str_items(msg, sname, sop, sval, 1);
 }
 
 static int ht_reset_by_name(str *hname)
@@ -920,6 +924,108 @@ error:
 /**
  *
  */
+static sr_kemi_xval_t _sr_kemi_htable_xval = {0};
+
+/* pkg copy */
+static ht_cell_t *_htc_kemi_local=NULL;
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ht_get_mode(sip_msg_t *msg, str *htname, str *itname,
+		int rmode)
+{
+	ht_t *ht = NULL;
+	ht_cell_t *htc=NULL;
+
+	/* Find the htable */
+	ht = ht_get_table(htname);
+	if (!ht) {
+		LM_ERR("No such htable: %.*s\n", htname->len, htname->s);
+		sr_kemi_xval_null(&_sr_kemi_htable_xval, rmode);
+		return &_sr_kemi_htable_xval;
+	}
+
+	htc = ht_cell_pkg_copy(ht, itname, _htc_kemi_local);
+	if(_htc_kemi_local!=htc) {
+		ht_cell_pkg_free(_htc_kemi_local);
+		_htc_kemi_local=htc;
+	}
+	if(htc==NULL) {
+		if(ht->flags==PV_VAL_INT) {
+			_sr_kemi_htable_xval.vtype = SR_KEMIP_INT;
+			_sr_kemi_htable_xval.v.n = ht->initval.n;
+			return &_sr_kemi_htable_xval;
+		}
+		sr_kemi_xval_null(&_sr_kemi_htable_xval, rmode);
+		return &_sr_kemi_htable_xval;
+	}
+
+	if(htc->flags&AVP_VAL_STR) {
+		_sr_kemi_htable_xval.vtype = SR_KEMIP_STR;
+		_sr_kemi_htable_xval.v.s = htc->value.s;
+		return &_sr_kemi_htable_xval;
+	}
+
+	/* integer */
+	_sr_kemi_htable_xval.vtype = SR_KEMIP_INT;
+	_sr_kemi_htable_xval.v.n = htc->value.n;
+	return &_sr_kemi_htable_xval;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ht_get(sip_msg_t *msg, str *htname, str *itname)
+{
+	return ki_ht_get_mode(msg, htname, itname, SR_KEMI_XVAL_NULL_NONE);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ht_gete(sip_msg_t *msg, str *htname, str *itname)
+{
+	return ki_ht_get_mode(msg, htname, itname, SR_KEMI_XVAL_NULL_EMPTY);
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ht_getw(sip_msg_t *msg, str *htname, str *itname)
+{
+	return ki_ht_get_mode(msg, htname, itname, SR_KEMI_XVAL_NULL_PRINT);
+}
+
+
+/**
+ *
+ */
+static int ki_ht_is_null(sip_msg_t *msg, str *htname, str *itname)
+{
+	ht_t *ht = NULL;
+
+	/* find the hash htable */
+	ht = ht_get_table(htname);
+	if (ht == NULL) {
+		return 2;
+	}
+
+	if(ht->flags==PV_VAL_INT) {
+		/* htable defined with default value */
+		return -2;
+	}
+
+	if(ht_cell_exists(ht, itname)>0) {
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
 static int ki_ht_sets(sip_msg_t *msg, str *htname, str *itname, str *itval)
 {
 	int_str isvalue;
@@ -1098,6 +1204,52 @@ static int ki_ht_setxi(sip_msg_t *msg, str *htname, str *itname, int itval,
 	return 0;
 }
 
+#define KSR_HT_KEMI_NOINTVAL -255
+static ht_cell_t *_htc_ki_local=NULL;
+
+static int ki_ht_add_op(sip_msg_t *msg, str *htname, str *itname, int itval)
+{
+	ht_t *ht;
+	ht_cell_t *htc=NULL;
+
+	ht = ht_get_table(htname);
+	if(ht==NULL) {
+		return KSR_HT_KEMI_NOINTVAL;
+	}
+
+	htc = ht_cell_value_add(ht, itname, itval, _htc_ki_local);
+	if(_htc_ki_local!=htc) {
+		ht_cell_pkg_free(_htc_ki_local);
+		_htc_ki_local=htc;
+	}
+	if(htc==NULL) {
+		return KSR_HT_KEMI_NOINTVAL;
+	}
+
+	if(htc->flags&AVP_VAL_STR) {
+		return KSR_HT_KEMI_NOINTVAL;
+	}
+
+	/* integer */
+	if (ht->dmqreplicate>0) {
+		if (ht_dmq_replicate_action(HT_DMQ_SET_CELL, htname, itname, 0,
+					&htc->value, 1)!=0) {
+			LM_ERR("dmq relication failed\n");
+		}
+	}
+	return htc->value.n;
+}
+
+static int ki_ht_inc(sip_msg_t *msg, str *htname, str *itname)
+{
+	return ki_ht_add_op(msg, htname, itname, 1);
+}
+
+static int ki_ht_dec(sip_msg_t *msg, str *htname, str *itname)
+{
+	return ki_ht_add_op(msg, htname, itname, -1);
+}
+
 #define RPC_DATE_BUF_LEN 21
 
 static const char* htable_dump_doc[2] = {
@@ -1128,10 +1280,19 @@ static const char* htable_stats_doc[2] = {
 	"Statistics about htables.",
 	0
 };
-static const char* htable_reload_doc[2] = {
-	"Reload hash table.",
+static const char* htable_flush_doc[2] = {
+	"Flush hash table.",
 	0
 };
+static const char* htable_reload_doc[2] = {
+	"Reload hash table from database.",
+	0
+};
+static const char* htable_store_doc[2] = {
+	"Store hash table to database.",
+	0
+};
+
 
 static void htable_rpc_delete(rpc_t* rpc, void* c) {
 	str htname, keyname;
@@ -1161,7 +1322,7 @@ static void htable_rpc_get(rpc_t* rpc, void* c) {
 	ht_cell_t *htc;	/*!< One HT cell */
 	void* th;
 	void* vh;
-	struct tm *_expire_t;
+	struct tm _expire_t;
 	char expire_buf[RPC_DATE_BUF_LEN]="NEVER";
 
 	if (rpc->scan(c, "SS", &htname, &keyname) < 2) {
@@ -1196,9 +1357,9 @@ static void htable_rpc_get(rpc_t* rpc, void* c) {
 	}
 
 	if (htc->expire) {
-		_expire_t = localtime(&htc->expire);
+		localtime_r(&htc->expire, &_expire_t);
 		strftime(expire_buf, RPC_DATE_BUF_LEN - 1,
-			"%Y-%m-%d %H:%M:%S", _expire_t);
+			"%Y-%m-%d %H:%M:%S", &_expire_t);
 	}
 
 	if(htc->flags&AVP_VAL_STR) {
@@ -1479,6 +1640,25 @@ error:
 	return;
 }
 
+/*! \brief RPC htable.flush command to empty a hash table */
+static void  htable_rpc_flush(rpc_t* rpc, void* c)
+{
+	str htname;
+	ht_t *ht;
+
+	if (rpc->scan(c, "S", &htname) < 1)
+	{
+		rpc->fault(c, 500, "No htable name given");
+		return;
+	}
+	ht = ht_get_table(&htname);
+	if(ht==NULL)
+	{
+		rpc->fault(c, 500, "No such htable");
+		return;
+	}
+	ht_reset_content(ht);
+}
 
 /*! \brief RPC htable.reload command to reload content of a hash table */
 static void htable_rpc_reload(rpc_t* rpc, void* c)
@@ -1579,6 +1759,56 @@ static void htable_rpc_reload(rpc_t* rpc, void* c)
 	return;
 }
 
+/*! \brief RPC htable.store command to store content of a hash table to db */
+static void htable_rpc_store(rpc_t* rpc, void* c)
+{
+	str htname;
+	ht_t *ht;
+
+	if(ht_db_url.len<=0) {
+		rpc->fault(c, 500, "No htable db_url");
+		return;
+	}
+	if(ht_db_init_con()!=0) {
+		rpc->fault(c, 500, "Failed to init htable db connection");
+		return;
+	}
+	if(ht_db_open_con()!=0) {
+		rpc->fault(c, 500, "Failed to open htable db connection");
+		return;
+	}
+
+	if (rpc->scan(c, "S", &htname) < 1) {
+		ht_db_close_con();
+		rpc->fault(c, 500, "No htable name given");
+		return;
+	}
+	ht = ht_get_table(&htname);
+	if(ht==NULL) {
+		ht_db_close_con();
+		rpc->fault(c, 500, "No such htable");
+		return;
+	}
+	if(ht->dbtable.s==NULL || ht->dbtable.len<=0) {
+		ht_db_close_con();
+		rpc->fault(c, 500, "No database htable");
+		return;
+	}
+	LM_DBG("sync db table [%.*s] from ht [%.*s]\n",
+			ht->dbtable.len, ht->dbtable.s,
+			ht->name.len, ht->name.s);
+	ht_db_delete_records(&ht->dbtable);
+	if(ht_db_save_table(ht, &ht->dbtable)!=0) {
+		LM_ERR("failed syncing hash table [%.*s] to db\n",
+					ht->name.len, ht->name.s);
+		ht_db_close_con();
+		rpc->fault(c, 500, "Storing htable failed");
+		return;
+	}
+	ht_db_close_con();
+	return;
+}
+
 rpc_export_t htable_rpc[] = {
 	{"htable.dump", htable_rpc_dump, htable_dump_doc, RET_ARRAY},
 	{"htable.delete", htable_rpc_delete, htable_delete_doc, 0},
@@ -1587,7 +1817,9 @@ rpc_export_t htable_rpc[] = {
 	{"htable.seti", htable_rpc_seti, htable_seti_doc, 0},
 	{"htable.listTables", htable_rpc_list, htable_list_doc, RET_ARRAY},
 	{"htable.reload", htable_rpc_reload, htable_reload_doc, 0},
+	{"htable.store", htable_rpc_store, htable_store_doc, 0},
 	{"htable.stats", htable_rpc_stats, htable_stats_doc, RET_ARRAY},
+	{"htable.flush", htable_rpc_flush, htable_flush_doc, 0},
 	{0, 0, 0, 0}
 };
 
@@ -1604,6 +1836,7 @@ static int htable_init_rpc(void)
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_htable_exports[] = {
 	{ str_init("htable"), str_init("sht_lock"),
 		SR_KEMIP_INT, ki_ht_slot_lock,
@@ -1660,14 +1893,29 @@ static sr_kemi_t sr_kemi_htable_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
-	{ str_init("htable"), str_init("sht_has_name"),
-		SR_KEMIP_INT, ki_ht_has_name,
+	{ str_init("htable"), str_init("sht_match_name"),
+		SR_KEMIP_INT, ki_ht_match_name,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
-	{ str_init("htable"), str_init("sht_has_str_value"),
-		SR_KEMIP_INT, ki_ht_has_str_value,
+	{ str_init("htable"), str_init("sht_match_str_value"),
+		SR_KEMIP_INT, ki_ht_match_str_value,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_get"),
+		SR_KEMIP_XVAL, ki_ht_get,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_gete"),
+		SR_KEMIP_XVAL, ki_ht_gete,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_getw"),
+		SR_KEMIP_XVAL, ki_ht_getw,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("htable"), str_init("sht_sets"),
@@ -1695,9 +1943,25 @@ static sr_kemi_t sr_kemi_htable_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("htable"), str_init("sht_is_null"),
+		SR_KEMIP_INT, ki_ht_is_null,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_inc"),
+		SR_KEMIP_INT, ki_ht_inc,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("htable"), str_init("sht_dec"),
+		SR_KEMIP_INT, ki_ht_dec,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

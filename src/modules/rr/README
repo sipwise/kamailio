@@ -46,17 +46,20 @@ Bogdan-Andrei Iancu
               4.6. custom_user_avp (avp string)
               4.7. force_send_socket (int)
               4.8. ignore_sips (int)
+              4.9. sockname_mode (int)
 
         5. Functions
 
               5.1. loose_route()
-              5.2. record_route() and record_route(string)
-              5.3. remove_record_route()
-              5.4. record_route_preset(string [,string2])
-              5.5. record_route_advertised_address(address)
-              5.6. add_rr_param(param)
-              5.7. check_route_param(re)
-              5.8. is_direction(dir)
+              5.2. loose_route_preloaded()
+              5.3. record_route([sparams])
+              5.4. remove_record_route()
+              5.5. record_route_preset(string [,string2])
+              5.6. record_route_advertised_address(address)
+              5.7. add_rr_param(param)
+              5.8. check_route_param(re)
+              5.9. is_direction(dir)
+              5.10. rr_next_hop_route()
 
         6. Exported Pseudo Variables
 
@@ -88,15 +91,18 @@ Bogdan-Andrei Iancu
    1.8. custom_user_avp usage
    1.9. Set force_send_socket parameter
    1.10. Set ignore_sips parameter
-   1.11. loose_route usage
-   1.12. record_route usage
-   1.13. remove_record_route usage
-   1.14. record_route_preset usage
-   1.15. record_route_advertised_address usage
-   1.16. add_rr_param usage
-   1.17. check_route_param usage
-   1.18. is_direction usage
-   1.19. $route_uri
+   1.11. Set sockname_mode parameter
+   1.12. loose_route usage
+   1.13. loose_route_preloaded usage
+   1.14. record_route usage
+   1.15. remove_record_route usage
+   1.16. record_route_preset usage
+   1.17. record_route_advertised_address usage
+   1.18. add_rr_param usage
+   1.19. check_route_param usage
+   1.20. is_direction usage
+   1.21. rr_next_hop_route usage
+   1.22. $route_uri
    2.1. record_route usage
    2.2. record_route_advertised_address usage
    2.3. Loading RR module's API from another module
@@ -122,17 +128,20 @@ Chapter 1. Admin Guide
         4.6. custom_user_avp (avp string)
         4.7. force_send_socket (int)
         4.8. ignore_sips (int)
+        4.9. sockname_mode (int)
 
    5. Functions
 
         5.1. loose_route()
-        5.2. record_route() and record_route(string)
-        5.3. remove_record_route()
-        5.4. record_route_preset(string [,string2])
-        5.5. record_route_advertised_address(address)
-        5.6. add_rr_param(param)
-        5.7. check_route_param(re)
-        5.8. is_direction(dir)
+        5.2. loose_route_preloaded()
+        5.3. record_route([sparams])
+        5.4. remove_record_route()
+        5.5. record_route_preset(string [,string2])
+        5.6. record_route_advertised_address(address)
+        5.7. add_rr_param(param)
+        5.8. check_route_param(re)
+        5.9. is_direction(dir)
+        5.10. rr_next_hop_route()
 
    6. Exported Pseudo Variables
 
@@ -170,8 +179,8 @@ Chapter 1. Admin Guide
    3261 (see 12.1.1 UAS behavior).
 
    For this purpose, the modules offers the following functions:
-     * add_rr_param() - see Section 5.6, “add_rr_param(param)”
-     * check_route_param() - see Section 5.7, “check_route_param(re)”
+     * add_rr_param() - see Section 5.7, “add_rr_param(param)”
+     * check_route_param() - see Section 5.8, “check_route_param(re)”
 
    Example 1.1. Dialog support in RR module
 ...
@@ -217,6 +226,7 @@ UAC                       Kamailio PROXY                          UAS
    4.6. custom_user_avp (avp string)
    4.7. force_send_socket (int)
    4.8. ignore_sips (int)
+   4.9. sockname_mode (int)
 
 4.1. enable_full_lr (integer)
 
@@ -357,16 +367,31 @@ modparam("rr", "force_send_socket", 1)
 modparam("rr", "ignore_sips", 1)
 ...
 
+4.9. sockname_mode (int)
+
+   If set to 1, the Record-Route URI is built to contain socket name in
+   'sn' parameter and then it is used to lookup the local socket for Route
+   header processing.
+
+   Default value is 0.
+
+   Example 1.11. Set sockname_mode parameter
+...
+modparam("rr", "sockname_mode", 1)
+...
+
 5. Functions
 
    5.1. loose_route()
-   5.2. record_route() and record_route(string)
-   5.3. remove_record_route()
-   5.4. record_route_preset(string [,string2])
-   5.5. record_route_advertised_address(address)
-   5.6. add_rr_param(param)
-   5.7. check_route_param(re)
-   5.8. is_direction(dir)
+   5.2. loose_route_preloaded()
+   5.3. record_route([sparams])
+   5.4. remove_record_route()
+   5.5. record_route_preset(string [,string2])
+   5.6. record_route_advertised_address(address)
+   5.7. add_rr_param(param)
+   5.8. check_route_param(re)
+   5.9. is_direction(dir)
+   5.10. rr_next_hop_route()
 
 5.1. loose_route()
 
@@ -410,12 +435,32 @@ modparam("rr", "ignore_sips", 1)
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 1.11. loose_route usage
+   Example 1.12. loose_route usage
 ...
 loose_route();
 ...
 
-5.2. record_route() and record_route(string)
+5.2. loose_route_preloaded()
+
+   The function is similar to `loose_route()`, but it returns 1 (true)
+   when the Route header is preloaded (is in an initial request) and -1
+   (false) if processing of the Route header failed or it is for requests
+   within dialog.
+
+   It is a convenient function to use for routing initial requests on an
+   edge proxy that adds Path header to REGISTER requests.
+
+   This function can be used from REQUEST_ROUTE.
+
+   Example 1.13. loose_route_preloaded usage
+...
+if(!loose_route_preloaded()) {
+   sl_send_reply("404" "Preloaded route expected");
+   exit;
+}
+...
+
+5.3. record_route([sparams])
 
    The function adds a new Record-Route header field. The header field
    will be inserted in the message before any other Record-Route header
@@ -430,15 +475,19 @@ loose_route();
    generate and add a flow-token as the username part of the
    Record-Route-URI.
 
+   Note: if append From-tag is enabled and the function is used for
+   requests within dialog, it must be executed after loose_route() in
+   order to detect properly the direction.
+
    This function can be used from REQUEST_ROUTE, BRANCH_ROUTE and
    FAILURE_ROUTE.
 
-   Example 1.12. record_route usage
+   Example 1.14. record_route usage
 ...
 record_route();
 ...
 
-5.3. remove_record_route()
+5.4. remove_record_route()
 
    The function removes the internal lumps added by record_route()
    functions.
@@ -447,15 +496,15 @@ record_route();
 
    This function can be used from REQUEST_ROUTE and FAILURE_ROUTE.
 
-   Example 1.13. remove_record_route usage
+   Example 1.15. remove_record_route usage
 ...
 remove_record_route();
 ...
 
-5.4. record_route_preset(string [,string2])
+5.5. record_route_preset(string [,string2])
 
-   This function will put the string into Record-Route, don't use unless
-   you know what you are doing.
+   This function will put the string params into Record-Route, avoid to
+   use it unless you know what you are doing.
 
    Meaning of the parameters is as follows:
      * string - String to be inserted into the first header field; it may
@@ -467,6 +516,13 @@ remove_record_route();
    the outbound interface and the 'string2' param is pointing to the
    inbound interface.
 
+   Note: The value of parameters must not contain the SIP protocol scheme
+   (sip: or sips:), one is added based on routing requirements. Thus the
+   value has to be like "address:port;parameters", the port and parameters
+   are optional. If the second parameter is provided, do not forget to add
+   the parameter "r2=on" so the proxy processes both corresponding Route
+   headers at once.
+
    When the “outbound” module was loaded before this module this function
    will determine whether outbound is required for the request and
    generate and add a flow-token as the username part of the
@@ -475,12 +531,12 @@ remove_record_route();
    This function can be used from REQUEST_ROUTE, BRANCH_ROUTE and
    FAILURE_ROUTE.
 
-   Example 1.14. record_route_preset usage
+   Example 1.16. record_route_preset usage
 ...
 record_route_preset("1.2.3.4:5090");
 ...
 
-5.5. record_route_advertised_address(address)
+5.6. record_route_advertised_address(address)
 
    The function adds a new Record-Route header field using the address
    given. The header field will be inserted in the message before any
@@ -502,18 +558,18 @@ record_route_preset("1.2.3.4:5090");
    This function can be used from REQUEST_ROUTE, BRANCH_ROUTE and
    FAILURE_ROUTE.
 
-   Example 1.15. record_route_advertised_address usage
+   Example 1.17. record_route_advertised_address usage
 ...
 record_route_advertised_address("1.2.3.4:5080");
 ...
 
-5.6. add_rr_param(param)
+5.7. add_rr_param(param)
 
    Adds a parameter to the Record-Route URI (param must be in
    “;name=value” format. The function may be called also before or after
-   the record_route() or record_route_advertised_address() calls (see
-   Section 5.2, “record_route() and record_route(string)” or Section 5.5,
-   “record_route_advertised_address(address)”)).
+   the record_route(), record_route_advertised_address(), and
+   record_route_preset() calls (see Section 5.3, “record_route([sparams])”
+   or Section 5.6, “record_route_advertised_address(address)”)).
 
    Meaning of the parameters is as follows:
      * param - String containing the URI parameter to be added. It must
@@ -522,12 +578,12 @@ record_route_advertised_address("1.2.3.4:5080");
    This function can be used from REQUEST_ROUTE, BRANCH_ROUTE and
    FAILURE_ROUTE.
 
-   Example 1.16. add_rr_param usage
+   Example 1.18. add_rr_param usage
 ...
 add_rr_param(";nat=yes");
 ...
 
-5.7. check_route_param(re)
+5.8. check_route_param(re)
 
    The function checks if the URI parameters of the local Route header
    (corresponding to the local server) matches the given regular
@@ -539,14 +595,14 @@ add_rr_param(";nat=yes");
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 1.17. check_route_param usage
+   Example 1.19. check_route_param usage
 ...
 if (check_route_param("nat=yes")) {
     setflag(6);
 }
 ...
 
-5.8. is_direction(dir)
+5.9. is_direction(dir)
 
    The function checks the flow direction of in-dialog requests. This
    function uses the “ftag” parameter from the Route header, therefore the
@@ -567,12 +623,30 @@ if (check_route_param("nat=yes")) {
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 1.18. is_direction usage
+   Example 1.20. is_direction usage
 ...
 if (is_direction("downstream")) {
     xdbg("in-dialog request from caller to callee (downstream) ($rm)\n");
 } else {
     xdbg("in-dialog request from callee to caller (upstream) ($rm)\n");
+}
+...
+
+5.10. rr_next_hop_route()
+
+   The function returns 1 (true) if there is a Route header for the next
+   hop address. It has to be used after loose_route(), when the local
+   Route headers are processed.
+
+   This function can be used from ANY_ROUTE.
+
+   Example 1.21. rr_next_hop_route usage
+...
+if(loose_route) {
+    if(rr_next_hop_route()) {
+        # next hop address is from Route header
+    }
+
 }
 ...
 
@@ -584,7 +658,7 @@ if (is_direction("downstream")) {
 
    Returns the URI of the top route-header.
 
-   Example 1.19. $route_uri
+   Example 1.22. $route_uri
 ...
     xdbg("Route-URI is: $route_uri\n");
 ...

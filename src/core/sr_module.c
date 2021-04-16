@@ -43,6 +43,8 @@
 #include "sr_compat.h"
 #include "ppcfg.h"
 #include "async_task.h"
+#include "shm_init.h"
+#include "daemonize.h"
 
 #include <sys/stat.h>
 #include <regex.h>
@@ -107,6 +109,24 @@ unsigned int set_modinit_delay(unsigned int v)
 	r =  modinit_delay;
 	modinit_delay = v;
 	return r;
+}
+
+/* shut down phase for instance - kept in shared memory */
+static int *_ksr_shutdown_phase = NULL;
+
+int ksr_shutdown_phase_init(void)
+{
+	if((_ksr_shutdown_phase == NULL) && (shm_initialized())) {
+		_ksr_shutdown_phase = (int*)shm_mallocxz(sizeof(int));
+	}
+	return 0;
+}
+/**
+ * return destroy modules phase state
+ */
+int ksr_shutdown_phase(void)
+{
+	return (_ksr_shutdown_phase)?(*_ksr_shutdown_phase):0;
 }
 
 /* keep state if server is in destroy modules phase */
@@ -214,7 +234,7 @@ static int register_module(module_exports_t* e, char* path, void* handle)
 
 	/* add module to the list */
 	if ((mod=pkg_malloc(sizeof(struct sr_module)))==0){
-		LM_ERR("memory allocation failure\n");
+		PKG_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -231,6 +251,11 @@ static int register_module(module_exports_t* e, char* path, void* handle)
 		for (n=0; e->cmds[n].name; n++);
 	}
 	mod->exports.cmds = pkg_malloc(sizeof(ksr_cmd_export_t)*(n+1));
+	if (mod->exports.cmds==0) {
+		PKG_MEM_ERROR;
+		ret=E_OUT_OF_MEM;
+		goto error;
+	}
 	memset(mod->exports.cmds, 0, sizeof(ksr_cmd_export_t)*(n+1));
 	for (i=0; i < n; i++) {
 		mod->exports.cmds[i].name = e->cmds[i].name;
@@ -410,7 +435,10 @@ int load_module(char* mod_path)
 				/* try path <MODS_DIR>/<modname>.so */
 				path = (char*)pkg_malloc(mdir_len + 1 /* "/" */ +
 									modname.len + 3 /* ".so" */ + 1);
-				if (path==0) goto error;
+				if (path==0) {
+					PKG_MEM_ERROR;
+					goto error;
+				}
 				memcpy(path, mdir, mdir_len);
 				len = mdir_len;
 				if (len != 0 && path[len - 1] != '/'){
@@ -431,7 +459,10 @@ int load_module(char* mod_path)
 						mdir_len + 1 /* "/" */ +
 						modname.len + 1 /* "/" */ +
 						modname.len + 3 /* ".so" */ + 1);
-					if (path==0) goto error;
+					if (path==0) {
+						PKG_MEM_ERROR;
+						goto error;
+					}
 					memcpy(path, mdir, mdir_len);
 					len = mdir_len;
 					if (len != 0 && path[len - 1] != '/') {
@@ -463,7 +494,10 @@ int load_module(char* mod_path)
 					/* try path <MODS_DIR>/mod_path - K compat */
 					path = (char*)pkg_malloc(mdir_len + 1 /* "/" */ +
 									strlen(mod_path) + 1);
-					if (path==0) goto error;
+					if (path==0) {
+						PKG_MEM_ERROR;
+						goto error;
+					}
 					memcpy(path, mdir, mdir_len);
 					len = mdir_len;
 					if (len != 0 && path[len - 1] != '/'){
@@ -507,7 +541,7 @@ reload:
 	}
 	/* version control */
 	if (!version_control(handle, path)) {
-		exit(-1);
+		ksr_exit(-1);
 	}
 	/* launch register */
 	mr = (mod_register_function)dlsym(handle, "mod_register");
@@ -724,6 +758,12 @@ void destroy_modules()
 	struct sr_module* t, *foo;
 
 	_sr_destroy_modules_phase = 1;
+	if(_ksr_shutdown_phase!=NULL) {
+		*_ksr_shutdown_phase = 1;
+	}
+
+	LM_DBG("starting modules destroy phase\n");
+
 	/* call first destroy function from each module */
 	t=modules;
 	while(t) {
@@ -746,86 +786,6 @@ void destroy_modules()
 		mod_response_cbks=0;
 	}
 }
-
-#ifdef NO_REVERSE_INIT
-
-/*
- * Initialize all loaded modules, the initialization
- * is done *AFTER* the configuration file is parsed
- */
-int init_modules(void)
-{
-	struct sr_module* t;
-
-	if(async_task_init()<0)
-		return -1;
-
-	for(t = modules; t; t = t->next) {
-		if (t->exports.init_f) {
-			if (t->exports.init_f() != 0) {
-				LM_ERR("Error while initializing module %s\n", t->exports.name);
-				return -1;
-			}
-			/* delay next module init, if configured */
-			if(unlikely(modinit_delay>0))
-				sleep_us(modinit_delay);
-		}
-		if (t->exports.response_f)
-			mod_response_cbk_no++;
-	}
-	mod_response_cbks=pkg_malloc(mod_response_cbk_no *
-									sizeof(response_function));
-	if (mod_response_cbks==0){
-		LM_ERR("memory allocation failure for %d response_f callbacks\n",
-					mod_response_cbk_no);
-		return -1;
-	}
-	for (t=modules, i=0; t && (i<mod_response_cbk_no); t=t->next) {
-		if (t->exports.response_f) {
-			mod_response_cbks[i]=t->exports.response_f;
-			i++;
-		}
-	}
-	return 0;
-}
-
-
-
-/*
- * per-child initialization
- */
-int init_child(int rank)
-{
-	struct sr_module* t;
-	char* type;
-
-	switch(rank) {
-	case PROC_MAIN:     type = "PROC_MAIN";     break;
-	case PROC_TIMER:    type = "PROC_TIMER";    break;
-	case PROC_FIFO:     type = "PROC_FIFO";     break;
-	case PROC_TCP_MAIN: type = "PROC_TCP_MAIN"; break;
-	default:            type = "CHILD";         break;
-	}
-	LM_DBG("initializing %s with rank %d\n", type, rank);
-
-	if(async_task_child_init(rank)<0)
-		return -1;
-
-	for(t = modules; t; t = t->next) {
-		if (t->exports.init_child_f) {
-			if ((t->exports.init_child_f(rank)) < 0) {
-				LM_ERR("Initialization of child %d failed\n", rank);
-				return -1;
-			}
-		}
-	}
-	if(rank!=PROC_INIT) {
-		pt[process_no].status = 1;
-	}
-	return 0;
-}
-
-#else
 
 
 /* recursive module child initialization; (recursion is used to
@@ -868,6 +828,23 @@ static int init_mod_child( struct sr_module* m, int rank )
 int init_child(int rank)
 {
 	int ret;
+	char* type;
+
+	switch(rank) {
+	case PROC_MAIN:       type = "PROC_MAIN";       break;
+	case PROC_TIMER:      type = "PROC_TIMER";      break;
+	case PROC_RPC:        type = "PROC_RPC";        break;
+	case PROC_TCP_MAIN:   type = "PROC_TCP_MAIN";   break;
+	case PROC_UNIXSOCK:   type = "PROC_UNIXSOCK";   break;
+	case PROC_ATTENDANT:  type = "PROC_ATTENDANT";  break;
+	case PROC_INIT:       type = "PROC_INIT";       break;
+	case PROC_NOCHLDINIT: type = "PROC_NOCHLDINIT"; break;
+	case PROC_SIPINIT:    type = "PROC_SIPINIT";    break;
+	case PROC_SIPRPC:     type = "PROC_SIPRPC";     break;
+	default:              type = "CHILD";           break;
+	}
+	LM_DBG("initializing %s with rank %d\n", type, rank);
+
 	if(async_task_child_init(rank)<0)
 		return -1;
 
@@ -933,7 +910,7 @@ int init_modules(void)
 	mod_response_cbks=pkg_malloc(mod_response_cbk_no *
 									sizeof(response_function));
 	if (mod_response_cbks==0){
-		LM_ERR("memory allocation failure for %d response_f callbacks\n", mod_response_cbk_no);
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	for (t=modules, i=0; t && (i<mod_response_cbk_no); t=t->next)
@@ -944,8 +921,6 @@ int init_modules(void)
 
 	return 0;
 }
-
-#endif
 
 
 action_u_t *fixup_get_param(void **cur_param, int cur_param_no,
@@ -1069,7 +1044,7 @@ int fix_param(int type, void** param)
 
 	p = (fparam_t*)pkg_malloc(sizeof(fparam_t));
 	if (!p) {
-		LM_ERR("No memory left\n");
+		PKG_MEM_ERROR;
 		return E_OUT_OF_MEM;
 	}
 	memset(p, 0, sizeof(fparam_t));
@@ -1102,7 +1077,7 @@ int fix_param(int type, void** param)
 			break;
 		case FPARAM_REGEX:
 			if ((p->v.regex = pkg_malloc(sizeof(regex_t))) == 0) {
-				LM_ERR("No memory left\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 			if (regcomp(p->v.regex, *param,
@@ -1164,7 +1139,7 @@ int fix_param(int type, void** param)
 			}
 			p->v.pvs=pkg_malloc(sizeof(pv_spec_t));
 			if (p->v.pvs==0){
-				LM_ERR("out of memory while parsing pv_spec_t\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 			if (pv_parse_spec2(&name, p->v.pvs, 1)==0){

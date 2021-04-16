@@ -42,6 +42,7 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <ifaddrs.h>
+#include <netdb.h>
 #ifdef HAVE_SYS_SOCKIO_H
 #include <sys/sockio.h>
 #endif
@@ -100,6 +101,73 @@
 #define addr_info_listins sock_listins
 #define addr_info_listrm sock_listrm
 
+/**
+ * return the scope for IPv6 interface matching the ipval parameter
+ * - needed for binding to link local IPv6 addresses
+ */
+unsigned int ipv6_get_netif_scope(char *ipval)
+{
+	struct ifaddrs *netiflist = NULL;
+	struct ifaddrs *netif = NULL;
+	char ipaddr[NI_MAXHOST];
+	unsigned int iscope = 0;
+	int i = 0;
+	int r = 0;
+	ip_addr_t *ipa = NULL;
+	ip_addr_t vaddr;
+	str ips;
+
+	ips.s = ipval;
+	ips.len = strlen(ipval);
+
+	ipa = str2ip6(&ips);
+	if(ipa==NULL) {
+		LM_ERR("could not parse ipv6 address: %s\n", ipval);
+		return 0;
+	}
+	memcpy(&vaddr, ipa, sizeof(ip_addr_t));
+	ipa = NULL;
+
+	/* walk over the list of all network interface addresses */
+	if(getifaddrs(&netiflist)!=0) {
+		LM_ERR("failed to get network interfaces - errno: %d\n", errno);
+		return 0;
+	}
+	for(netif = netiflist; netif; netif = netif->ifa_next) {
+		/* only active and ipv6 */
+		if (netif->ifa_addr && (netif->ifa_flags & IFF_UP)
+					&& netif->ifa_addr->sa_family==AF_INET6) {
+			r = getnameinfo(netif->ifa_addr, sizeof(struct sockaddr_in6),
+					ipaddr, sizeof(ipaddr), NULL, 0, NI_NUMERICHOST);
+			if(r!=0) {
+				LM_ERR("failed to get the name info - ret: %d\n", r);
+				goto done;
+			}
+			/* strip the interface name after */
+			for(i=0; ipaddr[i]; i++) {
+				if(ipaddr[i]=='%') {
+					ipaddr[i]='\0';
+					break;
+				}
+			}
+			ips.s = ipaddr;
+			ips.len = strlen(ipaddr);
+			ipa = str2ip6(&ips);
+			if(ipa!=NULL) {
+				/* if the ips match, get scope index from interface name */
+				if(ip_addr_cmp(&vaddr, ipa)) {
+					iscope=if_nametoindex(netif->ifa_name);
+					goto done;
+				}
+			}
+		}
+	}
+
+done:
+	freeifaddrs(netiflist);
+	return iscope;
+}
+
 inline static void addr_info_list_ins_lst(struct addr_info* lst,
 										struct addr_info* after)
 {
@@ -141,7 +209,7 @@ static int init_addr_info(struct addr_info* a,
 	a->flags=flags;
 	return 0;
 error:
-	LM_ERR("memory allocation error\n");
+	PKG_MEM_ERROR;
 	return -1;
 }
 
@@ -160,7 +228,7 @@ static inline struct addr_info* new_addr_info(char* name,
 	if (init_addr_info(al, name, gf)!=0) goto error;
 	return al;
 error:
-	LM_ERR("memory allocation error\n");
+	PKG_MEM_ERROR;
 	if (al){
 		if (al->name.s) pkg_free(al->name.s);
 		pkg_free(al);
@@ -215,18 +283,19 @@ error:
 
 
 
-/* another helper function, it just creates a socket_info struct */
+/* another helper function, it just creates a socket_info struct
+ * allocates a si and a si->name in new pkg memory */
 static inline struct socket_info* new_sock_info(	char* name,
 								struct name_lst* addr_l,
 								unsigned short port, unsigned short proto,
 								char *usename, unsigned short useport,
-								enum si_flags flags)
+								char *sockname, enum si_flags flags)
 {
 	struct socket_info* si;
 	struct name_lst* n;
 	struct hostent* he;
 	char *p;
-	
+
 	si=(struct socket_info*) pkg_malloc(sizeof(struct socket_info));
 	if (si==0) goto error;
 	memset(si, 0, sizeof(struct socket_info));
@@ -245,6 +314,12 @@ static inline struct socket_info* new_sock_info(	char* name,
 			LM_ERR("new_addr_info2list failed\n");
 			goto error;
 		}
+	}
+	if(sockname!=NULL) {
+		si->sockname.len = strlen(sockname);
+		si->sockname.s=(char*)pkg_malloc(si->sockname.len+1); /* include \0 */
+		if (si->sockname.s==0) { goto error; }
+		memcpy(si->sockname.s, sockname, si->sockname.len+1);
 	}
 	if(usename!=NULL)
 	{
@@ -285,10 +360,14 @@ static inline struct socket_info* new_sock_info(	char* name,
 	}
 	return si;
 error:
-	LM_ERR("memory allocation error\n");
+	PKG_MEM_ERROR;
 	if (si) {
-		if(si->name.s)
+		if(si->name.s) {
 			pkg_free(si->name.s);
+		}
+		if(si->sockname.s) {
+			pkg_free(si->sockname.s);
+		}
 		pkg_free(si);
 	}
 	return 0;
@@ -305,6 +384,7 @@ static void free_sock_info(struct socket_info* si)
 		if(si->port_no_str.s) pkg_free(si->port_no_str.s);
 		if(si->addr_info_lst) free_addr_info_lst(&si->addr_info_lst);
 		if(si->sock_str.s) pkg_free(si->sock_str.s);
+		if(si->sockname.s) pkg_free(si->sockname.s);
 		if(si->useinfo.name.s) pkg_free(si->useinfo.name.s);
 		if(si->useinfo.port_no_str.s) pkg_free(si->useinfo.port_no_str.s);
 		if(si->useinfo.sock_str.s) pkg_free(si->useinfo.sock_str.s);
@@ -419,7 +499,7 @@ static int fix_sock_str(struct socket_info* si)
 	
 	si->sock_str.s = pkg_malloc(len + 1);
 	if (si->sock_str.s == NULL) {
-		LM_ERR("No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	if (socketinfo2str(si->sock_str.s, &len, si, 0) < 0) {
@@ -430,13 +510,13 @@ static int fix_sock_str(struct socket_info* si)
 	si->sock_str.len = len;
 	if(si->useinfo.name.s!=NULL)
 	{
-		len = MAX_SOCKET_STR;
+		len = MAX_SOCKET_ADVERTISE_STR;
 
 		if (si->useinfo.sock_str.s) pkg_free(si->useinfo.sock_str.s);
 
 		si->useinfo.sock_str.s = pkg_malloc(len + 1);
 		if (si->useinfo.sock_str.s == NULL) {
-			LM_ERR("No memory left\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		if (socketinfo2str(si->useinfo.sock_str.s, &len, si, 1) < 0) {
@@ -539,23 +619,25 @@ struct socket_info* grep_sock_info(str* host, unsigned short port,
 	struct socket_info** list;
 	struct addr_info* ai;
 	unsigned short c_proto;
-	
+
 	hname=*host;
-	if ((hname.len>2)&&((*hname.s)=='[')&&(hname.s[hname.len-1]==']')){
-		/* ipv6 reference, skip [] */
+	if ((hname.len>2) && ((*hname.s)=='[') && (hname.s[hname.len-1]==']')) {
+		/* ipv6 - skip [] */
 		hname.s++;
 		hname.len-=2;
 	}
 
 	c_proto=(proto!=PROTO_NONE)?proto:PROTO_UDP;
 retry:
-	do{
+	do {
 		/* get the proper sock_list */
 		list=get_sock_info_list(c_proto);
-	
-		if (list==0) /* disabled or unknown protocol */
+
+		if (list==0) {
+			/* disabled or unknown protocol */
 			continue;
-		for (si=*list; si; si=si->next){
+		}
+		for (si=*list; si; si=si->next) {
 			LM_DBG("checking if host==us: %d==%d && [%.*s] == [%.*s]\n",
 						hname.len,
 						si->name.len,
@@ -569,31 +651,34 @@ retry:
 					continue;
 				}
 			}
-			if (si_hname_cmp(&hname, &si->name, &si->address_str, 
-								&si->address, si->flags)==0)
+			if (si_hname_cmp(&hname, &si->name, &si->address_str,
+								&si->address, si->flags)==0) {
 				goto found;
-			if(si->useinfo.name.s!=NULL)
-			{
+			}
+			if(si->useinfo.name.s!=NULL) {
 				LM_DBG("checking advertise if host==us:"
 						" %d==%d && [%.*s] == [%.*s]\n",
 						hname.len,
 						si->useinfo.name.len,
 						hname.len, hname.s,
 						si->useinfo.name.len, si->useinfo.name.s
-				);
+					);
 				if (si_hname_cmp(&hname, &si->useinfo.name,
 							&si->useinfo.address_str, &si->useinfo.address,
-							si->flags)==0)
+							si->flags)==0) {
 					goto found;
+				}
 			}
 			/* try among the extra addresses */
-			for (ai=si->addr_info_lst; ai; ai=ai->next)
-				if (si_hname_cmp(&hname, &ai->name, &ai->address_str, 
-									&ai->address, ai->flags)==0)
+			for (ai=si->addr_info_lst; ai; ai=ai->next) {
+				if (si_hname_cmp(&hname, &ai->name, &ai->address_str,
+									&ai->address, ai->flags)==0) {
 					goto found;
+				}
+			}
 		}
 
-	}while( (proto==0) && (c_proto=next_proto(c_proto)) );
+	} while( (proto==0) && (c_proto=next_proto(c_proto)) );
 
 #ifdef USE_TLS
 	if (unlikely(c_proto == PROTO_WS)) {
@@ -607,13 +692,47 @@ found:
 	return si;
 }
 
+socket_info_t* ksr_get_socket_by_name(str *sockname)
+{
+	socket_info_t *si = NULL;
+	struct socket_info** list;
+	unsigned short c_proto;
+
+	c_proto = PROTO_UDP;
+	do {
+		/* get the proper sock_list */
+		list=get_sock_info_list(c_proto);
+
+		if (list==0) {
+			/* disabled or unknown protocol */
+			continue;
+		}
+
+		for (si=*list; si; si=si->next) {
+			if(si->sockname.s == NULL) {
+				continue;
+			}
+			LM_DBG("checking if sockname %.*s matches %.*s\n",
+					sockname->len, sockname->s,
+					si->sockname.len, si->sockname.s);
+			if (sockname->len == si->sockname.len
+					&& strncasecmp(sockname->s, si->sockname.s,
+							sockname->len)==0) {
+				return si;
+			}
+		}
+	} while((c_proto = next_proto(c_proto))!=0);
+
+	return NULL;
+}
+
 /* checks if the proto:port is one of the ports we listen on
  * and returns the corresponding socket_info structure.
  * if proto==0 (PROTO_NONE) the protocol is ignored
  * returns  0 if not found
  */
-struct socket_info* grep_sock_info_by_port(unsigned short port, 
-											unsigned short proto)
+struct socket_info* grep_sock_info_by_port(unsigned short port,
+		unsigned short proto)
 {
 	struct socket_info* si;
 	struct socket_info** list;
@@ -623,22 +742,24 @@ struct socket_info* grep_sock_info_by_port(unsigned short port,
 		goto not_found;
 	}
 	c_proto=(proto!=PROTO_NONE)?proto:PROTO_UDP;
-	do{
+	do {
 		/* get the proper sock_list */
 		list=get_sock_info_list(c_proto);
-	
+
 		if (list==0) /* disabled or unknown protocol */
 			continue;
-		
+
 		for (si=*list; si; si=si->next){
 			LM_DBG("checking if port %d matches port %d\n", si->port_no, port);
 			if (si->port_no==port) {
 				goto found;
 			}
 		}
-	}while( (proto==0) && (c_proto=next_proto(c_proto)) );
+	} while( (proto==0) && (c_proto=next_proto(c_proto)) );
+
 not_found:
 	return 0;
+
 found:
 	return si;
 }
@@ -698,12 +819,13 @@ static struct socket_info* new_sock2list(char* name, struct name_lst* addr_l,
 									unsigned short port,
 									unsigned short proto,
 									char *usename, unsigned short useport,
+									char *sockname,
 									enum si_flags flags,
 									struct socket_info** list)
 {
 	struct socket_info* si;
-	
-	si=new_sock_info(name, addr_l, port, proto, usename, useport, flags);
+	/* allocates si and si->name in new pkg memory */
+	si=new_sock_info(name, addr_l, port, proto, usename, useport, sockname, flags);
 	if (si==0){
 		LM_ERR("new_sock_info failed\n");
 		goto error;
@@ -716,6 +838,12 @@ static struct socket_info* new_sock2list(char* name, struct name_lst* addr_l,
 	if (mcast!=0) {
 		si->mcast.len=strlen(mcast);
 		si->mcast.s=(char*)pkg_malloc(si->mcast.len+1);
+		if (si->mcast.s==0) {
+			PKG_MEM_ERROR;
+			pkg_free(si->name.s);
+			pkg_free(si);
+			return 0;
+		}
 		strcpy(si->mcast.s, mcast);
 		mcast = 0;
 	}
@@ -736,12 +864,13 @@ static struct socket_info* new_sock2list_after(char* name,
 									unsigned short proto,
 									char *usename,
 									unsigned short useport,
+									char *sockname,
 									enum si_flags flags,
 									struct socket_info* after)
 {
 	struct socket_info* si;
-	
-	si=new_sock_info(name, addr_l, port, proto, usename, useport, flags);
+
+	si=new_sock_info(name, addr_l, port, proto, usename, useport, sockname, flags);
 	if (si==0){
 		LM_ERR("new_sock_info failed\n");
 		goto error;
@@ -756,22 +885,22 @@ error:
 
 /* adds a sock_info structure to the corresponding proto list
  * return  0 on success, -1 on error */
-int add_listen_advertise_iface(char* name, struct name_lst* addr_l,
+int add_listen_advertise_iface_name(char* name, struct name_lst* addr_l,
 						unsigned short port, unsigned short proto,
-						char *usename, unsigned short useport,
+						char *usename, unsigned short useport, char *sockname,
 						enum si_flags flags)
 {
 	struct socket_info** list;
 	unsigned short c_proto;
 	struct name_lst* a_l;
 	unsigned short c_port;
-	
+
 	c_proto=(proto!=PROTO_NONE)?proto:PROTO_UDP;
 	do{
 		list=get_sock_info_list(c_proto);
 		if (list==0) /* disabled or unknown protocol */
 			continue;
-		
+
 		if (port==0){ /* use default port */
 			c_port=
 #ifdef USE_TLS
@@ -790,15 +919,15 @@ int add_listen_advertise_iface(char* name, struct name_lst* addr_l,
 		}
 		if (c_proto!=PROTO_SCTP){
 			if (new_sock2list(name, 0, c_port, c_proto, usename, useport,
-								flags & ~SI_IS_MHOMED, list)==0){
+								sockname, flags & ~SI_IS_MHOMED, list)==0){
 				LM_ERR("new_sock2list failed\n");
 				goto error;
 			}
 			/* add the other addresses in the list as separate sockets
 			 * since only SCTP can bind to multiple addresses */
 			for (a_l=addr_l; a_l; a_l=a_l->next){
-				if (new_sock2list(a_l->name, 0, c_port, 
-									c_proto, usename, useport,
+				if (new_sock2list(a_l->name, 0, c_port,
+									c_proto, usename, useport, sockname,
 									flags & ~SI_IS_MHOMED, list)==0){
 					LM_ERR("new_sock2list failed\n");
 					goto error;
@@ -806,7 +935,7 @@ int add_listen_advertise_iface(char* name, struct name_lst* addr_l,
 			}
 		}else{
 			if (new_sock2list(name, addr_l, c_port, c_proto, usename, useport,
-						flags, list)==0){
+						sockname, flags, list)==0){
 				LM_ERR("new_sock2list failed\n");
 				goto error;
 			}
@@ -819,12 +948,35 @@ error:
 
 /* adds a sock_info structure to the corresponding proto list
  * return  0 on success, -1 on error */
+int add_listen_advertise_iface(char* name, struct name_lst* addr_l,
+						unsigned short port, unsigned short proto,
+						char *usename, unsigned short useport,
+						enum si_flags flags)
+{
+	return add_listen_advertise_iface_name(name, addr_l, port, proto,
+						usename, useport, NULL, flags);
+}
+
+/* adds a sock_info structure to the corresponding proto list
+ * return  0 on success, -1 on error */
 int add_listen_iface(char* name, struct name_lst* addr_l,
 						unsigned short port, unsigned short proto,
 						enum si_flags flags)
 {
-	return add_listen_advertise_iface(name, addr_l, port, proto, 0, 0, flags);
+	return add_listen_advertise_iface_name(name, addr_l, port, proto, 0, 0, 0,
+			flags);
 }
+
+/* adds a sock_info structure to the corresponding proto list
+ * return  0 on success, -1 on error */
+int add_listen_iface_name(char* name, struct name_lst* addr_l,
+						unsigned short port, unsigned short proto, char *sockname,
+						enum si_flags flags)
+{
+	return add_listen_advertise_iface_name(name, addr_l, port, proto, 0, 0,
+			sockname, flags);
+}
+
 #ifdef __OS_linux
 
 #include "linux/types.h"
@@ -918,6 +1070,7 @@ error:
 	req.g.rtgen_family = family;\
 	} while(0);
 
+#define NETLINK_BUFFER_SIZE 32768
 	
 static int get_flags(int family){
 	struct {
@@ -927,12 +1080,12 @@ static int get_flags(int family){
 	int rtn = 0;
 	struct nlmsghdr*  nlp;
 	struct ifinfomsg *ifi;
-	char buf[8192];
+	char buf[NETLINK_BUFFER_SIZE];
 	char *p = buf;
 	int nll = 0;
     int nl_sock = -1;
 
-	fill_nl_req(req, RTM_GETLINK, AF_INET);
+	fill_nl_req(req, RTM_GETLINK, family);
 
 	if((nl_sock = nl_bound_sock()) < 0) return -1;
 
@@ -943,6 +1096,10 @@ static int get_flags(int family){
 	}
 
 	while(1) {
+		if ((sizeof(buf) - nll) == 0) {
+			LM_ERR("netlink buffer overflow in get_flags");
+			goto error;
+		}
 		rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
 		nlp = (struct nlmsghdr *) p;
 		if(nlp->nlmsg_type == NLMSG_DONE){
@@ -996,7 +1153,7 @@ static int build_iface_list(void)
 	struct nlmsghdr*  nlp;
 	struct ifaddrmsg *ifi;
 	int rtl;
-	char buf[8192];
+	char buf[NETLINK_BUFFER_SIZE];
 	char *p = buf;
 	int nll = 0;
 	struct rtattr * rtap;
@@ -1011,7 +1168,7 @@ static int build_iface_list(void)
 	if(ifaces == NULL){
 		if((ifaces = (struct idxlist*)pkg_malloc(MAX_IFACE_NO
 						*sizeof(struct idxlist))) == NULL){
-			LM_ERR("No more pkg memory\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		memset(ifaces, 0, sizeof(struct idxlist)*MAX_IFACE_NO);
@@ -1032,6 +1189,10 @@ static int build_iface_list(void)
 		nll = 0;
 		p = buf;
 		while(1) {
+			if ((sizeof(buf) - nll) == 0) {
+				LM_ERR("netlink buffer overflow in build_iface_list");
+				goto error;
+			}
 			rtn = recv(nl_sock, p, sizeof(buf) - nll, 0);
 			LM_DBG("received %d byles \n", rtn);
 			nlp = (struct nlmsghdr *) p;
@@ -1070,7 +1231,7 @@ static int build_iface_list(void)
 			entry = (struct idx*)pkg_malloc(sizeof(struct idx));
 			if(entry == 0)
 			{
-				LM_ERR("could not allocate memory\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 
@@ -1079,6 +1240,7 @@ static int build_iface_list(void)
 			entry->ifa_flags = ifi->ifa_flags;
             is_link_local = 0;
 
+			name[0] = '\0';
 			for(;RTA_OK(rtap, rtl);rtap=RTA_NEXT(rtap,rtl)){
 				switch(rtap->rta_type){
 					case IFA_ADDRESS:
@@ -1111,12 +1273,16 @@ static int build_iface_list(void)
 				}
 			}
 			if(is_link_local) {
-				pkg_free(entry);
-				continue;    /* link local addresses are not bindable */
+				if(sr_bind_ipv6_link_local==0) {
+					/* skip - link local addresses are not bindable without scope */
+					pkg_free(entry);
+					continue;
+				}
 			}
 
-			if(strlen(ifaces[index].name)==0)
+			if(strlen(ifaces[index].name)==0 && strlen(name)>0) {
 				strncpy(ifaces[index].name, name, MAX_IF_LEN-1);
+			}
 
 			ifaces[index].index = index;
 
@@ -1281,7 +1447,7 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 		pkg_free(name->s);
 		name->s=(char*)pkg_malloc(strlen(he->h_name)+1);
 		if (name->s==0){
-			LM_ERR("out of memory.\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		name->len=strlen(he->h_name);
@@ -1299,7 +1465,7 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 	if ((tmp=ip_addr2a(address))==0) goto error;
 	address_str->s=pkg_malloc(strlen(tmp)+1);
 	if (address_str->s==0){
-		LM_ERR("out of memory.\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	strncpy(address_str->s, tmp, strlen(tmp)+1);
@@ -1353,14 +1519,14 @@ error:
  */
 static int addr_info_to_si_lst(struct addr_info* ai_lst, unsigned short port,
 								char proto, char *usename,
-								unsigned short useport,
+								unsigned short useport, char *sockname,
 								enum si_flags flags,
 								struct socket_info** list)
 {
 	struct addr_info* ail;
-	
+
 	for (ail=ai_lst; ail; ail=ail->next){
-		if(new_sock2list(ail->name.s, 0, port, proto, usename, useport,
+		if(new_sock2list(ail->name.s, 0, port, proto, usename, useport, sockname,
 					ail->flags | flags, list)==0)
 			return -1;
 	}
@@ -1369,7 +1535,7 @@ static int addr_info_to_si_lst(struct addr_info* ai_lst, unsigned short port,
 
 
 
-/* insert new elements to a socket_info list after "el", 
+/* insert new elements to a socket_info list after "el",
  * each element is created from addr_info_lst + port, * protocol and flags
  * return 0 on succes, -1 on error
  */
@@ -1378,15 +1544,17 @@ static int addr_info_to_si_lst_after(struct addr_info* ai_lst,
 										char proto,
 										char *usename,
 										unsigned short useport,
+										char *sockname,
 										enum si_flags flags,
 										struct socket_info* el)
 {
 	struct addr_info* ail;
 	struct socket_info* new_si;
-	
+
 	for (ail=ai_lst; ail; ail=ail->next){
 		if((new_si=new_sock2list_after(ail->name.s, 0, port, proto,
-								usename, useport, ail->flags | flags, el))==0)
+								usename, useport, sockname,
+								ail->flags | flags, el))==0)
 			return -1;
 		el=new_si;
 	}
@@ -1395,7 +1563,7 @@ static int addr_info_to_si_lst_after(struct addr_info* ai_lst,
 
 
 
-/* fixes a socket list => resolve addresses, 
+/* fixes a socket list => resolve addresses,
  * interface names, fills missing members, remove duplicates
  * fills type_flags if not null with SOCKET_T_IPV4 and/or SOCKET_T_IPV6*/
 static int fix_socket_list(struct socket_info **list, int* type_flags)
@@ -1427,7 +1595,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 			if (si->flags & SI_IS_MHOMED){
 				if((new_si=new_sock2list_after(ai_lst->name.s, 0, si->port_no,
 											si->proto, si->useinfo.name.s,
-											si->useinfo.port_no,
+											si->useinfo.port_no, si->sockname.s,
 											ai_lst->flags|si->flags, si))==0)
 					break;
 				ail=ai_lst;
@@ -1447,12 +1615,11 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 					new_si->addr_info_lst=ail;
 					si->addr_info_lst=0; /* detached and moved to new_si */
 				}
-				
 			}else{
 				/* add all addr. as separate  interfaces */
 				if (addr_info_to_si_lst_after(ai_lst, si->port_no, si->proto,
 							si->useinfo.name.s, si->useinfo.port_no,
-							si->flags, si)!=0)
+							si->sockname.s, si->flags, si)!=0)
 					goto error;
 				/* ai_lst not needed anymore */
 				free_addr_info_lst(&ai_lst);
@@ -1466,7 +1633,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 			new_si=si;
 			ail=si->addr_info_lst;
 		}
-		
+
 		if (ail){
 			if (new_si && (new_si->flags & SI_IS_MHOMED)){
 				ai_lst=0;
@@ -1507,12 +1674,12 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 		}
 		si->port_no_str.s=(char*)pkg_malloc(len+1);
 		if (si->port_no_str.s==0){
-			LM_ERR("out of memory.\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		strncpy(si->port_no_str.s, tmp, len+1);
 		si->port_no_str.len=len;
-		
+
 		if (fix_hostname(&si->name, &si->address, &si->address_str,
 						&si->flags, type_flags, si) !=0 )
 			goto error;
@@ -1524,9 +1691,9 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 		}
 
 		if (fix_sock_str(si) < 0) goto error;
-		
+
 #ifdef EXTRA_DEBUG
-		printf("              %.*s [%s]:%s%s\n", si->name.len, 
+		printf("              %.*s [%s]:%s%s\n", si->name.len,
 				si->name.s, si->address_str.s, si->port_no_str.s,
 		                si->flags & SI_IS_MCAST ? " mcast" : "");
 #endif
@@ -1589,7 +1756,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 		/* check  for & remove internal duplicates: */
 		for (ail=si->addr_info_lst; ail;){
 			ail_next=ail->next;
-			/* 1. check if the extra addresses contain a duplicate for the 
+			/* 1. check if the extra addresses contain a duplicate for the
 			 * main  one */
 			if ((ail->address.af==si->address.af) &&
 				(memcmp(ail->address.u.addr, si->address.u.addr,
@@ -1698,7 +1865,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 			){
 			if (si->flags & SI_IS_MCAST){
 				LM_WARN("removing entry %s:%s [%s]:%s\n",
-					get_valid_proto_name(si->proto), si->name.s, 
+					get_valid_proto_name(si->proto), si->name.s,
 					si->address_str.s, si->port_no_str.s);
 				l = si;
 				si=si->next;
@@ -1710,7 +1877,7 @@ static int fix_socket_list(struct socket_info **list, int* type_flags)
 					if (ail->flags & SI_IS_MCAST){
 						LM_WARN("removing mh entry %s:%s"
 								" [%s]:%s\n",
-								get_valid_proto_name(si->proto), ail->name.s, 
+								get_valid_proto_name(si->proto), ail->name.s,
 								ail->address_str.s, si->port_no_str.s);
 						tmp_ail=ail;
 						ail=ail->next;
@@ -1742,9 +1909,9 @@ int fix_all_socket_lists()
 	struct utsname myname;
 	int flags;
 	struct addr_info* ai_lst;
-	
+
 	ai_lst=0;
-	
+
 	if ((udp_listen==0)
 #ifdef USE_TCP
 			&& (tcp_listen==0)
@@ -1763,7 +1930,7 @@ int fix_all_socket_lists()
 #else
 		&& ( !auto_bind_ipv6 || add_interfaces(0, AF_INET6, 0,  PROTO_UDP, &ai_lst) ==0 ) /* add_interface does not work for IPv6 on Linux */
 #endif /* __OS_linux */
-			 ) && (addr_info_to_si_lst(ai_lst, 0, PROTO_UDP, 0, 0, 0, &udp_listen)==0)){
+			 ) && (addr_info_to_si_lst(ai_lst, 0, PROTO_UDP, 0, 0, 0, 0, &udp_listen)==0)){
 			free_addr_info_lst(&ai_lst);
 			ai_lst=0;
 			/* if ok, try to add the others too */
@@ -1775,7 +1942,7 @@ int fix_all_socket_lists()
 #else
 				|| (auto_bind_ipv6 && add_interfaces(0, AF_INET6, 0,  PROTO_TCP, &ai_lst) !=0 )
 #endif /* __OS_linux */
-				) || (addr_info_to_si_lst(ai_lst, 0, PROTO_TCP, 0, 0, 0,
+				) || (addr_info_to_si_lst(ai_lst, 0, PROTO_TCP, 0, 0, 0, 0,
 										 				&tcp_listen)!=0))
 					goto error;
 				free_addr_info_lst(&ai_lst);
@@ -1789,7 +1956,7 @@ int fix_all_socket_lists()
 #else
 				|| (auto_bind_ipv6 && add_interfaces(0, AF_INET6, 0,  PROTO_TLS, &ai_lst)!=0)
 #endif /* __OS_linux */
-					) || (addr_info_to_si_lst(ai_lst, 0, PROTO_TLS, 0, 0, 0,
+					) || (addr_info_to_si_lst(ai_lst, 0, PROTO_TLS, 0, 0, 0, 0,
 										 				&tls_listen)!=0))
 						goto error;
 				}
@@ -1806,7 +1973,7 @@ int fix_all_socket_lists()
 #else
 				|| (auto_bind_ipv6 && add_interfaces(0, AF_INET6, 0,  PROTO_SCTP, &ai_lst) != 0)
 #endif /* __OS_linux */
-					) || (addr_info_to_si_lst(ai_lst, 0, PROTO_SCTP, 0, 0, 0,
+					) || (addr_info_to_si_lst(ai_lst, 0, PROTO_SCTP, 0, 0, 0, 0,
 							 				&sctp_listen)!=0))
 					goto error;
 				free_addr_info_lst(&ai_lst);
@@ -1892,8 +2059,7 @@ void print_all_socket_lists()
 	struct socket_info** list;
 	struct addr_info* ai;
 	unsigned short proto;
-	
-	
+
 	proto=PROTO_UDP;
 	do{
 		list=get_sock_info_list(proto);
@@ -1902,24 +2068,30 @@ void print_all_socket_lists()
 				printf("             %s: (%s",
 						get_valid_proto_name(proto),
 						si->address_str.s);
-				for (ai=si->addr_info_lst; ai; ai=ai->next)
+				for (ai=si->addr_info_lst; ai; ai=ai->next) {
 					printf(", %s", ai->address_str.s);
+				}
 				printf("):%s%s%s\n",
-						si->port_no_str.s, 
+						si->port_no_str.s,
 						si->flags & SI_IS_MCAST ? " mcast" : "",
 						si->flags & SI_IS_MHOMED? " mhomed" : "");
 			}else{
 				printf("             %s: %s",
 						get_valid_proto_name(proto),
 						si->name.s);
-				if (!(si->flags & SI_IS_IP))
+				if (!(si->flags & SI_IS_IP)) {
 					printf(" [%s]", si->address_str.s);
+				}
 				printf( ":%s%s%s",
-						si->port_no_str.s, 
+						si->port_no_str.s,
 						si->flags & SI_IS_MCAST ? " mcast" : "",
 						si->flags & SI_IS_MHOMED? " mhomed" : "");
-				if (si->useinfo.name.s)
+				if (si->sockname.s) {
+					printf(" name %s", si->sockname.s);
+				}
+				if (si->useinfo.name.s) {
 					printf(" advertise %s:%d", si->useinfo.name.s, si->useinfo.port_no);
+				}
 				printf("\n");
 			}
 		}
@@ -1931,13 +2103,15 @@ void print_aliases()
 {
 	struct host_alias* a;
 
-	for(a=aliases; a; a=a->next) 
-		if (a->port)
-			printf("             %s: %.*s:%d\n", get_valid_proto_name(a->proto), 
+	for(a=aliases; a; a=a->next) {
+		if (a->port) {
+			printf("             %s: %.*s:%d\n", get_valid_proto_name(a->proto),
 					a->alias.len, a->alias.s, a->port);
-		else
-			printf("             %s: %.*s:*\n", get_valid_proto_name(a->proto), 
+		} else {
+			printf("             %s: %.*s:*\n", get_valid_proto_name(a->proto),
 					a->alias.len, a->alias.s);
+		}
+	}
 }
 
 
@@ -1945,7 +2119,7 @@ void print_aliases()
 void init_proto_order()
 {
 	int r;
-	
+
 	/* fix proto list  (remove disabled protocols)*/
 #ifdef USE_TCP
 	if (tcp_disable)
@@ -1977,7 +2151,7 @@ void init_proto_order()
 
 
 /**
- * parse '[port:]host[:port]' string to a broken down structure
+ * parse '[proto:]host[:port]' string to a broken down structure
  */
 int parse_protohostport(str* ins, sr_phostp_t *r)
 {
@@ -2065,7 +2239,7 @@ error_port:
 }
 
 /**
- * lookup a local socket by '[port:]host[:port]' string
+ * lookup a local socket by '[proto:]host[:port]' string
  */
 struct socket_info* lookup_local_socket(str *phostp)
 {

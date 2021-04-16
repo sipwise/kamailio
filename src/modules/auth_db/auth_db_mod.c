@@ -82,6 +82,7 @@ static int version_table_check = 1;
 
 int calc_ha1                = 0;
 int use_domain              = 0; /* Use also domain when looking up in table */
+int force_generate_avps     = 0; /* Even when user failed to authenticate */
 
 db1_con_t* auth_db_handle    = 0; /* database connection handle */
 db_func_t auth_dbf;
@@ -128,6 +129,7 @@ static param_export_t params[] = {
 	{"use_domain",        INT_PARAM, &use_domain          },
 	{"load_credentials",  PARAM_STRING, &credentials_list    },
 	{"version_table",     INT_PARAM, &version_table_check },
+	{"force_generate_avps", INT_PARAM, &force_generate_avps},
 	{0, 0, 0}
 };
 
@@ -303,12 +305,13 @@ static int auth_fixup(void** param, int param_no)
 		if(version_table_check!=0
 				&& db_check_table_version(&auth_dbf, dbh, &name,
 					TABLE_VERSION) < 0) {
-			LM_ERR("error during version check for db table: %.*s.\n",
-					name.len, name.s);
+			DB_TABLE_VERSION_ERROR(name);
 			auth_dbf.close(dbh);
+			dbh = 0;
 			return -1;
 		}
 		auth_dbf.close(dbh);
+		dbh = 0;
 	}
 	return 0;
 }
@@ -437,6 +440,7 @@ error:
 /**
  *
  */
+/* clang-format off */
 static sr_kemi_t sr_kemi_auth_db_exports[] = {
 	{ str_init("auth_db"), str_init("auth_check"),
 		SR_KEMIP_INT, auth_check,
@@ -451,6 +455,7 @@ static sr_kemi_t sr_kemi_auth_db_exports[] = {
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
 };
+/* clang-format on */
 
 /**
  *

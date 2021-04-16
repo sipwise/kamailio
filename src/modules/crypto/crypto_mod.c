@@ -33,11 +33,10 @@
 #include "../../core/basex.h"
 #include "../../core/kemi.h"
 
+#include "crypto_aes.h"
 #include "crypto_uuid.h"
-
-#include <openssl/evp.h>
-
-#define AES_BLOCK_SIZE 256
+#include "crypto_evcb.h"
+#include "api.h"
 
 MODULE_VERSION
 
@@ -57,23 +56,43 @@ static int fixup_crypto_aes_encrypt(void** param, int param_no);
 static int w_crypto_aes_decrypt(sip_msg_t* msg, char* inb, char* keyb, char* outb);
 static int fixup_crypto_aes_decrypt(void** param, int param_no);
 
-#define CRYPTO_SALT_BSIZE	16
-static char _crypto_salt[CRYPTO_SALT_BSIZE];
+static int w_crypto_nio_in(sip_msg_t* msg, char* p1, char* p2);
+static int w_crypto_nio_out(sip_msg_t* msg, char* p1, char* p2);
+static int w_crypto_nio_encrypt(sip_msg_t* msg, char* p1, char* p2);
+static int w_crypto_nio_decrypt(sip_msg_t* msg, char* p1, char* p2);
+
 static char *_crypto_salt_param = "k8hTm4aZ";
 
 static int _crypto_register_callid = 0;
+static int _crypto_register_evcb = 0;
+
+str _crypto_kevcb_netio = STR_NULL;
+str _crypto_netio_key = STR_NULL;
 
 static cmd_export_t cmds[]={
 	{"crypto_aes_encrypt", (cmd_function)w_crypto_aes_encrypt, 3,
 		fixup_crypto_aes_encrypt, 0, ANY_ROUTE},
 	{"crypto_aes_decrypt", (cmd_function)w_crypto_aes_decrypt, 3,
 		fixup_crypto_aes_decrypt, 0, ANY_ROUTE},
+	{"crypto_netio_in", (cmd_function)w_crypto_nio_in, 0,
+		0, 0, ANY_ROUTE},
+	{"crypto_netio_out", (cmd_function)w_crypto_nio_out, 0,
+		0, 0, ANY_ROUTE},
+	{"crypto_netio_encrypt", (cmd_function)w_crypto_nio_encrypt, 0,
+		0, 0, ANY_ROUTE},
+	{"crypto_netio_decrypt", (cmd_function)w_crypto_nio_decrypt, 0,
+		0, 0, ANY_ROUTE},
+	{"load_crypto",        (cmd_function)load_crypto, 0, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}
 };
 
 static param_export_t params[]={
 	{ "salt",            PARAM_STRING, &_crypto_salt_param },
 	{ "register_callid", PARAM_INT, &_crypto_register_callid },
+	{ "register_evcb",   PARAM_INT, &_crypto_register_evcb },
+	{ "kevcb_netio",     PARAM_STR, &_crypto_kevcb_netio },
+	{ "netio_key",       PARAM_STR, &_crypto_netio_key },
+
 	{ 0, 0, 0 }
 };
 
@@ -96,23 +115,15 @@ struct module_exports exports = {
  */
 static int mod_init(void)
 {
-	int i;
-	char k;
-	memset(_crypto_salt, 0, CRYPTO_SALT_BSIZE*sizeof(char));
+
 	if(_crypto_salt_param==NULL || _crypto_salt_param[0]==0) {
 		_crypto_salt_param = NULL;
-	} else {
-		if(strlen(_crypto_salt_param)<8) {
-			LM_ERR("salt parameter must be at least 8 characters\n");
-			return -1;
-		}
-		k = 97;
-		for(i=0; i<strlen(_crypto_salt_param); i++) {
-			if(i>=CRYPTO_SALT_BSIZE) break;
-			_crypto_salt[i] = (_crypto_salt_param[i]*7 + k + k*(i+1))%0xff;
-			k = _crypto_salt[i];
-		}
 	}
+
+	if(crypto_set_salt(_crypto_salt_param) < 0) {
+		return -1;
+	}
+
 	if(_crypto_register_callid!=0) {
 		if(crypto_init_callid()<0) {
 			LM_ERR("failed to init callid callback\n");
@@ -124,6 +135,15 @@ static int mod_init(void)
 		}
 		LM_DBG("registered crypto callid callback\n");
 	}
+
+	if(_crypto_register_evcb!=0) {
+		if(_crypto_netio_key.s==NULL || _crypto_netio_key.len<=0) {
+			LM_ERR("crypto netio key parameter is not set\n");
+			return -1;
+		}
+		crypto_evcb_enable();
+	}
+
 	return 0;
 }
 
@@ -166,7 +186,7 @@ static int ki_crypto_aes_encrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 
 	/* gen key and iv. init the cipher ctx object */
 	if (crypto_aes_init((unsigned char *)keys->s, keys->len,
-				(unsigned char*)((_crypto_salt_param)?_crypto_salt:0), en, NULL)) {
+				(unsigned char*)crypto_get_salt(), en, NULL)) {
 		EVP_CIPHER_CTX_free(en);
 		LM_ERR("couldn't initialize AES cipher\n");
 		return -1;
@@ -285,7 +305,7 @@ static int ki_crypto_aes_decrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 
 	/* gen key and iv. init the cipher ctx object */
 	if (crypto_aes_init((unsigned char *)keys->s, keys->len,
-				(unsigned char*)((_crypto_salt_param)?_crypto_salt:0), NULL, de)) {
+				(unsigned char*)crypto_get_salt(), NULL, de)) {
 		EVP_CIPHER_CTX_free(de);
 		LM_ERR("couldn't initialize AES cipher\n");
 		return -1;
@@ -381,127 +401,6 @@ static int fixup_crypto_aes_decrypt(void** param, int param_no)
 	return 0;
 }
 
-
-/**
- * Create an 256 bit key and IV using the supplied key_data and salt.
- * Fills in the encryption and decryption ctx objects and returns 0 on success
- */
-int crypto_aes_init(unsigned char *key_data, int key_data_len,
-		unsigned char *salt, EVP_CIPHER_CTX *e_ctx, EVP_CIPHER_CTX *d_ctx)
-{
-	int i, nrounds = 5;
-	int x;
-	unsigned char key[32], iv[32];
-
-	/*
-	 * Gen key & IV for AES 256 CBC mode. A SHA1 digest is used to hash
-	 * the supplied key material.
-	 * nrounds is the number of times the we hash the material. More rounds
-	 * are more secure but slower.
-	 */
-	i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha1(), salt,
-			key_data, key_data_len, nrounds, key, iv);
-	if (i != 32) {
-		LM_ERR("key size is %d bits - should be 256 bits\n", i);
-		return -1;
-	}
-
-	for(x = 0; x<32; ++x)
-		LM_DBG("key: %x iv: %x \n", key[x], iv[x]);
-
-	for(x = 0; x<8; ++x)
-		LM_DBG("salt: %x\n", salt[x]);
-
-	if(e_ctx) {
-		EVP_CIPHER_CTX_init(e_ctx);
-		EVP_EncryptInit_ex(e_ctx, EVP_aes_256_cbc(), NULL, key, iv);
-	}
-	if(d_ctx) {
-		EVP_CIPHER_CTX_init(d_ctx);
-		EVP_DecryptInit_ex(d_ctx, EVP_aes_256_cbc(), NULL, key, iv);
-	}
-
-	return 0;
-}
-
-/*
- * Encrypt *len bytes of data
- * All data going in & out is considered binary (unsigned char[])
- */
-unsigned char *crypto_aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext,
-		int *len)
-{
-	/* max ciphertext len for a n bytes of plaintext is
-	 * n + AES_BLOCK_SIZE -1 bytes */
-	int c_len = *len + AES_BLOCK_SIZE - 1, f_len = 0;
-	unsigned char *ciphertext = (unsigned char *)malloc(c_len);
-
-	if(ciphertext == NULL) {
-		LM_ERR("no more system memory\n");
-		return NULL;
-	}
-	/* allows reusing of 'e' for multiple encryption cycles */
-	if(!EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL)){
-		LM_ERR("failure in EVP_EncryptInit_ex \n");
-		free(ciphertext);
-		return NULL;
-	}
-
-	/* update ciphertext, c_len is filled with the length of ciphertext
-	 * generated, *len is the size of plaintext in bytes */
-	if(!EVP_EncryptUpdate(e, ciphertext, &c_len, plaintext, *len)){
-		LM_ERR("failure in EVP_EncryptUpdate \n");
-		free(ciphertext);
-		return NULL;
-	}
-
-	/* update ciphertext with the final remaining bytes */
-	if(!EVP_EncryptFinal_ex(e, ciphertext+c_len, &f_len)){
-		LM_ERR("failure in EVP_EncryptFinal_ex \n");
-		free(ciphertext);
-		return NULL;
-	}
-
-	*len = c_len + f_len;
-	return ciphertext;
-}
-
-/*
- * Decrypt *len bytes of ciphertext
- */
-unsigned char *crypto_aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext,
-		int *len)
-{
-	/* plaintext will always be equal to or lesser than length of ciphertext*/
-	int p_len = *len, f_len = 0;
-	unsigned char *plaintext = (unsigned char *)malloc(p_len);
-
-	if(plaintext==NULL) {
-		LM_ERR("no more system memory\n");
-		return NULL;
-	}
-	if(!EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL)){
-		LM_ERR("failure in EVP_DecryptInit_ex \n");
-		free(plaintext);
-		return NULL;
-	}
-
-	if(!EVP_DecryptUpdate(e, plaintext, &p_len, ciphertext, *len)){
-		LM_ERR("failure in EVP_DecryptUpdate\n");
-		free(plaintext);
-		return NULL;
-	}
-
-	if(!EVP_DecryptFinal_ex(e, plaintext+p_len, &f_len)){
-		LM_ERR("failure in EVP_DecryptFinal_ex\n");
-		free(plaintext);
-		return NULL;
-	}
-
-	*len = p_len + f_len;
-	return plaintext;
-}
-
 /**
  * testing function
  */
@@ -577,6 +476,38 @@ int crypto_aes_test(void)
 	EVP_CIPHER_CTX_free(en);
 
 	return 0;
+}
+
+/**
+ *
+ */
+static int w_crypto_nio_in(sip_msg_t* msg, char* p1, char* p2)
+{
+	return crypto_nio_in(msg);
+}
+
+/**
+ *
+ */
+static int w_crypto_nio_out(sip_msg_t* msg, char* p1, char* p2)
+{
+	return crypto_nio_out(msg);
+}
+
+/**
+ *
+ */
+static int w_crypto_nio_encrypt(sip_msg_t* msg, char* p1, char* p2)
+{
+	return crypto_nio_encrypt(msg);
+}
+
+/**
+ *
+ */
+static int w_crypto_nio_decrypt(sip_msg_t* msg, char* p1, char* p2)
+{
+	return crypto_nio_decrypt(msg);
 }
 
 /**

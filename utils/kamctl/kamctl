@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 #
 # control tool for maintaining Kamailio
 #
 #===================================================================
 
 ### version for this script
-VERSION='5.2.0'
+VERSION='5.4.0'
 
 PATH=$PATH:/usr/local/sbin/
 
@@ -953,14 +953,9 @@ $AVP_USER_COLUMN='$OSERUSER' AND $AVP_DOMAIN_COLUMN='$OSERDOMAIN'"
 cisco_restart() {
 	require_ctlengine
 	myhost=`get_my_host`
-	CMDPARAMS="tm.t_uac_start NOTIFY $1 . . \"From:sip:daemon@$myhost\r\nTo:<$1>\r\nEvent:check-sync\r\nContact:sip:daemon@$myhost\r\n\""
+	CMDPARAMS="= tm.t_uac_start NOTIFY \"$1\" \".\" \".\" \"From:sip:daemon@$myhost=CRLF=To:<$1>=CRLF=Event:check-sync=CRLF=Contact:sip:daemon@$myhost=CRLF=\""
 
-	if [ $CTLENGINETYPE -eq 1 ] ; then
-		ctl_cmd_run $CMDPARAMS
-	else
-		RET=`ctl_cmd_run $CMDPARAMS | head -1`
-		print_status $RET
-	fi
+	ctl_cmd_run $CMDPARAMS
 }
 
 #
@@ -1795,6 +1790,20 @@ ksr_srv() {
 			mecho "list server rpc commands"
 			ctl_cmd_run system.listMethods
 			;;
+		debug)
+			require_ctlengine
+			mecho "server debug level command"
+			if [ $# -lt 2 ] ; then
+				ctl_cmd_run corex.debug
+			else
+				ctl_cmd_run corex.debug $2
+			fi
+			;;
+		version)
+			require_ctlengine
+			mecho "list server version"
+			ctl_cmd_run core.version
+			;;
 		*)
 			usage_ksr_srv
 			exit 1
@@ -1986,16 +1995,16 @@ kamailio_start() {
 		exit 1
 	fi
 
-	if [ ! -x "$OSERBIN" ] ; then
+	if [ ! -x "$KAMBIN" ] ; then
 		echo
-		merr "Kamailio binaries not found at $OSERBIN"
-		merr "set OSERBIN to the path of kamailio in $0 or ~/.kamctlrc"
+		merr "Kamailio binaries not found at $KAMBIN"
+		merr "set KAMBIN to the path of kamailio in $0 or ~/.kamctlrc"
 		exit 1
 	fi
 	if [ $SYSLOG = 1 ] ; then
-		$OSERBIN -P $PID_FILE  -f $ETCDIR/kamailio.cfg $STARTOPTIONS 1>/dev/null 2>/dev/null
+		$KAMBIN -P $PID_FILE  -f $ETCDIR/kamailio.cfg $STARTOPTIONS 1>/dev/null 2>/dev/null
 	else
-		$OSERBIN -P $PID_FILE -E  -f $ETCDIR/kamailio.cfg $STARTOPTIONS
+		$KAMBIN -P $PID_FILE -E  -f $ETCDIR/kamailio.cfg $STARTOPTIONS
 	fi
 	sleep 3
 	if [ ! -s $PID_FILE ] ; then
@@ -2031,13 +2040,8 @@ kamailio_stop() {
 options_ping() {
 	myhost=`get_my_host`
 	require_ctlengine
-	CMDPARAMS="tm.t_uac_start OPTIONS \"$1\" \".\" \".\" \"From:sip:daemon@$myhost"$'\r\n'"To:<$1>"$'\r\n'"Contact:sip:daemon@$myhost"$'\r\n'"\""
-	if [ $CTLENGINETYPE -eq 1 ] ; then
-		ctl_cmd_run $CMDPARAMS
-	else
-		RET=`ctl_cmd_run $CMDPARAMS | head -1`
-		print_status $RET
-	fi
+	CMDPARAMS="= tm.t_uac_wait_block OPTIONS \"$1\" \".\" \".\" \"From:sip:daemon@$myhost=CRLF=To:<$1>=CRLF=Contact:sip:daemon@$myhost=CRLF=\""
+	ctl_cmd_run $CMDPARAMS
 }
 
 #
@@ -2335,6 +2339,70 @@ $SD_SD_DOMAIN_COLUMN='$OSERDOMAIN'"
 			;;
 	esac
 } # end speed_dial()
+
+#
+##### ------------------------------------------------ #####
+### acc management
+#
+acc() {
+	if [ "$#" -lt 2 ] ; then
+		merr "acc - too few parameters"
+		usage_acc
+		exit 1
+	fi
+	shift;
+	require_dbengine
+	case $1 in
+		initdb)
+			QUERY=$(cat <<-END
+ALTER TABLE acc ADD COLUMN src_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN src_domain VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN src_ip varchar(64) NOT NULL default '';
+ALTER TABLE acc ADD COLUMN dst_ouser VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN dst_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE acc ADD COLUMN dst_domain VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN src_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN src_domain VARCHAR(128) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN src_ip varchar(64) NOT NULL default '';
+ALTER TABLE missed_calls ADD COLUMN dst_ouser VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN dst_user VARCHAR(64) NOT NULL DEFAULT '';
+ALTER TABLE missed_calls ADD COLUMN dst_domain VARCHAR(128) NOT NULL DEFAULT '';
+END
+)
+			$DBCMD "$QUERY"
+			if [ $? -ne 0 ] ; then
+				merr "error - acc db init"
+				exit 1
+			fi
+
+			mecho "ok - acc db init"
+
+			;;
+
+		showdb)
+			QUERY="select * FROM $ACC_TABLE ;"
+			$DBROCMD "$QUERY"
+			;;
+
+		recent)
+			TIMENOW=`date +"%s"`
+			if [ $# -eq 2 ] ; then
+				CLAUSE=" WHERE time>=$TIMENOW - $2 "
+			else
+				CLAUSE=" WHERE time>=$TIMENOW - 300 "
+			fi
+			QUERY="select * FROM $ACC_TABLE $CLAUSE ; "
+			$DBROCMD "$QUERY"
+			;;
+
+
+		*)
+			usage_acc
+			exit 1
+			;;
+	esac
+} # end acc()
+
 
 #
 ##### ================================================ #####
@@ -2657,6 +2725,18 @@ usrloc() {
 			fi
 			;;
 
+		dbclean)
+			require_dbengine
+			KSR_CLEAN_VAL=3600
+			if [ $# -eq 2 ] ; then
+				KSR_CLEAN_VAL=$2
+			fi
+			QUERY="delete from $USRLOC_TABLE where expires < SUBDATE(NOW(), INTERVAL $KSR_CLEAN_VAL SECOND);"
+			$DBCMD "$QUERY"
+
+			exit $?
+			;;
+
 		*)
 			usage_usrloc
 			exit 1
@@ -2828,7 +2908,7 @@ extcmd() {
 }
 
 ##### ================================================ #####
-### trap with gdb kamailio processes
+### trap with gdb kamailio processes using RPC core.psx
 #
 
 kamailio_trap() {
@@ -2849,6 +2929,35 @@ kamailio_trap() {
 		echo "" >> $LOG_FILE
 		echo "---start $PID -----------------------------------------------------" >> $LOG_FILE
 		$GDB kamailio $PID -batch --eval-command="bt full" >> $LOG_FILE 2>&1
+		echo "---end $PID -------------------------------------------------------" >> $LOG_FILE
+	done
+	echo "."
+}
+
+##### ================================================ #####
+### trap with gdb kamailio processes using ps command
+#
+
+kamailio_pstrap() {
+	if [ -z "$GDB" ] ; then
+		merr "'gdb' tool not found: set GDB variable to correct tool path"
+		exit
+	fi
+	DATE=`/bin/date +%Y%m%d_%H%M%S`
+	LOG_FILE=/tmp/gdb_kamailio_${DATE}.txt
+	minfo "Trap file: $LOG_FILE"
+	ps axw | grep kamailio | grep -v grep | grep -v kamctl | sort > $LOG_FILE
+	echo "" >> $LOG_FILE
+	echo "" >> $LOG_FILE
+	echo -n "Trapping Kamailio with gdb: "
+	PID_TIMESTAMP_VECTOR=`ps axw | grep kamailio | grep -v grep | grep -v kamctl | sort | awk '{print $1}'`
+	for pid in $PID_TIMESTAMP_VECTOR
+	do
+		echo -n "."
+		PID=`echo $pid | cut -d '-' -f 1`
+		echo "" >> $LOG_FILE
+		echo "---start $PID -----------------------------------------------------" >> $LOG_FILE
+		$GDB kamailio $PID -batch --eval-command="p process_no" --eval-command="p pt[process_no]" --eval-command="bt full" >> $LOG_FILE 2>&1
 		echo "---end $PID -------------------------------------------------------" >> $LOG_FILE
 	done
 	echo "."
@@ -3014,6 +3123,11 @@ case $1 in
 		ctl_cmd_run core.psx
 		;;
 
+	psa)
+		require_ctlengine
+		ctl_cmd_run core.psa
+		;;
+
 	uptime)
 		require_ctlengine
 		ctl_cmd_run core.uptime
@@ -3047,6 +3161,10 @@ case $1 in
 		speeddial "$@"
 		;;
 
+	acc)
+		acc "$@"
+		;;
+
 	tls)
 		shift
 		tls_ca "$@"
@@ -3055,6 +3173,10 @@ case $1 in
 	trap)
 		require_ctlengine
 		kamailio_trap
+		;;
+
+	pstrap)
+		kamailio_pstrap
 		;;
 
 	start)

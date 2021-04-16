@@ -49,6 +49,9 @@ int pv_get_methodid(struct sip_msg *msg, pv_param_t *param,
 int pv_get_msgtype(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
+int pv_get_msgtypes(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
 int pv_get_status(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
@@ -175,6 +178,9 @@ int pv_get_rcvadv_uri_full(struct sip_msg *msg, pv_param_t *param,
 int pv_get_force_sock(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
+int pv_get_force_sock_name(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
 int pv_get_useragent(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
@@ -221,6 +227,9 @@ int pv_get_body_size(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_get_authattr(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res);
+
+int pv_get_acc_user(struct sip_msg *msg, pv_param_t *param,
 		pv_value_t *res);
 
 int pv_get_acc_username(struct sip_msg *msg, pv_param_t *param,
@@ -290,6 +299,9 @@ int pv_set_branch(struct sip_msg* msg, pv_param_t *param,
 		int op, pv_value_t *val);
 
 int pv_set_force_sock(struct sip_msg* msg, pv_param_t *param,
+		int op, pv_value_t *val);
+
+int pv_set_force_sock_name(struct sip_msg* msg, pv_param_t *param,
 		int op, pv_value_t *val);
 
 int pv_set_mflags(struct sip_msg* msg, pv_param_t *param,
@@ -378,6 +390,9 @@ int pv_parse_ksr_attrs_name(pv_spec_p sp, str *in);
 
 int pv_get_ksr_attrs(sip_msg_t *msg, pv_param_t *param,
 		pv_value_t *res);
+
+int pv_parse_def_name(pv_spec_p sp, str *in);
+int pv_get_def(sip_msg_t *msg, pv_param_t *param, pv_value_t *res);
 
 #endif
 

@@ -62,8 +62,20 @@ static int w_tcp_conid_state(sip_msg_t* msg, char* con, char *p2);
 static int w_tcp_conid_alive(sip_msg_t* msg, char* con, char *p2);
 static int w_tcp_get_conid(sip_msg_t* msg, char *paddr, char *pvn);
 static int fixup_numpv(void** param, int param_no);
+static int w_tcp_set_otcpid(sip_msg_t* msg, char* conid, char *p2);
+static int w_tcp_set_otcpid_flag(sip_msg_t* msg, char* mode, char *p2);
 
 str tcpops_event_callback = STR_NULL;
+
+static int pv_get_tcp(sip_msg_t *msg, pv_param_t *param, pv_value_t *res);
+static int pv_parse_tcp_name(pv_spec_p sp, str *in);
+
+static pv_export_t mod_pvs[] = {
+	{ {"tcp", (sizeof("tcp")-1)}, PVT_CONTEXT, pv_get_tcp,
+		0, pv_parse_tcp_name, 0, 0, 0},
+
+	{ {0, 0}, 0, 0, 0, 0, 0, 0, 0 }
+};
 
 static cmd_export_t cmds[]={
 	{"tcp_keepalive_enable", (cmd_function)w_tcp_keepalive_enable4, 4,
@@ -88,6 +100,10 @@ static cmd_export_t cmds[]={
 			fixup_spve_pvar, fixup_free_spve_pvar, ANY_ROUTE},
 	{"tcp_conid_alive", (cmd_function)w_tcp_conid_alive, 1,
 			fixup_numpv, 0, ANY_ROUTE},
+	{"tcp_set_otcpid", (cmd_function)w_tcp_set_otcpid, 1,
+			fixup_igp_all, fixup_free_igp_all, ANY_ROUTE},
+	{"tcp_set_otcpid_flag", (cmd_function)w_tcp_set_otcpid_flag, 1,
+			fixup_igp_all, fixup_free_igp_all, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -105,7 +121,7 @@ struct module_exports exports = {
 	cmds,            /* exported functions to config */
 	params,          /* exported parameters to config */
 	0,               /* RPC method exports */
-	0,               /* exported pseudo-variables */
+	mod_pvs,         /* exported pseudo-variables */
 	0,               /* response function */
 	mod_init,        /* module initialization function */
 	child_init,      /* per child init function */
@@ -605,6 +621,131 @@ static int w_tcp_get_conid(sip_msg_t* msg, char *paddr, char *pvn)
 /**
  *
  */
+static int ki_tcp_set_otcpid(sip_msg_t* msg, int vconid)
+{
+	if(msg == NULL) {
+		return -1;
+	}
+	msg->otcpid = vconid;
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_tcp_set_otcpid(sip_msg_t* msg, char* conid, char *p2)
+{
+	int vconid = 0;
+
+	if(fixup_get_ivalue(msg, (gparam_t*)conid, &vconid)<0) {
+		LM_ERR("failed to get connection id\n");
+		return -1;
+	}
+	return ki_tcp_set_otcpid(msg, vconid);
+}
+
+/**
+ *
+ */
+static int ki_tcp_set_otcpid_flag(sip_msg_t* msg, int vmode)
+{
+	if(msg == NULL) {
+		return -1;
+	}
+	if(vmode) {
+		msg->msg_flags |= FL_USE_OTCPID;
+	} else {
+		msg->msg_flags &= ~(FL_USE_OTCPID);
+	}
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_tcp_set_otcpid_flag(sip_msg_t* msg, char* mode, char *p2)
+{
+	int vmode = 0;
+
+	if(fixup_get_ivalue(msg, (gparam_t*)mode, &vmode)<0) {
+		LM_ERR("failed to get mode parameter\n");
+		return -1;
+	}
+	return ki_tcp_set_otcpid_flag(msg, vmode);
+}
+
+/**
+ *
+ */
+static int pv_get_tcp(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
+{
+	tcp_connection_t *con;
+	int ival;
+	str sval;
+
+	if (msg == NULL) {
+		return -1;
+	}
+
+	if ((con = tcpconn_get(msg->rcv.proto_reserved1, 0, 0, 0, 0)) == NULL) {
+		return pv_get_null(msg, param, res);
+	}
+
+	switch(param->pvn.u.isname.name.n) {
+		case 1:
+			sval.s = ip_addr2a(&con->cinfo.src_ip);
+			tcpconn_put(con);
+			sval.len = strlen(sval.s);
+			return pv_get_strval(msg, param, res, &sval);
+		case 2:
+			ival = con->cinfo.src_port;
+			tcpconn_put(con);
+			return pv_get_sintval(msg, param, res, ival);
+		default:
+			ival = con->id;
+			tcpconn_put(con);
+			return pv_get_sintval(msg, param, res, ival);
+	}
+}
+
+
+/**
+ *
+ */
+static int pv_parse_tcp_name(pv_spec_p sp, str *in)
+{
+	if(sp==NULL || in==NULL || in->len<=0)
+		return -1;
+
+	switch(in->len) {
+		case 4:
+			if(strncmp(in->s, "c_si", 4)==0) {
+				sp->pvp.pvn.u.isname.name.n = 1;
+			} else if(strncmp(in->s, "c_sp", 4)==0) {
+				sp->pvp.pvn.u.isname.name.n = 2;
+			} else { goto error; }
+		break;
+		case 5:
+			if(strncmp(in->s, "conid", 5)==0) {
+				sp->pvp.pvn.u.isname.name.n = 0;
+			} else { goto error; }
+		break;
+		default:
+			goto error;
+	}
+	sp->pvp.pvn.type = PV_NAME_INTSTR;
+	sp->pvp.pvn.u.isname.type = 0;
+
+	return 0;
+
+error:
+	LM_ERR("unknown pv key: %.*s\n", in->len, in->s);
+	return -1;
+}
+
+/**
+ *
+ */
 /* clang-format off */
 static sr_kemi_t sr_kemi_tcpops_exports[] = {
 	{ str_init("tcpops"), str_init("tcp_keepalive_enable"),
@@ -654,6 +795,16 @@ static sr_kemi_t sr_kemi_tcpops_exports[] = {
 	},
 	{ str_init("tcpops"), str_init("tcp_conid_state"),
 		SR_KEMIP_INT, ki_tcp_conid_state,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tcpops"), str_init("tcp_set_otcpid"),
+		SR_KEMIP_INT, ki_tcp_set_otcpid,
+		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tcpops"), str_init("tcp_set_otcpid_flag"),
+		SR_KEMIP_INT, ki_tcp_set_otcpid_flag,
 		{ SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

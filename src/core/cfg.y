@@ -41,9 +41,7 @@
 #include <errno.h>
 #include "route_struct.h"
 #include "globals.h"
-#ifdef SHM_MEM
 #include "shm_init.h"
-#endif /* SHM_MEM */
 #include "route.h"
 #include "switch.h"
 #include "dprint.h"
@@ -71,6 +69,7 @@
 #include "ppcfg.h"
 #include "pvapi.h"
 #include "config.h"
+#include "daemonize.h"
 #include "cfg_core.h"
 #include "cfg/cfg.h"
 #ifdef CORE_TLS
@@ -327,6 +326,7 @@ extern char *default_routename;
 %token XAVPVIAFIELDS
 %token LISTEN
 %token ADVERTISE
+%token STRNAME
 %token ALIAS
 %token SR_AUTO_ALIASES
 %token DNS
@@ -339,6 +339,7 @@ extern char *default_routename;
 %token DNS_TLS_PREF
 %token DNS_SCTP_PREF
 %token DNS_RETR_TIME
+%token DNS_SLOW_QUERY_MS
 %token DNS_RETR_NO
 %token DNS_SERVERS_NO
 %token DNS_USE_SEARCH
@@ -358,6 +359,7 @@ extern char *default_routename;
 
 /* ipv6 auto bind */
 %token AUTO_BIND_IPV6
+%token BIND_IPV6_LINK_LOCAL
 
 /*blacklist*/
 %token DST_BLST_INIT
@@ -373,6 +375,7 @@ extern char *default_routename;
 
 %token PORT
 %token STAT
+%token STATS_NAMESEP
 %token CHILDREN
 %token SOCKET_WORKERS
 %token ASYNC_WORKERS
@@ -406,6 +409,8 @@ extern char *default_routename;
 %token MHOMED
 %token DISABLE_TCP
 %token TCP_ACCEPT_ALIASES
+%token TCP_ACCEPT_UNIQUE
+%token TCP_CONNECTION_MATCH
 %token TCP_CHILDREN
 %token TCP_CONNECT_TIMEOUT
 %token TCP_SEND_TIMEOUT
@@ -433,6 +438,7 @@ extern char *default_routename;
 %token TCP_OPT_CRLF_PING
 %token TCP_OPT_ACCEPT_NO_CL
 %token TCP_OPT_ACCEPT_HEP3
+%token TCP_OPT_ACCEPT_HAPROXY
 %token TCP_CLONE_RCVBUF
 %token TCP_REUSE_PORT
 %token DISABLE_TLS
@@ -489,14 +495,18 @@ extern char *default_routename;
 %token ONSEND_ROUTE_CALLBACK
 %token REPLY_ROUTE_CALLBACK
 %token EVENT_ROUTE_CALLBACK
+%token RECEIVED_ROUTE_CALLBACK
+%token RECEIVED_ROUTE_MODE
 %token MAX_RECURSIVE_LEVEL
 %token MAX_BRANCHES_PARAM
 %token LATENCY_CFG_LOG
 %token LATENCY_LOG
 %token LATENCY_LIMIT_DB
 %token LATENCY_LIMIT_ACTION
+%token LATENCY_LIMIT_CFG
 %token MSG_TIME
 %token ONSEND_RT_REPLY
+%token URI_HOST_EXTRA_CHARS
 
 %token FLAGS_DECL
 %token AVPFLAGS_DECL
@@ -648,7 +658,7 @@ listen_id:
 			} else {
 				$$=pkg_malloc(strlen(tmp)+1);
 				if ($$==0) {
-					LM_CRIT("cfg. parser: out of memory.\n");
+					PKG_MEM_CRITICAL;
 				} else {
 					strncpy($$, tmp, strlen(tmp)+1);
 				}
@@ -658,7 +668,7 @@ listen_id:
 	| STRING {
 		$$=pkg_malloc(strlen($1)+1);
 		if ($$==0) {
-				LM_CRIT("cfg. parser: out of memory.\n");
+				PKG_MEM_CRITICAL;
 		} else {
 				strncpy($$, $1, strlen($1)+1);
 		}
@@ -667,7 +677,7 @@ listen_id:
 		if ($1){
 			$$=pkg_malloc(strlen($1)+1);
 			if ($$==0) {
-					LM_CRIT("cfg. parser: out of memory.\n");
+					PKG_MEM_CRITICAL;
 			} else {
 					strncpy($$, $1, strlen($1)+1);
 			}
@@ -828,6 +838,8 @@ assign_stm:
 	| DNS_SCTP_PREF error { yyerror("number expected"); }
 	| DNS_RETR_TIME EQUAL NUMBER   { default_core_cfg.dns_retr_time=$3; }
 	| DNS_RETR_TIME error { yyerror("number expected"); }
+	| DNS_SLOW_QUERY_MS EQUAL NUMBER   { default_core_cfg.dns_slow_query_ms=$3; }
+	| DNS_SLOW_QUERY_MS error { yyerror("number expected"); }
 	| DNS_RETR_NO EQUAL NUMBER   { default_core_cfg.dns_retr_no=$3; }
 	| DNS_RETR_NO error { yyerror("number expected"); }
 	| DNS_SERVERS_NO EQUAL NUMBER   { default_core_cfg.dns_servers_no=$3; }
@@ -862,6 +874,8 @@ assign_stm:
 	| DNS_CACHE_REC_PREF error { yyerror("boolean value expected"); }
 	| AUTO_BIND_IPV6 EQUAL NUMBER {IF_AUTO_BIND_IPV6(auto_bind_ipv6 = $3);}
 	| AUTO_BIND_IPV6 error { yyerror("boolean value expected"); }
+	| BIND_IPV6_LINK_LOCAL EQUAL NUMBER {sr_bind_ipv6_link_local = $3;}
+	| BIND_IPV6_LINK_LOCAL error { yyerror("boolean value expected"); }
 	| DST_BLST_INIT EQUAL NUMBER   { IF_DST_BLACKLIST(dst_blacklist_init=$3); }
 	| DST_BLST_INIT error { yyerror("boolean value expected"); }
 	| USE_DST_BLST EQUAL NUMBER {
@@ -897,11 +911,6 @@ assign_stm:
 	| IP_FREE_BIND EQUAL intno { _sr_ip_free_bind=$3; }
 	| IP_FREE_BIND EQUAL error { yyerror("int value expected"); }
 	| PORT EQUAL NUMBER   { port_no=$3; }
-	| STAT EQUAL STRING {
-		#ifdef STATS
-				stat_file=$3;
-		#endif
-	}
 	| MAXBUFFER EQUAL NUMBER { maxbuffer=$3; }
 	| MAXBUFFER EQUAL error { yyerror("number expected"); }
     | SQL_BUFFER_SIZE EQUAL NUMBER { sql_buffer_size=$3; }
@@ -909,6 +918,8 @@ assign_stm:
 	| PORT EQUAL error    { yyerror("number expected"); }
 	| CHILDREN EQUAL NUMBER { children_no=$3; }
 	| CHILDREN EQUAL error { yyerror("number expected"); }
+	| STATS_NAMESEP EQUAL STRING { ksr_stats_namesep=$3; }
+	| STATS_NAMESEP EQUAL error { yyerror("string value expected"); }
 	| SOCKET_WORKERS EQUAL NUMBER { socket_workers=$3; }
 	| SOCKET_WORKERS EQUAL error { yyerror("number expected"); }
 	| ASYNC_WORKERS EQUAL NUMBER { async_task_set_workers($3); }
@@ -986,6 +997,22 @@ assign_stm:
 		#endif
 	}
 	| TCP_ACCEPT_ALIASES EQUAL error { yyerror("boolean value expected"); }
+	| TCP_ACCEPT_UNIQUE EQUAL NUMBER {
+		#ifdef USE_TCP
+			tcp_accept_unique=$3;
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_ACCEPT_UNIQUE EQUAL error { yyerror("number expected"); }
+	| TCP_CONNECTION_MATCH EQUAL NUMBER {
+		#ifdef USE_TCP
+			tcp_connection_match=$3;
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_CONNECTION_MATCH EQUAL error { yyerror("number expected"); }
 	| TCP_CHILDREN EQUAL NUMBER {
 		#ifdef USE_TCP
 			tcp_cfg_children_no=$3;
@@ -1230,6 +1257,14 @@ assign_stm:
 		#endif
 	}
 	| TCP_OPT_ACCEPT_HEP3 EQUAL error { yyerror("boolean value expected"); }
+	| TCP_OPT_ACCEPT_HAPROXY EQUAL NUMBER {
+		#ifdef USE_TCP
+			ksr_tcp_accept_haproxy=$3;
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_OPT_ACCEPT_HAPROXY EQUAL error { yyerror("boolean value expected"); }
 
 	| TCP_CLONE_RCVBUF EQUAL NUMBER {
 		#ifdef USE_TCP
@@ -1408,6 +1443,8 @@ assign_stm:
 			user_agent_hdr.len=strlen(user_agent_hdr.s);
 	}
 	| USER_AGENT_HEADER EQUAL error { yyerror("string value expected"); }
+	| URI_HOST_EXTRA_CHARS EQUAL STRING { _sr_uri_host_extra_chars=$3; }
+	| URI_HOST_EXTRA_CHARS EQUAL error { yyerror("string value expected"); }
 	| REPLY_TO_VIA EQUAL NUMBER { reply_to_via=$3; }
 	| REPLY_TO_VIA EQUAL error { yyerror("boolean value expected"); }
 	| LISTEN EQUAL id_lst {
@@ -1422,12 +1459,63 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+	| LISTEN EQUAL id_lst STRNAME STRING {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_iface_name(lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto, $5,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
 	| LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_advertise_iface(	lst_tmp->addr_lst->name,
 									lst_tmp->addr_lst->next,
 									lst_tmp->port, lst_tmp->proto,
 									$5, $7,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
+	| LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER STRNAME STRING {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto,
+									$5, $7, $9,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
+	| LISTEN EQUAL id_lst ADVERTISE listen_id {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_advertise_iface(	lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto,
+									$5, 0,
+									lst_tmp->flags)!=0) {
+				LM_CRIT("cfg. parser: failed to add listen address\n");
+				break;
+			}
+		}
+		free_socket_id_lst($3);
+	}
+	| LISTEN EQUAL id_lst ADVERTISE listen_id STRNAME STRING {
+		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
+									lst_tmp->addr_lst->next,
+									lst_tmp->port, lst_tmp->proto,
+									$5, 0, $7,
 									lst_tmp->flags)!=0) {
 				LM_CRIT("cfg. parser: failed to add listen address\n");
 				break;
@@ -1461,7 +1549,7 @@ assign_stm:
 	| ADVERTISED_PORT EQUAL NUMBER {
 		tmp=int2str($3, &i_tmp);
 		if ((default_global_port.s=pkg_malloc(i_tmp))==0) {
-			LM_CRIT("cfg. parser: out of memory.\n");
+			PKG_MEM_CRITICAL;
 			default_global_port.len=0;
 		} else {
 			default_global_port.len=i_tmp;
@@ -1617,6 +1705,18 @@ assign_stm:
 			}
 		}
 	| KEMI DOT EVENT_ROUTE_CALLBACK EQUAL error { yyerror("string expected"); }
+	| KEMI DOT RECEIVED_ROUTE_CALLBACK EQUAL STRING {
+			kemi_received_route_callback.s = $5;
+			kemi_received_route_callback.len = strlen($5);
+			if(kemi_received_route_callback.len==4
+					&& strcasecmp(kemi_received_route_callback.s, "none")==0) {
+				kemi_received_route_callback.s = "";
+				kemi_received_route_callback.len = 0;
+			}
+		}
+	| KEMI DOT RECEIVED_ROUTE_CALLBACK EQUAL error { yyerror("string expected"); }
+    | RECEIVED_ROUTE_MODE EQUAL intno { ksr_evrt_received_mode=$3; }
+	| RECEIVED_ROUTE_MODE EQUAL error  { yyerror("number  expected"); }
     | MAX_RECURSIVE_LEVEL EQUAL NUMBER { set_max_recursive_level($3); }
     | MAX_BRANCHES_PARAM EQUAL NUMBER { sr_dst_max_branches = $3; }
     | LATENCY_LOG EQUAL intno { default_core_cfg.latency_log=$3; }
@@ -1627,6 +1727,8 @@ assign_stm:
 	| LATENCY_LIMIT_DB EQUAL error  { yyerror("number  expected"); }
     | LATENCY_LIMIT_ACTION EQUAL NUMBER { default_core_cfg.latency_limit_action=$3; }
 	| LATENCY_LIMIT_ACTION EQUAL error  { yyerror("number  expected"); }
+    | LATENCY_LIMIT_CFG EQUAL NUMBER { default_core_cfg.latency_limit_cfg=$3; }
+	| LATENCY_LIMIT_CFG EQUAL error  { yyerror("number  expected"); }
     | MSG_TIME EQUAL NUMBER { sr_msg_time=$3; }
 	| MSG_TIME EQUAL error  { yyerror("number  expected"); }
 	| ONSEND_RT_REPLY EQUAL NUMBER { onsend_route_reply=$3; }
@@ -1734,23 +1836,19 @@ module_stm:
 	}
 	| LOADPATH EQUAL error	{ yyerror("string expected"); }
 	| MODPARAM LPAREN STRING COMMA STRING COMMA STRING RPAREN {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		if (set_mod_param_regex($3, $5, PARAM_STRING, $7) != 0) {
 			 yyerror("Can't set module parameter");
 		}
 	}
 	| MODPARAM LPAREN STRING COMMA STRING COMMA intno RPAREN {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		if (set_mod_param_regex($3, $5, PARAM_INT, (void*)$7) != 0) {
 			 yyerror("Can't set module parameter");
 		}
@@ -1780,7 +1878,7 @@ ipv4:
 	NUMBER DOT NUMBER DOT NUMBER DOT NUMBER {
 		$$=pkg_malloc(sizeof(struct ip_addr));
 		if ($$==0) {
-			LM_CRIT("cfg. parser: out of memory.\n");
+			PKG_MEM_CRITICAL;
 		} else {
 			memset($$, 0, sizeof(struct ip_addr));
 			$$->af=AF_INET;
@@ -1809,7 +1907,7 @@ ipv6addr:
 	IPV6ADDR {
 		$$=pkg_malloc(sizeof(struct ip_addr));
 		if ($$==0) {
-			LM_CRIT("cfg. parser: out of memory.\n");
+			PKG_MEM_CRITICAL;
 		} else {
 			memset($$, 0, sizeof(struct ip_addr));
 			$$->af=AF_INET6;
@@ -1848,21 +1946,17 @@ route_main:	ROUTE { routename=NULL; }
 
 route_stm:
 	route_main LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		push($3, &main_rt.rlist[DEFAULT_RT]);
 	}
 	| ROUTE LBRACK route_name RBRACK LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		i_tmp=route_get(&main_rt, $3);
 		if (i_tmp==-1){
 			yyerror("internal error");
@@ -1882,21 +1976,17 @@ failure_route_main: ROUTE_FAILURE { routename=NULL; }
 ;
 failure_route_stm:
 	failure_route_main LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		push($3, &failure_rt.rlist[DEFAULT_RT]);
 	}
 	| ROUTE_FAILURE LBRACK route_name RBRACK LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		i_tmp=route_get(&failure_rt, $3);
 		if (i_tmp==-1){
 			yyerror("internal error");
@@ -1919,12 +2009,10 @@ route_reply_main:	ROUTE_ONREPLY { routename=NULL; }
 
 onreply_route_stm:
 	route_reply_main LBRACE {rt=CORE_ONREPLY_ROUTE;} actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		push($4, &onreply_rt.rlist[DEFAULT_RT]);
 	}
 	| ROUTE_ONREPLY error { yyerror("invalid onreply_route statement"); }
@@ -1932,12 +2020,10 @@ onreply_route_stm:
 	| ROUTE_ONREPLY LBRACK route_name RBRACK
 		{rt=(*$3=='0' && $3[1]==0)?CORE_ONREPLY_ROUTE:TM_ONREPLY_ROUTE;}
 		LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		if (*$3=='0' && $3[1]==0){
 			/* onreply_route[0] {} is equivalent with onreply_route {}*/
 			push($7, &onreply_rt.rlist[DEFAULT_RT]);
@@ -1963,21 +2049,17 @@ branch_route_main: ROUTE_BRANCH { routename=NULL; }
 ;
 branch_route_stm:
 	branch_route_main LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		push($3, &branch_rt.rlist[DEFAULT_RT]);
 	}
 	| ROUTE_BRANCH LBRACK route_name RBRACK LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		i_tmp=route_get(&branch_rt, $3);
 		if (i_tmp==-1){
 			yyerror("internal error");
@@ -1996,21 +2078,17 @@ send_route_main: ROUTE_SEND { routename=NULL; }
 ;
 send_route_stm:
 	send_route_main LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		push($3, &onsend_rt.rlist[DEFAULT_RT]);
 	}
 	| ROUTE_SEND LBRACK route_name RBRACK LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		i_tmp=route_get(&onsend_rt, $3);
 		if (i_tmp==-1){
 			yyerror("internal error");
@@ -2029,12 +2107,10 @@ event_route_main: ROUTE_EVENT { routename=NULL; }
 ;
 event_route_stm:
 	event_route_main LBRACK EVENT_RT_NAME RBRACK LBRACE actions RBRACE {
-	#ifdef SHM_MEM
 		if (!shm_initialized() && init_shm()<0) {
 			yyerror("Can't initialize shared memory");
 			YYABORT;
 		}
-	#endif /* SHM_MEM */
 		i_tmp=route_get(&event_rt, $3);
 		if (i_tmp==-1){
 			yyerror("internal error");
@@ -2262,8 +2338,7 @@ host:
 		if ($1){
 			$$=(char*)pkg_malloc(strlen($1)+1+strlen($3)+1);
 			if ($$==0) {
-				LM_CRIT("cfg. parser: memory allocation"
-							" failure while parsing host\n");
+				PKG_MEM_CRITICAL;
 			} else {
 				memcpy($$, $1, strlen($1));
 				$$[strlen($1)]='.';
@@ -2278,8 +2353,7 @@ host:
 		if ($1){
 			$$=(char*)pkg_malloc(strlen($1)+1+strlen($3)+1);
 			if ($$==0) {
-				LM_CRIT("cfg. parser: memory allocation"
-							" failure while parsing host\n");
+				PKG_MEM_CRITICAL;
 			} else {
 				memcpy($$, $1, strlen($1));
 				$$[strlen($1)]='-';
@@ -2299,8 +2373,11 @@ host_if_id: ID
 		| NUMBER {
 			/* get string version */
 			$$=pkg_malloc(strlen(yy_number_str)+1);
-			if ($$)
+			if ($$==0) {
+				PKG_MEM_ERROR;
+			} else {
 				strcpy($$, yy_number_str);
+			}
 		}
 		;
 
@@ -2310,8 +2387,7 @@ host_or_if:
 		if ($1){
 			$$=(char*)pkg_malloc(strlen($1)+1+strlen($3)+1);
 			if ($$==0) {
-				LM_CRIT("cfg. parser: memory allocation"
-							" failure while parsing host/interface name\n");
+				PKG_MEM_CRITICAL;
 			} else {
 				memcpy($$, $1, strlen($1));
 				$$[strlen($1)]='.';
@@ -2326,8 +2402,7 @@ host_or_if:
 		if ($1){
 			$$=(char*)pkg_malloc(strlen($1)+1+strlen($3)+1);
 			if ($$==0) {
-				LM_CRIT("cfg. parser: memory allocation"
-							" failure while parsing host/interface name\n");
+				PKG_MEM_CRITICAL;
 			} else {
 				memcpy($$, $1, strlen($1));
 				$$[strlen($1)]='-';
@@ -3285,7 +3360,7 @@ cmd:
 	| SET_ADV_ADDRESS LPAREN listen_id RPAREN {
 		$$=0;
 		if ((str_tmp=pkg_malloc(sizeof(str)))==0) {
-			LM_CRIT("cfg. parser: out of memory.\n");
+			PKG_MEM_CRITICAL;
 		} else {
 			str_tmp->s=$3;
 			str_tmp->len=$3?strlen($3):0;
@@ -3299,10 +3374,10 @@ cmd:
 		$$=0;
 		tmp=int2str($3, &i_tmp);
 		if ((str_tmp=pkg_malloc(sizeof(str)))==0) {
-			LM_CRIT("cfg. parser: out of memory.\n");
+			PKG_MEM_CRITICAL;
 		} else {
 			if ((str_tmp->s=pkg_malloc(i_tmp))==0) {
-				LM_CRIT("cfg. parser: out of memory.\n");
+				PKG_MEM_CRITICAL;
 			} else {
 				memcpy(str_tmp->s, tmp, i_tmp);
 				str_tmp->len=i_tmp;
@@ -3362,7 +3437,7 @@ cmd:
 		if (mod_func_action != NULL) {
 			LM_ERR("function used inside params of another function: %s\n", $1);
 			yyerror("use of function execution inside params not allowed\n");
-			exit(-1);
+			ksr_exit(-1);
 		}
 		mod_func_action = mk_action(MODULE0_T, 2, MODEXP_ST, NULL, NUMBER_ST, 0);
 		} LPAREN func_params RPAREN	{
@@ -3382,7 +3457,7 @@ cmd:
 		}else{
 			if (mod_func_action && mod_f_params_pre_fixup(mod_func_action)<0) {
 				/* error messages are printed inside the function */
-				free_mod_func_action(mod_func_action);
+				/* free_mod_func_action(mod_func_action); */
 				mod_func_action = 0;
 				YYERROR;
 			}
@@ -3678,7 +3753,7 @@ static struct name_lst* mk_name_lst(char* host, int flags)
 	if (host==0) return 0;
 	l=pkg_malloc(sizeof(struct name_lst));
 	if (l==0) {
-		LM_CRIT("cfg. parser: out of memory.\n");
+		PKG_MEM_CRITICAL;
 	} else {
 		memset(l, 0, sizeof(struct name_lst));
 		l->name=host;
@@ -3695,7 +3770,7 @@ static struct socket_id* mk_listen_id(char* host, int proto, int port)
 	if (host==0) return 0;
 	l=pkg_malloc(sizeof(struct socket_id));
 	if (l==0) {
-		LM_CRIT("cfg. parser: out of memory.\n");
+		PKG_MEM_CRITICAL;
 	} else {
 		memset(l, 0, sizeof(struct socket_id));
 		l->addr_lst=mk_name_lst(host, 0);
@@ -3731,7 +3806,7 @@ static struct socket_id* mk_listen_id2(struct name_lst* addr_l, int proto,
 	if (addr_l==0) return 0;
 	l=pkg_malloc(sizeof(struct socket_id));
 	if (l==0) {
-		LM_CRIT("cfg. parser: out of memory.\n");
+		PKG_MEM_CRITICAL;
 	} else {
 		memset(l, 0, sizeof(struct socket_id));
 		l->flags=addr_l->flags;

@@ -335,6 +335,7 @@ int init_dns_cache()
 	}
 	dns_cache_mem_used=shm_malloc(sizeof(*dns_cache_mem_used));
 	if (dns_cache_mem_used==0){
+		SHM_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -342,6 +343,7 @@ int init_dns_cache()
 
 	dns_last_used_lst=shm_malloc(sizeof(*dns_last_used_lst));
 	if (dns_last_used_lst==0){
+		SHM_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -349,6 +351,7 @@ int init_dns_cache()
 
 	dns_hash=shm_malloc(sizeof(struct dns_hash_head)*DNS_HASH_SIZE);
 	if (dns_hash==0){
+		SHM_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -370,6 +373,7 @@ int init_dns_cache()
 #ifdef DNS_WATCHDOG_SUPPORT
 	dns_servers_up=shm_malloc(sizeof(atomic_t));
 	if (dns_servers_up==0){
+		SHM_MEM_ERROR;
 		ret=E_OUT_OF_MEM;
 		goto error;
 	}
@@ -416,6 +420,7 @@ int init_dns_cache_stats(int iproc_num)
 
 	dns_cache_stats=shm_malloc(sizeof(*dns_cache_stats) * iproc_num);
 	if (dns_cache_stats==0){
+		SHM_MEM_ERROR;
 		return E_OUT_OF_MEM;
 	}
 	memset(dns_cache_stats, 0, sizeof(*dns_cache_stats) * iproc_num);
@@ -757,7 +762,7 @@ inline static struct dns_hash_entry* dns_cache_mk_bad_entry(str* name,
 	size=sizeof(struct dns_hash_entry)+name->len-1+1;
 	e=shm_malloc(size);
 	if (e==0){
-		LM_ERR("out of memory\n");
+		SHM_MEM_ERROR;
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0*/
@@ -798,7 +803,7 @@ inline static struct dns_hash_entry* dns_cache_mk_ip_entry(str* name,
 			sizeof(struct dns_rr)+ ip->len;
 	e=shm_malloc(size);
 	if (e==0){
-		LM_ERR("out of memory\n");
+		SHM_MEM_ERROR;
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0*/
@@ -851,7 +856,7 @@ static struct dns_hash_entry* dns_cache_mk_srv_entry(str* name,
 
 	e=shm_malloc(size);
 	if (e==0){
-		LM_ERR("out of memory\n");
+		SHM_MEM_ERROR;
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0*/
@@ -1104,7 +1109,7 @@ inline static struct dns_hash_entry* dns_cache_mk_rd_entry(str* name, int type,
 	size+=ROUND_POINTER(sizeof(struct dns_hash_entry)+name->len-1+1);
 	e=shm_malloc(size);
 	if (e==0){
-		LM_ERR("out of memory\n");
+		SHM_MEM_ERROR;
 		return 0;
 	}
 	memset(e, 0, size); /* init with 0 */
@@ -1411,7 +1416,7 @@ found:
 	for (r=0; r<no_records; r++){
 		rec[r].e=shm_malloc(rec[r].size);
 		if (rec[r].e==0){
-			LM_ERR("out of memory\n");
+			SHM_MEM_ERROR;
 			goto error;
 		}
 		memset(rec[r].e, 0, rec[r].size); /* init with 0*/
@@ -2483,37 +2488,6 @@ struct hostent* dns_resolvehost(char* name)
 }
 
 
-
-
-#if 0
-/* resolves a host name trying  NAPTR,  SRV, A & AAAA lookups, for details
- *  see dns_sip_resolve()
- *  FIXME: this version will return only the first ip
- * returns: hostent struct & *port filled with the port from the SRV record;
- *  0 on error
- */
-struct hostent* dns_sip_resolvehost(str* name, unsigned short* port,
-										char* proto)
-{
-	struct dns_srv_handle h;
-	struct ip_addr ip;
-	int ret;
-
-	if ((cfg_get(core, core_cfg, use_dns_cache==0)) || (dns_hash==0)){
-		/* not init or off => use normal, non-cached version */
-		return _sip_resolvehost(name, port, proto);
-	}
-	dns_srv_handle_init(&h);
-	ret=dns_sip_resolve(&h, name, &ip, port, proto, dns_flags);
-	dns_srv_handle_put(&h);
-	if (ret>=0)
-		return ip_addr2he(name, &ip);
-	return 0;
-}
-#endif
-
-
-
 /* resolves a host name trying SRV lookup if *port==0 or normal A/AAAA lookup
  * if *port!=0.
  * when performing SRV lookup (*port==0) it will use proto to look for
@@ -3037,25 +3011,30 @@ inline static int dns_srv_resolve_ip(struct dns_srv_handle* h,
 {
 	int ret;
 	str host;
+	unsigned short vport;
 
 	host.len=0;
 	host.s=0;
+	if(port) vport =*port;
+	else vport = 0;
+
 	do{
 		if (h->a==0){
 #ifdef DNS_SRV_LB
 			if ((ret=dns_srv_resolve_nxt(&h->srv,
 								(flags & DNS_SRV_RR_LB)?&h->srv_tried_rrs:0,
 								&h->srv_no,
-								name, &host, port))<0)
+								name, &host, &vport))<0)
 				goto error;
 #else
 			if ((ret=dns_srv_resolve_nxt(&h->srv, &h->srv_no,
-								name, &host, port))<0)
+								name, &host, &vport))<0)
 				goto error;
 #endif
-			h->port=*port; /* store new port */
+			h->port=vport; /* store new port */
+			if(port) *port=vport;
 		}else{
-			*port=h->port; /* return the stored port */
+			if(port) *port=h->port; /* return the stored port */
 		}
 		if ((ret=dns_ip_resolve(&h->a, &h->ip_no, &host, ip, flags))<0){
 			/* couldn't find any good ip for this record, try the next one */
@@ -3283,10 +3262,12 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 	char n_proto, origproto;
 	str srv_name;
 	int ret;
+	int res;
 	int try_lookup_naptr = 0;
 
 	ret=-E_DNS_NO_NAPTR;
 	if(proto) origproto=*proto;
+	else origproto = PROTO_NONE;
 	if (dns_hash==0){ /* not init => use normal, non-cached version */
 		LM_WARN("called before dns cache initialization\n");
 		h->srv=h->a=0;
@@ -3318,13 +3299,16 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 		}
 		try_lookup_naptr = 1;
 	}
+	/* check if it's an ip address, dns_srv_sip_resolve will return the right failure */
+	if (str2ip(name) || str2ip6(name))
+		goto naptr_not_found;
 	/* do naptr lookup */
 	if ((e=dns_get_entry(name, T_NAPTR))==0)
 		goto naptr_not_found;
 
 	if (!try_lookup_naptr) {
 		if(proto) *proto=origproto;
-		int res = dns_srv_sip_resolve(h, name, ip, port, proto, flags);
+		res = dns_srv_sip_resolve(h, name, ip, port, proto, flags);
 		if (res) {
 			mark_skip_current_naptr(e->rr_lst, h->srv);
 			if (have_more_active_naptr(e->rr_lst)) {
@@ -3346,8 +3330,8 @@ inline static int dns_naptr_sip_resolve(struct dns_srv_handle* h,  str* name,
 				LM_DBG("(%.*s, %d, %d), srv0, ret=%d\n",
 								name->len, name->s, h->srv_no, h->ip_no, ret);
 				dns_hash_put(e);
-				*proto=n_proto;
-				h->proto=*proto;
+				if(proto) *proto=n_proto;
+				h->proto=n_proto;
 				return ret;
 			}
 		}
@@ -4034,7 +4018,7 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 	size = e->total_size;
 	if (rdata_size) {
 		/* we have to extend the entry */
-		rounded_size = ROUND_POINTER(size); /* size may not have been 
+		rounded_size = ROUND_POINTER(size); /* size may not have been
 												rounded previously */
 		switch (e->type) {
 			case T_A:
@@ -4069,7 +4053,7 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 
 	new=shm_malloc(rounded_size+rr_size+rdata_size);
 	if (!new) {
-		LM_ERR("out of memory\n");
+		SHM_MEM_ERROR;
 		return NULL;
 	}
 	memset(new, 0, rounded_size+rr_size+rdata_size);
@@ -4086,7 +4070,7 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 	/* fix the pointers inside the rr structures */
 	last_rr = NULL;
 	for (rr=new->rr_lst; rr; rr=rr->next) {
-		rr->rdata = (void*)translate_pointer((char*)new, (char*)e, 
+		rr->rdata = (void*)translate_pointer((char*)new, (char*)e,
 												(char*)rr->rdata);
 		if (rr->next)
 			rr->next = (struct dns_rr*)translate_pointer((char*)new, (char*)e,
@@ -4096,6 +4080,10 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 
 		switch(e->type){
 			case T_NAPTR:
+				if(rr->rdata==NULL) {
+					LM_WARN("null rdata filed for type: %u\n", e->type);
+					break;
+				}
 				/* there are pointers inside the NAPTR rdata stucture */
 				((struct naptr_rdata*)rr->rdata)->flags =
 					translate_pointer((char*)new, (char*)e,
@@ -4114,6 +4102,10 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 						((struct naptr_rdata*)rr->rdata)->repl);
 				break;
 			case T_TXT:
+				if(rr->rdata==NULL) {
+					LM_WARN("null rdata filed for type: %u\n", e->type);
+					break;
+				}
 				/* there are pointers inside the TXT structure */
 				for (i=0; i<((struct txt_rdata*)rr->rdata)->cstr_no; i++){
 					((struct txt_rdata*)rr->rdata)->txt[i].cstr=
@@ -4122,6 +4114,10 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 				}
 				break;
 			case T_EBL:
+				if(rr->rdata==NULL) {
+					LM_WARN("null rdata filed for type: %u\n", e->type);
+					break;
+				}
 				/* there are pointers inside the EBL structure */
 				((struct ebl_rdata*)rr->rdata)->separator =
 					translate_pointer((char*)new, (char*)e,
@@ -4140,7 +4136,9 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
 		new_rr->rdata = (void*)((char*)new_rr+rr_size);
 		new_rr->expire = now + S_TO_TICKS(ttl);
 		/* link the rr to the previous one */
-		last_rr->next = new_rr;
+		if(last_rr) {
+			last_rr->next = new_rr;
+		}
 
 		/* fix the total_size and expires values */
 		new->total_size=rounded_size+rr_size+rdata_size;
@@ -4162,7 +4160,7 @@ static struct dns_hash_entry *dns_cache_clone_entry(struct dns_hash_entry *e,
  * If there is an existing record with the same name and value
  * (ip address in case of A/AAAA record, name in case of SRV record)
  * only the remaining fields are updated.
- * 
+ *
  * Note that permanent records cannot be overwritten unless
  * the new record is also permanent. A permanent record
  * completely replaces a non-permanent one.
@@ -4406,7 +4404,7 @@ int dns_cache_add_record(unsigned short type,
 
 				if (*rr_iter != new_rr->next) {
 					/* unlink rr from the list */
-					*rr_p = (*rr_p)->next;
+					*rr_p = (*rr_p)?(*rr_p)->next:NULL;
 					/* link it before *rr_iter */
 					new_rr->next = *rr_iter;
 					*rr_iter = new_rr;

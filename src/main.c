@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <string.h>
+#include <getopt.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -74,11 +75,10 @@
 #include "core/udp_server.h"
 #include "core/globals.h"
 #include "core/mem/mem.h"
-#ifdef SHM_MEM
 #include "core/mem/shm_mem.h"
 #include "core/shm_init.h"
-#endif /* SHM_MEM */
 #include "core/sr_module.h"
+#include "core/modparam.h"
 #include "core/timer.h"
 #include "core/parser/msg_parser.h"
 #include "core/ip_addr.h"
@@ -125,8 +125,8 @@
 #endif
 #include "core/rand/fastrand.h" /* seed */
 #include "core/rand/kam_rand.h"
+#include "core/rand/cryptorand.h"
 
-#include "core/stats.h"
 #include "core/counters.h"
 #include "core/cfg/cfg.h"
 #include "core/cfg/cfg_struct.h"
@@ -160,65 +160,91 @@
 static char help_msg[]= "\
 Usage: " NAME " [options]\n\
 Options:\n\
-    -f file      Configuration file (default: " CFG_FILE ")\n\
-    -L path      Modules search path (default: " MODS_DIR ")\n\
-    -c           Check configuration file for errors\n\
-    -l address   Listen on the specified address/interface (multiple -l\n\
-                  mean listening on more addresses).  The address format is\n\
-                  [proto:]addr_lst[:port], where proto=udp|tcp|tls|sctp, \n\
-                  addr_lst= addr|(addr, addr_lst) and \n\
-                  addr= host|ip_address|interface_name. \n\
-                  E.g: -l localhost, -l udp:127.0.0.1:5080, -l eth0:5062,\n\
-                  -l \"sctp:(eth0)\", -l \"(eth0, eth1, 127.0.0.1):5065\".\n\
-                  The default behaviour is to listen on all the interfaces.\n\
-    -n processes Number of child processes to fork per interface\n\
-                  (default: 8)\n\
-    -r           Use dns to check if is necessary to add a \"received=\"\n\
-                  field to a via\n\
-    -R           Same as `-r` but use reverse dns;\n\
-                  (to use both use `-rR`)\n\
-    -K           Turn on \"via:\" host checking when forwarding replies\n\
-    -d           Debugging mode (multiple -d increase the level)\n\
+    -a mode      Auto aliases mode: enable with yes or on,\n\
+                  disable with no or off\n\
+    --alias=val  Add an alias, the value has to be '[proto:]hostname[:port]'\n\
+                  (like for 'alias' global parameter)\n\
+    --atexit=val Control atexit callbacks execution from external libraries\n\
+                  which may access destroyed shm memory causing crash on shutdown.\n\
+                  Can be y[es] or 1 to enable atexit callbacks, n[o] or 0 to disable,\n\
+                  default is yes.\n\
+    -A define    Add config pre-processor define (e.g., -A WITH_AUTH,\n\
+                  -A 'FLT_ACC=1', -A 'DEFVAL=\"str-val\"')\n\
+    -b nr        Maximum receive buffer size which will not be exceeded by\n\
+                  auto-probing procedure even if  OS allows\n\
+    -c           Check configuration file for syntax errors\n\
+    -d           Debugging level control (multiple -d to increase the level from 0)\n\
+    --debug=val  Debugging level value\n\
     -D           Control how daemonize is done:\n\
                   -D..do not fork (almost) anyway;\n\
                   -DD..do not daemonize creator;\n\
                   -DDD..daemonize (default)\n\
+    -e           Log messages printed in terminal colors (requires -E)\n\
     -E           Log to stderr\n\
-    -e           Log messages printed in terminal colors (requires -E)\n"
-#ifdef USE_TCP
-"    -T           Disable tcp\n\
-    -N           Number of tcp child processes (default: equal to `-n')\n\
-    -W type      poll method (depending on support in OS, it can be: poll,\n\
-                  epoll_lt, epoll_et, sigio_rt, select, kqueue, /dev/poll)\n"
-#endif
-#ifdef USE_SCTP
-"    -S           disable sctp\n\
-    -Q            Number of sctp child processes (default: equal to `-n')\n"
-#endif /* USE_SCTP */
-"    -v (-V)      Version number\n\
-    -h           This help message\n\
-    -I           Print more internal compile flags and options\n\
-    -b nr        Maximum receive buffer size which will not be exceeded by\n\
-                  auto-probing procedure even if  OS allows\n\
-    -m nr        Size of shared memory allocated in Megabytes\n\
-    -M nr        Size of private memory allocated, in Megabytes\n\
-    -w dir       Change the working directory to \"dir\" (default: \"/\")\n\
-    -t dir       Chroot to \"dir\"\n\
-    -u uid       Change uid (user id)\n\
+    -f file      Configuration file (default: " CFG_FILE ")\n\
     -g gid       Change gid (group id)\n\
-    -P file      Create a pid file\n\
     -G file      Create a pgid file\n\
-    -Y dir       Runtime dir path\n\
-    -O nr        Script optimization level (debugging option)\n\
-    -a mode      Auto aliases mode: enable with yes or on,\n\
-                  disable with no or off\n\
-    -A define    Add config pre-processor define (e.g., -A WITH_AUTH)\n\
+    -h           This help message\n\
+    --help       Long option for `-h`\n\
+    -I           Print more internal compile flags and options\n\
+    -K           Turn on \"via:\" host checking when forwarding replies\n\
+    -l address   Listen on the specified address/interface (multiple -l\n\
+                  mean listening on more addresses). The address format is\n\
+                  [proto:]addr_lst[:port][/advaddr], \n\
+                  where proto=udp|tcp|tls|sctp, \n\
+                  addr_lst= addr|(addr, addr_lst), \n\
+                  addr=host|ip_address|interface_name and \n\
+                  advaddr=addr[:port] (advertised address). \n\
+                  E.g: -l localhost, -l udp:127.0.0.1:5080, -l eth0:5062,\n\
+                  -l udp:127.0.0.1:5080/1.2.3.4:5060,\n\
+                  -l \"sctp:(eth0)\", -l \"(eth0, eth1, 127.0.0.1):5065\".\n\
+                  The default behaviour is to listen on all the interfaces.\n\
+    --loadmodule=name load the module specified by name\n\
+    --log-engine=log engine name and data\n\
+    -L path      Modules search path (default: " MODS_DIR ")\n\
+    -m nr        Size of shared memory allocated in Megabytes\n\
+    --modparam=modname:paramname:type:value set the module parameter\n\
+                  type has to be 's' for string value and 'i' for int value, \n\
+                  example: --modparam=corex:alias_subdomains:s:" NAME ".org\n\
+    -M nr        Size of private memory allocated, in Megabytes\n\
+    -n processes Number of child processes to fork per interface\n\
+                  (default: 8)\n"
+#ifdef USE_TCP
+"    -N           Number of tcp child processes (default: equal to `-n')\n"
+#endif
+"    -O nr        Script optimization level (debugging option)\n\
+    -P file      Create a pid file\n"
+#ifdef USE_SCTP
+"    -Q           Number of sctp child processes (default: equal to `-n')\n"
+#endif /* USE_SCTP */
+"    -r           Use dns to check if is necessary to add a \"received=\"\n\
+                  field to a via\n\
+    -R           Same as `-r` but use reverse dns;\n\
+                  (to use both use `-rR`)\n"
+"    --server-id=num set the value for server_id\n\
+    --subst=exp set a subst preprocessor directive\n\
+    --substdef=exp set a substdef preprocessor directive\n\
+    --substdefs=exp set a substdefs preprocessor directive\n"
+#ifdef USE_SCTP
+"    -S           disable sctp\n"
+#endif
+"    -t dir       Chroot to \"dir\"\n"
+#ifdef USE_TCP
+"    -T           Disable tcp\n"
+#endif
+"    -u uid       Change uid (user id)\n\
+    -v           Version number\n\
+    --version    Long option for `-v`\n\
+    -V           Alternative for `-v`\n\
     -x name      Specify internal manager for shared memory (shm)\n\
                   - can be: fm, qm or tlsf\n\
     -X name      Specify internal manager for private memory (pkg)\n\
-                  - if omitted, the one for shm is used\n"
-#ifdef STATS
-"    -s file     File where to write internal statistics on SIGUSR1\n"
+                  - if omitted, the one for shm is used\n\
+    -Y dir       Runtime dir path\n\
+    -w dir       Change the working directory to \"dir\" (default: \"/\")\n"
+#ifdef USE_TCP
+"    -W type      poll method (depending on support in OS, it can be: poll,\n\
+                  epoll_lt, epoll_et, sigio_rt, select, kqueue, /dev/poll)\n"
 #endif
 ;
 
@@ -227,14 +253,12 @@ Options:\n\
 void print_ct_constants(void)
 {
 #ifdef ADAPTIVE_WAIT
-	printf("ADAPTIVE_WAIT_LOOPS=%d, ", ADAPTIVE_WAIT_LOOPS);
+	printf("ADAPTIVE_WAIT_LOOPS %d, ", ADAPTIVE_WAIT_LOOPS);
 #endif
 /*
-#ifdef SHM_MEM
-	printf("SHM_MEM_SIZE=%d, ", SHM_MEM_SIZE);
-#endif
+	printf("SHM_MEM_SIZE %dMB, ", SHM_MEM_SIZE);
 */
-	printf("MAX_RECV_BUFFER_SIZE %d"
+	printf("MAX_RECV_BUFFER_SIZE %d,"
 			" MAX_URI_SIZE %d, BUF_SIZE %d, DEFAULT PKG_SIZE %uMB\n",
 		MAX_RECV_BUFFER_SIZE, MAX_URI_SIZE,
 		BUF_SIZE, PKG_MEM_SIZE);
@@ -255,9 +279,7 @@ void print_internals(void)
 	printf("  MAX_URI_SIZE=%d\n", MAX_URI_SIZE);
 	printf("  BUF_SIZE=%d\n", BUF_SIZE);
 	printf("  DEFAULT PKG_SIZE=%uMB\n", PKG_MEM_SIZE);
-#ifdef SHM_MEM
 	printf("  DEFAULT SHM_SIZE=%uMB\n", SHM_MEM_SIZE);
-#endif
 #ifdef ADAPTIVE_WAIT
 	printf("  ADAPTIVE_WAIT_LOOPS=%d\n", ADAPTIVE_WAIT_LOOPS);
 #endif
@@ -266,6 +288,7 @@ void print_internals(void)
 #endif
 	printf("  Source code revision ID: %s\n", ver_id);
 	printf("  Compiled with: %s\n", ver_compiler);
+	printf("  Compiled architecture: %s\n", ARCH);
 	printf("  Compiled on: %s\n", ver_compiled_time);
 	printf("Thank you for flying %s!\n", NAME);
 }
@@ -426,6 +449,7 @@ int tos = IPTOS_LOWDELAY;
 int pmtu_discovery = 0;
 
 int auto_bind_ipv6 = 0;
+int sr_bind_ipv6_link_local = 0;
 
 struct socket_info* udp_listen=0;
 #ifdef USE_TCP
@@ -513,6 +537,8 @@ char *sr_memmng_shm = NULL;
 
 static int *_sr_instance_started = NULL;
 
+int ksr_atexit_mode = 1;
+
 /**
  * return 1 if all child processes were forked
  * - note: they might still be in init phase (i.e., child init)
@@ -588,7 +614,6 @@ void cleanup(int show_status)
 		}
 	}
 #endif
-#ifdef SHM_MEM
 	if (pt) shm_free(pt);
 	pt=0;
 	if (show_status && memlog <= cfg_get(core, core_cfg, debug)){
@@ -603,7 +628,6 @@ void cleanup(int show_status)
 	}
 	/* zero all shmem alloc vars that we still use */
 	shm_destroy_manager();
-#endif
 	destroy_lock_ops();
 	if (pid_file) unlink(pid_file);
 	if (pgid_file) unlink(pgid_file);
@@ -673,6 +697,8 @@ static void sig_alarm_abort(int signo)
 
 static void shutdown_children(int sig, int show_status)
 {
+	sr_corecb_void_exec(app_shutdown);
+
 	kill_all_children(sig);
 	if (set_sig_h(SIGALRM, sig_alarm_kill) == SIG_ERR ) {
 		LM_ERR("could not install SIGALARM handler\n");
@@ -715,13 +741,10 @@ void handle_sigs(void)
 			LM_NOTICE("Thank you for flying " NAME "!!!\n");
 			/* shutdown/kill all the children */
 			shutdown_children(SIGTERM, 1);
-			exit(0);
+			ksr_exit(0);
 			break;
 
 		case SIGUSR1:
-#ifdef STATS
-			dump_all_statistic();
-#endif
 		memlog=cfg_get(core, core_cfg, memlog);
 #ifdef PKG_MALLOC
 		if (memlog <= cfg_get(core, core_cfg, debug)){
@@ -735,7 +758,6 @@ void handle_sigs(void)
 			}
 		}
 #endif
-#ifdef SHM_MEM
 		if (memlog <= cfg_get(core, core_cfg, debug)){
 			if (cfg_get(core, core_cfg, mem_summary) & 2) {
 				LOG(memlog, "Memory status (shm):\n");
@@ -746,7 +768,6 @@ void handle_sigs(void)
 				shm_sums();
 			}
 		}
-#endif
 			break;
 
 		case SIGCHLD:
@@ -790,9 +811,9 @@ void handle_sigs(void)
 			/* exit */
 			shutdown_children(SIGTERM, 1);
 			if (WIFSIGNALED(chld_status)) {
-				exit(1);
+				ksr_exit(1);
 			} else {
-				exit(0);
+				ksr_exit(0);
 			}
 			break;
 
@@ -1009,8 +1030,11 @@ static struct name_lst* mk_name_lst_elem(char* name, int name_len, int flags)
 		l->name[name_len]=0;
 		l->flags=flags;
 		l->next=0;
+		return l;
+	} else {
+		PKG_MEM_ERROR;
+		return 0;
 	}
-	return l;
 }
 
 
@@ -1229,14 +1253,15 @@ static struct name_lst* parse_phostport_mh(char* s, char** host, int* hlen,
 
 
 
-/** Update \c cfg_file variable to contain full pathname. The function updates
+/** Update \c cfg_file variable to contain full pathname or '-' (for stdin)
+ * allocated in system memory. The function updates
  * the value of \c cfg_file global variable to contain full absolute pathname
- * to the main configuration file of SER. The function uses CFG_FILE macro to
+ * to the main configuration file. The function uses CFG_FILE macro to
  * determine the default path to the configuration file if the user did not
  * specify one using the command line option. If \c cfg_file contains an
- * absolute pathname then it is used unmodified, if it contains a relative
+ * absolute pathname then it is cloned unmodified, if it contains a relative
  * pathanme than the value returned by \c getcwd function will be added at the
- * beginning. This function must be run before SER changes its current working
+ * beginning. This function must be run before changing its current working
  * directory to / (in daemon mode).
  * @return Zero on success, negative number
  * on error.
@@ -1245,34 +1270,55 @@ int fix_cfg_file(void)
 {
 	char* res = NULL;
 	size_t max_len, cwd_len, cfg_len;
-	
+
 	if (cfg_file == NULL) cfg_file = CFG_FILE;
-	if (cfg_file[0] == '/') return 0;
-	if (cfg_file[0] == '-' && strlen(cfg_file)==1) return 0;
-	
+	if (cfg_file[0] == '/') {
+		cfg_len = strlen(cfg_file);
+		if(cfg_len < 2) {
+			/* do not accept only '/' */
+			fprintf(stderr, "ERROR: invalid cfg file value\n");
+			return -1;
+		}
+		if ((res = malloc(cfg_len + 1)) == NULL) goto error;
+		memcpy(res, cfg_file, cfg_len);
+		res[cfg_len] = 0;
+		cfg_file = res;
+		return 0;
+	}
+	if (cfg_file[0] == '-') {
+		cfg_len = strlen(cfg_file);
+		if(cfg_len == 1) {
+			if ((res = malloc(2)) == NULL) goto error;
+			res[0] = '-';
+			res[1] = '\0';
+			cfg_file = res;
+			return 0;
+		}
+	}
+
 	/* cfg_file contains a relative pathname, get the current
 	 * working directory and add it at the beginning
 	 */
 	cfg_len = strlen(cfg_file);
-	
+
 	max_len = pathmax();
 	if ((res = malloc(max_len)) == NULL) goto error;
-	
+
 	if (getcwd(res, max_len) == NULL) goto error;
 	cwd_len = strlen(res);
-	
+
 	/* Make sure that the buffer is big enough */
 	if (cwd_len + 1 + cfg_len >= max_len) goto error;
-	
+
 	res[cwd_len] = '/';
 	memcpy(res + cwd_len + 1, cfg_file, cfg_len);
-	
+
 	res[cwd_len + 1 + cfg_len] = '\0'; /* Add terminating zero */
 	cfg_file = res;
 	return 0;
-	
+
  error:
-	fprintf(stderr, "ERROR: Unable to fix cfg_file to contain full pathname\n");
+	fprintf(stderr, "ERROR: Unable to fix cfg file to contain full pathname\n");
 	if (res) free(res);
 	return -1;
 }
@@ -1294,16 +1340,13 @@ int main_loop(void)
 	if(_sr_instance_started == NULL) {
 		_sr_instance_started = shm_malloc(sizeof(int));
 		if(_sr_instance_started == NULL) {
-			LM_ERR("no shared memory\n");
+			SHM_MEM_ERROR;
 			goto error;
 		}
 		*_sr_instance_started = 0;
 	}
 	/* one "main" process and n children handling i/o */
 	if (dont_fork){
-#ifdef STATS
-		setstats( 0 );
-#endif
 		if (udp_listen==0){
 			LM_ERR("no fork mode requires at least one"
 					" udp listen address, exiting...\n");
@@ -1432,6 +1475,7 @@ int main_loop(void)
 					if (arm_timer()<0) goto error;
 					timer_main();
 				}else{
+					/* do nothing for main timer */
 				}
 
 		if(sr_wtimer_start()<0) {
@@ -1659,9 +1703,7 @@ int main_loop(void)
 				}else if (pid==0){
 					/* child */
 					bind_address=si; /* shortcut */
-#ifdef STATS
-					setstats( i+r*children_no );
-#endif
+
 					if(woneinit==0) {
 						if(run_child_one_init_route()<0)
 							goto error;
@@ -1696,9 +1738,7 @@ int main_loop(void)
 					}else if (pid==0){
 						/* child */
 						bind_address=si; /* shortcut */
-#ifdef STATS
-						setstats( i+r*children_no );
-#endif
+
 						return sctp_core_rcv_loop();
 					}
 				}
@@ -1785,6 +1825,7 @@ int main_loop(void)
 		cfg_ok=1;
 
 		*_sr_instance_started = 1;
+		sr_corecb_void_exec(app_ready);
 
 #ifdef EXTRA_DEBUG
 		for (r=0; r<*process_count; r++){
@@ -1888,6 +1929,8 @@ int main(int argc, char** argv)
 	int tmp_len;
 	int port;
 	int proto;
+	char *ahost = NULL;
+	int aport = 0;
 	char *options;
 	int ret;
 	unsigned int seed;
@@ -1897,6 +1940,30 @@ int main(int argc, char** argv)
 	struct name_lst* n_lst;
 	char *p;
 	struct stat st = {0};
+
+#define KSR_TBUF_SIZE 512
+	char tbuf[KSR_TBUF_SIZE];
+
+	int option_index = 0;
+
+#define KARGOPTVAL	1024
+	static struct option long_options[] = {
+		/* long options with short variant */
+		{"help",  no_argument, 0, 'h'},
+		{"version",  no_argument, 0, 'v'},
+		/* long options without short variant */
+		{"alias",       required_argument, 0, KARGOPTVAL},
+		{"subst",       required_argument, 0, KARGOPTVAL + 1},
+		{"substdef",    required_argument, 0, KARGOPTVAL + 2},
+		{"substdefs",   required_argument, 0, KARGOPTVAL + 3},
+		{"server-id",   required_argument, 0, KARGOPTVAL + 4},
+		{"loadmodule",  required_argument, 0, KARGOPTVAL + 5},
+		{"modparam",    required_argument, 0, KARGOPTVAL + 6},
+		{"log-engine",  required_argument, 0, KARGOPTVAL + 7},
+		{"debug",       required_argument, 0, KARGOPTVAL + 8},
+		{"atexit",      required_argument, 0, KARGOPTVAL + 10},
+		{0, 0, 0, 0 }
+	};
 
 	/*init*/
 	time(&up_since);
@@ -1912,11 +1979,7 @@ int main(int argc, char** argv)
 	dprint_init_colors();
 
 	/* command line options */
-	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:"
-#ifdef STATS
-		"s:"
-#endif
-	;
+	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:";
 	/* Handle special command line arguments, that must be treated before
 	 * intializing the various subsystem or before parsing other arguments:
 	 *  - get the startup debug and log_stderr values
@@ -1926,7 +1989,8 @@ int main(int argc, char** argv)
 	 *    later
 	 */
 	opterr = 0;
-	while((c=getopt(argc,argv,options))!=-1) {
+	option_index = 0;
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case 'd':
 					debug_flag = 1;
@@ -1956,6 +2020,28 @@ int main(int argc, char** argv)
 			case 'X':
 					sr_memmng_pkg = optarg;
 					break;
+			case KARGOPTVAL+7:
+					ksr_slog_init(optarg);
+					break;
+			case KARGOPTVAL+8:
+					debug_flag = 1;
+					default_core_cfg.debug=(int)strtol(optarg, &tmp, 10);
+					if ((tmp==0) || (*tmp)){
+						LM_ERR("bad debug level value: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+10:
+					if(optarg[0]=='y' || optarg[0]=='1') {
+						ksr_atexit_mode = 1;
+					} else if(optarg[0]=='n' || optarg[0]=='0') {
+						ksr_atexit_mode = 0;
+					} else {
+						LM_ERR("bad atexit value: %s\n", optarg);
+						goto error;
+					}
+					break;
+
 			default:
 					if (c == 'h' || (optarg && strcmp(optarg, "-h") == 0)) {
 						printf("version: %s\n", full_version);
@@ -2002,9 +2088,10 @@ int main(int argc, char** argv)
 	pp_define_core();
 
 	/* process command line (cfg. file path etc) */
-	optind = 1;  /* reset getopt */
+	optind = 1;  /* reset getopt index */
+	option_index = 0;
 	/* switches required before script processing */
-	while((c=getopt(argc,argv,options))!=-1) {
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case 'M':
 			case 'x':
@@ -2012,6 +2099,10 @@ int main(int argc, char** argv)
 					/* ignore, they were parsed immediately after startup */
 					break;
 			case 'f':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -f parameter\n");
+						goto error;
+					}
 					cfg_file=optarg;
 					break;
 			case 'c':
@@ -2019,10 +2110,18 @@ int main(int argc, char** argv)
 					log_stderr=1; /* force stderr logging */
 					break;
 			case 'L':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -L parameter\n");
+						goto error;
+					}
 					mods_dir = optarg;
 					mods_dir_cmd = 1;
 					break;
 			case 'm':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad shared mem size\n");
+						goto error;
+					}
 					shm_mem_size=strtol(optarg, &tmp, 10) * 1024 * 1024;
 					if (tmp &&(*tmp)){
 						fprintf(stderr, "bad shmem size number: -m %s\n",
@@ -2060,6 +2159,10 @@ int main(int argc, char** argv)
 					/* ignore it, was parsed immediately after startup */
 					break;
 			case 'O':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -O parameter\n");
+						goto error;
+					}
 					scr_opt_lev=strtol(optarg, &tmp, 10);
 					if (tmp &&(*tmp)){
 						fprintf(stderr, "bad optimization level: -O %s\n",
@@ -2072,6 +2175,10 @@ int main(int argc, char** argv)
 					user=optarg;
 					break;
 			case 'A':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -A parameter\n");
+						goto error;
+					}
 					p = strchr(optarg, '=');
 					if(p) {
 						*p = '\0';
@@ -2112,24 +2219,77 @@ int main(int argc, char** argv)
 			case 'a':
 			case 's':
 			case 'Y':
+			case KARGOPTVAL+5:
+			case KARGOPTVAL+6:
+			case KARGOPTVAL+7:
+			case KARGOPTVAL+8:
+			case KARGOPTVAL+10:
 					break;
+
+			/* long options */
+			case KARGOPTVAL:
+					if(parse_phostport(optarg, &tmp, &tmp_len,
+											&port, &proto)!=0) {
+						fprintf(stderr, "Invalid alias value '%s'\n", optarg);
+						goto error;
+					}
+					if(add_alias(tmp, tmp_len, port, proto)<0) {
+						fprintf(stderr, "Failed to add alias value '%s'\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+1:
+					if(pp_subst_add(optarg)<0) {
+						LM_ERR("failed to add subst expression: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+2:
+					if(pp_substdef_add(optarg, 0)<0) {
+						LM_ERR("failed to add substdef expression: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+3:
+					if(pp_substdef_add(optarg, 1)<0) {
+						LM_ERR("failed to add substdefs expression: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+4:
+					server_id=(int)strtol(optarg, &tmp, 10);
+					if ((tmp==0) || (*tmp)){
+						LM_ERR("bad server_id value: %s\n", optarg);
+						goto error;
+					}
+					break;
+
+			/* special cases */
 			case '?':
 					if (isprint(optopt)) {
-						fprintf(stderr, "Unknown option `-%c'."
+						fprintf(stderr, "Unknown option '-%c'."
 										" Use -h for help.\n", optopt);
 					} else {
-						fprintf(stderr, "Unknown option character `\\x%x'."
+						fprintf(stderr, "Unknown option code '0x%x' (%d)."
 										" Use -h for help.\n",
-							optopt);
+							optopt, option_index);
 					}
 					goto error;
 			case ':':
-					fprintf(stderr, "Option `-%c' requires an argument."
+					if (isprint(optopt)) {
+						fprintf(stderr, "Option '-%c' requires an argument."
 									" Use -h for help.\n",
-						optopt);
+							optopt);
+					} else {
+						fprintf(stderr, "Option code '0x%x' (%d) requires an argument."
+										" Use -h for help.\n",
+							optopt, option_index);
+					}
 					goto error;
+
 			default:
-					abort();
+					fprintf(stderr, "Invalid option code '0x%x'", c);
+					return -1;
 		}
 	}
 	if (shm_mem_size == 0) {
@@ -2151,6 +2311,29 @@ int main(int argc, char** argv)
 	/* Fix the value of cfg_file variable.*/
 	if (fix_cfg_file() < 0) goto error;
 
+	/* process command line parameters that require initialized basic environment */
+	optind = 1;  /* reset getopt index */
+	option_index = 0;
+	/* switches required before config parsing and processing */
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
+		switch(c) {
+			case KARGOPTVAL+5:
+					if (load_module(optarg)!=0) {
+						LM_ERR("failed to load the module: %s\n", optarg);
+						goto error;
+					}
+					break;
+			case KARGOPTVAL+6:
+					if(set_mod_param_serialized(optarg) < 0) {
+						LM_ERR("failed to set modparam: %s\n", optarg);
+						goto error;
+					}
+					break;
+			default:
+					break;
+		}
+	}
+
 	/* load config file or die */
 	if (cfg_file[0] == '-' && strlen(cfg_file)==1) {
 		cfg_stream=stdin;
@@ -2158,7 +2341,8 @@ int main(int argc, char** argv)
 		cfg_stream=fopen (cfg_file, "r");
 	}
 	if (cfg_stream==0){
-		fprintf(stderr, "ERROR: loading config file(%s): %s\n", cfg_file,
+		fprintf(stderr, "ERROR: loading config file(%s): %s,"
+				" check file and directory permissions\n", cfg_file,
 				strerror(errno));
 		goto error;
 	}
@@ -2179,10 +2363,11 @@ try_again:
 	}
 	seed+=getpid()+time(0);
 	LM_DBG("seeding PRNG with %u\n", seed);
-	kam_srand(seed);
-	fastrand_seed(kam_rand());
-	srandom(kam_rand()+time(0));
-	LM_DBG("test random numbers %u %lu %u\n", kam_rand(), random(), fastrand());
+	cryptorand_seed(seed);
+	fastrand_seed(cryptorand());
+	kam_srand(cryptorand());
+	srandom(cryptorand());
+	LM_DBG("test random numbers %u %lu %u %u\n", kam_rand(), random(), fastrand(), cryptorand());
 
 	/*register builtin  modules*/
 	register_builtin_modules();
@@ -2192,10 +2377,10 @@ try_again:
 
 	yyin=cfg_stream;
 	debug_save = default_core_cfg.debug;
-	if ((yyparse()!=0)||(cfg_errors)){
+	if ((yyparse()!=0)||(cfg_errors)||(pp_ifdef_level_check()<0)){
 		fprintf(stderr, "ERROR: bad config file (%d errors)\n", cfg_errors);
 		if (debug_flag) default_core_cfg.debug = debug_save;
-		pp_ifdef_level_check();
+		pp_ifdef_level_error();
 
 		goto error;
 	}
@@ -2203,7 +2388,6 @@ try_again:
 		fprintf(stderr, "%d config warnings\n", cfg_warnings);
 	}
 	if (debug_flag) default_core_cfg.debug = debug_save;
-	pp_ifdef_level_check();
 	print_rls();
 
 	if(init_dst_set()<0) {
@@ -2211,8 +2395,9 @@ try_again:
 		goto error;
 	}
 	/* options with higher priority than cfg file */
-	optind = 1;  /* reset getopt */
-	while((c=getopt(argc,argv,options))!=-1) {
+	optind = 1;  /* reset getopt index */
+	option_index = 0;
+	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case 'f':
 			case 'c':
@@ -2235,6 +2420,10 @@ try_again:
 									   takes priority over config */
 					break;
 			case 'b':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -b parameter\n");
+						goto error;
+					}
 					maxbuffer=strtol(optarg, &tmp, 10);
 					if (tmp &&(*tmp)){
 						fprintf(stderr, "bad max buffer size number: -b %s\n",
@@ -2257,7 +2446,42 @@ try_again:
 				#endif
 					break;
 			case 'l':
-					if ((n_lst=parse_phostport_mh(optarg, &tmp, &tmp_len,
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -l parameter\n");
+						goto error;
+					}
+					p = strrchr(optarg, '/');
+					if(p==NULL) {
+						p = optarg;
+					} else {
+						if(strlen(optarg)>=KSR_TBUF_SIZE-1) {
+							fprintf(stderr, "listen value too long: %s\n",
+									optarg);
+							goto error;
+						}
+						strcpy(tbuf, optarg);
+						p = strrchr(tbuf, '/');
+						if(p==NULL) {
+							fprintf(stderr, "unexpected bug for listen: %s\n",
+									optarg);
+							goto error;
+						}
+						*p = '\0';
+						p++;
+						tmp_len = 0;
+						if(parse_phostport(p, &ahost, &tmp_len, &aport,
+									&proto)<0)
+						{
+							fprintf(stderr, "listen value with invalid advertise: %s\n",
+									optarg);
+							goto error;
+						}
+						if(ahost) {
+							ahost[tmp_len] = '\0';
+						}
+						p = tbuf;
+					}
+					if ((n_lst=parse_phostport_mh(p, &tmp, &tmp_len,
 											&port, &proto))==0){
 						fprintf(stderr, "bad -l address specifier: %s\n"
 											"Check disabled protocols\n",
@@ -2265,15 +2489,20 @@ try_again:
 						goto error;
 					}
 					/* add a new addr. to our address list */
-					if (add_listen_iface(n_lst->name, n_lst->next,  port,
-											proto, n_lst->flags)!=0){
-						fprintf(stderr, "failed to add new listen address\n");
+					if (add_listen_advertise_iface(n_lst->name, n_lst->next,  port,
+											proto, ahost, aport, n_lst->flags)!=0){
+						fprintf(stderr, "failed to add new listen address: %s\n",
+								optarg);
 						free_name_lst(n_lst);
 						goto error;
 					}
 					free_name_lst(n_lst);
 					break;
 			case 'n':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -n parameter\n");
+						goto error;
+					}
 					children_no=strtol(optarg, &tmp, 10);
 					if ((tmp==0) ||(*tmp)){
 						fprintf(stderr, "bad process number: -n %s\n",
@@ -2300,6 +2529,10 @@ try_again:
  									"TCP support disabled\n", optarg);
 						goto error;
 					}
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -N parameter\n");
+						goto error;
+					}
 					tcp_cfg_children_no=strtol(optarg, &tmp, 10);
 					if ((tmp==0) ||(*tmp)){
 						fprintf(stderr, "bad process number: -N %s\n",
@@ -2312,6 +2545,10 @@ try_again:
 					break;
 			case 'W':
 				#ifdef USE_TCP
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -W parameter\n");
+						goto error;
+					}
 					tcp_poll_method=get_poll_type(optarg);
 					if (tcp_poll_method==POLL_NONE){
 						fprintf(stderr, "bad poll method name: -W %s\ntry "
@@ -2327,6 +2564,10 @@ try_again:
 					if (sctp_disable) {
 						fprintf(stderr, "could not configure SCTP children: -Q %s\n"
 									"SCTP support disabled\n", optarg);
+						goto error;
+					}
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -Q parameter\n");
 						goto error;
 					}
 					sctp_children_no=strtol(optarg, &tmp, 10);
@@ -2372,11 +2613,6 @@ try_again:
 						goto error;
 					}
 					break;
-			case 's':
-				#ifdef STATS
-					stat_file=optarg;
-				#endif
-					break;
 			default:
 					break;
 		}
@@ -2388,6 +2624,8 @@ try_again:
 
 	if (ksr_route_locks_set_init()<0)
 		goto error;
+
+	ksr_shutdown_phase_init();
 
 	/* init lookup for core event routes */
 	sr_core_ert_init();
@@ -2470,8 +2708,8 @@ try_again:
 	/* create runtime dir if doesn't exist */
 	if (stat(runtime_dir, &st) == -1) {
 		if(mkdir(runtime_dir, 0700) == -1) {
-			LM_ERR("failed to create runtime dir %s\n", runtime_dir);
-			fprintf(stderr,  "failed to create runtime dir %s\n", runtime_dir);
+			LM_ERR("failed to create runtime dir %s, check directory permissions\n", runtime_dir);
+			fprintf(stderr, "failed to create runtime dir %s, check directory permissions\n", runtime_dir);
 			goto error;
 		}
 		if(sock_uid!=-1 || sock_gid!=-1) {
@@ -2523,10 +2761,8 @@ try_again:
 	 *  Note: shm can now be initialized when parsing the config script, that's
 	 *  why checking for a prior initialization is needed.
 	 * --andrei */
-#ifdef SHM_MEM
 	if (!shm_initialized() && init_shm()<0)
 		goto error;
-#endif /* SHM_MEM */
 	pkg_print_manager();
 	shm_print_manager();
 	if (init_atomic_ops()==-1)
@@ -2703,10 +2939,6 @@ try_again:
 	};
 	fixup_complete=1;
 
-#ifdef STATS
-	if (init_stats(  dont_fork ? 1 : children_no  )==-1) goto error;
-#endif
-
 	ret=main_loop();
 	if (ret < 0)
 		goto error;
@@ -2718,7 +2950,7 @@ try_again:
 					strerror(errno), errno);
 	}
 	/* else terminate process */
-	return ret;
+	ksr_exit(ret);
 
 error:
 	/*kill everything*/
@@ -2728,7 +2960,7 @@ error:
 			fprintf(stderr, "error sending exit status: %s [%d]\n",
 					strerror(errno), errno);
 	}
-	return -1;
+	ksr_exit(-1);
 }
 
 

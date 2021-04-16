@@ -57,6 +57,7 @@ typedef struct
 	char *failovercon;
 	char *useragent;
 	char *hdrs;
+	char *netinterface;
 	unsigned int authmethod;
 	unsigned int http_proxy_port;
 	unsigned int tlsversion;
@@ -249,7 +250,9 @@ static int curL_query_url(struct sip_msg *_m, const char *_url, str *_dst,
 	if(params->http_follow_redirect) {
 		LM_DBG("Following redirects for this request! \n");
 	}
-
+	if(params->netinterface != NULL) {
+		res |= curl_easy_setopt(curl, CURLOPT_INTERFACE, params->netinterface);
+	}
 
 	res |= curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
 	res |= curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void*)(&stream));
@@ -576,6 +579,7 @@ int curl_con_query_url_f(struct sip_msg *_m, const str *connection,
 	query_params.keep_connections = conn->keep_connections;
 	query_params.oneline = 0;
 	query_params.maxdatasize = maxdatasize;
+	query_params.netinterface = default_netinterface;
 	query_params.http_proxy_port = conn->http_proxy_port;
 	if(conn->failover.s) {
 		failovercon = as_asciiz(&conn->failover);
@@ -652,8 +656,9 @@ int http_client_query(
 	query_params.verify_host = default_tls_verify_host;
 	query_params.timeout = default_connection_timeout;
 	query_params.http_follow_redirect = default_http_follow_redirect;
-	query_params.oneline = 1;
-	query_params.maxdatasize = 0;
+	query_params.oneline = default_query_result;
+	query_params.maxdatasize = default_query_maxdatasize;
+	query_params.netinterface = default_netinterface;
 	if(default_useragent.s != NULL && default_useragent.len > 0) {
 		query_params.useragent = default_useragent.s;
 	}
@@ -662,6 +667,18 @@ int http_client_query(
 		if(default_http_proxy_port > 0) {
 			query_params.http_proxy_port = default_http_proxy_port;
 		}
+	}
+	if(default_tls_clientcert.s != NULL && default_tls_clientcert.len > 0) {
+		query_params.clientcert = default_tls_clientcert.s;
+	}
+	if(default_tls_clientkey.s != NULL && default_tls_clientkey.len > 0) {
+		query_params.clientkey = default_tls_clientkey.s;
+	}
+	if(default_tls_cacert != NULL) {
+		query_params.cacert = default_tls_cacert;
+	}
+	if(default_cipher_suite_list.s != NULL && default_cipher_suite_list.len) {
+		query_params.ciphersuites = default_cipher_suite_list.s;
 	}
 
 	res = curL_query_url(_m, _url, _dst, &query_params);

@@ -36,10 +36,12 @@
 #include "../../core/parser/parse_to.h"
 #include "../../core/parser/contact/parse_contact.h"
 #include "../../core/fmsg.h"
+#include "../../core/kemi.h"
 
 #include "auth.h"
 #include "auth_hdr.h"
 #include "uac_send.h"
+#include "uac_reg.h"
 
 #define MAX_UACH_SIZE 2048
 #define MAX_UACB_SIZE 32768
@@ -81,6 +83,8 @@ typedef struct _uac_send_info {
 
 static struct _uac_send_info _uac_req;
 
+extern str uac_event_callback;
+
 void uac_send_info_copy(uac_send_info_t *src, uac_send_info_t *dst)
 {
 	memcpy(dst, src, sizeof(uac_send_info_t));
@@ -104,7 +108,7 @@ uac_send_info_t *uac_send_info_clone(uac_send_info_t *ur)
 	tp = (uac_send_info_t*)shm_malloc(sizeof(uac_send_info_t));
 	if(tp==NULL)
 	{
-		LM_ERR("no more shm memory\n");
+		SHM_MEM_ERROR;
 		return NULL;
 	}
 	uac_send_info_copy(ur, tp);
@@ -629,12 +633,27 @@ void uac_req_run_event_route(sip_msg_t *msg, uac_send_info_t *tp, int rcode)
 	int rt, backup_rt;
 	struct run_act_ctx ctx;
 	sip_msg_t *fmsg;
+	sr_kemi_eng_t *keng = NULL;
+	int kemi_evroute = 0;
 
-	rt = route_get(&event_rt, evrtname);
-	if (rt < 0 || event_rt.rlist[rt] == NULL)
-	{
-		LM_DBG("event_route[uac:reply] does not exist\n");
-		return;
+	if(uac_event_callback.s!=NULL && uac_event_callback.len>0) {
+		keng = sr_kemi_eng_get();
+		if(keng==NULL) {
+			LM_DBG("event callback (%s) set, but no cfg engine\n",
+					uac_event_callback.s);
+			return;
+		} else {
+			kemi_evroute = 1;
+		}
+	}
+
+	if (kemi_evroute==0) {
+		rt = route_get(&event_rt, evrtname);
+		if (rt < 0 || event_rt.rlist[rt] == NULL)
+		{
+			LM_DBG("event_route[uac:reply] does not exist\n");
+			return;
+		}
 	}
 
 	uac_send_info_copy(tp, &_uac_req);
@@ -651,7 +670,17 @@ void uac_req_run_event_route(sip_msg_t *msg, uac_send_info_t *tp, int rcode)
 	backup_rt = get_route_type();
 	set_route_type(REQUEST_ROUTE);
 	init_run_actions_ctx(&ctx);
-	run_top_route(event_rt.rlist[rt], fmsg, 0);
+
+	if (kemi_evroute==1) {
+		str evrtname = str_init("uac:reply");
+
+		if(sr_kemi_route(keng, fmsg, EVENT_ROUTE,
+					&uac_event_callback, &evrtname)<0) {
+			LM_ERR("error running event route kemi callback\n");
+		}
+	} else {
+		run_top_route(event_rt.rlist[rt], fmsg, 0);
+	}
 	set_route_type(backup_rt);
 }
 
@@ -820,7 +849,13 @@ int uac_req_send(void)
 	uac_r.method = &_uac_req.s_method;
 	uac_r.headers = (_uac_req.s_hdrs.len <= 0) ? NULL : &_uac_req.s_hdrs;
 	uac_r.body = (_uac_req.s_body.len <= 0) ? NULL : &_uac_req.s_body;
-	uac_r.ssock = (_uac_req.s_sock.len <= 0) ? NULL : &_uac_req.s_sock;
+
+	if (_uac_req.s_sock.s != NULL && _uac_req.s_sock.len > 0) {
+		uac_r.ssock = &_uac_req.s_sock;
+	} else if(uac_default_socket.s != NULL && uac_default_socket.len > 0) {
+		uac_r.ssock = &uac_default_socket;
+	}
+
 	if((_uac_req.s_auser.len > 0 && _uac_req.s_apasswd.len>0)
 			|| (_uac_req.evroute > 0))
 	{

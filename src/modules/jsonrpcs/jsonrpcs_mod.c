@@ -470,8 +470,9 @@ static srjson_t* jsonrpc_print_value(jsonrpc_ctx_t* ctx, char fmt, va_list* ap)
 	srjson_t *nj = NULL;
 	char buf[JSONRPC_PRINT_VALUE_BUF_LEN];
 	time_t dt;
-	struct tm* t;
+	struct tm t;
 	str *sp;
+	char *cp;
 
 	switch(fmt) {
 	case 'd':
@@ -488,20 +489,29 @@ static srjson_t* jsonrpc_print_value(jsonrpc_ctx_t* ctx, char fmt, va_list* ap)
 		break;
 	case 't':
 		dt = va_arg(*ap, time_t);
-		t = gmtime(&dt);
+		gmtime_r(&dt, &t);
 		if (strftime(buf, JSONRPC_PRINT_VALUE_BUF_LEN,
-				"%Y%m%dT%H:%M:%S", t) == 0) {
+				"%Y%m%dT%H:%M:%S", &t) == 0) {
 			LM_ERR("Error while converting time\n");
 			return NULL;
 		}
 		nj = srjson_CreateString(ctx->jrpl, buf);
 		break;
 	case 's':
-		nj = srjson_CreateString(ctx->jrpl, va_arg(*ap, char*));
+		cp = va_arg(*ap, char*);
+		if(cp!=NULL) {
+			nj = srjson_CreateString(ctx->jrpl, cp);
+		} else {
+			nj = srjson_CreateNull(ctx->jrpl);
+		}
 		break;
 	case 'S':
 		sp = va_arg(*ap, str*);
-		nj = srjson_CreateStr(ctx->jrpl, sp->s, sp->len);
+		if(sp!=NULL && sp->s!=NULL) {
+			nj = srjson_CreateStr(ctx->jrpl, sp->s, sp->len);
+		} else {
+			nj = srjson_CreateNull(ctx->jrpl);
+		}
 		break;
 	default:
 		LM_ERR("Invalid formatting character [%c]\n", fmt);
@@ -1023,7 +1033,7 @@ static struct rpc_delayed_ctx* jsonrpc_delayed_ctx_new(jsonrpc_ctx_t* ctx)
 		return 0;
 	}
 	if(nj->valuestring!=NULL && strlen(nj->valuestring)>JSONRPC_ID_SIZE-1) {
-		LM_ERR("id attribute is too long (%lu/%d)\n", strlen(nj->valuestring),
+		LM_ERR("id attribute is too long (%lu/%d)\n", (unsigned long)strlen(nj->valuestring),
 				JSONRPC_ID_SIZE);
 		return 0;
 	}
@@ -1227,7 +1237,7 @@ static void mod_destroy(void)
 /**
  *
  */
-static int jsonrpc_dispatch(sip_msg_t* msg, char* s1, char* s2)
+static int ki_jsonrpcs_dispatch(sip_msg_t* msg)
 {
 	rpc_export_t* rpce;
 	jsonrpc_ctx_t* ctx;
@@ -1314,6 +1324,14 @@ send_reply:
 	return 1;
 }
 
+
+/**
+ *
+ */
+static int jsonrpc_dispatch(sip_msg_t* msg, char* s1, char* s2)
+{
+	return ki_jsonrpcs_dispatch(msg);
+}
 
 int jsonrpc_exec_ex(str *cmd, str *rpath)
 {
@@ -1530,8 +1548,32 @@ static int ki_jsonrpcs_exec(sip_msg_t *msg, str *scmd)
 /**
  *
  */
+static sr_kemi_xval_t _sr_kemi_jsonrpcs_xval = {0};
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_jsonrpcs_response(sip_msg_t *msg)
+{
+	if(_jsonrpc_plain_reply.rbody.s==NULL) {
+		sr_kemi_xval_null(&_sr_kemi_jsonrpcs_xval, SR_KEMI_XVAL_NULL_EMPTY);
+		return &_sr_kemi_jsonrpcs_xval;
+	}
+	_sr_kemi_jsonrpcs_xval.vtype = SR_KEMIP_STR;
+	_sr_kemi_jsonrpcs_xval.v.s = _jsonrpc_plain_reply.rbody;
+	return &_sr_kemi_jsonrpcs_xval;
+}
+
+/**
+ *
+ */
 /* clang-format off */
 static sr_kemi_t sr_kemi_jsonrpcs_exports[] = {
+	{ str_init("jsonrpcs"), str_init("dispatch"),
+		SR_KEMIP_INT, ki_jsonrpcs_dispatch,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("jsonrpcs"), str_init("exec"),
 		SR_KEMIP_INT, ki_jsonrpcs_exec,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
@@ -1540,6 +1582,11 @@ static sr_kemi_t sr_kemi_jsonrpcs_exports[] = {
 	{ str_init("jsonrpcs"), str_init("execx"),
 		SR_KEMIP_INT, ki_jsonrpcs_exec,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("jsonrpcs"), str_init("response"),
+		SR_KEMIP_XVAL, ki_jsonrpcs_response,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

@@ -345,26 +345,6 @@ modparam("presence", "startup_mode", 0)
 		</example>
 	</section>
 
-	<section id="presence.p.to_tag_pref">
-		<title><varname>to_tag_pref</varname> (str)</title>
-		<para>
-		The prefix used when generating to_tag when sending replies for
-		SUBSCRIBE requests.
-		</para>
-		<para>
-		<emphasis>Default value is <quote>10</quote>.
-		</emphasis>
-		</para>
-		<example>
-		<title>Set <varname>to_tag_pref</varname> parameter</title>
-		<programlisting format="linespecific">
-...
-modparam("presence", "to_tag_pref", 'pres')
-...
-	</programlisting>
-		</example>
-	</section>
-
 	<section id="presence.p.expires_offset">
 		<title><varname>expires_offset</varname> (int)</title>
 		<para>
@@ -545,12 +525,20 @@ modparam("presence", "subs_db_mode", 1)
 	<section id="presence.p.publ_cache">
 		<title><varname>publ_cache</varname> (int)</title>
 		<para>
-		To improve performance, the presence module holds by default a
-		publish cache that says if a certain publication exists in database.
-		This is only a list of URI + event, so it does not use much memory.
-		The cache is used when a Subscription is received to check if there
-		is any published state in database. This way unnecessary queries in
-		presentity table are avoided.
+		To improve performance, the presence module can operate in a couple of
+		modes related to how PUBLISH data is stored. If publ_cache is 0,
+		then no information is store in memory.
+		</para>
+		<para>
+		If publ_cache is 1, then the module keeps in memory an index of the
+		records stored in database, In this mode it keeps only the list of URIs
+		and events, so it does not use much memory. The cache is used when a
+		Subscription is received to check if there is any published state in
+		database. This way unnecessary queries in presentity table are avoided.
+		</para>
+		<para>
+		If publ_cache is 2, then the module keeps everything related to PUBLISH
+		requests in memory, not storing anything in the database.
 		</para>
 		<para>
 		Setting this parameter to 0 will disable the usage of the publish
@@ -929,6 +917,69 @@ modparam("presence", "enable_dmq", 1)
 	</example>
 </section>
 
+<section id="presence.p.pres_subs_mode">
+	<title><varname>pres_subs_mode</varname> (integer)</title>
+	<para>
+	Allow disabling cloning subscription structure for pv $subs(...), saving the
+	pkg memory and copy operations for all its fields. If 1 the cloning is done;
+	if 0, no cloning and $subs(...) returns $null.
+	</para>
+	<para>
+		<emphasis>
+			Default value is 1.
+		</emphasis>
+	</para>
+	<example>
+		<title>Set <varname>pres_subs_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("presence", "pres_subs_mode", 0)
+...
+</programlisting>
+	</example>
+</section>
+
+<section id="presence.p.delete_same_subs">
+	<title><varname>delete_same_subs</varname> (integer)</title>
+	<para>
+		Enable deleting of subscriptions with the same presence uri and callid.
+	</para>
+	<para>
+		<emphasis>
+			Default value is 0 (disabled behavior).
+		</emphasis>
+	</para>
+	<example>
+		<title>Set <varname>delete_same_subs</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("presence", "delete_same_subs", 1)
+...
+</programlisting>
+	</example>
+</section>
+
+<section id="presence.p.timer_mode">
+	<title><varname>timer_mode</varname> (integer)</title>
+	<para>
+	Specify what timer process to be used. If set to 0, the core main timer
+	is used. If set to 1, the core secondary timer is used.
+	</para>
+	<para>
+		<emphasis>
+			Default value is 1.
+		</emphasis>
+	</para>
+	<example>
+		<title>Set <varname>timer_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("presence", "timer_mode", 0)
+...
+</programlisting>
+	</example>
+</section>
+
 </section>
 
 <section>
@@ -1266,6 +1317,62 @@ pres_update_watchers("sip:test@kamailio.org", "presence");
 ...
 </programlisting>
 	</section>
+	<section id="presence.rpc.updateWatchers">
+	  <title>presence.updateWatchers</title>
+	  <para>
+		Manually triggers updates to watchers (for example,
+		after the contents of XCAP docs has been updated).
+	  </para>
+	  <para>
+		Name: <emphasis>presence.updateWatchers</emphasis>
+	  </para>
+	  <para>Parameters:</para>
+		<itemizedlist>
+			<listitem>
+				<para>uri - the uri of the user who made the changes
+				and whose watchers should be updated.</para>
+			</listitem>
+			<listitem>
+				<para>event - the event package (e.g. presence).
+				</para>
+			</listitem>
+		</itemizedlist>
+	  <para>
+		RPC Command Format:
+	  </para>
+	  <programlisting  format="linespecific">
+...
+&kamcmd; presence.updateWatchers sip:alice@domain.com presence
+...
+	  </programlisting>
+	</section>
+	<section id="presence.rpc.presentity_list">
+	  <title>presence.presentity_list</title>
+	  <para>
+		List the presentity records stored in memory.
+	  </para>
+	  <para>
+		Name: <emphasis>presence.presentity_list</emphasis>
+	  </para>
+	  <para>Parameters:</para>
+		<itemizedlist>
+			<listitem>
+				<para>mode - (optional) it can be 'full' to print all the
+				fields of presentity record. If missine, only a selected
+				set of fields are printed in the response.</para>
+			</listitem>
+		</itemizedlist>
+	  <para>
+		RPC Command Format:
+	  </para>
+	  <programlisting  format="linespecific">
+...
+kamctl rpc presence.presentity_list
+kamctl rpc presence.presentity_list full
+...
+	  </programlisting>
+	</section>
+
 </section>
 
 <section>

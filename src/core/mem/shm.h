@@ -16,6 +16,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/**
+ * \file
+ * \brief  Shared memory functions
+ * \ingroup mem
+ */
 
 #ifndef _sr_shm_h_
 #define _sr_shm_h_
@@ -91,4 +96,16 @@ int shm_address_in(void *p);
 #define shm_available_safe() shm_available()
 #define shm_malloc_on_fork() do{}while(0)
 
+/* generic logging helper for allocation errors in shared memory pool */
+#define SHM_MEM_ERROR LM_ERR("could not allocate shared memory from shm pool\n")
+#define SHM_MEM_CRITICAL LM_CRIT("could not allocate shared memory from shm pool\n")
+
+#ifdef __SUNPRO_C
+#define SHM_MEM_ERROR_FMT(...) LM_ERR("could not allocate shared memory from shm pool" __VA_ARGS__)
+#define SHM_MEM_CRITICAL_FMT(...) LM_CRIT("could not allocate shared memory from shm pool" __VA_ARGS__)
+#else
+#define SHM_MEM_ERROR_FMT(fmt, args...) LM_ERR("could not allocate shared memory from shm pool - " fmt , ## args)
+#define SHM_MEM_CRITICAL_FMT(fmt, args...) LM_CRIT("could not allocate shared memory from shm pool - " fmt , ## args)
 #endif
+
+#endif /* _sr_shm_h_ */

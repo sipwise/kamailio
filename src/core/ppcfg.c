@@ -32,6 +32,7 @@
 #include "dprint.h"
 
 #include "ppcfg.h"
+#include "fmsg.h"
 
 typedef struct _pp_subst_rule {
 	char *indata;
@@ -57,7 +58,7 @@ int pp_subst_add(char *data)
 	pr = (pp_subst_rule_t*)pkg_malloc(sizeof(pp_subst_rule_t));
 	if(pr==NULL)
 	{
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memset(pr, 0, sizeof(pp_subst_rule_t));
@@ -79,7 +80,7 @@ int pp_subst_add(char *data)
 	}
 	pp_subst_rules_tail = pr;
 
-	LM_INFO("### added subst expression: %s\n", data);
+	LM_DBG("### added subst expression: [%s]\n", data);
 
 	return 0;
 }
@@ -184,7 +185,8 @@ int pp_subst_run(char **data)
 	i = 0;
 	while(pr)
 	{
-		result=subst_str(*data, 0,
+		sip_msg_t *fmsg = faked_msg_get_next();
+		result=subst_str(*data, fmsg,
 				(struct subst_expr*)pr->ppdata, 0); /* pkg malloc'ed result */
 		if(result!=NULL)
 		{
@@ -214,14 +216,27 @@ void pp_ifdef_level_update(int val)
 /**
  *
  */
-void pp_ifdef_level_check(void)
+int pp_ifdef_level_check(void)
 {
 	if(_pp_ifdef_level!=0) {
-		LM_WARN("different number of preprocessor directives:"
-				" N(#!IF[N]DEF) - N(#!ENDIF) = %d\n", _pp_ifdef_level);
+		return -1;
 	} else {
 		LM_DBG("same number of pairing preprocessor directives"
 			" #!IF[N]DEF - #!ENDIF\n");
+	}
+	return 0;
+}
+
+void pp_ifdef_level_error(void)
+{
+	if(_pp_ifdef_level!=0) {
+		if (_pp_ifdef_level > 0) {
+			LM_ERR("different number of preprocessor directives:"
+				" %d more #!if[n]def as #!endif\n", _pp_ifdef_level);
+		} else {
+			LM_ERR("different number of preprocessor directives:"
+				" %d more #!endif as #!if[n]def\n", (_pp_ifdef_level)*-1);
+		}
 	}
 }
 

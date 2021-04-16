@@ -31,6 +31,7 @@
 #include <string.h>
 #include <time.h>
 
+extern int db_mysql_opt_ssl_mode;
 
 /*
  * Close the connection and release memory
@@ -61,15 +62,35 @@ int my_con_connect(db_con_t* con)
 	/* Do not reconnect already connected connections */
 	if (mcon->flags & MY_CONNECTED) return 0;
 
-	DBG("mysql: Connecting to %.*s:%.*s\n",
+	DBG("Connecting to %.*s:%.*s\n",
 		con->uri->scheme.len, ZSW(con->uri->scheme.s),
 		con->uri->body.len, ZSW(con->uri->body.s));
 
 	if (my_connect_to) {
 		if (mysql_options(mcon->con, MYSQL_OPT_CONNECT_TIMEOUT,
-					(char*)&my_connect_to))
-			WARN("mysql: failed to set MYSQL_OPT_CONNECT_TIMEOUT\n");
+					(const void*)&my_connect_to))
+			WARN("failed to set MYSQL_OPT_CONNECT_TIMEOUT\n");
 	}
+#if MYSQL_VERSION_ID > 50710 && !defined(MARIADB_BASE_VERSION)
+	if(db_mysql_opt_ssl_mode!=0) {
+		unsigned int optuint = 0;
+		if(db_mysql_opt_ssl_mode==1) {
+			if(db_mysql_opt_ssl_mode!=SSL_MODE_DISABLED) {
+				LM_WARN("ssl mode disabled is not 1 (value %u) - enforcing\n",
+						SSL_MODE_DISABLED);
+			}
+			optuint = SSL_MODE_DISABLED;
+		} else {
+			optuint = (unsigned int)db_mysql_opt_ssl_mode;
+		}
+		mysql_options(mcon->con, MYSQL_OPT_SSL_MODE, (const void*)&optuint);
+	}
+#else
+	if(db_mysql_opt_ssl_mode!=0) {
+		LM_WARN("ssl mode not supported by mysql version (value %u) - ignoring\n",
+						(unsigned int)db_mysql_opt_ssl_mode);
+	}
+#endif
 
 #if MYSQL_VERSION_ID >= 40101
 	if ((my_client_ver >= 50025) ||
@@ -77,26 +98,26 @@ int my_con_connect(db_con_t* con)
 			(my_client_ver < 50000))) {
 		if (my_send_to) {
 			if (mysql_options(mcon->con, MYSQL_OPT_WRITE_TIMEOUT ,
-						(char*)&my_send_to))
-				WARN("mysql: failed to set MYSQL_OPT_WRITE_TIMEOUT\n");
+						(const void*)&my_send_to))
+				WARN("failed to set MYSQL_OPT_WRITE_TIMEOUT\n");
 		}
 		if (my_recv_to){
 			if (mysql_options(mcon->con, MYSQL_OPT_READ_TIMEOUT ,
-						(char*)&my_recv_to))
-				WARN("mysql: failed to set MYSQL_OPT_READ_TIMEOUT\n");
+						(const void*)&my_recv_to))
+				WARN("failed to set MYSQL_OPT_READ_TIMEOUT\n");
 		}
 	}
 #endif
 
 	if (!mysql_real_connect(mcon->con, muri->host, muri->username,
 						muri->password, muri->database, muri->port, 0, 0)) {
-		LOG(L_ERR, "mysql: %s\n", mysql_error(mcon->con));
+		ERR("could not connect: %s\n", mysql_error(mcon->con));
 		return -1;
 	}
 
-	DBG("mysql: Connection type is %s\n", mysql_get_host_info(mcon->con));
-	DBG("mysql: Protocol version is %d\n", mysql_get_proto_info(mcon->con));
-	DBG("mysql: Server version is %s\n", mysql_get_server_info(mcon->con));
+	DBG("Connection type is %s\n", mysql_get_host_info(mcon->con));
+	DBG("Protocol version is %d\n", mysql_get_proto_info(mcon->con));
+	DBG("Server version is %s\n", mysql_get_server_info(mcon->con));
 
 	mcon->flags |= MY_CONNECTED;
 	return 0;
@@ -111,7 +132,7 @@ void my_con_disconnect(db_con_t* con)
 
 	if ((mcon->flags & MY_CONNECTED) == 0) return;
 
-	DBG("mysql: Disconnecting from %.*s:%.*s\n",
+	DBG("Disconnecting from %.*s:%.*s\n",
 		con->uri->scheme.len, ZSW(con->uri->scheme.s),
 		con->uri->body.len, ZSW(con->uri->body.s));
 
@@ -138,7 +159,7 @@ int my_con(db_con_t* con)
 	 */
 	ptr = (struct my_con*)db_pool_get(con->uri);
 	if (ptr) {
-		DBG("mysql: Connection to %.*s:%.*s found in connection pool\n",
+		DBG("Connection to %.*s:%.*s found in connection pool\n",
 			con->uri->scheme.len, ZSW(con->uri->scheme.s),
 			con->uri->body.len, ZSW(con->uri->body.s));
 		goto found;
@@ -146,7 +167,7 @@ int my_con(db_con_t* con)
 
 	ptr = (struct my_con*)pkg_malloc(sizeof(struct my_con));
 	if (!ptr) {
-		LOG(L_ERR, "mysql: No memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset(ptr, '\0', sizeof(struct my_con));
@@ -154,18 +175,18 @@ int my_con(db_con_t* con)
 
 	ptr->con = (MYSQL*)pkg_malloc(sizeof(MYSQL));
 	if (!ptr->con) {
-		LOG(L_ERR, "mysql: No enough memory\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	mysql_init(ptr->con);
 
-	DBG("mysql: Creating new connection to: %.*s:%.*s\n",
+	DBG("Creating new connection to: %.*s:%.*s\n",
 		con->uri->scheme.len, ZSW(con->uri->scheme.s),
 		con->uri->body.len, ZSW(con->uri->body.s));
 
 	/* Put the newly created mysql connection into the pool */
 	db_pool_put((struct db_pool_entry*)ptr);
-	DBG("mysql: Connection stored in connection pool\n");
+	DBG("Connection stored in connection pool\n");
 
 found:
 	/* Attach driver payload to the db_con structure and set connect and

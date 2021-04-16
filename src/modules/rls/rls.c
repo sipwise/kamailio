@@ -483,21 +483,21 @@ static int mod_init(void)
 
 	/* verify table version */
 	if(db_check_table_version(&rls_dbf, rls_db, &rlsubs_table, W_TABLE_VERSION) < 0) {
-		LM_ERR("error during table version check.\n");
-		return -1;
+		DB_TABLE_VERSION_ERROR(rlsubs_table);
+		goto dberror;
 	}
 
 	/* verify table version */
 	if(db_check_table_version(&rlpres_dbf, rlpres_db, &rlpres_table, P_TABLE_VERSION) < 0) {
-		LM_ERR("error during table version check.\n");
-		return -1;
+		DB_TABLE_VERSION_ERROR(rlpres_table);
+		goto dberror;
 	}
 
 	/* verify table version */
 	if(db_check_table_version(&rls_xcap_dbf, rls_xcap_db, &rls_xcap_table, X_TABLE_VERSION) < 0)
 	{
-		LM_ERR("error during table version check.\n");
-		return -1;
+		DB_TABLE_VERSION_ERROR(rls_xcap_table);
+		goto dberror;
 	}
 
 	if (dbmode != RLS_DB_ONLY)
@@ -511,14 +511,14 @@ static int mod_init(void)
 		if(rls_table== NULL)
 		{
 			LM_ERR("while creating new hash table\n");
-			return -1;
+			goto dberror;
 		}
 		if(rls_reload_db_subs!=0)
 		{
 			if(rls_restore_db_subs()< 0)
 			{
 				LM_ERR("while restoring rl watchers table\n");
-				return -1;
+				goto dberror;
 			}
 		}
 	}
@@ -659,6 +659,15 @@ static int mod_init(void)
 	}
 
 	return 0;
+
+dberror:
+	rls_dbf.close(rls_db);
+	rls_db = NULL;
+	rlpres_dbf.close(rlpres_db);
+	rlpres_db = NULL;
+	rls_xcap_dbf.close(rls_xcap_db);
+	rls_xcap_db = NULL;
+	return -1;
 }
 
 /**
@@ -1076,8 +1085,46 @@ static const char* rls_rpc_cleanup_doc[2] = {
 	0
 };
 
+static void rls_rpc_update_subs(rpc_t* rpc, void* ctx)
+{
+	str uri = {0, 0};
+	str event = {0, 0};
+	int pn = 0;
+
+	LM_DBG("executing update subs\n");
+	pn = rpc->scan(ctx, "SS", &uri, &event);
+	if(pn < 2) {
+		rpc->fault(ctx, 500, "Not enough parameters");
+		return;
+	}
+
+	if(uri.s == NULL || uri.len == 0) {
+		LM_ERR("empty uri\n");
+		rpc->fault(ctx, 500, "Empty URI");
+		return;
+	}
+
+	if(event.s == NULL || event.len == 0) {
+		LM_ERR("empty event parameter\n");
+		rpc->fault(ctx, 500, "Empty event parameter");
+		return;
+	}
+	LM_DBG("uri '%.*s' - event '%.*s'\n", uri.len, uri.s, event.len, event.s);
+
+	if(ki_rls_update_subs(NULL, &uri, &event)<0) {
+		rpc->fault(ctx, 500, "Processing failure");
+		return;
+	}
+}
+
+static const char* rls_rpc_update_subs_doc[2] = {
+	"Trigger rls cleanup.",
+	0
+};
+
 rpc_export_t rls_rpc[] = {
 	{"rls.cleanup", rls_rpc_cleanup, rls_rpc_cleanup_doc, 0},
+	{"rls.update_subs", rls_rpc_update_subs, rls_rpc_update_subs_doc, 0},
 	{0, 0, 0, 0}
 };
 

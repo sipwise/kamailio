@@ -26,14 +26,14 @@
 
 #include "../../core/dprint.h"
 #include "../../core/mem/pkg.h"
+#include "../../core/ip_addr.h"
+#include "../../core/resolve.h"
 
 #include <errno.h>
 #include <arpa/inet.h>
 #include <libmnl/libmnl.h>
 #include <linux/xfrm.h>
 #include <time.h>
-//#include <stdio.h>
-//#include <string.h>
 
 
 #define XFRM_TMPLS_BUF_SIZE 1024
@@ -42,8 +42,6 @@
 
 
 extern int xfrm_user_selector;
-extern int spi_id_start;
-extern int spi_id_range;
 
 struct xfrm_buffer {
     char buf[NLMSG_DELETEALL_BUF_SIZE];
@@ -90,7 +88,8 @@ static void string_to_key(char* dst, const str key_string)
     }
 }
 
-int add_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, int s_port, int d_port, int long id, str ck, str ik)
+
+int add_sa(struct mnl_socket* nl_sock, const struct ip_addr *src_addr_param, const struct ip_addr *dest_addr_param, int s_port, int d_port, int long id, str ck, str ik, str r_alg)
 {
     char l_msg_buf[MNL_SOCKET_BUFFER_SIZE];
     char l_auth_algo_buf[XFRM_TMPLS_BUF_SIZE];
@@ -101,30 +100,10 @@ int add_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, 
     struct xfrm_algo* l_auth_algo = NULL;
     struct xfrm_algo* l_enc_algo  = NULL;
 
-    char* src_addr = NULL;
-    char* dest_addr = NULL;
 
     memset(l_msg_buf, 0, sizeof(l_msg_buf));
     memset(l_auth_algo_buf, 0, sizeof(l_auth_algo_buf));
     memset(l_enc_algo_buf, 0, sizeof(l_enc_algo_buf));
-
-    // convert input IP addresses and keys to char*
-    if((src_addr = pkg_malloc(src_addr_param.len+1)) == NULL) {
-        LM_ERR("Error allocating memory for src addr during SA creation\n");
-        return -1;
-    }
-
-    if((dest_addr = pkg_malloc(dest_addr_param.len+1)) == NULL) {
-        pkg_free(src_addr);
-        LM_ERR("Error allocating memory for dest addr during SA creation\n");
-        return -2;
-    }
-
-    memset(src_addr, 0, src_addr_param.len+1);
-    memset(dest_addr, 0, dest_addr_param.len+1);
-
-    memcpy(src_addr, src_addr_param.s, src_addr_param.len);
-    memcpy(dest_addr, dest_addr_param.s, dest_addr_param.len);
 
     // nlmsghdr initialization
     l_nlh = mnl_nlmsg_put_header(l_msg_buf);
@@ -135,20 +114,33 @@ int add_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, 
 
     // add Security association
     l_xsainfo = (struct xfrm_usersa_info*)mnl_nlmsg_put_extra_header(l_nlh, sizeof(struct xfrm_usersa_info));
-    l_xsainfo->sel.family       = AF_INET;
-    l_xsainfo->sel.daddr.a4     = inet_addr(dest_addr);
-    l_xsainfo->sel.saddr.a4     = inet_addr(src_addr);
+    l_xsainfo->sel.family       = dest_addr_param->af;
+    if(dest_addr_param->af == AF_INET6) {
+        memcpy(l_xsainfo->sel.daddr.a6, dest_addr_param->u.addr32, sizeof(l_xsainfo->sel.daddr.a6));
+        memcpy(l_xsainfo->sel.saddr.a6, src_addr_param->u.addr32, sizeof(l_xsainfo->sel.saddr.a6));
+        l_xsainfo->sel.prefixlen_d  = 128;
+        l_xsainfo->sel.prefixlen_s  = 128;
+    }
+    else {
+        l_xsainfo->sel.daddr.a4     = dest_addr_param->u.addr32[0];
+        l_xsainfo->sel.saddr.a4     = src_addr_param->u.addr32[0];
+        l_xsainfo->sel.prefixlen_d  = 32;
+        l_xsainfo->sel.prefixlen_s  = 32;
+    }
     l_xsainfo->sel.dport        = htons(d_port);
     l_xsainfo->sel.dport_mask   = 0xFFFF;
-    l_xsainfo->sel.prefixlen_d  = 32;
     l_xsainfo->sel.sport        = htons(s_port);
     l_xsainfo->sel.sport_mask   = 0xFFFF;
-    l_xsainfo->sel.prefixlen_s  = 32;
-    l_xsainfo->sel.proto        = IPPROTO_UDP;
     l_xsainfo->sel.user         = htonl(xfrm_user_selector);
 
-    l_xsainfo->saddr.a4         = inet_addr(src_addr);
-    l_xsainfo->id.daddr.a4      = inet_addr(dest_addr);
+    if(dest_addr_param->af == AF_INET6) {
+        memcpy(l_xsainfo->id.daddr.a6, dest_addr_param->u.addr32, sizeof(l_xsainfo->id.daddr.a6));
+        memcpy(l_xsainfo->saddr.a6, src_addr_param->u.addr32, sizeof(l_xsainfo->saddr.a6));
+    }
+    else {
+        l_xsainfo->id.daddr.a4      = dest_addr_param->u.addr32[0];
+        l_xsainfo->saddr.a4         = src_addr_param->u.addr32[0];
+    }
     l_xsainfo->id.spi           = htonl(id);
     l_xsainfo->id.proto         = IPPROTO_ESP;
 
@@ -157,14 +149,9 @@ int add_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, 
     l_xsainfo->lft.soft_packet_limit    = XFRM_INF;
     l_xsainfo->lft.hard_packet_limit    = XFRM_INF;
     l_xsainfo->reqid                    = id;
-    l_xsainfo->family                   = AF_INET;
+    l_xsainfo->family                   = dest_addr_param->af;
     l_xsainfo->mode                     = XFRM_MODE_TRANSPORT;
     l_xsainfo->replay_window            = 32;
-    l_xsainfo->flags                    = XFRM_STATE_NOECN;
-
-    // char* ip addresses are no longer needed - free them
-    pkg_free(src_addr);
-    pkg_free(dest_addr);
 
     // Add authentication algorithm for this SA
 
@@ -172,7 +159,17 @@ int add_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, 
     // The point is to provide a continuous chunk of memory with the key in it
     l_auth_algo = (struct xfrm_algo *)l_auth_algo_buf;
 
-    strcpy(l_auth_algo->alg_name,"md5");
+    // Set the proper algorithm by r_alg str
+    if(strncasecmp(r_alg.s, "hmac-md5-96", r_alg.len) == 0) {
+        strcpy(l_auth_algo->alg_name,"md5");
+    }
+    else if(strncasecmp(r_alg.s, "hmac-sha1-96", r_alg.len) == 0) {
+        strcpy(l_auth_algo->alg_name,"sha1");
+    } else {
+        // set default algorithm to sha1
+        strcpy(l_auth_algo->alg_name,"sha1");
+    }
+
     l_auth_algo->alg_key_len = ik.len * 4;
     string_to_key(l_auth_algo->alg_key, ik);
 
@@ -195,7 +192,7 @@ int add_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, 
 }
 
 
-int remove_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, int s_port, int d_port, int long id)
+int remove_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_param, int s_port, int d_port, int long id, unsigned int af)
 {
     char* src_addr = NULL;
     char* dest_addr = NULL;
@@ -218,26 +215,47 @@ int remove_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_para
     memcpy(src_addr, src_addr_param.s, src_addr_param.len);
     memcpy(dest_addr, dest_addr_param.s, dest_addr_param.len);
 
-
     struct {
         struct nlmsghdr n;
         struct xfrm_usersa_id   xsid;
         char buf[XFRM_TMPLS_BUF_SIZE];
 
     } req = {
-        .n.nlmsg_len = NLMSG_LENGTH(sizeof(req.xsid)),
-        .n.nlmsg_flags = NLM_F_REQUEST,
-        .n.nlmsg_type = XFRM_MSG_DELSA,
-        .xsid.spi = htonl(id),
-        .xsid.family = AF_INET,
-        .xsid.proto = IPPROTO_ESP,
-        .xsid.daddr.a4 = inet_addr(dest_addr)
+        .n.nlmsg_len    = NLMSG_LENGTH(sizeof(req.xsid)),
+        .n.nlmsg_flags  = NLM_F_REQUEST,
+        .n.nlmsg_type   = XFRM_MSG_DELSA,
+        .n.nlmsg_pid    = id,
+        .xsid.spi       = htonl(id),
+        .xsid.family    = af,
+        .xsid.proto     = IPPROTO_ESP
     };
 
-    // SADDR
     xfrm_address_t saddr;
     memset(&saddr, 0, sizeof(saddr));
-    saddr.a4 = inet_addr(src_addr);
+
+    if(af == AF_INET6){
+        ip_addr_t ip_addr;
+
+        if(str2ipxbuf(&dest_addr_param, &ip_addr) < 0){
+            LM_ERR("Unable to convert dest address [%.*s]\n", dest_addr_param.len, dest_addr_param.s);
+            pkg_free(src_addr);
+            pkg_free(dest_addr);
+            return -1;
+        }
+        memcpy(req.xsid.daddr.a6, ip_addr.u.addr32, sizeof(req.xsid.daddr.a6));
+
+        memset(&ip_addr, 0, sizeof(ip_addr_t));
+        if(str2ipxbuf(&src_addr_param, &ip_addr) < 0){
+            LM_ERR("Unable to convert src address [%.*s]\n", src_addr_param.len, src_addr_param.s);
+            pkg_free(src_addr);
+            pkg_free(dest_addr);
+            return -1;
+        }
+        memcpy(saddr.a6, ip_addr.u.addr32, sizeof(saddr.a6));
+    }else{
+        req.xsid.daddr.a4   = inet_addr(dest_addr);
+        saddr.a4            = inet_addr(src_addr);
+    }
 
     mnl_attr_put(&req.n, XFRMA_SRCADDR, sizeof(saddr), (void *)&saddr);
 
@@ -256,36 +274,15 @@ int remove_sa(struct mnl_socket* nl_sock, str src_addr_param, str dest_addr_para
 }
 
 
-int add_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_addr_param, int src_port, int dst_port, int long p_id, enum ipsec_policy_direction dir)
+int add_policy(struct mnl_socket* mnl_socket, const struct ip_addr *src_addr_param, const struct ip_addr *dest_addr_param, int src_port, int dst_port, int long p_id, enum ipsec_policy_direction dir)
 {
     char                            l_msg_buf[MNL_SOCKET_BUFFER_SIZE];
     char                            l_tmpls_buf[XFRM_TMPLS_BUF_SIZE];
     struct nlmsghdr*                l_nlh;
     struct xfrm_userpolicy_info*    l_xpinfo;
 
-    char* src_addr = NULL;
-    char* dest_addr = NULL;
-
     memset(l_msg_buf, 0, sizeof(l_msg_buf));
     memset(l_tmpls_buf, 0, sizeof(l_tmpls_buf));
-
-    // convert input IP addresses to char*
-    if((src_addr = pkg_malloc(src_addr_param.len+1)) == NULL) {
-        LM_ERR("Error allocating memory for src addr during Policy creation\n");
-        return -1;
-    }
-
-    if((dest_addr = pkg_malloc(dest_addr_param.len+1)) == NULL) {
-        pkg_free(src_addr);
-        LM_ERR("Error allocating memory for dest addr during Policy creation\n");
-        return -2;
-    }
-
-    memset(src_addr, 0, src_addr_param.len+1);
-    memset(dest_addr, 0, dest_addr_param.len+1);
-
-    memcpy(src_addr, src_addr_param.s, src_addr_param.len);
-    memcpy(dest_addr, dest_addr_param.s, dest_addr_param.len);
 
     // nlmsghdr initialization
     l_nlh = mnl_nlmsg_put_header(l_msg_buf);
@@ -296,16 +293,24 @@ int add_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_addr_
 
     // add OUT policy
     l_xpinfo = (struct xfrm_userpolicy_info*)mnl_nlmsg_put_extra_header(l_nlh, sizeof(struct xfrm_userpolicy_info));
-    l_xpinfo->sel.family        = AF_INET;
-    l_xpinfo->sel.daddr.a4      = inet_addr(dest_addr);
-    l_xpinfo->sel.saddr.a4      = inet_addr(src_addr);
+    l_xpinfo->sel.family        = dest_addr_param->af;
+    if(dest_addr_param->af == AF_INET6) {
+        memcpy(l_xpinfo->sel.daddr.a6, dest_addr_param->u.addr32, sizeof(l_xpinfo->sel.daddr.a6));
+        memcpy(l_xpinfo->sel.saddr.a6, src_addr_param->u.addr32, sizeof(l_xpinfo->sel.saddr.a6));
+        l_xpinfo->sel.prefixlen_d  = 128;
+        l_xpinfo->sel.prefixlen_s  = 128;
+    }
+    else {
+        l_xpinfo->sel.daddr.a4     = dest_addr_param->u.addr32[0];
+        l_xpinfo->sel.saddr.a4     = src_addr_param->u.addr32[0];
+        l_xpinfo->sel.prefixlen_d  = 32;
+        l_xpinfo->sel.prefixlen_s  = 32;
+    }
     l_xpinfo->sel.dport         = htons(dst_port);
     l_xpinfo->sel.dport_mask    = 0xFFFF;
-    l_xpinfo->sel.prefixlen_d   = 32;
     l_xpinfo->sel.sport         = htons(src_port);
     l_xpinfo->sel.sport_mask    = 0xFFFF;
-    l_xpinfo->sel.prefixlen_s   = 32;
-    l_xpinfo->sel.proto         = IPPROTO_UDP;
+    //l_xpinfo->sel.proto         = sel_proto;
     l_xpinfo->sel.user          = htonl(xfrm_user_selector);
 
     l_xpinfo->lft.soft_byte_limit   = XFRM_INF;
@@ -324,43 +329,40 @@ int add_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_addr_
     }
     else {
         LM_ERR("Invalid direction parameter passed to add_policy: %d\n", dir);
-        pkg_free(src_addr);
-        pkg_free(dest_addr);
 
         return -3;
     }
 
-
     // xfrm_user_tmpl initialization
     struct xfrm_user_tmpl* l_tmpl = (struct xfrm_user_tmpl*)l_tmpls_buf;
     l_tmpl->id.proto    = IPPROTO_ESP;
-    l_tmpl->family      = AF_INET;
+    l_tmpl->family      = dest_addr_param->af;
+    if(dest_addr_param->af == AF_INET6) {
+        memcpy(l_tmpl->id.daddr.a6, dest_addr_param->u.addr32, sizeof(l_tmpl->id.daddr.a6));
+        memcpy(l_tmpl->saddr.a6, src_addr_param->u.addr32, sizeof(l_tmpl->saddr.a6));
+    }
+    else {
+        l_tmpl->id.daddr.a4        = dest_addr_param->u.addr32[0];
+        l_tmpl->saddr.a4           = src_addr_param->u.addr32[0];
+    }
     l_tmpl->reqid       = p_id;
     l_tmpl->mode        = XFRM_MODE_TRANSPORT;
     l_tmpl->aalgos      = (~(__u32)0);
     l_tmpl->ealgos      = (~(__u32)0);
     l_tmpl->calgos      = (~(__u32)0);
 
-
     mnl_attr_put(l_nlh, XFRMA_TMPL, sizeof(struct xfrm_user_tmpl), l_tmpl);
 
     if(mnl_socket_sendto(mnl_socket, l_nlh, l_nlh->nlmsg_len) < 0)
     {
-        pkg_free(src_addr);
-        pkg_free(dest_addr);
         LM_ERR("Failed to send Netlink message, error: %s\n", strerror(errno));
         return -4;
     }
 
-    // char* ip addresses are no longer needed - free them
-    pkg_free(src_addr);
-    pkg_free(dest_addr);
-
     return 0;
 }
 
-
-int remove_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_addr_param, int src_port, int dst_port, int long p_id, enum ipsec_policy_direction dir)
+int remove_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_addr_param, int src_port, int dst_port, int long p_id, unsigned int af, enum ipsec_policy_direction dir)
 {
     unsigned char policy_dir = 0;
 
@@ -371,7 +373,7 @@ int remove_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_ad
          policy_dir = XFRM_POLICY_OUT;
     }
     else {
-        LM_ERR("Invalid direction parameter passed to add_policy: %d\n", dir);
+        LM_ERR("Invalid direction parameter passed to remove_policy: %d\n", dir);
         return -1;
     }
 
@@ -401,21 +403,48 @@ int remove_policy(struct mnl_socket* mnl_socket, str src_addr_param, str dest_ad
         struct xfrm_userpolicy_id xpid;
         char buf[XFRM_TMPLS_BUF_SIZE];
     } req = {
-        .n.nlmsg_len = NLMSG_LENGTH(sizeof(req.xpid)),
-        .n.nlmsg_flags = NLM_F_REQUEST,
-        .n.nlmsg_type = XFRM_MSG_DELPOLICY,
+        .n.nlmsg_len            = NLMSG_LENGTH(sizeof(req.xpid)),
+        .n.nlmsg_flags          = NLM_F_REQUEST,
+        .n.nlmsg_type           = XFRM_MSG_DELPOLICY,
+        .n.nlmsg_pid            = p_id,
         .xpid.dir               = policy_dir,
-        .xpid.sel.family        = AF_INET,
-        .xpid.sel.daddr.a4      = inet_addr(dest_addr),
-        .xpid.sel.saddr.a4      = inet_addr(src_addr),
+        .xpid.sel.family        = af,
         .xpid.sel.dport         = htons(dst_port),
         .xpid.sel.dport_mask    = 0xFFFF,
-        .xpid.sel.prefixlen_d   = 32,
         .xpid.sel.sport         = htons(src_port),
         .xpid.sel.sport_mask    = 0xFFFF,
-        .xpid.sel.prefixlen_s   = 32,
-        .xpid.sel.proto         = IPPROTO_UDP
+        .xpid.sel.user          = htonl(xfrm_user_selector)
+        //.xpid.sel.proto         = sel_proto
     };
+
+    if(af == AF_INET6){
+        ip_addr_t ip_addr;
+
+        if(str2ipxbuf(&dest_addr_param, &ip_addr) < 0){
+            LM_ERR("Unable to convert dest address [%.*s]\n", dest_addr_param.len, dest_addr_param.s);
+            pkg_free(src_addr);
+            pkg_free(dest_addr);
+            return -1;
+        }
+        memcpy(req.xpid.sel.daddr.a6, ip_addr.u.addr32, sizeof(req.xpid.sel.daddr.a6));
+
+        if(str2ipxbuf(&src_addr_param, &ip_addr) < 0){
+            LM_ERR("Unable to convert src address [%.*s]\n", src_addr_param.len, src_addr_param.s);
+            pkg_free(src_addr);
+            pkg_free(dest_addr);
+            return -1;
+        }
+        memcpy(req.xpid.sel.saddr.a6, ip_addr.u.addr32, sizeof(req.xpid.sel.saddr.a6));
+
+        req.xpid.sel.prefixlen_d = 128;
+        req.xpid.sel.prefixlen_s = 128;
+    }else{
+        req.xpid.sel.daddr.a4       = inet_addr(dest_addr);
+        req.xpid.sel.saddr.a4       = inet_addr(src_addr);
+
+        req.xpid.sel.prefixlen_d    = 32;
+        req.xpid.sel.prefixlen_s    = 32;
+    }
 
     if(mnl_socket_sendto(mnl_socket, &req.n, req.n.nlmsg_len) < 0)
     {

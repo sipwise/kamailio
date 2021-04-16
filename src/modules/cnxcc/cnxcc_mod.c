@@ -27,32 +27,28 @@
 #include <sys/ipc.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <time.h>
 #include <ctype.h>
 
 #include "../../core/sr_module.h"
+#include "../../core/mod_fix.h"
 #include "../../core/dprint.h"
 #include "../../core/error.h"
 #include "../../core/mem/mem.h"
-#include "../../core/shm_init.h"
 #include "../../core/mem/shm_mem.h"
-#include "../../core/pvar.h"
-#include "../../core/locking.h"
+
 #include "../../core/lock_ops.h"
-#include "../../core/str_hash.h"
 #include "../../core/timer_proc.h"
-#include "../../modules/tm/tm_load.h"
 #include "../../core/parser/parse_from.h"
 #include "../../core/parser/parse_to.h"
 #include "../../core/parser/parse_uri.h"
 #include "../../core/parser/parse_cseq.h"
 #include "../../core/parser/contact/parse_contact.h"
 #include "../../core/parser/contact/contact.h"
-#include "../../core/parser/parse_rr.h"
-#include "../../core/mod_fix.h"
+
+#include "../tm/tm_load.h"
 #include "../dialog/dlg_load.h"
 #include "../dialog/dlg_hash.h"
-#include "../../core/fmsg.h"
+
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
 #include "../../core/kemi.h"
@@ -104,8 +100,8 @@ static int __pv_get_calls(
 /*
  * Billing management functions
  */
-static int __set_max_credit(sip_msg_t *msg, char *pclient,
-		char *pcredit, char *pcps, char *pinitp, char *pfinishp);
+static int __set_max_credit(sip_msg_t *msg, char *pclient, char *pcredit,
+		char *pconnect, char *pcps, char *pinitp, char *pfinishp);
 static int __set_max_time(sip_msg_t *msg, char *pclient, char *pmaxsecs);
 static int __update_max_time(sip_msg_t *msg, char *pclient, char *psecs);
 static int __set_max_channels(sip_msg_t *msg, char *pclient, char *pmaxchan);
@@ -121,8 +117,8 @@ static int __add_call_by_cid(str *cid, call_t *call, credit_type_t type);
 static call_t *__alloc_new_call_by_time(
 		credit_data_t *credit_data, struct sip_msg *msg, int max_secs);
 static call_t *__alloc_new_call_by_money(credit_data_t *credit_data,
-		struct sip_msg *msg, double credit, double cost_per_second,
-		int initial_pulse, int final_pulse);
+		struct sip_msg *msg, double credit, double connect_cost,
+		double cost_per_second, int initial_pulse, int final_pulse);
 static void __notify_call_termination(sip_msg_t *msg);
 static void __free_call(call_t *call);
 static void __delete_call(call_t *call, credit_data_t *credit_data);
@@ -155,7 +151,7 @@ static pv_export_t mod_pvs[] = {
 };
 
 static cmd_export_t cmds[] = {
-	{"cnxcc_set_max_credit", (cmd_function) __set_max_credit, 5,
+	{"cnxcc_set_max_credit", (cmd_function) __set_max_credit, 6,
 		cnxcc_set_max_credit_fixup, NULL, ANY_ROUTE},
 	{"cnxcc_set_max_time", (cmd_function) __set_max_time, 2,
 		fixup_spve_igp, fixup_free_spve_igp, ANY_ROUTE},
@@ -173,7 +169,7 @@ static cmd_export_t cmds[] = {
 static param_export_t params[] = {
 	{"dlg_flag", INT_PARAM,	&_data.ctrl_flag },
 	{"credit_check_period", INT_PARAM,	&_data.check_period },
-	{"redis", STR_PARAM, &_data.redis_cnn_str.s },
+	{"redis", PARAM_STR, &_data.redis_cnn_str },
 	{ 0, 0, 0 }
 };
 /* clang-format on */
@@ -232,7 +228,9 @@ static int cnxcc_set_max_credit_fixup(void **param, int param_no)
 		case 3:
 			return fixup_spve_all(param, param_no);
 		case 4:
+			return fixup_spve_all(param, param_no);
 		case 5:
+		case 6:
 			return fixup_igp_all(param, param_no);
 		default:
 			LM_ERR("unexpected parameter number: %d\n", param_no);
@@ -263,9 +261,6 @@ static int __mod_init(void)
 		return -1;
 	}
 
-	if(_data.redis_cnn_str.s)
-		_data.redis_cnn_str.len = strlen(_data.redis_cnn_str.s);
-
 	_data.time.credit_data_by_client =
 			shm_malloc(sizeof(struct str_hash_table));
 	_data.time.call_data_by_cid = shm_malloc(sizeof(struct str_hash_table));
@@ -285,15 +280,11 @@ static int __mod_init(void)
 	memset(_data.channel.call_data_by_cid, 0, sizeof(struct str_hash_table));
 
 	_data.stats = (stats_t *)shm_malloc(sizeof(stats_t));
-
 	if(!_data.stats) {
-		LM_ERR("Error allocating shared memory stats\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
-
-	_data.stats->active = 0;
-	_data.stats->dropped = 0;
-	_data.stats->total = 0;
+	memset(_data.stats, 0, sizeof(stats_t));
 
 	if(__init_hashtable(_data.time.credit_data_by_client) != 0)
 		return -1;
@@ -313,9 +304,7 @@ static int __mod_init(void)
 	if(__init_hashtable(_data.channel.call_data_by_cid) != 0)
 		return -1;
 
-
 	cnxcc_lock_init(_data.lock);
-
 	cnxcc_lock_init(_data.time.lock);
 	cnxcc_lock_init(_data.money.lock);
 	cnxcc_lock_init(_data.channel.lock);
@@ -434,21 +423,22 @@ static int __child_init(int rank)
 
 static int __init_hashtable(struct str_hash_table *ht)
 {
-	if(__shm_str_hash_alloc(ht, HT_SIZE) != 0) {
-		LM_ERR("Error allocating shared memory hashtable\n");
+	if(ht == NULL)
 		return -1;
-	}
+
+	if(__shm_str_hash_alloc(ht, HT_SIZE) != 0)
+		return -1;
 
 	str_hash_init(ht);
 	return 0;
 }
 
 static void __dialog_created_callback(
-		struct dlg_cell *cell, int type, struct dlg_cb_params *params)
+		struct dlg_cell *cell, int type, struct dlg_cb_params *_params)
 {
 	struct sip_msg *msg = NULL;
 
-	msg = params->direction == SIP_REPLY ? params->rpl : params->req;
+	msg = _params->direction == SIP_REPLY ? _params->rpl : _params->req;
 
 	if(msg == NULL) {
 		LM_ERR("Error getting direction of SIP msg\n");
@@ -472,7 +462,7 @@ static void __dialog_created_callback(
 }
 
 static void __dialog_confirmed_callback(
-		struct dlg_cell *cell, int type, struct dlg_cb_params *params)
+		struct dlg_cell *cell, int type, struct dlg_cb_params *_params)
 {
 	LM_DBG("Dialog confirmed for CID [%.*s]\n", cell->callid.len,
 			cell->callid.s);
@@ -481,7 +471,7 @@ static void __dialog_confirmed_callback(
 }
 
 static void __dialog_terminated_callback(
-		struct dlg_cell *cell, int type, struct dlg_cb_params *params)
+		struct dlg_cell *cell, int type, struct dlg_cb_params *_params)
 {
 	LM_DBG("Dialog terminated for CID [%.*s]\n", cell->callid.len,
 			cell->callid.s);
@@ -818,7 +808,7 @@ static void __start_billing(
 	 * Store from-tag value
 	 */
 	if(shm_str_dup(&call->sip_data.from_tag, &tags[0]) != 0) {
-		LM_ERR("No more pkg memory\n");
+		SHM_MEM_ERROR;
 		goto exit;
 	}
 
@@ -826,13 +816,13 @@ static void __start_billing(
 	 * Store to-tag value
 	 */
 	if(shm_str_dup(&call->sip_data.to_tag, &tags[1]) != 0) {
-		LM_ERR("No more pkg memory\n");
+		SHM_MEM_ERROR;
 		goto exit;
 	}
 
 	if(shm_str_dup(&call->sip_data.from_uri, from_uri) != 0
 			|| shm_str_dup(&call->sip_data.to_uri, to_uri) != 0) {
-		LM_ERR("No more pkg memory\n");
+		SHM_MEM_ERROR;
 		goto exit;
 	}
 
@@ -1052,9 +1042,10 @@ static int __shm_str_hash_alloc(struct str_hash_table *ht, int size)
 {
 	ht->table = shm_malloc(sizeof(struct str_hash_head) * size);
 
-	if(!ht->table)
+	if(!ht->table) {
+		SHM_MEM_ERROR;
 		return -1;
-
+	}
 	ht->size = size;
 	return 0;
 }
@@ -1073,7 +1064,7 @@ int terminate_call(call_t *call)
 			call->dlg_h_entry);
 
 	data = &call->sip_data;
-	if(faked_msg_init_with_dlg_info(&data->callid, &data->from_uri,
+	if(cnxcc_faked_msg_init_with_dlg_info(&data->callid, &data->from_uri,
 			   &data->from_tag, &data->to_uri, &data->to_tag, &dmsg)
 			!= 0) {
 		LM_ERR("[%.*s]: error generating faked sip message\n", data->callid.len,
@@ -1160,7 +1151,7 @@ static credit_data_t *__get_or_create_credit_data_entry(
 	return (credit_data_t *)e->u.p;
 
 no_memory:
-	LM_ERR("No shared memory left\n");
+	SHM_MEM_ERROR;
 	return NULL;
 }
 
@@ -1168,17 +1159,13 @@ static credit_data_t *__alloc_new_credit_data(
 		str *client_id, credit_type_t type)
 {
 	credit_data_t *credit_data = shm_malloc(sizeof(credit_data_t));
-	;
-
 	if(credit_data == NULL)
 		goto no_memory;
-
 	memset(credit_data, 0, sizeof(credit_data_t));
 
 	cnxcc_lock_init(credit_data->lock);
 
 	credit_data->call_list = shm_malloc(sizeof(call_t));
-
 	if(credit_data->call_list == NULL)
 		goto no_memory;
 
@@ -1194,7 +1181,6 @@ static credit_data_t *__alloc_new_credit_data(
 
 	if(_data.redis) {
 		credit_data->str_id = shm_malloc(client_id->len + 1);
-
 		if(!credit_data->str_id)
 			goto no_memory;
 
@@ -1202,14 +1188,7 @@ static credit_data_t *__alloc_new_credit_data(
 		snprintf(credit_data->str_id, client_id->len + 1, "%.*s",
 				client_id->len, client_id->s);
 	}
-
-	credit_data->max_amount = 0;
-	credit_data->concurrent_calls = 0;
-	credit_data->consumed_amount = 0;
-	credit_data->ended_calls_consumed_amount = 0;
-	credit_data->number_of_calls = 0;
 	credit_data->type = type;
-	credit_data->deallocating = 0;
 
 	if(!_data.redis)
 		return credit_data;
@@ -1220,14 +1199,14 @@ static credit_data_t *__alloc_new_credit_data(
 	return credit_data;
 
 no_memory:
-	LM_ERR("No shared memory left\n");
+	SHM_MEM_ERROR;
 error:
 	return NULL;
 }
 
 static call_t *__alloc_new_call_by_money(credit_data_t *credit_data,
-		struct sip_msg *msg, double credit, double cost_per_second,
-		int initial_pulse, int final_pulse)
+		struct sip_msg *msg, double credit, double connect_cost,
+		double cost_per_second, int initial_pulse, int final_pulse)
 {
 	call_t *call = NULL;
 
@@ -1240,9 +1219,10 @@ static call_t *__alloc_new_call_by_money(credit_data_t *credit_data,
 
 	call = shm_malloc(sizeof(call_t));
 	if(call == NULL) {
-		LM_ERR("No shared memory left\n");
+		SHM_MEM_ERROR;
 		goto error;
 	}
+	memset(call, 0, sizeof(call_t));
 
 	if((!msg->callid && parse_headers(msg, HDR_CALLID_F, 0) != 0)
 			|| shm_str_dup(&call->sip_data.callid, &msg->callid->body) != 0) {
@@ -1250,20 +1230,12 @@ static call_t *__alloc_new_call_by_money(credit_data_t *credit_data,
 		goto error;
 	}
 
-	call->sip_data.to_uri.s = NULL;
-	call->sip_data.to_uri.len = 0;
-	call->sip_data.to_tag.s = NULL;
-	call->sip_data.to_tag.len = 0;
-
-	call->sip_data.from_uri.s = NULL;
-	call->sip_data.from_uri.len = 0;
-	call->sip_data.from_tag.s = NULL;
-	call->sip_data.from_tag.len = 0;
-
 	call->consumed_amount = initial_pulse * cost_per_second;
+	call->connect_amount = connect_cost;
 	call->confirmed = FALSE;
 	call->max_amount = credit;
 
+	call->money_based.connect_cost = connect_cost;
 	call->money_based.cost_per_second = cost_per_second;
 	call->money_based.initial_pulse = initial_pulse;
 	call->money_based.final_pulse = final_pulse;
@@ -1317,22 +1289,13 @@ static call_t *__alloc_new_call_by_time(
 		LM_ERR("No shared memory left\n");
 		goto error;
 	}
+	memset(call, 0, sizeof(call_t));
 
 	if((!msg->callid && parse_headers(msg, HDR_CALLID_F, 0) != 0)
 			|| shm_str_dup(&call->sip_data.callid, &msg->callid->body) != 0) {
 		LM_ERR("Error processing CALLID hdr\n");
 		goto error;
 	}
-
-	call->sip_data.to_uri.s = NULL;
-	call->sip_data.to_uri.len = 0;
-	call->sip_data.to_tag.s = NULL;
-	call->sip_data.to_tag.len = 0;
-
-	call->sip_data.from_uri.s = NULL;
-	call->sip_data.from_uri.len = 0;
-	call->sip_data.from_tag.s = NULL;
-	call->sip_data.from_tag.len = 0;
 
 	call->consumed_amount = 0;
 	call->confirmed = FALSE;
@@ -1384,25 +1347,16 @@ static call_t *alloc_new_call_by_channel(
 
 	call = shm_malloc(sizeof(call_t));
 	if(call == NULL) {
-		LM_ERR("No shared memory left\n");
+		SHM_MEM_ERROR;
 		goto error;
 	}
+	memset(call, 0, sizeof(call_t));
 
 	if((!msg->callid && parse_headers(msg, HDR_CALLID_F, 0) != 0)
 			|| shm_str_dup(&call->sip_data.callid, &msg->callid->body) != 0) {
 		LM_ERR("Error processing CALLID hdr\n");
 		goto error;
 	}
-
-	call->sip_data.to_uri.s = NULL;
-	call->sip_data.to_uri.len = 0;
-	call->sip_data.to_tag.s = NULL;
-	call->sip_data.to_tag.len = 0;
-
-	call->sip_data.from_uri.s = NULL;
-	call->sip_data.from_uri.len = 0;
-	call->sip_data.from_tag.s = NULL;
-	call->sip_data.from_tag.len = 0;
 
 	call->consumed_amount = 0;
 	call->confirmed = FALSE;
@@ -1491,14 +1445,13 @@ static int __add_call_by_cid(str *cid, call_t *call, credit_type_t type)
 	}
 
 	e = shm_malloc(sizeof(struct str_hash_entry));
-
 	if(e == NULL) {
-		LM_ERR("No shared memory left\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 
 	if(shm_str_dup(&e->key, cid) != 0) {
-		LM_ERR("No shared memory left\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 
@@ -1530,14 +1483,14 @@ static inline int get_pv_value(
 	return 0;
 }
 
-static int ki_set_max_credit(sip_msg_t *msg, str *sclient,
-		str *scredit, str *scps, int initp, int finishp)
+static int ki_set_max_credit(sip_msg_t *msg, str *sclient, str *scredit,
+		str *sconnect, str *scps, int initp, int finishp)
 {
 	credit_data_t *credit_data = NULL;
 	call_t *call = NULL;
 	hash_tables_t *hts = NULL;
 
-	double credit = 0, cost_per_second = 0;
+	double credit = 0, connect_cost = 0, cost_per_second = 0;
 
 	if(msg->first_line.type != SIP_REQUEST
 			|| msg->first_line.u.request.method_value != METHOD_INVITE) {
@@ -1563,6 +1516,13 @@ static int ki_set_max_credit(sip_msg_t *msg, str *sclient,
 		return -1;
 	}
 
+	connect_cost = str2double(sconnect);
+
+	if(connect_cost < 0) {
+		LM_ERR("connect_cost value must be >= 0: %f\n", connect_cost);
+		return -1;
+	}
+
 	cost_per_second = str2double(scps);
 
 	if(cost_per_second <= 0) {
@@ -1577,26 +1537,26 @@ static int ki_set_max_credit(sip_msg_t *msg, str *sclient,
 	}
 
 	LM_DBG("Setting up new call for client [%.*s], max-credit[%f], "
-			"cost-per-sec[%f], initial-pulse [%d], "
-			"final-pulse [%d], call-id[%.*s]\n",
-			sclient->len, sclient->s, credit,
-			cost_per_second, initp, finishp,
-			msg->callid->body.len, msg->callid->body.s);
+		   "connect-cost[%f], cost-per-sec[%f], initial-pulse [%d], "
+		   "final-pulse [%d], call-id[%.*s]\n",
+			sclient->len, sclient->s, credit, connect_cost, cost_per_second,
+			initp, finishp, msg->callid->body.len, msg->callid->body.s);
 
 	set_ctrl_flag(msg);
 
 	if((credit_data = __get_or_create_credit_data_entry(sclient, CREDIT_MONEY))
 			== NULL) {
 		LM_ERR("Error retrieving credit data from shared memory for client "
-				"[%.*s]\n", sclient->len, sclient->s);
+			   "[%.*s]\n",
+				sclient->len, sclient->s);
 		return -1;
 	}
 
-	if((call = __alloc_new_call_by_money(credit_data, msg, credit,
+	if((call = __alloc_new_call_by_money(credit_data, msg, credit, connect_cost,
 				cost_per_second, initp, finishp))
 			== NULL) {
-		LM_ERR("Unable to allocate new call for client [%.*s]\n",
-				sclient->len, sclient->s);
+		LM_ERR("Unable to allocate new call for client [%.*s]\n", sclient->len,
+				sclient->s);
 		return -1;
 	}
 
@@ -1609,43 +1569,49 @@ static int ki_set_max_credit(sip_msg_t *msg, str *sclient,
 	return 1;
 }
 
-static int __set_max_credit(sip_msg_t *msg, char *pclient,
-		char *pcredit, char *pcps, char *pinitp, char *pfinishp)
+static int __set_max_credit(sip_msg_t *msg, char *pclient, char *pcredit,
+		char *pconnect, char *pcps, char *pinitp, char *pfinishp)
 {
 	str sclient;
 	str scredit;
+	str sconnect;
 	str scps;
 	int initp;
 	int finishp;
 
-	if(msg==NULL || pclient==NULL || pcredit==NULL || pcps==NULL
-			|| pinitp==NULL || pfinishp==NULL) {
+	if(msg == NULL || pclient == NULL || pcredit == NULL || pconnect == NULL
+			|| pcps == NULL || pinitp == NULL || pfinishp == NULL) {
 		LM_ERR("invalid parameters\n");
 		return -1;
 	}
 
-	if(fixup_get_svalue(msg, (gparam_t*)pclient, &sclient)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pclient, &sclient) < 0) {
 		LM_ERR("failed to get client parameter\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)pcredit, &scredit)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pcredit, &scredit) < 0) {
 		LM_ERR("failed to get credit parameter\n");
 		return -1;
 	}
-	if(fixup_get_svalue(msg, (gparam_t*)pcps, &scps)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pconnect, &sconnect) < 0) {
+		LM_ERR("failed to get connect parameter\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t *)pcps, &scps) < 0) {
 		LM_ERR("failed to get cps parameter\n");
 		return -1;
 	}
-	if(fixup_get_ivalue(msg, (gparam_t*)pinitp, &initp)<0) {
+	if(fixup_get_ivalue(msg, (gparam_t *)pinitp, &initp) < 0) {
 		LM_ERR("failed to get init pulse parameter\n");
 		return -1;
 	}
-	if(fixup_get_ivalue(msg, (gparam_t*)pfinishp, &finishp)<0) {
+	if(fixup_get_ivalue(msg, (gparam_t *)pfinishp, &finishp) < 0) {
 		LM_ERR("failed to get finish pulse parameter\n");
 		return -1;
 	}
 
-	return ki_set_max_credit(msg, &sclient, &scredit, &scps, initp, finishp);
+	return ki_set_max_credit(
+			msg, &sclient, &scredit, &sconnect, &scps, initp, finishp);
 }
 
 static int ki_terminate_all(sip_msg_t *msg, str *sclient)
@@ -1659,9 +1625,8 @@ static int ki_terminate_all(sip_msg_t *msg, str *sclient)
 	}
 
 	if(try_get_credit_data_entry(sclient, &credit_data) != 0) {
-		LM_DBG("credit data for [%.*s] on [%.*s] not found\n",
-				sclient->len, sclient->s,
-				msg->callid->body.len, msg->callid->body.s);
+		LM_DBG("credit data for [%.*s] on [%.*s] not found\n", sclient->len,
+				sclient->s, msg->callid->body.len, msg->callid->body.s);
 		return -1;
 	}
 
@@ -1673,7 +1638,7 @@ static int __terminate_all(sip_msg_t *msg, char *pclient, char *p2)
 {
 	str sclient;
 
-	if(fixup_get_svalue(msg, (gparam_t*)pclient, &sclient)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pclient, &sclient) < 0) {
 		LM_ERR("failed to get client parameter\n");
 		return -1;
 	}
@@ -1681,8 +1646,8 @@ static int __terminate_all(sip_msg_t *msg, char *pclient, char *p2)
 	return ki_terminate_all(msg, &sclient);
 }
 
-static int __get_channel_count_helper(sip_msg_t *msg, str *sclient,
-		pv_spec_t *pvcount)
+static int __get_channel_count_helper(
+		sip_msg_t *msg, str *sclient, pv_spec_t *pvcount)
 {
 	credit_data_t *credit_data = NULL;
 	pv_value_t countval;
@@ -1723,7 +1688,7 @@ static int __get_channel_count(sip_msg_t *msg, char *pclient, char *pcount)
 {
 	str sclient;
 
-	if(fixup_get_svalue(msg, (gparam_t*)pclient, &sclient)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pclient, &sclient) < 0) {
 		LM_ERR("failed to get client parameter\n");
 		return -1;
 	}
@@ -1737,7 +1702,7 @@ static int ki_get_channel_count(sip_msg_t *msg, str *sclient, str *pvname)
 
 	pvcount = pv_cache_get(pvname);
 
-	if(pvcount==NULL) {
+	if(pvcount == NULL) {
 		LM_ERR("failed to get pv spec for [%.*s]\n", pvname->len, pvname->s);
 		return -1;
 	}
@@ -1786,14 +1751,16 @@ static int ki_set_max_channels(sip_msg_t *msg, str *sclient, int max_chan)
 	}
 
 	LM_DBG("Setting up new call for client [%.*s], max-chan[%d], "
-			"call-id[%.*s]\n",
-			sclient->len, sclient->s, max_chan,
-			msg->callid->body.len, msg->callid->body.s);
+		   "call-id[%.*s]\n",
+			sclient->len, sclient->s, max_chan, msg->callid->body.len,
+			msg->callid->body.s);
 
-	if((credit_data = __get_or_create_credit_data_entry(sclient,
-				CREDIT_CHANNEL)) == NULL) {
+	if((credit_data = __get_or_create_credit_data_entry(
+				sclient, CREDIT_CHANNEL))
+			== NULL) {
 		LM_ERR("Error retrieving credit data from shared memory for client "
-				"[%.*s]\n", sclient->len, sclient->s);
+			   "[%.*s]\n",
+				sclient->len, sclient->s);
 		return -1;
 	}
 
@@ -1803,15 +1770,13 @@ static int ki_set_max_channels(sip_msg_t *msg, str *sclient, int max_chan)
 	if(credit_data->concurrent_calls + 1 > max_chan)
 		return -3; // you have the max amount of established calls already
 
-	if((call = alloc_new_call_by_channel(credit_data, msg, max_chan))
-			== NULL) {
-		LM_ERR("Unable to allocate new call for client [%.*s]\n",
-				sclient->len, sclient->s);
+	if((call = alloc_new_call_by_channel(credit_data, msg, max_chan)) == NULL) {
+		LM_ERR("Unable to allocate new call for client [%.*s]\n", sclient->len,
+				sclient->s);
 		return -1;
 	}
 
-	if(__add_call_by_cid(&call->sip_data.callid, call, CREDIT_CHANNEL)
-			!= 0) {
+	if(__add_call_by_cid(&call->sip_data.callid, call, CREDIT_CHANNEL) != 0) {
 		LM_ERR("Unable to allocate new cid_by_client for client [%.*s]\n",
 				sclient->len, sclient->s);
 		return -1;
@@ -1825,11 +1790,11 @@ static int __set_max_channels(sip_msg_t *msg, char *pclient, char *pmaxchan)
 	str sclient;
 	int max_chan = 0;
 
-	if(fixup_get_svalue(msg, (gparam_t*)pclient, &sclient)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pclient, &sclient) < 0) {
 		LM_ERR("failed to get client parameter\n");
 		return -1;
 	}
-	if(fixup_get_ivalue(msg, (gparam_t*)pmaxchan, &max_chan)<0) {
+	if(fixup_get_ivalue(msg, (gparam_t *)pmaxchan, &max_chan) < 0) {
 		LM_ERR("failed to get max chan parameter\n");
 		return -1;
 	}
@@ -1880,21 +1845,21 @@ static int ki_set_max_time(sip_msg_t *msg, str *sclient, int max_secs)
 	}
 
 	LM_DBG("Setting up new call for client [%.*s], max-secs[%d], "
-			"call-id[%.*s]\n",
-			sclient->len, sclient->s, max_secs,
-			msg->callid->body.len, msg->callid->body.s);
+		   "call-id[%.*s]\n",
+			sclient->len, sclient->s, max_secs, msg->callid->body.len,
+			msg->callid->body.s);
 
 	if((credit_data = __get_or_create_credit_data_entry(sclient, CREDIT_TIME))
 			== NULL) {
 		LM_ERR("Error retrieving credit data from shared memory for client "
-				"[%.*s]\n", sclient->len, sclient->s);
+			   "[%.*s]\n",
+				sclient->len, sclient->s);
 		return -1;
 	}
 
-	if((call = __alloc_new_call_by_time(credit_data, msg, max_secs))
-			== NULL) {
-		LM_ERR("Unable to allocate new call for client [%.*s]\n",
-				sclient->len, sclient->s);
+	if((call = __alloc_new_call_by_time(credit_data, msg, max_secs)) == NULL) {
+		LM_ERR("Unable to allocate new call for client [%.*s]\n", sclient->len,
+				sclient->s);
 		return -1;
 	}
 
@@ -1912,11 +1877,11 @@ static int __set_max_time(sip_msg_t *msg, char *pclient, char *pmaxsecs)
 	str sclient;
 	int max_secs = 0;
 
-	if(fixup_get_svalue(msg, (gparam_t*)pclient, &sclient)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pclient, &sclient) < 0) {
 		LM_ERR("failed to get client parameter\n");
 		return -1;
 	}
-	if(fixup_get_ivalue(msg, (gparam_t*)pmaxsecs, &max_secs)<0) {
+	if(fixup_get_ivalue(msg, (gparam_t *)pmaxsecs, &max_secs) < 0) {
 		LM_ERR("failed to get max secs parameter\n");
 		return -1;
 	}
@@ -1927,6 +1892,10 @@ static int __set_max_time(sip_msg_t *msg, char *pclient, char *pmaxsecs)
 static int ki_update_max_time(sip_msg_t *msg, str *sclient, int secs)
 {
 	credit_data_t *credit_data = NULL;
+	struct str_hash_table *ht = NULL;
+	struct str_hash_entry *e = NULL;
+	double update_fraction = secs;
+	call_t *call = NULL, *tmp_call = NULL;
 
 	set_ctrl_flag(msg);
 
@@ -1948,23 +1917,17 @@ static int ki_update_max_time(sip_msg_t *msg, str *sclient, int secs)
 	}
 
 	LM_DBG("Updating call for client [%.*s], max-secs[%d], call-id[%.*s]\n",
-			sclient->len, sclient->s, secs,
-			msg->callid->body.len, msg->callid->body.s);
+			sclient->len, sclient->s, secs, msg->callid->body.len,
+			msg->callid->body.s);
 
-
-	struct str_hash_table *ht = NULL;
-	struct str_hash_entry *e = NULL;
 	ht = _data.time.credit_data_by_client;
-	double update_fraction = secs;
-	call_t *call = NULL, *tmp_call = NULL;
 
 	cnxcc_lock(_data.time.lock);
 	e = str_hash_get(ht, sclient->s, sclient->len);
 	cnxcc_unlock(_data.time.lock);
 
 	if(e == NULL) {
-		LM_ERR("Client [%.*s] was not found\n", sclient->len,
-				sclient->s);
+		LM_ERR("Client [%.*s] was not found\n", sclient->len, sclient->s);
 		return -1;
 	}
 
@@ -1999,11 +1962,11 @@ static int __update_max_time(sip_msg_t *msg, char *pclient, char *psecs)
 	str sclient;
 	int secs = 0;
 
-	if(fixup_get_svalue(msg, (gparam_t*)pclient, &sclient)<0) {
+	if(fixup_get_svalue(msg, (gparam_t *)pclient, &sclient) < 0) {
 		LM_ERR("failed to get client parameter\n");
 		return -1;
 	}
-	if(fixup_get_ivalue(msg, (gparam_t*)psecs, &secs)<0) {
+	if(fixup_get_ivalue(msg, (gparam_t *)psecs, &secs) < 0) {
 		LM_ERR("failed to get secs parameter\n");
 		return -1;
 	}
@@ -2094,7 +2057,7 @@ static sr_kemi_t sr_kemi_cnxcc_exports[] = {
 	{ str_init("cnxcc"), str_init("set_max_credit"),
 		SR_KEMIP_INT, ki_set_max_credit,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
-			SR_KEMIP_INT, SR_KEMIP_INT, SR_KEMIP_NONE }
+			SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_INT }
 	},
 	{ str_init("cnxcc"), str_init("set_max_time"),
 		SR_KEMIP_INT, ki_set_max_time,

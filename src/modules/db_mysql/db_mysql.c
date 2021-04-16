@@ -45,6 +45,7 @@ unsigned int my_server_timezone = 0; /* Use FROM_UNIXTIME() for date conversion 
 
 unsigned long my_client_ver = 0;
 int db_mysql_unsigned_type = 0;
+int db_mysql_opt_ssl_mode = 0;
 
 struct mysql_counters_h mysql_cnts_h;
 counter_def_t mysql_cnt_defs[] =  {
@@ -100,6 +101,7 @@ static param_export_t params[] = {
 	{"insert_delayed",   INT_PARAM, &db_mysql_insert_all_delayed},
 	{"update_affected_found", INT_PARAM, &db_mysql_update_affected_found},
 	{"unsigned_type",    PARAM_INT, &db_mysql_unsigned_type},
+	{"opt_ssl_mode",     PARAM_INT, &db_mysql_opt_ssl_mode},
 	{0, 0, 0}
 };
 
@@ -139,14 +141,14 @@ static int mysql_mod_init(void)
 			my_recv_to= DEFAULT_MY_RECV_TO;
 		}
 	} else if (my_recv_to || my_send_to) {
-		LOG(L_WARN, "WARNING: mysql send or received timeout set, but "
+		LM_WARN("WARNING: mysql send or received timeout set, but "
 			" not supported by the installed mysql client library"
 			" (needed at least 4.1.22 or 5.0.25, but installed %ld)\n",
 			my_client_ver);
 	}
 #else
 	if (my_recv_to || my_send_to) {
-		LOG(L_WARN, "WARNING: mysql send or received timeout set, but "
+		LM_WARN("WARNING: mysql send or received timeout set, but "
 			" not supported by the mysql client library used to compile"
 			" the mysql module (needed at least 4.1.1 but "
 			" compiled against %ld)\n", MYSQL_VERSION_ID);

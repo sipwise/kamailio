@@ -173,6 +173,10 @@ void freeRP_DATA(sms_rp_data_t * rpdata) {
 #define BITMASK_HIGH_4BITS 0xF0
 #define BITMASK_LOW_4BITS 0x0F
 #define BITMASK_TP_UDHI 0x40
+#define BITMASK_TP_VPF 0x18
+#define BITMASK_TP_VPF_RELATIVE 0x10 
+#define BITMASK_TP_VPF_ENHANCED 0x08
+#define BITMASK_TP_VPF_ABSOLUTE 0x18
 
 // Encode SMS-Message by merging 7 bit ASCII characters into 8 bit octets.
 static int ascii_to_gsm(str sms, char * output_buffer, int buffer_size) {
@@ -195,7 +199,7 @@ static int ascii_to_gsm(str sms, char * output_buffer, int buffer_size) {
 		}
 	}
 
-	if (i <= sms.len)
+	if (i < sms.len)
 		output_buffer[output_buffer_length++] =	(sms.s[i] & BITMASK_7BITS) >> (carry_on_bits - 1);
 
 	return output_buffer_length;
@@ -370,24 +374,24 @@ static int DecodePhoneNumber(char* buffer, int len, str phone) {
 // Generate a 7 Byte Long Time
 static void EncodeTime(char * buffer) {
 	time_t ts;
-	struct tm * now;
+	struct tm now;
 	int i = 0;
 
 	time(&ts);
 	/* Get GMT time */
-	now = gmtime(&ts);
+	gmtime_r(&ts, &now);
 
-	i = now->tm_year % 100;
+	i = now.tm_year % 100;
 	buffer[0] = (unsigned char)((((i % 10) << 4) | (i / 10)) & 0xff);
-	i = now->tm_mon + 1;
+	i = now.tm_mon + 1;
 	buffer[1] = (unsigned char)((((i % 10) << 4) | (i / 10)) & 0xff);
-	i = now->tm_mday;
+	i = now.tm_mday;
 	buffer[2] = (unsigned char)((((i % 10) << 4) | (i / 10)) & 0xff);
-	i = now->tm_hour;
+	i = now.tm_hour;
 	buffer[3] = (unsigned char)((((i % 10) << 4) | (i / 10)) & 0xff);
-	i = now->tm_min;
+	i = now.tm_min;
 	buffer[4] = (unsigned char)((((i % 10) << 4) | (i / 10)) & 0xff);
-	i = now->tm_sec;
+	i = now.tm_sec;
 	buffer[5] = (unsigned char)((((i % 10) << 4) | (i / 10)) & 0xff);
 	buffer[6] = 0; // Timezone, we use no time offset.
 }
@@ -469,7 +473,7 @@ int decode_3gpp_sms(struct sip_msg *msg) {
 		if (!rp_data) {
 			rp_data = (sms_rp_data_t*)pkg_malloc(sizeof(struct _sms_rp_data));
 			if (!rp_data) {
-				LM_ERR("Error allocating %lu bytes!\n", sizeof(struct _sms_rp_data));
+				LM_ERR("Error allocating %lu bytes!\n", (unsigned long)sizeof(struct _sms_rp_data));
 				return -1;
 			}
 		} else {
@@ -525,7 +529,27 @@ int decode_3gpp_sms(struct sip_msg *msg) {
 				}
 				rp_data->pdu.pid = (unsigned char)body.s[p++];
 				rp_data->pdu.coding = (unsigned char)body.s[p++];
-				rp_data->pdu.validity = (unsigned char)body.s[p++];
+
+				// 3GPP TS 03.40 9.2.2.2 SMS SUBMIT type
+				// https://en.wikipedia.org/wiki/GSM_03.40
+				if(rp_data->pdu.msg_type == SUBMIT){
+					// 3GPP TS 03.40 9.2.3.3 TP Validity Period Format (TP VPF)
+					switch (rp_data->pdu.flags & BITMASK_TP_VPF){
+						case BITMASK_TP_VPF_RELATIVE:	// 3GPP TS 03.40 9.2.3.12.1 TP-VP (Relative format)
+							rp_data->pdu.validity = (unsigned char)body.s[p++];
+							break;
+						case BITMASK_TP_VPF_ENHANCED:	// 3GPP TS 03.40 9.2.3.12.2 TP-VP (Absolute format)
+							p += 7;
+							LM_WARN("3GPP TS 03.40 9.2.3.12.2 TP-VP (Absolute format) is not supported\n");
+							break;
+						case BITMASK_TP_VPF_ABSOLUTE:	// 3GPP TS 03.40 9.2.3.12.3 TP-VP (Enhanced format)
+							p += 7;
+							LM_WARN("3GPP TS 03.40 9.2.3.12.3 TP-VP (Enhanced format) is not supported\n");
+							break;
+						default:
+							break;
+					}
+				}
 
 				//TP-User-Data-Length and TP-User-Data
 				len = (unsigned char)body.s[p++];
@@ -606,6 +630,15 @@ int decode_3gpp_sms(struct sip_msg *msg) {
 							udh_read += (1 /* IE ID */ + 1 /* IE Len */ + ie->data.len /* IE data */);
 						}
 
+						// TS 23.040, Sec. 9.2.3.16
+						// Coding: 7 Bit
+						if (rp_data->pdu.coding == 0x00) {
+							int udh_bit_len = (1 + udh_len) * 8; // add 1 octet for the udh length
+							udh_bit_len += (7 - (udh_bit_len % 7));
+							len -= (udh_bit_len / 7);
+						}else{
+							len -= (1 + udh_len); // add 1 octet for the udh length
+						}
 					}
 
 					blen = 2 + len*4;
@@ -618,6 +651,7 @@ int decode_3gpp_sms(struct sip_msg *msg) {
 					// Coding: 7 Bit
 					if (rp_data->pdu.coding == 0x00) {
 						// We don't care about the extra used bytes here.
+						rp_data->pdu.payload.sm.len = len;
 						rp_data->pdu.payload.sm.len = gsm_to_ascii(&body.s[p], len, rp_data->pdu.payload.sm, fill_bits);
 					} else {
 						// Length is worst-case 2 * len (UCS2 is 2 Bytes, UTF8 is worst-case 4 Bytes)
@@ -846,7 +880,7 @@ int pv_set_sms(struct sip_msg* msg, pv_param_t *param, int op, pv_value_t *val) 
 	if (!rp_send_data) {
 		rp_send_data = (sms_rp_data_t*)pkg_malloc(sizeof(struct _sms_rp_data));
 		if (!rp_send_data) {
-			LM_ERR("Error allocating %lu bytes!\n", sizeof(struct _sms_rp_data));
+			LM_ERR("Error allocating %lu bytes!\n", (unsigned long)sizeof(struct _sms_rp_data));
 			return -1;
 		}
 		// Initialize structure:

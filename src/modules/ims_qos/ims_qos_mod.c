@@ -597,7 +597,7 @@ void callback_pcscf_contact_cb(struct pcontact *c, int type, void *param)
 
 
 		if (type == PCSCF_CONTACT_EXPIRE || type == PCSCF_CONTACT_DELETE) {
-				//we dont need to send STR if no QoS was ever succesfully registered!
+				// we dont need to send STR if no QoS was ever successfully registered!
 				if (must_send_str && (c->reg_state != PCONTACT_REG_PENDING) && (c->reg_state != PCONTACT_REG_PENDING_AAR)) {
 						LM_DBG("Received notification of contact (in state [%d] deleted for signalling bearer with  with Rx session ID: [%.*s]\n",
 								c->reg_state, c->rx_session_id.len, c->rx_session_id.s);
@@ -940,17 +940,23 @@ static int w_rx_aar(struct sip_msg *msg, char *route, char* dir, char *c_id, int
 												//get dialog and get the req URI from there
 												dlg = dlgb.get_dlg(msg);
 												if (!dlg) {
-														LM_ERR("Unable to find dialog and cannot do Rx without it\n");
+													if (!cscf_get_to_uri(orig_sip_request_msg, &uri)) {
+														LM_ERR("Error assigning P-Asserted-Identity using To hdr in req");
 														goto error;
-												}
-												LM_DBG("dlg req uri : [%.*s] going to remove parameters if any\n", dlg->req_uri.len, dlg->req_uri.s);
+													}
+													LM_DBG("going to remove parameters if any from identity: [%.*s]\n", uri.len, uri.s);
+													get_identifier(&uri);
+													LM_DBG("identifier from uri : [%.*s]\n", identifier.len, identifier.s);
+												}else{
+													LM_DBG("dlg req uri : [%.*s] going to remove parameters if any\n", dlg->req_uri.len, dlg->req_uri.s);
 
-												if (get_identifier(&dlg->req_uri) != 0) {
-														dlgb.release_dlg(dlg);
-														goto error;
+													if (get_identifier(&dlg->req_uri) != 0) {
+															dlgb.release_dlg(dlg);
+															goto error;
+													}
+													dlgb.release_dlg(dlg);
+													LM_DBG("identifier from dlg req uri : [%.*s]\n", identifier.len, identifier.s);
 												}
-												dlgb.release_dlg(dlg);
-												LM_DBG("identifier from dlg req uri : [%.*s]\n", identifier.len, identifier.s);
 										} else {
 												get_identifier(&uri);
 										}

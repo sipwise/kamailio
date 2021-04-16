@@ -27,13 +27,12 @@
 #include "socket_info.h"
 #include "rand/fastrand.h"
 #include "rand/kam_rand.h"
+#include "rand/cryptorand.h"
 #ifdef PKG_MALLOC
 #include "mem/mem.h"
 #endif
-#ifdef SHM_MEM
 #include "mem/shm_mem.h"
-#endif
-#if defined PKG_MALLOC || defined SHM_MEM
+#if defined PKG_MALLOC
 #include "cfg_core.h"
 #endif
 #include "daemonize.h"
@@ -103,17 +102,12 @@ int init_pt(int proc_no)
 	estimated_proc_no+=proc_no;
 	estimated_fds_no+=calc_common_open_fds_no();
 	/*alloc pids*/
-#ifdef SHM_MEM
 	pt=shm_malloc(sizeof(struct process_table)*estimated_proc_no);
 	process_count = shm_malloc(sizeof(int));
-#else
-	pt=pkg_malloc(sizeof(struct process_table)*estimated_proc_no);
-	process_count = pkg_malloc(sizeof(int));
-#endif
 	process_lock = lock_alloc();
 	process_lock = lock_init(process_lock);
 	if (pt==0||process_count==0||process_lock==0){
-		LM_ERR("out of memory\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(pt, 0, sizeof(struct process_table)*estimated_proc_no);
@@ -256,8 +250,7 @@ int fork_process(int child_id, char *desc, int make_sock)
 {
 	int pid, child_process_no;
 	int ret;
-	unsigned int new_seed1;
-	unsigned int new_seed2;
+	unsigned int new_seed;
 #ifdef USE_TCP
 	int sockfd[2];
 #endif
@@ -296,8 +289,7 @@ int fork_process(int child_id, char *desc, int make_sock)
 	}
 
 	child_process_no = *process_count;
-	new_seed1=kam_rand();
-	new_seed2=random();
+	new_seed=cryptorand();
 	pid = fork();
 	if (pid<0) {
 		lock_release(process_lock);
@@ -312,9 +304,13 @@ int fork_process(int child_id, char *desc, int make_sock)
 #ifdef USE_TCP
 		close_extra_socks(child_id, process_no);
 #endif /* USE_TCP */
-		kam_srand(new_seed1);
-		fastrand_seed(kam_rand());
-		srandom(new_seed2+time(0));
+		new_seed+=getpid()+time(0);
+		LM_DBG("seeding PRNG with %u\n", new_seed);
+		cryptorand_seed(new_seed);
+		fastrand_seed(cryptorand());
+		kam_srand(cryptorand());
+		srandom(cryptorand());
+		LM_DBG("test random numbers %u %lu %u %u\n", kam_rand(), random(), fastrand(), cryptorand());
 		shm_malloc_on_fork();
 #ifdef PROFILING
 		monstartup((u_long) &_start, (u_long) &etext);
@@ -566,7 +562,6 @@ void mem_dump_pkg_cb(str *gname, str *name)
 }
 #endif
 
-#ifdef SHM_MEM
 /* Dumps shm memory status.
  * fixup function that is called
  * when mem_dump_shm cfg var is set.
@@ -593,7 +588,6 @@ int mem_dump_shm_fixup(void *handle, str *gname, str *name, void **val)
 	}
 	return 0;
 }
-#endif
 
 /* cache if child processes were initialized */
 static int _sr_instance_ready = 0;

@@ -252,24 +252,45 @@ kamailio_create () # pars: <database name>
 		exit 1
 	fi
 
-	kamailio_db_create $1
+	if [ "$DBINITASK" = "yes" ]; then
+		get_answer "ask" "Create the database '$1'? (y/n): "
+	else
+		ANSWER="y"
+	fi
+	if [ "$ANSWER" = "y" ]; then
+		kamailio_db_create $1
+	fi
 
-	kamailio_db_grant $1
+	if [ "$DBINITASK" = "yes" ]; then
+		get_answer "ask" "Create database users with access privileges? (y/n): "
+	else
+		ANSWER="y"
+	fi
+	if [ "$ANSWER" = "y" ]; then
+		kamailio_db_grant $1
+	fi
 
-	standard_create $1
+	if [ "$DBINITASK" = "yes" ]; then
+		get_answer "ask" "Create the standard database tables? (y/n): "
+	else
+		ANSWER="y"
+	fi
+	if [ "$ANSWER" = "y" ]; then
+		standard_create $1
+	fi
 
-	get_answer $INSTALL_PRESENCE_TABLES "Install presence related tables? (y/n): "
+	get_answer $INSTALL_PRESENCE_TABLES "Create the presence related tables? (y/n): "
 	if [ "$ANSWER" = "y" ]; then
 		presence_create $1
 	fi
 
-	get_answer $INSTALL_EXTRA_TABLES "Install tables for $EXTRA_MODULES? (y/n): "
+	get_answer $INSTALL_EXTRA_TABLES "Create the tables for $EXTRA_MODULES? (y/n): "
 	if [ "$ANSWER" = "y" ]; then
 		HAS_EXTRA="yes"
 		extra_create $1
 	fi
 
-	get_answer $INSTALL_DBUID_TABLES "Install tables for $DBUID_MODULES? (y/n): "
+	get_answer $INSTALL_DBUID_TABLES "Create the tables for $DBUID_MODULES? (y/n): "
 	if [ "$ANSWER" = "y" ]; then
 		HAS_EXTRA="yes"
 		dbuid_create $1
@@ -294,7 +315,7 @@ standard_create () # pars: <database name>
 		fi
 	done
 
-	minfo "Core Kamailio tables succesfully created."
+	minfo "Core Kamailio tables successfully created."
 
 	if [ -e $DB_SCHEMA/extensions-create.sql ]
 	then
@@ -326,7 +347,7 @@ presence_create () # pars: <database name>
 		fi
 	done
 
-	minfo "Presence tables succesfully created."
+	minfo "Presence tables successfully created."
 }  # end presence_create
 
 
@@ -347,7 +368,7 @@ extra_create () # pars: <database name>
 			exit 1
 			fi
 		done
-	minfo "Extra tables succesfully created."
+	minfo "Extra tables successfully created."
 }  # end extra_create
 
 dbuid_create () # pars: <database name>
@@ -367,7 +388,7 @@ dbuid_create () # pars: <database name>
 			exit 1
 			fi
 		done
-	minfo "UID tables succesfully created."
+	minfo "UID tables successfully created."
 }  # end uid_create
 
 

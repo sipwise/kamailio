@@ -31,13 +31,12 @@
 #include "../../core/mem/shm_mem.h"
 #include "../../core/hash_func.h"
 #include "../../core/dprint.h"
-#include "../../core/md5utils.h"
+#include "../../core/crypto/md5utils.h"
 #include "../../core/ut.h"
 #include "../../core/globals.h"
 #include "../../core/error.h"
 #include "../../core/char_msg_val.h"
 #include "../../core/rand/kam_rand.h"
-#include "defs.h"
 #include "t_reply.h"
 #include "t_cancel.h"
 #include "t_stats.h"
@@ -171,10 +170,8 @@ void free_cell_helper(
 		sip_msg_free_unsafe(dead_cell->uas.request);
 	if(dead_cell->uas.response.buffer)
 		shm_free_unsafe(dead_cell->uas.response.buffer);
-#ifdef CANCEL_REASON_SUPPORT
 	if(unlikely(dead_cell->uas.cancel_reas))
 		shm_free_unsafe(dead_cell->uas.cancel_reas);
-#endif /* CANCEL_REASON_SUPPORT */
 
 	/* callbacks */
 	for(cbs = (struct tm_callback *)dead_cell->tmcb_hl.first; cbs;) {
@@ -237,10 +234,8 @@ void free_cell_helper(
 		}
 	}
 
-#ifdef WITH_AS_SUPPORT
 	if(dead_cell->uac[0].local_ack)
 		free_local_ack_unsafe(dead_cell->uac[0].local_ack);
-#endif
 
 	/* collected to tags */
 	tt = dead_cell->fwded_totags;
@@ -260,10 +255,12 @@ void free_cell_helper(
 		destroy_avp_list_unsafe(&dead_cell->uri_avps_from);
 	if(dead_cell->uri_avps_to)
 		destroy_avp_list_unsafe(&dead_cell->uri_avps_to);
-#ifdef WITH_XAVP
 	if(dead_cell->xavps_list)
 		xavp_destroy_list_unsafe(&dead_cell->xavps_list);
-#endif
+	if(dead_cell->xavus_list)
+		xavu_destroy_list_unsafe(&dead_cell->xavus_list);
+	if(dead_cell->xavis_list)
+		xavi_destroy_list_unsafe(&dead_cell->xavis_list);
 
 	memset(dead_cell, 0, sizeof(tm_cell_t));
 	/* the cell's body */
@@ -325,9 +322,7 @@ struct cell *build_cell(struct sip_msg *p_msg)
 	int sip_msg_len;
 	avp_list_t *old;
 	struct tm_callback *cbs, *cbs_tmp;
-#ifdef WITH_XAVP
 	sr_xavp_t **xold;
-#endif
 	unsigned int cell_size;
 
 	/* allocs a new cell, add space for:
@@ -338,6 +333,7 @@ struct cell *build_cell(struct sip_msg *p_msg)
 
 	new_cell = (struct cell *)shm_malloc(cell_size);
 	if(!new_cell) {
+		SHM_MEM_ERROR;
 		ser_error = E_OUT_OF_MEM;
 		return NULL;
 	}
@@ -371,11 +367,17 @@ struct cell *build_cell(struct sip_msg *p_msg)
 	new_cell->user_avps_to = *old;
 	*old = 0;
 
-#ifdef WITH_XAVP
 	xold = xavp_set_list(&new_cell->xavps_list);
 	new_cell->xavps_list = *xold;
 	*xold = 0;
-#endif
+
+	xold = xavu_set_list(&new_cell->xavus_list);
+	new_cell->xavus_list = *xold;
+	*xold = 0;
+
+	xold = xavi_set_list(&new_cell->xavis_list);
+	new_cell->xavis_list = *xold;
+	*xold = 0;
 
 	/* We can just store pointer to domain avps in the transaction context,
 	 * because they are read-only */
@@ -433,15 +435,15 @@ error:
 	destroy_avp_list(&new_cell->user_avps_to);
 	destroy_avp_list(&new_cell->uri_avps_from);
 	destroy_avp_list(&new_cell->uri_avps_to);
-#ifdef WITH_XAVP
 	xavp_destroy_list(&new_cell->xavps_list);
-#endif
+	xavu_destroy_list(&new_cell->xavus_list);
+	xavi_destroy_list(&new_cell->xavis_list);
 	shm_free(new_cell);
 	/* unlink transaction AVP list and link back the global AVP list (bogdan)*/
 	reset_avps();
-#ifdef WITH_XAVP
 	xavp_reset_list();
-#endif
+	xavu_reset_list();
+	xavi_reset_list();
 	return NULL;
 }
 
@@ -479,7 +481,7 @@ struct s_table *init_hash_table()
 	/*allocs the table*/
 	_tm_table = (struct s_table *)shm_malloc(sizeof(struct s_table));
 	if(!_tm_table) {
-		LM_ERR("no shmem for TM table\n");
+		SHM_MEM_ERROR;
 		goto error0;
 	}
 
@@ -536,9 +538,9 @@ void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &t->domain_avps_from);
 		x->domain_avps_to = set_avp_list(
 				AVP_TRACK_TO | AVP_CLASS_DOMAIN, &t->domain_avps_to);
-#ifdef WITH_XAVP
 		x->xavps_list = xavp_set_list(&t->xavps_list);
-#endif
+		x->xavus_list = xavu_set_list(&t->xavus_list);
+		x->xavis_list = xavi_set_list(&t->xavis_list);
 	} else if(mode == 1) {
 		/* restore original avp list */
 		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_URI, x->uri_avps_from);
@@ -547,9 +549,9 @@ void tm_xdata_swap(tm_cell_t *t, tm_xlinks_t *xd, int mode)
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_USER, x->user_avps_to);
 		set_avp_list(AVP_TRACK_FROM | AVP_CLASS_DOMAIN, x->domain_avps_from);
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, x->domain_avps_to);
-#ifdef WITH_XAVP
 		xavp_set_list(x->xavps_list);
-#endif
+		xavu_set_list(x->xavus_list);
+		xavi_set_list(x->xavis_list);
 	}
 }
 
@@ -566,9 +568,9 @@ void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
 		set_avp_list(
 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, bakxd->domain_avps_from);
 		set_avp_list(AVP_TRACK_TO | AVP_CLASS_DOMAIN, bakxd->domain_avps_to);
-#ifdef WITH_XAVP
 		xavp_set_list(bakxd->xavps_list);
-#endif
+		xavu_set_list(bakxd->xavus_list);
+		xavi_set_list(bakxd->xavis_list);
 		return;
 	}
 
@@ -585,9 +587,9 @@ void tm_xdata_replace(tm_xdata_t *newxd, tm_xlinks_t *bakxd)
 				AVP_TRACK_FROM | AVP_CLASS_DOMAIN, &newxd->domain_avps_from);
 		bakxd->domain_avps_to = set_avp_list(
 				AVP_TRACK_TO | AVP_CLASS_DOMAIN, &newxd->domain_avps_to);
-#ifdef WITH_XAVP
 		bakxd->xavps_list = xavp_set_list(&newxd->xavps_list);
-#endif
+		bakxd->xavus_list = xavu_set_list(&newxd->xavus_list);
+		bakxd->xavis_list = xavi_set_list(&newxd->xavis_list);
 		return;
 	}
 }
@@ -607,11 +609,7 @@ void tm_log_transaction(tm_cell_t *tcell, int llev, char *ltext)
 			(tcell->uas.request)?"yes":"no",
 			(unsigned)tcell->flags,
 			(unsigned)tcell->nr_of_outgoings,
-#ifdef TM_DEL_UNREF
 			(unsigned)atomic_get(&tcell->ref_count),
-#else
-			tcell->ref_count,
-#endif
 			(unsigned)TICKS_TO_S(tcell->end_of_life)
 		);
 

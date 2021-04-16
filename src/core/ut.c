@@ -99,7 +99,7 @@ int group2gid(int* gid, char* group)
 time_t _timegm(struct tm* t)
 {
 	time_t tl, tb;
-	struct tm* tg;
+	struct tm tg;
 
 	t->tm_isdst = 0;
 	tl = mktime(t);
@@ -112,12 +112,12 @@ time_t _timegm(struct tm* t)
 		tl += 3600;
 	}
 
-	tg = gmtime(&tl);
-	tg->tm_isdst = 0;
-	tb = mktime(tg);
+	gmtime_r(&tl, &tg);
+	tg.tm_isdst = 0;
+	tb = mktime(&tg);
 	if (tb == -1) {
-		tg->tm_hour--;
-		tb = mktime (tg);
+		tg.tm_hour--;
+		tb = mktime (&tg);
 		if (tb == -1) {
 			return -1; /* can't deal with output from gmtime */
 		}
@@ -130,22 +130,22 @@ time_t _timegm(struct tm* t)
 /* Convert time_t value that is relative to local timezone to UTC */
 time_t local2utc(time_t in)
 {
-	struct tm* tt;
-	tt = gmtime(&in);
-	tt->tm_isdst = -1;
-	return mktime(tt);
+	struct tm tt;
+	gmtime_r(&in, &tt);
+	tt.tm_isdst = -1;
+	return mktime(&tt);
 }
 
 
 /* Convert time_t value in UTC to to value relative to local time zone */
 time_t utc2local(time_t in)
 {
-	struct tm* tt;
-	tt = localtime(&in);
+	struct tm tt;
+	localtime_r(&in, &tt);
 #ifdef HAVE_TIMEGM
-	return timegm(tt);
+	return timegm(&tt);
 #else
-	return _timegm(tt);
+	return _timegm(&tt);
 #endif
 }
 
@@ -160,7 +160,7 @@ char* as_asciiz(str* s)
 
     r = (char*)pkg_malloc(s->len + 1);
     if (!r) {
-		ERR("Out of memory\n");
+		PKG_MEM_ERROR;
 		return 0;
     }
     memcpy(r, s->s, s->len);
@@ -240,7 +240,7 @@ char* get_abs_pathname(str* base, str* file)
 		/* This is an absolute pathname, make a zero terminated
 		 * copy and use it as it is */
 		if ((res = pkg_malloc(file->len+1)) == NULL) {
-			ERR("get_abs_pathname: No memory left (pkg_malloc failed)\n");
+			PKG_MEM_ERROR;
 			return NULL;
 		}
 		memcpy(res, file->s, file->len);
@@ -251,7 +251,7 @@ char* get_abs_pathname(str* base, str* file)
 		 */
 		/* Make a copy, function dirname may modify the string */
 		if ((buf = pkg_malloc(base->len+1)) == NULL) {
-			ERR("get_abs_pathname: No memory left (pkg_malloc failed)\n");
+			PKG_MEM_ERROR;
 			return NULL;
 		}
 		memcpy(buf, base->s, base->len);
@@ -260,7 +260,7 @@ char* get_abs_pathname(str* base, str* file)
 
 		len = strlen(dir);
 		if ((res = pkg_malloc(len + 1 + file->len + 1)) == NULL) {
-			ERR("get_abs_pathname: No memory left (pkg_malloc failed)\n");
+			PKG_MEM_ERROR;
 			pkg_free(buf);
 			return NULL;
 		}

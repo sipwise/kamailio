@@ -46,7 +46,7 @@ int cfg_register_ctx(cfg_ctx_t **handle, cfg_on_declare on_declare_cb)
 	 * must be in shm mem anyway */
 	ctx = (cfg_ctx_t *)shm_malloc(sizeof(cfg_ctx_t));
 	if (!ctx) {
-		LM_ERR("not enough shm memory\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(ctx, 0, sizeof(cfg_ctx_t));
@@ -183,7 +183,7 @@ int convert_val(unsigned int val_type, void *val,
 				if (temp_string) pkg_free(temp_string);
 				temp_string = (char *)pkg_malloc(sizeof(char) * (((str *)val)->len + 1));
 				if (!temp_string) {
-					LM_ERR("not enough memory\n");
+					PKG_MEM_ERROR;
 					return -1;
 				}
 				memcpy(temp_string, ((str *)val)->s, ((str *)val)->len);
@@ -284,7 +284,11 @@ static int cfg_update_defaults(cfg_group_meta_t	*meta,
 				meta->array = array;
 				clone_done = 1;
 			}
-			memcpy(ginst->vars + var->offset, new_val, cfg_var_size(var));
+			if(ginst->vars + var->offset) {
+				memcpy(ginst->vars + var->offset, new_val, cfg_var_size(var));
+			} else {
+				LM_ERR("invalid variable offset\n");
+			}
 		}
 	}
 	return 0;
@@ -427,7 +431,7 @@ int cfg_set_now(cfg_ctx_t *ctx, str *group_name, unsigned int *group_id, str *va
 				var->def->on_set_child_cb,
 				var->def->type);
 		if (!child_cb) {
-			LM_ERR("not enough shm memory\n");
+			SHM_MEM_ERROR;
 			goto error0;
 		}
 	}
@@ -558,7 +562,7 @@ int cfg_set_now(cfg_ctx_t *ctx, str *group_name, unsigned int *group_id, str *va
 			replaced = (void **)shm_malloc(sizeof(void *)
 					* ((old_string?1:0) + (new_array?1:0) + 1));
 			if (!replaced) {
-				LM_ERR("not enough shm memory\n");
+				SHM_MEM_ERROR;
 				goto error;
 			}
 			i = 0;
@@ -782,7 +786,7 @@ int cfg_set_delayed(cfg_ctx_t *ctx, str *group_name, unsigned int *group_id,
 		if (ctx->changed_first) {
 			temp_handle = (unsigned char *)pkg_malloc(group->size);
 			if (!temp_handle) {
-				LM_ERR("not enough memory\n");
+				PKG_MEM_ERROR;
 				goto error;
 			}
 			temp_handle_created = 1;
@@ -831,7 +835,7 @@ int cfg_set_delayed(cfg_ctx_t *ctx, str *group_name, unsigned int *group_id,
 		+ ((val_type != CFG_VAR_UNSET) ? cfg_var_size(var) : 0);
 	changed = (cfg_changed_var_t *)shm_malloc(size);
 	if (!changed) {
-		LM_ERR("not enough shm memory\n");
+		SHM_MEM_ERROR;
 		goto error;
 	}
 	memset(changed, 0, size);
@@ -1063,7 +1067,7 @@ int cfg_commit(cfg_ctx_t *ctx)
 		size = sizeof(void *)*(replaced_num + 1);
 		replaced = (void **)shm_malloc(size);
 		if (!replaced) {
-			LM_ERR("not enough shm memory\n");
+			SHM_MEM_ERROR;
 			goto error0;
 		}
 		memset(replaced, 0 , size);
@@ -1121,6 +1125,10 @@ int cfg_commit(cfg_ctx_t *ctx)
 				goto error;
 			}
 			p = group_inst->vars + changed->var->offset;
+		}
+		if(p==NULL) {
+			LM_ERR("failed to resolve valid variable offset\n");
+			goto error;
 		}
 
 		if (((changed->group_id_set && !changed->del_value
@@ -1635,7 +1643,7 @@ int cfg_add_group_inst(cfg_ctx_t *ctx, str *group_name, unsigned int group_id)
 		 * they will be freed when the old block is freed */
 		replaced = (void **)shm_malloc(sizeof(void *) * 2);
 		if (!replaced) {
-			LM_ERR("not enough shm memory\n");
+			SHM_MEM_ERROR;
 			goto error;
 		}
 		replaced[0] = CFG_GROUP_META(*cfg_global, group)->array;
@@ -1740,7 +1748,7 @@ int cfg_del_group_inst(cfg_ctx_t *ctx, str *group_name, unsigned int group_id)
 
 		replaced = (void **)shm_malloc(sizeof(void *) * (num + 2));
 		if (!replaced) {
-			LM_ERR("not enough shm memory\n");
+			SHM_MEM_ERROR;
 			goto error;
 		}
 

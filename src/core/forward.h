@@ -34,7 +34,6 @@
 #include "proxy.h"
 #include "ip_addr.h"
 
-#include "stats.h"
 #include "udp_server.h"
 #ifdef USE_TCP
 #include "tcp_server.h"
@@ -112,7 +111,7 @@ int is_check_self_func_list_set(void);
  *         that generated them; use 0 if you don't want this)
  * buf, len = buffer
  * flags = control internal behavior
- *    * 1 - skip executing event SREV_NET_DATA_OUT
+ *    * 1 - skip executing events: SREV_NET_DATA_OUT, SREV_NET_DATA_SEND
  * returns: 0 if ok, -1 on error*/
 
 static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
@@ -185,7 +184,12 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 		port = su_getport(&dst->to);
 		if (likely(port)) {
 			su2ip_addr(&ip, &dst->to);
-			con = tcpconn_get(dst->id, &ip, port, from, 0);
+			if(tcp_connection_match==TCPCONN_MATCH_STRICT) {
+				con = tcpconn_lookup(dst->id, &ip, port, from,
+						(dst->send_sock)?dst->send_sock->port_no:0, 0);
+			} else {
+				con = tcpconn_get(dst->id, &ip, port, from, 0);
+			}
 		}
 		else if (likely(dst->id))
 			con = tcpconn_get(dst->id, 0, 0, 0, 0);
@@ -224,7 +228,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 			dst=&new_dst;
 		}
 		if (unlikely(udp_send(dst, outb.s, outb.len)==-1)){
-			STATS_TX_DROPS;
 			LOG(cfg_get(core, core_cfg, corelog), "udp_send failed\n");
 			goto error;
 		}
@@ -232,7 +235,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 #ifdef USE_TCP
 	else if (dst->proto==PROTO_TCP){
 		if (unlikely(tcp_disable)){
-			STATS_TX_DROPS;
 			LM_WARN("attempt to send on tcp and tcp support is disabled\n");
 			goto error;
 		}else{
@@ -256,7 +258,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 				from=&local_addr;
 			}
 			if (unlikely(tcp_send(dst, from, outb.s, outb.len)<0)){
-				STATS_TX_DROPS;
 				LOG(cfg_get(core, core_cfg, corelog), "tcp_send failed\n");
 				goto error;
 			}
@@ -265,7 +266,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 #ifdef USE_TLS
 	else if (dst->proto==PROTO_TLS){
 		if (unlikely(tls_disable)){
-			STATS_TX_DROPS;
 			LM_WARN("attempt to send on tls and tls support is disabled\n");
 			goto error;
 		}else{
@@ -289,7 +289,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 				from=&local_addr;
 			}
 			if (unlikely(tcp_send(dst, from, outb.s, outb.len)<0)){
-				STATS_TX_DROPS;
 				LOG(cfg_get(core, core_cfg, corelog), "tcp_send failed\n");
 				goto error;
 			}
@@ -300,7 +299,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 #ifdef USE_SCTP
 	else if (dst->proto==PROTO_SCTP){
 		if (unlikely(sctp_disable)){
-			STATS_TX_DROPS;
 			LM_WARN("attempt to send on sctp and sctp support is disabled\n");
 			goto error;
 		}else{
@@ -314,7 +312,6 @@ static inline int msg_send_buffer(struct dest_info* dst, char* buf, int len,
 				dst=&new_dst;
 			}
 			if (unlikely(sctp_core_msg_send(dst, outb.s, outb.len)<0)){
-				STATS_TX_DROPS;
 				LOG(cfg_get(core, core_cfg, corelog), "sctp_msg_send failed\n");
 				goto error;
 			}
@@ -334,7 +331,7 @@ done:
 		netinfo.data.len = outb.len;
 		netinfo.dst = dst;
 		evp.data = (void*)&netinfo;
-		sr_event_exec(SREV_NET_DATA_SEND, &evp);
+		sr_event_exec(SREV_NET_DATA_SENT, &evp);
 	}
 
 	if(outb.s != buf)

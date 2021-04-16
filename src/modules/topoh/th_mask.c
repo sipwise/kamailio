@@ -26,7 +26,7 @@
 #include <string.h>
 
 #include "../../core/dprint.h"
-#include "../../core/md5.h"
+#include "../../core/crypto/md5.h"
 #include "../../core/crc.h"
 #include "../../core/mem/mem.h"
 #include "th_mask.h"
@@ -98,7 +98,7 @@ char* th_mask_encode(char *in, int ilen, str *prefix, int *olen)
 	out = (char*)pkg_malloc((*olen+1)*sizeof(char));
 	if(out==NULL)
 	{
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		*olen = 0;
 		return NULL;
 	}
@@ -151,7 +151,7 @@ char* th_mask_decode(char *in, int ilen, str *prefix, int extra, int *olen)
 
 	if(out==NULL)
 	{
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		*olen = 0;
 		return NULL;
 	}

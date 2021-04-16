@@ -61,6 +61,7 @@
 #define PV_IDX_PVAR	1
 #define PV_IDX_ALL	2
 #define PV_IDX_ITR	3
+#define PV_IDX_NONE 4
 
 /*! if PV name is dynamic, integer, or str */
 #define pv_has_dname(pv) ((pv)->pvp.pvn.type==PV_NAME_PVAR)
@@ -77,8 +78,8 @@ enum _pv_type {
 	PVT_DSTURI,           PVT_COLOR,             PVT_BRANCH,
 	PVT_FROM,             PVT_TO,                PVT_OURI,
 	PVT_SCRIPTVAR,        PVT_MSG_BODY,          PVT_CONTEXT,
-	PVT_XAVP,             PVT_HDRC,              PVT_OTHER,
-	PVT_EXTRA /* keep it last */
+	PVT_XAVP,             PVT_XAVU,              PVT_XAVI,
+	PVT_HDRC,             PVT_OTHER,             PVT_EXTRA /* keep it last */
 };
 
 typedef enum _pv_type pv_type_t;
@@ -173,7 +174,9 @@ char* pv_parse_spec2(str *in, pv_spec_p sp, int silent);
 int pv_get_spec_value(struct sip_msg* msg, pv_spec_p sp, pv_value_t *value);
 int pv_set_spec_value(struct sip_msg* msg, pv_spec_p sp, int op,
 		pv_value_t *value);
-int pv_printf(struct sip_msg* msg, pv_elem_p list, char *buf, int *len);
+int pv_printf_mode(sip_msg_t* msg, pv_elem_t* list, int mode, char *buf, int *len);
+int pv_printf(sip_msg_t* msg, pv_elem_t* list, char *buf, int *len);
+int pv_printf_size(sip_msg_t* msg, pv_elem_t *list);
 int pv_elem_free_all(pv_elem_p log);
 void pv_value_destroy(pv_value_t *val);
 void pv_spec_destroy(pv_spec_t *spec);
@@ -210,6 +213,7 @@ int pv_locate_name(str *in);
 pv_spec_t* pv_cache_get(str *name);
 str* pv_cache_get_name(pv_spec_t *spec);
 str *pv_get_null_str(void);
+str *pv_get_empty_str(void);
 
 /*! \brief PV helper functions */
 int pv_get_null(struct sip_msg *msg, pv_param_t *param, pv_value_t *res);
@@ -302,6 +306,14 @@ typedef struct _pv_xavp_name {
 	pv_spec_t index;
 	struct _pv_xavp_name *next;
 } pv_xavp_name_t;
+
+/**
+ * XAVU
+ */
+typedef struct _pv_xavu_name {
+	str name;
+	struct _pv_xavu_name *next;
+} pv_xavu_name_t;
 
 int pv_eval_str(sip_msg_t *msg, str *dst, str *src);
 

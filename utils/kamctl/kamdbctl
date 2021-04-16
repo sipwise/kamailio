@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/sh
 #
 # control tool for maintaining Kamailio databases
 #
 #===================================================================
 
 ### version for this script
-VERSION='5.2.0'
+VERSION='5.4.0'
 
 PATH=$PATH:/usr/local/sbin/
 

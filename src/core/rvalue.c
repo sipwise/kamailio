@@ -112,10 +112,7 @@ inline static void rval_force_clean(struct rvalue* rv)
 
 
 
-/** frees a rval returned by rval_new(), rval_convert() or rval_expr_eval().
- *   Note: it will be freed only when refcnt reaches 0
- */
-void rval_destroy(struct rvalue* rv)
+static inline void rval_destroy_helper(struct rvalue* rv, int allocated)
 {
 	if (rv && rv_unref(rv)){
 		rval_force_clean(rv);
@@ -126,9 +123,34 @@ void rval_destroy(struct rvalue* rv)
 			regfree(rv->v.re.regex);
 		}
 		if (rv->flags & RV_RV_ALLOCED_F){
-			pkg_free(rv);
+			if(likely(allocated)) {
+				pkg_free(rv);
+			} else {
+				/* not expected to be allocated */
+				abort(); /* abort, otherwise is lost - find bugs quicker */
+			}
 		}
 	}
+}
+
+
+
+/** frees a rval returned by rval_new(), rval_convert() or rval_expr_eval().
+ *   Note: it will be freed only when refcnt reaches 0
+ */
+void rval_destroy(struct rvalue* rv)
+{
+	rval_destroy_helper(rv, 1);
+}
+
+
+
+/** frees content of rval which is not allocated, otherwise aborts.
+ *   Note: it will be freed only when refcnt reaches 0
+ */
+void rval_destroy_content(struct rvalue* rv)
+{
+	rval_destroy_helper(rv, 0);
 }
 
 
@@ -227,6 +249,9 @@ struct rvalue* rval_new_empty(int extra_size)
 		rv->flags=RV_RV_ALLOCED_F;
 		rv->refcnt=1;
 		rv->type=RV_NONE;
+	} else {
+		PKG_MEM_ERROR;
+		return 0;
 	}
 	return rv;
 }
@@ -1255,7 +1280,7 @@ int rval_get_str(struct run_act_ctx* h, struct sip_msg* msg,
 		goto error;
 	s->s=pkg_malloc(tmp.len+1/* 0 term */);
 	if (unlikely(s->s==0)){
-		LM_ERR("memory allocation error\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	s->len=tmp.len;
@@ -1508,7 +1533,7 @@ inline static int int_strop1(int* res, enum rval_expr_op op, str* s1)
 }
 
 
-
+#if 0
 /** integer operation: ret= op v (returns a rvalue).
  * @return rvalue on success, 0 on error
  */
@@ -1604,7 +1629,7 @@ error:
 	rval_destroy(rv2);
 	return 0;
 }
-
+#endif /* #if 0 */
 
 
 /** string add operation: ret= l . r (returns a rvalue).
@@ -2535,8 +2560,10 @@ struct rval_expr* mk_rval_expr_v(enum rval_type rv_type, void* val,
 	int flags;
 
 	rve=pkg_malloc(sizeof(*rve));
-	if (rve==0)
+	if (rve==0) {
+		PKG_MEM_ERROR;
 		return 0;
+	}
 	memset(rve, 0, sizeof(*rve));
 	flags=0;
 	switch(rv_type){
@@ -2548,7 +2575,7 @@ struct rval_expr* mk_rval_expr_v(enum rval_type rv_type, void* val,
 			v.s.s=pkg_malloc(s->len+1 /*0*/);
 			if (v.s.s==0){
 				pkg_free(rve);
-				LM_ERR("memory allocation failure\n");
+				PKG_MEM_ERROR;
 				return 0;
 			}
 			v.s.len=s->len;
@@ -2614,8 +2641,10 @@ struct rval_expr* mk_rval_expr1(enum rval_expr_op op, struct rval_expr* rve1,
 			return 0;
 	}
 	ret=pkg_malloc(sizeof(*ret));
-	if (ret==0)
+	if (ret==0) {
+		PKG_MEM_ERROR;
 		return 0;
+	}
 	memset(ret, 0, sizeof(*ret));
 	ret->op=op;
 	ret->left.rve=rve1;
@@ -2672,8 +2701,10 @@ struct rval_expr* mk_rval_expr2(enum rval_expr_op op, struct rval_expr* rve1,
 			return 0;
 	}
 	ret=pkg_malloc(sizeof(*ret));
-	if (ret==0)
+	if (ret==0) {
+		PKG_MEM_ERROR;
 		return 0;
+	}
 	memset(ret, 0, sizeof(*ret));
 	ret->op=op;
 	ret->left.rve=rve1;
@@ -2931,7 +2962,7 @@ static int rve_replace_with_val(struct rval_expr* rve, enum rval_type type,
 			refcnt=rve->left.rval.refcnt;
 			abort(); /* find bugs quicker -- andrei */
 		}
-		rval_destroy(&rve->left.rval);
+		rval_destroy_content(&rve->left.rval);
 	}
 	rval_init(&rve->left.rval, type, v, flags);
 	rve->left.rval.refcnt=refcnt;
@@ -3003,7 +3034,7 @@ static int fix_match_rve(struct rval_expr* rve)
 	/* fixup the right side (RE) */
 	if (rve_is_constant(rve->right.rve)){
 		if ((rve_guess_type(rve->right.rve)!=RV_STR)){
-			LM_ERR("fixup failure(%d,%d-%d,%d): left side of  =~ is not string"
+			LM_ERR("fixup failure(%d,%d-%d,%d): right side of  =~ is not string"
 					" (%d,%d)\n",   rve->fpos.s_line, rve->fpos.s_col,
 									rve->fpos.e_line, rve->fpos.e_col,
 									rve->right.rve->fpos.s_line,
@@ -3011,7 +3042,7 @@ static int fix_match_rve(struct rval_expr* rve)
 			goto error;
 		}
 		if ((rv=rval_expr_eval(0, 0, rve->right.rve))==0){
-			LM_ERR("fixup failure(%d,%d-%d,%d):  bad RE expression\n",
+			LM_ERR("fixup failure(%d,%d-%d,%d): bad RE expression\n",
 					rve->right.rve->fpos.s_line, rve->right.rve->fpos.s_col,
 					rve->right.rve->fpos.e_line, rve->right.rve->fpos.e_col);
 			goto error;
@@ -3027,7 +3058,7 @@ static int fix_match_rve(struct rval_expr* rve)
 		rv=0;
 		re=pkg_malloc(sizeof(*re));
 		if (re==0){
-			LM_ERR("out of memory\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		/* same flags as for expr. =~ (fix_expr()) */
@@ -3070,6 +3101,7 @@ static int rve_opt_01(struct rval_expr* rve, enum rval_type rve_type)
 	struct rvalue* rv;
 	struct rval_expr* ct_rve;
 	struct rval_expr* v_rve;
+	struct rval_expr* r_rve = NULL;
 	int i;
 	int ret;
 	enum rval_expr_op op;
@@ -3093,7 +3125,7 @@ static int rve_opt_01(struct rval_expr* rve, enum rval_type rve_type)
 			pos=(e)->fpos; \
 			*(e)=*(v); /* replace e with v (in-place) */ \
 			(e)->fpos=pos; \
-			pkg_free((v)); /* rve_destroy(v_rve) would free everything*/ \
+			r_rve = v; /* link to free it */ \
 		}else{\
 			/* unknown type or str => (int) $v */ \
 			(e)->op=RVE_##ctype##_OP; \
@@ -3449,9 +3481,11 @@ static int rve_opt_01(struct rval_expr* rve, enum rval_type rve_type)
 		}
 	}
 	if (rv) rval_destroy(rv);
+	if (r_rve) pkg_free(r_rve); /* rve_destroy(v_rve) would free everything*/
 	return ret;
 error:
 	if (rv) rval_destroy(rv);
+	if (r_rve) pkg_free(r_rve); /* rve_destroy(v_rve) would free everything*/
 	return -1;
 }
 

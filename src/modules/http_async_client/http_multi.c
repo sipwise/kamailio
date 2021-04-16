@@ -352,16 +352,9 @@ static void *curl_shm_calloc(size_t nmemb, size_t size)
 
 static char *curl_shm_strdup(const char *cp)
 {
-    char *rval;
-    int len;
+    char *p = shm_char_dup(cp);
 
-    len = strlen(cp) + 1;
-    rval = shm_malloc(len);
-    if (!rval)
-        return NULL;
-
-    memcpy(rval, cp, len);
-    return rval;
+    return p;
 }
 
 void set_curl_mem_callbacks(void)
@@ -410,6 +403,7 @@ int init_http_multi(struct event_base *evbase, struct http_m_global *wg)
 	curl_multi_setopt(g->multi, CURLMOPT_SOCKETDATA, g);
 	curl_multi_setopt(g->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb);
 	curl_multi_setopt(g->multi, CURLMOPT_TIMERDATA, g);
+	curl_multi_setopt(g->multi, CURLMOPT_PIPELINING, CURLPIPE_NOTHING);
 
 	return init_http_m_table(hash_size);
 }
@@ -524,8 +518,28 @@ int new_request(str *query, http_m_params_t *query_params, http_multi_cbe_t cb, 
 	if (cell->params.password) {
 		curl_easy_setopt(cell->easy, CURLOPT_PASSWORD, cell->params.password);
 	}
+    
+    /* enable tcp keepalives for the handler */
+	if (cell->params.tcp_keepalive) {
+#ifdef CURLOPT_TCP_KEEPALIVE
+		LM_DBG("Enabling TCP keepalives\n");
+		curl_easy_setopt(cell->easy, CURLOPT_TCP_KEEPALIVE, 1L);
+		
+		if (cell->params.tcp_ka_idle) {
+			curl_easy_setopt(cell->easy, CURLOPT_TCP_KEEPIDLE, cell->params.tcp_ka_idle);
+			LM_DBG("CURLOPT_TCP_KEEPIDLE set to %d\n", cell->params.tcp_ka_idle);
+		}
 
-	LM_DBG("Adding easy %p to multi %p (%.*s)\n", cell->easy, g->multi, query->len, query->s);
+		if (cell->params.tcp_ka_interval) {
+			curl_easy_setopt(cell->easy, CURLOPT_TCP_KEEPINTVL, cell->params.tcp_ka_interval);
+			LM_DBG("CURLOPT_TCP_KEEPINTERVAL set to %d\n", cell->params.tcp_ka_interval);
+		}
+#else
+		LM_DBG("tcp_keepalive configured, but installed cURL version doesn't include CURLOPT_TCP_KEEPINTERVAL.\n");
+#endif
+	}
+	
+    LM_DBG("Adding easy %p to multi %p (%.*s)\n", cell->easy, g->multi, query->len, query->s);
 	rc = curl_multi_add_handle(g->multi, cell->easy);
 	if (check_mcode(rc, cell->error) < 0) {
 		LM_ERR("error adding curl handler: %s\n", cell->error);

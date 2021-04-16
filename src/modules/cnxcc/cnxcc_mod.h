@@ -25,7 +25,7 @@
 #include "../../core/locking.h"
 #include "../../core/atomic_ops.h"
 #include "../../core/str_hash.h"
-#include "../../core/parser/parse_rr.h"
+#include "../../core/flags.h"
 
 #define str_shm_free_if_not_null(_var_) \
 	if(_var_.s != NULL) {               \
@@ -35,7 +35,7 @@
 	}
 
 /*!
- * \brief Init a cnxcc_lock 
+ * \brief Init a cnxcc_lock
  * \param _entry locked entry
  */
 #define cnxcc_lock_init(_entry) \
@@ -89,13 +89,15 @@ typedef struct stats
 	unsigned int dropped;
 } stats_t;
 
-typedef enum cnxpvtypes {
+typedef enum cnxpvtypes
+{
 	CNX_PV_ACTIVE = 1,
 	CNX_PV_TOTAL,
 	CNX_PV_DROPPED
 } cnxpvtypes_t;
 
-typedef enum credit_type {
+typedef enum credit_type
+{
 	CREDIT_TIME,
 	CREDIT_MONEY,
 	CREDIT_CHANNEL
@@ -158,6 +160,7 @@ typedef struct sip_data
 
 typedef struct money_spec_data
 {
+	double connect_cost;
 	double cost_per_second;
 	int initial_pulse;
 	int final_pulse;
@@ -178,6 +181,7 @@ typedef struct call
 
 	unsigned int start_timestamp;
 	double consumed_amount;
+	double connect_amount;
 
 	unsigned int dlg_h_entry;
 	unsigned int dlg_h_id;
@@ -210,7 +214,7 @@ typedef struct credit_data
 
 	char *str_id;
 	// flag to mark this instance in the process of being eliminated
-	int deallocating : 1;
+	unsigned int deallocating : 1;
 } credit_data_t;
 
 

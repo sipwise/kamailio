@@ -51,6 +51,7 @@
 #include "../../core/lock_ops.h"
 #include "../../core/dprint.h"
 #include "../../core/str.h"
+#include "../../core/ut.h"
 #include "../../core/pvar.h"
 #include "../../core/error.h"
 #include "../../core/timer.h"
@@ -58,6 +59,7 @@
 #include "../../core/data_lump.h"
 #include "../../core/mod_fix.h"
 #include "../../core/script_cb.h"
+#include "../../core/strutils.h"
 #include "../../core/timer_proc.h"
 #include "../../core/parser/msg_parser.h"
 #include "../../core/parser/parse_from.h"
@@ -213,8 +215,6 @@ static bool test_private_contact(struct sip_msg *msg);
 static bool test_source_address(struct sip_msg *msg);
 static bool test_private_via(struct sip_msg *msg);
 
-static INLINE char *shm_strdup(char *source);
-
 static int mod_init(void);
 static int child_init(int rank);
 static void mod_destroy(void);
@@ -247,6 +247,7 @@ bool have_dlg_api = false;
 
 static int dialog_flag = -1;
 static unsigned dialog_default_timeout = 12 * 3600; // 12 hours
+static int natt_contact_match = 0;
 
 stat_var *keepalive_endpoints = 0;
 stat_var *registered_endpoints = 0;
@@ -288,6 +289,8 @@ static param_export_t parameters[] = {
 	{"keepalive_extra_headers", PARAM_STRING,
 			&keepalive_params.extra_headers},
 	{"keepalive_state_file", PARAM_STRING, &keepalive_state_file},
+	{"contact_match", PARAM_INT, &natt_contact_match},
+
 	{0, 0, 0}
 };
 
@@ -436,7 +439,7 @@ static NAT_Contact *NAT_Contact_new(char *uri, struct socket_info *socket)
 	}
 	memset(contact, 0, sizeof(NAT_Contact));
 
-	contact->uri = shm_strdup(uri);
+	contact->uri = shm_char_dup(uri);
 	if(!contact->uri) {
 		LM_ERR("out of memory while creating new NAT_Contact structure\n");
 		shm_free(contact);
@@ -714,7 +717,7 @@ static bool Dialog_Param_add_candidate(Dialog_Param *param, char *candidate)
 		param->callee_candidates.size = new_size;
 	}
 
-	new_candidate = shm_strdup(candidate);
+	new_candidate = shm_char_dup(candidate);
 	if(!new_candidate) {
 		LM_ERR("cannot allocate shared memory for new candidate uri\n");
 		return false;
@@ -730,51 +733,6 @@ static bool Dialog_Param_add_candidate(Dialog_Param *param, char *candidate)
 
 // Miscellaneous helper functions
 //
-
-// returns str with leading whitespace removed
-static INLINE void ltrim(str *string)
-{
-	while(string->len > 0 && isspace((int)*(string->s))) {
-		string->len--;
-		string->s++;
-	}
-}
-
-// returns str with trailing whitespace removed
-static INLINE void rtrim(str *string)
-{
-	char *ptr;
-
-	ptr = string->s + string->len - 1;
-	while(string->len > 0 && (*ptr == 0 || isspace((int)*ptr))) {
-		string->len--;
-		ptr--;
-	}
-}
-
-// returns str with leading and trailing whitespace removed
-static INLINE void trim(str *string)
-{
-	ltrim(string);
-	rtrim(string);
-}
-
-
-static INLINE char *shm_strdup(char *source)
-{
-	char *copy;
-
-	if(!source)
-		return NULL;
-
-	copy = (char *)shm_malloc(strlen(source) + 1);
-	if(!copy)
-		return NULL;
-	strcpy(copy, source);
-
-	return copy;
-}
-
 
 static bool get_contact_uri(
 		struct sip_msg *msg, struct sip_uri *uri, contact_t **_c)
@@ -943,7 +901,11 @@ static time_t get_register_expire(
 				r_contact_body = (contact_body_t *)r_hdr->parsed;
 				for(r_contact = r_contact_body->contacts; r_contact;
 						r_contact = r_contact->next) {
-					if(STR_MATCH_STR(contact->uri, r_contact->uri)) {
+					if((natt_contact_match==0
+								&& STR_MATCH_STR(contact->uri, r_contact->uri))
+							|| (natt_contact_match==1
+								&& cmp_uri_light_str(&contact->uri,
+									&r_contact->uri)==0)){
 						expires_param = r_contact->expires;
 						if(expires_param && expires_param->body.len
 								&& str2int(&expires_param->body, &exp) == 0)
@@ -1142,7 +1104,7 @@ static void __dialog_confirmed(
 		// free old uri in case this callback is called more than once (shouldn't normally happen)
 		if(param->callee_uri)
 			shm_free(param->callee_uri);
-		param->callee_uri = shm_strdup(callee_uri);
+		param->callee_uri = shm_char_dup(callee_uri);
 		if(!param->callee_uri) {
 			LM_ERR("cannot allocate shared memory for callee_uri in dialog "
 				   "param\n");
@@ -1277,7 +1239,7 @@ static void __dialog_created(
 		return;
 
 	uri = get_source_uri(request);
-	param->caller_uri = shm_strdup(uri);
+	param->caller_uri = shm_char_dup(uri);
 	if(!param->caller_uri) {
 		LM_ERR("cannot allocate shared memory for caller_uri in dialog "
 			   "param\n");
@@ -1479,7 +1441,7 @@ static int FixContact(struct sip_msg *msg)
 	struct lump *anchor;
 	struct sip_uri uri;
 	int len, offset;
-	char *buf;
+	str buf;
 
 	if(!get_contact_uri(msg, &uri, &contact))
 		return -1;
@@ -1506,8 +1468,8 @@ static int FixContact(struct sip_msg *msg)
 
 	// first try to alloc mem. if we fail we don't want to have the lump
 	// deleted and not replaced. at least this way we keep the original.
-	buf = pkg_malloc(len);
-	if(buf == NULL) {
+	buf.s = pkg_malloc(len);
+	if(buf.s == NULL) {
 		LM_ERR("out of memory\n");
 		return -1;
 	}
@@ -1517,26 +1479,30 @@ static int FixContact(struct sip_msg *msg)
 			msg, offset, contact->uri.len, (enum _hdr_types_t)HDR_CONTACT_F);
 
 	if(!anchor) {
-		pkg_free(buf);
+		pkg_free(buf.s);
 		return -1;
 	}
 
 	if(msg->rcv.src_ip.af == AF_INET6) {
-		len = sprintf(buf, "%.*s[%s]:%d%.*s", before_host.len, before_host.s,
+		buf.len = snprintf(buf.s, len, "%.*s[%s]:%d%.*s", before_host.len, before_host.s,
 				newip.s, newport, after.len, after.s);
 	} else {
-		len = sprintf(buf, "%.*s%s:%d%.*s", before_host.len, before_host.s,
+		buf.len = snprintf(buf.s, len, "%.*s%s:%d%.*s", before_host.len, before_host.s,
 				newip.s, newport, after.len, after.s);
 	}
-
-	if(insert_new_lump_after(anchor, buf, len, (enum _hdr_types_t)HDR_CONTACT_F)
-			== 0) {
-		pkg_free(buf);
+	if(buf.len < 0 || buf.len>=len) {
+		pkg_free(buf.s);
 		return -1;
 	}
 
-	contact->uri.s = buf;
-	contact->uri.len = len;
+	if(insert_new_lump_after(anchor, buf.s, buf.len, (enum _hdr_types_t)HDR_CONTACT_F)
+			== 0) {
+		pkg_free(buf.s);
+		return -1;
+	}
+
+	contact->uri.s = buf.s;
+	contact->uri.len = buf.len;
 
 	return 1;
 }
@@ -1587,6 +1553,11 @@ static void send_keepalive(NAT_Contact *contact)
 	str nat_ip;
 	unsigned short lport;
 	char lproto;
+
+	if(contact==NULL || contact->socket==NULL) {
+		LM_ERR("invalid parameters\n");
+		return;
+	}
 
 	if(keepalive_params.from == NULL) {
 		if(contact->socket != last_socket) {
@@ -1801,6 +1772,10 @@ static int mod_init(void)
 	sl_cbelem_t slcb;
 	int *param;
 	modparam_t type;
+
+	if(natt_contact_match!=0) {
+		natt_contact_match = 1;
+	}
 
 	if(keepalive_interval <= 0) {
 		LM_NOTICE(

@@ -352,10 +352,8 @@ if (uri=~"sip:+40") /* calls to Romania */ {
 					</itemizedlist>
 					See also <xref linkend="acc.p.cdr_extra"/>.
 					<para>
-					The full list of supported pseudo-variables in Sip-Router is
-					available at:
-					<ulink url="http://sip-router.org/wiki/cookbooks/pseudo-variables/devel">
-					http://sip-router.org/wiki/cookbooks/pseudo-variables/devel</ulink>
+					The list with all pseudo-variables in &kamailio; can
+					be found at: &kamwikilink;.
 					</para>
 			</section>
 		</section>
@@ -1035,6 +1033,23 @@ modparam("acc", "db_insert_mode", 1)
 		<programlisting format="linespecific">
 ...
 modparam("acc", "cdr_enable", 1)
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="acc.p.cdr_skip">
+		<title><varname>cdr_skip</varname> (string)</title>
+		<para>
+		Skip cdr generation for dialogs with this dlg_var set.
+		</para>
+		<para>
+		Default value is NULL.
+		</para>
+		<example>
+		<title>cdr_skip example</title>
+		<programlisting format="linespecific">
+...
+modparam("acc", "cdr_skip", "nocdr")
 ...
 </programlisting>
 		</example>

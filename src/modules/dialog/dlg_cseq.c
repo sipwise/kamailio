@@ -323,7 +323,7 @@ int dlg_cseq_msg_received(sr_event_param_t *evp)
 	LM_DBG("via cseq cookie [%.*s] val [%.*s]\n", vcseq.len, vcseq.s,
 			vcseq.len-3, vcseq.s+3);
 	if(vcseq.len-3>get_cseq(&msg)->number.len) {
-		/* higher lenght to update - wrong */
+		/* higher length to update - wrong */
 		LM_DBG("cseq in message (%d) shorter than in via (%d)\n",
 				get_cseq(&msg)->number.len, vcseq.len-3);
 		goto done;
@@ -381,7 +381,20 @@ int dlg_cseq_msg_sent(sr_event_param_t *evp)
 		goto done;
 	}
 
-	LM_DBG("traking cseq updates\n");
+	if(!IS_SIP(&msg)) {
+		/* nothing to do for non-sip requests */
+		goto done;
+	}
+
+	if(get_to(&msg)->tag_value.len<=0) {
+		/* intial request - handle only INVITEs, ACKs and CANCELs */
+		if(!(msg.first_line.u.request.method_value
+					& (METHOD_INVITE|METHOD_ACK|METHOD_CANCEL))) {
+			goto done;
+		}
+	}
+
+	LM_DBG("tracking cseq updates\n");
 	via = (struct via_body*)msg.h_via1->parsed;
 
 	if(via->branch==NULL || via->branch->value.len<=0) {

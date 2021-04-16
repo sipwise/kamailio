@@ -71,6 +71,7 @@ union sockaddr_union{
 	struct sockaddr     s;
 	struct sockaddr_in  sin;
 	struct sockaddr_in6 sin6;
+	struct sockaddr_storage sas;
 };
 
 
@@ -116,6 +117,7 @@ typedef struct socket_info {
 	struct addr_info* addr_info_lst; /* extra addresses (e.g. SCTP mh) */
 	int workers; /* number of worker processes for this socket */
 	int workers_tcpidx; /* index of workers in tcp children array */
+	str sockname; /* socket name given in config listen value */
 	struct advertise_info useinfo; /* details to be used in SIP msg */
 #ifdef USE_MCAST
 	str mcast; /* name of interface that should join multicast group*/
@@ -172,12 +174,22 @@ typedef struct dest_info {
 } dest_info_t;
 
 
+typedef struct ksr_coninfo {
+	ip_addr_t src_ip;
+	ip_addr_t dst_ip;
+	unsigned short src_port; /* host byte order */
+	unsigned short dst_port; /* host byte order */
+	int proto;
+	socket_info_t *csocket;
+} ksr_coninfo_t;
+
 typedef struct sr_net_info {
 	str data;
 	receive_info_t* rcv;
 	dest_info_t* dst;
 } sr_net_info_t;
 
+sr_net_info_t *ksr_evrt_rcvnetinfo_get(void);
 
 #define SND_FLAGS_INIT(sflags) \
 	do{ \
