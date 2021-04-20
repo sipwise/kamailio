@@ -32,7 +32,7 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## backports from upstream (5.4)
-#
+upstream/core-usr-avp-fix-detection-of-invalid-name-and-ids.patch
 ## upstream master (5.5)
 upstream/permissions-basic-safety-for-concurent-rpc-reload.patch
 upstream/permissions-add-reload_delta-parameter.patch
