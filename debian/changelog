@@ -1,8 +1,11 @@
-ngcp-kamailio (5.4.5-1+0~mr9.5.0.0) unstable; urgency=medium
+ngcp-kamailio (5.5.0-1~mr9.5.0.0) unstable; urgency=medium
 
-  * New release.
+  * TT#119500 core: usr avp, fix from upstream
+  * New upstream version 5.5.0
+  * TT#122350 update patches
+  * TT#122350 debian: add lwsc modules
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 20 Apr 2021 11:56:59 +0200
+ -- Victor Seva <vseva@debian.org>  Wed, 12 May 2021 12:36:21 +0200
 
 ngcp-kamailio (5.4.5-1+0~mr9.4.0.0) unstable; urgency=medium
 

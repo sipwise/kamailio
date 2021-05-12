@@ -1,4 +1,3 @@
-From 58fc634fe98953a2dfa1dd1ba9cf5e5c1d57416f Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Wed, 12 May 2021 11:40:59 +0200
 Subject: [PATCH] Revert "pua_dialoginfo: disable publish notifications for
@@ -6,14 +5,14 @@ Subject: [PATCH] Revert "pua_dialoginfo: disable publish notifications for
 
 This reverts commit 79be32bcc45775f703319730d405727b0a983726.
 ---
- .../pua_dialoginfo/doc/pua_dialoginfo.xml     |   9 -
- .../doc/pua_dialoginfo_admin.xml              |  66 +-----
- src/modules/pua_dialoginfo/pua_dialoginfo.c   | 188 ++++++------------
- src/modules/pua_dialoginfo/pua_dialoginfo.h   |   3 -
+ src/modules/pua_dialoginfo/doc/pua_dialoginfo.xml  |   9 -
+ .../pua_dialoginfo/doc/pua_dialoginfo_admin.xml    |  66 +-------
+ src/modules/pua_dialoginfo/pua_dialoginfo.c        | 188 +++++++--------------
+ src/modules/pua_dialoginfo/pua_dialoginfo.h        |   3 -
  4 files changed, 61 insertions(+), 205 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo.xml
-index df1e08557e..fd0a3fac5f 100644
+index df1e085..fd0a3fa 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo.xml
 @@ -45,11 +45,6 @@
@@ -40,7 +39,7 @@ index df1e08557e..fd0a3fac5f 100644
      <toc></toc>
      
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 191ee5f4e7..81ef722a4f 100644
+index 191ee5f..81ef722 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 @@ -536,71 +536,7 @@ modparam("pua_dialoginfo", "callee_trying", 1)
@@ -117,7 +116,7 @@ index 191ee5f4e7..81ef722a4f 100644
          <section id="pua_dialoginfo.p.attribute_display">
              <title><varname>attribute_display</varname> (int)</title>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index 7e7afe2eae..9ff64aa023 100644
+index 7e7afe2..9ff64aa 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -63,7 +63,6 @@ MODULE_VERSION
@@ -492,7 +491,7 @@ index 7e7afe2eae..9ff64aa023 100644
  	if (!bind_pua)
  	{
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.h b/src/modules/pua_dialoginfo/pua_dialoginfo.h
-index 2551beb4fa..01fc876999 100644
+index 2551beb..01fc876 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.h
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.h
 @@ -45,9 +45,6 @@ struct dlginfo_cell {
@@ -505,6 +504,3 @@ index 2551beb4fa..01fc876999 100644
  };
  
  
--- 
-2.20.1
-

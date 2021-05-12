@@ -8,7 +8,7 @@ Subject: pua_dialoginfo: use lock when use_puburi_avps is set
  2 files changed, 18 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index b0fb27be..d5b1feae 100644
+index b0fb27b..d5b1fea 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -346,6 +346,7 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
@@ -86,7 +86,7 @@ index b0fb27be..d5b1feae 100644
  }
  
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.h b/src/modules/pua_dialoginfo/pua_dialoginfo.h
-index 01fc8769..82896699 100644
+index 01fc876..8289669 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.h
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.h
 @@ -23,6 +23,7 @@
