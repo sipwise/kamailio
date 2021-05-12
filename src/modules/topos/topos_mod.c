@@ -53,6 +53,7 @@
 #include "../../core/timer_proc.h"
 #include "../../core/fmsg.h"
 #include "../../core/onsend.h"
+#include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
 
 #include "../../lib/srdb1/db.h"
@@ -78,6 +79,7 @@ sruid_t _tps_sruid;
 static str _tps_db_url = str_init(DEFAULT_DB_URL);
 int _tps_param_mask_callid = 0;
 int _tps_sanity_checks = 0;
+int _tps_rr_update = 0;
 str _tps_storage = str_init("db");
 
 extern int _tps_branch_expire;
@@ -87,13 +89,31 @@ int _tps_clean_interval = 60;
 
 #define TPS_EVENTRT_OUTGOING 1
 #define TPS_EVENTRT_SENDING  2
-static int _tps_eventrt_mode = TPS_EVENTRT_OUTGOING | TPS_EVENTRT_SENDING;
+#define TPS_EVENTRT_INCOMING  4
+#define TPS_EVENTRT_RECEIVING 8
+static int _tps_eventrt_mode = TPS_EVENTRT_OUTGOING | TPS_EVENTRT_SENDING
+				| TPS_EVENTRT_INCOMING | TPS_EVENTRT_RECEIVING;
 static int _tps_eventrt_outgoing = -1;
 static str _tps_eventrt_callback = STR_NULL;
 static str _tps_eventrt_outgoing_name = str_init("topos:msg-outgoing");
 static int _tps_eventrt_sending = -1;
 static str _tps_eventrt_sending_name = str_init("topos:msg-sending");
+static int _tps_eventrt_incoming = -1;
+static str _tps_eventrt_incoming_name = str_init("topos:msg-incoming");
+static int _tps_eventrt_receiving = -1;
+static str _tps_eventrt_receiving_name = str_init("topos:msg-receiving");
+
 str _tps_contact_host = str_init("");
+int _tps_contact_mode = 0;
+str _tps_cparam_name = str_init("tps");
+
+str _tps_xavu_cfg = str_init("");
+str _tps_xavu_field_acontact = str_init("");
+str _tps_xavu_field_bcontact = str_init("");
+str _tps_xavu_field_contact_host = str_init("");
+
+str _tps_context_param = str_init("");
+str _tps_context_value = str_init("");
 
 sanity_api_t scb;
 
@@ -111,9 +131,15 @@ static int child_init(int rank);
 /* Module destroy function prototype */
 static void destroy(void);
 
+static int w_tps_set_context(sip_msg_t* msg, char* pctx, char* p2);
+
 int bind_topos(topos_api_t *api);
 
 static cmd_export_t cmds[]={
+	{"tps_set_context", (cmd_function)w_tps_set_context,
+		1, fixup_spve_null, fixup_free_spve_null,
+		ANY_ROUTE},
+
 	{"bind_topos",  (cmd_function)bind_topos,  0,
 		0, 0, 0},
 
@@ -131,6 +157,14 @@ static param_export_t params[]={
 	{"event_callback",	PARAM_STR, &_tps_eventrt_callback},
 	{"event_mode",		PARAM_INT, &_tps_eventrt_mode},
 	{"contact_host",	PARAM_STR, &_tps_contact_host},
+	{"contact_mode",	PARAM_INT, &_tps_contact_mode},
+	{"cparam_name",		PARAM_STR, &_tps_cparam_name},
+	{"xavu_cfg",		PARAM_STR, &_tps_xavu_cfg},
+	{"xavu_field_a_contact",	PARAM_STR, &_tps_xavu_field_acontact},
+	{"xavu_field_b_contact",	PARAM_STR, &_tps_xavu_field_bcontact},
+	{"xavu_field_contact_host", PARAM_STR, &_tps_xavu_field_contact_host},
+	{"rr_update",		PARAM_INT, &_tps_rr_update},
+	{"context",			PARAM_STR, &_tps_context_param},
 	{0,0,0}
 };
 
@@ -163,6 +197,16 @@ static int mod_init(void)
 	if(_tps_eventrt_sending<0
 			|| event_rt.rlist[_tps_eventrt_sending]==NULL) {
 		_tps_eventrt_sending = -1;
+	}
+	_tps_eventrt_incoming = route_lookup(&event_rt, _tps_eventrt_incoming_name.s);
+	if(_tps_eventrt_incoming<0
+			|| event_rt.rlist[_tps_eventrt_incoming]==NULL) {
+		_tps_eventrt_incoming = -1;
+	}
+	_tps_eventrt_receiving = route_lookup(&event_rt, _tps_eventrt_receiving_name.s);
+	if(_tps_eventrt_receiving<0
+			|| event_rt.rlist[_tps_eventrt_receiving]==NULL) {
+		_tps_eventrt_receiving = -1;
 	}
 
 	if(faked_msg_init()<0) {
@@ -202,6 +246,13 @@ static int mod_init(void)
 
 	if(sruid_init(&_tps_sruid, '-', "tpsh", SRUID_INC)<0)
 		return -1;
+
+	if (_tps_contact_mode == 2 && (_tps_xavu_field_acontact.len <= 0
+				|| _tps_xavu_field_bcontact.len <= 0)) {
+		LM_ERR("contact_mode parameter is 2,"
+				" but a_contact or b_contact xavu fields not defined\n");
+		return -1;
+	}
 
 	sr_event_register_cb(SREV_NET_DATA_IN,  tps_msg_received);
 	sr_event_register_cb(SREV_NET_DATA_OUT, tps_msg_sent);
@@ -252,6 +303,58 @@ static void destroy(void)
 		}
 	}
 	tps_storage_lock_set_destroy();
+}
+
+/**
+ *
+ */
+static int ki_tps_set_context(sip_msg_t* msg, str* ctx)
+{
+	if(ctx==NULL || ctx->len<=0) {
+		if(_tps_context_value.s) {
+			pkg_free(_tps_context_value.s);
+		}
+		_tps_context_value.s = NULL;
+		_tps_context_value.len = 0;
+		return 1;
+	}
+
+	if(_tps_context_value.len>=ctx->len) {
+		memcpy(_tps_context_value.s, ctx->s, ctx->len);
+		_tps_context_value.len = ctx->len;
+		return 1;
+	}
+
+	if(_tps_context_value.s) {
+		pkg_free(_tps_context_value.s);
+	}
+	_tps_context_value.len = 0;
+
+	_tps_context_value.s = (char*)pkg_mallocxz(ctx->len + 1);
+	if(_tps_context_value.s==NULL) {
+		PKG_MEM_ERROR;
+		return -1;
+	}
+
+	memcpy(_tps_context_value.s, ctx->s, ctx->len);
+	_tps_context_value.len = ctx->len;
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_tps_set_context(sip_msg_t* msg, char* pctx, char* p2)
+{
+	str sctx = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pctx, &sctx)<0) {
+		LM_ERR("failed to get context parameter\n");
+		return -1;
+	}
+
+	return ki_tps_set_context(msg, &sctx);
 }
 
 /**
@@ -329,7 +432,15 @@ int tps_msg_received(sr_event_param_t *evp)
 	int dialog;
 	int ret;
 
+	ki_tps_set_context(NULL, NULL);
+
 	obuf = (str*)evp->data;
+
+	if(tps_execute_event_route(NULL, evp, TPS_EVENTRT_INCOMING,
+				_tps_eventrt_incoming, &_tps_eventrt_incoming_name)==1) {
+		return 0;
+	}
+
 	memset(&msg, 0, sizeof(sip_msg_t));
 	msg.buf = obuf->s;
 	msg.len = obuf->len;
@@ -340,6 +451,11 @@ int tps_msg_received(sr_event_param_t *evp)
 	}
 
 	if(tps_skip_msg(&msg)) {
+		goto done;
+	}
+
+	if(tps_execute_event_route(&msg, evp, TPS_EVENTRT_RECEIVING,
+				_tps_eventrt_receiving, &_tps_eventrt_receiving_name)==1) {
 		goto done;
 	}
 
@@ -486,11 +602,14 @@ static int tps_execute_event_route(sip_msg_t *msg, sr_event_param_t *evp,
 	struct run_act_ctx ctx;
 	int rtb;
 	sr_kemi_eng_t *keng = NULL;
-	struct onsend_info onsnd_info = {0};
+	onsend_info_t onsnd_info = {0};
+	onsend_info_t *p_onsend_bak;
 
 	if(!(_tps_eventrt_mode & evtype)) {
 		return 0;
 	}
+
+	p_onsend_bak = p_onsend;
 
 	if(evidx<0) {
 		if(_tps_eventrt_callback.s!=NULL || _tps_eventrt_callback.len>0) {
@@ -511,8 +630,10 @@ static int tps_execute_event_route(sip_msg_t *msg, sr_event_param_t *evp,
 			evidx);
 	fmsg = faked_msg_next();
 
-	onsnd_info.to = &evp->dst->to;
-	onsnd_info.send_sock = evp->dst->send_sock;
+	if(evp->dst) {
+		onsnd_info.to = &evp->dst->to;
+		onsnd_info.send_sock = evp->dst->send_sock;
+	}
 	if(msg!=NULL) {
 		onsnd_info.buf = msg->buf;
 		onsnd_info.len = msg->len;
@@ -534,7 +655,7 @@ static int tps_execute_event_route(sip_msg_t *msg, sr_event_param_t *evp,
 			if(sr_kemi_ctx_route(keng, &ctx, (msg)?msg:fmsg, EVENT_ROUTE,
 						&_tps_eventrt_callback, evname)<0) {
 				LM_ERR("error running event route kemi callback\n");
-				p_onsend=NULL;
+				p_onsend=p_onsend_bak;
 				return -1;
 			}
 		}
@@ -542,12 +663,12 @@ static int tps_execute_event_route(sip_msg_t *msg, sr_event_param_t *evp,
 	set_route_type(rtb);
 	if(ctx.run_flags&DROP_R_F) {
 		LM_DBG("exit due to 'drop' in event route\n");
-		p_onsend=NULL;
+		p_onsend=p_onsend_bak;
 		return 1;
 	}
 
 done:
-	p_onsend=NULL;
+	p_onsend=p_onsend_bak;
 	return 0;
 }
 
@@ -564,6 +685,31 @@ int bind_topos(topos_api_t *api)
 	api->set_storage_api = tps_set_storage_api;
 	api->get_dialog_expire = tps_get_dialog_expire;
 	api->get_branch_expire = tps_get_branch_expire;
+
+	return 0;
+}
+
+/**
+ *
+ */
+/* clang-format off */
+static sr_kemi_t sr_kemi_topos_exports[] = {
+	{ str_init("topos"), str_init("tps_set_context"),
+		SR_KEMIP_INT, ki_tps_set_context,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+
+	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
+};
+/* clang-format on */
+
+/**
+ *
+ */
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	sr_kemi_modules_add(sr_kemi_topos_exports);
 
 	return 0;
 }

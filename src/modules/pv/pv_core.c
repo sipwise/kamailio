@@ -860,6 +860,19 @@ int pv_get_rcvport(struct sip_msg *msg, pv_param_t *param,
 			&msg->rcv.bind_address->port_no_str);
 }
 
+int pv_get_rcvsname(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	if(msg==NULL)
+		return -1;
+
+	if(msg->rcv.bind_address==NULL
+			|| msg->rcv.bind_address->sockname.s==NULL)
+		return pv_get_null(msg, param, res);
+
+	return pv_get_strval(msg, param, res, &msg->rcv.bind_address->sockname);
+}
+
 int pv_get_rcvaddr_uri_helper(struct sip_msg *msg, pv_param_t *param,
 		int tmode, pv_value_t *res)
 {
@@ -1062,6 +1075,19 @@ int pv_get_force_sock_name(struct sip_msg *msg, pv_param_t *param,
 	}
 
 	return pv_get_strval(msg, param, res, &msg->force_send_socket->sockname);
+}
+
+int pv_get_force_sock_port(struct sip_msg *msg, pv_param_t *param,
+		pv_value_t *res)
+{
+	if(msg==NULL)
+		return -1;
+
+	if (msg->force_send_socket==0)
+		return pv_get_uintval(msg, param, res, 0);
+
+	return pv_get_intstrval(msg, param, res, (int)msg->force_send_socket->port_no,
+			&msg->force_send_socket->port_no_str);
 }
 
 int pv_get_useragent(struct sip_msg *msg, pv_param_t *param,
@@ -3725,64 +3751,3 @@ int pv_get_ksr_attrs(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			return pv_get_null(msg, param, res);
 	}
 }
-
-int pv_parse_env_name(pv_spec_p sp, str *in)
-{
-	char *csname;
-
-	if(in->s==NULL || in->len<=0)
-		return -1;
-
-	csname = pkg_malloc(in->len + 1);
-
-	if (csname == NULL) {
-		LM_ERR("no more pkg memory");
-		return -1;
-	}
-
-	memcpy(csname, in->s, in->len);
-	csname[in->len] = '\0';
-
-	sp->pvp.pvn.u.dname = (void*)csname;
-	sp->pvp.pvn.type = PV_NAME_OTHER;
-	return 0;
-}
-
-int pv_get_env(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
-{
-	char *val;
-	char *csname = (char *) param->pvn.u.dname;
-
-	if (csname) {
-		val = getenv(csname);
-
-		if (val) {
-			return pv_get_strzval(msg, param, res, val);
-		}
-	}
-	return pv_get_null(msg, param, res);
-}
-
-int pv_parse_def_name(pv_spec_p sp, str *in)
-{
-	if (in == NULL || in->s == NULL || sp == NULL) {
-		LM_ERR("INVALID DEF NAME\n");
-		return -1;
-	}
-	sp->pvp.pvn.type = PV_NAME_INTSTR;
-	sp->pvp.pvn.u.isname.type = AVP_NAME_STR;
-	sp->pvp.pvn.u.isname.name.s = *in;
-	return 0;
-
-}
-
-int pv_get_def(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
-{
-	str *val = pp_define_get(param->pvn.u.isname.name.s.len, param->pvn.u.isname.name.s.s);
-
-	if (val) {
-		return pv_get_strval(msg, param, res, val);
-	}
-	return pv_get_null(msg, param, res);
-}
-

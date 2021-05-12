@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.4.5
+%define ver 5.5.0
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -661,6 +661,16 @@ Lua extensions for Kamailio.
 %endif
 
 
+%package    lwsc
+Summary:    Websocket client implementation to interact with external systems, similar to http client
+Group:      %{PKGGROUP}
+Requires:   libwebsockets, kamailio = %ver
+BuildRequires:  libwebsockets-devel
+
+%description    lwsc
+Websocket client implementation to interact with external systems, similar to http client.
+
+
 %if %{with memcached}
 %package    memcached
 Summary:    Memcached configuration file support for Kamailio
@@ -1174,13 +1184,11 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
 %if %{with kazoo}
     kkazoo \
 %endif
-%if %{with rabbitmq}
-    krabbitmq \
-%endif
-    kldap 
+    kldap \
 %if %{with lua}
     klua \
 %endif
+    klwsc \
 %if %{with memcached}
     kmemcached \
 %endif
@@ -1200,6 +1208,9 @@ make every-module skip_modules="app_mono db_cassandra db_oracle iptrtpproxy \
     kpostgres kpresence kpython \
 %if %{with python3}
     kpython3 \
+%endif
+%if %{with rabbitmq}
+    krabbitmq \
 %endif
     kradius \
 %if %{with redis}
@@ -1266,13 +1277,11 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
 %if %{with kazoo}
     kkazoo \
 %endif
-%if %{with rabbitmq}
-    krabbitmq \
-%endif
     kldap \
 %if %{with lua}
     klua \
 %endif
+    klwsc \
 %if %{with memcached}
     kmemcached \
 %endif
@@ -1292,6 +1301,9 @@ make install-modules-all skip_modules="app_mono db_cassandra db_oracle \
     kpostgres kpresence kpython \
 %if %{with python3}
     kpython3 \
+%endif
+%if %{with rabbitmq}
+    krabbitmq \
 %endif
     kradius \
 %if %{with redis}
@@ -1448,6 +1460,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.ipops
 %doc %{_docdir}/kamailio/modules/README.kemix
 %doc %{_docdir}/kamailio/modules/README.kex
+%doc %{_docdir}/kamailio/modules/README.lrkproxy
 %doc %{_docdir}/kamailio/modules/README.malloc_test
 %doc %{_docdir}/kamailio/modules/README.mangler
 %doc %{_docdir}/kamailio/modules/README.matrix
@@ -1497,6 +1510,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.sst
 %doc %{_docdir}/kamailio/modules/README.statistics
 %doc %{_docdir}/kamailio/modules/README.stun
+%doc %{_docdir}/kamailio/modules/README.sworker
 %doc %{_docdir}/kamailio/modules/README.textops
 %doc %{_docdir}/kamailio/modules/README.textopsx
 %doc %{_docdir}/kamailio/modules/README.timer
@@ -1512,7 +1526,7 @@ fi
 %doc %{_docdir}/kamailio/modules/README.uid_gflags
 %doc %{_docdir}/kamailio/modules/README.uid_uri_db
 %doc %{_docdir}/kamailio/modules/README.uri_db
-%doc %{_docdir}/kamailio/modules/README.userblacklist
+%doc %{_docdir}/kamailio/modules/README.userblocklist
 %doc %{_docdir}/kamailio/modules/README.usrloc
 %doc %{_docdir}/kamailio/modules/README.xhttp
 %doc %{_docdir}/kamailio/modules/README.xhttp_prom
@@ -1605,6 +1619,7 @@ fi
 %{_libdir}/kamailio/modules/ipops.so
 %{_libdir}/kamailio/modules/kemix.so
 %{_libdir}/kamailio/modules/kex.so
+%{_libdir}/kamailio/modules/lrkproxy.so
 %{_libdir}/kamailio/modules/malloc_test.so
 %{_libdir}/kamailio/modules/mangler.so
 %{_libdir}/kamailio/modules/matrix.so
@@ -1654,6 +1669,7 @@ fi
 %{_libdir}/kamailio/modules/sst.so
 %{_libdir}/kamailio/modules/statistics.so
 %{_libdir}/kamailio/modules/stun.so
+%{_libdir}/kamailio/modules/sworker.so
 %{_libdir}/kamailio/modules/textops.so
 %{_libdir}/kamailio/modules/textopsx.so
 %{_libdir}/kamailio/modules/timer.so
@@ -1669,7 +1685,7 @@ fi
 %{_libdir}/kamailio/modules/uid_gflags.so
 %{_libdir}/kamailio/modules/uid_uri_db.so
 %{_libdir}/kamailio/modules/uri_db.so
-%{_libdir}/kamailio/modules/userblacklist.so
+%{_libdir}/kamailio/modules/userblocklist.so
 %{_libdir}/kamailio/modules/usrloc.so
 %{_libdir}/kamailio/modules/xhttp.so
 %{_libdir}/kamailio/modules/xhttp_prom.so
@@ -1927,6 +1943,11 @@ fi
 %{_libdir}/kamailio/modules/app_lua_sr.so
 %endif
 
+
+%files      lwsc
+%defattr(-,root,root)
+%doc %{_docdir}/kamailio/modules/README.lwsc
+%{_libdir}/kamailio/modules/lwsc.so
 
 %if %{with memcached}
 %files      memcached

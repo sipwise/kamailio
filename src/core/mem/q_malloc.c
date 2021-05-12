@@ -509,7 +509,7 @@ void qm_free(void* qmp, void* p)
 
 #ifdef DBG_QM_MALLOC
 	qm_debug_frag(qm, f, file, line);
-	if (f->u.is_free){
+	if (unlikely(f->u.is_free)){
 		if(likely(cfg_get(core, core_cfg, mem_safety)==0)) {
 			LM_CRIT("BUG: freeing already freed pointer (%p),"
 				" called from %s: %s(%d), first free %s: %s(%ld) - aborting\n",
@@ -524,12 +524,13 @@ void qm_free(void* qmp, void* p)
 	}
 	MDBG("freeing frag. %p alloc'ed from %s: %s(%ld)\n",
 			f, f->file, f->func, f->line);
-#endif
+#else
 	if (unlikely(f->u.is_free)){
 		LM_INFO("freeing a free fragment (%p/%p) - ignore\n",
 				f, p);
 		return;
 	}
+#endif
 
 	size=f->size;
 	qm->used-=size;
@@ -1350,7 +1351,16 @@ void qm_shm_sums(void* qmp)
 	qm_sums(qmp);
 	qm_shm_unlock();
 }
-
+void qm_shm_mod_get_stats(void *qmp, void **qm_rootp)
+{
+	qm_shm_lock();
+	qm_mod_get_stats(qmp, qm_rootp);
+	qm_shm_unlock();
+}
+void qm_shm_mod_free_stats(void *qm_rootp)
+{
+	qm_mod_free_stats(qm_rootp);
+}
 
 /**
  * \brief Destroy memory pool
@@ -1396,8 +1406,8 @@ int qm_malloc_init_shm_manager(void)
 	ma.xavailable     = qm_shm_available;
 	ma.xsums          = qm_shm_sums;
 	ma.xdestroy       = qm_malloc_destroy_shm_manager;
-	ma.xmodstats      = qm_mod_get_stats;
-	ma.xfmodstats     = qm_mod_free_stats;
+	ma.xmodstats      = qm_shm_mod_get_stats;
+	ma.xfmodstats     = qm_shm_mod_free_stats;
 	ma.xglock         = qm_shm_glock;
 	ma.xgunlock       = qm_shm_gunlock;
 

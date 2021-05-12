@@ -98,8 +98,8 @@ xmlNodePtr xmlNodeGetNodeByName(
 	while(cur) {
 		xmlNodePtr match = NULL;
 		if(xmlStrcasecmp(cur->name, (unsigned char *)name) == 0) {
-			if(!ns || (cur->ns &&
-				xmlStrcasecmp(cur->ns->prefix, (unsigned char *)ns) == 0))
+			if(!ns || (cur->ns && xmlStrcasecmp(cur->ns->prefix,
+									(unsigned char *)ns) == 0))
 				return cur;
 		}
 		match = xmlNodeGetNodeByName(cur->children, name, ns);
@@ -123,7 +123,10 @@ char *xmlNodeGetNodeContentByName(
 xmlNodePtr xmlDocGetNodeByName(xmlDocPtr doc, const char *name, const char *ns)
 {
 	xmlNodePtr cur = doc->children;
-	return xmlNodeGetNodeByName(cur, name, ns);
+	if(cur)
+		return xmlNodeGetNodeByName(cur, name, ns);
+	else
+		return NULL;
 }
 
 char *xmlDocGetNodeContentByName(

@@ -120,8 +120,8 @@
 #ifdef USE_DNS_CACHE
 #include "core/dns_cache.h"
 #endif
-#ifdef USE_DST_BLACKLIST
-#include "core/dst_blacklist.h"
+#ifdef USE_DST_BLOCKLIST
+#include "core/dst_blocklist.h"
 #endif
 #include "core/rand/fastrand.h" /* seed */
 #include "core/rand/kam_rand.h"
@@ -156,7 +156,6 @@
 #endif
 
 
-
 static char help_msg[]= "\
 Usage: " NAME " [options]\n\
 Options:\n\
@@ -173,6 +172,7 @@ Options:\n\
     -b nr        Maximum receive buffer size which will not be exceeded by\n\
                   auto-probing procedure even if  OS allows\n\
     -c           Check configuration file for syntax errors\n\
+    --cfg-print  Print configuration file evaluating includes and ifdefs\n\
     -d           Debugging level control (multiple -d to increase the level from 0)\n\
     --debug=val  Debugging level value\n\
     -D           Control how daemonize is done:\n\
@@ -537,7 +537,13 @@ char *sr_memmng_shm = NULL;
 
 static int *_sr_instance_started = NULL;
 
+int ksr_cfg_print_mode = 0;
 int ksr_atexit_mode = 1;
+
+int ksr_wait_worker1_mode = 0;
+int ksr_wait_worker1_time = 4000000;
+int ksr_wait_worker1_usleep = 100000;
+int *ksr_wait_worker1_done = NULL;
 
 /**
  * return 1 if all child processes were forked
@@ -570,8 +576,8 @@ void cleanup(int show_status)
 #ifdef USE_DNS_CACHE
 	destroy_dns_cache();
 #endif
-#ifdef USE_DST_BLACKLIST
-	destroy_dst_blacklist();
+#ifdef USE_DST_BLOCKLIST
+	destroy_dst_blocklist();
 #endif
 	/* restore the original core configuration before the
 	 * config block is freed, otherwise even logging is unusable,
@@ -800,14 +806,12 @@ void handle_sigs(void)
 				break;
 			}
 
-#ifndef STOP_JIRIS_CHANGES
 			if (dont_fork) {
 				LM_INFO("dont_fork turned on, living on\n");
 				break;
 			}
 			LM_INFO("terminating due to SIGCHLD\n");
-#endif
-			LM_DBG("terminating due to SIGCHLD\n");
+
 			/* exit */
 			shutdown_children(SIGTERM, 1);
 			if (WIFSIGNALED(chld_status)) {
@@ -836,9 +840,10 @@ void handle_sigs(void)
 */
 void sig_usr(int signo)
 {
-
+#ifdef SIG_DEBUG
 #ifdef PKG_MALLOC
 	int memlog;
+#endif
 #endif
 
 	if (is_main){
@@ -862,7 +867,7 @@ void sig_usr(int signo)
 #ifdef SIG_DEBUG /* signal unsafe stuff follows */
 					LM_INFO("signal %d received\n", signo);
 					/* print memory stats for non-main too */
-					#ifdef PKG_MALLOC
+#ifdef PKG_MALLOC
 					/* make sure we have current cfg values, but update only
 					  the safe part (values not requiring callbacks), to
 					  account for processes that might not have registered
@@ -880,11 +885,13 @@ void sig_usr(int signo)
 							pkg_sums();
 						}
 					}
-					#endif
+#endif
 #endif
 					_exit(0);
 					break;
 			case SIGUSR1:
+#ifdef SIG_DEBUG /* signal unsafe stuff follows */
+					LM_INFO("signal %d received\n", signo);
 #ifdef PKG_MALLOC
 					cfg_update_no_cbs();
 					memlog=cfg_get(core, core_cfg, memlog);
@@ -899,19 +906,19 @@ void sig_usr(int signo)
 						}
 					}
 #endif
+#endif
 					break;
 				/* ignored*/
 			case SIGUSR2:
 			case SIGHUP:
+#ifdef SIG_DEBUG /* signal unsafe stuff follows */
+					LM_INFO("signal %d received - ignoring\n", signo);
+#endif
 					break;
 			case SIGCHLD:
-#ifndef 			STOP_JIRIS_CHANGES
 #ifdef SIG_DEBUG /* signal unsafe stuff follows */
 					LM_DBG("SIGCHLD received: "
 						"we do not worry about grand-children\n");
-#endif
-#else
-					_exit(0); /* terminate if one child died */
 #endif
 					break;
 		}
@@ -1670,6 +1677,14 @@ int main_loop(void)
 
 
 		woneinit = 0;
+		if(ksr_wait_worker1_mode!=0) {
+			ksr_wait_worker1_done=(int*)shm_malloc(sizeof(int));
+			if(ksr_wait_worker1_done==0) {
+				SHM_MEM_ERROR;
+				goto error;
+			}
+			*ksr_wait_worker1_done = 0;
+		}
 		/* udp processes */
 		for(si=udp_listen; si; si=si->next){
 			nrprocs = (si->workers>0)?si->workers:children_no;
@@ -1708,7 +1723,26 @@ int main_loop(void)
 						if(run_child_one_init_route()<0)
 							goto error;
 					}
+					if(ksr_wait_worker1_mode!=0) {
+						*ksr_wait_worker1_done = 1;
+						LM_DBG("child one finished initialization\n");
+					}
 					return udp_rcv_loop();
+				}
+				/* main process */
+				if(woneinit==0 && ksr_wait_worker1_mode!=0) {
+					int wcount=0;
+					while(*ksr_wait_worker1_done==0) {
+						sleep_us(ksr_wait_worker1_usleep);
+						wcount++;
+						if(ksr_wait_worker1_time<=wcount*ksr_wait_worker1_usleep) {
+							LM_ERR("waiting for child one too long - wait time: %d\n",
+									ksr_wait_worker1_time);
+							goto error;
+						}
+					}
+					LM_DBG("child one initialized after %d wait steps\n",
+							wcount);
 				}
 				woneinit = 1;
 			}
@@ -1739,8 +1773,32 @@ int main_loop(void)
 						/* child */
 						bind_address=si; /* shortcut */
 
+						if(woneinit==0) {
+							if(run_child_one_init_route()<0)
+								goto error;
+						}
+						if(ksr_wait_worker1_mode!=0) {
+							*ksr_wait_worker1_done = 1;
+							LM_DBG("child one finished initialization\n");
+						}
 						return sctp_core_rcv_loop();
 					}
+					/* main process */
+					if(woneinit==0 && ksr_wait_worker1_mode!=0) {
+						int wcount=0;
+						while(*ksr_wait_worker1_done==0) {
+							sleep_us(ksr_wait_worker1_usleep);
+							wcount++;
+							if(ksr_wait_worker1_time<=wcount*ksr_wait_worker1_usleep) {
+								LM_ERR("waiting for child one too long - wait time: %d\n",
+										ksr_wait_worker1_time);
+								goto error;
+							}
+						}
+						LM_DBG("child one initialized after %d wait steps\n",
+								wcount);
+					}
+					woneinit = 1;
 				}
 			/*parent*/
 			/*close(sctp_sock)*/; /*if closed=>sendto invalid fd errors?*/
@@ -1796,8 +1854,8 @@ int main_loop(void)
 #ifdef USE_TCP
 		if (!tcp_disable){
 				/* start tcp  & tls receivers */
-			if (tcp_init_children()<0) goto error;
-				/* start tcp+tls master proc */
+			if (tcp_init_children(&woneinit)<0) goto error;
+				/* start tcp+tls main attendant proc */
 			pid = fork_process(PROC_TCP_MAIN, "tcp main process", 0);
 			if (pid<0){
 				LM_CRIT("cannot fork tcp main process: %s\n", strerror(errno));
@@ -1961,6 +2019,7 @@ int main(int argc, char** argv)
 		{"modparam",    required_argument, 0, KARGOPTVAL + 6},
 		{"log-engine",  required_argument, 0, KARGOPTVAL + 7},
 		{"debug",       required_argument, 0, KARGOPTVAL + 8},
+		{"cfg-print",   no_argument,       0, KARGOPTVAL + 9},
 		{"atexit",      required_argument, 0, KARGOPTVAL + 10},
 		{0, 0, 0, 0 }
 	};
@@ -1973,6 +2032,7 @@ int main(int argc, char** argv)
 	debug_flag=0;
 	dont_fork_cnt=0;
 
+	ksr_hname_init_index();
 	sr_cfgenv_init();
 	daemon_status_init();
 
@@ -2031,7 +2091,14 @@ int main(int argc, char** argv)
 						goto error;
 					}
 					break;
+			case KARGOPTVAL+9:
+					ksr_cfg_print_mode = 1;
+					break;
 			case KARGOPTVAL+10:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad atexit value\n");
+						goto error;
+					}
 					if(optarg[0]=='y' || optarg[0]=='1') {
 						ksr_atexit_mode = 1;
 					} else if(optarg[0]=='n' || optarg[0]=='0') {
@@ -2171,6 +2238,10 @@ int main(int argc, char** argv)
 					};
 					break;
 			case 'u':
+					if (optarg == NULL) {
+						fprintf(stderr, "bad -u parameter\n");
+						goto error;
+					}
 					/* user needed for possible shm. pre-init */
 					user=optarg;
 					break;
@@ -2181,16 +2252,17 @@ int main(int argc, char** argv)
 					}
 					p = strchr(optarg, '=');
 					if(p) {
-						*p = '\0';
+						tmp_len = p - optarg;
+					} else {
+						tmp_len = strlen(optarg);
 					}
 					pp_define_set_type(0);
-					if(pp_define(strlen(optarg), optarg)<0) {
+					if(pp_define(tmp_len, optarg)<0) {
 						fprintf(stderr, "error at define param: -A %s\n",
 								optarg);
 						goto error;
 					}
 					if(p) {
-						*p = '=';
 						p++;
 						if(pp_define_set(strlen(p), p)<0) {
 							fprintf(stderr, "error at define value: -A %s\n",
@@ -2223,11 +2295,16 @@ int main(int argc, char** argv)
 			case KARGOPTVAL+6:
 			case KARGOPTVAL+7:
 			case KARGOPTVAL+8:
+			case KARGOPTVAL+9:
 			case KARGOPTVAL+10:
 					break;
 
 			/* long options */
 			case KARGOPTVAL:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad alias parameter\n");
+						goto error;
+					}
 					if(parse_phostport(optarg, &tmp, &tmp_len,
 											&port, &proto)!=0) {
 						fprintf(stderr, "Invalid alias value '%s'\n", optarg);
@@ -2239,24 +2316,40 @@ int main(int argc, char** argv)
 					}
 					break;
 			case KARGOPTVAL+1:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad subst parameter\n");
+						goto error;
+					}
 					if(pp_subst_add(optarg)<0) {
 						LM_ERR("failed to add subst expression: %s\n", optarg);
 						goto error;
 					}
 					break;
 			case KARGOPTVAL+2:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad substdef parameter\n");
+						goto error;
+					}
 					if(pp_substdef_add(optarg, 0)<0) {
 						LM_ERR("failed to add substdef expression: %s\n", optarg);
 						goto error;
 					}
 					break;
 			case KARGOPTVAL+3:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad substdefs parameter\n");
+						goto error;
+					}
 					if(pp_substdef_add(optarg, 1)<0) {
 						LM_ERR("failed to add substdefs expression: %s\n", optarg);
 						goto error;
 					}
 					break;
 			case KARGOPTVAL+4:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad server if parameter\n");
+						goto error;
+					}
 					server_id=(int)strtol(optarg, &tmp, 10);
 					if ((tmp==0) || (*tmp)){
 						LM_ERR("bad server_id value: %s\n", optarg);
@@ -2318,12 +2411,20 @@ int main(int argc, char** argv)
 	while((c=getopt_long(argc, argv, options, long_options, &option_index))!=-1) {
 		switch(c) {
 			case KARGOPTVAL+5:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad load module parameter\n");
+						goto error;
+					}
 					if (load_module(optarg)!=0) {
 						LM_ERR("failed to load the module: %s\n", optarg);
 						goto error;
 					}
 					break;
 			case KARGOPTVAL+6:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad modparam parameter\n");
+						goto error;
+					}
 					if(set_mod_param_serialized(optarg) < 0) {
 						LM_ERR("failed to set modparam: %s\n", optarg);
 						goto error;
@@ -2377,13 +2478,21 @@ try_again:
 
 	yyin=cfg_stream;
 	debug_save = default_core_cfg.debug;
-	if ((yyparse()!=0)||(cfg_errors)||(pp_ifdef_level_check()<0)){
-		fprintf(stderr, "ERROR: bad config file (%d errors)\n", cfg_errors);
+	ksr_cfg_print_initial_state();
+	r = yyparse();
+	if (ksr_cfg_print_mode == 1) {
+		/* printed evaluated content of config file based on include and ifdef */
+		return 0;
+	}
+	if ((r!=0)||(cfg_errors)||(pp_ifdef_level_check()<0)){
+		fprintf(stderr, "ERROR: bad config file (%d errors) (parsing code: %d)\n",
+				cfg_errors, r);
 		if (debug_flag) default_core_cfg.debug = debug_save;
 		pp_ifdef_level_error();
 
 		goto error;
 	}
+
 	if (cfg_warnings){
 		fprintf(stderr, "%d config warnings\n", cfg_warnings);
 	}
@@ -2630,6 +2739,8 @@ try_again:
 	/* init lookup for core event routes */
 	sr_core_ert_init();
 
+	ksr_hname_init_config();
+
 	if (dont_fork_cnt)
 		dont_fork = dont_fork_cnt;	/* override by command line */
 
@@ -2812,18 +2923,18 @@ try_again:
 	}
 #endif /* USE_DNS_CACHE_STATS */
 #endif
-#ifdef USE_DST_BLACKLIST
-	if (init_dst_blacklist()<0){
-		LM_CRIT("could not initialize the dst blacklist, exiting...\n");
+#ifdef USE_DST_BLOCKLIST
+	if (init_dst_blocklist()<0){
+		LM_CRIT("could not initialize the dst blocklist, exiting...\n");
 		goto error;
 	}
-#ifdef USE_DST_BLACKLIST_STATS
+#ifdef USE_DST_BLOCKLIST_STATS
 	/* preinitializing before the number of processes is determined */
-	if (init_dst_blacklist_stats(1)<0){
-		LM_CRIT("could not initialize the dst blacklist measurement\n");
+	if (init_dst_blocklist_stats(1)<0){
+		LM_CRIT("could not initialize the dst blocklist measurement\n");
 		goto error;
 	}
-#endif /* USE_DST_BLACKLIST_STATS */
+#endif /* USE_DST_BLOCKLIST_STATS */
 #endif
 	if (init_avps()<0) goto error;
 	if (rpc_init_time() < 0) goto error;
@@ -2925,9 +3036,9 @@ try_again:
 		goto error;
 	}
 #endif
-#if defined USE_DST_BLACKLIST && defined USE_DST_BLACKLIST_STATS
-	if (init_dst_blacklist_stats(get_max_procs())<0){
-		LM_CRIT("could not initialize the dst blacklist measurement\n");
+#if defined USE_DST_BLOCKLIST && defined USE_DST_BLOCKLIST_STATS
+	if (init_dst_blocklist_stats(get_max_procs())<0){
+		LM_CRIT("could not initialize the dst blocklist measurement\n");
 		goto error;
 	}
 #endif

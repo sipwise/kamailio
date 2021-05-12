@@ -67,12 +67,14 @@ ticks_t ka_check_timer(ticks_t ticks, struct timer_ln* tl, void* param)
         return (ticks_t)(0); /* stops the timer */
     }
 
+	str *uuid = shm_malloc(sizeof(str));
+	ka_str_copy(&(ka_dest->uuid), uuid, NULL);
     /* Send ping using TM-Module.
      * int request(str* m, str* ruri, str* to, str* from, str* h,
      *		str* b, str *oburi,
      *		transaction_cb cb, void* cbp); */
     set_uac_req(&uac_r, &ka_ping_method, 0, 0, 0, TMCB_LOCAL_COMPLETED,
-            ka_options_callback, (void *)ka_dest);
+            ka_options_callback, (void *)uuid);
 
     if(tmb.t_request(&uac_r, &ka_dest->uri, &ka_dest->uri, &ka_ping_from,
                &ka_outbound_proxy)
@@ -99,8 +101,24 @@ static void ka_options_callback(
 
 	char *state_routes[] = {"", "keepalive:dst-up", "keepalive:dst-down"};
 
-	//NOTE: how to be sure destination is still allocated ?
-	ka_dest_t *ka_dest = (ka_dest_t *)(*ps->param);
+	str *uuid = (str *)(*ps->param);
+
+	LM_DBG("ka_options_callback with uuid: %.*s\n", uuid->len, uuid->s);
+
+	// Retrieve ka_dest by uuid from destination list
+	ka_lock_destination_list();
+	ka_dest_t *ka_dest=0,*hollow=0;
+	if (!ka_find_destination_by_uuid(*uuid, &ka_dest, &hollow)) {
+		LM_ERR("Couldn't find destination \r\n");
+		shm_free(uuid->s);
+		shm_free(uuid);
+		ka_unlock_destination_list();
+		return;
+	}
+	lock_get(&ka_dest->lock); // Lock record so we prevent to be removed in the meantime
+	shm_free(uuid->s);
+	shm_free(uuid);
+	ka_unlock_destination_list();
 
 	uri.s = t->to.s + 5;
 	uri.len = t->to.len - 8;
@@ -132,6 +150,7 @@ static void ka_options_callback(
 	if(ka_dest->response_clb != NULL) {
 		ka_dest->response_clb(&ka_dest->uri, ps, ka_dest->user_attr);
 	}
+	lock_release(&ka_dest->lock);
 }
 
 /*

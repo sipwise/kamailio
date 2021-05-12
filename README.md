@@ -1,6 +1,6 @@
 # Kamailio - The Open Source SIP Server
 
-[![Build Status](https://travis-ci.org/kamailio/kamailio.svg?branch=master)](https://travis-ci.org/kamailio/kamailio)
+[![Build Status](https://github.com/kamailio/kamailio/actions/workflows/main.yml/badge.svg)](https://github.com/kamailio/kamailio/actions)
 [![Code Triage Badge](https://www.codetriage.com/kamailio/kamailio/badges/users.svg)](https://www.codetriage.com/kamailio/kamailio)
 
 Project Website:
@@ -104,6 +104,13 @@ An open IRC discussion channel is managed by the community:
 
   * irc server: irc.freenode.net
   * irc channel: #kamailio
+
+### Matrix Channel
+
+An open Matrix discussion channel is managed by the community:
+
+  * server: https://riot.kamailio.dev/
+  * Room: https://riot.kamailio.dev/#/room/#kamailio:matrix.kamailio.dev
 
 ## Useful Resources
 

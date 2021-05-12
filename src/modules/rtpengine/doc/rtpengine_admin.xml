@@ -46,7 +46,9 @@
 	</para>
 	<para>
 		The balancing inside a set is done automatically by the module based on
-		the weight of each RTPEngine from the set.
+		the weight of each RTPEngine from the set. The default weight is 1, if
+		another RTPEngine should be used twice as often as the first one, one
+		would specify the weight 2 for this server, for example.
 	</para>
 	<para>
 		The selection of the set is done from script prior using
@@ -144,7 +146,7 @@
 		<title><varname>rtpengine_sock</varname> (string)</title>
 		<para>
 		Definition of socket(s) used to connect to (a set) &rtp; proxy. It may
-		specify a UNIX socket or an IPv4/IPv6 UDP socket.
+		specify an IPv4/IPv6 UDP socket or a websocket URI.
 		</para>
 		<para>
 		<emphasis>
@@ -157,6 +159,12 @@
 ...
 # single rtproxy
 modparam("rtpengine", "rtpengine_sock", "udp:localhost:12221")
+# IPv6 UDP
+modparam("rtpengine", "rtpengine_sock", "udp6:localhost:12221")
+# websocket
+modparam("rtpengine", "rtpengine_sock", "ws://localhost:12221/")
+# websocket with TLS
+modparam("rtpengine", "rtpengine_sock", "wss://localhost:12221/")
 # multiple rtproxies for LB with weights (missing weight defaults to 1)
 modparam("rtpengine", "rtpengine_sock",
 	"udp:localhost:12221=2 udp:localhost:12222=1")
@@ -830,7 +838,7 @@ modparam("rtpengine", "mos_min_jitter_pv", "$avp(mos_min_jitter)")
 	<section id="rtpengine.p.mos_min_roundtrip_pv">
 		<title><varname>mos_min_roundtrip_pv</varname> (string)</title>
 		<para>
-			The name of a pseudovariable to hold the packet round-trip time in milliseconds
+			The name of a pseudovariable to hold the packet round-trip time in microseconds
 			at the time the minimum MOS value was encountered;
 		</para>
 		<para>
@@ -952,7 +960,7 @@ modparam("rtpengine", "mos_max_jitter_pv", "$avp(mos_max_jitter)")
 	<section id="rtpengine.p.mos_max_roundtrip_pv">
 		<title><varname>mos_max_roundtrip_pv</varname> (string)</title>
 		<para>
-			The name of a pseudovariable to hold the packet round-trip time in milliseconds
+			The name of a pseudovariable to hold the packet round-trip time in microseconds
 			at the time the maximum MOS value was encountered;
 		</para>
 		<para>
@@ -1236,7 +1244,7 @@ modparam("rtpengine", "mos_min_jitter_A_pv", "$avp(mos_min_jitter_A)")
 	<section id="rtpengine.p.mos_min_roundtrip_A_pv">
 		<title><varname>mos_min_roundtrip_A_pv</varname> (string)</title>
 		<para>
-			The name of a pseudovariable to hold the packet round-trip time in milliseconds
+			The name of a pseudovariable to hold the packet round-trip time in microseconds
 			at the time the minimum MOS value was encountered;
 		</para>
 		<para>
@@ -1261,6 +1269,33 @@ modparam("rtpengine", "mos_min_roundtrip_A_pv", "$avp(mos_min_roundtrip_A)")
 		</example>
 	</section>
 
+	<section id="rtpengine.p.mos_min_roundtrip_leg_A_pv">
+		<title><varname>mos_min_roundtrip_leg_A_pv</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to hold the packet round-trip time of the specific call leg
+			in microseconds at the time the minimum MOS value was encountered;
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<para>
+			This value is filled in after invoking <quote>rtpengine_delete</quote>,
+			<quote>rtpengine_query</quote>, or <quote>rtpengine_manage</quote> if the
+			command resulted in a deletion of the call (or call branch).
+		</para>
+		<para>
+			Only call legs matching the rtpengine label given in the <quote>mos_A_label_pv</quote>
+			will be used in calculating this statistics value.
+		</para>
+		<example>
+		<title>Set <varname>mos_min_roundtrip_leg_A_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "mos_min_roundtrip_leg_A_pv", "$avp(mos_min_roundtrip_leg_A)")
+...
+</programlisting>
+		</example>
+	</section>
 
 	<section id="rtpengine.p.mos_max_A_pv">
 		<title><varname>mos_max_A_pv</varname> (string)</title>
@@ -1378,7 +1413,7 @@ modparam("rtpengine", "mos_max_jitter_A_pv", "$avp(mos_max_jitter_A)")
 	<section id="rtpengine.p.mos_max_roundtrip_A_pv">
 		<title><varname>mos_max_roundtrip_A_pv</varname> (string)</title>
 		<para>
-			The name of a pseudovariable to hold the packet round-trip time in milliseconds
+			The name of a pseudovariable to hold the packet round-trip time in microseconds
 			at the time the maximum MOS value was encountered;
 		</para>
 		<para>
@@ -1398,6 +1433,34 @@ modparam("rtpengine", "mos_max_jitter_A_pv", "$avp(mos_max_jitter_A)")
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "mos_max_roundtrip_A_pv", "$avp(mos_max_roundtrip_A)")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.mos_max_roundtrip_leg_A_pv">
+		<title><varname>mos_max_roundtrip_leg_A_pv</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to hold the packet round-trip time of the specific
+			call leg in microseconds at the time the maximum MOS value was encountered;
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<para>
+			This value is filled in after invoking <quote>rtpengine_delete</quote>,
+			<quote>rtpengine_query</quote>, or <quote>rtpengine_manage</quote> if the
+			command resulted in a deletion of the call (or call branch).
+		</para>
+		<para>
+			Only call legs matching the rtpengine label given in the <quote>mos_A_label_pv</quote>
+			will be used in calculating this statistics value.
+		</para>
+		<example>
+		<title>Set <varname>mos_max_roundtrip_leg_A_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "mos_max_roundtrip_leg_A_pv", "$avp(mos_max_roundtrip_leg_A)")
 ...
 </programlisting>
 		</example>
@@ -1493,8 +1556,7 @@ modparam("rtpengine", "mos_average_jitter_A_pv", "$avp(mos_average_jitter_A)")
 		<title><varname>mos_average_roundtrip_A_pv</varname> (string)</title>
 		<para>
 			The name of a pseudovariable to hold the average (median) packet round-trip
-			time in milliseconds
-			present throughout the call.
+			time in microseconds present throughout the call.
 		</para>
 		<para>
 			There is no default value.
@@ -1513,6 +1575,34 @@ modparam("rtpengine", "mos_average_jitter_A_pv", "$avp(mos_average_jitter_A)")
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "mos_average_roundtrip_A_pv", "$avp(mos_average_roundtrip_A)")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.mos_average_roundtrip_leg_A_pv">
+		<title><varname>mos_average_roundtrip_leg_A_pv</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to hold the average (median) packet round-trip
+			time of the specific call leg in microseconds present throughout the call.
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<para>
+			This value is filled in after invoking <quote>rtpengine_delete</quote>,
+			<quote>rtpengine_query</quote>, or <quote>rtpengine_manage</quote> if the
+			command resulted in a deletion of the call (or call branch).
+		</para>
+		<para>
+			Only call legs matching the rtpengine label given in the <quote>mos_A_label_pv</quote>
+			will be used in calculating this statistics value.
+		</para>
+		<example>
+		<title>Set <varname>mos_average_roundtrip_leg_A_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "mos_average_roundtrip_leg_A_pv", "$avp(mos_average_roundtrip_leg_A)")
 ...
 </programlisting>
 		</example>
@@ -1686,7 +1776,7 @@ modparam("rtpengine", "mos_min_jitter_B_pv", "$avp(mos_min_jitter_B)")
 	<section id="rtpengine.p.mos_min_roundtrip_B_pv">
 		<title><varname>mos_min_roundtrip_B_pv</varname> (string)</title>
 		<para>
-			The name of a pseudovariable to hold the packet round-trip time in milliseconds
+			The name of a pseudovariable to hold the packet round-trip time in microseconds
 			at the time the minimum MOS value was encountered;
 		</para>
 		<para>
@@ -1706,6 +1796,34 @@ modparam("rtpengine", "mos_min_jitter_B_pv", "$avp(mos_min_jitter_B)")
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "mos_min_roundtrip_B_pv", "$avp(mos_min_roundtrip_B)")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.mos_min_roundtrip_leg_B_pv">
+		<title><varname>mos_min_roundtrip_leg_B_pv</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to hold the packet round-trip time of the specific call leg
+			in microseconds at the time the minimum MOS value was encountered;
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<para>
+			This value is filled in after invoking <quote>rtpengine_delete</quote>,
+			<quote>rtpengine_query</quote>, or <quote>rtpengine_manage</quote> if the
+			command resulted in a deletion of the call (or call branch).
+		</para>
+		<para>
+			Only call legs matching the rtpengine label given in the <quote>mos_B_label_pv</quote>
+			will be used in calculating this statistics value.
+		</para>
+		<example>
+		<title>Set <varname>mos_min_roundtrip_leg_B_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "mos_min_roundtrip_leg_B_pv", "$avp(mos_min_roundtrip_leg_B)")
 ...
 </programlisting>
 		</example>
@@ -1828,7 +1946,7 @@ modparam("rtpengine", "mos_max_jitter_B_pv", "$avp(mos_max_jitter_B)")
 	<section id="rtpengine.p.mos_max_roundtrip_B_pv">
 		<title><varname>mos_max_roundtrip_B_pv</varname> (string)</title>
 		<para>
-			The name of a pseudovariable to hold the packet round-trip time in milliseconds
+			The name of a pseudovariable to hold the packet round-trip time in microseconds
 			at the time the maximum MOS value was encountered;
 		</para>
 		<para>
@@ -1848,6 +1966,34 @@ modparam("rtpengine", "mos_max_jitter_B_pv", "$avp(mos_max_jitter_B)")
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "mos_max_roundtrip_B_pv", "$avp(mos_max_roundtrip_B)")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.mos_max_roundtrip_leg_B_pv">
+		<title><varname>mos_max_roundtrip_leg_B_pv</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to hold the packet round-trip time of the specific
+			call leg in microseconds at the time the maximum MOS value was encountered;
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<para>
+			This value is filled in after invoking <quote>rtpengine_delete</quote>,
+			<quote>rtpengine_query</quote>, or <quote>rtpengine_manage</quote> if the
+			command resulted in a deletion of the call (or call branch).
+		</para>
+		<para>
+			Only call legs matching the rtpengine label given in the <quote>mos_A_label_pv</quote>
+			will be used in calculating this statistics value.
+		</para>
+		<example>
+		<title>Set <varname>mos_max_roundtrip_leg_B_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "mos_max_roundtrip_leg_B_pv", "$avp(mos_max_roundtrip_leg_B)")
 ...
 </programlisting>
 		</example>
@@ -1943,8 +2089,7 @@ modparam("rtpengine", "mos_average_jitter_B_pv", "$avp(mos_average_jitter_B)")
 		<title><varname>mos_average_roundtrip_B_pv</varname> (string)</title>
 		<para>
 			The name of a pseudovariable to hold the average (median) packet round-trip
-			time in milliseconds
-			present throughout the call.
+			time in microseconds present throughout the call.
 		</para>
 		<para>
 			There is no default value.
@@ -1963,6 +2108,34 @@ modparam("rtpengine", "mos_average_jitter_B_pv", "$avp(mos_average_jitter_B)")
 <programlisting format="linespecific">
 ...
 modparam("rtpengine", "mos_average_roundtrip_B_pv", "$avp(mos_average_roundtrip_B)")
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.mos_average_roundtrip_leg_B_pv">
+		<title><varname>mos_average_roundtrip_leg_B_pv</varname> (string)</title>
+		<para>
+			The name of a pseudovariable to hold the average (median) packet round-trip
+			time of the specific call leg in microseconds present throughout the call.
+		</para>
+		<para>
+			There is no default value.
+		</para>
+		<para>
+			This value is filled in after invoking <quote>rtpengine_delete</quote>,
+			<quote>rtpengine_query</quote>, or <quote>rtpengine_manage</quote> if the
+			command resulted in a deletion of the call (or call branch).
+		</para>
+		<para>
+			Only call legs matching the rtpengine label given in the <quote>mos_B_label_pv</quote>
+			will be used in calculating this statistics value.
+		</para>
+		<example>
+		<title>Set <varname>mos_average_roundtrip_leg_B_pv</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "mos_average_roundtrip_leg_B_pv", "$avp(mos_average_roundtrip_leg_B)")
 ...
 </programlisting>
 		</example>
@@ -2022,13 +2195,14 @@ modparam("rtpengine", "control_cmd_tos", 144)
 		<title><varname>hash_algo</varname> (integer)</title>
 		<para>
 			Hashing algorithm to be used in node selection algorithm. Now there are 2 possibilities: legacy
-			algorithm - 0(very basic hash over callid) or SHA1 - 1(apply sha1 over the callid and calculate hash).
+			algorithm - 0(very basic hash over callid), SHA1 - 1(apply sha1 over the callid and calculate hash) or
+			CRC32 - 2(calculate crc32 sum over the callid).
 		</para>
 		<para>
 			Default value is 0, legacy algorithm.
 		</para>
 		<para>
-			The values not falling into the range <quote>0-1</quote> are ignored.
+			The values not falling into the range <quote>0-2</quote> are ignored.
 		</para>
 		<example>
 		<title>Set <varname>hash_algo</varname> parameter</title>
@@ -2036,6 +2210,25 @@ modparam("rtpengine", "control_cmd_tos", 144)
 ...
 ### use SHA1 instead of legacy algorithm
 modparam("rtpengine", "hash_algo", 1)
+
+### use CRC32 instead of legacy algorithm
+modparam("rtpengine", "hash_algo", 2)
+...
+</programlisting>
+		</example>
+	</section>
+
+	<section id="rtpengine.p.wsapi">
+		<title><varname>wsapi</varname> (string)</title>
+		<para>
+			Configure a backend API for websocket usage. Currently the only supported setting is
+			<quote>lwsc</quote> (libwebsockets). If unset, then the websocket protocol cannot be used.
+		</para>
+		<example>
+		<title>Set <varname>wsapi</varname> parameter</title>
+<programlisting format="linespecific">
+...
+modparam("rtpengine", "wsapi", "lwsc")
 ...
 </programlisting>
 		</example>
@@ -2393,6 +2586,11 @@ rtpengine_offer();
 				</para></listitem>
 
 				<listitem><para>
+				<emphasis>codec-set=...</emphasis> - set codec options (bitrate etc) for codecs that are implicitly
+				accepted for transcoding from the offering side.
+				</para></listitem>
+
+				<listitem><para>
 				<emphasis>codec-strip=...</emphasis> - strips given codec from sdp
 				</para></listitem>
 
@@ -2402,8 +2600,12 @@ rtpengine_offer();
 				</para></listitem>
 
 				<listitem><para>
+				<emphasis>codec-except=...</emphasis> - same as <emphasis>codec-offer</emphasis> but preserves original order
+				</para></listitem>
+
+				<listitem><para>
 				<emphasis>codec-mask=...</emphasis> - Similar to strip except that codecs listed here will still be accepted
-				and used for transcoding on the offering side.Useful only in combination with codec-transcode. <emphasis>all</emphasis> keyword
+				and used for transcoding on the offering side. Useful only in combination with codec-transcode. <emphasis>all</emphasis> keyword
 				can be used to mask all offered codecs
 				</para></listitem>
 				<listitem><para>

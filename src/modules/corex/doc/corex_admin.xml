@@ -130,7 +130,7 @@ modparam("corex", "alias_subdomains", "udp:sip-router.org:5060")
 		<listitem>
 			<para>
 			<emphasis>flags</emphasis> - can be: 1 - the domain is unresolvable
-			(like blacklisted); 2 - the record is permanent (never times out,
+			(like blocklisted); 2 - the record is permanent (never times out,
 			never deleted, never overwritten)
 			</para>
 		</listitem>
@@ -869,6 +869,29 @@ event_route[dispatcher:dst-down] {
 </programlisting>
         </example>
     </section>
+	<section id="corex.f.is_socket_name">
+		<title>
+			<function moreinfo="none">is_socket_name(sockname)</function>
+		</title>
+        <para>
+			Returns 1 (native config true) if the parameter matches a local
+			socket name, otherwise -1 (native config false). The parameter can
+			contain variables.
+        </para>
+        <para>
+        This function can be used in ANY_ROUTE.
+        </para>
+        <example>
+        <title><function>is_socket_name</function> usage</title>
+        <programlisting format="linespecific">
+...
+    if (is_socket_name("socktls")) {
+        xinfo("matched local socket name\n");
+    }
+...
+</programlisting>
+        </example>
+    </section>
 	</section>
 
 	<section>
@@ -967,6 +990,34 @@ event_route[dispatcher:dst-down] {
         <programlisting  format="linespecific">
 		&sercmd; corex.pkg_summary pid 2345
 		&sercmd; corex.pkg_summary idx 1
+		</programlisting>
+    </section>
+	<section id="corex.rpc.shm.info">
+		<title>
+		<function moreinfo="none">corex.shm.info</function>
+		</title>
+		<para>
+			Return shared memory manager details.
+		</para>
+		<para>
+		Example:
+		</para>
+        <programlisting  format="linespecific">
+		&kamcli; rpc shm.info
+		</programlisting>
+    </section>
+	<section id="corex.rpc.shm.stats">
+		<title>
+		<function moreinfo="none">corex.shm.stats</function>
+		</title>
+		<para>
+			Return shared memory statistics (values are in bytes).
+		</para>
+		<para>
+		Example:
+		</para>
+        <programlisting  format="linespecific">
+		&kamcli; rpc shm.stats
 		</programlisting>
     </section>
     </section>

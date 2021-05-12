@@ -31,7 +31,7 @@
 
 
 enum _tr_type { TR_NONE=0, TR_STRING, TR_URI, TR_PARAMLIST, TR_NAMEADDR,
-				TR_TOBODY, TR_LINE };
+				TR_TOBODY, TR_LINE, TR_URIALIAS};
 enum _tr_s_subtype {
 	TR_S_NONE=0, TR_S_LEN, TR_S_INT, TR_S_MD5, TR_S_SHA256, TR_S_SHA384,
 	TR_S_SHA512, TR_S_SUBSTR, TR_S_SELECT, TR_S_ENCODEHEXA, TR_S_DECODEHEXA,
@@ -44,13 +44,15 @@ enum _tr_s_subtype {
 	TR_S_ENCODEBASE58, TR_S_DECODEBASE58, TR_S_COREHASH, TR_S_UNQUOTE,
 	TR_S_UNBRACKET, TR_S_COUNT, TR_S_ENCODEBASE64T, TR_S_DECODEBASE64T,
 	TR_S_ENCODEBASE64URL, TR_S_DECODEBASE64URL,
-	TR_S_ENCODEBASE64URLT, TR_S_DECODEBASE64URLT, TR_S_RMWS
+	TR_S_ENCODEBASE64URLT, TR_S_DECODEBASE64URLT, TR_S_RMWS, TR_S_BEFORE,
+	TR_S_AFTER
 };
 enum _tr_uri_subtype {
 	TR_URI_NONE=0, TR_URI_USER, TR_URI_HOST, TR_URI_PASSWD, TR_URI_PORT,
 	TR_URI_PARAMS, TR_URI_PARAM, TR_URI_HEADERS, TR_URI_TRANSPORT, TR_URI_TTL,
 	TR_URI_UPARAM, TR_URI_MADDR, TR_URI_METHOD, TR_URI_LR,
-	TR_URI_R2, TR_URI_SCHEME, TR_URI_TOSOCKET
+	TR_URI_R2, TR_URI_SCHEME, TR_URI_TOSOCKET, TR_URI_SAOR, TR_URI_DURI,
+	TR_URI_SURI
 };
 enum _tr_param_subtype {
 	TR_PL_NONE=0, TR_PL_VALUE, TR_PL_VALUEAT, TR_PL_NAME, TR_PL_COUNT
@@ -65,6 +67,9 @@ enum _tr_tobody_subtype {
 enum _tr_line_subtype {
 	TR_LINE_NONE=0, TR_LINE_COUNT, TR_LINE_AT, TR_LINE_SW
 };
+enum _tr_urialias_subtype {
+	TR_URIALIAS_NONE=0, TR_URIALIAS_ENCODE, TR_URIALIAS_DECODE
+};
 
 
 char* tr_parse_string(str *in, trans_t *tr);
@@ -73,6 +78,7 @@ char* tr_parse_paramlist(str *in, trans_t *tr);
 char* tr_parse_nameaddr(str *in, trans_t *tr);
 char* tr_parse_tobody(str* in, trans_t *t);
 char* tr_parse_line(str* in, trans_t *t);
+char* tr_parse_urialias(str* in, trans_t *t);
 
 int tr_init_buffers(void);
 

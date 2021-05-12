@@ -127,6 +127,10 @@ typedef enum request_method {
 #define FL_MTU_FB_MASK  (FL_MTU_TCP_FB|FL_MTU_TLS_FB|FL_MTU_SCTP_FB)
 
 
+/* sip parser mode flags (1<<n) */
+#define KSR_SIP_PARSER_MODE_NONE 0
+#define KSR_SIP_PARSER_MODE_STRICT 1
+
 #define IFISMETHOD(methodname,firstchar)                                  \
 if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 		strncasecmp( tmp+1, &#methodname[1], methodname##_LEN-1)==0 &&     \
@@ -137,28 +141,26 @@ if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 				tmp=buffer+methodname##_LEN;                              \
 }
 
-#define IS_HTTP(req)                                                \
-	((req)->first_line.u.request.version.len >= HTTP_VERSION_LEN && \
-	!strncasecmp((req)->first_line.u.request.version.s,             \
-		HTTP_VERSION, HTTP_VERSION_LEN))
 
-#define IS_SIP(req)                                                \
-	((req)->first_line.u.request.version.len >= SIP_VERSION_LEN && \
-	!strncasecmp((req)->first_line.u.request.version.s,             \
-		SIP_VERSION, SIP_VERSION_LEN))
+/* sip request */
+#define IS_SIP(req)                                     \
+	(((req)->first_line.type == SIP_REQUEST) &&           \
+	((req)->first_line.flags & FLINE_FLAG_PROTO_SIP))
 
-#define IS_HTTP_REPLY(rpl)                                                \
-	(((rpl)->first_line.u.reply.version.len >= HTTP_VERSION_LEN && \
-	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
-		HTTP_VERSION, HTTP_VERSION_LEN)) ||                         \
-	((rpl)->first_line.u.reply.version.len >= HTTP2_VERSION_LEN && \
-	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
-		HTTP2_VERSION, HTTP2_VERSION_LEN)))
+/* sip reply */
+#define IS_SIP_REPLY(rpl)                               \
+	(((rpl)->first_line.type == SIP_REPLY) &&             \
+	((rpl)->first_line.flags & FLINE_FLAG_PROTO_SIP))
 
-#define IS_SIP_REPLY(rpl)                                                \
-	((rpl)->first_line.u.reply.version.len >= SIP_VERSION_LEN && \
-	!strncasecmp((rpl)->first_line.u.reply.version.s,             \
-		SIP_VERSION, SIP_VERSION_LEN))
+/* http request */
+#define IS_HTTP(req)                                    \
+	(((req)->first_line.type == SIP_REQUEST) &&           \
+	((req)->first_line.flags & FLINE_FLAG_PROTO_HTTP))
+
+/* http reply */
+#define IS_HTTP_REPLY(rpl)                              \
+	(((rpl)->first_line.type == SIP_REPLY) &&             \
+	((rpl)->first_line.flags & FLINE_FLAG_PROTO_HTTP))
 
 /*! \brief
  * Return a URI to which the message should be really sent (not what should

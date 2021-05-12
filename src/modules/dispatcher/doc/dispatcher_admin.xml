@@ -1,18 +1,15 @@
 <?xml version="1.0" encoding='ISO-8859-1'?>
-<!DOCTYPE chapter PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
 "http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
- 
+
 <!-- Include general documentation entities -->
 <!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
 %docentities;
 
-<!ENTITY % xinclude SYSTEM "http://www.docbook.org/xml/4.4/xinclude.mod" >
-%xinclude;
-
 ]>
 <!-- Module User's Guide -->
 
-<chapter xmlns:xi="http://www.w3.org/2001/XInclude">
+<chapter>
 
 	<title>&adminguide;</title>
 
@@ -709,6 +706,7 @@ modparam("dispatcher", "ds_probing_mode", 1)
 		<title><varname>ds_ping_latency_stats</varname> (int)</title>
 		<para>
 		Enable latency measurement when pinging nodes
+		The estimator can be initialized at startup and reload using the attribute latency.
 		</para>
 
 		<itemizedlist>
@@ -735,6 +733,9 @@ DEST: {
 	URI: sip:1.2.3.4
 	FLAGS: AX
 	PRIORITY: 9
+	ATTRS: {
+		BODY: latency=24
+	}
 	LATENCY: {
 		AVG: 24.250000 # weighted moving average for the last few weeks
 		STD: 1.035000  # standard deviation of AVG
@@ -1240,7 +1241,7 @@ modparam("dispatcher", "reload_delta", 1)
 				</para>
 				<para>
 				Using this algorithm, you can also enable congestion control by setting the
-				attibute 'cc=1', when 'cc' is enabled the 'rweight' attribute will also be
+				attribute 'cc=1', when 'cc' is enabled the 'weight' attribute will also be
 				used to control congestion tolerance. When facing congestion the weight of
 				a gateway is lowered by 1 for every ms of estimated congestion, a 'rweight'
 				value of 50 is recommended. See the example "configuring load balancing with
@@ -1263,6 +1264,43 @@ modparam("dispatcher", "reload_delta", 1)
 				with the values of the destination records, no re-routing
 				making sense in this case.
 				</para>
+			</listitem>
+			<listitem>
+				<para>
+				<quote>13</quote> - latency optimized dispatching
+				</para>
+				<para>
+				- The algorithm will load balance using round-robin prioritizing the gateways with the highest priority.
+				</para>
+				<para>
+				- If ds_ping_latency_stats is active the algorithm will adjust the priority of the gateway automatically,
+				the priority will be lowered by 1 point every time the latency ms is as high as the priority.
+				</para>
+				<para>
+				- If the attribute 'cc=1' is set, the latency used is congestion ms : estimate (current latency ms) - average (normal condition latency ms).
+				</para>
+				<example>
+				<title><function>latency_optimized_dispatching</function> usage</title>
+				<programlisting format="linespecific">
+Using this simple formula :
+    ADJUSTED_PRIORITY = PRIORITY - (ESTIMATED_LATENCY_MS/PRIORITY)
+
+GATEWAY | PRIORITY | ESTIMATED | ADJUSTED | LOAD
+   #    |          |  LATENCY  | PRIORITY | DISTRIBUTION
+   1    |    30    |    21     |    30    | 33%
+   2    |    30    |    91     |    27    | 0%
+   3    |    30    |    61     |    28    | 0%
+   4    |    30    |    19     |    30    | 33%
+   5    |    30    |    32     |    29    | 0%
+   6    |    30    |    0      |    30    | 33%
+   7    |    30    |    201    |    24    | 0%
+
+
+With congestion control the formula becomes :
+    CONGESTION_MS = CURRENT_LATENCY_MS - NORMAL_CONDITION_LATENCY_MS
+    ADJUSTED_PRIORITY = PRIORITY - (CONGESTION_MS/PRIORITY)
+				</programlisting>
+				</example>
 			</listitem>
 			<listitem>
 				<para>
@@ -2106,20 +2144,21 @@ kamctl rpc dispatcher.hash 4 bob server.com
 						</listitem>
 						<listitem>
 							<para>'weight' - used for weight based load distribution. It must be set
-								to a positive integer value beteen 0 and 100. The value represents
-								the percent of calls to be sent to that gateways. The sum must not
-								exceed 100, otherwise the destinations whose weight added to the
-								sum go over 100 are ignored. If the sum is less than 100, then the
-								last destination is used to fill the missing percentage. See also
-								the description of the corresponding algorithm parameter for
+								to a positive integer value beteen 1 and 100 (inclusive the limits),
+								otherwise the destination address is ignored (its weight set to 0).
+								The value represents the percent of calls to be sent to that gateways.
+								The sum must not exceed 100, otherwise the destinations whose weight
+								added to the sum go over 100 are ignored. If the sum is less than 100,
+								then the last destination is used to fill the missing percentage. See
+								also the description of the corresponding algorithm parameter for
 								ds_select_dst().</para>
 						</listitem>
 						<listitem>
 							<para>'rweight' - used for relative weight based load distribution. It
-								must be set to a positive integer value between 1 and 100 (otherwise
-								host will be excluded from relative weight distribution
-								type). See also the description of the corresponding algorithm
-								parameter for ds_select_dst().</para>
+								must be set to a positive integer value between 1 and 100 (inclusive
+								the limits) otherwise host will be excluded from relative weight
+								distribution type - its rweight is set to 0. See also the description
+								of the corresponding algorithm parameter for ds_select_dst().</para>
 						</listitem>
 						<listitem>
 							<para>'socket' - used to set the sending socket for the gateway. It is
@@ -2138,6 +2177,9 @@ kamctl rpc dispatcher.hash 4 bob server.com
 						<listitem>
 							<para>'obproxy' - SIP URI of outbound proxy to be used when sending
 								pings. It overwrites the general ds_outbound_proxy parameter.</para>
+						</listitem>
+						<listitem>
+							<para>'latency' - latency_stats initialization in ms.</para>
 						</listitem>
 					</itemizedlist>
 		</para>
@@ -2170,7 +2212,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 		<title>dispatcher list file</title>
 		<programlisting format="linespecific">
 ...
-<xi:include href="dispatcher.list" parse="text"/>
+<xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="dispatcher.list" parse="text"/>
 ...
 </programlisting>
 		</example>
@@ -2186,7 +2228,7 @@ setid(int) destination(sip uri) flags(int,opt) priority(int,opt) attrs(str,opt)
 		<title>&kamailio; config script - sample dispatcher usage</title>
 		<programlisting format="linespecific">
 ...
-<xi:include href="dispatcher.cfg" parse="text"/>
+<xi:include xmlns:xi="http://www.w3.org/2001/XInclude" href="dispatcher.cfg" parse="text"/>
 ...
 		</programlisting>
 		</example>

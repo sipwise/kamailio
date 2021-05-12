@@ -484,7 +484,7 @@ char *build_local_reparse(tm_cell_t *Trans,unsigned int branch,
 				/* final (end-of-headers) CRLF */
 				append_str(d, CRLF, CRLF_LEN);
 				*len = d - cancel_buf;
-				/* LOG(L_DBG, "DBG: build_local: %.*s\n", *len, cancel_buf); */
+				/* LOG(L_DBG, "%.*s\n", *len, cancel_buf); */
 				return cancel_buf;
 
 			default:
@@ -1358,6 +1358,7 @@ static inline int assemble_via(str* dest, struct cell* t,
 	unsigned int via_len;
 	str branch_str;
 	struct hostport hp;
+	str rport = str_init(";rport");
 
 	if (!t_calc_branch(t, branch, branch_buf, &len)) {
 		LM_ERR("branch calculation failed\n");
@@ -1372,7 +1373,11 @@ static inline int assemble_via(str* dest, struct cell* t,
 #endif
 
 	set_hostport(&hp, 0);
-	via = via_builder(&via_len, NULL, dst, &branch_str, 0, &hp);
+	if(ksr_local_rport) {
+		via = via_builder(&via_len, NULL, dst, &branch_str, &rport, &hp);
+	} else {
+		via = via_builder(&via_len, NULL, dst, &branch_str, 0, &hp);
+	}
 	if (!via) {
 		LM_ERR("via building failed\n");
 		return -2;

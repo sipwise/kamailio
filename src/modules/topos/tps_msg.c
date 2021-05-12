@@ -47,6 +47,12 @@
 #include "tps_storage.h"
 
 extern int _tps_param_mask_callid;
+extern int _tps_contact_mode;
+extern str _tps_cparam_name;
+extern int _tps_rr_update;
+
+extern str _tps_context_param;
+extern str _tps_context_value;
 
 str _sr_hname_xbranch = str_init("P-SR-XBranch");
 str _sr_hname_xuuid = str_init("P-SR-XUID");
@@ -298,26 +304,53 @@ error:
 /**
  *
  */
-int tps_dlg_message_update(sip_msg_t *msg, tps_data_t *ptsd)
+int tps_dlg_message_update(sip_msg_t *msg, tps_data_t *ptsd, int ctmode)
 {
+	str tuuid = STR_NULL;
+	int ret;
+
+#define TPS_TUUID_MIN_LEN 10
+
 	if(parse_sip_msg_uri(msg)<0) {
 		LM_ERR("failed to parse r-uri\n");
 		return -1;
 	}
-	if(msg->parsed_uri.user.len<10) {
-		LM_DBG("not an expected user format\n");
-		return 1;
+
+	if (ctmode == 1 || ctmode == 2) {
+		if(msg->parsed_uri.sip_params.len<TPS_TUUID_MIN_LEN) {
+			LM_DBG("not an expected param format\n");
+			return 1;
+		}
+		/* find the r-uri parameter */
+		ret = tps_get_param_value(&msg->parsed_uri.params,
+			&_tps_cparam_name, &tuuid);
+		if (ret < 0) {
+			LM_ERR("failed to parse param\n");
+			return -1;
+		}
+		if (ret == 1) {
+			LM_DBG("prefix para not found\n");
+			return 1;
+		}
+	} else {
+		if(msg->parsed_uri.user.len<TPS_TUUID_MIN_LEN) {
+			LM_DBG("not an expected user format\n");
+			return 1;
+		}
+		tuuid = msg->parsed_uri.user;
 	}
-	if(memcmp(msg->parsed_uri.user.s, "atpsh-", 6)==0) {
-		ptsd->a_uuid = msg->parsed_uri.user;
+
+	if(memcmp(tuuid.s, "atpsh-", 6)==0) {
+		ptsd->a_uuid = tuuid;
 		return 0;
 	}
-	if(memcmp(msg->parsed_uri.user.s, "btpsh-", 6)==0) {
-		ptsd->a_uuid = msg->parsed_uri.user;
-		ptsd->b_uuid = msg->parsed_uri.user;
+	if(memcmp(tuuid.s, "btpsh-", 6)==0) {
+		ptsd->a_uuid = tuuid;
+		ptsd->b_uuid = tuuid;
 		return 0;
 	}
-	LM_DBG("not an expected user prefix\n");
+
+	LM_DBG("not an expected prefix\n");
 
 	return 1;
 }
@@ -334,9 +367,16 @@ int tps_pack_message(sip_msg_t *msg, tps_data_t *ptsd)
 	int vlen;
 	int r2;
 	int isreq;
+	int rr_update = _tps_rr_update;
 
 	if(ptsd->cp==NULL) {
 		ptsd->cp = ptsd->cbuf;
+	}
+
+	if(_tps_rr_update) {
+		if((msg->first_line.type==SIP_REQUEST) && !(get_to(msg)->tag_value.len>0)) {
+			rr_update = 0;
+		}
 	}
 
 	i = 0;
@@ -395,7 +435,7 @@ int tps_pack_message(sip_msg_t *msg, tps_data_t *ptsd)
 				LM_ERR("no more space to pack rr headers\n");
 				return -1;
 			}
-			if(isreq==1) {
+			if(isreq==1 || rr_update) {
 				/* sip request - get a+s-side record route */
 				if(i>1) {
 					if(i==2 &&r2==0) {
@@ -407,6 +447,12 @@ int tps_pack_message(sip_msg_t *msg, tps_data_t *ptsd)
 					*ptsd->cp = ',';
 					ptsd->cp++;
 					ptsd->a_rr.len++;
+					if(rr_update) {
+						ptsd->b_rr.len++;
+					}
+				}
+				if(i==1 && rr_update) {
+					ptsd->b_rr.s = ptsd->cp;
 				}
 				*ptsd->cp = '<';
 				if(i==1) {
@@ -424,6 +470,9 @@ int tps_pack_message(sip_msg_t *msg, tps_data_t *ptsd)
 
 				ptsd->cp++;
 				ptsd->a_rr.len++;
+				if(rr_update) {
+					ptsd->b_rr.len++;
+				}
 
 				memcpy(ptsd->cp, rr->nameaddr.uri.s, rr->nameaddr.uri.len);
 				if(i==1) {
@@ -449,6 +498,10 @@ int tps_pack_message(sip_msg_t *msg, tps_data_t *ptsd)
 				*ptsd->cp = '>';
 				ptsd->cp++;
 				ptsd->a_rr.len++;
+				if(rr_update) {
+					ptsd->b_rr.len += rr->nameaddr.uri.len;
+					ptsd->b_rr.len++;
+				}
 			} else {
 				/* sip response - get b-side record route */
 				if(i==1) {
@@ -490,7 +543,20 @@ int tps_pack_message(sip_msg_t *msg, tps_data_t *ptsd)
 			ptsd->as_contact.len, ZSW(ptsd->as_contact.s), ptsd->as_contact.len,
 			ptsd->bs_contact.len, ZSW(ptsd->bs_contact.s), ptsd->bs_contact.len);
 	ptsd->x_rr = ptsd->a_rr;
+	if(isreq==0) {
+		if(msg->first_line.u.reply.statuscode >= 180
+				&& msg->first_line.u.reply.statuscode < 199) {
+			/* provisional replies that create early dialogs
+			 * - skip 199 Early Dialog Terminated */
+			ptsd->y_rr = ptsd->b_rr;
+		}
+	}
 	ptsd->s_method_id = get_cseq(msg)->method_id;
+	if(_tps_context_value.len>0) {
+		ptsd->x_context = _tps_context_value;
+	} else if(_tps_context_param.len>0) {
+		ptsd->x_context = _tps_context_param;
+	}
 	return 0;
 }
 
@@ -753,48 +819,48 @@ int tps_request_received(sip_msg_t *msg, int dialog)
 		return -1;
 	}
 
-	ret = tps_dlg_message_update(msg, &mtsd);
+	ret = tps_dlg_message_update(msg, &mtsd, _tps_contact_mode);
 	if(ret<0) {
 		LM_ERR("failed to update on dlg message\n");
 		return -1;
 	}
 
 	lkey = msg->callid->body;
+	LM_DBG("callid [%.*s] - a_uuid [%.*s] - b_uuid [%.*s]\n", lkey.len, lkey.s,
+			mtsd.a_uuid.len, ((mtsd.a_uuid.len>0)?mtsd.a_uuid.s:""),
+			mtsd.b_uuid.len, ((mtsd.b_uuid.len>0)?mtsd.b_uuid.s:""));
 
 	tps_storage_lock_get(&lkey);
 
-	if((get_cseq(msg)->method_id)&(METHOD_PRACK)) {
-		if(tps_storage_link_msg(msg, &mtsd, TPS_DIR_DOWNSTREAM)<0) {
-			goto error;
-		}
-		if(tps_storage_load_branch(msg, &mtsd, &stsd, 1)<0) {
-			goto error;
-		}
-		use_branch = 1;
-	} else {
-		if(tps_storage_load_dialog(msg, &mtsd, &stsd) < 0) {
-			goto error;
-		}
-		if(((get_cseq(msg)->method_id) & (METHOD_BYE))
-				&& stsd.b_contact.len <= 0) {
-			/* BYE but not B-side contact, look for INVITE transaction record */
-			memset(&stsd, 0, sizeof(tps_data_t));
-			if(tps_storage_link_msg(msg, &mtsd, TPS_DIR_DOWNSTREAM) < 0) {
-				goto error;
-			}
-			if(tps_storage_load_branch(msg, &mtsd, &stsd, 1) < 0) {
-				goto error;
-			}
-			use_branch = 1;
-		} else {
+	if(tps_storage_load_dialog(msg, &mtsd, &stsd) < 0) {
+		goto error;
+	}
+	if(((get_cseq(msg)->method_id) & (METHOD_BYE|METHOD_PRACK|METHOD_UPDATE))
+			&& stsd.b_contact.len <= 0) {
+		/* no B-side contact, look for INVITE transaction record */
+		if((get_cseq(msg)->method_id) & (METHOD_UPDATE)) {
 			/* detect direction - via from-tag */
 			if(tps_dlg_detect_direction(msg, &stsd, &direction) < 0) {
 				goto error;
 			}
 		}
+		if(tps_storage_link_msg(msg, &mtsd, direction) < 0) {
+			goto error;
+		}
+		mtsd.direction = direction;
+		memset(&stsd, 0, sizeof(tps_data_t));
+		if(tps_storage_load_branch(msg, &mtsd, &stsd, 1) < 0) {
+			goto error;
+		}
+		use_branch = 1;
+	} else {
+		/* detect direction - via from-tag */
+		if(tps_dlg_detect_direction(msg, &stsd, &direction) < 0) {
+			goto error;
+		}
+		mtsd.direction = direction;
 	}
 
-	mtsd.direction = direction;
 
 	tps_storage_lock_release(&lkey);
 
@@ -845,6 +911,16 @@ int tps_request_received(sip_msg_t *msg, int dialog)
 	}
 	if(dialog!=0) {
 		tps_append_xuuid(msg, &stsd.a_uuid);
+		if(_tps_rr_update) {
+			if(tps_storage_update_dialog(msg, &mtsd, &stsd, TPS_DBU_RPLATTRS|TPS_DBU_BRR)<0) {
+				goto error;
+			}
+		}
+		if((get_cseq(msg)->method_id)&(METHOD_SUBSCRIBE)) {
+			if(tps_storage_update_dialog(msg, &mtsd, &stsd, TPS_DBU_CONTACT|TPS_DBU_TIME)<0) {
+				goto error;
+			}
+		}
 	}
 	return 0;
 
@@ -895,7 +971,9 @@ int tps_response_received(sip_msg_t *msg)
 				TPS_DBU_CONTACT|TPS_DBU_RPLATTRS)<0) {
 		goto error;
 	}
-	if(tps_storage_update_dialog(msg, &mtsd, &stsd, TPS_DBU_RPLATTRS)<0) {
+	if(tps_storage_update_dialog(msg, &mtsd, &stsd,
+			(_tps_rr_update)?(TPS_DBU_RPLATTRS|TPS_DBU_BRR|TPS_DBU_ARR)
+					:TPS_DBU_RPLATTRS)<0) {
 		goto error;
 	}
 	tps_storage_lock_release(&lkey);
@@ -998,7 +1076,9 @@ int tps_request_sent(sip_msg_t *msg, int dialog, int local)
 
 	if(dialog!=0) {
 		tps_storage_end_dialog(msg, &mtsd, ptsd);
-		if(tps_storage_update_dialog(msg, &mtsd, &stsd, TPS_DBU_CONTACT)<0) {
+		if(tps_storage_update_dialog(msg, &mtsd, &stsd,
+					(_tps_rr_update)?(TPS_DBU_CONTACT|TPS_DBU_ARR)
+						:TPS_DBU_CONTACT)<0) {
 			goto error;
 		}
 	}

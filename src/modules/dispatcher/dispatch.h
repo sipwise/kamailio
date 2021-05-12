@@ -190,6 +190,7 @@ typedef struct _ds_attrs {
 	int congestion_control;
 	str ping_from;
 	str obproxy;
+	int rpriority;
 } ds_attrs_t;
 
 typedef struct _ds_latency_stats {
@@ -203,6 +204,8 @@ typedef struct _ds_latency_stats {
 	int32_t count;
 	uint32_t timeout;
 } ds_latency_stats_t;
+
+void latency_stats_init(ds_latency_stats_t *latency_stats, int latency, int count);
 
 typedef struct _ds_dest {
 	str uri;          /*!< address/uri */

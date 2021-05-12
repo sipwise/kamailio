@@ -59,6 +59,8 @@ static tr_export_t mod_trans[] = {
 		tr_parse_tobody },
 	{ {"line", sizeof("line")-1}, /* line class */
 		tr_parse_line },
+	{ {"urialias", sizeof("urialias")-1}, /* uri alias class */
+		tr_parse_urialias },
 
 	{ { 0, 0 }, 0 }
 };
@@ -196,8 +198,6 @@ static pv_export_t mod_pvs[] = {
 	{{"dd", (sizeof("dd")-1)}, /* */
 		PVT_OTHER, pv_get_dsturi_attr, 0,
 		0, 0, pv_init_iname, 1},
-	{{"def", (sizeof("env")-1)}, PVT_OTHER, pv_get_def, 0,
-		pv_parse_def_name, 0, 0, 0},
 	{{"di", (sizeof("di")-1)}, /* */
 		PVT_OTHER, pv_get_diversion, 0,
 		0, 0, pv_init_iname, 1},
@@ -225,8 +225,6 @@ static pv_export_t mod_pvs[] = {
 	{{"duri", (sizeof("duri")-1)}, /* */
 		PVT_DSTURI, pv_get_dsturi, pv_set_dsturi,
 		0, 0, 0, 0},
-	{{"env", (sizeof("env")-1)}, PVT_OTHER, pv_get_env, 0,
-		pv_parse_env_name, 0, 0, 0},
 	{{"err.class", (sizeof("err.class")-1)}, /* */
 		PVT_OTHER, pv_get_errinfo_attr, 0,
 		0, 0, 0, 0},
@@ -256,6 +254,9 @@ static pv_export_t mod_pvs[] = {
 		0, 0, 0, 0},
 	{{"fsn", (sizeof("fsn")-1)}, /* */
 		PVT_OTHER, pv_get_force_sock_name, pv_set_force_sock_name,
+		0, 0, 0, 0},
+	{{"fsp", (sizeof("fsp")-1)}, /* */
+		PVT_OTHER, pv_get_force_sock_port, 0,
 		0, 0, 0, 0},
 	{{"ft", (sizeof("ft")-1)}, /* */
 		PVT_OTHER, pv_get_from_attr, 0,
@@ -410,6 +411,9 @@ static pv_export_t mod_pvs[] = {
 	{{"Rut", (sizeof("Rut")-1)}, /* */
 		PVT_OTHER, pv_get_rcvaddr_uri_full, 0,
 		0, 0, 0, 0},
+	{{"Rn", (sizeof("Rn")-1)}, /* */
+		PVT_OTHER, pv_get_rcvsname, 0,
+		0, 0, 0, 0},
 	{{"RAi", (sizeof("RAi")-1)}, /* */
 		PVT_OTHER, pv_get_rcv_advertised_ip, 0,
 		0, 0, 0, 0},
@@ -559,6 +563,8 @@ static int w_xavp_copy_dst(sip_msg_t *msg, char *src_name, char *src_idx,
 		char *dst_name, char *dst_idx);
 static int w_xavp_params_explode(sip_msg_t *msg, char *pparams, char *pxname);
 static int w_xavp_params_implode(sip_msg_t *msg, char *pxname, char *pvname);
+static int w_xavp_slist_explode(sip_msg_t *msg, char *pslist, char *psep,
+		char *pmode, char *pxname);
 static int w_xavp_child_seti(sip_msg_t *msg, char *prname, char *pcname,
 		char *pval);
 static int w_xavp_child_sets(sip_msg_t *msg, char *prname, char *pcname,
@@ -610,6 +616,9 @@ static cmd_export_t cmds[]={
 		ANY_ROUTE},
 	{"not_empty", (cmd_function)pv_not_empty, 1, fixup_pvar_null,
 		fixup_free_pvar_null,
+		ANY_ROUTE},
+	{"xavp_slist_explode", (cmd_function)w_xavp_slist_explode,
+		4, fixup_spve_all, fixup_free_spve_all,
 		ANY_ROUTE},
 	{"xavp_params_explode", (cmd_function)w_xavp_params_explode,
 		2, fixup_spve_spve, fixup_free_spve_spve,
@@ -1110,6 +1119,53 @@ static int w_xavp_params_implode(sip_msg_t *msg, char *pxname, char *pvname)
 
 	return ki_xavp_params_implode(msg, &sxname, (str*)pvname);
 }
+
+/**
+ *
+ */
+static int w_xavp_slist_explode(sip_msg_t *msg, char *pslist, char *psep,
+		char *pmode, char *pxname)
+{
+	str slist;
+	str sep;
+	str smode;
+	str sxname;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pslist, &slist)!=0) {
+		LM_ERR("cannot get the params\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)psep, &sep)!=0) {
+		LM_ERR("cannot get the params\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)pmode, &smode)!=0) {
+		LM_ERR("cannot get the params\n");
+		return -1;
+	}
+	if(fixup_get_svalue(msg, (gparam_t*)pxname, &sxname)!=0) {
+		LM_ERR("cannot get the xavp name\n");
+		return -1;
+	}
+
+	if(xavp_slist_explode(&slist, &sep, &smode, &sxname)<0)
+		return -1;
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int ki_xavp_slist_explode(sip_msg_t *msg, str *slist, str *sep, str *mode,
+		str *sxname)
+{
+	if(xavp_slist_explode(slist, sep, mode, sxname)<0)
+		return -1;
+
+	return 1;
+}
+
 
 /**
  *
@@ -2686,6 +2742,11 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
 		SR_KEMIP_INT, ki_xavp_params_implode,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("pvx"), str_init("xavp_slist_explode"),
+		SR_KEMIP_INT, ki_xavp_slist_explode,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("pvx"), str_init("xavp_seti"),
 		SR_KEMIP_INT, ki_xavp_seti,
