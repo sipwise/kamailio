@@ -2918,6 +2918,63 @@ static int ki_t_relay(sip_msg_t *msg)
 /**
  *
  */
+static int ki_t_relay_to_proto(sip_msg_t *msg, str *sproto)
+{
+
+	int proto = PROTO_NONE;
+
+	if (sproto != NULL && sproto->s != NULL && sproto->len == 3) {
+		if (strncasecmp(sproto->s, "UDP", 3) == 0) {
+			proto = PROTO_UDP;
+		} else if (strncasecmp(sproto->s, "TCP", 3) == 0) {
+			proto = PROTO_TCP;
+		} else if (strncasecmp(sproto->s, "TLS", 3)) {
+			proto = PROTO_TLS;
+		} else {
+			LM_ERR("bad protocol specified <%s>\n", sproto->s);
+			return E_UNSPEC;
+		}
+	}
+	return _w_t_relay_to(msg, (struct proxy_l *)0, proto);
+}
+
+/**
+ *
+ */
+static int ki_t_relay_to_proto_addr(sip_msg_t *msg, str *sproto, str *host, int port)
+{
+
+	int proto = PROTO_NONE;
+	proxy_l_t *proxy = NULL;
+	int ret = -1;
+
+	if (sproto != NULL && sproto->s != NULL && sproto->len == 3) {
+		if (strncasecmp(sproto->s, "UDP", 3) == 0) {
+			proto = PROTO_UDP;
+		} else if (strncasecmp(sproto->s, "TCP", 3) == 0) {
+			proto = PROTO_TCP;
+		} else if (strncasecmp(sproto->s, "TLS", 3)) {
+			proto = PROTO_TLS;
+		} else {
+			LM_ERR("bad protocol specified <%s>\n", sproto->s);
+			return E_UNSPEC;
+		}
+	}
+	proxy = mk_proxy(host, (unsigned short)port, 0);
+	if (proxy == 0) {
+		LM_ERR("bad host:port provided <%s:%d>\n",
+		       host->s, port );
+		return E_BAD_ADDRESS;
+	}
+	ret = _w_t_relay_to(msg, proxy, proto);
+	free_proxy(proxy);
+	pkg_free(proxy);
+	return ret;
+}
+
+/**
+ *
+ */
 static int ki_t_relay_to_proxy_flags(sip_msg_t *msg, str *sproxy, int rflags)
 {
 	proxy_l_t *proxy = NULL;
@@ -3242,6 +3299,16 @@ static sr_kemi_t tm_kemi_exports[] = {
 	{ str_init("tm"), str_init("t_relay_to_proxy_flags"),
 		SR_KEMIP_INT, ki_t_relay_to_proxy_flags,
 		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tm"), str_init("t_relay_to_proto"),
+		SR_KEMIP_INT, ki_t_relay_to_proto,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tm"), str_init("t_relay_to_proto_addr"),
+		SR_KEMIP_INT, ki_t_relay_to_proto_addr,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 	{ str_init("tm"), str_init("t_get_status_code"),

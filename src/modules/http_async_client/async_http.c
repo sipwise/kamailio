@@ -57,6 +57,7 @@ extern struct tm_binds tmb;
 
 struct sip_msg *ah_reply = NULL;
 str ah_error = {NULL, 0};
+http_m_time_t ah_time = {0};
 
 async_http_worker_t *workers = NULL;
 int num_workers = 1;
@@ -142,6 +143,8 @@ void async_http_cb(struct http_m_reply *reply, void *param)
 	/* clean process-local result variables */
 	ah_error.s = NULL;
 	ah_error.len = 0;
+
+	memset(&ah_time, 0, sizeof(struct http_m_time));
 	memset(ah_reply, 0, sizeof(struct sip_msg));
 
 	keng = sr_kemi_eng_get();
@@ -163,6 +166,8 @@ void async_http_cb(struct http_m_reply *reply, void *param)
 	}
 
 	/* set process-local result variables */
+	ah_time = reply->time;
+
 	if (reply->result == NULL) {
 		/* error */
 		ah_error.s = reply->error;
@@ -298,6 +303,7 @@ void notification_socket_cb(int fd, short event, void *arg)
 
 	memset(&query_params, 0, sizeof(http_m_params_t));
 	query_params.timeout = aq->query_params.timeout;
+	query_params.follow_redirect = aq->query_params.follow_redirect;
 	query_params.tls_verify_peer = aq->query_params.tls_verify_peer;
 	query_params.tls_verify_host = aq->query_params.tls_verify_host;
 	query_params.authmethod = aq->query_params.authmethod;
@@ -492,6 +498,7 @@ int async_send_query(sip_msg_t *msg, str *query, str *cbname)
 	aq->query_params.tls_verify_host = ah_params.tls_verify_host;
 	aq->query_params.suspend_transaction = suspend;
 	aq->query_params.timeout = ah_params.timeout;
+	aq->query_params.follow_redirect = ah_params.follow_redirect;
 	aq->query_params.tcp_keepalive = ah_params.tcp_keepalive;
 	aq->query_params.tcp_ka_idle = ah_params.tcp_ka_idle;
 	aq->query_params.tcp_ka_interval = ah_params.tcp_ka_interval;
@@ -639,6 +646,7 @@ void set_query_params(struct query_params *p) {
 	p->tls_verify_peer = tls_verify_peer;
 	p->suspend_transaction = 1;
 	p->timeout = http_timeout;
+	p->follow_redirect = curl_follow_redirect;
 	p->method = AH_METH_DEFAULT;
 	p->authmethod = default_authmethod;
 	p->tcp_keepalive = tcp_keepalive;

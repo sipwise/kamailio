@@ -38,10 +38,15 @@
 #include "crypto_evcb.h"
 #include "api.h"
 
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+
+
 MODULE_VERSION
 
 int crypto_aes_init(unsigned char *key_data, int key_data_len,
-		unsigned char *salt, EVP_CIPHER_CTX *e_ctx, EVP_CIPHER_CTX *d_ctx);
+		unsigned char *salt, unsigned char* custom_iv, EVP_CIPHER_CTX *e_ctx,
+		EVP_CIPHER_CTX *d_ctx);
 unsigned char *crypto_aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext,
 		int *len);
 unsigned char *crypto_aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext,
@@ -61,10 +66,17 @@ static int w_crypto_nio_out(sip_msg_t* msg, char* p1, char* p2);
 static int w_crypto_nio_encrypt(sip_msg_t* msg, char* p1, char* p2);
 static int w_crypto_nio_decrypt(sip_msg_t* msg, char* p1, char* p2);
 
+static int w_crypto_hmac_sha256(sip_msg_t* msg, char* inb, char* keyb, char* outb);
+static int fixup_crypto_hmac(void** param, int param_no);
+
 static char *_crypto_salt_param = "k8hTm4aZ";
 
 static int _crypto_register_callid = 0;
 static int _crypto_register_evcb = 0;
+
+int _crypto_key_derivation = 1;
+/* base64 of 0 IV */
+static str _crypto_init_vector = str_init("");
 
 str _crypto_kevcb_netio = STR_NULL;
 str _crypto_netio_key = STR_NULL;
@@ -82,6 +94,8 @@ static cmd_export_t cmds[]={
 		0, 0, ANY_ROUTE},
 	{"crypto_netio_decrypt", (cmd_function)w_crypto_nio_decrypt, 0,
 		0, 0, ANY_ROUTE},
+	{"crypto_hmac_sha256", (cmd_function)w_crypto_hmac_sha256, 3,
+		fixup_crypto_hmac, 0, ANY_ROUTE},
 	{"load_crypto",        (cmd_function)load_crypto, 0, 0, 0, 0},
 	{0, 0, 0, 0, 0, 0}
 };
@@ -92,6 +106,8 @@ static param_export_t params[]={
 	{ "register_evcb",   PARAM_INT, &_crypto_register_evcb },
 	{ "kevcb_netio",     PARAM_STR, &_crypto_kevcb_netio },
 	{ "netio_key",       PARAM_STR, &_crypto_netio_key },
+	{ "key_derivation",  PARAM_INT, &_crypto_key_derivation },
+	{ "init_vector",     PARAM_STR, &_crypto_init_vector },
 
 	{ 0, 0, 0 }
 };
@@ -176,7 +192,10 @@ static int ki_crypto_aes_encrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 {
 	pv_value_t val;
 	EVP_CIPHER_CTX *en = NULL;
-	str etext;
+	str etext, lkey, ttext;
+	str iv = STR_NULL;
+	unsigned char decoded_key[64];
+	unsigned char decoded_iv[16], tmpiv[16];
 
 	en = EVP_CIPHER_CTX_new();
 	if(en==NULL) {
@@ -184,9 +203,46 @@ static int ki_crypto_aes_encrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 		return -1;
 	}
 
+	if (!_crypto_key_derivation){
+		lkey.len = base64_dec((unsigned char *)keys->s, keys->len,
+				(unsigned char *)decoded_key, sizeof(decoded_key));
+		if (lkey.len != 16 && lkey.len != 32) {
+			LM_ERR("base64 key input has wrong length %d, only supports 128 "
+				"or 256 bit keys\n", lkey.len);
+			return -1;
+		}
+		lkey.s = (char *)decoded_key;
+
+		/* custom IV */
+		if (_crypto_init_vector.s != NULL && _crypto_init_vector.len > 0) {
+			iv.s = _crypto_init_vector.s;
+			iv.len = _crypto_init_vector.len;
+
+			iv.len = base64_dec((unsigned char *)iv.s, iv.len,
+				(unsigned char *)decoded_iv, sizeof(decoded_iv));
+			if (iv.len != 16) {
+				LM_ERR("base64 initialization vector input has wrong length %d, needs to be "
+					"16 bytes\n", iv.len);
+				return -1;
+			}
+			iv.s = (char *)decoded_iv;
+		} else { /* random IV */
+			if (RAND_bytes(tmpiv, sizeof(tmpiv)) != 1) {
+				LM_ERR("could not set initialization vector\n");
+				return -1;
+			}
+			iv.s = (char *)tmpiv;
+			iv.len = sizeof(tmpiv);
+		}
+	} else {
+		lkey.s = keys->s;
+		lkey.len = keys->len;
+	}
+
 	/* gen key and iv. init the cipher ctx object */
-	if (crypto_aes_init((unsigned char *)keys->s, keys->len,
-				(unsigned char*)crypto_get_salt(), en, NULL)) {
+	if (crypto_aes_init((unsigned char *)lkey.s, lkey.len,
+				(unsigned char*)crypto_get_salt(),
+				(unsigned char*)iv.s, en, NULL)) {
 		EVP_CIPHER_CTX_free(en);
 		LM_ERR("couldn't initialize AES cipher\n");
 		return -1;
@@ -201,8 +257,23 @@ static int ki_crypto_aes_encrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 
 	memset(&val, 0, sizeof(pv_value_t));
 	val.rs.s = pv_get_buffer();
-	val.rs.len = base64_enc((unsigned char *)etext.s, etext.len,
-					(unsigned char *)val.rs.s, pv_get_buffer_size()-1);
+	/* IV is prefix of cipher text, 128 bits for AES */
+	if (! _crypto_key_derivation) {
+		ttext.s = pkg_malloc(iv.len + etext.len);
+		if (ttext.s == NULL) {
+			PKG_MEM_ERROR;
+			goto error1;
+		}
+		memcpy(ttext.s, iv.s, iv.len);
+		memcpy(ttext.s + iv.len, etext.s, etext.len);
+		ttext.len = iv.len + etext.len;
+	} else {
+		ttext.s = etext.s;
+		ttext.len = etext.len;
+	}
+	val.rs.len = base64_enc((unsigned char *)ttext.s, ttext.len,
+					(unsigned char *)val.rs.s,
+					pv_get_buffer_size()-1);
 	if (val.rs.len < 0) {
 		EVP_CIPHER_CTX_free(en);
 		LM_ERR("base64 output of encrypted value is too large (need %d)\n",
@@ -213,12 +284,19 @@ static int ki_crypto_aes_encrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 	val.flags = PV_VAL_STR;
 	dst->setf(msg, &dst->pvp, (int)EQ_T, &val);
 
+	if (ttext.s != etext.s) {
+		pkg_free(ttext.s);
+	}
 	free(etext.s);
 	EVP_CIPHER_CTX_cleanup(en);
 	EVP_CIPHER_CTX_free(en);
 	return 1;
 
 error:
+	if (ttext.s != etext.s) {
+		pkg_free(ttext.s);
+	}
+error1:
 	free(etext.s);
 	EVP_CIPHER_CTX_cleanup(en);
 	EVP_CIPHER_CTX_free(en);
@@ -289,25 +367,123 @@ static int fixup_crypto_aes_encrypt(void** param, int param_no)
 /**
  *
  */
+static int ki_crypto_hmac_sha256_helper(sip_msg_t* msg, str *ins, str *key,
+		pv_spec_t *dst)
+{
+	pv_value_t val;
+	unsigned char digest[EVP_MAX_MD_SIZE];
+	unsigned int digest_len;
+
+	LM_DBG("ins: %.*s, key: %.*s\n", STR_FMT(ins), STR_FMT(key));
+
+	if (!HMAC(EVP_sha256(), key->s, key->len, (const unsigned char *)ins->s, ins->len, digest, &digest_len)) {
+		LM_ERR("HMAC error\n");
+		goto error;
+	}
+
+	memset(&val, 0, sizeof(pv_value_t));
+	val.rs.s = pv_get_buffer();
+	val.rs.len = base64url_enc((char *)digest, digest_len, val.rs.s, pv_get_buffer_size()-1);
+	if (val.rs.len < 0) {
+		LM_ERR("base64 output of digest value is too large (need %d)\n", -val.rs.len);
+		goto error;
+	}
+
+	if (val.rs.len > 1 && val.rs.s[val.rs.len-1] == '=') {
+		val.rs.len--;
+		if (val.rs.len > 1 && val.rs.s[val.rs.len-1] == '=') {
+			val.rs.len--;
+		}
+	}
+	val.rs.s[val.rs.len] = '\0';
+
+	LM_DBG("base64 digest result: [%.*s]\n", val.rs.len, val.rs.s);
+	val.flags = PV_VAL_STR;
+	dst->setf(msg, &dst->pvp, (int)EQ_T, &val);
+
+	return 1;
+
+error:
+	return -1;
+}
+
+/**
+ *
+ */
+static int ki_crypto_hmac_sha256(sip_msg_t* msg, str *ins, str *keys, str *dpv)
+{
+	pv_spec_t *dst;
+
+	dst = pv_cache_get(dpv);
+
+	if(dst==NULL) {
+		LM_ERR("failed getting pv: %.*s\n", dpv->len, dpv->s);
+		return -1;
+	}
+
+	return ki_crypto_hmac_sha256_helper(msg, ins, keys, dst);
+}
+
+/**
+ *
+ */
+static int w_crypto_hmac_sha256(sip_msg_t* msg, char* inb, char* keyb, char* outb)
+{
+	str ins;
+	str keys;
+	pv_spec_t *dst;
+
+	if (fixup_get_svalue(msg, (gparam_t*)inb, &ins) != 0) {
+		LM_ERR("cannot get input value\n");
+		return -1;
+	}
+	if (fixup_get_svalue(msg, (gparam_t*)keyb, &keys) != 0) {
+		LM_ERR("cannot get key value\n");
+		return -1;
+	}
+	dst = (pv_spec_t*)outb;
+
+	return ki_crypto_hmac_sha256_helper(msg, &ins, &keys, dst);
+}
+
+/**
+ *
+ */
+static int fixup_crypto_hmac(void** param, int param_no)
+{
+	if(param_no==1 || param_no==2) {
+		if(fixup_spve_null(param, 1)<0)
+			return -1;
+		return 0;
+	} else if(param_no==3) {
+		if (fixup_pvar_null(param, 1) != 0) {
+			LM_ERR("failed to fixup result pvar\n");
+			return -1;
+		}
+		if (((pv_spec_t *)(*param))->setf == NULL) {
+			LM_ERR("result pvar is not writeble\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/**
+ *
+ */
 static int ki_crypto_aes_decrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 		pv_spec_t *dst)
 {
 
 	pv_value_t val;
 	EVP_CIPHER_CTX *de=NULL;
-	str etext;
+	str etext, lkey;
+	unsigned char decoded_key[64];
+	char *iv = NULL;
 
 	de = EVP_CIPHER_CTX_new();
 	if(de==NULL) {
 		LM_ERR("cannot get new cipher context\n");
-		return -1;
-	}
-
-	/* gen key and iv. init the cipher ctx object */
-	if (crypto_aes_init((unsigned char *)keys->s, keys->len,
-				(unsigned char*)crypto_get_salt(), NULL, de)) {
-		EVP_CIPHER_CTX_free(de);
-		LM_ERR("couldn't initialize AES cipher\n");
 		return -1;
 	}
 
@@ -321,6 +497,32 @@ static int ki_crypto_aes_decrypt_helper(sip_msg_t* msg, str *ins, str *keys,
 				-etext.len);
 		return -1;
 	}
+        if (!_crypto_key_derivation){
+		lkey.len = base64_dec((unsigned char *)keys->s, keys->len,
+					(unsigned char *)decoded_key, sizeof(decoded_key));
+		if (lkey.len != 16 && lkey.len != 32) {
+			LM_ERR("base64 key input has wrong length %d, only 128 or 256 "
+			" bit keys are supported\n", lkey.len);
+			return -1;
+		}
+		lkey.s = (char *)decoded_key;
+		/* IV is prefix of cipher text, 128 bits for AES */
+		iv = etext.s;
+		etext.s += 16;
+		etext.len -= 16;
+	} else {
+		lkey.s = keys->s;
+		lkey.len = keys->len;
+	}
+	/* gen key and iv. init the cipher ctx object */
+	if (crypto_aes_init((unsigned char *)lkey.s, lkey.len,
+				(unsigned char*)crypto_get_salt(),
+				(unsigned char*)iv, NULL, de)) {
+		EVP_CIPHER_CTX_free(de);
+		LM_ERR("couldn't initialize AES cipher\n");
+		return -1;
+	}
+
 	val.rs.len = etext.len;
 	val.rs.s = (char *)crypto_aes_decrypt(de, (unsigned char *)etext.s,
 			&val.rs.len);
@@ -401,6 +603,7 @@ static int fixup_crypto_aes_decrypt(void** param, int param_no)
 	return 0;
 }
 
+
 /**
  * testing function
  */
@@ -440,7 +643,7 @@ int crypto_aes_test(void)
 	key_data_len = strlen((const char *)key_data);
 
 	/* gen key and iv. init the cipher ctx object */
-	if (crypto_aes_init(key_data, key_data_len, salt, en, de)) {
+	if (crypto_aes_init(key_data, key_data_len, salt, NULL, en, de)) {
 		LM_ERR("couldn't initialize AES cipher\n");
 		return -1;
 	}
@@ -522,6 +725,11 @@ static sr_kemi_t sr_kemi_crypto_exports[] = {
 	},
 	{ str_init("crypto"), str_init("aes_decrypt"),
 		SR_KEMIP_INT, ki_crypto_aes_decrypt,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("crypto"), str_init("hmac_sha256"),
+		SR_KEMIP_INT, ki_crypto_hmac_sha256,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

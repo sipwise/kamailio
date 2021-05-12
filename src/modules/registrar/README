@@ -62,23 +62,24 @@ Bogdan-Andre Iancu
               3.15. retry_after (integer)
               3.16. sock_flag (integer)
               3.17. sock_hdr_name (string)
-              3.18. method_filtering (integer)
-              3.19. use_path (integer)
-              3.20. path_mode (integer)
-              3.21. path_use_received (integer)
-              3.22. path_check_local (integer)
-              3.23. reg_callid_avp (string)
-              3.24. xavp_cfg (string)
-              3.25. xavp_rcd (string)
-              3.26. xavp_rcd_mask (int)
-              3.27. gruu_enabled (integer)
-              3.28. outbound_mode (integer)
-              3.29. regid_mode (integer)
-              3.30. flow_timer (integer)
-              3.31. contact_max_size (integer)
-              3.32. event_callback (str)
-              3.33. lookup_filter_mode (int)
-              3.34. use_expired_contacts (int)
+              3.18. sock_mode (integer)
+              3.19. method_filtering (integer)
+              3.20. use_path (integer)
+              3.21. path_mode (integer)
+              3.22. path_use_received (integer)
+              3.23. path_check_local (integer)
+              3.24. reg_callid_avp (string)
+              3.25. xavp_cfg (string)
+              3.26. xavp_rcd (string)
+              3.27. xavp_rcd_mask (int)
+              3.28. gruu_enabled (integer)
+              3.29. outbound_mode (integer)
+              3.30. regid_mode (integer)
+              3.31. flow_timer (integer)
+              3.32. contact_max_size (integer)
+              3.33. event_callback (str)
+              3.34. lookup_filter_mode (int)
+              3.35. use_expired_contacts (int)
 
         4. Functions
 
@@ -131,35 +132,36 @@ Bogdan-Andre Iancu
    1.14. Set retry_after parameter
    1.15. Set sock_flag parameter
    1.16. Set sock_hdr_name parameter
-   1.17. Set method_filtering parameter
-   1.18. Set use_path parameter
-   1.19. Set path_mode parameter
-   1.20. Set path_use_received parameter
-   1.21. Set path_check_local parameter
-   1.22. Set reg_callid_avp parameter
-   1.23. Set xavp_cfg parameter
-   1.24. Set xavp_rcd parameter
-   1.25. Set xavp_rcd_mask parameter
-   1.26. Set gruu_enabled parameter
-   1.27. Set outbound_mode parameter
-   1.28. Set regid_mode parameter
-   1.29. Set flow_timer parameter
-   1.30. Set contact_max_size parameter
-   1.31. Set event_callback parameter
-   1.32. Set xavp_cfg parameter
-   1.33. Set use_expired_contacts parameter
-   1.34. save usage
-   1.35. lookup usage
-   1.36. lookup_to_dset usage
-   1.37. lookup_branches usage
-   1.38. registered usage
-   1.39. add_sock_hdr usage
-   1.40. unregister usage
-   1.41. reg_fetch_contacts usage
-   1.42. reg_free_contacts usage
-   1.43. reg_send_reply usage
-   1.44. event_route[usrloc:contact-expired] usage
-   1.45. $ulc(name) usage
+   1.17. Set sock_mode parameter
+   1.18. Set method_filtering parameter
+   1.19. Set use_path parameter
+   1.20. Set path_mode parameter
+   1.21. Set path_use_received parameter
+   1.22. Set path_check_local parameter
+   1.23. Set reg_callid_avp parameter
+   1.24. Set xavp_cfg parameter
+   1.25. Set xavp_rcd parameter
+   1.26. Set xavp_rcd_mask parameter
+   1.27. Set gruu_enabled parameter
+   1.28. Set outbound_mode parameter
+   1.29. Set regid_mode parameter
+   1.30. Set flow_timer parameter
+   1.31. Set contact_max_size parameter
+   1.32. Set event_callback parameter
+   1.33. Set xavp_cfg parameter
+   1.34. Set use_expired_contacts parameter
+   1.35. save usage
+   1.36. lookup usage
+   1.37. lookup_to_dset usage
+   1.38. lookup_branches usage
+   1.39. registered usage
+   1.40. add_sock_hdr usage
+   1.41. unregister usage
+   1.42. reg_fetch_contacts usage
+   1.43. reg_free_contacts usage
+   1.44. reg_send_reply usage
+   1.45. event_route[usrloc:contact-expired] usage
+   1.46. $ulc(name) usage
 
 Chapter 1. Admin Guide
 
@@ -194,23 +196,24 @@ Chapter 1. Admin Guide
         3.15. retry_after (integer)
         3.16. sock_flag (integer)
         3.17. sock_hdr_name (string)
-        3.18. method_filtering (integer)
-        3.19. use_path (integer)
-        3.20. path_mode (integer)
-        3.21. path_use_received (integer)
-        3.22. path_check_local (integer)
-        3.23. reg_callid_avp (string)
-        3.24. xavp_cfg (string)
-        3.25. xavp_rcd (string)
-        3.26. xavp_rcd_mask (int)
-        3.27. gruu_enabled (integer)
-        3.28. outbound_mode (integer)
-        3.29. regid_mode (integer)
-        3.30. flow_timer (integer)
-        3.31. contact_max_size (integer)
-        3.32. event_callback (str)
-        3.33. lookup_filter_mode (int)
-        3.34. use_expired_contacts (int)
+        3.18. sock_mode (integer)
+        3.19. method_filtering (integer)
+        3.20. use_path (integer)
+        3.21. path_mode (integer)
+        3.22. path_use_received (integer)
+        3.23. path_check_local (integer)
+        3.24. reg_callid_avp (string)
+        3.25. xavp_cfg (string)
+        3.26. xavp_rcd (string)
+        3.27. xavp_rcd_mask (int)
+        3.28. gruu_enabled (integer)
+        3.29. outbound_mode (integer)
+        3.30. regid_mode (integer)
+        3.31. flow_timer (integer)
+        3.32. contact_max_size (integer)
+        3.33. event_callback (str)
+        3.34. lookup_filter_mode (int)
+        3.35. use_expired_contacts (int)
 
    4. Functions
 
@@ -325,23 +328,24 @@ Chapter 1. Admin Guide
    3.15. retry_after (integer)
    3.16. sock_flag (integer)
    3.17. sock_hdr_name (string)
-   3.18. method_filtering (integer)
-   3.19. use_path (integer)
-   3.20. path_mode (integer)
-   3.21. path_use_received (integer)
-   3.22. path_check_local (integer)
-   3.23. reg_callid_avp (string)
-   3.24. xavp_cfg (string)
-   3.25. xavp_rcd (string)
-   3.26. xavp_rcd_mask (int)
-   3.27. gruu_enabled (integer)
-   3.28. outbound_mode (integer)
-   3.29. regid_mode (integer)
-   3.30. flow_timer (integer)
-   3.31. contact_max_size (integer)
-   3.32. event_callback (str)
-   3.33. lookup_filter_mode (int)
-   3.34. use_expired_contacts (int)
+   3.18. sock_mode (integer)
+   3.19. method_filtering (integer)
+   3.20. use_path (integer)
+   3.21. path_mode (integer)
+   3.22. path_use_received (integer)
+   3.23. path_check_local (integer)
+   3.24. reg_callid_avp (string)
+   3.25. xavp_cfg (string)
+   3.26. xavp_rcd (string)
+   3.27. xavp_rcd_mask (int)
+   3.28. gruu_enabled (integer)
+   3.29. outbound_mode (integer)
+   3.30. regid_mode (integer)
+   3.31. flow_timer (integer)
+   3.32. contact_max_size (integer)
+   3.33. event_callback (str)
+   3.34. lookup_filter_mode (int)
+   3.35. use_expired_contacts (int)
 
 3.1. default_expires (integer)
 
@@ -603,7 +607,23 @@ modparam("registrar", "sock_flag", 18)
 modparam("registrar", "sock_hdr_name", "Sock-Info")
 ...
 
-3.18. method_filtering (integer)
+3.18. sock_mode (integer)
+
+   If set to 1, the server stores the advertised address in socket field,
+   instead of bind address.
+
+   This could be useful when kamailio is installed behind NAT and it is
+   necessary to store its public IP instead socket on which the register
+   request was received.
+
+   Default value is 0 (store bind address).
+
+   Example 1.17. Set sock_mode parameter
+...
+modparam("registrar", "sock_mode", 1)
+...
+
+3.19. method_filtering (integer)
 
    Tells if the contact filtering based on supported methods should be
    performed during lookup on initial requests without to-tag. It's
@@ -613,12 +633,12 @@ modparam("registrar", "sock_hdr_name", "Sock-Info")
 
    Default value is 0 (disabled).
 
-   Example 1.17. Set method_filtering parameter
+   Example 1.18. Set method_filtering parameter
 ...
 modparam("registrar", "method_filtering", 1)
 ...
 
-3.19. use_path (integer)
+3.20. use_path (integer)
 
    If set to 1, the “Path:” header is handled according to the parameter
    This parameter can be modified via Kamailio config framework.
@@ -626,12 +646,12 @@ modparam("registrar", "method_filtering", 1)
 
    Default value is 0 (disabled).
 
-   Example 1.18. Set use_path parameter
+   Example 1.19. Set use_path parameter
 ...
 modparam("registrar", "use_path", 1)
 ...
 
-3.20. path_mode (integer)
+3.21. path_mode (integer)
 
    The registrar module implements three different modes regarding the
    response to a registration which includes one or more Path headers:
@@ -649,12 +669,12 @@ modparam("registrar", "use_path", 1)
 
    Default value is 2.
 
-   Example 1.19. Set path_mode parameter
+   Example 1.20. Set path_mode parameter
 ...
 modparam("registrar", "path_mode", 0)
 ...
 
-3.21. path_use_received (integer)
+3.22. path_use_received (integer)
 
    If set to 1, the “received” parameter of the first Path URI of a
    registration is set as received-uri and the NAT branch flag is set for
@@ -664,12 +684,12 @@ modparam("registrar", "path_mode", 0)
 
    Default value is 0 (disabled).
 
-   Example 1.20. Set path_use_received parameter
+   Example 1.21. Set path_use_received parameter
 ...
 modparam("registrar", "path_use_received", 1)
 ...
 
-3.22. path_check_local (integer)
+3.23. path_check_local (integer)
 
    If set to 1, when performing a lookup the Path (if present) is
    evaluated and if the first hop is local (according to “myself” test),
@@ -680,12 +700,12 @@ modparam("registrar", "path_use_received", 1)
 
    Default value is 0 (disabled).
 
-   Example 1.21. Set path_check_local parameter
+   Example 1.22. Set path_check_local parameter
 ...
 modparam("registrar", "path_check_local", 1)
 ...
 
-3.23. reg_callid_avp (string)
+3.24. reg_callid_avp (string)
 
    obsolete. use match_option in registered function
 
@@ -695,42 +715,45 @@ modparam("registrar", "path_check_local", 1)
 
    Default value is NULL (disabled).
 
-   Example 1.22. Set reg_callid_avp parameter
+   Example 1.23. Set reg_callid_avp parameter
 ...
 modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 ...
 
-3.24. xavp_cfg (string)
+3.25. xavp_cfg (string)
 
    Defines the name of XAVP class to store runtime module config values.
    The values are stored as inner XAVPs, like $xavp(class=>attribute).
    Valid inner XAVP names:
+     * expires - the number of maximum contacts to be stored for the
+       current registration AoR. It overwrites the 'max_contacts' module
+       parameter value.
+     * q - the expires value, to overwrite the value from SIP headers.
      * max_contacts - the number of maximum contacts to be stored for the
        current registration AoR. It overwrites the 'max_contacts' module
        parameter value.
      * socket - the string representing the socket on which the register
        request was received, as alternative to using the sock_hdr.
-     * q - q value of contact (integer 0-1000). It overrides q value given
-       in contact header and default_q parameter.
 
    For example. if this parameter is set to 'reg', then the number of
    maximum contacts can be set in $xavp(reg=>max_contacts).
 
    Default value is NULL (disabled).
 
-   Example 1.23. Set xavp_cfg parameter
+   Example 1.24. Set xavp_cfg parameter
 ...
 modparam("registrar", "xavp_cfg", "reg")
 ...
 request_route {
     ...
     $xavp(reg=>max_contacts) = 4;
+    $xavp(reg[0]=>expires) = 600;
     save("location");
     ...
 }
 ...
 
-3.25. xavp_rcd (string)
+3.26. xavp_rcd (string)
 
    Defines the name of XAVP class to store details from the location
    records. The values are stored as inner XAVPs, like
@@ -750,12 +773,12 @@ request_route {
 
    Default value is NULL (disabled).
 
-   Example 1.24. Set xavp_rcd parameter
+   Example 1.25. Set xavp_rcd parameter
 ...
 modparam("registrar", "xavp_rcd", "ulrcd")
 ...
 
-3.26. xavp_rcd_mask (int)
+3.27. xavp_rcd_mask (int)
 
    Defines what values to skip when xavp_rcd is stored.
      * 1 - ruid
@@ -766,7 +789,7 @@ modparam("registrar", "xavp_rcd", "ulrcd")
 
    Default value is 0 (none).
 
-   Example 1.25. Set xavp_rcd_mask parameter
+   Example 1.26. Set xavp_rcd_mask parameter
 ...
 # skip path value
 modparam("registrar", "xavp_rcd_mask", 16)
@@ -775,7 +798,7 @@ modparam("registrar", "xavp_rcd_mask", 16)
 modparam("registrar", "xavp_rcd_mask", 20)
 ...
 
-3.27. gruu_enabled (integer)
+3.28. gruu_enabled (integer)
 
    If set to 1 and the “+sip.instance” parameter to Contact header of
    REGISTER is present, then the value of the parameter is saved to
@@ -785,12 +808,12 @@ modparam("registrar", "xavp_rcd_mask", 20)
 
    Default value is 1 (enabled).
 
-   Example 1.26. Set gruu_enabled parameter
+   Example 1.27. Set gruu_enabled parameter
 ...
 modparam("registrar", "gruu_enabled", 0)
 ...
 
-3.28. outbound_mode (integer)
+3.29. outbound_mode (integer)
 
    If set to 0 this module will accept REGISTER requests that do not
    contain a “Supported:” header with the outbound options-tag. The 200 OK
@@ -813,12 +836,12 @@ modparam("registrar", "gruu_enabled", 0)
 
    Default value is 0.
 
-   Example 1.27. Set outbound_mode parameter
+   Example 1.28. Set outbound_mode parameter
 ...
 modparam("registrar", "outbound_mode", 2)
 ...
 
-3.29. regid_mode (integer)
+3.30. regid_mode (integer)
 
    If set to 0 this module will ignore the “regid” contact param when
    saving REGISTER request if the request does not indicate support for
@@ -830,12 +853,12 @@ modparam("registrar", "outbound_mode", 2)
 
    Default value is 0.
 
-   Example 1.28. Set regid_mode parameter
+   Example 1.29. Set regid_mode parameter
 ...
 modparam("registrar", "regid_mode", 1)
 ...
 
-3.30. flow_timer (integer)
+3.31. flow_timer (integer)
 
    If set to 0 then this module will not add a “Flow-Timer:” header to 200
    OK responses to REGISTER requests.
@@ -857,12 +880,12 @@ modparam("registrar", "regid_mode", 1)
 
    Default value is 0.
 
-   Example 1.29. Set flow_timer parameter
+   Example 1.30. Set flow_timer parameter
 ...
 modparam("registrar", "flow_timer", 25)
 ...
 
-3.31. contact_max_size (integer)
+3.32. contact_max_size (integer)
 
    Max size of URIs in “Contact:” header.
 
@@ -877,12 +900,12 @@ modparam("registrar", "flow_timer", 25)
 
    Default value is 512.
 
-   Example 1.30. Set contact_max_size parameter
+   Example 1.31. Set contact_max_size parameter
 ...
 modparam("registrar", "contact_max_size", 1024)
 ...
 
-3.32. event_callback (str)
+3.33. event_callback (str)
 
    The name of the function in the KEMI configuration file (embedded
    scripting language such as Lua, Python, ...) to be executed instead of
@@ -893,7 +916,7 @@ modparam("registrar", "contact_max_size", 1024)
 
    Default value is 'empty' (no function is executed for events).
 
-   Example 1.31. Set event_callback parameter
+   Example 1.32. Set event_callback parameter
 ...
 modparam("registrar", "event_callback", "ksr_registrar_event")
 ...
@@ -904,7 +927,7 @@ function ksr_registrar_event(evname)
 end
 ...
 
-3.33. lookup_filter_mode (int)
+3.34. lookup_filter_mode (int)
 
    Control what filters should be applied to lookup(...) operations. It
    can be a combination (sum) of the next values:
@@ -915,7 +938,7 @@ end
 
    Default value is NULL (disabled).
 
-   Example 1.32. Set xavp_cfg parameter
+   Example 1.33. Set xavp_cfg parameter
 ...
 modparam("registrar", "xavp_cfg", "reg")
 modparam("registrar", "lookup_filter_mode", 1)
@@ -928,7 +951,7 @@ request_route {
 }
 ...
 
-3.34. use_expired_contacts (int)
+3.35. use_expired_contacts (int)
 
    Allow/Disallow the usage of the expired contacts.
      * 0 Disallow the usage of the expired contacts.
@@ -936,7 +959,7 @@ request_route {
 
    Default value is 0 (Disallow).
 
-   Example 1.33. Set use_expired_contacts parameter
+   Example 1.34. Set use_expired_contacts parameter
 ...
 modparam("registrar", "use_expired_contacts", 1)
 ...
@@ -999,7 +1022,7 @@ kamcmd cfg.set_now_int registrar use_expired_contacts 0
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE and
    REPLY_ROUTE.
 
-   Example 1.34. save usage
+   Example 1.35. save usage
 ...
 save("location");
 save("location", "0x01");
@@ -1033,7 +1056,7 @@ save("location", "0x00", "sip:test@kamailio.org");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.35. lookup usage
+   Example 1.36. lookup usage
 ...
 lookup("location");
                         switch ($retcode) {:1
@@ -1057,7 +1080,7 @@ lookup("location");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.36. lookup_to_dset usage
+   Example 1.37. lookup_to_dset usage
 ...
 lookup_to_dset("location");
 ...
@@ -1074,7 +1097,7 @@ lookup_to_dset("location");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.37. lookup_branches usage
+   Example 1.38. lookup_branches usage
 ...
 lookup_branches("location");
 ...
@@ -1106,7 +1129,7 @@ lookup_branches("location");
 
    This function can be used from ANY_ROUTE.
 
-   Example 1.38. registered usage
+   Example 1.39. registered usage
 ...
 if (registered("location")) {
         sl_send_reply("100", "Trying");
@@ -1133,7 +1156,7 @@ if (registered("location","$rz:$Au", 2)) {
 
    This function can be used from REQUEST_ROUTE.
 
-   Example 1.39. add_sock_hdr usage
+   Example 1.40. add_sock_hdr usage
 ...
 add_sock_hdr("Sock-Info");
 ...
@@ -1163,7 +1186,7 @@ add_sock_hdr("Sock-Info");
      * -2 - Error in unregistering user
      * -3 - Contacts for AOR not found
 
-   Example 1.40. unregister usage
+   Example 1.41. unregister usage
 ...
 unregister("location", "$ru");
 unregister("location", "sip:user@kamailio.org");
@@ -1187,7 +1210,7 @@ unregister("location", "", "$ruid");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.41. reg_fetch_contacts usage
+   Example 1.42. reg_fetch_contacts usage
 ...
 reg_fetch_contacts("location", "$ru", "callee");
 reg_fetch_contacts("location", "sip:user@kamailio.org", "caller");
@@ -1206,7 +1229,7 @@ reg_fetch_contacts("location", "sip:user@kamailio.org", "caller");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.42. reg_free_contacts usage
+   Example 1.43. reg_free_contacts usage
 ...
 reg_free_contacts("callee");
 ...
@@ -1220,7 +1243,7 @@ reg_free_contacts("callee");
 
    This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
 
-   Example 1.43. reg_send_reply usage
+   Example 1.44. reg_send_reply usage
 ...
 save("location", "0x2");
 ...
@@ -1236,7 +1259,7 @@ reg_send_reply();
    Executed when a contact in location table has expired. The variable
    $ulc(exp=>...) is filled with the attributes of the expired contact.
 
-   Example 1.44. event_route[usrloc:contact-expired] usage
+   Example 1.45. event_route[usrloc:contact-expired] usage
 ...
 event_route[usrloc:contact-expired] {
     xlog("expired contact for $ulc(exp=>aor)\n");
@@ -1310,7 +1333,7 @@ event_route[usrloc:contact-expired] {
    The pseudo-variable accepts positive index value to access a specific
    contact record.
 
-   Example 1.45. $ulc(name) usage
+   Example 1.46. $ulc(name) usage
 ...
 if(reg_fetch_contacts("location", "$fu", "caller"))
 {

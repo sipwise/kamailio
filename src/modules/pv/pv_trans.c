@@ -1316,6 +1316,94 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			val->rs.s = int2str(j, &val->rs.len);
 			break;
 
+		case TR_S_BEFORE:
+			if(tp==NULL)
+			{
+				LM_ERR("invalid parameters (cfg line: %d)\n",
+						get_cfg_crt_line());
+				return -1;
+			}
+			if(!(val->flags&PV_VAL_STR)) {
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			}
+			if(val->rs.len>TR_BUFFER_SIZE-2) {
+				LM_ERR("value too large: %d\n", val->rs.len);
+				return -1;
+			}
+			if(tp->type==TR_PARAM_STRING)
+			{
+				st = tp->v.s;
+			} else {
+				if(pv_get_spec_value(msg, (pv_spec_p)tp->v.data, &v)!=0
+						|| (!(v.flags&PV_VAL_STR)) || v.rs.len<=0)
+				{
+					LM_ERR("cannot get parameter value (cfg line: %d)\n",
+							get_cfg_crt_line());
+					return -1;
+				}
+				st = v.rs;
+			}
+			for(i=0; i<val->rs.len; i++) {
+				if(val->rs.s[i]==st.s[0]) {
+					break;
+				}
+			}
+			if(i==0) {
+				_tr_buffer[0] = '\0';
+				val->rs.len = 0;
+			} else {
+				memcpy(_tr_buffer, val->rs.s, i);
+				val->rs.len = i;
+			}
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.s[val->rs.len] = '\0';
+			break;
+
+		case TR_S_AFTER:
+			if(tp==NULL)
+			{
+				LM_ERR("invalid parameters (cfg line: %d)\n",
+						get_cfg_crt_line());
+				return -1;
+			}
+			if(!(val->flags&PV_VAL_STR)) {
+				val->rs.s = int2str(val->ri, &val->rs.len);
+			}
+			if(val->rs.len>TR_BUFFER_SIZE-2) {
+				LM_ERR("value too large: %d\n", val->rs.len);
+				return -1;
+			}
+			if(tp->type==TR_PARAM_STRING)
+			{
+				st = tp->v.s;
+			} else {
+				if(pv_get_spec_value(msg, (pv_spec_p)tp->v.data, &v)!=0
+						|| (!(v.flags&PV_VAL_STR)) || v.rs.len<=0)
+				{
+					LM_ERR("cannot get parameter value (cfg line: %d)\n",
+							get_cfg_crt_line());
+					return -1;
+				}
+				st = v.rs;
+			}
+			for(i=0; i<val->rs.len; i++) {
+				if(val->rs.s[i]==st.s[0]) {
+					break;
+				}
+			}
+			if(i>=val->rs.len-1) {
+				_tr_buffer[0] = '\0';
+				val->rs.len = 0;
+			} else {
+				memcpy(_tr_buffer, val->rs.s+i+1, val->rs.len-i-1);
+				val->rs.len = val->rs.len-i-1;
+			}
+			val->flags = PV_VAL_STR;
+			val->rs.s = _tr_buffer;
+			val->rs.s[val->rs.len] = '\0';
+			break;
+
 		default:
 			LM_ERR("unknown subtype %d (cfg line: %d)\n",
 					subtype, get_cfg_crt_line());
@@ -1408,6 +1496,67 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			break;
 		case TR_URI_PASSWD:
 			val->rs = (_tr_parsed_uri.passwd.s)?_tr_parsed_uri.passwd:_tr_empty;
+			break;
+		case TR_URI_DURI:
+		case TR_URI_SAOR:
+		case TR_URI_SURI:
+			if(_tr_uri.len >= TR_BUFFER_SIZE) {
+				LM_WARN("uri too long [%.*s] (%d)\n",
+						_tr_uri.len, _tr_uri.s, _tr_uri.len);
+				val->rs = _tr_empty;
+				break;
+			}
+
+			tr_set_crt_buffer();
+			sv.s = _tr_uri.s;
+			sv.len = 0;
+			while(sv.len<_tr_uri.len) {
+				if(_tr_uri.s[sv.len]==':') {
+					break;
+				}
+				sv.len++;
+			}
+			if(_tr_uri.s[sv.len]!=':') {
+				LM_WARN("uri schema not found [%.*s] (%d)\n",
+						_tr_uri.len, _tr_uri.s, _tr_uri.len);
+				val->rs = _tr_empty;
+				break;
+			}
+			sv.len++;
+			memcpy(_tr_buffer, sv.s, sv.len);
+			sv.s = _tr_buffer;
+			sv.len++;
+			if((_tr_parsed_uri.user.len > 0)
+					&& (subtype != TR_URI_DURI)) {
+				memcpy(sv.s + sv.len, _tr_parsed_uri.user.s,
+						_tr_parsed_uri.user.len);
+				sv.len += _tr_parsed_uri.user.len;
+				sv.s[sv.len] = '@';
+				sv.len++;
+			}
+			if(_tr_parsed_uri.host.len > 0) {
+				memcpy(sv.s + sv.len, _tr_parsed_uri.host.s,
+						_tr_parsed_uri.host.len);
+				sv.len += _tr_parsed_uri.host.len;
+			}
+			if(subtype != TR_URI_SAOR) {
+				if(_tr_parsed_uri.port.len > 0) {
+					sv.s[sv.len] = ':';
+					sv.len++;
+					memcpy(sv.s + sv.len, _tr_parsed_uri.port.s,
+							_tr_parsed_uri.port.len);
+					sv.len += _tr_parsed_uri.port.len;
+				}
+				if(_tr_parsed_uri.transport_val.len > 0) {
+					memcpy(sv.s + sv.len, ";transport=", 11);
+					sv.len += 11;
+					memcpy(sv.s + sv.len, _tr_parsed_uri.transport_val.s,
+							_tr_parsed_uri.transport_val.len);
+					sv.len += _tr_parsed_uri.transport_val.len;
+				}
+			}
+			sv.s[sv.len] = '\0';
+			val->rs = sv;
 			break;
 		case TR_URI_PORT:
 			val->flags |= PV_TYPE_INT|PV_VAL_INT;
@@ -2178,6 +2327,59 @@ done:
 	return 0;
 }
 
+/*!
+ * \brief Evaluate urialias transformations
+ * \param msg SIP message
+ * \param tp transformation
+ * \param subtype transformation type
+ * \param val pseudo-variable
+ * \return 0 on success, -1 on error
+ */
+int tr_eval_urialias(struct sip_msg *msg, tr_param_t *tp, int subtype,
+		pv_value_t *val)
+{
+	str sv;
+
+	if(val==NULL || (!(val->flags&PV_VAL_STR)) || val->rs.len<=0)
+		return -1;
+
+	switch(subtype)
+	{
+		case TR_URIALIAS_ENCODE:
+			tr_set_crt_buffer();
+			sv.s = _tr_buffer;
+			sv.len = TR_BUFFER_SIZE;
+			if(ksr_uri_alias_encode(&val->rs, &sv)<0) {
+				LM_WARN("error converting uri to alias [%.*s]\n",
+						val->rs.len, val->rs.s);
+				val->rs = _tr_empty;
+				break;
+			}
+			val->rs = sv;
+			break;
+		case TR_URIALIAS_DECODE:
+			tr_set_crt_buffer();
+			sv.s = _tr_buffer;
+			sv.len = TR_BUFFER_SIZE;
+			if(ksr_uri_alias_decode(&val->rs, &sv)<0) {
+				LM_WARN("error converting uri to alias [%.*s]\n",
+						val->rs.len, val->rs.s);
+				val->rs = _tr_empty;
+				break;
+			}
+			val->rs = sv;
+			break;
+
+		default:
+			LM_ERR("unknown subtype %d\n",
+					subtype);
+			return -1;
+	}
+
+	val->flags = PV_VAL_STR;
+	return 0;
+}
+
 
 #define _tr_parse_nparam(_p, _p0, _tp, _spec, _n, _sign, _in, _s) \
 	while(is_in_str(_p, _in) && (*_p==' ' || *_p=='\t' || *_p=='\n')) _p++; \
@@ -2725,6 +2927,46 @@ char* tr_parse_string(str* in, trans_t *t)
 			goto error;
 		}
 		goto done;
+	} else if(name.len==6 && strncasecmp(name.s, "before", 6)==0) {
+		t->subtype = TR_S_BEFORE;
+		if(*p!=TR_PARAM_MARKER)
+		{
+			LM_ERR("invalid before transformation: %.*s!\n",
+					in->len, in->s);
+			goto error;
+		}
+		p++;
+		_tr_parse_sparamx(p, p0, tp, spec, ps, in, s, 1);
+		t->params = tp;
+		tp = 0;
+		while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+		if(*p!=TR_RBRACKET)
+		{
+			LM_ERR("invalid before transformation: %.*s!!\n",
+					in->len, in->s);
+			goto error;
+		}
+		goto done;
+	} else if(name.len==5 && strncasecmp(name.s, "after", 5)==0) {
+		t->subtype = TR_S_AFTER;
+		if(*p!=TR_PARAM_MARKER)
+		{
+			LM_ERR("invalid after transformation: %.*s!\n",
+					in->len, in->s);
+			goto error;
+		}
+		p++;
+		_tr_parse_sparamx(p, p0, tp, spec, ps, in, s, 1);
+		t->params = tp;
+		tp = 0;
+		while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
+		if(*p!=TR_RBRACKET)
+		{
+			LM_ERR("invalid after transformation: %.*s!!\n",
+					in->len, in->s);
+			goto error;
+		}
+		goto done;
 	}
 
 	LM_ERR("unknown transformation: %.*s/%.*s/%d!\n", in->len, in->s,
@@ -2788,6 +3030,15 @@ char* tr_parse_uri(str* in, trans_t *t)
 		goto done;
 	} else if(name.len==4 && strncasecmp(name.s, "port", 4)==0) {
 		t->subtype = TR_URI_PORT;
+		goto done;
+	} else if(name.len==4 && strncasecmp(name.s, "saor", 4)==0) {
+		t->subtype = TR_URI_SAOR;
+		goto done;
+	} else if(name.len==4 && strncasecmp(name.s, "suri", 4)==0) {
+		t->subtype = TR_URI_SURI;
+		goto done;
+	} else if(name.len==4 && strncasecmp(name.s, "duri", 4)==0) {
+		t->subtype = TR_URI_DURI;
 		goto done;
 	} else if(name.len==6 && strncasecmp(name.s, "params", 6)==0) {
 		t->subtype = TR_URI_PARAMS;
@@ -3244,6 +3495,55 @@ char* tr_parse_line(str* in, trans_t *t)
 			name.len, name.s, name.len);
 error:
 	return NULL;
+done:
+	t->name = name;
+	return p;
+}
+
+/*!
+ * \brief Helper fuction to parse urialias transformation
+ * \param in parsed string
+ * \param t transformation
+ * \return pointer to the end of the transformation in the string - '}', null on error
+ */
+char* tr_parse_urialias(str* in, trans_t *t)
+{
+	char *p;
+	str name;
+
+
+	if(in==NULL || t==NULL)
+		return NULL;
+
+	p = in->s;
+	name.s = in->s;
+	t->type = TR_URIALIAS;
+	t->trf = tr_eval_urialias;
+
+	/* find next token */
+	while(is_in_str(p, in) && *p!=TR_PARAM_MARKER && *p!=TR_RBRACKET) p++;
+	if(*p=='\0') {
+		LM_ERR("invalid transformation: %.*s\n",
+				in->len, in->s);
+		goto error;
+	}
+	name.len = p - name.s;
+	trim(&name);
+
+	if(name.len==6 && strncasecmp(name.s, "encode", 6)==0) {
+		t->subtype = TR_URIALIAS_ENCODE;
+		goto done;
+	} else if(name.len==6 && strncasecmp(name.s, "decode", 6)==0) {
+		t->subtype = TR_URIALIAS_DECODE;
+		goto done;
+	}
+
+
+	LM_ERR("unknown transformation: %.*s/%.*s/%d!\n", in->len, in->s,
+			name.len, name.s, name.len);
+error:
+	return NULL;
+
 done:
 	t->name = name;
 	return p;

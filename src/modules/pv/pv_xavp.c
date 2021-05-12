@@ -583,6 +583,110 @@ int pv_xavi_print(sip_msg_t* msg, char* s1, char *s2)
 /**
  *
  */
+int xavp_slist_explode(str *slist, str *sep, str *mode, str *xname)
+{
+	str s;
+	sr_xavp_t *xavp_list=NULL;
+	sr_xavp_t *xavp=NULL;
+	sr_xval_t xval;
+	str itname = str_init("v");
+	int i;
+	int j;
+	int sfound;
+
+	if(slist==NULL || xname==NULL || slist->s==NULL || xname->s==NULL
+			|| slist->len<=0 || xname->len<=0 || sep==NULL  || sep->s==NULL
+			|| sep->len<=0 || mode==NULL) {
+		LM_ERR("invalid parameters\n");
+		return -1;
+	}
+
+	s.s = slist->s;
+	for(i=0; i<slist->len; i++) {
+		LM_DBG("==== %d = %c\n", i, slist->s[i]);
+		sfound = 0;
+		for(j=0; j<sep->len; j++) {
+			if(slist->s[i]==sep->s[j]) {
+				sfound = 1;
+			}
+		}
+		if(sfound) {
+			s.len = slist->s + i - s.s;
+			if(s.len > 0 && mode->len > 0) {
+				if(mode->s[0]=='t') {
+					trim(&s);
+				}
+			}
+			if(s.len>0) {
+				LM_DBG("token found: [%.*s]\n", s.len, s.s);
+				memset(&xval, 0, sizeof(sr_xval_t));
+				xval.type = SR_XTYPE_STR;
+				xval.v.s = s;
+				if(xavp_list == NULL) {
+					if(xavp_add_value(&itname, &xval, &xavp_list)==NULL) {
+						LM_ERR("failed to add item in the list: [%.*s]\n",
+								s.len, s.s);
+						return -1;
+					}
+					xavp = xavp_list;
+				} else {
+					xavp = xavp_add_value_after(&itname, &xval, xavp);
+					if(xavp == NULL) {
+						LM_ERR("failed to add item in the list: [%.*s]\n",
+								s.len, s.s);
+						xavp_destroy_list(&xavp_list);
+						return -1;
+					}
+				}
+			}
+			s.s = slist->s + i + 1;
+		}
+	}
+	/* last tocken */
+	s.len = slist->s + i - s.s;
+	if(s.len > 0 && mode->len > 0) {
+		if(mode->s[0]=='t') {
+			trim(&s);
+		}
+	}
+	if(s.len>0) {
+		LM_DBG("last token found: [%.*s]\n", s.len, s.s);
+		memset(&xval, 0, sizeof(sr_xval_t));
+		xval.type = SR_XTYPE_STR;
+		xval.v.s = s;
+		if(xavp_list == NULL) {
+			if(xavp_add_value(&itname, &xval, &xavp_list)==NULL) {
+				LM_ERR("failed to add item in the list: [%.*s]\n",
+						s.len, s.s);
+				return -1;
+			}
+			xavp = xavp_list;
+		} else {
+			xavp = xavp_add_value_after(&itname, &xval, xavp);
+			if(xavp == NULL) {
+				LM_ERR("failed to add item in the list: [%.*s]\n",
+						s.len, s.s);
+				xavp_destroy_list(&xavp_list);
+				return -1;
+			}
+		}
+	}
+
+	/* add main xavp in root list */
+	memset(&xval, 0, sizeof(sr_xval_t));
+	xval.type = SR_XTYPE_XAVP;
+	xval.v.xavp = xavp_list;
+	if(xavp_add_value(xname, &xval, NULL)==NULL) {
+		xavp_destroy_list(&xavp);
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ *
+ */
 int xavp_params_explode(str *params, str *xname)
 {
 	param_t* params_list = NULL;

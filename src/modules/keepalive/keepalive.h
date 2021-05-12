@@ -31,6 +31,8 @@
 #include <time.h>
 #include "../../core/sr_module.h"
 #include "../../core/locking.h"
+#include "../../core/str.h"
+#include "../../core/utils/sruid.h"
 #include "../tm/tm_load.h"
 
 #define KA_INACTIVE_DST 1 /*!< inactive destination */
@@ -55,11 +57,20 @@ typedef void (*ka_response_f)(
 		str *uri, struct tmcb_params *ps, void *user_attr);
 
 
+typedef struct _ka_initial_dest
+{
+	str uri;
+	str owner;
+	struct _ka_initial_dest *next;
+} ka_initial_dest_t;
+
+
 typedef struct _ka_dest
 {
 	str uri;
 	str owner; // name of destination "owner"
 			   // (module asking to monitor this destination
+	str  uuid; // Universal id for this record
 	int flags;
 	int state;
 	time_t last_checked, last_up, last_down;
@@ -74,6 +85,7 @@ typedef struct _ka_dest
 	unsigned short int port;   /*!< Port of the URI */
 	unsigned short int proto;  /*!< Protocol of the URI */
 	struct timer_ln *timer;    /*!< Timer firing the OPTIONS test */
+	gen_lock_t lock;		   /*!< Lock of this record to prevent being removed while running */
 	struct _ka_dest *next;
 } ka_dest_t;
 
@@ -85,6 +97,7 @@ typedef struct _ka_destinations_list
 
 extern ka_destinations_list_t *ka_destinations_list;
 extern int ka_counter_del;
+extern sruid_t ka_sruid;
 
 ticks_t ka_check_timer(ticks_t ticks, struct timer_ln* tl, void* param);
 
@@ -96,6 +109,7 @@ int ka_str_copy(str *src, str *dest, char *prefix);
 int free_destination(ka_dest_t *dest) ;
 int ka_del_destination(str *uri, str *owner) ;
 int ka_find_destination(str *uri, str *owner, ka_dest_t **target ,ka_dest_t **head);
+int ka_find_destination_by_uuid(str uuid, ka_dest_t **target, ka_dest_t **head);
 int ka_lock_destination_list();
 int ka_unlock_destination_list();
 #endif

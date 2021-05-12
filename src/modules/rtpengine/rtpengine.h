@@ -54,7 +54,14 @@ enum rtpe_operation {
 struct rtpp_node {
 	unsigned int		idx;			/* overall index */
 	str			rn_url;			/* unparsed, deletable */
-	int			rn_umode;
+	enum {
+		RNU_UNKNOWN = -1,
+		RNU_LOCAL = 0,
+		RNU_UDP = 1,
+		RNU_UDP6 = 6,
+		RNU_WS = 2,
+		RNU_WSS = 3,
+	}			rn_umode;
 	char			*rn_address;		/* substring of rn_url */
 	int			rn_disabled;		/* found unaccessible? */
 	unsigned int		rn_weight;		/* for load balancing */
@@ -103,6 +110,6 @@ extern str rtpp_url_col;
 extern str rtpp_weight_col;
 extern str rtpp_disabled_col;
 
-enum hash_algo_t { RTP_HASH_CALLID, RTP_HASH_SHA1_CALLID};
+enum hash_algo_t { RTP_HASH_CALLID, RTP_HASH_SHA1_CALLID, RTP_HASH_CRC32_CALLID };
 
 #endif

@@ -114,6 +114,7 @@ extern int version_len;
 
 str _ksr_xavp_via_params = STR_NULL;
 str _ksr_xavp_via_fields = STR_NULL;
+int ksr_local_rport = 0;
 
 /** per process fixup function for global_req_flags.
   * It should be called from the configuration framework.
@@ -1970,7 +1971,7 @@ clean:
   * depending on the presence of the BUILD_IN_SHM flag, needs freeing when
   *   done) and sets returned_len or 0 on error.
   */
-char * build_req_buf_from_sip_req( struct sip_msg* msg,
+char * build_req_buf_from_sip_req(struct sip_msg* msg,
 								unsigned int *returned_len,
 								struct dest_info* send_info,
 								unsigned int mode)
@@ -1986,6 +1987,7 @@ char * build_req_buf_from_sip_req( struct sip_msg* msg,
 	unsigned int offset, s_offset, size;
 	struct lump* via_anchor;
 	struct lump* via_lump;
+	struct lump* via_rm;
 	struct lump* via_insert_param;
 	struct lump* path_anchor;
 	struct lump* path_lump;
@@ -2031,10 +2033,21 @@ char * build_req_buf_from_sip_req( struct sip_msg* msg,
 
 	via_anchor=anchor_lump(msg, msg->via1->hdr.s-buf, 0, HDR_VIA_T);
 	if (unlikely(via_anchor==0)) goto error00;
-	line_buf = create_via_hf( &via_len, msg, send_info, &branch);
+	line_buf = create_via_hf(&via_len, msg, send_info, &branch);
 	if (unlikely(!line_buf)){
 		LM_ERR("could not create Via header\n");
 		goto error00;
+	}
+	if(unlikely(mode&BUILD_NEW_LOCAL_VIA)) {
+		/* delete exiting top Via header */
+		via_rm = del_lump(msg, msg->h_via1->name.s - msg->buf,
+				msg->h_via1->len, 0);
+		if (via_rm==0) {
+			LM_ERR("failed to remove exiting Via header\n");
+			goto error00;
+		}
+		/* do not update old Via header anymore */
+		mode |= BUILD_NO_VIA1_UPDATE;
 	}
 after_local_via:
 	if(unlikely(mode&BUILD_NO_VIA1_UPDATE))
@@ -2975,7 +2988,7 @@ char* create_via_hf(unsigned int *len,
 #endif /* USE_TCP || USE_SCTP */
 
 	/* test and add rport parameter to local via - rfc3581 */
-	if(msg && msg->msg_flags&FL_ADD_LOCAL_RPORT) {
+	if((ksr_local_rport) || (msg && (msg->msg_flags&FL_ADD_LOCAL_RPORT))) {
 		/* params so far + ';rport' + '\0' */
 		via = (char*)pkg_malloc(extra_params.len+RPORT_LEN);
 		if(via==0) {

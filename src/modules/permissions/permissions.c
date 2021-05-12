@@ -60,6 +60,7 @@ static char* perm_deny_suffix = ".deny";
 
 /* for allow_trusted and allow_address function */
 str perm_db_url = {NULL, 0};                    /* Don't connect to the database by default */
+int perm_reload_delta = 5;
 
 /* for allow_trusted function */
 int perm_db_mode = DISABLE_CACHE;               /* Database usage mode: 0=no cache, 1=cache */
@@ -88,7 +89,7 @@ str perm_address_file = STR_NULL;			   /* Full path to file with address records
  */
 static int perm_check_all_branches = 1;
 
-
+time_t *perm_rpc_reload_time = NULL;
 int _perm_max_subnets = 512;
 
 int _perm_load_backends = 0xFFFF;
@@ -186,6 +187,7 @@ static param_export_t params[] = {
 	{"port_col",           PARAM_STR, &perm_port_col        },
 	{"max_subnets",        PARAM_INT, &_perm_max_subnets    },
 	{"load_backends",      PARAM_INT, &_perm_load_backends  },
+	{"reload_delta",       PARAM_INT, &perm_reload_delta    },
 	{0, 0, 0}
 };
 
@@ -587,6 +589,16 @@ static int mod_init(void)
 		return -1;
 	}
 
+	perm_rpc_reload_time = shm_malloc(sizeof(time_t));
+	if(perm_rpc_reload_time == NULL) {
+		SHM_MEM_ERROR;
+		return -1;
+	}
+	*perm_rpc_reload_time = 0;
+
+	if(perm_reload_delta < 0)
+		perm_reload_delta = 5;
+
 	if(permissions_init_rpc()!=0) {
 		LM_ERR("failed to register RPC commands\n");
 		return -1;
@@ -673,6 +685,11 @@ static int child_init(int rank)
 static void mod_exit(void)
 {
 	int i;
+
+	if(perm_rpc_reload_time!=NULL) {
+		shm_free(perm_rpc_reload_time);
+		perm_rpc_reload_time = 0;
+	}
 
 	for(i = 0; i < perm_rules_num; i++) {
 		if(perm_allow[i].rules) free_rule(perm_allow[i].rules);

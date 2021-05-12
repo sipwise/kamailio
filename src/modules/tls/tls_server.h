@@ -30,28 +30,29 @@
 
 #include <stdio.h>
 #include "../../core/tcp_conn.h"
+#include "../../core/tcp_read.h"
 #include "tls_domain.h"
 #include "tls_ct_wrq.h"
 
-enum tls_conn_states {
+typedef enum tls_conn_states {
 						S_TLS_NONE = 0,
 						S_TLS_ACCEPTING,
 						S_TLS_CONNECTING,
 						S_TLS_ESTABLISHED
-					};
+					} tls_conn_states_t;
 
-struct tls_rd_buf {
+typedef struct tls_rd_buf {
 	unsigned int pos; /* current position */
 	unsigned int size; /* total size (buf) */
 	unsigned char buf[1];
-};
+} tls_rd_buf_t;
 
 /* tls conn flags */
 #define F_TLS_CON_WR_WANTS_RD    1 /* write wants read */
 #define F_TLS_CON_HANDSHAKED     2 /* connection is handshaked */
 #define F_TLS_CON_RENEGOTIATION  4 /* renegotiation by clinet */
 
-struct tls_extra_data {
+typedef struct tls_extra_data {
 	tls_domains_cfg_t* cfg; /* Configuration used for this connection */
 	SSL* ssl;               /* SSL context used for the connection */
 	BIO* rwbio;             /* bio used for read/write
@@ -61,7 +62,7 @@ struct tls_extra_data {
 	struct tls_rd_buf* enc_rd_buf;
 	unsigned int flags;
 	enum  tls_conn_states state;
-};
+} tls_extra_data_t;
 
 
 /* return true if write wants read */
@@ -87,7 +88,7 @@ int tls_h_encode_f(struct tcp_connection *c, const char ** pbuf,
 		unsigned int* plen, const char** rest_buf, unsigned int* rest_len,
 		snd_flags_t* send_flags) ;
 
-int tls_h_read_f(struct tcp_connection *c, int* flags);
+int tls_h_read_f(struct tcp_connection *c, rd_conn_flags_t* flags);
 
 int tls_h_fix_read_conn(struct tcp_connection *c);
 
@@ -95,4 +96,6 @@ int tls_connect(struct tcp_connection *c, int* error);
 int tls_accept(struct tcp_connection *c, int* error);
 
 void tls_lookup_event_routes(void);
+int ksr_tls_set_connect_server_id(str *srvid);
+
 #endif /* _TLS_SERVER_H */

@@ -59,9 +59,9 @@
 #else
 #include "tls_hooks.h"
 #endif /* CORE_TLS */
-#ifdef USE_DST_BLACKLIST
-#include "dst_blacklist.h"
-#endif /* USE_DST_BLACKLIST */
+#ifdef USE_DST_BLOCKLIST
+#include "dst_blocklist.h"
+#endif /* USE_DST_BLOCKLIST */
 
 #define HANDLE_IO_INLINE
 #include "io_wait.h"
@@ -116,26 +116,6 @@ int tcp_get_clone_rcvbuf(void)
 }
 
 #ifdef READ_HTTP11
-static inline char *strfindcasestrz(str *haystack, char *needlez)
-{
-	int i,j;
-	str needle;
-
-	needle.s = needlez;
-	needle.len = strlen(needlez);
-	for(i=0;i<haystack->len-needle.len;i++) {
-		for(j=0;j<needle.len;j++) {
-			if ( !((haystack->s[i+j]==needle.s[j]) ||
-					( isalpha((int)haystack->s[i+j])
-						&& ((haystack->s[i+j])^(needle.s[j]))==0x20 )) )
-				break;
-		}
-		if (j==needle.len)
-			return haystack->s+i;
-	}
-	return 0;
-}
-
 int tcp_http11_continue(struct tcp_connection *c)
 {
 	struct dest_info dst;
@@ -167,7 +147,7 @@ int tcp_http11_continue(struct tcp_connection *c)
 		return 0;
 
 	/* check for Expect header */
-	if(strfindcasestrz(&msg, "Expect: 100-continue")!=NULL)
+	if(str_casesearch_strz(&msg, "Expect: 100-continue")!=NULL)
 	{
 		init_dst_from_rcv(&dst, &c->rcv);
 		if (tcp_send(&dst, 0, HTTP11CONTINUE, HTTP11CONTINUE_LEN) < 0) {
@@ -175,7 +155,7 @@ int tcp_http11_continue(struct tcp_connection *c)
 		}
 	}
 	/* check for Transfer-Encoding header */
-	if(strfindcasestrz(&msg, "Transfer-Encoding: chunked")!=NULL)
+	if(str_casesearch_strz(&msg, "Transfer-Encoding: chunked")!=NULL)
 	{
 		c->req.flags |= F_TCP_REQ_BCHUNKED;
 		ret = 1;
@@ -184,7 +164,7 @@ int tcp_http11_continue(struct tcp_connection *c)
 	 * - HTTP Via format is different that SIP Via
 	 * - workaround: replace with Hia to be ignored by SIP parser
 	 */
-	if((p=strfindcasestrz(&msg, "\nVia:"))!=NULL)
+	if((p=str_casesearch_strz(&msg, "\nVia:"))!=NULL)
 	{
 		p++;
 		*p = 'H';
@@ -216,10 +196,10 @@ static int tcp_emit_closed_event(struct tcp_connection *con, enum tcp_closed_rea
 
 
 /** reads data from an existing tcp connection.
- * Side-effects: blacklisting, sets connection state to S_CONN_OK, tcp stats.
+ * Side-effects: blocklisting, sets connection state to S_CONN_OK, tcp stats.
  * @param fd - connection file descriptor
  * @param c - tcp connection structure. c->state might be changed and
- *             receive info might be used for blacklisting.
+ *             receive info might be used for blocklisting.
  * @param buf - buffer where the received data will be stored.
  * @param b_size - buffer size.
  * @param flags - value/result - used to signal a seen or "forced" EOF on the
@@ -244,7 +224,7 @@ static int tcp_emit_closed_event(struct tcp_connection *con, enum tcp_closed_rea
  * EOF checking should be done by checking the RD_CONN_EOF flag.
  */
 int tcp_read_data(int fd, struct tcp_connection *c,
-					char* buf, int b_size, int* flags)
+					char* buf, int b_size, rd_conn_flags_t* flags)
 {
 	int bytes_read;
 
@@ -261,20 +241,20 @@ again:
 				if (unlikely(c->state==S_CONN_CONNECT)){
 					switch(errno){
 						case ECONNRESET:
-#ifdef USE_DST_BLACKLIST
-							dst_blacklist_su(BLST_ERR_CONNECT, c->rcv.proto,
+#ifdef USE_DST_BLOCKLIST
+							dst_blocklist_su(BLST_ERR_CONNECT, c->rcv.proto,
 												&c->rcv.src_su,
 												&c->send_flags, 0);
-#endif /* USE_DST_BLACKLIST */
+#endif /* USE_DST_BLOCKLIST */
 							TCP_EV_CONNECT_RST(errno, TCP_LADDR(c),
 									TCP_LPORT(c), TCP_PSU(c), TCP_PROTO(c));
 							break;
 						case ETIMEDOUT:
-#ifdef USE_DST_BLACKLIST
-							dst_blacklist_su(BLST_ERR_CONNECT, c->rcv.proto,
+#ifdef USE_DST_BLOCKLIST
+							dst_blocklist_su(BLST_ERR_CONNECT, c->rcv.proto,
 												&c->rcv.src_su,
 												&c->send_flags, 0);
-#endif /* USE_DST_BLACKLIST */
+#endif /* USE_DST_BLOCKLIST */
 							TCP_EV_CONNECT_TIMEOUT(errno, TCP_LADDR(c),
 									TCP_LPORT(c), TCP_PSU(c), TCP_PROTO(c));
 							break;
@@ -287,18 +267,18 @@ again:
 						switch(errno){
 							case ECONNRESET:
 								TCP_STATS_CON_RESET();
-#ifdef USE_DST_BLACKLIST
-								dst_blacklist_su(BLST_ERR_SEND, c->rcv.proto,
+#ifdef USE_DST_BLOCKLIST
+								dst_blocklist_su(BLST_ERR_SEND, c->rcv.proto,
 													&c->rcv.src_su,
 													&c->send_flags, 0);
-#endif /* USE_DST_BLACKLIST */
+#endif /* USE_DST_BLOCKLIST */
 								break;
 							case ETIMEDOUT:
-#ifdef USE_DST_BLACKLIST
-								dst_blacklist_su(BLST_ERR_SEND, c->rcv.proto,
+#ifdef USE_DST_BLOCKLIST
+								dst_blocklist_su(BLST_ERR_SEND, c->rcv.proto,
 													&c->rcv.src_su,
 													&c->send_flags, 0);
-#endif /* USE_DST_BLACKLIST */
+#endif /* USE_DST_BLOCKLIST */
 								break;
 						}
 				}
@@ -357,7 +337,7 @@ again:
  * (to distinguish from reads that would block which could return 0)
  * RD_CONN_SHORT_READ is also set in *flags for short reads.
  * sets also r->error */
-int tcp_read(struct tcp_connection *c, int* flags)
+int tcp_read(struct tcp_connection *c, rd_conn_flags_t* flags)
 {
 	int bytes_free, bytes_read;
 	struct tcp_req *r;
@@ -397,7 +377,7 @@ int tcp_read(struct tcp_connection *c, int* flags)
  * when either r->body!=0 or r->state==H_BODY =>
  * all headers have been read. It should be called in a while loop.
  * returns < 0 if error or 0 if EOF */
-int tcp_read_headers(struct tcp_connection *c, int* read_flags)
+int tcp_read_headers(struct tcp_connection *c, rd_conn_flags_t* read_flags)
 {
 	int bytes, remaining;
 	char *p;
@@ -1110,7 +1090,7 @@ int msrp_process_msg(char* tcpbuf, unsigned int len,
 #endif
 
 #ifdef READ_WS
-static int tcp_read_ws(struct tcp_connection *c, int* read_flags)
+static int tcp_read_ws(struct tcp_connection *c, rd_conn_flags_t* read_flags)
 {
 	int bytes;
 	uint32_t size, pos, mask_present, len;
@@ -1265,7 +1245,7 @@ static int ws_process_msg(char* tcpbuf, unsigned int len,
 }
 #endif
 
-static int tcp_read_hep3(struct tcp_connection *c, int* read_flags)
+static int tcp_read_hep3(struct tcp_connection *c, rd_conn_flags_t* read_flags)
 {
 	int bytes;
 	uint32_t size, len;
@@ -1457,7 +1437,7 @@ int receive_tcp_msg(char* tcpbuf, unsigned int len,
 #endif /* TCP_CLONE_RCVBUF */
 }
 
-int tcp_read_req(struct tcp_connection* con, int* bytes_read, int* read_flags)
+int tcp_read_req(struct tcp_connection* con, int* bytes_read, rd_conn_flags_t* read_flags)
 {
 	int bytes;
 	int total_bytes;
@@ -1740,7 +1720,7 @@ inline static int handle_io(struct fd_map* fm, short events, int idx)
 {
 	int ret;
 	int n;
-	int read_flags;
+	rd_conn_flags_t read_flags;
 	struct tcp_connection* con;
 	int s;
 	long resp;

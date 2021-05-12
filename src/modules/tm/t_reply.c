@@ -51,8 +51,8 @@
 #include "../../core/usr_avp.h"
 #include "../../core/atomic_ops.h" /* membar_write() */
 #include "../../core/compiler_opt.h"
-#ifdef USE_DST_BLACKLIST
-#include "../../core/dst_blacklist.h"
+#ifdef USE_DST_BLOCKLIST
+#include "../../core/dst_blocklist.h"
 #endif
 #ifdef USE_DNS_FAILOVER
 #include "../../core/dns_cache.h"
@@ -1670,8 +1670,7 @@ int t_retransmit_reply( struct cell *t )
 	 * the chances for this increase a lot.
 	 */
 	if (!t->uas.response.dst.send_sock) {
-		LOG(L_WARN, "WARNING: t_retransmit_reply: "
-			"no resolved dst to retransmit\n");
+		LOG(L_WARN, "no resolved dst to retransmit\n");
 		return -1;
 	}
 
@@ -1681,14 +1680,13 @@ int t_retransmit_reply( struct cell *t )
 	LOCK_REPLIES( t );
 
 	if (!t->uas.response.buffer) {
-		DBG("DBG: t_retransmit_reply: nothing to retransmit\n");
+		DBG("nothing to retransmit\n");
 		goto error;
 	}
 
 	len=t->uas.response.buffer_len;
 	if ( len==0 || len>BUF_SIZE )  {
-		DBG("DBG: t_retransmit_reply: "
-			"zero length or too big to retransmit: %d\n", len);
+		DBG("zero length or too big to retransmit: %d\n", len);
 		goto error;
 	}
 	memcpy( b, t->uas.response.buffer, len );
@@ -2331,7 +2329,7 @@ int reply_received( struct sip_msg  *p_msg )
 	int branch_ret;
 	int prev_branch;
 #endif
-#ifdef USE_DST_BLACKLIST
+#ifdef USE_DST_BLOCKLIST
 	int blst_503_timeout;
 	struct hdr_field* hf;
 #endif
@@ -2609,12 +2607,12 @@ int reply_received( struct sip_msg  *p_msg )
 #endif /* EXTRA_DEBUG */
 		msg_status=p_msg->REPLY_STATUS;
 	}
-#ifdef USE_DST_BLACKLIST
-		/* add temporary to the blacklist the source of a 503 reply */
+#ifdef USE_DST_BLOCKLIST
+		/* add temporary to the blocklist the source of a 503 reply */
 		if ( (msg_status==503) && cfg_get(tm, tm_cfg, tm_blst_503) &&
 				/* check if the request sent on the branch had the the
 				 * blst 503 ignore flags set or it was set in the onreply_r*/
-				should_blacklist_su(BLST_503, &p_msg->fwd_send_flags,
+				should_blocklist_su(BLST_503, &p_msg->fwd_send_flags,
 										p_msg->rcv.proto, &p_msg->rcv.src_su)
 				){
 			blst_503_timeout=cfg_get(tm, tm_cfg, tm_blst_503_default);
@@ -2632,12 +2630,12 @@ int reply_received( struct sip_msg  *p_msg )
 					}
 			}
 			if (blst_503_timeout){
-				dst_blacklist_force_su_to(BLST_503, p_msg->rcv.proto,
+				dst_blocklist_force_su_to(BLST_503, p_msg->rcv.proto,
 											&p_msg->rcv.src_su, p_msg,
 											S_TO_TICKS(blst_503_timeout));
 			}
 		}
-#endif /* USE_DST_BLACKLIST */
+#endif /* USE_DST_BLOCKLIST */
 #ifdef USE_DNS_FAILOVER
 		/* if this is a 503 reply, and the destination resolves to more ips,
 		 *  add another branch/uac.
