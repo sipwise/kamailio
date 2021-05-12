@@ -42,6 +42,7 @@ Build-Depends:
  libssl-dev,
  libsystemd-dev,
  libunistring-dev,
+ libwebsockets-dev,
  libxml2-dev,
  ngcp-libswrate-dev (>= 1.1.2+0~1364315461.svn13284.127),
  ngcp-libtcap-dev,
@@ -836,6 +837,7 @@ Multi-Arch: same
 Pre-Depends:
  ${misc:Pre-Depends},
 Depends:
+ ngcp-kamailio (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},
 Description: contains the secsipid module
@@ -844,6 +846,23 @@ Description: contains the secsipid module
  per second even on low-budget hardware.
  .
  This package contains the secsipid Module.
+
+Package: ngcp-kamailio-lwsc-modules
+Architecture: any
+Multi-Arch: same
+Pre-Depends:
+ ${misc:Pre-Depends},
+Depends:
+ ngcp-kamailio (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: Libwebsockets module for the Kamailio SIP server
+ Kamailio is a very fast and flexible SIP (RFC3261)
+ server. Written entirely in C, Kamailio can handle thousands calls
+ per second even on low-budget hardware.
+ .
+ This package contains the lwcs module, which provides a client-side WebSockets
+ API through libwebsockets.
 
 Package: ngcp-kamailio-lcrrate-modules
 Architecture: any
@@ -867,6 +886,7 @@ Multi-Arch: same
 Pre-Depends:
  ${misc:Pre-Depends},
 Depends:
+ ngcp-kamailio (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},
 Description: contains the tcap module
