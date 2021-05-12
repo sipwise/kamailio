@@ -31,12 +31,12 @@ sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
-## backports from upstream (5.4)
-upstream/core-usr-avp-fix-detection-of-invalid-name-and-ids.patch
-## upstream master (5.5)
-upstream/permissions-basic-safety-for-concurent-rpc-reload.patch
-upstream/permissions-add-reload_delta-parameter.patch
-upstream/ndb_redis-set-message-level-to-debug-on-reconnect.patch
+## upstream 5.5
+# https://github.com/kamailio/kamailio/pull/979
+# collides with our changes to pua_dialoginfo
+sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
+upstream/tm-lw-parser-fix-matching-To-header-in-lw_get_hf_nam.patch
+upstream/lwsc-set-ws_ping_pong_interval-only-for-libwebsocket.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
@@ -44,7 +44,6 @@ sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
-sipwise/rtpengine-codec-set-except.patch
 sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch

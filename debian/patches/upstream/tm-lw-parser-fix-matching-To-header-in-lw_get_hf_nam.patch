@@ -1,0 +1,32 @@
+From 33db4ffc558b7a9d4c291c929b9e73b3cf8b16f0 Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 5 May 2021 18:56:04 +0200
+Subject: [PATCH] tm: lw parser - fix matching To header in lw_get_hf_name()
+
+(cherry picked from commit 4ab6e05df56afb7802a2cd125e89b9282a1c6c85)
+---
+ src/modules/tm/lw_parser.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/modules/tm/lw_parser.c b/src/modules/tm/lw_parser.c
+index d13ec58311..6f48304f53 100644
+--- a/src/modules/tm/lw_parser.c
++++ b/src/modules/tm/lw_parser.c
+@@ -188,9 +188,11 @@ char *lw_get_hf_name(char *begin, char *end, enum _hdr_types_t *type)
+ 
+ 				case 't': /* To */
+ 					if(LOWER_BYTE(*(p + 1)) == 'o') {
+-						p += 2;
+-						*type = HDR_TO_T;
+-						break;
++						if((*(p + 2) == ' ') || (*(p + 2) == ':')) {
++							p += 2;
++							*type = HDR_TO_T;
++							break;
++						}
+ 					}
+ 					if((*(p + 1) == ' ') || (*(p + 1) == ':')) {
+ 						p++;
+-- 
+2.20.1
+

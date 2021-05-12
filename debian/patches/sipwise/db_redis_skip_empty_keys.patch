@@ -1,6 +1,16 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Wed, 12 May 2021 11:53:43 +0200
+Subject: db_redis_skip_empty_keys
+
+---
+ src/modules/db_redis/redis_dbase.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index c9a25ad..1b0c72e 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -641,6 +641,9 @@
+@@ -641,6 +641,9 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
          LM_DBG("no direct entry key found, checking type keys\n");
          for (type = table->types; type; type = type->next) {
              key = type->keys;

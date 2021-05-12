@@ -16,7 +16,7 @@ Change-Id: Ifd823a576ed4eb1d95aa3c72f34226b6100c4c21
  create mode 100644 src/modules/tmrec/ical.h
 
 diff --git a/src/modules/tmrec/Makefile b/src/modules/tmrec/Makefile
-index 61cbca6..374ccc4 100644
+index 46de362..518136b 100644
 --- a/src/modules/tmrec/Makefile
 +++ b/src/modules/tmrec/Makefile
 @@ -5,6 +5,6 @@ include ../../Makefile.defs

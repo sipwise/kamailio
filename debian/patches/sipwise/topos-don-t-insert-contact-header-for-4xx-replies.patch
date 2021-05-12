@@ -8,10 +8,10 @@ unless original msg has contact
  1 file changed, 5 insertions(+)
 
 diff --git a/src/modules/topos/tps_msg.c b/src/modules/topos/tps_msg.c
-index e40a510..37aeac4 100644
+index 854d2cd..09bd43d 100644
 --- a/src/modules/topos/tps_msg.c
 +++ b/src/modules/topos/tps_msg.c
-@@ -1085,6 +1085,11 @@ int tps_response_sent(sip_msg_t *msg)
+@@ -1160,6 +1160,11 @@ int tps_response_sent(sip_msg_t *msg)
  				&& msg->contact==NULL) {
  		contact_keep = 1;
  	}

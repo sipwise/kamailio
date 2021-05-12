@@ -7,7 +7,7 @@ Subject: usrloc_dbro_pinger
  1 file changed, 10 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/usrloc/dlist.c b/src/modules/usrloc/dlist.c
-index 96a95fe..2da2e20 100644
+index 44ce3c6..113c16c 100644
 --- a/src/modules/usrloc/dlist.c
 +++ b/src/modules/usrloc/dlist.c
 @@ -301,6 +301,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,

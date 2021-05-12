@@ -7,10 +7,10 @@ Subject: pv_trans_eval_uri
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/pv/pv_trans.c b/src/modules/pv/pv_trans.c
-index d07e55e..e37e517 100644
+index f93f126..2637926 100644
 --- a/src/modules/pv/pv_trans.c
 +++ b/src/modules/pv/pv_trans.c
-@@ -1381,8 +1381,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
+@@ -1470,8 +1470,8 @@ int tr_eval_uri(struct sip_msg *msg, tr_param_t *tp, int subtype,
  		/* parse uri -- params only when requested */
  		if(parse_uri(_tr_uri.s, _tr_uri.len - dlen, &_tr_parsed_uri)!=0)
  		{
