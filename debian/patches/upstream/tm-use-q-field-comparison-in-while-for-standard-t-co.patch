@@ -1,0 +1,46 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Wed, 18 Nov 2020 14:04:15 +0100
+Subject: [PATCH] tm: use q field comparison in while for standard t contacts
+ load
+
+- fix ordering change to standar mode introduced with proportional mode
+- GH #2449
+
+(cherry picked from commit 59f6ddbe902d61bc682dd12fc6330df656468b1b)
+---
+ src/modules/tm/t_serial.c | 19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
+
+diff --git a/src/modules/tm/t_serial.c b/src/modules/tm/t_serial.c
+index d27a648243..13611cdb54 100644
+--- a/src/modules/tm/t_serial.c
++++ b/src/modules/tm/t_serial.c
+@@ -459,11 +459,20 @@ int ki_t_load_contacts_mode(struct sip_msg* msg, int mode)
+ 
+ 		prev = (struct contact *)0;
+ 		curr = contacts;
+-		while (curr &&
+-				((curr->q_index < next->q_index) ||
+-				 ((curr->q_index == next->q_index) && (next->path.len == 0)))) {
+-			prev = curr;
+-			curr = curr->next;
++		if (mode == T_LOAD_PROPORTIONAL) {
++			while (curr &&
++					((curr->q_index < next->q_index) ||
++					 ((curr->q_index == next->q_index) && (next->path.len == 0)))) {
++				prev = curr;
++				curr = curr->next;
++			}
++		} else {
++			while (curr &&
++					((curr->q < next->q) ||
++					 ((curr->q == next->q) && (next->path.len == 0)))) {
++				prev = curr;
++				curr = curr->next;
++			}
+ 		}
+ 		if (!curr) {
+ 			next->next = (struct contact *)0;
+-- 
+2.20.1
+
