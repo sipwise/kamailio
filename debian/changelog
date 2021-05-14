@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.5-1+0~mr8.5.1.6) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [b8e2ab9] TT#117700 q_forking serial fix
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 14 May 2021 10:46:04 +0200
+
 ngcp-kamailio (5.3.5-1+0~mr8.5.1.5) unstable; urgency=medium
 
   [ Victor Seva ]
