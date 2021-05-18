@@ -1,0 +1,28 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 6 May 2021 12:27:05 +0200
+Subject: [PATCH] dialog: ignore 408 on keepalive with cseq 0
+
+- some UAs do not reply at all
+
+(cherry picked from commit 7aa8056a5e3a9804133cb9ff79640d8116be63da)
+---
+ src/modules/dialog/dlg_req_within.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/modules/dialog/dlg_req_within.c b/src/modules/dialog/dlg_req_within.c
+index d48d139..8098345 100644
+--- a/src/modules/dialog/dlg_req_within.c
++++ b/src/modules/dialog/dlg_req_within.c
+@@ -271,6 +271,12 @@ void dlg_ka_cb_all(struct cell* t, int type, struct tmcb_params* ps, int dir)
+ 			LM_DBG("skip updating non-confirmed dialogs\n");
+ 			goto done;
+ 		}
++		if(ps->code==408 && (dlg->cseq[dir].len==0
++					|| (dlg->cseq[dir].len==1 && dlg->cseq[dir].s[0]=='\0'))) {
++			LM_DBG("ignore 408 for %s cseq 0\n",
++					((dir==DLG_CALLER_LEG)?"caller":"callee"));
++			goto done;
++		}
+ 		tend = 0;
+ 		if(dir==DLG_CALLER_LEG) {
+ 			dlg->ka_src_counter++;
