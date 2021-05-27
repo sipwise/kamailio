@@ -861,7 +861,7 @@ Description: Libwebsockets module for the Kamailio SIP server
  server. Written entirely in C, Kamailio can handle thousands calls
  per second even on low-budget hardware.
  .
- This package contains the lwcs module, which provides a client-side WebSockets
+ This package contains the lwsc module, which provides a client-side WebSockets
  API through libwebsockets.
 
 Package: ngcp-kamailio-lcrrate-modules
