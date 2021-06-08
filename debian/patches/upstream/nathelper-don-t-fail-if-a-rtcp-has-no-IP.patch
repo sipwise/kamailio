@@ -1,0 +1,30 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 8 Jun 2021 15:03:21 +0200
+Subject: nathelper: don't fail if 'a=rtcp' has no IP
+
+Examples from RFC3605:
+>    m=audio 49170 RTP/AVP 0
+>    a=rtcp:53020
+>
+>    m=audio 49170 RTP/AVP 0
+>    a=rtcp:53020 IN IP4 126.16.64.4
+>
+>    m=audio 49170 RTP/AVP 0
+>    a=rtcp:53020 IN IP6 2001:2345:6789:ABCD:EF01:2345:6789:ABCD
+---
+ src/modules/nathelper/nathelper.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/nathelper/nathelper.c b/src/modules/nathelper/nathelper.c
+index baae1db..9512834 100644
+--- a/src/modules/nathelper/nathelper.c
++++ b/src/modules/nathelper/nathelper.c
+@@ -1655,7 +1655,7 @@ static inline int replace_sdp_ip(
+ 		hasreplaced = 1;
+ 		body1 = body2;
+ 	}
+-	if(!hasreplaced) {
++	if(!hasreplaced && memcmp("a=rtcp", line, 6) != 0) {
+ 		LM_ERR("can't extract '%s' IP from the SDP\n", line);
+ 		return -1;
+ 	}

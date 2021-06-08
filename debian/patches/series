@@ -43,6 +43,8 @@ upstream/tcpops-use-fixup_igp_all-instead-of-fixup_igp_null.patch
 upstream/presence-set-correct-type-for-local_log_facility-mod.patch
 upstream/core-xavp-safety-checks-for-name-len.patch
 upstream/topos-init-xavp-and-context-modparams-to-str-null.patch
+## usptream master
+upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
