@@ -1,0 +1,154 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Tue, 8 Jun 2021 09:57:47 +0200
+Subject: kamctl: TMPDIR config
+
+* allow choose where to store temporal files
+* use g+w for temporal fifo file
+---
+ utils/kamctl/kamctl               |  8 ++++++--
+ utils/kamctl/kamctl.rpcfifo       | 14 ++++++++++----
+ utils/kamctl/kamdbctl             |  2 +-
+ utils/kamctl/kamdbctl.db_berkeley | 10 +++++-----
+ utils/kamctl/kamdbctl.oracle      |  2 +-
+ 5 files changed, 23 insertions(+), 13 deletions(-)
+
+diff --git a/utils/kamctl/kamctl b/utils/kamctl/kamctl
+index a2d839b..60a80e6 100755
+--- a/utils/kamctl/kamctl
++++ b/utils/kamctl/kamctl
+@@ -73,6 +73,10 @@ if [ -z "$MYLIBDIR" ] ; then
+ 	fi
+ fi
+ 
++if [ -z "$TMPDIR" ]; then
++	TMPDIR="/tmp"
++fi
++
+ ##### ------------------------------------------------ #####
+ ### load base functions
+ #
+@@ -2917,7 +2921,7 @@ kamailio_trap() {
+ 		exit
+ 	fi
+ 	DATE=`/bin/date +%Y%m%d_%H%M%S`
+-	LOG_FILE=/tmp/gdb_kamailio_${DATE}.txt
++	LOG_FILE=${TMPDIR}/gdb_kamailio_${DATE}.txt
+ 	minfo "Trap file: $LOG_FILE"
+ 	ctl_cmd_run core.psx > $LOG_FILE
+ 	echo -n "Trapping Kamailio with gdb: "
+@@ -2944,7 +2948,7 @@ kamailio_pstrap() {
+ 		exit
+ 	fi
+ 	DATE=`/bin/date +%Y%m%d_%H%M%S`
+-	LOG_FILE=/tmp/gdb_kamailio_${DATE}.txt
++	LOG_FILE=${TMPDIR}/gdb_kamailio_${DATE}.txt
+ 	minfo "Trap file: $LOG_FILE"
+ 	ps axw | grep kamailio | grep -v grep | grep -v kamctl | sort > $LOG_FILE
+ 	echo "" >> $LOG_FILE
+diff --git a/utils/kamctl/kamctl.rpcfifo b/utils/kamctl/kamctl.rpcfifo
+index c8e5329..a538a3c 100644
+--- a/utils/kamctl/kamctl.rpcfifo
++++ b/utils/kamctl/kamctl.rpcfifo
+@@ -30,6 +30,10 @@ if [ -z "$RPCFIFOPATH" ]; then
+ 	fi
+ fi
+ 
++if [ -z "$RPCFIFOGRP" ]; then
++	RPCFIFOGRP=`stat -c '%G' "$RPCFIFOPATH"`
++fi
++
+ #
+ ##### ----------------------------------------------- #####
+ ### functions
+@@ -79,7 +83,7 @@ rpc_cmd()
+ 		exit 1
+ 	fi
+ 	name=kamailio_receiver_$$
+-	path=$CHROOT_DIR/tmp/$name
++	path=${CHROOT_DIR}/${TMPDIR}/$name
+ 	# delete existing fifo file with same name
+ 	if test -p $path; then
+ 		rm -f $path
+@@ -98,7 +102,8 @@ rpc_cmd()
+ 			merr "error opening read fifo $path"
+ 			exit 3
+ 		fi
+-		chmod a+w $path
++		chgrp $RPCFIFOGRP $path
++		chmod g+w $path
+ 	fi
+ 
+ 	PARAMEVAL="no"
+@@ -183,7 +188,7 @@ CTLCMDPRINT=rpc_cmd_print
+ 
+ rpc_kamailio_monitor() {
+ 	name=kamailio_receiver_$$
+-	path=$CHROOT_DIR/tmp/$name
++	path=${CHROOT_DIR}/${TMPDIR}/$name
+ 	# delete existing fifo file with same name
+ 	if test -p $path; then
+ 		rm -f $path
+@@ -199,7 +204,8 @@ rpc_kamailio_monitor() {
+ 			merr "monitor - error opening read fifo $path"
+ 			exit 1
+ 		fi
+-		chmod a+w $path
++		chgrp $RPCFIFOGRP $path
++		chmod g+w $path
+ 	fi
+ 	trap "rm $path;  clear; echo monitor ^C-ed; exit 1" 2
+ 	attempt=0
+diff --git a/utils/kamctl/kamdbctl b/utils/kamctl/kamdbctl
+index 89ddc81..f2b6f5b 100755
+--- a/utils/kamctl/kamdbctl
++++ b/utils/kamctl/kamdbctl
+@@ -303,7 +303,7 @@ case $1 in
+ 			cp $DB_PATH $1
+ 			exit $?
+ 		fi
+-		tmp_file=`mktemp /tmp/kamdbctl.XXXXXXXXXX` || exit 1
++		tmp_file=`mktemp ${TMPDIR}/kamdbctl.XXXXXXXXXX` || exit 1
+ 		kamailio_dump $DBNAME $tmp_file
+ 		ret=$?
+ 		if [ "$ret" -ne 0 ]; then
+diff --git a/utils/kamctl/kamdbctl.db_berkeley b/utils/kamctl/kamdbctl.db_berkeley
+index 666122a..457e40c 100644
+--- a/utils/kamctl/kamdbctl.db_berkeley
++++ b/utils/kamctl/kamdbctl.db_berkeley
+@@ -436,10 +436,10 @@ kamailio_append()  # parms: <db> <newdata> [DB_PATH]
+ 
+ #####
+ # newappend process is:
+-# 1. create a new temp DBENV in /tmp/sc-<processID>
+-# 2. appends contents of newdata to /tmp/sc-<processID>/db
+-# 3. move /tmp/sc-<processID>/db over to DB_PATH/db.new
+-# 4. delete temp DBENV dir /tmp/sc-<processID>
++# 1. create a new temp DBENV in ${TMPDIR}/sc-<processID>
++# 2. appends contents of newdata to ${TMPDIR}/sc-<processID>/db
++# 3. move ${TMPDIR}/sc-<processID>/db over to DB_PATH/db.new
++# 4. delete temp DBENV dir ${TMPDIR}/sc-<processID>
+ #
+ kamailio_newappend()  # parms: <db> <newdata> [DB_PATH]
+ {
+@@ -453,7 +453,7 @@ kamailio_newappend()  # parms: <db> <newdata> [DB_PATH]
+ 	if [ -f $DBNEW ] ; then
+ 		rm $DBNEW
+ 	fi
+-	TMPENV=/tmp/sc-$$
++	TMPENV=${TMPDIR}/sc-$$
+ 	kamailio_create $TMPENV
+ 	cd $OLDPWD
+ 	$LOAD_CMD -T -t hash -f $2 -h $TMPENV $1
+diff --git a/utils/kamctl/kamdbctl.oracle b/utils/kamctl/kamdbctl.oracle
+index e6de52f..f1b95c5 100644
+--- a/utils/kamctl/kamdbctl.oracle
++++ b/utils/kamctl/kamdbctl.oracle
+@@ -45,7 +45,7 @@ if [ -z "$KAMAILIO_ORASEL" ] ; then
+ fi
+ 
+ #################################################################
+-ORALOG=/tmp/opensrdbctl.log
++ORALOG=${TMPDIR}/opensrdbctl.log
+ 
+ if [ -z "$SED" ]; then
+ 	SED="sed"
