@@ -37,6 +37,7 @@ upstream/core-usr-avp-fix-detection-of-invalid-name-and-ids.patch
 upstream/permissions-basic-safety-for-concurent-rpc-reload.patch
 upstream/permissions-add-reload_delta-parameter.patch
 upstream/ndb_redis-set-message-level-to-debug-on-reconnect.patch
+upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
