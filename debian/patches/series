@@ -43,6 +43,8 @@ upstream/cfgt-fix-implicit-declaration-of-strcasestr.patch
 upstream/topos_execute_event_route_topos_sending.patch
 ## backport from kamailio upstream (5.3)
 upstream/limit_the_execution_of_dialplan_reload.patch
+## backport from kamailio upstream (5.5)
+upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
 #
 sipwise/extend_stats.patch
 sipwise/tt37692.patch
