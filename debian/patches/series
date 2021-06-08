@@ -34,6 +34,8 @@ sipwise/openssl-locking.patch
 #
 ## backport from kamailio upstream (5.4)
 upstream/limit_the_execution_of_dialplan_reload.patch
+## backport from kamailio upstream (5.5)
+upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
 #
 sipwise/tt41650.patch
 sipwise/rtpengine-trickle-ice-sdp.patch
