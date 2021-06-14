@@ -1,4 +1,4 @@
-ngcp-kamailio (5.5.0-1~mr9.5.0.0) unstable; urgency=medium
+ngcp-kamailio (5.5.0-1+0~mr9.5.0.0) unstable; urgency=medium
 
   * TT#119500 core: usr avp, fix from upstream
   * New upstream version 5.5.0
