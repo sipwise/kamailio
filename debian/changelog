@@ -1,3 +1,9 @@
+ngcp-kamailio (5.5.0-1+0~mr9.5.1.0) unstable; urgency=medium
+
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 14 Jun 2021 16:35:21 +0200
+
 ngcp-kamailio (5.5.0-1+0~mr9.5.0.0) unstable; urgency=medium
 
   * TT#119500 core: usr avp, fix from upstream
