@@ -1,3 +1,10 @@
+ngcp-kamailio (5.4.5-1+0~mr9.4.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [56e5151] TT#124752 nathelper: don't fail if 'a=rtcp' has no IP
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 15 Jun 2021 14:56:59 +0200
+
 ngcp-kamailio (5.4.5-1+0~mr9.4.1.1) unstable; urgency=medium
 
   [ Victor Seva ]
