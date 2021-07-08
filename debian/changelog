@@ -1,3 +1,13 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.5.1) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [224b961] TT#117700 q_forking serial fix
+
+  [ Victor Seva ]
+  * [717d268] TT#124752 nathelper: don't fail if 'a=rtcp' has no IP
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 08 Jul 2021 12:00:19 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.5.0) unstable; urgency=medium
 
   [ Richard Fuchs ]
