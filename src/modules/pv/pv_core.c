@@ -3274,8 +3274,8 @@ int pv_parse_hdr_name(pv_spec_p sp, str *in)
 	s.s = p;
 	s.len = in->len+1;
 
-	if (parse_hname2_short(s.s, s.s + s.len, &hdr)==0)
-	{
+	parse_hname2_short(s.s, s.s + s.len, &hdr);
+	if(hdr.type==HDR_ERROR_T) {
 		LM_ERR("error parsing header name [%.*s]\n", s.len, s.s);
 		goto error;
 	}
@@ -3329,6 +3329,10 @@ int pv_parse_K_name(pv_spec_p sp, str *in)
 
 	switch(in->len)
 	{
+		case 2:
+			if(strncmp(in->s, "WS", 2)==0)
+				sp->pvp.pvn.u.isname.name.n = 6;
+			else goto error;
 		case 3:
 			if(strncmp(in->s, "UDP", 3)==0)
 				sp->pvp.pvn.u.isname.name.n = 2;
@@ -3336,6 +3340,8 @@ int pv_parse_K_name(pv_spec_p sp, str *in)
 				sp->pvp.pvn.u.isname.name.n = 3;
 			else if(strncmp(in->s, "TLS", 3)==0)
 				sp->pvp.pvn.u.isname.name.n = 4;
+			else if(strncmp(in->s, "WSS", 3)==0)
+				sp->pvp.pvn.u.isname.name.n = 7;
 			else goto error;
 		break;
 		case 4:
@@ -3407,6 +3413,10 @@ int pv_get_K(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			return pv_get_uintval(msg, param, res, PROTO_TLS);
 		case 5:
 			return pv_get_uintval(msg, param, res, PROTO_SCTP);
+		case 6:
+			return pv_get_uintval(msg, param, res, PROTO_WS);
+		case 7:
+			return pv_get_uintval(msg, param, res, PROTO_WSS);
 		default:
 			return pv_get_uintval(msg, param, res, AF_INET);
 	}
