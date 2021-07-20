@@ -1,0 +1,29 @@
+From b62a773c8f0c1daf1aa3d1cd57845d414eea5bac Mon Sep 17 00:00:00 2001
+From: Boris Korzun <korzun@miatel.ru>
+Date: Tue, 25 May 2021 17:14:18 +0300
+Subject: [PATCH] pike: fixed regression - removed unnecessary NULL-return from
+ mark_node() after previous commit
+
+(cherry picked from commit 79fbb7c6df5d4c742b1283b752c2df0f51e77f09)
+---
+ src/modules/pike/ip_tree.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/src/modules/pike/ip_tree.c b/src/modules/pike/ip_tree.c
+index c0324c0476..1fe9227a5f 100644
+--- a/src/modules/pike/ip_tree.c
++++ b/src/modules/pike/ip_tree.c
+@@ -301,10 +301,6 @@ pike_ip_node_t* mark_node(unsigned char *ip,int ip_len,
+ 		}
+ 	}
+ 
+-	if(node==NULL) {
+-		return NULL;
+-	}
+-
+ 	LM_DBG("only first %d were matched!\n",byte_pos);
+ 	*flag = 0;
+ 	*father = 0;
+-- 
+2.25.1
+
