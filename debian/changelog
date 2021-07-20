@@ -1,9 +1,10 @@
-ngcp-kamailio (5.5.0-1+0~mr9.5.2.0) unstable; urgency=medium
+ngcp-kamailio (5.5.1-1+0~mr9.5.2.0) unstable; urgency=medium
 
-  [ Victor Seva ]
   * [1df08eb] TT#124752 nathelper: don't fail if 'a=rtcp' has no IP
+  * New upstream version 5.5.1
+  * TT#131500 remove already applied fixes
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 06 Jul 2021 14:35:42 +0200
+ -- Victor Seva <vseva@sipwise.com>  Tue, 20 Jul 2021 10:52:15 +0200
 
 ngcp-kamailio (5.5.0-1+0~mr9.5.1.0) unstable; urgency=medium
 
@@ -18,7 +19,7 @@ ngcp-kamailio (5.5.0-1+0~mr9.5.0.0) unstable; urgency=medium
   * TT#122350 update patches
   * TT#122350 debian: add lwsc modules
 
- -- Victor Seva <vseva@debian.org>  Wed, 12 May 2021 12:36:21 +0200
+ -- Victor Seva <vseva@sipwise.com>  Wed, 12 May 2021 12:36:21 +0200
 
 ngcp-kamailio (5.4.5-1+0~mr9.4.0.0) unstable; urgency=medium
 
@@ -26,7 +27,7 @@ ngcp-kamailio (5.4.5-1+0~mr9.4.0.0) unstable; urgency=medium
   * TT#91551 ctl: remove debug message
   * TT#119500 update to 5.4.5
 
- -- Victor Seva <vseva@debian.org>  Fri, 16 Apr 2021 10:55:24 +0200
+ -- Victor Seva <vseva@sipwise.com>  Fri, 16 Apr 2021 10:55:24 +0200
 
 ngcp-kamailio (5.4.4-1+0~mr9.4.0.0) unstable; urgency=medium
 
@@ -41,7 +42,7 @@ ngcp-kamailio (5.4.4-1+0~mr9.4.0.0) unstable; urgency=medium
   * [d53e856] TT#63000 use SSCAN instead of SCAN if possible
   * [c182f41] TT#63000 fix SSCAN using empty key name
 
- -- Victor Seva <vseva@debian.org>  Mon, 22 Feb 2021 11:58:03 +0100
+ -- Victor Seva <vseva@sipwise.com>  Mon, 22 Feb 2021 11:58:03 +0100
 
 ngcp-kamailio (5.4.1-1+0~mr9.3.0.0) unstable; urgency=medium
 
@@ -88,7 +89,7 @@ ngcp-kamailio (5.4.1-1+0~mr9.1.0.0) unstable; urgency=medium
   * New upstream version 5.4.1
   * TT#91551 refresh patches
 
- -- Victor Seva <vseva@debian.org>  Tue, 01 Sep 2020 12:25:04 +0200
+ -- Victor Seva <vseva@sipwise.com>  Tue, 01 Sep 2020 12:25:04 +0200
 
 ngcp-kamailio (5.3.5-1+0~mr9.0.0.0) unstable; urgency=medium
 
@@ -127,7 +128,7 @@ ngcp-kamailio (5.3.5-1+0~mr8.5.0.0) unstable; urgency=medium
   * TT#84508 New upstream version 5.3.5
   * TT#84508 refresh patches
 
- -- Victor Seva <vseva@debian.org>  Tue, 23 Jun 2020 11:15:02 +0200
+ -- Victor Seva <vseva@sipwise.com>  Tue, 23 Jun 2020 11:15:02 +0200
 
 ngcp-kamailio (5.3.4-1+0~mr8.4.0.0) unstable; urgency=medium
 
@@ -150,7 +151,7 @@ ngcp-kamailio (5.3.4-1+0~mr8.4.0.0) unstable; urgency=medium
   [ Michael Prokop ]
   * TT#80825 utils/kamctl/dbtextdb/dbtextdb.py: fix exception usage with python3
 
- -- Victor Seva <vseva@debian.org>  Mon, 11 May 2020 11:29:01 +0200
+ -- Victor Seva <vseva@sipwise.com>  Mon, 11 May 2020 11:29:01 +0200
 
 ngcp-kamailio (5.2.5-1+0~mr8.3.0.0) unstable; urgency=medium
 
@@ -659,7 +660,7 @@ ngcp-kamailio (4.4.5-1+0~mr5.1.0.0) unstable; urgency=medium
   * [e0fd465] New upstream version 4.4.5
   * [16a4f27] TT#9301 remove already applied upstream patches
 
- -- Victor Seva <vseva@debian.org>  Thu, 19 Jan 2017 09:11:36 +0100
+ -- Victor Seva <vseva@sipwise.com>  Thu, 19 Jan 2017 09:11:36 +0100
 
 ngcp-kamailio (4.4.4-1+0~mr5.1.0.0) unstable; urgency=medium
 
@@ -681,7 +682,7 @@ ngcp-kamailio (4.4.4-1+0~mr5.0.0.0) unstable; urgency=medium
   [ Kirill Solomko ]
   * [042eb86] MT#22031 kamailio-mysql-modules now depend on mariadb-client
 
- -- Victor Seva <vseva@debian.org>  Wed, 09 Nov 2016 17:50:37 +0100
+ -- Victor Seva <vseva@sipwise.com>  Wed, 09 Nov 2016 17:50:37 +0100
 
 ngcp-kamailio (4.4.3-1+0~mr5.0.0.0) unstable; urgency=medium
 
@@ -692,7 +693,7 @@ ngcp-kamailio (4.4.3-1+0~mr5.0.0.0) unstable; urgency=medium
   * [c742e1b] New upstream version 4.4.3
   * [be034e3] TT#3010 remove upstream fixes merged into 4.4.3
 
- -- Victor Seva <vseva@debian.org>  Thu, 15 Sep 2016 10:17:33 +0200
+ -- Victor Seva <vseva@sipwise.com>  Thu, 15 Sep 2016 10:17:33 +0200
 
 ngcp-kamailio (4.4.2-1+0~mr5.0.0.0) unstable; urgency=medium
 
@@ -713,7 +714,7 @@ ngcp-kamailio (4.4.2-1+0~mr4.5.0.0) unstable; urgency=medium
   * [1e0fadc] MT#20927 fix build template for group modules
   * [c333758] MT#20927 remove upstream already applied fixes
 
- -- Victor Seva <vseva@debian.org>  Wed, 29 Jun 2016 10:04:47 +0200
+ -- Victor Seva <vseva@sipwise.com>  Wed, 29 Jun 2016 10:04:47 +0200
 
 ngcp-kamailio (4.4.1-1+0~mr4.5.0.0) unstable; urgency=medium
 
@@ -733,7 +734,7 @@ ngcp-kamailio (4.4.1-1+0~mr4.4.0.0) unstable; urgency=medium
   * [dea9d35] Imported Upstream version 4.4.1
   * [e8c6649] MT#19673 remove already applied patches from 4.4 branch
 
- -- Victor Seva <vseva@debian.org>  Wed, 11 May 2016 15:12:04 +0200
+ -- Victor Seva <vseva@sipwise.com>  Wed, 11 May 2016 15:12:04 +0200
 
 ngcp-kamailio (4.4.0-1+0~mr4.4.0.0) unstable; urgency=medium
 
@@ -741,7 +742,7 @@ ngcp-kamailio (4.4.0-1+0~mr4.4.0.0) unstable; urgency=medium
   * [20120d4] MT#19009 remove already applied upstream patches and refresh old ones
   * [801ca86] MT#19009 add upstream fixes from 4.4 branch
 
- -- Victor Seva <vseva@debian.org>  Mon, 11 Apr 2016 16:37:17 +0200
+ -- Victor Seva <vseva@sipwise.com>  Mon, 11 Apr 2016 16:37:17 +0200
 
 ngcp-kamailio (4.3.4-1+0~mr4.4.0.0) unstable; urgency=medium
 
