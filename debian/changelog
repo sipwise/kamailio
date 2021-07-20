@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.0-1+0~mr9.5.1.2) unstable; urgency=medium
+
+  [ donat zenichev ]
+  * [d26da26] TT#130901 pike_check_req() does not work as expected
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 20 Jul 2021 14:08:03 +0200
+
 ngcp-kamailio (5.5.0-1+0~mr9.5.1.1) unstable; urgency=medium
 
   [ Victor Seva ]
