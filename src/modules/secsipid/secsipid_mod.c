@@ -38,6 +38,8 @@
 
 MODULE_VERSION
 
+static void *_secsipid_dlhandle = NULL;
+
 static int secsipid_expire = 300;
 static int secsipid_timeout = 5;
 
@@ -107,6 +109,10 @@ struct module_exports exports = {
  */
 static int mod_init(void)
 {
+	if(_secsipid_dlhandle!=0) {
+		dlclose(_secsipid_dlhandle);
+		_secsipid_dlhandle = NULL;
+	}
 	return 0;
 }
 
@@ -115,7 +121,6 @@ static int mod_init(void)
  */
 static int child_init(int rank)
 {
-	void *handle = NULL;
 	char *errstr = NULL;
 	char *modpath = NULL;
 	secsipid_proc_bind_f bind_f = NULL;
@@ -135,16 +140,16 @@ static int child_init(int rank)
 /* for openbsd */
 #define RTLD_NOW DL_LAZY
 #endif
-	handle = dlopen(modpath, RTLD_NOW); /* resolve all symbols now */
-	if (handle==0) {
+	_secsipid_dlhandle = dlopen(modpath, RTLD_NOW); /* resolve all symbols now */
+	if (_secsipid_dlhandle==0) {
 		LM_ERR("could not open module <%s>: %s\n", modpath, dlerror());
 		goto error;
 	}
 	/* launch register */
-	bind_f = (secsipid_proc_bind_f)dlsym(handle, "secsipid_proc_bind");
+	bind_f = (secsipid_proc_bind_f)dlsym(_secsipid_dlhandle, "secsipid_proc_bind");
 	if (((errstr=(char*)dlerror())==NULL) && bind_f!=NULL) {
 		/* version control */
-		if (!ksr_version_control(handle, modpath)) {
+		if (!ksr_version_control(_secsipid_dlhandle, modpath)) {
 			goto error;
 		}
 		/* no error - call it */
@@ -322,6 +327,7 @@ static int ki_secsipid_add_identity(sip_msg_t *msg, str *origtn, str *desttn,
 			attest->s, origid->s, x5u->s, keypath->s, &ibody.s);
 
 	if(ibody.len<=0) {
+		LM_ERR("failed to get identity header body (%d)\n", ibody.len);
 		goto error;
 	}
 
@@ -521,9 +527,7 @@ static int secsipid_libopt_param(modparam_t type, void *val)
 		return -1;
 	}
 	sit->s = *((str*)val);
-	if(secsipid_libopt_list!=NULL) {
-		sit->next = secsipid_libopt_list;
-	}
+	sit->next = secsipid_libopt_list;
 	secsipid_libopt_list = sit;
 
 	return 0;
