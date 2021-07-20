@@ -35,16 +35,6 @@ sipwise/sca-add-pai_avp-parameter.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
-upstream/tm-lw-parser-fix-matching-To-header-in-lw_get_hf_nam.patch
-upstream/lwsc-set-ws_ping_pong_interval-only-for-libwebsocket.patch
-upstream/dialog-ignore-408-on-keepalive-with-cseq-0.patch
-upstream/usrloc-unnecessary-periodic-db-queries-cancelled.patch
-upstream/tcpops-use-fixup_igp_all-instead-of-fixup_igp_null.patch
-upstream/presence-set-correct-type-for-local_log_facility-mod.patch
-upstream/core-xavp-safety-checks-for-name-len.patch
-upstream/topos-init-xavp-and-context-modparams-to-str-null.patch
-## usptream master
-upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
