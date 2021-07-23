@@ -35,6 +35,8 @@ sipwise/sca-add-pai_avp-parameter.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
+## upstream master
+upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
