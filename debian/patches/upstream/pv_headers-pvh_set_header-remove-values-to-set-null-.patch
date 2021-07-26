@@ -1,0 +1,42 @@
+From af926514ac3e70dff51408baf326b29bce4eecfc Mon Sep 17 00:00:00 2001
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 27 Jul 2021 10:52:21 +0200
+Subject: [PATCH] pv_headers: pvh_set_header, remove values to set null when
+ necessary
+
+* fix pvh_set_xavi for SR_XTYPE_NULL
+---
+ src/modules/pv_headers/pvh_xavp.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index 96fdc292b0..b8e4f92e61 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -375,7 +375,7 @@ int pvh_set_xavi(struct sip_msg *msg, str *xname, str *name, void *data,
+ 	LM_DBG("br_xname: %.*s name: %.*s append:%d\n", br_xname.len, br_xname.s,
+ 			name->len, name->s, append);
+ 	memset(&xval, 0, sizeof(sr_xval_t));
+-	if(data == NULL || SR_XTYPE_NULL) {
++	if(data == NULL || type == SR_XTYPE_NULL) {
+ 		xval.type = SR_XTYPE_NULL;
+ 	} else if(type == SR_XTYPE_STR) {
+ 		xval.type = SR_XTYPE_STR;
+@@ -618,9 +618,11 @@ int pvh_set_header(
+ 
+ 	if(val == NULL || (val->flags & PV_VAL_NULL)) {
+ 		if(idxf == PV_IDX_ALL) {
+-			cnt = xavi_rm_by_name(hname, 1, &avi);
+-			LM_DBG("removed %d values of %.*s=>%.*s, set $null\n", cnt,
+-					xavi->name.len, xavi->name.s, hname->len, hname->s);
++			if(hname_cnt > 1) {
++				cnt = xavi_rm_by_name(hname, 1, &avi);
++				LM_DBG("removed %d values of %.*s=>%.*s, set $null\n", cnt,
++						xavi->name.len, xavi->name.s, hname->len, hname->s);
++			}
+ 			if(pvh_set_xavi(msg, &xavi_name, hname, NULL, SR_XTYPE_NULL, 0, 0)
+ 					< 0)
+ 				goto err;
+-- 
+2.20.1
+
