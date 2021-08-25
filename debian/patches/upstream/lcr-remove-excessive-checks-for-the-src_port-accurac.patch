@@ -1,0 +1,48 @@
+From 536736f2529f7554929f3aa6b74ac616c382bc6e Mon Sep 17 00:00:00 2001
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Tue, 24 Aug 2021 18:50:16 +0300
+Subject: [PATCH 1/2] lcr: remove excessive checks for the 'src_port' accuracy
+
+Remove unneeded check for 'src_port' in:
+- ki_from_any_gw_addr()
+- ki_from_gw_addr()
+
+Which makes no sense because 'src_port' is of type 'unsigned int',
+and the check concerns whether it's less than 0 or not.
+---
+ src/modules/lcr/lcr_mod.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
+index 858352f2c7..57b4021ac9 100644
+--- a/src/modules/lcr/lcr_mod.c
++++ b/src/modules/lcr/lcr_mod.c
+@@ -3093,9 +3093,9 @@ static int ki_from_gw_addr(
+ 		return -1;
+ 	}
+ 
+-	/* src_port set to 0 means we don't want to check it */
+-	if((src_port < 0) || (src_port > 65535)) {
+-		LM_ERR("invalid port parameter value %d\n", transport);
++	/* src_port set to 0 is allowed and means we don't want to check it */
++	if(src_port > 65535) {
++		LM_ERR("invalid port parameter value %d\n", src_port);
+ 		return -1;
+ 	}
+ 
+@@ -3215,9 +3215,9 @@ static int ki_from_any_gw_addr(sip_msg_t *_m, str *addr_str, int transport, unsi
+ 		return -1;
+ 	}
+ 
+-	/* src_port set to 0 means we don't want to check it */
+-	if((src_port < 0) || (src_port > 65535)) {
+-		LM_ERR("invalid port parameter value %d\n", transport);
++	/* src_port set to 0 is allowed and means we don't want to check it */
++	if(src_port > 65535) {
++		LM_ERR("invalid port parameter value %d\n", src_port);
+ 		return -1;
+ 	}
+ 
+-- 
+2.25.1
+

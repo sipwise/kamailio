@@ -38,6 +38,8 @@ sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
 ## upstream master
 upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
 upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
+upstream/lcr-source-port-check-for-from_any_gw-and-from_gw.patch
+upstream/lcr-remove-excessive-checks-for-the-src_port-accurac.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
