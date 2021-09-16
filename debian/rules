@@ -212,7 +212,9 @@ override_dh_installexamples:
 
 override_dh_installsystemd:
 	dh_installsystemd --name=kamailio-lb
+	dh_installsystemd --name=kamailio-lb@
 	dh_installsystemd --name=kamailio-proxy
+	dh_installsystemd --name=kamailio-proxy@
 
 override_dh_installchangelogs:
 	dh_installchangelogs ChangeLog

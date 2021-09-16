@@ -1,0 +1,33 @@
+[Unit]
+Description=Kamailio (OpenSER) - the Open Source SIP Server, Proxy
+After=redis-server.service
+After=mariadb.service
+After=network-online.target
+After=remote-fs.target
+Requires=network-online.target
+Requires=redis-server.service
+Wants=remote-fs.target
+Requires=mariadb.service
+
+[Service]
+Type=notify
+User=kamailio
+Group=kamailio
+RuntimeDirectory=kamailio
+RuntimeDirectoryMode=0750
+RuntimeDirectoryPreserve=yes
+PIDFile=/run/kamailio/kamailio.proxy.%i.pid
+Environment='CFGFILE=/etc/kamailio/proxy_%i/kamailio.cfg'
+# Values of SHM_MEMORY=125 and PKG_MEMORY=32 taken from old sysvinit file
+# Amount of shared memory to allocate for the running Kamailio server (in MiB)
+Environment='SHM_MEMORY=125'
+# Amount of private memory for each Kamailio process (in MiB)
+Environment='PKG_MEMORY=32'
+# -DD means to not daemonise
+ExecStart=/usr/sbin/kamailio -P /run/kamailio/kamailio.proxy.%i.pid -f $CFGFILE -m $SHM_MEMORY -M $PKG_MEMORY -DD
+Restart=on-abort
+LimitMEMLOCK=infinity
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target
