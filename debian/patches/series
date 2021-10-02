@@ -56,6 +56,7 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
+sipwise/lcr_improve_comparison_based_on_gws_port.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
