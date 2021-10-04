@@ -1,3 +1,11 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.6.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [4bbb590] TT#131050 pv_headers: fix removal of all values on when using PV_IDX_ALL
+  * [d4035aa] TT#131050 pv_headers: pvh_set_header, remove values to set null when necessary
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 04 Oct 2021 14:49:35 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.6.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
