@@ -1,3 +1,15 @@
+ngcp-kamailio (5.5.1-1+0~mr10.2.0.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [672fc64] TT#136601 lcr: source port check for from_any_gw() and from_gw()
+  * [f2417ad] TT#141403 lcr: improve binary search
+  * [9dbf01e] TT#143950 lcr: add new function for searching gw based on IP and src_port
+
+  [ Victor Seva ]
+  * [3d3b5c1] TT#139455 systemd template units
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 05 Oct 2021 13:18:33 +0200
+
 ngcp-kamailio (5.5.1-1+0~mr10.1.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
