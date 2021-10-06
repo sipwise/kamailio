@@ -58,6 +58,9 @@ sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/lcr_improve_comparison_based_on_gws_port.patch
 #
+sipwise/tm_t_append_branch_by_contact.patch
+sipwise/tsilo_add_ts_append_by_contact.patch
+#
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
