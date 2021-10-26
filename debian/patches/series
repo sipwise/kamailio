@@ -92,6 +92,7 @@ sipwise/pv_headers-fix-detection-of-split-marker.patch
 ### active development
 sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
 sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
+sipwise/pv_headers-don-t-try-to-replace-header.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
