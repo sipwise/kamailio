@@ -43,6 +43,8 @@ upstream/pv_headers-don-t-try-to-replace-header.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
+# merged upstream but we have pua_dialoginfo changes see above
+sipwise/pua_dialoginfo_uuid.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
