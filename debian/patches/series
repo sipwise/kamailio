@@ -78,6 +78,7 @@ upstream/tm-use-q-field-comparison-in-while-for-standard-t-co.patch
 upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
 upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
 upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
+upstream/pv_headers-don-t-try-to-replace-header.patch
 ### relevant for upstream
 #
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
