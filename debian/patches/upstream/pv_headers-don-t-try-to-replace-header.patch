@@ -1,0 +1,110 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 28 Oct 2021 15:54:39 +0200
+Subject: pv_headers: don't try to replace header
+
+Multiple headers where not removed if new value was just one header
+---
+ src/modules/pv_headers/pvh_func.c |  6 ----
+ src/modules/pv_headers/pvh_hdr.c  | 59 ---------------------------------------
+ src/modules/pv_headers/pvh_hdr.h  |  1 -
+ 3 files changed, 66 deletions(-)
+
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index 7afc39d..01a7d3d 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -276,12 +276,6 @@ int pvh_apply_headers(struct sip_msg *msg)
+ 		}
+ 
+ 		if(!str_hash_case_get(&rm_hdrs, sub->name.s, sub->name.len)) {
+-			if(!pvh_avp_is_null(sub) && xavi_count(&sub->name, &sub) == 1) {
+-				LM_DBG("replace header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
+-				pvh_real_hdr_replace(msg, &sub->name, &sub->val.v.s);
+-				pvh_str_hash_add_key(&rm_hdrs, &sub->name);
+-				continue;
+-			}
+ 			LM_DBG("remove header[%s]: %s\n", sub->name.s, sub->val.v.s.s);
+ 			pvh_real_hdr_del_by_name(msg, &sub->name);
+ 			pvh_str_hash_add_key(&rm_hdrs, &sub->name);
+diff --git a/src/modules/pv_headers/pvh_hdr.c b/src/modules/pv_headers/pvh_hdr.c
+index d83a646..fbb471c 100644
+--- a/src/modules/pv_headers/pvh_hdr.c
++++ b/src/modules/pv_headers/pvh_hdr.c
+@@ -131,65 +131,6 @@ int pvh_real_hdr_append(struct sip_msg *msg, str *hname, str *hvalue)
+ 	return 1;
+ }
+ 
+-int pvh_real_hdr_replace(struct sip_msg *msg, str *hname, str *hvalue)
+-{
+-	struct lump *anchor = NULL;
+-	hdr_field_t *hf = NULL;
+-	str new_h = STR_NULL;
+-	int new = 1;
+-
+-	if(hname->s == NULL || hvalue->s == NULL) {
+-		LM_ERR("header name/value cannot be empty");
+-		return -1;
+-	}
+-
+-	for(hf = msg->headers; hf; hf = hf->next) {
+-		if(hf->name.len == hname->len
+-				&& strncasecmp(hf->name.s, hname->s, hname->len) == 0) {
+-			if(hf->body.len == hvalue->len
+-					&& strncasecmp(hf->body.s, hvalue->s, hvalue->len) == 0) {
+-				return 1;
+-			}
+-			new = 0;
+-			break;
+-		}
+-		if(!hf->next)
+-			break;
+-	}
+-
+-	if(hf == NULL) {
+-		LM_ERR("unable to find header lump\n");
+-		return -1;
+-	}
+-
+-	if(new == 0) {
+-		if((anchor = del_lump(msg, hf->name.s - msg->buf, hf->len, 0)) == 0) {
+-			LM_ERR("unable to delete header lump\n");
+-			return -1;
+-		}
+-	} else {
+-		anchor = anchor_lump(msg, hf->name.s + hf->len - msg->buf, 0, 0);
+-	}
+-
+-	if(anchor == 0) {
+-		LM_ERR("unable to find header lump\n");
+-		return -1;
+-	}
+-
+-	if(pvh_create_hdr_str(hname, hvalue, &new_h) <= 0)
+-		return -1;
+-
+-	if(insert_new_lump_after(anchor, new_h.s, new_h.len, 0) == 0) {
+-		LM_ERR("cannot insert header lump\n");
+-		pkg_free(new_h.s);
+-		return -1;
+-	}
+-
+-	LM_DBG("%s header: %.*s\n", new ? "append" : "replace", new_h.len, new_h.s);
+-
+-	return 1;
+-}
+-
+ int pvh_real_hdr_del_by_name(struct sip_msg *msg, str *hname)
+ {
+ 	hdr_field_t *hf = NULL;
+diff --git a/src/modules/pv_headers/pvh_hdr.h b/src/modules/pv_headers/pvh_hdr.h
+index 4f86953..a5ad415 100644
+--- a/src/modules/pv_headers/pvh_hdr.h
++++ b/src/modules/pv_headers/pvh_hdr.h
+@@ -38,7 +38,6 @@ void pvh_hdrs_set_applied(struct sip_msg *msg);
+ void pvh_hdrs_reset_flags(struct sip_msg *msg);
+ 
+ int pvh_real_hdr_append(struct sip_msg *msg, str *hname, str *hvalue);
+-int pvh_real_hdr_replace(struct sip_msg *msg, str *hname, str *hvalue);
+ int pvh_real_hdr_del_by_name(struct sip_msg *msg, str *hname);
+ int pvh_real_hdr_remove_display(struct sip_msg *msg, str *hname);
+ int pvh_real_replace_reply_reason(struct sip_msg *msg, str *value);
