@@ -46,6 +46,7 @@ upstream/topos-init-xavp-and-context-modparams-to-str-null.patch
 upstream/pike-fixed-regression.patch
 ## usptream master
 upstream/nathelper-don-t-fail-if-a-rtcp-has-no-IP.patch
+upstream/pv_headers-don-t-try-to-replace-header.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
