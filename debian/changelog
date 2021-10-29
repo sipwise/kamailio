@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.6.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [41386d1] TT#71906 sca: pai_avp parameter
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 29 Oct 2021 09:20:33 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.6.1) unstable; urgency=medium
 
   [ Victor Seva ]
