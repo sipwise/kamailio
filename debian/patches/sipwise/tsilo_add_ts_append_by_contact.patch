@@ -1,3 +1,15 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Tue, 2 Nov 2021 11:14:23 +0100
+Subject: tsilo_add_ts_append_by_contact
+
+---
+ src/modules/tsilo/ts_append.c | 116 ++++++++++++++++++
+ src/modules/tsilo/ts_append.h |   2 +
+ src/modules/tsilo/tsilo.c     | 269 +++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 386 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/tsilo/ts_append.c b/src/modules/tsilo/ts_append.c
+index 7d95186..1847ac1 100644
 --- a/src/modules/tsilo/ts_append.c
 +++ b/src/modules/tsilo/ts_append.c
 @@ -139,3 +139,119 @@ done:
@@ -120,6 +132,8 @@
 +
 +	return ret;
 +}
+diff --git a/src/modules/tsilo/ts_append.h b/src/modules/tsilo/ts_append.h
+index 56f9120..461f888 100644
 --- a/src/modules/tsilo/ts_append.h
 +++ b/src/modules/tsilo/ts_append.h
 @@ -24,5 +24,7 @@
@@ -130,6 +144,8 @@
 +int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact);
  
  #endif
+diff --git a/src/modules/tsilo/tsilo.c b/src/modules/tsilo/tsilo.c
+index 0c531ac..2eefb2f 100644
 --- a/src/modules/tsilo/tsilo.c
 +++ b/src/modules/tsilo/tsilo.c
 @@ -34,6 +34,8 @@
@@ -141,7 +157,7 @@
  #include "ts_hash.h"
  #include "ts_handlers.h"
  #include "ts_append.h"
-@@ -61,7 +63,9 @@ static int w_ts_append_to2(struct sip_ms
+@@ -61,7 +63,9 @@ static int w_ts_append_to2(struct sip_msg* msg, char *idx, char *lbl, char *d, c
  static int fixup_ts_append_to(void** param, int param_no);
  static int w_ts_append(struct sip_msg* _msg, char *_table, char *_ruri);
  static int fixup_ts_append(void** param, int param_no);
@@ -163,7 +179,7 @@
  	{"ts_store", (cmd_function)w_ts_store,  0,
  		0 , 0, REQUEST_ROUTE | FAILURE_ROUTE },
  	{"ts_store", (cmd_function)w_ts_store1,  1,
-@@ -241,6 +249,23 @@ static int fixup_ts_append(void** param,
+@@ -241,6 +249,23 @@ static int fixup_ts_append(void** param, int param_no)
  	return 0;
  }
  
@@ -187,10 +203,13 @@
  /**
   *
   */
-@@ -360,6 +385,238 @@ static int ki_ts_append_to_uri(sip_msg_t
- /**
-  *
-  */
+@@ -357,6 +382,238 @@ static int ki_ts_append_to_uri(sip_msg_t* _msg, int tindex, int tlabel,
+ 			_table->s, _uri);
+ }
+ 
++/**
++ *
++ */
 +static int w_ts_append_by_contact2(struct sip_msg* _msg, char *_table, char *_ruri) {
 +	str ruri = STR_NULL;
 +	str ruri_fixed = STR_NULL;
@@ -318,7 +337,7 @@
 +	}
 +
 +	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
-+	rc = ts_append_by_contact(_msg, &ruri, &contact, _table);
++	rc = ts_append_by_contact(_msg, &ruri, &contact, _table->s);
 +
 +	pkg_free(ruri.s);
 +	pkg_free(contact.s);
@@ -412,7 +431,7 @@
 +		return -1;
 +
 +	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
-+	rc = ts_append_by_contact(_msg, &ruri, &contact, _table);
++	rc = ts_append_by_contact(_msg, &ruri, &contact, _table->s);
 +
 +	pkg_free(ruri.s);
 +	pkg_free(contact.s);
@@ -420,13 +439,10 @@
 +	return rc;
 +}
 +
-+/**
-+ *
-+ */
- static int w_ts_store(struct sip_msg* msg, char *p1, char *p2)
- {
- 	return ts_store(msg, 0);
-@@ -417,6 +674,16 @@ static sr_kemi_t sr_kemi_tsilo_exports[]
+ /**
+  *
+  */
+@@ -417,6 +674,16 @@ static sr_kemi_t sr_kemi_tsilo_exports[] = {
  		{ SR_KEMIP_INT, SR_KEMIP_INT, SR_KEMIP_STR,
  			SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
