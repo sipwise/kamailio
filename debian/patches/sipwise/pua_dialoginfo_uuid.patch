@@ -7,13 +7,13 @@ was receiving NOTIFY messages with the same id for different branches
 
 fixes #2906
 ---
- src/modules/pua_dialoginfo/dialog_publish.c | 18 +++++------
- src/modules/pua_dialoginfo/pua_dialoginfo.c | 50 +++++++++++++++++++----------
+ src/modules/pua_dialoginfo/dialog_publish.c | 18 ++++----
+ src/modules/pua_dialoginfo/pua_dialoginfo.c | 71 +++++++++++++++++++++--------
  src/modules/pua_dialoginfo/pua_dialoginfo.h |  3 +-
- 3 files changed, 44 insertions(+), 27 deletions(-)
+ 3 files changed, 63 insertions(+), 29 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/dialog_publish.c b/src/modules/pua_dialoginfo/dialog_publish.c
-index 7eaf27b..7f2751f 100644
+index 7eaf27b..137823c 100644
 --- a/src/modules/pua_dialoginfo/dialog_publish.c
 +++ b/src/modules/pua_dialoginfo/dialog_publish.c
 @@ -87,7 +87,7 @@ static xmlAttrPtr puadi_xmlNewPropStr(xmlNodePtr node, char *name, str *sval)
@@ -67,7 +67,7 @@ index 7eaf27b..7f2751f 100644
  	memcpy(publ->id.s, "DIALOG_PUBLISH.", 15);
 -	memcpy(publ->id.s+15, callid->s, callid->len);
 -	publ->id.len= 15+ callid->len;
-+	memcpy(publ->id.s+15, uuid->s, callid->len);
++	memcpy(publ->id.s+15, uuid->s, uuid->len);
 +	publ->id.len= 15+ uuid->len;
  	size+= publ->id.len;
  
@@ -90,7 +90,7 @@ index 7eaf27b..7f2751f 100644
  	}
  }
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index d5b1fea..0bf13ae 100644
+index d5b1fea..bf622bd 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -42,6 +42,7 @@
@@ -109,6 +109,24 @@ index d5b1fea..0bf13ae 100644
  
  static str caller_dlg_var = {0, 0}; /* pubruri_caller */
  static str callee_dlg_var = {0, 0}; /* pubruri_callee */
+@@ -107,7 +109,7 @@ send_publish_t pua_send_publish;
+ /** module functions */
+ 
+ static int mod_init(void);
+-
++static int child_init(int rank);
+ 
+ static cmd_export_t cmds[]={
+ 	{0, 0, 0, 0, 0, 0}
+@@ -144,7 +146,7 @@ struct module_exports exports= {
+ 	0,					/* exported pseudo-variables */
+ 	0,					/* response handling function */
+ 	mod_init,			/* module initialization function */
+-	0,					/* per-child init function */
++	child_init, 	/* per-child init function */
+ 	0					/* module destroy function */
+ };
+ 
 @@ -273,7 +275,7 @@ void refresh_pubruri_avps(struct dlginfo_cell *dlginfo, str *uri)
  				dialog_publish_multi("terminated", list,
  						&(dlginfo->from_uri), uri, &(dlginfo->callid), 1,
@@ -231,40 +249,48 @@ index d5b1fea..0bf13ae 100644
  			}
  	}
  	if(use_pubruri_avps && (refresh_pubruri_avps_flag > -1
-@@ -572,7 +574,8 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
+@@ -565,6 +567,13 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
+ 	int len;
+ 	str* s=NULL;
+ 
++	// generate new random uuid
++	if(sruid_next_safe(&_puadi_sruid) < 0) {
++		return NULL;
++	}
++	LM_DBG("uuid generated: '%.*s'\n",
++		_puadi_sruid.uid.len, _puadi_sruid.uid.s);
++
+ 	/* create dlginfo structure to store important data inside the module*/
+ 	len = sizeof(struct dlginfo_cell)
+ 		+ dlg->from_uri.len
+@@ -572,7 +581,8 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
  		+ dlg->callid.len
  		+ dlg->tag[0].len
  		+ dlg->req_uri.len
 -		+ dlg->contact[0].len;
 +		+ dlg->contact[0].len
-+		+ SRUID_SIZE;
++		+ _puadi_sruid.uid.len;
  
  	dlginfo = (struct dlginfo_cell*)shm_malloc( len );
  	if (dlginfo==0) {
-@@ -599,6 +602,8 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
+@@ -599,6 +609,8 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
  	dlginfo->req_uri.len  = dlg->req_uri.len;
  	dlginfo->from_contact.s   = dlginfo->req_uri.s + dlginfo->req_uri.len;
  	dlginfo->from_contact.len = dlg->contact[0].len;
 +	dlginfo->uuid.s = dlginfo->from_contact.s + dlginfo->from_contact.len;
-+	dlginfo->uuid.len = SRUID_SIZE;
++	dlginfo->uuid.len = _puadi_sruid.uid.len;
  
  	memcpy(dlginfo->from_uri.s, dlg->from_uri.s, dlg->from_uri.len);
  	memcpy(dlginfo->to_uri.s, dlg->to_uri.s, dlg->to_uri.len);
-@@ -607,6 +612,13 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
+@@ -606,6 +618,7 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
+ 	memcpy(dlginfo->from_tag.s, dlg->tag[0].s, dlg->tag[0].len);
  	memcpy(dlginfo->req_uri.s, dlg->req_uri.s, dlg->req_uri.len);
  	memcpy(dlginfo->from_contact.s, dlg->contact[0].s, dlg->contact[0].len);
++	memcpy(dlginfo->uuid.s, _puadi_sruid.uid.s, _puadi_sruid.uid.len);
  
-+	// generate new random uuid
-+	sruid_next_safe(&_puadi_sruid);
-+	strcpy(dlginfo->uuid.s, _puadi_sruid.uid.s);
-+	dlginfo->uuid.len = _puadi_sruid.uid.len;
-+	LM_DBG("uuid generated: '%.*s'\n",
-+		dlginfo->uuid.len, dlginfo->uuid.s);
-+
  	if (use_pubruri_avps) {
  		if(type==DLGCB_CREATED) {
- 			dlginfo->pubruris_caller = get_str_list(pubruri_caller_avp_type,
-@@ -740,7 +752,7 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
+@@ -740,7 +753,7 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  				&(dlg->from_uri),
  				(include_req_uri)?&(dlg->req_uri):&(dlg->to_uri),
  				&(dlg->callid), 1, dlginfo->lifetime,
@@ -273,7 +299,7 @@ index d5b1fea..0bf13ae 100644
  		if(use_pubruri_avps) lock_release(&dlginfo->lock);
  	}
  
-@@ -752,7 +764,7 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
+@@ -752,7 +765,7 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  				(include_req_uri)?&(dlg->req_uri):&(dlg->to_uri),
  				&(dlg->from_uri),
  				&(dlg->callid), 0, dlginfo->lifetime,
@@ -282,7 +308,7 @@ index d5b1fea..0bf13ae 100644
  		if(use_pubruri_avps) lock_release(&dlginfo->lock);
  	}
  }
-@@ -784,6 +796,10 @@ static int mod_init(void)
+@@ -784,6 +797,10 @@ static int mod_init(void)
  	str s;
  	pv_spec_t avp_spec;
  
@@ -293,6 +319,29 @@ index d5b1fea..0bf13ae 100644
  	if(caller_dlg_var.len<=0) {
  		LM_WARN("pubruri_caller_dlg_var is not set"
  				" - restore on restart disabled\n");
+@@ -866,6 +883,22 @@ static int mod_init(void)
+ 	return 0;
+ }
+ 
++/**
++ * @brief Initialize module children
++ */
++static int child_init(int rank)
++{
++	if(sruid_init(&_puadi_sruid, (char)'-', "padi", SRUID_INC)<0) {
++		return -1;
++	}
++
++	if(rank != PROC_MAIN) {
++		return 0;
++	}
++
++	return 0;
++}
++
+ void free_dlginfo_cell(void *param) {
+ 
+ 	struct dlginfo_cell *cell = NULL;
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.h b/src/modules/pua_dialoginfo/pua_dialoginfo.h
 index 8289669..8d3757d 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.h
