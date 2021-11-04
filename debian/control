@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
 Build-Depends:
  bison,
- debhelper-compat (= 12),
+ debhelper-compat (= 13),
  default-libmysqlclient-dev,
  docbook-xml,
  dpkg-dev (>= 1.16.1.1),
@@ -54,7 +54,7 @@ Build-Depends:
  uuid-dev,
  xsltproc,
  zlib1g-dev,
-Standards-Version: 3.9.8
+Standards-Version: 4.5.1
 Homepage: https://www.kamailio.org/
 Vcs-git: https://anonscm.debian.org/git/pkg-voip/kamailio.git
 Vcs-Browser: https://anonscm.debian.org/gitweb/?p=pkg-voip/kamailio.git

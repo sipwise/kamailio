@@ -21,8 +21,10 @@
 /ngcp-kamailio-lcrrate-modules/
 /ngcp-kamailio-ldap-modules/
 /ngcp-kamailio-lua-modules/
+/ngcp-kamailio-lwsc-modules/
 /ngcp-kamailio-memcached-modules/
 /ngcp-kamailio-mono-modules/
+/ngcp-kamailio-mqtt-modules/
 /ngcp-kamailio-mysql-modules/
 /ngcp-kamailio-outbound-modules/
 /ngcp-kamailio-perl-modules/
@@ -30,11 +32,14 @@
 /ngcp-kamailio-presence-modules/
 /ngcp-kamailio-purple-modules/
 /ngcp-kamailio-python-modules/
+/ngcp-kamailio-python3-modules/
 /ngcp-kamailio-radius-modules/
 /ngcp-kamailio-redis-modules/
 /ngcp-kamailio-sctp-modules/
+/ngcp-kamailio-secsipid-modules/
 /ngcp-kamailio-snmpstats-modules/
 /ngcp-kamailio-sqlite-modules/
+/ngcp-kamailio-systemd-modules/
 /ngcp-kamailio-tcap-modules/
 /ngcp-kamailio-tls-modules/
 /ngcp-kamailio-unixodbc-modules/
