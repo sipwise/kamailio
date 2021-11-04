@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.1-1+0~mr10.0.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [ace7350] TT#131050 pv_headers: don't try to replace header
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 04 Nov 2021 11:03:59 +0100
+
 ngcp-kamailio (5.5.1-1+0~mr10.0.1.1) unstable; urgency=medium
 
   * New release.
