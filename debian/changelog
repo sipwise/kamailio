@@ -1,3 +1,11 @@
+ngcp-kamailio (5.5.1-1+0~mr10.0.1.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [5e07bcc] TT#144550 pua_dialoginfo: dialog_uuid
+  * [35037cd] TT#148850 pua_dialoginfo: fix memory corruption
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 05 Nov 2021 12:50:53 +0100
+
 ngcp-kamailio (5.5.1-1+0~mr10.0.1.2) unstable; urgency=medium
 
   [ Victor Seva ]
