@@ -63,6 +63,8 @@ sipwise/lcr_improve_comparison_based_on_gws_port.patch
 #
 sipwise/tm_t_append_branch_by_contact.patch
 sipwise/tsilo_add_ts_append_by_contact.patch
+upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
+upstream/permissions-trusted_cleanup_interval.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
