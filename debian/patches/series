@@ -42,6 +42,7 @@ upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/lcr-source-port-check-for-from_any_gw-and-from_gw.patch
 upstream/lcr-remove-excessive-checks-for-the-src_port-accurac.patch
 upstream/lcr-improve-binary-search-to-support-match-including-src-port.patch
+upstream/nathelper-fix_nated_sdp-added-ignoring-RFC3605-param.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
