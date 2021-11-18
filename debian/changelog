@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.6.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [67b40a4] TT#124752 nathelper: fix_nated_sdp added ignoring RFC3605-param if omitted
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 18 Nov 2021 11:09:42 +0100
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.6.3) unstable; urgency=medium
 
   [ Victor Seva ]
