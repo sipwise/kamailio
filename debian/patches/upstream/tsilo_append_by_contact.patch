@@ -1,0 +1,1051 @@
+From 7265f1cf7c57d258538119bc0d41146a04183eec Mon Sep 17 00:00:00 2001
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Fri, 12 Nov 2021 15:30:44 +0200
+Subject: [PATCH] tsilo: Add support of a lookup and branch creating by contact
+
+Improvement of the TSILO module, which allows to run a lookup using the provided RURI,
+but only to create a new branch for the Contact, which is set in the currently processed REGISTER.
+Or optionally a Contact URI value given as a parameter to the function.
+If the Contact URI for a lookup, is given as a parameter,
+it is possible to provide it as a pseudo-variable.
+
+Hence it is now possible to append new branch(es) for only UAC(s)
+getting REGISTERED at the moment of calling 'ts_append_by_contact()'.
+
+Previously it was only possible to call 'ts_append()' and create new branches
+for all previously present location records (for this specific URI), which was in some circumstsances undersired.
+
+New script functions introduced:
+- ts_append_by_contact(table, ruri [, contact])
+
+New module functions introduced:
+- w_ts_append_by_contact2() / ki_ts_append_by_contact()
+- w_ts_append_by_contact3 / ki_ts_append_by_contact_uri()
+- ts_append_by_contact() / ts_append_by_contact_to()
+
+Backwards compatibility is saved, the new functionality is not overlapping with
+the previously existing implementation, hence it only acts when the new script function
+ts_append_by_contact() is used.
+
+The documentation has been updated accordingly.
+---
+ src/modules/tsilo/doc/tsilo.xml       |   5 +
+ src/modules/tsilo/doc/tsilo_admin.xml |  54 ++++++
+ src/modules/tsilo/ts_append.c         | 116 +++++++++++
+ src/modules/tsilo/ts_append.h         |   2 +
+ src/modules/tsilo/tsilo.c             | 269 +++++++++++++++++++++++++-
+ 5 files changed, 445 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/tsilo/doc/tsilo.xml b/src/modules/tsilo/doc/tsilo.xml
+index 6a2be7b0e7..1ad967ae64 100644
+--- a/src/modules/tsilo/doc/tsilo.xml
++++ b/src/modules/tsilo/doc/tsilo.xml
+@@ -23,6 +23,11 @@
+ 		<surname>Cabiddu</surname>
+ 		<email>federico.cabiddu@gmail.com</email>
+ 	    </editor>
++	    <editor>
++		<firstname>Donat</firstname>
++		<surname>Zenichev</surname>
++		<email>dzenichev@sipwise.com</email>
++	    </editor>
+ 	</authorgroup>
+ 	<copyright>
+ 	    <year>2015</year>
+diff --git a/src/modules/tsilo/doc/tsilo_admin.xml b/src/modules/tsilo/doc/tsilo_admin.xml
+index c294e7c282..965c339156 100644
+--- a/src/modules/tsilo/doc/tsilo_admin.xml
++++ b/src/modules/tsilo/doc/tsilo_admin.xml
+@@ -181,6 +181,60 @@ if (is_method("REGISTER")) {
+ 	ts_append("location", "$tu");
+ }
+ ...
++</programlisting>
++		</example>
++	</section>
++	<section id="tsilo.f.ts_append_by_contact">
++		<title><function moreinfo="none">ts_append_by_contact(domain, ruri [, contact])</function></title>
++		<para>
++		Has almost the same intention as the ts_append(),
++		but gives a possibility to append branches
++		only for a specific location record (Contact URI).
++		The contact's URI value can be either taken from the currently processed REGISTER
++		or (optionally) given as a third parameter.
++		If the Contact URI for a lookup is given as the parameter,
++		it is possible to provide it as a pseudo-variable.
++
++		The contact lookup is performed on the table specified by the domain parameter.
++		The method should be called when a REGISTER request is received.
++		</para>
++		<para>Meaning of the parameters is as follows:</para>
++		<itemizedlist>
++		<listitem>
++			<para>
++			<emphasis>domain</emphasis> - Name of table that should be used for looking
++			up new contacts for r-uri.
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			<emphasis>ruri</emphasis> - The r-uri for which we want to check existing
++			transactions and add them new branches. Can be a static string value or a
++			dynamic string with pseudo-variables.
++			</para>
++		</listitem>
++		<listitem>
++			<para>
++			<emphasis>contact</emphasis> - Optional, a value of the location record
++			(contact URI) based on which to perform the branch appending.
++			If not given, the value will be taken from the currently processed REGISTER.
++			If a location lookup based on this Contact URI fails (no location record found),
++			then the branch append will not happen.
++			</para>
++		</listitem>
++		</itemizedlist>
++		<para>
++		This function can be used from REQUEST_ROUTE, FAILURE_ROUTE.
++		</para>
++		<example>
++		<title><function>ts_append_by_contact</function> usage</title>
++		<programlisting format="linespecific">
++...
++if (is_method("REGISTER")) {
++	$var(formated_ct) = $(x_hdr(Contact){nameaddr.uri});
++	ts_append_by_contact("location", "$tu", "$var(formated_ct)");
++}
++...
+ </programlisting>
+ 		</example>
+ 	</section>
+diff --git a/src/modules/tsilo/ts_append.c b/src/modules/tsilo/ts_append.c
+index 7d951865f0..1847ac1c1b 100644
+--- a/src/modules/tsilo/ts_append.c
++++ b/src/modules/tsilo/ts_append.c
+@@ -139,3 +139,119 @@ done:
+ 
+ 	return ret;
+ }
++
++int ts_append_by_contact(struct sip_msg* msg, str *ruri, str *contact, char *table) {
++	ts_urecord_t* _r;
++	ts_transaction_t* ptr;
++
++	struct sip_uri p_uri;
++	struct sip_uri c_uri;
++	str *t_uri;
++
++	int res;
++	int appended;
++
++	/* parse R-URI */
++	if (use_domain) {
++		t_uri = ruri;
++	} else {
++		if (parse_uri(ruri->s, ruri->len, &p_uri) < 0) {
++			LM_ERR("tsilo: failed to parse uri %.*s\n", ruri->len, ruri->s);
++			return -1;
++		}
++		t_uri = &p_uri.user;
++	}
++
++	/* parse contact */
++	if (parse_uri(contact->s, contact->len, &c_uri) < 0) {
++		LM_ERR("tsilo: failed to parse contact %.*s\n", ruri->len, ruri->s);
++		return -1;
++	}
++
++	/* find urecord in TSILO cache */
++	lock_entry_by_ruri(t_uri);
++	res = get_ts_urecord(t_uri, &_r);
++
++	if (res != 0) {
++		LM_ERR("tsilo: failed to retrieve record for %.*s\n", t_uri->len, t_uri->s);
++		unlock_entry_by_ruri(t_uri);
++		return -1;
++	}
++
++	/* cycle through existing transactions */
++	ptr = _r->transactions;
++	while(ptr) {
++		LM_DBG("tsilo: transaction %u:%u found for %.*s, going to append branches\n",
++						ptr->tindex, ptr->tlabel, t_uri->len, t_uri->s);
++		/* append only if the desired contact has been found in locations */
++		appended = ts_append_by_contact_to(msg, ptr->tindex, ptr->tlabel, table, ruri, contact);
++		if (appended > 0)
++			update_stat(added_branches, appended);
++		ptr = ptr->next;
++	}
++
++	unlock_entry_by_ruri(t_uri);
++
++	return 1;
++}
++
++int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact) {
++	struct cell     *t=0;
++	struct cell     *orig_t;	/* a pointer to an existing transaction or 0 if lookup fails*/
++	struct sip_msg *orig_msg;
++	int ret;
++	str stable;
++
++	LM_DBG("tsilo: trying to append based on contact <%.*s>\n", contact->len, contact->s);
++
++	/* lookup a transaction based on its identifier (hash_index:label) */
++	orig_t = _tmb.t_gett();
++	if(_tmb.t_lookup_ident(&t, tindex, tlabel) < 0)
++	{
++		LM_ERR("tsilo: transaction [%u:%u] not found\n", tindex, tlabel);
++		ret = -1;
++		goto done;
++	}
++
++	/* check if the dialog is still in the early stage */
++	if (t->flags & T_CANCELED) {
++		LM_DBG("tsilo: trasaction [%u:%u] was cancelled\n", tindex, tlabel);
++		ret = -2;
++		goto done;
++	}
++	if (t->uas.status >= 200) {
++		LM_DBG("tsilo: trasaction [%u:%u] sent out a final response already - %d\n",
++					tindex, tlabel, t->uas.status);
++		ret = -3;
++		goto done;
++	}
++
++	/* get original (very first) request of the transaction */
++	orig_msg = t->uas.request;
++	stable.s = table;
++	stable.len = strlen(stable.s);
++
++	if(uri==NULL || uri->s==NULL || uri->len<=0) {
++		ret = _regapi.lookup_to_dset(orig_msg, &stable, NULL);
++	} else {
++		ret = _regapi.lookup_to_dset(orig_msg, &stable, uri);
++	}
++
++	if(ret != 1) {
++		LM_ERR("tsilo: transaction %u:%u: error updating dset (%d)\n", tindex, tlabel, ret);
++		ret = -4;
++		goto done;
++	}
++
++	/* start the transaction only for the desired contact
++		contact must be of syntax: sip:<user>@<host>:<port> with no parameters list*/
++	ret = _tmb.t_append_branch_by_contact(contact);
++
++done:
++	/* unref the transaction which had been referred by t_lookup_ident() call.
++	 * Restore the original transaction (if any) */
++	if(t) _tmb.unref_cell(t);
++	_tmb.t_sett(orig_t, T_BR_UNDEFINED);
++
++	return ret;
++}
+diff --git a/src/modules/tsilo/ts_append.h b/src/modules/tsilo/ts_append.h
+index 56f91204df..461f8881f3 100644
+--- a/src/modules/tsilo/ts_append.h
++++ b/src/modules/tsilo/ts_append.h
+@@ -24,5 +24,7 @@
+ 
+ int ts_append(struct sip_msg* msg, str *ruri, char *table);
+ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri);
++int ts_append_by_contact(struct sip_msg* msg, str *ruri, str *contact, char *table);
++int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact);
+ 
+ #endif
+diff --git a/src/modules/tsilo/tsilo.c b/src/modules/tsilo/tsilo.c
+index 0c531acc74..2eefb2fe2d 100644
+--- a/src/modules/tsilo/tsilo.c
++++ b/src/modules/tsilo/tsilo.c
+@@ -34,6 +34,8 @@
+ #include "../../core/rpc_lookup.h"
+ #include "../../core/kemi.h"
+ 
++#include "../../core/parser/contact/parse_contact.h"
++
+ #include "ts_hash.h"
+ #include "ts_handlers.h"
+ #include "ts_append.h"
+@@ -61,7 +63,9 @@ static int w_ts_append_to2(struct sip_msg* msg, char *idx, char *lbl, char *d, c
+ static int fixup_ts_append_to(void** param, int param_no);
+ static int w_ts_append(struct sip_msg* _msg, char *_table, char *_ruri);
+ static int fixup_ts_append(void** param, int param_no);
+-
++static int w_ts_append_by_contact2(struct sip_msg* _msg, char *_table, char *_ruri);
++static int w_ts_append_by_contact3(struct sip_msg* _msg, char *_table, char *_ruri, char *_contact);
++static int fixup_ts_append_by_contact(void** param, int param_no);
+ static int w_ts_store(struct sip_msg* msg, char *p1, char *p2);
+ static int w_ts_store1(struct sip_msg* msg, char *_ruri, char *p2);
+ 
+@@ -78,6 +82,10 @@ static cmd_export_t cmds[]={
+ 		fixup_ts_append_to, 0, REQUEST_ROUTE | FAILURE_ROUTE },
+ 	{"ts_append", (cmd_function)w_ts_append,  2,
+ 		fixup_ts_append, 0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"ts_append_by_contact", (cmd_function)w_ts_append_by_contact2,  2,	/* for two parameters */
++		fixup_ts_append_by_contact, 0, REQUEST_ROUTE | FAILURE_ROUTE },
++	{"ts_append_by_contact", (cmd_function)w_ts_append_by_contact3,  3,	/* for three parameters */
++		fixup_ts_append_by_contact, 0, REQUEST_ROUTE | FAILURE_ROUTE },
+ 	{"ts_store", (cmd_function)w_ts_store,  0,
+ 		0 , 0, REQUEST_ROUTE | FAILURE_ROUTE },
+ 	{"ts_store", (cmd_function)w_ts_store1,  1,
+@@ -241,6 +249,23 @@ static int fixup_ts_append(void** param, int param_no)
+ 	return 0;
+ }
+ 
++static int fixup_ts_append_by_contact(void** param, int param_no)
++{
++	if (param_no==1) {
++		if(strlen((char*)*param)<=1 && (*(char*)(*param)==0 || *(char*)(*param)=='0')) {
++			*param = (void*)0;
++			LM_ERR("empty table name\n");
++			return -1;
++		}
++	}
++
++	if (param_no==2 || param_no==3) {
++		return fixup_spve_null(param, 1);
++	}
++
++	return 0;
++}
++
+ /**
+  *
+  */
+@@ -357,6 +382,238 @@ static int ki_ts_append_to_uri(sip_msg_t* _msg, int tindex, int tlabel,
+ 			_table->s, _uri);
+ }
+ 
++/**
++ *
++ */
++static int w_ts_append_by_contact2(struct sip_msg* _msg, char *_table, char *_ruri) {
++	str ruri = STR_NULL;
++	str ruri_fixed = STR_NULL;
++
++	str contact = STR_NULL;
++	str tmp_contact = STR_NULL;
++	struct sip_uri curi;
++
++	int rc;
++
++	/* parse R-URI */
++	if (fixup_get_svalue(_msg, (gparam_t*)_ruri, &ruri_fixed)!=0) {
++		LM_ERR("failed to convert r-uri parameter\n");
++		return -1;
++	}
++
++	if (_ruri==NULL || strlen(_ruri) <= 0 || ruri_fixed.len <= 0) {
++		LM_ERR("tsilo: invalid ruri parameter (empty or zero length).\n");
++		return -1;
++	}
++
++	if (pkg_str_dup(&ruri, &ruri_fixed) < 0) {
++		LM_ERR("failed to copy r-uri parameter\n");
++		return -1;
++	}
++
++	if (ts_check_uri(&ruri) < 0) {
++		LM_ERR("tsilo: failed to parse R-URI.\n");
++		return -1;
++	}
++
++	/* parse Contact header */
++	if ((!_msg->contact && parse_headers(_msg, HDR_CONTACT_F, 0) != 0)
++			|| !_msg->contact) {
++		LM_WARN("tsilo: missing contact header or the value is empty/malformed.\n");
++		return -1;
++	}
++	if (_msg->contact) {
++		if (parse_contact(_msg->contact) < 0) {
++			LM_WARN("tsilo: failed to parse Contact header.\n");
++			return -1;
++		}
++		if (parse_uri(
++						((struct contact_body*)_msg->contact->parsed)->contacts->uri.s,
++						((struct contact_body*)_msg->contact->parsed)->contacts->uri.len,
++						&curi) != 0 ) {
++			if (ts_check_uri(&_msg->contact->body) < 0) {	/* one more attempt */
++				LM_WARN("tsilo: failed to parse Contact header.\n");
++				return -1;
++			}
++		}
++
++		tmp_contact.len = ((struct contact_body*)_msg->contact->parsed)->contacts->uri.len;
++		tmp_contact.s = (char*)pkg_malloc(tmp_contact.len+1);
++		if (tmp_contact.s == NULL) {
++			PKG_MEM_ERROR;
++			return -1;
++		}
++		memcpy(tmp_contact.s, ((struct contact_body*)_msg->contact->parsed)->contacts->uri.s, tmp_contact.len);
++		tmp_contact.s[tmp_contact.len] = '\0';
++
++		if (pkg_str_dup(&contact, &tmp_contact) < 0) {
++			if (pkg_str_dup(&contact, &_msg->contact->body) < 0) { /* one more attempt */
++				LM_ERR("tsilo: problems when calling ts_append_contact(), cannot copy Contact parameter.\n");
++				return -1;
++			}
++		}
++	}
++
++	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
++	rc = ts_append_by_contact(_msg, &ruri, &contact, _table);
++
++	/* free previously used memory */
++	pkg_free(ruri.s);
++	pkg_free(contact.s);
++	pkg_free(tmp_contact.s);
++
++	return rc;
++}
++
++/**
++ *
++ */
++static int ki_ts_append_by_contact(sip_msg_t* _msg, str *_table, str *_ruri) {
++	str ruri = STR_NULL;
++	str contact = STR_NULL;
++	str tmp_contact = STR_NULL;
++	struct sip_uri curi;
++	int rc;
++
++	/* parse R-URI */
++	if (ts_check_uri(_ruri) < 0)
++		return -1;
++	if (pkg_str_dup(&ruri, _ruri) < 0)
++		return -1;
++
++	/* parse Contact header */
++	if ((!_msg->contact && parse_headers(_msg, HDR_CONTACT_F, 0) != 0) || !_msg->contact)
++		return -1;
++
++	if (_msg->contact) {
++		if (parse_contact(_msg->contact) < 0)
++			return -1;
++		if (parse_uri(
++						((struct contact_body*)_msg->contact->parsed)->contacts->uri.s,
++						((struct contact_body*)_msg->contact->parsed)->contacts->uri.len,
++						&curi) != 0 ) {
++			if (ts_check_uri(&_msg->contact->body) < 0) /* one more attempt */
++				return -1;
++		}
++
++		tmp_contact.len = ((struct contact_body*)_msg->contact->parsed)->contacts->uri.len;
++		tmp_contact.s = (char*)pkg_malloc(tmp_contact.len+1);
++		if (tmp_contact.s == NULL) {
++			PKG_MEM_ERROR;
++			return -1;
++		}
++		memcpy(tmp_contact.s, ((struct contact_body*)_msg->contact->parsed)->contacts->uri.s, tmp_contact.len);
++		tmp_contact.s[tmp_contact.len] = '\0';
++
++		if (pkg_str_dup(&contact, &tmp_contact) < 0) {
++			if (pkg_str_dup(&contact, &_msg->contact->body) < 0) /* one more attempt */
++				return -1;
++		}
++	}
++
++	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
++	rc = ts_append_by_contact(_msg, &ruri, &contact, _table->s);
++
++	pkg_free(ruri.s);
++	pkg_free(contact.s);
++	pkg_free(tmp_contact.s);
++
++	return rc;
++}
++
++/**
++ *
++ */
++static int w_ts_append_by_contact3(struct sip_msg* _msg, char *_table, char *_ruri, char *_contact) {
++	str ruri = STR_NULL;
++	str ruri_fixed = STR_NULL;
++
++	str contact = STR_NULL;
++	str contact_fixed = STR_NULL;
++
++	int rc;
++
++	/* parse R-URI */
++	if (fixup_get_svalue(_msg, (gparam_t*)_ruri, &ruri_fixed)!=0) {
++		LM_ERR("failed to convert r-uri parameter\n");
++		return -1;
++	}
++
++	if (_ruri==NULL || strlen(_ruri) <= 0 || ruri_fixed.len <= 0) {
++		LM_ERR("tsilo: invalid ruri parameter.\n");
++		return -1;
++	}
++
++	if (pkg_str_dup(&ruri, &ruri_fixed) < 0) {
++		LM_ERR("failed to copy r-uri parameter\n");
++		return -1;
++	}
++
++	if (ts_check_uri(&ruri) < 0) {
++		LM_ERR("tsilo: failed to parse R-URI.\n");
++		return -1;
++	}
++
++	/* parse Contact header */
++	if (fixup_get_svalue(_msg, (gparam_t*)_contact, &contact_fixed)!=0) {
++		LM_ERR("failed to convert contact parameter\n");
++		return -1;
++	}
++
++	if (_contact==NULL || strlen(_contact) <= 0 || contact_fixed.len <= 0) {
++		LM_ERR("tsilo: invalid contact parameter.\n");
++		return -1;
++	}
++
++	if (pkg_str_dup(&contact, &contact_fixed) < 0) {
++		LM_ERR("failed to copy r-uri parameter\n");
++		return -1;
++	}
++
++	if (ts_check_uri(&contact) < 0) {
++		LM_ERR("tsilo: failed to parse Contact parameter.\n");
++		return -1;
++	}
++
++	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
++	rc = ts_append_by_contact(_msg, &ruri, &contact, _table);
++
++	pkg_free(ruri.s);
++	pkg_free(contact.s);
++
++	return rc;
++}
++
++/**
++ *
++ */
++static int ki_ts_append_by_contact_uri(sip_msg_t* _msg, str *_table, str *_ruri, str *_contact) {
++	str ruri = STR_NULL;
++	str contact = STR_NULL;
++
++	int rc;
++
++	/* parse R-URI */
++	if(ts_check_uri(_ruri) < 0)
++		return -1;
++	if (pkg_str_dup(&ruri, _ruri) < 0)
++		return -1;
++
++	/* parse Contact header */
++	if (ts_check_uri(_contact) < 0)
++		return -1;
++	if (pkg_str_dup(&contact, _contact) < 0)
++		return -1;
++
++	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
++	rc = ts_append_by_contact(_msg, &ruri, &contact, _table->s);
++
++	pkg_free(ruri.s);
++	pkg_free(contact.s);
++
++	return rc;
++}
++
+ /**
+  *
+  */
+@@ -417,6 +674,16 @@ static sr_kemi_t sr_kemi_tsilo_exports[] = {
+ 		{ SR_KEMIP_INT, SR_KEMIP_INT, SR_KEMIP_STR,
+ 			SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE }
+ 	},
++	{ str_init("tsilo"), str_init("ts_append_by_contact"),
++		SR_KEMIP_INT, ki_ts_append_by_contact,
++		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
++			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
++	},
++	{ str_init("tsilo"), str_init("ts_append_by_contact_uri"),
++		SR_KEMIP_INT, ki_ts_append_by_contact_uri,
++		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
++			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
++	},
+ 
+ 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
+ };
+-- 
+2.25.1
+
+From 474649171d3c269e2fcfb00c7b1dbd318a952f51 Mon Sep 17 00:00:00 2001
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Sun, 14 Nov 2021 23:13:15 +0200
+Subject: [PATCH] tsilo: Be compliant with changes in TM, now only
+ t_append_branches()
+
+Since of changes in TM's module, where 't_append_branches()' and
+'t_append_branch_by_contact()' have been merged into one function,
+we need to edit all the occurences where TM's API is called
+in TSILO.
+
+No logic changes.
+---
+ src/modules/tsilo/ts_append.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/tsilo/ts_append.c b/src/modules/tsilo/ts_append.c
+index 1847ac1c1b..e4967f8167 100644
+--- a/src/modules/tsilo/ts_append.c
++++ b/src/modules/tsilo/ts_append.c
+@@ -89,6 +89,10 @@ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *
+ 	int ret;
+ 	str stable;
+ 
++	str contact;       /* needed for usage of TM's API, t_append_branches() */
++	contact.s = NULL;  /* must be emptied */
++	contact.len = 0;
++
+ 	orig_t = _tmb.t_gett();
+ 
+ 	if(_tmb.t_lookup_ident(&t, tindex, tlabel) < 0)
+@@ -129,7 +133,7 @@ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *
+ 		goto done;
+ 	}
+ 
+-	ret = _tmb.t_append_branches();
++	ret = _tmb.t_append_branches(&contact);
+ 
+ done:
+ 	/* unref the transaction which had been referred by t_lookup_ident() call.
+@@ -245,7 +249,7 @@ int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *t
+ 
+ 	/* start the transaction only for the desired contact
+ 		contact must be of syntax: sip:<user>@<host>:<port> with no parameters list*/
+-	ret = _tmb.t_append_branch_by_contact(contact);
++	ret = _tmb.t_append_branches(contact);
+ 
+ done:
+ 	/* unref the transaction which had been referred by t_lookup_ident() call.
+-- 
+2.25.1
+
+From c1fd9ebaa0fe0eb7457ea74e8a22444b855af9cd Mon Sep 17 00:00:00 2001
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Wed, 17 Nov 2021 16:27:37 +0200
+Subject: [PATCH] tsilo: Merge similar functions in ts_append.c
+
+We need to merge similar functions in ts_append.c implementation
+to give less work for maintaining similar code.
+Furthermore the purpose of them is quite the same,
+but differes just in some details (usage of TM's API).
+
+Merged functions are:
+- ts_append() and ts_append_by_contact()
+- ts_append_to() and ts_append_by_contact_to()
+
+Now all appending in TSILO happens only through ts_append() / ts_append_to()
+An implementation in tsilo.c has been updated accordingly.
+
+Usage.
+In case we do not want to append based on specific Contact (location),
+the contact parameter being passed to either ts_append() or ts_append_to()
+must be set to zero.
+In case we do want to append by a specific Contact, then we must
+set the Contact parameter of str type beforehand calling ts_append() / ts_append_to().
+---
+ src/modules/tsilo/ts_append.c | 154 ++++++----------------------------
+ src/modules/tsilo/ts_append.h |   6 +-
+ src/modules/tsilo/tsilo.c     |  42 +++++++---
+ 3 files changed, 61 insertions(+), 141 deletions(-)
+
+diff --git a/src/modules/tsilo/ts_append.c b/src/modules/tsilo/ts_append.c
+index e4967f8167..2781deffc4 100644
+--- a/src/modules/tsilo/ts_append.c
++++ b/src/modules/tsilo/ts_append.c
+@@ -36,26 +36,37 @@
+ #include "ts_hash.h"
+ #include "ts_append.h"
+ 
+-int ts_append(struct sip_msg* msg, str *ruri, char *table) {
++int ts_append(struct sip_msg* msg, str *ruri, str *contact, char *table) {
+ 	ts_urecord_t* _r;
+ 	ts_transaction_t* ptr;
+ 
+ 	struct sip_uri p_uri;
++	struct sip_uri c_uri;
+ 	str *t_uri;
+ 
+ 	int res;
+ 	int appended;
+-	
++
++	/* parse R-URI */
+ 	if (use_domain) {
+ 		t_uri = ruri;
+ 	} else {
+-		if(parse_uri(ruri->s, ruri->len, &p_uri)<0) {
++		if(parse_uri(ruri->s, ruri->len, &p_uri) < 0) {
+ 			LM_ERR("failed to parse uri %.*s\n", ruri->len, ruri->s);
+ 			return -1;
+ 		}
+ 		t_uri = &p_uri.user;
+ 	}
+ 
++	/* parse contact if given */
++	if(contact->s != NULL && contact->len != 0) {
++		if (parse_uri(contact->s, contact->len, &c_uri) < 0) {
++			LM_ERR("failed to parse contact %.*s\n", ruri->len, ruri->s);
++			return -1;
++		}
++	}
++
++	/* find urecord in TSILO cache */
+ 	lock_entry_by_ruri(t_uri);
+ 
+ 	res = get_ts_urecord(t_uri, &_r);
+@@ -66,12 +77,13 @@ int ts_append(struct sip_msg* msg, str *ruri, char *table) {
+ 		return -1;
+ 	}
+ 
++	/* cycle through existing transactions */
+ 	ptr = _r->transactions;
+ 
+ 	while(ptr) {
+ 		LM_DBG("transaction %u:%u found for %.*s, going to append branches\n",ptr->tindex, ptr->tlabel, t_uri->len, t_uri->s);
+ 
+-		appended = ts_append_to(msg, ptr->tindex, ptr->tlabel, table, ruri);
++		appended = ts_append_to(msg, ptr->tindex, ptr->tlabel, table, ruri, contact);
+ 		if (appended > 0)
+ 			update_stat(added_branches, appended);
+ 		ptr = ptr->next;
+@@ -82,27 +94,28 @@ int ts_append(struct sip_msg* msg, str *ruri, char *table) {
+ 	return 1;
+ }
+ 
+-int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri) {
++int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact) {
+ 	struct cell     *t=0;
+-	struct cell     *orig_t;
++	struct cell     *orig_t;	/* a pointer to an existing transaction or 0 if lookup fails */
+ 	struct sip_msg *orig_msg;
+ 	int ret;
+ 	str stable;
+ 
+-	str contact;       /* needed for usage of TM's API, t_append_branches() */
+-	contact.s = NULL;  /* must be emptied */
+-	contact.len = 0;
++	if(contact->s!=NULL && contact->len > 0) {
++		LM_DBG("trying to append based on specific contact <%.*s>\n", contact->len, contact->s);
++	}
+ 
++	/* lookup a transaction based on its identifier (hash_index:label) */
+ 	orig_t = _tmb.t_gett();
+ 
+ 	if(_tmb.t_lookup_ident(&t, tindex, tlabel) < 0)
+ 	{
+-		LM_ERR("transaction [%u:%u] not found\n",
+-				tindex, tlabel);
++		LM_ERR("transaction [%u:%u] not found\n",	tindex, tlabel);
+ 		ret = -1;
+ 		goto done;
+ 	}
+ 
++	/* check if the dialog is still in the early stage */
+ 	if (t->flags & T_CANCELED) {
+ 		LM_DBG("trasaction [%u:%u] was cancelled\n",
+ 				tindex, tlabel);
+@@ -117,119 +130,6 @@ int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *
+ 		goto done;
+ 	}
+ 
+-	orig_msg = t->uas.request;
+-
+-	stable.s = table;
+-	stable.len = strlen(stable.s);
+-	if(uri==NULL || uri->s==NULL || uri->len<=0) {
+-		ret = _regapi.lookup_to_dset(orig_msg, &stable, NULL);
+-	} else {
+-		ret = _regapi.lookup_to_dset(orig_msg, &stable, uri);
+-	}
+-
+-	if(ret != 1) {
+-		LM_DBG("transaction %u:%u: error updating dset (%d)\n", tindex, tlabel, ret);
+-		ret = -4;
+-		goto done;
+-	}
+-
+-	ret = _tmb.t_append_branches(&contact);
+-
+-done:
+-	/* unref the transaction which had been referred by t_lookup_ident() call.
+-	 * Restore the original transaction (if any) */
+-	if(t) _tmb.unref_cell(t);
+-	_tmb.t_sett(orig_t, T_BR_UNDEFINED);
+-
+-	return ret;
+-}
+-
+-int ts_append_by_contact(struct sip_msg* msg, str *ruri, str *contact, char *table) {
+-	ts_urecord_t* _r;
+-	ts_transaction_t* ptr;
+-
+-	struct sip_uri p_uri;
+-	struct sip_uri c_uri;
+-	str *t_uri;
+-
+-	int res;
+-	int appended;
+-
+-	/* parse R-URI */
+-	if (use_domain) {
+-		t_uri = ruri;
+-	} else {
+-		if (parse_uri(ruri->s, ruri->len, &p_uri) < 0) {
+-			LM_ERR("tsilo: failed to parse uri %.*s\n", ruri->len, ruri->s);
+-			return -1;
+-		}
+-		t_uri = &p_uri.user;
+-	}
+-
+-	/* parse contact */
+-	if (parse_uri(contact->s, contact->len, &c_uri) < 0) {
+-		LM_ERR("tsilo: failed to parse contact %.*s\n", ruri->len, ruri->s);
+-		return -1;
+-	}
+-
+-	/* find urecord in TSILO cache */
+-	lock_entry_by_ruri(t_uri);
+-	res = get_ts_urecord(t_uri, &_r);
+-
+-	if (res != 0) {
+-		LM_ERR("tsilo: failed to retrieve record for %.*s\n", t_uri->len, t_uri->s);
+-		unlock_entry_by_ruri(t_uri);
+-		return -1;
+-	}
+-
+-	/* cycle through existing transactions */
+-	ptr = _r->transactions;
+-	while(ptr) {
+-		LM_DBG("tsilo: transaction %u:%u found for %.*s, going to append branches\n",
+-						ptr->tindex, ptr->tlabel, t_uri->len, t_uri->s);
+-		/* append only if the desired contact has been found in locations */
+-		appended = ts_append_by_contact_to(msg, ptr->tindex, ptr->tlabel, table, ruri, contact);
+-		if (appended > 0)
+-			update_stat(added_branches, appended);
+-		ptr = ptr->next;
+-	}
+-
+-	unlock_entry_by_ruri(t_uri);
+-
+-	return 1;
+-}
+-
+-int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact) {
+-	struct cell     *t=0;
+-	struct cell     *orig_t;	/* a pointer to an existing transaction or 0 if lookup fails*/
+-	struct sip_msg *orig_msg;
+-	int ret;
+-	str stable;
+-
+-	LM_DBG("tsilo: trying to append based on contact <%.*s>\n", contact->len, contact->s);
+-
+-	/* lookup a transaction based on its identifier (hash_index:label) */
+-	orig_t = _tmb.t_gett();
+-	if(_tmb.t_lookup_ident(&t, tindex, tlabel) < 0)
+-	{
+-		LM_ERR("tsilo: transaction [%u:%u] not found\n", tindex, tlabel);
+-		ret = -1;
+-		goto done;
+-	}
+-
+-	/* check if the dialog is still in the early stage */
+-	if (t->flags & T_CANCELED) {
+-		LM_DBG("tsilo: trasaction [%u:%u] was cancelled\n", tindex, tlabel);
+-		ret = -2;
+-		goto done;
+-	}
+-	if (t->uas.status >= 200) {
+-		LM_DBG("tsilo: trasaction [%u:%u] sent out a final response already - %d\n",
+-					tindex, tlabel, t->uas.status);
+-		ret = -3;
+-		goto done;
+-	}
+-
+ 	/* get original (very first) request of the transaction */
+ 	orig_msg = t->uas.request;
+ 	stable.s = table;
+@@ -242,13 +142,13 @@ int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *t
+ 	}
+ 
+ 	if(ret != 1) {
+-		LM_ERR("tsilo: transaction %u:%u: error updating dset (%d)\n", tindex, tlabel, ret);
++		LM_ERR("transaction %u:%u: error updating dset (%d)\n", tindex, tlabel, ret);
+ 		ret = -4;
+ 		goto done;
+ 	}
+ 
+-	/* start the transaction only for the desired contact
+-		contact must be of syntax: sip:<user>@<host>:<port> with no parameters list*/
++	/* if the contact has been given previously
++		then do a new append only for the desired location */
+ 	ret = _tmb.t_append_branches(contact);
+ 
+ done:
+diff --git a/src/modules/tsilo/ts_append.h b/src/modules/tsilo/ts_append.h
+index 461f8881f3..02f3244b27 100644
+--- a/src/modules/tsilo/ts_append.h
++++ b/src/modules/tsilo/ts_append.h
+@@ -22,9 +22,7 @@
+ #ifndef _TS_APPEND_H
+ #define _TS_APPEND_H
+ 
+-int ts_append(struct sip_msg* msg, str *ruri, char *table);
+-int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri);
+-int ts_append_by_contact(struct sip_msg* msg, str *ruri, str *contact, char *table);
+-int ts_append_by_contact_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact);
++int ts_append(struct sip_msg* msg, str *ruri, str *contact, char *table);
++int ts_append_to(struct sip_msg* msg, int tindex, int tlabel, char *table, str *uri, str *contact);
+ 
+ #endif
+diff --git a/src/modules/tsilo/tsilo.c b/src/modules/tsilo/tsilo.c
+index 2eefb2fe2d..9769a3c7d8 100644
+--- a/src/modules/tsilo/tsilo.c
++++ b/src/modules/tsilo/tsilo.c
+@@ -275,6 +275,9 @@ static int w_ts_append(struct sip_msg* _msg, char *_table, char *_ruri)
+ 	str ruri = STR_NULL;
+ 	int rc;
+ 
++	/* we do not want to do append by particular location */
++	str contact = STR_NULL;
++
+ 	if(_ruri==NULL || (fixup_get_svalue(_msg, (gparam_p)_ruri, &tmp)!=0 || tmp.len<=0)) {
+ 		LM_ERR("invalid ruri parameter\n");
+ 		return -1;
+@@ -285,7 +288,7 @@ static int w_ts_append(struct sip_msg* _msg, char *_table, char *_ruri)
+ 	if (pkg_str_dup(&ruri, &tmp) < 0)
+ 		return -1;
+ 
+-	rc = ts_append(_msg, &ruri, _table);
++	rc = ts_append(_msg, &ruri, &contact, _table);
+ 
+ 	pkg_free(ruri.s);
+ 
+@@ -300,13 +303,16 @@ static int ki_ts_append(sip_msg_t* _msg, str *_table, str *_ruri)
+ 	str ruri = STR_NULL;
+ 	int rc;
+ 
++	/* we do not want to do append by particular location */
++	str contact = STR_NULL;
++
+ 	if(ts_check_uri(_ruri)<0)
+ 		return -1;
+ 
+ 	if (pkg_str_dup(&ruri, _ruri) < 0)
+ 		return -1;
+ 
+-	rc = ts_append(_msg, &ruri, _table->s);
++	rc = ts_append(_msg, &ruri, &contact, _table->s);
+ 
+ 	pkg_free(ruri.s);
+ 
+@@ -321,6 +327,9 @@ static int w_ts_append_to(struct sip_msg* msg, char *idx, char *lbl, char *table
+ 	unsigned int tindex;
+ 	unsigned int tlabel;
+ 
++	/* we do not want to do append by particular location */
++	str contact = STR_NULL;
++
+ 	if(fixup_get_ivalue(msg, (gparam_p)idx, (int*)&tindex)<0) {
+ 		LM_ERR("cannot get transaction index\n");
+ 		return -1;
+@@ -331,7 +340,8 @@ static int w_ts_append_to(struct sip_msg* msg, char *idx, char *lbl, char *table
+ 		return -1;
+ 	}
+ 
+-	return ts_append_to(msg, tindex, tlabel, table, 0);
++	/* we do not want to do append by particular location here */
++	return ts_append_to(msg, tindex, tlabel, table, 0, &contact);
+ }
+ 
+ /**
+@@ -339,8 +349,12 @@ static int w_ts_append_to(struct sip_msg* msg, char *idx, char *lbl, char *table
+  */
+ static int ki_ts_append_to(sip_msg_t* _msg, int tindex, int tlabel, str *_table)
+ {
++	/* we do not want to do append by particular location */
++	str contact = STR_NULL;
++
++	/* we do not want to do append by particular location here */
+ 	return ts_append_to(_msg, (unsigned int)tindex, (unsigned int)tlabel,
+-			_table->s, 0);
++			_table->s, 0, &contact);
+ }
+ 
+ /**
+@@ -352,6 +366,9 @@ static int w_ts_append_to2(struct sip_msg* msg, char *idx, char *lbl, char *tabl
+ 	unsigned int tlabel;
+ 	str suri;
+ 
++	/* we do not want to do append by particular location */
++	str contact = STR_NULL;
++
+ 	if(fixup_get_ivalue(msg, (gparam_p)idx, (int*)&tindex)<0) {
+ 		LM_ERR("cannot get transaction index\n");
+ 		return -1;
+@@ -369,7 +386,8 @@ static int w_ts_append_to2(struct sip_msg* msg, char *idx, char *lbl, char *tabl
+ 	if(ts_check_uri(&suri)<0)
+ 		return -1;
+ 
+-	return ts_append_to(msg, tindex, tlabel, table, &suri);
++	/* we do not want to do append by particular location here */
++	return ts_append_to(msg, tindex, tlabel, table, &suri, &contact);
+ }
+ 
+ /**
+@@ -378,8 +396,12 @@ static int w_ts_append_to2(struct sip_msg* msg, char *idx, char *lbl, char *tabl
+ static int ki_ts_append_to_uri(sip_msg_t* _msg, int tindex, int tlabel,
+ 		str *_table, str *_uri)
+ {
++	/* we do not want to do append by particular location */
++	str contact = STR_NULL;
++
++	/* we do not want to do append by particular location here */
+ 	return ts_append_to(_msg, (unsigned int)tindex, (unsigned int)tlabel,
+-			_table->s, _uri);
++			_table->s, _uri, &contact);
+ }
+ 
+ /**
+@@ -455,7 +477,7 @@ static int w_ts_append_by_contact2(struct sip_msg* _msg, char *_table, char *_ru
+ 	}
+ 
+ 	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
+-	rc = ts_append_by_contact(_msg, &ruri, &contact, _table);
++	rc = ts_append(_msg, &ruri, &contact, _table);
+ 
+ 	/* free previously used memory */
+ 	pkg_free(ruri.s);
+@@ -512,7 +534,7 @@ static int ki_ts_append_by_contact(sip_msg_t* _msg, str *_table, str *_ruri) {
+ 	}
+ 
+ 	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
+-	rc = ts_append_by_contact(_msg, &ruri, &contact, _table->s);
++	rc = ts_append(_msg, &ruri, &contact, _table->s);
+ 
+ 	pkg_free(ruri.s);
+ 	pkg_free(contact.s);
+@@ -576,7 +598,7 @@ static int w_ts_append_by_contact3(struct sip_msg* _msg, char *_table, char *_ru
+ 	}
+ 
+ 	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
+-	rc = ts_append_by_contact(_msg, &ruri, &contact, _table);
++	rc = ts_append(_msg, &ruri, &contact, _table);
+ 
+ 	pkg_free(ruri.s);
+ 	pkg_free(contact.s);
+@@ -606,7 +628,7 @@ static int ki_ts_append_by_contact_uri(sip_msg_t* _msg, str *_table, str *_ruri,
+ 		return -1;
+ 
+ 	/* contact must be of syntax: sip:<user>@<host>:<port> with no parameters list */
+-	rc = ts_append_by_contact(_msg, &ruri, &contact, _table->s);
++	rc = ts_append(_msg, &ruri, &contact, _table->s);
+ 
+ 	pkg_free(ruri.s);
+ 	pkg_free(contact.s);
+-- 
+2.25.1
+
