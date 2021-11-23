@@ -1,3 +1,21 @@
+ngcp-kamailio (5.5.1-1+0~mr10.3.0.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * [ce9c81c] TT#144053 TSILO: / TM: Add support of a lookup and branch creating by contact
+
+  [ Victor Seva ]
+  * [ee03278] TT#131050 pv_headers: don't try to replace header
+  * [1283085] TT#144550 pua_dialoginfo: dialog_uuid
+  * [452c996] TT#144053 tsilo: fix build warnings
+  * [e8b4156] TT#148850 pua_dialoginfo: fix memory corruption
+  * [2bfad1d] TT#146100 permissions: fix for match crash while RPC reload
+  * [ee55a33] TT#124752 nathelper: fix_nated_sdp added ignoring RFC3605-param if omitted
+
+  [ Guillem Jover ]
+  * [bfa102d] TT#124273 Update packaging for bullseye
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 23 Nov 2021 14:17:27 +0100
+
 ngcp-kamailio (5.5.1-1+0~mr10.2.0.0) unstable; urgency=medium
 
   [ Donat Zenichev ]
