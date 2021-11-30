@@ -1,0 +1,11 @@
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -515,8 +515,6 @@ int pvh_clone_branch_xavi(struct sip_msg
+ 	}
+ 
+ 	do {
+-		if(pvh_skip_header(&sub->name))
+-			continue;
+ 		if(sub->val.type == SR_XTYPE_DATA)
+ 			continue;
+ 		if(pvh_xavi_append_value(&sub->name, &sub->val, &br_xavi->val.v.xavp)
