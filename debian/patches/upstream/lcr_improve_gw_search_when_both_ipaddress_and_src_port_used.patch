@@ -1,0 +1,104 @@
+From d737c876cc36b4de802da77dfcd361323ad7cd8e Mon Sep 17 00:00:00 2001
+From: Donat Zenichev <dzenichev@sipwise.com>
+Date: Fri, 8 Oct 2021 16:18:47 +0300
+Subject: [PATCH] lcr: improve the search for GW when both IP address and
+ src_port are used
+
+It has been noticed, that after a list of contributions into lcr:
+* 14e6fc80b3d2389567c73c4a2196bf8e6d92d8d2
+* d8583d6ce1748c1ac8494616fced507b01dd4375
+* 470fd5b8bedca56efcc5e6aa0225089fe3857ac9
+* aa8d3ed4fe20efbd22db3b0b01a655789afa8818
+the gateways matching when a search is being done based on
+the IP address and the src_port (through the list of GWs with the same IP)
+works, but not fully correct.
+
+It is only related to the usage with the third parameter 'src_port',
+when calling from_gw() and from_any_gw(), and, only when the search
+is done through the gateways list, which have the same IP address
+(but different ports). If gateways have different IPs, the issue
+is not catchable.
+
+The problem is in the algorithm used for matching based on
+two objects (ip_addr and src_port) - the binary search.
+It's not fully suitable for a search based on two (or more) objects.
+
+The binary works completely fine, when only one object is used for searching,
+but works not fully correct when the search is based on a comparison
+of two (or more) objects. A division happening based on the value of
+the first object, gives a chance that the second object will never
+be found in the current half being looked up.
+
+This commit concerns switching to a full cycling through the list of
+gateways of the same lcr_id, and gives a proper work of the do_from_gw().
+
+The slight drawback of the new method is that we have to do a cycling
+through the whole list of GWs of the same lcr_id, but on the other hand
+it is much more efficient than trying to build up a matching using binary
+based on two objects (ip_addr and src_port) being used for comparison.
+---
+ src/modules/lcr/lcr_mod.c | 39 +++++++++++++++++----------------------
+ 1 file changed, 17 insertions(+), 22 deletions(-)
+
+diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
+index 93c5181600..d796c08c2c 100644
+--- a/src/modules/lcr/lcr_mod.c
++++ b/src/modules/lcr/lcr_mod.c
+@@ -922,28 +922,24 @@ static int comp_gws(const void *_g1, const void *_g2)
+ }
+ 
+ /*
+- * Compare gateways based on their IP address and port
++ * Compare a gateway using IP address and the src port
+  */
+-static int comp_gws_include_port(const void *_g1, const void *_g2)
+-{
+-	struct gw_info *g1 = (struct gw_info *)_g1;
+-	struct gw_info *g2 = (struct gw_info *)_g2;
+-
+-	/* first address family comparison */
+-	if(g1->ip_addr.af < g2->ip_addr.af)
+-		return -1;
+-	if(g1->ip_addr.af > g2->ip_addr.af)
+-		return 1;
+-	if(g1->ip_addr.len < g2->ip_addr.len)
+-		return -1;
+-	if(g1->ip_addr.len > g2->ip_addr.len)
+-		return 1;
+-
+-	/* secondly ports comparison */
+-	if(g1->port != g2->port)
+-		return -1;
++static struct gw_info * find_gateway_by_ip_and_port(struct gw_info * gw, struct gw_info * gws) {
++	int tmp = 0, gw_index = 0;
++
++	for (int i = 1; i <= gws[0].ip_addr.u.addr32[0]; i++) {
++		tmp = memcmp(gws[i].ip_addr.u.addr, gw->ip_addr.u.addr, gws[i].ip_addr.len);
++		if (gws[i].ip_addr.af == gw->ip_addr.af &&
++			gws[i].ip_addr.len == gw->ip_addr.len &&
++			tmp == 0 &&	/* a comparison of the IP address value */
++			gws[i].port == gw->port) {
++				gw_index = i;
++				break;
++		}
++	}
++	if (gw_index != 0) return &(gws[gw_index]);
+ 
+-	return memcmp(g1->ip_addr.u.addr, g2->ip_addr.u.addr, g1->ip_addr.len);
++	return NULL;
+ }
+ 
+ /* 
+@@ -3025,8 +3021,7 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+ 	if (src_port != 0) {
+ 		/* Search for gw based on its ip address and port */
+ 		gw.port = src_port;
+-		res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr.u.addr32[0],
+-				sizeof(struct gw_info), comp_gws_include_port);
++		res = find_gateway_by_ip_and_port(&gw, gws);
+ 	} else {
+ 		/* Search for gw based on its ip address */
+ 		res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr.u.addr32[0],
+-- 
+2.25.1
+

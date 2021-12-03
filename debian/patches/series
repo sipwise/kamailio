@@ -42,6 +42,7 @@ upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/lcr-source-port-check-for-from_any_gw-and-from_gw.patch
 upstream/lcr-remove-excessive-checks-for-the-src_port-accurac.patch
 upstream/lcr-improve-binary-search-to-support-match-including-src-port.patch
+upstream/lcr_improve_gw_search_when_both_ipaddress_and_src_port_used.patch
 upstream/nathelper-fix_nated_sdp-added-ignoring-RFC3605-param.patch
 upstream/tm_api_improvement_t_append_branches_with_contact.patch
 upstream/tsilo_append_by_contact.patch
@@ -62,7 +63,6 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
-sipwise/lcr_improve_comparison_based_on_gws_port.patch
 #
 sipwise/pv-headers-clone-branch-ignore-skip-header.patch
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
