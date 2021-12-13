@@ -1,3 +1,14 @@
+ngcp-kamailio (5.5.1-1+0~mr9.5.3.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [8bbe949] TT#131050 pv_headers: don't try to replace header
+  * [07d1c99] TT#144550 pua_dialoginfo: dialog_uuid
+  * [c247d8d] TT#148850 pua_dialoginfo: fix memory corruption
+  * [e463bdf] TT#146100 permissions: fix for match crash while RPC reload
+  * [d24f46d] TT#124752 nathelper: fix_nated_sdp added ignoring RFC3605-param if omitted
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 13 Dec 2021 19:28:34 +0100
+
 ngcp-kamailio (5.5.1-1+0~mr9.5.3.0) unstable; urgency=medium
 
   [ Victor Seva ]
