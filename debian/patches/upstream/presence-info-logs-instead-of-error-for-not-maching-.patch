@@ -1,0 +1,26 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Mon, 13 Dec 2021 08:31:07 +0100
+Subject: presence: info logs instead of error for not maching conditions
+
+(cherry picked from commit f42b6c5cf2ee9861cb1eed016a5ddcc499d2b854)
+---
+ src/modules/presence/presentity.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/modules/presence/presentity.c b/src/modules/presence/presentity.c
+index bc17bf1..9b3b9cd 100644
+--- a/src/modules/presence/presentity.c
++++ b/src/modules/presence/presentity.c
+@@ -1367,10 +1367,10 @@ done:
+ send_412:
+ 
+ 	if(!ruid) {
+-		LM_ERR("No E_Tag match %*s\n", presentity->etag.len,
++		LM_INFO("No E-Tag match %*s\n", presentity->etag.len,
+ 				presentity->etag.s);
+ 	} else {
+-		LM_ERR("No ruid match %*s\n", ruid->len, ruid->s);
++		LM_INFO("No ruid match %*s\n", ruid->len, ruid->s);
+ 	}
+ 
+ 	if(msg != NULL) {
