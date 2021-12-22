@@ -30,6 +30,8 @@
 #include "ut.h"
 #include "re.h"
 #include "pvar.h"
+#include "pvapi.h"
+#include "str_list.h"
 #include "dprint.h"
 
 #include "ppcfg.h"
@@ -44,6 +46,7 @@ typedef struct _pp_subst_rule {
 static pp_subst_rule_t *pp_subst_rules_head = NULL;
 static pp_subst_rule_t *pp_subst_rules_tail = NULL;
 static int _pp_ifdef_level = 0;
+static str_list_t *_ksr_substdef_strlist = NULL;
 
 int pp_subst_add(char *data)
 {
@@ -94,6 +97,7 @@ int pp_substdef_add(char *data, int mode)
 	str defvalue;
 	str newval;
 	sip_msg_t *fmsg;
+	str_list_t *sb;
 
 	if(pp_subst_add(data)<0) {
 		LM_ERR("subst rule cannot be added\n");
@@ -146,19 +150,39 @@ found_repl:
 	if(memchr(defvalue.s, '$', defvalue.len) != NULL) {
 		fmsg = faked_msg_get_next();
 		if(pv_eval_str(fmsg, &newval, &defvalue)>=0) {
-			defvalue = newval;
+			if(mode!=KSR_PPDEF_QUOTED) {
+				sb = str_list_block_add(&_ksr_substdef_strlist, newval.s, newval.len);
+				if(sb==NULL) {
+					LM_ERR("failed to handle substdef: [%s]\n", data);
+					return -1;
+				}
+				defvalue = sb->s;
+			} else {
+				defvalue = newval;
+			}
 		}
 	}
-	if(pp_define_set(defvalue.len, defvalue.s,
-				(mode==1)?KSR_PPDEF_QUOTED:KSR_PPDEF_NORMAL)<0) {
+	if(mode==KSR_PPDEF_QUOTED) {
+		if(pv_get_buffer_size() < defvalue.len + 4) {
+			LM_ERR("defined value is too large\n");
+			return -1;
+		}
+		newval.s = pv_get_buffer();
+		newval.s[0] = '"';
+		memcpy(newval.s + 1, defvalue.s, defvalue.len);
+		newval.s[defvalue.len + 1] = '"';
+		newval.s[defvalue.len + 2] = '\0';
+		newval.len = defvalue.len + 2;
+		sb = str_list_block_add(&_ksr_substdef_strlist, newval.s, newval.len);
+		if(sb==NULL) {
+			LM_ERR("failed to handle substdef: [%s]\n", data);
+			return -1;
+		}
+		defvalue = sb->s;
+	}
+	if(pp_define_set(defvalue.len, defvalue.s, KSR_PPDEF_QUOTED)<0) {
 		LM_ERR("cannot set define value\n");
 		goto error;
-	}
-	if(mode==1) {
-		defvalue.s++;
-		defvalue.len -= 2;
-		*(defvalue.s-1) = c;
-		defvalue.s[defvalue.len] = c;
 	}
 
 	LM_DBG("### added substdef: [%.*s]=[%.*s] (%d)\n", defname.len, defname.s,

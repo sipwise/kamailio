@@ -478,6 +478,7 @@ Chapter 1. Admin Guide
    The following modules must be loaded before this module:
      * tm module - (optional) if you want to have rtpengine_manage() fully
        functional
+       lwsc module - (optional) if you plan to use “wsapi” parameter
 
 3.2. External Libraries or Applications
 
@@ -2668,6 +2669,8 @@ play_dtmf("code=1 volume=5 duration=300 pause=150");
    or hides old ones, based on the database content. If allow_op modparam
    is enabled, the sessions are still allowed to finish for the hidden old
    nodes.
+
+   The execution of this command is limited to 10 seconds intervals.
 
    Example 1.100.  rtpengine.reload usage
 ...
