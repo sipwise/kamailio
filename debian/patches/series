@@ -36,6 +36,7 @@ upstream/presence-info-logs-instead-of-error-for-not-maching-.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
+upstream/pv_headers-restore-pvh_real_hdr_del_by_name.patch
 ## upstream master
 upstream/lcr-source-port-check-for-from_any_gw-and-from_gw.patch
 upstream/lcr-remove-excessive-checks-for-the-src_port-accurac.patch
