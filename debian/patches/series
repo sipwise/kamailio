@@ -37,14 +37,10 @@ upstream/presence-info-logs-instead-of-error-for-not-maching-.patch
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
 ## upstream master
-upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
-upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
-upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/lcr-source-port-check-for-from_any_gw-and-from_gw.patch
 upstream/lcr-remove-excessive-checks-for-the-src_port-accurac.patch
 upstream/lcr-improve-binary-search-to-support-match-including-src-port.patch
 upstream/lcr_improve_gw_search_when_both_ipaddress_and_src_port_used.patch
-upstream/nathelper-fix_nated_sdp-added-ignoring-RFC3605-param.patch
 upstream/tm_api_improvement_t_append_branches_with_contact.patch
 upstream/tsilo_append_by_contact.patch
 ### relevant for upstream
