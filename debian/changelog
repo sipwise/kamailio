@@ -1,7 +1,16 @@
-ngcp-kamailio (5.5.1-1+0~mr10.3.0.0) unstable; urgency=medium
+ngcp-kamailio (5.5.3-1+0~mr10.3.0.0) unstable; urgency=medium
+
+  [ Kirill Solomko ]
+  * TT#136050 pv_headers clone branch ignore skip_headers
 
   [ Donat Zenichev ]
   * [ce9c81c] TT#144053 TSILO: / TM: Add support of a lookup and branch creating by contact
+  * TT#144053 TM: 't_append_branches()' improvement / TSILO: add 'ts_append_by_contact()'
+  * TT#143950 lcr: improve the search for GW when both IP address and src_port are used
+
+  [ Guillem Jover ]
+  * [bfa102d] TT#124273 Update packaging for bullseye
+  * TT#124273 Remove obsolete dbg symbol package transition
 
   [ Victor Seva ]
   * [ee03278] TT#131050 pv_headers: don't try to replace header
@@ -10,9 +19,10 @@ ngcp-kamailio (5.5.1-1+0~mr10.3.0.0) unstable; urgency=medium
   * [e8b4156] TT#148850 pua_dialoginfo: fix memory corruption
   * [2bfad1d] TT#146100 permissions: fix for match crash while RPC reload
   * [ee55a33] TT#124752 nathelper: fix_nated_sdp added ignoring RFC3605-param if omitted
-
-  [ Guillem Jover ]
-  * [bfa102d] TT#124273 Update packaging for bullseye
+  * TT#155750 presence: info logs instead of error for not maching conditions
+  * TT#154255 remove redis-server from unit service
+  * New upstream version 5.5.3
+  * TT#155903 remove applied patches
 
  -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 23 Nov 2021 14:17:27 +0100
 
