@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.3-1+0~mr10.4.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [1927c05] TT#155903 pv_headers: pv_headers: restore pvh_real_hdr_del_by_name()
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 24 Jan 2022 16:55:03 +0100
+
 ngcp-kamailio (5.5.3-1+0~mr10.3.0.0) unstable; urgency=medium
 
   [ Kirill Solomko ]
