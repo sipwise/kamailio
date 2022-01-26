@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.1-1+0~mr10.2.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [09cd4ca] TT#155750 presence: info logs instead of error for not maching conditions
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 26 Jan 2022 09:53:52 +0100
+
 ngcp-kamailio (5.5.1-1+0~mr10.2.1.1) unstable; urgency=medium
 
   * New release.
