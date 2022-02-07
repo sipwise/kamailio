@@ -1,3 +1,9 @@
+ngcp-kamailio (5.5.3-1+0~mr10.3.2.0) unstable; urgency=medium
+
+  * New release.
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 07 Feb 2022 11:35:03 +0100
+
 ngcp-kamailio (5.5.3-1+0~mr10.3.1.0) unstable; urgency=medium
 
   [ Victor Seva ]
