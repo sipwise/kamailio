@@ -35,6 +35,7 @@ sipwise/sca-add-pai_avp-parameter.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
+upstream/core-ip-addr-use-POSIX-INET6_ADDRSTRLEN-and-INET_ADD.patch
 ## upstream master
 upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
 upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
