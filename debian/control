@@ -93,8 +93,8 @@ Suggests:
 Breaks:
  ngcp-kamailio-carrierroute-modules,
 Provides:
- sip-router,
  ngcp-kamailio-carrierroute-modules,
+ sip-router,
 Description: very fast and configurable SIP proxy
  Kamailio is a very fast and flexible SIP (RFC3261)
  proxy server. Written entirely in C, Kamailio can handle thousands calls
