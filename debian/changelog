@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.1-1+0~mr9.5.3.2) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [6f332de] TT#164550 IPV6 string lenght fix for kamailio
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 21 Feb 2022 12:06:32 +0100
+
 ngcp-kamailio (5.5.1-1+0~mr9.5.3.1) unstable; urgency=medium
 
   [ Victor Seva ]
