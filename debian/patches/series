@@ -83,6 +83,7 @@ upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
 upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/core-ip-addr-use-POSIX-INET6_ADDRSTRLEN-and-INET_ADD.patch
 upstream/db_redis-don-t-leave-unconsumed-redis-replies-in-cas.patch
+upstream/pv-headers-remove_specific_header_value.patch
 ### relevant for upstream
 #
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
@@ -99,6 +100,7 @@ sipwise/pv_headers-fix-detection-of-split-marker.patch
 sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
 sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
 sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
+sipwise/pv_headers-fix-build-warning.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
@@ -116,3 +118,4 @@ sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+
