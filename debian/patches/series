@@ -82,6 +82,7 @@ upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
 upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
 upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/core-ip-addr-use-POSIX-INET6_ADDRSTRLEN-and-INET_ADD.patch
+upstream/db_redis-don-t-leave-unconsumed-redis-replies-in-cas.patch
 ### relevant for upstream
 #
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
