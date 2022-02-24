@@ -37,6 +37,7 @@ upstream/tmx-use-trimmed-call-id-value-for-hashing.patch
 upstream/topos_redis-contact-on-A-side-is-never-updated-on-di.patch
 upstream/db_redis-clean-previous-connection-before-trying-to-.patch
 upstream/pv-headers-ignore-skip-header-config-on-clone_branch.patch
+upstream/pv-headers-remove_specific_header_value.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
@@ -68,6 +69,7 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
+sipwise/pv_headers-fix-build-warning.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
@@ -85,3 +87,4 @@ sipwise/lcr-stopper_mode-parameter.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+
