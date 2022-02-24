@@ -1,0 +1,34 @@
+From: Andrii Pogrebennyk <andrii@ng-voice.com>
+Date: Sun, 28 Nov 2021 08:34:36 +0100
+Subject: db_redis: don't leave unconsumed redis replies in case of error on
+ update
+
+Execute db_redis_consume_replies on failed update same as in db_redis_insert:
+if db_redis_perform_update encounters an error it was leaving unconsumed data
+thus causing unexpected reply later on when reading from the same connection.
+
+(cherry picked from commit bbd7b2ed5827252680e9d8949c193699da0a76b2)
+---
+ src/modules/db_redis/redis_dbase.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
+index 5258d57..ffe6ad7 100644
+--- a/src/modules/db_redis/redis_dbase.c
++++ b/src/modules/db_redis/redis_dbase.c
+@@ -2292,6 +2292,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+ 
+     db_redis_key_free(&all_type_keys);
+     db_redis_key_free(&new_type_keys);
++    db_redis_consume_replies(con);
+     return 0;
+ 
+ error:
+@@ -2303,6 +2304,7 @@ error:
+     db_redis_key_free(&type_keys);
+     db_redis_key_free(&set_keys);
+     db_redis_key_free(&new_type_keys);
++    db_redis_consume_replies(con);
+     return -1;
+ }
+ 
