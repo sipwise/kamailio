@@ -44,6 +44,7 @@ upstream/lcr-improve-binary-search-to-support-match-including-src-port.patch
 upstream/lcr_improve_gw_search_when_both_ipaddress_and_src_port_used.patch
 upstream/tm_api_improvement_t_append_branches_with_contact.patch
 upstream/tsilo_append_by_contact.patch
+upstream/core_sdp_parser_improve_ice_options_and_cloning.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
