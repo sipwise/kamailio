@@ -1,3 +1,11 @@
+ngcp-kamailio (5.5.3-1+0~mr10.3.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [3a1f84d] TT#165251 db_redis: don't leave unconsumed redis replies in case of error on update
+  * [f859ebf] TT#165251 db_redis: clean previous connection before reconnect
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 01 Mar 2022 10:38:13 +0100
+
 ngcp-kamailio (5.5.3-1+0~mr10.3.1.1) unstable; urgency=medium
 
   * New release.
