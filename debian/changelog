@@ -1,3 +1,14 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.9.0) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [8889524] TT#164550 IPV6 string lenght fix for kamailio
+
+  [ Victor Seva ]
+  * [8130181] TT#165251 db_redis: don't leave unconsumed redis replies in case of error on update
+  * [3eec7a7] TT#165251 db_redis: clean previous connection before reconnect
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 01 Mar 2022 20:11:37 +0100
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.8.0) unstable; urgency=medium
 
   [ Victor Seva ]
