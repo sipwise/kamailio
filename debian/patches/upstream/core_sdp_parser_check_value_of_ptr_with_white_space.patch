@@ -1,0 +1,25 @@
+From f65c98cf74e4495a6e892a701980c4b691a3390b Mon Sep 17 00:00:00 2001
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Fri, 4 Mar 2022 09:43:13 +0100
+Subject: [PATCH] core: parser - check value of pointer with white space code
+
+---
+ src/core/parser/sdp/sdp_helpr_funcs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/core/parser/sdp/sdp_helpr_funcs.c b/src/core/parser/sdp/sdp_helpr_funcs.c
+index 9fae1f7448..c2b817f3e4 100644
+--- a/src/core/parser/sdp/sdp_helpr_funcs.c
++++ b/src/core/parser/sdp/sdp_helpr_funcs.c
+@@ -376,7 +376,7 @@ int extract_ice_option(str *body, sdp_stream_cell_t *stream)
+ 		return -1;
+ 
+ 	ptr_src = body->s + 14;
+-	if (ptr_src == 32) ptr_src++; /* if starts with a space, skip it */
++	if (*ptr_src == 32) ptr_src++; /* if starts with a space, skip it */
+ 
+ 	/* identify all existing ICE options, if they are listed in one row */
+ 	while (*ptr_src && *ptr_src != '\r' && *ptr_src != '\n' && max_options-->0)
+-- 
+2.25.1
+
