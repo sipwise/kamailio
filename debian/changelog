@@ -1,9 +1,17 @@
-ngcp-kamailio (5.5.3-1+0~mr10.4.0.0) unstable; urgency=medium
+ngcp-kamailio (5.5.4-1+0~mr10.4.0.0) unstable; urgency=medium
+
+  [ Donat Zenichev ]
+  * TT#158001 core: add support of ICE media options to SDP parser
+  * TT#158001 core: sdp parser check value of ptr with white space
 
   [ Victor Seva ]
-  * [1927c05] TT#155903 pv_headers: pv_headers: restore pvh_real_hdr_del_by_name()
+  * TT#155903 pv_headers: pv_headers: restore pvh_real_hdr_del_by_name()
+  * TT#165251 db_redis: don't leave unconsumed redis replies in case of error on update
+  * TT#165251 db_redis: clean previous connection before reconnect
+  * TT#167301 New upstream version 5.5.4
+  * TT#167301 remove already applied patches from 5.5
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 24 Jan 2022 16:55:03 +0100
+ -- Victor Seva <vseva@sipwise.com>  Fri, 11 Mar 2022 13:54:14 +0100
 
 ngcp-kamailio (5.5.3-1+0~mr10.3.0.0) unstable; urgency=medium
 
