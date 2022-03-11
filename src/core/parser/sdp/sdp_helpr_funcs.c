@@ -52,7 +52,10 @@ static struct {
 
 
 #define READ(val) \
-	(*(val + 0) + (*(val + 1) << 8) + (*(val + 2) << 16) + (*(val + 3) << 24))
+	((unsigned int)(*(val + 0)) \
+	 + ((unsigned int)(*(val + 1)) << 8) \
+	 + ((unsigned int)(*(val + 2)) << 16) \
+	 + ((unsigned int)(*(val + 3)) << 24))
 #define advance(_ptr,_n,_str,_error) \
 	do{\
 		if ((_ptr)+(_n)>(_str).s+(_str).len)\
@@ -739,7 +742,7 @@ char* get_sdp_hdr_field(char* buf, char* end, struct hdr_field* hdr)
 	}
 
 	/* eliminate leading whitespace */
-	tmp=eat_lws_end(tmp, end); 
+	tmp=eat_lws_end(tmp, end);
 	if (tmp>=end) {
 		LM_ERR("hf empty\n");
 		goto error;
@@ -754,7 +757,8 @@ char* get_sdp_hdr_field(char* buf, char* end, struct hdr_field* hdr)
 		if (match){
 			match++;
 		}else {
-			LM_ERR("bad body for <%s>(%d)\n", hdr->name.s, hdr->type);
+			LM_ERR("bad body for <%.*s>(%d)\n", hdr->name.len, hdr->name.s,
+					hdr->type);
 			tmp=end;
 			goto error;
 		}
@@ -778,32 +782,32 @@ error:
 
 char *find_sdp_line_delimiter(char* p, char* plimit, str delimiter)
 {
-  static char delimiterhead[3] = "--";
-  char *cp, *cp1;
-  /* Iterate through body */
-  cp = p;
-  for (;;) {
-    if (cp >= plimit)
-      return NULL;
-    for(;;) {
-      cp1 = ser_memmem(cp, delimiterhead, plimit-cp, 2);
-      if (cp1 == NULL)
-	return NULL;
-      /* We matched '--',
-       * now let's match the boundary delimiter */
-      if (strncmp(cp1+2, delimiter.s, delimiter.len) == 0)
-	break;
-      else
-	cp = cp1 + 2 + delimiter.len;
-      if (cp >= plimit)
-	return NULL;
-    }
-    if (cp1[-1] == '\n' || cp1[-1] == '\r')
-      return cp1;
-    if (plimit - cp1 < 2 + delimiter.len)
-      return NULL;
-    cp = cp1 + 2 + delimiter.len;
-  }
+	static char delimiterhead[3] = "--";
+	char *cp, *cp1;
+	/* Iterate through body */
+	cp = p;
+	for (;;) {
+		if (cp >= plimit)
+			return NULL;
+		for(;;) {
+			cp1 = ser_memmem(cp, delimiterhead, plimit-cp, 2);
+			if (cp1 == NULL)
+				return NULL;
+			/* We matched '--',
+			 * now let's match the boundary delimiter */
+			if(cp1+2+delimiter.len >= plimit)
+				return NULL;
+			if (strncmp(cp1+2, delimiter.s, delimiter.len) == 0)
+				break;
+			else
+				cp = cp1 + 2 + delimiter.len;
+		}
+		if (cp1[-1] == '\n' || cp1[-1] == '\r')
+			return cp1;
+		if (plimit - cp1 < 2 + delimiter.len)
+			return NULL;
+		cp = cp1 + 2 + delimiter.len;
+	}
 }
 
 
@@ -812,10 +816,10 @@ char *find_sdp_line_delimiter(char* p, char* plimit, str delimiter)
  */
 char *find_next_sdp_line_delimiter(char* p, char* plimit, str delimiter, char* defptr)
 {
-  char *t;
-  if (p >= plimit || plimit - p < 3)
-    return defptr;
-  t = find_sdp_line_delimiter(p + 2, plimit, delimiter);
-  return t ? t : defptr;
+	char *t;
+	if (p >= plimit || plimit - p < 3)
+		return defptr;
+	t = find_sdp_line_delimiter(p + 2, plimit, delimiter);
+	return t ? t : defptr;
 }
 

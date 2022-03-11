@@ -106,7 +106,7 @@ INSTALL_FLAVOUR=$(FLAVOUR)
 # version number
 VERSION = 5
 PATCHLEVEL = 5
-SUBLEVEL = 3
+SUBLEVEL = 4
 EXTRAVERSION = 
 
 # memory manager switcher
@@ -522,7 +522,12 @@ ifeq ($(OS), darwin)
 	doc_dir = share/doc/$(MAIN_NAME)/
 	man_dir = man/
 	data_dir = share/$(MAIN_NAME)/
+	MACPORTS = $(shell which port 2>/dev/null)
+ifeq ($(MACPORTS),)
 	LOCALBASE ?= /usr/local
+else
+	LOCALBASE ?= /opt/local
+endif
 endif
 
 LOCALBASE ?= /usr/local
@@ -1885,6 +1890,13 @@ ifeq ($(OS), linux)
 	endif
 	ifeq ($(NO_SELECT),)
 		C_DEFS+=-DHAVE_SELECT
+	endif
+	ifeq ($(CC_NAME), gcc)
+		# link librt for glibc <= 2.17
+		GLIBCVER=$(shell ldd --version | head -1 | sed -e 's/^.* //' -e 's/\.//' )
+		ifeq ($(shell [ $(GLIBCVER) -le 217 ] && echo librt), librt)
+			LIBS+=-lrt
+		endif
 	endif
 endif
 
