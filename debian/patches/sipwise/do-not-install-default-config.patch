@@ -8,7 +8,7 @@ Subject: do-not-install-default-config
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/Makefile b/src/Makefile
-index 14cc0d7..0e37b95 100644
+index 3c8dcda..7a8a402 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -652,7 +652,7 @@ sunpkg:

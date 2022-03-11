@@ -1,4 +1,3 @@
-From e82819e6613dd64ca5c887759eab18cd38d20373 Mon Sep 17 00:00:00 2001
 From: Donat Zenichev <dzenichev@sipwise.com>
 Date: Fri, 17 Sep 2021 12:56:39 +0300
 Subject: [PATCH 1/3] lcr: improve binary search to support a match including
@@ -22,11 +21,11 @@ when from_gw() and from_any_gw() functions are used with the 'src_port' paramete
 
 This means backwards compatibility is still present (when one uses functions without 'src_port').
 ---
- src/modules/lcr/lcr_mod.c | 37 ++++++++++++++++++++++++++++++++++---
- 1 file changed, 34 insertions(+), 3 deletions(-)
+ src/modules/lcr/lcr_mod.c | 41 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 35 insertions(+), 6 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 21f05a4730..8c5b05d1df 100644
+index c25ed61..bc5a0cd 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -921,6 +921,30 @@ static int comp_gws(const void *_g1, const void *_g2)
@@ -60,7 +59,7 @@ index 21f05a4730..8c5b05d1df 100644
  
  /* 
   * Insert gw info into index i or gws table
-@@ -2997,10 +3021,17 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -2999,15 +3023,20 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  		return -1;
  	}
  
@@ -80,67 +79,10 @@ index 21f05a4730..8c5b05d1df 100644
 +	}
  
  	/* Store tag and flags and return result */
- 	if((res != NULL)
--- 
-2.25.1
-
-
-From 7a3a54433bbbfdb2521d4f8981c5b72423299bb1 Mon Sep 17 00:00:00 2001
-From: Donat Zenichev <dzenichev@sipwise.com>
-Date: Sun, 19 Sep 2021 10:01:53 +0300
-Subject: [PATCH 2/3] lcr: remove excessive conditional check in do_from_gw()
-
-After an update of the bsearch(), which now supports matching not only
-by the IP address, but also using the 'src_port', there is no need to check,
-if the source port of a request matched the one from the 'lcr_gw'
-('res' pointer will be NULL anyway, if ports don't match).
-
-Nor do we need to check if it's zero.
----
- src/modules/lcr/lcr_mod.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 8c5b05d1df..23b5bce0dc 100644
---- a/src/modules/lcr/lcr_mod.c
-+++ b/src/modules/lcr/lcr_mod.c
-@@ -3035,8 +3035,7 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
- 
- 	/* Store tag and flags and return result */
- 	if((res != NULL)
+-	if((res != NULL)
 -					&& ((transport == PROTO_NONE) || (res->transport_code == transport))
 -					&& ((src_port == 0) || (res->port == src_port))) {
-+					&& ((transport == PROTO_NONE) || (res->transport_code == transport))) {
- 		LM_DBG("request came from gw\n");
- 		if(tag_avp_param) {
- 			val.s.s = res->tag;
--- 
-2.25.1
-
-
-From 10b014b505080a918a8443ff83029a0155364661 Mon Sep 17 00:00:00 2001
-From: Henning Westerholt <hw@skalatan.de>
-Date: Mon, 20 Sep 2021 18:14:35 +0000
-Subject: [PATCH 3/3] lcr: small white-space (related to GH #2859)
-
----
- src/modules/lcr/lcr_mod.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 23b5bce0dc..93c5181600 100644
---- a/src/modules/lcr/lcr_mod.c
-+++ b/src/modules/lcr/lcr_mod.c
-@@ -3034,8 +3034,7 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
- 	}
- 
- 	/* Store tag and flags and return result */
--	if((res != NULL)
--					&& ((transport == PROTO_NONE) || (res->transport_code == transport))) {
 +	if((res != NULL) && ((transport == PROTO_NONE) || (res->transport_code == transport))) {
  		LM_DBG("request came from gw\n");
  		if(tag_avp_param) {
  			val.s.s = res->tag;
--- 
-2.25.1
-

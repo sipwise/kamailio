@@ -1,4 +1,3 @@
-From 9115d74b33aefb0febad7c7fffe7d184e4066b77 Mon Sep 17 00:00:00 2001
 From: Donat Zenichev <dzenichev@sipwise.com>
 Date: Mon, 23 Aug 2021 21:50:50 +0300
 Subject: [PATCH 2/2] lcr: source port check for from_any_gw() and from_gw().
@@ -13,12 +12,12 @@ Improvements are done for the following functions of the lcr module:
 
 Back compatibility provided, hence it does not affect already existing behavior.
 ---
- src/modules/lcr/doc/lcr_admin.xml |  31 ++++----
- src/modules/lcr/lcr_mod.c         | 116 +++++++++++++++++++++++++-----
+ src/modules/lcr/doc/lcr_admin.xml |  31 +++++-----
+ src/modules/lcr/lcr_mod.c         | 116 ++++++++++++++++++++++++++++++++------
  2 files changed, 116 insertions(+), 31 deletions(-)
 
 diff --git a/src/modules/lcr/doc/lcr_admin.xml b/src/modules/lcr/doc/lcr_admin.xml
-index 2c5bfb0d85..f6461e1a24 100644
+index 2c5bfb0..f6461e1 100644
 --- a/src/modules/lcr/doc/lcr_admin.xml
 +++ b/src/modules/lcr/doc/lcr_admin.xml
 @@ -1425,16 +1425,16 @@ defunct_gw(60);
@@ -101,7 +100,7 @@ index 2c5bfb0d85..f6461e1a24 100644
  </programlisting>
  		</example>
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 579ec06d4d..858352f2c7 100644
+index d24f952..983d4b4 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -260,8 +260,10 @@ static int inactivate_gw(struct sip_msg *_m, char *_s1, char *_s2);
@@ -130,7 +129,7 @@ index 579ec06d4d..858352f2c7 100644
      {"to_gw", (cmd_function)to_gw_1, 1, 0, 0,
       REQUEST_ROUTE | FAILURE_ROUTE | ONREPLY_ROUTE},
      {"to_gw", (cmd_function)to_gw_3, 3, 0, 0,
-@@ -2978,7 +2984,7 @@ static int next_gw(struct sip_msg *_m, char *_s1, char *_s2)
+@@ -2980,7 +2986,7 @@ static int next_gw(struct sip_msg *_m, char *_s1, char *_s2)
   * Checks if request comes from ip address of a gateway
   */
  static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
@@ -139,7 +138,7 @@ index 579ec06d4d..858352f2c7 100644
  {
  	struct gw_info *res, gw, *gws;
  	int_str val;
-@@ -2997,9 +3003,10 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -2999,9 +3005,10 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  			sizeof(struct gw_info), comp_gws);
  
  	/* Store tag and flags and return result */
@@ -153,7 +152,7 @@ index 579ec06d4d..858352f2c7 100644
  		if(tag_avp_param) {
  			val.s.s = res->tag;
  			val.s.len = res->tag_len;
-@@ -3021,22 +3028,24 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -3023,22 +3030,24 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  
  /*
   * Checks if request comes from ip address of a gateway taking source
@@ -181,7 +180,7 @@ index 579ec06d4d..858352f2c7 100644
  }
  
  static int from_gw_1(struct sip_msg *_m, char *_lcr_id, char *_s2)
-@@ -3056,10 +3065,10 @@ static int from_gw_1(struct sip_msg *_m, char *_lcr_id, char *_s2)
+@@ -3058,10 +3067,10 @@ static int from_gw_1(struct sip_msg *_m, char *_lcr_id, char *_s2)
  
  /*
   * Checks if request comes from ip address of a gateway taking source
@@ -194,7 +193,7 @@ index 579ec06d4d..858352f2c7 100644
  {
  	struct ip_addr src_addr;
  	struct ip_addr *ip;
-@@ -3084,8 +3093,14 @@ static int ki_from_gw_addr(
+@@ -3086,8 +3095,14 @@ static int ki_from_gw_addr(
  		return -1;
  	}
  
@@ -210,7 +209,7 @@ index 579ec06d4d..858352f2c7 100644
  }
  
  static int from_gw_3(
-@@ -3112,7 +3127,41 @@ static int from_gw_3(
+@@ -3114,7 +3129,41 @@ static int from_gw_3(
  		return -1;
  	}
  
@@ -253,7 +252,7 @@ index 579ec06d4d..858352f2c7 100644
  }
  
  /*
-@@ -3123,11 +3172,14 @@ static int ki_from_any_gw(sip_msg_t *_m)
+@@ -3125,11 +3174,14 @@ static int ki_from_any_gw(sip_msg_t *_m)
  {
  	unsigned int i;
  	uri_transport transport;
@@ -269,7 +268,7 @@ index 579ec06d4d..858352f2c7 100644
  			return i;
  		}
  	}
-@@ -3141,9 +3193,9 @@ static int from_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2)
+@@ -3143,9 +3195,9 @@ static int from_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2)
  
  /*
   * Checks if request comes from ip address of a a gateway taking source
@@ -281,7 +280,7 @@ index 579ec06d4d..858352f2c7 100644
  {
  	unsigned int i;
  	struct ip_addr *ip, src_addr;
-@@ -3163,9 +3215,15 @@ static int ki_from_any_gw_addr(sip_msg_t *_m, str *addr_str, int transport)
+@@ -3165,9 +3217,15 @@ static int ki_from_any_gw_addr(sip_msg_t *_m, str *addr_str, int transport)
  		return -1;
  	}
  
@@ -298,7 +297,7 @@ index 579ec06d4d..858352f2c7 100644
  			return i;
  		}
  	}
-@@ -3188,7 +3246,33 @@ static int from_any_gw_2(struct sip_msg *_m, char *_addr, char *_transport)
+@@ -3190,7 +3248,33 @@ static int from_any_gw_2(struct sip_msg *_m, char *_addr, char *_transport)
  		return -1;
  	}
  
@@ -333,6 +332,3 @@ index 579ec06d4d..858352f2c7 100644
  }
  
  /*
--- 
-2.25.1
-

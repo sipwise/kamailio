@@ -10,7 +10,7 @@ but will sort them first before stopping
  2 files changed, 40 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 579ec06..0565044 100644
+index fb85f5b..15e62bc 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -205,6 +205,10 @@ static unsigned int priority_ordering_param = 0;
@@ -24,7 +24,7 @@ index 579ec06..0565044 100644
  /*
   * Other module types and variables
   */
-@@ -351,6 +355,7 @@ static param_export_t params[] = {
+@@ -357,6 +361,7 @@ static param_export_t params[] = {
      {"ping_valid_reply_codes",   PARAM_STR, &ping_valid_reply_codes_param},
      {"ping_from",                PARAM_STR, &ping_from_param},
      {"ping_socket",              PARAM_STR, &ping_socket_param},
@@ -32,7 +32,7 @@ index 579ec06..0565044 100644
      {0, 0, 0}
  };
  
-@@ -2201,6 +2206,8 @@ int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri, str *request_uri,
+@@ -2227,6 +2232,8 @@ int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri, str *request_uri,
  				matched_gws[gw_index].priority = t->priority;
  				matched_gws[gw_index].weight = t->weight * (kam_rand() >> 8);
  				matched_gws[gw_index].duplicate = 0;
@@ -41,7 +41,7 @@ index 579ec06..0565044 100644
  				LM_DBG("added matched_gws[%d]=[%u, %u, %u, %u]\n", gw_index,
  						t->gw_index, pl->prefix_len, t->priority,
  						matched_gws[gw_index].weight);
-@@ -2208,8 +2215,10 @@ int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri, str *request_uri,
+@@ -2234,8 +2241,10 @@ int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri, str *request_uri,
  			skip_gw:
  				t = t->next;
  			}
@@ -53,7 +53,7 @@ index 579ec06..0565044 100644
  
  		next:
  			rule = rule->next;
-@@ -2236,6 +2245,11 @@ done:
+@@ -2262,6 +2271,11 @@ done:
  		if(matched_gws[i].duplicate == 1)
  			continue;
  		gw_indexes[j] = matched_gws[i].gw_index;
@@ -65,7 +65,7 @@ index 579ec06..0565044 100644
  		j++;
  	}
  
-@@ -2251,7 +2265,7 @@ static int ki_load_gws_furi(
+@@ -2277,7 +2291,7 @@ static int ki_load_gws_furi(
  {
  	str *request_uri;
  	int i, j;
@@ -74,7 +74,7 @@ index 579ec06..0565044 100644
  	int_str val;
  	struct matched_gw_info matched_gws[MAX_NO_OF_GWS + 1];
  	struct rule_info **rules, *rule, *pl;
-@@ -2366,6 +2380,8 @@ static int ki_load_gws_furi(
+@@ -2392,6 +2406,8 @@ static int ki_load_gws_furi(
  				matched_gws[gw_index].priority = t->priority;
  				matched_gws[gw_index].weight = t->weight * (kam_rand() >> 8);
  				matched_gws[gw_index].duplicate = 0;
@@ -83,7 +83,7 @@ index 579ec06..0565044 100644
  				LM_DBG("added matched_gws[%d]=[%u, %u, %u, %u]\n", gw_index,
  						t->gw_index, pl->prefix_len, t->priority,
  						matched_gws[gw_index].weight);
-@@ -2374,8 +2390,10 @@ static int ki_load_gws_furi(
+@@ -2400,8 +2416,10 @@ static int ki_load_gws_furi(
  				t = t->next;
  			}
  			/* Do not look further if this matching rule was stopper */
@@ -95,7 +95,7 @@ index 579ec06..0565044 100644
  
  		next:
  			rule = rule->next;
-@@ -2400,6 +2418,24 @@ done:
+@@ -2426,6 +2444,24 @@ done:
  		}
  	}
  

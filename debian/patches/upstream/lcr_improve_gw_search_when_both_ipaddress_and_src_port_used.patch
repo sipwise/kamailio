@@ -1,4 +1,3 @@
-From d737c876cc36b4de802da77dfcd361323ad7cd8e Mon Sep 17 00:00:00 2001
 From: Donat Zenichev <dzenichev@sipwise.com>
 Date: Fri, 8 Oct 2021 16:18:47 +0300
 Subject: [PATCH] lcr: improve the search for GW when both IP address and
@@ -41,7 +40,7 @@ based on two objects (ip_addr and src_port) being used for comparison.
  1 file changed, 17 insertions(+), 22 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 93c5181600..d796c08c2c 100644
+index bc5a0cd..fb85f5b 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -922,28 +922,24 @@ static int comp_gws(const void *_g1, const void *_g2)
@@ -89,7 +88,7 @@ index 93c5181600..d796c08c2c 100644
  }
  
  /* 
-@@ -3025,8 +3021,7 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
+@@ -3027,8 +3023,7 @@ static int do_from_gw(struct sip_msg *_m, unsigned int lcr_id,
  	if (src_port != 0) {
  		/* Search for gw based on its ip address and port */
  		gw.port = src_port;
@@ -99,6 +98,3 @@ index 93c5181600..d796c08c2c 100644
  	} else {
  		/* Search for gw based on its ip address */
  		res = (struct gw_info *)bsearch(&gw, &(gws[1]), gws[0].ip_addr.u.addr32[0],
--- 
-2.25.1
-
