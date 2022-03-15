@@ -1,7 +1,9 @@
 From: Victor Seva <vseva@sipwise.com>
 Date: Mon, 28 Feb 2022 15:24:21 +0100
-Subject: db_redis: clean previous connection before trying to reconnect
+Subject: [PATCH] db_redis: clean previous connection before trying to
+ reconnect
 
+(cherry picked from commit 78c8d084e30373aacc456fd41062b68e6e82ea6f)
 ---
  src/modules/db_redis/redis_connection.c | 5 +++++
  1 file changed, 5 insertions(+)

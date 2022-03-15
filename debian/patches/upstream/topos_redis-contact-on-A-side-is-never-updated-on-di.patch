@@ -1,0 +1,23 @@
+From: frederic <frederic.gaisnon@mmtt.fr>
+Date: Wed, 2 Mar 2022 15:59:41 +0100
+Subject: [PATCH] topos_redis: contact on A side is never updated on dialog
+ update
+
+(cherry picked from commit 86d233d34b06016fc3436ca4574155959d24bb16)
+---
+ src/modules/topos_redis/topos_redis_storage.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/topos_redis/topos_redis_storage.c b/src/modules/topos_redis/topos_redis_storage.c
+index 0d21cbc..456d54e 100644
+--- a/src/modules/topos_redis/topos_redis_storage.c
++++ b/src/modules/topos_redis/topos_redis_storage.c
+@@ -1321,7 +1321,7 @@ int tps_redis_update_dialog(sip_msg_t *msg, tps_data_t *md, tps_data_t *sd,
+ 	argc++;
+ 
+ 	if(mode & TPS_DBU_CONTACT) {
+-		TPS_REDIS_SET_ARGS(&md->b_contact, argc, &td_key_b_contact,
++		TPS_REDIS_SET_ARGS(&md->a_contact, argc, &td_key_a_contact,
+ 				argv, argvlen);
+ 		TPS_REDIS_SET_ARGS(&md->b_contact, argc, &td_key_b_contact,
+ 				argv, argvlen);

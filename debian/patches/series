@@ -32,6 +32,11 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.5
+upstream/nathelper-Fix-uninitialized-data.patch
+upstream/tmx-use-trimmed-call-id-value-for-hashing.patch
+upstream/topos_redis-contact-on-A-side-is-never-updated-on-di.patch
+upstream/db_redis-clean-previous-connection-before-trying-to-.patch
+upstream/pv-headers-ignore-skip-header-config-on-clone_branch.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
@@ -44,6 +49,8 @@ upstream/tm_api_improvement_t_append_branches_with_contact.patch
 upstream/tsilo_append_by_contact.patch
 upstream/core_sdp_parser_improve_ice_options_and_cloning.patch
 upstream/core_sdp_parser_check_value_of_ptr_with_white_space.patch
+upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
+upstream/permissions-trusted_cleanup_interval.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
@@ -61,11 +68,6 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
-sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
-#
-sipwise/pv-headers-clone-branch-ignore-skip-header.patch
-upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
-upstream/permissions-trusted_cleanup_interval.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches

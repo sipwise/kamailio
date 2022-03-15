@@ -1,0 +1,33 @@
+From: Matthias Urlichs <matthias@urlichs.de>
+Date: Tue, 22 Feb 2022 18:22:52 +0100
+Subject: [PATCH] nathelper: Fix uninitialized data
+
+- the IP checksum is part of the header and must be zeroed before checksumming
+- also silence another (benign) warning
+
+(cherry picked from commit 7cbbd8fb22ac0d57a5dd3883dee185b3bc0601e2)
+---
+ src/modules/nathelper/nathelper.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/nathelper/nathelper.c b/src/modules/nathelper/nathelper.c
+index 9e45a61..3cb138e 100644
+--- a/src/modules/nathelper/nathelper.c
++++ b/src/modules/nathelper/nathelper.c
+@@ -1615,7 +1615,7 @@ static inline int replace_sdp_ip(
+ {
+ 	str body1, oldip, newip;
+ 	str body = *org_body;
+-	int pf, pf1 = 0;
++	int pf = 0, pf1 = 0;
+ 	str body2;
+ 	char *bodylimit = body.s + body.len;
+ 	int ret;
+@@ -1974,6 +1974,7 @@ static int send_raw(const char *buf, int buf_len, union sockaddr_union *to,
+ 	ip->ip_off = 0;
+ 	ip->ip_ttl = 69;
+ 	ip->ip_p = 17;
++	ip->ip_sum = 0;
+ 	ip->ip_src.s_addr = s_ip;
+ 	ip->ip_dst.s_addr = to->sin.sin_addr.s_addr;
+ 
