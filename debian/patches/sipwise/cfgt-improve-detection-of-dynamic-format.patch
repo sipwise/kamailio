@@ -1,0 +1,21 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 15 Apr 2022 13:41:36 +0200
+Subject: cfgt: improve detection of dynamic format
+
+---
+ src/modules/cfgt/cfgt_json.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/cfgt/cfgt_json.c b/src/modules/cfgt/cfgt_json.c
+index 04aa032..d3aca8d 100644
+--- a/src/modules/cfgt/cfgt_json.c
++++ b/src/modules/cfgt/cfgt_json.c
+@@ -323,7 +323,7 @@ int cfgt_get_json(struct sip_msg *msg, unsigned int mask, srjson_doc_t *jdoc,
+ 					el = el->next;
+ 					continue;
+ 				}
+-				if(el->pvname.len > 3 && strncmp("$_s", el->pvname.s, 3) == 0) {
++				if(strchr(el->pvname.s + 1, 36) != NULL) {
+ 					LM_DBG("skip dynamic format [%.*s]\n", el->pvname.len, el->pvname.s);
+ 					el = el->next;
+ 					continue;
