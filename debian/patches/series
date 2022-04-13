@@ -64,6 +64,9 @@ sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
 sipwise/pv_headers-fix-build-warning.patch
+sipwise/cfgt-improve-detection-of-dynamic-format.patch
+sipwise/cfgt-fix-memory-leaks.patch
+sipwise/cfgt-skip_unknown.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
