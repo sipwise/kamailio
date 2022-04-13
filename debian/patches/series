@@ -92,6 +92,9 @@ sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
+sipwise/cfgt-improve-detection-of-dynamic-format.patch
+sipwise/cfgt-fix-memory-leaks.patch
+sipwise/cfgt-skip_unknown.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
