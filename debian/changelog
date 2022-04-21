@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.4-1+0~mr10.4.1.1) unstable; urgency=medium
+
+  [ Fabricio Santolin da Silva ]
+  * [162ebfe] TT#159750 Add support to remove a specific value from a header
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 21 Apr 2022 13:01:07 +0200
+
 ngcp-kamailio (5.5.4-1+0~mr10.4.1.0) unstable; urgency=medium
 
   [ Victor Seva ]
