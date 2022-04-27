@@ -100,11 +100,12 @@ sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/pv_headers-fix-detection-of-split-marker.patch
+sipwise/pv_headers-fix-build-warning.patch
+sipwise/pv_headers-use-memset.patch
 ### active development
 sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
 sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
 sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
-sipwise/pv_headers-fix-build-warning.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
