@@ -104,6 +104,7 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
 sipwise/pv_headers-fix-detection-of-split-marker.patch
 sipwise/pv_headers-fix-build-warning.patch
+sipwise/pv_headers-use-memset.patch
 ### active development
 #
 ### Don't just put stuff in any order
