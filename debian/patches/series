@@ -61,6 +61,9 @@ sipwise/pua_dialoginfo_uuid.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
+sipwise/cfgt-improve-detection-of-dynamic-format.patch
+sipwise/cfgt-fix-memory-leaks.patch
+sipwise/cfgt-skip_unknown.patch
 sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
@@ -71,9 +74,8 @@ sipwise/pv_headers-fix-build-warning.patch
 sipwise/pv_headers-use-memset.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
-sipwise/cfgt-improve-detection-of-dynamic-format.patch
-sipwise/cfgt-fix-memory-leaks.patch
-sipwise/cfgt-skip_unknown.patch
+sipwise/dialog-dlg_get_var.patch
+sipwise/dialog-dlg_set_var.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
