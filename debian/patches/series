@@ -76,6 +76,7 @@ sipwise/pv_headers-use-memset.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/dialog-dlg_get_var.patch
 sipwise/dialog-dlg_set_var.patch
+sipwise/dialog-rework-dlg_get_var.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
