@@ -1,17 +1,16 @@
-From: Victor Seva <vseva@sipwise.com>
-Date: Wed, 25 May 2022 11:07:39 +0200
-Subject: dialog: rework dlg_get_var
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Fri, 27 May 2022 16:58:28 +0200
+Subject: [PATCH] dialog: dlg_get_var assure return null on error
 
-be sure to set null to dst_var on error
 ---
- src/modules/dialog/dialog.c | 29 +++++++++++++++++++----------
- 1 file changed, 19 insertions(+), 10 deletions(-)
+ src/modules/dialog/dialog.c | 31 ++++++++++++++++++++-----------
+ 1 file changed, 20 insertions(+), 11 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 42e3e1b..2b860c2 100644
+index ee9e240..b9f6378 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1540,53 +1540,62 @@ static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
+@@ -1564,53 +1564,62 @@ static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
  	str k = STR_NULL;
  	str *val = NULL;
  	pv_value_t dst_val;
@@ -58,7 +57,8 @@ index 42e3e1b..2b860c2 100644
 +		goto error;
  	}
 -	dst_pv = (pv_spec_t *)pv;
- 	val = ki_dlg_get_var(msg, &sc, &sf, &st, &k);
+-	val = ki_dlg_get_var_helper(msg, &sc, &sf, &st, &k);
++	val = ki_dlg_get_var(msg, &sc, &sf, &st, &k);
  	if(val) {
  		memset(&dst_val, 0, sizeof(pv_value_t));
  		dst_val.flags |= PV_VAL_STR;

@@ -1,6 +1,6 @@
 From: Victor Seva <vseva@sipwise.com>
 Date: Fri, 6 May 2022 13:30:01 +0200
-Subject: dialog: dlg_get_var(ci, ft, tt, key, dst_var)
+Subject: [PATCH] dialog: dlg_get_var(ci, ft, tt, key, dst_var)
 
 ---
  src/modules/dialog/dialog.c             | 113 +++++++++++++++++++++++++++++++-

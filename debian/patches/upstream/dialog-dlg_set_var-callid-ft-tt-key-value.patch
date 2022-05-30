@@ -1,6 +1,6 @@
 From: Victor Seva <vseva@sipwise.com>
 Date: Wed, 11 May 2022 15:50:14 +0200
-Subject: dialog: dlg_set_var(callid, ft, tt, key, value)
+Subject: [PATCH] dialog: dlg_set_var(callid, ft, tt, key, value)
 
 ---
  src/modules/dialog/dialog.c             | 100 ++++++++++++++++++++++++++++++++

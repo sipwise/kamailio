@@ -52,6 +52,12 @@ upstream/core_sdp_parser_improve_ice_options_and_cloning.patch
 upstream/core_sdp_parser_check_value_of_ptr_with_white_space.patch
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
 upstream/permissions-trusted_cleanup_interval.patch
+upstream/dialog-dlg_get_var-ci-ft-tt-key-dst_var.patch
+upstream/dialog-dlg_set_var-callid-ft-tt-key-value.patch
+upstream/dialog-reworked-kemi-export-for-dlg_get_var.patch
+upstream/dialog-fix-ki_dlg_get_var-introduced-previously.patch
+upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
+upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
@@ -74,9 +80,6 @@ sipwise/pv_headers-fix-build-warning.patch
 sipwise/pv_headers-use-memset.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
-sipwise/dialog-dlg_get_var.patch
-sipwise/dialog-dlg_set_var.patch
-sipwise/dialog-rework-dlg_get_var.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
