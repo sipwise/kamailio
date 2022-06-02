@@ -1,3 +1,14 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.9.1) unstable; urgency=medium
+
+  [ Fabricio Santolin da Silva ]
+  * [14406b4] TT#159750 Add support to remove a specific value from a header
+
+  [ Victor Seva ]
+  * [689d66b] TT#81500 cfgt: skip $_s and avp id 0
+  * [7ffcce4] TT#170350 cfgt: skip_unknown parameter
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 02 Jun 2022 19:55:20 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.9.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
