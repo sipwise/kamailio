@@ -1,3 +1,15 @@
+ngcp-kamailio (5.5.1-1+0~mr9.5.5.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [2797136] TT#165251 db_redis: don't leave unconsumed redis replies in case of error on update
+  * [2ccbfaf] TT#165251 db_redis: clean previous connection before reconnect
+  * [484765c] TT#170350 cfgt: skip_unknown parameter
+
+  [ Fabricio Santolin da Silva ]
+  * [1185c66] TT#159750 Add support to remove a specific value from a header
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 03 Jun 2022 18:09:26 +0200
+
 ngcp-kamailio (5.5.1-1+0~mr9.5.5.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
