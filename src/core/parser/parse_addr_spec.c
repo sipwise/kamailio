@@ -225,6 +225,12 @@ static char *parse_to_param(char *const buffer, const char *const end,
 			case '\\':
 				switch(status) {
 					case PARA_VALUE_QUOTED:
+						if(tmp+1>=end) {
+							LM_ERR("unexpected end of data in status %d - start: %p"
+									" - end: %p - crt: %p\n",
+								status, buffer, end , tmp);
+							goto error;
+						}
 						switch(*(tmp + 1)) {
 							case '\r':
 							case '\n':
@@ -241,6 +247,12 @@ static char *parse_to_param(char *const buffer, const char *const end,
 			case '"':
 				switch(status) {
 					case S_PARA_VALUE:
+						if(tmp+1>=end) {
+							LM_ERR("unexpected end of data in status %d - start: %p"
+									" - end: %p - crt: %p\n",
+								status, buffer, end , tmp);
+							goto error;
+						}
 						param->value.s = tmp + 1;
 						status = PARA_VALUE_QUOTED;
 						break;
@@ -281,6 +293,10 @@ static char *parse_to_param(char *const buffer, const char *const end,
 					semicolon_add_param:
 						add_param(param, to_b, newparam);
 					case E_PARA_VALUE:
+						if(newparam) {
+							pkg_free(newparam);
+							newparam = NULL;
+						}
 						param = (struct to_param *)pkg_malloc(
 								sizeof(struct to_param));
 						if(!param) {
@@ -555,6 +571,9 @@ endofheader:
 					saved_status, (int)(tmp - buffer), ZSW(buffer));
 			goto error;
 	}
+	if(newparam) {
+		pkg_free(newparam);
+	}
 	*returned_status = saved_status;
 	return tmp;
 
@@ -630,8 +649,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						status = saved_status;
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), ZSW(buffer));
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), ZSW(buffer));
 						goto error;
 				}
 				break;
@@ -658,8 +677,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						status = saved_status;
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), ZSW(buffer));
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), ZSW(buffer));
 						goto error;
 				}
 				break;
@@ -672,8 +691,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						saved_status = status = END;
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), ZSW(buffer));
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), ZSW(buffer));
 						goto error;
 				}
 				break;
@@ -683,8 +702,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						tmp++; /* jump over next char */
 						break;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), ZSW(buffer));
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), ZSW(buffer));
 						goto error;
 				}
 				break;
@@ -715,8 +734,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						/*previous=crlf and now !=' '*/
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), ZSW(buffer));
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), ZSW(buffer));
 						goto error;
 				}
 				break;
@@ -736,8 +755,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						/*previous=crlf and now !=' '*/
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), ZSW(buffer));
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), ZSW(buffer));
 						goto error;
 				}
 				break;
@@ -758,8 +777,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						/*previous=crlf and now !=' '*/
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), buffer);
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), buffer);
 						goto error;
 				}
 				break;
@@ -783,8 +802,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						/*previous=crlf and now !=' '*/
 						goto endofheader;
 					default:
-						LM_ERR("unexpected char [%c] in status %d: [%.*s] .\n",
-								*tmp, status, (int)(tmp - buffer), buffer);
+						LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] .\n",
+								*tmp, *tmp, status, (int)(tmp - buffer), buffer);
 						goto error;
 				}
 				break;
@@ -808,9 +827,9 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 							/*previous=crlf and now !=' '*/
 							goto endofheader;
 						default:
-							LM_ERR("unexpected char [%c] in status %d: [%.*s] "
+							LM_ERR("unexpected char [%c/%d] in status %d: [%.*s] "
 									".\n",
-									*tmp, status, (int)(tmp - buffer), buffer);
+									*tmp, *tmp, status, (int)(tmp - buffer), buffer);
 							goto error;
 					}
 					break;
@@ -841,8 +860,8 @@ char *parse_addr_spec(char *const buffer, const char *const end,
 						/*previous=crlf and now !=' '*/
 						goto endofheader;
 					default:
-						LM_DBG("spitting out [%c] in status %d\n", *tmp,
-								status);
+						LM_DBG("spitting out [%c/%d] in status %d\n", *tmp,
+								*tmp, status);
 						goto error;
 				}
 		} /*char switch*/
@@ -872,10 +891,13 @@ endofheader:
 		case E_PARA_VALUE:
 			break;
 		default:
-			LM_ERR("invalid To -  unexpected "
+			LM_ERR("invalid body -  unexpected "
 					"end of header in state %d\n",
 					status);
 			goto error;
+	}
+	if(to_b->error == PARSE_ERROR) {
+		free_to_params(to_b);
 	}
 	return tmp;
 

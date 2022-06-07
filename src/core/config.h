@@ -88,11 +88,12 @@
 #define SERVER_HDR "Server: " SRVAPP_SIGNATURE
 #define SERVER_HDR_LEN (sizeof(SERVER_HDR)-1)
 
-#define MAX_WARNING_LEN  256
+#define MAX_WARNING_LEN  1024
 
 #define MY_BRANCH ";branch="
 #define MY_BRANCH_LEN (sizeof(MY_BRANCH) - 1)
 
+#define MAX_PORT_VAL 65535
 #define MAX_PORT_LEN 7 /* ':' + max 5 letters + \0 */
 
 #define CRLF "\r\n"

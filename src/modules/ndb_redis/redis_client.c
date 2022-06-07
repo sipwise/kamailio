@@ -988,6 +988,11 @@ int redisc_exec(str *srv, str *res, str *cmd, ...)
 			if(redisc_reconnect_server(rsrv)==0)
 			{
 				rpl->rplRedis = redisvCommand(rsrv->ctxRedis, cmd->s, ap4);
+				if(rpl->rplRedis == NULL)
+				{
+					redis_count_err_and_disable(rsrv);
+					goto error_exec;
+				}
 			} else {
 				LM_ERR("unable to reconnect to redis server: %.*s\n",
 						srv->len, srv->s);
@@ -1192,6 +1197,10 @@ int redisc_check_auth(redisc_server_t *rsrv, char *pass)
 	int retval = 0;
 
 	reply = redisCommand(rsrv->ctxRedis, "AUTH %s", pass);
+	if(!reply) {
+		LM_ERR("Redis authentication error\n");
+		return -1;
+	}
 	if (reply->type == REDIS_REPLY_ERROR) {
 		LM_ERR("Redis authentication error\n");
 		retval = -1;
