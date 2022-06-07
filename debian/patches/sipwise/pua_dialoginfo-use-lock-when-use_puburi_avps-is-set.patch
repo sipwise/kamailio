@@ -3,15 +3,15 @@ Date: Tue, 30 Jun 2020 09:27:58 +0200
 Subject: pua_dialoginfo: use lock when use_puburi_avps is set
 
 ---
- src/modules/pua_dialoginfo/pua_dialoginfo.c | 21 ++++++++++++++++-----
+ src/modules/pua_dialoginfo/pua_dialoginfo.c | 21 ++++++++++++++++++---
  src/modules/pua_dialoginfo/pua_dialoginfo.h |  2 ++
- 2 files changed, 18 insertions(+), 5 deletions(-)
+ 2 files changed, 20 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index b0fb27b..d5b1fea 100644
+index a705ed3..83c4f2c 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-@@ -346,6 +346,7 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
+@@ -353,6 +353,7 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
  	if(use_pubruri_avps && (refresh_pubruri_avps_flag > -1
  		|| (request->flags & (1<<refresh_pubruri_avps_flag))))
  	{
@@ -19,10 +19,11 @@ index b0fb27b..d5b1fea 100644
  		refresh_pubruri_avps(dlginfo, &uri);
  	}
  
-@@ -502,6 +503,11 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
- 						send_publish_flag==-1?1:0);
+@@ -496,6 +497,12 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
+ 						send_publish_flag==-1?1:0,&(dlginfo->uuid));
  			}
  	}
++
 +	if(use_pubruri_avps && (refresh_pubruri_avps_flag > -1
 +		|| (request->flags & (1<<refresh_pubruri_avps_flag))))
 +	{
@@ -31,50 +32,45 @@ index b0fb27b..d5b1fea 100644
  }
  
  /*
-@@ -574,7 +580,11 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type)
- 		return NULL;
+@@ -577,6 +584,12 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type, int disable
  	}
  	memset( dlginfo, 0, len);
--
+ 
 +	if(use_pubruri_avps && lock_init(&dlginfo->lock) == 0) {
 +		LM_ERR("cannot init the lock\n");
 +		free_dlginfo_cell(dlginfo);
 +		return NULL;
 +	}
++
  	/* copy from dlg structure to dlginfo structure */
  	dlginfo->lifetime     = override_lifetime ? override_lifetime : dlg->lifetime;
- 	dlginfo->from_uri.s   = (char*)dlginfo + sizeof(struct dlginfo_cell);
-@@ -722,25 +732,28 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
- 	dlginfo=get_dialog_data(dlg, type);
- 	if(dlginfo==NULL)
- 		return;
--
- 	if (disable_caller_publish_flag == -1 || !(request && (request->flags
- 					& (1<<disable_caller_publish_flag))))
- 	{
+ 	dlginfo->disable_caller_publish     = disable_caller_publish;
+@@ -756,20 +769,24 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
+ 
+ 	if ((!disable_caller_publish) && (disable_caller_publish_flag == -1 || !(request
+ 		&& (request->flags & (1<<disable_caller_publish_flag))))) {
 +		if(use_pubruri_avps) lock_get(&dlginfo->lock);
  		dialog_publish_multi("Trying", dlginfo->pubruris_caller,
- 				&(dlg->from_uri),
- 				(include_req_uri)?&(dlg->req_uri):&(dlg->to_uri),
+ 				&identity_local,
+ 				&identity_remote,
  				&(dlg->callid), 1, dlginfo->lifetime,
- 				0, 0, 0, 0, (send_publish_flag==-1)?1:0);
+ 				0, 0, 0, 0, (send_publish_flag==-1)?1:0,&(dlginfo->uuid));
 +		if(use_pubruri_avps) lock_release(&dlginfo->lock);
  	}
  
- 	if (callee_trying && (disable_callee_publish_flag == -1 || !(request
- 					&& (request->flags & (1<<disable_callee_publish_flag)))))
- 	{
+ 	if (callee_trying && ((!disable_callee_publish) && (disable_callee_publish_flag == -1 || !(request
+ 			&& (request->flags & (1<<disable_callee_publish_flag)))))) {
 +		if(use_pubruri_avps) lock_get(&dlginfo->lock);
  		dialog_publish_multi("Trying", dlginfo->pubruris_callee,
- 				(include_req_uri)?&(dlg->req_uri):&(dlg->to_uri),
- 				&(dlg->from_uri),
+ 				&identity_remote,
+ 				&identity_local,
  				&(dlg->callid), 0, dlginfo->lifetime,
- 				0, 0, 0, 0, (send_publish_flag==-1)?1:0);
+ 				0, 0, 0, 0, (send_publish_flag==-1)?1:0,&(dlginfo->uuid));
 +		if(use_pubruri_avps) lock_release(&dlginfo->lock);
  	}
  }
  
-@@ -864,9 +877,7 @@ void free_dlginfo_cell(void *param) {
+@@ -939,9 +956,7 @@ void free_dlginfo_cell(void *param) {
  	free_str_list_all(cell->pubruris_caller);
  	free_str_list_all(cell->pubruris_callee);
  
@@ -86,7 +82,7 @@ index b0fb27b..d5b1fea 100644
  }
  
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.h b/src/modules/pua_dialoginfo/pua_dialoginfo.h
-index 01fc876..8289669 100644
+index d86799a..0487553 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.h
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.h
 @@ -23,6 +23,7 @@

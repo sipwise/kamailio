@@ -10,7 +10,7 @@ but will sort them first before stopping
  2 files changed, 40 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index fb85f5b..15e62bc 100644
+index 6f5eafd..b831711 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -205,6 +205,10 @@ static unsigned int priority_ordering_param = 0;

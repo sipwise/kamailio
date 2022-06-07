@@ -3,20 +3,19 @@ Date: Fri, 28 Feb 2020 11:39:24 +0100
 Subject: pua_dialoginfo: local_identity_dlg_var
 
 ---
- .../pua_dialoginfo/doc/pua_dialoginfo_admin.xml      | 20 ++++++++++++++++++++
- src/modules/pua_dialoginfo/pua_dialoginfo.c          | 17 +++++++++++++++++
- 2 files changed, 37 insertions(+)
+ .../pua_dialoginfo/doc/pua_dialoginfo_admin.xml       | 19 +++++++++++++++++++
+ src/modules/pua_dialoginfo/pua_dialoginfo.c           | 17 +++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 49f9f0f..81156af 100644
+index 7c4f08d..3f6a639 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-@@ -554,6 +554,26 @@ modparam("pua_dialoginfo", "callee_trying", 1)
- </programlisting>
- 		</example>
- 		</section>
-+
-+		<section>
+@@ -620,6 +620,25 @@ modparam("pua_dialoginfo", "publish_dialog_req_within", 0)
+                 </example>
+                 </section>
+ 
++		<section id="pua_dialoginfo.p.local_identity_dlg_var">
 +		<title><varname>local_identity_dlg_var</varname> (str)</title>
 +		<para>
 +			PUBLISH-requests reporting dialog-information will use the value of
@@ -35,22 +34,22 @@ index 49f9f0f..81156af 100644
 +		</example>
 +		</section>
 +
- 	</section>
- 
          <section id="pua_dialoginfo.p.attribute_display">
+             <title><varname>attribute_display</varname> (int)</title>
+             <para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index a39b8f1..b0fb27b 100644
+index 83c4f2c..1e4f171 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-@@ -82,6 +82,7 @@ int_str pubruri_callee_avp_name;
- 
- static str caller_dlg_var = {0, 0}; /* pubruri_caller */
+@@ -87,6 +87,7 @@ static str caller_dlg_var = {0, 0}; /* pubruri_caller */
  static str callee_dlg_var = {0, 0}; /* pubruri_callee */
+ static str caller_entity_when_publish_disabled = {0, 0}; /* pubruri_caller */
+ static str callee_entity_when_publish_disabled = {0, 0}; /* pubruri_callee */
 +static str local_identity_dlg_var = STR_NULL;
  
  /* Module parameter variables */
  int include_callid         = DEF_INCLUDE_CALLID;
-@@ -126,6 +127,7 @@ static param_export_t params[]={
+@@ -132,6 +133,7 @@ static param_export_t params[]={
  	{"pubruri_callee_avp",  PARAM_STRING, &pubruri_callee_avp },
  	{"pubruri_caller_dlg_var",  PARAM_STR, &caller_dlg_var },
  	{"pubruri_callee_dlg_var",  PARAM_STR, &callee_dlg_var },
@@ -58,7 +57,7 @@ index a39b8f1..b0fb27b 100644
  	{"callee_trying",       INT_PARAM, &callee_trying },
  	{"disable_caller_publish_flag",   INT_PARAM, &disable_caller_publish_flag },
  	{"disable_callee_publish_flag",   INT_PARAM, &disable_callee_publish_flag },
-@@ -303,6 +305,17 @@ void refresh_pubruri_avps(struct dlginfo_cell *dlginfo, str *uri)
+@@ -312,6 +314,17 @@ void refresh_pubruri_avps(struct dlginfo_cell *dlginfo, str *uri)
  	}
  }
  
@@ -76,7 +75,7 @@ index a39b8f1..b0fb27b 100644
  static void
  __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  {
-@@ -336,6 +349,10 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
+@@ -357,6 +370,10 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
  		refresh_pubruri_avps(dlginfo, &uri);
  	}
  

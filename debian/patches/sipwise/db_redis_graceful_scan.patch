@@ -7,7 +7,7 @@ Subject: db_redis_graceful_scan
  1 file changed, 15 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index 68d8412..c82f82b 100644
+index aa0a9fd..8166d29 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -754,7 +754,7 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
@@ -41,7 +41,7 @@ index 68d8412..c82f82b 100644
          db_redis_key_free(&query_v);
          db_redis_check_reply(con, reply, err);
          if (reply->type != REDIS_REPLY_ARRAY) {
-@@ -870,11 +877,15 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc
+@@ -883,11 +890,15 @@ while ((node = nodeNext(&niter)) != NULL) {
          }
  
  #ifdef USE_SCAN

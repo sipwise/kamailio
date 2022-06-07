@@ -8,7 +8,7 @@ Subject: usrloc_dbro
  2 files changed, 67 insertions(+)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index db8bfbe..729fb6a7 100644
+index 797c252..2d274c1 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
 @@ -167,6 +167,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta
@@ -19,7 +19,7 @@ index db8bfbe..729fb6a7 100644
  int ul_timer_interval  = 60;				/*!< Timer interval in seconds */
  int ul_db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
  int ul_db_load         = 1;				/*!< Database load after restart: 1- true, 0- false (only the db_mode allows it) */
-@@ -200,6 +201,8 @@ static cmd_export_t cmds[] = {
+@@ -201,6 +202,8 @@ static cmd_export_t cmds[] = {
  	{0, 0, 0, 0, 0, 0}
  };
  
@@ -28,7 +28,7 @@ index db8bfbe..729fb6a7 100644
  
  /*! \brief
   * Exported parameters
-@@ -216,6 +219,7 @@ static param_export_t params[] = {
+@@ -217,6 +220,7 @@ static param_export_t params[] = {
  	{"flags_column",        PARAM_STR, &ul_flags_col     },
  	{"cflags_column",       PARAM_STR, &ul_cflags_col    },
  	{"db_url",              PARAM_STR, &ul_db_url        },
@@ -36,7 +36,7 @@ index db8bfbe..729fb6a7 100644
  	{"timer_interval",      INT_PARAM, &ul_timer_interval  },
  	{"db_mode",             INT_PARAM, &ul_db_mode         },
  	{"db_load",             INT_PARAM, &ul_db_load         },
-@@ -286,6 +290,38 @@ struct module_exports exports = {
+@@ -288,6 +292,38 @@ struct module_exports exports = {
  	destroy          /*!< destroy function */
  };
  
@@ -75,7 +75,7 @@ index db8bfbe..729fb6a7 100644
  
  /*! \brief
   * Module initialization function
-@@ -380,6 +416,21 @@ static int mod_init(void)
+@@ -392,6 +428,21 @@ static int mod_init(void)
  		}
  	}
  
@@ -97,7 +97,7 @@ index db8bfbe..729fb6a7 100644
  	if (ul_nat_bflag==(unsigned int)-1) {
  		ul_nat_bflag = 0;
  	} else if (ul_nat_bflag>=8*sizeof(ul_nat_bflag) ) {
-@@ -473,6 +524,16 @@ static int child_init(int _rank)
+@@ -485,6 +536,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -114,7 +114,7 @@ index db8bfbe..729fb6a7 100644
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
  	if (_rank==ul_load_rank && ul_db_mode!=DB_ONLY && ul_db_load) {
  		/* if cache is used, populate domains from DB */
-@@ -503,6 +564,10 @@ static void destroy(void)
+@@ -515,6 +576,10 @@ static void destroy(void)
  		ul_dbf.close(ul_dbh);
  	}
  

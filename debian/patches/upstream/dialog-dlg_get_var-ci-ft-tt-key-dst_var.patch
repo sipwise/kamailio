@@ -8,10 +8,10 @@ Subject: [PATCH] dialog: dlg_get_var(ci, ft, tt, key, dst_var)
  2 files changed, 160 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 243bb9b..8e06c01 100644
+index 4d30b27..058d42a 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -193,7 +193,9 @@ static int w_is_known_dlg(struct sip_msg *);
+@@ -194,7 +194,9 @@ static int w_is_known_dlg(struct sip_msg *);
  static int w_dlg_set_ruri(sip_msg_t *, char *, char *);
  static int w_dlg_db_load_callid(sip_msg_t *msg, char *ci, char *p2);
  static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2);
@@ -22,7 +22,7 @@ index 243bb9b..8e06c01 100644
  static int w_dlg_remote_profile(sip_msg_t *msg, char *cmd, char *pname,
  		char *pval, char *puid, char *expires);
  static int fixup_dlg_remote_profile(void** param, int param_no);
-@@ -255,6 +257,8 @@ static cmd_export_t cmds[]={
+@@ -256,6 +258,8 @@ static cmd_export_t cmds[]={
  			0, ANY_ROUTE },
  	{"dlg_db_load_extra", (cmd_function)w_dlg_db_load_extra, 0, 0,
  			0, ANY_ROUTE },
@@ -31,7 +31,7 @@ index 243bb9b..8e06c01 100644
  
  	{"load_dlg",  (cmd_function)load_dlg,   0, 0, 0, 0},
  	{0,0,0,0,0,0}
-@@ -1496,6 +1500,108 @@ static int fixup_dlg_bridge(void** param, int param_no)
+@@ -1502,6 +1506,108 @@ static int fixup_dlg_bridge(void** param, int param_no)
  	return 0;
  }
  
@@ -140,7 +140,7 @@ index 243bb9b..8e06c01 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2081,6 +2187,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2087,6 +2193,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
@@ -153,10 +153,10 @@ index 243bb9b..8e06c01 100644
  		SR_KEMIP_INT, ki_set_dlg_profile_static,
  		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 987bd54..26d1cbb 100644
+index 5b8d99b..972b9e4 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
-@@ -2076,6 +2076,54 @@ if(dlg_get("abcdef", "123", "456"))
+@@ -2103,6 +2103,54 @@ if(dlg_get("abcdef", "123", "456"))
  		</example>
  	</section>
  

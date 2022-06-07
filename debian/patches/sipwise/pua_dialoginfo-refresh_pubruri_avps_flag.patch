@@ -8,7 +8,7 @@ Subject: pua_dialoginfo: refresh_pubruri_avps_flag
  2 files changed, 94 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 81ef722..49f9f0f 100644
+index 191ee5f..7c4f08d 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 @@ -433,7 +433,25 @@ modparam("pua_dialoginfo", "use_pubruri_avps", 1)
@@ -39,7 +39,7 @@ index 81ef722..49f9f0f 100644
  		<title><varname>pubruri_caller_avp</varname> (str)</title>
  		<para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index 9ff64aa..a39b8f1 100644
+index 2dae4d4..a705ed3 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -41,6 +41,7 @@
@@ -47,10 +47,10 @@ index 9ff64aa..a39b8f1 100644
  #include "../../core/mem/mem.h"
  #include "../../core/pt.h"
 +#include "../../core/ut.h"
+ #include "../../core/utils/sruid.h"
  #include "../dialog/dlg_load.h"
  #include "../dialog/dlg_hash.h"
- #include "../pua/pua_bind.h"
-@@ -58,6 +59,7 @@ MODULE_VERSION
+@@ -59,6 +60,7 @@ MODULE_VERSION
  #define DEF_OVERRIDE_LIFETIME 0
  #define DEF_SEND_PUBLISH_FLAG -1
  #define DEF_USE_PUBRURI_AVPS 0
@@ -58,7 +58,7 @@ index 9ff64aa..a39b8f1 100644
  #define DEF_PUBRURI_CALLER_AVP 0
  #define DEF_PUBRURI_CALLEE_AVP 0
  #define DEF_CALLEE_TRYING 0
-@@ -90,6 +92,7 @@ int caller_confirmed       = DEF_CALLER_ALWAYS_CONFIRMED;
+@@ -95,6 +97,7 @@ int caller_confirmed       = DEF_CALLER_ALWAYS_CONFIRMED;
  int include_req_uri        = DEF_INCLUDE_REQ_URI;
  int send_publish_flag      = DEF_SEND_PUBLISH_FLAG;
  int use_pubruri_avps       = DEF_USE_PUBRURI_AVPS;
@@ -66,7 +66,7 @@ index 9ff64aa..a39b8f1 100644
  int callee_trying          = DEF_CALLEE_TRYING;
  int disable_caller_publish_flag = DEF_DISABLE_CALLER_PUBLISH_FLAG;
  int disable_callee_publish_flag = DEF_DISABLE_CALLEE_PUBLISH_FLAG;
-@@ -118,6 +121,7 @@ static param_export_t params[]={
+@@ -124,6 +127,7 @@ static param_export_t params[]={
  	{"include_req_uri",     INT_PARAM, &include_req_uri },
  	{"send_publish_flag",   INT_PARAM, &send_publish_flag },
  	{"use_pubruri_avps",    INT_PARAM, &use_pubruri_avps },
@@ -74,7 +74,7 @@ index 9ff64aa..a39b8f1 100644
  	{"pubruri_caller_avp",  PARAM_STRING, &pubruri_caller_avp },
  	{"pubruri_callee_avp",  PARAM_STRING, &pubruri_callee_avp },
  	{"pubruri_caller_dlg_var",  PARAM_STR, &caller_dlg_var },
-@@ -247,6 +251,58 @@ __dialog_cbtest(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
+@@ -256,6 +260,58 @@ __dialog_cbtest(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  }
  #endif
  
@@ -98,7 +98,7 @@ index 9ff64aa..a39b8f1 100644
 +				dialog_publish_multi("terminated", list,
 +						&(dlginfo->from_uri), uri, &(dlginfo->callid), 1,
 +						10, 0, 0, &(dlginfo->from_contact),
-+						&target, send_publish_flag==-1?1:0);
++						&target, send_publish_flag==-1?1:0, &(dlginfo->uuid));
 +				list->next = next;
 +			}
 +			list = list->next;
@@ -119,7 +119,7 @@ index 9ff64aa..a39b8f1 100644
 +				dialog_publish_multi("terminated", list,
 +						uri, &(dlginfo->from_uri), &(dlginfo->callid), 0,
 +						10, 0, 0, &target, &(dlginfo->from_contact),
-+						send_publish_flag==-1?1:0);
++						send_publish_flag==-1?1:0, &(dlginfo->uuid));
 +				list->next = next;
 +			}
 +			list = list->next;
@@ -133,8 +133,8 @@ index 9ff64aa..a39b8f1 100644
  static void
  __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  {
-@@ -274,6 +330,12 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
- 		uri = dlginfo->to_uri;
+@@ -294,6 +350,12 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
+ 		uri=callee_entity_when_publish_disabled;
  	}
  
 +	if(use_pubruri_avps && (refresh_pubruri_avps_flag > -1
@@ -146,7 +146,7 @@ index 9ff64aa..a39b8f1 100644
  	switch (type) {
  		case DLGCB_FAILED:
  		case DLGCB_TERMINATED:
-@@ -792,6 +854,19 @@ void free_dlginfo_cell(void *param) {
+@@ -884,6 +946,19 @@ void free_dlginfo_cell(void *param) {
  }
  
  

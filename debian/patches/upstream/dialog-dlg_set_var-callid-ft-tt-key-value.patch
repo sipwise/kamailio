@@ -8,10 +8,10 @@ Subject: [PATCH] dialog: dlg_set_var(callid, ft, tt, key, value)
  2 files changed, 148 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 8e06c01..42e3e1b 100644
+index 058d42a..b169dc2 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -196,6 +196,9 @@ static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2);
+@@ -197,6 +197,9 @@ static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2);
  static int fixup_dlg_get_var(void** param, int param_no);
  static int fixup_dlg_get_var_free(void** param, int param_no);
  static int w_dlg_get_var(struct sip_msg*, char*, char*, char*, char*, char*);
@@ -21,7 +21,7 @@ index 8e06c01..42e3e1b 100644
  static int w_dlg_remote_profile(sip_msg_t *msg, char *cmd, char *pname,
  		char *pval, char *puid, char *expires);
  static int fixup_dlg_remote_profile(void** param, int param_no);
-@@ -259,6 +262,8 @@ static cmd_export_t cmds[]={
+@@ -260,6 +263,8 @@ static cmd_export_t cmds[]={
  			0, ANY_ROUTE },
  	{"dlg_get_var",(cmd_function)w_dlg_get_var, 5, fixup_dlg_get_var,
  			fixup_dlg_get_var_free, ANY_ROUTE },
@@ -30,7 +30,7 @@ index 8e06c01..42e3e1b 100644
  
  	{"load_dlg",  (cmd_function)load_dlg,   0, 0, 0, 0},
  	{0,0,0,0,0,0}
-@@ -1602,6 +1607,96 @@ static int fixup_dlg_get_var_free(void** param, int param_no)
+@@ -1608,6 +1613,96 @@ static int fixup_dlg_get_var_free(void** param, int param_no)
  	return -1;
  }
  
@@ -127,7 +127,7 @@ index 8e06c01..42e3e1b 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2192,6 +2287,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2198,6 +2293,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
@@ -140,10 +140,10 @@ index 8e06c01..42e3e1b 100644
  		SR_KEMIP_INT, ki_set_dlg_profile_static,
  		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 26d1cbb..242a487 100644
+index 972b9e4..6fcaaf7 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
-@@ -2124,6 +2124,54 @@ if(dlg_get_var("$var(ci)", "$var(ft)", "456", "test", "$var(tmp)"))
+@@ -2151,6 +2151,54 @@ if(dlg_get_var("$var(ci)", "$var(ft)", "456", "test", "$var(tmp)"))
  		</example>
  	</section>
  

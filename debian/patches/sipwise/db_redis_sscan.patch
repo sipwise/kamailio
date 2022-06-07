@@ -7,7 +7,7 @@ Subject: db_redis_sscan
  1 file changed, 65 insertions(+), 21 deletions(-)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index c82f82b..dd11ad5 100644
+index 8166d29..8569aa0 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -591,7 +591,7 @@ err:
@@ -74,7 +74,7 @@ index c82f82b..dd11ad5 100644
          }
          if (db_redis_key_add_string(&query_v, cursor_str, strlen(cursor_str)) != 0) {
              LM_ERR("Failed to add cursor to scan query\n");
-@@ -932,7 +960,8 @@ err:
+@@ -951,7 +979,8 @@ err:
  static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
          const int _n,
          redis_key_t **query_keys, int *query_keys_count,
@@ -84,7 +84,7 @@ index c82f82b..dd11ad5 100644
  
      struct str_hash_entry *table_e;
      redis_table_t *table;
-@@ -969,7 +998,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
+@@ -988,7 +1017,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
                  table->version_code.len, table->version_code.s,
                  table_name->len, table_name->s);
          str match_pattern = {match, len};
@@ -93,7 +93,7 @@ index c82f82b..dd11ad5 100644
                  manual_keys, manual_keys_count, 1000);
          pkg_free(match);
          return ret;
-@@ -1031,7 +1060,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
+@@ -1050,7 +1079,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
              str match_pattern = {match, len};
              LM_DBG("running timestamp/int range matching using pattern '%.*s'\n", len, match);
  
@@ -102,7 +102,7 @@ index c82f82b..dd11ad5 100644
                      manual_keys, manual_keys_count, 5000);
              if (ret)
                  goto out;
-@@ -1076,7 +1105,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
+@@ -1095,7 +1124,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
          str match_pattern = {match, len};
          LM_DBG("running timestamp/int range matching using pattern '%.*s'\n", len, match);
  
@@ -111,7 +111,7 @@ index c82f82b..dd11ad5 100644
                  manual_keys, manual_keys_count, 5000);
          if (ret)
              goto out;
-@@ -1089,7 +1118,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
+@@ -1108,7 +1137,7 @@ static int db_redis_scan_query_keys(km_redis_con_t *con, const str *table_name,
          str match_pattern = {match, len};
          LM_DBG("running timestamp/int range matching using pattern '%.*s'\n", len, match);
  
@@ -120,7 +120,7 @@ index c82f82b..dd11ad5 100644
                  manual_keys, manual_keys_count, 5000);
          if (ret)
              goto out;
-@@ -1447,7 +1476,7 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
+@@ -1466,7 +1495,7 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
          const int _n, const int _nc, db1_res_t** _r,
          redis_key_t **keys, int *keys_count,
          int **manual_keys, int *manual_keys_count, int do_table_scan, uint64_t ts_scan_start,
@@ -129,7 +129,7 @@ index c82f82b..dd11ad5 100644
  
      redisReply *reply = NULL;
      redis_key_t *query_v = NULL;
-@@ -1481,7 +1510,7 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
+@@ -1500,7 +1529,7 @@ static int db_redis_perform_query(const db1_con_t* _h, km_redis_con_t *con, cons
          }
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _n,
                      keys, keys_count,
@@ -138,7 +138,7 @@ index c82f82b..dd11ad5 100644
              LM_ERR("failed to scan query keys\n");
              goto error;
          }
-@@ -1632,7 +1661,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1651,7 +1680,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          const db_val_t* _v, const db_op_t *_op, const int _n,
          redis_key_t **keys, int *keys_count,
          int **manual_keys, int *manual_keys_count, int do_table_scan, uint64_t ts_scan_start,
@@ -147,7 +147,7 @@ index c82f82b..dd11ad5 100644
  
      int i = 0, j = 0;
      redis_key_t *k = NULL;
-@@ -1665,7 +1694,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1688,7 +1717,7 @@ static int db_redis_perform_delete(const db1_con_t* _h, km_redis_con_t *con, con
          }
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _n,
                      keys, keys_count,
@@ -156,7 +156,7 @@ index c82f82b..dd11ad5 100644
              LM_ERR("failed to scan query keys\n");
              goto error;
          }
-@@ -1878,7 +1907,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1953,7 +1982,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
          const int _n, const int _nu,
          redis_key_t **keys, int *keys_count,
          int **manual_keys, int *manual_keys_count, int do_table_scan, uint64_t ts_scan_start,
@@ -165,7 +165,7 @@ index c82f82b..dd11ad5 100644
  
      redisReply *reply = NULL;
      redis_key_t *query_v = NULL;
-@@ -1907,7 +1936,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -1985,7 +2014,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
          }
          if (db_redis_scan_query_keys(con, CON_TABLE(_h), _n,
                      keys, keys_count,
@@ -174,7 +174,7 @@ index c82f82b..dd11ad5 100644
              LM_ERR("failed to scan query keys\n");
              goto error;
          }
-@@ -2300,6 +2329,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -2433,6 +2462,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      int do_table_scan = 0;
      uint64_t ts_scan_start = 0;
      str ts_scan_key = {0,};
@@ -182,7 +182,7 @@ index c82f82b..dd11ad5 100644
  
      redis_key_t *keys = NULL;
      int keys_count = 0;
-@@ -2371,7 +2401,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -2504,7 +2534,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      if (_n > 0) {
          if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
                      &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan, &ts_scan_start,
@@ -191,7 +191,7 @@ index c82f82b..dd11ad5 100644
              LM_ERR("failed to build query keys\n");
              goto error;
          }
-@@ -2389,7 +2419,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -2522,7 +2552,7 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      }
  
      if (db_redis_perform_query(_h, con, _k, _v, query_ops, _c, _n, _nc, _r,
@@ -200,7 +200,7 @@ index c82f82b..dd11ad5 100644
          goto error;
      }
  
-@@ -2405,6 +2435,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
+@@ -2538,6 +2568,8 @@ int db_redis_query(const db1_con_t* _h, const db_key_t* _k, const db_op_t* _op,
      }
      if (ts_scan_key.s)
          pkg_free(ts_scan_key.s);
@@ -209,7 +209,7 @@ index c82f82b..dd11ad5 100644
  
      db_redis_consume_replies(con);
      return 0;
-@@ -2420,6 +2452,8 @@ error:
+@@ -2553,6 +2585,8 @@ error:
      }
      if (ts_scan_key.s)
          pkg_free(ts_scan_key.s);
@@ -218,7 +218,7 @@ index c82f82b..dd11ad5 100644
      db_redis_consume_replies(con);
  
  
-@@ -2605,6 +2639,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2738,6 +2772,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      int do_table_scan = 0;
      uint64_t ts_scan_start = 0;
      str ts_scan_key = {0,};
@@ -226,7 +226,7 @@ index c82f82b..dd11ad5 100644
      db_op_t *query_ops = NULL;
      int i;
  
-@@ -2650,7 +2685,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2783,7 +2818,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      if (_n > 0) {
          if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
                      &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan, &ts_scan_start,
@@ -235,7 +235,7 @@ index c82f82b..dd11ad5 100644
              LM_ERR("failed to build query keys\n");
              goto error;
          }
-@@ -2668,7 +2703,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2801,7 +2836,7 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
      }
  
      if (db_redis_perform_delete(_h, con, _k, _v, query_ops, _n,
@@ -244,7 +244,7 @@ index c82f82b..dd11ad5 100644
          goto error;
      }
  
-@@ -2682,6 +2717,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
+@@ -2815,6 +2850,8 @@ int db_redis_delete(const db1_con_t* _h, const db_key_t* _k,
          pkg_free(manual_keys);
      if (ts_scan_key.s)
          pkg_free(ts_scan_key.s);
@@ -253,7 +253,7 @@ index c82f82b..dd11ad5 100644
      db_redis_consume_replies(con);
  
      return 0;
-@@ -2696,6 +2733,8 @@ error:
+@@ -2829,6 +2866,8 @@ error:
          pkg_free(manual_keys);
      if (ts_scan_key.s)
          pkg_free(ts_scan_key.s);
@@ -262,7 +262,7 @@ index c82f82b..dd11ad5 100644
      db_redis_consume_replies(con);
      return -1;
  }
-@@ -2720,6 +2759,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2853,6 +2892,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      int do_table_scan = 0;
      uint64_t ts_scan_start = 0;
      str ts_scan_key = {0,};
@@ -270,7 +270,7 @@ index c82f82b..dd11ad5 100644
  
      redis_key_t *keys = NULL;
      int keys_count = 0;
-@@ -2770,7 +2810,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2903,7 +2943,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      if (_n > 0) {
          if (db_redis_build_query_keys(con, CON_TABLE(_h), _k, _v, query_ops, _n,
                      &keys, &keys_count, &manual_keys, &manual_keys_count, &do_table_scan, &ts_scan_start,
@@ -279,7 +279,7 @@ index c82f82b..dd11ad5 100644
              LM_ERR("failed to build query keys\n");
              goto error;
          }
-@@ -2787,7 +2827,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2920,7 +2960,7 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      }
  
      if (db_redis_perform_update(_h, con, _k, _v, query_ops, _uk, _uv, _n, _nu,
@@ -288,7 +288,7 @@ index c82f82b..dd11ad5 100644
          goto error;
      }
  
-@@ -2803,6 +2843,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
+@@ -2936,6 +2976,8 @@ int db_redis_update(const db1_con_t* _h, const db_key_t* _k,
      }
      if (ts_scan_key.s)
          pkg_free(ts_scan_key.s);
@@ -297,7 +297,7 @@ index c82f82b..dd11ad5 100644
      db_redis_consume_replies(con);
      return 0;
  
-@@ -2817,6 +2859,8 @@ error:
+@@ -2950,6 +2992,8 @@ error:
      }
      if (ts_scan_key.s)
          pkg_free(ts_scan_key.s);

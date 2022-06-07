@@ -7,10 +7,10 @@ Subject: [PATCH] dialog: dlg_get_var assure return null on error
  1 file changed, 20 insertions(+), 11 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index ee9e240..b9f6378 100644
+index 6668712..767e6ef 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1564,53 +1564,62 @@ static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
+@@ -1570,53 +1570,62 @@ static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
  	str k = STR_NULL;
  	str *val = NULL;
  	pv_value_t dst_val;
