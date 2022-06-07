@@ -589,20 +589,22 @@ int pv_get_flag(struct sip_msg *msg, pv_param_t *param,
 	return pv_get_uintval(msg, param, res, (msg->flags & (1<<param->pvn.u.isname.name.n)) ? 1 : 0);
 }
 
-static inline char* int_to_8hex(int val)
+static inline char* int_to_8hex(int sval)
 {
 	unsigned short digit;
 	int i;
 	static char outbuf[9];
+	unsigned int uval;
 
+	uval = (unsigned int)sval;
 	outbuf[8] = '\0';
 	for(i=0; i<8; i++)
 	{
-		if(val!=0)
+		if(uval!=0)
 		{
-			digit =  val & 0x0f;
+			digit =  uval & 0x0f;
 			outbuf[7-i] = digit >= 10 ? digit + 'a' - 10 : digit + '0';
-			val >>= 4;
+			uval >>= 4;
 		}
 		else
 			outbuf[7-i] = '0';
@@ -3180,8 +3182,8 @@ int pv_parse_hdr_name(pv_spec_p sp, str *in)
 	s.s = p;
 	s.len = in->len+1;
 
-	if (parse_hname2_short(s.s, s.s + s.len, &hdr)==0)
-	{
+	parse_hname2_short(s.s, s.s + s.len, &hdr);
+	if(hdr.type==HDR_ERROR_T) {
 		LM_ERR("error parsing header name [%.*s]\n", s.len, s.s);
 		goto error;
 	}
@@ -3235,6 +3237,10 @@ int pv_parse_K_name(pv_spec_p sp, str *in)
 
 	switch(in->len)
 	{
+		case 2:
+			if(strncmp(in->s, "WS", 2)==0)
+				sp->pvp.pvn.u.isname.name.n = 6;
+			else goto error;
 		case 3:
 			if(strncmp(in->s, "UDP", 3)==0)
 				sp->pvp.pvn.u.isname.name.n = 2;
@@ -3242,6 +3248,8 @@ int pv_parse_K_name(pv_spec_p sp, str *in)
 				sp->pvp.pvn.u.isname.name.n = 3;
 			else if(strncmp(in->s, "TLS", 3)==0)
 				sp->pvp.pvn.u.isname.name.n = 4;
+			else if(strncmp(in->s, "WSS", 3)==0)
+				sp->pvp.pvn.u.isname.name.n = 7;
 			else goto error;
 		break;
 		case 4:
@@ -3313,6 +3321,10 @@ int pv_get_K(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 			return pv_get_uintval(msg, param, res, PROTO_TLS);
 		case 5:
 			return pv_get_uintval(msg, param, res, PROTO_SCTP);
+		case 6:
+			return pv_get_uintval(msg, param, res, PROTO_WS);
+		case 7:
+			return pv_get_uintval(msg, param, res, PROTO_WSS);
 		default:
 			return pv_get_uintval(msg, param, res, AF_INET);
 	}

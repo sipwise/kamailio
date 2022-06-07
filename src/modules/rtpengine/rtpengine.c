@@ -287,6 +287,9 @@ static pv_spec_t *media_duration_pvar = NULL;
 #define RTPENGINE_SESS_LIMIT_MSG "Parallel session limit reached"
 #define RTPENGINE_SESS_LIMIT_MSG_LEN (sizeof(RTPENGINE_SESS_LIMIT_MSG)-1)
 
+#define RTPENGINE_SESS_OUT_OF_PORTS_MSG "Ran out of ports"
+#define RTPENGINE_SESS_OUT_OF_PORTS_MSG_LEN (sizeof(RTPENGINE_SESS_OUT_OF_PORTS_MSG)-1)
+
 char* force_send_ip_str="";
 int force_send_ip_af = AF_UNSPEC;
 
@@ -1003,7 +1006,14 @@ int add_rtpengine_socks(struct rtpp_set *rtpp_list, char *rtpengine,
 
 		/* Check the rn_address is 'hostname:port' */
 		/* Check the rn_address port is valid */
-		p1 = strchr(pnode->rn_address, ':');
+		if(pnode->rn_umode == 6) {
+                        p1 = strstr(pnode->rn_address, "]:");
+                        if(p1 != NULL) {
+                                p1++;
+                        }
+                } else {
+                        p1 = strchr(pnode->rn_address, ':');
+                }
 		if (p1 != NULL) {
 			p1++;
 		}
@@ -1797,6 +1807,7 @@ static int build_rtpp_socks(int lmode, int rtest) {
 		rtpe_reload_lock_get(rtpp_list->rset_lock);
 		for (pnode=rtpp_list->rn_first; pnode!=0; pnode = pnode->rn_next) {
 			char *hostname;
+			char *hp;
 
 			if (pnode->rn_umode == 0) {
 				rtpp_socks[pnode->idx] = -1;
@@ -1823,11 +1834,23 @@ static int build_rtpp_socks(int lmode, int rtest) {
 			if (cp == NULL || *cp == '\0')
 				cp = CPORT;
 
+			if(pnode->rn_umode == 6) {
+				hp = strrchr(hostname, ']');
+				if(hp != NULL)
+					*hp = '\0';
+
+				hp = hostname;
+				if(*hp == '[')
+					hp++;
+			} else {
+				hp = hostname;
+			}
+
 			memset(&hints, 0, sizeof(hints));
 			hints.ai_flags = 0;
 			hints.ai_family = (pnode->rn_umode == 6) ? AF_INET6 : AF_INET;
 			hints.ai_socktype = SOCK_DGRAM;
-			if ((n = getaddrinfo(hostname, cp, &hints, &res)) != 0) {
+			if ((n = getaddrinfo(hp, cp, &hints, &res)) != 0) {
 				LM_ERR("%s\n", gai_strerror(n));
 				pkg_free(hostname);
 				rtpp_socks[pnode->idx] = -1;
@@ -2585,6 +2608,13 @@ select_node:
 				LM_WARN("proxy %.*s: %.*s", node->rn_url.len, node->rn_url.s , error.len, error.s);
 				goto select_node;
 			}
+			if ((RTPENGINE_SESS_OUT_OF_PORTS_MSG_LEN == error.len) &&
+				(strncmp(error.s, RTPENGINE_SESS_OUT_OF_PORTS_MSG, RTPENGINE_SESS_OUT_OF_PORTS_MSG_LEN) == 0))
+			{
+				LM_WARN("proxy %.*s: %.*s", node->rn_url.len, node->rn_url.s , error.len, error.s);
+				goto select_node;
+			}
+
 			LM_ERR("proxy replied with error: %.*s\n", error.len, error.s);
 		}
 		goto error;

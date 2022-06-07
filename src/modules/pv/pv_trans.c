@@ -190,7 +190,7 @@ static int pdu_7bit_encode(str sin) {
 	nleft = 1;
 	j = 0;
 	for(i = 0; i < sin.len; i++) {
-		hex = *(sin.s) >> (nleft - 1);
+		hex = (unsigned char)(*(sin.s)) >> (nleft - 1);
 		fill = *(sin.s+1) << (8-nleft);
 		hex = hex | fill;
 		_tr_buffer[j++] = HexTbl[hex >> 4];
@@ -345,7 +345,7 @@ int tr_eval_string(struct sip_msg *msg, tr_param_t *tp, int subtype,
 			j = 0;
 			for(i=0; i<val->rs.len; i++)
 			{
-				_tr_buffer[j++] = fourbits2char[val->rs.s[i] >> 4];
+				_tr_buffer[j++] = fourbits2char[(unsigned char)val->rs.s[i] >> 4];
 				_tr_buffer[j++] = fourbits2char[val->rs.s[i] & 0xf];
 			}
 			_tr_buffer[j] = '\0';
@@ -2440,8 +2440,8 @@ char* tr_parse_string(str* in, trans_t *t)
 		while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
 		if(*p!=TR_RBRACKET)
 		{
-			LM_ERR("invalid select transformation: %.*s!!\n",
-					in->len, in->s);
+			LM_ERR("invalid select transformation: %.*s (c:%c/%d - p:%d)!!\n",
+					in->len, in->s, *p, *p, (int)(p - in->s));
 			goto error;
 		}
 		goto done;
@@ -2596,7 +2596,7 @@ char* tr_parse_string(str* in, trans_t *t)
 		while(*p && (*p==' ' || *p=='\t' || *p=='\n')) p++;
 		if(*p!=TR_RBRACKET)
 		{
-			LM_ERR("invalid ftime transformation: %.*s!!\n",
+			LM_ERR("invalid rm transformation: %.*s!!\n",
 					in->len, in->s);
 			goto error;
 		}
