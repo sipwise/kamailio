@@ -7,7 +7,7 @@ Subject: [PATCH] core: main - executes callbacks on app ready and shutdown
  1 file changed, 3 insertions(+)
 
 diff --git a/src/main.c b/src/main.c
-index a474f88..b1414a9 100644
+index 0e16009..5af26f3 100644
 --- a/src/main.c
 +++ b/src/main.c
 @@ -683,6 +683,8 @@ static void sig_alarm_abort(int signo)
@@ -19,7 +19,7 @@ index a474f88..b1414a9 100644
  	kill_all_children(sig);
  	if (set_sig_h(SIGALRM, sig_alarm_kill) == SIG_ERR ) {
  		LM_ERR("could not install SIGALARM handler\n");
-@@ -1787,6 +1789,7 @@ int main_loop(void)
+@@ -1809,6 +1811,7 @@ int main_loop(void)
  		cfg_ok=1;
  
  		*_sr_instance_started = 1;

@@ -7,7 +7,7 @@ Subject: [PATCH] rtpengine: add support for new T.38 options
  1 file changed, 8 insertions(+)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index edd5899..60d505c 100644
+index f0e1076..72637d2 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -118,6 +118,7 @@ enum {
@@ -18,7 +18,7 @@ index edd5899..60d505c 100644
  		       *codec, *codec_strip, *codec_offer, *codec_transcode, *codec_mask;
  	str call_id, from_tag, to_tag;
  };
-@@ -2125,6 +2126,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
+@@ -2148,6 +2149,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
  			bencode_list_add_str(ng_flags->sdes, &s);
  			goto next;
  		}
@@ -29,7 +29,7 @@ index edd5899..60d505c 100644
  		if (str_key_val_prefix(&key, "rtcp-mux", &val, &s)) {
  			bencode_list_add_str(ng_flags->rtcp_mux, &s);
  			goto next;
-@@ -2402,6 +2407,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
+@@ -2425,6 +2430,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  		ng_flags.replace = bencode_list(bencbuf);
  		ng_flags.rtcp_mux = bencode_list(bencbuf);
  		ng_flags.sdes = bencode_list(bencbuf);
@@ -37,7 +37,7 @@ index edd5899..60d505c 100644
  		ng_flags.codec = bencode_dictionary(bencbuf);
  
  		if (read_sdp_pvar!= NULL) {
-@@ -2455,6 +2461,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
+@@ -2478,6 +2484,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  		bencode_dictionary_add(ng_flags.dict, "rtcp-mux", ng_flags.rtcp_mux);
  	if (ng_flags.sdes && ng_flags.sdes->child)
  		bencode_dictionary_add(ng_flags.dict, "SDES", ng_flags.sdes);

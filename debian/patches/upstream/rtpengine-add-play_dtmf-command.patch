@@ -8,7 +8,7 @@ Subject: [PATCH] rtpengine: add play_dtmf() command
  2 files changed, 12 insertions(+)
 
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index 8b72e5b..dba5e62 100644
+index 56f49fd..acb3cd5 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
 @@ -138,6 +138,7 @@ static const char *command_strings[] = {
@@ -27,7 +27,7 @@ index 8b72e5b..dba5e62 100644
  static int rtpengine_answer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_offer1_f(struct sip_msg *, char *, char *);
  static int rtpengine_delete1_f(struct sip_msg *, char *, char *);
-@@ -376,6 +378,9 @@ static cmd_export_t cmds[] = {
+@@ -379,6 +381,9 @@ static cmd_export_t cmds[] = {
  	{"stop_media",		(cmd_function)stop_media_f, 		0,
  		0, 0,
  		ANY_ROUTE},
@@ -37,7 +37,7 @@ index 8b72e5b..dba5e62 100644
  	{"rtpengine_offer",	(cmd_function)rtpengine_offer1_f,	0,
  		0, 0,
  		ANY_ROUTE},
-@@ -3845,6 +3850,12 @@ stop_media_f(struct sip_msg* msg, char *str1, char *str2)
+@@ -3875,6 +3880,12 @@ stop_media_f(struct sip_msg* msg, char *str1, char *str2)
  	return rtpengine_generic_f(msg, str1, OP_STOP_MEDIA);
  }
  

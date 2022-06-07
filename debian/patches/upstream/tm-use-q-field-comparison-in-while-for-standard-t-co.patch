@@ -12,7 +12,7 @@ Subject: [PATCH] tm: use q field comparison in while for standard t contacts
  1 file changed, 14 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/tm/t_serial.c b/src/modules/tm/t_serial.c
-index d27a648243..13611cdb54 100644
+index 7487c7c..4532105 100644
 --- a/src/modules/tm/t_serial.c
 +++ b/src/modules/tm/t_serial.c
 @@ -459,11 +459,20 @@ int ki_t_load_contacts_mode(struct sip_msg* msg, int mode)
@@ -41,6 +41,3 @@ index d27a648243..13611cdb54 100644
  		}
  		if (!curr) {
  			next->next = (struct contact *)0;
--- 
-2.20.1
-

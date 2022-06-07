@@ -15,7 +15,7 @@ to 0 == PV_IDX_INT
  2 files changed, 8 insertions(+)
 
 diff --git a/src/core/pvapi.c b/src/core/pvapi.c
-index 0148578..30b2a7c 100644
+index 4c5c82d..a018646 100644
 --- a/src/core/pvapi.c
 +++ b/src/core/pvapi.c
 @@ -857,6 +857,7 @@ char* pv_parse_spec2(str *in, pv_spec_p e, int silent)

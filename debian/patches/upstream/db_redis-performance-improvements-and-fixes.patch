@@ -21,7 +21,7 @@ Subject: [PATCH] db_redis: performance improvements and fixes
  6 files changed, 746 insertions(+), 103 deletions(-)
 
 diff --git a/src/modules/db_redis/redis_connection.c b/src/modules/db_redis/redis_connection.c
-index 6743a97..ad2921f 100644
+index 5a5887d..dd421a7 100644
 --- a/src/modules/db_redis/redis_connection.c
 +++ b/src/modules/db_redis/redis_connection.c
 @@ -23,6 +23,7 @@

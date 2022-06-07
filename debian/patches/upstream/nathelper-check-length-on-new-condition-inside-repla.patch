@@ -1,4 +1,3 @@
-From ccd29983f538d13de3f5d07584d45020ca75f174 Mon Sep 17 00:00:00 2001
 From: Daniel-Constantin Mierla <miconda@gmail.com>
 Date: Tue, 15 Jun 2021 09:54:32 +0200
 Subject: [PATCH] nathelper: check length on new condition inside
@@ -10,10 +9,10 @@ Subject: [PATCH] nathelper: check length on new condition inside
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/nathelper/nathelper.c b/src/modules/nathelper/nathelper.c
-index 9512834d0e..1392a0af2a 100644
+index 9ffaf36..15def63 100644
 --- a/src/modules/nathelper/nathelper.c
 +++ b/src/modules/nathelper/nathelper.c
-@@ -1655,7 +1655,7 @@ static inline int replace_sdp_ip(
+@@ -1613,7 +1613,7 @@ static inline int replace_sdp_ip(
  		hasreplaced = 1;
  		body1 = body2;
  	}
@@ -22,6 +21,3 @@ index 9512834d0e..1392a0af2a 100644
  		LM_ERR("can't extract '%s' IP from the SDP\n", line);
  		return -1;
  	}
--- 
-2.30.2
-

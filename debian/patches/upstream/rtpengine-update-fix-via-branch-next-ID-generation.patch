@@ -12,7 +12,7 @@ processing in scripts
  2 files changed, 29 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/rtpengine/doc/rtpengine_admin.xml b/src/modules/rtpengine/doc/rtpengine_admin.xml
-index cafd6b6..9e31a7d 100644
+index dd1fc2d..1619ffb 100644
 --- a/src/modules/rtpengine/doc/rtpengine_admin.xml
 +++ b/src/modules/rtpengine/doc/rtpengine_admin.xml
 @@ -2113,6 +2113,10 @@ rtpengine_offer();
@@ -27,10 +27,10 @@ index cafd6b6..9e31a7d 100644
  				on the &rtp; proxy. When sending a subsequent <quote>delete</quote> command to
  				the &rtp; proxy, you can then stop just the session for a specific branch when
 diff --git a/src/modules/rtpengine/rtpengine.c b/src/modules/rtpengine/rtpengine.c
-index dba5e62..edd5899 100644
+index acb3cd5..f0e1076 100644
 --- a/src/modules/rtpengine/rtpengine.c
 +++ b/src/modules/rtpengine/rtpengine.c
-@@ -2268,6 +2268,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
+@@ -2291,6 +2291,10 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
  						ng_flags->via = -1;
  					else if (str_eq(&val, "next"))
  						ng_flags->via = -2;
@@ -41,7 +41,7 @@ index dba5e62..edd5899 100644
  					else
  						goto error;
  					goto next;
-@@ -2363,6 +2367,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
+@@ -2386,6 +2390,8 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	char md5[MD5_LEN];
  	char branch_buf[MAX_BRANCH_PARAM_LEN];
  	bencode_item_t *result;
@@ -50,7 +50,7 @@ index dba5e62..edd5899 100644
  
  	/*** get & init basic stuff needed ***/
  
-@@ -2453,11 +2459,21 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
+@@ -2476,11 +2482,21 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  	bencode_dictionary_add_str(ng_flags.dict, "call-id", &ng_flags.call_id);
  
  	if (ng_flags.via) {
@@ -74,7 +74,7 @@ index dba5e62..edd5899 100644
  			case 1:
  			case 2:
  				ret = get_via_branch(msg, ng_flags.via, &viabranch);
-@@ -2469,10 +2485,16 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
+@@ -2492,10 +2508,16 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
  			case -2:
  				if (!char_msg_val(msg, md5))
  					break;

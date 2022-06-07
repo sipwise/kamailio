@@ -39,7 +39,7 @@ index c869344..bd48956 100644
  		<title><varname>pubruri_caller_avp</varname> (str)</title>
  		<para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index f393249..2e25386 100644
+index 79d0dc9..0663934 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -41,6 +41,7 @@
@@ -133,7 +133,7 @@ index f393249..2e25386 100644
  static void
  __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  {
-@@ -266,6 +322,12 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
+@@ -271,6 +327,12 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
  		uri = dlginfo->to_uri;
  	}
  
@@ -146,7 +146,7 @@ index f393249..2e25386 100644
  	switch (type) {
  		case DLGCB_FAILED:
  		case DLGCB_TERMINATED:
-@@ -784,6 +846,19 @@ void free_dlginfo_cell(void *param) {
+@@ -789,6 +851,19 @@ void free_dlginfo_cell(void *param) {
  }
  
  

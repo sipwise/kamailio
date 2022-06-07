@@ -7,10 +7,10 @@ Subject: [PATCH] pv: fix for new PV_IDX_NONE value
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/src/modules/pv/pv_core.c b/src/modules/pv/pv_core.c
-index d4ae29b..ca863b4 100644
+index 7ffd87f..c1d64d6 100644
 --- a/src/modules/pv/pv_core.c
 +++ b/src/modules/pv/pv_core.c
-@@ -1791,7 +1791,7 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
+@@ -1793,7 +1793,7 @@ int pv_get_avp(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
  	if ((avp=search_first_avp(name_type, avp_name, &avp_value, &state))==0)
  		return pv_get_null(msg, param, res);
  	res->flags = PV_VAL_STR;
@@ -19,7 +19,7 @@ index d4ae29b..ca863b4 100644
  	{
  		if(avp->flags & AVP_VAL_STR)
  		{
-@@ -1949,7 +1949,7 @@ int pv_get_hdr(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
+@@ -1951,7 +1951,7 @@ int pv_get_hdr(struct sip_msg *msg,  pv_param_t *param, pv_value_t *res)
  
  	/* get the value */
  	res->flags = PV_VAL_STR;

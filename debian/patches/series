@@ -89,6 +89,8 @@ upstream/pv-headers-remove_specific_header_value.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
+sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
+sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
@@ -99,12 +101,10 @@ sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
-sipwise/pv_headers-fix-detection-of-split-marker.patch
-### active development
-sipwise/pua-fix-send_publish-behavior-on-PUA_DB_ONLY.patch
-sipwise/pua-update_version_puadb-use-pres_id-to-select-recor.patch
 sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
+sipwise/pv_headers-fix-detection-of-split-marker.patch
 sipwise/pv_headers-fix-build-warning.patch
+### active development
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches

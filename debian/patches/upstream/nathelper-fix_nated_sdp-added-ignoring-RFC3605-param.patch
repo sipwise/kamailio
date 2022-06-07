@@ -10,7 +10,7 @@ Subject: nathelper: fix_nated_sdp added ignoring RFC3605-param if omitted
  1 file changed, 18 insertions(+), 19 deletions(-)
 
 diff --git a/src/modules/nathelper/nathelper.c b/src/modules/nathelper/nathelper.c
-index 4452b97..a51c827 100644
+index 15def63..0057dd3 100644
 --- a/src/modules/nathelper/nathelper.c
 +++ b/src/modules/nathelper/nathelper.c
 @@ -1567,13 +1567,12 @@ static int is_rfc1918_f(struct sip_msg *msg, char *str1, char *str2)

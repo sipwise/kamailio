@@ -13,10 +13,10 @@ thus causing unexpected reply later on when reading from the same connection.
  1 file changed, 2 insertions(+)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index 5258d57..ffe6ad7 100644
+index 863968a..140eb4c 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
-@@ -2292,6 +2292,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
+@@ -2241,6 +2241,7 @@ static int db_redis_perform_update(const db1_con_t* _h, km_redis_con_t *con, con
  
      db_redis_key_free(&all_type_keys);
      db_redis_key_free(&new_type_keys);
@@ -24,7 +24,7 @@ index 5258d57..ffe6ad7 100644
      return 0;
  
  error:
-@@ -2303,6 +2304,7 @@ error:
+@@ -2252,6 +2253,7 @@ error:
      db_redis_key_free(&type_keys);
      db_redis_key_free(&set_keys);
      db_redis_key_free(&new_type_keys);

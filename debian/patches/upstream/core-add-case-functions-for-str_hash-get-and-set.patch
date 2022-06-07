@@ -7,7 +7,7 @@ Subject: core: add case functions for str_hash get and set
  1 file changed, 24 insertions(+)
 
 diff --git a/src/core/str_hash.h b/src/core/str_hash.h
-index 8755a62..a338283 100644
+index a524e73..cd6d998 100644
 --- a/src/core/str_hash.h
 +++ b/src/core/str_hash.h
 @@ -101,6 +101,30 @@ inline static struct str_hash_entry* str_hash_get(struct str_hash_table* ht,

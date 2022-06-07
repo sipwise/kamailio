@@ -16,7 +16,7 @@ Skip split marker between double quotes to avoid this
  4 files changed, 49 insertions(+), 13 deletions(-)
 
 diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
-index 749275e..90fedde 100644
+index 5b7b5da..fccd077 100644
 --- a/src/modules/pv_headers/pvh_func.c
 +++ b/src/modules/pv_headers/pvh_func.c
 @@ -62,6 +62,7 @@ int pvh_collect_headers(struct sip_msg *msg)
@@ -41,7 +41,7 @@ index 749275e..90fedde 100644
  					   "value",
  						name.len, name.s);
 diff --git a/src/modules/pv_headers/pvh_hash.c b/src/modules/pv_headers/pvh_hash.c
-index 80297bc..545fcd0 100644
+index 89f93f7..d4b6bfc 100644
 --- a/src/modules/pv_headers/pvh_hash.c
 +++ b/src/modules/pv_headers/pvh_hash.c
 @@ -37,7 +37,7 @@ int pvh_str_hash_init(struct str_hash_table *ht, str *keys, char *desc)

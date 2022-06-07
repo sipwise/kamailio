@@ -16,10 +16,10 @@ Examples from RFC3605:
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/src/modules/nathelper/nathelper.c b/src/modules/nathelper/nathelper.c
-index baae1db..9512834 100644
+index 86d49e1..9ffaf36 100644
 --- a/src/modules/nathelper/nathelper.c
 +++ b/src/modules/nathelper/nathelper.c
-@@ -1655,7 +1655,7 @@ static inline int replace_sdp_ip(
+@@ -1613,7 +1613,7 @@ static inline int replace_sdp_ip(
  		hasreplaced = 1;
  		body1 = body2;
  	}

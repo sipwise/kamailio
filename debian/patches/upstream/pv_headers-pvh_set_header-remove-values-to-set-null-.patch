@@ -1,10 +1,9 @@
 From: Victor Seva <vseva@sipwise.com>
 Date: Tue, 27 Jul 2021 13:13:36 +0200
-Subject: [PATCH] pv_headers: pvh_set_header, remove values to set null when
- necessary
+Subject: [PATCH] pv_headers: pvh_set_header,
+ remove values to set null when necessary
 
 * fix pvh_set_xavi for SR_XTYPE_NULL
-
 ---
  src/modules/pv_headers/pvh_xavp.c | 10 ++++++----
  1 file changed, 6 insertions(+), 4 deletions(-)

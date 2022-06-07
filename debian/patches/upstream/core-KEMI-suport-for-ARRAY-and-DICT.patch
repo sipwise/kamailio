@@ -8,10 +8,10 @@ Subject: [PATCH] core: KEMI suport for ARRAY and DICT
  2 files changed, 44 insertions(+), 1 deletion(-)
 
 diff --git a/src/core/kemi.c b/src/core/kemi.c
-index 6a4732e..bd52f77 100644
+index 2d0a604..84db06c 100644
 --- a/src/core/kemi.c
 +++ b/src/core/kemi.c
-@@ -2371,6 +2371,34 @@ void sr_kemi_xval_null(sr_kemi_xval_t *xval, int rmode)
+@@ -2377,6 +2377,34 @@ void sr_kemi_xval_null(sr_kemi_xval_t *xval, int rmode)
  	}
  }
  

@@ -10,7 +10,7 @@ Related #2057
  3 files changed, 18 insertions(+), 10 deletions(-)
 
 diff --git a/src/core/ppcfg.c b/src/core/ppcfg.c
-index 584a491..115707a 100644
+index 8fd19f6..c6b7d2e 100644
 --- a/src/core/ppcfg.c
 +++ b/src/core/ppcfg.c
 @@ -216,19 +216,27 @@ void pp_ifdef_level_update(int val)
@@ -62,10 +62,10 @@ index 8485059..6fbd8a3 100644
  void pp_define_core(void);
  
 diff --git a/src/main.c b/src/main.c
-index b1414a9..c12b9e4 100644
+index 5af26f3..6d8f3bd 100644
 --- a/src/main.c
 +++ b/src/main.c
-@@ -2265,10 +2265,10 @@ try_again:
+@@ -2307,10 +2307,10 @@ try_again:
  
  	yyin=cfg_stream;
  	debug_save = default_core_cfg.debug;
@@ -78,7 +78,7 @@ index b1414a9..c12b9e4 100644
  
  		goto error;
  	}
-@@ -2276,7 +2276,6 @@ try_again:
+@@ -2318,7 +2318,6 @@ try_again:
  		fprintf(stderr, "%d config warnings\n", cfg_warnings);
  	}
  	if (debug_flag) default_core_cfg.debug = debug_save;

@@ -7,7 +7,7 @@ Subject: [PATCH] app_lua: add support for ARRAY and DICT types
  1 file changed, 87 insertions(+)
 
 diff --git a/src/modules/app_lua/app_lua_api.c b/src/modules/app_lua/app_lua_api.c
-index f80de09..da3b4ee 100644
+index 1a27136..f736bea 100644
 --- a/src/modules/app_lua/app_lua_api.c
 +++ b/src/modules/app_lua/app_lua_api.c
 @@ -806,6 +806,85 @@ int sr_kemi_lua_return_int(lua_State* L, sr_kemi_t *ket, int rc)

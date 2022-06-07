@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.9-1+0~mr8.5.10.0) unstable; urgency=medium
+
+  * TT#180100 New upstream version 5.3.9
+  * TT#180100 refresh patches
+
+ -- Victor Seva <vseva@debian.org>  Tue, 07 Jun 2022 13:16:38 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.10.0) unstable; urgency=medium
 
   [ Fabricio Santolin da Silva ]
