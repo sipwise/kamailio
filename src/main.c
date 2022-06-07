@@ -293,22 +293,6 @@ void print_internals(void)
 	printf("Thank you for flying %s!\n", NAME);
 }
 
-/* debugging function */
-/*
-void receive_stdin_loop(void)
-{
-	#define BSIZE 1024
-	char buf[BSIZE+1];
-	int len;
-
-	while(1){
-		len=fread(buf,1,BSIZE,stdin);
-		buf[len+1]=0;
-		receive_msg(buf, len);
-		printf("-------------------------\n");
-	}
-}
-*/
 
 /* global vars */
 
@@ -323,7 +307,7 @@ unsigned int maxbuffer = MAX_RECV_BUFFER_SIZE; /* maximum buffer size we do
 												  not want to exceed during the
 												  auto-probing procedure; may
 												  be re-configured */
-unsigned int sql_buffer_size = 65535; /* Size for the SQL buffer. Defaults to 64k. 
+unsigned int sql_buffer_size = 65535; /* Size for the SQL buffer. Defaults to 64k.
                                          This may be re-configured */
 int socket_workers = 0;		/* number of workers processing requests for a socket
 							   - it's reset everytime with a new listen socket */
@@ -358,9 +342,11 @@ int dont_fork = 0;
 int dont_daemonize = 0;
 int log_stderr = 0;
 int log_color = 0;
+int log_cee = 0;
 /* set custom app name for syslog printing */
 char *log_name = 0;
 char *log_prefix_fmt = 0;
+char *log_fqdn = 0;
 pid_t creator_pid = (pid_t) -1;
 int config_check = 0;
 /* check if reply first via host==us */
@@ -1512,6 +1498,12 @@ int main_loop(void)
 			LM_ERR("init_child failed\n");
 			goto error;
 		}
+
+		if (init_child(PROC_POSTCHILDINIT) < 0) {
+			LM_ERR("error in init_child for rank PROC_POSTCHILDINIT\n");
+			goto error;
+		}
+
 		*_sr_instance_started = 1;
 		return udp_rcv_loop();
 	}else{ /* fork: */
@@ -1878,6 +1870,11 @@ int main_loop(void)
 			unix_tcp_sock=-1;
 		}
 #endif
+		if (init_child(PROC_POSTCHILDINIT) < 0) {
+			LM_ERR("error in init_child for rank PROC_POSTCHILDINIT\n");
+			goto error;
+		}
+
 		/* init cfg, but without per child callbacks support */
 		cfg_child_no_cb_init();
 		cfg_ok=1;
@@ -2024,6 +2021,25 @@ int main(int argc, char** argv)
 		{0, 0, 0, 0 }
 	};
 
+	if (argc > 1) {
+		/* checks for common wrong arguments */
+		if(strcasecmp(argv[1], "start")==0) {
+			fprintf(stderr, "error: 'start' is not a supported argument\n");
+			fprintf(stderr, "error: stopping " NAME " ...\n\n");
+			exit(-1);
+		}
+		if(strcasecmp(argv[1], "stop")==0) {
+			fprintf(stderr, "error: 'stop' is not a supported argument\n");
+			fprintf(stderr, "error: stopping " NAME " ...\n\n");
+			exit(-1);
+		}
+		if(strcasecmp(argv[1], "restart")==0) {
+			fprintf(stderr, "error: 'restart' is not a supported argument\n");
+			fprintf(stderr, "error: stopping " NAME " ...\n\n");
+			exit(-1);
+		}
+	}
+
 	/*init*/
 	time(&up_since);
 	creator_pid = getpid();
@@ -2036,7 +2052,7 @@ int main(int argc, char** argv)
 	sr_cfgenv_init();
 	daemon_status_init();
 
-	dprint_init_colors();
+	log_init();
 
 	/* command line options */
 	options=  ":f:cm:M:dVIhEeb:l:L:n:vKrRDTN:W:w:t:u:g:P:G:SQ:O:a:A:x:X:Y:";
@@ -2084,6 +2100,10 @@ int main(int argc, char** argv)
 					ksr_slog_init(optarg);
 					break;
 			case KARGOPTVAL+8:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad debug level value\n");
+						goto error;
+					}
 					debug_flag = 1;
 					default_core_cfg.debug=(int)strtol(optarg, &tmp, 10);
 					if ((tmp==0) || (*tmp)){
@@ -2835,6 +2855,7 @@ try_again:
 		fprintf(stderr,  "failed to initialize list addresses\n");
 		goto error;
 	}
+	ksr_sockets_index();
 	if (default_core_cfg.dns_try_ipv6 && !(socket_types & SOCKET_T_IPV6)){
 		/* if we are not listening on any ipv6 address => no point
 		 * to try to resovle ipv6 addresses */

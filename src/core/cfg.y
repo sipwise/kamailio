@@ -328,6 +328,7 @@ extern char *default_routename;
 %token XAVPVIAFIELDS
 %token LISTEN
 %token ADVERTISE
+%token VIRTUAL
 %token STRNAME
 %token ALIAS
 %token SR_AUTO_ALIASES
@@ -394,6 +395,7 @@ extern char *default_routename;
 %token MEMSAFETY
 %token MEMJOIN
 %token MEMSTATUSMODE
+%token SIP_PARSER_LOG_ONELINE
 %token SIP_PARSER_LOG
 %token SIP_PARSER_MODE
 %token CORELOG
@@ -450,6 +452,8 @@ extern char *default_routename;
 %token TCP_OPT_ACCEPT_HAPROXY
 %token TCP_CLONE_RCVBUF
 %token TCP_REUSE_PORT
+%token TCP_WAIT_DATA
+%token TCP_SCRIPT_MODE
 %token DISABLE_TLS
 %token ENABLE_TLS
 %token TLSLOG
@@ -970,6 +974,8 @@ assign_stm:
 	| MEMJOIN EQUAL error { yyerror("int value expected"); }
 	| MEMSTATUSMODE EQUAL intno { default_core_cfg.mem_status_mode=$3; }
 	| MEMSTATUSMODE EQUAL error { yyerror("int value expected"); }
+	| SIP_PARSER_LOG_ONELINE EQUAL intno { default_core_cfg.sip_parser_log_oneline=$3; }
+	| SIP_PARSER_LOG_ONELINE EQUAL error { yyerror("int value expected"); }
 	| SIP_PARSER_LOG EQUAL intno { default_core_cfg.sip_parser_log=$3; }
 	| SIP_PARSER_LOG EQUAL error { yyerror("int value expected"); }
 	| SIP_PARSER_MODE EQUAL intno { ksr_sip_parser_mode=$3; }
@@ -1316,6 +1322,22 @@ assign_stm:
 		#endif
 	}
 	| TCP_REUSE_PORT EQUAL error { yyerror("boolean value expected"); }
+	| TCP_WAIT_DATA EQUAL intno {
+		#ifdef USE_TCP
+			tcp_default_cfg.wait_data_ms=$3;
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_WAIT_DATA EQUAL error { yyerror("number expected"); }
+	| TCP_SCRIPT_MODE EQUAL intno {
+		#ifdef USE_TCP
+			ksr_tcp_script_mode=$3;
+		#else
+			warn("tcp support not compiled in");
+		#endif
+	}
+	| TCP_SCRIPT_MODE EQUAL error { yyerror("number expected"); }
 	| DISABLE_TLS EQUAL NUMBER {
 		#ifdef USE_TLS
 			tls_disable=$3;
@@ -1491,6 +1513,19 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+        | LISTEN EQUAL id_lst VIRTUAL {
+                for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			lst_tmp->flags |= SI_IS_VIRTUAL;
+                        if (add_listen_iface(   lst_tmp->addr_lst->name,
+                                                                        lst_tmp->addr_lst->next,
+                                                                        lst_tmp->port, lst_tmp->proto,
+                                                                        lst_tmp->flags)!=0) {
+                                LM_CRIT("cfg. parser: failed to add listen address\n");
+                                break;
+                        }
+                }
+                free_socket_id_lst($3);
+        }
 	| LISTEN EQUAL id_lst STRNAME STRING {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_iface_name(lst_tmp->addr_lst->name,
@@ -1503,6 +1538,19 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+        | LISTEN EQUAL id_lst STRNAME STRING VIRTUAL {
+                for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+                        lst_tmp->flags |= SI_IS_VIRTUAL;
+                        if (add_listen_iface_name(lst_tmp->addr_lst->name,
+                                                                        lst_tmp->addr_lst->next,
+                                                                        lst_tmp->port, lst_tmp->proto, $5,
+                                                                        lst_tmp->flags)!=0) {
+                                LM_CRIT("cfg. parser: failed to add listen address\n");
+                                break;
+                        }
+                }
+                free_socket_id_lst($3);
+        }
 	| LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_advertise_iface(	lst_tmp->addr_lst->name,
@@ -1516,6 +1564,20 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+        | LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER VIRTUAL {
+                for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			lst_tmp->flags |= SI_IS_VIRTUAL;
+                        if (add_listen_advertise_iface( lst_tmp->addr_lst->name,
+                                                                        lst_tmp->addr_lst->next,
+                                                                        lst_tmp->port, lst_tmp->proto,
+                                                                        $5, $7,
+                                                                        lst_tmp->flags)!=0) {
+                                LM_CRIT("cfg. parser: failed to add listen address\n");
+                                break;
+                        }
+                }
+                free_socket_id_lst($3);
+        }
 	| LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER STRNAME STRING {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
@@ -1529,6 +1591,20 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+        | LISTEN EQUAL id_lst ADVERTISE listen_id COLON NUMBER STRNAME STRING VIRTUAL {
+                for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			lst_tmp->flags |= SI_IS_VIRTUAL;
+                        if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
+                                                                        lst_tmp->addr_lst->next,
+                                                                        lst_tmp->port, lst_tmp->proto,
+                                                                        $5, $7, $9,
+                                                                        lst_tmp->flags)!=0) {
+                                LM_CRIT("cfg. parser: failed to add listen address\n");
+                                break;
+                        }
+                }
+                free_socket_id_lst($3);
+        }
 	| LISTEN EQUAL id_lst ADVERTISE listen_id {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_advertise_iface(	lst_tmp->addr_lst->name,
@@ -1542,6 +1618,20 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+        | LISTEN EQUAL id_lst ADVERTISE listen_id VIRTUAL {
+                for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			lst_tmp->flags |= SI_IS_VIRTUAL;
+                        if (add_listen_advertise_iface( lst_tmp->addr_lst->name,
+                                                                        lst_tmp->addr_lst->next,
+                                                                        lst_tmp->port, lst_tmp->proto,
+                                                                        $5, 0,
+                                                                        lst_tmp->flags)!=0) {
+                                LM_CRIT("cfg. parser: failed to add listen address\n");
+                                break;
+                        }
+                }
+                free_socket_id_lst($3);
+        }
 	| LISTEN EQUAL id_lst ADVERTISE listen_id STRNAME STRING {
 		for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
 			if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
@@ -1555,6 +1645,20 @@ assign_stm:
 		}
 		free_socket_id_lst($3);
 	}
+        | LISTEN EQUAL id_lst ADVERTISE listen_id STRNAME STRING VIRTUAL {
+                for(lst_tmp=$3; lst_tmp; lst_tmp=lst_tmp->next) {
+			lst_tmp->flags |= SI_IS_VIRTUAL;
+                        if (add_listen_advertise_iface_name(lst_tmp->addr_lst->name,
+                                                                        lst_tmp->addr_lst->next,
+                                                                        lst_tmp->port, lst_tmp->proto,
+                                                                        $5, 0, $7,
+                                                                        lst_tmp->flags)!=0) {
+                                LM_CRIT("cfg. parser: failed to add listen address\n");
+                                break;
+                        }
+                }
+                free_socket_id_lst($3);
+        }
 	| LISTEN EQUAL  error { yyerror("ip address, interface name or"
 									" hostname expected"); }
 	| ALIAS EQUAL  id_lst {

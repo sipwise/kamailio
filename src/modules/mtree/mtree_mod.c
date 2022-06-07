@@ -318,18 +318,6 @@ error1:
 	return -1;
 }
 
-static int mt_child_init(void)
-{
-	db_con = mt_dbf.init(&db_url);
-	if(db_con==NULL)
-	{
-		LM_ERR("failed to connect to database\n");
-		return -1;
-	}
-
-	return 0;
-}
-
 
 /* each child get a new connection to the database */
 static int child_init(int rank)
@@ -338,9 +326,12 @@ static int child_init(int rank)
 	if (rank==PROC_INIT || rank==PROC_MAIN || rank==PROC_TCP_MAIN)
 		return 0;
 
-	if ( mt_child_init()!=0 )
+	db_con = mt_dbf.init(&db_url);
+	if(db_con==NULL)
+	{
+		LM_ERR("failed to connect to database\n");
 		return -1;
-
+	}
 	LM_DBG("#%d: database connection opened successfully\n", rank);
 
 	return 0;
@@ -929,61 +920,62 @@ void rpc_mtree_reload(rpc_t* rpc, void* c)
 {
 	str tname = {0, 0};
 	m_tree_t *pt = NULL;
-	int treloaded = 0;
+	int treeloaded = 0;
 
 	if(db_table.len>0)
 	{
 		/* re-loading all information from database */
 		if(mt_load_db_trees()!=0)
 		{
-			LM_ERR("cannot re-load mtrees from database\n");
-			goto error;
+			rpc->fault(c, 500, "Can not reload Mtrees from database.");
+			LM_ERR("RPC failed: cannot reload mtrees from database\n");
+			return;
 		}
-	} else {
-		if(!mt_defined_trees())
-		{
-			LM_ERR("empty mtree list\n");
-			goto error;
-		}
+		rpc->rpl_printf(c, "Ok. Mtrees reloaded.");
+		return;
+	}
+	if(!mt_defined_trees())
+	{
+		rpc->fault(c, 500, "No Mtrees defined.");
+		LM_ERR("RPC failed: No Mtrees defined\n");
+		return;
+	}
 
-		/* read tree name */
-		if (rpc->scan(c, "S", &tname) != 1) {
+	/* read tree name */
+	if (rpc->scan(c, "S", &tname) != 1) {
+		tname.s = 0;
+		tname.len = 0;
+	} else {
+		if(*tname.s=='.') {
 			tname.s = 0;
 			tname.len = 0;
-		} else {
-			if(*tname.s=='.') {
-				tname.s = 0;
-				tname.len = 0;
-			}
-		}
-
-		pt = mt_get_first_tree();
-
-		while(pt!=NULL)
-		{
-			if(tname.s==NULL
-					|| (tname.s!=NULL && pt->tname.len>=tname.len
-						&& strncmp(pt->tname.s, tname.s, tname.len)==0))
-			{
-				/* re-loading table from database */
-				if(mt_load_db(pt)!=0)
-				{
-					LM_ERR("cannot re-load mtree from database\n");
-					goto error;
-				}
-				treloaded = 1;
-			}
-			pt = pt->next;
-		}
-		if(treloaded == 0) {
-			rpc->fault(c, 500, "No Mtree Name Matching");
 		}
 	}
 
-	return;
+	pt = mt_get_first_tree();
 
-error:
-	rpc->fault(c, 500, "Mtree Reload Failed");
+	while(pt!=NULL)
+	{
+		if(tname.s==NULL
+				|| (tname.s!=NULL && pt->tname.len>=tname.len
+					&& strncmp(pt->tname.s, tname.s, tname.len)==0))
+		{
+			/* re-loading table from database */
+			if(mt_load_db(pt)!=0)
+			{
+				rpc->fault(c, 500, "Mtree Reload Failed");
+				LM_ERR("RPC failed: cannot reload mtrees from database\n");
+				return;
+			}
+			treeloaded = 1;
+		}
+		pt = pt->next;
+	}
+	if(treeloaded == 0) {
+		rpc->fault(c, 500, "Can not find specified Mtree");	
+	}
+	rpc->rpl_printf(c, "Ok. Mtree reloaded.");
+	return;
 }
 
 static const char* rpc_mtree_reload_doc[2] = {

@@ -63,7 +63,7 @@ void secf_rpc_add_dst(rpc_t *rpc, void *ctx)
 	char *text = NULL;
 
 	if(rpc->scan(ctx, "d", &number) < 1) {
-		rpc->fault(ctx, 0,
+		rpc->fault(ctx, 500,
 				"Invalid Parameters. Usage: secfilter.add_dst "
 				"number\n     Example: secfilter.add_dst "
 				"555123123");
@@ -73,7 +73,7 @@ void secf_rpc_add_dst(rpc_t *rpc, void *ctx)
 	data.s = pkg_malloc(data.len * sizeof(char));
 	if(!data.s) {
 		PKG_MEM_ERROR;
-		rpc->rpl_printf(ctx, "Error insert values in the blacklist");
+		rpc->fault(ctx, 500, "Error insert values in the blacklist");
 		return;
 	}
 	memcpy(data.s, text, data.len);
@@ -82,7 +82,7 @@ void secf_rpc_add_dst(rpc_t *rpc, void *ctx)
 		rpc->rpl_printf(ctx,
 				"Values (%s) inserted into blacklist destinations", data);
 	} else {
-		rpc->rpl_printf(ctx, "Error insert values in the blacklist");
+		rpc->fault(ctx, 500, "Error insert values in the blacklist");
 	}
 	lock_release(&secf_data->lock);
 	if(data.s)
@@ -112,7 +112,7 @@ void secf_rpc_add_bl(rpc_t *rpc, void *ctx)
 		rpc->rpl_printf(ctx, "Values (%.*s, %.*s) inserted into blacklist",
 				ctype.len, ctype.s, data.len, data.s);
 	} else {
-		rpc->rpl_printf(ctx, "Error insert values in the blacklist");
+		rpc->fault(ctx, 500, "Error inserting values in the blacklist");
 	}
 	lock_release(&secf_data->lock);
 }
@@ -141,7 +141,7 @@ void secf_rpc_add_wl(rpc_t *rpc, void *ctx)
 		rpc->rpl_printf(ctx, "Values (%.*s, %.*s) inserted into whitelist",
 				ctype.len, ctype.s, data.len, data.s);
 	} else {
-		rpc->rpl_printf(ctx, "Error insert values in the whitelist");
+		rpc->fault(ctx, 500, "Error insert values in the whitelist");
 	}
 	lock_release(&secf_data->lock);
 }
@@ -154,7 +154,7 @@ void secf_rpc_reload(rpc_t *rpc, void *ctx)
 
 	if(secf_load_db() == -1) {
 		LM_ERR("Error loading data from database\n");
-		rpc->rpl_printf(ctx, "Error loading data from database");
+		rpc->fault(ctx, 500, "Error loading data from database");
 	} else {
 		rpc->rpl_printf(ctx, "Data reloaded");
 	}

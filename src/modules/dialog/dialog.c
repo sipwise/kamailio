@@ -104,6 +104,7 @@ str dlg_extra_hdrs = {NULL,0};
 static int db_fetch_rows = 200;
 static int db_skip_load = 0;
 static int dlg_keep_proxy_rr = 0;
+int dlg_filter_mode = 0;
 int initial_cbs_inscript = 1;
 int dlg_wait_ack = 1;
 static int dlg_timer_procs = 0;
@@ -327,6 +328,7 @@ static param_export_t mod_params[]={
 	{ "h_id_start",            PARAM_INT, &dlg_h_id_start           },
 	{ "h_id_step",             PARAM_INT, &dlg_h_id_step            },
 	{ "keep_proxy_rr",         INT_PARAM, &dlg_keep_proxy_rr        },
+	{ "dlg_filter_mode",       INT_PARAM, &dlg_filter_mode          },
 	{ 0,0,0 }
 };
 
@@ -736,6 +738,10 @@ static int mod_init(void)
 		return -1;
 	}
 
+	if(dlg_db_mode==DB_MODE_SHUTDOWN) {
+		ksr_module_set_flag(KSRMOD_FLAG_POSTCHILDINIT);
+	}
+
 	return 0;
 }
 
@@ -775,9 +781,9 @@ static int child_init(int rank)
 		}
 	}
 
-	if ( ((dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED) &&
-	(rank>0 || rank==PROC_TIMER || rank==PROC_RPC)) ||
-	(dlg_db_mode==DB_MODE_SHUTDOWN && (rank==PROC_MAIN)) ) {
+	if ( ((dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED)
+				&& (rank>0 || rank==PROC_TIMER || rank==PROC_RPC))
+			|| (dlg_db_mode==DB_MODE_SHUTDOWN && (rank==PROC_POSTCHILDINIT)) ) {
 		if ( dlg_connect_db(&db_url) ) {
 			LM_ERR("failed to connect to database (rank=%d)\n",rank);
 			return -1;
@@ -2324,10 +2330,20 @@ static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, dlg_cell_t *dlg,
 	void *h, *sh, *ssh;
 	dlg_profile_link_t *pl;
 	dlg_var_t *var;
+	time_t tnow;
+	int tdur;
 
 	if (rpc->add(c, "{", &h) < 0) goto error;
 
-	rpc->struct_add(h, "dddSSSddddddddd",
+	tnow = time(NULL);
+	if (dlg->end_ts) {
+		tdur = (int)(dlg->end_ts - dlg->start_ts);
+	} else if (dlg->start_ts) {
+		tdur = (int)(tnow - dlg->start_ts);
+	} else {
+		tdur = 0;
+	}
+	rpc->struct_add(h, "dddSSSdddddddddd",
 		"h_entry", dlg->h_entry,
 		"h_id", dlg->h_id,
 		"ref", dlg->ref,
@@ -2338,7 +2354,8 @@ static inline void internal_rpc_print_dlg(rpc_t *rpc, void *c, dlg_cell_t *dlg,
 		"start_ts", dlg->start_ts,
 		"init_ts", dlg->init_ts,
 		"end_ts", dlg->end_ts,
-		"timeout", dlg->tl.timeout ? time(0) + dlg->tl.timeout - get_ticks() : 0,
+		"duration", tdur,
+		"timeout", dlg->tl.timeout ? tnow + dlg->tl.timeout - get_ticks() : 0,
 		"lifetime", dlg->lifetime,
 		"dflags", dlg->dflags,
 		"sflags", dlg->sflags,
@@ -2858,16 +2875,21 @@ static void rpc_dlg_stats_active(rpc_t *rpc, void *c)
 {
 	dlg_cell_t *dlg;
 	unsigned int i;
+	int dlg_own = 0;
 	int dlg_starting = 0;
 	int dlg_connecting = 0;
 	int dlg_answering = 0;
 	int dlg_ongoing = 0;
 	void *h;
 
+	if(rpc->scan(c, "*d", &dlg_own) < 1)
+		dlg_own = 0;
 	for( i=0 ; i<d_table->size ; i++ ) {
 		dlg_lock( d_table, &(d_table->entries[i]) );
 
 		for( dlg=d_table->entries[i].first ; dlg ; dlg=dlg->next ) {
+			if(dlg_own != 0 && dlg->bind_addr[0] == NULL)
+				continue;
 			switch(dlg->state) {
 				case DLG_STATE_UNCONFIRMED:
 					dlg_starting++;
@@ -2916,6 +2938,8 @@ static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
 	str mop = {NULL, 0};
 	str mval = {NULL, 0};
 	str sval = {NULL, 0};
+	unsigned int ival = 0;
+	unsigned int mival = 0;
 	int n = 0;
 	int m = 0;
 	int vkey = 0;
@@ -2944,6 +2968,8 @@ static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
 		vkey = 2;
 	} else if(mkey.len==6 && strncmp(mkey.s, "callid", mkey.len)==0) {
 		vkey = 3;
+	} else if(mkey.len==8 && strncmp(mkey.s, "start_ts", mkey.len)==0) {
+		vkey = 4;
 	} else {
 		LM_ERR("invalid key %.*s\n", mkey.len, mkey.s);
 		rpc->fault(c, 500, "Invalid matching key parameter");
@@ -2967,6 +2993,10 @@ static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
 		}
 	} else if(strncmp(mop.s, "sw", 2)==0) {
 		vop = 2;
+	} else if(strncmp(mop.s, "gt", 2)==0) {
+		vop = 3;
+	} else if(strncmp(mop.s, "lt", 2)==0) {
+		vop = 4;
 	} else {
 		LM_ERR("invalid matching operator %.*s\n", mop.len, mop.s);
 		rpc->fault(c, 500, "Invalid matching operator parameter");
@@ -2974,6 +3004,18 @@ static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
 	}
 	if(rpc->scan(c, "*d", &n)<1) {
 		n = 0;
+	}
+
+	if (vkey == 4  && vop <= 2) {
+		LM_ERR("Matching operator %.*s not supported with start_ts key\n", mop.len, mop.s);
+		rpc->fault(c, 500, "Matching operator not supported with start_ts key");
+		return;
+	}
+
+	if (vkey != 4  && vop >= 3) {
+		LM_ERR("Matching operator %.*s not supported with key %.*s\n", mop.len, mop.s, mkey.len, mkey.s);
+		rpc->fault(c, 500, "Matching operator not supported");
+		return;
 	}
 
 	for(i=0; i<d_table->size; i++) {
@@ -2992,6 +3034,9 @@ static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
 				break;
 				case 3:
 					sval = dlg->callid;
+				break;
+				case 4:
+					ival = dlg->start_ts;
 				break;
 			}
 			switch(vop) {
@@ -3012,6 +3057,17 @@ static void rpc_dlg_list_match_ex(rpc_t *rpc, void *c, int with_context)
 					/* starts with */
 					if(mval.len<=sval.len
 							&& strncmp(mval.s, sval.s, mval.len)==0) {
+						matched = 1;
+					}
+				break;
+				case 3:		
+					/* greater than */
+					if (str2int(&mval, &mival) == 0 && ival > mival) {
+						matched = 1;
+					}
+				break;
+				case 4:
+					if (str2int(&mval, &mival) == 0 && ival < mival) {
 						matched = 1;
 					}
 				break;

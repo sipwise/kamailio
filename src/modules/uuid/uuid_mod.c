@@ -31,6 +31,8 @@
 #include "../../core/dprint.h"
 #include "../../core/ut.h"
 #include "../../core/pvar.h"
+#include "../../core/kemi.h"
+#include "../../core/utils/sruid.h"
 
 MODULE_VERSION
 
@@ -181,4 +183,161 @@ int pv_get_uuid(sip_msg_t *msg, pv_param_t *param,
 	}
 	uuid_unparse_lower(_k_uuid_val, _k_uuid_str);
 	return pv_get_strzval(msg, param, res, _k_uuid_str);
+}
+
+
+/**
+ * generate uuid value
+ */
+static int ksr_uuid_generate(char *out, int *len)
+{
+	if(out==NULL || len==NULL || *len<KSR_UUID_BSIZE) {
+		return -1;
+	}
+	uuid_generate(_k_uuid_val);
+	uuid_unparse_lower(_k_uuid_val, out);
+	*len = strlen(out);
+	return 0;
+}
+
+/**
+ * generate uuid time value
+ */
+static int ksr_uuid_generate_time(char *out, int *len)
+{
+	if(out==NULL || len==NULL || *len<KSR_UUID_BSIZE) {
+		return -1;
+	}
+#ifndef __OS_darwin
+	if(uuid_generate_time_safe(_k_uuid_val)!=0) {
+		LM_ERR("uuid not generated in a safe mode\n");
+		return -1;
+	}
+#else
+	uuid_generate_time(_k_uuid_val);
+#endif
+
+	uuid_unparse_lower(_k_uuid_val, out);
+	*len = strlen(out);
+	return 0;
+}
+
+/**
+ * generate uuid random value
+ */
+static int ksr_uuid_generate_random(char *out, int *len)
+{
+	if(out==NULL || len==NULL || *len<KSR_UUID_BSIZE) {
+		return -1;
+	}
+	uuid_generate_random(_k_uuid_val);
+	uuid_unparse_lower(_k_uuid_val, out);
+	*len = strlen(out);
+	return 0;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t _ksr_kemi_uuid_xval = {0};
+
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ksr_uuid_get(sip_msg_t *msg)
+{
+	int len = KSR_UUID_BSIZE;
+
+	memset(&_ksr_kemi_uuid_xval, 0, sizeof(sr_kemi_xval_t));
+
+	if(ksr_uuid_generate(_k_uuid_str, &len)) {
+		sr_kemi_xval_null(&_ksr_kemi_uuid_xval, SR_KEMI_XVAL_NULL_EMPTY);
+		return &_ksr_kemi_uuid_xval;
+	}
+	_ksr_kemi_uuid_xval.vtype = SR_KEMIP_STR;
+	_ksr_kemi_uuid_xval.v.s.s = _k_uuid_str;
+	_ksr_kemi_uuid_xval.v.s.len = len;
+	return &_ksr_kemi_uuid_xval;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ksr_uuid_rget(sip_msg_t *msg)
+{
+	int len = KSR_UUID_BSIZE;
+
+	memset(&_ksr_kemi_uuid_xval, 0, sizeof(sr_kemi_xval_t));
+
+	if(ksr_uuid_generate_random(_k_uuid_str, &len)) {
+		sr_kemi_xval_null(&_ksr_kemi_uuid_xval, SR_KEMI_XVAL_NULL_EMPTY);
+		return &_ksr_kemi_uuid_xval;
+	}
+	_ksr_kemi_uuid_xval.vtype = SR_KEMIP_STR;
+	_ksr_kemi_uuid_xval.v.s.s = _k_uuid_str;
+	_ksr_kemi_uuid_xval.v.s.len = len;
+	return &_ksr_kemi_uuid_xval;
+}
+
+/**
+ *
+ */
+static sr_kemi_xval_t* ki_ksr_uuid_tget(sip_msg_t *msg)
+{
+	int len = KSR_UUID_BSIZE;
+
+	memset(&_ksr_kemi_uuid_xval, 0, sizeof(sr_kemi_xval_t));
+
+	if(ksr_uuid_generate_time(_k_uuid_str, &len)) {
+		sr_kemi_xval_null(&_ksr_kemi_uuid_xval, SR_KEMI_XVAL_NULL_EMPTY);
+		return &_ksr_kemi_uuid_xval;
+	}
+	_ksr_kemi_uuid_xval.vtype = SR_KEMIP_STR;
+	_ksr_kemi_uuid_xval.v.s.s = _k_uuid_str;
+	_ksr_kemi_uuid_xval.v.s.len = len;
+	return &_ksr_kemi_uuid_xval;
+}
+
+/**
+ *
+ */
+/* clang-format off */
+static sr_kemi_t sr_kemi_uuid_exports[] = {
+	{ str_init("uuid"), str_init("get"),
+		SR_KEMIP_XVAL, ki_ksr_uuid_get,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("uuid"), str_init("rget"),
+		SR_KEMIP_XVAL, ki_ksr_uuid_rget,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("uuid"), str_init("tget"),
+		SR_KEMIP_XVAL, ki_ksr_uuid_tget,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+
+	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
+};
+/* clang-format on */
+
+
+/**
+ *
+ */
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	sruid_uuid_api_t sapi;
+	memset(&sapi, 0, sizeof(sruid_uuid_api_t));
+	sapi.fgenerate = ksr_uuid_generate;
+	sapi.fgenerate_time = ksr_uuid_generate_time;
+	sapi.fgenerate_random = ksr_uuid_generate_random;
+	if(sruid_uuid_api_set(&sapi) < 0) {
+		return -1;
+	}
+	sr_kemi_modules_add(sr_kemi_uuid_exports);
+	return 0;
 }
