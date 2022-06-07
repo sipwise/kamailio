@@ -1,3 +1,18 @@
+ngcp-kamailio (5.5.4-1+0~mr11.0.0.0) unstable; urgency=medium
+
+  [ Fabricio Santolin da Silva ]
+  * [41c2623] TT#159750 Add support to remove a specific value from a header
+  * [809ae67] TT#159750  pv_headers: fix possible mem. overflow issue and wrong size string
+
+  [ Victor Seva ]
+  * [a988420] TT#170350 cfgt: skip_unknown parameter
+  * [c241a98] TT#159750  pv_headers: update patches
+  * [c7b775a] TT#165301 dialog: dlg_get|set_var function
+  * [a902a25] TT#165301 dialog: dlg_get_var assure return null on error
+  * [66fb17a] TT#165301 dialog: sync with upstream changes
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 07 Jun 2022 11:42:29 +0200
+
 ngcp-kamailio (5.5.4-1+0~mr10.5.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
