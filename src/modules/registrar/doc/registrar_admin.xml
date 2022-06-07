@@ -745,15 +745,41 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 		<itemizedlist>
 		<listitem>
 			<para>
-				<emphasis>expires</emphasis> - the number of maximum
-				contacts to be stored for the current registration AoR. It
-				overwrites the 'max_contacts' module parameter value.
+				<emphasis>match_callid</emphasis> - filter contacts by callid.
+				Used in registered().
 			</para>
 		</listitem>
 		<listitem>
 			<para>
-				<emphasis>q</emphasis> - the expires value, to overwrite the
+				<emphasis>match_contact</emphasis> - filter contacts by contact.
+				Used in registered().
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>match_received</emphasis> - filter contacts by received.
+				Used in registered().
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>rlf_bflags</emphasis> - filter contacts by branch flags.
+				Used in lookup().
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>q</emphasis> - q value of contact
+				(integer 0-1000). It overrides q value given in
+				contact header and default_q parameter.
+				Used in save().
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>expires</emphasis> - the expires value, to overwrite the
 				value from SIP headers.
+				Used in save().
 			</para>
 		</listitem>
 		<listitem>
@@ -761,6 +787,7 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 				<emphasis>max_contacts</emphasis> - the number of maximum
 				contacts to be stored for the current registration AoR. It
 				overwrites the 'max_contacts' module parameter value.
+				Used in save().
 			</para>
 		</listitem>
 		<listitem>
@@ -768,6 +795,7 @@ modparam("registrar", "reg_callid_avp", "$avp(s:avp)")
 				<emphasis>socket</emphasis> - the string representing the
 				socket on which the register request was received, as alternative
 				to using the sock_hdr.
+				Used in save().
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -1109,7 +1137,15 @@ end
 				rlf_bflags - e.g., $xavp(reg=&gt;rlf_bflags).
 			</para>
 		</listitem>
-	</itemizedlist>
+		<listitem>
+			<para>
+				<emphasis>2</emphasis> - apply the active tcp connection filter
+				- return only contact records that have the associated TCP/TLS/WSS
+				connection active. UDP and SCTP contacts are not filtered, all
+				are returned.
+			</para>
+		</listitem>
+		</itemizedlist>
 		<para>
 		<emphasis>
 			Default value is NULL (disabled).
@@ -1226,6 +1262,11 @@ kamcmd cfg.set_now_int registrar use_expired_contacts 0
 					<emphasis>expires_range</emphasis> or 
 					<emphasis>default_expires_range</emphasis> to this
 					registration.
+					</para>
+				</listitem>
+				<listitem>
+					<para><emphasis>0x10</emphasis> - prepare the headers for
+					reply, used only if flag 0x02 is set.
 					</para>
 				</listitem>
 			</itemizedlist>
@@ -1438,7 +1479,7 @@ lookup_branches("location");
 		<listitem>
 			<para>
 			<emphasis>match_option</emphasis> (optional) - flag parameter to restrict
-			contact search. use reg_xavp_cfg to set the values to compare to.
+			contact search. use xavp_cfg to set the values to compare to.
 			</para>
             <para>flag values is as follows:</para>
 			<itemizedlist>

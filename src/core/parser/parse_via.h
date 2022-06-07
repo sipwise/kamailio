@@ -72,10 +72,12 @@ typedef struct via_body {
 	unsigned short port;
 #ifdef USE_COMP
 	short comp_no;
+	short comp_no_pad; /* padding to align to 32bit */
 #endif
 	str port_str;
 	str params;
 	str comment;
+	char *bstart;                 /* body content, not including hdr */
 	int bsize;                    /* body size, not including hdr */
 	struct via_param* param_lst;  /* list of parameters*/
 	struct via_param* last_param; /*last via parameter, internal use*/

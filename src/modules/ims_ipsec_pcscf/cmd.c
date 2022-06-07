@@ -140,7 +140,7 @@ static str get_www_auth_param(const char* param_name, str www_auth)
     return val;
 }
 
-static int fill_contact(struct pcontact_info* ci, struct sip_msg* m)
+static int fill_contact(struct pcontact_info* ci, struct sip_msg* m, tm_cell_t *t)
 {
     contact_body_t* cb = NULL;
     struct via_body* vb = NULL;
@@ -244,7 +244,6 @@ static int fill_contact(struct pcontact_info* ci, struct sip_msg* m)
 		}
 	}
     else if(m->first_line.type == SIP_REPLY) {
-        struct cell *t = tmb.t_gett();
         if (!t || t == (void*) -1) {
             LM_ERR("Reply without transaction\n");
             return -1;
@@ -435,29 +434,29 @@ static int create_ipsec_tunnel(const struct ip_addr *remote_addr, ipsec_t* s)
         return -1;
     }
 
-    LM_DBG("Creating security associations: Local IP: %.*s port_pc: %d port_ps: %d; UE IP: %s; port_uc %d port_us %d; spi_pc %u, spi_ps %u, spi_uc %u, spi_us %u\n",
+    LM_DBG("Creating security associations: Local IP: %.*s port_pc: %d port_ps: %d; UE IP: %s; port_uc %d port_us %d; spi_pc %u, spi_ps %u, spi_uc %u, spi_us %u, alg %.*s, ealg %.*s\n",
             remote_addr->af == AF_INET ? ipsec_listen_addr.len : ipsec_listen_addr6.len,
             remote_addr->af == AF_INET ? ipsec_listen_addr.s : ipsec_listen_addr6.s,
-            s->port_pc, s->port_ps, remote_addr_str, s->port_uc, s->port_us, s->spi_pc, s->spi_ps, s->spi_uc, s->spi_us);
+            s->port_pc, s->port_ps, remote_addr_str, s->port_uc, s->port_us, s->spi_pc, s->spi_ps, s->spi_uc, s->spi_us, s->r_alg.len, s->r_alg.s, s->r_ealg.len, s->r_ealg.s);
 
     // SA1 UE client to P-CSCF server
     //               src adrr     dst addr     src port    dst port
-    add_sa    (sock, remote_addr, ipsec_addr, s->port_uc, s->port_ps, s->spi_ps, s->ck, s->ik, s->r_alg);
+    add_sa    (sock, remote_addr, ipsec_addr, s->port_uc, s->port_ps, s->spi_ps, s->ck, s->ik, s->r_alg, s->r_ealg);
     add_policy(sock, remote_addr, ipsec_addr, s->port_uc, s->port_ps, s->spi_ps, IPSEC_POLICY_DIRECTION_IN);
 
     // SA2 P-CSCF client to UE server
     //               src adrr     dst addr     src port           dst port
-    add_sa    (sock, ipsec_addr, remote_addr, s->port_pc, s->port_us, s->spi_us, s->ck, s->ik, s->r_alg);
+    add_sa    (sock, ipsec_addr, remote_addr, s->port_pc, s->port_us, s->spi_us, s->ck, s->ik, s->r_alg, s->r_ealg);
     add_policy(sock, ipsec_addr, remote_addr, s->port_pc, s->port_us, s->spi_us, IPSEC_POLICY_DIRECTION_OUT);
 
     // SA3 P-CSCF server to UE client
     //               src adrr     dst addr     src port           dst port
-    add_sa    (sock, ipsec_addr, remote_addr, s->port_ps, s->port_uc, s->spi_uc, s->ck, s->ik, s->r_alg);
+    add_sa    (sock, ipsec_addr, remote_addr, s->port_ps, s->port_uc, s->spi_uc, s->ck, s->ik, s->r_alg, s->r_ealg);
     add_policy(sock, ipsec_addr, remote_addr, s->port_ps, s->port_uc, s->spi_uc, IPSEC_POLICY_DIRECTION_OUT);
 
     // SA4 UE server to P-CSCF client
     //               src adrr     dst addr     src port    dst port
-    add_sa    (sock, remote_addr, ipsec_addr, s->port_us, s->port_pc, s->spi_pc, s->ck, s->ik, s->r_alg);
+    add_sa    (sock, remote_addr, ipsec_addr, s->port_us, s->port_pc, s->spi_pc, s->ck, s->ik, s->r_alg, s->r_ealg);
     add_policy(sock, remote_addr, ipsec_addr, s->port_us, s->port_pc, s->spi_pc, IPSEC_POLICY_DIRECTION_IN);
 
     close_mnl_socket(sock);
@@ -651,9 +650,13 @@ int ipsec_create(struct sip_msg* m, udomain_t* d, int _cflags)
     pcontact_t* pcontact = NULL;
     struct pcontact_info ci;
     int ret = IPSEC_CMD_FAIL;   // FAIL by default
+	tm_cell_t *t = NULL;
 
+    if(m->first_line.type == SIP_REPLY) {
+        t = tmb.t_gett();
+    }
     // Find the contact
-    if(fill_contact(&ci, m) != 0) {
+    if(fill_contact(&ci, m, t) != 0) {
         LM_ERR("Error filling in contact data\n");
         return ret;
     }
@@ -664,7 +667,7 @@ int ipsec_create(struct sip_msg* m, udomain_t* d, int _cflags)
 
     ul.lock_udomain(d, &ci.via_host, ci.via_port, ci.via_prot);
 
-    if (ul.get_pcontact(d, &ci, &pcontact, 0) != 0) {
+    if (ul.get_pcontact(d, &ci, &pcontact, 0) != 0 || pcontact==NULL) {
         LM_ERR("Contact doesn't exist\n");
         goto cleanup;
     }
@@ -681,7 +684,7 @@ int ipsec_create(struct sip_msg* m, udomain_t* d, int _cflags)
     }
 
     // Get request from reply
-    struct cell *t = tmb.t_gett();
+    if (!t) t = tmb.t_gett();
     if (!t || t == (void*) -1) {
         LM_ERR("Reply without transaction\n");
         goto cleanup;
@@ -765,6 +768,9 @@ cleanup:
     // Do not free str* sec_header! It will be freed in data_lump.c -> free_lump()
     ul.unlock_udomain(d, &ci.via_host, ci.via_port, ci.via_prot);
     pkg_free(ci.received_host.s);
+	if(t) {
+		tmb.t_uas_request_clean_parsed(t);
+	}
     return ret;
 }
 
@@ -778,11 +784,12 @@ int ipsec_forward(struct sip_msg* m, udomain_t* d, int _cflags)
     unsigned short dst_port = 0;
     unsigned short src_port = 0;
     ip_addr_t via_host;
-    
     struct sip_msg* req = NULL;
+    struct cell *t = NULL;
+
     if(m->first_line.type == SIP_REPLY) {
         // Get request from reply
-        struct cell *t = tmb.t_gett();
+        t = tmb.t_gett();
         if (!t) {
             LM_ERR("Error getting transaction\n");
             return ret;
@@ -796,14 +803,15 @@ int ipsec_forward(struct sip_msg* m, udomain_t* d, int _cflags)
     //
     // Find the contact
     //
-    if(fill_contact(&ci, m) != 0) {
+    if(fill_contact(&ci, m, t) != 0) {
         LM_ERR("Error filling in contact data\n");
         return ret;
     }
 
     ul.lock_udomain(d, &ci.via_host, ci.via_port, ci.via_prot);
 
-    if (ul.get_pcontact(d, &ci, &pcontact, _cflags & IPSEC_REVERSE_SEARCH) != 0) {
+    if (ul.get_pcontact(d, &ci, &pcontact, _cflags & IPSEC_REVERSE_SEARCH) != 0
+    		|| pcontact==NULL) {
         LM_ERR("Contact doesn't exist\n");
         goto cleanup;
     }
@@ -851,13 +859,20 @@ int ipsec_forward(struct sip_msg* m, udomain_t* d, int _cflags)
 
         // for Reply and TCP sends to UE client port, for Reply and UDP sends to UE server port
         dst_port = dst_proto == PROTO_TCP ? s->port_uc : s->port_us;
+
+        // Check send socket
+        struct socket_info * client_sock = grep_sock_info(via_host.af == AF_INET ? &ipsec_listen_addr : &ipsec_listen_addr6, src_port, dst_proto);
+        if(!client_sock) {
+            src_port = s->port_pc;
+            dst_port = s->port_us;
+        }
     }else{
         // for Request get the dest proto from the saved contact
         dst_proto = pcontact->received_proto;
 
         // for Request sends from P-CSCF client port
         src_port = s->port_pc;
-        
+
         // for Request sends to UE server port
         dst_port = s->port_us;
     }
@@ -927,6 +942,9 @@ int ipsec_forward(struct sip_msg* m, udomain_t* d, int _cflags)
 cleanup:
     ul.unlock_udomain(d, &ci.via_host, ci.via_port, ci.via_prot);
     pkg_free(ci.received_host.s);
+	if(t) {
+		tmb.t_uas_request_clean_parsed(t);
+	}
     return ret;
 }
 
@@ -936,18 +954,21 @@ int ipsec_destroy(struct sip_msg* m, udomain_t* d)
     struct pcontact_info ci;
     pcontact_t* pcontact = NULL;
     int ret = IPSEC_CMD_FAIL; // FAIL by default
+	tm_cell_t *t = NULL;
 
-    //
+    if(m->first_line.type == SIP_REPLY) {
+        t = tmb.t_gett();
+    }
+
     // Find the contact
-    //
-    if(fill_contact(&ci, m) != 0) {
+    if(fill_contact(&ci, m, t) != 0) {
         LM_ERR("Error filling in contact data\n");
         return ret;
     }
 
     ul.lock_udomain(d, &ci.via_host, ci.via_port, ci.via_prot);
 
-    if (ul.get_pcontact(d, &ci, &pcontact, 0) != 0) {
+    if (ul.get_pcontact(d, &ci, &pcontact, 0) != 0 || pcontact==NULL) {
         LM_ERR("Contact doesn't exist\n");
         goto cleanup;
     }
@@ -971,6 +992,9 @@ int ipsec_destroy(struct sip_msg* m, udomain_t* d)
 cleanup:
     ul.unlock_udomain(d, &ci.via_host, ci.via_port, ci.via_prot);
     pkg_free(ci.received_host.s);
+	if(t) {
+		tmb.t_uas_request_clean_parsed(t);
+	}
     return ret;
 }
 
