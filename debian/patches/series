@@ -32,19 +32,13 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.5
-upstream/db_redis-don-t-leave-unconsumed-redis-replies-in-cas.patch
 upstream/pv-headers-remove_specific_header_value.patch
 # https://github.com/kamailio/kamailio/pull/979
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
-upstream/core-ip-addr-use-POSIX-INET6_ADDRSTRLEN-and-INET_ADD.patch
 ## upstream master
-upstream/pv_headers-fix-removal-of-all-values-on-when-using-P.patch
-upstream/pv_headers-pvh_set_header-remove-values-to-set-null-.patch
-upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
 upstream/permissions-trusted_cleanup_interval.patch
-upstream/nathelper-fix_nated_sdp-added-ignoring-RFC3605-param.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
@@ -54,19 +48,19 @@ sipwise/pua_dialoginfo_uuid.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip-tm-vars-T_.patch
 sipwise/cfgt-skip.patch
+sipwise/cfgt-improve-detection-of-dynamic-format.patch
+sipwise/cfgt-fix-memory-leaks.patch
+sipwise/cfgt-skip_unknown.patch
 sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
+sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
 sipwise/kamctl-TMPDIR-config.patch
+sipwise/pv_headers-fix-build-warning.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
-sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
-sipwise/pv_headers-fix-build-warning.patch
-sipwise/cfgt-improve-detection-of-dynamic-format.patch
-sipwise/cfgt-fix-memory-leaks.patch
-sipwise/cfgt-skip_unknown.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
