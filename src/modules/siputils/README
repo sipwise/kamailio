@@ -452,6 +452,11 @@ modparam("auth", "rpid_avp", "$avp(myrpid)")
    timeout value will be converted to a 180 message. Please note that you
    need to set a positive timeout value in order to use this function.
 
+   Note: the change of sip reply can be done only in cases when it is not
+   parsed too much before config execution, otherwise it fails. For
+   example, setting global parameter "log_prefix" can cause this function
+   to fail changing the replies.
+
    The function returns TRUE on success, and FALSE during processing
    failures.
 
@@ -761,7 +766,7 @@ if (is_alphanumex("$rU", "+.-_")) {
 
    This function will encode uri-s inside Contact header in the following
    manner sip:username:password@ip:port;transport=protocol goes
-   sip:encoding_prefix*username*ip*port*protocol@hostpart.
+   sip:encoding_prefix*username*password*ip*port*protocol@hostpart.
 
    * is the default separator and can be changed by setting the
    contact_flds_separator module parameter.
@@ -787,9 +792,9 @@ if (src_ip == 10.0.0.0/8) encode_contact("natted_client","1.2.3.4");
 4.20.  decode_contact()
 
    This function will decode the request URI. If the RURI is in the format
-   sip:encoding_prefix*username*ip*port*protocol@hostpart it will be
-   decoded to sip:username:password@ip:port;transport=protocol It uses the
-   default set parameter for contact encoding separator.
+   sip:encoding_prefix*username*password*ip*port*protocol@hostpart it will
+   be decoded to sip:username:password@ip:port;transport=protocol. It uses
+   the default set parameter for contact encoding separator.
 
    The function returns negative on error, 1 on success.
 

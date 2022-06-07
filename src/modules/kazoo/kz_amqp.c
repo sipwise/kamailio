@@ -796,9 +796,9 @@ void kz_amqp_connection_close(kz_amqp_conn_ptr rmq) {
 }
 
 void kz_amqp_channel_close(kz_amqp_conn_ptr rmq, amqp_channel_t channel) {
-    LM_DBG("Close rmq channel\n");
-    if (!rmq)
-    	return;
+	LM_DBG("Close rmq channel\n");
+	if (!rmq)
+		return;
 
 	LM_DBG("close channel: %d rmq(%p)->channel(%d)\n", getpid(), (void *)rmq, channel);
 	kz_amqp_error("closing channel", amqp_channel_close(rmq->conn, channel, AMQP_REPLY_SUCCESS));
@@ -1121,11 +1121,11 @@ int kz_amqp_pipe_send(str *str_exchange, str *str_routing_key, str *str_payload)
 	if(cmd)
 		kz_amqp_free_pipe_cmd(cmd);
 
-    if(json_obj)
-    	json_object_put(json_obj);
+	if(json_obj)
+		json_object_put(json_obj);
 
-    if(s_local_routing_key)
-    	pkg_free(s_local_routing_key);
+	if(s_local_routing_key)
+		pkg_free(s_local_routing_key);
 
 	return ret;
 }
@@ -2009,14 +2009,13 @@ int kz_amqp_subscribe_simple(struct sip_msg* msg, char* exchange, char* exchange
 	binding->bind = bind;
 	bindings_count++;
 
-    return 1;
+	return 1;
 
 error:
-    if(binding != NULL)
-    	shm_free(binding);
+	if(binding != NULL)
+		shm_free(binding);
 
 	return -1;
-
 }
 
 
@@ -2498,24 +2497,24 @@ void kz_amqp_fire_connection_event(char *event, char* host, char* zone)
 
 void kz_amqp_cb_ok(kz_amqp_cmd_ptr cmd)
 {
-	int n = route_lookup(&main_rt, cmd->cb_route);
+	int n = route_lookup(&onreply_rt, cmd->cb_route);
 	if(n==-1) {
 		/* route block not found in the configuration file */
 		return;
 	}
-	struct action *a = main_rt.rlist[n];
+	struct action *a = onreply_rt.rlist[n];
 	tmb.t_continue(cmd->t_hash, cmd->t_label, a);
 	ksr_msg_env_reset();
 }
 
 void kz_amqp_cb_error(kz_amqp_cmd_ptr cmd)
 {
-	int n = route_lookup(&main_rt, cmd->err_route);
+	int n = route_lookup(&failure_rt, cmd->err_route);
 	if(n==-1) {
 		/* route block not found in the configuration file */
 		return;
 	}
-	struct action *a = main_rt.rlist[n];
+	struct action *a = failure_rt.rlist[n];
 	tmb.t_continue(cmd->t_hash, cmd->t_label, a);
 	ksr_msg_env_reset();
 }

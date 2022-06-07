@@ -169,8 +169,8 @@ Options:\n\
                   default is yes.\n\
     -A define    Add config pre-processor define (e.g., -A WITH_AUTH,\n\
                   -A 'FLT_ACC=1', -A 'DEFVAL=\"str-val\"')\n\
-    -b nr        Maximum receive buffer size which will not be exceeded by\n\
-                  auto-probing procedure even if  OS allows\n\
+    -b nr        Maximum OS UDP receive buffer size which will not be exceeded by\n\
+                  auto-probing-and-increase procedure even if OS allows\n\
     -c           Check configuration file for syntax errors\n\
     --cfg-print  Print configuration file evaluating includes and ifdefs\n\
     -d           Debugging level control (multiple -d to increase the level from 0)\n\
@@ -522,7 +522,7 @@ extern FILE* yyin;
 extern int yyparse(void);
 
 
-int is_main=1; /* flag = is this the  "main" process? */
+int _ksr_is_main=1; /* flag = is this the  "main" process? */
 int fixup_complete=0; /* flag = is the fixup complete ? */
 
 char* pid_file = 0; /* filename as asked by use */
@@ -663,7 +663,7 @@ static void kill_all_children(int signum)
 		  * (only main can add processes, so from main is safe not to lock
 		  *  and moreover it avoids the lock-holding suicidal children problem)
 		  */
-		if (!is_main) lock_get(process_lock);
+		if (!_ksr_is_main) lock_get(process_lock);
 		for (r=1; r<*process_count; r++){
 			if (r==process_no) continue; /* try not to be suicidal */
 			if (pt[r].pid) {
@@ -672,7 +672,7 @@ static void kill_all_children(int signum)
 			else LM_CRIT("killing: %s > %d no pid!!!\n",
 							pt[r].desc, pt[r].pid);
 		}
-		if (!is_main) lock_release(process_lock);
+		if (!_ksr_is_main) lock_release(process_lock);
 	}
 }
 
@@ -846,7 +846,7 @@ void sig_usr(int signo)
 #endif
 #endif
 
-	if (is_main){
+	if (_ksr_is_main){
 		if (sig_flag==0) sig_flag=signo;
 		else /*  previous sig. not processed yet, ignoring? */
 			return; ;
@@ -2330,7 +2330,7 @@ int main(int argc, char** argv)
 						fprintf(stderr, "bad substdef parameter\n");
 						goto error;
 					}
-					if(pp_substdef_add(optarg, 0)<0) {
+					if(pp_substdef_add(optarg, KSR_PPDEF_NORMAL)<0) {
 						LM_ERR("failed to add substdef expression: %s\n", optarg);
 						goto error;
 					}
@@ -2340,7 +2340,7 @@ int main(int argc, char** argv)
 						fprintf(stderr, "bad substdefs parameter\n");
 						goto error;
 					}
-					if(pp_substdef_add(optarg, 1)<0) {
+					if(pp_substdef_add(optarg, KSR_PPDEF_QUOTED)<0) {
 						LM_ERR("failed to add substdefs expression: %s\n", optarg);
 						goto error;
 					}
@@ -3054,7 +3054,7 @@ try_again:
 	if (ret < 0)
 		goto error;
 	/*kill everything*/
-	if (is_main) shutdown_children(SIGTERM, 0);
+	if (_ksr_is_main) shutdown_children(SIGTERM, 0);
 	if (!dont_daemonize) {
 		if (daemon_status_send(0) < 0)
 			fprintf(stderr, "error sending exit status: %s [%d]\n",
@@ -3065,7 +3065,7 @@ try_again:
 
 error:
 	/*kill everything*/
-	if (is_main) shutdown_children(SIGTERM, 0);
+	if (_ksr_is_main) shutdown_children(SIGTERM, 0);
 	if (!dont_daemonize) {
 		if (daemon_status_send((char)-1) < 0)
 			fprintf(stderr, "error sending exit status: %s [%d]\n",

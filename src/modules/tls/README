@@ -238,6 +238,14 @@ Chapter 1. Admin Guide
    module that uses libssl (OpenSSL library). A safe option is to have the
    tls module loaded first (be in the first "loadmodule" in Kamailio.cfg).
 
+   IMPORTANT: using this module compiled with newer versions of libssl
+   (e.g., v1.1+) may require Kamailio to be started with --atexit=no
+   command line parameters to avoid calling C atexit callbacks inside the
+   process ending during daemonize procedure as well as during shut down,
+   which can lead to crashes because it destroys and then accesses shared
+   memory. For example, such case has been reported for Ubuntu 20.04 or
+   RedHat 8.
+
 2. Quick Start
 
    The default kamailio.cfg file has basic tls support included, it has to
@@ -549,17 +557,17 @@ Revoking a certificate and using a CRL
    require the certificate file and list of CA certificates per a regular
    TLS configuration.
 
-AWS CloudHSM Example
+Thales Luna Example
 --------------------
 
 ...
-# Example for AWS CloudHSM (SafeNet Luna)
+# Example for Thales Luna
 modparam("tls", "engine", "gem")
-modparam("tls", "engine_config", "/usr/local/etc/kamailio/luna.conf")
-modparam("tls", "engine_algorithms", "ALL)
+modparam("tls", "engine_config", "/usr/local/etc/kamailio/thales.cnf")
+modparam("tls", "engine_algorithms", "EC")
 ...
 
-/usr/local/etc/kamailio/luna.cnf is a OpenSSL config format file used to
+/usr/local/etc/kamailio/thales.cnf is a OpenSSL config format file used to
 bootstrap the engine, e.g., pass the PIN.
 
 ...
@@ -570,11 +578,12 @@ kamailio = openssl_init
 engines = engine_section
 
 [ engine_section ]
-# gem is the name of the SafeNet Luna OpenSSL engine
+# gem is the name of the Thales Luna OpenSSL engine
 gem = gem_section
 
 [ gem_section ]
-# from SafeNet documentation
+# from Thales documentation
+dynamic_path = /usr/lib64/engines-1.1/gem.so
 ENGINE_INIT = 0:20:21:password=1234-ABCD-5678-EFGH
 ...
 

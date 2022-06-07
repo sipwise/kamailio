@@ -453,6 +453,18 @@ static int parse_sdp_session(str *sdp_body, int session_num, str *cnt_disp, sdp_
 		extract_bwidth(&tmpstr1, &session->bw_type, &session->bw_width);
 	}
 
+	/* Find sendrecv_mode between session begin and first media.
+	 * parse session attributes to check is_on_hold for a= for all medias. */
+	a1p = find_first_sdp_line(o1p, m1p, 'a', NULL);
+	while (a1p) {
+		tmpstr1.s = a1p;
+		tmpstr1.len = m1p - a1p;
+		if (extract_sendrecv_mode(&tmpstr1, &session->sendrecv_mode, &session->is_on_hold) == 0) {
+			break;
+		}
+		a1p = find_next_sdp_line(a1p, m1p, 'a', NULL);
+	}
+
 	/* Have session. Iterate media descriptions in session */
 	m2p = m1p;
 	stream_num = 0;
@@ -584,7 +596,8 @@ static int parse_sdp_session(str *sdp_body, int session_num, str *cnt_disp, sdp_
 				a1p = stream->path.s + stream->path.len;
 			} else {
 				/* unknown a= line, ignore -- jump over it */
-				LM_DBG("ignoring unknown type in a= line: `%.*s'\n", tmpstr1.len, tmpstr1.s);
+				LM_DBG("ignoring unknown type in a= line: `%.*s...'\n",
+						(tmpstr1.len>20)?20:tmpstr1.len, tmpstr1.s);
 				a1p += 2;
 			}
 
@@ -632,12 +645,16 @@ static int parse_mixed_content(str *mixed_body, str delimiter, sdp_info_t* _sdp)
 		d1p = d2p;
 		if (d1p == NULL || d1p >= bodylimit)
 			break; /* No applications left */
+		if(d1p + delimiter.len + 2 > bodylimit) {
+			LM_ERR("failed parsing [%.*s]\n", mixed_body->len, mixed_body->s);
+			return -1;
+		}
 		d2p = find_next_sdp_line_delimiter(d1p, bodylimit, delimiter, bodylimit);
 		/* d2p is text limit for application parsing */
-		memset(&hf,0, sizeof(struct hdr_field));
+		memset(&hf, 0, sizeof(struct hdr_field));
 		rest = eat_line(d1p + delimiter.len + 2, d2p - d1p - delimiter.len - 2);
 		if ( rest > d2p ) {
-			LM_ERR("Unparsable <%.*s>\n", (int)(d2p-d1p), d1p);
+			LM_ERR("unparsable [%.*s]\n", (int)(d2p-d1p), d1p);
 			return -1;
 		}
 		no_eoh_found = 1;
