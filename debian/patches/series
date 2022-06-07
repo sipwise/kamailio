@@ -31,27 +31,9 @@ sipwise/sca-fix-on-hold-detection-when-upstream-flow.patch
 sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
-## upstream 5.5
-upstream/nathelper-Fix-uninitialized-data.patch
-upstream/tmx-use-trimmed-call-id-value-for-hashing.patch
-upstream/topos_redis-contact-on-A-side-is-never-updated-on-di.patch
-upstream/db_redis-clean-previous-connection-before-trying-to-.patch
-upstream/pv-headers-ignore-skip-header-config-on-clone_branch.patch
-upstream/pv-headers-remove_specific_header_value.patch
-# https://github.com/kamailio/kamailio/pull/979
-# collides with our changes to pua_dialoginfo
-sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
+## upstream 5.6
+#
 ## upstream master
-upstream/lcr-source-port-check-for-from_any_gw-and-from_gw.patch
-upstream/lcr-remove-excessive-checks-for-the-src_port-accurac.patch
-upstream/lcr-improve-binary-search-to-support-match-including-src-port.patch
-upstream/lcr_improve_gw_search_when_both_ipaddress_and_src_port_used.patch
-upstream/tm_api_improvement_t_append_branches_with_contact.patch
-upstream/tsilo_append_by_contact.patch
-upstream/core_sdp_parser_improve_ice_options_and_cloning.patch
-upstream/core_sdp_parser_check_value_of_ptr_with_white_space.patch
-upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
-upstream/permissions-trusted_cleanup_interval.patch
 upstream/dialog-dlg_get_var-ci-ft-tt-key-dst_var.patch
 upstream/dialog-dlg_set_var-callid-ft-tt-key-value.patch
 upstream/dialog-reworked-kemi-export-for-dlg_get_var.patch
@@ -60,15 +42,9 @@ upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
 upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
-sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
-# merged upstream but we have pua_dialoginfo changes see above
-sipwise/pua_dialoginfo_uuid.patch
+sipwise/pua_dialoginfo-local_identity_dlg_var.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
-sipwise/cfgt-skip-tm-vars-T_.patch
-sipwise/cfgt-skip.patch
-sipwise/cfgt-improve-detection-of-dynamic-format.patch
-sipwise/cfgt-fix-memory-leaks.patch
 sipwise/cfgt-skip_unknown.patch
 sipwise/topos-don-t-insert-contact-header-for-4xx-replies.patch
 sipwise/db_redis_skip_empty_keys.patch
@@ -76,10 +52,8 @@ sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
-sipwise/pv_headers-fix-build-warning.patch
-sipwise/pv_headers-use-memset.patch
-### active development
 sipwise/lcr-stopper_mode-parameter.patch
+### active development
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
