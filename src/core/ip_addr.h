@@ -84,6 +84,7 @@ typedef enum si_flags {
 	SI_IS_MCAST     = (1<<2),
 	SI_IS_ANY       = (1<<3),
 	SI_IS_MHOMED    = (1<<4),
+	SI_IS_VIRTUAL	= (1<<5),
 } si_flags_t;
 
 typedef struct addr_info {
@@ -109,6 +110,7 @@ typedef struct advertise_info {
 
 typedef struct socket_info {
 	int socket;
+	int gindex; /* global index in the lists of all sockets */
 	str name; /* name - eg.: foo.bar or 10.0.0.1 */
 	struct ip_addr address; /* ip address */
 	str address_str;        /*ip address converted to string -- optimization*/
@@ -201,6 +203,7 @@ typedef struct ksr_coninfo {
 
 typedef struct sr_net_info {
 	str data;
+	unsigned int bufsize;
 	receive_info_t* rcv;
 	dest_info_t* dst;
 } sr_net_info_t;

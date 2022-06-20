@@ -1299,7 +1299,33 @@ modparam("dialog", "send_bye", 1)
 </programlisting>
 		</example>
 	</section>
-
+	<section id="dialog.p.dlg_filter_mode">
+		<title><varname>dlg_filter_mode</varname> (int)</title>
+		<para>
+			Set dialog fitering mode, which can specify what dialogs are processed.
+			Its value can be a combination (the sum) of following flags:
+		</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>1</emphasis> - do not send keepalives and do not
+				execute timeout function if dialog is not local (if the
+				associated bind address is not a local socket).
+			</para></listitem>
+		</itemizedlist>
+		<para>
+		<emphasis>
+			Default value is <quote>0</quote>.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>dlg_filter_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("dialog", "dlg_filter_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	<section id="dialog.p.wait_ack">
 		<title><varname>wait_ack</varname> (int)</title>
 		<para>
@@ -2055,7 +2081,8 @@ dlg_bridge("sip:user@kamailio.org", "sip:annoucement@kamailio.org",
 			</para>
 		</listitem>
 		<listitem>
-			<para><emphasis>ttag</emphasis> - SIP To tag.
+			<para><emphasis>ttag</emphasis> - SIP To tag (it can be empty string
+			to match a dialog during call setup (eg., match for CANCEL)).
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -2500,12 +2527,16 @@ dlg_reset_property("timeout-noreset");
 				<emphasis>mkey</emphasis> - matching key. It can be: 'ruri' -
 				match against R-URI of the dialog; 'furi' - match against From
 				header URI of the dialog; 'turi' - match against the To header
-				URI of the dialog; 'callid' - match against Call-Id value.
+				URI of the dialog; 'callid' - match against Call-Id value;
+				'start_ts' - match against start timestamp.
 			</para></listitem>
 			<listitem><para>
 				<emphasis>mop</emphasis> - matching operator. It can be: 'eq' -
 				match using string comparison; 're' - match using regular
-				expression; 'sw' - match using starts-with (prefix) comparison.
+				expression; 'sw' - match using starts-with (prefix) comparison;
+				'gt' - match using integer greater comparison; 'lt' - match
+				using integer lesser comparison. Integer comparison can be used
+				only with 'start_ts' key.
 			</para></listitem>
 			<listitem><para>
 				<emphasis>mval</emphasis> - matching value.
@@ -2517,6 +2548,8 @@ dlg_reset_property("timeout-noreset");
 &kamcmd; dlg.list_match furi eq sip:alice@test.com 2
 ...
 &kamcmd; dlg.list_match furi sw sip:alice@
+...
+&kamcmd; dlg.list_match start_ts gt s:1641550904
 ...
 		</programlisting>
 		</section>
@@ -2801,7 +2834,14 @@ dlg_reset_property("timeout-noreset");
 			(not relying on core stats framework).
 		</para>
 		<para>Name: <emphasis>dlg.stats_active</emphasis></para>
-		<para>Parameters: none.</para>
+		<para>Parameters:</para>
+		<itemizedlist>
+			<listitem><para>
+				<emphasis>local_only</emphasis> (optional) - if not 0 then filter out
+				non local dialogs (the receiving socket is not found locally,
+				from C code point of view, the bind_addr info is not set).
+			</para></listitem>
+		</itemizedlist>
 		<para>Returned fields</para>
 		<itemizedlist>
 			<listitem><para>

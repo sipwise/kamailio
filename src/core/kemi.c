@@ -34,6 +34,7 @@
 #include "select_buf.h"
 #include "pvar.h"
 #include "trim.h"
+#include "resolve.h"
 #include "mem/shm.h"
 #include "parser/parse_uri.h"
 #include "parser/parse_from.h"
@@ -1158,6 +1159,18 @@ static int sr_kemi_core_is_proto_wss(sip_msg_t *msg)
 /**
  *
  */
+static int sr_kemi_core_is_proto_wsx(sip_msg_t *msg)
+{
+	if (msg->rcv.proto == PROTO_WSS) return SR_KEMI_TRUE;
+	if (msg->rcv.proto == PROTO_WS) return SR_KEMI_TRUE;
+
+	return SR_KEMI_FALSE;
+}
+
+
+/**
+ *
+ */
 static int sr_kemi_core_is_proto_sctp(sip_msg_t *msg)
 {
 	return (msg->rcv.proto == PROTO_SCTP)?SR_KEMI_TRUE:SR_KEMI_FALSE;
@@ -1527,6 +1540,205 @@ static int sr_kemi_core_route(sip_msg_t *msg, str *route)
 /**
  *
  */
+static int sr_kemi_core_to_proto_helper(sip_msg_t *msg)
+{
+	sip_uri_t parsed_uri;
+	str uri;
+
+	if(msg==NULL) {
+		return -1;
+	}
+	if(msg->first_line.type == SIP_REPLY) {
+		/* REPLY doesnt have r/d-uri - use second Via */
+		if(parse_headers( msg, HDR_VIA2_F, 0)==-1) {
+			LM_DBG("no 2nd via parsed\n");
+			return -1;
+		}
+		if((msg->via2==0) || (msg->via2->error!=PARSE_OK)) {
+			return -1;
+		}
+		return (int)msg->via2->proto;
+	}
+	if (msg->dst_uri.s != NULL && msg->dst_uri.len>0) {
+		uri = msg->dst_uri;
+	} else {
+		if (msg->new_uri.s!=NULL && msg->new_uri.len>0)
+		{
+			uri = msg->new_uri;
+		} else {
+			uri = msg->first_line.u.request.uri;
+		}
+	}
+	if(parse_uri(uri.s, uri.len, &parsed_uri)!=0) {
+		LM_ERR("failed to parse nh uri [%.*s]\n", uri.len, uri.s);
+		return -1;
+	}
+	return (int)parsed_uri.proto;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_udp(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	return (proto == PROTO_UDP)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_tcp(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	return (proto == PROTO_TCP)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_tls(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	return (proto == PROTO_TLS)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_sctp(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	return (proto == PROTO_SCTP)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_ws(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	return (proto == PROTO_WS)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_wss(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	return (proto == PROTO_WSS)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_proto_wsx(sip_msg_t *msg)
+{
+	int proto;
+
+	proto = sr_kemi_core_to_proto_helper(msg);
+	if (proto == PROTO_WSS) { return SR_KEMI_TRUE; }
+	return (proto == PROTO_WS)?SR_KEMI_TRUE:SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_af_helper(sip_msg_t *msg)
+{
+	sip_uri_t parsed_uri;
+	str uri;
+	str host;
+
+	if(msg==NULL) {
+		return -1;
+	}
+	if(msg->first_line.type == SIP_REPLY) {
+		/* REPLY doesnt have r/d-uri - use second Via */
+		if(parse_headers( msg, HDR_VIA2_F, 0)==-1) {
+			LM_DBG("no 2nd via parsed\n");
+			return -1;
+		}
+		if((msg->via2==0) || (msg->via2->error!=PARSE_OK)) {
+			return -1;
+		}
+		if(msg->via2->received) {
+			LM_DBG("using 'received'\n");
+			host = msg->via2->received->value;
+		} else {
+			LM_DBG("using via host\n");
+			host = msg->via2->host;
+		}
+	} else {
+		if (msg->dst_uri.s != NULL && msg->dst_uri.len>0) {
+			uri = msg->dst_uri;
+		} else {
+			if (msg->new_uri.s!=NULL && msg->new_uri.len>0)
+			{
+				uri = msg->new_uri;
+			} else {
+				uri = msg->first_line.u.request.uri;
+			}
+		}
+		if(parse_uri(uri.s, uri.len, &parsed_uri)!=0) {
+			LM_ERR("failed to parse nh uri [%.*s]\n", uri.len, uri.s);
+			return -1;
+		}
+		host = parsed_uri.host;
+	}
+
+	if(host.len<=0) {
+		return 0;
+	}
+	if(str2ip(&host)!=NULL) {
+		return 4;
+	}
+	if(str2ip6(&host)!=NULL) {
+		return 6;
+	}
+	return 0;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_af_ipv4(sip_msg_t *msg)
+{
+	int af;
+
+	af = sr_kemi_core_to_af_helper(msg);
+	if (af == 4) { return SR_KEMI_TRUE; }
+	return SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
+static int sr_kemi_core_to_af_ipv6(sip_msg_t *msg)
+{
+	int af;
+
+	af = sr_kemi_core_to_af_helper(msg);
+	if (af == 6) { return SR_KEMI_TRUE; }
+	return SR_KEMI_FALSE;
+}
+
+/**
+ *
+ */
 static sr_kemi_t _sr_kemi_core[] = {
 	{ str_init(""), str_init("dbg"),
 		SR_KEMIP_NONE, sr_kemi_core_dbg,
@@ -1888,6 +2100,11 @@ static sr_kemi_t _sr_kemi_core[] = {
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init(""), str_init("is_WSX"),
+		SR_KEMIP_BOOL, sr_kemi_core_is_proto_wsx,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init(""), str_init("is_SCTP"),
 		SR_KEMIP_BOOL, sr_kemi_core_is_proto_sctp,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
@@ -1905,6 +2122,51 @@ static sr_kemi_t _sr_kemi_core[] = {
 	},
 	{ str_init(""), str_init("is_IPv6"),
 		SR_KEMIP_BOOL, sr_kemi_core_is_af_ipv6,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_UDP"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_udp,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_TCP"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_tcp,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_TLS"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_tls,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_SCTP"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_sctp,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_WS"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_ws,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_WSS"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_wss,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_WSX"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_proto_wsx,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_IPv4"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_af_ipv4,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init(""), str_init("to_IPv6"),
+		SR_KEMIP_BOOL, sr_kemi_core_to_af_ipv6,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
@@ -2864,6 +3126,47 @@ static sr_kemi_xval_t* sr_kemi_pv_getvn (sip_msg_t *msg, str *pvn, int xival)
 /**
  *
  */
+static int sr_kemi_pv_geti (sip_msg_t *msg, str *pvn)
+{
+	pv_spec_t *pvs;
+	pv_value_t val;
+	int vi;
+
+	LM_DBG("pv get: %.*s\n", pvn->len, pvn->s);
+	vi = pv_locate_name(pvn);
+	if(vi != pvn->len) {
+		LM_WARN("invalid pv [%.*s] (%d/%d)\n", pvn->len, pvn->s, vi, pvn->len);
+		return 0;
+	}
+	pvs = pv_cache_get(pvn);
+	if(pvs==NULL) {
+		LM_WARN("cannot get pv spec for [%.*s]\n", pvn->len, pvn->s);
+		return 0;
+	}
+
+	memset(&val, 0, sizeof(pv_value_t));
+	if(pv_get_spec_value(msg, pvs, &val) != 0) {
+		LM_WARN("unable to get pv value for [%.*s]\n", pvn->len, pvn->s);
+		return 0;
+	}
+	if(val.flags&PV_VAL_NULL) {
+		return 0;
+	}
+	if(val.flags&(PV_TYPE_INT|PV_VAL_INT)) {
+		return val.ri;
+	}
+	if(val.ri!=0) {
+		return val.ri;
+	}
+	vi = 0;
+	str2sint(&val.rs, &vi);
+
+	return vi;
+}
+
+/**
+ *
+ */
 static int sr_kemi_pv_seti (sip_msg_t *msg, str *pvn, int ival)
 {
 	pv_spec_t *pvs;
@@ -3006,6 +3309,11 @@ static sr_kemi_t _sr_kemi_pv[] = {
 	},
 	{ str_init("pv"), str_init("gete"),
 		SR_KEMIP_XVAL, sr_kemi_pv_gete,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("pv"), str_init("geti"),
+		SR_KEMIP_INT, sr_kemi_pv_geti,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

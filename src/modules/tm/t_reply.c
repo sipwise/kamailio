@@ -2653,6 +2653,11 @@ int reply_received( struct sip_msg  *p_msg )
 		}
 #endif
 
+	if (t->flags & T_ASYNC_SUSPENDED) {
+		LM_DBG("Reply for suspended transaction, done.\n");
+		goto done;
+	}
+
 	if (unlikely(p_msg->msg_flags&FL_RPL_SUSPENDED)) {
 		/* suspended the reply (async) - no error */
 		goto done;
@@ -2713,6 +2718,9 @@ int reply_received( struct sip_msg  *p_msg )
 				( (last_uac_status<msg_status) &&
 					((msg_status>=180) || (last_uac_status==0)) )
 			) ) { /* provisional now */
+#ifdef TIMER_DEBUG
+		LM_DBG("updating FR/RETR timers, \"fr_inv_timeout\": %d\n", t->fr_inv_timeout);
+#endif
 		restart_rb_fr(& uac->request, t->fr_inv_timeout);
 		uac->request.flags|=F_RB_FR_INV; /* mark fr_inv */
 	} /* provisional replies */
