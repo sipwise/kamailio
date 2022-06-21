@@ -1,0 +1,33 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Tue, 21 Jun 2022 08:41:53 +0200
+Subject: topos: skip adding contact header for BYE, CANCEL, PRACK
+
+- GH #3149
+---
+ src/modules/topos/tps_msg.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/modules/topos/tps_msg.c b/src/modules/topos/tps_msg.c
+index 83d5f5f..c01dde7 100644
+--- a/src/modules/topos/tps_msg.c
++++ b/src/modules/topos/tps_msg.c
+@@ -46,6 +46,8 @@
+ #include "tps_msg.h"
+ #include "tps_storage.h"
+ 
++#define TPS_METHODS_NOCONTACT (METHOD_CANCEL|METHOD_BYE|METHOD_PRACK)
++
+ extern int _tps_param_mask_callid;
+ extern int _tps_contact_mode;
+ extern str _tps_cparam_name;
+@@ -582,6 +584,10 @@ int tps_reinsert_contact(sip_msg_t *msg, tps_data_t *ptsd, str *hbody)
+ {
+ 	str hname = str_init("Contact");
+ 
++	if (get_cseq(msg)->method_id & TPS_METHODS_NOCONTACT) {
++		return 0;
++	}
++
+ 	if(tps_add_headers(msg, &hname, hbody, 0)<0) {
+ 		return -1;
+ 	}
