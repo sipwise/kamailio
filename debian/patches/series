@@ -40,6 +40,7 @@ upstream/dialog-reworked-kemi-export-for-dlg_get_var.patch
 upstream/dialog-fix-ki_dlg_get_var-introduced-previously.patch
 upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
 upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
+upstream/topos-skip-adding-contact-header-for-BYE-CANCEL-PRAC.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
