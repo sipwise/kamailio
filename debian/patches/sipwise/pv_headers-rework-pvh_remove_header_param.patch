@@ -1,0 +1,238 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Wed, 22 Jun 2022 15:12:33 +0200
+Subject: pv_headers: rework pvh_remove_header_param
+
+* fix KEMI interface, this is suppose to be called
+  like pvh_remove_header_param(header_name, string_to_remove)
+* use pv buffer for temporal value
+* use xavi interface to set the new value
+---
+ src/modules/pv_headers/pv_headers.c | 63 +++++++++++++++---------
+ src/modules/pv_headers/pvh_func.c   | 96 +++++++++++++------------------------
+ src/modules/pv_headers/pvh_func.h   |  2 +-
+ 3 files changed, 76 insertions(+), 85 deletions(-)
+
+diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
+index fb20dfc..e555e02 100644
+--- a/src/modules/pv_headers/pv_headers.c
++++ b/src/modules/pv_headers/pv_headers.c
+@@ -220,15 +220,47 @@ static int w_pvh_header_param_exists(
+ 	return pvh_header_param_exists(msg, &hname, &value);
+ }
+ 
++static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRemove)
++{
++	int idx;
++	int new_size;
++	str dst = STR_NULL;
++	sr_xavp_t *avi = pvh_xavi_get_child(msg, &xavi_name, hname);
++
++	for(idx=0; avi != NULL; avi = xavi_get_next(avi)) {
++		if (avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL) {
++			if(str_casesearch(&avi->val.v.s, toRemove) != NULL) {
++				new_size = pvh_remove_header_param_helper(&avi->val.v.s, toRemove, &dst);
++				if(dst.len == 0) {
++					LM_DBG("nothing left in the header:%.*s, remove it[%d]\n",
++							STR_FMT(hname), idx);
++					if(pvh_remove_header(msg, hname, idx) < 0)
++						return -1;
++				} else if(dst.len < 0 || new_size == avi->val.v.s.len) {
++					LM_DBG("'%.*s' not found at '%.*s'\n", STR_FMT(toRemove),
++						STR_FMT(&avi->val.v.s));
++				} else {
++					LM_DBG("old_value:'%.*s' new_value:'%.*s'\n",
++						STR_FMT(&avi->val.v.s), STR_FMT(&dst));
++					if(pvh_set_xavi(msg, &xavi_name, hname, &dst, SR_XTYPE_STR, idx, 0) < 0) {
++						LM_ERR("can't set new value\n");
++						return -1;
++					}
++				}
++			} else {
++				LM_DBG("'%.*s' not found at '%.*s'\n", STR_FMT(toRemove),
++						STR_FMT(&avi->val.v.s));
++			}
++		}
++		idx++;
++	}
++	return 1;
++}
++
+ static int w_pvh_remove_header_param(struct sip_msg *msg, char *p1, char *p2)
+ {
+-	int ret = -1;
+-	int idx = 0;
+ 	str hname = STR_NULL;
+ 	str value = STR_NULL;
+-	sr_xavp_t *avi=NULL;
+-	char tt[header_name_size];
+-	str br_xname = {tt, header_name_size};
+ 
+ 	if(fixup_get_svalue(msg, (gparam_p)p1, &hname) < 0)
+ 		return -1;
+@@ -236,20 +268,7 @@ static int w_pvh_remove_header_param(struct sip_msg *msg, char *p1, char *p2)
+ 	if(p2 && fixup_get_svalue(msg, (gparam_p)p2, &value) < 0)
+ 		return -1;
+ 
+-	pvh_get_branch_xname(msg, &xavi_name, &br_xname);
+-
+-	avi = xavi_get_child(&br_xname, &hname);
+-
+-	while(avi)
+-	{
+-		if (avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL && _strnstr(avi->val.v.s.s, value.s, avi->val.v.s.len) != NULL) {
+-			ret = pvh_remove_header_param(msg, idx, &hname, &avi->val.v.s, &value) && ret;
+-		}
+-		idx++;
+-		avi = xavi_get_next(avi);
+-	}
+-
+-	return ret;
++	return ki_pvh_remove_header_param(msg, &hname, &value);
+ }
+ 
+ /* clang-format off */
+@@ -594,9 +613,9 @@ static sr_kemi_t pvh_kemi_exports[] = {
+ 				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
+ 	},
+ 	{ str_init("pv_headers"), str_init("pvh_remove_header_param"),
+-		SR_KEMIP_INT, pvh_remove_header_param,
+-			{ SR_KEMIP_INT, SR_KEMIP_STR, SR_KEMIP_STR,
+-				SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE}
++		SR_KEMIP_INT, ki_pvh_remove_header_param,
++			{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
++				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
+ 	},
+ 	{{0, 0}, {0, 0}, 0, NULL, {0, 0, 0, 0, 0, 0}}
+ };
+diff --git a/src/modules/pv_headers/pvh_func.c b/src/modules/pv_headers/pvh_func.c
+index dde1b83..a6adaa1 100644
+--- a/src/modules/pv_headers/pvh_func.c
++++ b/src/modules/pv_headers/pvh_func.c
+@@ -22,7 +22,7 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  *
+  */
+-
++#include "../../core/pvapi.h"
+ #include "../../core/strutils.h"
+ 
+ #include "pv_headers.h"
+@@ -381,73 +381,45 @@ int pvh_header_param_exists(struct sip_msg *msg, str *hname, str *hvalue)
+ 	return -1;
+ }
+ 
+-int pvh_remove_header_param(struct sip_msg *msg, int idx, str *hname, str *elements, str *toRemove)
++int pvh_remove_header_param_helper(str *orig, const str *toRemove, str *dst)
+ {
+-	int notTarget, writtenChars;
++	int notTarget;
++	int writtenChars = 0;
+ 	int offset = 0;
+-	int ret = -1;
+-	char *next_token;
++	char *saveptr = NULL;
+ 	char *token;
+-	char *result = (char*)pkg_malloc(elements->len - toRemove->len);
+-	char *t = (char*)pkg_malloc(elements->len+1);
+-
+-	if (result == NULL || t == NULL)
+-	{
+-		PKG_MEM_ERROR;
+-		goto clean;
+-	}
+-
+-	snprintf(t, elements->len+1, "%s", elements->s);
+-
+-	token = strtok_r(t, ", ", &next_token);
+-	while(token)
+-	{
+-		notTarget = strncmp(token, toRemove->s, toRemove->len);
+-		if (notTarget)
+-		{
+-			writtenChars = snprintf(result + offset, elements->len - offset, "%s", token);
+-			if (writtenChars < 0 || writtenChars >= elements->len - offset)
+-			{
+-				break;
+-			}
+-			offset += writtenChars;
+-		}
+-		token = strtok_r(NULL, ", ", &next_token);
+-		if (token && notTarget && elements->len - offset - toRemove->len > 2)
+-		{
+-			writtenChars = snprintf(result + offset, elements->len - offset, ", ");
+-			if (writtenChars < 0 || writtenChars >= elements->len - offset)
+-			{
+-				break;
+-			}
++	char t[header_value_size];
++	char *result = pv_get_buffer();
++	int maxSize = pv_get_buffer_size();
++
++	memset(result, 0, maxSize);
++	LM_DBG("orig:'%.*s' toRemove:'%.*s'\n", STR_FMT(orig), STR_FMT(toRemove));
++	strncpy(t, orig->s, orig->len);
++	t[orig->len] = '\0';
++	token = strtok_r(t, ", ", &saveptr);
++	dst->s = NULL; dst->len = -1;
++	while(token) {
++		notTarget = strncasecmp(token, toRemove->s, toRemove->len);
++		LM_DBG("offset:%d token:%s notTarget:%d\n", offset, token, notTarget);
++		if(notTarget) {
++			writtenChars = snprintf(result + offset, maxSize - offset, "%s, ", token);
++			if(writtenChars < 0) break;
+ 			offset += writtenChars;
++ 		} else {
++			dst->len = 0; /* we found a token */
+ 		}
++		token = strtok_r(NULL, ", ", &saveptr);
+ 	}
+ 
+-	if (elements->len-toRemove->len > 0)
+-	{
+-		snprintf(elements->s, (strlen(result)%elements->len)+1, "%s", result);
+-		elements->len = strlen(result);
+-		ret = 1;
+-	}
+-	else
+-	{
+-		ret = pvh_remove_header(msg, hname, idx);
+-	}
+-
+-clean:
+-
+-	if(t != NULL)
+-	{
+-		pkg_free(t);
+-		t = NULL;
+-	}
+-
+-	if(result != NULL)
+-	{
+-		pkg_free(result);
+-		result = NULL;
++	if(offset > 0) {
++		dst->s = result;
++		if(offset > 2 && result[offset-2] == ',' && result[offset-1] == ' ') {
++			LM_DBG("remove last separator\n");
++			offset = offset - 2;
++			result[offset] = '\0';
++		}
++		dst->len = offset;
++		LM_DBG("offset:%d result:'%.*s'[%d]\n", offset, STR_FMT(dst), dst->len);
+ 	}
+-
+-	return ret;
++	return offset;
+ }
+diff --git a/src/modules/pv_headers/pvh_func.h b/src/modules/pv_headers/pvh_func.h
+index a4e0bfa..737212c 100644
+--- a/src/modules/pv_headers/pvh_func.h
++++ b/src/modules/pv_headers/pvh_func.h
+@@ -39,6 +39,6 @@ int pvh_append_header(struct sip_msg *msg, str *hname, str *hvalue);
+ int pvh_modify_header(struct sip_msg *msg, str *hname, str *hvalue, int indx);
+ int pvh_remove_header(struct sip_msg *msg, str *hname, int indx);
+ int pvh_header_param_exists(struct sip_msg *msg, str *hname, str *hvalue);
+-int pvh_remove_header_param(struct sip_msg *msg, int idx, str *hname, str *elements, str *toRemove);
++int pvh_remove_header_param_helper(str *orig, const str *toRemove, str *dst);
+ 
+ #endif /* PV_FUNC_H */
