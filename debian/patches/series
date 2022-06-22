@@ -69,6 +69,7 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/pv_headers-fix-build-warning.patch
 sipwise/pv_headers-use-memset.patch
+sipwise/pv_headers-rework-pvh_remove_header_param.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 #
