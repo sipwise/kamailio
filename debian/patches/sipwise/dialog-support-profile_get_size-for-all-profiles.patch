@@ -3,77 +3,80 @@ Date: Mon, 27 Jun 2022 21:04:29 +0200
 Subject: dialog: support profile_get_size for all profiles
 
 ---
- src/modules/dialog/dialog.c             | 38 +++++++++++++++++++++++----------
- src/modules/dialog/dlg_profile.c        |  8 +++++++
- src/modules/dialog/dlg_profile.h        |  5 +++++
- src/modules/dialog/doc/dialog_admin.xml |  7 +++++-
- 4 files changed, 46 insertions(+), 12 deletions(-)
+ src/modules/dialog/dialog.c             |   35 ++++++++++++++++++++++++++++++++
+ src/modules/dialog/dlg_profile.c        |    8 +++++++
+ src/modules/dialog/dlg_profile.h        |    5 ++++
+ src/modules/dialog/doc/dialog_admin.xml |   22 ++++++++++++++++++++
+ 4 files changed, 70 insertions(+)
 
-diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 2082a41..8ab4f13 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -2739,19 +2739,34 @@ static void internal_rpc_print_single_dlg(rpc_t *rpc, void *c, int with_context)
-  * \param profile_name the given profile
-  * \param value the given profile value
-  */
--static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name,
--		str *value) {
-+static void internal_rpc_profile_get_size(
-+		rpc_t *rpc, void *c, str *profile_name, str *value)
-+{
-+	void *h;
- 	unsigned int size;
- 	dlg_profile_table_t *profile;
- 
--	profile = search_dlg_profile( profile_name );
--	if (!profile) {
--		rpc->fault(c, 404, "Profile not found: %.*s",
--			profile_name->len, profile_name->s);
--		return;
-+	if(profile_name == NULL) {
-+		profile = get_first_dlg_profile();
-+		for(; profile; profile = profile->next) {
-+			size = get_profile_size(profile, NULL);
-+			rpc->add(c, "{", &h);
-+			if(rpc->struct_add(h, "Sd", "name", &profile->name, "size", size)
-+					< 0) {
-+				rpc->fault(c, 500, "Server failure");
-+				return;
-+			}
-+		}
-+	} else {
-+		profile = search_dlg_profile(profile_name);
-+		if(!profile) {
-+			rpc->fault(c, 404, "Profile not found: %.*s", profile_name->len,
-+					profile_name->s);
-+			return;
-+		}
-+		size = get_profile_size(profile, value);
-+		rpc->add(c, "d", size);
- 	}
--	size = get_profile_size(profile, value);
--	rpc->add(c, "d", size);
- 	return;
+@@ -2756,6 +2756,33 @@ static void internal_rpc_profile_get_siz
  }
  
-@@ -3044,8 +3059,9 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c) {
+ /*!
++ * \brief Helper function that outputs the sizes of all profiles via the RPC interface
++ * \see rpc_profile_get_sizes
++ * \see rpc_profile_w_value_get_sizes
++ * \param rpc RPC node that should be filled
++ * \param c RPC void pointer
++ */
++static void internal_rpc_profile_get_sizes(rpc_t *rpc, void *c)
++{
++	void *h;
++	unsigned int size;
++	dlg_profile_table_t *profile;
++
++	profile = get_first_dlg_profile();
++	for (; profile; profile = profile->next) {
++		size = get_profile_size(profile, NULL);
++		rpc->add(c, "{", &h);
++		if (rpc->struct_add(h, "Sd",
++				"name", &profile->name,
++				"size", size) < 0) {
++			rpc->fault(c, 500, "Server failure");
++			return;
++		}
++	}
++	return;
++}
++
++/*!
+  * \brief Helper function that outputs the dialogs belonging to a given profile via the RPC interface
+  * \see rpc_profile_print_dlgs
+  * \see rpc_profile_w_value_print_dlgs
+@@ -2847,6 +2874,9 @@ static const char *rpc_dlg_set_state_doc
+ static const char *rpc_profile_get_size_doc[2] = {
+ 	"Returns the number of dialogs belonging to a profile", 0
+ };
++static const char *rpc_profile_get_sizes_doc[2] = {
++	"Returns the number of dialogs belonging to all profiles", 0
++};
+ static const char *rpc_profile_print_dlgs_doc[2] = {
+ 	"Lists all the dialogs belonging to a profile", 0
+ };
+@@ -3052,6 +3082,10 @@ static void rpc_profile_get_size(rpc_t *
+ 	}
+ 	return;
+ }
++static void rpc_profile_get_sizes(rpc_t *rpc, void *c) {
++	internal_rpc_profile_get_sizes(rpc, c);
++	return;
++}
+ static void rpc_profile_print_dlgs(rpc_t *rpc, void *c) {
  	str profile_name = {NULL,0};
  	str value = {NULL,0};
- 
--	if (rpc->scan(c, ".S", &profile_name) < 1) return;
--	if (rpc->scan(c, "*.S", &value) > 0) {
-+	if (rpc->scan(c, ".S", &profile_name) < 1){
-+		internal_rpc_profile_get_size(rpc, c, NULL, NULL);
-+	} else if (rpc->scan(c, "*.S", &value) > 0) {
- 		internal_rpc_profile_get_size(rpc, c, &profile_name, &value);
- 	} else {
- 		internal_rpc_profile_get_size(rpc, c, &profile_name, NULL);
-diff --git a/src/modules/dialog/dlg_profile.c b/src/modules/dialog/dlg_profile.c
-index f9ad20f..0d3e62f 100644
+@@ -3469,6 +3503,7 @@ static rpc_export_t rpc_methods[] = {
+ 	{"dlg.dlg_list_ctx", rpc_print_dlg_ctx, rpc_print_dlg_ctx_doc, 0},
+ 	{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
+ 	{"dlg.profile_get_size", rpc_profile_get_size, rpc_profile_get_size_doc, 0},
++	{"dlg.profile_get_sizes", rpc_profile_get_sizes, rpc_profile_get_sizes_doc, RET_ARRAY},
+ 	{"dlg.profile_list", rpc_profile_print_dlgs, rpc_profile_print_dlgs_doc, RET_ARRAY},
+ 	{"dlg.bridge_dlg", rpc_dlg_bridge, rpc_dlg_bridge_doc, 0},
+ 	{"dlg.terminate_dlg", rpc_dlg_terminate_dlg, rpc_dlg_terminate_dlg_doc, 0},
 --- a/src/modules/dialog/dlg_profile.c
 +++ b/src/modules/dialog/dlg_profile.c
-@@ -126,6 +126,14 @@ int add_profile_definitions( char* profiles, unsigned int has_value)
+@@ -126,6 +126,14 @@ int add_profile_definitions( char* profi
  	return 0;
  }
  
@@ -88,11 +91,9 @@ index f9ad20f..0d3e62f 100644
  
  /*!
   * \brief Search a dialog profile in the global list
-diff --git a/src/modules/dialog/dlg_profile.h b/src/modules/dialog/dlg_profile.h
-index 3dc7be8..7a4f8b0 100644
 --- a/src/modules/dialog/dlg_profile.h
 +++ b/src/modules/dialog/dlg_profile.h
-@@ -108,6 +108,11 @@ int add_profile_definitions( char* profiles, unsigned int has_value);
+@@ -108,6 +108,11 @@ int add_profile_definitions( char* profi
   */
  void destroy_dlg_profiles(void);
  
@@ -104,28 +105,34 @@ index 3dc7be8..7a4f8b0 100644
  
  /*!
   * \brief Search a dialog profile in the global list
-diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 6fcaaf7..aca75f5 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
-@@ -2829,7 +2829,8 @@ dlg_reset_property("timeout-noreset");
- 		<section id="dlg.r.profile_get_size">
- 		<title>dlg.profile_get_size</title>
- 		<para>
--		Returns the number of dialogs belonging to a profile. If the profile
-+		Returns the number of dialogs belonging to a profile. If no profile is
-+		passed, all possible profiles are returned with their size. If the profile
- 		supports values, the check can be reinforced to take into account a
- 		specific value - how many dialogs were inserted into the profile with
- 		a specific value. If no value is passed, only the simply belonging of
-@@ -2839,6 +2840,10 @@ dlg_reset_property("timeout-noreset");
- 		<para>Name: <emphasis>dlg.profile_get_size</emphasis></para>
- 		<para>Parameters:</para>
- 		<itemizedlist>
+@@ -2856,6 +2856,28 @@ dlg_reset_property("timeout-noreset");
+ 		</programlisting>
+ 		</section>
+ 
++		<section id="dlg.r.profile_get_sizes">
++		<title>dlg.profile_get_sizes</title>
++		<para>
++		Returns a list if structs with the profile name and number of dialogs
++		belonging to that profile.
++		</para>
++		<para>Name: <emphasis>dlg.profile_get_sizes</emphasis></para>
++		<para>Parameters:</para>
++		<itemizedlist>
 +			<listitem><para>
 +				<emphasis>NULL</emphasis> - returns a list of the profiles with
 +				their size.
 +			</para></listitem>
- 			<listitem><para>
- 				<emphasis>profile</emphasis> - name of the profile to get the
- 				value for.
++		</itemizedlist>
++		<para>RPC Command Format:</para>
++		<programlisting  format="linespecific">
++...
++&kamcmd; dlg.dlg.profile_get_sizes
++...
++		</programlisting>
++		</section>
++
+ 		<section id="dlg.r.profile_list">
+ 		<title>dlg.profile_list</title>
+ 		<para>
