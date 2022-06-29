@@ -64,6 +64,7 @@ sipwise/pv_headers-rework-pvh_remove_header_param.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/tm-check-again-T-just-in-case-before-UNREF.patch
+sipwise/presence-be-more-resilient-doing-clean-up.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
