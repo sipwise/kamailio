@@ -1,3 +1,19 @@
+ngcp-kamailio (5.6.0-1+0~mr10.5.2.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [1178f9b] TT#94500 upstream fix for TOPOS contact header
+  * [0afc8d3] TT#179351 fix coredump at getaddrinfo
+  * [66ed653] TT#182001 pv_headers: rework pvh_remove_header_param
+  * [f4a05b0] TT#178351 presence: be more resilient doing clean up of presentity
+
+  [ Fabricio Santolin da Silva ]
+  * [4bf74da] TT#181513 dialog: Add RCP command parameter to get all dialog profiles
+
+  [ Guillem Jover ]
+  * [5f0a40c] TT#181513 dialog: Add a new RCP command to get all dialog profiles
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 29 Jun 2022 17:26:38 +0200
+
 ngcp-kamailio (5.6.0-1+0~mr10.5.1.0) unstable; urgency=medium
 
   [ Fabricio Santolin da Silva ]
