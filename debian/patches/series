@@ -56,8 +56,9 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
-### active development
 sipwise/pv_headers-rework-pvh_remove_header_param.patch
+### active development
+sipwise/presence-be-more-resilient-doing-clean-up.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
