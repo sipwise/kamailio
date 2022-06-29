@@ -60,6 +60,7 @@ sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
+sipwise/presence-be-more-resilient-doing-clean-up.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
