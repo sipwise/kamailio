@@ -1,3 +1,14 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.9.2) unstable; urgency=medium
+
+  [ Fabricio Santolin da Silva ]
+  * [d6a9337] TT#159750  pv_headers: fix possible mem. overflow issue and wrong size string
+
+  [ Victor Seva ]
+  * [3005a2c] TT#159750  pv_headers: update patches
+  * [9c6fca5] TT#182001 pv_headers: rework pvh_remove_header_param
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 30 Jun 2022 09:38:07 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.9.1) unstable; urgency=medium
 
   [ Fabricio Santolin da Silva ]
