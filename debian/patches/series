@@ -105,6 +105,7 @@ sipwise/db_redis-clean-previous-connection-before-trying-to-.patch
 sipwise/pv_headers-fix-detection-of-split-marker.patch
 sipwise/pv_headers-fix-build-warning.patch
 sipwise/pv_headers-use-memset.patch
+sipwise/core-str_casesearch.patch
 sipwise/pv_headers-rework-pvh_remove_header_param.patch
 ### active development
 #
