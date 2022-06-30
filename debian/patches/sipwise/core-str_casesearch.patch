@@ -1,0 +1,53 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Thu, 30 Jun 2022 10:51:01 +0200
+Subject: core: str_casesearch
+
+---
+ src/core/ut.c | 20 ++++++++++++++++++++
+ src/core/ut.h |  2 ++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/src/core/ut.c b/src/core/ut.c
+index 90b01d1..1e59e7d 100644
+--- a/src/core/ut.c
++++ b/src/core/ut.c
+@@ -273,6 +273,26 @@ char* get_abs_pathname(str* base, str* file)
+ 	return res;
+ }
+ 
++/**
++ * @brief case insensitive search for occurrence of needle in text
++ * @return pointer to start of needle in text or NULL if the needle
++ *	is not found
++ */
++char *str_casesearch(str *text, str *needle)
++{
++	int i,j;
++	for(i=0;i<=text->len-needle->len;i++) {
++		for(j=0;j<needle->len;j++) {
++			if ( !((text->s[i+j]==needle->s[j]) ||
++					( isalpha((int)text->s[i+j])
++						&& ((text->s[i+j])^(needle->s[j]))==0x20 )) )
++				break;
++		}
++		if (j==needle->len)
++			return text->s+i;
++	}
++	return NULL;
++}
+ 
+ /**
+  * @brief search for occurence of needle in text
+diff --git a/src/core/ut.h b/src/core/ut.h
+index 2259aea..7772879 100644
+--- a/src/core/ut.h
++++ b/src/core/ut.h
+@@ -945,6 +945,8 @@ char* get_abs_pathname(str* base, str* file);
+  */
+ char *str_search(str *text, str *needle);
+ 
++char *str_casesearch(str *text, str *needle);
++
+ /*
+  * ser_memmem() returns the location of the first occurrence of data
+  * pattern b2 of size len2 in memory block b1 of size len1 or
