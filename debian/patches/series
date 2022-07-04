@@ -60,3 +60,23 @@ sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
+### active development
+sipwise/tm-check-again-T-just-in-case-before-UNREF.patch
+#
+### Don't just put stuff in any order
+### use gbp pq import/export tooling to help maintain patches
+###
+## apt install git-buildpackage
+## git checkout -b vseva/xxxx --track origin/master
+### rework on a patch
+### edit debian/patches/series to keep that patch as last entry
+### for instance sipwise/add_pv_headers_module.patch
+## gbp pq import --force
+### edit files and ammend that commit
+## gbp pq export
+## git add debian/patches/sipwise/add_pv_headers_module.patch
+### don't commit any other change to debian/
+## git checkout -- debian/
+### git commit + git-review as usual
+###
+
