@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.1-1+0~mr9.5.5.3) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [77e8cb1] TT#183850 tm: try not to crash on unref
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 06 Jul 2022 11:07:31 +0200
+
 ngcp-kamailio (5.5.1-1+0~mr9.5.5.2) unstable; urgency=medium
 
   [ Fabricio Santolin da Silva ]
