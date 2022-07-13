@@ -41,6 +41,7 @@ upstream/dialog-fix-ki_dlg_get_var-introduced-previously.patch
 upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
 upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
 upstream/topos-skip-adding-contact-header-for-BYE-CANCEL-PRAC.patch
+upstream/presence-No-autocommit-rollback-if-no-active-watcher.patch
 ### relevant for upstream
 sipwise/core-fix-freeaddrinfo-coredump.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
