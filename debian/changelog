@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.0-1+0~mr10.5.1.3) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [e4e45a8] TT#184400 No autocommit+rollback if no active watchers kamailio patch
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 14 Jul 2022 11:22:06 +0200
+
 ngcp-kamailio (5.6.0-1+0~mr10.5.1.2) unstable; urgency=medium
 
   [ Victor Seva ]
