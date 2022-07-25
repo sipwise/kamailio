@@ -1,3 +1,10 @@
+ngcp-kamailio (5.5.1-1+0~mr9.5.5.4) unstable; urgency=medium
+
+  [ dzenichev ]
+  * [c417f7b] TT#185450 Topos: backport from upstream a list of important commits
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 25 Jul 2022 10:52:11 +0200
+
 ngcp-kamailio (5.5.1-1+0~mr9.5.5.3) unstable; urgency=medium
 
   [ Victor Seva ]
