@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.0-1+0~mr10.5.1.5) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [d58807d] TT#178351 presence: be more resilient doing clean up of presentity
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 03 Aug 2022 15:26:25 +0200
+
 ngcp-kamailio (5.6.0-1+0~mr10.5.1.4) unstable; urgency=medium
 
   [ dzenichev ]
