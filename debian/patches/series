@@ -73,6 +73,8 @@ sipwise/cfgt-improve-detection-of-dynamic-format.patch
 sipwise/cfgt-fix-memory-leaks.patch
 sipwise/cfgt-skip_unknown.patch
 sipwise/tm-check-again-T-just-in-case-before-UNREF.patch
+upstream/pv_headers-use-tm.t_find-API.patch
+upstream/tm-new-inter-module-API-function-t_find.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
