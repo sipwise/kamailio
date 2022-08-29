@@ -70,6 +70,7 @@ sipwise/tm-check-again-T-just-in-case-before-UNREF.patch
 sipwise/presence-be-more-resilient-doing-clean-up.patch
 upstream/pv_headers-use-tm.t_find-API.patch
 upstream/tm-new-inter-module-API-function-t_find.patch
+sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
