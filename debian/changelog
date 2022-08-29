@@ -1,3 +1,11 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.9.5) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [db7fb75] TT#187250 pv_headers: use tm.t_find API
+  * [32cb278] TT#188700 pv_headers: rework pvh_remove_header_param, take two
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 29 Aug 2022 16:39:16 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.9.4) unstable; urgency=medium
 
   [ Victor Seva ]
