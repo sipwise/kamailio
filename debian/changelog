@@ -1,3 +1,10 @@
+ngcp-kamailio (5.3.8-1+0~mr8.5.9.6) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [651b17a] TT#187250 pv_header: fixes from upstream related to tm manage
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 30 Aug 2022 12:18:54 +0200
+
 ngcp-kamailio (5.3.8-1+0~mr8.5.9.5) unstable; urgency=medium
 
   [ Victor Seva ]
