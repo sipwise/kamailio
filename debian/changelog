@@ -1,3 +1,20 @@
+ngcp-kamailio (5.6.0-1+0~mr10.5.2.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [870b819] TT#183850 tm: try not to crash on unref
+  * [a66858a] TT#178351 presence: be more resilient doing clean up of presentity
+  * [fe4ca24] TT#187250 pv_headers: use tm.t_find API
+  * [afa90dc] TT#188700 pv_headers: rework pvh_remove_header_param, take two
+  * [b224ff6] TT#187250 pv_header: fixes from upstream related to tm manage
+
+  [ Alessio Garzi ]
+  * [4530159] TT#184400 No autocommit+rollback if no active watchers kamailio patch
+
+  [ dzenichev ]
+  * [829ad5d] TT#185450 topos_redis: use tag based on direction for early dialog
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Sep 2022 14:35:33 +0200
+
 ngcp-kamailio (5.6.0-1+0~mr10.5.2.0) unstable; urgency=medium
 
   [ Victor Seva ]
