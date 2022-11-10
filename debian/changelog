@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.0-1+0~mr11.1.1.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [da44046] MT#55631 dialog: support dlg_set_var() with empty totag
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 10 Nov 2022 10:45:35 +0100
+
 ngcp-kamailio (5.6.0-1+0~mr11.1.1.1) unstable; urgency=medium
 
   * New release.
