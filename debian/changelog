@@ -1,3 +1,19 @@
+ngcp-kamailio (5.3.9-1+0~mr8.5.10.1) unstable; urgency=medium
+
+  [ Fabricio Santolin da Silva ]
+  * [4279d3e] TT#159750  pv_headers: fix possible mem. overflow issue and wrong size string
+
+  [ Victor Seva ]
+  * [cb06555] TT#159750  pv_headers: update patches
+  * [22068b4] TT#182001 pv_headers: rework pvh_remove_header_param
+  * [d120702] TT#183100 fix pv_headers build
+  * [9070528] TT#183850 tm: try not to crash on unref
+  * [9f81434] TT#187250 pv_headers: use tm.t_find API
+  * [af81f9f] TT#188700 pv_headers: rework pvh_remove_header_param, take two
+  * [9e9318b] TT#187250 pv_header: fixes from upstream related to tm manage
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 29 Nov 2022 16:39:18 +0100
+
 ngcp-kamailio (5.3.9-1+0~mr8.5.10.0) unstable; urgency=medium
 
   * TT#180100 New upstream version 5.3.9
