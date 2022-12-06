@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.0-1+0~mr10.5.2.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [a2de032] MT#55968 pv_headers: fix t_resume scenario
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 06 Dec 2022 12:44:43 +0100
+
 ngcp-kamailio (5.6.0-1+0~mr10.5.2.1) unstable; urgency=medium
 
   [ Victor Seva ]
