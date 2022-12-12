@@ -166,6 +166,10 @@ static int get_redirect_fixup(void** param, int param_no)
 		*param=(void*)(long)( (((unsigned short)maxt)<<8) | maxb);
 	} else if (param_no==2) {
 		/* acc function loaded? */
+		if (uacred_acc_fct_s.s==0 || uacred_acc_fct_s.s[0]=='\0') {
+			LM_ERR("acc support enabled, but no acc function defined\n");
+			return E_UNSPEC;
+		}
 		if (_uacred_accb.acc_request==NULL) {
 			/* bind the ACC API */
 			if(acc_load_api(&_uacred_accb) < 0) {
@@ -249,10 +253,12 @@ static int redirect_init(void)
 		goto error;
 	}
 
-	/* bind the ACC API */
-	if(acc_load_api(&_uacred_accb) < 0) {
-		LM_ERR("cannot bind to ACC API\n");
-		return -1;
+	if(uacred_acc_fct_s.s != 0 && uacred_acc_fct_s.s[0] != '\0') {
+		/* bind the ACC API */
+		if(acc_load_api(&_uacred_accb) < 0) {
+			LM_ERR("cannot bind to ACC API\n");
+			return -1;
+		}
 	}
 
 	/* init filter */
@@ -338,17 +344,19 @@ static int w_get_redirect2(struct sip_msg* msg, char *max_c, char *reason)
 {
 	int n;
 	unsigned short max;
-	str sreason;
+	str sreason = {0};
 
-	if(fixup_get_svalue(msg, (gparam_t*)reason, &sreason)<0) {
-		LM_ERR("failed to get reason parameter\n");
-		return -1;
+	if(reason!=NULL) {
+		if(fixup_get_svalue(msg, (gparam_t*)reason, &sreason)<0) {
+			LM_ERR("failed to get reason parameter\n");
+			return -1;
+		}
 	}
 
 	msg_tracer( msg, 0);
 	/* get the contacts */
 	max = (unsigned short)(long)max_c;
-	n = get_redirect(msg , (max>>8)&0xff, max&0xff, &sreason, bflags);
+	n = get_redirect(msg , (max>>8)&0xff, max&0xff, (reason)?&sreason:NULL, bflags);
 	reset_filters();
 	/* reset the tracer */
 	msg_tracer( msg, 1);
