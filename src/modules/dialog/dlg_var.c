@@ -279,12 +279,15 @@ void print_lists(struct dlg_cell *dlg) {
 	}
 }
 
-str * get_dlg_variable(struct dlg_cell *dlg, str *key)
+/**
+ * return reference to the dlg variable value
+ * - unsafe - use only when it is sure that the value is not updated
+ */
+str* get_dlg_varref(struct dlg_cell *dlg, str *key)
 {
     str* var = NULL;
 
-    if( !dlg || !key || key->len > strlen(key->s))
-    {
+    if( !dlg || !key || key->len<=0) {
         LM_ERR("BUG - bad parameters\n");
 
         return NULL;
@@ -297,10 +300,139 @@ str * get_dlg_variable(struct dlg_cell *dlg, str *key)
     return var;
 }
 
+/**
+ * set *val to a pv buffer where the dlg value is cloned
+ * - safe to use immediately, before another dlg var get or other operation
+ *   done by the same process exceeds the number of pv buffer slots
+ */
+int get_dlg_varval(struct dlg_cell *dlg, str *key, str *val)
+{
+	str *var = NULL;
+
+	val->s = NULL;
+	val->len = 0;
+
+	if( !dlg || !key || key->len<=0) {
+		LM_ERR("BUG - bad parameters\n");
+		return -1;
+	}
+
+	dlg_lock(d_table, &(d_table->entries[dlg->h_entry]));
+	var = get_dlg_variable_unsafe(dlg, key);
+	if(var) {
+		val->len = pv_get_buffer_size();
+		if(val->len < var->len+1) {
+			LM_ERR("pv buffer too small (%d) - needed %d\n",
+					val->len, var->len+1);
+			val->s = NULL;
+			val->len = 0;
+			var = NULL;
+		} else {
+			val->s = pv_get_buffer();
+			memcpy(val->s, var->s, var->len);
+			val->len = var->len;
+			val->s[val->len] = '\0';
+		}
+	}
+	dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
+
+	if(var) {
+		return 0;
+	}
+	return -2;
+}
+
+/**
+ * set *val to a pkg-allocated buffer where the dlg value is cloned
+ * - val->s has to be pkg-freed after use
+ */
+int get_dlg_vardup(struct dlg_cell *dlg, str *key, str *val)
+{
+	str *var = NULL;
+
+	val->s = NULL;
+	val->len = 0;
+
+	if( !dlg || !key || key->len<=0) {
+		LM_ERR("BUG - bad parameters\n");
+		return -1;
+	}
+
+	dlg_lock(d_table, &(d_table->entries[dlg->h_entry]));
+	var = get_dlg_variable_unsafe(dlg, key);
+	if(var && var->s) {
+		val->s = (char*)pkg_malloc(var->len + 1);
+		if(val->s!=NULL) {
+			memcpy(val->s, var->s, var->len);
+			val->len = var->len;
+			val->s[val->len] = '\0';
+		}
+	}
+	dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
+
+	if(val->s) {
+		return 0;
+	}
+	return -2;
+}
+
+/**
+ * return the status if the dlg variable value is set or not
+ * - 1 - variable is set
+ * - 0 - variable is not set
+ */
+int get_dlg_varstatus(struct dlg_cell *dlg, str *key)
+{
+    str* var = NULL;
+    int ret = 0;
+
+    if( !dlg || !key || key->len<=0) {
+        LM_ERR("BUG - bad parameters\n");
+        return 0;
+    }
+
+    dlg_lock(d_table, &(d_table->entries[dlg->h_entry]));
+    var = get_dlg_variable_unsafe(dlg, key);
+	if(var && var->s) {
+		ret = 1;
+	}
+    dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
+
+    return ret;
+}
+
+int get_dlg_variable_uintval(struct dlg_cell *dlg, str *key, unsigned int *uval)
+{
+	str* var = NULL;
+
+	if( !dlg || !key || key->len <=0 || !uval) {
+		LM_ERR("BUG - bad parameters\n");
+		return -1;
+	}
+
+	dlg_lock(d_table, &(d_table->entries[dlg->h_entry]));
+	var = get_dlg_variable_unsafe(dlg, key);
+	if(var==NULL || var->s==NULL || var->len<=0) {
+		LM_DBG("no variable set yet\n");
+		goto error;
+	}
+	if(str2int(var, uval)<0) {
+		LM_ERR("invalid unsingned int value: %.*s\n",
+				var->len, var->s);
+		goto error;
+	}
+	dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
+	return 0;
+
+error:
+	dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
+	return -1;
+}
+
 int set_dlg_variable(struct dlg_cell *dlg, str *key, str *val)
 {
     int ret = -1;
-    if( !dlg || !key || key->len > strlen(key->s) || (val && val->len > strlen(val->s)))
+    if( !dlg || !key || !key->s || key->len<=0 )
     {
         LM_ERR("BUG - bad parameters\n");
         return -1;
@@ -324,6 +456,18 @@ int set_dlg_variable(struct dlg_cell *dlg, str *key, str *val)
 done:
     dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
     return ret;
+}
+
+int set_dlg_variable_uintval(struct dlg_cell *dlg, str *key, unsigned int uval)
+{
+	str sval = STR_NULL;
+
+	sval.s = int2str(uval, &sval.len);
+	if(sval.s==NULL) {
+		return -1;
+	}
+
+	return set_dlg_variable(dlg, key, &sval);
 }
 
 int pv_get_dlg_variable(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)

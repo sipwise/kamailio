@@ -679,6 +679,7 @@ void ws_timer(unsigned int ticks, void *param)
 	ws_connection_list_t rmlist;
 	ws_connection_t *wsc;
 	ws_connection_t *next;
+	struct tcp_connection *con = NULL;
 	ticks_t nticks;
 	int h;
 
@@ -695,6 +696,15 @@ void ws_timer(unsigned int ticks, void *param)
 				wsconn_detach_connection(wsc);
 				wsc->id_next = rmlist.head;
 				rmlist.head = wsc;
+			} else if(wsc->state != WS_S_REMOVING) {
+				con = tcpconn_get(wsc->id, 0, 0, 0, 0);
+				if(con == NULL) {
+					LM_DBG("ws structure without active tcp connection\n");
+					wsc->state = WS_S_REMOVING;
+					wsc->rmticks = get_ticks();
+				} else {
+					tcpconn_put(con);
+				}
 			}
 			wsc = next;
 		}
@@ -756,8 +766,10 @@ static int ws_rpc_add_node(
 
 		tcpconn_put(con);
 		return 1;
-	} else
+	} else {
+		LM_DBG("ws structure [%p] without an active tcp connection\n", wsc);
 		return 0;
+	}
 }
 
 void ws_rpc_dump(rpc_t *rpc, void *ctx)
