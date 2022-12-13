@@ -8,10 +8,10 @@ Subject: [PATCH] dialog: reworked kemi export for dlg_get_var()
  1 file changed, 27 insertions(+), 8 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index b169dc2..5347c0f 100644
+index fec9f5e..623db59 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1511,7 +1511,7 @@ static int fixup_dlg_bridge(void** param, int param_no)
+@@ -1514,7 +1514,7 @@ static int fixup_dlg_bridge(void** param, int param_no)
  	return 0;
  }
  
@@ -20,7 +20,7 @@ index b169dc2..5347c0f 100644
  {
  	dlg_cell_t *dlg = NULL;
  	unsigned int dir = 0;
-@@ -1538,6 +1538,30 @@ static str *ki_dlg_get_var(sip_msg_t *msg, str *sc, str *sf, str *st, str *key)
+@@ -1541,6 +1541,30 @@ static str *ki_dlg_get_var(sip_msg_t *msg, str *sc, str *sf, str *st, str *key)
  	return val;
  }
  
@@ -51,7 +51,7 @@ index b169dc2..5347c0f 100644
  static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char *key, char *pv)
  {
  	str sc = STR_NULL;
-@@ -1582,7 +1606,7 @@ static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
+@@ -1585,7 +1609,7 @@ static int w_dlg_get_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
  		return -1;
  	}
  	dst_pv = (pv_spec_t *)pv;
@@ -60,7 +60,7 @@ index b169dc2..5347c0f 100644
  	if(val) {
  		memset(&dst_val, 0, sizeof(pv_value_t));
  		dst_val.flags |= PV_VAL_STR;
-@@ -2155,11 +2179,6 @@ static int ki_dlg_var_sets(sip_msg_t *msg, str *name, str *val)
+@@ -2158,11 +2182,6 @@ static int ki_dlg_var_sets(sip_msg_t *msg, str *name, str *val)
  	return (ret==0)?1:ret;
  }
  
@@ -72,7 +72,7 @@ index b169dc2..5347c0f 100644
  /**
   *
   */
-@@ -2289,7 +2308,7 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2292,7 +2311,7 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},
  	{ str_init("dialog"), str_init("dlg_get_var"),

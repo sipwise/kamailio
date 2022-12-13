@@ -3,18 +3,21 @@ Date: Mon, 27 Jun 2022 21:04:29 +0200
 Subject: dialog: support profile_get_size for all profiles
 
 ---
- src/modules/dialog/dialog.c             |   35 ++++++++++++++++++++++++++++++++
- src/modules/dialog/dlg_profile.c        |    8 +++++++
- src/modules/dialog/dlg_profile.h        |    5 ++++
- src/modules/dialog/doc/dialog_admin.xml |   22 ++++++++++++++++++++
+ src/modules/dialog/dialog.c             | 35 +++++++++++++++++++++++++++++++++
+ src/modules/dialog/dlg_profile.c        |  8 ++++++++
+ src/modules/dialog/dlg_profile.h        |  5 +++++
+ src/modules/dialog/doc/dialog_admin.xml | 22 +++++++++++++++++++++
  4 files changed, 70 insertions(+)
 
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index 6545444..e9ed5d9 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -2756,6 +2756,33 @@ static void internal_rpc_profile_get_siz
+@@ -2758,6 +2758,33 @@ static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name
+ 	return;
  }
  
- /*!
++/*!
 + * \brief Helper function that outputs the sizes of all profiles via the RPC interface
 + * \see rpc_profile_get_sizes
 + * \see rpc_profile_w_value_get_sizes
@@ -41,11 +44,10 @@ Subject: dialog: support profile_get_size for all profiles
 +	return;
 +}
 +
-+/*!
+ /*!
   * \brief Helper function that outputs the dialogs belonging to a given profile via the RPC interface
   * \see rpc_profile_print_dlgs
-  * \see rpc_profile_w_value_print_dlgs
-@@ -2847,6 +2874,9 @@ static const char *rpc_dlg_set_state_doc
+@@ -2850,6 +2877,9 @@ static const char *rpc_dlg_set_state_doc[3] = {
  static const char *rpc_profile_get_size_doc[2] = {
  	"Returns the number of dialogs belonging to a profile", 0
  };
@@ -55,7 +57,7 @@ Subject: dialog: support profile_get_size for all profiles
  static const char *rpc_profile_print_dlgs_doc[2] = {
  	"Lists all the dialogs belonging to a profile", 0
  };
-@@ -3052,6 +3082,10 @@ static void rpc_profile_get_size(rpc_t *
+@@ -3055,6 +3085,10 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c) {
  	}
  	return;
  }
@@ -66,7 +68,7 @@ Subject: dialog: support profile_get_size for all profiles
  static void rpc_profile_print_dlgs(rpc_t *rpc, void *c) {
  	str profile_name = {NULL,0};
  	str value = {NULL,0};
-@@ -3469,6 +3503,7 @@ static rpc_export_t rpc_methods[] = {
+@@ -3472,6 +3506,7 @@ static rpc_export_t rpc_methods[] = {
  	{"dlg.dlg_list_ctx", rpc_print_dlg_ctx, rpc_print_dlg_ctx_doc, 0},
  	{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
  	{"dlg.profile_get_size", rpc_profile_get_size, rpc_profile_get_size_doc, 0},
@@ -74,9 +76,11 @@ Subject: dialog: support profile_get_size for all profiles
  	{"dlg.profile_list", rpc_profile_print_dlgs, rpc_profile_print_dlgs_doc, RET_ARRAY},
  	{"dlg.bridge_dlg", rpc_dlg_bridge, rpc_dlg_bridge_doc, 0},
  	{"dlg.terminate_dlg", rpc_dlg_terminate_dlg, rpc_dlg_terminate_dlg_doc, 0},
+diff --git a/src/modules/dialog/dlg_profile.c b/src/modules/dialog/dlg_profile.c
+index f9ad20f..0d3e62f 100644
 --- a/src/modules/dialog/dlg_profile.c
 +++ b/src/modules/dialog/dlg_profile.c
-@@ -126,6 +126,14 @@ int add_profile_definitions( char* profi
+@@ -126,6 +126,14 @@ int add_profile_definitions( char* profiles, unsigned int has_value)
  	return 0;
  }
  
@@ -91,9 +95,11 @@ Subject: dialog: support profile_get_size for all profiles
  
  /*!
   * \brief Search a dialog profile in the global list
+diff --git a/src/modules/dialog/dlg_profile.h b/src/modules/dialog/dlg_profile.h
+index 3dc7be8..7a4f8b0 100644
 --- a/src/modules/dialog/dlg_profile.h
 +++ b/src/modules/dialog/dlg_profile.h
-@@ -108,6 +108,11 @@ int add_profile_definitions( char* profi
+@@ -108,6 +108,11 @@ int add_profile_definitions( char* profiles, unsigned int has_value);
   */
  void destroy_dlg_profiles(void);
  
@@ -105,6 +111,8 @@ Subject: dialog: support profile_get_size for all profiles
  
  /*!
   * \brief Search a dialog profile in the global list
+diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
+index 6fcaaf7..906151d 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
 @@ -2856,6 +2856,28 @@ dlg_reset_property("timeout-noreset");
