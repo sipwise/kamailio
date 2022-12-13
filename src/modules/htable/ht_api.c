@@ -395,7 +395,6 @@ int ht_init_tables(void)
 		if(ht->entries==NULL)
 		{
 			LM_ERR("no more shared memory for [%.*s]\n", ht->name.len, ht->name.s);
-			shm_free(ht);
 			return -1;
 		}
 		memset(ht->entries, 0, ht->htsize*sizeof(ht_entry_t));
@@ -413,7 +412,7 @@ int ht_init_tables(void)
 					i--;
 				}
 				shm_free(ht->entries);
-				shm_free(ht);
+				ht->entries = NULL;
 				return -1;
 
 			}
@@ -1069,7 +1068,7 @@ int ht_db_sync_tables(void)
 	ht = _ht_root;
 	while(ht)
 	{
-		if(ht->dbtable.len>0 && ht->dbmode!=0 && ht->ncols==0)
+		if(ht->dbtable.len>0 && ht->dbmode!=0 && ht->dbload!=0 && ht->ncols==0)
 		{
 			LM_DBG("sync db table [%.*s] from ht [%.*s]\n",
 					ht->dbtable.len, ht->dbtable.s,

@@ -37,6 +37,7 @@
 #include "../../core/parser/parse_from.h"
 #include "../../core/parser/parse_to.h"
 #include "../../core/parser/parse_rr.h"
+#include "../../core/rand/fastrand.h"
 
 #include "ul_keepalive.h"
 
@@ -61,11 +62,11 @@ Content-Length: 0\r\n\r\n"
 #define ULKA_CALLID_PREFIX_LEN (sizeof(ULKA_CALLID_PREFIX) - 1)
 
 #define ULKA_MSG "%.*s %.*s SIP/2.0\r\n" \
-  "Via: SIP/2.0/%.*s %.*s:%.*s;branch=z9hG4bKx.%u.%u.0\r\n" \
+  "Via: SIP/2.0/%.*s %s%.*s%s:%.*s;branch=z9hG4bKx.%u.%u.0\r\n" \
   "%s%.*s%.*s" \
   "From: <%.*s>;tag=%.*s-%x-%lx-%lx-%x.%x\r\n" \
   "To: <sip:%.*s%s%.*s>\r\n" \
-  "Call-ID: " ULKA_CALLID_PREFIX "%u.%u\r\n" \
+  "Call-ID: " ULKA_CALLID_PREFIX "%x-%x-%x.%x\r\n" \
   "CSeq: 80 %.*s\r\n" \
   "Content-Length: 0\r\n\r\n"
 
@@ -101,6 +102,7 @@ int ul_ka_urecord(urecord_t *ur)
 	socket_info_t *ssock;
 	dest_info_t idst;
 	unsigned int bcnt = 0;
+	unsigned int via_ipv6 = 0;
 	int aortype = 0;
 	int i;
 	struct timeval tv;
@@ -195,8 +197,14 @@ int ul_ka_urecord(urecord_t *ur)
 		idst.send_sock = ssock;
 
 		if(ssock->useinfo.name.len > 0) {
+			if (ssock->useinfo.address.af == AF_INET6) {
+				via_ipv6 = 1;
+			}
 			vaddr = ssock->useinfo.name;
 		} else {
+			if (ssock->address.af == AF_INET6) {
+				via_ipv6 = 1;
+			}
 			vaddr = ssock->address_str;
 		}
 		if(ssock->useinfo.port_no > 0) {
@@ -212,7 +220,9 @@ int ul_ka_urecord(urecord_t *ur)
 				ul_ka_method.len, ul_ka_method.s,
 				uc->c.len, uc->c.s,
 				sproto.len, sproto.s,
+				(via_ipv6==1)?"[":"",
 				vaddr.len, vaddr.s,
+				(via_ipv6==1)?"]":"",
 				vport.len, vport.s,
 				_ul_ka_counter, bcnt,
 				(uc->path.len>0)?"Route: ":"",
@@ -227,6 +237,7 @@ int ul_ka_urecord(urecord_t *ur)
 				ur->aor.len, ur->aor.s,
 				(aortype==1)?"":"@",
 				(aortype==1)?0:ul_ka_domain.len, (aortype==1)?"":ul_ka_domain.s,
+				fastrand(), my_pid(),
 				_ul_ka_counter, bcnt,
 				ul_ka_method.len, ul_ka_method.s);
 		if(kabuf_len<=0 || kabuf_len>=ULKA_BUF_SIZE) {
