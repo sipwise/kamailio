@@ -8,7 +8,7 @@ Subject: [PATCH] dialog: dlg_get_var(ci, ft, tt, key, dst_var)
  2 files changed, 160 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 4d30b27..058d42a 100644
+index 9f9f647..25584b5 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -194,7 +194,9 @@ static int w_is_known_dlg(struct sip_msg *);
@@ -31,7 +31,7 @@ index 4d30b27..058d42a 100644
  
  	{"load_dlg",  (cmd_function)load_dlg,   0, 0, 0, 0},
  	{0,0,0,0,0,0}
-@@ -1502,6 +1506,108 @@ static int fixup_dlg_bridge(void** param, int param_no)
+@@ -1505,6 +1509,108 @@ static int fixup_dlg_bridge(void** param, int param_no)
  	return 0;
  }
  
@@ -140,7 +140,7 @@ index 4d30b27..058d42a 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2087,6 +2193,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2090,6 +2196,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},

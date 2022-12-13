@@ -1,4 +1,3 @@
-From 72234f9efbb5b299823b33dc4eda84a43d5f6384 Mon Sep 17 00:00:00 2001
 From: Daniel-Constantin Mierla <miconda@gmail.com>
 Date: Tue, 30 Aug 2022 10:58:39 +0200
 Subject: [PATCH] pv_headers: use t_unset() based on vref instead of resetting
@@ -9,7 +8,7 @@ Subject: [PATCH] pv_headers: use t_unset() based on vref instead of resetting
  1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index 7da426c184..b900ae5be6 100644
+index 7da426c..b900ae5 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -555,12 +555,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
@@ -29,6 +28,3 @@ index 7da426c184..b900ae5be6 100644
  
  	return 1;
  }
--- 
-2.30.2
-
