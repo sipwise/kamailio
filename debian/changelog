@@ -1,9 +1,9 @@
-ngcp-kamailio (5.5.4-1+0~mr9.5.7.0) unstable; urgency=medium
-
-  [ Fabricio Santolin da Silva ]
-  * [8f7dcf9] TT#159750  pv_headers: fix possible mem. overflow issue and wrong size string
+ngcp-kamailio (5.5.5-1+0~mr9.5.7.0) unstable; urgency=medium
 
   [ Victor Seva ]
+  * MT#55968 pv_headers: fix t_resume scenario
+  * New upstream version 5.5.5
+  * MT#56144 refresh patches and remove already applied upstream
   * [e989934] TT#159750  pv_headers: update patches
   * [8f25c9d] TT#182001 pv_headers: rework pvh_remove_header_param
   * [537dc74] TT#183850 tm: try not to crash on unref
@@ -12,10 +12,13 @@ ngcp-kamailio (5.5.4-1+0~mr9.5.7.0) unstable; urgency=medium
   * [eedec05] TT#188700 pv_headers: rework pvh_remove_header_param, take two
   * [be16cce] TT#187250 pv_header: fixes from upstream related to tm manage
 
+  [ Fabricio Santolin da Silva ]
+  * [8f7dcf9] TT#159750  pv_headers: fix possible mem. overflow issue and wrong size string
+
   [ dzenichev ]
   * [069d5de] TT#185450 Topos: backport from upstream a list of important commits
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 07 Nov 2022 14:59:10 +0100
+ -- Victor Seva <vseva@debian.org>  Tue, 13 Dec 2022 16:24:40 +0100
 
 ngcp-kamailio (5.5.4-1+0~mr9.5.6.0) unstable; urgency=medium
 
