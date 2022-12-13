@@ -1,8 +1,12 @@
-ngcp-kamailio (5.6.0-1+0~mr11.1.2.0) unstable; urgency=medium
+ngcp-kamailio (5.6.2-1+0~mr11.1.2.0) unstable; urgency=medium
 
-  * New release.
+  * MT#55631 dialog: support dlg_set_var() with empty totag
+  * MT#55968 pv_headers: fix t_resume scenario
+  * New upstream version 5.6.2
+  * MT#56146 refresh patches and remove already applied upstream
+  * MT#56147 fix undefined symbol: get_dlg_variable
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 21 Oct 2022 14:37:00 +0200
+ -- Victor Seva <vseva@debian.org>  Tue, 13 Dec 2022 15:20:10 +0100
 
 ngcp-kamailio (5.6.0-1+0~mr11.1.1.0) unstable; urgency=medium
 
