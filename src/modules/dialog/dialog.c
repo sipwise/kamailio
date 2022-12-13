@@ -446,7 +446,10 @@ int load_dlg( struct dlg_binds *dlgb )
 	dlgb->register_dlgcb = register_dlgcb;
 	dlgb->terminate_dlg = dlg_bye_all;
 	dlgb->set_dlg_var = set_dlg_variable;
-	dlgb->get_dlg_var = get_dlg_variable;
+	dlgb->get_dlg_varref = get_dlg_varref;
+	dlgb->get_dlg_varval = get_dlg_varval;
+	dlgb->get_dlg_vardup = get_dlg_vardup;
+	dlgb->get_dlg_varstatus = get_dlg_varstatus;
 	dlgb->get_dlg = dlg_get_msg_dialog;
 	dlgb->release_dlg = dlg_release;
 	return 1;
@@ -792,7 +795,7 @@ static int child_init(int rank)
 
 	/* in DB_MODE_SHUTDOWN only PROC_MAIN will do a DB dump at the end, so
 	 * for the rest of the processes will be the same as DB_MODE_NONE */
-	if (dlg_db_mode==DB_MODE_SHUTDOWN && rank!=PROC_MAIN)
+	if (dlg_db_mode==DB_MODE_SHUTDOWN && rank!=PROC_POSTCHILDINIT)
 		dlg_db_mode = DB_MODE_NONE;
 	/* in DB_MODE_REALTIME and DB_MODE_DELAYED the PROC_MAIN have no DB handle */
 	if ( (dlg_db_mode==DB_MODE_REALTIME || dlg_db_mode==DB_MODE_DELAYED) &&
@@ -1974,7 +1977,7 @@ static sr_kemi_xval_t* ki_dlg_var_get_mode(sip_msg_t *msg, str *name, int rmode)
 		sr_kemi_xval_null(&_sr_kemi_dialog_xval, rmode);
 		return &_sr_kemi_dialog_xval;
 	}
-	pval = get_dlg_variable(dlg, name);
+	pval = get_dlg_varref(dlg, name);
 	if(pval==NULL || pval->s==NULL) {
 		sr_kemi_xval_null(&_sr_kemi_dialog_xval, rmode);
 		goto done;
@@ -2029,14 +2032,14 @@ static int ki_dlg_var_rm(sip_msg_t *msg, str *name)
 static int ki_dlg_var_is_null(sip_msg_t *msg, str *name)
 {
 	dlg_cell_t *dlg;
-	str *pval;
+	int ret;
 
 	dlg = dlg_get_msg_dialog(msg);
 	if(dlg==NULL) {
 		return 1;
 	}
-	pval = get_dlg_variable(dlg, name);
-	if(pval==NULL || pval->s==NULL) {
+	ret = get_dlg_varstatus(dlg, name);
+	if(ret==1) {
 		return 1;
 	}
 	return -1;
