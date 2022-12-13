@@ -10,7 +10,7 @@ cleanup old data of trusted hash_table by timer function.
  3 files changed, 23 insertions(+)
 
 diff --git a/src/modules/permissions/permissions.c b/src/modules/permissions/permissions.c
-index 12ab2d8..d565520 100644
+index 231117c..6f1b36c 100644
 --- a/src/modules/permissions/permissions.c
 +++ b/src/modules/permissions/permissions.c
 @@ -61,6 +61,7 @@ static char* perm_deny_suffix = ".deny";

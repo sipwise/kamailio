@@ -1,4 +1,3 @@
-From a9cf4577c25d7933531b8969a1941bac4faf8d68 Mon Sep 17 00:00:00 2001
 From: Daniel-Constantin Mierla <miconda@gmail.com>
 Date: Thu, 25 Aug 2022 14:51:23 +0200
 Subject: [PATCH] tm: new inter-module API function t_find(...)
@@ -13,7 +12,7 @@ Subject: [PATCH] tm: new inter-module API function t_find(...)
  4 files changed, 27 insertions(+)
 
 diff --git a/src/modules/tm/t_lookup.c b/src/modules/tm/t_lookup.c
-index f041116bb8..ad41f0de93 100644
+index 4ccdee7..9b21e98 100644
 --- a/src/modules/tm/t_lookup.c
 +++ b/src/modules/tm/t_lookup.c
 @@ -145,6 +145,28 @@ int get_t_branch()
@@ -46,7 +45,7 @@ index f041116bb8..ad41f0de93 100644
  {
  	if (parse_headers(msg, HDR_FROM_F | HDR_CSEQ_F | HDR_TO_F, 0)==-1) {
 diff --git a/src/modules/tm/t_lookup.h b/src/modules/tm/t_lookup.h
-index 1f6596a90d..de65be8365 100644
+index 1f6596a..de65be8 100644
 --- a/src/modules/tm/t_lookup.h
 +++ b/src/modules/tm/t_lookup.h
 @@ -68,6 +68,9 @@ int t_check_msg(struct sip_msg* , int *branch );
@@ -60,7 +59,7 @@ index 1f6596a90d..de65be8365 100644
  int get_t_branch(void);
  
 diff --git a/src/modules/tm/tm_load.c b/src/modules/tm/tm_load.c
-index 8635b90eae..c9f39b576e 100644
+index 0afa4d3..0687703 100644
 --- a/src/modules/tm/tm_load.c
 +++ b/src/modules/tm/tm_load.c
 @@ -92,6 +92,7 @@ int load_tm( struct tm_binds *tmb)
@@ -72,7 +71,7 @@ index 8635b90eae..c9f39b576e 100644
  	tmb->t_sett = set_t;
  	tmb->calculate_hooks = w_calculate_hooks;
 diff --git a/src/modules/tm/tm_load.h b/src/modules/tm/tm_load.h
-index 4695a8f7e1..1f97061d1e 100644
+index a84dc75..d1d44f7 100644
 --- a/src/modules/tm/tm_load.h
 +++ b/src/modules/tm/tm_load.h
 @@ -71,6 +71,7 @@ struct tm_binds {
@@ -83,6 +82,3 @@ index 4695a8f7e1..1f97061d1e 100644
  	tgett_branch_f     t_gett_branch;
  	tsett_f            t_sett;
  	calculate_hooks_f  calculate_hooks;
--- 
-2.30.2
-

@@ -7,7 +7,7 @@ Subject: db_redis_sscan
  1 file changed, 65 insertions(+), 21 deletions(-)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index c82f82b..dd11ad5 100644
+index 5b1d6b1..68e3456 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -591,7 +591,7 @@ err:

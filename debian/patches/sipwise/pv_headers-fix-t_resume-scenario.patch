@@ -7,7 +7,7 @@ Subject: pv_headers: fix t_resume scenario
  1 file changed, 49 insertions(+)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index fd9a619..5afe2dc 100644
+index 57be587..8c7539d 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -65,6 +65,7 @@ static void mod_destroy(void);

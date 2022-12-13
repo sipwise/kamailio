@@ -12,7 +12,7 @@ Subject: pv_headers: rework pvh_remove_header_param, take two
  4 files changed, 38 insertions(+), 28 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index 7da426c..a41658e 100644
+index 8a2976e..57be587 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -222,12 +222,15 @@ static int w_pvh_header_param_exists(
