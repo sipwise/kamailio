@@ -38,7 +38,7 @@ index 7c4f08d..3f6a639 100644
              <title><varname>attribute_display</varname> (int)</title>
              <para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index 8848033..fe5dc8a 100644
+index 8848033..94efcef 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -87,6 +87,7 @@ static str caller_dlg_var = {0, 0}; /* pubruri_caller */
@@ -62,7 +62,7 @@ index 8848033..fe5dc8a 100644
  }
  
 +void refresh_local_identity(struct dlg_cell *dlg, str *uri) {
-+	str *s = dlg_api.get_dlg_var(dlg, &local_identity_dlg_var);
++	str *s = dlg_api.get_dlg_varref(dlg, &local_identity_dlg_var);
 +
 +	if(s != NULL) {
 +		uri->s = s->s;

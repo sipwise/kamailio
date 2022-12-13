@@ -8,7 +8,7 @@ Subject: MT#55631 dialog: dlg_set_var() support empty totag parameter
  1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index e9ed5d9..90a20f6 100644
+index aedf8a7..8f4c806 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -1663,7 +1663,7 @@ static int ki_dlg_set_var(sip_msg_t *msg, str *sc, str *sf, str *st, str *key, s
