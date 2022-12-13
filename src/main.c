@@ -2084,6 +2084,10 @@ int main(int argc, char** argv)
 					ksr_slog_init(optarg);
 					break;
 			case KARGOPTVAL+8:
+					if (optarg == NULL) {
+						fprintf(stderr, "bad debug level value\n");
+						goto error;
+					}
 					debug_flag = 1;
 					default_core_cfg.debug=(int)strtol(optarg, &tmp, 10);
 					if ((tmp==0) || (*tmp)){
@@ -2151,6 +2155,10 @@ int main(int argc, char** argv)
 #ifdef USE_TCP
 	init_tcp_options(); /* set the defaults before the config */
 #endif
+
+	if (pv_init_buffer()<0) {
+		goto error;
+	}
 
 	pp_define_core();
 

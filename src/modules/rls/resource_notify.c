@@ -146,6 +146,9 @@ int send_notify(xmlDocPtr * rlmi_doc, char * buf, int buf_len,
 	int result = 0;
 	str rlmi_cont= {0, 0}, multi_cont;
 
+	if(rlmi_doc==NULL || *rlmi_doc==NULL) {
+		return -1;
+	}
 	xmlDocDumpFormatMemory(*rlmi_doc,(xmlChar**)(void*)&rlmi_cont.s,
 			&rlmi_cont.len, 0);
 
@@ -183,7 +186,6 @@ static void send_notifies(db1_res_t *result, int did_col, int resource_uri_col, 
 	subs_t* dialog= NULL;
 	int len_est = 0;
 	int resource_added = 0; /* Flag to indicate that we have added at least one resource */
-	int ok = 0;
 
 	/* generate the boundary string */
 	boundary_string= generate_string(BOUNDARY_STRING_LEN);
@@ -418,8 +420,9 @@ static void send_notifies(db1_res_t *result, int did_col, int resource_uri_col, 
 
 	if(rlmi_doc)
 	{
-		LM_DBG("timer_send_notify at end len_est = %d resource_added = %d\n", len_est, resource_added);
-		if (resource_added == 1)
+		LM_DBG("timer notify at end len_est = %d resource_added = %d dlg = %p\n",
+				len_est, resource_added, dialog);
+		if (resource_added == 1 && dialog != NULL)
 		{
 			send_notify(&rlmi_doc, buf, buf_len, bstr, dialog, hash_code);
 		}
@@ -431,7 +434,6 @@ static void send_notifies(db1_res_t *result, int did_col, int resource_uri_col, 
 	}
 
 done:
-	ok = 1;
 	if (dbmode == RLS_DB_ONLY && rls_dbf.end_transaction)
 	{
 		if (rls_dbf.end_transaction(rls_db) < 0)
@@ -456,11 +458,10 @@ error:
 			LM_ERR("in abort_transaction\n");
 	}
 
-	if(ok==0) {
-		if(rlmi_doc!=NULL) {
-			xmlFreeDoc(rlmi_doc);
-		}
+	if(rlmi_doc!=NULL) {
+		xmlFreeDoc(rlmi_doc);
 	}
+
 	return;
 }
 
