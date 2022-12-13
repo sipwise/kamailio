@@ -1,6 +1,11 @@
-ngcp-kamailio (5.6.0-1+0~mr10.5.3.0) unstable; urgency=medium
+ngcp-kamailio (5.6.2-1+0~mr10.5.3.0) unstable; urgency=medium
 
   [ Victor Seva ]
+  * MT#55631 dialog: support dlg_set_var() with empty totag
+  * MT#55968 pv_headers: fix t_resume scenario
+  * New upstream version 5.6.2
+  * MT#56145 refresh patches and remove already applied upstream
+  * MT#56147 fix undefined symbol: get_dlg_variable
   * [870b819] TT#183850 tm: try not to crash on unref
   * [a66858a] TT#178351 presence: be more resilient doing clean up of presentity
   * [fe4ca24] TT#187250 pv_headers: use tm.t_find API
@@ -13,7 +18,7 @@ ngcp-kamailio (5.6.0-1+0~mr10.5.3.0) unstable; urgency=medium
   [ dzenichev ]
   * [829ad5d] TT#185450 topos_redis: use tag based on direction for early dialog
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 19 Sep 2022 14:35:34 +0200
+ -- Victor Seva <vseva@debian.org>  Tue, 13 Dec 2022 16:00:53 +0100
 
 ngcp-kamailio (5.6.0-1+0~mr10.5.2.0) unstable; urgency=medium
 
