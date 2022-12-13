@@ -8,7 +8,7 @@ Subject: pua_dialoginfo: use lock when use_puburi_avps is set
  2 files changed, 20 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index a705ed3..83c4f2c 100644
+index 9d9de31..8848033 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -353,6 +353,7 @@ __dialog_sendpublish(struct dlg_cell *dlg, int type, struct dlg_cb_params *_para
@@ -45,7 +45,7 @@ index a705ed3..83c4f2c 100644
  	/* copy from dlg structure to dlginfo structure */
  	dlginfo->lifetime     = override_lifetime ? override_lifetime : dlg->lifetime;
  	dlginfo->disable_caller_publish     = disable_caller_publish;
-@@ -756,20 +769,24 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
+@@ -764,20 +777,24 @@ __dialog_created(struct dlg_cell *dlg, int type, struct dlg_cb_params *_params)
  
  	if ((!disable_caller_publish) && (disable_caller_publish_flag == -1 || !(request
  		&& (request->flags & (1<<disable_caller_publish_flag))))) {
@@ -70,7 +70,7 @@ index a705ed3..83c4f2c 100644
  	}
  }
  
-@@ -939,9 +956,7 @@ void free_dlginfo_cell(void *param) {
+@@ -947,9 +964,7 @@ void free_dlginfo_cell(void *param) {
  	free_str_list_all(cell->pubruris_caller);
  	free_str_list_all(cell->pubruris_callee);
  

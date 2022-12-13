@@ -1,4 +1,3 @@
-From c80cccd996dcc3b91d4f0f68a2de51104a16d1a5 Mon Sep 17 00:00:00 2001
 From: Alessio Garzi <agarzi@sipwise.com>
 Date: Thu, 7 Jul 2022 15:22:12 +0200
 Subject: [PATCH] presence: No autocommit+rollback if no active watchers
@@ -15,7 +14,7 @@ Subject: [PATCH] presence: No autocommit+rollback if no active watchers
  1 file changed, 12 insertions(+), 8 deletions(-)
 
 diff --git a/src/modules/presence/notify.c b/src/modules/presence/notify.c
-index cf52c21c22..4980dc4b0a 100644
+index cf52c21..4980dc4 100644
 --- a/src/modules/presence/notify.c
 +++ b/src/modules/presence/notify.c
 @@ -2867,6 +2867,7 @@ int process_dialogs(int round, int presence_winfo)
@@ -67,6 +66,3 @@ index cf52c21c22..4980dc4b0a 100644
  		if(pa_dbf.abort_transaction(pa_db) < 0)
  			LM_ERR("in abort_transaction\n");
  	}
--- 
-2.25.1
-

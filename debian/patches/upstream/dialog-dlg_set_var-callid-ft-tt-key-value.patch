@@ -8,7 +8,7 @@ Subject: [PATCH] dialog: dlg_set_var(callid, ft, tt, key, value)
  2 files changed, 148 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 058d42a..b169dc2 100644
+index 25584b5..fec9f5e 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
 @@ -197,6 +197,9 @@ static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2);
@@ -30,7 +30,7 @@ index 058d42a..b169dc2 100644
  
  	{"load_dlg",  (cmd_function)load_dlg,   0, 0, 0, 0},
  	{0,0,0,0,0,0}
-@@ -1608,6 +1613,96 @@ static int fixup_dlg_get_var_free(void** param, int param_no)
+@@ -1611,6 +1616,96 @@ static int fixup_dlg_get_var_free(void** param, int param_no)
  	return -1;
  }
  
@@ -127,7 +127,7 @@ index 058d42a..b169dc2 100644
  static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
  {
  	dlg_cell_t *dlg = NULL;
-@@ -2198,6 +2293,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+@@ -2201,6 +2296,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
  		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
  			SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE }
  	},

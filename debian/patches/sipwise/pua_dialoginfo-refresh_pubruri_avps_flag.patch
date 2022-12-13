@@ -39,7 +39,7 @@ index 191ee5f..7c4f08d 100644
  		<title><varname>pubruri_caller_avp</varname> (str)</title>
  		<para>
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index 2dae4d4..a705ed3 100644
+index 1765734..9d9de31 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
 @@ -41,6 +41,7 @@
@@ -146,7 +146,7 @@ index 2dae4d4..a705ed3 100644
  	switch (type) {
  		case DLGCB_FAILED:
  		case DLGCB_TERMINATED:
-@@ -884,6 +946,19 @@ void free_dlginfo_cell(void *param) {
+@@ -892,6 +954,19 @@ void free_dlginfo_cell(void *param) {
  }
  
  

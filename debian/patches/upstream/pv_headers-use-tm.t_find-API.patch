@@ -1,4 +1,3 @@
-From 836d122af8575c66651232f3ad25bad085bfb972 Mon Sep 17 00:00:00 2001
 From: Victor Seva <linuxmaniac@torreviejawireless.org>
 Date: Sun, 28 Aug 2022 22:59:44 +0200
 Subject: [PATCH] pv_headers: use tm.t_find API
@@ -8,7 +7,7 @@ Subject: [PATCH] pv_headers: use tm.t_find API
  1 file changed, 8 insertions(+), 13 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index e555e0265b..7da426c184 100644
+index e555e02..7da426c 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -526,6 +526,7 @@ int handle_msg_branch_cb(struct sip_msg *msg, unsigned int flags, void *cb)
@@ -53,6 +52,3 @@ index e555e0265b..7da426c184 100644
  		tmb.unref_cell(t);
  		LM_DBG("T:%p unref\n", t);
  	}
--- 
-2.30.2
-
