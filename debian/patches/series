@@ -46,6 +46,7 @@ upstream/presence-No-autocommit-rollback-if-no-active-watcher.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
+sipwise/pua_dialoginfo-use-dlg_api.get_dlg_varval.patch
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
 sipwise/db_redis_skip_empty_keys.patch
