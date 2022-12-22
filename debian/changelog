@@ -1,3 +1,12 @@
+ngcp-kamailio (5.6.2-1+0~mr10.5.3.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [413a400] MT#56147 kamcmd fix autocompletion
+  * [5c2934a] MT#56147 import .gitignore from upstream
+  * [0150337] MT#56241 pua_dialoginfo: use dlg_api.get_dlg_varval()
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 22 Dec 2022 16:19:31 +0100
+
 ngcp-kamailio (5.6.2-1+0~mr10.5.3.0) unstable; urgency=medium
 
   [ Victor Seva ]
