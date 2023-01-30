@@ -130,11 +130,65 @@ CC_EXTRA_OPTS += -DNO_SIG_DEBUG
 # Fix for UDP buffer issue when TLS is enabled
 CC_EXTRA_OPTS += -pthread -DKSR_PTHREAD_MUTEX_SHARED
 LD_EXTRA_OPTS += -pthread -rdynamic -ldl -Wl,-Bsymbolic-functions
+BUILD_MODULES   := $(addprefix build_,   $(PACKAGE_GROUPS) $(EXTRA_GROUPS))
+INSTALL_MODULES := $(addprefix install_, $(PACKAGE_GROUPS))
+INSTALL_EXTRA   := $(addprefix install_, $(EXTRA_GROUPS))
+
+.PHONY: $(BUILD_MODULES) $(INSTALL_MODULES) $(INSTALL_EXTRA)
+test_build_all-stamp: configure-stamp
+	$(MAKE) all quiet=verbose
+	touch test_build_all-stamp
+
+$(BUILD_MODULES): test_build_all-stamp
+	$(MAKE) every-module group_include="k$(subst build_,,$@)" quiet=verbose
+
+test_install_all-stamp: test_build_all-stamp
+	$(MAKE) install quiet=verbose LIBDIR=$(LIBDIR) group_include="kstandard"
+	touch test_install_all-stamp
+
+$(INSTALL_MODULES): test_install_all-stamp
+	$(MAKE) install-modules-all \
+	  quiet=verbose \
+	  LIBDIR=$(LIBDIR) \
+	  BASEDIR=$(D)-$(subst install_,,$@)-modules \
+	  cfg_prefix=$(D)-$(subst install_,,$@)-modules \
+	  doc-dir=share/doc/$(DEB_SOURCE)-$(subst install_,,$@)-modules \
+	  group_include="k$(subst install_,,$@)"
+	# Eliminate duplicate libs.
+	for d in $(DUP_LIBS_DIRS); do \
+	  test "$$d" != "$(D)-$${module}-modules/usr/$(LIBDIR)/kamailio" && \
+	  for r in `find $$d -name 'lib*' | xargs`; do \
+	    echo "removing $(subst install_,,$@) lib `basename $$r` present also in $$d"; \
+	    rm -f $(D)-$(subst install_,,$@)-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"`; \
+	  done ; \
+	done
+	# clean empty dirs
+	find $(D)-$(subst install_,,$@)-modules -depth -empty -type d -exec rmdir {} \;
+
+$(INSTALL_EXTRA): test_install_all-stamp
+	$(MAKE) install-modules-all \
+	  quiet=verbose \
+	  LIBDIR=$(LIBDIR) \
+	  BASEDIR=$(D)-extra-modules \
+	  cfg_prefix=$(D)-extra-modules \
+	  doc-dir=share/doc/$(DEB_SOURCE)-extra-modules \
+	  group_include="k$(subst install_,,$@)"
+	# Eliminate duplicate extra libs.
+	for d in $(DUP_LIBS_DIRS); do \
+	  test "$$d" != "$(D)-extra-modules/usr/$(LIBDIR)/kamailio" && \
+	  for r in `find $$d -name 'lib*' | xargs`; do \
+	    echo "removing extra lib `basename $$r` present also in $$d"; \
+	    rm -f $(D)-extra-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"`; \
+	  done ; \
+	done
+	# clean empty dirs
+	find $(D)-extra-modules -depth -empty -type d -exec rmdir {} \;
 
 %:
 	dh $@
 
-override_dh_auto_configure:
+override_dh_auto_configure: configure-stamp
+configure-stamp:
 	$(MAKE) cfg \
 	  prefix=/usr \
 	  cfg_prefix=$(D) \
@@ -145,63 +199,17 @@ override_dh_auto_configure:
 	  LD_EXTRA_OPTS="$(LD_EXTRA_OPTS)" \
 	  skip_modules="$(EXCLUDED_MODULES) $(EXTRA_EXCLUDED_MODULES)" \
 	  group_include="kstandard"
+	touch configure-stamp
 
-override_dh_auto_build:
-	$(MAKE) all
-	:
-	# Package all the modules in PACKAGE_GROUPS in separate packages
-	for grp in $(PACKAGE_GROUPS); do \
-	  $(MAKE) every-module group_include="k$$grp" ; \
-	done
-	# Package all the modules in EXTRA_GROUPS in separate packages.
-	for grp in $(EXTRA_GROUPS); do \
-	  $(MAKE) every-module group_include="k$$grp" quiet=verbose ; \
-	done
+override_dh_auto_build: $(BUILD_MODULES)
 
 override_dh_auto_clean:
 	if [ -r autover.h -a ! -r debian/autover.h ]; then cp -a autover.h debian/; fi
 	dh_auto_clean -- maintainer-clean
 	if [ -r debian/autover.h -a ! -r autover.h ]; then mv debian/autover.h .; fi
+	rm -f configure-stamp test_build_all-stamp test_install_all-stamp
 
-override_dh_auto_install:
-	$(MAKE) install LIBDIR=$(LIBDIR) group_include="kstandard"
-	:
-	# Install group packages.
-	for grp in $(PACKAGE_GROUPS); do \
-	  $(MAKE) install-modules-all \
-	    LIBDIR=$(LIBDIR) \
-	    BASEDIR=$(D)-$${grp}-modules \
-	    cfg_prefix=$(D)-$${grp}-modules \
-	    doc-dir=share/doc/$(DEB_SOURCE)-$${grp}-modules \
-	    group_include="k$${grp}" ; \
-	  : Eliminate duplicate libs ; \
-	  for d in $(DUP_LIBS_DIRS); do \
-	    test "$$d" != "$(D)-$${grp}-modules/usr/$(LIBDIR)/kamailio" && \
-	    for r in `find $$d -name 'lib*' | xargs`; do \
-	      echo "removing $${grp} lib `basename $$r` present also in $$d"; \
-	      rm -f $(D)-$${grp}-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"`; \
-	    done ; \
-	  done ; \
-	  find $(D)-$${grp}-modules -depth -empty -type d -exec rmdir {} \; ;\
-	done
-	:
-	# Install extra packages.
-	for grp in $(EXTRA_GROUPS); do \
-		$(MAKE) install-modules-all LIBDIR=$(LIBDIR) group_include="k$$grp" \
-		BASEDIR=$(D)-extra-modules \
-		cfg_prefix=$(D)-extra-modules \
-		doc-dir=share/doc/$(DEB_SOURCE)-extra-modules ; \
-	done
-	# Eliminate duplicate extra libs.
-	-for d in $(DUP_LIBS_DIRS); do \
-	  test "$$d" != "$(D)-extra-modules/usr/$(LIBDIR)/kamailio" && \
-	  for r in `find $$d -name 'lib*' | xargs`; do \
-	    echo "removing extra lib `basename $$r` present also in $$d"; \
-	    rm -f $(D)-extra-modules/usr/$(LIBDIR)/kamailio/`basename "$$r"`; \
-	  done ; \
-	done
-	find $(D)-extra-modules -depth -empty -type d -exec rmdir {} \;
-	:
+override_dh_auto_install: $(INSTALL_MODULES) $(INSTALL_EXTRA)
 	# Move binaries of kamailio-berkeley-modules to kamailio-berkeley-bin.
 	mkdir -p $(D)-berkeley-bin/usr/
 	mv $(D)-berkeley-modules/usr/sbin \
