@@ -42,6 +42,9 @@ upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
 upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
 sipwise/dialog-dlg_get_var-changes-in-API.patch
 upstream/presence-No-autocommit-rollback-if-no-active-watcher.patch
+upstream/app_python3-use-new-Python-3.10-API-functions-for-tr.patch
+upstream/app_python3-proper-check-of-PY_VERSION_HEX-for-pytho.patch
+upstream/app_python3-use-Py_SET_TYPE-from-python-3.9.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
