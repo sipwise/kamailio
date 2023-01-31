@@ -46,6 +46,7 @@ upstream/app_python3-use-new-Python-3.10-API-functions-for-tr.patch
 upstream/app_python3-proper-check-of-PY_VERSION_HEX-for-pytho.patch
 upstream/app_python3-use-Py_SET_TYPE-from-python-3.9.patch
 ### relevant for upstream
+sipwise/Makefile-support-parallelism-on-install-modules-doc-.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-use-lock-when-use_puburi_avps-is-set.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
