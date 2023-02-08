@@ -1,0 +1,961 @@
+From: Sipwise Development Team <support@sipwise.com>
+Date: Fri, 10 Mar 2023 11:58:50 +0100
+Subject: lcr: add stats per gw
+
+---
+ src/modules/lcr/lcr_mod.c | 310 ++++++++++++++++++++++++++++++-
+ src/modules/lcr/lcr_mod.h |  53 ++++++
+ src/modules/lcr/lcr_rpc.c | 460 +++++++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 816 insertions(+), 7 deletions(-)
+
+diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
+index fa5cac5..e607da6 100644
+--- a/src/modules/lcr/lcr_mod.c
++++ b/src/modules/lcr/lcr_mod.c
+@@ -66,6 +66,7 @@
+ #include "../../core/mod_fix.h"
+ #include "../../core/rand/kam_rand.h"
+ #include "../../core/kemi.h"
++#include "../../core/script_cb.h"
+ #include "hash.h"
+ #include "lcr_rpc.h"
+ #include "../../core/rpc_lookup.h"
+@@ -209,6 +210,9 @@ str mtree_param = {"lcr", 3};
+ #define DEF_LCR_STOPPER_MODE 0
+ unsigned int stopper_mode_param = DEF_LCR_STOPPER_MODE;
+ 
++/* lcr stats enable flag */
++unsigned int lcr_stats_flag = 0;
++
+ /*
+  * Other module types and variables
+  */
+@@ -250,6 +254,9 @@ unsigned int ping_rc_count = 0;
+ /* Mtree API var */
+ mtree_api_t mtree_api;
+ 
++// stat counters names
++char *rcv_requests = "rcv_gw_requests";
++
+ /*
+  * Functions that are defined later
+  */
+@@ -272,6 +279,10 @@ static int to_gw_1(struct sip_msg *_m, char *_s1, char *_s2);
+ static int to_gw_3(struct sip_msg *_m, char *_s1, char *_s2, char *_s3);
+ static int to_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2);
+ static int to_any_gw_2(struct sip_msg *_m, char *_s1, char *_s2);
++static struct gw_info *ki_lcr_check_sip_msg_against_gwlist(sip_msg_t *_m);
++static struct gw_info *fetch_gw_id(struct sip_msg *_m, unsigned int lcr_id,
++		struct ip_addr *src_addr, uri_transport transport,
++		unsigned int src_port);
+ 
+ /* clang-format off */
+ /*
+@@ -362,6 +373,7 @@ static param_export_t params[] = {
+     {"ping_from",                PARAM_STR, &ping_from_param},
+     {"ping_socket",              PARAM_STR, &ping_socket_param},
+     {"stopper_mode",             PARAM_INT, &stopper_mode_param},
++    {"lcr_stats",                PARAM_INT, &lcr_stats_flag },
+     {0, 0, 0}
+ };
+ 
+@@ -427,6 +439,180 @@ static void lcr_db_close(void)
+ 	}
+ }
+ 
++// stats request callback function
++static int km_cb_req_stats(struct sip_msg *msg, unsigned int flags, void *param)
++{
++	struct gw_info *stat_gw;
++	if(!IS_SIP(msg))
++		return 1;
++
++	stat_gw = ki_lcr_check_sip_msg_against_gwlist(msg);
++	if(!stat_gw)
++		return 1;
++
++	//update_stat(stat_gw->rcv_reqs,1);
++	stat_gw->rcv_gw_reqs++;
++
++	switch(msg->first_line.u.request.method_value) {
++		case METHOD_INVITE:
++			stat_gw->rcv_gw_reqs_invite++;
++			break;
++		case METHOD_CANCEL:
++			stat_gw->rcv_gw_reqs_cancel++;
++			break;
++		case METHOD_ACK:
++			stat_gw->rcv_gw_reqs_ack++;
++			break;
++		case METHOD_BYE:
++			stat_gw->rcv_gw_reqs_bye++;
++			break;
++		case METHOD_INFO:
++			stat_gw->rcv_gw_reqs_info++;
++			break;
++		case METHOD_REGISTER:
++			stat_gw->rcv_gw_reqs_register++;
++			break;
++		case METHOD_SUBSCRIBE:
++			stat_gw->rcv_gw_reqs_subscribe++;
++			break;
++		case METHOD_NOTIFY:
++			stat_gw->rcv_gw_reqs_notify++;
++			break;
++		case METHOD_MESSAGE:
++			stat_gw->rcv_gw_reqs_message++;
++			break;
++		case METHOD_OPTIONS:
++			stat_gw->rcv_gw_reqs_options++;
++			break;
++		case METHOD_PRACK:
++			stat_gw->rcv_gw_reqs_prack++;
++			break;
++		case METHOD_UPDATE:
++			stat_gw->rcv_gw_reqs_update++;
++			break;
++		case METHOD_REFER:
++			stat_gw->rcv_gw_reqs_refer++;
++			break;
++		case METHOD_PUBLISH:
++			stat_gw->rcv_gw_reqs_publish++;
++			break;
++		case METHOD_OTHER:
++			stat_gw->rcv_gw_reqs_other++;
++			break;
++	}
++	return 1;
++}
++
++static int km_cb_rpl_stats_by_method(
++		struct sip_msg *msg, unsigned int flags, void *param)
++{
++	struct gw_info *stat_gw;
++	int method = 0;
++	int group = 0;
++
++	if(msg == NULL) {
++		return -1;
++	}
++	if(!msg->cseq && (parse_headers(msg, HDR_CSEQ_F, 0) < 0 || !msg->cseq)) {
++		return -1;
++	}
++	method = get_cseq(msg)->method_id;
++	group = msg->first_line.u.reply.statuscode / 100 - 1;
++
++	stat_gw = ki_lcr_check_sip_msg_against_gwlist(msg);
++	if(!stat_gw)
++		return 1;
++
++	if(group >= 0 && group <= 5) {
++		switch(method) {
++			case METHOD_INVITE:
++				stat_gw->rcv_gw_rpl_invite++;
++				stat_gw->rcv_gw_rpl_invite_by_method[group]++;
++				break;
++			case METHOD_CANCEL:
++				stat_gw->rcv_gw_rpl_cancel++;
++				stat_gw->rcv_gw_rpl_cancel_by_method[group]++;
++				break;
++			case METHOD_BYE:
++				stat_gw->rcv_gw_rpl_bye++;
++				stat_gw->rcv_gw_rpl_bye_by_method[group]++;
++				break;
++			case METHOD_REGISTER:
++				stat_gw->rcv_gw_rpl_register++;
++				stat_gw->rcv_gw_rpl_register_by_method[group]++;
++				break;
++			case METHOD_MESSAGE:
++				stat_gw->rcv_gw_rpl_message++;
++				stat_gw->rcv_gw_rpl_message_by_method[group]++;
++				break;
++			case METHOD_PRACK:
++				stat_gw->rcv_gw_rpl_prack++;
++				stat_gw->rcv_gw_rpl_prack_by_method[group]++;
++				break;
++			case METHOD_UPDATE:
++				stat_gw->rcv_gw_rpl_update++;
++				stat_gw->rcv_gw_rpl_update_by_method[group]++;
++				break;
++			case METHOD_REFER:
++				stat_gw->rcv_gw_rpl_refer++;
++				stat_gw->rcv_gw_rpl_refer_by_method[group]++;
++				break;
++		}
++	}
++	return 1;
++}
++
++static int km_cb_rpl_stats(struct sip_msg *msg, unsigned int flags, void *param)
++{
++	struct gw_info *stat_gw;
++	stat_gw = ki_lcr_check_sip_msg_against_gwlist(msg);
++	if(!stat_gw)
++		return 1;
++
++	stat_gw->rcv_gw_rpl++;
++
++	if(msg->first_line.u.reply.statuscode > 99
++			&& msg->first_line.u.reply.statuscode < 200) {
++		stat_gw->rcv_gw_rpls_1xx++;
++		if(msg->first_line.u.reply.statuscode > 179
++				&& msg->first_line.u.reply.statuscode < 190) {
++			stat_gw->rcv_gw_rpls_18x++;
++		}
++	} else if(msg->first_line.u.reply.statuscode > 199
++			  && msg->first_line.u.reply.statuscode < 300) {
++		stat_gw->rcv_gw_rpls_2xx++;
++	} else if(msg->first_line.u.reply.statuscode > 299
++			  && msg->first_line.u.reply.statuscode < 400) {
++		stat_gw->rcv_gw_rpls_3xx++;
++	} else if(msg->first_line.u.reply.statuscode > 399
++			  && msg->first_line.u.reply.statuscode < 500) {
++		stat_gw->rcv_gw_rpls_4xx++;
++		switch(msg->first_line.u.reply.statuscode) {
++			case 401:
++				stat_gw->rcv_gw_rpls_401++;
++				break;
++			case 404:
++				stat_gw->rcv_gw_rpls_404++;
++				break;
++			case 407:
++				stat_gw->rcv_gw_rpls_407++;
++				break;
++			case 480:
++				stat_gw->rcv_gw_rpls_480++;
++				break;
++			case 486:
++				stat_gw->rcv_gw_rpls_486++;
++				break;
++		}
++	} else if(msg->first_line.u.reply.statuscode > 499
++			  && msg->first_line.u.reply.statuscode < 600) {
++		stat_gw->rcv_gw_rpls_5xx++;
++	} else if(msg->first_line.u.reply.statuscode > 599
++			  && msg->first_line.u.reply.statuscode < 700) {
++		stat_gw->rcv_gw_rpls_6xx++;
++	}
++	return 1;
++}
+ 
+ /*
+  * Module initialization function that is called before the main process forks
+@@ -439,6 +625,28 @@ static int mod_init(void)
+ 	unsigned int i;
+ 	char *at, *past, *sep;
+ 
++	// Register callback function for counting in case lcr stats are required
++	if(lcr_stats_flag) {
++		if(register_script_cb(km_cb_req_stats, PRE_SCRIPT_CB | REQUEST_CB, 0)
++				< 0) {
++			LM_ERR("failed to register PRE request callback\n");
++			return -1;
++		}
++
++		if(register_script_cb(km_cb_rpl_stats, PRE_SCRIPT_CB | ONREPLY_CB, 0)
++				< 0) {
++			LM_ERR("failed to register PRE request callback\n");
++			return -1;
++		}
++
++		if(register_script_cb(
++				   km_cb_rpl_stats_by_method, PRE_SCRIPT_CB | ONREPLY_CB, 0)
++				< 0) {
++			LM_ERR("failed to register PRE request callback\n");
++			return -1;
++		}
++	}
++
+ 	/* Register RPC commands */
+ 	if(rpc_register_array(lcr_rpc) != 0) {
+ 		LM_ERR("failed to register RPC commands\n");
+@@ -1014,6 +1222,10 @@ static int insert_gw(struct gw_info *gws, unsigned int i, unsigned int gw_id,
+ 		append_str(at, transport, transport_len);
+ 	}
+ 	gws[i].uri_len = at - &(gws[i].uri[0]);
++
++	if(lcr_stats_flag)
++		reset_gw_stats(&gws[i]);
++
+ 	LM_DBG("inserted gw <%u, %.*s, %.*s> at index %u\n", gw_id, gw_name_len,
+ 			gw_name, gws[i].uri_len, gws[i].uri, i);
+ 	return 1;
+@@ -2282,6 +2494,48 @@ done:
+ 	return j;
+ }
+ 
++void reset_gw_stats(struct gw_info *gw)
++{
++	gw->rcv_gw_reqs = 0;
++	gw->rcv_gw_reqs_invite = 0;
++	gw->rcv_gw_reqs_cancel = 0;
++	gw->rcv_gw_reqs_ack = 0;
++	gw->rcv_gw_reqs_bye = 0;
++	gw->rcv_gw_reqs_info = 0;
++	gw->rcv_gw_reqs_register = 0;
++	gw->rcv_gw_reqs_subscribe = 0;
++	gw->rcv_gw_reqs_notify = 0;
++	gw->rcv_gw_reqs_message = 0;
++	gw->rcv_gw_reqs_options = 0;
++	gw->rcv_gw_reqs_prack = 0;
++	gw->rcv_gw_reqs_update = 0;
++	gw->rcv_gw_reqs_refer = 0;
++	gw->rcv_gw_reqs_publish = 0;
++	gw->rcv_gw_reqs_other = 0;
++
++	gw->rcv_gw_rpl = 0;
++	gw->rcv_gw_rpl_invite = 0;
++	gw->rcv_gw_rpl_cancel = 0;
++	gw->rcv_gw_rpl_bye = 0;
++	gw->rcv_gw_rpl_register = 0;
++	gw->rcv_gw_rpl_message = 0;
++	gw->rcv_gw_rpl_prack = 0;
++	gw->rcv_gw_rpl_update = 0;
++	gw->rcv_gw_rpl_refer = 0;
++
++	gw->rcv_gw_rpls_1xx = 0;
++	gw->rcv_gw_rpls_18x = 0;
++	gw->rcv_gw_rpls_2xx = 0;
++	gw->rcv_gw_rpls_3xx = 0;
++	gw->rcv_gw_rpls_4xx = 0;
++	gw->rcv_gw_rpls_401 = 0;
++	gw->rcv_gw_rpls_404 = 0;
++	gw->rcv_gw_rpls_407 = 0;
++	gw->rcv_gw_rpls_480 = 0;
++	gw->rcv_gw_rpls_486 = 0;
++	gw->rcv_gw_rpls_5xx = 0;
++	gw->rcv_gw_rpls_6xx = 0;
++}
+ 
+ /*
+  * Load info of matching GWs into gw_uri_avps
+@@ -3267,8 +3521,8 @@ static int from_any_gw_0(struct sip_msg *_m, char *_s1, char *_s2)
+  * Checks if request comes from ip address of a gateway taking source
+  * IP address, transport protocol and source port from parameters.
+  */
+-static int ki_from_any_gw_addr_port(sip_msg_t *_m, str *addr_str, int transport,
+-		int src_port)
++static int ki_from_any_gw_addr_port(
++		sip_msg_t *_m, str *addr_str, int transport, int src_port)
+ {
+ 	unsigned int i;
+ 	struct ip_addr *ip, src_addr;
+@@ -3701,3 +3955,55 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+ 	sr_kemi_modules_add(sr_kemi_lcr_exports);
+ 	return 0;
+ }
++static struct gw_info *fetch_gw_id(struct sip_msg *_m, unsigned int lcr_id,
++		struct ip_addr *src_addr, uri_transport transport,
++		unsigned int src_port)
++{
++	struct gw_info *res, gw, *gws;
++
++	gws = gw_pt[lcr_id];
++
++	/* Skip lcr instance if some of its gws do not have ip_addr */
++	if(gws[0].port != 0) {
++		LM_DBG("lcr instance <%u> has gw(s) without ip_addr\n", lcr_id);
++		return NULL;
++	}
++
++	gw.ip_addr = *src_addr;
++	if(src_port == 0) {
++		return NULL;
++	}
++
++	/* Search for gw based on its ip address and port */
++	gw.port = src_port;
++	res = find_gateway_by_ip_and_port(&gw, gws);
++
++	/* Store tag and flags and return result */
++	if((res != NULL)
++			&& ((transport == PROTO_NONE)
++					|| (res->transport_code == transport))) {
++		LM_DBG("request came from gw\n");
++		return res;
++	}
++	LM_DBG("request did not come from gw\n");
++	return NULL;
++}
++static struct gw_info *ki_lcr_check_sip_msg_against_gwlist(sip_msg_t *_m)
++{
++	unsigned int i;
++	uri_transport transport;
++	unsigned int src_port;
++	struct gw_info *res;
++
++	/* Get transport protocol and port */
++	transport = _m->rcv.proto;
++	src_port = _m->rcv.src_port;
++
++	for(i = 1; i <= lcr_count_param; i++) {
++		res = fetch_gw_id(_m, i, &_m->rcv.src_ip, transport, src_port);
++		if(res != NULL) {
++			return res;
++		}
++	}
++	return NULL;
++}
+\ No newline at end of file
+diff --git a/src/modules/lcr/lcr_mod.h b/src/modules/lcr/lcr_mod.h
+index 193e216..e14ffd7 100644
+--- a/src/modules/lcr/lcr_mod.h
++++ b/src/modules/lcr/lcr_mod.h
+@@ -37,6 +37,7 @@
+ #include "../../core/locking.h"
+ #include "../../core/parser/parse_uri.h"
+ #include "../../core/ip_addr.h"
++#include "../../core/counters.h"
+ 
+ #define MAX_PREFIX_LEN 16
+ #define MAX_URI_LEN 256
+@@ -134,6 +135,54 @@ struct gw_info
+ 	char uri[MAX_URI_LEN];
+ 	unsigned short uri_len;
+ 	unsigned int defunct_until;
++
++	unsigned long rcv_gw_reqs;
++	unsigned long rcv_gw_reqs_invite;
++	unsigned long rcv_gw_reqs_cancel;
++	unsigned long rcv_gw_reqs_ack;
++	unsigned long rcv_gw_reqs_bye;
++	unsigned long rcv_gw_reqs_info;
++	unsigned long rcv_gw_reqs_register;
++	unsigned long rcv_gw_reqs_subscribe;
++	unsigned long rcv_gw_reqs_notify;
++	unsigned long rcv_gw_reqs_message;
++	unsigned long rcv_gw_reqs_options;
++	unsigned long rcv_gw_reqs_prack;
++	unsigned long rcv_gw_reqs_update;
++	unsigned long rcv_gw_reqs_refer;
++	unsigned long rcv_gw_reqs_publish;
++	unsigned long rcv_gw_reqs_other;
++
++	unsigned long rcv_gw_rpl;
++	unsigned long rcv_gw_rpl_invite;
++	unsigned long rcv_gw_rpl_invite_by_method[6];
++	unsigned long rcv_gw_rpl_cancel;
++	unsigned long rcv_gw_rpl_cancel_by_method[6];
++	unsigned long rcv_gw_rpl_bye;
++	unsigned long rcv_gw_rpl_bye_by_method[6];
++	unsigned long rcv_gw_rpl_register;
++	unsigned long rcv_gw_rpl_register_by_method[6];
++	unsigned long rcv_gw_rpl_message;
++	unsigned long rcv_gw_rpl_message_by_method[6];
++	unsigned long rcv_gw_rpl_prack;
++	unsigned long rcv_gw_rpl_prack_by_method[6];
++	unsigned long rcv_gw_rpl_update;
++	unsigned long rcv_gw_rpl_update_by_method[6];
++	unsigned long rcv_gw_rpl_refer;
++	unsigned long rcv_gw_rpl_refer_by_method[6];
++
++	unsigned long rcv_gw_rpls_1xx;
++	unsigned long rcv_gw_rpls_18x;
++	unsigned long rcv_gw_rpls_2xx;
++	unsigned long rcv_gw_rpls_3xx;
++	unsigned long rcv_gw_rpls_4xx;
++	unsigned long rcv_gw_rpls_401;
++	unsigned long rcv_gw_rpls_404;
++	unsigned long rcv_gw_rpls_407;
++	unsigned long rcv_gw_rpls_480;
++	unsigned long rcv_gw_rpls_486;
++	unsigned long rcv_gw_rpls_5xx;
++	unsigned long rcv_gw_rpls_6xx;
+ };
+ 
+ extern unsigned int lcr_rule_hash_size_param;
+@@ -150,5 +199,9 @@ extern int load_gws_dummy(int lcr_id, str *ruri_user, str *from_uri,
+ 		str *request_uri, unsigned int *gw_indexes);
+ extern int reload_tables();
+ extern int rpc_defunct_gw(unsigned int, unsigned int, unsigned int);
++extern void reset_gw_stats(struct gw_info *gw);
++
++/* lcr stats enable flag */
++extern unsigned int lcr_stats_flag;
+ 
+ #endif /* LCR_MOD_H */
+diff --git a/src/modules/lcr/lcr_rpc.c b/src/modules/lcr/lcr_rpc.c
+index 3a990c7..fb38912 100644
+--- a/src/modules/lcr/lcr_rpc.c
++++ b/src/modules/lcr/lcr_rpc.c
+@@ -99,11 +99,176 @@ static void dump_gw(rpc_t *rpc, void *st, struct gw_info *gw, unsigned int gw_in
+ 	prefix.len = gw->prefix_len;
+ 	tag.s = gw->tag;
+ 	tag.len = gw->tag_len;
+-	start = int2strbuf(
+-			gw->defunct_until, &(buf[0]), INT2STR_MAX_LEN, &len);
+-	rpc->struct_add(st, "dSSdds", "strip", gw->strip, "prefix",
+-			&prefix, "tag", &tag, "flags", gw->flags, "state",
+-			gw->state, "defunct_until", start);
++	start = int2strbuf(gw->defunct_until, &(buf[0]), INT2STR_MAX_LEN, &len);
++	rpc->struct_add(st, "dSSdds", "strip", gw->strip, "prefix", &prefix, "tag",
++			&tag, "flags", gw->flags, "state", gw->state, "defunct_until",
++			start);
++}
++
++static void print_gw_stat(rpc_t *rpc, void *st, struct gw_info *gw)
++{
++	str gw_name;
++
++	rpc->struct_add(st, "d", "gw_id", gw->gw_id);
++	gw_name.s = gw->gw_name;
++	gw_name.len = gw->gw_name_len;
++	rpc->struct_add(st, "S", "gw_name", &gw_name);
++
++	rpc->struct_add(st, "d", "requests", gw->rcv_gw_reqs);
++	rpc->struct_add(st, "d", "requests_invite", gw->rcv_gw_reqs_invite);
++	rpc->struct_add(st, "d", "requests_cancel", gw->rcv_gw_reqs_cancel);
++	rpc->struct_add(st, "d", "requests_ack", gw->rcv_gw_reqs_ack);
++	rpc->struct_add(st, "d", "requests_bye", gw->rcv_gw_reqs_bye);
++	rpc->struct_add(st, "d", "requests_info", gw->rcv_gw_reqs_info);
++	rpc->struct_add(st, "d", "requests_register", gw->rcv_gw_reqs_register);
++	rpc->struct_add(st, "d", "requests_subscribe", gw->rcv_gw_reqs_subscribe);
++	rpc->struct_add(st, "d", "requests_notify", gw->rcv_gw_reqs_notify);
++	rpc->struct_add(st, "d", "requests_message", gw->rcv_gw_reqs_message);
++	rpc->struct_add(st, "d", "requests_options", gw->rcv_gw_reqs_options);
++	rpc->struct_add(st, "d", "requests_prack", gw->rcv_gw_reqs_prack);
++	rpc->struct_add(st, "d", "requests_update", gw->rcv_gw_reqs_update);
++	rpc->struct_add(st, "d", "requests_refer", gw->rcv_gw_reqs_refer);
++	rpc->struct_add(st, "d", "requests_publish", gw->rcv_gw_reqs_publish);
++	rpc->struct_add(st, "d", "requests_other", gw->rcv_gw_reqs_other);
++
++	rpc->struct_add(st, "d", "replies", gw->rcv_gw_rpl);
++	rpc->struct_add(st, "d", "replies_invite", gw->rcv_gw_rpl_invite);
++	rpc->struct_add(
++			st, "d", "replies_1xx_invite", gw->rcv_gw_rpl_invite_by_method[0]);
++	rpc->struct_add(
++			st, "d", "replies_2xx_invite", gw->rcv_gw_rpl_invite_by_method[1]);
++	rpc->struct_add(
++			st, "d", "replies_3xx_invite", gw->rcv_gw_rpl_invite_by_method[2]);
++	rpc->struct_add(
++			st, "d", "replies_4xx_invite", gw->rcv_gw_rpl_invite_by_method[3]);
++	rpc->struct_add(
++			st, "d", "replies_5xx_invite", gw->rcv_gw_rpl_invite_by_method[4]);
++	rpc->struct_add(
++			st, "d", "replies_6xx_invite", gw->rcv_gw_rpl_invite_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_cancel", gw->rcv_gw_rpl_cancel);
++	rpc->struct_add(
++			st, "d", "replies_1xx_cancel", gw->rcv_gw_rpl_cancel_by_method[0]);
++	rpc->struct_add(
++			st, "d", "replies_2xx_cancel", gw->rcv_gw_rpl_cancel_by_method[1]);
++	rpc->struct_add(
++			st, "d", "replies_3xx_cancel", gw->rcv_gw_rpl_cancel_by_method[2]);
++	rpc->struct_add(
++			st, "d", "replies_4xx_cancel", gw->rcv_gw_rpl_cancel_by_method[3]);
++	rpc->struct_add(
++			st, "d", "replies_5xx_cancel", gw->rcv_gw_rpl_cancel_by_method[4]);
++	rpc->struct_add(
++			st, "d", "replies_6xx_cancel", gw->rcv_gw_rpl_cancel_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_bye", gw->rcv_gw_rpl_bye);
++	rpc->struct_add(
++			st, "d", "replies_1xx_bye", gw->rcv_gw_rpl_bye_by_method[0]);
++	rpc->struct_add(
++			st, "d", "replies_2xx_bye", gw->rcv_gw_rpl_bye_by_method[1]);
++	rpc->struct_add(
++			st, "d", "replies_3xx_bye", gw->rcv_gw_rpl_bye_by_method[2]);
++	rpc->struct_add(
++			st, "d", "replies_4xx_bye", gw->rcv_gw_rpl_bye_by_method[3]);
++	rpc->struct_add(
++			st, "d", "replies_5xx_bye", gw->rcv_gw_rpl_bye_by_method[4]);
++	rpc->struct_add(
++			st, "d", "replies_6xx_bye", gw->rcv_gw_rpl_bye_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_register", gw->rcv_gw_rpl_register);
++	rpc->struct_add(st, "d", "replies_1xx_register",
++			gw->rcv_gw_rpl_register_by_method[0]);
++	rpc->struct_add(st, "d", "replies_2xx_register",
++			gw->rcv_gw_rpl_register_by_method[1]);
++	rpc->struct_add(st, "d", "replies_3xx_register",
++			gw->rcv_gw_rpl_register_by_method[2]);
++	rpc->struct_add(st, "d", "replies_4xx_register",
++			gw->rcv_gw_rpl_register_by_method[3]);
++	rpc->struct_add(st, "d", "replies_5xx_register",
++			gw->rcv_gw_rpl_register_by_method[4]);
++	rpc->struct_add(st, "d", "replies_6xx_register",
++			gw->rcv_gw_rpl_register_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_message", gw->rcv_gw_rpl_message);
++	rpc->struct_add(st, "d", "replies_1xx_message",
++			gw->rcv_gw_rpl_message_by_method[0]);
++	rpc->struct_add(st, "d", "replies_2xx_message",
++			gw->rcv_gw_rpl_message_by_method[1]);
++	rpc->struct_add(st, "d", "replies_3xx_message",
++			gw->rcv_gw_rpl_message_by_method[2]);
++	rpc->struct_add(st, "d", "replies_4xx_message",
++			gw->rcv_gw_rpl_message_by_method[3]);
++	rpc->struct_add(st, "d", "replies_5xx_message",
++			gw->rcv_gw_rpl_message_by_method[4]);
++	rpc->struct_add(st, "d", "replies_6xx_message",
++			gw->rcv_gw_rpl_message_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_prack", gw->rcv_gw_rpl_prack);
++	rpc->struct_add(
++			st, "d", "replies_1xx_prack", gw->rcv_gw_rpl_prack_by_method[0]);
++	rpc->struct_add(
++			st, "d", "replies_2xx_prack", gw->rcv_gw_rpl_prack_by_method[1]);
++	rpc->struct_add(
++			st, "d", "replies_3xx_prack", gw->rcv_gw_rpl_prack_by_method[2]);
++	rpc->struct_add(
++			st, "d", "replies_4xx_prack", gw->rcv_gw_rpl_prack_by_method[3]);
++	rpc->struct_add(
++			st, "d", "replies_5xx_prack", gw->rcv_gw_rpl_prack_by_method[4]);
++	rpc->struct_add(
++			st, "d", "replies_6xx_prack", gw->rcv_gw_rpl_prack_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_update", gw->rcv_gw_rpl_update);
++	rpc->struct_add(
++			st, "d", "replies_1xx_update", gw->rcv_gw_rpl_update_by_method[0]);
++	rpc->struct_add(
++			st, "d", "replies_2xx_update", gw->rcv_gw_rpl_update_by_method[1]);
++	rpc->struct_add(
++			st, "d", "replies_3xx_update", gw->rcv_gw_rpl_update_by_method[2]);
++	rpc->struct_add(
++			st, "d", "replies_4xx_update", gw->rcv_gw_rpl_update_by_method[3]);
++	rpc->struct_add(
++			st, "d", "replies_5xx_update", gw->rcv_gw_rpl_update_by_method[4]);
++	rpc->struct_add(
++			st, "d", "replies_6xx_update", gw->rcv_gw_rpl_update_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_refer", gw->rcv_gw_rpl_refer);
++	rpc->struct_add(
++			st, "d", "replies_1xx_refer", gw->rcv_gw_rpl_refer_by_method[0]);
++	rpc->struct_add(
++			st, "d", "replies_2xx_refer", gw->rcv_gw_rpl_refer_by_method[1]);
++	rpc->struct_add(
++			st, "d", "replies_3xx_refer", gw->rcv_gw_rpl_refer_by_method[2]);
++	rpc->struct_add(
++			st, "d", "replies_4xx_refer", gw->rcv_gw_rpl_refer_by_method[3]);
++	rpc->struct_add(
++			st, "d", "replies_5xx_refer", gw->rcv_gw_rpl_refer_by_method[4]);
++	rpc->struct_add(
++			st, "d", "replies_6xx_refer", gw->rcv_gw_rpl_refer_by_method[5]);
++
++	rpc->struct_add(st, "d", "replies_1xx", gw->rcv_gw_rpls_1xx);
++	rpc->struct_add(st, "d", "replies_18x", gw->rcv_gw_rpls_18x);
++	rpc->struct_add(st, "d", "replies_2xx", gw->rcv_gw_rpls_2xx);
++	rpc->struct_add(st, "d", "replies_3xx", gw->rcv_gw_rpls_3xx);
++	rpc->struct_add(st, "d", "replies_4xx", gw->rcv_gw_rpls_4xx);
++	rpc->struct_add(st, "d", "replies_401", gw->rcv_gw_rpls_401);
++	rpc->struct_add(st, "d", "replies_404", gw->rcv_gw_rpls_404);
++	rpc->struct_add(st, "d", "replies_407", gw->rcv_gw_rpls_407);
++	rpc->struct_add(st, "d", "replies_480", gw->rcv_gw_rpls_480);
++	rpc->struct_add(st, "d", "replies_486", gw->rcv_gw_rpls_486);
++	rpc->struct_add(st, "d", "replies_5xx", gw->rcv_gw_rpls_5xx);
++	rpc->struct_add(st, "d", "replies_6xx", gw->rcv_gw_rpls_6xx);
++}
++
++static void dump_gw_counters(rpc_t *rpc, void *st, struct gw_info *gw,
++		unsigned int gw_index, unsigned int lcr_id)
++{
++	print_gw_stat(rpc, st, gw);
++}
++
++static void reset_gw_counters(rpc_t *rpc, void *st, struct gw_info *gw,
++		unsigned int gw_index, unsigned int lcr_id)
++{
++	reset_gw_stats(gw);
++	print_gw_stat(rpc, st, gw);
+ }
+ 
+ static void dump_gws(rpc_t *rpc, void *c)
+@@ -302,6 +467,288 @@ static void load_gws(rpc_t *rpc, void *c)
+ 	return;
+ }
+ 
++static const char *lcr_reset_stats_doc[2] = {"Reset stats for gws.", 0};
++
++static void lcr_reset_stats(rpc_t *rpc, void *ctx)
++{
++	int input_gw = 0;
++
++	if(!lcr_stats_flag) {
++		rpc->fault(ctx, 500, "lcr stat module not enabled");
++		return;
++	}
++
++	if(rpc->scan(ctx, "*d", &input_gw) == -1) {
++		rpc->fault(ctx, 500, "invalid parameters");
++		return;
++	}
++
++	void *st;
++	void *rec = NULL;
++	void *srec = NULL;
++	unsigned int i, j;
++	struct gw_info *gws;
++
++	for(j = 1; j <= lcr_count_param; j++) {
++
++		gws = gw_pt[j];
++
++		for(i = 1; i <= gws[0].ip_addr.u.addr32[0]; i++) {
++			if(!input_gw || input_gw == gws[i].gw_id) {
++				if(srec == NULL) {
++					/* We create one array per lcr_id */
++					if(rpc->add(ctx, "{", &rec) < 0)
++						return;
++					if(rpc->struct_add(rec, "[", "gw", &srec) < 0)
++						return;
++				}
++				if(rpc->array_add(srec, "{", &st) < 0)
++					return;
++				reset_gw_counters(rpc, st, &gws[i], i, j);
++			}
++		}
++	}
++
++	return;
++}
++
++static const char *lcr_print_stats_doc[2] = {"Print stats for gws.", 0};
++
++static void lcr_print_stats(rpc_t *rpc, void *ctx)
++{
++	int input_gw = 0;
++	void *st;
++	void *rec = NULL;
++	void *srec = NULL;
++	unsigned int i, j;
++	struct gw_info *gws;
++
++	if(!lcr_stats_flag) {
++		rpc->fault(ctx, 500, "lcr stat module not enabled");
++		return;
++	}
++
++	rpc->scan(ctx, "*d", &input_gw);
++
++	for(j = 1; j <= lcr_count_param; j++) {
++
++		gws = gw_pt[j];
++
++		for(i = 1; i <= gws[0].ip_addr.u.addr32[0]; i++) {
++			if(!input_gw || input_gw == gws[i].gw_id) {
++				if(srec == NULL) {
++					/* We create one array per lcr_id */
++					if(rpc->add(ctx, "{", &rec) < 0)
++						return;
++					if(rpc->struct_add(rec, "[", "gw", &srec) < 0)
++						return;
++				}
++				if(rpc->array_add(srec, "{", &st) < 0)
++					return;
++				dump_gw_counters(rpc, st, &gws[i], i, j);
++			}
++		}
++	}
++
++	// if no gw return empty array
++	if(srec == NULL) {
++		rpc->add(ctx, "{", &rec);
++	}
++	return;
++}
++
++#define CREATE_RPC_ENTRY(var1, var2)                                       \
++	snprintf(param, sizeof(param), "%s%u:%s = %lu", "gw", gw->gw_id, var1, \
++			var2);                                                         \
++	paramstr.s = param;                                                    \
++	paramstr.len = strlen(param);                                          \
++	if(rpc->array_add(rec, "S", &paramstr) < 0) {                          \
++		rpc->fault(ctx, 500, "cant create array element");                 \
++		return;                                                            \
++	}
++
++static const char *lcr_get_statistics_doc[2] = {
++		"Print stats for gws as string value.", 0};
++
++static void lcr_get_statistics(rpc_t *rpc, void *ctx)
++{
++	int input_gw = 0;
++	unsigned int i, j;
++	struct gw_info *gws;
++	struct gw_info *gw;
++	void *rec = NULL;
++	char param[100];
++	str paramstr;
++
++	if(!lcr_stats_flag) {
++		rpc->fault(ctx, 500, "lcr stat module not enabled");
++		return;
++	}
++
++	rpc->scan(ctx, "*d", &input_gw);
++
++	if(rpc->add(ctx, "[", &rec) < 0) {
++		rpc->fault(ctx, 500, "cant create rec");
++		return;
++	}
++
++	for(j = 1; j <= lcr_count_param; j++) {
++
++		gws = gw_pt[j];
++
++		for(i = 1; i <= gws[0].ip_addr.u.addr32[0]; i++) {
++			if(!input_gw || input_gw == gws[i].gw_id) {
++				gw = &gws[i];
++
++				CREATE_RPC_ENTRY("request", gw->rcv_gw_reqs);
++				CREATE_RPC_ENTRY("requests_invite", gw->rcv_gw_reqs_invite);
++				CREATE_RPC_ENTRY("requests_cancel", gw->rcv_gw_reqs_cancel);
++				CREATE_RPC_ENTRY("requests_ack", gw->rcv_gw_reqs_ack);
++				CREATE_RPC_ENTRY("requests_bye", gw->rcv_gw_reqs_bye);
++				CREATE_RPC_ENTRY("requests_info", gw->rcv_gw_reqs_info);
++				CREATE_RPC_ENTRY("requests_register", gw->rcv_gw_reqs_register);
++				CREATE_RPC_ENTRY(
++						"requests_subscribe", gw->rcv_gw_reqs_subscribe);
++				CREATE_RPC_ENTRY("requests_notify", gw->rcv_gw_reqs_notify);
++				CREATE_RPC_ENTRY("requests_message", gw->rcv_gw_reqs_message);
++				CREATE_RPC_ENTRY("requests_options", gw->rcv_gw_reqs_options);
++				CREATE_RPC_ENTRY("requests_prack", gw->rcv_gw_reqs_prack);
++				CREATE_RPC_ENTRY("requests_update", gw->rcv_gw_reqs_update);
++				CREATE_RPC_ENTRY("requests_refer", gw->rcv_gw_reqs_refer);
++				CREATE_RPC_ENTRY("requests_publish", gw->rcv_gw_reqs_publish);
++				CREATE_RPC_ENTRY("requests_other", gw->rcv_gw_reqs_other);
++
++				CREATE_RPC_ENTRY("replies", gw->rcv_gw_rpl);
++				CREATE_RPC_ENTRY("replies_invite", gw->rcv_gw_rpl_invite);
++				CREATE_RPC_ENTRY("replies_1XX_invite",
++						gw->rcv_gw_rpl_invite_by_method[0]);
++				CREATE_RPC_ENTRY("replies_2XX_invite",
++						gw->rcv_gw_rpl_invite_by_method[1]);
++				CREATE_RPC_ENTRY("replies_3XX_invite",
++						gw->rcv_gw_rpl_invite_by_method[2]);
++				CREATE_RPC_ENTRY("replies_4XX_invite",
++						gw->rcv_gw_rpl_invite_by_method[3]);
++				CREATE_RPC_ENTRY("replies_5XX_invite",
++						gw->rcv_gw_rpl_invite_by_method[4]);
++				CREATE_RPC_ENTRY("replies_6XX_invite",
++						gw->rcv_gw_rpl_invite_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_cancel", gw->rcv_gw_rpl_cancel);
++				CREATE_RPC_ENTRY("replies_1XX_cancel",
++						gw->rcv_gw_rpl_cancel_by_method[0]);
++				CREATE_RPC_ENTRY("replies_2XX_cancel",
++						gw->rcv_gw_rpl_cancel_by_method[1]);
++				CREATE_RPC_ENTRY("replies_3XX_cancel",
++						gw->rcv_gw_rpl_cancel_by_method[2]);
++				CREATE_RPC_ENTRY("replies_4XX_cancel",
++						gw->rcv_gw_rpl_cancel_by_method[3]);
++				CREATE_RPC_ENTRY("replies_5XX_cancel",
++						gw->rcv_gw_rpl_cancel_by_method[4]);
++				CREATE_RPC_ENTRY("replies_6XX_cancel",
++						gw->rcv_gw_rpl_cancel_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_bye", gw->rcv_gw_rpl_bye);
++				CREATE_RPC_ENTRY(
++						"replies_1XX_bye", gw->rcv_gw_rpl_bye_by_method[0]);
++				CREATE_RPC_ENTRY(
++						"replies_2XX_bye", gw->rcv_gw_rpl_bye_by_method[1]);
++				CREATE_RPC_ENTRY(
++						"replies_3XX_bye", gw->rcv_gw_rpl_bye_by_method[2]);
++				CREATE_RPC_ENTRY(
++						"replies_4XX_bye", gw->rcv_gw_rpl_bye_by_method[3]);
++				CREATE_RPC_ENTRY(
++						"replies_5XX_bye", gw->rcv_gw_rpl_bye_by_method[4]);
++				CREATE_RPC_ENTRY(
++						"replies_6XX_bye", gw->rcv_gw_rpl_bye_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_register", gw->rcv_gw_rpl_register);
++				CREATE_RPC_ENTRY("replies_1XX_register",
++						gw->rcv_gw_rpl_register_by_method[0]);
++				CREATE_RPC_ENTRY("replies_2XX_register",
++						gw->rcv_gw_rpl_register_by_method[1]);
++				CREATE_RPC_ENTRY("replies_3XX_register",
++						gw->rcv_gw_rpl_register_by_method[2]);
++				CREATE_RPC_ENTRY("replies_4XX_register",
++						gw->rcv_gw_rpl_register_by_method[3]);
++				CREATE_RPC_ENTRY("replies_5XX_register",
++						gw->rcv_gw_rpl_register_by_method[4]);
++				CREATE_RPC_ENTRY("replies_6XX_register",
++						gw->rcv_gw_rpl_register_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_message", gw->rcv_gw_rpl_message);
++				CREATE_RPC_ENTRY("replies_1XX_message",
++						gw->rcv_gw_rpl_message_by_method[0]);
++				CREATE_RPC_ENTRY("replies_2XX_message",
++						gw->rcv_gw_rpl_message_by_method[1]);
++				CREATE_RPC_ENTRY("replies_3XX_message",
++						gw->rcv_gw_rpl_message_by_method[2]);
++				CREATE_RPC_ENTRY("replies_4XX_message",
++						gw->rcv_gw_rpl_message_by_method[3]);
++				CREATE_RPC_ENTRY("replies_5XX_message",
++						gw->rcv_gw_rpl_message_by_method[4]);
++				CREATE_RPC_ENTRY("replies_6XX_message",
++						gw->rcv_gw_rpl_message_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_prack", gw->rcv_gw_rpl_prack);
++				CREATE_RPC_ENTRY(
++						"replies_1XX_prack", gw->rcv_gw_rpl_prack_by_method[0]);
++				CREATE_RPC_ENTRY(
++						"replies_2XX_prack", gw->rcv_gw_rpl_prack_by_method[1]);
++				CREATE_RPC_ENTRY(
++						"replies_3XX_prack", gw->rcv_gw_rpl_prack_by_method[2]);
++				CREATE_RPC_ENTRY(
++						"replies_4XX_prack", gw->rcv_gw_rpl_prack_by_method[3]);
++				CREATE_RPC_ENTRY(
++						"replies_5XX_prack", gw->rcv_gw_rpl_prack_by_method[4]);
++				CREATE_RPC_ENTRY(
++						"replies_6XX_prack", gw->rcv_gw_rpl_prack_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_update", gw->rcv_gw_rpl_update);
++				CREATE_RPC_ENTRY("replies_1XX_update",
++						gw->rcv_gw_rpl_update_by_method[0]);
++				CREATE_RPC_ENTRY("replies_2XX_update",
++						gw->rcv_gw_rpl_update_by_method[1]);
++				CREATE_RPC_ENTRY("replies_3XX_update",
++						gw->rcv_gw_rpl_update_by_method[2]);
++				CREATE_RPC_ENTRY("replies_4XX_update",
++						gw->rcv_gw_rpl_update_by_method[3]);
++				CREATE_RPC_ENTRY("replies_5XX_update",
++						gw->rcv_gw_rpl_update_by_method[4]);
++				CREATE_RPC_ENTRY("replies_6XX_update",
++						gw->rcv_gw_rpl_update_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_refer", gw->rcv_gw_rpl_refer);
++				CREATE_RPC_ENTRY(
++						"replies_1XX_refer", gw->rcv_gw_rpl_refer_by_method[0]);
++				CREATE_RPC_ENTRY(
++						"replies_2XX_refer", gw->rcv_gw_rpl_refer_by_method[1]);
++				CREATE_RPC_ENTRY(
++						"replies_3XX_refer", gw->rcv_gw_rpl_refer_by_method[2]);
++				CREATE_RPC_ENTRY(
++						"replies_4XX_refer", gw->rcv_gw_rpl_refer_by_method[3]);
++				CREATE_RPC_ENTRY(
++						"replies_5XX_refer", gw->rcv_gw_rpl_refer_by_method[4]);
++				CREATE_RPC_ENTRY(
++						"replies_6XX_refer", gw->rcv_gw_rpl_refer_by_method[5]);
++
++				CREATE_RPC_ENTRY("replies_1xx", gw->rcv_gw_rpls_1xx);
++				CREATE_RPC_ENTRY("replies_18x", gw->rcv_gw_rpls_18x);
++				CREATE_RPC_ENTRY("replies_2xx", gw->rcv_gw_rpls_2xx);
++				CREATE_RPC_ENTRY("replies_3xx", gw->rcv_gw_rpls_3xx);
++				CREATE_RPC_ENTRY("replies_4xx", gw->rcv_gw_rpls_4xx);
++				CREATE_RPC_ENTRY("replies_401", gw->rcv_gw_rpls_401);
++				CREATE_RPC_ENTRY("replies_404", gw->rcv_gw_rpls_404);
++				CREATE_RPC_ENTRY("replies_407", gw->rcv_gw_rpls_407);
++				CREATE_RPC_ENTRY("replies_480", gw->rcv_gw_rpls_480);
++				CREATE_RPC_ENTRY("replies_486", gw->rcv_gw_rpls_486);
++				CREATE_RPC_ENTRY("replies_5xx", gw->rcv_gw_rpls_5xx);
++				CREATE_RPC_ENTRY("replies_6xx", gw->rcv_gw_rpls_6xx);
++			}
++		}
++	}
++	return;
++}
++
+ /* clang-format off */
+ rpc_export_t lcr_rpc[] = {
+     {"lcr.reload", reload, reload_doc, 0},
+@@ -309,6 +756,9 @@ rpc_export_t lcr_rpc[] = {
+     {"lcr.dump_rules", dump_rules, dump_rules_doc, 0},
+     {"lcr.defunct_gw", defunct_gw, defunct_gw_doc, 0},
+     {"lcr.load_gws", load_gws, load_gws_doc, 0},
++    {"lcr.stats", lcr_print_stats, lcr_print_stats_doc, 0},
++    {"lcr.reset_stats", lcr_reset_stats, lcr_reset_stats_doc, 0},
++    {"lcr.get_statistics", lcr_get_statistics, lcr_get_statistics_doc, 0},
+     {0, 0, 0, 0}
+ };
+ /* clang-format on */

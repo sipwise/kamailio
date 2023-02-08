@@ -56,6 +56,7 @@ sipwise/db_redis_sscan.patch
 sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
+sipwise/lcr-stats.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/dialog-dlg_set_var-support-empty-totag-param.patch
 ### active development
