@@ -60,6 +60,7 @@ sipwise/lcr-stopper_mode-parameter.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/dialog-dlg_set_var-support-empty-totag-param.patch
 sipwise/pv_headers-rework-pvh_remove_header_param.patch
+sipwise/usrloc-correct-AOR-value-on-usrloc-contact-expired.patch
 ### active development
 sipwise/presence-be-more-resilient-doing-clean-up.patch
 sipwise/tm-check-again-T-just-in-case-before-UNREF.patch
