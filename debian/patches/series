@@ -62,6 +62,7 @@ sipwise/kamctl-TMPDIR-config.patch
 sipwise/pv_headers-fix-build-warning.patch
 sipwise/pv_headers-use-memset.patch
 sipwise/pv_headers-rework-pvh_remove_header_param.patch
+sipwise/usrloc-correct-AOR-value-on-usrloc-contact-expired.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/presence-be-more-resilient-doing-clean-up.patch
