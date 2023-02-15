@@ -43,6 +43,7 @@ upstream/pv_headers-don-t-try-to-replace-header.patch
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
 upstream/permissions-trusted_cleanup_interval.patch
 upstream/nathelper-fix_nated_sdp-added-ignoring-RFC3605-param.patch
+upstream/dialog-deactivate-print-variable-function-which-is-o.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
