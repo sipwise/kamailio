@@ -41,6 +41,7 @@ upstream/utils-kamcmd-add-missing-USE_READLINE-define-for-pkg.patch
 ## upstream master
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
 upstream/permissions-trusted_cleanup_interval.patch
+upstream/dialog-deactivate-print-variable-function-which-is-o.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch

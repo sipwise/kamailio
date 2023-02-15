@@ -8,10 +8,10 @@ previously $ulc(x=>aor) had only the user part even with use_domain set
  1 file changed, 31 insertions(+), 8 deletions(-)
 
 diff --git a/src/modules/usrloc/udomain.c b/src/modules/usrloc/udomain.c
-index 4025cc5..d7b9e8a 100644
+index 204ddfd..534583e 100644
 --- a/src/modules/usrloc/udomain.c
 +++ b/src/modules/usrloc/udomain.c
-@@ -956,7 +956,7 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
+@@ -905,7 +905,7 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
  	db_val_t query_vals[3];
  	int key_num = 2;
  	db1_res_t* res = NULL;
@@ -20,7 +20,7 @@ index 4025cc5..d7b9e8a 100644
  	int i;
  	int n;
  	urecord_t r;
-@@ -964,6 +964,9 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
+@@ -913,6 +913,9 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
  #define RUIDBUF_SIZE 128
  	char ruidbuf[RUIDBUF_SIZE];
  	str ruid;
@@ -30,7 +30,7 @@ index 4025cc5..d7b9e8a 100644
  
  	if (ul_db_mode!=DB_ONLY) {
  		return 0;
-@@ -1058,6 +1061,14 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
+@@ -1007,6 +1010,14 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
  				continue;
  			}
  			user.len = strlen(user.s);
@@ -45,7 +45,7 @@ index 4025cc5..d7b9e8a 100644
  
  			ci = dbrow2info(ROW_VALUES(row)+1, &contact, 0);
  			if (ci==0) {
-@@ -1066,18 +1077,30 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
+@@ -1015,18 +1026,30 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
  				continue;
  			}
  
@@ -81,7 +81,7 @@ index 4025cc5..d7b9e8a 100644
  				goto error;
  			}
  
-@@ -1096,11 +1119,11 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
+@@ -1045,11 +1068,11 @@ int udomain_contact_expired_cb(db1_con_t* _c, udomain_t* _d)
  					ruid.len = c->ruid.len;
  				} else {
  					LM_ERR("ruid is too long %d for %.*s\n", c->ruid.len,
