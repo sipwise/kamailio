@@ -8,10 +8,10 @@ Subject: MT#55631 dialog: dlg_set_var() support empty totag parameter
  1 file changed, 2 insertions(+), 6 deletions(-)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index aedf8a7..8f4c806 100644
+index 4ecc858..fe07899 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -1663,7 +1663,7 @@ static int ki_dlg_set_var(sip_msg_t *msg, str *sc, str *sf, str *st, str *key, s
+@@ -1666,7 +1666,7 @@ static int ki_dlg_set_var(sip_msg_t *msg, str *sc, str *sf, str *st, str *key, s
  		LM_ERR("invalid From tag parameter\n");
  		return -1;
  	}
@@ -20,7 +20,7 @@ index aedf8a7..8f4c806 100644
  		LM_ERR("invalid To tag parameter\n");
  		return -1;
  	}
-@@ -1707,11 +1707,7 @@ static int w_dlg_set_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
+@@ -1710,11 +1710,7 @@ static int w_dlg_set_var(struct sip_msg *msg, char *ci, char *ft, char *tt, char
  		LM_ERR("unable to get To Tag\n");
  		return -1;
  	}
