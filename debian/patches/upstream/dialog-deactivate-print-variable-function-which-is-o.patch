@@ -1,0 +1,117 @@
+From: Henning Westerholt <hw@gilawa.com>
+Date: Wed, 16 Nov 2022 15:33:06 +0000
+Subject: dialog: deactivate print variable function which is only used for
+ debugging
+
+- deactivate print variable function which is only used for debugging
+- this function is not good for performance and might also cause race conditions
+---
+ src/modules/dialog/dialog.c             |  3 +++
+ src/modules/dialog/dlg_var.c            | 12 +++++++++---
+ src/modules/dialog/dlg_var.h            |  2 ++
+ src/modules/dialog/doc/dialog_admin.xml | 21 +++++++++++++++++++++
+ 4 files changed, 35 insertions(+), 3 deletions(-)
+
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index 25f3ca1..49888ec 100644
+--- a/src/modules/dialog/dialog.c
++++ b/src/modules/dialog/dialog.c
+@@ -141,6 +141,8 @@ stat_var *expired_dlgs = 0;
+ stat_var *failed_dlgs = 0;
+ stat_var *early_dlgs  = 0;
+ 
++int debug_variables_list = 0;
++
+ struct tm_binds d_tmb;
+ struct rr_binds d_rrb;
+ pv_spec_t timeout_avp;
+@@ -338,6 +340,7 @@ static param_export_t mod_params[]={
+ 	{ "h_id_step",             PARAM_INT, &dlg_h_id_step            },
+ 	{ "keep_proxy_rr",         INT_PARAM, &dlg_keep_proxy_rr        },
+ 	{ "dlg_filter_mode",       INT_PARAM, &dlg_filter_mode          },
++	{ "debug_variables",       PARAM_INT, &debug_variables_list     },
+ 	{ 0,0,0 }
+ };
+ 
+diff --git a/src/modules/dialog/dlg_var.c b/src/modules/dialog/dlg_var.c
+index 473736b..0e165c5 100644
+--- a/src/modules/dialog/dlg_var.c
++++ b/src/modules/dialog/dlg_var.c
+@@ -449,7 +449,9 @@ int set_dlg_variable(struct dlg_cell *dlg, str *key, str *val)
+     if ( dlg_db_mode==DB_MODE_REALTIME )
+         update_dialog_dbinfo(dlg);
+ 
+-    print_lists(dlg);
++    if(unlikely(debug_variables_list)) {
++        print_lists(dlg);
++    }
+ 
+     return 0;
+ 
+@@ -510,7 +512,9 @@ int pv_get_dlg_variable(struct sip_msg *msg, pv_param_t *param, pv_value_t *res)
+ 		}
+ 	}
+ 
+-	print_lists(dlg);
++	if(unlikely(debug_variables_list)) {
++		print_lists(dlg);
++	}
+ 
+ 	/* unlock dialog */
+ 	if (dlg) {
+@@ -584,7 +588,9 @@ int pv_set_dlg_variable(struct sip_msg* msg, pv_param_t *param, int op, pv_value
+ 		}
+ 		dlg_unlock(d_table, &(d_table->entries[dlg->h_entry]));
+ 	}
+-	print_lists(dlg);
++	if(unlikely(debug_variables_list)) {
++		print_lists(dlg);
++	}
+ 
+ 	dlg_release(dlg);
+ 	return 0;
+diff --git a/src/modules/dialog/dlg_var.h b/src/modules/dialog/dlg_var.h
+index 292e9f7..44bd6ec 100644
+--- a/src/modules/dialog/dlg_var.h
++++ b/src/modules/dialog/dlg_var.h
+@@ -89,6 +89,8 @@ extern stat_var *processed_dlgs;	/*!< number of processed dialogs */
+ extern stat_var *expired_dlgs;		/*!< number of expired dialogs */
+ extern stat_var *failed_dlgs;		/*!< number of failed dialogs */
+ 
++extern int debug_variables_list;
++
+ int pv_get_dlg_ctx(sip_msg_t *msg,  pv_param_t *param,
+ 		pv_value_t *res);
+ int pv_set_dlg_ctx(sip_msg_t *msg, pv_param_t *param,
+diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
+index 6fcaaf7..185c53a 100644
+--- a/src/modules/dialog/doc/dialog_admin.xml
++++ b/src/modules/dialog/doc/dialog_admin.xml
+@@ -1663,6 +1663,27 @@ modparam("dialog", "h_id_step", 10)
+ ...
+ modparam("dialog", "keep_proxy_rr", 1)
+ ...
++</programlisting>
++		</example>
++	</section>
++	<section id="dialog.p.debug_variables">
++		<title><varname>debug_variables</varname> (int)</title>
++		<para>
++			Activate additional debugging for printing internal lists for dialog variables.
++			This output is only visible at debug log level and should only be used for
++			debugging. By default its deactivated.
++		</para>
++		<para>
++		<emphasis>
++			Default value is <quote>0</quote>.
++		</emphasis>
++		</para>
++		<example>
++		<title>Set <varname>debug_variables</varname> parameter</title>
++		<programlisting format="linespecific">
++...
++modparam("dialog", "debug_variables", 1)
++...
+ </programlisting>
+ 		</example>
+ 	</section>
