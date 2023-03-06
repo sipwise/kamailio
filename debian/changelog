@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.2-1+0~mr10.5.3.2) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [7ca1c47] MT#56097 dialog: deactivate print_list
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 06 Mar 2023 09:47:36 +0100
+
 ngcp-kamailio (5.6.2-1+0~mr10.5.3.1) unstable; urgency=medium
 
   [ Victor Seva ]
