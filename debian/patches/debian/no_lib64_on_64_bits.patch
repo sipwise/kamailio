@@ -7,7 +7,7 @@ Subject: no_lib64_on_64_bits
  1 file changed, 1 insertion(+), 9 deletions(-)
 
 diff --git a/src/Makefile.defs b/src/Makefile.defs
-index 0e49c6f..4060de2 100644
+index 5ec3536..0635767 100644
 --- a/src/Makefile.defs
 +++ b/src/Makefile.defs
 @@ -454,15 +454,7 @@ endif

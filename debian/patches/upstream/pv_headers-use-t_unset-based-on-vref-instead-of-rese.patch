@@ -8,10 +8,10 @@ Subject: [PATCH] pv_headers: use t_unset() based on vref instead of resetting
  1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index f547f2d..8a2976e 100644
+index 64460a3..0bb710e 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -555,12 +555,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+@@ -604,12 +604,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
  		xavi_set_list(backup_xavis);
  		LM_DBG("restored backup_xavis:%p\n", *backup_xavis);
  	}

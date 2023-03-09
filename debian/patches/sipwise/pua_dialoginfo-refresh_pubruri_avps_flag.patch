@@ -8,7 +8,7 @@ Subject: pua_dialoginfo: refresh_pubruri_avps_flag
  2 files changed, 94 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 81ef722..49f9f0f 100644
+index eebad01..8595b33 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 @@ -433,7 +433,25 @@ modparam("pua_dialoginfo", "use_pubruri_avps", 1)

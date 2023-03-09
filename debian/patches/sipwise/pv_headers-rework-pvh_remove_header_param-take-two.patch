@@ -12,10 +12,10 @@ Subject: pv_headers: rework pvh_remove_header_param, take two
  4 files changed, 38 insertions(+), 28 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index 8a2976e..57be587 100644
+index 0bb710e..8c7539d 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -222,12 +222,15 @@ static int w_pvh_header_param_exists(
+@@ -223,12 +223,15 @@ static int w_pvh_header_param_exists(
  
  static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRemove)
  {
@@ -33,7 +33,7 @@ index 8a2976e..57be587 100644
  		if (avi->val.type == SR_XTYPE_STR && avi->val.v.s.s != NULL) {
  			if(str_casesearch(&avi->val.v.s, toRemove) != NULL) {
  				new_size = pvh_remove_header_param_helper(&avi->val.v.s, toRemove, &dst);
-@@ -236,13 +239,17 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
+@@ -237,13 +240,17 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
  							STR_FMT(hname), idx);
  					if(pvh_remove_header(msg, hname, idx) < 0)
  						return -1;
@@ -52,7 +52,7 @@ index 8a2976e..57be587 100644
  						LM_ERR("can't set new value\n");
  						return -1;
  					}
-@@ -252,7 +259,10 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
+@@ -253,7 +260,10 @@ static int ki_pvh_remove_header_param(struct sip_msg *msg, str *hname, str *toRe
  						STR_FMT(&avi->val.v.s));
  			}
  		}

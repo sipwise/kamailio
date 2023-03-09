@@ -39,7 +39,7 @@ index df1e085..fd0a3fa 100644
      <toc></toc>
      
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 191ee5f..81ef722 100644
+index cfc0fc7..eebad01 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 @@ -536,71 +536,7 @@ modparam("pua_dialoginfo", "callee_trying", 1)

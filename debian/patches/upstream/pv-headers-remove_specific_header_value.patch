@@ -84,10 +84,10 @@ index a5211b9..47d40e1 100644
  	<copyright>
  	    <year>2018</year>
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index 6dfac3d..be43bb2 100644
+index daf223c..5b2c0ee 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -205,6 +205,53 @@ static int w_pvh_remove_header(
+@@ -206,6 +206,53 @@ static int w_pvh_remove_header(
  	return pvh_remove_header(msg, &hname, indx);
  }
  
@@ -141,7 +141,7 @@ index 6dfac3d..be43bb2 100644
  /* clang-format off */
  static cmd_export_t cmds[] = {
  	{"pvh_collect_headers", (cmd_function)w_pvh_collect_headers, 0, 0, 0,
-@@ -225,6 +272,10 @@ static cmd_export_t cmds[] = {
+@@ -226,6 +273,10 @@ static cmd_export_t cmds[] = {
  			fixup_spve_null, fixup_free_spve_null, ANY_ROUTE},
  	{"pvh_remove_header", (cmd_function)w_pvh_remove_header, 2,
  			fixup_spve_spve, fixup_free_spve_spve, ANY_ROUTE},
@@ -152,7 +152,7 @@ index 6dfac3d..be43bb2 100644
  	{0, 0, 0, 0, 0, 0}
  };
  
-@@ -537,6 +588,16 @@ static sr_kemi_t pvh_kemi_exports[] = {
+@@ -586,6 +637,16 @@ static sr_kemi_t pvh_kemi_exports[] = {
  			{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
  				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
  	},

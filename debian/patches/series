@@ -37,11 +37,10 @@ upstream/pv-headers-remove_specific_header_value.patch
 # collides with our changes to pua_dialoginfo
 sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
 ## upstream 5.6
-upstream/utils-kamcmd-add-missing-USE_READLINE-define-for-pkg.patch
+#
 ## upstream master
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
 upstream/permissions-trusted_cleanup_interval.patch
-upstream/dialog-deactivate-print-variable-function-which-is-o.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
@@ -63,7 +62,6 @@ sipwise/kamctl-TMPDIR-config.patch
 sipwise/pv_headers-fix-build-warning.patch
 sipwise/pv_headers-use-memset.patch
 sipwise/pv_headers-rework-pvh_remove_header_param.patch
-sipwise/usrloc-correct-AOR-value-on-usrloc-contact-expired.patch
 ### active development
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/presence-be-more-resilient-doing-clean-up.patch
@@ -72,7 +70,6 @@ upstream/pv_headers-use-tm.t_find-API.patch
 upstream/tm-added-t_unset-intermodule-API-function.patch
 upstream/pv_headers-use-t_unset-based-on-vref-instead-of-rese.patch
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
-sipwise/pv_headers-fix-t_resume-scenario.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches

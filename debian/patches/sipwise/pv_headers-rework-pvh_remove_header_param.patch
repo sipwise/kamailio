@@ -13,10 +13,10 @@ Subject: pv_headers: rework pvh_remove_header_param
  3 files changed, 75 insertions(+), 81 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index be43bb2..9658ed7 100644
+index 5b2c0ee..73acd08 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -220,15 +220,47 @@ static int w_pvh_header_param_exists(
+@@ -221,15 +221,47 @@ static int w_pvh_header_param_exists(
  	return pvh_header_param_exists(msg, &hname, &value);
  }
  
@@ -69,7 +69,7 @@ index be43bb2..9658ed7 100644
  
  	if(fixup_get_svalue(msg, (gparam_p)p1, &hname) < 0)
  		return -1;
-@@ -236,20 +268,7 @@ static int w_pvh_remove_header_param(struct sip_msg *msg, char *p1, char *p2)
+@@ -237,20 +269,7 @@ static int w_pvh_remove_header_param(struct sip_msg *msg, char *p1, char *p2)
  	if(p2 && fixup_get_svalue(msg, (gparam_p)p2, &value) < 0)
  		return -1;
  
@@ -91,7 +91,7 @@ index be43bb2..9658ed7 100644
  }
  
  /* clang-format off */
-@@ -594,8 +613,8 @@ static sr_kemi_t pvh_kemi_exports[] = {
+@@ -643,8 +662,8 @@ static sr_kemi_t pvh_kemi_exports[] = {
  				SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE}
  	},
  	{ str_init("pv_headers"), str_init("pvh_remove_header_param"),
