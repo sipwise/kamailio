@@ -1105,7 +1105,7 @@ lookup_branches("location");
 4.5.  registered(domain [, uri [, match_option [, match_action]]])
 
    The function returns true if the AOR in the URI is registered, false
-   otherwise. The function does not modify the message being process, it
+   otherwise. The function does not modify the message being processed, it
    neither rewrites the Request-URI if a contact is found nor append
    branches. If uri parameter is not provided, then it considered to be
    the Request-URI for SIP requests and To-URI for SIP replies.
@@ -1175,7 +1175,7 @@ add_sock_hdr("Sock-Info");
      * uri - The SIP URI address of the user which to remove the contact
        addresses for. It can contain pseudo-variables that are evaluated
        at runtime.
-     * ruid - The record unique ID for a a specific contact to be removed.
+     * ruid - The record unique ID for a specific contact to be removed.
        It can contain pseudo-variables that are evaluated at runtime.
 
    This function can be used from ANY_ROUTE.
