@@ -8,7 +8,7 @@ Subject: usrloc_dbro
  2 files changed, 67 insertions(+)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index 797c252..2d274c1 100644
+index dc31c6f..55c5b6e 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
 @@ -167,6 +167,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta

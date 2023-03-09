@@ -7,10 +7,10 @@ Subject: [PATCH] pv_headers: use tm.t_find API
  1 file changed, 8 insertions(+), 13 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index e555e02..7da426c 100644
+index 3648335..d713611 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
-@@ -526,6 +526,7 @@ int handle_msg_branch_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+@@ -571,6 +571,7 @@ int handle_msg_branch_cb(struct sip_msg *msg, unsigned int flags, void *cb)
  
  int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
  {
@@ -18,9 +18,9 @@ index e555e02..7da426c 100644
  	tm_cell_t *t = NULL;
  	sr_xavp_t **backup_xavis = NULL;
  	sr_xavp_t **list = NULL;
-@@ -534,18 +535,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
- 		return 1;
+@@ -583,18 +584,12 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
  	LM_DBG("msg:%p previous branch:%d\n", msg, _branch);
+ 	print_cb_flags(flags);
  
 -	if(tmb.t_check(msg, &_branch) == -1) {
 -		LM_ERR("failed find UAC branch\n");
@@ -43,7 +43,7 @@ index e555e02..7da426c 100644
  	}
  
  	pvh_get_branch_index(msg, &_branch);
-@@ -560,7 +555,7 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
+@@ -609,7 +604,7 @@ int handle_msg_reply_cb(struct sip_msg *msg, unsigned int flags, void *cb)
  		xavi_set_list(backup_xavis);
  		LM_DBG("restored backup_xavis:%p\n", *backup_xavis);
  	}

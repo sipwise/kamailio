@@ -10,10 +10,10 @@ Subject: dialog: support profile_get_size for all profiles
  4 files changed, 70 insertions(+)
 
 diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
-index 49888ec..4ecc858 100644
+index 25f3ca1..aedf8a7 100644
 --- a/src/modules/dialog/dialog.c
 +++ b/src/modules/dialog/dialog.c
-@@ -2761,6 +2761,33 @@ static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name
+@@ -2758,6 +2758,33 @@ static void internal_rpc_profile_get_size(rpc_t *rpc, void *c, str *profile_name
  	return;
  }
  
@@ -47,7 +47,7 @@ index 49888ec..4ecc858 100644
  /*!
   * \brief Helper function that outputs the dialogs belonging to a given profile via the RPC interface
   * \see rpc_profile_print_dlgs
-@@ -2853,6 +2880,9 @@ static const char *rpc_dlg_set_state_doc[3] = {
+@@ -2850,6 +2877,9 @@ static const char *rpc_dlg_set_state_doc[3] = {
  static const char *rpc_profile_get_size_doc[2] = {
  	"Returns the number of dialogs belonging to a profile", 0
  };
@@ -57,7 +57,7 @@ index 49888ec..4ecc858 100644
  static const char *rpc_profile_print_dlgs_doc[2] = {
  	"Lists all the dialogs belonging to a profile", 0
  };
-@@ -3058,6 +3088,10 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c) {
+@@ -3055,6 +3085,10 @@ static void rpc_profile_get_size(rpc_t *rpc, void *c) {
  	}
  	return;
  }
@@ -68,7 +68,7 @@ index 49888ec..4ecc858 100644
  static void rpc_profile_print_dlgs(rpc_t *rpc, void *c) {
  	str profile_name = {NULL,0};
  	str value = {NULL,0};
-@@ -3475,6 +3509,7 @@ static rpc_export_t rpc_methods[] = {
+@@ -3472,6 +3506,7 @@ static rpc_export_t rpc_methods[] = {
  	{"dlg.dlg_list_ctx", rpc_print_dlg_ctx, rpc_print_dlg_ctx_doc, 0},
  	{"dlg.end_dlg", rpc_end_dlg_entry_id, rpc_end_dlg_entry_id_doc, 0},
  	{"dlg.profile_get_size", rpc_profile_get_size, rpc_profile_get_size_doc, 0},
@@ -112,10 +112,10 @@ index 3dc7be8..7a4f8b0 100644
  /*!
   * \brief Search a dialog profile in the global list
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 185c53a..45be914 100644
+index 23ca1fb..13b0f8f 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
-@@ -2877,6 +2877,28 @@ dlg_reset_property("timeout-noreset");
+@@ -2856,6 +2856,28 @@ dlg_reset_property("timeout-noreset");
  		</programlisting>
  		</section>
  

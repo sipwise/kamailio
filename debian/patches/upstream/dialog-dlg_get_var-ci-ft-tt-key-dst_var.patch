@@ -153,7 +153,7 @@ index 9f9f647..25584b5 100644
  		SR_KEMIP_INT, ki_set_dlg_profile_static,
  		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 5b8d99b..972b9e4 100644
+index 51faa16..9f20125 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
 @@ -2103,6 +2103,54 @@ if(dlg_get("abcdef", "123", "456"))
