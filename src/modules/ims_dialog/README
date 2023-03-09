@@ -465,7 +465,7 @@ modparam("ims_dialog", "detect_spirals", 1)
 
    Example 1.8. Set profiles_with_value parameter
 ...
-modparam("dialog", "profiles_with_value", "caller ; my_profile")
+modparam("ims_dialog", "profiles_with_value", "caller ; my_profile")
 ...
 
 5.16.  profiles_no_value (string)
@@ -476,7 +476,7 @@ modparam("dialog", "profiles_with_value", "caller ; my_profile")
 
    Example 1.9. Set profiles_no_value parameter
 ...
-modparam("dialog", "profiles_no_value", "inbound ; outbound")
+modparam("ims_dialog", "profiles_no_value", "inbound ; outbound")
 ...
 
 5.17.  bridge_controller (string)
@@ -487,7 +487,7 @@ modparam("dialog", "profiles_no_value", "inbound ; outbound")
 
    Example 1.10. Set bridge_controller parameter
 ...
-modparam("dialog", "bridge_controller", "sip:ctd@kamailio.org")
+modparam("ims_dialog", "bridge_controller", "sip:ctd@kamailio.org")
 ...
 
 5.18.  initial_cbs_inscript (string)
@@ -571,7 +571,7 @@ unset_dlg_profile("caller","$fu");
    Example 1.13.  is_in_profile usage
 ...
 if (is_in_profile("inbound_call")) {
-        log("this request belongs to a inbound call\n");
+        log("this request belongs to an inbound call\n");
 }
 ...
 if (is_in_profile("caller","XX")) {
@@ -1040,7 +1040,7 @@ Chapter 2. Developer Guide
 Chapter 3. Frequently Asked Questions
 
    3.1. What happened with “use_tight_match” parameter?
-   3.2. Why is there a ims_dialog module and a dialog module?
+   3.2. Why is there an ims_dialog module and a dialog module?
    3.3. Where can I find more about Kamailio?
    3.4. Where can I post a question about this module?
    3.5. How can I report a bug?
@@ -1055,7 +1055,7 @@ Chapter 3. Frequently Asked Questions
 
    3.2.
 
-   Why is there a ims_dialog module and a dialog module?
+   Why is there an ims_dialog module and a dialog module?
 
    The ims_dialog module addresses shortcomings in the initial dialog
    module design. It makes some large changes to the API and therefore

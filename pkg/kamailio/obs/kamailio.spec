@@ -1,5 +1,5 @@
 %define name    kamailio
-%define ver 5.6.2
+%define ver 5.6.4
 %define rel dev1.0%{dist}
 
 %if 0%{?fedora}
@@ -736,8 +736,11 @@ BuildRequires:  zlib-devel
 Requires:   libmysqlclient18
 BuildRequires:  libmysqlclient-devel
 %else
-Requires:   mysql-libs
+%if 0%{?rhel} == 6
 BuildRequires:  mysql-devel
+%else
+BuildRequires:  mariadb-devel
+%endif
 %endif
 
 %description    mysql
