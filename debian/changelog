@@ -1,11 +1,14 @@
-ngcp-kamailio (5.6.2-1+0~mr10.5.4.0) unstable; urgency=medium
+ngcp-kamailio (5.6.4-1+0~mr10.5.4.0) unstable; urgency=medium
 
-  [ Victor Seva ]
   * [413a400] MT#56147 kamcmd fix autocompletion
   * [5c2934a] MT#56147 import .gitignore from upstream
   * [0150337] MT#56241 pua_dialoginfo: use dlg_api.get_dlg_varval()
+  * MT#56613 usrloc: correct AOR value at usrloc:contact-expired
+  * MT#56097 dialog: deactivate print_list
+  * New upstream version 5.6.4
+  * MT#56873 remove already applied patches and refresh
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 22 Dec 2022 16:19:32 +0100
+ -- Victor Seva <vseva@debian.org>  Thu, 09 Mar 2023 11:04:36 +0100
 
 ngcp-kamailio (5.6.2-1+0~mr10.5.3.0) unstable; urgency=medium
 
