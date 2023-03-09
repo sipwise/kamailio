@@ -8,7 +8,7 @@ Subject: pua_dialoginfo: local_identity_dlg_var
  2 files changed, 36 insertions(+)
 
 diff --git a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
-index 7c4f08d..3f6a639 100644
+index bdf9efa..eaedbc4 100644
 --- a/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 +++ b/src/modules/pua_dialoginfo/doc/pua_dialoginfo_admin.xml
 @@ -620,6 +620,25 @@ modparam("pua_dialoginfo", "publish_dialog_req_within", 0)

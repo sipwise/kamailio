@@ -12,7 +12,7 @@ Subject: [PATCH] tm: new inter-module API function t_find(...)
  4 files changed, 27 insertions(+)
 
 diff --git a/src/modules/tm/t_lookup.c b/src/modules/tm/t_lookup.c
-index f041116..ad41f0d 100644
+index bc3dd5e..09063c1 100644
 --- a/src/modules/tm/t_lookup.c
 +++ b/src/modules/tm/t_lookup.c
 @@ -145,6 +145,28 @@ int get_t_branch()

@@ -140,7 +140,7 @@ index 25584b5..fec9f5e 100644
  		SR_KEMIP_INT, ki_set_dlg_profile_static,
  		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 diff --git a/src/modules/dialog/doc/dialog_admin.xml b/src/modules/dialog/doc/dialog_admin.xml
-index 972b9e4..6fcaaf7 100644
+index 9f20125..23ca1fb 100644
 --- a/src/modules/dialog/doc/dialog_admin.xml
 +++ b/src/modules/dialog/doc/dialog_admin.xml
 @@ -2151,6 +2151,54 @@ if(dlg_get_var("$var(ci)", "$var(ft)", "456", "test", "$var(tmp)"))

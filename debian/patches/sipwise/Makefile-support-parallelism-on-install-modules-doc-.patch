@@ -7,7 +7,7 @@ Subject: [PATCH] Makefile: support parallelism on install-modules-doc rule
  1 file changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/src/Makefile b/src/Makefile
-index 7a8a402..efffb56 100644
+index f10a178..e343caa 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -473,13 +473,10 @@ install-$(1)-doc: modules.lst $(doc_prefix)/$(doc_dir)$(1)

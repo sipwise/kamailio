@@ -13,7 +13,7 @@ Subject: [PATCH] tm: added t_unset() intermodule API function
  4 files changed, 18 insertions(+)
 
 diff --git a/src/modules/tm/t_lookup.c b/src/modules/tm/t_lookup.c
-index ad41f0d..dd2ed6f 100644
+index 09063c1..4936c30 100644
 --- a/src/modules/tm/t_lookup.c
 +++ b/src/modules/tm/t_lookup.c
 @@ -167,6 +167,19 @@ struct cell* t_find(struct sip_msg *msg, int *branch, int *vref)
