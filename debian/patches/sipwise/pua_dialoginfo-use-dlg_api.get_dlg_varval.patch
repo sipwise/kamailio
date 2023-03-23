@@ -4,22 +4,14 @@ Subject: pua_dialoginfo: use dlg_api.get_dlg_varval()
 
 * rework creating str_list from dlg_var
 ---
- src/modules/pua_dialoginfo/pua_dialoginfo.c | 37 +++++++++++++++--------------
- 1 file changed, 19 insertions(+), 18 deletions(-)
+ src/modules/pua_dialoginfo/pua_dialoginfo.c | 36 ++++++++++++++---------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
 diff --git a/src/modules/pua_dialoginfo/pua_dialoginfo.c b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-index 94efcef..4d5503f 100644
+index 94efcef..0fe87e3 100644
 --- a/src/modules/pua_dialoginfo/pua_dialoginfo.c
 +++ b/src/modules/pua_dialoginfo/pua_dialoginfo.c
-@@ -550,6 +550,7 @@ struct str_list* get_str_list(unsigned short avp_flags, int_str avp_name) {
- 			list_current=list_current->next;
- 		} else {
- 			list_current=list_first= (struct str_list*) shm_malloc( len);
-+			list_current->next = 0;
- 		}
- 
- 		if (list_current==0) {
-@@ -574,8 +575,8 @@ struct str_list* get_str_list(unsigned short avp_flags, int_str avp_name) {
+@@ -574,8 +574,8 @@ struct str_list* get_str_list(unsigned short avp_flags, int_str avp_name) {
  struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type, int disable_caller_publish, int disable_callee_publish)
  {
  	struct dlginfo_cell *dlginfo;
@@ -30,7 +22,7 @@ index 94efcef..4d5503f 100644
  
  	// generate new random uuid
  	if(sruid_next_safe(&_puadi_sruid) < 0) {
-@@ -651,39 +652,39 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type, int disable
+@@ -651,39 +651,39 @@ struct dlginfo_cell* get_dialog_data(struct dlg_cell *dlg, int type, int disable
  
  		} else {
  			if(caller_dlg_var.len>0
