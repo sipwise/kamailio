@@ -42,6 +42,7 @@ upstream/dialog-dlg_get_var-assure-return-null-on-error.patch
 upstream/dialog-w_dlg_get_var-fix-incompatible-pointer.patch
 sipwise/dialog-dlg_get_var-changes-in-API.patch
 upstream/presence-No-autocommit-rollback-if-no-active-watcher.patch
+upstream/app_lua-fix-crash-on-exausted-memory-scenario.patch
 ### relevant for upstream
 sipwise/Makefile-support-parallelism-on-install-modules-doc-.patch
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
