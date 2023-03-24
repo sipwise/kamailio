@@ -1,3 +1,15 @@
+ngcp-kamailio (5.6.4-1+0~mr11.4.0.0) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [c8d2eb7] MT#56490 lcr: stats by peer
+
+  [ Victor Seva ]
+  * [556c6fb] MT#56753 cfgt: don't dump same node twice
+  * [3351788] MT#56969 pua_dialoginfo: fix crash on memory exhaustion
+  * [831a147] MT#57011 app_lua: fix crash on exhausted memory scenario
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 24 Mar 2023 13:03:20 +0100
+
 ngcp-kamailio (5.6.4-1+0~mr11.3.0.0) unstable; urgency=medium
 
   * MT#56147 fix undefined symbol: get_dlg_variable
