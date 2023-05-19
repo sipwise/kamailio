@@ -22,10 +22,10 @@ Subject: add_presence_dfks_module
  create mode 100644 src/modules/presence_dfks/presence_dfks.h
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index 6b9e3b5..b357a3f 100644
+index 640e3fd..0a8d500 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
-@@ -118,7 +118,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
+@@ -121,7 +121,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
  					   presence_xml \
  					   pua pua_bla pua_dialoginfo pua_reginfo \
  					   pua_rpc pua_usrloc pua_xmpp \

@@ -12,7 +12,7 @@ Subject: pv_headers: rework pvh_remove_header_param, take two
  4 files changed, 38 insertions(+), 28 deletions(-)
 
 diff --git a/src/modules/pv_headers/pv_headers.c b/src/modules/pv_headers/pv_headers.c
-index 246339f..5afe2dc 100644
+index 7561b08..3e9e5a6 100644
 --- a/src/modules/pv_headers/pv_headers.c
 +++ b/src/modules/pv_headers/pv_headers.c
 @@ -223,12 +223,15 @@ static int w_pvh_header_param_exists(
@@ -103,7 +103,7 @@ index 918733c..09f70ba 100644
  	}
  
 diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
-index 8b2acbf..50cac4f 100644
+index 4f90808..6f63015 100644
 --- a/src/modules/pv_headers/pvh_xavp.c
 +++ b/src/modules/pv_headers/pvh_xavp.c
 @@ -131,18 +131,18 @@ static sr_xavp_t *pvh_xavi_new_value(str *name, sr_xval_t *val)

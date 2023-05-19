@@ -7,7 +7,7 @@ Subject: sca-fix-on-hold-detection-when-upstream-flow
  1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/sca/sca_call_info.c b/src/modules/sca/sca_call_info.c
-index ed43fe2..419df8c 100644
+index 27335d0..abca7d4 100644
 --- a/src/modules/sca/sca_call_info.c
 +++ b/src/modules/sca/sca_call_info.c
 @@ -948,11 +948,13 @@ int sca_call_info_invite_request_handler(sip_msg_t *msg,
