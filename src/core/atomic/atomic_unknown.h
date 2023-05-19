@@ -45,8 +45,13 @@
 #define membar() do {} while(0)
 #else /* SMP */
 
+#if defined __CPU_arm64 && defined __OS_darwin
+	/* fallback to locking-variant of atomic ops for OSes used for development
+	 * - MacOS with Apple silicon */
+#else
 #warning no native memory barrier implementations, falling back to slow lock \
-	       based workarround
+	       based workaround
+#endif
 
 #define MEMBAR_USES_LOCK
 
@@ -238,7 +243,7 @@ ATOMIC_FUNC_DECL1_RET(add, *var+=v;ret=*var, long, long, ret )
  */
 
 /* mb_atomic_{set,get} use membar() : if we're lucky we have membars
- * for the arch. (e.g. sparc32) => membar() might be cheaper then lock/unlock */
+ * for the arch. (e.g. sparc32) => membar() might be cheaper than lock/unlock */
 #define mb_atomic_set_int(v, i) \
 	do{ \
 		membar(); \

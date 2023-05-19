@@ -39,6 +39,7 @@
 #include "../../core/str.h"
 #include "../../core/mem/mem.h"
 #include "../../core/ut.h" /* for user2uid() */
+#include "../../core/kemi.h"
 #include "carrierroute.h"
 #include "cr_fixup.h"
 #include "cr_map.h"
@@ -87,18 +88,20 @@ static void mod_destroy(void);
 
 /************* Module Exports **********************************************/
 static cmd_export_t cmds[]={
-	{"cr_user_carrier",  (cmd_function)cr_load_user_carrier,  3,
-		cr_load_user_carrier_fixup, 0, REQUEST_ROUTE | FAILURE_ROUTE },
+	{"cr_user_carrier",  (cmd_function)cr_load_user_carrier,   3,
+		cr_load_user_carrier_fixup, cr_load_user_carrier_fixup_free,
+		REQUEST_ROUTE | FAILURE_ROUTE },
 	{"cr_route",         (cmd_function)cr_route5,              5,
-		cr_route_fixup,             0, REQUEST_ROUTE | FAILURE_ROUTE },
-	{"cr_route",         (cmd_function)cr_route,              6,
-		cr_route_fixup,             0, REQUEST_ROUTE | FAILURE_ROUTE },
-	{"cr_nofallback_route",(cmd_function)cr_nofallback_route5,     5,
-		cr_route_fixup,             0, REQUEST_ROUTE | FAILURE_ROUTE },
-	{"cr_nofallback_route",(cmd_function)cr_nofallback_route,     6,
-		cr_route_fixup,             0, REQUEST_ROUTE | FAILURE_ROUTE },
-	{"cr_next_domain",   (cmd_function)cr_load_next_domain,   6,
-		cr_load_next_domain_fixup,  0, REQUEST_ROUTE | FAILURE_ROUTE },
+		cr_route_fixup, cr_route_fixup_free, REQUEST_ROUTE | FAILURE_ROUTE },
+	{"cr_route",         (cmd_function)cr_route,               6,
+		cr_route_fixup, cr_route_fixup_free, REQUEST_ROUTE | FAILURE_ROUTE },
+	{"cr_nofallback_route",(cmd_function)cr_nofallback_route5, 5,
+		cr_route_fixup, cr_route_fixup_free, REQUEST_ROUTE | FAILURE_ROUTE },
+	{"cr_nofallback_route",(cmd_function)cr_nofallback_route,  6,
+		cr_route_fixup, cr_route_fixup_free, REQUEST_ROUTE | FAILURE_ROUTE },
+	{"cr_next_domain",   (cmd_function)cr_load_next_domain,    6,
+		cr_load_next_domain_fixup, cr_load_next_domain_fixup_free,
+		REQUEST_ROUTE | FAILURE_ROUTE },
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -268,4 +271,54 @@ static void mod_destroy(void) {
 		carrierroute_db_close();
 	}
 	destroy_route_data();
+}
+
+
+/**
+ *
+ */
+/* clang-format off */
+static sr_kemi_t sr_kemi_carrierroute_exports[] = {
+	{ str_init("carrierroute"), str_init("cr_user_carrier"),
+		SR_KEMIP_INT, ki_cr_load_user_carrier,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("carrierroute"), str_init("cr_route"),
+		SR_KEMIP_INT, ki_cr_route,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE }
+	},
+	{ str_init("carrierroute"), str_init("cr_route_info"),
+		SR_KEMIP_INT, ki_cr_route_info,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR }
+	},
+	{ str_init("carrierroute"), str_init("cr_nofallback_route"),
+		SR_KEMIP_INT, ki_cr_nofallback_route,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE }
+	},
+	{ str_init("carrierroute"), str_init("cr_nofallback_route_info"),
+		SR_KEMIP_INT, ki_cr_nofallback_route_info,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR }
+	},
+	{ str_init("carrierroute"), str_init("cr_next_domain"),
+		SR_KEMIP_INT, ki_cr_load_next_domain,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+			SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR }
+	},
+
+	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }
+};
+/* clang-format on */
+
+/**
+ *
+ */
+int mod_register(char *path, int *dlflags, void *p1, void *p2)
+{
+	sr_kemi_modules_add(sr_kemi_carrierroute_exports);
+	return 0;
 }

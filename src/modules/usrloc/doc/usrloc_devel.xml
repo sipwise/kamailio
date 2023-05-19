@@ -416,7 +416,7 @@
 
 	<section>
 		<title>
-		<function moreinfo="none">ul_bind_ursloc( api )
+		<function moreinfo="none">ul_bind_ursloc(api)
 			</function>
 		</title>
 		<para>
@@ -435,12 +435,12 @@
 
 	<section>
 		<title>
-		<function moreinfo="none">ul_register_ulcb(type ,callback, param)
+		<function moreinfo="none">ul_register_ulcb(type, callback, param)
 			</function>
 		</title>
 		<para>
 		The function register with USRLOC a callback function to be called
-		when some event occures inside USRLOC.
+		when some event occurs inside USRLOC.
 		</para>
 		<para>Meaning of the parameters is as follows:</para>
 		<itemizedlist>

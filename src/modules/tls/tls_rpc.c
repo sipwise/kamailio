@@ -92,7 +92,7 @@ static void tls_reload(rpc_t* rpc, void* ctx)
 
  error:
 	tls_free_cfg(cfg);
-	
+
 }
 
 
@@ -115,6 +115,9 @@ static void tls_list(rpc_t* rpc, void* c)
 	struct tls_extra_data* tls_d;
 	struct tcp_connection* con;
 	int i, len, timeout;
+	struct tm timestamp;
+	char timestamp_s[128];
+	const char* sni;
 
 	TCPCONN_LOCK;
 	for(i = 0; i < TCP_ID_HASH_SIZE; i++) {
@@ -132,8 +135,29 @@ static void tls_list(rpc_t* rpc, void* c)
 				BUG("failed to convert destination ip");
 			dst_ip[len] = 0;
 			timeout = TICKS_TO_S(con->timeout - get_ticks_raw());
-			rpc->struct_add(handle, "ddsdsd",
+			timestamp = *localtime(&con->timestamp);
+			if (snprintf(timestamp_s, 128, "%d-%02d-%02d %02d:%02d:%02d", timestamp.tm_year + 1900,
+					timestamp.tm_mon + 1, timestamp.tm_mday, timestamp.tm_hour,
+					timestamp.tm_min, timestamp.tm_sec) < 0) {
+				timestamp_s[0] = 'N';
+				timestamp_s[1] = '/';
+				timestamp_s[2] = 'A';
+				timestamp_s[3] = '\0';
+			}
+
+			if (tls_d) {
+				sni = SSL_get_servername(tls_d->ssl, TLSEXT_NAMETYPE_host_name);
+				if (sni == NULL) {
+					sni = "N/A";
+				}
+			} else {
+				sni = "N/A";
+			}
+
+			rpc->struct_add(handle, "dssdsdsd",
 					"id", con->id,
+					"sni", sni,
+					"timestamp", timestamp_s,
 					"timeout", timeout,
 					"src_ip", src_ip,
 					"src_port", con->rcv.src_port,
@@ -255,7 +279,7 @@ static void tls_options(rpc_t* rpc, void* c)
 
 
 rpc_export_t tls_rpc[] = {
-	{"tls.reload", tls_reload, tls_reload_doc, 0},
+	{"tls.reload", tls_reload, tls_reload_doc, RPC_EXEC_DELTA},
 	{"tls.list",   tls_list,   tls_list_doc,   RET_ARRAY},
 	{"tls.info",   tls_info,   tls_info_doc, 0},
 	{"tls.options",tls_options, tls_options_doc, 0},

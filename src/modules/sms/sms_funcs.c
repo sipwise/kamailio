@@ -226,7 +226,7 @@ int push_on_network(struct sip_msg *msg, int net)
 	/* allocs a new sms_msg structure in shared memory */
 	sms_messg = (struct sms_msg*)shm_malloc(len);
 	if (!sms_messg) {
-		LM_ERR("failed to get shm memory!\n");
+		SHM_MEM_ERROR;
 		goto error;
 	}
 	p = (char*)sms_messg + sizeof(struct sms_msg);
@@ -341,7 +341,7 @@ int send_sip_msg_request(str *to, str *from_user, str *body)
 	if (hdrs.s) pkg_free(hdrs.s);
 	return foo;
 error:
-	LM_ERR("no free pkg memory!\n");
+	PKG_MEM_ERROR;
 	if (from.s) pkg_free(from.s);
 	if (hdrs.s) pkg_free(hdrs.s);
 	return -1;
@@ -371,7 +371,7 @@ static inline int send_error(struct sms_msg *sms_messg, char *msg1_s, int msg1_l
 	pkg_free( body.s );
 	return foo;
 error:
-	LM_ERR("no free pkg memory!\n");
+	PKG_MEM_ERROR;
 	return -1;
 
 }
@@ -531,7 +531,7 @@ int send_sms_as_sip( struct incame_sms *sms )
 	   the sip destination address;
 	   The sms body can to be in the following two formats:
 	   1. The entire or part of the sent header still exists - we will
-	      pars it and consider the start of the sip message the first
+	      parse it and consider the start of the sip message the first
 	      character that doesn't match the header!
 	   2. The sms body is totally different of the send sms -> search for a
 	      sip address inside; everything before it is ignored, only the
@@ -732,7 +732,7 @@ int _send_sms_as_sip(struct incame_sms *sms, struct modem *mdm)
 			break;
 	}
 	
-	/* CASE IMPOSIBLE!!!!, scan assume default value SMS_BODY_SCAN */
+	/* CASE IMPOSSIBLE!!!!, scan assume default value SMS_BODY_SCAN */
 	LM_ERR("SMS bad config param scan: %d for modem: %s\n",
 		mdm->scan, mdm->name);
 
@@ -888,7 +888,7 @@ void modem_process(struct modem *mdm)
 			if (getsms(&sms,mdm,i)!=-1) {
 				k++;
 				LM_DBG("SMS Get from location %d\n",i);
-				/*for test ;-) ->  to be remove*/
+				/*for test ;-) ->  to be removed*/
 				LM_DBG("SMS RECEIVED:\n\rFrom: %s %s\n\r%.*s %.*s"
 					"\n\r\"%.*s\"\n\r",sms.sender,sms.name,
 					DATE_LEN,sms.date,TIME_LEN,sms.time,

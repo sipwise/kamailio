@@ -322,7 +322,7 @@ void dprint_term_color(char f, char b, str *obuf)
 	p = term_color;
 	end = p + TERM_COLOR_SIZE;
 
-	/* excape sequence */
+	/* escape sequence */
 	dprint_termc_add(p, end, "\033[");
 
 	if(f!='_')
@@ -506,7 +506,7 @@ void log_prefix_set(sip_msg_t *msg)
 	log_callid_set(msg);
 	if(log_prefix_pvs == NULL)
 		return;
-	if(msg==NULL || !(IS_SIP(msg) || IS_SIP_REPLY(msg))) {
+	if(msg==NULL || !IS_SIP_MSG(msg)) {
 		log_prefix_val = NULL;
 		return;
 	}

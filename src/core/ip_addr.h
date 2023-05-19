@@ -134,6 +134,16 @@ typedef struct socket_info {
 #endif /* USE_MCAST */
 } socket_info_t;
 
+typedef struct socket_attrs {
+	int bindproto;
+	str bindaddr;
+	int bindport;
+	str useaddr;
+	int useport;
+	str sockname;
+	int workers;
+	int sflags;
+} socket_attrs_t;
 
 /* send flags */
 typedef enum send_flags {
@@ -294,6 +304,8 @@ char* get_proto_name(unsigned int proto);
 int get_valid_proto_string(unsigned int iproto, int utype, int vtype,
 		str *sproto);
 
+char* get_af_name(unsigned int af);
+
 #ifdef USE_MCAST
 /* Returns 1 if the given address is a multicast address */
 int is_mcast(struct ip_addr* ip);
@@ -301,7 +313,7 @@ int is_mcast(struct ip_addr* ip);
 
 /* returns 1 if the given ip address is INADDR_ANY or IN6ADDR_ANY,
  * 0 otherwise */
-inline static int ip_addr_any(struct ip_addr* ip)
+inline static int ip_addr_any(const struct ip_addr* ip)
 {
 	int r;
 	int l;
@@ -316,7 +328,7 @@ inline static int ip_addr_any(struct ip_addr* ip)
 
 /* returns 1 if the given ip address is a loopback address
  * 0 otherwise */
-inline static int ip_addr_loopback(struct ip_addr* ip)
+inline static int ip_addr_loopback(const struct ip_addr* ip)
 {
 	if (ip->af==AF_INET)
 		return ip->u.addr32[0]==htonl(INADDR_LOOPBACK);
@@ -352,7 +364,7 @@ inline static void ip_addr_mk_any(int af, struct ip_addr* ip)
 
 /* returns 1 if ip & net.mask == net.ip ; 0 otherwise & -1 on error
  * [ diff. address families ]) */
-inline static int matchnet(struct ip_addr* ip, struct net* net)
+inline static int matchnet(const struct ip_addr* ip, const struct net* net)
 {
 	unsigned int r;
 
@@ -371,7 +383,7 @@ inline static int matchnet(struct ip_addr* ip, struct net* net)
 
 
 /* inits an ip_addr pointer from a sockaddr structure*/
-static inline void sockaddr2ip_addr(struct ip_addr* ip, struct sockaddr* sa)
+static inline void sockaddr2ip_addr(struct ip_addr* ip, const struct sockaddr* sa)
 {
 	switch(sa->sa_family){
 		case AF_INET:
@@ -447,7 +459,7 @@ static inline void su_setport(union sockaddr_union* su, unsigned short port)
 
 
 /* inits an ip_addr pointer from a sockaddr_union ip address */
-static inline void su2ip_addr(struct ip_addr* ip, union sockaddr_union* su)
+static inline void su2ip_addr(struct ip_addr* ip, const union sockaddr_union* su)
 {
 	switch(su->s.sa_family){
 		case AF_INET:
@@ -595,7 +607,7 @@ struct hostent* ip_addr2he(str* name, struct ip_addr* ip);
 
 /* init a dest_info structure from a recv_info structure */
 inline static void init_dst_from_rcv(struct dest_info* dst,
-		struct receive_info* rcv)
+		const struct receive_info* rcv)
 {
 	dst->send_sock=rcv->bind_address;
 	dst->to=rcv->src_su;

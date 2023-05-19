@@ -40,6 +40,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
+ 
 
 #include <stdio.h>
 #include "ims_usrloc_pcscf_mod.h"
@@ -62,6 +63,11 @@ MODULE_VERSION
 #define DEFAULT_DBG_FILE "/var/log/usrloc_debug"
 static FILE *debug_file;
 
+int audit_expired_pcontacts_timeout = 40;
+int audit_expired_pcontacts_interval = 60;
+
+static void audit_usrloc_expired_pcontacts_timer(unsigned int ticks, void* param);
+
 static int mod_init(void);                          /*!< Module initialization function */
 static void destroy(void);                          /*!< Module destroy function */
 static void timer(unsigned int ticks, void* param); /*!< Timer handler */
@@ -77,13 +83,13 @@ int expires_grace = 3600;   //default is a grace period of 1 hour - after this c
  * Module parameters and their default values
  */
 str usrloc_debug_file = str_init(DEFAULT_DBG_FILE);
-int usrloc_debug 	= 0;
-int ul_hash_size = 9;
-int init_flag = 0;
-str db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
-int timer_interval  = 60;						/*!< Timer interval in seconds */
-int db_mode         = 0;						/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
-int ul_fetch_rows 	= 2000;
+int usrloc_debug 	  = 0;
+int ul_hash_size      = 9;
+int ims_ulp_init_flag = 0;
+str db_url            = str_init(DEFAULT_DB_URL);	/*!< Database URL */
+int timer_interval    = 60;						/*!< Timer interval in seconds */
+int db_mode           = 0;						/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
+int ul_fetch_rows 	  = 2000;
 int match_contact_host_port = 1;					/*!< Should we match contact just based on rui host and port*/
 
 db1_con_t* ul_dbh = 0;
@@ -110,8 +116,10 @@ static param_export_t params[] = {
 	{"timer_interval",      INT_PARAM, &timer_interval  },
 	{"db_mode",             INT_PARAM, &db_mode         },
 
-	{"match_contact_host_port",		INT_PARAM, &match_contact_host_port	},
-        {"expires_grace",		INT_PARAM, &expires_grace	},
+	{"match_contact_host_port",	                   INT_PARAM, &match_contact_host_port },
+         {"audit_expired_pcontacts_timeout",            INT_PARAM, &audit_expired_pcontacts_timeout },
+         {"audit_expired_pcontacts_interval",           INT_PARAM, &audit_expired_pcontacts_interval },
+         {"expires_grace",       INT_PARAM, &expires_grace },
 
 	{0, 0, 0}
 };
@@ -178,6 +186,11 @@ static int mod_init(void) {
 	LM_DBG("Registering cache timer");
 	register_timer(timer, 0, timer_interval);
 
+        /* Register audit timer */
+        if (db_mode == DB_ONLY)
+            register_timer(audit_usrloc_expired_pcontacts_timer, 0, audit_expired_pcontacts_interval);
+
+
 	/* init the callbacks list */
 	if (init_ulcb_list() < 0) {
 		LM_ERR("usrloc/callbacks initialization failed\n");
@@ -191,14 +204,19 @@ static int mod_init(void) {
 			return -1;
 		}
 
-		if (init_db(&db_url, timer_interval, ul_fetch_rows) != 0) {
-			LM_ERR("Error initializing db connection\n");
-			return -1;
-		}
+                if (db_bind_mod(&db_url, &ul_dbf) < 0) { /* Find database module */
+                        LM_ERR("failed to bind database module\n");
+                        return -1;
+                }
+                if (!DB_CAPABILITY(ul_dbf, DB_CAP_ALL)) {
+                        LM_ERR("database module does not implement all functions"
+                                        " needed by the module\n");
+                        return -1;
+                }
 		LM_DBG("Running in DB mode %i\n", db_mode);
 	}
 
-	init_flag = 1;
+	ims_ulp_init_flag = 1;
 
 	return 0;
 }
@@ -225,10 +243,12 @@ static int child_init(int _rank)
 	}
 
 	LM_DBG("Connecting to usrloc_pcscf DB for rank %d\n", _rank);
-	if (connect_db(&db_url) != 0) {
-		LM_ERR("child(%d): failed to connect to database\n", _rank);
-		return -1;
-	}
+        ul_dbh = ul_dbf.init(&db_url); /* Get a database connection per child */
+
+        if (!ul_dbh) {
+                LM_ERR("child(%d): failed to connect to database\n", _rank);
+                return -1;
+        }
 	/* _rank==PROC_SIPINIT is used even when fork is disabled */
 	if (_rank==PROC_SIPINIT && db_mode!=DB_ONLY) {
 		// if cache is used, populate domains from DB
@@ -261,6 +281,17 @@ static void destroy(void)
 
 	if (db_mode)
 		destroy_db();
+
+        if (cbp_qos)
+           shm_free(cbp_qos);
+
+        if (cbp_registrar)
+           shm_free(cbp_registrar);            
+}
+
+static void audit_usrloc_expired_pcontacts_timer(unsigned int ticks, void* param) {
+
+     audit_usrloc_expired_pcontacts(root->d);
 }
 
 

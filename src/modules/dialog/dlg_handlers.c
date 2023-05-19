@@ -42,7 +42,6 @@
 #include "../../core/parser/parse_from.h"
 #include "../../core/parser/parse_cseq.h"
 #include "../../core/parser/contact/parse_contact.h"
-#include "../../core/parser/parse_from.h"
 #include "../../core/parser/parse_rr.h"
 #include "../../modules/tm/tm_load.h"
 #include "../rr/api.h"
@@ -72,6 +71,7 @@ extern int       dlg_event_rt[DLG_EVENTRT_MAX];
 extern int       dlg_wait_ack;
 extern int       dlg_enable_dmq;
 extern int       dlg_filter_mode;
+extern int       dlg_ctxiuid_mode;
 int              spiral_detected = -1;
 
 extern struct rr_binds d_rrb;		/*!< binding to record-routing module */
@@ -90,6 +90,9 @@ static unsigned int CURR_DLG_ID  = 0xffffffff;	/*!< current dialog id */
 #define RR_DLG_PARAM_SIZE  (2*2*sizeof(int)+3+MAX_DLG_RR_PARAM_NAME)
 /*! separator inside the record-route paramter */
 #define DLG_SEPARATOR      '.'
+
+/*! flags for dlg_ctxiuid */
+#define DLG_CTXIUID_MODE_CANCEL 1
 
 int dlg_set_tm_callbacks(tm_cell_t *t, sip_msg_t *req, dlg_cell_t *dlg,
 		int mode);
@@ -401,7 +404,7 @@ static void dlg_terminated(sip_msg_t *req, dlg_cell_t *dlg, unsigned int dir)
 	if(iuid==NULL)
 		return;
 
-    /* register callback for the coresponding reply */
+    /* register callback for the corresponding reply */
     if (d_tmb.register_tmcb(req,
                             0,
                             TMCB_RESPONSE_OUT,
@@ -945,6 +948,8 @@ int dlg_new_dialog(sip_msg_t *req, struct cell *t, const int run_initial_cbs)
 		LM_ERR("failed to create new dialog\n");
 		return -1;
 	}
+	// Store link to Transaction
+	dlg->t = t;
 
 	/* save caller's tag, cseq, contact and record route*/
 	if (populate_leg_info(dlg, req, t, DLG_CALLER_LEG,
@@ -1255,6 +1260,10 @@ dlg_cell_t *dlg_lookup_msg_dialog(sip_msg_t *msg, unsigned int *dir)
 		LM_DBG("dlg with callid '%.*s' not found\n",
 				msg->callid->body.len, msg->callid->body.s);
 		return NULL;
+	}
+	if((dlg_ctxiuid_mode & DLG_CTXIUID_MODE_CANCEL) && IS_SIP_REQUEST(msg)
+			&& (msg->first_line.u.request.method_value == METHOD_CANCEL)) {
+		dlg_set_ctx_iuid(dlg);
 	}
 	if(dir) *dir = vdir;
 	return dlg;

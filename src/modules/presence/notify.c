@@ -1272,7 +1272,7 @@ int get_subs_db(
 		return -1;
 
 	if(result->n <= 0) {
-		LM_DBG("The query for subscribtion for [uri]= %.*s for [event]= %.*s"
+		LM_DBG("The query for subscription for [uri]= %.*s for [event]= %.*s"
 			   " returned no result\n",
 				pres_uri->len, pres_uri->s, event->name.len, event->name.s);
 		pa_dbf.free_result(pa_db, result);
@@ -1949,7 +1949,7 @@ int pres_get_delete_sub(void)
 
 	vavp = xavp_get_child_with_ival(&pres_xavp_cfg, &vname);
 	if(vavp != NULL) {
-		return (int)vavp->val.v.i;
+		return (int)vavp->val.v.l;
 	}
 
 	return 0;
@@ -2867,6 +2867,7 @@ int process_dialogs(int round, int presence_winfo)
 	str ev_sname, winfo = str_init("presence.winfo");
 	int now = (int)time(NULL);
 	int updated = 0;
+	int no_active_watchers = 0;
 	db_query_f query_fn = pa_dbf.query_lock ? pa_dbf.query_lock : pa_dbf.query;
 
 	query_cols[n_query_cols] = &str_updated_col;
@@ -2900,13 +2901,6 @@ int process_dialogs(int round, int presence_winfo)
 		goto error;
 	}
 
-	if(pa_dbf.start_transaction) {
-		if(pa_dbf.start_transaction(pa_db, pres_db_table_lock) < 0) {
-			LM_ERR("in start_transaction\n");
-			goto error;
-		}
-	}
-
 	/* Step 1: Find active_watchers that require notification */
 	if(query_fn(pa_db, query_cols, query_ops, query_vals, result_cols,
 			   n_query_cols, n_result_cols, 0, &dialog_list)
@@ -2920,7 +2914,17 @@ int process_dialogs(int round, int presence_winfo)
 	}
 
 	if(dialog_list->n <= 0)
+	{
+		no_active_watchers = 1;
 		goto done;
+	}
+
+	if(pa_dbf.start_transaction) {
+		if(pa_dbf.start_transaction(pa_db, pres_db_table_lock) < 0) {
+			LM_ERR("in start_transaction\n");
+			goto error;
+		}
+	}
 
 	/* Step 2: Update the records so they are not notified again */
 	if(pa_dbf.update(pa_db, query_cols, query_ops, query_vals, update_cols,
@@ -3164,7 +3168,7 @@ error:
 	if(dialog)
 		pa_dbf.free_result(pa_db, dialog);
 
-	if(pa_dbf.abort_transaction) {
+	if(no_active_watchers == 0 && pa_dbf.abort_transaction) {
 		if(pa_dbf.abort_transaction(pa_db) < 0)
 			LM_ERR("in abort_transaction\n");
 	}

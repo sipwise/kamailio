@@ -1220,6 +1220,7 @@ struct tcp_connection* tcpconn_new(int sock, union sockaddr_union* su,
 	c->rcv.proto_reserved2=0;
 	c->state=state;
 	c->extra_data=0;
+	c->timestamp=time(NULL);
 #ifdef USE_TLS
 	if (type==PROTO_TLS){
 		if (tls_tcpconn_init(c, sock)==-1) goto error;
@@ -1473,7 +1474,7 @@ int tcpconn_finish_connect( struct tcp_connection* c,
 		new_conn_alias_flags=cfg_get(tcp, tcp_cfg, new_conn_alias_flags);
 		TCPCONN_LOCK;
 			/* remove all the aliases except the first one and re-add them
-			 * (there shouldn't be more then the 3 default aliases at this
+			 * (there shouldn't be more than the 3 default aliases at this
 			 * stage) */
 			if (c->aliases > 1) {
 				for (r=1; r<c->aliases; r++){
@@ -1511,13 +1512,13 @@ inline static struct tcp_connection*  tcpconn_add(struct tcp_connection *c)
 		new_conn_alias_flags=cfg_get(tcp, tcp_cfg, new_conn_alias_flags);
 		TCPCONN_LOCK;
 		c->flags|=F_CONN_HASHED;
-		/* add it at the begining of the list*/
+		/* add it at the beginning of the list*/
 		tcpconn_listadd(tcpconn_id_hash[c->id_hash], c, id_next, id_prev);
 		/* set the aliases */
 		/* first alias is for (peer_ip, peer_port, 0 ,0) -- for finding
 		 *  any connection to peer_ip, peer_port
 		 * the second alias is for (peer_ip, peer_port, local_addr, 0) -- for
-		 *  finding any conenction to peer_ip, peer_port from local_addr 
+		 *  finding any connection to peer_ip, peer_port from local_addr 
 		 * the third alias is for (peer_ip, peer_port, local_addr, local_port) 
 		 *   -- for finding if a fully specified connection exists 
 		 * the fourth alias is for (peer_ip, peer_port, cinfo_addr, 0) -- for
@@ -2562,7 +2563,7 @@ static int tcpconn_send_put(struct tcp_connection* c, const char* buf,
 			}
 			/* handle fd closed or bad connection/error
 				(it's possible that this happened in the time between
-				we found the intial connection and the time when we get
+				we found the initial connection and the time when we get
 				the fd)
 			 */
 			if (unlikely(c!=tmp || fd==-1 || c->state==S_CONN_BAD)){
@@ -3201,8 +3202,7 @@ error:
 inline static void tcpconn_close_main_fd(struct tcp_connection* tcpconn)
 {
 	int fd;
-	
-	
+
 	fd=tcpconn->s;
 #ifdef USE_TLS
 	if (tcpconn->type==PROTO_TLS || tcpconn->type==PROTO_WSS)
@@ -3211,6 +3211,16 @@ inline static void tcpconn_close_main_fd(struct tcp_connection* tcpconn)
 #ifdef TCP_FD_CACHE
 	if (likely(cfg_get(tcp, tcp_cfg, fd_cache))) shutdown(fd, SHUT_RDWR);
 #endif /* TCP_FD_CACHE */
+	if(unlikely(cfg_get(tcp, tcp_cfg, close_rst))) {
+		struct linger sl = {
+				.l_onoff = 1,  /* non-zero value enables linger option in kernel */
+				.l_linger = 0, /* timeout interval in seconds */
+		};
+		if(setsockopt(fd, SOL_SOCKET, SO_LINGER, &sl, sizeof(sl))<0) {
+			LM_WARN("setsockopt SO_LINGER %d - %s\n", errno,
+						strerror(errno));
+		}
+	}
 	if (unlikely(tcp_safe_close(fd)<0))
 		LM_ERR("(%p): %s close(%d) failed (flags 0x%x): %s (%d)\n", tcpconn,
 					su2a(&tcpconn->rcv.src_su, sizeof(tcpconn->rcv.src_su)),
@@ -3634,7 +3644,7 @@ inline static int handle_tcp_child(struct tcp_child* tcp_c, int fd_i)
 			/* should never happen */
 			LM_CRIT("too few bytes received (%d)\n", bytes );
 			bytes=0; /* something was read so there is no error; otoh if
-					  receive_fd returned less then requested => the receive
+					  receive_fd returned less than requested => the receive
 					  buffer is empty => no more io queued on this fd */
 			goto end;
 		}
@@ -3873,7 +3883,7 @@ inline static int handle_ser_child(struct process_table* p, int fd_i)
 			/* should never happen */
 			LM_CRIT("too few bytes received (%d)\n", bytes );
 			ret=0; /* something was read so there is no error; otoh if
-					  receive_fd returned less then requested => the receive
+					  receive_fd returned less than requested => the receive
 					  buffer is empty => no more io queued on this fd */
 			goto end;
 		}
@@ -3936,7 +3946,7 @@ inline static int handle_ser_child(struct process_table* p, int fd_i)
 			} else if (unlikely(send_fd(p->unix_sock, &tcpconn,
 										sizeof(tcpconn), tcpconn->s)<=0)){
 				LM_ERR("CONN_GET_FD: send_fd failed\n");
-				/* try sending error (better then not sending anything) */
+				/* try sending error (better than not sending anything) */
 				tmp = 0;
 				if (unlikely(send_all(p->unix_sock, &tmp, sizeof(tmp)) <= 0))
 					BUG("handle_ser_child: CONN_GET_FD:"
@@ -4406,7 +4416,7 @@ static inline int handle_new_connect(struct socket_info* si)
  * params: tcpconn - pointer to the tcp_connection for which we have an io ev.
  *         fd_i    - index in the fd_array table (needed for delete)
  * returns:  handle_* return convention, but on success it always returns 0
- *           (because it's one-shot, after a succesful execution the fd is
+ *           (because it's one-shot, after a successful execution the fd is
  *            removed from tcp_main's watch fd list and passed to a child =>
  *            tcp_main is not interested in further io events that might be
  *            queued for this fd)
@@ -4590,7 +4600,7 @@ error:
  * return: -1 on error
  *          0 on EAGAIN or when by some other way it is known that no more 
  *            io events are queued on the fd (the receive buffer is empty).
- *            Usefull to detect when there are no more io events queued for
+ *            Useful to detect when there are no more io events queued for
  *            sigio_rt, epoll_et, kqueue.
  *         >0 on successfull read from the fd (when there might be more io
  *            queued -- the receive buffer might still be non-empty)
@@ -4849,7 +4859,7 @@ void tcp_main_loop()
 					goto error;
 			}
 	}
-	/* add all the unix sokets used for communication with the tcp childs */
+	/* add all the unix sockets used for communication with the tcp childs */
 	for (r=0; r<tcp_children_no; r++){
 		if (tcp_children[r].unix_sock>0)/*we can't have 0, we never close it!*/
 			if (io_watch_add(&io_h, tcp_children[r].unix_sock, POLLIN,

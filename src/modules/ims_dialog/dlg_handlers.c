@@ -18,7 +18,6 @@
 #include "../../core/parser/parse_from.h"
 #include "../../core/parser/parse_cseq.h"
 #include "../../core/parser/contact/parse_contact.h"
-#include "../../core/parser/parse_from.h"
 #include "../../core/parser/parse_rr.h"
 #include "../../modules/tm/tm_load.h"
 #include "../../modules/rr/api.h"
@@ -362,7 +361,7 @@ static void dlg_terminated(struct sip_msg* req,
     /* dialog terminated (BYE) */
     run_dlg_callbacks(DLGCB_TERMINATED, dlg, req, NULL, dir, 0);
 
-//    /* register callback for the coresponding reply */
+//    /* register callback for the corresponding reply */
 //    LM_DBG("Registering tmcb1\n");
 //    if (d_tmb.register_tmcb(req,
 //            0,
@@ -397,7 +396,7 @@ static void dlg_cancelled(struct sip_msg* req,
     /* dialog terminated (BYE) */
     run_dlg_callbacks(DLGCB_TERMINATED, dlg, req, NULL, dir, 0);
 
-    /* register callback for the coresponding reply */
+    /* register callback for the corresponding reply */
     LM_DBG("Registering tmcb for CANCEL confirmed\n");
     if (d_tmb.register_tmcb(req,
             0,

@@ -203,7 +203,8 @@ inline static int calc_bin_nonce_md5(union bin_nonce* b_nonce, int cfg,
  *                message will be included in the generated nonce.
  * @return 0 on success and -1 on error
  */
-int calc_nonce(char* nonce, int *nonce_len, int cfg, int since, int expires,
+int calc_nonce(char* nonce, int *nonce_len, int cfg, unsigned int since,
+		unsigned int expires,
 #if defined USE_NC || defined USE_OT_NONCE
 		unsigned int n_id, unsigned char pf,
 #endif /* USE_NC || USE_OT_NONCE */
@@ -307,10 +308,11 @@ static inline int l8hex2int(char* _s, unsigned int *_r)
  *          6 - nonce reused
  */
 int check_nonce(auth_body_t* auth, str* secret1, str* secret2,
-		struct sip_msg* msg)
+		struct sip_msg* msg, int update_nonce)
 {
 	str * nonce;
-	int since, b_nonce2_len, b_nonce_len, cfg;
+	time_t since;
+	int b_nonce2_len, b_nonce_len, cfg;
 	union bin_nonce b_nonce;
 	union bin_nonce b_nonce2;
 	time_t t;
@@ -418,7 +420,7 @@ if (!memcmp(&b_nonce.n.md5_1[0], &b_nonce2.n.md5_1[0], 16)) {
 			LM_ERR("bad nc value %.*s\n", auth->digest.nc.len, auth->digest.nc.s);
 			return 5; /* invalid nc */
 		}
-		switch(nc_check_val(n_id, pf & NF_POOL_NO_MASK, nc)){
+		switch(nc_check_val(n_id, pf & NF_POOL_NO_MASK, nc, update_nonce)){
 			case NC_OK:
 				/* don't perform extra checks or one-time nonce checks
 				 * anymore, if we have nc */

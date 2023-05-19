@@ -77,7 +77,7 @@
 			addresses.
 		</para>
 		<para>
-			The public GRUU is build based on the '+sip.instance'
+			The public GRUU is built based on the '+sip.instance'
 			UUID parameter as recommended by RFC.
 		</para>
 		<para>
@@ -322,7 +322,7 @@ modparam("registrar", "realm_prefix", "sip.")
 		The parameter controls how lookup function processes multiple 
 		contacts.  If there are multiple contacts for the given username in 
 		usrloc and this parameter is set to 1, Request-URI will be 
-		overwritten with the highest-q rated contact and the rest will be 
+		overwritten with the highest-q rated contact.  The rest will be 
 		appended to sip_msg structure and can be later used by tm for forking.
 		If the parameter is set to 0, only Request-URI will be overwritten 
 		with the highest-q rated contact and the rest will be left unprocessed.
@@ -1450,6 +1450,83 @@ lookup_branches("location");
 		</example>
 	</section>
 
+	<section id="registrar.f.lookup_xavp">
+		<title>
+		<function moreinfo="none">lookup_xavp(ultable, uri, rxname, cxname)</function>
+		</title>
+		<para>
+			Similar to lookup(...), but store the location record attributes
+			in XAVPs. Note that not all contact record fields are stored
+		</para>
+		<para>Meaning of the parameters:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+			<emphasis>ultable</emphasis> - name of the usrloc table that is used
+			for the lookup.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>uri</emphasis> - the URI to be searched in location table.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>rxname</emphasis> - name of the XAVP to store record
+				attributes. These are:
+			</para>
+			<itemizedlist>
+			<listitem>
+				<para>
+				<emphasis>aor</emphasis> - the address of record.
+				</para>
+			</listitem>
+			</itemizedlist>
+		</listitem>
+		<listitem>
+			<para>
+				<emphasis>cxname</emphasis> - name of the XAVP to store content
+				attributes, name mapping is done from the perspective of using
+				them to send out SIP requests. These are:
+			</para>
+			<itemizedlist>
+			<listitem>
+				<para>
+				<emphasis>uri</emphasis> - the contact address.
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				<emphasis>socket</emphasis> - the socket of the contact record.
+				</para>
+			</listitem>
+			<listitem>
+				<para>
+				<emphasis>dsturi</emphasis> - the destination uri of the contact
+				record (the received field in location contact).
+				</para>
+			</listitem>
+			</itemizedlist>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>lookup_xavp</function> usage</title>
+		<programlisting format="linespecific">
+...
+lookup_xavp("location", "$fu", "rul", "cul");
+xinfo("aor: $xavp(rul=&gt;aor)\n");
+xinfo("number of contacts: $xavp(rul&gt;count)\n");
+xinfo("first contact record - uri: $xavp(cul&gt;uri)\n");
+xinfo("first contact record - socket: $xavp(cul&gt;socket)\n");
+...
+</programlisting>
+		</example>
+	</section>
+
 	<section id="registrar.f.registered">
 		<title>
 		<function moreinfo="none">registered(domain [, uri [, match_option [, match_action]]])</function>
@@ -1735,6 +1812,52 @@ reg_free_contacts("callee");
 save("location", "0x2");
 ...
 reg_send_reply();
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="registrar.f.reg_from_user">
+		<title>
+		<function moreinfo="none">reg_from_user(ultable, uri, mode)</function>
+		</title>
+		<para>
+			The function returns true if the SIP message comes from the user
+			identified by 'uri' parameter by matching the associated location
+			records. The matching is done with the field 'received' if it is set,
+			otherwise with the contact address.
+		</para>
+		<para>Meaning of the parameters is as follows:</para>
+		<itemizedlist>
+		<listitem>
+			<para>
+			<emphasis>ultable</emphasis> - user location table (e.g., 'location')
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>uri</emphasis> - SIP URI to identify the location records
+			to match against.
+			</para>
+		</listitem>
+		<listitem>
+			<para>
+			<emphasis>mode</emphasis> - matching mode (int) - host part (IP address)
+			is matched always. If mode has bit 1 set (value 1), then the port is
+			matched as well. If mode has bit 2 set (value 2), then the protocol
+			is matched as well.
+			</para>
+		</listitem>
+		</itemizedlist>
+		<para>
+		This function can be used from ANY_ROUTE.
+		</para>
+		<example>
+		<title><function>reg_from_user</function> usage</title>
+		<programlisting format="linespecific">
+...
+if(reg_from_user("location", "sip:alice@server.com", "0")) {
+    # message coming from where 'alice' sent before a REGISTER request
+}
 ...
 </programlisting>
 		</example>

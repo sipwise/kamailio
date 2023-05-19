@@ -36,10 +36,11 @@
 #include "../../core/ut.h"
 #include "../../core/parser/digest/digest.h"
 #include "../../core/parser/hf.h"
-#include "../../core/mod_fix.h"
 
 #include "auth_ephemeral_mod.h"
 #include "authorize.h"
+
+extern struct secret **secret_list;
 
 static inline int get_pass(str *_username, str *_secret, str *_password)
 {
@@ -267,8 +268,13 @@ static inline int digest_authenticate(struct sip_msg *_m, str *_realm,
 		}
 	}
 
+	if (secret_list == NULL)
+	{
+		LM_DBG("empty secret list\n");
+		return ret;
+	}
 	SECRET_LOCK;
-	secret_struct = secret_list;
+	secret_struct = *secret_list;
 	while (secret_struct != NULL)
 	{
 		ret = do_auth(_m, h, _realm, _method,
@@ -530,8 +536,13 @@ int ki_autheph_authenticate(sip_msg_t *_m, str *susername, str *spassword)
 	LM_DBG("password: %.*s\n", spassword->len, spassword->s);
 
 	sgenerated_password.s = generated_password;
+	if (secret_list == NULL)
+	{
+		LM_DBG("empty secret list\n");
+		return AUTH_ERROR;
+	}
 	SECRET_LOCK;
-	secret_struct = secret_list;
+	secret_struct = *secret_list;
 	while (secret_struct != NULL)
 	{
 		LM_DBG("trying secret: %.*s (%i)\n",

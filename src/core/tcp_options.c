@@ -109,7 +109,9 @@ static cfg_def_t tcp_cfg_def[] = {
 	{ "reuse_port",   CFG_VAR_INT | CFG_ATOMIC,   0,        1,  0,         0,
 		"reuse TCP ports "},
 	{ "wait_data_ms",  CFG_VAR_INT | CFG_ATOMIC,      0, 7200000, 0,        0,
-		"wait for data on new tcp connetions (milliseconds)"},
+		"wait for data on new tcp connections (milliseconds)"},
+	{ "close_rst",     CFG_VAR_INT | CFG_READONLY,    0,   1,      0,         0,
+			"trigger an RST on connection close"},
 	/* internal and/or "fixed" versions of some vars
 	   (not supposed to be writeable, read will provide only debugging value*/
 	{ "rd_buf_size", CFG_VAR_INT | CFG_ATOMIC,    512,    16777216,  0,         0,
@@ -167,6 +169,7 @@ void init_tcp_options()
 	tcp_default_cfg.wq_blk_size=DEFAULT_TCP_WBUF_SIZE;
 	tcp_default_cfg.reuse_port=0;
 	tcp_default_cfg.wait_data_ms=5000;
+	tcp_default_cfg.close_rst=0;
 }
 
 
@@ -390,7 +393,7 @@ void tcp_options_get(struct cfg_group_tcp* t)
 
 
 /** register tcp config into the configuration framework.
- *  @return 0 on succes, -1 on error*/
+ *  @return 0 on success, -1 on error*/
 int tcp_register_cfg()
 {
 	if (cfg_declare("tcp", tcp_cfg_def, &tcp_default_cfg, cfg_sizeof(tcp),

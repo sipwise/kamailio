@@ -43,21 +43,25 @@
 #include "../../core/parser/parse_via.h"
 #include "../../core/parser/contact/parse_contact.h"
 #include "../../core/parser/parse_refer_to.h"
+
+
 #include "tps_msg.h"
 #include "tps_storage.h"
-
-#define TPS_METHODS_NOCONTACT (METHOD_CANCEL|METHOD_BYE|METHOD_PRACK)
 
 extern int _tps_param_mask_callid;
 extern int _tps_contact_mode;
 extern str _tps_cparam_name;
 extern int _tps_rr_update;
+extern int _tps_header_mode;
 
 extern str _tps_context_param;
 extern str _tps_context_value;
 
 str _sr_hname_xbranch = str_init("P-SR-XBranch");
 str _sr_hname_xuuid = str_init("P-SR-XUID");
+
+unsigned int _tps_methods_nocontact = METHOD_CANCEL|METHOD_BYE|METHOD_PRACK;
+unsigned int _tps_methods_noinitial = 0;
 
 /**
  *
@@ -270,6 +274,13 @@ int tps_skip_msg(sip_msg_t *msg)
 
 	if((get_cseq(msg)->method_id)&(METHOD_REGISTER|METHOD_PUBLISH))
 		return 1;
+
+	if(_tps_methods_noinitial!=0 && msg->first_line.type==SIP_REQUEST
+			&& get_to(msg)->tag_value.len<=0) {
+		if((get_cseq(msg)->method_id) & _tps_methods_noinitial) {
+			return 1;
+		}
+	}
 
 	return 0;
 }
@@ -584,7 +595,7 @@ int tps_reinsert_contact(sip_msg_t *msg, tps_data_t *ptsd, str *hbody)
 {
 	str hname = str_init("Contact");
 
-	if (get_cseq(msg)->method_id & TPS_METHODS_NOCONTACT) {
+	if (get_cseq(msg)->method_id & _tps_methods_nocontact) {
 		return 0;
 	}
 
@@ -623,9 +634,52 @@ int tps_remove_name_headers(sip_msg_t *msg, str *hname)
 /**
  *
  */
+int tps_reappend_separate_header_values(sip_msg_t *msg, tps_data_t *ptsd, str *hbody, str *hname)
+{
+
+        int i;
+        str sb;
+        char *p = NULL;
+
+        if(hbody==NULL || hbody->s==NULL || hbody->len<=0 || hbody->s[0]=='\0')
+            return 0;
+
+        sb.len = 1;
+        p = hbody->s;
+        for(i=0; i<hbody->len-1; i++) {
+            if(hbody->s[i]==',') {
+                if(sb.len>0) {
+                    sb.s = p;
+                    if(sb.s[sb.len-1]==',') sb.len--;
+                    if(tps_add_headers(msg, hname, &sb, 0)<0) {
+                        return -1;
+                    }
+                }
+                sb.len = 0;
+                p = hbody->s + i + 1;
+            }
+            sb.len++;
+        }
+
+
+        if(sb.len>0) {
+                sb.s = p;
+                if(sb.s[sb.len-1]==',') sb.len--;
+                if(tps_add_headers(msg, hname, &sb, 0)<0) {
+                    return -1;
+                }
+        }
+
+
+        return 0;
+}
+
 int tps_reappend_via(sip_msg_t *msg, tps_data_t *ptsd, str *hbody)
 {
 	str hname = str_init("Via");
+
+	if (TPS_SPLIT_VIA & _tps_header_mode)
+		return tps_reappend_separate_header_values(msg, ptsd, hbody,&hname);
 
 	if(tps_add_headers(msg, &hname, hbody, 0)<0) {
 		return -1;
@@ -736,6 +790,9 @@ int tps_reappend_rr(sip_msg_t *msg, tps_data_t *ptsd, str *hbody)
 {
 	str hname = str_init("Record-Route");
 
+	if (TPS_SPLIT_RECORD_ROUTE & _tps_header_mode)
+		return tps_reappend_separate_header_values(msg, ptsd, hbody,&hname);
+
 	if(tps_add_headers(msg, &hname, hbody, 0)<0) {
 		return -1;
 	}
@@ -790,6 +847,8 @@ int tps_reappend_route(sip_msg_t *msg, tps_data_t *ptsd, str *hbody, int rev)
 	trim_zeros_lr(&sb);
 	trim(&sb);
 	if(sb.len>0 && sb.s[sb.len-1]==',') sb.len--;
+	if (TPS_SPLIT_ROUTE & _tps_header_mode)
+		return tps_reappend_separate_header_values(msg, ptsd, &sb,&hname);
 	if(tps_add_headers(msg, &hname, &sb, 0)<0) {
 		return -1;
 	}
@@ -820,6 +879,8 @@ int tps_request_received(sip_msg_t *msg, int dialog)
 
 	memset(&mtsd, 0, sizeof(tps_data_t));
 	memset(&stsd, 0, sizeof(tps_data_t));
+
+	tps_unmask_callid(msg);
 
 	if(tps_pack_message(msg, &mtsd)<0) {
 		LM_ERR("failed to extract and pack the headers\n");
@@ -889,14 +950,22 @@ int tps_request_received(sip_msg_t *msg, int dialog)
 		}
 	}
 
-	if(use_branch && direction == TPS_DIR_DOWNSTREAM) {
+	if(use_branch) {
+		LM_DBG("use branch for routing information, request from direction %d\n", direction);
 		if(tps_reappend_route(msg, &stsd, &stsd.s_rr, 1) < 0) {
 			LM_ERR("failed to reappend s-route\n");
 			return -1;
 		}
-		if(tps_reappend_route(msg, &stsd, &stsd.y_rr, 1) < 0) {
-			LM_ERR("failed to reappend b-route\n");
-			return -1;
+		if (direction == TPS_DIR_UPSTREAM) {
+			if(tps_reappend_route(msg, &stsd, &stsd.x_rr, 0) < 0) {
+				LM_ERR("failed to reappend a-route\n");
+				return -1;
+			}
+		} else {
+			if(tps_reappend_route(msg, &stsd, &stsd.y_rr, 1) < 0) {
+				LM_ERR("failed to reappend b-route\n");
+				return -1;
+			}
 		}
 	} else {
 		if(tps_reappend_route(msg, &stsd, &stsd.s_rr,
@@ -953,12 +1022,14 @@ int tps_response_received(sip_msg_t *msg)
 	memset(&stsd, 0, sizeof(tps_data_t));
 	memset(&btsd, 0, sizeof(tps_data_t));
 
-	lkey = msg->callid->body;
+	tps_unmask_callid(msg);
 
 	if(tps_pack_message(msg, &mtsd)<0) {
 		LM_ERR("failed to extract and pack the headers\n");
 		return -1;
 	}
+	lkey = msg->callid->body;
+
 	tps_storage_lock_get(&lkey);
 	if(tps_storage_load_branch(msg, &mtsd, &btsd, 0)<0) {
 		goto error;
@@ -1024,7 +1095,12 @@ int tps_request_sent(sip_msg_t *msg, int dialog, int local)
 
 	if(dialog!=0) {
 		if(tps_get_xuuid(msg, &xuuid)<0) {
-			LM_DBG("no x-uuid header - nothing to do\n");
+			LM_DBG("no x-uuid header - local message only - Call-ID mask if downstream \n");
+			/* ACK and CANCEL go downstream so Call-ID mask required */
+			if(get_cseq(msg)->method_id==METHOD_ACK
+					|| get_cseq(msg)->method_id==METHOD_CANCEL) {
+				tps_mask_callid(msg);
+			}
 			return 0;
 		}
 		mtsd.a_uuid = xuuid;
@@ -1092,6 +1168,10 @@ int tps_request_sent(sip_msg_t *msg, int dialog, int local)
 
 done:
 	tps_storage_lock_release(&lkey);
+	if(direction == TPS_DIR_DOWNSTREAM) {
+	    tps_mask_callid(msg);
+	}
+
 	return 0;
 
 error:
@@ -1187,6 +1267,10 @@ int tps_response_sent(sip_msg_t *msg)
 	}
 	if(tps_storage_update_dialog(msg, &mtsd, &stsd, TPS_DBU_CONTACT)<0) {
 		goto error1;
+	}
+
+	if(direction == TPS_DIR_UPSTREAM) {
+	    tps_mask_callid(msg);
 	}
 	return 0;
 

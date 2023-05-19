@@ -43,7 +43,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <sys/types.h>
 #include <signal.h>
@@ -57,7 +57,6 @@
 #include "../../core/parser/msg_parser.h"
 #include "../../core/ut.h"
 #include "../../core/dset.h"
-#include "../../core/str.h"
 #include "../../core/dprint.h"
 #include "../../core/data_lump.h"
 #include "../../core/data_lump_rpl.h"
@@ -70,6 +69,7 @@
 #include "../../core/script_cb.h" /* exec_*_script_cb */
 #include "../../core/route.h" /* route_get */
 #include "../../core/sip_msg_clone.h" /* sip_msg_shm_clone */
+#include "../../core/rpc_lookup.h"
 #include "../../core/kemi.h"
 #include "http.h"
 
@@ -692,7 +692,7 @@ static void clean_xmlrpc_reply(struct xmlrpc_reply* reply)
 /** Create XML-RPC reply that indicates an error to the caller.
  *
  * This function is used to build the XML-RPC reply body that indicates that
- * an error ocurred on the server. It is called when a management function in
+ * an error occurred on the server. It is called when a management function in
  * SER reports an error. The reply will contain the reason code and reason
  * phrase text provided by the management function that indicated the error.
  */
@@ -713,7 +713,7 @@ static int build_fault_reply(struct xmlrpc_reply* reply)
 }
 
 
-/** Add a memory registion to the list of memory blocks that
+/** Add a memory registration to the list of memory blocks that
  * need to be re-claimed later.
  *
  * @param type The type of the memory block (ordinary text or structure).
@@ -869,7 +869,7 @@ static int print_structures(struct xmlrpc_reply* reply,
  * SER asks the management interface to send the reply to the client. The
  * function will generate the XML-RPC document, put it in body of a SIP
  * response and send the response to the client. The SIP/HTTP reply sent to
- * the client will be always 200 OK, if an error ocurred on the server then it
+ * the client will be always 200 OK, if an error occurred on the server then it
  * will be indicated in the XML document in body.
  *
  * @param ctx A pointer to the context structure of the XML-RPC request that
@@ -917,7 +917,7 @@ static void set_fault(struct xmlrpc_reply* reply, int code, char* fmt, ...)
  * SER.
  *
  * This function will be called whenever a management function in SER
- * indicates that an error ocurred while it was processing the request. The
+ * indicates that an error occurred while it was processing the request. The
  * function takes the reply code and reason phrase as parameters, these will
  * be put in the body of the reply.
  *
@@ -1265,7 +1265,7 @@ static enum xmlrpc_val_type xml_get_type(xmlNodePtr value)
  * This function receives a pointer to a parameter encoded in XML-RPC format
  * and tries to convert the value of the parameter into integer.  Only
  * &lt;i4&gt;, &lt;int&gt;, &lt;boolean&gt;, &lt;dateTime.iso8601&gt; XML-RPC
- * parameters can be converted to integer, attempts to conver other types will
+ * parameters can be converted to integer, attempts to convert other types will
  * fail.
  * @param val A pointer to an integer variable where the result will be
  *            stored.
@@ -1336,7 +1336,7 @@ static int get_int(int* val, struct xmlrpc_reply* reply,
 				ret=-1;
 			break;
 		case XML_T_DATE:
-			*val = xmlrpc2time(val_str);
+			*val = (int)(uint64_t)xmlrpc2time(val_str);
 			break;
 		case XML_T_DOUBLE:
 			*val = (int)strtod(val_str, &end_ptr);
@@ -1361,7 +1361,7 @@ static int get_int(int* val, struct xmlrpc_reply* reply,
  * This function receives a pointer to a parameter encoded in XML-RPC format
  * and tries to convert the value of the parameter into double.  Only
  * &lt;i4&gt;, &lt;int&gt;, &lt;double&gt; XML-RPC parameters can be converted
- * to double, attempts to conver other types will fail.
+ * to double, attempts to convert other types will fail.
  * @param val A pointer to an integer variable where the result will be
  *            stored.
  * @param reply A pointer to XML-RPC reply being constructed (used to indicate
@@ -1488,7 +1488,7 @@ static int get_string(char** val, struct xmlrpc_reply* reply,
 		return -1;
 	}
 	type=xml_get_type(dbl);
-	LM_DBG("xmrpc parameter type: %d\n", type);
+	LM_DBG("xmlrpc parameter type: %d\n", type);
 	switch(type){
 		case XML_T_STR:
 		case XML_T_TXT:
@@ -2236,7 +2236,7 @@ error:
 				(hdr->parsed<(void*)r_ctx->msg ||
 				hdr->parsed>=(void*)(r_ctx->msg+r_ctx->msg_shm_block_size))) {
 			/* header parsed filed doesn't point inside uas.request memory
-			 * chunck -> it was added by failure funcs.-> free it as pkg */
+			 * chunk -> it was added by failure funcs.-> free it as pkg */
 			DBG("DBG:free_faked_req: removing hdr->parsed %d\n",
 					hdr->type);
 			clean_hdr_field(hdr);
@@ -2601,20 +2601,27 @@ static int process_xmlrpc(sip_msg_t* msg)
  */
 static int ki_dispatch_rpc(sip_msg_t* msg)
 {
-	rpc_export_t* exp;
+	rpc_exportx_t* exp;
 	int ret = 1;
+	unsigned int rdata;
 
 	if (init_context(&ctx, msg) < 0) goto skip;
 
-	exp = find_rpc_export(ctx.method, 0);
-	if (!exp || !exp->function) {
+	exp = rpc_lookupx(ctx.method, strlen(ctx.method), &rdata);
+	if (!exp || !exp->r.function) {
 		rpc_fault(&ctx, 500, "Method Not Found");
 		goto skip;
 	}
-	ctx.flags = exp->flags;
-	if ((exp->flags & RET_ARRAY) &&
+	if (rdata & RPC_EXEC_DELTA) {
+		LM_ERR("execution of command [%s] is limited by delta [%d]\n",
+				ctx.method, ksr_rpc_exec_delta);
+		rpc_fault(&ctx, 500, "Command Executed Too Fast");
+		goto skip;
+	}
+	ctx.flags = exp->r.flags;
+	if ((exp->r.flags & RET_ARRAY) &&
 			add_xmlrpc_reply(&ctx.reply, &array_prefix) < 0) goto skip;
-	exp->function(&func_param, &ctx);
+	exp->r.function(&func_param, &ctx);
 
 skip:
 	/* The function may have sent the reply itself */

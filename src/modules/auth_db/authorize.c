@@ -59,7 +59,7 @@ int fetch_credentials(sip_msg_t *msg, str *user, str* domain, str *table, int fl
 	}
 	col = pkg_malloc(sizeof(*col) * (nc+1));
 	if (col == NULL) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -140,7 +140,7 @@ static inline int get_ha1(struct username* _username, str* _domain,
 
 	col = pkg_malloc(sizeof(*col) * (credentials_n + 1));
 	if (col == NULL) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -305,7 +305,7 @@ static int digest_authenticate_hdr(sip_msg_t* msg, str *realm,
 		ret = AUTH_OK;
 		switch(auth_api.post_auth(msg, h, ha1)) {
 			case AUTHENTICATED:
-				/* Only when user succeded to authenticate */
+				/* Only when user succeeded to authenticate */
 				if (!force_generate_avps) {
 					generate_avps(msg, result);
 				}
@@ -402,6 +402,14 @@ int www_authenticate(struct sip_msg* _m, char* _realm, char* _table)
 					&_m->first_line.u.request.method);
 }
 
+int ki_www_authenticate(struct sip_msg* _m, str *realm, str *table)
+{
+	LM_DBG("realm value [%.*s]\n", realm->len, realm->s);
+
+	return digest_authenticate(_m, realm, table, HDR_AUTHORIZATION_T,
+					&_m->first_line.u.request.method);
+}
+
 int www_authenticate2(struct sip_msg* _m, char* _realm, char* _table, char *_method)
 {
 	str srealm;
@@ -442,6 +450,11 @@ int www_authenticate2(struct sip_msg* _m, char* _realm, char* _table, char *_met
 
 	return digest_authenticate(_m, &srealm, &stable, HDR_AUTHORIZATION_T,
 					&smethod);
+}
+
+int ki_www_authenticate_method(sip_msg_t *msg, str *realm, str *table, str *method)
+{
+	return digest_authenticate(msg, realm, table, HDR_AUTHORIZATION_T, method);
 }
 
 /**

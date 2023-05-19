@@ -93,7 +93,7 @@ int init_nonce_count()
 		return -1;
 	}else if (size*sizeof(nc_t) >= max_mem/2){
 		LM_WARN("the currently configured nc_array_size (%ld)  "
-				"would use more then 50%% of the available shared"
+				"would use more than 50%% of the available shared"
 				" memory(%ld bytes)\n", size, max_mem);
 	}
 	nc_array_size=size;
@@ -191,7 +191,7 @@ nid_t nc_new(nid_t id, unsigned char p)
 	unsigned int v, new_v;
 
 	n=get_nc_array_raw_idx(id, p); /* n-th nc_t */
-	i=get_nc_array_uint_idx(n);  /* aray index i, corresponding to n */
+	i=get_nc_array_uint_idx(n);  /* array index i, corresponding to n */
 	r=get_nc_int_pos(n);  /* byte/short inside the uint corresponding to n */
 	/* reset corresponding value to 0 */
 	do{
@@ -213,7 +213,7 @@ nid_t nc_new(nid_t id, unsigned char p)
  * NC_TOO_BIG       (nc value got too big and cannot be held anymore)
  * NC_REPLAY        (nc value is <= the current stored one)
  */
-enum nc_check_ret nc_check_val(nid_t id, unsigned pool, unsigned int nc)
+enum nc_check_ret nc_check_val(nid_t id, unsigned pool, unsigned int nc, int update)
 {
 	unsigned int i;
 	unsigned n, r;
@@ -226,7 +226,7 @@ enum nc_check_ret nc_check_val(nid_t id, unsigned pool, unsigned int nc)
 	if (unlikely(nc>=(1U<<(sizeof(nc_t)*8))))
 		return NC_TOO_BIG;
 	n=get_nc_array_raw_idx(id, pool); /* n-th nc_t */
-	i=get_nc_array_uint_idx(n);  /* aray index i, corresponding to n */
+	i=get_nc_array_uint_idx(n);  /* array index i, corresponding to n */
 	r=get_nc_int_pos(n); /* byte/short inside the uint corresponding to n */
 	do{
 		v=atomic_get_int(&nc_array[i]);
@@ -234,6 +234,8 @@ enum nc_check_ret nc_check_val(nid_t id, unsigned pool, unsigned int nc)
 		crt_nc=(v>>(r*8)) & ((1U<<(sizeof(nc_t)*8))-1);
 		if (crt_nc>=nc)
 			return NC_REPLAY;
+		if (!update)
+			break;
 		/* set corresponding array cell byte/short to new nc */
 		new_v=(v & ~(((1U<<(sizeof(nc_t)*8))-1)<< (r*8)) )|
 				(nc << (r*8));

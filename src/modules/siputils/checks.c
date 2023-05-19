@@ -48,6 +48,8 @@
 #include "../../core/mod_fix.h"
 #include "checks.h"
 
+extern int e164_max_len;
+
 /**
  * return 1 (true) if the SIP message type is request
  */
@@ -386,7 +388,7 @@ int ki_add_uri_param(struct sip_msg* _msg, str* param)
 		}
 		new_uri.s = pkg_malloc(new_uri.len);
 		if (new_uri.s == 0) {
-			LM_ERR("add_uri_param(): Memory allocation failure\n");
+			PKG_MEM_ERROR;
 			return -1;
 		}
 		memcpy(new_uri.s, cur_uri->s, cur_uri->len);
@@ -414,7 +416,7 @@ int ki_add_uri_param(struct sip_msg* _msg, str* param)
 
 	new_uri.s = pkg_malloc(new_uri.len);
 	if (new_uri.s == 0) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -573,7 +575,7 @@ int w_uri_param_rm(struct sip_msg* _msg, char* _param, char* _str2)
  * Converts URI, if it is tel URI, to SIP URI.  Returns 1, if
  * conversion succeeded and 2 if no conversion was needed, i.e., URI was not
  * tel URI.  Returns -1, if conversion failed.  Takes SIP URI hostpart from
- * second parameter and (if needed) writes the result to third paramater.
+ * second parameter and (if needed) writes the result to third parameter.
  */
 int tel2sip(struct sip_msg* _msg, char* _uri, char* _hostpart, char* _res)
 {
@@ -601,7 +603,7 @@ int tel2sip(struct sip_msg* _msg, char* _uri, char* _hostpart, char* _res)
 	/* reserve memory for clean tel uri */
 	tel_uri.s = pkg_malloc(uri.len+1);
 	if (tel_uri.s == 0) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -627,7 +629,7 @@ int tel2sip(struct sip_msg* _msg, char* _uri, char* _hostpart, char* _res)
 	sip_uri.len = 4 + tel_uri.len - 4 + 1 + hostpart.len + 1 + 10;
 	sip_uri.s = pkg_malloc(sip_uri.len+1);
 	if (sip_uri.s == 0) {
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		pkg_free(tel_uri.s);
 		return -1;
 	}
@@ -662,12 +664,12 @@ int tel2sip(struct sip_msg* _msg, char* _uri, char* _hostpart, char* _res)
 /*
  * Check if parameter is an e164 number.
  */
-static inline int e164_check(str* _user)
+int siputils_e164_check(str* _user)
 {
 	int i;
 	char c;
 
-	if ((_user->len > 2) && (_user->len < 17) && ((_user->s)[0] == '+')) {
+	if ((_user->len > 2) && (_user->len <= e164_max_len) && ((_user->s)[0] == '+')) {
 		for (i = 1; i < _user->len; i++) {
 			c = (_user->s)[i];
 			if (c < '0' || c > '9') return -1;
@@ -681,7 +683,7 @@ static inline int e164_check(str* _user)
 /*
  * Check if user part of URI in pseudo variable is an e164 number
  */
-int is_e164(struct sip_msg* _m, char* _sp, char* _s2)
+int w_is_e164(struct sip_msg* _m, char* _sp, char* _s2)
 {
 	pv_spec_t *sp;
 	pv_value_t pv_val;
@@ -694,7 +696,7 @@ int is_e164(struct sip_msg* _m, char* _sp, char* _s2)
 				LM_DBG("missing argument\n");
 				return -1;
 			}
-			return e164_check(&(pv_val.rs));
+			return siputils_e164_check(&(pv_val.rs));
 		} else {
 			LM_ERR("pseudo variable value is not string\n");
 			return -1;
@@ -749,7 +751,7 @@ int is_uri_user_e164(str *uri)
 	if (chr == NULL) return -1;
 	user.len = chr - user.s;
 
-	return e164_check(&user);
+	return siputils_e164_check(&user);
 }
 
 /*

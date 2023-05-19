@@ -156,7 +156,7 @@ static int make_socket_str_from_uri(struct sip_uri *uri, str *socket)
 	socket->len = uri->host.len + uri->port.len + 7 /*sctp + : + : \0*/;
 	socket->s = pkg_malloc(socket->len);
 	if(socket->s == NULL) {
-		LM_ERR("no more pkg\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 
@@ -245,14 +245,15 @@ static int mod_init(void)
 	/* allocate workers array */
 	dmq_workers = shm_malloc(dmq_num_workers * sizeof(dmq_worker_t));
 	if(dmq_workers == NULL) {
-		LM_ERR("error in shm_malloc\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(dmq_workers, 0, dmq_num_workers * sizeof(dmq_worker_t));
 
 	dmq_init_callback_done = shm_malloc(sizeof(int));
 	if(!dmq_init_callback_done) {
-		LM_ERR("no more shm\n");
+		SHM_MEM_ERROR;
+		shm_free(dmq_workers);
 		return -1;
 	}
 	*dmq_init_callback_done = 0;
@@ -379,7 +380,7 @@ static int dmq_add_notification_address(modparam_t type, void * val)
 	}
 
 	/* initial allocation */
-	if (dmq_notification_address_list == 0) {
+	if (dmq_notification_address_list == NULL) {
 		dmq_notification_address_list = pkg_malloc(sizeof(str_list_t));
 		if (dmq_notification_address_list == NULL) {
 			PKG_MEM_ERROR;
@@ -388,6 +389,8 @@ static int dmq_add_notification_address(modparam_t type, void * val)
 		dmq_tmp_list = dmq_notification_address_list;
 		dmq_tmp_list->s = tmp_str;
 		dmq_tmp_list->next = NULL;
+		LM_DBG("Created list and added new notification address to the list %.*s\n",
+			dmq_tmp_list->s.len, dmq_tmp_list->s.s);
 	} else {
 		dmq_tmp_list = append_str_list(tmp_str.s, tmp_str.len, &dmq_tmp_list, &total_list);
 		if (dmq_tmp_list == NULL) {

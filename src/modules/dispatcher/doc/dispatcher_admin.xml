@@ -771,7 +771,7 @@ modparam("dispatcher", "ds_ping_latency_stats", 1)
 		</emphasis>
 		</para>
 		<example>
-		<title>Set the <quote>ds_hash_size</quote> parameter</title>
+		<title>Set the <quote>ds_latency_estimator_alpha</quote> parameter</title>
 <programlisting format="linespecific">
 ...
 modparam("dispatcher", "ds_latency_estimator_alpha", 900)
@@ -1399,7 +1399,8 @@ With congestion control the formula becomes :
 			<emphasis>limit</emphasis> - the maximum number of items to be
 			stored in XAVP list for further fail-overs (the first selected
 			destination and default destination are the first to be put in
-			the list)
+			the list). This can improve the performance especially if you
+			are using a large list of gateways.
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -1423,7 +1424,7 @@ ds_select_dst("1", "4", "3");
 		<title>configuring load balancing with congestion detection</title>
 		<programlisting format="linespecific">
 ...
-# sample of SQL provisionning statements
+# sample of SQL provisioning statements
 INSERT INTO "dispatcher" 
 VALUES(1,1,'sip:192.168.0.1:5060',0,12,'rweight=50;weight=50;cc=1;','');
 INSERT INTO "dispatcher" 
@@ -1764,8 +1765,10 @@ if(ds_list_exists("10")) {
 		</listitem>
 		<listitem>
 			<para><emphasis>mode</emphasis> - (optional) - a bitmask to specify
-				how the matching should be done. If parameter is 0, all ip, port and
-				proto are matched and active status is ignored.
+				how the matching should be done. If the parameter is missing,
+				the matching is done with ignoring the protocol (value 2).
+				If parameter is 0, all ip, port and proto are matched and
+				active status is ignored.
 				If bit one is set, then port is ignored.
 				If bit two is set, then protocol is ignored.
 				If bit three is set, then state must be active.	The parameter
@@ -1987,7 +1990,7 @@ onreply_route {
 		</title>
 		<para>
 		Sets the state for a destination by matching on 'duid' attribute. The
-		parameters first two parameter 'state' and 'group' are the same like
+		first two parameters 'state' and 'group' are the same like
 		for RPC command 'dispatcher.set_state'. The third parameter 'duid' is
 		the value to be matched against the 'duid' attribute of dispatcher
 		destinations.
@@ -2280,7 +2283,7 @@ kamctl rpc dispatcher.hash 4 bob server.com
 						</listitem>
 						<listitem>
 							<para>'weight' - used for weight based load distribution. It must be set
-								to a positive integer value beteen 1 and 100 (inclusive the limits),
+								to a positive integer value between 1 and 100 (inclusive the limits),
 								otherwise the destination address is ignored (its weight set to 0).
 								The value represents the percent of calls to be sent to that gateways.
 								The sum must not exceed 100, otherwise the destinations whose weight

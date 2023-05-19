@@ -110,7 +110,7 @@ typedef enum request_method {
 #define FL_MSG_NOREPLY       (1<<23) /*!< do not send sip reply for request */
 #define FL_SIPTRACE          (1<<24) /*!< message to be traced in stateless replies */
 #define FL_ROUTE_ADDR        (1<<25) /*!< request has Route address for next hop */
-#define FL_USE_OTCPID        (1<<26) /*!< request to be routed using outboud tcp con id */
+#define FL_USE_OTCPID        (1<<26) /*!< request to be routed using outbound tcp con id */
 
 /* WARNING: Value (1 << 28) is reserved for use in kamailio call_control
  * module (flag  FL_USE_CALL_CONTROL )! */
@@ -147,10 +147,19 @@ if (  (*tmp==(firstchar) || *tmp==((firstchar) | 32)) &&                  \
 	(((req)->first_line.type == SIP_REQUEST) &&           \
 	((req)->first_line.flags & FLINE_FLAG_PROTO_SIP))
 
+/* sip request */
+#define IS_SIP_REQUEST(req)                             \
+	(((req)->first_line.type == SIP_REQUEST) &&           \
+	((req)->first_line.flags & FLINE_FLAG_PROTO_SIP))
+
 /* sip reply */
 #define IS_SIP_REPLY(rpl)                               \
 	(((rpl)->first_line.type == SIP_REPLY) &&             \
 	((rpl)->first_line.flags & FLINE_FLAG_PROTO_SIP))
+
+/* sip message */
+#define IS_SIP_MSG(req)                                  \
+	((req)->first_line.flags & FLINE_FLAG_PROTO_SIP)
 
 /* http request */
 #define IS_HTTP(req)                                    \
@@ -374,7 +383,7 @@ typedef struct sip_msg {
 
 	struct lump* add_rm;       /*!< used for all the forwarded requests/replies */
 	struct lump* body_lumps;     /*!< Lumps that update Content-Length */
-	struct lump_rpl *reply_lump; /*!< only for localy generated replies !!!*/
+	struct lump_rpl *reply_lump; /*!< only for locally generated replies !!!*/
 
 	/*! \brief str add_to_branch;
 		whatever whoever want to append to Via branch comes here */
@@ -435,7 +444,7 @@ void free_sip_msg(struct sip_msg* const msg);
 */
 int check_transaction_quadruple(sip_msg_t* const msg);
 
-/*! \brief returns a pointer to the begining of the msg's body
+/*! \brief returns a pointer to the beginning of the msg's body
  */
 char* get_body(sip_msg_t* const msg);
 

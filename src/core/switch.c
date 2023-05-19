@@ -148,7 +148,8 @@ void destroy_case_stms(struct case_stms *lst)
 int fix_switch(struct action* t)
 {
 	struct case_stms* c;
-	int n, i, j, ret, val;
+	int n, i, j, ret;
+	long val;
 	struct action* a;
 	struct action* block;
 	struct action* def_a;
@@ -202,7 +203,7 @@ int fix_switch(struct action* t)
 				LM_ERR("non constant expression in case\n");
 				return E_BUG;
 			}
-			if (rval_expr_eval_int(0, 0,  &c->label.match_int, c->ct_rve)
+			if (rval_expr_eval_long(0, 0,  &c->label.match_int, c->ct_rve)
 					<0){
 				LM_ERR("case expression (%d,%d) has non-interger type\n",
 						c->ct_rve->fpos.s_line,
@@ -213,7 +214,7 @@ int fix_switch(struct action* t)
 			n++; /* count only non-default cases */
 		}else{
 			if (default_found){
-				LM_ERR("more then one \"default\"");
+				LM_ERR("more than one \"default\"");
 				return E_UNSPEC;
 			}
 			default_found=1;
@@ -293,7 +294,7 @@ int fix_switch(struct action* t)
 	   with the case rve block */
 	if ( (scr_opt_lev>=2) &&
 			!rve_has_side_effects(sw_rve) && rve_is_constant(sw_rve)){
-		if (rval_expr_eval_int(0, 0,  &val, sw_rve) <0){
+		if (rval_expr_eval_long(0, 0, &val, sw_rve) <0){
 			LM_ERR("wrong type for switch(...) expression (%d,%d)\n", 
 					sw_rve->fpos.s_line, sw_rve->fpos.s_col);
 			ret=E_UNSPEC;
@@ -315,16 +316,16 @@ int fix_switch(struct action* t)
 		t->val[1].type=0;
 		t->val[1].u.data=0;
 		ret=0;
-		LM_DBG("constant switch(%d) with %d cases optimized away to case"
+		LM_DBG("constant switch(%ld) with %d cases optimized away to case"
 				" %d \n", val, n, i);
 		goto end;
 	}
 	/* try to create a jumptable */
 	/* cost: 2 cmp & table lookup
-	   => makes sense for more then 3 cases
+	   => makes sense for more than 3 cases
 	   & if size< MAX_JT_SIZE
 	*/
-	best_hits=3; /* more then 3 hits needed */
+	best_hits=3; /* more than 3 hits needed */
 	start=end=0;
 	for (i=0; i<n; i++){
 		last=first=cond[i];
@@ -528,7 +529,7 @@ static int fix_match(struct action* t)
 			}
 		}else{
 			if (default_found){
-				LM_ERR("more then one \"default\" label found (%d, %d)\n",
+				LM_ERR("more than one \"default\" label found (%d, %d)\n",
 						(c->ct_rve)?c->ct_rve->fpos.s_line:0,
 						(c->ct_rve)?c->ct_rve->fpos.s_col:0);
 				ret=E_UNSPEC;

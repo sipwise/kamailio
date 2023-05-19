@@ -259,7 +259,7 @@ static int w_sl_reply_error( struct sip_msg* msg, char* str, char* str2)
 /**
  * @brief send stateful reply if transaction was created
  *
- * Check if transation was created for respective SIP request and reply
+ * Check if transaction was created for respective SIP request and reply
  * in stateful mode, otherwise send stateless reply
  *
  * @param msg - SIP message structure
@@ -341,7 +341,7 @@ static int w_send_reply(struct sip_msg* msg, char* p1, char* p2)
 /**
  * @brief send stateful reply if transaction was created
  *
- * Check if transation was created for respective SIP request and reply
+ * Check if transaction was created for respective SIP request and reply
  * in stateful mode, otherwise send stateless reply
  *
  * @param msg - SIP message structure
@@ -498,7 +498,7 @@ static int w_sl_forward_reply(sip_msg_t* msg, str* code, str* reason)
 		}
 		rbuf = (char *)pkg_malloc(reason->len);
 		if (rbuf==NULL) {
-			LM_ERR("not enough memory\n");
+			PKG_MEM_ERROR;
 			ret = -1;
 			goto restore;
 		}

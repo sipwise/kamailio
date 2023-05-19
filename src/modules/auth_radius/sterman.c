@@ -94,7 +94,7 @@ static inline int extract_avp(
 			name->s.s = vp->strvalue;
 			value->n = strtol(++p, &r, 10);
 		} else if(p && r && p != r && !q) {
-			/* int name and int vale */
+			/* int name and int value */
 			name->n = strtol(++p, &q, 10);
 			value->n = strtol(++r, &q, 10);
 		} else if((!p || p > q) && q) {
@@ -160,7 +160,7 @@ static int generate_avps(VALUE_PAIR *received)
 		if(add_avp(flags, name, val) < 0) {
 			LM_ERR("unable to create a new AVP\n");
 		} else {
-			LM_DBG("AVP '%.*s'/%d='%.*s'/%d has been added\n",
+			LM_DBG("AVP '%.*s'/%ld='%.*s'/%ld has been added\n",
 					(flags & AVP_NAME_STR) ? name.s.len : 4,
 					(flags & AVP_NAME_STR) ? name.s.s : "null",
 					(flags & AVP_NAME_STR) ? 0 : name.n,

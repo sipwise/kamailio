@@ -39,7 +39,7 @@
 #include "../pua/pua.h"
 #include "pua_dialoginfo.h"
 
-/* global modul parameters */
+/* global module parameters */
 extern int include_callid;
 extern int include_localremote;
 extern int include_tags;
@@ -131,7 +131,7 @@ str* build_dialoginfo(char *state, str *entity, str *peer, str *callid,
 	 * Thus, id could be for example derived from the totag.
 	 *
 	 * Currently the dialog module does not support multiple dialogs.
-	 * Thus, it does no make sense to differ here between multiple dialog.
+	 * Thus, it does not make sense to differ here between multiple dialog.
 	 * Thus, id and call-id will be populated identically */
 
 	/* dialog tag */

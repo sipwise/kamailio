@@ -49,7 +49,7 @@
 	( (_len_)+(((_len_)&3)?4-((_len_)&3):0) )
 
 
-/* from an AAAMessage structure, a buffer to be sent is build
+/* from an AAAMessage structure, a buffer to be sent is built
  */
 AAAReturnCode AAABuildMsgBuffer( AAAMessage *msg )
 {
@@ -67,7 +67,7 @@ AAAReturnCode AAABuildMsgBuffer( AAAMessage *msg )
 	/* allocate some memory */
 	msg->buf.s = (char*)ad_malloc( msg->buf.len );
 	if (!msg->buf.s) {
-		LM_ERR(" no more pkg memory!\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset(msg->buf.s, 0, msg->buf.len);
@@ -209,7 +209,7 @@ AAAMessage* AAATranslateMessage( unsigned char* source, unsigned int sourceLen,
 	/* alloc a new message structure */
 	msg = (AAAMessage*)ad_malloc(sizeof(AAAMessage));
 	if (!msg) {
-		LM_ERR(" no more free memory!!\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset(msg,0,sizeof(AAAMessage));
@@ -226,7 +226,7 @@ AAAMessage* AAATranslateMessage( unsigned char* source, unsigned int sourceLen,
 	msg_len = get_3bytes( ptr );
 	ptr += MESSAGE_LENGTH_SIZE;
 	if (msg_len>sourceLen) {
-		LM_ERR(" AAA message len [%d] bigger then"
+		LM_ERR(" AAA message len [%d] bigger than"
 			" buffer len [%d]\n",msg_len,sourceLen);
 		goto error;
 	}
@@ -325,7 +325,7 @@ AAAMessage* AAAInMessage(AAACommandCode commandCode, AAAApplicationId appId)
 	msg = (AAAMessage*)ad_malloc(sizeof(AAAMessage));
 	if (!msg) 
 	{
-		LM_ERR("no more pkg memory!\n");
+		PKG_MEM_ERROR;
 		return NULL;
 	}
 	memset(msg, 0, sizeof(AAAMessage));

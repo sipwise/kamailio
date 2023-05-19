@@ -360,8 +360,17 @@ static int mod_init(void)
 
 	/* Initialize the counter */
 	ds_ping_reply_codes = (int **)shm_malloc(sizeof(unsigned int *));
+	if(!(ds_ping_reply_codes)) {
+		SHM_MEM_ERROR;
+		return -1;
+	}
 	*ds_ping_reply_codes = 0;
 	ds_ping_reply_codes_cnt = (int *)shm_malloc(sizeof(int));
+	if(!(ds_ping_reply_codes_cnt)) {
+		shm_free(ds_ping_reply_codes);
+		SHM_MEM_ERROR;
+		return -1;
+	}
 	*ds_ping_reply_codes_cnt = 0;
 	if(ds_ping_reply_codes_str.s) {
 		cfg_get(dispatcher, dispatcher_cfg, ds_ping_reply_codes_str) =
@@ -508,6 +517,8 @@ static int mod_init(void)
 
 	ds_rpc_reload_time = shm_malloc(sizeof(time_t));
 	if(ds_rpc_reload_time == NULL) {
+		shm_free(ds_ping_reply_codes);
+		shm_free(ds_ping_reply_codes_cnt);
 		SHM_MEM_ERROR;
 		return -1;
 	}
@@ -792,8 +803,8 @@ static int ki_ds_select_routes_limit(sip_msg_t *msg, str *srules, str *smode,
 			&& (ds_xavp_ctx.len >= 0)) {
 		/* add to xavp the number of selected dst records */
 		memset(&nxval, 0, sizeof(sr_xval_t));
-		nxval.type = SR_XTYPE_INT;
-		nxval.v.i = vstate.cnt;
+		nxval.type = SR_XTYPE_LONG;
+		nxval.v.l = vstate.cnt;
 		if(xavp_add_xavp_value(&ds_xavp_ctx, &ds_xavp_ctx_cnt, &nxval, NULL)==NULL) {
 			LM_ERR("failed to add cnt value to xavp\n");
 			return -1;
@@ -1187,7 +1198,7 @@ static int ds_parse_reply_codes()
 		ds_ping_reply_codes_new = (int *)shm_malloc(list_size * sizeof(int));
 		if(ds_ping_reply_codes_new == NULL) {
 			free_params(params_list);
-			LM_ERR("no more memory\n");
+			SHM_MEM_ERROR;
 			return -1;
 		}
 

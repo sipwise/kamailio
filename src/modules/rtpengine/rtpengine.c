@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include <inttypes.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -41,11 +42,10 @@
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 #include <ifaddrs.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
 #include "../../core/flags.h"
 #include "../../core/sr_module.h"
@@ -120,7 +120,7 @@ enum {
 struct ng_flags_parse {
 	int via, to, packetize, transport, directional;
 	bencode_item_t *dict, *flags, *direction, *replace, *rtcp_mux, *sdes,
-		       *t38,
+		       *t38,*received_from,
 		       *codec, *codec_strip, *codec_offer, *codec_transcode, *codec_mask,
 		       *codec_set, *codec_except;
 	str call_id, from_tag, to_tag;
@@ -1149,8 +1149,8 @@ int add_rtpengine_socks(struct rtpp_set *rtpp_list, char *rtpengine,
 }
 
 
-/* 0 - succes
- * -1 - erorr
+/* 0 - success
+ * -1 - error
  * */
 static int rtpengine_add_rtpengine_set(char * rtp_proxies, unsigned int weight, int disabled, unsigned int ticks)
 {
@@ -1338,9 +1338,9 @@ static void rtpengine_rpc_reload(rpc_t* rpc, void* ctx)
 
 	_rtpe_list_version->vernum += 1;
 	_rtpe_list_version->vertime = time(NULL);
-	LM_DBG("current rtpengines list version: %d (%u)\n",
+	LM_DBG("current rtpengines list version: %d (%" PRIu64 ")\n",
 			_rtpe_list_version->vernum,
-			(unsigned int)_rtpe_list_version->vertime);
+			(uint64_t)_rtpe_list_version->vertime);
 	rpc->rpl_printf(ctx, "Ok. Reload successful.");
 }
 
@@ -1858,9 +1858,9 @@ static int build_rtpp_socks(int lmode, int rtest) {
 
 	if(_rtpe_list_vernum_local == _rtpe_list_version->vernum) {
 		/* same version for the list of rtpengines */
-		LM_DBG("same rtpengines list version: %d (%u)\n",
+		LM_DBG("same rtpengines list version: %d (%" PRIu64 ")\n",
 			_rtpe_list_version->vernum,
-			(unsigned int)_rtpe_list_version->vertime);
+			(uint64_t)_rtpe_list_version->vertime);
 		return 0;
 	}
 
@@ -2241,8 +2241,8 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
 {
 	char *e;
 	const char *err;
-	str key, val, s;
-
+	str key, val, s , s1;
+	int ip_af = AF_UNSPEC;
 	if (!flags_str)
 		return 0;
 
@@ -2274,6 +2274,27 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
 		/* check for items which have their own sub-list */
 		if (str_key_val_prefix(&key, "replace", &val, &s)) {
 			bencode_list_add_str(ng_flags->replace, &s);
+			goto next;
+		}
+		if (str_key_val_prefix(&key, "received-from", &val, &s)) {
+			ip_af = get_ip_type(s.s);
+			if (ip_af == AF_INET)
+			{
+				s1.s="IP4";
+				s1.len=3;
+				bencode_list_add_str(ng_flags->received_from, &s1);
+				bencode_list_add_str(ng_flags->received_from, &s);
+			
+			}else if (ip_af == AF_INET6)
+			{
+				s1.s="IP6";
+				s1.len=3;
+				bencode_list_add_str(ng_flags->received_from, &s1);
+				bencode_list_add_str(ng_flags->received_from, &s);
+			
+			}
+			
+			
 			goto next;
 		}
 		if (str_key_val_prefix(&key, "SDES", &val, &s)) {
@@ -2442,6 +2463,7 @@ static int parse_flags(struct ng_flags_parse *ng_flags, struct sip_msg *msg, enu
 				else if (str_eq(&key, "delete-delay") && val.s)
 					bencode_dictionary_add_integer(ng_flags->dict, "delete delay", atoi(val.s));
 				break;
+						
 
 			case 16:
 				if (str_eq(&key, "UDP/TLS/RTP/SAVP") && !val.s)
@@ -2529,6 +2551,7 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 
 	body.s = NULL;
 	ng_flags.flags = bencode_list(bencbuf);
+	ng_flags.received_from = bencode_list(bencbuf);
 
 	if (op == OP_OFFER || op == OP_ANSWER) {
 		ng_flags.direction = bencode_list(bencbuf);
@@ -2649,20 +2672,28 @@ static bencode_item_t *rtpp_function_call(bencode_buffer_t *bencbuf, struct sip_
 		bencode_dictionary_add_str(ng_flags.dict, "via-branch", &viabranch);
 	}
 
-	item = bencode_list(bencbuf);
-	bencode_dictionary_add(ng_flags.dict, "received-from", item);
-	bencode_list_add_string(item, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
-		(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
-		"?"
-	) );
-	bencode_list_add_string(item, ip_addr2a(&msg->rcv.src_ip));
+	if (ng_flags.received_from && ng_flags.received_from->child) {
+		bencode_dictionary_add(ng_flags.dict, "received-from", ng_flags.received_from);
+	}
+	else {
+		//item = bencode_list(bencbuf);
+		bencode_dictionary_add(ng_flags.dict, "received-from", ng_flags.received_from);
+		bencode_list_add_string(ng_flags.received_from, (msg->rcv.src_ip.af == AF_INET) ? "IP4" : (
+			(msg->rcv.src_ip.af == AF_INET6) ? "IP6" :
+			"?"
+		) );
+		bencode_list_add_string(ng_flags.received_from, ip_addr2a(&msg->rcv.src_ip));
+	}
 
 	if (op == OP_BLOCK_DTMF || op == OP_BLOCK_MEDIA || op == OP_UNBLOCK_DTMF
 			|| op == OP_UNBLOCK_MEDIA || op == OP_START_FORWARDING || op == OP_STOP_FORWARDING
 			|| op == OP_SILENCE_MEDIA || op == OP_UNSILENCE_MEDIA)
 	{
-		if (ng_flags.directional)
+		if (ng_flags.directional) {
 			bencode_dictionary_add_str(ng_flags.dict, "from-tag", &ng_flags.from_tag);
+			if (ng_flags.to && ng_flags.to_tag.s && ng_flags.to_tag.len)
+				bencode_dictionary_add_str(ng_flags.dict, "to-tag", &ng_flags.to_tag);
+		}
 	}
 	else if ((msg->first_line.type == SIP_REQUEST && op != OP_ANSWER)
 		|| (msg->first_line.type == SIP_REPLY && op == OP_DELETE)
@@ -3429,11 +3460,11 @@ set_rtpengine_set_from_avp(struct sip_msg *msg, int direction)
 
 	active_rtpp_set = select_rtpp_set(setid_val.n);
 	if(active_rtpp_set == NULL) {
-		LM_ERR("could not locate engine set %u\n", setid_val.n);
+		LM_ERR("could not locate engine set %ld\n", setid_val.n);
 		return -1;
 	}
 
-	LM_DBG("using rtpengine set %u\n", setid_val.n);
+	LM_DBG("using rtpengine set %ld\n", setid_val.n);
 
 	current_msg_id = msg->id;
 
@@ -3776,7 +3807,7 @@ set_rtpengine_set_n(struct sip_msg *msg, rtpp_set_link_t *rtpl, struct rtpp_set 
 	}
 	*out = select_rtpp_set(val.ri);
 	if(*out==NULL) {
-		LM_ERR("could not locate rtpengine set %u\n", val.ri);
+		LM_ERR("could not locate rtpengine set %ld\n", val.ri);
 		return -1;
 	}
 	current_msg_id = msg->id;
@@ -3793,13 +3824,13 @@ set_rtpengine_set_n(struct sip_msg *msg, rtpp_set_link_t *rtpl, struct rtpp_set 
 	if ( nb_active_nodes > 0 )
 	{
 		LM_DBG("rtpp: selected proxy set ID %d with %d active nodes.\n",
-			current_msg_id, nb_active_nodes);
+			(*out)->id_set, nb_active_nodes);
 		return nb_active_nodes;
 	}
 	else
 	{
 		LM_WARN("rtpp: selected proxy set ID %d but it has no active node.\n",
-			current_msg_id);
+			(*out)->id_set);
 		return -2;
 	}
 }

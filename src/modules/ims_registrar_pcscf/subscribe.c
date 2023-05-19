@@ -23,7 +23,7 @@
  * * History:
  * ========
  * 
- * Nov 2013 Richard Good migrated pua_reginfo funtionality to ims_registrar_pcscf
+ * Nov 2013 Richard Good migrated pua_reginfo functionality to ims_registrar_pcscf
  */
 
 #include "subscribe.h"
@@ -53,7 +53,7 @@ int reginfo_subscribe_real(struct sip_msg* msg, pv_elem_t* uri, str* service_rou
 	int len = strlen(P_ASSERTED_IDENTITY_HDR_PREFIX) + pcscf_uri.len + 1 + CRLF_LEN;
 	p_asserted_identity_header.s = (char *)pkg_malloc( len );
 	if ( p_asserted_identity_header.s == NULL ) {
-	    LM_ERR( "insert_asserted_identity: pkg_malloc %d bytes failed", len );
+	    SHM_MEM_ERROR_FMT("%d bytes failed", len );
 	    goto error;
 	}
 

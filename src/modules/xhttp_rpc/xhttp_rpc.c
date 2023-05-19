@@ -115,7 +115,7 @@ struct module_exports exports= {
 /** Implementation of rpc_fault function required by the management API.
  *
  * This function will be called whenever a management function
- * indicates that an error ocurred while it was processing the request. The
+ * indicates that an error occurred while it was processing the request. The
  * function takes the reply code and reason phrase as parameters, these will
  * be put in the body of the reply.
  *
@@ -149,7 +149,7 @@ static void free_data_struct(struct rpc_data_struct *rpc_d)
 	struct rpc_data_struct *ds;
 
 	if (!rpc_d) {
-		LM_ERR("Atempting to free NULL rpc_data_struct\n");
+		LM_ERR("Attempting to free NULL rpc_data_struct\n");
 		return;
 	}
 	while (rpc_d) {
@@ -213,7 +213,7 @@ static int init_xhttp_rpc_reply(rpc_ctx_t *ctx)
  * This is the function that will be called whenever a management function
  * asks the management interface to send the reply to the client.
  * The SIP/HTTP reply sent to
- * the client will be always 200 OK, if an error ocurred on the server then it
+ * the client will be always 200 OK, if an error occurred on the server then it
  * will be indicated in the html document in body.
  *
  * @param ctx A pointer to the context structure of the xhttp_rpc request that
@@ -762,23 +762,23 @@ static int child_init(int rank)
 		xhttp_rpc_mod_cmds_size = 1;
 		cmds = xhttp_rpc_mod_cmds;
 		for(i=0; i<rpc_sarray_crt_size; i++){
-			len = strlen(rpc_sarray[i]->name);
+			len = strlen(rpc_sarray[i]->r.name);
 			j = 0;
-			while (j<len && rpc_sarray[i]->name[j]!='.')
+			while (j<len && rpc_sarray[i]->r.name[j]!='.')
 				j++;
 			if (j==len) {
 				LM_DBG("dropping invalid command format [%.*s]\n",
-						len, rpc_sarray[i]->name);
+						len, rpc_sarray[i]->r.name);
 			} else {
 				if (cmds->mod.len==0) {
 					/* this is the first module */
 					cmds->rpc_e_index = i;
-					cmds->mod.s = (char*)&rpc_sarray[i]->name[0];
+					cmds->mod.s = (char*)&rpc_sarray[i]->r.name[0];
 					cmds->mod.len = j;
 					cmds->size++;
 				} else if (cmds->mod.len==j &&
 					strncmp(cmds->mod.s,
-						(char*)&rpc_sarray[i]->name[0],
+						(char*)&rpc_sarray[i]->r.name[0],
 						j)==0){
 					cmds->size++;
 				} else {
@@ -793,7 +793,7 @@ static int child_init(int rank)
 					xhttp_rpc_mod_cmds = cmds;
 					cmds = &xhttp_rpc_mod_cmds[xhttp_rpc_mod_cmds_size];
 					cmds->rpc_e_index = i;
-					cmds->mod.s = (char*)&rpc_sarray[i]->name[0];
+					cmds->mod.s = (char*)&rpc_sarray[i]->r.name[0];
 					cmds->mod.len = j;
 					xhttp_rpc_mod_cmds_size++;
 					cmds->size = 1;
@@ -824,7 +824,7 @@ static int child_init(int rank)
 
 static int ki_xhttp_rpc_dispatch(sip_msg_t* msg)
 {
-	rpc_export_t* rpc_e;
+	rpc_exportx_t* rpc_e;
 	str arg = {NULL, 0};
 	int ret = 0;
 	int i;
@@ -872,7 +872,7 @@ static int ki_xhttp_rpc_dispatch(sip_msg_t* msg)
 	} else {
 		goto send_reply;
 	}
-	
+
 	/*
 	rpc_e=find_rpc_export((char*)rpc_sarray[xhttp_rpc_mod_cmds[ctx.mod].rpc_e_index+ctx.cmd]->name, 0);
 	if ((rpc_e==NULL) || (rpc_e->function==NULL)){
@@ -883,7 +883,7 @@ static int ki_xhttp_rpc_dispatch(sip_msg_t* msg)
 	}
 	*/
 	rpc_e=rpc_sarray[xhttp_rpc_mod_cmds[ctx.mod].rpc_e_index+ctx.cmd];
-	rpc_e->function(&func_param, &ctx);
+	rpc_e->r.function(&func_param, &ctx);
 
 send_reply:
 	if (!ctx.reply_sent) {

@@ -68,6 +68,12 @@ int t_check_msg(struct sip_msg* , int *branch );
 typedef struct cell * (*tgett_f)(void);
 struct cell *get_t(void);
 
+typedef struct cell* (*tfind_f)(struct sip_msg*, int*, int*);
+struct cell* t_find(struct sip_msg *msg, int *branch, int *vref);
+
+typedef void (*tunset_f)(void);
+void t_unset(void);
+
 typedef int (*tgett_branch_f)(void);
 int get_t_branch(void);
 
@@ -98,6 +104,9 @@ tm_cell_t *t_find_ident_filter(unsigned int hash_index, unsigned int label,
 		int filter);
 /* lookup a transaction by callid and cseq */
 int t_lookup_callid(struct cell** trans, str callid, str cseq);
+
+int t_request_search( struct sip_msg* p_msg, struct cell **r_cell);
+int t_reply_search(struct sip_msg *p_msg, struct cell **r_cell, int *r_branch);
 
 int t_set_fr(struct sip_msg* msg, unsigned int fr_inv_to, unsigned int fr_to );
 int t_reset_fr(void);

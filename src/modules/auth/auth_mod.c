@@ -476,6 +476,19 @@ int w_has_credentials(sip_msg_t *msg, char* realm, char* s2)
 	}
 	return ki_has_credentials(msg, &srealm);
 }
+
+#ifdef USE_NC
+/**
+ * Calls auth_check_hdr_md5 with the update_nonce flag set to false.
+ * Used when flag 32 is set in pv_authenticate.
+ */
+static int auth_check_hdr_md5_noupdate(struct sip_msg* msg, auth_body_t* auth,
+		auth_result_t* auth_res)
+{
+	return auth_check_hdr_md5(msg, auth, auth_res, 0);
+}
+#endif
+
 /**
  * @brief do WWW-Digest authentication with password taken from cfg var
  */
@@ -490,11 +503,17 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd,
 	avp_value_t val;
 	static char ha1[256];
 	struct qp *qop = NULL;
+	check_auth_hdr_t check_auth_hdr = NULL;
 
 	cred = 0;
 	ret = AUTH_ERROR;
 
-	switch(pre_auth(msg, realm, hftype, &h, NULL)) {
+#ifdef USE_NC
+	if (nc_enabled && (flags & 32))
+		check_auth_hdr = auth_check_hdr_md5_noupdate;
+#endif
+
+	switch(pre_auth(msg, realm, hftype, &h, check_auth_hdr)) {
 		case NONCE_REUSED:
 			LM_DBG("nonce reused");
 			ret = AUTH_NONCE_REUSED;
@@ -561,6 +580,16 @@ int pv_authenticate(struct sip_msg *msg, str *realm, str *passwd,
 		else
 			ret = AUTH_ERROR;
 	}
+
+#ifdef USE_NC
+	/* On success we need to update the nonce if flag 32 is set */
+	if (nc_enabled && ret == AUTH_OK && (flags & 32)) {
+		if (check_nonce(cred, &secret1, &secret2, msg, 1) < 0) {
+			LM_ERR("check_nonce failed after post_auth");
+			ret = AUTH_ERROR;
+		}
+	}
+#endif
 
 end:
 	if (ret < 0) {
@@ -1076,6 +1105,22 @@ error:
 /**
  *
  */
+static int ki_www_challenge(struct sip_msg *msg, str* realm, int flags)
+{
+	return auth_challenge_hftype(msg, realm, flags, HDR_AUTHORIZATION_T);
+}
+
+/**
+ *
+ */
+static int ki_proxy_challenge(struct sip_msg *msg, str* realm, int flags)
+{
+	return auth_challenge_hftype(msg, realm, flags, HDR_PROXYAUTH_T);
+}
+
+/**
+ *
+ */
 static int w_auth_challenge(struct sip_msg *msg, char* realm, char *flags)
 {
 	int vflags = 0;
@@ -1218,6 +1263,43 @@ static int fixup_auth_get_www_authenticate(void **param, int param_no)
 /**
  *
  */
+static int ki_auth_get_www_authenticate(sip_msg_t* msg, str* realm,
+		int flags, str *pvdst)
+{
+	str hf = {0};
+	pv_spec_t *pvs;
+	pv_value_t val;
+	int ret;
+
+	pvs = pv_cache_get(pvdst);
+	if(pvs==NULL) {
+		LM_ERR("cannot get pv spec for [%.*s]\n", pvdst->len, pvdst->s);
+		return -1;
+	}
+
+	ret = auth_challenge_helper(NULL, realm, flags,
+			HDR_AUTHORIZATION_T, &hf);
+
+	if(ret<0)
+		return ret;
+
+	val.rs.s = pv_get_buffer();
+	val.rs.len = 0;
+	if(hf.s!=NULL) {
+		memcpy(val.rs.s, hf.s, hf.len);
+		val.rs.len = hf.len;
+		val.rs.s[val.rs.len] = '\0';
+		pkg_free(hf.s);
+	}
+	val.flags = PV_VAL_STR;
+	pvs->setf(msg, &pvs->pvp, (int)EQ_T, &val);
+
+	return (ret==0)?1:ret;
+}
+
+/**
+ *
+ */
 /* clang-format off */
 static sr_kemi_t sr_kemi_auth_exports[] = {
 	{ str_init("auth"), str_init("consume_credentials"),
@@ -1230,6 +1312,16 @@ static sr_kemi_t sr_kemi_auth_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("auth"), str_init("www_challenge"),
+		SR_KEMIP_INT, ki_www_challenge,
+		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("auth"), str_init("proxy_challenge"),
+		SR_KEMIP_INT, ki_proxy_challenge,
+		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("auth"), str_init("pv_auth_check"),
 		SR_KEMIP_INT, pv_auth_check,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
@@ -1238,6 +1330,11 @@ static sr_kemi_t sr_kemi_auth_exports[] = {
 	{ str_init("auth"), str_init("has_credentials"),
 		SR_KEMIP_INT, ki_has_credentials,
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("auth"), str_init("auth_get_www_authenticate"),
+		SR_KEMIP_INT, ki_auth_get_www_authenticate,
+		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

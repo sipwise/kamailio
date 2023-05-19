@@ -446,7 +446,7 @@ int receiver_init(peer *p)
 }
 
 /**
- * The Receiver Process - calls the receiv_loop and it never returns.
+ * The Receiver Process - calls the receive_loop and it never returns.
  * @param p - the peer it is associated with or NULL for the unknown peers receiver
  * @returns never, when disconnected it will exit
  */
@@ -470,7 +470,7 @@ void receiver_process(peer *p)
 
 done:
 	if (!*shutdownx){
-		LM_INFO("receiver_process(): [%.*s]... Receiver process cleaning-up - should not happen unless shuting down!\n",
+		LM_INFO("receiver_process(): [%.*s]... Receiver process cleaning-up - should not happen unless shutting down!\n",
 				p?p->fqdn.len:0,p?p->fqdn.s:0);
 
 	}
@@ -853,8 +853,11 @@ int peer_connect(peer *p)
 	int error;
 
 	memset (&hints, 0, sizeof(hints));
-	//hints.ai_protocol = IPPROTO_SCTP;
-	//hints.ai_protocol = IPPROTO_TCP;
+	if ((p->proto.len) && (strncasecmp(p->proto.s,"SCTP",4)==0)){
+		hints.ai_protocol = IPPROTO_SCTP;
+	}else{
+		hints.ai_protocol = IPPROTO_TCP;
+	}
 	hints.ai_flags = AI_ADDRCONFIG;
 	hints.ai_socktype = SOCK_STREAM;
 

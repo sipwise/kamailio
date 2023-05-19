@@ -34,7 +34,6 @@
 #include "../../core/pvar.h"
 #include "../../core/mem/shm_mem.h"
 #include "../../core/mod_fix.h"
-#include "../../core/pvar.h"
 #include "../../core/cfg/cfg_struct.h"
 #include "../../core/kemi.h"
 #include "../../core/fmsg.h"
@@ -45,7 +44,7 @@
 
 MODULE_VERSION
 
-static int   _evapi_workers = 1;
+int _evapi_workers = 1;
 static char *_evapi_bind_addr = "127.0.0.1";
 static int   _evapi_bind_port = 8448;
 static char *_evapi_bind_param = NULL;
@@ -54,6 +53,8 @@ static int   _evapi_netstring_format_param = 1;
 str _evapi_event_callback = STR_NULL;
 int _evapi_dispatcher_pid = -1;
 int _evapi_max_clients = 8;
+int _evapi_wait_idle = 500000;
+int _evapi_wait_increase = 3;
 
 static str _evapi_data = STR_NULL;
 static int _evapi_data_size = 0;
@@ -103,6 +104,8 @@ static param_export_t params[]={
 	{"netstring_format",  INT_PARAM,   &_evapi_netstring_format_param},
 	{"event_callback",    PARAM_STR,   &_evapi_event_callback},
 	{"max_clients",       PARAM_INT,   &_evapi_max_clients},
+	{"wait_idle",         PARAM_INT,   &_evapi_wait_idle},
+	{"wait_increase",     PARAM_INT,   &_evapi_wait_increase},
 	{0, 0, 0}
 };
 
@@ -160,6 +163,14 @@ static int mod_init(void)
 		_evapi_bind_addr = _evapi_bind_param;
 	}
 
+	if(evapi_clients_init() < 0) {
+		LM_ERR("failed to init client structures\n");
+		return -1;
+	}
+	if(evapi_queue_init() < 0) {
+		LM_ERR("failed to init faked internal message queue\n");
+		return -1;
+	}
 	/* add space for one extra process */
 	register_procs(1 + _evapi_workers);
 

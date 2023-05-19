@@ -40,15 +40,19 @@
 #include "../../core/receive.h"
 #include "../../core/kemi.h"
 #include "../../core/fmsg.h"
+#include "../../core/mem/shm.h"
 
 #include "evapi_dispatch.h"
 
 static int _evapi_notify_sockets[2];
 static int _evapi_netstring_format = 1;
 
+extern int _evapi_workers;
 extern str _evapi_event_callback;
 extern int _evapi_dispatcher_pid;
 extern int _evapi_max_clients;
+extern int _evapi_wait_idle;
+extern int _evapi_wait_increase;
 
 #define EVAPI_IPADDR_SIZE	64
 #define EVAPI_TAG_SIZE	64
@@ -69,6 +73,7 @@ typedef struct _evapi_env {
 	int eset;
 	int conidx;
 	str msg;
+	struct _evapi_env *next;
 } evapi_env_t;
 
 typedef struct _evapi_msg {
@@ -76,6 +81,12 @@ typedef struct _evapi_msg {
 	str tag;
 	int unicast;
 } evapi_msg_t;
+
+typedef struct _evapi_queue {
+	gen_lock_t qlock;
+	evapi_env_t *head;
+	evapi_env_t *tail;
+} evapi_queue_t;
 
 #define EVAPI_MAX_CLIENTS	_evapi_max_clients
 
@@ -92,6 +103,109 @@ typedef struct _evapi_evroutes {
 } evapi_evroutes_t;
 
 static evapi_evroutes_t _evapi_rts;
+
+static evapi_queue_t *_evapi_queue_packets = NULL;
+
+/**
+ *
+ */
+int evapi_queue_init(void)
+{
+	_evapi_queue_packets = (evapi_queue_t*)shm_malloc(sizeof(evapi_queue_t));
+	if(_evapi_queue_packets==NULL) {
+		return -1;
+	}
+	memset(_evapi_queue_packets, 0, sizeof(evapi_queue_t));
+	if(lock_init(&_evapi_queue_packets->qlock) == NULL) {
+		shm_free(_evapi_queue_packets);
+		_evapi_queue_packets = NULL;
+		return -1;
+	}
+	return 0;
+}
+
+/**
+ *
+ */
+int evapi_queue_add(evapi_env_t *renv)
+{
+	evapi_env_t *nenv;
+	uint32_t ssize;
+
+	LM_DBG("adding message to queue [%.*s]\n",  renv->msg.len,  renv->msg.s);
+	ssize = ROUND_POINTER(sizeof(evapi_env_t)) + renv->msg.len + 1;
+	nenv = (evapi_env_t*)shm_malloc(ssize);
+	if(nenv==NULL) {
+		return -1;
+	}
+	memset(nenv, 0, ssize);
+	nenv->msg.s = (char*)nenv + ROUND_POINTER(sizeof(evapi_env_t));
+	memcpy(nenv->msg.s, renv->msg.s, renv->msg.len);
+	nenv->msg.len = renv->msg.len;
+	nenv->eset = renv->eset;
+	nenv->conidx = renv->conidx;
+
+	lock_get(&_evapi_queue_packets->qlock);
+	if(_evapi_queue_packets->tail == NULL) {
+		_evapi_queue_packets->head = nenv;
+		_evapi_queue_packets->tail = nenv;
+	} else {
+		_evapi_queue_packets->tail->next = nenv;
+		_evapi_queue_packets->tail = nenv;
+	}
+	lock_release(&_evapi_queue_packets->qlock);
+
+	return 1;
+}
+
+/**
+ *
+ */
+evapi_env_t* evapi_queue_get(void)
+{
+	evapi_env_t *renv = NULL;
+
+	lock_get(&_evapi_queue_packets->qlock);
+	if(_evapi_queue_packets->head != NULL) {
+		renv = _evapi_queue_packets->head;
+		if(_evapi_queue_packets->head->next != NULL) {
+			_evapi_queue_packets->head = _evapi_queue_packets->head->next;
+		} else {
+			_evapi_queue_packets->head = NULL;
+			_evapi_queue_packets->tail = NULL;
+		}
+		renv->next = NULL;
+	}
+	lock_release(&_evapi_queue_packets->qlock);
+
+	if(renv!=NULL) {
+		LM_DBG("getting message from queue [%.*s]\n",  renv->msg.len,  renv->msg.s);
+	}
+
+	return renv;
+}
+
+
+/**
+ *
+ */
+int evapi_clients_init(void)
+{
+	int i;
+
+	_evapi_clients = (evapi_client_t*)shm_malloc(sizeof(evapi_client_t)
+			* (EVAPI_MAX_CLIENTS+1));
+	if(_evapi_clients==NULL) {
+		LM_ERR("failed to allocate client structures\n");
+		return -1;
+	}
+	memset(_evapi_clients, 0, sizeof(evapi_client_t) * EVAPI_MAX_CLIENTS);
+	for(i=0; i<EVAPI_MAX_CLIENTS; i++) {
+		_evapi_clients[i].sock = -1;
+	}
+	return 0;
+}
+
 
 /**
  *
@@ -468,18 +582,28 @@ void evapi_recv_client(struct ev_loop *loop, struct ev_io *watcher, int revents)
 			k += frame.len ;
 			evenv.msg.s = frame.s;
 			evenv.msg.len = frame.len;
-			LM_DBG("executing event route for frame: [%.*s] (%d)\n",
+			if(_evapi_workers<=0) {
+				LM_DBG("executing event route for frame: [%.*s] (%d)\n",
 						frame.len, frame.s, frame.len);
-			evapi_run_cfg_route(&evenv, _evapi_rts.msg_received,
+				evapi_run_cfg_route(&evenv, _evapi_rts.msg_received,
 					&_evapi_rts.msg_received_name);
+			} else {
+				LM_DBG("queueing event route for frame: [%.*s] (%d)\n",
+						frame.len, frame.s, frame.len);
+				evapi_queue_add(&evenv);
+			}
 			k++;
 		}
 		_evapi_clients[i].rpos = 0 ;
 	} else {
 		evenv.msg.s = _evapi_clients[i].rbuffer;
 		evenv.msg.len = rlen;
-		evapi_run_cfg_route(&evenv, _evapi_rts.msg_received,
+		if(_evapi_workers<=0) {
+			evapi_run_cfg_route(&evenv, _evapi_rts.msg_received,
 				&_evapi_rts.msg_received_name);
+		} else {
+			evapi_queue_add(&evenv);
+		}
 	}
 }
 
@@ -626,20 +750,14 @@ int evapi_run_dispatcher(char *laddr, int lport)
 	struct ev_io io_notify;
 	int yes_true = 1;
 	int fflags = 0;
-	int i;
 
 	LM_DBG("starting dispatcher processing\n");
 
-	_evapi_clients = (evapi_client_t*)malloc(sizeof(evapi_client_t)
-			* (EVAPI_MAX_CLIENTS+1));
 	if(_evapi_clients==NULL) {
-		LM_ERR("failed to allocate client structures\n");
+		LM_ERR("client structures not initialized\n");
 		exit(-1);
 	}
-	memset(_evapi_clients, 0, sizeof(evapi_client_t) * EVAPI_MAX_CLIENTS);
-	for(i=0; i<EVAPI_MAX_CLIENTS; i++) {
-		_evapi_clients[i].sock = -1;
-	}
+
 	loop = ev_default_loop(0);
 
 	if(loop==NULL) {
@@ -718,11 +836,32 @@ int evapi_run_dispatcher(char *laddr, int lport)
 /**
  *
  */
+static int _evapi_wait_idle_step = 0;
+
+/**
+ *
+ */
 int evapi_run_worker(int prank)
 {
+	evapi_env_t *renv = NULL;
+
 	LM_DBG("started worker process: %d\n", prank);
+
 	while(1) {
-		sleep(3);
+		renv = evapi_queue_get();
+		if(renv != NULL) {
+			LM_DBG("processing task: %p [%.*s]\n", renv,
+					renv->msg.len, ZSW(renv->msg.s));
+			evapi_run_cfg_route(renv, _evapi_rts.msg_received,
+					&_evapi_rts.msg_received_name);
+			shm_free(renv);
+			_evapi_wait_idle_step = 0;
+		} else {
+			if(_evapi_wait_idle_step < _evapi_wait_increase) {
+				_evapi_wait_idle_step++;
+			}
+			sleep_us(_evapi_wait_idle_step * _evapi_wait_idle);
+		}
 	}
 }
 

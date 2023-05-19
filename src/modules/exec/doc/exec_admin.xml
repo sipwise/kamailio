@@ -186,7 +186,7 @@ modparam("exec", "time_to_kill", 20)
 		<itemizedlist>
 		<listitem>
 			<para><emphasis>command</emphasis> - Command to be executed. It can
-			include pseudo- variabes;
+			include pseudo-variables;
 			</para>
 		</listitem>
 		</itemizedlist>
@@ -260,7 +260,7 @@ exec_msg("echo TEST > /tmp/$(rU).txt");
 		<itemizedlist>
 		<listitem>
 			<para><emphasis>command</emphasis> - Command to be executed. It can
-			include pseudo- variabes;
+			include pseudo-variables;
 			</para>
 		</listitem>
 		<listitem>

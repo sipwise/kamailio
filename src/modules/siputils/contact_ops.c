@@ -304,7 +304,7 @@ int encode2format(str uri, struct uri_format *format)
 	format->first = start - string + 4; /*sip: */
 	format->second = end - string;
 	/* --------------------------testing ------------------------------- */
-	/* sip:gva@pass@10.0.0.1;;transport=udp>;expires=2 INCORECT BEHAVIOR OF
+	/* sip:gva@pass@10.0.0.1;;transport=udp>;expires=2 INCORRECT BEHAVIOR OF
 	 * parse_uri,myfunction works good */
 	foo = parse_uri(start, end - start, &sipUri);
 	if(foo != 0) {
@@ -373,9 +373,8 @@ int encode_uri(str uri, char *encoding_prefix, char *public_ip, char separator,
 	result->s = pkg_malloc(result->len);
 	pos = result->s;
 	if(pos == NULL) {
-		LM_DBG("unable to alloc result [%d] end=[%d]\n", result->len,
+		PKG_MEM_ERROR_FMT("unable to alloc result [%d] end=[%d]\n", result->len,
 				format.second);
-		LM_ERR("unable to alloc pkg memory\n");
 		return -3;
 	}
 	LM_DBG("pass=[%d]i: allocated [%d], bytes.first=[%d] lengthsec=[%d];"
@@ -581,11 +580,10 @@ int decode_uri(str uri, char separator, str *result)
 	/* adding one comes from * */
 	result->s = pkg_malloc(result->len + 1); /* NULL termination */
 	if(result->s == NULL) {
-		LM_ERR("unable to allocate pkg memory\n");
+		PKG_MEM_ERROR;
 		return -4;
 	}
 	pos = result->s;
-
 	LM_DBG("Adding [%.*s]\n", format.first, uri.s);
 
 	memcpy(pos, uri.s, format.first); /* till sip: */

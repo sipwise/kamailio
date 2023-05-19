@@ -122,7 +122,7 @@ m_tree_t* mt_init_tree(str* tname, str *dbtable, str *scols, int type,
 
 	pt->type = type;
 	pt->multi = multi;
-	pt->reload_time = (unsigned int)time(NULL);
+	pt->reload_time = (uint64_t)time(NULL);
 	pt->tname.s = (char*)shm_malloc((1+tname->len)*sizeof(char));
 	if(pt->tname.s==NULL)
 	{
@@ -432,7 +432,7 @@ int mt_add_tvalues(struct sip_msg *msg, m_tree_t *pt, str *tomatch)
 		while (tvalues != NULL) {
 			if (pt->type == MT_TREE_IVAL) {
 				val.n = tvalues->tvalue.n;
-				LM_DBG("adding avp <%.*s> with value <i:%d>\n",
+				LM_DBG("adding avp <%.*s> with value <i:%ld>\n",
 						values_avp_name.s.len, values_avp_name.s.s, val.n);
 				add_avp(values_name_type, values_avp_name, val);
 			} else {  /* pt->type == MT_TREE_SVAL */

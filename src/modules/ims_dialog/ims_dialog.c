@@ -152,7 +152,7 @@ static mi_export_t mi_cmds[] = {
     { "dlg_list", mi_print_dlgs, 0, 0, 0},
     { "dlg_terminate_dlg", mi_terminate_dlg, 0, 0, 0},
     { 0, 0, 0, 0, 0}
-    /* TODO: restore old dialog functionality later - also expose dialoig_out cmds, possibly*/
+    /* TODO: restore old dialog functionality later - also expose dialog_out cmds, possibly*/
 };
 #endif
 
@@ -737,7 +737,7 @@ static int w_get_profile_size3(struct sip_msg *msg, char *profile,
 
     memset(&val, 0, sizeof (pv_value_t));
     val.flags = PV_VAL_INT | PV_TYPE_INT;
-    val.ri = (int) size;
+    val.ri = (long) size;
 
     if (sp_dest->setf(msg, &sp_dest->pvp, (int) EQ_T, &val) < 0) {
         LM_ERR("setting profile PV failed\n");
