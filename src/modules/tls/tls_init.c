@@ -18,7 +18,7 @@
 
 /*! \defgroup tls Kamailio TLS support
  *
- * This modules implements SIP over TCP with TLS encryption.
+ * This module implements SIP over TCP with TLS encryption.
  * Make sure you read the README file that describes configuration
  * of TLS for single servers and servers hosting multiple domains,
  * and thus using multiple SSL/TLS certificates.
@@ -42,6 +42,7 @@
 #include <netinet/ip.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
 #include <openssl/ssl.h>
 
 #include "../../core/dprint.h"
@@ -64,6 +65,36 @@
 static int tls_mod_preinitialized = 0;
 static int tls_mod_initialized = 0;
 
+extern int ksr_tls_init_mode;
+pthread_mutex_t ksr_tls_lock_shm;
+
+/**
+ *
+ */
+int ksr_tls_lock_init(void)
+{
+	if(!(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)) {
+		return 0;
+	}
+    if (pthread_mutex_init(&ksr_tls_lock_shm, NULL) != 0) {
+        LM_ERR("mutex init failed\n");
+        return -1;
+    }
+	return 0;
+}
+
+/**
+ *
+ */
+void ksr_tls_lock_destroy(void)
+{
+	if(!(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)) {
+		return;
+	}
+    pthread_mutex_destroy(&ksr_tls_lock_shm);
+	return;
+}
+
 #if OPENSSL_VERSION_NUMBER < 0x00907000L
 #    warning ""
 #    warning "==============================================================="
@@ -85,20 +116,20 @@ static int tls_mod_initialized = 0;
 #    include "fixed_c_zlib.h"
 #endif
 
-#ifdef TLS_KSSL_WORKARROUND
+#ifdef TLS_KSSL_WORKAROUND
 #if OPENSSL_VERSION_NUMBER < 0x00908050L
 #	warning "openssl lib compiled with kerberos support which introduces a bug\
 	(wrong malloc/free used in kssl.c) -- attempting workaround"
-#	warning "NOTE: if you don't link libssl staticaly don't try running the \
+#	warning "NOTE: if you don't link libssl statically don't try running the \
 	compiled code on a system with a differently compiled openssl (it's safer \
 			to compile on the  _target_ system)"
 #endif /* OPENSSL_VERSION_NUMBER */
-#endif /* TLS_KSSL_WORKARROUND */
+#endif /* TLS_KSSL_WORKAROUND */
 
 /* openssl < 1. 0 */
 #if OPENSSL_VERSION_NUMBER < 0x01000000L
 #	warning "openssl < 1.0: no TLS extensions or server name support"
-#endif /* OPENSSL_VERION < 1.0 */
+#endif /* OPENSSL_VERSION < 1.0 */
 
 
 
@@ -115,7 +146,7 @@ static int tls_mod_initialized = 0;
 #endif
 
 
-#ifdef TLS_KSSL_WORKARROUND
+#ifdef TLS_KSSL_WORKAROUND
 int openssl_kssl_malloc_bug=0; /* is openssl bug #1467 present ? */
 #endif
 
@@ -180,7 +211,7 @@ inline static int backtrace2str(char* buf, int size)
 			}else if ((s=strchr(bt_strs[i], '['))!=0){
 				e=s+strlen(s);
 			}else{
-				s=bt_strs[i]; e=s+strlen(s); /* add thw whole string */
+				s=bt_strs[i]; e=s+strlen(s); /* add the whole string */
 			}
 			next=buf_append(p, end, s, (int)(long)(e-s));
 			if (next==0) break;
@@ -207,7 +238,12 @@ static void* ser_malloc(size_t size, const char* file, int line)
 	int s;
 #ifdef RAND_NULL_MALLOC
 	static ticks_t st=0;
+#endif
 
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
+
+#ifdef RAND_NULL_MALLOC
 	/* start random null returns only after
 	 * NULL_GRACE_PERIOD from first call */
 	if (st==0) st=get_ticks();
@@ -232,6 +268,8 @@ static void* ser_malloc(size_t size, const char* file, int line)
 				size, file, line, bt_buf);
 	}
 #endif
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
 	return p;
 }
 
@@ -243,7 +281,12 @@ static void* ser_realloc(void *ptr, size_t size, const char* file, int line)
 	int s;
 #ifdef RAND_NULL_MALLOC
 	static ticks_t st=0;
+#endif
 
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
+
+#ifdef RAND_NULL_MALLOC
 	/* start random null returns only after
 	 * NULL_GRACE_PERIOD from first call */
 	if (st==0) st=get_ticks();
@@ -268,6 +311,10 @@ static void* ser_realloc(void *ptr, size_t size, const char* file, int line)
 				bt_buf);
 	}
 #endif
+
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
+
 	return p;
 }
 #endif /* LIBRESSL_VERSION_NUMBER */
@@ -279,24 +326,49 @@ static void* ser_realloc(void *ptr, size_t size, const char* file, int line)
 #if OPENSSL_VERSION_NUMBER < 0x010100000L
 static void* ser_malloc(size_t size)
 {
-	return shm_malloc(size);
+	void *p;
+
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
+	p = shm_malloc(size);
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
+	return p;
 }
 
 
 static void* ser_realloc(void *ptr, size_t size)
 {
-	return shm_realloc(ptr, size);
+	void *p;
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
+	p = shm_realloc(ptr, size);
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
+	return p;
 }
 #else
 static void* ser_malloc(size_t size, const char *fname, int fline)
 {
-	return shm_malloc(size);
+	void *p;
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
+	p = shm_malloc(size);
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
+	return p;
 }
 
 
 static void* ser_realloc(void *ptr, size_t size, const char *fname, int fline)
 {
-	return shm_realloc(ptr, size);
+	void *p;
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
+	p = shm_realloc(ptr, size);
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
+	return p;
 }
 #endif
 
@@ -312,16 +384,24 @@ static void ser_free(void *ptr)
 	 * As shm_free() aborts on null pointers, we have to check for null pointer
 	 * here in the wrapper function.
 	 */
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
 	if (ptr) {
 		shm_free(ptr);
 	}
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
 }
 #else
 static void ser_free(void *ptr, const char *fname, int fline)
 {
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_lock(&ksr_tls_lock_shm);
 	if (ptr) {
 		shm_free(ptr);
 	}
+	if(ksr_tls_init_mode&TLS_MODE_PTHREAD_LOCK_SHM)
+		pthread_mutex_unlock(&ksr_tls_lock_shm);
 }
 #endif
 
@@ -463,6 +543,18 @@ static void init_ssl_methods(void)
 	sr_tls_methods[TLS_USE_TLSv1_2 - 1].TLSMethodMin = TLS1_2_VERSION;
 	sr_tls_methods[TLS_USE_TLSv1_2 - 1].TLSMethodMax = TLS1_2_VERSION;
 
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER)
+	sr_tls_methods[TLS_USE_TLSv1_3_cli - 1].TLSMethod = TLS_client_method();
+	sr_tls_methods[TLS_USE_TLSv1_3_cli - 1].TLSMethodMin = TLS1_3_VERSION;
+	sr_tls_methods[TLS_USE_TLSv1_3_cli - 1].TLSMethodMax = TLS1_3_VERSION;
+	sr_tls_methods[TLS_USE_TLSv1_3_srv - 1].TLSMethod = TLS_server_method();
+	sr_tls_methods[TLS_USE_TLSv1_3_srv - 1].TLSMethodMin = TLS1_3_VERSION;
+	sr_tls_methods[TLS_USE_TLSv1_3_srv - 1].TLSMethodMax = TLS1_3_VERSION;
+	sr_tls_methods[TLS_USE_TLSv1_3 - 1].TLSMethod = TLS_method();
+	sr_tls_methods[TLS_USE_TLSv1_3 - 1].TLSMethodMin = TLS1_3_VERSION;
+	sr_tls_methods[TLS_USE_TLSv1_3 - 1].TLSMethodMax = TLS1_3_VERSION;
+#endif
+
 	/* ranges of TLS versions (require a minimum TLS version) */
 	sr_tls_methods[TLS_USE_TLSv1_PLUS - 1].TLSMethod = TLS_method();
 	sr_tls_methods[TLS_USE_TLSv1_PLUS - 1].TLSMethodMin = TLS1_VERSION;
@@ -472,6 +564,11 @@ static void init_ssl_methods(void)
 
 	sr_tls_methods[TLS_USE_TLSv1_2_PLUS - 1].TLSMethod = TLS_method();
 	sr_tls_methods[TLS_USE_TLSv1_2_PLUS - 1].TLSMethodMin = TLS1_2_VERSION;
+
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER)
+	sr_tls_methods[TLS_USE_TLSv1_3_PLUS - 1].TLSMethod = TLS_method();
+	sr_tls_methods[TLS_USE_TLSv1_3_PLUS - 1].TLSMethodMin = TLS1_3_VERSION;
+#endif
 
 #endif
 }
@@ -773,7 +870,7 @@ int tls_h_mod_init_f(void)
 		}
 	}
 
-#ifdef TLS_KSSL_WORKARROUND
+#ifdef TLS_KSSL_WORKAROUND
 	/* if openssl compiled with kerberos support, and openssl < 0.9.8e-dev
 	 * or openssl between 0.9.9-dev and 0.9.9-beta1 apply workaround for
 	 * openssl bug #1467 */
@@ -819,7 +916,7 @@ int tls_h_mod_init_f(void)
 	if ((low_mem_threshold1 != cfg_get(tls, tls_cfg, low_mem_threshold1))
 			|| (low_mem_threshold2
 				!= cfg_get(tls, tls_cfg, low_mem_threshold2))) {
-		/* ugly hack to set the initial values for the mem tresholds */
+		/* ugly hack to set the initial values for the mem thresholds */
 		if (cfg_register_ctx(&cfg_ctx, 0)) {
 			LM_ERR("failed to register cfg context\n");
 			return -1;

@@ -123,7 +123,7 @@ Chapter 1. Admin Guide
    Set the path to the SQLang file to be loaded at startup. Then you can
    use sqlang_run(function, params) to execute a function from the script
    at runtime. If you use it for KEMI configuration, then it has to
-   include the requited functions.
+   include the required functions.
 
    Default value is “null”.
 
@@ -206,9 +206,9 @@ if(!sqlang_runstring('KSR.dbg("Hello World from $fU\n")'))
 
 5.1.  app_sqlang.reload
 
-   Marks the need to reload the SQLang script pointed by 'load'
-   parameter.The actual reload is done by every working process when the
-   next call to sqlang_run() function or KEMI config is executed.
+   Marks the need to reload the SQLang script pointed by 'load' parameter.
+   The actual reload is done by every working process when the next call
+   to sqlang_run() function or KEMI config is executed.
 
    Name: app_sqlang.reload
 

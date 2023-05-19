@@ -104,7 +104,7 @@ static inline int add_contacts_to_loc_set(struct sip_msg* msg,
 		}
 	}
 
-	/* extract from contact header the all the addresses */
+	/* extract from contact header all the addresses */
 	if (parse_contact( msg->contact )!=0) {
 		LM_ERR("unable to parse Contact hdr!\n");
 		goto error;
@@ -153,7 +153,7 @@ static void reply_callback( struct cell* t, int type, struct tmcb_params* ps)
 
 	if (type&TMCB_RESPONSE_OUT) {
 		/* the purpose of the final reply is to trash down the interpreter
-		 * structure! it's the safest place to do that, since this callback
+		 * structure! It's the safest place to do that, since this callback
 		 * it's called only once per transaction for final codes (>=200) ;-) */
 		if (ps->code>=200) {
 			LM_DBG("code=%d, final reply received\n", ps->code);
@@ -168,7 +168,7 @@ static void reply_callback( struct cell* t, int type, struct tmcb_params* ps)
 		goto exit;
 	}
 
-	LM_DBG("negativ reply received\n");
+	LM_DBG("negative reply received\n");
 
 	intr->flags |= CPL_PROXY_DONE;
 	intr->msg = ps->req;
@@ -529,7 +529,7 @@ static inline char *run_proxy( struct cpl_interpreter *intr )
 script_error:
 	return CPL_SCRIPT_ERROR;
 mem_error:
-	LM_ERR("no more free shm memory\n");
+	SHM_MEM_ERROR;
 runtime_error:
 	return CPL_RUNTIME_ERROR;
 }

@@ -114,6 +114,12 @@ extern int jsonrpc_dgram_mod_init(void);
 extern int jsonrpc_dgram_child_init(int rank);
 extern int jsonrpc_dgram_destroy(void);
 
+/* tcp server parameters */
+extern char *jsonrpc_tcp_socket;
+
+int jsonrpc_tcp_mod_init(void);
+int jsonrpc_tcp_child_init(int rank);
+
 /** The context of the jsonrpc request being processed.
  *
  * This is a global variable that records the context of the jsonrpc request
@@ -161,6 +167,7 @@ static param_export_t params[] = {
 	{"dgram_group",      PARAM_INT,    &jsonrpc_dgram_unix_socket_gid},
 	{"dgram_user",       PARAM_STRING, &jsonrpc_dgram_unix_socket_uid_s},
 	{"dgram_user",       PARAM_INT,    &jsonrpc_dgram_unix_socket_uid},
+	{"tcp_socket",       PARAM_STRING, &jsonrpc_tcp_socket},
 
 	{0, 0, 0}
 };
@@ -204,6 +211,13 @@ static jsonrpc_error_t _jsonrpc_error_table[] = {
 	{0, { 0, 0 } }
 };
 
+#define JSONRPCS_STORED_ID_SIZE 72
+static char _jsonrpcs_stored_id[JSONRPCS_STORED_ID_SIZE];
+
+char *jsonrpcs_stored_id_get(void)
+{
+	return _jsonrpcs_stored_id;
+}
 
 static jsonrpc_plain_reply_t _jsonrpc_plain_reply;
 
@@ -284,7 +298,7 @@ static int jsonrpc_delayed_reply_ctx_init(jsonrpc_ctx_t* ctx)
 /** Implementation of rpc_fault function required by the management API.
  *
  * This function will be called whenever a management function
- * indicates that an error ocurred while it was processing the request. The
+ * indicates that an error occurred while it was processing the request. The
  * function takes the reply code and reason phrase as parameters, these will
  * be put in the body of the reply.
  *
@@ -326,15 +340,16 @@ static void jsonrpc_fault(jsonrpc_ctx_t* ctx, int code, char* fmt, ...)
  * This is the function that will be called whenever a management function
  * asks the management interface to send the reply to the client.
  * The SIP/HTTP reply sent to
- * the client will be always 200 OK, if an error ocurred on the server then it
+ * the client will be always 200 OK, if an error occurred on the server then it
  * will be indicated in the html document in body.
  *
  * @param ctx A pointer to the context structure of the jsonrpc request that
  *            generated the reply.
+ * @param mode If the jsonrpc id should be stored in global buffer
  * @return 1 if the reply was already sent, 0 on success, a negative number on
  *            error
  */
-static int jsonrpc_send(jsonrpc_ctx_t* ctx)
+static int jsonrpc_send_mode(jsonrpc_ctx_t* ctx, int mode)
 {
 	srjson_t *nj = NULL;
 	int i;
@@ -394,9 +409,17 @@ static int jsonrpc_send(jsonrpc_ctx_t* ctx)
 				srjson_AddStrStrToObject(ctx->jrpl, ctx->jrpl->root,
 						"id", 2,
 						nj->valuestring, strlen(nj->valuestring));
+				if(mode==1) {
+					snprintf(_jsonrpcs_stored_id, JSONRPCS_STORED_ID_SIZE-1,
+							"\"%s\"", nj->valuestring);
+				}
 			} else {
 				srjson_AddNumberToObject(ctx->jrpl, ctx->jrpl->root, "id",
 						nj->valuedouble);
+				if(mode==1) {
+					snprintf(_jsonrpcs_stored_id, JSONRPCS_STORED_ID_SIZE-1, "%lld",
+							(long long int)nj->valuedouble);
+				}
 			}
 		}
 	} else {
@@ -404,9 +427,17 @@ static int jsonrpc_send(jsonrpc_ctx_t* ctx)
 			srjson_AddStrStrToObject(ctx->jrpl, ctx->jrpl->root,
 					"id", 2,
 					ctx->jsrid_val, strlen(ctx->jsrid_val));
+			if(mode==1) {
+				snprintf(_jsonrpcs_stored_id, JSONRPCS_STORED_ID_SIZE-1,
+						"\"%s\"", ctx->jsrid_val);
+			}
 		} else if(ctx->jsrid_type == 2) {
 			srjson_AddNumberToObject(ctx->jrpl, ctx->jrpl->root, "id",
 					(double)(*(long*)ctx->jsrid_val));
+			if(mode==1) {
+				snprintf(_jsonrpcs_stored_id, JSONRPCS_STORED_ID_SIZE-1,
+						"%ld", *((long*)ctx->jsrid_val));
+			}
 		}
 	}
 
@@ -447,6 +478,23 @@ static int jsonrpc_send(jsonrpc_ctx_t* ctx)
 	return 0;
 }
 
+/** Implementation of rpc_send function required by the management API.
+ *
+ * This is the function that will be called whenever a management function
+ * asks the management interface to send the reply to the client.
+ * The SIP/HTTP reply sent to
+ * the client will be always 200 OK, if an error ocurred on the server then it
+ * will be indicated in the html document in body.
+ *
+ * @param ctx A pointer to the context structure of the jsonrpc request that
+ *            generated the reply.
+ * @return 1 if the reply was already sent, 0 on success, a negative number on
+ *            error
+ */
+static int jsonrpc_send(jsonrpc_ctx_t* ctx)
+{
+	return jsonrpc_send_mode(ctx, 0);
+}
 
 /** Converts the variables provided in parameter ap according to formatting
  * string provided in parameter fmt into HTML format.
@@ -1143,7 +1191,7 @@ error:
 					(hdr->parsed<(void*)r_ctx->msg ||
 					hdr->parsed>=(void*)(r_ctx->msg+r_ctx->msg_shm_block_size))) {
 				/* header parsed filed doesn't point inside uas.request memory
-				 * chunck -> it was added by failure funcs.-> free it as pkg */
+				 * chunk -> it was added by failure funcs.-> free it as pkg */
 				DBG("removing hdr->parsed %d\n", hdr->type);
 				clean_hdr_field(hdr);
 				hdr->parsed = 0;
@@ -1163,6 +1211,9 @@ error:
 static int mod_init(void)
 {
 	memset(&xhttp_api, 0, sizeof(xhttp_api_t));
+
+	_jsonrpcs_stored_id[0] = '0';
+	_jsonrpcs_stored_id[1] = '\0';
 
 	/* bind the XHTTP API */
 	if(jsonrpc_transport==0 || (jsonrpc_transport&1)) {
@@ -1213,6 +1264,25 @@ static int mod_init(void)
 	} else {
 		jsonrpc_dgram_socket = NULL;
 	}
+	/* prepare tcp transport */
+	if(jsonrpc_transport==0 || (jsonrpc_transport&8)) {
+		if(jsonrpc_tcp_socket!=NULL && *jsonrpc_tcp_socket!='\0') {
+			LM_DBG("preparing to listen on tcp socket: %s\n",
+					jsonrpc_tcp_socket);
+			if(jsonrpc_tcp_mod_init()<0) {
+				if(jsonrpc_transport&8) {
+					LM_ERR("cannot initialize tcp transport\n");
+					return -1;
+				} else {
+					jsonrpc_tcp_socket = NULL;
+				}
+			}
+		} else {
+			jsonrpc_tcp_socket = NULL;
+		}
+	} else {
+		jsonrpc_tcp_socket = NULL;
+	}
 
 	memset(&func_param, 0, sizeof(func_param));
 	func_param.send              = (rpc_send_f)jsonrpc_send;
@@ -1250,6 +1320,12 @@ static int child_init(int rank)
 				return -1;
 			}
 		}
+		if(jsonrpc_tcp_socket!=NULL) {
+			if(jsonrpc_tcp_child_init(rank)<0) {
+				LM_ERR("failed to init tcp worker\n");
+				return -1;
+			}
+		}
 	}
 
 	return 0;
@@ -1271,11 +1347,12 @@ static void mod_destroy(void)
  */
 static int ki_jsonrpcs_dispatch(sip_msg_t* msg)
 {
-	rpc_export_t* rpce;
+	rpc_exportx_t* rpce;
 	jsonrpc_ctx_t* ctx;
 	int ret = 0;
 	srjson_t *nj = NULL;
 	str val;
+	unsigned int rdata;
 
 	if(!IS_HTTP(msg)) {
 		LM_DBG("Got non HTTP msg\n");
@@ -1332,20 +1409,26 @@ static int ki_jsonrpcs_dispatch(sip_msg_t* msg)
 	val.s = nj->valuestring;
 	val.len = strlen(val.s);
 	ctx->method = val.s;
-	rpce = find_rpc_export(ctx->method, 0);
-	if (!rpce || !rpce->function) {
+	rpce = rpc_lookupx(val.s, val.len, &rdata);
+	if (!rpce || !rpce->r.function) {
 		LM_ERR("method callback not found [%.*s]\n", val.len, val.s);
 		jsonrpc_fault(ctx, 500, "Method Not Found");
 		goto send_reply;
 	}
-	ctx->flags = rpce->flags;
+	if (rdata & RPC_EXEC_DELTA) {
+		LM_ERR("execution of command [%.*s] is limited by delta [%d]\n",
+				val.len, val.s, ksr_rpc_exec_delta);
+		jsonrpc_fault(ctx, 500, "Command Executed Too Fast");
+		goto send_reply;
+	}
+	ctx->flags = rpce->r.flags;
 	nj = srjson_GetObjectItem(ctx->jreq, ctx->jreq->root, "params");
 	if(nj!=NULL && nj->type!=srjson_Array && nj->type!=srjson_Object) {
 		LM_ERR("params field is not an array or object\n");
 		goto send_reply;
 	}
 	if(nj!=NULL) ctx->req_node = nj->child;
-	rpce->function(&func_param, ctx);
+	rpce->r.function(&func_param, ctx);
 
 send_reply:
 	if (!ctx->reply_sent && !(ctx->flags&JSONRPC_DELAYED_REPLY_F)) {
@@ -1365,14 +1448,16 @@ static int jsonrpc_dispatch(sip_msg_t* msg, char* s1, char* s2)
 	return ki_jsonrpcs_dispatch(msg);
 }
 
-int jsonrpc_exec_ex(str *cmd, str *rpath)
+int jsonrpc_exec_ex(str *cmd, str *rpath, str *spath)
 {
-	rpc_export_t* rpce;
+	rpc_exportx_t* rpce;
 	jsonrpc_ctx_t* ctx;
 	int ret;
 	srjson_t *nj = NULL;
 	str val;
 	str scmd;
+	unsigned int rdata = 0;
+	int mode;
 
 	scmd = *cmd;
 
@@ -1432,6 +1517,34 @@ int jsonrpc_exec_ex(str *cmd, str *rpath)
 		rpath->s[val.len] = 0;
 		rpath->len = val.len;
 	}
+	/* store file path */
+	if(spath!=NULL) {
+		if(spath->s==NULL || spath->len<=0) {
+			LM_ERR("empty buffer to store the output file path\n");
+			goto send_reply;
+		}
+		nj = srjson_GetObjectItem(ctx->jreq, ctx->jreq->root, "store_path");
+		if(nj==NULL) {
+			LM_DBG("store path not provided in request\n");
+			spath->len = 0;
+		} else {
+			val.s = nj->valuestring;
+			val.len = strlen(val.s);
+			if(val.len > 0) {
+				if(val.len>=spath->len) {
+					LM_ERR("no space to store path field\n");
+					goto send_reply;
+				}
+				strncpy(spath->s, val.s, val.len);
+				spath->s[val.len] = 0;
+				spath->len = val.len;
+				mode = 1;
+			} else {
+				spath->len = 0;
+			}
+		}
+	}
+
 	/* run jsonrpc command */
 	nj = srjson_GetObjectItem(ctx->jreq, ctx->jreq->root, "method");
 	if(nj==NULL) {
@@ -1441,25 +1554,31 @@ int jsonrpc_exec_ex(str *cmd, str *rpath)
 	val.s = nj->valuestring;
 	val.len = strlen(val.s);
 	ctx->method = val.s;
-	rpce = find_rpc_export(ctx->method, 0);
-	if (!rpce || !rpce->function) {
+	rpce = rpc_lookupx(val.s, val.len, &rdata);
+	if (!rpce || !rpce->r.function) {
 		LM_ERR("method callback not found [%.*s]\n", val.len, val.s);
 		jsonrpc_fault(ctx, 500, "Method Not Found");
 		goto send_reply;
 	}
-	ctx->flags = rpce->flags;
+	if (rdata & RPC_EXEC_DELTA) {
+		LM_ERR("execution of command [%.*s] is limited by delta [%d]\n",
+				val.len, val.s, ksr_rpc_exec_delta);
+		jsonrpc_fault(ctx, 500, "Command Executed Too Fast");
+		goto send_reply;
+	}
+	ctx->flags = rpce->r.flags;
 	nj = srjson_GetObjectItem(ctx->jreq, ctx->jreq->root, "params");
 	if(nj!=NULL && nj->type!=srjson_Array && nj->type!=srjson_Object) {
 		LM_ERR("params field is not an array or object\n");
 		goto send_reply;
 	}
 	if(nj!=NULL) ctx->req_node = nj->child;
-	rpce->function(&func_param, ctx);
+	rpce->r.function(&func_param, ctx);
 	ret = 1;
 
 send_reply:
 	if (!ctx->reply_sent) {
-		ret = jsonrpc_send(ctx);
+		ret = jsonrpc_send_mode(ctx, mode);
 	}
 	jsonrpc_clean_context(ctx);
 	if (ret < 0) return -1;
@@ -1474,7 +1593,7 @@ static int jsonrpc_exec(sip_msg_t* msg, char* cmd, char* s2)
 		LM_ERR("cannot get the rpc command parameter\n");
 		return -1;
 	}
-	return jsonrpc_exec_ex(&scmd, NULL);
+	return jsonrpc_exec_ex(&scmd, NULL, NULL);
 }
 /**
  *
@@ -1574,7 +1693,7 @@ static int jsonrpc_pv_parse_jrpl_name(pv_spec_t *sp, str *in)
  */
 static int ki_jsonrpcs_exec(sip_msg_t *msg, str *scmd)
 {
-	return jsonrpc_exec_ex(scmd, NULL);
+	return jsonrpc_exec_ex(scmd, NULL, NULL);
 }
 
 /**

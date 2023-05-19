@@ -69,7 +69,7 @@ char *generate_ETag(int publ_count)
 		ERR_MEM(PKG_MEM_STR);
 	}
 	memset(etag, 0, ETAG_LEN * sizeof(char));
-	size = snprintf(etag, ETAG_LEN, "%c.%d.%d.%d.%d", pres_prefix,
+	size = snprintf(etag, ETAG_LEN, "%c.%u.%d.%d.%d", pres_prefix,
 			pres_startup_time, pres_pid, pres_counter, publ_count);
 	if(size < 0) {
 		LM_ERR("unsuccessful snprintf\n ");
@@ -173,7 +173,7 @@ unsigned int pres_get_priority(void)
 
 	vavp = xavp_get_child_with_ival(&pres_xavp_cfg, &vname);
 	if(vavp != NULL) {
-		return (unsigned int)vavp->val.v.i;
+		return (unsigned int)vavp->val.v.l;
 	}
 
 	return (unsigned int)(time(NULL) - PRES_PRIORITY_TBASE);
@@ -2341,7 +2341,7 @@ int mark_presentity_for_delete(presentity_t *pres, str *ruid)
 	}
 
 	if(RES_ROW_N(result) > 1) {
-		/* More that one is prevented by DB constraint  - but handle
+		/* More than one is prevented by DB constraint  - but handle
 		 * it anyway */
 		LM_ERR("Found %d presentities - expected 1\n", RES_ROW_N(result));
 

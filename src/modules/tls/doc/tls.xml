@@ -84,7 +84,7 @@
 		The most important parameters to set the path to the public certificate and private key
 		files. You can either have them in different file or in the same file in PEM format.
 		The parameters for them are <varname>certificate</varname> and <varname>private_key</varname>.
-		They can be given as modparam or or provided in the profiles of tls.cfg file.
+		They can be given as modparam or provided in the profiles of tls.cfg file.
 		</para>
 		<para>
 		When installing tls module of kamailio, a sample 'tls.cfg' file is deployed in the same
@@ -228,7 +228,7 @@ make TLS_EXTRA_LIBS="-lkrb5 -lz" all include_modules=tls
 			allocations start to fail (due to memory shortage), Openssl can crash or cause memory
 			leaks (making the memory shortage even worse). As of this writing all Openssl versions
 			were affected (including 0.9.8e), see Openssl bug #1491. The TLS module has some
-			workarounds for preventing this problem (see <varname>low_mem_treshold1</varname>
+			workarounds for preventing this problem (see <varname>low_mem_threshold1</varname>
 			and <varname>low_mem_threshold2</varname>), however starting Kamailio with enough shared
 			memory is higly recommended. When this is not possible a quick way to significantly
 			reduce Openssl memory usage it to  disable compression (see <varname>tls_disable_compression</varname>).

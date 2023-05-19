@@ -181,7 +181,7 @@ int hepv2_received(char *buf, unsigned int len, struct receive_info *ri)
 		return -1;
 	}
 
-	/* timming */
+	/* timing */
 	if(heph->hp_v == 2) {
 		hep_offset += sizeof(struct hep_timehdr);
 		heptime_tmp = (struct hep_timehdr *)hep_payload;
@@ -265,7 +265,7 @@ int parsing_hepv3_message(char *buf, unsigned int len)
 
 	hg = (struct hep_generic_recv *)pkg_malloc(sizeof(struct hep_generic_recv));
 	if(hg == NULL) {
-		LM_ERR("no more pkg memory left for hg\n");
+		PKG_MEM_ERROR_FMT("for hg\n");
 		return -1;
 	}
 
@@ -462,7 +462,7 @@ int parsing_hepv3_message(char *buf, unsigned int len)
 	/* a little bit memory */
 	si = (struct socket_info *)pkg_malloc(sizeof(struct socket_info));
 	if(si == 0) {
-		LOG(L_ERR, "ERROR: new_sock_info: memory allocation error\n");
+		PKG_MEM_ERROR_FMT("for socket_info\n");
 		goto error;
 	}
 
@@ -548,7 +548,7 @@ int hepv3_message_parse(char *buf, unsigned int len, sip_msg_t *msg)
 
 	hg = (struct hep_generic_recv *)pkg_malloc(sizeof(struct hep_generic_recv));
 	if(hg == NULL) {
-		LM_ERR("no more pkg memory left for hg\n");
+		PKG_MEM_ERROR_FMT("for hg\n");
 		return -1;
 	}
 
@@ -856,7 +856,7 @@ int hepv2_message_parse(char *buf, unsigned int len, sip_msg_t *msg)
 		return -1;
 	}
 
-	/* timming */
+	/* timing */
 	if(heph->hp_v == 2) {
 		hep_offset += sizeof(struct hep_timehdr);
 		heptime_tmp = (struct hep_timehdr *)hep_payload;
@@ -919,7 +919,7 @@ int hepv3_get_chunk(struct sip_msg *msg, char *buf, unsigned int len,
 
 	hg = (struct hep_generic_recv *)pkg_malloc(sizeof(struct hep_generic_recv));
 	if(hg == NULL) {
-		LM_ERR("no more pkg memory left for hg\n");
+		PKG_MEM_ERROR_FMT("for hg\n");
 		return -1;
 	}
 

@@ -67,7 +67,7 @@ int flat_cmd(db_cmd_t* cmd)
 
 	fcmd = (struct flat_cmd*)pkg_malloc(sizeof(struct flat_cmd));
 	if (fcmd == NULL) {
-		ERR("flatstore: No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 	memset(fcmd, '\0', sizeof(struct flat_cmd));
@@ -142,7 +142,7 @@ int flat_put(db_res_t* res, db_cmd_t* cmd)
 			break;
 
 		case DB_DATETIME:
-			if (fprintf(f, "%u", (unsigned int)cmd->vals[i].v.time) < 0) 
+			if (fprintf(f, "%llu", (unsigned long long)cmd->vals[i].v.time) < 0) 
 				goto error;
 			break;
 

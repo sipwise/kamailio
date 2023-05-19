@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -144,7 +145,7 @@ static int xl_get_times(struct sip_msg *msg, str *res, str *hp, int hi, int hf)
 		msg_tm = time(NULL);
 		msg_id = msg->id;
 	}
-	ch = int2str_base_0pad(msg_tm, &l, hi, hi==10?0:8);
+	ch = int2str_base_0pad((unsigned int)(uint64_t)msg_tm, &l, hi, hi==10?0:8);
 
 	res->s = ch;
 	res->len = l;
@@ -239,7 +240,7 @@ static int xl_get_ruri(struct sip_msg *msg, str *res, str *hp, int hi, int hf)
 	if(msg==NULL || res==NULL)
 		return -1;
 
-	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesnt have a ruri */
+	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesn't have a ruri */
 		return xl_get_null(msg, res, hp, hi, hf);
 
 	if(msg->parsed_uri_ok==0 /* R-URI not parsed*/ && parse_sip_msg_uri(msg)<0)
@@ -580,7 +581,7 @@ static int xl_get_color(struct sip_msg *msg, str *res, str *hp, int hi, int hf)
 	p = color;
 	end = p + COL_BUF;
 
-	/* excape sequenz */
+	/* escape sequence */
 	append_sstring(p, end, "\033[");
 
 	if(hp->s[0]!='_')
@@ -988,7 +989,7 @@ static int xl_get_special(struct sip_msg *msg, str *res, str *hp, int hi, int hf
 	return 0;
 }
 
-/* copy the string withing this range */
+/* copy the string within this range */
 static int	range_from = -1;
 static int	range_to = -1;
 
@@ -1061,7 +1062,17 @@ static int _xl_parse_format(char *s, xl_elog_p *el, int shm, xl_parse_cb parse_c
 		else
 			e = pkg_malloc(sizeof(xl_elog_t));
 		if(!e)
+		{
+			if(shm)
+			{
+				SHM_MEM_ERROR;
+			}
+			else
+			{
+				PKG_MEM_ERROR;
+			}
 			goto error;
+		}
 		memset(e, 0, sizeof(xl_elog_t));
 		n++;
 		if(*el == NULL)
@@ -1842,7 +1853,11 @@ int xl_mod_init()
 	int i;
 
 	s=(char*)pkg_malloc(HOSTNAME_MAX);
-	if (!s) return -1;
+	if (!s)
+	{
+		PKG_MEM_ERROR;
+		return -1;
+	}
 	if (gethostname(s, HOSTNAME_MAX)<0) {
 		str_fullname.len = 0;
 		str_fullname.s = NULL;
@@ -1871,6 +1886,7 @@ int xl_mod_init()
 		}
 		s=(char*)pkg_malloc(HOSTNAME_MAX);
 		if (!s) {
+			PKG_MEM_ERROR;
 			pkg_free(str_fullname.s);
 			return -1;
 		}
@@ -1895,8 +1911,9 @@ int xl_mod_init()
 								memcpy(str_ipaddr.s, s, str_ipaddr.len);
 								str_ipaddr.s[str_ipaddr.len] = '\0';
 							} else {
+								pkg_free(s);
 								str_ipaddr.len=0;
-								LOG(L_ERR, "ERROR: xl_mod_init: No memory left for str_ipaddr\n");
+								PKG_MEM_ERROR_FMT("for str_ipaddr\n");
 							}
 						} else if (strncmp(str_ipaddr.s, s, str_ipaddr.len)!=0) {
 							LOG(L_WARN, "WARNING: xl_mod_init: more IP %s not used\n", s);

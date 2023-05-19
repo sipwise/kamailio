@@ -193,7 +193,7 @@ static int pdb_msg_format_send(struct pdb_msg *msg,
 #define PDB_BUFTOSHORT(_sv, _b, _n) memcpy(&(_sv), (char*)(_b) + (_n), sizeof(short int))
 
 /*!
- * \return 1 if query for the number succeded and the avp with the corresponding carrier id was set,
+ * \return 1 if query for the number succeeded and the avp with the corresponding carrier id was set,
  * -1 otherwise
  */
 static int pdb_query(struct sip_msg *_msg, struct multiparam_t *_number, struct multiparam_t *_dstavp)
@@ -541,6 +541,7 @@ static int add_server(char *host, char *port)
 	server->host = pkg_malloc(strlen(host)+1);
 	if (server->host == NULL) {
 		PKG_MEM_ERROR;
+		pkg_free(server);
 		return -1;
 	}
 	strcpy(server->host, host);
@@ -798,9 +799,14 @@ static int mod_init(void)
 		return -1;
 	}
 
-    global_id = (uint16_t*)shm_malloc(sizeof(uint16_t));
-
-    return 0;
+	global_id = (uint16_t*)shm_malloc(sizeof(uint16_t));
+	if(!global_id)
+	{
+		SHM_MEM_ERROR;
+		shm_free(active);
+		return -1;
+	}
+	return 0;
 }
 
 static int child_init (int rank)

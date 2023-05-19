@@ -505,7 +505,7 @@ int mk_net_bitlen(struct net* n, struct ip_addr* ip, unsigned int bitlen)
 /** initializes a net structure from a string.
  * @param dst - net structure that will be filled
  * @param s - string of the form "ip", "ip/mask_len" or "ip/ip_mak".
- * @return -1 on error, 0 on succes
+ * @return -1 on error, 0 on success
  */
 int mk_net_str(struct net* dst, str* s)
 {
@@ -714,6 +714,22 @@ char* get_proto_name(unsigned int proto)
 			if(get_valid_proto_string(proto, 1, 0, &sproto)<0)
 				return "unknown";
 			return sproto.s;
+	}
+}
+
+/** get address family name (asciiz).
+ * @param af - address family id
+ * @return  string with the adderess family name or "unknown".
+ */
+char* get_af_name(unsigned int af)
+{
+	switch(af) {
+		case AF_INET:
+			return "IPv4";
+		case AF_INET6:
+			return "IPv6";
+		default:
+			return "unknown";
 	}
 }
 

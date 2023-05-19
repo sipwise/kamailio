@@ -30,10 +30,17 @@
 #ifndef _RPC_H_
 #define _RPC_H_
 
+#include <time.h>
+#include "locking.h"
+
 enum rpc_flags {
-	RET_ARRAY = (1 << 0),
-	RET_VALUE = (1 << 1)
+	RPC_RET_ARRAY  = (1 << 0),
+	RPC_RET_VALUE  = (1 << 1),
+	RPC_EXEC_DELTA = (1 << 2)
 };
+
+/* compatibility with old rpc flag name */
+#define RET_ARRAY RPC_RET_ARRAY
 
 typedef enum rpc_capabilities {
 	RPC_DELAYED_REPLY = (1 <<0)  /* delayed reply support */
@@ -47,7 +54,7 @@ typedef int (*rpc_send_f)(void* ctx);                                      /*!< 
 typedef void (*rpc_fault_f)(void* ctx, int code, char* fmt, ...);          /*!< Signal a failure to the client */
 typedef int (*rpc_add_f)(void* ctx, char* fmt, ...);                       /*!< Add a new piece of data to the result */
 typedef int (*rpc_scan_f)(void* ctx, char* fmt, ...);                      /*!< Retrieve request parameters */
-typedef int (*rpc_rpl_printf_f)(void* ctx, char* fmt, ...);                /*!< Add printf-like formated data to the result set */
+typedef int (*rpc_rpl_printf_f)(void* ctx, char* fmt, ...);                /*!< Add printf-like formatted data to the result set */
 typedef int (*rpc_struct_add_f)(void* ctx, char* fmt, ...);                /*!< Add fields in a structure */
 typedef int (*rpc_array_add_f)(void* ctx, char* fmt, ...);                 /*!< Add values in an array */
 typedef int (*rpc_struct_scan_f)(void* ctx, char* fmt, ...);               /*!< Scan attributes of a structure */
@@ -115,5 +122,16 @@ typedef struct rpc_export {
 	const char** doc_str;  /*!< Documentation strings, method signature and description */
 	unsigned int flags;      /*!< Various flags, reserved for future use */
 } rpc_export_t;
+
+typedef struct rpc_xdata {
+	gen_lock_t elock;
+	time_t etime;
+} rpc_xdata_t;
+
+typedef struct rpc_exportx {
+	rpc_export_t r;
+	rpc_xdata_t *xdata;
+} rpc_exportx_t;
+
 
 #endif /* _RPC_H_ */

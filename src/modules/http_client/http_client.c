@@ -11,6 +11,8 @@
  *
  * This file is part of Kamailio, a free SIP server.
  *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ * 
  * Kamailio is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
@@ -691,7 +693,7 @@ static int ki_curl_connect_post_helper(sip_msg_t *_m, str *con, str *url,
 	if(dst->setf) {
 		dst->setf(_m, &dst->pvp, (int)EQ_T, &val);
 	} else {
-		LM_WARN("target pv is not writtable\n");
+		LM_WARN("target pv is not writable\n");
 	}
 
 	if(result.s != NULL)

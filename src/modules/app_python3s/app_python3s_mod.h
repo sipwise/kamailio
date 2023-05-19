@@ -1,8 +1,5 @@
 /*
- * IMS IPSEC PCSCF module
- *
- * Copyright (C) 2018 Tsvetomir Dimitrov
- * Copyright (C) 2019 Aleksandar Yosifov
+ * Copyright (C) 2009 Sippy Software, Inc., http://www.sippysoft.com
  *
  * This file is part of Kamailio, a free SIP server.
  *
@@ -20,22 +17,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  *
- */
+*/
 
-#ifndef _SPI_GEN_H_
+#ifndef _APP_PYTHON3_MOD_H
+#define  _APP_PYTHON3_MOD_H
 
-#include <stdint.h>
+#include <Python.h>
 
-//
-// PORT GEN is based on SPI list, because the logics of the SPI gen and PORT gen are basically the same.
-// It is used as an unique port generator for the TCP client and server ports.
+extern PyObject *_sr_apy3s_handler_script;
+extern PyObject *_sr_apy3s_format_exc_obj;
+extern PyThreadState *myThreadState;
+int apy_reload_script(void);
 
-int init_port_gen(uint32_t sport_start_val, uint32_t cport_start_val, uint32_t range);
-int clean_port_lists();
-int destroy_port_gen();
-uint32_t acquire_sport(); // acquare server port
-uint32_t acquire_cport(); // acquare client port
-int release_sport(uint32_t port); // release server port
-int release_cport(uint32_t port); // release client port
-
-#endif /*  _SPI_GEN_H_ */
+#endif

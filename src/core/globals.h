@@ -213,11 +213,13 @@ extern int rt_timer2_policy; /* "slow" timer, SCHED_OTHER */
 extern int http_reply_parse;
 extern int _sr_ip_free_bind;
 extern int ksr_verbose_startup;
+extern int ksr_all_errors;
 extern int ksr_route_locks_size;
 extern str _ksr_xavp_via_params;
 extern str _ksr_xavp_via_fields;
 extern int ksr_sip_parser_mode;
 extern int ksr_cfg_print_mode;
+extern int ksr_return_mode;
 
 extern int ksr_wait_worker1_mode;
 extern int ksr_wait_worker1_time;
@@ -230,6 +232,8 @@ extern unsigned char *_ksr_hname_extra_chars;
 extern char *ksr_stats_namesep;
 extern str ksr_ipv6_hex_style;
 extern int ksr_local_rport;
+
+extern int ksr_rpc_exec_delta;
 
 #ifdef USE_DNS_CACHE
 extern int dns_cache_init; /* if 0, the DNS cache is not initialized at startup */

@@ -142,7 +142,7 @@ static int fixup_has_subscribers(void **param, int param_no);
 int pres_counter = 0;
 int pres_pid = 0;
 char pres_prefix = 'a';
-int pres_startup_time = 0;
+unsigned int pres_startup_time = 0;
 str pres_db_url = {0, 0};
 int pres_expires_offset = 0;
 int pres_cseq_offset = 0;
@@ -447,7 +447,7 @@ static int mod_init(void)
 	}
 
 
-	pres_startup_time = (int)time(NULL);
+	pres_startup_time = (unsigned int)(uint64_t)time(NULL);
 	if(pres_clean_period > 0) {
 		if(pres_timer_mode==0) {
 			register_timer(ps_presentity_db_timer_clean, 0, pres_clean_period);
@@ -1728,7 +1728,7 @@ static int fixup_update_watchers(void **param, int param_no)
  *  rpc cmd: presence.refreshWatchers
  *			\<presentity_uri>
  *			\<event>
- *          \<refresh_type> // can be:  = 0 -> watchers autentification type or
+ *          \<refresh_type> // can be:  = 0 -> watchers authentification type or
  *									  != 0 -> publish type //
  *		* */
 void rpc_presence_refresh_watchers(rpc_t *rpc, void *ctx)
@@ -1859,31 +1859,28 @@ static const char *rpc_presence_cleanup_doc[3] = {
 };
 
 /*! \brief
- *  rpc cmd: presence.presentity_list
- *			\mode - output attributes control
- *		* */
-void rpc_presence_presentity_list(rpc_t *rpc, void *ctx)
+ *  Build the rpc response for listing presentity records
+ *	- imode - output attributes control
+ *	- user - filter by user
+ *  - domain - filter by domain
+ */
+void rpc_presence_presentity_list_filter(rpc_t *rpc, void *ctx, int imode,
+		str *user, str *domain)
 {
-	str omode = {0, 0};
-	int imode = 0;
 	int i = 0;
+	int skip = 0;
 	ps_ptable_t *ptb = NULL;
 	ps_presentity_t *ptn = NULL;
 	void* th = NULL;
 	str pempty = str_init("");
 
-	LM_DBG("listing in memory presentity records\n");
+	LM_DBG("listing in memory presentity records - imode: %d, user: %.*s,"
+			" domain: %.*s\n", imode,
+			(user && user->len>0)?user->len:0,
+			(user && user->len>0)?user->s:"",
+			(domain && domain->len>0)?domain->len:0,
+			(domain && domain->len>0)?domain->s:"");
 
-	imode = rpc->scan(ctx, "*S", &omode);
-	if(imode < 1) {
-		imode = 0;
-	} else {
-		if(omode.len == 4 && strncmp(omode.s, "full", 4)==0) {
-			imode = 1;
-		} else {
-			imode = 0;
-		}
-	}
 	ptb = ps_ptable_get();
 	if(ptb == NULL) {
 		return;
@@ -1893,6 +1890,31 @@ void rpc_presence_presentity_list(rpc_t *rpc, void *ctx)
 		lock_get(&ptb->slots[i].lock);
 		ptn = ptb->slots[i].plist;
 		while(ptn!=NULL) {
+			skip = 0;
+			if(user!=NULL && user->len>0) {
+				if(ptn->user.len==user->len
+						&& strncasecmp(ptn->user.s, user->s, user->len)==0) {
+					if(domain!=NULL && domain->len>0) {
+						if(ptn->domain.len!=domain->len
+								|| strncasecmp(ptn->domain.s, domain->s, domain->len)!=0) {
+							skip = 1;
+						}
+					}
+				} else {
+					skip = 1;
+				}
+			} else {
+				if(domain!=NULL && domain->len>0) {
+					if(ptn->domain.len!=domain->len
+							|| strncasecmp(ptn->domain.s, domain->s, domain->len)!=0) {
+						skip = 1;
+					}
+				}
+			}
+			if(skip == 1) {
+				ptn = ptn->next;
+				continue;
+			}
 			/* add record node */
 			if (rpc->add(ctx, "{", &th) < 0) {
 				rpc->fault(ctx, 500, "Internal error creating rpc");
@@ -1931,10 +1953,178 @@ void rpc_presence_presentity_list(rpc_t *rpc, void *ctx)
 	return;
 }
 
+/*! \brief
+ *  rpc cmd: presence.presentity_list
+ *			\mode - output attributes control
+ *		* */
+void rpc_presence_presentity_list(rpc_t *rpc, void *ctx)
+{
+	str omode = {0, 0};
+	int imode = 0;
+
+	LM_DBG("listing in memory presentity records\n");
+
+	imode = rpc->scan(ctx, "*S", &omode);
+	if(imode < 1) {
+		imode = 0;
+	} else {
+		if(omode.len == 4 && strncmp(omode.s, "full", 4)==0) {
+			imode = 1;
+		} else {
+			imode = 0;
+		}
+	}
+	rpc_presence_presentity_list_filter(rpc, ctx, imode, NULL, NULL);
+}
+
+
+
 static const char *rpc_presence_presentity_list_doc[2] = {
 	"Trigger update of watchers",
 	0
 };
+
+
+/*! \brief
+ *  rpc cmd: presence.presentity_show
+ *			\mode - output attributes control
+ *			\user - filter by user
+ *			\domain - filter by domain
+ *		* */
+void rpc_presence_presentity_show(rpc_t *rpc, void *ctx)
+{
+	str omode = {0, 0};
+	int imode = 0;
+	str user = str_init("");
+	str domain = str_init("");
+
+	LM_DBG("listing in memory presentity records\n");
+
+	imode = rpc->scan(ctx, "SSS", &omode, &user, &domain);
+	if(imode < 3) {
+		rpc->fault(ctx, 500, "Not enough parameters");
+		return;
+	}
+	if(omode.len == 4 && strncmp(omode.s, "full", 4)==0) {
+		imode = 1;
+	} else if(omode.len == 5 && strncmp(omode.s, "basic", 5)==0) {
+		imode = 0;
+	} else {
+		rpc->fault(ctx, 500, "Unknown output mode");
+		return;
+	}
+	if(user.len==1 && user.s[0]=='*') {
+		user.len = 0;
+	}
+	if(domain.len==1 && domain.s[0]=='*') {
+		domain.len = 0;
+	}
+
+	rpc_presence_presentity_list_filter(rpc, ctx, imode, (user.len>0)?&user:NULL,
+			(domain.len>0)?&domain:NULL);
+}
+
+static const char *rpc_presence_presentity_show_doc[2] = {
+	"Show the presentity records for a specific user",
+	0
+};
+
+/*! \brief
+ *  rpc cmd: presence.watcher_list
+ *			\mode - output attributes control
+ *			\presuri - filter by presentity uri
+ */
+void rpc_presence_watcher_list(rpc_t *rpc, void *ctx)
+{
+	int i = 0;
+	str omode = {0, 0};
+	int imode = 0;
+	str presuri = str_init("");
+	str pempty = str_init("");
+	subs_t *s = NULL;
+	void *th = NULL;
+
+	LM_DBG("listing in memory presentity records\n");
+
+	imode = rpc->scan(ctx, "SS", &omode, &presuri);
+	if(imode < 2) {
+		rpc->fault(ctx, 500, "Not enough parameters");
+		return;
+	}
+	if(omode.len == 4 && strncmp(omode.s, "full", 4)==0) {
+		imode = 1;
+	} else if(omode.len == 5 && strncmp(omode.s, "basic", 5)==0) {
+		imode = 0;
+	} else {
+		rpc->fault(ctx, 500, "Unknown output mode");
+		return;
+	}
+
+	for(i = 0; i < shtable_size; i++) {
+		lock_get(&subs_htable[i].lock);
+		for(s = subs_htable[i].entries->next; s!=NULL; s = s->next) {
+			if(s->pres_uri.len == presuri.len
+					&& strncasecmp(s->pres_uri.s, presuri.s, presuri.len)==0) {
+				/* add record node */
+				if (rpc->add(ctx, "{", &th) < 0) {
+					rpc->fault(ctx, 500, "Internal error creating response");
+					lock_release(&subs_htable[i].lock);
+					return;
+				}
+
+				/* add common fields */
+				if(rpc->struct_add(th, "SSSSSSSSSSSuudu",
+						"pres_uri",  &s->pres_uri,
+						"to_user", &s->to_user,
+						"to_domain", &s->to_domain,
+						"from_user", &s->from_user,
+						"from_domain", &s->from_domain,
+						"watcher_user", &s->watcher_user,
+						"watcher_domain", &s->watcher_domain,
+						"contact", &s->contact,
+						"event_id", &s->event_id,
+						"callid", &s->callid,
+						"user_agent", (s->user_agent.s)?&s->user_agent:&pempty,
+						"expires", s->expires,
+						"status", s->status,
+						"version", s->version,
+						"flags", s->flags)<0) {
+					rpc->fault(ctx, 500, "Internal error adding attributes");
+					lock_release(&subs_htable[i].lock);
+					return;
+				}
+				if(imode==1) {
+					/* add extra fields */
+					if(rpc->struct_add(th, "SSSSSSSuuddd",
+							"reason", (s->reason.s)?&s->reason:&pempty,
+							"to_tag", &s->to_tag,
+							"from_tag", &s->from_tag,
+							"socket", (s->sockinfo_str.s)?&s->sockinfo_str:&pempty,
+							"local_contact", (s->local_contact.s)?&s->local_contact:&pempty,
+							"record_route", (s->record_route.s)?&s->record_route:&pempty,
+							"auth_rules", (s->auth_rules_doc)?s->auth_rules_doc:&pempty,
+							"remote_cseq", s->remote_cseq,
+							"local_cseq", s->local_cseq,
+							"recv_event", s->recv_event,
+							"updated", s->updated,
+							"updated_winfo", s->updated_winfo)<0) {
+						rpc->fault(ctx, 500, "Internal error adding extra attributes");
+						lock_release(&subs_htable[i].lock);
+						return;
+					}
+				}
+
+			}
+		}
+		lock_release(&subs_htable[i].lock);
+	}
+}
+
+static const char *rpc_presence_watcher_list_doc[2] = {
+	"Show the watcher records for a specific presentity user",
+	0
+};
+
 
 rpc_export_t presence_rpc[] = {
 	{"presence.cleanup", rpc_presence_cleanup, rpc_presence_cleanup_doc, 0},
@@ -1944,6 +2134,10 @@ rpc_export_t presence_rpc[] = {
 			rpc_presence_update_watchers_doc, 0},
 	{"presence.presentity_list", rpc_presence_presentity_list,
 			rpc_presence_presentity_list_doc, RET_ARRAY},
+	{"presence.presentity_show", rpc_presence_presentity_show,
+			rpc_presence_presentity_show_doc, RET_ARRAY},
+	{"presence.watcher_list", rpc_presence_watcher_list,
+			rpc_presence_watcher_list_doc, RET_ARRAY},
 	{0, 0, 0, 0}
 };
 

@@ -29,6 +29,7 @@
 #include "../../core/mod_fix.h"
 #include "../../core/xavp.h"
 #include "../../core/kemi.h"
+#include "../../core/dset.h"
 #include "../../core/rpc.h"
 #include "../../core/rpc_lookup.h"
 #include "../../core/strutils.h"
@@ -526,6 +527,8 @@ static pv_export_t mod_pvs[] = {
 
 	{ {"shv", (sizeof("shv")-1)}, PVT_OTHER, pv_get_shvar,
 		pv_set_shvar, pv_parse_shvar_name, 0, 0, 0},
+	{ {"shvinc", (sizeof("shvinc")-1)}, PVT_OTHER, pv_get_shvinc,
+		0, pv_parse_shvar_name, 0, 0, 0},
 	{ {"time", (sizeof("time")-1)}, PVT_CONTEXT, pv_get_local_time,
 		0, pv_parse_time_name, 0, 0, 0},
 	{ {"timef", (sizeof("timef")-1)}, PVT_CONTEXT, pv_get_local_strftime,
@@ -599,7 +602,7 @@ static int w_sbranch_set_ruri(sip_msg_t *msg, char p1, char *p2);
 static int w_sbranch_append(sip_msg_t *msg, char p1, char *p2);
 static int w_sbranch_reset(sip_msg_t *msg, char p1, char *p2);
 static int w_var_to_xavp(sip_msg_t *msg, char *p1, char *p2);
-static int w_xavp_to_var(sip_msg_t *msg, char *p1);
+static int w_xavp_to_var(sip_msg_t *msg, char *p1, char *p2);
 
 static int w_xavi_child_seti(sip_msg_t *msg, char *prname, char *pcname,
 		char *pval);
@@ -607,6 +610,9 @@ static int w_xavi_child_sets(sip_msg_t *msg, char *prname, char *pcname,
 		char *pval);
 static int w_xavi_rm(sip_msg_t *msg, char *prname, char *p2);
 static int w_xavi_child_rm(sip_msg_t *msg, char *prname, char *pcname);
+
+static int w_xavp_lshift(sip_msg_t *msg, char *pxname, char *pidx);
+static int w_xavp_push_dst(sip_msg_t *msg, char *pxname, char *p2);
 
 int pv_xavp_copy_fixup(void** param, int param_no);
 int pv_evalx_fixup(void** param, int param_no);
@@ -684,6 +690,12 @@ static cmd_export_t cmds[]={
 	{"xavi_child_rm", (cmd_function)w_xavi_child_rm,
 		2, fixup_spve_spve, fixup_free_spve_spve,
 		ANY_ROUTE},
+	{"xavp_lshift", (cmd_function)w_xavp_lshift,
+		2, fixup_spve_igp, fixup_free_spve_igp,
+		ANY_ROUTE},
+	{"xavp_push_dst", (cmd_function)w_xavp_push_dst,
+		1, fixup_spve_null, fixup_free_spve_null,
+		REQUEST_ROUTE|BRANCH_ROUTE|FAILURE_ROUTE},
 	{"sbranch_set_ruri",  (cmd_function)w_sbranch_set_ruri,  0, 0, 0,
 		ANY_ROUTE },
 	{"sbranch_append",    (cmd_function)w_sbranch_append,    0, 0, 0,
@@ -757,7 +769,7 @@ static int pv_unset(struct sip_msg* msg, char* pvid, char *foo)
 
 	sp = (pv_spec_t*)pvid;
 	if(pv_set_spec_value(msg, sp, 0, NULL)<0) {
-		LM_ERR("faile to unset variable\n");
+		LM_ERR("failed to unset variable\n");
 		return -1;
 	}
 
@@ -881,7 +893,7 @@ static int ki_var_to_xavp(sip_msg_t *msg, str *varname, str *xname)
 /**
  * xavp to script variable
  */
-static int w_xavp_to_var(sip_msg_t *msg, char *s1)
+static int w_xavp_to_var(sip_msg_t *msg, char *s1, char *p2)
 {
 	str xname = STR_NULL;
 
@@ -902,6 +914,116 @@ static int ki_xavp_print(sip_msg_t* msg)
 {
 	xavp_print_list(NULL);
 	return 1;
+}
+
+/**
+ *
+ */
+static int ki_xavp_lshift(sip_msg_t *msg, str *xname, int idx)
+{
+	int ret;
+
+	ret = xavp_lshift(xname, NULL, idx);
+
+	return (ret==0)?1:ret;
+}
+
+/**
+ *
+ */
+static int w_xavp_lshift(sip_msg_t *msg, char *pxname, char *pidx)
+{
+	str xname = STR_NULL;
+	int idx = 0;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pxname, &xname)<0) {
+		LM_ERR("failed to get the xavp name\n");
+		return -1;
+	}
+	if(fixup_get_ivalue(msg, (gparam_t*)pidx, &idx)<0) {
+		LM_ERR("failed to get the xavp index\n");
+		return -1;
+	}
+
+	return ki_xavp_lshift(msg, &xname, idx);
+}
+
+/**
+ *
+ */
+static int ki_xavp_push_dst(sip_msg_t *msg, str *xname)
+{
+	sr_xavp_t *rxavp = NULL;
+	sr_xavp_t *lxavp = NULL;
+	str fxname = STR_NULL;
+	socket_info_t *si;
+
+	rxavp = xavp_get(xname, NULL);
+	if(rxavp == NULL || rxavp->val.type != SR_XTYPE_XAVP) {
+		LM_DBG("no xavp with destination attributes\n");
+		return -1;
+	}
+
+	/* retrieve attributes from sub list */
+	rxavp = rxavp->val.v.xavp;
+
+	STR_STATIC_SET(fxname, "uri")
+	lxavp = xavp_get(&fxname, rxavp);
+	if(lxavp!=NULL && lxavp->val.type==SR_XTYPE_STR) {
+		LM_DBG("xavp uri field in next destination record (%p)\n", lxavp);
+		if(rewrite_uri(msg, &lxavp->val.v.s) < 0) {
+			LM_ERR("error while setting r-uri with: %.*s\n",
+					lxavp->val.v.s.len, lxavp->val.v.s.s);
+			return -1;
+		}
+	}
+
+	STR_STATIC_SET(fxname, "dsturi")
+	lxavp = xavp_get(&fxname, rxavp);
+	if(lxavp!=NULL && lxavp->val.type==SR_XTYPE_STR) {
+		LM_DBG("xavp dsturi field in next destination record (%p)\n", lxavp);
+		if(set_dst_uri(msg, &lxavp->val.v.s) < 0) {
+			LM_ERR("error while setting dst uri with: %.*s\n",
+					lxavp->val.v.s.len, lxavp->val.v.s.s);
+			return -1;
+		}
+		/* dst_uri changes, so it makes sense to re-use the current uri for
+		 * forking */
+		ruri_mark_new(); /* re-use uri for serial forking */
+	}
+
+	STR_STATIC_SET(fxname, "socket")
+	lxavp = xavp_get(&fxname, rxavp);
+	if(lxavp!=NULL && lxavp->val.type==SR_XTYPE_STR) {
+		si = ksr_get_socket_by_address(&lxavp->val.v.s);
+		if(si != NULL) {
+			set_force_socket(msg, si);
+		}
+	} else {
+		STR_STATIC_SET(fxname, "sockptr")
+		lxavp = xavp_get(&fxname, rxavp);
+		if(lxavp!=NULL && lxavp->val.type==SR_XTYPE_VPTR) {
+			LM_DBG("socket enforced in next destination record\n");
+			set_force_socket(msg, lxavp->val.v.vptr);
+		}
+	}
+
+	return 1;
+}
+
+/**
+ *
+ */
+static int w_xavp_push_dst(sip_msg_t *msg, char *pxname, char *p2)
+{
+	str xname = STR_NULL;
+
+	if(fixup_get_svalue(msg, (gparam_t*)pxname, &xname)<0) {
+		LM_ERR("failed to get the xavp name\n");
+		return -1;
+	}
+
+	return ki_xavp_push_dst(msg, &xname);
 }
 
 static int ki_xavu_print(sip_msg_t* msg)
@@ -976,7 +1098,7 @@ static int ki_xavp_copy_dst_mode(str *src_name, int src_idx, str *dst_name,
 		}
 	} else {
 		/* check if destination exists,
-		 * if it does we will append, similar to XAVP assigment */
+		 * if it does we will append, similar to XAVP assignment */
 		dst_xavp = xavp_get(dst_name, NULL);
 		if (!dst_xavp) {
 			LM_DBG("xavp_copy(new): $xavp(%.*s[%d]) >> $xavp(%.*s)\n",
@@ -1301,8 +1423,8 @@ static int ki_xav_seti(sip_msg_t *msg, str *rname, int ival, int _case)
 	sr_xval_t xval;
 
 	memset(&xval, 0, sizeof(sr_xval_t));
-	xval.type = SR_XTYPE_INT;
-	xval.v.i = ival;
+	xval.type = SR_XTYPE_LONG;
+	xval.v.l = ival;
 
 	if(_case) {
 		xavp = xavi_add_value(rname, &xval, NULL);
@@ -1649,9 +1771,9 @@ static sr_kemi_xval_t* ki_xavp_get_xval(sr_xavp_t *xavp, int rmode)
 			sr_kemi_xval_null(&_sr_kemi_pv_xval, rmode);
 			return &_sr_kemi_pv_xval;
 		break;
-		case SR_XTYPE_INT:
+		case SR_XTYPE_LONG:
 			_sr_kemi_pv_xval.vtype = SR_KEMIP_INT;
-			_sr_kemi_pv_xval.v.n = xavp->val.v.i;
+			_sr_kemi_pv_xval.v.n = xavp->val.v.l;
 			return &_sr_kemi_pv_xval;
 		break;
 		case SR_XTYPE_STR:
@@ -1661,12 +1783,6 @@ static sr_kemi_xval_t* ki_xavp_get_xval(sr_xavp_t *xavp, int rmode)
 		break;
 		case SR_XTYPE_TIME:
 			if(snprintf(_pv_ki_xavp_buf, 128, "%lu", (long unsigned)xavp->val.v.t)<0) {
-				sr_kemi_xval_null(&_sr_kemi_pv_xval, rmode);
-				return &_sr_kemi_pv_xval;
-			}
-		break;
-		case SR_XTYPE_LONG:
-			if(snprintf(_pv_ki_xavp_buf, 128, "%ld", (long unsigned)xavp->val.v.l)<0) {
 				sr_kemi_xval_null(&_sr_kemi_pv_xval, rmode);
 				return &_sr_kemi_pv_xval;
 			}
@@ -1820,9 +1936,9 @@ sr_kemi_dict_item_t* ki_xav_dict_name(sr_xavp_t *xavp, str *name, int _case)
 			case SR_XTYPE_NULL:
 				val->vtype = SR_KEMIP_NULL;
 			break;
-			case SR_XTYPE_INT:
+			case SR_XTYPE_LONG:
 				val->vtype = SR_KEMIP_INT;
-				val->v.n = avp->val.v.i;
+				val->v.n = avp->val.v.l;
 			break;
 			case SR_XTYPE_STR:
 				val->vtype = SR_KEMIP_STR;
@@ -1830,7 +1946,6 @@ sr_kemi_dict_item_t* ki_xav_dict_name(sr_xavp_t *xavp, str *name, int _case)
 				val->v.s.len = avp->val.v.s.len;
 			break;
 			case SR_XTYPE_TIME:
-			case SR_XTYPE_LONG:
 			case SR_XTYPE_LLONG:
 			case SR_XTYPE_DATA:
 				val->vtype = SR_KEMIP_NULL;
@@ -1942,10 +2057,10 @@ static sr_kemi_xval_t* ki_xav_getd_helper(sip_msg_t *msg, str *rname,
 	memset(&_sr_kemi_pv_xval, 0, sizeof(sr_kemi_xval_t));
 	if(_indx) {
 		indx = *_indx;
-		/* we're going to retrive just one */
+		/* we're going to retrieve just one */
 		_sr_kemi_pv_xval.vtype = SR_KEMIP_DICT;
 	} else {
-		/* we're going to retrive all */
+		/* we're going to retrieve all */
 		_sr_kemi_pv_xval.vtype = SR_KEMIP_ARRAY;
 	}
 	if(_case) {
@@ -2833,6 +2948,11 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
 		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
+	{ str_init("pvx"), str_init("shvinc_get"),
+		SR_KEMIP_XVAL, ki_shvinc_get,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
 	{ str_init("pvx"), str_init("pv_var_to_xavp"),
 		SR_KEMIP_INT, ki_var_to_xavp,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
@@ -3172,6 +3292,16 @@ static sr_kemi_t sr_kemi_pvx_exports[] = {
 		SR_KEMIP_INT, ki_xavp_copy_dst,
 		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_STR,
 			SR_KEMIP_INT, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("pvx"), str_init("xavp_lshift"),
+		SR_KEMIP_INT, ki_xavp_lshift,
+		{ SR_KEMIP_STR, SR_KEMIP_INT, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("pvx"), str_init("xavp_push_dst"),
+		SR_KEMIP_INT, ki_xavp_push_dst,
+		{ SR_KEMIP_STR, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 
 	{ {0, 0}, {0, 0}, 0, NULL, { 0, 0, 0, 0, 0, 0 } }

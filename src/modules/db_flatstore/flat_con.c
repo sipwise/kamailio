@@ -43,7 +43,7 @@
 
 
 /** Free all memory allocated for a flat_con structure.
- * This function function frees all memory that is in use by
+ * This function frees all memory that is in use by
  * a flat_con structure.
  * @param con A generic db_con connection structure.
  * @param payload Flatstore specific payload to be freed.
@@ -88,7 +88,7 @@ int flat_con(db_con_t* con)
 
 	fcon = (struct flat_con*)pkg_malloc(sizeof(struct flat_con));
 	if (fcon == NULL) {
-		ERR("flatstore: No memory left\n");
+		PKG_MEM_ERROR;
 		goto error;
 	}
 	memset(fcon, '\0', sizeof(struct flat_con));
@@ -199,7 +199,7 @@ static char* get_filename(str* dir, str* name)
     }
 
     if ((buf = pkg_malloc(buf_len)) == NULL) {
-        ERR("flatstore: No memory left\n");
+        PKG_MEM_ERROR;
         return 0;
     }
     p = buf;
@@ -287,7 +287,7 @@ int flat_open_table(int* idx, db_con_t* con, str* name)
 	return 0;
 
  no_mem:
-	ERR("flatstore: No memory left\n");
+	PKG_MEM_ERROR;
 	if (filename) pkg_free(filename);
 	if (table) pkg_free(table);
 	return -1;

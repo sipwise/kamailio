@@ -303,7 +303,7 @@ kamailioSIPStatusCodesTable_context *kamailioSIPStatusCodesTable_create_row(
 	if(!ctx)
 		return NULL;
 
-	/* The *_extract_index funtion already validates the indices, so we
+	/* The *_extract_index function already validates the indices, so we
 	 * don't need to do any further evaluations here.  */
 	if(kamailioSIPStatusCodesTable_extract_index(ctx, hdr)) {
 		if(NULL != ctx->index.oids)
@@ -502,7 +502,7 @@ void kamailioSIPStatusCodesTable_set_reserve2(netsnmp_request_group *rg)
 
 /*
  * This function is called only when all the *_reserve[1|2] functions were
- * succeful.  Its purpose is to make any changes to the row before it is
+ * successful.  Its purpose is to make any changes to the row before it is
  * inserted into the table.  
  *
  * In our case, we don't require any changes.  So we leave the original
@@ -590,7 +590,7 @@ void kamailioSIPStatusCodesTable_set_commit(netsnmp_request_group *rg)
 
 
 /*
- * This function is called if the *_reserve[1|2] calls failed.  Its supposed to
+ * This function is called if the *_reserve[1|2] calls failed.  It is supposed to
  * free up any resources allocated earlier.  However, we already take care of
  * all these resources in earlier functions.  So for our purposes, the function
  * body is empty. 

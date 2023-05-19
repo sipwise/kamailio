@@ -35,7 +35,6 @@
 #include "../../core/socket_info.h"
 #include "../../core/dset.h"
 #include "../../core/pt.h"
-#include "../../core/receive.h"
 #include "../../core/timer_proc.h"
 #include "../../core/script_cb.h"
 #include "../../core/parser/parse_param.h"
@@ -302,7 +301,7 @@ int stm_t_param(modparam_t type, void *val)
 	nt = (stm_timer_t*)pkg_malloc(sizeof(stm_timer_t));
 	if(nt==0)
 	{
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		free_params(params_list);
 		return -1;
 	}
@@ -388,7 +387,7 @@ int stm_e_param(modparam_t type, void *val)
 	rt = (stm_route_t*)pkg_malloc(sizeof(stm_route_t));
 	if(rt==0)
 	{
-		LM_ERR("no more pkg memory\n");
+		PKG_MEM_ERROR;
 		free_params(params_list);
 		return -1;
 	}

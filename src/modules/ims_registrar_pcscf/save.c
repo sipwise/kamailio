@@ -233,7 +233,7 @@ static inline int update_contacts(struct sip_msg *req,struct sip_msg *rpl, udoma
 							LM_DBG("failed to update pcscf contact\n");
 						}else{
 							// Register callback to destroy related tunnels to this contact.
-							// The registration should be exact here, after the successfuly registration of the UE
+							// The registration should be exactly here, after the successful registration of the UE
 							LM_DBG("ul.register_ulcb(pcontact, PCSCF_CONTACT_EXPIRE|PCSCF_CONTACT_DELETE...)\n");
 							if(ul.register_ulcb(pcontact, PCSCF_CONTACT_EXPIRE|PCSCF_CONTACT_DELETE, ipsec_pcscf.ipsec_on_expire, NULL) != 1){
 								LM_DBG("Error subscribing for contact\n");
@@ -254,7 +254,7 @@ next_contact:
 }
 
 /**
- * Save contact based on REGISTER request. this will be a pending save, until we receive response
+ * Save contact based on REGISTER request. This will be a pending save, until we receive response
  * from SCSCF. If no response after pending_timeout seconds, the contacts is removed. Can only be used from REQUEST ROUTE
  */
 int save_pending(struct sip_msg* _m, udomain_t* _d) {
@@ -262,13 +262,12 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 	int cexpires = 0;
 	pcontact_t* pcontact;
 	contact_t* c;
-	struct pcontact_info ci;
+	struct pcontact_info ci, ci_;
 	struct via_body* vb;
 	unsigned short port, proto;
 	int_str val;
 	struct sip_uri parsed_received;
 	char srcip[50];
-
 	memset(&ci, 0, sizeof(struct pcontact_info));
         
 	vb = cscf_get_ue_via(_m);
@@ -391,7 +390,25 @@ int save_pending(struct sip_msg* _m, udomain_t* _d) {
 			}
 		}
 	} else { //contact already exists - update
-        LM_DBG("Contact already exists - not doing anything for now\n");
+           if (ul.db_mode == DB_ONLY){
+              const int window_for_notify = 20;
+              if ((pcontact->reg_state==PCONTACT_DEREG_PENDING_PUBLISH) || 
+                  ((pcontact->expires   < local_time_now) &&
+                   (pcontact->expires + window_for_notify  > local_time_now))){
+                  ul.unlock_udomain(_d, &ci.via_host, ci.via_port, ci.via_prot);
+                  return -2;
+              }
+              if((pcontact->expires + window_for_notify ) <= local_time_now){
+                 memset(&ci_, 0, sizeof(struct pcontact_info));
+                 ci_.reg_state = PCONTACT_DEREG_PENDING_PUBLISH;
+                 ci_.num_service_routes = 0;
+                 ul.update_pcontact(_d, &ci_, pcontact);
+                 ul.unlock_udomain(_d, &ci.via_host, ci.via_port, ci.via_prot);
+                 return -2;  
+              }
+           }else{
+               LM_DBG("Contact already exists - not doing anything for now\n");
+           }
 	}
 
 	ul.unlock_udomain(_d, &ci.via_host, ci.via_port, ci.via_prot);
@@ -423,6 +440,8 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags) {
 	int contact_has_sos=-1;
 	contact_t* chi; //contact header information
 	struct hdr_field* h;
+	contact_t *ctct;
+	unsigned int expir = 0;
 	//get request from reply
 	req = get_request_from_reply(_m);
 	if (!req) {
@@ -467,6 +486,19 @@ int save(struct sip_msg* _m, udomain_t* _d, int _cflags) {
 		goto error;
 	}
 
+        // skip subscribe, if all contacts have "expires=0" parameter
+	if (cb && (ctct = cb->contacts)) {
+		while (ctct && ctct->expires && ctct->expires->body.len) {
+			expir = 0;
+			str2int(&(ctct->expires->body), (unsigned int*) &expir);
+			if (expir)
+				break;
+			ctct = ctct->next;
+		}
+		if (!ctct)
+			goto done;
+	}
+	
 	if(subscribe_to_reginfo == 1 && contact_has_sos < 1){
 	    
 	    //use the first p_associated_uri - i.e. the default IMPU

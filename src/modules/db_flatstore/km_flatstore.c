@@ -69,7 +69,7 @@ db1_con_t* flat_db_init(const str* url)
 	 */
 	res = pkg_malloc(sizeof(db1_con_t)+sizeof(struct flat_con*)+sizeof(str));
 	if (!res) {
-		LM_ERR("no pkg memory left\n");
+		PKG_MEM_ERROR;
 		return 0;
 	}
 	memset(res, 0, sizeof(db1_con_t) + sizeof(struct flat_con*) + sizeof(str));
@@ -207,7 +207,7 @@ int flat_db_insert(const db1_con_t* h, const db_key_t* k, const db_val_t* v,
 			break;
 
 		case DB1_DATETIME:
-			fprintf(f, "%u", (unsigned int)VAL_TIME(v + i));
+			fprintf(f, "%llu", (unsigned long long)VAL_TIME(v + i));
 			break;
 
 		case DB1_BLOB:

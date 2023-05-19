@@ -102,7 +102,7 @@ typedef struct AVP_List {
 typedef struct CallControlSocket {
     char *name;             // name
     int  sock;              // socket
-    int  timeout;           // how many miliseconds to wait for an answer
+    int  timeout;           // how many milliseconds to wait for an answer
     time_t last_failure;    // time of the last failure
     char data[BUFFER_SIZE]; // buffer for the answer data
 } CallControlSocket;
@@ -124,7 +124,7 @@ int parse_param_stop(unsigned int type, void *val);
 static CallControlSocket callcontrol_socket = {
     "/run/callcontrol/socket", // name
     -1,                            // sock
-    500,                           // timeout in 500 miliseconds if there is no answer
+    500,                           // timeout in 500 milliseconds if there is no answer
     0,                             // time of the last failure
     ""                             // data
 };
@@ -260,6 +260,10 @@ cc_parse_param(void *val, AVP_List** avps) {
 	}
 
     p0 = (char*) pkg_malloc (content.len + 1);
+    if(!(p0)) {
+        PKG_MEM_ERROR;
+        return -1;
+    }
     CHECK_ALLOC(p0);
     memset(p0, 0, content.len + 1);
     p = p0;
@@ -270,10 +274,22 @@ cc_parse_param(void *val, AVP_List** avps) {
     for (;*p != '\0';) {
 
         mp = (AVP_List*) pkg_malloc (sizeof(AVP_List));
+        if(!(mp)) {
+            PKG_MEM_ERROR;
+            pkg_free(p0);
+            return -1;
+        }
         CHECK_ALLOC(mp);
         memset(mp, 0, sizeof(AVP_List));
         mp->next = *avps;
         mp->pv = (pv_spec_p) pkg_malloc (sizeof(pv_spec_t));
+        if(!(mp->next))
+        {
+            PKG_MEM_ERROR;
+            pkg_free(p0);
+            pkg_free(mp);
+            return -1;
+        }
         CHECK_ALLOC(mp->pv);
         memset(mp->pv, 0, sizeof(pv_spec_t));
 
@@ -589,7 +605,7 @@ make_custom_request(struct sip_msg *msg, CallInfo *call)
         }
         if (pt.flags & PV_VAL_INT) {
             len += snprintf(request + len0, sizeof(request)-len0,
-                      "%.*s = %d ", al->name.len, al->name.s,
+                      "%.*s = %ld ", al->name.len, al->name.s,
                    pt.ri);
         } else    if (pt.flags & PV_VAL_STR) {
             len += snprintf(request + len0, sizeof(request)-len0,

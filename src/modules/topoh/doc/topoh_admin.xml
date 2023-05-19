@@ -136,6 +136,29 @@ modparam("topoh", "mask_callid", 1)
 </programlisting>
 		</example>
 	</section>
+	<section id="topoh.p.mask_mode">
+		<title><varname>mask_mode</varname> (integer)</title>
+		<para>
+			Control when and what parts of SIP message are masked.
+		</para>
+		<para>
+			It works as a bitmask value. The following options are available:
+			(1) - skip masking Contact headers in 3XX (redirect) replies.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0.
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>mask_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("topoh", "mask_mode", 1)
+...
+</programlisting>
+		</example>
+	</section>
 	<section id="topoh.p.uparam_name">
 		<title><varname>uparam_name</varname> (str)</title>
 		<para>
@@ -328,6 +351,28 @@ end
 		<programlisting format="linespecific">
 ...
 modparam("topoh", "event_mode", 2)
+...
+</programlisting>
+		</example>
+	</section>
+	<section id="topoh.p.use_mode">
+		<title><varname>use_mode</varname> (int)</title>
+		<para>
+			Control how the module is initialized. If set to 1, the module is
+			only initialized to be used as a library via inter-module API
+			functions. If set to 0, the module is initialized for SIP messages
+			processing.
+		</para>
+		<para>
+		<emphasis>
+			Default value is 0 (to process SIP messages).
+		</emphasis>
+		</para>
+		<example>
+		<title>Set <varname>use_mode</varname> parameter</title>
+		<programlisting format="linespecific">
+...
+modparam("topoh", "use_mode", 1)
 ...
 </programlisting>
 		</example>

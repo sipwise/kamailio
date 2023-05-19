@@ -359,7 +359,7 @@ int parse_aaa_pvs(char *definition, pv_elem_t **pv_def, int *cnt)
 	while ( (end=strchr(p,';'))!=0 || (end=p+strlen(p))!=p ) {
 		/* new pv_elem_t */
 		if ( (pve=(pv_elem_t*)pkg_malloc(sizeof(pv_elem_t)))==0 ) {
-			LM_ERR("no more pkg mem\n");
+			PKG_MEM_ERROR;
 			goto error;
 		}
 		memset( pve, 0, sizeof(pv_elem_t));
@@ -394,8 +394,8 @@ int parse_aaa_pvs(char *definition, pv_elem_t **pv_def, int *cnt)
 			/* create an avp definition for the spec parser */
 			pv.s = (char*)pkg_malloc(pve->text.len + 7);
 			if (pv.s == NULL) {
-				LM_ERR("no more pkg mem\n");
-				goto parse_error;
+				PKG_MEM_ERROR;
+				goto error;
 			}
 			pv.len = snprintf(pv.s, pve->text.len + 7, "$avp(%.*s)",
 					pve->text.len, pve->text.s);
@@ -450,6 +450,16 @@ static sr_kemi_t sr_kemi_auth_db_exports[] = {
 	{ str_init("auth_db"), str_init("is_subscriber"),
 		SR_KEMIP_INT, is_subscriber,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_INT,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("auth_db"), str_init("www_authenticate"),
+		SR_KEMIP_INT, ki_www_authenticate,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("auth_db"), str_init("www_authenticate_method"),
+		SR_KEMIP_INT, ki_www_authenticate_method,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

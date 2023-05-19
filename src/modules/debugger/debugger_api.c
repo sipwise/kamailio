@@ -358,7 +358,7 @@ int dbg_cfg_trace(sr_event_param_t *evp)
 				an->len, an->s, a->cline);
 		qm_check(mem_block);
 #else
-		LM_DBG("cfg pkg check is disbled due to missing qm handler\n");
+		LM_DBG("cfg pkg check is disabled due to missing qm handler\n");
 #endif
 	}
 
@@ -488,7 +488,7 @@ int dbg_cfg_trace(sr_event_param_t *evp)
 					{
 						olen = snprintf(_dbg_pid_list[process_no].out.buf,
 							DBG_CMD_SIZE,
-							"%s : t=int v=%d",
+							"%s : t=int v=%ld",
 							pvn.s, val.ri);
 						if(olen<0)
 						{
@@ -498,7 +498,7 @@ int dbg_cfg_trace(sr_event_param_t *evp)
 						_dbg_pid_list[process_no].out.cmd = DBG_CMD_READ;
 					} else {
 						LOG(_dbg_cfgtrace_level,
-								"breakpoint eval: %s : t=int v=%d\n",
+								"breakpoint eval: %s : t=int v=%ld\n",
 								pvn.s, val.ri
 							);
 					}
@@ -557,7 +557,10 @@ int dbg_init_bp_list(void)
 		return -1;
 	_dbg_bp_list = (dbg_bp_t*)shm_malloc(sizeof(dbg_bp_t));
 	if(_dbg_bp_list==NULL)
+	{
+		SHM_MEM_ERROR;
 		return -1;
+	}
 	memset(_dbg_bp_list, 0, sizeof(dbg_bp_t));
 	if(_dbg_breakpoint==1)
 		_dbg_bp_list->set |= DBG_ABKPOINT_ON;
@@ -580,7 +583,10 @@ int dbg_add_breakpoint(struct action *a, int bpon)
 	len += sizeof(dbg_bp_t) + 1;
 	nbp = (dbg_bp_t*)shm_malloc(len);
 	if(nbp==NULL)
+	{
+		SHM_MEM_ERROR;
 		return -1;
+	}
 	memset(nbp, 0, len);
 	nbp->set |= (bpon)?DBG_ABKPOINT_ON:0;
 	nbp->cline = a->cline;
@@ -605,7 +611,10 @@ int dbg_init_pid_list(void)
 		return -1;
 	_dbg_pid_list = (dbg_pid_t*)shm_malloc(_dbg_pid_no*sizeof(dbg_pid_t));
 	if(_dbg_pid_list==NULL)
+	{
+		SHM_MEM_ERROR;
 		return -1;
+	}
 	memset(_dbg_pid_list, 0, _dbg_pid_no*sizeof(dbg_pid_t));
 	return 0;
 }
@@ -1202,7 +1211,7 @@ int dbg_init_mod_levels(int dbg_mod_hash_size)
 	_dbg_mod_table = (dbg_mod_slot_t*)shm_malloc(_dbg_mod_table_size*sizeof(dbg_mod_slot_t));
 	if(_dbg_mod_table==NULL)
 	{
-		LM_ERR("no more shm.\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(_dbg_mod_table, 0, _dbg_mod_table_size*sizeof(dbg_mod_slot_t));
@@ -1367,8 +1376,9 @@ int dbg_set_mod_debug_level(char *mname, int mnlen, int *mlevel)
 		return 0;
 	}
 	itn = (dbg_mod_level_t*)shm_malloc(sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
-	if(itn==NULL) {
-		LM_ERR("no more shm\n");
+	if(itn==NULL)
+	{
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(itn, 0, sizeof(dbg_mod_level_t) + (mnlen+1)*sizeof(char));
@@ -1444,7 +1454,7 @@ int dbg_set_mod_debug_facility(char *mname, int mnlen, int *mfacility)
 	}
 	itn = (dbg_mod_facility_t*)shm_malloc(sizeof(dbg_mod_facility_t) + (mnlen+1)*sizeof(char));
 	if(itn==NULL) {
-		LM_ERR("no more shm\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(itn, 0, sizeof(dbg_mod_facility_t) + (mnlen+1)*sizeof(char));
@@ -1474,7 +1484,7 @@ int dbg_get_mod_debug_level(char *mname, int mnlen, int *mlevel)
 	unsigned int idx;
 	unsigned int hid;
 	dbg_mod_level_t *it;
-	/* no LOG*() usage in this function and those executed insite it
+	/* no LOG*() usage in this function and those executed inside it
 	 * - use fprintf(stderr, ...) if need for troubleshooting
 	 * - it will loop otherwise */
 	if(_dbg_mod_table==NULL)
@@ -1521,7 +1531,7 @@ int dbg_get_mod_debug_facility(char *mname, int mnlen, int *mfacility)
 	unsigned int idx;
 	unsigned int hid;
 	dbg_mod_facility_t *it;
-	/* no LOG*() usage in this function and those executed insite it
+	/* no LOG*() usage in this function and those executed inside it
 	 * - use fprintf(stderr, ...) if need for troubleshooting
 	 * - it will loop otherwise */
 	if(_dbg_mod_table==NULL)
@@ -1594,7 +1604,7 @@ int dbg_init_pvcache()
 	_dbg_pvcache = (dbg_pvcache_t**)pkg_malloc(sizeof(dbg_pvcache_t*)*DBG_PVCACHE_SIZE);
 	if(_dbg_pvcache==NULL)
 	{
-		LM_ERR("no more memory.\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(_dbg_pvcache, 0, sizeof(dbg_pvcache_t*)*DBG_PVCACHE_SIZE);
@@ -1616,7 +1626,7 @@ int dbg_assign_add(str *name, pv_spec_t *spec)
 	pvn = (dbg_pvcache_t*)pkg_malloc(sizeof(dbg_pvcache_t));
 	if(pvn==NULL)
 	{
-		LM_ERR("no more memory\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(pvn, 0, sizeof(dbg_pvcache_t));
@@ -1681,7 +1691,7 @@ int _dbg_log_assign_action_avp(struct sip_msg* msg, struct lvalue* lv)
 			LM_DBG("%.*s:\"%.*s\"\n", avp_s->name.s.len, avp_s->name.s.s,
 				avp_val.s.len, avp_val.s.s);
 		}else{
-			LM_DBG("%.*s:%d\n", avp_s->name.s.len, avp_s->name.s.s,
+			LM_DBG("%.*s:%ld\n", avp_s->name.s.len, avp_s->name.s.s,
 				avp_val.n);
 		}
 	}
@@ -1706,7 +1716,7 @@ int _dbg_log_assign_action_pvar(struct sip_msg* msg, struct lvalue* lv)
 	if(value.flags&(PV_VAL_NULL|PV_VAL_EMPTY|PV_VAL_NONE)){
 		LM_DBG("%.*s: $null\n", name->len, name->s);
 	}else if(value.flags&(PV_VAL_INT)){
-		LM_DBG("%.*s:%d\n", name->len, name->s, value.ri);
+		LM_DBG("%.*s:%ld\n", name->len, name->s, value.ri);
 	}else if(value.flags&(PV_VAL_STR)){
 		LM_DBG("%.*s:\"%.*s\"\n", name->len, name->s, value.rs.len, value.rs.s);
 	}

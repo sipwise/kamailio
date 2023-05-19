@@ -19,6 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include <inttypes.h>
+#include <stdint.h>
+
 #include "../../core/mem/shm_mem.h"
 #include "ul_check.h"
 #include "time.h"
@@ -130,11 +133,12 @@ int set_must_reconnect(void) {
 }
 
 
-int must_retry(time_t * timer, time_t interval){
+int must_retry(time_t *timer, time_t interval){
 	if(!timer){
 		return -1;
 	}
-	LM_DBG("must_retry: time is at %i, retry at %i.\n", (int)time(NULL), (int)(*timer));
+	LM_DBG("must_retry: time is at %" PRIu64 ", retry at %" PRIu64 ".\n", (uint64_t)time(NULL),
+			(uint64_t)(*timer));
 	if(*timer <= time(NULL)){
 		*timer = time(NULL) + interval;
 		return 1;

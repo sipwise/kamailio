@@ -63,7 +63,6 @@
 #include "../../core/mod_fix.h"
 #include "../../core/socket_info.h"
 #include "../../core/pvar.h"
-#include "../../core/mod_fix.h"
 #include "../../core/rand/kam_rand.h"
 #include "../../core/kemi.h"
 #include "hash.h"
@@ -705,7 +704,7 @@ static int mod_init(void)
 	rule_pt = (struct rule_info ***)shm_malloc(
 			sizeof(struct rule_info **) * (lcr_count_param + 1));
 	if(rule_pt == 0) {
-		LM_ERR("no memory for rule hash table pointer table\n");
+		SHM_MEM_ERROR_FMT("for rule hash table pointer table\n");
 		goto err;
 	}
 	memset(rule_pt, 0, sizeof(struct rule_info **) * (lcr_count_param + 1));
@@ -716,7 +715,7 @@ static int mod_init(void)
 		rule_pt[i] = (struct rule_info **)shm_malloc(
 				sizeof(struct rule_info *) * (lcr_rule_hash_size_param + 1));
 		if(rule_pt[i] == 0) {
-			LM_ERR("no memory for rules hash table\n");
+			SHM_MEM_ERROR_FMT("for rules hash table\n");
 			goto err;
 		}
 		memset(rule_pt[i], 0,
@@ -729,7 +728,7 @@ static int mod_init(void)
 	gw_pt = (struct gw_info **)shm_malloc(
 			sizeof(struct gw_info *) * (lcr_count_param + 1));
 	if(gw_pt == 0) {
-		LM_ERR("no memory for gw table pointer table\n");
+		SHM_MEM_ERROR_FMT("for gw table pointer table\n");
 		goto err;
 	}
 	memset(gw_pt, 0, sizeof(struct gw_info *) * (lcr_count_param + 1));
@@ -743,7 +742,7 @@ static int mod_init(void)
 		gw_pt[i] = (struct gw_info *)shm_malloc(
 				sizeof(struct gw_info) * (lcr_gw_count_param + 1));
 		if(gw_pt[i] == 0) {
-			LM_ERR("no memory for gw table\n");
+			SHM_MEM_ERROR_FMT("for gw table\n");
 			goto err;
 		}
 		memset(gw_pt[i], 0, sizeof(struct gw_info) * (lcr_gw_count_param + 1));
@@ -893,7 +892,7 @@ static pcre *reg_ex_comp(const char *pattern)
 	result = (pcre *)shm_malloc(size);
 	if(result == NULL) {
 		pcre_free(re);
-		LM_ERR("not enough shared memory for compiled PCRE pattern\n");
+		SHM_MEM_ERROR_FMT("for compiled PCRE pattern\n");
 		return (pcre *)0;
 	}
 	memcpy(result, re, size);
@@ -1033,7 +1032,7 @@ static int prefix_len_insert(
 		if(this->prefix_len < prefix_len) {
 			lcr_rec = shm_malloc(sizeof(struct rule_info));
 			if(lcr_rec == NULL) {
-				LM_ERR("no shared memory for rule_info\n");
+				SHM_MEM_ERROR_FMT("for rule_info\n");
 				return 0;
 			}
 			memset(lcr_rec, 0, sizeof(struct rule_info));
@@ -1048,7 +1047,7 @@ static int prefix_len_insert(
 
 	lcr_rec = shm_malloc(sizeof(struct rule_info));
 	if(lcr_rec == NULL) {
-		LM_ERR("no shared memory for rule_info\n");
+		SHM_MEM_ERROR_FMT("for rule_info\n");
 		return 0;
 	}
 	memset(lcr_rec, 0, sizeof(struct rule_info));
@@ -1452,7 +1451,7 @@ int reload_tables()
 	rule_id_hash_table = pkg_malloc(
 			sizeof(struct rule_id_info *) * lcr_rule_hash_size_param);
 	if(!rule_id_hash_table) {
-		LM_ERR("no pkg memory for rule_id hash table\n");
+		PKG_MEM_ERROR_FMT("for rule_id hash table\n");
 		goto err;
 	}
 	memset(rule_id_hash_table, 0,
@@ -2299,6 +2298,11 @@ static int ki_load_gws_furi(
 		}
 	}
 
+	if((lcr_id < 1) || (lcr_id > lcr_count_param)) {
+		LM_ERR("invalid lcr_id parameter value %d\n", lcr_id);
+		return -1;
+	}
+
 	/* Use rules and gws with index lcr_id */
 	rules = rule_pt[lcr_id];
 	gws = gw_pt[lcr_id];
@@ -2493,10 +2497,7 @@ static int load_gws(struct sip_msg *_m, int argc, action_u_t argv[])
 		LM_ERR("invalid lcr_id parameter %s\n", argv[0].u.string);
 		return -1;
 	}
-	if((lcr_id < 1) || (lcr_id > lcr_count_param)) {
-		LM_ERR("invalid lcr_id parameter value %d\n", lcr_id);
-		return -1;
-	}
+
 	if(argc > 1) {
 		ruri_user = argv[1].u.str;
 	} else {
@@ -2527,10 +2528,21 @@ static int generate_uris(struct sip_msg *_m, char *r_uri, str *r_uri_user,
 {
 	int_str gw_uri_val;
 	struct usr_avp *gu_avp;
-	str scheme, prefix, hostname, port, params, transport, addr_str, tmp_tag;
+	str scheme = STR_NULL;
+	str prefix = STR_NULL;
+	str hostname = STR_NULL;
+	str port = STR_NULL;
+	str params = STR_NULL;
+	str transport = STR_NULL;
+	str addr_str = STR_NULL;
+	str tmp_tag = STR_NULL;
 	char *at;
-	unsigned int strip;
+	unsigned int strip = 0;
 
+	if(!tag) {
+		LM_ERR("tag parameter is empty\n");
+		return -1;
+	}
 	gu_avp = search_first_avp(gw_uri_avp_type, gw_uri_avp, &gw_uri_val, 0);
 
 	if(!gu_avp)
@@ -2820,8 +2832,8 @@ static void ping_callback(struct cell *t, int type, struct tmcb_params *ps)
 	/* SIP URI is taken from the Transaction.
      * Remove the "To: <" (s+5) and the trailing >+new-line (s - 5 (To: <)
      * - 3 (>\r\n)). */
-	uri.s = t->to.s + 5;
-	uri.len = t->to.len - 8;
+	uri.s = t->to_hdr.s + 5;
+	uri.len = t->to_hdr.len - 8;
 
 	LM_DBG("OPTIONS %.*s finished with code <%d>\n", uri.len, uri.s, ps->code);
 

@@ -946,6 +946,19 @@ socket_info_t* ksr_get_socket_by_index(int idx)
 	return NULL;
 }
 
+socket_info_t* ksr_get_socket_by_address(str *sockstr)
+{
+	socket_info_t *si = NULL;
+
+	si = ksr_get_socket_by_listen(sockstr);
+
+	if(si!=NULL) {
+		return si;
+	}
+
+	return ksr_get_socket_by_advertise(sockstr);
+}
+
 /* checks if the proto:port is one of the ports we listen on
  * and returns the corresponding socket_info structure.
  * if proto==0 (PROTO_NONE) the protocol is ignored
@@ -1104,13 +1117,14 @@ error:
 
 
 /* adds a sock_info structure to the corresponding proto list
- * return  0 on success, -1 on error */
-int add_listen_advertise_iface_name(char* name, struct name_lst* addr_l,
+ * return last new socket info structur on success, NULL on error */
+socket_info_t* add_listen_socket_info(char* name, struct name_lst* addr_l,
 						unsigned short port, unsigned short proto,
 						char *usename, unsigned short useport, char *sockname,
 						enum si_flags flags)
 {
-	struct socket_info** list;
+	socket_info_t* newsi = NULL;
+	socket_info_t** list = NULL;
 	unsigned short c_proto;
 	struct name_lst* a_l;
 	unsigned short c_port;
@@ -1138,8 +1152,9 @@ int add_listen_advertise_iface_name(char* name, struct name_lst* addr_l,
 			c_port=port;
 		}
 		if (c_proto!=PROTO_SCTP){
-			if (new_sock2list(name, 0, c_port, c_proto, usename, useport,
-								sockname, flags & ~SI_IS_MHOMED, list)==0){
+			newsi = new_sock2list(name, 0, c_port, c_proto, usename, useport,
+								sockname, flags & ~SI_IS_MHOMED, list);
+			if(newsi==0){
 				LM_ERR("new_sock2list failed\n");
 				goto error;
 			}
@@ -1154,16 +1169,32 @@ int add_listen_advertise_iface_name(char* name, struct name_lst* addr_l,
 				}
 			}
 		}else{
-			if (new_sock2list(name, addr_l, c_port, c_proto, usename, useport,
-						sockname, flags, list)==0){
+			newsi = new_sock2list(name, addr_l, c_port, c_proto, usename, useport,
+						sockname, flags, list);
+			if(newsi==0){
 				LM_ERR("new_sock2list failed\n");
 				goto error;
 			}
 		}
-	}while( (proto==0) && (c_proto=next_proto(c_proto)));
-	return 0;
+	} while((proto==0) && (c_proto=next_proto(c_proto)));
+
+	return newsi;
 error:
-	return -1;
+	return NULL;
+}
+
+/* adds a sock_info structure to the corresponding proto list
+ * return  0 on success, -1 on error */
+int add_listen_advertise_iface_name(char* name, struct name_lst* addr_l,
+						unsigned short port, unsigned short proto,
+						char *usename, unsigned short useport, char *sockname,
+						enum si_flags flags)
+{
+	if(add_listen_socket_info(name, addr_l, port, proto, usename, useport,
+				sockname, flags)==NULL) {
+		return -1;
+	}
+	return 0;
 }
 
 /* adds a sock_info structure to the corresponding proto list
@@ -1195,6 +1226,24 @@ int add_listen_iface_name(char* name, struct name_lst* addr_l,
 {
 	return add_listen_advertise_iface_name(name, addr_l, port, proto, 0, 0,
 			sockname, flags);
+}
+
+int add_listen_socket(socket_attrs_t *sa)
+{
+	socket_info_t* newsi;
+	name_lst_t addr_l;
+
+	if(sa->bindaddr.s==NULL) {
+		LM_ERR("no bind address provided\n");
+		return -1;
+	}
+	memset(&addr_l, 0, sizeof(name_lst_t));
+	addr_l.name = sa->bindaddr.s;
+
+	newsi = add_listen_socket_info(sa->bindaddr.s, &addr_l, sa->bindport,
+			sa->bindproto, sa->useaddr.s, sa->useport, sa->sockname.s, sa->sflags);
+
+	return (newsi!=NULL)?0:-1;
 }
 
 #ifdef __OS_linux
@@ -1690,9 +1739,9 @@ static int fix_hostname(str* name, struct ip_addr* address, str* address_str,
 		PKG_MEM_ERROR;
 		goto error;
 	}
-	strncpy(address_str->s, tmp, strlen(tmp)+1);
-	/* set is_ip (1 if name is an ip address, 0 otherwise) */
 	address_str->len=strlen(tmp);
+	strncpy(address_str->s, tmp, address_str->len+1);
+	/* set is_ip (1 if name is an ip address, 0 otherwise) */
 	if (sr_auto_aliases && (address_str->len==name->len) &&
 		(strncasecmp(address_str->s, name->s, address_str->len)==0)){
 		*flags|=SI_IS_IP;
@@ -1737,7 +1786,7 @@ error:
 
 /* append new elements to a socket_info list after "list"
  * each element is created  from addr_info_lst + port, protocol and flags
- * return 0 on succes, -1 on error
+ * return 0 on success, -1 on error
  */
 static int addr_info_to_si_lst(struct addr_info* ai_lst, unsigned short port,
 								char proto, char *usename,
@@ -1759,7 +1808,7 @@ static int addr_info_to_si_lst(struct addr_info* ai_lst, unsigned short port,
 
 /* insert new elements to a socket_info list after "el",
  * each element is created from addr_info_lst + port, * protocol and flags
- * return 0 on succes, -1 on error
+ * return 0 on success, -1 on error
  */
 static int addr_info_to_si_lst_after(struct addr_info* ai_lst,
 										unsigned short port,
@@ -2447,7 +2496,7 @@ int parse_protohostport(str* ins, sr_phostp_t *r)
 		r->host.s=first+1;
 		r->host.len=(int)(p-r->host.s);
 	}else{
-		/* valid port => its host:port */
+		/* valid port => it is host:port */
 		r->sport = tmp;
 		r->host.s=ins->s;
 		r->host.len=(int)(first-r->host.s);

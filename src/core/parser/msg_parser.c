@@ -45,7 +45,6 @@
 #include "../dprint.h"
 #include "../data_lump_rpl.h"
 #include "../mem/mem.h"
-#include "../error.h"
 #include "../core_stats.h"
 #include "../globals.h"
 #include "parse_hname2.h"
@@ -1373,7 +1372,7 @@ int get_rcv_socket_uri(sip_msg_t *m, int tmode, str *uri, int atype)
 }
 
 
-/*! \brief returns a pointer to the begining of the msg's body
+/*! \brief returns a pointer to the beginning of the msg's body
  */
 char* get_body(sip_msg_t* const msg)
 {

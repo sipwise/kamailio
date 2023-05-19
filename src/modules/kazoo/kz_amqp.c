@@ -1340,7 +1340,7 @@ int kz_amqp_async_query_ex(struct sip_msg* msg, char* _exchange, char* _routing_
 	  json_obj = json_tokener_parse(json_s.s);
 
 	  if (json_obj==NULL) {
-		  LM_ERR("empty or invalid JSON payload : %*.s\n", json_s.len, json_s.s);
+		  LM_ERR("empty or invalid JSON payload : %.*s\n", json_s.len, json_s.s);
 		  goto error;
 	  }
 
@@ -1499,7 +1499,7 @@ int kz_amqp_query_ex(struct sip_msg* msg, char* exchange, char* routing_key, cha
 		struct json_object *j = json_tokener_parse(json_s.s);
 
 		if (j==NULL) {
-			LM_ERR("empty or invalid JSON payload : %*.s\n", json_s.len, json_s.s);
+			LM_ERR("empty or invalid JSON payload : %.*s\n", json_s.len, json_s.s);
 			return -1;
 		}
 
@@ -2259,7 +2259,8 @@ int kz_amqp_send_ex(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd, kz_amqp_channel
 	amqp_bytes_t routing_key = {0,0};
 	amqp_bytes_t payload = {0,0};
 	int ret = -1;
-    json_obj_ptr json_obj = NULL;
+	json_obj_ptr json_obj = NULL;
+	int num_headers = 0;
 
 	amqp_basic_properties_t props;
 	memset(&props, 0, sizeof(amqp_basic_properties_t));
@@ -2278,7 +2279,6 @@ int kz_amqp_send_ex(kz_amqp_server_ptr srv, kz_amqp_cmd_ptr cmd, kz_amqp_channel
     routing_key = amqp_bytes_malloc_dup(amqp_cstring_bytes(cmd->routing_key));
     payload = amqp_bytes_malloc_dup(amqp_cstring_bytes(cmd->payload));
 
-    int num_headers = 0;
     if ( (cmd->headers != NULL) &&  (strlen (cmd->headers) > 0 ) ) {
         num_headers = add_amqp_headers(cmd->headers, &props);
     }
@@ -2353,10 +2353,10 @@ int add_amqp_headers (char * headers, amqp_basic_properties_t * props )
 			if (header_value != NULL) {
 				num_headers++;
 			} else {
-				LM_ERR("Header-Value cant be parsed - skipping!\n");
+				LM_ERR("Header-Value can't be parsed - skipping!\n");
 			}
 		} else {
-			LM_ERR("Header-Name cant be parsed - skipping!\n");
+			LM_ERR("Header-Name can't be parsed - skipping!\n");
 		}
 		kv_pair_str = strtok_r(NULL, headers_delim, &header_saveptr);
 	}

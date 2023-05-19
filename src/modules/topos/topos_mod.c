@@ -50,16 +50,20 @@
 #include "../../core/parser/parse_uri.h"
 #include "../../core/parser/parse_to.h"
 #include "../../core/parser/parse_from.h"
+#include "../../core/parser/parse_methods.h"
 #include "../../core/timer_proc.h"
 #include "../../core/fmsg.h"
 #include "../../core/onsend.h"
 #include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
+#include "../../core/data_lump.h"
 
 #include "../../lib/srdb1/db.h"
 #include "../../core/utils/sruid.h"
 
 #include "../../modules/sanity/api.h"
+
+#include "../topoh/api.h"
 
 #include "tps_storage.h"
 #include "tps_msg.h"
@@ -80,10 +84,17 @@ static str _tps_db_url = str_init(DEFAULT_DB_URL);
 int _tps_param_mask_callid = 0;
 int _tps_sanity_checks = 0;
 int _tps_rr_update = 0;
+int _tps_header_mode = 0;
 str _tps_storage = str_init("db");
 
 extern int _tps_branch_expire;
 extern int _tps_dialog_expire;
+extern unsigned int _tps_methods_nocontact;
+str _tps_methods_nocontact_list = str_init("");
+extern unsigned int _tps_methods_noinitial;
+str _tps_methods_noinitial_list = str_init("");
+
+static topoh_api_t thb = {0};
 
 int _tps_clean_interval = 60;
 
@@ -151,6 +162,7 @@ static param_export_t params[]={
 	{"db_url",		PARAM_STR, &_tps_db_url},
 	{"mask_callid",		PARAM_INT, &_tps_param_mask_callid},
 	{"sanity_checks",	PARAM_INT, &_tps_sanity_checks},
+	{"header_mode",	PARAM_INT, &_tps_header_mode},
 	{"branch_expire",	PARAM_INT, &_tps_branch_expire},
 	{"dialog_expire",	PARAM_INT, &_tps_dialog_expire},
 	{"clean_interval",	PARAM_INT, &_tps_clean_interval},
@@ -165,6 +177,9 @@ static param_export_t params[]={
 	{"xavu_field_contact_host", PARAM_STR, &_tps_xavu_field_contact_host},
 	{"rr_update",		PARAM_INT, &_tps_rr_update},
 	{"context",			PARAM_STR, &_tps_context_param},
+	{"methods_nocontact",		PARAM_STR, &_tps_methods_nocontact_list},
+	{"methods_noinitial",		PARAM_STR, &_tps_methods_noinitial_list},
+
 	{0,0,0}
 };
 
@@ -214,6 +229,18 @@ static int mod_init(void)
 		return -1;
 	}
 
+	if(_tps_methods_nocontact_list.len>0) {
+		if(parse_methods(&_tps_methods_nocontact_list, &_tps_methods_nocontact)<0) {
+			LM_ERR("failed to parse methods_nocontact parameter\n");
+			return -1;
+		}
+	}
+	if(_tps_methods_noinitial_list.len>0) {
+		if(parse_methods(&_tps_methods_noinitial_list, &_tps_methods_noinitial)<0) {
+			LM_ERR("failed to parse methods_noinitial parameter\n");
+			return -1;
+		}
+	}
 	if(_tps_storage.len==2 && strncmp(_tps_storage.s, "db", 2)==0) {
 		/* Find a database module */
 		if (db_bind_mod(&_tps_db_url, &_tpsdbf)) {
@@ -253,6 +280,14 @@ static int mod_init(void)
 		LM_ERR("contact_mode parameter is 2,"
 				" but a_contact or b_contact xavu fields not defined\n");
 		return -1;
+	}
+	
+	if(_tps_param_mask_callid == 1) {
+		/* bind the topoh API */
+		if(topoh_load_api(&thb) != 0) {
+			LM_ERR("cannot bind to topoh API\n");
+			return -1;
+		}
 	}
 
 	sr_event_register_cb(SREV_NET_DATA_IN,  tps_msg_received);
@@ -714,5 +749,103 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
 
 	return 0;
 }
+
+/**
+ *  MASK CallID
+ */
+
+int tps_mask_callid(sip_msg_t *msg)
+{
+	struct lump* l;
+	str out;
+	str in;
+
+	if(_tps_param_mask_callid==0) {
+		return 0;
+	}
+
+	if(msg->callid==NULL) {
+		LM_ERR("cannot get Call-Id header\n");
+		return -1;
+	}
+	LM_DBG("incoming call-id: [%.*s]\n", msg->callid->body.len, msg->callid->body.s);
+	in=msg->callid->body;
+
+	if(thb.mask_callid(&in, &out) != 0) {
+		LM_ERR("cannot encode callid\n");
+		return -1;
+	}
+
+	LM_DBG("updated (masked) call-id: [%.*s]\n", out.len, out.s);
+	if(out.s==NULL) {
+		LM_ERR("cannot encode callid\n");
+		return -1;
+	}
+
+	l=del_lump(msg, msg->callid->body.s-msg->buf, msg->callid->body.len, 0);
+	if (l==0) {
+		LM_ERR("failed deleting callid\n");
+		pkg_free(out.s);
+		return -1;
+	}
+	if (insert_new_lump_after(l, out.s, out.len, 0)==0) {
+		LM_ERR("could not insert new lump\n");
+		pkg_free(out.s);
+		return -1;
+	}
+
+	return 0;
+}
+
+/**
+ *  UNMASK CallID
+ */
+int tps_unmask_callid(sip_msg_t *msg)
+{
+	struct lump* l;
+	str out;
+	str in;
+	int umask_ret;
+
+	if(_tps_param_mask_callid==0) {
+		return 0;
+	}
+
+	if(msg->callid==NULL) {
+		LM_ERR("cannot get Call-Id header\n");
+		return -1;
+	}
+
+	LM_DBG("incoming call-id: [%.*s]\n", msg->callid->body.len, msg->callid->body.s);
+	in=msg->callid->body;
+	umask_ret=thb.unmask_callid(&in, &out);
+	if(umask_ret == 1) {
+		LM_DBG("unmask not required\n");
+		return 0;
+	} else if(umask_ret != 0) {
+		LM_ERR("cannot decode callid\n");
+		return -1;
+	}
+	LM_DBG("updated (unmasked) call-id: [%.*s]\n", out.len, out.s);
+	if(out.s==NULL) {
+		LM_ERR("cannot decode callid\n");
+		return -1;
+	}
+
+	l=del_lump(msg, msg->callid->body.s-msg->buf, msg->callid->body.len, 0);
+	if (l==0) {
+		LM_ERR("failed deleting callid\n");
+		pkg_free(out.s);
+		return -1;
+	}
+	if (insert_new_lump_after(l, out.s, out.len, 0)==0) {
+		LM_ERR("could not insert new lump\n");
+		pkg_free(out.s);
+		return -1;
+	}
+
+	return 0;
+}
+
 
 /** @} */

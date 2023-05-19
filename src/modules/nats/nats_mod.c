@@ -59,7 +59,7 @@ static param_export_t params[] = {
 
 static cmd_export_t cmds[] = {
 	{"nats_publish", (cmd_function)w_nats_publish_f,
-		  2, fixup_publish_get_value, fixup_publish_get_value_free, ANY_ROUTE},
+		  3, fixup_publish_get_value, fixup_publish_get_value_free, ANY_ROUTE},
 	{0, 0, 0, 0, 0, 0}
 };
 
@@ -182,6 +182,7 @@ static int mod_init(void)
 		return -1;
 	}
 	register_procs(total_procs);
+	cfg_register_child(total_procs);
 
 	nats_pub_worker_pipes_fds =
 			(int *)shm_malloc(sizeof(int) * (nats_pub_workers_num)*2);
@@ -369,6 +370,8 @@ static int mod_child_init(int rank)
 				LM_ERR("failed to fork worker process %d\n", i);
 				return -1;
 			} else if(newpid == 0) {
+				if(cfg_child_init())
+					return -1;
 				worker_loop(i);
 			} else {
 				nats_workers[i].pid = newpid;
@@ -530,6 +533,7 @@ int nats_cleanup_init_servers()
 
 int nats_cleanup_connection(nats_connection_ptr c)
 {
+	int s;
 	if(c->conn != NULL) {
 		natsConnection_Close(c->conn);
 		natsConnection_Destroy(c->conn);
@@ -537,7 +541,7 @@ int nats_cleanup_connection(nats_connection_ptr c)
 	if(c->opts != NULL) {
 		natsOptions_Destroy(c->opts);
 	}
-	for(int s = 0; s < NATS_MAX_SERVERS; s++) {
+	for(s = 0; s < NATS_MAX_SERVERS; s++) {
 		if(c->servers[s]) {
 			shm_free(c->servers[s]);
 		}
@@ -593,7 +597,9 @@ int nats_destroy_workers()
 						LM_ERR("could not cleanup worker connection\n");
 					}
 				}
-				uv_poll_stop(&pub_worker->poll);
+				if(uv_is_active((uv_handle_t*)&pub_worker->poll)) {
+					uv_poll_stop(&pub_worker->poll);
+				}
 				shm_free(pub_worker);
 			}
 		}
@@ -822,7 +828,16 @@ int nats_pv_get_event_payload(
  */
 int ki_nats_publish(sip_msg_t *msg, str *subject, str *payload)
 {
-	return w_nats_publish(msg, *subject, *payload);
+	str reply = STR_NULL;
+	return w_nats_publish(msg, *subject, *payload, reply);
+}
+
+/**
+ *
+ */
+int ki_nats_publish_request(sip_msg_t *msg, str *subject, str *payload, str *reply)
+{
+	return w_nats_publish(msg, *subject, *payload, *reply);
 }
 
 /**
@@ -833,6 +848,11 @@ static sr_kemi_t sr_kemi_nats_exports[] = {
 	{ str_init("nats"), str_init("publish"),
 		SR_KEMIP_INT, ki_nats_publish,
 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("nats"), str_init("publish_request"),
+		SR_KEMIP_INT, ki_nats_publish_request,
+		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},
 

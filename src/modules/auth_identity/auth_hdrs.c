@@ -382,7 +382,7 @@ static void free_out_contacthdr(void)
 {
 	void** h_parsed;
 
-	h_parsed=&glb_contact.parsed; /*strict aliasing warnings workarround */
+	h_parsed=&glb_contact.parsed; /*strict aliasing warnings workaround */
 	if (glb_siphdr) {
 		pkg_free(glb_siphdr);
 		glb_siphdr=NULL;
@@ -520,7 +520,7 @@ int append_hf(struct sip_msg* msg, char *str1, enum _hdr_types_t type)
 
 	s = (char*)pkg_malloc(len+1);
 	if (!s) {
-		LOG(L_ERR, "AUTH_IDENTITY:append_hf: No memory left\n");
+		PKG_MEM_ERROR;
 		return -1;
 	}
 

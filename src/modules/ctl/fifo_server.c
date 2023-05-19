@@ -84,6 +84,7 @@
 #include "../../core/sr_module.h"
 #include "../../core/pt.h"
 #include "../../core/rpc.h"
+#include "../../core/rpc_lookup.h"
 #include "../../core/tsend.h"
 #include "fifo_server.h"
 #include "io_listener.h"
@@ -109,7 +110,7 @@ struct readline_handle{
 
 enum text_flags {
 	CHUNK_SEEN         = (1 << 0),
-	CHUNK_POSITIONAL   = (1 << 1), /* Positinal parameter, should be followed by \n */
+	CHUNK_POSITIONAL   = (1 << 1), /* Positional parameter, should be followed by \n */
 	CHUNK_MEMBER_NAME  = (1 << 2), /* Struct member name, should be followed by : */
 	CHUNK_MEMBER_VALUE = (1 << 3)  /* Struct member value, should be followed by , if
 					* there is another member name and \n if not */
@@ -171,13 +172,13 @@ int   fifo_reply_retries = DEFAULT_REPLY_RETRIES;
 int   fifo_reply_wait    = DEFAULT_REPLY_WAIT;
 
 
-static rpc_t     func_param;        /* Pointers to implementation of RPC funtions */
+static rpc_t     func_param;        /* Pointers to implementation of RPC functions */
 
 static int  rpc_send         (rpc_ctx_t* ctx);                                 /* Send the reply to the client */
 static void rpc_fault        (rpc_ctx_t* ctx,       int code, char* fmt, ...); /* Signal a failure to the client */
 static int  rpc_add          (rpc_ctx_t* ctx,       char* fmt, ...);           /* Add a new piece of data to the result */
 static int  rpc_scan         (rpc_ctx_t* ctx,       char* fmt, ...);           /* Retrieve request parameters */
-static int  rpc_rpl_printf   (rpc_ctx_t* ctx,       char* fmt, ...);           /* Add printf-like formated data to the result set */
+static int  rpc_rpl_printf   (rpc_ctx_t* ctx,       char* fmt, ...);           /* Add printf-like formatted data to the result set */
 static int  rpc_struct_add   (struct text_chunk* s, char* fmt, ...);           /* Create a new structure */
 static int  rpc_struct_scan  (struct rpc_struct* s, char* fmt, ...);           /* Scan attributes of a structure */
 static int  rpc_struct_printf(struct text_chunk* s, char* name, char* fmt, ...);
@@ -456,7 +457,7 @@ static struct rpc_struct* new_struct(rpc_ctx_t* ctx, str* line)
 		     /* Create value chunk */
 		v = new_chunk_unescape(&value);
 		if (!v) {
-			rpc_fault(ctx, 400, "Error while processing struct membeer '%.*s'"
+			rpc_fault(ctx, 400, "Error while processing struct member '%.*s'"
 						" on line %d", name.len, ZSW(name.s), ctx->line_no);
 			goto err;
 		}
@@ -667,7 +668,7 @@ static int open_reply_pipe(char *pipe_name)
 int fifo_process(char* msg_buf, int size, int* bytes_needed, void *sh,
 					void** saved_state)
 {
-	rpc_export_t* exp;
+	rpc_exportx_t* exp;
 	char* buf;
 	int line_len;
 	char *file_sep;
@@ -675,7 +676,8 @@ int fifo_process(char* msg_buf, int size, int* bytes_needed, void *sh,
 	struct rpc_struct* s;
 	int r;
 	int req_size;
-	static rpc_ctx_t context; 
+	static rpc_ctx_t context;
+	unsigned int rdata;
 
 	DBG("process_fifo: called with %d bytes, offset %d: %.*s\n",
 			size, (int)(long)*saved_state, size, msg_buf);
@@ -747,7 +749,7 @@ process:
 			ERR("Empty command\n");
 			goto consume;
 		}
-		if (*(file_sep + 1) == 0) context.reply_file = NULL; 
+		if (*(file_sep + 1) == 0) context.reply_file = NULL;
 		else {
 			context.reply_file = file_sep + 1;
 			context.reply_file = trim_filename(context.reply_file);
@@ -758,26 +760,32 @@ process:
 		}
 		     /* make command zero-terminated */
 		*file_sep = 0;
-		
-		exp = find_rpc_export(context.method, 0);
-		if (!exp || !exp->function) {
+
+		exp = rpc_lookupx(context.method, strlen(context.method), &rdata);
+		if ((exp==NULL) || (exp->r.function==NULL)){
 			DBG("Command %s not found\n", context.method);
 			rpc_fault(&context, 500, "Command '%s' not found", context.method);
 			goto consume;
 		}
+		if (rdata & RPC_EXEC_DELTA) {
+			LM_ERR("execution of command [%s] is limited by delta [%d]\n",
+					context.method, ksr_rpc_exec_delta);
+			rpc_fault(&context, 500, "Command Executed Too Fast");
+			goto consume;
+		}
 
-		exp->function(&func_param, &context);
+		exp->r.function(&func_param, &context);
 
 	consume:
 		if (!context.reply_sent) {
 			rpc_send(&context);
 		}
 
-		if (context.reply_file) { 
-			ctl_free(context.reply_file); 
-			context.reply_file = 0; 
+		if (context.reply_file) {
+			ctl_free(context.reply_file);
+			context.reply_file = 0;
 		}
-		
+
 		     /* Collect garbage (unescaped strings and structures) */
 		while(context.strs) {
 			p = context.strs;

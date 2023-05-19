@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "../../core/sr_module.h"
@@ -115,7 +116,7 @@ static int mod_init(void)
 		}
 	} else {
 		if(_statsc_info->items != (uint32_t)statsc_items) {
-			LM_ERR("number of items set after tracking statiscs were added\n");
+			LM_ERR("number of items set after tracking statistics were added\n");
 			LM_ERR("set mod param 'items' before 'track'\n");
 			return -1;
 		}
@@ -192,7 +193,7 @@ int statsc_nmap_add(str *sname, str *rname)
 		return -1;
 	}
 	if(_statsc_info->items != (uint32_t)statsc_items) {
-		LM_ERR("number of items set after tracking statiscs were added\n");
+		LM_ERR("number of items set after tracking statistics were added\n");
 		LM_ERR("set mod param 'items' before 'track'\n");
 		return -1;
 	}
@@ -201,7 +202,7 @@ int statsc_nmap_add(str *sname, str *rname)
 		+ STRLEN_ROUNDUP(sname->len) + STRLEN_ROUNDUP(rname->len);
 	sm = shm_malloc(sz);
 	if(sm==NULL) {
-		LM_ERR("no more shared memory\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(sm, 0, sz);
@@ -240,7 +241,7 @@ int statsc_init(void)
 
 	_statsc_info = shm_malloc(sizeof(statsc_info_t));
 	if(_statsc_info==NULL) {
-		LM_ERR("no more shared memory\n");
+		SHM_MEM_ERROR;
 		return -1;
 	}
 	memset(_statsc_info, 0, sizeof(statsc_info_t));
@@ -249,7 +250,8 @@ int statsc_init(void)
 	sz = sizeof(statsc_nmap_t) + statsc_items * sizeof(int64_t);
 	sm = shm_malloc(sz);
 	if(sm==NULL) {
-		LM_ERR("no more shared memory\n");
+		SHM_MEM_ERROR;
+		shm_free(_statsc_info);
 		return -1;
 	}
 	memset(sm, 0, sz);
@@ -408,9 +410,9 @@ static void statsc_rpc_report(rpc_t* rpc, void* ctx)
 		rpc->fault(ctx, 500, "Error creating rpc (1)");
 		return;
 	}
-	if(rpc->struct_add(th, "u[",
-				"timestamp", (unsigned int)tn,
-				"stats",     &ts )<0) {
+	if(rpc->struct_add(th, "J[",
+				"timestamp", (unsigned long long)tn,
+				"stats",     &ts)<0) {
 		rpc->fault(ctx, 500, "Error creating rpc (2)");
 		return;
 	}

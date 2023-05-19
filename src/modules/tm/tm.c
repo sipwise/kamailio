@@ -66,6 +66,7 @@
 #include "../../core/dset.h"
 #include "../../core/mod_fix.h"
 #include "../../core/kemi.h"
+#include "../../core/parser/parse_from.h"
 
 #include "config.h"
 #include "sip_msg.h"
@@ -104,6 +105,9 @@ static int fixup_t_is_set(void** param, int param_no);
 static int mod_init(void);
 static int child_init(int rank);
 
+#ifdef USE_DNS_FAILOVER
+static int t_failover_parse_reply_codes();
+#endif
 
 /* exported functions */
 static int w_t_check(struct sip_msg* msg, char* str, char* str2);
@@ -209,6 +213,7 @@ static int w_t_uac_send(sip_msg_t* msg, char* pmethod, char* pruri,
 static int w_t_get_status_code(sip_msg_t* msg, char *p1, char *p2);
 
 static int t_clean(struct sip_msg* msg, char* key, char* value);
+static int w_t_exists(struct sip_msg* msg, char* p1, char* p2);
 
 /* by default the fr timers avps are not set, so that the avps won't be
  * searched for nothing each time a new transaction is created */
@@ -221,6 +226,12 @@ str ulattrs_xavp_name = {NULL, 0};
 str on_sl_reply_name = {NULL, 0};
 int tm_remap_503_500 = 1;
 str _tm_event_callback_lres_sent = {NULL, 0};
+
+#ifdef USE_DNS_FAILOVER
+str failover_reply_codes_str = {NULL, 0};
+int** failover_reply_codes = NULL;
+int* failover_reply_codes_cnt;
+#endif
 
 /* control if reply should be relayed
  * when transaction reply status is RPS_PUSHED_AFTER_COMPLETION */
@@ -420,6 +431,7 @@ static cmd_export_t cmds[]={
 	{"t_next_contact_flow", t_next_contact_flow,            0, 0, 0,
 		REQUEST_ROUTE },
 	{"t_clean", t_clean, 0, 0, 0, ANY_ROUTE },
+	{"t_exists", w_t_exists, 0, 0, 0, ANY_ROUTE },
 
 	/* not applicable from the script */
 	{"load_tm",            (cmd_function)load_tm,           NO_SCRIPT,   0, 0, 0},
@@ -487,6 +499,9 @@ static param_export_t params[]={
 	{"exec_time_check" ,    PARAM_INT, &tm_exec_time_check_param             },
 	{"reply_relay_mode",    PARAM_INT, &tm_reply_relay_mode                  },
 	{"enable_uac_fr",       PARAM_INT, &default_tm_cfg.enable_uac_fr         },
+#ifdef USE_DNS_FAILOVER
+	{"failover_reply_codes",PARAM_STR, &failover_reply_codes_str             },
+#endif
 	{0,0,0}
 };
 
@@ -780,6 +795,18 @@ static int mod_init(void)
 	}
 
 #ifdef USE_DNS_FAILOVER
+	/* Initialize code and counter  for other failover reply codes*/
+	failover_reply_codes = (int **)shm_malloc(sizeof(unsigned int *));
+	*failover_reply_codes = 0;
+	failover_reply_codes_cnt = (int *)shm_malloc(sizeof(int));
+	*failover_reply_codes_cnt = 0;
+	if(failover_reply_codes_str.s && failover_reply_codes_str.len > 0) {
+		if(t_failover_parse_reply_codes() < 0) {
+			LM_ERR("failed to parse failover_reply_codes\n");
+			return -1;
+		}
+	}
+
 	if (default_tm_cfg.reparse_on_dns_failover && mhomed) {
 		LM_WARN("reparse_on_dns_failover is enabled on a"
 				" multihomed host -- check the readme of tm module!\n");
@@ -3053,6 +3080,158 @@ static int ki_t_clean(sip_msg_t* msg)
 	return 1;
 }
 
+static int ki_t_exists(sip_msg_t* msg)
+{
+	tm_cell_t *t = NULL;
+	int br = -1;
+
+	if (parse_headers(msg, HDR_EOH_F, 0 )==-1) {
+		LM_ERR("parsing error\n");
+		return -1;;
+	}
+	if (parse_headers(msg, HDR_VIA1_F|HDR_CSEQ_F|HDR_CALLID_F|HDR_TO_F, 0)==-1) {
+		LM_ERR("required headers cannot be parsed\n");
+		return -1;
+	}
+	if(parse_from_header(msg)==-1) {
+		LM_ERR("from header parsing failed\n");
+		return -1;
+	}
+
+	if (msg->first_line.type==SIP_REQUEST) {
+		t_request_search(msg, &t);
+	} else {
+		t_reply_search(msg, &t, &br);
+	}
+
+	if(!t) {
+		return -1;
+	}
+	UNREF(t);
+
+	return 1;
+}
+
+static int w_t_exists(struct sip_msg* msg, char* p1, char* p2)
+{
+	return ki_t_exists(msg);
+}
+
+#ifdef USE_DNS_FAILOVER
+/* parse reply codes for failover given in module paraleter */
+static int t_failover_parse_reply_codes()
+{
+	param_t *params_list = NULL;
+	param_t *pit = NULL;
+	int list_size = 0;
+	int i = 0;
+	int pos = 0;
+	int code = 0;
+	str input = {0, 0};
+	int *new_failover_reply_codes = NULL;
+	int *old_failover_reply_codes = NULL;
+
+	/* validate input string */
+	if(failover_reply_codes_str.s == 0 || failover_reply_codes_str.len <= 0)
+		return 0;
+
+	/* parse_params() updates the string pointer of .s -- make a copy */
+	input.s = failover_reply_codes_str.s;
+	input.len = failover_reply_codes_str.len;
+
+	if(parse_params(&input, CLASS_ANY, 0, &params_list) < 0)
+		return -1;
+
+	/* get the number of entries in the list */
+	for(pit = params_list; pit; pit = pit->next) {
+		if(pit->name.len == 4 && strncasecmp(pit->name.s, "code", 4) == 0) {
+			str2sint(&pit->body, &code);
+			if((code >= 300) && (code < 700))
+				list_size += 1;
+		} else if(pit->name.len == 5
+				  && strncasecmp(pit->name.s, "class", 5) == 0) {
+			str2sint(&pit->body, &code);
+			if((code >= 3) && (code < 7))
+				list_size += 1;
+		}
+	}
+	LM_DBG("expecting %d reply codes and classes\n", list_size);
+
+	if(list_size > 0) {
+		/* Allocate Memory for the new list: */
+		new_failover_reply_codes = (int *)shm_malloc(list_size * sizeof(int));
+		if(new_failover_reply_codes == NULL) {
+			free_params(params_list);
+			LM_ERR("no more memory\n");
+			return -1;
+		}
+
+		/* Now create the list of valid reply-codes: */
+		for(pit = params_list; pit; pit = pit->next) {
+			if(pit->name.len == 4 && strncasecmp(pit->name.s, "code", 4) == 0) {
+				str2sint(&pit->body, &code);
+				if((code >= 300) && (code < 700)) {
+					new_failover_reply_codes[pos++] = code;
+				}
+			} else if(pit->name.len == 5
+					  && strncasecmp(pit->name.s, "class", 5) == 0) {
+				str2sint(&pit->body, &code);
+				if((code >= 3) && (code < 7)) {
+					new_failover_reply_codes[pos++] = code;
+				}
+			}
+		}
+	} else {
+		new_failover_reply_codes = 0;
+	}
+	free_params(params_list);
+
+	if(list_size > *failover_reply_codes_cnt) {
+		/* if more reply-codes -- change pointer and then set number of codes */
+		old_failover_reply_codes = *failover_reply_codes;
+		*failover_reply_codes = new_failover_reply_codes;
+		*failover_reply_codes_cnt = list_size;
+		if(old_failover_reply_codes)
+			shm_free(old_failover_reply_codes);
+	} else {
+		/* less or equal reply codea -- set the number of codes first */
+		*failover_reply_codes_cnt = list_size;
+		old_failover_reply_codes = *failover_reply_codes;
+		*failover_reply_codes = new_failover_reply_codes;
+		if(old_failover_reply_codes)
+			shm_free(old_failover_reply_codes);
+	}
+	/* Print the list as INFO: */
+	for(i = 0; i < *failover_reply_codes_cnt; i++) {
+		LM_DBG("accepting reply %s %d (%d/%d) as valid\n",
+				((*failover_reply_codes)[i]/10)?"code":"class",
+				(*failover_reply_codes)[i], (i + 1), *failover_reply_codes_cnt);
+	}
+	return 0;
+}
+
+int t_failover_check_reply_code(int code)
+{
+	int i;
+
+	for(i = 0; i < *failover_reply_codes_cnt; i++) {
+		if((*failover_reply_codes)[i] / 10) {
+			/* reply code */
+			if((*failover_reply_codes)[i] == code) {
+				return 1;
+			}
+		} else {
+			/* reply class */
+			if((*failover_reply_codes)[i] == code / 100) {
+				return 1;
+			}
+		}
+	}
+
+	return 0;
+}
+#endif
+
 /**
  *
  */
@@ -3325,6 +3504,11 @@ static sr_kemi_t tm_kemi_exports[] = {
 	},
 	{ str_init("tm"), str_init("t_clean"),
 		SR_KEMIP_INT, ki_t_clean,
+		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
+			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+	},
+	{ str_init("tm"), str_init("t_exists"),
+		SR_KEMIP_INT, ki_t_exists,
 		{ SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE,
 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
 	},

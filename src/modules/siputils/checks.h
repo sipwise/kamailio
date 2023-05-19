@@ -71,7 +71,7 @@ int ki_add_uri_param(struct sip_msg* _msg, str* param);
  * Converts URI, if it is tel URI, to SIP URI.  Returns 1, if
  * conversion succeeded or if no conversion was needed, i.e., URI was not
  * tel URI.  Returns -1, if conversion failed.  Takes SIP URI hostpart from
- * second parameter and (if needed) writes the result to third paramater.
+ * second parameter and (if needed) writes the result to third parameter.
  */
 int tel2sip(struct sip_msg* _msg, char* _uri, char* _hostpart, char* _res);
 
@@ -89,7 +89,9 @@ int is_uri_user_e164(str *uri);
 /*
  * Check if pseudo variable argument value is an e164 number
  */
-int is_e164(struct sip_msg* _m, char* _sp, char* _s2);
+int w_is_e164(struct sip_msg* _m, char* _sp, char* _s2);
+
+int siputils_e164_check(str* _user);
 
 /*
  * Set userpart of URI

@@ -27,7 +27,6 @@
 #include <regex.h>
 #include "../../core/mem/mem.h"
 #include "../../core/sr_module.h"
-#include "../../core/mem/mem.h"
 #include "rule.h"
 
 
@@ -114,7 +113,7 @@ int search_rule(rule *r, char *left, char *right)
 
 /*
  * allocate memory for a new expression
- * str is saved in vale, and compiled to POSIX regexp (reg_value)
+ * str is saved in value, and compiled to POSIX regexp (reg_value)
  */
 expression *new_expression(char *sv)
 {

@@ -31,7 +31,6 @@
 #include "../../core/mem/mem.h"
 #include "../../core/dprint.h"
 #include "../../core/parser/parse_expires.h"
-#include "../../core/dprint.h"
 #include "../../core/mem/shm_mem.h"
 #include "../../core/parser/msg_parser.h"
 #include "../../core/strutils.h"
@@ -251,7 +250,7 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 				&& hentity->flag!= RPC_ASYN_PUBLISH)
 		{
 			/* sent a PUBLISH within a dialog that no longer exists
-			 * send again an intial PUBLISH */
+			 * send again an initial PUBLISH */
 			LM_DBG("received a 412 reply- try again to send PUBLISH\n");
 			publ_info_t publ;
 			memset(&publ, 0, sizeof(publ_info_t));
@@ -410,6 +409,7 @@ void publ_cback_func(struct cell *t, int type, struct tmcb_params *ps)
 	if(presentity->etag.s== NULL)
 	{
 		SHM_MEM_ERROR;
+		shm_free(presentity);
 		goto error;
 	}
 	memcpy(presentity->etag.s, etag.s, etag.len);

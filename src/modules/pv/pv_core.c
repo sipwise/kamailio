@@ -282,7 +282,7 @@ int pv_get_ruri(struct sip_msg *msg, pv_param_t *param,
 	if(msg==NULL || res==NULL)
 		return -1;
 
-	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesnt have a ruri */
+	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesn't have a ruri */
 		return pv_get_null(msg, param, res);
 
 	if(msg->parsed_uri_ok==0 /* R-URI not parsed*/ && parse_sip_msg_uri(msg)<0)
@@ -302,7 +302,7 @@ int pv_get_ouri(struct sip_msg *msg, pv_param_t *param,
 	if(msg==NULL || res==NULL)
 		return -1;
 
-	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesnt have a ruri */
+	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesn't have a ruri */
 		return pv_get_null(msg, param, res);
 
 	if(msg->parsed_orig_ruri_ok==0
@@ -359,7 +359,7 @@ int pv_get_ruri_attr(struct sip_msg *msg, pv_param_t *param,
 	if(msg==NULL)
 		return -1;
 
-	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesnt have a ruri */
+	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesn't have a ruri */
 		return pv_get_null(msg, param, res);
 
 	if(msg->parsed_uri_ok==0 /* R-URI not parsed*/ && parse_sip_msg_uri(msg)<0)
@@ -376,7 +376,7 @@ int pv_get_ouri_attr(struct sip_msg *msg, pv_param_t *param,
 	if(msg==NULL)
 		return -1;
 
-	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesnt have a ruri */
+	if(msg->first_line.type == SIP_REPLY)	/* REPLY doesn't have a ruri */
 		return pv_get_null(msg, param, res);
 
 	if(msg->parsed_orig_ruri_ok==0
@@ -2259,7 +2259,7 @@ int pv_get_hfl(sip_msg_t *msg, pv_param_t *param, pv_value_t *res)
 		parse_hname2_str(&tv.rs, &thdr);
 		if(thdr.type==HDR_ERROR_T) {
 			LM_ERR("error parsing header name [%.*s]\n", tv.rs.len, tv.rs.s);
-			return pv_get_sintval(msg, param, res, 0);
+			return pv_get_null(msg, param, res);
 		}
 		if(thdr.type!=HDR_OTHER_T) {
 			tv.flags = 0;
@@ -4650,7 +4650,7 @@ int pv_set_ccp_attrs(struct sip_msg* msg, pv_param_t *param,
 	char *sep = NULL;
 
 	if(val == NULL || (val->flags&PV_VAL_NULL)) {
-		LM_WARN("ignoring null asignment\n");
+		LM_WARN("ignoring null assignment\n");
 		return 0;
 	}
 

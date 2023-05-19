@@ -54,7 +54,7 @@
 	( (_len_)+(((_len_)&3)?4-((_len_)&3):0) )
 
 
-/*! \brief from an AAAMessage structure, a buffer to be sent is build
+/*! \brief from an AAAMessage structure, a buffer to be sent is built
  */
 AAAReturnCode AAABuildMsgBuffer( AAAMessage *msg )
 {
@@ -230,7 +230,7 @@ AAAMessage* AAATranslateMessage( unsigned char* source, unsigned int sourceLen,
 	msg_len = get_3bytes( ptr );
 	ptr += MESSAGE_LENGTH_SIZE;
 	if (msg_len>sourceLen) {
-		LM_ERR("AAA message len [%d] bigger then buffer len [%d]\n",
+		LM_ERR("AAA message len [%d] bigger than buffer len [%d]\n",
 				msg_len,sourceLen);
 		goto error;
 	}

@@ -43,8 +43,8 @@
 
 #define MAX_LOG_FILE_NAME      32
 
-#define FILE_NAME_SUFIX        ".log"
-#define FILE_NAME_SUFIX_LEN    (sizeof(FILE_NAME_SUFIX)-1)
+#define FILE_NAME_SUFFIX        ".log"
+#define FILE_NAME_SUFFIX_LEN    (sizeof(FILE_NAME_SUFFIX)-1)
 
 #define LOG_SEPARATOR          ": "
 #define LOG_SEPARATOR_LEN      (sizeof(LOG_SEPARATOR)-1)
@@ -56,7 +56,7 @@
 #define LOG_TERMINATOR_LEN      (sizeof(LOG_TERMINATOR)-1)
 
 
-static char file[MAX_LOG_DIR_SIZE+1+MAX_LOG_FILE_NAME+FILE_NAME_SUFIX_LEN+1];
+static char file[MAX_LOG_DIR_SIZE+1+MAX_LOG_FILE_NAME+FILE_NAME_SUFFIX_LEN+1];
 static char *file_ptr;
 
 
@@ -72,8 +72,8 @@ static inline void write_log( struct cpl_cmd *cmd)
 	if (cmd->s1.len>MAX_LOG_FILE_NAME)
 		cmd->s1.len = MAX_LOG_FILE_NAME;
 	memcpy(file_ptr, cmd->s1.s, cmd->s1.len );
-	memcpy(file_ptr+cmd->s1.len,FILE_NAME_SUFIX,FILE_NAME_SUFIX_LEN);
-	file_ptr[cmd->s1.len+FILE_NAME_SUFIX_LEN] = 0;
+	memcpy(file_ptr+cmd->s1.len,FILE_NAME_SUFFIX,FILE_NAME_SUFFIX_LEN);
+	file_ptr[cmd->s1.len+FILE_NAME_SUFFIX_LEN] = 0;
 
 	/* get current date+time -> wr_vec[0] */
 	time( &now );
@@ -169,7 +169,7 @@ static inline void send_mail( struct cpl_cmd *cmd)
 		if (cmd->s2.s && cmd->s2.len) {
 			/* put the subject in this format : <"$subject"\0> */
 			if ( (argv[2]=(char*)pkg_malloc(1+cmd->s2.len+1+1))==0) {
-				LM_ERR("cannot get pkg memory\n");
+				PKG_MEM_ERROR;
 				goto child_exit;
 			}
 			argv[2][0] = '\"';
@@ -181,7 +181,8 @@ static inline void send_mail( struct cpl_cmd *cmd)
 		}
 		/* put the TO in <$to\0> format*/
 		if ( (argv[3]=(char*)pkg_malloc(cmd->s1.len+1))==0) {
-			LM_ERR("cannot get pkg memory\n");
+			PKG_MEM_ERROR;
+			pkg_free(argv[2]);
 			goto child_exit;
 		}
 		memcpy(argv[3],cmd->s1.s,cmd->s1.len);
@@ -191,7 +192,7 @@ static inline void send_mail( struct cpl_cmd *cmd)
 		/* just debug */
 		for(i=0;i<sizeof(argv)/sizeof(char*);i++)
 			LM_DBG("argv[%d] = %s\n",i,argv[i]);
-		/* once I copy localy all the data from shm mem -> free the shm */
+		/* once I copy locally all the data from shm mem -> free the shm */
 		shm_free( cmd->s1.s );
 
 		/* set an alarm -> sending the email shouldn't take more than 10 sec */
