@@ -50,6 +50,7 @@ sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 ### active development
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 sipwise/cfgt-route-log.patch
+sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
