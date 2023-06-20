@@ -32,7 +32,13 @@ sipwise/sca-debug.patch
 sipwise/sca-fix-notify-after-bye.patch
 sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
-#
+upstream/tls-OPENSSL_fork_-prepare-parent-child-deprecated-at.patch
+upstream/tls-disable-engine-for-openssl-3.0.patch
+upstream/tls-disable-tls_rand-for-openssl-3.0.patch
+upstream/http_client-fix-depecration-of-CURLOPT_PROTOCOLS-and.patch
+upstream/http_client-fix-depecration-of-CURLOPT_REDIR_PROTOCO.patch
+upstream/tls-fix-build-for-openssl-1.1.1.patch
+upstream/tls-enable-locking-for-rand-ctx-if-libssl-version-is.patch
 ## upstream master
 #
 ### relevant for upstream

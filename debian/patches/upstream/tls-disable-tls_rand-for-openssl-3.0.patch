@@ -1,0 +1,69 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 19 Jun 2023 20:12:17 +0200
+Subject: [PATCH] tls: disable tls_rand for openssl >= 3.0
+
+From https://www.openssl.org/docs/man3.0/man3/RAND_set_rand_method.html
+
+> All of the functions described on this page are deprecated.
+> Applications should instead use RAND_set_DRBG_type(3), EVP_RAND(3) and
+> EVP_RAND(7).
+
+(cherry picked from commit c4b04696a6bfe31fdd65fa56529b0d46f2774067)
+---
+ src/modules/tls/tls_mod.c  | 6 ++++--
+ src/modules/tls/tls_rand.c | 3 ++-
+ src/modules/tls/tls_rand.h | 3 ++-
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/modules/tls/tls_mod.c b/src/modules/tls/tls_mod.c
+index a0f90c1..e57a98c 100644
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -506,7 +506,8 @@ static void mod_destroy(void)
+ 
+ int ksr_rand_engine_param(modparam_t type, void* val)
+ {
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L \
++		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 	str *reng;
+ 
+ 	if(val==NULL) {
+@@ -674,7 +675,8 @@ int mod_register(char *path, int *dlflags, void *p1, void *p2)
+ 
+ 	register_tls_hooks(&tls_h);
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L \
++		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 	LM_DBG("setting cryptorand random engine\n");
+ 	RAND_set_rand_method(RAND_ksr_cryptorand_method());
+ #endif
+diff --git a/src/modules/tls/tls_rand.c b/src/modules/tls/tls_rand.c
+index 2cdb2ec..260cd7d 100644
+--- a/src/modules/tls/tls_rand.c
++++ b/src/modules/tls/tls_rand.c
+@@ -29,7 +29,8 @@
+ 
+ #include "tls_rand.h"
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L \
++		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 
+ #include "../../core/dprint.h"
+ #include "../../core/locking.h"
+diff --git a/src/modules/tls/tls_rand.h b/src/modules/tls/tls_rand.h
+index 34d6b2d..58ddc85 100644
+--- a/src/modules/tls/tls_rand.h
++++ b/src/modules/tls/tls_rand.h
+@@ -21,7 +21,8 @@
+ #define _TLS_RAND_H_
+ 
+ #include <openssl/ssl.h>
+-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
++#if OPENSSL_VERSION_NUMBER >= 0x10100000L \
++		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 
+ #include <openssl/rand.h>
+ 

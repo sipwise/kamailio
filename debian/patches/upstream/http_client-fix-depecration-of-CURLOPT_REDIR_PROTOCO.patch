@@ -1,0 +1,29 @@
+From: Daniel-Constantin Mierla <miconda@gmail.com>
+Date: Thu, 22 Jun 2023 14:37:18 +0200
+Subject: [PATCH] http_client: fix depecration of CURLOPT_REDIR_PROTOCOLS
+
+- GH #3492
+
+(cherry picked from commit 4d8263f9be97a541a24cbc6acc9855509640780b)
+---
+ src/modules/http_client/functions.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/modules/http_client/functions.c b/src/modules/http_client/functions.c
+index be0b202..8b1f33d 100644
+--- a/src/modules/http_client/functions.c
++++ b/src/modules/http_client/functions.c
+@@ -161,8 +161,13 @@ static int curL_request_url(struct sip_msg *_m, const char *_met,
+ 	res = curl_easy_setopt(
+ 			curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+ #endif
++
++#if defined(CURL_AT_LEAST_VERSION) && CURL_AT_LEAST_VERSION(7, 85, 0)
++	res = curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
++#else
+ 	res = curl_easy_setopt(
+ 			curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
++#endif
+ 
+ 	if(_met != NULL) {
+ 		/* Enforce method (GET, PUT, ...) */

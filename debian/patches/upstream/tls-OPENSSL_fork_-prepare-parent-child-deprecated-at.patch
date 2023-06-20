@@ -1,0 +1,65 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 13 Jun 2023 12:37:21 +0200
+Subject: [PATCH] tls: OPENSSL_fork_[prepare|parent|child] deprecated at
+ openssl 3.0
+
+From https://www.openssl.org/docs/man3.0/man3/OPENSSL_fork_prepare.html:
+
+> OPENSSL_fork_prepare, OPENSSL_fork_parent, OPENSSL_fork_child have been
+> deprecated since OpenSSL 3.0.
+>
+> These methods are currently unused, and as such, no replacement methods
+> are required or planned.
+>
+> OpenSSL has state that should be reset when a process forks. For
+> example, the entropy pool used to generate random numbers (and therefore
+> encryption keys) should not be shared across multiple programs. The
+> OPENSSL_fork_prepare(), OPENSSL_fork_parent(), and OPENSSL_fork_child()
+> functions are used to reset this internal state.
+>
+> OPENSSL_init_crypto(3) will register these functions with the
+> appropriate handler, when the OPENSSL_INIT_ATFORK flag is used
+
+(cherry picked from commit 9d6bfb96528c49e6aaa39aa47be877ca528c3537)
+---
+ src/modules/tls/tls_init.c | 2 +-
+ src/modules/tls/tls_mod.c  | 6 ++++--
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/src/modules/tls/tls_init.c b/src/modules/tls/tls_init.c
+index 8f40fab..8071ec3 100644
+--- a/src/modules/tls/tls_init.c
++++ b/src/modules/tls/tls_init.c
+@@ -740,7 +740,7 @@ int tls_h_mod_pre_init_f(void)
+ 	LM_DBG("preparing tls env for modules initialization\n");
+ #if OPENSSL_VERSION_NUMBER >= 0x010100000L && !defined(LIBRESSL_VERSION_NUMBER)
+ 	LM_DBG("preparing tls env for modules initialization (libssl >=1.1)\n");
+-	OPENSSL_init_ssl(0, NULL);
++	OPENSSL_init_ssl(OPENSSL_INIT_ATFORK, NULL);
+ #else
+ 	LM_DBG("preparing tls env for modules initialization (libssl <=1.0)\n");
+ 	SSL_library_init();
+diff --git a/src/modules/tls/tls_mod.c b/src/modules/tls/tls_mod.c
+index 466e2fc..22be768 100644
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -450,7 +450,8 @@ static int mod_child(int rank)
+ 									&mod_params, &mod_params) < 0)
+ 				return -1;
+ 		}
+-#if OPENSSL_VERSION_NUMBER >= 0x010101000L
++#if OPENSSL_VERSION_NUMBER >= 0x010101000L \
++		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 		if(ksr_tls_init_mode&TLS_MODE_FORK_PREPARE) {
+ 			OPENSSL_fork_prepare();
+ 		}
+@@ -458,7 +459,8 @@ static int mod_child(int rank)
+ 		return 0;
+ 	}
+ 
+-#if OPENSSL_VERSION_NUMBER >= 0x010101000L
++#if OPENSSL_VERSION_NUMBER >= 0x010101000L \
++		&& OPENSSL_VERSION_NUMBER < 0x030000000L
+ 	if(ksr_tls_init_mode&TLS_MODE_FORK_PREPARE) {
+ 		if(rank==PROC_POSTCHILDINIT) {
+ 			/*

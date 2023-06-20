@@ -1,0 +1,65 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Mon, 19 Jun 2023 13:36:53 +0200
+Subject: [PATCH] tls: disable engine for openssl >= 3.0
+
+From https://www.openssl.org/docs/man3.0/man7/migration_guide.html
+
+> The refactoring to support Providers conflicts internally with the APIs
+> used to support engines, including the ENGINE API and any function that
+> creates or modifies custom "METHODS"
+
+From https://www.openssl.org/docs/man3.0/man3/ENGINE_init.html:
+
+> All of the functions described on this page are deprecated. Applications
+> should instead use the provider APIs.
+
+(cherry picked from commit a0a9373ccb3d3da3a1e9e1335d904fcf013d9ebd)
+---
+ src/modules/tls/tls_domain.c | 4 ++++
+ src/modules/tls/tls_mod.c    | 3 +++
+ src/modules/tls/tls_server.c | 3 +++
+ 3 files changed, 10 insertions(+)
+
+diff --git a/src/modules/tls/tls_domain.c b/src/modules/tls/tls_domain.c
+index d718c92..ad6e08b 100644
+--- a/src/modules/tls/tls_domain.c
++++ b/src/modules/tls/tls_domain.c
+@@ -30,6 +30,10 @@
+ #include <openssl/bn.h>
+ #include <openssl/dh.h>
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x030000000L
++#define OPENSSL_NO_ENGINE
++#endif
++
+ #ifndef OPENSSL_NO_ENGINE
+ #include <openssl/engine.h>
+ #include "tls_map.h"
+diff --git a/src/modules/tls/tls_mod.c b/src/modules/tls/tls_mod.c
+index 22be768..a0f90c1 100644
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -87,6 +87,9 @@ int ksr_rand_engine_param(modparam_t type, void* val);
+ 
+ MODULE_VERSION
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x030000000L
++#define OPENSSL_NO_ENGINE
++#endif
+ 
+ extern str sr_tls_event_callback;
+ str sr_tls_xavp_cfg = {0, 0};
+diff --git a/src/modules/tls/tls_server.c b/src/modules/tls/tls_server.c
+index afd16ab..5c039c9 100644
+--- a/src/modules/tls/tls_server.c
++++ b/src/modules/tls/tls_server.c
+@@ -128,6 +128,9 @@ int tls_run_event_routes(struct tcp_connection *c);
+ 	#endif /* __SUNPRO_c */
+ #endif /* TLS_RD_DEBUG */
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x030000000L
++#define OPENSSL_NO_ENGINE
++#endif
+ 
+ extern str sr_tls_xavp_cfg;
+ 
