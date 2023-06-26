@@ -1,3 +1,11 @@
+ngcp-kamailio (5.7.0-1+0~mr11.4.1.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [e312576] MT#56571 cfgt: route_log
+  * [96ac3dc] MT#57542 pua_dialoginfo: dlg_var fixes
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 26 Jun 2023 14:09:58 +0200
+
 ngcp-kamailio (5.7.0-1+0~mr11.4.0.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
