@@ -7,7 +7,7 @@ Subject: cfgt: don't dump same node
  1 file changed, 40 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/cfgt/cfgt_int.c b/src/modules/cfgt/cfgt_int.c
-index 4eda949..683b39f 100644
+index 6314878..ed29d29 100644
 --- a/src/modules/cfgt/cfgt_int.c
 +++ b/src/modules/cfgt/cfgt_int.c
 @@ -32,6 +32,7 @@
@@ -18,7 +18,7 @@ index 4eda949..683b39f 100644
  
  #include "cfgt_int.h"
  #include "cfgt_json.h"
-@@ -459,11 +460,25 @@ void _cfgt_print_node(cfgt_node_p node, int json)
+@@ -460,11 +461,25 @@ void _cfgt_print_node(cfgt_node_p node, int json)
  
  int _cfgt_set_dump(struct sip_msg *msg, cfgt_node_p node, str *flow)
  {
@@ -44,7 +44,7 @@ index 4eda949..683b39f 100644
  	vars = srjson_CreateObject(&node->jdoc);
  	if(vars == NULL) {
  		LM_ERR("cannot create json object\n");
-@@ -762,11 +777,35 @@ int cfgt_msgin(sr_event_param_t *evp)
+@@ -763,11 +778,35 @@ int cfgt_msgin(sr_event_param_t *evp)
  	return -1;
  }
  
@@ -80,7 +80,7 @@ index 4eda949..683b39f 100644
  	if(_cfgt_node) {
  		if(_cfgt_node->msgid == 0) {
  			LM_DBG("new node\n");
-@@ -811,7 +850,7 @@ int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
+@@ -812,7 +851,7 @@ int cfgt_pre(struct sip_msg *msg, unsigned int flags, void *bar)
  int cfgt_post(struct sip_msg *msg, unsigned int flags, void *bar)
  {
  	str flowname = STR_NULL;
