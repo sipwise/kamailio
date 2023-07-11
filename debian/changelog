@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.0-1+0~mr11.4.1.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [0f193b7] MT#57688 tls: openssl 3.0 fixes
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Tue, 11 Jul 2023 17:50:07 +0200
+
 ngcp-kamailio (5.7.0-1+0~mr11.4.1.0) unstable; urgency=medium
 
   [ Victor Seva ]
