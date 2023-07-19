@@ -10,7 +10,7 @@ but will sort them first before stopping
  2 files changed, 40 insertions(+), 3 deletions(-)
 
 diff --git a/src/modules/lcr/lcr_mod.c b/src/modules/lcr/lcr_mod.c
-index 29925cd..90d789f 100644
+index 6b01284..11dc6e2 100644
 --- a/src/modules/lcr/lcr_mod.c
 +++ b/src/modules/lcr/lcr_mod.c
 @@ -205,6 +205,10 @@ static unsigned int priority_ordering_param = 0;
@@ -74,7 +74,7 @@ index 29925cd..90d789f 100644
  	int_str val;
  	struct matched_gw_info matched_gws[MAX_NO_OF_GWS + 1];
  	struct rule_info **rules, *rule, *pl;
-@@ -2366,6 +2380,8 @@ static int ki_load_gws_furi(
+@@ -2371,6 +2385,8 @@ static int ki_load_gws_furi(
  				matched_gws[gw_index].priority = t->priority;
  				matched_gws[gw_index].weight = t->weight * (kam_rand() >> 8);
  				matched_gws[gw_index].duplicate = 0;
@@ -83,7 +83,7 @@ index 29925cd..90d789f 100644
  				LM_DBG("added matched_gws[%d]=[%u, %u, %u, %u]\n", gw_index,
  						t->gw_index, pl->prefix_len, t->priority,
  						matched_gws[gw_index].weight);
-@@ -2374,8 +2390,10 @@ static int ki_load_gws_furi(
+@@ -2379,8 +2395,10 @@ static int ki_load_gws_furi(
  				t = t->next;
  			}
  			/* Do not look further if this matching rule was stopper */
@@ -95,7 +95,7 @@ index 29925cd..90d789f 100644
  
  		next:
  			rule = rule->next;
-@@ -2400,6 +2418,24 @@ done:
+@@ -2405,6 +2423,24 @@ done:
  		}
  	}
  
