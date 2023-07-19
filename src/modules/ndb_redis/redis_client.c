@@ -153,13 +153,14 @@ int redisc_init(void)
 			for(i= 0; i< sentinels_count; i++) {
 				char *sentinelAddr = sentinels[i];
 				char *pos;
+				int srvfound = 0;
 				redisContext *redis;
 				redisReply *res, *res2;
 
 				port = 6379;
 				if( (pos = strchr(sentinelAddr, ':')) != NULL ) {
 					port = atoi(pos+1);
-					pos[i] = '\0';
+					pos[0] = '\0';
 				}
 
 				redis = redisConnectWithTimeout(sentinelAddr, port, tv_conn);
@@ -174,9 +175,9 @@ int redisc_init(void)
 									res->element[0]->len + 1);
 							port = atoi(res->element[1]->str);
 							LM_DBG("sentinel replied: %s:%d\n", addr, port);
+							srvfound = 1;
 						}
-					}
-					else {
+					} else {
 						res = redisCommand(redis, "SENTINEL slaves %s",
 								sentinel_group);
 						if( res && (res->type == REDIS_REPLY_ARRAY) ) {
@@ -198,8 +199,12 @@ int redisc_init(void)
 							}
 							LM_DBG("slave for %s: %s:%d\n", sentinel_group,
 									addr, port);
+							srvfound = 1;
 						}
 					}
+				}
+				if(srvfound==1) {
+					break;
 				}
 			}
 		}
