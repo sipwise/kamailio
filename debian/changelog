@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.4-1+0~mr10.5.6.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [c521f26] MT#56969 pua_dialoginfo: fix crash on memory exhaustion
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 24 Jul 2023 12:19:47 +0200
+
 ngcp-kamailio (5.6.4-1+0~mr10.5.5.0) unstable; urgency=medium
 
   * New release.
