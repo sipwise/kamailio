@@ -1,4 +1,4 @@
-ngcp-kamailio (5.7.1-1) unstable; urgency=medium
+ngcp-kamailio (5.7.1-1+0~mr11.5.0.0) unstable; urgency=medium
 
   * MT#57799 New upstream version 5.7.1
   * MT#57799 refresh patches
