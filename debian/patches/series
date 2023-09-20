@@ -69,3 +69,4 @@ sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
+sipwise/lcr_stats_flags_as_id
