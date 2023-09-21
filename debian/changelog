@@ -1,3 +1,10 @@
+ngcp-kamailio (5.7.1-1+0~mr11.5.1.2) unstable; urgency=medium
+
+  [ Alessio Garzi ]
+  * [d3e0c96] MT#58314 Use gw flags as id
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Thu, 21 Sep 2023 10:05:49 +0200
+
 ngcp-kamailio (5.7.1-1+0~mr11.5.1.1) unstable; urgency=medium
 
   * New release.
