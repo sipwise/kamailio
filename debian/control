@@ -2,6 +2,7 @@ Source: ngcp-kamailio
 Section: net
 Priority: optional
 Maintainer: Sipwise Development Team <support@sipwise.com>
+Rules-Requires-Root: binary-targets
 Build-Depends:
  bison,
  debhelper-compat (= 13),
@@ -54,7 +55,7 @@ Build-Depends:
  uuid-dev,
  xsltproc,
  zlib1g-dev,
-Standards-Version: 4.5.1
+Standards-Version: 4.6.2
 Homepage: https://www.kamailio.org/
 Vcs-git: https://anonscm.debian.org/git/pkg-voip/kamailio.git
 Vcs-Browser: https://anonscm.debian.org/gitweb/?p=pkg-voip/kamailio.git
