@@ -1,6 +1,13 @@
-ngcp-kamailio (5.7.1-1+0~mr12.0.1.0) unstable; urgency=medium
+ngcp-kamailio (5.7.2-1+0~mr12.0.1.0) unstable; urgency=medium
 
-  * New release.
+  [ Alessio Garzi ]
+  * MT#58314 Use gw flags as id
+
+  [ Guillem Jover ]
+  * MT#58356 Update packaging for bookworm
+
+  [ Victor Seva ]
+  * New upstream version 5.7.2
 
  -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 30 Aug 2023 18:03:43 +0200
 
