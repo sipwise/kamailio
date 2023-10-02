@@ -7,7 +7,7 @@ Subject: db_redis_graceful_scan
  1 file changed, 15 insertions(+), 4 deletions(-)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index aa0a9fd..8166d29 100644
+index 4dc4959..2569e0a 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -754,7 +754,7 @@ static int db_redis_scan_query_keys_pattern(km_redis_con_t *con, const str *matc

@@ -7,7 +7,7 @@ Subject: db_redis_skip_empty_keys
  1 file changed, 3 insertions(+)
 
 diff --git a/src/modules/db_redis/redis_dbase.c b/src/modules/db_redis/redis_dbase.c
-index 254e0f6..aa0a9fd 100644
+index 8f7056b..4dc4959 100644
 --- a/src/modules/db_redis/redis_dbase.c
 +++ b/src/modules/db_redis/redis_dbase.c
 @@ -641,6 +641,9 @@ static int db_redis_build_query_keys(km_redis_con_t *con, const str *table_name,
