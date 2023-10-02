@@ -34,11 +34,14 @@ sipwise/sca-add-pai_avp-parameter.patch
 ## upstream 5.7
 #
 ## upstream master
+sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
 upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
+sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
 sipwise/cfgt-skip_duplicate_dump.patch
+sipwise/cfgt-route-log.patch
 sipwise/db_redis_skip_empty_keys.patch
 sipwise/db_redis_graceful_scan.patch
 sipwise/db_redis_sscan.patch
@@ -46,12 +49,10 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/lcr-stats.patch
+sipwise/lcr_stats_flags_as_id
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
 ### active development
-sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
-sipwise/cfgt-route-log.patch
-sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
@@ -69,4 +70,3 @@ sipwise/pua_dialoginfo-fix-dlg_var-store-and-retrieval.patch
 ## git checkout -- debian/
 ### git commit + git-review as usual
 ###
-sipwise/lcr_stats_flags_as_id
