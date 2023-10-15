@@ -1,3 +1,11 @@
+ngcp-kamailio (5.7.2-1+0~mr12.1.0.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [4c9d844] reorder patches
+  * [6febdcb] refresh patches
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sun, 15 Oct 2023 08:23:06 +0200
+
 ngcp-kamailio (5.7.2-1+0~mr12.0.1.0) unstable; urgency=medium
 
   [ Alessio Garzi ]
