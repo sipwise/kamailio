@@ -1,0 +1,90 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 17 Oct 2023 14:12:57 +0200
+Subject: presence: active_watcher cleanup timer
+
+---
+ src/modules/presence/notify.c   | 33 +++++++++++++++++++++++++++++++++
+ src/modules/presence/notify.h   |  1 +
+ src/modules/presence/presence.c |  5 +++++
+ 3 files changed, 39 insertions(+)
+
+diff --git a/src/modules/presence/notify.c b/src/modules/presence/notify.c
+index b10e069..358775e 100644
+--- a/src/modules/presence/notify.c
++++ b/src/modules/presence/notify.c
+@@ -3194,3 +3194,36 @@ void pres_timer_send_notify(unsigned int ticks, void *param)
+ 		return;
+ 	}
+ }
++
++void ps_active_watchers_db_timer_clean(unsigned int ticks, void *param)
++{
++	db_key_t db_keys[2];
++	db_val_t db_vals[2];
++	db_op_t db_ops[2];
++
++	if(pa_db == NULL) {
++		return;
++	}
++
++	LM_DBG("cleaning expired subscriptions\n");
++
++	db_keys[0] = &str_expires_col;
++	db_ops[0] = OP_LT;
++	db_vals[0].type = DB1_INT;
++	db_vals[0].nul = 0;
++	db_vals[0].val.int_val = (int)time(NULL);
++
++	db_keys[1] = &str_expires_col;
++	db_ops[1] = OP_GT;
++	db_vals[1].type = DB1_INT;
++	db_vals[1].nul = 0;
++	db_vals[1].val.int_val = 0;
++
++	if(pa_dbf.use_table(pa_db, &active_watchers_table) < 0) {
++		LM_ERR("unsuccessful use table sql operation\n");
++		return;
++	}
++
++	if(pa_dbf.delete(pa_db, db_keys, db_ops, db_vals, 2) < 0)
++		LM_ERR("cleaning expired subscriptions\n");
++}
+diff --git a/src/modules/presence/notify.h b/src/modules/presence/notify.h
+index 4bac84b..3d875f3 100644
+--- a/src/modules/presence/notify.h
++++ b/src/modules/presence/notify.h
+@@ -129,4 +129,5 @@ char *get_status_str(int flag);
+ str *get_p_notify_body(str pres_uri, pres_ev_t *event, str *etag, str *contact);
+ void free_notify_body(str *body, pres_ev_t *ev);
+ void pres_timer_send_notify(unsigned int ticks, void *param);
++void ps_active_watchers_db_timer_clean(unsigned int ticks, void *param);
+ #endif
+diff --git a/src/modules/presence/presence.c b/src/modules/presence/presence.c
+index 06b73df..a3a786f 100644
+--- a/src/modules/presence/presence.c
++++ b/src/modules/presence/presence.c
+@@ -452,12 +452,16 @@ static int mod_init(void)
+ 		if(pres_timer_mode==0) {
+ 			register_timer(ps_presentity_db_timer_clean, 0, pres_clean_period);
+ 			register_timer(ps_watchers_db_timer_clean, 0, pres_clean_period);
++			register_timer(
++					ps_active_watchers_db_timer_clean, 0, pres_clean_period);
+ 			if(publ_cache_mode==PS_PCACHE_RECORD) {
+ 				register_timer(ps_ptable_timer_clean, 0, pres_clean_period);
+ 			}
+ 		} else {
+ 			sr_wtimer_add(ps_presentity_db_timer_clean, 0, pres_clean_period);
+ 			sr_wtimer_add(ps_watchers_db_timer_clean, 0, pres_clean_period);
++			sr_wtimer_add(
++					ps_active_watchers_db_timer_clean, 0, pres_clean_period);
+ 			if(publ_cache_mode==PS_PCACHE_RECORD) {
+ 				sr_wtimer_add(ps_ptable_timer_clean, 0, pres_clean_period);
+ 			}
+@@ -1845,6 +1849,7 @@ void rpc_presence_cleanup(rpc_t *rpc, void *c)
+ 
+ 	(void)ps_watchers_db_timer_clean(0, 0);
+ 	(void)ps_presentity_db_timer_clean(0, 0);
++	(void)ps_active_watchers_db_timer_clean(0, 0);
+ 	(void)ps_ptable_timer_clean(0, 0);
+ 	(void)timer_db_update(0, 0);
+ 
