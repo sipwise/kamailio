@@ -40,7 +40,7 @@ upstream/http_client-fix-depecration-of-CURLOPT_REDIR_PROTOCO.patch
 upstream/tls-fix-build-for-openssl-1.1.1.patch
 upstream/tls-enable-locking-for-rand-ctx-if-libssl-version-is.patch
 ## upstream master
-#
+sipwise/presence-active_watcher-cleanup-timer.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
