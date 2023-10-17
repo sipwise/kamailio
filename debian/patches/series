@@ -35,6 +35,7 @@ sipwise/sca-add-pai_avp-parameter.patch
 #
 ## upstream master
 upstream/pv_headers-compare-result-of-pvh_set_xavi-with-NULL-.patch
+sipwise/presence-active_watcher-cleanup-timer.patch
 ### relevant for upstream
 sipwise/dialplan-don-t-stop-loading-rules-on-error.patch
 sipwise/cfgt-skip_unknown.patch
