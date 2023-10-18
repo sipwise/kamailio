@@ -9,8 +9,9 @@ Copyright:
  2006-2010 iptelorg GmbH
  Various others (see AUTHORS file)
 License: GPL-2+
- On Debian systems, the full text of the GNU General Public
- License version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
+Comment:
+ On Debian systems, the full text of the GNU General Public License version 2
+ can be found in the file `/usr/share/common-licenses/GPL-2'.
 
 Files: debian/*
 Copyright: 2013-2023 Sipwise GmbH, Austria
@@ -21,8 +22,9 @@ Copyright: 2013-2023 Sipwise GmbH, Austria
            2009, Henning Westerholt <henning.westerholt@1und1.de>
            2007, Julien BLACHE <jblache@debian.org>
 License: GPL-2+
- On Debian systems, the full text of the GNU General Public
- License version 2 can be found in the file `/usr/share/common-licenses/GPL-2'.
+Comment:
+ On Debian systems, the full text of the GNU General Public License version 2
+ can be found in the file `/usr/share/common-licenses/GPL-2'.
 
 
 Files: atomic/* atomic_ops.* basex.* bit_*.c char_msg_val.h compiler_opt.h
