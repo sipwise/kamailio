@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.4-1+0~mr11.3.1.4) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [92af71d] MT#56847 presence: active_watcher cleanup timer
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Fri, 20 Oct 2023 14:49:31 +0200
+
 ngcp-kamailio (5.6.4-1+0~mr11.3.1.3) unstable; urgency=medium
 
   [ Alessio Garzi ]
