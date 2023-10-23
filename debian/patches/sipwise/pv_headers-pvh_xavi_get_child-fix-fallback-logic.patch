@@ -1,0 +1,22 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 23 Oct 2023 14:36:49 +0200
+Subject: pv_headers: pvh_xavi_get_child() fix fallback logic
+
+* don't fallback to Initial request headers for Replies
+---
+ src/modules/pv_headers/pvh_xavp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/pv_headers/pvh_xavp.c b/src/modules/pv_headers/pvh_xavp.c
+index 3bc32d2..bb5f950 100644
+--- a/src/modules/pv_headers/pvh_xavp.c
++++ b/src/modules/pv_headers/pvh_xavp.c
+@@ -284,7 +284,7 @@ sr_xavp_t *pvh_xavi_get_child(struct sip_msg *msg, str *xname, str *name)
+ 
+ 	pvh_get_branch_xname(msg, xname, &br_xname);
+ 	xavi = xavi_get_child(&br_xname, name);
+-	if(xavi == NULL) {
++	if(xavi == NULL && msg->first_line.type == SIP_REQUEST) {
+ 		if(cmp_str(xname, &br_xname) != 0) {
+ 			xavi = xavi_get_child(xname, name);
+ 			if(xavi) {
