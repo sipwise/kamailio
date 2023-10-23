@@ -57,6 +57,7 @@ sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/dialog-dlg_set_var-support-empty-totag-param.patch
+sipwise/pv_headers-pvh_xavi_get_child-fix-fallback-logic.patch
 ### active development
 upstream/tm-new-inter-module-API-function-t_find.patch
 upstream/pv_headers-use-tm.t_find-API.patch
