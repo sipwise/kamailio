@@ -50,7 +50,6 @@ sipwise/db_redis_sscan_fix_empty_key.patch
 sipwise/kamctl-TMPDIR-config.patch
 sipwise/lcr-stopper_mode-parameter.patch
 sipwise/lcr-stats.patch
-sipwise/lcr_stats_flags_as_id.patch
 sipwise/lcr_read_id.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
