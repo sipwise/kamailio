@@ -1,0 +1,288 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Fri, 27 Oct 2023 14:35:09 +0200
+Subject: dialog: dlg_get_ttag()
+
+---
+ src/modules/dialog/dialog.c   | 126 ++++++++++++++++++++++++++++++++++++++++++
+ src/modules/dialog/dlg_hash.c |  70 +++++++++++++++++++++++
+ src/modules/dialog/dlg_hash.h |  13 +++++
+ 3 files changed, 209 insertions(+)
+
+diff --git a/src/modules/dialog/dialog.c b/src/modules/dialog/dialog.c
+index b76f1da..9478c67 100644
+--- a/src/modules/dialog/dialog.c
++++ b/src/modules/dialog/dialog.c
+@@ -54,6 +54,7 @@
+ #include "../../core/error.h"
+ #include "../../core/ut.h"
+ #include "../../core/pvar.h"
++#include "../../core/pvapi.h"
+ #include "../../core/mod_fix.h"
+ #include "../../core/script_cb.h"
+ #include "../../core/kemi.h"
+@@ -197,6 +198,9 @@ static int fixup_dlg_refer(void** param, int param_no);
+ static int fixup_dlg_bridge(void** param, int param_no);
+ static int w_dlg_get(struct sip_msg*, char*, char*, char*);
+ static int w_is_known_dlg(struct sip_msg *);
++static int w_dlg_get_ttag(sip_msg_t *, char *, char *, char *);
++static int fixup_dlg_get_ttag(void** param, int param_no);
++static int fixup_dlg_get_ttag_free(void** param, int param_no);
+ static int w_dlg_set_ruri(sip_msg_t *, char *, char *);
+ static int w_dlg_db_load_callid(sip_msg_t *msg, char *ci, char *p2);
+ static int w_dlg_db_load_extra(sip_msg_t *msg, char *p1, char *p2);
+@@ -255,6 +259,8 @@ static cmd_export_t cmds[]={
+ 			0, ANY_ROUTE },
+ 	{"is_known_dlg", (cmd_function)w_is_known_dlg,        0, NULL,
+ 			0, ANY_ROUTE },
++	{"dlg_get_ttag", (cmd_function)w_dlg_get_ttag,        3, fixup_dlg_get_ttag,
++			fixup_dlg_get_ttag_free, ANY_ROUTE },
+ 	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  1,fixup_igp_null,
+ 			0, ANY_ROUTE },
+ 	{"dlg_set_timeout", (cmd_function)w_dlg_set_timeout,  3,fixup_igp_all,
+@@ -1992,6 +1998,121 @@ static int fixup_dlg_set_var_free(void** param, int param_no)
+ 	return -1;
+ }
+ 
++static str *ki_dlg_get_ttag_helper(str *sc, str *sf)
++{
++	dlg_cell_t *dlg = NULL;
++	static str val = STR_NULL;
++
++	if(sc==NULL || sc->s==NULL || sc->len == 0) {
++		LM_ERR("invalid Call-ID parameter\n");
++		return NULL;
++	}
++	if(sf==NULL || sf->s==NULL || sf->len == 0) {
++		LM_ERR("invalid From tag parameter\n");
++		return NULL;
++	}
++
++	dlg = get_dlg_confirmed(sc, sf);
++	if(dlg==NULL)
++		return NULL;
++	val.s = pv_get_buffer();
++	val.len = pv_get_buffer_size();
++	if(unlikely(val.len<dlg->tag[DLG_CALLEE_LEG].len)) {
++		LM_ERR("to-tag length bigger than pv_buffer\n");
++		dlg_release(dlg);
++		return NULL;
++	}
++	memcpy(val.s, dlg->tag[DLG_CALLEE_LEG].s, dlg->tag[DLG_CALLEE_LEG].len);
++	val.len = dlg->tag[DLG_CALLEE_LEG].len;
++	dlg_release(dlg);
++	return &val;
++}
++
++static sr_kemi_xval_t *ki_dlg_get_ttag(sip_msg_t *msg, str *sc, str *sf)
++{
++	str *val = NULL;
++
++	memset(&_sr_kemi_dialog_xval, 0, sizeof(sr_kemi_xval_t));
++
++	val = ki_dlg_get_ttag_helper(sc, sf);
++	if(!val) {
++		sr_kemi_xval_null(&_sr_kemi_dialog_xval, SR_KEMI_XVAL_NULL_NONE);
++		return &_sr_kemi_dialog_xval;
++	}
++
++	_sr_kemi_dialog_xval.vtype = SR_KEMIP_STR;
++	_sr_kemi_dialog_xval.v.s = *val;
++
++	return &_sr_kemi_dialog_xval;
++}
++
++static int fixup_dlg_get_ttag(void** param, int param_no)
++{
++	if(param_no>=1 && param_no<=2)
++		return fixup_spve_null(param, 1);
++	if(param_no==3)
++		return fixup_pvar_null(param, 1);
++	return 0;
++}
++
++static int fixup_dlg_get_ttag_free(void** param, int param_no)
++{
++	if (param_no <= 2)
++		return fixup_free_spve_null(param, 1);
++	if (param_no == 3)
++		return fixup_free_pvar_all(param, 1);
++	return -1;
++}
++
++static int w_dlg_get_ttag(struct sip_msg *msg, char *ci, char *ft, char *pv)
++{
++	str sc = STR_NULL;
++	str sf = STR_NULL;
++	str *val = NULL;
++	pv_value_t dst_val;
++	pv_spec_t* dst_pv = (pv_spec_t *)pv;
++
++	if(ci==0 || ft==0)
++	{
++		LM_ERR("invalid parameters\n");
++		goto error;
++	}
++
++	if(fixup_get_svalue(msg, (gparam_p)ci, &sc)!=0)
++	{
++		LM_ERR("unable to get Call-ID\n");
++		goto error;
++	}
++
++	if(fixup_get_svalue(msg, (gparam_p)ft, &sf)!=0)
++	{
++		LM_ERR("unable to get From tag\n");
++		goto error;
++	}
++	val = ki_dlg_get_ttag_helper(&sc, &sf);
++	if(val) {
++		memset(&dst_val, 0, sizeof(pv_value_t));
++		dst_val.flags |= PV_VAL_STR;
++		dst_val.rs.s = val->s;
++		dst_val.rs.len = val->len;
++	} else {
++		pv_get_null(msg, NULL, &dst_val);
++	}
++	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
++		LM_ERR("unable to set value to dst_pv\n");
++		if(val) goto error; else return -1;
++	}
++	return 1;
++
++error:
++	pv_get_null(msg, NULL, &dst_val);
++	if(pv_set_spec_value(msg, dst_pv, 0, &dst_val) != 0) {
++		LM_ERR("unable to set null value to dst_pv\n");
++	}
++	return -1;
++}
++
++
+ static int ki_dlg_get(sip_msg_t *msg, str *sc, str *sf, str *st)
+ {
+ 	dlg_cell_t *dlg = NULL;
+@@ -2572,6 +2693,11 @@ static sr_kemi_t sr_kemi_dialog_exports[] = {
+ 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+ 			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
+ 	},
++	{ str_init("dialog"), str_init("dlg_get_ttag"),
++		SR_KEMIP_XVAL, ki_dlg_get_ttag,
++		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_NONE,
++			SR_KEMIP_NONE, SR_KEMIP_NONE, SR_KEMIP_NONE }
++	},
+ 	{ str_init("dialog"), str_init("dlg_get_var"),
+ 		SR_KEMIP_XVAL, ki_dlg_get_var,
+ 		{ SR_KEMIP_STR, SR_KEMIP_STR, SR_KEMIP_STR,
+diff --git a/src/modules/dialog/dlg_hash.c b/src/modules/dialog/dlg_hash.c
+index d61bfb6..b9084fb 100644
+--- a/src/modules/dialog/dlg_hash.c
++++ b/src/modules/dialog/dlg_hash.c
+@@ -916,7 +916,48 @@ static inline struct dlg_cell* internal_get_dlg(unsigned int h_entry,
+ 	return 0;
+ }
+ 
++/*!
++ * \brief Helper function to get a confirmed dialog corresponding to a SIP message
++ * \see get_dlg_confirmed
++ * \param h_entry hash index in the directory list
++ * \param callid callid
++ * \param ftag from tag
++ * \param mode let hash table slot locked or not, even when dlg is not found
++ * \return dialog structure on success, NULL on failure
++ */
++static inline struct dlg_cell* internal_get_dlg_confirmed(unsigned int h_entry,
++						str *callid, str *ftag, int mode)
++{
++	struct dlg_cell *dlg;
++	struct dlg_entry *d_entry;
+ 
++	d_entry = &(d_table->entries[h_entry]);
++
++	dlg_lock( d_table, d_entry);
++
++	for( dlg = d_entry->first ; dlg ; dlg = dlg->next ) {
++		if(dlg->state != DLG_STATE_CONFIRMED)
++			continue;
++		/* check callid / fromtag */
++		if (match_downstream_dialog( dlg, callid, ftag)==1) {
++			ref_dlg_unsafe(dlg, 1);
++			if(likely(mode==0)) {
++				dlg_unlock( d_table, d_entry);
++			}
++			LM_DBG("dialog callid='%.*s' found on entry %u, to-tag='%.*s'\n",
++				STR_FMT(callid), h_entry, STR_FMT(&dlg->tag[DLG_CALLEE_LEG]));
++			return dlg;
++		}
++	}
++
++	if(likely(mode==0)) {
++		dlg_unlock(d_table, d_entry);
++	}
++
++	LM_DBG("no dialog callid='%.*s' from-tag='%.*s' found\n",
++		STR_FMT(callid), STR_FMT(ftag));
++	return 0;
++}
+ 
+ /*!
+  * \brief Get dialog that correspond to CallId, From Tag and To Tag
+@@ -953,6 +994,35 @@ struct dlg_cell* get_dlg( str *callid, str *ftag, str *ttag, unsigned int *dir)
+ 	return dlg;
+ }
+ 
++/*!
++ * \brief Get confirmed dialog that correspond to CallId, From Tag
++ *
++ * Note that the caller is responsible for decrementing (or reusing)
++ * the reference counter by one again iff a dialog has been found.
++ * \param callid callid
++ * \param ftag from tag
++ * \return dialog structure on success, NULL on failure
++ */
++struct dlg_cell* get_dlg_confirmed(str *callid, str *ftag)
++{
++	struct dlg_cell *dlg;
++	unsigned int he;
++
++	if(d_table==NULL) {
++		LM_ERR("dialog hash table not available\n");
++		return 0;
++	}
++	he = core_hash(callid, 0, d_table->size);
++	dlg = internal_get_dlg_confirmed(he, callid, ftag, 0);
++
++	if (dlg == 0) {
++		LM_DBG("no dialog callid='%.*s' from-tag='%.*s' found\n",
++			STR_FMT(callid), STR_FMT(ftag));
++		return 0;
++	}
++	return dlg;
++}
++
+ 
+ /*!
+  * \brief Search dialog that corresponds to CallId, From Tag and To Tag
+diff --git a/src/modules/dialog/dlg_hash.h b/src/modules/dialog/dlg_hash.h
+index 067f489..041c0c4 100644
+--- a/src/modules/dialog/dlg_hash.h
++++ b/src/modules/dialog/dlg_hash.h
+@@ -391,6 +391,19 @@ dlg_cell_t* dlg_get_by_iuid(dlg_iuid_t *diuid);
+  */
+ dlg_cell_t* get_dlg(str *callid, str *ftag, str *ttag, unsigned int *dir);
+ 
++/*!
++ * \brief Get confirmed dialog that correspond to CallId and From Tag
++ *
++ * Get confirmed dialog that correspond to CallId and From Tag.
++ * Note that the caller is responsible for decrementing (or reusing)
++ * the reference counter by one again iff a dialog has been found.
++ * \param callid callid
++ * \param ftag from tag
++ * \param ttag to tag
++ * \param dir direction
++ * \return dialog structure on success, NULL on failure
++ */
++dlg_cell_t* get_dlg_confirmed(str *callid, str *ftag);
+ 
+ /*!
+  * \brief Search dialog that corresponds to CallId, From Tag and To Tag
