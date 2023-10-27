@@ -56,7 +56,7 @@ sipwise/rtpengine-set-mime-content-length.patch
 sipwise/pv_headers-pvh_xavi_get_child-fix-fallback-logic.patch
 sipwise/presence_vqr.patch
 ### active development
-#
+sipwise/dialog-dlg_get_ttag.patch
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
 ###
