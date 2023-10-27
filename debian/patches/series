@@ -69,6 +69,7 @@ upstream/pv_headers-use-tm.t_find-API.patch
 upstream/tm-added-t_unset-intermodule-API-function.patch
 upstream/pv_headers-use-t_unset-based-on-vref-instead-of-rese.patch
 sipwise/pv_headers-rework-pvh_remove_header_param-take-two.patch
+sipwise/dialog-dlg_get_ttag.patch
 #
 ### Don't just put stuff in any order
 ### use gbp pq import/export tooling to help maintain patches
