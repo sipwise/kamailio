@@ -1,3 +1,11 @@
+ngcp-kamailio (5.7.2-1+0~mr12.0.3.0) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [d54932b] MT#56847 presence: active_watcher cleanup timer
+  * [0276111] MT#58408 pv_headers: don't fallback to Request headers at Replay msg
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 30 Oct 2023 17:04:37 +0100
+
 ngcp-kamailio (5.7.2-1+0~mr12.0.2.0) unstable; urgency=medium
 
   [ Victor Seva ]
