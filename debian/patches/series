@@ -54,6 +54,7 @@ sipwise/lcr_read_id.patch
 sipwise/dialog-support-profile_get_size-for-all-profiles.patch
 sipwise/rtpengine-set-mime-content-length.patch
 sipwise/pv_headers-pvh_xavi_get_child-fix-fallback-logic.patch
+sipwise/presence_vqr.patch
 ### active development
 #
 ### Don't just put stuff in any order

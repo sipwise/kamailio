@@ -1,0 +1,458 @@
+From: Victor Seva <vseva@sipwise.com>
+Date: Mon, 30 Oct 2023 17:29:00 +0100
+Subject: presence_vqr
+
+---
+ src/Makefile.groups                                |   2 +-
+ src/modules/presence_vqr/Makefile                  |  11 +++
+ src/modules/presence_vqr/README                    |   1 +
+ src/modules/presence_vqr/add_events.c              |  86 +++++++++++++++++
+ src/modules/presence_vqr/add_events.h              |  30 ++++++
+ src/modules/presence_vqr/doc/Makefile              |   4 +
+ src/modules/presence_vqr/doc/presence_vqr.xml      |  39 ++++++++
+ .../presence_vqr/doc/presence_vqr_admin.xml        |  61 ++++++++++++
+ src/modules/presence_vqr/presence_vqr.c            | 103 +++++++++++++++++++++
+ src/modules/presence_vqr/presence_vqr.h            |  30 ++++++
+ 10 files changed, 366 insertions(+), 1 deletion(-)
+ create mode 100644 src/modules/presence_vqr/Makefile
+ create mode 100644 src/modules/presence_vqr/README
+ create mode 100644 src/modules/presence_vqr/add_events.c
+ create mode 100644 src/modules/presence_vqr/add_events.h
+ create mode 100644 src/modules/presence_vqr/doc/Makefile
+ create mode 100644 src/modules/presence_vqr/doc/presence_vqr.xml
+ create mode 100644 src/modules/presence_vqr/doc/presence_vqr_admin.xml
+ create mode 100644 src/modules/presence_vqr/presence_vqr.c
+ create mode 100644 src/modules/presence_vqr/presence_vqr.h
+
+diff --git a/src/Makefile.groups b/src/Makefile.groups
+index ec0d8ac..df52698 100644
+--- a/src/Makefile.groups
++++ b/src/Makefile.groups
+@@ -121,7 +121,7 @@ mod_list_presence=presence presence_conference presence_dialoginfo \
+ 					   presence_xml \
+ 					   pua pua_bla pua_dialoginfo pua_reginfo \
+ 					   pua_rpc pua_usrloc pua_xmpp \
+-					   rls xcap_client xcap_server presence_dfks
++					   rls xcap_client xcap_server presence_dfks presence_vqr
+ 
+ 
+ # - modules depending on lua library
+diff --git a/src/modules/presence_vqr/Makefile b/src/modules/presence_vqr/Makefile
+new file mode 100644
+index 0000000..02957e5
+--- /dev/null
++++ b/src/modules/presence_vqr/Makefile
+@@ -0,0 +1,11 @@
++#
++# Presence_vqr Makefile
++# 
++# 
++# WARNING: do not run this directly, it should be run by the main Makefile
++
++include ../../Makefile.defs
++auto_gen=
++NAME=presence_vqr.so
++
++include ../../Makefile.modules
+diff --git a/src/modules/presence_vqr/README b/src/modules/presence_vqr/README
+new file mode 100644
+index 0000000..8b13789
+--- /dev/null
++++ b/src/modules/presence_vqr/README
+@@ -0,0 +1 @@
++
+diff --git a/src/modules/presence_vqr/add_events.c b/src/modules/presence_vqr/add_events.c
+new file mode 100644
+index 0000000..d956a63
+--- /dev/null
++++ b/src/modules/presence_vqr/add_events.c
+@@ -0,0 +1,86 @@
++/*
++ * presence_vqr module - Presence Handling of vq-rtcpxr events
++ *
++ * Copyright (C) 2023 Victor Seva, vseva@sipwise.com
++ * https://www.sipwise.com
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include "../../core/parser/parse_content.h"
++#include "../presence/event_list.h"
++#include "presence_vqr.h"
++
++/*! \brief
++ * event specific publish handling - check if body format is ok
++ */
++int vqr_publ_handl(struct sip_msg *msg)
++{
++	str body;
++
++	if(get_content_length(msg) == 0)
++		return 1;
++
++	body.s = get_body(msg);
++	if(body.s == NULL) {
++		LM_ERR("cannot extract body from msg\n");
++		return -1;
++	}
++	/* content-length (if present) must be already parsed */
++	body.len = get_content_length(msg);
++
++	/* check VQReportEvent */
++	if(body.len <= 14)
++		return -1;
++	if(strncmp(body.s, "VQSessionReport:", 16) != 0
++			&& strncmp(body.s, "VQAlertReport:", 14) != 0
++			&& strncmp(body.s, "VQIntervalReport:", 17) != 0) {
++		LM_ERR("No valid SessionReport detected\n");
++		return -1;
++	}
++	if(str_casesearch_strz(&body, "LocalMetrics:") == NULL) {
++		LM_ERR("No LocalMetrics detected\n");
++		return -1;
++	}
++	return 1;
++}
++
++int vqr_add_events(void)
++{
++	pres_ev_t event;
++
++	/* constructing message-summary event */
++	memset(&event, 0, sizeof(pres_ev_t));
++	event.name.s = "vq-rtcpxr";
++	event.name.len = 9;
++
++	event.content_type.s = "application/vq-rtcpxr";
++	event.content_type.len = 21;
++	event.default_expires = pres_vqr_default_expires;
++	event.type = PUBL_TYPE;
++	event.req_auth = 0;
++	event.evs_publ_handl = vqr_publ_handl;
++
++	if(pres_add_event(&event) < 0) {
++		LM_ERR("failed to add event \"vq-rtcpxr\"\n");
++		return -1;
++	}
++	return 0;
++}
+diff --git a/src/modules/presence_vqr/add_events.h b/src/modules/presence_vqr/add_events.h
+new file mode 100644
+index 0000000..45fe8b6
+--- /dev/null
++++ b/src/modules/presence_vqr/add_events.h
+@@ -0,0 +1,30 @@
++/*
++ * presence_vqr module - Presence Handling of vq-rtcpxr events
++ *
++ * Copyright (C) 2023 Victor Seva, vseva@sipwise.com
++ * https://www.sipwise.com
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++
++#ifndef _VQR_ADD_EV_H_
++#define _VQR_ADD_EV_H_
++
++int vqr_add_events(void);
++
++#endif
+diff --git a/src/modules/presence_vqr/doc/Makefile b/src/modules/presence_vqr/doc/Makefile
+new file mode 100644
+index 0000000..b8abbc8
+--- /dev/null
++++ b/src/modules/presence_vqr/doc/Makefile
+@@ -0,0 +1,4 @@
++docs = presence_vqr.xml
++
++docbook_dir = ../../../../doc/docbook
++include $(docbook_dir)/Makefile.module
+diff --git a/src/modules/presence_vqr/doc/presence_vqr.xml b/src/modules/presence_vqr/doc/presence_vqr.xml
+new file mode 100644
+index 0000000..9ea4e6a
+--- /dev/null
++++ b/src/modules/presence_vqr/doc/presence_vqr.xml
+@@ -0,0 +1,39 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
++%docentities;
++
++]>
++
++<book xmlns:xi="http://www.w3.org/2001/XInclude">
++    <bookinfo>
++	<title>presence_vqr Module</title>
++	<productname class="trade">&kamailioname;</productname>
++	<authorgroup>
++		<author>
++			<firstname>Victor</firstname>
++			<surname>Seva</surname>
++			<email>vseva@sipwise.com</email>
++		</author>
++		<editor>
++			<firstname>Victor</firstname>
++			<surname>Seva</surname>
++			<email>vseva@sipwise.com</email>
++		</editor>
++	</authorgroup>
++	<copyright>
++	    <year>2023</year>
++	    <holder>sipwise.com</holder>
++	</copyright>
++  </bookinfo>
++    <toc></toc>
++    
++    <xi:include href="presence_vqr_admin.xml"/>
++    
++    
++</book>
++
++
+diff --git a/src/modules/presence_vqr/doc/presence_vqr_admin.xml b/src/modules/presence_vqr/doc/presence_vqr_admin.xml
+new file mode 100644
+index 0000000..604cac9
+--- /dev/null
++++ b/src/modules/presence_vqr/doc/presence_vqr_admin.xml
+@@ -0,0 +1,61 @@
++<?xml version="1.0" encoding='ISO-8859-1'?>
++<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.4//EN"
++"http://www.oasis-open.org/docbook/xml/4.4/docbookx.dtd" [
++
++<!-- Include general documentation entities -->
++<!ENTITY % docentities SYSTEM "../../../../doc/docbook/entities.xml">
++%docentities;
++
++]>
++<!-- Module User's Guide -->
++
++<chapter>
++
++	<title>&adminguide;</title>
++	
++	<section>
++	  <title>Overview</title>
++	    <para> 
++	      The module enables the handling of "Event: vq-rtcpxr" (as defined 
++	      in RFC 6035) inside of the presence module. Enables the collection
++				and reporting of metrics that measure the quality for Voice over
++				Internet Protocol (VoIP) sessions.
++	    </para>
++	</section>
++
++	<section>
++	  <title>Dependencies</title>
++	  <section>
++		<title>&kamailio; Modules</title>
++		<para>
++		The following modules must be loaded before this module:
++			<itemizedlist>
++			<listitem>
++			<para>
++				<emphasis>presence</emphasis>.
++			</para>
++			</listitem>
++			</itemizedlist>
++		</para>
++	  </section>
++
++	  <section>
++		<title>External Libraries or Applications</title>
++		<para>
++		None.
++		</para>
++	  </section>
++	
++		<section>
++			<title>Exported Parameters</title>
++				<para>None</para>
++		</section>
++
++		<section>
++			<title>Exported Functions</title>
++					<para>
++						None to be used in configuration file.
++					</para>
++		</section>
++	</section>
++</chapter>
+diff --git a/src/modules/presence_vqr/presence_vqr.c b/src/modules/presence_vqr/presence_vqr.c
+new file mode 100644
+index 0000000..ba6f0fe
+--- /dev/null
++++ b/src/modules/presence_vqr/presence_vqr.c
+@@ -0,0 +1,103 @@
++/*
++ * presence_vqr module - Presence Handling of vq-rtcpxr events
++ *
++ * Copyright (C) 2023 Victor Seva, vseva@sipwise.com
++ * https://www.sipwise.com
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <time.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#include "../../core/sr_module.h"
++#include "../../core/dprint.h"
++#include "../../core/str.h"
++#include "../../core/parser/msg_parser.h"
++#include "../../core/mem/mem.h"
++#include "../presence/bind_presence.h"
++#include "add_events.h"
++#include "presence_vqr.h"
++
++MODULE_VERSION
++
++/* module functions */
++static int mod_init(void);
++
++/* module variables */
++add_event_t pres_add_event;
++
++/* module parameters */
++unsigned int pres_vqr_default_expires = 3600;
++
++/* module exported parameters */
++/* clang-format off */
++static param_export_t params[] = {
++	{"default_expires", PARAM_INT, &pres_vqr_default_expires},
++	{0, 0, 0}
++};
++
++/* module exports */
++struct module_exports exports= {
++	"presence_vqr",  /* module name */
++	DEFAULT_DLFLAGS, /* dlopen flags */
++	0,               /* exported functions */
++	params,          /* exported parameters */
++	0,               /* RPC method exports */
++	0,               /* exported pseudo-variables */
++	0,               /* response handling function */
++	mod_init,        /* module initialization function */
++	0,               /* per-child init function */
++	0                /* module destroy function */
++};
++/* clang-format on */
++
++/*
++ * init module function
++ */
++static int mod_init(void)
++{
++	presence_api_t pres;
++	bind_presence_t bind_presence;
++
++	bind_presence = (bind_presence_t)find_export("bind_presence", 1, 0);
++	if(!bind_presence) {
++		LM_ERR("can't bind presence\n");
++		return -1;
++	}
++	if(bind_presence(&pres) < 0) {
++		LM_ERR("can't bind presence\n");
++		return -1;
++	}
++
++	pres_add_event = pres.add_event;
++	if(pres_add_event == NULL) {
++		LM_ERR("could not import add_event\n");
++		return -1;
++	}
++	if(vqr_add_events() < 0) {
++		LM_ERR("failed to add vq-rtcpxr events\n");
++		return -1;
++	}
++
++	return 0;
++}
+diff --git a/src/modules/presence_vqr/presence_vqr.h b/src/modules/presence_vqr/presence_vqr.h
+new file mode 100644
+index 0000000..18b961c
+--- /dev/null
++++ b/src/modules/presence_vqr/presence_vqr.h
+@@ -0,0 +1,30 @@
++/*
++ * presence_vqr module - Presence Handling of vq-rtcpxr events
++ *
++ * Copyright (C) 2023 Victor Seva, vseva@sipwise.com
++ * https://www.sipwise.com
++ *
++ * This file is part of Kamailio, a free SIP server.
++ *
++ * Kamailio is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version
++ *
++ * Kamailio is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
++ */
++
++#ifndef _PRES_VQR_H_
++#define _PRES_VQR_H_
++
++extern add_event_t pres_add_event;
++extern unsigned int pres_vqr_default_expires;
++
++#endif
