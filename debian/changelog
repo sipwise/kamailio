@@ -1,31 +1,25 @@
-ngcp-kamailio (5.7.2-1+0~mr12.0.3.0) unstable; urgency=medium
+ngcp-kamailio (5.7.2-1+0~mr12.0.0.0) unstable; urgency=medium
 
   [ Victor Seva ]
+  * [1ebd71b] MT#57799 update debian changelog
+  * [6a4f20f] MT#57799 pv_headers: fixes from upstream
+  * [651240b] MT#57799 fix package version
+  * [f3fa76d] New upstream version 5.7.2
+  * [deb64c2] update debian changelog
+  * [4c9d844] reorder patches
   * [d54932b] MT#56847 presence: active_watcher cleanup timer
   * [0276111] MT#58408 pv_headers: don't fallback to Request headers at Replay msg
 
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 30 Oct 2023 17:04:37 +0100
-
-ngcp-kamailio (5.7.2-1+0~mr12.0.2.0) unstable; urgency=medium
-
-  [ Victor Seva ]
-  * [4c9d844] reorder patches
-  * [6febdcb] refresh patches
-
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Sun, 15 Oct 2023 08:23:05 +0200
-
-ngcp-kamailio (5.7.2-1+0~mr12.0.1.0) unstable; urgency=medium
+  [ Richard Fuchs ]
+  * [be4de16] MT#55283 set MIME Content-Length
 
   [ Alessio Garzi ]
-  * MT#58314 Use gw flags as id
+  * [5fdb68a] MT#58314 Use gw flags as id
 
   [ Guillem Jover ]
-  * MT#58356 Update packaging for bookworm
+  * [726a1fe] MT#58356 Update packaging for bookworm
 
-  [ Victor Seva ]
-  * New upstream version 5.7.2
-
- -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Wed, 30 Aug 2023 18:03:43 +0200
+ -- Mykola Malkov <mmalkov@sipwise.com>  Tue, 07 Nov 2023 16:15:48 +0200
 
 ngcp-kamailio (5.7.1-1+0~mr11.5.0.0) unstable; urgency=medium
 
