@@ -1,3 +1,10 @@
+ngcp-kamailio (5.6.4-1+0~mr10.5.6.1) unstable; urgency=medium
+
+  [ Victor Seva ]
+  * [f9c4009] MT#58408 pv_headers: don't fallback to Request headers at Replay msg
+
+ -- Sipwise Jenkins Builder <jenkins@sipwise.com>  Mon, 20 Nov 2023 16:37:10 +0100
+
 ngcp-kamailio (5.6.4-1+0~mr10.5.6.0) unstable; urgency=medium
 
   [ Victor Seva ]
