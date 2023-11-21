@@ -41,6 +41,7 @@ sipwise/Revert-pua_dialoginfo-disable-publish-notifications-.patch
 ## upstream master
 upstream/permissions-don-t-remove-old-data-at-the-end-of-the-.patch
 upstream/permissions-trusted_cleanup_interval.patch
+upstream/core-timer_proc-don-t-execute-timers-on-destroy_modu.patch
 ### relevant for upstream
 sipwise/pua_dialoginfo-refresh_pubruri_avps_flag.patch
 sipwise/pua_dialoginfo-local_identity_dlg_var.patch
