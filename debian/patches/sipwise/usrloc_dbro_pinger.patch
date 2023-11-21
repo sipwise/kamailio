@@ -3,23 +3,23 @@ Date: Thu, 26 Mar 2020 10:06:46 +0100
 Subject: usrloc_dbro_pinger
 
 ---
- src/modules/usrloc/dlist.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+ src/modules/usrloc/dlist.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
 diff --git a/src/modules/usrloc/dlist.c b/src/modules/usrloc/dlist.c
-index 4e54f96..bca621d 100644
+index 57a9b4a..50dd4c1 100644
 --- a/src/modules/usrloc/dlist.c
 +++ b/src/modules/usrloc/dlist.c
-@@ -305,6 +305,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
- 	db_op_t  ops1[4];
+@@ -307,6 +307,8 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+ 	db_op_t ops1[4];
  	db_key_t keys2[6]; /* select */
- 	int n[2] = {2,6}; /* number of dynamic values used on key1/key2 */
-+	db1_con_t* dbh = ul_dbh;
-+	db_func_t* dbf = &ul_dbf;
+ 	int n[2] = {2, 6}; /* number of dynamic values used on key1/key2 */
++	db1_con_t *dbh = ul_dbh;
++	db_func_t *dbf = &ul_dbf;
  
  	cp = buf;
  	shortage = 0;
-@@ -351,22 +353,26 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -353,23 +355,27 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  		vals1[n[0]].nul = 0;
  		vals1[n[0]].val.int_val = server_id;
  		n[0]++;
@@ -31,25 +31,27 @@ index 4e54f96..bca621d 100644
  
  	/* TODO: use part_idx and part_max on keys1 */
  
- 	for (dom = _ksr_ul_root; dom!=NULL ; dom=dom->next) {
--		if (ul_dbf.use_table(ul_dbh, dom->d->name) < 0) {
-+		if (ul_dbf.use_table(dbh, dom->d->name) < 0) {
+ 	for(dom = _ksr_ul_root; dom != NULL; dom = dom->next) {
+-		if(ul_dbf.use_table(ul_dbh, dom->d->name) < 0) {
++		if(ul_dbf.use_table(dbh, dom->d->name) < 0) {
  			LM_ERR("sql use_table failed\n");
  			return -1;
  		}
--		if (ul_dbf.query(ul_dbh, keys1, ops1, vals1, keys2,
-+		if (dbf->query(dbh, keys1, ops1, vals1, keys2,
- 							n[0], n[1], NULL, &res) <0 ) {
+-		if(ul_dbf.query(
+-				   ul_dbh, keys1, ops1, vals1, keys2, n[0], n[1], NULL, &res)
++		if(dbf.query(
++				   dbh, keys1, ops1, vals1, keys2, n[0], n[1], NULL, &res)
+ 				< 0) {
  			LM_ERR("query error\n");
  			return -1;
  		}
- 		if( RES_ROW_N(res)==0 ) {
+ 		if(RES_ROW_N(res) == 0) {
 -			ul_dbf.free_result(ul_dbh, res);
-+			dbf->free_result(dbh, res);
++			dbf.free_result(dbh, res);
  			continue;
  		}
  
-@@ -489,7 +495,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
+@@ -487,7 +493,7 @@ static inline int get_all_db_ucontacts(void *buf, int len, unsigned int flags,
  			len -= needed;
  		} /* row cycle */
  

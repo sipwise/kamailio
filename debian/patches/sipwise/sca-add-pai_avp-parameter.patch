@@ -12,7 +12,7 @@ values from Headers. If no value, skip header creation.
  4 files changed, 44 insertions(+), 13 deletions(-)
 
 diff --git a/src/modules/sca/sca.c b/src/modules/sca/sca.c
-index c0042b9..bdcc2ab 100644
+index 2c0dc32..dc1e806 100644
 --- a/src/modules/sca/sca.c
 +++ b/src/modules/sca/sca.c
 @@ -70,6 +70,8 @@ unsigned short from_uri_avp_type;

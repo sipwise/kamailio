@@ -3,23 +3,23 @@ Date: Thu, 26 Mar 2020 10:06:46 +0100
 Subject: usrloc_dbro
 
 ---
- src/modules/usrloc/usrloc_mod.c | 65 +++++++++++++++++++++++++++++++++++++++++
+ src/modules/usrloc/usrloc_mod.c | 68 ++++++++++++++++++++++++++++++++++++++++-
  src/modules/usrloc/usrloc_mod.h |  2 ++
- 2 files changed, 67 insertions(+)
+ 2 files changed, 69 insertions(+), 1 deletion(-)
 
 diff --git a/src/modules/usrloc/usrloc_mod.c b/src/modules/usrloc/usrloc_mod.c
-index dc31c6f..55c5b6e 100644
+index de75545..fcbb171 100644
 --- a/src/modules/usrloc/usrloc_mod.c
 +++ b/src/modules/usrloc/usrloc_mod.c
-@@ -167,6 +167,7 @@ str ulattrs_avalue_col = str_init(ULATTRS_AVALUE_COL); /*!< Name of column conta
- str ulattrs_last_mod_col = str_init(ULATTRS_LAST_MOD_COL);	/*!< Name of column containing the last modified date */
+@@ -198,6 +198,7 @@ str ulattrs_last_mod_col = str_init(
+ 		ULATTRS_LAST_MOD_COL); /*!< Name of column containing the last modified date */
  
- str ul_db_url          = str_init(DEFAULT_DB_URL);	/*!< Database URL */
-+str ul_db_url_ro       = STR_NULL;			/*!< Read-Only Database URL */
- int ul_timer_interval  = 60;				/*!< Timer interval in seconds */
- int ul_db_mode         = 0;				/*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
- int ul_db_load         = 1;				/*!< Database load after restart: 1- true, 0- false (only the db_mode allows it) */
-@@ -201,6 +202,8 @@ static cmd_export_t cmds[] = {
+ str ul_db_url = str_init(DEFAULT_DB_URL); /*!< Database URL */
++str ul_db_url_ro = STR_NULL; /*!< Read-Only Database URL */
+ int ul_timer_interval = 60;				  /*!< Timer interval in seconds */
+ int ul_db_mode =
+ 		0; /*!< Database sync scheme: 0-no db, 1-write through, 2-write back, 3-only db */
+@@ -239,6 +240,8 @@ static cmd_export_t cmds[] = {
  	{0, 0, 0, 0, 0, 0}
  };
  
@@ -28,17 +28,17 @@ index dc31c6f..55c5b6e 100644
  
  /*! \brief
   * Exported parameters
-@@ -217,6 +220,7 @@ static param_export_t params[] = {
- 	{"flags_column",        PARAM_STR, &ul_flags_col     },
- 	{"cflags_column",       PARAM_STR, &ul_cflags_col    },
- 	{"db_url",              PARAM_STR, &ul_db_url        },
-+	{"db_url_ro",           PARAM_STR, &ul_db_url_ro.s     },
- 	{"timer_interval",      INT_PARAM, &ul_timer_interval  },
- 	{"db_mode",             INT_PARAM, &ul_db_mode         },
- 	{"db_load",             INT_PARAM, &ul_db_load         },
-@@ -288,6 +292,38 @@ struct module_exports exports = {
- 	destroy          /*!< destroy function */
+@@ -255,6 +258,7 @@ static param_export_t params[] = {
+ 	{"flags_column", PARAM_STR, &ul_flags_col},
+ 	{"cflags_column", PARAM_STR, &ul_cflags_col},
+ 	{"db_url", PARAM_STR, &ul_db_url},
++	{"db_url_ro", PARAM_STR, &ul_db_url_ro.s},
+ 	{"timer_interval", INT_PARAM, &ul_timer_interval},
+ 	{"db_mode", INT_PARAM, &ul_db_mode},
+ 	{"db_load", INT_PARAM, &ul_db_load},
+@@ -327,6 +331,39 @@ struct module_exports exports = {
  };
+ /* clang-format on */
  
 +/*!
 + * \brief check ro db
@@ -72,13 +72,15 @@ index dc31c6f..55c5b6e 100644
 +	if (con) ul_dbf_ro.close(con);
 +	return -1;
 +}
- 
++
  /*! \brief
   * Module initialization function
-@@ -392,6 +428,21 @@ static int mod_init(void)
+  */
+@@ -430,7 +467,22 @@ static int mod_init(void)
  		}
  	}
  
+-	if(ul_nat_bflag == (unsigned int)-1) {
 +	/* Shall we use read-only db ? */
 +	if (ul_db_mode == DB_ONLY && ul_db_url_ro.len > 0) {
 +		if (db_bind_mod(&ul_db_url_ro, &ul_dbf_ro) < 0) { /* Find database module */
@@ -94,10 +96,11 @@ index dc31c6f..55c5b6e 100644
 +		LM_DBG("ul_db_url_ro detected and checked\n");
 +	}
 +
- 	if (ul_nat_bflag==(unsigned int)-1) {
++	if (ul_nat_bflag == (unsigned int)-1) {
  		ul_nat_bflag = 0;
- 	} else if (ul_nat_bflag>=8*sizeof(ul_nat_bflag) ) {
-@@ -485,6 +536,16 @@ static int child_init(int _rank)
+ 	} else if(ul_nat_bflag >= 8 * sizeof(ul_nat_bflag)) {
+ 		LM_ERR("bflag index (%d) too big!\n", ul_nat_bflag);
+@@ -524,6 +576,16 @@ static int child_init(int _rank)
  		LM_ERR("child(%d): failed to connect to database\n", _rank);
  		return -1;
  	}
@@ -112,9 +115,9 @@ index dc31c6f..55c5b6e 100644
 +		LM_DBG("read-only connection init\n");
 +	}
  	/* _rank==PROC_SIPINIT is used even when fork is disabled */
- 	if (_rank==ul_load_rank && ul_db_mode!=DB_ONLY && ul_db_load) {
+ 	if(_rank == ul_load_rank && ul_db_mode != DB_ONLY && ul_db_load) {
  		/* if cache is used, populate domains from DB */
-@@ -515,6 +576,10 @@ static void destroy(void)
+@@ -554,6 +616,10 @@ static void destroy(void)
  		ul_dbf.close(ul_dbh);
  	}
  
@@ -126,7 +129,7 @@ index dc31c6f..55c5b6e 100644
  
  	/* free callbacks list */
 diff --git a/src/modules/usrloc/usrloc_mod.h b/src/modules/usrloc/usrloc_mod.h
-index 8c24e12..f227c69 100644
+index 7192c9c..4fe237b 100644
 --- a/src/modules/usrloc/usrloc_mod.h
 +++ b/src/modules/usrloc/usrloc_mod.h
 @@ -89,6 +89,8 @@ extern int ul_handle_lost_tcp;

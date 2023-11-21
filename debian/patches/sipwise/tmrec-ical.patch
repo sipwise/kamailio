@@ -102,7 +102,7 @@ index 0000000..5e44ba1
 +
 +#endif
 diff --git a/src/modules/tmrec/tmrec_mod.c b/src/modules/tmrec/tmrec_mod.c
-index cc97cc9..e574af1 100644
+index 5cb57aa..7195a55 100644
 --- a/src/modules/tmrec/tmrec_mod.c
 +++ b/src/modules/tmrec/tmrec_mod.c
 @@ -41,6 +41,7 @@
@@ -113,28 +113,28 @@ index cc97cc9..e574af1 100644
  
  
  MODULE_VERSION
-@@ -50,7 +51,9 @@ static int  child_init(int);
+@@ -50,7 +51,9 @@ static int child_init(int);
  static void mod_destroy(void);
  
- static int w_tmrec_match(struct sip_msg* msg, char* rec, char* t);
-+static int w_tmrec_match_ical(struct sip_msg* msg, char* rec, char* t);
- static int fixup_tmrec_match(void** param, int param_no);
-+static int fixup_ical(void** param, int param_no);
- static int w_is_leap_year(struct sip_msg* msg, char* t, char* p2);
- static int fixup_is_leap_year(void** param, int param_no);
- static int fixup_time_period_match(void** param, int param_no);
-@@ -65,6 +68,10 @@ static cmd_export_t cmds[]={
- 		0, ANY_ROUTE},
- 	{"tmrec_match", (cmd_function)w_tmrec_match, 2, fixup_tmrec_match,
- 		0, ANY_ROUTE},
-+	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 1, fixup_ical,
-+		0, ANY_ROUTE},
-+	{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 2, fixup_ical,
-+		0, ANY_ROUTE},
- 	{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year,
- 		0, ANY_ROUTE},
- 	{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year,
-@@ -254,6 +261,45 @@ static int w_tmrec_match(struct sip_msg* msg, char* rec, char* t)
+ static int w_tmrec_match(struct sip_msg *msg, char *rec, char *t);
++static int w_tmrec_match_ical(struct sip_msg *msg, char *rec, char *t);
+ static int fixup_tmrec_match(void **param, int param_no);
++static int fixup_ical(void **param, int param_no);
+ static int w_is_leap_year(struct sip_msg *msg, char *t, char *p2);
+ static int fixup_is_leap_year(void **param, int param_no);
+ static int fixup_time_period_match(void **param, int param_no);
+@@ -64,6 +67,10 @@ static cmd_export_t cmds[] = {{"tmrec_match", (cmd_function)w_tmrec_match, 1,
+ 									  fixup_tmrec_match, 0, ANY_ROUTE},
+ 		{"tmrec_match", (cmd_function)w_tmrec_match, 2, fixup_tmrec_match, 0,
+ 				ANY_ROUTE},
++		{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 1, fixup_ical, 0,
++				ANY_ROUTE},
++		{"tmrec_match_ical", (cmd_function)w_tmrec_match_ical, 2, fixup_ical, 0,
++				ANY_ROUTE},
+ 		{"is_leap_year", (cmd_function)w_is_leap_year, 0, fixup_is_leap_year, 0,
+ 				ANY_ROUTE},
+ 		{"is_leap_year", (cmd_function)w_is_leap_year, 1, fixup_is_leap_year, 0,
+@@ -242,6 +249,45 @@ static int w_tmrec_match(struct sip_msg *msg, char *rec, char *t)
  	return ki_tmrec_match_timestamp(msg, &rv, ti);
  }
  
@@ -177,10 +177,10 @@ index cc97cc9..e574af1 100644
 +	return rc;
 +}
 +
- static int fixup_tmrec_match(void** param, int param_no)
+ static int fixup_tmrec_match(void **param, int param_no)
  {
- 	if(param_no==1)
-@@ -268,6 +314,20 @@ static int fixup_tmrec_match(void** param, int param_no)
+ 	if(param_no == 1) {
+@@ -255,6 +301,20 @@ static int fixup_tmrec_match(void **param, int param_no)
  	return 0;
  }
  
@@ -198,6 +198,6 @@ index cc97cc9..e574af1 100644
 +	return 0;
 +}
 +
- static int fixup_time_period_match(void** param, int param_no)
+ static int fixup_time_period_match(void **param, int param_no)
  {
- 	if(param_no==1)
+ 	if(param_no == 1) {

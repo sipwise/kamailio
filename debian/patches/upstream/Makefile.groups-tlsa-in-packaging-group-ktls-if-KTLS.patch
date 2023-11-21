@@ -11,7 +11,7 @@ Subject: Makefile.groups: tlsa in packaging group ktls if
  1 file changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/src/Makefile.groups b/src/Makefile.groups
-index df52698..0c74b3e 100644
+index ec0d8ac..7cb9586 100644
 --- a/src/Makefile.groups
 +++ b/src/Makefile.groups
 @@ -88,12 +88,12 @@ mod_list_memcached=memcached

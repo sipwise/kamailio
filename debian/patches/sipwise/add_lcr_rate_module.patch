@@ -4,11 +4,11 @@ Subject: add_lcr_rate_module
 
 ---
  src/Makefile.groups                 |   9 +-
- src/core/mod_fix.c                  |   2 +
+ src/core/mod_fix.c                  |   3 +
  src/core/mod_fix.h                  |   2 +
  src/modules/lcr_rate/Makefile       |   9 +
  src/modules/lcr_rate/lcr_rate_mod.c | 473 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 493 insertions(+), 2 deletions(-)
+ 5 files changed, 494 insertions(+), 2 deletions(-)
  create mode 100644 src/modules/lcr_rate/Makefile
  create mode 100644 src/modules/lcr_rate/lcr_rate_mod.c
 
@@ -47,10 +47,10 @@ index 15fec0d..87e624a 100644
  ### --- Groups defined for pacKaging ###
  
 diff --git a/src/core/mod_fix.c b/src/core/mod_fix.c
-index e9cf314..3e75e75 100644
+index ecd870c..78245c9 100644
 --- a/src/core/mod_fix.c
 +++ b/src/core/mod_fix.c
-@@ -605,6 +605,7 @@ int fixup_free_igp_spve(void** param, int param_no)
+@@ -598,6 +598,7 @@ int fixup_free_igp_spve(void **param, int param_no)
  FIXUP_F_SPVE_T(spve_spve, 1, 2, 2, 0)
  FIXUP_F_SPVE_T(spve_uint, 1, 2, 1, FPARAM_INT)
  FIXUP_F_SPVE_T(spve_str, 1, 2, 1, FPARAM_STR)
@@ -58,27 +58,28 @@ index e9cf314..3e75e75 100644
  FIXUP_F_SPVE_T(spve_null, 1, 1, 1, 0)
  
  /** get the corresp. fixup_free* function.
-@@ -634,6 +635,7 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
- 	   see above fixup_uint_null) */
- 	if (f == fixup_spve_uint) return 0;
- 	if (f == fixup_spve_str) return fixup_free_spve_str;
-+	if (f == fixup_spve_str_str) return fixup_free_spve_str_str;
+@@ -644,6 +645,8 @@ free_fixup_function mod_fix_get_fixup_free(fixup_function f)
+ 		return 0;
+ 	if(f == fixup_spve_str)
+ 		return fixup_free_spve_str;
++	if(f == fixup_spve_str_str)
++		return fixup_free_spve_str_str;
  	return 0;
  }
  
 diff --git a/src/core/mod_fix.h b/src/core/mod_fix.h
-index 043b1e3..e2006df 100644
+index a76d64f..e4fe17e 100644
 --- a/src/core/mod_fix.h
 +++ b/src/core/mod_fix.h
-@@ -138,6 +138,8 @@ int fixup_spve_uint(void** param, int param_no);
- int fixup_free_spve_uint(void** param, int param_no);
- int fixup_spve_str(void** param, int param_no);
- int fixup_free_spve_str(void** param, int param_no);
-+int fixup_spve_str_str(void** param, int param_no);
-+int fixup_free_spve_str_str(void** param, int param_no);
+@@ -138,6 +138,8 @@ int fixup_spve_uint(void **param, int param_no);
+ int fixup_free_spve_uint(void **param, int param_no);
+ int fixup_spve_str(void **param, int param_no);
+ int fixup_free_spve_str(void **param, int param_no);
++int fixup_spve_str_str(void **param, int param_no);
++int fixup_free_spve_str_str(void **param, int param_no);
  
- int fixup_spve_all(void** param, int param_no);
- int fixup_free_spve_all(void** param, int param_no);
+ int fixup_spve_all(void **param, int param_no);
+ int fixup_free_spve_all(void **param, int param_no);
 diff --git a/src/modules/lcr_rate/Makefile b/src/modules/lcr_rate/Makefile
 new file mode 100644
 index 0000000..9a3cee1
