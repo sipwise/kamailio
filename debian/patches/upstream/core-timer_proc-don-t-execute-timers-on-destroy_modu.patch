@@ -1,0 +1,80 @@
+From: Victor Seva <linuxmaniac@torreviejawireless.org>
+Date: Tue, 21 Nov 2023 15:30:03 +0100
+Subject: core: timer_proc don't execute timers on shutdown phase
+
+---
+ src/core/timer_proc.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/src/core/timer_proc.c b/src/core/timer_proc.c
+index 344d79c..b877cd3 100644
+--- a/src/core/timer_proc.c
++++ b/src/core/timer_proc.c
+@@ -29,6 +29,7 @@
+ #include "pt.h"
+ #include "ut.h"
+ #include "mem/shm_mem.h"
++#include "sr_module.h"
+ 
+ #include <unistd.h>
+ 
+@@ -74,6 +75,9 @@ int fork_basic_timer(int child_id, char* desc, int make_sock,
+ 		/* child */
+ 		if (cfg_child_init()) return -1;
+ 		for(;;){
++			if(unlikely(ksr_shutdown_phase() != 0)) {
++				return 0;
++			}
+ 			sleep(interval);
+ 			cfg_update();
+ 			f(get_ticks(), param); /* ticks in s for compatibility with old
+@@ -95,6 +99,9 @@ int fork_basic_timer_w(int child_id, char* desc, int make_sock,
+ 		/* child */
+ 		if (cfg_child_init()) return -1;
+ 		for(;;){
++			if(unlikely(ksr_shutdown_phase() != 0)) {
++				return 0;
++			}
+ 			sleep(interval);
+ 			cfg_update();
+ 			f(get_ticks(), worker, param); /* ticks in s for compatibility with old
+@@ -134,6 +141,9 @@ int fork_basic_utimer(int child_id, char* desc, int make_sock,
+ 		/* child */
+ 		if (cfg_child_init()) return -1;
+ 		for(;;){
++			if(unlikely(ksr_shutdown_phase() != 0)) {
++				return 0;
++			}
+ 			sleep_us(uinterval);
+ 			cfg_update();
+ 			ts = get_ticks_raw();
+@@ -156,6 +166,9 @@ int fork_basic_utimer_w(int child_id, char* desc, int make_sock,
+ 		/* child */
+ 		if (cfg_child_init()) return -1;
+ 		for(;;){
++			if(unlikely(ksr_shutdown_phase() != 0)) {
++				return 0;
++			}
+ 			sleep_us(uinterval);
+ 			cfg_update();
+ 			ts = get_ticks_raw();
+@@ -258,6 +271,9 @@ int fork_sync_timer(int child_id, char* desc, int make_sock,
+ 		ts2 = interval;
+ 		if (cfg_child_init()) return -1;
+ 		for(;;){
++			if(unlikely(ksr_shutdown_phase() != 0)) {
++				return 0;
++			}
+ 			if (ts2>interval)
+ 				sleep_us(1000);    /* 1 millisecond sleep to catch up */
+ 			else
+@@ -306,6 +322,9 @@ int fork_sync_utimer(int child_id, char* desc, int make_sock,
+ 		ts2 = uinterval;
+ 		if (cfg_child_init()) return -1;
+ 		for(;;){
++			if(unlikely(ksr_shutdown_phase() != 0)) {
++				return 0;
++			}
+ 			if(ts2>uinterval)
+ 				sleep_us(1);
+ 			else
